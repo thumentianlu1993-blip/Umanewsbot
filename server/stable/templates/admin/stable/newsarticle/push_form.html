@@ -1,0 +1,17 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div id="content-main">
+  <h1>{{ title }}</h1>
+  <p>新闻：<strong>{{ article.effective_title }}</strong></p>
+  <form method="post">
+    {% csrf_token %}
+    <fieldset class="module aligned">
+      {{ form.as_p }}
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" value="加入推送队列" class="default">
+      <a href="{% url 'admin:stable_newsarticle_change' article.pk %}" class="button cancel-link">返回</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

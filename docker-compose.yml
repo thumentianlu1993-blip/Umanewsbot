@@ -1,0 +1,57 @@
+services:
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./server:/app/server
+      - ./server/media:/app/server/media
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    build: .
+    command: celery -A app worker -l info
+    volumes:
+      - ./server:/app/server
+      - ./server/media:/app/server/media
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
+  beat:
+    build: .
+    command: celery -A app beat -l info
+    volumes:
+      - ./server:/app/server
+      - ./server/media:/app/server/media
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: horse_news
+      POSTGRES_USER: horse_news
+      POSTGRES_PASSWORD: horse_news
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
