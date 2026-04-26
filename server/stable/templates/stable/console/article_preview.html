@@ -1,0 +1,38 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}预览 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">发布预览</h2>
+      <p class="page-subtitle">这里按照前台阅读形态预览当前发布稿，方便在发布前快速检查标题、摘要、正文和封面是否顺眼。</p>
+    </div>
+    <div class="toolbar">
+      <a class="btn secondary" href="{% url 'console-article-editor' article.id %}">返回编辑台</a>
+      <a class="btn ghost" href="{{ article.public_path }}">前台路径</a>
+    </div>
+  </div>
+
+  <article class="panel public-article" style="padding-top: 24px;">
+    <div class="article-meta">
+      <span>{{ article.published_to_web_at|default:article.published_at|date:"Y-m-d H:i" }}</span>
+      <span>{{ article.source_note|default:article.get_source_site_display }}</span>
+    </div>
+    <h1 class="page-title" style="font-size: 40px;">{{ article.effective_title }}</h1>
+    {% if article.effective_summary %}
+      <p class="page-subtitle">{{ article.effective_summary }}</p>
+    {% endif %}
+    {% if article.cover_image_url %}
+      <img class="cover" src="{{ article.cover_image_url }}" alt="">
+    {% endif %}
+    <div class="tag-list" style="margin-bottom: 16px;">
+      {% for tag in article.tags_json %}
+        <span class="badge gold">{{ tag }}</span>
+      {% empty %}
+        <span class="muted">暂无标签</span>
+      {% endfor %}
+    </div>
+    <div class="content-block">{{ article.body_zh|linebreaks }}</div>
+  </article>
+{% endblock %}

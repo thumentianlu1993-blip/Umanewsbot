@@ -1,0 +1,93 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: umanewsbot:prod
+    command: /app/deploy/docker/start-web.sh
+    env_file:
+      - .env
+    volumes:
+      - static_data:/app/server/staticfiles
+      - app_logs:/app/logs
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/healthz/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+  worker:
+    image: umanewsbot:prod
+    command: /app/deploy/docker/start-worker.sh
+    env_file:
+      - .env
+    volumes:
+      - app_logs:/app/logs
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
+
+  beat:
+    image: umanewsbot:prod
+    command: /app/deploy/docker/start-beat.sh
+    env_file:
+      - .env
+    volumes:
+      - app_logs:/app/logs
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  onebot:
+    image: your-onebot-image:latest
+    profiles: ["with-onebot"]
+    restart: unless-stopped
+    environment:
+      ONEBOT_HTTP_ENABLE: "true"
+      ONEBOT_HTTP_PORT: "3000"
+      ONEBOT_HTTP_HOST: "0.0.0.0"
+    ports:
+      - "3000:3000"
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      web:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+      - static_data:/var/www/static:ro
+      - app_logs:/var/log/umanewsbot:ro
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  static_data:
+  app_logs:

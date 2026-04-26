@@ -1,170 +1,129 @@
 # 翻译与术语库配置说明
 
-## 1. 当前翻译能力状态
+## 1. 当前翻译能力
 
-当前项目里翻译链路已经实现：
+当前系统支持：
 
-- 文章入库后可进入翻译任务
-- 翻译前会先从术语库召回日文专有名词
-- 翻译服务支持 `OpenAI-compatible` 接口
-- 如果没有配置模型接口，会自动降级为 `dummy` 模式
+- 文章入库后自动进入翻译任务
+- 默认在新稿落库后立即同步调用翻译接口，后台点进文章时可直接看到译文
+- 翻译前先从术语库召回相关专有名词
+- 通过 OpenAI-compatible 接口生成 `title_zh`、`body_zh`、`push_summary_zh`
+- 翻译状态可见：`pending / translating / translated / failed`
+- 失败原因、最近模型、重试次数、翻译完成时间会写回文章
+- 人工改过的字段不会在重翻时被机器覆盖
+- 支持单篇重翻和批量补翻历史文章
+- 翻译结果会做完整性校验，遇到疑似半截译文时会自动重试
+- 翻译运行会记录 `finish_reason`、token 用量和尝试次数，方便后台排查
+- 对于术语库未提供中文译名的疑似马名，翻译会优先要求保留原始日文马名，不再擅自音译或意译
 
-说明：
+当前已显式支持两个提供方：
 
-- `dummy` 模式不会真正翻译，只会把日文正文原样回填，方便本地开发验证流程
-- 要得到真实中文译文，必须配置可用的大模型接口
+- `openai-compatible`
+- `siliconflow`
 
-核心配置文件：
+如果没有配置可用的真实模型接口，系统会自动回退到 `dummy` 模式，只用于本地流程联调。
 
+核心代码：
+
+- [settings.py](E:\Codex\server\app\settings.py)
 - [translation.py](E:\Codex\server\stable\services\translation.py)
+- [tasks.py](E:\Codex\server\stable\tasks.py)
 - [models.py](E:\Codex\server\stable\models.py)
 - [.env.example](E:\Codex\.env.example)
 
-## 2. 配置真实翻译模型
+## 2. 推荐的硅基流动配置
 
-在项目根目录复制环境变量模板：
+我已经把默认配置切到了硅基流动。
 
-```bash
-copy E:\Codex\.env.example E:\Codex\.env
-```
-
-然后至少填写这些字段：
+推荐值：
 
 ```env
-TRANSLATION_PROVIDER=openai-compatible
-TRANSLATION_MODEL=gpt-4.1
-OPENAI_API_KEY=你的Key
-OPENAI_BASE_URL=
+TRANSLATION_PROVIDER=siliconflow
+TRANSLATION_MODEL=deepseek-ai/DeepSeek-V3
+SILICONFLOW_API_KEY=你的硅基流动Key
+SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
+TRANSLATION_TIMEOUT_SECONDS=90
+TRANSLATION_MAX_TOKENS=2400
+TRANSLATION_MAX_ATTEMPTS=2
+TRANSLATION_UNKNOWN_HORSE_LIMIT=12
 TRANSLATION_TERM_LIMIT=20
+AUTO_TRANSLATE_ON_INGEST=true
+AUTO_TRANSLATE_SYNC=true
 ```
 
 说明：
 
-- 如果你直接用 OpenAI 官方接口，`OPENAI_BASE_URL` 可以留空
-- 如果你用兼容 OpenAI 协议的中转服务或私有网关，就填写它的 base URL
-- `TRANSLATION_TERM_LIMIT` 表示每次翻译最多注入多少条术语
+- `SILICONFLOW_BASE_URL` 使用官方 OpenAI-compatible 接口地址。
+- `TRANSLATION_MODEL` 我默认给你设成了 `deepseek-ai/DeepSeek-V3`。
+- `TRANSLATION_MAX_TOKENS` 用来限制单次翻译输出上限，长文建议保持在 `2400` 左右。
+- `TRANSLATION_MAX_ATTEMPTS` 控制遇到疑似半截译文时的自动重试次数，默认 `2` 次。
+- `TRANSLATION_UNKNOWN_HORSE_LIMIT` 控制“未在术语库命中、需要按日文原样保留”的疑似马名提取上限。
+- `AUTO_TRANSLATE_ON_INGEST=true` 表示新稿落库后默认自动触发翻译。
+- `AUTO_TRANSLATE_SYNC=true` 表示抓取任务内同步等待翻译完成，适合你现在这种“进后台就想直接看到译文”的工作方式。
+- 改完 `.env` 后需要重启后端服务。
 
-## 3. 术语库数据结构
+## 3. 模型建议
 
-后台术语库表是 `TermEntry`，字段如下：
+针对“日文赛马新闻 -> 简体中文 + 稳定 JSON 输出”这个场景，我建议优先用：
 
-- `term_type`
-  - `horse`
-  - `race`
-  - `jockey`
-  - `trainer`
-  - `owner`
-  - `farm`
-  - `racecourse`
-  - `org`
-  - `fixed_phrase`
-  - `other`
-- `source_ja`
-  - 日文标准词条
-- `target_zh`
-  - 你希望固定采用的中文译法
-- `aliases_ja`
-  - 日文别名列表，JSON 数组
-- `aliases_zh`
-  - 中文别名列表，JSON 数组，可先不用
-- `notes`
-  - 用于给模型的备注，例如“马名，不要意译”
-- `is_active`
-  - 是否启用
-- `priority`
-  - 优先级，数字越大越优先
+1. `deepseek-ai/DeepSeek-V3`
+   硅基流动官方文档在聊天场景下直接推荐使用它，适合作为当前新闻翻译链路的默认模型。
+2. `Qwen/Qwen2.5-72B-Instruct`
+   如果你更偏好中文表达与指令遵循风格，也可以作为备选模型。
 
-推荐维护规范：
+这里的推荐是我基于硅基流动官方文档中的模型示例和你当前场景做的推断。
 
-- 一匹马一条词条
-- 一场比赛一条词条
-- 常见固定短语单独建条，例如“競走馬登録抹消”
-- `aliases_ja` 放常见简称、旧译名、片假名变体
-- `notes` 只写真正有帮助的约束，不要写长段说明
+## 4. 当前配置方式
 
-## 4. 推荐知识库录入示例
+### 4.1 硅基流动
 
-### 马名
-
-```json
-{
-  "term_type": "horse",
-  "source_ja": "ソダシ",
-  "target_zh": "苏打希",
-  "aliases_ja": ["Sodashi"],
-  "aliases_zh": ["白毛马苏打希"],
-  "notes": "马名，固定音译，不要意译",
-  "is_active": true,
-  "priority": 100
-}
+```env
+TRANSLATION_PROVIDER=siliconflow
+TRANSLATION_MODEL=deepseek-ai/DeepSeek-V3
+SILICONFLOW_API_KEY=你的Key
+SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
 ```
 
-### 比赛名
+### 4.2 OpenAI
 
-```json
-{
-  "term_type": "race",
-  "source_ja": "大阪杯",
-  "target_zh": "大阪杯",
-  "aliases_ja": [],
-  "aliases_zh": [],
-  "notes": "日本JRA GI赛事名",
-  "is_active": true,
-  "priority": 90
-}
+```env
+TRANSLATION_PROVIDER=openai-compatible
+TRANSLATION_MODEL=gpt-5-mini
+OPENAI_API_KEY=你的Key
+OPENAI_BASE_URL=https://api.openai.com/v1
 ```
 
-### 固定短语
+## 5. 批量补翻历史文章
 
-```json
-{
-  "term_type": "fixed_phrase",
-  "source_ja": "競走馬登録抹消",
-  "target_zh": "取消竞走马注册",
-  "aliases_ja": [],
-  "aliases_zh": [],
-  "notes": "JRA官方公告固定表达",
-  "is_active": true,
-  "priority": 80
-}
+```bash
+cd E:\Codex\server
+python manage.py translate_news --pending --limit 20 --sync
+python manage.py translate_news --failed --limit 20 --sync
 ```
 
-## 5. 如何在后台维护术语库
+说明：
 
-启动后台后，进入：
+- `--pending`：补翻待翻译文章
+- `--failed`：重跑失败文章
+- `--sync`：当前进程立即执行，便于本地手测
+- 不加 `--sync` 时会走 Celery 任务队列
 
-`/admin/stable/termentry/`
+## 6. 术语库配置入口
 
-你可以：
+推荐入口：
 
-- 新增术语
-- 编辑译法
-- 暂停某条术语
-- 用优先级控制冲突时的召回顺序
+- [术语工作台](http://127.0.0.1:8000/console/terms/)
 
-## 6. 当前实际测试情况
+备用入口：
 
-已测：
+- [Django Admin 术语表](http://127.0.0.1:8000/admin/stable/termentry/)
 
-- 术语召回函数可正常命中并返回固定译法
-- 翻译任务链路可运行
-- 未配置模型时可回退到 `dummy` 模式
+## 7. 手测建议
 
-未完成的实网联调：
+建议这样验证：
 
-- 没有拿真实 OpenAI-compatible 凭证跑过一轮完整翻译
-- 没有验证长文、多术语并发场景下的成本和耗时
-
-## 7. 建议你下一步怎么做
-
-建议先录入三类术语：
-
-1. 马名
-2. G1/G2/G3 与经典赛事名
-3. 常见固定公告短语
-
-等你把第一批术语给我后，我可以继续帮你：
-
-- 做一份“推荐初始术语模板”
-- 补一个 CSV/JSON 导入器
-- 优化提示词，让赛马新闻翻译更像专业赛马媒体口吻
+1. 在 `.env` 里填好 `SILICONFLOW_API_KEY`
+2. 重启服务
+3. 在候选池里找一篇文章点“重新翻译”
+4. 看状态是否从 `翻译中` 变成 `已翻译`
+5. 进入编辑台确认人工改过的字段不会被重翻覆盖

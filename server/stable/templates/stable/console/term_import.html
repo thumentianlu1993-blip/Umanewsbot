@@ -1,0 +1,144 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}批量导入术语 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">批量导入术语</h2>
+      <p class="page-subtitle">支持上传 CSV 文件，也支持直接粘贴 CSV 文本。系统会先做预检并自动识别常见编码，确认无误后再真正写入数据库。</p>
+    </div>
+    <a class="btn ghost" href="{% url 'console-term-list' %}">返回术语列表</a>
+  </div>
+
+  <section class="panel">
+    <div class="toolbar">
+      <h3 style="margin: 0;">模板说明</h3>
+      <a class="btn secondary" href="data:text/csv;charset=utf-8,%EF%BB%BFterm_type,source_ja,target_zh,aliases_ja,aliases_zh,priority,is_active,notes%0Ahorse,%E3%82%B0%E3%83%A9%E3%83%B3%E3%82%A2%E3%83%AC%E3%82%B0%E3%83%AA%E3%82%A2,%E6%94%BE%E5%A3%B0%E6%AC%A2%E5%91%BC,%22Gran%20Alegria%7C%E3%82%B0%E3%83%A9%E3%83%B3%22,%22%E6%94%BE%E5%A3%B0%E6%AC%A2%E5%91%BC%7C%E5%A4%A7%E6%AC%A2%E5%A3%B0%22,100,true," download="term_import_template.csv">下载 CSV 模板</a>
+    </div>
+    <p class="muted">别名字段使用 <code>|</code> 分隔，例如：<code>Gran Alegria|グラン</code>。推荐优先使用 UTF-8 或 UTF-8 BOM；如果文件来自 Excel/WPS，系统也会尽量自动识别常见编码。</p>
+  </section>
+
+  <section class="panel">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="preview">
+      <div class="form-grid">
+        <div class="field">
+          <label for="{{ form.import_mode.id_for_label }}">导入模式</label>
+          {{ form.import_mode }}
+        </div>
+        <div class="field">
+          <label for="{{ form.csv_file.id_for_label }}">上传 CSV 文件</label>
+          {{ form.csv_file }}
+        </div>
+        <div class="field full">
+          <label for="{{ form.csv_text.id_for_label }}">或者直接粘贴 CSV 文本</label>
+          {{ form.csv_text }}
+        </div>
+      </div>
+      {% if form.non_field_errors %}
+        <div class="help" style="color: var(--danger); margin-top: 10px;">{{ form.non_field_errors|join:' ' }}</div>
+      {% endif %}
+      <div class="toolbar" style="margin-top: 18px;">
+        <button type="submit">执行预检</button>
+      </div>
+    </form>
+  </section>
+
+  {% if preview %}
+    <section class="panel">
+      <div class="toolbar">
+        <h3 style="margin: 0;">预检结果</h3>
+        {% if preview.can_commit %}
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="commit">
+            <button class="btn gold" type="submit">确认导入</button>
+          </form>
+        {% endif %}
+      </div>
+      <div class="article-meta" style="margin-bottom: 14px;">
+        <span class="badge">总计 {{ preview.summary.total }}</span>
+        <span class="badge success">新增 {{ preview.summary.create_count }}</span>
+        <span class="badge gold">更新 {{ preview.summary.update_count }}</span>
+        <span class="badge danger">错误 {{ preview.summary.error_count }}</span>
+        <span class="badge">编码 {{ preview.detected_encoding|default:"unknown" }}</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>行号</th>
+              <th>状态</th>
+              <th>类型</th>
+              <th>日文原词</th>
+              <th>中文译词</th>
+              <th>说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in preview.rows %}
+              <tr>
+                <td>{{ row.line_no }}</td>
+                <td>
+                  {% if row.status == 'create' %}
+                    <span class="badge success">新增</span>
+                  {% elif row.status == 'update' %}
+                    <span class="badge gold">更新</span>
+                  {% else %}
+                    <span class="badge danger">错误</span>
+                  {% endif %}
+                </td>
+                <td>{{ row.payload.term_type }}</td>
+                <td>{{ row.payload.source_ja }}</td>
+                <td>{{ row.payload.target_zh }}</td>
+                <td>
+                  {% if row.errors %}
+                    <div class="help" style="color: var(--danger);">{{ row.errors|join:'；' }}</div>
+                  {% elif row.existing_id %}
+                    <span class="muted">匹配已有术语 ID：{{ row.existing_id }}</span>
+                  {% else %}
+                    <span class="muted">可导入</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if commit_result %}
+    <section class="panel">
+      <h3 style="margin-top: 0;">导入结果</h3>
+      <div class="article-meta" style="margin-bottom: 14px;">
+        <span class="badge">总计 {{ commit_result.total }}</span>
+        <span class="badge success">新增 {{ commit_result.success_count }}</span>
+        <span class="badge gold">更新 {{ commit_result.update_count }}</span>
+        <span class="badge warning">跳过 {{ commit_result.skipped_count }}</span>
+      </div>
+      {% if commit_result.failed_rows %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>行号</th>
+                <th>错误详情</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in commit_result.failed_rows %}
+                <tr>
+                  <td>{{ row.line_no }}</td>
+                  <td>{{ row.errors|join:'；' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </section>
+  {% endif %}
+{% endblock %}

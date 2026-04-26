@@ -7,7 +7,26 @@ from urllib.parse import urlparse
 
 import requests
 from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.utils import timezone
+
+
+def current_media_provider() -> str:
+    return "oss" if getattr(settings, "MEDIA_STORAGE_BACKEND", "local") == "oss" else "local"
+
+
+def resolve_media_url(path_or_url: str) -> str:
+    if not path_or_url:
+        return ""
+    if path_or_url.startswith(("http://", "https://")):
+        return path_or_url
+    url = default_storage.url(path_or_url)
+    if url.startswith(("http://", "https://")):
+        return url
+    if url.startswith("/"):
+        return f"{settings.SITE_URL.rstrip('/')}{url}"
+    return f"{settings.SITE_URL.rstrip('/')}/{url.lstrip('/')}"
 
 
 def download_image(original_url: str) -> str:
@@ -17,13 +36,10 @@ def download_image(original_url: str) -> str:
         guessed, _ = mimetypes.guess_type(original_url)
         extension = mimetypes.guess_extension(guessed or "image/jpeg") or ".jpg"
     relative_dir = Path("news_images") / f"{timezone.localtime():%Y/%m/%d}"
-    target_dir = Path(settings.MEDIA_ROOT) / relative_dir
-    target_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{uuid.uuid4().hex}{extension}"
-    response = requests.get(original_url, timeout=10, stream=True)
+    relative_path = (relative_dir / filename).as_posix()
+    response = requests.get(original_url, timeout=10)
     response.raise_for_status()
-    with open(target_dir / filename, "wb") as file:
-        for chunk in response.iter_content(chunk_size=8192):
-            if chunk:
-                file.write(chunk)
-    return str((relative_dir / filename).as_posix())
+    default_storage.save(relative_path, ContentFile(response.content))
+    return relative_path
+

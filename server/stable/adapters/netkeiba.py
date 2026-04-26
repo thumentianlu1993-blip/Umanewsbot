@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from stable.models import SourceMode, SourceSite
 from stable.services.http import get_bytes
-from stable.services.text import normalize_whitespace
+from stable.services.text import extract_article_text, normalize_whitespace
 
 from .base import CanonicalNewsDraft, SourceAdapter, SourceArticleDetail, SourceArticleStub, SourceImageDraft
 
@@ -91,7 +91,7 @@ class NetkeibaAdapter(SourceAdapter):
         published_text = soup.select_one(".News_Data_Time").get_text(" ", strip=True)
         published_at = self._parse_absolute_time(published_text)
         body_node = soup.select_one(".News_Txt")
-        body_raw = body_node.get_text("\n", strip=True) if body_node else ""
+        body_raw = extract_article_text(body_node)
         body_normalized = normalize_whitespace(body_raw)
         images: list[SourceImageDraft] = []
         for index, image_box in enumerate(soup.select(".News_Photo_Box_02"), start=0):

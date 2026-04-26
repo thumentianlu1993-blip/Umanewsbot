@@ -16,13 +16,12 @@ def build_push_message(article: NewsArticle) -> tuple[str, str | None]:
         article.effective_title,
         f"发布时间：{article.published_at:%Y-%m-%d %H:%M}",
         f"来源：{article.get_source_site_display()} / {article.get_source_mode_display()}",
-        "",
-        article.effective_summary,
-        "",
-        f"原文链接：{article.source_url}",
     ]
-    image = article.main_image
-    image_url = image.public_url if image else None
+    summary = article.effective_summary
+    if summary:
+        lines.extend(["", summary])
+    lines.extend(["", f"原文链接：{article.source_url}"])
+    image_url = article.cover_image_url or (article.main_image.public_url if article.main_image else None)
     return "\n".join(lines), image_url
 
 

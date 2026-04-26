@@ -2,17 +2,25 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN pip install -r /app/requirements.txt
 
 COPY server /app/server
+COPY deploy /app/deploy
 COPY .env.example /app/.env.example
+
+RUN chmod +x /app/deploy/docker/*.sh \
+    && mkdir -p /app/logs /app/server/staticfiles
 
 WORKDIR /app/server
 
-RUN python manage.py collectstatic --noinput
+CMD ["/app/deploy/docker/start-web.sh"]
 
-CMD ["gunicorn", "app.wsgi:application", "--bind", "0.0.0.0:8000"]

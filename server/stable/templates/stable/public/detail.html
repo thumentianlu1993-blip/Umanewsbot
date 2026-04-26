@@ -1,0 +1,41 @@
+{% load static %}
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ article.effective_title }}</title>
+  <link rel="stylesheet" href="{% static 'stable/console.css' %}">
+</head>
+<body>
+  <article class="public-article">
+    <div class="toolbar" style="justify-content: space-between;">
+      <a class="btn ghost" href="/">返回首页</a>
+      <a class="btn secondary" href="{{ article.source_url }}" target="_blank" rel="noreferrer">查看原文</a>
+    </div>
+    <div class="article-meta" style="margin-top: 18px;">
+      <span>{{ article.published_to_web_at|date:"Y-m-d H:i" }}</span>
+      <span>{{ article.source_note|default:article.get_source_site_display }}</span>
+    </div>
+    <h1 class="page-title" style="margin-top: 14px;">{{ article.effective_title }}</h1>
+    {% if article.effective_summary %}
+      <p class="page-subtitle">{{ article.effective_summary }}</p>
+    {% endif %}
+    <div class="tag-list" style="margin-top: 14px;">
+      {% for tag in article.tags_json %}
+        <span class="badge gold">{{ tag }}</span>
+      {% empty %}
+        <span class="badge">新闻</span>
+      {% endfor %}
+    </div>
+    {% if article.cover_image_url %}
+      <img class="cover" src="{{ article.cover_image_url }}" alt="">
+    {% endif %}
+    <div class="content-block">{{ article.body_zh|linebreaks }}</div>
+    <div class="panel" style="margin-top: 26px;">
+      <p><strong>来源说明：</strong>{{ article.source_note|default:article.get_source_site_display }}</p>
+      <p><strong>原文链接：</strong><a href="{{ article.source_url }}" target="_blank" rel="noreferrer">{{ article.source_url }}</a></p>
+    </div>
+  </article>
+</body>
+</html>

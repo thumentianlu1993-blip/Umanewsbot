@@ -1,0 +1,104 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}工作台 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">工作台</h2>
+      <p class="page-subtitle">这里汇总今天的抓取情况、候选新闻处理状态和最近发布动态，方便你快速进入当天工作节奏。</p>
+    </div>
+    <div class="toolbar">
+      <a class="btn" href="{% url 'console-source-create' %}">新建来源</a>
+      <a class="btn secondary" href="{% url 'console-candidate-list' %}">查看候选池</a>
+      <a class="btn gold" href="{% url 'console-published-list' %}">查看已发布</a>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">今日抓取成功数</div>
+      <div class="stat-value">{{ stats.crawl_success_today }}</div>
+    </div>
+    <div class="stat-card gold">
+      <div class="stat-label">待编辑文章</div>
+      <div class="stat-value">{{ stats.pending_edit }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">待审核文章</div>
+      <div class="stat-value">{{ stats.pending_review }}</div>
+    </div>
+    <div class="stat-card gold">
+      <div class="stat-label">今日已发布</div>
+      <div class="stat-value">{{ stats.published_today }}</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top: 20px;">
+    <section class="panel">
+      <div class="toolbar">
+        <h3 style="margin: 0;">最近来源状态</h3>
+        <a class="btn ghost" href="{% url 'console-source-list' %}">管理来源</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>来源</th>
+              <th>频率</th>
+              <th>最后抓取</th>
+              <th>状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for source in recent_sources %}
+              <tr>
+                <td>{{ source.name }}</td>
+                <td>{{ source.crawl_interval_minutes }} 分钟</td>
+                <td>{% if source.last_crawl_at %}{{ source.last_crawl_at|date:"Y-m-d H:i" }}{% else %}<span class="muted">暂无</span>{% endif %}</td>
+                <td>
+                  {% if source.last_crawl_status == "success" %}
+                    <span class="badge success">成功</span>
+                  {% elif source.last_crawl_status == "failed" %}
+                    <span class="badge danger">失败</span>
+                  {% else %}
+                    <span class="badge">未运行</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="muted">还没有来源，先创建一个来源开始。</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="toolbar">
+        <h3 style="margin: 0;">最近发布</h3>
+        <a class="btn ghost" href="{% url 'console-published-list' %}">全部已发布</a>
+      </div>
+      <div class="card-list">
+        {% for article in recent_published %}
+          <article class="article-card">
+            <div class="article-meta">
+              <span>{{ article.published_to_web_at|date:"Y-m-d H:i" }}</span>
+              <span>{{ article.source_note|default:article.get_source_site_display }}</span>
+            </div>
+            <h4 class="article-title">{{ article.effective_title }}</h4>
+            {% if article.effective_summary %}
+              <p class="muted">{{ article.effective_summary|truncatechars:110 }}</p>
+            {% endif %}
+            <div class="article-actions">
+              <a class="btn secondary" href="{% url 'console-article-editor' article.id %}">继续编辑</a>
+              <a class="btn ghost" href="{{ article.public_path }}">前台查看</a>
+            </div>
+          </article>
+        {% empty %}
+          <p class="muted">还没有发布内容，先从候选池里挑一篇新闻吧。</p>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+{% endblock %}

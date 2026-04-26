@@ -1,0 +1,86 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}候选详情 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">候选详情</h2>
+      <p class="page-subtitle">查看原文、译文、图片和当前状态；如果这篇稿件值得继续打磨，直接进入编辑台即可。</p>
+    </div>
+    <div class="toolbar">
+      <a class="btn secondary" href="{% url 'console-candidate-list' %}">返回候选池</a>
+      <a class="btn" href="{% url 'console-article-editor' article.id %}">进入编辑台</a>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <section class="panel">
+      <h3>原文信息</h3>
+      <p><strong>标题：</strong>{{ article.title_ja }}</p>
+      <p><strong>来源：</strong>{{ article.source_config.name|default:article.get_source_site_display }}</p>
+      <p><strong>发布时间：</strong>{{ article.published_at|date:"Y-m-d H:i" }}</p>
+      <p><strong>原文链接：</strong><a href="{{ article.source_url }}" target="_blank" rel="noreferrer">{{ article.source_url }}</a></p>
+      <div class="content-block">{{ article.body_ja_normalized|default:article.body_ja_raw }}</div>
+    </section>
+
+    <section class="panel">
+      <div class="toolbar">
+        <h3 style="margin: 0;">翻译结果</h3>
+        <form method="post" action="{% url 'console-candidate-retranslate' article.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'console-candidate-detail' article.id %}">
+          <button class="btn secondary" type="submit">重新翻译</button>
+        </form>
+      </div>
+      <p>
+        <strong>翻译状态：</strong>
+        <span class="badge {% if article.translation_status == 'translated' %}success{% elif article.translation_status == 'failed' %}danger{% else %}warning{% endif %}">
+          {{ article.get_translation_status_display }}
+        </span>
+      </p>
+      <p><strong>中文标题：</strong>{{ article.translated_title_zh|default:"暂未生成翻译" }}</p>
+      {% if article.translation_model %}
+        <p><strong>模型：</strong>{{ article.translation_model }}</p>
+      {% endif %}
+      {% if article.translation_provider %}
+        <p><strong>提供方：</strong>{{ article.translation_provider }}</p>
+      {% endif %}
+      {% if article.translated_at %}
+        <p><strong>最近完成时间：</strong>{{ article.translated_at|date:"Y-m-d H:i:s" }}</p>
+      {% endif %}
+      {% if article.translation_retry_count %}
+        <p><strong>重试次数：</strong>{{ article.translation_retry_count }}</p>
+      {% endif %}
+      {% if article.translation_error_message %}
+        <p class="muted" style="color: var(--danger);"><strong>失败原因：</strong>{{ article.translation_error_message }}</p>
+      {% endif %}
+      {% if article.latest_translation_run %}
+        <p class="muted">最近一次翻译记录：{{ article.latest_translation_run.created_at|date:"Y-m-d H:i:s" }} -> {{ article.latest_translation_run.updated_at|date:"Y-m-d H:i:s" }}</p>
+      {% endif %}
+      <div class="content-block">{{ article.translated_body_zh|default:"翻译任务尚未完成。" }}</div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="toolbar">
+      <h3 style="margin: 0;">原始图片</h3>
+      <form method="post" action="{% url 'console-candidate-ignore' article.id %}" onsubmit="return confirm('确认忽略这篇候选新闻吗？');">
+        {% csrf_token %}
+        <button class="btn danger" type="submit">忽略</button>
+      </form>
+    </div>
+    <div class="card-list">
+      {% for image in article.images.all %}
+        <div class="image-card">
+          <img src="{{ image.public_url }}" alt="">
+          <div class="meta">
+            <p class="muted">{{ image.caption_ja|default:"无图注" }}</p>
+          </div>
+        </div>
+      {% empty %}
+        <p class="muted">这篇候选新闻没有抓到图片。</p>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

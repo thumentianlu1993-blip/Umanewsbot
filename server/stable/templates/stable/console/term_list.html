@@ -1,0 +1,141 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}术语映射 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">术语映射</h2>
+      <p class="page-subtitle">这是管理员日常维护赛马专有名词的工作台。支持快速搜索、筛选、启停、复制和进入编辑，不再依赖 Django Admin。</p>
+    </div>
+    <div class="toolbar">
+      <a class="btn secondary" href="{% url 'console-term-import' %}">批量导入</a>
+      <a class="btn" href="{% url 'console-term-create' %}">新建术语</a>
+    </div>
+  </div>
+
+  <section class="panel">
+    <form method="get" class="filters">
+      <input type="text" name="q" placeholder="搜索日文原词、中文译词、别名或备注" value="{{ request.GET.q }}">
+      <select name="term_type">
+        <option value="">全部类型</option>
+        {% for value, label in term_type_choices %}
+          <option value="{{ value }}" {% if request.GET.term_type == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="is_active">
+        <option value="">全部状态</option>
+        <option value="true" {% if request.GET.is_active == 'true' %}selected{% endif %}>启用中</option>
+        <option value="false" {% if request.GET.is_active == 'false' %}selected{% endif %}>已停用</option>
+      </select>
+      <select name="has_alias">
+        <option value="">别名情况</option>
+        <option value="yes" {% if request.GET.has_alias == 'yes' %}selected{% endif %}>至少有一个别名</option>
+      </select>
+      <button type="submit">筛选</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="table-wrap desktop-only">
+      <table>
+        <thead>
+          <tr>
+            <th>日文原词</th>
+            <th>中文译词</th>
+            <th>类型</th>
+            <th>日文别名</th>
+            <th>中文别名</th>
+            <th>优先级</th>
+            <th>状态</th>
+            <th>最近更新时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for term in page_obj %}
+            <tr>
+              <td>
+                <strong>{{ term.source_ja }}</strong>
+                {% if term.notes %}
+                  <div class="muted">{{ term.notes|truncatechars:36 }}</div>
+                {% endif %}
+              </td>
+              <td>{{ term.target_zh }}</td>
+              <td>{{ term.get_term_type_display }}</td>
+              <td>{{ term.aliases_ja|length }}</td>
+              <td>{{ term.aliases_zh|length }}</td>
+              <td>{{ term.priority }}</td>
+              <td>
+                {% if term.is_active %}
+                  <span class="badge success">启用中</span>
+                {% else %}
+                  <span class="badge">已停用</span>
+                {% endif %}
+              </td>
+              <td>{{ term.updated_at|date:"Y-m-d H:i" }}</td>
+              <td>
+                <div class="article-actions">
+                  <a class="btn ghost" href="{% url 'console-term-edit' term.id %}">编辑</a>
+                  <a class="btn secondary" href="{% url 'console-term-create' %}?copy={{ term.id }}">复制一条</a>
+                  <form method="post" action="{% url 'console-term-toggle' term.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="btn secondary" type="submit">{{ term.is_active|yesno:"停用,启用" }}</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="9" class="muted">还没有术语，先新建一条或批量导入。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-list mobile-only">
+      {% for term in page_obj %}
+        <article class="article-card term-mobile-card">
+          <div class="article-meta">
+            <span class="badge gold">{{ term.get_term_type_display }}</span>
+            {% if term.is_active %}
+              <span class="badge success">启用中</span>
+            {% else %}
+              <span class="badge">已停用</span>
+            {% endif %}
+          </div>
+          <h3 class="article-title">{{ term.source_ja }}</h3>
+          <p class="term-mobile-target">{{ term.target_zh }}</p>
+          <div class="term-mobile-meta">
+            <div><strong>日文别名</strong><span>{{ term.aliases_ja|length }}</span></div>
+            <div><strong>中文别名</strong><span>{{ term.aliases_zh|length }}</span></div>
+            <div><strong>优先级</strong><span>{{ term.priority }}</span></div>
+            <div><strong>更新时间</strong><span>{{ term.updated_at|date:"m-d H:i" }}</span></div>
+          </div>
+          {% if term.notes %}
+            <p class="muted">{{ term.notes|truncatechars:88 }}</p>
+          {% endif %}
+          <div class="article-actions">
+            <a class="btn ghost" href="{% url 'console-term-edit' term.id %}">编辑</a>
+            <a class="btn secondary" href="{% url 'console-term-create' %}?copy={{ term.id }}">复制一条</a>
+            <form method="post" action="{% url 'console-term-toggle' term.id %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button class="btn secondary" type="submit">{{ term.is_active|yesno:"停用,启用" }}</button>
+            </form>
+          </div>
+        </article>
+      {% empty %}
+        <p class="muted">还没有术语，先新建一条或批量导入。</p>
+      {% endfor %}
+    </div>
+    <div class="pagination">
+      {% if page_obj.has_previous %}
+        <a class="btn ghost" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.term_type %}term_type={{ request.GET.term_type }}&{% endif %}{% if request.GET.is_active %}is_active={{ request.GET.is_active }}&{% endif %}{% if request.GET.has_alias %}has_alias={{ request.GET.has_alias }}&{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>
+      {% endif %}
+      <span class="badge">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+      {% if page_obj.has_next %}
+        <a class="btn ghost" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.term_type %}term_type={{ request.GET.term_type }}&{% endif %}{% if request.GET.is_active %}is_active={{ request.GET.is_active }}&{% endif %}{% if request.GET.has_alias %}has_alias={{ request.GET.has_alias }}&{% endif %}page={{ page_obj.next_page_number }}">下一页</a>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

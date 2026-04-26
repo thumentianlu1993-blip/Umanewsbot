@@ -1,0 +1,154 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}{{ page_title }} - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">{{ page_title }}</h2>
+      <p class="page-subtitle">这里是术语工作台的单条维护页。别名输入支持回车、逗号、竖线和多行粘贴，保存时会自动去重与标准化。</p>
+    </div>
+    <div class="toolbar">
+      <a class="btn ghost" href="{% url 'console-term-list' %}">返回列表</a>
+      <a class="btn secondary" href="{% url 'console-term-import' %}">去批量导入</a>
+    </div>
+  </div>
+
+  <section class="panel">
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-grid">
+        <div class="field">
+          <label for="{{ form.term_type.id_for_label }}">术语类型</label>
+          {{ form.term_type }}
+          {% if form.term_type.errors %}<div class="help" style="color: var(--danger);">{{ form.term_type.errors|join:' ' }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <label for="{{ form.priority.id_for_label }}">优先级</label>
+          {{ form.priority }}
+          {% if form.priority.errors %}<div class="help" style="color: var(--danger);">{{ form.priority.errors|join:' ' }}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label for="{{ form.source_ja.id_for_label }}">日文原词</label>
+          {{ form.source_ja }}
+          {% if form.source_ja.errors %}<div class="help" style="color: var(--danger);">{{ form.source_ja.errors|join:' ' }}</div>{% endif %}
+        </div>
+        <div class="field">
+          <label for="{{ form.target_zh.id_for_label }}">中文译词</label>
+          {{ form.target_zh }}
+          {% if form.target_zh.errors %}<div class="help" style="color: var(--danger);">{{ form.target_zh.errors|join:' ' }}</div>{% endif %}
+        </div>
+
+        <div class="field full">
+          <label>日文别名</label>
+          {{ form.aliases_ja_text }}
+          <div class="chip-editor" data-target="#id_aliases_ja_text" data-placeholder="输入日文别名，按回车添加"></div>
+          <div class="help">支持回车新增、删除单个别名、以及粘贴多行自动拆分。</div>
+          {% if form.aliases_ja_text.errors %}<div class="help" style="color: var(--danger);">{{ form.aliases_ja_text.errors|join:' ' }}</div>{% endif %}
+        </div>
+
+        <div class="field full">
+          <label>中文别名</label>
+          {{ form.aliases_zh_text }}
+          <div class="chip-editor" data-target="#id_aliases_zh_text" data-placeholder="输入中文别名，按回车添加"></div>
+          <div class="help">支持回车、逗号、竖线、多行粘贴自动拆分。</div>
+          {% if form.aliases_zh_text.errors %}<div class="help" style="color: var(--danger);">{{ form.aliases_zh_text.errors|join:' ' }}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label for="{{ form.is_active.id_for_label }}">启用状态</label>
+          {{ form.is_active }}
+        </div>
+
+        <div class="field full">
+          <label for="{{ form.notes.id_for_label }}">备注</label>
+          {{ form.notes }}
+          {% if form.notes.errors %}<div class="help" style="color: var(--danger);">{{ form.notes.errors|join:' ' }}</div>{% endif %}
+        </div>
+      </div>
+
+      <div class="toolbar" style="margin-top: 18px;">
+        <button type="submit" name="intent" value="save">{{ submit_label }}</button>
+        <button class="btn secondary" type="submit" name="intent" value="save_continue">保存并继续编辑</button>
+        <button class="btn gold" type="submit" name="intent" value="save_new">保存并新建下一条</button>
+      </div>
+    </form>
+  </section>
+
+  <script>
+    (function () {
+      function splitValues(raw) {
+        return raw
+          .split(/[\n\r|,，、]+/)
+          .map(item => item.trim())
+          .filter(Boolean);
+      }
+
+      function mountEditor(editor) {
+        const hidden = document.querySelector(editor.dataset.target);
+        const placeholder = editor.dataset.placeholder || "输入后回车";
+        const values = splitValues(hidden.value);
+
+        const box = document.createElement("div");
+        box.className = "chip-box";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "chip-input";
+        input.placeholder = placeholder;
+        editor.appendChild(box);
+        editor.appendChild(input);
+
+        function sync() {
+          hidden.value = values.join("\n");
+          box.innerHTML = "";
+          values.forEach((value, index) => {
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "chip";
+            chip.innerHTML = `<span>${value}</span><strong>×</strong>`;
+            chip.addEventListener("click", function () {
+              values.splice(index, 1);
+              sync();
+            });
+            box.appendChild(chip);
+          });
+        }
+
+        function pushValue(raw) {
+          splitValues(raw).forEach(item => {
+            if (!values.includes(item)) values.push(item);
+          });
+          sync();
+        }
+
+        input.addEventListener("keydown", function (event) {
+          if (event.key === "Enter" || event.key === "," || event.key === "|") {
+            event.preventDefault();
+            pushValue(input.value);
+            input.value = "";
+          }
+        });
+
+        input.addEventListener("paste", function (event) {
+          const text = (event.clipboardData || window.clipboardData).getData("text");
+          if (/[\n\r|,，、]/.test(text)) {
+            event.preventDefault();
+            pushValue(text);
+          }
+        });
+
+        input.addEventListener("blur", function () {
+          if (input.value.trim()) {
+            pushValue(input.value);
+            input.value = "";
+          }
+        });
+
+        sync();
+      }
+
+      document.querySelectorAll(".chip-editor").forEach(mountEditor);
+    }());
+  </script>
+{% endblock %}

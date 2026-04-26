@@ -1,0 +1,136 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}来源管理 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">来源管理</h2>
+      <p class="page-subtitle">统一维护新闻抓取来源、抓取频率、启用状态和最近运行结果。内置来源也会展示在这里，方便统一管理。</p>
+    </div>
+    <a class="btn" href="{% url 'console-source-create' %}">新增来源</a>
+  </div>
+
+  <section class="panel">
+    <div class="table-wrap desktop-only">
+      <table>
+        <thead>
+          <tr>
+            <th>来源</th>
+            <th>语言</th>
+            <th>抓取入口</th>
+            <th>启用</th>
+            <th>频率</th>
+            <th>最后抓取</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for source in sources %}
+            <tr>
+              <td>
+                <strong>{{ source.name }}</strong>
+                <div class="muted">{{ source.get_source_type_display }}</div>
+              </td>
+              <td>{{ source.get_language_display }}</td>
+              <td><a href="{{ source.feed_url }}" target="_blank" rel="noreferrer">{{ source.feed_url|truncatechars:48 }}</a></td>
+              <td>
+                {% if source.enabled %}
+                  <span class="badge success">启用中</span>
+                {% else %}
+                  <span class="badge">已停用</span>
+                {% endif %}
+              </td>
+              <td>{{ source.crawl_interval_minutes }} 分钟</td>
+              <td>{% if source.last_crawl_at %}{{ source.last_crawl_at|date:"Y-m-d H:i" }}{% else %}<span class="muted">暂无</span>{% endif %}</td>
+              <td>
+                {% if source.last_crawl_status == "success" %}
+                  <span class="badge success">成功</span>
+                {% elif source.last_crawl_status == "failed" %}
+                  <span class="badge danger">失败</span>
+                {% else %}
+                  <span class="badge">未运行</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="article-actions">
+                  <a class="btn ghost" href="{% url 'console-source-edit' source.id %}">编辑</a>
+                  <form method="post" action="{% url 'console-source-test-crawl' source.id %}">
+                    {% csrf_token %}
+                    <button class="btn secondary" type="submit">测试抓取</button>
+                  </form>
+                  <form method="post" action="{% url 'console-source-toggle' source.id %}">
+                    {% csrf_token %}
+                    <button class="btn secondary" type="submit">{{ source.enabled|yesno:"停用,启用" }}</button>
+                  </form>
+                  <form method="post" action="{% url 'console-source-delete' source.id %}" onsubmit="return confirm('确认删除这个来源吗？');">
+                    {% csrf_token %}
+                    <button class="btn danger" type="submit">删除</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="8" class="muted">还没有来源，先新增一个来源。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-list mobile-only">
+      {% for source in sources %}
+        <article class="article-card source-mobile-card">
+          <div class="article-meta">
+            <span class="badge gold">{{ source.get_source_type_display }}</span>
+            {% if source.enabled %}
+              <span class="badge success">启用中</span>
+            {% else %}
+              <span class="badge">已停用</span>
+            {% endif %}
+          </div>
+          <h3 class="article-title">{{ source.name }}</h3>
+          <p class="muted">{{ source.get_language_display }} · {{ source.crawl_interval_minutes }} 分钟 / 次</p>
+          <div class="source-mobile-meta">
+            <div>
+              <strong>抓取入口</strong>
+              <span><a href="{{ source.feed_url }}" target="_blank" rel="noreferrer">{{ source.feed_url|truncatechars:40 }}</a></span>
+            </div>
+            <div>
+              <strong>最后抓取</strong>
+              <span>{% if source.last_crawl_at %}{{ source.last_crawl_at|date:"m-d H:i" }}{% else %}暂无{% endif %}</span>
+            </div>
+            <div>
+              <strong>运行状态</strong>
+              <span>
+                {% if source.last_crawl_status == "success" %}
+                  成功
+                {% elif source.last_crawl_status == "failed" %}
+                  失败
+                {% else %}
+                  未运行
+                {% endif %}
+              </span>
+            </div>
+          </div>
+          <div class="article-actions">
+            <a class="btn ghost" href="{% url 'console-source-edit' source.id %}">编辑</a>
+            <form method="post" action="{% url 'console-source-test-crawl' source.id %}">
+              {% csrf_token %}
+              <button class="btn secondary" type="submit">测试抓取</button>
+            </form>
+            <form method="post" action="{% url 'console-source-toggle' source.id %}">
+              {% csrf_token %}
+              <button class="btn secondary" type="submit">{{ source.enabled|yesno:"停用,启用" }}</button>
+            </form>
+            <form method="post" action="{% url 'console-source-delete' source.id %}" onsubmit="return confirm('确认删除这个来源吗？');">
+              {% csrf_token %}
+              <button class="btn danger" type="submit">删除</button>
+            </form>
+          </div>
+        </article>
+      {% empty %}
+        <p class="muted">还没有来源，先新增一个来源。</p>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

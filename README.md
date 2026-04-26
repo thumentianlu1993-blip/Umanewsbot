@@ -1,81 +1,73 @@
-# 日本赛马新闻采集-翻译-QQ 推送系统
+# 日本赛马新闻采集、翻译与发布系统
 
-当前版本：`0.0.1`
+当前版本：`v0.0.1`（上线准备阶段）
 
-基于 `Django + Celery + PostgreSQL/SQLite + Redis + OneBot` 的日本赛马新闻采集后台。
+## 系统能力
 
-当前已实现：
+- 来源采集：`netkeiba`（新着/访问/注目）与 `JRA`
+- 翻译链路：术语召回 + 大模型翻译 + 失败重试 + 人工编辑保护
+- 内容后台：候选池、编辑台、术语库、来源管理、发布管理、操作日志
+- 前台展示：信息流 + 详情页
+- 推送能力：OneBot（QQ 群）手动推送
 
-- `netkeiba` 三种榜单模式采集器
-- `JRA` 月归档新闻采集器
-- 新闻、图片、榜单快照、术语库、推送目标、推送日志、任务日志数据模型
-- OpenAI-compatible 翻译接口与 dummy 翻译降级
-- QQ OneBot 推送服务与图片失败降级
-- Django Admin 后台，支持编辑新闻、维护术语库和推送目标、手动推送、重译
-- Celery 定时任务与管理命令
-
-## 本地启动
-
-1. 安装依赖
+## 本地开发
 
 ```bash
 pip install -r requirements.txt
-```
-
-2. 配置环境变量
-
-```bash
 copy .env.example .env
-```
-
-3. 初始化数据库
-
-```bash
+# 本地开发建议改成 sqlite
+# DB_ENGINE=sqlite
 cd server
 python manage.py migrate
 python manage.py seed_admin --username admin --password admin123456
-```
-
-4. 启动后台
-
-```bash
 python manage.py runserver
 ```
 
-后台地址：`http://127.0.0.1:8000/admin/`
+访问地址：
 
-## 常用命令
+- 前台：`http://127.0.0.1:8000/`
+- 后台：`http://127.0.0.1:8000/admin/login/`
+- Django Admin：`http://127.0.0.1:8000/django-admin/`
 
-抓取新闻：
+兼容旧入口（会重定向）：
 
-```bash
-python manage.py crawl_news netkeiba_latest --pages 2
-python manage.py crawl_news netkeiba_access
-python manage.py crawl_news netkeiba_attention
-python manage.py crawl_news jra
-```
+- `/login/` -> `/admin/login/`
+- `/console/` -> `/admin/`
 
-运行测试：
+## 生产部署（Docker Compose）
 
 ```bash
-python manage.py test stable
+cp .env.example .env
+# 填写 .env 中的 RDS / OSS / API / 域名配置
+docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-## 部署
+低成本模式（不购买 RDS，ECS 本机 PostgreSQL）：
 
-仓库根目录已包含：
+```bash
+cp .env.example .env
+# .env 里先填 POSTGRES_DB/USER/PASSWORD 即可，POSTGRES_HOST 会由 lowcost compose 覆盖为 db
+docker compose -f docker-compose.prod.lowcost.yml up -d --build
+```
 
-- `Dockerfile`
-- `docker-compose.yml`
+也可以使用脚本：
 
-生产环境建议：
+```bash
+chmod +x deploy.sh deploy/*.sh deploy/docker/*.sh
+./deploy.sh
+# 低成本模式
+./deploy_lowcost.sh
+```
 
-- `.env` 配置 PostgreSQL、Redis、OpenAI-compatible 接口、OneBot 地址
-- `web + worker + beat + db + redis` 一起编排
-- 由反向代理暴露 `/admin/` 和 `/media/`
+## 关键文档
 
-## 文档
-
-- [翻译与术语库配置](E:\Codex\docs\translation_and_termbase.md)
-- [QQ Bot 配置教程](E:\Codex\docs\qqbot_setup.md)
-- [后台使用说明](E:\Codex\docs\backend_usage.md)
+- [项目状态文档](E:/Codex/docs/project_status.md)
+- [生产部署指南](E:/Codex/docs/deploy_production.md)
+- [阿里云香港区手把手指南](E:/Codex/docs/alicloud_hongkong_step_by_step.md)
+- [回滚指南](E:/Codex/docs/rollback_guide.md)
+- [备份与恢复指南](E:/Codex/docs/backup_recovery.md)
+- [生产上线检查清单](E:/Codex/docs/production_checklist.md)
+- [翻译与术语库配置](E:/Codex/docs/translation_and_termbase.md)
+- [QQ Bot 配置教程](E:/Codex/docs/qqbot_setup.md)
+- [后台使用说明](E:/Codex/docs/backend_usage.md)
+- [PRD 归档目录](E:/Codex/docs/PRD/README.md)

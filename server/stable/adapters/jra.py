@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from stable.models import SourceMode, SourceSite
 from stable.services.http import get_bytes
-from stable.services.text import normalize_whitespace
+from stable.services.text import extract_article_text, normalize_whitespace
 
 from .base import CanonicalNewsDraft, SourceAdapter, SourceArticleDetail, SourceArticleStub, SourceImageDraft
 
@@ -61,7 +61,7 @@ class JRAAdapter(SourceAdapter):
         published_text = soup.select_one(".news_title .date").get_text(" ", strip=True)
         published_at = self._parse_heading_date(published_text)
         body_node = soup.select_one(".news_body")
-        body_raw = body_node.get_text("\n", strip=True) if body_node else ""
+        body_raw = extract_article_text(body_node)
         body_normalized = normalize_whitespace(body_raw)
         images: list[SourceImageDraft] = []
         for index, item in enumerate(soup.select(".img_line_list .item"), start=0):

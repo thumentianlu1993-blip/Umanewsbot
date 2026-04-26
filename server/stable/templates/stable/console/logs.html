@@ -1,0 +1,52 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}操作日志 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">操作日志</h2>
+      <p class="page-subtitle">记录登录、来源配置、抓取触发、文章编辑、发布和撤回等关键动作，方便后续排查。</p>
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>操作类型</th>
+            <th>对象</th>
+            <th>对象 ID</th>
+            <th>操作人</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in page_obj %}
+            <tr>
+              <td>{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
+              <td>{{ log.action_type }}</td>
+              <td>{{ log.target_type }}</td>
+              <td>{{ log.target_id|default:"-" }}</td>
+              <td>{{ log.admin.username|default:"系统" }}</td>
+              <td>{{ log.detail }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="muted">暂无操作日志。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      {% if page_obj.has_previous %}
+        <a class="btn ghost" href="?page={{ page_obj.previous_page_number }}">上一页</a>
+      {% endif %}
+      <span class="badge">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+      {% if page_obj.has_next %}
+        <a class="btn ghost" href="?page={{ page_obj.next_page_number }}">下一页</a>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

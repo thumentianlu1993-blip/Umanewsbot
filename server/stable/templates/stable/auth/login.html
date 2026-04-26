@@ -1,0 +1,40 @@
+{% load static %}
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 - 赛马新闻后台</title>
+  <link rel="stylesheet" href="{% static 'stable/console.css' %}">
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-card">
+      <div class="brand" style="margin-bottom: 18px;">
+        <div class="brand-badge">马</div>
+        <div class="brand-meta">
+          <h1>赛马新闻后台</h1>
+          <p>单管理员内容生产闭环</p>
+        </div>
+      </div>
+
+      {% if form.non_field_errors %}
+        <div class="flash error" style="margin-bottom: 16px;">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="field" style="margin-bottom: 14px;">
+          <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+          {{ form.username }}
+        </div>
+        <div class="field" style="margin-bottom: 18px;">
+          <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+          {{ form.password }}
+        </div>
+        <button type="submit" style="width: 100%;">登录后台</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

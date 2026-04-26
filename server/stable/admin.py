@@ -6,27 +6,39 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
 from django.utils.html import format_html
 
-from .forms import NewsArticleAdminForm, NewsImageAdminForm, PushArticleForm
+from .forms import NewsArticleAdminForm, NewsImageAdminForm, NewsSourceForm, PushArticleForm
 from .models import (
     ArticleStatus,
+    CrawlJob,
+    MediaAsset,
     NewsArticle,
     NewsImage,
     NewsSnapshot,
+    NewsSource,
+    OperationLog,
     PushLog,
     PushTarget,
     TaskExecutionLog,
     TermEntry,
     TranslationRun,
+    WorkflowStatus,
 )
+from .services.operations import log_operation
 from .services.pushing import enqueue_push_for_article
 from .services.queueing import dispatch_task
-from .tasks import translate_article_task
+from .tasks import crawl_news_source_task, translate_article_task
 
 
 class NewsImageInline(admin.TabularInline):
     model = NewsImage
     form = NewsImageAdminForm
     extra = 0
+
+
+class MediaAssetInline(admin.TabularInline):
+    model = MediaAsset
+    extra = 0
+    readonly_fields = ("original_image_url", "internal_image_url", "storage_provider", "status")
 
 
 class NewsSnapshotInline(admin.TabularInline):
@@ -55,17 +67,20 @@ class NewsArticleAdmin(admin.ModelAdmin):
     form = NewsArticleAdminForm
     list_display = (
         "id",
+        "effective_title",
         "source_site",
         "source_mode",
         "published_at",
-        "title_ja",
+        "workflow_status",
         "status",
         "is_first_crawled",
         "push_action_link",
     )
-    list_filter = ("source_site", "source_mode", "status", "is_first_crawled")
-    search_fields = ("title_ja", "title_zh", "source_article_id", "source_url")
+    list_filter = ("source_site", "source_mode", "workflow_status", "status", "is_first_crawled")
+    search_fields = ("title_ja", "translated_title_zh", "title_zh", "source_article_id", "source_url")
     readonly_fields = (
+        "source_config",
+        "crawl_job",
         "source_site",
         "source_mode",
         "source_article_id",
@@ -73,6 +88,9 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "title_ja",
         "body_ja_raw",
         "body_ja_normalized",
+        "translated_title_zh",
+        "translated_body_zh",
+        "translated_summary_zh",
         "published_at",
         "is_first_crawled",
         "first_seen_at",
@@ -80,46 +98,54 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "push_action_link",
         "translate_action_link",
     )
-    inlines = [NewsImageInline, NewsSnapshotInline, TranslationRunInline, PushLogInline]
-    actions = ["mark_reviewed", "mark_push_ready", "queue_translation"]
+    inlines = [NewsImageInline, MediaAssetInline, NewsSnapshotInline, TranslationRunInline, PushLogInline]
+    actions = ["mark_pending_review", "mark_published_ready", "queue_translation"]
 
     fieldsets = (
-        ("来源信息", {"fields": ("source_site", "source_mode", "source_article_id", "source_url", "published_at")}),
-        ("日文原文", {"fields": ("title_ja", "body_ja_raw", "body_ja_normalized")}),
-        ("中文内容", {"fields": ("title_zh", "body_zh", "push_summary_zh")}),
-        ("状态", {"fields": ("status", "is_first_crawled", "first_seen_at", "last_seen_at", "editor_notes")}),
+        ("来源信息", {"fields": ("source_config", "crawl_job", "source_site", "source_mode", "source_article_id", "source_url", "published_at")}),
+        ("日文原稿", {"fields": ("title_ja", "body_ja_raw", "body_ja_normalized")}),
+        ("翻译参考", {"fields": ("translated_title_zh", "translated_summary_zh", "translated_body_zh")}),
+        ("发布内容", {"fields": ("title_zh", "summary_zh", "body_zh", "source_note", "editor_notes", "workflow_status", "status")}),
+        ("追踪信息", {"fields": ("is_first_crawled", "first_seen_at", "last_seen_at")}),
         ("操作", {"fields": ("translate_action_link", "push_action_link")}),
     )
 
     def save_model(self, request, obj, form, change):
-        changed = set(form.changed_data) & {"title_zh", "body_zh", "push_summary_zh", "editor_notes"}
+        changed = set(form.changed_data) & {"title_zh", "summary_zh", "body_zh", "editor_notes"}
         if changed:
             obj.mark_manual_edits(changed)
-            if obj.status == ArticleStatus.TRANSLATED:
-                obj.status = ArticleStatus.REVIEWED
+            if obj.workflow_status == WorkflowStatus.PENDING_EDIT:
+                obj.workflow_status = WorkflowStatus.PENDING_REVIEW
+            log_operation(
+                action_type="article_saved_admin",
+                target_type="article",
+                target_id=obj.pk or "",
+                detail=f"通过 Django Admin 保存《{obj.effective_title}》",
+                admin=request.user,
+            )
         super().save_model(request, obj, form, change)
 
-    @admin.action(description="标记为已审核")
-    def mark_reviewed(self, request, queryset):
-        count = queryset.update(status=ArticleStatus.REVIEWED)
-        self.message_user(request, f"已标记 {count} 条新闻为已审核。", messages.SUCCESS)
+    @admin.action(description="标记为待审核")
+    def mark_pending_review(self, request, queryset):
+        count = queryset.update(workflow_status=WorkflowStatus.PENDING_REVIEW)
+        self.message_user(request, f"已将 {count} 篇文章标记为待审核。", messages.SUCCESS)
 
     @admin.action(description="标记为可推送")
-    def mark_push_ready(self, request, queryset):
+    def mark_published_ready(self, request, queryset):
         count = queryset.update(status=ArticleStatus.PUSH_READY)
-        self.message_user(request, f"已标记 {count} 条新闻为可推送。", messages.SUCCESS)
+        self.message_user(request, f"已将 {count} 篇文章标记为可推送。", messages.SUCCESS)
 
     @admin.action(description="加入翻译队列")
     def queue_translation(self, request, queryset):
         for article in queryset:
             dispatch_task(translate_article_task, article.id)
-        self.message_user(request, f"已将 {queryset.count()} 条新闻加入翻译队列。", messages.SUCCESS)
+        self.message_user(request, f"已将 {queryset.count()} 篇文章加入翻译队列。", messages.SUCCESS)
 
     def push_action_link(self, obj):
         url = reverse("admin:stable_newsarticle_push", args=[obj.pk])
-        return format_html('<a class="button" href="{}">推送到QQ群</a>', url)
+        return format_html('<a class="button" href="{}">推送到 QQ 群</a>', url)
 
-    push_action_link.short_description = "推送"
+    push_action_link.short_description = "QQ 推送"
 
     def translate_action_link(self, obj):
         url = reverse("admin:stable_newsarticle_translate", args=[obj.pk])
@@ -167,6 +193,39 @@ class NewsArticleAdmin(admin.ModelAdmin):
         return HttpResponseRedirect(reverse("admin:stable_newsarticle_change", args=[article.pk]))
 
 
+@admin.register(NewsSource)
+class NewsSourceAdmin(admin.ModelAdmin):
+    form = NewsSourceForm
+    list_display = ("name", "source_type", "language", "enabled", "crawl_interval_minutes", "last_crawl_at", "last_crawl_status", "test_crawl_link")
+    list_filter = ("enabled", "source_type", "language", "adapter_key")
+    search_fields = ("name", "homepage_url", "feed_url", "notes")
+
+    def test_crawl_link(self, obj):
+        url = reverse("admin:stable_newssource_test_crawl", args=[obj.pk])
+        return format_html('<a class="button" href="{}">立即测试抓取</a>', url)
+
+    test_crawl_link.short_description = "测试抓取"
+
+    def get_urls(self):
+        custom_urls = [
+            path("<int:source_id>/test-crawl/", self.admin_site.admin_view(self.test_crawl_view), name="stable_newssource_test_crawl")
+        ]
+        return custom_urls + super().get_urls()
+
+    def test_crawl_view(self, request: HttpRequest, source_id: int):
+        source = get_object_or_404(NewsSource, pk=source_id)
+        dispatch_task(crawl_news_source_task, source.id)
+        self.message_user(request, f"已为来源“{source.name}”触发抓取。", messages.SUCCESS)
+        log_operation(
+            action_type="source_crawl_triggered_admin",
+            target_type="source",
+            target_id=source.pk,
+            detail=f"通过 Django Admin 手动抓取来源 {source.name}",
+            admin=request.user,
+        )
+        return redirect(reverse("admin:stable_newssource_change", args=[source.pk]))
+
+
 @admin.register(TermEntry)
 class TermEntryAdmin(admin.ModelAdmin):
     list_display = ("source_ja", "target_zh", "term_type", "priority", "is_active", "updated_at")
@@ -179,6 +238,13 @@ class PushTargetAdmin(admin.ModelAdmin):
     list_display = ("name", "group_id", "is_default", "is_active", "updated_at")
     list_filter = ("is_default", "is_active")
     search_fields = ("name", "group_id")
+
+
+@admin.register(CrawlJob)
+class CrawlJobAdmin(admin.ModelAdmin):
+    list_display = ("id", "source", "status", "started_at", "finished_at", "success_count", "fail_count")
+    list_filter = ("status", "source")
+    readonly_fields = ("source", "status", "started_at", "finished_at", "success_count", "fail_count", "error_message")
 
 
 @admin.register(TaskExecutionLog)
@@ -195,3 +261,11 @@ class PushLogAdmin(admin.ModelAdmin):
     list_filter = ("status", "target")
     search_fields = ("article__title_ja", "article__title_zh", "target__name", "error_message")
     readonly_fields = ("article", "target", "triggered_by", "status", "request_payload", "response_payload", "error_message", "sent_at")
+
+
+@admin.register(OperationLog)
+class OperationLogAdmin(admin.ModelAdmin):
+    list_display = ("action_type", "target_type", "target_id", "admin", "created_at")
+    list_filter = ("action_type", "target_type")
+    search_fields = ("detail", "target_id", "admin__username")
+    readonly_fields = ("action_type", "target_type", "target_id", "detail", "admin", "created_at")

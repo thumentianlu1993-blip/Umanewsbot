@@ -1,0 +1,202 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}编辑台 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">编辑台</h2>
+      <p class="page-subtitle">左栏保留原始来源与图片，中栏负责中文发布稿编辑，右栏提供翻译状态、AI 译文参考和素材操作入口。</p>
+    </div>
+    <div class="toolbar">
+      <a class="btn ghost" href="{% url 'console-candidate-detail' article.id %}">查看候选详情</a>
+      <a class="btn secondary" href="{% url 'console-article-preview' article.id %}">预览发布效果</a>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" id="editor-form">
+    {% csrf_token %}
+    <div class="editor-shell">
+      <section class="panel editor-pane source-pane">
+        <h3>来源参照区</h3>
+        <p><strong>原文标题：</strong>{{ article.title_ja }}</p>
+        <p><strong>来源：</strong>{{ article.source_config.name|default:article.get_source_site_display }}</p>
+        <p><strong>发布时间：</strong>{{ article.published_at|date:"Y-m-d H:i" }}</p>
+        <p><strong>原文链接：</strong><a href="{{ article.source_url }}" target="_blank" rel="noreferrer">{{ article.source_url }}</a></p>
+        <div class="content-block" style="margin-top: 14px;">{{ article.body_ja_normalized|default:article.body_ja_raw }}</div>
+
+        <h4 style="margin-top: 20px;">原文图片</h4>
+        <div class="image-strip">
+          {% for image in article.images.all %}
+            <div class="image-card">
+              <img src="{{ image.public_url }}" alt="">
+              <div class="meta">
+                <p class="muted">{{ image.caption_ja|default:"无图注" }}</p>
+                <form method="post" action="{% url 'console-article-localize-image' article.id image.id %}">
+                  {% csrf_token %}
+                  <button class="btn secondary" type="submit">本地化并加入素材库</button>
+                </form>
+              </div>
+            </div>
+          {% empty %}
+            <p class="muted">当前没有可用原图。</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="panel editor-pane content-pane">
+        <h3>中文编辑区</h3>
+        <div class="field" style="margin-bottom: 14px;">
+          <label for="{{ form.title_zh.id_for_label }}">中文标题</label>
+          {{ form.title_zh }}
+          {% if form.title_zh.errors %}<div class="help" style="color: var(--danger);">{{ form.title_zh.errors|join:' ' }}</div>{% endif %}
+        </div>
+        <div class="field" style="margin-bottom: 14px;">
+          <label for="{{ form.summary_zh.id_for_label }}">中文摘要</label>
+          {{ form.summary_zh }}
+          <div class="help">选填。留空后将不再默认回填机器摘要。</div>
+          {% if form.summary_zh.errors %}<div class="help" style="color: var(--danger);">{{ form.summary_zh.errors|join:' ' }}</div>{% endif %}
+        </div>
+        <div class="field" style="margin-bottom: 14px;">
+          <label for="{{ form.tags_text.id_for_label }}">标签</label>
+          {{ form.tags_text }}
+          <div class="help">{{ form.tags_text.help_text }} 系统会先自动摘取正文中命中的马名标签。</div>
+          {% if form.tags_text.errors %}<div class="help" style="color: var(--danger);">{{ form.tags_text.errors|join:' ' }}</div>{% endif %}
+        </div>
+        <div class="field" style="margin-bottom: 14px;">
+          <label for="{{ form.body_zh.id_for_label }}">正文</label>
+          {{ form.body_zh }}
+          {% if form.body_zh.errors %}<div class="help" style="color: var(--danger);">{{ form.body_zh.errors|join:' ' }}</div>{% endif %}
+        </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="{{ form.source_note.id_for_label }}">来源说明</label>
+            {{ form.source_note }}
+            {% if form.source_note.errors %}<div class="help" style="color: var(--danger);">{{ form.source_note.errors|join:' ' }}</div>{% endif %}
+          </div>
+          <div class="field">
+            <label for="{{ form.editor_notes.id_for_label }}">编辑备注</label>
+            {{ form.editor_notes }}
+            {% if form.editor_notes.errors %}<div class="help" style="color: var(--danger);">{{ form.editor_notes.errors|join:' ' }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div style="margin-top: 18px;">
+          <p><strong>当前封面：</strong></p>
+          {% if article.cover_image_url %}
+            <img class="cover" src="{{ article.cover_image_url }}" alt="" style="max-width: 100%; border-radius: 18px;">
+          {% else %}
+            <p class="muted">当前还没有封面图。</p>
+          {% endif %}
+        </div>
+
+        <div class="toolbar" style="margin-top: 20px;">
+          <button type="submit" name="intent" value="save">保存草稿</button>
+          <button class="btn secondary" type="submit" name="intent" value="submit_review">提交审核</button>
+          <button class="btn gold" type="submit" name="intent" value="publish">审核并发布</button>
+        </div>
+        <div class="toolbar">
+          <button class="btn danger" type="submit" name="intent" value="reject" onclick="return confirm('确认驳回这篇稿件吗？');">驳回</button>
+          <button class="btn ghost" type="submit" name="intent" value="withdraw" onclick="return confirm('确认撤回这篇已发布稿件吗？');">撤回</button>
+          {% if allow_publish_without_cover %}
+            <label class="badge warning" style="cursor: pointer;">
+              <input type="checkbox" name="publish_without_cover" value="1" style="margin-right: 8px;">无封面继续发布
+            </label>
+          {% endif %}
+        </div>
+      </section>
+
+      <aside class="panel editor-pane tools-pane">
+        <h3>辅助工具区</h3>
+        <p class="badge {% if article.translation_status == 'translated' %}success{% elif article.translation_status == 'failed' %}danger{% else %}warning{% endif %}">
+          {{ article.get_translation_status_display }}
+        </p>
+        {% if article.translation_model %}
+          <p class="muted">模型：{{ article.translation_model }}</p>
+        {% endif %}
+        {% if article.translation_provider %}
+          <p class="muted">提供方：{{ article.translation_provider }}</p>
+        {% endif %}
+        {% if article.translated_at %}
+          <p class="muted">最近完成：{{ article.translated_at|date:"Y-m-d H:i:s" }}</p>
+        {% endif %}
+        {% if article.translation_retry_count %}
+          <p class="muted">重试次数：{{ article.translation_retry_count }}</p>
+        {% endif %}
+        {% if article.translation_error_message %}
+          <p class="muted" style="color: var(--danger);">失败原因：{{ article.translation_error_message }}</p>
+        {% endif %}
+        <p class="badge success">术语映射会在翻译阶段和落稿阶段一并生效</p>
+
+        <h4 style="margin-top: 16px;">AI 翻译参考</h4>
+        <p><strong>{{ article.translated_title_zh|default:"暂未生成翻译标题" }}</strong></p>
+        <div class="content-block">{{ article.translated_body_zh|default:"当前还没有可用译文。" }}</div>
+
+        <form method="post" action="{% url 'console-candidate-retranslate' article.id %}" style="margin-top: 16px;">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'console-article-editor' article.id %}">
+          <button class="btn secondary" type="submit">重新应用翻译与术语</button>
+        </form>
+
+        <h4 style="margin-top: 18px;">素材库 / 封面</h4>
+        <div class="image-strip">
+          {% for asset in article.media_assets.all %}
+            <div class="image-card">
+              <img src="{{ asset.public_url }}" alt="">
+              <div class="meta">
+                <div class="article-meta">
+                  {% if asset.is_cover %}<span class="badge gold">当前封面</span>{% endif %}
+                  <span class="badge">{{ asset.storage_provider }}</span>
+                </div>
+                <form method="post" action="{% url 'console-article-set-cover' article.id asset.id %}" style="margin-top: 8px;">
+                  {% csrf_token %}
+                  <button class="btn secondary" type="submit">设为封面</button>
+                </form>
+              </div>
+            </div>
+          {% empty %}
+            <p class="muted">还没有本地化图片，可以在左栏逐张加入素材库。</p>
+          {% endfor %}
+        </div>
+
+        <h4 style="margin-top: 18px;">手动上传封面</h4>
+        <form method="post" enctype="multipart/form-data" action="{% url 'console-article-upload-cover' article.id %}">
+          {% csrf_token %}
+          <div class="field">
+            <input type="file" name="cover_file" accept="image/*">
+          </div>
+          <button style="margin-top: 10px;" type="submit">上传并设为封面</button>
+        </form>
+      </aside>
+    </div>
+  </form>
+
+  <script>
+    (function () {
+      const form = document.getElementById("editor-form");
+      const token = form.querySelector("input[name='csrfmiddlewaretoken']").value;
+      let dirty = false;
+      let saving = false;
+
+      form.addEventListener("input", function () {
+        dirty = true;
+      });
+
+      setInterval(function () {
+        if (!dirty || saving) return;
+        saving = true;
+        const data = new FormData(form);
+        data.set("intent", "autosave");
+        fetch(window.location.href, {
+          method: "POST",
+          headers: {"X-Requested-With": "XMLHttpRequest", "X-CSRFToken": token},
+          body: data
+        }).then(function () {
+          dirty = false;
+        }).finally(function () {
+          saving = false;
+        });
+      }, 20000);
+    }());
+  </script>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}候选新闻池 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">候选新闻池</h2>
+      <p class="page-subtitle">这里承接所有抓取入库后的候选新闻，支持筛选、查看原文、重翻译、忽略和进入编辑台。</p>
+    </div>
+    <form method="post" action="{% url 'console-candidate-batch-retranslate' %}" class="toolbar">
+      {% csrf_token %}
+      <input type="hidden" name="q" value="{{ request.GET.q }}">
+      <input type="hidden" name="source" value="{{ request.GET.source }}">
+      <input type="hidden" name="workflow_status" value="{{ request.GET.workflow_status }}">
+      <input type="hidden" name="translated" value="{{ request.GET.translated }}">
+      <input type="hidden" name="translation_status" value="{{ request.GET.translation_status }}">
+      <input type="hidden" name="limit" value="20">
+      <button class="btn secondary" type="submit">批量补翻当前筛选</button>
+    </form>
+  </div>
+
+  <section class="panel">
+    <form method="get" class="filters">
+      <input type="text" name="q" placeholder="搜索标题或正文关键字" value="{{ request.GET.q }}">
+      <select name="source">
+        <option value="">全部来源</option>
+        {% for source in sources %}
+          <option value="{{ source.id }}" {% if request.GET.source == source.id|stringformat:'s' %}selected{% endif %}>{{ source.name }}</option>
+        {% endfor %}
+      </select>
+      <select name="workflow_status">
+        <option value="">全部工作流状态</option>
+        {% for value, label in workflow_choices %}
+          <option value="{{ value }}" {% if request.GET.workflow_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="translated">
+        <option value="">是否已有译文</option>
+        <option value="yes" {% if request.GET.translated == 'yes' %}selected{% endif %}>已有译文</option>
+        <option value="no" {% if request.GET.translated == 'no' %}selected{% endif %}>暂无译文</option>
+      </select>
+      <select name="translation_status">
+        <option value="">翻译状态</option>
+        {% for value, label in translation_status_choices %}
+          <option value="{{ value }}" {% if request.GET.translation_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">筛选</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="card-list candidate-card-list">
+      {% for article in page_obj %}
+        <article class="article-card candidate-card">
+          <div class="article-meta">
+            <span class="badge">{{ article.source_config.name|default:article.get_source_site_display }}</span>
+            <span>{{ article.published_at|date:"Y-m-d H:i" }}</span>
+          </div>
+          <h3 class="article-title">{{ article.title_zh|default:article.translated_title_zh|default:article.title_ja }}</h3>
+          {% if article.title_zh or article.translated_title_zh %}
+            <p class="muted candidate-origin-title">原文：{{ article.title_ja|truncatechars:56 }}</p>
+          {% endif %}
+          <p class="muted candidate-excerpt">{{ article.translated_body_zh|default:article.body_ja_normalized|truncatechars:120 }}</p>
+          <div class="article-meta">
+            <span class="badge {% if article.translation_status == 'translated' %}success{% elif article.translation_status == 'failed' %}danger{% else %}warning{% endif %}">
+              {{ article.get_translation_status_display }}
+            </span>
+            <span class="badge gold">{{ article.get_workflow_status_display }}</span>
+          </div>
+          {% if article.translation_error_message %}
+            <p class="muted" style="color: var(--danger);">失败原因：{{ article.translation_error_message|truncatechars:90 }}</p>
+          {% elif article.translation_model %}
+            <p class="muted">模型：{{ article.translation_model }}{% if article.translated_at %} · {{ article.translated_at|date:"Y-m-d H:i" }}{% endif %}</p>
+          {% endif %}
+          <div class="article-actions">
+            <a class="btn ghost" href="{% url 'console-candidate-detail' article.id %}">详情</a>
+            <a class="btn secondary" href="{% url 'console-article-editor' article.id %}">编辑</a>
+            <form method="post" action="{% url 'console-candidate-retranslate' article.id %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{% url 'console-candidate-list' %}">
+              <button class="btn ghost" type="submit">重翻</button>
+            </form>
+            <form method="post" action="{% url 'console-candidate-ignore' article.id %}" onsubmit="return confirm('确认忽略这篇候选新闻吗？');">
+              {% csrf_token %}
+              <button class="btn danger" type="submit">忽略</button>
+            </form>
+          </div>
+        </article>
+      {% empty %}
+        <p class="muted">候选池里还没有内容，可以先去来源管理里手动触发一次抓取。</p>
+      {% endfor %}
+    </div>
+    <div class="pagination">
+      {% if page_obj.has_previous %}
+        <a class="btn ghost" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.source %}source={{ request.GET.source }}&{% endif %}{% if request.GET.workflow_status %}workflow_status={{ request.GET.workflow_status }}&{% endif %}{% if request.GET.translated %}translated={{ request.GET.translated }}&{% endif %}{% if request.GET.translation_status %}translation_status={{ request.GET.translation_status }}&{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>
+      {% endif %}
+      <span class="badge">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+      {% if page_obj.has_next %}
+        <a class="btn ghost" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.source %}source={{ request.GET.source }}&{% endif %}{% if request.GET.workflow_status %}workflow_status={{ request.GET.workflow_status }}&{% endif %}{% if request.GET.translated %}translated={{ request.GET.translated }}&{% endif %}{% if request.GET.translation_status %}translation_status={{ request.GET.translation_status }}&{% endif %}page={{ page_obj.next_page_number }}">下一页</a>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}
