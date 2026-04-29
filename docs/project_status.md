@@ -119,6 +119,9 @@
 - 已发现并修复一项镜像拉取风险：
   - `worker / beat` 使用本地构建镜像 `umanewsbot:prod`
   - 部署脚本已改为仅拉取外部依赖镜像，避免误向公共仓库拉取业务镜像失败
+- 已发现并修复一项健康检查风险：
+  - 容器内 `curl http://127.0.0.1:8000/healthz/` 会命中 Django `DisallowedHost`
+  - 应用现已自动允许回环地址进入 `ALLOWED_HOSTS`，兼容 Docker 健康检查
 - 已拿到生产所需核心密钥：
   - `SILICONFLOW_API_KEY`
   - `OSS_ACCESS_KEY_ID`

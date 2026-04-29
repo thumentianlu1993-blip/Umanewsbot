@@ -28,9 +28,21 @@ def env_list(key: str, default: str = "") -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
+def extend_unique(items: list[str], extras: list[str]) -> list[str]:
+    seen = set(items)
+    merged = list(items)
+    for extra in extras:
+        if extra not in seen:
+            merged.append(extra)
+            seen.add(extra)
+    return merged
+
+
 SECRET_KEY = env("SECRET_KEY", "dev-secret-key-change-me")
 DEBUG = env_bool("DEBUG", True)
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "*" if DEBUG else "")
+if "*" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS = extend_unique(ALLOWED_HOSTS, ["127.0.0.1", "localhost", "[::1]", "::1"])
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
 
 INSTALLED_APPS = [
