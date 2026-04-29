@@ -115,6 +115,7 @@
 - 已发现并修复一项部署兼容性风险：
   - 部分 Ubuntu 镜像仅提供 `docker-compose`
   - 项目部署/回滚脚本现已兼容 `docker compose` 与 `docker-compose`
+  - 兼容包装脚本已调整为优先使用 `docker-compose`，避免旧环境误判
 - 已拿到生产所需核心密钥：
   - `SILICONFLOW_API_KEY`
   - `OSS_ACCESS_KEY_ID`
