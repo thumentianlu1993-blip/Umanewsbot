@@ -12,6 +12,7 @@
 - 标准模式：`docker-compose.prod.yml`
 - 低成本模式：`docker-compose.prod.lowcost.yml`
 - Nginx：`deploy/nginx/nginx.conf`
+- Compose 兼容包装脚本：`deploy/docker/compose-wrapper.sh`
 - 脚本：
   - `deploy.sh` / `deploy/deploy.sh`
   - `deploy_lowcost.sh` / `deploy/deploy_lowcost.sh`
@@ -78,6 +79,8 @@
 
 Nginx 会自动挂载并启用 HTTPS。
 
+如果还没有正式域名，可先为公网 IP 生成一份临时自签证书做上线验证；浏览器会提示证书不受信任，但不影响功能验收。
+
 ---
 
 ## 5. 上线后验证
@@ -119,4 +122,3 @@ docker compose -f docker-compose.prod.lowcost.yml logs -f beat
 ```bash
 BACKUP_TARGET=oss ./deploy/backup_db.sh
 ```
-

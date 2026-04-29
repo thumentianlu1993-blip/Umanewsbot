@@ -1,7 +1,7 @@
 # 项目状态文档
 
-最后更新时间：`2026-04-14`  
-当前版本：`v0.0.1`（上线准备改造中）
+最后更新时间：`2026-04-29`
+当前版本：`v0.0.1`（云端真实上线推进中）
 
 ## 1. 项目背景
 
@@ -60,6 +60,7 @@
 
 - 标准模式（RDS）：`docker-compose.prod.yml`
 - 低成本模式（本机 PG）：`docker-compose.prod.lowcost.yml`
+- Compose 兼容包装脚本：`deploy/docker/compose-wrapper.sh`
 - Docker 与启动脚本：
   - `Dockerfile`
   - `deploy/docker/start-web.sh`
@@ -102,13 +103,31 @@
 ## 6. 当前待办（上线前）
 
 - 在真实 ECS 上完成一次全链路部署与验收
+- 完成 ECS 上 `.env` 落地、自签证书与 IP 临时访问验证
 - 完成 OneBot 实网联调
 - 低成本模式补一条定时备份 cron
 - 完成一次恢复演练并记录结果
 
-## 7. 协作约定
+## 7. 当前上线进展
+
+- 目标服务器：阿里云香港 ECS，采用低成本部署方案（本机 PostgreSQL + OSS）
+- 仓库线上基线：`main` 分支已包含生产化改造与低成本部署脚本
+- 已发现并修复一项部署兼容性风险：
+  - 部分 Ubuntu 镜像仅提供 `docker-compose`
+  - 项目部署/回滚脚本现已兼容 `docker compose` 与 `docker-compose`
+- 已拿到生产所需核心密钥：
+  - `SILICONFLOW_API_KEY`
+  - `OSS_ACCESS_KEY_ID`
+  - `OSS_ACCESS_KEY_SECRET`
+  - `OSS_BUCKET_NAME`
+- 当前下一步：
+  - 在远端写入生产 `.env`
+  - 生成临时自签 HTTPS 证书
+  - 拉起 `web / worker / beat / db / redis / nginx`
+  - 验证后台登录、翻译链路与 OSS 媒体访问
+
+## 8. 协作约定
 
 1. 每次开始项目前先读本文件。  
 2. 每次更新完成后回写本文件。  
 3. 每次收到新 PRD 归档到 `E:/Codex/docs/PRD/`。  
-

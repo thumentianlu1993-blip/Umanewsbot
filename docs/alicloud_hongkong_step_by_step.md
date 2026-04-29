@@ -13,11 +13,11 @@
 
 - ECS（香港）
 - OSS（香港）
-- 域名（可解析到 ECS）
 
 可以暂不买：
 
 - RDS PostgreSQL
+- 正式域名（可先用公网 IP 验证上线）
 
 ## 1. 购买 ECS（香港）
 
@@ -61,7 +61,7 @@ SSH 登录后执行：
 
 ```bash
 sudo apt update
-sudo apt install -y git docker.io docker-compose-plugin
+sudo apt install -y git docker.io docker-compose
 sudo usermod -aG docker $USER
 newgrp docker
 ```
@@ -106,6 +106,8 @@ cp .env.example .env
 - `deploy/certs/fullchain.pem`
 - `deploy/certs/privkey.pem`
 
+如果还没有正式域名，可以先给公网 IP 生成临时自签证书，再走低成本部署验证后台、翻译与 OSS。
+
 启动（低成本）：
 
 ```bash
@@ -124,9 +126,9 @@ chmod +x deploy_lowcost.sh deploy/*.sh deploy/docker/*.sh
 日志查看：
 
 ```bash
-docker compose -f docker-compose.prod.lowcost.yml logs -f web
-docker compose -f docker-compose.prod.lowcost.yml logs -f worker
-docker compose -f docker-compose.prod.lowcost.yml logs -f beat
+./deploy/docker/compose-wrapper.sh -f docker-compose.prod.lowcost.yml logs -f web
+./deploy/docker/compose-wrapper.sh -f docker-compose.prod.lowcost.yml logs -f worker
+./deploy/docker/compose-wrapper.sh -f docker-compose.prod.lowcost.yml logs -f beat
 ```
 
 ## 8. 低成本模式必做运维
@@ -153,4 +155,3 @@ BACKUP_TARGET=oss ./deploy/backup_db.sh
 4. 运行标准部署：`./deploy.sh`
 
 代码层已经支持，不需要改业务逻辑。
-

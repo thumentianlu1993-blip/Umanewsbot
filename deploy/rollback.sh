@@ -13,7 +13,8 @@ TARGET_REF="$1"
 
 git fetch --all --tags
 git checkout "$TARGET_REF"
-docker compose -f docker-compose.prod.yml build web
-docker compose -f docker-compose.prod.yml up -d --remove-orphans
-docker compose -f docker-compose.prod.yml exec web python manage.py migrate --noinput
+COMPOSE="./deploy/docker/compose-wrapper.sh"
 
+"$COMPOSE" -f docker-compose.prod.yml build web
+"$COMPOSE" -f docker-compose.prod.yml up -d --remove-orphans
+"$COMPOSE" -f docker-compose.prod.yml exec web python manage.py migrate --noinput
