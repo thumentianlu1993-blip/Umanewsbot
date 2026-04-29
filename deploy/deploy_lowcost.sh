@@ -11,7 +11,7 @@ fi
 
 COMPOSE="./deploy/docker/compose-wrapper.sh"
 
-"$COMPOSE" -f docker-compose.prod.lowcost.yml pull
+"$COMPOSE" -f docker-compose.prod.lowcost.yml pull db redis nginx
 "$COMPOSE" -f docker-compose.prod.lowcost.yml build web
 "$COMPOSE" -f docker-compose.prod.lowcost.yml up -d --remove-orphans
 "$COMPOSE" -f docker-compose.prod.lowcost.yml exec web python manage.py migrate --noinput
