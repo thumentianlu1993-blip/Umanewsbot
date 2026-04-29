@@ -122,6 +122,9 @@
 - 已发现并修复一项健康检查风险：
   - 容器内 `curl http://127.0.0.1:8000/healthz/` 会命中 Django `DisallowedHost`
   - 应用现已自动允许回环地址进入 `ALLOWED_HOSTS`，兼容 Docker 健康检查
+- 已识别一项远端编排兼容性风险：
+  - 服务器自带 `docker-compose 1.29.2` 在重建带卷容器时会触发 `KeyError: 'ContainerConfig'`
+  - 部署策略调整为优先使用 `docker compose` v2 插件，必要时在 ECS 上手动安装官方 CLI plugin
 - 已拿到生产所需核心密钥：
   - `SILICONFLOW_API_KEY`
   - `OSS_ACCESS_KEY_ID`
