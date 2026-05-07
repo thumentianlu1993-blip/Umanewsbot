@@ -9,6 +9,7 @@ services:
       - .env
     volumes:
       - static_data:/app/server/staticfiles
+      - media_data:/app/server/media
       - app_logs:/app/logs
     restart: unless-stopped
     depends_on:
@@ -27,6 +28,7 @@ services:
     env_file:
       - .env
     volumes:
+      - media_data:/app/server/media
       - app_logs:/app/logs
     restart: unless-stopped
     depends_on:
@@ -84,10 +86,12 @@ services:
       - ./deploy/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./deploy/certs:/etc/nginx/certs:ro
       - static_data:/var/www/static:ro
+      - media_data:/var/www/media:ro
       - app_logs:/var/log/umanewsbot:ro
     restart: unless-stopped
 
 volumes:
   redis_data:
   static_data:
+  media_data:
   app_logs:

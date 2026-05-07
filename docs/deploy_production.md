@@ -70,7 +70,23 @@
 
 ---
 
-## 4. HTTPS 证书
+## 4. HTTP 域名接入
+
+当你先做 HTTP 域名接入时：
+
+- `ALLOWED_HOSTS` 填域名、`www` 子域名和必要的回环地址
+- `CSRF_TRUSTED_ORIGINS` 同时预留 `http://` 与 `https://` 版本
+- `SITE_URL` 先使用 `http://your-domain.com`
+- `SECURE_SSL_REDIRECT=false`
+- `SESSION_COOKIE_SECURE=false`
+- `CSRF_COOKIE_SECURE=false`
+- `SECURE_HSTS_SECONDS=0`
+
+Nginx 当前会直接在 `80` 端口提供服务，不强制跳转 HTTPS。
+
+---
+
+## 5. HTTPS 证书
 
 将证书放到：
 
@@ -83,7 +99,7 @@ Nginx 会自动挂载并启用 HTTPS。
 
 ---
 
-## 5. 上线后验证
+## 6. 上线后验证
 
 1. 服务状态
 
@@ -96,14 +112,14 @@ docker compose -f docker-compose.prod.lowcost.yml ps
 2. 健康检查
 
 ```bash
-curl -I https://your-domain/healthz/
+curl -I http://your-domain/healthz/
 ```
 
 3. 页面验证
 
-- 前台：`https://your-domain/`
-- 后台：`https://your-domain/admin/login/`
-- Django Admin：`https://your-domain/django-admin/`
+- 前台：`http://your-domain/`
+- 后台：`http://your-domain/admin/login/`
+- Django Admin：`http://your-domain/django-admin/`
 
 4. 任务验证
 
@@ -114,7 +130,7 @@ docker compose -f docker-compose.prod.lowcost.yml logs -f beat
 
 ---
 
-## 6. 备份建议
+## 7. 备份建议
 
 - 标准模式：RDS 自动备份 + `backup_db.sh` 额外快照
 - 低成本模式：强烈建议每日定时执行：

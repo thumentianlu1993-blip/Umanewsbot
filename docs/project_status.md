@@ -1,7 +1,7 @@
 # 项目状态文档
 
-最后更新时间：`2026-04-29`
-当前版本：`v0.0.1`（云端真实上线推进中）
+最后更新时间：`2026-05-07`
+当前版本：`v0.0.1`（生产域名接入改造中）
 
 ## 1. 项目背景
 
@@ -125,16 +125,20 @@
 - 已识别一项远端编排兼容性风险：
   - 服务器自带 `docker-compose 1.29.2` 在重建带卷容器时会触发 `KeyError: 'ContainerConfig'`
   - 部署策略调整为优先使用 `docker compose` v2 插件，必要时在 ECS 上手动安装官方 CLI plugin
+- 已开始域名接入准备：
+  - 目标域名为 `umafans.run` 与 `www.umafans.run`
+  - 当前阶段仅接入 HTTP，不强制跳 HTTPS
+  - Nginx / Compose / `.env.example` 将同步适配域名与 media 卷映射
 - 已拿到生产所需核心密钥：
   - `SILICONFLOW_API_KEY`
   - `OSS_ACCESS_KEY_ID`
   - `OSS_ACCESS_KEY_SECRET`
   - `OSS_BUCKET_NAME`
 - 当前下一步：
-  - 在远端写入生产 `.env`
-  - 生成临时自签 HTTPS 证书
-  - 拉起 `web / worker / beat / db / redis / nginx`
-  - 验证后台登录、翻译链路与 OSS 媒体访问
+  - 完成 `umafans.run` / `www.umafans.run` 的 HTTP 域名接入
+  - 在远端写入新的生产 `.env`
+  - 重建并拉起 `web / worker / beat / db / redis / nginx`
+  - 验证域名访问、后台登录与 static/media 访问
 
 ## 8. 协作约定
 

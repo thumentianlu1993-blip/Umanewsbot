@@ -99,14 +99,18 @@ cp .env.example .env
 - 翻译 API Key（`SILICONFLOW_API_KEY` 或 `OPENAI_API_KEY`）
 - OneBot 配置（如果要推送）
 
-## 6. 放证书并启动
+## 6. HTTP 域名接入并启动
 
-证书路径：
+如果已经有正式域名并且当前阶段只做 HTTP：
 
-- `deploy/certs/fullchain.pem`
-- `deploy/certs/privkey.pem`
-
-如果还没有正式域名，可以先给公网 IP 生成临时自签证书，再走低成本部署验证后台、翻译与 OSS。
+- 在 DNS 中把 `@` 和 `www` 的 `A` 记录都指向 ECS 公网 IP
+- `.env` 中将 `SITE_URL` 设为 `http://your-domain.com`
+- 将 `CSRF_TRUSTED_ORIGINS` 同时写入 `http://` 与 `https://` 版本
+- 关闭当前阶段的 HTTPS 强制项：
+  - `SECURE_SSL_REDIRECT=false`
+  - `SESSION_COOKIE_SECURE=false`
+  - `CSRF_COOKIE_SECURE=false`
+  - `SECURE_HSTS_SECONDS=0`
 
 启动（低成本）：
 
@@ -115,11 +119,20 @@ chmod +x deploy_lowcost.sh deploy/*.sh deploy/docker/*.sh
 ./deploy_lowcost.sh
 ```
 
-## 7. 验证
+## 7. 放证书（下一步）
 
-1. `https://your-domain/healthz/`
-2. `https://your-domain/admin/login/`
-3. `https://your-domain/`
+证书路径：
+
+- `deploy/certs/fullchain.pem`
+- `deploy/certs/privkey.pem`
+
+如果还没有正式域名，可以先给公网 IP 生成临时自签证书，再走低成本部署验证后台、翻译与 OSS。
+
+## 8. 验证
+
+1. `http://your-domain/healthz/`
+2. `http://your-domain/admin/login/`
+3. `http://your-domain/`
 4. 发布一篇并检查前台
 5. 触发一次抓取和翻译任务
 
@@ -131,7 +144,7 @@ chmod +x deploy_lowcost.sh deploy/*.sh deploy/docker/*.sh
 ./deploy/docker/compose-wrapper.sh -f docker-compose.prod.lowcost.yml logs -f beat
 ```
 
-## 8. 低成本模式必做运维
+## 9. 低成本模式必做运维
 
 每日备份并上传 OSS：
 
@@ -145,7 +158,7 @@ BACKUP_TARGET=oss ./deploy/backup_db.sh
 0 3 * * * cd /opt/umanewsbot && BACKUP_TARGET=oss ./deploy/backup_db.sh >> /var/log/umanewsbot_backup.log 2>&1
 ```
 
-## 9. 将来升级到 RDS（平滑迁移）
+## 10. 将来升级到 RDS（平滑迁移）
 
 当流量上来时：
 
