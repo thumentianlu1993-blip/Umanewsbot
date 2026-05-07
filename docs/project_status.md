@@ -1,7 +1,11 @@
 # 项目状态文档
 
 最后更新时间：`2026-05-07`
-当前版本：`v0.0.1`（生产域名接入改造中）
+当前版本：`v0.0.1`（正式域名 HTTP 接入已修复）
+
+> 角色说明：
+> 本文档用于保留项目级概览与摘要信息。
+> 当前真实工作状态、最近一次关键修复、线上实际进展，请以 [docs/current_state.md](E:/Codex/docs/current_state.md) 为准。
 
 ## 1. 项目背景
 
@@ -100,15 +104,14 @@
 
 说明：本地 `.env` 若指向不存在的 `postgres@db`，测试建库会失败，这是本地环境问题。
 
-## 6. 当前待办（上线前）
+## 6. 当前待办（项目级摘要）
 
-- 在真实 ECS 上完成一次全链路部署与验收
-- 完成 ECS 上 `.env` 落地、自签证书与 IP 临时访问验证
-- 完成 OneBot 实网联调
-- 低成本模式补一条定时备份 cron
-- 完成一次恢复演练并记录结果
+- 推进 HTTPS / 证书接入
+- 做部署稳定化
+- 完善监控、备份与回滚流程
+- 完成 OneBot / QQ Bot 实网联调
 
-## 7. 当前上线进展
+## 7. 当前上线进展（摘要）
 
 - 目标服务器：阿里云香港 ECS，采用低成本部署方案（本机 PostgreSQL + OSS）
 - 仓库线上基线：`main` 分支已包含生产化改造与低成本部署脚本
@@ -127,21 +130,20 @@
   - 部署策略调整为优先使用 `docker compose` v2 插件，必要时在 ECS 上手动安装官方 CLI plugin
 - 已开始域名接入准备：
   - 目标域名为 `umafans.run` 与 `www.umafans.run`
-  - 当前阶段仅接入 HTTP，不强制跳 HTTPS
-  - Nginx / Compose / `.env.example` 将同步适配域名与 media 卷映射
+  - 当前阶段正式域名 HTTP 接入修复已完成
+  - 下一阶段进入 HTTPS / 证书接入与部署稳定化
 - 已拿到生产所需核心密钥：
   - `SILICONFLOW_API_KEY`
   - `OSS_ACCESS_KEY_ID`
   - `OSS_ACCESS_KEY_SECRET`
   - `OSS_BUCKET_NAME`
 - 当前下一步：
-  - 完成 `umafans.run` / `www.umafans.run` 的 HTTP 域名接入
-  - 在远端写入新的生产 `.env`
-  - 重建并拉起 `web / worker / beat / db / redis / nginx`
-  - 验证域名访问、后台登录与 static/media 访问
+  - 推进 HTTPS / 证书接入
+  - 做部署稳定化
+  - 完善监控、备份与回滚流程
 
 ## 8. 协作约定
 
-1. 每次开始项目前先读本文件。  
-2. 每次更新完成后回写本文件。  
+1. 每次开始项目前优先阅读 [docs/current_state.md](E:/Codex/docs/current_state.md) 与 [AGENTS.md](E:/Codex/AGENTS.md)，本文档作为项目级摘要辅助阅读。  
+2. 每次更新完成后同步回写本文件与 [docs/current_state.md](E:/Codex/docs/current_state.md)。  
 3. 每次收到新 PRD 归档到 `E:/Codex/docs/PRD/`。  
