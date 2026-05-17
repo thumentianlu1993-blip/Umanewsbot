@@ -32,6 +32,7 @@
             <th>发布时间</th>
             <th>标签</th>
             <th>来源</th>
+            <th>发布模式</th>
             <th>状态</th>
             <th>更新时间</th>
             <th>操作</th>
@@ -52,6 +53,7 @@
                 </div>
               </td>
               <td>{{ article.source_note|default:article.get_source_site_display }}</td>
+              <td>{{ article.get_published_by_mode_display|default:"-" }}</td>
               <td><span class="badge success">{{ article.get_workflow_status_display }}</span></td>
               <td>{{ article.updated_at|date:"Y-m-d H:i" }}</td>
               <td>
@@ -62,7 +64,7 @@
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="7" class="muted">还没有发布文章。</td></tr>
+            <tr><td colspan="8" class="muted">还没有发布文章。</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -80,6 +82,7 @@
           {% endif %}
           <div class="article-meta">
             <span>{{ article.source_note|default:article.get_source_site_display }}</span>
+            <span>{{ article.get_published_by_mode_display|default:"-" }}</span>
             <span>更新于 {{ article.updated_at|date:"m-d H:i" }}</span>
           </div>
           <div class="tag-list">

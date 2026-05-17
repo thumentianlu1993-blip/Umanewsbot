@@ -20,14 +20,19 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 
 from .forms import ArticleEditorForm, BackendAuthenticationForm, NewsSourceForm, TermEntryForm, TermImportForm
 from .models import (
+    AutomationLog,
+    AutomationStatus,
     ArticleTranslationStatus,
     CrawlJob,
     MediaAsset,
     NewsArticle,
     NewsImage,
     NewsSource,
+    NotificationLog,
     OperationLog,
+    PublishedByMode,
     PushTarget,
+    ReviewMode,
     TaskExecutionLog,
     TermEntry,
     TermType,
@@ -47,7 +52,7 @@ from .services.term_admin import (
     serialize_aliases,
     validate_term_payload,
 )
-from .tasks import batch_translate_articles_task, crawl_news_source_task, translate_article_task
+from .tasks import batch_translate_articles_task, crawl_news_source_task, process_article_automation_task, translate_article_task
 
 
 class BackendLoginView(LoginView):
@@ -109,6 +114,8 @@ def _article_filters(queryset, request: HttpRequest):
     workflow_status = (request.GET.get("workflow_status") or request.POST.get("workflow_status") or "").strip()
     translated = (request.GET.get("translated") or request.POST.get("translated") or "").strip()
     translation_status = (request.GET.get("translation_status") or request.POST.get("translation_status") or "").strip()
+    automation_status = (request.GET.get("automation_status") or request.POST.get("automation_status") or "").strip()
+    review_mode = (request.GET.get("review_mode") or request.POST.get("review_mode") or "").strip()
 
     if query:
         queryset = queryset.filter(
@@ -123,6 +130,10 @@ def _article_filters(queryset, request: HttpRequest):
         queryset = queryset.filter(workflow_status=workflow_status)
     if translation_status:
         queryset = queryset.filter(translation_status=translation_status)
+    if automation_status:
+        queryset = queryset.filter(automation_status=automation_status)
+    if review_mode:
+        queryset = queryset.filter(review_mode=review_mode)
     if translated == "yes":
         queryset = queryset.exclude(translated_body_zh="")
     elif translated == "no":
@@ -521,6 +532,8 @@ def candidate_list(request: HttpRequest):
             sources=sources,
             workflow_choices=WorkflowStatus.choices,
             translation_status_choices=ArticleTranslationStatus.choices,
+            automation_status_choices=AutomationStatus.choices,
+            review_mode_choices=ReviewMode.choices,
         ),
     )
 
@@ -531,7 +544,9 @@ def candidate_detail(request: HttpRequest, article_id: int):
     if denied:
         return denied
     article = get_object_or_404(
-        NewsArticle.objects.select_related("source_config", "cover_media_asset").prefetch_related("images", "media_assets", "translation_runs"),
+        NewsArticle.objects.select_related("source_config", "cover_media_asset").prefetch_related(
+            "images", "media_assets", "translation_runs", "automation_logs"
+        ),
         pk=article_id,
     )
     return render(request, "stable/console/candidate_detail.html", _console_context(request, article=article))
@@ -588,8 +603,10 @@ def candidate_ignore(request: HttpRequest, article_id: int):
         return denied
     article = get_object_or_404(NewsArticle, pk=article_id)
     article.workflow_status = WorkflowStatus.IGNORED
+    article.review_mode = ReviewMode.IGNORED
+    article.automation_status = AutomationStatus.IGNORED
     article.ignored_at = timezone.now()
-    article.save(update_fields=["workflow_status", "ignored_at", "updated_at"])
+    article.save(update_fields=["workflow_status", "review_mode", "automation_status", "ignored_at", "updated_at"])
     log_operation(
         action_type="article_ignored",
         target_type="article",
@@ -599,6 +616,48 @@ def candidate_ignore(request: HttpRequest, article_id: int):
     )
     messages.success(request, "候选新闻已忽略。")
     return redirect("console-candidate-list")
+
+
+@login_required
+@require_POST
+def candidate_mark_manual(request: HttpRequest, article_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    article = get_object_or_404(NewsArticle, pk=article_id)
+    article.review_mode = ReviewMode.MANUAL
+    article.automation_status = AutomationStatus.MANUAL_REVIEW_REQUIRED
+    article.workflow_status = WorkflowStatus.PENDING_REVIEW
+    article.decision_summary = article.decision_summary or "人工接管：管理员手动转入审核"
+    article.save(update_fields=["review_mode", "automation_status", "workflow_status", "decision_summary", "updated_at"])
+    log_operation(
+        action_type="article_marked_manual",
+        target_type="article",
+        target_id=article.pk,
+        detail=f"手动转入人工审核《{article.effective_title}》",
+        admin=request.user,
+    )
+    messages.success(request, "已转入人工审核。")
+    return redirect(request.POST.get("next") or reverse("console-candidate-detail", args=[article.pk]))
+
+
+@login_required
+@require_POST
+def candidate_run_automation(request: HttpRequest, article_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    article = get_object_or_404(NewsArticle, pk=article_id)
+    dispatch_task(process_article_automation_task, article.id)
+    log_operation(
+        action_type="article_automation_triggered",
+        target_type="article",
+        target_id=article.pk,
+        detail=f"手动触发自动化处理《{article.effective_title}》",
+        admin=request.user,
+    )
+    messages.success(request, "已触发自动化处理。")
+    return redirect(request.POST.get("next") or reverse("console-candidate-detail", args=[article.pk]))
 
 
 @login_required
@@ -634,6 +693,7 @@ def article_editor(request: HttpRequest, article_id: int):
                 article.workflow_status = WorkflowStatus.PUBLISHED
                 article.published_to_web_at = timezone.now()
                 article.published_by = request.user
+                article.published_by_mode = PublishedByMode.MANUAL
             elif intent == "withdraw":
                 article.workflow_status = WorkflowStatus.WITHDRAWN
                 article.withdrawn_at = timezone.now()
@@ -772,9 +832,15 @@ def operation_log_list(request: HttpRequest):
     if denied:
         return denied
     logs = OperationLog.objects.select_related("admin").all()
+    automation_logs = AutomationLog.objects.select_related("article").all()[:20]
+    notification_logs = NotificationLog.objects.all()[:20]
     paginator = Paginator(logs, 20)
     page_obj = paginator.get_page(request.GET.get("page"))
-    return render(request, "stable/console/logs.html", _console_context(request, page_obj=page_obj))
+    return render(
+        request,
+        "stable/console/logs.html",
+        _console_context(request, page_obj=page_obj, automation_logs=automation_logs, notification_logs=notification_logs),
+    )
 
 
 def public_news_feed(request: HttpRequest):
@@ -805,6 +871,14 @@ def _article_payload(article: NewsArticle) -> dict:
         "summary_zh": article.summary_zh,
         "published_at": article.published_at.isoformat(),
         "workflow_status": article.workflow_status,
+        "review_mode": article.review_mode,
+        "risk_level": article.risk_level,
+        "automation_status": article.automation_status,
+        "decision_summary": article.decision_summary,
+        "score_total": article.score_total,
+        "quality_score": article.quality_score,
+        "rewrite_confidence": article.rewrite_confidence,
+        "content_category": article.content_category,
         "status": article.status,
         "translation_status": article.translation_status,
         "translation_error_message": article.translation_error_message,
@@ -812,6 +886,11 @@ def _article_payload(article: NewsArticle) -> dict:
         "translation_provider": article.translation_provider,
         "translation_retry_count": article.translation_retry_count,
         "translated_at": article.translated_at.isoformat() if article.translated_at else None,
+        "rewrite_title_zh": article.rewrite_title_zh,
+        "rewrite_summary_zh": article.rewrite_summary_zh,
+        "rewrite_body_zh": article.rewrite_body_zh,
+        "published_by_mode": article.published_by_mode,
+        "auto_publish_at": article.auto_publish_at.isoformat() if article.auto_publish_at else None,
         "source_url": article.source_url,
         "is_first_crawled": article.is_first_crawled,
         "images": [

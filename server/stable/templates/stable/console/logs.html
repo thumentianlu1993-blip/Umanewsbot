@@ -49,4 +49,68 @@
       {% endif %}
     </div>
   </section>
+
+  <section class="panel">
+    <h3>最近自动化日志</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>文章</th>
+            <th>阶段</th>
+            <th>结果</th>
+            <th>分数</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in automation_logs %}
+            <tr>
+              <td>{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
+              <td>{{ log.article.effective_title|truncatechars:36 }}</td>
+              <td>{{ log.get_phase_display }}</td>
+              <td>{{ log.get_result_display }}</td>
+              <td>{{ log.score|default:"-" }}</td>
+              <td>{{ log.reason|default:log.error_message|truncatechars:100 }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="muted">暂无自动化日志。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>最近通知记录</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>类型</th>
+            <th>渠道</th>
+            <th>状态</th>
+            <th>目标</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in notification_logs %}
+            <tr>
+              <td>{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
+              <td>{{ log.get_type_display }}</td>
+              <td>{{ log.get_channel_display }}</td>
+              <td>{{ log.get_status_display }}</td>
+              <td>{{ log.target|default:"-" }}</td>
+              <td>{{ log.payload_summary|default:log.error_message|truncatechars:100 }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="muted">暂无通知记录。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 {% endblock %}

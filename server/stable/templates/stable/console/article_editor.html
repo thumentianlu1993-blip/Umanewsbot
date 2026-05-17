@@ -128,9 +128,29 @@
         {% endif %}
         <p class="badge success">术语映射会在翻译阶段和落稿阶段一并生效</p>
 
+        <h4 style="margin-top: 16px;">自动化决策</h4>
+        <div class="article-meta">
+          <span class="badge">分流：{{ article.get_review_mode_display|default:"未分流" }}</span>
+          <span class="badge">状态：{{ article.get_automation_status_display }}</span>
+          <span class="badge">分数：{{ article.score_total }}</span>
+        </div>
+        {% if article.decision_summary %}
+          <p class="muted">{{ article.decision_summary }}</p>
+        {% endif %}
+        {% if article.automation_error_message %}
+          <p class="muted" style="color: var(--danger);">{{ article.automation_error_message }}</p>
+        {% endif %}
+
         <h4 style="margin-top: 16px;">AI 翻译参考</h4>
         <p><strong>{{ article.translated_title_zh|default:"暂未生成翻译标题" }}</strong></p>
         <div class="content-block">{{ article.translated_body_zh|default:"当前还没有可用译文。" }}</div>
+
+        <h4 style="margin-top: 16px;">AI 改写参考</h4>
+        <p><strong>{{ article.rewrite_title_zh|default:"暂未生成改写标题" }}</strong></p>
+        {% if article.rewrite_summary_zh %}
+          <p class="muted">{{ article.rewrite_summary_zh }}</p>
+        {% endif %}
+        <div class="content-block">{{ article.rewrite_body_zh|default:"当前还没有可用改写稿。" }}</div>
 
         <form method="post" action="{% url 'console-candidate-retranslate' article.id %}" style="margin-top: 16px;">
           {% csrf_token %}

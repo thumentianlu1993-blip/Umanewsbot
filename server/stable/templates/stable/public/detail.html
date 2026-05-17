@@ -31,7 +31,7 @@
     {% if article.cover_image_url %}
       <img class="cover" src="{{ article.cover_image_url }}" alt="">
     {% endif %}
-    <div class="content-block">{{ article.body_zh|linebreaks }}</div>
+    <div class="content-block">{{ article.effective_body|linebreaks }}</div>
     <div class="panel" style="margin-top: 26px;">
       <p><strong>来源说明：</strong>{{ article.source_note|default:article.get_source_site_display }}</p>
       <p><strong>原文链接：</strong><a href="{{ article.source_url }}" target="_blank" rel="noreferrer">{{ article.source_url }}</a></p>

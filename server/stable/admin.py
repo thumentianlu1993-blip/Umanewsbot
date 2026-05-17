@@ -9,12 +9,14 @@ from django.utils.html import format_html
 from .forms import NewsArticleAdminForm, NewsImageAdminForm, NewsSourceForm, PushArticleForm
 from .models import (
     ArticleStatus,
+    AutomationLog,
     CrawlJob,
     MediaAsset,
     NewsArticle,
     NewsImage,
     NewsSnapshot,
     NewsSource,
+    NotificationLog,
     OperationLog,
     PushLog,
     PushTarget,
@@ -62,6 +64,13 @@ class TranslationRunInline(admin.TabularInline):
     can_delete = False
 
 
+class AutomationLogInline(admin.TabularInline):
+    model = AutomationLog
+    extra = 0
+    readonly_fields = ("phase", "result", "score", "confidence", "reason", "error_message", "created_at")
+    can_delete = False
+
+
 @admin.register(NewsArticle)
 class NewsArticleAdmin(admin.ModelAdmin):
     form = NewsArticleAdminForm
@@ -72,11 +81,14 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "source_mode",
         "published_at",
         "workflow_status",
+        "automation_status",
+        "review_mode",
+        "score_total",
         "status",
         "is_first_crawled",
         "push_action_link",
     )
-    list_filter = ("source_site", "source_mode", "workflow_status", "status", "is_first_crawled")
+    list_filter = ("source_site", "source_mode", "workflow_status", "automation_status", "review_mode", "risk_level", "status", "is_first_crawled")
     search_fields = ("title_ja", "translated_title_zh", "title_zh", "source_article_id", "source_url")
     readonly_fields = (
         "source_config",
@@ -98,13 +110,14 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "push_action_link",
         "translate_action_link",
     )
-    inlines = [NewsImageInline, MediaAssetInline, NewsSnapshotInline, TranslationRunInline, PushLogInline]
+    inlines = [NewsImageInline, MediaAssetInline, NewsSnapshotInline, TranslationRunInline, AutomationLogInline, PushLogInline]
     actions = ["mark_pending_review", "mark_published_ready", "queue_translation"]
 
     fieldsets = (
         ("来源信息", {"fields": ("source_config", "crawl_job", "source_site", "source_mode", "source_article_id", "source_url", "published_at")}),
         ("日文原稿", {"fields": ("title_ja", "body_ja_raw", "body_ja_normalized")}),
         ("翻译参考", {"fields": ("translated_title_zh", "translated_summary_zh", "translated_body_zh")}),
+        ("自动化运营", {"fields": ("review_mode", "risk_level", "automation_status", "content_category", "score_total", "quality_score", "rewrite_confidence", "decision_summary", "decision_reason", "base_translation_zh", "rewrite_title_zh", "rewrite_summary_zh", "rewrite_body_zh", "published_by_mode", "auto_publish_at", "automation_error_message")}),
         ("发布内容", {"fields": ("title_zh", "summary_zh", "body_zh", "source_note", "editor_notes", "workflow_status", "status")}),
         ("追踪信息", {"fields": ("is_first_crawled", "first_seen_at", "last_seen_at")}),
         ("操作", {"fields": ("translate_action_link", "push_action_link")}),
@@ -269,3 +282,19 @@ class OperationLogAdmin(admin.ModelAdmin):
     list_filter = ("action_type", "target_type")
     search_fields = ("detail", "target_id", "admin__username")
     readonly_fields = ("action_type", "target_type", "target_id", "detail", "admin", "created_at")
+
+
+@admin.register(AutomationLog)
+class AutomationLogAdmin(admin.ModelAdmin):
+    list_display = ("article", "phase", "result", "score", "confidence", "created_at")
+    list_filter = ("phase", "result")
+    search_fields = ("article__title_ja", "article__title_zh", "reason", "error_message")
+    readonly_fields = ("article", "phase", "result", "score", "confidence", "reason", "payload", "error_message", "created_at")
+
+
+@admin.register(NotificationLog)
+class NotificationLogAdmin(admin.ModelAdmin):
+    list_display = ("type", "channel", "target", "status", "sent_at", "created_at")
+    list_filter = ("type", "channel", "status")
+    search_fields = ("target", "payload_summary", "error_message")
+    readonly_fields = ("type", "channel", "target", "status", "payload_summary", "error_message", "sent_at", "created_at")

@@ -16,6 +16,8 @@ urlpatterns = [
     path("candidates/batch-retranslate/", views.candidate_batch_retranslate, name="console-candidate-batch-retranslate"),
     path("candidates/<int:article_id>/", views.candidate_detail, name="console-candidate-detail"),
     path("candidates/<int:article_id>/retranslate/", views.candidate_retranslate, name="console-candidate-retranslate"),
+    path("candidates/<int:article_id>/automation/", views.candidate_run_automation, name="console-candidate-run-automation"),
+    path("candidates/<int:article_id>/manual/", views.candidate_mark_manual, name="console-candidate-mark-manual"),
     path("candidates/<int:article_id>/ignore/", views.candidate_ignore, name="console-candidate-ignore"),
     path("articles/<int:article_id>/edit/", views.article_editor, name="console-article-editor"),
     path("articles/<int:article_id>/preview/", views.article_preview, name="console-article-preview"),
@@ -30,4 +32,3 @@ urlpatterns = [
     path("published/", views.published_list, name="console-published-list"),
     path("logs/", views.operation_log_list, name="console-log-list"),
 ]
-

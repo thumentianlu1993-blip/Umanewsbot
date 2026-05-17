@@ -136,3 +136,92 @@ docker logs --tail=120 umanewsbot-web-1
 docker logs --tail=120 umanewsbot-nginx-1
 ```
 
+## 自动化运营 MVP 部署与验证
+
+### 关键环境变量
+
+自动化能力通过 `.env` 控制，建议生产首次部署时先关闭：
+
+```bash
+AUTOMATION_ENABLED=false
+AUTO_REVIEW_THRESHOLD=75
+MANUAL_REVIEW_THRESHOLD=45
+AUTO_PUBLISH_BATCH_LIMIT=3
+AUTO_PUBLISH_INTERVAL_MINUTES=15
+REWRITE_CONFIDENCE_MIN=60
+AUTO_PUBLISH_REQUIRE_COVER=false
+REWRITE_PROVIDER=fallback
+REWRITE_MODEL=deepseek-ai/DeepSeek-V3
+REWRITE_MAX_TOKENS=2600
+REWRITE_TIMEOUT_SECONDS=90
+AUTOMATION_ENABLE_EMAIL=false
+AUTOMATION_NOTIFY_EMAILS=
+```
+
+真实启用 AI 改写时，按现有 OpenAI-compatible / SiliconFlow 配置补齐 Key，并将 `REWRITE_PROVIDER` 设置为对应 provider。
+
+### 部署步骤
+
+```bash
+cd /opt/umanewsbot
+cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+git pull origin main
+docker compose -f docker-compose.prod.lowcost.yml build web worker beat
+docker compose -f docker-compose.prod.lowcost.yml up -d
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py migrate
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py check
+```
+
+如生产使用标准 RDS 方案，将 compose 文件替换为 `docker-compose.prod.yml`。
+
+### 验证自动化字段与迁移
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.models import NewsArticle, AutomationLog, NotificationLog; print(NewsArticle.objects.count(), AutomationLog.objects.count(), NotificationLog.objects.count())"
+```
+
+### 灰度启用自动化
+
+先把 `.env` 中 `AUTOMATION_ENABLED` 改为 `true`，再重启相关容器：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml up -d web worker beat
+docker logs --tail=120 umanewsbot-worker-1
+docker logs --tail=120 umanewsbot-beat-1
+```
+
+### 手动触发单篇自动化验证
+
+进入后台候选新闻详情页，点击“重新自动化处理”；或在服务器执行：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.tasks import process_article_automation_task; process_article_automation_task.delay(ARTICLE_ID)"
+```
+
+将 `ARTICLE_ID` 替换为已翻译文章 ID。
+
+### 自动发布批次验证
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.tasks import auto_publish_batch_task; print(auto_publish_batch_task.delay(limit=1))"
+docker logs --tail=120 umanewsbot-worker-1
+```
+
+验证后台“已发布内容”列表、前台首页和文章详情页是否出现自动发布稿。
+
+### 异常通知验证
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.tasks import send_notification_task; send_notification_task.delay('rewrite_failed', {'title': '通知测试', 'article_id': 1})"
+```
+
+如果邮件未启用，后台日志中应出现 `NotificationLog(status=skipped, channel=email)`；如果邮件已启用，应出现 `sent` 或具体失败原因。
+
+### 自动化排障顺序
+
+1. 先查 `.env` 中 `AUTOMATION_ENABLED`、阈值、邮件配置和模型配置
+2. 再查 `beat` 是否加载 `auto-publish-batch` 与 `detect-automation-anomalies`
+3. 查看 `worker` 日志是否有评分、改写、校验、发布异常
+4. 后台文章详情页查看 `AutomationLog`
+5. 后台操作日志页查看 `NotificationLog`
+6. 如果内容质量不稳，先关闭 `AUTOMATION_ENABLED`，不要急着回滚代码

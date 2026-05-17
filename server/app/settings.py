@@ -199,6 +199,29 @@ TRANSLATION_UNKNOWN_HORSE_LIMIT = int(env("TRANSLATION_UNKNOWN_HORSE_LIMIT", "12
 AUTO_TRANSLATE_ON_INGEST = env_bool("AUTO_TRANSLATE_ON_INGEST", True)
 AUTO_TRANSLATE_SYNC = env_bool("AUTO_TRANSLATE_SYNC", True)
 
+AUTOMATION_ENABLED = env_bool("AUTOMATION_ENABLED", False)
+AUTO_REVIEW_THRESHOLD = int(env("AUTO_REVIEW_THRESHOLD", "75"))
+MANUAL_REVIEW_THRESHOLD = int(env("MANUAL_REVIEW_THRESHOLD", "45"))
+AUTO_PUBLISH_BATCH_LIMIT = int(env("AUTO_PUBLISH_BATCH_LIMIT", "3"))
+AUTO_PUBLISH_INTERVAL_MINUTES = int(env("AUTO_PUBLISH_INTERVAL_MINUTES", "15"))
+REWRITE_CONFIDENCE_MIN = int(env("REWRITE_CONFIDENCE_MIN", "60"))
+AUTO_PUBLISH_REQUIRE_COVER = env_bool("AUTO_PUBLISH_REQUIRE_COVER", False)
+REWRITE_PROVIDER = env("REWRITE_PROVIDER", TRANSLATION_PROVIDER)
+REWRITE_MODEL = env("REWRITE_MODEL", TRANSLATION_MODEL)
+REWRITE_MAX_TOKENS = int(env("REWRITE_MAX_TOKENS", "2600"))
+REWRITE_TIMEOUT_SECONDS = int(env("REWRITE_TIMEOUT_SECONDS", str(TRANSLATION_TIMEOUT_SECONDS)))
+
+EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = env("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(env("EMAIL_PORT", "25"))
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", False)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", "umanewsbot@example.com")
+AUTOMATION_ENABLE_EMAIL = env_bool("AUTOMATION_ENABLE_EMAIL", False)
+AUTOMATION_NOTIFY_EMAILS = env_list("AUTOMATION_NOTIFY_EMAILS", "")
+
 ONEBOT_BASE_URL = env("ONEBOT_BASE_URL", "http://localhost:3000")
 ONEBOT_ACCESS_TOKEN = env("ONEBOT_ACCESS_TOKEN")
 
@@ -240,6 +263,15 @@ CELERY_BEAT_SCHEDULE = {
     "crawl-jra": {
         "task": "stable.tasks.crawl_jra_news",
         "schedule": crontab(minute=10, hour="0,12"),
+    },
+    "auto-publish-batch": {
+        "task": "stable.tasks.auto_publish_batch_task",
+        "schedule": crontab(minute=f"*/{AUTO_PUBLISH_INTERVAL_MINUTES}"),
+        "kwargs": {"limit": AUTO_PUBLISH_BATCH_LIMIT},
+    },
+    "detect-automation-anomalies": {
+        "task": "stable.tasks.detect_automation_anomalies_task",
+        "schedule": crontab(minute="*/30"),
     },
 }
 

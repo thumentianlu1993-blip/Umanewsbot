@@ -55,6 +55,85 @@ class WorkflowStatus(models.TextChoices):
     IGNORED = "ignored", "已忽略"
 
 
+class ReviewMode(models.TextChoices):
+    AUTO = "auto", "自动发布"
+    MANUAL = "manual", "人工审核"
+    IGNORED = "ignored", "忽略"
+
+
+class RiskLevel(models.TextChoices):
+    LOW = "low", "低风险"
+    MEDIUM = "medium", "中风险"
+    HIGH = "high", "高风险"
+
+
+class AutomationStatus(models.TextChoices):
+    PENDING = "pending", "待处理"
+    SCORED = "scored", "已评分"
+    REWRITE_READY = "rewrite_ready", "待改写"
+    REWRITTEN = "rewritten", "已改写"
+    VALIDATED = "validated", "已校验"
+    PUBLISH_READY = "publish_ready", "可自动发布"
+    AUTO_PUBLISHED = "auto_published", "已自动发布"
+    MANUAL_REVIEW_REQUIRED = "manual_review_required", "需人工审核"
+    IGNORED = "ignored", "已忽略"
+    FAILED = "failed", "自动化失败"
+
+
+class ContentCategory(models.TextChoices):
+    FLASH = "flash", "快讯"
+    PRE_RACE = "pre_race", "赛前前瞻"
+    POST_RACE = "post_race", "赛后结果/复盘"
+    OFFICIAL = "official", "官方公告"
+    INTERVIEW = "interview", "采访/人物"
+    OTHER = "other", "其他"
+
+
+class PublishedByMode(models.TextChoices):
+    MANUAL = "manual", "人工"
+    AUTO = "auto", "自动"
+
+
+class AutomationPhase(models.TextChoices):
+    SCORE = "score", "评分"
+    REWRITE = "rewrite", "改写"
+    VALIDATE = "validate", "校验"
+    PUBLISH = "publish", "发布"
+    NOTIFY = "notify", "通知"
+
+
+class AutomationResult(models.TextChoices):
+    SUCCESS = "success", "成功"
+    FAILED = "failed", "失败"
+    SKIPPED = "skipped", "跳过"
+
+
+class NotificationType(models.TextChoices):
+    CRAWL_FAILED = "crawl_failed", "来源抓取失败"
+    TRANSLATION_FAILED = "translation_failed", "翻译失败"
+    REWRITE_FAILED = "rewrite_failed", "改写失败"
+    PUBLISH_FAILED = "publish_failed", "自动发布失败"
+    STALE_SOURCE = "stale_source", "来源长时间无新稿"
+    BACKLOG = "backlog", "候选稿异常堆积"
+    NO_AUTO_PUBLISH_24H = "no_auto_publish_24h", "24 小时无自动发布"
+    IMPORTANT_MANUAL = "important_manual", "重点新闻转人工"
+    REPEATED_FAILURE = "repeated_failure", "关键任务连续失败"
+
+
+class NotificationChannel(models.TextChoices):
+    EMAIL = "email", "邮件"
+    SMS = "sms", "短信"
+    QQ = "qq", "QQ"
+    WECHAT = "wechat", "微信"
+
+
+class NotificationStatus(models.TextChoices):
+    QUEUED = "queued", "排队中"
+    SENT = "sent", "已发送"
+    FAILED = "failed", "失败"
+    SKIPPED = "skipped", "跳过"
+
+
 class PushStatus(models.TextChoices):
     QUEUED = "queued", "排队中"
     SUCCESS = "success", "成功"
@@ -209,6 +288,26 @@ class NewsArticle(TimestampedModel):
         choices=WorkflowStatus.choices,
         default=WorkflowStatus.PENDING_TRANSLATION,
     )
+    review_mode = models.CharField(max_length=16, choices=ReviewMode.choices, blank=True)
+    risk_level = models.CharField(max_length=16, choices=RiskLevel.choices, blank=True)
+    automation_status = models.CharField(
+        max_length=32,
+        choices=AutomationStatus.choices,
+        default=AutomationStatus.PENDING,
+    )
+    decision_reason = models.JSONField(default=dict, blank=True)
+    decision_summary = models.TextField(blank=True)
+    score_total = models.PositiveSmallIntegerField(default=0)
+    quality_score = models.PositiveSmallIntegerField(default=0)
+    rewrite_confidence = models.PositiveSmallIntegerField(default=0)
+    base_translation_zh = models.TextField(blank=True)
+    rewrite_title_zh = models.CharField(max_length=500, blank=True)
+    rewrite_summary_zh = models.TextField(blank=True)
+    rewrite_body_zh = models.TextField(blank=True)
+    published_by_mode = models.CharField(max_length=16, choices=PublishedByMode.choices, blank=True)
+    auto_publish_at = models.DateTimeField(null=True, blank=True)
+    automation_error_message = models.TextField(blank=True)
+    content_category = models.CharField(max_length=32, choices=ContentCategory.choices, blank=True)
     editor_notes = models.TextField(blank=True)
     manually_edited_fields = models.JSONField(default=list, blank=True)
     translation_metadata = models.JSONField(default=dict, blank=True)
@@ -270,17 +369,25 @@ class NewsArticle(TimestampedModel):
 
     @property
     def effective_title(self) -> str:
-        return self.title_zh or self.translated_title_zh or self.title_ja
+        manual_fields = set(self.manually_edited_fields or [])
+        if "title_zh" in manual_fields and self.title_zh:
+            return self.title_zh
+        return self.rewrite_title_zh or self.title_zh or self.translated_title_zh or self.title_ja
 
     @property
     def effective_body(self) -> str:
-        return self.body_zh or self.translated_body_zh or self.body_ja_normalized or self.body_ja_raw
+        manual_fields = set(self.manually_edited_fields or [])
+        if "body_zh" in manual_fields and self.body_zh:
+            return self.body_zh
+        return self.rewrite_body_zh or self.body_zh or self.translated_body_zh or self.body_ja_normalized or self.body_ja_raw
 
     @property
     def effective_summary(self) -> str:
         manual_fields = set(self.manually_edited_fields or [])
         if "summary_zh" in manual_fields:
             return self.summary_zh or ""
+        if self.rewrite_summary_zh:
+            return self.rewrite_summary_zh
         if self.summary_zh:
             return self.summary_zh
         if "push_summary_zh" in manual_fields:
@@ -530,6 +637,33 @@ class TaskExecutionLog(TimestampedModel):
 
     class Meta:
         ordering = ("-started_at", "-id")
+
+
+class AutomationLog(TimestampedModel):
+    article = models.ForeignKey(NewsArticle, on_delete=models.CASCADE, related_name="automation_logs")
+    phase = models.CharField(max_length=16, choices=AutomationPhase.choices)
+    result = models.CharField(max_length=16, choices=AutomationResult.choices)
+    score = models.PositiveSmallIntegerField(null=True, blank=True)
+    confidence = models.PositiveSmallIntegerField(null=True, blank=True)
+    reason = models.TextField(blank=True)
+    payload = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+
+
+class NotificationLog(TimestampedModel):
+    type = models.CharField(max_length=32, choices=NotificationType.choices)
+    channel = models.CharField(max_length=16, choices=NotificationChannel.choices)
+    target = models.CharField(max_length=255, blank=True)
+    status = models.CharField(max_length=16, choices=NotificationStatus.choices, default=NotificationStatus.QUEUED)
+    payload_summary = models.TextField(blank=True)
+    error_message = models.TextField(blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
 
 
 class OperationLog(models.Model):

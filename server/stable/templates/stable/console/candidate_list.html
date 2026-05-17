@@ -15,6 +15,8 @@
       <input type="hidden" name="workflow_status" value="{{ request.GET.workflow_status }}">
       <input type="hidden" name="translated" value="{{ request.GET.translated }}">
       <input type="hidden" name="translation_status" value="{{ request.GET.translation_status }}">
+      <input type="hidden" name="automation_status" value="{{ request.GET.automation_status }}">
+      <input type="hidden" name="review_mode" value="{{ request.GET.review_mode }}">
       <input type="hidden" name="limit" value="20">
       <button class="btn secondary" type="submit">批量补翻当前筛选</button>
     </form>
@@ -46,6 +48,18 @@
           <option value="{{ value }}" {% if request.GET.translation_status == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
+      <select name="automation_status">
+        <option value="">自动化状态</option>
+        {% for value, label in automation_status_choices %}
+          <option value="{{ value }}" {% if request.GET.automation_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="review_mode">
+        <option value="">分流结果</option>
+        {% for value, label in review_mode_choices %}
+          <option value="{{ value }}" {% if request.GET.review_mode == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
       <button type="submit">筛选</button>
     </form>
   </section>
@@ -69,6 +83,16 @@
             </span>
             <span class="badge gold">{{ article.get_workflow_status_display }}</span>
           </div>
+          <div class="article-meta">
+            <span class="badge {% if article.review_mode == 'auto' %}success{% elif article.review_mode == 'manual' %}warning{% elif article.review_mode == 'ignored' %}danger{% else %}{% endif %}">
+              分流：{{ article.get_review_mode_display|default:"未分流" }}
+            </span>
+            <span class="badge">自动化：{{ article.get_automation_status_display }}</span>
+            <span class="badge">分数：{{ article.score_total }}</span>
+          </div>
+          {% if article.decision_summary %}
+            <p class="muted candidate-excerpt">决策：{{ article.decision_summary|truncatechars:96 }}</p>
+          {% endif %}
           {% if article.translation_error_message %}
             <p class="muted" style="color: var(--danger);">失败原因：{{ article.translation_error_message|truncatechars:90 }}</p>
           {% elif article.translation_model %}
@@ -82,6 +106,16 @@
               <input type="hidden" name="next" value="{% url 'console-candidate-list' %}">
               <button class="btn ghost" type="submit">重翻</button>
             </form>
+            <form method="post" action="{% url 'console-candidate-run-automation' article.id %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{% url 'console-candidate-list' %}">
+              <button class="btn ghost" type="submit">自动化</button>
+            </form>
+            <form method="post" action="{% url 'console-candidate-mark-manual' article.id %}">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{% url 'console-candidate-list' %}">
+              <button class="btn secondary" type="submit">转人工</button>
+            </form>
             <form method="post" action="{% url 'console-candidate-ignore' article.id %}" onsubmit="return confirm('确认忽略这篇候选新闻吗？');">
               {% csrf_token %}
               <button class="btn danger" type="submit">忽略</button>
@@ -94,11 +128,11 @@
     </div>
     <div class="pagination">
       {% if page_obj.has_previous %}
-        <a class="btn ghost" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.source %}source={{ request.GET.source }}&{% endif %}{% if request.GET.workflow_status %}workflow_status={{ request.GET.workflow_status }}&{% endif %}{% if request.GET.translated %}translated={{ request.GET.translated }}&{% endif %}{% if request.GET.translation_status %}translation_status={{ request.GET.translation_status }}&{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>
+        <a class="btn ghost" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.source %}source={{ request.GET.source }}&{% endif %}{% if request.GET.workflow_status %}workflow_status={{ request.GET.workflow_status }}&{% endif %}{% if request.GET.translated %}translated={{ request.GET.translated }}&{% endif %}{% if request.GET.translation_status %}translation_status={{ request.GET.translation_status }}&{% endif %}{% if request.GET.automation_status %}automation_status={{ request.GET.automation_status }}&{% endif %}{% if request.GET.review_mode %}review_mode={{ request.GET.review_mode }}&{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>
       {% endif %}
       <span class="badge">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
       {% if page_obj.has_next %}
-        <a class="btn ghost" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.source %}source={{ request.GET.source }}&{% endif %}{% if request.GET.workflow_status %}workflow_status={{ request.GET.workflow_status }}&{% endif %}{% if request.GET.translated %}translated={{ request.GET.translated }}&{% endif %}{% if request.GET.translation_status %}translation_status={{ request.GET.translation_status }}&{% endif %}page={{ page_obj.next_page_number }}">下一页</a>
+        <a class="btn ghost" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.source %}source={{ request.GET.source }}&{% endif %}{% if request.GET.workflow_status %}workflow_status={{ request.GET.workflow_status }}&{% endif %}{% if request.GET.translated %}translated={{ request.GET.translated }}&{% endif %}{% if request.GET.translation_status %}translation_status={{ request.GET.translation_status }}&{% endif %}{% if request.GET.automation_status %}automation_status={{ request.GET.automation_status }}&{% endif %}{% if request.GET.review_mode %}review_mode={{ request.GET.review_mode }}&{% endif %}page={{ page_obj.next_page_number }}">下一页</a>
       {% endif %}
     </div>
   </section>

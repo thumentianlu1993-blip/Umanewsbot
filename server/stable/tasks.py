@@ -12,21 +12,38 @@ from stable.adapters.netkeiba import NetkeibaAdapter
 from stable.models import (
     ArticleStatus,
     ArticleTranslationStatus,
+    AutomationPhase,
+    AutomationStatus,
     CrawlJob,
     NewsArticle,
     NewsSource,
+    NotificationLog,
+    NotificationType,
+    PublishedByMode,
     PushTarget,
+    ReviewMode,
     SourceMode,
     TaskExecutionLog,
     TaskStatus,
     WorkflowStatus,
 )
+from stable.services.automation import (
+    apply_score_decision,
+    important_manual_notification_payload,
+    is_ready_for_auto_publish,
+    mark_automation_failed,
+    publish_article_automatically,
+    score_article_for_automation,
+)
 from stable.services.ingestion import upsert_article_from_draft
+from stable.services.notifications import send_automation_notification
 from stable.services.operations import log_operation
 from stable.services.pushing import push_article_to_targets
 from stable.services.queueing import dispatch_task
+from stable.services.rewriting import apply_rewrite_result, rewrite_article
 from stable.services.sources import find_builtin_source, sync_builtin_sources
 from stable.services.translation import translate_article
+from stable.services.validation import apply_validation_outcome, validate_rewrite
 
 
 User = get_user_model()
@@ -244,8 +261,11 @@ def translate_article_task(article_id: int) -> dict:
         article.translation_provider = result.metadata.get("provider", "")
         if article.workflow_status in {WorkflowStatus.PENDING_TRANSLATION, WorkflowStatus.TRANSLATION_FAILED}:
             article.workflow_status = WorkflowStatus.PENDING_EDIT
+        article.automation_status = AutomationStatus.PENDING
         article.translation_metadata = {**article.translation_metadata, **result.metadata}
         article.save()
+        if getattr(settings, "AUTOMATION_ENABLED", False):
+            dispatch_task(process_article_automation_task, article.id)
         _log_success(log, f"translated article={article_id}")
         return {
             "article_id": article_id,
@@ -271,8 +291,196 @@ def translate_article_task(article_id: int) -> dict:
                     "updated_at",
                 ]
             )
+            if getattr(settings, "AUTOMATION_ENABLED", False):
+                dispatch_task(
+                    send_notification_task,
+                    NotificationType.TRANSLATION_FAILED,
+                    {
+                        "article_id": article.id,
+                        "title": article.effective_title,
+                        "error": str(exc),
+                        "source_url": article.source_url,
+                    },
+                )
         _log_failure(log, str(exc))
         raise
+
+
+@shared_task
+def process_article_automation_task(article_id: int) -> dict:
+    log = _log_start("process_article_automation", {"article_id": article_id})
+    if not getattr(settings, "AUTOMATION_ENABLED", False):
+        _log_success(log, "automation disabled")
+        return {"article_id": article_id, "skipped": True, "reason": "automation disabled"}
+    article = NewsArticle.objects.get(pk=article_id)
+    try:
+        score_article_task.run(article.id)
+        article.refresh_from_db()
+        if article.automation_status == AutomationStatus.REWRITE_READY and article.review_mode == ReviewMode.AUTO:
+            rewrite_article_task.run(article.id)
+            article.refresh_from_db()
+        if article.automation_status == AutomationStatus.REWRITTEN and article.review_mode == ReviewMode.AUTO:
+            validate_rewrite_task.run(article.id)
+            article.refresh_from_db()
+        payload = important_manual_notification_payload(article)
+        if payload:
+            send_notification_task.run(NotificationType.IMPORTANT_MANUAL, payload)
+        _log_success(log, f"automation_status={article.automation_status} review_mode={article.review_mode}")
+        return {
+            "article_id": article.id,
+            "automation_status": article.automation_status,
+            "review_mode": article.review_mode,
+            "score_total": article.score_total,
+        }
+    except Exception as exc:
+        mark_automation_failed(article, phase=AutomationPhase.SCORE, error=exc)
+        send_notification_task.run(
+            NotificationType.REPEATED_FAILURE,
+            {"article_id": article.id, "title": article.effective_title, "error": str(exc)},
+        )
+        _log_failure(log, str(exc))
+        raise
+
+
+@shared_task
+def score_article_task(article_id: int) -> dict:
+    log = _log_start("score_article", {"article_id": article_id})
+    article = NewsArticle.objects.get(pk=article_id)
+    try:
+        decision = score_article_for_automation(article)
+        apply_score_decision(article, decision)
+        _log_success(log, decision.decision_summary)
+        return {
+            "article_id": article.id,
+            "review_mode": decision.review_mode,
+            "automation_status": decision.automation_status,
+            "score_total": decision.score_total,
+        }
+    except Exception as exc:
+        mark_automation_failed(article, phase=AutomationPhase.SCORE, error=exc)
+        _log_failure(log, str(exc))
+        raise
+
+
+@shared_task
+def rewrite_article_task(article_id: int) -> dict:
+    log = _log_start("rewrite_article", {"article_id": article_id})
+    article = NewsArticle.objects.get(pk=article_id)
+    if article.review_mode != ReviewMode.AUTO:
+        _log_success(log, "skipped non-auto article")
+        return {"article_id": article.id, "skipped": True}
+    try:
+        result = rewrite_article(article)
+        apply_rewrite_result(article, result)
+        _log_success(log, f"confidence={result.confidence}")
+        return {"article_id": article.id, "rewritten": True, "confidence": result.confidence}
+    except Exception as exc:
+        mark_automation_failed(article, phase=AutomationPhase.REWRITE, error=exc)
+        send_notification_task.run(
+            NotificationType.REWRITE_FAILED,
+            {"article_id": article.id, "title": article.effective_title, "error": str(exc), "source_url": article.source_url},
+        )
+        _log_failure(log, str(exc))
+        raise
+
+
+@shared_task
+def validate_rewrite_task(article_id: int) -> dict:
+    log = _log_start("validate_rewrite", {"article_id": article_id})
+    article = NewsArticle.objects.get(pk=article_id)
+    try:
+        outcome = validate_rewrite(article)
+        apply_validation_outcome(article, outcome)
+        _log_success(log, outcome.reason)
+        return {"article_id": article.id, "validated": outcome.passed, "reason": outcome.reason}
+    except Exception as exc:
+        mark_automation_failed(article, phase=AutomationPhase.VALIDATE, error=exc)
+        _log_failure(log, str(exc))
+        raise
+
+
+@shared_task
+def auto_publish_batch_task(limit: int | None = None) -> dict:
+    log = _log_start("auto_publish_batch", {"limit": limit})
+    if not getattr(settings, "AUTOMATION_ENABLED", False):
+        _log_success(log, "automation disabled")
+        return {"published_count": 0, "skipped": True}
+    batch_limit = limit or getattr(settings, "AUTO_PUBLISH_BATCH_LIMIT", 3)
+    queryset = (
+        NewsArticle.objects.filter(review_mode=ReviewMode.AUTO, automation_status=AutomationStatus.PUBLISH_READY)
+        .exclude(workflow_status__in=[WorkflowStatus.PUBLISHED, WorkflowStatus.WITHDRAWN, WorkflowStatus.IGNORED])
+        .order_by("-score_total", "-published_at", "-id")
+    )
+    published_ids: list[int] = []
+    failed_ids: list[int] = []
+    for article in queryset[:batch_limit]:
+        try:
+            if not is_ready_for_auto_publish(article):
+                continue
+            publish_article_automatically(article)
+            published_ids.append(article.id)
+        except Exception as exc:
+            failed_ids.append(article.id)
+            mark_automation_failed(article, phase=AutomationPhase.PUBLISH, error=exc)
+            send_notification_task.run(
+                NotificationType.PUBLISH_FAILED,
+                {"article_id": article.id, "title": article.effective_title, "error": str(exc)},
+            )
+    detail = f"published={len(published_ids)} failed={len(failed_ids)}"
+    if failed_ids:
+        _log_failure(log, detail)
+    else:
+        _log_success(log, detail)
+    return {"published_count": len(published_ids), "published_ids": published_ids, "failed_ids": failed_ids}
+
+
+def _recent_notification_exists(notification_type: str, hours: int = 6) -> bool:
+    since = timezone.now() - timedelta(hours=hours)
+    return NotificationLog.objects.filter(type=notification_type, created_at__gte=since).exists()
+
+
+@shared_task
+def send_notification_task(notification_type: str, payload: dict) -> dict:
+    logs = send_automation_notification(notification_type, payload)
+    return {"notification_type": notification_type, "log_ids": [log.id for log in logs]}
+
+
+@shared_task
+def detect_automation_anomalies_task() -> dict:
+    log = _log_start("detect_automation_anomalies")
+    if not getattr(settings, "AUTOMATION_ENABLED", False):
+        _log_success(log, "automation disabled")
+        return {"skipped": True}
+    sent: list[str] = []
+    now = timezone.now()
+    stale_sources = []
+    for source in NewsSource.objects.filter(enabled=True, deleted_at__isnull=True):
+        if not source.last_crawl_at:
+            continue
+        stale_minutes = max(source.crawl_interval_minutes * 3, 180)
+        if source.last_crawl_at < now - timedelta(minutes=stale_minutes):
+            stale_sources.append(source.name)
+    if stale_sources and not _recent_notification_exists(NotificationType.STALE_SOURCE):
+        send_notification_task.run(NotificationType.STALE_SOURCE, {"source": ", ".join(stale_sources)})
+        sent.append(NotificationType.STALE_SOURCE)
+
+    backlog_count = NewsArticle.objects.filter(automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED).count()
+    if backlog_count >= 50 and not _recent_notification_exists(NotificationType.BACKLOG):
+        send_notification_task.run(NotificationType.BACKLOG, {"manual_review_count": backlog_count})
+        sent.append(NotificationType.BACKLOG)
+
+    last_day_auto = NewsArticle.objects.filter(auto_publish_at__gte=now - timedelta(hours=24)).exists()
+    has_publish_ready = NewsArticle.objects.filter(automation_status=AutomationStatus.PUBLISH_READY).exists()
+    if not last_day_auto and has_publish_ready and not _recent_notification_exists(NotificationType.NO_AUTO_PUBLISH_24H):
+        send_notification_task.run(NotificationType.NO_AUTO_PUBLISH_24H, {"publish_ready_count": has_publish_ready})
+        sent.append(NotificationType.NO_AUTO_PUBLISH_24H)
+
+    recent_failures = TaskExecutionLog.objects.filter(status=TaskStatus.FAILED, started_at__gte=now - timedelta(hours=2)).count()
+    if recent_failures >= 3 and not _recent_notification_exists(NotificationType.REPEATED_FAILURE):
+        send_notification_task.run(NotificationType.REPEATED_FAILURE, {"failed_task_count": recent_failures})
+        sent.append(NotificationType.REPEATED_FAILURE)
+    _log_success(log, f"notifications={','.join(sent) or 'none'}")
+    return {"notifications": sent}
 
 
 @shared_task
@@ -326,7 +534,8 @@ def publish_article(article: NewsArticle, user) -> None:
     article.workflow_status = WorkflowStatus.PUBLISHED
     article.published_to_web_at = timezone.now()
     article.published_by = user
-    article.save(update_fields=["workflow_status", "published_to_web_at", "published_by", "updated_at"])
+    article.published_by_mode = PublishedByMode.MANUAL
+    article.save(update_fields=["workflow_status", "published_to_web_at", "published_by", "published_by_mode", "updated_at"])
     log_operation(
         action_type="article_published",
         target_type="article",

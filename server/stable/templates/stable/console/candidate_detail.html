@@ -64,6 +64,80 @@
 
   <section class="panel">
     <div class="toolbar">
+      <h3 style="margin: 0;">自动决策与 AI 改写</h3>
+      <div class="toolbar">
+        <form method="post" action="{% url 'console-candidate-run-automation' article.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'console-candidate-detail' article.id %}">
+          <button class="btn secondary" type="submit">重新跑自动化</button>
+        </form>
+        <form method="post" action="{% url 'console-candidate-mark-manual' article.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'console-candidate-detail' article.id %}">
+          <button class="btn ghost" type="submit">转人工审核</button>
+        </form>
+      </div>
+    </div>
+    <div class="article-meta">
+      <span class="badge">分流：{{ article.get_review_mode_display|default:"未分流" }}</span>
+      <span class="badge">风险：{{ article.get_risk_level_display|default:"-" }}</span>
+      <span class="badge">自动化：{{ article.get_automation_status_display }}</span>
+      <span class="badge">类型：{{ article.get_content_category_display|default:"-" }}</span>
+      <span class="badge">总分：{{ article.score_total }}</span>
+      <span class="badge">质量：{{ article.quality_score }}</span>
+      <span class="badge">改写置信：{{ article.rewrite_confidence }}</span>
+    </div>
+    {% if article.decision_summary %}
+      <p><strong>决策摘要：</strong>{{ article.decision_summary }}</p>
+    {% endif %}
+    {% if article.automation_error_message %}
+      <p class="muted" style="color: var(--danger);"><strong>自动化错误：</strong>{{ article.automation_error_message }}</p>
+    {% endif %}
+    <div class="grid-2">
+      <div>
+        <h4>基准翻译稿</h4>
+        <div class="content-block">{{ article.base_translation_zh|default:article.translated_body_zh|default:"暂无基准稿。" }}</div>
+      </div>
+      <div>
+        <h4>改写稿</h4>
+        <p><strong>{{ article.rewrite_title_zh|default:"暂未生成改写标题" }}</strong></p>
+        {% if article.rewrite_summary_zh %}<p class="muted">{{ article.rewrite_summary_zh }}</p>{% endif %}
+        <div class="content-block">{{ article.rewrite_body_zh|default:"暂无改写稿。" }}</div>
+      </div>
+    </div>
+    <h4 style="margin-top: 18px;">最近自动化日志</h4>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>时间</th>
+            <th>阶段</th>
+            <th>结果</th>
+            <th>分数</th>
+            <th>置信</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in article.automation_logs.all|slice:":8" %}
+            <tr>
+              <td>{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
+              <td>{{ log.get_phase_display }}</td>
+              <td>{{ log.get_result_display }}</td>
+              <td>{{ log.score|default:"-" }}</td>
+              <td>{{ log.confidence|default:"-" }}</td>
+              <td>{{ log.reason|default:log.error_message|truncatechars:120 }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="muted">暂无自动化日志。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="toolbar">
       <h3 style="margin: 0;">原始图片</h3>
       <form method="post" action="{% url 'console-candidate-ignore' article.id %}" onsubmit="return confirm('确认忽略这篇候选新闻吗？');">
         {% csrf_token %}

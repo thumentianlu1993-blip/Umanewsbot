@@ -10,7 +10,18 @@ from django.utils import timezone
 
 from stable.adapters.jra import JRAAdapter
 from stable.adapters.netkeiba import NetkeibaAdapter
-from stable.models import ArticleTranslationStatus, NewsArticle, PushTarget, SourceMode, SourceSite, TermEntry, WorkflowStatus
+from stable.models import (
+    ArticleTranslationStatus,
+    AutomationStatus,
+    NewsArticle,
+    NotificationLog,
+    PushTarget,
+    ReviewMode,
+    SourceMode,
+    SourceSite,
+    TermEntry,
+    WorkflowStatus,
+)
 from stable.services.pushing import build_push_message, push_article_to_targets
 from stable.services.sources import sync_builtin_sources
 from stable.services.term_admin import preview_term_import
@@ -21,7 +32,15 @@ from stable.services.translation import (
     TranslationResponseError,
     translate_article as run_translation_service,
 )
-from stable.tasks import _crawl_netkeiba_mode, batch_translate_articles_task, translate_article_task
+from stable.tasks import (
+    _crawl_netkeiba_mode,
+    auto_publish_batch_task,
+    batch_translate_articles_task,
+    process_article_automation_task,
+    score_article_task,
+    send_notification_task,
+    translate_article_task,
+)
 
 
 User = get_user_model()
@@ -219,11 +238,13 @@ class ConsoleFlowTests(TestCase):
         self.assertContains(public_detail, "这是发布正文。")
 
     def test_candidate_retranslate_endpoint_redirects(self):
-        response = self.client.post(
-            reverse("console-candidate-retranslate", args=[self.article.id]),
-            {"next": reverse("console-candidate-detail", args=[self.article.id])},
-        )
+        with patch("stable.views.dispatch_task") as mocked_dispatch:
+            response = self.client.post(
+                reverse("console-candidate-retranslate", args=[self.article.id]),
+                {"next": reverse("console-candidate-detail", args=[self.article.id])},
+            )
         self.assertEqual(response.status_code, 302)
+        mocked_dispatch.assert_called_once_with(translate_article_task, self.article.id)
 
     def test_public_feed_only_shows_published_articles(self):
         NewsArticle.objects.create(
@@ -286,6 +307,111 @@ class ConsoleFlowTests(TestCase):
         self.article.refresh_from_db()
         self.assertEqual(self.article.summary_zh, "")
         self.assertEqual(self.article.effective_summary, "")
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, AUTOMATION_ENABLED=True, REWRITE_PROVIDER="fallback")
+class AutomationFlowTests(TestCase):
+    def _translated_article(self, **overrides):
+        body_ja = (
+            "大阪杯G1（芝2000メートル）はクロワデュノールが1着。北村友一騎手が騎乗し、直線で抜け出した。"
+            "道中は中団で脚をため、最後の直線では力強く伸びて後続を振り切った。"
+            "管理する斉藤崇史調教師は状態の良さを評価し、今後の大舞台にも期待を寄せている。"
+            "勝ち時計は1分57秒台で、良馬場のなか内容の濃い結果となった。"
+        )
+        body_zh = (
+            "大阪杯G1（草地2000米）由北十字星取得第1名。北村友一骑手策骑，直线冲出。"
+            "比赛中段保持在中团蓄力，进入最后直线后强势加速，最终甩开后续马群。"
+            "练马师斉藤崇史评价其状态良好，也对接下来的大舞台寄予期待。"
+            "胜利时间为1分57秒区间，在良好场地下是一场内容扎实的胜利。"
+        )
+        defaults = {
+            "source_site": SourceSite.NETKEIBA,
+            "source_mode": SourceMode.LATEST,
+            "source_article_id": "auto-1",
+            "title_ja": "大阪杯G1 クロワデュノールが優勝",
+            "translated_title_zh": "大阪杯G1 北十字星夺冠",
+            "title_zh": "大阪杯G1 北十字星夺冠",
+            "body_ja_raw": body_ja,
+            "body_ja_normalized": body_ja,
+            "translated_body_zh": body_zh,
+            "translated_summary_zh": "北十字星赢下大阪杯G1。",
+            "summary_zh": "北十字星赢下大阪杯G1。",
+            "body_zh": body_zh,
+            "published_at": timezone.now(),
+            "source_url": "https://example.com/auto-1",
+            "workflow_status": WorkflowStatus.PENDING_EDIT,
+            "translation_status": ArticleTranslationStatus.TRANSLATED,
+        }
+        defaults.update(overrides)
+        return NewsArticle.objects.create(**defaults)
+
+    def test_process_article_automation_marks_high_value_article_publish_ready(self):
+        TermEntry.objects.create(term_type="horse", source_ja="クロワデュノール", target_zh="北十字星", priority=100)
+        article = self._translated_article()
+
+        result = process_article_automation_task.run(article.id)
+
+        article.refresh_from_db()
+        self.assertEqual(result["review_mode"], ReviewMode.AUTO)
+        self.assertEqual(article.automation_status, AutomationStatus.PUBLISH_READY)
+        self.assertEqual(article.review_mode, ReviewMode.AUTO)
+        self.assertGreaterEqual(article.score_total, 75)
+        self.assertTrue(article.rewrite_body_zh)
+        self.assertEqual(article.base_translation_zh, article.translated_body_zh)
+
+    def test_score_short_body_is_ignored(self):
+        article = self._translated_article(
+            source_article_id="short-1",
+            title_ja="短い記事",
+            body_ja_raw="短文",
+            body_ja_normalized="短文",
+            translated_body_zh="短文",
+            body_zh="短文",
+        )
+
+        score_article_task.run(article.id)
+
+        article.refresh_from_db()
+        self.assertEqual(article.review_mode, ReviewMode.IGNORED)
+        self.assertEqual(article.workflow_status, WorkflowStatus.IGNORED)
+        self.assertEqual(article.automation_status, AutomationStatus.IGNORED)
+
+    def test_auto_publish_batch_only_publishes_ready_articles(self):
+        TermEntry.objects.create(term_type="horse", source_ja="クロワデュノール", target_zh="北十字星", priority=100)
+        article = self._translated_article()
+        process_article_automation_task.run(article.id)
+
+        result = auto_publish_batch_task.run(limit=3)
+
+        article.refresh_from_db()
+        self.assertEqual(result["published_count"], 1)
+        self.assertEqual(article.workflow_status, WorkflowStatus.PUBLISHED)
+        self.assertEqual(article.automation_status, AutomationStatus.AUTO_PUBLISHED)
+        self.assertEqual(article.published_by_mode, "auto")
+        self.assertIsNotNone(article.auto_publish_at)
+
+    def test_public_page_prefers_rewrite_when_not_manually_edited(self):
+        article = self._translated_article(
+            source_article_id="rewrite-public",
+            rewrite_title_zh="改写后的中文标题",
+            rewrite_summary_zh="改写后的摘要",
+            rewrite_body_zh="改写后的正文内容。",
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+        )
+
+        response = self.client.get(article.public_path)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "改写后的中文标题")
+        self.assertContains(response, "改写后的正文内容。")
+
+    def test_notification_without_email_config_is_logged_as_skipped(self):
+        send_notification_task.run("rewrite_failed", {"article_id": 123, "title": "测试稿"})
+
+        log = NotificationLog.objects.get(channel="email")
+        self.assertEqual(log.status, "skipped")
+        self.assertEqual(log.channel, "email")
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
