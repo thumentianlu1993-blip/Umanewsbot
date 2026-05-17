@@ -81,6 +81,14 @@ class TermResolverTests(TestCase):
         self.assertIn("ダノンデサイル", names)
         self.assertNotIn("クロワデュノール", names)
 
+    def test_extract_unknown_horse_names_skips_generic_racing_words(self):
+        names = extract_unknown_horse_names(
+            "【平安S】ロードクロンヌがリベンジへ",
+            "昨年の雪辱を期すロードクロンヌが平安Sに向かう。アクションプランも出走予定。",
+        )
+
+        self.assertNotIn("リベンジ", names)
+
 
 class TextExtractionTests(TestCase):
     def test_extract_article_text_keeps_inline_links_in_same_line(self):
