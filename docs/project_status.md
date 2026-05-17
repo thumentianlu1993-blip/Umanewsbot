@@ -1,7 +1,7 @@
 # 项目状态文档
 
 最后更新时间：`2026-05-17`
-当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP 代码侧已完成）
+当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP 已上线观察）
 
 > 角色说明：
 > 本文档用于保留项目级概览与摘要信息。
@@ -113,8 +113,8 @@
 
 ## 6. 当前待办（项目级摘要）
 
-- 部署自动化运营 MVP 并执行数据库迁移
-- 灰度启用 `AUTOMATION_ENABLED=true`，观察自动发布质量
+- 观察自动发布质量与自动化日志
+- 补充翻译 warning 可视化和术语库补全流程
 - 推进 HTTPS / 证书接入
 - 做部署稳定化
 - 完善监控、备份与回滚流程
@@ -147,8 +147,8 @@
   - `OSS_ACCESS_KEY_SECRET`
   - `OSS_BUCKET_NAME`
 - 当前下一步：
-  - 部署自动化运营 MVP 并执行迁移
-  - 低批量灰度启用自动发布
+  - 观察自动化发布质量
+  - 补充翻译 warning 可视化和术语库补全流程
   - 推进 HTTPS / 证书接入
   - 做部署稳定化
   - 完善监控、备份与回滚流程
@@ -158,3 +158,4 @@
 1. 每次开始项目前优先阅读 [docs/current_state.md](E:/Codex/docs/current_state.md) 与 [AGENTS.md](E:/Codex/AGENTS.md)，本文档作为项目级摘要辅助阅读。  
 2. 每次更新完成后同步回写本文件与 [docs/current_state.md](E:/Codex/docs/current_state.md)。  
 3. 每次收到新 PRD 归档到 `E:/Codex/docs/PRD/`。  
+4. 每次阶段性收工时同步更新 [docs/work_log.md](E:/Codex/docs/work_log.md)。
