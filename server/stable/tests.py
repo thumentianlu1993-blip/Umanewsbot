@@ -843,6 +843,85 @@ class TranslationWorkflowTests(TestCase):
         self.assertEqual(result.metadata["attempt"], 2)
         self.assertIn("メイショウタバル", result.metadata["unknown_horse_names"])
 
+    @override_settings(TRANSLATION_MODEL="deepseek-ai/DeepSeek-V3", TRANSLATION_MAX_ATTEMPTS=1)
+    def test_provider_restores_unknown_horse_placeholders(self):
+        self.article.title_ja = "メイショウタバルが出走"
+        self.article.body_ja_raw = "1着 メイショウタバル(武豊騎手)。"
+        self.article.body_ja_normalized = self.article.body_ja_raw
+        self.article.save()
+
+        provider = OpenAICompatibleTranslationProvider(api_key="test-key", base_url="https://example.com/v1")
+        usage = type("Usage", (), {"model_dump": lambda self: {"completion_tokens": 20}})()
+        choice = type(
+            "Choice",
+            (),
+            {
+                "message": type(
+                    "Message",
+                    (),
+                    {
+                        "content": __import__("json").dumps(
+                            {
+                                "title_zh": "__UMA_KEEP_1__出战",
+                                "body_zh": "第1名 __UMA_KEEP_1__(武丰骑手)。",
+                                "push_summary_zh": "__UMA_KEEP_1__获胜。",
+                            },
+                            ensure_ascii=False,
+                        )
+                    },
+                )(),
+                "finish_reason": "stop",
+            },
+        )()
+
+        with patch.object(provider, "_request_completion", return_value=type("Response", (), {"choices": [choice], "usage": usage})()):
+            result = provider.translate(self.article)
+
+        self.assertIn("メイショウタバル", result.title_zh)
+        self.assertIn("メイショウタバル", result.body_zh)
+        self.assertNotIn("__UMA_KEEP_", result.body_zh)
+
+    @override_settings(TRANSLATION_MODEL="deepseek-ai/DeepSeek-V3", TRANSLATION_MAX_ATTEMPTS=1)
+    def test_provider_accepts_with_warning_when_unknown_horse_still_missing(self):
+        self.article.title_ja = "メイショウタバルが出走"
+        self.article.body_ja_raw = "1着 メイショウタバル(武豊騎手)。"
+        self.article.body_ja_normalized = self.article.body_ja_raw
+        self.article.save()
+
+        provider = OpenAICompatibleTranslationProvider(api_key="test-key", base_url="https://example.com/v1")
+        usage = type("Usage", (), {"model_dump": lambda self: {"completion_tokens": 20}})()
+        choice = type(
+            "Choice",
+            (),
+            {
+                "message": type(
+                    "Message",
+                    (),
+                    {
+                        "content": __import__("json").dumps(
+                            {
+                                "title_zh": "名将原野出战",
+                                "body_zh": "第1名 名将原野(武丰骑手)。",
+                                "push_summary_zh": "名将原野获胜。",
+                            },
+                            ensure_ascii=False,
+                        )
+                    },
+                )(),
+                "finish_reason": "stop",
+            },
+        )()
+
+        with patch.object(provider, "_request_completion", return_value=type("Response", (), {"choices": [choice], "usage": usage})()):
+            result = provider.translate(self.article)
+
+        self.assertIn("名将原野", result.body_zh)
+        self.assertEqual(
+            result.metadata["warning"],
+            "Translation response changed unknown horse names; accepted with warning",
+        )
+        self.assertIn("メイショウタバル", result.metadata["missing_unknown_horse_names"])
+
     def test_translate_task_preserves_manually_cleared_summary_and_populates_horse_tags(self):
         TermEntry.objects.create(term_type="horse", source_ja="ソダシ", target_zh="纯净之辉", priority=100)
         TermEntry.objects.create(term_type="horse", source_ja="リバティアイランド", target_zh="自由岛", priority=90)

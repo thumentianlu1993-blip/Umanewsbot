@@ -68,6 +68,8 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         unknown_horse_lines: list[str],
         *,
         retry_hint: str = "",
+        source_title: str | None = None,
+        source_body: str | None = None,
     ) -> str:
         return (
             "你是一名熟悉日本赛马行业的专业翻译编辑。"
@@ -75,13 +77,14 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             "请优先遵守术语表中的译法，不要杜撰信息，不要省略关键事实，不要把原文改写成摘要。"
             "如果原文包含排行榜、分点、小标题或项目符号，译文必须保留相同的顺序和完整信息。"
             "如果识别到马名但术语表没有提供中文译名，必须保留该马名的原始日文写法，不得音译、意译或自行猜译。"
+            "若原文中出现 __UMA_KEEP_数字__ 形式的占位符，请在译文中原样复制该占位符，不要翻译或删除。"
             "输出必须是 JSON 对象，且只包含 title_zh、body_zh、push_summary_zh 三个键。"
             f"{retry_hint}"
             "\n\n"
             f"术语表：\n{chr(10).join(glossary_lines) if glossary_lines else '无可用术语'}\n\n"
-            f"未收录中文译名、必须保留原始日文的疑似马名：\n{chr(10).join(unknown_horse_lines) if unknown_horse_lines else '无'}\n\n"
-            f"原文标题：{article.title_ja}\n\n"
-            f"原文正文：\n{article.body_ja_normalized or article.body_ja_raw}"
+            f"未收录中文译名、必须保留原始日文的疑似马名/占位符：\n{chr(10).join(unknown_horse_lines) if unknown_horse_lines else '无'}\n\n"
+            f"原文标题：{source_title if source_title is not None else article.title_ja}\n\n"
+            f"原文正文：\n{source_body if source_body is not None else article.body_ja_normalized or article.body_ja_raw}"
         )
 
     def _build_messages(
@@ -91,8 +94,17 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         unknown_horse_lines: list[str],
         *,
         retry_hint: str = "",
+        source_title: str | None = None,
+        source_body: str | None = None,
     ) -> list[dict]:
-        prompt = self._build_prompt(article, glossary_lines, unknown_horse_lines, retry_hint=retry_hint)
+        prompt = self._build_prompt(
+            article,
+            glossary_lines,
+            unknown_horse_lines,
+            retry_hint=retry_hint,
+            source_title=source_title,
+            source_body=source_body,
+        )
         return [
             {
                 "role": "system",
@@ -159,6 +171,23 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         return [name for name in unknown_horse_names if name not in translated_text]
 
     @staticmethod
+    def _protect_unknown_horse_names(text: str, unknown_horse_names: list[str]) -> tuple[str, dict[str, str]]:
+        protected = text or ""
+        placeholders: dict[str, str] = {}
+        for index, name in enumerate(sorted(unknown_horse_names, key=len, reverse=True), start=1):
+            placeholder = f"__UMA_KEEP_{index}__"
+            protected = protected.replace(name, placeholder)
+            placeholders[placeholder] = name
+        return protected, placeholders
+
+    @staticmethod
+    def _restore_unknown_horse_placeholders(text: str, placeholders: dict[str, str]) -> str:
+        restored = text or ""
+        for placeholder, name in placeholders.items():
+            restored = restored.replace(placeholder, name)
+        return restored
+
+    @staticmethod
     def _usage_to_dict(usage) -> dict:
         if usage is None:
             return {}
@@ -181,28 +210,42 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             source_text,
             limit=max(1, int(settings.TRANSLATION_UNKNOWN_HORSE_LIMIT)),
         )
-        unknown_horse_lines = [f"- {name}" for name in unknown_horse_names]
+        protected_title, title_placeholders = self._protect_unknown_horse_names(article.title_ja, unknown_horse_names)
+        protected_body, body_placeholders = self._protect_unknown_horse_names(source_text, unknown_horse_names)
+        horse_placeholders = {**title_placeholders, **body_placeholders}
+        unknown_horse_lines = [
+            f"- {placeholder} => {name}（译文中先原样复制占位符，系统会还原为日文马名）"
+            for placeholder, name in horse_placeholders.items()
+        ]
         max_attempts = max(1, int(getattr(settings, "TRANSLATION_MAX_ATTEMPTS", 2)))
         retry_hint = ""
         last_metadata: dict | None = None
 
         for attempt in range(1, max_attempts + 1):
             response = self._request_completion(
-                self._build_messages(article, glossary_lines, unknown_horse_lines, retry_hint=retry_hint)
+                self._build_messages(
+                    article,
+                    glossary_lines,
+                    unknown_horse_lines,
+                    retry_hint=retry_hint,
+                    source_title=protected_title,
+                    source_body=protected_body,
+                )
             )
             choice = response.choices[0]
             content = choice.message.content or "{}"
             payload = json.loads(content)
 
-            title_zh = (payload.get("title_zh") or "").strip()
-            body_zh = (payload.get("body_zh") or "").strip()
-            push_summary_zh = (payload.get("push_summary_zh") or "").strip()
+            title_zh = self._restore_unknown_horse_placeholders((payload.get("title_zh") or "").strip(), horse_placeholders)
+            body_zh = self._restore_unknown_horse_placeholders((payload.get("body_zh") or "").strip(), horse_placeholders)
+            push_summary_zh = self._restore_unknown_horse_placeholders((payload.get("push_summary_zh") or "").strip(), horse_placeholders)
 
             last_metadata = {
                 "provider": self.name,
                 "model": settings.TRANSLATION_MODEL,
                 "terms": serialize_terms(terms),
                 "unknown_horse_names": unknown_horse_names,
+                "unknown_horse_placeholders": horse_placeholders,
                 "raw": payload,
                 "finish_reason": getattr(choice, "finish_reason", ""),
                 "usage": self._usage_to_dict(getattr(response, "usage", None)),
@@ -227,15 +270,12 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                 last_metadata["missing_unknown_horse_names"] = missing_unknown_horse_names
                 retry_hint = (
                     "\n\n注意：上一版把部分未收录中文译名的马名翻掉了。"
-                    "以下名字必须在译文中按原始日文原样保留："
-                    f"{'、'.join(missing_unknown_horse_names)}。"
+                    "请保留对应占位符，不要自行翻译或删除。"
+                    f"缺失的原始马名：{'、'.join(missing_unknown_horse_names)}。"
                 )
                 if attempt < max_attempts:
                     continue
-                raise TranslationResponseError(
-                    "Translation response changed unknown horse names",
-                    metadata=last_metadata,
-                )
+                last_metadata["warning"] = "Translation response changed unknown horse names; accepted with warning"
 
             return TranslationResult(
                 title_zh=apply_term_mappings(title_zh),

@@ -56,6 +56,19 @@
 - 需要补足更标准的部署基线、回滚与备份演练
 - QQ Bot 实网联调与正式推送链路仍需单独验收
 
+## 最近一次翻译稳定性修复
+
+- 现象：部分文章翻译失败，错误为 `Translation response changed unknown horse names`
+- 原因：未知马名校验过于严格；模型没有原样保留疑似未收录马名时，系统会让整篇翻译失败
+- 修复：
+  - 翻译 prompt 中对未知马名使用 `__UMA_KEEP_n__` 占位符保护
+  - 模型返回后将占位符还原为原始日文马名
+  - 若模型仍未保留未知马名，不再让整篇失败，而是写入 metadata warning 后接受译文
+- 验证：
+  - 新增未知马名占位符还原测试
+  - 新增未知马名仍缺失但不阻断翻译的测试
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable` 通过，45 项
+
 ## 自动化内容运营 MVP 开发纪要
 
 ### 本轮新增能力
