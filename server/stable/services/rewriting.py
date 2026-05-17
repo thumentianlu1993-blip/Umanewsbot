@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 
 from django.conf import settings
@@ -61,6 +62,17 @@ def _category_instruction(category: str) -> str:
         ContentCategory.OTHER: "其他：保守改写，优先准确和自然。",
     }
     return instructions.get(category, instructions[ContentCategory.OTHER])
+
+
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def _loads_rewrite_payload(raw_content: str) -> dict:
+    try:
+        return json.loads(raw_content or "{}")
+    except json.JSONDecodeError:
+        cleaned = _CONTROL_CHARS_RE.sub("", raw_content or "{}")
+        return json.loads(cleaned)
 
 
 class FallbackRewriteProvider(RewriteProvider):
@@ -139,7 +151,7 @@ class OpenAICompatibleRewriteProvider(RewriteProvider):
             timeout=getattr(settings, "REWRITE_TIMEOUT_SECONDS", settings.TRANSLATION_TIMEOUT_SECONDS),
         )
         choice = response.choices[0]
-        payload = json.loads(choice.message.content or "{}")
+        payload = _loads_rewrite_payload(choice.message.content or "{}")
         title = (payload.get("rewrite_title_zh") or "").strip()
         summary = (payload.get("rewrite_summary_zh") or "").strip()
         body = (payload.get("rewrite_body_zh") or "").strip()

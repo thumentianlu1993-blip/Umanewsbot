@@ -23,6 +23,7 @@ from stable.models import (
     WorkflowStatus,
 )
 from stable.services.pushing import build_push_message, push_article_to_targets
+from stable.services.rewriting import _loads_rewrite_payload
 from stable.services.sources import sync_builtin_sources
 from stable.services.term_admin import preview_term_import
 from stable.services.terms import apply_term_mappings, extract_horse_tags, extract_unknown_horse_names, resolve_terms
@@ -106,6 +107,16 @@ class TextExtractionTests(TestCase):
         self.assertIn("対象レースはJRAホームページに掲載される。", text)
         self.assertNotIn("\nWIN5\n", text)
         self.assertNotIn("\nJRA\n", text)
+
+
+class RewritePayloadTests(TestCase):
+    def test_loads_rewrite_payload_tolerates_control_characters(self):
+        payload = _loads_rewrite_payload(
+            '{"rewrite_title_zh":"标题","rewrite_summary_zh":"摘要","rewrite_body_zh":"第一段\x0b第二段","rewrite_confidence":90}'
+        )
+
+        self.assertEqual(payload["rewrite_title_zh"], "标题")
+        self.assertEqual(payload["rewrite_body_zh"], "第一段第二段")
 
 
 class AdapterTests(TestCase):
