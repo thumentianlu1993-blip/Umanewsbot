@@ -76,9 +76,13 @@
   - `auto_publish_batch_task`
   - `send_notification_task`
   - `detect_automation_anomalies_task`
-- 新增 Celery Beat 调度：
-  - 每 15 分钟批量自动发布
-  - 每 30 分钟检测自动化异常
+  - 新增 Celery Beat 调度：
+    - 每 15 分钟批量自动发布
+    - 每 30 分钟检测自动化异常
+  - 自动发布批量规则已调整为：
+    - 常规时段每批最多 4 篇
+    - 每周日北京时间 13:00-16:00 每批最多 10 篇
+    - 调度频率仍为每 15 分钟一次
 
 ### 当前验证结果
 
@@ -90,7 +94,7 @@
 - 必须先部署代码并执行迁移 `python manage.py migrate`
 - 初次部署建议 `AUTOMATION_ENABLED=false`
 - 确认后台可看到自动化字段和日志后，再切换 `AUTOMATION_ENABLED=true`
-- 初期建议保持 `AUTO_PUBLISH_BATCH_LIMIT=3` 或更低，并定期人工抽检自动发布稿
+- 当前自动发布策略为常规每批 4 篇、周日 13:00-16:00 每批 10 篇，并定期人工抽检自动发布稿
 
 ## 最近一次关键修复纪要
 

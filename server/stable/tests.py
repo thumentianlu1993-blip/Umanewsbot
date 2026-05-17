@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone as dt_timezone
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -35,6 +36,7 @@ from stable.services.translation import (
 )
 from stable.tasks import (
     _crawl_netkeiba_mode,
+    _resolve_auto_publish_batch_limit,
     auto_publish_batch_task,
     batch_translate_articles_task,
     process_article_automation_task,
@@ -408,6 +410,24 @@ class AutomationFlowTests(TestCase):
         self.assertEqual(article.automation_status, AutomationStatus.AUTO_PUBLISHED)
         self.assertEqual(article.published_by_mode, "auto")
         self.assertIsNotNone(article.auto_publish_at)
+
+    @override_settings(
+        AUTO_PUBLISH_BATCH_LIMIT=4,
+        AUTO_PUBLISH_PEAK_BATCH_LIMIT=10,
+        AUTO_PUBLISH_PEAK_DAY_OF_WEEK=6,
+        AUTO_PUBLISH_PEAK_START_HOUR=13,
+        AUTO_PUBLISH_PEAK_END_HOUR=16,
+    )
+    def test_auto_publish_limit_uses_sunday_peak_window(self):
+        sunday_peak = datetime(2026, 5, 17, 5, 30, tzinfo=dt_timezone.utc)
+        sunday_window_end = datetime(2026, 5, 17, 8, 0, tzinfo=dt_timezone.utc)
+        monday_same_hour = datetime(2026, 5, 18, 5, 30, tzinfo=dt_timezone.utc)
+
+        self.assertEqual(_resolve_auto_publish_batch_limit(now=sunday_peak), 10)
+        self.assertEqual(_resolve_auto_publish_batch_limit(now=sunday_window_end), 4)
+        self.assertEqual(_resolve_auto_publish_batch_limit(now=monday_same_hour), 4)
+        self.assertEqual(_resolve_auto_publish_batch_limit(limit=2, now=sunday_peak), 2)
+        self.assertEqual(_resolve_auto_publish_batch_limit(limit=0, now=sunday_peak), 0)
 
     def test_public_page_prefers_rewrite_when_not_manually_edited(self):
         article = self._translated_article(

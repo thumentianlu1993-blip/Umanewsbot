@@ -202,7 +202,11 @@ AUTO_TRANSLATE_SYNC = env_bool("AUTO_TRANSLATE_SYNC", True)
 AUTOMATION_ENABLED = env_bool("AUTOMATION_ENABLED", False)
 AUTO_REVIEW_THRESHOLD = int(env("AUTO_REVIEW_THRESHOLD", "75"))
 MANUAL_REVIEW_THRESHOLD = int(env("MANUAL_REVIEW_THRESHOLD", "45"))
-AUTO_PUBLISH_BATCH_LIMIT = int(env("AUTO_PUBLISH_BATCH_LIMIT", "3"))
+AUTO_PUBLISH_BATCH_LIMIT = int(env("AUTO_PUBLISH_BATCH_LIMIT", "4"))
+AUTO_PUBLISH_PEAK_BATCH_LIMIT = int(env("AUTO_PUBLISH_PEAK_BATCH_LIMIT", "10"))
+AUTO_PUBLISH_PEAK_DAY_OF_WEEK = int(env("AUTO_PUBLISH_PEAK_DAY_OF_WEEK", "6"))
+AUTO_PUBLISH_PEAK_START_HOUR = int(env("AUTO_PUBLISH_PEAK_START_HOUR", "13"))
+AUTO_PUBLISH_PEAK_END_HOUR = int(env("AUTO_PUBLISH_PEAK_END_HOUR", "16"))
 AUTO_PUBLISH_INTERVAL_MINUTES = int(env("AUTO_PUBLISH_INTERVAL_MINUTES", "15"))
 REWRITE_CONFIDENCE_MIN = int(env("REWRITE_CONFIDENCE_MIN", "60"))
 AUTO_PUBLISH_REQUIRE_COVER = env_bool("AUTO_PUBLISH_REQUIRE_COVER", False)
@@ -267,7 +271,6 @@ CELERY_BEAT_SCHEDULE = {
     "auto-publish-batch": {
         "task": "stable.tasks.auto_publish_batch_task",
         "schedule": crontab(minute=f"*/{AUTO_PUBLISH_INTERVAL_MINUTES}"),
-        "kwargs": {"limit": AUTO_PUBLISH_BATCH_LIMIT},
     },
     "detect-automation-anomalies": {
         "task": "stable.tasks.detect_automation_anomalies_task",

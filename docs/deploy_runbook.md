@@ -146,7 +146,11 @@ docker logs --tail=120 umanewsbot-nginx-1
 AUTOMATION_ENABLED=false
 AUTO_REVIEW_THRESHOLD=75
 MANUAL_REVIEW_THRESHOLD=45
-AUTO_PUBLISH_BATCH_LIMIT=3
+AUTO_PUBLISH_BATCH_LIMIT=4
+AUTO_PUBLISH_PEAK_BATCH_LIMIT=10
+AUTO_PUBLISH_PEAK_DAY_OF_WEEK=6
+AUTO_PUBLISH_PEAK_START_HOUR=13
+AUTO_PUBLISH_PEAK_END_HOUR=16
 AUTO_PUBLISH_INTERVAL_MINUTES=15
 REWRITE_CONFIDENCE_MIN=60
 AUTO_PUBLISH_REQUIRE_COVER=false
@@ -208,6 +212,25 @@ docker logs --tail=120 umanewsbot-worker-1
 ```
 
 验证后台“已发布内容”列表、前台首页和文章详情页是否出现自动发布稿。
+
+### 自动发布批量规则验证
+
+生产默认规则：
+
+- 常规时段：每 15 分钟最多自动发布 4 篇
+- 每周日北京时间 13:00-16:00：每 15 分钟最多自动发布 10 篇
+
+检查运行时配置：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web sh -c 'env | grep -E "^(AUTO_PUBLISH_BATCH_LIMIT|AUTO_PUBLISH_PEAK_BATCH_LIMIT|AUTO_PUBLISH_PEAK_DAY_OF_WEEK|AUTO_PUBLISH_PEAK_START_HOUR|AUTO_PUBLISH_PEAK_END_HOUR|AUTO_PUBLISH_INTERVAL_MINUTES)="'
+```
+
+检查任务按当前时间解析出的批量上限：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.tasks import _resolve_auto_publish_batch_limit; print(_resolve_auto_publish_batch_limit())"
+```
 
 ### 异常通知验证
 

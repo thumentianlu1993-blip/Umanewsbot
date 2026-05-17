@@ -399,13 +399,27 @@ def validate_rewrite_task(article_id: int) -> dict:
         raise
 
 
+def _resolve_auto_publish_batch_limit(limit: int | None = None, now=None) -> int:
+    if limit is not None:
+        return max(0, int(limit))
+    base_limit = int(getattr(settings, "AUTO_PUBLISH_BATCH_LIMIT", 4))
+    peak_limit = int(getattr(settings, "AUTO_PUBLISH_PEAK_BATCH_LIMIT", 10))
+    peak_day = int(getattr(settings, "AUTO_PUBLISH_PEAK_DAY_OF_WEEK", 6))
+    peak_start = int(getattr(settings, "AUTO_PUBLISH_PEAK_START_HOUR", 13))
+    peak_end = int(getattr(settings, "AUTO_PUBLISH_PEAK_END_HOUR", 16))
+    local_now = timezone.localtime(now or timezone.now())
+    if local_now.weekday() == peak_day and peak_start <= local_now.hour < peak_end:
+        return max(0, peak_limit)
+    return max(0, base_limit)
+
+
 @shared_task
 def auto_publish_batch_task(limit: int | None = None) -> dict:
     log = _log_start("auto_publish_batch", {"limit": limit})
     if not getattr(settings, "AUTOMATION_ENABLED", False):
         _log_success(log, "automation disabled")
         return {"published_count": 0, "skipped": True}
-    batch_limit = limit or getattr(settings, "AUTO_PUBLISH_BATCH_LIMIT", 3)
+    batch_limit = _resolve_auto_publish_batch_limit(limit)
     queryset = (
         NewsArticle.objects.filter(review_mode=ReviewMode.AUTO, automation_status=AutomationStatus.PUBLISH_READY)
         .exclude(workflow_status__in=[WorkflowStatus.PUBLISHED, WorkflowStatus.WITHDRAWN, WorkflowStatus.IGNORED])
@@ -431,7 +445,7 @@ def auto_publish_batch_task(limit: int | None = None) -> dict:
         _log_failure(log, detail)
     else:
         _log_success(log, detail)
-    return {"published_count": len(published_ids), "published_ids": published_ids, "failed_ids": failed_ids}
+    return {"published_count": len(published_ids), "batch_limit": batch_limit, "published_ids": published_ids, "failed_ids": failed_ids}
 
 
 def _recent_notification_exists(notification_type: str, hours: int = 6) -> bool:
