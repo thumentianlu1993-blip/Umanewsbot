@@ -9,6 +9,8 @@
 
 OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试、本地隔离环境浏览器验收，并归档为 `2026-06-06-add-term-candidate-discovery`；正式能力规格已同步到 `openspec/specs/term-candidate-discovery/spec.md`。
 
+`2026-06-07` 已将术语候选发现部署到生产：服务器从 `7123e4e` 拉到 `e2e3e07`，应用迁移 `0006` 新建候选与证据表，`.env` 补入术语发现开关并保持 `TERM_DISCOVERY_ENABLED=false`（灰度，先关后开）。本次部署同时核实线上 `AUTOMATION_ENABLED=true`、`REWRITE_PROVIDER=siliconflow` 仍在生效。
+
 仓库已明确长期语言约定：Codex 新增或维护的协作文档、OpenSpec 产物与代理说明默认使用中文；仅保留必要的代码标识符、命令和工具机器语法。
 
 ## 已完成内容
@@ -52,10 +54,12 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 正式域名 `umafans.run` / `www.umafans.run` 可访问
 - 自动化运营 MVP 已上线
 - 自动化能力通过 `.env` 中 `AUTOMATION_ENABLED` 控制，当前已进入灰度运行与质量观察阶段
+- 已核实线上 `AUTOMATION_ENABLED=true`、`REWRITE_PROVIDER=siliconflow`（真实 AI 改写在生效）
+- 术语候选发现代码已部署到生产（`e2e3e07`，迁移 `0006` 已应用），`TERM_DISCOVERY_ENABLED=false` 默认关闭，等待单篇抽检后灰度开启
 
 ## 下一步优先级
 
-1. 在生产执行迁移并单篇验证术语候选质量，随后灰度启用 `TERM_DISCOVERY_ENABLED`
+1. 生产迁移已于 `2026-06-07` 完成；下一步在生产做单篇手动重新发现并抽检术语候选质量，确认后灰度启用 `TERM_DISCOVERY_ENABLED`
 2. 观察自动化发布质量与 `AutomationLog`
 3. 补充翻译 warning 可视化和术语库补全流程
 4. HTTPS / 证书接入
@@ -71,6 +75,31 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 邮件通知首版已实现；短信 / QQ / 微信通知当前只保留日志与配置位，尚未接真实发送网关
 - 需要补足更标准的部署基线、回滚与备份演练
 - QQ Bot 实网联调与正式推送链路仍需单独验收
+
+## 2026-06-07 术语候选发现生产部署纪要
+
+### 部署内容
+
+- 服务器 `/opt/umanewsbot`：`git pull origin main` 从 `7123e4e` 快进到 `e2e3e07`
+- 迁移 `0006`（纯新增 `TermCandidate` / `TermCandidateEvidence` 两表）已应用；`web` 启动脚本会自动迁移，显式 `migrate` 显示 `No migrations to apply`
+- `.env` 追加并保持关闭：`TERM_DISCOVERY_ENABLED=false` / `TERM_DISCOVERY_PROVIDER=rules` / `TERM_DISCOVERY_MIN_CONFIDENCE=60`
+- 用低成本 compose `docker-compose.prod.lowcost.yml` 重建 `web/worker/beat`，`db/redis/nginx` 未动
+
+### 迁移前备份（可回滚）
+
+- `.env.backup.20260607_033207`
+- 数据库快照 `backups/pre-0006-20260607_033207.sql`（74M，`horse_news` 库，含 `PostgreSQL database dump complete` 标记）
+
+### 上线后验证
+
+- 容器 `web/db` healthy、`worker/beat` up；`manage.py check` 0 issues
+- 候选/证据模型可查、计数 `0/0`；`nginx → web` 与外网 `umafans.run` / `www.umafans.run` 均 `200`
+- `worker` 近 200 行日志无报错；核对 `AUTOMATION_ENABLED=true`、`REWRITE_PROVIDER=siliconflow` 未变更
+
+### 回滚方式
+
+- 停用功能：将 `TERM_DISCOVERY_ENABLED=false`（当前即为关闭），重启 `web` 与 `worker` 即可，无需回滚迁移或删除候选数据
+- 整体回退：用上面的 `.env` 备份与数据库快照还原
 
 ## 最近一次翻译稳定性修复
 
@@ -138,7 +167,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ### 当前启用策略
 
-- `TERM_DISCOVERY_ENABLED=false`：默认关闭，生产部署迁移后再灰度开启。
+- `TERM_DISCOVERY_ENABLED=false`：默认关闭。`2026-06-07` 已在生产应用迁移并部署代码，当前处于“先关后开”灰度阶段，待单篇抽检后再开启。
 - `TERM_DISCOVERY_PROVIDER=rules`：首版使用保守规则发现器。
 - `TERM_DISCOVERY_MIN_CONFIDENCE=60`：低于阈值的发现结果不进入候选池。
 

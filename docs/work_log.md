@@ -170,3 +170,31 @@
 - 功能代码已完成，生产默认关闭。
 - 下一阶段应先做单篇手动发现和候选质量抽检，再通过 `TERM_DISCOVERY_ENABLED=true` 灰度启用。
 - OpenSpec change 已归档为 `2026-06-06-add-term-candidate-discovery`，正式规格已同步到主规格目录。
+
+## 2026-06-07
+
+### 项目：术语候选发现生产灰度部署
+
+#### 已完成
+
+- 将 `origin/main` 推进到 `e2e3e07`（含术语候选发现），服务器 `/opt/umanewsbot` 从 `7123e4e` 拉到 `e2e3e07`
+- 迁移前备份：`.env.backup.20260607_033207` 与数据库快照 `backups/pre-0006-20260607_033207.sql`（74M，含 `PostgreSQL database dump complete` 标记）
+- 应用迁移 `0006`，新建 `stable_termcandidate` 与 `stable_termcandidateevidence` 两张表（纯新增 `CreateModel` + 索引/约束，无破坏性操作）
+- `.env` 追加术语发现开关并保持关闭：`TERM_DISCOVERY_ENABLED=false` / `TERM_DISCOVERY_PROVIDER=rules` / `TERM_DISCOVERY_MIN_CONFIDENCE=60`
+- 用新镜像 `umanewsbot:prod` 重建并重启 `web/worker/beat`，`db/redis/nginx` 未动
+
+#### 验证
+
+- `showmigrations stable`：`0006` 已 `[X]` 应用（`web` 启动脚本 `start-web.sh` 启动时已自动迁移，显式 `migrate` 显示 `No migrations to apply`）
+- `manage.py check`：0 issues
+- `TermCandidate` / `TermCandidateEvidence` 计数 `0/0`（发现关闭，符合预期）
+- 容器：`web/db` healthy，`worker/beat` up，`nginx/redis` 稳定
+- `nginx → web` 返回 `200`；外网 `umafans.run` / `www.umafans.run` 均 `200`
+- `worker` 近 200 行日志 0 报错
+- 核对线上运行态：`AUTOMATION_ENABLED=true`、`REWRITE_PROVIDER=siliconflow` 未变更；生产数据库名 `horse_news`
+
+#### 当前状态与下一步
+
+- 术语候选发现代码已上线，生产默认关闭
+- 下一步：在后台或 shell 做单篇手动重新发现，抽检候选质量；确认后再将 `TERM_DISCOVERY_ENABLED=true` 灰度开启，仅重启 `web` 与 `worker`
+- 回滚：将 `TERM_DISCOVERY_ENABLED=false` 即可停用，无需回滚迁移或删除候选数据；如需整体回退可用 `.env.backup.20260607_033207` 与 `backups/pre-0006-20260607_033207.sql`
