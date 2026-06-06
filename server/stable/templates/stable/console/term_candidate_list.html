@@ -1,0 +1,67 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}术语候选池 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">术语候选池</h2>
+      <p class="page-subtitle">自动发现的未知专有术语必须经过管理员确认后，才能进入正式术语库。</p>
+    </div>
+  </div>
+
+  <section class="panel">
+    <form method="get" class="filters">
+      <input name="q" value="{{ request.GET.q }}" placeholder="搜索日文原词、建议中文或审核备注">
+      <select name="status"><option value="">全部状态</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      <select name="term_type"><option value="">全部类型</option>{% for value,label in term_type_choices %}<option value="{{ value }}" {% if request.GET.term_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      <select name="source"><option value="">全部来源</option>{% for source in sources %}<option value="{{ source.id }}" {% if request.GET.source == source.id|stringformat:"s" %}selected{% endif %}>{{ source.name }}</option>{% endfor %}</select>
+      <input type="number" name="min_confidence" value="{{ request.GET.min_confidence }}" placeholder="最低置信度">
+      <input type="date" name="seen_from" value="{{ request.GET.seen_from }}">
+      <input type="date" name="seen_to" value="{{ request.GET.seen_to }}">
+      <button type="submit">筛选</button>
+    </form>
+  </section>
+
+  <form method="post" action="{% url 'console-term-candidate-batch-review' %}">
+    {% csrf_token %}
+    <section class="panel">
+      <div class="toolbar">
+        <select name="status" required>
+          <option value="">批量操作</option>
+          <option value="rejected">批量拒绝</option>
+          <option value="ignored">批量忽略</option>
+        </select>
+        <input name="review_notes" placeholder="批量审核备注">
+        <button class="btn secondary" type="submit">执行</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>候选</th><th>类型</th><th>状态</th><th>置信度</th><th>出现/文章</th><th>最近发现</th><th>原因</th><th>操作</th></tr></thead>
+          <tbody>
+            {% for candidate in page_obj %}
+              <tr>
+                <td><input type="checkbox" name="candidate_ids" value="{{ candidate.id }}"></td>
+                <td><strong>{{ candidate.source_ja }}</strong>{% if candidate.suggested_target_zh %}<div class="muted">{{ candidate.suggested_target_zh }}</div>{% endif %}</td>
+                <td>{{ candidate.get_term_type_display }}</td>
+                <td><span class="badge {% if candidate.status == 'pending' %}warning{% elif candidate.status == 'accepted' %}success{% endif %}">{{ candidate.get_status_display }}</span></td>
+                <td>{{ candidate.confidence }}</td>
+                <td>{{ candidate.occurrence_count }} / {{ candidate.article_count }}</td>
+                <td>{{ candidate.last_seen_at|date:"Y-m-d H:i" }}</td>
+                <td>{{ candidate.detection_reasons|join:"、"|truncatechars:48 }}</td>
+                <td><a class="btn ghost" href="{% url 'console-term-candidate-detail' candidate.id %}">审核详情</a></td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="9" class="muted">当前筛选条件下没有术语候选。</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </form>
+  <div class="pagination">
+    {% if page_obj.has_previous %}<a class="btn ghost" href="?page={{ page_obj.previous_page_number }}">上一页</a>{% endif %}
+    <span class="badge">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+    {% if page_obj.has_next %}<a class="btn ghost" href="?page={{ page_obj.next_page_number }}">下一页</a>{% endif %}
+  </div>
+{% endblock %}

@@ -248,3 +248,47 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shel
 4. 后台文章详情页查看 `AutomationLog`
 5. 后台操作日志页查看 `NotificationLog`
 6. 如果内容质量不稳，先关闭 `AUTOMATION_ENABLED`，不要急着回滚代码
+
+## 专有术语候选发现灰度部署
+
+### 部署前配置
+
+首次部署保持默认关闭：
+
+```env
+TERM_DISCOVERY_ENABLED=false
+TERM_DISCOVERY_PROVIDER=rules
+TERM_DISCOVERY_MIN_CONFIDENCE=60
+```
+
+执行代码部署、数据库迁移与检查：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml up -d --build web worker beat
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py migrate
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py check
+```
+
+### 单篇手动验证
+
+在后台候选新闻详情页点击“重新发现术语”，或执行：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.tasks import discover_term_candidates_task; print(discover_term_candidates_task.run(ARTICLE_ID))"
+```
+
+检查后台“术语候选”列表，确认候选类型、上下文、来源文章、置信度、冲突信息和出现次数合理；接受一条测试候选后，确认正式术语库新增记录且操作日志完整。
+
+### 逐步启用
+
+1. 先保持关闭，抽查若干单篇手动发现结果。
+2. 将 `TERM_DISCOVERY_ENABLED=true`，只重启 `web` 与 `worker`。
+3. 每日抽检待审核候选，重点观察误报、跨类型冲突和证据增长。
+4. 根据质量谨慎调整 `TERM_DISCOVERY_MIN_CONFIDENCE`，不要在未抽检时降低阈值。
+
+### 监控与关闭
+
+- 通过 `TaskExecutionLog(task_name=discover_term_candidates)` 查看任务成功与失败。
+- 观察候选池每日新增量、拒绝比例、平均证据数量和正式术语冲突。
+- 若误报或任务异常增加，将 `TERM_DISCOVERY_ENABLED=false` 并重启 `web` 与 `worker`；无需回滚迁移或删除候选数据。
+- 不进行历史全量回溯，不允许绕过工作人员审核直接写入 `TermEntry`。

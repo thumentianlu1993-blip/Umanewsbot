@@ -21,6 +21,8 @@ from .models import (
     PushLog,
     PushTarget,
     TaskExecutionLog,
+    TermCandidate,
+    TermCandidateEvidence,
     TermEntry,
     TranslationRun,
     WorkflowStatus,
@@ -29,6 +31,10 @@ from .services.operations import log_operation
 from .services.pushing import enqueue_push_for_article
 from .services.queueing import dispatch_task
 from .tasks import crawl_news_source_task, translate_article_task
+
+
+admin.site.register(TermCandidate)
+admin.site.register(TermCandidateEvidence)
 
 
 class NewsImageInline(admin.TabularInline):

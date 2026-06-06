@@ -3,7 +3,7 @@ from __future__ import annotations
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 
-from .models import NewsArticle, NewsImage, NewsSource, PushTarget, TermEntry, TermType
+from .models import NewsArticle, NewsImage, NewsSource, PushTarget, TermCandidate, TermEntry, TermType
 from .services.term_admin import serialize_aliases, validate_term_payload
 
 
@@ -235,3 +235,75 @@ class TermImportForm(forms.Form):
         if not csv_file and not csv_text:
             raise forms.ValidationError("请上传 CSV 文件，或直接粘贴 CSV 内容。")
         return cleaned_data
+
+
+class TermCandidateAcceptForm(forms.Form):
+    term_type = forms.ChoiceField(label="术语类型", choices=TermType.choices)
+    source_ja = forms.CharField(label="日文原词", max_length=255)
+    target_zh = forms.CharField(label="中文译词", max_length=255)
+    aliases_ja_text = forms.CharField(label="日文别名", required=False, widget=forms.Textarea(attrs={"rows": 3}))
+    aliases_zh_text = forms.CharField(label="中文别名", required=False, widget=forms.Textarea(attrs={"rows": 3}))
+    priority = forms.IntegerField(label="优先级", initial=0)
+    notes = forms.CharField(label="正式术语备注", required=False, widget=forms.Textarea(attrs={"rows": 3}))
+    review_notes = forms.CharField(label="审核备注", required=False, widget=forms.Textarea(attrs={"rows": 3}))
+
+    def __init__(self, *args, candidate: TermCandidate, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.candidate = candidate
+        self.fields["term_type"].choices = [
+            choice for choice in TermType.choices if choice[0] in {"horse", "race", "jockey", "owner"}
+        ]
+        if not self.is_bound:
+            self.initial.update(
+                {
+                    "term_type": candidate.term_type,
+                    "source_ja": candidate.source_ja,
+                    "target_zh": candidate.suggested_target_zh,
+                }
+            )
+
+    def clean(self):
+        cleaned = super().clean()
+        normalized, errors = validate_term_payload(
+            {
+                "term_type": cleaned.get("term_type"),
+                "source_ja": cleaned.get("source_ja"),
+                "target_zh": cleaned.get("target_zh"),
+                "aliases_ja": cleaned.get("aliases_ja_text"),
+                "aliases_zh": cleaned.get("aliases_zh_text"),
+                "priority": cleaned.get("priority"),
+                "is_active": True,
+                "notes": cleaned.get("notes"),
+            }
+        )
+        for field, messages in errors.items():
+            mapped_field = {"aliases_ja": "aliases_ja_text", "aliases_zh": "aliases_zh_text"}.get(field, field)
+            for message in messages:
+                self.add_error(mapped_field if mapped_field in self.fields else None, message)
+        self.normalized_payload = normalized
+        self.normalized_payload["review_notes"] = cleaned.get("review_notes", "")
+        return cleaned
+
+
+class TermCandidateMergeForm(forms.Form):
+    target_candidate = forms.ModelChoiceField(label="目标候选", queryset=TermCandidate.objects.none(), required=False)
+    target_term = forms.ModelChoiceField(label="目标正式术语", queryset=TermEntry.objects.none(), required=False)
+    add_as_alias = forms.BooleanField(label="将候选日文原词加入正式术语日文别名", required=False)
+    review_notes = forms.CharField(label="审核备注", required=False, widget=forms.Textarea(attrs={"rows": 3}))
+
+    def __init__(self, *args, candidate: TermCandidate, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["target_candidate"].queryset = TermCandidate.objects.filter(status="pending").exclude(pk=candidate.pk).order_by("-last_seen_at")
+        self.fields["target_term"].queryset = TermEntry.objects.all().order_by("-priority", "source_ja")
+
+    def clean(self):
+        cleaned = super().clean()
+        if bool(cleaned.get("target_candidate")) == bool(cleaned.get("target_term")):
+            raise forms.ValidationError("必须且只能选择一个合并目标。")
+        if cleaned.get("add_as_alias") and not cleaned.get("target_term"):
+            self.add_error("add_as_alias", "只有合并到正式术语时才能添加日文别名。")
+        return cleaned
+
+
+class TermCandidateReviewForm(forms.Form):
+    review_notes = forms.CharField(label="审核备注", required=False, widget=forms.Textarea(attrs={"rows": 3}))

@@ -5,6 +5,12 @@
 项目当前已经完成正式域名 HTTP 接入修复，`umafans.run` 与 `www.umafans.run` 已可访问。  
 “自动化内容运营 + AI 编辑改写 MVP”已完成代码侧与生产侧上线，当前处于上线后观察与质量抽检阶段。
 
+仓库已于 `2026-06-06` 加入 OpenSpec + Codex 协作支持，用于在较大功能、跨模块改动、架构调整和生产高风险变更前先对齐规格，再进入实现。
+
+OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试、本地隔离环境浏览器验收，并归档为 `2026-06-06-add-term-candidate-discovery`；正式能力规格已同步到 `openspec/specs/term-candidate-discovery/spec.md`。
+
+仓库已明确长期语言约定：Codex 新增或维护的协作文档、OpenSpec 产物与代理说明默认使用中文；仅保留必要的代码标识符、命令和工具机器语法。
+
 ## 已完成内容
 
 - 域名购买与解析
@@ -19,6 +25,16 @@
   - 支持一致性校验、批量自动发布、自动化日志与通知日志
   - 后台候选池、详情页、编辑台、日志页已展示自动化状态与决策留痕
   - 前台展示优先级已调整为人工稿优先，其次改写稿，最后基准翻译稿
+- OpenSpec + Codex 工作流已完成仓库级配置：
+  - `openspec/config.yaml` 记录真实项目上下文、验证命令和任务域路由
+  - `.codex/skills/openspec-*` 提供提案、实现、同步与归档技能
+  - `.codex/agents/` 提供 `application / integration / operations` 领域代理与只读安全审查代理
+  - `AGENTS.md` 已补充规格驱动开发与子代理使用约定
+- 专有术语候选发现与待标注池已完成：
+  - 支持马名、比赛名、骑手名和马主名发现
+  - 支持候选去重、证据聚合、工作人员审核和安全写入正式术语
+  - 已完成 69 项测试与本地浏览器功能验收
+  - 生产默认关闭，等待灰度启用
 
 ## 本轮问题简述
 
@@ -39,11 +55,11 @@
 
 ## 下一步优先级
 
-1. 观察自动化发布质量与 `AutomationLog`
-2. 补充翻译 warning 可视化和术语库补全流程
-3. HTTPS / 证书接入
-4. 部署稳定化
-5. 监控 / 备份 / 回滚完善
+1. 在生产执行迁移并单篇验证术语候选质量，随后灰度启用 `TERM_DISCOVERY_ENABLED`
+2. 观察自动化发布质量与 `AutomationLog`
+3. 补充翻译 warning 可视化和术语库补全流程
+4. HTTPS / 证书接入
+5. 部署稳定化与监控 / 备份 / 回滚完善
 
 ## 当前已知风险与待确认项
 
@@ -108,6 +124,31 @@
 - 初次部署建议 `AUTOMATION_ENABLED=false`
 - 确认后台可看到自动化字段和日志后，再切换 `AUTOMATION_ENABLED=true`
 - 当前自动发布策略为常规每批 4 篇、周日 13:00-16:00 每批 10 篇，并定期人工抽检自动发布稿
+
+## 专有术语候选发现与待标注池
+
+### 当前实现
+
+- 新增 `TermCandidate` 与 `TermCandidateEvidence`，分别保存待审核术语和按文章聚合的来源证据。
+- 首版支持马名、比赛名、骑手名和马主名四类实体。
+- 新文章入库后可旁路触发发现任务；发现失败不会阻断抓取、翻译、改写或发布。
+- 候选会与正式 `TermEntry.source_ja`、日文别名及已有候选去重；停用正式术语也参与去重。
+- 后台新增“术语候选”列表、详情、单篇重新发现、接受、修改后接受、合并、拒绝、忽略和保守批量拒绝/忽略。
+- 规则或 AI 发现结果不会直接写入正式术语库，只有工作人员明确接受后才创建 `TermEntry`。
+
+### 当前启用策略
+
+- `TERM_DISCOVERY_ENABLED=false`：默认关闭，生产部署迁移后再灰度开启。
+- `TERM_DISCOVERY_PROVIDER=rules`：首版使用保守规则发现器。
+- `TERM_DISCOVERY_MIN_CONFIDENCE=60`：低于阈值的发现结果不进入候选池。
+
+### 当前验证结果
+
+- `DB_ENGINE=sqlite python manage.py check`：通过。
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable`：通过，69 项。
+- `openspec validate --all`：通过。
+- 两种生产 Compose 配置基于 `.env.example` 检查通过。
+- 已使用独立 SQLite 数据库部署本地验收环境，并通过浏览器完成筛选、单篇重跑、接受、合并、拒绝、忽略、批量操作、操作日志和别名搜索验收。
 
 ## 最近一次关键修复纪要
 

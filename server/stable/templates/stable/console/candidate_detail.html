@@ -10,6 +10,11 @@
     </div>
     <div class="toolbar">
       <a class="btn secondary" href="{% url 'console-candidate-list' %}">返回候选池</a>
+      <form method="post" action="{% url 'console-article-discover-terms' article.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{% url 'console-candidate-detail' article.id %}">
+        <button class="btn secondary" type="submit">重新发现术语</button>
+      </form>
       <a class="btn" href="{% url 'console-article-editor' article.id %}">进入编辑台</a>
     </div>
   </div>

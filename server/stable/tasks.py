@@ -42,6 +42,7 @@ from stable.services.pushing import push_article_to_targets
 from stable.services.queueing import dispatch_task
 from stable.services.rewriting import apply_rewrite_result, rewrite_article
 from stable.services.sources import find_builtin_source, sync_builtin_sources
+from stable.services.term_discovery import discover_and_aggregate_article
 from stable.services.translation import translate_article
 from stable.services.validation import apply_validation_outcome, validate_rewrite
 
@@ -96,6 +97,15 @@ def _auto_translate_article_after_ingest(article: NewsArticle) -> dict | None:
         return {"article_id": article.id, "translated": False, "error": str(exc)}
 
 
+def _discover_terms_after_ingest(article: NewsArticle) -> dict | None:
+    if not getattr(settings, "TERM_DISCOVERY_ENABLED", False):
+        return None
+    try:
+        return dispatch_task(discover_term_candidates_task, article.id)
+    except Exception as exc:
+        return {"article_id": article.id, "discovered": False, "error": str(exc)}
+
+
 def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None) -> dict:
     adapter = NetkeibaAdapter()
     job = _start_crawl_job(source)
@@ -112,6 +122,7 @@ def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None
                 article, created = upsert_article_from_draft(draft, crawl_job=job)
                 if created:
                     new_count += 1
+                    _discover_terms_after_ingest(article)
                     _auto_translate_article_after_ingest(article)
                 else:
                     seen_count += 1
@@ -141,6 +152,7 @@ def _crawl_jra_source(source: NewsSource | None = None) -> dict:
                 article, created = upsert_article_from_draft(draft, crawl_job=job)
                 if created:
                     new_count += 1
+                    _discover_terms_after_ingest(article)
                     _auto_translate_article_after_ingest(article)
                 else:
                     seen_count += 1
@@ -221,6 +233,22 @@ def crawl_news_source_task(source_id: int) -> dict:
         else:
             raise NotImplementedError("当前版本仅支持内置 netkeiba / JRA 来源")
         _log_success(log, f"source={source_id} new={result['new_count']} seen={result['seen_count']}")
+        return result
+    except Exception as exc:
+        _log_failure(log, str(exc))
+        raise
+
+
+@shared_task
+def discover_term_candidates_task(article_id: int) -> dict:
+    log = _log_start("discover_term_candidates", {"article_id": article_id})
+    if not getattr(settings, "TERM_DISCOVERY_ENABLED", False):
+        _log_success(log, "term discovery disabled")
+        return {"article_id": article_id, "skipped": True, "reason": "term discovery disabled"}
+    try:
+        article = NewsArticle.objects.get(pk=article_id)
+        result = discover_and_aggregate_article(article)
+        _log_success(log, f"findings={result['finding_count']} candidates={len(result['candidate_ids'])}")
         return result
     except Exception as exc:
         _log_failure(log, str(exc))

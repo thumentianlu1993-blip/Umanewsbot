@@ -109,7 +109,7 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+            "NAME": env("SQLITE_DB_PATH", str(BASE_DIR / "db.sqlite3")),
         }
     }
 
@@ -214,6 +214,10 @@ REWRITE_PROVIDER = env("REWRITE_PROVIDER", TRANSLATION_PROVIDER)
 REWRITE_MODEL = env("REWRITE_MODEL", TRANSLATION_MODEL)
 REWRITE_MAX_TOKENS = int(env("REWRITE_MAX_TOKENS", "2600"))
 REWRITE_TIMEOUT_SECONDS = int(env("REWRITE_TIMEOUT_SECONDS", str(TRANSLATION_TIMEOUT_SECONDS)))
+
+TERM_DISCOVERY_ENABLED = env_bool("TERM_DISCOVERY_ENABLED", False)
+TERM_DISCOVERY_PROVIDER = env("TERM_DISCOVERY_PROVIDER", "rules")
+TERM_DISCOVERY_MIN_CONFIDENCE = int(env("TERM_DISCOVERY_MIN_CONFIDENCE", "60"))
 
 EMAIL_BACKEND = env("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = env("EMAIL_HOST", "localhost")

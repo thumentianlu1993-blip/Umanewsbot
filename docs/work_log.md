@@ -1,5 +1,57 @@
 # 工作日志
 
+## 2026-06-06
+
+### 项目：OpenSpec + Codex 仓库协作支持
+
+#### 已完成
+
+- 安装并验证 OpenSpec CLI `1.4.1`
+- 使用 Codex 工具配置初始化 OpenSpec，生成 5 个 `openspec-*` skills
+- 基于真实 Django/Celery/Docker Compose 架构编写 `openspec/config.yaml`
+- 为 OpenSpec tasks 增加 `application / integration / operations` 域路由
+- 创建三个领域代理与只读 `security-scanner`
+- 在 `AGENTS.md` 中增量加入 OpenSpec / Codex 使用约定
+
+#### 验证
+
+- `openspec --version`：通过，版本 `1.4.1`
+- `openspec list --json`：通过，当前无活动 change
+- `openspec schema validate spec-driven`：通过
+- 临时 change 的 `openspec instructions tasks --json` 已确认真实项目上下文与 5 条任务域规则会被注入
+- 已确认生成 skills 未被手工修改，项目上下文无外部项目模板残留
+
+### 项目：自动化术语候选发现规划
+
+#### 已完成
+
+- 创建 OpenSpec change：`add-term-candidate-discovery`
+- 完成 proposal、`term-candidate-discovery` capability spec、技术设计和 22 项领域路由任务
+- 明确首版仅覆盖马名、比赛名、骑手名和马主名
+- 明确候选与文章证据分层存储、规则优先识别、管理员确认后才能进入 `TermEntry`
+- 明确不做历史全量回溯、复杂实体消歧、知识图谱和 AI 直接写入正式术语库
+
+#### 验证
+
+- `openspec validate add-term-candidate-discovery`：通过
+- OpenSpec 状态：全部 planning artifacts 完成，已达到 apply-ready
+- 当前尚未开始应用代码实现
+
+### 项目：仓库协作文档中文化
+
+#### 已完成
+
+- 将 OpenSpec 项目上下文和任务规则说明改为中文
+- 将 Codex 自定义代理描述与指令改为中文
+- 将 `add-term-candidate-discovery` 的 proposal、spec、design 和 tasks 说明性内容改为中文
+- 在 `AGENTS.md` 与 `docs/decisions.md` 记录长期语言约定
+
+#### 约定
+
+- Codex 新增或维护的协作文档默认使用中文
+- 命令、代码标识符和第三方工具要求的机器语法可以保留英文
+- 上游自动生成且约定不手工修改的 OpenSpec skills 保持原样
+
 ## 2026-05-17
 
 ### 项目一：自动化内容运营 + AI 编辑改写上线
@@ -93,3 +145,28 @@
 - 定期从 warning 中提取高频未知马名，批量补充术语库
 - 继续维护片假名停用词，减少普通词被误判为马名
 
+### 项目三：专有术语候选发现与待标注池
+
+#### 已完成
+
+- 新增候选与证据模型、迁移、索引和唯一约束。
+- 新增四类实体规则发现、正式术语去重、跨类型冲突和幂等证据聚合。
+- 新增发现任务并接入新增文章入库旁路，失败不影响原有主链路。
+- 新增工作人员候选审核后台、单篇重跑和操作日志。
+- 新增接受、修改后接受、合并、拒绝、忽略及批量拒绝/忽略。
+- 完成中文部署、后台和术语库说明。
+
+#### 验证
+
+- `DB_ENGINE=sqlite python manage.py check`：通过。
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable`：通过，69 项。
+- `openspec validate add-term-candidate-discovery`：通过。
+- 两种生产 Compose 配置基于 `.env.example` 检查通过。
+- 使用 `/tmp/umanews-term-acceptance.sqlite3` 部署隔离测试环境，并通过浏览器完成完整后台审核流程。
+- 浏览器验收中修复状态成功提示重复“已”和正式术语别名搜索不兼容 SQLite 的问题。
+
+#### 当前状态
+
+- 功能代码已完成，生产默认关闭。
+- 下一阶段应先做单篇手动发现和候选质量抽检，再通过 `TERM_DISCOVERY_ENABLED=true` 灰度启用。
+- OpenSpec change 已归档为 `2026-06-06-add-term-candidate-discovery`，正式规格已同步到主规格目录。

@@ -1,6 +1,6 @@
 # 项目状态文档
 
-最后更新时间：`2026-05-17`
+最后更新时间：`2026-06-06`
 当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP 已上线观察）
 
 > 角色说明：
@@ -102,6 +102,15 @@
 - [后台使用说明](E:/Codex/docs/backend_usage.md)
 - [PRD 归档说明](E:/Codex/docs/PRD/README.md)
 
+### 4.6 OpenSpec / Codex 协作资产
+
+- OpenSpec 项目配置：`openspec/config.yaml`
+- OpenSpec 规格与变更目录：`openspec/specs/`、`openspec/changes/`
+- Codex OpenSpec skills：`.codex/skills/openspec-*`
+- Codex 领域代理：`application`、`integration`、`operations`
+- Codex 只读安全审查代理：`security-scanner`
+- 较大功能、跨模块、架构和生产高风险变更采用“探索 -> 提案/规格/设计/任务 -> 实现 -> 验证 -> 归档”流程
+
 ## 5. 当前验证结果
 
 - `python manage.py check`：通过
@@ -159,3 +168,12 @@
 2. 每次更新完成后同步回写本文件与 [docs/current_state.md](E:/Codex/docs/current_state.md)。  
 3. 每次收到新 PRD 归档到 `E:/Codex/docs/PRD/`。  
 4. 每次阶段性收工时同步更新 [docs/work_log.md](E:/Codex/docs/work_log.md)。
+
+## 9. 专有术语候选发现状态
+
+- 已完成四类实体候选发现：马名、比赛名、骑手名、马主名。
+- 已完成正式术语去重、已有候选聚合、按文章证据留存和跨类型冲突提示。
+- 已完成工作人员候选审核后台与单篇重新发现入口。
+- 已完成接受、修改后接受、合并、拒绝、忽略和保守批量操作。
+- 生产默认关闭，通过 `TERM_DISCOVERY_ENABLED` 灰度启用。
+- 当前验证：Django 检查通过，`stable` 69 项测试通过，两种生产 Compose 配置检查通过，并完成本地隔离环境浏览器功能验收。

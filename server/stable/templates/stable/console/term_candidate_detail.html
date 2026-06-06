@@ -1,0 +1,57 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}术语候选详情 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">{{ candidate.source_ja }}</h2>
+      <p class="page-subtitle">{{ candidate.get_term_type_display }} · {{ candidate.get_status_display }} · 置信度 {{ candidate.confidence }}</p>
+    </div>
+    <a class="btn ghost" href="{% url 'console-term-candidate-list' %}">返回候选池</a>
+  </div>
+
+  <section class="panel">
+    <h3>候选信息</h3>
+    <p>标准化键：{{ candidate.normalized_key }}</p>
+    <p>出现次数：{{ candidate.occurrence_count }}；文章数量：{{ candidate.article_count }}</p>
+    <p>识别理由：{{ candidate.detection_reasons|join:"、"|default:"-" }}</p>
+    {% if candidate.conflicts %}<p class="badge warning">存在跨类型正式术语冲突：{{ candidate.conflicts }}</p>{% endif %}
+    {% if candidate.review_notes %}<p>审核备注：{{ candidate.review_notes }}</p>{% endif %}
+  </section>
+
+  <section class="panel">
+    <h3>文章证据</h3>
+    {% for evidence in candidate.evidence.all %}
+      <article class="article-card">
+        <div class="article-meta"><span class="badge">{{ evidence.article.source_note }}</span><span>置信度 {{ evidence.confidence }}</span><span>出现 {{ evidence.occurrence_count }} 次</span></div>
+        <h4><a href="{% url 'console-candidate-detail' evidence.article.id %}">{{ evidence.article.title_ja }}</a></h4>
+        {% for context in evidence.contexts %}<p>{{ context }}</p>{% endfor %}
+        <p class="muted">发现器：{{ evidence.detectors|join:"、" }}；理由：{{ evidence.reasons|join:"、" }}</p>
+      </article>
+    {% empty %}<p class="muted">暂无证据。</p>{% endfor %}
+  </section>
+
+  {% if candidate.status == 'pending' %}
+    <section class="panel">
+      <h3>修改后接受为正式术语</h3>
+      <form method="post" action="{% url 'console-term-candidate-accept' candidate.id %}">
+        {% csrf_token %}{{ accept_form.as_p }}<button class="btn" type="submit">确认并写入正式术语库</button>
+      </form>
+    </section>
+    <section class="panel">
+      <h3>合并候选</h3>
+      <form method="post" action="{% url 'console-term-candidate-merge' candidate.id %}">
+        {% csrf_token %}{{ merge_form.as_p }}<button class="btn secondary" type="submit">确认合并</button>
+      </form>
+    </section>
+    <section class="panel">
+      <h3>拒绝或忽略</h3>
+      <form method="post">
+        {% csrf_token %}{{ review_form.as_p }}
+        <button class="btn secondary" formaction="{% url 'console-term-candidate-reject' candidate.id %}">拒绝</button>
+        <button class="btn secondary" formaction="{% url 'console-term-candidate-ignore' candidate.id %}">忽略</button>
+      </form>
+    </section>
+  {% endif %}
+{% endblock %}

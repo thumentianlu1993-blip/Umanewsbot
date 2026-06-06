@@ -183,6 +183,14 @@ class TermType(models.TextChoices):
     OTHER = "other", "其他"
 
 
+class TermCandidateStatus(models.TextChoices):
+    PENDING = "pending", "待审核"
+    ACCEPTED = "accepted", "已接受"
+    REJECTED = "rejected", "已拒绝"
+    IGNORED = "ignored", "已忽略"
+    MERGED = "merged", "已合并"
+
+
 class TimestampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -578,6 +586,94 @@ class TermEntry(TimestampedModel):
     def all_japanese_terms(self) -> list[str]:
         aliases = self.aliases_ja if isinstance(self.aliases_ja, list) else []
         return [self.source_ja, *aliases]
+
+
+class TermCandidate(TimestampedModel):
+    term_type = models.CharField(max_length=32, choices=TermType.choices)
+    source_ja = models.CharField(max_length=255)
+    normalized_key = models.CharField(max_length=255)
+    suggested_target_zh = models.CharField(max_length=255, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=TermCandidateStatus.choices,
+        default=TermCandidateStatus.PENDING,
+    )
+    confidence = models.PositiveSmallIntegerField(default=0)
+    occurrence_count = models.PositiveIntegerField(default=0)
+    article_count = models.PositiveIntegerField(default=0)
+    detection_reasons = models.JSONField(default=list, blank=True)
+    conflicts = models.JSONField(default=list, blank=True)
+    first_seen_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_notes = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_term_candidates",
+    )
+    accepted_term = models.ForeignKey(
+        TermEntry,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="accepted_candidates",
+    )
+    merged_into_candidate = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="merged_candidates",
+    )
+    merged_into_term = models.ForeignKey(
+        TermEntry,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="merged_candidates",
+    )
+
+    class Meta:
+        ordering = ("-last_seen_at", "-confidence", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("term_type", "normalized_key"),
+                name="uq_term_candidate_type_normalized",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("status", "term_type", "-last_seen_at"), name="termcand_status_type_idx"),
+            models.Index(fields=("-confidence", "-last_seen_at"), name="termcand_conf_seen_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.get_term_type_display()}：{self.source_ja}"
+
+
+class TermCandidateEvidence(TimestampedModel):
+    candidate = models.ForeignKey(TermCandidate, on_delete=models.CASCADE, related_name="evidence")
+    article = models.ForeignKey(NewsArticle, on_delete=models.CASCADE, related_name="term_candidate_evidence")
+    source_fields = models.JSONField(default=list, blank=True)
+    contexts = models.JSONField(default=list, blank=True)
+    occurrence_count = models.PositiveIntegerField(default=0)
+    confidence = models.PositiveSmallIntegerField(default=0)
+    detectors = models.JSONField(default=list, blank=True)
+    reasons = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        ordering = ("-updated_at", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("candidate", "article"),
+                name="uq_term_candidate_evidence_article",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.candidate.source_ja} @ {self.article_id}"
 
 
 class PushTarget(TimestampedModel):

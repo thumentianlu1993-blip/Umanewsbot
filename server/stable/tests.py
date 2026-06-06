@@ -15,18 +15,32 @@ from stable.models import (
     ArticleTranslationStatus,
     AutomationStatus,
     NewsArticle,
+    NewsSource,
     NotificationLog,
     PushTarget,
     ReviewMode,
     SourceMode,
     SourceSite,
+    TermCandidate,
+    TermCandidateStatus,
     TermEntry,
+    TaskExecutionLog,
+    TaskStatus,
     WorkflowStatus,
 )
 from stable.services.pushing import build_push_message, push_article_to_targets
 from stable.services.rewriting import _loads_rewrite_payload
 from stable.services.sources import sync_builtin_sources
 from stable.services.term_admin import preview_term_import
+from stable.services.term_candidate_review import accept_candidate, merge_candidate, set_candidate_status
+from stable.services.term_discovery import (
+    TermDiscoveryFinding,
+    aggregate_finding,
+    discover_and_aggregate_article,
+    discover_term_findings,
+    match_formal_terms,
+    normalize_japanese_term,
+)
 from stable.services.terms import apply_term_mappings, extract_horse_tags, extract_unknown_horse_names, resolve_terms
 from stable.services.text import extract_article_text
 from stable.services.translation import (
@@ -39,6 +53,7 @@ from stable.tasks import (
     _resolve_auto_publish_batch_limit,
     auto_publish_batch_task,
     batch_translate_articles_task,
+    discover_term_candidates_task,
     process_article_automation_task,
     score_article_task,
     send_notification_task,
@@ -473,6 +488,12 @@ class TermConsoleTests(TestCase):
         response = self.client.get(reverse("console-term-list"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "术语映射")
+        self.assertContains(response, "イクイノックス")
+
+    def test_term_list_can_search_japanese_and_chinese_aliases(self):
+        response = self.client.get(reverse("console-term-list"), {"q": "イクイノ"})
+        self.assertContains(response, "イクイノックス")
+        response = self.client.get(reverse("console-term-list"), {"q": "春秋分马"})
         self.assertContains(response, "イクイノックス")
 
     def test_term_create_page_can_create_entry(self):
@@ -979,6 +1000,31 @@ class CrawlAutoTranslateTests(TestCase):
         self.assertEqual(result["seen_count"], 0)
         mocked_translate.assert_called_once_with(article.id)
 
+    @override_settings(TERM_DISCOVERY_ENABLED=True, AUTO_TRANSLATE_ON_INGEST=False)
+    def test_term_discovery_dispatch_failure_does_not_abort_crawl(self):
+        stub = type("Stub", (), {"source_article_id": "789"})()
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="existing-789",
+            title_ja="术语发现隔离测试",
+            body_ja_raw="正文",
+            body_ja_normalized="正文",
+            published_at=timezone.now(),
+            source_url="https://example.com/news/789",
+            workflow_status=WorkflowStatus.PENDING_TRANSLATION,
+        )
+
+        with patch("stable.tasks.NetkeibaAdapter.fetch_listing", return_value=[stub]), patch(
+            "stable.tasks.NetkeibaAdapter.fetch_detail", return_value=object()
+        ), patch("stable.tasks.NetkeibaAdapter.normalize_source_payload", return_value=object()), patch(
+            "stable.tasks.upsert_article_from_draft", return_value=(article, True)
+        ), patch("stable.tasks.dispatch_task", side_effect=RuntimeError("boom")):
+            result = _crawl_netkeiba_mode("latest", 1)
+
+        self.assertEqual(result["new_count"], 1)
+        self.assertEqual(result["seen_count"], 0)
+
     @override_settings(AUTO_TRANSLATE_ON_INGEST=True, AUTO_TRANSLATE_SYNC=True)
     def test_translation_failure_does_not_abort_crawl(self):
         stub = type("Stub", (), {"source_article_id": "456"})()
@@ -1004,3 +1050,331 @@ class CrawlAutoTranslateTests(TestCase):
         self.assertEqual(result["new_count"], 1)
         self.assertEqual(result["seen_count"], 0)
         mocked_translate.assert_called_once_with(article.id)
+
+
+class TermCandidateDiscoveryTests(TestCase):
+    def setUp(self):
+        self.article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="term-candidate-1",
+            title_ja="【大阪杯】メイショウタバルが出走、武豊騎手が騎乗",
+            body_ja_raw="馬主は松本好雄。メイショウタバルが大阪杯に挑む。",
+            body_ja_normalized="馬主は松本好雄。メイショウタバルが大阪杯に挑む。",
+            published_at=timezone.now(),
+            source_url="https://example.com/term-candidate-1",
+        )
+
+    def test_normalize_and_formal_alias_matching_includes_inactive_terms(self):
+        term = TermEntry.objects.create(
+            term_type="horse",
+            source_ja="別名の馬",
+            target_zh="测试马",
+            aliases_ja=["メイショウタバル"],
+            is_active=False,
+        )
+        self.assertEqual(normalize_japanese_term(" メイショウタバル "), "メイショウタバル")
+        same_type, other_type = match_formal_terms("horse", "メイショウタバル")
+        self.assertEqual(same_type, [term])
+        self.assertEqual(other_type, [])
+
+    def test_rule_discovery_finds_four_supported_types(self):
+        findings = discover_term_findings(self.article)
+        values = {(item.term_type, item.source_ja) for item in findings}
+        self.assertIn(("horse", "メイショウタバル"), values)
+        self.assertIn(("race", "大阪杯"), values)
+        self.assertIn(("jockey", "武豊"), values)
+        self.assertIn(("owner", "松本好雄"), values)
+
+    @override_settings(TERM_DISCOVERY_MIN_CONFIDENCE=60)
+    def test_aggregate_is_idempotent_and_preserves_rejected_status(self):
+        first = discover_and_aggregate_article(self.article)
+        second = discover_and_aggregate_article(self.article)
+        self.assertEqual(set(first["candidate_ids"]), set(second["candidate_ids"]))
+        horse = TermCandidate.objects.get(term_type="horse", source_ja="メイショウタバル")
+        evidence = horse.evidence.get(article=self.article)
+        self.assertEqual(evidence.occurrence_count, 2)
+        self.assertEqual(horse.article_count, 1)
+        horse.status = TermCandidateStatus.REJECTED
+        horse.save(update_fields=["status", "updated_at"])
+        discover_and_aggregate_article(self.article)
+        horse.refresh_from_db()
+        self.assertEqual(horse.status, TermCandidateStatus.REJECTED)
+
+    @override_settings(TERM_DISCOVERY_MIN_CONFIDENCE=60)
+    def test_formal_term_and_absent_source_are_not_persisted(self):
+        TermEntry.objects.create(term_type="race", source_ja="大阪杯", target_zh="大阪杯")
+        discover_and_aggregate_article(self.article)
+        self.assertFalse(TermCandidate.objects.filter(term_type="race", source_ja="大阪杯").exists())
+        absent = TermDiscoveryFinding("horse", "不存在的马", 99, "test", "测试", "title_ja", "")
+        self.assertIsNone(aggregate_finding(self.article, absent))
+
+    @override_settings(TERM_DISCOVERY_MIN_CONFIDENCE=60)
+    def test_cross_type_formal_conflict_is_retained(self):
+        TermEntry.objects.create(term_type="owner", source_ja="武豊", target_zh="冲突词")
+        discover_and_aggregate_article(self.article)
+        candidate = TermCandidate.objects.get(term_type="jockey", source_ja="武豊")
+        self.assertEqual(candidate.conflicts[0]["term_type"], "owner")
+
+    @override_settings(TERM_DISCOVERY_MIN_CONFIDENCE=60)
+    def test_evidence_contexts_are_bounded(self):
+        for index in range(7):
+            aggregate_finding(
+                self.article,
+                TermDiscoveryFinding(
+                    "horse",
+                    "メイショウタバル",
+                    78,
+                    "test",
+                    "测试",
+                    "title_ja",
+                    f"上下文 {index}",
+                ),
+            )
+        evidence = TermCandidate.objects.get(term_type="horse", source_ja="メイショウタバル").evidence.get(article=self.article)
+        self.assertEqual(len(evidence.contexts), 5)
+
+    @override_settings(TERM_DISCOVERY_ENABLED=False)
+    def test_task_skips_when_disabled(self):
+        result = discover_term_candidates_task.run(self.article.id)
+        self.assertTrue(result["skipped"])
+        self.assertEqual(TermCandidate.objects.count(), 0)
+
+    @override_settings(TERM_DISCOVERY_ENABLED=True)
+    def test_task_records_failure_when_article_is_missing(self):
+        with self.assertRaises(NewsArticle.DoesNotExist):
+            discover_term_candidates_task.run(999999)
+        log = TaskExecutionLog.objects.get(task_name="discover_term_candidates")
+        self.assertEqual(log.status, TaskStatus.FAILED)
+        self.assertTrue(log.finished_at)
+
+
+@override_settings(TERM_DISCOVERY_ENABLED=True, TERM_DISCOVERY_MIN_CONFIDENCE=60, CELERY_TASK_ALWAYS_EAGER=True)
+class TermCandidateReviewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="term-admin", password="pass", is_staff=True)
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="term-review-1",
+            title_ja="メイショウタバルが出走",
+            body_ja_raw="メイショウタバルが勝利した。",
+            body_ja_normalized="メイショウタバルが勝利した。",
+            published_at=timezone.now(),
+            source_url="https://example.com/term-review-1",
+        )
+        discover_and_aggregate_article(self.article)
+        self.candidate = TermCandidate.objects.get(term_type="horse")
+
+    def test_accept_candidate_creates_formal_term_and_logs(self):
+        term = accept_candidate(
+            self.candidate,
+            {
+                "term_type": "horse",
+                "source_ja": self.candidate.source_ja,
+                "target_zh": "名将田原",
+                "aliases_ja": [],
+                "aliases_zh": [],
+                "priority": 10,
+                "is_active": True,
+                "notes": "",
+                "review_notes": "确认",
+            },
+            self.user,
+        )
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.status, TermCandidateStatus.ACCEPTED)
+        self.assertEqual(self.candidate.accepted_term, term)
+        self.assertTrue(self.user.operation_logs.filter(action_type="term_candidate_accepted").exists())
+        with self.assertRaisesMessage(ValueError, "只有待审核候选"):
+            set_candidate_status(self.candidate, self.user, TermCandidateStatus.REJECTED)
+
+    def test_merge_requires_explicit_alias_confirmation(self):
+        term = TermEntry.objects.create(term_type="horse", source_ja="正式马名", target_zh="正式译名")
+        merge_candidate(self.candidate, self.user, target_term=term, add_as_alias=False)
+        term.refresh_from_db()
+        self.assertNotIn(self.candidate.source_ja, term.aliases_ja)
+
+    def test_reject_keeps_candidate_and_evidence(self):
+        set_candidate_status(self.candidate, self.user, TermCandidateStatus.REJECTED, "误报")
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.status, TermCandidateStatus.REJECTED)
+        self.assertTrue(self.candidate.evidence.exists())
+
+    def test_staff_pages_and_single_article_retrigger(self):
+        list_response = self.client.get(reverse("console-term-candidate-list"))
+        detail_response = self.client.get(reverse("console-term-candidate-detail", args=[self.candidate.id]))
+        retrigger_response = self.client.post(
+            reverse("console-article-discover-terms", args=[self.article.id]),
+            {"next": reverse("console-candidate-detail", args=[self.article.id])},
+        )
+        self.assertEqual(list_response.status_code, 200)
+        self.assertContains(list_response, "メイショウタバル")
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertEqual(retrigger_response.status_code, 302)
+        self.assertTrue(TaskExecutionLog.objects.filter(task_name="discover_term_candidates", status=TaskStatus.SUCCESS).exists())
+
+    def test_list_filters_by_status_and_type(self):
+        response = self.client.get(
+            reverse("console-term-candidate-list"),
+            {"status": TermCandidateStatus.PENDING, "term_type": "horse", "min_confidence": 70},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "メイショウタバル")
+        response = self.client.get(reverse("console-term-candidate-list"), {"term_type": "race"})
+        self.assertNotContains(response, "メイショウタバル")
+
+    def test_list_filters_by_keyword_source_and_seen_date(self):
+        source = NewsSource.objects.create(
+            name="功能测试来源",
+            homepage_url="https://example.com",
+            feed_url="https://example.com/feed",
+        )
+        self.article.source_config = source
+        self.article.save(update_fields=["source_config", "updated_at"])
+        today = timezone.localdate().isoformat()
+
+        response = self.client.get(
+            reverse("console-term-candidate-list"),
+            {"q": "メイショウ", "source": source.id, "seen_from": today, "seen_to": today},
+        )
+        self.assertContains(response, "メイショウタバル")
+        response = self.client.get(reverse("console-term-candidate-list"), {"q": "不存在"})
+        self.assertNotContains(response, "メイショウタバル")
+
+    def test_unauthenticated_user_is_redirected_to_login(self):
+        client = Client()
+        response = client.get(reverse("console-term-candidate-list"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("backend-login"), response.url)
+
+    def test_non_staff_is_forbidden(self):
+        non_staff = User.objects.create_user(username="reader", password="pass")
+        client = Client()
+        client.force_login(non_staff)
+        response = client.get(reverse("console-term-candidate-list"))
+        self.assertEqual(response.status_code, 403)
+
+    def test_batch_review_only_changes_pending_candidates(self):
+        accepted = TermCandidate.objects.create(
+            term_type="race",
+            source_ja="大阪杯",
+            normalized_key="大阪杯",
+            status=TermCandidateStatus.ACCEPTED,
+        )
+        response = self.client.post(
+            reverse("console-term-candidate-batch-review"),
+            {"candidate_ids": [self.candidate.id, accepted.id], "status": TermCandidateStatus.IGNORED},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.candidate.refresh_from_db()
+        accepted.refresh_from_db()
+        self.assertEqual(self.candidate.status, TermCandidateStatus.IGNORED)
+        self.assertEqual(accepted.status, TermCandidateStatus.ACCEPTED)
+
+    def test_accept_endpoint_creates_formal_term_with_modified_fields(self):
+        response = self.client.post(
+            reverse("console-term-candidate-accept", args=[self.candidate.id]),
+            {
+                "term_type": "horse",
+                "source_ja": "メイショウタバル改",
+                "target_zh": "名将田原改",
+                "aliases_ja_text": "メイショウタバル",
+                "aliases_zh_text": "名将田原",
+                "priority": "25",
+                "notes": "功能测试正式术语",
+                "review_notes": "页面修改后接受",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.candidate.refresh_from_db()
+        term = TermEntry.objects.get(source_ja="メイショウタバル改")
+        self.assertEqual(self.candidate.status, TermCandidateStatus.ACCEPTED)
+        self.assertEqual(self.candidate.accepted_term, term)
+        self.assertEqual(term.aliases_ja, ["メイショウタバル"])
+        self.assertEqual(term.aliases_zh, ["名将田原"])
+        self.assertEqual(term.priority, 25)
+        self.assertEqual(self.candidate.review_notes, "页面修改后接受")
+
+    def test_accept_endpoint_rejects_existing_formal_term(self):
+        TermEntry.objects.create(term_type="horse", source_ja=self.candidate.source_ja, target_zh="已有译名")
+        response = self.client.post(
+            reverse("console-term-candidate-accept", args=[self.candidate.id]),
+            {
+                "term_type": "horse",
+                "source_ja": self.candidate.source_ja,
+                "target_zh": "重复译名",
+                "priority": "0",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "已存在相同日文原词", status_code=400)
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.status, TermCandidateStatus.PENDING)
+
+    def test_merge_endpoint_adds_alias_only_with_explicit_confirmation(self):
+        term = TermEntry.objects.create(term_type="horse", source_ja="正式马名", target_zh="正式译名")
+        response = self.client.post(
+            reverse("console-term-candidate-merge", args=[self.candidate.id]),
+            {
+                "target_term": term.id,
+                "add_as_alias": "on",
+                "review_notes": "确认添加别名",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.candidate.refresh_from_db()
+        term.refresh_from_db()
+        self.assertEqual(self.candidate.status, TermCandidateStatus.MERGED)
+        self.assertEqual(self.candidate.merged_into_term, term)
+        self.assertIn(self.candidate.source_ja, term.aliases_ja)
+        self.assertTrue(self.candidate.evidence.exists())
+        search_response = self.client.get(reverse("console-term-list"), {"q": self.candidate.source_ja})
+        self.assertContains(search_response, term.source_ja)
+
+    def test_merge_endpoint_into_candidate_keeps_evidence(self):
+        target = TermCandidate.objects.create(
+            term_type="horse",
+            source_ja="メイショウタバル別候補",
+            normalized_key="メイショウタバル別候補",
+        )
+        response = self.client.post(
+            reverse("console-term-candidate-merge", args=[self.candidate.id]),
+            {"target_candidate": target.id, "review_notes": "合并重复候选"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.status, TermCandidateStatus.MERGED)
+        self.assertEqual(self.candidate.merged_into_candidate, target)
+        self.assertTrue(self.candidate.evidence.exists())
+
+    def test_reject_and_ignore_endpoints_keep_evidence_and_log_operations(self):
+        reject_response = self.client.post(
+            reverse("console-term-candidate-reject", args=[self.candidate.id]),
+            {"review_notes": "页面拒绝"},
+            follow=True,
+        )
+        self.assertEqual(reject_response.status_code, 200)
+        self.assertContains(reject_response, "候选状态已更新为“已拒绝”。")
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.status, TermCandidateStatus.REJECTED)
+        self.assertTrue(self.candidate.evidence.exists())
+
+        ignored = TermCandidate.objects.create(
+            term_type="race",
+            source_ja="测试忽略杯",
+            normalized_key="测试忽略杯",
+        )
+        ignore_response = self.client.post(
+            reverse("console-term-candidate-ignore", args=[ignored.id]),
+            {"review_notes": "页面忽略"},
+            follow=True,
+        )
+        self.assertEqual(ignore_response.status_code, 200)
+        self.assertContains(ignore_response, "候选状态已更新为“已忽略”。")
+        ignored.refresh_from_db()
+        self.assertEqual(ignored.status, TermCandidateStatus.IGNORED)
+        self.assertTrue(self.user.operation_logs.filter(action_type="term_candidate_rejected").exists())
+        self.assertTrue(self.user.operation_logs.filter(action_type="term_candidate_ignored").exists())

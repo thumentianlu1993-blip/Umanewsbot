@@ -37,6 +37,17 @@
 - 所有关键状态、决策、排查过程都要写回仓库文档
 - 做生产相关改动时，优先核对运行态，而不是只看本地代码预期
 
+## OpenSpec / Codex 工作流
+
+- 较大功能、跨模块改动、架构调整和生产高风险变更，先通过 OpenSpec 对齐需求，再进入实现
+- OpenSpec 项目上下文与任务路由位于 `openspec/config.yaml`
+- 工作流顺序：探索 -> 提案/规格/设计/任务 -> 实现 -> 验证 -> 归档
+- 使用 Codex 时，可从 `/skills` 调用 `openspec-propose` 创建变更，调用 `openspec-apply-change` 实现，完成验证后调用 `openspec-archive-change`
+- `tasks.md` 中的任务必须使用 `(application)`、`(integration)` 或 `(operations)` 域前缀，并按实现先于验证的顺序排列
+- `.codex/agents/` 中提供对应领域代理；子代理仅在明确要求时启用
+- 不手工修改 `.codex/skills/openspec-*` 生成文件；需要刷新时运行 `openspec update`
+- 小型修复可以直接处理，但仍须遵守本文件的阅读、验证与文档回写要求
+
 ## 开始任何任务前必须先阅读
 
 1. [docs/project_overview.md](E:/Codex/docs/project_overview.md)
@@ -58,6 +69,9 @@
 
 ## 输出风格
 
+- Codex 新增或维护的仓库文档、OpenSpec 产物、代理说明和面向协作者的文字默认使用中文
+- 命令、代码标识符、协议字段、第三方工具要求的机器语法，以及无法合理翻译的专有名词可以保留英文
+- OpenSpec 规格中的 `ADDED Requirements / Requirement / Scenario / WHEN / THEN` 等校验关键字必须保留，但其标题和正文内容使用中文
 - 先确认当前真实状态，再给建议
 - 涉及生产问题时，优先给文件、命令、路由、配置片段级别的说明
 - 如果用户要求部署/排障，必须区分：

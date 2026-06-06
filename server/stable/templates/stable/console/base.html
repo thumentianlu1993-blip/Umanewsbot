@@ -51,6 +51,10 @@
           <a class="nav-link {% if '/admin/terms/' in active_path %}active{% endif %}" href="{% url 'console-term-list' %}">
             <span>术语映射</span>
           </a>
+          <a class="nav-link {% if '/admin/term-candidates/' in active_path %}active{% endif %}" href="{% url 'console-term-candidate-list' %}">
+            <span>术语候选池</span>
+            <span class="badge warning">{{ pending_term_candidate_count }}</span>
+          </a>
           <a class="nav-link {% if '/admin/published/' in active_path %}active{% endif %}" href="{% url 'console-published-list' %}">
             <span>已发布内容</span>
           </a>

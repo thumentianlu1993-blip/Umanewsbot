@@ -18,7 +18,16 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
-from .forms import ArticleEditorForm, BackendAuthenticationForm, NewsSourceForm, TermEntryForm, TermImportForm
+from .forms import (
+    ArticleEditorForm,
+    BackendAuthenticationForm,
+    NewsSourceForm,
+    TermCandidateAcceptForm,
+    TermCandidateMergeForm,
+    TermCandidateReviewForm,
+    TermEntryForm,
+    TermImportForm,
+)
 from .models import (
     AutomationLog,
     AutomationStatus,
@@ -34,6 +43,8 @@ from .models import (
     PushTarget,
     ReviewMode,
     TaskExecutionLog,
+    TermCandidate,
+    TermCandidateStatus,
     TermEntry,
     TermType,
     WorkflowStatus,
@@ -52,7 +63,14 @@ from .services.term_admin import (
     serialize_aliases,
     validate_term_payload,
 )
-from .tasks import batch_translate_articles_task, crawl_news_source_task, process_article_automation_task, translate_article_task
+from .services.term_candidate_review import accept_candidate, merge_candidate, set_candidate_status
+from .tasks import (
+    batch_translate_articles_task,
+    crawl_news_source_task,
+    discover_term_candidates_task,
+    process_article_automation_task,
+    translate_article_task,
+)
 
 
 class BackendLoginView(LoginView):
@@ -104,6 +122,7 @@ def _console_context(request: HttpRequest, **extra):
         "django_admin_url": settings.DJANGO_ADMIN_URL,
         "pending_edit_count": NewsArticle.objects.filter(workflow_status=WorkflowStatus.PENDING_EDIT).count(),
         "pending_review_count": NewsArticle.objects.filter(workflow_status=WorkflowStatus.PENDING_REVIEW).count(),
+        "pending_term_candidate_count": TermCandidate.objects.filter(status=TermCandidateStatus.PENDING).count(),
         **extra,
     }
 
@@ -166,12 +185,20 @@ def _term_filters(queryset, request: HttpRequest):
     has_alias = request.GET.get("has_alias", "").strip()
 
     if query:
+        normalized_query = query.casefold()
+        alias_match_ids = [
+            term.id
+            for term in queryset.only("id", "aliases_ja", "aliases_zh")
+            if any(
+                normalized_query in str(alias).casefold()
+                for alias in [*(term.aliases_ja or []), *(term.aliases_zh or [])]
+            )
+        ]
         queryset = queryset.filter(
             Q(source_ja__icontains=query)
             | Q(target_zh__icontains=query)
-            | Q(aliases_ja__icontains=query)
-            | Q(aliases_zh__icontains=query)
             | Q(notes__icontains=query)
+            | Q(pk__in=alias_match_ids)
         )
     if term_type:
         queryset = queryset.filter(term_type=term_type)
@@ -182,6 +209,31 @@ def _term_filters(queryset, request: HttpRequest):
     if has_alias == "yes":
         queryset = queryset.filter(~Q(aliases_ja=[]) | ~Q(aliases_zh=[]))
     return queryset
+
+
+def _term_candidate_filters(queryset, request: HttpRequest):
+    query = request.GET.get("q", "").strip()
+    status = request.GET.get("status", "").strip()
+    term_type = request.GET.get("term_type", "").strip()
+    source_id = request.GET.get("source", "").strip()
+    min_confidence = request.GET.get("min_confidence", "").strip()
+    seen_from = request.GET.get("seen_from", "").strip()
+    seen_to = request.GET.get("seen_to", "").strip()
+    if query:
+        queryset = queryset.filter(Q(source_ja__icontains=query) | Q(suggested_target_zh__icontains=query) | Q(review_notes__icontains=query))
+    if status:
+        queryset = queryset.filter(status=status)
+    if term_type:
+        queryset = queryset.filter(term_type=term_type)
+    if source_id:
+        queryset = queryset.filter(evidence__article__source_config_id=source_id)
+    if min_confidence.isdigit():
+        queryset = queryset.filter(confidence__gte=int(min_confidence))
+    if seen_from:
+        queryset = queryset.filter(last_seen_at__date__gte=seen_from)
+    if seen_to:
+        queryset = queryset.filter(last_seen_at__date__lte=seen_to)
+    return queryset.distinct()
 
 
 @login_required
@@ -509,6 +561,184 @@ def term_import(request: HttpRequest):
         "stable/console/term_import.html",
         _console_context(request, form=form, preview=preview, commit_result=commit_result),
     )
+
+
+@login_required
+def term_candidate_list(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    queryset = TermCandidate.objects.select_related("accepted_term", "reviewed_by").order_by("-last_seen_at", "-confidence")
+    queryset = _term_candidate_filters(queryset, request)
+    paginator = Paginator(queryset, 20)
+    return render(
+        request,
+        "stable/console/term_candidate_list.html",
+        _console_context(
+            request,
+            page_obj=paginator.get_page(request.GET.get("page")),
+            status_choices=TermCandidateStatus.choices,
+            term_type_choices=[choice for choice in TermType.choices if choice[0] in {"horse", "race", "jockey", "owner"}],
+            sources=NewsSource.objects.filter(deleted_at__isnull=True).order_by("name"),
+        ),
+    )
+
+
+@login_required
+def term_candidate_detail(request: HttpRequest, candidate_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    candidate = get_object_or_404(
+        TermCandidate.objects.select_related(
+            "accepted_term", "merged_into_candidate", "merged_into_term", "reviewed_by"
+        ).prefetch_related("evidence__article"),
+        pk=candidate_id,
+    )
+    return render(
+        request,
+        "stable/console/term_candidate_detail.html",
+        _console_context(
+            request,
+            candidate=candidate,
+            accept_form=TermCandidateAcceptForm(candidate=candidate),
+            merge_form=TermCandidateMergeForm(candidate=candidate),
+            review_form=TermCandidateReviewForm(),
+        ),
+    )
+
+
+@login_required
+@require_POST
+def term_candidate_accept(request: HttpRequest, candidate_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    candidate = get_object_or_404(TermCandidate, pk=candidate_id)
+    form = TermCandidateAcceptForm(request.POST, candidate=candidate)
+    if form.is_valid():
+        try:
+            term = accept_candidate(candidate, form.normalized_payload, request.user)
+            messages.success(request, f"候选已接受并创建正式术语：{term.source_ja} -> {term.target_zh}")
+            return redirect("console-term-candidate-detail", candidate_id=candidate.pk)
+        except ValueError as exc:
+            form.add_error(None, str(exc))
+    return render(
+        request,
+        "stable/console/term_candidate_detail.html",
+        _console_context(
+            request,
+            candidate=candidate,
+            accept_form=form,
+            merge_form=TermCandidateMergeForm(candidate=candidate),
+            review_form=TermCandidateReviewForm(),
+        ),
+        status=400,
+    )
+
+
+@login_required
+@require_POST
+def term_candidate_merge(request: HttpRequest, candidate_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    candidate = get_object_or_404(TermCandidate, pk=candidate_id)
+    form = TermCandidateMergeForm(request.POST, candidate=candidate)
+    if form.is_valid():
+        try:
+            merge_candidate(
+                candidate,
+                request.user,
+                target_candidate=form.cleaned_data.get("target_candidate"),
+                target_term=form.cleaned_data.get("target_term"),
+                add_as_alias=form.cleaned_data.get("add_as_alias", False),
+                notes=form.cleaned_data.get("review_notes", ""),
+            )
+            messages.success(request, "候选已合并。")
+            return redirect("console-term-candidate-detail", candidate_id=candidate.pk)
+        except ValueError as exc:
+            form.add_error(None, str(exc))
+    return render(
+        request,
+        "stable/console/term_candidate_detail.html",
+        _console_context(
+            request,
+            candidate=candidate,
+            accept_form=TermCandidateAcceptForm(candidate=candidate),
+            merge_form=form,
+            review_form=TermCandidateReviewForm(),
+        ),
+        status=400,
+    )
+
+
+def _review_term_candidate(request: HttpRequest, candidate_id: int, status: str):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    candidate = get_object_or_404(TermCandidate, pk=candidate_id)
+    form = TermCandidateReviewForm(request.POST)
+    if form.is_valid():
+        try:
+            set_candidate_status(candidate, request.user, status, form.cleaned_data.get("review_notes", ""))
+            messages.success(request, f"候选状态已更新为“{TermCandidateStatus(status).label}”。")
+        except ValueError as exc:
+            messages.error(request, str(exc))
+    return redirect("console-term-candidate-detail", candidate_id=candidate.pk)
+
+
+@login_required
+@require_POST
+def term_candidate_reject(request: HttpRequest, candidate_id: int):
+    return _review_term_candidate(request, candidate_id, TermCandidateStatus.REJECTED)
+
+
+@login_required
+@require_POST
+def term_candidate_ignore(request: HttpRequest, candidate_id: int):
+    return _review_term_candidate(request, candidate_id, TermCandidateStatus.IGNORED)
+
+
+@login_required
+@require_POST
+def term_candidate_batch_review(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    status = request.POST.get("status", "")
+    if status not in {TermCandidateStatus.REJECTED, TermCandidateStatus.IGNORED}:
+        messages.error(request, "批量操作仅支持拒绝或忽略。")
+        return redirect("console-term-candidate-list")
+    candidates = list(
+        TermCandidate.objects.filter(
+            pk__in=request.POST.getlist("candidate_ids"),
+            status=TermCandidateStatus.PENDING,
+        )
+    )
+    for candidate in candidates:
+        set_candidate_status(candidate, request.user, status, request.POST.get("review_notes", ""))
+    messages.success(request, f"已批量处理 {len(candidates)} 条候选。")
+    return redirect("console-term-candidate-list")
+
+
+@login_required
+@require_POST
+def article_discover_terms(request: HttpRequest, article_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    article = get_object_or_404(NewsArticle, pk=article_id)
+    dispatch_task(discover_term_candidates_task, article.id)
+    log_operation(
+        action_type="article_term_discovery_triggered",
+        target_type="article",
+        target_id=article.pk,
+        detail=f"手动触发术语发现《{article.effective_title}》",
+        admin=request.user,
+    )
+    messages.success(request, "已触发单篇文章术语发现。")
+    return redirect(request.POST.get("next") or reverse("console-candidate-detail", args=[article.pk]))
 
 
 @login_required
