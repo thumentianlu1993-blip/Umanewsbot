@@ -12,6 +12,7 @@ class ResolvedTerm:
     source_ja: str
     target_zh: str
     matched_text: str
+    race_grade: str
     priority: int
     notes: str
 
@@ -31,6 +32,7 @@ def resolve_terms(text: str, limit: int = 20) -> list[ResolvedTerm]:
                     source_ja=entry.source_ja,
                     target_zh=entry.target_zh,
                     matched_text=matched,
+                    race_grade=getattr(entry, "race_grade", ""),
                     priority=entry.priority,
                     notes=entry.notes,
                 )

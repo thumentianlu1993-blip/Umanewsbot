@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
+from io import StringIO
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
@@ -29,6 +31,7 @@ from stable.models import (
     WorkflowStatus,
 )
 from stable.services.pushing import build_push_message, push_article_to_targets
+from stable.services.automation import score_article_for_automation
 from stable.services.rewriting import _loads_rewrite_payload
 from stable.services.sources import sync_builtin_sources
 from stable.services.term_admin import preview_term_import
@@ -106,6 +109,65 @@ class TermResolverTests(TestCase):
         )
 
         self.assertNotIn("リベンジ", names)
+
+
+class RaceGradeTests(TestCase):
+    def test_normalize_race_grade_covers_common_jra_classes(self):
+        from stable.services.automation import normalize_race_grade
+
+        cases = {
+            "宝塚記念・GI": "G1",
+            "安田記念（ＧⅠ）": "G1",
+            "札幌記念 GII": "G2",
+            "金鯱賞（Ｇ２）": "G2",
+            "中山金杯 GIII": "G3",
+            "京都金杯（ＧⅢ）": "G3",
+            "リステッド競走": "L",
+            "Listed": "L",
+            "オープン特別": "OP",
+            "OP": "OP",
+            "メイクデビュー東京": "NEWCOMER",
+            "新馬戦": "NEWCOMER",
+            "未勝利戦": "MAIDEN",
+        }
+        for raw, expected in cases.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(normalize_race_grade(raw), expected)
+
+    def test_race_grade_drives_automation_priority_and_keeps_low_classes_low(self):
+        from stable.services.automation import race_priority
+
+        TermEntry.objects.create(term_type="race", source_ja="宝塚記念", target_zh="宝塚纪念", race_grade="G1")
+        g1_article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="race-grade-g1",
+            title_ja="【宝塚記念】注目馬が出走",
+            body_ja_raw="宝塚記念に出走する。GIの大一番に向けて調整は順調。",
+            body_ja_normalized="宝塚記念に出走する。GIの大一番に向けて調整は順調。",
+            translated_body_zh="宝塚纪念的赛前消息。" * 20,
+            translation_status=ArticleTranslationStatus.TRANSLATED,
+            published_at=timezone.now(),
+            source_url="https://example.com/race-grade-g1",
+        )
+        self.assertEqual(race_priority(g1_article)["priority"], "P0")
+
+        TermEntry.objects.create(term_type="race", source_ja="新馬戦", target_zh="新马战", race_grade="NEWCOMER")
+        newcomer_article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="race-grade-newcomer",
+            title_ja="東京新馬戦の出走馬が決定",
+            body_ja_raw="東京新馬戦に若駒が出走する。",
+            body_ja_normalized="東京新馬戦に若駒が出走する。",
+            translated_body_zh="新马战消息。" * 20,
+            translation_status=ArticleTranslationStatus.TRANSLATED,
+            published_at=timezone.now(),
+            source_url="https://example.com/race-grade-newcomer",
+        )
+        decision = score_article_for_automation(newcomer_article)
+        self.assertNotEqual(decision.decision_reason["signals"]["race_priority"], "P0")
+        self.assertLess(decision.score_total, 75)
 
 
 class TextExtractionTests(TestCase):
@@ -395,6 +457,34 @@ class AutomationFlowTests(TestCase):
         self.assertTrue(article.rewrite_body_zh)
         self.assertEqual(article.base_translation_zh, article.translated_body_zh)
 
+    def test_takarazuka_article_uses_title_horse_and_race_grade(self):
+        TermEntry.objects.create(term_type="horse", source_ja="キタサンブラック", target_zh="北部玄驹", priority=100)
+        TermEntry.objects.create(term_type="race", source_ja="宝塚記念", target_zh="宝塚纪念", race_grade="G1", priority=90)
+        body = (
+            "シュガークンが宝塚記念・GIで一発を狙う。兄キタサンブラックの悔しさを晴らす舞台だ。"
+            "ドゥラメンテ、シュガーハート、サクラバクシンオーなど血統面の話題も多い。"
+            "最終追い切りでは軽快な動きを見せ、陣営は状態の良さを強調した。"
+            "今年の上半期を締めくくる大一番としてファンの注目も集まっている。"
+        )
+        article = self._translated_article(
+            source_article_id="takarazuka-3961-shape",
+            title_ja="【宝塚記念】兄キタサンブラックの悔しさを晴らすか シュガークンが一発狙う",
+            translated_title_zh="【宝塚纪念】弟弟シュガークン能否为兄长北部玄驹雪耻",
+            title_zh="【宝塚纪念】弟弟シュガークン能否为兄长北部玄驹雪耻",
+            body_ja_raw=body,
+            body_ja_normalized=body,
+            translated_body_zh="シュガークン将挑战宝塚纪念，北部玄驹相关背景受到关注。" * 20,
+            body_zh="シュガークン将挑战宝塚纪念，北部玄驹相关背景受到关注。" * 20,
+        )
+
+        decision = score_article_for_automation(article)
+
+        self.assertGreaterEqual(decision.score_total, 75)
+        self.assertEqual(decision.review_mode, ReviewMode.AUTO)
+        self.assertEqual(decision.decision_reason["signals"]["race_grade"], "G1")
+        self.assertEqual(decision.decision_reason["signals"]["race_priority"], "P0")
+        self.assertTrue(decision.decision_reason["signals"]["p0_horse_hits"])
+
     def test_score_short_body_is_ignored(self):
         article = self._translated_article(
             source_article_id="short-1",
@@ -541,14 +631,24 @@ class TermConsoleTests(TestCase):
 
     def test_preview_term_import_service(self):
         csv_text = (
-            "term_type,source_ja,target_zh,aliases_ja,aliases_zh,priority,is_active,notes\n"
-            "horse,グランアレグリア,放声欢呼,Gran Alegria|グラン,放声欢呼,100,true,\n"
-            "race,大阪杯,大阪杯,,大阪杯一级赛,20,true,重要赛事\n"
+            "term_type,source_ja,target_zh,aliases_ja,aliases_zh,priority,is_active,notes,race_grade\n"
+            "horse,グランアレグリア,放声欢呼,Gran Alegria|グラン,放声欢呼,100,true,,\n"
+            "race,大阪杯,大阪杯,,大阪杯一级赛,20,true,重要赛事,G1\n"
         )
         preview = preview_term_import(csv_text=csv_text, import_mode="create")
         self.assertEqual(preview["summary"]["total"], 2)
         self.assertEqual(preview["summary"]["error_count"], 0)
         self.assertTrue(preview["can_commit"])
+        self.assertEqual(preview["rows"][1]["payload"]["race_grade"], "G1")
+
+    def test_preview_term_import_rejects_invalid_race_grade(self):
+        csv_text = (
+            "term_type,source_ja,target_zh,aliases_ja,aliases_zh,priority,is_active,notes,race_grade\n"
+            "race,謎の特別,谜之特别,,,,true,,P9\n"
+        )
+        preview = preview_term_import(csv_text=csv_text, import_mode="create")
+        self.assertEqual(preview["summary"]["error_count"], 1)
+        self.assertIn("比赛等级", " ".join(preview["rows"][0]["errors"]))
 
     def test_preview_term_import_service_decodes_gb18030_file(self):
         TermEntry.objects.all().delete()
@@ -578,9 +678,9 @@ class TermConsoleTests(TestCase):
 
     def test_term_import_preview_and_commit(self):
         csv_text = (
-            "term_type,source_ja,target_zh,aliases_ja,aliases_zh,priority,is_active,notes\n"
-            "horse,グランアレグリア,放声欢呼,Gran Alegria|グラン,放声欢呼,100,true,\n"
-            "race,大阪杯,大阪杯,,大阪杯一级赛,20,true,重要赛事\n"
+            "term_type,source_ja,target_zh,aliases_ja,aliases_zh,priority,is_active,notes,race_grade\n"
+            "horse,グランアレグリア,放声欢呼,Gran Alegria|グラン,放声欢呼,100,true,,\n"
+            "race,大阪杯,大阪杯,,大阪杯一级赛,20,true,重要赛事,G1\n"
         )
         preview_response = self.client.post(
             reverse("console-term-import"),
@@ -596,7 +696,13 @@ class TermConsoleTests(TestCase):
         )
         self.assertEqual(commit_response.status_code, 200)
         self.assertTrue(TermEntry.objects.filter(source_ja="グランアレグリア").exists())
-        self.assertTrue(TermEntry.objects.filter(source_ja="大阪杯").exists())
+        self.assertEqual(TermEntry.objects.get(source_ja="大阪杯").race_grade, "G1")
+
+    def test_import_terms_management_command_supports_dry_run(self):
+        out = StringIO()
+        call_command("import_terms", "--dry-run", stdout=out)
+        self.assertIn("预检", out.getvalue())
+        self.assertFalse(TermEntry.objects.filter(source_ja="キタサンブラック").exists())
 
     def test_term_api_create_and_toggle(self):
         create_response = self.client.post(
@@ -809,6 +915,47 @@ class TranslationWorkflowTests(TestCase):
         self.assertEqual(run.status, "failed")
         self.assertEqual(run.raw_response["finish_reason"], "stop")
         self.assertEqual(run.raw_response["attempt"], 2)
+
+    @override_settings(TRANSLATION_MODEL="deepseek-ai/DeepSeek-V3", TRANSLATION_MAX_ATTEMPTS=1)
+    def test_provider_uses_title_terms_and_excludes_known_horse_from_unknowns(self):
+        TermEntry.objects.create(term_type="horse", source_ja="キタサンブラック", target_zh="北部玄驹", priority=100)
+        self.article.title_ja = "【宝塚記念】兄キタサンブラックの悔しさを晴らすか シュガークンが一発狙う"
+        self.article.body_ja_raw = "シュガークンがGI宝塚記念に挑む。"
+        self.article.body_ja_normalized = self.article.body_ja_raw
+        self.article.save()
+
+        provider = OpenAICompatibleTranslationProvider(api_key="test-key", base_url="https://example.com/v1")
+        usage = type("Usage", (), {"model_dump": lambda self: {"completion_tokens": 42}})()
+        choice = type(
+            "Choice",
+            (),
+            {
+                "message": type(
+                    "Message",
+                    (),
+                    {
+                        "content": __import__("json").dumps(
+                            {
+                                "title_zh": "キタサンブラック的弟弟シュガークン挑战宝塚纪念",
+                                "body_zh": "シュガークン将向GI宝塚纪念发起挑战。",
+                                "push_summary_zh": "シュガークン挑战宝塚纪念。",
+                            },
+                            ensure_ascii=False,
+                        )
+                    },
+                )(),
+                "finish_reason": "stop",
+            },
+        )()
+        response = type("Response", (), {"choices": [choice], "usage": usage})()
+
+        with patch.object(provider, "_request_completion", return_value=response):
+            result = provider.translate(self.article)
+
+        self.assertIn("北部玄驹", result.title_zh)
+        self.assertIn("キタサンブラック", [term["source_ja"] for term in result.metadata["terms"]])
+        self.assertNotIn("キタサンブラック", result.metadata["unknown_horse_names"])
+        self.assertIn("シュガークン", result.metadata["unknown_horse_names"])
 
     @override_settings(TRANSLATION_MODEL="deepseek-ai/DeepSeek-V3", TRANSLATION_MAX_ATTEMPTS=2)
     def test_provider_retries_when_unknown_horse_names_are_translated_away(self):
@@ -1110,6 +1257,29 @@ class TermCandidateDiscoveryTests(TestCase):
         self.assertIsNone(aggregate_finding(self.article, absent))
 
     @override_settings(TERM_DISCOVERY_MIN_CONFIDENCE=60)
+    def test_unknown_horse_and_race_enter_candidate_pool_with_content_fields(self):
+        discover_and_aggregate_article(self.article)
+        horse = TermCandidate.objects.get(term_type="horse", source_ja="メイショウタバル")
+        race = TermCandidate.objects.get(term_type="race", source_ja="大阪杯")
+
+        self.assertEqual(horse.target_zh, "")
+        self.assertEqual(horse.aliases_ja, [])
+        self.assertEqual(horse.aliases_zh, [])
+        self.assertEqual(race.target_zh, "")
+        self.assertEqual(race.aliases_ja, [])
+        self.assertEqual(race.aliases_zh, [])
+        self.assertTrue(horse.evidence.filter(article=self.article).exists())
+        self.assertTrue(race.evidence.filter(article=self.article).exists())
+
+    @override_settings(TERM_DISCOVERY_MIN_CONFIDENCE=60)
+    def test_formal_alias_prevents_horse_and_race_candidates(self):
+        TermEntry.objects.create(term_type="horse", source_ja="正式马名", target_zh="正式马名", aliases_ja=["メイショウタバル"])
+        TermEntry.objects.create(term_type="race", source_ja="正式赛事", target_zh="正式赛事", aliases_ja=["大阪杯"])
+        discover_and_aggregate_article(self.article)
+        self.assertFalse(TermCandidate.objects.filter(term_type="horse", source_ja="メイショウタバル").exists())
+        self.assertFalse(TermCandidate.objects.filter(term_type="race", source_ja="大阪杯").exists())
+
+    @override_settings(TERM_DISCOVERY_MIN_CONFIDENCE=60)
     def test_cross_type_formal_conflict_is_retained(self):
         TermEntry.objects.create(term_type="owner", source_ja="武豊", target_zh="冲突词")
         discover_and_aggregate_article(self.article)
@@ -1169,14 +1339,18 @@ class TermCandidateReviewTests(TestCase):
         self.candidate = TermCandidate.objects.get(term_type="horse")
 
     def test_accept_candidate_creates_formal_term_and_logs(self):
+        self.candidate.target_zh = "名将田原"
+        self.candidate.aliases_ja = ["メイショウ"]
+        self.candidate.aliases_zh = ["名将田原号"]
+        self.candidate.save(update_fields=["target_zh", "aliases_ja", "aliases_zh", "updated_at"])
         term = accept_candidate(
             self.candidate,
             {
                 "term_type": "horse",
                 "source_ja": self.candidate.source_ja,
-                "target_zh": "名将田原",
-                "aliases_ja": [],
-                "aliases_zh": [],
+                "target_zh": self.candidate.target_zh,
+                "aliases_ja": self.candidate.aliases_ja,
+                "aliases_zh": self.candidate.aliases_zh,
                 "priority": 10,
                 "is_active": True,
                 "notes": "",
@@ -1187,6 +1361,8 @@ class TermCandidateReviewTests(TestCase):
         self.candidate.refresh_from_db()
         self.assertEqual(self.candidate.status, TermCandidateStatus.ACCEPTED)
         self.assertEqual(self.candidate.accepted_term, term)
+        self.assertEqual(term.aliases_ja, ["メイショウ"])
+        self.assertEqual(term.aliases_zh, ["名将田原号"])
         self.assertTrue(self.user.operation_logs.filter(action_type="term_candidate_accepted").exists())
         with self.assertRaisesMessage(ValueError, "只有待审核候选"):
             set_candidate_status(self.candidate, self.user, TermCandidateStatus.REJECTED)
@@ -1275,6 +1451,10 @@ class TermCandidateReviewTests(TestCase):
         self.assertEqual(accepted.status, TermCandidateStatus.ACCEPTED)
 
     def test_accept_endpoint_creates_formal_term_with_modified_fields(self):
+        self.candidate.target_zh = "名将田原"
+        self.candidate.aliases_ja = ["メイショウ"]
+        self.candidate.aliases_zh = ["名将"]
+        self.candidate.save(update_fields=["target_zh", "aliases_ja", "aliases_zh", "updated_at"])
         response = self.client.post(
             reverse("console-term-candidate-accept", args=[self.candidate.id]),
             {
@@ -1378,3 +1558,47 @@ class TermCandidateReviewTests(TestCase):
         self.assertEqual(ignored.status, TermCandidateStatus.IGNORED)
         self.assertTrue(self.user.operation_logs.filter(action_type="term_candidate_rejected").exists())
         self.assertTrue(self.user.operation_logs.filter(action_type="term_candidate_ignored").exists())
+
+    def test_validate_candidate_news_since_midnight_command_reports_today_articles(self):
+        TermEntry.objects.create(term_type="race", source_ja="宝塚記念", target_zh="宝塚纪念", race_grade="G1")
+        today_article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="today-candidate-news",
+            title_ja="【宝塚記念】シュガークンが出走",
+            body_ja_raw="シュガークンが宝塚記念・GIに挑む。",
+            body_ja_normalized="シュガークンが宝塚記念・GIに挑む。",
+            translated_body_zh="宝塚纪念候选新闻。",
+            translation_status=ArticleTranslationStatus.TRANSLATED,
+            published_at=timezone.now(),
+            first_seen_at=timezone.now(),
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            source_url="https://example.com/today-candidate-news",
+        )
+        yesterday = timezone.now() - timedelta(days=1)
+        old_article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="old-candidate-news",
+            title_ja="【大阪杯】古い候補ニュース",
+            body_ja_raw="古い候補ニュース。",
+            body_ja_normalized="古い候補ニュース。",
+            translated_body_zh="旧新闻。",
+            translation_status=ArticleTranslationStatus.TRANSLATED,
+            published_at=yesterday,
+            first_seen_at=yesterday,
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            source_url="https://example.com/old-candidate-news",
+        )
+        discover_and_aggregate_article(today_article)
+
+        out = StringIO()
+        call_command("validate_candidate_news_since_midnight", "--format", "json", stdout=out)
+        payload = __import__("json").loads(out.getvalue())
+        article_ids = [item["article_id"] for item in payload["articles"]]
+
+        self.assertIn(today_article.id, article_ids)
+        self.assertNotIn(old_article.id, article_ids)
+        self.assertGreaterEqual(payload["candidate_news_count"], 1)
+        self.assertIn("race_priority", payload["articles"][0])
+        self.assertIn("term_candidate_count", payload["articles"][0])

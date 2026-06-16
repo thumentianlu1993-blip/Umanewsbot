@@ -48,6 +48,17 @@ class DummyTranslationProvider(TranslationProvider):
         )
 
 
+def _article_term_text(article: NewsArticle) -> str:
+    return "\n".join(
+        part
+        for part in [
+            article.title_ja or "",
+            article.body_ja_normalized or article.body_ja_raw or "",
+        ]
+        if part
+    )
+
+
 class OpenAICompatibleTranslationProvider(TranslationProvider):
     name = "openai-compatible"
     _SENTENCE_END_RE = re.compile(r"[。！？!?；;…]$")
@@ -198,7 +209,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         return {"repr": repr(usage)}
 
     def translate(self, article: NewsArticle) -> TranslationResult:
-        terms = resolve_terms(article.body_ja_normalized or article.body_ja_raw, settings.TRANSLATION_TERM_LIMIT)
+        terms = resolve_terms(_article_term_text(article), settings.TRANSLATION_TERM_LIMIT)
         glossary_lines = [
             f"- [{term.term_type}] {term.source_ja} => {term.target_zh}"
             + (f"（备注：{term.notes}）" if term.notes else "")
@@ -313,7 +324,7 @@ def get_translation_provider() -> TranslationProvider:
 def translate_article(article: NewsArticle) -> TranslationResult:
     provider = get_translation_provider()
     source_text = article.body_ja_normalized or article.body_ja_raw
-    terms = resolve_terms(source_text, settings.TRANSLATION_TERM_LIMIT)
+    terms = resolve_terms(_article_term_text(article), settings.TRANSLATION_TERM_LIMIT)
     run = TranslationRun.objects.create(
         article=article,
         provider_name=provider.name,

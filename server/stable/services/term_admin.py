@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 
 from stable.models import TermEntry, TermType
+from stable.services.race_grades import normalize_race_grade
 
 
 VALID_TERM_TYPES = {value for value, _label in TermType.choices}
@@ -19,6 +20,7 @@ EXPECTED_CSV_HEADERS = {
     "priority",
     "is_active",
     "notes",
+    "race_grade",
 }
 CSV_CANDIDATE_ENCODINGS = (
     "utf-8-sig",
@@ -161,6 +163,7 @@ def validate_term_payload(
     notes = (payload.get("notes") or "").strip()
     aliases_ja = split_aliases(payload.get("aliases_ja"))
     aliases_zh = split_aliases(payload.get("aliases_zh"))
+    race_grade_raw = (payload.get("race_grade") or "").strip()
 
     if not term_type:
         errors.setdefault("term_type", []).append("术语类型不能为空。")
@@ -185,6 +188,13 @@ def validate_term_payload(
         errors.setdefault("is_active", []).append("启用状态格式不合法。")
         is_active = True
 
+    race_grade = normalize_race_grade(race_grade_raw)
+    if race_grade_raw and not race_grade:
+        errors.setdefault("race_grade", []).append("比赛等级不合法。")
+    if term_type and term_type != TermType.RACE and race_grade:
+        errors.setdefault("race_grade", []).append("只有赛事术语可以设置比赛等级。")
+        race_grade = ""
+
     if term_type and source_ja and not allow_existing:
         queryset = TermEntry.objects.filter(term_type=term_type, source_ja=source_ja)
         if instance_id:
@@ -201,6 +211,7 @@ def validate_term_payload(
         "target_zh": target_zh,
         "aliases_ja": aliases_ja,
         "aliases_zh": aliases_zh,
+        "race_grade": race_grade,
         "priority": priority,
         "is_active": is_active,
         "notes": notes,
@@ -242,6 +253,7 @@ def preview_term_import(*, csv_file=None, csv_text: str = "", import_mode: str =
                 "priority": row.get("priority"),
                 "is_active": row.get("is_active"),
                 "notes": row.get("notes"),
+                "race_grade": row.get("race_grade"),
             },
             allow_existing=import_mode == "upsert",
         )
@@ -326,6 +338,7 @@ def commit_term_import(preview_rows: list[dict], import_mode: str) -> dict:
         entry.target_zh = payload.get("target_zh", "")
         entry.aliases_ja = payload.get("aliases_ja", [])
         entry.aliases_zh = payload.get("aliases_zh", [])
+        entry.race_grade = payload.get("race_grade", "")
         entry.priority = payload.get("priority", 0)
         entry.is_active = payload.get("is_active", True)
         entry.notes = payload.get("notes", "")

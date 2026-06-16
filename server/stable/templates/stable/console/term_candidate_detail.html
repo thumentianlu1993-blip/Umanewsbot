@@ -13,6 +13,9 @@
 
   <section class="panel">
     <h3>候选信息</h3>
+    <p>中文译词：{{ candidate.target_zh|default:candidate.suggested_target_zh|default:"-" }}</p>
+    <p>日文别名：{{ candidate.aliases_ja|join:"、"|default:"-" }}</p>
+    <p>中文别名：{{ candidate.aliases_zh|join:"、"|default:"-" }}</p>
     <p>标准化键：{{ candidate.normalized_key }}</p>
     <p>出现次数：{{ candidate.occurrence_count }}；文章数量：{{ candidate.article_count }}</p>
     <p>识别理由：{{ candidate.detection_reasons|join:"、"|default:"-" }}</p>

@@ -145,6 +145,10 @@ def aggregate_finding(article: NewsArticle, finding: TermDiscoveryFinding) -> Te
     now = timezone.now()
     defaults = {
         "source_ja": finding.source_ja,
+        "target_zh": "",
+        "aliases_ja": [],
+        "aliases_zh": [],
+        "suggested_target_zh": "",
         "confidence": finding.confidence,
         "detection_reasons": [finding.reason],
         "conflicts": _conflict_payload(other_type),

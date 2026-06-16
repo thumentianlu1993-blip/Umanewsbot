@@ -251,6 +251,107 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shel
 
 ## 专有术语候选发现灰度部署
 
+## 正式术语库恢复与赛事等级修复部署
+
+### 适用场景
+
+用于修复正式术语库缺失、马名或比赛名翻译未命中、赛事等级识别不足导致自动评分偏低的问题。本流程覆盖：
+
+- 正式术语 `race_grade` 字段迁移
+- 术语候选池基础内容字段迁移
+- 正式术语种子数据 dry-run 与导入
+- 执行日 0:00 后候选新闻池批量验收
+
+### 部署前备份
+
+```bash
+cd /opt/umanewsbot
+cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+mkdir -p backups
+docker compose -f docker-compose.prod.lowcost.yml exec db pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > backups/pre-termbase-race-grade-$(date +%Y%m%d_%H%M%S).sql
+```
+
+如生产使用标准 Compose 文件，将 `docker-compose.prod.lowcost.yml` 替换为 `docker-compose.prod.yml`。
+
+### 部署与迁移
+
+```bash
+cd /opt/umanewsbot
+git pull origin main
+docker compose -f docker-compose.prod.lowcost.yml build web worker beat
+docker compose -f docker-compose.prod.lowcost.yml up -d web worker beat
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py migrate
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py check
+```
+
+### 术语导入 dry-run
+
+默认种子文件位于容器内 `server/stable/data/terms_seed.csv`。先执行预检：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py import_terms --dry-run
+```
+
+确认输出中的错误数量为 `0`。若生产已经存在部分术语，默认 `upsert` 会显示更新数量；如需严格新增模式，可显式执行：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py import_terms --dry-run --mode create
+```
+
+### 正式导入术语
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py import_terms
+```
+
+### 核验正式术语
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.models import TermEntry; print(TermEntry.objects.count()); print(list(TermEntry.objects.filter(source_ja__in=['キタサンブラック','宝塚記念']).values('term_type','source_ja','target_zh','race_grade','aliases_ja')))"
+```
+
+期望：
+
+- `キタサンブラック` 为启用马名术语，中文译词为 `北部玄驹`
+- `宝塚記念` 为启用比赛术语，`race_grade=G1`
+
+### 执行日候选新闻池批量验收
+
+验收不只看单篇文章。按服务器当前时区执行日 0:00 后进入候选新闻池的全部文章检查：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py validate_candidate_news_since_midnight --format json
+```
+
+如需指定起点：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py validate_candidate_news_since_midnight --since 2026-06-09 --format json
+```
+
+逐篇确认：
+
+- `terms` 中已有正式术语命中
+- 未命中的马名和比赛名存在术语候选证据
+- `race_grade` 与 `race_priority` 合理
+- `score_total` 与 `review_mode` 不再出现明显低估
+
+### 单篇文章重跑
+
+如需重跑文章 `3961`：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.tasks import translate_article_task, process_article_automation_task, discover_term_candidates_task; article_id=3961; translate_article_task.delay(article_id); process_article_automation_task.delay(article_id); discover_term_candidates_task.delay(article_id)"
+```
+
+重跑后进入后台文章详情页核验中文标题、翻译元数据、自动评分原因和术语候选证据。
+
+### 回滚方式
+
+- 数据导入错误：优先使用后台停用错误术语，或用 `import_terms --mode upsert` 导入修正 CSV。
+- 代码异常：回滚到上一 commit 并重启 `web/worker/beat`。
+- 数据结构回滚：仅在确认无法通过停用术语或代码回滚恢复时，使用部署前数据库备份还原。
+
 ### 部署前配置
 
 首次部署保持默认关闭：

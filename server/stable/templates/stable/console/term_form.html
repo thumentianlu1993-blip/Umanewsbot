@@ -28,6 +28,12 @@
           {{ form.priority }}
           {% if form.priority.errors %}<div class="help" style="color: var(--danger);">{{ form.priority.errors|join:' ' }}</div>{% endif %}
         </div>
+        <div class="field">
+          <label for="{{ form.race_grade.id_for_label }}">比赛等级</label>
+          {{ form.race_grade }}
+          <div class="help">仅赛事术语需要设置；马名等类型保持未设置。</div>
+          {% if form.race_grade.errors %}<div class="help" style="color: var(--danger);">{{ form.race_grade.errors|join:' ' }}</div>{% endif %}
+        </div>
 
         <div class="field">
           <label for="{{ form.source_ja.id_for_label }}">日文原词</label>

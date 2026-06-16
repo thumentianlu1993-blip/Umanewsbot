@@ -3,7 +3,7 @@ from __future__ import annotations
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 
-from .models import NewsArticle, NewsImage, NewsSource, PushTarget, TermCandidate, TermEntry, TermType
+from .models import NewsArticle, NewsImage, NewsSource, PushTarget, RaceGrade, TermCandidate, TermEntry, TermType
 from .services.term_admin import serialize_aliases, validate_term_payload
 
 
@@ -149,7 +149,7 @@ class TermEntryForm(forms.ModelForm):
 
     class Meta:
         model = TermEntry
-        fields = ["term_type", "source_ja", "target_zh", "priority", "is_active", "notes"]
+        fields = ["term_type", "source_ja", "target_zh", "race_grade", "priority", "is_active", "notes"]
         widgets = {
             "source_ja": forms.TextInput(attrs={"placeholder": "例如：イクイノックス"}),
             "target_zh": forms.TextInput(attrs={"placeholder": "例如：春秋分"}),
@@ -160,6 +160,7 @@ class TermEntryForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["term_type"].choices = TermType.choices
+        self.fields["race_grade"].choices = [("", "未设置"), *RaceGrade.choices]
         self.fields["aliases_ja_text"].initial = serialize_aliases(self.instance.aliases_ja or [])
         self.fields["aliases_zh_text"].initial = serialize_aliases(self.instance.aliases_zh or [])
 
@@ -171,6 +172,7 @@ class TermEntryForm(forms.ModelForm):
             "target_zh": cleaned_data.get("target_zh"),
             "aliases_ja": cleaned_data.get("aliases_ja_text", ""),
             "aliases_zh": cleaned_data.get("aliases_zh_text", ""),
+            "race_grade": cleaned_data.get("race_grade", ""),
             "priority": cleaned_data.get("priority"),
             "is_active": cleaned_data.get("is_active"),
             "notes": cleaned_data.get("notes", ""),
@@ -196,6 +198,7 @@ class TermEntryForm(forms.ModelForm):
                     "target_zh": self.cleaned_data["target_zh"],
                     "aliases_ja": self.cleaned_data.get("aliases_ja_text", ""),
                     "aliases_zh": self.cleaned_data.get("aliases_zh_text", ""),
+                    "race_grade": self.cleaned_data.get("race_grade", ""),
                     "priority": self.cleaned_data.get("priority"),
                     "is_active": self.cleaned_data.get("is_active"),
                     "notes": self.cleaned_data.get("notes", ""),
@@ -207,6 +210,7 @@ class TermEntryForm(forms.ModelForm):
         instance.target_zh = normalized["target_zh"]
         instance.aliases_ja = normalized["aliases_ja"]
         instance.aliases_zh = normalized["aliases_zh"]
+        instance.race_grade = normalized["race_grade"]
         instance.priority = normalized["priority"]
         instance.is_active = normalized["is_active"]
         instance.notes = normalized["notes"]
@@ -258,7 +262,9 @@ class TermCandidateAcceptForm(forms.Form):
                 {
                     "term_type": candidate.term_type,
                     "source_ja": candidate.source_ja,
-                    "target_zh": candidate.suggested_target_zh,
+                    "target_zh": candidate.target_zh or candidate.suggested_target_zh,
+                    "aliases_ja_text": serialize_aliases(candidate.aliases_ja or []),
+                    "aliases_zh_text": serialize_aliases(candidate.aliases_zh or []),
                 }
             )
 

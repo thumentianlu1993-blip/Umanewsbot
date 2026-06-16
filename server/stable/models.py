@@ -183,6 +183,27 @@ class TermType(models.TextChoices):
     OTHER = "other", "其他"
 
 
+class RaceGrade(models.TextChoices):
+    G1 = "G1", "G1 / GI / GⅠ"
+    G2 = "G2", "G2 / GII / GⅡ"
+    G3 = "G3", "G3 / GIII / GⅢ"
+    JPN1 = "JPN1", "Jpn1 / JpnⅠ"
+    JPN2 = "JPN2", "Jpn2 / JpnⅡ"
+    JPN3 = "JPN3", "Jpn3 / JpnⅢ"
+    JG1 = "JG1", "J-G1 / J・GⅠ"
+    JG2 = "JG2", "J-G2 / J・GⅡ"
+    JG3 = "JG3", "J-G3 / J・GⅢ"
+    LISTED = "L", "Listed / リステッド"
+    OPEN = "OP", "Open / オープン"
+    THREE_WIN = "3WIN", "3胜级"
+    TWO_WIN = "2WIN", "2胜级"
+    ONE_WIN = "1WIN", "1胜级"
+    NEWCOMER = "NEWCOMER", "新马"
+    MAIDEN = "MAIDEN", "未胜利"
+    LOCAL_GRADE = "LOCAL_GRADE", "地方重赏"
+    OTHER = "OTHER", "其他"
+
+
 class TermCandidateStatus(models.TextChoices):
     PENDING = "pending", "待审核"
     ACCEPTED = "accepted", "已接受"
@@ -573,6 +594,7 @@ class TermEntry(TimestampedModel):
     target_zh = models.CharField(max_length=255)
     aliases_ja = models.JSONField(default=list, blank=True)
     aliases_zh = models.JSONField(default=list, blank=True)
+    race_grade = models.CharField(max_length=32, choices=RaceGrade.choices, blank=True)
     notes = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
     priority = models.IntegerField(default=0)
@@ -592,6 +614,9 @@ class TermCandidate(TimestampedModel):
     term_type = models.CharField(max_length=32, choices=TermType.choices)
     source_ja = models.CharField(max_length=255)
     normalized_key = models.CharField(max_length=255)
+    target_zh = models.CharField(max_length=255, blank=True)
+    aliases_ja = models.JSONField(default=list, blank=True)
+    aliases_zh = models.JSONField(default=list, blank=True)
     suggested_target_zh = models.CharField(max_length=255, blank=True)
     status = models.CharField(
         max_length=16,

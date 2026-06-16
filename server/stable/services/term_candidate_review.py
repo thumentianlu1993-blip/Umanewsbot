@@ -41,6 +41,9 @@ def accept_candidate(candidate: TermCandidate, payload: dict, user) -> TermEntry
     candidate.term_type = normalized["term_type"]
     candidate.source_ja = normalized["source_ja"]
     candidate.normalized_key = normalized_key
+    candidate.target_zh = normalized["target_zh"]
+    candidate.aliases_ja = normalized["aliases_ja"]
+    candidate.aliases_zh = normalized["aliases_zh"]
     candidate.suggested_target_zh = normalized["target_zh"]
     candidate.accepted_term = term
     _review(candidate, user, TermCandidateStatus.ACCEPTED, payload.get("review_notes", ""))

@@ -1,0 +1,5 @@
+term_type,source_ja,target_zh,aliases_ja,aliases_zh,priority,is_active,notes,race_grade
+horse,グランアレグリア,放声欢呼,Gran Alegria|グラン,放声欢呼,100,true,历史 PRD 已确认术语,
+horse,イクイノックス,春秋分,Equinox|イクイノ,春秋分,100,true,历史 PRD 已确认术语,
+horse,キタサンブラック,北部玄驹,Kitasan Black,北部玄驹,100,true,历史 PRD 已确认术语,
+race,宝塚記念,宝塚纪念,宝塚記念GI|宝塚記念ＧⅠ|宝塚記念G1,宝塚纪念|宝冢纪念,100,true,本次线上修复初始赛事术语,G1

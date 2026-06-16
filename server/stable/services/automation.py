@@ -23,6 +23,7 @@ from stable.models import (
     WorkflowStatus,
 )
 from stable.services.terms import extract_unknown_horse_names, resolve_terms
+from stable.services.race_grades import better_race_priority, normalize_race_grade, race_priority_for_grade
 
 
 P0_OVERSEAS_RACES = [
@@ -170,17 +171,31 @@ def p0_horse_hits(article: NewsArticle) -> list[dict]:
     return hits
 
 
-def race_priority(article: NewsArticle) -> str:
+def race_priority(article: NewsArticle) -> dict:
     text = _source_text(article)
     race_terms = [term for term in resolve_terms(text, limit=60) if term.term_type == TermType.RACE]
     combined_races = " ".join([term.source_ja for term in race_terms] + [term.target_zh for term in race_terms] + [text])
+    best = {"priority": "", "grade": "", "source": "", "term": ""}
+    for term in race_terms:
+        grade = normalize_race_grade(getattr(term, "race_grade", ""))
+        priority = race_priority_for_grade(grade)
+        if priority and better_race_priority(best["priority"], priority) == priority:
+            best = {"priority": priority, "grade": grade, "source": "term", "term": term.source_ja}
+    if best["priority"]:
+        return best
+
     if any(name in combined_races for name in P0_OVERSEAS_RACES):
-        return "P0"
-    if ("G1" in combined_races or "Ｇ１" in combined_races or "Jpn1" in combined_races or "JPN1" in combined_races) and "障害" not in combined_races:
-        return "P0"
-    if "G2" in combined_races or "Ｇ２" in combined_races or "JG1" in combined_races or "障害" in combined_races:
-        return "P1"
-    return "P2"
+        return {"priority": "P0", "grade": "G1", "source": "overseas_p0", "term": ""}
+
+    text_grade = normalize_race_grade(combined_races)
+    text_priority = race_priority_for_grade(text_grade)
+    if "障害" in combined_races and text_priority == "P0":
+        text_priority = "P1"
+    if text_priority:
+        return {"priority": text_priority, "grade": text_grade, "source": "text", "term": ""}
+    if "障害" in combined_races:
+        return {"priority": "P1", "grade": "", "source": "text", "term": ""}
+    return {"priority": "P2", "grade": "", "source": "default", "term": ""}
 
 
 def _is_duplicate_secondary(article: NewsArticle) -> bool:
@@ -233,7 +248,8 @@ def score_article_for_automation(article: NewsArticle) -> AutomationDecision:
     category = classify_content_category(article)
     hard_mode, hard_risk, hard_reasons, checks = _hard_rule_decision(article, category)
     horse_hits = p0_horse_hits(article)
-    priority = race_priority(article)
+    race_signal = race_priority(article)
+    priority = race_signal["priority"]
     high_focus_hits = [keyword for keyword in HIGH_FOCUS_KEYWORDS if keyword in text]
     source_score = 15 if article.source_site == "jra" else 10
     value_score = 0
@@ -243,6 +259,8 @@ def score_article_for_automation(article: NewsArticle) -> AutomationDecision:
         value_score += 20
     elif priority == "P1":
         value_score += 12
+    elif priority == "P2":
+        value_score += 6
     if high_focus_hits:
         value_score += 10
     if category in {ContentCategory.FLASH, ContentCategory.OFFICIAL, ContentCategory.POST_RACE, ContentCategory.PRE_RACE}:
@@ -261,6 +279,9 @@ def score_article_for_automation(article: NewsArticle) -> AutomationDecision:
             "category": category,
             "p0_horse_hits": horse_hits[:8],
             "race_priority": priority,
+            "race_grade": race_signal.get("grade", ""),
+            "race_grade_source": race_signal.get("source", ""),
+            "race_term": race_signal.get("term", ""),
             "high_focus_hits": high_focus_hits,
             "age_hours": age_hours,
         },
