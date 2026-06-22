@@ -1,7 +1,7 @@
 # 项目状态文档
 
-最后更新时间：`2026-06-07`
-当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP 已上线观察）
+最后更新时间：`2026-06-21`
+当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP 已上线观察；公开首页资讯流升级已完成本地实现、验证与 OpenSpec 归档）
 
 > 角色说明：
 > 本文档用于保留项目级概览与摘要信息。
@@ -40,9 +40,18 @@
   - 一致性校验、批量自动发布、自动化日志
   - 自动发布批量规则：常规每批 4 篇，周日北京时间 13:00-16:00 每批 10 篇
   - 邮件通知 MVP 与通知日志
-- 前台信息流与详情页
+- 前台信息流与详情页已升级为公开站点专用 Web + 移动 H5 资讯流
 - QQ 推送链路
 - 前后台移动端适配
+
+## 3.1 已完成本地实现（体验升级）
+
+- 公开首页资讯流升级主 OpenSpec change：`upgrade-public-home-info-feed`
+  - Web 端已实现：轻导航、主头条、普通新闻流、右侧热门/重点辅助模块
+  - 移动 H5 已实现：轻顶部、轻量头条、高密度左文右图新闻列表
+  - 实施方式：严格 TDD，按可测试行为逐轮执行 RED -> GREEN -> REFACTOR；热门代理使用有限候选集与批量快照读取
+  - 首版不做原生 App、手工置顶、搜索频道、专题、赛事日历、站内评论或站内浏览量
+  - 当前状态：本地实现、Django 测试、OpenSpec 校验、桌面/移动浏览器验收和 OpenSpec 归档已完成，尚未部署生产
 
 ## 4. 已完成（上线准备）
 
@@ -113,8 +122,12 @@
 
 ## 5. 当前验证结果
 
-- `python manage.py check`：通过
-- `python manage.py test stable`：通过（`DB_ENGINE=sqlite` 下 40 项）
+- `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py check`：通过
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable`：通过，88 项
+- `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable.tests.PublicHomeInfoFeedTests`：通过，10 项
+- `openspec validate upgrade-public-home-info-feed --strict`：归档前通过
+- `openspec validate --all`：归档前通过；同步正式规格并归档后再次通过
+- 公开首页资讯流浏览器验收：桌面首页、移动首页、桌面详情页、移动详情页通过；移动普通卡约 128px 高，无横向溢出，图片加载正常
 - `docker compose -f docker-compose.prod.yml config`：通过
 - `docker compose -f docker-compose.prod.lowcost.yml config`：通过
 
@@ -122,6 +135,7 @@
 
 ## 6. 当前待办（项目级摘要）
 
+- 对公开首页资讯流升级进行生产发布规划，发布前确认线上运行态、静态资源收集和回滚路径
 - 观察自动发布质量与自动化日志
 - 补充翻译 warning 可视化和术语库补全流程
 - 推进 HTTPS / 证书接入

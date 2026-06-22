@@ -1,0 +1,15 @@
+{% if hot_articles %}
+  <aside class="hot-panel" aria-label="原站热度">
+    <h2>原站热度</h2>
+    <ol>
+      {% for entry in hot_articles %}
+        <li>
+          <a href="{{ entry.article.public_path }}">{{ entry.article.effective_title }}</a>
+          {% if entry.snapshot.rank %}
+            <span>原站排行 {{ entry.snapshot.rank }}</span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+  </aside>
+{% endif %}
