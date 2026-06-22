@@ -13,7 +13,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 仓库已明确长期语言约定：Codex 新增或维护的协作文档、OpenSpec 产物与代理说明默认使用中文；仅保留必要的代码标识符、命令和工具机器语法。
 
-`2026-06-19` 已创建公开首页资讯流升级主 OpenSpec change：`upgrade-public-home-info-feed`。该 change 作为后续前台 Web + 移动 H5 首页子任务的指导规范，目标是把当前 MVP 公开首页从“大说明 + 大卡片网格”升级为成熟资讯流：移动端轻头条 + 高密度新闻列表，桌面端门户式主内容 + 侧栏。`2026-06-21` 已完成 plan-eng-review 与 `/opsx:apply` 本地实现；实施过程按严格 TDD 执行发布过滤、头条选择、普通流去重、热门代理、公开静态资源和详情页结构测试，并已通过本地 Django 测试、OpenSpec 校验和桌面/移动浏览器验收。`2026-06-22` 已将 delta spec 同步为正式规格 `openspec/specs/public-home-info-feed/spec.md`，并归档为 `openspec/changes/archive/2026-06-22-upgrade-public-home-info-feed/`。
+`2026-06-19` 已创建公开首页资讯流升级主 OpenSpec change：`upgrade-public-home-info-feed`。该 change 作为后续前台 Web + 移动 H5 首页子任务的指导规范，目标是把当前 MVP 公开首页从“大说明 + 大卡片网格”升级为成熟资讯流：移动端轻头条 + 高密度新闻列表，桌面端门户式主内容 + 侧栏。`2026-06-21` 已完成 plan-eng-review 与 `/opsx:apply` 本地实现；实施过程按严格 TDD 执行发布过滤、头条选择、普通流去重、热门代理、公开静态资源和详情页结构测试，并已通过本地 Django 测试、OpenSpec 校验和桌面/移动浏览器验收。`2026-06-22` 已将 delta spec 同步为正式规格 `openspec/specs/public-home-info-feed/spec.md`，并归档为 `openspec/changes/archive/2026-06-22-upgrade-public-home-info-feed/`；同日 PR #1 已合并并部署到生产，服务器运行 `e834f58`，公开首页已切换到 `stable/public.css` 和新资讯流模板。
 
 ## 已完成内容
 
@@ -55,13 +55,14 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 线上域名已通
 - 正式域名 `umafans.run` / `www.umafans.run` 可访问
 - 自动化运营 MVP 已上线
+- 公开首页资讯流升级已上线生产：`/` 使用公开站点专用 `public.css`、头条、普通新闻流和原站热度模块；移动 H5 已展示头条 + 高密度左文右图列表
 - 自动化能力通过 `.env` 中 `AUTOMATION_ENABLED` 控制，当前已进入灰度运行与质量观察阶段
 - 已核实线上 `AUTOMATION_ENABLED=true`、`REWRITE_PROVIDER=siliconflow`（真实 AI 改写在生效）
 - 术语候选发现代码已部署到生产（`e2e3e07`，迁移 `0006` 已应用），`TERM_DISCOVERY_ENABLED=false` 默认关闭，等待单篇抽检后灰度开启
 
 ## 下一步优先级
 
-1. 公开首页资讯流升级：OpenSpec change `upgrade-public-home-info-feed` 已完成本地实现、验证、正式 spec 同步与归档；下一步进入生产发布规划，不新增手工置顶、搜索频道或赛事日历模型
+1. 观察公开首页资讯流生产运行 24 小时，重点确认 `/`、`/news/<slug>/`、图片、`public.css` 和移动 H5 体验稳定
 2. 生产迁移已于 `2026-06-07` 完成；下一步在生产做单篇手动重新发现并抽检术语候选质量，确认后灰度启用 `TERM_DISCOVERY_ENABLED`
 3. 观察自动化发布质量与 `AutomationLog`
 4. 补充翻译 warning 可视化和术语库补全流程
@@ -70,7 +71,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 当前已知风险与待确认项
 
-- 公开首页资讯流升级当前 OpenSpec 主 change 已完成本地实现与验证；尚未部署到生产，后续发布前仍需按部署流程确认线上运行态、静态资源收集与回滚路径
+- 公开首页资讯流升级已部署生产；后续仍需观察真实访问、图片加载和自动发布内容在首页的长期表现
 - 当前正式域名阶段仍以 HTTP 为主，HTTPS 证书尚未接入完成
 - 需要把 HTTP 阶段的临时安全配置，在 HTTPS 切换时重新收紧
 - 需要继续确认抓取调度、翻译调度、发布链路在正式域名环境下的长期稳定性
@@ -123,6 +124,26 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py check`：通过。
 - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable`：通过，88 项。
 - 本地开发服务器浏览器验收：桌面首页、移动首页、桌面详情页、移动详情页通过；无横向溢出，图片加载正常，移动普通卡高度受控，桌面主列与右侧热门模块不重叠。
+
+### 生产部署结果（2026-06-22）
+
+- GitHub PR #1 从 draft 转为 ready 后合并到 `main`，merge commit 为 `e834f58`，包含实现提交 `1c9be7d`。
+- 服务器 `/opt/umanewsbot` 从 `62a6a02` 快进到 `e834f58`；部署前备份 `.env` 为 `.env.backup.20260622_140844`。
+- 生产使用低成本 compose 执行 `./deploy_lowcost.sh`：重建 `web/worker/beat`，`migrate` 显示 `No migrations to apply`，`collectstatic` 成功处理 `stable/public.css`，`web` 容器 healthy。
+- 外部健康检查通过：`http://umafans.run/healthz/` 与 `http://umafans.run/` 均返回 `200`。
+- 首页 HTML 已引用 `/static/stable/public.2eec24723b45.css`，页面包含 `home-page`、`headline-card`、`news-card` 和“原站热度”；不再引用后台 `console.css`。
+- 浏览器生产验收通过：桌面端显示轻导航、头条和热门模块；390px 移动端普通新闻卡约 `128px` 高，首屏头条后可见 3 条普通新闻，无横向溢出；新闻详情页可打开，标题、封面和公开详情结构正常，控制台无错误。
+
+### 移动端首屏密度 follow-up（2026-06-22）
+
+- 在不改变首页数据层、公开 URL、模板结构或普通新闻卡尺寸的前提下，后续小幅收紧移动端首页视觉密度。
+- 调整范围仅限 `server/stable/static/stable/public.css` 的 `max-width: 599px` 移动端规则：
+  - 顶部和页面内边距略收紧。
+  - 移动端头条图片从 `16 / 9` 改为 `16 / 7`。
+  - 移动端头条摘要隐藏，仅保留来源时间和两行标题。
+  - 普通新闻卡继续保持约 `128px` 高和右侧缩略图结构。
+- 本地临时 SQLite + 浏览器验收结果：390px 视口下头条高度约 `250px`，第一张普通新闻卡提前到 `top=381`，首屏可见 4 条普通新闻卡，无横向溢出，控制台无错误。
+- 该 follow-up 尚未部署生产；后续合并发布时仍需确认新的 `public.css` hash、`/`、`/news/<slug>/` 和移动端首屏表现。
 
 ## 2026-06-07 术语候选发现生产部署纪要
 
