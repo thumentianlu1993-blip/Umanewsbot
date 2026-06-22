@@ -13,6 +13,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 仓库已明确长期语言约定：Codex 新增或维护的协作文档、OpenSpec 产物与代理说明默认使用中文；仅保留必要的代码标识符、命令和工具机器语法。
 
+`2026-06-19` 已创建公开首页资讯流升级主 OpenSpec change：`upgrade-public-home-info-feed`。该 change 作为后续前台 Web + 移动 H5 首页子任务的指导规范，目标是把当前 MVP 公开首页从“大说明 + 大卡片网格”升级为成熟资讯流：移动端轻头条 + 高密度新闻列表，桌面端门户式主内容 + 侧栏。`2026-06-21` 已完成 plan-eng-review 与 `/opsx:apply` 本地实现；实施过程按严格 TDD 执行发布过滤、头条选择、普通流去重、热门代理、公开静态资源和详情页结构测试，并已通过本地 Django 测试、OpenSpec 校验和桌面/移动浏览器验收。`2026-06-22` 已将 delta spec 同步为正式规格 `openspec/specs/public-home-info-feed/spec.md`，并归档为 `openspec/changes/archive/2026-06-22-upgrade-public-home-info-feed/`。
+
 ## 已完成内容
 
 - 域名购买与解析
@@ -59,14 +61,16 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 下一步优先级
 
-1. 生产迁移已于 `2026-06-07` 完成；下一步在生产做单篇手动重新发现并抽检术语候选质量，确认后灰度启用 `TERM_DISCOVERY_ENABLED`
-2. 观察自动化发布质量与 `AutomationLog`
-3. 补充翻译 warning 可视化和术语库补全流程
-4. HTTPS / 证书接入
-5. 部署稳定化与监控 / 备份 / 回滚完善
+1. 公开首页资讯流升级：OpenSpec change `upgrade-public-home-info-feed` 已完成本地实现、验证、正式 spec 同步与归档；下一步进入生产发布规划，不新增手工置顶、搜索频道或赛事日历模型
+2. 生产迁移已于 `2026-06-07` 完成；下一步在生产做单篇手动重新发现并抽检术语候选质量，确认后灰度启用 `TERM_DISCOVERY_ENABLED`
+3. 观察自动化发布质量与 `AutomationLog`
+4. 补充翻译 warning 可视化和术语库补全流程
+5. HTTPS / 证书接入
+6. 部署稳定化与监控 / 备份 / 回滚完善
 
 ## 当前已知风险与待确认项
 
+- 公开首页资讯流升级当前 OpenSpec 主 change 已完成本地实现与验证；尚未部署到生产，后续发布前仍需按部署流程确认线上运行态、静态资源收集与回滚路径
 - 当前正式域名阶段仍以 HTTP 为主，HTTPS 证书尚未接入完成
 - 需要把 HTTP 阶段的临时安全配置，在 HTTPS 切换时重新收紧
 - 需要继续确认抓取调度、翻译调度、发布链路在正式域名环境下的长期稳定性
@@ -75,6 +79,50 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 邮件通知首版已实现；短信 / QQ / 微信通知当前只保留日志与配置位，尚未接真实发送网关
 - 需要补足更标准的部署基线、回滚与备份演练
 - QQ Bot 实网联调与正式推送链路仍需单独验收
+
+## 2026-06-19 公开首页资讯流升级 OpenSpec 主 change
+
+### 已归档产物
+
+- 正式规格：`openspec/specs/public-home-info-feed/spec.md`
+- 归档目录：`openspec/changes/archive/2026-06-22-upgrade-public-home-info-feed/`
+- 归档内保留 proposal、design、delta spec、tasks 和 `.openspec.yaml`
+
+### 主范围
+
+- Web 端：首页升级为轻导航、主头条、普通新闻流和右侧热门/重点辅助模块。
+- 移动 H5：首页升级为轻顶部、轻量头条和高密度左文右图新闻列表。
+- 数据层优先复用现有 `NewsArticle`、`NewsSnapshot` 与自动评分字段，不新增数据库模型。
+- 公开站点样式从后台 `console.css` 中解耦，后续实现应新增公开站点专用样式入口。
+- 文章详情页与首页共享公开站点视觉体系，并保持已有有效稿件字段优先级。
+- 后续实施采用严格 TDD：发布过滤、普通流排序、头条选择、热门代理、详情页字段和公开静态资源必须逐行为执行 RED -> GREEN -> REFACTOR，禁止一次性批量写完全部测试后再实现。
+- 热门代理必须在有限候选集内批量读取 `NewsSnapshot` 或使用等价预取方式，避免无上限扫描或逐篇文章查询最近快照。
+
+### 明确非目标
+
+- 不做原生 App、个性化推荐、无限滚动、站内浏览量、站内评论或用户系统。
+- 不在本轮新增手工置顶、推荐位、专题、搜索频道或赛事日历模型。
+- 不改抓取、翻译、AI 改写、自动发布、QQ 推送或 Docker Compose 主架构。
+
+### 本地实现结果
+
+- 公开首页 `/` 已升级为公开站点专用模板和 `stable/public.css`，不再以后台 `console.css` 作为主要样式入口。
+- 首页数据层复用现有 `NewsArticle`、`NewsSnapshot` 与自动评分字段，提供 `headline_article`、`feed_articles`、`latest_articles` 和 `hot_articles`。
+- 头条选择按近期范围、赛事优先级、自动评分、封面和发布时间排序；低量内容回退到近 7 天或最新已发布文章。
+- 热门代理在有限已发布候选集内批量读取上游访问/注目快照，无快照时按自动评分和发布时间回退；页面只标注“原站热度/原站排行”，不包装为本站评论或浏览量。
+- 移动 H5 首页采用轻头条 + 左文右图高密度列表，普通卡片在 390px 视口验收中稳定为约 128px 高，缺图卡不破坏列表布局。
+- 详情页复用公开站点 base，继续展示有效标题、摘要、正文、来源、原文链接和发布时间，并完成窄屏阅读排版验收。
+- 本轮未新增数据库模型、迁移、生产配置或部署运行手册步骤。
+
+### 校验结果
+
+- `openspec validate upgrade-public-home-info-feed --strict`：归档前通过。
+- `openspec validate --all`：归档前通过；归档并同步正式 spec 后再次通过。
+- `/plan-eng-review upgrade-public-home-info-feed`：通过。
+- `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable.tests.PublicHomeInfoFeedTests`：通过，10 项。
+- `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py check`：通过。
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable`：通过，88 项。
+- 本地开发服务器浏览器验收：桌面首页、移动首页、桌面详情页、移动详情页通过；无横向溢出，图片加载正常，移动普通卡高度受控，桌面主列与右侧热门模块不重叠。
 
 ## 2026-06-07 术语候选发现生产部署纪要
 

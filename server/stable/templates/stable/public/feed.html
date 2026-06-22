@@ -1,59 +1,28 @@
-{% load static %}
-<!doctype html>
-<html lang="zh-Hans">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>赛马新闻</title>
-  <link rel="stylesheet" href="{% static 'stable/console.css' %}">
-</head>
-<body>
-  <main class="hero-feed">
-    <header class="public-header">
-      <div class="article-meta">
-        <span class="badge gold">日本赛马</span>
-        <span class="badge">中文资讯流</span>
-      </div>
-      <h1>把重要的日本赛马新闻，整理成清晰可读的中文版本。</h1>
-      <p class="page-subtitle">这里展示后台已审核发布的新闻稿，按发布时间倒序排列。第一阶段先追求内容闭环稳定，页面保持轻量、快速、好读。</p>
-    </header>
+{% extends "stable/public/base.html" %}
 
-    <section class="public-grid">
-      {% for article in page_obj %}
-        <article class="public-card">
-          {% if article.cover_image_url %}
-            <a href="{{ article.public_path }}"><img src="{{ article.cover_image_url }}" alt=""></a>
-          {% endif %}
-          <div class="public-card-body">
-            <div class="article-meta">
-              <span>{{ article.published_to_web_at|date:"Y-m-d H:i" }}</span>
-              <span>{{ article.source_note|default:article.get_source_site_display }}</span>
-            </div>
-            <h2 class="article-title"><a href="{{ article.public_path }}">{{ article.effective_title }}</a></h2>
-            {% if article.effective_summary %}
-              <p class="muted">{{ article.effective_summary|truncatechars:130 }}</p>
-            {% endif %}
-            <div class="tag-list">
-              {% for tag in article.tags_json %}
-                <span class="badge gold">{{ tag }}</span>
-              {% endfor %}
-            </div>
-          </div>
-        </article>
-      {% empty %}
-        <p class="muted">目前还没有已发布文章。</p>
-      {% endfor %}
+{% block title %}赛马新闻{% endblock %}
+
+{% block content %}
+  <main class="home-page">
+    <section class="home-lead">
+      <span class="section-kicker">日本赛马</span>
+      <h1>赛马新闻</h1>
     </section>
 
-    <div class="pagination">
-      {% if page_obj.has_previous %}
-        <a class="btn ghost" href="?page={{ page_obj.previous_page_number }}">上一页</a>
-      {% endif %}
-      <span class="badge">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
-      {% if page_obj.has_next %}
-        <a class="btn ghost" href="?page={{ page_obj.next_page_number }}">下一页</a>
-      {% endif %}
+    {% include "stable/public/_headline.html" %}
+
+    <div class="home-layout">
+      <section class="news-list" aria-label="最新新闻">
+        {% for article in feed_articles %}
+          {% include "stable/public/_article_card.html" %}
+        {% empty %}
+          {% include "stable/public/_empty_state.html" %}
+        {% endfor %}
+
+        {% include "stable/public/_pagination.html" %}
+      </section>
+
+      {% include "stable/public/_hot_list.html" %}
     </div>
   </main>
-</body>
-</html>
+{% endblock %}

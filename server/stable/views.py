@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from pathlib import Path
 
 from django.conf import settings
@@ -36,12 +36,14 @@ from .models import (
     MediaAsset,
     NewsArticle,
     NewsImage,
+    NewsSnapshot,
     NewsSource,
     NotificationLog,
     OperationLog,
     PublishedByMode,
     PushTarget,
     ReviewMode,
+    SourceMode,
     TaskExecutionLog,
     TermCandidate,
     TermCandidateStatus,
@@ -71,6 +73,10 @@ from .tasks import (
     process_article_automation_task,
     translate_article_task,
 )
+
+PUBLIC_FEED_PAGE_SIZE = 12
+PUBLIC_HOT_CANDIDATE_LIMIT = 48
+PUBLIC_HOT_DISPLAY_LIMIT = 6
 
 
 class BackendLoginView(LoginView):
@@ -1074,19 +1080,104 @@ def operation_log_list(request: HttpRequest):
     )
 
 
-def public_news_feed(request: HttpRequest):
-    queryset = (
+def _public_published_articles():
+    return (
         NewsArticle.objects.select_related("cover_media_asset")
-        .filter(workflow_status=WorkflowStatus.PUBLISHED)
+        .prefetch_related("images")
+        .filter(workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at__isnull=False)
         .order_by("-published_to_web_at", "-id")
     )
-    paginator = Paginator(queryset, 12)
+
+
+def _race_priority_score(article: NewsArticle) -> int:
+    signals = article.decision_reason.get("signals") if isinstance(article.decision_reason, dict) else {}
+    priority = signals.get("race_priority") if isinstance(signals, dict) else ""
+    return {"P0": 3, "P1": 2}.get(priority, 0)
+
+
+def _headline_sort_key(article: NewsArticle) -> tuple:
+    published_at = article.published_to_web_at or article.published_at
+    return (
+        _race_priority_score(article),
+        article.score_total or 0,
+        1 if article.cover_image_url else 0,
+        published_at.timestamp(),
+        article.id,
+    )
+
+
+def _select_headline_article(queryset) -> NewsArticle | None:
+    now = timezone.now()
+    for threshold in (now - timedelta(hours=72), now - timedelta(days=7), None):
+        candidates = queryset
+        if threshold is not None:
+            candidates = candidates.filter(published_to_web_at__gte=threshold)
+        candidate_list = list(candidates[:PUBLIC_HOT_CANDIDATE_LIMIT])
+        if candidate_list:
+            return max(candidate_list, key=_headline_sort_key)
+    return None
+
+
+def _snapshot_sort_key(snapshot: NewsSnapshot) -> tuple:
+    mode_score = 2 if snapshot.source_mode == SourceMode.ACCESS else 1
+    rank_score = -(snapshot.rank or 9999)
+    engagement = (snapshot.comment_count or 0) + (snapshot.attention_count or 0)
+    return (mode_score, rank_score, engagement, snapshot.captured_at.timestamp(), snapshot.id)
+
+
+def _hot_article_sort_key(entry: dict) -> tuple:
+    snapshot = entry.get("snapshot")
+    if snapshot:
+        return (2, *_snapshot_sort_key(snapshot), entry["article"].published_to_web_at.timestamp())
+    return (0, entry["article"].score_total or 0, entry["article"].published_to_web_at.timestamp(), entry["article"].id)
+
+
+def _build_hot_articles(queryset) -> list[dict]:
+    candidates = list(queryset[:PUBLIC_HOT_CANDIDATE_LIMIT])
+    article_ids = [article.id for article in candidates]
+    if not article_ids:
+        return []
+    snapshots = NewsSnapshot.objects.filter(
+        article_id__in=article_ids,
+        source_mode__in=[SourceMode.ACCESS, SourceMode.ATTENTION],
+    )
+    best_snapshots: dict[int, NewsSnapshot] = {}
+    for snapshot in snapshots:
+        current = best_snapshots.get(snapshot.article_id)
+        if current is None or _snapshot_sort_key(snapshot) > _snapshot_sort_key(current):
+            best_snapshots[snapshot.article_id] = snapshot
+
+    entries = [{"article": article, "snapshot": best_snapshots.get(article.id)} for article in candidates]
+    return sorted(entries, key=_hot_article_sort_key, reverse=True)[:PUBLIC_HOT_DISPLAY_LIMIT]
+
+
+def public_news_feed(request: HttpRequest):
+    queryset = _public_published_articles()
+    headline_article = _select_headline_article(queryset)
+    hot_articles = _build_hot_articles(queryset)
+    paginator = Paginator(queryset, PUBLIC_FEED_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
-    return render(request, "stable/public/feed.html", {"page_obj": page_obj})
+    feed_articles = [article for article in page_obj if not headline_article or article.pk != headline_article.pk]
+    return render(
+        request,
+        "stable/public/feed.html",
+        {
+            "page_obj": page_obj,
+            "latest_articles": page_obj,
+            "headline_article": headline_article,
+            "feed_articles": feed_articles,
+            "hot_articles": hot_articles,
+        },
+    )
 
 
 def public_article_detail(request: HttpRequest, slug: str):
-    article = get_object_or_404(NewsArticle, workflow_status=WorkflowStatus.PUBLISHED, public_slug=slug)
+    article = get_object_or_404(
+        NewsArticle,
+        workflow_status=WorkflowStatus.PUBLISHED,
+        published_to_web_at__isnull=False,
+        public_slug=slug,
+    )
     return render(request, "stable/public/detail.html", {"article": article})
 
 

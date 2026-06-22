@@ -16,7 +16,9 @@ from stable.adapters.netkeiba import NetkeibaAdapter
 from stable.models import (
     ArticleTranslationStatus,
     AutomationStatus,
+    NewsImage,
     NewsArticle,
+    NewsSnapshot,
     NewsSource,
     NotificationLog,
     PushTarget,
@@ -405,6 +407,239 @@ class ConsoleFlowTests(TestCase):
         self.article.refresh_from_db()
         self.assertEqual(self.article.summary_zh, "")
         self.assertEqual(self.article.effective_summary, "")
+
+
+class PublicHomeInfoFeedTests(TestCase):
+    def make_article(
+        self,
+        source_article_id: str,
+        title: str,
+        *,
+        workflow_status: str = WorkflowStatus.PUBLISHED,
+        published_to_web_at=None,
+        published_at=None,
+        score_total: int = 0,
+        race_priority: str = "",
+        has_cover: bool = False,
+        source_mode: str = SourceMode.LATEST,
+        tags: list[str] | None = None,
+    ) -> NewsArticle:
+        published_at = published_at or timezone.now()
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=source_mode,
+            source_article_id=source_article_id,
+            title_ja=title,
+            translated_title_zh=title,
+            title_zh=title,
+            body_ja_raw=f"{title} 原文",
+            body_ja_normalized=f"{title} 原文",
+            translated_body_zh=f"{title} 正文",
+            body_zh=f"{title} 正文",
+            translated_summary_zh=f"{title} 摘要",
+            summary_zh=f"{title} 摘要",
+            published_at=published_at,
+            source_url=f"https://example.com/{source_article_id}",
+            workflow_status=workflow_status,
+            published_to_web_at=published_to_web_at if published_to_web_at is not None else published_at,
+            source_note="netkeiba",
+            tags_json=tags or ["赛马"],
+            score_total=score_total,
+            decision_reason={"signals": {"race_priority": race_priority}} if race_priority else {},
+        )
+        if has_cover:
+            NewsImage.objects.create(
+                article=article,
+                original_url=f"https://example.com/images/{source_article_id}.jpg",
+                caption_zh=title,
+            )
+        return article
+
+    def test_public_home_latest_articles_filter_and_order_published_items(self):
+        now = timezone.now()
+        self.make_article("older", "较早发布", published_to_web_at=now - timedelta(hours=2))
+        self.make_article("newer", "最新发布", published_to_web_at=now)
+        self.make_article(
+            "draft",
+            "待编辑草稿",
+            workflow_status=WorkflowStatus.PENDING_EDIT,
+            published_to_web_at=now + timedelta(hours=1),
+        )
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        latest_titles = [article.effective_title for article in response.context["latest_articles"]]
+        self.assertEqual(latest_titles, ["最新发布", "较早发布"])
+
+    def test_public_home_selects_recent_high_value_cover_article_as_headline(self):
+        now = timezone.now()
+        self.make_article(
+            "new-low",
+            "最新普通稿",
+            published_to_web_at=now,
+            score_total=20,
+        )
+        featured = self.make_article(
+            "featured",
+            "宝塚纪念重点稿",
+            published_to_web_at=now - timedelta(hours=1),
+            score_total=95,
+            race_priority="P0",
+            has_cover=True,
+        )
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["headline_article"], featured)
+
+    def test_public_home_headline_falls_back_to_latest_published_article(self):
+        now = timezone.now()
+        old_article = self.make_article(
+            "old",
+            "七天外旧稿",
+            published_to_web_at=now - timedelta(days=10),
+            score_total=20,
+        )
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["headline_article"], old_article)
+
+    def test_public_home_feed_articles_do_not_repeat_headline(self):
+        now = timezone.now()
+        headline = self.make_article(
+            "featured-no-repeat",
+            "重点头条",
+            published_to_web_at=now,
+            score_total=95,
+            race_priority="P0",
+            has_cover=True,
+        )
+        regular = self.make_article(
+            "regular-no-repeat",
+            "普通新闻",
+            published_to_web_at=now - timedelta(minutes=5),
+            score_total=20,
+        )
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["headline_article"], headline)
+        self.assertNotIn(headline, response.context["feed_articles"])
+        self.assertIn(regular, response.context["feed_articles"])
+
+    def test_public_home_hot_articles_prioritize_upstream_access_snapshot(self):
+        now = timezone.now()
+        snapshot_article = self.make_article(
+            "snapshot-hot",
+            "原站访问榜文章",
+            published_to_web_at=now - timedelta(hours=1),
+            score_total=30,
+        )
+        high_score_article = self.make_article(
+            "score-hot",
+            "高分无快照文章",
+            published_to_web_at=now,
+            score_total=95,
+        )
+        NewsSnapshot.objects.create(
+            article=snapshot_article,
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.ACCESS,
+            rank=1,
+            comment_count=18,
+            attention_count=4,
+            captured_at=now,
+        )
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        hot_articles = [entry["article"] for entry in response.context["hot_articles"]]
+        self.assertEqual(hot_articles[0], snapshot_article)
+
+    def test_public_home_hot_articles_fall_back_to_score_and_recency_without_snapshots(self):
+        now = timezone.now()
+        low_score_newer = self.make_article(
+            "low-score-hot",
+            "低分新稿",
+            published_to_web_at=now,
+            score_total=10,
+        )
+        high_score_older = self.make_article(
+            "high-score-hot",
+            "高分旧稿",
+            published_to_web_at=now - timedelta(hours=3),
+            score_total=85,
+        )
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        hot_articles = [entry["article"] for entry in response.context["hot_articles"]]
+        self.assertEqual(hot_articles[:2], [high_score_older, low_score_newer])
+        self.assertTrue(all(entry["snapshot"] is None for entry in response.context["hot_articles"]))
+
+    def test_public_home_labels_upstream_hot_signal_without_site_metric_claims(self):
+        now = timezone.now()
+        hot = self.make_article("label-hot", "访问榜重点稿", published_to_web_at=now)
+        NewsSnapshot.objects.create(
+            article=hot,
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.ACCESS,
+            rank=2,
+            comment_count=88,
+            attention_count=66,
+            captured_at=now,
+        )
+
+        response = self.client.get("/")
+
+        self.assertContains(response, "原站热度")
+        self.assertNotContains(response, "本站评论")
+        self.assertNotContains(response, "本站浏览")
+
+    def test_public_pages_use_public_stylesheet_instead_of_console_stylesheet(self):
+        article = self.make_article("public-css", "公开样式测试", published_to_web_at=timezone.now())
+
+        home = self.client.get("/")
+        detail = self.client.get(article.public_path)
+
+        for response in (home, detail):
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'stable/public.css')
+            self.assertNotContains(response, 'stable/console.css')
+
+    def test_public_detail_uses_public_structure_and_effective_article_fields(self):
+        article = self.make_article("detail-public", "原始标题", published_to_web_at=timezone.now())
+        article.rewrite_title_zh = "改写标题"
+        article.rewrite_summary_zh = "改写摘要"
+        article.rewrite_body_zh = "改写正文第一段。\n改写正文第二段。"
+        article.source_note = "netkeiba"
+        article.save()
+
+        response = self.client.get(article.public_path)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-public-detail')
+        self.assertContains(response, "改写标题")
+        self.assertContains(response, "改写摘要")
+        self.assertContains(response, "改写正文第一段")
+        self.assertContains(response, "netkeiba")
+        self.assertContains(response, article.source_url)
+
+    def test_public_detail_requires_web_publish_time(self):
+        article = self.make_article("detail-without-web-time", "无发布时间", published_to_web_at=None)
+        article.published_to_web_at = None
+        article.save(update_fields=["published_to_web_at", "updated_at"])
+
+        response = self.client.get(article.public_path)
+
+        self.assertEqual(response.status_code, 404)
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, AUTOMATION_ENABLED=True, REWRITE_PROVIDER="fallback")
