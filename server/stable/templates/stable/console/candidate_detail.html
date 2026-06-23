@@ -98,6 +98,46 @@
     {% if article.automation_error_message %}
       <p class="muted" style="color: var(--danger);"><strong>自动化错误：</strong>{{ article.automation_error_message }}</p>
     {% endif %}
+    {% if article.gate_issues %}
+      <h4 style="margin-top: 18px;">自动发布门禁</h4>
+      <div class="article-meta">
+        {% if article.gate_blockers %}<span class="badge danger">blocker：{{ article.gate_blockers|length }}</span>{% endif %}
+        {% if article.gate_warnings %}<span class="badge warning">warning：{{ article.gate_warnings|length }}</span>{% endif %}
+        {% if article.gate_infos %}<span class="badge">info：{{ article.gate_infos|length }}</span>{% endif %}
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>级别</th>
+              <th>代码</th>
+              <th>路由</th>
+              <th>说明</th>
+              <th>payload</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for issue in article.gate_issues %}
+              <tr>
+                <td>{{ issue.severity }}</td>
+                <td>{{ issue.code }}</td>
+                <td>{{ issue.route }}</td>
+                <td>{{ issue.message }}</td>
+                <td>{{ issue.payload|truncatechars:120 }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+    {% if article.duplicate_of_id %}
+      <p class="muted">
+        <strong>重复检测：</strong>
+        相似文章
+        <a href="{% url 'console-candidate-detail' article.duplicate_of_id %}">#{{ article.duplicate_of_id }}</a>{% if article.duplicate_score %}，相似度 {{ article.duplicate_score|floatformat:2 }}{% endif %}
+        {% if article.duplicate_reason %}，{{ article.duplicate_reason }}{% endif %}
+      </p>
+    {% endif %}
     <div class="grid-2">
       <div>
         <h4>基准翻译稿</h4>
@@ -120,6 +160,7 @@
             <th>结果</th>
             <th>分数</th>
             <th>置信</th>
+            <th>门禁</th>
             <th>说明</th>
           </tr>
         </thead>
@@ -131,10 +172,19 @@
               <td>{{ log.get_result_display }}</td>
               <td>{{ log.score|default:"-" }}</td>
               <td>{{ log.confidence|default:"-" }}</td>
+              <td>
+                {% if log.payload.issue_counts %}
+                  B:{{ log.payload.issue_counts.blocker|default:0 }}
+                  W:{{ log.payload.issue_counts.warning|default:0 }}
+                  I:{{ log.payload.issue_counts.info|default:0 }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
               <td>{{ log.reason|default:log.error_message|truncatechars:120 }}</td>
             </tr>
           {% empty %}
-            <tr><td colspan="6" class="muted">暂无自动化日志。</td></tr>
+            <tr><td colspan="7" class="muted">暂无自动化日志。</td></tr>
           {% endfor %}
         </tbody>
       </table>

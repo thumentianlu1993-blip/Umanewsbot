@@ -29,14 +29,16 @@ from stable.models import (
 )
 from stable.services.automation import (
     apply_score_decision,
+    automation_content_source,
     important_manual_notification_payload,
     is_ready_for_auto_publish,
     mark_automation_failed,
+    prepare_base_translation_for_publish,
     publish_article_automatically,
     score_article_for_automation,
 )
 from stable.services.ingestion import upsert_article_from_draft
-from stable.services.notifications import send_automation_notification
+from stable.services.notifications import send_automation_notification, send_high_value_warning_notification
 from stable.services.operations import log_operation
 from stable.services.pushing import push_article_to_targets
 from stable.services.queueing import dispatch_task
@@ -346,11 +348,16 @@ def process_article_automation_task(article_id: int) -> dict:
         score_article_task.run(article.id)
         article.refresh_from_db()
         if article.automation_status == AutomationStatus.REWRITE_READY and article.review_mode == ReviewMode.AUTO:
-            rewrite_article_task.run(article.id)
+            if automation_content_source() == "rewrite":
+                rewrite_article_task.run(article.id)
+            else:
+                prepare_base_translation_for_publish(article)
+                validate_rewrite_task.run(article.id)
             article.refresh_from_db()
         if article.automation_status == AutomationStatus.REWRITTEN and article.review_mode == ReviewMode.AUTO:
             validate_rewrite_task.run(article.id)
             article.refresh_from_db()
+        send_high_value_warning_notification(article)
         payload = important_manual_notification_payload(article)
         if payload:
             send_notification_task.run(NotificationType.IMPORTANT_MANUAL, payload)
@@ -451,7 +458,7 @@ def auto_publish_batch_task(limit: int | None = None) -> dict:
     batch_limit = _resolve_auto_publish_batch_limit(limit)
     queryset = (
         NewsArticle.objects.filter(review_mode=ReviewMode.AUTO, automation_status=AutomationStatus.PUBLISH_READY)
-        .exclude(workflow_status__in=[WorkflowStatus.PUBLISHED, WorkflowStatus.WITHDRAWN, WorkflowStatus.IGNORED])
+        .exclude(workflow_status__in=[WorkflowStatus.PUBLISHED, WorkflowStatus.WITHDRAWN, WorkflowStatus.IGNORED, WorkflowStatus.DUPLICATE])
         .order_by("-score_total", "-published_at", "-id")
     )
     published_ids: list[int] = []

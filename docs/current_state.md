@@ -15,6 +15,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-19` 已创建公开首页资讯流升级主 OpenSpec change：`upgrade-public-home-info-feed`。该 change 作为后续前台 Web + 移动 H5 首页子任务的指导规范，目标是把当前 MVP 公开首页从“大说明 + 大卡片网格”升级为成熟资讯流：移动端轻头条 + 高密度新闻列表，桌面端门户式主内容 + 侧栏。`2026-06-21` 已完成 plan-eng-review 与 `/opsx:apply` 本地实现；实施过程按严格 TDD 执行发布过滤、头条选择、普通流去重、热门代理、公开静态资源和详情页结构测试，并已通过本地 Django 测试、OpenSpec 校验和桌面/移动浏览器验收。`2026-06-22` 已将 delta spec 同步为正式规格 `openspec/specs/public-home-info-feed/spec.md`，并归档为 `openspec/changes/archive/2026-06-22-upgrade-public-home-info-feed/`；同日 PR #1 已合并并部署到生产，服务器运行 `e834f58`，公开首页已切换到 `stable/public.css` 和新资讯流模板。`2026-06-23` PR #2 已合并并部署生产，服务器运行 `04e2ee9`，移动 H5 首屏密度 follow-up 已上线。
 
+`2026-06-24` 已创建并实现自动发布门禁优化 OpenSpec change：`refine-automation-publish-gates`。本地代码已将自动发布门禁拆为 `blocker / warning / info`：`blocker` 阻断自动发布，`warning` 初期不阻断但记录并对高价值文章邮件告警，`info` 仅用于诊断；同时支持基准翻译稿自动发布、高价值来源评分放行、非马名普通词过滤、关键术语分层校验和重复内容拦截。当前为本地实现完成并通过测试，尚未部署到生产服务器。
+
 ## 已完成内容
 
 - 域名购买与解析
@@ -68,6 +70,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 4. 补充翻译 warning 可视化和术语库补全流程
 5. HTTPS / 证书接入
 6. 部署稳定化与监控 / 备份 / 回滚完善
+7. 将 OpenSpec change `refine-automation-publish-gates` 合并并部署到生产后，按低批量观察 warning 邮件、重复内容阻断、候选池门禁展示和自动发布结果
 
 ## 当前已知风险与待确认项
 
@@ -80,6 +83,30 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 邮件通知首版已实现；短信 / QQ / 微信通知当前只保留日志与配置位，尚未接真实发送网关
 - 需要补足更标准的部署基线、回滚与备份演练
 - QQ Bot 实网联调与正式推送链路仍需单独验收
+
+## 2026-06-24 自动发布门禁优化本地实现
+
+- OpenSpec change：`refine-automation-publish-gates`，当前 `tasks.md` 已完成本地实现和验证。
+- 新增配置：
+  - `AUTO_REWRITE_ENABLED=false`：默认跳过 AI 改写前置。
+  - `AUTO_PUBLISH_CONTENT_SOURCE=base_translation`：默认使用基准翻译稿作为自动发布内容源。
+  - `HIGH_VALUE_SOURCE_RULES=netkeiba:access,netkeiba:attention`：访问量榜和注目数榜评分阶段放行。
+  - `AUTOMATION_WARNING_NOTIFY_EMAILS=754652181@qq.com`：高价值 warning 初期告警收件人示例。
+- 新增数据字段：
+  - `NewsArticle.gate_issues` 保存结构化门禁 issue。
+  - `WorkflowStatus.DUPLICATE` 描述高度重复内容。
+  - `duplicate_of / duplicate_score / duplicate_reason` 保存重复检测解释。
+  - `automation_warning_email_signature / automation_warning_email_sent_at` 用于 warning 邮件 24 小时去重。
+- 迁移 `0009_automation_publish_gates` 会导入首批非马名普通词固定译法，包括 `タイトル`、`メートル`、`オッズ`、`ハンデ`、`ラジオ`、`ダート`、`マイル`、`スプリント`、`クラス`、`チャンス`、`キャリア`、`イメージ`、`デビュー`、`ゲート`。
+- 后台候选列表、候选详情、自动化日志和 Django Admin 已展示 blocker / warning / info、重复检测结果和相似文章信息。
+- `2026-06-24` review 返修：
+  - 重新校验通过且当前不再重复的文章，会清理旧 `duplicate_of / duplicate_score / duplicate_reason`，并把旧 `duplicate` / `pending_review` 状态恢复为可进入自动发布批次的候选状态，避免显示 `publish_ready` 但被批发布排除。
+  - 候选列表与候选详情中的相似文章现在链接到后台候选详情 `/admin/candidates/<id>/`。
+- 本地验证：
+  - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py check`：通过。
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.AutomationFlowTests stable.tests.ConsoleFlowTests --noinput`：通过，23 项。
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：通过，106 项。
+  - `openspec validate refine-automation-publish-gates --strict`：通过。
 
 ## 2026-06-23 前台发布判定代码阅读结论
 

@@ -90,6 +90,18 @@
             <span class="badge">自动化：{{ article.get_automation_status_display }}</span>
             <span class="badge">分数：{{ article.score_total }}</span>
           </div>
+          {% if article.gate_issues %}
+            <div class="article-meta">
+              {% if article.gate_blockers %}<span class="badge danger">blocker：{{ article.gate_blockers|length }}</span>{% endif %}
+              {% if article.gate_warnings %}<span class="badge warning">warning：{{ article.gate_warnings|length }}</span>{% endif %}
+              {% if article.gate_infos %}<span class="badge">info：{{ article.gate_infos|length }}</span>{% endif %}
+            </div>
+          {% endif %}
+          {% if article.duplicate_of_id %}
+            <p class="muted candidate-excerpt">
+              相似文章：<a href="{% url 'console-candidate-detail' article.duplicate_of_id %}">#{{ article.duplicate_of_id }}</a>{% if article.duplicate_score %}，相似度 {{ article.duplicate_score|floatformat:2 }}{% endif %}
+            </p>
+          {% endif %}
           {% if article.decision_summary %}
             <p class="muted candidate-excerpt">决策：{{ article.decision_summary|truncatechars:96 }}</p>
           {% endif %}
