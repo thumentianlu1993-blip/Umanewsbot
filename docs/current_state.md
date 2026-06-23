@@ -388,3 +388,10 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 续跑确认：`parameters.already_imported_race_count=10`，说明第二批已跳过首批落库 race。
 - 运行结果：`status=paused`，`success_count=10`，`failure_count=0`，`skipped_count=316`。
 - 累计写入统计：`race_count=20`、`entry_count=292`、`result_count=274`、`horse_count=274`、`unique_horse_id_count=274`、`unique_horse_name_count=274`、`missing_horse_id_or_name_count=36`。
+
+### 生产第三批续跑结果
+
+- 第三批真实导入：`run_id=3`，仍为 `2026-05`，最多 30 场，不抓赔率，不补马匹详情，10 秒间隔 + 2 秒抖动。
+- 运行结果：`status=paused`，`success_count=30`，`failure_count=0`，`skipped_count=286`。
+- 累计写入统计：`race_count=50`、`entry_count=742`、`result_count=695`、`horse_count=695`、`unique_horse_id_count=695`、`unique_horse_name_count=695`、`missing_horse_id_or_name_count=94`。
+- 服务器健康检查：`/healthz/` 返回 `200`。
