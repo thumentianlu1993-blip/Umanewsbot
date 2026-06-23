@@ -61,6 +61,7 @@
             <th>阶段</th>
             <th>结果</th>
             <th>分数</th>
+            <th>门禁</th>
             <th>说明</th>
           </tr>
         </thead>
@@ -72,10 +73,19 @@
               <td>{{ log.get_phase_display }}</td>
               <td>{{ log.get_result_display }}</td>
               <td>{{ log.score|default:"-" }}</td>
+              <td>
+                {% if log.payload.issue_counts %}
+                  B:{{ log.payload.issue_counts.blocker|default:0 }}
+                  W:{{ log.payload.issue_counts.warning|default:0 }}
+                  I:{{ log.payload.issue_counts.info|default:0 }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
               <td>{{ log.reason|default:log.error_message|truncatechars:100 }}</td>
             </tr>
           {% empty %}
-            <tr><td colspan="6" class="muted">暂无自动化日志。</td></tr>
+            <tr><td colspan="7" class="muted">暂无自动化日志。</td></tr>
           {% endfor %}
         </tbody>
       </table>

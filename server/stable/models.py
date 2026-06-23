@@ -49,6 +49,7 @@ class WorkflowStatus(models.TextChoices):
     PENDING_EDIT = "pending_edit", "待编辑"
     PENDING_REVIEW = "pending_review", "待审核"
     PUBLISHED = "published", "已发布"
+    DUPLICATE = "duplicate", "重复内容"
     REJECTED = "rejected", "已驳回"
     WITHDRAWN = "withdrawn", "已撤回"
     ARCHIVED = "archived", "已归档"
@@ -117,6 +118,7 @@ class NotificationType(models.TextChoices):
     BACKLOG = "backlog", "候选稿异常堆积"
     NO_AUTO_PUBLISH_24H = "no_auto_publish_24h", "24 小时无自动发布"
     IMPORTANT_MANUAL = "important_manual", "重点新闻转人工"
+    HIGH_VALUE_WARNING = "high_value_warning", "高价值新闻 warning"
     REPEATED_FAILURE = "repeated_failure", "关键任务连续失败"
 
 
@@ -338,6 +340,7 @@ class NewsArticle(TimestampedModel):
     )
     decision_reason = models.JSONField(default=dict, blank=True)
     decision_summary = models.TextField(blank=True)
+    gate_issues = models.JSONField(default=list, blank=True)
     score_total = models.PositiveSmallIntegerField(default=0)
     quality_score = models.PositiveSmallIntegerField(default=0)
     rewrite_confidence = models.PositiveSmallIntegerField(default=0)
@@ -348,6 +351,17 @@ class NewsArticle(TimestampedModel):
     published_by_mode = models.CharField(max_length=16, choices=PublishedByMode.choices, blank=True)
     auto_publish_at = models.DateTimeField(null=True, blank=True)
     automation_error_message = models.TextField(blank=True)
+    duplicate_of = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="duplicate_articles",
+    )
+    duplicate_score = models.FloatField(null=True, blank=True)
+    duplicate_reason = models.TextField(blank=True)
+    automation_warning_email_signature = models.CharField(max_length=64, blank=True)
+    automation_warning_email_sent_at = models.DateTimeField(null=True, blank=True)
     content_category = models.CharField(max_length=32, choices=ContentCategory.choices, blank=True)
     editor_notes = models.TextField(blank=True)
     manually_edited_fields = models.JSONField(default=list, blank=True)
@@ -453,6 +467,21 @@ class NewsArticle(TimestampedModel):
     @property
     def public_path(self) -> str:
         return f"/news/{self.public_slug or self.pk}/"
+
+    def _gate_issues_by_severity(self, severity: str) -> list[dict]:
+        return [issue for issue in (self.gate_issues or []) if issue.get("severity") == severity]
+
+    @property
+    def gate_blockers(self) -> list[dict]:
+        return self._gate_issues_by_severity("blocker")
+
+    @property
+    def gate_warnings(self) -> list[dict]:
+        return self._gate_issues_by_severity("warning")
+
+    @property
+    def gate_infos(self) -> list[dict]:
+        return self._gate_issues_by_severity("info")
 
     def mark_manual_edits(self, fields: Iterable[str]) -> None:
         current = set(self.manually_edited_fields or [])

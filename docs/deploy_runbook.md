@@ -146,6 +146,13 @@ docker logs --tail=120 umanewsbot-nginx-1
 AUTOMATION_ENABLED=false
 AUTO_REVIEW_THRESHOLD=75
 MANUAL_REVIEW_THRESHOLD=45
+AUTO_REWRITE_ENABLED=false
+AUTO_PUBLISH_CONTENT_SOURCE=base_translation
+HIGH_VALUE_SOURCE_RULES=netkeiba:access,netkeiba:attention
+HIGH_VALUE_WARNING_SCORE_THRESHOLD=90
+AUTO_DUPLICATE_LOOKBACK_DAYS=7
+AUTO_DUPLICATE_HIGH_THRESHOLD=0.86
+AUTO_DUPLICATE_REVIEW_THRESHOLD=0.72
 AUTO_PUBLISH_BATCH_LIMIT=4
 AUTO_PUBLISH_PEAK_BATCH_LIMIT=10
 AUTO_PUBLISH_PEAK_DAY_OF_WEEK=6
@@ -160,9 +167,12 @@ REWRITE_MAX_TOKENS=2600
 REWRITE_TIMEOUT_SECONDS=90
 AUTOMATION_ENABLE_EMAIL=false
 AUTOMATION_NOTIFY_EMAILS=
+AUTOMATION_WARNING_EMAIL_ENABLED=true
+AUTOMATION_WARNING_NOTIFY_EMAILS=754652181@qq.com
+AUTOMATION_WARNING_EMAIL_DEDUP_HOURS=24
 ```
 
-真实启用 AI 改写时，按现有 OpenAI-compatible / SiliconFlow 配置补齐 Key，并将 `REWRITE_PROVIDER` 设置为对应 provider。
+`refine-automation-publish-gates` 实施后，短期建议保持 `AUTO_REWRITE_ENABLED=false` 和 `AUTO_PUBLISH_CONTENT_SOURCE=base_translation`，先用基准翻译稿跑自动发布门禁。真实恢复 AI 改写时，按现有 OpenAI-compatible / SiliconFlow 配置补齐 Key，将 `AUTO_REWRITE_ENABLED=true`，并将 `AUTO_PUBLISH_CONTENT_SOURCE=rewrite`、`REWRITE_PROVIDER` 设置为对应 provider。
 
 ### 部署步骤
 
@@ -184,6 +194,12 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py chec
 docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.models import NewsArticle, AutomationLog, NotificationLog; print(NewsArticle.objects.count(), AutomationLog.objects.count(), NotificationLog.objects.count())"
 ```
 
+验证门禁字段、重复状态和普通词种子：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.models import NewsArticle, TermEntry, WorkflowStatus; print(hasattr(WorkflowStatus, 'DUPLICATE'), NewsArticle.objects.exclude(gate_issues=[]).count(), TermEntry.objects.filter(notes__icontains='non_horse_common_word').count())"
+```
+
 ### 灰度启用自动化
 
 先把 `.env` 中 `AUTOMATION_ENABLED` 改为 `true`，再重启相关容器：
@@ -203,6 +219,14 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shel
 ```
 
 将 `ARTICLE_ID` 替换为已翻译文章 ID。
+
+自动化门禁优化上线后，单篇验证重点查看：
+
+- 后台候选详情页是否展示 blocker / warning / info。
+- `warning` 是否仍允许文章进入 `automation_status=publish_ready`。
+- 高度重复文章是否进入 `workflow_status=duplicate`。
+- 中等相似文章是否转入 `workflow_status=pending_review`。
+- 高价值来源文章是否在评分阶段放行，但不绕过 blocker。
 
 ### 自动发布批次验证
 
@@ -240,9 +264,19 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shel
 
 如果邮件未启用，后台日志中应出现 `NotificationLog(status=skipped, channel=email)`；如果邮件已启用，应出现 `sent` 或具体失败原因。
 
+### 高价值 warning 邮件验证
+
+`warning` 初期不阻断自动发布，但高价值文章出现 warning 时应发送或跳过并留痕：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.models import NotificationLog; print(NotificationLog.objects.filter(type='high_value_warning').order_by('-created_at').values('status','target','error_message')[:5])"
+```
+
+如果 `AUTOMATION_WARNING_EMAIL_ENABLED=true` 但没有配置 `AUTOMATION_WARNING_NOTIFY_EMAILS`，应看到 `status=skipped` 且自动发布不被阻断。同一文章同一 warning 组合 24 小时内重复触发时，也应记录 skipped 去重日志。
+
 ### 自动化排障顺序
 
-1. 先查 `.env` 中 `AUTOMATION_ENABLED`、阈值、邮件配置和模型配置
+1. 先查 `.env` 中 `AUTOMATION_ENABLED`、`AUTO_REWRITE_ENABLED`、`AUTO_PUBLISH_CONTENT_SOURCE`、阈值、邮件配置和模型配置
 2. 再查 `beat` 是否加载 `auto-publish-batch` 与 `detect-automation-anomalies`
 3. 查看 `worker` 日志是否有评分、改写、校验、发布异常
 4. 后台文章详情页查看 `AutomationLog`
