@@ -479,3 +479,70 @@ git checkout 62a6a02
 ```
 
 如需保持 `main` 分支语义，优先在 GitHub revert `e834f58` 后服务器 `git pull --ff-only origin main` 并重新执行 `./deploy_lowcost.sh`。
+
+## 移动端首页密度 follow-up 生产部署（2026-06-23）
+
+### 部署内容
+
+- GitHub PR #2 `[codex] Polish mobile public home density` 已从 draft 转为 ready，并合并到 `main`。
+- merge commit：`04e2ee9`；实现提交：`b6e93b9`。
+- 服务器 `/opt/umanewsbot` 从 `e834f58` 快进到 `04e2ee9`。
+- 本次不包含数据库迁移、生产 `.env` 开关调整或 Compose 架构变更。
+- 主要变更是移动端 `stable/public.css` 首屏密度微调：收紧顶部与页面间距、头条图片比例从 `16 / 9` 改为 `16 / 7`、移动端隐藏头条摘要，普通新闻卡保持约 `128px` 高。
+
+### 部署前状态与备份
+
+- 部署前 `.env` 备份：`.env.backup.20260623_120201`。
+- 服务器仍存在历史 `.env.backup.*` 与 `imports/` 未跟踪文件，保留不清理。
+- 服务器 tracked diff 显示多个部署脚本权限位变化，属线上执行权限修正遗留，部署时保留不回滚。
+
+### 部署命令
+
+```bash
+cd /opt/umanewsbot
+cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+git pull --ff-only origin main
+chmod +x deploy_lowcost.sh deploy/*.sh deploy/docker/*.sh
+./deploy_lowcost.sh
+```
+
+脚本结果：
+
+- 重建并重启 `web / worker / beat`。
+- `migrate` 显示 `No migrations to apply`。
+- `collectstatic` 完成，生产首页引用 `/static/stable/public.9aaf4b105424.css`。
+- `web` 容器为 healthy，`db / redis` healthy，`worker / beat` up。
+- `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check` 返回 `System check identified no issues`。
+
+### 验证结果
+
+```bash
+curl -I http://umafans.run/healthz/
+curl -I http://umafans.run/
+curl http://umafans.run/ | grep public
+docker compose -f docker-compose.prod.lowcost.yml ps
+docker logs --tail=80 umanewsbot-web-1
+```
+
+结果：
+
+- `http://umafans.run/healthz/` 返回 `200`。
+- `http://umafans.run/` 返回 `200`。
+- 首页 HTML 包含 `home-page`、`headline-card`、`news-card` 和“原站热度”。
+- 首页引用 `/static/stable/public.9aaf4b105424.css`，不引用 `console.css`。
+- `public.css` 可访问并包含移动端 `max-width: 599px`、`aspect-ratio: 16 / 7` 和摘要隐藏规则。
+- 浏览器生产验收：
+  - 390px 移动端：首页头条约 `257px` 高，第一张普通新闻卡 `top=388`，普通新闻卡约 `128px` 高，右侧缩略图约 `104px x 78px`，首屏可见 4 条普通新闻，无横向溢出。
+  - 详情页：公开详情结构、标题、封面正常，无横向溢出，控制台无错误。
+
+### 回滚方式
+
+本次无数据库迁移。若移动端首页密度出现严重问题，优先在 GitHub revert `04e2ee9`，然后服务器执行：
+
+```bash
+cd /opt/umanewsbot
+git pull --ff-only origin main
+./deploy_lowcost.sh
+```
+
+如需临时直接回退到上一生产版本，可 checkout `e834f58` 后重新部署，但后续仍应通过 GitHub revert 保持 `main` 分支语义一致。
