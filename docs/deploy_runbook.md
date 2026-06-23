@@ -274,6 +274,17 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shel
 
 如果 `AUTOMATION_WARNING_EMAIL_ENABLED=true` 但没有配置 `AUTOMATION_WARNING_NOTIFY_EMAILS`，应看到 `status=skipped` 且自动发布不被阻断。同一文章同一 warning 组合 24 小时内重复触发时，也应记录 skipped 去重日志。
 
+### 2026-06-24 自动发布门禁优化生产上线结果
+
+- 部署 PR：#4 `[codex] refine automation publish gates`。
+- 生产提交：`42a4622`。
+- 部署前 `.env` 备份：`.env.backup.refine-automation-20260624_013323`。
+- 生产灰度策略：`AUTO_REWRITE_ENABLED=false`，`AUTO_PUBLISH_CONTENT_SOURCE=base_translation`，高价值 warning 邮件发送到 `754652181@qq.com`。
+- 迁移：`stable.0009_automation_publish_gates` 已应用。
+- 健康检查：`http://umafans.run/healthz/` 与 `/` 均返回 `200`，`web` 容器 healthy。
+- 验收查询：`WorkflowStatus.DUPLICATE=True`，首批非马名普通词种子数量 `14`，`python manage.py check` 通过。
+- 部署日志曾出现一次字段已存在异常，原因为容器启动迁移与手工迁移并发；后续 `showmigrations`、`check` 和健康检查均正常。
+
 ### 自动化排障顺序
 
 1. 先查 `.env` 中 `AUTOMATION_ENABLED`、`AUTO_REWRITE_ENABLED`、`AUTO_PUBLISH_CONTENT_SOURCE`、阈值、邮件配置和模型配置
