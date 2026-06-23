@@ -366,14 +366,25 @@ class ExternalHorseDataImporter:
     def _import_month_into_run(self, run: ExternalDataImportRun, year: int, month: int) -> None:
         self._set_current(run, "month", f"{year}-{month:02d}")
         race_ids = self.adapter.race_list(year, month)
-        for race_id in race_ids[: self.options.max_races]:
+        existing_race_ids = set(
+            ExternalRace.objects.filter(source=self.options.source, race_id__in=race_ids).values_list("race_id", flat=True)
+        )
+        race_ids_to_import = [race_id for race_id in race_ids if race_id not in existing_race_ids]
+        for race_id in race_ids_to_import[: self.options.max_races]:
             try:
                 self._import_race_into_run(run, race_id)
             except Exception as exc:
                 self._record_error(run, "race", race_id, exc)
-        if len(race_ids) > self.options.max_races:
-            run.skipped_count += len(race_ids) - self.options.max_races
-            run.save(update_fields=["skipped_count", "updated_at"])
+        remaining_count = max(0, len(race_ids_to_import) - self.options.max_races)
+        if remaining_count:
+            run.skipped_count += remaining_count
+        if existing_race_ids:
+            run.parameters = {
+                **(run.parameters or {}),
+                "already_imported_race_count": len(existing_race_ids),
+            }
+        if remaining_count or existing_race_ids:
+            run.save(update_fields=["skipped_count", "parameters", "updated_at"])
 
     def import_race(self, race_id: str) -> dict[str, Any]:
         if self.options.dry_run:

@@ -243,10 +243,14 @@ class AdapterTests(TestCase):
 
 
 class FakeExternalHorseDataAdapter:
+    def __init__(self):
+        self.fetched_race_ids: list[str] = []
+
     def race_list(self, year: int, month: int) -> list[str]:
         return [f"{year}{month:02d}0101", f"{year}{month:02d}0102"]
 
     def fetch_race(self, race_id: str, *, fetch_odds: bool = False) -> dict:
+        self.fetched_race_ids.append(race_id)
         return {
             "race": {
                 "race_id": race_id,
@@ -300,6 +304,7 @@ class FakeExternalHorseDataAdapter:
 @override_settings(EXTERNAL_HORSE_DATA_IMPORT_ENABLED=True)
 class ExternalHorseDataImportTests(TestCase):
     def importer(self, **overrides):
+        adapter = overrides.pop("adapter", None) or FakeExternalHorseDataAdapter()
         values = {
             "allow_network": True,
             "request_interval_seconds": 0,
@@ -311,7 +316,7 @@ class ExternalHorseDataImportTests(TestCase):
         }
         values.update(overrides)
         options = ImportOptions(**values)
-        return ExternalHorseDataImporter(options, adapter=FakeExternalHorseDataAdapter())
+        return ExternalHorseDataImporter(options, adapter=adapter)
 
     def test_import_race_preserves_payload_and_is_idempotent(self):
         importer = self.importer()
@@ -369,6 +374,21 @@ class ExternalHorseDataImportTests(TestCase):
         self.assertEqual(result["skipped_count"], 1)
         self.assertEqual(result["coverage_stats"]["race_count"], 1)
         self.assertEqual(result["coverage_stats"]["unique_horse_name_count"], 2)
+
+    def test_month_import_skips_existing_races_and_processes_next_batch(self):
+        first_adapter = FakeExternalHorseDataAdapter()
+        second_adapter = FakeExternalHorseDataAdapter()
+
+        first = self.importer(adapter=first_adapter, max_races=1).import_month(2026, 5)
+        second = self.importer(adapter=second_adapter, max_races=1).import_month(2026, 5)
+
+        self.assertEqual(first["status"], ExternalImportStatus.PAUSED)
+        self.assertEqual(second["status"], ExternalImportStatus.SUCCESS)
+        self.assertEqual(first_adapter.fetched_race_ids, ["2026050101"])
+        self.assertEqual(second_adapter.fetched_race_ids, ["2026050102"])
+        self.assertEqual(ExternalRace.objects.count(), 2)
+        second_run = ExternalDataImportRun.objects.get(pk=second["run_id"])
+        self.assertEqual(second_run.parameters["already_imported_race_count"], 1)
 
     def test_management_command_dry_run_does_not_write(self):
         out = StringIO()
