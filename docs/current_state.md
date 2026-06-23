@@ -380,3 +380,11 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 - `2026-06-24` 已补充按月续跑逻辑：再次导入同一月份时会先跳过已落库的 `ExternalRace.race_id`，只处理下一批未导入 race。
 - 不建议直接一次性跑近两年全量；应继续按月、小批量、低速运行，并观察失败率和覆盖率。
+
+### 生产第二批续跑结果
+
+- 续跑部署提交：`a61d789`。
+- 第二批真实导入：`run_id=2`，同为 `2026-05`，最多 10 场，不抓赔率，不补马匹详情，10 秒间隔 + 2 秒抖动。
+- 续跑确认：`parameters.already_imported_race_count=10`，说明第二批已跳过首批落库 race。
+- 运行结果：`status=paused`，`success_count=10`，`failure_count=0`，`skipped_count=316`。
+- 累计写入统计：`race_count=20`、`entry_count=292`、`result_count=274`、`horse_count=274`、`unique_horse_id_count=274`、`unique_horse_name_count=274`、`missing_horse_id_or_name_count=36`。
