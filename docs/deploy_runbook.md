@@ -408,3 +408,74 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shel
 - 本次备份产物：`.env.backup.20260607_033207` 与 `backups/pre-0006-20260607_033207.sql`（74M）。
 - 验证：`check` 0 issues；候选/证据计数 `0/0`；`nginx → web` 与外网 `umafans.run` / `www.umafans.run` 均 `200`；`worker` 无报错。
 - 本轮保持 `TERM_DISCOVERY_ENABLED=false`，未改 `AUTOMATION_ENABLED`（线上为 `true`）与 HTTPS。
+
+## 公开首页资讯流生产部署（2026-06-22）
+
+### 部署内容
+
+- GitHub PR #1 `[codex] Upgrade public home info feed` 已从 draft 转为 ready，并合并到 `main`。
+- merge commit：`e834f58`；实现提交：`1c9be7d`。
+- 服务器 `/opt/umanewsbot` 从 `62a6a02` 快进到 `e834f58`。
+- 本次不包含数据库迁移、生产 `.env` 开关调整或 Compose 架构变更。
+- 新增公开站点静态资源 `stable/public.css`，首页与详情页不再以后台 `console.css` 作为主要样式入口。
+
+### 部署前状态与备份
+
+- 服务器存在未跟踪 `.env.backup.*` 和 `imports/`，保留不清理。
+- 服务器 tracked diff 仅为部署脚本权限位变化：
+  - `deploy_lowcost.sh`
+  - `deploy/deploy_lowcost.sh`
+  - `deploy/docker/compose-wrapper.sh`
+- 上述权限位变化是为了修复此前 `Permission denied`，内容无差异，部署时予以保留。
+- 部署前 `.env` 备份：`.env.backup.20260622_140844`。
+
+### 部署命令
+
+```bash
+cd /opt/umanewsbot
+git fetch origin main
+git pull --ff-only origin main
+./deploy_lowcost.sh
+```
+
+脚本结果：
+
+- 重建并重启 `web / worker / beat`。
+- `migrate` 显示 `No migrations to apply`。
+- `collectstatic` 成功处理公开静态资源，生产首页引用 `/static/stable/public.2eec24723b45.css`。
+- `web` 容器为 healthy，`db / redis` healthy，`worker / beat` up。
+
+### 验证结果
+
+```bash
+curl -I http://umafans.run/healthz/
+curl -I http://umafans.run/
+curl -I http://umafans.run/static/stable/public.2eec24723b45.css
+docker compose -f docker-compose.prod.lowcost.yml ps
+docker logs --tail=80 umanewsbot-web-1
+docker logs --tail=80 umanewsbot-nginx-1
+```
+
+结果：
+
+- `http://umafans.run/healthz/` 返回 `200`，响应体为 `{"status": "ok"}`。
+- `http://umafans.run/` 返回 `200`。
+- 首页 HTML 包含 `home-page`、`headline-card`、`news-card` 和“原站热度”。
+- 首页引用 `/static/stable/public.2eec24723b45.css`，不再引用旧 `console.css`。
+- `public.css` 可访问并包含移动端 `news-card`、`headline-card`、`-webkit-line-clamp` 和 390px 视口布局规则。
+- 浏览器生产验收：
+  - 桌面端：轻导航、主头条和热门模块显示正常。
+  - 390px 移动端：普通新闻卡约 `128px` 高，右侧缩略图约 `104px x 78px`，首屏头条后可见 3 条普通新闻，无横向溢出。
+  - 详情页：标题、封面、来源、公开详情结构和 `public.css` 引用正常，控制台无错误。
+
+### 回滚方式
+
+本次无数据库迁移。若公开首页出现严重问题，优先回滚代码与容器：
+
+```bash
+cd /opt/umanewsbot
+git checkout 62a6a02
+./deploy_lowcost.sh
+```
+
+如需保持 `main` 分支语义，优先在 GitHub revert `e834f58` 后服务器 `git pull --ff-only origin main` 并重新执行 `./deploy_lowcost.sh`。
