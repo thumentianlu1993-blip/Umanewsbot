@@ -363,3 +363,20 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 首次真实请求建议使用 8-10 秒间隔、小批量、低峰时段，不抓赔率。
 - 同一来源通过导入锁避免多 worker 并发放大请求。
 - 如发现异常，优先关闭 `EXTERNAL_HORSE_DATA_IMPORT_ENABLED` / `EXTERNAL_HORSE_DATA_ALLOW_NETWORK` 并停止任务；新表不参与主新闻链路。
+
+### 生产首轮小批量导入结果
+
+- 生产部署提交：`58a6e82`。
+- 部署前 `.env` 备份：`.env.backup.external-horse-data-20260623_231514`。
+- 服务器迁移：`stable.0008_externaldataimportrun_externaldataimportlock_and_more` 已应用。
+- 容器内依赖检查：`keibascraper import ok`。
+- dry-run：`2026-05` 单月、小批量、最多 10 场，预计 20 个请求。
+- 真实导入命令：`2026-05`、`--max-races 10`、`--max-horses 30`、不抓赔率、不补马匹详情、请求间隔 10 秒 + 2 秒抖动。
+- 运行结果：`run_id=1`，`status=paused`，`success_count=10`，`failure_count=0`，`skipped_count=326`。
+- 写入统计：`race_count=10`、`entry_count=151`、`result_count=143`、`horse_count=143`、`unique_horse_id_count=143`、`unique_horse_name_count=143`、`missing_horse_id_or_name_count=16`。
+- 样本马名索引已写入，如 `ヴォルスター`、`ファイツオン`、`サトノエピック`。
+
+### 后续继续导入注意
+
+- 当前按月导入已能安全小批量运行，但继续补完整月份前，建议先优化“续跑下一批”逻辑：当前扩大 `--max-races` 可以继续覆盖更多比赛，但会重复访问已处理的前 N 场。
+- 不建议直接一次性跑近两年全量；应先改进续跑/跳过已成功 race 的逻辑，再按月分批运行。

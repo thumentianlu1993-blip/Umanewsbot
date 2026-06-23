@@ -207,3 +207,5 @@
 - 生产默认关闭：`EXTERNAL_HORSE_DATA_IMPORT_ENABLED=false`、`EXTERNAL_HORSE_DATA_ALLOW_NETWORK=false`。
 - 当前能力只维护本地外部赛马数据缓存，不改变新闻抓取、翻译、改写、自动发布或公开前台。
 - 当前验证：Django check 通过，`stable` 96 项测试通过。
+- 生产首轮小批量已完成：`run_id=1`，`2026-05` 前 10 场，成功 10、失败 0，写入 143 个唯一马 ID/马名索引。
+- 后续继续补全前，建议先优化按月续跑逻辑，避免重复访问已处理的前 N 场。

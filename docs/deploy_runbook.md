@@ -647,3 +647,15 @@ docker logs --tail=200 umanewsbot-worker-1
 1. 关闭 `EXTERNAL_HORSE_DATA_IMPORT_ENABLED=false` 和 `EXTERNAL_HORSE_DATA_ALLOW_NETWORK=false`。
 2. 停止正在执行导入的命令或 Celery worker。
 3. 保留外部数据表记录，新表不参与主新闻链路，不影响前台发布。
+
+### 2026-06-23 首次生产小批量结果
+
+- 部署提交：`58a6e82`。
+- `.env` 备份：`.env.backup.external-horse-data-20260623_231514`。
+- `stable.0008` 迁移已应用，`web` healthy，`/healthz/` 返回 `200`。
+- `python manage.py import_external_horse_data --check-dependency` 返回 `keibascraper import ok`。
+- dry-run 目标：`2026-05`，最多 10 场，预计 20 个请求。
+- 真实导入参数：`2026-05`，最多 10 场，不抓赔率，不补马匹详情，请求间隔 10 秒 + 2 秒抖动。
+- 结果：`run_id=1`，`status=paused`，成功 10 场，失败 0，因批量上限跳过 326 场。
+- 写入：10 场比赛、151 条出走、143 条赛果、143 个唯一马 ID/马名索引。
+- 继续扩大导入前，建议先优化按月续跑逻辑，避免重复访问已处理的前 N 场。
