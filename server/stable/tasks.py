@@ -45,6 +45,7 @@ from stable.services.sources import find_builtin_source, sync_builtin_sources
 from stable.services.term_discovery import discover_and_aggregate_article
 from stable.services.translation import translate_article
 from stable.services.validation import apply_validation_outcome, validate_rewrite
+from stable.services.external_horse_data import ExternalHorseDataImporter, ImportOptions
 
 
 User = get_user_model()
@@ -523,6 +524,49 @@ def detect_automation_anomalies_task() -> dict:
         sent.append(NotificationType.REPEATED_FAILURE)
     _log_success(log, f"notifications={','.join(sent) or 'none'}")
     return {"notifications": sent}
+
+
+@shared_task
+def import_external_horse_data_task(
+    *,
+    year: int | None = None,
+    month: int | None = None,
+    race_id: str = "",
+    horse_id: str = "",
+    horse_name: str = "",
+    allow_network: bool = False,
+    max_races: int | None = None,
+    max_horses: int | None = None,
+    fetch_odds: bool | None = None,
+    fetch_horse_detail: bool | None = None,
+) -> dict:
+    log = _log_start(
+        "import_external_horse_data",
+        {"year": year, "month": month, "race_id": race_id, "horse_id": horse_id, "allow_network": allow_network},
+    )
+    importer = ExternalHorseDataImporter(
+        ImportOptions.from_settings(
+            allow_network=allow_network,
+            max_races=max_races,
+            max_horses=max_horses,
+            fetch_odds=fetch_odds,
+            fetch_horse_detail=fetch_horse_detail,
+        )
+    )
+    try:
+        if race_id:
+            result = importer.import_race(race_id)
+        elif horse_id:
+            result = importer.import_horse(horse_id, horse_name=horse_name)
+        elif year and month:
+            result = importer.import_month(year, month)
+        else:
+            result = importer.import_default()
+        _log_success(log, f"status={result.get('status')} run_id={result.get('run_id')}")
+        return result
+    except Exception as exc:
+        _log_failure(log, str(exc))
+        raise
 
 
 @shared_task

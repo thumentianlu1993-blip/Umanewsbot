@@ -16,6 +16,14 @@ from stable.adapters.netkeiba import NetkeibaAdapter
 from stable.models import (
     ArticleTranslationStatus,
     AutomationStatus,
+    ExternalDataImportLock,
+    ExternalDataImportRun,
+    ExternalHorseAlias,
+    ExternalImportStatus,
+    ExternalRace,
+    ExternalRaceEntry,
+    ExternalRaceOdds,
+    ExternalRaceResult,
     NewsImage,
     NewsArticle,
     NewsSnapshot,
@@ -52,6 +60,12 @@ from stable.services.translation import (
     OpenAICompatibleTranslationProvider,
     TranslationResponseError,
     translate_article as run_translation_service,
+)
+from stable.services.external_horse_data import (
+    ExternalHorseDataAlreadyRunning,
+    ExternalHorseDataImporter,
+    ExternalHorseDataNetworkDisabled,
+    ImportOptions,
 )
 from stable.tasks import (
     _crawl_netkeiba_mode,
@@ -226,6 +240,158 @@ class AdapterTests(TestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0].source_site, SourceSite.JRA)
         self.assertEqual(items[0].title_ja, "クイーンSの競走馬登録抹消")
+
+
+class FakeExternalHorseDataAdapter:
+    def race_list(self, year: int, month: int) -> list[str]:
+        return [f"{year}{month:02d}0101", f"{year}{month:02d}0102"]
+
+    def fetch_race(self, race_id: str, *, fetch_odds: bool = False) -> dict:
+        return {
+            "race": {
+                "race_id": race_id,
+                "race_name": "東京優駿",
+                "race_date": "2026-05-31",
+                "extra_field": "保留字段",
+            },
+            "entry": [
+                {
+                    "horse_id": "1001",
+                    "horse_name": "マヤノライジン",
+                    "horse_number": "1",
+                    "jockey_name": "武豊",
+                    "extra_entry": "保存",
+                },
+                {
+                    "horse_id": "1002",
+                    "horse_name": "クロワデュノール",
+                    "horse_number": "2",
+                },
+            ],
+            "result": [
+                {
+                    "horse_id": "1001",
+                    "horse_name": "マヤノライジン",
+                    "horse_number": "1",
+                    "finish_position": "1",
+                }
+            ],
+            "odds": [{"odds_type": "win", "horse_number": "1", "odds": "2.1"}] if fetch_odds else [],
+        }
+
+    def fetch_horse(self, horse_id: str) -> dict:
+        return {
+            "horse": {
+                "horse_id": horse_id,
+                "father_name": "マヤノトップガン",
+                "unknown_future_field": "後で使う",
+            },
+            "history": [
+                {
+                    "race_id": "202605310101",
+                    "race_name": "東京優駿",
+                    "race_date": "2026-05-31",
+                    "finish_position": "1",
+                }
+            ],
+        }
+
+
+@override_settings(EXTERNAL_HORSE_DATA_IMPORT_ENABLED=True)
+class ExternalHorseDataImportTests(TestCase):
+    def importer(self, **overrides):
+        values = {
+            "allow_network": True,
+            "request_interval_seconds": 0,
+            "jitter_seconds": 0,
+            "max_races": 1,
+            "max_horses": 10,
+            "fetch_odds": True,
+            "fetch_horse_detail": True,
+        }
+        values.update(overrides)
+        options = ImportOptions(**values)
+        return ExternalHorseDataImporter(options, adapter=FakeExternalHorseDataAdapter())
+
+    def test_import_race_preserves_payload_and_is_idempotent(self):
+        importer = self.importer()
+
+        first = importer.import_race("202605310101")
+        second = importer.import_race("202605310101")
+
+        self.assertEqual(first["status"], ExternalImportStatus.SUCCESS)
+        self.assertEqual(second["status"], ExternalImportStatus.SUCCESS)
+        self.assertEqual(ExternalRace.objects.count(), 1)
+        self.assertEqual(ExternalRaceEntry.objects.count(), 2)
+        self.assertEqual(ExternalRaceResult.objects.count(), 1)
+        self.assertEqual(ExternalRaceOdds.objects.count(), 1)
+        self.assertEqual(ExternalHorseAlias.objects.filter(name_ja="マヤノライジン").count(), 1)
+        race = ExternalRace.objects.get()
+        self.assertEqual(race.raw_payload["extra_field"], "保留字段")
+        entry = ExternalRaceEntry.objects.get(horse_id="1001")
+        self.assertEqual(entry.raw_payload["extra_entry"], "保存")
+
+    def test_dry_run_does_not_write_external_tables(self):
+        importer = self.importer(dry_run=True, allow_network=False)
+
+        result = importer.import_race("202605310101")
+
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(ExternalDataImportRun.objects.count(), 0)
+        self.assertEqual(ExternalRace.objects.count(), 0)
+
+    @override_settings(EXTERNAL_HORSE_DATA_IMPORT_ENABLED=False)
+    def test_real_import_requires_enabled_setting(self):
+        with self.assertRaises(ExternalHorseDataNetworkDisabled):
+            self.importer().import_race("202605310101")
+
+    def test_single_horse_import_only_creates_alias_with_trusted_name(self):
+        importer = self.importer(fetch_horse_detail=True)
+
+        importer.import_horse("1001")
+        importer.import_horse("1002", horse_name="マヤノライジン")
+
+        self.assertFalse(ExternalHorseAlias.objects.filter(external_horse_id="1001").exists())
+        alias = ExternalHorseAlias.objects.get(external_horse_id="1002")
+        self.assertEqual(alias.name_ja, "マヤノライジン")
+
+    def test_source_lock_blocks_parallel_real_imports(self):
+        run = ExternalDataImportRun.objects.create(source="netkeiba", target_type="month", status=ExternalImportStatus.STARTED)
+        ExternalDataImportLock.objects.create(source="netkeiba", locked_by_run=run, acquired_at=timezone.now())
+
+        with self.assertRaises(ExternalHorseDataAlreadyRunning):
+            self.importer().import_race("202605310101")
+
+    def test_month_import_respects_max_races_and_records_coverage_stats(self):
+        result = self.importer(max_races=1).import_month(2026, 5)
+
+        self.assertEqual(result["status"], ExternalImportStatus.PAUSED)
+        self.assertEqual(result["skipped_count"], 1)
+        self.assertEqual(result["coverage_stats"]["race_count"], 1)
+        self.assertEqual(result["coverage_stats"]["unique_horse_name_count"], 2)
+
+    def test_management_command_dry_run_does_not_write(self):
+        out = StringIO()
+
+        call_command("import_external_horse_data", "--race-id", "202605310101", "--dry-run", stdout=out)
+
+        self.assertIn('"dry_run": true', out.getvalue())
+        self.assertEqual(ExternalDataImportRun.objects.count(), 0)
+        self.assertEqual(ExternalRace.objects.count(), 0)
+
+    def test_management_command_lookup_name_reads_local_alias(self):
+        ExternalHorseAlias.objects.create(
+            source="netkeiba",
+            external_horse_id="1001",
+            name_ja="マヤノライジン",
+            normalized_name="マヤノライジン",
+            alias_source="test",
+        )
+        out = StringIO()
+
+        call_command("import_external_horse_data", "--lookup-name", "マヤノライジン", stdout=out)
+
+        self.assertIn('"external_horse_id": "1001"', out.getvalue())
 
 
 class PushTests(TestCase):

@@ -127,7 +127,7 @@
 ## 5. 当前验证结果
 
 - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py check`：通过
-- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable`：通过，88 项
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable`：通过，96 项
 - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable.tests.PublicHomeInfoFeedTests`：通过，10 项
 - `openspec validate upgrade-public-home-info-feed --strict`：归档前通过
 - `openspec validate --all`：归档前通过；同步正式规格并归档后再次通过
@@ -177,6 +177,7 @@
   - `OSS_BUCKET_NAME`
 - 当前下一步：
   - 观察自动化发布质量
+  - 生产灰度前先评审外部赛马数据导入配置，执行 dry-run 和单月小批量验证
   - 补充翻译 warning 可视化和术语库补全流程
   - 推进 HTTPS / 证书接入
   - 做部署稳定化
@@ -197,3 +198,12 @@
 - 已完成接受、修改后接受、合并、拒绝、忽略和保守批量操作。
 - `2026-06-07` 已部署生产并应用迁移 `0006`（服务器到 `e2e3e07`），生产默认关闭，待单篇抽检后通过 `TERM_DISCOVERY_ENABLED` 灰度启用。
 - 当前验证：Django 检查通过，`stable` 69 项测试通过，两种生产 Compose 配置检查通过，并完成本地隔离环境浏览器功能验收。
+
+## 10. 外部赛马数据导入状态
+
+- 已实现 `add-netkeiba-horse-data-import` OpenSpec change 的首版代码。
+- 新增外部比赛、出走、赛果、赔率、马匹、履历、马名索引、导入运行、错误记录和单来源锁模型。
+- 新增 `import_external_horse_data` 管理命令和 `import_external_horse_data_task` Celery 任务。
+- 生产默认关闭：`EXTERNAL_HORSE_DATA_IMPORT_ENABLED=false`、`EXTERNAL_HORSE_DATA_ALLOW_NETWORK=false`。
+- 当前能力只维护本地外部赛马数据缓存，不改变新闻抓取、翻译、改写、自动发布或公开前台。
+- 当前验证：Django check 通过，`stable` 96 项测试通过。

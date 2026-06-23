@@ -546,3 +546,104 @@ git pull --ff-only origin main
 ```
 
 如需临时直接回退到上一生产版本，可 checkout `e834f58` 后重新部署，但后续仍应通过 GitHub revert 保持 `main` 分支语义一致。
+
+## 外部赛马数据导入运行手册
+
+### 默认状态
+
+外部赛马数据导入默认不运行：
+
+```bash
+EXTERNAL_HORSE_DATA_IMPORT_ENABLED=false
+EXTERNAL_HORSE_DATA_ALLOW_NETWORK=false
+```
+
+Celery 任务 `stable.tasks.import_external_horse_data_task` 不加入默认全量 Celery Beat 调度，生产只能由人工明确触发。
+
+### 生产执行前
+
+1. 确认代码已部署并执行迁移。
+2. 备份数据库。
+3. 确认同一时间没有其他外部赛马数据导入任务运行。
+4. 首次执行建议先不抓赔率，先只补 `entry/result/horse/history`。
+5. 首次真实请求建议使用更保守限速：`8-10` 秒请求间隔，小批量执行。
+
+### 依赖检查
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data --check-dependency
+```
+
+### dry-run
+
+dry-run 不写入外部数据表：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data --year 2026 --month 5 --dry-run
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data --race-id 202605310101 --dry-run
+```
+
+### 单月小批量真实导入
+
+必须同时打开配置和命令参数：
+
+```bash
+EXTERNAL_HORSE_DATA_IMPORT_ENABLED=true
+EXTERNAL_HORSE_DATA_ALLOW_NETWORK=true
+EXTERNAL_HORSE_DATA_REQUEST_INTERVAL_SECONDS=10
+EXTERNAL_HORSE_DATA_JITTER_SECONDS=2
+EXTERNAL_HORSE_DATA_MAX_RACES_PER_RUN=10
+EXTERNAL_HORSE_DATA_MAX_HORSES_PER_RUN=30
+EXTERNAL_HORSE_DATA_FETCH_ODDS=false
+```
+
+执行：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data \
+  --year 2026 --month 5 \
+  --allow-network \
+  --max-races 10 \
+  --max-horses 30 \
+  --no-fetch-horse-detail
+```
+
+如需补单匹马，并且人工已知可信日文马名：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data \
+  --horse-id 1000000000 \
+  --horse-name マヤノライジン \
+  --allow-network
+```
+
+### 验收查询
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data --lookup-name マヤノライジン
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data --stats-run-id <run_id>
+```
+
+重点看：
+
+- `status`
+- `failure_count`
+- `coverage_stats.race_count`
+- `coverage_stats.entry_count`
+- `coverage_stats.result_count`
+- `coverage_stats.unique_horse_id_count`
+- `coverage_stats.unique_horse_name_count`
+- `coverage_stats.missing_horse_id_or_name_count`
+
+### 日志与停止
+
+```bash
+docker logs --tail=200 umanewsbot-web-1
+docker logs --tail=200 umanewsbot-worker-1
+```
+
+如需停止：
+
+1. 关闭 `EXTERNAL_HORSE_DATA_IMPORT_ENABLED=false` 和 `EXTERNAL_HORSE_DATA_ALLOW_NETWORK=false`。
+2. 停止正在执行导入的命令或 Celery worker。
+3. 保留外部数据表记录，新表不参与主新闻链路，不影响前台发布。

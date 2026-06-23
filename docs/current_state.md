@@ -81,6 +81,23 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 需要补足更标准的部署基线、回滚与备份演练
 - QQ Bot 实网联调与正式推送链路仍需单独验收
 
+## 2026-06-23 前台发布判定代码阅读结论
+
+- 公开前台首页 `/` 与详情页 `/news/<slug>/` 只展示 `workflow_status=published` 且 `published_to_web_at` 非空的 `NewsArticle`。
+- 抓取入库的新稿默认是 `workflow_status=pending_translation`，不会因为来自 `netkeiba` 新着、访问榜、注目榜或 `JRA` 官方新闻而直接进入前台。
+- 翻译成功后文章进入 `pending_edit`；若 `AUTOMATION_ENABLED=true`，会触发自动化评分、改写与校验链路。
+- 自动化评分为 `auto` 的文章也不会立刻公开；必须完成改写、通过一致性校验成为 `automation_status=publish_ready`，再由批量自动发布任务写入 `workflow_status=published` 与 `published_to_web_at` 后才进入前台。
+- 自动化硬规则会把重复稿、正文过短或为空、疑似乱码/结构损坏、疑似广告或导航短页直接置为 `ignored`，默认不进入前台。
+- 长采访或引语较多、翻译未成功、缺少基准中文翻译等会转为 `manual` / `pending_review`，需要人工审核后发布。
+- 人工发布通过运营后台文章编辑页完成时会写入 `workflow_status=published`、`published_to_web_at`、`published_by_mode=manual`；无封面时需要二次确认。Django Admin 或后台 API 若只改 `workflow_status` 而不补 `published_to_web_at`，仍不会被公开前台接收。
+
+## 2026-06-23 外部赛马数据导入 OpenSpec 提案
+
+- 已创建 OpenSpec change：`add-netkeiba-horse-data-import`。
+- 提案目标：使用 `keibascraper` / netkeiba 作为低频离线导入来源，先抓取近两年比赛、出走、赛果、赔率、马匹血统和马匹履历数据，保存结构化字段与原始 payload，并派生本地马名索引。
+- 关键约束：导入默认关闭，不加入自动全量调度；生产必须人工显式执行、强制限速、随机抖动、小批量、可暂停、可恢复；导入失败不得影响新闻抓取、翻译、自动化发布或公开前台。
+- 当前状态：仅完成 proposal、design、delta spec 和 tasks，尚未实现代码，尚未执行真实爬取。
+
 ## 2026-06-19 公开首页资讯流升级 OpenSpec 主 change
 
 ### 已归档产物
@@ -302,3 +319,47 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - `web` 容器内真实环境变量
 - 不把聊天记录当唯一记忆来源，关键修复过程必须落文档
 - 生产问题处理时，坚持“先核对运行态，再给结论”
+
+## 2026-06-23 外部赛马数据导入实现状态
+
+### 本地已实现
+
+- 新增 OpenSpec change：`add-netkeiba-horse-data-import`。
+- 新增 `keibascraper==3.1.5` 依赖，并通过管理命令提供 import 冒烟检查入口。
+- 新增外部赛马数据表：比赛、出走表、赛果、赔率、马匹、马匹履历、马名索引、导入运行、导入错误和单来源导入锁。
+- 新增 `stable.services.external_horse_data`：
+  - 包装 `keibascraper.race_list()` 与 `keibascraper.load()`。
+  - 项目侧强制执行网络开关、请求间隔、随机抖动。
+  - 保存结构化字段与 `raw_payload`。
+  - 对比赛、出走、赛果、赔率、马匹、履历做幂等 upsert。
+  - 从出走表、赛果、可信单马参数派生 `ExternalHorseAlias`。
+  - 单马导入仅在存在可信马名时创建马名索引，避免凭空写入错误马名。
+  - 记录覆盖率统计：比赛数、出走数、赛果数、赔率数、马匹数、履历数、唯一马 ID、唯一日文马名、缺失马 ID/马名记录数。
+- 新增管理命令 `import_external_horse_data`：
+  - 支持默认近两年、指定年月、指定 `race_id`、指定 `horse_id`、`--horse-name`、`--dry-run`。
+  - 支持 `--max-races`、`--max-horses`、`--fetch-odds`、`--no-fetch-horse-detail`。
+  - 支持 `--lookup-name` 查询本地马名索引。
+  - 支持 `--stats-run-id` 查看导入运行统计。
+  - 支持 `--check-dependency` 检查 `keibascraper` 是否可 import。
+- 新增 Celery 任务 `import_external_horse_data_task`，但未加入默认 Celery Beat 全量调度。
+
+### 当前默认策略
+
+- `EXTERNAL_HORSE_DATA_IMPORT_ENABLED=false`。
+- `EXTERNAL_HORSE_DATA_ALLOW_NETWORK=false`。
+- 代码已可部署迁移，但生产不会自动发起 netkeiba 请求。
+- 外部数据导入当前不参与新闻抓取、翻译、AI 改写、自动发布或公开前台。
+
+### 本地验证
+
+- `DB_ENGINE=sqlite python manage.py check`：通过。
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable.tests.ExternalHorseDataImportTests`：通过，8 项。
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable`：通过，96 项。
+
+### 生产执行提醒
+
+- 生产首次真实导入前必须备份数据库。
+- 先执行 dry-run 或单月小批量。
+- 首次真实请求建议使用 8-10 秒间隔、小批量、低峰时段，不抓赔率。
+- 同一来源通过导入锁避免多 worker 并发放大请求。
+- 如发现异常，优先关闭 `EXTERNAL_HORSE_DATA_IMPORT_ENABLED` / `EXTERNAL_HORSE_DATA_ALLOW_NETWORK` 并停止任务；新表不参与主新闻链路。

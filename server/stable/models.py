@@ -146,6 +146,18 @@ class TaskStatus(models.TextChoices):
     FAILED = "failed", "失败"
 
 
+class ExternalDataSource(models.TextChoices):
+    NETKEIBA = "netkeiba", "netkeiba"
+
+
+class ExternalImportStatus(models.TextChoices):
+    STARTED = "started", "运行中"
+    SUCCESS = "success", "成功"
+    FAILED = "failed", "失败"
+    PARTIAL = "partial", "部分完成"
+    PAUSED = "paused", "可继续"
+
+
 class TranslationStatus(models.TextChoices):
     STARTED = "started", "进行中"
     SUCCESS = "success", "成功"
@@ -586,6 +598,243 @@ class NewsSnapshot(TimestampedModel):
 
     class Meta:
         ordering = ("-captured_at", "-id")
+
+
+class ExternalRace(TimestampedModel):
+    source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    race_id = models.CharField(max_length=32)
+    race_name = models.CharField(max_length=255, blank=True)
+    race_date = models.DateField(null=True, blank=True)
+    course = models.CharField(max_length=128, blank=True)
+    surface = models.CharField(max_length=64, blank=True)
+    distance = models.CharField(max_length=64, blank=True)
+    weather = models.CharField(max_length=64, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    fetched_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("-race_date", "-race_id")
+        constraints = [
+            models.UniqueConstraint(fields=("source", "race_id"), name="uq_external_race_source_race"),
+        ]
+        indexes = [
+            models.Index(fields=("source", "race_date"), name="ext_race_source_date_idx"),
+            models.Index(fields=("source", "race_name"), name="ext_race_source_name_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.source}:{self.race_id} {self.race_name}".strip()
+
+
+class ExternalRaceEntry(TimestampedModel):
+    source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    race = models.ForeignKey(ExternalRace, on_delete=models.CASCADE, related_name="entries")
+    external_race_id = models.CharField(max_length=32)
+    entry_key = models.CharField(max_length=128)
+    horse_id = models.CharField(max_length=32, blank=True)
+    horse_name = models.CharField(max_length=255, blank=True)
+    normalized_horse_name = models.CharField(max_length=255, blank=True)
+    horse_number = models.CharField(max_length=32, blank=True)
+    frame_number = models.CharField(max_length=32, blank=True)
+    jockey_name = models.CharField(max_length=255, blank=True)
+    trainer_name = models.CharField(max_length=255, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    fetched_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("external_race_id", "horse_number", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("source", "external_race_id", "entry_key"), name="uq_ext_entry_source_race_key"),
+        ]
+        indexes = [
+            models.Index(fields=("source", "horse_id"), name="ext_entry_source_horse_idx"),
+            models.Index(fields=("source", "normalized_horse_name"), name="ext_entry_source_name_idx"),
+        ]
+
+
+class ExternalRaceResult(TimestampedModel):
+    source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    race = models.ForeignKey(ExternalRace, on_delete=models.CASCADE, related_name="results")
+    external_race_id = models.CharField(max_length=32)
+    result_key = models.CharField(max_length=128)
+    horse_id = models.CharField(max_length=32, blank=True)
+    horse_name = models.CharField(max_length=255, blank=True)
+    normalized_horse_name = models.CharField(max_length=255, blank=True)
+    horse_number = models.CharField(max_length=32, blank=True)
+    finish_position = models.CharField(max_length=32, blank=True)
+    jockey_name = models.CharField(max_length=255, blank=True)
+    trainer_name = models.CharField(max_length=255, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    fetched_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("external_race_id", "finish_position", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("source", "external_race_id", "result_key"), name="uq_ext_result_source_race_key"),
+        ]
+        indexes = [
+            models.Index(fields=("source", "horse_id"), name="ext_result_source_horse_idx"),
+            models.Index(fields=("source", "normalized_horse_name"), name="ext_result_source_name_idx"),
+        ]
+
+
+class ExternalRaceOdds(TimestampedModel):
+    source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    race = models.ForeignKey(ExternalRace, on_delete=models.CASCADE, related_name="odds")
+    external_race_id = models.CharField(max_length=32)
+    odds_type = models.CharField(max_length=64, blank=True)
+    odds_key = models.CharField(max_length=128)
+    horse_number = models.CharField(max_length=32, blank=True)
+    odds_value = models.CharField(max_length=64, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    fetched_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("external_race_id", "odds_type", "odds_key")
+        constraints = [
+            models.UniqueConstraint(fields=("source", "external_race_id", "odds_type", "odds_key"), name="uq_ext_odds_source_race_key"),
+        ]
+        indexes = [
+            models.Index(fields=("source", "external_race_id"), name="ext_odds_source_race_idx"),
+        ]
+
+
+class ExternalHorse(TimestampedModel):
+    source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    horse_id = models.CharField(max_length=32)
+    horse_name = models.CharField(max_length=255, blank=True)
+    normalized_horse_name = models.CharField(max_length=255, blank=True)
+    sex = models.CharField(max_length=64, blank=True)
+    birth_date = models.DateField(null=True, blank=True)
+    father_name = models.CharField(max_length=255, blank=True)
+    mother_name = models.CharField(max_length=255, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    fetched_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("source", "horse_id")
+        constraints = [
+            models.UniqueConstraint(fields=("source", "horse_id"), name="uq_ext_horse_source_horse"),
+        ]
+        indexes = [
+            models.Index(fields=("source", "normalized_horse_name"), name="ext_horse_source_name_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.source}:{self.horse_id} {self.horse_name}".strip()
+
+
+class ExternalHorseHistory(TimestampedModel):
+    source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    horse = models.ForeignKey(ExternalHorse, on_delete=models.CASCADE, related_name="history")
+    external_horse_id = models.CharField(max_length=32)
+    external_race_id = models.CharField(max_length=32, blank=True)
+    history_key = models.CharField(max_length=128)
+    race_name = models.CharField(max_length=255, blank=True)
+    raced_at = models.DateField(null=True, blank=True)
+    horse_number = models.CharField(max_length=32, blank=True)
+    finish_position = models.CharField(max_length=32, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    fetched_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("-raced_at", "-external_race_id", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("source", "external_horse_id", "history_key"), name="uq_ext_history_source_horse_key"),
+        ]
+        indexes = [
+            models.Index(fields=("source", "external_race_id"), name="ext_history_source_race_idx"),
+        ]
+
+
+class ExternalHorseAlias(TimestampedModel):
+    source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    horse = models.ForeignKey(ExternalHorse, on_delete=models.CASCADE, related_name="aliases", null=True, blank=True)
+    external_horse_id = models.CharField(max_length=32)
+    name_ja = models.CharField(max_length=255)
+    normalized_name = models.CharField(max_length=255)
+    confidence = models.PositiveSmallIntegerField(default=100)
+    alias_source = models.CharField(max_length=64, blank=True)
+    first_seen_at = models.DateTimeField(default=timezone.now)
+    last_seen_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("source", "normalized_name")
+        constraints = [
+            models.UniqueConstraint(fields=("source", "external_horse_id", "normalized_name"), name="uq_ext_alias_source_horse_name"),
+        ]
+        indexes = [
+            models.Index(fields=("source", "normalized_name"), name="ext_alias_source_name_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name_ja} ({self.external_horse_id})"
+
+
+class ExternalDataImportRun(TimestampedModel):
+    source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    target_type = models.CharField(max_length=32)
+    target_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    target_month = models.PositiveSmallIntegerField(null=True, blank=True)
+    race_id = models.CharField(max_length=32, blank=True)
+    horse_id = models.CharField(max_length=32, blank=True)
+    parameters = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=16, choices=ExternalImportStatus.choices, default=ExternalImportStatus.STARTED)
+    dry_run = models.BooleanField(default=False)
+    current_target_type = models.CharField(max_length=32, blank=True)
+    current_target_id = models.CharField(max_length=64, blank=True)
+    success_count = models.PositiveIntegerField(default=0)
+    skipped_count = models.PositiveIntegerField(default=0)
+    failure_count = models.PositiveIntegerField(default=0)
+    coverage_stats = models.JSONField(default=dict, blank=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-started_at", "-id")
+        indexes = [
+            models.Index(fields=("source", "status", "-started_at"), name="ext_run_source_status_idx"),
+            models.Index(fields=("target_type", "target_year", "target_month"), name="ext_run_target_month_idx"),
+        ]
+
+
+class ExternalDataImportError(TimestampedModel):
+    run = models.ForeignKey(ExternalDataImportRun, on_delete=models.CASCADE, related_name="errors")
+    source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    target_type = models.CharField(max_length=32)
+    target_id = models.CharField(max_length=128)
+    error_type = models.CharField(max_length=128)
+    message = models.TextField()
+    retry_count = models.PositiveIntegerField(default=0)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    occurred_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("-occurred_at", "-id")
+        indexes = [
+            models.Index(fields=("source", "target_type", "target_id"), name="ext_error_source_target_idx"),
+        ]
+
+
+class ExternalDataImportLock(TimestampedModel):
+    source = models.CharField(max_length=32, choices=ExternalDataSource.choices, unique=True)
+    locked_by_run = models.ForeignKey(
+        ExternalDataImportRun,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="locks",
+    )
+    acquired_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("source",)
 
 
 class TermEntry(TimestampedModel):
