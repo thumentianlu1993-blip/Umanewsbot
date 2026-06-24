@@ -22,11 +22,17 @@
   <div class="grid-2">
     <section class="panel">
       <h3>原文信息</h3>
-      <p><strong>标题：</strong>{{ article.title_ja }}</p>
+      <p data-term-selection-source><strong>标题：</strong>{{ article.title_ja }}</p>
       <p><strong>来源：</strong>{{ article.source_config.name|default:article.get_source_site_display }}</p>
       <p><strong>发布时间：</strong>{{ article.published_at|date:"Y-m-d H:i" }}</p>
       <p><strong>原文链接：</strong><a href="{{ article.source_url }}" target="_blank" rel="noreferrer">{{ article.source_url }}</a></p>
-      <div class="content-block">{{ article.body_ja_normalized|default:article.body_ja_raw }}</div>
+      <div class="content-block" data-term-selection-source>{{ article.body_ja_normalized|default:article.body_ja_raw }}</div>
+      {% url 'console-candidate-detail' article.id as quick_term_next_url %}
+      <form id="quick-term-candidate-form" method="post" action="{% url 'console-article-quick-term-create' article.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ quick_term_next_url }}">
+      </form>
+      {% include "stable/console/_quick_term_form.html" with quick_term_context="candidate" quick_term_form_id="quick-term-candidate-form" %}
     </section>
 
     <section class="panel">

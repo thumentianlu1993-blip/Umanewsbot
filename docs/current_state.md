@@ -473,3 +473,40 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 已人工收尾：将 `run_id=9` 标记为 `partial`，写入 `finished_at` 和 coverage，释放 `ExternalDataImportLock`。
 - 中断后累计写入：`race_count=182`、`entry_count=2692`、`result_count=2518`、`horse_count=2401`、`unique_horse_id_count=2401`、`unique_horse_name_count=2401`、`missing_horse_id_or_name_count=348`。
 - 当前服务状态：`web/db/redis/nginx/worker/beat` 运行，`/healthz/` 返回 `200`。按“报错退出则停止”约定，未继续启动后续导入。
+
+## 后台原文选区快速加入术语库
+
+- OpenSpec change：`add-selection-term-quick-add`。
+- 本地分支：`codex/add-selection-term-quick-add`。
+- 实现时间：`2026-06-24`。
+- 状态：本地实现和验证完成，尚未部署生产。
+
+### 已实现能力
+
+- 候选详情页和文章编辑台的原文标题、原文正文已标记为可选区来源。
+- 两个页面都新增“快速加入术语库”入口；管理员可点击“使用当前选区”填入日文原词，也可手工粘贴作为无 JavaScript fallback。
+- 快速表单字段包含日文原词、术语类型、中文译词；术语类型默认 `horse`（马名），但可改为赛事、骑手、调教师、马主、牧场、赛马场、机构、固定译法或其他。
+- 后端新增文章上下文 POST 入口 `console-article-quick-term-create`，路径为 `/admin/articles/<article_id>/quick-term/`。
+- 创建正式术语时复用 `validate_term_payload()`，继续执行正式术语库的类型、重复、比赛等级、启用状态和优先级校验。
+- 快速创建默认写入：`is_active=true`、`priority=0`、`race_grade=""`、`aliases_ja=[]`、`aliases_zh=[]`，并在 `notes` 记录来源文章 ID 和标题。
+- 创建成功后留在当前页面并显示成功消息，同时写入 `OperationLog`。
+- 创建失败时不写入 `TermEntry`，通过 messages 展示错误；重复术语提示已有术语 ID，并提供已有术语编辑页链接。
+
+### 明确边界
+
+- 快速加入术语库只写入 `TermEntry` 和操作日志。
+- 不触发 `translate_article_task`，不触发自动化处理，不修改当前文章的 `title_zh`、`body_zh`、`base_translation_zh` 或 `rewrite_body_zh`。
+- “新增术语后自动重新应用术语/重翻译联动”仍属于后续 change，不在本次实现中。
+- 本次没有生产部署，因此 `docs/deploy_runbook.md` 未新增上线记录。
+
+### 验证结果
+
+- `DB_ENGINE=sqlite python manage.py check` 已通过（本地使用 Codex bundled Python 执行）。
+- `DB_ENGINE=sqlite python manage.py test stable.tests.ConsoleFlowTests --verbosity=2` 已通过；本轮按 OpenSpec 场景补齐非法术语类型、换行误选整段、文章不存在、非联动状态保持和原文选区脚本限制等测试。
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable --verbosity=2` 已通过，126 个测试全部通过。
+- `openspec validate add-selection-term-quick-add --strict` 已通过。
+- 本地浏览器验收使用临时 SQLite 后台：
+  - 候选详情页可创建术语并返回当前候选页。
+  - 候选详情页重复创建同类型同日文原词时显示失败提示和已有术语编辑链接。
+  - 编辑台快速术语入口已验证不会提交外层文章编辑表单；提交成功后返回编辑台。
+  - 无选区点击“使用当前选区”不会乱填，提示需在原文标题或正文中选择短词。

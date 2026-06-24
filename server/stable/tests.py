@@ -32,6 +32,7 @@ from stable.models import (
     NewsSnapshot,
     NewsSource,
     NotificationLog,
+    OperationLog,
     PushTarget,
     ReviewMode,
     SourceMode,
@@ -695,6 +696,184 @@ class ConsoleFlowTests(TestCase):
             )
         self.assertEqual(response.status_code, 302)
         mocked_dispatch.assert_called_once_with(translate_article_task, self.article.id)
+
+    def test_candidate_detail_quick_term_create_defaults_to_horse_and_logs_article(self):
+        response = self.client.post(
+            reverse("console-article-quick-term-create", args=[self.article.id]),
+            {
+                "source_ja": "マヤノライジン",
+                "term_type": "horse",
+                "target_zh": "摩耶雷神",
+                "next": reverse("console-candidate-detail", args=[self.article.id]),
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "术语已创建：マヤノライジン")
+        self.assertContains(response, "摩耶雷神")
+        term = TermEntry.objects.get(source_ja="マヤノライジン")
+        self.assertEqual(term.term_type, "horse")
+        self.assertEqual(term.target_zh, "摩耶雷神")
+        self.assertEqual(term.aliases_ja, [])
+        self.assertEqual(term.aliases_zh, [])
+        self.assertEqual(term.priority, 0)
+        self.assertEqual(term.race_grade, "")
+        self.assertTrue(term.is_active)
+        self.assertIn(f"文章 #{self.article.id}", term.notes)
+        self.assertTrue(
+            OperationLog.objects.filter(
+                action_type="article_quick_term_created",
+                target_type="term",
+                target_id=str(term.id),
+                detail__contains=f"文章 #{self.article.id}",
+            ).exists()
+        )
+
+    def test_article_editor_quick_term_create_returns_to_editor(self):
+        editor_url = reverse("console-article-editor", args=[self.article.id])
+        response = self.client.post(
+            reverse("console-article-quick-term-create", args=[self.article.id]),
+            {
+                "source_ja": "大阪杯",
+                "term_type": "race",
+                "target_zh": "大阪杯",
+                "next": editor_url,
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.redirect_chain[-1][0], editor_url)
+        self.assertTrue(TermEntry.objects.filter(term_type="race", source_ja="大阪杯").exists())
+
+    def test_quick_term_create_rejects_blank_long_and_duplicate_source(self):
+        url = reverse("console-article-quick-term-create", args=[self.article.id])
+        TermEntry.objects.create(term_type="horse", source_ja="重複馬", target_zh="重复马")
+        cases = [
+            (
+                {"source_ja": "タイトル", "term_type": "horse", "target_zh": ""},
+                "中文译词不能为空。",
+            ),
+            (
+                {"source_ja": "", "term_type": "horse", "target_zh": "空词"},
+                "日文原词不能为空",
+            ),
+            (
+                {"source_ja": "ア" * 81, "term_type": "horse", "target_zh": "过长"},
+                "日文原词过长",
+            ),
+            (
+                {"source_ja": "マヤノライジン\nゲート確認", "term_type": "horse", "target_zh": "整段误选"},
+                "不能包含换行",
+            ),
+            (
+                {"source_ja": "重複馬", "term_type": "horse", "target_zh": "重复马二号"},
+                "打开已有术语",
+            ),
+            (
+                {"source_ja": "タイプ不正", "term_type": "not-a-term-type", "target_zh": "非法类型"},
+                "术语类型不合法",
+            ),
+        ]
+
+        for payload, expected_message in cases:
+            with self.subTest(expected_message=expected_message):
+                before_count = TermEntry.objects.count()
+                response = self.client.post(
+                    url,
+                    {**payload, "next": reverse("console-candidate-detail", args=[self.article.id])},
+                    follow=True,
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(TermEntry.objects.count(), before_count)
+                self.assertContains(response, expected_message)
+
+    def test_quick_term_create_requires_staff(self):
+        url = reverse("console-article-quick-term-create", args=[self.article.id])
+        self.client.logout()
+
+        anonymous = self.client.post(url, {"source_ja": "未登录", "term_type": "horse", "target_zh": "未登录"})
+        self.assertEqual(anonymous.status_code, 302)
+        self.assertFalse(TermEntry.objects.filter(source_ja="未登录").exists())
+
+        normal_user = User.objects.create_user("editor", "editor@example.com", "editor123456")
+        self.client.login(username="editor", password="editor123456")
+        forbidden = self.client.post(url, {"source_ja": "普通用户", "term_type": "horse", "target_zh": "普通用户"})
+        self.assertEqual(forbidden.status_code, 403)
+        self.assertFalse(TermEntry.objects.filter(source_ja="普通用户").exists())
+
+    def test_quick_term_create_does_not_retranslate_or_mutate_article_copy(self):
+        self.article.title_zh = "旧中文标题"
+        self.article.body_zh = "旧中文正文"
+        self.article.base_translation_zh = "旧基准翻译"
+        self.article.rewrite_body_zh = "旧改写正文"
+        self.article.workflow_status = WorkflowStatus.PENDING_EDIT
+        self.article.automation_status = AutomationStatus.PENDING
+        self.article.save()
+
+        with patch("stable.views.dispatch_task") as mocked_dispatch:
+            response = self.client.post(
+                reverse("console-article-quick-term-create", args=[self.article.id]),
+                {
+                    "source_ja": "非联动馬",
+                    "term_type": "horse",
+                    "target_zh": "非联动马",
+                    "next": reverse("console-candidate-detail", args=[self.article.id]),
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        mocked_dispatch.assert_not_called()
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.title_zh, "旧中文标题")
+        self.assertEqual(self.article.body_zh, "旧中文正文")
+        self.assertEqual(self.article.base_translation_zh, "旧基准翻译")
+        self.assertEqual(self.article.rewrite_body_zh, "旧改写正文")
+        self.assertEqual(self.article.workflow_status, WorkflowStatus.PENDING_EDIT)
+        self.assertEqual(self.article.automation_status, AutomationStatus.PENDING)
+
+    def test_quick_term_create_rejects_missing_article_without_creating_term(self):
+        response = self.client.post(
+            reverse("console-article-quick-term-create", args=[999999]),
+            {
+                "source_ja": "存在しない記事",
+                "term_type": "horse",
+                "target_zh": "不存在文章",
+                "next": reverse("console-candidate-detail", args=[self.article.id]),
+            },
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(TermEntry.objects.filter(source_ja="存在しない記事").exists())
+
+    def test_candidate_and_editor_templates_include_quick_term_entry(self):
+        candidate = self.client.get(reverse("console-candidate-detail", args=[self.article.id]))
+        editor = self.client.get(reverse("console-article-editor", args=[self.article.id]))
+
+        for response in (candidate, editor):
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, "快速加入术语库")
+            self.assertContains(response, "仅写入术语库，不会自动重新翻译或改写当前文章")
+            self.assertContains(response, "如需当前稿件应用新术语，请手动点击重新应用翻译与术语")
+            self.assertContains(response, 'name="csrfmiddlewaretoken"')
+            self.assertContains(response, 'name="next"')
+            self.assertContains(response, 'data-term-selection-source')
+            self.assertContains(response, 'data-fill-selected-term')
+            self.assertContains(response, '<option value="horse" selected>马名</option>', html=True)
+        self.assertContains(candidate, 'id="quick-term-candidate-form"')
+        self.assertContains(candidate, 'form="quick-term-candidate-form"')
+        self.assertContains(editor, 'id="quick-term-editor-form"')
+        self.assertContains(editor, 'form="quick-term-editor-form"')
+
+    def test_quick_term_script_prefills_only_original_selection(self):
+        candidate = self.client.get(reverse("console-candidate-detail", args=[self.article.id]))
+        html = candidate.content.decode()
+
+        self.assertIn('closest("[data-term-selection-source]")', html)
+        self.assertIn("anchorSource !== focusSource", html)
+        self.assertIn('status.textContent = "请先在原文标题或正文中选择一个短词。";', html)
+        self.assertIn("sourceInput.value = text;", html)
 
     def test_public_feed_only_shows_published_articles(self):
         NewsArticle.objects.create(

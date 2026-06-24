@@ -15,11 +15,13 @@ from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.html import format_html
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .forms import (
     ArticleEditorForm,
+    ArticleQuickTermForm,
     BackendAuthenticationForm,
     NewsSourceForm,
     TermCandidateAcceptForm,
@@ -852,7 +854,67 @@ def candidate_detail(request: HttpRequest, article_id: int):
         ),
         pk=article_id,
     )
-    return render(request, "stable/console/candidate_detail.html", _console_context(request, article=article))
+    return render(
+        request,
+        "stable/console/candidate_detail.html",
+        _console_context(request, article=article, term_type_choices=TermType.choices),
+    )
+
+
+def _message_quick_term_errors(request: HttpRequest, form: ArticleQuickTermForm, normalized: dict | None = None) -> None:
+    existing = None
+    if normalized and normalized.get("term_type") and normalized.get("source_ja"):
+        existing = TermEntry.objects.filter(
+            term_type=normalized["term_type"],
+            source_ja=normalized["source_ja"],
+        ).first()
+    if existing:
+        messages.error(
+            request,
+            format_html(
+                '创建失败：同一术语类型下已存在相同日文原词，<a href="{}">打开已有术语 #{}</a>。',
+                reverse("console-term-edit", args=[existing.pk]),
+                existing.pk,
+            ),
+        )
+
+    for field_name, field_errors in form.errors.items():
+        label = form.fields[field_name].label if field_name in form.fields else "术语"
+        for error in field_errors:
+            messages.error(request, f"{label}：{error}")
+
+
+@login_required
+@require_POST
+def article_quick_term_create(request: HttpRequest, article_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    article = get_object_or_404(NewsArticle, pk=article_id)
+    next_url = request.POST.get("next") or reverse("console-candidate-detail", args=[article.pk])
+    form = ArticleQuickTermForm(request.POST)
+    normalized = None
+    if form.is_valid():
+        payload = form.to_payload(article)
+        normalized, errors = validate_term_payload(payload)
+        for field_name, field_errors in errors.items():
+            mapped_field = field_name if field_name in form.fields else None
+            for error in field_errors:
+                form.add_error(mapped_field, error)
+        if not errors:
+            term = TermEntry.objects.create(**normalized)
+            log_operation(
+                action_type="article_quick_term_created",
+                target_type="term",
+                target_id=term.pk,
+                detail=f"从文章 #{article.pk} 快速创建术语 {term.source_ja} -> {term.target_zh}",
+                admin=request.user,
+            )
+            messages.success(request, f"术语已创建：{term.source_ja} -> {term.target_zh}")
+            return redirect(next_url)
+
+    _message_quick_term_errors(request, form, normalized)
+    return redirect(next_url)
 
 
 @login_required
@@ -991,7 +1053,13 @@ def article_editor(request: HttpRequest, article_id: int):
                     return render(
                         request,
                         "stable/console/article_editor.html",
-                        _console_context(request, form=form, article=article, allow_publish_without_cover=True),
+                        _console_context(
+                            request,
+                            form=form,
+                            article=article,
+                            allow_publish_without_cover=True,
+                            term_type_choices=TermType.choices,
+                        ),
                     )
                 article.workflow_status = WorkflowStatus.PUBLISHED
                 article.published_to_web_at = timezone.now()
@@ -1027,7 +1095,17 @@ def article_editor(request: HttpRequest, article_id: int):
             return redirect("console-article-editor", article_id=article.pk)
     else:
         form = ArticleEditorForm(instance=article)
-    return render(request, "stable/console/article_editor.html", _console_context(request, form=form, article=article, allow_publish_without_cover=False))
+    return render(
+        request,
+        "stable/console/article_editor.html",
+        _console_context(
+            request,
+            form=form,
+            article=article,
+            allow_publish_without_cover=False,
+            term_type_choices=TermType.choices,
+        ),
+    )
 
 
 @login_required
