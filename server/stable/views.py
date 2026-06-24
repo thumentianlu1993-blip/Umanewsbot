@@ -15,11 +15,13 @@ from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.html import format_html
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .forms import (
     ArticleEditorForm,
+    ArticleQuickTermForm,
     BackendAuthenticationForm,
     NewsSourceForm,
     TermCandidateAcceptForm,
@@ -45,6 +47,7 @@ from .models import (
     ReviewMode,
     SourceMode,
     TaskExecutionLog,
+    TaskStatus,
     TermCandidate,
     TermCandidateStatus,
     TermEntry,
@@ -66,6 +69,7 @@ from .services.term_admin import (
     validate_term_payload,
 )
 from .services.term_candidate_review import accept_candidate, merge_candidate, set_candidate_status
+from .services.terms import apply_created_term_to_article
 from .tasks import (
     batch_translate_articles_task,
     crawl_news_source_task,
@@ -77,6 +81,7 @@ from .tasks import (
 PUBLIC_FEED_PAGE_SIZE = 12
 PUBLIC_HOT_CANDIDATE_LIMIT = 48
 PUBLIC_HOT_DISPLAY_LIMIT = 6
+QUICK_TERM_FOLLOWUP_SESSION_KEY = "article_quick_term_followup"
 
 
 class BackendLoginView(LoginView):
@@ -242,6 +247,71 @@ def _term_candidate_filters(queryset, request: HttpRequest):
     return queryset.distinct()
 
 
+def _source_health(source: NewsSource, *, now=None) -> dict:
+    now = now or timezone.now()
+    latest_job = source.crawl_jobs.order_by("-started_at", "-id").first()
+    latest_completed_job = source.crawl_jobs.exclude(status=TaskStatus.STARTED).order_by("-started_at", "-id").first()
+    running_timeout_minutes = 60
+    stale_minutes = max(source.crawl_interval_minutes * 3, 180)
+    completed_at = (latest_completed_job.finished_at if latest_completed_job else None) or source.last_crawl_at
+    freshness_reference_at = completed_at or source.created_at
+    is_stale = bool(source.enabled and freshness_reference_at and freshness_reference_at < now - timedelta(minutes=stale_minutes))
+    status = (latest_completed_job.status if latest_completed_job else "") or source.last_crawl_status
+    new_count = latest_completed_job.success_count if latest_completed_job else None
+    duplicate_count = latest_completed_job.fail_count if latest_completed_job else None
+    error_summary = ((latest_completed_job.error_message if latest_completed_job else "") or source.last_crawl_message).strip()
+    if latest_job and latest_job.status == TaskStatus.STARTED:
+        running_minutes = int((now - latest_job.started_at).total_seconds() // 60)
+        started_at = timezone.localtime(latest_job.started_at).strftime("%m-%d %H:%M")
+        if running_minutes > running_timeout_minutes:
+            label = "运行超时"
+            tone = "warning"
+            summary = f"运行中记录已超过 {running_timeout_minutes} 分钟，开始于 {started_at}"
+        else:
+            label = "运行中"
+            tone = "warning"
+            summary = f"开始于 {started_at}"
+    elif status == TaskStatus.FAILED:
+        label = "失败"
+        tone = "danger"
+        summary = error_summary or "抓取失败"
+    elif is_stale:
+        label = "长时间未运行"
+        tone = "warning"
+        summary = f"超过 {stale_minutes} 分钟无抓取记录"
+    elif status == TaskStatus.SUCCESS and new_count == 0:
+        label = "成功无新增"
+        tone = "success"
+        summary = f"新增 0，重复 {duplicate_count or 0}"
+    elif status == TaskStatus.SUCCESS:
+        label = "成功"
+        tone = "success"
+        summary = f"新增 {new_count or 0}，重复 {duplicate_count or 0}"
+    else:
+        label = "未运行"
+        tone = ""
+        summary = "暂无抓取记录"
+    return {
+        "label": label,
+        "tone": tone,
+        "summary": summary,
+        "new_count": new_count,
+        "duplicate_count": duplicate_count,
+        "error_summary": error_summary,
+        "latest_job": latest_job,
+        "latest_completed_job": latest_completed_job,
+        "is_stale": is_stale,
+    }
+
+
+def _attach_source_health(sources):
+    source_list = list(sources)
+    now = timezone.now()
+    for source in source_list:
+        source.health = _source_health(source, now=now)
+    return source_list
+
+
 @login_required
 def console_dashboard(request: HttpRequest):
     denied = _ensure_staff(request)
@@ -253,7 +323,7 @@ def console_dashboard(request: HttpRequest):
     published_today = NewsArticle.objects.filter(published_to_web_at__date=today).count()
     crawl_success_today = NewsArticle.objects.filter(first_seen_at__gte=today_start).count()
     crawl_failed_today = CrawlJob.objects.filter(started_at__gte=today_start, status="failed").count()
-    recent_sources = NewsSource.objects.filter(deleted_at__isnull=True).order_by("-updated_at")[:5]
+    recent_sources = _attach_source_health(NewsSource.objects.filter(deleted_at__isnull=True).order_by("-updated_at")[:5])
     recent_published = NewsArticle.objects.filter(workflow_status=WorkflowStatus.PUBLISHED).order_by("-published_to_web_at")[:6]
     stats = {
         "crawl_success_today": crawl_success_today,
@@ -275,7 +345,7 @@ def source_list(request: HttpRequest):
     if denied:
         return denied
     sync_builtin_sources()
-    sources = NewsSource.objects.filter(deleted_at__isnull=True).order_by("-enabled", "-priority", "name")
+    sources = _attach_source_health(NewsSource.objects.filter(deleted_at__isnull=True).order_by("-enabled", "-priority", "name"))
     return render(request, "stable/console/source_list.html", _console_context(request, sources=sources))
 
 
@@ -786,7 +856,196 @@ def candidate_detail(request: HttpRequest, article_id: int):
         ),
         pk=article_id,
     )
-    return render(request, "stable/console/candidate_detail.html", _console_context(request, article=article))
+    return render(
+        request,
+        "stable/console/candidate_detail.html",
+        _console_context(
+            request,
+            article=article,
+            term_type_choices=TermType.choices,
+            quick_term_followup=_pop_quick_term_followup(request, article, "candidate"),
+        ),
+    )
+
+
+def _message_quick_term_errors(request: HttpRequest, form: ArticleQuickTermForm, normalized: dict | None = None) -> None:
+    existing = None
+    if normalized and normalized.get("term_type") and normalized.get("source_ja"):
+        existing = TermEntry.objects.filter(
+            term_type=normalized["term_type"],
+            source_ja=normalized["source_ja"],
+        ).first()
+    if existing:
+        messages.error(
+            request,
+            format_html(
+                '创建失败：同一术语类型下已存在相同日文原词，<a href="{}">打开已有术语 #{}</a>。',
+                reverse("console-term-edit", args=[existing.pk]),
+                existing.pk,
+            ),
+        )
+
+    for field_name, field_errors in form.errors.items():
+        label = form.fields[field_name].label if field_name in form.fields else "术语"
+        for error in field_errors:
+            messages.error(request, f"{label}：{error}")
+
+
+def _article_context_url(article: NewsArticle, source_context: str) -> str:
+    if source_context == "editor":
+        return reverse("console-article-editor", args=[article.pk])
+    return reverse("console-candidate-detail", args=[article.pk])
+
+
+def _normalize_article_context(value: str | None) -> str:
+    return "editor" if value == "editor" else "candidate"
+
+
+def _article_context_from_request(article: NewsArticle, request: HttpRequest) -> str:
+    explicit = request.POST.get("source_context")
+    if explicit in {"candidate", "editor"}:
+        return explicit
+    if request.POST.get("next") == reverse("console-article-editor", args=[article.pk]):
+        return "editor"
+    return "candidate"
+
+
+def _safe_article_return_url(article: NewsArticle, requested_next: str | None, source_context: str | None = None) -> str:
+    allowed = {
+        reverse("console-candidate-detail", args=[article.pk]),
+        reverse("console-article-editor", args=[article.pk]),
+    }
+    if requested_next in allowed:
+        return requested_next
+    return _article_context_url(article, _normalize_article_context(source_context))
+
+
+def _quick_term_followup_key(article: NewsArticle, source_context: str) -> str:
+    return f"{_normalize_article_context(source_context)}:{article.pk}"
+
+
+def _quick_term_followups(request: HttpRequest) -> dict:
+    pending = request.session.get(QUICK_TERM_FOLLOWUP_SESSION_KEY)
+    return pending if isinstance(pending, dict) else {}
+
+
+def _store_quick_term_followup(request: HttpRequest, article: NewsArticle, term: TermEntry, source_context: str) -> None:
+    pending = _quick_term_followups(request).copy()
+    normalized_context = _normalize_article_context(source_context)
+    pending[_quick_term_followup_key(article, normalized_context)] = {
+        "article_id": article.pk,
+        "term_id": term.pk,
+        "source_context": normalized_context,
+    }
+    request.session[QUICK_TERM_FOLLOWUP_SESSION_KEY] = pending
+    request.session.modified = True
+
+
+def _pop_quick_term_followup(request: HttpRequest, article: NewsArticle, source_context: str) -> dict | None:
+    pending = _quick_term_followups(request)
+    key = _quick_term_followup_key(article, source_context)
+    payload = pending.get(key)
+    if payload is None:
+        return None
+    if payload.get("article_id") != article.pk:
+        return None
+    if payload.get("source_context") != source_context:
+        return None
+    term = TermEntry.objects.filter(pk=payload.get("term_id"), is_active=True).first()
+    if term is None:
+        pending = pending.copy()
+        pending.pop(key, None)
+        request.session[QUICK_TERM_FOLLOWUP_SESSION_KEY] = pending
+        request.session.modified = True
+        return None
+    pending = pending.copy()
+    pending.pop(key, None)
+    request.session[QUICK_TERM_FOLLOWUP_SESSION_KEY] = pending
+    request.session.modified = True
+    return {"term": term, "source_context": source_context}
+
+
+def _field_names_text(field_names: list[str]) -> str:
+    labels = {
+        "translated_title_zh": "机器标题",
+        "translated_body_zh": "机器正文",
+        "translated_summary_zh": "机器摘要",
+        "base_translation_zh": "基准翻译稿",
+        "title_zh": "发布标题",
+        "body_zh": "发布正文",
+        "summary_zh": "发布摘要",
+        "push_summary_zh": "推送摘要",
+    }
+    return "、".join(labels.get(field_name, field_name) for field_name in field_names)
+
+
+@login_required
+@require_POST
+def article_quick_term_create(request: HttpRequest, article_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    article = get_object_or_404(NewsArticle, pk=article_id)
+    source_context = _article_context_from_request(article, request)
+    next_url = _safe_article_return_url(article, request.POST.get("next"), source_context)
+    form = ArticleQuickTermForm(request.POST)
+    normalized = None
+    if form.is_valid():
+        payload = form.to_payload(article)
+        normalized, errors = validate_term_payload(payload)
+        for field_name, field_errors in errors.items():
+            mapped_field = field_name if field_name in form.fields else None
+            for error in field_errors:
+                form.add_error(mapped_field, error)
+        if not errors:
+            term = TermEntry.objects.create(**normalized)
+            log_operation(
+                action_type="article_quick_term_created",
+                target_type="term",
+                target_id=term.pk,
+                detail=f"从文章 #{article.pk} 快速创建术语 {term.source_ja} -> {term.target_zh}",
+                admin=request.user,
+            )
+            _store_quick_term_followup(request, article, term, source_context)
+            messages.success(request, f"术语已创建：{term.source_ja} -> {term.target_zh}")
+            return redirect(next_url)
+
+    _message_quick_term_errors(request, form, normalized)
+    return redirect(next_url)
+
+
+@login_required
+@require_POST
+def article_apply_created_term(request: HttpRequest, article_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    article = get_object_or_404(NewsArticle, pk=article_id)
+    source_context = _article_context_from_request(article, request)
+    next_url = _safe_article_return_url(article, request.POST.get("next"), source_context)
+    term = get_object_or_404(TermEntry, pk=request.POST.get("term_id"), is_active=True)
+
+    result = apply_created_term_to_article(article, term)
+    detail = (
+        f"应用术语 #{term.pk} {term.source_ja} -> {term.target_zh} 到文章 #{article.pk}；"
+        f"更新字段：{','.join(result.updated_fields) or '-'}；"
+        f"跳过字段：{','.join(result.skipped_fields) or '-'}"
+    )
+    log_operation(
+        action_type="article_created_term_applied",
+        target_type="article",
+        target_id=article.pk,
+        detail=detail,
+        admin=request.user,
+    )
+
+    if result.updated_fields:
+        messages.success(request, f"已应用该术语，更新字段：{_field_names_text(result.updated_fields)}。")
+    else:
+        messages.info(request, "没有可更新字段，或当前稿件中没有命中该术语。")
+    if result.skipped_fields:
+        messages.warning(request, f"已保护人工编辑字段：{_field_names_text(result.skipped_fields)}。")
+    return redirect(next_url)
 
 
 @login_required
@@ -796,16 +1055,18 @@ def candidate_retranslate(request: HttpRequest, article_id: int):
     if denied:
         return denied
     article = get_object_or_404(NewsArticle, pk=article_id)
+    source_context = _article_context_from_request(article, request)
+    next_url = _safe_article_return_url(article, request.POST.get("next"), source_context)
     dispatch_task(translate_article_task, article.id)
     log_operation(
         action_type="article_retranslated",
         target_type="article",
         target_id=article.pk,
-        detail=f"重新触发翻译《{article.effective_title}》",
+        detail=f"重新触发翻译《{article.effective_title}》，任务已派发",
         admin=request.user,
     )
     messages.success(request, "已重新触发翻译。")
-    return redirect(request.POST.get("next") or reverse("console-candidate-detail", args=[article.pk]))
+    return redirect(next_url)
 
 
 @login_required
@@ -925,7 +1186,14 @@ def article_editor(request: HttpRequest, article_id: int):
                     return render(
                         request,
                         "stable/console/article_editor.html",
-                        _console_context(request, form=form, article=article, allow_publish_without_cover=True),
+                        _console_context(
+                            request,
+                            form=form,
+                            article=article,
+                            allow_publish_without_cover=True,
+                            term_type_choices=TermType.choices,
+                            quick_term_followup=None,
+                        ),
                     )
                 article.workflow_status = WorkflowStatus.PUBLISHED
                 article.published_to_web_at = timezone.now()
@@ -965,7 +1233,18 @@ def article_editor(request: HttpRequest, article_id: int):
             return redirect("console-article-editor", article_id=article.pk)
     else:
         form = ArticleEditorForm(instance=article)
-    return render(request, "stable/console/article_editor.html", _console_context(request, form=form, article=article, allow_publish_without_cover=False))
+    return render(
+        request,
+        "stable/console/article_editor.html",
+        _console_context(
+            request,
+            form=form,
+            article=article,
+            allow_publish_without_cover=False,
+            term_type_choices=TermType.choices,
+            quick_term_followup=_pop_quick_term_followup(request, article, "editor"),
+        ),
+    )
 
 
 @login_required

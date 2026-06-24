@@ -290,11 +290,11 @@ CELERY_BEAT_SCHEDULE = {
     },
     "crawl-netkeiba-access": {
         "task": "stable.tasks.crawl_netkeiba_access",
-        "schedule": crontab(minute=0, hour="0,12"),
+        "schedule": crontab(minute=16),
     },
     "crawl-netkeiba-attention": {
         "task": "stable.tasks.crawl_netkeiba_attention",
-        "schedule": crontab(minute=5, hour="0,12"),
+        "schedule": crontab(minute=26),
     },
     "crawl-jra": {
         "task": "stable.tasks.crawl_jra_news",

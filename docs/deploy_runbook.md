@@ -136,6 +136,100 @@ docker logs --tail=120 umanewsbot-web-1
 docker logs --tail=120 umanewsbot-nginx-1
 ```
 
+## 新闻抓取健康排查
+
+### 后台入口
+
+日常先看业务后台：
+
+- `/admin/` 工作台的“最近来源状态”
+- `/admin/sources/` 来源管理列表
+
+重点确认：
+
+- 最近抓取时间
+- 运行状态
+- 最近结果摘要
+- 是否显示“运行中”“运行超时”“成功无新增”“失败”或“长时间未运行”
+
+“成功无新增”表示抓取任务正常执行，但本轮抓到的文章都已存在；这不等同于抓取失败。
+“运行中”表示最新抓取记录已开始但尚未写入最终结果；如运行中记录超过 60 分钟仍未完成，后台会显示“运行超时”，需要检查 worker / beat 日志和对应 `CrawlJob`。
+“长时间未运行”只用于仍启用的来源；停用来源不纳入该告警。
+
+### 服务器查询
+
+```bash
+cd /opt/umanewsbot
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py shell -c "from stable.models import CrawlJob; from django.utils import timezone; [print(timezone.localtime(j.started_at).strftime('%F %T'), j.source.name if j.source_id else '-', j.status, j.success_count, j.fail_count, (j.error_message or '')[:120]) for j in CrawlJob.objects.select_related('source').order_by('-started_at')[:20]]"
+```
+
+### 当前内置抓取频率
+
+- netkeiba 新着顺：每小时 `00` 分抓取，周日重赏时段另有高频补抓。
+- netkeiba 访问量榜：每小时 `16` 分抓取第一页。
+- netkeiba 注目数榜：每小时 `26` 分抓取第一页。
+- JRA 官方新闻：每 12 小时扫描当前月和上月。
+
+部署涉及抓取调度变更后，必须重启 `beat / worker / web`，并在连续一个小时内确认 netkeiba 新着顺、访问量榜和注目数榜分别按 `00/16/26` 分生成错峰 `CrawlJob`；周日重赏高频补抓分钟不得与访问量榜 / 注目数榜重合。
+
+### JRA 日期解析验收
+
+如 JRA 曾出现 `time data '5月31日' does not match format '%Y年%m月%d日'`，部署后可以手动触发或等待下一次任务：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py crawl_news jra
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py shell -c "from stable.models import CrawlJob, NewsSource; source=NewsSource.objects.get(source_site='jra', source_mode='official'); print(source.last_crawl_status, source.last_crawl_message); print(CrawlJob.objects.filter(source=source).order_by('-started_at').values('status','success_count','fail_count','error_message').first())"
+```
+
+若单篇 JRA 详情页结构异常，预期行为是跳过该篇、继续处理同轮其他新闻，并在 `last_crawl_message` / `CrawlJob.error_message` 中留下“跳过 N 条”摘要；列表页、网络或数据库异常仍按整轮失败排查。
+
+## 2026-06-25 三个运营改造 change 合并、部署与归档
+
+### 合并范围
+
+- `codex/fix-crawl-freshness-and-health`：抓取新鲜度、JRA 日期解析、来源健康摘要和 netkeiba `00/16/26` 分错峰调度。
+- `codex/add-selection-term-quick-add`：后台候选详情页 / 文章编辑台原文选区快速加入术语库。
+- `codex/add-selection-term-quick-add` 后续提交：新增术语成功后的 15 秒一次性浮层，可点击后仅将该术语应用到当前文章已有中文字段。
+- 注意：`fix-crawl-health-running-and-schedule-stagger` 是抓取 change 的后续返修 OpenSpec 目录，随抓取 change 一并归档。
+
+### 部署前检查
+
+- 服务器部署前 HEAD：`268100d`。
+- 服务器工作树：干净。
+- 外部导入锁：`ExternalDataImportLock.locked_by_run_id=None`。
+- 最近外部导入 run：`run_id=120` 等均为 `paused`，没有运行中的长导入。
+
+### 部署步骤与结果
+
+- 本地发布分支从 `origin/main` 合并两个代码分支后推送到 `main`，合并后提交为 `7f54f13`。
+- 部署前备份 `.env`：`.env.backup.three-changes-20260625_003714`。
+- 服务器 `/opt/umanewsbot` 执行 `git pull --ff-only origin main`，从 `268100d` 更新到 `7f54f13`。
+- 执行 `bash ./deploy_lowcost.sh`，重建 `web / worker / beat`，`db / redis / nginx` 保持运行。
+- 迁移结果：`No migrations to apply`。
+- `collectstatic` 结果：`0 static files copied`，`360 post-processed`。
+- 容器状态：`web` healthy，`db / redis` healthy，`worker / beat` running，`nginx` running。
+- 验证：
+  - `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check`：通过。
+  - `http://127.0.0.1/healthz/`：`200`。
+  - `http://127.0.0.1/`：`200`。
+  - 运行态调度确认：`crawl-netkeiba-latest-hourly=00`，`crawl-netkeiba-access=16`，`crawl-netkeiba-attention=26`，三者 `crawl_interval_minutes=60`。
+
+### 归档结果
+
+- `openspec/changes/archive/2026-06-24-fix-crawl-freshness-and-jra-date-parse/`
+- `openspec/changes/archive/2026-06-24-fix-crawl-health-running-and-schedule-stagger/`
+- `openspec/changes/archive/2026-06-24-add-selection-term-quick-add/`
+- `openspec/changes/archive/2026-06-24-reapply-terms-after-quick-add/`
+- 正式规格已同步：
+  - `openspec/specs/crawl-freshness-and-source-health/spec.md`
+  - `openspec/specs/termbase-and-race-priority/spec.md`
+- 归档后 `openspec validate --all` 通过。
+
+### 后续观察
+
+- 抓取错峰的“连续小时自然生成 `CrawlJob`”仍需等待调度运行后确认；本次已确认代码和运行时 Celery Beat 配置加载为 `00/16/26` 分。
+- 如外部马名数据导入重新启动，继续遵守“导入期间不执行 `git pull / build / up / deploy_lowcost.sh`”的互斥规则。
+
 ## 自动化运营 MVP 部署与验证
 
 ### 关键环境变量

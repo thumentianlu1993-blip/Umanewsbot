@@ -1,0 +1,49 @@
+{% if quick_term_followup %}
+  <div
+    class="quick-term-followup-wrap"
+    data-quick-term-followup-toast
+    data-auto-dismiss-ms="15000"
+    data-message="术语【{{ quick_term_followup.term.source_ja }}（{{ quick_term_followup.term.target_zh }}）】已添加，点击此处立即应用到文章中"
+    style="position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 80; width: min(720px, calc(100vw - 32px)); pointer-events: none;"
+  >
+    <div class="panel" style="display: flex; align-items: center; gap: 12px; padding: 14px 16px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16); pointer-events: auto;">
+      <div style="flex: 1; min-width: 0;">
+        <span>术语【{{ quick_term_followup.term.source_ja }}（{{ quick_term_followup.term.target_zh }}）】已添加，</span>
+        <button class="btn ghost" type="submit" form="apply-created-term-{{ quick_term_context }}" style="padding: 0; border: 0; box-shadow: none; vertical-align: baseline;">点击此处</button>
+        <span>立即应用到文章中</span>
+      </div>
+      <button class="btn ghost" type="button" aria-label="关闭" data-quick-term-followup-close style="min-width: 36px; width: 36px; height: 36px; padding: 0;">×</button>
+    </div>
+  </div>
+  <form id="apply-created-term-{{ quick_term_context }}" method="post" action="{% url 'console-article-apply-created-term' article.id %}">
+    {% csrf_token %}
+    <input type="hidden" name="term_id" value="{{ quick_term_followup.term.id }}">
+    <input type="hidden" name="source_context" value="{{ quick_term_context }}">
+    <input type="hidden" name="next" value="{{ quick_term_next_url }}">
+  </form>
+  <script>
+    (function () {
+      document.querySelectorAll("[data-quick-term-followup-toast]").forEach(function (toast) {
+        function hide() {
+          toast.hidden = true;
+        }
+
+        const closeButton = toast.querySelector("[data-quick-term-followup-close]");
+        if (closeButton) {
+          closeButton.addEventListener("click", hide);
+        }
+
+        const formId = "apply-created-term-{{ quick_term_context }}";
+        const form = document.getElementById(formId);
+        if (form) {
+          form.addEventListener("submit", hide);
+        }
+
+        const timeoutMs = parseInt(toast.dataset.autoDismissMs || "15000", 10);
+        if (timeoutMs > 0) {
+          window.setTimeout(hide, timeoutMs);
+        }
+      });
+    }());
+  </script>
+{% endif %}

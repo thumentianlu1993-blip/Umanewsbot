@@ -219,6 +219,56 @@ class TermEntryForm(forms.ModelForm):
         return instance
 
 
+class ArticleQuickTermForm(forms.Form):
+    source_ja = forms.CharField(
+        label="日文原词",
+        max_length=80,
+        strip=True,
+        error_messages={
+            "required": "日文原词不能为空，请先选择或粘贴原文片段。",
+            "max_length": "日文原词过长，请只选择一个短词或短语。",
+        },
+        widget=forms.TextInput(attrs={"maxlength": 80, "placeholder": "选中原文后自动填入，也可手工粘贴"}),
+    )
+    term_type = forms.ChoiceField(
+        label="术语类型",
+        choices=TermType.choices,
+        initial=TermType.HORSE,
+        error_messages={"invalid_choice": "术语类型不合法。"},
+    )
+    target_zh = forms.CharField(
+        label="中文译词",
+        max_length=255,
+        strip=True,
+        error_messages={"required": "中文译词不能为空。"},
+        widget=forms.TextInput(attrs={"placeholder": "请输入中文译法"}),
+    )
+
+    def clean_source_ja(self):
+        value = (self.cleaned_data.get("source_ja") or "").strip()
+        if not value:
+            raise forms.ValidationError("日文原词不能为空，请先选择或粘贴原文片段。")
+        if len(value) > 80:
+            raise forms.ValidationError("日文原词过长，请只选择一个短词或短语。")
+        if "\n" in value or "\r" in value:
+            raise forms.ValidationError("日文原词不能包含换行，请不要选择整段正文。")
+        return value
+
+    def to_payload(self, article: NewsArticle) -> dict:
+        title = article.title_ja or article.effective_title
+        return {
+            "term_type": self.cleaned_data["term_type"],
+            "source_ja": self.cleaned_data["source_ja"],
+            "target_zh": self.cleaned_data["target_zh"],
+            "aliases_ja": [],
+            "aliases_zh": [],
+            "race_grade": "",
+            "priority": 0,
+            "is_active": True,
+            "notes": f"从文章 #{article.pk} 快速添加：{title}",
+        }
+
+
 class TermImportForm(forms.Form):
     import_mode = forms.ChoiceField(
         label="导入模式",

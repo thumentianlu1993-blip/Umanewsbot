@@ -1,7 +1,7 @@
 # 项目状态文档
 
-最后更新时间：`2026-06-24`
-当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP 已上线观察；公开首页资讯流升级和移动端首屏密度 follow-up 已部署生产）
+最后更新时间：`2026-06-25`
+当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP、公开首页资讯流、抓取新鲜度修复、后台快速术语创建与当前稿术语应用已部署生产）
 
 > 角色说明：
 > 本文档用于保留项目级概览与摘要信息。
@@ -42,6 +42,8 @@
   - 邮件通知 MVP 与通知日志
 - 前台信息流与详情页已升级为公开站点专用 Web + 移动 H5 资讯流
 - QQ 推送链路：已新增并部署自动推送实现，支持高价值优先/全公开、多群、去重、有限重试、OneBot 业务失败识别、`sending` 陈旧恢复、后台交付记录和按群限速；生产 OneBot / NapCat 网关已登录并在测试群验证发送，`QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=all_public` 已生效。
+- 抓取新鲜度与来源健康：netkeiba 新着顺 / 访问量榜 / 注目数榜已切换为每小时 `00/16/26` 分错峰抓取，JRA 无年份日期解析已修复，后台来源健康摘要已上线
+- 后台术语运营：候选详情页和文章编辑台支持原文选区快速加入术语库；新增术语成功后可一次性将该术语应用到当前文章已有中文稿
 - 前后台移动端适配
 
 ## 3.1 已完成并部署生产（体验升级）
@@ -135,6 +137,7 @@
 - 公开首页资讯流生产验收：服务器 HEAD `e834f58`，`http://umafans.run/healthz/` 与 `/` 均返回 `200`，首页引用 `/static/stable/public.2eec24723b45.css`，390px 移动端普通新闻卡约 `128px` 高且首屏头条后可见 3 条普通新闻
 - 移动端首页密度 follow-up 生产验收：服务器 HEAD `04e2ee9`，`http://umafans.run/healthz/` 与 `/` 均返回 `200`，首页引用 `/static/stable/public.9aaf4b105424.css`，390px 视口下头条约 `257px` 高，第一张普通新闻卡 `top=388`，首屏可见 4 条普通新闻卡，普通卡仍约 `128px` 高，无横向溢出
 - 自动发布门禁优化生产验收：服务器 HEAD `42a4622`，迁移 `stable.0009_automation_publish_gates` 已应用，`AUTO_REWRITE_ENABLED=false`、`AUTO_PUBLISH_CONTENT_SOURCE=base_translation`、`AUTOMATION_WARNING_EMAIL_ENABLED=true` 已生效，`http://umafans.run/healthz/` 与 `/` 均返回 `200`
+- 三个运营改造 change 生产验收：服务器 HEAD `7f54f13`，`web / worker / beat` 已重建，`manage.py check` 通过，`http://127.0.0.1/healthz/` 与 `/` 均返回 `200`；运行态确认 netkeiba 新着顺 / 访问量榜 / 注目数榜调度分钟为 `00/16/26`，OpenSpec 归档后 `openspec validate --all` 通过
 - `docker compose -f docker-compose.prod.yml config`：通过
 - `docker compose -f docker-compose.prod.lowcost.yml config`：通过
 

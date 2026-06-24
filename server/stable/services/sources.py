@@ -28,8 +28,8 @@ BUILTIN_SOURCE_DEFINITIONS = [
         "source_site": SourceSite.NETKEIBA,
         "source_mode": SourceMode.ACCESS,
         "enabled": True,
-        "crawl_interval_minutes": 720,
-        "notes": "每 12 小时抓取前 20 条。",
+        "crawl_interval_minutes": 60,
+        "notes": "每小时抓取访问量榜前 20 条。",
         "priority": 90,
     },
     {
@@ -42,8 +42,8 @@ BUILTIN_SOURCE_DEFINITIONS = [
         "source_site": SourceSite.NETKEIBA,
         "source_mode": SourceMode.ATTENTION,
         "enabled": True,
-        "crawl_interval_minutes": 720,
-        "notes": "每 12 小时抓取前 20 条。",
+        "crawl_interval_minutes": 60,
+        "notes": "每小时错峰抓取注目数榜前 20 条。",
         "priority": 80,
     },
     {

@@ -3,6 +3,7 @@
 {% block title %}编辑台 - 赛马新闻后台{% endblock %}
 
 {% block content %}
+  {% url 'console-article-editor' article.id as quick_term_next_url %}
   <div class="page-header">
     <div>
       <h2 class="page-title">编辑台</h2>
@@ -14,16 +15,19 @@
     </div>
   </div>
 
+  {% include "stable/console/_quick_term_followup_toast.html" with quick_term_context="editor" %}
+
   <form method="post" enctype="multipart/form-data" id="editor-form">
     {% csrf_token %}
     <div class="editor-shell">
       <section class="panel editor-pane source-pane">
         <h3>来源参照区</h3>
-        <p><strong>原文标题：</strong>{{ article.title_ja }}</p>
+        <p data-term-selection-source><strong>原文标题：</strong>{{ article.title_ja }}</p>
         <p><strong>来源：</strong>{{ article.source_config.name|default:article.get_source_site_display }}</p>
         <p><strong>发布时间：</strong>{{ article.published_at|date:"Y-m-d H:i" }}</p>
         <p><strong>原文链接：</strong><a href="{{ article.source_url }}" target="_blank" rel="noreferrer">{{ article.source_url }}</a></p>
-        <div class="content-block" style="margin-top: 14px;">{{ article.body_ja_normalized|default:article.body_ja_raw }}</div>
+        <div class="content-block" style="margin-top: 14px;" data-term-selection-source>{{ article.body_ja_normalized|default:article.body_ja_raw }}</div>
+        {% include "stable/console/_quick_term_form.html" with quick_term_context="editor" quick_term_form_id="quick-term-editor-form" %}
 
         <h4 style="margin-top: 20px;">原文图片</h4>
         <div class="image-strip">
@@ -189,6 +193,11 @@
         </form>
       </aside>
     </div>
+  </form>
+
+  <form id="quick-term-editor-form" method="post" action="{% url 'console-article-quick-term-create' article.id %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ quick_term_next_url }}">
   </form>
 
   <script>
