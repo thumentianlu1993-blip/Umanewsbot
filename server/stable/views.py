@@ -15,11 +15,13 @@ from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.html import format_html
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .forms import (
     ArticleEditorForm,
+    ArticleQuickTermForm,
     BackendAuthenticationForm,
     NewsSourceForm,
     TermCandidateAcceptForm,
@@ -67,6 +69,7 @@ from .services.term_admin import (
     validate_term_payload,
 )
 from .services.term_candidate_review import accept_candidate, merge_candidate, set_candidate_status
+from .services.terms import apply_created_term_to_article
 from .tasks import (
     batch_translate_articles_task,
     crawl_news_source_task,
@@ -78,6 +81,7 @@ from .tasks import (
 PUBLIC_FEED_PAGE_SIZE = 12
 PUBLIC_HOT_CANDIDATE_LIMIT = 48
 PUBLIC_HOT_DISPLAY_LIMIT = 6
+QUICK_TERM_FOLLOWUP_SESSION_KEY = "article_quick_term_followup"
 
 
 class BackendLoginView(LoginView):
@@ -852,7 +856,196 @@ def candidate_detail(request: HttpRequest, article_id: int):
         ),
         pk=article_id,
     )
-    return render(request, "stable/console/candidate_detail.html", _console_context(request, article=article))
+    return render(
+        request,
+        "stable/console/candidate_detail.html",
+        _console_context(
+            request,
+            article=article,
+            term_type_choices=TermType.choices,
+            quick_term_followup=_pop_quick_term_followup(request, article, "candidate"),
+        ),
+    )
+
+
+def _message_quick_term_errors(request: HttpRequest, form: ArticleQuickTermForm, normalized: dict | None = None) -> None:
+    existing = None
+    if normalized and normalized.get("term_type") and normalized.get("source_ja"):
+        existing = TermEntry.objects.filter(
+            term_type=normalized["term_type"],
+            source_ja=normalized["source_ja"],
+        ).first()
+    if existing:
+        messages.error(
+            request,
+            format_html(
+                '创建失败：同一术语类型下已存在相同日文原词，<a href="{}">打开已有术语 #{}</a>。',
+                reverse("console-term-edit", args=[existing.pk]),
+                existing.pk,
+            ),
+        )
+
+    for field_name, field_errors in form.errors.items():
+        label = form.fields[field_name].label if field_name in form.fields else "术语"
+        for error in field_errors:
+            messages.error(request, f"{label}：{error}")
+
+
+def _article_context_url(article: NewsArticle, source_context: str) -> str:
+    if source_context == "editor":
+        return reverse("console-article-editor", args=[article.pk])
+    return reverse("console-candidate-detail", args=[article.pk])
+
+
+def _normalize_article_context(value: str | None) -> str:
+    return "editor" if value == "editor" else "candidate"
+
+
+def _article_context_from_request(article: NewsArticle, request: HttpRequest) -> str:
+    explicit = request.POST.get("source_context")
+    if explicit in {"candidate", "editor"}:
+        return explicit
+    if request.POST.get("next") == reverse("console-article-editor", args=[article.pk]):
+        return "editor"
+    return "candidate"
+
+
+def _safe_article_return_url(article: NewsArticle, requested_next: str | None, source_context: str | None = None) -> str:
+    allowed = {
+        reverse("console-candidate-detail", args=[article.pk]),
+        reverse("console-article-editor", args=[article.pk]),
+    }
+    if requested_next in allowed:
+        return requested_next
+    return _article_context_url(article, _normalize_article_context(source_context))
+
+
+def _quick_term_followup_key(article: NewsArticle, source_context: str) -> str:
+    return f"{_normalize_article_context(source_context)}:{article.pk}"
+
+
+def _quick_term_followups(request: HttpRequest) -> dict:
+    pending = request.session.get(QUICK_TERM_FOLLOWUP_SESSION_KEY)
+    return pending if isinstance(pending, dict) else {}
+
+
+def _store_quick_term_followup(request: HttpRequest, article: NewsArticle, term: TermEntry, source_context: str) -> None:
+    pending = _quick_term_followups(request).copy()
+    normalized_context = _normalize_article_context(source_context)
+    pending[_quick_term_followup_key(article, normalized_context)] = {
+        "article_id": article.pk,
+        "term_id": term.pk,
+        "source_context": normalized_context,
+    }
+    request.session[QUICK_TERM_FOLLOWUP_SESSION_KEY] = pending
+    request.session.modified = True
+
+
+def _pop_quick_term_followup(request: HttpRequest, article: NewsArticle, source_context: str) -> dict | None:
+    pending = _quick_term_followups(request)
+    key = _quick_term_followup_key(article, source_context)
+    payload = pending.get(key)
+    if payload is None:
+        return None
+    if payload.get("article_id") != article.pk:
+        return None
+    if payload.get("source_context") != source_context:
+        return None
+    term = TermEntry.objects.filter(pk=payload.get("term_id"), is_active=True).first()
+    if term is None:
+        pending = pending.copy()
+        pending.pop(key, None)
+        request.session[QUICK_TERM_FOLLOWUP_SESSION_KEY] = pending
+        request.session.modified = True
+        return None
+    pending = pending.copy()
+    pending.pop(key, None)
+    request.session[QUICK_TERM_FOLLOWUP_SESSION_KEY] = pending
+    request.session.modified = True
+    return {"term": term, "source_context": source_context}
+
+
+def _field_names_text(field_names: list[str]) -> str:
+    labels = {
+        "translated_title_zh": "机器标题",
+        "translated_body_zh": "机器正文",
+        "translated_summary_zh": "机器摘要",
+        "base_translation_zh": "基准翻译稿",
+        "title_zh": "发布标题",
+        "body_zh": "发布正文",
+        "summary_zh": "发布摘要",
+        "push_summary_zh": "推送摘要",
+    }
+    return "、".join(labels.get(field_name, field_name) for field_name in field_names)
+
+
+@login_required
+@require_POST
+def article_quick_term_create(request: HttpRequest, article_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    article = get_object_or_404(NewsArticle, pk=article_id)
+    source_context = _article_context_from_request(article, request)
+    next_url = _safe_article_return_url(article, request.POST.get("next"), source_context)
+    form = ArticleQuickTermForm(request.POST)
+    normalized = None
+    if form.is_valid():
+        payload = form.to_payload(article)
+        normalized, errors = validate_term_payload(payload)
+        for field_name, field_errors in errors.items():
+            mapped_field = field_name if field_name in form.fields else None
+            for error in field_errors:
+                form.add_error(mapped_field, error)
+        if not errors:
+            term = TermEntry.objects.create(**normalized)
+            log_operation(
+                action_type="article_quick_term_created",
+                target_type="term",
+                target_id=term.pk,
+                detail=f"从文章 #{article.pk} 快速创建术语 {term.source_ja} -> {term.target_zh}",
+                admin=request.user,
+            )
+            _store_quick_term_followup(request, article, term, source_context)
+            messages.success(request, f"术语已创建：{term.source_ja} -> {term.target_zh}")
+            return redirect(next_url)
+
+    _message_quick_term_errors(request, form, normalized)
+    return redirect(next_url)
+
+
+@login_required
+@require_POST
+def article_apply_created_term(request: HttpRequest, article_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    article = get_object_or_404(NewsArticle, pk=article_id)
+    source_context = _article_context_from_request(article, request)
+    next_url = _safe_article_return_url(article, request.POST.get("next"), source_context)
+    term = get_object_or_404(TermEntry, pk=request.POST.get("term_id"), is_active=True)
+
+    result = apply_created_term_to_article(article, term)
+    detail = (
+        f"应用术语 #{term.pk} {term.source_ja} -> {term.target_zh} 到文章 #{article.pk}；"
+        f"更新字段：{','.join(result.updated_fields) or '-'}；"
+        f"跳过字段：{','.join(result.skipped_fields) or '-'}"
+    )
+    log_operation(
+        action_type="article_created_term_applied",
+        target_type="article",
+        target_id=article.pk,
+        detail=detail,
+        admin=request.user,
+    )
+
+    if result.updated_fields:
+        messages.success(request, f"已应用该术语，更新字段：{_field_names_text(result.updated_fields)}。")
+    else:
+        messages.info(request, "没有可更新字段，或当前稿件中没有命中该术语。")
+    if result.skipped_fields:
+        messages.warning(request, f"已保护人工编辑字段：{_field_names_text(result.skipped_fields)}。")
+    return redirect(next_url)
 
 
 @login_required
@@ -862,16 +1055,18 @@ def candidate_retranslate(request: HttpRequest, article_id: int):
     if denied:
         return denied
     article = get_object_or_404(NewsArticle, pk=article_id)
+    source_context = _article_context_from_request(article, request)
+    next_url = _safe_article_return_url(article, request.POST.get("next"), source_context)
     dispatch_task(translate_article_task, article.id)
     log_operation(
         action_type="article_retranslated",
         target_type="article",
         target_id=article.pk,
-        detail=f"重新触发翻译《{article.effective_title}》",
+        detail=f"重新触发翻译《{article.effective_title}》，任务已派发",
         admin=request.user,
     )
     messages.success(request, "已重新触发翻译。")
-    return redirect(request.POST.get("next") or reverse("console-candidate-detail", args=[article.pk]))
+    return redirect(next_url)
 
 
 @login_required
@@ -991,7 +1186,14 @@ def article_editor(request: HttpRequest, article_id: int):
                     return render(
                         request,
                         "stable/console/article_editor.html",
-                        _console_context(request, form=form, article=article, allow_publish_without_cover=True),
+                        _console_context(
+                            request,
+                            form=form,
+                            article=article,
+                            allow_publish_without_cover=True,
+                            term_type_choices=TermType.choices,
+                            quick_term_followup=None,
+                        ),
                     )
                 article.workflow_status = WorkflowStatus.PUBLISHED
                 article.published_to_web_at = timezone.now()
@@ -1031,7 +1233,18 @@ def article_editor(request: HttpRequest, article_id: int):
             return redirect("console-article-editor", article_id=article.pk)
     else:
         form = ArticleEditorForm(instance=article)
-    return render(request, "stable/console/article_editor.html", _console_context(request, form=form, article=article, allow_publish_without_cover=False))
+    return render(
+        request,
+        "stable/console/article_editor.html",
+        _console_context(
+            request,
+            form=form,
+            article=article,
+            allow_publish_without_cover=False,
+            term_type_choices=TermType.choices,
+            quick_term_followup=_pop_quick_term_followup(request, article, "editor"),
+        ),
+    )
 
 
 @login_required

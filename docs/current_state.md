@@ -505,3 +505,76 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 已人工收尾：将 `run_id=9` 标记为 `partial`，写入 `finished_at` 和 coverage，释放 `ExternalDataImportLock`。
 - 中断后累计写入：`race_count=182`、`entry_count=2692`、`result_count=2518`、`horse_count=2401`、`unique_horse_id_count=2401`、`unique_horse_name_count=2401`、`missing_horse_id_or_name_count=348`。
 - 当前服务状态：`web/db/redis/nginx/worker/beat` 运行，`/healthz/` 返回 `200`。按“报错退出则停止”约定，未继续启动后续导入。
+
+## 后台原文选区快速加入术语库
+
+- OpenSpec change：`add-selection-term-quick-add`。
+- 本地分支：`codex/add-selection-term-quick-add`。
+- 实现时间：`2026-06-24`。
+- 状态：本地实现和验证完成，尚未部署生产。
+
+### 已实现能力
+
+- 候选详情页和文章编辑台的原文标题、原文正文已标记为可选区来源。
+- 两个页面都新增“快速加入术语库”入口；管理员可点击“使用当前选区”填入日文原词，也可手工粘贴作为无 JavaScript fallback。
+- 快速表单字段包含日文原词、术语类型、中文译词；术语类型默认 `horse`（马名），但可改为赛事、骑手、调教师、马主、牧场、赛马场、机构、固定译法或其他。
+- 后端新增文章上下文 POST 入口 `console-article-quick-term-create`，路径为 `/admin/articles/<article_id>/quick-term/`。
+- 创建正式术语时复用 `validate_term_payload()`，继续执行正式术语库的类型、重复、比赛等级、启用状态和优先级校验。
+- 快速创建默认写入：`is_active=true`、`priority=0`、`race_grade=""`、`aliases_ja=[]`、`aliases_zh=[]`，并在 `notes` 记录来源文章 ID 和标题。
+- 创建成功后留在当前页面并显示成功消息，同时写入 `OperationLog`。
+- 创建失败时不写入 `TermEntry`，通过 messages 展示错误；重复术语提示已有术语 ID，并提供已有术语编辑页链接。
+
+### 明确边界
+
+- 快速加入术语库只写入 `TermEntry` 和操作日志。
+- 不触发 `translate_article_task`，不触发自动化处理，不修改当前文章的 `title_zh`、`body_zh`、`base_translation_zh` 或 `rewrite_body_zh`。
+- “新增术语后自动重新应用术语/重翻译联动”仍属于后续 change，不在本次实现中。
+- 本次没有生产部署，因此 `docs/deploy_runbook.md` 未新增上线记录。
+
+### 验证结果
+
+- `DB_ENGINE=sqlite python manage.py check` 已通过（本地使用 Codex bundled Python 执行）。
+- `DB_ENGINE=sqlite python manage.py test stable.tests.ConsoleFlowTests --verbosity=2` 已通过；本轮按 OpenSpec 场景补齐非法术语类型、换行误选整段、文章不存在、非联动状态保持和原文选区脚本限制等测试。
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable --verbosity=2` 已通过，126 个测试全部通过。
+- `openspec validate add-selection-term-quick-add --strict` 已通过。
+- 本地浏览器验收使用临时 SQLite 后台：
+  - 候选详情页可创建术语并返回当前候选页。
+  - 候选详情页重复创建同类型同日文原词时显示失败提示和已有术语编辑链接。
+  - 编辑台快速术语入口已验证不会提交外层文章编辑表单；提交成功后返回编辑台。
+  - 无选区点击“使用当前选区”不会乱填，提示需在原文标题或正文中选择短词。
+
+## 后台快速术语创建后的当前稿联动提案
+
+- OpenSpec change：`reapply-terms-after-quick-add`。
+- 创建时间：`2026-06-24`。
+- 当前状态：本地实现和验证已完成；review 后的浮层交互和多标签页 session pending 返修已于 `2026-06-25` 完成，尚未部署生产。
+- 目标：在候选详情页或文章编辑台快速创建正式术语后，为当前文章提供明确的后续动作：
+  - 一次性“应用该术语到当前稿”：只把刚创建的指定术语应用到当前文章整篇已有中文字段，不调用翻译模型，不重扫整个正式术语库。
+  - 页面级“重新翻译”：复用现有 `translate_article_task`，异步重新走翻译链路；不属于术语成功浮层，若页面已有按钮则不新增。
+- 关键边界：
+  - 不做全站批量重翻译或批量重应用。
+  - 快速创建成功后的应用入口只出现一次；刷新、离开页面或错过成功反馈后不补常驻入口。
+  - 不自动发布文章，不改变前台发布过滤规则。
+  - 默认保护 `manually_edited_fields` 中的人工标题、正文、摘要和推送摘要，不在无确认时覆盖人工稿。
+  - 术语应用必须记录文章、用户、来源术语、更新字段和跳过字段；页面级重新翻译继续记录文章、用户和任务触发结果。
+- 实现范围：
+  - 新增指定术语应用服务函数，只替换刚创建术语的日文原词和日文别名。
+  - 新增后台 POST 入口 `/admin/articles/<article_id>/apply-created-term/`。
+  - quick-create 成功后通过 session 多 pending 字典提供一次性后续动作上下文；候选详情页和编辑台只消费匹配当前文章与页面上下文的 pending follow-up。
+  - `candidate_retranslate` 改为安全返回，并继续作为页面级重新翻译入口记录任务触发结果；术语成功浮层不提供重翻译入口。
+  - 候选详情页和编辑台已改为页面上方浮层：`术语【日文名（中文名）】已添加，点击此处立即应用到文章中`；浮层只承载当前术语应用，不承载重新翻译。
+  - 旧的术语表单内嵌“刚创建术语”面板和 `retranslate-created-term-*` follow-up 表单/按钮已删除；重新翻译仅保留页面级既有入口。
+  - 浮层点击“点击此处”立即应用，不再二次确认；点击关闭 icon、应用成功、当前页面新术语浮层出现、关闭页面或 15 秒超时后消失。
+  - 浮层不阻塞选区、滚动、编辑和其他不离开当前页面的点击行为。
+  - session follow-up 已从全局单槽改为多 pending 结构，避免多标签页之间互相覆盖；渲染不匹配文章或上下文时不会消费其他 pending follow-up。
+  - 后端不额外增加一次性 token 限制；当前后台仅单人可信使用，手工构造接口请求被视为可接受风险。
+- TDD 测试：
+  - `2026-06-25` 已先在 `server/stable/tests.py` 补充完整测试约束，覆盖浮层文案、关闭/15 秒 DOM 合同、旧内嵌面板不存在、`retranslate-created-term-*` 不存在、多 pending、不匹配页面不消费 pending、同页新术语替换旧浮层，以及应用术语不派发翻译任务。
+  - 红灯阶段结果：未实现新交互前，`DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable.tests.ConsoleFlowTests --noinput` 为 31 项中 5 项失败，失败集中在旧内嵌面板和单槽 session。
+- 本轮验证结果：
+  - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py check`：通过。
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.ConsoleFlowTests --noinput`：通过，31 项。
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：通过，135 项。
+  - `openspec validate reapply-terms-after-quick-add --strict`：通过。
+- 本次没有生产部署，因此未新增 `docs/deploy_runbook.md` 上线记录。
+- 规格校验：`openspec validate reapply-terms-after-quick-add --strict` 已通过。

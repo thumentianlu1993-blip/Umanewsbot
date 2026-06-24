@@ -1,0 +1,69 @@
+<div class="quick-term-box" data-quick-term-root style="margin-top: 18px;">
+  <div class="toolbar">
+    <h4 style="margin: 0;">快速加入术语库</h4>
+    <button class="btn secondary" type="button" data-fill-selected-term>使用当前选区</button>
+  </div>
+  <p class="muted">加入术语库后会出现一次性操作，可只把新术语应用到当前文章；重新翻译请使用页面级按钮。</p>
+  <input type="hidden" name="source_context" value="{{ quick_term_context }}" form="{{ quick_term_form_id }}">
+  <div class="grid-2">
+    <div class="field">
+      <label for="quick-term-source-ja-{{ quick_term_context }}">日文原词</label>
+      <input id="quick-term-source-ja-{{ quick_term_context }}" type="text" name="source_ja" maxlength="80" required form="{{ quick_term_form_id }}" data-quick-term-source placeholder="选中原文后自动填入，也可手工粘贴">
+    </div>
+    <div class="field">
+      <label for="quick-term-type-{{ quick_term_context }}">术语类型</label>
+      <select id="quick-term-type-{{ quick_term_context }}" name="term_type" form="{{ quick_term_form_id }}">
+        {% for value, label in term_type_choices %}
+          <option value="{{ value }}"{% if value == "horse" %} selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="field" style="margin-top: 12px;">
+    <label for="quick-term-target-zh-{{ quick_term_context }}">中文译词</label>
+    <input id="quick-term-target-zh-{{ quick_term_context }}" type="text" name="target_zh" maxlength="255" required form="{{ quick_term_form_id }}" placeholder="请输入中文译法">
+  </div>
+  <div class="toolbar" style="margin-top: 12px;">
+    <button type="submit" form="{{ quick_term_form_id }}">加入术语库</button>
+    <span class="help" data-quick-term-status></span>
+  </div>
+</div>
+
+<script>
+  (function () {
+    function asElement(node) {
+      if (!node) return null;
+      return node.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    }
+
+    function selectedOriginalText() {
+      const selection = window.getSelection && window.getSelection();
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return "";
+      const anchor = asElement(selection.anchorNode);
+      const focus = asElement(selection.focusNode);
+      const anchorSource = anchor && anchor.closest("[data-term-selection-source]");
+      const focusSource = focus && focus.closest("[data-term-selection-source]");
+      if (!anchorSource || !focusSource || anchorSource !== focusSource) return "";
+      return selection.toString().trim();
+    }
+
+    document.querySelectorAll("[data-quick-term-root]").forEach(function (root) {
+      const fillButton = root.querySelector("[data-fill-selected-term]");
+      const sourceInput = root.querySelector("[data-quick-term-source]");
+      const targetInput = root.querySelector("input[name='target_zh']");
+      const status = root.querySelector("[data-quick-term-status]");
+      if (!fillButton || !sourceInput || !status) return;
+
+      fillButton.addEventListener("click", function () {
+        const text = selectedOriginalText();
+        if (!text) {
+          status.textContent = "请先在原文标题或正文中选择一个短词。";
+          return;
+        }
+        sourceInput.value = text;
+        status.textContent = "已填入选区。";
+        if (targetInput) targetInput.focus();
+      });
+    });
+  }());
+</script>
