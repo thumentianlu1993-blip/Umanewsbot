@@ -820,3 +820,73 @@ docker logs --tail=200 umanewsbot-worker-1
 - 第二批续跑结果：`run_id=2`，已跳过首批 10 场，继续成功导入 10 场，失败 0；累计 20 场比赛、274 个唯一马 ID/马名索引。
 - 第三批续跑结果：`run_id=3`，继续成功导入 30 场，失败 0；累计 50 场比赛、695 个唯一马 ID/马名索引，`/healthz/` 返回 `200`。
 - 长循环导入中断记录：`run_id=4` 到 `run_id=8` 均成功；`run_id=9` 成功 7 场后进程退出码 `137` 中断，已标记为 `partial` 并释放导入锁。中断后累计 182 场比赛、2401 个唯一马 ID/马名索引，`/healthz/` 返回 `200`。
+
+## QQ Bot / OneBot 生产运行态配置（2026-06-24）
+
+### 配置结论
+
+- OneBot 网关：独立 Docker 容器 `umanewsbot-onebot-1`
+- 镜像：`mlikiowa/napcat-docker:latest`
+- 访问边界：
+  - 宿主机仅绑定 `127.0.0.1:3000 -> 3000` 和 `127.0.0.1:6099 -> 6099`
+  - 应用容器通过 Docker 网络别名 `http://onebot:3000` 访问
+  - 不对公网暴露 OneBot API 或 NapCat WebUI
+- 数据目录：
+  - `/opt/umanewsbot/napcat/config`
+  - `/opt/umanewsbot/napcat/qq`
+- 机密文件：
+  - `/opt/umanewsbot/runtime/secrets/onebot_access_token`
+  - `/opt/umanewsbot/runtime/secrets/napcat_webui_token`
+
+### 生产 `.env`
+
+```env
+ONEBOT_BASE_URL=http://onebot:3000
+ONEBOT_TIMEOUT_SECONDS=30
+QQ_PUSH_ENABLED=false
+QQ_PUSH_SCOPE=all_public
+QQ_PUSH_MAX_ATTEMPTS=3
+QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS=5
+QQ_PUSH_SENDING_STALE_SECONDS=600
+```
+
+`ONEBOT_ACCESS_TOKEN` 已写入生产 `.env`，但不得写入仓库文档。`QQ_PUSH_ENABLED` 在自动推送代码和迁移部署完成前保持 `false`，部署验收后再改为 `true`。
+
+### 已配置群目标
+
+- `PushTarget.group_id=1026525240`
+- `name=UmaFans测试群`
+- `is_active=true`
+
+### 验证结果
+
+- `docker ps` 显示 `umanewsbot-onebot-1` 正常运行。
+- `ss -ltnp` 显示 `3000` 与 `6099` 均只监听 `127.0.0.1`。
+- OneBot 直连测试返回 `{"status":"ok","retcode":0,...}`，消息发送到 `新闻测试(1026525240)`。
+- Django 应用侧 `stable.services.onebot.BotPusher` 通过 `http://onebot:3000` 成功发送测试消息，返回 `retcode=0`。
+- 重启 `worker / beat` 让它们读取新的 `.env`；Compose 同时按依赖短暂重建了 `db / web` 容器，但没有执行 `git pull`、没有 build、没有运行 `deploy_lowcost.sh`。
+- 重启后 `web` healthz 返回 `{"status": "ok"}`，`web` 容器 healthy，`db / redis` healthy，`worker / beat` up。
+
+### 自动推送上线步骤
+
+1. 合入并部署 `add-qqbot-auto-push`。
+2. 执行迁移，确认 `stable_qqpushdelivery` 表存在。
+3. 确认 `QQ_PUSH_SCOPE=all_public` 和测试群 `PushTarget.is_active=true`。
+4. 设置 `QQ_PUSH_ENABLED=true`。
+5. 重启 `worker / beat`。
+6. 发布或复用一篇公开文章触发自动推送，核对测试群消息、`QQPushDelivery` 和 worker 日志。
+
+### 停用方式
+
+停用自动推送：
+
+```env
+QQ_PUSH_ENABLED=false
+```
+
+停用 OneBot 网关：
+
+```bash
+cd /opt/umanewsbot
+docker rm -f umanewsbot-onebot-1
+```

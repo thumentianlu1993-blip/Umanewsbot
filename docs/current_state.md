@@ -61,6 +61,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 自动化能力通过 `.env` 中 `AUTOMATION_ENABLED` 控制，当前已进入灰度运行与质量观察阶段
 - 已核实线上 `AUTOMATION_ENABLED=true`、`AUTO_REWRITE_ENABLED=false`、`AUTO_PUBLISH_CONTENT_SOURCE=base_translation`、`AUTOMATION_WARNING_EMAIL_ENABLED=true`，当前按“基准翻译稿自动发布 + 高价值 warning 邮件告警”灰度运行
 - 术语候选发现代码已部署到生产（`e2e3e07`，迁移 `0006` 已应用），`TERM_DISCOVERY_ENABLED=false` 默认关闭，等待单篇抽检后灰度开启
+- `2026-06-24` 已完成 QQ Bot / OneBot 生产运行态配置：独立 NapCat 容器 `umanewsbot-onebot-1` 已启动，OneBot HTTP 仅绑定服务器 `127.0.0.1:3000` 并通过 Docker 网络别名 `onebot` 给应用访问，测试群 `1026525240` 已写入 `PushTarget`，OneBot 直连与 Django `BotPusher` 均已成功发送测试消息。
 
 ## 下一步优先级
 
@@ -81,9 +82,9 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 需要继续确认抓取调度、翻译调度、发布链路在正式域名环境下的长期稳定性
 - 自动化发布涉及内容安全，生产首轮建议低频、低批量、保守开关启用
 - AI 改写真实效果依赖模型配置与术语库质量，需继续通过后台人工抽检
-- 邮件通知首版已实现；短信 / 微信通知当前只保留日志与配置位；QQ 新闻推送已新增自动推送实现，但仍需实网联调与灰度启用
+- 邮件通知首版已实现；短信 / 微信通知当前只保留日志与配置位；QQ / OneBot 真实发送网关已在生产配置并通过测试消息，自动推送代码部署后即可灰度开启
 - 需要补足更标准的部署基线、回滚与备份演练
-- QQ Bot 实网联调与正式推送链路仍需单独验收；`add-qqbot-auto-push` 已新增自动推送实现，默认 `QQ_PUSH_ENABLED=false`，生产需先完成 OneBot 网关和测试群灰度。
+- QQ Bot 正式自动推送链路仍需在本 change 部署迁移后开启 `QQ_PUSH_ENABLED=true` 并用测试群验收。
 
 ## 2026-06-23 QQ 群自动推送 OpenSpec change
 
@@ -103,15 +104,15 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ### 当前启用策略
 
-- 生产首次部署保持 `QQ_PUSH_ENABLED=false`。
-- 先配置 NapCatQQ / OneBot v11 网关、测试群和 access token。
-- 测试群确认后再设置 `QQ_PUSH_ENABLED=true` 与 `QQ_PUSH_SCOPE=high_value_only`，重启 `worker/beat` 灰度观察。
+- 生产已配置 NapCatQQ / OneBot v11 网关、测试群和 access token。
+- 生产 `.env` 已设置 `QQ_PUSH_SCOPE=all_public`，目标是测试群阶段推送所有公开新闻。
+- 部署代码和迁移前保持 `QQ_PUSH_ENABLED=false`；确认 `QQPushDelivery` 可用后再设置 `QQ_PUSH_ENABLED=true`，重启 `worker/beat` 灰度观察。
 - OneBot API 不得公网裸露；优先 Docker 内网 `http://onebot:3000`，临时映射只能绑定 `127.0.0.1`。
 
 ### 待验收
 
-- 真实 OneBot 网关发送测试。
-- 测试群灰度推送。
+- 部署迁移后开启 `QQ_PUSH_ENABLED=true`。
+- 发布或复用一篇公开文章触发测试群自动推送。
 - 生产 `QQPushDelivery` 记录与 worker 日志核对。
 
 ## 2026-06-24 自动发布门禁优化本地实现
