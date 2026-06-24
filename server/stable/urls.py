@@ -21,6 +21,7 @@ urlpatterns = [
     path("candidates/<int:article_id>/manual/", views.candidate_mark_manual, name="console-candidate-mark-manual"),
     path("candidates/<int:article_id>/ignore/", views.candidate_ignore, name="console-candidate-ignore"),
     path("articles/<int:article_id>/quick-term/", views.article_quick_term_create, name="console-article-quick-term-create"),
+    path("articles/<int:article_id>/apply-created-term/", views.article_apply_created_term, name="console-article-apply-created-term"),
     path("articles/<int:article_id>/edit/", views.article_editor, name="console-article-editor"),
     path("articles/<int:article_id>/preview/", views.article_preview, name="console-article-preview"),
     path("articles/<int:article_id>/images/<int:image_id>/localize/", views.article_localize_image, name="console-article-localize-image"),

@@ -59,7 +59,13 @@ from stable.services.term_discovery import (
     match_formal_terms,
     normalize_japanese_term,
 )
-from stable.services.terms import apply_term_mappings, extract_horse_tags, extract_unknown_horse_names, resolve_terms
+from stable.services.terms import (
+    apply_created_term_to_article,
+    apply_term_mappings,
+    extract_horse_tags,
+    extract_unknown_horse_names,
+    resolve_terms,
+)
 from stable.services.text import extract_article_text
 from stable.services.translation import (
     OpenAICompatibleTranslationProvider,
@@ -561,6 +567,59 @@ class ConsoleFlowTests(TestCase):
             workflow_status=WorkflowStatus.PENDING_EDIT,
         )
 
+    def _create_article(self, source_article_id: str, title_ja: str) -> NewsArticle:
+        return NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id=source_article_id,
+            title_ja=title_ja,
+            translated_title_zh=title_ja,
+            translated_body_zh=f"{title_ja} 的译文",
+            title_zh=title_ja,
+            body_ja_raw=f"{title_ja} 原文",
+            body_ja_normalized=f"{title_ja} 原文",
+            body_zh=f"{title_ja} 的译文",
+            published_at=timezone.now(),
+            source_url=f"https://example.com/{source_article_id}",
+            workflow_status=WorkflowStatus.PENDING_EDIT,
+        )
+
+    def _post_quick_term(
+        self,
+        article: NewsArticle,
+        source_ja: str,
+        target_zh: str,
+        *,
+        source_context: str = "candidate",
+        term_type: str = "horse",
+        follow: bool = False,
+    ):
+        next_url = (
+            reverse("console-article-editor", args=[article.id])
+            if source_context == "editor"
+            else reverse("console-candidate-detail", args=[article.id])
+        )
+        return self.client.post(
+            reverse("console-article-quick-term-create", args=[article.id]),
+            {
+                "source_ja": source_ja,
+                "term_type": term_type,
+                "target_zh": target_zh,
+                "source_context": source_context,
+                "next": next_url,
+            },
+            follow=follow,
+        )
+
+    def _assert_quick_term_toast(self, response, source_ja: str, target_zh: str, context: str):
+        self.assertContains(response, f"术语【{source_ja}（{target_zh}）】已添加，点击此处立即应用到文章中")
+        self.assertContains(response, "data-quick-term-followup-toast")
+        self.assertContains(response, 'data-auto-dismiss-ms="15000"')
+        self.assertContains(response, "data-quick-term-followup-close")
+        self.assertContains(response, f"apply-created-term-{context}")
+        self.assertNotContains(response, f"刚创建术语：{source_ja}")
+        self.assertNotContains(response, f"retranslate-created-term-{context}")
+
     def test_dashboard_and_sources_page_available(self):
         dashboard = self.client.get(reverse("console-dashboard"))
         source_page = self.client.get(reverse("console-source-list"))
@@ -697,21 +756,72 @@ class ConsoleFlowTests(TestCase):
         self.assertEqual(response.status_code, 302)
         mocked_dispatch.assert_called_once_with(translate_article_task, self.article.id)
 
-    def test_candidate_detail_quick_term_create_defaults_to_horse_and_logs_article(self):
-        response = self.client.post(
-            reverse("console-article-quick-term-create", args=[self.article.id]),
-            {
-                "source_ja": "マヤノライジン",
-                "term_type": "horse",
-                "target_zh": "摩耶雷神",
-                "next": reverse("console-candidate-detail", args=[self.article.id]),
-            },
-            follow=True,
+    def test_apply_created_term_service_updates_only_specified_term(self):
+        term = TermEntry.objects.create(
+            term_type="horse",
+            source_ja="マヤノライジン",
+            target_zh="摩耶雷神",
+            aliases_ja=["マヤノR"],
         )
+        TermEntry.objects.create(term_type="race", source_ja="大阪杯", target_zh="大阪杯")
+        other_article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="detail-other",
+            title_ja="其他文章",
+            translated_body_zh="マヤノライジン",
+            published_at=timezone.now(),
+            source_url="https://example.com/detail-other",
+        )
+        self.article.translated_title_zh = "マヤノライジン挑战"
+        self.article.translated_body_zh = "マヤノライジン与マヤノR连续出现。大阪杯保持原样。"
+        self.article.base_translation_zh = "基准稿提到マヤノR，也提到大阪杯。"
+        self.article.body_zh = "发布稿：マヤノライジン、マヤノライジン。大阪杯。"
+        self.article.save()
+
+        result = apply_created_term_to_article(self.article, term)
+
+        self.article.refresh_from_db()
+        other_article.refresh_from_db()
+        self.assertIn("translated_title_zh", result.updated_fields)
+        self.assertIn("translated_body_zh", result.updated_fields)
+        self.assertIn("base_translation_zh", result.updated_fields)
+        self.assertEqual(self.article.translated_title_zh, "摩耶雷神挑战")
+        self.assertEqual(self.article.translated_body_zh, "摩耶雷神与摩耶雷神连续出现。大阪杯保持原样。")
+        self.assertEqual(self.article.base_translation_zh, "基准稿提到摩耶雷神，也提到大阪杯。")
+        self.assertEqual(self.article.body_zh, "发布稿：摩耶雷神、摩耶雷神。大阪杯。")
+        self.assertEqual(other_article.translated_body_zh, "マヤノライジン")
+
+    def test_apply_created_term_service_protects_manual_publish_fields(self):
+        term = TermEntry.objects.create(term_type="horse", source_ja="マヤノライジン", target_zh="摩耶雷神")
+        self.article.translated_body_zh = "机器稿 マヤノライジン"
+        self.article.title_zh = "人工标题 マヤノライジン"
+        self.article.body_zh = "人工正文 マヤノライジン"
+        self.article.summary_zh = "人工摘要 マヤノライジン"
+        self.article.push_summary_zh = "人工推送 マヤノライジン"
+        self.article.manually_edited_fields = ["title_zh", "body_zh", "summary_zh", "push_summary_zh"]
+        self.article.save()
+
+        result = apply_created_term_to_article(self.article, term)
+
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.translated_body_zh, "机器稿 摩耶雷神")
+        self.assertEqual(self.article.title_zh, "人工标题 マヤノライジン")
+        self.assertEqual(self.article.body_zh, "人工正文 マヤノライジン")
+        self.assertEqual(self.article.summary_zh, "人工摘要 マヤノライジン")
+        self.assertEqual(self.article.push_summary_zh, "人工推送 マヤノライジン")
+        self.assertEqual(
+            set(result.skipped_fields),
+            {"title_zh", "body_zh", "summary_zh", "push_summary_zh"},
+        )
+
+    def test_candidate_detail_quick_term_create_defaults_to_horse_and_logs_article(self):
+        response = self._post_quick_term(self.article, "マヤノライジン", "摩耶雷神", follow=True)
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "术语已创建：マヤノライジン")
         self.assertContains(response, "摩耶雷神")
+        self._assert_quick_term_toast(response, "マヤノライジン", "摩耶雷神", "candidate")
         term = TermEntry.objects.get(source_ja="マヤノライジン")
         self.assertEqual(term.term_type, "horse")
         self.assertEqual(term.target_zh, "摩耶雷神")
@@ -730,22 +840,172 @@ class ConsoleFlowTests(TestCase):
             ).exists()
         )
 
+        refreshed = self.client.get(reverse("console-candidate-detail", args=[self.article.id]))
+        self.assertNotContains(refreshed, "术语【マヤノライジン（摩耶雷神）】已添加")
+        self.assertNotContains(refreshed, "apply-created-term-candidate")
+
     def test_article_editor_quick_term_create_returns_to_editor(self):
         editor_url = reverse("console-article-editor", args=[self.article.id])
-        response = self.client.post(
-            reverse("console-article-quick-term-create", args=[self.article.id]),
-            {
-                "source_ja": "大阪杯",
-                "term_type": "race",
-                "target_zh": "大阪杯",
-                "next": editor_url,
-            },
+        response = self._post_quick_term(
+            self.article,
+            "大阪杯",
+            "大阪杯",
+            source_context="editor",
+            term_type="race",
             follow=True,
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.redirect_chain[-1][0], editor_url)
+        self._assert_quick_term_toast(response, "大阪杯", "大阪杯", "editor")
         self.assertTrue(TermEntry.objects.filter(term_type="race", source_ja="大阪杯").exists())
+
+    def test_quick_term_followup_keeps_other_article_pending_until_matching_page_renders(self):
+        other_article = self._create_article("detail-other-pending", "別記事")
+
+        self._post_quick_term(self.article, "マヤノライジン", "摩耶雷神")
+
+        other_response = self.client.get(reverse("console-candidate-detail", args=[other_article.id]))
+        self.assertNotContains(other_response, "术语【マヤノライジン（摩耶雷神）】已添加")
+
+        matching_response = self.client.get(reverse("console-candidate-detail", args=[self.article.id]))
+        self._assert_quick_term_toast(matching_response, "マヤノライジン", "摩耶雷神", "candidate")
+
+    def test_quick_term_followup_keeps_parallel_candidate_and_editor_contexts(self):
+        other_article = self._create_article("detail-editor-pending", "編集台記事")
+
+        self._post_quick_term(self.article, "マヤノライジン", "摩耶雷神", source_context="candidate")
+        self._post_quick_term(other_article, "ナリタブライアン", "成田白仁", source_context="editor")
+
+        candidate_response = self.client.get(reverse("console-candidate-detail", args=[self.article.id]))
+        editor_response = self.client.get(reverse("console-article-editor", args=[other_article.id]))
+
+        self._assert_quick_term_toast(candidate_response, "マヤノライジン", "摩耶雷神", "candidate")
+        self._assert_quick_term_toast(editor_response, "ナリタブライアン", "成田白仁", "editor")
+
+    def test_quick_term_followup_replaces_old_pending_for_same_page(self):
+        self._post_quick_term(self.article, "古い馬", "旧译名")
+        self._post_quick_term(self.article, "新しい馬", "新译名")
+
+        response = self.client.get(reverse("console-candidate-detail", args=[self.article.id]))
+
+        self.assertNotContains(response, "术语【古い馬（旧译名）】已添加")
+        self._assert_quick_term_toast(response, "新しい馬", "新译名", "candidate")
+
+    def test_apply_created_term_from_followup_does_not_dispatch_translation_task(self):
+        term = TermEntry.objects.create(term_type="horse", source_ja="マヤノライジン", target_zh="摩耶雷神")
+        self.article.translated_body_zh = "マヤノライジン"
+        self.article.save(update_fields=["translated_body_zh", "updated_at"])
+
+        with patch("stable.views.dispatch_task") as mocked_dispatch:
+            response = self.client.post(
+                reverse("console-article-apply-created-term", args=[self.article.id]),
+                {
+                    "term_id": term.id,
+                    "source_context": "candidate",
+                    "next": reverse("console-candidate-detail", args=[self.article.id]),
+                },
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        mocked_dispatch.assert_not_called()
+
+    def test_apply_created_term_endpoint_updates_article_and_sanitizes_next(self):
+        term = TermEntry.objects.create(term_type="horse", source_ja="マヤノライジン", target_zh="摩耶雷神")
+        self.article.translated_body_zh = "マヤノライジン"
+        self.article.base_translation_zh = "基准 マヤノライジン"
+        self.article.body_zh = "发布 マヤノライジン"
+        self.article.save()
+
+        response = self.client.post(
+            reverse("console-article-apply-created-term", args=[self.article.id]),
+            {
+                "term_id": term.id,
+                "source_context": "editor",
+                "next": "https://evil.example/",
+            },
+            follow=True,
+        )
+
+        self.article.refresh_from_db()
+        self.assertEqual(response.redirect_chain[-1][0], reverse("console-article-editor", args=[self.article.id]))
+        self.assertEqual(self.article.translated_body_zh, "摩耶雷神")
+        self.assertEqual(self.article.base_translation_zh, "基准 摩耶雷神")
+        self.assertEqual(self.article.body_zh, "发布 摩耶雷神")
+        self.assertContains(response, "已应用该术语")
+        self.assertTrue(
+            OperationLog.objects.filter(
+                action_type="article_created_term_applied",
+                target_type="article",
+                target_id=str(self.article.id),
+                detail__contains=f"术语 #{term.id}",
+            )
+            .filter(detail__contains="更新字段")
+            .exists()
+        )
+
+    def test_apply_created_term_endpoint_reports_no_change_and_protected_fields(self):
+        term = TermEntry.objects.create(term_type="horse", source_ja="マヤノライジン", target_zh="摩耶雷神")
+        self.article.title_zh = "人工标题 マヤノライジン"
+        self.article.body_zh = "人工正文 マヤノライジン"
+        self.article.summary_zh = "人工摘要 マヤノライジン"
+        self.article.push_summary_zh = "人工推送 マヤノライジン"
+        self.article.manually_edited_fields = ["title_zh", "body_zh", "summary_zh", "push_summary_zh"]
+        self.article.save()
+
+        response = self.client.post(
+            reverse("console-article-apply-created-term", args=[self.article.id]),
+            {
+                "term_id": term.id,
+                "source_context": "candidate",
+                "next": reverse("console-candidate-detail", args=[self.article.id]),
+            },
+            follow=True,
+        )
+
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.title_zh, "人工标题 マヤノライジン")
+        self.assertEqual(self.article.body_zh, "人工正文 マヤノライジン")
+        self.assertEqual(self.article.summary_zh, "人工摘要 マヤノライジン")
+        self.assertEqual(self.article.push_summary_zh, "人工推送 マヤノライジン")
+        self.assertContains(response, "没有可更新字段")
+        self.assertContains(response, "已保护人工编辑字段")
+
+    def test_page_level_retranslate_logs_task_result_and_does_not_publish(self):
+        term = TermEntry.objects.create(term_type="horse", source_ja="マヤノライジン", target_zh="摩耶雷神")
+        self.article.workflow_status = WorkflowStatus.PENDING_EDIT
+        self.article.save(update_fields=["workflow_status", "updated_at"])
+
+        with patch("stable.views.dispatch_task") as mocked_dispatch:
+            response = self.client.post(
+                reverse("console-candidate-retranslate", args=[self.article.id]),
+                {
+                    "source_context": "candidate",
+                    "next": reverse("console-candidate-detail", args=[self.article.id]),
+                },
+                follow=True,
+            )
+
+        self.article.refresh_from_db()
+        mocked_dispatch.assert_called_once_with(translate_article_task, self.article.id)
+        self.assertEqual(self.article.workflow_status, WorkflowStatus.PENDING_EDIT)
+        self.assertContains(response, "已重新触发翻译")
+        self.assertTrue(
+            OperationLog.objects.filter(
+                action_type="article_retranslated",
+                target_id=str(self.article.id),
+                detail__contains="任务已派发",
+            )
+            .exists()
+        )
+        self.assertFalse(
+            OperationLog.objects.filter(
+                action_type="article_retranslated",
+                target_id=str(self.article.id),
+                detail__contains=f"来源术语 #{term.id}",
+            ).exists()
+        )
 
     def test_quick_term_create_rejects_blank_long_and_duplicate_source(self):
         url = reverse("console-article-quick-term-create", args=[self.article.id])
@@ -854,13 +1114,14 @@ class ConsoleFlowTests(TestCase):
         for response in (candidate, editor):
             self.assertEqual(response.status_code, 200)
             self.assertContains(response, "快速加入术语库")
-            self.assertContains(response, "仅写入术语库，不会自动重新翻译或改写当前文章")
-            self.assertContains(response, "如需当前稿件应用新术语，请手动点击重新应用翻译与术语")
+            self.assertContains(response, "加入术语库后会出现一次性操作")
             self.assertContains(response, 'name="csrfmiddlewaretoken"')
             self.assertContains(response, 'name="next"')
+            self.assertContains(response, 'name="source_context"')
             self.assertContains(response, 'data-term-selection-source')
             self.assertContains(response, 'data-fill-selected-term')
             self.assertContains(response, '<option value="horse" selected>马名</option>', html=True)
+            self.assertNotContains(response, "应用该术语到当前稿")
         self.assertContains(candidate, 'id="quick-term-candidate-form"')
         self.assertContains(candidate, 'form="quick-term-candidate-form"')
         self.assertContains(editor, 'id="quick-term-editor-form"')

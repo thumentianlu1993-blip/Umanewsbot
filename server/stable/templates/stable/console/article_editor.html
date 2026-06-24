@@ -3,6 +3,7 @@
 {% block title %}编辑台 - 赛马新闻后台{% endblock %}
 
 {% block content %}
+  {% url 'console-article-editor' article.id as quick_term_next_url %}
   <div class="page-header">
     <div>
       <h2 class="page-title">编辑台</h2>
@@ -14,6 +15,8 @@
     </div>
   </div>
 
+  {% include "stable/console/_quick_term_followup_toast.html" with quick_term_context="editor" %}
+
   <form method="post" enctype="multipart/form-data" id="editor-form">
     {% csrf_token %}
     <div class="editor-shell">
@@ -24,7 +27,6 @@
         <p><strong>发布时间：</strong>{{ article.published_at|date:"Y-m-d H:i" }}</p>
         <p><strong>原文链接：</strong><a href="{{ article.source_url }}" target="_blank" rel="noreferrer">{{ article.source_url }}</a></p>
         <div class="content-block" style="margin-top: 14px;" data-term-selection-source>{{ article.body_ja_normalized|default:article.body_ja_raw }}</div>
-        {% url 'console-article-editor' article.id as quick_term_next_url %}
         {% include "stable/console/_quick_term_form.html" with quick_term_context="editor" quick_term_form_id="quick-term-editor-form" %}
 
         <h4 style="margin-top: 20px;">原文图片</h4>

@@ -3,7 +3,8 @@
     <h4 style="margin: 0;">快速加入术语库</h4>
     <button class="btn secondary" type="button" data-fill-selected-term>使用当前选区</button>
   </div>
-  <p class="muted">仅写入术语库，不会自动重新翻译或改写当前文章；如需当前稿件应用新术语，请手动点击重新应用翻译与术语。</p>
+  <p class="muted">加入术语库后会出现一次性操作，可只把新术语应用到当前文章；重新翻译请使用页面级按钮。</p>
+  <input type="hidden" name="source_context" value="{{ quick_term_context }}" form="{{ quick_term_form_id }}">
   <div class="grid-2">
     <div class="field">
       <label for="quick-term-source-ja-{{ quick_term_context }}">日文原词</label>

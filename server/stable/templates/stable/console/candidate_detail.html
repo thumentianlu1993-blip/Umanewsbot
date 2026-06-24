@@ -3,6 +3,7 @@
 {% block title %}候选详情 - 赛马新闻后台{% endblock %}
 
 {% block content %}
+  {% url 'console-candidate-detail' article.id as quick_term_next_url %}
   <div class="page-header">
     <div>
       <h2 class="page-title">候选详情</h2>
@@ -19,6 +20,8 @@
     </div>
   </div>
 
+  {% include "stable/console/_quick_term_followup_toast.html" with quick_term_context="candidate" %}
+
   <div class="grid-2">
     <section class="panel">
       <h3>原文信息</h3>
@@ -27,7 +30,6 @@
       <p><strong>发布时间：</strong>{{ article.published_at|date:"Y-m-d H:i" }}</p>
       <p><strong>原文链接：</strong><a href="{{ article.source_url }}" target="_blank" rel="noreferrer">{{ article.source_url }}</a></p>
       <div class="content-block" data-term-selection-source>{{ article.body_ja_normalized|default:article.body_ja_raw }}</div>
-      {% url 'console-candidate-detail' article.id as quick_term_next_url %}
       <form id="quick-term-candidate-form" method="post" action="{% url 'console-article-quick-term-create' article.id %}">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ quick_term_next_url }}">

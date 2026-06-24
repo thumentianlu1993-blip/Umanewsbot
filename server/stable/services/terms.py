@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass
 
-from stable.models import TermEntry, TermType
+from stable.models import NewsArticle, TermEntry, TermType
 
 
 @dataclass
@@ -15,6 +15,13 @@ class ResolvedTerm:
     race_grade: str
     priority: int
     notes: str
+
+
+@dataclass
+class ArticleTermApplyResult:
+    updated_fields: list[str]
+    skipped_fields: list[str]
+    unchanged_fields: list[str]
 
 
 def resolve_terms(text: str, limit: int = 20) -> list[ResolvedTerm]:
@@ -65,6 +72,47 @@ def apply_term_mappings(text: str) -> str:
             if candidate:
                 mapped = mapped.replace(candidate, entry.target_zh)
     return mapped
+
+
+def apply_single_term_mapping(text: str, term: TermEntry) -> str:
+    if not text:
+        return text
+    mapped = text
+    for candidate in sorted(term.all_japanese_terms(), key=len, reverse=True):
+        if candidate:
+            mapped = mapped.replace(candidate, term.target_zh)
+    return mapped
+
+
+def apply_created_term_to_article(article: NewsArticle, term: TermEntry) -> ArticleTermApplyResult:
+    machine_fields = ["translated_title_zh", "translated_body_zh", "translated_summary_zh", "base_translation_zh"]
+    publish_fields = ["title_zh", "body_zh", "summary_zh", "push_summary_zh"]
+    manual_fields = set(article.manually_edited_fields or [])
+
+    updated_fields: list[str] = []
+    skipped_fields: list[str] = []
+    unchanged_fields: list[str] = []
+
+    for field_name in [*machine_fields, *publish_fields]:
+        current_value = getattr(article, field_name, "") or ""
+        mapped_value = apply_single_term_mapping(current_value, term)
+        if mapped_value == current_value:
+            unchanged_fields.append(field_name)
+            continue
+        if field_name in publish_fields and field_name in manual_fields:
+            skipped_fields.append(field_name)
+            continue
+        setattr(article, field_name, mapped_value)
+        updated_fields.append(field_name)
+
+    if updated_fields:
+        article.save(update_fields=[*updated_fields, "updated_at"])
+
+    return ArticleTermApplyResult(
+        updated_fields=updated_fields,
+        skipped_fields=skipped_fields,
+        unchanged_fields=unchanged_fields,
+    )
 
 
 def extract_horse_tags(text: str, limit: int = 12) -> list[str]:
