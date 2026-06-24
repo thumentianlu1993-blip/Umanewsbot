@@ -852,7 +852,7 @@ QQ_PUSH_SENDING_STALE_SECONDS=600
 QQ_PUSH_MIN_INTERVAL_SECONDS=60
 ```
 
-`ONEBOT_ACCESS_TOKEN` 已写入生产 `.env`，但不得写入仓库文档。`QQ_PUSH_MIN_INTERVAL_SECONDS` 用于控制同一目标群两次自动发送尝试之间的最小间隔，避免批量补推或批量发布触发 QQ / NapCat 发送异常。
+`ONEBOT_ACCESS_TOKEN` 已写入生产 `.env`，但不得写入仓库文档。生产当前已将 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=all_public` 用于测试群灰度。`QQ_PUSH_MIN_INTERVAL_SECONDS` 用于控制同一目标群两次自动发送尝试之间的最小间隔，避免批量补推或批量发布触发 QQ / NapCat 发送异常。
 
 ### 已配置群目标
 
@@ -870,6 +870,7 @@ QQ_PUSH_MIN_INTERVAL_SECONDS=60
 - 重启后 `web` healthz 返回 `{"status": "ok"}`，`web` 容器 healthy，`db / redis` healthy，`worker / beat` up。
 - 2026-06-24 已部署 `add-qqbot-auto-push` 到 `main`，生产迁移 `stable.0010_qqpushdelivery` 已应用，`QQ_PUSH_ENABLED=true` 与 `QQ_PUSH_SCOPE=all_public` 已生效。
 - 批量补推 126 篇存量公开文章时，`QQPushDelivery` 记录创建成功；NapCat / QQ 客户端返回 `EventChecker Failed ... 网络连接异常`，系统按 `send_failed` 记录并进入有限重试，未误标记成功。后续补推必须使用 `QQ_PUSH_MIN_INTERVAL_SECONDS` 或人工脚本限速。
+- 2026-06-25 重新扫码登录 NapCat 后，Django 应用侧短消息和 `qq_auto_push_article_task` 自动任务链路均已成功发送到测试群。限速补推按 65 秒间隔成功发送 79 条交付记录；按当前验收口径，不再继续补推全部历史公开新闻，剩余历史失败记录保留在后台，不影响后续新发布文章自动推送。
 
 ### 自动推送上线步骤
 

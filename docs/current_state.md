@@ -115,6 +115,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - OneBot 直连和 Django 应用侧短消息均已成功发送到测试群 `1026525240`。
 - 生产批量补推 126 篇公开文章时，交付记录成功创建并进入有限重试；NapCat / QQ 客户端随后返回 `网络连接异常`，系统正确记录为 `send_failed` 且未误标为成功。
 - 已补充 `QQ_PUSH_MIN_INTERVAL_SECONDS` 节流保护，后续自动任务按目标群最小间隔重排，降低 QQ 风控和客户端异常风险。
+- 2026-06-25 重新扫码登录 NapCat 后，Django `BotPusher` 短消息发送成功，`qq_auto_push_article_task -> qq_push_delivery_task -> OneBot` 自动任务链路已用真实公开文章验证成功，`QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=all_public` 在生产 worker 生效。
+- 2026-06-25 存量补推按 65 秒间隔运行并成功发送 79 条交付记录；按当前验收判断，不再要求继续补推全部历史公开新闻，剩余历史 `retrying/send_failed` 记录保留用于后台排查，不影响后续新发布文章自动推送。
 
 ## 2026-06-24 自动发布门禁优化本地实现
 
