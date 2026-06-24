@@ -306,6 +306,7 @@ QQ_PUSH_SCOPE=high_value_only
 QQ_PUSH_MAX_ATTEMPTS=3
 QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS=5
 QQ_PUSH_SENDING_STALE_SECONDS=600
+QQ_PUSH_MIN_INTERVAL_SECONDS=60
 ONEBOT_BASE_URL=http://onebot:3000
 ONEBOT_ACCESS_TOKEN=
 ONEBOT_TIMEOUT_SECONDS=30
@@ -375,7 +376,7 @@ docker compose -f docker-compose.prod.lowcost.yml up -d worker beat
 检查配置：
 
 ```bash
-docker compose -f docker-compose.prod.lowcost.yml exec worker sh -c 'env | grep -E "^(QQ_PUSH_ENABLED|QQ_PUSH_SCOPE|QQ_PUSH_MAX_ATTEMPTS|QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS|QQ_PUSH_SENDING_STALE_SECONDS|ONEBOT_BASE_URL|ONEBOT_TIMEOUT_SECONDS)="'
+docker compose -f docker-compose.prod.lowcost.yml exec worker sh -c 'env | grep -E "^(QQ_PUSH_ENABLED|QQ_PUSH_SCOPE|QQ_PUSH_MAX_ATTEMPTS|QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS|QQ_PUSH_SENDING_STALE_SECONDS|QQ_PUSH_MIN_INTERVAL_SECONDS|ONEBOT_BASE_URL|ONEBOT_TIMEOUT_SECONDS)="'
 ```
 
 查看交付记录：
@@ -848,9 +849,10 @@ QQ_PUSH_SCOPE=all_public
 QQ_PUSH_MAX_ATTEMPTS=3
 QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS=5
 QQ_PUSH_SENDING_STALE_SECONDS=600
+QQ_PUSH_MIN_INTERVAL_SECONDS=60
 ```
 
-`ONEBOT_ACCESS_TOKEN` 已写入生产 `.env`，但不得写入仓库文档。`QQ_PUSH_ENABLED` 在自动推送代码和迁移部署完成前保持 `false`，部署验收后再改为 `true`。
+`ONEBOT_ACCESS_TOKEN` 已写入生产 `.env`，但不得写入仓库文档。`QQ_PUSH_MIN_INTERVAL_SECONDS` 用于控制同一目标群两次自动发送尝试之间的最小间隔，避免批量补推或批量发布触发 QQ / NapCat 发送异常。
 
 ### 已配置群目标
 
@@ -866,6 +868,8 @@ QQ_PUSH_SENDING_STALE_SECONDS=600
 - Django 应用侧 `stable.services.onebot.BotPusher` 通过 `http://onebot:3000` 成功发送测试消息，返回 `retcode=0`。
 - 重启 `worker / beat` 让它们读取新的 `.env`；Compose 同时按依赖短暂重建了 `db / web` 容器，但没有执行 `git pull`、没有 build、没有运行 `deploy_lowcost.sh`。
 - 重启后 `web` healthz 返回 `{"status": "ok"}`，`web` 容器 healthy，`db / redis` healthy，`worker / beat` up。
+- 2026-06-24 已部署 `add-qqbot-auto-push` 到 `main`，生产迁移 `stable.0010_qqpushdelivery` 已应用，`QQ_PUSH_ENABLED=true` 与 `QQ_PUSH_SCOPE=all_public` 已生效。
+- 批量补推 126 篇存量公开文章时，`QQPushDelivery` 记录创建成功；NapCat / QQ 客户端返回 `EventChecker Failed ... 网络连接异常`，系统按 `send_failed` 记录并进入有限重试，未误标记成功。后续补推必须使用 `QQ_PUSH_MIN_INTERVAL_SECONDS` 或人工脚本限速。
 
 ### 自动推送上线步骤
 

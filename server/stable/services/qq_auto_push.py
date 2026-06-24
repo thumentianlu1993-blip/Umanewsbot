@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -166,6 +167,26 @@ def _set_delivery_failure(delivery: QQPushDelivery, *, error_type: str, error: s
 
 def _sending_stale_after() -> int:
     return max(60, int(getattr(settings, "QQ_PUSH_SENDING_STALE_SECONDS", 600)))
+
+
+def qq_push_next_attempt_delay(delivery: QQPushDelivery) -> int:
+    min_interval = max(0, int(getattr(settings, "QQ_PUSH_MIN_INTERVAL_SECONDS", 60)))
+    if min_interval <= 0:
+        return 0
+
+    latest_attempt_at = (
+        QQPushDelivery.objects.filter(target=delivery.target, last_attempt_at__isnull=False)
+        .order_by("-last_attempt_at")
+        .values_list("last_attempt_at", flat=True)
+        .first()
+    )
+    if latest_attempt_at is None:
+        return 0
+
+    elapsed = (timezone.now() - latest_attempt_at).total_seconds()
+    if elapsed >= min_interval:
+        return 0
+    return max(1, math.ceil(min_interval - elapsed))
 
 
 def _is_stale_sending(delivery: QQPushDelivery) -> bool:

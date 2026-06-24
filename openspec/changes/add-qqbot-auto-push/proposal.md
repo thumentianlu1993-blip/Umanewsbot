@@ -28,6 +28,6 @@
 - Celery 任务：新增发布后自动推送编排、公开 URL 可访问检查、单群交付任务和有限重试。
 - 服务层：复用并收紧 OneBot HTTP 调用、消息模板生成和高价值新闻判断。
 - 后台管理：通过 Django Admin 管理 QQ 群、查看自动推送交付记录和失败原因。
-- 配置：新增 `QQ_PUSH_ENABLED`、`QQ_PUSH_SCOPE`、`QQ_PUSH_MAX_ATTEMPTS`、`QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS`、`ONEBOT_TIMEOUT_SECONDS` 等环境变量。
+- 配置：新增 `QQ_PUSH_ENABLED`、`QQ_PUSH_SCOPE`、`QQ_PUSH_MAX_ATTEMPTS`、`QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS`、`QQ_PUSH_MIN_INTERVAL_SECONDS`、`ONEBOT_TIMEOUT_SECONDS` 等环境变量。
 - 部署与文档：更新 `.env.example`、Compose OneBot 示例、`docs/qqbot_setup.md`、`docs/deploy_runbook.md`、`docs/current_state.md` 和 `docs/project_status.md`。
 - 外部系统：依赖同机运行的 OneBot v11 HTTP 网关；推荐 NapCatQQ，go-cqhttp 不作为新接入路线。

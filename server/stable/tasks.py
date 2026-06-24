@@ -47,6 +47,7 @@ from stable.services.qq_auto_push import (
     ensure_qq_push_deliveries,
     get_auto_push_targets,
     process_qq_push_delivery,
+    qq_push_next_attempt_delay,
     should_push_news_to_qq,
 )
 from stable.services.queueing import dispatch_task
@@ -676,6 +677,18 @@ def qq_push_delivery_task(self, delivery_id: int) -> dict:
     log = _log_start("qq_push_delivery", {"delivery_id": delivery_id})
     try:
         delivery = QQPushDelivery.objects.select_related("article", "target").get(pk=delivery_id)
+        throttle_delay = qq_push_next_attempt_delay(delivery)
+        if throttle_delay > 0 and not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            self.apply_async(args=(delivery_id,), countdown=throttle_delay)
+            result = {
+                "delivery_id": delivery.id,
+                "status": delivery.status,
+                "attempt_count": delivery.attempt_count,
+                "last_error_type": delivery.last_error_type,
+                "throttle_delay_seconds": throttle_delay,
+            }
+            _log_success(log, f"rate limited: retry in {throttle_delay}s")
+            return result
         delivery = process_qq_push_delivery(delivery)
         result = {
             "delivery_id": delivery.id,
@@ -685,7 +698,7 @@ def qq_push_delivery_task(self, delivery_id: int) -> dict:
         }
         if delivery.status == QQPushDeliveryStatus.RETRYING and delivery.attempt_count < delivery.max_attempts:
             if not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
-                self.retry(countdown=_qq_push_retry_countdown(delivery.attempt_count), throw=False)
+                self.apply_async(args=(delivery_id,), countdown=_qq_push_retry_countdown(delivery.attempt_count))
             _log_success(log, f"retry scheduled: {delivery.last_error_type}")
             return result
         if delivery.status == QQPushDeliveryStatus.FAILED:

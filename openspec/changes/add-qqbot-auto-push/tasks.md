@@ -2,7 +2,7 @@
 
 - [x] 1.1 (application) 新增自动 QQ 推送状态枚举和 `QQPushDelivery` 或等价模型，字段覆盖文章、目标群、状态、尝试次数、最大尝试次数、最近错误类型、错误、OneBot 响应、最后尝试时间和成功时间，并添加 `article + target` 唯一约束。
 - [x] 1.2 (application) 生成并检查 Django 迁移，确保 PostgreSQL 与 SQLite 均可应用，且不改变现有 `PushTarget`、`PushLog` 的手动推送语义。
-- [x] 1.3 (application) 在 `server/app/settings.py` 新增 `QQ_PUSH_ENABLED`、`QQ_PUSH_SCOPE`、`QQ_PUSH_MAX_ATTEMPTS`、`QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS`、`ONEBOT_TIMEOUT_SECONDS` 等配置读取，默认自动推送关闭、范围为 `high_value_only`、最大重试 3 次。
+- [x] 1.3 (application) 在 `server/app/settings.py` 新增 `QQ_PUSH_ENABLED`、`QQ_PUSH_SCOPE`、`QQ_PUSH_MAX_ATTEMPTS`、`QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS`、`QQ_PUSH_MIN_INTERVAL_SECONDS`、`ONEBOT_TIMEOUT_SECONDS` 等配置读取，默认自动推送关闭、范围为 `high_value_only`、最大重试 3 次。
 
 ## 2. 推送服务与任务编排
 

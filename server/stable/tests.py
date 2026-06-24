@@ -48,6 +48,7 @@ from stable.services.onebot import BotPusher, OneBotRequestError
 from stable.services.qq_auto_push import (
     build_qq_auto_push_message,
     ensure_qq_push_deliveries,
+    qq_push_next_attempt_delay,
     should_push_news_to_qq,
 )
 from stable.services.pushing import build_push_message, push_article_to_targets
@@ -657,6 +658,33 @@ class QQAutoPushTests(TestCase):
         self.assertEqual(result["status"], QQPushDeliveryStatus.SENT)
         self.assertEqual(delivery.attempt_count, 2)
         self.assertEqual(delivery.message_id, "456")
+
+    @override_settings(QQ_PUSH_MIN_INTERVAL_SECONDS=60)
+    def test_delivery_attempt_delay_uses_target_last_attempt(self):
+        first_delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
+        first_delivery.last_attempt_at = timezone.now() - timedelta(seconds=15)
+        first_delivery.save(update_fields=["last_attempt_at", "updated_at"])
+        second_article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="qq-auto-2",
+            title_ja="原文标题2",
+            title_zh="中文标题2",
+            body_ja_raw="原文正文2",
+            body_ja_normalized="原文正文2",
+            body_zh="中文正文2",
+            published_at=timezone.now(),
+            source_url="https://example.com/article/qq-auto-2",
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+            score_total=90,
+        )
+        second_delivery = ensure_qq_push_deliveries(second_article, [self.target])[0]
+
+        delay = qq_push_next_attempt_delay(second_delivery)
+
+        self.assertGreaterEqual(delay, 44)
+        self.assertLessEqual(delay, 60)
 
     @override_settings(QQ_PUSH_ENABLED=True, QQ_PUSH_SCOPE="high_value_only")
     def test_article_task_queues_only_active_targets(self):

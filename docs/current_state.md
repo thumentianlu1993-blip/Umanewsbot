@@ -82,9 +82,9 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 需要继续确认抓取调度、翻译调度、发布链路在正式域名环境下的长期稳定性
 - 自动化发布涉及内容安全，生产首轮建议低频、低批量、保守开关启用
 - AI 改写真实效果依赖模型配置与术语库质量，需继续通过后台人工抽检
-- 邮件通知首版已实现；短信 / 微信通知当前只保留日志与配置位；QQ / OneBot 真实发送网关已在生产配置并通过测试消息，自动推送代码部署后即可灰度开启
+- 邮件通知首版已实现；短信 / 微信通知当前只保留日志与配置位；QQ / OneBot 真实发送网关已在生产配置并通过测试消息，自动推送代码已部署并进入测试群灰度
 - 需要补足更标准的部署基线、回滚与备份演练
-- QQ Bot 正式自动推送链路仍需在本 change 部署迁移后开启 `QQ_PUSH_ENABLED=true` 并用测试群验收。
+- QQ Bot 自动推送已在生产开启测试群灰度；如出现 QQ 客户端发送异常，优先通过 `QQ_PUSH_ENABLED=false` 停止自动推送并保留 OneBot 网关排查。
 
 ## 2026-06-23 QQ 群自动推送 OpenSpec change
 
@@ -99,6 +99,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 自动交付会先原子领取尝试再执行 URL 检查和 OneBot 发送，避免重复任务并发消耗重试次数。
 - OneBot HTTP 200 但 JSON 返回业务失败时按 `send_failed` 记录，不会误标记为成功。
 - `sending` 状态超过 `QQ_PUSH_SENDING_STALE_SECONDS`（默认 600 秒）后允许后续任务重新领取，避免 worker 异常后长期卡住。
+- 自动发送按目标群最近一次尝试时间做最小间隔保护，`QQ_PUSH_MIN_INTERVAL_SECONDS` 默认 60 秒，避免批量发布或补推时压垮 QQ / NapCat 发送通道。
 - 自动推送只读取 `PushTarget.is_active=true` 的群；`is_default` 保留给后台手动推送默认目标。
 - Django Admin 新增自动交付记录查看入口，并在文章详情中展示交付内联记录。
 
@@ -106,14 +107,14 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 - 生产已配置 NapCatQQ / OneBot v11 网关、测试群和 access token。
 - 生产 `.env` 已设置 `QQ_PUSH_SCOPE=all_public`，目标是测试群阶段推送所有公开新闻。
-- 部署代码和迁移前保持 `QQ_PUSH_ENABLED=false`；确认 `QQPushDelivery` 可用后再设置 `QQ_PUSH_ENABLED=true`，重启 `worker/beat` 灰度观察。
+- 生产已部署迁移 `stable.0010_qqpushdelivery`，并设置 `QQ_PUSH_ENABLED=true` 进入测试群灰度。
 - OneBot API 不得公网裸露；优先 Docker 内网 `http://onebot:3000`，临时映射只能绑定 `127.0.0.1`。
 
-### 待验收
+### 验收记录
 
-- 部署迁移后开启 `QQ_PUSH_ENABLED=true`。
-- 发布或复用一篇公开文章触发测试群自动推送。
-- 生产 `QQPushDelivery` 记录与 worker 日志核对。
+- OneBot 直连和 Django 应用侧短消息均已成功发送到测试群 `1026525240`。
+- 生产批量补推 126 篇公开文章时，交付记录成功创建并进入有限重试；NapCat / QQ 客户端随后返回 `网络连接异常`，系统正确记录为 `send_failed` 且未误标为成功。
+- 已补充 `QQ_PUSH_MIN_INTERVAL_SECONDS` 节流保护，后续自动任务按目标群最小间隔重排，降低 QQ 风控和客户端异常风险。
 
 ## 2026-06-24 自动发布门禁优化本地实现
 

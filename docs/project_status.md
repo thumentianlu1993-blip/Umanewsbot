@@ -148,7 +148,7 @@
 - 推进 HTTPS / 证书接入
 - 做部署稳定化
 - 完善监控、备份与回滚流程
-- 部署 QQ Bot 自动推送代码，执行迁移后灰度开启 `QQ_PUSH_ENABLED=true`
+- 观察 QQ Bot 测试群灰度；OneBot 已接通并开启 `QQ_PUSH_ENABLED=true`，批量补推需按 `QQ_PUSH_MIN_INTERVAL_SECONDS` 限速以避免 QQ / NapCat 发送异常
 
 ## 7. 当前上线进展（摘要）
 
