@@ -938,6 +938,10 @@ def article_editor(request: HttpRequest, article_id: int):
                 if article.workflow_status in {WorkflowStatus.PENDING_TRANSLATION, WorkflowStatus.TRANSLATION_FAILED}:
                     article.workflow_status = WorkflowStatus.PENDING_EDIT
             article.save()
+            if intent == "publish":
+                from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article
+
+                enqueue_qq_auto_push_for_article(article.id)
             action_map = {
                 "save": "article_saved",
                 "autosave": "article_autosaved",

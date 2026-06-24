@@ -20,6 +20,8 @@ from stable.models import (
     NotificationLog,
     NotificationType,
     PublishedByMode,
+    QQPushDelivery,
+    QQPushDeliveryStatus,
     PushTarget,
     ReviewMode,
     SourceMode,
@@ -39,6 +41,12 @@ from stable.services.ingestion import upsert_article_from_draft
 from stable.services.notifications import send_automation_notification
 from stable.services.operations import log_operation
 from stable.services.pushing import push_article_to_targets
+from stable.services.qq_auto_push import (
+    ensure_qq_push_deliveries,
+    get_auto_push_targets,
+    process_qq_push_delivery,
+    should_push_news_to_qq,
+)
 from stable.services.queueing import dispatch_task
 from stable.services.rewriting import apply_rewrite_result, rewrite_article
 from stable.services.sources import find_builtin_source, sync_builtin_sources
@@ -572,12 +580,82 @@ def push_article_task(article_id: int, target_ids: list[int], user_id: int | Non
         raise
 
 
+def _qq_push_retry_countdown(attempt_count: int) -> int:
+    return min(300, max(30, attempt_count * 60))
+
+
+@shared_task
+def qq_auto_push_article_task(article_id: int) -> dict:
+    log = _log_start("qq_auto_push_article", {"article_id": article_id})
+    if not getattr(settings, "QQ_PUSH_ENABLED", False):
+        _log_success(log, "qq push disabled")
+        return {"article_id": article_id, "skipped": True, "reason": "disabled"}
+    try:
+        article = NewsArticle.objects.get(pk=article_id)
+        eligibility = should_push_news_to_qq(article)
+        if not eligibility.allowed:
+            _log_success(log, f"skipped: {eligibility.reason}")
+            return {"article_id": article_id, "skipped": True, "reason": eligibility.reason}
+        targets = get_auto_push_targets()
+        if not targets:
+            _log_success(log, "skipped: no active targets")
+            return {"article_id": article_id, "skipped": True, "reason": "no_targets"}
+        deliveries = ensure_qq_push_deliveries(article, targets)
+        queued_ids: list[int] = []
+        skipped_ids: list[int] = []
+        for delivery in deliveries:
+            if delivery.status == QQPushDeliveryStatus.SENT:
+                skipped_ids.append(delivery.id)
+                continue
+            qq_push_delivery_task.delay(delivery.id)
+            queued_ids.append(delivery.id)
+        _log_success(log, f"queued={len(queued_ids)} already_sent={len(skipped_ids)}")
+        return {
+            "article_id": article_id,
+            "queued_delivery_ids": queued_ids,
+            "already_sent_delivery_ids": skipped_ids,
+        }
+    except Exception as exc:
+        _log_failure(log, str(exc))
+        raise
+
+
+@shared_task(bind=True)
+def qq_push_delivery_task(self, delivery_id: int) -> dict:
+    log = _log_start("qq_push_delivery", {"delivery_id": delivery_id})
+    try:
+        delivery = QQPushDelivery.objects.select_related("article", "target").get(pk=delivery_id)
+        delivery = process_qq_push_delivery(delivery)
+        result = {
+            "delivery_id": delivery.id,
+            "status": delivery.status,
+            "attempt_count": delivery.attempt_count,
+            "last_error_type": delivery.last_error_type,
+        }
+        if delivery.status == QQPushDeliveryStatus.RETRYING and delivery.attempt_count < delivery.max_attempts:
+            if not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
+                self.retry(countdown=_qq_push_retry_countdown(delivery.attempt_count), throw=False)
+            _log_success(log, f"retry scheduled: {delivery.last_error_type}")
+            return result
+        if delivery.status == QQPushDeliveryStatus.FAILED:
+            _log_failure(log, delivery.last_error or "qq push delivery failed")
+            return result
+        _log_success(log, f"status={delivery.status}")
+        return result
+    except Exception as exc:
+        _log_failure(log, str(exc))
+        raise
+
+
 def publish_article(article: NewsArticle, user) -> None:
     article.workflow_status = WorkflowStatus.PUBLISHED
     article.published_to_web_at = timezone.now()
     article.published_by = user
     article.published_by_mode = PublishedByMode.MANUAL
     article.save(update_fields=["workflow_status", "published_to_web_at", "published_by", "published_by_mode", "updated_at"])
+    from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article
+
+    enqueue_qq_auto_push_for_article(article.id)
     log_operation(
         action_type="article_published",
         target_type="article",

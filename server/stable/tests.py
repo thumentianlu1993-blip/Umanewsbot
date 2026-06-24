@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone as dt_timezone
 from io import StringIO
 from unittest.mock import patch
 
+import requests
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -22,6 +23,9 @@ from stable.models import (
     NewsSource,
     NotificationLog,
     PushTarget,
+    QQPushDelivery,
+    QQPushDeliveryStatus,
+    QQPushErrorType,
     ReviewMode,
     SourceMode,
     SourceSite,
@@ -31,6 +35,12 @@ from stable.models import (
     TaskExecutionLog,
     TaskStatus,
     WorkflowStatus,
+)
+from stable.services.onebot import BotPusher, OneBotRequestError
+from stable.services.qq_auto_push import (
+    build_qq_auto_push_message,
+    ensure_qq_push_deliveries,
+    should_push_news_to_qq,
 )
 from stable.services.pushing import build_push_message, push_article_to_targets
 from stable.services.automation import score_article_for_automation
@@ -60,6 +70,8 @@ from stable.tasks import (
     batch_translate_articles_task,
     discover_term_candidates_task,
     process_article_automation_task,
+    qq_auto_push_article_task,
+    qq_push_delivery_task,
     score_article_task,
     send_notification_task,
     translate_article_task,
@@ -273,6 +285,226 @@ class PushTests(TestCase):
         self.article.refresh_from_db()
         self.assertEqual(logs[0].status, "success")
         self.assertEqual(self.article.status, "pushed")
+
+
+@override_settings(
+    SITE_URL="http://testserver",
+    CELERY_TASK_ALWAYS_EAGER=True,
+    CELERY_TASK_EAGER_PROPAGATES=False,
+)
+class QQAutoPushTests(TestCase):
+    def setUp(self):
+        self.article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="qq-auto-1",
+            title_ja="原文标题",
+            title_zh="中文标题",
+            summary_zh="中文摘要",
+            body_ja_raw="原文正文",
+            body_ja_normalized="原文正文",
+            body_zh="中文正文" * 80,
+            push_summary_zh="中文摘要",
+            published_at=timezone.now(),
+            source_url="https://example.com/article/qq-auto-1",
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+            score_total=90,
+        )
+        self.target = PushTarget.objects.create(name="测试群", group_id="10001", is_default=False, is_active=True)
+        self.inactive_target = PushTarget.objects.create(name="停用群", group_id="10002", is_active=False)
+
+    def test_delivery_records_are_unique_per_article_and_target(self):
+        first = ensure_qq_push_deliveries(self.article, [self.target])
+        second = ensure_qq_push_deliveries(self.article, [self.target])
+
+        self.assertEqual(first[0].id, second[0].id)
+        self.assertEqual(QQPushDelivery.objects.count(), 1)
+
+    @override_settings(QQ_PUSH_SCOPE="high_value_only", AUTO_REVIEW_THRESHOLD=75)
+    def test_high_value_scope_uses_score_threshold(self):
+        self.assertTrue(should_push_news_to_qq(self.article).allowed)
+        self.article.score_total = 20
+        self.article.save(update_fields=["score_total", "updated_at"])
+
+        result = should_push_news_to_qq(self.article)
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.reason, "not_high_value")
+
+    @override_settings(QQ_PUSH_SCOPE="all_public", AUTO_REVIEW_THRESHOLD=75)
+    def test_all_public_scope_ignores_score(self):
+        self.article.score_total = 20
+        self.article.save(update_fields=["score_total", "updated_at"])
+
+        self.assertTrue(should_push_news_to_qq(self.article).allowed)
+
+    @override_settings(QQ_PUSH_SCOPE="unsupported", AUTO_REVIEW_THRESHOLD=75)
+    def test_invalid_scope_falls_back_to_high_value_only(self):
+        self.article.score_total = 20
+        self.article.save(update_fields=["score_total", "updated_at"])
+
+        self.assertFalse(should_push_news_to_qq(self.article).allowed)
+
+    def test_auto_push_message_uses_summary_and_public_url(self):
+        message = build_qq_auto_push_message(self.article)
+
+        self.assertIn("【UmaFans】中文标题", message)
+        self.assertIn("中文摘要", message)
+        self.assertIn("阅读全文：http://testserver/news/", message)
+
+    def test_auto_push_message_truncates_body_when_summary_blank(self):
+        self.article.summary_zh = ""
+        self.article.push_summary_zh = ""
+        self.article.translated_summary_zh = ""
+        self.article.rewrite_summary_zh = ""
+        self.article.save()
+
+        message = build_qq_auto_push_message(self.article)
+
+        self.assertIn("……", message)
+        self.assertIn("阅读全文：http://testserver/news/", message)
+
+    @override_settings(QQ_PUSH_MAX_ATTEMPTS=3)
+    def test_delivery_url_unavailable_records_retryable_error_type(self):
+        delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
+
+        with patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(False, "HTTP 404")):
+            result = qq_push_delivery_task.run(delivery.id)
+
+        delivery.refresh_from_db()
+        self.assertEqual(result["status"], QQPushDeliveryStatus.RETRYING)
+        self.assertEqual(delivery.attempt_count, 1)
+        self.assertEqual(delivery.last_error_type, QQPushErrorType.URL_UNAVAILABLE)
+
+    @override_settings(QQ_PUSH_MAX_ATTEMPTS=1)
+    def test_delivery_onebot_failure_records_send_failed(self):
+        delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
+
+        with (
+            patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")),
+            patch("stable.services.qq_auto_push.BotPusher.send_group_message", side_effect=RuntimeError("bot down")),
+        ):
+            result = qq_push_delivery_task.run(delivery.id)
+
+        delivery.refresh_from_db()
+        self.assertEqual(result["status"], QQPushDeliveryStatus.FAILED)
+        self.assertEqual(delivery.attempt_count, 1)
+        self.assertEqual(delivery.last_error_type, QQPushErrorType.SEND_FAILED)
+
+    def test_delivery_success_saves_message_id(self):
+        delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
+
+        with (
+            patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")),
+            patch("stable.services.qq_auto_push.BotPusher.send_group_message", return_value={"status": "ok", "data": {"message_id": 123}}),
+        ):
+            result = qq_push_delivery_task.run(delivery.id)
+
+        delivery.refresh_from_db()
+        self.assertEqual(result["status"], QQPushDeliveryStatus.SENT)
+        self.assertEqual(delivery.message_id, "123")
+        self.assertIsNotNone(delivery.sent_at)
+
+    @override_settings(QQ_PUSH_MAX_ATTEMPTS=1, ONEBOT_ACCESS_TOKEN="SECRET")
+    def test_delivery_onebot_failed_json_records_send_failed(self):
+        delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
+
+        class FailedResponse:
+            text = '{"status":"failed","retcode":100,"wording":"bad SECRET"}'
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"status": "failed", "retcode": 100, "wording": "bad SECRET"}
+
+        with (
+            patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")),
+            patch("stable.services.onebot.requests.post", return_value=FailedResponse()),
+        ):
+            result = qq_push_delivery_task.run(delivery.id)
+
+        delivery.refresh_from_db()
+        self.assertEqual(result["status"], QQPushDeliveryStatus.FAILED)
+        self.assertEqual(delivery.last_error_type, QQPushErrorType.SEND_FAILED)
+        self.assertNotIn("SECRET", delivery.last_error)
+
+    @override_settings(QQ_PUSH_SENDING_STALE_SECONDS=60)
+    def test_active_sending_delivery_is_not_reclaimed(self):
+        delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
+        delivery.status = QQPushDeliveryStatus.SENDING
+        delivery.attempt_count = 1
+        delivery.last_attempt_at = timezone.now()
+        delivery.save(update_fields=["status", "attempt_count", "last_attempt_at", "updated_at"])
+
+        with (
+            patch("stable.services.qq_auto_push.is_public_url_accessible") as url_check,
+            patch("stable.services.qq_auto_push.BotPusher.send_group_message") as send_message,
+        ):
+            result = qq_push_delivery_task.run(delivery.id)
+
+        delivery.refresh_from_db()
+        self.assertEqual(result["status"], QQPushDeliveryStatus.SENDING)
+        self.assertEqual(delivery.attempt_count, 1)
+        url_check.assert_not_called()
+        send_message.assert_not_called()
+
+    @override_settings(QQ_PUSH_SENDING_STALE_SECONDS=60)
+    def test_stale_sending_delivery_is_reclaimed(self):
+        delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
+        delivery.status = QQPushDeliveryStatus.SENDING
+        delivery.attempt_count = 1
+        delivery.max_attempts = 3
+        delivery.last_attempt_at = timezone.now() - timedelta(seconds=120)
+        delivery.save(update_fields=["status", "attempt_count", "max_attempts", "last_attempt_at", "updated_at"])
+
+        with (
+            patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")),
+            patch("stable.services.qq_auto_push.BotPusher.send_group_message", return_value={"status": "ok", "data": {"message_id": 456}}),
+        ):
+            result = qq_push_delivery_task.run(delivery.id)
+
+        delivery.refresh_from_db()
+        self.assertEqual(result["status"], QQPushDeliveryStatus.SENT)
+        self.assertEqual(delivery.attempt_count, 2)
+        self.assertEqual(delivery.message_id, "456")
+
+    @override_settings(QQ_PUSH_ENABLED=True, QQ_PUSH_SCOPE="high_value_only")
+    def test_article_task_queues_only_active_targets(self):
+        with patch("stable.tasks.qq_push_delivery_task.delay") as delay:
+            result = qq_auto_push_article_task.run(self.article.id)
+
+        self.assertEqual(len(result["queued_delivery_ids"]), 1)
+        self.assertEqual(QQPushDelivery.objects.count(), 1)
+        self.assertEqual(QQPushDelivery.objects.get().target, self.target)
+        delay.assert_called_once()
+
+    @override_settings(QQ_PUSH_ENABLED=False)
+    def test_manual_push_still_works_when_auto_push_disabled(self):
+        with patch("stable.services.pushing.BotPusher.send_group_message", return_value={"status": "ok"}):
+            logs = push_article_to_targets(self.article, [self.target])
+
+        self.assertEqual(logs[0].status, "success")
+
+    @override_settings(ONEBOT_ACCESS_TOKEN="SECRET", ONEBOT_TIMEOUT_SECONDS=1)
+    def test_onebot_errors_redact_token(self):
+        with patch("stable.services.onebot.requests.post", side_effect=requests.RequestException("bad SECRET")):
+            with self.assertRaises(OneBotRequestError) as error:
+                BotPusher().send_group_message("10001", "测试")
+
+        self.assertNotIn("SECRET", str(error.exception))
+
+    def test_admin_delivery_changelist_is_visible(self):
+        user = User.objects.create_superuser("admin2", "admin2@example.com", "admin123456")
+        client = Client()
+        client.login(username="admin2", password="admin123456")
+        ensure_qq_push_deliveries(self.article, [self.target])
+
+        response = client.get(reverse("admin:stable_qqpushdelivery_changelist"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "测试群")
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)

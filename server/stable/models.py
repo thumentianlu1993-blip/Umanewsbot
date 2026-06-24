@@ -140,6 +140,22 @@ class PushStatus(models.TextChoices):
     FAILED = "failed", "失败"
 
 
+class QQPushDeliveryStatus(models.TextChoices):
+    PENDING = "pending", "待推送"
+    RETRYING = "retrying", "等待重试"
+    SENDING = "sending", "发送中"
+    SENT = "sent", "已发送"
+    FAILED = "failed", "失败"
+    SKIPPED = "skipped", "已跳过"
+
+
+class QQPushErrorType(models.TextChoices):
+    URL_UNAVAILABLE = "url_unavailable", "公开 URL 不可访问"
+    SEND_FAILED = "send_failed", "OneBot 发送失败"
+    NOT_ELIGIBLE = "not_eligible", "不符合推送范围"
+    NO_TARGETS = "no_targets", "无启用目标群"
+
+
 class TaskStatus(models.TextChoices):
     STARTED = "started", "运行中"
     SUCCESS = "success", "成功"
@@ -732,6 +748,38 @@ class PushLog(TimestampedModel):
 
     class Meta:
         ordering = ("-created_at", "-id")
+
+
+class QQPushDelivery(TimestampedModel):
+    article = models.ForeignKey(NewsArticle, on_delete=models.CASCADE, related_name="qq_push_deliveries")
+    target = models.ForeignKey(PushTarget, on_delete=models.CASCADE, related_name="qq_push_deliveries")
+    status = models.CharField(
+        max_length=16,
+        choices=QQPushDeliveryStatus.choices,
+        default=QQPushDeliveryStatus.PENDING,
+    )
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    max_attempts = models.PositiveSmallIntegerField(default=3)
+    last_error_type = models.CharField(max_length=32, choices=QQPushErrorType.choices, blank=True)
+    last_error = models.TextField(blank=True)
+    request_payload = models.JSONField(default=dict, blank=True)
+    response_payload = models.JSONField(default=dict, blank=True)
+    message_id = models.CharField(max_length=128, blank=True)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        constraints = [
+            models.UniqueConstraint(fields=("article", "target"), name="uq_qq_push_delivery_article_target")
+        ]
+        indexes = [
+            models.Index(fields=("status", "-updated_at"), name="qqpush_status_updated_idx"),
+            models.Index(fields=("target", "status"), name="qqpush_target_status_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.article_id} -> {self.target_id} ({self.status})"
 
 
 class TranslationRun(TimestampedModel):

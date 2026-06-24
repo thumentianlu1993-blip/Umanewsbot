@@ -463,6 +463,9 @@ def publish_article_automatically(article: NewsArticle) -> None:
         reason="自动批量发布",
         payload={"article_id": article.id, "title": article.effective_title},
     )
+    from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article
+
+    enqueue_qq_auto_push_for_article(article.id)
 
 
 def important_manual_notification_payload(article: NewsArticle) -> dict | None:

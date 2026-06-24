@@ -249,6 +249,119 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shel
 5. 后台操作日志页查看 `NotificationLog`
 6. 如果内容质量不稳，先关闭 `AUTOMATION_ENABLED`，不要急着回滚代码
 
+## QQ 群自动推送部署与验证
+
+### 关键环境变量
+
+自动 QQ 推送默认关闭，生产首次部署建议保持：
+
+```bash
+QQ_PUSH_ENABLED=false
+QQ_PUSH_SCOPE=high_value_only
+QQ_PUSH_MAX_ATTEMPTS=3
+QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS=5
+QQ_PUSH_SENDING_STALE_SECONDS=600
+ONEBOT_BASE_URL=http://onebot:3000
+ONEBOT_ACCESS_TOKEN=
+ONEBOT_TIMEOUT_SECONDS=30
+```
+
+`QQ_PUSH_SCOPE` 支持：
+
+- `high_value_only`：默认，仅推 `score_total >= AUTO_REVIEW_THRESHOLD` 的已发布文章
+- `all_public`：推所有公开 URL 可访问的已发布文章
+
+### 部署步骤
+
+```bash
+cd /opt/umanewsbot
+cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+git pull origin main
+docker compose -f docker-compose.prod.lowcost.yml build web worker beat
+docker compose -f docker-compose.prod.lowcost.yml up -d
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py migrate
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py check
+```
+
+### 配置群目标
+
+进入 Django Admin：
+
+```text
+/django-admin/stable/pushtarget/
+```
+
+配置 `name`、`group_id`，并将测试群设为 `is_active=true`。自动推送只看 `is_active`，`is_default` 仅用于手动推送默认群。
+
+### OneBot 网关安全边界
+
+OneBot API 不得公网裸露。推荐 Docker 内网访问：
+
+```env
+ONEBOT_BASE_URL=http://onebot:3000
+```
+
+如果临时映射到宿主机，只允许：
+
+```yaml
+ports:
+  - "127.0.0.1:3000:3000"
+```
+
+不要使用公网 `0.0.0.0:3000:3000`。
+
+### 灰度启用
+
+确认测试群和 OneBot 网关可用后，把 `.env` 改为：
+
+```bash
+QQ_PUSH_ENABLED=true
+QQ_PUSH_SCOPE=high_value_only
+```
+
+重启 worker / beat：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml up -d worker beat
+```
+
+### 验收命令
+
+检查配置：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec worker sh -c 'env | grep -E "^(QQ_PUSH_ENABLED|QQ_PUSH_SCOPE|QQ_PUSH_MAX_ATTEMPTS|QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS|QQ_PUSH_SENDING_STALE_SECONDS|ONEBOT_BASE_URL|ONEBOT_TIMEOUT_SECONDS)="'
+```
+
+查看交付记录：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.models import QQPushDelivery; print(QQPushDelivery.objects.order_by('-created_at').values('id','article_id','target_id','status','attempt_count','last_error_type')[:10])"
+```
+
+查看 worker 日志：
+
+```bash
+docker logs --tail=160 umanewsbot-worker-1
+```
+
+后台排查入口：
+
+```text
+/django-admin/stable/qqpushdelivery/
+```
+
+### 停用和回滚
+
+最快停用方式：
+
+```bash
+QQ_PUSH_ENABLED=false
+docker compose -f docker-compose.prod.lowcost.yml up -d worker beat
+```
+
+停用自动 QQ 推送不会影响公开网站、自动发布或后台手动推送。若 OneBot 网关异常，可先停掉 OneBot 容器或把目标群 `is_active=false`。
+
 ## 专有术语候选发现灰度部署
 
 ## 正式术语库恢复与赛事等级修复部署

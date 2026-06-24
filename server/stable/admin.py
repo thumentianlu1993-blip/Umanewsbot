@@ -20,6 +20,7 @@ from .models import (
     OperationLog,
     PushLog,
     PushTarget,
+    QQPushDelivery,
     TaskExecutionLog,
     TermCandidate,
     TermCandidateEvidence,
@@ -60,6 +61,23 @@ class PushLogInline(admin.TabularInline):
     model = PushLog
     extra = 0
     readonly_fields = ("target", "status", "error_message", "sent_at", "created_at")
+    can_delete = False
+
+
+class QQPushDeliveryInline(admin.TabularInline):
+    model = QQPushDelivery
+    extra = 0
+    readonly_fields = (
+        "target",
+        "status",
+        "attempt_count",
+        "max_attempts",
+        "last_error_type",
+        "last_error",
+        "last_attempt_at",
+        "sent_at",
+        "created_at",
+    )
     can_delete = False
 
 
@@ -116,7 +134,15 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "push_action_link",
         "translate_action_link",
     )
-    inlines = [NewsImageInline, MediaAssetInline, NewsSnapshotInline, TranslationRunInline, AutomationLogInline, PushLogInline]
+    inlines = [
+        NewsImageInline,
+        MediaAssetInline,
+        NewsSnapshotInline,
+        TranslationRunInline,
+        AutomationLogInline,
+        PushLogInline,
+        QQPushDeliveryInline,
+    ]
     actions = ["mark_pending_review", "mark_published_ready", "queue_translation"]
 
     fieldsets = (
@@ -280,6 +306,39 @@ class PushLogAdmin(admin.ModelAdmin):
     list_filter = ("status", "target")
     search_fields = ("article__title_ja", "article__title_zh", "target__name", "error_message")
     readonly_fields = ("article", "target", "triggered_by", "status", "request_payload", "response_payload", "error_message", "sent_at")
+
+
+@admin.register(QQPushDelivery)
+class QQPushDeliveryAdmin(admin.ModelAdmin):
+    list_display = (
+        "article",
+        "target",
+        "status",
+        "attempt_count",
+        "max_attempts",
+        "last_error_type",
+        "last_attempt_at",
+        "sent_at",
+        "created_at",
+    )
+    list_filter = ("status", "target", "last_error_type", "created_at")
+    search_fields = ("article__title_ja", "article__title_zh", "article__rewrite_title_zh", "target__name", "target__group_id", "last_error")
+    readonly_fields = (
+        "article",
+        "target",
+        "status",
+        "attempt_count",
+        "max_attempts",
+        "last_error_type",
+        "last_error",
+        "request_payload",
+        "response_payload",
+        "message_id",
+        "last_attempt_at",
+        "sent_at",
+        "created_at",
+        "updated_at",
+    )
 
 
 @admin.register(OperationLog)

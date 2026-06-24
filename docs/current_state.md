@@ -66,8 +66,9 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 2. 生产迁移已于 `2026-06-07` 完成；下一步在生产做单篇手动重新发现并抽检术语候选质量，确认后灰度启用 `TERM_DISCOVERY_ENABLED`
 3. 观察自动化发布质量与 `AutomationLog`
 4. 补充翻译 warning 可视化和术语库补全流程
-5. HTTPS / 证书接入
-6. 部署稳定化与监控 / 备份 / 回滚完善
+5. QQ Bot 实网联调并灰度开启自动推送
+6. HTTPS / 证书接入
+7. 部署稳定化与监控 / 备份 / 回滚完善
 
 ## 当前已知风险与待确认项
 
@@ -77,9 +78,38 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 需要继续确认抓取调度、翻译调度、发布链路在正式域名环境下的长期稳定性
 - 自动化发布涉及内容安全，生产首轮建议低频、低批量、保守开关启用
 - AI 改写真实效果依赖模型配置与术语库质量，需继续通过后台人工抽检
-- 邮件通知首版已实现；短信 / QQ / 微信通知当前只保留日志与配置位，尚未接真实发送网关
+- 邮件通知首版已实现；短信 / 微信通知当前只保留日志与配置位；QQ 新闻推送已新增自动推送实现，但仍需实网联调与灰度启用
 - 需要补足更标准的部署基线、回滚与备份演练
-- QQ Bot 实网联调与正式推送链路仍需单独验收
+- QQ Bot 实网联调与正式推送链路仍需单独验收；`add-qqbot-auto-push` 已新增自动推送实现，默认 `QQ_PUSH_ENABLED=false`，生产需先完成 OneBot 网关和测试群灰度。
+
+## 2026-06-23 QQ 群自动推送 OpenSpec change
+
+### 当前实现
+
+- 新增 OpenSpec change：`add-qqbot-auto-push`。
+- 新增自动 QQ 推送交付模型，以“文章 x QQ 群”为唯一粒度记录状态、尝试次数、最大尝试次数、错误类型、错误信息、OneBot 响应、消息 ID、最后尝试时间和成功时间。
+- 自动推送默认关闭：`QQ_PUSH_ENABLED=false`。
+- 自动推送默认范围：`QQ_PUSH_SCOPE=high_value_only`，首版高价值口径为 `score_total >= AUTO_REVIEW_THRESHOLD`；也支持 `all_public`。
+- 发布入口已接入自动推送入队：人工发布、`publish_article()` helper 和自动发布成功后都会在开关开启时异步进入 QQ 推送编排。
+- 推送前检查 `SITE_URL + article.public_path` 是否可访问；URL 不可访问和 OneBot 发送失败分别记录为 `url_unavailable` 与 `send_failed`。
+- 自动交付会先原子领取尝试再执行 URL 检查和 OneBot 发送，避免重复任务并发消耗重试次数。
+- OneBot HTTP 200 但 JSON 返回业务失败时按 `send_failed` 记录，不会误标记为成功。
+- `sending` 状态超过 `QQ_PUSH_SENDING_STALE_SECONDS`（默认 600 秒）后允许后续任务重新领取，避免 worker 异常后长期卡住。
+- 自动推送只读取 `PushTarget.is_active=true` 的群；`is_default` 保留给后台手动推送默认目标。
+- Django Admin 新增自动交付记录查看入口，并在文章详情中展示交付内联记录。
+
+### 当前启用策略
+
+- 生产首次部署保持 `QQ_PUSH_ENABLED=false`。
+- 先配置 NapCatQQ / OneBot v11 网关、测试群和 access token。
+- 测试群确认后再设置 `QQ_PUSH_ENABLED=true` 与 `QQ_PUSH_SCOPE=high_value_only`，重启 `worker/beat` 灰度观察。
+- OneBot API 不得公网裸露；优先 Docker 内网 `http://onebot:3000`，临时映射只能绑定 `127.0.0.1`。
+
+### 待验收
+
+- 真实 OneBot 网关发送测试。
+- 测试群灰度推送。
+- 生产 `QQPushDelivery` 记录与 worker 日志核对。
 
 ## 2026-06-19 公开首页资讯流升级 OpenSpec 主 change
 
