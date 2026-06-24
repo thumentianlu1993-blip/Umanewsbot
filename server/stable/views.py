@@ -45,6 +45,7 @@ from .models import (
     ReviewMode,
     SourceMode,
     TaskExecutionLog,
+    TaskStatus,
     TermCandidate,
     TermCandidateStatus,
     TermEntry,
@@ -242,6 +243,71 @@ def _term_candidate_filters(queryset, request: HttpRequest):
     return queryset.distinct()
 
 
+def _source_health(source: NewsSource, *, now=None) -> dict:
+    now = now or timezone.now()
+    latest_job = source.crawl_jobs.order_by("-started_at", "-id").first()
+    latest_completed_job = source.crawl_jobs.exclude(status=TaskStatus.STARTED).order_by("-started_at", "-id").first()
+    running_timeout_minutes = 60
+    stale_minutes = max(source.crawl_interval_minutes * 3, 180)
+    completed_at = (latest_completed_job.finished_at if latest_completed_job else None) or source.last_crawl_at
+    freshness_reference_at = completed_at or source.created_at
+    is_stale = bool(source.enabled and freshness_reference_at and freshness_reference_at < now - timedelta(minutes=stale_minutes))
+    status = (latest_completed_job.status if latest_completed_job else "") or source.last_crawl_status
+    new_count = latest_completed_job.success_count if latest_completed_job else None
+    duplicate_count = latest_completed_job.fail_count if latest_completed_job else None
+    error_summary = ((latest_completed_job.error_message if latest_completed_job else "") or source.last_crawl_message).strip()
+    if latest_job and latest_job.status == TaskStatus.STARTED:
+        running_minutes = int((now - latest_job.started_at).total_seconds() // 60)
+        started_at = timezone.localtime(latest_job.started_at).strftime("%m-%d %H:%M")
+        if running_minutes > running_timeout_minutes:
+            label = "运行超时"
+            tone = "warning"
+            summary = f"运行中记录已超过 {running_timeout_minutes} 分钟，开始于 {started_at}"
+        else:
+            label = "运行中"
+            tone = "warning"
+            summary = f"开始于 {started_at}"
+    elif status == TaskStatus.FAILED:
+        label = "失败"
+        tone = "danger"
+        summary = error_summary or "抓取失败"
+    elif is_stale:
+        label = "长时间未运行"
+        tone = "warning"
+        summary = f"超过 {stale_minutes} 分钟无抓取记录"
+    elif status == TaskStatus.SUCCESS and new_count == 0:
+        label = "成功无新增"
+        tone = "success"
+        summary = f"新增 0，重复 {duplicate_count or 0}"
+    elif status == TaskStatus.SUCCESS:
+        label = "成功"
+        tone = "success"
+        summary = f"新增 {new_count or 0}，重复 {duplicate_count or 0}"
+    else:
+        label = "未运行"
+        tone = ""
+        summary = "暂无抓取记录"
+    return {
+        "label": label,
+        "tone": tone,
+        "summary": summary,
+        "new_count": new_count,
+        "duplicate_count": duplicate_count,
+        "error_summary": error_summary,
+        "latest_job": latest_job,
+        "latest_completed_job": latest_completed_job,
+        "is_stale": is_stale,
+    }
+
+
+def _attach_source_health(sources):
+    source_list = list(sources)
+    now = timezone.now()
+    for source in source_list:
+        source.health = _source_health(source, now=now)
+    return source_list
+
+
 @login_required
 def console_dashboard(request: HttpRequest):
     denied = _ensure_staff(request)
@@ -253,7 +319,7 @@ def console_dashboard(request: HttpRequest):
     published_today = NewsArticle.objects.filter(published_to_web_at__date=today).count()
     crawl_success_today = NewsArticle.objects.filter(first_seen_at__gte=today_start).count()
     crawl_failed_today = CrawlJob.objects.filter(started_at__gte=today_start, status="failed").count()
-    recent_sources = NewsSource.objects.filter(deleted_at__isnull=True).order_by("-updated_at")[:5]
+    recent_sources = _attach_source_health(NewsSource.objects.filter(deleted_at__isnull=True).order_by("-updated_at")[:5])
     recent_published = NewsArticle.objects.filter(workflow_status=WorkflowStatus.PUBLISHED).order_by("-published_to_web_at")[:6]
     stats = {
         "crawl_success_today": crawl_success_today,
@@ -275,7 +341,7 @@ def source_list(request: HttpRequest):
     if denied:
         return denied
     sync_builtin_sources()
-    sources = NewsSource.objects.filter(deleted_at__isnull=True).order_by("-enabled", "-priority", "name")
+    sources = _attach_source_health(NewsSource.objects.filter(deleted_at__isnull=True).order_by("-enabled", "-priority", "name"))
     return render(request, "stable/console/source_list.html", _console_context(request, sources=sources))
 
 

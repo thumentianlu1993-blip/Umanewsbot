@@ -136,6 +136,53 @@ docker logs --tail=120 umanewsbot-web-1
 docker logs --tail=120 umanewsbot-nginx-1
 ```
 
+## 新闻抓取健康排查
+
+### 后台入口
+
+日常先看业务后台：
+
+- `/admin/` 工作台的“最近来源状态”
+- `/admin/sources/` 来源管理列表
+
+重点确认：
+
+- 最近抓取时间
+- 运行状态
+- 最近结果摘要
+- 是否显示“运行中”“运行超时”“成功无新增”“失败”或“长时间未运行”
+
+“成功无新增”表示抓取任务正常执行，但本轮抓到的文章都已存在；这不等同于抓取失败。
+“运行中”表示最新抓取记录已开始但尚未写入最终结果；如运行中记录超过 60 分钟仍未完成，后台会显示“运行超时”，需要检查 worker / beat 日志和对应 `CrawlJob`。
+“长时间未运行”只用于仍启用的来源；停用来源不纳入该告警。
+
+### 服务器查询
+
+```bash
+cd /opt/umanewsbot
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py shell -c "from stable.models import CrawlJob; from django.utils import timezone; [print(timezone.localtime(j.started_at).strftime('%F %T'), j.source.name if j.source_id else '-', j.status, j.success_count, j.fail_count, (j.error_message or '')[:120]) for j in CrawlJob.objects.select_related('source').order_by('-started_at')[:20]]"
+```
+
+### 当前内置抓取频率
+
+- netkeiba 新着顺：每小时 `00` 分抓取，周日重赏时段另有高频补抓。
+- netkeiba 访问量榜：每小时 `16` 分抓取第一页。
+- netkeiba 注目数榜：每小时 `26` 分抓取第一页。
+- JRA 官方新闻：每 12 小时扫描当前月和上月。
+
+部署涉及抓取调度变更后，必须重启 `beat / worker / web`，并在连续一个小时内确认 netkeiba 新着顺、访问量榜和注目数榜分别按 `00/16/26` 分生成错峰 `CrawlJob`；周日重赏高频补抓分钟不得与访问量榜 / 注目数榜重合。
+
+### JRA 日期解析验收
+
+如 JRA 曾出现 `time data '5月31日' does not match format '%Y年%m月%d日'`，部署后可以手动触发或等待下一次任务：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py crawl_news jra
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py shell -c "from stable.models import CrawlJob, NewsSource; source=NewsSource.objects.get(source_site='jra', source_mode='official'); print(source.last_crawl_status, source.last_crawl_message); print(CrawlJob.objects.filter(source=source).order_by('-started_at').values('status','success_count','fail_count','error_message').first())"
+```
+
+若单篇 JRA 详情页结构异常，预期行为是跳过该篇、继续处理同轮其他新闻，并在 `last_crawl_message` / `CrawlJob.error_message` 中留下“跳过 N 条”摘要；列表页、网络或数据库异常仍按整轮失败排查。
+
 ## 自动化运营 MVP 部署与验证
 
 ### 关键环境变量

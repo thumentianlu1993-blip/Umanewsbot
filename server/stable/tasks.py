@@ -60,6 +60,7 @@ from stable.services.external_horse_data import ExternalHorseDataImporter, Impor
 
 
 User = get_user_model()
+JRA_SKIPPABLE_DETAIL_ERRORS = (ValueError, AttributeError, IndexError, TypeError)
 
 
 def _log_start(task_name: str, payload: dict | None = None) -> TaskExecutionLog:
@@ -84,17 +85,24 @@ def _start_crawl_job(source: NewsSource | None) -> CrawlJob:
     return CrawlJob.objects.create(source=source, status=TaskStatus.STARTED)
 
 
-def _finish_crawl_job(job: CrawlJob, *, success_count: int = 0, fail_count: int = 0, error_message: str = "") -> None:
+def _finish_crawl_job(
+    job: CrawlJob,
+    *,
+    success_count: int = 0,
+    fail_count: int = 0,
+    error_message: str = "",
+    message: str = "",
+) -> None:
     job.status = TaskStatus.FAILED if error_message else TaskStatus.SUCCESS
     job.success_count = success_count
     job.fail_count = fail_count
-    job.error_message = error_message
+    job.error_message = error_message or message
     job.finished_at = timezone.now()
     job.save()
     if job.source:
         job.source.last_crawl_at = job.finished_at
         job.source.last_crawl_status = job.status
-        job.source.last_crawl_message = error_message or f"新增 {success_count}，重复 {fail_count}"
+        job.source.last_crawl_message = error_message or message or f"新增 {success_count}，重复 {fail_count}"
         job.source.save(update_fields=["last_crawl_at", "last_crawl_status", "last_crawl_message", "updated_at"])
 
 
@@ -156,10 +164,15 @@ def _crawl_jra_source(source: NewsSource | None = None) -> dict:
     }
     new_count = 0
     seen_count = 0
+    skipped_errors: list[str] = []
     try:
         for month in sorted(months):
             for stub in adapter.fetch_listing(SourceMode.OFFICIAL, month):
-                detail = adapter.fetch_detail(stub.source_url)
+                try:
+                    detail = adapter.fetch_detail(stub.source_url)
+                except JRA_SKIPPABLE_DETAIL_ERRORS as exc:
+                    skipped_errors.append(f"{stub.source_url}: {exc}")
+                    continue
                 draft = adapter.normalize_source_payload(stub, detail)
                 article, created = upsert_article_from_draft(draft, crawl_job=job)
                 if created:
@@ -168,8 +181,17 @@ def _crawl_jra_source(source: NewsSource | None = None) -> dict:
                     _auto_translate_article_after_ingest(article)
                 else:
                     seen_count += 1
-        _finish_crawl_job(job, success_count=new_count, fail_count=seen_count)
-        return {"new_count": new_count, "seen_count": seen_count, "crawl_job_id": job.id}
+        skipped_errors = [*adapter.skipped_items, *skipped_errors]
+        message = ""
+        if skipped_errors:
+            message = f"新增 {new_count}，重复 {seen_count}；跳过 {len(skipped_errors)} 条：{skipped_errors[0][:120]}"
+        _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, message=message)
+        return {
+            "new_count": new_count,
+            "seen_count": seen_count,
+            "skipped_count": len(skipped_errors),
+            "crawl_job_id": job.id,
+        }
     except Exception as exc:
         _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, error_message=str(exc))
         raise
