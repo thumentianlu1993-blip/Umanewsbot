@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass
 
-from stable.models import TermEntry
+from stable.models import TermEntry, TermType
 
 
 @dataclass
@@ -101,6 +101,20 @@ _HORSE_STOPWORDS = {
     "ファン",
     "リベンジ",
 }
+_NON_HORSE_NOTE_MARKER = "non_horse_common_word"
+
+
+def non_horse_common_words() -> set[str]:
+    words = set(_HORSE_STOPWORDS)
+    for entry in TermEntry.objects.filter(is_active=True, term_type=TermType.FIXED_PHRASE):
+        note = (entry.notes or "").casefold()
+        if _NON_HORSE_NOTE_MARKER not in note:
+            continue
+        for candidate in entry.all_japanese_terms():
+            normalized = (candidate or "").strip()
+            if normalized:
+                words.add(normalized)
+    return words
 
 
 def extract_unknown_horse_names(title_text: str, body_text: str, limit: int = 12) -> list[str]:
@@ -116,11 +130,12 @@ def extract_unknown_horse_names(title_text: str, body_text: str, limit: int = 12
             normalized = (candidate or "").strip()
             if normalized:
                 known_horse_terms.add(normalized)
+    stopwords = non_horse_common_words()
 
     candidates: dict[str, dict] = {}
     for match in _KATAKANA_TOKEN_RE.finditer(full_text):
         candidate = match.group(0)
-        if candidate in known_horse_terms or candidate in _HORSE_STOPWORDS:
+        if candidate in known_horse_terms or candidate in stopwords:
             continue
 
         before = full_text[max(0, match.start() - 8) : match.start()]

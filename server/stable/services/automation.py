@@ -72,6 +72,56 @@ HIGH_FOCUS_KEYWORDS = [
 ]
 
 
+def _configured_high_value_sources() -> set[tuple[str, str]]:
+    rules = getattr(settings, "HIGH_VALUE_SOURCE_RULES", []) or []
+    configured: set[tuple[str, str]] = set()
+    for rule in rules:
+        if not rule or ":" not in rule:
+            continue
+        site, mode = rule.split(":", 1)
+        configured.add((site.strip(), mode.strip()))
+    return configured
+
+
+def is_high_value_source(article: NewsArticle) -> bool:
+    return (article.source_site, article.source_mode) in _configured_high_value_sources()
+
+
+def is_high_value_article(article: NewsArticle) -> bool:
+    threshold = int(getattr(settings, "HIGH_VALUE_WARNING_SCORE_THRESHOLD", 90))
+    return article.score_total >= threshold or is_high_value_source(article)
+
+
+def automation_content_source() -> str:
+    if not getattr(settings, "AUTO_REWRITE_ENABLED", False):
+        return "base_translation"
+    configured = (getattr(settings, "AUTO_PUBLISH_CONTENT_SOURCE", "base_translation") or "base_translation").strip().lower()
+    return configured if configured in {"base_translation", "rewrite"} else "base_translation"
+
+
+def prepare_base_translation_for_publish(article: NewsArticle) -> list[str]:
+    manual_fields = set(article.manually_edited_fields or [])
+    updated: list[str] = []
+    if "title_zh" not in manual_fields and not article.title_zh and article.translated_title_zh:
+        article.title_zh = article.translated_title_zh
+        updated.append("title_zh")
+    if "summary_zh" not in manual_fields and not article.summary_zh:
+        article.summary_zh = article.translated_summary_zh or (article.translated_body_zh or "")[:160]
+        updated.append("summary_zh")
+    if "body_zh" not in manual_fields and not article.body_zh and article.translated_body_zh:
+        article.body_zh = article.translated_body_zh
+        updated.append("body_zh")
+    if "push_summary_zh" not in manual_fields and not article.push_summary_zh:
+        article.push_summary_zh = article.translated_summary_zh or (article.translated_body_zh or "")[:160]
+        updated.append("push_summary_zh")
+    if not article.base_translation_zh and article.translated_body_zh:
+        article.base_translation_zh = article.translated_body_zh
+        updated.append("base_translation_zh")
+    if updated:
+        article.save(update_fields=[*updated, "updated_at"])
+    return updated
+
+
 @dataclass
 class AutomationDecision:
     review_mode: str
@@ -231,13 +281,13 @@ def _hard_rule_decision(article: NewsArticle, category: str) -> tuple[str | None
 
     quote_count = text.count("「") + text.count("『")
     if category == ContentCategory.INTERVIEW and (quote_count >= 8 or len(body) > 2400):
-        reasons.append("长采访或引语较多，转人工审核")
+        checks.append("长采访或引语较多，后续作为 warning 记录")
     if article.translation_status != "translated":
         reasons.append("翻译尚未成功完成")
     if not article.translated_body_zh:
         reasons.append("缺少基准中文翻译")
     if extract_unknown_horse_names(article.title_ja, body, limit=3) and not p0_horse_hits(article):
-        checks.append("存在未收录疑似马名，保守处理")
+        checks.append("存在未收录疑似马名，后续作为 warning 记录")
     if reasons:
         return ReviewMode.MANUAL, RiskLevel.MEDIUM, reasons, checks
     return None, RiskLevel.LOW, reasons, checks
@@ -252,6 +302,7 @@ def score_article_for_automation(article: NewsArticle) -> AutomationDecision:
     priority = race_signal["priority"]
     high_focus_hits = [keyword for keyword in HIGH_FOCUS_KEYWORDS if keyword in text]
     source_score = 15 if article.source_site == "jra" else 10
+    high_value_source = is_high_value_source(article)
     value_score = 0
     if horse_hits:
         value_score += 25
@@ -277,6 +328,8 @@ def score_article_for_automation(article: NewsArticle) -> AutomationDecision:
         "checks": checks,
         "signals": {
             "category": category,
+            "high_value_source": high_value_source,
+            "content_source": automation_content_source(),
             "p0_horse_hits": horse_hits[:8],
             "race_priority": priority,
             "race_grade": race_signal.get("grade", ""),
@@ -322,6 +375,10 @@ def score_article_for_automation(article: NewsArticle) -> AutomationDecision:
 
     auto_threshold = int(getattr(settings, "AUTO_REVIEW_THRESHOLD", 75))
     manual_threshold = int(getattr(settings, "MANUAL_REVIEW_THRESHOLD", 45))
+    if high_value_source:
+        score_total = max(score_total, auto_threshold)
+        decision_reason["scores"]["total"] = score_total
+        decision_reason["scores"]["high_value_source_override"] = True
     if score_total >= auto_threshold:
         mode = ReviewMode.AUTO
         status = AutomationStatus.REWRITE_READY

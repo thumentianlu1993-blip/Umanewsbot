@@ -31,14 +31,16 @@ from stable.models import (
 )
 from stable.services.automation import (
     apply_score_decision,
+    automation_content_source,
     important_manual_notification_payload,
     is_ready_for_auto_publish,
     mark_automation_failed,
+    prepare_base_translation_for_publish,
     publish_article_automatically,
     score_article_for_automation,
 )
 from stable.services.ingestion import upsert_article_from_draft
-from stable.services.notifications import send_automation_notification
+from stable.services.notifications import send_automation_notification, send_high_value_warning_notification
 from stable.services.operations import log_operation
 from stable.services.pushing import push_article_to_targets
 from stable.services.qq_auto_push import (
@@ -53,6 +55,7 @@ from stable.services.sources import find_builtin_source, sync_builtin_sources
 from stable.services.term_discovery import discover_and_aggregate_article
 from stable.services.translation import translate_article
 from stable.services.validation import apply_validation_outcome, validate_rewrite
+from stable.services.external_horse_data import ExternalHorseDataImporter, ImportOptions
 
 
 User = get_user_model()
@@ -353,11 +356,16 @@ def process_article_automation_task(article_id: int) -> dict:
         score_article_task.run(article.id)
         article.refresh_from_db()
         if article.automation_status == AutomationStatus.REWRITE_READY and article.review_mode == ReviewMode.AUTO:
-            rewrite_article_task.run(article.id)
+            if automation_content_source() == "rewrite":
+                rewrite_article_task.run(article.id)
+            else:
+                prepare_base_translation_for_publish(article)
+                validate_rewrite_task.run(article.id)
             article.refresh_from_db()
         if article.automation_status == AutomationStatus.REWRITTEN and article.review_mode == ReviewMode.AUTO:
             validate_rewrite_task.run(article.id)
             article.refresh_from_db()
+        send_high_value_warning_notification(article)
         payload = important_manual_notification_payload(article)
         if payload:
             send_notification_task.run(NotificationType.IMPORTANT_MANUAL, payload)
@@ -458,7 +466,7 @@ def auto_publish_batch_task(limit: int | None = None) -> dict:
     batch_limit = _resolve_auto_publish_batch_limit(limit)
     queryset = (
         NewsArticle.objects.filter(review_mode=ReviewMode.AUTO, automation_status=AutomationStatus.PUBLISH_READY)
-        .exclude(workflow_status__in=[WorkflowStatus.PUBLISHED, WorkflowStatus.WITHDRAWN, WorkflowStatus.IGNORED])
+        .exclude(workflow_status__in=[WorkflowStatus.PUBLISHED, WorkflowStatus.WITHDRAWN, WorkflowStatus.IGNORED, WorkflowStatus.DUPLICATE])
         .order_by("-score_total", "-published_at", "-id")
     )
     published_ids: list[int] = []
@@ -531,6 +539,49 @@ def detect_automation_anomalies_task() -> dict:
         sent.append(NotificationType.REPEATED_FAILURE)
     _log_success(log, f"notifications={','.join(sent) or 'none'}")
     return {"notifications": sent}
+
+
+@shared_task
+def import_external_horse_data_task(
+    *,
+    year: int | None = None,
+    month: int | None = None,
+    race_id: str = "",
+    horse_id: str = "",
+    horse_name: str = "",
+    allow_network: bool = False,
+    max_races: int | None = None,
+    max_horses: int | None = None,
+    fetch_odds: bool | None = None,
+    fetch_horse_detail: bool | None = None,
+) -> dict:
+    log = _log_start(
+        "import_external_horse_data",
+        {"year": year, "month": month, "race_id": race_id, "horse_id": horse_id, "allow_network": allow_network},
+    )
+    importer = ExternalHorseDataImporter(
+        ImportOptions.from_settings(
+            allow_network=allow_network,
+            max_races=max_races,
+            max_horses=max_horses,
+            fetch_odds=fetch_odds,
+            fetch_horse_detail=fetch_horse_detail,
+        )
+    )
+    try:
+        if race_id:
+            result = importer.import_race(race_id)
+        elif horse_id:
+            result = importer.import_horse(horse_id, horse_name=horse_name)
+        elif year and month:
+            result = importer.import_month(year, month)
+        else:
+            result = importer.import_default()
+        _log_success(log, f"status={result.get('status')} run_id={result.get('run_id')}")
+        return result
+    except Exception as exc:
+        _log_failure(log, str(exc))
+        raise
 
 
 @shared_task

@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('stable', '0007_termcandidate_aliases_ja_termcandidate_aliases_zh_and_more'),
+        ('stable', '0009_automation_publish_gates'),
     ]
 
     operations = [

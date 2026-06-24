@@ -17,6 +17,14 @@ from stable.adapters.netkeiba import NetkeibaAdapter
 from stable.models import (
     ArticleTranslationStatus,
     AutomationStatus,
+    ExternalDataImportLock,
+    ExternalDataImportRun,
+    ExternalHorseAlias,
+    ExternalImportStatus,
+    ExternalRace,
+    ExternalRaceEntry,
+    ExternalRaceOdds,
+    ExternalRaceResult,
     NewsImage,
     NewsArticle,
     NewsSnapshot,
@@ -44,6 +52,7 @@ from stable.services.qq_auto_push import (
 )
 from stable.services.pushing import build_push_message, push_article_to_targets
 from stable.services.automation import score_article_for_automation
+from stable.services.notifications import send_high_value_warning_notification
 from stable.services.rewriting import _loads_rewrite_payload
 from stable.services.sources import sync_builtin_sources
 from stable.services.term_admin import preview_term_import
@@ -62,6 +71,13 @@ from stable.services.translation import (
     OpenAICompatibleTranslationProvider,
     TranslationResponseError,
     translate_article as run_translation_service,
+)
+from stable.services.validation import apply_validation_outcome, validate_rewrite
+from stable.services.external_horse_data import (
+    ExternalHorseDataAlreadyRunning,
+    ExternalHorseDataImporter,
+    ExternalHorseDataNetworkDisabled,
+    ImportOptions,
 )
 from stable.tasks import (
     _crawl_netkeiba_mode,
@@ -238,6 +254,178 @@ class AdapterTests(TestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0].source_site, SourceSite.JRA)
         self.assertEqual(items[0].title_ja, "クイーンSの競走馬登録抹消")
+
+
+class FakeExternalHorseDataAdapter:
+    def __init__(self):
+        self.fetched_race_ids: list[str] = []
+
+    def race_list(self, year: int, month: int) -> list[str]:
+        return [f"{year}{month:02d}0101", f"{year}{month:02d}0102"]
+
+    def fetch_race(self, race_id: str, *, fetch_odds: bool = False) -> dict:
+        self.fetched_race_ids.append(race_id)
+        return {
+            "race": {
+                "race_id": race_id,
+                "race_name": "東京優駿",
+                "race_date": "2026-05-31",
+                "extra_field": "保留字段",
+            },
+            "entry": [
+                {
+                    "horse_id": "1001",
+                    "horse_name": "マヤノライジン",
+                    "horse_number": "1",
+                    "jockey_name": "武豊",
+                    "extra_entry": "保存",
+                },
+                {
+                    "horse_id": "1002",
+                    "horse_name": "クロワデュノール",
+                    "horse_number": "2",
+                },
+            ],
+            "result": [
+                {
+                    "horse_id": "1001",
+                    "horse_name": "マヤノライジン",
+                    "horse_number": "1",
+                    "finish_position": "1",
+                }
+            ],
+            "odds": [{"odds_type": "win", "horse_number": "1", "odds": "2.1"}] if fetch_odds else [],
+        }
+
+    def fetch_horse(self, horse_id: str) -> dict:
+        return {
+            "horse": {
+                "horse_id": horse_id,
+                "father_name": "マヤノトップガン",
+                "unknown_future_field": "後で使う",
+            },
+            "history": [
+                {
+                    "race_id": "202605310101",
+                    "race_name": "東京優駿",
+                    "race_date": "2026-05-31",
+                    "finish_position": "1",
+                }
+            ],
+        }
+
+
+@override_settings(EXTERNAL_HORSE_DATA_IMPORT_ENABLED=True)
+class ExternalHorseDataImportTests(TestCase):
+    def importer(self, **overrides):
+        adapter = overrides.pop("adapter", None) or FakeExternalHorseDataAdapter()
+        values = {
+            "allow_network": True,
+            "request_interval_seconds": 0,
+            "jitter_seconds": 0,
+            "max_races": 1,
+            "max_horses": 10,
+            "fetch_odds": True,
+            "fetch_horse_detail": True,
+        }
+        values.update(overrides)
+        options = ImportOptions(**values)
+        return ExternalHorseDataImporter(options, adapter=adapter)
+
+    def test_import_race_preserves_payload_and_is_idempotent(self):
+        importer = self.importer()
+
+        first = importer.import_race("202605310101")
+        second = importer.import_race("202605310101")
+
+        self.assertEqual(first["status"], ExternalImportStatus.SUCCESS)
+        self.assertEqual(second["status"], ExternalImportStatus.SUCCESS)
+        self.assertEqual(ExternalRace.objects.count(), 1)
+        self.assertEqual(ExternalRaceEntry.objects.count(), 2)
+        self.assertEqual(ExternalRaceResult.objects.count(), 1)
+        self.assertEqual(ExternalRaceOdds.objects.count(), 1)
+        self.assertEqual(ExternalHorseAlias.objects.filter(name_ja="マヤノライジン").count(), 1)
+        race = ExternalRace.objects.get()
+        self.assertEqual(race.raw_payload["extra_field"], "保留字段")
+        entry = ExternalRaceEntry.objects.get(horse_id="1001")
+        self.assertEqual(entry.raw_payload["extra_entry"], "保存")
+
+    def test_dry_run_does_not_write_external_tables(self):
+        importer = self.importer(dry_run=True, allow_network=False)
+
+        result = importer.import_race("202605310101")
+
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(ExternalDataImportRun.objects.count(), 0)
+        self.assertEqual(ExternalRace.objects.count(), 0)
+
+    @override_settings(EXTERNAL_HORSE_DATA_IMPORT_ENABLED=False)
+    def test_real_import_requires_enabled_setting(self):
+        with self.assertRaises(ExternalHorseDataNetworkDisabled):
+            self.importer().import_race("202605310101")
+
+    def test_single_horse_import_only_creates_alias_with_trusted_name(self):
+        importer = self.importer(fetch_horse_detail=True)
+
+        importer.import_horse("1001")
+        importer.import_horse("1002", horse_name="マヤノライジン")
+
+        self.assertFalse(ExternalHorseAlias.objects.filter(external_horse_id="1001").exists())
+        alias = ExternalHorseAlias.objects.get(external_horse_id="1002")
+        self.assertEqual(alias.name_ja, "マヤノライジン")
+
+    def test_source_lock_blocks_parallel_real_imports(self):
+        run = ExternalDataImportRun.objects.create(source="netkeiba", target_type="month", status=ExternalImportStatus.STARTED)
+        ExternalDataImportLock.objects.create(source="netkeiba", locked_by_run=run, acquired_at=timezone.now())
+
+        with self.assertRaises(ExternalHorseDataAlreadyRunning):
+            self.importer().import_race("202605310101")
+
+    def test_month_import_respects_max_races_and_records_coverage_stats(self):
+        result = self.importer(max_races=1).import_month(2026, 5)
+
+        self.assertEqual(result["status"], ExternalImportStatus.PAUSED)
+        self.assertEqual(result["skipped_count"], 1)
+        self.assertEqual(result["coverage_stats"]["race_count"], 1)
+        self.assertEqual(result["coverage_stats"]["unique_horse_name_count"], 2)
+
+    def test_month_import_skips_existing_races_and_processes_next_batch(self):
+        first_adapter = FakeExternalHorseDataAdapter()
+        second_adapter = FakeExternalHorseDataAdapter()
+
+        first = self.importer(adapter=first_adapter, max_races=1).import_month(2026, 5)
+        second = self.importer(adapter=second_adapter, max_races=1).import_month(2026, 5)
+
+        self.assertEqual(first["status"], ExternalImportStatus.PAUSED)
+        self.assertEqual(second["status"], ExternalImportStatus.SUCCESS)
+        self.assertEqual(first_adapter.fetched_race_ids, ["2026050101"])
+        self.assertEqual(second_adapter.fetched_race_ids, ["2026050102"])
+        self.assertEqual(ExternalRace.objects.count(), 2)
+        second_run = ExternalDataImportRun.objects.get(pk=second["run_id"])
+        self.assertEqual(second_run.parameters["already_imported_race_count"], 1)
+
+    def test_management_command_dry_run_does_not_write(self):
+        out = StringIO()
+
+        call_command("import_external_horse_data", "--race-id", "202605310101", "--dry-run", stdout=out)
+
+        self.assertIn('"dry_run": true', out.getvalue())
+        self.assertEqual(ExternalDataImportRun.objects.count(), 0)
+        self.assertEqual(ExternalRace.objects.count(), 0)
+
+    def test_management_command_lookup_name_reads_local_alias(self):
+        ExternalHorseAlias.objects.create(
+            source="netkeiba",
+            external_horse_id="1001",
+            name_ja="マヤノライジン",
+            normalized_name="マヤノライジン",
+            alias_source="test",
+        )
+        out = StringIO()
+
+        call_command("import_external_horse_data", "--lookup-name", "マヤノライジン", stdout=out)
+
+        self.assertIn('"external_horse_id": "1001"', out.getvalue())
 
 
 class PushTests(TestCase):
@@ -640,6 +828,34 @@ class ConsoleFlowTests(TestCase):
         self.assertEqual(self.article.summary_zh, "")
         self.assertEqual(self.article.effective_summary, "")
 
+    def test_duplicate_reference_links_to_candidate_detail(self):
+        original = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.ACCESS,
+            source_article_id="original-for-duplicate-link",
+            title_ja="相似原稿",
+            translated_title_zh="相似原稿",
+            title_zh="相似原稿",
+            body_ja_raw="相似原稿の本文",
+            body_ja_normalized="相似原稿の本文",
+            translated_body_zh="相似原稿的正文。",
+            body_zh="相似原稿的正文。",
+            published_at=timezone.now(),
+            source_url="https://example.com/original-for-duplicate-link",
+            workflow_status=WorkflowStatus.PUBLISHED,
+        )
+        self.article.duplicate_of = original
+        self.article.duplicate_score = 0.91
+        self.article.workflow_status = WorkflowStatus.DUPLICATE
+        self.article.save(update_fields=["duplicate_of", "duplicate_score", "workflow_status", "updated_at"])
+
+        detail = self.client.get(reverse("console-candidate-detail", args=[self.article.id]))
+        candidate_list = self.client.get(reverse("console-candidate-list"))
+        duplicate_href = reverse("console-candidate-detail", args=[original.id])
+
+        self.assertContains(detail, f'href="{duplicate_href}"')
+        self.assertContains(candidate_list, f'href="{duplicate_href}"')
+
 
 class PublicHomeInfoFeedTests(TestCase):
     def make_article(
@@ -921,8 +1137,9 @@ class AutomationFlowTests(TestCase):
         self.assertEqual(article.automation_status, AutomationStatus.PUBLISH_READY)
         self.assertEqual(article.review_mode, ReviewMode.AUTO)
         self.assertGreaterEqual(article.score_total, 75)
-        self.assertTrue(article.rewrite_body_zh)
+        self.assertFalse(article.rewrite_body_zh)
         self.assertEqual(article.base_translation_zh, article.translated_body_zh)
+        self.assertEqual(article.decision_reason["gate_issue_counts"]["blocker"], 0)
 
     def test_takarazuka_article_uses_title_horse_and_race_grade(self):
         TermEntry.objects.create(term_type="horse", source_ja="キタサンブラック", target_zh="北部玄驹", priority=100)
@@ -951,6 +1168,153 @@ class AutomationFlowTests(TestCase):
         self.assertEqual(decision.decision_reason["signals"]["race_grade"], "G1")
         self.assertEqual(decision.decision_reason["signals"]["race_priority"], "P0")
         self.assertTrue(decision.decision_reason["signals"]["p0_horse_hits"])
+
+    def test_high_value_source_overrides_score_stage_only(self):
+        article = self._translated_article(
+            source_article_id="access-source-1",
+            source_mode=SourceMode.ACCESS,
+            title_ja="アクセスランキングの一般ニュース",
+            body_ja_raw="レース前の短い展望記事です。" * 20,
+            body_ja_normalized="レース前の短い展望記事です。" * 20,
+            translated_body_zh="访问量榜新闻的中文正文。" * 20,
+            body_zh="访问量榜新闻的中文正文。" * 20,
+        )
+
+        decision = score_article_for_automation(article)
+
+        self.assertEqual(decision.review_mode, ReviewMode.AUTO)
+        self.assertGreaterEqual(decision.score_total, 75)
+        self.assertTrue(decision.decision_reason["signals"]["high_value_source"])
+        self.assertTrue(decision.decision_reason["scores"]["high_value_source_override"])
+
+    def test_non_horse_fixed_phrases_are_not_unknown_horse_names(self):
+        TermEntry.objects.create(
+            term_type="fixed_phrase",
+            source_ja="タイトル",
+            target_zh="头衔",
+            notes="non_horse_common_word: 测试普通词",
+        )
+        TermEntry.objects.create(
+            term_type="fixed_phrase",
+            source_ja="オッズ",
+            target_zh="赔率",
+            notes="non_horse_common_word: 测试普通词",
+        )
+
+        names = extract_unknown_horse_names(
+            "【函館記念】マジックサンズがタイトル狙う",
+            "3番人気マジックサンズのオッズが注目され、アラタは2つ目のタイトルを狙う。",
+        )
+
+        self.assertIn("マジックサンズ", names)
+        self.assertNotIn("タイトル", names)
+        self.assertNotIn("オッズ", names)
+
+    def test_warning_issues_do_not_block_publish_ready(self):
+        article = self._translated_article(
+            source_article_id="warning-not-blocking",
+            title_ja="【函館記念】マジックサンズがタイトルを狙う",
+            translated_title_zh="函馆纪念热门马冲击头衔",
+            title_zh="函馆纪念热门马冲击头衔",
+            body_ja_raw="マジックサンズは函館記念で24日の追い切り後に2000メートルへ向かう。" * 8,
+            body_ja_normalized="マジックサンズは函館記念で24日の追い切り後に2000メートルへ向かう。" * 8,
+            translated_body_zh="这匹热门马将向函馆纪念发起挑战，阵营称状态良好。" * 8,
+            body_zh="这匹热门马将向函馆纪念发起挑战，阵营称状态良好。" * 8,
+        )
+
+        outcome = validate_rewrite(article)
+        apply_validation_outcome(article, outcome)
+
+        article.refresh_from_db()
+        self.assertTrue(outcome.passed)
+        self.assertEqual(article.automation_status, AutomationStatus.PUBLISH_READY)
+        self.assertTrue(any(issue["code"] == "unknown_horse_not_preserved" for issue in article.gate_issues))
+        self.assertTrue(any(issue["severity"] == "warning" for issue in article.gate_issues))
+
+    def test_core_term_missing_blocks_and_background_term_missing_warns(self):
+        TermEntry.objects.create(term_type="race", source_ja="有馬記念", target_zh="有马纪念", priority=90)
+        core_article = self._translated_article(
+            source_article_id="core-term-missing",
+            title_ja="有馬記念の登録馬が発表",
+            translated_title_zh="重要赛事报名马公布",
+            title_zh="重要赛事报名马公布",
+            translated_body_zh="重要赛事报名马公布，阵容受到关注。" * 10,
+            body_zh="重要赛事报名马公布，阵容受到关注。" * 10,
+        )
+
+        core_outcome = validate_rewrite(core_article)
+        apply_validation_outcome(core_article, core_outcome)
+
+        core_article.refresh_from_db()
+        self.assertFalse(core_outcome.passed)
+        self.assertEqual(core_article.workflow_status, WorkflowStatus.PENDING_REVIEW)
+        self.assertTrue(any(issue["code"] == "core_term_missing" for issue in core_article.gate_issues))
+
+        TermEntry.objects.create(term_type="race", source_ja="金鯱賞", target_zh="金鯱赏", priority=10)
+        background_body = "前半は陣営の調整過程を詳しく紹介する。" * 40 + "金鯱賞での好走歴にも触れた。"
+        background_article = self._translated_article(
+            source_article_id="background-term-warning",
+            title_ja="夏競馬へ向けた調整進む",
+            body_ja_raw=background_body,
+            body_ja_normalized=background_body,
+            translated_body_zh="前半介绍阵营调整过程，最后概括过往表现。" * 12,
+            body_zh="前半介绍阵营调整过程，最后概括过往表现。" * 12,
+        )
+
+        background_outcome = validate_rewrite(background_article)
+        apply_validation_outcome(background_article, background_outcome)
+
+        background_article.refresh_from_db()
+        self.assertTrue(background_outcome.passed)
+        self.assertEqual(background_article.automation_status, AutomationStatus.PUBLISH_READY)
+        self.assertTrue(any(issue["code"] == "background_term_missing" for issue in background_article.gate_issues))
+
+    def test_duplicate_detection_blocks_highly_similar_article(self):
+        published = self._translated_article(
+            source_article_id="published-duplicate-source",
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+        )
+        article = self._translated_article(source_article_id="duplicate-candidate")
+
+        outcome = validate_rewrite(article)
+        apply_validation_outcome(article, outcome)
+
+        article.refresh_from_db()
+        self.assertFalse(outcome.passed)
+        self.assertEqual(article.workflow_status, WorkflowStatus.DUPLICATE)
+        self.assertEqual(article.duplicate_of, published)
+        self.assertTrue(any(issue["code"] == "duplicate_content" for issue in article.gate_issues))
+
+    def test_passing_validation_clears_stale_duplicate_state_and_can_publish(self):
+        stale_duplicate = self._translated_article(source_article_id="stale-duplicate-reference")
+        article = self._translated_article(source_article_id="stale-duplicate-now-clean")
+        article.workflow_status = WorkflowStatus.DUPLICATE
+        article.duplicate_of = stale_duplicate
+        article.duplicate_score = 0.91
+        article.duplicate_reason = "旧重复检测结果"
+        article.save(
+            update_fields=[
+                "workflow_status",
+                "duplicate_of",
+                "duplicate_score",
+                "duplicate_reason",
+                "updated_at",
+            ]
+        )
+
+        outcome = validate_rewrite(article)
+        apply_validation_outcome(article, outcome)
+        publish_result = auto_publish_batch_task.run(limit=1)
+
+        article.refresh_from_db()
+        self.assertTrue(outcome.passed)
+        self.assertEqual(article.duplicate_of, None)
+        self.assertEqual(article.duplicate_score, None)
+        self.assertEqual(article.duplicate_reason, "")
+        self.assertEqual(publish_result["published_count"], 1)
+        self.assertEqual(article.workflow_status, WorkflowStatus.PUBLISHED)
+        self.assertEqual(article.automation_status, AutomationStatus.AUTO_PUBLISHED)
 
     def test_score_short_body_is_ignored(self):
         article = self._translated_article(
@@ -1023,6 +1387,54 @@ class AutomationFlowTests(TestCase):
         log = NotificationLog.objects.get(channel="email")
         self.assertEqual(log.status, "skipped")
         self.assertEqual(log.channel, "email")
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        AUTOMATION_WARNING_EMAIL_ENABLED=True,
+        AUTOMATION_WARNING_NOTIFY_EMAILS=["754652181@qq.com"],
+        HIGH_VALUE_SOURCE_RULES=["netkeiba:access"],
+    )
+    def test_high_value_warning_sends_deduplicated_email(self):
+        article = self._translated_article(
+            source_article_id="warning-email",
+            source_mode=SourceMode.ACCESS,
+            title_ja="【函館記念】マジックサンズが挑む",
+            translated_title_zh="函馆纪念热门马挑战",
+            title_zh="函馆纪念热门马挑战",
+            body_ja_raw="マジックサンズは函館記念で上位を狙う。" * 10,
+            body_ja_normalized="マジックサンズは函館記念で上位を狙う。" * 10,
+            translated_body_zh="热门马将挑战函馆纪念，阵营状态良好。" * 10,
+            body_zh="热门马将挑战函馆纪念，阵营状态良好。" * 10,
+        )
+
+        process_article_automation_task.run(article.id)
+        article.refresh_from_db()
+        send_high_value_warning_notification(article)
+
+        sent = NotificationLog.objects.filter(type="high_value_warning", status="sent").count()
+        skipped = NotificationLog.objects.filter(type="high_value_warning", status="skipped").count()
+        self.assertEqual(sent, 1)
+        self.assertEqual(skipped, 1)
+        self.assertEqual(article.automation_status, AutomationStatus.PUBLISH_READY)
+
+    @override_settings(AUTOMATION_WARNING_EMAIL_ENABLED=True, AUTOMATION_WARNING_NOTIFY_EMAILS=[])
+    def test_high_value_warning_missing_recipient_is_skipped(self):
+        article = self._translated_article(source_article_id="warning-email-skipped", score_total=100)
+        article.gate_issues = [
+            {
+                "code": "numbers_omitted",
+                "severity": "warning",
+                "message": "发布稿省略较多原文数字",
+                "route": "auto",
+                "payload": {},
+            }
+        ]
+        article.save(update_fields=["gate_issues", "score_total", "updated_at"])
+
+        logs = send_high_value_warning_notification(article)
+
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(logs[0].status, "skipped")
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)

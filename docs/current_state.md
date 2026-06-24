@@ -15,6 +15,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-19` 已创建公开首页资讯流升级主 OpenSpec change：`upgrade-public-home-info-feed`。该 change 作为后续前台 Web + 移动 H5 首页子任务的指导规范，目标是把当前 MVP 公开首页从“大说明 + 大卡片网格”升级为成熟资讯流：移动端轻头条 + 高密度新闻列表，桌面端门户式主内容 + 侧栏。`2026-06-21` 已完成 plan-eng-review 与 `/opsx:apply` 本地实现；实施过程按严格 TDD 执行发布过滤、头条选择、普通流去重、热门代理、公开静态资源和详情页结构测试，并已通过本地 Django 测试、OpenSpec 校验和桌面/移动浏览器验收。`2026-06-22` 已将 delta spec 同步为正式规格 `openspec/specs/public-home-info-feed/spec.md`，并归档为 `openspec/changes/archive/2026-06-22-upgrade-public-home-info-feed/`；同日 PR #1 已合并并部署到生产，服务器运行 `e834f58`，公开首页已切换到 `stable/public.css` 和新资讯流模板。`2026-06-23` PR #2 已合并并部署生产，服务器运行 `04e2ee9`，移动 H5 首屏密度 follow-up 已上线。
 
+`2026-06-24` 已完成自动发布门禁优化 OpenSpec change：`refine-automation-publish-gates` 的实现、PR 合并与生产上线。代码已将自动发布门禁拆为 `blocker / warning / info`：`blocker` 阻断自动发布，`warning` 初期不阻断但记录并对高价值文章邮件告警，`info` 仅用于诊断；同时支持基准翻译稿自动发布、高价值来源评分放行、非马名普通词过滤、关键术语分层校验和重复内容拦截。生产服务器当前运行 PR #4 squash merge 后的提交 `42a4622`，迁移 `stable.0009_automation_publish_gates` 已应用。
+
 ## 已完成内容
 
 - 域名购买与解析
@@ -57,7 +59,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 自动化运营 MVP 已上线
 - 公开首页资讯流升级已上线生产：`/` 使用公开站点专用 `public.css`、头条、普通新闻流和原站热度模块；移动 H5 已展示头条 + 高密度左文右图列表；移动端首屏密度 follow-up 已上线，390px 视口首屏可见 4 条普通新闻卡
 - 自动化能力通过 `.env` 中 `AUTOMATION_ENABLED` 控制，当前已进入灰度运行与质量观察阶段
-- 已核实线上 `AUTOMATION_ENABLED=true`、`REWRITE_PROVIDER=siliconflow`（真实 AI 改写在生效）
+- 已核实线上 `AUTOMATION_ENABLED=true`、`AUTO_REWRITE_ENABLED=false`、`AUTO_PUBLISH_CONTENT_SOURCE=base_translation`、`AUTOMATION_WARNING_EMAIL_ENABLED=true`，当前按“基准翻译稿自动发布 + 高价值 warning 邮件告警”灰度运行
 - 术语候选发现代码已部署到生产（`e2e3e07`，迁移 `0006` 已应用），`TERM_DISCOVERY_ENABLED=false` 默认关闭，等待单篇抽检后灰度开启
 
 ## 下一步优先级
@@ -66,9 +68,10 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 2. 生产迁移已于 `2026-06-07` 完成；下一步在生产做单篇手动重新发现并抽检术语候选质量，确认后灰度启用 `TERM_DISCOVERY_ENABLED`
 3. 观察自动化发布质量与 `AutomationLog`
 4. 补充翻译 warning 可视化和术语库补全流程
-5. QQ Bot 实网联调并灰度开启自动推送
+5. QQ Bot 自动推送合入、部署并灰度开启测试群推送
 6. HTTPS / 证书接入
 7. 部署稳定化与监控 / 备份 / 回滚完善
+8. 继续低批量观察 `refine-automation-publish-gates` 上线后的 warning 邮件、重复内容阻断、候选池门禁展示和自动发布结果
 
 ## 当前已知风险与待确认项
 
@@ -110,6 +113,71 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 真实 OneBot 网关发送测试。
 - 测试群灰度推送。
 - 生产 `QQPushDelivery` 记录与 worker 日志核对。
+
+## 2026-06-24 自动发布门禁优化本地实现
+
+- OpenSpec change：`refine-automation-publish-gates`，当前 `tasks.md` 已完成本地实现和验证。
+- 新增配置：
+  - `AUTO_REWRITE_ENABLED=false`：默认跳过 AI 改写前置。
+  - `AUTO_PUBLISH_CONTENT_SOURCE=base_translation`：默认使用基准翻译稿作为自动发布内容源。
+  - `HIGH_VALUE_SOURCE_RULES=netkeiba:access,netkeiba:attention`：访问量榜和注目数榜评分阶段放行。
+  - `AUTOMATION_WARNING_NOTIFY_EMAILS=754652181@qq.com`：高价值 warning 初期告警收件人示例。
+- 新增数据字段：
+  - `NewsArticle.gate_issues` 保存结构化门禁 issue。
+  - `WorkflowStatus.DUPLICATE` 描述高度重复内容。
+  - `duplicate_of / duplicate_score / duplicate_reason` 保存重复检测解释。
+  - `automation_warning_email_signature / automation_warning_email_sent_at` 用于 warning 邮件 24 小时去重。
+- 迁移 `0009_automation_publish_gates` 会导入首批非马名普通词固定译法，包括 `タイトル`、`メートル`、`オッズ`、`ハンデ`、`ラジオ`、`ダート`、`マイル`、`スプリント`、`クラス`、`チャンス`、`キャリア`、`イメージ`、`デビュー`、`ゲート`。
+- 后台候选列表、候选详情、自动化日志和 Django Admin 已展示 blocker / warning / info、重复检测结果和相似文章信息。
+- `2026-06-24` review 返修：
+  - 重新校验通过且当前不再重复的文章，会清理旧 `duplicate_of / duplicate_score / duplicate_reason`，并把旧 `duplicate` / `pending_review` 状态恢复为可进入自动发布批次的候选状态，避免显示 `publish_ready` 但被批发布排除。
+  - 候选列表与候选详情中的相似文章现在链接到后台候选详情 `/admin/candidates/<id>/`。
+- 本地验证：
+  - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py check`：通过。
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.AutomationFlowTests stable.tests.ConsoleFlowTests --noinput`：通过，23 项。
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：通过，106 项。
+  - `openspec validate refine-automation-publish-gates --strict`：通过。
+
+### 生产上线结果
+
+- PR：GitHub PR #4 `[codex] refine automation publish gates` 已 squash merge。
+- 生产提交：服务器 `/opt/umanewsbot` 已从 `71ab966` 更新到 `42a4622`。
+- 部署前 `.env` 备份：`.env.backup.refine-automation-20260624_013323`。
+- 已设置生产灰度配置：
+  - `AUTO_REWRITE_ENABLED=false`
+  - `AUTO_PUBLISH_CONTENT_SOURCE=base_translation`
+  - `HIGH_VALUE_SOURCE_RULES=netkeiba:access,netkeiba:attention`
+  - `HIGH_VALUE_WARNING_SCORE_THRESHOLD=90`
+  - `AUTO_DUPLICATE_LOOKBACK_DAYS=7`
+  - `AUTO_DUPLICATE_HIGH_THRESHOLD=0.86`
+  - `AUTO_DUPLICATE_REVIEW_THRESHOLD=0.72`
+  - `AUTOMATION_WARNING_EMAIL_ENABLED=true`
+  - `AUTOMATION_WARNING_NOTIFY_EMAILS=754652181@qq.com`
+  - `AUTOMATION_WARNING_EMAIL_DEDUP_HOURS=24`
+- 容器：`web` healthy，`db / redis` healthy，`worker / beat` up。
+- 迁移：`stable.0009_automation_publish_gates` 已应用；运行时确认 `WorkflowStatus.DUPLICATE=True`，首批 `non_horse_common_word` 普通词种子数量为 `14`。
+- 验证：
+  - `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check`：通过。
+  - `http://umafans.run/healthz/` 返回 `200`。
+  - `http://umafans.run/` 返回 `200`。
+- 部署注意：重启初期日志曾出现一次 `automation_warning_email_sent_at` 字段已存在异常，判断为容器启动自动迁移与手工迁移并发撞车；后续日志显示 `No migrations to apply`，`showmigrations stable` 显示 `0009` 已应用，服务健康检查持续返回 `200`。
+
+## 2026-06-23 前台发布判定代码阅读结论
+
+- 公开前台首页 `/` 与详情页 `/news/<slug>/` 只展示 `workflow_status=published` 且 `published_to_web_at` 非空的 `NewsArticle`。
+- 抓取入库的新稿默认是 `workflow_status=pending_translation`，不会因为来自 `netkeiba` 新着、访问榜、注目榜或 `JRA` 官方新闻而直接进入前台。
+- 翻译成功后文章进入 `pending_edit`；若 `AUTOMATION_ENABLED=true`，会触发自动化评分、改写与校验链路。
+- 自动化评分为 `auto` 的文章也不会立刻公开；必须完成改写、通过一致性校验成为 `automation_status=publish_ready`，再由批量自动发布任务写入 `workflow_status=published` 与 `published_to_web_at` 后才进入前台。
+- 自动化硬规则会把重复稿、正文过短或为空、疑似乱码/结构损坏、疑似广告或导航短页直接置为 `ignored`，默认不进入前台。
+- 长采访或引语较多、翻译未成功、缺少基准中文翻译等会转为 `manual` / `pending_review`，需要人工审核后发布。
+- 人工发布通过运营后台文章编辑页完成时会写入 `workflow_status=published`、`published_to_web_at`、`published_by_mode=manual`；无封面时需要二次确认。Django Admin 或后台 API 若只改 `workflow_status` 而不补 `published_to_web_at`，仍不会被公开前台接收。
+
+## 2026-06-23 外部赛马数据导入 OpenSpec 提案
+
+- 已创建 OpenSpec change：`add-netkeiba-horse-data-import`。
+- 提案目标：使用 `keibascraper` / netkeiba 作为低频离线导入来源，先抓取近两年比赛、出走、赛果、赔率、马匹血统和马匹履历数据，保存结构化字段与原始 payload，并派生本地马名索引。
+- 关键约束：导入默认关闭，不加入自动全量调度；生产必须人工显式执行、强制限速、随机抖动、小批量、可暂停、可恢复；导入失败不得影响新闻抓取、翻译、自动化发布或公开前台。
+- 当前状态：仅完成 proposal、design、delta spec 和 tasks，尚未实现代码，尚未执行真实爬取。
 
 ## 2026-06-19 公开首页资讯流升级 OpenSpec 主 change
 
@@ -332,3 +400,88 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - `web` 容器内真实环境变量
 - 不把聊天记录当唯一记忆来源，关键修复过程必须落文档
 - 生产问题处理时，坚持“先核对运行态，再给结论”
+
+## 2026-06-23 外部赛马数据导入实现状态
+
+### 本地已实现
+
+- 新增 OpenSpec change：`add-netkeiba-horse-data-import`。
+- 新增 `keibascraper==3.1.5` 依赖，并通过管理命令提供 import 冒烟检查入口。
+- 新增外部赛马数据表：比赛、出走表、赛果、赔率、马匹、马匹履历、马名索引、导入运行、导入错误和单来源导入锁。
+- 新增 `stable.services.external_horse_data`：
+  - 包装 `keibascraper.race_list()` 与 `keibascraper.load()`。
+  - 项目侧强制执行网络开关、请求间隔、随机抖动。
+  - 保存结构化字段与 `raw_payload`。
+  - 对比赛、出走、赛果、赔率、马匹、履历做幂等 upsert。
+  - 从出走表、赛果、可信单马参数派生 `ExternalHorseAlias`。
+  - 单马导入仅在存在可信马名时创建马名索引，避免凭空写入错误马名。
+  - 记录覆盖率统计：比赛数、出走数、赛果数、赔率数、马匹数、履历数、唯一马 ID、唯一日文马名、缺失马 ID/马名记录数。
+- 新增管理命令 `import_external_horse_data`：
+  - 支持默认近两年、指定年月、指定 `race_id`、指定 `horse_id`、`--horse-name`、`--dry-run`。
+  - 支持 `--max-races`、`--max-horses`、`--fetch-odds`、`--no-fetch-horse-detail`。
+  - 支持 `--lookup-name` 查询本地马名索引。
+  - 支持 `--stats-run-id` 查看导入运行统计。
+  - 支持 `--check-dependency` 检查 `keibascraper` 是否可 import。
+- 新增 Celery 任务 `import_external_horse_data_task`，但未加入默认 Celery Beat 全量调度。
+
+### 当前默认策略
+
+- `EXTERNAL_HORSE_DATA_IMPORT_ENABLED=false`。
+- `EXTERNAL_HORSE_DATA_ALLOW_NETWORK=false`。
+- 代码已可部署迁移，但生产不会自动发起 netkeiba 请求。
+- 外部数据导入当前不参与新闻抓取、翻译、AI 改写、自动发布或公开前台。
+
+### 本地验证
+
+- `DB_ENGINE=sqlite python manage.py check`：通过。
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable.tests.ExternalHorseDataImportTests`：通过，8 项。
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable`：通过，96 项。
+
+### 生产执行提醒
+
+- 生产首次真实导入前必须备份数据库。
+- 先执行 dry-run 或单月小批量。
+- 首次真实请求建议使用 8-10 秒间隔、小批量、低峰时段，不抓赔率。
+- 同一来源通过导入锁避免多 worker 并发放大请求。
+- 如发现异常，优先关闭 `EXTERNAL_HORSE_DATA_IMPORT_ENABLED` / `EXTERNAL_HORSE_DATA_ALLOW_NETWORK` 并停止任务；新表不参与主新闻链路。
+
+### 生产首轮小批量导入结果
+
+- 生产部署提交：`58a6e82`。
+- 部署前 `.env` 备份：`.env.backup.external-horse-data-20260623_231514`。
+- 服务器迁移：`stable.0008_externaldataimportrun_externaldataimportlock_and_more` 已应用。
+- 容器内依赖检查：`keibascraper import ok`。
+- dry-run：`2026-05` 单月、小批量、最多 10 场，预计 20 个请求。
+- 真实导入命令：`2026-05`、`--max-races 10`、`--max-horses 30`、不抓赔率、不补马匹详情、请求间隔 10 秒 + 2 秒抖动。
+- 运行结果：`run_id=1`，`status=paused`，`success_count=10`，`failure_count=0`，`skipped_count=326`。
+- 写入统计：`race_count=10`、`entry_count=151`、`result_count=143`、`horse_count=143`、`unique_horse_id_count=143`、`unique_horse_name_count=143`、`missing_horse_id_or_name_count=16`。
+- 样本马名索引已写入，如 `ヴォルスター`、`ファイツオン`、`サトノエピック`。
+
+### 后续继续导入注意
+
+- `2026-06-24` 已补充按月续跑逻辑：再次导入同一月份时会先跳过已落库的 `ExternalRace.race_id`，只处理下一批未导入 race。
+- 不建议直接一次性跑近两年全量；应继续按月、小批量、低速运行，并观察失败率和覆盖率。
+
+### 生产第二批续跑结果
+
+- 续跑部署提交：`a61d789`。
+- 第二批真实导入：`run_id=2`，同为 `2026-05`，最多 10 场，不抓赔率，不补马匹详情，10 秒间隔 + 2 秒抖动。
+- 续跑确认：`parameters.already_imported_race_count=10`，说明第二批已跳过首批落库 race。
+- 运行结果：`status=paused`，`success_count=10`，`failure_count=0`，`skipped_count=316`。
+- 累计写入统计：`race_count=20`、`entry_count=292`、`result_count=274`、`horse_count=274`、`unique_horse_id_count=274`、`unique_horse_name_count=274`、`missing_horse_id_or_name_count=36`。
+
+### 生产第三批续跑结果
+
+- 第三批真实导入：`run_id=3`，仍为 `2026-05`，最多 30 场，不抓赔率，不补马匹详情，10 秒间隔 + 2 秒抖动。
+- 运行结果：`status=paused`，`success_count=30`，`failure_count=0`，`skipped_count=286`。
+- 累计写入统计：`race_count=50`、`entry_count=742`、`result_count=695`、`horse_count=695`、`unique_horse_id_count=695`、`unique_horse_name_count=695`、`missing_horse_id_or_name_count=94`。
+- 服务器健康检查：`/healthz/` 返回 `200`。
+
+### 生产长循环导入中断记录
+
+- `2026-06-24` 按用户确认启动长循环：从 `2026-05` 到 `2025-06`，每批 25 场，不抓赔率，不补马匹详情，10 秒间隔 + 2 秒抖动。
+- 成功完成批次：`run_id=4` 到 `run_id=8`，均为 `2026-05`，每批 25 场，均 `failure_count=0`。
+- 中断批次：`run_id=9`，`2026-05`，已成功 7 场后执行进程以退出码 `137` 中断；当时 `web/db` 容器发生重启，但 `OOMKilled=false`。
+- 已人工收尾：将 `run_id=9` 标记为 `partial`，写入 `finished_at` 和 coverage，释放 `ExternalDataImportLock`。
+- 中断后累计写入：`race_count=182`、`entry_count=2692`、`result_count=2518`、`horse_count=2401`、`unique_horse_id_count=2401`、`unique_horse_name_count=2401`、`missing_horse_id_or_name_count=348`。
+- 当前服务状态：`web/db/redis/nginx/worker/beat` 运行，`/healthz/` 返回 `200`。按“报错退出则停止”约定，未继续启动后续导入。

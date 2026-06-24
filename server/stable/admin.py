@@ -107,6 +107,7 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "workflow_status",
         "automation_status",
         "review_mode",
+        "gate_issue_summary",
         "score_total",
         "status",
         "is_first_crawled",
@@ -131,6 +132,8 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "is_first_crawled",
         "first_seen_at",
         "last_seen_at",
+        "gate_issue_summary",
+        "duplicate_article_link",
         "push_action_link",
         "translate_action_link",
     )
@@ -149,7 +152,8 @@ class NewsArticleAdmin(admin.ModelAdmin):
         ("来源信息", {"fields": ("source_config", "crawl_job", "source_site", "source_mode", "source_article_id", "source_url", "published_at")}),
         ("日文原稿", {"fields": ("title_ja", "body_ja_raw", "body_ja_normalized")}),
         ("翻译参考", {"fields": ("translated_title_zh", "translated_summary_zh", "translated_body_zh")}),
-        ("自动化运营", {"fields": ("review_mode", "risk_level", "automation_status", "content_category", "score_total", "quality_score", "rewrite_confidence", "decision_summary", "decision_reason", "base_translation_zh", "rewrite_title_zh", "rewrite_summary_zh", "rewrite_body_zh", "published_by_mode", "auto_publish_at", "automation_error_message")}),
+        ("自动化运营", {"fields": ("review_mode", "risk_level", "automation_status", "content_category", "score_total", "quality_score", "rewrite_confidence", "decision_summary", "decision_reason", "gate_issues", "gate_issue_summary", "base_translation_zh", "rewrite_title_zh", "rewrite_summary_zh", "rewrite_body_zh", "published_by_mode", "auto_publish_at", "automation_error_message")}),
+        ("重复内容", {"fields": ("duplicate_of", "duplicate_article_link", "duplicate_score", "duplicate_reason", "automation_warning_email_signature", "automation_warning_email_sent_at")}),
         ("发布内容", {"fields": ("title_zh", "summary_zh", "body_zh", "source_note", "editor_notes", "workflow_status", "status")}),
         ("追踪信息", {"fields": ("is_first_crawled", "first_seen_at", "last_seen_at")}),
         ("操作", {"fields": ("translate_action_link", "push_action_link")}),
@@ -197,6 +201,25 @@ class NewsArticleAdmin(admin.ModelAdmin):
         return format_html('<a class="button" href="{}">重新翻译</a>', url)
 
     translate_action_link.short_description = "重译"
+
+    def gate_issue_summary(self, obj):
+        issues = obj.gate_issues or []
+        if not issues:
+            return "-"
+        counts = {"blocker": 0, "warning": 0, "info": 0}
+        for issue in issues:
+            counts[str(issue.get("severity") or "info")] = counts.get(str(issue.get("severity") or "info"), 0) + 1
+        return f"B:{counts.get('blocker', 0)} W:{counts.get('warning', 0)} I:{counts.get('info', 0)}"
+
+    gate_issue_summary.short_description = "门禁"
+
+    def duplicate_article_link(self, obj):
+        if not obj.duplicate_of_id:
+            return "-"
+        url = reverse("admin:stable_newsarticle_change", args=[obj.duplicate_of_id])
+        return format_html('<a href="{}">#{}</a>', url, obj.duplicate_of_id)
+
+    duplicate_article_link.short_description = "相似文章"
 
     def get_urls(self):
         custom_urls = [

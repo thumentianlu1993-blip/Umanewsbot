@@ -146,6 +146,13 @@ docker logs --tail=120 umanewsbot-nginx-1
 AUTOMATION_ENABLED=false
 AUTO_REVIEW_THRESHOLD=75
 MANUAL_REVIEW_THRESHOLD=45
+AUTO_REWRITE_ENABLED=false
+AUTO_PUBLISH_CONTENT_SOURCE=base_translation
+HIGH_VALUE_SOURCE_RULES=netkeiba:access,netkeiba:attention
+HIGH_VALUE_WARNING_SCORE_THRESHOLD=90
+AUTO_DUPLICATE_LOOKBACK_DAYS=7
+AUTO_DUPLICATE_HIGH_THRESHOLD=0.86
+AUTO_DUPLICATE_REVIEW_THRESHOLD=0.72
 AUTO_PUBLISH_BATCH_LIMIT=4
 AUTO_PUBLISH_PEAK_BATCH_LIMIT=10
 AUTO_PUBLISH_PEAK_DAY_OF_WEEK=6
@@ -160,9 +167,12 @@ REWRITE_MAX_TOKENS=2600
 REWRITE_TIMEOUT_SECONDS=90
 AUTOMATION_ENABLE_EMAIL=false
 AUTOMATION_NOTIFY_EMAILS=
+AUTOMATION_WARNING_EMAIL_ENABLED=true
+AUTOMATION_WARNING_NOTIFY_EMAILS=754652181@qq.com
+AUTOMATION_WARNING_EMAIL_DEDUP_HOURS=24
 ```
 
-真实启用 AI 改写时，按现有 OpenAI-compatible / SiliconFlow 配置补齐 Key，并将 `REWRITE_PROVIDER` 设置为对应 provider。
+`refine-automation-publish-gates` 实施后，短期建议保持 `AUTO_REWRITE_ENABLED=false` 和 `AUTO_PUBLISH_CONTENT_SOURCE=base_translation`，先用基准翻译稿跑自动发布门禁。真实恢复 AI 改写时，按现有 OpenAI-compatible / SiliconFlow 配置补齐 Key，将 `AUTO_REWRITE_ENABLED=true`，并将 `AUTO_PUBLISH_CONTENT_SOURCE=rewrite`、`REWRITE_PROVIDER` 设置为对应 provider。
 
 ### 部署步骤
 
@@ -184,6 +194,12 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py chec
 docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.models import NewsArticle, AutomationLog, NotificationLog; print(NewsArticle.objects.count(), AutomationLog.objects.count(), NotificationLog.objects.count())"
 ```
 
+验证门禁字段、重复状态和普通词种子：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.models import NewsArticle, TermEntry, WorkflowStatus; print(hasattr(WorkflowStatus, 'DUPLICATE'), NewsArticle.objects.exclude(gate_issues=[]).count(), TermEntry.objects.filter(notes__icontains='non_horse_common_word').count())"
+```
+
 ### 灰度启用自动化
 
 先把 `.env` 中 `AUTOMATION_ENABLED` 改为 `true`，再重启相关容器：
@@ -203,6 +219,14 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shel
 ```
 
 将 `ARTICLE_ID` 替换为已翻译文章 ID。
+
+自动化门禁优化上线后，单篇验证重点查看：
+
+- 后台候选详情页是否展示 blocker / warning / info。
+- `warning` 是否仍允许文章进入 `automation_status=publish_ready`。
+- 高度重复文章是否进入 `workflow_status=duplicate`。
+- 中等相似文章是否转入 `workflow_status=pending_review`。
+- 高价值来源文章是否在评分阶段放行，但不绕过 blocker。
 
 ### 自动发布批次验证
 
@@ -240,9 +264,30 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shel
 
 如果邮件未启用，后台日志中应出现 `NotificationLog(status=skipped, channel=email)`；如果邮件已启用，应出现 `sent` 或具体失败原因。
 
+### 高价值 warning 邮件验证
+
+`warning` 初期不阻断自动发布，但高价值文章出现 warning 时应发送或跳过并留痕：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.models import NotificationLog; print(NotificationLog.objects.filter(type='high_value_warning').order_by('-created_at').values('status','target','error_message')[:5])"
+```
+
+如果 `AUTOMATION_WARNING_EMAIL_ENABLED=true` 但没有配置 `AUTOMATION_WARNING_NOTIFY_EMAILS`，应看到 `status=skipped` 且自动发布不被阻断。同一文章同一 warning 组合 24 小时内重复触发时，也应记录 skipped 去重日志。
+
+### 2026-06-24 自动发布门禁优化生产上线结果
+
+- 部署 PR：#4 `[codex] refine automation publish gates`。
+- 生产提交：`42a4622`。
+- 部署前 `.env` 备份：`.env.backup.refine-automation-20260624_013323`。
+- 生产灰度策略：`AUTO_REWRITE_ENABLED=false`，`AUTO_PUBLISH_CONTENT_SOURCE=base_translation`，高价值 warning 邮件发送到 `754652181@qq.com`。
+- 迁移：`stable.0009_automation_publish_gates` 已应用。
+- 健康检查：`http://umafans.run/healthz/` 与 `/` 均返回 `200`，`web` 容器 healthy。
+- 验收查询：`WorkflowStatus.DUPLICATE=True`，首批非马名普通词种子数量 `14`，`python manage.py check` 通过。
+- 部署日志曾出现一次字段已存在异常，原因为容器启动迁移与手工迁移并发；后续 `showmigrations`、`check` 和健康检查均正常。
+
 ### 自动化排障顺序
 
-1. 先查 `.env` 中 `AUTOMATION_ENABLED`、阈值、邮件配置和模型配置
+1. 先查 `.env` 中 `AUTOMATION_ENABLED`、`AUTO_REWRITE_ENABLED`、`AUTO_PUBLISH_CONTENT_SOURCE`、阈值、邮件配置和模型配置
 2. 再查 `beat` 是否加载 `auto-publish-batch` 与 `detect-automation-anomalies`
 3. 查看 `worker` 日志是否有评分、改写、校验、发布异常
 4. 后台文章详情页查看 `AutomationLog`
@@ -659,3 +704,119 @@ git pull --ff-only origin main
 ```
 
 如需临时直接回退到上一生产版本，可 checkout `e834f58` 后重新部署，但后续仍应通过 GitHub revert 保持 `main` 分支语义一致。
+
+## 外部赛马数据导入运行手册
+
+### 默认状态
+
+外部赛马数据导入默认不运行：
+
+```bash
+EXTERNAL_HORSE_DATA_IMPORT_ENABLED=false
+EXTERNAL_HORSE_DATA_ALLOW_NETWORK=false
+```
+
+Celery 任务 `stable.tasks.import_external_horse_data_task` 不加入默认全量 Celery Beat 调度，生产只能由人工明确触发。
+
+### 生产执行前
+
+1. 确认代码已部署并执行迁移。
+2. 备份数据库。
+3. 确认同一时间没有其他外部赛马数据导入任务运行。
+4. 首次执行建议先不抓赔率，先只补 `entry/result/horse/history`。
+5. 首次真实请求建议使用更保守限速：`8-10` 秒请求间隔，小批量执行。
+
+### 依赖检查
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data --check-dependency
+```
+
+### dry-run
+
+dry-run 不写入外部数据表：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data --year 2026 --month 5 --dry-run
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data --race-id 202605310101 --dry-run
+```
+
+### 单月小批量真实导入
+
+必须同时打开配置和命令参数：
+
+```bash
+EXTERNAL_HORSE_DATA_IMPORT_ENABLED=true
+EXTERNAL_HORSE_DATA_ALLOW_NETWORK=true
+EXTERNAL_HORSE_DATA_REQUEST_INTERVAL_SECONDS=10
+EXTERNAL_HORSE_DATA_JITTER_SECONDS=2
+EXTERNAL_HORSE_DATA_MAX_RACES_PER_RUN=10
+EXTERNAL_HORSE_DATA_MAX_HORSES_PER_RUN=30
+EXTERNAL_HORSE_DATA_FETCH_ODDS=false
+```
+
+执行：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data \
+  --year 2026 --month 5 \
+  --allow-network \
+  --max-races 10 \
+  --max-horses 30 \
+  --no-fetch-horse-detail
+```
+
+如需补单匹马，并且人工已知可信日文马名：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data \
+  --horse-id 1000000000 \
+  --horse-name マヤノライジン \
+  --allow-network
+```
+
+### 验收查询
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data --lookup-name マヤノライジン
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_external_horse_data --stats-run-id <run_id>
+```
+
+重点看：
+
+- `status`
+- `failure_count`
+- `coverage_stats.race_count`
+- `coverage_stats.entry_count`
+- `coverage_stats.result_count`
+- `coverage_stats.unique_horse_id_count`
+- `coverage_stats.unique_horse_name_count`
+- `coverage_stats.missing_horse_id_or_name_count`
+
+### 日志与停止
+
+```bash
+docker logs --tail=200 umanewsbot-web-1
+docker logs --tail=200 umanewsbot-worker-1
+```
+
+如需停止：
+
+1. 关闭 `EXTERNAL_HORSE_DATA_IMPORT_ENABLED=false` 和 `EXTERNAL_HORSE_DATA_ALLOW_NETWORK=false`。
+2. 停止正在执行导入的命令或 Celery worker。
+3. 保留外部数据表记录，新表不参与主新闻链路，不影响前台发布。
+
+### 2026-06-23 首次生产小批量结果
+
+- 部署提交：`58a6e82`。
+- `.env` 备份：`.env.backup.external-horse-data-20260623_231514`。
+- `stable.0008` 迁移已应用，`web` healthy，`/healthz/` 返回 `200`。
+- `python manage.py import_external_horse_data --check-dependency` 返回 `keibascraper import ok`。
+- dry-run 目标：`2026-05`，最多 10 场，预计 20 个请求。
+- 真实导入参数：`2026-05`，最多 10 场，不抓赔率，不补马匹详情，请求间隔 10 秒 + 2 秒抖动。
+- 结果：`run_id=1`，`status=paused`，成功 10 场，失败 0，因批量上限跳过 326 场。
+- 写入：10 场比赛、151 条出走、143 条赛果、143 个唯一马 ID/马名索引。
+- `2026-06-24` 已补充按月续跑逻辑：再次执行同一月份时会跳过已落库 race，只处理下一批未导入 race。
+- 第二批续跑结果：`run_id=2`，已跳过首批 10 场，继续成功导入 10 场，失败 0；累计 20 场比赛、274 个唯一马 ID/马名索引。
+- 第三批续跑结果：`run_id=3`，继续成功导入 30 场，失败 0；累计 50 场比赛、695 个唯一马 ID/马名索引，`/healthz/` 返回 `200`。
+- 长循环导入中断记录：`run_id=4` 到 `run_id=8` 均成功；`run_id=9` 成功 7 场后进程退出码 `137` 中断，已标记为 `partial` 并释放导入锁。中断后累计 182 场比赛、2401 个唯一马 ID/马名索引，`/healthz/` 返回 `200`。
