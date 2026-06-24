@@ -23,6 +23,7 @@
             <th>频率</th>
             <th>最后抓取</th>
             <th>状态</th>
+            <th>最近结果</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -45,13 +46,14 @@
               <td>{{ source.crawl_interval_minutes }} 分钟</td>
               <td>{% if source.last_crawl_at %}{{ source.last_crawl_at|date:"Y-m-d H:i" }}{% else %}<span class="muted">暂无</span>{% endif %}</td>
               <td>
-                {% if source.last_crawl_status == "success" %}
-                  <span class="badge success">成功</span>
-                {% elif source.last_crawl_status == "failed" %}
-                  <span class="badge danger">失败</span>
+                {% if source.health.tone %}
+                  <span class="badge {{ source.health.tone }}">{{ source.health.label }}</span>
                 {% else %}
-                  <span class="badge">未运行</span>
+                  <span class="badge">{{ source.health.label }}</span>
                 {% endif %}
+              </td>
+              <td>
+                {{ source.health.summary|truncatechars:72 }}
               </td>
               <td>
                 <div class="article-actions">
@@ -72,7 +74,7 @@
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="8" class="muted">还没有来源，先新增一个来源。</td></tr>
+            <tr><td colspan="9" class="muted">还没有来源，先新增一个来源。</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -102,14 +104,12 @@
             <div>
               <strong>运行状态</strong>
               <span>
-                {% if source.last_crawl_status == "success" %}
-                  成功
-                {% elif source.last_crawl_status == "failed" %}
-                  失败
-                {% else %}
-                  未运行
-                {% endif %}
+                {{ source.health.label }}
               </span>
+            </div>
+            <div>
+              <strong>最近结果</strong>
+              <span>{{ source.health.summary|truncatechars:54 }}</span>
             </div>
           </div>
           <div class="article-actions">

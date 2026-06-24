@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone as dt_timezone
 from io import StringIO
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
+from django.conf import settings as django_settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -24,6 +26,7 @@ from stable.models import (
     ExternalRaceEntry,
     ExternalRaceOdds,
     ExternalRaceResult,
+    CrawlJob,
     NewsImage,
     NewsArticle,
     NewsSnapshot,
@@ -44,7 +47,7 @@ from stable.services.pushing import build_push_message, push_article_to_targets
 from stable.services.automation import score_article_for_automation
 from stable.services.notifications import send_high_value_warning_notification
 from stable.services.rewriting import _loads_rewrite_payload
-from stable.services.sources import sync_builtin_sources
+from stable.services.sources import BUILTIN_SOURCE_DEFINITIONS, sync_builtin_sources
 from stable.services.term_admin import preview_term_import
 from stable.services.term_candidate_review import accept_candidate, merge_candidate, set_candidate_status
 from stable.services.term_discovery import (
@@ -70,6 +73,7 @@ from stable.services.external_horse_data import (
     ImportOptions,
 )
 from stable.tasks import (
+    _crawl_jra_source,
     _crawl_netkeiba_mode,
     _resolve_auto_publish_batch_limit,
     auto_publish_batch_task,
@@ -242,6 +246,74 @@ class AdapterTests(TestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0].source_site, SourceSite.JRA)
         self.assertEqual(items[0].title_ja, "クイーンSの競走馬登録抹消")
+
+    def test_jra_listing_parse_without_year_uses_month_hint(self):
+        html = """
+        <div class="news_unit"><h2>5月31日（日曜）</h2>
+        <ul class="news_line_list"><li><a href="/news/202605/053101.html"><div class="txt">無年份日期新闻</div></a></li></ul>
+        </div>
+        """
+        with patch("stable.adapters.jra.get_bytes", return_value=html):
+            items = JRAAdapter().fetch_listing(SourceMode.OFFICIAL, "202605")
+        self.assertEqual(len(items), 1)
+        local = items[0].published_at.astimezone(ZoneInfo("Asia/Tokyo"))
+        self.assertEqual(local.year, 2026)
+        self.assertEqual(local.month, 5)
+        self.assertEqual(local.day, 31)
+
+    def test_jra_date_parse_rolls_back_future_no_year_date(self):
+        adapter = JRAAdapter()
+        now = datetime(2026, 1, 2, 3, 0, tzinfo=dt_timezone.utc)
+        with patch("stable.adapters.jra.timezone.now", return_value=now):
+            parsed = adapter._parse_heading_date("12月31日（木曜）")
+        local = parsed.astimezone(ZoneInfo("Asia/Tokyo"))
+        self.assertEqual(local.year, 2025)
+        self.assertEqual(local.month, 12)
+        self.assertEqual(local.day, 31)
+
+    def test_jra_listing_skips_bad_date_and_keeps_following_items(self):
+        html = """
+        <div class="news_unit"><h2>bad-date</h2>
+        <ul class="news_line_list"><li><a href="/news/202605/053099.html"><div class="txt">坏日期</div></a></li></ul>
+        </div>
+        <div class="news_unit"><h2>5月31日（日曜）</h2>
+        <ul class="news_line_list"><li><a href="/news/202605/053101.html"><div class="txt">可解析新闻</div></a></li></ul>
+        </div>
+        """
+        adapter = JRAAdapter()
+        with patch("stable.adapters.jra.get_bytes", return_value=html):
+            items = adapter.fetch_listing(SourceMode.OFFICIAL, "202605")
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0].title_ja, "可解析新闻")
+        self.assertEqual(len(adapter.skipped_items), 1)
+
+    def test_netkeiba_rank_schedule_and_builtin_interval_stay_aligned(self):
+        latest_schedule = django_settings.CELERY_BEAT_SCHEDULE["crawl-netkeiba-latest-hourly"]["schedule"]
+        rush_schedule = django_settings.CELERY_BEAT_SCHEDULE["crawl-netkeiba-latest-sunday-rush"]["schedule"]
+        rush_end_schedule = django_settings.CELERY_BEAT_SCHEDULE["crawl-netkeiba-latest-sunday-rush-end"]["schedule"]
+        access_schedule = django_settings.CELERY_BEAT_SCHEDULE["crawl-netkeiba-access"]["schedule"]
+        attention_schedule = django_settings.CELERY_BEAT_SCHEDULE["crawl-netkeiba-attention"]["schedule"]
+
+        def minute_values(schedule):
+            return {int(item) for item in str(schedule._orig_minute).split(",")}
+
+        latest_minutes = minute_values(latest_schedule)
+        access_minutes = minute_values(access_schedule)
+        attention_minutes = minute_values(attention_schedule)
+        rush_minutes = minute_values(rush_schedule) | minute_values(rush_end_schedule)
+
+        self.assertEqual(access_schedule._orig_minute, 16)
+        self.assertEqual(attention_schedule._orig_minute, 26)
+        self.assertEqual(access_schedule._orig_hour, "*")
+        self.assertEqual(attention_schedule._orig_hour, "*")
+        self.assertTrue(latest_minutes.isdisjoint(access_minutes))
+        self.assertTrue(latest_minutes.isdisjoint(attention_minutes))
+        self.assertTrue(access_minutes.isdisjoint(attention_minutes))
+        self.assertTrue(rush_minutes.isdisjoint(access_minutes))
+        self.assertTrue(rush_minutes.isdisjoint(attention_minutes))
+        definitions = {(item["source_site"], item["source_mode"]): item for item in BUILTIN_SOURCE_DEFINITIONS}
+        self.assertEqual(definitions[(SourceSite.NETKEIBA, SourceMode.ACCESS)]["crawl_interval_minutes"], 60)
+        self.assertEqual(definitions[(SourceSite.NETKEIBA, SourceMode.ATTENTION)]["crawl_interval_minutes"], 60)
 
 
 class FakeExternalHorseDataAdapter:
@@ -495,6 +567,96 @@ class ConsoleFlowTests(TestCase):
         self.assertContains(dashboard, "工作台")
         self.assertEqual(source_page.status_code, 200)
         self.assertContains(source_page, "来源管理")
+
+    def test_source_pages_show_success_no_new_failure_and_stale_health(self):
+        sources = {source.source_mode: source for source in NewsSource.objects.all()}
+        latest = sources[SourceMode.LATEST]
+        latest.last_crawl_at = timezone.now()
+        latest.last_crawl_status = TaskStatus.SUCCESS
+        latest.last_crawl_message = "新增 0，重复 120"
+        latest.save(update_fields=["last_crawl_at", "last_crawl_status", "last_crawl_message", "updated_at"])
+        CrawlJob.objects.create(source=latest, status=TaskStatus.SUCCESS, success_count=0, fail_count=120)
+
+        access = sources[SourceMode.ACCESS]
+        access.last_crawl_at = timezone.now()
+        access.last_crawl_status = TaskStatus.FAILED
+        access.last_crawl_message = "解析失败"
+        access.save(update_fields=["last_crawl_at", "last_crawl_status", "last_crawl_message", "updated_at"])
+        CrawlJob.objects.create(source=access, status=TaskStatus.FAILED, error_message="解析失败")
+
+        attention = sources[SourceMode.ATTENTION]
+        stale_time = timezone.now() - timedelta(hours=4)
+        attention.last_crawl_at = stale_time
+        attention.last_crawl_status = TaskStatus.SUCCESS
+        attention.last_crawl_message = "新增 3，重复 37"
+        attention.save(update_fields=["last_crawl_at", "last_crawl_status", "last_crawl_message", "updated_at"])
+        CrawlJob.objects.create(source=attention, status=TaskStatus.SUCCESS, success_count=3, fail_count=37, started_at=stale_time, finished_at=stale_time)
+
+        source_page = self.client.get(reverse("console-source-list"))
+        dashboard = self.client.get(reverse("console-dashboard"))
+        self.assertContains(source_page, "成功无新增")
+        self.assertContains(source_page, "新增 0，重复 120")
+        self.assertContains(source_page, "解析失败")
+        self.assertContains(source_page, "长时间未运行")
+        self.assertContains(dashboard, "成功无新增")
+
+    def test_source_health_shows_current_running_job_before_stale_success_cache(self):
+        source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.LATEST)
+        source.last_crawl_at = timezone.now() - timedelta(minutes=5)
+        source.last_crawl_status = TaskStatus.SUCCESS
+        source.last_crawl_message = "新增 0，重复 120"
+        source.save(update_fields=["last_crawl_at", "last_crawl_status", "last_crawl_message", "updated_at"])
+        CrawlJob.objects.create(source=source, status=TaskStatus.SUCCESS, success_count=0, fail_count=120, finished_at=timezone.now() - timedelta(minutes=5))
+        CrawlJob.objects.create(source=source, status=TaskStatus.STARTED, started_at=timezone.now())
+
+        source_page = self.client.get(reverse("console-source-list"))
+
+        self.assertContains(source_page, "运行中")
+        self.assertNotContains(source_page, "成功无新增")
+
+    def test_source_health_shows_first_running_job_instead_of_not_run_or_stale(self):
+        source = NewsSource.objects.get(source_site=SourceSite.JRA, source_mode=SourceMode.OFFICIAL)
+        CrawlJob.objects.create(source=source, status=TaskStatus.STARTED, started_at=timezone.now())
+
+        source_page = self.client.get(reverse("console-source-list"))
+
+        self.assertContains(source_page, "运行中")
+        self.assertNotContains(source_page, "长时间未运行")
+
+    def test_source_health_shows_timed_out_running_job(self):
+        source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.ACCESS)
+        CrawlJob.objects.create(source=source, status=TaskStatus.STARTED, started_at=timezone.now() - timedelta(minutes=61))
+
+        source_page = self.client.get(reverse("console-source-list"))
+
+        self.assertContains(source_page, "运行超时")
+        self.assertContains(source_page, "超过 60 分钟")
+
+    def test_source_health_shows_old_never_run_source_as_stale(self):
+        source = NewsSource.objects.get(source_site=SourceSite.JRA, source_mode=SourceMode.OFFICIAL)
+        old_time = timezone.now() - timedelta(hours=37)
+        NewsSource.objects.filter(pk=source.pk).update(created_at=old_time)
+        source.refresh_from_db()
+
+        from stable.views import _source_health
+
+        health = _source_health(source, now=timezone.now())
+
+        self.assertEqual(health["label"], "长时间未运行")
+        self.assertIn("超过", health["summary"])
+
+    def test_source_health_does_not_mark_disabled_source_as_stale(self):
+        source = NewsSource.objects.get(source_site=SourceSite.JRA, source_mode=SourceMode.OFFICIAL)
+        old_time = timezone.now() - timedelta(hours=37)
+        NewsSource.objects.filter(pk=source.pk).update(created_at=old_time, enabled=False)
+        source.refresh_from_db()
+
+        from stable.views import _source_health
+
+        health = _source_health(source, now=timezone.now())
+
+        self.assertEqual(health["label"], "未运行")
+        self.assertFalse(health["is_stale"])
 
     def test_public_backend_route_and_legacy_console_redirect_work(self):
         dashboard = self.client.get("/admin/")
@@ -1844,6 +2006,73 @@ class CrawlAutoTranslateTests(TestCase):
         self.assertEqual(result["new_count"], 1)
         self.assertEqual(result["seen_count"], 0)
         mocked_translate.assert_called_once_with(article.id)
+
+    @override_settings(AUTO_TRANSLATE_ON_INGEST=False)
+    def test_crawl_success_with_no_new_articles_records_success_summary(self):
+        sync_builtin_sources()
+        source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.LATEST)
+        stub = type("Stub", (), {"source_article_id": "seen-article"})()
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="seen-article",
+            title_ja="既存記事",
+            body_ja_raw="本文",
+            body_ja_normalized="本文",
+            published_at=timezone.now(),
+            source_url="https://example.com/news/seen-article",
+            workflow_status=WorkflowStatus.PENDING_TRANSLATION,
+        )
+
+        with patch("stable.tasks.NetkeibaAdapter.fetch_listing", return_value=[stub]), patch(
+            "stable.tasks.NetkeibaAdapter.fetch_detail", return_value=object()
+        ), patch("stable.tasks.NetkeibaAdapter.normalize_source_payload", return_value=object()), patch(
+            "stable.tasks.upsert_article_from_draft", return_value=(article, False)
+        ):
+            result = _crawl_netkeiba_mode("latest", 1, source=source)
+
+        source.refresh_from_db()
+        job = CrawlJob.objects.get(pk=result["crawl_job_id"])
+        self.assertEqual(job.status, TaskStatus.SUCCESS)
+        self.assertEqual(job.success_count, 0)
+        self.assertEqual(job.fail_count, 1)
+        self.assertEqual(source.last_crawl_status, TaskStatus.SUCCESS)
+        self.assertEqual(source.last_crawl_message, "新增 0，重复 1")
+
+    @override_settings(AUTO_TRANSLATE_ON_INGEST=False)
+    def test_jra_detail_structure_error_skips_article_and_continues(self):
+        sync_builtin_sources()
+        source = NewsSource.objects.get(source_site=SourceSite.JRA, source_mode=SourceMode.OFFICIAL)
+        bad_stub = type("Stub", (), {"source_url": "https://www.jra.go.jp/news/202605/bad.html"})()
+        good_stub = type("Stub", (), {"source_url": "https://www.jra.go.jp/news/202605/good.html"})()
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.JRA,
+            source_mode=SourceMode.OFFICIAL,
+            source_article_id="/news/202605/good.html",
+            title_ja="JRA 正常详情",
+            body_ja_raw="本文",
+            body_ja_normalized="本文",
+            published_at=timezone.now(),
+            source_url="https://www.jra.go.jp/news/202605/good.html",
+            workflow_status=WorkflowStatus.PENDING_TRANSLATION,
+        )
+
+        with patch("stable.tasks.JRAAdapter.fetch_listing", side_effect=[[bad_stub, good_stub], []]), patch(
+            "stable.tasks.JRAAdapter.fetch_detail", side_effect=[AttributeError("missing date node"), object()]
+        ), patch("stable.tasks.JRAAdapter.normalize_source_payload", return_value=object()), patch(
+            "stable.tasks.upsert_article_from_draft", return_value=(article, True)
+        ):
+            result = _crawl_jra_source(source=source)
+
+        source.refresh_from_db()
+        job = CrawlJob.objects.get(pk=result["crawl_job_id"])
+        self.assertEqual(result["new_count"], 1)
+        self.assertEqual(result["skipped_count"], 1)
+        self.assertEqual(job.status, TaskStatus.SUCCESS)
+        self.assertIn("跳过 1 条", job.error_message)
+        self.assertIn("missing date node", job.error_message)
+        self.assertIn("跳过 1 条", source.last_crawl_message)
+        self.assertIn("missing date node", source.last_crawl_message)
 
 
 class TermCandidateDiscoveryTests(TestCase):

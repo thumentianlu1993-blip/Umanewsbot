@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 from urllib.parse import urljoin
 from zoneinfo import ZoneInfo
 
@@ -21,8 +22,12 @@ TOKYO_TZ = ZoneInfo("Asia/Tokyo")
 class JRAAdapter(SourceAdapter):
     source_site = SourceSite.JRA
 
+    def __init__(self) -> None:
+        self.skipped_items: list[str] = []
+
     def fetch_listing(self, mode: SourceMode, page_or_month: str | int) -> list[SourceArticleStub]:
         month = str(page_or_month)
+        year_hint = self._year_hint_from_month(month)
         html = str(get_bytes(f"{BASE_URL}/news/{month}/", encoding="shift_jis"))
         soup = BeautifulSoup(html, "lxml")
         articles: list[SourceArticleStub] = []
@@ -30,7 +35,12 @@ class JRAAdapter(SourceAdapter):
             heading = news_unit.select_one("h2")
             if not heading:
                 continue
-            published_at = self._parse_heading_date(heading.get_text(" ", strip=True))
+            heading_text = heading.get_text(" ", strip=True)
+            try:
+                published_at = self._parse_heading_date(heading_text, year_hint=year_hint)
+            except ValueError as exc:
+                self.skipped_items.append(f"{heading_text}: {exc}")
+                continue
             for anchor in news_unit.select("ul.news_line_list li a[href]"):
                 href = anchor.get("href", "").strip()
                 if not href.startswith("/news/"):
@@ -59,7 +69,11 @@ class JRAAdapter(SourceAdapter):
         soup = BeautifulSoup(html, "lxml")
         title = soup.find_all("h1")[1].get_text(" ", strip=True)
         published_text = soup.select_one(".news_title .date").get_text(" ", strip=True)
-        published_at = self._parse_heading_date(published_text)
+        published_at = self._parse_heading_date(
+            published_text,
+            year_hint=self._year_hint_from_url(url),
+            source_url=url,
+        )
         body_node = soup.select_one(".news_body")
         body_raw = extract_article_text(body_node)
         body_normalized = normalize_whitespace(body_raw)
@@ -99,8 +113,27 @@ class JRAAdapter(SourceAdapter):
             metadata={**stub.metadata, **detail.metadata},
         )
 
-    def _parse_heading_date(self, text: str) -> datetime:
+    def _parse_heading_date(self, text: str, *, year_hint: int | None = None, source_url: str = "") -> datetime:
         normalized = text.replace("（", "(").replace("）", ")")
         date_part = normalized.split("(")[0].strip()
-        dt = datetime.strptime(date_part, "%Y年%m月%d日").replace(tzinfo=TOKYO_TZ)
+        match = re.search(r"(?:(?P<year>\d{4})年)?(?P<month>\d{1,2})月(?P<day>\d{1,2})日", date_part)
+        if not match:
+            location = f" ({source_url})" if source_url else ""
+            raise ValueError(f"unsupported JRA date format: {text}{location}")
+        year = int(match.group("year") or year_hint or timezone.now().astimezone(TOKYO_TZ).year)
+        month = int(match.group("month"))
+        day = int(match.group("day"))
+        dt = datetime(year, month, day, tzinfo=TOKYO_TZ)
+        if not match.group("year") and not year_hint:
+            today = timezone.now().astimezone(TOKYO_TZ).date()
+            if dt.date() > today + timedelta(days=7):
+                dt = datetime(year - 1, month, day, tzinfo=TOKYO_TZ)
         return dt.astimezone(timezone.get_current_timezone())
+
+    def _year_hint_from_month(self, value: str) -> int | None:
+        match = re.match(r"(?P<year>\d{4})(?P<month>\d{2})$", value)
+        return int(match.group("year")) if match else None
+
+    def _year_hint_from_url(self, value: str) -> int | None:
+        match = re.search(r"/news/(?P<year>\d{4})(?P<month>\d{2})/", value)
+        return int(match.group("year")) if match else None
