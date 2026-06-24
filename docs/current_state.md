@@ -17,6 +17,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-24` 已完成自动发布门禁优化 OpenSpec change：`refine-automation-publish-gates` 的实现、PR 合并与生产上线。代码已将自动发布门禁拆为 `blocker / warning / info`：`blocker` 阻断自动发布，`warning` 初期不阻断但记录并对高价值文章邮件告警，`info` 仅用于诊断；同时支持基准翻译稿自动发布、高价值来源评分放行、非马名普通词过滤、关键术语分层校验和重复内容拦截。生产服务器当前运行 PR #4 squash merge 后的提交 `42a4622`，迁移 `stable.0009_automation_publish_gates` 已应用。
 
+`2026-06-25` 已将本轮三个运营改造 change 合并到 `main` 并部署生产：抓取新鲜度与来源健康、后台原文选区快速加入术语库、新增术语后一次性应用到当前稿。服务器 `/opt/umanewsbot` 已从 `268100d` 更新到 `7f54f13`，`web / worker / beat` 已重建，`manage.py check`、`/healthz/` 和首页 HTTP 验证通过。相关 OpenSpec change 已归档并同步正式规格；其中抓取返修的 `fix-crawl-health-running-and-schedule-stagger` 是 change1 的后续规格，随 change1 一并归档。
+
 ## 已完成内容
 
 - 域名购买与解析
@@ -62,6 +64,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 已核实线上 `AUTOMATION_ENABLED=true`、`AUTO_REWRITE_ENABLED=false`、`AUTO_PUBLISH_CONTENT_SOURCE=base_translation`、`AUTOMATION_WARNING_EMAIL_ENABLED=true`，当前按“基准翻译稿自动发布 + 高价值 warning 邮件告警”灰度运行
 - 术语候选发现代码已部署到生产（`e2e3e07`，迁移 `0006` 已应用），`TERM_DISCOVERY_ENABLED=false` 默认关闭，等待单篇抽检后灰度开启
 - `2026-06-24` 已完成 QQ Bot / OneBot 生产运行态配置：独立 NapCat 容器 `umanewsbot-onebot-1` 已启动，OneBot HTTP 仅绑定服务器 `127.0.0.1:3000` 并通过 Docker 网络别名 `onebot` 给应用访问，测试群 `1026525240` 已写入 `PushTarget`，OneBot 直连与 Django `BotPusher` 均已成功发送测试消息。
+- `2026-06-25` 生产服务器运行 `7f54f13`：netkeiba 新着顺 / 访问量榜 / 注目数榜调度已加载为每小时 `00/16/26` 分，后台已具备来源健康摘要；候选详情页和文章编辑台已具备原文选区快速加入术语库，以及新增术语后 15 秒一次性浮层“应用到当前稿”。
 
 ## 下一步优先级
 
@@ -69,10 +72,11 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 2. 生产迁移已于 `2026-06-07` 完成；下一步在生产做单篇手动重新发现并抽检术语候选质量，确认后灰度启用 `TERM_DISCOVERY_ENABLED`
 3. 观察自动化发布质量与 `AutomationLog`
 4. 补充翻译 warning 可视化和术语库补全流程
-5. QQ Bot 自动推送合入、部署并灰度开启测试群推送
-6. HTTPS / 证书接入
-7. 部署稳定化与监控 / 备份 / 回滚完善
-8. 继续低批量观察 `refine-automation-publish-gates` 上线后的 warning 邮件、重复内容阻断、候选池门禁展示和自动发布结果
+5. 继续观察 QQ Bot 测试群灰度推送，必要时通过 `QQ_PUSH_ENABLED=false` 暂停自动发送
+6. 继续观察 netkeiba `00/16/26` 分错峰抓取在连续小时内生成 `CrawlJob`，并抽检后台来源健康摘要
+7. HTTPS / 证书接入
+8. 部署稳定化与监控 / 备份 / 回滚完善
+9. 继续低批量观察 `refine-automation-publish-gates` 上线后的 warning 邮件、重复内容阻断、候选池门禁展示和自动发布结果
 
 ## 当前已知风险与待确认项
 
@@ -166,7 +170,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 2026-06-24 抓取新鲜度与 JRA 日期解析本地实现
 
-- OpenSpec change：`fix-crawl-freshness-and-jra-date-parse`，当前已完成本地实现，尚未部署生产。
+- OpenSpec change：`fix-crawl-freshness-and-jra-date-parse`，当前已完成本地实现并于 `2026-06-25` 部署生产。
 - 修复范围：
   - JRA 官方新闻日期解析兼容 `2026年5月31日`、`5月31日`、零填充和非零填充日期。
   - JRA 无年份日期优先使用列表月份或 URL 年份；缺少上下文时使用当前东京年份，若推断日期晚于当前东京日期超过 7 天则回退上一年。
@@ -181,6 +185,11 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：通过，118 项。
   - `openspec validate fix-crawl-health-running-and-schedule-stagger --strict`：通过。
   - `openspec validate --all`：通过，7 项。
+- 生产部署：
+  - 服务器 `/opt/umanewsbot` 已于 `2026-06-25` 更新到 `7f54f13`，部署前 `.env` 备份为 `.env.backup.three-changes-20260625_003714`。
+  - `web / worker / beat` 已重建，`manage.py check` 通过，`http://127.0.0.1/healthz/` 与 `/` 均返回 `200`。
+  - 运行态确认 `crawl-netkeiba-latest-hourly / access / attention` 分钟分别为 `0 / 16 / 26`，内置来源定义中三者 `crawl_interval_minutes=60`。
+  - 后续仍需等待自然调度，确认访问量榜 / 注目数榜在连续小时内按 `16 / 26` 分生成新 `CrawlJob`。
 
 ## 2026-06-23 前台发布判定代码阅读结论
 
@@ -511,7 +520,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - OpenSpec change：`add-selection-term-quick-add`。
 - 本地分支：`codex/add-selection-term-quick-add`。
 - 实现时间：`2026-06-24`。
-- 状态：本地实现和验证完成，尚未部署生产。
+- 状态：已于 `2026-06-25` 合并到 `main` 并部署生产，OpenSpec 已归档为 `openspec/changes/archive/2026-06-24-add-selection-term-quick-add/`。
 
 ### 已实现能力
 
@@ -529,7 +538,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 快速加入术语库只写入 `TermEntry` 和操作日志。
 - 不触发 `translate_article_task`，不触发自动化处理，不修改当前文章的 `title_zh`、`body_zh`、`base_translation_zh` 或 `rewrite_body_zh`。
 - “新增术语后自动重新应用术语/重翻译联动”仍属于后续 change，不在本次实现中。
-- 本次没有生产部署，因此 `docs/deploy_runbook.md` 未新增上线记录。
+- 生产部署记录见 `docs/deploy_runbook.md` 的 `2026-06-25 三个运营改造 change 合并、部署与归档`。
 
 ### 验证结果
 
@@ -547,7 +556,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 - OpenSpec change：`reapply-terms-after-quick-add`。
 - 创建时间：`2026-06-24`。
-- 当前状态：本地实现和验证已完成；review 后的浮层交互和多标签页 session pending 返修已于 `2026-06-25` 完成，尚未部署生产。
+- 当前状态：本地实现和验证已完成；review 后的浮层交互和多标签页 session pending 返修已于 `2026-06-25` 完成，并已随 `7f54f13` 部署生产。OpenSpec 已归档为 `openspec/changes/archive/2026-06-24-reapply-terms-after-quick-add/`。
 - 目标：在候选详情页或文章编辑台快速创建正式术语后，为当前文章提供明确的后续动作：
   - 一次性“应用该术语到当前稿”：只把刚创建的指定术语应用到当前文章整篇已有中文字段，不调用翻译模型，不重扫整个正式术语库。
   - 页面级“重新翻译”：复用现有 `translate_article_task`，异步重新走翻译链路；不属于术语成功浮层，若页面已有按钮则不新增。
@@ -576,5 +585,5 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.ConsoleFlowTests --noinput`：通过，31 项。
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：通过，135 项。
   - `openspec validate reapply-terms-after-quick-add --strict`：通过。
-- 本次没有生产部署，因此未新增 `docs/deploy_runbook.md` 上线记录。
+- 生产部署记录见 `docs/deploy_runbook.md` 的 `2026-06-25 三个运营改造 change 合并、部署与归档`。
 - 规格校验：`openspec validate reapply-terms-after-quick-add --strict` 已通过。

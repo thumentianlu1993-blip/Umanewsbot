@@ -25,5 +25,5 @@
 
 - [x] 4.1 (operations) 更新 `.env.example` 或部署文档，记录 netkeiba 榜单新抓取频率、JRA 日期解析修复和来源健康排障入口。
 - [x] 4.2 (operations) 更新 `docs/current_state.md` 与 `docs/deploy_runbook.md`，记录本 change 的上线状态、验证命令和回滚方式。
-- [ ] 4.3 (operations) 生产部署时重启 `beat / worker / web`，确认 Celery Beat 已加载新调度。
+- [x] 4.3 (operations) 生产部署时重启 `beat / worker / web`，确认 Celery Beat 已加载新调度。
 - [ ] 4.4 (operations) 生产验收：确认 JRA 抓取不再因无年份日期失败，netkeiba 访问量榜/注目数榜在连续两个小时内按新频率生成错峰 `CrawlJob`，后台来源健康摘要可读。

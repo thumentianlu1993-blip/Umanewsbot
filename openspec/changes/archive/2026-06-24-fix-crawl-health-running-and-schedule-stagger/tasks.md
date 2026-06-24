@@ -31,5 +31,5 @@
 
 ## 5. 生产部署与验收
 
-- [ ] 5.1 (operations) 生产部署时重启 `beat / worker / web`，确认 Celery Beat 已加载 `00/16/26` 分错峰调度。
+- [x] 5.1 (operations) 生产部署时重启 `beat / worker / web`，确认 Celery Beat 已加载 `00/16/26` 分错峰调度。
 - [ ] 5.2 (operations) 生产验收：在同一小时内确认 netkeiba 新着顺、访问量榜、注目数榜分别生成错峰 `CrawlJob`，并确认运行中任务在后台显示为“运行中”、超时运行中任务显示为疑似卡住。

@@ -183,6 +183,53 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py s
 
 若单篇 JRA 详情页结构异常，预期行为是跳过该篇、继续处理同轮其他新闻，并在 `last_crawl_message` / `CrawlJob.error_message` 中留下“跳过 N 条”摘要；列表页、网络或数据库异常仍按整轮失败排查。
 
+## 2026-06-25 三个运营改造 change 合并、部署与归档
+
+### 合并范围
+
+- `codex/fix-crawl-freshness-and-health`：抓取新鲜度、JRA 日期解析、来源健康摘要和 netkeiba `00/16/26` 分错峰调度。
+- `codex/add-selection-term-quick-add`：后台候选详情页 / 文章编辑台原文选区快速加入术语库。
+- `codex/add-selection-term-quick-add` 后续提交：新增术语成功后的 15 秒一次性浮层，可点击后仅将该术语应用到当前文章已有中文字段。
+- 注意：`fix-crawl-health-running-and-schedule-stagger` 是抓取 change 的后续返修 OpenSpec 目录，随抓取 change 一并归档。
+
+### 部署前检查
+
+- 服务器部署前 HEAD：`268100d`。
+- 服务器工作树：干净。
+- 外部导入锁：`ExternalDataImportLock.locked_by_run_id=None`。
+- 最近外部导入 run：`run_id=120` 等均为 `paused`，没有运行中的长导入。
+
+### 部署步骤与结果
+
+- 本地发布分支从 `origin/main` 合并两个代码分支后推送到 `main`，合并后提交为 `7f54f13`。
+- 部署前备份 `.env`：`.env.backup.three-changes-20260625_003714`。
+- 服务器 `/opt/umanewsbot` 执行 `git pull --ff-only origin main`，从 `268100d` 更新到 `7f54f13`。
+- 执行 `bash ./deploy_lowcost.sh`，重建 `web / worker / beat`，`db / redis / nginx` 保持运行。
+- 迁移结果：`No migrations to apply`。
+- `collectstatic` 结果：`0 static files copied`，`360 post-processed`。
+- 容器状态：`web` healthy，`db / redis` healthy，`worker / beat` running，`nginx` running。
+- 验证：
+  - `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check`：通过。
+  - `http://127.0.0.1/healthz/`：`200`。
+  - `http://127.0.0.1/`：`200`。
+  - 运行态调度确认：`crawl-netkeiba-latest-hourly=00`，`crawl-netkeiba-access=16`，`crawl-netkeiba-attention=26`，三者 `crawl_interval_minutes=60`。
+
+### 归档结果
+
+- `openspec/changes/archive/2026-06-24-fix-crawl-freshness-and-jra-date-parse/`
+- `openspec/changes/archive/2026-06-24-fix-crawl-health-running-and-schedule-stagger/`
+- `openspec/changes/archive/2026-06-24-add-selection-term-quick-add/`
+- `openspec/changes/archive/2026-06-24-reapply-terms-after-quick-add/`
+- 正式规格已同步：
+  - `openspec/specs/crawl-freshness-and-source-health/spec.md`
+  - `openspec/specs/termbase-and-race-priority/spec.md`
+- 归档后 `openspec validate --all` 通过。
+
+### 后续观察
+
+- 抓取错峰的“连续小时自然生成 `CrawlJob`”仍需等待调度运行后确认；本次已确认代码和运行时 Celery Beat 配置加载为 `00/16/26` 分。
+- 如外部马名数据导入重新启动，继续遵守“导入期间不执行 `git pull / build / up / deploy_lowcost.sh`”的互斥规则。
+
 ## 自动化运营 MVP 部署与验证
 
 ### 关键环境变量
