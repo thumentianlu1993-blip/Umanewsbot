@@ -594,7 +594,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 - OpenSpec change：`use-external-horse-alias-for-name-recognition`。
 - 创建时间：`2026-06-25`。
-- 当前状态：本地实现、验证和 OpenSpec 归档已完成，尚未部署生产；归档目录为 `openspec/changes/archive/2026-06-25-use-external-horse-alias-for-name-recognition/`。
+- 当前状态：本地实现、验证、OpenSpec 归档和生产部署已完成；归档目录为 `openspec/changes/archive/2026-06-25-use-external-horse-alias-for-name-recognition/`。
 - 背景：近两年外部赛马数据已导入 `ExternalHorseAlias`，当前未知马名识别仍主要依赖片假名 token + 上下文打分，无法真正判断没见过的片假名词是不是普通词，容易把 `タイトル` 等普通词误判为马名，也可能漏掉 `マヤノライジン` 等真实马名。
 - 核心边界：
   - `TermEntry` 继续表示有中文译名或固定译法的正式术语，参与翻译术语表、译后替换和正式术语校验。
@@ -628,8 +628,14 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：review 返修后通过，147 项。
   - `openspec validate use-external-horse-alias-for-name-recognition --strict`：通过。
   - `openspec validate --all`：归档前后均通过。
+- 生产部署结果：
+  - GitHub PR #6 `[codex] Use external horse aliases for name recognition` 已 squash merge 到 `main`，merge commit 为 `35b0866`。
+  - 服务器 `/opt/umanewsbot` 已从 `817e1c8` 快进到 `35b0866`，部署前 `.env` 备份为 `.env.backup.external-horse-alias-20260625_182936`。
+  - `./deploy_lowcost.sh` 执行成功，迁移显示 `No migrations to apply`，`collectstatic` 完成，`web` 容器 healthy，`worker / beat` 已重启。
+  - 生产验证通过：`manage.py check` 无问题，`http://127.0.0.1/healthz/`、`http://umafans.run/healthz/` 和 `http://umafans.run/` 均返回 `200`。
+  - 生产只读 smoke test：`ExternalHorseAlias` 数量为 `11521`；`recognize_horse_names("ロブチェンが出走", ...)` 返回 `ロブチェン`，来源为 `external_alias`，外部 horse ID 为 `2023107089`。
 - 长文样本抽检：
   - 抽检方式：从生产只读导出 5 篇长文、2054 条启用正式术语和 11521 条 `ExternalHorseAlias`，写入本地临时 SQLite 后用当前未部署代码跑识别、候选发现和发布校验；未改生产数据。
   - 样本结果：netkeiba 长文中外部索引可命中多匹真实马名，例如 `ロブチェン`、`パントルナイーフ`、`ミクニインスパイア`、`ドリームコア` 等，并在译文未保留时产生独立 `external_horse_not_preserved` warning。
   - 观察到的后续优化点：JRA 活动公告类长文（例如 `JRA宮崎育成牧場けいばフェスタ`）仍会通过启发式把 `フェスタ`、`ウインズ`、`イベント`、`ポニー`、`オリジナル` 等普通片假名词列为疑似未知马名；外部马名索引能降低真实马名漏报，但不能完全替代后续普通词过滤和启发式收紧。
-- 本次没有生产部署，因此未新增 `docs/deploy_runbook.md` 上线记录。
+- 生产部署记录见 `docs/deploy_runbook.md` 的 `2026-06-25 外部马名索引识别链路生产部署`。
