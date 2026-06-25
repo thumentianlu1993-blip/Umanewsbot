@@ -589,3 +589,47 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - `openspec validate reapply-terms-after-quick-add --strict`：通过。
 - 生产部署记录见 `docs/deploy_runbook.md` 的 `2026-06-25 三个运营改造 change 合并、部署与归档`。
 - 规格校验：`openspec validate reapply-terms-after-quick-add --strict` 已通过。
+
+## 2026-06-25 外部马名索引接入识别链路本地实现
+
+- OpenSpec change：`use-external-horse-alias-for-name-recognition`。
+- 创建时间：`2026-06-25`。
+- 当前状态：本地实现、验证和 OpenSpec 归档已完成，尚未部署生产；归档目录为 `openspec/changes/archive/2026-06-25-use-external-horse-alias-for-name-recognition/`。
+- 背景：近两年外部赛马数据已导入 `ExternalHorseAlias`，当前未知马名识别仍主要依赖片假名 token + 上下文打分，无法真正判断没见过的片假名词是不是普通词，容易把 `タイトル` 等普通词误判为马名，也可能漏掉 `マヤノライジン` 等真实马名。
+- 核心边界：
+  - `TermEntry` 继续表示有中文译名或固定译法的正式术语，参与翻译术语表、译后替换和正式术语校验。
+  - `ExternalHorseAlias` 只表示本地外部马名索引，用来确认“这是马名”，不代表已有中文译名，不批量写入 `TermEntry`。
+  - 新闻处理链路只查询本地数据库，不在翻译、校验或候选发现阶段实时访问 netkeiba / keibascraper。
+- 已实现能力：
+  - `server/stable/services/terms.py` 新增结构化马名识别结果，区分 `formal_term`、`external_alias` 和 `heuristic`，并保留旧字符串列表接口兼容既有调用。
+  - 识别链路会先提取候选片假名 token，做 NFKC 标准化，再批量查询本地 `ExternalHorseAlias.normalized_name__in`；同一日文名多次出现时按文章出现顺序和长词优先去重。
+  - 正式 `TermEntry(term_type=horse)` 优先于外部马名索引；已存在正式中文译名的马名继续走正式术语提示和替换，不再作为未知马名保护。
+  - 翻译阶段对外部已知但无中文译名的马名做占位符保护，译后还原为日文原名，不自动替换为中文；翻译 metadata 会记录 `recognized_horse_names` 和 `external_horse_names`。
+  - 发布校验阶段把外部已知马名未保留记录为独立 `external_horse_not_preserved` warning，payload 包含日文名、全部外部 horse ID、主展示 ID、来源、置信度和冲突标记；只命中外部索引的马名不触发核心术语或背景术语缺失。
+  - 术语候选发现阶段把新闻中出现、外部索引命中但无正式中文译名的马名均作为 `external_horse_alias` 高置信候选来源，包括正文背景段落中的马名；已有正式马名术语或日文别名时不重复建候选。
+  - 若片假名文本同时命中普通词过滤表和外部马名索引，必须依赖强马名上下文消歧，不能仅因数据库存在同名马就识别为马名。
+  - 同一日文马名对应多个外部 horse ID 时，识别结果和校验 payload 保留全部 ID，不静默只取第一条。
+- `2026-06-25` review 返修：
+  - `limit` 只限制需要原样保留的外部已知马名和启发式疑似马名，不再让已有中文译名的正式马名占用保护名额。
+  - `extract_unknown_horse_names()`、翻译阶段和发布校验阶段均改为先取完整结构化识别结果，再对 `needs_preserve=True` 的名单截断。
+  - 新增回归测试覆盖“前面出现多个正式马名，后面出现外部已知但无中文译名马名”时，翻译保护和发布校验仍能命中后者。
+- 已创建规格：
+  - `external-horse-name-recognition`：新增本地外部马名索引识别能力。
+  - `termbase-and-race-priority`：修改翻译链路正式术语命中，并新增外部已知马名保留校验。
+  - `term-candidate-discovery`：修改候选发现，使外部马名索引成为高置信来源且不绕过正式术语审核。
+- 已同步正式规格：
+  - `openspec/specs/external-horse-name-recognition/spec.md`
+  - `openspec/specs/termbase-and-race-priority/spec.md`
+  - `openspec/specs/term-candidate-discovery/spec.md`
+- 验证结果：
+  - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py check`：通过。
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.TermResolverTests stable.tests.AutomationFlowTests stable.tests.TranslationWorkflowTests stable.tests.TermCandidateDiscoveryTests --noinput`：通过，49 项。
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.TermResolverTests stable.tests.AutomationFlowTests stable.tests.TranslationWorkflowTests --noinput`：review 返修后通过，39 项。
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：review 返修后通过，147 项。
+  - `openspec validate use-external-horse-alias-for-name-recognition --strict`：通过。
+  - `openspec validate --all`：归档前后均通过。
+- 长文样本抽检：
+  - 抽检方式：从生产只读导出 5 篇长文、2054 条启用正式术语和 11521 条 `ExternalHorseAlias`，写入本地临时 SQLite 后用当前未部署代码跑识别、候选发现和发布校验；未改生产数据。
+  - 样本结果：netkeiba 长文中外部索引可命中多匹真实马名，例如 `ロブチェン`、`パントルナイーフ`、`ミクニインスパイア`、`ドリームコア` 等，并在译文未保留时产生独立 `external_horse_not_preserved` warning。
+  - 观察到的后续优化点：JRA 活动公告类长文（例如 `JRA宮崎育成牧場けいばフェスタ`）仍会通过启发式把 `フェスタ`、`ウインズ`、`イベント`、`ポニー`、`オリジナル` 等普通片假名词列为疑似未知马名；外部马名索引能降低真实马名漏报，但不能完全替代后续普通词过滤和启发式收紧。
+- 本次没有生产部署，因此未新增 `docs/deploy_runbook.md` 上线记录。

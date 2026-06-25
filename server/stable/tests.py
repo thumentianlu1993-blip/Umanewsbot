@@ -75,6 +75,7 @@ from stable.services.terms import (
     apply_term_mappings,
     extract_horse_tags,
     extract_unknown_horse_names,
+    recognize_horse_names,
     resolve_terms,
 )
 from stable.services.text import extract_article_text
@@ -151,6 +152,99 @@ class TermResolverTests(TestCase):
         )
 
         self.assertNotIn("リベンジ", names)
+
+    def test_external_horse_alias_is_recognized_and_preserved_without_mapping(self):
+        ExternalHorseAlias.objects.create(
+            source="netkeiba",
+            external_horse_id="1001",
+            name_ja="マヤノライジン",
+            normalized_name="マヤノライジン",
+            alias_source="test",
+        )
+
+        recognized = recognize_horse_names("マヤノライジンが出走", "マヤノライジンは重賞へ向かう。")
+        external = [item for item in recognized if item.name_ja == "マヤノライジン"][0]
+
+        self.assertEqual(external.source, "external_alias")
+        self.assertTrue(external.needs_preserve)
+        self.assertFalse(external.has_translation)
+        self.assertEqual(external.external_horse_ids, ["1001"])
+        self.assertEqual(apply_term_mappings("マヤノライジンが出走"), "マヤノライジンが出走")
+        self.assertIn("マヤノライジン", extract_unknown_horse_names("マヤノライジンが出走", ""))
+
+    def test_formal_horse_term_takes_priority_over_external_alias(self):
+        TermEntry.objects.create(term_type="horse", source_ja="マヤノライジン", target_zh="摩耶雷神", priority=100)
+        ExternalHorseAlias.objects.create(
+            source="netkeiba",
+            external_horse_id="1001",
+            name_ja="マヤノライジン",
+            normalized_name="マヤノライジン",
+            alias_source="test",
+        )
+
+        recognized = recognize_horse_names("マヤノライジンが出走", "")
+        formal = [item for item in recognized if item.name_ja == "マヤノライジン"][0]
+
+        self.assertEqual(formal.source, "formal_term")
+        self.assertFalse(formal.needs_preserve)
+        self.assertTrue(formal.has_translation)
+        self.assertEqual(apply_term_mappings("マヤノライジンが出走"), "摩耶雷神が出走")
+        self.assertNotIn("マヤノライジン", extract_unknown_horse_names("マヤノライジンが出走", ""))
+
+    def test_common_word_external_alias_requires_strong_horse_context(self):
+        TermEntry.objects.create(
+            term_type="fixed_phrase",
+            source_ja="タイトル",
+            target_zh="标题",
+            notes="non_horse_common_word: 测试普通词",
+        )
+        ExternalHorseAlias.objects.create(
+            source="netkeiba",
+            external_horse_id="2001",
+            name_ja="タイトル",
+            normalized_name="タイトル",
+            alias_source="test",
+        )
+
+        ordinary = recognize_horse_names("記事のタイトルを変更", "ページタイトルを確認した。")
+        strong = recognize_horse_names("タイトルが出走", "タイトルは武豊騎手とのコンビで重賞へ向かう。")
+
+        self.assertNotIn("タイトル", [item.name_ja for item in ordinary])
+        self.assertIn("タイトル", [item.name_ja for item in strong])
+
+    def test_external_horse_alias_keeps_multiple_horse_ids(self):
+        for horse_id in ["3001", "3002"]:
+            ExternalHorseAlias.objects.create(
+                source="netkeiba",
+                external_horse_id=horse_id,
+                name_ja="ドウメイホース",
+                normalized_name="ドウメイホース",
+                alias_source="test",
+            )
+
+        recognized = recognize_horse_names("ドウメイホースが出走", "")
+        item = [entry for entry in recognized if entry.name_ja == "ドウメイホース"][0]
+
+        self.assertCountEqual(item.external_horse_ids, ["3001", "3002"])
+
+    def test_unknown_horse_limit_is_applied_after_known_horse_terms(self):
+        for name in ["アカホース", "アオホース", "クロホース"]:
+            TermEntry.objects.create(term_type="horse", source_ja=name, target_zh=f"{name}译名")
+        ExternalHorseAlias.objects.create(
+            source="netkeiba",
+            external_horse_id="4001",
+            name_ja="マヤノライジン",
+            normalized_name="マヤノライジン",
+            alias_source="test",
+        )
+
+        names = extract_unknown_horse_names(
+            "アカホース アオホース クロホース マヤノライジンが出走",
+            "",
+            limit=1,
+        )
+
+        self.assertEqual(names, ["マヤノライジン"])
 
 
 class RaceGradeTests(TestCase):
@@ -1861,6 +1955,75 @@ class AutomationFlowTests(TestCase):
         self.assertTrue(any(issue["code"] == "unknown_horse_not_preserved" for issue in article.gate_issues))
         self.assertTrue(any(issue["severity"] == "warning" for issue in article.gate_issues))
 
+    def test_external_horse_missing_warns_without_known_term_blocker_and_keeps_all_ids(self):
+        for horse_id in ["1001", "1002"]:
+            ExternalHorseAlias.objects.create(
+                source="netkeiba",
+                external_horse_id=horse_id,
+                name_ja="マヤノライジン",
+                normalized_name="マヤノライジン",
+                alias_source="test",
+            )
+        article = self._translated_article(
+            source_article_id="external-horse-warning",
+            title_ja="マヤノライジンが出走",
+            body_ja_raw="マヤノライジンは重賞へ向かう。" * 10,
+            body_ja_normalized="マヤノライジンは重賞へ向かう。" * 10,
+            translated_title_zh="摩耶雷神出战",
+            title_zh="摩耶雷神出战",
+            translated_body_zh="这匹马将向重赏进发。" * 10,
+            body_zh="这匹马将向重赏进发。" * 10,
+        )
+
+        outcome = validate_rewrite(article)
+
+        external_issue = next(issue for issue in outcome.issues if issue["code"] == "external_horse_not_preserved")
+        self.assertTrue(outcome.passed)
+        self.assertEqual(external_issue["severity"], "warning")
+        self.assertCountEqual(external_issue["payload"]["names"][0]["external_horse_ids"], ["1001", "1002"])
+        self.assertFalse(any(issue["code"] in {"core_term_missing", "background_term_missing"} for issue in outcome.issues))
+
+    def test_validation_preserve_limit_is_not_consumed_by_known_horse_terms(self):
+        known_names = [
+            "アカホース",
+            "アオホース",
+            "クロホース",
+            "シロホース",
+            "キンホース",
+            "ギンホース",
+            "ミドリホース",
+            "サクラホース",
+            "モモホース",
+            "ユキホース",
+            "ソラホース",
+            "ナミホース",
+        ]
+        for index, name in enumerate(known_names):
+            TermEntry.objects.create(term_type="horse", source_ja=name, target_zh=f"译名{index}", priority=100)
+        ExternalHorseAlias.objects.create(
+            source="netkeiba",
+            external_horse_id="4001",
+            name_ja="マヤノライジン",
+            normalized_name="マヤノライジン",
+            alias_source="test",
+        )
+        source_body = " ".join(known_names) + " マヤノライジンは重賞へ向かう。" + "調整は順調。" * 12
+        translated_known = " ".join(f"译名{index}" for index in range(len(known_names)))
+        article = self._translated_article(
+            source_article_id="external-horse-after-known-terms",
+            title_ja="重賞展望",
+            body_ja_raw=source_body,
+            body_ja_normalized=source_body,
+            translated_title_zh="重赏展望",
+            title_zh="重赏展望",
+            translated_body_zh=translated_known + " 这匹马将向重赏进发。" * 10,
+            body_zh=translated_known + " 这匹马将向重赏进发。" * 10,
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertTrue(any(issue["code"] == "external_horse_not_preserved" for issue in outcome.issues))
+
     def test_core_term_missing_blocks_and_background_term_missing_warns(self):
         TermEntry.objects.create(term_type="race", source_ja="有馬記念", target_zh="有马纪念", priority=90)
         core_article = self._translated_article(
@@ -2466,6 +2629,103 @@ class TranslationWorkflowTests(TestCase):
         self.assertNotIn("キタサンブラック", result.metadata["unknown_horse_names"])
         self.assertIn("シュガークン", result.metadata["unknown_horse_names"])
 
+    @override_settings(TRANSLATION_MODEL="deepseek-ai/DeepSeek-V3", TRANSLATION_MAX_ATTEMPTS=1)
+    def test_provider_protects_external_horse_alias_without_chinese_mapping(self):
+        ExternalHorseAlias.objects.create(
+            source="netkeiba",
+            external_horse_id="1001",
+            name_ja="マヤノライジン",
+            normalized_name="マヤノライジン",
+            alias_source="test",
+        )
+        self.article.title_ja = "マヤノライジンが出走"
+        self.article.body_ja_raw = "マヤノライジンは重賞へ向かう。"
+        self.article.body_ja_normalized = self.article.body_ja_raw
+        self.article.save()
+
+        provider = OpenAICompatibleTranslationProvider(api_key="test-key", base_url="https://example.com/v1")
+        usage = type("Usage", (), {"model_dump": lambda self: {"completion_tokens": 20}})()
+        choice = type(
+            "Choice",
+            (),
+            {
+                "message": type(
+                    "Message",
+                    (),
+                    {
+                        "content": __import__("json").dumps(
+                            {
+                                "title_zh": "__UMA_KEEP_1__出战",
+                                "body_zh": "__UMA_KEEP_1__将向重赏进发。",
+                                "push_summary_zh": "__UMA_KEEP_1__出战。",
+                            },
+                            ensure_ascii=False,
+                        )
+                    },
+                )(),
+                "finish_reason": "stop",
+            },
+        )()
+
+        with patch.object(provider, "_request_completion", return_value=type("Response", (), {"choices": [choice], "usage": usage})()):
+            result = provider.translate(self.article)
+
+        self.assertIn("マヤノライジン", result.title_zh)
+        self.assertIn("マヤノライジン", result.body_zh)
+        self.assertIn("マヤノライジン", result.metadata["external_horse_names"])
+        external = [item for item in result.metadata["recognized_horse_names"] if item["source"] == "external_alias"][0]
+        self.assertEqual(external["external_horse_ids"], ["1001"])
+
+    @override_settings(
+        TRANSLATION_MODEL="deepseek-ai/DeepSeek-V3",
+        TRANSLATION_MAX_ATTEMPTS=1,
+        TRANSLATION_UNKNOWN_HORSE_LIMIT=1,
+    )
+    def test_provider_unknown_limit_is_not_consumed_by_known_horse_terms(self):
+        for name in ["アカホース", "アオホース", "クロホース"]:
+            TermEntry.objects.create(term_type="horse", source_ja=name, target_zh=f"{name}译名")
+        ExternalHorseAlias.objects.create(
+            source="netkeiba",
+            external_horse_id="4001",
+            name_ja="マヤノライジン",
+            normalized_name="マヤノライジン",
+            alias_source="test",
+        )
+        self.article.title_ja = "アカホース アオホース クロホース マヤノライジンが出走"
+        self.article.body_ja_raw = "マヤノライジンは重賞へ向かう。"
+        self.article.body_ja_normalized = self.article.body_ja_raw
+        self.article.save()
+
+        provider = OpenAICompatibleTranslationProvider(api_key="test-key", base_url="https://example.com/v1")
+        usage = type("Usage", (), {"model_dump": lambda self: {"completion_tokens": 20}})()
+        choice = type(
+            "Choice",
+            (),
+            {
+                "message": type(
+                    "Message",
+                    (),
+                    {
+                        "content": __import__("json").dumps(
+                            {
+                                "title_zh": "__UMA_KEEP_1__出战",
+                                "body_zh": "__UMA_KEEP_1__将向重赏进发。",
+                                "push_summary_zh": "__UMA_KEEP_1__出战。",
+                            },
+                            ensure_ascii=False,
+                        )
+                    },
+                )(),
+                "finish_reason": "stop",
+            },
+        )()
+
+        with patch.object(provider, "_request_completion", return_value=type("Response", (), {"choices": [choice], "usage": usage})()):
+            result = provider.translate(self.article)
+
+        self.assertEqual(result.metadata["unknown_horse_names"], ["マヤノライジン"])
+        self.assertIn("マヤノライジン", result.title_zh)
+
     @override_settings(TRANSLATION_MODEL="deepseek-ai/DeepSeek-V3", TRANSLATION_MAX_ATTEMPTS=2)
     def test_provider_retries_when_unknown_horse_names_are_translated_away(self):
         self.article.title_ja = "【大阪杯レース後コメント】クロワデュノール北村友一騎手ら"
@@ -2846,6 +3106,88 @@ class TermCandidateDiscoveryTests(TestCase):
         self.assertEqual(race.aliases_zh, [])
         self.assertTrue(horse.evidence.filter(article=self.article).exists())
         self.assertTrue(race.evidence.filter(article=self.article).exists())
+
+    @override_settings(TERM_DISCOVERY_MIN_CONFIDENCE=60)
+    def test_external_alias_horse_enters_candidate_pool_from_background_body(self):
+        ExternalHorseAlias.objects.create(
+            source="netkeiba",
+            external_horse_id="1001",
+            name_ja="マヤノライジン",
+            normalized_name="マヤノライジン",
+            alias_source="test",
+        )
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="external-alias-candidate",
+            title_ja="重賞展望",
+            body_ja_raw="前半は調教過程を紹介する。" * 6 + "背景としてマヤノライジンにも触れた。",
+            body_ja_normalized="前半は調教過程を紹介する。" * 6 + "背景としてマヤノライジンにも触れた。",
+            published_at=timezone.now(),
+            source_url="https://example.com/external-alias-candidate",
+        )
+
+        discover_and_aggregate_article(article)
+
+        candidate = TermCandidate.objects.get(term_type="horse", source_ja="マヤノライジン")
+        evidence = candidate.evidence.get(article=article)
+        self.assertIn("本地外部马名索引命中且缺少中文译名", candidate.detection_reasons)
+        self.assertIn("external_horse_alias", evidence.detectors)
+
+    @override_settings(TERM_DISCOVERY_MIN_CONFIDENCE=60)
+    def test_external_alias_horse_with_formal_term_does_not_create_candidate(self):
+        TermEntry.objects.create(term_type="horse", source_ja="マヤノライジン", target_zh="摩耶雷神")
+        ExternalHorseAlias.objects.create(
+            source="netkeiba",
+            external_horse_id="1001",
+            name_ja="マヤノライジン",
+            normalized_name="マヤノライジン",
+            alias_source="test",
+        )
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="external-alias-formal",
+            title_ja="マヤノライジンが出走",
+            body_ja_raw="マヤノライジンが重賞へ向かう。",
+            body_ja_normalized="マヤノライジンが重賞へ向かう。",
+            published_at=timezone.now(),
+            source_url="https://example.com/external-alias-formal",
+        )
+
+        discover_and_aggregate_article(article)
+
+        self.assertFalse(TermCandidate.objects.filter(term_type="horse", source_ja="マヤノライジン").exists())
+
+    @override_settings(TERM_DISCOVERY_MIN_CONFIDENCE=60)
+    def test_common_word_external_alias_without_strong_context_does_not_enter_candidate_pool(self):
+        TermEntry.objects.create(
+            term_type="fixed_phrase",
+            source_ja="タイトル",
+            target_zh="标题",
+            notes="non_horse_common_word: 测试普通词",
+        )
+        ExternalHorseAlias.objects.create(
+            source="netkeiba",
+            external_horse_id="2001",
+            name_ja="タイトル",
+            normalized_name="タイトル",
+            alias_source="test",
+        )
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            source_article_id="external-alias-common-word",
+            title_ja="記事のタイトルを変更",
+            body_ja_raw="ページタイトルを確認した。",
+            body_ja_normalized="ページタイトルを確認した。",
+            published_at=timezone.now(),
+            source_url="https://example.com/external-alias-common-word",
+        )
+
+        discover_and_aggregate_article(article)
+
+        self.assertFalse(TermCandidate.objects.filter(term_type="horse", source_ja="タイトル").exists())
 
     @override_settings(TERM_DISCOVERY_MIN_CONFIDENCE=60)
     def test_formal_alias_prevents_horse_and_race_candidates(self):
