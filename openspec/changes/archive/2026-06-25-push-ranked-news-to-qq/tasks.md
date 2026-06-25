@@ -12,5 +12,5 @@
 - [x] 2.3 (application) 运行 `openspec validate push-ranked-news-to-qq --strict`
 - [x] 2.4 (application) 运行 `openspec validate --all` 和 `git diff --check`
 - [x] 2.5 (operations) 更新 `docs/qqbot_setup.md`、`docs/current_state.md` 和 `docs/deploy_runbook.md`，说明生产推荐 `QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，且本期重点策略表示 netkeiba 访问量榜 / 注目数榜新闻
-- [ ] 2.6 (operations) 部署后将生产 `.env` 中 `QQ_PUSH_SCOPE` 从测试期 `all_public` 切换为 `high_value_only`，设置 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，并在测试群观察自然榜单新闻推送
-- [ ] 2.7 (operations) 本 change 完成并准备归档前，确认 `add-qqbot-auto-push` 已同步或归档为正式 `qqbot-auto-push` 规格；本轮需求完成后提醒维护者尽可能归档其他已完成的 active change
+- [x] 2.6 (operations) 部署后将生产 `.env` 中 `QQ_PUSH_SCOPE` 从测试期 `all_public` 切换为 `high_value_only`，设置 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`；生产 worker 已确认读取 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，后续等待自然榜单新闻触发测试群推送
+- [x] 2.7 (operations) 本 change 完成并准备归档前，确认 `add-qqbot-auto-push` 已同步或归档为正式 `qqbot-auto-push` 规格；本轮需求完成后提醒维护者尽可能归档其他已完成的 active change
