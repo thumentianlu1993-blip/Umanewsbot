@@ -916,6 +916,46 @@ docker logs --tail=200 umanewsbot-worker-1
 - 第三批续跑结果：`run_id=3`，继续成功导入 30 场，失败 0；累计 50 场比赛、695 个唯一马 ID/马名索引，`/healthz/` 返回 `200`。
 - 长循环导入中断记录：`run_id=4` 到 `run_id=8` 均成功；`run_id=9` 成功 7 场后进程退出码 `137` 中断，已标记为 `partial` 并释放导入锁。中断后累计 182 场比赛、2401 个唯一马 ID/马名索引，`/healthz/` 返回 `200`。
 
+## 2026-06-25 外部马名索引识别链路生产部署
+
+### 部署内容
+
+- GitHub PR #6 `[codex] Use external horse aliases for name recognition` 已 squash merge 到 `main`。
+- merge commit：`35b0866`。
+- 服务器 `/opt/umanewsbot` 从 `817e1c8` 快进到 `35b0866`。
+- 本次不包含数据库迁移或 `.env` 功能开关调整。
+- 主要变更：
+  - `ExternalHorseAlias` 接入文章马名识别、翻译保护、发布校验和术语候选发现。
+  - 外部已知但无中文译名的马名在译文中原样保护，未保留时记录独立 `external_horse_not_preserved` warning。
+  - `TermEntry` 仍作为正式中文术语库；外部马名索引不批量写入 `TermEntry`。
+
+### 部署前状态与备份
+
+- 部署前 `.env` 备份：`.env.backup.external-horse-alias-20260625_182936`。
+- 服务器部署前只有 `.env.backup.*`、`imports/`、`napcat/`、`runtime/` 等未跟踪运行态文件；无 tracked diff。
+
+### 部署命令
+
+```bash
+cd /opt/umanewsbot
+cp .env .env.backup.external-horse-alias-$(date +%Y%m%d_%H%M%S)
+git pull --ff-only origin main
+chmod +x deploy_lowcost.sh deploy/*.sh deploy/docker/*.sh
+./deploy_lowcost.sh
+```
+
+### 验证结果
+
+- `./deploy_lowcost.sh` 执行成功。
+- `migrate` 显示 `No migrations to apply`。
+- `collectstatic` 完成，`0 static files copied`，`129 unmodified`，`360 post-processed`。
+- `web` 容器 healthy，`db / redis` healthy，`worker / beat` up。
+- `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check`：通过。
+- `http://127.0.0.1/healthz/` 返回 `{"status": "ok"}`。
+- `http://umafans.run/healthz/` 返回 `200`。
+- `http://umafans.run/` 返回 `200`。
+- 生产只读 smoke test：`ExternalHorseAlias=11521`；`recognize_horse_names("ロブチェンが出走", "ロブチェンは重賞へ向かう。")` 返回 `ロブチェン`，来源为 `external_alias`，外部 horse ID 为 `2023107089`。
+
 ## QQ Bot / OneBot 生产运行态配置（2026-06-24）
 
 ### 配置结论
