@@ -68,7 +68,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 下一步优先级
 
-1. 继续观察公开首页资讯流生产运行，重点确认 `/`、`/news/<slug>/`、图片、`public.css`、移动 H5 首屏密度和自动发布内容长期表现
+1. 继续观察公开首页资讯流生产运行，重点确认 `/`、`/news/<article_id>/`、旧非纯数字 `/news/<slug>/` 跳转、图片、`public.css`、移动 H5 首屏密度和自动发布内容长期表现
 2. 生产迁移已于 `2026-06-07` 完成；下一步在生产做单篇手动重新发现并抽检术语候选质量，确认后灰度启用 `TERM_DISCOVERY_ENABLED`
 3. 观察自动化发布质量与 `AutomationLog`
 4. 补充翻译 warning 可视化和术语库补全流程
@@ -77,6 +77,18 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 7. HTTPS / 证书接入
 8. 部署稳定化与监控 / 备份 / 回滚完善
 9. 继续低批量观察 `refine-automation-publish-gates` 上线后的 warning 邮件、重复内容阻断、候选池门禁展示和自动发布结果
+
+## 2026-06-25 榜单重点新闻 QQ 推送规划
+
+- 已形成协调总纲：`docs/ranked_news_push_plan.md`。该文档只作为本轮计划说明，不作为 OpenSpec 长期能力规格。
+- 本轮拆为三个 OpenSpec 子 change：`elevate-ranked-netkeiba-sources`、`push-ranked-news-to-qq`、`use-article-id-public-urls`。
+- 推送策略方向：`QQ_PUSH_SCOPE` 继续表示“全推 / 重点推”，重点推送的判定方式由后续配置承载；本期统一实现 `ranked` 榜单策略，即只推 `netkeiba:access` 与 `netkeiba:attention` 新闻。
+- QQ 推送 blocker 判断必须复用现有 `NewsArticle.gate_blockers` / `gate_issues.severity=blocker` 结构化门禁结果，不在 QQ 服务里重新实现一套发布门禁。
+- 本轮需求完成后，需要先确保 `add-qqbot-auto-push` 同步或归档为正式 `qqbot-auto-push` 规格，再归档依赖它的返修 change；同时提醒维护者尽可能归档其他已完成项目。
+- `elevate-ranked-netkeiba-sources` 已完成本地实现：`upsert_article_from_draft()` 会将同一 netkeiba 文章从 `latest` 提升为首次命中的 `access` 或 `attention`，二者之间不互相覆盖，`latest` 也不会覆盖榜单来源；每次命中仍创建 `NewsSnapshot`。入库结果新增 `source_elevated` 稳定信号，且仍兼容旧的 `article, created = ...` 解包方式。
+- `push-ranked-news-to-qq` 已完成本地实现：新增 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，`high_value_only` 下只推 `netkeiba:access` / `netkeiba:attention` 且无 blocker 的公开文章；已公开文章被榜单来源提升时会触发 QQ 自动推送编排，并继续依靠 `QQPushDelivery(article, target)` 唯一约束去重。QQ delivery 真正发送前也会复检推送资格，若文章后来出现 blocker 或不再符合范围，会标记为 `skipped/not_eligible`，不会继续发群消息。
+- `use-article-id-public-urls` 已完成本地实现：`NewsArticle.public_path` 改为 `/news/<article_id>/`，公开详情页可通过文章 ID 访问，非纯数字旧 slug URL 会跳转到 ID URL；首页、热门列表、后台前台查看入口和 QQ 自动推送消息均继续通过 `article.public_path` 使用 ID URL。
+- 本地已通过完整 `stable` 测试、三个子 change 的严格校验、`openspec validate --all` 和 `git diff --check`。三个子 change 尚未部署生产。
 
 ## 当前已知风险与待确认项
 
@@ -195,7 +207,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 2026-06-23 前台发布判定代码阅读结论
 
-- 公开前台首页 `/` 与详情页 `/news/<slug>/` 只展示 `workflow_status=published` 且 `published_to_web_at` 非空的 `NewsArticle`。
+- 公开前台首页 `/` 与详情页 `/news/<article_id>/` 只展示 `workflow_status=published` 且 `published_to_web_at` 非空的 `NewsArticle`；旧的非纯数字 `/news/<slug>/` 兼容入口会跳转到对应 ID URL。
 - 抓取入库的新稿默认是 `workflow_status=pending_translation`，不会因为来自 `netkeiba` 新着、访问榜、注目榜或 `JRA` 官方新闻而直接进入前台。
 - 翻译成功后文章进入 `pending_edit`；若 `AUTOMATION_ENABLED=true`，会触发自动化评分、改写与校验链路。
 - 自动化评分为 `auto` 的文章也不会立刻公开；必须完成改写、通过一致性校验成为 `automation_status=publish_ready`，再由批量自动发布任务写入 `workflow_status=published` 与 `published_to_web_at` 后才进入前台。

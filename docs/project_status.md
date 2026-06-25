@@ -43,6 +43,9 @@
 - 前台信息流与详情页已升级为公开站点专用 Web + 移动 H5 资讯流
 - QQ 推送链路：已新增并部署自动推送实现，支持高价值优先/全公开、多群、去重、有限重试、OneBot 业务失败识别、`sending` 陈旧恢复、后台交付记录和按群限速；生产 OneBot / NapCat 网关已登录并在测试群验证发送，`QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=all_public` 已生效。
 - 抓取新鲜度与来源健康：netkeiba 新着顺 / 访问量榜 / 注目数榜已切换为每小时 `00/16/26` 分错峰抓取，JRA 无年份日期解析已修复，后台来源健康摘要已上线
+- 榜单来源提升：本地已实现 `netkeiba:latest -> access/attention` 主来源提升，访问量榜和注目数榜不互相覆盖，并为后续 QQ 榜单推送暴露 `source_elevated` 信号；尚未部署生产。
+- 榜单重点推送：本地已实现 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，`QQ_PUSH_SCOPE=high_value_only` 下只推 netkeiba 访问量榜 / 注目数榜且无 blocker 的公开文章；尚未部署生产。
+- 公开文章 ID URL：本地已将公开详情主路径改为 `/news/<article_id>/`，非纯数字旧 slug URL 跳转到 ID URL，QQ 消息链接不再包含标题全文；尚未部署生产。
 - 后台术语运营：候选详情页和文章编辑台支持原文选区快速加入术语库；新增术语成功后可一次性将该术语应用到当前文章已有中文稿
 - 前后台移动端适配
 

@@ -13,6 +13,7 @@ server/media/
 server/staticfiles/
 deploy/certs/*.pem
 backups/
+tmp/
 *.log
 
 sample_news.json

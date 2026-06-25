@@ -1454,14 +1454,24 @@ def public_news_feed(request: HttpRequest):
     )
 
 
-def public_article_detail(request: HttpRequest, slug: str):
+def public_article_detail(request: HttpRequest, article_id: int):
+    article = get_object_or_404(
+        NewsArticle,
+        workflow_status=WorkflowStatus.PUBLISHED,
+        published_to_web_at__isnull=False,
+        pk=article_id,
+    )
+    return render(request, "stable/public/detail.html", {"article": article})
+
+
+def legacy_public_article_detail(request: HttpRequest, slug: str):
     article = get_object_or_404(
         NewsArticle,
         workflow_status=WorkflowStatus.PUBLISHED,
         published_to_web_at__isnull=False,
         public_slug=slug,
     )
-    return render(request, "stable/public/detail.html", {"article": article})
+    return redirect(article.public_path)
 
 
 def _article_payload(article: NewsArticle) -> dict:

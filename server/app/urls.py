@@ -13,7 +13,8 @@ def healthcheck(_request):
 
 urlpatterns = [
     path("", stable_views.public_news_feed, name="public-news-feed"),
-    path("news/<str:slug>/", stable_views.public_article_detail, name="public-article-detail"),
+    path("news/<int:article_id>/", stable_views.public_article_detail, name="public-article-detail"),
+    path("news/<str:slug>/", stable_views.legacy_public_article_detail, name="legacy-public-article-detail"),
     path("admin/", include("stable.urls")),
     path("api/", include("stable.api_urls")),
     path("login/", stable_views.legacy_login_redirect, name="legacy-backend-login"),
@@ -26,4 +27,3 @@ urlpatterns = [
 
 if settings.DEBUG and settings.MEDIA_STORAGE_BACKEND != "oss":
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-

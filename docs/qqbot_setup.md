@@ -12,6 +12,7 @@
 ```env
 QQ_PUSH_ENABLED=false
 QQ_PUSH_SCOPE=high_value_only
+QQ_PUSH_IMPORTANCE_STRATEGY=ranked
 ```
 
 生产应先配置 OneBot、测试群和后台群目标，再灰度开启。
@@ -54,6 +55,7 @@ ports:
 ```env
 QQ_PUSH_ENABLED=false
 QQ_PUSH_SCOPE=high_value_only
+QQ_PUSH_IMPORTANCE_STRATEGY=ranked
 QQ_PUSH_MAX_ATTEMPTS=3
 QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS=5
 QQ_PUSH_SENDING_STALE_SECONDS=600
@@ -65,17 +67,24 @@ ONEBOT_TIMEOUT_SECONDS=30
 含义：
 
 - `QQ_PUSH_ENABLED`：自动推送总开关，默认关闭。
-- `QQ_PUSH_SCOPE`：`high_value_only` 只推高价值新闻；`all_public` 推所有公开新闻。
+- `QQ_PUSH_SCOPE`：`high_value_only` 只推重点新闻；`all_public` 推所有公开且无 blocker 的新闻。
+- `QQ_PUSH_IMPORTANCE_STRATEGY`：重点新闻判定方式，本期只支持 `ranked`。
 - `QQ_PUSH_MAX_ATTEMPTS`：每篇新闻对每个群最多尝试次数，默认 3。
 - `QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS`：推送前检查公开详情页 URL 的超时。
 - `QQ_PUSH_SENDING_STALE_SECONDS`：`sending` 状态超过该秒数仍未更新时，允许后续任务重新领取该交付记录，默认 600。
 - `ONEBOT_TIMEOUT_SECONDS`：调用 OneBot HTTP API 的超时。
 
-首版高价值口径：
+本期重点新闻口径：
 
 ```text
-score_total >= AUTO_REVIEW_THRESHOLD
+QQ_PUSH_SCOPE=high_value_only
+QQ_PUSH_IMPORTANCE_STRATEGY=ranked
+source_site=netkeiba
+source_mode in (access, attention)
+gate_blockers 为空
 ```
+
+也就是说，本期只自动推 netkeiba 访问量榜和注目数榜新闻；新着顺新闻不会因为分数高而进入 QQ 自动推送。
 
 ## 5. 在后台配置群
 
@@ -101,7 +110,7 @@ score_total >= AUTO_REVIEW_THRESHOLD
 ```text
 【UmaFans】标题
 摘要内容……
-阅读全文：http://umafans.run/news/...
+阅读全文：http://umafans.run/news/123/
 ```
 
 规则：
@@ -109,7 +118,7 @@ score_total >= AUTO_REVIEW_THRESHOLD
 - 标题使用前台有效中文标题。
 - 摘要优先使用前台有效中文摘要。
 - 摘要为空时从正文截断，并用 `……` 表示截断。
-- 链接使用 `SITE_URL + public_path`，当前 HTTP 阶段生产为 `http://umafans.run/...`。
+- 链接使用 `SITE_URL + public_path`，公开文章主路径为 `/news/<article_id>/`。当前 HTTP 阶段生产示例为 `http://umafans.run/news/123/`。
 
 ## 7. 灰度启用顺序
 
@@ -130,6 +139,7 @@ curl -X POST "$ONEBOT_BASE_URL/send_group_msg" \
 ```env
 QQ_PUSH_ENABLED=true
 QQ_PUSH_SCOPE=high_value_only
+QQ_PUSH_IMPORTANCE_STRATEGY=ranked
 ```
 
 6. 重启 `worker/beat`。
@@ -168,18 +178,23 @@ QQ_PUSH_SCOPE=high_value_only
 
 - `.env` 中 `QQ_PUSH_ENABLED=true`
 - `QQ_PUSH_SCOPE` 是否为 `high_value_only` 或 `all_public`
+- `QQ_PUSH_IMPORTANCE_STRATEGY` 是否为 `ranked`
 - 文章是否已发布且有 `published_to_web_at`
+- 文章是否存在 blocker；有 blocker 的文章不会自动推送
 - 文章详情页 URL 是否可访问
 - 后台是否存在 `is_active=true` 的 `PushTarget`
 - `worker` 是否运行
 - 如果记录长时间停在 `sending`，检查 `last_attempt_at` 是否已超过 `QQ_PUSH_SENDING_STALE_SECONDS`；超过后再次触发任务会重新领取该交付记录。
 
-### 9.2 高价值新闻没有推送
+### 9.2 重点新闻没有推送
 
 `high_value_only` 下检查：
 
 ```text
-score_total >= AUTO_REVIEW_THRESHOLD
+QQ_PUSH_IMPORTANCE_STRATEGY=ranked
+source_site=netkeiba
+source_mode in (access, attention)
+gate_blockers 为空
 ```
 
 如果只是想验证链路，可以临时把测试环境设为：
@@ -204,6 +219,7 @@ QQ_PUSH_SCOPE=all_public
 
 - 先只启用测试群
 - 默认 `high_value_only`
+- 默认 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`
 - 控制发布频率
 - 使用专门机器人账号
 

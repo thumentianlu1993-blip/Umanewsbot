@@ -15,6 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from stable.adapters.jra import JRAAdapter
+from stable.adapters.base import CanonicalNewsDraft
 from stable.adapters.netkeiba import NetkeibaAdapter
 from stable.models import (
     ArticleTranslationStatus,
@@ -60,6 +61,7 @@ from stable.services.automation import score_article_for_automation
 from stable.services.notifications import send_high_value_warning_notification
 from stable.services.rewriting import _loads_rewrite_payload
 from stable.services.sources import BUILTIN_SOURCE_DEFINITIONS, sync_builtin_sources
+from stable.services.ingestion import ArticleUpsertResult, upsert_article_from_draft
 from stable.services.term_admin import preview_term_import
 from stable.services.term_candidate_review import accept_candidate, merge_candidate, set_candidate_status
 from stable.services.term_discovery import (
@@ -336,6 +338,104 @@ class AdapterTests(TestCase):
         self.assertEqual(definitions[(SourceSite.NETKEIBA, SourceMode.ATTENTION)]["crawl_interval_minutes"], 60)
 
 
+class IngestionSourceElevationTests(TestCase):
+    def setUp(self):
+        sync_builtin_sources()
+
+    def make_draft(self, source_article_id: str, source_mode: str, *, rank: int | None = None) -> CanonicalNewsDraft:
+        return CanonicalNewsDraft(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=source_mode,
+            source_article_id=source_article_id,
+            source_url=f"https://news.netkeiba.com/?pid=news_view&no={source_article_id}",
+            title_ja=f"榜单来源测试 {source_article_id}",
+            body_ja_raw=f"榜单来源测试正文 {source_article_id}",
+            body_ja_normalized=f"榜单来源测试正文 {source_article_id}",
+            published_at=timezone.now(),
+            images=[],
+            rank=rank,
+            metadata={"source_mode": source_mode},
+        )
+
+    def upsert(self, source_article_id: str, source_mode: str, *, rank: int | None = None, crawl_job: CrawlJob | None = None):
+        return upsert_article_from_draft(self.make_draft(source_article_id, source_mode, rank=rank), crawl_job=crawl_job)
+
+    def unpack_article(self, result):
+        return result[0] if isinstance(result, tuple) else result.article
+
+    def source_elevated(self, result) -> bool:
+        if hasattr(result, "source_elevated"):
+            return bool(result.source_elevated)
+        if isinstance(result, tuple) and len(result) >= 3:
+            return bool(result[2])
+        return False
+
+    def test_latest_article_elevates_to_access_and_exposes_signal(self):
+        self.upsert("rank-elevate-access", SourceMode.LATEST)
+        access_source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.ACCESS)
+        access_job = CrawlJob.objects.create(source=access_source)
+
+        result = self.upsert("rank-elevate-access", SourceMode.ACCESS, rank=1, crawl_job=access_job)
+
+        article = self.unpack_article(result)
+        article.refresh_from_db()
+        self.assertEqual(article.source_mode, SourceMode.ACCESS)
+        self.assertEqual(article.source_config, access_source)
+        self.assertEqual(article.source_note, access_source.name)
+        self.assertEqual(article.crawl_job, access_job)
+        self.assertTrue(self.source_elevated(result))
+        self.assertTrue(
+            NewsSnapshot.objects.filter(article=article, source_mode=SourceMode.ACCESS, rank=1).exists()
+        )
+
+    def test_latest_article_elevates_to_attention_and_exposes_signal(self):
+        self.upsert("rank-elevate-attention", SourceMode.LATEST)
+        attention_source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.ATTENTION)
+
+        result = self.upsert("rank-elevate-attention", SourceMode.ATTENTION, rank=2)
+
+        article = self.unpack_article(result)
+        article.refresh_from_db()
+        self.assertEqual(article.source_mode, SourceMode.ATTENTION)
+        self.assertEqual(article.source_config, attention_source)
+        self.assertTrue(self.source_elevated(result))
+        self.assertTrue(
+            NewsSnapshot.objects.filter(article=article, source_mode=SourceMode.ATTENTION, rank=2).exists()
+        )
+
+    def test_access_and_attention_do_not_override_each_other(self):
+        result = self.upsert("rank-no-mutual-override", SourceMode.ACCESS, rank=3)
+        article = self.unpack_article(result)
+        access_source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.ACCESS)
+        self.assertEqual(article.source_mode, SourceMode.ACCESS)
+
+        result = self.upsert("rank-no-mutual-override", SourceMode.ATTENTION, rank=4)
+
+        article = self.unpack_article(result)
+        article.refresh_from_db()
+        self.assertEqual(article.source_mode, SourceMode.ACCESS)
+        self.assertEqual(article.source_config, access_source)
+        self.assertFalse(self.source_elevated(result))
+        self.assertTrue(
+            NewsSnapshot.objects.filter(article=article, source_mode=SourceMode.ATTENTION, rank=4).exists()
+        )
+
+    def test_latest_does_not_override_ranked_source(self):
+        result = self.upsert("rank-not-overwritten-by-latest", SourceMode.ATTENTION, rank=5)
+        article = self.unpack_article(result)
+        attention_source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.ATTENTION)
+        self.assertEqual(article.source_mode, SourceMode.ATTENTION)
+
+        result = self.upsert("rank-not-overwritten-by-latest", SourceMode.LATEST)
+
+        article = self.unpack_article(result)
+        article.refresh_from_db()
+        self.assertEqual(article.source_mode, SourceMode.ATTENTION)
+        self.assertEqual(article.source_config, attention_source)
+        self.assertFalse(self.source_elevated(result))
+        self.assertTrue(NewsSnapshot.objects.filter(article=article, source_mode=SourceMode.LATEST).exists())
+
+
 class FakeExternalHorseDataAdapter:
     def __init__(self):
         self.fetched_race_ids: list[str] = []
@@ -559,6 +659,7 @@ class PushTests(TestCase):
     SITE_URL="http://testserver",
     CELERY_TASK_ALWAYS_EAGER=True,
     CELERY_TASK_EAGER_PROPAGATES=False,
+    QQ_PUSH_SCOPE="all_public",
 )
 class QQAutoPushTests(TestCase):
     def setUp(self):
@@ -589,16 +690,24 @@ class QQAutoPushTests(TestCase):
         self.assertEqual(first[0].id, second[0].id)
         self.assertEqual(QQPushDelivery.objects.count(), 1)
 
-    @override_settings(QQ_PUSH_SCOPE="high_value_only", AUTO_REVIEW_THRESHOLD=75)
-    def test_high_value_scope_uses_score_threshold(self):
-        self.assertTrue(should_push_news_to_qq(self.article).allowed)
+    @override_settings(QQ_PUSH_SCOPE="high_value_only", QQ_PUSH_IMPORTANCE_STRATEGY="ranked", AUTO_REVIEW_THRESHOLD=75)
+    def test_high_value_scope_uses_ranked_strategy_instead_of_score(self):
+        self.assertFalse(should_push_news_to_qq(self.article).allowed)
         self.article.score_total = 20
-        self.article.save(update_fields=["score_total", "updated_at"])
+        self.article.source_mode = SourceMode.ACCESS
+        self.article.save(update_fields=["score_total", "source_mode", "updated_at"])
 
         result = should_push_news_to_qq(self.article)
 
-        self.assertFalse(result.allowed)
-        self.assertEqual(result.reason, "not_high_value")
+        self.assertTrue(result.allowed)
+
+    @override_settings(QQ_PUSH_SCOPE="high_value_only", QQ_PUSH_IMPORTANCE_STRATEGY="ranked", AUTO_REVIEW_THRESHOLD=75)
+    def test_ranked_strategy_allows_attention_source(self):
+        self.article.score_total = 20
+        self.article.source_mode = SourceMode.ATTENTION
+        self.article.save(update_fields=["score_total", "source_mode", "updated_at"])
+
+        self.assertTrue(should_push_news_to_qq(self.article).allowed)
 
     @override_settings(QQ_PUSH_SCOPE="all_public", AUTO_REVIEW_THRESHOLD=75)
     def test_all_public_scope_ignores_score(self):
@@ -614,12 +723,30 @@ class QQAutoPushTests(TestCase):
 
         self.assertFalse(should_push_news_to_qq(self.article).allowed)
 
+    @override_settings(QQ_PUSH_SCOPE="high_value_only", QQ_PUSH_IMPORTANCE_STRATEGY="unsupported", AUTO_REVIEW_THRESHOLD=75)
+    def test_invalid_importance_strategy_falls_back_to_ranked(self):
+        self.article.source_mode = SourceMode.ACCESS
+        self.article.score_total = 20
+        self.article.save(update_fields=["source_mode", "score_total", "updated_at"])
+
+        self.assertTrue(should_push_news_to_qq(self.article).allowed)
+
+    @override_settings(QQ_PUSH_SCOPE="high_value_only", QQ_PUSH_IMPORTANCE_STRATEGY="ranked")
+    def test_blocker_article_is_not_eligible_for_auto_push(self):
+        self.article.source_mode = SourceMode.ACCESS
+        self.article.gate_issues = [
+            {"code": "missing_body", "severity": "blocker", "message": "正文为空", "route": "manual_review", "payload": {}}
+        ]
+        self.article.save(update_fields=["source_mode", "gate_issues", "updated_at"])
+
+        self.assertFalse(should_push_news_to_qq(self.article).allowed)
+
     def test_auto_push_message_uses_summary_and_public_url(self):
         message = build_qq_auto_push_message(self.article)
 
         self.assertIn("【UmaFans】中文标题", message)
         self.assertIn("中文摘要", message)
-        self.assertIn("阅读全文：http://testserver/news/", message)
+        self.assertIn(f"阅读全文：http://testserver/news/{self.article.id}/", message)
 
     def test_auto_push_message_truncates_body_when_summary_blank(self):
         self.article.summary_zh = ""
@@ -631,7 +758,7 @@ class QQAutoPushTests(TestCase):
         message = build_qq_auto_push_message(self.article)
 
         self.assertIn("……", message)
-        self.assertIn("阅读全文：http://testserver/news/", message)
+        self.assertIn(f"阅读全文：http://testserver/news/{self.article.id}/", message)
 
     @override_settings(QQ_PUSH_MAX_ATTEMPTS=3)
     def test_delivery_url_unavailable_records_retryable_error_type(self):
@@ -644,6 +771,48 @@ class QQAutoPushTests(TestCase):
         self.assertEqual(result["status"], QQPushDeliveryStatus.RETRYING)
         self.assertEqual(delivery.attempt_count, 1)
         self.assertEqual(delivery.last_error_type, QQPushErrorType.URL_UNAVAILABLE)
+
+    @override_settings(QQ_PUSH_SCOPE="all_public")
+    def test_delivery_rechecks_blocker_before_sending(self):
+        delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
+        self.article.gate_issues = [
+            {"code": "late_blocker", "severity": "blocker", "message": "发布后发现 blocker", "payload": {}}
+        ]
+        self.article.save(update_fields=["gate_issues", "updated_at"])
+
+        with (
+            patch("stable.services.qq_auto_push.is_public_url_accessible") as url_check,
+            patch("stable.services.qq_auto_push.BotPusher.send_group_message") as send_message,
+        ):
+            result = qq_push_delivery_task.run(delivery.id)
+
+        delivery.refresh_from_db()
+        self.assertEqual(result["status"], QQPushDeliveryStatus.SKIPPED)
+        self.assertEqual(delivery.attempt_count, 0)
+        self.assertEqual(delivery.last_error_type, QQPushErrorType.NOT_ELIGIBLE)
+        self.assertEqual(delivery.last_error, "has_blocker")
+        url_check.assert_not_called()
+        send_message.assert_not_called()
+
+    @override_settings(QQ_PUSH_SCOPE="all_public")
+    def test_skipped_delivery_can_send_after_article_becomes_eligible_again(self):
+        delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
+        delivery.status = QQPushDeliveryStatus.SKIPPED
+        delivery.last_error_type = QQPushErrorType.NOT_ELIGIBLE
+        delivery.last_error = "has_blocker"
+        delivery.save(update_fields=["status", "last_error_type", "last_error", "updated_at"])
+
+        with (
+            patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")),
+            patch("stable.services.qq_auto_push.BotPusher.send_group_message", return_value={"status": "ok"}),
+        ):
+            result = qq_push_delivery_task.run(delivery.id)
+
+        delivery.refresh_from_db()
+        self.assertEqual(result["status"], QQPushDeliveryStatus.SENT)
+        self.assertEqual(delivery.attempt_count, 1)
+        self.assertEqual(delivery.last_error_type, "")
+        self.assertEqual(delivery.last_error, "")
 
     @override_settings(QQ_PUSH_MAX_ATTEMPTS=1)
     def test_delivery_onebot_failure_records_send_failed(self):
@@ -765,11 +934,15 @@ class QQAutoPushTests(TestCase):
         self.assertGreaterEqual(delay, 44)
         self.assertLessEqual(delay, 60)
 
-    @override_settings(QQ_PUSH_ENABLED=True, QQ_PUSH_SCOPE="high_value_only")
-    def test_article_task_queues_only_active_targets(self):
+    @override_settings(QQ_PUSH_ENABLED=True, QQ_PUSH_SCOPE="high_value_only", QQ_PUSH_IMPORTANCE_STRATEGY="ranked")
+    def test_article_task_queues_only_active_targets_for_ranked_news(self):
+        self.article.source_mode = SourceMode.ACCESS
+        self.article.score_total = 20
+        self.article.save(update_fields=["source_mode", "score_total", "updated_at"])
         with patch("stable.tasks.qq_push_delivery_task.delay") as delay:
             result = qq_auto_push_article_task.run(self.article.id)
 
+        self.assertIn("queued_delivery_ids", result)
         self.assertEqual(len(result["queued_delivery_ids"]), 1)
         self.assertEqual(QQPushDelivery.objects.count(), 1)
         self.assertEqual(QQPushDelivery.objects.get().target, self.target)
@@ -1532,6 +1705,56 @@ class PublicHomeInfoFeedTests(TestCase):
                 caption_zh=title,
             )
         return article
+
+    def test_article_public_path_uses_article_id(self):
+        article = self.make_article("id-public-path", "ID 链接文章")
+
+        self.assertEqual(article.public_path, f"/news/{article.id}/")
+
+    def test_unsaved_article_public_path_is_blank(self):
+        article = NewsArticle(title_zh="未保存文章")
+
+        self.assertEqual(article.public_path, "")
+
+    def test_public_article_detail_can_be_visited_by_article_id(self):
+        article = self.make_article("id-detail", "ID 详情文章")
+
+        response = self.client.get(f"/news/{article.id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ID 详情文章")
+
+    def test_unpublished_article_id_is_not_public(self):
+        article = self.make_article(
+            "id-unpublished",
+            "未发布 ID 文章",
+            workflow_status=WorkflowStatus.PENDING_EDIT,
+            published_to_web_at=None,
+        )
+
+        response = self.client.get(f"/news/{article.id}/")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_legacy_non_numeric_slug_redirects_to_article_id_url(self):
+        article = self.make_article("legacy-slug", "旧 slug 文章")
+        article.public_slug = "legacy-slug-path"
+        article.save(update_fields=["public_slug", "updated_at"])
+
+        response = self.client.get("/news/legacy-slug-path/")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], f"/news/{article.id}/")
+
+    def test_public_home_links_use_article_id_url(self):
+        article = self.make_article("home-id-link", "首页 ID 链接文章")
+        article.public_slug = "home-legacy-slug"
+        article.save(update_fields=["public_slug", "updated_at"])
+
+        response = self.client.get("/")
+
+        self.assertContains(response, f'href="/news/{article.id}/"')
+        self.assertNotContains(response, 'href="/news/home-legacy-slug/"')
 
     def test_public_home_latest_articles_filter_and_order_published_items(self):
         now = timezone.now()
@@ -2738,6 +2961,38 @@ class CrawlAutoTranslateTests(TestCase):
         self.assertEqual(job.fail_count, 1)
         self.assertEqual(source.last_crawl_status, TaskStatus.SUCCESS)
         self.assertEqual(source.last_crawl_message, "新增 0，重复 1")
+
+    @override_settings(AUTO_TRANSLATE_ON_INGEST=False, QQ_PUSH_ENABLED=True)
+    def test_source_elevated_public_article_dispatches_qq_auto_push(self):
+        sync_builtin_sources()
+        source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.ACCESS)
+        stub = type("Stub", (), {"source_article_id": "seen-ranked-article"})()
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.ACCESS,
+            source_article_id="seen-ranked-article",
+            title_ja="榜单提升已公开",
+            title_zh="榜单提升已公开",
+            body_ja_raw="本文",
+            body_ja_normalized="本文",
+            body_zh="正文",
+            published_at=timezone.now(),
+            source_url="https://example.com/news/seen-ranked-article",
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+        )
+
+        with patch("stable.tasks.NetkeibaAdapter.fetch_listing", return_value=[stub]), patch(
+            "stable.tasks.NetkeibaAdapter.fetch_detail", return_value=object()
+        ), patch("stable.tasks.NetkeibaAdapter.normalize_source_payload", return_value=object()), patch(
+            "stable.tasks.upsert_article_from_draft",
+            return_value=ArticleUpsertResult(article=article, created=False, source_elevated=True),
+        ), patch("stable.tasks.dispatch_task") as mocked_dispatch:
+            result = _crawl_netkeiba_mode("access", 1, source=source)
+
+        self.assertEqual(result["new_count"], 0)
+        self.assertEqual(result["seen_count"], 1)
+        mocked_dispatch.assert_called_once_with(qq_auto_push_article_task, article.id)
 
     @override_settings(AUTO_TRANSLATE_ON_INGEST=False)
     def test_jra_detail_structure_error_skips_article_and_continues(self):

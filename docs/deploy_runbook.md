@@ -397,6 +397,7 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shel
 ```bash
 QQ_PUSH_ENABLED=false
 QQ_PUSH_SCOPE=high_value_only
+QQ_PUSH_IMPORTANCE_STRATEGY=ranked
 QQ_PUSH_MAX_ATTEMPTS=3
 QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS=5
 QQ_PUSH_SENDING_STALE_SECONDS=600
@@ -408,8 +409,10 @@ ONEBOT_TIMEOUT_SECONDS=30
 
 `QQ_PUSH_SCOPE` 支持：
 
-- `high_value_only`：默认，仅推 `score_total >= AUTO_REVIEW_THRESHOLD` 的已发布文章
-- `all_public`：推所有公开 URL 可访问的已发布文章
+- `high_value_only`：默认，仅推重点新闻
+- `all_public`：推所有公开 URL 可访问且无 blocker 的已发布文章
+
+`QQ_PUSH_IMPORTANCE_STRATEGY=ranked` 是本期唯一支持的重点新闻口径：仅 `netkeiba:access` 与 `netkeiba:attention` 文章会被视为重点新闻。
 
 ### 部署步骤
 
@@ -457,6 +460,7 @@ ports:
 ```bash
 QQ_PUSH_ENABLED=true
 QQ_PUSH_SCOPE=high_value_only
+QQ_PUSH_IMPORTANCE_STRATEGY=ranked
 ```
 
 重启 worker / beat：
@@ -470,7 +474,7 @@ docker compose -f docker-compose.prod.lowcost.yml up -d worker beat
 检查配置：
 
 ```bash
-docker compose -f docker-compose.prod.lowcost.yml exec worker sh -c 'env | grep -E "^(QQ_PUSH_ENABLED|QQ_PUSH_SCOPE|QQ_PUSH_MAX_ATTEMPTS|QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS|QQ_PUSH_SENDING_STALE_SECONDS|QQ_PUSH_MIN_INTERVAL_SECONDS|ONEBOT_BASE_URL|ONEBOT_TIMEOUT_SECONDS)="'
+docker compose -f docker-compose.prod.lowcost.yml exec worker sh -c 'env | grep -E "^(QQ_PUSH_ENABLED|QQ_PUSH_SCOPE|QQ_PUSH_IMPORTANCE_STRATEGY|QQ_PUSH_MAX_ATTEMPTS|QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS|QQ_PUSH_SENDING_STALE_SECONDS|QQ_PUSH_MIN_INTERVAL_SECONDS|ONEBOT_BASE_URL|ONEBOT_TIMEOUT_SECONDS)="'
 ```
 
 查看交付记录：
@@ -484,6 +488,15 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shel
 ```bash
 docker logs --tail=160 umanewsbot-worker-1
 ```
+
+抽检公开文章 ID URL：
+
+```bash
+ARTICLE_ID=$(docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py shell -c "from stable.models import NewsArticle, WorkflowStatus; article = NewsArticle.objects.filter(workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at__isnull=False).order_by('-published_to_web_at', '-id').first(); print(article.id if article else '')")
+curl -I "http://127.0.0.1/news/${ARTICLE_ID}/"
+```
+
+预期 `/news/<article_id>/` 返回 `200`；非纯数字旧 `/news/<slug>/` 若能查到已发布文章，应返回 `302` 并跳转到对应 ID URL。QQ 自动推送消息中的 `阅读全文` 链接同样应为 `SITE_URL/news/<article_id>/`。
 
 后台排查入口：
 
@@ -940,13 +953,14 @@ ONEBOT_BASE_URL=http://onebot:3000
 ONEBOT_TIMEOUT_SECONDS=30
 QQ_PUSH_ENABLED=false
 QQ_PUSH_SCOPE=all_public
+QQ_PUSH_IMPORTANCE_STRATEGY=ranked
 QQ_PUSH_MAX_ATTEMPTS=3
 QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS=5
 QQ_PUSH_SENDING_STALE_SECONDS=600
 QQ_PUSH_MIN_INTERVAL_SECONDS=60
 ```
 
-`ONEBOT_ACCESS_TOKEN` 已写入生产 `.env`，但不得写入仓库文档。生产当前已将 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=all_public` 用于测试群灰度。`QQ_PUSH_MIN_INTERVAL_SECONDS` 用于控制同一目标群两次自动发送尝试之间的最小间隔，避免批量补推或批量发布触发 QQ / NapCat 发送异常。
+`ONEBOT_ACCESS_TOKEN` 已写入生产 `.env`，但不得写入仓库文档。生产当前已将 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=all_public` 用于测试群灰度。完成 `push-ranked-news-to-qq` 部署后，推荐切换为 `QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，让后续自动推送只覆盖 netkeiba 访问量榜 / 注目数榜新闻。`QQ_PUSH_MIN_INTERVAL_SECONDS` 用于控制同一目标群两次自动发送尝试之间的最小间隔，避免批量补推或批量发布触发 QQ / NapCat 发送异常。
 
 ### 已配置群目标
 
@@ -970,8 +984,8 @@ QQ_PUSH_MIN_INTERVAL_SECONDS=60
 
 1. 合入并部署 `add-qqbot-auto-push`。
 2. 执行迁移，确认 `stable_qqpushdelivery` 表存在。
-3. 确认 `QQ_PUSH_SCOPE=all_public` 和测试群 `PushTarget.is_active=true`。
-4. 设置 `QQ_PUSH_ENABLED=true`。
+3. 确认测试群 `PushTarget.is_active=true`。
+4. 设置 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`。
 5. 重启 `worker / beat`。
 6. 发布或复用一篇公开文章触发自动推送，核对测试群消息、`QQPushDelivery` 和 worker 日志。
 
