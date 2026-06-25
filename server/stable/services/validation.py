@@ -21,7 +21,7 @@ from stable.models import (
     TermType,
     WorkflowStatus,
 )
-from stable.services.terms import extract_unknown_horse_names
+from stable.services.terms import recognize_horse_names, serialize_recognized_horse_names
 
 
 _NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
@@ -274,6 +274,8 @@ def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
     details: dict = {
         "content_source": content_source,
         "unknown_horse_names": [],
+        "recognized_horse_names": [],
+        "external_horse_names": [],
         "missing_known_terms": [],
         "missing_numbers": [],
         "quote_fragments_checked": [],
@@ -298,12 +300,43 @@ def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
             )
         )
 
-    unknown_horses = extract_unknown_horse_names(article.title_ja, article.body_ja_normalized or article.body_ja_raw, limit=12)
+    preserve_limit = 12
+    recognized_horses = recognize_horse_names(article.title_ja, article.body_ja_normalized or article.body_ja_raw, limit=None)
+    details["recognized_horse_names"] = serialize_recognized_horse_names(recognized_horses)
+    preservable_horses = [item for item in recognized_horses if item.needs_preserve][:preserve_limit]
+    unknown_horses = [item.name_ja for item in preservable_horses]
     details["unknown_horse_names"] = unknown_horses
+    external_horses = [item for item in preservable_horses if item.source == "external_alias"]
+    details["external_horse_names"] = [item.name_ja for item in external_horses]
+    missing_external_horses = [item for item in external_horses if item.name_ja and item.name_ja not in publish_text]
+    if missing_external_horses:
+        issues.append(
+            _issue(
+                "external_horse_not_preserved",
+                SEVERITY_WARNING,
+                "外部已知马名未原样保留：" + "、".join(item.name_ja for item in missing_external_horses[:6]),
+                payload={
+                    "names": [
+                        {
+                            "name_ja": item.name_ja,
+                            "external_horse_ids": item.external_horse_ids,
+                            "primary_external_horse_id": item.primary_external_horse_id,
+                            "source": item.source,
+                            "confidence": item.confidence,
+                            "conflict_flags": item.conflict_flags,
+                        }
+                        for item in missing_external_horses[:12]
+                    ]
+                },
+            )
+        )
+
     missing_unknown_horses: list[str] = []
-    for name in unknown_horses:
-        if name and name not in publish_text:
-            missing_unknown_horses.append(name)
+    for item in preservable_horses:
+        if item.source != "heuristic" or not item.needs_preserve:
+            continue
+        if item.name_ja and item.name_ja not in publish_text:
+            missing_unknown_horses.append(item.name_ja)
     if missing_unknown_horses:
         issues.append(
             _issue(

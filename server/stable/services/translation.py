@@ -9,7 +9,7 @@ from openai import OpenAI
 
 from stable.models import NewsArticle, TranslationRun
 
-from .terms import apply_term_mappings, extract_unknown_horse_names, resolve_terms, serialize_terms
+from .terms import apply_term_mappings, recognize_horse_names, resolve_terms, serialize_recognized_horse_names, serialize_terms
 
 
 @dataclass
@@ -216,11 +216,9 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             for term in terms
         ]
         source_text = article.body_ja_normalized or article.body_ja_raw
-        unknown_horse_names = extract_unknown_horse_names(
-            article.title_ja,
-            source_text,
-            limit=max(1, int(settings.TRANSLATION_UNKNOWN_HORSE_LIMIT)),
-        )
+        unknown_horse_limit = max(1, int(settings.TRANSLATION_UNKNOWN_HORSE_LIMIT))
+        recognized_horses = recognize_horse_names(article.title_ja, source_text, limit=None)
+        unknown_horse_names = [item.name_ja for item in recognized_horses if item.needs_preserve][:unknown_horse_limit]
         protected_title, title_placeholders = self._protect_unknown_horse_names(article.title_ja, unknown_horse_names)
         protected_body, body_placeholders = self._protect_unknown_horse_names(source_text, unknown_horse_names)
         horse_placeholders = {**title_placeholders, **body_placeholders}
@@ -256,6 +254,10 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                 "model": settings.TRANSLATION_MODEL,
                 "terms": serialize_terms(terms),
                 "unknown_horse_names": unknown_horse_names,
+                "recognized_horse_names": serialize_recognized_horse_names(recognized_horses),
+                "external_horse_names": [
+                    item.name_ja for item in recognized_horses if item.source == "external_alias"
+                ],
                 "unknown_horse_placeholders": horse_placeholders,
                 "raw": payload,
                 "finish_reason": getattr(choice, "finish_reason", ""),

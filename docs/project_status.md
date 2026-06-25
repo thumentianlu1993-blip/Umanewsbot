@@ -1,7 +1,7 @@
 # 项目状态文档
 
 最后更新时间：`2026-06-25`
-当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP、公开首页资讯流、抓取新鲜度修复、后台快速术语创建与当前稿术语应用已部署生产）
+当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP、公开首页资讯流、抓取新鲜度修复、后台快速术语创建与当前稿术语应用已部署生产；外部马名索引识别链路已本地实现）
 
 > 角色说明：
 > 本文档用于保留项目级概览与摘要信息。
@@ -32,6 +32,7 @@
 - 翻译状态机与失败重试
 - 未收录马名保留日文、翻译完整性校验
 - 未收录马名翻译保护已增强：使用占位符保留原文名，模型仍漏保留时记录 warning 但不阻断整篇翻译
+- 外部马名索引识别链路已本地实现：`ExternalHorseAlias` 可参与马名识别、翻译保护、发布校验和候选发现；外部马名只用于确认“这是马名”，不批量写入正式术语库 `TermEntry`
 - 术语工作台与批量导入
 - 候选池、编辑台、发布流
 - 自动化内容运营 MVP：
@@ -129,7 +130,9 @@
 ## 5. 当前验证结果
 
 - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py check`：通过
-- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable`：通过，96 项
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable`：通过，147 项
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.TermResolverTests stable.tests.AutomationFlowTests stable.tests.TranslationWorkflowTests stable.tests.TermCandidateDiscoveryTests --noinput`：通过，49 项
+- `openspec validate use-external-horse-alias-for-name-recognition --strict`：通过
 - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable.tests.PublicHomeInfoFeedTests`：通过，10 项
 - `openspec validate upgrade-public-home-info-feed --strict`：归档前通过
 - `openspec validate --all`：归档前通过；同步正式规格并归档后再次通过
@@ -148,6 +151,7 @@
 - 观察公开首页资讯流生产运行，重点看首页、详情页、图片、静态资源和移动端首屏密度
 - 观察自动发布质量与自动化日志
 - 补充翻译 warning 可视化和术语库补全流程
+- 评估外部马名索引识别链路的生产部署与灰度验证，重点抽检 `external_horse_not_preserved` warning 和候选池 `external_horse_alias` 来源质量
 - 推进 HTTPS / 证书接入
 - 做部署稳定化
 - 完善监控、备份与回滚流程
@@ -210,9 +214,11 @@
 - 新增 `import_external_horse_data` 管理命令和 `import_external_horse_data_task` Celery 任务。
 - 生产默认关闭：`EXTERNAL_HORSE_DATA_IMPORT_ENABLED=false`、`EXTERNAL_HORSE_DATA_ALLOW_NETWORK=false`。
 - 当前能力只维护本地外部赛马数据缓存，不改变新闻抓取、翻译、改写、自动发布或公开前台。
-- 当前验证：Django check 通过，`stable` 96 项测试通过。
+- 当前验证：Django check 通过，`stable` 147 项测试通过。
 - 生产首轮小批量已完成：`run_id=1`，`2026-05` 前 10 场，成功 10、失败 0，写入 143 个唯一马 ID/马名索引。
 - `2026-06-24` 已补充按月续跑跳过已落库 race 的逻辑，后续可继续对 `2026-05` 做小批量下一批导入。
 - 生产第二批续跑已完成：`run_id=2`，累计 20 场比赛、274 个唯一马 ID/马名索引，失败 0。
 - 生产第三批续跑已完成：`run_id=3`，累计 50 场比赛、695 个唯一马 ID/马名索引，失败 0。
 - 生产长循环导入在 `run_id=9` 以退出码 `137` 中断；已停止继续导入、释放锁并标记 partial。当前累计 182 场比赛、2401 个唯一马 ID/马名索引，服务健康。
+- 外部马名索引已接入本地识别链路：翻译阶段保护外部已知但无中文译名的马名，发布校验输出独立 `external_horse_not_preserved` warning，术语候选发现会把新闻中出现且缺少正式中文译名的外部马名以 `external_horse_alias` 来源送入候选池；同名普通词需要强马名上下文才会被识别为马名；review 返修后，保护名单 `limit` 不再被已有中文译名的正式马名占用。OpenSpec change `use-external-horse-alias-for-name-recognition` 已归档到 `openspec/changes/archive/2026-06-25-use-external-horse-alias-for-name-recognition/`，正式规格已同步。
+- 长文样本抽检显示：netkeiba 长文可有效命中外部马名索引，但 JRA 活动公告类长文仍会通过启发式误报普通片假名词，后续需要继续补普通词过滤或收紧启发式马名规则。
