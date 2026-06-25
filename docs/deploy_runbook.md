@@ -991,8 +991,8 @@ chmod +x deploy_lowcost.sh deploy/*.sh deploy/docker/*.sh
 ```env
 ONEBOT_BASE_URL=http://onebot:3000
 ONEBOT_TIMEOUT_SECONDS=30
-QQ_PUSH_ENABLED=false
-QQ_PUSH_SCOPE=all_public
+QQ_PUSH_ENABLED=true
+QQ_PUSH_SCOPE=high_value_only
 QQ_PUSH_IMPORTANCE_STRATEGY=ranked
 QQ_PUSH_MAX_ATTEMPTS=3
 QQ_PUSH_URL_CHECK_TIMEOUT_SECONDS=5
@@ -1000,7 +1000,7 @@ QQ_PUSH_SENDING_STALE_SECONDS=600
 QQ_PUSH_MIN_INTERVAL_SECONDS=60
 ```
 
-`ONEBOT_ACCESS_TOKEN` 已写入生产 `.env`，但不得写入仓库文档。生产当前已将 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=all_public` 用于测试群灰度。完成 `push-ranked-news-to-qq` 部署后，推荐切换为 `QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，让后续自动推送只覆盖 netkeiba 访问量榜 / 注目数榜新闻。`QQ_PUSH_MIN_INTERVAL_SECONDS` 用于控制同一目标群两次自动发送尝试之间的最小间隔，避免批量补推或批量发布触发 QQ / NapCat 发送异常。
+`ONEBOT_ACCESS_TOKEN` 已写入生产 `.env`，但不得写入仓库文档。生产当前已将 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked` 用于测试群灰度，让后续自动推送只覆盖 netkeiba 访问量榜 / 注目数榜新闻。`QQ_PUSH_MIN_INTERVAL_SECONDS` 用于控制同一目标群两次自动发送尝试之间的最小间隔，避免批量补推或批量发布触发 QQ / NapCat 发送异常。
 
 ### 已配置群目标
 
@@ -1019,6 +1019,72 @@ QQ_PUSH_MIN_INTERVAL_SECONDS=60
 - 2026-06-24 已部署 `add-qqbot-auto-push` 到 `main`，生产迁移 `stable.0010_qqpushdelivery` 已应用，`QQ_PUSH_ENABLED=true` 与 `QQ_PUSH_SCOPE=all_public` 已生效。
 - 批量补推 126 篇存量公开文章时，`QQPushDelivery` 记录创建成功；NapCat / QQ 客户端返回 `EventChecker Failed ... 网络连接异常`，系统按 `send_failed` 记录并进入有限重试，未误标记成功。后续补推必须使用 `QQ_PUSH_MIN_INTERVAL_SECONDS` 或人工脚本限速。
 - 2026-06-25 重新扫码登录 NapCat 后，Django 应用侧短消息和 `qq_auto_push_article_task` 自动任务链路均已成功发送到测试群。限速补推按 65 秒间隔成功发送 79 条交付记录；按当前验收口径，不再继续补推全部历史公开新闻，剩余历史失败记录保留在后台，不影响后续新发布文章自动推送。
+- 2026-06-25 部署榜单重点推送后，生产已切换为 `QQ_PUSH_SCOPE=high_value_only` 与 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`；本次不补推历史公开新闻，后续等待自然榜单新闻触发测试群推送。
+
+## 2026-06-25 榜单重点 QQ 推送与公开文章 ID URL 生产部署
+
+### 部署内容
+
+- `elevate-ranked-netkeiba-sources`：同一 netkeiba 新闻先被新着顺命中、稍后被访问量榜或注目数榜命中时，主来源可从 `latest` 提升为 `access` 或 `attention`；访问量榜和注目数榜不互相覆盖。
+- `push-ranked-news-to-qq`：生产 `high_value_only` 改为按 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked` 判断重点新闻，本期只推 `netkeiba:access` / `netkeiba:attention` 且无 blocker 的公开文章；来源提升后的已公开文章会触发 QQ 自动推送编排。
+- `use-article-id-public-urls`：公开详情主路径改为 `/news/<article_id>/`，旧非纯数字 slug URL 保留为 `302` 跳转入口，QQ 消息中的 `阅读全文` 不再包含标题全文。
+
+### 部署前状态与备份
+
+- 合并 PR：#8 `[codex] Implement ranked QQ push and ID article URLs`。
+- 部署提交：`00e4bd4`。
+- 服务器部署前 HEAD：`b0c986a`。
+- 部署前确认无正在运行的 `ExternalDataImportRun(status="started")`。
+- 部署前 `.env` 备份：`.env.backup.qq-ranked-idurl-20260625_191826`。
+- 服务器部署前只有 `.env.backup.*`、`imports/`、`napcat/`、`runtime/` 等未跟踪运行态文件；无 tracked diff。
+
+### 部署步骤与配置
+
+```bash
+cd /opt/umanewsbot
+git pull --ff-only origin main
+cp .env .env.backup.qq-ranked-idurl-20260625_191826
+```
+
+生产 `.env` 已设置：
+
+```env
+QQ_PUSH_ENABLED=true
+QQ_PUSH_SCOPE=high_value_only
+QQ_PUSH_IMPORTANCE_STRATEGY=ranked
+QQ_PUSH_MAX_ATTEMPTS=3
+QQ_PUSH_MIN_INTERVAL_SECONDS=60
+ONEBOT_BASE_URL=http://onebot:3000
+ONEBOT_TIMEOUT_SECONDS=30
+```
+
+随后执行：
+
+```bash
+bash ./deploy_lowcost.sh
+```
+
+### 验证结果
+
+- `./deploy_lowcost.sh` 执行成功，`db / web / worker / beat` 已重建，`nginx / redis` 正常运行。
+- `migrate` 显示 `No migrations to apply`。
+- `collectstatic` 完成，`0 static files copied`，`129 unmodified`，`360 post-processed`。
+- `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check`：通过。
+- 生产 worker 环境确认 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`。
+- `http://umafans.run/healthz/` 返回 `200`。
+- `http://umafans.run/` 返回 `200`。
+- 抽检公开文章 `ARTICLE_ID=5551`：`http://127.0.0.1/news/5551/` 返回 `200`。
+- 抽检旧 slug URL 返回 `302`，`Location` 指向 `/news/5551/`。
+- 本轮不补推全部已发表新闻；后续只等待自然榜单新闻触发测试群推送。
+
+### 归档结果
+
+- `add-qqbot-auto-push` 已归档为 `openspec/changes/archive/2026-06-25-add-qqbot-auto-push/`，并创建正式规格 `openspec/specs/qqbot-auto-push/spec.md`。
+- `elevate-ranked-netkeiba-sources` 已归档为 `openspec/changes/archive/2026-06-25-elevate-ranked-netkeiba-sources/`，并同步到 `openspec/specs/crawl-freshness-and-source-health/spec.md`。
+- `use-article-id-public-urls` 已归档为 `openspec/changes/archive/2026-06-25-use-article-id-public-urls/`，并同步到 `openspec/specs/public-home-info-feed/spec.md`。
+- `push-ranked-news-to-qq` 已归档为 `openspec/changes/archive/2026-06-25-push-ranked-news-to-qq/`，并同步到 `openspec/specs/qqbot-auto-push/spec.md`。
+- 前期废弃的空目录 `openspec/changes/refine-ranked-news-push/` 已清理，避免 OpenSpec active 列表出现无任务占位 change。
+- 归档后 `openspec validate --all` 通过。
 
 ### 自动推送上线步骤
 

@@ -19,6 +19,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-25` 已将本轮三个运营改造 change 合并到 `main` 并部署生产：抓取新鲜度与来源健康、后台原文选区快速加入术语库、新增术语后一次性应用到当前稿。服务器 `/opt/umanewsbot` 已从 `268100d` 更新到 `7f54f13`，`web / worker / beat` 已重建，`manage.py check`、`/healthz/` 和首页 HTTP 验证通过。相关 OpenSpec change 已归档并同步正式规格；其中抓取返修的 `fix-crawl-health-running-and-schedule-stagger` 是 change1 的后续规格，随 change1 一并归档。
 
+`2026-06-25` 已将榜单重点新闻 QQ 推送与公开文章 ID URL 改造通过 PR #8 合并并部署生产。服务器 `/opt/umanewsbot` 已更新到 `00e4bd4`，部署前 `.env` 备份为 `.env.backup.qq-ranked-idurl-20260625_191826`；生产 `.env` 已切换为 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`。`web / worker / beat` 已重建，`manage.py check`、`http://umafans.run/healthz/`、`http://umafans.run/`、`/news/<article_id>/` 公开详情和旧 slug 到 ID URL 的 `302` 跳转均已验证通过。本次不补推历史公开新闻，后续只等待自然榜单新闻触发测试群推送。
+
 ## 已完成内容
 
 - 域名购买与解析
@@ -84,11 +86,11 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 本轮拆为三个 OpenSpec 子 change：`elevate-ranked-netkeiba-sources`、`push-ranked-news-to-qq`、`use-article-id-public-urls`。
 - 推送策略方向：`QQ_PUSH_SCOPE` 继续表示“全推 / 重点推”，重点推送的判定方式由后续配置承载；本期统一实现 `ranked` 榜单策略，即只推 `netkeiba:access` 与 `netkeiba:attention` 新闻。
 - QQ 推送 blocker 判断必须复用现有 `NewsArticle.gate_blockers` / `gate_issues.severity=blocker` 结构化门禁结果，不在 QQ 服务里重新实现一套发布门禁。
-- 本轮需求完成后，需要先确保 `add-qqbot-auto-push` 同步或归档为正式 `qqbot-auto-push` 规格，再归档依赖它的返修 change；同时提醒维护者尽可能归档其他已完成项目。
-- `elevate-ranked-netkeiba-sources` 已完成本地实现：`upsert_article_from_draft()` 会将同一 netkeiba 文章从 `latest` 提升为首次命中的 `access` 或 `attention`，二者之间不互相覆盖，`latest` 也不会覆盖榜单来源；每次命中仍创建 `NewsSnapshot`。入库结果新增 `source_elevated` 稳定信号，且仍兼容旧的 `article, created = ...` 解包方式。
-- `push-ranked-news-to-qq` 已完成本地实现：新增 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，`high_value_only` 下只推 `netkeiba:access` / `netkeiba:attention` 且无 blocker 的公开文章；已公开文章被榜单来源提升时会触发 QQ 自动推送编排，并继续依靠 `QQPushDelivery(article, target)` 唯一约束去重。QQ delivery 真正发送前也会复检推送资格，若文章后来出现 blocker 或不再符合范围，会标记为 `skipped/not_eligible`，不会继续发群消息。
-- `use-article-id-public-urls` 已完成本地实现：`NewsArticle.public_path` 改为 `/news/<article_id>/`，公开详情页可通过文章 ID 访问，非纯数字旧 slug URL 会跳转到 ID URL；首页、热门列表、后台前台查看入口和 QQ 自动推送消息均继续通过 `article.public_path` 使用 ID URL。
-- 本地已通过完整 `stable` 测试、三个子 change 的严格校验、`openspec validate --all` 和 `git diff --check`。三个子 change 尚未部署生产。
+- 归档状态：`add-qqbot-auto-push` 已先归档为正式 `qqbot-auto-push` 规格，随后本轮三个子 change 已归档到 `openspec/changes/archive/2026-06-25-*` 并同步正式规格。后续仍建议维护者定期清理其他已完成的 active change。
+- `elevate-ranked-netkeiba-sources` 已完成并部署生产：`upsert_article_from_draft()` 会将同一 netkeiba 文章从 `latest` 提升为首次命中的 `access` 或 `attention`，二者之间不互相覆盖，`latest` 也不会覆盖榜单来源；每次命中仍创建 `NewsSnapshot`。入库结果新增 `source_elevated` 稳定信号，且仍兼容旧的 `article, created = ...` 解包方式。
+- `push-ranked-news-to-qq` 已完成并部署生产：新增 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，`high_value_only` 下只推 `netkeiba:access` / `netkeiba:attention` 且无 blocker 的公开文章；已公开文章被榜单来源提升时会触发 QQ 自动推送编排，并继续依靠 `QQPushDelivery(article, target)` 唯一约束去重。QQ delivery 真正发送前也会复检推送资格，若文章后来出现 blocker 或不再符合范围，会标记为 `skipped/not_eligible`，不会继续发群消息。
+- `use-article-id-public-urls` 已完成并部署生产：`NewsArticle.public_path` 改为 `/news/<article_id>/`，公开详情页可通过文章 ID 访问，非纯数字旧 slug URL 会跳转到 ID URL；首页、热门列表、后台前台查看入口和 QQ 自动推送消息均继续通过 `article.public_path` 使用 ID URL。
+- 本地已通过完整 `stable` 测试、三个子 change 的严格校验、`openspec validate --all` 和 `git diff --check`；生产已通过容器重建、Django check、外部健康检查、首页检查、ID URL 与旧 slug 跳转 smoke test。
 
 ## 当前已知风险与待确认项
 
@@ -122,7 +124,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 ### 当前启用策略
 
 - 生产已配置 NapCatQQ / OneBot v11 网关、测试群和 access token。
-- 生产 `.env` 已设置 `QQ_PUSH_SCOPE=all_public`，目标是测试群阶段推送所有公开新闻。
+- 生产 `.env` 已设置 `QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，当前只等待自然榜单新闻触发测试群推送。
 - 生产已部署迁移 `stable.0010_qqpushdelivery`，并设置 `QQ_PUSH_ENABLED=true` 进入测试群灰度。
 - OneBot API 不得公网裸露；优先 Docker 内网 `http://onebot:3000`，临时映射只能绑定 `127.0.0.1`。
 
@@ -133,6 +135,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 已补充 `QQ_PUSH_MIN_INTERVAL_SECONDS` 节流保护，后续自动任务按目标群最小间隔重排，降低 QQ 风控和客户端异常风险。
 - 2026-06-25 重新扫码登录 NapCat 后，Django `BotPusher` 短消息发送成功，`qq_auto_push_article_task -> qq_push_delivery_task -> OneBot` 自动任务链路已用真实公开文章验证成功，`QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=all_public` 在生产 worker 生效。
 - 2026-06-25 存量补推按 65 秒间隔运行并成功发送 79 条交付记录；按当前验收判断，不再要求继续补推全部历史公开新闻，剩余历史 `retrying/send_failed` 记录保留用于后台排查，不影响后续新发布文章自动推送。
+- 2026-06-25 榜单重点推送部署后，生产 worker 已确认 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked` 生效；本次不补推历史公开新闻，后续只等待自然榜单新闻推送。
 
 ## 2026-06-24 自动发布门禁优化本地实现
 
