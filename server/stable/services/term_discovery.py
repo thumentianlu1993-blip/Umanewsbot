@@ -15,7 +15,7 @@ from stable.models import (
     TermEntry,
     TermType,
 )
-from stable.services.terms import extract_unknown_horse_names
+from stable.services.terms import recognize_horse_names
 
 
 SUPPORTED_TERM_TYPES = {TermType.HORSE, TermType.RACE, TermType.JOCKEY, TermType.OWNER}
@@ -101,9 +101,14 @@ def discover_term_findings(article: NewsArticle) -> list[TermDiscoveryFinding]:
     results: list[TermDiscoveryFinding] = []
     title = article.title_ja or ""
     body = article.body_ja_normalized or article.body_ja_raw or ""
-    for horse_name in extract_unknown_horse_names(title, body, limit=30):
-        field, text = ("title_ja", title) if horse_name in title else ("body_ja_normalized", body)
-        finding = _finding(TermType.HORSE, horse_name, 78 if horse_name in title else 70, "unknown_horse", "疑似未知马名", field, text)
+    for horse in recognize_horse_names(title, body, limit=None):
+        if not horse.needs_preserve:
+            continue
+        field, text = ("title_ja", title) if horse.name_ja in title else ("body_ja_normalized", body)
+        detector = "external_horse_alias" if horse.source == "external_alias" else "unknown_horse"
+        reason = "本地外部马名索引命中且缺少中文译名" if horse.source == "external_alias" else "疑似未知马名"
+        confidence = max(85, horse.confidence) if horse.source == "external_alias" else horse.confidence
+        finding = _finding(TermType.HORSE, horse.name_ja, confidence, detector, reason, field, text)
         if finding:
             results.append(finding)
     for field, text in fields:
