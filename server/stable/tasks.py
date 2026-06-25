@@ -46,6 +46,7 @@ from stable.services.pushing import push_article_to_targets
 from stable.services.qq_auto_push import (
     ensure_qq_push_deliveries,
     get_auto_push_targets,
+    is_article_public,
     process_qq_push_delivery,
     qq_push_next_attempt_delay,
     should_push_news_to_qq,
@@ -126,6 +127,15 @@ def _discover_terms_after_ingest(article: NewsArticle) -> dict | None:
         return {"article_id": article.id, "discovered": False, "error": str(exc)}
 
 
+def _qq_push_after_source_elevation(article: NewsArticle, *, source_elevated: bool) -> dict | None:
+    if not source_elevated or not getattr(settings, "QQ_PUSH_ENABLED", False) or not is_article_public(article):
+        return None
+    try:
+        return dispatch_task(qq_auto_push_article_task, article.id)
+    except Exception as exc:
+        return {"article_id": article.id, "queued": False, "error": str(exc)}
+
+
 def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None) -> dict:
     adapter = NetkeibaAdapter()
     job = _start_crawl_job(source)
@@ -139,13 +149,18 @@ def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None
             for stub in stubs:
                 detail = adapter.fetch_detail(stub.source_article_id)
                 draft = adapter.normalize_source_payload(stub, detail)
-                article, created = upsert_article_from_draft(draft, crawl_job=job)
+                upsert_result = upsert_article_from_draft(draft, crawl_job=job)
+                article, created = upsert_result
                 if created:
                     new_count += 1
                     _discover_terms_after_ingest(article)
                     _auto_translate_article_after_ingest(article)
                 else:
                     seen_count += 1
+                    _qq_push_after_source_elevation(
+                        article,
+                        source_elevated=bool(getattr(upsert_result, "source_elevated", False)),
+                    )
             if mode in {SourceMode.ACCESS, SourceMode.ATTENTION}:
                 break
         _finish_crawl_job(job, success_count=new_count, fail_count=seen_count)

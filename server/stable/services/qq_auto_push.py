@@ -17,6 +17,8 @@ from stable.models import (
     QQPushDelivery,
     QQPushDeliveryStatus,
     QQPushErrorType,
+    SourceMode,
+    SourceSite,
     WorkflowStatus,
 )
 
@@ -28,6 +30,9 @@ logger = logging.getLogger(__name__)
 SCOPE_ALL_PUBLIC = "all_public"
 SCOPE_HIGH_VALUE_ONLY = "high_value_only"
 VALID_SCOPES = {SCOPE_ALL_PUBLIC, SCOPE_HIGH_VALUE_ONLY}
+IMPORTANCE_STRATEGY_RANKED = "ranked"
+VALID_IMPORTANCE_STRATEGIES = {IMPORTANCE_STRATEGY_RANKED}
+RANKED_NETKEIBA_MODES = {SourceMode.ACCESS, SourceMode.ATTENTION}
 AUTO_PUSH_SUMMARY_LIMIT = 160
 
 
@@ -46,8 +51,33 @@ def normalize_qq_push_scope(scope: str | None = None) -> str:
     return SCOPE_HIGH_VALUE_ONLY
 
 
+def normalize_qq_push_importance_strategy(strategy: str | None = None) -> str:
+    candidate = (
+        strategy
+        if strategy is not None
+        else getattr(settings, "QQ_PUSH_IMPORTANCE_STRATEGY", IMPORTANCE_STRATEGY_RANKED)
+    ) or ""
+    normalized = candidate.strip().lower()
+    if normalized in VALID_IMPORTANCE_STRATEGIES:
+        return normalized
+    logger.warning(
+        "Unsupported QQ_PUSH_IMPORTANCE_STRATEGY=%s, fallback to %s",
+        candidate,
+        IMPORTANCE_STRATEGY_RANKED,
+    )
+    return IMPORTANCE_STRATEGY_RANKED
+
+
 def is_article_public(article: NewsArticle) -> bool:
     return article.workflow_status == WorkflowStatus.PUBLISHED and article.published_to_web_at is not None
+
+
+def has_publish_blocker(article: NewsArticle) -> bool:
+    return bool(article.gate_blockers)
+
+
+def is_ranked_news(article: NewsArticle) -> bool:
+    return article.source_site == SourceSite.NETKEIBA and article.source_mode in RANKED_NETKEIBA_MODES
 
 
 def build_public_article_url(article: NewsArticle) -> str:
@@ -71,11 +101,13 @@ def is_public_url_accessible(url: str) -> tuple[bool, str]:
 def should_push_news_to_qq(article: NewsArticle, scope: str | None = None) -> PushEligibility:
     if not is_article_public(article):
         return PushEligibility(False, "article_not_public")
+    if has_publish_blocker(article):
+        return PushEligibility(False, "has_blocker")
     resolved_scope = normalize_qq_push_scope(scope)
     if resolved_scope == SCOPE_ALL_PUBLIC:
         return PushEligibility(True)
-    threshold = int(getattr(settings, "AUTO_REVIEW_THRESHOLD", 75))
-    if int(article.score_total or 0) >= threshold:
+    strategy = normalize_qq_push_importance_strategy()
+    if strategy == IMPORTANCE_STRATEGY_RANKED and is_ranked_news(article):
         return PushEligibility(True)
     return PushEligibility(False, "not_high_value")
 
@@ -165,6 +197,14 @@ def _set_delivery_failure(delivery: QQPushDelivery, *, error_type: str, error: s
     return delivery
 
 
+def _set_delivery_not_eligible(delivery: QQPushDelivery, *, reason: str) -> QQPushDelivery:
+    delivery.status = QQPushDeliveryStatus.SKIPPED
+    delivery.last_error_type = QQPushErrorType.NOT_ELIGIBLE
+    delivery.last_error = reason[:2000]
+    delivery.save(update_fields=["status", "last_error_type", "last_error", "updated_at"])
+    return delivery
+
+
 def _sending_stale_after() -> int:
     return max(60, int(getattr(settings, "QQ_PUSH_SENDING_STALE_SECONDS", 600)))
 
@@ -199,7 +239,14 @@ def _is_stale_sending(delivery: QQPushDelivery) -> bool:
 
 def _claim_delivery_attempt(delivery: QQPushDelivery, *, message: str, public_url: str) -> bool:
     stale_cutoff = timezone.now() - timedelta(seconds=_sending_stale_after())
-    claimable_status = Q(status__in=[QQPushDeliveryStatus.PENDING, QQPushDeliveryStatus.RETRYING, QQPushDeliveryStatus.FAILED])
+    claimable_status = Q(
+        status__in=[
+            QQPushDeliveryStatus.PENDING,
+            QQPushDeliveryStatus.RETRYING,
+            QQPushDeliveryStatus.FAILED,
+            QQPushDeliveryStatus.SKIPPED,
+        ]
+    )
     stale_sending = Q(status=QQPushDeliveryStatus.SENDING) & (
         Q(last_attempt_at__lte=stale_cutoff) | Q(last_attempt_at__isnull=True)
     )
@@ -227,6 +274,10 @@ def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
         return delivery
 
     article = delivery.article
+    eligibility = should_push_news_to_qq(article)
+    if not eligibility.allowed:
+        return _set_delivery_not_eligible(delivery, reason=eligibility.reason or "not_eligible")
+
     public_url = build_public_article_url(article)
     message = build_qq_auto_push_message(article, public_url=public_url)
     if not _claim_delivery_attempt(delivery, message=message, public_url=public_url):

@@ -1,17 +1,62 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Iterator
+
 from django.db import transaction
 from django.utils import timezone
 
-from stable.models import ArticleStatus, CrawlJob, CrawlStatus, NewsArticle, NewsImage, NewsSnapshot, WorkflowStatus
+from stable.models import (
+    ArticleStatus,
+    CrawlJob,
+    CrawlStatus,
+    NewsArticle,
+    NewsImage,
+    NewsSnapshot,
+    SourceMode,
+    SourceSite,
+    WorkflowStatus,
+)
 
 from .sources import find_builtin_source
 from .storage import download_image
 
 
-def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> tuple[NewsArticle, bool]:
+@dataclass(frozen=True)
+class ArticleUpsertResult:
+    article: NewsArticle
+    created: bool
+    source_elevated: bool = False
+
+    def __iter__(self) -> Iterator[object]:
+        yield self.article
+        yield self.created
+
+
+RANKED_NETKEIBA_MODES = {SourceMode.ACCESS, SourceMode.ATTENTION}
+
+
+def _should_elevate_netkeiba_source(article: NewsArticle, draft) -> bool:
+    return (
+        article.source_site == SourceSite.NETKEIBA
+        and draft.source_site == SourceSite.NETKEIBA
+        and article.source_mode == SourceMode.LATEST
+        and draft.source_mode in RANKED_NETKEIBA_MODES
+    )
+
+
+def _should_update_primary_source(article: NewsArticle, draft, *, source_elevated: bool) -> bool:
+    if source_elevated:
+        return True
+    if article.source_site != SourceSite.NETKEIBA or draft.source_site != SourceSite.NETKEIBA:
+        return True
+    return article.source_mode == draft.source_mode
+
+
+def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> ArticleUpsertResult:
     now = timezone.now()
     source_config = find_builtin_source(draft.source_site, draft.source_mode)
+    source_elevated = False
     with transaction.atomic():
         article, created = NewsArticle.objects.get_or_create(
             source_site=draft.source_site,
@@ -39,8 +84,13 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> tuple
             },
         )
         if not created:
-            article.source_config = source_config or article.source_config
-            article.crawl_job = crawl_job or article.crawl_job
+            source_elevated = _should_elevate_netkeiba_source(article, draft)
+            if _should_update_primary_source(article, draft, source_elevated=source_elevated):
+                article.source_mode = draft.source_mode
+                article.source_config = source_config or article.source_config
+                article.crawl_job = crawl_job or article.crawl_job
+                if source_config:
+                    article.source_note = source_config.name
             article.title_ja = draft.title_ja or article.title_ja
             article.body_ja_raw = draft.body_ja_raw or article.body_ja_raw
             article.body_ja_normalized = draft.body_ja_normalized or article.body_ja_normalized
@@ -78,4 +128,4 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> tuple
                 except Exception:
                     image.local_path = ""
             image.save()
-    return article, created
+    return ArticleUpsertResult(article=article, created=created, source_elevated=source_elevated)

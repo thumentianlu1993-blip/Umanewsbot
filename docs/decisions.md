@@ -115,6 +115,19 @@ QQ 群是强打扰分发渠道，上线初期如果全量推送，容易刷屏�
 
 如需验证链路或临时全量推送，可以显式切换为 `QQ_PUSH_SCOPE=all_public`。
 
+## 为什么 QQ 重点推送要拆分范围配置和策略配置
+
+QQ 自动推送后续会存在多种“重点”口径：本期按 netkeiba 访问量榜 / 注目数榜推送，后续可能扩展为“榜单 + 每场比赛当天高频推”或重新支持“按分数推”。
+
+因此后续配置需要区分两层含义：
+
+- `QQ_PUSH_SCOPE` 表示推送范围：例如 `high_value_only` 只推重点，`all_public` 临时推所有公开新闻。
+- `QQ_PUSH_IMPORTANCE_STRATEGY` 表示“重点如何判定”：本期统一为 `ranked`，即 netkeiba 访问量榜和注目数榜。
+
+这样可以避免把 `high_value_only` 永久绑定到某一个算法，也能让后续策略扩展只修改重点判定函数，而不破坏自动推送交付、去重、重试和多群配置。
+
+无论采用哪种重点策略，QQ 推送都不得绕过自动发布门禁。阻断问题以 `NewsArticle.gate_blockers` 或 `gate_issues.severity=blocker` 为准，QQ 服务只消费现有结构化门禁结果，不重新实现一套独立 blocker 规则。
+
 ## 为什么 OneBot API 不公网裸露
 
 OneBot HTTP API 可以直接发送群消息，一旦公网裸露且 token 泄露或配置不当，就可能被滥用。

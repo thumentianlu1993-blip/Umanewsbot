@@ -482,7 +482,12 @@ class NewsArticle(TimestampedModel):
 
     @property
     def public_path(self) -> str:
-        return f"/news/{self.public_slug or self.pk}/"
+        if not self.pk:
+            return ""
+        return f"/news/{self.pk}/"
+
+    def get_absolute_url(self) -> str:
+        return self.public_path
 
     def _gate_issues_by_severity(self, severity: str) -> list[dict]:
         return [issue for issue in (self.gate_issues or []) if issue.get("severity") == severity]
