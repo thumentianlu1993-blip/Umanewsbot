@@ -398,3 +398,33 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web env HKJC_IMPORT_RE
 - 该运行是 dry-run，未执行 `--commit`，未写正式表。
 - 中断后生产检查：HKJC 锁为空、`started_runs=0`、HKJC 表计数仍为 fixture 样本 `ExternalRace=1`、`ExternalRaceEntry=2`、`ExternalRaceResult=2`、`ExternalHorse=2`、`ExternalHorseAlias=4`。
 - 已按 TDD 补充 client transient timeout retry：单个请求最多 `3` 次，失败尝试会进入请求证据；普通一次成功请求的证据格式保持兼容。
+
+retry 补丁部署：
+
+- 生产已从 `65d41eb` 快进到 `04c0444`
+- `manage.py check`：通过
+- `http://127.0.0.1/healthz/`：`200`
+- `http://umafans.run/healthz/`：`200`
+
+原第 1 批 20 场改为 4 个 5 场小批次重新 dry-run：
+
+| 批次 | race_count | entries | results | unique horses | horse profiles | requests | retry attempts | completion |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1a | 5 | 60 | 60 | 60 | 60 | 65 | 0 | complete |
+| 1b | 5 | 65 | 65 | 65 | 65 | 70 | 0 | complete |
+| 1c | 5 | 65 | 65 | 65 | 65 | 70 | 0 | complete |
+| 1d | 5 | 66 | 66 | 66 | 66 | 71 | 0 | complete |
+
+小批次 dry-run 输出保存在生产：
+
+- `runtime/hkjc_import/hkjc-batch1a-dryrun-20260626.json`
+- `runtime/hkjc_import/hkjc-batch1b-dryrun-20260626.json`
+- `runtime/hkjc_import/hkjc-batch1c-dryrun-20260626.json`
+- `runtime/hkjc_import/hkjc-batch1d-dryrun-20260626.json`
+
+dry-run 后生产复查：
+
+- `started_runs=0`
+- HKJC `ExternalDataImportLock.locked_by_run_id=None`
+- HKJC 正式表计数仍为上次 fixture 样本：`ExternalRace=1`、`ExternalRaceEntry=2`、`ExternalRaceResult=2`、`ExternalHorse=2`、`ExternalHorseAlias=4`
+- 当前停在生产 commit 前确认点，尚未执行 `--commit`
