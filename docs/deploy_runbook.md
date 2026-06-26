@@ -1073,6 +1073,7 @@ QQ_PUSH_MIN_INTERVAL_SECONDS=60
 - 2026-06-25 重新扫码登录 NapCat 后，Django 应用侧短消息和 `qq_auto_push_article_task` 自动任务链路均已成功发送到测试群。限速补推按 65 秒间隔成功发送 79 条交付记录；按当前验收口径，不再继续补推全部历史公开新闻，剩余历史失败记录保留在后台，不影响后续新发布文章自动推送。
 - 2026-06-25 部署榜单重点推送后，生产已切换为 `QQ_PUSH_SCOPE=high_value_only` 与 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`；本次不补推历史公开新闻，后续等待自然榜单新闻触发测试群推送。
 - 2026-06-26 再次排查 QQ 推送停滞时，生产日志确认 NapCat 快速登录态失效；处理时先将 `QQ_PUSH_ENABLED=false` 并重启 `worker / beat` 暂停自动推送，用户重新扫码登录后，`BotPusher().is_online()` 返回 `(True, '')`，`/get_login_info` 显示 QQ `1577955464`，群列表包含 `1026525240`，Django 应用侧测试消息发送成功。随后恢复 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked` 并重启 `worker / beat`。本次不补推全部已发表新闻。
+- 2026-06-26 OneBot 离线防护已部署到生产 `a2146d6`，部署前 `.env` 备份为 `.env.backup.qqbot-offline-guard-20260626_223731`。部署后 `web` healthy，迁移无新增，`manage.py check` 通过，本地和公网 `/healthz/` 均为 `200`，worker 环境确认 QQ 自动推送仍开启；`BotPusher().is_online()` 返回 `(True, '')`，测试群部署验证消息发送成功，`message_id=1364343902`。
 
 ## 2026-06-25 榜单重点 QQ 推送与公开文章 ID URL 生产部署
 

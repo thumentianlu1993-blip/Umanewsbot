@@ -165,6 +165,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 2026-06-25 存量补推按 65 秒间隔运行并成功发送 79 条交付记录；按当前验收判断，不再要求继续补推全部历史公开新闻，剩余历史 `retrying/send_failed` 记录保留用于后台排查，不影响后续新发布文章自动推送。
 - 2026-06-25 榜单重点推送部署后，生产 worker 已确认 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked` 生效；本次不补推历史公开新闻，后续只等待自然榜单新闻推送。
 - 2026-06-26 QQ 推送中断排查确认根因是 NapCat 快速登录态失效，日志出现“登录态已失效，请重新登录 / 你的用户身份已失效”。处理过程为：先把生产 `.env` 临时切到 `QQ_PUSH_ENABLED=false` 并重启 `worker / beat` 暂停自动推送；用户重新扫码登录后，OneBot `/get_status` 返回 `online=true`，`/get_login_info` 返回 QQ `1577955464`，群列表包含 `1026525240`，Django 应用侧测试消息发送成功；随后恢复 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked` 并重启 `worker / beat`。本次不补推全部已发表新闻，后续只等待自然榜单新闻触发。
+- 2026-06-26 已将 OneBot 离线防护部署生产，服务器 `/opt/umanewsbot` 从 `849004c` 更新到 `a2146d6`，部署前 `.env` 备份为 `.env.backup.qqbot-offline-guard-20260626_223731`。部署后 `web` healthy，迁移显示 `No migrations to apply`，`manage.py check` 通过，`http://127.0.0.1/healthz/` 与 `http://umafans.run/healthz/` 均返回 `200`；worker 环境确认 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，`BotPusher().is_online()` 返回 `(True, '')`，测试群 `1026525240` 发送部署验证消息成功，返回 `message_id=1364343902`。
 
 ## 2026-06-24 自动发布门禁优化本地实现
 

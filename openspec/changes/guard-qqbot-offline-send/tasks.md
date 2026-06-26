@@ -12,4 +12,4 @@
 - [x] 2.2 (application) 运行 QQ 自动推送目标测试，确认新增测试通过。
 - [x] 2.3 (application) 运行 `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable`。
 - [x] 2.4 (operations) 运行 `openspec validate guard-qqbot-offline-send --strict`、`openspec validate --all` 和 `git diff --check`。
-- [ ] 2.5 (operations) 部署后确认生产 `QQ_PUSH_ENABLED=true`、OneBot `/get_status online=true`、测试群发送成功、`/healthz/` 返回 `200`。
+- [x] 2.5 (operations) 部署后确认生产 `QQ_PUSH_ENABLED=true`、OneBot `/get_status online=true`、测试群发送成功、`/healthz/` 返回 `200`。
