@@ -1213,6 +1213,12 @@ python manage.py import_hkjc_external_data --race-id HK20260624HV01 --allow-netw
 python manage.py import_hkjc_external_data --recent-days 60 --limit-races 1 --limit-horses 1 --max-requests 10 --allow-network
 ```
 
+`recent-days/date-range` 输出中的 `completion` 是生产门禁字段：
+
+- `completion.is_complete=false`：本次因 `limit-races`、`limit-horses` 或请求上限等原因只是小样本/拆批运行，不能当作最近 2 个月全量完成。
+- `completion.stop_reason`：记录停止原因，例如 `limit_horses_reached`。
+- `completion.meetings_found / races_imported / unique_horses_found / horse_profiles_fetched`：用于估算下一批请求量和生产 commit 风险。
+
 隔离环境验证过的真实网络 payload 可以 commit，但生产执行前必须先备份数据库、检查单来源锁和 `started` run、跑 dry-run、取得用户显式确认：
 
 ```bash

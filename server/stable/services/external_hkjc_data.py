@@ -598,11 +598,20 @@ class HKJCExternalDataImporter:
                     source_url=client.requests[-1]["url"],
                 )
             )
+        completion = self._date_range_completion(
+            meetings=meetings,
+            races=races,
+            horse_ids=horse_ids,
+            horses=horses,
+            limit_races=limit_races,
+            limit_horses=limit_horses,
+        )
         return (
             {
                 "races": races,
                 "horses": horses,
                 "meetings": meetings,
+                "completion": completion,
                 "raw_payload": {
                     "start_date": start_date.isoformat(),
                     "end_date": end_date.isoformat(),
@@ -612,6 +621,36 @@ class HKJCExternalDataImporter:
             },
             client,
         )
+
+    def _date_range_completion(
+        self,
+        *,
+        meetings: list[dict[str, Any]],
+        races: list[dict[str, Any]],
+        horse_ids: list[str],
+        horses: list[dict[str, Any]],
+        limit_races: int | None,
+        limit_horses: int | None,
+    ) -> dict[str, Any]:
+        stop_reason = "complete"
+        is_complete = True
+        if limit_races is not None and len(races) >= limit_races:
+            stop_reason = "limit_races_reached"
+            is_complete = False
+        if limit_horses is not None and len(horses) < len(horse_ids):
+            stop_reason = "limit_horses_reached"
+            is_complete = False
+        return {
+            "is_complete": is_complete,
+            "stop_reason": stop_reason,
+            "meetings_found": len(meetings),
+            "races_imported": len(races),
+            "unique_horses_found": len(horse_ids),
+            "horse_profiles_fetched": len(horses),
+            "limit_races": limit_races,
+            "limit_horses": limit_horses,
+            "max_requests": self.options.max_requests,
+        }
 
     def _network_url(self, target_type: str, target_id: str) -> str:
         base_url = self._base_url()
@@ -655,6 +694,7 @@ class HKJCExternalDataImporter:
 
     def _import_payload(self, target_type: str, target_id: str, payload: dict, *, has_payload_file: bool) -> dict:
         stats = self._payload_stats(payload)
+        completion = payload.get("completion") if isinstance(payload.get("completion"), dict) else {}
         if self.options.dry_run:
             return {
                 "source": self.source,
@@ -662,6 +702,7 @@ class HKJCExternalDataImporter:
                 "target_id": target_id,
                 "dry_run": True,
                 "coverage_stats": stats,
+                "completion": completion,
                 "would_write_formal_tables": False,
             }
         if not has_payload_file:
@@ -679,7 +720,7 @@ class HKJCExternalDataImporter:
                 racing_region=self.racing_region,
                 source_language=self.source_language,
                 target_type=target_type,
-                parameters={"target_id": target_id},
+                parameters={"target_id": target_id, "completion": completion},
                 dry_run=False,
                 status=ExternalImportStatus.STARTED,
             )
@@ -707,6 +748,7 @@ class HKJCExternalDataImporter:
             "dry_run": False,
             "success_count": run.success_count,
             "coverage_stats": stats,
+            "completion": completion,
         }
 
     def _payload_stats(self, payload: dict) -> dict:

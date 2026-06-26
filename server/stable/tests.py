@@ -2032,6 +2032,64 @@ class HKJCExternalDataImportTests(TestCase):
         HKJC_IMPORT_MAX_HORSES_PER_RUN=5,
         HKJC_IMPORT_MAX_REQUESTS_PER_RUN=10,
     )
+    def test_hkjc_network_dry_run_reports_incomplete_when_horse_limit_truncates_profiles(self):
+        # Mutation: without completion metadata, a limited sample can be mistaken for a complete 60-day import.
+        from pathlib import Path
+
+        from stable.services import external_hkjc_data as hkjc_module
+
+        fixture_dir = Path(__file__).resolve().parent / "fixtures" / "hkjc" / "html"
+        mock_get = Mock(
+            side_effect=[
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults",
+                    text=(fixture_dir / "localresults-meetings-sample.html").read_text(encoding="utf-8"),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/24",
+                    text=self.hkjc_date_page_with_race_links(),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=1",
+                    text=(fixture_dir / "localresults-race-sample.html").read_text(encoding="utf-8"),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/horse?horseid=HK_2023_J524",
+                    text=(fixture_dir / "horse-profile-sample.html").read_text(encoding="utf-8"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        importer = HKJCExternalDataImporter(
+            HKJCImportOptions(dry_run=True, allow_network=True, request_interval_seconds=0, max_requests=10)
+        )
+
+        with patch.object(hkjc_module, "requests", fake_requests, create=True):
+            result = importer.import_date_range("2026-04-27", "2026-06-26", limit_races=1, limit_horses=1)
+
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual(
+            result["completion"],
+            {
+                "is_complete": False,
+                "stop_reason": "limit_horses_reached",
+                "meetings_found": 3,
+                "races_imported": 1,
+                "unique_horses_found": 2,
+                "horse_profiles_fetched": 1,
+                "limit_races": 1,
+                "limit_horses": 1,
+                "max_requests": 10,
+            },
+        )
+
+    @override_settings(
+        HKJC_IMPORT_NETWORK_BASE_URL="https://hkjc.example.test",
+        HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        HKJC_IMPORT_MAX_RACES_PER_RUN=5,
+        HKJC_IMPORT_MAX_HORSES_PER_RUN=5,
+        HKJC_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
     def test_hkjc_network_date_range_commit_writes_horse_profiles_idempotently(self):
         # Mutation: if horse profile payloads are not part of the verified network payload, commit only creates aliases.
         from pathlib import Path

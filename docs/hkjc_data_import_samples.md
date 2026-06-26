@@ -237,6 +237,7 @@ DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-run
 - 请求数：`1`
 - HTTP 状态：`200`
 - `coverage_stats={"races": 1, "entries": 12, "results": 12, "horses": 12}`
+- `completion={"is_complete": false, "stop_reason": "limit_horses_reached", "meetings_found": 28, "races_imported": 1, "unique_horses_found": 12, "horse_profiles_fetched": 1, "limit_races": 1, "limit_horses": 1, "max_requests": 10}`
 - `would_write_formal_tables=false`
 
 隔离 SQLite 真实 commit：
@@ -296,6 +297,7 @@ DB_ENGINE=sqlite SQLITE_DB_PATH=/tmp/umanews-hkjc-real-range.sqlite3 CELERY_TASK
 - 首次 `run_id=1`，重复执行 `run_id=2`
 - 每次 `success_count=26`
 - `coverage_stats={"races": 1, "entries": 12, "results": 12, "horses": 12}`
+- `completion.is_complete=false`，`stop_reason=limit_horses_reached`
 - 首次 commit 后计数：`ExternalRace=1`、`ExternalRaceEntry=12`、`ExternalRaceResult=12`、`ExternalHorse=1`、`ExternalHorseAlias=12`
 - 解析到的马匹详情样例：`HK_2022_H293` / `ALL ARE MINE` / `GER` / `Gelding` / `B Crawford`
 - 重复 commit 后正式对象计数保持：`ExternalRace=1`、`ExternalRaceEntry=12`、`ExternalRaceResult=12`、`ExternalHorse=1`、`ExternalHorseAlias=12`
@@ -305,4 +307,5 @@ DB_ENGINE=sqlite SQLITE_DB_PATH=/tmp/umanews-hkjc-real-range.sqlite3 CELERY_TASK
 
 - 本验证只抓取 `limit-races=1` 和 `limit-horses=1`，尚未覆盖生产最近 2 个月全量。
 - `coverage_stats.horses=12` 表示单场 entries/results 涉及 12 匹唯一马；本次因 `limit-horses=1` 只补抓其中 1 匹 profile。
+- `completion.is_complete=false` 明确表示这是样本链路验证，不能作为最近 2 个月全量完成证明。
 - 生产全量 commit 前仍必须执行生产备份、锁检查、健康检查、最近 2 个月 dry-run，并取得用户显式确认。

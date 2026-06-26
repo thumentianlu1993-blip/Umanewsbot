@@ -1,6 +1,6 @@
 ## 0. Pre-declared hypotheses
 
-- [ ] 0.1 (integration) H1 正确性：HKJC 最近 60 天 dry-run 解析到的赛日、比赛、赛果、唯一马匹数量必须来自真实页面；如果任一数量为 0 且页面可访问，判定为 BLOCKER。
+- [x] 0.1 (integration) H1 正确性：HKJC 最近 60 天 dry-run 解析到的赛日、比赛、赛果、唯一马匹数量必须来自真实页面；如果任一数量为 0 且页面可访问，判定为 BLOCKER。
 - [x] 0.2 (integration) H2 限速：真实网络抓取相邻请求间隔必须不小于配置值；测试中移除 sleep 调用或绕过 rate limiter 必须失败。
 - [x] 0.3 (application) H3 幂等：同一 HKJC 日期范围 commit 执行两次后，`ExternalRace / ExternalRaceEntry / ExternalRaceResult / ExternalHorse / ExternalHorseAlias` 不得重复增长。
 - [ ] 0.4 (operations) H4 停止边界：每个地区最近 2 个月赛事和涉及马匹详情完成后不得注册 Celery Beat 周期任务；如发现新增周期调度，判定为 BLOCKER。
