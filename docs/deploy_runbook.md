@@ -1282,7 +1282,7 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py i
 
 ### 边界
 
-- 本次生产没有执行 HKJC `--commit`。
+- 该部署验证阶段没有执行 HKJC `--commit`；后续生产样本 commit 见下方单独记录。
 - 本次生产没有启用英法美正式导入、Celery Beat 调度或生产命令队列。
 - HKJC 真实网络 dry-run 当前最小 URL 构造返回 `404`，后续必须先确认稳定 JSON/API、页面脚本 payload 或 HTML 解析入口，才能进入真实网络 commit 设计。
 
@@ -1293,3 +1293,95 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py i
 - `db0f3cc` 仅移动 OpenSpec change 到 archive 并同步正式 spec，不包含服务代码变更；因此未重新 build 或重启容器。
 - 服务器未安装 `openspec` CLI，归档后的 `openspec validate --all` 在本地 worktree 执行并通过。
 - 归档同步后 `http://umafans.run/healthz/` 和 `http://umafans.run/` 仍返回 `200`。
+
+## 2026-06-26 HKJC 生产样本 commit
+
+### 执行边界
+
+- 本次只提交仓库 fixture：`stable/fixtures/hkjc/2026-06-21-race-date-sample.json`。
+- 本次不是 HKJC 真实网络抓取；`--allow-network` 的稳定入口仍未确认。
+- 本次不创建公开比赛页、赛果页或马匹页，只写 `External*` 外部缓存表和 `ExternalHorseAlias`。
+- 本次不启用 Celery Beat 周期任务或后台持续导入队列。
+
+### 备份
+
+```bash
+cd /opt/umanewsbot
+mkdir -p backups/db
+docker compose -f docker-compose.prod.lowcost.yml exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB"' | gzip > backups/db/pre-hkjc-sample-20260626_180646.sql.gz
+gzip -t backups/db/pre-hkjc-sample-20260626_180646.sql.gz
+```
+
+结果：
+
+- 备份文件：`backups/db/pre-hkjc-sample-20260626_180646.sql.gz`
+- 大小：`42M`
+- `gzip -t`：通过
+
+### 预检查
+
+```bash
+cd /opt/umanewsbot
+docker compose -f docker-compose.prod.lowcost.yml ps
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py shell -c 'from stable.models import ExternalDataImportLock, ExternalDataImportRun, ExternalRace, ExternalRaceEntry, ExternalRaceResult, ExternalHorse, ExternalHorseAlias; print({"active_locks": [], "started_runs": [], "hkjc_counts": {"runs": ExternalDataImportRun.objects.filter(source="hkjc").count(), "races": ExternalRace.objects.filter(source="hkjc").count(), "entries": ExternalRaceEntry.objects.filter(source="hkjc").count(), "results": ExternalRaceResult.objects.filter(source="hkjc").count(), "horses": ExternalHorse.objects.filter(source="hkjc").count(), "aliases": ExternalHorseAlias.objects.filter(source="hkjc").count()}})'
+ps -eo pid,args | grep "[i]mport_hkjc_external_data\|[i]mport_external_horse_data" || true
+```
+
+结果：
+
+- 生产 HEAD：`5f92e4d`
+- `web / worker / beat / db / redis / nginx`：运行中，`web` healthy
+- HKJC 生产导入前计数：`runs=0`、`races=0`、`entries=0`、`results=0`、`horses=0`、`aliases=0`
+- 无 HKJC 导入进程
+
+### dry-run
+
+```bash
+cd /opt/umanewsbot
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_hkjc_external_data --race-date 2026-06-21 --payload-file stable/fixtures/hkjc/2026-06-21-race-date-sample.json
+```
+
+结果：
+
+- `dry_run=true`
+- `coverage_stats={"races":1,"entries":2,"results":2,"horses":2}`
+- `would_write_formal_tables=false`
+
+### commit
+
+```bash
+cd /opt/umanewsbot
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_hkjc_external_data --race-date 2026-06-21 --payload-file stable/fixtures/hkjc/2026-06-21-race-date-sample.json --commit
+```
+
+结果：
+
+- `run_id=1960`
+- `status=success`
+- `success_count=7`
+- `skipped_count=0`
+- `failure_count=0`
+- `coverage_stats={"races":1,"entries":2,"results":2,"horses":2}`
+
+### 提交后核验
+
+```bash
+cd /opt/umanewsbot
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_hkjc_external_data --stats-run-id 1960
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_hkjc_external_data --lookup-name "STELLAR EXPRESS"
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py shell -c 'from stable.models import ExternalDataImportLock, ExternalDataImportRun, ExternalRace, ExternalRaceEntry, ExternalRaceResult, ExternalHorse, ExternalHorseAlias; print({"locks": list(ExternalDataImportLock.objects.values("source", "racing_region", "locked_by_run_id", "acquired_at")), "hkjc_runs": ExternalDataImportRun.objects.filter(source="hkjc").count(), "latest_run": list(ExternalDataImportRun.objects.filter(source="hkjc").order_by("-id").values("id", "status", "success_count", "skipped_count", "failure_count", "target_type", "current_target_id")[:1]), "counts": {"races": ExternalRace.objects.filter(source="hkjc").count(), "entries": ExternalRaceEntry.objects.filter(source="hkjc").count(), "results": ExternalRaceResult.objects.filter(source="hkjc").count(), "horses": ExternalHorse.objects.filter(source="hkjc").count(), "aliases": ExternalHorseAlias.objects.filter(source="hkjc").count()}})'
+curl -sS -o /dev/null -w "public_healthz=%{http_code}\n" http://umafans.run/healthz/
+```
+
+结果：
+
+- `--stats-run-id 1960`：`status=success`，`success_count=7`，`failure_count=0`
+- `--lookup-name "STELLAR EXPRESS"`：命中 `external_horse_id=HKH_STELLAR_EXPRESS`，`confidence=100`
+- HKJC 正式外部表计数：`races=1`、`entries=2`、`results=2`、`horses=2`、`aliases=4`
+- `ExternalDataImportLock` 中 HKJC 记录为未占用状态：`locked_by_run_id=None`，`acquired_at=None`
+- 未发现仍在运行的 HKJC 导入进程
+- `http://umafans.run/healthz/`：`200`
+
+### 恢复口径
+
+如需要撤销本次样本写入，优先在维护窗口使用备份 `backups/db/pre-hkjc-sample-20260626_180646.sql.gz` 做整库恢复；不要只手工删除 `External*` 表行，避免遗漏 `ExternalDataImportRun`、`ExternalHorseAlias` 或锁状态证据。当前样本写入规模很小，且不参与公开前台或自动发布链路。
