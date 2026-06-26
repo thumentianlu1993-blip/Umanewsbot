@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 
-from stable.models import ExternalHorseAlias, NewsArticle, TermEntry, TermType
+from django.db.models.functions import Lower
+
+from stable.models import ExternalHorseAlias, NewsArticle, SourceLanguage, TermAlias, TermEntry, TermType
 
 
 @dataclass
@@ -40,13 +43,96 @@ class RecognizedHorseName:
     conflict_flags: list[str]
 
 
-def resolve_terms(text: str, limit: int = 20) -> list[ResolvedTerm]:
+def _dedupe_source_terms(values: Iterable[str]) -> list[str]:
+    terms: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        term = (value or "").strip()
+        if not term or term in seen:
+            continue
+        seen.add(term)
+        terms.append(term)
+    return terms
+
+
+def _alias_texts_by_term(source_language: str | None = None, term_ids: Iterable[int] | None = None) -> dict[int, list[str]]:
+    queryset = TermAlias.objects.filter(is_active=True)
+    if source_language:
+        queryset = queryset.filter(source_language=source_language)
+    if term_ids is not None:
+        term_ids = list(term_ids)
+        if not term_ids:
+            return {}
+        queryset = queryset.filter(term_id__in=term_ids)
+    queryset = queryset.order_by("term_id", "source_language", "alias_type", "text").values_list("term_id", "text")
+    aliases: dict[int, list[str]] = {}
+    for term_id, text in queryset:
+        aliases.setdefault(term_id, []).append(text)
+    return aliases
+
+
+def _entry_source_terms(
+    entry: TermEntry,
+    *,
+    source_language: str | None,
+    alias_lookup: dict[int, list[str]],
+) -> list[str]:
+    values: list[str] = []
+    if source_language is None or source_language == entry.source_language:
+        values.extend(entry.all_japanese_terms())
+    values.extend(alias_lookup.get(entry.pk, []))
+    return _dedupe_source_terms(values)
+
+
+def source_terms_by_entry(entries: Iterable[TermEntry], source_language: str | None = None) -> dict[int, list[str]]:
+    entry_list = list(entries)
+    alias_lookup = _alias_texts_by_term(source_language, term_ids=[entry.pk for entry in entry_list])
+    return {
+        entry.pk: _entry_source_terms(entry, source_language=source_language, alias_lookup=alias_lookup)
+        for entry in entry_list
+    }
+
+
+def _source_term_pattern(candidate: str, source_language: str | None):
+    if source_language == SourceLanguage.ENGLISH:
+        return re.compile(r"(?<![0-9A-Za-z])" + re.escape(candidate) + r"(?![0-9A-Za-z])", re.IGNORECASE)
+    return None
+
+
+def _find_source_term_match(text: str, candidate: str, source_language: str | None) -> str:
+    if not candidate:
+        return ""
+    pattern = _source_term_pattern(candidate, source_language)
+    if pattern:
+        match = pattern.search(text)
+        return match.group(0) if match else ""
+    return candidate if candidate in text else ""
+
+
+def source_term_matches_text(text: str, candidate: str, source_language: str | None) -> bool:
+    return bool(_find_source_term_match(text or "", candidate, source_language))
+
+
+def _replace_source_term(text: str, candidate: str, target: str, source_language: str | None) -> str:
+    if not candidate:
+        return text
+    pattern = _source_term_pattern(candidate, source_language)
+    if pattern:
+        return pattern.sub(target, text)
+    return text.replace(candidate, target)
+
+
+def _resolve_terms_from_entries(text: str, entries, *, source_language: str | None, limit: int) -> list[ResolvedTerm]:
     results: list[ResolvedTerm] = []
-    for entry in TermEntry.objects.filter(is_active=True).order_by("-priority", "source_ja"):
+    entries = list(entries)
+    terms_by_entry = source_terms_by_entry(entries, source_language)
+    for entry in entries:
         matched = None
-        for candidate in entry.all_japanese_terms():
-            if candidate and candidate in text:
-                matched = candidate
+        candidates = terms_by_entry.get(entry.pk, [])
+        for candidate in candidates:
+            matched_candidate = _find_source_term_match(text, candidate, source_language)
+            if matched_candidate:
+                matched = matched_candidate
                 break
         if matched:
             results.append(
@@ -61,6 +147,12 @@ def resolve_terms(text: str, limit: int = 20) -> list[ResolvedTerm]:
                 )
             )
     results.sort(key=lambda item: (-item.priority, -len(item.matched_text), item.source_ja))
+    return results[:limit]
+
+
+def resolve_terms(text: str, limit: int = 20) -> list[ResolvedTerm]:
+    entries = TermEntry.objects.filter(is_active=True).order_by("-priority", "source_ja")
+    results = _resolve_terms_from_entries(text or "", entries, source_language=None, limit=max(limit * 3, 20))
     deduped: list[ResolvedTerm] = []
     seen: set[tuple[str, str]] = set()
     for item in results:
@@ -74,6 +166,11 @@ def resolve_terms(text: str, limit: int = 20) -> list[ResolvedTerm]:
     return deduped
 
 
+def resolve_terms_for_language(text: str, source_language: str, limit: int = 20) -> list[ResolvedTerm]:
+    queryset = TermEntry.objects.filter(is_active=True).order_by("-priority", "source_ja")
+    return _resolve_terms_from_entries(text or "", queryset, source_language=source_language, limit=limit)
+
+
 def serialize_terms(items: list[ResolvedTerm]) -> list[dict]:
     return [asdict(item) for item in items]
 
@@ -82,25 +179,27 @@ def serialize_recognized_horse_names(items: list[RecognizedHorseName]) -> list[d
     return [asdict(item) for item in items]
 
 
-def apply_term_mappings(text: str) -> str:
+def apply_term_mappings(text: str, source_language: str | None = None) -> str:
     if not text:
         return text
     mapped = text
     entries = list(TermEntry.objects.filter(is_active=True).order_by("-priority", "source_ja"))
+    terms_by_entry = source_terms_by_entry(entries, source_language)
     for entry in entries:
-        for candidate in sorted(entry.all_japanese_terms(), key=len, reverse=True):
-            if candidate:
-                mapped = mapped.replace(candidate, entry.target_zh)
+        candidates = terms_by_entry.get(entry.pk, [])
+        for candidate in sorted(candidates, key=len, reverse=True):
+            mapped = _replace_source_term(mapped, candidate, entry.target_zh, source_language)
     return mapped
 
 
-def apply_single_term_mapping(text: str, term: TermEntry) -> str:
+def apply_single_term_mapping(text: str, term: TermEntry, source_language: str | None = None) -> str:
     if not text:
         return text
     mapped = text
-    for candidate in sorted(term.all_japanese_terms(), key=len, reverse=True):
+    candidates = term.source_terms_for_language(source_language) if source_language else term.all_source_terms()
+    for candidate in sorted(candidates, key=len, reverse=True):
         if candidate:
-            mapped = mapped.replace(candidate, term.target_zh)
+            mapped = _replace_source_term(mapped, candidate, term.target_zh, source_language)
     return mapped
 
 
@@ -115,7 +214,11 @@ def apply_created_term_to_article(article: NewsArticle, term: TermEntry) -> Arti
 
     for field_name in [*machine_fields, *publish_fields]:
         current_value = getattr(article, field_name, "") or ""
-        mapped_value = apply_single_term_mapping(current_value, term)
+        mapped_value = apply_single_term_mapping(
+            current_value,
+            term,
+            article.source_language or SourceLanguage.JAPANESE,
+        )
         if mapped_value == current_value:
             unchanged_fields.append(field_name)
             continue
@@ -135,10 +238,15 @@ def apply_created_term_to_article(article: NewsArticle, term: TermEntry) -> Arti
     )
 
 
-def extract_horse_tags(text: str, limit: int = 12) -> list[str]:
+def extract_horse_tags(text: str, limit: int = 12, source_language: str | None = None) -> list[str]:
     tags: list[str] = []
     seen: set[str] = set()
-    for term in resolve_terms(text or "", limit=max(limit * 3, 20)):
+    terms = (
+        resolve_terms_for_language(text or "", source_language, limit=max(limit * 3, 20))
+        if source_language
+        else resolve_terms(text or "", limit=max(limit * 3, 20))
+    )
+    for term in terms:
         if term.term_type != "horse":
             continue
         tag = (term.target_zh or "").strip()
@@ -182,21 +290,25 @@ def _normalize_horse_name(value: str) -> str:
 
 def non_horse_common_words() -> set[str]:
     words = set(_HORSE_STOPWORDS)
-    for entry in TermEntry.objects.filter(is_active=True, term_type=TermType.FIXED_PHRASE):
+    entries = list(TermEntry.objects.filter(is_active=True, term_type=TermType.FIXED_PHRASE))
+    terms_by_entry = source_terms_by_entry(entries, SourceLanguage.JAPANESE)
+    for entry in entries:
         note = (entry.notes or "").casefold()
         if _NON_HORSE_NOTE_MARKER not in note:
             continue
-        for candidate in entry.all_japanese_terms():
+        for candidate in terms_by_entry.get(entry.pk, []):
             normalized = (candidate or "").strip()
             if normalized:
                 words.add(normalized)
     return words
 
 
-def _known_horse_terms() -> set[str]:
+def _known_horse_terms(source_language: str = SourceLanguage.JAPANESE) -> set[str]:
     known_horse_terms: set[str] = set()
-    for entry in TermEntry.objects.filter(is_active=True, term_type=TermType.HORSE):
-        for candidate in entry.all_japanese_terms():
+    entries = list(TermEntry.objects.filter(is_active=True, term_type=TermType.HORSE))
+    terms_by_entry = source_terms_by_entry(entries, source_language)
+    for entry in entries:
+        for candidate in terms_by_entry.get(entry.pk, []):
             normalized = (candidate or "").strip()
             if normalized:
                 known_horse_terms.add(normalized)
@@ -236,30 +348,153 @@ def _candidate_tokens(full_text: str) -> list[re.Match[str]]:
     return list(_KATAKANA_TOKEN_RE.finditer(full_text))
 
 
-def _external_aliases_by_normalized(candidates: set[str]) -> dict[str, list[ExternalHorseAlias]]:
+def _external_aliases_by_normalized(
+    candidates: set[str],
+    *,
+    source_language: str | None = None,
+) -> dict[str, list[ExternalHorseAlias]]:
     if not candidates:
         return {}
-    queryset = (
-        ExternalHorseAlias.objects.filter(normalized_name__in=candidates)
-        .order_by("normalized_name", "-confidence", "-last_seen_at", "external_horse_id")
-    )
+    queryset = ExternalHorseAlias.objects.filter(normalized_name__in=candidates)
+    if source_language:
+        queryset = queryset.filter(source_language=source_language)
+    queryset = queryset.order_by("normalized_name", "-confidence", "-last_seen_at", "external_horse_id")
     aliases: dict[str, list[ExternalHorseAlias]] = {}
     for alias in queryset:
         aliases.setdefault(alias.normalized_name, []).append(alias)
     return aliases
 
 
-def recognize_horse_names(title_text: str, body_text: str, limit: int | None = 12) -> list[RecognizedHorseName]:
+def _comparable_horse_name(value: str, source_language: str) -> str:
+    normalized = _normalize_horse_name(value)
+    if source_language == SourceLanguage.ENGLISH:
+        return normalized.casefold()
+    return normalized
+
+
+def _non_japanese_alias_candidate_keys(full_text: str, source_language: str) -> set[str]:
+    normalized_text = _normalize_horse_name(full_text)
+    if not normalized_text:
+        return set()
+    if source_language == SourceLanguage.ENGLISH:
+        words = re.findall(r"[0-9A-Za-z][0-9A-Za-z'’.-]*", normalized_text)
+        keys: set[str] = set()
+        max_words = 6
+        for start in range(len(words)):
+            for end in range(start + 1, min(len(words), start + max_words) + 1):
+                keys.add(" ".join(words[start:end]).casefold())
+        return keys
+
+    keys = set()
+    for chunk in re.split(r"[\s，。、《》「」『』（）()：:；;、,.!?！？\n\r\t]+", normalized_text):
+        compact = chunk.strip()
+        if not compact:
+            continue
+        max_len = min(12, len(compact))
+        for size in range(2, max_len + 1):
+            for start in range(0, len(compact) - size + 1):
+                keys.add(compact[start : start + size])
+    return keys
+
+
+def _find_non_japanese_alias_match(full_text: str, alias_text: str, source_language: str) -> tuple[int, str]:
+    comparable_alias = _comparable_horse_name(alias_text, source_language)
+    if not comparable_alias:
+        return -1, ""
+    if source_language == SourceLanguage.ENGLISH:
+        pattern = re.compile(r"(?<![0-9A-Za-z])" + re.escape(alias_text) + r"(?![0-9A-Za-z])", re.IGNORECASE)
+        match = pattern.search(full_text)
+        return (match.start(), match.group(0)) if match else (-1, "")
+    comparable_text = _comparable_horse_name(full_text, source_language)
+    position = comparable_text.find(comparable_alias)
+    if position < 0:
+        return -1, ""
+    return position, full_text[position : position + len(alias_text)]
+
+
+def _recognize_non_japanese_external_aliases(
+    full_text: str,
+    source_language: str,
+    limit: int | None,
+) -> list[RecognizedHorseName]:
+    known_horse_terms = {_comparable_horse_name(term, source_language) for term in _known_horse_terms(source_language)}
+    candidates: dict[str, dict] = {}
+    candidate_keys = _non_japanese_alias_candidate_keys(full_text, source_language)
+    if not candidate_keys:
+        return []
+    queryset = ExternalHorseAlias.objects.filter(source_language=source_language).exclude(normalized_name="")
+    if source_language == SourceLanguage.ENGLISH:
+        queryset = queryset.annotate(normalized_key=Lower("normalized_name")).filter(normalized_key__in=candidate_keys)
+    else:
+        queryset = queryset.filter(normalized_name__in=candidate_keys)
+    queryset = queryset.order_by("normalized_name", "-confidence", "-last_seen_at", "external_horse_id")
+    for alias in queryset:
+        alias_text = _normalize_horse_name(alias.normalized_name or alias.name_en or alias.name_zh_hant or alias.name_ja)
+        comparable_alias = _comparable_horse_name(alias_text, source_language)
+        if not comparable_alias or comparable_alias in known_horse_terms:
+            continue
+        position, matched_text = _find_non_japanese_alias_match(full_text, alias_text, source_language)
+        if position < 0:
+            continue
+        record = candidates.setdefault(
+            comparable_alias,
+            {
+                "name": alias_text,
+                "matched_text": matched_text,
+                "first": position,
+                "score": 0,
+                "aliases": [],
+            },
+        )
+        if position < record["first"]:
+            record["first"] = position
+            record["matched_text"] = matched_text
+        record["score"] = max(record["score"], alias.confidence)
+        record["aliases"].append(alias)
+
+    recognized: list[RecognizedHorseName] = []
+    for meta in candidates.values():
+        horse_ids: list[str] = []
+        for alias in meta["aliases"]:
+            if alias.external_horse_id and alias.external_horse_id not in horse_ids:
+                horse_ids.append(alias.external_horse_id)
+        recognized.append(
+            RecognizedHorseName(
+                name_ja=meta["name"],
+                source="external_alias",
+                matched_text=meta["matched_text"],
+                confidence=int(meta["score"]),
+                external_horse_ids=horse_ids,
+                primary_external_horse_id=horse_ids[0] if horse_ids else "",
+                needs_preserve=True,
+                has_translation=False,
+                first_position=meta["first"],
+                detection_reason="external_horse_alias",
+                conflict_flags=[],
+            )
+        )
+    recognized.sort(key=lambda item: (item.first_position, -len(item.matched_text), -item.confidence, item.name_ja))
+    return recognized[:limit] if limit is not None else recognized
+
+
+def recognize_horse_names(
+    title_text: str,
+    body_text: str,
+    limit: int | None = 12,
+    source_language: str = SourceLanguage.JAPANESE,
+) -> list[RecognizedHorseName]:
     title = title_text or ""
     body = body_text or ""
     full_text = "\n".join(part for part in [title, body] if part)
     if not full_text:
         return []
+    if source_language != SourceLanguage.JAPANESE:
+        return _recognize_non_japanese_external_aliases(full_text, source_language, limit)
 
     token_matches = _candidate_tokens(full_text)
     normalized_tokens = {_normalize_horse_name(match.group(0)) for match in token_matches if _normalize_horse_name(match.group(0))}
-    alias_lookup = _external_aliases_by_normalized(normalized_tokens)
-    known_horse_terms = _known_horse_terms()
+    alias_lookup = _external_aliases_by_normalized(normalized_tokens, source_language=source_language)
+    known_horse_terms = _known_horse_terms(source_language)
     stopwords = non_horse_common_words()
 
     candidates: dict[str, dict] = {}

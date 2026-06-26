@@ -13,6 +13,9 @@ from stable.models import (
     NewsArticle,
     NewsImage,
     NewsSnapshot,
+    RacingRegion,
+    SourceKind,
+    SourceLanguage,
     SourceMode,
     SourceSite,
     WorkflowStatus,
@@ -33,42 +36,95 @@ class ArticleUpsertResult:
         yield self.created
 
 
-RANKED_NETKEIBA_MODES = {SourceMode.ACCESS, SourceMode.ATTENTION}
+RANKED_NEWS_MODES = {SourceMode.ACCESS, SourceMode.ATTENTION}
 
 
-def _should_elevate_netkeiba_source(article: NewsArticle, draft) -> bool:
+def _draft_value(draft, field_name: str, fallback):
+    value = getattr(draft, field_name, None)
+    return value or fallback
+
+
+def _source_metadata(draft, source_config) -> dict:
+    return {
+        "racing_region": _draft_value(
+            draft,
+            "racing_region",
+            getattr(source_config, "racing_region", RacingRegion.JAPAN) if source_config else RacingRegion.JAPAN,
+        ),
+        "source_language": _draft_value(
+            draft,
+            "source_language",
+            getattr(source_config, "source_language", SourceLanguage.JAPANESE) if source_config else SourceLanguage.JAPANESE,
+        ),
+        "source_kind": _draft_value(
+            draft,
+            "source_kind",
+            getattr(source_config, "source_kind", SourceKind.NEWS) if source_config else SourceKind.NEWS,
+        ),
+    }
+
+
+def _draft_html(draft) -> str:
+    return getattr(draft, "original_content_html", "") or draft.metadata.get("html", "")
+
+
+def _draft_metadata(draft) -> dict:
+    return {key: value for key, value in (draft.metadata or {}).items() if key != "html"}
+
+
+def _draft_article_source_site(draft):
+    return getattr(draft, "canonical_source_site", None) or draft.source_site
+
+
+def _should_elevate_ranked_source(article: NewsArticle, draft) -> bool:
     return (
-        article.source_site == SourceSite.NETKEIBA
-        and draft.source_site == SourceSite.NETKEIBA
+        article.source_site == _draft_article_source_site(draft)
         and article.source_mode == SourceMode.LATEST
-        and draft.source_mode in RANKED_NETKEIBA_MODES
+        and draft.source_mode in RANKED_NEWS_MODES
     )
 
 
 def _should_update_primary_source(article: NewsArticle, draft, *, source_elevated: bool) -> bool:
+    article_source_site = _draft_article_source_site(draft)
     if source_elevated:
         return True
-    if article.source_site != SourceSite.NETKEIBA or draft.source_site != SourceSite.NETKEIBA:
+    if article.source_site != article_source_site:
         return True
+    if article.source_mode in RANKED_NEWS_MODES:
+        return article.source_mode == draft.source_mode
+    if article_source_site == SourceSite.TDN and draft.source_site == SourceSite.TDN_FRANCE:
+        return True
+    if (
+        article_source_site == SourceSite.TDN
+        and draft.source_site == SourceSite.TDN
+        and article.source_config
+        and article.source_config.source_site == SourceSite.TDN_FRANCE
+    ):
+        return False
     return article.source_mode == draft.source_mode
 
 
 def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> ArticleUpsertResult:
     now = timezone.now()
     source_config = find_builtin_source(draft.source_site, draft.source_mode)
+    source_metadata = _source_metadata(draft, source_config)
+    draft_metadata = _draft_metadata(draft)
+    article_source_site = _draft_article_source_site(draft)
     source_elevated = False
     with transaction.atomic():
         article, created = NewsArticle.objects.get_or_create(
-            source_site=draft.source_site,
+            source_site=article_source_site,
             source_article_id=draft.source_article_id,
             defaults={
                 "source_config": source_config,
                 "crawl_job": crawl_job,
                 "source_mode": draft.source_mode,
+                "racing_region": source_metadata["racing_region"],
+                "source_language": source_metadata["source_language"],
                 "title_ja": draft.title_ja,
                 "body_ja_raw": draft.body_ja_raw,
                 "body_ja_normalized": draft.body_ja_normalized,
-                "original_content_html": draft.metadata.get("html", ""),
+                "original_content_html": _draft_html(draft),
                 "original_author": draft.metadata.get("author", ""),
                 "published_at": draft.published_at,
                 "source_url": draft.source_url,
@@ -79,28 +135,30 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
                 "status": ArticleStatus.CRAWLED,
                 "workflow_status": WorkflowStatus.PENDING_TRANSLATION,
                 "source_note": source_config.name if source_config else draft.source_site,
-                "translation_metadata": draft.metadata,
+                "translation_metadata": draft_metadata,
                 "tags_json": list(source_config.default_tags) if source_config else [],
             },
         )
         if not created:
-            source_elevated = _should_elevate_netkeiba_source(article, draft)
+            source_elevated = _should_elevate_ranked_source(article, draft)
             if _should_update_primary_source(article, draft, source_elevated=source_elevated):
                 article.source_mode = draft.source_mode
                 article.source_config = source_config or article.source_config
                 article.crawl_job = crawl_job or article.crawl_job
+                article.racing_region = source_metadata["racing_region"]
+                article.source_language = source_metadata["source_language"]
                 if source_config:
                     article.source_note = source_config.name
             article.title_ja = draft.title_ja or article.title_ja
             article.body_ja_raw = draft.body_ja_raw or article.body_ja_raw
             article.body_ja_normalized = draft.body_ja_normalized or article.body_ja_normalized
-            article.original_content_html = draft.metadata.get("html", article.original_content_html)
+            article.original_content_html = _draft_html(draft) or article.original_content_html
             article.original_author = draft.metadata.get("author", article.original_author)
             article.published_at = draft.published_at or article.published_at
             article.source_url = draft.source_url or article.source_url
             article.last_seen_at = now
             article.crawl_status = CrawlStatus.SUCCESS
-            article.translation_metadata = {**article.translation_metadata, **draft.metadata}
+            article.translation_metadata = {**article.translation_metadata, **draft_metadata}
             article.save()
 
         NewsSnapshot.objects.create(
@@ -110,7 +168,7 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
             rank=draft.rank,
             comment_count=draft.comment_count,
             attention_count=draft.attention_count,
-            snapshot_metadata=draft.metadata,
+            snapshot_metadata=dict(draft_metadata),
             captured_at=now,
         )
 

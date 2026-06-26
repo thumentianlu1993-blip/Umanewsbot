@@ -14,8 +14,9 @@ from stable.models import (
     AutomationStatus,
     ContentCategory,
     NewsArticle,
+    SourceLanguage,
 )
-from stable.services.terms import apply_term_mappings, resolve_terms
+from stable.services.terms import apply_term_mappings, resolve_terms_for_language
 
 
 STYLE_GUIDE = (
@@ -82,6 +83,7 @@ class FallbackRewriteProvider(RewriteProvider):
         title = article.translated_title_zh or article.title_zh or article.title_ja
         body = article.translated_body_zh or article.body_zh or article.body_ja_normalized or article.body_ja_raw
         summary = article.translated_summary_zh or article.summary_zh or _first_sentence(body)
+        source_language = article.source_language or SourceLanguage.JAPANESE
         confidence = (
             62
             if article.content_category
@@ -94,9 +96,9 @@ class FallbackRewriteProvider(RewriteProvider):
             else 55
         )
         return RewriteResult(
-            title_zh=apply_term_mappings(title.strip()),
-            summary_zh=apply_term_mappings(summary.strip()),
-            body_zh=apply_term_mappings(body.strip()),
+            title_zh=apply_term_mappings(title.strip(), source_language=source_language),
+            summary_zh=apply_term_mappings(summary.strip(), source_language=source_language),
+            body_zh=apply_term_mappings(body.strip(), source_language=source_language),
             confidence=confidence,
             metadata={"provider": self.name, "model": "fallback", "category": article.content_category},
         )
@@ -112,9 +114,13 @@ class OpenAICompatibleRewriteProvider(RewriteProvider):
     def _messages(self, article: NewsArticle) -> list[dict]:
         source_text = article.body_ja_normalized or article.body_ja_raw
         base_body = article.translated_body_zh or article.body_zh
-        terms = resolve_terms(source_text, settings.TRANSLATION_TERM_LIMIT)
+        terms = resolve_terms_for_language(
+            source_text,
+            article.source_language or SourceLanguage.JAPANESE,
+            settings.TRANSLATION_TERM_LIMIT,
+        )
         glossary_lines = [
-            f"- [{term.term_type}] {term.source_ja} => {term.target_zh}"
+            f"- [{term.term_type}] {term.matched_text or term.source_ja} => {term.target_zh}"
             + (f"（备注：{term.notes}）" if term.notes else "")
             for term in terms
         ]
@@ -158,10 +164,11 @@ class OpenAICompatibleRewriteProvider(RewriteProvider):
         confidence = int(payload.get("rewrite_confidence") or 0)
         if not title or not body:
             raise ValueError("Rewrite response missing required fields")
+        source_language = article.source_language or SourceLanguage.JAPANESE
         return RewriteResult(
-            title_zh=apply_term_mappings(title),
-            summary_zh=apply_term_mappings(summary or _first_sentence(body)),
-            body_zh=apply_term_mappings(body),
+            title_zh=apply_term_mappings(title, source_language=source_language),
+            summary_zh=apply_term_mappings(summary or _first_sentence(body), source_language=source_language),
+            body_zh=apply_term_mappings(body, source_language=source_language),
             confidence=max(0, min(100, confidence)),
             metadata={
                 "provider": self.name,

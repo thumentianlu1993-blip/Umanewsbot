@@ -24,6 +24,7 @@ from .models import (
     TaskExecutionLog,
     TermCandidate,
     TermCandidateEvidence,
+    TermAlias,
     TermEntry,
     TranslationRun,
     WorkflowStatus,
@@ -36,6 +37,7 @@ from .tasks import crawl_news_source_task, translate_article_task
 
 admin.site.register(TermCandidate)
 admin.site.register(TermCandidateEvidence)
+admin.site.register(TermAlias)
 
 
 class NewsImageInline(admin.TabularInline):
@@ -101,6 +103,8 @@ class NewsArticleAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "effective_title",
+        "racing_region",
+        "source_language",
         "source_site",
         "source_mode",
         "published_at",
@@ -113,13 +117,26 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "is_first_crawled",
         "push_action_link",
     )
-    list_filter = ("source_site", "source_mode", "workflow_status", "automation_status", "review_mode", "risk_level", "status", "is_first_crawled")
+    list_filter = (
+        "racing_region",
+        "source_language",
+        "source_site",
+        "source_mode",
+        "workflow_status",
+        "automation_status",
+        "review_mode",
+        "risk_level",
+        "status",
+        "is_first_crawled",
+    )
     search_fields = ("title_ja", "translated_title_zh", "title_zh", "source_article_id", "source_url")
     readonly_fields = (
         "source_config",
         "crawl_job",
         "source_site",
         "source_mode",
+        "racing_region",
+        "source_language",
         "source_article_id",
         "source_url",
         "title_ja",
@@ -149,8 +166,23 @@ class NewsArticleAdmin(admin.ModelAdmin):
     actions = ["mark_pending_review", "mark_published_ready", "queue_translation"]
 
     fieldsets = (
-        ("来源信息", {"fields": ("source_config", "crawl_job", "source_site", "source_mode", "source_article_id", "source_url", "published_at")}),
-        ("日文原稿", {"fields": ("title_ja", "body_ja_raw", "body_ja_normalized")}),
+        (
+            "来源信息",
+            {
+                "fields": (
+                    "source_config",
+                    "crawl_job",
+                    "source_site",
+                    "source_mode",
+                    "racing_region",
+                    "source_language",
+                    "source_article_id",
+                    "source_url",
+                    "published_at",
+                )
+            },
+        ),
+        ("来源原文", {"fields": ("title_ja", "body_ja_raw", "body_ja_normalized")}),
         ("翻译参考", {"fields": ("translated_title_zh", "translated_summary_zh", "translated_body_zh")}),
         ("自动化运营", {"fields": ("review_mode", "risk_level", "automation_status", "content_category", "score_total", "quality_score", "rewrite_confidence", "decision_summary", "decision_reason", "gate_issues", "gate_issue_summary", "base_translation_zh", "rewrite_title_zh", "rewrite_summary_zh", "rewrite_body_zh", "published_by_mode", "auto_publish_at", "automation_error_message")}),
         ("重复内容", {"fields": ("duplicate_of", "duplicate_article_link", "duplicate_score", "duplicate_reason", "automation_warning_email_signature", "automation_warning_email_sent_at")}),
@@ -264,8 +296,19 @@ class NewsArticleAdmin(admin.ModelAdmin):
 @admin.register(NewsSource)
 class NewsSourceAdmin(admin.ModelAdmin):
     form = NewsSourceForm
-    list_display = ("name", "source_type", "language", "enabled", "crawl_interval_minutes", "last_crawl_at", "last_crawl_status", "test_crawl_link")
-    list_filter = ("enabled", "source_type", "language", "adapter_key")
+    list_display = (
+        "name",
+        "racing_region",
+        "source_language",
+        "source_kind",
+        "source_type",
+        "enabled",
+        "crawl_interval_minutes",
+        "last_crawl_at",
+        "last_crawl_status",
+        "test_crawl_link",
+    )
+    list_filter = ("enabled", "racing_region", "source_language", "source_kind", "source_type", "adapter_key")
     search_fields = ("name", "homepage_url", "feed_url", "notes")
 
     def test_crawl_link(self, obj):
@@ -296,15 +339,15 @@ class NewsSourceAdmin(admin.ModelAdmin):
 
 @admin.register(TermEntry)
 class TermEntryAdmin(admin.ModelAdmin):
-    list_display = ("source_ja", "target_zh", "term_type", "race_grade", "priority", "is_active", "updated_at")
-    list_filter = ("term_type", "race_grade", "is_active")
+    list_display = ("source_ja", "source_language", "target_zh", "term_type", "race_grade", "priority", "is_active", "updated_at")
+    list_filter = ("source_language", "term_type", "race_grade", "is_active")
     search_fields = ("source_ja", "target_zh", "notes")
 
 
 @admin.register(PushTarget)
 class PushTargetAdmin(admin.ModelAdmin):
-    list_display = ("name", "group_id", "is_default", "is_active", "updated_at")
-    list_filter = ("is_default", "is_active")
+    list_display = ("name", "group_id", "allowed_regions", "push_scope", "importance_strategy", "is_default", "is_active", "updated_at")
+    list_filter = ("push_scope", "importance_strategy", "is_default", "is_active")
     search_fields = ("name", "group_id")
 
 

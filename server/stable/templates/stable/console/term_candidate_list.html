@@ -12,7 +12,7 @@
 
   <section class="panel">
     <form method="get" class="filters">
-      <input name="q" value="{{ request.GET.q }}" placeholder="搜索日文原词、建议中文或审核备注">
+      <input name="q" value="{{ request.GET.q }}" placeholder="搜索原文、建议中文或审核备注">
       <select name="status"><option value="">全部状态</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
       <select name="term_type"><option value="">全部类型</option>{% for value,label in term_type_choices %}<option value="{{ value }}" {% if request.GET.term_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
       <select name="source"><option value="">全部来源</option>{% for source in sources %}<option value="{{ source.id }}" {% if request.GET.source == source.id|stringformat:"s" %}selected{% endif %}>{{ source.name }}</option>{% endfor %}</select>

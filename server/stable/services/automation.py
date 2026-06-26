@@ -18,11 +18,17 @@ from stable.models import (
     PublishedByMode,
     ReviewMode,
     RiskLevel,
+    SourceLanguage,
     TermEntry,
     TermType,
     WorkflowStatus,
 )
-from stable.services.terms import extract_unknown_horse_names, resolve_terms
+from stable.services.terms import (
+    extract_unknown_horse_names,
+    resolve_terms_for_language,
+    source_term_matches_text,
+    source_terms_by_entry,
+)
 from stable.services.race_grades import better_race_priority, normalize_race_grade, race_priority_for_grade
 
 
@@ -50,6 +56,35 @@ P0_OVERSEAS_RACES = [
     "サウジカップ",
     "沙特杯",
 ]
+P0_OVERSEAS_RACES_BY_LANGUAGE = {
+    SourceLanguage.ENGLISH: [
+        "prix de l'arc de triomphe",
+        "arc de triomphe",
+        "breeders' cup",
+        "hong kong cup",
+        "hong kong mile",
+        "hong kong sprint",
+        "hong kong vase",
+        "the everest",
+        "dubai world cup",
+        "dubai sheema classic",
+        "dubai turf",
+        "saudi cup",
+        "kentucky derby",
+    ],
+    SourceLanguage.CHINESE_TRADITIONAL: [
+        "凱旋門賞",
+        "育馬者盃",
+        "香港盃",
+        "香港一哩錦標",
+        "香港短途錦標",
+        "香港瓶",
+        "杜拜世界盃",
+        "杜拜司馬經典賽",
+        "杜拜草地大賽",
+        "沙特盃",
+    ],
+}
 
 HIGH_FOCUS_KEYWORDS = [
     "回避",
@@ -70,6 +105,89 @@ HIGH_FOCUS_KEYWORDS = [
     "登録",
     "結果",
 ]
+HIGH_FOCUS_KEYWORDS_BY_LANGUAGE = {
+    SourceLanguage.JAPANESE: HIGH_FOCUS_KEYWORDS,
+    SourceLanguage.ENGLISH: [
+        "withdrawn",
+        "withdrawal",
+        "injury",
+        "injured",
+        "retired",
+        "retirement",
+        "stallion",
+        "breeding",
+        "transferred",
+        "jockey change",
+        "stewards",
+        "suspension",
+        "disciplinary",
+        "scratched",
+        "scratch",
+        "draw",
+        "barrier",
+        "entries",
+        "entry",
+        "declarations",
+        "workout",
+        "gallop",
+        "result",
+        "results",
+    ],
+    SourceLanguage.CHINESE_TRADITIONAL: [
+        "退出",
+        "受傷",
+        "退役",
+        "種馬",
+        "繁殖",
+        "轉廄",
+        "更換騎師",
+        "制裁",
+        "聆訊",
+        "取消出賽",
+        "排位",
+        "檔位",
+        "報名",
+        "試閘",
+        "晨操",
+        "賽果",
+    ],
+}
+
+OFFICIAL_KEYWORDS_BY_LANGUAGE = {
+    SourceLanguage.JAPANESE: ["発表", "お知らせ"],
+    SourceLanguage.ENGLISH: ["official", "notice", "statement", "announced", "announcement", "stewards"],
+    SourceLanguage.CHINESE_TRADITIONAL: ["公布", "公告", "通知", "宣布", "競賽董事"],
+}
+INTERVIEW_KEYWORDS_BY_LANGUAGE = {
+    SourceLanguage.JAPANESE: ["コメント", "インタビュー"],
+    SourceLanguage.ENGLISH: ["interview", "said", "quotes", "commented"],
+    SourceLanguage.CHINESE_TRADITIONAL: ["訪問", "專訪", "表示", "稱"],
+}
+POST_RACE_KEYWORDS_BY_LANGUAGE = {
+    SourceLanguage.JAPANESE: ["結果", "制した", "優勝", "着", "レース後"],
+    SourceLanguage.ENGLISH: ["result", "results", "won", "winner", "victory", "finished", "post-race"],
+    SourceLanguage.CHINESE_TRADITIONAL: ["賽果", "勝出", "奪冠", "第", "賽後"],
+}
+PRE_RACE_KEYWORDS_BY_LANGUAGE = {
+    SourceLanguage.JAPANESE: ["出走", "枠順", "登録", "追い切り", "前哨戦", "展望"],
+    SourceLanguage.ENGLISH: ["preview", "entries", "entry", "declarations", "declared", "draw", "barrier", "racecard"],
+    SourceLanguage.CHINESE_TRADITIONAL: ["出賽", "排位", "檔位", "報名", "試閘", "賽前", "展望"],
+}
+
+
+def _language_match_text(text: str, source_language: str) -> str:
+    if source_language == SourceLanguage.ENGLISH:
+        return text.casefold()
+    return text
+
+
+def _keywords_for_language(mapping: dict[str, list[str]], source_language: str) -> list[str]:
+    return mapping.get(source_language) or mapping.get(SourceLanguage.JAPANESE, [])
+
+
+def _contains_language_keyword(text: str, mapping: dict[str, list[str]], source_language: str) -> bool:
+    match_text = _language_match_text(text, source_language)
+    return any(keyword in match_text for keyword in _keywords_for_language(mapping, source_language))
 
 
 def _configured_high_value_sources() -> set[tuple[str, str]]:
@@ -191,16 +309,17 @@ def log_automation(
 def classify_content_category(article: NewsArticle) -> str:
     text = _source_text(article)
     title = article.title_ja or ""
-    if article.source_site == "jra" or "発表" in title or "お知らせ" in text:
+    source_language = article.source_language or SourceLanguage.JAPANESE
+    if article.source_site == "jra" or _contains_language_keyword(f"{title}\n{text}", OFFICIAL_KEYWORDS_BY_LANGUAGE, source_language):
         return ContentCategory.OFFICIAL
     quote_count = text.count("「") + text.count("『")
-    if any(word in text for word in ["コメント", "インタビュー"]) or (
+    if _contains_language_keyword(text, INTERVIEW_KEYWORDS_BY_LANGUAGE, source_language) or (
         quote_count >= 4 and any(word in text for word in ["騎手", "調教師", "師"])
     ):
         return ContentCategory.INTERVIEW
-    if any(word in text for word in ["結果", "制した", "優勝", "着", "レース後"]):
+    if _contains_language_keyword(text, POST_RACE_KEYWORDS_BY_LANGUAGE, source_language):
         return ContentCategory.POST_RACE
-    if any(word in text for word in ["出走", "枠順", "登録", "追い切り", "前哨戦", "展望"]):
+    if _contains_language_keyword(text, PRE_RACE_KEYWORDS_BY_LANGUAGE, source_language):
         return ContentCategory.PRE_RACE
     if len(text) < 900:
         return ContentCategory.FLASH
@@ -211,10 +330,13 @@ def p0_horse_hits(article: NewsArticle) -> list[dict]:
     text = _source_text(article)
     hits: list[dict] = []
     seen: set[int] = set()
-    for entry in TermEntry.objects.filter(is_active=True, term_type=TermType.HORSE).exclude(target_zh=""):
+    source_language = article.source_language or SourceLanguage.JAPANESE
+    entries = list(TermEntry.objects.filter(is_active=True, term_type=TermType.HORSE).exclude(target_zh=""))
+    terms_by_entry = source_terms_by_entry(entries, source_language)
+    for entry in entries:
         if entry.pk in seen:
             continue
-        if any(term and term in text for term in entry.all_japanese_terms()):
+        if any(source_term_matches_text(text, term, source_language) for term in terms_by_entry.get(entry.pk, [])):
             seen.add(entry.pk)
             hits.append({"source_ja": entry.source_ja, "target_zh": entry.target_zh, "priority": entry.priority})
     hits.sort(key=lambda item: (-item["priority"], item["source_ja"]))
@@ -223,7 +345,12 @@ def p0_horse_hits(article: NewsArticle) -> list[dict]:
 
 def race_priority(article: NewsArticle) -> dict:
     text = _source_text(article)
-    race_terms = [term for term in resolve_terms(text, limit=60) if term.term_type == TermType.RACE]
+    source_language = article.source_language or SourceLanguage.JAPANESE
+    race_terms = [
+        term
+        for term in resolve_terms_for_language(text, source_language, limit=60)
+        if term.term_type == TermType.RACE
+    ]
     combined_races = " ".join([term.source_ja for term in race_terms] + [term.target_zh for term in race_terms] + [text])
     best = {"priority": "", "grade": "", "source": "", "term": ""}
     for term in race_terms:
@@ -234,7 +361,9 @@ def race_priority(article: NewsArticle) -> dict:
     if best["priority"]:
         return best
 
-    if any(name in combined_races for name in P0_OVERSEAS_RACES):
+    language_match_text = _language_match_text(combined_races, source_language)
+    language_p0_races = P0_OVERSEAS_RACES + _keywords_for_language(P0_OVERSEAS_RACES_BY_LANGUAGE, source_language)
+    if any(_language_match_text(name, source_language) in language_match_text for name in language_p0_races):
         return {"priority": "P0", "grade": "G1", "source": "overseas_p0", "term": ""}
 
     text_grade = normalize_race_grade(combined_races)
@@ -286,7 +415,11 @@ def _hard_rule_decision(article: NewsArticle, category: str) -> tuple[str | None
         reasons.append("翻译尚未成功完成")
     if not article.translated_body_zh:
         reasons.append("缺少基准中文翻译")
-    if extract_unknown_horse_names(article.title_ja, body, limit=3) and not p0_horse_hits(article):
+    if (
+        (article.source_language or SourceLanguage.JAPANESE) == SourceLanguage.JAPANESE
+        and extract_unknown_horse_names(article.title_ja, body, limit=3)
+        and not p0_horse_hits(article)
+    ):
         checks.append("存在未收录疑似马名，后续作为 warning 记录")
     if reasons:
         return ReviewMode.MANUAL, RiskLevel.MEDIUM, reasons, checks
@@ -300,7 +433,13 @@ def score_article_for_automation(article: NewsArticle) -> AutomationDecision:
     horse_hits = p0_horse_hits(article)
     race_signal = race_priority(article)
     priority = race_signal["priority"]
-    high_focus_hits = [keyword for keyword in HIGH_FOCUS_KEYWORDS if keyword in text]
+    source_language = article.source_language or SourceLanguage.JAPANESE
+    match_text = _language_match_text(text, source_language)
+    high_focus_hits = [
+        keyword
+        for keyword in _keywords_for_language(HIGH_FOCUS_KEYWORDS_BY_LANGUAGE, source_language)
+        if _language_match_text(keyword, source_language) in match_text
+    ]
     source_score = 15 if article.source_site == "jra" else 10
     high_value_source = is_high_value_source(article)
     value_score = 0

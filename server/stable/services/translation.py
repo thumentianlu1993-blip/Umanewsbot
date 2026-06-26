@@ -7,9 +7,15 @@ from dataclasses import dataclass
 from django.conf import settings
 from openai import OpenAI
 
-from stable.models import NewsArticle, TranslationRun
+from stable.models import NewsArticle, SourceLanguage, TranslationRun
 
-from .terms import apply_term_mappings, recognize_horse_names, resolve_terms, serialize_recognized_horse_names, serialize_terms
+from .terms import (
+    apply_term_mappings,
+    recognize_horse_names,
+    resolve_terms_for_language,
+    serialize_recognized_horse_names,
+    serialize_terms,
+)
 
 
 @dataclass
@@ -38,8 +44,9 @@ class DummyTranslationProvider(TranslationProvider):
 
     def translate(self, article: NewsArticle) -> TranslationResult:
         body = article.body_ja_normalized or article.body_ja_raw
-        mapped_title = apply_term_mappings(article.title_ja)
-        mapped_body = apply_term_mappings(body)
+        source_language = article.source_language or SourceLanguage.JAPANESE
+        mapped_title = apply_term_mappings(article.title_ja, source_language=source_language)
+        mapped_body = apply_term_mappings(body, source_language=source_language)
         return TranslationResult(
             title_zh=f"[未配置真实翻译模型] {mapped_title}",
             body_zh=mapped_body,
@@ -83,17 +90,17 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         source_body: str | None = None,
     ) -> str:
         return (
-            "你是一名熟悉日本赛马行业的专业翻译编辑。"
-            "请把下面的日文赛马新闻逐段完整翻译成自然、准确、专业的简体中文。"
+            "你是一名熟悉赛马行业的专业翻译编辑。"
+            "请把下面的赛马新闻逐段完整翻译成自然、准确、专业的简体中文。"
             "请优先遵守术语表中的译法，不要杜撰信息，不要省略关键事实，不要把原文改写成摘要。"
             "如果原文包含排行榜、分点、小标题或项目符号，译文必须保留相同的顺序和完整信息。"
-            "如果识别到马名但术语表没有提供中文译名，必须保留该马名的原始日文写法，不得音译、意译或自行猜译。"
+            "如果识别到马名但术语表没有提供中文译名，必须保留该马名的原始写法，不得音译、意译或自行猜译。"
             "若原文中出现 __UMA_KEEP_数字__ 形式的占位符，请在译文中原样复制该占位符，不要翻译或删除。"
             "输出必须是 JSON 对象，且只包含 title_zh、body_zh、push_summary_zh 三个键。"
             f"{retry_hint}"
             "\n\n"
             f"术语表：\n{chr(10).join(glossary_lines) if glossary_lines else '无可用术语'}\n\n"
-            f"未收录中文译名、必须保留原始日文的疑似马名/占位符：\n{chr(10).join(unknown_horse_lines) if unknown_horse_lines else '无'}\n\n"
+            f"未收录中文译名、必须保留原始写法的疑似马名/占位符：\n{chr(10).join(unknown_horse_lines) if unknown_horse_lines else '无'}\n\n"
             f"原文标题：{source_title if source_title is not None else article.title_ja}\n\n"
             f"原文正文：\n{source_body if source_body is not None else article.body_ja_normalized or article.body_ja_raw}"
         )
@@ -120,9 +127,9 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             {
                 "role": "system",
                 "content": (
-                    "你负责把日本赛马新闻翻译成简体中文。"
+                    "你负责把赛马新闻翻译成简体中文。"
                     "译文要忠于原文，保留赛事、马名、骑手、机构、时间与公告口径。"
-                    "凡是术语表未提供中文译名的马名，一律保留原始日文片假名写法。"
+                    "凡是术语表未提供中文译名的马名，一律保留原始写法。"
                     "不得省略段落，不得省略榜单条目，不得输出半截句子。"
                 ),
             },
@@ -209,16 +216,29 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         return {"repr": repr(usage)}
 
     def translate(self, article: NewsArticle) -> TranslationResult:
-        terms = resolve_terms(_article_term_text(article), settings.TRANSLATION_TERM_LIMIT)
+        terms = resolve_terms_for_language(
+            _article_term_text(article),
+            article.source_language or SourceLanguage.JAPANESE,
+            settings.TRANSLATION_TERM_LIMIT,
+        )
         glossary_lines = [
-            f"- [{term.term_type}] {term.source_ja} => {term.target_zh}"
+            f"- [{term.term_type}] {term.matched_text or term.source_ja} => {term.target_zh}"
             + (f"（备注：{term.notes}）" if term.notes else "")
             for term in terms
         ]
         source_text = article.body_ja_normalized or article.body_ja_raw
         unknown_horse_limit = max(1, int(settings.TRANSLATION_UNKNOWN_HORSE_LIMIT))
-        recognized_horses = recognize_horse_names(article.title_ja, source_text, limit=None)
-        unknown_horse_names = [item.name_ja for item in recognized_horses if item.needs_preserve][:unknown_horse_limit]
+        recognized_horses = recognize_horse_names(
+            article.title_ja,
+            source_text,
+            limit=None,
+            source_language=article.source_language or SourceLanguage.JAPANESE,
+        )
+        unknown_horse_names = [
+            item.matched_text or item.name_ja
+            for item in recognized_horses
+            if item.needs_preserve and (item.matched_text or item.name_ja)
+        ][:unknown_horse_limit]
         protected_title, title_placeholders = self._protect_unknown_horse_names(article.title_ja, unknown_horse_names)
         protected_body, body_placeholders = self._protect_unknown_horse_names(source_text, unknown_horse_names)
         horse_placeholders = {**title_placeholders, **body_placeholders}
@@ -256,7 +276,18 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                 "unknown_horse_names": unknown_horse_names,
                 "recognized_horse_names": serialize_recognized_horse_names(recognized_horses),
                 "external_horse_names": [
-                    item.name_ja for item in recognized_horses if item.source == "external_alias"
+                    item.matched_text or item.name_ja
+                    for item in recognized_horses
+                    if item.source == "external_alias"
+                ],
+                "external_horse_aliases": [
+                    {
+                        "matched_text": item.matched_text,
+                        "name_ja": item.name_ja,
+                        "external_horse_ids": item.external_horse_ids,
+                    }
+                    for item in recognized_horses
+                    if item.source == "external_alias"
                 ],
                 "unknown_horse_placeholders": horse_placeholders,
                 "raw": payload,
@@ -290,10 +321,11 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                     continue
                 last_metadata["warning"] = "Translation response changed unknown horse names; accepted with warning"
 
+            source_language = article.source_language or SourceLanguage.JAPANESE
             return TranslationResult(
-                title_zh=apply_term_mappings(title_zh),
-                body_zh=apply_term_mappings(body_zh),
-                push_summary_zh=apply_term_mappings(push_summary_zh or body_zh[:160])[:300],
+                title_zh=apply_term_mappings(title_zh, source_language=source_language),
+                body_zh=apply_term_mappings(body_zh, source_language=source_language),
+                push_summary_zh=apply_term_mappings(push_summary_zh or body_zh[:160], source_language=source_language)[:300],
                 metadata=last_metadata,
             )
 
@@ -326,7 +358,11 @@ def get_translation_provider() -> TranslationProvider:
 def translate_article(article: NewsArticle) -> TranslationResult:
     provider = get_translation_provider()
     source_text = article.body_ja_normalized or article.body_ja_raw
-    terms = resolve_terms(_article_term_text(article), settings.TRANSLATION_TERM_LIMIT)
+    terms = resolve_terms_for_language(
+        _article_term_text(article),
+        article.source_language or SourceLanguage.JAPANESE,
+        settings.TRANSLATION_TERM_LIMIT,
+    )
     run = TranslationRun.objects.create(
         article=article,
         provider_name=provider.name,

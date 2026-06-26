@@ -51,6 +51,36 @@ a {
   margin: 4px 0 16px;
 }
 
+.region-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 16px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.region-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.region-tabs a {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #435166;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.region-tabs a.active {
+  border-color: #1f8b4c;
+  background: #e9f6ef;
+  color: #166a3a;
+}
+
 .section-kicker {
   display: inline-block;
   margin-bottom: 6px;

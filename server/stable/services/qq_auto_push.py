@@ -17,6 +17,7 @@ from stable.models import (
     QQPushDelivery,
     QQPushDeliveryStatus,
     QQPushErrorType,
+    RacingRegion,
     SourceMode,
     SourceSite,
     WorkflowStatus,
@@ -32,8 +33,21 @@ SCOPE_HIGH_VALUE_ONLY = "high_value_only"
 VALID_SCOPES = {SCOPE_ALL_PUBLIC, SCOPE_HIGH_VALUE_ONLY}
 IMPORTANCE_STRATEGY_RANKED = "ranked"
 VALID_IMPORTANCE_STRATEGIES = {IMPORTANCE_STRATEGY_RANKED}
-RANKED_NETKEIBA_MODES = {SourceMode.ACCESS, SourceMode.ATTENTION}
+RANKED_NEWS_MODES = {SourceMode.ACCESS, SourceMode.ATTENTION}
+RANKED_NEWS_SOURCE_SITES = {
+    SourceSite.NETKEIBA,
+    SourceSite.SPONICHI,
+    SourceSite.SKY_SPORTS_RACING,
+    SourceSite.HORSE_RACING_NATION,
+}
 AUTO_PUSH_SUMMARY_LIMIT = 160
+FIRST_PHASE_REGIONS = {
+    RacingRegion.JAPAN,
+    RacingRegion.HONG_KONG,
+    RacingRegion.UNITED_KINGDOM,
+    RacingRegion.FRANCE,
+    RacingRegion.UNITED_STATES,
+}
 
 
 @dataclass(frozen=True)
@@ -68,6 +82,34 @@ def normalize_qq_push_importance_strategy(strategy: str | None = None) -> str:
     return IMPORTANCE_STRATEGY_RANKED
 
 
+def target_allowed_regions(target: PushTarget | None = None) -> set[str]:
+    if target is None:
+        return set(FIRST_PHASE_REGIONS)
+    raw_regions = target.allowed_regions or []
+    if not isinstance(raw_regions, list) or not raw_regions:
+        return {RacingRegion.JAPAN}
+    regions = {str(region).strip() for region in raw_regions if str(region).strip() in FIRST_PHASE_REGIONS}
+    return regions or {RacingRegion.JAPAN}
+
+
+def target_push_scope(target: PushTarget | None = None, scope: str | None = None) -> str:
+    if scope is not None:
+        return normalize_qq_push_scope(scope)
+    target_scope = (getattr(target, "push_scope", "") or "").strip() if target is not None else ""
+    return normalize_qq_push_scope(target_scope or None)
+
+
+def target_importance_strategy(target: PushTarget | None = None, strategy: str | None = None) -> str:
+    if strategy is not None:
+        return normalize_qq_push_importance_strategy(strategy)
+    target_strategy = (getattr(target, "importance_strategy", "") or "").strip() if target is not None else ""
+    return normalize_qq_push_importance_strategy(target_strategy or None)
+
+
+def article_region(article: NewsArticle) -> str:
+    return (getattr(article, "racing_region", "") or "").strip()
+
+
 def is_article_public(article: NewsArticle) -> bool:
     return article.workflow_status == WorkflowStatus.PUBLISHED and article.published_to_web_at is not None
 
@@ -77,7 +119,7 @@ def has_publish_blocker(article: NewsArticle) -> bool:
 
 
 def is_ranked_news(article: NewsArticle) -> bool:
-    return article.source_site == SourceSite.NETKEIBA and article.source_mode in RANKED_NETKEIBA_MODES
+    return article.source_site in RANKED_NEWS_SOURCE_SITES and article.source_mode in RANKED_NEWS_MODES
 
 
 def build_public_article_url(article: NewsArticle) -> str:
@@ -98,15 +140,25 @@ def is_public_url_accessible(url: str) -> tuple[bool, str]:
     return False, f"HTTP {response.status_code}"
 
 
-def should_push_news_to_qq(article: NewsArticle, scope: str | None = None) -> PushEligibility:
+def should_push_news_to_qq(
+    article: NewsArticle,
+    scope: str | None = None,
+    *,
+    target: PushTarget | None = None,
+) -> PushEligibility:
     if not is_article_public(article):
         return PushEligibility(False, "article_not_public")
     if has_publish_blocker(article):
         return PushEligibility(False, "has_blocker")
-    resolved_scope = normalize_qq_push_scope(scope)
+    region = article_region(article)
+    if region not in FIRST_PHASE_REGIONS:
+        return PushEligibility(False, "region_missing")
+    if target is not None and region not in target_allowed_regions(target):
+        return PushEligibility(False, "region_not_allowed")
+    resolved_scope = target_push_scope(target, scope)
     if resolved_scope == SCOPE_ALL_PUBLIC:
         return PushEligibility(True)
-    strategy = normalize_qq_push_importance_strategy()
+    strategy = target_importance_strategy(target)
     if strategy == IMPORTANCE_STRATEGY_RANKED and is_ranked_news(article):
         return PushEligibility(True)
     return PushEligibility(False, "not_high_value")
@@ -274,7 +326,7 @@ def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
         return delivery
 
     article = delivery.article
-    eligibility = should_push_news_to_qq(article)
+    eligibility = should_push_news_to_qq(article, target=delivery.target)
     if not eligibility.allowed:
         return _set_delivery_not_eligible(delivery, reason=eligibility.reason or "not_eligible")
 

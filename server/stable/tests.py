@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone as dt_timezone
+import json
+import tempfile
 from io import StringIO
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -10,16 +12,37 @@ from django.conf import settings as django_settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import Client, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
 from stable.adapters.jra import JRAAdapter
 from stable.adapters.base import CanonicalNewsDraft
+from stable.adapters.base import SourceArticleDetail, SourceArticleStub
+from stable.adapters.international import (
+    AtTheRacesFranceAdapter,
+    BloodHorseAdapter,
+    BHAAdapter,
+    FIRST_VERSION_INTERNATIONAL_ADAPTER_KEYS,
+    FIRST_VERSION_INTERNATIONAL_PROBES,
+    FranceGalopEnglishNewsAdapter,
+    HorseRacingNationAdapter,
+    HKJCRacingNewsAdapter,
+    PaulickReportAdapter,
+    SCMPRacingAdapter,
+    SkySportsRacingAdapter,
+    SponichiAdapter,
+    SportingLifeAdapter,
+    TDNAdapter,
+    TDNFranceKeywordAdapter,
+)
 from stable.adapters.netkeiba import NetkeibaAdapter
 from stable.models import (
     ArticleTranslationStatus,
     AutomationStatus,
+    ContentCategory,
     ExternalDataImportLock,
     ExternalDataImportRun,
     ExternalHorseAlias,
@@ -39,9 +62,13 @@ from stable.models import (
     QQPushDelivery,
     QQPushDeliveryStatus,
     QQPushErrorType,
+    RacingRegion,
     ReviewMode,
+    SourceLanguage,
     SourceMode,
     SourceSite,
+    TermAlias,
+    TermAliasType,
     TermCandidate,
     TermCandidateStatus,
     TermEntry,
@@ -55,14 +82,15 @@ from stable.services.qq_auto_push import (
     ensure_qq_push_deliveries,
     qq_push_next_attempt_delay,
     should_push_news_to_qq,
+    target_allowed_regions,
 )
 from stable.services.pushing import build_push_message, push_article_to_targets
 from stable.services.automation import score_article_for_automation
 from stable.services.notifications import send_high_value_warning_notification
-from stable.services.rewriting import _loads_rewrite_payload
+from stable.services.rewriting import OpenAICompatibleRewriteProvider, _loads_rewrite_payload
 from stable.services.sources import BUILTIN_SOURCE_DEFINITIONS, sync_builtin_sources
 from stable.services.ingestion import ArticleUpsertResult, upsert_article_from_draft
-from stable.services.term_admin import preview_term_import
+from stable.services.term_admin import commit_term_import, preview_term_import
 from stable.services.term_candidate_review import accept_candidate, merge_candidate, set_candidate_status
 from stable.services.term_discovery import (
     TermDiscoveryFinding,
@@ -79,6 +107,7 @@ from stable.services.terms import (
     extract_unknown_horse_names,
     recognize_horse_names,
     resolve_terms,
+    resolve_terms_for_language,
 )
 from stable.services.text import extract_article_text
 from stable.services.translation import (
@@ -93,8 +122,10 @@ from stable.services.external_horse_data import (
     ExternalHorseDataNetworkDisabled,
     ImportOptions,
 )
+from stable.services.external_hkjc_data import HKJCExternalDataImporter, HKJCImportError, HKJCImportOptions
 from stable.tasks import (
     _crawl_jra_source,
+    _crawl_international_source,
     _crawl_netkeiba_mode,
     _resolve_auto_publish_batch_limit,
     auto_publish_batch_task,
@@ -125,6 +156,204 @@ class TermResolverTests(TestCase):
         self.assertEqual(len(matches), 1)
         self.assertEqual(matches[0].target_zh, "纯白少女")
         self.assertEqual(apply_term_mappings("ソダシが勝利した"), "纯白少女が勝利した")
+
+    def test_terms_with_same_text_can_coexist_by_source_language(self):
+        TermEntry.objects.create(term_type="race", source_language=SourceLanguage.JAPANESE, source_ja="Title", target_zh="日文标题")
+        TermEntry.objects.create(term_type="race", source_language=SourceLanguage.ENGLISH, source_ja="Title", target_zh="英文标题")
+        TermEntry.objects.create(
+            term_type="race",
+            source_language=SourceLanguage.CHINESE_TRADITIONAL,
+            source_ja="香港打吡大賽",
+            target_zh="香港打吡大赛",
+        )
+
+        english_terms = resolve_terms_for_language("Title preview", SourceLanguage.ENGLISH, limit=10)
+        zh_hant_terms = resolve_terms_for_language("香港打吡大賽前瞻", SourceLanguage.CHINESE_TRADITIONAL, limit=10)
+
+        self.assertEqual([term.target_zh for term in english_terms], ["英文标题"])
+        self.assertEqual([term.target_zh for term in zh_hant_terms], ["香港打吡大赛"])
+        self.assertEqual(apply_term_mappings("Title preview", source_language=SourceLanguage.ENGLISH), "英文标题 preview")
+        self.assertEqual(apply_term_mappings("Title preview", source_language=SourceLanguage.JAPANESE), "日文标题 preview")
+        self.assertEqual(
+            apply_term_mappings("香港打吡大賽前瞻", source_language=SourceLanguage.CHINESE_TRADITIONAL),
+            "香港打吡大赛前瞻",
+        )
+
+    def test_same_term_concept_can_have_multilingual_aliases(self):
+        term = TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="イクイノックス",
+            target_zh="春秋分",
+            priority=100,
+        )
+        TermAlias.objects.create(term=term, source_language=SourceLanguage.ENGLISH, text="Equinox", alias_type=TermAliasType.PRIMARY)
+        TermAlias.objects.create(
+            term=term,
+            source_language=SourceLanguage.CHINESE_TRADITIONAL,
+            text="春秋分",
+            alias_type=TermAliasType.PRIMARY,
+        )
+
+        english_terms = resolve_terms_for_language("Equinox returns in a feature", SourceLanguage.ENGLISH, limit=10)
+        japanese_terms = resolve_terms_for_language("イクイノックスが始動", SourceLanguage.JAPANESE, limit=10)
+
+        self.assertEqual([(item.source_ja, item.target_zh, item.matched_text) for item in english_terms], [("イクイノックス", "春秋分", "Equinox")])
+        self.assertEqual([(item.source_ja, item.target_zh, item.matched_text) for item in japanese_terms], [("イクイノックス", "春秋分", "イクイノックス")])
+        self.assertEqual(resolve_terms_for_language("イクイノックス", SourceLanguage.ENGLISH, limit=10), [])
+        self.assertEqual(extract_horse_tags("Equinox lines up at Ascot.", source_language=SourceLanguage.ENGLISH), ["春秋分"])
+
+    def test_english_term_matching_is_case_insensitive_and_preserves_matched_text(self):
+        term = TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="イクイノックス",
+            target_zh="春秋分",
+            priority=100,
+        )
+        TermAlias.objects.create(term=term, source_language=SourceLanguage.ENGLISH, text="Equinox", alias_type=TermAliasType.PRIMARY)
+
+        matches = resolve_terms_for_language("EQUINOX returns at Ascot", SourceLanguage.ENGLISH, limit=10)
+
+        self.assertEqual([(item.target_zh, item.matched_text) for item in matches], [("春秋分", "EQUINOX")])
+        self.assertEqual(apply_term_mappings("EQUINOX returns at Ascot", source_language=SourceLanguage.ENGLISH), "春秋分 returns at Ascot")
+        self.assertEqual(apply_term_mappings("PREQUINOX returns", source_language=SourceLanguage.ENGLISH), "PREQUINOX returns")
+
+    def test_apply_single_created_english_term_is_case_insensitive_for_article_language(self):
+        term = TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Equinox",
+            target_zh="春秋分",
+            priority=100,
+        )
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.TDN,
+            source_mode=SourceMode.LATEST,
+            source_article_id="single-term-english-case",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            title_ja="EQUINOX returns",
+            translated_title_zh="EQUINOX returns",
+            translated_body_zh="EQUINOX returns at Ascot. PREQUINOX stays unchanged.",
+            body_zh="EQUINOX returns at Ascot.",
+            published_at=timezone.now(),
+            source_url="https://example.com/single-term-english-case",
+        )
+
+        result = apply_created_term_to_article(article, term)
+
+        article.refresh_from_db()
+        self.assertIn("translated_title_zh", result.updated_fields)
+        self.assertEqual(article.translated_title_zh, "春秋分 returns")
+        self.assertEqual(article.translated_body_zh, "春秋分 returns at Ascot. PREQUINOX stays unchanged.")
+        self.assertEqual(article.body_zh, "春秋分 returns at Ascot.")
+
+    def test_multilingual_alias_matching_bulk_loads_aliases(self):
+        for index in range(8):
+            term = TermEntry.objects.create(
+                term_type="horse",
+                source_language=SourceLanguage.JAPANESE,
+                source_ja=f"テストホース{index}",
+                target_zh=f"测试马{index}",
+                priority=index,
+            )
+            TermAlias.objects.create(
+                term=term,
+                source_language=SourceLanguage.ENGLISH,
+                text=f"Test Horse {index}",
+                alias_type=TermAliasType.PRIMARY,
+            )
+
+        with CaptureQueriesContext(connection) as captured:
+            terms = resolve_terms_for_language("Test Horse 7 returns at Sha Tin", SourceLanguage.ENGLISH, limit=10)
+
+        self.assertEqual([term.target_zh for term in terms], ["测试马7"])
+        self.assertLessEqual(len(captured.captured_queries), 3)
+
+    def test_english_article_does_not_use_japanese_horse_heuristic(self):
+        recognized = recognize_horse_names("ASCOT PREVIEW", "TITLE runs at Ascot.", source_language=SourceLanguage.ENGLISH)
+
+        self.assertEqual(recognized, [])
+
+    def test_english_external_horse_alias_is_recognized_without_japanese_heuristic(self):
+        ExternalHorseAlias.objects.create(
+            source="hkjc",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            external_horse_id="HKH001",
+            name_ja="Lucky Star",
+            name_en="Lucky Star",
+            normalized_name="Lucky Star",
+            confidence=96,
+        )
+
+        recognized = recognize_horse_names(
+            "Lucky Star wins at Sha Tin",
+            "The gelding Lucky Star was too strong in the Class 3 contest.",
+            source_language=SourceLanguage.ENGLISH,
+        )
+
+        self.assertEqual(len(recognized), 1)
+        self.assertEqual(recognized[0].source, "external_alias")
+        self.assertEqual(recognized[0].matched_text, "Lucky Star")
+        self.assertEqual(recognized[0].external_horse_ids, ["HKH001"])
+        self.assertTrue(recognized[0].needs_preserve)
+
+    def test_english_external_horse_alias_preserves_source_spelling(self):
+        ExternalHorseAlias.objects.create(
+            source="hkjc",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            external_horse_id="HKH002",
+            name_ja="Lucky Star",
+            name_en="Lucky Star",
+            normalized_name="Lucky Star",
+            confidence=96,
+        )
+
+        recognized = recognize_horse_names(
+            "LUCKY STAR wins at Sha Tin",
+            "The gelding was too strong.",
+            source_language=SourceLanguage.ENGLISH,
+        )
+
+        self.assertEqual(len(recognized), 1)
+        self.assertEqual(recognized[0].name_ja, "Lucky Star")
+        self.assertEqual(recognized[0].matched_text, "LUCKY STAR")
+
+    def test_english_external_horse_alias_lookup_uses_article_candidates(self):
+        for index in range(20):
+            ExternalHorseAlias.objects.create(
+                source="hkjc",
+                racing_region=RacingRegion.HONG_KONG,
+                source_language=SourceLanguage.ENGLISH,
+                external_horse_id=f"UNRELATED{index}",
+                name_ja=f"Unrelated Horse {index}",
+                name_en=f"Unrelated Horse {index}",
+                normalized_name=f"Unrelated Horse {index}",
+                confidence=80,
+            )
+        ExternalHorseAlias.objects.create(
+            source="hkjc",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            external_horse_id="HKH003",
+            name_ja="Lucky Star",
+            name_en="Lucky Star",
+            normalized_name="Lucky Star",
+            confidence=96,
+        )
+
+        with CaptureQueriesContext(connection) as captured:
+            recognized = recognize_horse_names(
+                "Lucky Star wins again",
+                "A sharp performance at Sha Tin.",
+                source_language=SourceLanguage.ENGLISH,
+            )
+
+        self.assertEqual([item.matched_text for item in recognized], ["Lucky Star"])
+        self.assertLessEqual(len(captured.captured_queries), 4)
 
     def test_extract_horse_tags_returns_translated_horse_names(self):
         TermEntry.objects.create(term_type="horse", source_ja="ソダシ", target_zh="纯净之辉", priority=100)
@@ -335,6 +564,41 @@ class RewritePayloadTests(TestCase):
         self.assertEqual(payload["rewrite_title_zh"], "标题")
         self.assertEqual(payload["rewrite_body_zh"], "第一段第二段")
 
+    def test_rewrite_prompt_uses_matched_source_alias_for_article_language(self):
+        term = TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="イクイノックス",
+            target_zh="春秋分",
+            priority=100,
+        )
+        TermAlias.objects.create(
+            term=term,
+            source_language=SourceLanguage.ENGLISH,
+            text="Equinox",
+            alias_type=TermAliasType.PRIMARY,
+        )
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.TDN,
+            source_mode=SourceMode.LATEST,
+            source_article_id="rewrite-english-term-prompt",
+            racing_region=RacingRegion.UNITED_STATES,
+            source_language=SourceLanguage.ENGLISH,
+            title_ja="Equinox returns at Ascot",
+            body_ja_raw="Equinox returns at Ascot in a feature race.",
+            body_ja_normalized="Equinox returns at Ascot in a feature race.",
+            translated_title_zh="春秋分回归",
+            translated_body_zh="春秋分将在阿斯科特回归。",
+            published_at=timezone.now(),
+            source_url="https://example.com/rewrite-english-term-prompt",
+        )
+        provider = OpenAICompatibleRewriteProvider(api_key="test-key", base_url="https://example.com/v1")
+
+        prompt = provider._messages(article)[1]["content"]
+
+        self.assertIn("[horse] Equinox => 春秋分", prompt)
+        self.assertNotIn("[horse] イクイノックス => 春秋分", prompt)
+
 
 class AdapterTests(TestCase):
     def test_netkeiba_listing_parse(self):
@@ -387,6 +651,276 @@ class AdapterTests(TestCase):
         self.assertEqual(local.month, 12)
         self.assertEqual(local.day, 31)
 
+    def test_international_adapters_parse_minimal_article_metadata(self):
+        cases = [
+            (SponichiAdapter(), RacingRegion.JAPAN, SourceLanguage.JAPANESE, "競馬 テスト記事"),
+            (HKJCRacingNewsAdapter(), RacingRegion.HONG_KONG, SourceLanguage.ENGLISH, "HKJC racing preview"),
+            (SCMPRacingAdapter(), RacingRegion.HONG_KONG, SourceLanguage.ENGLISH, "Hong Kong racing news"),
+            (SportingLifeAdapter(), RacingRegion.UNITED_KINGDOM, SourceLanguage.ENGLISH, "Royal Ascot latest"),
+            (SkySportsRacingAdapter(), RacingRegion.UNITED_KINGDOM, SourceLanguage.ENGLISH, "Sky Sports racing latest"),
+            (BHAAdapter(), RacingRegion.UNITED_KINGDOM, SourceLanguage.ENGLISH, "BHA racing update"),
+            (FranceGalopEnglishNewsAdapter(), RacingRegion.FRANCE, SourceLanguage.ENGLISH, "France Galop English update"),
+            (HorseRacingNationAdapter(), RacingRegion.UNITED_STATES, SourceLanguage.ENGLISH, "Kentucky racing report"),
+            (AtTheRacesFranceAdapter(), RacingRegion.FRANCE, SourceLanguage.ENGLISH, "France racing at Deauville"),
+            (BloodHorseAdapter(), RacingRegion.UNITED_STATES, SourceLanguage.ENGLISH, "Kentucky racing report"),
+            (PaulickReportAdapter(), RacingRegion.UNITED_STATES, SourceLanguage.ENGLISH, "US racing report"),
+        ]
+        listing_html = '<main><article><a href="/news/test-article">France racing at Deauville</a></article></main>'
+        detail_html = """
+        <html><body>
+          <article>
+            <h1>France racing at Deauville</h1>
+            <time datetime="2026-06-20T10:30:00+00:00">20 June 2026</time>
+            <div class="article-body"><p>Preview body with enough racing detail.</p></div>
+          </article>
+        </body></html>
+        """
+        for adapter, region, language, title in cases:
+            with self.subTest(adapter=adapter.__class__.__name__):
+                listing_href = f"{adapter.link_path_keywords[0].rstrip('/')}/test-article"
+                listing = listing_html.replace("/news/test-article", listing_href).replace("France racing at Deauville", title)
+                detail = detail_html.replace("France racing at Deauville", title)
+                stubs = adapter.parse_listing_html(listing, url=adapter.base_url)
+                self.assertEqual(len(stubs), 1)
+                detail_payload = adapter.parse_detail_html(detail, url=stubs[0].source_url)
+                draft = adapter.normalize_source_payload(stubs[0], detail_payload)
+                self.assertEqual(draft.title_ja, title)
+                self.assertIn("Preview body", draft.body_ja_normalized)
+                self.assertEqual(draft.racing_region, region)
+                self.assertEqual(draft.source_language, language)
+                self.assertTrue(draft.source_url.startswith("https://"))
+                self.assertIn("<html>", draft.original_content_html)
+                self.assertNotIn("html", draft.metadata)
+
+    def test_international_article_id_includes_url_hash_to_avoid_slug_collision(self):
+        adapter = HKJCRacingNewsAdapter()
+
+        first = adapter.parse_listing_html(
+            '<article><a href="/english/news/preview">Preview</a></article>',
+            url=adapter.base_url,
+        )[0]
+        second = adapter.parse_listing_html(
+            '<article><a href="/english/features/preview">Preview</a></article>',
+            url=adapter.base_url,
+        )[0]
+
+        self.assertNotEqual(first.source_article_id, second.source_article_id)
+        self.assertTrue(first.source_article_id.startswith("preview-"))
+
+    def test_international_listing_ignores_navigation_links(self):
+        adapter = AtTheRacesFranceAdapter()
+        stubs = adapter.parse_listing_html(
+            """
+            <nav><a href="/news/site-map">France racing navigation</a></nav>
+            <main>
+              <article><a href="/news/deauville-preview">France racing at Deauville</a></article>
+            </main>
+            """,
+            url=adapter.base_url,
+        )
+
+        self.assertEqual(len(stubs), 1)
+        self.assertEqual(stubs[0].source_url, "https://www.attheraces.com/news/deauville-preview")
+
+    def test_sponichi_access_ranking_keeps_upstream_rank_and_filters_non_racing(self):
+        adapter = SponichiAdapter()
+        stubs = adapter.parse_listing_html(
+            """
+            <ul class="tab-contents">
+              <a href="/gamble/news/2026/06/25/kiji/20260625s00053000198000c.html">
+                1 【鳴門ボート】シリーズ2勝の石野貴之
+              </a>
+              <a href="/gamble/news/2026/06/25/kiji/20260625s00004048222000c.html">
+                4 昨年皐月賞＆有馬記念覇者ミュージアムマイルは放牧中
+              </a>
+            </ul>
+            """,
+            url=adapter.listing_url(1, mode=SourceMode.ACCESS),
+            mode=SourceMode.ACCESS,
+        )
+
+        self.assertEqual(len(stubs), 1)
+        self.assertEqual(stubs[0].source_mode, SourceMode.ACCESS)
+        self.assertEqual(stubs[0].rank, 4)
+        self.assertEqual(stubs[0].title_ja, "昨年皐月賞＆有馬記念覇者ミュージアムマイルは放牧中")
+        self.assertIn("s000040", stubs[0].source_url)
+
+    def test_sky_sports_access_ranking_keeps_top_story_order(self):
+        adapter = SkySportsRacingAdapter()
+        stubs = adapter.parse_listing_html(
+            """
+            <main>
+              <a href="/football/news/11661/1/not-racing">Football story</a>
+              <a href="/racing/news/12426/100/racing-top-story">Racing top story</a>
+              <a href="/racing/news/12426/101/royal-ascot-preview">Royal Ascot preview</a>
+            </main>
+            """,
+            url=adapter.listing_url(1, mode=SourceMode.ACCESS),
+            mode=SourceMode.ACCESS,
+        )
+
+        self.assertEqual(len(stubs), 2)
+        self.assertEqual(stubs[0].source_mode, SourceMode.ACCESS)
+        self.assertEqual(stubs[0].rank, 1)
+        self.assertEqual(stubs[1].rank, 2)
+        self.assertEqual(stubs[0].title_ja, "Racing top story")
+
+    def test_france_galop_english_news_uses_official_english_pages(self):
+        adapter = FranceGalopEnglishNewsAdapter()
+        stubs = adapter.parse_listing_html(
+            """
+            <div class="views-row">
+              <h2><a href="/en/content/grand-prix-preview">Grand Prix preview</a></h2>
+            </div>
+            <h2><a href="/fr/content/article-francais">Article français</a></h2>
+            """,
+            url=adapter.listing_url(1, mode=SourceMode.OFFICIAL),
+            mode=SourceMode.OFFICIAL,
+        )
+
+        self.assertEqual(len(stubs), 1)
+        self.assertEqual(stubs[0].source_site, SourceSite.FRANCE_GALOP_NEWS)
+        self.assertEqual(stubs[0].source_mode, SourceMode.OFFICIAL)
+        self.assertEqual(stubs[0].source_url, "https://www.france-galop.com/en/content/grand-prix-preview")
+
+    def test_tdn_latest_listing_uses_public_wordpress_api(self):
+        adapter = TDNAdapter()
+
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return [
+                    {
+                        "link": "https://www.thoroughbreddailynews.com/test-story/",
+                        "title": {"rendered": "TDN &amp; racing update"},
+                        "date_gmt": "2026-06-25T01:02:03",
+                    }
+                ]
+
+        with patch("stable.adapters.international.requests.get", return_value=FakeResponse()):
+            stubs = adapter.fetch_listing(SourceMode.LATEST, 1)
+
+        self.assertEqual(len(stubs), 1)
+        self.assertEqual(stubs[0].source_site, SourceSite.TDN)
+        self.assertEqual(stubs[0].title_ja, "TDN & racing update")
+        self.assertEqual(stubs[0].source_url, "https://www.thoroughbreddailynews.com/test-story/")
+        self.assertIsNotNone(stubs[0].published_at.tzinfo)
+
+    def test_tdn_normalize_preserves_listing_timestamp_when_detail_has_no_date(self):
+        adapter = TDNAdapter()
+
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return [
+                    {
+                        "link": "https://www.thoroughbreddailynews.com/test-story/",
+                        "title": {"rendered": "TDN racing update"},
+                        "date_gmt": "2026-06-25T01:02:03",
+                    }
+                ]
+
+        with patch("stable.adapters.international.requests.get", return_value=FakeResponse()):
+            stub = adapter.fetch_listing(SourceMode.LATEST, 1)[0]
+        detail = adapter.parse_detail_html(
+            """
+            <html><body>
+              <article>
+                <h1>TDN racing update</h1>
+                <div class="entry-content"><p>Body without a date node.</p></div>
+              </article>
+            </body></html>
+            """,
+            url=stub.source_url,
+        )
+
+        draft = adapter.normalize_source_payload(stub, detail)
+
+        self.assertIsNone(detail.published_at)
+        self.assertEqual(draft.published_at, datetime(2026, 6, 25, 1, 2, 3, tzinfo=dt_timezone.utc))
+
+    def test_tdn_france_keyword_listing_marks_france_region(self):
+        adapter = TDNFranceKeywordAdapter()
+
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return [{"url": "https://www.thoroughbreddailynews.com/france-galop-story/", "title": "France Galop story"}]
+
+        with patch("stable.adapters.international.requests.get", return_value=FakeResponse()):
+            stubs = adapter.fetch_listing(SourceMode.LATEST, 1)
+
+        self.assertEqual(len(stubs), 1)
+        self.assertEqual(adapter.racing_region, RacingRegion.FRANCE)
+        self.assertEqual(stubs[0].source_site, SourceSite.TDN_FRANCE)
+        self.assertEqual(stubs[0].title_ja, "France Galop story")
+
+    def test_tdn_france_keyword_draft_uses_tdn_canonical_source_site(self):
+        adapter = TDNFranceKeywordAdapter()
+        stub = SourceArticleStub(
+            source_site=SourceSite.TDN_FRANCE,
+            source_mode=SourceMode.LATEST,
+            source_article_id="france-galop-story-123",
+            source_url="https://www.thoroughbreddailynews.com/france-galop-story/",
+            title_ja="France Galop story",
+            published_at=timezone.now(),
+        )
+        detail = SourceArticleDetail(
+            title_ja="France Galop story",
+            body_ja_raw="France Galop story body",
+            body_ja_normalized="France Galop story body",
+            published_at=None,
+            images=[],
+        )
+
+        draft = adapter.normalize_source_payload(stub, detail)
+
+        self.assertEqual(draft.source_site, SourceSite.TDN_FRANCE)
+        self.assertEqual(draft.canonical_source_site, SourceSite.TDN)
+        self.assertEqual(draft.racing_region, RacingRegion.FRANCE)
+
+    def test_horse_racing_nation_access_prefers_trending_links(self):
+        adapter = HorseRacingNationAdapter()
+        stubs = adapter.parse_listing_html(
+            """
+            <div class="ticker">
+              <a href="/news/Trending_story_123">Trending story</a>
+            </div>
+            <main>
+              <a href="/news/Latest_story_456">Latest story</a>
+            </main>
+            """,
+            url=adapter.listing_url(1, mode=SourceMode.ACCESS),
+            mode=SourceMode.ACCESS,
+        )
+
+        self.assertEqual(len(stubs), 2)
+        self.assertEqual(stubs[0].title_ja, "Trending story")
+        self.assertEqual(stubs[0].rank, 1)
+        self.assertEqual(stubs[1].rank, 2)
+
+    def test_horse_racing_nation_listing_skips_news_index_links(self):
+        adapter = HorseRacingNationAdapter()
+        stubs = adapter.parse_listing_html(
+            """
+            <main>
+              <a href="/news/news.aspx">Horse Racing News - Today's News Stories</a>
+              <a href="/news/Real_story_123">Real racing story</a>
+            </main>
+            """,
+            url=adapter.listing_url(1, mode=SourceMode.LATEST),
+            mode=SourceMode.LATEST,
+        )
+
+        self.assertEqual(len(stubs), 1)
+        self.assertEqual(stubs[0].title_ja, "Real racing story")
+
     def test_jra_listing_skips_bad_date_and_keeps_following_items(self):
         html = """
         <div class="news_unit"><h2>bad-date</h2>
@@ -430,6 +964,7 @@ class AdapterTests(TestCase):
         definitions = {(item["source_site"], item["source_mode"]): item for item in BUILTIN_SOURCE_DEFINITIONS}
         self.assertEqual(definitions[(SourceSite.NETKEIBA, SourceMode.ACCESS)]["crawl_interval_minutes"], 60)
         self.assertEqual(definitions[(SourceSite.NETKEIBA, SourceMode.ATTENTION)]["crawl_interval_minutes"], 60)
+        self.assertEqual(definitions[(SourceSite.SPONICHI, SourceMode.ACCESS)]["feed_url"], "https://www.sponichi.co.jp/gamble/ranking/")
 
 
 class IngestionSourceElevationTests(TestCase):
@@ -448,6 +983,34 @@ class IngestionSourceElevationTests(TestCase):
             published_at=timezone.now(),
             images=[],
             rank=rank,
+            metadata={"source_mode": source_mode},
+        )
+
+    def make_source_draft(
+        self,
+        source_article_id: str,
+        source_mode: str,
+        *,
+        source_site: str,
+        canonical_source_site: str | None = None,
+        rank: int | None = None,
+        racing_region: str = RacingRegion.JAPAN,
+        source_language: str = SourceLanguage.JAPANESE,
+    ) -> CanonicalNewsDraft:
+        return CanonicalNewsDraft(
+            source_site=source_site,
+            source_mode=source_mode,
+            source_article_id=source_article_id,
+            source_url=f"https://example.com/{source_site}/{source_article_id}",
+            title_ja=f"排序来源测试 {source_article_id}",
+            body_ja_raw=f"排序来源测试正文 {source_article_id}",
+            body_ja_normalized=f"排序来源测试正文 {source_article_id}",
+            published_at=timezone.now(),
+            images=[],
+            racing_region=racing_region,
+            source_language=source_language,
+            rank=rank,
+            canonical_source_site=canonical_source_site,
             metadata={"source_mode": source_mode},
         )
 
@@ -528,6 +1091,204 @@ class IngestionSourceElevationTests(TestCase):
         self.assertEqual(article.source_config, attention_source)
         self.assertFalse(self.source_elevated(result))
         self.assertTrue(NewsSnapshot.objects.filter(article=article, source_mode=SourceMode.LATEST).exists())
+
+    def test_international_latest_article_elevates_to_ranked_source(self):
+        latest_draft = self.make_source_draft(
+            "sky-ranked-elevate",
+            SourceMode.LATEST,
+            source_site=SourceSite.SKY_SPORTS_RACING,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            source_language=SourceLanguage.ENGLISH,
+        )
+        upsert_article_from_draft(latest_draft)
+        ranked_source = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
+
+        result = upsert_article_from_draft(
+            self.make_source_draft(
+                "sky-ranked-elevate",
+                SourceMode.ACCESS,
+                source_site=SourceSite.SKY_SPORTS_RACING,
+                rank=1,
+                racing_region=RacingRegion.UNITED_KINGDOM,
+                source_language=SourceLanguage.ENGLISH,
+            )
+        )
+
+        article = self.unpack_article(result)
+        article.refresh_from_db()
+        self.assertEqual(article.source_mode, SourceMode.ACCESS)
+        self.assertEqual(article.source_config, ranked_source)
+        self.assertTrue(self.source_elevated(result))
+
+    def test_latest_source_does_not_override_international_ranked_source(self):
+        ranked_draft = self.make_source_draft(
+            "hrn-ranked-keeps-priority",
+            SourceMode.ACCESS,
+            source_site=SourceSite.HORSE_RACING_NATION,
+            rank=3,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_language=SourceLanguage.ENGLISH,
+        )
+        result = upsert_article_from_draft(ranked_draft)
+        article = self.unpack_article(result)
+        ranked_source = NewsSource.objects.get(source_site=SourceSite.HORSE_RACING_NATION, source_mode=SourceMode.ACCESS)
+        self.assertEqual(article.source_mode, SourceMode.ACCESS)
+
+        result = upsert_article_from_draft(
+            self.make_source_draft(
+                "hrn-ranked-keeps-priority",
+                SourceMode.LATEST,
+                source_site=SourceSite.HORSE_RACING_NATION,
+                racing_region=RacingRegion.UNITED_STATES,
+                source_language=SourceLanguage.ENGLISH,
+            )
+        )
+
+        article = self.unpack_article(result)
+        article.refresh_from_db()
+        self.assertEqual(article.source_mode, SourceMode.ACCESS)
+        self.assertEqual(article.source_config, ranked_source)
+        self.assertFalse(self.source_elevated(result))
+        self.assertTrue(NewsSnapshot.objects.filter(article=article, source_mode=SourceMode.LATEST).exists())
+
+    def test_tdn_france_keyword_dedupes_against_tdn_and_keeps_france_region(self):
+        normal_draft = self.make_source_draft(
+            "tdn-shared-url",
+            SourceMode.LATEST,
+            source_site=SourceSite.TDN,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_language=SourceLanguage.ENGLISH,
+        )
+        france_draft = self.make_source_draft(
+            "tdn-shared-url",
+            SourceMode.LATEST,
+            source_site=SourceSite.TDN_FRANCE,
+            canonical_source_site=SourceSite.TDN,
+            racing_region=RacingRegion.FRANCE,
+            source_language=SourceLanguage.ENGLISH,
+        )
+        france_source = NewsSource.objects.get(source_site=SourceSite.TDN_FRANCE, source_mode=SourceMode.LATEST)
+
+        first_result = upsert_article_from_draft(normal_draft)
+        second_result = upsert_article_from_draft(france_draft)
+
+        article = self.unpack_article(first_result)
+        article.refresh_from_db()
+        self.assertFalse(second_result.created)
+        self.assertEqual(NewsArticle.objects.filter(source_site=SourceSite.TDN, source_article_id="tdn-shared-url").count(), 1)
+        self.assertEqual(article.racing_region, RacingRegion.FRANCE)
+        self.assertEqual(article.source_config, france_source)
+        self.assertTrue(
+            NewsSnapshot.objects.filter(
+                article=article,
+                source_site=SourceSite.TDN_FRANCE,
+                source_mode=SourceMode.LATEST,
+            ).exists()
+        )
+
+        upsert_article_from_draft(normal_draft)
+        article.refresh_from_db()
+        self.assertEqual(article.racing_region, RacingRegion.FRANCE)
+        self.assertEqual(article.source_config, france_source)
+
+
+class InternationalSourceMetadataTests(TestCase):
+    def test_sync_builtin_sources_includes_region_language_and_kind(self):
+        sync_builtin_sources()
+
+        jra = NewsSource.objects.get(source_site=SourceSite.JRA, source_mode=SourceMode.OFFICIAL)
+        hkjc = NewsSource.objects.get(source_site=SourceSite.HKJC_NEWS, source_mode=SourceMode.LATEST)
+        france = NewsSource.objects.get(source_site=SourceSite.FRANCE_GALOP_NEWS, source_mode=SourceMode.OFFICIAL)
+        sky_ranked = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
+        hpn_ranked = NewsSource.objects.get(source_site=SourceSite.HORSE_RACING_NATION, source_mode=SourceMode.ACCESS)
+        at_the_races = NewsSource.objects.get(source_site=SourceSite.AT_THE_RACES, source_mode=SourceMode.LATEST)
+
+        self.assertEqual(jra.racing_region, RacingRegion.JAPAN)
+        self.assertEqual(jra.source_language, SourceLanguage.JAPANESE)
+        self.assertEqual(hkjc.racing_region, RacingRegion.HONG_KONG)
+        self.assertEqual(hkjc.source_language, SourceLanguage.ENGLISH)
+        self.assertEqual(france.racing_region, RacingRegion.FRANCE)
+        self.assertEqual(france.source_language, SourceLanguage.ENGLISH)
+        self.assertFalse(france.enabled)
+        self.assertEqual(sky_ranked.adapter_key, "sky_sports_racing")
+        self.assertEqual(hpn_ranked.adapter_key, "horse_racing_nation")
+        self.assertGreater(sky_ranked.priority, NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.LATEST).priority)
+        self.assertIn("403", at_the_races.notes)
+
+    def test_sync_builtin_sources_preserves_manual_enabled_flags(self):
+        sync_builtin_sources()
+        sky_latest = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.LATEST)
+        jra = NewsSource.objects.get(source_site=SourceSite.JRA, source_mode=SourceMode.OFFICIAL)
+        sky_latest.enabled = True
+        sky_latest.save(update_fields=["enabled", "updated_at"])
+        jra.enabled = False
+        jra.save(update_fields=["enabled", "updated_at"])
+
+        sync_builtin_sources()
+
+        sky_latest.refresh_from_db()
+        jra.refresh_from_db()
+        self.assertTrue(sky_latest.enabled)
+        self.assertFalse(jra.enabled)
+
+    def test_default_probe_sources_are_first_version_usable_sources(self):
+        self.assertIn("sky_sports_racing", FIRST_VERSION_INTERNATIONAL_ADAPTER_KEYS)
+        self.assertIn("france_galop_news", FIRST_VERSION_INTERNATIONAL_ADAPTER_KEYS)
+        self.assertIn("tdn_france", FIRST_VERSION_INTERNATIONAL_ADAPTER_KEYS)
+        self.assertIn("tdn", FIRST_VERSION_INTERNATIONAL_ADAPTER_KEYS)
+        self.assertIn("horse_racing_nation", FIRST_VERSION_INTERNATIONAL_ADAPTER_KEYS)
+        self.assertNotIn("at_the_races_france", FIRST_VERSION_INTERNATIONAL_ADAPTER_KEYS)
+        self.assertNotIn("bloodhorse", FIRST_VERSION_INTERNATIONAL_ADAPTER_KEYS)
+        self.assertNotIn("paulick_report", FIRST_VERSION_INTERNATIONAL_ADAPTER_KEYS)
+        self.assertIn(("sky_sports_racing", SourceMode.ACCESS), FIRST_VERSION_INTERNATIONAL_PROBES)
+        self.assertIn(("horse_racing_nation", SourceMode.ACCESS), FIRST_VERSION_INTERNATIONAL_PROBES)
+        self.assertIn(("france_galop_news", SourceMode.OFFICIAL), FIRST_VERSION_INTERNATIONAL_PROBES)
+        self.assertNotIn(("at_the_races_france", SourceMode.LATEST), FIRST_VERSION_INTERNATIONAL_PROBES)
+
+    def test_article_upsert_inherits_region_and_language_from_source(self):
+        sync_builtin_sources()
+        draft = CanonicalNewsDraft(
+            source_site=SourceSite.HKJC_NEWS,
+            source_mode=SourceMode.LATEST,
+            source_article_id="hkjc-meta-1",
+            source_url="https://racingnews.hkjc.com/english/example",
+            title_ja="HKJC news",
+            body_ja_raw="HKJC body",
+            body_ja_normalized="HKJC body",
+            published_at=timezone.now(),
+            images=[],
+        )
+
+        result = upsert_article_from_draft(draft)
+
+        self.assertEqual(result.article.racing_region, RacingRegion.HONG_KONG)
+        self.assertEqual(result.article.source_language, SourceLanguage.ENGLISH)
+        self.assertEqual(result.article.source_config.adapter_key, "hkjc_news")
+
+    def test_article_upsert_keeps_html_out_of_translation_metadata(self):
+        sync_builtin_sources()
+        draft = CanonicalNewsDraft(
+            source_site=SourceSite.HKJC_NEWS,
+            source_mode=SourceMode.LATEST,
+            source_article_id="hkjc-html-meta",
+            source_url="https://racingnews.hkjc.com/english/html-meta",
+            title_ja="HKJC HTML metadata",
+            body_ja_raw="HKJC body",
+            body_ja_normalized="HKJC body",
+            published_at=timezone.now(),
+            images=[],
+            original_content_html="<html><body>full page</body></html>",
+            metadata={"html": "<html>legacy html</html>", "author": "HKJC"},
+        )
+
+        result = upsert_article_from_draft(draft)
+
+        self.assertEqual(result.article.original_content_html, "<html><body>full page</body></html>")
+        self.assertEqual(result.article.translation_metadata.get("author"), "HKJC")
+        self.assertNotIn("html", result.article.translation_metadata)
+        snapshot = NewsSnapshot.objects.get(article=result.article)
+        self.assertEqual(snapshot.snapshot_metadata.get("author"), "HKJC")
+        self.assertNotIn("html", snapshot.snapshot_metadata)
 
 
 class FakeExternalHorseDataAdapter:
@@ -702,6 +1463,181 @@ class ExternalHorseDataImportTests(TestCase):
         self.assertIn('"external_horse_id": "1001"', out.getvalue())
 
 
+class HKJCExternalDataImportTests(TestCase):
+    def sample_payload(self) -> dict:
+        return {
+            "races": [
+                {
+                    "race_id": "HK2026062101",
+                    "race_date": "2026-06-21",
+                    "venue": "Sha Tin",
+                    "race_number": "1",
+                    "race_name": "Class 4 Handicap",
+                    "class": "Class 4",
+                    "distance": "1200m",
+                    "surface": "Turf",
+                    "going": "Good",
+                    "weather": "Fine",
+                    "entries": [
+                        {
+                            "horse_id": "HKH001",
+                            "horse_name_en": "Lucky Star",
+                            "horse_name_zh_hant": "幸運星",
+                            "horse_number": "1",
+                            "barrier": "5",
+                            "jockey": "Z Purton",
+                            "trainer": "C Fownes",
+                            "owner": "Happy Syndicate",
+                            "weight": "126",
+                            "rating": "60",
+                        }
+                    ],
+                    "results": [
+                        {
+                            "horse_id": "HKH001",
+                            "horse_name_en": "Lucky Star",
+                            "finish_position": "1",
+                            "finish_time": "1:09.88",
+                            "margin": "",
+                            "odds": "3.5",
+                            "running_position": "2-1",
+                            "sectional_time": "22.1",
+                            "jockey": "Z Purton",
+                            "trainer": "C Fownes",
+                            "barrier": "5",
+                        }
+                    ],
+                }
+            ],
+            "horses": [
+                {
+                    "horse_id": "HKH001",
+                    "horse_name_en": "Lucky Star",
+                    "horse_name_zh_hant": "幸運星",
+                    "sire": "Deep Field",
+                    "dam": "Lucky Mare",
+                    "birth_date": "2021-03-01",
+                    "owner": "Happy Syndicate",
+                    "trainer": "C Fownes",
+                    "country": "AUS",
+                    "colour": "Bay",
+                    "career_record": "10-2-1-1",
+                }
+            ],
+        }
+
+    def write_payload(self, payload: dict | None = None) -> str:
+        handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
+        with handle:
+            json.dump(payload or self.sample_payload(), handle, ensure_ascii=False)
+        return handle.name
+
+    def test_dry_run_reports_coverage_without_writing(self):
+        importer = HKJCExternalDataImporter(HKJCImportOptions(dry_run=True))
+        result = importer.import_race_date("2026-06-21", payload_file=self.write_payload())
+
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 1, "results": 1, "horses": 1})
+        self.assertEqual(ExternalRace.objects.count(), 0)
+
+    def test_payload_import_is_idempotent_and_creates_aliases(self):
+        payload_file = self.write_payload()
+        importer = HKJCExternalDataImporter(HKJCImportOptions(dry_run=False, allow_network=False))
+
+        first = importer.import_race_date("2026-06-21", payload_file=payload_file)
+        second = importer.import_race_date("2026-06-21", payload_file=payload_file)
+
+        self.assertFalse(first["dry_run"])
+        self.assertFalse(second["dry_run"])
+        self.assertEqual(ExternalRace.objects.count(), 1)
+        self.assertEqual(ExternalRaceEntry.objects.count(), 1)
+        self.assertEqual(ExternalRaceResult.objects.count(), 1)
+        self.assertEqual(ExternalHorseAlias.objects.filter(source="hkjc", external_horse_id="HKH001").count(), 2)
+        race = ExternalRace.objects.get()
+        self.assertEqual(race.racing_region, RacingRegion.HONG_KONG)
+        self.assertEqual(race.going, "Good")
+        horse_alias = ExternalHorseAlias.objects.get(source="hkjc", normalized_name="Lucky Star")
+        self.assertEqual(horse_alias.source_language, SourceLanguage.ENGLISH)
+
+    def test_commit_requires_payload_file_until_network_import_is_implemented(self):
+        importer = HKJCExternalDataImporter(HKJCImportOptions(dry_run=False, allow_network=False))
+
+        with self.assertRaisesRegex(HKJCImportError, "requires --payload-file"):
+            importer.import_race("HK2026062101")
+
+        self.assertEqual(ExternalRace.objects.count(), 0)
+        self.assertEqual(ExternalDataImportRun.objects.count(), 0)
+
+    def test_commit_rejects_running_hkjc_import_lock(self):
+        active_run = ExternalDataImportRun.objects.create(
+            source="hkjc",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            target_type="race_date",
+            status=ExternalImportStatus.STARTED,
+        )
+        ExternalDataImportLock.objects.create(
+            source="hkjc",
+            racing_region=RacingRegion.HONG_KONG,
+            locked_by_run=active_run,
+            acquired_at=timezone.now(),
+        )
+        importer = HKJCExternalDataImporter(HKJCImportOptions(dry_run=False, allow_network=False))
+
+        with self.assertRaisesRegex(HKJCImportError, "already running"):
+            importer.import_race_date("2026-06-21", payload_file=self.write_payload())
+
+        self.assertEqual(ExternalDataImportRun.objects.count(), 1)
+        self.assertEqual(ExternalRace.objects.count(), 0)
+
+    def test_commit_rejects_payload_over_configured_limits(self):
+        payload = self.sample_payload()
+        payload["races"] = [*payload["races"], {**payload["races"][0], "race_id": "HK2026062102"}]
+        importer = HKJCExternalDataImporter(HKJCImportOptions(dry_run=False, allow_network=False, max_races=1))
+
+        with self.assertRaisesRegex(HKJCImportError, "max_races"):
+            importer.import_race_date("2026-06-21", payload_file=self.write_payload(payload))
+
+        self.assertEqual(ExternalRace.objects.count(), 0)
+        self.assertEqual(ExternalDataImportRun.objects.count(), 0)
+
+    def test_commit_rejects_entry_and_result_horses_over_configured_limits(self):
+        payload = self.sample_payload()
+        payload["horses"] = []
+        payload["races"][0]["entries"] = [
+            {"horse_id": "HKH001", "horse_name_en": "Lucky Star", "horse_number": "1"},
+            {"horse_id": "HKH002", "horse_name_en": "Fast Runner", "horse_number": "2"},
+        ]
+        payload["races"][0]["results"] = [
+            {"horse_id": "HKH003", "horse_name_en": "Late Charge", "finish_position": "1"},
+        ]
+        importer = HKJCExternalDataImporter(HKJCImportOptions(dry_run=False, allow_network=False, max_horses=2))
+
+        with self.assertRaisesRegex(HKJCImportError, "max_horses"):
+            importer.import_race_date("2026-06-21", payload_file=self.write_payload(payload))
+
+        self.assertEqual(ExternalRace.objects.count(), 0)
+        self.assertEqual(ExternalHorseAlias.objects.count(), 0)
+        self.assertEqual(ExternalDataImportRun.objects.count(), 0)
+
+    def test_hkjc_management_command_lookup_name(self):
+        ExternalHorseAlias.objects.create(
+            source="hkjc",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            external_horse_id="HKH001",
+            name_ja="Lucky Star",
+            name_en="Lucky Star",
+            normalized_name="Lucky Star",
+            alias_source="test",
+        )
+        out = StringIO()
+
+        call_command("import_hkjc_external_data", "--lookup-name", "Lucky Star", stdout=out)
+
+        self.assertIn('"external_horse_id": "HKH001"', out.getvalue())
+
+
 class PushTests(TestCase):
     def setUp(self):
         self.article = NewsArticle.objects.create(
@@ -802,6 +1738,48 @@ class QQAutoPushTests(TestCase):
         self.article.save(update_fields=["score_total", "source_mode", "updated_at"])
 
         self.assertTrue(should_push_news_to_qq(self.article).allowed)
+
+    @override_settings(QQ_PUSH_SCOPE="high_value_only", QQ_PUSH_IMPORTANCE_STRATEGY="ranked", AUTO_REVIEW_THRESHOLD=75)
+    def test_ranked_strategy_allows_international_ranked_sources(self):
+        self.article.source_site = SourceSite.SKY_SPORTS_RACING
+        self.article.source_mode = SourceMode.ACCESS
+        self.article.racing_region = RacingRegion.UNITED_KINGDOM
+        self.article.source_language = SourceLanguage.ENGLISH
+        self.article.score_total = 20
+        self.article.save(
+            update_fields=["source_site", "source_mode", "racing_region", "source_language", "score_total", "updated_at"]
+        )
+
+        self.assertTrue(should_push_news_to_qq(self.article).allowed)
+
+    @override_settings(QQ_PUSH_SCOPE="all_public")
+    def test_blank_target_regions_keep_legacy_japan_only_behavior(self):
+        self.assertEqual(target_allowed_regions(self.target), {RacingRegion.JAPAN})
+        self.target.allowed_regions = [""]
+        self.target.save(update_fields=["allowed_regions", "updated_at"])
+        self.assertEqual(target_allowed_regions(self.target), {RacingRegion.JAPAN})
+        self.article.racing_region = RacingRegion.HONG_KONG
+        self.article.source_language = SourceLanguage.ENGLISH
+        self.article.save(update_fields=["racing_region", "source_language", "updated_at"])
+
+        result = should_push_news_to_qq(self.article, target=self.target)
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.reason, "region_not_allowed")
+
+    @override_settings(QQ_PUSH_SCOPE="all_public")
+    def test_invalid_target_regions_keep_legacy_japan_only_behavior(self):
+        self.target.allowed_regions = ["hongkong"]
+        self.target.save(update_fields=["allowed_regions", "updated_at"])
+        self.assertEqual(target_allowed_regions(self.target), {RacingRegion.JAPAN})
+        self.article.racing_region = RacingRegion.HONG_KONG
+        self.article.source_language = SourceLanguage.ENGLISH
+        self.article.save(update_fields=["racing_region", "source_language", "updated_at"])
+
+        result = should_push_news_to_qq(self.article, target=self.target)
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.reason, "region_not_allowed")
 
     @override_settings(QQ_PUSH_SCOPE="all_public", AUTO_REVIEW_THRESHOLD=75)
     def test_all_public_scope_ignores_score(self):
@@ -1041,6 +2019,40 @@ class QQAutoPushTests(TestCase):
         self.assertEqual(QQPushDelivery.objects.count(), 1)
         self.assertEqual(QQPushDelivery.objects.get().target, self.target)
         delay.assert_called_once()
+
+    @override_settings(QQ_PUSH_ENABLED=True, QQ_PUSH_SCOPE="high_value_only", QQ_PUSH_IMPORTANCE_STRATEGY="ranked")
+    def test_article_task_uses_target_region_and_scope_config(self):
+        self.article.racing_region = RacingRegion.HONG_KONG
+        self.article.source_language = SourceLanguage.ENGLISH
+        self.article.save(update_fields=["racing_region", "source_language", "updated_at"])
+        self.target.allowed_regions = [RacingRegion.HONG_KONG]
+        self.target.push_scope = "all_public"
+        self.target.save(update_fields=["allowed_regions", "push_scope", "updated_at"])
+        uk_us_target = PushTarget.objects.create(
+            name="英美群",
+            group_id="10003",
+            allowed_regions=[RacingRegion.UNITED_KINGDOM, RacingRegion.UNITED_STATES],
+            push_scope="all_public",
+            is_active=True,
+        )
+
+        with patch("stable.tasks.qq_push_delivery_task.delay") as delay:
+            result = qq_auto_push_article_task.run(self.article.id)
+
+        self.assertEqual(QQPushDelivery.objects.count(), 1)
+        self.assertEqual(QQPushDelivery.objects.get().target, self.target)
+        self.assertIn(str(uk_us_target.id), result["target_skip_reasons"])
+        self.assertEqual(result["target_skip_reasons"][str(uk_us_target.id)], "region_not_allowed")
+        delay.assert_called_once()
+
+    def test_article_without_region_is_not_auto_push_eligible(self):
+        NewsArticle.objects.filter(pk=self.article.pk).update(racing_region="")
+        self.article.refresh_from_db()
+
+        result = should_push_news_to_qq(self.article, target=self.target)
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.reason, "region_missing")
 
     @override_settings(QQ_PUSH_ENABLED=False)
     def test_manual_push_still_works_when_auto_push_disabled(self):
@@ -1544,11 +2556,11 @@ class ConsoleFlowTests(TestCase):
             ),
             (
                 {"source_ja": "", "term_type": "horse", "target_zh": "空词"},
-                "日文原词不能为空",
+                "原文不能为空",
             ),
             (
                 {"source_ja": "ア" * 81, "term_type": "horse", "target_zh": "过长"},
-                "日文原词过长",
+                "原文过长",
             ),
             (
                 {"source_ja": "マヤノライジン\nゲート確認", "term_type": "horse", "target_zh": "整段误选"},
@@ -1767,12 +2779,16 @@ class PublicHomeInfoFeedTests(TestCase):
         race_priority: str = "",
         has_cover: bool = False,
         source_mode: str = SourceMode.LATEST,
+        racing_region: str = RacingRegion.JAPAN,
+        source_language: str = SourceLanguage.JAPANESE,
         tags: list[str] | None = None,
     ) -> NewsArticle:
         published_at = published_at or timezone.now()
         article = NewsArticle.objects.create(
             source_site=SourceSite.NETKEIBA,
             source_mode=source_mode,
+            racing_region=racing_region,
+            source_language=source_language,
             source_article_id=source_article_id,
             title_ja=title,
             translated_title_zh=title,
@@ -1866,6 +2882,71 @@ class PublicHomeInfoFeedTests(TestCase):
         self.assertEqual(response.status_code, 200)
         latest_titles = [article.effective_title for article in response.context["latest_articles"]]
         self.assertEqual(latest_titles, ["最新发布", "较早发布"])
+
+    def test_public_home_region_tabs_filter_published_articles(self):
+        now = timezone.now()
+        self.make_article("jp-region", "日本新闻", published_to_web_at=now - timedelta(minutes=2))
+        hk_article = self.make_article(
+            "hk-region",
+            "香港新闻",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            published_to_web_at=now,
+        )
+        self.make_article(
+            "uk-draft",
+            "英国草稿",
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            source_language=SourceLanguage.ENGLISH,
+            workflow_status=WorkflowStatus.PENDING_EDIT,
+            published_to_web_at=now + timedelta(minutes=1),
+        )
+
+        aggregate = self.client.get("/")
+        hk = self.client.get("/", {"region": RacingRegion.HONG_KONG})
+
+        self.assertContains(aggregate, "综合")
+        self.assertContains(aggregate, "日本")
+        self.assertContains(aggregate, "中国香港")
+        self.assertContains(aggregate, "英国")
+        self.assertContains(aggregate, "法国")
+        self.assertContains(aggregate, "美国")
+        self.assertEqual([article.effective_title for article in aggregate.context["latest_articles"]], ["香港新闻", "日本新闻"])
+        self.assertEqual([article.effective_title for article in hk.context["latest_articles"]], ["香港新闻"])
+        self.assertEqual(hk.context["headline_article"], hk_article)
+        self.assertNotContains(hk, "日本新闻")
+        self.assertNotContains(hk, "英国草稿")
+
+    def test_public_home_pagination_preserves_region_filter(self):
+        now = timezone.now()
+        for index in range(14):
+            self.make_article(
+                f"hk-page-{index}",
+                f"香港分页新闻 {index}",
+                racing_region=RacingRegion.HONG_KONG,
+                source_language=SourceLanguage.ENGLISH,
+                published_to_web_at=now - timedelta(minutes=index),
+            )
+
+        response = self.client.get("/", {"region": RacingRegion.HONG_KONG})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "?region=hong_kong&amp;page=2")
+
+    def test_public_detail_shows_region_source_and_source_language(self):
+        article = self.make_article(
+            "us-detail",
+            "美国详情",
+            racing_region=RacingRegion.UNITED_STATES,
+            source_language=SourceLanguage.ENGLISH,
+            source_mode=SourceMode.LATEST,
+        )
+
+        response = self.client.get(article.public_path)
+
+        self.assertContains(response, "美国")
+        self.assertContains(response, "英文")
+        self.assertContains(response, "netkeiba")
 
     def test_public_home_selects_recent_high_value_cover_article_as_headline(self):
         now = timezone.now()
@@ -2116,6 +3197,102 @@ class AutomationFlowTests(TestCase):
         self.assertEqual(decision.decision_reason["signals"]["race_priority"], "P0")
         self.assertTrue(decision.decision_reason["signals"]["p0_horse_hits"])
 
+    def test_automation_scoring_uses_terms_for_article_source_language_only(self):
+        from stable.services.automation import race_priority
+
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="International Star",
+            target_zh="国际之星",
+            priority=100,
+        )
+        TermEntry.objects.create(
+            term_type="race",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Derby",
+            target_zh="德比",
+            race_grade="G1",
+            priority=100,
+        )
+        japanese_article = self._translated_article(
+            source_article_id="ja-language-term-isolation",
+            title_ja="Derby preview for International Star",
+            translated_title_zh="Derby preview for International Star",
+            body_ja_raw="Derby preview for International Star.",
+            body_ja_normalized="Derby preview for International Star.",
+            translated_body_zh="Derby preview for International Star.",
+        )
+        english_article = self._translated_article(
+            source_article_id="en-language-term-isolation",
+            source_language=SourceLanguage.ENGLISH,
+            title_ja="Derby preview for International Star",
+            translated_title_zh="Derby preview for International Star",
+            body_ja_raw="Derby preview for International Star.",
+            body_ja_normalized="Derby preview for International Star.",
+            translated_body_zh="Derby preview for International Star.",
+        )
+
+        japanese_decision = score_article_for_automation(japanese_article)
+        english_decision = score_article_for_automation(english_article)
+
+        self.assertEqual(race_priority(japanese_article)["priority"], "P2")
+        self.assertEqual(race_priority(english_article)["priority"], "P0")
+        self.assertEqual(japanese_decision.decision_reason["signals"]["p0_horse_hits"], [])
+        self.assertTrue(english_decision.decision_reason["signals"]["p0_horse_hits"])
+
+    def test_automation_p0_horse_hits_match_english_terms_case_insensitively(self):
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Equinox",
+            target_zh="春秋分",
+            priority=100,
+        )
+        article = self._translated_article(
+            source_article_id="english-uppercase-p0-horse",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            title_ja="EQUINOX returns in top form",
+            body_ja_raw="EQUINOX returns in a G1 preview. The champion will feature at Ascot.",
+            body_ja_normalized="EQUINOX returns in a G1 preview. The champion will feature at Ascot.",
+            translated_title_zh="春秋分回归",
+            title_zh="春秋分回归",
+            translated_body_zh="春秋分将在一级赛前瞻中回归。" * 12,
+            body_zh="春秋分将在一级赛前瞻中回归。" * 12,
+        )
+
+        decision = score_article_for_automation(article)
+
+        self.assertEqual(decision.decision_reason["signals"]["p0_horse_hits"][0]["target_zh"], "春秋分")
+
+    def test_english_automation_scoring_uses_english_racing_keywords(self):
+        article = self._translated_article(
+            source_article_id="english-keyword-score",
+            source_language=SourceLanguage.ENGLISH,
+            title_ja="Breeders' Cup Classic preview: entries and draw confirmed",
+            translated_title_zh="育马者杯经典赛前瞻",
+            body_ja_raw=(
+                "Breeders' Cup Classic preview with entries, draw and barrier updates. "
+                "Connections confirmed one runner was withdrawn after an injury. "
+            )
+            * 8,
+            body_ja_normalized=(
+                "Breeders' Cup Classic preview with entries, draw and barrier updates. "
+                "Connections confirmed one runner was withdrawn after an injury. "
+            )
+            * 8,
+            translated_body_zh="育马者杯经典赛前瞻，报名、排位和伤退消息受到关注。" * 20,
+            body_zh="育马者杯经典赛前瞻，报名、排位和伤退消息受到关注。" * 20,
+        )
+
+        decision = score_article_for_automation(article)
+
+        self.assertEqual(decision.content_category, ContentCategory.PRE_RACE)
+        self.assertEqual(decision.decision_reason["signals"]["race_priority"], "P0")
+        self.assertIn("withdrawn", decision.decision_reason["signals"]["high_focus_hits"])
+        self.assertIn("entries", decision.decision_reason["signals"]["high_focus_hits"])
+
     def test_high_value_source_overrides_score_stage_only(self):
         article = self._translated_article(
             source_article_id="access-source-1",
@@ -2206,6 +3383,36 @@ class AutomationFlowTests(TestCase):
         self.assertCountEqual(external_issue["payload"]["names"][0]["external_horse_ids"], ["1001", "1002"])
         self.assertFalse(any(issue["code"] in {"core_term_missing", "background_term_missing"} for issue in outcome.issues))
 
+    def test_validation_uses_matched_external_horse_spelling_for_english_article(self):
+        ExternalHorseAlias.objects.create(
+            source="hkjc",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            external_horse_id="HKH001",
+            name_ja="Lucky Star",
+            name_en="Lucky Star",
+            normalized_name="Lucky Star",
+            alias_source="test",
+        )
+        article = self._translated_article(
+            source_article_id="english-external-horse-preserved",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            title_ja="LUCKY STAR wins at Sha Tin",
+            body_ja_raw="LUCKY STAR was too strong in the closing stages. " * 8,
+            body_ja_normalized="LUCKY STAR was too strong in the closing stages. " * 8,
+            translated_title_zh="LUCKY STAR 在沙田取胜",
+            title_zh="LUCKY STAR 在沙田取胜",
+            translated_body_zh="LUCKY STAR 在末段表现强劲。" * 12,
+            body_zh="LUCKY STAR 在末段表现强劲。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertTrue(outcome.passed)
+        self.assertEqual(outcome.details["external_horse_names"], ["LUCKY STAR"])
+        self.assertFalse(any(issue["code"] == "external_horse_not_preserved" for issue in outcome.issues))
+
     def test_validation_preserve_limit_is_not_consumed_by_known_horse_terms(self):
         known_names = [
             "アカホース",
@@ -2284,6 +3491,32 @@ class AutomationFlowTests(TestCase):
         self.assertTrue(background_outcome.passed)
         self.assertEqual(background_article.automation_status, AutomationStatus.PUBLISH_READY)
         self.assertTrue(any(issue["code"] == "background_term_missing" for issue in background_article.gate_issues))
+
+    def test_english_core_term_missing_detects_source_case_insensitively(self):
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Equinox",
+            target_zh="春秋分",
+            priority=90,
+        )
+        article = self._translated_article(
+            source_article_id="english-core-term-uppercase-missing",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            title_ja="EQUINOX returns in feature",
+            body_ja_raw="EQUINOX returns in feature company at Ascot.",
+            body_ja_normalized="EQUINOX returns in feature company at Ascot.",
+            translated_title_zh="名马回归",
+            title_zh="名马回归",
+            translated_body_zh="这匹名马将在阿斯科特回归。" * 12,
+            body_zh="这匹名马将在阿斯科特回归。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertFalse(outcome.passed)
+        self.assertTrue(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
 
     def test_duplicate_detection_blocks_highly_similar_article(self):
         published = self._translated_article(
@@ -2481,6 +3714,20 @@ class TermConsoleTests(TestCase):
         response = self.client.get(reverse("console-term-list"), {"q": "春秋分马"})
         self.assertContains(response, "イクイノックス")
 
+    def test_term_list_pagination_preserves_source_language_filter(self):
+        for index in range(21):
+            TermEntry.objects.create(
+                term_type="horse",
+                source_language=SourceLanguage.ENGLISH,
+                source_ja=f"English Horse {index:02d}",
+                target_zh=f"英文马{index:02d}",
+            )
+
+        response = self.client.get(reverse("console-term-list"), {"source_language": SourceLanguage.ENGLISH})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "source_language=en&amp;page=2")
+
     def test_term_create_page_can_create_entry(self):
         response = self.client.post(
             reverse("console-term-create"),
@@ -2518,11 +3765,50 @@ class TermConsoleTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "已有术语 ID")
 
+    def test_english_term_create_duplicate_rejected_case_insensitively(self):
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Equinox",
+            target_zh="春秋分",
+        )
+
+        response = self.client.post(
+            reverse("console-term-create"),
+            {
+                "term_type": "horse",
+                "source_language": SourceLanguage.ENGLISH,
+                "source_ja": "EQUINOX",
+                "target_zh": "另一个春秋分",
+                "aliases_ja_text": "",
+                "aliases_zh_text": "",
+                "priority": "10",
+                "is_active": "on",
+                "notes": "",
+                "intent": "save",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "已有术语 ID")
+        self.assertEqual(
+            TermEntry.objects.filter(term_type="horse", source_language=SourceLanguage.ENGLISH, source_ja__iexact="equinox").count(),
+            1,
+        )
+
     def test_term_toggle_active(self):
+        TermAlias.objects.create(
+            term=self.term,
+            source_language=SourceLanguage.ENGLISH,
+            text="Equinox",
+            alias_type=TermAliasType.ALIAS,
+            is_active=True,
+        )
         response = self.client.post(reverse("console-term-toggle", args=[self.term.id]), follow=True)
         self.assertEqual(response.status_code, 200)
         self.term.refresh_from_db()
         self.assertFalse(self.term.is_active)
+        self.assertFalse(TermAlias.objects.get(term=self.term, text="Equinox").is_active)
 
     def test_preview_term_import_service(self):
         csv_text = (
@@ -2593,6 +3879,222 @@ class TermConsoleTests(TestCase):
         self.assertTrue(TermEntry.objects.filter(source_ja="グランアレグリア").exists())
         self.assertEqual(TermEntry.objects.get(source_ja="大阪杯").race_grade, "G1")
 
+    def test_term_import_upsert_alias_match_preserves_concept_primary_source(self):
+        term = TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="イクイノックス",
+            target_zh="春秋分",
+            aliases_ja=["イクイ"],
+            priority=100,
+            is_active=True,
+        )
+        TermAlias.objects.create(
+            term=term,
+            source_language=SourceLanguage.ENGLISH,
+            text="Equinox",
+            alias_type=TermAliasType.PRIMARY,
+            is_active=True,
+        )
+        preview_rows = [
+            {
+                "line_no": 1,
+                "status": "update",
+                "payload": {
+                    "term_type": "horse",
+                    "source_language": SourceLanguage.ENGLISH,
+                    "source_ja": "Equinox",
+                    "target_zh": "春秋分",
+                    "aliases_ja": ["EQUINOX"],
+                    "aliases_zh": ["春秋分马"],
+                    "race_grade": "",
+                    "priority": 80,
+                    "is_active": True,
+                    "notes": "英文别名",
+                },
+            }
+        ]
+
+        result = commit_term_import(preview_rows, import_mode="upsert")
+
+        self.assertEqual(result["update_count"], 1)
+        term.refresh_from_db()
+        self.assertEqual(term.source_language, SourceLanguage.JAPANESE)
+        self.assertEqual(term.source_ja, "イクイノックス")
+        self.assertEqual(term.aliases_ja, ["イクイ"])
+        self.assertEqual(term.target_zh, "春秋分")
+        self.assertEqual(term.aliases_zh, ["春秋分马"])
+        self.assertEqual(term.priority, 80)
+        self.assertTrue(
+            TermAlias.objects.filter(
+                term=term,
+                source_language=SourceLanguage.ENGLISH,
+                text="Equinox",
+                alias_type=TermAliasType.PRIMARY,
+            ).exists()
+        )
+        self.assertFalse(
+            TermAlias.objects.filter(
+                term=term,
+                source_language=SourceLanguage.ENGLISH,
+                text="EQUINOX",
+                alias_type=TermAliasType.ALIAS,
+            ).exists()
+        )
+
+    def test_term_import_upsert_same_language_case_variant_updates_primary_source(self):
+        term = TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Equinox",
+            target_zh="旧译名",
+            aliases_ja=["Old Alias"],
+            priority=10,
+            is_active=True,
+        )
+        TermAlias.objects.create(
+            term=term,
+            source_language=SourceLanguage.ENGLISH,
+            text="Equinox",
+            alias_type=TermAliasType.PRIMARY,
+            is_active=True,
+        )
+        TermAlias.objects.create(
+            term=term,
+            source_language=SourceLanguage.ENGLISH,
+            text="Old Alias",
+            alias_type=TermAliasType.ALIAS,
+            is_active=True,
+        )
+        preview_rows = [
+            {
+                "line_no": 1,
+                "status": "update",
+                "payload": {
+                    "term_type": "horse",
+                    "source_language": SourceLanguage.ENGLISH,
+                    "source_ja": "EQUINOX",
+                    "target_zh": "春秋分",
+                    "aliases_ja": ["Fresh Alias", "equinox"],
+                    "aliases_zh": ["春秋分马"],
+                    "race_grade": "",
+                    "priority": 90,
+                    "is_active": True,
+                    "notes": "英文主原文大小写更新",
+                },
+            }
+        ]
+
+        result = commit_term_import(preview_rows, import_mode="upsert")
+
+        self.assertEqual(result["update_count"], 1)
+        term.refresh_from_db()
+        self.assertEqual(term.source_language, SourceLanguage.ENGLISH)
+        self.assertEqual(term.source_ja, "EQUINOX")
+        self.assertEqual(term.target_zh, "春秋分")
+        self.assertEqual(term.aliases_ja, ["Fresh Alias", "equinox"])
+        self.assertEqual(term.aliases_zh, ["春秋分马"])
+        self.assertEqual(term.priority, 90)
+        self.assertEqual(term.notes, "英文主原文大小写更新")
+        self.assertTrue(
+            TermAlias.objects.filter(
+                term=term,
+                source_language=SourceLanguage.ENGLISH,
+                text="EQUINOX",
+                alias_type=TermAliasType.PRIMARY,
+            ).exists()
+        )
+        self.assertTrue(
+            TermAlias.objects.filter(
+                term=term,
+                source_language=SourceLanguage.ENGLISH,
+                text="Fresh Alias",
+                alias_type=TermAliasType.ALIAS,
+            ).exists()
+        )
+        self.assertFalse(
+            TermAlias.objects.filter(
+                term=term,
+                source_language=SourceLanguage.ENGLISH,
+                text="Equinox",
+            ).exists()
+        )
+        self.assertFalse(
+            TermAlias.objects.filter(
+                term=term,
+                source_language=SourceLanguage.ENGLISH,
+                text="equinox",
+            ).exists()
+        )
+        self.assertEqual(TermAlias.objects.filter(term=term, source_language=SourceLanguage.ENGLISH).count(), 2)
+
+    def test_term_import_upsert_rejects_alias_conflict_with_other_term(self):
+        existing = TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Equinox",
+            target_zh="春秋分",
+            is_active=True,
+        )
+        TermAlias.objects.create(
+            term=existing,
+            source_language=SourceLanguage.ENGLISH,
+            text="Equinox",
+            alias_type=TermAliasType.PRIMARY,
+            is_active=True,
+        )
+        csv_text = (
+            "term_type,source_language,source_ja,target_zh,aliases_ja,aliases_zh,priority,is_active,notes,race_grade\n"
+            "horse,en,Different Horse,另一匹马,EQUINOX,,10,true,,\n"
+        )
+
+        preview = preview_term_import(csv_text=csv_text, import_mode="upsert")
+
+        self.assertEqual(preview["summary"]["error_count"], 1)
+        self.assertFalse(preview["can_commit"])
+        self.assertIn(f"术语 ID：{existing.pk}", " ".join(preview["rows"][0]["errors"]))
+        self.assertFalse(TermEntry.objects.filter(source_ja="Different Horse").exists())
+
+    def test_term_import_commit_rechecks_alias_conflict_with_other_term(self):
+        existing = TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Equinox",
+            target_zh="春秋分",
+            is_active=True,
+        )
+        TermAlias.objects.create(
+            term=existing,
+            source_language=SourceLanguage.ENGLISH,
+            text="Equinox",
+            alias_type=TermAliasType.PRIMARY,
+            is_active=True,
+        )
+        preview_rows = [
+            {
+                "line_no": 2,
+                "status": "create",
+                "payload": {
+                    "term_type": "horse",
+                    "source_language": SourceLanguage.ENGLISH,
+                    "source_ja": "Different Horse",
+                    "target_zh": "另一匹马",
+                    "aliases_ja": ["EQUINOX"],
+                    "aliases_zh": [],
+                    "race_grade": "",
+                    "priority": 10,
+                    "is_active": True,
+                    "notes": "",
+                },
+            }
+        ]
+
+        result = commit_term_import(preview_rows, import_mode="upsert")
+
+        self.assertEqual(result["skipped_count"], 1)
+        self.assertIn(f"术语 ID：{existing.pk}", " ".join(result["failed_rows"][0]["errors"]))
+        self.assertFalse(TermEntry.objects.filter(source_ja="Different Horse").exists())
+
     def test_import_terms_management_command_supports_dry_run(self):
         out = StringIO()
         call_command("import_terms", "--dry-run", stdout=out)
@@ -2602,15 +4104,66 @@ class TermConsoleTests(TestCase):
     def test_term_api_create_and_toggle(self):
         create_response = self.client.post(
             reverse("api-term-create"),
-            data='{"term_type":"org","source_ja":"JRA","target_zh":"日本中央竞马会","aliases_ja":["日本中央競馬会"],"aliases_zh":["JRA"],"priority":5,"is_active":true,"notes":""}',
+            data='{"term_type":"org","source_language":"en","source_ja":"JRA","target_zh":"日本中央竞马会","aliases_ja":["jra","Japan Racing Association"],"aliases_zh":["JRA"],"priority":5,"is_active":true,"notes":""}',
             content_type="application/json",
         )
         self.assertEqual(create_response.status_code, 200)
         payload = create_response.json()
         term_id = payload["term"]["id"]
+        self.assertEqual(payload["term"]["source_language"], SourceLanguage.ENGLISH)
+        self.assertTrue(
+            TermAlias.objects.filter(
+                term_id=term_id,
+                source_language=SourceLanguage.ENGLISH,
+                text="JRA",
+                alias_type=TermAliasType.PRIMARY,
+                is_active=True,
+            ).exists()
+        )
+        self.assertTrue(
+            TermAlias.objects.filter(
+                term_id=term_id,
+                source_language=SourceLanguage.ENGLISH,
+                text="Japan Racing Association",
+                alias_type=TermAliasType.ALIAS,
+                is_active=True,
+            ).exists()
+        )
+        self.assertFalse(TermAlias.objects.filter(term_id=term_id, text="jra").exists())
         toggle_response = self.client.post(reverse("api-term-toggle-active", args=[term_id]))
         self.assertEqual(toggle_response.status_code, 200)
         self.assertFalse(TermEntry.objects.get(pk=term_id).is_active)
+        self.assertFalse(TermAlias.objects.filter(term_id=term_id, is_active=True).exists())
+
+    def test_term_api_update_syncs_source_aliases_case_insensitively(self):
+        term = TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Equinox",
+            target_zh="春秋分",
+            aliases_ja=["Old Alias"],
+            is_active=True,
+        )
+        TermAlias.objects.create(
+            term=term,
+            source_language=SourceLanguage.ENGLISH,
+            text="Old Alias",
+            alias_type=TermAliasType.ALIAS,
+            is_active=True,
+        )
+
+        response = self.client.post(
+            reverse("api-term-update", args=[term.id]),
+            data='{"term_type":"horse","source_language":"en","source_ja":"EQUINOX","target_zh":"春秋分","aliases_ja":["equinox","Fresh Alias"],"aliases_zh":[],"priority":5,"is_active":true,"notes":""}',
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        term.refresh_from_db()
+        self.assertEqual(term.aliases_ja, ["Fresh Alias"])
+        self.assertTrue(TermAlias.objects.filter(term=term, text="EQUINOX", alias_type=TermAliasType.PRIMARY).exists())
+        self.assertTrue(TermAlias.objects.filter(term=term, text="Fresh Alias", alias_type=TermAliasType.ALIAS).exists())
+        self.assertFalse(TermAlias.objects.filter(term=term, text="Old Alias").exists())
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)
@@ -2898,6 +4451,58 @@ class TranslationWorkflowTests(TestCase):
         self.assertIn("マヤノライジン", result.metadata["external_horse_names"])
         external = [item for item in result.metadata["recognized_horse_names"] if item["source"] == "external_alias"][0]
         self.assertEqual(external["external_horse_ids"], ["1001"])
+
+    @override_settings(TRANSLATION_MODEL="deepseek-ai/DeepSeek-V3", TRANSLATION_MAX_ATTEMPTS=1)
+    def test_provider_protects_english_external_horse_alias_with_source_spelling(self):
+        ExternalHorseAlias.objects.create(
+            source="hkjc",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            external_horse_id="HKH001",
+            name_ja="Lucky Star",
+            name_en="Lucky Star",
+            normalized_name="Lucky Star",
+            alias_source="test",
+        )
+        self.article.source_site = SourceSite.HKJC_NEWS
+        self.article.source_language = SourceLanguage.ENGLISH
+        self.article.racing_region = RacingRegion.HONG_KONG
+        self.article.title_ja = "LUCKY STAR wins at Sha Tin"
+        self.article.body_ja_raw = "LUCKY STAR was too strong in the closing stages."
+        self.article.body_ja_normalized = self.article.body_ja_raw
+        self.article.save()
+
+        provider = OpenAICompatibleTranslationProvider(api_key="test-key", base_url="https://example.com/v1")
+        usage = type("Usage", (), {"model_dump": lambda self: {"completion_tokens": 20}})()
+        choice = type(
+            "Choice",
+            (),
+            {
+                "message": type(
+                    "Message",
+                    (),
+                    {
+                        "content": __import__("json").dumps(
+                            {
+                                "title_zh": "__UMA_KEEP_1__ 在沙田取胜",
+                                "body_zh": "__UMA_KEEP_1__ 在末段表现强劲。",
+                                "push_summary_zh": "__UMA_KEEP_1__ 取胜。",
+                            },
+                            ensure_ascii=False,
+                        )
+                    },
+                )(),
+                "finish_reason": "stop",
+            },
+        )()
+
+        with patch.object(provider, "_request_completion", return_value=type("Response", (), {"choices": [choice], "usage": usage})()):
+            result = provider.translate(self.article)
+
+        self.assertIn("LUCKY STAR", result.title_zh)
+        self.assertEqual(result.metadata["unknown_horse_names"], ["LUCKY STAR"])
+        self.assertEqual(result.metadata["external_horse_names"], ["LUCKY STAR"])
+        self.assertEqual(result.metadata["external_horse_aliases"][0]["name_ja"], "Lucky Star")
 
     @override_settings(
         TRANSLATION_MODEL="deepseek-ai/DeepSeek-V3",
@@ -3254,6 +4859,48 @@ class CrawlAutoTranslateTests(TestCase):
         self.assertEqual(result["seen_count"], 1)
         mocked_dispatch.assert_called_once_with(qq_auto_push_article_task, article.id)
 
+    @override_settings(AUTO_TRANSLATE_ON_INGEST=False, QQ_PUSH_ENABLED=True)
+    def test_international_source_elevated_public_article_dispatches_qq_auto_push(self):
+        sync_builtin_sources()
+        source = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
+        stub = type("Stub", (), {"source_url": "https://www.skysports.com/racing/news/sky-ranked-article"})()
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.SKY_SPORTS_RACING,
+            source_mode=SourceMode.ACCESS,
+            source_article_id="sky-ranked-article",
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            source_language=SourceLanguage.ENGLISH,
+            title_ja="Sky ranked article",
+            title_zh="Sky 榜单文章",
+            body_ja_raw="Body",
+            body_ja_normalized="Body",
+            body_zh="正文",
+            published_at=timezone.now(),
+            source_url=stub.source_url,
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+        )
+
+        class FakeInternationalAdapter:
+            def fetch_listing(self, mode, page):
+                return [stub]
+
+            def fetch_detail(self, source_url):
+                return object()
+
+            def normalize_source_payload(self, stub, detail):
+                return object()
+
+        with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {source.adapter_key: FakeInternationalAdapter}), patch(
+            "stable.tasks.upsert_article_from_draft",
+            return_value=ArticleUpsertResult(article=article, created=False, source_elevated=True),
+        ), patch("stable.tasks.dispatch_task") as mocked_dispatch:
+            result = _crawl_international_source(source)
+
+        self.assertEqual(result["new_count"], 0)
+        self.assertEqual(result["seen_count"], 1)
+        mocked_dispatch.assert_called_once_with(qq_auto_push_article_task, article.id)
+
     @override_settings(AUTO_TRANSLATE_ON_INGEST=False)
     def test_jra_detail_structure_error_skips_article_and_continues(self):
         sync_builtin_sources()
@@ -3312,6 +4959,7 @@ class TermCandidateDiscoveryTests(TestCase):
             is_active=False,
         )
         self.assertEqual(normalize_japanese_term(" メイショウタバル "), "メイショウタバル")
+        self.assertEqual(normalize_japanese_term(" EQUINOX "), "equinox")
         same_type, other_type = match_formal_terms("horse", "メイショウタバル")
         self.assertEqual(same_type, [term])
         self.assertEqual(other_type, [])
@@ -3663,7 +5311,7 @@ class TermCandidateReviewTests(TestCase):
             },
         )
         self.assertEqual(response.status_code, 400)
-        self.assertContains(response, "已存在相同日文原词", status_code=400)
+        self.assertContains(response, "已存在相同原文", status_code=400)
         self.candidate.refresh_from_db()
         self.assertEqual(self.candidate.status, TermCandidateStatus.PENDING)
 
@@ -3686,6 +5334,72 @@ class TermCandidateReviewTests(TestCase):
         self.assertTrue(self.candidate.evidence.exists())
         search_response = self.client.get(reverse("console-term-list"), {"q": self.candidate.source_ja})
         self.assertContains(search_response, term.source_ja)
+
+    def test_merge_endpoint_adds_cross_language_alias_to_term_concept(self):
+        self.candidate.source_language = SourceLanguage.ENGLISH
+        self.candidate.source_ja = "Equinox"
+        self.candidate.normalized_key = "Equinox"
+        self.candidate.save(update_fields=["source_language", "source_ja", "normalized_key", "updated_at"])
+        term = TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="イクイノックス",
+            target_zh="春秋分",
+        )
+
+        response = self.client.post(
+            reverse("console-term-candidate-merge", args=[self.candidate.id]),
+            {
+                "target_term": term.id,
+                "add_as_alias": "on",
+                "review_notes": "英文名并入同一马匹",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        term.refresh_from_db()
+        self.candidate.refresh_from_db()
+        self.assertEqual(self.candidate.status, TermCandidateStatus.MERGED)
+        self.assertNotIn("Equinox", term.aliases_ja)
+        self.assertTrue(
+            TermAlias.objects.filter(term=term, source_language=SourceLanguage.ENGLISH, text="Equinox").exists()
+        )
+        matches = resolve_terms_for_language("Equinox is back", SourceLanguage.ENGLISH, limit=10)
+        self.assertEqual([item.target_zh for item in matches], ["春秋分"])
+
+    def test_merge_endpoint_does_not_duplicate_cross_language_alias_by_case(self):
+        self.candidate.source_language = SourceLanguage.ENGLISH
+        self.candidate.source_ja = "EQUINOX"
+        self.candidate.normalized_key = "equinox"
+        self.candidate.save(update_fields=["source_language", "source_ja", "normalized_key", "updated_at"])
+        term = TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="イクイノックス",
+            target_zh="春秋分",
+        )
+        TermAlias.objects.create(
+            term=term,
+            source_language=SourceLanguage.ENGLISH,
+            text="Equinox",
+            alias_type=TermAliasType.ALIAS,
+            is_active=True,
+        )
+
+        response = self.client.post(
+            reverse("console-term-candidate-merge", args=[self.candidate.id]),
+            {
+                "target_term": term.id,
+                "add_as_alias": "on",
+                "review_notes": "英文名大小写合并",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            TermAlias.objects.filter(term=term, source_language=SourceLanguage.ENGLISH, text__iexact="equinox").count(),
+            1,
+        )
 
     def test_merge_endpoint_into_candidate_keeps_evidence(self):
         target = TermCandidate.objects.create(

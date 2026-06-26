@@ -21,6 +21,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-25` 已将榜单重点新闻 QQ 推送与公开文章 ID URL 改造通过 PR #8 合并并部署生产。服务器 `/opt/umanewsbot` 已更新到 `00e4bd4`，部署前 `.env` 备份为 `.env.backup.qq-ranked-idurl-20260625_191826`；生产 `.env` 已切换为 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`。`web / worker / beat` 已重建，`manage.py check`、`http://umafans.run/healthz/`、`http://umafans.run/`、`/news/<article_id>/` 公开详情和旧 slug 到 ID URL 的 `302` 跳转均已验证通过。本次不补推历史公开新闻，后续只等待自然榜单新闻触发测试群推送。
 
+`2026-06-25` 已创建并本地实现国际赛马资讯扩展 OpenSpec change：`expand-international-racing-coverage`，尚未部署生产。范围包括：一期接入多地区新闻源，日本 `Sponichi`，中国香港 `HKJC Racing News / SCMP Racing`，英国 `Sporting Life Racing / Sky Sports Racing`，英国官方补充 `BHA`，法国仅接英文来源 `France Galop English News / TDN France keyword`，美国 `TDN / Horse Racing Nation`；公开首页新增 `综合 / 日本 / 中国香港 / 英国 / 法国 / 美国` 地区 tab；术语库从“每条术语绑定一种原文语言”返修为“`TermEntry` 正式术语概念 + `TermAlias` 多语言原文别名”；QQ 自动推送迁移为总开关 + 群级地区 / 范围 / 重点策略配置；外部数据库第一期正式实现 HKJC payload 受控导入，`Equibase`、英国 `Sporting Life + BHA`、法国 `France Galop` 先做受控 spike。review 返修已补齐 HKJC 单来源互斥锁、commit 必须提供真实 payload 文件且超过批量上限直接失败、多语言术语替换、自动标签和自动化评分均按文章原文语言选择别名、公开详情继续使用全局自增数字文章 ID、国际来源去重键使用完整 URL 派生防碰撞、整页 HTML 不进入 `translation_metadata` 或 `NewsSnapshot.snapshot_metadata`、TDN 详情页缺少日期时保留列表 API 的真实发布时间、国际榜单来源提升后触发 QQ 自动推送编排、英文/繁中外部马名索引参与识别、术语导入 upsert 命中跨语言别名时不覆盖正式术语概念主原文、多语言术语匹配批量加载别名避免 N+1 查询、HKJC `max_horses` 按顶层马匹和 entries/results 中会写入的马匹合并统计；最终 review 又补齐英文正式术语在自动评分、发布校验和新增术语应用当前稿中的大小写不敏感匹配、英文术语重复校验/导入/候选合并/API 保存均按大小写不敏感归并、术语启停同步所有语言 `TermAlias` 状态，以及 QQ 群非法地区配置回退日本旧行为。本次上线前返修继续补齐：术语导入 upsert 只有主原文命中时才更新，别名撞到其它术语会在预览和提交阶段都报错；`TDN France keyword` 使用 `TDN` canonical source site 去重，避免与美国 `TDN` 同 URL 重复入库，同时保留法国来源和地区信号；后台术语列表翻页会保留 `source_language` 等筛选条件。真实新闻源 dry-run 探测命令 `probe_international_news_sources` 默认探测第一版最终矩阵，已成功解析 `Sponichi latest/access`、`HKJC Racing News`、`SCMP Racing`、`Sporting Life Racing`、`Sky Sports Racing access/latest`、`BHA official`、`France Galop English News official`、`TDN France keyword`、`TDN`、`Horse Racing Nation access/latest` 的真实样本；`At The Races`、`Paulick Report` 和 `BloodHorse` 保留为候选但不进入第一版默认清单。
+
 ## 已完成内容
 
 - 域名购买与解析
@@ -76,9 +78,10 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 4. 补充翻译 warning 可视化和术语库补全流程
 5. 继续观察 QQ Bot 测试群灰度推送，必要时通过 `QQ_PUSH_ENABLED=false` 暂停自动发送
 6. 继续观察 netkeiba `00/16/26` 分错峰抓取在连续小时内生成 `CrawlJob`，并抽检后台来源健康摘要
-7. HTTPS / 证书接入
-8. 部署稳定化与监控 / 备份 / 回滚完善
-9. 继续低批量观察 `refine-automation-publish-gates` 上线后的 warning 邮件、重复内容阻断、候选池门禁展示和自动发布结果
+7. 对 `expand-international-racing-coverage` 做一次上线前整体 review；后续进入 PR / 部署前，需要重点确认迁移窗口、国际新闻源灰度启用顺序、HKJC payload 小样本和生产外部导入锁状态
+8. HTTPS / 证书接入
+9. 部署稳定化与监控 / 备份 / 回滚完善
+10. 继续低批量观察 `refine-automation-publish-gates` 上线后的 warning 邮件、重复内容阻断、候选池门禁展示和自动发布结果
 
 ## 2026-06-25 榜单重点新闻 QQ 推送规划
 
@@ -654,3 +657,52 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - 样本结果：netkeiba 长文中外部索引可命中多匹真实马名，例如 `ロブチェン`、`パントルナイーフ`、`ミクニインスパイア`、`ドリームコア` 等，并在译文未保留时产生独立 `external_horse_not_preserved` warning。
   - 观察到的后续优化点：JRA 活动公告类长文（例如 `JRA宮崎育成牧場けいばフェスタ`）仍会通过启发式把 `フェスタ`、`ウインズ`、`イベント`、`ポニー`、`オリジナル` 等普通片假名词列为疑似未知马名；外部马名索引能降低真实马名漏报，但不能完全替代后续普通词过滤和启发式收紧。
 - 生产部署记录见 `docs/deploy_runbook.md` 的 `2026-06-25 外部马名索引识别链路生产部署`。
+
+## 2026-06-25 国际赛马资讯扩展本地实现
+
+- OpenSpec change：`expand-international-racing-coverage`。
+- 当前状态：本地代码、迁移、测试、文档和 review 返修已完成；尚未部署生产，生产仍以已上线的日本新闻源和既有 QQ 推送配置为准。
+- 已落地能力：
+  - `NewsSource`、`NewsArticle`、外部数据缓存、`TermEntry`、`TermCandidate` 和 `PushTarget` 已增加地区、原文语言、来源类型或群级推送配置字段；现有数据默认回填为 `japan / ja`。
+  - 内置来源同步已增加一期国际新闻源最终清单：`Sponichi`、`HKJC Racing News`、`SCMP Racing`、`Sporting Life Racing`、`Sky Sports Racing`、`BHA`、`France Galop English News`、`TDN France keyword`、`TDN`、`Horse Racing Nation`。新来源默认 `enabled=false`，需要人工启用或测试抓取；2026-06-26 review 返修后，内置来源同步只更新来源定义，不再覆盖工作人员手动调整的 `enabled` 状态。
+  - 已补充排序型入口策略：类似 netkeiba 访问量榜/注目榜的来源，只有在公开 HTML/API 能稳定慢速抓取时才作为独立榜单源接入。本轮确认 `Sponichi 新闻ランキング`、`Sky Sports Racing Top Stories`、`Horse Racing Nation Trending` 可抓，均作为独立排序/榜单来源加入并保留原站 rank；2026-06-26 review 返修后，同源普通 list 不会覆盖已入库的排序/榜单主来源，普通 list 仍会记录 `NewsSnapshot`；旧候选 `At The Races`、`Paulick Report`、`BloodHorse` 因 403、反爬或空样本风险不进入第一版默认清单。
+  - 公开首页新增 `综合 / 日本 / 中国香港 / 英国 / 法国 / 美国` 地区 tab，`/?region=<region>` 过滤头条、信息流和热门列表；地区页翻页会保留当前 `region` 查询参数，不会翻页后跳回综合流；文章详情展示地区、来源和原文语言。
+  - 术语库 UI 和服务语义已从“日文原词/日文别名”扩展为“原文/原文别名/原文语言”，并新增 `TermAlias` 作为多语言原文别名表；`TermEntry` 表示正式术语概念和标准中文译名，旧 `source_ja / aliases_ja` 物理字段继续兼容并回填为 `ja` 别名。
+  - 翻译、改写、发布校验、候选发现、自动标签和自动化评分会按文章 `source_language` 选择对应 `TermAlias`；日文片假名未知马名启发式只应用于 `ja`，英文和繁中不套日文规则，但会按同语言 `ExternalHorseAlias` 做保守外部马名匹配；英文候选可合并到日文正式术语概念并保存为英文别名。2026-06-26 review 返修后，术语匹配和自动化 P0 马匹命中会按本次候选术语批量加载 `TermAlias`，避免每条术语各查一次别名；英文/繁中外部马名识别会先从文章文本生成候选片段收窄数据库查询，并使用原文中实际出现的大小写/写法作为保护文本；翻译保护、发布校验和候选发现也统一使用真实匹配文本，英文正式术语按大小写不敏感方式命中并记录原文真实写法；最终 review 返修后，自动化 P0 马匹命中、发布校验的核心/背景术语判定、以及“新增术语后应用到当前稿”均复用同一套语言感知匹配，避免 `EQUINOX` 这类大写英文漏判或漏替换。本轮补丁进一步将同语言术语查重、别名去重、导入 upsert、候选合并和术语 API 保存统一为大小写不敏感；同语言大小写变体导入 upsert 会更新正式主原文并同步别名表，跨语言别名 upsert 仍只维护该语言别名、不覆盖概念主原文；后台/API 启停术语时会同步所有语言 `TermAlias` 的启用状态；AI 改写 prompt 的术语表也使用本次文章实际命中的 `matched_text`，避免英文稿看到日文概念主名而漏用标准译名。本次返修明确术语导入 upsert 的目标解析：主原文命中同一术语时才更新；如果只是原文别名命中已有其它术语，预览和提交都会拒绝该行，避免把两个正式概念误合并。
+  - 自动化评分已补充英文和繁体中文赛马关键词表，英文 `preview / entries / draw / withdrawn / injury / results / stewards` 等信号会参与分类、高关注命中和重点赛事 fallback，不再只依赖日文关键词。
+  - QQ 自动推送保留 `QQ_PUSH_ENABLED` 总开关；每个 `PushTarget` 可配置 `allowed_regions`、`push_scope`、`importance_strategy`。总开关管“能不能推”，群配置管“推什么给谁”；文章地区缺失时返回 `region_missing` 并不自动推送。2026-06-26 review 返修后，`importance_strategy=ranked` 不再只认 netkeiba，也会把 `Sponichi / Sky Sports Racing / Horse Racing Nation` 的排序/榜单稿视为重点新闻；已有群迁移会把空 `allowed_regions` 回填为 `["japan"]`，运行时空地区或非法地区配置也按旧行为仅允许日本，避免旧群或误配置群突然收到全球新闻。
+  - HKJC 外部数据新增 `import_hkjc_external_data` 管理命令和 `HKJCExternalDataImporter`，支持 `--race-date`、`--race-id`、`--horse-id`、`--payload-file`、`--commit`、`--lookup-name`、`--stats-run-id`，默认 dry-run；提交只写 External* 缓存表和 `ExternalHorseAlias`，不生成前台赛果页。commit 模式在真实网络抓取实现前必须提供 `--payload-file`，并参考 netkeiba 外部导入使用单来源互斥锁，已有 `STARTED` 导入时拒绝并发写入；payload 超过 `max_races / max_horses` 时直接失败，不静默截断或部分写入。2026-06-26 review 返修后，`max_horses` 会合并统计顶层 `horses`、赛事 `entries` 和 `results` 中可识别的唯一马匹，避免 entries/results 里的大量马绕过批量上限。
+  - 公开详情 URL 继续使用 `/news/<NewsArticle.id>/` 全局自增数字 ID；国际新闻源的 `source_article_id` 只作为来源内幂等去重键，使用完整 URL 派生的 `slug-short_hash`，避免同 slug 不同路径碰撞。
+  - 国际新闻原始 HTML 只写入 `original_content_html`；`translation_metadata` 和 `NewsSnapshot.snapshot_metadata` 只保留轻量抓取/翻译元信息，不再重复保存整页 HTML；TDN 等列表 API 提供真实发布时间的来源，在详情页缺少日期节点时会回退使用列表时间；`TDN France keyword` 与美国 `TDN` 来自同一站点，入库时使用 `TDN` canonical source site 和同一 `source_article_id` 去重，`NewsSnapshot` 仍记录实际发现来源，法国关键词来源会优先保留法国地区归类。
+  - 欧美数据库源 spike 结论已写入 `docs/global_racing_data_source_spikes.md`；本轮 spike 不加入 Celery Beat、生产命令队列或正式导入队列，不写正式外部数据表。
+- 本轮新增迁移：
+  - `server/stable/migrations/0011_remove_termcandidate_uq_term_candidate_type_normalized_and_more.py`
+  - `server/stable/migrations/0012_termalias.py`
+  - `server/stable/migrations/0013_alter_newsarticle_source_site_and_more.py`
+- 本轮新增/调整的关键入口：
+  - 新闻来源同步：`server/stable/services/sources.py`
+  - 国际新闻适配器：`server/stable/adapters/international.py`
+  - 国际新闻真实探测命令：`server/stable/management/commands/probe_international_news_sources.py`
+  - QQ 群级推送判断：`server/stable/services/qq_auto_push.py`
+  - HKJC 数据导入：`server/stable/services/external_hkjc_data.py`
+  - HKJC 管理命令：`server/stable/management/commands/import_hkjc_external_data.py`
+  - 公开首页地区 tab：`server/stable/views.py`、`server/stable/templates/stable/public/feed.html`
+- 已完成的本地验证：
+  - `openspec/changes/expand-international-racing-coverage/test_cases.md`：已新增完整测试用例矩阵，按 OpenSpec `proposal/design/spec` 拆分，不依据实现代码倒推；覆盖地区/语言、国际新闻源、公开首页、术语多语言、QQ 群级推送、HKJC 导入、欧美数据源 spike、迁移和非目标边界。
+  - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py check`：通过。
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.AdapterTests stable.tests.InternationalSourceMetadataTests stable.tests.HKJCExternalDataImportTests stable.tests.AutomationFlowTests --noinput`：通过，35 项。
+  - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.InternationalSourceMetadataTests stable.tests.QQAutoPushTests --verbosity 2`：通过，26 项。
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：最终源清单返修前通过，201 项；返修后通过，209 项；2026-06-26 上线前 review 返修后通过，210 项；第二轮 review 返修后通过，214 项，新增覆盖人工来源启用保留、国际榜单来源提升、普通 list 不覆盖榜单主来源、QQ ranked 识别国际榜单稿；本次 review 补丁后通过，217 项，新增覆盖国际榜单来源提升后触发 QQ 自动推送编排、英文外部马名索引识别、术语导入 upsert 命中跨语言别名时保留正式概念主原文；术语批量别名和 HKJC 上限口径返修后通过，219 项；本轮全球范围适配 review 返修后通过，224 项，新增覆盖英文外部马名真实写法保护、非日文外部别名候选查询、旧 QQ 群空地区日本兼容、地区 tab 翻页保留过滤和英文赛马关键词评分；本轮 review 返修后通过，227 项，新增覆盖翻译保护使用英文外部马名真实写法、发布校验不误报已保留真实写法、英文正式术语大小写不敏感匹配与替换；最终 review 补丁后通过，231 项，新增覆盖英文 P0 马匹自动化评分大小写不敏感命中、英文核心术语缺失大小写不敏感阻断、新增英文术语应用当前稿大小写不敏感替换、QQ 群非法地区配置回退日本旧行为；本轮术语生命周期补丁后完整 `stable` 测试通过 236 项，新增覆盖英文重复术语大小写不敏感拒绝、API 创建/更新同步 `TermAlias`、术语启停同步别名状态、候选合并大小写去重、同语言大小写变体导入 upsert 更新主原文，以及 AI 改写 prompt 使用英文实际命中别名；本次上线前返修后完整 `stable` 测试通过 241 项，新增覆盖术语导入 upsert 原文别名冲突预览/提交双重拒绝、`TDN France keyword` canonical 去重并保留法国地区信号、以及术语列表分页保留原文语言筛选。
+  - `openspec validate expand-international-racing-coverage --strict`：通过。
+  - `openspec validate --all`：通过，9 项。
+  - `git diff --check`：通过。
+  - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py makemigrations --check --dry-run`：通过，无额外迁移。
+- 国际新闻源 dry-run 探测：
+  - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py probe_international_news_sources --limit 2 --json`：已执行，不写库。
+  - 默认第一版矩阵成功解析两篇真实样本：`Sponichi latest/access`、`HKJC Racing News`、`SCMP Racing`、`Sporting Life Racing`、`Sky Sports Racing access/latest`、`BHA official`、`France Galop English News official`、`TDN France keyword`、`TDN`、`Horse Racing Nation access/latest`。
+  - 榜单/排序入口结论：`Sponichi 新闻ランキング`、`Sky Sports Racing Top Stories`、`Horse Racing Nation Trending` 可抓并保留原站 rank；`HKJC Racing News`、`SCMP Racing`、`BHA`、`France Galop English News`、`TDN` 当前不按热门榜处理。
+  - 旧候选源处理：`At The Races` 当前 403，`Paulick Report` 当前 403，`BloodHorse` 有反机器人/空样本风险；三者仍保留适配器供后续单独探测，但不进入第一版默认清单。
+- 生产注意事项：
+  - 本变更含数据库迁移，部署前必须确认没有正在运行的外部数据导入。
+  - 国际新闻源默认关闭；生产启用前应先完成一次整体 review，再按地区逐个灰度启用，并用后台“测试抓取”或命令行小样本复验页面结构。
+  - HKJC 正式网络导入仍应小批量、低频、单来源互斥，并从 `--payload-file --dry-run` 或单场小样本开始；如样本超过 `max_races / max_horses`，应先拆分 payload，而不是依赖程序截断。

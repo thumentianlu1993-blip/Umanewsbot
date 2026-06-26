@@ -12,6 +12,19 @@ from django.utils.text import slugify
 class SourceSite(models.TextChoices):
     NETKEIBA = "netkeiba", "netkeiba"
     JRA = "jra", "JRA"
+    SPONICHI = "sponichi", "Sponichi"
+    HKJC_NEWS = "hkjc_news", "HKJC Racing News"
+    SCMP_RACING = "scmp_racing", "SCMP Racing"
+    SPORTING_LIFE = "sporting_life", "Sporting Life Racing"
+    SKY_SPORTS_RACING = "sky_sports_racing", "Sky Sports Racing"
+    BHA = "bha", "BHA"
+    FRANCE_GALOP_NEWS = "france_galop_news", "France Galop English News"
+    TDN = "tdn", "Thoroughbred Daily News"
+    TDN_FRANCE = "tdn_france", "TDN France Keyword News"
+    HORSE_RACING_NATION = "horse_racing_nation", "Horse Racing Nation"
+    AT_THE_RACES = "at_the_races", "At The Races"
+    BLOODHORSE = "bloodhorse", "BloodHorse"
+    PAULICK_REPORT = "paulick_report", "Paulick Report"
 
 
 class SourceMode(models.TextChoices):
@@ -32,6 +45,24 @@ class SourceLanguage(models.TextChoices):
     JAPANESE = "ja", "日文"
     ENGLISH = "en", "英文"
     CHINESE = "zh", "中文"
+    CHINESE_TRADITIONAL = "zh-hant", "繁体中文"
+    FRENCH = "fr", "法语"
+
+
+class RacingRegion(models.TextChoices):
+    JAPAN = "japan", "日本"
+    HONG_KONG = "hong_kong", "中国香港"
+    UNITED_KINGDOM = "united_kingdom", "英国"
+    FRANCE = "france", "法国"
+    UNITED_STATES = "united_states", "美国"
+    OTHER = "other", "其他"
+
+
+class SourceKind(models.TextChoices):
+    NEWS = "news", "新闻"
+    DATABASE = "database", "数据库"
+    OFFICIAL = "official", "官方"
+    MEDIA = "media", "媒体"
 
 
 class ArticleStatus(models.TextChoices):
@@ -158,6 +189,17 @@ class QQPushErrorType(models.TextChoices):
     NO_TARGETS = "no_targets", "无启用目标群"
 
 
+class QQPushScope(models.TextChoices):
+    INHERIT = "", "继承全局默认"
+    ALL_PUBLIC = "all_public", "所有公开新闻"
+    HIGH_VALUE_ONLY = "high_value_only", "仅重点新闻"
+
+
+class QQPushImportanceStrategy(models.TextChoices):
+    INHERIT = "", "继承全局默认"
+    RANKED = "ranked", "榜单重点新闻"
+
+
 class TaskStatus(models.TextChoices):
     STARTED = "started", "运行中"
     SUCCESS = "success", "成功"
@@ -166,6 +208,7 @@ class TaskStatus(models.TextChoices):
 
 class ExternalDataSource(models.TextChoices):
     NETKEIBA = "netkeiba", "netkeiba"
+    HKJC = "hkjc", "HKJC"
 
 
 class ExternalImportStatus(models.TextChoices):
@@ -213,6 +256,11 @@ class TermType(models.TextChoices):
     OTHER = "other", "其他"
 
 
+class TermAliasType(models.TextChoices):
+    PRIMARY = "primary", "主原文名"
+    ALIAS = "alias", "原文别名"
+
+
 class RaceGrade(models.TextChoices):
     G1 = "G1", "G1 / GI / GⅠ"
     G2 = "G2", "G2 / GII / GⅡ"
@@ -256,6 +304,9 @@ class NewsSource(TimestampedModel):
     feed_url = models.URLField(max_length=1000)
     source_type = models.CharField(max_length=32, choices=SourceType.choices, default=SourceType.BUILTIN)
     language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
+    source_kind = models.CharField(max_length=32, choices=SourceKind.choices, default=SourceKind.NEWS)
     adapter_key = models.CharField(max_length=64, blank=True)
     source_site = models.CharField(max_length=32, choices=SourceSite.choices, blank=True)
     source_mode = models.CharField(max_length=32, choices=SourceMode.choices, blank=True)
@@ -322,6 +373,8 @@ class NewsArticle(TimestampedModel):
     )
     source_site = models.CharField(max_length=32, choices=SourceSite.choices)
     source_mode = models.CharField(max_length=32, choices=SourceMode.choices)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
     source_article_id = models.CharField(max_length=255)
     title_ja = models.CharField(max_length=500)
     body_ja_raw = models.TextField(blank=True)
@@ -518,7 +571,7 @@ class NewsArticle(TimestampedModel):
                 self.body_ja_normalized or self.body_ja_raw or "",
             ]
         ).strip()
-        return extract_horse_tags(source_text, limit=12)
+        return extract_horse_tags(source_text, limit=12, source_language=self.source_language or SourceLanguage.JAPANESE)
 
     def ensure_editable_fields(self) -> None:
         manual_fields = set(self.manually_edited_fields or [])
@@ -652,13 +705,23 @@ class NewsSnapshot(TimestampedModel):
 
 class ExternalRace(TimestampedModel):
     source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
     race_id = models.CharField(max_length=32)
     race_name = models.CharField(max_length=255, blank=True)
     race_date = models.DateField(null=True, blank=True)
     course = models.CharField(max_length=128, blank=True)
+    venue = models.CharField(max_length=128, blank=True)
+    race_number = models.CharField(max_length=32, blank=True)
+    race_grade = models.CharField(max_length=64, blank=True)
+    race_class = models.CharField(max_length=128, blank=True)
     surface = models.CharField(max_length=64, blank=True)
+    track = models.CharField(max_length=128, blank=True)
     distance = models.CharField(max_length=64, blank=True)
     weather = models.CharField(max_length=64, blank=True)
+    going = models.CharField(max_length=128, blank=True)
+    prize_money = models.CharField(max_length=128, blank=True)
+    scheduled_start_at = models.DateTimeField(null=True, blank=True)
     raw_payload = models.JSONField(default=dict, blank=True)
     fetched_at = models.DateTimeField(default=timezone.now)
     last_seen_at = models.DateTimeField(default=timezone.now)
@@ -679,6 +742,8 @@ class ExternalRace(TimestampedModel):
 
 class ExternalRaceEntry(TimestampedModel):
     source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
     race = models.ForeignKey(ExternalRace, on_delete=models.CASCADE, related_name="entries")
     external_race_id = models.CharField(max_length=32)
     entry_key = models.CharField(max_length=128)
@@ -687,8 +752,13 @@ class ExternalRaceEntry(TimestampedModel):
     normalized_horse_name = models.CharField(max_length=255, blank=True)
     horse_number = models.CharField(max_length=32, blank=True)
     frame_number = models.CharField(max_length=32, blank=True)
+    barrier = models.CharField(max_length=32, blank=True)
     jockey_name = models.CharField(max_length=255, blank=True)
     trainer_name = models.CharField(max_length=255, blank=True)
+    carried_weight = models.CharField(max_length=64, blank=True)
+    equipment = models.CharField(max_length=255, blank=True)
+    rating = models.CharField(max_length=64, blank=True)
+    owner_name = models.CharField(max_length=255, blank=True)
     raw_payload = models.JSONField(default=dict, blank=True)
     fetched_at = models.DateTimeField(default=timezone.now)
     last_seen_at = models.DateTimeField(default=timezone.now)
@@ -706,6 +776,8 @@ class ExternalRaceEntry(TimestampedModel):
 
 class ExternalRaceResult(TimestampedModel):
     source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
     race = models.ForeignKey(ExternalRace, on_delete=models.CASCADE, related_name="results")
     external_race_id = models.CharField(max_length=32)
     result_key = models.CharField(max_length=128)
@@ -714,6 +786,12 @@ class ExternalRaceResult(TimestampedModel):
     normalized_horse_name = models.CharField(max_length=255, blank=True)
     horse_number = models.CharField(max_length=32, blank=True)
     finish_position = models.CharField(max_length=32, blank=True)
+    finish_time = models.CharField(max_length=64, blank=True)
+    margin = models.CharField(max_length=64, blank=True)
+    odds_value = models.CharField(max_length=64, blank=True)
+    running_position = models.CharField(max_length=255, blank=True)
+    sectional_time = models.CharField(max_length=255, blank=True)
+    barrier = models.CharField(max_length=32, blank=True)
     jockey_name = models.CharField(max_length=255, blank=True)
     trainer_name = models.CharField(max_length=255, blank=True)
     raw_payload = models.JSONField(default=dict, blank=True)
@@ -733,6 +811,8 @@ class ExternalRaceResult(TimestampedModel):
 
 class ExternalRaceOdds(TimestampedModel):
     source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
     race = models.ForeignKey(ExternalRace, on_delete=models.CASCADE, related_name="odds")
     external_race_id = models.CharField(max_length=32)
     odds_type = models.CharField(max_length=64, blank=True)
@@ -755,13 +835,22 @@ class ExternalRaceOdds(TimestampedModel):
 
 class ExternalHorse(TimestampedModel):
     source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
     horse_id = models.CharField(max_length=32)
     horse_name = models.CharField(max_length=255, blank=True)
+    horse_name_en = models.CharField(max_length=255, blank=True)
+    horse_name_zh_hant = models.CharField(max_length=255, blank=True)
     normalized_horse_name = models.CharField(max_length=255, blank=True)
     sex = models.CharField(max_length=64, blank=True)
     birth_date = models.DateField(null=True, blank=True)
+    country = models.CharField(max_length=128, blank=True)
+    color = models.CharField(max_length=128, blank=True)
     father_name = models.CharField(max_length=255, blank=True)
     mother_name = models.CharField(max_length=255, blank=True)
+    owner_name = models.CharField(max_length=255, blank=True)
+    trainer_name = models.CharField(max_length=255, blank=True)
+    record_summary = models.CharField(max_length=255, blank=True)
     raw_payload = models.JSONField(default=dict, blank=True)
     fetched_at = models.DateTimeField(default=timezone.now)
     last_seen_at = models.DateTimeField(default=timezone.now)
@@ -781,6 +870,8 @@ class ExternalHorse(TimestampedModel):
 
 class ExternalHorseHistory(TimestampedModel):
     source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
     horse = models.ForeignKey(ExternalHorse, on_delete=models.CASCADE, related_name="history")
     external_horse_id = models.CharField(max_length=32)
     external_race_id = models.CharField(max_length=32, blank=True)
@@ -805,9 +896,13 @@ class ExternalHorseHistory(TimestampedModel):
 
 class ExternalHorseAlias(TimestampedModel):
     source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
     horse = models.ForeignKey(ExternalHorse, on_delete=models.CASCADE, related_name="aliases", null=True, blank=True)
     external_horse_id = models.CharField(max_length=32)
     name_ja = models.CharField(max_length=255)
+    name_en = models.CharField(max_length=255, blank=True)
+    name_zh_hant = models.CharField(max_length=255, blank=True)
     normalized_name = models.CharField(max_length=255)
     confidence = models.PositiveSmallIntegerField(default=100)
     alias_source = models.CharField(max_length=64, blank=True)
@@ -829,6 +924,8 @@ class ExternalHorseAlias(TimestampedModel):
 
 class ExternalDataImportRun(TimestampedModel):
     source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
     target_type = models.CharField(max_length=32)
     target_year = models.PositiveSmallIntegerField(null=True, blank=True)
     target_month = models.PositiveSmallIntegerField(null=True, blank=True)
@@ -857,6 +954,8 @@ class ExternalDataImportRun(TimestampedModel):
 class ExternalDataImportError(TimestampedModel):
     run = models.ForeignKey(ExternalDataImportRun, on_delete=models.CASCADE, related_name="errors")
     source = models.CharField(max_length=32, choices=ExternalDataSource.choices, default=ExternalDataSource.NETKEIBA)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
     target_type = models.CharField(max_length=32)
     target_id = models.CharField(max_length=128)
     error_type = models.CharField(max_length=128)
@@ -874,6 +973,7 @@ class ExternalDataImportError(TimestampedModel):
 
 class ExternalDataImportLock(TimestampedModel):
     source = models.CharField(max_length=32, choices=ExternalDataSource.choices, unique=True)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
     locked_by_run = models.ForeignKey(
         ExternalDataImportRun,
         on_delete=models.SET_NULL,
@@ -889,6 +989,7 @@ class ExternalDataImportLock(TimestampedModel):
 
 class TermEntry(TimestampedModel):
     term_type = models.CharField(max_length=32, choices=TermType.choices, default=TermType.OTHER)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
     source_ja = models.CharField(max_length=255)
     target_zh = models.CharField(max_length=255)
     aliases_ja = models.JSONField(default=list, blank=True)
@@ -908,9 +1009,70 @@ class TermEntry(TimestampedModel):
         aliases = self.aliases_ja if isinstance(self.aliases_ja, list) else []
         return [self.source_ja, *aliases]
 
+    def all_source_terms(self) -> list[str]:
+        values = [*self.all_japanese_terms()]
+        if self.pk:
+            values.extend(
+                self.source_aliases.filter(is_active=True)
+                .order_by("source_language", "alias_type", "text")
+                .values_list("text", flat=True)
+            )
+        result: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            normalized = (value or "").strip()
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                result.append(normalized)
+        return result
+
+    def source_terms_for_language(self, source_language: str | None) -> list[str]:
+        language = source_language or SourceLanguage.JAPANESE
+        values: list[str] = []
+        if language == self.source_language:
+            values.extend(self.all_japanese_terms())
+        if self.pk:
+            values.extend(
+                self.source_aliases.filter(source_language=language, is_active=True)
+                .order_by("alias_type", "text")
+                .values_list("text", flat=True)
+            )
+        result: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            normalized = (value or "").strip()
+            if normalized and normalized not in seen:
+                seen.add(normalized)
+                result.append(normalized)
+        return result
+
+
+class TermAlias(TimestampedModel):
+    term = models.ForeignKey(TermEntry, on_delete=models.CASCADE, related_name="source_aliases")
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
+    text = models.CharField(max_length=255)
+    alias_type = models.CharField(max_length=16, choices=TermAliasType.choices, default=TermAliasType.ALIAS)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ("source_language", "alias_type", "text")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("term", "source_language", "text"),
+                name="uq_term_alias_term_language_text",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("source_language", "text"), name="idx_termalias_lang_text"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.text} ({self.source_language}) -> {self.term.target_zh}"
+
 
 class TermCandidate(TimestampedModel):
     term_type = models.CharField(max_length=32, choices=TermType.choices)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
     source_ja = models.CharField(max_length=255)
     normalized_key = models.CharField(max_length=255)
     target_zh = models.CharField(max_length=255, blank=True)
@@ -964,7 +1126,7 @@ class TermCandidate(TimestampedModel):
         ordering = ("-last_seen_at", "-confidence", "-id")
         constraints = [
             models.UniqueConstraint(
-                fields=("term_type", "normalized_key"),
+                fields=("term_type", "source_language", "normalized_key"),
                 name="uq_term_candidate_type_normalized",
             )
         ]
@@ -1005,6 +1167,14 @@ class PushTarget(TimestampedModel):
     group_id = models.CharField(max_length=64, unique=True)
     is_default = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    allowed_regions = models.JSONField(default=list, blank=True)
+    push_scope = models.CharField(max_length=32, choices=QQPushScope.choices, blank=True, default=QQPushScope.INHERIT)
+    importance_strategy = models.CharField(
+        max_length=32,
+        choices=QQPushImportanceStrategy.choices,
+        blank=True,
+        default=QQPushImportanceStrategy.INHERIT,
+    )
 
     class Meta:
         ordering = ("-is_default", "name")

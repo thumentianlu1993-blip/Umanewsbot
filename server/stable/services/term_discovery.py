@@ -10,12 +10,13 @@ from django.utils import timezone
 
 from stable.models import (
     NewsArticle,
+    SourceLanguage,
     TermCandidate,
     TermCandidateEvidence,
     TermEntry,
     TermType,
 )
-from stable.services.terms import recognize_horse_names
+from stable.services.terms import recognize_horse_names, source_terms_by_entry
 
 
 SUPPORTED_TERM_TYPES = {TermType.HORSE, TermType.RACE, TermType.JOCKEY, TermType.OWNER}
@@ -37,19 +38,26 @@ class TermDiscoveryFinding:
 def normalize_japanese_term(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", value or "").strip()
     normalized = re.sub(r"\s+", " ", normalized)
-    return normalized.translate(str.maketrans({"（": "(", "）": ")", "・": "·"}))
+    normalized = normalized.translate(str.maketrans({"（": "(", "）": ")", "・": "·"}))
+    return normalized.casefold()
 
 
-def _term_matches(entry: TermEntry, normalized: str) -> bool:
-    return any(normalize_japanese_term(value) == normalized for value in entry.all_japanese_terms() if value)
+def _term_matches(source_terms: list[str], normalized: str) -> bool:
+    return any(normalize_japanese_term(value) == normalized for value in source_terms if value)
 
 
-def match_formal_terms(term_type: str, source_ja: str) -> tuple[list[TermEntry], list[TermEntry]]:
+def match_formal_terms(
+    term_type: str,
+    source_ja: str,
+    source_language: str = SourceLanguage.JAPANESE,
+) -> tuple[list[TermEntry], list[TermEntry]]:
     normalized = normalize_japanese_term(source_ja)
     same_type: list[TermEntry] = []
     other_type: list[TermEntry] = []
-    for entry in TermEntry.objects.all():
-        if not _term_matches(entry, normalized):
+    entries = list(TermEntry.objects.all())
+    terms_by_entry = source_terms_by_entry(entries, source_language)
+    for entry in entries:
+        if not _term_matches(terms_by_entry.get(entry.pk, []), normalized):
             continue
         if entry.term_type == term_type:
             same_type.append(entry)
@@ -101,18 +109,21 @@ def discover_term_findings(article: NewsArticle) -> list[TermDiscoveryFinding]:
     results: list[TermDiscoveryFinding] = []
     title = article.title_ja or ""
     body = article.body_ja_normalized or article.body_ja_raw or ""
-    for horse in recognize_horse_names(title, body, limit=None):
+    source_language = article.source_language or SourceLanguage.JAPANESE
+    for horse in recognize_horse_names(title, body, limit=None, source_language=source_language):
         if not horse.needs_preserve:
             continue
-        field, text = ("title_ja", title) if horse.name_ja in title else ("body_ja_normalized", body)
+        matched_text = horse.matched_text or horse.name_ja
+        field, text = ("title_ja", title) if matched_text in title else ("body_ja_normalized", body)
         detector = "external_horse_alias" if horse.source == "external_alias" else "unknown_horse"
         reason = "本地外部马名索引命中且缺少中文译名" if horse.source == "external_alias" else "疑似未知马名"
         confidence = max(85, horse.confidence) if horse.source == "external_alias" else horse.confidence
-        finding = _finding(TermType.HORSE, horse.name_ja, confidence, detector, reason, field, text)
+        finding = _finding(TermType.HORSE, matched_text, confidence, detector, reason, field, text)
         if finding:
             results.append(finding)
     for field, text in fields:
-        results.extend(_regex_findings(text, field))
+        if source_language == SourceLanguage.JAPANESE:
+            results.extend(_regex_findings(text, field))
     return results
 
 
@@ -143,13 +154,15 @@ def aggregate_finding(article: NewsArticle, finding: TermDiscoveryFinding) -> Te
     minimum = int(getattr(settings, "TERM_DISCOVERY_MIN_CONFIDENCE", 60))
     if finding.confidence < minimum:
         return None
+    source_language = article.source_language or SourceLanguage.JAPANESE
     normalized = normalize_japanese_term(finding.source_ja)
-    same_type, other_type = match_formal_terms(finding.term_type, finding.source_ja)
+    same_type, other_type = match_formal_terms(finding.term_type, finding.source_ja, source_language)
     if same_type:
         return None
     now = timezone.now()
     defaults = {
         "source_ja": finding.source_ja,
+        "source_language": source_language,
         "target_zh": "",
         "aliases_ja": [],
         "aliases_zh": [],
@@ -163,11 +176,16 @@ def aggregate_finding(article: NewsArticle, finding: TermDiscoveryFinding) -> Te
     try:
         candidate, _ = TermCandidate.objects.select_for_update().get_or_create(
             term_type=finding.term_type,
+            source_language=source_language,
             normalized_key=normalized,
             defaults=defaults,
         )
     except IntegrityError:
-        candidate = TermCandidate.objects.select_for_update().get(term_type=finding.term_type, normalized_key=normalized)
+        candidate = TermCandidate.objects.select_for_update().get(
+            term_type=finding.term_type,
+            source_language=source_language,
+            normalized_key=normalized,
+        )
     evidence, _ = TermCandidateEvidence.objects.select_for_update().get_or_create(candidate=candidate, article=article)
     contexts = _unique_strings([*(evidence.contexts or []), finding.context], MAX_CONTEXTS_PER_EVIDENCE)
     source_fields = _unique_strings([*(evidence.source_fields or []), finding.source_field])

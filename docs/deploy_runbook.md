@@ -1109,3 +1109,65 @@ QQ_PUSH_ENABLED=false
 cd /opt/umanewsbot
 docker rm -f umanewsbot-onebot-1
 ```
+
+## expand-international-racing-coverage 部署前运维说明
+
+> 当前状态：本 change 仍在本地实现与验证阶段，尚未部署生产。本节用于后续部署前核对。
+
+### QQ 群级自动推送配置
+
+- `QQ_PUSH_ENABLED` 仍是总开关，只决定自动推送任务是否运行。
+- `PushTarget.allowed_regions`、`PushTarget.push_scope`、`PushTarget.importance_strategy` 决定“推什么给谁”。
+- 迁移会把已有 `PushTarget.allowed_regions` 回填为 `["japan"]`，保留旧的日本新闻推送行为；运行时若遇到空地区列表，也按兼容默认处理为仅允许 `japan`，不得默认推送全球新闻。
+- `PushTarget.push_scope` 为空时回退到全局 `QQ_PUSH_SCOPE`。
+- `PushTarget.importance_strategy` 为空时回退到全局 `QQ_PUSH_IMPORTANCE_STRATEGY`。
+- 文章 `racing_region` 缺失或非法时，自动推送必须跳过，原因记录为 `region_missing`。
+- 自动推送创建交付前会逐个目标群判断地区、范围和重点策略；不符合目标群配置的群不会创建新的 `QQPushDelivery`。
+
+部署后建议核对：
+
+```bash
+python manage.py shell -c "from stable.models import PushTarget; print(list(PushTarget.objects.values('name','group_id','is_active','allowed_regions','push_scope','importance_strategy')))"
+```
+
+回滚/停用方式：
+
+```env
+QQ_PUSH_ENABLED=false
+```
+
+如果只想恢复旧日本新闻推送行为，可在 Django Admin 中把目标群 `allowed_regions` 设置为 `["japan"]` 或留空，并把 `push_scope / importance_strategy` 留空，让代码只在范围和重点策略上回退到全局配置。
+
+### HKJC 外部数据导入命令
+
+HKJC 导入默认 dry-run，不会写正式外部缓存表：
+
+```bash
+python manage.py import_hkjc_external_data --race-date 2026-06-21 --payload-file /path/to/hkjc_sample.json
+```
+
+确认样本字段后再提交写入 External* 缓存表：
+
+```bash
+python manage.py import_hkjc_external_data --race-date 2026-06-21 --payload-file /path/to/hkjc_sample.json --commit
+```
+
+提交写入仍是小样本受控导入：命令会按配置检查 `max_races / max_horses`，payload 超过上限时直接失败，不会静默截断或部分写入。遇到超限时应拆分样本文件后重新 dry-run，再提交。
+
+查询导入统计：
+
+```bash
+python manage.py import_hkjc_external_data --stats-run-id <run_id>
+```
+
+查询本地 HKJC 马名索引：
+
+```bash
+python manage.py import_hkjc_external_data --lookup-name "Lucky Star"
+```
+
+生产注意事项：
+
+- 部署前必须确认没有正在运行的外部数据导入。
+- 后续如启用真实网络请求，必须从单赛日、单场、单马小样本开始，并保持低频限速。
+- 本 change 不创建比赛页、赛果页、马匹页；导入数据只作为外部缓存、马名识别和后续项目底座。

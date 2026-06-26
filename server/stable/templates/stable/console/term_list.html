@@ -16,11 +16,17 @@
 
   <section class="panel">
     <form method="get" class="filters">
-      <input type="text" name="q" placeholder="搜索日文原词、中文译词、别名或备注" value="{{ request.GET.q }}">
+      <input type="text" name="q" placeholder="搜索原文、中文译词、别名或备注" value="{{ request.GET.q }}">
       <select name="term_type">
         <option value="">全部类型</option>
         {% for value, label in term_type_choices %}
           <option value="{{ value }}" {% if request.GET.term_type == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="source_language">
+        <option value="">全部原文语言</option>
+        {% for value, label in source_language_choices %}
+          <option value="{{ value }}" {% if request.GET.source_language == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
       <select name="is_active">
@@ -41,11 +47,12 @@
       <table>
         <thead>
           <tr>
-            <th>日文原词</th>
+            <th>原文</th>
+            <th>原文语言</th>
             <th>中文译词</th>
             <th>类型</th>
             <th>比赛等级</th>
-            <th>日文别名</th>
+            <th>原文别名</th>
             <th>中文别名</th>
             <th>优先级</th>
             <th>状态</th>
@@ -62,6 +69,7 @@
                   <div class="muted">{{ term.notes|truncatechars:36 }}</div>
                 {% endif %}
               </td>
+              <td>{{ term.get_source_language_display }}</td>
               <td>{{ term.target_zh }}</td>
               <td>{{ term.get_term_type_display }}</td>
               <td>{{ term.race_grade|default:"-" }}</td>
@@ -89,7 +97,7 @@
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="10" class="muted">还没有术语，先新建一条或批量导入。</td></tr>
+            <tr><td colspan="11" class="muted">还没有术语，先新建一条或批量导入。</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -99,6 +107,7 @@
         <article class="article-card term-mobile-card">
           <div class="article-meta">
             <span class="badge gold">{{ term.get_term_type_display }}</span>
+            <span class="badge">{{ term.get_source_language_display }}</span>
             {% if term.is_active %}
               <span class="badge success">启用中</span>
             {% else %}
@@ -108,7 +117,7 @@
           <h3 class="article-title">{{ term.source_ja }}</h3>
           <p class="term-mobile-target">{{ term.target_zh }}</p>
           <div class="term-mobile-meta">
-            <div><strong>日文别名</strong><span>{{ term.aliases_ja|length }}</span></div>
+            <div><strong>原文别名</strong><span>{{ term.aliases_ja|length }}</span></div>
             <div><strong>中文别名</strong><span>{{ term.aliases_zh|length }}</span></div>
             <div><strong>比赛等级</strong><span>{{ term.race_grade|default:"-" }}</span></div>
             <div><strong>优先级</strong><span>{{ term.priority }}</span></div>
@@ -133,11 +142,11 @@
     </div>
     <div class="pagination">
       {% if page_obj.has_previous %}
-        <a class="btn ghost" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.term_type %}term_type={{ request.GET.term_type }}&{% endif %}{% if request.GET.is_active %}is_active={{ request.GET.is_active }}&{% endif %}{% if request.GET.has_alias %}has_alias={{ request.GET.has_alias }}&{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>
+        <a class="btn ghost" href="?{% if pagination_querystring %}{{ pagination_querystring }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>
       {% endif %}
       <span class="badge">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
       {% if page_obj.has_next %}
-        <a class="btn ghost" href="?{% if request.GET.q %}q={{ request.GET.q }}&{% endif %}{% if request.GET.term_type %}term_type={{ request.GET.term_type }}&{% endif %}{% if request.GET.is_active %}is_active={{ request.GET.is_active }}&{% endif %}{% if request.GET.has_alias %}has_alias={{ request.GET.has_alias }}&{% endif %}page={{ page_obj.next_page_number }}">下一页</a>
+        <a class="btn ghost" href="?{% if pagination_querystring %}{{ pagination_querystring }}&amp;{% endif %}page={{ page_obj.next_page_number }}">下一页</a>
       {% endif %}
     </div>
   </section>

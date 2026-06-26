@@ -3,7 +3,9 @@
     <div class="news-card-body">
       <div class="article-meta">
         <span>{{ article.published_to_web_at|date:"Y-m-d H:i" }}</span>
+        <span>{{ article.get_racing_region_display }}</span>
         <span>{{ article.source_note|default:article.get_source_site_display }}</span>
+        <span>{{ article.get_source_language_display }}</span>
       </div>
       <h2><a href="{{ article.public_path }}">{{ article.effective_title }}</a></h2>
       {% if article.effective_summary %}

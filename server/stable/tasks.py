@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from stable.adapters.jra import JRAAdapter
+from stable.adapters.international import INTERNATIONAL_ADAPTERS
 from stable.adapters.netkeiba import NetkeibaAdapter
 from stable.models import (
     ArticleStatus,
@@ -212,6 +213,37 @@ def _crawl_jra_source(source: NewsSource | None = None) -> dict:
         raise
 
 
+def _crawl_international_source(source: NewsSource) -> dict:
+    adapter_class = INTERNATIONAL_ADAPTERS.get(source.adapter_key)
+    if adapter_class is None:
+        raise NotImplementedError(f"未支持的国际新闻适配器：{source.adapter_key}")
+    adapter = adapter_class()
+    job = _start_crawl_job(source)
+    new_count = 0
+    seen_count = 0
+    try:
+        for stub in adapter.fetch_listing(source.source_mode, 1):
+            detail = adapter.fetch_detail(stub.source_url)
+            draft = adapter.normalize_source_payload(stub, detail)
+            upsert_result = upsert_article_from_draft(draft, crawl_job=job)
+            article, created = upsert_result
+            if created:
+                new_count += 1
+                _discover_terms_after_ingest(article)
+                _auto_translate_article_after_ingest(article)
+            else:
+                seen_count += 1
+                _qq_push_after_source_elevation(
+                    article,
+                    source_elevated=bool(getattr(upsert_result, "source_elevated", False)),
+                )
+        _finish_crawl_job(job, success_count=new_count, fail_count=seen_count)
+        return {"new_count": new_count, "seen_count": seen_count, "crawl_job_id": job.id}
+    except Exception as exc:
+        _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, error_message=str(exc))
+        raise
+
+
 @shared_task
 def crawl_netkeiba_latest(max_pages: int = 3, rush_window: bool = False) -> dict:
     sync_builtin_sources()
@@ -279,8 +311,10 @@ def crawl_news_source_task(source_id: int) -> dict:
             result = _crawl_netkeiba_mode(source.source_mode, pages, source=source)
         elif source.adapter_key == "jra":
             result = _crawl_jra_source(source=source)
+        elif source.adapter_key in INTERNATIONAL_ADAPTERS:
+            result = _crawl_international_source(source)
         else:
-            raise NotImplementedError("当前版本仅支持内置 netkeiba / JRA 来源")
+            raise NotImplementedError("当前版本仅支持内置 netkeiba / JRA / 一期国际新闻来源")
         _log_success(log, f"source={source_id} new={result['new_count']} seen={result['seen_count']}")
         return result
     except Exception as exc:
@@ -681,7 +715,7 @@ def qq_auto_push_article_task(article_id: int) -> dict:
         return {"article_id": article_id, "skipped": True, "reason": "disabled"}
     try:
         article = NewsArticle.objects.get(pk=article_id)
-        eligibility = should_push_news_to_qq(article)
+        eligibility = should_push_news_to_qq(article, scope="all_public")
         if not eligibility.allowed:
             _log_success(log, f"skipped: {eligibility.reason}")
             return {"article_id": article_id, "skipped": True, "reason": eligibility.reason}
@@ -689,7 +723,15 @@ def qq_auto_push_article_task(article_id: int) -> dict:
         if not targets:
             _log_success(log, "skipped: no active targets")
             return {"article_id": article_id, "skipped": True, "reason": "no_targets"}
-        deliveries = ensure_qq_push_deliveries(article, targets)
+        eligible_targets = []
+        target_skip_reasons: dict[str, str] = {}
+        for target in targets:
+            target_eligibility = should_push_news_to_qq(article, target=target)
+            if target_eligibility.allowed:
+                eligible_targets.append(target)
+            else:
+                target_skip_reasons[str(target.id)] = target_eligibility.reason or "not_eligible"
+        deliveries = ensure_qq_push_deliveries(article, eligible_targets)
         queued_ids: list[int] = []
         skipped_ids: list[int] = []
         for delivery in deliveries:
@@ -698,11 +740,12 @@ def qq_auto_push_article_task(article_id: int) -> dict:
                 continue
             qq_push_delivery_task.delay(delivery.id)
             queued_ids.append(delivery.id)
-        _log_success(log, f"queued={len(queued_ids)} already_sent={len(skipped_ids)}")
+        _log_success(log, f"queued={len(queued_ids)} already_sent={len(skipped_ids)} target_skipped={len(target_skip_reasons)}")
         return {
             "article_id": article_id,
             "queued_delivery_ids": queued_ids,
             "already_sent_delivery_ids": skipped_ids,
+            "target_skip_reasons": target_skip_reasons,
         }
     except Exception as exc:
         _log_failure(log, str(exc))

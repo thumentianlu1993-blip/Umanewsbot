@@ -34,9 +34,14 @@
           <div class="help">仅赛事术语需要设置；马名等类型保持未设置。</div>
           {% if form.race_grade.errors %}<div class="help" style="color: var(--danger);">{{ form.race_grade.errors|join:' ' }}</div>{% endif %}
         </div>
+        <div class="field">
+          <label for="{{ form.source_language.id_for_label }}">原文语言</label>
+          {{ form.source_language }}
+          {% if form.source_language.errors %}<div class="help" style="color: var(--danger);">{{ form.source_language.errors|join:' ' }}</div>{% endif %}
+        </div>
 
         <div class="field">
-          <label for="{{ form.source_ja.id_for_label }}">日文原词</label>
+          <label for="{{ form.source_ja.id_for_label }}">原文</label>
           {{ form.source_ja }}
           {% if form.source_ja.errors %}<div class="help" style="color: var(--danger);">{{ form.source_ja.errors|join:' ' }}</div>{% endif %}
         </div>
@@ -47,9 +52,9 @@
         </div>
 
         <div class="field full">
-          <label>日文别名</label>
+          <label>原文别名</label>
           {{ form.aliases_ja_text }}
-          <div class="chip-editor" data-target="#id_aliases_ja_text" data-placeholder="输入日文别名，按回车添加"></div>
+          <div class="chip-editor" data-target="#id_aliases_ja_text" data-placeholder="输入原文别名，按回车添加"></div>
           <div class="help">支持回车新增、删除单个别名、以及粘贴多行自动拆分。</div>
           {% if form.aliases_ja_text.errors %}<div class="help" style="color: var(--danger);">{{ form.aliases_ja_text.errors|join:' ' }}</div>{% endif %}
         </div>

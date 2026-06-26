@@ -4,15 +4,19 @@ import csv
 import io
 import json
 import re
+import unicodedata
 from dataclasses import dataclass
 
-from stable.models import TermEntry, TermType
+from django.utils import timezone
+
+from stable.models import SourceLanguage, TermAlias, TermAliasType, TermEntry, TermType
 from stable.services.race_grades import normalize_race_grade
 
 
 VALID_TERM_TYPES = {value for value, _label in TermType.choices}
 EXPECTED_CSV_HEADERS = {
     "term_type",
+    "source_language",
     "source_ja",
     "target_zh",
     "aliases_ja",
@@ -35,6 +39,11 @@ CSV_CANDIDATE_ENCODINGS = (
 )
 VALID_BOOL_TRUE = {"1", "true", "yes", "y", "on", "启用", "是"}
 VALID_BOOL_FALSE = {"0", "false", "no", "n", "off", "停用", "否"}
+SUPPORTED_TERM_SOURCE_LANGUAGES = {
+    SourceLanguage.JAPANESE,
+    SourceLanguage.ENGLISH,
+    SourceLanguage.CHINESE_TRADITIONAL,
+}
 
 
 @dataclass
@@ -57,15 +66,214 @@ def split_aliases(raw: str | list | None) -> list[str]:
     seen: set[str] = set()
     for item in values:
         value = str(item).strip()
-        if not value or value in seen:
+        key = source_text_identity(value)
+        if not value or key in seen:
             continue
-        seen.add(value)
+        seen.add(key)
         normalized.append(value)
     return normalized
 
 
 def serialize_aliases(values: list[str]) -> str:
     return "\n".join(values or [])
+
+
+def term_source_texts(source_ja: str, aliases_ja: list[str]) -> list[str]:
+    values = [source_ja, *(aliases_ja or [])]
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        normalized = (value or "").strip()
+        key = source_text_identity(normalized)
+        if normalized and key not in seen:
+            seen.add(key)
+            result.append(normalized)
+    return result
+
+
+def source_text_identity(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value or "").strip()
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.casefold()
+
+
+def source_aliases_for_primary(source_ja: str, aliases_ja: list[str]) -> list[str]:
+    primary_key = source_text_identity(source_ja)
+    aliases: list[str] = []
+    seen: set[str] = {primary_key} if primary_key else set()
+    for alias in aliases_ja or []:
+        value = (alias or "").strip()
+        key = source_text_identity(value)
+        if not value or key in seen:
+            continue
+        seen.add(key)
+        aliases.append(value)
+    return aliases
+
+
+def find_term_by_source_alias(
+    *,
+    term_type: str,
+    source_language: str,
+    source_text: str,
+    exclude_term_id: int | None = None,
+) -> TermEntry | None:
+    text = (source_text or "").strip()
+    if not term_type or not source_language or not text:
+        return None
+    alias_queryset = TermAlias.objects.select_related("term").filter(
+        term__term_type=term_type,
+        source_language=source_language,
+        text__iexact=text,
+    )
+    if exclude_term_id:
+        alias_queryset = alias_queryset.exclude(term_id=exclude_term_id)
+    alias = alias_queryset.first()
+    if alias:
+        return alias.term
+    entry_queryset = TermEntry.objects.filter(
+        term_type=term_type,
+        source_language=source_language,
+        source_ja__iexact=text,
+    )
+    if exclude_term_id:
+        entry_queryset = entry_queryset.exclude(pk=exclude_term_id)
+    return entry_queryset.first()
+
+
+def resolve_term_import_target(
+    *,
+    term_type: str,
+    source_language: str,
+    source_ja: str,
+    aliases_ja: list[str],
+) -> tuple[TermEntry | None, list[str]]:
+    existing = find_term_by_source_alias(
+        term_type=term_type,
+        source_language=source_language,
+        source_text=source_ja,
+    )
+    conflict_errors: list[str] = []
+    for alias in source_aliases_for_primary(source_ja, aliases_ja):
+        alias_owner = find_term_by_source_alias(
+            term_type=term_type,
+            source_language=source_language,
+            source_text=alias,
+        )
+        if alias_owner is None:
+            continue
+        if existing is not None and alias_owner.pk == existing.pk:
+            continue
+        conflict_errors.append(
+            f"原文别名“{alias}”已属于术语 ID：{alias_owner.pk}，不能用于另一条术语。"
+        )
+    return existing, conflict_errors
+
+
+def sync_term_source_alias_values(
+    term: TermEntry,
+    *,
+    source_language: str,
+    source_text: str,
+    aliases: list[str],
+    is_active: bool,
+) -> None:
+    language = source_language or SourceLanguage.JAPANESE
+    primary = (source_text or "").strip()
+    desired = [(primary, TermAliasType.PRIMARY), *[(alias, TermAliasType.ALIAS) for alias in aliases]]
+    seen: set[str] = set()
+    keep_ids: list[int] = []
+    existing_aliases = list(
+        TermAlias.objects.filter(term=term, source_language=language).order_by("alias_type", "text", "pk")
+    )
+    for text, alias_type in desired:
+        normalized = (text or "").strip()
+        key = source_text_identity(normalized)
+        if not normalized or key in seen:
+            continue
+        seen.add(key)
+        alias = next((item for item in existing_aliases if item.text == normalized), None)
+        if alias is None:
+            alias = next((item for item in existing_aliases if source_text_identity(item.text) == key), None)
+        created = alias is None
+        if created:
+            alias = TermAlias.objects.create(
+                term=term,
+                source_language=language,
+                text=normalized,
+                alias_type=alias_type,
+                is_active=is_active,
+            )
+            existing_aliases.append(alias)
+        updates = []
+        if alias.text != normalized:
+            alias.text = normalized
+            updates.append("text")
+        if alias.alias_type != alias_type:
+            alias.alias_type = alias_type
+            updates.append("alias_type")
+        if alias.is_active != is_active:
+            alias.is_active = is_active
+            updates.append("is_active")
+        if updates and not created:
+            alias.save(update_fields=[*updates, "updated_at"])
+        keep_ids.append(alias.pk)
+    TermAlias.objects.filter(term=term, source_language=language).exclude(pk__in=keep_ids).delete()
+
+
+def upsert_term_source_alias(
+    term: TermEntry,
+    *,
+    source_language: str,
+    text: str,
+    alias_type: str = TermAliasType.ALIAS,
+    is_active: bool | None = None,
+) -> TermAlias | None:
+    language = source_language or SourceLanguage.JAPANESE
+    normalized = (text or "").strip()
+    if not normalized:
+        return None
+    alias = (
+        TermAlias.objects.filter(term=term, source_language=language, text__iexact=normalized)
+        .order_by("alias_type", "text", "pk")
+        .first()
+    )
+    if alias is None:
+        return TermAlias.objects.create(
+            term=term,
+            source_language=language,
+            text=normalized,
+            alias_type=alias_type,
+            is_active=term.is_active if is_active is None else is_active,
+        )
+    updates = []
+    if alias.text != normalized:
+        alias.text = normalized
+        updates.append("text")
+    if alias.alias_type != alias_type:
+        alias.alias_type = alias_type
+        updates.append("alias_type")
+    desired_active = term.is_active if is_active is None else is_active
+    if alias.is_active != desired_active:
+        alias.is_active = desired_active
+        updates.append("is_active")
+    if updates:
+        alias.save(update_fields=[*updates, "updated_at"])
+    return alias
+
+
+def sync_term_source_aliases(term: TermEntry, source_language: str | None = None) -> None:
+    sync_term_source_alias_values(
+        term,
+        source_language=source_language or term.source_language or SourceLanguage.JAPANESE,
+        source_text=term.source_ja,
+        aliases=split_aliases(term.aliases_ja),
+        is_active=term.is_active,
+    )
+
+
+def sync_all_term_alias_active(term: TermEntry) -> None:
+    TermAlias.objects.filter(term=term).update(is_active=term.is_active, updated_at=timezone.now())
 
 
 def parse_bool(raw, default: bool = True) -> bool:
@@ -158,10 +366,11 @@ def validate_term_payload(
     errors: dict[str, list[str]] = {}
 
     term_type = (payload.get("term_type") or "").strip()
+    source_language = (payload.get("source_language") or SourceLanguage.JAPANESE).strip()
     source_ja = (payload.get("source_ja") or "").strip()
     target_zh = (payload.get("target_zh") or "").strip()
     notes = (payload.get("notes") or "").strip()
-    aliases_ja = split_aliases(payload.get("aliases_ja"))
+    aliases_ja = source_aliases_for_primary(source_ja, split_aliases(payload.get("aliases_ja")))
     aliases_zh = split_aliases(payload.get("aliases_zh"))
     race_grade_raw = (payload.get("race_grade") or "").strip()
 
@@ -170,8 +379,11 @@ def validate_term_payload(
     elif term_type not in VALID_TERM_TYPES:
         errors.setdefault("term_type", []).append("术语类型不合法。")
 
+    if source_language not in SUPPORTED_TERM_SOURCE_LANGUAGES:
+        errors.setdefault("source_language", []).append("原文语言不合法。")
+
     if not source_ja:
-        errors.setdefault("source_ja", []).append("日文原词不能为空。")
+        errors.setdefault("source_ja", []).append("原文不能为空。")
 
     if not target_zh:
         errors.setdefault("target_zh", []).append("中文译词不能为空。")
@@ -196,17 +408,22 @@ def validate_term_payload(
         race_grade = ""
 
     if term_type and source_ja and not allow_existing:
-        queryset = TermEntry.objects.filter(term_type=term_type, source_ja=source_ja)
-        if instance_id:
-            queryset = queryset.exclude(pk=instance_id)
-        if queryset.exists():
-            existing = queryset.first()
-            errors.setdefault("source_ja", []).append(
-                f"同一术语类型下已存在相同日文原词，已有术语 ID：{existing.pk}。"
+        for source_text in term_source_texts(source_ja, aliases_ja):
+            existing = find_term_by_source_alias(
+                term_type=term_type,
+                source_language=source_language,
+                source_text=source_text,
+                exclude_term_id=instance_id,
             )
+            if existing:
+                errors.setdefault("source_ja", []).append(
+                    f"同一术语类型和原文语言下已存在相同原文或别名“{source_text}”，已有术语 ID：{existing.pk}。"
+                )
+                break
 
     normalized = {
         "term_type": term_type,
+        "source_language": source_language,
         "source_ja": source_ja,
         "target_zh": target_zh,
         "aliases_ja": aliases_ja,
@@ -246,6 +463,7 @@ def preview_term_import(*, csv_file=None, csv_text: str = "", import_mode: str =
         normalized, field_errors = validate_term_payload(
             {
                 "term_type": row.get("term_type"),
+                "source_language": row.get("source_language") or row.get("language"),
                 "source_ja": row.get("source_ja"),
                 "target_zh": row.get("target_zh"),
                 "aliases_ja": row.get("aliases_ja"),
@@ -258,13 +476,17 @@ def preview_term_import(*, csv_file=None, csv_text: str = "", import_mode: str =
             allow_existing=import_mode == "upsert",
         )
         existing = None
+        conflict_errors: list[str] = []
         if normalized["term_type"] and normalized["source_ja"]:
-            existing = TermEntry.objects.filter(
+            existing, conflict_errors = resolve_term_import_target(
                 term_type=normalized["term_type"],
+                source_language=normalized["source_language"],
                 source_ja=normalized["source_ja"],
-            ).first()
+                aliases_ja=normalized["aliases_ja"],
+            )
 
         flat_errors = [message for messages in field_errors.values() for message in messages]
+        flat_errors.extend(conflict_errors)
         status = "create"
         if existing and import_mode == "create":
             flat_errors.append(f"第 {index} 行与已有术语重复，已有术语 ID：{existing.pk}。")
@@ -316,10 +538,16 @@ def commit_term_import(preview_rows: list[dict], import_mode: str) -> dict:
             continue
 
         payload = row.get("payload", {})
-        existing = TermEntry.objects.filter(
+        existing, conflict_errors = resolve_term_import_target(
             term_type=payload.get("term_type"),
+            source_language=payload.get("source_language") or SourceLanguage.JAPANESE,
             source_ja=payload.get("source_ja"),
-        ).first()
+            aliases_ja=payload.get("aliases_ja") or [],
+        )
+        if conflict_errors:
+            skipped_count += 1
+            failed_rows.append({"line_no": row.get("line_no"), "errors": conflict_errors})
+            continue
 
         if existing and import_mode == "create":
             skipped_count += 1
@@ -333,16 +561,36 @@ def commit_term_import(preview_rows: list[dict], import_mode: str) -> dict:
             entry = TermEntry()
             success_count += 1
 
-        entry.term_type = payload.get("term_type", "")
-        entry.source_ja = payload.get("source_ja", "")
+        payload_language = payload.get("source_language") or SourceLanguage.JAPANESE
+        payload_source = payload.get("source_ja", "")
+        should_replace_primary_source = not existing or (
+            entry.source_language == payload_language
+            and source_text_identity(entry.source_ja) == source_text_identity(payload_source)
+        )
+
+        if should_replace_primary_source:
+            entry.term_type = payload.get("term_type", "")
+            entry.source_language = payload_language
+            entry.source_ja = payload_source
         entry.target_zh = payload.get("target_zh", "")
-        entry.aliases_ja = payload.get("aliases_ja", [])
         entry.aliases_zh = payload.get("aliases_zh", [])
         entry.race_grade = payload.get("race_grade", "")
         entry.priority = payload.get("priority", 0)
         entry.is_active = payload.get("is_active", True)
         entry.notes = payload.get("notes", "")
+        if should_replace_primary_source:
+            entry.aliases_ja = payload.get("aliases_ja", [])
         entry.save()
+        if should_replace_primary_source:
+            sync_term_source_aliases(entry, entry.source_language)
+        else:
+            sync_term_source_alias_values(
+                entry,
+                source_language=payload_language,
+                source_text=payload_source,
+                aliases=payload.get("aliases_ja", []),
+                is_active=entry.is_active,
+            )
 
     return {
         "total": len(preview_rows),

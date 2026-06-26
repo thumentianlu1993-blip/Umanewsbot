@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from stable.models import SourceMode, SourceSite
+from stable.models import RacingRegion, SourceKind, SourceLanguage, SourceMode, SourceSite
 
 
 @dataclass
@@ -33,8 +33,9 @@ class SourceArticleDetail:
     title_ja: str
     body_ja_raw: str
     body_ja_normalized: str
-    published_at: datetime
+    published_at: datetime | None
     images: list[SourceImageDraft]
+    original_content_html: str = ""
     metadata: dict = field(default_factory=dict)
 
 
@@ -49,9 +50,14 @@ class CanonicalNewsDraft:
     body_ja_normalized: str
     published_at: datetime
     images: list[SourceImageDraft]
+    racing_region: str = ""
+    source_language: str = ""
+    source_kind: str = ""
+    original_content_html: str = ""
     comment_count: int | None = None
     attention_count: int | None = None
     rank: int | None = None
+    canonical_source_site: SourceSite | str | None = None
     metadata: dict = field(default_factory=dict)
 
 

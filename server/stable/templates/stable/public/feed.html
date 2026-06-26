@@ -5,9 +5,15 @@
 {% block content %}
   <main class="home-page">
     <section class="home-lead">
-      <span class="section-kicker">日本赛马</span>
+      <span class="section-kicker">全球赛马</span>
       <h1>赛马新闻</h1>
     </section>
+
+    <nav class="region-tabs" aria-label="地区频道">
+      {% for tab in region_tabs %}
+        <a class="{% if tab.is_active %}active{% endif %}" href="{{ tab.url }}">{{ tab.label }}</a>
+      {% endfor %}
+    </nav>
 
     {% include "stable/public/_headline.html" %}
 

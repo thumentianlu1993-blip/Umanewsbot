@@ -188,6 +188,19 @@ OpenSpec 项目上下文与任务规则以 `openspec/config.yaml` 为准；项�
 
 该设计优先保证正式术语库可信，并为后续接入模型识别或更多信息源保留可审计证据。
 
+## 为什么国际化术语库采用“正式术语概念 + 多语言原文别名”
+
+接入日本、中国香港、英国、法国和美国新闻后，同一匹马、同一场赛事或同一个人物可能同时出现日文名、英文名和繁体中文名。如果把每种语言都建成一条独立 `TermEntry`，后台会出现多个“同一实体”，自动评分、标签、翻译校验和候选合并也会越来越难解释。
+
+因此本轮国际化返修采用两层模型：
+
+- `TermEntry` 表示正式术语概念和标准简体中文译名，例如一匹马“春秋分”。
+- `TermAlias` 表示该概念在不同原文语言下的名称或别名，例如 `イクイノックス / Equinox / 春秋分`。
+
+文章匹配时只使用与文章 `source_language` 一致的原文别名，避免英文文章误命中日文别名；命中后仍回到同一个 `TermEntry`，用于统一的中文译名、标签和评分。
+
+本轮保留 `TermEntry.source_ja / aliases_ja` 作为兼容字段，迁移会把旧数据回填为 `ja` 别名。后续如果要彻底重命名旧字段，应另起清理 change。
+
 ## 为什么公开首页升级先做主 OpenSpec change
 
 公开首页从 MVP 页面升级为 Web + 移动 H5 成熟资讯流，虽然主要发生在模板、样式和视图层，但它会影响前台信息架构、后续子能力边界和用户内容消费路径，因此先创建主 OpenSpec change `upgrade-public-home-info-feed` 作为指导规范。
@@ -216,6 +229,19 @@ OpenSpec 项目上下文与任务规则以 `openspec/config.yaml` 为准；项�
 - `add-homepage-editorial-placement`：手工头条、推荐位和置顶。
 - `add-public-topic-search-navigation`：搜索、标签页、频道页和专题页。
 - `add-race-calendar-sidebar`：结构化赛事日历和今日重要赛事模块。
+
+## 为什么 QQ 群空地区配置按旧日本行为处理
+
+国际赛马资讯扩展后，QQ 群级配置需要区分“系统能不能推”和“这个群想看什么”。如果把旧群的空 `allowed_regions` 解释为所有地区，部署后既有群会在没有明确订阅的情况下突然收到中国香港、英国、法国和美国新闻。
+
+因此本轮约定：
+
+- `QQ_PUSH_ENABLED` 仍是总开关，只决定是否运行自动推送。
+- `PushTarget.allowed_regions` 决定该群允许接收哪些地区。
+- 迁移会把既有群回填为 `["japan"]`。
+- 运行时如果仍遇到空 `allowed_regions`，也按旧行为仅允许日本新闻，而不是默认允许全球新闻。
+
+这样能让国际新闻源上线后按群灰度启用，不打扰只想继续看日本新闻的旧群。
 
 ## 为什么公开首页资讯流升级要求严格 TDD
 
@@ -258,6 +284,32 @@ OpenSpec 项目上下文与任务规则以 `openspec/config.yaml` 为准；项�
 - 术语候选池应把新闻中出现、外部索引命中但缺少正式中文译名的马名均作为高置信候选，包括正文背景段落中的马名，让工作人员决定是否补入正式术语库。
 - 普通词与外部马名同名时不能无条件信任数据库，必须结合强马名上下文消歧；缺少强马名上下文时不得把普通词当马名。
 - 同一日文马名可能对应多个外部 horse ID，识别结果必须保留全部匹配 ID，并只把主 ID 作为展示辅助，避免静默丢弃同名歧义。
+
+## 为什么国际赛马资讯扩展先做多地区承载和 HKJC 导入
+
+项目下一阶段需要从日本赛马资讯扩展到日本、中国香港、英国、法国和美国，但不同地区的新闻语言、数据库开放度、审核可读性和 QQ 群偏好差异很大。因此国际化第一期不直接追求全地区全量抓取，而是先建立可承载多地区、多原文语言和多群推送偏好的主干能力。
+
+具体决策：
+
+- 前台先提供 `综合 / 日本 / 中国香港 / 英国 / 法国 / 美国` 地区 tab，综合流第一期使用已发布文章倒序，不先做复杂推荐或地区打散。
+- 新闻正文第一期只支持日文、英文和繁体中文；法国新闻只接英文来源，法语正文不进入人工审核和自动发布主链路。
+- 术语库先从 UI 和服务语义上改为“原文术语 -> 简体中文译名”，并增加原文语言；现有 `source_ja / aliases_ja` 物理字段暂时保留兼容，避免在同一阶段做高风险重命名。
+- QQ 自动推送从全局范围配置扩展为群级配置，因为不同 QQ 群可能只想看不同地区或不同范围的新闻。
+- 外部数据库第一期正式实现 HKJC，因为香港官方数据集中、字段完整、中文用户价值高；美国 `Equibase`、英国 `Sporting Life + BHA`、法国 `France Galop` 先做小样本 spike，确认字段、入口和反爬/语言风险后再进入正式导入。
+
+该决策最初只对应 OpenSpec change `expand-international-racing-coverage` 的规划边界；`2026-06-25` 已在独立 worktree 开始本地实现。当前仍不表示国际化能力已经生产上线，后续部署需要完成完整测试、OpenSpec 校验和生产窗口确认。
+
+review 返修后补充实现边界：HKJC 外部数据导入必须参考 netkeiba 的单来源互斥锁语义，已有运行中导入时拒绝并发写入；在真实网络抓取实现前，`--commit` 不允许写入占位 payload，必须通过 `--payload-file` 提供真实小样本；payload 超过 `max_races / max_horses` 时直接失败，不静默截断或部分写入；`max_horses` 的统计口径必须覆盖顶层 `horses`、赛事 `entries` 和 `results` 中实际会写入缓存或别名的唯一马匹，避免 entries/results 绕过批量上限；多语言术语后处理和自动化评分必须按文章 `source_language` 隔离，避免英语、繁中、日语术语在翻译、改写、重点马和赛事优先级判断中串用。
+
+公开文章 ID 和来源去重键必须分离：公开详情页继续使用本地全局自增 `NewsArticle.id`，减少标题 slug 或上游 ID 变化带来的公开 URL 问题；但抓取入库仍需要稳定的 `source_article_id` 识别同一上游文章，否则重复抓取无法幂等更新。国际新闻源的 `source_article_id` 因此使用完整 URL 派生的低碰撞键，而不是只取 URL 最后一段 slug。
+
+原始 HTML 和轻量 metadata 必须分离：整页 HTML 只保存到 `original_content_html`，`translation_metadata` 只保存来源语言、作者、抓取 URL、模型和 warning 等轻量元信息，避免同一份 HTML 在文本字段和 JSON 字段中重复保存。
+
+排序型入口采用逐源确认策略：类似 netkeiba 访问量榜/注目榜的来源，只有公开 HTML 或公开 API 能稳定慢速抓取并能拿到真实文章时，才作为独立榜单源接入并记录原站排名。本轮只确认 `Sponichi 新闻ランキング` 可稳定抓取，因此先作为 `source_mode=access` 榜单源加入，默认关闭；该页面混有ボート等非赛马内容，适配器必须过滤非赛马文章并保留原站排名，不按过滤后的列表重新编号。`HKJC Racing News`、`SCMP Racing`、`BHA` 暂未发现等价公开热门新闻榜单；`Sporting Life` 有 `MOST READ RACING` 骨架容器但未确认稳定公开 API；`At The Races`、`Paulick Report` 当前 403，`BloodHorse` 有反机器人/空样本风险，均不作为生产自动榜单源启用。
+
+上线前最终新闻源清单以真实 dry-run 可抓到两篇正文为准。第一版生产候选为：日本 `Sponichi latest/access`；中国香港 `HKJC Racing News`、`SCMP Racing`；英国 `Sporting Life Racing`、`Sky Sports Racing latest/access`，官方补充 `BHA official`；法国仅英文来源 `France Galop English News official`、`TDN France keyword`；美国 `TDN`、`Horse Racing Nation latest/access`。其中 `Sky Sports Racing Top Stories` 和 `Horse Racing Nation Trending` 作为弱热门/编辑排序信号，按页面顺序写入 rank；`At The Races`、`Paulick Report`、`BloodHorse` 保留为可单独探测候选，但不进入第一版默认清单或生产启用计划。
+
+`TDN France keyword` 本质上仍来自 `thoroughbreddailynews.com`，与美国 `TDN` 普通源可能发现同一篇 URL。为避免同 URL 在两个 `source_site` 下重复入库，本轮采用简单 canonical 去重：文章主键使用 `TDN + source_article_id`，快照仍记录实际发现来源 `TDN France keyword`，且法国关键词来源会优先保留法国地区归类。这样既减少重复文章，也不丢失“这篇是法国相关稿”的审核和推送信号。
 
 这样可以利用本地马名数据库降低普通词误报和真实马名漏报，同时避免把没有中文译名的外部数据污染正式术语库。
 

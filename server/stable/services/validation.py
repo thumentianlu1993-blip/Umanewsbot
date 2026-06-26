@@ -17,11 +17,17 @@ from stable.models import (
     NewsArticle,
     ReviewMode,
     RiskLevel,
+    SourceLanguage,
     TermEntry,
     TermType,
     WorkflowStatus,
 )
-from stable.services.terms import recognize_horse_names, serialize_recognized_horse_names
+from stable.services.terms import (
+    recognize_horse_names,
+    serialize_recognized_horse_names,
+    source_term_matches_text,
+    source_terms_by_entry,
+)
 
 
 _NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
@@ -168,19 +174,38 @@ def _normalize_term_text(text: str) -> str:
     return normalized
 
 
-def _term_preserved(entry: TermEntry, publish_text: str) -> bool:
+def _term_preserved(
+    entry: TermEntry,
+    publish_text: str,
+    source_language: str | None = None,
+    source_terms: list[str] | None = None,
+) -> bool:
     normalized_publish = _normalize_term_text(publish_text)
-    candidates = [*entry.all_japanese_terms(), entry.target_zh, *(entry.aliases_zh or [])]
+    if source_terms is None:
+        source_terms = entry.source_terms_for_language(source_language) if source_language else entry.all_source_terms()
+    candidates = [*source_terms, entry.target_zh, *(entry.aliases_zh or [])]
     return any(candidate and _normalize_term_text(candidate) in normalized_publish for candidate in candidates)
 
 
-def _is_core_term(entry: TermEntry, source: str, title: str, first_block: str) -> bool:
-    japanese_terms = entry.all_japanese_terms()
+def _source_term_hit(text: str, source_terms: list[str], source_language: str | None) -> bool:
+    return any(source_term_matches_text(text, term, source_language) for term in source_terms)
+
+
+def _is_core_term(
+    entry: TermEntry,
+    source: str,
+    title: str,
+    first_block: str,
+    source_language: str | None = None,
+    source_terms: list[str] | None = None,
+) -> bool:
+    if source_terms is None:
+        source_terms = entry.source_terms_for_language(source_language) if source_language else entry.all_source_terms()
     if entry.priority >= 80:
         return True
-    if entry.term_type in {TermType.HORSE, TermType.RACE} and any(term and term in title for term in japanese_terms):
+    if entry.term_type in {TermType.HORSE, TermType.RACE} and _source_term_hit(title, source_terms, source_language):
         return True
-    return any(term and term in first_block for term in japanese_terms)
+    return _source_term_hit(first_block, source_terms, source_language)
 
 
 def _fingerprint_text(text: str) -> set[str]:
@@ -301,24 +326,33 @@ def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
         )
 
     preserve_limit = 12
-    recognized_horses = recognize_horse_names(article.title_ja, article.body_ja_normalized or article.body_ja_raw, limit=None)
+    article_source_language = article.source_language or SourceLanguage.JAPANESE
+    recognized_horses = recognize_horse_names(
+        article.title_ja,
+        article.body_ja_normalized or article.body_ja_raw,
+        limit=None,
+        source_language=article_source_language,
+    )
     details["recognized_horse_names"] = serialize_recognized_horse_names(recognized_horses)
     preservable_horses = [item for item in recognized_horses if item.needs_preserve][:preserve_limit]
-    unknown_horses = [item.name_ja for item in preservable_horses]
+    unknown_horses = [item.matched_text or item.name_ja for item in preservable_horses]
     details["unknown_horse_names"] = unknown_horses
     external_horses = [item for item in preservable_horses if item.source == "external_alias"]
-    details["external_horse_names"] = [item.name_ja for item in external_horses]
-    missing_external_horses = [item for item in external_horses if item.name_ja and item.name_ja not in publish_text]
+    details["external_horse_names"] = [item.matched_text or item.name_ja for item in external_horses]
+    missing_external_horses = [
+        item for item in external_horses if (item.matched_text or item.name_ja) and (item.matched_text or item.name_ja) not in publish_text
+    ]
     if missing_external_horses:
         issues.append(
             _issue(
                 "external_horse_not_preserved",
                 SEVERITY_WARNING,
-                "外部已知马名未原样保留：" + "、".join(item.name_ja for item in missing_external_horses[:6]),
+                "外部已知马名未原样保留：" + "、".join((item.matched_text or item.name_ja) for item in missing_external_horses[:6]),
                 payload={
                     "names": [
                         {
                             "name_ja": item.name_ja,
+                            "matched_text": item.matched_text,
                             "external_horse_ids": item.external_horse_ids,
                             "primary_external_horse_id": item.primary_external_horse_id,
                             "source": item.source,
@@ -335,8 +369,9 @@ def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
     for item in preservable_horses:
         if item.source != "heuristic" or not item.needs_preserve:
             continue
-        if item.name_ja and item.name_ja not in publish_text:
-            missing_unknown_horses.append(item.name_ja)
+        matched_name = item.matched_text or item.name_ja
+        if matched_name and matched_name not in publish_text:
+            missing_unknown_horses.append(matched_name)
     if missing_unknown_horses:
         issues.append(
             _issue(
@@ -350,13 +385,19 @@ def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
     missing_terms: list[str] = []
     title = article.title_ja or ""
     first_block = (article.body_ja_normalized or article.body_ja_raw or "")[:500]
-    for entry in TermEntry.objects.filter(is_active=True, term_type__in=[TermType.HORSE, TermType.RACE, TermType.JOCKEY, TermType.TRAINER]):
-        source_hit = any(term and term in source for term in entry.all_japanese_terms())
+    term_entries = list(TermEntry.objects.filter(
+        is_active=True,
+        term_type__in=[TermType.HORSE, TermType.RACE, TermType.JOCKEY, TermType.TRAINER],
+    ))
+    terms_by_entry = source_terms_by_entry(term_entries, article_source_language)
+    for entry in term_entries:
+        source_terms = terms_by_entry.get(entry.pk, [])
+        source_hit = _source_term_hit(source, source_terms, article_source_language)
         if not source_hit:
             continue
-        if not _term_preserved(entry, publish_text):
+        if not _term_preserved(entry, publish_text, article_source_language, source_terms):
             missing_terms.append(entry.source_ja)
-            is_core = _is_core_term(entry, source, title, first_block)
+            is_core = _is_core_term(entry, source, title, first_block, article_source_language, source_terms)
             issues.append(
                 _issue(
                     "core_term_missing" if is_core else "background_term_missing",
@@ -365,6 +406,7 @@ def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
                     route=ROUTE_MANUAL if is_core else ROUTE_AUTO,
                     payload={
                         "source_ja": entry.source_ja,
+                        "source_language": entry.source_language,
                         "target_zh": entry.target_zh,
                         "term_type": entry.term_type,
                         "priority": entry.priority,

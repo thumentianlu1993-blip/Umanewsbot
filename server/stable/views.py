@@ -44,7 +44,9 @@ from .models import (
     OperationLog,
     PublishedByMode,
     PushTarget,
+    RacingRegion,
     ReviewMode,
+    SourceLanguage,
     SourceMode,
     TaskExecutionLog,
     TaskStatus,
@@ -62,10 +64,13 @@ from .services.sources import sync_builtin_sources
 from .services.storage import current_media_provider
 from .services.term_admin import (
     commit_term_import,
+    find_term_by_source_alias,
     preview_from_session_value,
     preview_term_import,
     preview_to_session_value,
     serialize_aliases,
+    sync_all_term_alias_active,
+    sync_term_source_aliases,
     validate_term_payload,
 )
 from .services.term_candidate_review import accept_candidate, merge_candidate, set_candidate_status
@@ -82,6 +87,14 @@ PUBLIC_FEED_PAGE_SIZE = 12
 PUBLIC_HOT_CANDIDATE_LIMIT = 48
 PUBLIC_HOT_DISPLAY_LIMIT = 6
 QUICK_TERM_FOLLOWUP_SESSION_KEY = "article_quick_term_followup"
+PUBLIC_REGION_TABS = [
+    {"value": "", "label": "综合"},
+    {"value": RacingRegion.JAPAN, "label": "日本"},
+    {"value": RacingRegion.HONG_KONG, "label": "中国香港"},
+    {"value": RacingRegion.UNITED_KINGDOM, "label": "英国"},
+    {"value": RacingRegion.FRANCE, "label": "法国"},
+    {"value": RacingRegion.UNITED_STATES, "label": "美国"},
+]
 
 
 class BackendLoginView(LoginView):
@@ -192,6 +205,7 @@ TERM_IMPORT_SESSION_KEY = "term_import_preview"
 def _term_filters(queryset, request: HttpRequest):
     query = request.GET.get("q", "").strip()
     term_type = request.GET.get("term_type", "").strip()
+    source_language = request.GET.get("source_language", "").strip()
     is_active = request.GET.get("is_active", "").strip()
     has_alias = request.GET.get("has_alias", "").strip()
 
@@ -209,16 +223,19 @@ def _term_filters(queryset, request: HttpRequest):
             Q(source_ja__icontains=query)
             | Q(target_zh__icontains=query)
             | Q(notes__icontains=query)
+            | Q(source_aliases__text__icontains=query)
             | Q(pk__in=alias_match_ids)
-        )
+        ).distinct()
     if term_type:
         queryset = queryset.filter(term_type=term_type)
+    if source_language:
+        queryset = queryset.filter(Q(source_language=source_language) | Q(source_aliases__source_language=source_language)).distinct()
     if is_active == "true":
         queryset = queryset.filter(is_active=True)
     elif is_active == "false":
         queryset = queryset.filter(is_active=False)
     if has_alias == "yes":
-        queryset = queryset.filter(~Q(aliases_ja=[]) | ~Q(aliases_zh=[]))
+        queryset = queryset.filter(~Q(aliases_ja=[]) | ~Q(aliases_zh=[]) | Q(source_aliases__isnull=False)).distinct()
     return queryset
 
 
@@ -465,6 +482,8 @@ def term_list(request: HttpRequest):
     queryset = _term_filters(queryset, request)
     paginator = Paginator(queryset, 20)
     page_obj = paginator.get_page(request.GET.get("page"))
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
     return render(
         request,
         "stable/console/term_list.html",
@@ -472,6 +491,12 @@ def term_list(request: HttpRequest):
             request,
             page_obj=page_obj,
             term_type_choices=TermType.choices,
+            source_language_choices=[
+                (SourceLanguage.JAPANESE, "日文"),
+                (SourceLanguage.ENGLISH, "英文"),
+                (SourceLanguage.CHINESE_TRADITIONAL, "繁体中文"),
+            ],
+            pagination_querystring=pagination_params.urlencode(),
         ),
     )
 
@@ -487,6 +512,7 @@ def term_create(request: HttpRequest):
         source_term = get_object_or_404(TermEntry, pk=copy_id)
         initial = {
             "term_type": source_term.term_type,
+            "source_language": source_term.source_language,
             "source_ja": source_term.source_ja,
             "target_zh": source_term.target_zh,
             "race_grade": source_term.race_grade,
@@ -565,6 +591,7 @@ def term_toggle_active(request: HttpRequest, term_id: int):
     term = get_object_or_404(TermEntry, pk=term_id)
     term.is_active = not term.is_active
     term.save(update_fields=["is_active", "updated_at"])
+    sync_all_term_alias_active(term)
     log_operation(
         action_type="term_toggled",
         target_type="term",
@@ -871,15 +898,16 @@ def candidate_detail(request: HttpRequest, article_id: int):
 def _message_quick_term_errors(request: HttpRequest, form: ArticleQuickTermForm, normalized: dict | None = None) -> None:
     existing = None
     if normalized and normalized.get("term_type") and normalized.get("source_ja"):
-        existing = TermEntry.objects.filter(
+        existing = find_term_by_source_alias(
             term_type=normalized["term_type"],
-            source_ja=normalized["source_ja"],
-        ).first()
+            source_language=normalized.get("source_language") or "ja",
+            source_text=normalized["source_ja"],
+        )
     if existing:
         messages.error(
             request,
             format_html(
-                '创建失败：同一术语类型下已存在相同日文原词，<a href="{}">打开已有术语 #{}</a>。',
+                '创建失败：同一术语类型和原文语言下已存在相同原文，<a href="{}">打开已有术语 #{}</a>。',
                 reverse("console-term-edit", args=[existing.pk]),
                 existing.pk,
             ),
@@ -999,6 +1027,7 @@ def article_quick_term_create(request: HttpRequest, article_id: int):
                 form.add_error(mapped_field, error)
         if not errors:
             term = TermEntry.objects.create(**normalized)
+            sync_term_source_aliases(term, term.source_language)
             log_operation(
                 action_type="article_quick_term_created",
                 target_type="term",
@@ -1363,13 +1392,36 @@ def operation_log_list(request: HttpRequest):
     )
 
 
-def _public_published_articles():
-    return (
+def _public_published_articles(region: str = ""):
+    queryset = (
         NewsArticle.objects.select_related("cover_media_asset")
         .prefetch_related("images")
         .filter(workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at__isnull=False)
         .order_by("-published_to_web_at", "-id")
     )
+    if region:
+        queryset = queryset.filter(racing_region=region)
+    return queryset
+
+
+def _resolve_public_region(value: str) -> str:
+    candidate = (value or "").strip()
+    valid_regions = {tab["value"] for tab in PUBLIC_REGION_TABS if tab["value"]}
+    return candidate if candidate in valid_regions else ""
+
+
+def _region_tab_context(active_region: str) -> list[dict]:
+    tabs: list[dict] = []
+    for tab in PUBLIC_REGION_TABS:
+        value = tab["value"]
+        tabs.append(
+            {
+                **tab,
+                "is_active": value == active_region,
+                "url": "/" if not value else f"/?region={value}",
+            }
+        )
+    return tabs
 
 
 def _race_priority_score(article: NewsArticle) -> int:
@@ -1435,12 +1487,15 @@ def _build_hot_articles(queryset) -> list[dict]:
 
 
 def public_news_feed(request: HttpRequest):
-    queryset = _public_published_articles()
+    active_region = _resolve_public_region(request.GET.get("region", ""))
+    queryset = _public_published_articles(active_region)
     headline_article = _select_headline_article(queryset)
     hot_articles = _build_hot_articles(queryset)
     paginator = Paginator(queryset, PUBLIC_FEED_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
     feed_articles = [article for article in page_obj if not headline_article or article.pk != headline_article.pk]
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
     return render(
         request,
         "stable/public/feed.html",
@@ -1450,6 +1505,9 @@ def public_news_feed(request: HttpRequest):
             "headline_article": headline_article,
             "feed_articles": feed_articles,
             "hot_articles": hot_articles,
+            "region_tabs": _region_tab_context(active_region),
+            "active_region": active_region,
+            "pagination_querystring": pagination_params.urlencode(),
         },
     )
 
@@ -1479,6 +1537,10 @@ def _article_payload(article: NewsArticle) -> dict:
         "id": article.id,
         "source_site": article.source_site,
         "source_mode": article.source_mode,
+        "racing_region": article.racing_region,
+        "racing_region_label": article.get_racing_region_display(),
+        "source_language": article.source_language,
+        "source_language_label": article.get_source_language_display(),
         "source_article_id": article.source_article_id,
         "title_ja": article.title_ja,
         "translated_title_zh": article.translated_title_zh,
@@ -1557,7 +1619,7 @@ def article_list_api(request: HttpRequest) -> JsonResponse:
     if denied:
         return JsonResponse({"detail": "forbidden"}, status=403)
     queryset = NewsArticle.objects.all().prefetch_related("images")
-    for key in ("source_site", "source_mode", "status", "workflow_status"):
+    for key in ("source_site", "source_mode", "racing_region", "source_language", "status", "workflow_status"):
         value = request.GET.get(key)
         if value:
             queryset = queryset.filter(**{key: value})
@@ -1672,6 +1734,7 @@ def _term_payload(term: TermEntry) -> dict:
     return {
         "id": term.id,
         "term_type": term.term_type,
+        "source_language": term.source_language,
         "source_ja": term.source_ja,
         "target_zh": term.target_zh,
         "aliases_ja": term.aliases_ja,
@@ -1728,6 +1791,7 @@ def term_create_api(request: HttpRequest) -> JsonResponse:
     if errors:
         return JsonResponse({"ok": False, "errors": errors}, status=400)
     term = TermEntry.objects.create(**normalized)
+    sync_term_source_aliases(term, term.source_language)
     log_operation(
         action_type="term_created_api",
         target_type="term",
@@ -1752,6 +1816,7 @@ def term_update_api(request: HttpRequest, term_id: int) -> JsonResponse:
     for field, value in normalized.items():
         setattr(term, field, value)
     term.save()
+    sync_term_source_aliases(term, term.source_language)
     log_operation(
         action_type="term_updated_api",
         target_type="term",
@@ -1771,6 +1836,7 @@ def term_toggle_active_api(request: HttpRequest, term_id: int) -> JsonResponse:
     term = get_object_or_404(TermEntry, pk=term_id)
     term.is_active = not term.is_active
     term.save(update_fields=["is_active", "updated_at"])
+    sync_all_term_alias_active(term)
     log_operation(
         action_type="term_toggled_api",
         target_type="term",

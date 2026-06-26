@@ -9,7 +9,9 @@
       <div class="headline-body">
         <div class="article-meta">
           <span>{{ headline_article.published_to_web_at|date:"Y-m-d H:i" }}</span>
+          <span>{{ headline_article.get_racing_region_display }}</span>
           <span>{{ headline_article.source_note|default:headline_article.get_source_site_display }}</span>
+          <span>{{ headline_article.get_source_language_display }}</span>
         </div>
         <h2><a href="{{ headline_article.public_path }}">{{ headline_article.effective_title }}</a></h2>
         {% if headline_article.effective_summary %}

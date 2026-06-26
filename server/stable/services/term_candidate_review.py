@@ -3,9 +3,16 @@ from __future__ import annotations
 from django.db import transaction
 from django.utils import timezone
 
-from stable.models import TermCandidate, TermCandidateStatus, TermEntry
+from stable.models import SourceLanguage, TermCandidate, TermCandidateStatus, TermEntry
 from stable.services.operations import log_operation
-from stable.services.term_admin import split_aliases, validate_term_payload
+from stable.services.term_admin import (
+    find_term_by_source_alias,
+    source_text_identity,
+    split_aliases,
+    sync_term_source_aliases,
+    upsert_term_source_alias,
+    validate_term_payload,
+)
 from stable.services.term_discovery import match_formal_terms, normalize_japanese_term
 
 
@@ -28,17 +35,24 @@ def accept_candidate(candidate: TermCandidate, payload: dict, user) -> TermEntry
     normalized, errors = validate_term_payload(payload)
     if errors:
         raise ValueError("；".join(message for messages in errors.values() for message in messages))
-    same_type, _ = match_formal_terms(normalized["term_type"], normalized["source_ja"])
+    same_type, _ = match_formal_terms(
+        normalized["term_type"],
+        normalized["source_ja"],
+        normalized["source_language"],
+    )
     if same_type:
         raise ValueError(f"正式术语或别名已存在，请改为合并：{same_type[0].source_ja}")
     normalized_key = normalize_japanese_term(normalized["source_ja"])
     if TermCandidate.objects.exclude(pk=candidate.pk).filter(
         term_type=normalized["term_type"],
+        source_language=normalized["source_language"],
         normalized_key=normalized_key,
     ).exists():
         raise ValueError("修改后的术语已存在候选，请先合并候选。")
     term = TermEntry.objects.create(**normalized)
+    sync_term_source_aliases(term, normalized["source_language"])
     candidate.term_type = normalized["term_type"]
+    candidate.source_language = normalized["source_language"]
     candidate.source_ja = normalized["source_ja"]
     candidate.normalized_key = normalized_key
     candidate.target_zh = normalized["target_zh"]
@@ -71,16 +85,34 @@ def merge_candidate(
         if target_candidate.pk == candidate.pk:
             raise ValueError("不能合并到自身。")
         _ensure_pending(target_candidate)
+        if target_candidate.source_language != candidate.source_language:
+            raise ValueError("不同原文语言的候选不能直接互相合并，请先接受或选择一个正式术语概念后按语言别名合并。")
         candidate.merged_into_candidate = target_candidate
         detail = f"合并术语候选 {candidate.source_ja} -> 候选 {target_candidate.source_ja}"
     else:
         target_term = TermEntry.objects.select_for_update().get(pk=target_term.pk)
         if add_as_alias:
-            aliases = split_aliases(target_term.aliases_ja)
-            if candidate.source_ja not in aliases and candidate.source_ja != target_term.source_ja:
-                aliases.append(candidate.source_ja)
-                target_term.aliases_ja = aliases
-                target_term.save(update_fields=["aliases_ja", "updated_at"])
+            existing = find_term_by_source_alias(
+                term_type=target_term.term_type,
+                source_language=candidate.source_language or SourceLanguage.JAPANESE,
+                source_text=candidate.source_ja,
+                exclude_term_id=target_term.pk,
+            )
+            if existing:
+                raise ValueError(f"该原文已属于正式术语 #{existing.pk}，不能合并为当前术语别名。")
+            upsert_term_source_alias(
+                target_term,
+                source_language=candidate.source_language or SourceLanguage.JAPANESE,
+                text=candidate.source_ja,
+                is_active=target_term.is_active,
+            )
+            if (candidate.source_language or SourceLanguage.JAPANESE) == target_term.source_language:
+                aliases = split_aliases(target_term.aliases_ja)
+                existing_keys = {source_text_identity(value) for value in [target_term.source_ja, *aliases]}
+                if source_text_identity(candidate.source_ja) not in existing_keys:
+                    aliases.append(candidate.source_ja)
+                    target_term.aliases_ja = aliases
+                    target_term.save(update_fields=["aliases_ja", "updated_at"])
         candidate.merged_into_term = target_term
         detail = f"合并术语候选 {candidate.source_ja} -> 正式术语 {target_term.source_ja}"
     _review(candidate, user, TermCandidateStatus.MERGED, notes)
