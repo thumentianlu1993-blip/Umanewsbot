@@ -16,8 +16,45 @@
 - 本轮实现阶段未对欧美站点执行生产式爬取。
 - 2026-06-25 spike 样本请求次数：`0` 次生产请求。
 - 2026-06-26 read-only spike 样本请求次数：`6` 次公开页面 GET 请求，未写正式数据库。
+- 2026-06-26 追加复核请求次数：`18` 次公开页面 GET 请求，未写正式数据库；主要用于复核英国、法国、美国的具体 racecard/result/horse/profile 入口信号。
 - 限速建议：后续正式 spike 可从 `10-30 秒/请求` 起步，先单日期、单比赛、单马 profile 小样本，不做历史全量。
 - 样本解析保存位置：仅允许仓库文档、隔离 fixture 或临时文件，不允许写正式外部数据表。
+
+## 2026-06-26 英法美数据库源追加复核
+
+执行方式：
+
+- 请求方式：`requests.get`
+- User-Agent：`umanews-spike/0.2`
+- 请求总数：`18`
+- 请求间隔：约 `1` 秒
+- 数据库写入：无
+
+### 请求证据
+
+| 地区 | 样本 URL | 状态 | Content-Type | 长度 | 观察信号 |
+| --- | --- | ---: | --- | ---: | --- |
+| 美国 | `https://www.equibase.com/static/entry/index.html` | 200 | `text/html` | 613095 | entries/results/racecard/horse/profile/calendar/rating/breeding |
+| 美国 | `https://www.equibase.com/static/chart/pdf/index.html` | 200 | `text/html` | 131968 | charts/PDF 索引可访问，含 results/horse/profile/trainer 等信号 |
+| 美国 | `https://www.equibase.com/profiles/Results.cfm?rbt=TB&refno=11107564&registry=T&type=Horse` | 200 | `text/html;charset=UTF-8` | 126580 | horse profile 可访问，页面内含 Horse Profile、Entries、Results、Calendar 链接和相关 profile 参数 |
+| 英国 | `https://www.sportinglife.com/racing/racecards` | 200 | `text/html; charset=utf-8` | 101995 | racecards/entries/results/horse/runner/trainer/jockey |
+| 英国 | `https://www.sportinglife.com/racing/fast-results` | 200 | `text/html; charset=utf-8` | 144003 | 结果页返回具体 racecard 链接和 horse profile 链接，例如 `/racing/racecards/2026-06-26/yarmouth/racecard/924406/...`、`/racing/profiles/horse/1212905` |
+| 英国 | `https://www.sportinglife.com/racing/profiles/horse/328651` | 200 | `text/html; charset=utf-8` | 92727 | horse profile 页面可访问，标题为 `Race Record & Horse Form` |
+| 英国 | `https://www.britishhorseracing.com/racing/horses/` | 200 | `text/html; charset=UTF-8` | 78411 | BHA horses 页面可访问，暴露 `/racing/horses/feed/`、`/racing/horses/racehorse-search-results/` 等链接 |
+| 英国 | `https://www.britishhorseracing.com/racing/fixtures/upcoming/` | 200 | `text/html; charset=UTF-8` | 85972 | BHA fixtures 页面可访问，暴露 entries/racecards/view-races/feed 等链接 |
+| 法国 | `https://www.france-galop.com/en` | 200 | `text/html; charset=UTF-8` | 35782 | entries/results/horse/calendar/rating/breeding/trainer/jockey 浅层关键词信号 |
+| 法国 | `https://www.france-galop.com/en/understand-the-races/find-out-more` | 200 | `text/html; charset=UTF-8` | 31487 | entries/results/horse/calendar/rating/trainer/jockey 浅层关键词信号 |
+| 法国 | `https://www.france-galop.com/en/content/france-galop-launches-mobile-app-transform-horse-racing-experience` | 200 | `text/html; charset=UTF-8` | 37302 | 官方 app 说明页提到 calendar、race card、results，但网页结构化查询参数仍未定位 |
+
+### 追加复核结论
+
+| 地区 | entries/racecards | results/charts | horse profile | 官方补字段 | 当前判断 |
+| --- | --- | --- | --- | --- | --- |
+| 美国 `Equibase` | 有公开 HTML 索引信号 | chart/PDF 索引可访问 | 具体 horse profile 参数可访问 | Equibase 自身即主候选 | 仍为 `needs_more_spike`；下一步应做单日 entries + 单马 profile + chart/PDF fixture |
+| 英国 `Sporting Life + BHA` | Sporting Life racecards 可访问，fast-results 暴露具体 racecard URL | Sporting Life fast-results 有具体 racecard/runner/profile 链接 | Sporting Life horse profile 可访问 | BHA horses/fixtures 200 且暴露 feed/search/racecards 链接 | 英国优先级最高；Sporting Life 可作为正式导入主候选，BHA 作为官方补字段候选，仍需 fixture parser 后再 `ready_for_formal_import` |
+| 法国 `France Galop` | 首页和说明页有浅层 race card/calendar 信号 | app/说明页声明 results 能力 | 浅层 horse/profile 关键词信号 | France Galop 官方性强 | 仍为 `needs_more_spike`；必须先定位真实结构化查询参数或可静态解析页面 |
+
+本次追加复核后，英国的可行性最高，美国入口更具体但 PDF/chart 解析成本仍高，法国仍停留在官方页面浅层信号阶段。
 
 ## 2026-06-26 英法美数据库源 read-only spike
 

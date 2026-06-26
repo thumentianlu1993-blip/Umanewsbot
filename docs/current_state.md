@@ -35,6 +35,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-26` 已新建 OpenSpec change `connect-real-global-racing-databases`，目标是按 `香港 -> 英国 -> 法国 -> 美国` 顺序接入真实赛马数据库，抓取每个地区最近 2 个月赛事和涉及马匹详情后停止，不创建公开比赛页或持续调度。香港阶段已定位 HKJC 官方真实 HTML 入口：赛日列表 `localresults`、单场结果 `localresults?racedate=YYYY/MM/DD&Racecourse=HV|ST&RaceNo=N`、马匹详情 `horse?horseid=...`。本地 TDD 已新增 HKJC HTML parser、race link 聚合、recent-days/date-range、马匹详情补抓、限速和请求上限测试，`HKJCExternalDataImportTests` 20 项通过；真实 HKJC 单场 dry-run `HK20260624HV01` 请求 1 次官方页面并解析 `1` 场、`12` entries、`12` results、`12` unique horses，未写库。随后在隔离 SQLite `/tmp/umanews-hkjc-real-single.sqlite3` 执行同一真实单场 `--commit --allow-network`，成功写入 `ExternalRace=1`、`ExternalRaceEntry=12`、`ExternalRaceResult=12`、`ExternalHorseAlias=12`，`run_id=1`、`success_count=25`、`failure_count=0`。同日又完成 HKJC `--recent-days 60 --end-date 2026-06-26 --limit-races 1 --limit-horses 1` 真实小范围链路：dry-run 请求赛日列表、赛日页、单场结果和马匹详情共 `4` 次，解析 `1` 场、`12` entries、`12` results、`12` unique horses；隔离 SQLite `/tmp/umanews-hkjc-real-range.sqlite3` commit 后写入 `ExternalRace=1`、`ExternalRaceEntry=12`、`ExternalRaceResult=12`、`ExternalHorse=1`、`ExternalHorseAlias=12`，重复执行后正式对象计数不增长。当前仍未部署生产，也未执行生产最近两个月全量 dry-run/commit；下一步需要生产部署前锁检查、备份、用户确认后再低频运行 HKJC 最近两个月范围。
 
+`2026-06-26` 已为 `connect-real-global-racing-databases` 追加英法美只读 spike 复核，共执行 `18` 次公开页面 GET，不写任何 `External*` 表。英国 `Sporting Life` racecards、fast-results 和 horse profile 均返回 `200`，fast-results 暴露具体 racecard 与 horse profile 链接；`BHA` horses/fixtures 返回 `200`，暴露 horses feed、search 和 fixtures/racecards 相关入口，因此英国当前优先级最高，建议后续以 Sporting Life 为正式导入主候选、BHA 为官方补字段候选。美国 `Equibase` entries、chart/PDF index 和具体 horse profile 均返回 `200`，但 chart/PDF 解析成本和访问限制仍需 fixture spike。法国 `France Galop` 官方页面和 app 说明页返回 `200` 并有 race card/results/calendar 浅层信号，但尚未定位稳定结构化查询参数，仍为 `needs_more_spike`。证据已写入 `docs/global_racing_data_source_spikes.md`。
+
 ## 已完成内容
 
 - 域名购买与解析
@@ -64,7 +66,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 ## 当前进行中的 OpenSpec change
 
 - `start-hkjc-data-import-and-global-spikes`：已完成实现、生产部署、验证和归档；生产服务镜像来自 `b0361cf`。已在生产执行一次 HKJC fixture 样本 commit（`run_id=1960`），但未启用 HKJC 真实网络持续抓取，也未启用英法美正式导入。
-- `connect-real-global-racing-databases`：进行中；已完成 proposal/design/spec/tasks，香港真实 HKJC 单场 HTML dry-run、隔离 SQLite commit、recent-days/date-range 小范围 dry-run/commit、马匹详情补抓、限速和请求上限测试；尚未完成生产最近 2 个月全量 dry-run/commit，以及英国、法国、美国正式接入。
+- `connect-real-global-racing-databases`：进行中；已完成 proposal/design/spec/tasks，香港真实 HKJC 单场 HTML dry-run、隔离 SQLite commit、recent-days/date-range 小范围 dry-run/commit、马匹详情补抓、限速和请求上限测试；英法美只读入口复核已追加记录。尚未完成生产最近 2 个月全量 dry-run/commit，也未进入英国、法国、美国正式写库接入。
 
 ## 本轮问题简述
 

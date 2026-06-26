@@ -373,3 +373,9 @@ review 返修后补充实现边界：HKJC 外部数据导入必须参考 netkeib
 - 法国 `France Galop`：英文站浅层页面可访问，但结构化赛程、报名、出马、赛果和马匹资料的稳定查询入口仍未确认；法语新闻正文仍不进入新闻审核、翻译、自动发布或 QQ 推送主链路。
 
 后续如要正式导入英法美数据库源，必须另起 OpenSpec change，先把每个地区的具体 URL 参数、字段映射、限速、失败恢复、正式表写入边界和回滚口径设计清楚。
+
+2026-06-26 `connect-real-global-racing-databases` 追加只读复核后，英法美仍不进入正式写库，但职责边界更清晰：
+
+- 英国优先以 `Sporting Life` 作为正式导入主候选，因为 `racecards`、`fast-results` 和 horse profile 均可访问，且 results 页面暴露具体 racecard/profile 链接；`BHA` 作为官方补字段候选，负责复核 horses、fixtures、feed/search 等权威入口。
+- 美国 `Equibase` 可继续作为唯一主候选推进 fixture spike；entries、chart/PDF index 和 horse profile 均可访问，但正式导入前必须先证明 chart/PDF 或 HTML chart 解析成本可控。
+- 法国 `France Galop` 仍停留在官方页面浅层信号阶段；在定位稳定结构化查询参数前，不进入正式 parser/importer TDD。

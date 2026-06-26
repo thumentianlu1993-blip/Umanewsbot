@@ -43,21 +43,21 @@
 
 ## 5. 英国准入与正式导入准备
 
-- [ ] 5.1 (integration) 复核 Sporting Life racecards、results、horse profile 真实入口，保存请求证据和字段覆盖矩阵。
-- [ ] 5.2 (integration) 复核 BHA 官方可用入口，明确其作为主来源或补字段来源的职责。
+- [x] 5.1 (integration) 复核 Sporting Life racecards、results、horse profile 真实入口，保存请求证据和字段覆盖矩阵。
+- [x] 5.2 (integration) 复核 BHA 官方可用入口，明确其作为主来源或补字段来源的职责。
 - [ ] 5.3 (application) 在英国入口 `ready_for_formal_import` 后，按 TDD 新增英国 parser/importer fixture 和 dry-run 测试。
 - [ ] 5.4 (operations) 仅在香港阶段完成后，按生产安全门禁执行英国最近 2 个月 dry-run/commit。
 
 ## 6. 法国准入与正式导入准备
 
-- [ ] 6.1 (integration) 复核 France Galop 或其他法国权威来源的赛程、出马、赛果和马匹 profile 入口，保存请求证据和字段覆盖矩阵。
+- [x] 6.1 (integration) 复核 France Galop 或其他法国权威来源的赛程、出马、赛果和马匹 profile 入口，保存请求证据和字段覆盖矩阵。
 - [ ] 6.2 (integration) 明确法语字段处理、原始 payload 保留和不进入新闻正文链路的边界。
 - [ ] 6.3 (application) 在法国入口 `ready_for_formal_import` 后，按 TDD 新增法国 parser/importer fixture 和 dry-run 测试。
 - [ ] 6.4 (operations) 仅在英国阶段完成后，按生产安全门禁执行法国最近 2 个月 dry-run/commit。
 
 ## 7. 美国准入与正式导入准备
 
-- [ ] 7.1 (integration) 复核 Equibase entries、results、chart/PDF 和 horse profile 入口，保存请求证据和字段覆盖矩阵。
+- [x] 7.1 (integration) 复核 Equibase entries、results、chart/PDF 和 horse profile 入口，保存请求证据和字段覆盖矩阵。
 - [ ] 7.2 (integration) 明确美国正式导入主来源采用 HTML chart、PDF chart 或 profile 页面，并记录访问限制风险。
 - [ ] 7.3 (application) 在美国入口 `ready_for_formal_import` 后，按 TDD 新增美国 parser/importer fixture 和 dry-run 测试。
 - [ ] 7.4 (operations) 仅在法国阶段完成后，按生产安全门禁执行美国最近 2 个月 dry-run/commit。
