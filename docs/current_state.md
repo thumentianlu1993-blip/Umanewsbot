@@ -23,6 +23,10 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-26` 已将国际赛马资讯扩展 OpenSpec change：`expand-international-racing-coverage` 合并到 `main` 并部署生产，服务器 `/opt/umanewsbot` 已从 `2f0c35c` 更新到 `5865e58`，部署前 `.env` 备份为 `.env.backup.international-coverage-20260626_103923`。本次部署应用迁移 `stable.0011`、`0012`、`0013`，`web / worker / beat` 已重建，`manage.py check`、`http://127.0.0.1/healthz/` 和首页 HTTP 验证通过。部署前发现生产 netkeiba 外部马名导入脚本仍在连续运行，已等待当前批次完成并释放 `ExternalDataImportLock` 后再部署；外层脚本 `/opt/umanewsbot/imports/run_horse_import_202504_to_202406_20260626_083946.sh` 已停止，最近两批 `1958 / 1959` 均停在 `paused`，避免部署与导入写库重叠。国际来源已同步并灰度启用第一版清单：`Sponichi latest/access`、`HKJC Racing News`、`SCMP Racing`、`Sporting Life Racing`、`Sky Sports Racing latest/access`、`France Galop English News`、`TDN France keyword`、`TDN`、`Horse Racing Nation latest/access`；生产探测中 `BHA official` 返回 `403`，已暂时停用，`At The Races`、`Paulick Report` 和 `BloodHorse` 仍保留为候选但不启用。测试 QQ 群 `1026525240` 已配置允许 `japan / hong_kong / united_kingdom / france / united_states` 五个地区。首轮手动触发 12 个新增来源抓取任务后，`Sponichi latest` 已完成并入库 `13` 篇新稿、`7` 篇重复稿，`Sponichi access` 与 `HKJC Racing News` 已开始执行，其他国际来源仍在 worker 队列中等待；后续重点观察 `CrawlJob`、翻译结果、自动发布门禁和 QQ 群推送。
 
+`2026-06-26` 已创建新的本地 Codex 工作树 `/Users/mentianlu/.codex/worktrees/openspec-ready-20260626/umanews`，基线为 `origin/main` 的 `4d09d25`。该工作树已带入 `.codex/skills/openspec-*`、`.codex/skills/plan-eng-review`、`.codex/skills/tdd`、`.codex/skills/workflow-spine` 和 `.agents/skills` 镜像，并补齐 `gate-templates.md` 引用副本；已通过 `openspec list`、`openspec validate --all`、`openspec validate expand-international-racing-coverage --strict`、`openspec validate add-netkeiba-horse-data-import --strict`、`openspec status --change expand-international-racing-coverage --json` 和 skill 文件一致性检查。该记录仅描述本地协作工作树准备状态，不代表新的产品或生产部署变更。
+
+`2026-06-26` 已新增并完成计划审查 OpenSpec change `start-hkjc-data-import-and-global-spikes`，用于启动香港 HKJC 外部赛马数据受控导入，并为英国 `Sporting Life + BHA`、美国 `Equibase`、法国 `France Galop` 产出结构化数据库 spike。该 change 明确不续跑日本 netkeiba 外部数据导入，日本导入由其他线程继续；本轮也不实现前台比赛页、赛果页或马匹页。已创建 `proposal.md`、`design.md`、`specs/global-racing-data-import-readiness/spec.md` 和 `tasks.md`，并通过 `/plan-eng-review`；审查后补齐 HKJC 生产 commit 前的隔离库验证、数据库备份、用户显式确认、`HKJC_IMPORT_*` 环境配置入口，以及英法美 spike 前后正式表计数保持不变的验收要求。当前 `.openspec.yaml` 为 `phase: reviewed`，已通过 `openspec validate start-hkjc-data-import-and-global-spikes --strict`、`openspec validate --all` 和 `git diff --check`。随后按 TDD 红灯阶段新增 `openspec/changes/start-hkjc-data-import-and-global-spikes/test_cases.md` 和自动化测试；本轮实现已将 4 个红灯转绿：补齐 `HKJC_IMPORT_*` settings 和 `.env.example`，新增 HKJC `--allow-network` dry-run 请求边界输出，新增英法美只读 spike runner 和正式表 before/after 计数检查。HKJC 最小样本 fixture 已保存到 `server/stable/fixtures/hkjc/`，本地隔离 SQLite `/tmp/umanews-hkjc-apply.sqlite3` 已完成赛日、单场、单马 dry-run/commit，结果写入 `docs/hkjc_data_import_samples.md`；隔离库最终统计为 3 个 import run、1 场比赛、2 个 entries、2 条 results、2 匹马、4 条别名。英法美 read-only spike 已执行 6 次公开页面 GET，请求证据、字段覆盖矩阵和准入判断已写入 `docs/global_racing_data_source_spikes.md`；三地当前均为 `needs_more_spike`，且正式表 before/after 计数保持不变。验证通过：`manage.py check`、HKJC/spike 目标测试 12 项、完整 `stable` 测试 246 项。
+
 ## 已完成内容
 
 - 域名购买与解析
@@ -40,6 +44,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - OpenSpec + Codex 工作流已完成仓库级配置：
   - `openspec/config.yaml` 记录真实项目上下文、验证命令和任务域路由
   - `.codex/skills/openspec-*` 提供提案、实现、同步与归档技能
+  - `.codex/skills/plan-eng-review` 提供实现前工程计划审查入口；`tdd` 与 `workflow-spine` 作为其配套审查约束与流程参考
   - `.codex/agents/` 提供 `application / integration / operations` 领域代理与只读安全审查代理
   - `AGENTS.md` 已补充规格驱动开发与子代理使用约定
 - 专有术语候选发现与待标注池已完成：
@@ -47,6 +52,10 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - 支持候选去重、证据聚合、工作人员审核和安全写入正式术语
   - 已完成 69 项测试与本地浏览器功能验收
   - 生产默认关闭，等待灰度启用
+
+## 当前进行中的 OpenSpec change
+
+- `start-hkjc-data-import-and-global-spikes`：准备启动 HKJC 赛日/单场/单马样本导入闭环，并产出英法美数据库 spike。当前已完成提案、设计、规格、任务、`/plan-eng-review`、TDD 红灯测试和第一批最小实现；尚未执行真实 HKJC 网络站点探测、生产 commit 或英法美真实网络 spike。
 
 ## 本轮问题简述
 

@@ -1,0 +1,43 @@
+{
+  "_meta": {
+    "source": "HKJC",
+    "source_url": "https://racing.hkjc.com/racing/information/English/Racing/DisplaySectionalTime.aspx?RaceDate=21/06/2026&Racecourse=ST&RaceNo=6",
+    "sample_scope": "2026-06-21 Sha Tin Race 6 minimal race sample",
+    "captured_for": "start-hkjc-data-import-and-global-spikes"
+  },
+  "race": {
+    "race_id": "HK20260621ST06",
+    "race_date": "2026-06-21",
+    "venue": "Sha Tin",
+    "race_number": "6",
+    "race_name": "THE PREMIER PLATE",
+    "class": "Group 3",
+    "distance": "1800m",
+    "surface": "Turf",
+    "going": "Good",
+    "entries": [
+      {
+        "horse_id": "HKH_STELLAR_EXPRESS",
+        "horse_name_en": "STELLAR EXPRESS",
+        "horse_name_zh_hant": "駿步騰飛",
+        "horse_number": "1",
+        "barrier": "5",
+        "jockey": "Z Purton",
+        "trainer": "J Size",
+        "weight": "135"
+      }
+    ],
+    "results": [
+      {
+        "horse_id": "HKH_STELLAR_EXPRESS",
+        "horse_name_en": "STELLAR EXPRESS",
+        "finish_position": "1",
+        "finish_time": "1:46.44",
+        "running_position": "4-4-3-1",
+        "jockey": "Z Purton",
+        "trainer": "J Size",
+        "barrier": "5"
+      }
+    ]
+  }
+}

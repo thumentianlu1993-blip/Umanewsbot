@@ -1196,6 +1196,21 @@ python manage.py import_hkjc_external_data --race-date 2026-06-21 --payload-file
 
 提交写入仍是小样本受控导入：命令会按配置检查 `max_races / max_horses`，payload 超过上限时直接失败，不会静默截断或部分写入。遇到超限时应拆分样本文件后重新 dry-run，再提交。
 
+HKJC 真实网络小样本相关配置保持保守值：
+
+```env
+HKJC_IMPORT_NETWORK_BASE_URL=https://racing.hkjc.com
+HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=8
+HKJC_IMPORT_MAX_RACES_PER_RUN=20
+HKJC_IMPORT_MAX_HORSES_PER_RUN=80
+```
+
+真实网络探测当前只允许 dry-run 记录请求边界，不允许无 payload commit：
+
+```bash
+python manage.py import_hkjc_external_data --race-date 2026-06-21 --allow-network
+```
+
 查询导入统计：
 
 ```bash

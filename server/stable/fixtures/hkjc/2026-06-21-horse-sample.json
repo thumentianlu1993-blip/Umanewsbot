@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "source": "HKJC",
+    "source_url": "https://racing.hkjc.com/racing/information/English/Racing/DisplaySectionalTime.aspx?RaceDate=21/06/2026&Racecourse=ST&RaceNo=6",
+    "sample_scope": "HKJC minimal horse profile sample derived from race result context",
+    "captured_for": "start-hkjc-data-import-and-global-spikes"
+  },
+  "horse": {
+    "horse_id": "HKH_STELLAR_EXPRESS",
+    "horse_name_en": "STELLAR EXPRESS",
+    "horse_name_zh_hant": "駿步騰飛",
+    "trainer": "J Size",
+    "country": "AUS"
+  }
+}

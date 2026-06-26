@@ -1,8 +1,8 @@
 # 全球赛马数据库源 spike 记录
 
-日期：2026-06-25
+日期：2026-06-25 / 2026-06-26
 
-关联 OpenSpec change：`expand-international-racing-coverage`
+关联 OpenSpec change：`expand-international-racing-coverage`、`start-hkjc-data-import-and-global-spikes`
 
 ## 边界
 
@@ -14,9 +14,58 @@
 ## 请求边界
 
 - 本轮实现阶段未对欧美站点执行生产式爬取。
-- spike 样本请求次数：`0` 次生产请求。
+- 2026-06-25 spike 样本请求次数：`0` 次生产请求。
+- 2026-06-26 read-only spike 样本请求次数：`6` 次公开页面 GET 请求，未写正式数据库。
 - 限速建议：后续正式 spike 可从 `10-30 秒/请求` 起步，先单日期、单比赛、单马 profile 小样本，不做历史全量。
 - 样本解析保存位置：仅允许仓库文档、隔离 fixture 或临时文件，不允许写正式外部数据表。
+
+## 2026-06-26 英法美数据库源 read-only spike
+
+执行方式：
+
+- 请求方式：`requests.get`
+- User-Agent：`umanews-spike/0.1`
+- 请求总数：`6`
+- 数据库写入：无
+- 正式表隔离检查：通过
+
+正式表计数检查使用隔离 SQLite `/tmp/umanews-hkjc-apply.sqlite3`：
+
+| 表 | before | after |
+| --- | ---: | ---: |
+| `ExternalRace` | 1 | 1 |
+| `ExternalRaceEntry` | 2 | 2 |
+| `ExternalRaceResult` | 2 | 2 |
+| `ExternalHorse` | 2 | 2 |
+| `ExternalHorseAlias` | 4 | 4 |
+
+### 请求证据
+
+| 地区 | 样本 URL | 状态 | Content-Type | 长度 | 观察信号 |
+| --- | --- | ---: | --- | ---: | --- |
+| 美国 | `https://www.equibase.com/static/entry/index.html` | 200 | `text/html` | 623259 | entries/results 有信号，horse profile 未确认 |
+| 美国 | `https://www.equibase.com/static/foreign/entry/index.html?SAP=TN` | 200 | `text/html` | 262986 | entries/results 有信号，horse profile 未确认 |
+| 英国 | `https://www.sportinglife.com/racing/racecards` | 200 | `text/html; charset=utf-8` | 421762 | racecards/results/horse profile 有信号 |
+| 英国 | `https://www.sportinglife.com/racing/fast-results` | 200 | `text/html; charset=utf-8` | 366794 | racecards/results/horse profile 有信号 |
+| 法国 | `https://www.france-galop.com/en` | 200 | `text/html; charset=UTF-8` | 34900 | calendar/results/horse profile/runners 有浅层信号 |
+| 法国 | `https://www.france-galop.com/en/understand-the-races/find-out-more` | 200 | `text/html; charset=UTF-8` | 31487 | calendar/results/horse profile/runners 有浅层信号 |
+
+未观察到 `access denied`、`forbidden`、`captcha` 或 `Pardon Our Interruption` 等明显访问阻断信号。
+
+### 字段覆盖矩阵
+
+| 地区 | entries/racecards | results | horse profile | 主要缺口 | 准入状态 |
+| --- | --- | --- | --- | --- | --- |
+| 美国 `Equibase` | 有信号 | 有信号 | 未确认 | horse profile 与 chart/PDF 解析未做；需要更具体的单赛日、单马 URL | `needs_more_spike` |
+| 英国 `Sporting Life + BHA` | Sporting Life 有信号 | Sporting Life 有信号 | Sporting Life 有信号 | BHA 官方搜索/监管入口本轮未复验；需要拆分商业页面与官方补字段 | `needs_more_spike` |
+| 法国 `France Galop` | 有浅层信号 | 有浅层信号 | 有浅层信号 | 当前只是英文站浅层页面信号；正式结构化赛程/报名/出马/赛果查询参数未确认 | `needs_more_spike` |
+
+### 本轮结论
+
+- 美国 `Equibase`：页面可访问，但 horse profile 和 chart/PDF 仍是关键风险，不建议直接正式导入。
+- 英国 `Sporting Life + BHA`：Sporting Life 页面可访问，优先级最高；BHA 作为官方补字段入口需要单独复验。
+- 法国 `France Galop`：页面可访问，但必须继续定位结构化查询入口；不进入法语新闻正文链路。
+- 三个地区均未写入正式 `External*` 表或 `ExternalHorseAlias`，也未加入 Celery Beat、生产命令队列或正式导入队列。
 
 ## 2026-06-25 国际新闻源真实探测
 

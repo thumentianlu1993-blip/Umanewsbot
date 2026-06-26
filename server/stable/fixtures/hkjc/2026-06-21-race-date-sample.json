@@ -1,0 +1,83 @@
+{
+  "_meta": {
+    "source": "HKJC",
+    "source_url": "https://racing.hkjc.com/racing/information/English/Racing/DisplaySectionalTime.aspx?RaceDate=21/06/2026&Racecourse=ST&RaceNo=6",
+    "sample_scope": "2026-06-21 Sha Tin race date minimal sample, Race 6 only",
+    "captured_for": "start-hkjc-data-import-and-global-spikes"
+  },
+  "races": [
+    {
+      "race_id": "HK20260621ST06",
+      "race_date": "2026-06-21",
+      "venue": "Sha Tin",
+      "race_number": "6",
+      "race_name": "THE PREMIER PLATE",
+      "class": "Group 3",
+      "distance": "1800m",
+      "surface": "Turf",
+      "going": "Good",
+      "entries": [
+        {
+          "horse_id": "HKH_STELLAR_EXPRESS",
+          "horse_name_en": "STELLAR EXPRESS",
+          "horse_name_zh_hant": "駿步騰飛",
+          "horse_number": "1",
+          "barrier": "5",
+          "jockey": "Z Purton",
+          "trainer": "J Size",
+          "weight": "135"
+        },
+        {
+          "horse_id": "HKH_MASSIVE_SOVEREIGN",
+          "horse_name_en": "MASSIVE SOVEREIGN",
+          "horse_name_zh_hant": "大至尊",
+          "horse_number": "2",
+          "barrier": "2",
+          "jockey": "K Teetan",
+          "trainer": "D A Hayes",
+          "weight": "128"
+        }
+      ],
+      "results": [
+        {
+          "horse_id": "HKH_STELLAR_EXPRESS",
+          "horse_name_en": "STELLAR EXPRESS",
+          "finish_position": "1",
+          "finish_time": "1:46.44",
+          "margin": "",
+          "running_position": "4-4-3-1",
+          "jockey": "Z Purton",
+          "trainer": "J Size",
+          "barrier": "5"
+        },
+        {
+          "horse_id": "HKH_MASSIVE_SOVEREIGN",
+          "horse_name_en": "MASSIVE SOVEREIGN",
+          "finish_position": "2",
+          "finish_time": "1:46.62",
+          "margin": "1",
+          "running_position": "6-6-6-2",
+          "jockey": "K Teetan",
+          "trainer": "D A Hayes",
+          "barrier": "2"
+        }
+      ]
+    }
+  ],
+  "horses": [
+    {
+      "horse_id": "HKH_STELLAR_EXPRESS",
+      "horse_name_en": "STELLAR EXPRESS",
+      "horse_name_zh_hant": "駿步騰飛",
+      "trainer": "J Size",
+      "country": "AUS"
+    },
+    {
+      "horse_id": "HKH_MASSIVE_SOVEREIGN",
+      "horse_name_en": "MASSIVE SOVEREIGN",
+      "horse_name_zh_hant": "大至尊",
+      "trainer": "D A Hayes",
+      "country": "IRE"
+    }
+  ]
+}

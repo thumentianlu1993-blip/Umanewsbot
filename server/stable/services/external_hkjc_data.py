@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import requests
 from django.conf import settings
 from django.db import transaction
 from django.utils import dateparse, timezone
@@ -109,16 +110,61 @@ class HKJCExternalDataImporter:
         self.options = options or HKJCImportOptions.from_settings()
 
     def import_race_date(self, race_date: str, *, payload_file: str = "") -> dict:
-        payload = _load_json_file(payload_file) if payload_file else {"races": [], "race_date": race_date}
-        return self._import_payload("race_date", race_date, payload, has_payload_file=bool(payload_file))
+        return self._import_target("race_date", race_date, payload_file=payload_file)
 
     def import_race(self, race_id: str, *, payload_file: str = "") -> dict:
-        payload = _load_json_file(payload_file) if payload_file else {"race": {"race_id": race_id}}
-        return self._import_payload("race", race_id, payload, has_payload_file=bool(payload_file))
+        return self._import_target("race", race_id, payload_file=payload_file)
 
     def import_horse(self, horse_id: str, *, payload_file: str = "") -> dict:
-        payload = _load_json_file(payload_file) if payload_file else {"horses": [{"horse_id": horse_id}]}
-        return self._import_payload("horse", horse_id, payload, has_payload_file=bool(payload_file))
+        return self._import_target("horse", horse_id, payload_file=payload_file)
+
+    def _import_target(self, target_type: str, target_id: str, *, payload_file: str = "") -> dict:
+        if payload_file:
+            payload = _load_json_file(payload_file)
+            return self._import_payload(target_type, target_id, payload, has_payload_file=True)
+        if self.options.allow_network and self.options.dry_run:
+            payload, request_info = self._fetch_network_payload(target_type, target_id)
+            result = self._import_payload(target_type, target_id, payload, has_payload_file=False)
+            result["network_probe"] = True
+            result["requests"] = [request_info]
+            return result
+        payload = self._placeholder_payload(target_type, target_id)
+        return self._import_payload(target_type, target_id, payload, has_payload_file=False)
+
+    def _placeholder_payload(self, target_type: str, target_id: str) -> dict:
+        if target_type == "race_date":
+            return {"races": [], "race_date": target_id}
+        if target_type == "race":
+            return {"race": {"race_id": target_id}}
+        return {"horses": [{"horse_id": target_id}]}
+
+    def _fetch_network_payload(self, target_type: str, target_id: str) -> tuple[dict, dict]:
+        url = self._network_url(target_type, target_id)
+        response = requests.get(url, timeout=20)
+        request_info = {
+            "url": getattr(response, "url", url),
+            "status_code": response.status_code,
+            "target_type": target_type,
+            "target_id": target_id,
+        }
+        if response.status_code >= 400:
+            raise HKJCImportError(f"HKJC network dry-run failed with HTTP {response.status_code}: {url}")
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise HKJCImportError("HKJC network dry-run did not return JSON payload") from exc
+        if not isinstance(payload, dict):
+            raise HKJCImportError("HKJC network dry-run payload must be a JSON object")
+        return payload, request_info
+
+    def _network_url(self, target_type: str, target_id: str) -> str:
+        base_url = _string(getattr(settings, "HKJC_IMPORT_NETWORK_BASE_URL", "https://racing.hkjc.com")).rstrip("/")
+        path_by_target = {
+            "race_date": "racing",
+            "race": "race",
+            "horse": "horse",
+        }
+        return f"{base_url}/{path_by_target[target_type]}/{target_id}"
 
     def _import_payload(self, target_type: str, target_id: str, payload: dict, *, has_payload_file: bool) -> dict:
         stats = self._payload_stats(payload)

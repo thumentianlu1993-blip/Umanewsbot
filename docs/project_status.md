@@ -127,9 +127,11 @@
 - OpenSpec 项目配置：`openspec/config.yaml`
 - OpenSpec 规格与变更目录：`openspec/specs/`、`openspec/changes/`
 - Codex OpenSpec skills：`.codex/skills/openspec-*`
+- Codex 工程计划审查 skill：`.codex/skills/plan-eng-review`，配套 `tdd`、`workflow-spine` 与 `gate-templates.md` 引用；`2026-06-26` 新工作树 `/Users/mentianlu/.codex/worktrees/openspec-ready-20260626/umanews` 已补齐并验证这些入口
 - Codex 领域代理：`application`、`integration`、`operations`
 - Codex 只读安全审查代理：`security-scanner`
 - 较大功能、跨模块、架构和生产高风险变更采用“探索 -> 提案/规格/设计/任务 -> 实现 -> 验证 -> 归档”流程
+- 当前新增 OpenSpec change：`start-hkjc-data-import-and-global-spikes`，用于 HKJC 外部数据受控导入启动和英法美数据库 spike；日本 netkeiba 续跑不属于本 change。该 change 已完成 `/plan-eng-review`，当前 `.openspec.yaml` 为 `phase: reviewed`；审查后补齐生产 HKJC commit 前数据库备份和用户确认、`HKJC_IMPORT_*` 运行配置、英法美 spike 正式表计数不变等验收闸门。TDD 红灯测试已先行写入并完成第一批最小实现，当前 HKJC/spike 目标测试 12 项通过，完整 `stable` 测试 246 项通过；HKJC 最小 fixture 与隔离 SQLite dry-run/commit 证据已写入 `docs/hkjc_data_import_samples.md`；英法美 read-only spike 请求证据、字段覆盖矩阵和准入判断已写入 `docs/global_racing_data_source_spikes.md`，三地当前均为 `needs_more_spike`。下一步是执行真实 HKJC 入口调研和生产前安全检查。
 
 ## 5. 当前验证结果
 

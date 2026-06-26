@@ -361,3 +361,15 @@ review 返修后补充实现边界：HKJC 外部数据导入必须参考 netkeib
 - 重翻译继续复用现有 `translate_article_task`，避免新增任务类型，也让最新正式术语库自然进入现有翻译提示和译文纠偏链路；若页面已有重新翻译按钮，不为术语成功浮层新增重翻译入口。
 
 首版不做全站批量重翻译，不自动重新跑自动发布门禁，也不因指定术语应用或重翻译自动发布文章。后续如需要字段级 diff、强制覆盖人工字段或自动重跑门禁，应继续拆独立 change。
+
+## 为什么英法美数据库源本轮仍保持 needs_more_spike
+
+`start-hkjc-data-import-and-global-spikes` 对 `Equibase`、`Sporting Life + BHA`、`France Galop` 做了 2026-06-26 read-only spike。三地公开页面均能返回 `200`，且没有观察到明显访问阻断，但本轮只确认了浅层 HTML 入口和字段信号，没有确认稳定的结构化 API、完整单赛日/单马 URL 参数、分页/历史范围、PDF chart 解析成本或官方补字段路径。
+
+因此本轮准入判断统一保持 `needs_more_spike`：
+
+- 美国 `Equibase`：entries/results 有信号，但 horse profile 与 chart/PDF 仍需更具体小样本验证。
+- 英国 `Sporting Life + BHA`：Sporting Life racecards/results/profile 信号较好，优先级最高；BHA 官方搜索、监管和补字段入口仍需单独复验。
+- 法国 `France Galop`：英文站浅层页面可访问，但结构化赛程、报名、出马、赛果和马匹资料的稳定查询入口仍未确认；法语新闻正文仍不进入新闻审核、翻译、自动发布或 QQ 推送主链路。
+
+后续如要正式导入英法美数据库源，必须另起 OpenSpec change，先把每个地区的具体 URL 参数、字段映射、限速、失败恢复、正式表写入边界和回滚口径设计清楚。

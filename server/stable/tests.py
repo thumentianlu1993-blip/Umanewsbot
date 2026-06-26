@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone as dt_timezone
 import json
 import tempfile
 from io import StringIO
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from zoneinfo import ZoneInfo
 
 import requests
@@ -45,6 +45,7 @@ from stable.models import (
     ContentCategory,
     ExternalDataImportLock,
     ExternalDataImportRun,
+    ExternalHorse,
     ExternalHorseAlias,
     ExternalImportStatus,
     ExternalRace,
@@ -1636,6 +1637,120 @@ class HKJCExternalDataImportTests(TestCase):
         call_command("import_hkjc_external_data", "--lookup-name", "Lucky Star", stdout=out)
 
         self.assertIn('"external_horse_id": "HKH001"', out.getvalue())
+
+    def test_hkjc_management_command_stats_run_id_reports_coverage(self):
+        payload_file = self.write_payload()
+        importer = HKJCExternalDataImporter(HKJCImportOptions(dry_run=False, allow_network=False))
+        result = importer.import_race_date("2026-06-21", payload_file=payload_file)
+        out = StringIO()
+
+        call_command("import_hkjc_external_data", "--stats-run-id", str(result["run_id"]), stdout=out)
+
+        stats = json.loads(out.getvalue())
+        self.assertEqual(stats["run_id"], result["run_id"])
+        self.assertEqual(stats["source"], "hkjc")
+        self.assertEqual(stats["status"], ExternalImportStatus.SUCCESS)
+        self.assertEqual(stats["success_count"], 4)
+        self.assertEqual(stats["coverage_stats"], {"races": 1, "entries": 1, "results": 1, "horses": 1})
+        self.assertEqual(stats["error_count"], 0)
+
+    def test_hkjc_import_options_are_backed_by_runtime_settings(self):
+        # Mutation: removing HKJC_IMPORT_* from settings.py would leave production limits stuck at code defaults.
+        self.assertTrue(hasattr(django_settings, "HKJC_IMPORT_REQUEST_INTERVAL_SECONDS"))
+        self.assertTrue(hasattr(django_settings, "HKJC_IMPORT_MAX_RACES_PER_RUN"))
+        self.assertTrue(hasattr(django_settings, "HKJC_IMPORT_MAX_HORSES_PER_RUN"))
+
+        options = HKJCImportOptions.from_settings()
+
+        self.assertEqual(options.request_interval_seconds, django_settings.HKJC_IMPORT_REQUEST_INTERVAL_SECONDS)
+        self.assertEqual(options.max_races, django_settings.HKJC_IMPORT_MAX_RACES_PER_RUN)
+        self.assertEqual(options.max_horses, django_settings.HKJC_IMPORT_MAX_HORSES_PER_RUN)
+
+    @override_settings(
+        HKJC_IMPORT_NETWORK_BASE_URL="https://hkjc.example.test",
+        HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        HKJC_IMPORT_MAX_RACES_PER_RUN=2,
+        HKJC_IMPORT_MAX_HORSES_PER_RUN=10,
+    )
+    def test_hkjc_network_dry_run_records_request_boundary_without_writing(self):
+        # Mutation: treating --allow-network dry-run as a placeholder payload would hide request URLs and status.
+        fake_payload = self.sample_payload()
+        from stable.services import external_hkjc_data as hkjc_module
+
+        mock_get = Mock()
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.url = "https://hkjc.example.test/racing/2026-06-21"
+        mock_get.return_value.json.return_value = fake_payload
+        mock_get.return_value.text = json.dumps(fake_payload)
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(hkjc_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command("import_hkjc_external_data", "--race-date", "2026-06-21", "--allow-network", stdout=out)
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertTrue(result["network_probe"])
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 1, "results": 1, "horses": 1})
+        self.assertEqual(
+            result["requests"],
+            [
+                {
+                    "url": "https://hkjc.example.test/racing/2026-06-21",
+                    "status_code": 200,
+                    "target_type": "race_date",
+                    "target_id": "2026-06-21",
+                }
+            ],
+        )
+        self.assertFalse(result["would_write_formal_tables"])
+        self.assertTrue(mock_get.called)
+        self.assertEqual(ExternalRace.objects.count(), 0)
+        self.assertEqual(ExternalHorseAlias.objects.count(), 0)
+        self.assertEqual(ExternalDataImportRun.objects.count(), 0)
+
+
+class GlobalRacingSpikeIsolationTests(TestCase):
+    def external_counts(self) -> dict[str, int]:
+        return {
+            "ExternalRace": ExternalRace.objects.count(),
+            "ExternalRaceEntry": ExternalRaceEntry.objects.count(),
+            "ExternalRaceResult": ExternalRaceResult.objects.count(),
+            "ExternalHorse": ExternalHorse.objects.count(),
+            "ExternalHorseAlias": ExternalHorseAlias.objects.count(),
+        }
+
+    def test_equibase_spike_records_counts_and_does_not_write_formal_tables(self):
+        # Mutation: if a spike accidentally upserts ExternalRace or aliases, before/after counts diverge.
+        before_counts = self.external_counts()
+
+        from stable.services.global_racing_spikes import run_source_spike
+
+        report = run_source_spike(
+            source="equibase",
+            fixture_payload={
+                "sample_url": "https://www.equibase.com/static/entry/RaceCard.html",
+                "request_count": 1,
+                "fields": {"entries": True, "results": True, "horse_profile": False},
+            },
+            dry_run=True,
+        )
+
+        self.assertEqual(self.external_counts(), before_counts)
+        self.assertEqual(report["before_counts"], before_counts)
+        self.assertEqual(report["after_counts"], before_counts)
+        self.assertEqual(report["source"], "equibase")
+        self.assertEqual(report["readiness_status"], "needs_more_spike")
+        self.assertFalse(report["wrote_formal_tables"])
+
+    def test_uk_fr_us_spikes_reject_commit_mode(self):
+        # Mutation: accepting commit=True for spike sources would bypass the OpenSpec read-only boundary.
+        from stable.services.global_racing_spikes import run_source_spike
+
+        for source in ("equibase", "sporting_life_bha", "france_galop"):
+            with self.subTest(source=source):
+                with self.assertRaisesMessage(ValueError, "read-only spike"):
+                    run_source_spike(source=source, fixture_payload={}, dry_run=False, commit=True)
 
 
 class PushTests(TestCase):
