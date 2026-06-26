@@ -2438,6 +2438,44 @@ class HKJCExternalDataImportTests(TestCase):
 
         sleep.assert_has_calls([call(2.5), call(2.5), call(2.5)])
 
+    def test_hkjc_network_client_retries_transient_timeout_and_records_attempts(self):
+        # Mutation: without retry, one transient HKJC TLS/read timeout aborts a long production batch dry-run.
+        from stable.services import external_hkjc_data as hkjc_module
+
+        response = self.hkjc_response(url="https://hkjc.example.test/horse", text="<html></html>")
+        mock_get = Mock(side_effect=[requests.exceptions.ReadTimeout("handshake timed out"), response])
+        fake_exceptions = type("FakeRequestExceptions", (), {"RequestException": requests.RequestException})
+        fake_requests = type("FakeRequests", (), {"get": mock_get, "exceptions": fake_exceptions})
+        client = hkjc_module.HKJCNetworkClient(
+            HKJCImportOptions(dry_run=True, allow_network=True, request_interval_seconds=0, max_requests=10)
+        )
+
+        with patch.object(hkjc_module, "requests", fake_requests, create=True):
+            result = client.get("https://hkjc.example.test/horse", target_type="horse", target_id="HK_2022_H293")
+
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(mock_get.call_count, 2)
+        self.assertEqual(
+            client.requests,
+            [
+                {
+                    "url": "https://hkjc.example.test/horse",
+                    "status_code": None,
+                    "target_type": "horse",
+                    "target_id": "HK_2022_H293",
+                    "attempt": 1,
+                    "error": "handshake timed out",
+                },
+                {
+                    "url": "https://hkjc.example.test/horse",
+                    "status_code": 200,
+                    "target_type": "horse",
+                    "target_id": "HK_2022_H293",
+                    "attempt": 2,
+                },
+            ],
+        )
+
     @override_settings(
         HKJC_IMPORT_NETWORK_BASE_URL="https://hkjc.example.test",
         HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=0,

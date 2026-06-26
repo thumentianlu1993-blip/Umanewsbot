@@ -1264,6 +1264,7 @@ python manage.py import_hkjc_external_data --lookup-name "Lucky Star"
 - 真实网络请求必须保持低频限速；扩大到最近 2 个月全量前，应先用 `--limit-races / --limit-horses / --max-requests` 分批 dry-run，确认请求量和字段覆盖。
 - 生产最近 2 个月全量 commit 前必须记录备份路径、dry-run 结果、锁检查、健康检查和用户确认。
 - 本 change 不创建比赛页、赛果页、马匹页；导入数据只作为外部缓存、马名识别和后续项目底座。
+- 2026-06-26 生产第 1 批 full dry-run 曾在 HKJC 马匹 profile 补抓阶段遇到 `ReadTimeout` / TLS handshake timeout；该次为 dry-run，未写表，锁为空。随后已补 transient timeout retry：单请求最多 3 次，失败尝试会保留在请求证据中。长批次仍建议先 dry-run，失败后检查 `started_runs`、单来源锁和表计数再重试。
 
 ## 2026-06-26 HKJC 数据导入 readiness 与英法美 spike 生产部署
 

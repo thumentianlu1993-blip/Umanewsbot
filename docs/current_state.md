@@ -39,6 +39,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-26` 已为 HKJC 增加 `--plan-only`、`--skip-races` 和 `--race-ids` 批次能力，并用真实页面完成本地 plan-only 预检：最近 60 天 HKJC 下拉目标日期页 `28` 个，过滤 overseas simulcast 的 `S*` racecourse 后，本地香港 `HV/ST` 比赛为 `144` 场；按 `limit-races=20` 可拆为 `8` 批。`--skip-races 20 --limit-races 1 --limit-horses 0` 真实 smoke 成功从第 21 场 `HK20260613ST04` 开始，证明日期范围后续批次不会重复第一批；随后 `--race-ids HK20260624HV02,HK20260613ST04 --limit-horses 1` 真实 smoke 只请求 `race/race/horse` 3 个页面，解析 `2` 场、`26` entries、`26` results 和 `26` 匹唯一马，证明可按 plan-only 输出的 race_id 清单执行精确批次。本能力只用于生产全量前规划和拆批；尚未执行生产最近 2 个月全量 dry-run 或 commit。
 
+`2026-06-26` 已将 `connect-real-global-racing-databases` 当前 HKJC 真实网络实现部署到生产 `65d41eb`，部署前数据库备份为 `backups/db/pre-hkjc-real-network-20260626_202442.sql.gz` 并通过 `gzip -t` 校验。部署后 `manage.py check`、本地和公网 `/healthz/`、HKJC 精确 race-id 小样本 dry-run 均通过；生产 plan-only 仍显示最近 60 天本地香港 `HV/ST` 比赛 `144` 场、拆为 `8` 批。随后第 1 批 full dry-run 在马匹 profile 补抓阶段遇到 HKJC `ReadTimeout` / TLS handshake timeout 中断；该次未使用 `--commit`，未写正式表，中断后生产 HKJC 锁为空、`started_runs=0`、HKJC 表计数仍为上次 fixture 样本 `ExternalRace=1`、`ExternalRaceEntry=2`、`ExternalRaceResult=2`、`ExternalHorse=2`、`ExternalHorseAlias=4`。已按 TDD 追加 transient timeout retry，单请求最多 `3` 次并记录失败尝试；补丁尚需重新部署后再重跑第 1 批 full dry-run。
+
 ## 已完成内容
 
 - 域名购买与解析
@@ -68,7 +70,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 ## 当前进行中的 OpenSpec change
 
 - `start-hkjc-data-import-and-global-spikes`：已完成实现、生产部署、验证和归档；生产服务镜像来自 `b0361cf`。已在生产执行一次 HKJC fixture 样本 commit（`run_id=1960`），但未启用 HKJC 真实网络持续抓取，也未启用英法美正式导入。
-- `connect-real-global-racing-databases`：进行中；已完成 proposal/design/spec/tasks，香港真实 HKJC 单场 HTML dry-run、隔离 SQLite commit、recent-days/date-range 小范围 dry-run/commit、马匹详情补抓、限速、请求上限、completion 审计、plan-only 批次计划、skip-races 续跑测试和 `--race-ids` 精确批次 smoke；英法美只读入口复核已追加记录。尚未完成生产最近 2 个月全量 dry-run/commit，也未进入英国、法国、美国正式写库接入。
+- `connect-real-global-racing-databases`：进行中；已完成 proposal/design/spec/tasks，香港真实 HKJC 单场 HTML dry-run、隔离 SQLite commit、recent-days/date-range 小范围 dry-run/commit、马匹详情补抓、限速、请求上限、completion 审计、plan-only 批次计划、skip-races 续跑测试和 `--race-ids` 精确批次 smoke；英法美只读入口复核已追加记录。生产已部署到 `65d41eb` 并完成 plan-only，但第 1 批 full dry-run 因 HKJC profile 请求 timeout 中断，已补 retry 待重新部署验证。尚未完成生产最近 2 个月全量 dry-run/commit，也未进入英国、法国、美国正式写库接入。
 
 ## 本轮问题简述
 

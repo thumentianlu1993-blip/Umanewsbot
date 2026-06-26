@@ -365,3 +365,36 @@ DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true HKJC_IMPORT_REQUEST_INTERVAL_SECO
 - plan-only 里的 `meetings=28` 是 HKJC 下拉中的目标日期页数量，其中包含会跳转到海外转播结果页的日期；正式香港本地导入以 `HV/ST` race links 为准。
 - plan-only 只估算比赛批次，不知道每批最终唯一马匹数量；每批正式 commit 前仍要先执行同参数 dry-run，确认 `completion`、请求量、唯一马匹数量和失败摘要。
 - `--race-ids` 适合使用 plan-only 输出的批次清单执行生产 dry-run/commit；该模式不接受 `--payload-file`、`--limit-races` 或 `--skip-races`，并且必须显式带 `--allow-network`。
+
+## 生产 HKJC 真实网络部署与第 1 批 dry-run 中断
+
+2026-06-26 已将 `connect-real-global-racing-databases` 当前实现部署到生产 `65d41eb`，部署前备份：
+
+- `backups/db/pre-hkjc-real-network-20260626_202442.sql.gz`
+- 大小约 `42M`
+- `gzip -t` 校验通过
+
+部署后验证：
+
+- `manage.py check`：通过
+- `http://127.0.0.1/healthz/`：`200`
+- `http://umafans.run/healthz/`：`200`
+- HKJC `--race-ids HK20260624HV02,HK20260613ST04 --limit-horses 1` 生产 dry-run：请求 `3` 次，解析 `2` 场、`26` entries、`26` results、`26` unique horses，未写正式表
+
+生产 plan-only：
+
+- `coverage_stats={"meetings": 28, "races": 144, "estimated_requests_without_horses": 173}`
+- 仍为 `8` 批：前 7 批各 `20` 场，第 8 批 `4` 场
+
+第 1 批 full dry-run：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web env HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=3 HKJC_IMPORT_MAX_REQUESTS_PER_RUN=400 python manage.py import_hkjc_external_data --race-ids "<batch-1-race-ids>" --max-requests 400 --allow-network
+```
+
+结果：
+
+- 在马匹 profile 补抓阶段遇到 HKJC `ReadTimeout` / TLS handshake timeout，命令退出。
+- 该运行是 dry-run，未执行 `--commit`，未写正式表。
+- 中断后生产检查：HKJC 锁为空、`started_runs=0`、HKJC 表计数仍为 fixture 样本 `ExternalRace=1`、`ExternalRaceEntry=2`、`ExternalRaceResult=2`、`ExternalHorse=2`、`ExternalHorseAlias=4`。
+- 已按 TDD 补充 client transient timeout retry：单个请求最多 `3` 次，失败尝试会进入请求证据；普通一次成功请求的证据格式保持兼容。

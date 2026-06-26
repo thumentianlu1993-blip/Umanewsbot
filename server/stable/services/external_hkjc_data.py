@@ -417,31 +417,51 @@ def _parse_hkjc_race_id(race_id: str) -> tuple[date, str, str]:
 
 class HKJCNetworkClient:
     user_agent = "umanewsbot/1.0 (+https://umafans.run; low-frequency data import)"
+    max_attempts = 3
 
     def __init__(self, options: HKJCImportOptions):
         self.options = options
         self.requests: list[dict[str, Any]] = []
 
     def get(self, url: str, *, target_type: str, target_id: str):
-        if len(self.requests) >= self.options.max_requests:
-            raise HKJCImportError(f"HKJC network import exceeded max_requests={self.options.max_requests}")
-        if self.requests and self.options.request_interval_seconds > 0:
-            time.sleep(self.options.request_interval_seconds)
-        response = requests.get(
-            url,
-            timeout=20,
-            headers={"User-Agent": self.user_agent},
-        )
-        request_info = {
-            "url": getattr(response, "url", url),
-            "status_code": response.status_code,
-            "target_type": target_type,
-            "target_id": target_id,
-        }
-        self.requests.append(request_info)
-        if response.status_code >= 400:
-            raise HKJCImportError(f"HKJC network import failed with HTTP {response.status_code}: {url}")
-        return response
+        last_error = ""
+        for attempt in range(1, self.max_attempts + 1):
+            if len(self.requests) >= self.options.max_requests:
+                raise HKJCImportError(f"HKJC network import exceeded max_requests={self.options.max_requests}")
+            if self.requests and self.options.request_interval_seconds > 0:
+                time.sleep(self.options.request_interval_seconds)
+            try:
+                response = requests.get(
+                    url,
+                    timeout=20,
+                    headers={"User-Agent": self.user_agent},
+                )
+            except requests.exceptions.RequestException as exc:
+                last_error = str(exc)
+                self.requests.append(
+                    {
+                        "url": url,
+                        "status_code": None,
+                        "target_type": target_type,
+                        "target_id": target_id,
+                        "attempt": attempt,
+                        "error": last_error,
+                    }
+                )
+                continue
+            request_info = {
+                "url": getattr(response, "url", url),
+                "status_code": response.status_code,
+                "target_type": target_type,
+                "target_id": target_id,
+            }
+            if attempt > 1:
+                request_info["attempt"] = attempt
+            self.requests.append(request_info)
+            if response.status_code >= 400:
+                raise HKJCImportError(f"HKJC network import failed with HTTP {response.status_code}: {url}")
+            return response
+        raise HKJCImportError(f"HKJC network import failed after {self.max_attempts} attempts: {last_error or url}")
 
 
 class HKJCExternalDataImporter:
