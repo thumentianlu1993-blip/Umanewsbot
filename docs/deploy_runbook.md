@@ -1228,3 +1228,60 @@ python manage.py import_hkjc_external_data --lookup-name "Lucky Star"
 - 部署前必须确认没有正在运行的外部数据导入。
 - 后续如启用真实网络请求，必须从单赛日、单场、单马小样本开始，并保持低频限速。
 - 本 change 不创建比赛页、赛果页、马匹页；导入数据只作为外部缓存、马名识别和后续项目底座。
+
+## 2026-06-26 HKJC 数据导入 readiness 与英法美 spike 生产部署
+
+### 部署前状态
+
+- change：`start-hkjc-data-import-and-global-spikes`
+- 部署 commit：`b0361cf`
+- 服务器部署前 HEAD：`4d09d25`
+- 部署前 `.env` 备份：`.env.backup.hkjc-global-spikes-20260626_164045`
+- 部署前只读检查：
+  - `ExternalDataImportLock` 运行中锁：无
+  - `ExternalDataImportRun(status="started")`：无
+  - `web` 容器：healthy
+
+### 部署命令
+
+```bash
+cd /opt/umanewsbot
+cp .env .env.backup.hkjc-global-spikes-20260626_164045
+git pull --ff-only origin main
+chmod +x deploy_lowcost.sh deploy/*.sh deploy/docker/*.sh
+bash ./deploy_lowcost.sh
+```
+
+### 部署结果
+
+- 服务器 `/opt/umanewsbot` 已从 `4d09d25` 快进到 `b0361cf`。
+- `bash ./deploy_lowcost.sh` 执行成功。
+- 迁移显示 `No migrations to apply`。
+- `web / worker / beat` 已重建，`web` healthy。
+- `collectstatic` 完成：`0 static files copied`，`129 unmodified`，`360 post-processed`。
+
+### 生产验证
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check
+curl -I http://127.0.0.1/healthz/
+curl -I http://umafans.run/healthz/
+curl -I http://umafans.run/
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_hkjc_external_data --race-date 2026-06-21 --payload-file stable/fixtures/hkjc/2026-06-21-race-date-sample.json
+```
+
+结果：
+
+- `manage.py check`：通过。
+- `http://127.0.0.1/healthz/`：`200`
+- `http://umafans.run/healthz/`：`200`
+- `http://umafans.run/`：`200`
+- HKJC 样本命令：dry-run 成功，`coverage_stats={"races":1,"entries":2,"results":2,"horses":2}`，`would_write_formal_tables=false`。
+
+注意：第一次 HKJC smoke 使用了仓库根相对路径 `server/stable/fixtures/...`，容器内工作目录为 `/app/server`，因此返回 `FileNotFoundError`；已改用 `stable/fixtures/...` 重跑通过。这不是业务逻辑失败。
+
+### 边界
+
+- 本次生产没有执行 HKJC `--commit`。
+- 本次生产没有启用英法美正式导入、Celery Beat 调度或生产命令队列。
+- HKJC 真实网络 dry-run 当前最小 URL 构造返回 `404`，后续必须先确认稳定 JSON/API、页面脚本 payload 或 HTML 解析入口，才能进入真实网络 commit 设计。

@@ -47,4 +47,4 @@
 - [x] 5.3 (application) 执行完整 `stable` 测试或说明无法执行的原因。
 - [x] 5.4 (operations) 执行 `openspec validate start-hkjc-data-import-and-global-spikes --strict`。
 - [x] 5.5 (operations) 执行 `openspec validate --all` 和 `git diff --check`。
-- [ ] 5.6 (operations) 在完成实现与验证后，整理本 change 是否可归档，若可归档则提醒执行 `/opsx:archive`。
+- [x] 5.6 (operations) 在完成实现与验证后，整理本 change 是否可归档，若可归档则提醒执行 `/opsx:archive`。
