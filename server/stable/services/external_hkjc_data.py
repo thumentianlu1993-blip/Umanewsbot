@@ -458,6 +458,18 @@ class HKJCExternalDataImporter:
     def import_race(self, race_id: str, *, payload_file: str = "") -> dict:
         return self._import_target("race", race_id, payload_file=payload_file)
 
+    def import_race_batch(self, race_ids: list[str], *, limit_horses: int | None = None) -> dict:
+        cleaned_race_ids = [_string(race_id) for race_id in race_ids if _string(race_id)]
+        if not cleaned_race_ids:
+            raise HKJCImportError("race_ids must not be empty")
+        if not self.options.allow_network:
+            raise HKJCImportError("HKJC race-id batch import requires --allow-network")
+        return self._import_target(
+            "race_batch",
+            ",".join(cleaned_race_ids),
+            network_kwargs={"race_ids": cleaned_race_ids, "limit_horses": limit_horses},
+        )
+
     def import_horse(self, horse_id: str, *, payload_file: str = "") -> dict:
         return self._import_target("horse", horse_id, payload_file=payload_file)
 
@@ -604,6 +616,12 @@ class HKJCExternalDataImporter:
         return {"horses": [{"horse_id": target_id}]}
 
     def _fetch_network_payload(self, target_type: str, target_id: str, **kwargs: Any) -> tuple[dict, list[dict]]:
+        if target_type == "race_batch":
+            payload, client = self._fetch_race_batch_payload(
+                kwargs["race_ids"],
+                limit_horses=kwargs.get("limit_horses"),
+            )
+            return payload, client.requests
         if target_type == "date_range":
             payload, client = self._fetch_date_range_payload(
                 kwargs["start_date"],
@@ -628,6 +646,65 @@ class HKJCExternalDataImporter:
         if not isinstance(payload, dict):
             raise HKJCImportError("HKJC network dry-run payload must be a JSON object")
         return payload, client.requests
+
+    def _fetch_race_batch_payload(
+        self,
+        race_ids: list[str],
+        *,
+        limit_horses: int | None,
+    ) -> tuple[dict, HKJCNetworkClient]:
+        parser = HKJCHTMLParser()
+        client = HKJCNetworkClient(self.options)
+        races: list[dict[str, Any]] = []
+        horse_ids: list[str] = []
+        seen_horse_ids: set[str] = set()
+        for race_id in race_ids:
+            race_date, racecourse, race_no = _parse_hkjc_race_id(race_id)
+            race_response = client.get(self._network_url("race", race_id), target_type="race", target_id=race_id)
+            race = parser.parse_race_result(
+                race_response.text,
+                race_date=race_date,
+                racecourse=racecourse,
+                race_no=race_no,
+                source_url=client.requests[-1]["url"],
+            )
+            races.append(race)
+            for runner in [*(race.get("entries") or []), *(race.get("results") or [])]:
+                horse_id = _string(runner.get("horse_id")) if isinstance(runner, dict) else ""
+                if horse_id and horse_id not in seen_horse_ids:
+                    seen_horse_ids.add(horse_id)
+                    horse_ids.append(horse_id)
+        horses: list[dict[str, Any]] = []
+        for horse_id in horse_ids:
+            if limit_horses is not None and len(horses) >= limit_horses:
+                break
+            horse_response = client.get(self._horse_url(horse_id), target_type="horse", target_id=horse_id)
+            horses.append(
+                parser.parse_horse_profile(
+                    horse_response.text,
+                    horse_id=horse_id,
+                    source_url=client.requests[-1]["url"],
+                )
+            )
+        completion = self._race_batch_completion(
+            race_ids=race_ids,
+            races=races,
+            horse_ids=horse_ids,
+            horses=horses,
+            limit_horses=limit_horses,
+        )
+        return (
+            {
+                "races": races,
+                "horses": horses,
+                "completion": completion,
+                "raw_payload": {
+                    "race_ids": race_ids,
+                    "limit_horses": limit_horses,
+                },
+            },
+            client,
+        )
 
     def _fetch_date_range_payload(
         self,
@@ -717,6 +794,31 @@ class HKJCExternalDataImporter:
             },
             client,
         )
+
+    def _race_batch_completion(
+        self,
+        *,
+        race_ids: list[str],
+        races: list[dict[str, Any]],
+        horse_ids: list[str],
+        horses: list[dict[str, Any]],
+        limit_horses: int | None,
+    ) -> dict[str, Any]:
+        stop_reason = "complete"
+        is_complete = True
+        if limit_horses is not None and len(horses) < len(horse_ids):
+            stop_reason = "limit_horses_reached"
+            is_complete = False
+        return {
+            "is_complete": is_complete,
+            "stop_reason": stop_reason,
+            "race_ids": race_ids,
+            "races_imported": len(races),
+            "unique_horses_found": len(horse_ids),
+            "horse_profiles_fetched": len(horses),
+            "limit_horses": limit_horses,
+            "max_requests": self.options.max_requests,
+        }
 
     def _date_range_completion(
         self,

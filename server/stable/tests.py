@@ -2130,6 +2130,75 @@ class HKJCExternalDataImportTests(TestCase):
         HKJC_IMPORT_MAX_HORSES_PER_RUN=5,
         HKJC_IMPORT_MAX_REQUESTS_PER_RUN=10,
     )
+    def test_hkjc_network_race_ids_batch_fetches_exact_races_without_date_scan(self):
+        # Mutation: if race-id batches still scan meeting/date pages, production batches waste requests before fetching the requested races.
+        from pathlib import Path
+
+        from stable.services import external_hkjc_data as hkjc_module
+
+        fixture_dir = Path(__file__).resolve().parent / "fixtures" / "hkjc" / "html"
+        mock_get = Mock(
+            side_effect=[
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=1",
+                    text=(fixture_dir / "localresults-race-sample.html").read_text(encoding="utf-8"),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/21&Racecourse=ST&RaceNo=3",
+                    text=(fixture_dir / "localresults-race-sample.html").read_text(encoding="utf-8"),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/horse?horseid=HK_2023_J524",
+                    text=(fixture_dir / "horse-profile-sample.html").read_text(encoding="utf-8"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(hkjc_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_hkjc_external_data",
+                "--race-ids",
+                "HK20260624HV01,HK20260621ST03",
+                "--limit-horses",
+                "1",
+                "--max-requests",
+                "10",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["target_type"], "race_batch")
+        self.assertEqual(result["target_id"], "HK20260624HV01,HK20260621ST03")
+        self.assertEqual(result["coverage_stats"], {"races": 2, "entries": 4, "results": 4, "horses": 2})
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["race", "race", "horse"])
+        self.assertEqual([request["target_id"] for request in result["requests"]], ["HK20260624HV01", "HK20260621ST03", "HK_2023_J524"])
+        self.assertEqual(
+            result["completion"],
+            {
+                "is_complete": False,
+                "stop_reason": "limit_horses_reached",
+                "race_ids": ["HK20260624HV01", "HK20260621ST03"],
+                "races_imported": 2,
+                "unique_horses_found": 2,
+                "horse_profiles_fetched": 1,
+                "limit_horses": 1,
+                "max_requests": 10,
+            },
+        )
+        self.assertEqual(ExternalRace.objects.count(), 0)
+        self.assertEqual(ExternalHorse.objects.count(), 0)
+
+    @override_settings(
+        HKJC_IMPORT_NETWORK_BASE_URL="https://hkjc.example.test",
+        HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        HKJC_IMPORT_MAX_RACES_PER_RUN=5,
+        HKJC_IMPORT_MAX_HORSES_PER_RUN=5,
+        HKJC_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
     def test_hkjc_network_dry_run_reports_incomplete_when_horse_limit_truncates_profiles(self):
         # Mutation: without completion metadata, a limited sample can be mistaken for a complete 60-day import.
         from pathlib import Path

@@ -37,7 +37,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-26` 已为 `connect-real-global-racing-databases` 追加英法美只读 spike 复核，共执行 `18` 次公开页面 GET，不写任何 `External*` 表。英国 `Sporting Life` racecards、fast-results 和 horse profile 均返回 `200`，fast-results 暴露具体 racecard 与 horse profile 链接；`BHA` horses/fixtures 返回 `200`，暴露 horses feed、search 和 fixtures/racecards 相关入口，因此英国当前优先级最高，建议后续以 Sporting Life 为正式导入主候选、BHA 为官方补字段候选。美国 `Equibase` entries、chart/PDF index 和具体 horse profile 均返回 `200`，但 chart/PDF 解析成本和访问限制仍需 fixture spike。法国 `France Galop` 官方页面和 app 说明页返回 `200` 并有 race card/results/calendar 浅层信号，但尚未定位稳定结构化查询参数，仍为 `needs_more_spike`。证据已写入 `docs/global_racing_data_source_spikes.md`。
 
-`2026-06-26` 已为 HKJC 增加 `--plan-only` 和 `--skip-races` 批次能力，并用真实页面完成本地 plan-only 预检：最近 60 天 HKJC 下拉目标日期页 `28` 个，过滤 overseas simulcast 的 `S*` racecourse 后，本地香港 `HV/ST` 比赛为 `144` 场；按 `limit-races=20` 可拆为 `8` 批。`--skip-races 20 --limit-races 1 --limit-horses 0` 真实 smoke 成功从第 21 场 `HK20260613ST04` 开始，证明后续批次不会重复第一批。本能力只用于生产全量前规划和拆批；尚未执行生产最近 2 个月全量 dry-run 或 commit。
+`2026-06-26` 已为 HKJC 增加 `--plan-only`、`--skip-races` 和 `--race-ids` 批次能力，并用真实页面完成本地 plan-only 预检：最近 60 天 HKJC 下拉目标日期页 `28` 个，过滤 overseas simulcast 的 `S*` racecourse 后，本地香港 `HV/ST` 比赛为 `144` 场；按 `limit-races=20` 可拆为 `8` 批。`--skip-races 20 --limit-races 1 --limit-horses 0` 真实 smoke 成功从第 21 场 `HK20260613ST04` 开始，证明日期范围后续批次不会重复第一批；随后 `--race-ids HK20260624HV02,HK20260613ST04 --limit-horses 1` 真实 smoke 只请求 `race/race/horse` 3 个页面，解析 `2` 场、`26` entries、`26` results 和 `26` 匹唯一马，证明可按 plan-only 输出的 race_id 清单执行精确批次。本能力只用于生产全量前规划和拆批；尚未执行生产最近 2 个月全量 dry-run 或 commit。
 
 ## 已完成内容
 
@@ -68,7 +68,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 ## 当前进行中的 OpenSpec change
 
 - `start-hkjc-data-import-and-global-spikes`：已完成实现、生产部署、验证和归档；生产服务镜像来自 `b0361cf`。已在生产执行一次 HKJC fixture 样本 commit（`run_id=1960`），但未启用 HKJC 真实网络持续抓取，也未启用英法美正式导入。
-- `connect-real-global-racing-databases`：进行中；已完成 proposal/design/spec/tasks，香港真实 HKJC 单场 HTML dry-run、隔离 SQLite commit、recent-days/date-range 小范围 dry-run/commit、马匹详情补抓、限速、请求上限、completion 审计、plan-only 批次计划和 skip-races 续跑测试；英法美只读入口复核已追加记录。尚未完成生产最近 2 个月全量 dry-run/commit，也未进入英国、法国、美国正式写库接入。
+- `connect-real-global-racing-databases`：进行中；已完成 proposal/design/spec/tasks，香港真实 HKJC 单场 HTML dry-run、隔离 SQLite commit、recent-days/date-range 小范围 dry-run/commit、马匹详情补抓、限速、请求上限、completion 审计、plan-only 批次计划、skip-races 续跑测试和 `--race-ids` 精确批次 smoke；英法美只读入口复核已追加记录。尚未完成生产最近 2 个月全量 dry-run/commit，也未进入英国、法国、美国正式写库接入。
 
 ## 本轮问题简述
 

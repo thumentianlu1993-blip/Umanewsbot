@@ -328,7 +328,7 @@ DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true HKJC_IMPORT_REQUEST_INTERVAL_SECO
 - 已过滤 HKJC overseas simulcast：`S1/S2/S3/S4/S5` 等 racecourse 不进入本地香港批次
 - 本地香港 `HV/ST` 比赛共 `144` 场
 - 按 `limit-races=20` 生成 `8` 批：前 7 批各 `20` 场，最后 1 批 `4` 场
-- 每个 batch 带 `skip_races`，例如第 2 批可用 `--skip-races 20 --limit-races 20` 续跑
+- 每个 batch 带 `race_ids` 和 `skip_races`；生产执行优先使用 `--race-ids` 精确批次，避免为续批重复扫描前置赛日页，`--skip-races` 保留为日期范围续跑备选
 
 批次续跑 smoke：
 
@@ -344,7 +344,24 @@ DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true HKJC_IMPORT_REQUEST_INTERVAL_SECO
 - `completion.is_complete=false`
 - `horse_profiles_fetched=0`，因为本次 smoke 使用 `--limit-horses 0`
 
+精确 race-id 批次 smoke：
+
+```bash
+DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=1 HKJC_IMPORT_MAX_REQUESTS_PER_RUN=20 /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py import_hkjc_external_data --race-ids HK20260624HV02,HK20260613ST04 --limit-horses 1 --max-requests 20 --allow-network
+```
+
+结果：
+
+- `target_type="race_batch"`
+- 请求数：`3`，顺序为 `race`、`race`、`horse`
+- `coverage_stats={"races": 2, "entries": 26, "results": 26, "horses": 26}`
+- `completion.is_complete=false`
+- `stop_reason=limit_horses_reached`
+- `horse_profiles_fetched=1`，因为本次 smoke 使用 `--limit-horses 1`
+- 未写正式表，`would_write_formal_tables=false`
+
 边界：
 
 - plan-only 里的 `meetings=28` 是 HKJC 下拉中的目标日期页数量，其中包含会跳转到海外转播结果页的日期；正式香港本地导入以 `HV/ST` race links 为准。
 - plan-only 只估算比赛批次，不知道每批最终唯一马匹数量；每批正式 commit 前仍要先执行同参数 dry-run，确认 `completion`、请求量、唯一马匹数量和失败摘要。
+- `--race-ids` 适合使用 plan-only 输出的批次清单执行生产 dry-run/commit；该模式不接受 `--payload-file`、`--limit-races` 或 `--skip-races`，并且必须显式带 `--allow-network`。

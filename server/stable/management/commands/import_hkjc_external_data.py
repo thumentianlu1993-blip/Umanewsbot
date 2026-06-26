@@ -14,6 +14,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--race-date", help="按香港赛日导入，例如 2026-06-21")
         parser.add_argument("--race-id", help="按 HKJC 单场 race_id 导入")
+        parser.add_argument("--race-ids", help="按逗号分隔的 HKJC race_id 列表导入精确批次")
         parser.add_argument("--horse-id", help="按 HKJC 单匹 horse_id 导入")
         parser.add_argument("--recent-days", type=int, help="按最近 N 天真实 HKJC 赛日范围导入")
         parser.add_argument("--start-date", help="日期范围开始，例如 2026-04-27")
@@ -84,10 +85,10 @@ class Command(BaseCommand):
             return
 
         has_date_range = bool(options.get("start_date"))
-        target_count = sum(1 for key in ("race_date", "race_id", "horse_id", "recent_days") if options.get(key))
+        target_count = sum(1 for key in ("race_date", "race_id", "race_ids", "horse_id", "recent_days") if options.get(key))
         target_count += 1 if has_date_range else 0
         if target_count != 1:
-            raise CommandError("必须且只能指定 --race-date、--race-id、--horse-id、--recent-days 或 --start-date/--end-date 之一。")
+            raise CommandError("必须且只能指定 --race-date、--race-id、--race-ids、--horse-id、--recent-days 或 --start-date/--end-date 之一。")
         if has_date_range and not options.get("end_date"):
             raise CommandError("--start-date 和 --end-date 必须同时指定。")
         if options.get("end_date") and not (options.get("start_date") or options.get("recent_days")):
@@ -96,6 +97,16 @@ class Command(BaseCommand):
             raise CommandError("--plan-only 只能 dry-run，不能与 --commit 同时使用。")
         if options.get("plan_only") and not options["allow_network"]:
             raise CommandError("--plan-only 必须与 --allow-network 一起使用。")
+        if options.get("plan_only") and not (options.get("recent_days") or options.get("start_date")):
+            raise CommandError("--plan-only 只能与 --recent-days 或 --start-date/--end-date 一起使用。")
+        if options.get("race_ids") and not options["allow_network"]:
+            raise CommandError("--race-ids 必须与 --allow-network 一起使用。")
+        if options.get("race_ids") and options.get("payload_file"):
+            raise CommandError("--race-ids 不支持 --payload-file。")
+        if options.get("race_ids") and options.get("limit_races"):
+            raise CommandError("--race-ids 已经精确指定比赛，不支持 --limit-races。")
+        if options.get("race_ids") and options.get("skip_races"):
+            raise CommandError("--race-ids 已经精确指定比赛，不支持 --skip-races。")
         try:
             if options.get("plan_only") and options["recent_days"]:
                 result = importer.plan_recent_days(
@@ -113,6 +124,9 @@ class Command(BaseCommand):
                 result = importer.import_race_date(options["race_date"], payload_file=options["payload_file"])
             elif options["race_id"]:
                 result = importer.import_race(options["race_id"], payload_file=options["payload_file"])
+            elif options["race_ids"]:
+                race_ids = [race_id.strip() for race_id in options["race_ids"].split(",") if race_id.strip()]
+                result = importer.import_race_batch(race_ids, limit_horses=options.get("limit_horses"))
             elif options["recent_days"]:
                 result = importer.import_recent_days(
                     options["recent_days"],

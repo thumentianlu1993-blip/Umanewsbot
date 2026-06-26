@@ -1225,13 +1225,20 @@ plan-only 的每个 batch 会输出 `skip_races`，后续批次 dry-run/commit �
 python manage.py import_hkjc_external_data --recent-days 60 --skip-races 20 --limit-races 20 --limit-horses 200 --max-requests 260 --allow-network
 ```
 
+更推荐使用 plan-only 输出里的 `race_ids` 做精确批次。该模式只请求指定比赛页和涉及马匹详情页，不需要为后续批次重新扫描前置赛日页：
+
+```bash
+python manage.py import_hkjc_external_data --race-ids HK20260624HV02,HK20260613ST04 --limit-horses 200 --max-requests 260 --allow-network
+```
+
 2026-06-26 本地 plan-only 结果显示：最近 60 天 HKJC 下拉目标日期页 `28` 个；过滤 overseas simulcast 的 `S*` racecourse 后，本地香港 `HV/ST` 比赛为 `144` 场，按每批 `20` 场拆为 `8` 批。生产环境仍需重跑 plan-only，以生产当时页面为准。
 
-`recent-days/date-range` 输出中的 `completion` 是生产门禁字段：
+`recent-days/date-range/race-ids` 输出中的 `completion` 是生产门禁字段：
 
 - `completion.is_complete=false`：本次因 `limit-races`、`limit-horses` 或请求上限等原因只是小样本/拆批运行，不能当作最近 2 个月全量完成。
 - `completion.stop_reason`：记录停止原因，例如 `limit_horses_reached`。
 - `completion.meetings_found / races_imported / unique_horses_found / horse_profiles_fetched`：用于估算下一批请求量和生产 commit 风险。
+- `race-ids` 批次没有 `meetings_found`，以 `race_ids / races_imported / unique_horses_found / horse_profiles_fetched` 作为审计字段。
 
 隔离环境验证过的真实网络 payload 可以 commit，但生产执行前必须先备份数据库、检查单来源锁和 `started` run、跑 dry-run、取得用户显式确认：
 
