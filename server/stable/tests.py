@@ -1495,6 +1495,30 @@ class HKJCExternalDataImportTests(TestCase):
         self.assertEqual(meetings[0]["source_url"], "https://racing.hkjc.com/en-us/local/information/localresults")
         self.assertEqual(meetings[0]["raw_date"], "24/06/2026")
 
+    def test_hkjc_meeting_parser_skips_overseas_simulcast_dates(self):
+        # Mutation: if S1/S5 overseas simulcast options are treated as Hong Kong meetings, imports create invalid HK race ids.
+        from stable.services.external_hkjc_data import HKJCHTMLParser
+
+        html = """
+        <html><body>
+          <select id="selectId">
+            <option value='{"date":"24/06/2026","venue":""}'>24/06/2026</option>
+            <option value='{"date":"20/06/2026","venue":"S5"}'>20/06/2026 Overseas</option>
+            <option value='{"date":"21/06/2026","venue":"ST"}'>21/06/2026 Sha Tin</option>
+          </select>
+        </body></html>
+        """
+
+        meetings = HKJCHTMLParser().parse_result_meetings(
+            html,
+            start_date="2026-04-27",
+            end_date="2026-06-26",
+            source_url="https://racing.hkjc.com/en-us/local/information/localresults",
+        )
+
+        self.assertEqual([meeting["race_date"] for meeting in meetings], ["2026-06-24", "2026-06-21"])
+        self.assertEqual([meeting["venue"] for meeting in meetings], ["", "ST"])
+
     def test_hkjc_result_parser_maps_race_and_result_rows(self):
         # Mutation: if horse IDs are parsed from brand numbers instead of horse links, aliases collide across seasons.
         from pathlib import Path
@@ -1538,6 +1562,26 @@ class HKJCExternalDataImportTests(TestCase):
         self.assertEqual(race["results"][0]["odds"], "3.2")
         self.assertEqual(race["results"][1]["margin"], "1-1/4")
         self.assertEqual(race["raw_payload"]["source_url"], "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=1")
+
+    def test_hkjc_result_race_link_parser_skips_overseas_racecourses(self):
+        # Mutation: accepting S1/S5 racecourses makes local HKJC batches include overseas simulcast races.
+        from stable.services.external_hkjc_data import HKJCHTMLParser
+
+        html = """
+        <html><body>
+          <a href="/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=1">HV Race</a>
+          <a href="/en-us/overseas/results?RaceDate=20260620&Racecourse=S5&RaceNo=1">Overseas Race</a>
+          <a href="/en-us/local/information/localresults?racedate=2026/06/13&Racecourse=S1&RaceNo=1">Simulcast Race</a>
+          <a href="/en-us/local/information/localresults?racedate=2026/06/21&Racecourse=ST&RaceNo=2">ST Race</a>
+        </body></html>
+        """
+
+        links = HKJCHTMLParser().parse_result_race_links(
+            html,
+            source_url="https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026/06/24",
+        )
+
+        self.assertEqual([link["race_id"] for link in links], ["HK20260624HV01", "HK20260621ST02"])
 
     def test_hkjc_result_parser_handles_realistic_td_header_table(self):
         # Mutation: HKJC result tables often use td header cells; requiring th silently drops every runner.
@@ -1685,6 +1729,13 @@ class HKJCExternalDataImportTests(TestCase):
         <html><body>
           <a href="/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=1">Race 1</a>
           <a href="/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=2">Race 2</a>
+        </body></html>
+        """
+
+    def hkjc_date_page_with_single_race_link(self, race_date: str, racecourse: str = "ST", race_no: int = 1) -> str:
+        return f"""
+        <html><body>
+          <a href="/en-us/local/information/localresults?racedate={race_date}&Racecourse={racecourse}&RaceNo={race_no}">Race {race_no}</a>
         </body></html>
         """
 
@@ -2032,6 +2083,53 @@ class HKJCExternalDataImportTests(TestCase):
         HKJC_IMPORT_MAX_HORSES_PER_RUN=5,
         HKJC_IMPORT_MAX_REQUESTS_PER_RUN=10,
     )
+    def test_hkjc_network_date_range_skip_races_starts_later_batch(self):
+        # Mutation: without skip_races, every planned batch re-imports the first races instead of advancing.
+        from pathlib import Path
+
+        from stable.services import external_hkjc_data as hkjc_module
+
+        fixture_dir = Path(__file__).resolve().parent / "fixtures" / "hkjc" / "html"
+        mock_get = Mock(
+            side_effect=[
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults",
+                    text=(fixture_dir / "localresults-meetings-sample.html").read_text(encoding="utf-8"),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/24",
+                    text=self.hkjc_date_page_with_race_links(),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/21",
+                    text=self.hkjc_date_page_with_single_race_link("2026/06/21", racecourse="ST", race_no=3),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/21&Racecourse=ST&RaceNo=3",
+                    text=(fixture_dir / "localresults-race-sample.html").read_text(encoding="utf-8"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        importer = HKJCExternalDataImporter(
+            HKJCImportOptions(dry_run=True, allow_network=True, request_interval_seconds=0, max_requests=10)
+        )
+
+        with patch.object(hkjc_module, "requests", fake_requests, create=True):
+            result = importer.import_date_range("2026-04-27", "2026-06-26", limit_races=1, limit_horses=0, skip_races=2)
+
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual(result["requests"][-1]["target_id"], "HK20260621ST03")
+        self.assertEqual(result["completion"]["skip_races"], 2)
+        self.assertEqual(result["completion"]["races_imported"], 1)
+
+    @override_settings(
+        HKJC_IMPORT_NETWORK_BASE_URL="https://hkjc.example.test",
+        HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        HKJC_IMPORT_MAX_RACES_PER_RUN=5,
+        HKJC_IMPORT_MAX_HORSES_PER_RUN=5,
+        HKJC_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
     def test_hkjc_network_dry_run_reports_incomplete_when_horse_limit_truncates_profiles(self):
         # Mutation: without completion metadata, a limited sample can be mistaken for a complete 60-day import.
         from pathlib import Path
@@ -2079,9 +2177,94 @@ class HKJCExternalDataImportTests(TestCase):
                 "horse_profiles_fetched": 1,
                 "limit_races": 1,
                 "limit_horses": 1,
+                "skip_races": 0,
                 "max_requests": 10,
             },
         )
+
+    @override_settings(
+        HKJC_IMPORT_NETWORK_BASE_URL="https://hkjc.example.test",
+        HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        HKJC_IMPORT_MAX_RACES_PER_RUN=5,
+        HKJC_IMPORT_MAX_HORSES_PER_RUN=5,
+        HKJC_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_hkjc_network_plan_only_builds_batches_without_fetching_races_or_horses(self):
+        # Mutation: if plan-only fetches race or horse detail pages, the safe preflight can still trigger heavy crawling.
+        from pathlib import Path
+
+        from stable.services import external_hkjc_data as hkjc_module
+
+        fixture_dir = Path(__file__).resolve().parent / "fixtures" / "hkjc" / "html"
+        mock_get = Mock(
+            side_effect=[
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults",
+                    text=(fixture_dir / "localresults-meetings-sample.html").read_text(encoding="utf-8"),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/24",
+                    text=self.hkjc_date_page_with_race_links(),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/21",
+                    text=self.hkjc_date_page_with_single_race_link("2026/06/21"),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/05/27",
+                    text=self.hkjc_date_page_with_single_race_link("2026/05/27", race_no=2),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(hkjc_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_hkjc_external_data",
+                "--recent-days",
+                "60",
+                "--end-date",
+                "2026-06-26",
+                "--limit-races",
+                "2",
+                "--max-requests",
+                "10",
+                "--allow-network",
+                "--plan-only",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertTrue(result["plan_only"])
+        self.assertEqual(result["coverage_stats"], {"meetings": 3, "races": 4, "estimated_requests_without_horses": 8})
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["meeting_list", "race_date", "race_date", "race_date"])
+        self.assertEqual(
+            result["batches"],
+            [
+                {
+                    "batch_no": 1,
+                    "skip_races": 0,
+                    "start_date": "2026-06-24",
+                    "end_date": "2026-06-24",
+                    "race_ids": ["HK20260624HV01", "HK20260624HV02"],
+                    "race_count": 2,
+                    "suggested_limit_races": 2,
+                },
+                {
+                    "batch_no": 2,
+                    "skip_races": 2,
+                    "start_date": "2026-06-21",
+                    "end_date": "2026-05-27",
+                    "race_ids": ["HK20260621ST01", "HK20260527ST02"],
+                    "race_count": 2,
+                    "suggested_limit_races": 2,
+                },
+            ],
+        )
+        self.assertEqual(ExternalRace.objects.count(), 0)
+        self.assertEqual(ExternalHorse.objects.count(), 0)
 
     @override_settings(
         HKJC_IMPORT_NETWORK_BASE_URL="https://hkjc.example.test",

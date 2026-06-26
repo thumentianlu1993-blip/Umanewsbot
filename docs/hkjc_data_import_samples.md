@@ -309,3 +309,42 @@ DB_ENGINE=sqlite SQLITE_DB_PATH=/tmp/umanews-hkjc-real-range.sqlite3 CELERY_TASK
 - `coverage_stats.horses=12` 表示单场 entries/results 涉及 12 匹唯一马；本次因 `limit-horses=1` 只补抓其中 1 匹 profile。
 - `completion.is_complete=false` 明确表示这是样本链路验证，不能作为最近 2 个月全量完成证明。
 - 生产全量 commit 前仍必须执行生产备份、锁检查、健康检查、最近 2 个月 dry-run，并取得用户显式确认。
+
+## 真实 HKJC recent-days plan-only 批次计划
+
+2026-06-26 追加 `--plan-only` 预检能力，用于生产全量前低风险估算赛日和比赛数量。该模式只请求赛日列表和每个赛日的 race links，不请求单场结果页或马匹详情页，不写正式表。
+
+命令：
+
+```bash
+DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=1 HKJC_IMPORT_MAX_REQUESTS_PER_RUN=80 /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py import_hkjc_external_data --recent-days 60 --end-date 2026-06-26 --limit-races 20 --max-requests 80 --allow-network --plan-only
+```
+
+结果：
+
+- `plan_only=true`
+- 请求数：`29` 个页面，包括 `1` 个 meeting list 和 `28` 个赛日页
+- `coverage_stats={"meetings": 28, "races": 144, "estimated_requests_without_horses": 173}`
+- 已过滤 HKJC overseas simulcast：`S1/S2/S3/S4/S5` 等 racecourse 不进入本地香港批次
+- 本地香港 `HV/ST` 比赛共 `144` 场
+- 按 `limit-races=20` 生成 `8` 批：前 7 批各 `20` 场，最后 1 批 `4` 场
+- 每个 batch 带 `skip_races`，例如第 2 批可用 `--skip-races 20 --limit-races 20` 续跑
+
+批次续跑 smoke：
+
+```bash
+DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=1 HKJC_IMPORT_MAX_REQUESTS_PER_RUN=80 /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py import_hkjc_external_data --recent-days 60 --end-date 2026-06-26 --skip-races 20 --limit-races 1 --limit-horses 0 --max-requests 80 --allow-network
+```
+
+结果：
+
+- `skip_races=20`
+- 实际抓取 race：`HK20260613ST04`
+- `coverage_stats={"races": 1, "entries": 14, "results": 14, "horses": 14}`
+- `completion.is_complete=false`
+- `horse_profiles_fetched=0`，因为本次 smoke 使用 `--limit-horses 0`
+
+边界：
+
+- plan-only 里的 `meetings=28` 是 HKJC 下拉中的目标日期页数量，其中包含会跳转到海外转播结果页的日期；正式香港本地导入以 `HV/ST` race links 为准。
+- plan-only 只估算比赛批次，不知道每批最终唯一马匹数量；每批正式 commit 前仍要先执行同参数 dry-run，确认 `completion`、请求量、唯一马匹数量和失败摘要。

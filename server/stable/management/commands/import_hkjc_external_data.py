@@ -25,7 +25,9 @@ class Command(BaseCommand):
         parser.add_argument("--max-horses", type=int, help="单次最大马匹数配置记录")
         parser.add_argument("--limit-races", type=int, dest="limit_races", help="本次真实网络抓取最多解析的比赛数")
         parser.add_argument("--limit-horses", type=int, dest="limit_horses", help="本次真实网络抓取最多补抓的马匹详情数")
+        parser.add_argument("--skip-races", type=int, default=0, help="从日期范围 race link 序列开头跳过 N 场，用于按 plan-only 批次续跑")
         parser.add_argument("--max-requests", type=int, help="单次最大外部请求数")
+        parser.add_argument("--plan-only", action="store_true", help="只抓赛日和 race links 生成拆批计划，不抓单场结果或马匹详情")
         parser.add_argument("--lookup-name", help="查询本地 HKJC 马名索引，不发起外部请求")
         parser.add_argument("--stats-run-id", type=int, help="查看指定 HKJC 导入运行统计")
 
@@ -90,8 +92,24 @@ class Command(BaseCommand):
             raise CommandError("--start-date 和 --end-date 必须同时指定。")
         if options.get("end_date") and not (options.get("start_date") or options.get("recent_days")):
             raise CommandError("--end-date 只能与 --recent-days 或 --start-date 一起使用。")
+        if options.get("plan_only") and options["commit"]:
+            raise CommandError("--plan-only 只能 dry-run，不能与 --commit 同时使用。")
+        if options.get("plan_only") and not options["allow_network"]:
+            raise CommandError("--plan-only 必须与 --allow-network 一起使用。")
         try:
-            if options["race_date"]:
+            if options.get("plan_only") and options["recent_days"]:
+                result = importer.plan_recent_days(
+                    options["recent_days"],
+                    end_date=options.get("end_date"),
+                    suggested_limit_races=options.get("limit_races"),
+                )
+            elif options.get("plan_only") and options["start_date"]:
+                result = importer.plan_date_range(
+                    options["start_date"],
+                    options["end_date"],
+                    suggested_limit_races=options.get("limit_races"),
+                )
+            elif options["race_date"]:
                 result = importer.import_race_date(options["race_date"], payload_file=options["payload_file"])
             elif options["race_id"]:
                 result = importer.import_race(options["race_id"], payload_file=options["payload_file"])
@@ -101,6 +119,7 @@ class Command(BaseCommand):
                     end_date=options.get("end_date"),
                     limit_races=options.get("limit_races"),
                     limit_horses=options.get("limit_horses"),
+                    skip_races=options.get("skip_races") or 0,
                 )
             elif options["start_date"]:
                 result = importer.import_date_range(
@@ -108,6 +127,7 @@ class Command(BaseCommand):
                     options["end_date"],
                     limit_races=options.get("limit_races"),
                     limit_horses=options.get("limit_horses"),
+                    skip_races=options.get("skip_races") or 0,
                 )
             else:
                 result = importer.import_horse(options["horse_id"], payload_file=options["payload_file"])

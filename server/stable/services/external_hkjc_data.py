@@ -138,6 +138,9 @@ class HKJCHTMLParser:
             except json.JSONDecodeError:
                 continue
             raw_date = _string(data.get("date"))
+            venue = _string(data.get("venue")).upper()
+            if venue and venue not in {"HV", "ST"}:
+                continue
             race_date = _parse_date(raw_date)
             if not race_date or race_date < start or race_date > end:
                 continue
@@ -145,7 +148,7 @@ class HKJCHTMLParser:
                 {
                     "race_date": race_date.isoformat(),
                     "raw_date": raw_date,
-                    "venue": _string(data.get("venue")),
+                    "venue": venue,
                     "source_url": source_url,
                 }
             )
@@ -165,6 +168,8 @@ class HKJCHTMLParser:
             raw_date = _first_query_value(params, "racedate")
             racecourse = _first_query_value(params, "Racecourse").upper()
             race_no = _first_query_value(params, "RaceNo")
+            if racecourse not in {"HV", "ST"}:
+                continue
             race_date = _parse_date(raw_date)
             if not race_date or not racecourse or not race_no:
                 continue
@@ -463,6 +468,7 @@ class HKJCExternalDataImporter:
         *,
         limit_races: int | None = None,
         limit_horses: int | None = None,
+        skip_races: int = 0,
     ) -> dict:
         start = _coerce_date(start_date)
         end = _coerce_date(end_date)
@@ -474,6 +480,7 @@ class HKJCExternalDataImporter:
                 "end_date": end,
                 "limit_races": limit_races,
                 "limit_horses": limit_horses,
+                "skip_races": skip_races,
             },
         )
 
@@ -484,12 +491,90 @@ class HKJCExternalDataImporter:
         end_date: str | date | None = None,
         limit_races: int | None = None,
         limit_horses: int | None = None,
+        skip_races: int = 0,
     ) -> dict:
         if days <= 0:
             raise HKJCImportError("recent days must be positive")
         end = _coerce_date(end_date) if end_date else timezone.localdate()
         start = end - timedelta(days=days)
-        return self.import_date_range(start, end, limit_races=limit_races, limit_horses=limit_horses)
+        return self.import_date_range(start, end, limit_races=limit_races, limit_horses=limit_horses, skip_races=skip_races)
+
+    def plan_date_range(
+        self,
+        start_date: str | date,
+        end_date: str | date,
+        *,
+        suggested_limit_races: int | None = None,
+    ) -> dict:
+        if not self.options.allow_network:
+            raise HKJCImportError("HKJC plan-only requires --allow-network")
+        start = _coerce_date(start_date)
+        end = _coerce_date(end_date)
+        parser = HKJCHTMLParser()
+        client = HKJCNetworkClient(self.options)
+        meeting_response = client.get(self._meeting_list_url(), target_type="meeting_list", target_id=f"{start.isoformat()}..{end.isoformat()}")
+        meetings = parser.parse_result_meetings(
+            meeting_response.text,
+            start_date=start,
+            end_date=end,
+            source_url=client.requests[-1]["url"],
+        )
+        race_links: list[dict[str, str]] = []
+        for meeting in meetings:
+            race_date = meeting["race_date"]
+            date_response = client.get(self._race_date_url(race_date), target_type="race_date", target_id=race_date)
+            race_links.extend(parser.parse_result_race_links(date_response.text, source_url=client.requests[-1]["url"]))
+        batch_size = suggested_limit_races or self.options.max_races
+        batches = self._race_plan_batches(race_links, batch_size=batch_size)
+        return {
+            "source": self.source,
+            "target_type": "date_range",
+            "target_id": f"{start.isoformat()}..{end.isoformat()}",
+            "dry_run": True,
+            "plan_only": True,
+            "coverage_stats": {
+                "meetings": len(meetings),
+                "races": len(race_links),
+                "estimated_requests_without_horses": 1 + len(meetings) + len(race_links),
+            },
+            "batches": batches,
+            "requests": client.requests,
+            "would_write_formal_tables": False,
+        }
+
+    def plan_recent_days(
+        self,
+        days: int,
+        *,
+        end_date: str | date | None = None,
+        suggested_limit_races: int | None = None,
+    ) -> dict:
+        if days <= 0:
+            raise HKJCImportError("recent days must be positive")
+        end = _coerce_date(end_date) if end_date else timezone.localdate()
+        start = end - timedelta(days=days)
+        return self.plan_date_range(start, end, suggested_limit_races=suggested_limit_races)
+
+    def _race_plan_batches(self, race_links: list[dict[str, str]], *, batch_size: int) -> list[dict[str, Any]]:
+        if batch_size <= 0:
+            raise HKJCImportError("batch race limit must be positive")
+        batches: list[dict[str, Any]] = []
+        for index in range(0, len(race_links), batch_size):
+            chunk = race_links[index : index + batch_size]
+            if not chunk:
+                continue
+            batches.append(
+                {
+                    "batch_no": len(batches) + 1,
+                    "skip_races": index,
+                    "start_date": chunk[0]["race_date"],
+                    "end_date": chunk[-1]["race_date"],
+                    "race_ids": [race["race_id"] for race in chunk],
+                    "race_count": len(chunk),
+                    "suggested_limit_races": batch_size,
+                }
+            )
+        return batches
 
     def _import_target(
         self,
@@ -525,6 +610,7 @@ class HKJCExternalDataImporter:
                 kwargs["end_date"],
                 limit_races=kwargs.get("limit_races"),
                 limit_horses=kwargs.get("limit_horses"),
+                skip_races=kwargs.get("skip_races", 0),
             )
             return payload, client.requests
         url = self._network_url(target_type, target_id)
@@ -550,7 +636,10 @@ class HKJCExternalDataImporter:
         *,
         limit_races: int | None,
         limit_horses: int | None,
+        skip_races: int = 0,
     ) -> tuple[dict, HKJCNetworkClient]:
+        if skip_races < 0:
+            raise HKJCImportError("skip_races must be non-negative")
         parser = HKJCHTMLParser()
         client = HKJCNetworkClient(self.options)
         meeting_response = client.get(self._meeting_list_url(), target_type="meeting_list", target_id=f"{start_date.isoformat()}..{end_date.isoformat()}")
@@ -563,6 +652,7 @@ class HKJCExternalDataImporter:
         races: list[dict[str, Any]] = []
         horse_ids: list[str] = []
         seen_horse_ids: set[str] = set()
+        race_seen = 0
         for meeting in meetings:
             if limit_races is not None and len(races) >= limit_races:
                 break
@@ -570,8 +660,12 @@ class HKJCExternalDataImporter:
             date_response = client.get(self._race_date_url(race_date), target_type="race_date", target_id=race_date)
             race_links = parser.parse_result_race_links(date_response.text, source_url=client.requests[-1]["url"])
             for race_link in race_links:
+                if race_seen < skip_races:
+                    race_seen += 1
+                    continue
                 if limit_races is not None and len(races) >= limit_races:
                     break
+                race_seen += 1
                 race_response = client.get(race_link["url"], target_type="race", target_id=race_link["race_id"])
                 race = parser.parse_race_result(
                     race_response.text,
@@ -605,6 +699,7 @@ class HKJCExternalDataImporter:
             horses=horses,
             limit_races=limit_races,
             limit_horses=limit_horses,
+            skip_races=skip_races,
         )
         return (
             {
@@ -617,6 +712,7 @@ class HKJCExternalDataImporter:
                     "end_date": end_date.isoformat(),
                     "limit_races": limit_races,
                     "limit_horses": limit_horses,
+                    "skip_races": skip_races,
                 },
             },
             client,
@@ -631,6 +727,7 @@ class HKJCExternalDataImporter:
         horses: list[dict[str, Any]],
         limit_races: int | None,
         limit_horses: int | None,
+        skip_races: int,
     ) -> dict[str, Any]:
         stop_reason = "complete"
         is_complete = True
@@ -649,6 +746,7 @@ class HKJCExternalDataImporter:
             "horse_profiles_fetched": len(horses),
             "limit_races": limit_races,
             "limit_horses": limit_horses,
+            "skip_races": skip_races,
             "max_requests": self.options.max_requests,
         }
 
