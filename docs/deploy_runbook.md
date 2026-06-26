@@ -1285,3 +1285,11 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py i
 - 本次生产没有执行 HKJC `--commit`。
 - 本次生产没有启用英法美正式导入、Celery Beat 调度或生产命令队列。
 - HKJC 真实网络 dry-run 当前最小 URL 构造返回 `404`，后续必须先确认稳定 JSON/API、页面脚本 payload 或 HTML 解析入口，才能进入真实网络 commit 设计。
+
+### 归档同步
+
+- 归档提交：`db0f3cc`
+- 服务器 `/opt/umanewsbot` 已从 `b0361cf` 快进到 `db0f3cc`。
+- `db0f3cc` 仅移动 OpenSpec change 到 archive 并同步正式 spec，不包含服务代码变更；因此未重新 build 或重启容器。
+- 服务器未安装 `openspec` CLI，归档后的 `openspec validate --all` 在本地 worktree 执行并通过。
+- 归档同步后 `http://umafans.run/healthz/` 和 `http://umafans.run/` 仍返回 `200`。

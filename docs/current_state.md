@@ -29,7 +29,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-26` 已将 `start-hkjc-data-import-and-global-spikes` 实现提交 `b0361cf` 推送到 `main` 并部署生产。服务器 `/opt/umanewsbot` 已从 `4d09d25` 快进到 `b0361cf`，部署前 `.env` 备份为 `.env.backup.hkjc-global-spikes-20260626_164045`。部署前确认生产无运行中 `ExternalDataImportLock`，无 `ExternalDataImportRun(status="started")`；`bash ./deploy_lowcost.sh` 执行成功，迁移显示 `No migrations to apply`，`web / worker / beat` 已重建，`web` healthy。生产验证通过：`manage.py check` 无问题，`http://127.0.0.1/healthz/`、`http://umafans.run/healthz/` 和首页均返回 `200`；HKJC 样本命令以 dry-run 方式读取容器内 `stable/fixtures/hkjc/2026-06-21-race-date-sample.json`，返回 `coverage_stats={"races":1,"entries":2,"results":2,"horses":2}` 且 `would_write_formal_tables=false`。本次生产未执行 HKJC commit，也未启用英法美正式导入。
 
-`2026-06-26` 已归档 `start-hkjc-data-import-and-global-spikes`，归档目录为 `openspec/changes/archive/2026-06-26-start-hkjc-data-import-and-global-spikes/`；delta spec 已同步为正式规格 `openspec/specs/global-racing-data-import-readiness/spec.md`。归档后 `openspec validate --all` 通过，`global-racing-data-import-readiness` 正式规格包含 6 个 requirement。
+`2026-06-26` 已归档 `start-hkjc-data-import-and-global-spikes`，归档目录为 `openspec/changes/archive/2026-06-26-start-hkjc-data-import-and-global-spikes/`；delta spec 已同步为正式规格 `openspec/specs/global-racing-data-import-readiness/spec.md`。归档后 `openspec validate --all` 通过，`global-racing-data-import-readiness` 正式规格包含 6 个 requirement。归档提交 `db0f3cc` 已推送到 `main` 并在生产 `/opt/umanewsbot` 快进；该提交只移动 OpenSpec/文档，不重建容器，生产服务代码仍为已部署验证过的 `b0361cf` 镜像内容，线上 `/healthz/` 和首页保持 `200`。
 
 ## 已完成内容
 
