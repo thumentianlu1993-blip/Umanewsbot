@@ -230,6 +230,48 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py s
 - 抓取错峰的“连续小时自然生成 `CrawlJob`”仍需等待调度运行后确认；本次已确认代码和运行时 Celery Beat 配置加载为 `00/16/26` 分。
 - 如外部马名数据导入重新启动，继续遵守“导入期间不执行 `git pull / build / up / deploy_lowcost.sh`”的互斥规则。
 
+## 2026-06-26 国际赛马资讯扩展部署
+
+### 部署前检查
+
+- 本地提交 `5865e58` 已推送到 `main`，分支 `codex/expand-international-racing-coverage` 保留远端备查。
+- 本地验证通过：
+  - `DB_ENGINE=sqlite ... server/manage.py check`
+  - `DB_ENGINE=sqlite ... server/manage.py makemigrations --check --dry-run`
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true ... server/manage.py test stable --noinput`：241 项通过
+  - `openspec validate expand-international-racing-coverage --strict`
+  - `openspec validate --all`
+  - `git diff --check`
+- 生产部署前发现 `/opt/umanewsbot/imports/run_horse_import_202504_to_202406_20260626_083946.sh` 正在连续执行 netkeiba 外部马名导入。已等待当前批次完成并确认 `ExternalDataImportLock.locked_by_run_id=None` 后再部署；外层导入脚本已停止，避免继续自动开下一批。
+
+### 部署步骤与结果
+
+- 部署前服务器 HEAD：`2f0c35c`。
+- 部署前备份 `.env`：`.env.backup.international-coverage-20260626_103923`。
+- 服务器 `/opt/umanewsbot` 执行 `git pull --ff-only origin main`，从 `2f0c35c` 更新到 `5865e58`。
+- 执行 `bash ./deploy_lowcost.sh`，重建 `web / worker / beat`，`db / redis / nginx` 保持运行。
+- 迁移状态：`stable.0011_remove_termcandidate_uq_term_candidate_type_normalized_and_more`、`0012_termalias`、`0013_alter_newsarticle_source_site_and_more` 均已应用。
+- `collectstatic` 结果：`0 static files copied`，`129 unmodified`，`360 post-processed`。
+- 容器状态：`web` healthy，`db / redis` healthy，`worker / beat` running，`nginx` running。
+- 验证：
+  - `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check`：通过。
+  - `http://127.0.0.1/healthz/`：`200`。
+  - `http://127.0.0.1/`：`200`。
+
+### 来源灰度与首轮观察
+
+- 部署后手动执行 `sync_builtin_sources()`，生产已创建 20 个内置来源。
+- 已启用第一版来源：`Sponichi latest/access`、`HKJC Racing News`、`SCMP Racing`、`Sporting Life Racing`、`Sky Sports Racing latest/access`、`France Galop English News`、`TDN France keyword`、`TDN`、`Horse Racing Nation latest/access`。
+- 生产 `probe_international_news_sources` 验证中，除 `BHA official` 返回 `403` 外，其余第一版来源均能解析真实样本；`BHA` 已停用，后续再评估是否需要换请求策略或放弃。
+- 测试 QQ 群 `1026525240` 已配置允许 `japan / hong_kong / united_kingdom / france / united_states` 五个地区，继续沿用全局 `QQ_PUSH_SCOPE` / `QQ_PUSH_IMPORTANCE_STRATEGY`。
+- 已手动触发 12 个新增来源抓取任务；首轮观察中 `Sponichi latest` 已完成并入库 `13` 篇新稿、`7` 篇重复稿，`Sponichi access` 与 `HKJC Racing News` 已开始执行，其他国际来源仍在 worker 队列中等待。
+
+### 后续观察
+
+- 继续查看 `/admin/sources/` 和 `CrawlJob`，确认 `HKJC / SCMP / Sporting Life / Sky / France Galop / TDN / Horse Racing Nation` 依次完成首轮抓取。
+- 抽检英文稿的翻译、术语别名命中、外部马名识别、自动发布门禁和公开地区 tab。
+- 等自然公开/榜单提升后观察 QQ 测试群是否按地区配置推送；如刷屏或质量不稳，优先停用单个 `NewsSource` 或调整测试群 `allowed_regions`，不需要回滚代码。
+
 ## 自动化运营 MVP 部署与验证
 
 ### 关键环境变量
