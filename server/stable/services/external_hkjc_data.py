@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import json
+import re
+import time
 import unicodedata
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urljoin, urlparse
 
 import requests
+from bs4 import BeautifulSoup
 from django.conf import settings
 from django.db import transaction
 from django.utils import dateparse, timezone
@@ -38,6 +42,7 @@ class HKJCImportOptions:
     request_interval_seconds: float = 8
     max_races: int = 20
     max_horses: int = 80
+    max_requests: int = 200
 
     @classmethod
     def from_settings(cls, **overrides: Any) -> "HKJCImportOptions":
@@ -45,6 +50,7 @@ class HKJCImportOptions:
             "request_interval_seconds": getattr(settings, "HKJC_IMPORT_REQUEST_INTERVAL_SECONDS", 8),
             "max_races": getattr(settings, "HKJC_IMPORT_MAX_RACES_PER_RUN", 20),
             "max_horses": getattr(settings, "HKJC_IMPORT_MAX_HORSES_PER_RUN", 80),
+            "max_requests": getattr(settings, "HKJC_IMPORT_MAX_REQUESTS_PER_RUN", 200),
         }
         values.update({key: value for key, value in overrides.items() if value is not None})
         return cls(**values)
@@ -80,7 +86,16 @@ def _parse_date(value: Any):
     raw = _string(value)
     if not raw:
         return None
-    return dateparse.parse_date(raw.replace("/", "-"))
+    normalized = raw.replace("/", "-")
+    parsed = dateparse.parse_date(normalized)
+    if parsed:
+        return parsed
+    for fmt in ("%d-%m-%Y", "%d-%m-%y"):
+        try:
+            return datetime.strptime(normalized, fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
 def _parse_datetime(value: Any):
@@ -101,6 +116,329 @@ def _load_json_file(path: str | Path) -> dict:
     return payload
 
 
+class HKJCHTMLParser:
+    def parse_result_meetings(
+        self,
+        html: str,
+        *,
+        start_date: str | date,
+        end_date: str | date,
+        source_url: str,
+    ) -> list[dict[str, str]]:
+        start = _coerce_date(start_date)
+        end = _coerce_date(end_date)
+        soup = BeautifulSoup(html, "lxml")
+        meetings: list[dict[str, str]] = []
+        for option in soup.select("select#selectId option"):
+            value = _string(option.get("value"))
+            if not value:
+                continue
+            try:
+                data = json.loads(value)
+            except json.JSONDecodeError:
+                continue
+            raw_date = _string(data.get("date"))
+            race_date = _parse_date(raw_date)
+            if not race_date or race_date < start or race_date > end:
+                continue
+            meetings.append(
+                {
+                    "race_date": race_date.isoformat(),
+                    "raw_date": raw_date,
+                    "venue": _string(data.get("venue")),
+                    "source_url": source_url,
+                }
+            )
+        return meetings
+
+    def parse_result_race_links(self, html: str, *, source_url: str) -> list[dict[str, str]]:
+        soup = BeautifulSoup(html, "lxml")
+        links: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for anchor in soup.find_all("a", href=True):
+            href = _string(anchor.get("href"))
+            if "localresults" not in href or "RaceNo" not in href:
+                continue
+            absolute_url = urljoin(source_url, href)
+            parsed = urlparse(absolute_url)
+            params = parse_qs(parsed.query)
+            raw_date = _first_query_value(params, "racedate")
+            racecourse = _first_query_value(params, "Racecourse").upper()
+            race_no = _first_query_value(params, "RaceNo")
+            race_date = _parse_date(raw_date)
+            if not race_date or not racecourse or not race_no:
+                continue
+            race_id = f"HK{race_date.strftime('%Y%m%d')}{racecourse}{int(race_no):02d}"
+            if race_id in seen:
+                continue
+            seen.add(race_id)
+            links.append(
+                {
+                    "race_id": race_id,
+                    "race_date": race_date.isoformat(),
+                    "racecourse": racecourse,
+                    "race_no": str(int(race_no)),
+                    "url": absolute_url,
+                }
+            )
+        return links
+
+    def parse_race_result(
+        self,
+        html: str,
+        *,
+        race_date: str,
+        racecourse: str,
+        race_no: str,
+        source_url: str,
+    ) -> dict[str, Any]:
+        soup = BeautifulSoup(html, "lxml")
+        parsed_date = _coerce_date(race_date)
+        race_no_text = _string(race_no)
+        race_id = f"HK{parsed_date.strftime('%Y%m%d')}{_string(racecourse).upper()}{int(race_no_text):02d}"
+        header_text = self._race_header_text(soup)
+        race = {
+            "race_id": race_id,
+            "race_date": parsed_date.isoformat(),
+            "venue": _hkjc_venue_name(racecourse),
+            "race_number": race_no_text,
+            "race_name": self._race_name_from_header(header_text),
+            "race_class": self._race_class_from_header(header_text),
+            "distance": self._distance_from_header(header_text),
+            "going": self._going_from_header(header_text),
+            "course": self._field_after_label(header_text, "Course"),
+            "prize_money": self._prize_money_from_header(header_text),
+            "entries": [],
+            "results": [],
+            "raw_payload": {
+                "source_url": source_url,
+                "racecourse": _string(racecourse).upper(),
+                "header": header_text,
+            },
+        }
+        for row in self._result_rows(soup):
+            entry = {
+                "horse_id": row["horse_id"],
+                "horse_name_en": row["horse_name"],
+                "horse_number": row["horse_number"],
+                "barrier": row["barrier"],
+                "jockey": row["jockey"],
+                "trainer": row["trainer"],
+                "weight": row["carried_weight"],
+            "raw_payload": row["raw_payload"],
+        }
+            result = {
+                **entry,
+                "finish_position": row["finish_position"],
+                "finish_time": row["finish_time"],
+                "margin": row["margin"],
+                "odds": row["odds"],
+                "running_position": row["running_position"],
+            }
+            race["entries"].append(entry)
+            race["results"].append(result)
+        return race
+
+    def parse_horse_profile(self, html: str, *, horse_id: str, source_url: str) -> dict[str, Any]:
+        soup = BeautifulSoup(html, "lxml")
+        profile_text = _collapse_spaces(soup.get_text(" ", strip=True))
+        name_match = re.search(r"\b([A-Z][A-Z0-9' -]+)\s+\(([A-Z]\d+)\)", profile_text)
+        fields = self._profile_fields(soup)
+        country, age = _split_slash(fields.get("Country of Origin / Age", ""))
+        color, sex = _split_slash(fields.get("Colour / Sex", ""))
+        horse = {
+            "horse_id": _string(horse_id),
+            "horse_name_en": _collapse_spaces(name_match.group(1)) if name_match else "",
+            "brand_number": name_match.group(2) if name_match else "",
+            "country": country,
+            "age": age,
+            "color": color,
+            "sex": sex,
+            "import_type": fields.get("Import Type", ""),
+            "trainer": fields.get("Trainer", ""),
+            "owner": fields.get("Owner", ""),
+            "rating": fields.get("Current Rating", ""),
+            "sire": fields.get("Sire", ""),
+            "dam": fields.get("Dam", ""),
+            "dams_sire": fields.get("Dam's Sire", ""),
+            "record_summary": fields.get("No. of 1-2-3-Starts*", ""),
+            "raw_payload": {
+                "source_url": source_url,
+                "fields": fields,
+            },
+        }
+        return horse
+
+    def _race_header_text(self, soup: BeautifulSoup) -> str:
+        for table in soup.find_all("table"):
+            rows = [_collapse_spaces(row.get_text(" ", strip=True)) for row in table.find_all("tr")]
+            text = " | ".join(row for row in rows if row)
+            if "RACE" in text.upper() and "Going" in text:
+                return text
+        return ""
+
+    def _result_rows(self, soup: BeautifulSoup) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for table in soup.find_all("table"):
+            table_rows = table.find_all("tr")
+            if not table_rows:
+                continue
+            header_cells = [
+                _collapse_spaces(cell.get_text(" ", strip=True))
+                for cell in table_rows[0].find_all(["td", "th"], recursive=False)
+            ]
+            if "Pla." not in header_cells or "Horse" not in header_cells:
+                continue
+            for tr in table_rows[1:]:
+                cells = tr.find_all(["td", "th"], recursive=False)
+                if len(cells) < 12:
+                    continue
+                horse_cell = cells[2]
+                horse_link = horse_cell.find("a", href=True)
+                horse_name = _collapse_spaces(horse_link.get_text(" ", strip=True) if horse_link else horse_cell.get_text(" ", strip=True))
+                horse_id = _query_param(_string(horse_link.get("href") if horse_link else ""), "horseid")
+                values = [_collapse_spaces(cell.get_text(" ", strip=True)) for cell in cells]
+                rows.append(
+                    {
+                        "finish_position": values[0],
+                        "horse_number": values[1],
+                        "horse_name": horse_name,
+                        "horse_id": horse_id,
+                        "jockey": values[3],
+                        "trainer": values[4],
+                        "carried_weight": values[5],
+                        "declar_horse_weight": values[6],
+                        "barrier": values[7],
+                        "margin": "" if values[8] == "---" else values[8],
+                        "running_position": values[9],
+                        "finish_time": values[10],
+                        "odds": values[11],
+                        "raw_payload": {
+                            "row": values,
+                            "horse_href": _string(horse_link.get("href") if horse_link else ""),
+                        },
+                    }
+                )
+            break
+        return rows
+
+    def _race_name_from_header(self, header_text: str) -> str:
+        going_pattern = self._going_pattern()
+        match = re.search(rf"Going\s*:\s*(?:{going_pattern})\s+(.+?)\s+Course\s*:", header_text, re.IGNORECASE)
+        if match:
+            return _collapse_spaces(match.group(1).strip(" |"))
+        for part in header_text.split("|"):
+            normalized = _collapse_spaces(part)
+            if normalized and "HANDICAP" in normalized.upper() and "RACE" not in normalized.upper():
+                return normalized
+        return ""
+
+    def _race_class_from_header(self, header_text: str) -> str:
+        match = re.search(r"\b(Class\s+\d+)\b", header_text, re.IGNORECASE)
+        return match.group(1) if match else ""
+
+    def _distance_from_header(self, header_text: str) -> str:
+        match = re.search(r"\b(\d{3,4}M)\b", header_text, re.IGNORECASE)
+        return match.group(1).upper() if match else ""
+
+    def _field_after_label(self, header_text: str, label: str) -> str:
+        match = re.search(rf"{re.escape(label)}\s*:\s*([^|]+?)(?=\s*\||\s+HK\$|$)", header_text)
+        return _collapse_spaces(match.group(1)) if match else ""
+
+    def _going_from_header(self, header_text: str) -> str:
+        match = re.search(rf"Going\s*:\s*({self._going_pattern()})\b", header_text, re.IGNORECASE)
+        return match.group(1).upper() if match else ""
+
+    def _going_pattern(self) -> str:
+        return r"GOOD TO FIRM|GOOD TO YIELDING|GOOD|YIELDING TO SOFT|YIELDING|SOFT|FIRM|FAST|WET SLOW|SLOW"
+
+    def _prize_money_from_header(self, header_text: str) -> str:
+        match = re.search(r"HK\$\s*[0-9,]+", header_text)
+        return match.group(0) if match else ""
+
+    def _profile_fields(self, soup: BeautifulSoup) -> dict[str, str]:
+        fields: dict[str, str] = {}
+        for tr in soup.find_all("tr"):
+            cells = [_collapse_spaces(cell.get_text(" ", strip=True)) for cell in tr.find_all(["td", "th"], recursive=False)]
+            if len(cells) >= 3 and cells[1] == ":":
+                fields[cells[0]] = cells[2]
+        return fields
+
+
+def _coerce_date(value: str | date) -> date:
+    if isinstance(value, date):
+        return value
+    parsed = _parse_date(value)
+    if not parsed:
+        raise HKJCImportError(f"invalid date: {value}")
+    return parsed
+
+
+def _collapse_spaces(value: str) -> str:
+    return re.sub(r"\s+", " ", value or "").strip()
+
+
+def _query_param(url: str, key: str) -> str:
+    match = re.search(rf"[?&]{re.escape(key)}=([^&#]+)", url, re.IGNORECASE)
+    return match.group(1) if match else ""
+
+
+def _first_query_value(params: dict[str, list[str]], key: str) -> str:
+    for existing_key, values in params.items():
+        if existing_key.lower() == key.lower() and values:
+            return _string(values[0])
+    return ""
+
+
+def _hkjc_venue_name(racecourse: str) -> str:
+    return {
+        "HV": "Happy Valley",
+        "ST": "Sha Tin",
+    }.get(_string(racecourse).upper(), _string(racecourse).upper())
+
+
+def _split_slash(value: str) -> tuple[str, str]:
+    left, _, right = _string(value).partition("/")
+    return _collapse_spaces(left), _collapse_spaces(right)
+
+
+def _parse_hkjc_race_id(race_id: str) -> tuple[date, str, str]:
+    match = re.fullmatch(r"HK(\d{8})([A-Z]+)(\d{2})", _string(race_id).upper())
+    if not match:
+        raise HKJCImportError(f"invalid HKJC race_id: {race_id}")
+    parsed_date = datetime.strptime(match.group(1), "%Y%m%d").date()
+    return parsed_date, match.group(2), match.group(3)
+
+
+class HKJCNetworkClient:
+    user_agent = "umanewsbot/1.0 (+https://umafans.run; low-frequency data import)"
+
+    def __init__(self, options: HKJCImportOptions):
+        self.options = options
+        self.requests: list[dict[str, Any]] = []
+
+    def get(self, url: str, *, target_type: str, target_id: str):
+        if len(self.requests) >= self.options.max_requests:
+            raise HKJCImportError(f"HKJC network import exceeded max_requests={self.options.max_requests}")
+        if self.requests and self.options.request_interval_seconds > 0:
+            time.sleep(self.options.request_interval_seconds)
+        response = requests.get(
+            url,
+            timeout=20,
+            headers={"User-Agent": self.user_agent},
+        )
+        request_info = {
+            "url": getattr(response, "url", url),
+            "status_code": response.status_code,
+            "target_type": target_type,
+            "target_id": target_id,
+        }
+        self.requests.append(request_info)
+        if response.status_code >= 400:
+            raise HKJCImportError(f"HKJC network import failed with HTTP {response.status_code}: {url}")
+        return response
+
+
 class HKJCExternalDataImporter:
     source = ExternalDataSource.HKJC
     racing_region = RacingRegion.HONG_KONG
@@ -118,15 +456,57 @@ class HKJCExternalDataImporter:
     def import_horse(self, horse_id: str, *, payload_file: str = "") -> dict:
         return self._import_target("horse", horse_id, payload_file=payload_file)
 
-    def _import_target(self, target_type: str, target_id: str, *, payload_file: str = "") -> dict:
+    def import_date_range(
+        self,
+        start_date: str | date,
+        end_date: str | date,
+        *,
+        limit_races: int | None = None,
+        limit_horses: int | None = None,
+    ) -> dict:
+        start = _coerce_date(start_date)
+        end = _coerce_date(end_date)
+        return self._import_target(
+            "date_range",
+            f"{start.isoformat()}..{end.isoformat()}",
+            network_kwargs={
+                "start_date": start,
+                "end_date": end,
+                "limit_races": limit_races,
+                "limit_horses": limit_horses,
+            },
+        )
+
+    def import_recent_days(
+        self,
+        days: int,
+        *,
+        end_date: str | date | None = None,
+        limit_races: int | None = None,
+        limit_horses: int | None = None,
+    ) -> dict:
+        if days <= 0:
+            raise HKJCImportError("recent days must be positive")
+        end = _coerce_date(end_date) if end_date else timezone.localdate()
+        start = end - timedelta(days=days)
+        return self.import_date_range(start, end, limit_races=limit_races, limit_horses=limit_horses)
+
+    def _import_target(
+        self,
+        target_type: str,
+        target_id: str,
+        *,
+        payload_file: str = "",
+        network_kwargs: dict[str, Any] | None = None,
+    ) -> dict:
         if payload_file:
             payload = _load_json_file(payload_file)
             return self._import_payload(target_type, target_id, payload, has_payload_file=True)
-        if self.options.allow_network and self.options.dry_run:
-            payload, request_info = self._fetch_network_payload(target_type, target_id)
-            result = self._import_payload(target_type, target_id, payload, has_payload_file=False)
+        if self.options.allow_network:
+            payload, request_info = self._fetch_network_payload(target_type, target_id, **(network_kwargs or {}))
+            result = self._import_payload(target_type, target_id, payload, has_payload_file=True)
             result["network_probe"] = True
-            result["requests"] = [request_info]
+            result["requests"] = request_info
             return result
         payload = self._placeholder_payload(target_type, target_id)
         return self._import_payload(target_type, target_id, payload, has_payload_file=False)
@@ -138,33 +518,140 @@ class HKJCExternalDataImporter:
             return {"race": {"race_id": target_id}}
         return {"horses": [{"horse_id": target_id}]}
 
-    def _fetch_network_payload(self, target_type: str, target_id: str) -> tuple[dict, dict]:
+    def _fetch_network_payload(self, target_type: str, target_id: str, **kwargs: Any) -> tuple[dict, list[dict]]:
+        if target_type == "date_range":
+            payload, client = self._fetch_date_range_payload(
+                kwargs["start_date"],
+                kwargs["end_date"],
+                limit_races=kwargs.get("limit_races"),
+                limit_horses=kwargs.get("limit_horses"),
+            )
+            return payload, client.requests
         url = self._network_url(target_type, target_id)
-        response = requests.get(url, timeout=20)
-        request_info = {
-            "url": getattr(response, "url", url),
-            "status_code": response.status_code,
-            "target_type": target_type,
-            "target_id": target_id,
-        }
-        if response.status_code >= 400:
-            raise HKJCImportError(f"HKJC network dry-run failed with HTTP {response.status_code}: {url}")
+        client = HKJCNetworkClient(self.options)
+        response = client.get(url, target_type=target_type, target_id=target_id)
         try:
             payload = response.json()
         except ValueError as exc:
-            raise HKJCImportError("HKJC network dry-run did not return JSON payload") from exc
+            if target_type == "race":
+                payload = {"race": self._parse_network_race_html(target_id, response.text, client.requests[-1]["url"])}
+            elif target_type == "horse":
+                payload = {"horse": HKJCHTMLParser().parse_horse_profile(response.text, horse_id=target_id, source_url=client.requests[-1]["url"])}
+            else:
+                raise HKJCImportError("HKJC network dry-run did not return JSON payload") from exc
         if not isinstance(payload, dict):
             raise HKJCImportError("HKJC network dry-run payload must be a JSON object")
-        return payload, request_info
+        return payload, client.requests
+
+    def _fetch_date_range_payload(
+        self,
+        start_date: date,
+        end_date: date,
+        *,
+        limit_races: int | None,
+        limit_horses: int | None,
+    ) -> tuple[dict, HKJCNetworkClient]:
+        parser = HKJCHTMLParser()
+        client = HKJCNetworkClient(self.options)
+        meeting_response = client.get(self._meeting_list_url(), target_type="meeting_list", target_id=f"{start_date.isoformat()}..{end_date.isoformat()}")
+        meetings = parser.parse_result_meetings(
+            meeting_response.text,
+            start_date=start_date,
+            end_date=end_date,
+            source_url=client.requests[-1]["url"],
+        )
+        races: list[dict[str, Any]] = []
+        horse_ids: list[str] = []
+        seen_horse_ids: set[str] = set()
+        for meeting in meetings:
+            if limit_races is not None and len(races) >= limit_races:
+                break
+            race_date = meeting["race_date"]
+            date_response = client.get(self._race_date_url(race_date), target_type="race_date", target_id=race_date)
+            race_links = parser.parse_result_race_links(date_response.text, source_url=client.requests[-1]["url"])
+            for race_link in race_links:
+                if limit_races is not None and len(races) >= limit_races:
+                    break
+                race_response = client.get(race_link["url"], target_type="race", target_id=race_link["race_id"])
+                race = parser.parse_race_result(
+                    race_response.text,
+                    race_date=race_link["race_date"],
+                    racecourse=race_link["racecourse"],
+                    race_no=race_link["race_no"],
+                    source_url=client.requests[-1]["url"],
+                )
+                races.append(race)
+                for runner in [*(race.get("entries") or []), *(race.get("results") or [])]:
+                    horse_id = _string(runner.get("horse_id")) if isinstance(runner, dict) else ""
+                    if horse_id and horse_id not in seen_horse_ids:
+                        seen_horse_ids.add(horse_id)
+                        horse_ids.append(horse_id)
+        horses: list[dict[str, Any]] = []
+        for horse_id in horse_ids:
+            if limit_horses is not None and len(horses) >= limit_horses:
+                break
+            horse_response = client.get(self._horse_url(horse_id), target_type="horse", target_id=horse_id)
+            horses.append(
+                parser.parse_horse_profile(
+                    horse_response.text,
+                    horse_id=horse_id,
+                    source_url=client.requests[-1]["url"],
+                )
+            )
+        return (
+            {
+                "races": races,
+                "horses": horses,
+                "meetings": meetings,
+                "raw_payload": {
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "limit_races": limit_races,
+                    "limit_horses": limit_horses,
+                },
+            },
+            client,
+        )
 
     def _network_url(self, target_type: str, target_id: str) -> str:
-        base_url = _string(getattr(settings, "HKJC_IMPORT_NETWORK_BASE_URL", "https://racing.hkjc.com")).rstrip("/")
+        base_url = self._base_url()
         path_by_target = {
             "race_date": "racing",
             "race": "race",
             "horse": "horse",
         }
+        if target_type == "race":
+            race_date, racecourse, race_no = _parse_hkjc_race_id(target_id)
+            return (
+                f"{base_url}/en-us/local/information/localresults"
+                f"?racedate={race_date.strftime('%Y/%m/%d')}&Racecourse={racecourse}&RaceNo={int(race_no)}"
+            )
+        if target_type == "horse":
+            return self._horse_url(target_id)
         return f"{base_url}/{path_by_target[target_type]}/{target_id}"
+
+    def _base_url(self) -> str:
+        return _string(getattr(settings, "HKJC_IMPORT_NETWORK_BASE_URL", "https://racing.hkjc.com")).rstrip("/")
+
+    def _meeting_list_url(self) -> str:
+        return f"{self._base_url()}/en-us/local/information/localresults"
+
+    def _race_date_url(self, race_date: str | date) -> str:
+        parsed = _coerce_date(race_date)
+        return f"{self._meeting_list_url()}?racedate={parsed.strftime('%Y/%m/%d')}"
+
+    def _horse_url(self, horse_id: str) -> str:
+        return f"{self._base_url()}/en-us/local/information/horse?horseid={horse_id}"
+
+    def _parse_network_race_html(self, race_id: str, html: str, source_url: str) -> dict:
+        race_date, racecourse, race_no = _parse_hkjc_race_id(race_id)
+        return HKJCHTMLParser().parse_race_result(
+            html,
+            race_date=race_date,
+            racecourse=racecourse,
+            race_no=race_no,
+            source_url=source_url,
+        )
 
     def _import_payload(self, target_type: str, target_id: str, payload: dict, *, has_payload_file: bool) -> dict:
         stats = self._payload_stats(payload)

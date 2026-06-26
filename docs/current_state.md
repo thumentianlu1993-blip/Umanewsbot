@@ -33,6 +33,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-26` 已按用户确认启动 HKJC 生产样本导入，但范围仅限仓库 fixture `stable/fixtures/hkjc/2026-06-21-race-date-sample.json`，不是 HKJC 真实网络持续抓取。执行前已在生产服务器创建数据库备份 `backups/db/pre-hkjc-sample-20260626_180646.sql.gz` 并通过 `gzip -t` 校验；预检查显示无运行中 HKJC 导入、无 started run，`web` healthy。生产 dry-run 再次返回 `coverage_stats={"races":1,"entries":2,"results":2,"horses":2}` 且不写正式表；随后执行 `--commit` 成功，`run_id=1960`、`success_count=7`、`failure_count=0`、`skipped_count=0`。提交后生产 HKJC 外部表统计为 `ExternalRace=1`、`ExternalRaceEntry=2`、`ExternalRaceResult=2`、`ExternalHorse=2`、`ExternalHorseAlias=4`，马名索引 `STELLAR EXPRESS` 命中 `HKH_STELLAR_EXPRESS`；`ExternalDataImportLock` 仅保留未占用的来源占位记录，未发现仍在运行的 HKJC 导入进程，`http://umafans.run/healthz/` 返回 `200`。真实 HKJC 网络入口仍未确认，不能把这次样本导入理解为已开启自动抓取。
 
+`2026-06-26` 已新建 OpenSpec change `connect-real-global-racing-databases`，目标是按 `香港 -> 英国 -> 法国 -> 美国` 顺序接入真实赛马数据库，抓取每个地区最近 2 个月赛事和涉及马匹详情后停止，不创建公开比赛页或持续调度。香港阶段已定位 HKJC 官方真实 HTML 入口：赛日列表 `localresults`、单场结果 `localresults?racedate=YYYY/MM/DD&Racecourse=HV|ST&RaceNo=N`、马匹详情 `horse?horseid=...`。本地 TDD 已新增 HKJC HTML parser、race link 聚合、recent-days/date-range、马匹详情补抓、限速和请求上限测试，`HKJCExternalDataImportTests` 20 项通过；真实 HKJC 单场 dry-run `HK20260624HV01` 请求 1 次官方页面并解析 `1` 场、`12` entries、`12` results、`12` unique horses，未写库。随后在隔离 SQLite `/tmp/umanews-hkjc-real-single.sqlite3` 执行同一真实单场 `--commit --allow-network`，成功写入 `ExternalRace=1`、`ExternalRaceEntry=12`、`ExternalRaceResult=12`、`ExternalHorseAlias=12`，`run_id=1`、`success_count=25`、`failure_count=0`。同日又完成 HKJC `--recent-days 60 --end-date 2026-06-26 --limit-races 1 --limit-horses 1` 真实小范围链路：dry-run 请求赛日列表、赛日页、单场结果和马匹详情共 `4` 次，解析 `1` 场、`12` entries、`12` results、`12` unique horses；隔离 SQLite `/tmp/umanews-hkjc-real-range.sqlite3` commit 后写入 `ExternalRace=1`、`ExternalRaceEntry=12`、`ExternalRaceResult=12`、`ExternalHorse=1`、`ExternalHorseAlias=12`，重复执行后正式对象计数不增长。当前仍未部署生产，也未执行生产最近两个月全量 dry-run/commit；下一步需要生产部署前锁检查、备份、用户确认后再低频运行 HKJC 最近两个月范围。
+
 ## 已完成内容
 
 - 域名购买与解析
@@ -62,6 +64,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 ## 当前进行中的 OpenSpec change
 
 - `start-hkjc-data-import-and-global-spikes`：已完成实现、生产部署、验证和归档；生产服务镜像来自 `b0361cf`。已在生产执行一次 HKJC fixture 样本 commit（`run_id=1960`），但未启用 HKJC 真实网络持续抓取，也未启用英法美正式导入。
+- `connect-real-global-racing-databases`：进行中；已完成 proposal/design/spec/tasks，香港真实 HKJC 单场 HTML dry-run、隔离 SQLite commit、recent-days/date-range 小范围 dry-run/commit、马匹详情补抓、限速和请求上限测试；尚未完成生产最近 2 个月全量 dry-run/commit，以及英国、法国、美国正式接入。
 
 ## 本轮问题简述
 

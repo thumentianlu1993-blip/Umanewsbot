@@ -15,11 +15,17 @@ class Command(BaseCommand):
         parser.add_argument("--race-date", help="按香港赛日导入，例如 2026-06-21")
         parser.add_argument("--race-id", help="按 HKJC 单场 race_id 导入")
         parser.add_argument("--horse-id", help="按 HKJC 单匹 horse_id 导入")
+        parser.add_argument("--recent-days", type=int, help="按最近 N 天真实 HKJC 赛日范围导入")
+        parser.add_argument("--start-date", help="日期范围开始，例如 2026-04-27")
+        parser.add_argument("--end-date", help="日期范围结束，例如 2026-06-26")
         parser.add_argument("--payload-file", default="", help="隔离样本 JSON 文件；可用于 dry-run 或提交")
         parser.add_argument("--commit", action="store_true", help="提交写入 External* 缓存表；默认只 dry-run")
         parser.add_argument("--allow-network", action="store_true", help="预留真实网络请求开关；默认关闭")
         parser.add_argument("--max-races", type=int, help="单次最大比赛数配置记录")
         parser.add_argument("--max-horses", type=int, help="单次最大马匹数配置记录")
+        parser.add_argument("--limit-races", type=int, dest="limit_races", help="本次真实网络抓取最多解析的比赛数")
+        parser.add_argument("--limit-horses", type=int, dest="limit_horses", help="本次真实网络抓取最多补抓的马匹详情数")
+        parser.add_argument("--max-requests", type=int, help="单次最大外部请求数")
         parser.add_argument("--lookup-name", help="查询本地 HKJC 马名索引，不发起外部请求")
         parser.add_argument("--stats-run-id", type=int, help="查看指定 HKJC 导入运行统计")
 
@@ -30,6 +36,7 @@ class Command(BaseCommand):
                 allow_network=options["allow_network"],
                 max_races=options["max_races"],
                 max_horses=options["max_horses"],
+                max_requests=options["max_requests"],
             )
         )
         if options["lookup_name"]:
@@ -74,14 +81,34 @@ class Command(BaseCommand):
             )
             return
 
-        target_count = sum(1 for key in ("race_date", "race_id", "horse_id") if options.get(key))
+        has_date_range = bool(options.get("start_date"))
+        target_count = sum(1 for key in ("race_date", "race_id", "horse_id", "recent_days") if options.get(key))
+        target_count += 1 if has_date_range else 0
         if target_count != 1:
-            raise CommandError("必须且只能指定 --race-date、--race-id 或 --horse-id 之一。")
+            raise CommandError("必须且只能指定 --race-date、--race-id、--horse-id、--recent-days 或 --start-date/--end-date 之一。")
+        if has_date_range and not options.get("end_date"):
+            raise CommandError("--start-date 和 --end-date 必须同时指定。")
+        if options.get("end_date") and not (options.get("start_date") or options.get("recent_days")):
+            raise CommandError("--end-date 只能与 --recent-days 或 --start-date 一起使用。")
         try:
             if options["race_date"]:
                 result = importer.import_race_date(options["race_date"], payload_file=options["payload_file"])
             elif options["race_id"]:
                 result = importer.import_race(options["race_id"], payload_file=options["payload_file"])
+            elif options["recent_days"]:
+                result = importer.import_recent_days(
+                    options["recent_days"],
+                    end_date=options.get("end_date"),
+                    limit_races=options.get("limit_races"),
+                    limit_horses=options.get("limit_horses"),
+                )
+            elif options["start_date"]:
+                result = importer.import_date_range(
+                    options["start_date"],
+                    options["end_date"],
+                    limit_races=options.get("limit_races"),
+                    limit_horses=options.get("limit_horses"),
+                )
             else:
                 result = importer.import_horse(options["horse_id"], payload_file=options["payload_file"])
         except HKJCImportError as exc:

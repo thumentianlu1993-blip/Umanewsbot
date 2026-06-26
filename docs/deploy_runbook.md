@@ -1203,12 +1203,20 @@ HKJC_IMPORT_NETWORK_BASE_URL=https://racing.hkjc.com
 HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=8
 HKJC_IMPORT_MAX_RACES_PER_RUN=20
 HKJC_IMPORT_MAX_HORSES_PER_RUN=80
+HKJC_IMPORT_MAX_REQUESTS_PER_RUN=200
 ```
 
-真实网络探测当前只允许 dry-run 记录请求边界，不允许无 payload commit：
+真实网络 dry-run 可从单场或小范围 recent-days 开始，并记录请求边界：
 
 ```bash
-python manage.py import_hkjc_external_data --race-date 2026-06-21 --allow-network
+python manage.py import_hkjc_external_data --race-id HK20260624HV01 --allow-network
+python manage.py import_hkjc_external_data --recent-days 60 --limit-races 1 --limit-horses 1 --max-requests 10 --allow-network
+```
+
+隔离环境验证过的真实网络 payload 可以 commit，但生产执行前必须先备份数据库、检查单来源锁和 `started` run、跑 dry-run、取得用户显式确认：
+
+```bash
+python manage.py import_hkjc_external_data --recent-days 60 --limit-races 1 --limit-horses 1 --max-requests 10 --allow-network --commit
 ```
 
 查询导入统计：
@@ -1226,7 +1234,8 @@ python manage.py import_hkjc_external_data --lookup-name "Lucky Star"
 生产注意事项：
 
 - 部署前必须确认没有正在运行的外部数据导入。
-- 后续如启用真实网络请求，必须从单赛日、单场、单马小样本开始，并保持低频限速。
+- 真实网络请求必须保持低频限速；扩大到最近 2 个月全量前，应先用 `--limit-races / --limit-horses / --max-requests` 分批 dry-run，确认请求量和字段覆盖。
+- 生产最近 2 个月全量 commit 前必须记录备份路径、dry-run 结果、锁检查、健康检查和用户确认。
 - 本 change 不创建比赛页、赛果页、马匹页；导入数据只作为外部缓存、马名识别和后续项目底座。
 
 ## 2026-06-26 HKJC 数据导入 readiness 与英法美 spike 生产部署
