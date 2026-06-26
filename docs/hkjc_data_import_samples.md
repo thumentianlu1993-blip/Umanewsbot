@@ -430,6 +430,10 @@ retry 补丁部署：
 | 5b | 5 | 60 | 60 | 60 | 60 | 65 | 0 | complete |
 | 5c | 5 | 62 | 62 | 62 | 62 | 67 | 0 | complete |
 | 5d | 5 | 70 | 70 | 70 | 70 | 75 | 0 | complete |
+| 6a | 5 | 56 | 56 | 56 | 56 | 61 | 0 | complete |
+| 6b | 5 | 61 | 61 | 61 | 61 | 66 | 0 | complete |
+| 6c | 5 | 66 | 66 | 66 | 66 | 71 | 0 | complete |
+| 6d | 5 | 65 | 65 | 65 | 65 | 70 | 0 | complete |
 
 小批次 dry-run 输出保存在生产：
 
@@ -453,11 +457,15 @@ retry 补丁部署：
 - `runtime/hkjc_import/hkjc-batch5b-dryrun-20260626.json`
 - `runtime/hkjc_import/hkjc-batch5c-dryrun-20260626.json`
 - `runtime/hkjc_import/hkjc-batch5d-dryrun-20260626.json`
+- `runtime/hkjc_import/hkjc-batch6a-dryrun-20260626.json`
+- `runtime/hkjc_import/hkjc-batch6b-dryrun-20260626.json`
+- `runtime/hkjc_import/hkjc-batch6c-dryrun-20260626.json`
+- `runtime/hkjc_import/hkjc-batch6d-dryrun-20260626.json`
 
 dry-run 后生产复查：
 
 - `started_runs=0`
 - HKJC `ExternalDataImportLock.locked_by_run_id=None`
 - HKJC 正式表计数仍为上次 fixture 样本：`ExternalRace=1`、`ExternalRaceEntry=2`、`ExternalRaceResult=2`、`ExternalHorse=2`、`ExternalHorseAlias=4`
-- 当前已完成前 5 个 plan-only 批次共 `100` 场 full dry-run，均未执行 `--commit`
+- 当前已完成前 6 个 plan-only 批次共 `120` 场 full dry-run，均未执行 `--commit`
 - 3c 首次执行时遇到一次执行容器 `137` 中断，输出文件为 `0` 字节；复查服务、锁和表计数均安全。随后改用一次性 `docker compose run --rm --no-deps web ...` 容器重跑 3c/3d 并完成，避免长 dry-run 进入常驻 `web` 容器。
