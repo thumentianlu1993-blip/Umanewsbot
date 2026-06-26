@@ -141,6 +141,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 自动推送默认范围：`QQ_PUSH_SCOPE=high_value_only`，首版高价值口径为 `score_total >= AUTO_REVIEW_THRESHOLD`；也支持 `all_public`。
 - 发布入口已接入自动推送入队：人工发布、`publish_article()` helper 和自动发布成功后都会在开关开启时异步进入 QQ 推送编排。
 - 推送前检查 `SITE_URL + article.public_path` 是否可访问；URL 不可访问和 OneBot 发送失败分别记录为 `url_unavailable` 与 `send_failed`。
+- 自动交付在领取一次发送尝试前会先检查 OneBot `/get_status`，若网关离线、登录态失效或状态检查失败，则记录 `send_failed` 错误摘要并保持可恢复重试状态，不调用 `/send_group_msg`，也不增加 `attempt_count`。
 - 自动交付会先原子领取尝试再执行 URL 检查和 OneBot 发送，避免重复任务并发消耗重试次数。
 - OneBot HTTP 200 但 JSON 返回业务失败时按 `send_failed` 记录，不会误标记为成功。
 - `sending` 状态超过 `QQ_PUSH_SENDING_STALE_SECONDS`（默认 600 秒）后允许后续任务重新领取，避免 worker 异常后长期卡住。
@@ -163,6 +164,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 2026-06-25 重新扫码登录 NapCat 后，Django `BotPusher` 短消息发送成功，`qq_auto_push_article_task -> qq_push_delivery_task -> OneBot` 自动任务链路已用真实公开文章验证成功，`QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=all_public` 在生产 worker 生效。
 - 2026-06-25 存量补推按 65 秒间隔运行并成功发送 79 条交付记录；按当前验收判断，不再要求继续补推全部历史公开新闻，剩余历史 `retrying/send_failed` 记录保留用于后台排查，不影响后续新发布文章自动推送。
 - 2026-06-25 榜单重点推送部署后，生产 worker 已确认 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked` 生效；本次不补推历史公开新闻，后续只等待自然榜单新闻推送。
+- 2026-06-26 QQ 推送中断排查确认根因是 NapCat 快速登录态失效，日志出现“登录态已失效，请重新登录 / 你的用户身份已失效”。处理过程为：先把生产 `.env` 临时切到 `QQ_PUSH_ENABLED=false` 并重启 `worker / beat` 暂停自动推送；用户重新扫码登录后，OneBot `/get_status` 返回 `online=true`，`/get_login_info` 返回 QQ `1577955464`，群列表包含 `1026525240`，Django 应用侧测试消息发送成功；随后恢复 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked` 并重启 `worker / beat`。本次不补推全部已发表新闻，后续只等待自然榜单新闻触发。
 
 ## 2026-06-24 自动发布门禁优化本地实现
 

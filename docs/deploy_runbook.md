@@ -525,6 +525,14 @@ docker compose -f docker-compose.prod.lowcost.yml exec worker sh -c 'env | grep 
 docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py shell -c "from stable.models import QQPushDelivery; print(QQPushDelivery.objects.order_by('-created_at').values('id','article_id','target_id','status','attempt_count','last_error_type')[:10])"
 ```
 
+检查 OneBot 登录状态：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py shell -c "from stable.services.onebot import BotPusher; print(BotPusher().is_online())"
+```
+
+预期返回 `(True, '')`。若返回 `onebot_offline` 或 `onebot_status_check_failed`，自动推送会暂停真实发送并记录错误摘要，不会调用 `/send_group_msg`，也不会增加 `QQPushDelivery.attempt_count`。
+
 查看 worker 日志：
 
 ```bash
@@ -556,6 +564,8 @@ docker compose -f docker-compose.prod.lowcost.yml up -d worker beat
 ```
 
 停用自动 QQ 推送不会影响公开网站、自动发布或后台手动推送。若 OneBot 网关异常，可先停掉 OneBot 容器或把目标群 `is_active=false`。
+
+如果 NapCat 日志出现“登录态已失效，请重新登录”或 `/get_status` 返回 `online=false`，先按上面的停用方式暂停自动推送，再通过 NapCat WebUI 或新的登录二维码完成 QQ 重新登录。登录后必须重新执行 OneBot 在线检查、测试群短消息和 worker 环境变量检查，再恢复 `QQ_PUSH_ENABLED=true`。
 
 ## 专有术语候选发现灰度部署
 
@@ -1062,6 +1072,7 @@ QQ_PUSH_MIN_INTERVAL_SECONDS=60
 - 批量补推 126 篇存量公开文章时，`QQPushDelivery` 记录创建成功；NapCat / QQ 客户端返回 `EventChecker Failed ... 网络连接异常`，系统按 `send_failed` 记录并进入有限重试，未误标记成功。后续补推必须使用 `QQ_PUSH_MIN_INTERVAL_SECONDS` 或人工脚本限速。
 - 2026-06-25 重新扫码登录 NapCat 后，Django 应用侧短消息和 `qq_auto_push_article_task` 自动任务链路均已成功发送到测试群。限速补推按 65 秒间隔成功发送 79 条交付记录；按当前验收口径，不再继续补推全部历史公开新闻，剩余历史失败记录保留在后台，不影响后续新发布文章自动推送。
 - 2026-06-25 部署榜单重点推送后，生产已切换为 `QQ_PUSH_SCOPE=high_value_only` 与 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`；本次不补推历史公开新闻，后续等待自然榜单新闻触发测试群推送。
+- 2026-06-26 再次排查 QQ 推送停滞时，生产日志确认 NapCat 快速登录态失效；处理时先将 `QQ_PUSH_ENABLED=false` 并重启 `worker / beat` 暂停自动推送，用户重新扫码登录后，`BotPusher().is_online()` 返回 `(True, '')`，`/get_login_info` 显示 QQ `1577955464`，群列表包含 `1026525240`，Django 应用侧测试消息发送成功。随后恢复 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked` 并重启 `worker / beat`。本次不补推全部已发表新闻。
 
 ## 2026-06-25 榜单重点 QQ 推送与公开文章 ID URL 生产部署
 

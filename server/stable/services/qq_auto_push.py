@@ -332,6 +332,15 @@ def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
 
     public_url = build_public_article_url(article)
     message = build_qq_auto_push_message(article, public_url=public_url)
+    pusher = BotPusher()
+    online, status_error = pusher.is_online()
+    if not online:
+        return _set_delivery_failure(
+            delivery,
+            error_type=QQPushErrorType.SEND_FAILED,
+            error=status_error or "onebot_offline",
+        )
+
     if not _claim_delivery_attempt(delivery, message=message, public_url=public_url):
         delivery.refresh_from_db()
         return delivery
@@ -346,7 +355,7 @@ def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
         )
 
     try:
-        response = BotPusher().send_group_message(delivery.target.group_id, message)
+        response = pusher.send_group_message(delivery.target.group_id, message)
     except Exception as exc:
         delivery.refresh_from_db()
         return _set_delivery_failure(

@@ -2754,7 +2754,10 @@ class QQAutoPushTests(TestCase):
     def test_delivery_url_unavailable_records_retryable_error_type(self):
         delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
 
-        with patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(False, "HTTP 404")):
+        with (
+            patch("stable.services.qq_auto_push.BotPusher.is_online", return_value=(True, "")),
+            patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(False, "HTTP 404")),
+        ):
             result = qq_push_delivery_task.run(delivery.id)
 
         delivery.refresh_from_db()
@@ -2793,6 +2796,7 @@ class QQAutoPushTests(TestCase):
         delivery.save(update_fields=["status", "last_error_type", "last_error", "updated_at"])
 
         with (
+            patch("stable.services.qq_auto_push.BotPusher.is_online", return_value=(True, "")),
             patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")),
             patch("stable.services.qq_auto_push.BotPusher.send_group_message", return_value={"status": "ok"}),
         ):
@@ -2809,6 +2813,7 @@ class QQAutoPushTests(TestCase):
         delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
 
         with (
+            patch("stable.services.qq_auto_push.BotPusher.is_online", return_value=(True, "")),
             patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")),
             patch("stable.services.qq_auto_push.BotPusher.send_group_message", side_effect=RuntimeError("bot down")),
         ):
@@ -2823,6 +2828,7 @@ class QQAutoPushTests(TestCase):
         delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
 
         with (
+            patch("stable.services.qq_auto_push.BotPusher.is_online", return_value=(True, "")),
             patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")),
             patch("stable.services.qq_auto_push.BotPusher.send_group_message", return_value={"status": "ok", "data": {"message_id": 123}}),
         ):
@@ -2847,6 +2853,7 @@ class QQAutoPushTests(TestCase):
                 return {"status": "failed", "retcode": 100, "wording": "bad SECRET"}
 
         with (
+            patch("stable.services.qq_auto_push.BotPusher.is_online", return_value=(True, "")),
             patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")),
             patch("stable.services.onebot.requests.post", return_value=FailedResponse()),
         ):
@@ -2856,6 +2863,64 @@ class QQAutoPushTests(TestCase):
         self.assertEqual(result["status"], QQPushDeliveryStatus.FAILED)
         self.assertEqual(delivery.last_error_type, QQPushErrorType.SEND_FAILED)
         self.assertNotIn("SECRET", delivery.last_error)
+
+    def test_delivery_does_not_consume_attempt_when_onebot_offline(self):
+        delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
+
+        with (
+            patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")) as url_check,
+            patch("stable.services.qq_auto_push.BotPusher.is_online", return_value=(False, "onebot_offline")),
+            patch("stable.services.qq_auto_push.BotPusher.send_group_message") as send_message,
+        ):
+            result = qq_push_delivery_task.run(delivery.id)
+
+        delivery.refresh_from_db()
+        self.assertEqual(result["status"], QQPushDeliveryStatus.RETRYING)
+        self.assertEqual(delivery.status, QQPushDeliveryStatus.RETRYING)
+        self.assertEqual(delivery.attempt_count, 0)
+        self.assertEqual(delivery.last_error_type, QQPushErrorType.SEND_FAILED)
+        self.assertIn("onebot_offline", delivery.last_error)
+        url_check.assert_not_called()
+        send_message.assert_not_called()
+
+    def test_delivery_does_not_consume_attempt_when_onebot_status_check_fails(self):
+        delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
+
+        with (
+            patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")) as url_check,
+            patch("stable.services.qq_auto_push.BotPusher.is_online", return_value=(False, "status_check_failed: timeout")),
+            patch("stable.services.qq_auto_push.BotPusher.send_group_message") as send_message,
+        ):
+            result = qq_push_delivery_task.run(delivery.id)
+
+        delivery.refresh_from_db()
+        self.assertEqual(result["status"], QQPushDeliveryStatus.RETRYING)
+        self.assertEqual(delivery.attempt_count, 0)
+        self.assertEqual(delivery.last_error_type, QQPushErrorType.SEND_FAILED)
+        self.assertIn("status_check_failed", delivery.last_error)
+        url_check.assert_not_called()
+        send_message.assert_not_called()
+
+    def test_delivery_sends_after_onebot_recovers_online(self):
+        delivery = ensure_qq_push_deliveries(self.article, [self.target])[0]
+        delivery.status = QQPushDeliveryStatus.RETRYING
+        delivery.last_error_type = QQPushErrorType.SEND_FAILED
+        delivery.last_error = "onebot_offline"
+        delivery.save(update_fields=["status", "last_error_type", "last_error", "updated_at"])
+
+        with (
+            patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")),
+            patch("stable.services.qq_auto_push.BotPusher.is_online", return_value=(True, "")),
+            patch("stable.services.qq_auto_push.BotPusher.send_group_message", return_value={"status": "ok", "data": {"message_id": 789}}),
+        ):
+            result = qq_push_delivery_task.run(delivery.id)
+
+        delivery.refresh_from_db()
+        self.assertEqual(result["status"], QQPushDeliveryStatus.SENT)
+        self.assertEqual(delivery.attempt_count, 1)
+        self.assertEqual(delivery.message_id, "789")
+        self.assertEqual(delivery.last_error_type, "")
+        self.assertEqual(delivery.last_error, "")
 
     @override_settings(QQ_PUSH_SENDING_STALE_SECONDS=60)
     def test_active_sending_delivery_is_not_reclaimed(self):
@@ -2887,6 +2952,7 @@ class QQAutoPushTests(TestCase):
         delivery.save(update_fields=["status", "attempt_count", "max_attempts", "last_attempt_at", "updated_at"])
 
         with (
+            patch("stable.services.qq_auto_push.BotPusher.is_online", return_value=(True, "")),
             patch("stable.services.qq_auto_push.is_public_url_accessible", return_value=(True, "")),
             patch("stable.services.qq_auto_push.BotPusher.send_group_message", return_value={"status": "ok", "data": {"message_id": 456}}),
         ):
@@ -2986,6 +3052,31 @@ class QQAutoPushTests(TestCase):
                 BotPusher().send_group_message("10001", "测试")
 
         self.assertNotIn("SECRET", str(error.exception))
+
+    def test_onebot_status_check_detects_offline(self):
+        class OfflineResponse:
+            text = '{"status":"ok","retcode":0,"data":{"online":false}}'
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"status": "ok", "retcode": 0, "data": {"online": False, "good": False}}
+
+        with patch("stable.services.onebot.requests.get", return_value=OfflineResponse()):
+            online, error = BotPusher().is_online()
+
+        self.assertFalse(online)
+        self.assertIn("onebot_offline", error)
+
+    @override_settings(ONEBOT_ACCESS_TOKEN="SECRET", ONEBOT_TIMEOUT_SECONDS=1)
+    def test_onebot_status_check_errors_redact_token(self):
+        with patch("stable.services.onebot.requests.get", side_effect=requests.RequestException("bad SECRET")):
+            online, error = BotPusher().is_online()
+
+        self.assertFalse(online)
+        self.assertIn("onebot_status_check_failed", error)
+        self.assertNotIn("SECRET", error)
 
     def test_admin_delivery_changelist_is_visible(self):
         user = User.objects.create_superuser("admin2", "admin2@example.com", "admin123456")

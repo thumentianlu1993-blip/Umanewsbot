@@ -34,6 +34,36 @@ class BotPusher:
         if settings.ONEBOT_ACCESS_TOKEN:
             self.headers["Authorization"] = f"Bearer {settings.ONEBOT_ACCESS_TOKEN}"
 
+    def is_online(self) -> tuple[bool, str]:
+        try:
+            response = requests.get(
+                f"{self.base_url}/get_status",
+                headers=self.headers,
+                timeout=getattr(settings, "ONEBOT_TIMEOUT_SECONDS", 30),
+            )
+            response.raise_for_status()
+            try:
+                payload = response.json()
+            except ValueError as exc:
+                detail = "OneBot status check returned invalid JSON"
+                if response.text:
+                    detail = f"{detail}: {_sanitize_error(response.text[:500])}"
+                raise OneBotRequestError(detail) from exc
+            payload = _validate_onebot_response(payload)
+        except requests.RequestException as exc:
+            detail = _sanitize_error(str(exc))
+            response = getattr(exc, "response", None)
+            if response is not None and response.text:
+                detail = f"{detail}: {_sanitize_error(response.text[:500])}"
+            return False, f"onebot_status_check_failed: {detail}"
+        except OneBotRequestError as exc:
+            return False, f"onebot_status_check_failed: {_sanitize_error(str(exc))}"
+
+        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+        if data.get("online") is True:
+            return True, ""
+        return False, f"onebot_offline: {data}"
+
     def send_group_message(self, group_id: str, text: str, image_url: str | None = None) -> dict:
         if image_url:
             try:
