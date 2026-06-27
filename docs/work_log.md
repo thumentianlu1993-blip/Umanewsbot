@@ -218,3 +218,11 @@
 - `audit_global_racing_import_outputs --proof-only --fail-on-incomplete` 复跑 `runtime/global_racing_import/proof-20260627`：通过，`proof_ready=true`、`proof_blocking_reasons=[]`、`commit_candidate_ready=false`。
 - `openspec validate --all`：通过。
 - `git diff --check`：通过。
+
+#### 生产部署
+
+- 已将提交 `93b7007` 推送到 `main` 并部署到 `/opt/umanewsbot`。
+- 部署前确认无 started import，HKJC/netkeiba 锁为空。
+- `bash ./deploy_lowcost.sh` 成功，迁移显示 `No migrations to apply`，`web / worker / beat` 已重建。
+- 部署后 `manage.py check` 通过，`healthz` 本地与公网均为 `200`，首页为 `200`。
+- 生产命令入口和 proof-only 审计通过，未启动真实抓取或生产 `--commit`。

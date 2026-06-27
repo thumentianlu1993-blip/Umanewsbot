@@ -1452,6 +1452,22 @@ curl -sS -o /dev/null -w "public_healthz=%{http_code}\n" http://umafans.run/heal
 - 生产不新增 `ExternalDataImportRun(status="started")`，不持有 `ExternalDataImportLock`
 
 后续如果要完整抓取最近 60 天数据，必须新开执行窗口，先 plan-only，再小批 dry-run，再离线审计，最后经备份、锁检查、健康检查和用户显式确认后才允许讨论 `--commit`。
+
+### 本次执行结果
+
+- 提交：`93b7007 Ship global racing database import capability`
+- 推送：`main` 从 `9ff667a` fast-forward 到 `93b7007`
+- 部署：服务器 `/opt/umanewsbot` 执行 `git pull --ff-only origin main` 后运行 `bash ./deploy_lowcost.sh`
+- 迁移：`No migrations to apply`
+- 容器：`web / worker / beat` 已重建，`web` healthy
+- 验证：
+  - `manage.py check` 通过
+  - `http://127.0.0.1/healthz/`、`http://umafans.run/healthz/` 和首页均返回 `200`
+  - `import_uk_external_data`、`import_france_external_data`、`import_us_external_data`、`render_global_racing_batch_command` 命令入口可用
+  - proof-only 审计通过，`proof_ready=true`、`proof_blocking_reasons=[]`、`commit_candidate_ready=false`
+  - `ExternalDataImportRun(status="started")=0`
+  - HKJC 与 netkeiba 的 `ExternalDataImportLock.locked_by_run_id=None`
+  - 一次性 proof 审计容器已自动删除，无 `umanewsbot-web-run-*` 临时容器残留
 - `http://umafans.run/healthz/`：`200`
 
 ### 恢复口径
