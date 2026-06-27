@@ -198,3 +198,23 @@
 - 术语候选发现代码已上线，生产默认关闭
 - 下一步：在后台或 shell 做单篇手动重新发现，抽检候选质量；确认后再将 `TERM_DISCOVERY_ENABLED=true` 灰度开启，仅重启 `web` 与 `worker`
 - 回滚：将 `TERM_DISCOVERY_ENABLED=false` 即可停用，无需回滚迁移或删除候选数据；如需整体回退可用 `.env.backup.20260607_033207` 与 `backups/pre-0006-20260607_033207.sql`
+
+## 2026-06-27
+
+### 项目：全球赛马数据库能力确认上线包整理
+
+#### 已完成
+
+- 用户将目标调整为：先保证香港、英国、法国、美国的数据爬取能力真实可用，不要求本轮真实爬取最近 60 天完整数据。
+- 从 `origin/main` 创建干净上线基线，单独整理全球赛马数据库能力确认改造，避免当前本地大工作树里的 QQ、前台、compose 等旁支差异冲突。
+- 复核四地管理命令入口：`import_hkjc_external_data`、`import_uk_external_data`、`import_france_external_data`、`import_us_external_data` 均具备 `--allow-network`、低频/限量、精确批次、dry-run 和受控 `--commit` 能力。
+- 生产只读核对 HKJC：服务器 `/opt/umanewsbot` 当前为 `9ff667a`，`runtime/hkjc_import/` 中存在真实 dry-run 批次 JSON；有效批次合计覆盖 `130` 场、`1652` 条 entries/results/horses、`1783` 次请求，抽样为 `dry_run=true`、`would_write_formal_tables=false`、`completion.is_complete=true`。
+- 复核 UK / France / US proof：`runtime/global_racing_import/proof-20260627` 中三地 proof 均有真实 `200` 响应、非写库 dry-run、非空 coverage，并通过 proof-only 审计。
+- Review 当前文件改造必要性：四地 importer、fixtures、审计命令、batch command 渲染器、OpenSpec 规格和 `docs/global_racing_*` 属于本目标必要改造；QQ 推送、前台信息流、历史 archive、OneBot compose 端口等旁支差异不属于本目标必要范围。
+
+#### 验证
+
+- `stable.tests.HKJCExternalDataImportTests`、`UKExternalDataImportTests`、`FranceExternalDataImportTests`、`USExternalDataImportTests`、`GlobalRacingImporterCommitGateTests`、`GlobalRacingImportOutputAuditTests`、`GlobalRacingSpikeIsolationTests`：通过。
+- `audit_global_racing_import_outputs --proof-only --fail-on-incomplete` 复跑 `runtime/global_racing_import/proof-20260627`：通过，`proof_ready=true`、`proof_blocking_reasons=[]`、`commit_candidate_ready=false`。
+- `openspec validate --all`：通过。
+- `git diff --check`：通过。

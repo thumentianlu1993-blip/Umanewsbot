@@ -1,0 +1,291 @@
+{
+  "commit_candidate_ready": false,
+  "file_count": 3,
+  "source_count": 3,
+  "sources": [
+    "geny_france",
+    "horse_racing_nation",
+    "sporting_life"
+  ],
+  "expected_sources": [
+    "geny_france",
+    "horse_racing_nation",
+    "sporting_life"
+  ],
+  "missing_expected_sources": [],
+  "expected_request_types": {
+    "geny_france": [
+      "horse",
+      "partants",
+      "results"
+    ],
+    "horse_racing_nation": [
+      "horse",
+      "track_day"
+    ],
+    "sporting_life": [
+      "horse",
+      "race"
+    ]
+  },
+  "proof_sources": {
+    "geny_france": {
+      "files": [
+        "france-geny/france-geny-partants-proof.json"
+      ],
+      "file_count": 1,
+      "complete_file_count": 0,
+      "incomplete_file_count": 1,
+      "request_count": 3,
+      "successful_response_count": 3,
+      "coverage_totals": {
+        "races": 1,
+        "entries": 6,
+        "results": 6,
+        "horses": 6
+      },
+      "request_types": [
+        "horse",
+        "partants",
+        "results"
+      ],
+      "stop_reasons": [
+        "limit_horses_reached"
+      ]
+    },
+    "horse_racing_nation": {
+      "files": [
+        "us-hrn/us-hrn-race-id-proof.json"
+      ],
+      "file_count": 1,
+      "complete_file_count": 0,
+      "incomplete_file_count": 1,
+      "request_count": 2,
+      "successful_response_count": 2,
+      "coverage_totals": {
+        "races": 1,
+        "entries": 12,
+        "results": 4,
+        "horses": 12
+      },
+      "request_types": [
+        "horse",
+        "track_day"
+      ],
+      "stop_reasons": [
+        "limit_horses_reached"
+      ]
+    },
+    "sporting_life": {
+      "files": [
+        "uk/uk-race-url-proof.json"
+      ],
+      "file_count": 1,
+      "complete_file_count": 0,
+      "incomplete_file_count": 1,
+      "request_count": 2,
+      "successful_response_count": 2,
+      "coverage_totals": {
+        "races": 1,
+        "entries": 7,
+        "results": 7,
+        "horses": 7
+      },
+      "request_types": [
+        "horse",
+        "race"
+      ],
+      "stop_reasons": [
+        "limit_horses_reached"
+      ]
+    }
+  },
+  "proof_request_types_by_source": {
+    "geny_france": [
+      "horse",
+      "partants",
+      "results"
+    ],
+    "horse_racing_nation": [
+      "horse",
+      "track_day"
+    ],
+    "sporting_life": [
+      "horse",
+      "race"
+    ]
+  },
+  "missing_proof_request_types": [],
+  "plan_file_count": 0,
+  "batch_file_count": 3,
+  "incomplete_file_count": 3,
+  "invalid_file_count": 0,
+  "non_dry_run_file_count": 0,
+  "proof_ready": true,
+  "proof_file_count": 3,
+  "proof_request_count": 7,
+  "proof_successful_response_count": 7,
+  "proof_plan_file_count": 0,
+  "proof_empty_request_file_count": 0,
+  "proof_non_success_response_file_count": 0,
+  "proof_empty_coverage_file_count": 0,
+  "proof_disallowed_stop_file_count": 0,
+  "incomplete_plan_file_count": 0,
+  "non_dry_run_plan_file_count": 0,
+  "limited_plan_file_count": 0,
+  "incomplete_horse_detail_file_count": 2,
+  "missing_source_file_count": 0,
+  "would_write_formal_table_file_count": 0,
+  "planned_item_count": 0,
+  "covered_planned_item_count": 0,
+  "missing_planned_item_count": 0,
+  "extra_covered_item_count": 0,
+  "duplicate_planned_item_count": 0,
+  "duplicate_covered_item_count": 0,
+  "total_requests": 7,
+  "coverage_totals": {
+    "races": 3,
+    "entries": 25,
+    "results": 17,
+    "horses": 25
+  },
+  "incomplete_files": [
+    {
+      "path": "france-geny/france-geny-partants-proof.json",
+      "stop_reason": "limit_horses_reached"
+    },
+    {
+      "path": "uk/uk-race-url-proof.json",
+      "stop_reason": "limit_horses_reached"
+    },
+    {
+      "path": "us-hrn/us-hrn-race-id-proof.json",
+      "stop_reason": "limit_horses_reached"
+    }
+  ],
+  "invalid_files": [],
+  "non_dry_run_files": [],
+  "proof_plan_files": [],
+  "proof_empty_request_files": [],
+  "proof_non_success_response_files": [],
+  "proof_empty_coverage_files": [],
+  "proof_disallowed_stop_files": [],
+  "incomplete_plan_files": [],
+  "non_dry_run_plan_files": [],
+  "limited_plan_files": [],
+  "incomplete_horse_detail_files": [
+    {
+      "path": "uk/uk-race-url-proof.json",
+      "unique_horses_found": 7,
+      "horse_profiles_fetched": 1,
+      "horse_profile_source": ""
+    },
+    {
+      "path": "us-hrn/us-hrn-race-id-proof.json",
+      "unique_horses_found": 12,
+      "horse_profiles_fetched": 1,
+      "horse_profile_source": ""
+    }
+  ],
+  "missing_source_files": [],
+  "would_write_formal_table_files": [],
+  "missing_planned_items": [],
+  "extra_covered_items": [],
+  "duplicate_planned_items": [],
+  "duplicate_covered_items": [],
+  "files": [
+    {
+      "path": "france-geny/france-geny-partants-proof.json",
+      "valid": true,
+      "source": "geny_france",
+      "target_type": "partants_urls",
+      "dry_run": true,
+      "plan_only": false,
+      "is_complete": false,
+      "stop_reason": "limit_horses_reached",
+      "coverage_stats": {
+        "races": 1,
+        "entries": 6,
+        "results": 6,
+        "horses": 6
+      },
+      "request_count": 3
+    },
+    {
+      "path": "uk/uk-race-url-proof.json",
+      "valid": true,
+      "source": "sporting_life",
+      "target_type": "race_urls",
+      "dry_run": true,
+      "plan_only": false,
+      "is_complete": false,
+      "stop_reason": "limit_horses_reached",
+      "coverage_stats": {
+        "races": 1,
+        "entries": 7,
+        "results": 7,
+        "horses": 7
+      },
+      "request_count": 2
+    },
+    {
+      "path": "us-hrn/us-hrn-race-id-proof.json",
+      "valid": true,
+      "source": "horse_racing_nation",
+      "target_type": "race_ids",
+      "dry_run": true,
+      "plan_only": false,
+      "is_complete": false,
+      "stop_reason": "limit_horses_reached",
+      "coverage_stats": {
+        "races": 1,
+        "entries": 12,
+        "results": 4,
+        "horses": 12
+      },
+      "request_count": 2
+    }
+  ],
+  "blocking_reasons": [
+    "missing plan file",
+    "mixed sources geny_france,horse_racing_nation,sporting_life",
+    "france-geny/france-geny-partants-proof.json",
+    "uk/uk-race-url-proof.json",
+    "us-hrn/us-hrn-race-id-proof.json",
+    "incomplete horse details uk/uk-race-url-proof.json",
+    "incomplete horse details us-hrn/us-hrn-race-id-proof.json"
+  ],
+  "proof_blocking_reasons": [],
+  "handoff_decision": "proof_only_ready_not_commit_candidate",
+  "handoff_decision_reasons": [
+    "proof-only audit passed",
+    "commit audit still blocked",
+    "complete 60-day crawl and commit gate remain required"
+  ],
+  "audit_parameters": {
+    "input_dir": "runtime/global_racing_import/proof-20260627",
+    "pattern": "*/*.json",
+    "proof_only": true,
+    "fail_on_incomplete": true,
+    "expected_sources": [
+      "geny_france",
+      "horse_racing_nation",
+      "sporting_life"
+    ],
+    "expected_request_types": {
+      "geny_france": [
+        "horse",
+        "partants",
+        "results"
+      ],
+      "horse_racing_nation": [
+        "horse",
+        "track_day"
+      ],
+      "sporting_life": [
+        "horse",
+        "race"
+      ]
+    }
+  }
+}

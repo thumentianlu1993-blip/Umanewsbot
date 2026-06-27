@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone as dt_timezone
 import json
+from pathlib import Path
 import tempfile
 from io import StringIO
 from unittest.mock import Mock, call, patch
@@ -11,6 +12,7 @@ import requests
 from django.conf import settings as django_settings
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import connection
 from django.test import Client, TestCase, override_settings
@@ -1707,6 +1709,13 @@ class HKJCExternalDataImportTests(TestCase):
                     "career_record": "10-2-1-1",
                 }
             ],
+            "completion": {
+                "is_complete": True,
+                "stop_reason": "complete",
+                "races_imported": 1,
+                "unique_horses_found": 1,
+                "horse_profiles_fetched": 1,
+            },
         }
 
     def write_payload(self, payload: dict | None = None) -> str:
@@ -1827,6 +1836,24 @@ class HKJCExternalDataImportTests(TestCase):
         self.assertEqual(ExternalHorseAlias.objects.count(), 0)
         self.assertEqual(ExternalDataImportRun.objects.count(), 0)
 
+    def test_commit_rejects_incomplete_hkjc_payload(self):
+        # Mutation: HKJC commit must not write a dry-run payload that explicitly reports incomplete coverage.
+        payload = self.sample_payload()
+        payload["completion"] = {
+            "is_complete": False,
+            "stop_reason": "limit_horses_reached",
+            "horse_profiles_fetched": 1,
+            "unique_horses_found": 2,
+        }
+        importer = HKJCExternalDataImporter(HKJCImportOptions(dry_run=False, allow_network=False))
+
+        with self.assertRaisesRegex(HKJCImportError, "incomplete"):
+            importer.import_race_date("2026-06-21", payload_file=self.write_payload(payload))
+
+        self.assertEqual(ExternalRace.objects.count(), 0)
+        self.assertEqual(ExternalHorseAlias.objects.count(), 0)
+        self.assertEqual(ExternalDataImportRun.objects.count(), 0)
+
     def test_hkjc_management_command_lookup_name(self):
         ExternalHorseAlias.objects.create(
             source="hkjc",
@@ -1936,12 +1963,23 @@ class HKJCExternalDataImportTests(TestCase):
             / "html"
             / "localresults-race-sample.html"
         )
-        mock_get = Mock()
-        mock_get.return_value.status_code = 200
-        mock_get.return_value.url = "https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=1"
-        mock_get.return_value.headers = {"Content-Type": "text/html; charset=utf-8"}
-        mock_get.return_value.text = fixture_path.read_text(encoding="utf-8")
-        mock_get.return_value.json.side_effect = ValueError("not json")
+        horse_fixture = fixture_path.parent / "horse-profile-sample.html"
+        mock_get = Mock(
+            side_effect=[
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=1",
+                    text=fixture_path.read_text(encoding="utf-8"),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/horse?horseid=HK_2023_J524",
+                    text=horse_fixture.read_text(encoding="utf-8"),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/horse?horseid=HK_2024_K500",
+                    text=horse_fixture.read_text(encoding="utf-8"),
+                ),
+            ]
+        )
         fake_requests = type("FakeRequests", (), {"get": mock_get})
         with patch.object(hkjc_module, "requests", fake_requests, create=True):
             out = StringIO()
@@ -1960,7 +1998,19 @@ class HKJCExternalDataImportTests(TestCase):
                     "status_code": 200,
                     "target_type": "race",
                     "target_id": "HK20260624HV01",
-                }
+                },
+                {
+                    "url": "https://hkjc.example.test/en-us/local/information/horse?horseid=HK_2023_J524",
+                    "status_code": 200,
+                    "target_type": "horse",
+                    "target_id": "HK_2023_J524",
+                },
+                {
+                    "url": "https://hkjc.example.test/en-us/local/information/horse?horseid=HK_2024_K500",
+                    "status_code": 200,
+                    "target_type": "horse",
+                    "target_id": "HK_2024_K500",
+                },
             ],
         )
         self.assertFalse(result["would_write_formal_tables"])
@@ -1987,12 +2037,23 @@ class HKJCExternalDataImportTests(TestCase):
             / "html"
             / "localresults-race-sample.html"
         )
-        mock_get = Mock()
-        mock_get.return_value.status_code = 200
-        mock_get.return_value.url = "https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=1"
-        mock_get.return_value.headers = {"Content-Type": "text/html; charset=utf-8"}
-        mock_get.return_value.text = fixture_path.read_text(encoding="utf-8")
-        mock_get.return_value.json.side_effect = ValueError("not json")
+        horse_fixture = fixture_path.parent / "horse-profile-sample.html"
+        mock_get = Mock(
+            side_effect=[
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=1",
+                    text=fixture_path.read_text(encoding="utf-8"),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/horse?horseid=HK_2023_J524",
+                    text=horse_fixture.read_text(encoding="utf-8"),
+                ),
+                self.hkjc_response(
+                    url="https://hkjc.example.test/en-us/local/information/horse?horseid=HK_2024_K500",
+                    text=horse_fixture.read_text(encoding="utf-8"),
+                ),
+            ]
+        )
         fake_requests = type("FakeRequests", (), {"get": mock_get})
         importer = HKJCExternalDataImporter(HKJCImportOptions(dry_run=False, allow_network=True))
 
@@ -2000,12 +2061,14 @@ class HKJCExternalDataImportTests(TestCase):
             result = importer.import_race("HK20260624HV01")
 
         self.assertFalse(result["dry_run"])
-        self.assertEqual(result["success_count"], 5)
+        self.assertEqual(result["success_count"], 7)
         self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual(result["completion"]["horse_profiles_fetched"], 2)
         self.assertEqual(ExternalRace.objects.count(), 1)
         self.assertEqual(ExternalRaceEntry.objects.count(), 2)
         self.assertEqual(ExternalRaceResult.objects.count(), 2)
-        self.assertEqual(ExternalHorseAlias.objects.filter(source="hkjc").count(), 2)
+        self.assertEqual(ExternalHorse.objects.count(), 2)
+        self.assertEqual(ExternalHorseAlias.objects.filter(source="hkjc").count(), 3)
         race = ExternalRace.objects.get()
         self.assertEqual(race.race_id, "HK20260624HV01")
         self.assertEqual(race.race_name, "ICE HOUSE STREET HANDICAP")
@@ -2342,7 +2405,7 @@ class HKJCExternalDataImportTests(TestCase):
         HKJC_IMPORT_MAX_HORSES_PER_RUN=5,
         HKJC_IMPORT_MAX_REQUESTS_PER_RUN=10,
     )
-    def test_hkjc_network_date_range_commit_writes_horse_profiles_idempotently(self):
+    def test_hkjc_network_race_batch_commit_writes_horse_profiles_idempotently(self):
         # Mutation: if horse profile payloads are not part of the verified network payload, commit only creates aliases.
         from pathlib import Path
 
@@ -2351,20 +2414,19 @@ class HKJCExternalDataImportTests(TestCase):
         fixture_dir = Path(__file__).resolve().parent / "fixtures" / "hkjc" / "html"
         response_cycle = [
             self.hkjc_response(
-                url="https://hkjc.example.test/en-us/local/information/localresults",
-                text=(fixture_dir / "localresults-meetings-sample.html").read_text(encoding="utf-8"),
-            ),
-            self.hkjc_response(
-                url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/24",
-                text=self.hkjc_date_page_with_race_links(),
-            ),
-            self.hkjc_response(
                 url="https://hkjc.example.test/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=1",
                 text=(fixture_dir / "localresults-race-sample.html").read_text(encoding="utf-8"),
             ),
             self.hkjc_response(
                 url="https://hkjc.example.test/en-us/local/information/horse?horseid=HK_2023_J524",
                 text=(fixture_dir / "horse-profile-sample.html").read_text(encoding="utf-8"),
+            ),
+            self.hkjc_response(
+                url="https://hkjc.example.test/en-us/local/information/horse?horseid=HK_2024_K500",
+                text=(fixture_dir / "horse-profile-sample.html")
+                .read_text(encoding="utf-8")
+                .replace("ROSEWOOD FLEETFOOT", "GOLDEN FORTUNE")
+                .replace("(J524)", "(K500)"),
             ),
         ]
         mock_get = Mock(side_effect=[*response_cycle, *response_cycle])
@@ -2381,15 +2443,15 @@ class HKJCExternalDataImportTests(TestCase):
         )
 
         with patch.object(hkjc_module, "requests", fake_requests, create=True):
-            first = importer.import_date_range("2026-04-27", "2026-06-26", limit_races=1, limit_horses=1)
-            second = importer.import_date_range("2026-04-27", "2026-06-26", limit_races=1, limit_horses=1)
+            first = importer.import_race_batch(["HK20260624HV01"], limit_horses=2)
+            second = importer.import_race_batch(["HK20260624HV01"], limit_horses=2)
 
         self.assertFalse(first["dry_run"])
         self.assertFalse(second["dry_run"])
         self.assertEqual(ExternalRace.objects.count(), 1)
         self.assertEqual(ExternalRaceEntry.objects.count(), 2)
         self.assertEqual(ExternalRaceResult.objects.count(), 2)
-        self.assertEqual(ExternalHorse.objects.count(), 1)
+        self.assertEqual(ExternalHorse.objects.count(), 2)
         horse = ExternalHorse.objects.get(source="hkjc", horse_id="HK_2023_J524")
         self.assertEqual(horse.horse_name_en, "ROSEWOOD FLEETFOOT")
         self.assertEqual(horse.country, "NZ")
@@ -2513,6 +2575,1709 @@ class HKJCExternalDataImportTests(TestCase):
         self.assertEqual(ExternalRace.objects.count(), 0)
 
 
+class UKExternalDataImportTests(TestCase):
+    def sporting_life_fixture(self, name: str) -> str:
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parent / "fixtures" / "uk" / "sporting_life" / name
+        return path.read_text(encoding="utf-8")
+
+    def uk_response(self, *, url: str, text: str, status_code: int = 200):
+        response = Mock()
+        response.status_code = status_code
+        response.url = url
+        response.headers = {"Content-Type": "text/html; charset=utf-8"}
+        response.text = text
+        response.json.side_effect = ValueError("not json")
+        return response
+
+    def test_sporting_life_results_page_parses_race_links(self):
+        # Mutation: if the parser only detects generic /racing links, UK live planning cannot build exact race batches.
+        from stable.services.external_uk_racing_data import SportingLifeHTMLParser
+
+        parser = SportingLifeHTMLParser()
+
+        race_links = parser.parse_result_race_links(
+            self.sporting_life_fixture("results-date-sample.html"),
+            source_url="https://www.sportinglife.com/racing/results/2026-06-26",
+        )
+
+        self.assertEqual(
+            race_links,
+            [
+                {
+                    "race_id": "SL924406",
+                    "race_date": "2026-06-26",
+                    "venue": "yarmouth",
+                    "race_no": "924406",
+                    "url": "https://www.sportinglife.com/racing/racecards/2026-06-26/yarmouth/racecard/924406/download-the-free-attheraces-app-handicap",
+                },
+                {
+                    "race_id": "SL924407",
+                    "race_date": "2026-06-26",
+                    "venue": "newmarket",
+                    "race_no": "924407",
+                    "url": "https://www.sportinglife.com/racing/racecards/2026-06-26/newmarket/racecard/924407/british-stallion-studs-ebf-fillies-novice-stakes",
+                },
+            ],
+        )
+
+    def test_sporting_life_racecard_parses_runners_results_and_profile_links(self):
+        # Mutation: if horse profile ids are not extracted, the 60-day import cannot fetch involved horse details.
+        from stable.services.external_uk_racing_data import SportingLifeHTMLParser
+
+        parser = SportingLifeHTMLParser()
+
+        race = parser.parse_racecard(
+            self.sporting_life_fixture("racecard-sample.html"),
+            race_id="SL924406",
+            race_date="2026-06-26",
+            venue="yarmouth",
+            source_url="https://www.sportinglife.com/racing/racecards/2026-06-26/yarmouth/racecard/924406/download-the-free-attheraces-app-handicap",
+        )
+
+        self.assertEqual(race["race_id"], "SL924406")
+        self.assertEqual(race["race_name"], "Download The Free At The Races App Handicap")
+        self.assertEqual(race["venue"], "yarmouth")
+        self.assertEqual(race["race_date"], "2026-06-26")
+        self.assertEqual(race["race_class"], "Class 5")
+        self.assertEqual(race["distance"], "1m 2f")
+        self.assertEqual(race["going"], "Good to Firm")
+        self.assertEqual(race["surface"], "Turf")
+        self.assertEqual(race["prize_money"], "Winner £4,711")
+        self.assertEqual(len(race["entries"]), 2)
+        self.assertEqual(race["entries"][0]["horse_id"], "1212905")
+        self.assertEqual(race["entries"][0]["horse_name_en"], "Sea Legend")
+        self.assertEqual(race["entries"][0]["jockey"], "Oisin Murphy")
+        self.assertEqual(race["results"][0]["finish_position"], "1")
+        self.assertEqual(race["results"][1]["odds"], "4/1")
+
+    def test_sporting_life_horse_profile_parses_identity_and_breeding(self):
+        # Mutation: if profile dt/dd fields are not mapped, UK horse pages would create aliases without useful detail.
+        from stable.services.external_uk_racing_data import SportingLifeHTMLParser
+
+        parser = SportingLifeHTMLParser()
+
+        horse = parser.parse_horse_profile(
+            self.sporting_life_fixture("horse-profile-sample.html"),
+            horse_id="1212905",
+            source_url="https://www.sportinglife.com/racing/profiles/horse/1212905/sea-legend",
+        )
+
+        self.assertEqual(horse["horse_id"], "1212905")
+        self.assertEqual(horse["horse_name_en"], "Sea Legend")
+        self.assertEqual(horse["age"], "4")
+        self.assertEqual(horse["sex"], "Gelding")
+        self.assertEqual(horse["trainer"], "Andrew Balding")
+        self.assertEqual(horse["owner"], "Kingsclere Racing Club")
+        self.assertEqual(horse["sire"], "Sea The Stars")
+        self.assertEqual(horse["dam"], "Urban Castle")
+        self.assertEqual(horse["country"], "GB")
+        self.assertEqual(horse["record_summary"], "21-3521")
+
+    @override_settings(
+        UK_IMPORT_NETWORK_BASE_URL="https://www.sportinglife.com",
+        UK_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        UK_IMPORT_MAX_RACES_PER_RUN=5,
+        UK_IMPORT_MAX_HORSES_PER_RUN=5,
+        UK_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_uk_recent_days_dry_run_fetches_races_and_horse_profiles_without_writing(self):
+        # Mutation: if UK dry-run writes External* rows, the production safety gate is bypassed before confirmation.
+        from stable.services import external_uk_racing_data as uk_module
+
+        mock_get = Mock(
+            side_effect=[
+                self.uk_response(
+                    url="https://www.sportinglife.com/racing/results/2026-06-26",
+                    text=self.sporting_life_fixture("results-date-sample.html"),
+                ),
+                self.uk_response(
+                    url="https://www.sportinglife.com/racing/racecards/2026-06-26/yarmouth/racecard/924406/download-the-free-attheraces-app-handicap",
+                    text=self.sporting_life_fixture("racecard-sample.html"),
+                ),
+                self.uk_response(
+                    url="https://www.sportinglife.com/racing/profiles/horse/1212905",
+                    text=self.sporting_life_fixture("horse-profile-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(uk_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_uk_external_data",
+                "--recent-days",
+                "1",
+                "--end-date",
+                "2026-06-26",
+                "--limit-races",
+                "1",
+                "--limit-horses",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertTrue(result["network_probe"])
+        self.assertEqual(result["source"], "sporting_life")
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["result_date", "race", "horse"])
+        self.assertEqual(result["completion"]["stop_reason"], "limit_horses_reached")
+        self.assertEqual(ExternalRace.objects.filter(source="sporting_life").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="sporting_life").count(), 0)
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="sporting_life").count(), 0)
+
+    @override_settings(
+        UK_IMPORT_NETWORK_BASE_URL="https://www.sportinglife.com",
+        UK_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        UK_IMPORT_MAX_RACES_PER_RUN=5,
+        UK_IMPORT_MAX_HORSES_PER_RUN=5,
+        UK_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_uk_recent_days_dry_run_supports_skip_races_for_batch_resume(self):
+        # Mutation: without skip-races, each UK batch restarts from the same earliest race in the 60-day window.
+        from stable.services import external_uk_racing_data as uk_module
+
+        mock_get = Mock(
+            side_effect=[
+                self.uk_response(
+                    url="https://www.sportinglife.com/racing/results/2026-06-26",
+                    text=self.sporting_life_fixture("results-date-sample.html"),
+                ),
+                self.uk_response(
+                    url="https://www.sportinglife.com/racing/racecards/2026-06-26/newmarket/racecard/924407/british-stallion-studs-ebf-fillies-novice-stakes",
+                    text=self.sporting_life_fixture("racecard-sample.html"),
+                ),
+                self.uk_response(
+                    url="https://www.sportinglife.com/racing/profiles/horse/1212905",
+                    text=self.sporting_life_fixture("horse-profile-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(uk_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_uk_external_data",
+                "--recent-days",
+                "1",
+                "--end-date",
+                "2026-06-26",
+                "--skip-races",
+                "1",
+                "--limit-races",
+                "1",
+                "--limit-horses",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["result_date", "race", "horse"])
+        self.assertEqual(result["requests"][1]["target_id"], "SL924407")
+        self.assertEqual(result["completion"]["skip_races"], 1)
+        self.assertEqual(result["completion"]["race_links_selected"], 1)
+        self.assertEqual(ExternalRace.objects.filter(source="sporting_life").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="sporting_life").count(), 0)
+
+    @override_settings(
+        UK_IMPORT_NETWORK_BASE_URL="https://www.sportinglife.com",
+        UK_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        UK_IMPORT_MAX_RACES_PER_RUN=5,
+        UK_IMPORT_MAX_HORSES_PER_RUN=5,
+        UK_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_uk_recent_days_plan_only_lists_race_batches_without_fetching_races(self):
+        # Mutation: without plan-only, operators cannot size the full 60-day UK window before starting race/profile requests.
+        from stable.services import external_uk_racing_data as uk_module
+
+        mock_get = Mock(
+            return_value=self.uk_response(
+                url="https://www.sportinglife.com/racing/results/2026-06-26",
+                text=self.sporting_life_fixture("results-date-sample.html"),
+            )
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(uk_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_uk_external_data",
+                "--recent-days",
+                "1",
+                "--end-date",
+                "2026-06-26",
+                "--plan-only",
+                "--batch-size",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertTrue(result["plan_only"])
+        self.assertEqual(result["source"], "sporting_life")
+        self.assertEqual(result["coverage_stats"], {"races": 2, "entries": 0, "results": 0, "horses": 0})
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["result_date"])
+        self.assertEqual(result["completion"]["race_links_found"], 2)
+        self.assertEqual(result["completion"]["batch_size"], 1)
+        self.assertEqual(result["completion"]["batches"], 2)
+        self.assertEqual(result["batches"][1]["skip_races"], 1)
+        self.assertEqual(result["batches"][1]["race_ids"], ["SL924407"])
+        self.assertEqual(
+            result["batches"][1]["race_urls"],
+            [
+                "https://www.sportinglife.com/racing/racecards/2026-06-26/newmarket/racecard/924407/british-stallion-studs-ebf-fillies-novice-stakes",
+            ],
+        )
+        self.assertEqual(ExternalRace.objects.filter(source="sporting_life").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="sporting_life").count(), 0)
+
+    @override_settings(
+        UK_IMPORT_NETWORK_BASE_URL="https://www.sportinglife.com",
+        UK_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        UK_IMPORT_MAX_RACES_PER_RUN=5,
+        UK_IMPORT_MAX_HORSES_PER_RUN=5,
+        UK_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_uk_plan_only_excludes_non_uk_race_links(self):
+        # Mutation: Sporting Life results include Irish/overseas cards; UK batches must not count them as UK races.
+        from stable.services import external_uk_racing_data as uk_module
+
+        html = """
+        <a href="/racing/racecards/2026-06-26/newmarket/racecard/924388/debenhamscom-handicap">Newmarket</a>
+        <a href="/racing/racecards/2026-06-26/curragh/racecard/924649/schweppes-trophy-handicap">Curragh</a>
+        <a href="/racing/racecards/2026-06-26/laurel-park/racecard/925165/race-3-maiden-claiming">Laurel</a>
+        """
+        mock_get = Mock(
+            return_value=self.uk_response(
+                url="https://www.sportinglife.com/racing/results/2026-06-26",
+                text=html,
+            )
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(uk_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_uk_external_data",
+                "--recent-days",
+                "1",
+                "--end-date",
+                "2026-06-26",
+                "--plan-only",
+                "--batch-size",
+                "5",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertEqual(result["completion"]["race_links_found"], 1)
+        self.assertEqual(result["batches"][0]["race_ids"], ["SL924388"])
+        self.assertEqual(
+            result["batches"][0]["race_urls"],
+            ["https://www.sportinglife.com/racing/racecards/2026-06-26/newmarket/racecard/924388/debenhamscom-handicap"],
+        )
+
+    @override_settings(
+        UK_IMPORT_NETWORK_BASE_URL="https://www.sportinglife.com",
+        UK_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        UK_IMPORT_MAX_RACES_PER_RUN=5,
+        UK_IMPORT_MAX_HORSES_PER_RUN=5,
+        UK_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_uk_race_urls_dry_run_fetches_exact_races_without_date_scan(self):
+        # Mutation: if exact race batches still scan date pages, later UK batches waste requests and increase rate-limit risk.
+        from stable.services import external_uk_racing_data as uk_module
+
+        race_url = "https://www.sportinglife.com/racing/racecards/2026-06-26/newmarket/racecard/924407/british-stallion-studs-ebf-fillies-novice-stakes"
+        mock_get = Mock(
+            side_effect=[
+                self.uk_response(
+                    url=race_url,
+                    text=self.sporting_life_fixture("racecard-sample.html"),
+                ),
+                self.uk_response(
+                    url="https://www.sportinglife.com/racing/profiles/horse/1212905",
+                    text=self.sporting_life_fixture("horse-profile-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(uk_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_uk_external_data",
+                "--race-urls",
+                race_url,
+                "--limit-horses",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["target_type"], "race_urls")
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["race", "horse"])
+        self.assertEqual(result["completion"]["race_links_found"], 1)
+        self.assertEqual(result["completion"]["race_links_selected"], 1)
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual(ExternalRace.objects.filter(source="sporting_life").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="sporting_life").count(), 0)
+
+    @override_settings(
+        UK_IMPORT_NETWORK_BASE_URL="https://www.sportinglife.com",
+        UK_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        UK_IMPORT_MAX_RACES_PER_RUN=5,
+        UK_IMPORT_MAX_HORSES_PER_RUN=5,
+        UK_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_uk_commit_rejects_incomplete_profile_batch(self):
+        # Mutation: production commit must not write a batch whose horse-profile fetch was truncated by limits.
+        from stable.services import external_uk_racing_data as uk_module
+
+        race_url = "https://www.sportinglife.com/racing/racecards/2026-06-26/newmarket/racecard/924407/british-stallion-studs-ebf-fillies-novice-stakes"
+        mock_get = Mock(
+            side_effect=[
+                self.uk_response(
+                    url=race_url,
+                    text=self.sporting_life_fixture("racecard-sample.html"),
+                ),
+                self.uk_response(
+                    url="https://www.sportinglife.com/racing/profiles/horse/1212905",
+                    text=self.sporting_life_fixture("horse-profile-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(uk_module, "requests", fake_requests, create=True):
+            with self.assertRaisesRegex(CommandError, "incomplete"):
+                call_command(
+                    "import_uk_external_data",
+                    "--race-urls",
+                    race_url,
+                    "--limit-horses",
+                    "1",
+                    "--allow-network",
+                    "--commit",
+                    stdout=StringIO(),
+                )
+
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="sporting_life").count(), 0)
+        self.assertEqual(ExternalRace.objects.filter(source="sporting_life").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="sporting_life").count(), 0)
+
+    @override_settings(
+        UK_IMPORT_NETWORK_BASE_URL="https://www.sportinglife.com",
+        UK_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        UK_IMPORT_MAX_RACES_PER_RUN=5,
+        UK_IMPORT_MAX_HORSES_PER_RUN=5,
+        UK_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_uk_race_urls_commit_writes_external_tables_idempotently(self):
+        # Mutation: full UK ingestion needs the exact race batch path to be writable and idempotent, not only dry-run proof.
+        from stable.services import external_uk_racing_data as uk_module
+
+        race_url = "https://www.sportinglife.com/racing/racecards/2026-06-26/newmarket/racecard/924407/british-stallion-studs-ebf-fillies-novice-stakes"
+        responses = [
+            self.uk_response(
+                url=race_url,
+                text=self.sporting_life_fixture("racecard-sample.html"),
+            ),
+            self.uk_response(
+                url="https://www.sportinglife.com/racing/profiles/horse/1212905",
+                text=self.sporting_life_fixture("horse-profile-sample.html"),
+            ),
+            self.uk_response(
+                url="https://www.sportinglife.com/racing/profiles/horse/328651",
+                text=self.sporting_life_fixture("horse-profile-sample.html").replace("Sea Legend", "City Streak"),
+            ),
+        ]
+        mock_get = Mock(side_effect=[*responses, *responses])
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(uk_module, "requests", fake_requests, create=True):
+            first = StringIO()
+            second = StringIO()
+
+            for out in (first, second):
+                call_command(
+                    "import_uk_external_data",
+                    "--race-urls",
+                    race_url,
+                    "--allow-network",
+                    "--commit",
+                    stdout=out,
+                )
+
+        result = json.loads(second.getvalue())
+        self.assertFalse(result["dry_run"])
+        self.assertEqual(result["source"], "sporting_life")
+        self.assertEqual(result["target_type"], "race_urls")
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="sporting_life", status=ExternalImportStatus.SUCCESS).count(), 2)
+        self.assertEqual(ExternalRace.objects.filter(source="sporting_life").count(), 1)
+        self.assertEqual(ExternalRaceEntry.objects.filter(source="sporting_life").count(), 2)
+        self.assertEqual(ExternalRaceResult.objects.filter(source="sporting_life").count(), 2)
+        self.assertEqual(ExternalHorse.objects.filter(source="sporting_life").count(), 2)
+        self.assertEqual(ExternalHorseAlias.objects.filter(source="sporting_life").count(), 2)
+        self.assertFalse(ExternalDataImportLock.objects.get(source="sporting_life").locked_by_run_id)
+
+
+class FranceExternalDataImportTests(TestCase):
+    def france_galop_fixture(self, name: str) -> str:
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parent / "fixtures" / "france_galop" / name
+        return path.read_text(encoding="utf-8")
+
+    def france_response(self, *, url: str, text: str, status_code: int = 200):
+        response = Mock()
+        response.status_code = status_code
+        response.url = url
+        response.headers = {"Content-Type": "text/html; charset=utf-8"}
+        response.text = text
+        response.json.side_effect = ValueError("not json")
+        return response
+
+    def test_france_galop_today_page_parses_meeting_links(self):
+        # Mutation: if meeting ids are not preserved, France date-range crawling cannot fetch race detail pages.
+        from stable.services.external_france_racing_data import FranceGalopHTMLParser
+
+        parser = FranceGalopHTMLParser()
+
+        meetings = parser.parse_meeting_links(
+            self.france_galop_fixture("racing-today-sample.html"),
+            race_date="2026-06-26",
+            source_url="https://www.france-galop.com/en/racing/today",
+        )
+
+        self.assertEqual(
+            meetings,
+            [
+                {
+                    "meeting_id": "UUI1MEN3bUdDZ09lcDluYm41NGxndz09",
+                    "race_date": "2026-06-26",
+                    "venue": "DEAUVILLE",
+                    "url": "https://www.france-galop.com/en/racing/meeting/20260626/UUI1MEN3bUdDZ09lcDluYm41NGxndz09",
+                },
+                {
+                    "meeting_id": "bFM4ZXA3eFQ0TGVkSEhKR0FRamMyUT09",
+                    "race_date": "2026-06-26",
+                    "venue": "LA TESTE",
+                    "url": "https://www.france-galop.com/en/racing/meeting/20260626/bFM4ZXA3eFQ0TGVkSEhKR0FRamMyUT09",
+                },
+            ],
+        )
+
+    def test_france_galop_race_detail_parses_results_and_horse_detail_rows(self):
+        # Mutation: if detail rows are treated as plain runner links, sire/dam/owner/trainer fields are lost.
+        from stable.services.external_france_racing_data import FranceGalopHTMLParser
+
+        parser = FranceGalopHTMLParser()
+
+        race = parser.parse_race_detail(
+            self.france_galop_fixture("race-detail-sample.html"),
+            race_id="FG2026P-Mk5FdWZLYVplaEljbmRZckU4bEo3UT09",
+            source_url="https://www.france-galop.com/en/racing/detail/2026/P/Mk5FdWZLYVplaEljbmRZckU4bEo3UT09",
+        )
+
+        self.assertEqual(race["race_name"], "PRIX ADELAIDE")
+        self.assertEqual(race["race_date"], "2026-06-26")
+        self.assertEqual(race["venue"], "DEAUVILLE")
+        self.assertEqual(race["distance"], "1.900 meters")
+        self.assertEqual(race["surface"], "PSF")
+        self.assertEqual(race["going"], "LENTE")
+        self.assertEqual(len(race["entries"]), 2)
+        self.assertEqual(race["entries"][0]["horse_id"], "UVIvUnZsZ3lqYUM4b21vTFdZK1d5UT09")
+        self.assertEqual(race["entries"][0]["horse_name_en"], "SHEERAN")
+        self.assertEqual(race["entries"][0]["sex"], "F")
+        self.assertEqual(race["entries"][0]["age"], "3")
+        self.assertEqual(race["entries"][0]["sire"], "DUBAWI")
+        self.assertEqual(race["entries"][0]["dam"], "SOLSTICIA")
+        self.assertEqual(race["entries"][0]["owner"], "WERTHEIMER & FRERE")
+        self.assertEqual(race["results"][1]["finish_position"], "2")
+        self.assertEqual(race["results"][1]["margin"], "3.5")
+
+    @override_settings(
+        FRANCE_IMPORT_NETWORK_BASE_URL="https://www.france-galop.com",
+        FRANCE_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        FRANCE_IMPORT_MAX_RACES_PER_RUN=5,
+        FRANCE_IMPORT_MAX_HORSES_PER_RUN=20,
+        FRANCE_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_france_galop_dry_run_fetches_meeting_and_race_detail_without_writing(self):
+        # Mutation: France Galop dry-run must not create External* rows while horse profile pages still require login.
+        from stable.services import external_france_racing_data as france_module
+
+        mock_get = Mock(
+            side_effect=[
+                self.france_response(
+                    url="https://www.france-galop.com/en/racing/today",
+                    text=self.france_galop_fixture("racing-today-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.france-galop.com/en/racing/meeting/20260626/UUI1MEN3bUdDZ09lcDluYm41NGxndz09",
+                    text=self.france_galop_fixture("meeting-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.france-galop.com/en/racing/detail/2026/P/Mk5FdWZLYVplaEljbmRZckU4bEo3UT09",
+                    text=self.france_galop_fixture("race-detail-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(france_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_france_external_data",
+                "--race-date",
+                "2026-06-26",
+                "--limit-races",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["source"], "france_galop")
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["race_date", "meeting", "race"])
+        self.assertEqual(result["completion"]["horse_profile_source"], "race_detail_rows")
+        self.assertEqual(ExternalRace.objects.filter(source="france_galop").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="france_galop").count(), 0)
+
+    def test_geny_date_page_parses_french_race_links(self):
+        # Mutation: Geny date pages also list foreign meetings; those must not enter France import batches.
+        from stable.services.external_france_racing_data import GenyFranceHTMLParser
+
+        parser = GenyFranceHTMLParser()
+
+        links = parser.parse_race_links(
+            self.france_galop_fixture("geny-date-sample.html"),
+            race_date="2026-06-24",
+            source_url="https://www.geny.com/reunions-courses-pmu/_d2026-06-24",
+        )
+
+        self.assertEqual(len(links), 3)
+        self.assertEqual(links[1]["race_id"], "GENY1662144")
+        self.assertEqual(links[1]["venue"], "Chantilly")
+        self.assertEqual(links[1]["meeting_number"], "R2")
+        self.assertEqual(links[1]["race_number"], "1")
+        self.assertEqual(links[1]["race_name"], "Prix du Clos de la Barre")
+        self.assertEqual(
+            links[1]["partants_url"],
+            "https://www.geny.com/partants-pmu/2026-06-24-chantilly-pmu-prix-du-clos-de-la-barre_c1662144",
+        )
+        self.assertEqual(
+            links[1]["results_url"],
+            "https://www.geny.com/arrivee-et-rapports-pmu/2026-06-24-pmu-prix-du-clos-de-la-barre_c1662144",
+        )
+        self.assertNotIn("Happy Valley", {link["venue"] for link in links})
+
+    def test_geny_partants_and_results_parse_horse_rows(self):
+        # Mutation: if the Geny runner onclick payload is ignored, horse ids and profile references disappear.
+        from stable.services.external_france_racing_data import GenyFranceHTMLParser
+
+        parser = GenyFranceHTMLParser()
+
+        race = parser.parse_partants(
+            self.france_galop_fixture("geny-partants-sample.html"),
+            race_link={
+                "race_id": "GENY1662144",
+                "race_date": "2026-06-24",
+                "venue": "Chantilly",
+                "meeting_number": "R2",
+                "race_number": "1",
+                "race_name": "Prix du Clos de la Barre",
+                "partants_url": "https://www.geny.com/partants-pmu/2026-06-24-chantilly-pmu-prix-du-clos-de-la-barre_c1662144",
+            },
+        )
+        results = parser.parse_results(self.france_galop_fixture("geny-results-sample.html"))
+
+        self.assertEqual(len(race["entries"]), 2)
+        self.assertEqual(race["entries"][1]["horse_id"], "2814630")
+        self.assertEqual(race["entries"][1]["horse_name_en"], "Zakharova")
+        self.assertEqual(race["entries"][1]["horse_number"], "6")
+        self.assertEqual(race["entries"][1]["barrier"], "5")
+        self.assertEqual(race["entries"][1]["sex"], "F")
+        self.assertEqual(race["entries"][1]["age"], "4")
+        self.assertEqual(race["entries"][1]["weight"], "54,5")
+        self.assertEqual(race["entries"][1]["jockey"], "C. Belmont")
+        self.assertEqual(race["entries"][1]["trainer"], "F. Belmont")
+        self.assertEqual(race["entries"][1]["record_summary"], "0p8p(25)1p")
+        self.assertEqual(race["entries"][1]["rating"], "43")
+        self.assertEqual(race["entries"][1]["odds"], "27,8")
+        self.assertEqual(race["entries"][1]["raw_payload"]["horse_profile_url"], "https://www.geny.com/fr/cheval/2814630/course/1662144")
+        self.assertEqual(results[0]["horse_id"], "2814630")
+        self.assertEqual(results[0]["finish_position"], "1")
+        self.assertEqual(results[0]["horse_number"], "6")
+        self.assertEqual(results[0]["margin"], "Courte tête")
+        self.assertEqual(results[1]["horse_name_en"], "Waldnebel")
+
+    def test_geny_horse_profile_parses_identity_breeding_and_connections(self):
+        # Mutation: if Geny profile prose is not parsed, France horses keep only row-level race fields.
+        from stable.services.external_france_racing_data import GenyFranceHTMLParser
+
+        parser = GenyFranceHTMLParser()
+
+        horse = parser.parse_horse_profile(
+            self.france_galop_fixture("geny-horse-profile-sample.html"),
+            horse_id="2814630",
+            source_url="https://www.geny.com/fr/cheval/2814630/course/1662144",
+        )
+
+        self.assertEqual(horse["horse_id"], "2814630")
+        self.assertEqual(horse["horse_name_en"], "Zakharova")
+        self.assertEqual(horse["sex"], "Femelle")
+        self.assertEqual(horse["age"], "4")
+        self.assertEqual(horse["color"], "bai")
+        self.assertEqual(horse["sire"], "Zelzal")
+        self.assertEqual(horse["dam"], "Diva Cattiva")
+        self.assertEqual(horse["trainer"], "François Belmont")
+        self.assertEqual(horse["owner"], "François Belmont")
+        self.assertEqual(horse["record_summary"], "0p8p(25)1p3p7p3p6p(24)7p")
+        self.assertEqual(horse["earnings"], "57 100 €")
+
+    @override_settings(
+        GENY_FRANCE_IMPORT_NETWORK_BASE_URL="https://www.geny.com",
+        FRANCE_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        FRANCE_IMPORT_MAX_RACES_PER_RUN=5,
+        FRANCE_IMPORT_MAX_HORSES_PER_RUN=20,
+        FRANCE_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_geny_france_recent_days_dry_run_fetches_date_partants_results_without_writing(self):
+        # Mutation: Geny is the historical France source; dry-run batches must support date windows and race offsets.
+        from stable.services import external_france_racing_data as france_module
+
+        mock_get = Mock(
+            side_effect=[
+                self.france_response(
+                    url="https://www.geny.com/reunions-courses-pmu/_d2026-06-24",
+                    text=self.france_galop_fixture("geny-date-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.geny.com/partants-pmu/2026-06-24-chantilly-pmu-prix-du-clos-de-la-barre_c1662144",
+                    text=self.france_galop_fixture("geny-partants-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.geny.com/arrivee-et-rapports-pmu/2026-06-24-pmu-prix-du-clos-de-la-barre_c1662144",
+                    text=self.france_galop_fixture("geny-results-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(france_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_france_external_data",
+                "--source",
+                "geny",
+                "--recent-days",
+                "1",
+                "--end-date",
+                "2026-06-24",
+                "--skip-races",
+                "1",
+                "--limit-races",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["source"], "geny_france")
+        self.assertEqual(result["target_type"], "date_range")
+        self.assertEqual(result["target_id"], "2026-06-24..2026-06-24")
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["race_date", "partants", "results"])
+        self.assertEqual(result["requests"][1]["target_id"], "GENY1662144")
+        self.assertEqual(result["completion"]["horse_profile_source"], "geny_partants_rows")
+        self.assertEqual(result["completion"]["skip_races"], 1)
+        self.assertEqual(ExternalRace.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="geny_france").count(), 0)
+
+    @override_settings(
+        GENY_FRANCE_IMPORT_NETWORK_BASE_URL="https://www.geny.com",
+        FRANCE_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        FRANCE_IMPORT_MAX_RACES_PER_RUN=5,
+        FRANCE_IMPORT_MAX_HORSES_PER_RUN=20,
+        FRANCE_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_geny_france_dry_run_fetches_limited_horse_profiles_without_writing(self):
+        # Mutation: without a profile fetch limit, France full ingestion cannot safely prove horse-detail coverage.
+        from stable.services import external_france_racing_data as france_module
+
+        mock_get = Mock(
+            side_effect=[
+                self.france_response(
+                    url="https://www.geny.com/reunions-courses-pmu/_d2026-06-24",
+                    text=self.france_galop_fixture("geny-date-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.geny.com/partants-pmu/2026-06-24-chantilly-pmu-prix-du-clos-de-la-barre_c1662144",
+                    text=self.france_galop_fixture("geny-partants-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.geny.com/arrivee-et-rapports-pmu/2026-06-24-pmu-prix-du-clos-de-la-barre_c1662144",
+                    text=self.france_galop_fixture("geny-results-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.geny.com/fr/cheval/2818930/course/1662144",
+                    text=self.france_galop_fixture("geny-horse-profile-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(france_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_france_external_data",
+                "--source",
+                "geny",
+                "--recent-days",
+                "1",
+                "--end-date",
+                "2026-06-24",
+                "--skip-races",
+                "1",
+                "--limit-races",
+                "1",
+                "--limit-horses",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["race_date", "partants", "results", "horse"])
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual(result["completion"]["unique_horses_found"], 2)
+        self.assertEqual(result["completion"]["horse_profiles_fetched"], 1)
+        self.assertEqual(result["completion"]["stop_reason"], "limit_horses_reached")
+        self.assertEqual(ExternalRace.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="geny_france").count(), 0)
+
+    @override_settings(
+        GENY_FRANCE_IMPORT_NETWORK_BASE_URL="https://www.geny.com",
+        FRANCE_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        FRANCE_IMPORT_MAX_RACES_PER_RUN=5,
+        FRANCE_IMPORT_MAX_HORSES_PER_RUN=20,
+        FRANCE_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_geny_france_plan_only_lists_race_batches_without_fetching_races(self):
+        # Mutation: without a Geny plan-only map, French 60-day batches cannot be sized before partants/results requests.
+        from stable.services import external_france_racing_data as france_module
+
+        mock_get = Mock(
+            return_value=self.france_response(
+                url="https://www.geny.com/reunions-courses-pmu/_d2026-06-24",
+                text=self.france_galop_fixture("geny-date-sample.html"),
+            )
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(france_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_france_external_data",
+                "--source",
+                "geny",
+                "--recent-days",
+                "1",
+                "--end-date",
+                "2026-06-24",
+                "--plan-only",
+                "--batch-size",
+                "2",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertTrue(result["plan_only"])
+        self.assertEqual(result["source"], "geny_france")
+        self.assertEqual(result["coverage_stats"], {"races": 3, "entries": 0, "results": 0, "horses": 0})
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["race_date"])
+        self.assertEqual(result["completion"]["race_links_found"], 3)
+        self.assertEqual(result["completion"]["batches"], 2)
+        self.assertEqual(result["batches"][0]["skip_races"], 0)
+        self.assertEqual(result["batches"][0]["race_ids"], ["GENY1662153", "GENY1662144"])
+        self.assertEqual(result["batches"][1]["skip_races"], 2)
+        self.assertEqual(result["batches"][1]["race_ids"], ["GENY1662145"])
+        self.assertEqual(ExternalRace.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="geny_france").count(), 0)
+
+    @override_settings(
+        GENY_FRANCE_IMPORT_NETWORK_BASE_URL="https://www.geny.com",
+        FRANCE_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        FRANCE_IMPORT_MAX_RACES_PER_RUN=5,
+        FRANCE_IMPORT_MAX_HORSES_PER_RUN=20,
+        FRANCE_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_geny_france_partants_urls_dry_run_fetches_exact_races_without_date_scan(self):
+        # Mutation: if France exact batches rescan date pages, later 60-day runs waste requests and increase 429 risk.
+        from stable.services import external_france_racing_data as france_module
+
+        partants_url = "https://www.geny.com/partants-pmu/2026-06-24-chantilly-pmu-prix-du-clos-de-la-barre_c1662144"
+        mock_get = Mock(
+            side_effect=[
+                self.france_response(
+                    url=partants_url,
+                    text=self.france_galop_fixture("geny-partants-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.geny.com/arrivee-et-rapports-pmu/2026-06-24-pmu-prix-du-clos-de-la-barre_c1662144",
+                    text=self.france_galop_fixture("geny-results-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.geny.com/fr/cheval/2818930/course/1662144",
+                    text=self.france_galop_fixture("geny-horse-profile-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(france_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_france_external_data",
+                "--source",
+                "geny",
+                "--partants-urls",
+                partants_url,
+                "--limit-horses",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["target_type"], "partants_urls")
+        self.assertEqual(result["target_id"], "GENY1662144")
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["partants", "results", "horse"])
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual(result["completion"]["race_links_found"], 1)
+        self.assertEqual(result["completion"]["race_links_selected"], 1)
+        self.assertEqual(result["completion"]["race_ids_selected"], ["GENY1662144"])
+        self.assertEqual(result["completion"]["horse_profiles_fetched"], 1)
+        self.assertEqual(ExternalRace.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="geny_france").count(), 0)
+
+    @override_settings(
+        GENY_FRANCE_IMPORT_NETWORK_BASE_URL="https://www.geny.com",
+        FRANCE_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        FRANCE_IMPORT_MAX_RACES_PER_RUN=5,
+        FRANCE_IMPORT_MAX_HORSES_PER_RUN=20,
+        FRANCE_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_geny_france_commit_rejects_incomplete_profile_batch(self):
+        # Mutation: production commit must not write a Geny batch whose profile fetch stopped at limit_horses.
+        from stable.services import external_france_racing_data as france_module
+
+        partants_url = "https://www.geny.com/partants-pmu/2026-06-24-chantilly-pmu-prix-du-clos-de-la-barre_c1662144"
+        mock_get = Mock(
+            side_effect=[
+                self.france_response(
+                    url=partants_url,
+                    text=self.france_galop_fixture("geny-partants-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.geny.com/arrivee-et-rapports-pmu/2026-06-24-pmu-prix-du-clos-de-la-barre_c1662144",
+                    text=self.france_galop_fixture("geny-results-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.geny.com/fr/cheval/2818930/course/1662144",
+                    text=self.france_galop_fixture("geny-horse-profile-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(france_module, "requests", fake_requests, create=True):
+            with self.assertRaisesRegex(CommandError, "incomplete"):
+                call_command(
+                    "import_france_external_data",
+                    "--source",
+                    "geny",
+                    "--partants-urls",
+                    partants_url,
+                    "--limit-horses",
+                    "1",
+                    "--allow-network",
+                    "--commit",
+                    stdout=StringIO(),
+                )
+
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalRace.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="geny_france").count(), 0)
+
+    @override_settings(
+        GENY_FRANCE_IMPORT_NETWORK_BASE_URL="https://www.geny.com",
+        FRANCE_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        FRANCE_IMPORT_MAX_RACES_PER_RUN=5,
+        FRANCE_IMPORT_MAX_HORSES_PER_RUN=20,
+        FRANCE_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_geny_france_partants_urls_commit_writes_external_tables_idempotently(self):
+        # Mutation: full France ingestion should commit exact partants-url batches, not only date-range batches.
+        from stable.services import external_france_racing_data as france_module
+
+        partants_url = "https://www.geny.com/partants-pmu/2026-06-24-chantilly-pmu-prix-du-clos-de-la-barre_c1662144"
+        responses = [
+            self.france_response(
+                url=partants_url,
+                text=self.france_galop_fixture("geny-partants-sample.html"),
+            ),
+            self.france_response(
+                url="https://www.geny.com/arrivee-et-rapports-pmu/2026-06-24-pmu-prix-du-clos-de-la-barre_c1662144",
+                text=self.france_galop_fixture("geny-results-sample.html"),
+            ),
+            self.france_response(
+                url="https://www.geny.com/fr/cheval/2818930/course/1662144",
+                text=self.france_galop_fixture("geny-horse-profile-sample.html"),
+            ),
+            self.france_response(
+                url="https://www.geny.com/fr/cheval/2814630/course/1662144",
+                text=self.france_galop_fixture("geny-horse-profile-sample.html"),
+            ),
+        ]
+        mock_get = Mock(side_effect=[*responses, *responses])
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(france_module, "requests", fake_requests, create=True):
+            first = StringIO()
+            second = StringIO()
+
+            for out in (first, second):
+                call_command(
+                    "import_france_external_data",
+                    "--source",
+                    "geny",
+                    "--partants-urls",
+                    partants_url,
+                    "--limit-horses",
+                    "2",
+                    "--allow-network",
+                    "--commit",
+                    stdout=out,
+                )
+
+        result = json.loads(second.getvalue())
+        self.assertFalse(result["dry_run"])
+        self.assertEqual(result["source"], "geny_france")
+        self.assertEqual(result["target_type"], "partants_urls")
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="geny_france", status=ExternalImportStatus.SUCCESS).count(), 2)
+        self.assertEqual(ExternalRace.objects.filter(source="geny_france").count(), 1)
+        self.assertEqual(ExternalRaceEntry.objects.filter(source="geny_france").count(), 2)
+        self.assertEqual(ExternalRaceResult.objects.filter(source="geny_france").count(), 2)
+        self.assertEqual(ExternalHorse.objects.filter(source="geny_france").count(), 2)
+        self.assertEqual(ExternalHorseAlias.objects.filter(source="geny_france").count(), 2)
+        self.assertFalse(ExternalDataImportLock.objects.get(source="geny_france").locked_by_run_id)
+
+    @override_settings(
+        GENY_FRANCE_IMPORT_NETWORK_BASE_URL="https://www.geny.com",
+        FRANCE_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        FRANCE_IMPORT_MAX_RACES_PER_RUN=5,
+        FRANCE_IMPORT_MAX_HORSES_PER_RUN=20,
+        FRANCE_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_geny_france_dry_run_stops_safely_on_rate_limit_without_writing(self):
+        # Mutation: a Geny 429 must produce resumable dry-run evidence instead of hiding partial progress behind CommandError.
+        from stable.services import external_france_racing_data as france_module
+
+        mock_get = Mock(
+            side_effect=[
+                self.france_response(
+                    url="https://www.geny.com/reunions-courses-pmu/_d2026-06-24",
+                    text=self.france_galop_fixture("geny-date-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.geny.com/partants-pmu/2026-06-24-chantilly-pmu-prix-du-clos-de-la-barre_c1662144",
+                    text=self.france_galop_fixture("geny-partants-sample.html"),
+                ),
+                self.france_response(
+                    url="https://www.geny.com/arrivee-et-rapports-pmu/2026-06-24-pmu-prix-du-clos-de-la-barre_c1662144",
+                    text="rate limited",
+                    status_code=429,
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(france_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_france_external_data",
+                "--source",
+                "geny",
+                "--recent-days",
+                "1",
+                "--end-date",
+                "2026-06-24",
+                "--skip-races",
+                "1",
+                "--limit-races",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertFalse(result["completion"]["is_complete"])
+        self.assertEqual(result["completion"]["stop_reason"], "rate_limited")
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 0, "horses": 2})
+        self.assertEqual(result["requests"][-1]["status_code"], 429)
+        self.assertEqual(ExternalRace.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="geny_france").count(), 0)
+
+    @override_settings(
+        GENY_FRANCE_IMPORT_NETWORK_BASE_URL="https://www.geny.com",
+        FRANCE_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        FRANCE_IMPORT_MAX_RACES_PER_RUN=5,
+        FRANCE_IMPORT_MAX_HORSES_PER_RUN=20,
+        FRANCE_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_geny_france_commit_rejects_limited_date_range_batch(self):
+        # Mutation: date-range commits should not write a range explicitly truncated by limit_races.
+        from stable.services import external_france_racing_data as france_module
+
+        responses = [
+            self.france_response(
+                url="https://www.geny.com/reunions-courses-pmu/_d2026-06-24",
+                text=self.france_galop_fixture("geny-date-sample.html"),
+            ),
+            self.france_response(
+                url="https://www.geny.com/partants-pmu/2026-06-24-chantilly-pmu-prix-du-clos-de-la-barre_c1662144",
+                text=self.france_galop_fixture("geny-partants-sample.html"),
+            ),
+            self.france_response(
+                url="https://www.geny.com/arrivee-et-rapports-pmu/2026-06-24-pmu-prix-du-clos-de-la-barre_c1662144",
+                text=self.france_galop_fixture("geny-results-sample.html"),
+            ),
+        ]
+        mock_get = Mock(side_effect=responses)
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(france_module, "requests", fake_requests, create=True):
+            with self.assertRaisesRegex(CommandError, "incomplete"):
+                call_command(
+                    "import_france_external_data",
+                    "--source",
+                    "geny",
+                    "--recent-days",
+                    "1",
+                    "--end-date",
+                    "2026-06-24",
+                    "--skip-races",
+                    "1",
+                    "--limit-races",
+                    "1",
+                    "--allow-network",
+                    "--commit",
+                    stdout=StringIO(),
+                )
+
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalRace.objects.filter(source="geny_france").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="geny_france").count(), 0)
+
+
+class USExternalDataImportTests(TestCase):
+    def hrn_fixture(self, name: str) -> str:
+        from pathlib import Path
+
+        path = Path(__file__).resolve().parent / "fixtures" / "us_hrn" / name
+        return path.read_text(encoding="utf-8")
+
+    def hrn_response(self, *, url: str, text: str, status_code: int = 200):
+        response = Mock()
+        response.status_code = status_code
+        response.url = url
+        response.headers = {"Content-Type": "text/html; charset=utf-8"}
+        response.text = text
+        response.json.side_effect = ValueError("not json")
+        return response
+
+    def test_hrn_track_day_parses_same_date_track_links(self):
+        # Mutation: without same-date track links, the US import cannot expand from one seed track to the day slate.
+        from stable.services.external_us_racing_data import HorseRacingNationHTMLParser
+
+        parser = HorseRacingNationHTMLParser()
+
+        track_links = parser.parse_track_day_links(
+            self.hrn_fixture("track-day-sample.html"),
+            race_date="2026-06-25",
+            source_url="https://entries.horseracingnation.com/entries-results/churchill-downs/2026-06-25",
+        )
+
+        self.assertEqual(
+            track_links,
+            [
+                {
+                    "track_slug": "churchill-downs",
+                    "race_date": "2026-06-25",
+                    "track_name": "Churchill Downs",
+                    "url": "https://entries.horseracingnation.com/entries-results/churchill-downs/2026-06-25",
+                },
+                {
+                    "track_slug": "belmont-at-aqueduct",
+                    "race_date": "2026-06-25",
+                    "track_name": "Belmont at Aqueduct",
+                    "url": "https://entries.horseracingnation.com/entries-results/belmont-at-aqueduct/2026-06-25",
+                },
+                {
+                    "track_slug": "woodbine",
+                    "race_date": "2026-06-25",
+                    "track_name": "Woodbine",
+                    "url": "https://entries.horseracingnation.com/entries-results/woodbine/2026-06-25",
+                },
+            ],
+        )
+
+    def test_hrn_track_day_parses_races_entries_results_and_horse_links(self):
+        # Mutation: parsing only the summary tables would miss the actual runner/result payload.
+        from stable.services.external_us_racing_data import HorseRacingNationHTMLParser
+
+        parser = HorseRacingNationHTMLParser()
+
+        races = parser.parse_track_day_races(
+            self.hrn_fixture("track-day-sample.html"),
+            race_date="2026-06-25",
+            track_slug="churchill-downs",
+            track_name="Churchill Downs",
+            source_url="https://entries.horseracingnation.com/entries-results/churchill-downs/2026-06-25",
+        )
+
+        self.assertEqual(len(races), 1)
+        race = races[0]
+        self.assertEqual(race["race_id"], "HRN_churchill-downs_2026-06-25_1")
+        self.assertEqual(race["race_name"], "Churchill Downs Race # 1")
+        self.assertEqual(race["scheduled_start_time"], "5:00 PM")
+        self.assertEqual(len(race["entries"]), 2)
+        self.assertEqual(race["entries"][0]["horse_id"], "Crystal_Frost")
+        self.assertEqual(race["entries"][0]["horse_name_en"], "Crystal Frost")
+        self.assertEqual(race["entries"][0]["sire"], "Frosted")
+        self.assertEqual(race["entries"][1]["jockey"], "Tyler Gaffalione")
+        self.assertEqual(race["results"][0]["horse_name_en"], "Beauxbatons")
+        self.assertEqual(race["results"][0]["finish_position"], "1")
+        self.assertEqual(race["results"][1]["horse_name_en"], "Crystal Frost")
+
+    def test_hrn_horse_profile_parses_pedigree_owner_and_trainer(self):
+        # Mutation: if profile prose is not parsed, US horse aliases would lack the useful detail fields.
+        from stable.services.external_us_racing_data import HorseRacingNationHTMLParser
+
+        parser = HorseRacingNationHTMLParser()
+
+        horse = parser.parse_horse_profile(
+            self.hrn_fixture("horse-profile-sample.html"),
+            horse_id="Avalon_Rose_1",
+            source_url="https://www.horseracingnation.com/horse/Avalon_Rose_1",
+        )
+
+        self.assertEqual(horse["horse_id"], "Avalon_Rose_1")
+        self.assertEqual(horse["horse_name_en"], "Avalon Rose")
+        self.assertEqual(horse["age"], "2")
+        self.assertEqual(horse["sex"], "Filly")
+        self.assertEqual(horse["sire"], "Rock Your World")
+        self.assertEqual(horse["dam"], "Freedom Rose")
+        self.assertEqual(horse["dams_sire"], "Constitution")
+        self.assertEqual(horse["owner"], "James Avansino, Bobby Stephen")
+        self.assertEqual(horse["trainer"], "Robert B. Hess Jr.")
+        self.assertEqual(horse["country"], "Kentucky, US")
+
+    @override_settings(
+        US_IMPORT_ENTRIES_BASE_URL="https://entries.horseracingnation.com",
+        US_IMPORT_HRN_BASE_URL="https://www.horseracingnation.com",
+        US_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        US_IMPORT_MAX_RACES_PER_RUN=5,
+        US_IMPORT_MAX_HORSES_PER_RUN=5,
+        US_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_us_hrn_dry_run_fetches_track_day_and_horse_profile_without_writing(self):
+        # Mutation: US dry-run must not write External* rows before the source coverage and safety gate are accepted.
+        from stable.services import external_us_racing_data as us_module
+
+        mock_get = Mock(
+            side_effect=[
+                self.hrn_response(
+                    url="https://entries.horseracingnation.com/entries-results/2026-06-25",
+                    text=self.hrn_fixture("track-day-sample.html"),
+                ),
+                self.hrn_response(
+                    url="https://www.horseracingnation.com/horse/Crystal_Frost",
+                    text=self.hrn_fixture("horse-profile-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(us_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_us_external_data",
+                "--race-date",
+                "2026-06-25",
+                "--seed-track",
+                "churchill-downs",
+                "--limit-tracks",
+                "1",
+                "--limit-races",
+                "1",
+                "--limit-horses",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["source"], "horse_racing_nation")
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["track_day", "horse"])
+        self.assertEqual(result["completion"]["track_days_fetched"], 1)
+        self.assertEqual(result["completion"]["horse_profiles_fetched"], 1)
+        self.assertEqual(ExternalRace.objects.filter(source="horse_racing_nation").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="horse_racing_nation").count(), 0)
+
+    @override_settings(
+        US_IMPORT_ENTRIES_BASE_URL="https://entries.horseracingnation.com",
+        US_IMPORT_HRN_BASE_URL="https://www.horseracingnation.com",
+        US_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        US_IMPORT_MAX_RACES_PER_RUN=5,
+        US_IMPORT_MAX_HORSES_PER_RUN=5,
+        US_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_us_hrn_dry_run_reports_only_actual_track_days_fetched(self):
+        # Mutation: if limit_races stops on the seed page, reporting all planned track links as fetched overstates coverage.
+        from stable.services import external_us_racing_data as us_module
+
+        mock_get = Mock(
+            return_value=self.hrn_response(
+                url="https://entries.horseracingnation.com/entries-results/churchill-downs/2026-06-25",
+                text=self.hrn_fixture("track-day-sample.html"),
+            )
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(us_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_us_external_data",
+                "--race-date",
+                "2026-06-25",
+                "--seed-track",
+                "churchill-downs",
+                "--limit-tracks",
+                "3",
+                "--limit-races",
+                "1",
+                "--limit-horses",
+                "0",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["track_day"])
+        self.assertEqual(result["completion"]["track_days_found"], 3)
+        self.assertEqual(result["completion"]["track_days_fetched"], 1)
+
+    @override_settings(
+        US_IMPORT_ENTRIES_BASE_URL="https://entries.horseracingnation.com",
+        US_IMPORT_HRN_BASE_URL="https://www.horseracingnation.com",
+        US_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        US_IMPORT_MAX_RACES_PER_RUN=5,
+        US_IMPORT_MAX_HORSES_PER_RUN=5,
+        US_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_us_hrn_recent_days_dry_run_fetches_date_range_without_writing(self):
+        # Mutation: without recent-days/date-range support, US cannot progress from a one-day smoke to a two-month batch.
+        from stable.services import external_us_racing_data as us_module
+
+        mock_get = Mock(
+            side_effect=[
+                self.hrn_response(
+                    url="https://entries.horseracingnation.com/entries-results/2026-06-25",
+                    text=self.hrn_fixture("track-day-sample.html"),
+                ),
+                self.hrn_response(
+                    url="https://www.horseracingnation.com/horse/Crystal_Frost",
+                    text=self.hrn_fixture("horse-profile-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(us_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_us_external_data",
+                "--recent-days",
+                "1",
+                "--end-date",
+                "2026-06-25",
+                "--seed-track",
+                "churchill-downs",
+                "--limit-tracks",
+                "1",
+                "--limit-races",
+                "1",
+                "--limit-horses",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["source"], "horse_racing_nation")
+        self.assertEqual(result["target_type"], "date_range")
+        self.assertEqual(result["target_id"], "2026-06-25..2026-06-25")
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["track_day", "horse"])
+        self.assertEqual(result["requests"][0]["url"], "https://entries.horseracingnation.com/entries-results/2026-06-25")
+        self.assertEqual(result["completion"]["race_dates_fetched"], 1)
+        self.assertEqual(result["completion"]["track_days_fetched"], 1)
+        self.assertEqual(result["completion"]["horse_profiles_fetched"], 1)
+        self.assertEqual(ExternalRace.objects.filter(source="horse_racing_nation").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="horse_racing_nation").count(), 0)
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="horse_racing_nation").count(), 0)
+
+    @override_settings(
+        US_IMPORT_ENTRIES_BASE_URL="https://entries.horseracingnation.com",
+        US_IMPORT_HRN_BASE_URL="https://www.horseracingnation.com",
+        US_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        US_IMPORT_MAX_RACES_PER_RUN=5,
+        US_IMPORT_MAX_HORSES_PER_RUN=5,
+        US_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_us_hrn_plan_only_lists_race_batches_without_fetching_horses(self):
+        # Mutation: without a plan-only map, the 60-day US crawl cannot be split safely before profile requests.
+        from stable.services import external_us_racing_data as us_module
+
+        mock_get = Mock(
+            return_value=self.hrn_response(
+                url="https://entries.horseracingnation.com/entries-results/2026-06-25",
+                text=self.hrn_fixture("track-day-sample.html"),
+            )
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(us_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_us_external_data",
+                "--recent-days",
+                "1",
+                "--end-date",
+                "2026-06-25",
+                "--seed-track",
+                "churchill-downs",
+                "--limit-tracks",
+                "1",
+                "--plan-only",
+                "--batch-size",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertTrue(result["plan_only"])
+        self.assertEqual(result["source"], "horse_racing_nation")
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 0, "results": 0, "horses": 0})
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["track_day"])
+        self.assertEqual(result["completion"]["race_links_found"], 1)
+        self.assertEqual(result["completion"]["batches"], 1)
+        self.assertTrue(result["completion"]["coverage_scope_limited"])
+        self.assertEqual(result["completion"]["limit_tracks"], 1)
+        self.assertEqual(result["batches"][0]["skip_races"], 0)
+        self.assertEqual(result["batches"][0]["race_ids"], ["HRN_churchill-downs_2026-06-25_1"])
+        self.assertEqual(ExternalRace.objects.filter(source="horse_racing_nation").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="horse_racing_nation").count(), 0)
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="horse_racing_nation").count(), 0)
+
+    @override_settings(
+        US_IMPORT_ENTRIES_BASE_URL="https://entries.horseracingnation.com",
+        US_IMPORT_HRN_BASE_URL="https://www.horseracingnation.com",
+        US_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        US_IMPORT_MAX_RACES_PER_RUN=5,
+        US_IMPORT_MAX_HORSES_PER_RUN=5,
+        US_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_us_hrn_race_ids_dry_run_fetches_exact_races_without_date_scan(self):
+        # Mutation: if US exact batches rescan date indexes, later 60-day batches waste requests and raise rate-limit risk.
+        from stable.services import external_us_racing_data as us_module
+
+        mock_get = Mock(
+            side_effect=[
+                self.hrn_response(
+                    url="https://entries.horseracingnation.com/entries-results/churchill-downs/2026-06-25",
+                    text=self.hrn_fixture("track-day-sample.html"),
+                ),
+                self.hrn_response(
+                    url="https://www.horseracingnation.com/horse/Crystal_Frost",
+                    text=self.hrn_fixture("horse-profile-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(us_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_us_external_data",
+                "--race-ids",
+                "HRN_churchill-downs_2026-06-25_1",
+                "--limit-horses",
+                "1",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["target_type"], "race_ids")
+        self.assertEqual(result["target_id"], "HRN_churchill-downs_2026-06-25_1")
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["track_day", "horse"])
+        self.assertEqual(result["requests"][0]["url"], "https://entries.horseracingnation.com/entries-results/churchill-downs/2026-06-25")
+        self.assertEqual(result["completion"]["race_links_found"], 1)
+        self.assertEqual(result["completion"]["race_links_selected"], 1)
+        self.assertEqual(result["completion"]["race_ids_selected"], ["HRN_churchill-downs_2026-06-25_1"])
+        self.assertEqual(result["completion"]["horse_profiles_fetched"], 1)
+        self.assertEqual(ExternalRace.objects.filter(source="horse_racing_nation").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="horse_racing_nation").count(), 0)
+
+    @override_settings(
+        US_IMPORT_ENTRIES_BASE_URL="https://entries.horseracingnation.com",
+        US_IMPORT_HRN_BASE_URL="https://www.horseracingnation.com",
+        US_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        US_IMPORT_MAX_RACES_PER_RUN=5,
+        US_IMPORT_MAX_HORSES_PER_RUN=5,
+        US_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_us_hrn_commit_rejects_incomplete_profile_batch(self):
+        # Mutation: production commit must not write HRN race-id batches whose profile fetch was truncated.
+        from stable.services import external_us_racing_data as us_module
+
+        mock_get = Mock(
+            side_effect=[
+                self.hrn_response(
+                    url="https://entries.horseracingnation.com/entries-results/churchill-downs/2026-06-25",
+                    text=self.hrn_fixture("track-day-sample.html"),
+                ),
+                self.hrn_response(
+                    url="https://www.horseracingnation.com/horse/Crystal_Frost",
+                    text=self.hrn_fixture("horse-profile-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(us_module, "requests", fake_requests, create=True):
+            with self.assertRaisesRegex(CommandError, "incomplete"):
+                call_command(
+                    "import_us_external_data",
+                    "--race-ids",
+                    "HRN_churchill-downs_2026-06-25_1",
+                    "--limit-horses",
+                    "1",
+                    "--allow-network",
+                    "--commit",
+                    stdout=StringIO(),
+                )
+
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="horse_racing_nation").count(), 0)
+        self.assertEqual(ExternalRace.objects.filter(source="horse_racing_nation").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="horse_racing_nation").count(), 0)
+
+    @override_settings(
+        US_IMPORT_ENTRIES_BASE_URL="https://entries.horseracingnation.com",
+        US_IMPORT_HRN_BASE_URL="https://www.horseracingnation.com",
+        US_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        US_IMPORT_MAX_RACES_PER_RUN=5,
+        US_IMPORT_MAX_HORSES_PER_RUN=5,
+        US_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_us_hrn_race_ids_commit_writes_external_tables_idempotently(self):
+        # Mutation: full US ingestion should commit exact race-id batches, not only date-range batches.
+        from stable.services import external_us_racing_data as us_module
+
+        responses = [
+            self.hrn_response(
+                url="https://entries.horseracingnation.com/entries-results/churchill-downs/2026-06-25",
+                text=self.hrn_fixture("track-day-sample.html"),
+            ),
+            self.hrn_response(
+                url="https://www.horseracingnation.com/horse/Crystal_Frost",
+                text=self.hrn_fixture("horse-profile-sample.html"),
+            ),
+            self.hrn_response(
+                url="https://www.horseracingnation.com/horse/Avalon_Rose_1",
+                text=self.hrn_fixture("horse-profile-sample.html"),
+            ),
+        ]
+        mock_get = Mock(side_effect=[*responses, *responses])
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(us_module, "requests", fake_requests, create=True):
+            first = StringIO()
+            second = StringIO()
+
+            for out in (first, second):
+                call_command(
+                    "import_us_external_data",
+                    "--race-ids",
+                    "HRN_churchill-downs_2026-06-25_1",
+                    "--allow-network",
+                    "--commit",
+                    stdout=out,
+                )
+
+        result = json.loads(second.getvalue())
+        self.assertFalse(result["dry_run"])
+        self.assertEqual(result["source"], "horse_racing_nation")
+        self.assertEqual(result["target_type"], "race_ids")
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="horse_racing_nation", status=ExternalImportStatus.SUCCESS).count(), 2)
+        self.assertEqual(ExternalRace.objects.filter(source="horse_racing_nation").count(), 1)
+        self.assertEqual(ExternalRaceEntry.objects.filter(source="horse_racing_nation").count(), 2)
+        self.assertEqual(ExternalRaceResult.objects.filter(source="horse_racing_nation").count(), 2)
+        self.assertEqual(ExternalHorse.objects.filter(source="horse_racing_nation").count(), 2)
+        self.assertEqual(ExternalHorseAlias.objects.filter(source="horse_racing_nation").count(), 2)
+        self.assertFalse(ExternalDataImportLock.objects.get(source="horse_racing_nation").locked_by_run_id)
+
+    @override_settings(
+        US_IMPORT_ENTRIES_BASE_URL="https://entries.horseracingnation.com",
+        US_IMPORT_HRN_BASE_URL="https://www.horseracingnation.com",
+        US_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        US_IMPORT_MAX_RACES_PER_RUN=5,
+        US_IMPORT_MAX_HORSES_PER_RUN=5,
+        US_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_us_hrn_recent_days_dry_run_supports_skip_races_for_batch_resume(self):
+        # Mutation: without skip-races, each US batch restarts from the first race in the date window.
+        from stable.services import external_us_racing_data as us_module
+
+        mock_get = Mock(
+            side_effect=[
+                self.hrn_response(
+                    url="https://entries.horseracingnation.com/entries-results/2026-06-25",
+                    text=self.hrn_fixture("track-day-sample.html"),
+                ),
+                self.hrn_response(
+                    url="https://entries.horseracingnation.com/entries-results/belmont-at-aqueduct/2026-06-25",
+                    text=self.hrn_fixture("track-day-sample.html"),
+                ),
+            ]
+        )
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(us_module, "requests", fake_requests, create=True):
+            out = StringIO()
+
+            call_command(
+                "import_us_external_data",
+                "--recent-days",
+                "1",
+                "--end-date",
+                "2026-06-25",
+                "--seed-track",
+                "churchill-downs",
+                "--limit-tracks",
+                "2",
+                "--skip-races",
+                "1",
+                "--limit-races",
+                "1",
+                "--limit-horses",
+                "0",
+                "--allow-network",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["dry_run"])
+        self.assertEqual([request["target_type"] for request in result["requests"]], ["track_day", "track_day"])
+        self.assertEqual(result["requests"][1]["target_id"], "belmont-at-aqueduct:2026-06-25")
+        self.assertEqual(result["coverage_stats"], {"races": 1, "entries": 2, "results": 2, "horses": 2})
+        self.assertEqual(result["completion"]["skip_races"], 1)
+        self.assertEqual(result["completion"]["race_links_found"], 2)
+        self.assertEqual(result["completion"]["race_links_selected"], 1)
+        self.assertEqual(result["completion"]["race_ids_selected"], ["HRN_belmont-at-aqueduct_2026-06-25_1"])
+        self.assertEqual(result["completion"]["horse_profiles_fetched"], 0)
+        self.assertEqual(ExternalRace.objects.filter(source="horse_racing_nation").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="horse_racing_nation").count(), 0)
+
+    @override_settings(
+        US_IMPORT_ENTRIES_BASE_URL="https://entries.horseracingnation.com",
+        US_IMPORT_HRN_BASE_URL="https://www.horseracingnation.com",
+        US_IMPORT_REQUEST_INTERVAL_SECONDS=0,
+        US_IMPORT_MAX_RACES_PER_RUN=5,
+        US_IMPORT_MAX_HORSES_PER_RUN=5,
+        US_IMPORT_MAX_REQUESTS_PER_RUN=10,
+    )
+    def test_us_hrn_commit_rejects_limited_date_range_batch(self):
+        # Mutation: date-range commits should not write batches truncated by track/race/profile limits.
+        from stable.services import external_us_racing_data as us_module
+
+        responses = [
+            self.hrn_response(
+                url="https://entries.horseracingnation.com/entries-results/2026-06-25",
+                text=self.hrn_fixture("track-day-sample.html"),
+            ),
+            self.hrn_response(
+                url="https://www.horseracingnation.com/horse/Crystal_Frost",
+                text=self.hrn_fixture("horse-profile-sample.html"),
+            ),
+        ]
+        mock_get = Mock(side_effect=responses)
+        fake_requests = type("FakeRequests", (), {"get": mock_get})
+        with patch.object(us_module, "requests", fake_requests, create=True):
+            with self.assertRaisesRegex(CommandError, "incomplete"):
+                call_command(
+                    "import_us_external_data",
+                    "--recent-days",
+                    "1",
+                    "--end-date",
+                    "2026-06-25",
+                    "--seed-track",
+                    "churchill-downs",
+                    "--limit-tracks",
+                    "1",
+                    "--limit-races",
+                    "1",
+                    "--limit-horses",
+                    "1",
+                    "--allow-network",
+                    "--commit",
+                    stdout=StringIO(),
+                )
+
+        self.assertEqual(ExternalDataImportRun.objects.filter(source="horse_racing_nation").count(), 0)
+        self.assertEqual(ExternalRace.objects.filter(source="horse_racing_nation").count(), 0)
+        self.assertEqual(ExternalHorse.objects.filter(source="horse_racing_nation").count(), 0)
+
+
 class GlobalRacingSpikeIsolationTests(TestCase):
     def external_counts(self) -> dict[str, int]:
         return {
@@ -2554,6 +4319,1597 @@ class GlobalRacingSpikeIsolationTests(TestCase):
             with self.subTest(source=source):
                 with self.assertRaisesMessage(ValueError, "read-only spike"):
                     run_source_spike(source=source, fixture_payload={}, dry_run=False, commit=True)
+
+
+class GlobalRacingImporterCommitGateTests(TestCase):
+    def test_plan_batch_command_renders_exact_batch_commands(self):
+        # Mutation: full-crawl batches should be driven from plan JSON instead of hand-copying URLs or IDs.
+        from stable.services.global_racing_plan import build_plan_batch_command
+
+        cases = [
+            (
+                {
+                    "source": "hkjc",
+                    "plan_only": True,
+                    "batches": [{"batch_no": 2, "race_ids": ["HK20260624HV01", "HK20260624HV02"]}],
+                },
+                2,
+                "import_hkjc_external_data",
+                "--race-ids",
+                "HK20260624HV01,HK20260624HV02",
+            ),
+            (
+                {
+                    "source": "sporting_life",
+                    "plan_only": True,
+                    "batches": [{"batch_index": 1, "race_urls": ["https://www.sportinglife.com/racing/racecards/race-a"]}],
+                },
+                1,
+                "import_uk_external_data",
+                "--race-urls",
+                "https://www.sportinglife.com/racing/racecards/race-a",
+            ),
+            (
+                {
+                    "source": "geny_france",
+                    "plan_only": True,
+                    "batches": [{"batch_index": 3, "partants_urls": ["https://www.geny.com/partants/foo"]}],
+                },
+                3,
+                "import_france_external_data",
+                "--partants-urls",
+                "https://www.geny.com/partants/foo",
+            ),
+            (
+                {
+                    "source": "horse_racing_nation",
+                    "plan_only": True,
+                    "batches": [{"batch_index": 4, "race_ids": ["HRN_track_2026-06-25_1"]}],
+                },
+                4,
+                "import_us_external_data",
+                "--race-ids",
+                "HRN_track_2026-06-25_1",
+            ),
+        ]
+
+        for plan, batch_number, command_name, target_flag, target_value in cases:
+            with self.subTest(source=plan["source"]):
+                rendered = build_plan_batch_command(plan, batch_number=batch_number, limit_horses=99)
+
+                self.assertEqual(rendered["management_command"], command_name)
+                self.assertIn("--allow-network", rendered["args"])
+                self.assertIn("--limit-horses", rendered["args"])
+                self.assertEqual(rendered["args"][rendered["args"].index(target_flag) + 1], target_value)
+                self.assertIn(command_name, rendered["command_line"])
+
+    def test_plan_batch_command_rejects_missing_or_unsafe_plan(self):
+        from stable.services.global_racing_plan import GlobalRacingPlanError, build_plan_batch_command
+
+        with self.assertRaisesRegex(GlobalRacingPlanError, "plan_only"):
+            build_plan_batch_command({"source": "sporting_life", "batches": []}, batch_number=1)
+        with self.assertRaisesRegex(GlobalRacingPlanError, "batch 2"):
+            build_plan_batch_command(
+                {"source": "sporting_life", "plan_only": True, "batches": [{"batch_index": 1, "race_urls": ["u1"]}]},
+                batch_number=2,
+            )
+        with self.assertRaisesRegex(GlobalRacingPlanError, "target list"):
+            build_plan_batch_command(
+                {"source": "sporting_life", "plan_only": True, "batches": [{"batch_index": 1, "race_ids": ["SL1"]}]},
+                batch_number=1,
+            )
+
+    def test_plan_batch_commands_render_all_batches(self):
+        # Mutation: full-crawl execution should be able to enumerate every planned batch without manual batch selection.
+        from stable.services.global_racing_plan import build_plan_batch_commands
+
+        plan = {
+            "source": "sporting_life",
+            "plan_only": True,
+            "batches": [
+                {"batch_index": 1, "race_urls": ["https://www.sportinglife.com/racing/racecards/race-a"]},
+                {"batch_index": 2, "race_urls": ["https://www.sportinglife.com/racing/racecards/race-b"]},
+            ],
+        }
+
+        rendered = build_plan_batch_commands(plan, limit_horses=88)
+
+        self.assertEqual([item["batch_number"] for item in rendered], [1, 2])
+        self.assertEqual([item["target_count"] for item in rendered], [1, 1])
+        self.assertTrue(all("--limit-horses 88" in item["command_line"] for item in rendered))
+        self.assertIn("race-a", rendered[0]["command_line"])
+        self.assertIn("race-b", rendered[1]["command_line"])
+
+    def test_plan_batch_command_suggests_stable_output_filename_and_path(self):
+        # Mutation: batch command manifests need stable output names so dry-run JSON files are not overwritten or misplaced.
+        from stable.services.global_racing_plan import build_plan_batch_command
+
+        plan = {
+            "source": "geny_france",
+            "plan_only": True,
+            "batches": [{"batch_index": 12, "partants_urls": ["https://www.geny.com/partants/foo"]}],
+        }
+
+        dry_run = build_plan_batch_command(plan, batch_number=12, output_dir="runtime/global_racing_import/france-geny")
+        commit = build_plan_batch_command(
+            plan,
+            batch_number=12,
+            commit=True,
+            output_dir="runtime/global_racing_import/france-geny",
+        )
+
+        self.assertEqual(dry_run["suggested_output_file"], "france-geny-batch-012-dryrun.json")
+        self.assertEqual(dry_run["suggested_output_path"], "runtime/global_racing_import/france-geny/france-geny-batch-012-dryrun.json")
+        self.assertTrue(dry_run["tee_command_line"].endswith("| tee runtime/global_racing_import/france-geny/france-geny-batch-012-dryrun.json"))
+        self.assertEqual(commit["suggested_output_file"], "france-geny-batch-012-commit.json")
+        self.assertEqual(commit["suggested_output_path"], "runtime/global_racing_import/france-geny/france-geny-batch-012-commit.json")
+        self.assertTrue(commit["tee_command_line"].endswith("| tee runtime/global_racing_import/france-geny/france-geny-batch-012-commit.json"))
+
+    def test_render_plan_batch_command_reads_plan_file(self):
+        plan = {
+            "source": "geny_france",
+            "plan_only": True,
+            "batches": [{"batch_index": 1, "partants_urls": ["https://www.geny.com/partants/foo"]}],
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan_path = Path(tmpdir) / "france-plan.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            out = StringIO()
+
+            call_command(
+                "render_global_racing_batch_command",
+                "--plan-file",
+                str(plan_path),
+                "--batch",
+                "1",
+                "--limit-horses",
+                "12",
+                "--output-dir",
+                "runtime/global_racing_import/france-geny",
+                stdout=out,
+            )
+
+        rendered = json.loads(out.getvalue())
+        self.assertEqual(rendered["artifact_type"], "global_racing_batch_command")
+        self.assertEqual(rendered["management_command"], "import_france_external_data")
+        self.assertEqual(
+            rendered["suggested_output_path"],
+            "runtime/global_racing_import/france-geny/france-geny-batch-001-dryrun.json",
+        )
+        self.assertIn("| tee runtime/global_racing_import/france-geny/france-geny-batch-001-dryrun.json", rendered["tee_command_line"])
+        self.assertEqual(rendered["args"][:3], ["import_france_external_data", "--source", "geny"])
+        self.assertIn("--limit-horses", rendered["args"])
+
+    def test_render_plan_batch_command_can_render_all_batches(self):
+        plan = {
+            "source": "horse_racing_nation",
+            "plan_only": True,
+            "batches": [
+                {"batch_index": 1, "race_ids": ["HRN_track_2026-06-25_1"]},
+                {"batch_index": 2, "race_ids": ["HRN_track_2026-06-25_2"]},
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plan_path = Path(tmpdir) / "us-plan.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            out = StringIO()
+
+            call_command(
+                "render_global_racing_batch_command",
+                "--plan-file",
+                str(plan_path),
+                "--all-batches",
+                "--output-dir",
+                "runtime/global_racing_import/us-hrn",
+                stdout=out,
+            )
+
+        rendered = json.loads(out.getvalue())
+        self.assertEqual(rendered["artifact_type"], "global_racing_batch_commands")
+        self.assertEqual(rendered["batch_count"], 2)
+        self.assertEqual([item["batch_number"] for item in rendered["commands"]], [1, 2])
+        self.assertEqual(
+            [item["suggested_output_path"] for item in rendered["commands"]],
+            [
+                "runtime/global_racing_import/us-hrn/us-hrn-batch-001-dryrun.json",
+                "runtime/global_racing_import/us-hrn/us-hrn-batch-002-dryrun.json",
+            ],
+        )
+        self.assertIn("HRN_track_2026-06-25_2", rendered["commands"][1]["command_line"])
+
+    def test_plan_only_commands_require_explicit_network_permission(self):
+        # Mutation: plan-only still fetches external date/race listing pages, so it must not run without an explicit network gate.
+        cases = [
+            (
+                "import_uk_external_data",
+                ["--recent-days", "60", "--plan-only"],
+                "--plan-only 必须与 --allow-network 一起使用。",
+            ),
+            (
+                "import_france_external_data",
+                ["--source", "geny", "--recent-days", "60", "--plan-only"],
+                "--plan-only 必须与 --allow-network 一起使用。",
+            ),
+            (
+                "import_us_external_data",
+                ["--recent-days", "60", "--plan-only"],
+                "--plan-only 必须与 --allow-network 一起使用。",
+            ),
+        ]
+        for command_name, args, message in cases:
+            with self.subTest(command_name=command_name):
+                with self.assertRaisesRegex(CommandError, message):
+                    call_command(command_name, *args, stdout=StringIO())
+
+    def test_commit_completion_gate_rejects_missing_or_unproven_completion(self):
+        # Mutation: commit mode must not treat missing completion metadata as safe to write.
+        from stable.services.external_france_racing_data import FranceExternalDataImporter, FranceImportError
+        from stable.services.external_hkjc_data import HKJCExternalDataImporter, HKJCImportError
+        from stable.services.external_uk_racing_data import UKExternalDataImporter, UKImportError
+        from stable.services.external_us_racing_data import USExternalDataImporter, USImportError
+
+        cases = [
+            (HKJCExternalDataImporter(), HKJCImportError, "HKJC"),
+            (UKExternalDataImporter(), UKImportError, "UK"),
+            (FranceExternalDataImporter(), FranceImportError, "France"),
+            (USExternalDataImporter(), USImportError, "US"),
+        ]
+        for importer, error_class, region in cases:
+            for completion in ({}, {"stop_reason": "complete"}, {"is_complete": None}, {"is_complete": "true"}):
+                with self.subTest(region=region, completion=completion):
+                    with self.assertRaisesRegex(error_class, "Cannot commit unverified"):
+                        importer._validate_completion_for_commit(completion)
+
+    def test_commit_completion_gate_accepts_explicit_complete_completion(self):
+        from stable.services.external_france_racing_data import FranceExternalDataImporter
+        from stable.services.external_hkjc_data import HKJCExternalDataImporter
+        from stable.services.external_uk_racing_data import UKExternalDataImporter
+        from stable.services.external_us_racing_data import USExternalDataImporter
+
+        for importer in (
+            HKJCExternalDataImporter(),
+            UKExternalDataImporter(),
+            FranceExternalDataImporter(),
+            USExternalDataImporter(),
+        ):
+            with self.subTest(importer=importer.__class__.__name__):
+                importer._validate_completion_for_commit(
+                    {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "unique_horses_found": 8,
+                        "horse_profiles_fetched": 8,
+                    }
+                )
+
+    def test_commit_completion_gate_rejects_missing_horse_detail_coverage_metadata(self):
+        # Mutation: is_complete=true is not enough; commit needs counters proving horse detail coverage.
+        from stable.services.external_france_racing_data import FranceExternalDataImporter, FranceImportError
+        from stable.services.external_hkjc_data import HKJCExternalDataImporter, HKJCImportError
+        from stable.services.external_uk_racing_data import UKExternalDataImporter, UKImportError
+        from stable.services.external_us_racing_data import USExternalDataImporter, USImportError
+
+        cases = [
+            (HKJCExternalDataImporter(), HKJCImportError, "HKJC"),
+            (UKExternalDataImporter(), UKImportError, "UK"),
+            (FranceExternalDataImporter(), FranceImportError, "France"),
+            (USExternalDataImporter(), USImportError, "US"),
+        ]
+        completions = [
+            {"is_complete": True, "stop_reason": "complete"},
+            {"is_complete": True, "stop_reason": "complete", "unique_horses_found": 8},
+            {"is_complete": True, "stop_reason": "complete", "horse_profiles_fetched": 8},
+        ]
+        for importer, error_class, region in cases:
+            for completion in completions:
+                with self.subTest(region=region, completion=completion):
+                    with self.assertRaisesRegex(error_class, "horse detail coverage metadata"):
+                        importer._validate_completion_for_commit(completion)
+
+    def test_commit_completion_gate_rejects_inconsistent_complete_metadata(self):
+        # Mutation: commit mode must not trust is_complete=true if the completion details still show a partial crawl.
+        from stable.services.external_france_racing_data import FranceExternalDataImporter, FranceImportError
+        from stable.services.external_hkjc_data import HKJCExternalDataImporter, HKJCImportError
+        from stable.services.external_uk_racing_data import UKExternalDataImporter, UKImportError
+        from stable.services.external_us_racing_data import USExternalDataImporter, USImportError
+
+        cases = [
+            (HKJCExternalDataImporter(), HKJCImportError, "HKJC"),
+            (UKExternalDataImporter(), UKImportError, "UK"),
+            (FranceExternalDataImporter(), FranceImportError, "France"),
+            (USExternalDataImporter(), USImportError, "US"),
+        ]
+        inconsistent_completions = [
+            {"is_complete": True, "stop_reason": "limit_horses_reached"},
+            {
+                "is_complete": True,
+                "stop_reason": "complete",
+                "unique_horses_found": 8,
+                "horse_profiles_fetched": 3,
+            },
+        ]
+        for importer, error_class, region in cases:
+            for completion in inconsistent_completions:
+                with self.subTest(region=region, completion=completion):
+                    with self.assertRaisesRegex(error_class, "Cannot commit inconsistent"):
+                        importer._validate_completion_for_commit(completion)
+
+    def test_commit_completion_gate_allows_declared_row_detail_horse_source(self):
+        from stable.services.external_france_racing_data import FranceExternalDataImporter
+        from stable.services.external_hkjc_data import HKJCExternalDataImporter
+        from stable.services.external_uk_racing_data import UKExternalDataImporter
+        from stable.services.external_us_racing_data import USExternalDataImporter
+
+        completion = {
+            "is_complete": True,
+            "stop_reason": "complete",
+            "unique_horses_found": 8,
+            "horse_profiles_fetched": 0,
+            "horse_profile_source": "geny_partants_rows",
+        }
+        for importer in (
+            HKJCExternalDataImporter(),
+            UKExternalDataImporter(),
+            FranceExternalDataImporter(),
+            USExternalDataImporter(),
+        ):
+            with self.subTest(importer=importer.__class__.__name__):
+                importer._validate_completion_for_commit(completion)
+
+    def test_commit_payload_gate_rejects_missing_required_coverage(self):
+        # Mutation: a complete-looking payload must still contain race, entry, result, and horse coverage before commit.
+        from stable.services.external_france_racing_data import FranceExternalDataImporter, FranceImportError
+        from stable.services.external_hkjc_data import HKJCExternalDataImporter, HKJCImportError
+        from stable.services.external_uk_racing_data import UKExternalDataImporter, UKImportError
+        from stable.services.external_us_racing_data import USExternalDataImporter, USImportError
+
+        cases = [
+            (HKJCExternalDataImporter(), HKJCImportError, "HKJC"),
+            (UKExternalDataImporter(), UKImportError, "UK"),
+            (FranceExternalDataImporter(), FranceImportError, "France"),
+            (USExternalDataImporter(), USImportError, "US"),
+        ]
+        for importer, error_class, region in cases:
+            for missing_key in ("races", "entries", "results", "horses"):
+                stats = {"races": 1, "entries": 1, "results": 1, "horses": 1}
+                stats[missing_key] = 0
+                with self.subTest(region=region, missing_key=missing_key):
+                    with self.assertRaisesRegex(error_class, "missing required coverage"):
+                        importer._validate_payload_limits(stats)
+
+    def test_commit_payload_gate_accepts_required_coverage(self):
+        from stable.services.external_france_racing_data import FranceExternalDataImporter
+        from stable.services.external_hkjc_data import HKJCExternalDataImporter
+        from stable.services.external_uk_racing_data import UKExternalDataImporter
+        from stable.services.external_us_racing_data import USExternalDataImporter
+
+        stats = {"races": 1, "entries": 1, "results": 1, "horses": 1}
+        for importer in (
+            HKJCExternalDataImporter(),
+            UKExternalDataImporter(),
+            FranceExternalDataImporter(),
+            USExternalDataImporter(),
+        ):
+            with self.subTest(importer=importer.__class__.__name__):
+                importer._validate_payload_limits(stats)
+
+
+class GlobalRacingImportOutputAuditTests(TestCase):
+    def write_json(self, directory, name: str, payload: dict) -> None:
+        path = directory / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+    def test_audit_ignores_rendered_batch_command_artifacts(self):
+        # Mutation: saving the read-only command manifest beside dry-run outputs must not poison commit-candidate auditing.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"], "race_urls": ["https://example.test/race/SL1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "unique_horses_found": 8,
+                        "horse_profiles_fetched": 8,
+                        "race_ids_selected": ["SL1"],
+                    },
+                    "requests": [{"url": "https://example.test/race/SL1", "status_code": 200}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-rendered-commands.json",
+                {
+                    "artifact_type": "global_racing_batch_commands",
+                    "source": "sporting_life",
+                    "batch_count": 1,
+                    "commands": [{"batch_number": 1, "command_line": "python server/manage.py import_uk_external_data"}],
+                },
+            )
+            out = StringIO()
+
+            call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete", stdout=out)
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["commit_candidate_ready"])
+        self.assertEqual(result["ignored_artifact_file_count"], 1)
+        self.assertEqual(result["ignored_artifact_files"], [{"path": "uk-rendered-commands.json", "artifact_type": "global_racing_batch_commands"}])
+        self.assertEqual(result["batch_file_count"], 1)
+
+    def test_audit_summarizes_complete_dry_run_batches(self):
+        # Mutation: operators need a machine summary before deciding whether a group of dry-run files can approach commit.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 10, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [
+                        {"batch_index": 1, "race_ids": ["SL1"], "race_urls": ["https://example.test/race/SL1"]},
+                        {"batch_index": 2, "race_ids": ["SL2"], "race_urls": ["https://example.test/race/SL2"]},
+                    ],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 5, "entries": 47, "results": 47, "horses": 46},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "unique_horses_found": 46,
+                        "horse_profiles_fetched": 46,
+                        "race_ids_selected": ["SL1"],
+                    },
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}, {"url": "https://example.test/horse", "status_code": 200}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-2.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL2",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 5, "entries": 61, "results": 61, "horses": 59},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "unique_horses_found": 59,
+                        "horse_profiles_fetched": 59,
+                        "race_ids_selected": ["SL2"],
+                    },
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                },
+            )
+            out = StringIO()
+
+            call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), stdout=out)
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["commit_candidate_ready"])
+        self.assertEqual(result["file_count"], 3)
+        self.assertEqual(result["plan_file_count"], 1)
+        self.assertEqual(result["batch_file_count"], 2)
+        self.assertEqual(result["incomplete_file_count"], 0)
+        self.assertEqual(result["planned_item_count"], 2)
+        self.assertEqual(result["covered_planned_item_count"], 2)
+        self.assertEqual(result["missing_planned_item_count"], 0)
+        self.assertEqual(result["total_requests"], 3)
+        self.assertEqual(result["coverage_totals"], {"races": 10, "entries": 108, "results": 108, "horses": 105})
+
+    def test_audit_can_fail_when_horse_profiles_do_not_cover_unique_horses(self):
+        # Mutation: a complete-looking batch must not pass if involved horses lack profile/detail coverage.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["SL1"],
+                        "unique_horses_found": 8,
+                        "horse_profiles_fetched": 3,
+                    },
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "incomplete horse details"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_batch_without_request_evidence(self):
+        # Mutation: a batch cannot become a commit candidate unless it carries request evidence.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["SL1"],
+                        "unique_horses_found": 8,
+                        "horse_profiles_fetched": 8,
+                    },
+                    "requests": [],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "empty batch requests"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_batch_without_required_coverage(self):
+        # Mutation: claiming a planned race without entries/results/horses must not satisfy full-crawl coverage.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["SL1"],
+                        "unique_horses_found": 0,
+                        "horse_profiles_fetched": 0,
+                    },
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "empty batch coverage"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_batch_non_success_response(self):
+        # Mutation: a batch with failed network evidence cannot anchor a production commit decision.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["SL1"],
+                        "unique_horses_found": 8,
+                        "horse_profiles_fetched": 8,
+                    },
+                    "requests": [{"url": "https://example.test/race", "status_code": 503}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "non-success batch response"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_plan_without_request_evidence(self):
+        # Mutation: a plan cannot anchor a full-crawl commit audit unless it records its source requests.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["SL1"],
+                        "unique_horses_found": 8,
+                        "horse_profiles_fetched": 8,
+                    },
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "empty plan requests"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_plan_non_success_response(self):
+        # Mutation: a failed plan discovery request cannot prove the 60-day batch ledger.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 503}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["SL1"],
+                        "unique_horses_found": 8,
+                        "horse_profiles_fetched": 8,
+                    },
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "non-success plan response"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_allows_declared_row_detail_horse_source(self):
+        # Mutation: France row-level horse detail sources can be the documented equivalent to independent profile pages.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "france-plan.json",
+                {
+                    "source": "geny_france",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["GENY1"], "partants_urls": ["https://example.test/partants"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "france-batch-1.json",
+                {
+                    "source": "geny_france",
+                    "target_type": "partants_urls",
+                    "target_id": "GENY1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["GENY1"],
+                        "unique_horses_found": 8,
+                        "horse_profiles_fetched": 0,
+                        "horse_profile_source": "geny_partants_rows",
+                    },
+                    "requests": [{"url": "https://example.test/partants", "status_code": 200}],
+                },
+            )
+            out = StringIO()
+
+            call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete", stdout=out)
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["commit_candidate_ready"])
+        self.assertEqual(result["incomplete_horse_detail_file_count"], 0)
+
+    def test_audit_reports_blocking_reasons_without_fail_flag(self):
+        # Mutation: a handoff audit without --fail-on-incomplete still needs machine-readable reasons for why commit is blocked.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "france-batch-1.json",
+                {
+                    "source": "geny_france",
+                    "target_type": "partants_urls",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 5, "entries": 57, "results": 52, "horses": 54},
+                    "completion": {"is_complete": False, "stop_reason": "limit_horses_reached"},
+                    "requests": [{"url": "https://example.test/partants", "status_code": 200}],
+                },
+            )
+            out = StringIO()
+
+            call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), stdout=out)
+
+        result = json.loads(out.getvalue())
+        self.assertFalse(result["commit_candidate_ready"])
+        self.assertEqual(
+            result["blocking_reasons"],
+            ["missing plan file", "france-batch-1.json"],
+        )
+
+    def test_audit_reports_missing_batch_reason(self):
+        # Mutation: a plan-only file by itself must not produce an empty failure reason when no batch output exists.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"]}],
+                },
+            )
+            out = StringIO()
+
+            call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), stdout=out)
+
+        result = json.loads(out.getvalue())
+        self.assertFalse(result["commit_candidate_ready"])
+        self.assertEqual(result["blocking_reasons"], ["missing batch file"])
+
+    def test_audit_can_fail_on_incomplete_batch_outputs(self):
+        # Mutation: incomplete dry-run files must stop the handoff before anyone adds --commit.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "france-batch-1.json",
+                {
+                    "source": "geny_france",
+                    "target_type": "partants_urls",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 5, "entries": 57, "results": 52, "horses": 54},
+                    "completion": {"is_complete": False, "stop_reason": "limit_horses_reached"},
+                    "requests": [{"url": "https://example.test/partants", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "incomplete"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_missing_planned_race_ids(self):
+        # Mutation: a complete-looking batch set must not pass if it skipped items listed by plan-only output.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "us-plan.json",
+                {
+                    "source": "horse_racing_nation",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 2, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [
+                        {"batch_index": 1, "race_ids": ["HRN_track_2026-06-25_1"]},
+                        {"batch_index": 2, "race_ids": ["HRN_track_2026-06-25_2"]},
+                    ],
+                },
+            )
+            self.write_json(
+                directory,
+                "us-batch-1.json",
+                {
+                    "source": "horse_racing_nation",
+                    "target_type": "race_ids",
+                    "target_id": "HRN_track_2026-06-25_1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["HRN_track_2026-06-25_1"],
+                    },
+                    "requests": [{"url": "https://example.test/track-day", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "missing planned"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_extra_covered_items(self):
+        # Mutation: a complete-looking batch set must not pass if it includes races outside the plan.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"], "race_urls": ["https://example.test/race/SL1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1,SL999",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 2, "entries": 12, "results": 12, "horses": 12},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["SL1", "SL999"],
+                    },
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "extra covered"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_when_plan_file_is_missing(self):
+        # Mutation: complete dry-run batches without a plan-only file must not become commit candidates.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["SL1"],
+                    },
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "missing plan"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_non_dry_run_plan_file(self):
+        # Mutation: a plan file produced by commit mode must not anchor a dry-run commit audit.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": False,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {"is_complete": True, "stop_reason": "complete", "race_ids_selected": ["SL1"]},
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "non-dry-run plan"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_incomplete_plan_file(self):
+        # Mutation: a partial plan cannot prove that subsequent batches cover the intended window.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "us-plan.json",
+                {
+                    "source": "horse_racing_nation",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": False, "stop_reason": "rate_limited"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["HRN_track_2026-06-25_1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "us-batch-1.json",
+                {
+                    "source": "horse_racing_nation",
+                    "target_type": "race_ids",
+                    "target_id": "HRN_track_2026-06-25_1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["HRN_track_2026-06-25_1"],
+                    },
+                    "requests": [{"url": "https://example.test/track-day", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "incomplete plan"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_limited_plan_file(self):
+        # Mutation: a proof plan that intentionally limited source coverage must not anchor a full-crawl commit audit.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "us-plan.json",
+                {
+                    "source": "horse_racing_nation",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "plan_only",
+                        "coverage_scope_limited": True,
+                        "limit_tracks": 3,
+                    },
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["HRN_track_2026-06-25_1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "us-batch-1.json",
+                {
+                    "source": "horse_racing_nation",
+                    "target_type": "race_ids",
+                    "target_id": "HRN_track_2026-06-25_1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["HRN_track_2026-06-25_1"],
+                    },
+                    "requests": [{"url": "https://example.test/track-day", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "limited plan"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_duplicate_planned_items(self):
+        # Mutation: duplicate plan entries must not make the batch ledger look one-to-one.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 2, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [
+                        {"batch_index": 1, "race_ids": ["SL1"]},
+                        {"batch_index": 2, "race_ids": ["SL1"]},
+                    ],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {
+                        "is_complete": True,
+                        "stop_reason": "complete",
+                        "race_ids_selected": ["SL1"],
+                        "unique_horses_found": 8,
+                        "horse_profiles_fetched": 8,
+                    },
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "duplicate planned"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_duplicate_covered_items(self):
+        # Mutation: running the same planned race twice must not be accepted as a clean full-crawl batch set.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"]}],
+                },
+            )
+            for name in ("uk-batch-1.json", "uk-batch-2.json"):
+                self.write_json(
+                    directory,
+                    name,
+                    {
+                        "source": "sporting_life",
+                        "target_type": "race_urls",
+                        "target_id": "SL1",
+                        "dry_run": True,
+                        "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                        "completion": {
+                            "is_complete": True,
+                            "stop_reason": "complete",
+                            "race_ids_selected": ["SL1"],
+                            "unique_horses_found": 8,
+                            "horse_profiles_fetched": 8,
+                        },
+                        "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                    },
+                )
+
+            with self.assertRaisesRegex(CommandError, "duplicate covered"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_mixed_sources(self):
+        # Mutation: a commit audit must not combine plan and batch files from different regions or sources.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "france-batch-1.json",
+                {
+                    "source": "geny_france",
+                    "target_type": "partants_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {"is_complete": True, "stop_reason": "complete", "race_ids_selected": ["SL1"]},
+                    "requests": [{"url": "https://example.test/partants", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "mixed sources"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_missing_source(self):
+        # Mutation: source-less JSON must not fail with an empty audit reason.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "plan.json",
+                {
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["R1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "batch.json",
+                {
+                    "target_type": "race_ids",
+                    "target_id": "R1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {"is_complete": True, "stop_reason": "complete", "race_ids_selected": ["R1"]},
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "missing source"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_dry_run_that_would_write_formal_tables(self):
+        # Mutation: a contradictory dry-run file must not be allowed into commit review.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "would_write_formal_tables": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {"is_complete": True, "stop_reason": "complete", "race_ids_selected": ["SL1"]},
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "would write formal tables"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_can_fail_on_plan_that_would_write_formal_tables(self):
+        # Mutation: a contradictory plan file must not anchor commit review.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-plan.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "date_range",
+                    "dry_run": True,
+                    "plan_only": True,
+                    "would_write_formal_tables": True,
+                    "coverage_stats": {"races": 1, "entries": 0, "results": 0, "horses": 0},
+                    "completion": {"is_complete": True, "stop_reason": "plan_only"},
+                    "requests": [{"url": "https://example.test/plan", "status_code": 200}],
+                    "batches": [{"batch_index": 1, "race_ids": ["SL1"]}],
+                },
+            )
+            self.write_json(
+                directory,
+                "uk-batch-1.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "target_id": "SL1",
+                    "dry_run": True,
+                    "coverage_stats": {"races": 1, "entries": 8, "results": 8, "horses": 8},
+                    "completion": {"is_complete": True, "stop_reason": "complete", "race_ids_selected": ["SL1"]},
+                    "requests": [{"url": "https://example.test/race", "status_code": 200}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "would write formal tables"):
+                call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--fail-on-incomplete")
+
+    def test_audit_proof_only_accepts_limited_real_dry_run_proofs(self):
+        # Mutation: proof runs intentionally stop at low limits, but still need a machine gate proving real dry-run requests.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-proof.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "dry_run": True,
+                    "would_write_formal_tables": False,
+                    "coverage_stats": {"races": 1, "entries": 7, "results": 7, "horses": 7},
+                    "completion": {"is_complete": False, "stop_reason": "limit_horses_reached"},
+                    "requests": [
+                        {"target_type": "race", "status_code": 200, "url": "https://example.test/race"},
+                        {"target_type": "horse", "status_code": 200, "url": "https://example.test/horse"},
+                    ],
+                },
+            )
+            self.write_json(
+                directory,
+                "france-proof.json",
+                {
+                    "source": "geny_france",
+                    "target_type": "partants_urls",
+                    "dry_run": True,
+                    "would_write_formal_tables": False,
+                    "coverage_stats": {"races": 1, "entries": 6, "results": 6, "horses": 6},
+                    "completion": {"is_complete": False, "stop_reason": "limit_horses_reached"},
+                    "requests": [
+                        {"target_type": "partants", "status_code": 200, "url": "https://example.test/partants"},
+                        {"target_type": "results", "status_code": 200, "url": "https://example.test/results"},
+                        {"target_type": "horse", "status_code": 200, "url": "https://example.test/horse"},
+                    ],
+                },
+            )
+            self.write_json(
+                directory,
+                "us-proof.json",
+                {
+                    "source": "horse_racing_nation",
+                    "target_type": "race_ids",
+                    "dry_run": True,
+                    "would_write_formal_tables": False,
+                    "coverage_stats": {"races": 1, "entries": 12, "results": 4, "horses": 12},
+                    "completion": {"is_complete": False, "stop_reason": "limit_horses_reached"},
+                    "requests": [
+                        {"target_type": "track_day", "status_code": 200, "url": "https://example.test/track-day"},
+                        {"target_type": "horse", "status_code": 200, "url": "https://example.test/horse"},
+                    ],
+                },
+            )
+            out = StringIO()
+
+            call_command("audit_global_racing_import_outputs", "--input-dir", str(directory), "--proof-only", "--fail-on-incomplete", stdout=out)
+
+        result = json.loads(out.getvalue())
+        self.assertTrue(result["proof_ready"])
+        self.assertFalse(result["commit_candidate_ready"])
+        self.assertEqual(result["handoff_decision"], "proof_only_ready_not_commit_candidate")
+        self.assertEqual(
+            result["handoff_decision_reasons"],
+            [
+                "proof-only audit passed",
+                "commit audit still blocked",
+                "complete 60-day crawl and commit gate remain required",
+            ],
+        )
+        self.assertEqual(result["proof_file_count"], 3)
+        self.assertEqual(result["proof_successful_response_count"], 7)
+        self.assertEqual(result["proof_blocking_reasons"], [])
+        self.assertEqual(
+            result["proof_sources"]["sporting_life"],
+            {
+                "files": ["uk-proof.json"],
+                "file_count": 1,
+                "complete_file_count": 0,
+                "incomplete_file_count": 1,
+                "request_count": 2,
+                "successful_response_count": 2,
+                "coverage_totals": {"races": 1, "entries": 7, "results": 7, "horses": 7},
+                "request_types": ["horse", "race"],
+                "stop_reasons": ["limit_horses_reached"],
+            },
+        )
+        self.assertEqual(result["proof_sources"]["geny_france"]["request_types"], ["horse", "partants", "results"])
+        self.assertEqual(result["proof_sources"]["horse_racing_nation"]["coverage_totals"]["horses"], 12)
+
+    def test_audit_records_runtime_parameters_for_handoff(self):
+        # Mutation: without audit parameters, a saved audit JSON cannot prove which directory or gate produced it.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-proof.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "dry_run": True,
+                    "would_write_formal_tables": False,
+                    "coverage_stats": {"races": 1, "entries": 7, "results": 7, "horses": 7},
+                    "completion": {"is_complete": False, "stop_reason": "limit_horses_reached"},
+                    "requests": [
+                        {"target_type": "race", "status_code": 200, "url": "https://example.test/race"},
+                        {"target_type": "horse", "status_code": 200, "url": "https://example.test/horse"},
+                    ],
+                },
+            )
+            out = StringIO()
+
+            call_command(
+                "audit_global_racing_import_outputs",
+                "--input-dir",
+                str(directory),
+                "--pattern",
+                "*.json",
+                "--proof-only",
+                "--expected-sources",
+                "sporting_life",
+                "--expected-request-types",
+                "sporting_life:race|horse",
+                "--fail-on-incomplete",
+                stdout=out,
+            )
+
+        result = json.loads(out.getvalue())
+        self.assertEqual(
+            result["audit_parameters"],
+            {
+                "input_dir": str(directory),
+                "pattern": "*.json",
+                "proof_only": True,
+                "fail_on_incomplete": True,
+                "expected_sources": ["sporting_life"],
+                "expected_request_types": {"sporting_life": ["horse", "race"]},
+            },
+        )
+
+    def test_audit_proof_only_requires_expected_sources_when_declared(self):
+        # Mutation: a handoff claiming UK/France/US proof must fail if one expected source JSON is missing.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "uk-proof.json",
+                {
+                    "source": "sporting_life",
+                    "target_type": "race_urls",
+                    "dry_run": True,
+                    "would_write_formal_tables": False,
+                    "coverage_stats": {"races": 1, "entries": 7, "results": 7, "horses": 7},
+                    "completion": {"is_complete": False, "stop_reason": "limit_horses_reached"},
+                    "requests": [{"target_type": "race", "status_code": 200, "url": "https://example.test/race"}],
+                },
+            )
+            self.write_json(
+                directory,
+                "france-proof.json",
+                {
+                    "source": "geny_france",
+                    "target_type": "partants_urls",
+                    "dry_run": True,
+                    "would_write_formal_tables": False,
+                    "coverage_stats": {"races": 1, "entries": 6, "results": 6, "horses": 6},
+                    "completion": {"is_complete": False, "stop_reason": "limit_horses_reached"},
+                    "requests": [{"target_type": "partants", "status_code": 200, "url": "https://example.test/partants"}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "missing expected proof source horse_racing_nation"):
+                call_command(
+                    "audit_global_racing_import_outputs",
+                    "--input-dir",
+                    str(directory),
+                    "--proof-only",
+                    "--expected-sources",
+                    "sporting_life,geny_france,horse_racing_nation",
+                    "--fail-on-incomplete",
+                )
+
+    def test_audit_proof_only_requires_expected_request_types_when_declared(self):
+        # Mutation: a source proof without horse/profile requests must not prove the full race-to-horse path is usable.
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            self.write_json(
+                directory,
+                "us-proof.json",
+                {
+                    "source": "horse_racing_nation",
+                    "target_type": "race_ids",
+                    "dry_run": True,
+                    "would_write_formal_tables": False,
+                    "coverage_stats": {"races": 1, "entries": 12, "results": 4, "horses": 12},
+                    "completion": {"is_complete": False, "stop_reason": "limit_horses_reached"},
+                    "requests": [{"target_type": "track_day", "status_code": 200, "url": "https://example.test/track-day"}],
+                },
+            )
+
+            with self.assertRaisesRegex(CommandError, "missing proof request type horse_racing_nation:horse"):
+                call_command(
+                    "audit_global_racing_import_outputs",
+                    "--input-dir",
+                    str(directory),
+                    "--proof-only",
+                    "--expected-request-types",
+                    "horse_racing_nation:track_day|horse",
+                    "--fail-on-incomplete",
+                )
 
 
 class PushTests(TestCase):

@@ -1,0 +1,43 @@
+{
+  "source": "horse_racing_nation",
+  "target_type": "race_ids",
+  "target_id": "HRN_churchill-downs_2026-06-25_1",
+  "dry_run": true,
+  "coverage_stats": {
+    "races": 1,
+    "entries": 12,
+    "results": 4,
+    "horses": 12
+  },
+  "completion": {
+    "is_complete": false,
+    "stop_reason": "limit_horses_reached",
+    "track_days_found": 1,
+    "track_days_fetched": 1,
+    "races_imported": 1,
+    "unique_horses_found": 12,
+    "horse_profiles_fetched": 1,
+    "race_links_found": 1,
+    "race_links_selected": 1,
+    "race_ids_selected": [
+      "HRN_churchill-downs_2026-06-25_1"
+    ],
+    "max_requests": 20
+  },
+  "would_write_formal_tables": false,
+  "network_probe": true,
+  "requests": [
+    {
+      "url": "https://entries.horseracingnation.com/entries-results/churchill-downs/2026-06-25",
+      "status_code": 200,
+      "target_type": "track_day",
+      "target_id": "churchill-downs:2026-06-25"
+    },
+    {
+      "url": "https://www.horseracingnation.com/horse/Crystal_Frost",
+      "status_code": 200,
+      "target_type": "horse",
+      "target_id": "Crystal_Frost"
+    }
+  ]
+}

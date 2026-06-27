@@ -1,17 +1,23 @@
 ## ADDED Requirements
 
-### Requirement: 真实数据库接入必须按地区顺序推进
-系统 SHALL 按 `香港 -> 英国 -> 法国 -> 美国` 的顺序接入真实赛马数据库。前一地区未完成最近 2 个月赛事和涉及马匹详情的验证前，后一地区不得进入正式生产 commit。
+### Requirement: 真实数据库接入必须按地区顺序和显式门禁推进
+系统 SHALL 按 `香港 -> 英国 -> 法国 -> 美国` 的顺序接入真实赛马数据库。若前一地区已达到用户确认的暂停边界且未执行生产 commit，后一地区 MAY 进入真实抓取实现、dry-run 和隔离验证；任一地区的生产 commit 仍 MUST 满足本地区备份、dry-run、锁检查和用户确认门禁。
 
-#### Scenario: 香港完成前不得正式写入英国
-- **WHEN** 香港最近 2 个月真实赛事和涉及马匹详情尚未完成 dry-run、commit 和统计验证
-- **THEN** 系统不得把英国、法国或美国真实数据写入正式 `External*` 表
-- **AND** 英法美最多只能执行 read-only spike 或隔离 fixture 解析
+#### Scenario: 香港暂停后可以进入英国真实抓取
+- **WHEN** 香港生产 dry-run 已达到用户确认的暂停边界但尚未执行生产 commit
+- **THEN** 系统 MAY 开始英国真实页面 parser、importer、dry-run 和隔离库验证
+- **AND** 系统不得把英国、法国或美国真实数据写入生产 `External*` 表，除非对应地区已单独通过生产 commit 门禁
 
 #### Scenario: 每个地区完成后停止
 - **WHEN** 任一地区完成最近 2 个月赛事、赛果、涉及马匹详情抓取和写入验证
 - **THEN** 本轮任务 SHALL 停止该地区的继续抓取
 - **AND** 系统不得自动加入 Celery Beat 周期调度或后台持续导入队列
+
+#### Scenario: 用户将本会话收敛为 proof 后停止
+- **WHEN** 用户明确要求英国、法国、美国本会话只抓几个真实批次证明接入方式和 importer 可用
+- **THEN** 系统 SHALL 把本会话验收边界调整为低频真实 dry-run proof
+- **AND** 报告 MUST 明确 proof 与完整两个月大量爬取不是同一件事
+- **AND** 完整大量爬取 SHALL 留给后续会话单独执行，不得在本会话继续扩大抓取范围
 
 ### Requirement: HKJC 真实 HTML 导入必须覆盖最近 2 个月赛事
 系统 SHALL 从 HKJC 官方公开页面低频抓取最近 2 个月赛日、每场比赛结果和所有涉及马匹详情，并映射到现有外部缓存表。
@@ -67,23 +73,30 @@
 - **WHEN** 任一真实网络导入完成或失败
 - **THEN** `ExternalDataImportRun.parameters` 或文档记录 MUST 包含目标范围、请求入口、请求数量、限速配置、失败摘要和停止原因
 
-### Requirement: 英法美必须先完成真实入口准入
-系统 SHALL 在正式写入英国、法国、美国数据前，分别证明最近赛事、单场结果和马匹 profile 的真实入口稳定可访问并具备字段覆盖。
+### Requirement: 英法美必须从 spike 升级为真实抓取准入
+系统 SHALL 将英国、法国、美国从只读 spike 升级为真实抓取目标，并在正式写入生产数据前分别证明最近赛事、单场结果和马匹 profile 的真实入口稳定可访问并具备字段覆盖。
 
 #### Scenario: 英国准入
-- **WHEN** 香港阶段完成后进入英国
-- **THEN** 系统先对英国候选来源执行 read-only spike
-- **AND** 报告 MUST 明确 Sporting Life 与 BHA 的职责边界、样本 URL、字段覆盖、访问限制和是否进入正式导入
+- **WHEN** 香港阶段按用户指令暂停后进入英国
+- **THEN** 系统先以 Sporting Life 作为英国真实导入主候选实现 parser/importer dry-run
+- **AND** 报告 MUST 明确 Sporting Life 与 BHA 的职责边界、样本 URL、字段覆盖、访问限制和生产 commit 前门禁
+
+#### Scenario: 英国批次不得混入海外赛场
+- **WHEN** Sporting Life 日期结果页同时暴露英国、爱尔兰、美国、加拿大、法国或其他海外赛场链接
+- **THEN** 英国 importer MUST 只把英国赛场 allowlist 命中的 racecard 纳入英国批次计划和 coverage 统计
+- **AND** plan-only 输出 MUST 暴露可复用的 `race_urls`，以便后续批次直接请求指定 racecard，减少重复日期扫描请求
+- **AND** 报告 MUST 区分未过滤历史证据与当前有效英国覆盖口径
 
 #### Scenario: 法国准入
 - **WHEN** 英国阶段完成后进入法国
-- **THEN** 系统先对 France Galop 或其他法国权威来源执行 read-only spike
-- **AND** 报告 MUST 明确赛程、出马、赛果、马匹 profile 的入口参数和法语字段处理边界
+- **THEN** 系统先定位 France Galop 或 Geny 等法国公开来源的真实 race/result/horse detail 入口，并实现 parser/importer dry-run
+- **AND** 报告 MUST 明确赛程、出马、赛果、马匹 profile 或行内详情的入口参数、法语字段处理边界和生产 commit 前门禁
+- **AND** 若来源返回 `429` 或同等限流响应，系统 MUST 停止当前 dry-run 批次、返回 partial 请求证据和完成度摘要，且不得写入正式 `External*` 表
 
 #### Scenario: 美国准入
 - **WHEN** 法国阶段完成后进入美国
-- **THEN** 系统先对 Equibase 或其他美国权威来源执行 read-only spike
-- **AND** 报告 MUST 明确 HTML chart、PDF chart、entries 和 horse profile 中哪个作为正式导入主来源
+- **THEN** 系统先定位 Equibase 或其他美国权威来源的真实 entries/result/horse profile 入口，并实现 parser/importer dry-run
+- **AND** 报告 MUST 明确 HTML chart、PDF chart、entries 和 horse profile 中哪个作为正式导入主来源，以及生产 commit 前门禁
 
 ### Requirement: 真实数据库接入不得改变新闻分发和前台产品
 系统 MUST 将本变更限定为外部缓存和马名索引数据层，不得改变新闻抓取、翻译、自动发布、QQ 推送或公开前台展示。

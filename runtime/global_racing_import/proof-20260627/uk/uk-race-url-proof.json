@@ -1,0 +1,41 @@
+{
+  "source": "sporting_life",
+  "target_type": "race_urls",
+  "target_id": "SL924407",
+  "dry_run": true,
+  "coverage_stats": {
+    "races": 1,
+    "entries": 7,
+    "results": 7,
+    "horses": 7
+  },
+  "completion": {
+    "is_complete": false,
+    "stop_reason": "limit_horses_reached",
+    "races_imported": 1,
+    "unique_horses_found": 7,
+    "horse_profiles_fetched": 1,
+    "limit_races": null,
+    "limit_horses": 1,
+    "skip_races": 0,
+    "race_links_found": 1,
+    "race_links_selected": 1,
+    "max_requests": 20
+  },
+  "would_write_formal_tables": false,
+  "network_probe": true,
+  "requests": [
+    {
+      "url": "https://www.sportinglife.com/racing/racecards/2026-06-26/newmarket/racecard/924407/british-stallion-studs-ebf-fillies-novice-stakes",
+      "status_code": 200,
+      "target_type": "race",
+      "target_id": "SL924407"
+    },
+    {
+      "url": "https://www.sportinglife.com/racing/profiles/horse/1174829",
+      "status_code": 200,
+      "target_type": "horse",
+      "target_id": "1174829"
+    }
+  ]
+}

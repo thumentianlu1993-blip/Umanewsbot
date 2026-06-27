@@ -41,6 +41,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-26` 已将 `connect-real-global-racing-databases` 当前 HKJC 真实网络实现部署到生产，部署前数据库备份为 `backups/db/pre-hkjc-real-network-20260626_202442.sql.gz` 并通过 `gzip -t` 校验。生产 `65d41eb` 部署后 `manage.py check`、本地和公网 `/healthz/`、HKJC 精确 race-id 小样本 dry-run 均通过；生产 plan-only 仍显示最近 60 天本地香港 `HV/ST` 比赛 `144` 场、拆为 `8` 批。随后第 1 批 full dry-run 在马匹 profile 补抓阶段遇到 HKJC `ReadTimeout` / TLS handshake timeout 中断；该次未使用 `--commit`，未写正式表，中断后生产 HKJC 锁为空、`started_runs=0`、HKJC 表计数仍为上次 fixture 样本 `ExternalRace=1`、`ExternalRaceEntry=2`、`ExternalRaceResult=2`、`ExternalHorse=2`、`ExternalHorseAlias=4`。已按 TDD 追加 transient timeout retry 并部署到生产 `04c0444`，单请求最多 `3` 次并记录失败尝试；目前已将前 6 个 plan-only 批次拆成 24 个 5 场小批次完成 full dry-run，累计覆盖 `120` 场、`1522` entries、`1522` results、`1522` 个 horse profile 请求，所有小批次均 `completion.is_complete=true`，未写正式表。3c 首次执行时遇到一次执行容器 `137` 中断，输出文件为 `0` 字节；复查服务、锁和表计数均安全，随后改用一次性 `docker compose run --rm --no-deps web ...` 容器重跑 3c/3d 并完成；5a 出现 `2` 次 transient retry 记录但最终完成。当前停在生产 commit 前确认点，并可继续第 7 批 dry-run。
 
+`2026-06-27` 全球赛马数据库目标已调整并完成“能力真实可用”确认：香港 HKJC 已有生产真实 dry-run 批次证据，英国 Sporting Life、法国 Geny、美国 Horse Racing Nation 已完成少量真实 proof，证明四地公开入口、parser/importer、马匹详情链路、低频限量抓取和 proof-only 离线审计可用。本次上线包从 `origin/main` 干净基线单独整理，只包含全球赛马数据库 importer、fixtures、审计工具、批次命令渲染器、OpenSpec 规格/归档、proof 证据和相关文档；刻意排除当前本地大工作树中的 QQ 推送、前台信息流、compose 端口等旁支差异。本目标不再要求本轮完成最近 60 天完整大量爬取或生产 `--commit`；后续完整爬取需另按 `docs/global_racing_next_run_checklist.md` 与 `docs/global_racing_full_crawl_runbook.md` 新开执行窗口。
+
 ## 已完成内容
 
 - 域名购买与解析
@@ -70,7 +72,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 ## 当前进行中的 OpenSpec change
 
 - `start-hkjc-data-import-and-global-spikes`：已完成实现、生产部署、验证和归档；生产服务镜像来自 `b0361cf`。已在生产执行一次 HKJC fixture 样本 commit（`run_id=1960`），但未启用 HKJC 真实网络持续抓取，也未启用英法美正式导入。
-- `connect-real-global-racing-databases`：进行中；已完成 proposal/design/spec/tasks，香港真实 HKJC 单场 HTML dry-run、隔离 SQLite commit、recent-days/date-range 小范围 dry-run/commit、马匹详情补抓、限速、请求上限、completion 审计、plan-only 批次计划、skip-races 续跑测试和 `--race-ids` 精确批次 smoke；英法美只读入口复核已追加记录。生产已部署到 `04c0444`，完成 plan-only，并完成前 6 个 plan-only 批次共 `120` 场拆分后的 full dry-run，尚未执行生产 commit。尚未完成生产最近 2 个月全量 dry-run/commit，也未进入英国、法国、美国正式写库接入。
+- `connect-real-global-racing-databases`：本轮已按用户调整后的“能力真实可用”口径完成并归档；香港 HKJC 生产真实 dry-run 证据成立，英国 Sporting Life、法国 Geny、美国 Horse Racing Nation 少量真实 proof 成立，四地 importer、低频限量抓取、proof-only 审计和后续完整抓取门禁已可用。最近 60 天完整大量爬取和任何生产 `--commit` 不属于本轮完成口径，后续需要新执行窗口。
 
 ## 本轮问题简述
 

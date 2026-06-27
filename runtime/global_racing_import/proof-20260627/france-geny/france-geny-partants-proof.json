@@ -1,0 +1,50 @@
+{
+  "source": "geny_france",
+  "target_type": "partants_urls",
+  "target_id": "GENY1662144",
+  "dry_run": true,
+  "coverage_stats": {
+    "races": 1,
+    "entries": 6,
+    "results": 6,
+    "horses": 6
+  },
+  "completion": {
+    "is_complete": false,
+    "stop_reason": "limit_horses_reached",
+    "race_links_found": 1,
+    "race_links_selected": 1,
+    "skip_races": 0,
+    "races_imported": 1,
+    "unique_horses_found": 6,
+    "horse_profiles_fetched": 1,
+    "limit_horses": 1,
+    "horse_profile_source": "geny_partants_rows",
+    "max_requests": 20,
+    "race_ids_selected": [
+      "GENY1662144"
+    ]
+  },
+  "would_write_formal_tables": false,
+  "network_probe": true,
+  "requests": [
+    {
+      "url": "https://www.geny.com/partants-pmu/2026-06-24-chantilly-pmu-prix-du-clos-de-la-barre_c1662144",
+      "status_code": 200,
+      "target_type": "partants",
+      "target_id": "GENY1662144"
+    },
+    {
+      "url": "https://www.geny.com/arrivee-et-rapports-pmu/2026-06-24-pmu-prix-du-clos-de-la-barre_c1662144",
+      "status_code": 200,
+      "target_type": "results",
+      "target_id": "GENY1662144"
+    },
+    {
+      "url": "https://www.geny.com/fr/cheval/2818930/course/1662144",
+      "status_code": 200,
+      "target_type": "horse",
+      "target_id": "2818930"
+    }
+  ]
+}

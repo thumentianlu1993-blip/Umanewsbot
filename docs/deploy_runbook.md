@@ -1429,6 +1429,29 @@ curl -sS -o /dev/null -w "public_healthz=%{http_code}\n" http://umafans.run/heal
 - HKJC 正式外部表计数：`races=1`、`entries=2`、`results=2`、`horses=2`、`aliases=4`
 - `ExternalDataImportLock` 中 HKJC 记录为未占用状态：`locked_by_run_id=None`，`acquired_at=None`
 - 未发现仍在运行的 HKJC 导入进程
+
+## 2026-06-27 全球赛马数据库能力确认上线
+
+本次上线只发布四地赛马数据库“抓取能力可用”相关改造，不执行最近 60 天完整大量爬取，也不执行生产 `--commit`。
+
+上线包必须从 `origin/main` 干净基线整理，避免把当前本地大工作树中的 QQ 推送、前台信息流、compose 端口或历史 archive 差异混入。必要范围限定为：
+
+- UK / France / US importer 与管理命令
+- `audit_global_racing_import_outputs` 离线审计命令
+- `render_global_racing_batch_command` 只读批次命令渲染器
+- 四地真实来源 fixtures、OpenSpec `real-global-racing-data-ingestion` 规格/归档
+- `docs/global_racing_*` 交接、runbook、审计和 proof 记录
+
+上线后验收重点：
+
+- `manage.py check` 通过
+- 全球赛马目标测试通过
+- `openspec validate --all` 通过
+- `/healthz/` 返回 `200`
+- `import_uk_external_data --help`、`import_france_external_data --help`、`import_us_external_data --help`、`audit_global_racing_import_outputs --help` 可用
+- 生产不新增 `ExternalDataImportRun(status="started")`，不持有 `ExternalDataImportLock`
+
+后续如果要完整抓取最近 60 天数据，必须新开执行窗口，先 plan-only，再小批 dry-run，再离线审计，最后经备份、锁检查、健康检查和用户显式确认后才允许讨论 `--commit`。
 - `http://umafans.run/healthz/`：`200`
 
 ### 恢复口径

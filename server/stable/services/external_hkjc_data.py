@@ -60,6 +60,28 @@ def _string(value: Any) -> str:
     return "" if value is None else str(value).strip()
 
 
+def _completion_horse_detail_gap(completion: dict[str, Any]) -> bool:
+    if _string(completion.get("horse_profile_source")) in {"race_detail_rows", "geny_partants_rows"}:
+        return False
+    try:
+        unique_horses = int(completion.get("unique_horses_found"))
+        fetched_horses = int(completion.get("horse_profiles_fetched"))
+    except (TypeError, ValueError):
+        return False
+    return unique_horses > 0 and fetched_horses < unique_horses
+
+
+def _completion_horse_detail_metadata_missing(completion: dict[str, Any]) -> bool:
+    for key in ("unique_horses_found", "horse_profiles_fetched"):
+        if key not in completion or completion.get(key) is None:
+            return True
+        try:
+            int(completion.get(key))
+        except (TypeError, ValueError):
+            return True
+    return False
+
+
 def _normalize_name(value: str) -> str:
     return unicodedata.normalize("NFKC", value or "").strip()
 
@@ -651,6 +673,9 @@ class HKJCExternalDataImporter:
                 skip_races=kwargs.get("skip_races", 0),
             )
             return payload, client.requests
+        if target_type == "race":
+            payload, client = self._fetch_race_batch_payload([target_id], limit_horses=None)
+            return payload, client.requests
         url = self._network_url(target_type, target_id)
         client = HKJCNetworkClient(self.options)
         response = client.get(url, target_type=target_type, target_id=target_id)
@@ -927,6 +952,7 @@ class HKJCExternalDataImporter:
             }
         if not has_payload_file:
             raise HKJCImportError("HKJC commit import requires --payload-file until network import is implemented")
+        self._validate_completion_for_commit(completion)
         self._validate_payload_limits(stats)
         with transaction.atomic():
             lock, _ = ExternalDataImportLock.objects.select_for_update().get_or_create(
@@ -971,6 +997,21 @@ class HKJCExternalDataImporter:
             "completion": completion,
         }
 
+    def _validate_completion_for_commit(self, completion: dict) -> None:
+        if completion.get("is_complete") is not True:
+            if completion.get("is_complete") is not False:
+                raise HKJCImportError("Cannot commit unverified HKJC import; completion.is_complete must be true")
+        if completion.get("is_complete") is False:
+            stop_reason = _string(completion.get("stop_reason")) or "unknown"
+            raise HKJCImportError(f"Cannot commit incomplete HKJC import; stop_reason={stop_reason}")
+        stop_reason = _string(completion.get("stop_reason"))
+        if stop_reason and stop_reason != "complete":
+            raise HKJCImportError(f"Cannot commit inconsistent HKJC import; stop_reason={stop_reason}")
+        if _completion_horse_detail_metadata_missing(completion):
+            raise HKJCImportError("Cannot commit unverified HKJC import; horse detail coverage metadata is required")
+        if _completion_horse_detail_gap(completion):
+            raise HKJCImportError("Cannot commit inconsistent HKJC import; horse_profiles_fetched is below unique_horses_found")
+
     def _payload_stats(self, payload: dict) -> dict:
         races = self._races(payload)
         horses = self._horses(payload)
@@ -993,6 +1034,9 @@ class HKJCExternalDataImporter:
         return {"races": len(races), "entries": entries, "results": results, "horses": len(horse_identities)}
 
     def _validate_payload_limits(self, stats: dict) -> None:
+        for key in ("races", "entries", "results", "horses"):
+            if int(stats.get(key) or 0) <= 0:
+                raise HKJCImportError(f"HKJC payload missing required coverage: {key}")
         if stats["races"] > self.options.max_races:
             raise HKJCImportError(f"HKJC payload has {stats['races']} races; max_races is {self.options.max_races}")
         if stats["horses"] > self.options.max_horses:

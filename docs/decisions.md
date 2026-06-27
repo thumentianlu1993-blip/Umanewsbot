@@ -381,3 +381,16 @@ review 返修后补充实现边界：HKJC 外部数据导入必须参考 netkeib
 - 英国优先以 `Sporting Life` 作为正式导入主候选，因为 `racecards`、`fast-results` 和 horse profile 均可访问，且 results 页面暴露具体 racecard/profile 链接；`BHA` 作为官方补字段候选，负责复核 horses、fixtures、feed/search 等权威入口。
 - 美国 `Equibase` 可继续作为唯一主候选推进 fixture spike；entries、chart/PDF index 和 horse profile 均可访问，但正式导入前必须先证明 chart/PDF 或 HTML chart 解析成本可控。
 - 法国 `France Galop` 仍停留在官方页面浅层信号阶段；在定位稳定结构化查询参数前，不进入正式 parser/importer TDD。
+
+## 为什么本轮全球赛马数据库目标关闭在“能力可用”
+
+`2026-06-27` 用户将本轮目标从“完成最近 2 个月完整大量爬取”调整为“先保证所有地区的数据爬取能力真实可用”。因此本轮完成口径不再要求香港、英国、法国、美国都完成最近 60 天全量赛事与所有涉及马匹 profile 的真实爬取，也不要求生产 `--commit`。
+
+本轮关闭目标的依据是：
+
+- HKJC 已有生产真实 dry-run 批次证据，证明官方 HTML 入口、race batch、马匹详情补抓、低频请求和 dry-run 安全边界可用。
+- UK / France / US 已有少量真实 proof，证明 Sporting Life、Geny、Horse Racing Nation 的赛事、赛果和马匹详情入口可访问并可解析。
+- 四地 importer 均保留默认 dry-run、显式 `--allow-network`、请求上限、限速、精确批次和严格 `--commit` 门禁。
+- proof-only 离线审计可以证明“能力可用”，同时完整 commit 候选审计会继续阻断缺少 plan、混合来源或马匹详情未补齐的输出。
+
+后续若重新追求最近 60 天完整大量抓取，应作为新的执行窗口处理，并从最新 plan-only、逐批 dry-run、离线审计、备份、锁检查和用户显式确认重新开始。
