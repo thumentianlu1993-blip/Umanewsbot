@@ -1704,3 +1704,48 @@ QQ_PUSH_ENABLED=false
 ```
 
 也可只收窄某个群的 `PushTarget.allowed_regions` 为 `["japan"]`，或在后台停用具体 `NewsSource.enabled`。停用后重新执行只读审计并检查 `worker / beat` 日志，确认没有新的国际来源轮询和异常 QQ 交付。
+
+## 2026-06-30 多地区新闻常态生产部署与归档
+
+### 部署前互斥处理
+
+- 部署前生产服务器 `/opt/umanewsbot` 运行 `main` 的 `7b6e51b`。
+- HKJC 长窗口 dry-run worker 正在运行，`runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-slow-dryrun.state=92`，并存在临时 `umanewsbot-web-run-*` 容器。
+- 为避免部署与长任务重叠，已先停止 `hkjc-slow-dryrun.pid` 对应 wrapper，并停止临时 `umanewsbot-web-run-*` 容器。
+- 暂停后复查：`ExternalDataImportRun(status="started")=0`，HKJC 与 netkeiba 的 `ExternalDataImportLock.locked_by_run_id=None`。
+
+### 部署步骤与结果
+
+- 本地实现提交 `62a0f9a` 已快进推送到 `main`。
+- 生产 `.env` 备份：`.env.backup.multiregion-news-20260630_185150`。
+- 服务器执行 `git pull --ff-only origin main`，从 `7b6e51b` 更新到 `62a0f9a`。
+- 执行 `bash ./deploy_lowcost.sh`，重建 `web / worker / beat`，`db / redis / nginx` 保持运行。
+- 迁移已应用：`stable.0014_multiregion_news_indexes`、`stable.0015_termentry_racing_region`。
+- `collectstatic` 结果：`0 static files copied`，`129 unmodified`，`360 post-processed`。
+- 容器状态：`web` healthy，`db / redis` healthy，`worker / beat` running，`nginx` running。
+
+### 验证结果
+
+- `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check`：通过。
+- `python manage.py showmigrations stable`：`0014`、`0015` 均为 `[X]`。
+- `http://umafans.run/healthz/`：`200`。
+- `http://umafans.run/`：`200`。
+- `http://umafans.run/admin/login/`：`200`。
+- `http://umafans.run/admin/regions/`：`302` 到 `/admin/login/?next=/admin/regions/`，路由存在且受后台登录保护。
+- `python manage.py audit_multiregion_news_production`：只读审计可输出 `japan / hong_kong / united_kingdom / france / united_states` 五个地区；生产设置仍为 `NEWS_SOURCE_POLL_ENABLED=false`，非日本自动发布 allowlist 为空。
+
+### 归档结果
+
+- OpenSpec change：`operate-multiregion-news-production`。
+- 归档目录：`openspec/changes/archive/2026-06-30-operate-multiregion-news-production/`。
+- 正式规格已同步：
+  - `openspec/specs/multiregion-news-production/spec.md`
+  - `openspec/specs/crawl-freshness-and-source-health/spec.md`
+  - `openspec/specs/automation-publish-gates/spec.md`
+  - `openspec/specs/qqbot-auto-push/spec.md`
+  - `openspec/specs/termbase-and-race-priority/spec.md`
+
+### 后续注意
+
+- 本次部署只上线能力与安全默认配置，不直接开启通用国际来源轮询。
+- 如需继续 HKJC 长窗口 dry-run，应从 `hkjc-slow-dryrun.state=92` 对应进度恢复或重新渲染剩余批次；恢复前再次确认不与部署、重建容器或 `git pull` 重叠。
