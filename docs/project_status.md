@@ -49,6 +49,7 @@
 - 公开文章 ID URL：已部署公开详情主路径 `/news/<article_id>/`，非纯数字旧 slug URL 跳转到 ID URL，QQ 消息链接不再包含标题全文。
 - 国际赛马资讯扩展：已部署多地区新闻源、公开首页地区 tab、多语言术语别名、群级 QQ 地区配置和 HKJC 受控导入；生产第一版已启用 `Sponichi`、`HKJC Racing News`、`SCMP Racing`、`Sporting Life Racing`、`Sky Sports Racing`、`France Galop English News`、`TDN France keyword`、`TDN`、`Horse Racing Nation`，其中 `BHA` 因生产探测返回 `403` 暂停启用。
 - 全球赛马数据库抓取能力：香港 HKJC、英国 Sporting Life、法国 Geny、美国 Horse Racing Nation 的受控 importer 能力已部署；`2026-06-30` 已开始香港 HKJC 慢速真实 dry-run，最新 plan 为 `146` 场且前两场完整 dry-run 成功，仍未执行生产 `--commit`。
+- 香港 HKJC 长窗口 dry-run：`2026-06-30` 已按用户要求启动到 `2024-07-01` 的慢速后台抓取计划，plan 共 `1496` 场；生产正在按每 `5` 场 mini-batch、请求间隔 `8` 秒执行 dry-run，仍未写正式表。
 - 后台术语运营：候选详情页和文章编辑台支持原文选区快速加入术语库；新增术语成功后可一次性将该术语应用到当前文章已有中文稿
 - 前后台移动端适配
 

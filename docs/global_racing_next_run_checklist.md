@@ -34,12 +34,14 @@
 - 已有生产前 dry-run 进度为前 `120/144` 场，未 commit。
 - `2026-06-30` 已恢复香港慢速真实 dry-run 试跑；最新 plan 变为 `146` 场、`8` 批，已不同于历史 `144` 场。
 - 已完成最新 plan 中前两场 `HK20260627ST02,HK20260627ST03` 的慢速 dry-run，输出 `runtime/global_racing_import/hkjc-20260630/hkjc-batch1-races-001-002-dryrun-20260630.json`，`completion.is_complete=true`、`horse_profiles_fetched=28`、`30/30` 请求返回 `200`，未 commit。
+- 用户随后要求继续慢速抓取到 `2024-07`；生产已生成 `runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-plan-20240701-20260630.json`，共 `1496` 场、`75` 批，最早进入 plan 的本地赛日为 `2024-09-08/09-11`。
+- 后台 dry-run worker 已启动，脚本为 `runtime/global_racing_import/hkjc-20260701-to-202407/run_hkjc_slow_dryrun_to_202407.sh`，PID/state/log 分别为 `hkjc-slow-dryrun.pid`、`hkjc-slow-dryrun.state`、`hkjc-slow-dryrun.log`；每 `5` 场一批、请求间隔 `8` 秒、批次间暂停 `60` 秒，不写正式表。
 
 下一步：
 
-1. 运行最新 `--recent-days 60 --plan-only`。
-2. 因最新 plan 已确认不是历史 `144` 场，后续按最新 `146` 场 plan 重新切批；不要直接沿用旧 `--skip-races 120`。
-3. 每批使用 `--limit-races` 控制小批，`--limit-horses` 必须覆盖本批唯一马匹数。
+1. 监控后台 worker 的 `hkjc-slow-dryrun.log`、`hkjc-slow-dryrun.state` 和最新 `hkjc-mini-races-*-dryrun.json`。
+2. 若 worker 停止，先解析最后一个输出的 `completion`、`coverage_stats` 和 request attempts，再决定是否重启。
+3. 不要在 worker 运行时执行生产部署、重建容器或会修改运行文件的 `git pull`；需要上线文档时可先推 GitHub，等抓取暂停后再同步生产工作树。
 
 必须收集：
 
@@ -49,8 +51,8 @@
 
 停止条件：
 
-- 如果 plan 总量或停点与历史 `120/144` 不一致，先记录差异并暂停确认。
-- 任一批次出现非 `200`、`completion.is_complete=false`、请求超时、空输出、锁未释放或健康检查失败，立即暂停。
+- `completion.is_complete=false`、`stop_reason` 非 `complete`、coverage 缺失、空输出、锁未释放或健康检查失败，立即暂停。
+- 单次 request attempt 超时但最终 `completion.is_complete=true`、马匹详情补齐时，记录为 transient warning；若同一目标持续超时或最终未补齐，停止排查。
 
 ## 2. 英国 Sporting Life
 

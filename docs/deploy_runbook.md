@@ -1481,7 +1481,7 @@ curl -sS -o /dev/null -w "public_healthz=%{http_code}\n" http://umafans.run/heal
 ### 执行前检查
 
 - 服务器：`/opt/umanewsbot`
-- 代码：`a7e89a2`
+- 代码：`7b6e51b`
 - `docker compose -f docker-compose.prod.lowcost.yml ps`：`web/db/redis` healthy，`worker/beat/nginx` 运行中
 - `ExternalDataImportRun(status="started")=0`
 - HKJC 与 netkeiba 的 `ExternalDataImportLock.locked_by_run_id=None`
@@ -1542,3 +1542,84 @@ docker compose -f docker-compose.prod.lowcost.yml run --rm --no-deps -T \
 - 无 `umanewsbot-web-run-*` 临时容器残留
 - `http://umafans.run/healthz/`：`200`
 - `http://127.0.0.1/healthz/`：`200`
+
+## 2026-06-30 HKJC 慢速 dry-run 延伸到 2024-07
+
+本次按用户要求把香港 HKJC 慢速抓取窗口延伸到 `2024-07-01`。执行口径仍为 dry-run，不执行生产 `--commit`，不写正式表。
+
+### 长窗口 plan-only
+
+```bash
+cd /opt/umanewsbot
+mkdir -p runtime/global_racing_import/hkjc-20260701-to-202407
+docker compose -f docker-compose.prod.lowcost.yml run --rm --no-deps -T \
+  -e HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=8 \
+  -e HKJC_IMPORT_MAX_REQUESTS_PER_RUN=600 \
+  web python manage.py import_hkjc_external_data \
+  --start-date 2024-07-01 \
+  --end-date 2026-06-30 \
+  --plan-only \
+  --limit-races 20 \
+  --max-requests 600 \
+  --allow-network \
+  > runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-plan-20240701-20260630.json
+```
+
+结果：
+
+- 输出：`runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-plan-20240701-20260630.json`
+- `race_count=1496`
+- `batch_count=75`
+- `request_count=254`
+- `request_statuses={"200":253,"missing":1}`
+- 最后一个 plan 批次覆盖 `2024-09-11` 与 `2024-09-08`；`2024-07-01` 至 `2024-09` 之间没有更早的本地 `HV/ST` HKJC 场次进入计划。
+
+### 后台 worker
+
+运行脚本：
+
+```bash
+/opt/umanewsbot/runtime/global_racing_import/hkjc-20260701-to-202407/run_hkjc_slow_dryrun_to_202407.sh
+```
+
+关键文件：
+
+- PID：`runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-slow-dryrun.pid`
+- 状态：`runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-slow-dryrun.state`
+- 日志：`runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-slow-dryrun.log`
+- 输出：`runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-mini-races-*-dryrun.json`
+
+运行参数：
+
+- 每批 `5` 场
+- `HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=8`
+- `HKJC_IMPORT_MAX_REQUESTS_PER_RUN=140`
+- 批次间暂停 `60` 秒
+- 从状态 `2` 开始，跳过已完成的 `HK20260627ST02,HK20260627ST03` 两场证据
+
+### 启动后证据
+
+- `races=3-7/1496`：`completion.is_complete=true`，`coverage_stats={"races":5,"entries":67,"results":67,"horses":67}`，有 `1` 次 horse profile 初始 `ReadTimeout` attempt，但最终 `horse_profiles_fetched=67`。
+- `races=8-12/1496`：`completion.is_complete=true`，`coverage_stats={"races":5,"entries":66,"results":66,"horses":66}`，`request_count=71`，`non_200_request_attempts=0`。
+- 截至记录时 worker 已进入 `races=13-17/1496`。
+
+### 监控命令
+
+```bash
+cd /opt/umanewsbot
+OUT_DIR=runtime/global_racing_import/hkjc-20260701-to-202407
+cat "$OUT_DIR/hkjc-slow-dryrun.pid"
+cat "$OUT_DIR/hkjc-slow-dryrun.state"
+tail -40 "$OUT_DIR/hkjc-slow-dryrun.log"
+pgrep -af "run_hkjc_slow_dryrun_to_202407|import_hkjc_external_data"
+docker ps --format "{{.Names}} {{.Status}}" | grep "umanewsbot-web-run" || true
+```
+
+停止 worker：
+
+```bash
+cd /opt/umanewsbot
+kill "$(cat runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-slow-dryrun.pid)"
+```
+
+不要在 worker 运行时执行生产部署、重建容器或修改运行脚本的 `git pull`；需要同步文档时，先推 GitHub，等抓取暂停后再同步生产工作树。

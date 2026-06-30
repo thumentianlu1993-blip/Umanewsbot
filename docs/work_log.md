@@ -234,7 +234,7 @@
 #### 已完成
 
 - 按用户要求从香港开始尝试慢速抓取赛马数据库；本轮仍为 dry-run，不写正式表，不执行生产 `--commit`。
-- 生产服务器 `/opt/umanewsbot` 当前为 `a7e89a2`，执行前确认 `web/db/redis` healthy、`worker/beat/nginx` 运行，`ExternalDataImportRun(status="started")=0`，HKJC/netkeiba 锁为空。
+- 生产服务器 `/opt/umanewsbot` 当前为 `7b6e51b`，执行前确认 `web/db/redis` healthy、`worker/beat/nginx` 运行，`ExternalDataImportRun(status="started")=0`，HKJC/netkeiba 锁为空。
 - 重新运行 HKJC 最近 60 天 plan-only：输出 `runtime/global_racing_import/hkjc-20260630/hkjc-plan-20260630.json`，`meetings=29`、`races=146`、`estimated_requests_without_horses=176`，拆为 `8` 批。
 - 最新 plan 已不同于历史 `144` 场，因此旧的 `120/144` 停点不能直接作为续跑依据。
 - 使用 `HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=8` 和 `HKJC_IMPORT_MAX_REQUESTS_PER_RUN=100` 执行 `HK20260627ST02,HK20260627ST03` 精确小批 dry-run：输出 `runtime/global_racing_import/hkjc-20260630/hkjc-batch1-races-001-002-dryrun-20260630.json`。
@@ -252,3 +252,34 @@
 - 香港 HKJC 慢速真实 dry-run 已证明当前生产网络、parser、race detail 与 horse profile 链路仍可用。
 - 后续继续香港时，应按最新 `146` 场 plan 重新切批或从第 1 批剩余 race_ids 继续，不要沿用旧 `skip-races=120`。
 - 生产 `--commit` 仍需要另行备份、锁检查、健康检查、完整批次审计和用户显式确认。
+
+### 项目：香港 HKJC 慢速 dry-run 延伸到 2024-07
+
+#### 已完成
+
+- 用户要求保持抓取并慢速抓取到 `2024-07`；本轮继续坚持 dry-run，不执行生产 `--commit`，不写正式表。
+- 生产运行长窗口 plan-only：`--start-date 2024-07-01 --end-date 2026-06-30 --plan-only --limit-races 20 --max-requests 600 --allow-network`。
+- plan 输出：`runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-plan-20240701-20260630.json`。
+- plan 结果：`1496` 场、`75` 个 20 场批次、`254` 条请求日志，其中 `253` 条 HTTP `200`；最早进入 plan 的本地 HKJC 赛日为 `2024-09-08/09-11`，未见 `2024-07-01` 至 `2024-09` 之间的本地 `HV/ST` 场次。
+- 已创建并启动生产后台 worker：`runtime/global_racing_import/hkjc-20260701-to-202407/run_hkjc_slow_dryrun_to_202407.sh`。
+
+#### 运行配置
+
+- PID：`runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-slow-dryrun.pid`
+- 状态：`runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-slow-dryrun.state`
+- 日志：`runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-slow-dryrun.log`
+- 输出：`runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-mini-races-*-dryrun.json`
+- 每批 `5` 场，`HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=8`，`HKJC_IMPORT_MAX_REQUESTS_PER_RUN=140`，批次间暂停 `60` 秒。
+
+#### 当前验证
+
+- `races=3-7/1496`：输出 `hkjc-mini-races-0003-0007-dryrun.json`，`completion.is_complete=true`，`coverage_stats={"races":5,"entries":67,"results":67,"horses":67}`；有 `1` 次 horse profile 初始 `ReadTimeout` attempt，但最终补齐 `67/67` 个 profile。
+- `races=8-12/1496`：输出 `hkjc-mini-races-0008-0012-dryrun.json`，`completion.is_complete=true`，`coverage_stats={"races":5,"entries":66,"results":66,"horses":66}`，`request_count=71`，`non_200_request_attempts=0`。
+- 截至记录时 worker 已进入 `races=13-17/1496`。
+- 生产健康检查正常，HKJC 与 netkeiba 锁未被正式写库路径占用。
+
+#### 当前状态与下一步
+
+- 让 worker 继续运行；它会在任一批次缺失 completion/coverage、最终未补齐马匹详情或命令失败时停止。
+- 已恢复的 transient timeout attempt 仅记为 warning；最终 `completion.is_complete=false` 或 horse profile 缺口仍是停止条件。
+- 不在 worker 运行期间做生产部署或重建容器；文档可先推 GitHub，生产工作树等抓取暂停后再同步。
