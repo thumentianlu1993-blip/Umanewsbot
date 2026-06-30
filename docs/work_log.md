@@ -226,3 +226,29 @@
 - `bash ./deploy_lowcost.sh` 成功，迁移显示 `No migrations to apply`，`web / worker / beat` 已重建。
 - 部署后 `manage.py check` 通过，`healthz` 本地与公网均为 `200`，首页为 `200`。
 - 生产命令入口和 proof-only 审计通过，未启动真实抓取或生产 `--commit`。
+
+## 2026-06-30
+
+### 项目：香港 HKJC 慢速真实 dry-run 启动
+
+#### 已完成
+
+- 按用户要求从香港开始尝试慢速抓取赛马数据库；本轮仍为 dry-run，不写正式表，不执行生产 `--commit`。
+- 生产服务器 `/opt/umanewsbot` 当前为 `a7e89a2`，执行前确认 `web/db/redis` healthy、`worker/beat/nginx` 运行，`ExternalDataImportRun(status="started")=0`，HKJC/netkeiba 锁为空。
+- 重新运行 HKJC 最近 60 天 plan-only：输出 `runtime/global_racing_import/hkjc-20260630/hkjc-plan-20260630.json`，`meetings=29`、`races=146`、`estimated_requests_without_horses=176`，拆为 `8` 批。
+- 最新 plan 已不同于历史 `144` 场，因此旧的 `120/144` 停点不能直接作为续跑依据。
+- 使用 `HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=8` 和 `HKJC_IMPORT_MAX_REQUESTS_PER_RUN=100` 执行 `HK20260627ST02,HK20260627ST03` 精确小批 dry-run：输出 `runtime/global_racing_import/hkjc-20260630/hkjc-batch1-races-001-002-dryrun-20260630.json`。
+
+#### 验证
+
+- 小批结果：`dry_run=true`、`would_write_formal_tables=false`、`coverage_stats={"races":2,"entries":28,"results":28,"horses":28}`。
+- `completion.is_complete=true`、`stop_reason=complete`、`unique_horses_found=28`、`horse_profiles_fetched=28`。
+- 请求日志 `30/30` 均为 HTTP `200`，包含 `2` 个 race 页面和 `28` 个 horse profile 页面。
+- 执行后 `ExternalDataImportRun(status="started")=0`，HKJC/netkeiba 锁为空，无 `umanewsbot-web-run-*` 临时容器残留。
+- `http://umafans.run/healthz/` 与 `http://127.0.0.1/healthz/` 均返回 `200`。
+
+#### 当前状态与下一步
+
+- 香港 HKJC 慢速真实 dry-run 已证明当前生产网络、parser、race detail 与 horse profile 链路仍可用。
+- 后续继续香港时，应按最新 `146` 场 plan 重新切批或从第 1 批剩余 race_ids 继续，不要沿用旧 `skip-races=120`。
+- 生产 `--commit` 仍需要另行备份、锁检查、健康检查、完整批次审计和用户显式确认。

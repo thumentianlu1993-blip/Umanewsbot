@@ -1,6 +1,6 @@
 # 全球赛马数据库下一轮执行检查表
 
-日期：2026-06-27
+日期：2026-06-30
 
 用途：给后续新会话执行完整最近 60 天抓取时作为开跑检查页。详细命令和背景仍以 `docs/global_racing_full_crawl_runbook.md`、`docs/global_racing_sync_manifest.md` 和 `docs/global_racing_database_handoff.md` 为准。
 
@@ -32,12 +32,13 @@
 当前边界：
 
 - 已有生产前 dry-run 进度为前 `120/144` 场，未 commit。
-- 用户要求香港先停在当前点；下一轮若恢复，先重跑最新 plan，而不是直接默认旧停点仍有效。
+- `2026-06-30` 已恢复香港慢速真实 dry-run 试跑；最新 plan 变为 `146` 场、`8` 批，已不同于历史 `144` 场。
+- 已完成最新 plan 中前两场 `HK20260627ST02,HK20260627ST03` 的慢速 dry-run，输出 `runtime/global_racing_import/hkjc-20260630/hkjc-batch1-races-001-002-dryrun-20260630.json`，`completion.is_complete=true`、`horse_profiles_fetched=28`、`30/30` 请求返回 `200`，未 commit。
 
 下一步：
 
 1. 运行最新 `--recent-days 60 --plan-only`。
-2. 若最新 plan 仍确认前 `120` 场可作为正式进度接受，再从 `--skip-races 120` 继续；否则按最新 plan 重新切批。
+2. 因最新 plan 已确认不是历史 `144` 场，后续按最新 `146` 场 plan 重新切批；不要直接沿用旧 `--skip-races 120`。
 3. 每批使用 `--limit-races` 控制小批，`--limit-horses` 必须覆盖本批唯一马匹数。
 
 必须收集：
@@ -48,8 +49,8 @@
 
 停止条件：
 
-- 当前用户边界未改变前，不续跑香港。
 - 如果 plan 总量或停点与历史 `120/144` 不一致，先记录差异并暂停确认。
+- 任一批次出现非 `200`、`completion.is_complete=false`、请求超时、空输出、锁未释放或健康检查失败，立即暂停。
 
 ## 2. 英国 Sporting Life
 

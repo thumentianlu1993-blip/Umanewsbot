@@ -1473,3 +1473,72 @@ curl -sS -o /dev/null -w "public_healthz=%{http_code}\n" http://umafans.run/heal
 ### 恢复口径
 
 如需要撤销本次样本写入，优先在维护窗口使用备份 `backups/db/pre-hkjc-sample-20260626_180646.sql.gz` 做整库恢复；不要只手工删除 `External*` 表行，避免遗漏 `ExternalDataImportRun`、`ExternalHorseAlias` 或锁状态证据。当前样本写入规模很小，且不参与公开前台或自动发布链路。
+
+## 2026-06-30 HKJC 慢速真实 dry-run 启动
+
+本次只执行香港 HKJC 真实网络 dry-run，不执行生产 `--commit`，不写正式表。
+
+### 执行前检查
+
+- 服务器：`/opt/umanewsbot`
+- 代码：`a7e89a2`
+- `docker compose -f docker-compose.prod.lowcost.yml ps`：`web/db/redis` healthy，`worker/beat/nginx` 运行中
+- `ExternalDataImportRun(status="started")=0`
+- HKJC 与 netkeiba 的 `ExternalDataImportLock.locked_by_run_id=None`
+- `http://umafans.run/healthz/`：`200`
+
+### 最新 plan-only
+
+```bash
+cd /opt/umanewsbot
+mkdir -p runtime/global_racing_import/hkjc-20260630
+docker compose -f docker-compose.prod.lowcost.yml run --rm --no-deps -T \
+  -e HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=8 \
+  -e HKJC_IMPORT_MAX_REQUESTS_PER_RUN=160 \
+  web python manage.py import_hkjc_external_data \
+  --recent-days 60 \
+  --end-date 2026-06-30 \
+  --plan-only \
+  --limit-races 20 \
+  --max-requests 160 \
+  --allow-network \
+  > runtime/global_racing_import/hkjc-20260630/hkjc-plan-20260630.json
+```
+
+结果：
+
+- `coverage={"meetings":29,"races":146,"estimated_requests_without_horses":176}`
+- `batch_count=8`
+- `first_batch.race_count=20`
+- `last_batch.skip_races=140`、`last_batch.race_count=6`
+- 该 plan 已不同于历史 `144` 场；不要直接沿用旧 `120/144` 停点。
+
+### 小批慢速 dry-run
+
+```bash
+cd /opt/umanewsbot
+docker compose -f docker-compose.prod.lowcost.yml run --rm --no-deps -T \
+  -e HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=8 \
+  -e HKJC_IMPORT_MAX_REQUESTS_PER_RUN=100 \
+  web python manage.py import_hkjc_external_data \
+  --race-ids HK20260627ST02,HK20260627ST03 \
+  --max-requests 100 \
+  --allow-network \
+  > runtime/global_racing_import/hkjc-20260630/hkjc-batch1-races-001-002-dryrun-20260630.json
+```
+
+结果：
+
+- `dry_run=true`
+- `would_write_formal_tables=false`
+- `coverage_stats={"races":2,"entries":28,"results":28,"horses":28}`
+- `completion={"is_complete":true,"stop_reason":"complete","race_ids":["HK20260627ST02","HK20260627ST03"],"races_imported":2,"unique_horses_found":28,"horse_profiles_fetched":28,"limit_horses":null,"max_requests":100}`
+- 请求日志：`30` 条，全部 HTTP `200`
+
+### 执行后复查
+
+- `ExternalDataImportRun(status="started")=0`
+- HKJC 与 netkeiba 的 `ExternalDataImportLock.locked_by_run_id=None`
+- 无 `umanewsbot-web-run-*` 临时容器残留
+- `http://umafans.run/healthz/`：`200`
+- `http://127.0.0.1/healthz/`：`200`
