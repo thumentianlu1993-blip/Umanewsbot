@@ -1749,3 +1749,78 @@ QQ_PUSH_ENABLED=false
 
 - 本次部署只上线能力与安全默认配置，不直接开启通用国际来源轮询。
 - 如需继续 HKJC 长窗口 dry-run，应从 `hkjc-slow-dryrun.state=92` 对应进度恢复或重新渲染剩余批次；恢复前再次确认不与部署、重建容器或 `git pull` 重叠。
+
+## 2026-06-30 多地区新闻生产开关开启
+
+### 开启范围
+
+按用户要求开启多地区新闻生产相关开关。本次只调整 `.env` 中多地区新闻生产配置，不恢复 HKJC 长窗口 dry-run，不修改数据库、翻译 Key 或 OneBot token。
+
+备份：
+
+- `.env.backup.enable-all-multiregion-20260630_203647`
+
+当前生产配置：
+
+```dotenv
+NEWS_SOURCE_POLL_ENABLED=true
+NEWS_SOURCE_POLL_INTERVAL_MINUTES=30
+NEWS_SOURCE_POLL_MAX_SOURCES=12
+NEWS_SOURCE_POLL_ALLOWED_REGIONS=japan,hong_kong,united_kingdom,france,united_states
+NEWS_SOURCE_POLL_ALLOWED_SOURCES=
+NEWS_SOURCE_POLL_RUNNING_TIMEOUT_MINUTES=60
+NEWS_SOURCE_POLL_RETRY_STALE_RUNNING=false
+MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=hong_kong,united_kingdom,france,united_states
+MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES=hkjc_news:latest,scmp_racing:latest,sporting_life:latest,sky_sports_racing:latest,sky_sports_racing:access,france_galop_news:official,tdn_france:latest,tdn:latest,horse_racing_nation:latest,horse_racing_nation:access
+MULTIREGION_AUTO_PUBLISH_REGION_BATCH_LIMITS=hong_kong:2,united_kingdom:2,france:1,united_states:1
+MULTIREGION_AUTO_PUBLISH_REGION_DAILY_LIMITS=hong_kong:5,united_kingdom:5,france:3,united_states:3
+MULTIREGION_TERM_CANDIDATE_BACKLOG_THRESHOLD=50
+```
+
+### 重启与验证
+
+- 已重启 `web / worker / beat`。
+- `manage.py check`：通过。
+- `http://127.0.0.1/healthz/`：`200`。
+- `http://umafans.run/healthz/`：`200`。
+- `http://umafans.run/`：`200`。
+- Django settings 确认 `NEWS_SOURCE_POLL_ENABLED=true`，地区与来源 allowlist 已按上述配置生效。
+
+### 通用轮询 smoke
+
+手动执行 `crawl_enabled_news_sources_task.run()` 后，选中并派发 `12` 个 due 来源：
+
+- `sponichi:latest`
+- `sponichi:access`
+- `hkjc_news:latest`
+- `scmp_racing:latest`
+- `sky_sports_racing:access`
+- `sporting_life:latest`
+- `sky_sports_racing:latest`
+- `france_galop_news:official`
+- `tdn_france:latest`
+- `tdn:latest`
+- `horse_racing_nation:access`
+- `horse_racing_nation:latest`
+
+固定调度来源被正确跳过：
+
+- `netkeiba:latest`
+- `netkeiba:access`
+- `netkeiba:attention`
+- `jra:official`
+
+当前 worker 并发为 `2`，因此 smoke 后先进入 active 的是两个 Sponichi 抓取任务，其余来源会随队列继续消化。
+
+### 快速回滚
+
+如国际来源抓取、翻译、自动发布或 QQ 推送出现异常，优先按以下顺序收敛：
+
+```dotenv
+NEWS_SOURCE_POLL_ENABLED=false
+MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=
+MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES=
+QQ_PUSH_ENABLED=false
+```
+
+修改 `.env` 后重启 `web / worker / beat`，再执行 `audit_multiregion_news_production` 和日志检查。
