@@ -1,0 +1,101 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}地区生产 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">地区生产</h2>
+      <p class="page-subtitle">按地区查看抓取、翻译、审核、发布、QQ 交付和术语候选状态。</p>
+    </div>
+    <a class="btn ghost" href="{% url 'console-source-list' %}{% if selected_region %}?region={{ selected_region }}{% endif %}">查看来源</a>
+  </div>
+
+  <form class="filter-bar" method="get">
+    <label>
+      地区
+      <select name="region">
+        <option value="">全部地区</option>
+        {% for region in production_regions %}
+          <option value="{{ region }}" {% if selected_region == region %}selected{% endif %}>{{ region }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="btn secondary" type="submit">筛选</button>
+    {% if selected_region %}<a class="btn ghost" href="{% url 'console-region-production' %}">清除</a>{% endif %}
+  </form>
+
+  <section class="panel">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>地区</th>
+            <th>启用来源</th>
+            <th>今日新增</th>
+            <th>待翻译</th>
+            <th>翻译失败</th>
+            <th>待审核</th>
+            <th>自动发布</th>
+            <th>人工发布</th>
+            <th>公开</th>
+            <th>QQ</th>
+            <th>术语候选</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td><strong>{{ row.label }}</strong></td>
+              <td>{{ row.enabled_sources }}</td>
+              <td>{{ row.today_new }}</td>
+              <td>{{ row.pending_translation }}</td>
+              <td>{{ row.translation_failed }}</td>
+              <td>{{ row.pending_review }}</td>
+              <td>{{ row.auto_published }}</td>
+              <td>{{ row.manual_published }}</td>
+              <td>{{ row.public }}</td>
+              <td>成功 {{ row.qq_sent }} / 等待 {{ row.qq_pending }} / 跳过 {{ row.qq_skipped }} / 失败 {{ row.qq_failed }}</td>
+              <td>{{ row.pending_term_candidates }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="11" class="muted">没有符合筛选条件的地区。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>来源健康</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>来源</th>
+            <th>地区</th>
+            <th>启用</th>
+            <th>最后抓取</th>
+            <th>状态</th>
+            <th>最近结果</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for source in sources %}
+            <tr>
+              <td>{{ source.name }}</td>
+              <td>{{ source.get_racing_region_display }}</td>
+              <td>{{ source.enabled|yesno:"启用,停用" }}</td>
+              <td>{% if source.last_crawl_at %}{{ source.last_crawl_at|date:"Y-m-d H:i" }}{% else %}<span class="muted">暂无</span>{% endif %}</td>
+              <td><span class="badge {{ source.health.tone }}">{{ source.health.label }}</span></td>
+              <td>{{ source.health.summary|truncatechars:80 }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="muted">当前地区没有来源。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
+

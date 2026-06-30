@@ -44,6 +44,9 @@
           <a class="nav-link {% if '/admin/sources/' in active_path %}active{% endif %}" href="{% url 'console-source-list' %}">
             <span>来源管理</span>
           </a>
+          <a class="nav-link {% if '/admin/regions/' in active_path %}active{% endif %}" href="{% url 'console-region-production' %}">
+            <span>地区生产</span>
+          </a>
           <a class="nav-link {% if '/admin/candidates/' in active_path %}active{% endif %}" href="{% url 'console-candidate-list' %}">
             <span>候选新闻池</span>
             <span class="badge warning">{{ pending_edit_count }}</span>

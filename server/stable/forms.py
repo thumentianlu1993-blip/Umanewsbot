@@ -3,7 +3,7 @@ from __future__ import annotations
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 
-from .models import NewsArticle, NewsImage, NewsSource, PushTarget, RaceGrade, SourceLanguage, TermCandidate, TermEntry, TermType
+from .models import NewsArticle, NewsImage, NewsSource, PushTarget, RaceGrade, RacingRegion, SourceLanguage, TermCandidate, TermEntry, TermType
 from .services.term_admin import serialize_aliases, sync_term_source_aliases, validate_term_payload
 
 
@@ -152,7 +152,7 @@ class TermEntryForm(forms.ModelForm):
 
     class Meta:
         model = TermEntry
-        fields = ["term_type", "source_language", "source_ja", "target_zh", "race_grade", "priority", "is_active", "notes"]
+        fields = ["term_type", "source_language", "racing_region", "source_ja", "target_zh", "race_grade", "priority", "is_active", "notes"]
         widgets = {
             "source_ja": forms.TextInput(attrs={"placeholder": "例如：イクイノックス / Ascot / 香港打吡大赛"}),
             "target_zh": forms.TextInput(attrs={"placeholder": "例如：春秋分"}),
@@ -170,6 +170,8 @@ class TermEntryForm(forms.ModelForm):
             (SourceLanguage.ENGLISH, "英文"),
             (SourceLanguage.CHINESE_TRADITIONAL, "繁体中文"),
         ]
+        self.fields["racing_region"].required = False
+        self.fields["racing_region"].choices = [("", "全局通用"), *RacingRegion.choices]
         self.fields["race_grade"].choices = [("", "未设置"), *RaceGrade.choices]
         self.fields["aliases_ja_text"].initial = serialize_aliases(self.instance.aliases_ja or [])
         self.fields["aliases_zh_text"].initial = serialize_aliases(self.instance.aliases_zh or [])
@@ -179,6 +181,7 @@ class TermEntryForm(forms.ModelForm):
         payload = {
             "term_type": cleaned_data.get("term_type"),
             "source_language": cleaned_data.get("source_language"),
+            "racing_region": cleaned_data.get("racing_region"),
             "source_ja": cleaned_data.get("source_ja"),
             "target_zh": cleaned_data.get("target_zh"),
             "aliases_ja": cleaned_data.get("aliases_ja_text", ""),
@@ -206,6 +209,7 @@ class TermEntryForm(forms.ModelForm):
                 {
                     "term_type": self.cleaned_data["term_type"],
                     "source_language": self.cleaned_data.get("source_language") or SourceLanguage.JAPANESE,
+                    "racing_region": self.cleaned_data.get("racing_region") or "",
                     "source_ja": self.cleaned_data["source_ja"],
                     "target_zh": self.cleaned_data["target_zh"],
                     "aliases_ja": self.cleaned_data.get("aliases_ja_text", ""),
@@ -219,6 +223,7 @@ class TermEntryForm(forms.ModelForm):
             )
         instance.term_type = normalized["term_type"]
         instance.source_language = normalized["source_language"]
+        instance.racing_region = normalized["racing_region"]
         instance.source_ja = normalized["source_ja"]
         instance.target_zh = normalized["target_zh"]
         instance.aliases_ja = normalized["aliases_ja"]
@@ -283,6 +288,7 @@ class ArticleQuickTermForm(forms.Form):
         return {
             "term_type": self.cleaned_data["term_type"],
             "source_language": self.cleaned_data.get("source_language") or article.source_language or SourceLanguage.JAPANESE,
+            "racing_region": article.racing_region or "",
             "source_ja": self.cleaned_data["source_ja"],
             "target_zh": self.cleaned_data["target_zh"],
             "aliases_ja": [],

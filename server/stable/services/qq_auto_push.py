@@ -204,6 +204,8 @@ def build_qq_auto_push_message(article: NewsArticle, public_url: str | None = No
         summary = _truncate_with_ellipsis(summary)
     url = public_url or build_public_article_url(article)
     lines = [f"【UmaFans】{title}"]
+    if article_region(article) and article_region(article) != RacingRegion.JAPAN:
+        lines.append(f"地区：{article.get_racing_region_display()}")
     if summary:
         lines.append(summary)
     lines.append(f"阅读全文：{url}")

@@ -9,14 +9,16 @@ from dataclasses import dataclass
 
 from django.utils import timezone
 
-from stable.models import SourceLanguage, TermAlias, TermAliasType, TermEntry, TermType
+from stable.models import RacingRegion, SourceLanguage, TermAlias, TermAliasType, TermEntry, TermType
 from stable.services.race_grades import normalize_race_grade
 
 
 VALID_TERM_TYPES = {value for value, _label in TermType.choices}
+VALID_TERM_REGIONS = {"", *{value for value, _label in RacingRegion.choices}}
 EXPECTED_CSV_HEADERS = {
     "term_type",
     "source_language",
+    "racing_region",
     "source_ja",
     "target_zh",
     "aliases_ja",
@@ -367,6 +369,7 @@ def validate_term_payload(
 
     term_type = (payload.get("term_type") or "").strip()
     source_language = (payload.get("source_language") or SourceLanguage.JAPANESE).strip()
+    racing_region = (payload.get("racing_region") or "").strip()
     source_ja = (payload.get("source_ja") or "").strip()
     target_zh = (payload.get("target_zh") or "").strip()
     notes = (payload.get("notes") or "").strip()
@@ -381,6 +384,9 @@ def validate_term_payload(
 
     if source_language not in SUPPORTED_TERM_SOURCE_LANGUAGES:
         errors.setdefault("source_language", []).append("原文语言不合法。")
+
+    if racing_region not in VALID_TERM_REGIONS:
+        errors.setdefault("racing_region", []).append("地区不合法。")
 
     if not source_ja:
         errors.setdefault("source_ja", []).append("原文不能为空。")
@@ -424,6 +430,7 @@ def validate_term_payload(
     normalized = {
         "term_type": term_type,
         "source_language": source_language,
+        "racing_region": racing_region,
         "source_ja": source_ja,
         "target_zh": target_zh,
         "aliases_ja": aliases_ja,
@@ -464,6 +471,7 @@ def preview_term_import(*, csv_file=None, csv_text: str = "", import_mode: str =
             {
                 "term_type": row.get("term_type"),
                 "source_language": row.get("source_language") or row.get("language"),
+                "racing_region": row.get("racing_region") or row.get("region"),
                 "source_ja": row.get("source_ja"),
                 "target_zh": row.get("target_zh"),
                 "aliases_ja": row.get("aliases_ja"),
@@ -571,6 +579,7 @@ def commit_term_import(preview_rows: list[dict], import_mode: str) -> dict:
         if should_replace_primary_source:
             entry.term_type = payload.get("term_type", "")
             entry.source_language = payload_language
+            entry.racing_region = payload.get("racing_region", "")
             entry.source_ja = payload_source
         entry.target_zh = payload.get("target_zh", "")
         entry.aliases_zh = payload.get("aliases_zh", [])

@@ -475,6 +475,12 @@ class NewsArticle(TimestampedModel):
                 name="uq_article_source_article_id",
             )
         ]
+        indexes = [
+            models.Index(fields=("racing_region", "workflow_status", "-first_seen_at"), name="news_region_workflow_idx"),
+            models.Index(fields=("racing_region", "automation_status", "-auto_publish_at"), name="news_region_auto_idx"),
+            models.Index(fields=("racing_region", "-published_to_web_at"), name="news_region_public_idx"),
+            models.Index(fields=("racing_region", "translation_status"), name="news_region_trans_idx"),
+        ]
 
     def __str__(self) -> str:
         return self.effective_title
@@ -990,6 +996,12 @@ class ExternalDataImportLock(TimestampedModel):
 class TermEntry(TimestampedModel):
     term_type = models.CharField(max_length=32, choices=TermType.choices, default=TermType.OTHER)
     source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, default=SourceLanguage.JAPANESE)
+    racing_region = models.CharField(
+        max_length=32,
+        choices=[("", "全局通用"), *RacingRegion.choices],
+        default="",
+        blank=True,
+    )
     source_ja = models.CharField(max_length=255)
     target_zh = models.CharField(max_length=255)
     aliases_ja = models.JSONField(default=list, blank=True)
@@ -1001,6 +1013,9 @@ class TermEntry(TimestampedModel):
 
     class Meta:
         ordering = ("-priority", "source_ja")
+        indexes = [
+            models.Index(fields=("racing_region", "source_language", "term_type"), name="term_region_lang_type_idx"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.source_ja} -> {self.target_zh}"

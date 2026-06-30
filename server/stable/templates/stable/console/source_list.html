@@ -11,6 +11,20 @@
     <a class="btn" href="{% url 'console-source-create' %}">新增来源</a>
   </div>
 
+  <form class="filter-bar" method="get">
+    <label>
+      地区
+      <select name="region">
+        <option value="">全部地区</option>
+        {% for region in production_regions %}
+          <option value="{{ region }}" {% if selected_region == region %}selected{% endif %}>{{ region|default:"" }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="btn secondary" type="submit">筛选</button>
+    {% if selected_region %}<a class="btn ghost" href="{% url 'console-source-list' %}">清除</a>{% endif %}
+  </form>
+
   <section class="panel">
     <div class="table-wrap desktop-only">
       <table>

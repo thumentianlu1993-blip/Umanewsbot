@@ -29,6 +29,12 @@
           <option value="{{ value }}" {% if request.GET.source_language == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
+      <select name="racing_region">
+        <option value="">全部地区</option>
+        {% for value, label in racing_region_choices %}
+          <option value="{{ value }}" {% if request.GET.racing_region == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
       <select name="is_active">
         <option value="">全部状态</option>
         <option value="true" {% if request.GET.is_active == 'true' %}selected{% endif %}>启用中</option>
@@ -49,6 +55,7 @@
           <tr>
             <th>原文</th>
             <th>原文语言</th>
+            <th>地区</th>
             <th>中文译词</th>
             <th>类型</th>
             <th>比赛等级</th>
@@ -70,6 +77,7 @@
                 {% endif %}
               </td>
               <td>{{ term.get_source_language_display }}</td>
+              <td>{{ term.get_racing_region_display|default:"全局通用" }}</td>
               <td>{{ term.target_zh }}</td>
               <td>{{ term.get_term_type_display }}</td>
               <td>{{ term.race_grade|default:"-" }}</td>
@@ -97,7 +105,7 @@
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="11" class="muted">还没有术语，先新建一条或批量导入。</td></tr>
+            <tr><td colspan="12" class="muted">还没有术语，先新建一条或批量导入。</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -108,6 +116,7 @@
           <div class="article-meta">
             <span class="badge gold">{{ term.get_term_type_display }}</span>
             <span class="badge">{{ term.get_source_language_display }}</span>
+            <span class="badge">{{ term.get_racing_region_display|default:"全局通用" }}</span>
             {% if term.is_active %}
               <span class="badge success">启用中</span>
             {% else %}

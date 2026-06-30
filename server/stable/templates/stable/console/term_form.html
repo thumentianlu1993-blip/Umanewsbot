@@ -39,6 +39,12 @@
           {{ form.source_language }}
           {% if form.source_language.errors %}<div class="help" style="color: var(--danger);">{{ form.source_language.errors|join:' ' }}</div>{% endif %}
         </div>
+        <div class="field">
+          <label for="{{ form.racing_region.id_for_label }}">适用地区</label>
+          {{ form.racing_region }}
+          <div class="help">不指定时表示全局通用术语。</div>
+          {% if form.racing_region.errors %}<div class="help" style="color: var(--danger);">{{ form.racing_region.errors|join:' ' }}</div>{% endif %}
+        </div>
 
         <div class="field">
           <label for="{{ form.source_ja.id_for_label }}">原文</label>

@@ -61,6 +61,7 @@ from stable.models import (
     NewsSource,
     NotificationLog,
     OperationLog,
+    PublishedByMode,
     PushTarget,
     QQPushDelivery,
     QQPushDeliveryStatus,
@@ -73,6 +74,7 @@ from stable.models import (
     TermAlias,
     TermAliasType,
     TermCandidate,
+    TermCandidateEvidence,
     TermCandidateStatus,
     TermEntry,
     TaskExecutionLog,
@@ -1292,6 +1294,423 @@ class InternationalSourceMetadataTests(TestCase):
         snapshot = NewsSnapshot.objects.get(article=result.article)
         self.assertEqual(snapshot.snapshot_metadata.get("author"), "HKJC")
         self.assertNotIn("html", snapshot.snapshot_metadata)
+
+
+class MultiRegionNewsProductionTests(TestCase):
+    def _article(self, **overrides):
+        payload = {
+            "source_site": SourceSite.HKJC_NEWS,
+            "source_mode": SourceMode.LATEST,
+            "source_article_id": overrides.pop("source_article_id", "mr-article"),
+            "racing_region": RacingRegion.HONG_KONG,
+            "source_language": SourceLanguage.ENGLISH,
+            "title_ja": "Lucky Star wins at Sha Tin",
+            "body_ja_raw": "Lucky Star wins at Sha Tin. " * 16,
+            "body_ja_normalized": "Lucky Star wins at Sha Tin. " * 16,
+            "translated_title_zh": "Lucky Star 在沙田取胜",
+            "title_zh": "Lucky Star 在沙田取胜",
+            "translated_summary_zh": "香港赛马新闻摘要",
+            "summary_zh": "香港赛马新闻摘要",
+            "translated_body_zh": "Lucky Star 在沙田取胜。" * 20,
+            "body_zh": "Lucky Star 在沙田取胜。" * 20,
+            "published_at": timezone.now(),
+            "source_url": "https://example.com/mr-article",
+        }
+        payload.update(overrides)
+        return NewsArticle.objects.create(**payload)
+
+    @override_settings(NEWS_SOURCE_POLL_ENABLED=False)
+    def test_disabled_generic_source_poll_does_not_create_crawl_jobs(self):
+        from stable.tasks import crawl_enabled_news_sources_task
+
+        source = NewsSource.objects.create(
+            name="HK enabled source",
+            homepage_url="https://example.com",
+            feed_url="https://example.com/feed",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            adapter_key="hkjc_news",
+            source_site=SourceSite.HKJC_NEWS,
+            source_mode=SourceMode.LATEST,
+            enabled=True,
+            crawl_interval_minutes=1,
+        )
+
+        result = crawl_enabled_news_sources_task.run()
+
+        self.assertTrue(result["skipped"])
+        self.assertEqual(result["reason"], "disabled")
+        self.assertEqual(CrawlJob.objects.filter(source=source).count(), 0)
+
+    @override_settings(
+        NEWS_SOURCE_POLL_ENABLED=True,
+        NEWS_SOURCE_POLL_ALLOWED_REGIONS=["hong_kong", "japan"],
+        NEWS_SOURCE_POLL_MAX_SOURCES=3,
+    )
+    def test_generic_source_selector_excludes_fixed_schedule_sources_and_respects_limit(self):
+        from stable.services.source_polling import select_due_enabled_news_sources
+
+        sync_builtin_sources()
+        fixed = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.LATEST)
+        fixed.enabled = True
+        fixed.last_crawl_at = timezone.now() - timedelta(hours=3)
+        fixed.save(update_fields=["enabled", "last_crawl_at", "updated_at"])
+        first = NewsSource.objects.get(source_site=SourceSite.HKJC_NEWS, source_mode=SourceMode.LATEST)
+        second = NewsSource.objects.get(source_site=SourceSite.SCMP_RACING, source_mode=SourceMode.LATEST)
+        third = NewsSource.objects.create(
+            name="HK extra",
+            homepage_url="https://example.com",
+            feed_url="https://example.com/extra",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            adapter_key="hkjc_news",
+            source_site=SourceSite.HKJC_NEWS,
+            source_mode=SourceMode.OFFICIAL,
+            enabled=True,
+            priority=1,
+            crawl_interval_minutes=1,
+        )
+        for index, source in enumerate([first, second]):
+            source.enabled = True
+            source.last_crawl_at = timezone.now() - timedelta(hours=6 + index)
+            source.save(update_fields=["enabled", "last_crawl_at", "updated_at"])
+
+        selection = select_due_enabled_news_sources(max_sources=2)
+
+        self.assertEqual([item.source.id for item in selection.selected], [first.id, second.id])
+        self.assertEqual(selection.deferred_count, 1)
+        self.assertIn(fixed.id, [item.source.id for item in selection.skipped])
+        self.assertTrue(third.enabled)
+
+    @override_settings(
+        NEWS_SOURCE_POLL_ENABLED=True,
+        NEWS_SOURCE_POLL_ALLOWED_REGIONS=["hong_kong"],
+        NEWS_SOURCE_POLL_RUNNING_TIMEOUT_MINUTES=60,
+        NEWS_SOURCE_POLL_RETRY_STALE_RUNNING=False,
+    )
+    def test_generic_source_selector_reports_stale_running_without_retriggering_by_default(self):
+        from stable.services.source_polling import select_due_enabled_news_sources
+
+        source = NewsSource.objects.create(
+            name="HK stale running",
+            homepage_url="https://example.com",
+            feed_url="https://example.com/feed",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            adapter_key="hkjc_news",
+            source_site=SourceSite.HKJC_NEWS,
+            source_mode=SourceMode.LATEST,
+            enabled=True,
+            crawl_interval_minutes=1,
+        )
+        CrawlJob.objects.create(source=source, status=TaskStatus.STARTED, started_at=timezone.now() - timedelta(minutes=90))
+
+        selection = select_due_enabled_news_sources(max_sources=1)
+
+        self.assertEqual(selection.selected, [])
+        self.assertIn((source.id, "stale_running"), [(item.source.id, item.reason) for item in selection.skipped])
+
+    @override_settings(MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=[], MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES=[])
+    def test_non_japan_article_defaults_to_manual_review_without_auto_publish_policy(self):
+        from stable.services.automation import score_article_for_automation
+
+        article = self._article(
+            source_article_id="mr-manual-default",
+            source_site=SourceSite.SKY_SPORTS_RACING,
+            source_mode=SourceMode.ACCESS,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+        )
+
+        decision = score_article_for_automation(article)
+
+        self.assertEqual(decision.review_mode, ReviewMode.MANUAL)
+        self.assertEqual(decision.automation_status, AutomationStatus.MANUAL_REVIEW_REQUIRED)
+        self.assertEqual(decision.decision_reason["publish_policy"]["reason"], "region_not_allowed")
+
+    @override_settings(
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES=["hkjc_news:latest"],
+        MULTIREGION_TERM_CANDIDATE_BACKLOG_THRESHOLD=1,
+    )
+    def test_term_candidate_backlog_routes_allowed_international_article_to_manual(self):
+        from stable.services.automation import score_article_for_automation
+
+        article = self._article(source_article_id="mr-term-backlog")
+        candidate = TermCandidate.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Lucky Star",
+            normalized_key="lucky star",
+            status=TermCandidateStatus.PENDING,
+            confidence=90,
+        )
+        TermCandidateEvidence.objects.create(candidate=candidate, article=article, occurrence_count=1, confidence=90)
+
+        decision = score_article_for_automation(article)
+
+        self.assertEqual(decision.review_mode, ReviewMode.MANUAL)
+        self.assertEqual(decision.decision_reason["publish_policy"]["reason"], "term_candidate_backlog")
+
+    @override_settings(
+        AUTOMATION_ENABLED=True,
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES=["hkjc_news:latest"],
+        MULTIREGION_AUTO_PUBLISH_REGION_BATCH_LIMITS={"hong_kong": 1},
+        MULTIREGION_AUTO_PUBLISH_REGION_DAILY_LIMITS={"hong_kong": 1},
+    )
+    def test_auto_publish_batch_applies_region_per_run_and_daily_limits(self):
+        first = self._article(source_article_id="mr-ready-1", automation_status=AutomationStatus.PUBLISH_READY, review_mode=ReviewMode.AUTO, score_total=90)
+        second = self._article(source_article_id="mr-ready-2", automation_status=AutomationStatus.PUBLISH_READY, review_mode=ReviewMode.AUTO, score_total=89)
+        third = self._article(source_article_id="mr-ready-3", automation_status=AutomationStatus.PUBLISH_READY, review_mode=ReviewMode.AUTO, score_total=88)
+
+        first_result = auto_publish_batch_task.run(limit=5)
+        second_result = auto_publish_batch_task.run(limit=5)
+
+        first.refresh_from_db()
+        second.refresh_from_db()
+        third.refresh_from_db()
+        self.assertEqual(first_result["published_count"], 1)
+        self.assertEqual(second_result["published_count"], 0)
+        self.assertEqual(first.workflow_status, WorkflowStatus.PUBLISHED)
+        self.assertNotEqual(second.workflow_status, WorkflowStatus.PUBLISHED)
+        self.assertNotEqual(third.workflow_status, WorkflowStatus.PUBLISHED)
+        self.assertIn("daily_limit_reached", second_result["skipped_reasons"].values())
+
+    @override_settings(
+        AUTOMATION_ENABLED=True,
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES=["hkjc_news:latest"],
+        MULTIREGION_AUTO_PUBLISH_REGION_DAILY_LIMITS={"hong_kong": 1},
+    )
+    def test_auto_publish_batch_continues_past_limited_region_for_japan(self):
+        self._article(
+            source_article_id="mr-hk-published-today",
+            automation_status=AutomationStatus.AUTO_PUBLISHED,
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_by_mode=PublishedByMode.AUTO,
+            auto_publish_at=timezone.now(),
+            published_to_web_at=timezone.now(),
+            score_total=100,
+        )
+        for index in range(220):
+            self._article(
+                source_article_id=f"mr-hk-limited-{index}",
+                automation_status=AutomationStatus.PUBLISH_READY,
+                review_mode=ReviewMode.AUTO,
+                score_total=100,
+            )
+        japan_article = self._article(
+            source_article_id="mr-japan-ready-after-limited-hk",
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            racing_region=RacingRegion.JAPAN,
+            source_language=SourceLanguage.JAPANESE,
+            automation_status=AutomationStatus.PUBLISH_READY,
+            review_mode=ReviewMode.AUTO,
+            score_total=10,
+        )
+
+        result = auto_publish_batch_task.run(limit=1)
+
+        japan_article.refresh_from_db()
+        self.assertEqual(result["published_ids"], [japan_article.id])
+        self.assertEqual(japan_article.workflow_status, WorkflowStatus.PUBLISHED)
+
+    def test_multiregion_audit_command_is_read_only_and_outputs_region_metrics(self):
+        source = NewsSource.objects.create(
+            name="HK audit source",
+            homepage_url="https://example.com",
+            feed_url="https://example.com/feed",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            adapter_key="hkjc_news",
+            source_site=SourceSite.HKJC_NEWS,
+            source_mode=SourceMode.LATEST,
+            enabled=True,
+        )
+        CrawlJob.objects.create(source=source, status=TaskStatus.SUCCESS, success_count=1, finished_at=timezone.now())
+        self._article(source_article_id="mr-audit")
+        before = {
+            "crawl_jobs": CrawlJob.objects.count(),
+            "articles": NewsArticle.objects.count(),
+            "deliveries": QQPushDelivery.objects.count(),
+            "external_runs": ExternalDataImportRun.objects.count(),
+        }
+        out = StringIO()
+
+        call_command("audit_multiregion_news_production", stdout=out)
+
+        payload = json.loads(out.getvalue())
+        after = {
+            "crawl_jobs": CrawlJob.objects.count(),
+            "articles": NewsArticle.objects.count(),
+            "deliveries": QQPushDelivery.objects.count(),
+            "external_runs": ExternalDataImportRun.objects.count(),
+        }
+        self.assertEqual(before, after)
+        self.assertGreaterEqual(payload["regions"]["hong_kong"]["sources"]["enabled"], 1)
+        self.assertEqual(payload["regions"]["hong_kong"]["articles"]["total"], 1)
+        self.assertIn("term_operations", payload["regions"]["hong_kong"])
+
+    def test_region_overview_uses_today_window_for_publish_counts(self):
+        now = timezone.now()
+        yesterday = now - timedelta(days=1)
+        self._article(
+            source_article_id="mr-old-auto",
+            workflow_status=WorkflowStatus.PUBLISHED,
+            automation_status=AutomationStatus.AUTO_PUBLISHED,
+            published_by_mode=PublishedByMode.AUTO,
+            first_seen_at=yesterday,
+            auto_publish_at=yesterday,
+            published_to_web_at=yesterday,
+        )
+        self._article(
+            source_article_id="mr-today-manual",
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_by_mode=PublishedByMode.MANUAL,
+            first_seen_at=now,
+            published_to_web_at=now,
+        )
+
+        from stable.services.multiregion import region_production_rows
+
+        rows = region_production_rows(selected_region=RacingRegion.HONG_KONG, now=now)
+
+        self.assertEqual(rows[0]["today_new"], 1)
+        self.assertEqual(rows[0]["auto_published"], 0)
+        self.assertEqual(rows[0]["manual_published"], 1)
+        self.assertEqual(rows[0]["public"], 1)
+
+    def test_multiregion_audit_filters_formal_terms_by_region(self):
+        from stable.services.multiregion import summarize_multiregion_news_production
+
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Global Horse",
+            target_zh="全局马",
+        )
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            source_ja="HK Horse",
+            target_zh="香港马",
+        )
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            source_ja="UK Horse",
+            target_zh="英国马",
+        )
+
+        summary = summarize_multiregion_news_production()
+
+        self.assertEqual(summary["regions"][RacingRegion.HONG_KONG]["term_operations"]["formal_terms_by_language"][SourceLanguage.ENGLISH], 2)
+        self.assertEqual(summary["regions"][RacingRegion.UNITED_KINGDOM]["term_operations"]["formal_terms_by_language"][SourceLanguage.ENGLISH], 2)
+        self.assertEqual(summary["regions"][RacingRegion.FRANCE]["term_operations"]["formal_terms_by_language"][SourceLanguage.ENGLISH], 1)
+
+    def test_multiregion_audit_crawl_statuses_use_current_source_state(self):
+        from stable.services.multiregion import summarize_multiregion_news_production
+
+        success_source = NewsSource.objects.create(
+            name="HK current success",
+            homepage_url="https://example.com/success",
+            feed_url="https://example.com/success/feed",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            adapter_key="hkjc_news",
+            source_site=SourceSite.HKJC_NEWS,
+            source_mode=SourceMode.LATEST,
+            enabled=True,
+            last_crawl_status=TaskStatus.SUCCESS,
+        )
+        failed_source = NewsSource.objects.create(
+            name="HK current failed",
+            homepage_url="https://example.com/failed",
+            feed_url="https://example.com/failed/feed",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            adapter_key="scmp_racing",
+            source_site=SourceSite.SCMP_RACING,
+            source_mode=SourceMode.LATEST,
+            enabled=True,
+            last_crawl_status=TaskStatus.FAILED,
+        )
+        for index in range(3):
+            CrawlJob.objects.create(source=success_source, status=TaskStatus.SUCCESS, finished_at=timezone.now() - timedelta(days=index + 1))
+            CrawlJob.objects.create(source=failed_source, status=TaskStatus.SUCCESS, finished_at=timezone.now() - timedelta(days=index + 1))
+
+        summary = summarize_multiregion_news_production()
+
+        self.assertEqual(summary["regions"][RacingRegion.HONG_KONG]["sources"]["crawl_statuses"][TaskStatus.SUCCESS], 1)
+        self.assertEqual(summary["regions"][RacingRegion.HONG_KONG]["sources"]["crawl_statuses"][TaskStatus.FAILED], 1)
+
+    def test_qq_message_for_international_article_contains_region_label(self):
+        article = self._article(
+            source_article_id="mr-qq-region",
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+        )
+
+        message = build_qq_auto_push_message(article, public_url="http://testserver/news/1/")
+
+        self.assertIn("地区：中国香港", message)
+        self.assertIn("【UmaFans】", message)
+
+    def test_region_overview_view_filters_sources_by_region_and_shows_qq_counts(self):
+        user = User.objects.create_superuser("region-admin", "region-admin@example.com", "pass")
+        self.client.login(username="region-admin", password="pass")
+        source = NewsSource.objects.create(
+            name="HK overview source",
+            homepage_url="https://example.com",
+            feed_url="https://example.com/feed",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            adapter_key="hkjc_news",
+            source_site=SourceSite.HKJC_NEWS,
+            source_mode=SourceMode.LATEST,
+            enabled=True,
+        )
+        article = self._article(source_article_id="mr-overview", source_config=source, workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at=timezone.now())
+        target = PushTarget.objects.create(name="测试群", group_id="10001", allowed_regions=[RacingRegion.HONG_KONG], is_active=True)
+        QQPushDelivery.objects.create(article=article, target=target, status=QQPushDeliveryStatus.SENT, sent_at=timezone.now())
+
+        response = self.client.get(reverse("console-region-production"), {"region": RacingRegion.HONG_KONG})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "中国香港")
+        self.assertContains(response, "HK overview source")
+        self.assertContains(response, "QQ")
+
+
+class TermRegionFilterTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser("term-region-admin", "term-region-admin@example.com", "pass")
+        self.client.login(username="term-region-admin", password="pass")
+
+    def test_term_list_filters_by_racing_region(self):
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            source_ja="HK Term",
+            target_zh="香港术语",
+        )
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            source_ja="UK Term",
+            target_zh="英国术语",
+        )
+
+        response = self.client.get(reverse("console-term-list"), {"racing_region": RacingRegion.HONG_KONG})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "HK Term")
+        self.assertNotContains(response, "UK Term")
 
 
 class FakeExternalHorseDataAdapter:

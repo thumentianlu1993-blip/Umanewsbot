@@ -9,6 +9,8 @@
 
 OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试、本地隔离环境浏览器验收，并归档为 `2026-06-06-add-term-candidate-discovery`；正式能力规格已同步到 `openspec/specs/term-candidate-discovery/spec.md`。
 
+`2026-06-30` 本地 OpenSpec change `operate-multiregion-news-production` 已完成首轮实现与代码审查返修：新增多地区新闻生产只读审计命令 `audit_multiregion_news_production`、通用 enabled 新闻来源轮询任务 `crawl_enabled_news_sources_task`、地区/来源自动发布 allowlist 与地区上限策略、后台 `/admin/regions/` 地区生产概览、来源管理地区筛选、QQ 国际新闻地区标签、地区查询索引和运行手册。返修后，地区生产概览的自动发布、人工发布和公开数量按今日窗口统计，待翻译、翻译失败和待审核保留为当前积压；审计中的来源抓取状态改为按 `NewsSource.last_crawl_status` 当前来源状态聚合，不再累计历史 `CrawlJob` 次数；正式术语 `TermEntry` 增加可选适用地区，空值表示全局通用，术语列表/表单/API/CSV 导入和多地区审计均支持地区口径；自动发布批次在地区每日/每轮上限跳过大量国际候选时，会在主扫描未填满后执行有限的日本候选兜底扫描，避免拖慢符合既有策略的日本文章。该实现保持生产默认安全关闭：`NEWS_SOURCE_POLL_ENABLED=false`，非日本自动发布默认不放行，正式 QQ 群仍需显式配置 `PushTarget.allowed_regions` 才接收国际新闻。外部赛马数据库 `External*` importer 不进入新闻常态调度，不自动生成公开新闻或 QQ 推送。当前状态为本地实现与目标测试已通过，尚未提交、推送或部署生产。
+
 `2026-06-07` 已将术语候选发现部署到生产：服务器从 `7123e4e` 拉到 `e2e3e07`，应用迁移 `0006` 新建候选与证据表，`.env` 补入术语发现开关并保持 `TERM_DISCOVERY_ENABLED=false`（灰度，先关后开）。本次部署同时核实线上 `AUTOMATION_ENABLED=true`、`REWRITE_PROVIDER=siliconflow` 仍在生效。
 
 仓库已明确长期语言约定：Codex 新增或维护的协作文档、OpenSpec 产物与代理说明默认使用中文；仅保留必要的代码标识符、命令和工具机器语法。

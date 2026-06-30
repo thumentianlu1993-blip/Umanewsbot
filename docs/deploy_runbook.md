@@ -1623,3 +1623,84 @@ kill "$(cat runtime/global_racing_import/hkjc-20260701-to-202407/hkjc-slow-dryru
 ```
 
 不要在 worker 运行时执行生产部署、重建容器或修改运行脚本的 `git pull`；需要同步文档时，先推 GitHub，等抓取暂停后再同步生产工作树。
+
+## 多地区新闻常态生产灰度运行手册
+
+本节只覆盖新闻来源常态抓取、自动发布灰度、地区运营观测和 QQ 群推送灰度；HKJC / UK / France / US 外部赛马数据库 importer 仍是独立受控导入，不进入新闻 Celery Beat。
+
+### 启用前只读审计
+
+```bash
+cd /opt/umanewsbot
+docker compose -f docker-compose.prod.lowcost.yml exec -T web \
+  python manage.py audit_multiregion_news_production
+```
+
+如需留存基线：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web \
+  python manage.py audit_multiregion_news_production \
+  --output multiregion-news-baseline-$(date +%Y%m%d_%H%M%S).json
+```
+
+该命令只读查询 `NewsSource / CrawlJob / NewsArticle / QQPushDelivery / TermEntry / TermCandidate / ExternalHorseAlias`，不会创建 `CrawlJob`、`NewsArticle`、`QQPushDelivery` 或 `ExternalDataImportRun`。
+
+### 灰度开启顺序
+
+1. 备份 `.env`：
+
+```bash
+cp .env .env.backup.multiregion-news-$(date +%Y%m%d_%H%M%S)
+```
+
+2. 先只允许少量地区和来源进入通用轮询：
+
+```dotenv
+NEWS_SOURCE_POLL_ENABLED=true
+NEWS_SOURCE_POLL_INTERVAL_MINUTES=30
+NEWS_SOURCE_POLL_MAX_SOURCES=2
+NEWS_SOURCE_POLL_ALLOWED_REGIONS=hong_kong,united_kingdom
+NEWS_SOURCE_POLL_ALLOWED_SOURCES=hkjc_news:latest,scmp_racing:latest,sporting_life:latest,sky_sports_racing:latest
+```
+
+3. 自动发布默认仍保守。非日本地区只有显式配置后才允许自动发布：
+
+```dotenv
+MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=hong_kong
+MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES=hkjc_news:latest
+MULTIREGION_AUTO_PUBLISH_REGION_BATCH_LIMITS=hong_kong:1
+MULTIREGION_AUTO_PUBLISH_REGION_DAILY_LIMITS=hong_kong:3
+MULTIREGION_TERM_CANDIDATE_BACKLOG_THRESHOLD=50
+```
+
+4. QQ 灰度继续以群级 `PushTarget.allowed_regions` 为准。测试群可显式加入 `hong_kong / united_kingdom`，正式群不得因为 `QQ_PUSH_ENABLED=true` 自动接收新地区。
+
+5. 重启 `worker / beat / web` 后观察至少一个自然调度窗口：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml ps
+docker logs --tail=120 umanewsbot-worker-1
+docker logs --tail=120 umanewsbot-beat-1
+curl -I http://127.0.0.1/healthz/
+curl -I http://umafans.run/
+```
+
+### 后台验收入口
+
+- `/admin/regions/`：地区生产概览，查看今日新增、待翻译、翻译失败、待审核、自动发布、人工发布、公开数量、近期 QQ 交付和术语候选积压。
+- `/admin/sources/?region=hong_kong`：按地区筛选来源健康，确认成功、成功无新增、运行中、运行超时、失败和长时间未运行。
+- `/admin/` 首页与公开首页地区 tab：确认后台与前台状态一致。
+
+### 停用和回滚
+
+如任一地区出现来源异常、翻译质量异常、候选池积压或 QQ 推送异常，按风险从小到大收敛：
+
+```dotenv
+NEWS_SOURCE_POLL_ENABLED=false
+MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=
+MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES=
+QQ_PUSH_ENABLED=false
+```
+
+也可只收窄某个群的 `PushTarget.allowed_regions` 为 `["japan"]`，或在后台停用具体 `NewsSource.enabled`。停用后重新执行只读审计并检查 `worker / beat` 日志，确认没有新的国际来源轮询和异常 QQ 交付。

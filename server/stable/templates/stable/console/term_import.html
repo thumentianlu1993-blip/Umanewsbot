@@ -14,7 +14,7 @@
   <section class="panel">
     <div class="toolbar">
       <h3 style="margin: 0;">模板说明</h3>
-      <a class="btn secondary" href="data:text/csv;charset=utf-8,%EF%BB%BFterm_type,source_language,source_ja,target_zh,aliases_ja,aliases_zh,priority,is_active,notes%0Ahorse,ja,%E3%82%B0%E3%83%A9%E3%83%B3%E3%82%A2%E3%83%AC%E3%82%B0%E3%83%AA%E3%82%A2,%E6%94%BE%E5%A3%B0%E6%AC%A2%E5%91%BC,%22Gran%20Alegria%7C%E3%82%B0%E3%83%A9%E3%83%B3%22,%22%E6%94%BE%E5%A3%B0%E6%AC%A2%E5%91%BC%7C%E5%A4%A7%E6%AC%A2%E5%A3%B0%22,100,true," download="term_import_template.csv">下载 CSV 模板</a>
+      <a class="btn secondary" href="data:text/csv;charset=utf-8,%EF%BB%BFterm_type,source_language,racing_region,source_ja,target_zh,aliases_ja,aliases_zh,priority,is_active,notes%0Ahorse,ja,,%E3%82%B0%E3%83%A9%E3%83%B3%E3%82%A2%E3%83%AC%E3%82%B0%E3%83%AA%E3%82%A2,%E6%94%BE%E5%A3%B0%E6%AC%A2%E5%91%BC,%22Gran%20Alegria%7C%E3%82%B0%E3%83%A9%E3%83%B3%22,%22%E6%94%BE%E5%A3%B0%E6%AC%A2%E5%91%BC%7C%E5%A4%A7%E6%AC%A2%E5%A3%B0%22,100,true," download="term_import_template.csv">下载 CSV 模板</a>
     </div>
     <p class="muted">原文语言使用 <code>ja</code>、<code>en</code> 或 <code>zh-hant</code>。别名字段使用 <code>|</code> 分隔，例如：<code>Gran Alegria|グラン</code>。推荐优先使用 UTF-8 或 UTF-8 BOM；如果文件来自 Excel/WPS，系统也会尽量自动识别常见编码。</p>
   </section>
@@ -73,6 +73,7 @@
               <th>状态</th>
               <th>类型</th>
               <th>原文语言</th>
+              <th>地区</th>
               <th>原文</th>
               <th>中文译词</th>
               <th>说明</th>
@@ -93,6 +94,7 @@
                 </td>
                 <td>{{ row.payload.term_type }}</td>
                 <td>{{ row.payload.source_language }}</td>
+                <td>{{ row.payload.racing_region|default:"全局通用" }}</td>
                 <td>{{ row.payload.source_ja }}</td>
                 <td>{{ row.payload.target_zh }}</td>
                 <td>

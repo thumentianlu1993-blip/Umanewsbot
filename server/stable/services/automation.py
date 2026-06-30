@@ -29,6 +29,7 @@ from stable.services.terms import (
     source_term_matches_text,
     source_terms_by_entry,
 )
+from stable.services.multiregion import auto_publish_policy_for_article
 from stable.services.race_grades import better_race_priority, normalize_race_grade, race_priority_for_grade
 
 
@@ -486,6 +487,8 @@ def score_article_for_automation(article: NewsArticle) -> AutomationDecision:
             "total": score_total,
         },
     }
+    publish_policy = auto_publish_policy_for_article(article)
+    decision_reason["publish_policy"] = publish_policy.as_dict()
 
     if hard_mode == ReviewMode.IGNORED:
         return AutomationDecision(
@@ -509,6 +512,19 @@ def score_article_for_automation(article: NewsArticle) -> AutomationDecision:
             rewrite_confidence=0,
             content_category=category,
             decision_summary=f"转人工：{hard_reasons[0]}",
+            decision_reason=decision_reason,
+        )
+
+    if article.racing_region != "japan" and not publish_policy.allowed:
+        return AutomationDecision(
+            review_mode=ReviewMode.MANUAL,
+            risk_level=RiskLevel.MEDIUM,
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            score_total=score_total,
+            quality_score=quality_score,
+            rewrite_confidence=0,
+            content_category=category,
+            decision_summary=f"转人工：多地区自动发布策略未放行（{publish_policy.reason}）",
             decision_reason=decision_reason,
         )
 
@@ -630,6 +646,8 @@ def is_ready_for_auto_publish(article: NewsArticle) -> bool:
     if not (article.effective_title and article.effective_summary and article.effective_body and article.source_url):
         return False
     if getattr(settings, "AUTO_PUBLISH_REQUIRE_COVER", False) and not article.cover_image_url:
+        return False
+    if not auto_publish_policy_for_article(article).allowed:
         return False
     return True
 

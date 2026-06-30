@@ -57,6 +57,7 @@ from .models import (
     WorkflowStatus,
 )
 from .services.media_assets import localize_news_image, set_cover_asset
+from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
 from .services.operations import log_operation
 from .services.pushing import enqueue_push_for_article
 from .services.queueing import dispatch_task
@@ -206,6 +207,7 @@ def _term_filters(queryset, request: HttpRequest):
     query = request.GET.get("q", "").strip()
     term_type = request.GET.get("term_type", "").strip()
     source_language = request.GET.get("source_language", "").strip()
+    racing_region = request.GET.get("racing_region", "").strip()
     is_active = request.GET.get("is_active", "").strip()
     has_alias = request.GET.get("has_alias", "").strip()
 
@@ -230,6 +232,8 @@ def _term_filters(queryset, request: HttpRequest):
         queryset = queryset.filter(term_type=term_type)
     if source_language:
         queryset = queryset.filter(Q(source_language=source_language) | Q(source_aliases__source_language=source_language)).distinct()
+    if racing_region:
+        queryset = queryset.filter(racing_region=racing_region)
     if is_active == "true":
         queryset = queryset.filter(is_active=True)
     elif is_active == "false":
@@ -362,8 +366,40 @@ def source_list(request: HttpRequest):
     if denied:
         return denied
     sync_builtin_sources()
-    sources = _attach_source_health(NewsSource.objects.filter(deleted_at__isnull=True).order_by("-enabled", "-priority", "name"))
-    return render(request, "stable/console/source_list.html", _console_context(request, sources=sources))
+    selected_region = (request.GET.get("region") or "").strip()
+    queryset = NewsSource.objects.filter(deleted_at__isnull=True)
+    if selected_region:
+        queryset = queryset.filter(racing_region=selected_region)
+    sources = _attach_source_health(queryset.order_by("-enabled", "-priority", "name"))
+    return render(
+        request,
+        "stable/console/source_list.html",
+        _console_context(request, sources=sources, selected_region=selected_region, production_regions=PRODUCTION_REGIONS),
+    )
+
+
+@login_required
+def region_production(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    selected_region = (request.GET.get("region") or "").strip()
+    rows = region_production_rows(selected_region=selected_region)
+    sources = NewsSource.objects.filter(deleted_at__isnull=True)
+    if selected_region:
+        sources = sources.filter(racing_region=selected_region)
+    sources = _attach_source_health(sources.order_by("-enabled", "-priority", "name")[:50])
+    return render(
+        request,
+        "stable/console/region_production.html",
+        _console_context(
+            request,
+            rows=rows,
+            sources=sources,
+            selected_region=selected_region,
+            production_regions=PRODUCTION_REGIONS,
+        ),
+    )
 
 
 @login_required
@@ -496,6 +532,7 @@ def term_list(request: HttpRequest):
                 (SourceLanguage.ENGLISH, "英文"),
                 (SourceLanguage.CHINESE_TRADITIONAL, "繁体中文"),
             ],
+            racing_region_choices=RacingRegion.choices,
             pagination_querystring=pagination_params.urlencode(),
         ),
     )
@@ -513,6 +550,7 @@ def term_create(request: HttpRequest):
         initial = {
             "term_type": source_term.term_type,
             "source_language": source_term.source_language,
+            "racing_region": source_term.racing_region,
             "source_ja": source_term.source_ja,
             "target_zh": source_term.target_zh,
             "race_grade": source_term.race_grade,
@@ -1735,6 +1773,7 @@ def _term_payload(term: TermEntry) -> dict:
         "id": term.id,
         "term_type": term.term_type,
         "source_language": term.source_language,
+        "racing_region": term.racing_region,
         "source_ja": term.source_ja,
         "target_zh": term.target_zh,
         "aliases_ja": term.aliases_ja,

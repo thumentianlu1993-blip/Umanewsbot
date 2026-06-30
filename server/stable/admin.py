@@ -339,8 +339,8 @@ class NewsSourceAdmin(admin.ModelAdmin):
 
 @admin.register(TermEntry)
 class TermEntryAdmin(admin.ModelAdmin):
-    list_display = ("source_ja", "source_language", "target_zh", "term_type", "race_grade", "priority", "is_active", "updated_at")
-    list_filter = ("source_language", "term_type", "race_grade", "is_active")
+    list_display = ("source_ja", "source_language", "racing_region", "target_zh", "term_type", "race_grade", "priority", "is_active", "updated_at")
+    list_filter = ("source_language", "racing_region", "term_type", "race_grade", "is_active")
     search_fields = ("source_ja", "target_zh", "notes")
 
 

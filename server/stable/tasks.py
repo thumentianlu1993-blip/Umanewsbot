@@ -24,6 +24,7 @@ from stable.models import (
     QQPushDelivery,
     QQPushDeliveryStatus,
     PushTarget,
+    RacingRegion,
     ReviewMode,
     SourceMode,
     TaskExecutionLog,
@@ -41,6 +42,7 @@ from stable.services.automation import (
     score_article_for_automation,
 )
 from stable.services.ingestion import upsert_article_from_draft
+from stable.services.multiregion import auto_publish_count_today, auto_publish_policy_for_article
 from stable.services.notifications import send_automation_notification, send_high_value_warning_notification
 from stable.services.operations import log_operation
 from stable.services.pushing import push_article_to_targets
@@ -55,6 +57,7 @@ from stable.services.qq_auto_push import (
 from stable.services.queueing import dispatch_task
 from stable.services.rewriting import apply_rewrite_result, rewrite_article
 from stable.services.sources import find_builtin_source, sync_builtin_sources
+from stable.services.source_polling import select_due_enabled_news_sources
 from stable.services.term_discovery import discover_and_aggregate_article
 from stable.services.translation import translate_article
 from stable.services.validation import apply_validation_outcome, validate_rewrite
@@ -323,6 +326,39 @@ def crawl_news_source_task(source_id: int) -> dict:
 
 
 @shared_task
+def crawl_enabled_news_sources_task() -> dict:
+    log = _log_start("crawl_enabled_news_sources")
+    if not getattr(settings, "NEWS_SOURCE_POLL_ENABLED", False):
+        _log_success(log, "disabled")
+        return {"skipped": True, "reason": "disabled", "triggered_source_ids": []}
+    sync_builtin_sources()
+    selection = select_due_enabled_news_sources()
+    triggered: list[dict] = []
+    failed: list[dict] = []
+    for item in selection.selected:
+        source = item.source
+        try:
+            dispatch_task(crawl_news_source_task, source.id)
+            triggered.append({"id": source.id, "name": source.name, "reason": item.reason})
+        except Exception as exc:
+            failed.append({"id": source.id, "name": source.name, "error": str(exc)})
+    result = {
+        "triggered_source_ids": [item["id"] for item in triggered],
+        "triggered": triggered,
+        "skipped": [{"id": item.source.id, "name": item.source.name, "reason": item.reason} for item in selection.skipped],
+        "deferred": [{"id": item.source.id, "name": item.source.name, "reason": item.reason} for item in selection.deferred],
+        "deferred_count": selection.deferred_count,
+        "failed": failed,
+    }
+    detail = f"triggered={len(triggered)} skipped={len(selection.skipped)} deferred={selection.deferred_count} failed={len(failed)}"
+    if failed:
+        _log_failure(log, detail)
+    else:
+        _log_success(log, detail)
+    return result
+
+
+@shared_task
 def discover_term_candidates_task(article_id: int) -> dict:
     log = _log_start("discover_term_candidates", {"article_id": article_id})
     if not getattr(settings, "TERM_DISCOVERY_ENABLED", False):
@@ -543,12 +579,51 @@ def auto_publish_batch_task(limit: int | None = None) -> dict:
     )
     published_ids: list[int] = []
     failed_ids: list[int] = []
-    for article in queryset[:batch_limit]:
+    skipped_reasons: dict[int, str] = {}
+    region_run_counts: dict[str, int] = {}
+    candidate_limit = max(batch_limit * 8, batch_limit + 20, 50)
+    scan_limit = max(candidate_limit * 4, batch_limit + 100, 200)
+    scanned_count = 0
+    scanned_ids: set[int] = set()
+    limit_skip_seen = False
+
+    def process_candidate(article: NewsArticle) -> None:
+        nonlocal limit_skip_seen
         try:
+            policy = auto_publish_policy_for_article(article)
+            if not policy.allowed:
+                skipped_reasons[article.id] = policy.reason
+                if policy.reason in {"region_not_allowed", "source_not_allowed", "term_candidate_backlog"}:
+                    article.review_mode = ReviewMode.MANUAL
+                    article.automation_status = AutomationStatus.MANUAL_REVIEW_REQUIRED
+                    article.workflow_status = WorkflowStatus.PENDING_REVIEW
+                    article.decision_summary = f"转人工：多地区自动发布策略未放行（{policy.reason}）"
+                    article.decision_reason = {**(article.decision_reason or {}), "publish_policy": policy.as_dict()}
+                    article.save(
+                        update_fields=[
+                            "review_mode",
+                            "automation_status",
+                            "workflow_status",
+                            "decision_summary",
+                            "decision_reason",
+                            "updated_at",
+                        ]
+                    )
+                return
+            region = policy.region
+            if policy.per_run_limit is not None and region_run_counts.get(region, 0) >= policy.per_run_limit:
+                skipped_reasons[article.id] = "batch_limit_reached"
+                limit_skip_seen = True
+                return
+            if policy.daily_limit is not None and auto_publish_count_today(region) >= policy.daily_limit:
+                skipped_reasons[article.id] = "daily_limit_reached"
+                limit_skip_seen = True
+                return
             if not is_ready_for_auto_publish(article):
-                continue
+                return
             publish_article_automatically(article)
             published_ids.append(article.id)
+            region_run_counts[region] = region_run_counts.get(region, 0) + 1
         except Exception as exc:
             failed_ids.append(article.id)
             mark_automation_failed(article, phase=AutomationPhase.PUBLISH, error=exc)
@@ -556,12 +631,34 @@ def auto_publish_batch_task(limit: int | None = None) -> dict:
                 NotificationType.PUBLISH_FAILED,
                 {"article_id": article.id, "title": article.effective_title, "error": str(exc)},
             )
+    for article in queryset[:scan_limit]:
+        if len(published_ids) >= batch_limit:
+            break
+        scanned_count += 1
+        scanned_ids.add(article.id)
+        process_candidate(article)
+    if len(published_ids) < batch_limit and limit_skip_seen:
+        fallback_limit = max((batch_limit - len(published_ids)) * 5, 20)
+        fallback_queryset = queryset.filter(racing_region=RacingRegion.JAPAN).exclude(pk__in=scanned_ids)
+        for article in fallback_queryset[:fallback_limit]:
+            if len(published_ids) >= batch_limit:
+                break
+            scanned_count += 1
+            scanned_ids.add(article.id)
+            process_candidate(article)
     detail = f"published={len(published_ids)} failed={len(failed_ids)}"
     if failed_ids:
         _log_failure(log, detail)
     else:
         _log_success(log, detail)
-    return {"published_count": len(published_ids), "batch_limit": batch_limit, "published_ids": published_ids, "failed_ids": failed_ids}
+    return {
+        "published_count": len(published_ids),
+        "batch_limit": batch_limit,
+        "scanned_count": scanned_count,
+        "published_ids": published_ids,
+        "failed_ids": failed_ids,
+        "skipped_reasons": skipped_reasons,
+    }
 
 
 def _recent_notification_exists(notification_type: str, hours: int = 6) -> bool:

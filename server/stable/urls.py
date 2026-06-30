@@ -6,6 +6,7 @@ urlpatterns = [
     path("login/", views.BackendLoginView.as_view(), name="backend-login"),
     path("logout/", views.BackendLogoutView.as_view(), name="backend-logout"),
     path("", views.console_dashboard, name="console-dashboard"),
+    path("regions/", views.region_production, name="console-region-production"),
     path("sources/", views.source_list, name="console-source-list"),
     path("sources/new/", views.source_create, name="console-source-create"),
     path("sources/<int:source_id>/edit/", views.source_edit, name="console-source-edit"),
