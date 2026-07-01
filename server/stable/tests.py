@@ -1866,6 +1866,26 @@ class ProductionWindowServiceTests(TestCase):
         MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=["hong_kong"],
         MULTIREGION_CRAWL_DEFAULT_INTERVAL_MINUTES=15,
     )
+    def test_crawl_window_serializes_async_dispatch_result(self):
+        from stable.tasks import crawl_production_sources_window_task
+
+        source = self._source()
+        async_result = Mock()
+        async_result.id = "queued-task-1"
+
+        with patch("stable.tasks.dispatch_task", return_value=async_result):
+            crawl_production_sources_window_task.run(now_iso="2026-07-01T10:17:00+00:00")
+
+        window = ProductionWindow.objects.get(kind=ProductionWindowKind.CRAWL, source=source)
+        self.assertEqual(window.status, ProductionWindowStatus.RUNNING)
+        self.assertEqual(window.result_payload["dispatch_result"], {"task_id": "queued-task-1"})
+
+    @override_settings(
+        MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_CRAWL_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_CRAWL_DEFAULT_INTERVAL_MINUTES=15,
+    )
     def test_crawl_window_task_only_fetches_latest_missing_window(self):
         from stable.tasks import crawl_news_source_task, crawl_production_sources_window_task
 

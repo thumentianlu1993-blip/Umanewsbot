@@ -133,6 +133,15 @@ def _parse_task_now(now_iso: str | None = None) -> datetime:
     return datetime.fromisoformat(now_iso) if now_iso else timezone.now()
 
 
+def _json_safe_dispatch_result(result) -> dict | str:
+    if isinstance(result, dict | list | str | int | float | bool) or result is None:
+        return result
+    task_id = getattr(result, "id", None)
+    if task_id:
+        return {"task_id": str(task_id)}
+    return {"repr": repr(result)}
+
+
 def _window_starts_to_run(*, kind: str, scope_key: str, now: datetime, minutes: int) -> list[datetime]:
     current = current_window_bounds(now, minutes=minutes).start
     lookback_hours = int(getattr(settings, "MULTIREGION_PRODUCTION_WINDOW_LOOKBACK_HOURS", 3))
@@ -517,7 +526,11 @@ def crawl_production_sources_window_task(now_iso: str | None = None) -> dict:
                 window.refresh_from_db()
                 if window.status == ProductionWindowStatus.RUNNING:
                     window.reason_summary = "dispatched"
-                    window.result_payload = {"dispatch_result": dispatch_result, "mode": mode, "source_reason": item.reason}
+                    window.result_payload = {
+                        "dispatch_result": _json_safe_dispatch_result(dispatch_result),
+                        "mode": mode,
+                        "source_reason": item.reason,
+                    }
                     window.save(update_fields=["reason_summary", "result_payload", "updated_at"])
                 triggered.append(
                     {"id": source.id, "name": source.name, "window_id": window.id, "window_start": window_start.isoformat(), "mode": mode}
