@@ -1975,3 +1975,117 @@ QQ 限流或 OneBot 异常时优先关闭：
 MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED=false
 QQ_PUSH_ENABLED=false
 ```
+
+## 2026-07-02 多地区新闻增量窗口生产上线记录
+
+本节对应 OpenSpec change `increase-multiregion-news-volume`。
+
+### 部署前检查
+
+- 生产目录：`/opt/umanewsbot`。
+- 部署前 `HEAD=80454c6`，`origin/main=b7b0ce0`；上线修复后最终运行 `HEAD=9e97e8c`。
+- 外部数据导入锁检查：`hkjc / netkeiba` 均无占用者；未发现运行中的 HKJC/global racing/import 进程。
+- 备份：
+  - `.env.backup.multiregion-volume-20260702_040811`
+  - `backups/db/pre-multiregion-volume-20260702_040811.sql.gz`
+  - `gzip -t`：通过。
+
+### 部署与迁移
+
+执行：
+
+```bash
+cd /opt/umanewsbot
+git pull --ff-only origin main
+bash ./deploy_lowcost.sh
+```
+
+结果：
+
+- 迁移已应用：
+  - `stable.0017_majorraceevent_productionwindow_quotaledger_and_more`
+  - `stable.0018_alter_notificationlog_type`
+- `web / worker / beat` 已重建并运行。
+- `docker compose -f docker-compose.prod.lowcost.yml ps` 显示 `web` healthy，`db / redis` healthy。
+- `manage.py check`：通过。
+- `http://127.0.0.1/healthz/`：`200`。
+- `http://umafans.run/healthz/`：`200`。
+
+### 启用开关
+
+启用前备份 `.env`：
+
+```text
+.env.backup.enable-multiregion-volume-20260702_041242
+```
+
+当前生产窗口配置：
+
+```dotenv
+MULTIREGION_PRODUCTION_WINDOWS_ENABLED=true
+MULTIREGION_PRODUCTION_WINDOWS_CRAWL_ENABLED=true
+MULTIREGION_PRODUCTION_WINDOWS_PUBLISH_ENABLED=true
+MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED=true
+MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=japan,hong_kong,united_kingdom,france,united_states
+MULTIREGION_PRODUCTION_WINDOW_DAILY_MINUTES=15
+MULTIREGION_PRODUCTION_WINDOW_MAJOR_RACE_MINUTES=5
+MULTIREGION_PRODUCTION_WINDOW_LOOKBACK_HOURS=3
+MULTIREGION_CRAWL_DEFAULT_INTERVAL_MINUTES=15
+MULTIREGION_PUBLISH_REGION_WINDOW_MAX=5
+MULTIREGION_PUBLISH_REGION_WINDOW_MIN=1
+MULTIREGION_QQ_REGION_WINDOW_MAX=3
+MULTIREGION_OPS_NOTIFICATIONS_ENABLED=true
+MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
+```
+
+当前 16 个启用新闻源均已标记 `production_approved=true`。活跃 QQ 目标为 `UmaFans测试群`，群号 `1026525240`，允许 `japan / hong_kong / united_kingdom / france / united_states`。
+
+### 上线中修复
+
+首次真实抓取窗口暴露问题：`crawl_production_sources_window_task` 把 Celery `AsyncResult` 直接写入 `ProductionWindow.result_payload`，触发 `Object of type AsyncResult is not JSON serializable`。
+
+处理：
+
+1. 临时设置 `MULTIREGION_ROLLBACK_DISABLE_CRAWL_WINDOWS=true`，避免 beat 继续制造失败抓取窗口。
+2. 修复代码，将异步派发结果序列化为 `{"task_id": "..."}`。
+3. 新增测试 `test_crawl_window_serializes_async_dispatch_result`。
+4. 验证：
+   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable.tests.ProductionWindowServiceTests stable.tests.PublishWindowServiceTests stable.tests.QQWindowServiceTests stable.tests.MultiRegionNewsProductionTests --noinput`：51 项通过。
+   - `DB_ENGINE=sqlite python manage.py check`：通过。
+   - `git diff --check`：通过。
+5. 提交并部署 `9e97e8c Fix crawl window async dispatch payload`。
+6. 恢复 `MULTIREGION_ROLLBACK_DISABLE_CRAWL_WINDOWS=false`。
+
+### 生产验收结果
+
+- 默认关闭验证：启用前抓取、发布、QQ 三条窗口任务均返回 `disabled`。
+- 生产资格审计：五地区生产窗口开关为开启；批准来源数为日本 6、香港 2、英国 3、法国 2、美国 3。
+- 20:15 抓取窗口：15 个 due 来源被派发；最终 14 个成功，1 个失败。
+  - 失败来源：`Sponichi 新闻ランキング`
+  - 失败原因：上游详情页 `502 Bad Gateway`
+- 20:15 发布窗口：
+  - 香港：发布 1 篇。
+  - 美国：发布 3 篇。
+  - 日本、英国、法国：`no_ready_candidates`。
+- 20:30 发布窗口：
+  - 美国：发布 1 篇。
+  - 日本、香港、英国、法国：`no_ready_candidates`。
+- 20:15 QQ 窗口：
+  - 美国：生成并发送 2 条 delivery。
+  - 日本、香港、英国、法国：`no_eligible_articles`。
+- 20:30 QQ 窗口：
+  - 美国：`already_sent`。
+  - 日本、香港、英国、法国：`no_eligible_articles`。
+- Celery inspect：`active/reserved` 为空。
+- ops 摘要通知：`NotificationLog #13051`，channel=`qq`，target=`1026525240`，status=`sent`。
+- 浏览器验收：
+  - `http://umafans.run/` 首页正常展示 20:15 窗口新发布的香港和美国文章。
+  - `/?region=hong_kong`、`/?region=united_states`、`/?region=japan` 可展示对应地区新闻。
+  - 英国、法国地区页可正常渲染，当前本轮无新 ready 候选。
+
+### 继续观察项
+
+- 因上线时间为后半夜新闻低峰，用户确认跳过继续等待 20:45 及后续自然窗口；最近 4 个自然窗口口径改为次日继续验证。
+- `Sponichi 新闻ランキング` 当前失败为上游 `502`，如连续失败达到阈值会进入来源 backoff；必要时可在后台单来源暂停或降频。
+- `TDN 美国新闻` 每轮最多 20 条列表且详情请求超时为 15 秒，单轮耗时可能偏长；如持续占用 worker，可另起优化将每轮详情数量做成配置或拆分任务。
+- 生产构建上下文约 425MB，紧急修复发布时镜像构建前置上传较慢；后续应优化 `.dockerignore`。
