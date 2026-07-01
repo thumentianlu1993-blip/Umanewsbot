@@ -677,6 +677,9 @@ def publish_article_automatically(article: NewsArticle) -> None:
         reason="自动批量发布",
         payload={"article_id": article.id, "title": article.effective_title},
     )
+    if (article.decision_reason or {}).get("disable_auto_qq"):
+        return
+
     from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article
 
     enqueue_qq_auto_push_for_article(article.id)

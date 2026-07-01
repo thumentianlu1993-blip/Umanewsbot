@@ -151,6 +151,8 @@ class NotificationType(models.TextChoices):
     IMPORTANT_MANUAL = "important_manual", "重点新闻转人工"
     HIGH_VALUE_WARNING = "high_value_warning", "高价值新闻 warning"
     REPEATED_FAILURE = "repeated_failure", "关键任务连续失败"
+    OPS_SUMMARY = "ops_summary", "运营摘要"
+    OPS_ANOMALY = "ops_anomaly", "运营异常"
 
 
 class NotificationChannel(models.TextChoices):
@@ -206,6 +208,45 @@ class TaskStatus(models.TextChoices):
     FAILED = "failed", "失败"
 
 
+class ProductionWindowKind(models.TextChoices):
+    CRAWL = "crawl", "抓取"
+    PUBLISH = "publish", "发布"
+    QQ_PUSH = "qq_push", "QQ 推送"
+
+
+class ProductionWindowMode(models.TextChoices):
+    DAILY = "daily", "日常"
+    MAJOR_RACE = "major_race", "重要赛事"
+
+
+class ProductionWindowStatus(models.TextChoices):
+    PENDING = "pending", "待执行"
+    RUNNING = "running", "运行中"
+    SUCCEEDED = "succeeded", "成功"
+    PARTIAL = "partial", "部分完成"
+    FAILED = "failed", "失败"
+    SKIPPED = "skipped", "跳过"
+
+
+class WindowDecisionStatus(models.TextChoices):
+    SELECTED = "selected", "入选"
+    SKIPPED = "skipped", "跳过"
+    BLOCKED = "blocked", "阻断"
+    FAILED = "failed", "失败"
+
+
+class QuotaLedgerKind(models.TextChoices):
+    WEB_PUBLISH = "web_publish", "网页发布"
+    QQ_PUSH = "qq_push", "QQ 推送"
+
+
+class QuotaLedgerScope(models.TextChoices):
+    REGION_WINDOW = "region_window", "地区窗口"
+    REGION_HOUR = "region_hour", "地区小时"
+    GROUP_HOUR = "group_hour", "群小时"
+    SITE_HOUR = "site_hour", "全站小时"
+
+
 class ExternalDataSource(models.TextChoices):
     NETKEIBA = "netkeiba", "netkeiba"
     HKJC = "hkjc", "HKJC"
@@ -240,6 +281,17 @@ class CrawlStatus(models.TextChoices):
     SUCCESS = "success", "成功"
     FAILED = "failed", "失败"
     IGNORED = "ignored", "忽略"
+
+
+class SourceErrorCategory(models.TextChoices):
+    HTTP_403 = "http_403", "HTTP 403"
+    HTTP_429 = "http_429", "HTTP 429"
+    CAPTCHA_OR_BLOCKED = "captcha_or_blocked", "验证码或疑似封禁"
+    TIMEOUT = "timeout", "超时"
+    PARSE_ERROR = "parse_error", "解析失败"
+    EMPTY_SUCCESS = "empty_success", "成功但无内容"
+    SERVER_ERROR = "server_error", "服务端错误"
+    UNKNOWN = "unknown", "未知"
 
 
 class MediaAssetStatus(models.TextChoices):
@@ -316,6 +368,14 @@ class NewsSource(TimestampedModel):
     source_mode = models.CharField(max_length=32, choices=SourceMode.choices, blank=True)
     enabled = models.BooleanField(default=True)
     crawl_interval_minutes = models.PositiveIntegerField(default=60)
+    production_approved = models.BooleanField(default=False)
+    effective_crawl_interval_minutes = models.PositiveIntegerField(null=True, blank=True)
+    backoff_until = models.DateTimeField(null=True, blank=True)
+    manual_pause_reason = models.TextField(blank=True)
+    failure_streak = models.PositiveIntegerField(default=0)
+    success_streak = models.PositiveIntegerField(default=0)
+    last_error_category = models.CharField(max_length=32, choices=SourceErrorCategory.choices, blank=True)
+    allow_event_boost = models.BooleanField(default=True)
     notes = models.TextField(blank=True)
     logo_url = models.URLField(max_length=1000, blank=True)
     priority = models.IntegerField(default=0)
@@ -334,6 +394,13 @@ class NewsSource(TimestampedModel):
                 name="uq_news_source_site_mode_active",
             )
         ]
+        indexes = [
+            models.Index(
+                fields=("enabled", "production_approved", "racing_region"),
+                name="source_prod_region_idx",
+            ),
+            models.Index(fields=("backoff_until",), name="source_backoff_idx"),
+        ]
 
     def __str__(self) -> str:
         return self.name
@@ -341,6 +408,39 @@ class NewsSource(TimestampedModel):
     @property
     def is_deleted(self) -> bool:
         return self.deleted_at is not None
+
+
+class MajorRaceEvent(TimestampedModel):
+    name = models.CharField(max_length=255)
+    normalized_name = models.CharField(max_length=255)
+    year = models.PositiveSmallIntegerField()
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices)
+    race_grade = models.CharField(max_length=32, choices=RaceGrade.choices)
+    external_id = models.CharField(max_length=128, blank=True)
+    aliases = models.JSONField(default=list, blank=True)
+    timezone_name = models.CharField(max_length=64)
+    local_date = models.DateField()
+    local_start_time = models.TimeField(null=True, blank=True)
+    boost_start_at = models.DateTimeField(null=True, blank=True)
+    boost_end_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("racing_region", "local_date", "local_start_time", "name")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("normalized_name", "year", "racing_region", "race_grade"),
+                name="uq_major_race_identity",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("racing_region", "is_active", "local_date"), name="major_region_date_idx"),
+            models.Index(fields=("boost_start_at", "boost_end_at"), name="major_boost_window_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} {self.year} {self.racing_region}"
 
 
 class CrawlJob(TimestampedModel):
@@ -1252,6 +1352,146 @@ class QQPushDelivery(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.article_id} -> {self.target_id} ({self.status})"
+
+
+class ProductionWindow(TimestampedModel):
+    kind = models.CharField(max_length=16, choices=ProductionWindowKind.choices)
+    mode = models.CharField(max_length=16, choices=ProductionWindowMode.choices, default=ProductionWindowMode.DAILY)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, blank=True)
+    source = models.ForeignKey(
+        NewsSource,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="production_windows",
+    )
+    target = models.ForeignKey(
+        PushTarget,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="production_windows",
+    )
+    scope_key = models.CharField(max_length=255)
+    window_start = models.DateTimeField()
+    window_end = models.DateTimeField()
+    status = models.CharField(
+        max_length=16,
+        choices=ProductionWindowStatus.choices,
+        default=ProductionWindowStatus.PENDING,
+    )
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    scheduled_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    reason_summary = models.TextField(blank=True)
+    result_payload = models.JSONField(default=dict, blank=True)
+    rerun_count = models.PositiveSmallIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    triggered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="triggered_production_windows",
+    )
+
+    class Meta:
+        ordering = ("-window_start", "kind", "scope_key")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("kind", "scope_key", "window_start"),
+                name="uq_prod_window_scope",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("kind", "status", "window_start"), name="prodwin_status_idx"),
+            models.Index(fields=("racing_region", "window_start"), name="prodwin_region_idx"),
+            models.Index(fields=("lease_expires_at",), name="prodwin_lease_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.kind}:{self.scope_key}@{self.window_start:%Y-%m-%d %H:%M}"
+
+
+class WindowCandidateDecision(TimestampedModel):
+    window = models.ForeignKey(ProductionWindow, on_delete=models.CASCADE, related_name="candidate_decisions")
+    article = models.ForeignKey(NewsArticle, on_delete=models.CASCADE, related_name="window_candidate_decisions")
+    status = models.CharField(max_length=16, choices=WindowDecisionStatus.choices)
+    reason = models.CharField(max_length=128, blank=True)
+    score = models.PositiveSmallIntegerField(null=True, blank=True)
+    rank = models.PositiveSmallIntegerField(null=True, blank=True)
+    payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("window", "rank", "-score", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("window", "article"), name="uq_window_candidate")
+        ]
+        indexes = [
+            models.Index(fields=("window", "status"), name="cand_window_status_idx"),
+            models.Index(fields=("article", "status"), name="cand_article_status_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.window_id}:{self.article_id}:{self.status}"
+
+
+class WindowTargetDecision(TimestampedModel):
+    window = models.ForeignKey(ProductionWindow, on_delete=models.CASCADE, related_name="target_decisions")
+    article = models.ForeignKey(
+        NewsArticle,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="window_target_decisions",
+    )
+    target = models.ForeignKey(PushTarget, on_delete=models.CASCADE, related_name="window_target_decisions")
+    decision_key = models.CharField(max_length=255)
+    status = models.CharField(max_length=16, choices=WindowDecisionStatus.choices)
+    reason = models.CharField(max_length=128, blank=True)
+    payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("window", "target", "article_id")
+        constraints = [
+            models.UniqueConstraint(fields=("window", "decision_key"), name="uq_window_target_key")
+        ]
+        indexes = [
+            models.Index(fields=("window", "status"), name="target_window_status_idx"),
+            models.Index(fields=("target", "status"), name="target_status_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.window_id}:{self.decision_key}:{self.status}"
+
+
+class QuotaLedger(TimestampedModel):
+    kind = models.CharField(max_length=16, choices=QuotaLedgerKind.choices)
+    scope = models.CharField(max_length=32, choices=QuotaLedgerScope.choices)
+    scope_key = models.CharField(max_length=255)
+    window_start = models.DateTimeField()
+    limit = models.PositiveSmallIntegerField()
+    used = models.PositiveSmallIntegerField(default=0)
+    payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-window_start", "kind", "scope", "scope_key")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("kind", "scope", "scope_key", "window_start"),
+                name="uq_quota_ledger_scope",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("kind", "scope", "window_start"), name="quota_kind_scope_idx"),
+            models.Index(fields=("scope_key", "window_start"), name="quota_scope_start_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.kind}:{self.scope}:{self.scope_key}@{self.window_start:%Y-%m-%d %H:%M}"
 
 
 class TranslationRun(TimestampedModel):

@@ -349,6 +349,19 @@ BUILTIN_SOURCE_DEFINITIONS = [
 
 def sync_builtin_sources() -> list[NewsSource]:
     sources: list[NewsSource] = []
+    protected_fields = {
+        "source_site",
+        "source_mode",
+        "enabled",
+        "production_approved",
+        "effective_crawl_interval_minutes",
+        "backoff_until",
+        "manual_pause_reason",
+        "failure_streak",
+        "success_streak",
+        "last_error_category",
+        "allow_event_boost",
+    }
     for payload in BUILTIN_SOURCE_DEFINITIONS:
         lookup = {
             "source_site": payload["source_site"],
@@ -362,7 +375,7 @@ def sync_builtin_sources() -> list[NewsSource]:
         if not created:
             update_fields = []
             for field_name, value in payload.items():
-                if field_name in {"source_site", "source_mode", "enabled"}:
+                if field_name in protected_fields:
                     continue
                 if getattr(source, field_name) != value:
                     setattr(source, field_name, value)

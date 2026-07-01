@@ -32,6 +32,8 @@
           <tr>
             <th>地区</th>
             <th>启用来源</th>
+            <th>生产批准</th>
+            <th>暂停/backoff</th>
             <th>今日新增</th>
             <th>待翻译</th>
             <th>翻译失败</th>
@@ -41,6 +43,8 @@
             <th>公开</th>
             <th>QQ</th>
             <th>术语候选</th>
+            <th>当前赛事</th>
+            <th>最近窗口</th>
           </tr>
         </thead>
         <tbody>
@@ -48,6 +52,8 @@
             <tr>
               <td><strong>{{ row.label }}</strong></td>
               <td>{{ row.enabled_sources }}</td>
+              <td>{{ row.production_approved_sources }}</td>
+              <td>{{ row.paused_sources }} / {{ row.backoff_sources }}</td>
               <td>{{ row.today_new }}</td>
               <td>{{ row.pending_translation }}</td>
               <td>{{ row.translation_failed }}</td>
@@ -57,9 +63,26 @@
               <td>{{ row.public }}</td>
               <td>成功 {{ row.qq_sent }} / 等待 {{ row.qq_pending }} / 跳过 {{ row.qq_skipped }} / 失败 {{ row.qq_failed }}</td>
               <td>{{ row.pending_term_candidates }}</td>
+              <td>
+                {% if row.major_race_window %}
+                  {% for event in row.major_race_window.events %}{{ event.name }}{% if not forloop.last %}、{% endif %}{% endfor %}
+                {% else %}
+                  <span class="muted">日常</span>
+                {% endif %}
+              </td>
+	              <td>
+	                {% for window in row.recent_windows %}
+	                  <div>
+	                    <a href="{% url 'console-production-window-detail' window.id %}">{{ window.kind }} / {{ window.status }}</a>
+	                    / {{ window.reason_summary|default:"-" }}
+	                  </div>
+	                {% empty %}
+	                  <span class="muted">暂无</span>
+	                {% endfor %}
+              </td>
             </tr>
           {% empty %}
-            <tr><td colspan="11" class="muted">没有符合筛选条件的地区。</td></tr>
+            <tr><td colspan="15" class="muted">没有符合筛选条件的地区。</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -75,6 +98,10 @@
             <th>来源</th>
             <th>地区</th>
             <th>启用</th>
+            <th>生产批准</th>
+            <th>有效间隔</th>
+            <th>backoff</th>
+            <th>错误分类</th>
             <th>最后抓取</th>
             <th>状态</th>
             <th>最近结果</th>
@@ -86,16 +113,19 @@
               <td>{{ source.name }}</td>
               <td>{{ source.get_racing_region_display }}</td>
               <td>{{ source.enabled|yesno:"启用,停用" }}</td>
+              <td>{{ source.production_approved|yesno:"是,否" }}</td>
+              <td>{{ source.effective_crawl_interval_minutes|default:source.crawl_interval_minutes }} 分钟</td>
+              <td>{% if source.backoff_until %}{{ source.backoff_until|date:"Y-m-d H:i" }}{% else %}<span class="muted">无</span>{% endif %}</td>
+              <td>{{ source.last_error_category|default:"-" }}</td>
               <td>{% if source.last_crawl_at %}{{ source.last_crawl_at|date:"Y-m-d H:i" }}{% else %}<span class="muted">暂无</span>{% endif %}</td>
               <td><span class="badge {{ source.health.tone }}">{{ source.health.label }}</span></td>
               <td>{{ source.health.summary|truncatechars:80 }}</td>
             </tr>
           {% empty %}
-            <tr><td colspan="6" class="muted">当前地区没有来源。</td></tr>
+            <tr><td colspan="10" class="muted">当前地区没有来源。</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </section>
 {% endblock %}
-

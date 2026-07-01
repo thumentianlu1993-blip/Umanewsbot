@@ -1,0 +1,81 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}窗口预览 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">窗口预览</h2>
+      <p class="page-subtitle">{{ window.kind }} / {{ window.racing_region }} / {{ window.window_start|date:"Y-m-d H:i" }}</p>
+    </div>
+    <a class="btn ghost" href="{% url 'console-production-window-detail' window.id %}">返回详情</a>
+  </div>
+
+  {% if unsupported %}
+    <section class="panel">
+      <p class="muted">抓取窗口默认不预览，避免误解为会重新请求外部来源。</p>
+    </section>
+  {% else %}
+    <section class="panel">
+      <h3>0 结果原因</h3>
+      {% if zero_reasons %}
+        {% for reason in zero_reasons %}<span class="badge">{{ reason }}</span>{% endfor %}
+      {% else %}
+        <span class="muted">无</span>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <h3>预计发布文章</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>文章</th><th>分数</th><th>状态</th></tr></thead>
+          <tbody>
+            {% for article in selected_articles %}
+              <tr><td>{{ article.effective_title|truncatechars:60 }}</td><td>{{ article.score_total }}</td><td>{{ article.workflow_status }}</td></tr>
+            {% empty %}
+              <tr><td colspan="3" class="muted">没有预计发布文章。</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>预计 QQ 文章</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>文章</th><th>分数</th></tr></thead>
+          <tbody>
+            {% for article in delivery_articles %}
+              <tr><td>{{ article.effective_title|truncatechars:60 }}</td><td>{{ article.score_total }}</td></tr>
+            {% empty %}
+              <tr><td colspan="2" class="muted">没有预计 QQ 文章。</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h3>候选/目标决策</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>对象</th><th>状态</th><th>原因</th></tr></thead>
+          <tbody>
+            {% for decision in candidate_decisions %}
+              <tr><td>{{ decision.article.effective_title|truncatechars:48 }}</td><td>{{ decision.status }}</td><td>{{ decision.reason|default:"-" }}</td></tr>
+            {% endfor %}
+            {% for decision in target_decisions %}
+              <tr><td>{{ decision.target.name }} / {% if decision.article %}{{ decision.article.effective_title|truncatechars:36 }}{% else %}-{% endif %}</td><td>{{ decision.status }}</td><td>{{ decision.reason|default:"-" }}</td></tr>
+            {% empty %}
+              {% if not candidate_decisions %}
+                <tr><td colspan="3" class="muted">暂无决策。</td></tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

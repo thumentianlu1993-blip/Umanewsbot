@@ -6,7 +6,7 @@ from datetime import datetime, time, timedelta
 from typing import Any
 
 from django.conf import settings
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 from django.utils import timezone
 
 from stable.models import (
@@ -14,6 +14,8 @@ from stable.models import (
     ExternalHorseAlias,
     NewsArticle,
     NewsSource,
+    ProductionWindow,
+    QuotaLedger,
     QQPushDelivery,
     QQPushDeliveryStatus,
     RacingRegion,
@@ -142,6 +144,37 @@ def _count_by(queryset, field: str) -> dict[str, int]:
     return {row[field] or "": row["count"] for row in queryset.values(field).annotate(count=Count("id"))}
 
 
+def _window_rows(region: str, *, limit: int = 4) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": window.id,
+            "kind": window.kind,
+            "mode": window.mode,
+            "status": window.status,
+            "window_start": window.window_start,
+            "reason_summary": window.reason_summary,
+            "result_payload": window.result_payload,
+        }
+        for window in ProductionWindow.objects.filter(racing_region=region)
+        .order_by("-window_start", "-id")[:limit]
+    ]
+
+
+def _quota_rows(*, recent_start) -> list[dict[str, Any]]:
+    return [
+        {
+            "kind": ledger.kind,
+            "scope": ledger.scope,
+            "scope_key": ledger.scope_key,
+            "window_start": ledger.window_start,
+            "limit": ledger.limit,
+            "used": ledger.used,
+        }
+        for ledger in QuotaLedger.objects.filter(window_start__gte=recent_start, used__gte=F("limit"))
+        .order_by("-window_start", "kind", "scope")[:20]
+    ]
+
+
 def summarize_multiregion_news_production(*, now=None) -> dict[str, Any]:
     now = now or timezone.now()
     today = timezone.localdate(now)
@@ -174,6 +207,9 @@ def summarize_multiregion_news_production(*, now=None) -> dict[str, Any]:
             "sources": {
                 "total": sources.count(),
                 "enabled": enabled_sources.count(),
+                "production_approved": sources.filter(enabled=True, production_approved=True).count(),
+                "paused": sources.exclude(manual_pause_reason="").count(),
+                "backoff_active": sources.filter(backoff_until__gt=now).count(),
                 "latest_crawl_at": enabled_sources.order_by("-last_crawl_at").values_list("last_crawl_at", flat=True).first(),
                 "crawl_statuses": _count_by(sources, "last_crawl_status"),
                 "success_no_new": sources.filter(last_crawl_status=TaskStatus.SUCCESS, last_crawl_message__icontains="新增 0").count(),
@@ -203,6 +239,7 @@ def summarize_multiregion_news_production(*, now=None) -> dict[str, Any]:
                 "public_total": articles.filter(workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at__isnull=False).count(),
             },
             "qq_delivery": _count_by(qq_recent, "status"),
+            "production_windows": _window_rows(region),
             "term_operations": {
                 "formal_terms_by_language": _count_by(term_entries, "source_language"),
                 "external_aliases": external_aliases.count(),
@@ -218,13 +255,21 @@ def summarize_multiregion_news_production(*, now=None) -> dict[str, Any]:
         "settings": {
             "news_source_poll_enabled": bool(getattr(settings, "NEWS_SOURCE_POLL_ENABLED", False)),
             "news_source_poll_max_sources": int(getattr(settings, "NEWS_SOURCE_POLL_MAX_SOURCES", 3)),
+            "multiregion_production_windows_enabled": bool(getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ENABLED", False)),
+            "multiregion_crawl_windows_enabled": bool(getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_CRAWL_ENABLED", False)),
+            "multiregion_publish_windows_enabled": bool(getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_PUBLISH_ENABLED", False)),
+            "multiregion_qq_windows_enabled": bool(getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED", False)),
             "multiregion_auto_publish_allowed_regions": sorted(_setting_list("MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS")),
             "multiregion_auto_publish_allowed_sources": sorted(_setting_list("MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES")),
         },
+        "quota_exhausted": _quota_rows(recent_start=recent_start),
     }
 
 
 def region_production_rows(*, selected_region: str = "", now=None) -> list[dict[str, Any]]:
+    from stable.services.production_windows import active_major_race_window
+
+    now = now or timezone.now()
     summary = summarize_multiregion_news_production(now=now)
     regions = [selected_region] if selected_region else PRODUCTION_REGIONS
     rows: list[dict[str, Any]] = []
@@ -234,11 +279,15 @@ def region_production_rows(*, selected_region: str = "", now=None) -> list[dict[
         item = summary["regions"][region]
         articles = item["articles"]
         qq = item["qq_delivery"]
+        major_window = active_major_race_window(region, now=now)
         rows.append(
             {
                 "region": region,
                 "label": item["label"],
                 "enabled_sources": item["sources"]["enabled"],
+                "production_approved_sources": item["sources"]["production_approved"],
+                "paused_sources": item["sources"]["paused"],
+                "backoff_sources": item["sources"]["backoff_active"],
                 "today_new": articles["today_new"],
                 "pending_translation": articles["workflow"].get(WorkflowStatus.PENDING_TRANSLATION, 0),
                 "translation_failed": articles["translation"].get(ArticleTranslationStatus.FAILED, 0),
@@ -251,6 +300,8 @@ def region_production_rows(*, selected_region: str = "", now=None) -> list[dict[
                 "qq_skipped": qq.get(QQPushDeliveryStatus.SKIPPED, 0),
                 "qq_failed": qq.get(QQPushDeliveryStatus.FAILED, 0),
                 "pending_term_candidates": item["term_operations"]["pending_candidates"],
+                "recent_windows": item["production_windows"],
+                "major_race_window": major_window,
             }
         )
     return rows

@@ -1,0 +1,95 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}窗口详情 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">窗口详情</h2>
+      <p class="page-subtitle">{{ window.kind }} / {{ window.racing_region }} / {{ window.window_start|date:"Y-m-d H:i" }}</p>
+    </div>
+    <div class="button-row">
+      <a class="btn ghost" href="{% url 'console-region-production' %}{% if window.racing_region %}?region={{ window.racing_region }}{% endif %}">返回地区生产</a>
+      <a class="btn secondary" href="{% url 'console-production-window-preview' window.id %}">预览</a>
+      {% if window.kind == "publish" or window.kind == "qq_push" %}
+        <form method="post" action="{% url 'console-production-window-rerun' window.id %}">
+          {% csrf_token %}
+          <button class="btn" type="submit">重跑</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <section class="panel">
+    <h3>摘要</h3>
+    <div class="table-wrap">
+      <table>
+        <tbody>
+          <tr><th>状态</th><td>{{ window.status }}</td><th>模式</th><td>{{ window.mode }}</td></tr>
+          <tr><th>窗口</th><td>{{ window.window_start|date:"Y-m-d H:i" }} - {{ window.window_end|date:"H:i" }}</td><th>重跑</th><td>{{ window.rerun_count }}</td></tr>
+          <tr><th>原因</th><td colspan="3">{{ window.reason_summary|default:"-" }}</td></tr>
+          <tr><th>错误</th><td colspan="3">{{ window.last_error|default:"-" }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>文章候选决策</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>文章</th><th>状态</th><th>原因</th><th>分数</th><th>排序</th></tr></thead>
+        <tbody>
+          {% for decision in candidate_decisions %}
+            <tr>
+              <td>{% if decision.article %}<a href="{% url 'console-candidate-detail' decision.article.id %}">{{ decision.article.effective_title|truncatechars:48 }}</a>{% else %}-{% endif %}</td>
+              <td>{{ decision.status }}</td>
+              <td>{{ decision.reason|default:"-" }}</td>
+              <td>{{ decision.score|default:"-" }}</td>
+              <td>{{ decision.rank|default:"-" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="muted">暂无文章候选决策。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>QQ 目标决策</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>目标群</th><th>文章</th><th>状态</th><th>原因</th></tr></thead>
+        <tbody>
+          {% for decision in target_decisions %}
+            <tr>
+              <td>{{ decision.target.name|default:"-" }}</td>
+              <td>{% if decision.article %}{{ decision.article.effective_title|truncatechars:48 }}{% else %}-{% endif %}</td>
+              <td>{{ decision.status }}</td>
+              <td>{{ decision.reason|default:"-" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="muted">暂无 QQ 目标决策。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h3>配额</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>类型</th><th>范围</th><th>键</th><th>已用/上限</th></tr></thead>
+        <tbody>
+          {% for ledger in quota_ledgers %}
+            <tr><td>{{ ledger.kind }}</td><td>{{ ledger.scope }}</td><td>{{ ledger.scope_key }}</td><td>{{ ledger.used }} / {{ ledger.limit }}</td></tr>
+          {% empty %}
+            <tr><td colspan="4" class="muted">暂无配额记录。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

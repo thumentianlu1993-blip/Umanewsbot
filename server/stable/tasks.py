@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from celery import shared_task
 from django.conf import settings
@@ -21,6 +21,10 @@ from stable.models import (
     NotificationLog,
     NotificationType,
     PublishedByMode,
+    ProductionWindow,
+    ProductionWindowKind,
+    ProductionWindowMode,
+    ProductionWindowStatus,
     QQPushDelivery,
     QQPushDeliveryStatus,
     PushTarget,
@@ -43,8 +47,21 @@ from stable.services.automation import (
 )
 from stable.services.ingestion import upsert_article_from_draft
 from stable.services.multiregion import auto_publish_count_today, auto_publish_policy_for_article
+from stable.services.multiregion import summarize_multiregion_news_production
 from stable.services.notifications import send_automation_notification, send_high_value_warning_notification
 from stable.services.operations import log_operation
+from stable.services.ops_notifications import send_production_summary_notification
+from stable.services.onebot import BotPusher
+from stable.services.production_windows import (
+    active_major_race_window,
+    claim_window,
+    classify_source_error,
+    current_window_bounds,
+    due_window_starts,
+    record_source_crawl_result,
+    select_production_sources,
+)
+from stable.services.publishing_windows import select_publish_candidates
 from stable.services.pushing import push_article_to_targets
 from stable.services.qq_auto_push import (
     ensure_qq_push_deliveries,
@@ -54,6 +71,7 @@ from stable.services.qq_auto_push import (
     qq_push_next_attempt_delay,
     should_push_news_to_qq,
 )
+from stable.services.qq_windows import select_qq_window_deliveries
 from stable.services.queueing import dispatch_task
 from stable.services.rewriting import apply_rewrite_result, rewrite_article
 from stable.services.sources import find_builtin_source, sync_builtin_sources
@@ -109,6 +127,74 @@ def _finish_crawl_job(
         job.source.last_crawl_status = job.status
         job.source.last_crawl_message = error_message or message or f"新增 {success_count}，重复 {fail_count}"
         job.source.save(update_fields=["last_crawl_at", "last_crawl_status", "last_crawl_message", "updated_at"])
+
+
+def _parse_task_now(now_iso: str | None = None) -> datetime:
+    return datetime.fromisoformat(now_iso) if now_iso else timezone.now()
+
+
+def _window_starts_to_run(*, kind: str, scope_key: str, now: datetime, minutes: int) -> list[datetime]:
+    current = current_window_bounds(now, minutes=minutes).start
+    lookback_hours = int(getattr(settings, "MULTIREGION_PRODUCTION_WINDOW_LOOKBACK_HOURS", 3))
+    earliest = current - timedelta(hours=max(0, lookback_hours))
+    starts: set[datetime] = {current}
+    last_success = (
+        ProductionWindow.objects.filter(
+            kind=kind,
+            scope_key=scope_key,
+            status=ProductionWindowStatus.SUCCEEDED,
+            window_start__lt=current,
+        )
+        .order_by("-window_start")
+        .values_list("window_start", flat=True)
+        .first()
+    )
+    if last_success is not None:
+        starts.update(due_window_starts(last_window_start=last_success, now=now, minutes=minutes))
+    starts.update(
+        ProductionWindow.objects.filter(
+            kind=kind,
+            scope_key=scope_key,
+            window_start__gte=earliest,
+            window_start__lte=current,
+        )
+        .exclude(status=ProductionWindowStatus.SUCCEEDED)
+        .values_list("window_start", flat=True)
+    )
+    return sorted(starts)
+
+
+def _http_status_code_from_exception(exc: Exception) -> int | None:
+    response = getattr(exc, "response", None)
+    status_code = getattr(response, "status_code", None)
+    return int(status_code) if status_code is not None else None
+
+
+def _finish_crawl_window(window_id: int | None, *, status: str, reason: str, payload: dict | None = None, error: str = "") -> None:
+    if not window_id:
+        return
+    window = ProductionWindow.objects.filter(pk=window_id, kind=ProductionWindowKind.CRAWL).first()
+    if window is None:
+        return
+    window.status = status
+    window.finished_at = timezone.now()
+    window.reason_summary = reason
+    window.result_payload = payload or {}
+    window.last_error = error
+    window.save(update_fields=["status", "finished_at", "reason_summary", "result_payload", "last_error", "updated_at"])
+
+
+def _can_coalesce_old_window(window: ProductionWindow, *, now: datetime) -> bool:
+    if window.status in {
+        ProductionWindowStatus.PENDING,
+        ProductionWindowStatus.FAILED,
+        ProductionWindowStatus.SKIPPED,
+    }:
+        return True
+    return (
+        window.status == ProductionWindowStatus.RUNNING
+        and (window.lease_expires_at is None or window.lease_expires_at <= now)
+    )
 
 
 def _auto_translate_article_after_ingest(article: NewsArticle) -> dict | None:
@@ -304,10 +390,10 @@ def crawl_jra_news() -> dict:
 
 
 @shared_task
-def crawl_news_source_task(source_id: int) -> dict:
+def crawl_news_source_task(source_id: int, window_id: int | None = None) -> dict:
     sync_builtin_sources()
     source = NewsSource.objects.get(pk=source_id, deleted_at__isnull=True)
-    log = _log_start("crawl_news_source", {"source_id": source_id})
+    log = _log_start("crawl_news_source", {"source_id": source_id, "window_id": window_id})
     try:
         if source.adapter_key == "netkeiba":
             pages = 3 if source.source_mode == SourceMode.LATEST else 1
@@ -318,11 +404,147 @@ def crawl_news_source_task(source_id: int) -> dict:
             result = _crawl_international_source(source)
         else:
             raise NotImplementedError("当前版本仅支持内置 netkeiba / JRA / 一期国际新闻来源")
+        record_source_crawl_result(source, success=True)
+        _finish_crawl_window(
+            window_id,
+            status=ProductionWindowStatus.SUCCEEDED,
+            reason="completed",
+            payload={
+                "new_count": result.get("new_count", 0),
+                "seen_count": result.get("seen_count", 0),
+                "crawl_job_id": result.get("crawl_job_id"),
+            },
+        )
         _log_success(log, f"source={source_id} new={result['new_count']} seen={result['seen_count']}")
         return result
     except Exception as exc:
+        error_category = classify_source_error(status_code=_http_status_code_from_exception(exc), message=str(exc))
+        record_source_crawl_result(source, success=False, error_category=error_category)
+        _finish_crawl_window(
+            window_id,
+            status=ProductionWindowStatus.FAILED,
+            reason="crawl_failed",
+            payload={"error_category": error_category},
+            error=str(exc),
+        )
         _log_failure(log, str(exc))
         raise
+
+
+@shared_task
+def crawl_production_sources_window_task(now_iso: str | None = None) -> dict:
+    log = _log_start("crawl_production_sources_window", {"now_iso": now_iso})
+    if (
+        not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ENABLED", False)
+        or not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_CRAWL_ENABLED", False)
+        or getattr(settings, "MULTIREGION_ROLLBACK_DISABLE_CRAWL_WINDOWS", False)
+    ):
+        _log_success(log, "disabled")
+        return {"skipped": True, "reason": "disabled", "triggered_source_ids": []}
+
+    now = _parse_task_now(now_iso)
+    sync_builtin_sources()
+    allowed_regions = set(getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS", []))
+    selection = select_production_sources(now=now, allowed_regions=allowed_regions)
+    triggered: list[dict] = []
+    skipped: list[dict] = [
+        {"id": item.source.id, "name": item.source.name, "reason": item.reason} for item in selection.skipped
+    ]
+    failed: list[dict] = []
+
+    for item in selection.selected:
+        source = item.source
+        major_window = active_major_race_window(source.racing_region, now=now) if source.allow_event_boost else None
+        mode = ProductionWindowMode.MAJOR_RACE if major_window else ProductionWindowMode.DAILY
+        minutes = (
+            int(getattr(settings, "MULTIREGION_CRAWL_MAJOR_RACE_INTERVAL_MINUTES", 5))
+            if major_window
+            else int(getattr(settings, "MULTIREGION_CRAWL_DEFAULT_INTERVAL_MINUTES", 15))
+        )
+        scope_key = f"source:{source.id}"
+        window_starts = _window_starts_to_run(
+            kind=ProductionWindowKind.CRAWL,
+            scope_key=scope_key,
+            now=now,
+            minutes=minutes,
+        )
+        latest_window_start = window_starts[-1] if window_starts else None
+        for window_start in window_starts[:-1]:
+            window, created = ProductionWindow.objects.get_or_create(
+                kind=ProductionWindowKind.CRAWL,
+                scope_key=scope_key,
+                window_start=window_start,
+                defaults={
+                    "mode": mode,
+                    "racing_region": source.racing_region,
+                    "source": source,
+                    "window_end": window_start + timedelta(minutes=minutes),
+                    "scheduled_at": now,
+                },
+            )
+            if created or _can_coalesce_old_window(window, now=now):
+                window.status = ProductionWindowStatus.SKIPPED
+                window.finished_at = timezone.now()
+                window.reason_summary = "coalesced_to_latest_crawl_window"
+                window.result_payload = {
+                    "mode": mode,
+                    "coalesced_to_window_start": latest_window_start.isoformat() if latest_window_start else "",
+                    "source_reason": item.reason,
+                }
+                window.save(update_fields=["status", "finished_at", "reason_summary", "result_payload", "updated_at"])
+                skipped.append({"id": source.id, "name": source.name, "window_id": window.id, "reason": window.reason_summary})
+
+        for window_start in window_starts[-1:]:
+            window, _created = ProductionWindow.objects.get_or_create(
+                kind=ProductionWindowKind.CRAWL,
+                scope_key=scope_key,
+                window_start=window_start,
+                defaults={
+                    "mode": mode,
+                    "racing_region": source.racing_region,
+                    "source": source,
+                    "window_end": window_start + timedelta(minutes=minutes),
+                    "scheduled_at": now,
+                },
+            )
+            claim = claim_window(window, now=now)
+            if not claim.claimed:
+                skipped.append({"id": source.id, "name": source.name, "window_id": window.id, "reason": claim.reason})
+                continue
+            try:
+                dispatch_result = dispatch_task(crawl_news_source_task, source.id, window.id)
+                window = claim.window
+                window.refresh_from_db()
+                if window.status == ProductionWindowStatus.RUNNING:
+                    window.reason_summary = "dispatched"
+                    window.result_payload = {"dispatch_result": dispatch_result, "mode": mode, "source_reason": item.reason}
+                    window.save(update_fields=["reason_summary", "result_payload", "updated_at"])
+                triggered.append(
+                    {"id": source.id, "name": source.name, "window_id": window.id, "window_start": window_start.isoformat(), "mode": mode}
+                )
+            except Exception as exc:
+                window = ProductionWindow.objects.get(pk=claim.window.pk)
+                if window.status != ProductionWindowStatus.FAILED:
+                    window.status = ProductionWindowStatus.FAILED
+                    window.finished_at = timezone.now()
+                    window.reason_summary = "dispatch_failed"
+                    window.last_error = str(exc)
+                    window.result_payload = {"mode": mode, "source_reason": item.reason}
+                    window.save(update_fields=["status", "finished_at", "reason_summary", "last_error", "result_payload", "updated_at"])
+                failed.append({"id": source.id, "name": source.name, "window_id": window.id, "error": str(exc)})
+
+    result = {
+        "triggered_source_ids": [item["id"] for item in triggered],
+        "triggered": triggered,
+        "skipped": skipped,
+        "failed": failed,
+    }
+    detail = f"triggered={len(triggered)} skipped={len(skipped)} failed={len(failed)}"
+    if failed:
+        _log_failure(log, detail)
+    else:
+        _log_success(log, detail)
+    return result
 
 
 @shared_task
@@ -566,8 +788,146 @@ def _resolve_auto_publish_batch_limit(limit: int | None = None, now=None) -> int
 
 
 @shared_task
+def publish_region_window_task(region: str, now_iso: str | None = None) -> dict:
+    log = _log_start("publish_region_window", {"region": region, "now_iso": now_iso})
+    if (
+        not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ENABLED", False)
+        or not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_PUBLISH_ENABLED", False)
+        or getattr(settings, "MULTIREGION_ROLLBACK_DISABLE_PUBLISH_WINDOWS", False)
+    ):
+        _log_success(log, "disabled")
+        return {"skipped": True, "reason": "disabled", "published_article_ids": []}
+
+    now = _parse_task_now(now_iso)
+    major_window = active_major_race_window(region, now=now)
+    mode = ProductionWindowMode.MAJOR_RACE if major_window else ProductionWindowMode.DAILY
+    minutes = (
+        int(getattr(settings, "MULTIREGION_PRODUCTION_WINDOW_MAJOR_RACE_MINUTES", 5))
+        if major_window
+        else int(getattr(settings, "MULTIREGION_PRODUCTION_WINDOW_DAILY_MINUTES", 15))
+    )
+    scope_key = f"region:{region}"
+    window_ids: list[int] = []
+    published_ids: list[int] = []
+    failed_ids: list[int] = []
+    skipped_windows: list[dict] = []
+    failed_windows: list[dict] = []
+    zero_reasons: list[str] = []
+
+    for window_start in _window_starts_to_run(
+        kind=ProductionWindowKind.PUBLISH,
+        scope_key=scope_key,
+        now=now,
+        minutes=minutes,
+    ):
+        window, _created = ProductionWindow.objects.get_or_create(
+            kind=ProductionWindowKind.PUBLISH,
+            scope_key=scope_key,
+            window_start=window_start,
+            defaults={
+                "mode": mode,
+                "racing_region": region,
+                "window_end": window_start + timedelta(minutes=minutes),
+                "scheduled_at": now,
+            },
+        )
+        claim = claim_window(window, now=now)
+        if not claim.claimed:
+            skipped_windows.append({"window_id": window.id, "window_start": window_start.isoformat(), "reason": claim.reason})
+            continue
+
+        window = claim.window
+        window_ids.append(window.id)
+        try:
+            selection = select_publish_candidates(region, window=window, now=window.window_end)
+            window_published_ids: list[int] = []
+            window_failed_ids: list[int] = []
+            for article in selection.selected:
+                try:
+                    publish_article_automatically(article)
+                    window_published_ids.append(article.id)
+                except Exception:
+                    window_failed_ids.append(article.id)
+            published_ids.extend(window_published_ids)
+            failed_ids.extend(window_failed_ids)
+            zero_reasons.extend(selection.zero_reasons)
+            window.status = ProductionWindowStatus.PARTIAL if window_failed_ids else ProductionWindowStatus.SUCCEEDED
+            window.finished_at = timezone.now()
+            window.reason_summary = "published" if window_published_ids else ",".join(selection.zero_reasons or ["no_published_articles"])
+            window.result_payload = {
+                "published_article_ids": window_published_ids,
+                "failed_article_ids": window_failed_ids,
+                "zero_reasons": selection.zero_reasons,
+                "mode": mode,
+            }
+            window.save(update_fields=["status", "finished_at", "reason_summary", "result_payload", "updated_at"])
+        except Exception as exc:
+            window.status = ProductionWindowStatus.FAILED
+            window.finished_at = timezone.now()
+            window.reason_summary = "publish_window_failed"
+            window.last_error = str(exc)
+            window.save(update_fields=["status", "finished_at", "reason_summary", "last_error", "updated_at"])
+            failed_windows.append({"window_id": window.id, "window_start": window_start.isoformat(), "error": str(exc)})
+
+    detail = f"region={region} windows={len(window_ids)} published={len(published_ids)} failed={len(failed_ids)}"
+    if failed_ids or failed_windows:
+        _log_failure(log, detail)
+    else:
+        _log_success(log, detail)
+    return {
+        "region": region,
+        "window_id": window_ids[-1] if window_ids else None,
+        "window_ids": window_ids,
+        "published_article_ids": published_ids,
+        "failed_article_ids": failed_ids,
+        "zero_reasons": list(dict.fromkeys(zero_reasons)),
+        "skipped_windows": skipped_windows,
+        "failed_windows": failed_windows,
+    }
+
+
+@shared_task
+def publish_production_regions_window_task(now_iso: str | None = None) -> dict:
+    log = _log_start("publish_production_regions_window", {"now_iso": now_iso})
+    if (
+        not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ENABLED", False)
+        or not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_PUBLISH_ENABLED", False)
+        or getattr(settings, "MULTIREGION_ROLLBACK_DISABLE_PUBLISH_WINDOWS", False)
+    ):
+        _log_success(log, "disabled")
+        return {"skipped": True, "reason": "disabled", "triggered_regions": []}
+    regions = list(getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS", [])) or [
+        RacingRegion.JAPAN,
+        RacingRegion.HONG_KONG,
+        RacingRegion.UNITED_KINGDOM,
+        RacingRegion.FRANCE,
+        RacingRegion.UNITED_STATES,
+    ]
+    triggered: list[str] = []
+    failed: list[dict] = []
+    for region in regions:
+        try:
+            dispatch_task(publish_region_window_task, region, now_iso=now_iso)
+            triggered.append(region)
+        except Exception as exc:
+            failed.append({"region": region, "error": str(exc)})
+    detail = f"triggered={len(triggered)} failed={len(failed)}"
+    if failed:
+        _log_failure(log, detail)
+    else:
+        _log_success(log, detail)
+    return {"triggered_regions": triggered, "failed": failed}
+
+
+@shared_task
 def auto_publish_batch_task(limit: int | None = None) -> dict:
     log = _log_start("auto_publish_batch", {"limit": limit})
+    if (
+        getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ENABLED", False)
+        and getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_PUBLISH_ENABLED", False)
+    ):
+        _log_success(log, "multiregion windows enabled")
+        return {"published_count": 0, "skipped": True, "reason": "multiregion_windows_enabled"}
     if not getattr(settings, "AUTOMATION_ENABLED", False):
         _log_success(log, "automation disabled")
         return {"published_count": 0, "skipped": True}
@@ -798,6 +1158,198 @@ def push_article_task(article_id: int, target_ids: list[int], user_id: int | Non
     except Exception as exc:
         _log_failure(log, str(exc))
         raise
+
+
+@shared_task
+def qq_region_window_task(region: str, now_iso: str | None = None) -> dict:
+    log = _log_start("qq_region_window", {"region": region, "now_iso": now_iso})
+    if (
+        not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ENABLED", False)
+        or not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED", False)
+        or getattr(settings, "MULTIREGION_ROLLBACK_DISABLE_QQ_WINDOWS", False)
+        or not getattr(settings, "QQ_PUSH_ENABLED", False)
+    ):
+        _log_success(log, "disabled")
+        return {"skipped": True, "reason": "disabled", "delivery_ids": []}
+
+    now = _parse_task_now(now_iso)
+    major_window = active_major_race_window(region, now=now)
+    mode = ProductionWindowMode.MAJOR_RACE if major_window else ProductionWindowMode.DAILY
+    minutes = (
+        int(getattr(settings, "MULTIREGION_PRODUCTION_WINDOW_MAJOR_RACE_MINUTES", 5))
+        if major_window
+        else int(getattr(settings, "MULTIREGION_PRODUCTION_WINDOW_DAILY_MINUTES", 15))
+    )
+    scope_key = f"region:{region}:qq"
+    window_ids: list[int] = []
+    delivery_ids: list[int] = []
+    failed_delivery_ids: list[int] = []
+    skipped_windows: list[dict] = []
+    failed_windows: list[dict] = []
+    zero_reasons: list[str] = []
+
+    window_starts = _window_starts_to_run(
+        kind=ProductionWindowKind.QQ_PUSH,
+        scope_key=scope_key,
+        now=now,
+        minutes=minutes,
+    )
+    latest_window_start = window_starts[-1] if window_starts else None
+    for window_start in window_starts[:-1]:
+        window, created = ProductionWindow.objects.get_or_create(
+            kind=ProductionWindowKind.QQ_PUSH,
+            scope_key=scope_key,
+            window_start=window_start,
+            defaults={
+                "mode": mode,
+                "racing_region": region,
+                "window_end": window_start + timedelta(minutes=minutes),
+                "scheduled_at": now,
+            },
+        )
+        if created or _can_coalesce_old_window(window, now=now):
+            window.status = ProductionWindowStatus.SKIPPED
+            window.finished_at = timezone.now()
+            window.reason_summary = "coalesced_to_latest_qq_window"
+            window.result_payload = {
+                "mode": mode,
+                "coalesced_to_window_start": latest_window_start.isoformat() if latest_window_start else "",
+            }
+            window.save(update_fields=["status", "finished_at", "reason_summary", "result_payload", "updated_at"])
+            skipped_windows.append(
+                {
+                    "window_id": window.id,
+                    "window_start": window_start.isoformat(),
+                    "reason": window.reason_summary,
+                }
+            )
+
+    for window_start in window_starts[-1:]:
+        window, _created = ProductionWindow.objects.get_or_create(
+            kind=ProductionWindowKind.QQ_PUSH,
+            scope_key=scope_key,
+            window_start=window_start,
+            defaults={
+                "mode": mode,
+                "racing_region": region,
+                "window_end": window_start + timedelta(minutes=minutes),
+                "scheduled_at": now,
+            },
+        )
+        claim = claim_window(window, now=now)
+        if not claim.claimed:
+            skipped_windows.append({"window_id": window.id, "window_start": window_start.isoformat(), "reason": claim.reason})
+            continue
+
+        window = claim.window
+        window_ids.append(window.id)
+        try:
+            online, status_error = BotPusher().is_online()
+            if not online:
+                reason = status_error or "onebot_offline"
+                zero_reasons.append(reason)
+                window.status = ProductionWindowStatus.FAILED
+                window.finished_at = timezone.now()
+                window.reason_summary = reason
+                window.last_error = reason
+                window.result_payload = {
+                    "delivery_ids": [],
+                    "failed_delivery_ids": [],
+                    "zero_reasons": [reason],
+                    "mode": mode,
+                    "onebot_online": False,
+                }
+                window.save(update_fields=["status", "finished_at", "reason_summary", "last_error", "result_payload", "updated_at"])
+                failed_windows.append({"window_id": window.id, "window_start": window_start.isoformat(), "error": reason})
+                continue
+            result = select_qq_window_deliveries(region, window=window, now=window.window_end)
+            window_delivery_ids: list[int] = []
+            window_failed_delivery_ids: list[int] = []
+            for delivery in result.deliveries:
+                try:
+                    dispatch_task(qq_push_delivery_task, delivery.id)
+                    window_delivery_ids.append(delivery.id)
+                except Exception:
+                    window_failed_delivery_ids.append(delivery.id)
+            delivery_ids.extend(window_delivery_ids)
+            failed_delivery_ids.extend(window_failed_delivery_ids)
+            zero_reasons.extend(result.zero_reasons)
+            window.status = ProductionWindowStatus.PARTIAL if window_failed_delivery_ids else ProductionWindowStatus.SUCCEEDED
+            window.finished_at = timezone.now()
+            window.reason_summary = "queued" if window_delivery_ids else ",".join(result.zero_reasons or ["no_deliveries"])
+            window.result_payload = {
+                "delivery_ids": window_delivery_ids,
+                "failed_delivery_ids": window_failed_delivery_ids,
+                "zero_reasons": result.zero_reasons,
+                "mode": mode,
+            }
+            window.save(update_fields=["status", "finished_at", "reason_summary", "result_payload", "updated_at"])
+        except Exception as exc:
+            window.status = ProductionWindowStatus.FAILED
+            window.finished_at = timezone.now()
+            window.reason_summary = "qq_window_failed"
+            window.last_error = str(exc)
+            window.save(update_fields=["status", "finished_at", "reason_summary", "last_error", "updated_at"])
+            failed_windows.append({"window_id": window.id, "window_start": window_start.isoformat(), "error": str(exc)})
+
+    detail = f"region={region} windows={len(window_ids)} queued={len(delivery_ids)} failed={len(failed_delivery_ids)}"
+    if failed_delivery_ids or failed_windows:
+        _log_failure(log, detail)
+    else:
+        _log_success(log, detail)
+    return {
+        "region": region,
+        "window_id": window_ids[-1] if window_ids else None,
+        "window_ids": window_ids,
+        "delivery_ids": delivery_ids,
+        "failed_delivery_ids": failed_delivery_ids,
+        "zero_reasons": list(dict.fromkeys(zero_reasons)),
+        "skipped_windows": skipped_windows,
+        "failed_windows": failed_windows,
+    }
+
+
+@shared_task
+def qq_production_regions_window_task(now_iso: str | None = None) -> dict:
+    log = _log_start("qq_production_regions_window", {"now_iso": now_iso})
+    if (
+        not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ENABLED", False)
+        or not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED", False)
+        or getattr(settings, "MULTIREGION_ROLLBACK_DISABLE_QQ_WINDOWS", False)
+        or not getattr(settings, "QQ_PUSH_ENABLED", False)
+    ):
+        _log_success(log, "disabled")
+        return {"skipped": True, "reason": "disabled", "triggered_regions": []}
+    regions = list(getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS", [])) or [
+        RacingRegion.JAPAN,
+        RacingRegion.HONG_KONG,
+        RacingRegion.UNITED_KINGDOM,
+        RacingRegion.FRANCE,
+        RacingRegion.UNITED_STATES,
+    ]
+    triggered: list[str] = []
+    failed: list[dict] = []
+    for region in regions:
+        try:
+            dispatch_task(qq_region_window_task, region, now_iso=now_iso)
+            triggered.append(region)
+        except Exception as exc:
+            failed.append({"region": region, "error": str(exc)})
+    detail = f"triggered={len(triggered)} failed={len(failed)}"
+    if failed:
+        _log_failure(log, detail)
+    else:
+        _log_success(log, detail)
+    return {"triggered_regions": triggered, "failed": failed}
+
+
+@shared_task
+def production_summary_task() -> dict:
+    log = _log_start("production_summary")
+    payload = summarize_multiregion_news_production()
+    send_production_summary_notification(payload)
+    _log_success(log, "production summary generated")
+    return payload
 
 
 def _qq_push_retry_countdown(attempt_count: int) -> int:

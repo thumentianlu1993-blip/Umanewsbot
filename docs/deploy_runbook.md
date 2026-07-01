@@ -1903,3 +1903,75 @@ QQ_PUSH_IMPORTANCE_STRATEGY=ranked
 ```
 
 enabled 来源最近状态显示五地区均有来源记录，多数为 `success`。当前仅 `Sponichi 新闻ランキング` 最近一次为上游 `502 Bad Gateway`，其余日本、香港、英国、法国、美国 enabled 来源最近状态为 `success`。该 502 属于来源站点临时响应异常，不阻断本次部署验收。
+
+## 2026-07-01 多地区新闻增量窗口部署注意事项
+
+本节对应 OpenSpec change `increase-multiregion-news-volume`。该变更包含新迁移和新 Celery Beat 项，部署后默认关闭。
+
+### 部署前
+
+1. 备份生产数据库和 `.env`。
+2. 确认没有运行中的外部数据 importer、长窗口 dry-run 或手工导入任务。
+3. 部署前本地必须通过：
+
+```bash
+DB_ENGINE=sqlite python server/manage.py check
+DB_ENGINE=sqlite python server/manage.py makemigrations --check --dry-run
+DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python server/manage.py test stable.tests.ProductionWindowModelTests stable.tests.ProductionWindowServiceTests stable.tests.PublishWindowServiceTests stable.tests.QQWindowServiceTests --noinput
+openspec validate increase-multiregion-news-volume --strict
+openspec validate --all
+git diff --check
+```
+
+### 默认关闭验证
+
+迁移和重启后先确认以下开关仍为关闭：
+
+```dotenv
+MULTIREGION_PRODUCTION_WINDOWS_ENABLED=false
+MULTIREGION_PRODUCTION_WINDOWS_CRAWL_ENABLED=false
+MULTIREGION_PRODUCTION_WINDOWS_PUBLISH_ENABLED=false
+MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED=false
+```
+
+执行只读审计：
+
+```bash
+python manage.py audit_multiregion_news_production --output multiregion-window-audit.json
+```
+
+重点查看 `settings`、各地区 `sources.production_approved`、`sources.backoff_active`、`production_windows` 和 `quota_exhausted`。
+
+### 启用顺序
+
+建议按以下顺序启用：
+
+1. 标记来源 `production_approved=true`，确认没有高风险或需长间隔来源被误纳入。
+2. 设置 `MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=japan,hong_kong,united_kingdom,france,united_states`。
+3. 开启总开关和抓取窗口，观察最近 4 个抓取窗口。
+4. 开启发布窗口，观察最近 4 个发布窗口，每地区每窗口应为 `0-5` 篇，0 篇必须有 `reason_summary` 或候选决策原因。
+5. 开启 QQ 窗口，观察最近 4 个 QQ 窗口，每地区每窗口最多 3 篇，保底文章不应自动 QQ。
+
+### 快速回滚
+
+优先使用分链路回滚：
+
+```dotenv
+MULTIREGION_ROLLBACK_DISABLE_CRAWL_WINDOWS=true
+MULTIREGION_ROLLBACK_DISABLE_PUBLISH_WINDOWS=true
+MULTIREGION_ROLLBACK_DISABLE_QQ_WINDOWS=true
+MULTIREGION_ROLLBACK_DISABLE_OPS_NOTIFICATIONS=true
+```
+
+如需完全关闭新窗口：
+
+```dotenv
+MULTIREGION_PRODUCTION_WINDOWS_ENABLED=false
+```
+
+QQ 限流或 OneBot 异常时优先关闭：
+
+```dotenv
+MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED=false
+QQ_PUSH_ENABLED=false
+```

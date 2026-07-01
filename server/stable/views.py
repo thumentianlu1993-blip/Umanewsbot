@@ -11,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -43,7 +44,12 @@ from .models import (
     NotificationLog,
     OperationLog,
     PublishedByMode,
+    ProductionWindow,
+    ProductionWindowKind,
+    ProductionWindowStatus,
     PushTarget,
+    QuotaLedger,
+    QuotaLedgerKind,
     RacingRegion,
     ReviewMode,
     SourceLanguage,
@@ -54,12 +60,18 @@ from .models import (
     TermCandidateStatus,
     TermEntry,
     TermType,
+    WindowCandidateDecision,
+    WindowTargetDecision,
     WorkflowStatus,
 )
 from .services.media_assets import localize_news_image, set_cover_asset
 from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
+from .services.onebot import BotPusher
 from .services.operations import log_operation
+from .services.production_windows import claim_window
+from .services.publishing_windows import select_publish_candidates
 from .services.pushing import enqueue_push_for_article
+from .services.qq_windows import select_qq_window_deliveries
 from .services.queueing import dispatch_task
 from .services.sources import sync_builtin_sources
 from .services.storage import current_media_provider
@@ -81,6 +93,8 @@ from .tasks import (
     crawl_news_source_task,
     discover_term_candidates_task,
     process_article_automation_task,
+    publish_article_automatically,
+    qq_push_delivery_task,
     translate_article_task,
 )
 
@@ -402,6 +416,173 @@ def region_production(request: HttpRequest):
     )
 
 
+def _window_quota_ledgers(window: ProductionWindow):
+    hour_start = window.window_start.replace(minute=0, second=0, microsecond=0)
+    kinds = [QuotaLedgerKind.WEB_PUBLISH] if window.kind == ProductionWindowKind.PUBLISH else [QuotaLedgerKind.QQ_PUSH]
+    return QuotaLedger.objects.filter(kind__in=kinds, window_start=hour_start).order_by("kind", "scope", "scope_key")
+
+
+@login_required
+def production_window_detail(request: HttpRequest, window_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    window = get_object_or_404(
+        ProductionWindow.objects.select_related("source", "target", "triggered_by"),
+        pk=window_id,
+    )
+    return render(
+        request,
+        "stable/console/production_window_detail.html",
+        _console_context(
+            request,
+            window=window,
+            candidate_decisions=window.candidate_decisions.select_related("article").order_by("rank", "-score", "id"),
+            target_decisions=window.target_decisions.select_related("article", "target").order_by("target_id", "article_id", "id"),
+            quota_ledgers=_window_quota_ledgers(window),
+        ),
+    )
+
+
+@login_required
+def production_window_preview(request: HttpRequest, window_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    window = get_object_or_404(ProductionWindow, pk=window_id)
+    selected_articles = []
+    delivery_articles = []
+    candidate_decisions = []
+    target_decisions = []
+    zero_reasons: list[str] = []
+    unsupported = window.kind not in {ProductionWindowKind.PUBLISH, ProductionWindowKind.QQ_PUSH}
+
+    if not unsupported:
+        with transaction.atomic():
+            if window.kind == ProductionWindowKind.PUBLISH:
+                result = select_publish_candidates(window.racing_region, window=window, now=window.window_end)
+                selected_articles = list(result.selected)
+                zero_reasons = result.zero_reasons
+                candidate_decisions = list(
+                    WindowCandidateDecision.objects.filter(window=window)
+                    .select_related("article")
+                    .order_by("rank", "-score", "id")
+                )
+            else:
+                result = select_qq_window_deliveries(window.racing_region, window=window, now=window.window_end)
+                zero_reasons = result.zero_reasons
+                delivery_articles = [delivery.article for delivery in result.deliveries]
+                target_decisions = list(
+                    WindowTargetDecision.objects.filter(window=window)
+                    .select_related("article", "target")
+                    .order_by("target_id", "article_id", "id")
+                )
+            transaction.set_rollback(True)
+
+    return render(
+        request,
+        "stable/console/production_window_preview.html",
+        _console_context(
+            request,
+            window=window,
+            unsupported=unsupported,
+            selected_articles=selected_articles,
+            delivery_articles=delivery_articles,
+            candidate_decisions=candidate_decisions,
+            target_decisions=target_decisions,
+            zero_reasons=zero_reasons,
+        ),
+    )
+
+
+@login_required
+@require_POST
+def production_window_rerun(request: HttpRequest, window_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    window = get_object_or_404(ProductionWindow, pk=window_id)
+    if window.kind not in {ProductionWindowKind.PUBLISH, ProductionWindowKind.QQ_PUSH}:
+        messages.warning(request, "抓取窗口默认不从这里重跑，避免重新请求外部来源。")
+        return redirect("console-production-window-detail", window_id=window.id)
+
+    window.status = ProductionWindowStatus.PENDING
+    window.rerun_count += 1
+    window.triggered_by = request.user
+    window.save(update_fields=["status", "rerun_count", "triggered_by", "updated_at"])
+    claim = claim_window(window)
+    if not claim.claimed:
+        messages.warning(request, f"窗口当前不能重跑：{claim.reason}")
+        return redirect("console-production-window-detail", window_id=window.id)
+
+    window = claim.window
+    try:
+        if window.kind == ProductionWindowKind.PUBLISH:
+            selection = select_publish_candidates(window.racing_region, window=window, now=window.window_end)
+            published_ids = []
+            failed_ids = []
+            for article in selection.selected:
+                try:
+                    publish_article_automatically(article)
+                    published_ids.append(article.id)
+                except Exception:
+                    failed_ids.append(article.id)
+            window.status = ProductionWindowStatus.PARTIAL if failed_ids else ProductionWindowStatus.SUCCEEDED
+            window.reason_summary = "manual_rerun_published" if published_ids else ",".join(selection.zero_reasons or ["manual_rerun_no_published_articles"])
+            window.result_payload = {
+                "published_article_ids": published_ids,
+                "failed_article_ids": failed_ids,
+                "zero_reasons": selection.zero_reasons,
+                "manual_rerun": True,
+            }
+            window.last_error = ""
+        else:
+            online, status_error = BotPusher().is_online()
+            if not online:
+                reason = status_error or "onebot_offline"
+                window.status = ProductionWindowStatus.FAILED
+                window.reason_summary = reason
+                window.last_error = reason
+                window.result_payload = {"delivery_ids": [], "zero_reasons": [reason], "manual_rerun": True}
+            else:
+                result = select_qq_window_deliveries(window.racing_region, window=window, now=window.window_end)
+                delivery_ids = []
+                failed_ids = []
+                for delivery in result.deliveries:
+                    try:
+                        dispatch_task(qq_push_delivery_task, delivery.id)
+                        delivery_ids.append(delivery.id)
+                    except Exception:
+                        failed_ids.append(delivery.id)
+                window.status = ProductionWindowStatus.PARTIAL if failed_ids else ProductionWindowStatus.SUCCEEDED
+                window.reason_summary = "manual_rerun_queued" if delivery_ids else ",".join(result.zero_reasons or ["manual_rerun_no_deliveries"])
+                window.result_payload = {
+                    "delivery_ids": delivery_ids,
+                    "failed_delivery_ids": failed_ids,
+                    "zero_reasons": result.zero_reasons,
+                    "manual_rerun": True,
+                }
+                window.last_error = ""
+        window.finished_at = timezone.now()
+        window.save(update_fields=["status", "finished_at", "reason_summary", "last_error", "result_payload", "updated_at"])
+        log_operation(
+            action_type="production_window_rerun",
+            target_type="production_window",
+            target_id=window.pk,
+            detail=f"手动重跑 {window.kind} 窗口 {window.scope_key} @ {window.window_start}",
+            admin=request.user,
+        )
+        messages.success(request, "窗口重跑已完成。")
+    except Exception as exc:
+        window.status = ProductionWindowStatus.FAILED
+        window.finished_at = timezone.now()
+        window.reason_summary = "manual_rerun_failed"
+        window.last_error = str(exc)
+        window.save(update_fields=["status", "finished_at", "reason_summary", "last_error", "updated_at"])
+        messages.error(request, f"窗口重跑失败：{exc}")
+    return redirect("console-production-window-detail", window_id=window.id)
+
+
 @login_required
 def source_create(request: HttpRequest):
     denied = _ensure_staff(request)
@@ -497,6 +678,12 @@ def source_test_crawl(request: HttpRequest, source_id: int):
     if denied:
         return denied
     source = get_object_or_404(NewsSource, pk=source_id, deleted_at__isnull=True)
+    if source.manual_pause_reason:
+        messages.error(request, f"来源已人工暂停：{source.manual_pause_reason}")
+        return redirect("console-source-list")
+    if source.backoff_until and source.backoff_until > timezone.now():
+        messages.error(request, f"来源处于自动降频/backoff，下一次允许抓取：{timezone.localtime(source.backoff_until):%Y-%m-%d %H:%M}")
+        return redirect("console-source-list")
     dispatch_task(crawl_news_source_task, source.id)
     log_operation(
         action_type="source_test_crawl",

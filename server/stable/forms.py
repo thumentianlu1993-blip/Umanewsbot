@@ -72,12 +72,21 @@ class NewsSourceForm(forms.ModelForm):
             "source_mode",
             "enabled",
             "crawl_interval_minutes",
+            "production_approved",
+            "effective_crawl_interval_minutes",
+            "backoff_until",
+            "manual_pause_reason",
+            "failure_streak",
+            "success_streak",
+            "last_error_category",
+            "allow_event_boost",
             "priority",
             "logo_url",
             "notes",
         ]
         widgets = {
             "notes": forms.Textarea(attrs={"rows": 4}),
+            "manual_pause_reason": forms.Textarea(attrs={"rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):

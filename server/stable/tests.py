@@ -14,7 +14,7 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.test import Client, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -62,13 +62,23 @@ from stable.models import (
     NewsSource,
     NotificationLog,
     OperationLog,
+    MajorRaceEvent,
     PublishedByMode,
+    ProductionWindow,
+    ProductionWindowKind,
+    ProductionWindowMode,
+    ProductionWindowStatus,
     PushTarget,
     QQPushDelivery,
     QQPushDeliveryStatus,
     QQPushErrorType,
+    QuotaLedger,
+    QuotaLedgerKind,
+    QuotaLedgerScope,
+    RaceGrade,
     RacingRegion,
     ReviewMode,
+    SourceErrorCategory,
     SourceLanguage,
     SourceMode,
     SourceSite,
@@ -80,6 +90,9 @@ from stable.models import (
     TermEntry,
     TaskExecutionLog,
     TaskStatus,
+    WindowCandidateDecision,
+    WindowDecisionStatus,
+    WindowTargetDecision,
     WorkflowStatus,
 )
 from stable.services.onebot import BotPusher, OneBotRequestError
@@ -1297,6 +1310,1221 @@ class InternationalSourceMetadataTests(TestCase):
         self.assertNotIn("html", snapshot.snapshot_metadata)
 
 
+class ProductionWindowModelTests(TestCase):
+    def _article(self, **overrides):
+        payload = {
+            "source_site": SourceSite.HKJC_NEWS,
+            "source_mode": SourceMode.LATEST,
+            "source_article_id": overrides.pop("source_article_id", "window-article"),
+            "racing_region": RacingRegion.HONG_KONG,
+            "source_language": SourceLanguage.ENGLISH,
+            "title_ja": "Window article",
+            "body_ja_raw": "Window body. " * 20,
+            "body_ja_normalized": "Window body. " * 20,
+            "published_at": timezone.now(),
+            "source_url": "https://example.com/window-article",
+        }
+        payload.update(overrides)
+        return NewsArticle.objects.create(**payload)
+
+    def test_production_window_unique_scope_per_kind_and_start(self):
+        window_start = timezone.now().replace(second=0, microsecond=0)
+        ProductionWindow.objects.create(
+            kind=ProductionWindowKind.PUBLISH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            scope_key="region:hong_kong",
+            window_start=window_start,
+            window_end=window_start + timedelta(minutes=15),
+            status=ProductionWindowStatus.PENDING,
+        )
+
+        with self.assertRaises(IntegrityError):
+            ProductionWindow.objects.create(
+                kind=ProductionWindowKind.PUBLISH,
+                mode=ProductionWindowMode.DAILY,
+                racing_region=RacingRegion.HONG_KONG,
+                scope_key="region:hong_kong",
+                window_start=window_start,
+                window_end=window_start + timedelta(minutes=15),
+                status=ProductionWindowStatus.PENDING,
+            )
+
+    def test_window_decisions_record_article_and_target_reasons(self):
+        article = self._article()
+        target = PushTarget.objects.create(name="HK group", group_id="12345", allowed_regions=[RacingRegion.HONG_KONG])
+        window_start = timezone.now().replace(second=0, microsecond=0)
+        window = ProductionWindow.objects.create(
+            kind=ProductionWindowKind.QQ_PUSH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            target=target,
+            scope_key="region:hong_kong:target:12345",
+            window_start=window_start,
+            window_end=window_start + timedelta(minutes=15),
+        )
+
+        candidate = WindowCandidateDecision.objects.create(
+            window=window,
+            article=article,
+            status=WindowDecisionStatus.SELECTED,
+            reason="high_value",
+            score=92,
+            rank=1,
+            payload={"signals": ["ranked"]},
+        )
+        target_decision = WindowTargetDecision.objects.create(
+            window=window,
+            article=article,
+            target=target,
+            decision_key=f"target:{target.pk}:article:{article.pk}",
+            status=WindowDecisionStatus.SKIPPED,
+            reason="group_hour_quota_exhausted",
+            payload={"limit": 12, "used": 12},
+        )
+
+        self.assertEqual(candidate.payload["signals"], ["ranked"])
+        self.assertEqual(target_decision.reason, "group_hour_quota_exhausted")
+
+    def test_quota_ledger_unique_scope_and_window(self):
+        window_start = timezone.now().replace(minute=0, second=0, microsecond=0)
+        QuotaLedger.objects.create(
+            kind=QuotaLedgerKind.QQ_PUSH,
+            scope=QuotaLedgerScope.GROUP_HOUR,
+            scope_key="group:12345",
+            window_start=window_start,
+            limit=12,
+            used=3,
+        )
+
+        with self.assertRaises(IntegrityError):
+            QuotaLedger.objects.create(
+                kind=QuotaLedgerKind.QQ_PUSH,
+                scope=QuotaLedgerScope.GROUP_HOUR,
+                scope_key="group:12345",
+                window_start=window_start,
+                limit=12,
+                used=1,
+            )
+
+    def test_major_race_event_unique_by_name_year_region_and_grade(self):
+        race_date = timezone.localdate()
+        MajorRaceEvent.objects.create(
+            name="皋月赏",
+            normalized_name="皋月赏",
+            year=2026,
+            racing_region=RacingRegion.JAPAN,
+            race_grade=RaceGrade.G1,
+            timezone_name="Asia/Tokyo",
+            local_date=race_date,
+        )
+
+        with self.assertRaises(IntegrityError):
+            MajorRaceEvent.objects.create(
+                name="皐月賞",
+                normalized_name="皋月赏",
+                year=2026,
+                racing_region=RacingRegion.JAPAN,
+                race_grade=RaceGrade.G1,
+                timezone_name="Asia/Tokyo",
+                local_date=race_date,
+            )
+
+    def test_major_race_event_admin_recalculates_boost_window_on_save(self):
+        from django.contrib import admin as django_admin
+
+        from stable.admin import MajorRaceEventAdmin
+
+        race_date = datetime(2026, 4, 19, tzinfo=dt_timezone.utc).date()
+        event = MajorRaceEvent(
+            name="皋月赏",
+            normalized_name="皋月赏",
+            year=2026,
+            racing_region=RacingRegion.JAPAN,
+            race_grade=RaceGrade.G1,
+            timezone_name="Asia/Tokyo",
+            local_date=race_date,
+            local_start_time=datetime(2026, 4, 19, 15, 40).time(),
+        )
+        admin_instance = MajorRaceEventAdmin(MajorRaceEvent, django_admin.site)
+
+        admin_instance.save_model(None, event, None, False)
+        event.refresh_from_db()
+        first_boost_start = event.boost_start_at
+        self.assertEqual(first_boost_start, datetime(2026, 4, 19, 3, 40, tzinfo=dt_timezone.utc))
+
+        event.local_start_time = datetime(2026, 4, 19, 15, 45).time()
+        admin_instance.save_model(None, event, None, True)
+
+        event.refresh_from_db()
+        self.assertEqual(event.boost_start_at, datetime(2026, 4, 19, 3, 45, tzinfo=dt_timezone.utc))
+        self.assertNotEqual(event.boost_start_at, first_boost_start)
+
+    def test_news_source_production_runtime_fields(self):
+        backoff_until = timezone.now() + timedelta(minutes=30)
+        source = NewsSource.objects.create(
+            name="HK production source",
+            homepage_url="https://example.com",
+            feed_url="https://example.com/feed",
+            racing_region=RacingRegion.HONG_KONG,
+            source_language=SourceLanguage.ENGLISH,
+            adapter_key="hkjc_news",
+            source_site=SourceSite.HKJC_NEWS,
+            source_mode=SourceMode.LATEST,
+            enabled=True,
+            production_approved=True,
+            effective_crawl_interval_minutes=15,
+            backoff_until=backoff_until,
+            manual_pause_reason="manual pause",
+            failure_streak=3,
+            success_streak=0,
+            last_error_category=SourceErrorCategory.HTTP_429,
+            allow_event_boost=False,
+        )
+
+        source.refresh_from_db()
+        self.assertTrue(source.production_approved)
+        self.assertEqual(source.effective_crawl_interval_minutes, 15)
+        self.assertEqual(source.failure_streak, 3)
+        self.assertEqual(source.last_error_category, SourceErrorCategory.HTTP_429)
+        self.assertFalse(source.allow_event_boost)
+
+
+class ProductionWindowServiceTests(TestCase):
+    def _source(self, **overrides):
+        payload = {
+            "name": overrides.pop("name", "HK production source"),
+            "homepage_url": "https://example.com",
+            "feed_url": "https://example.com/feed",
+            "racing_region": RacingRegion.HONG_KONG,
+            "source_language": SourceLanguage.ENGLISH,
+            "adapter_key": "hkjc_news",
+            "source_site": SourceSite.HKJC_NEWS,
+            "source_mode": SourceMode.LATEST,
+            "enabled": True,
+            "production_approved": True,
+            "effective_crawl_interval_minutes": 15,
+        }
+        payload.update(overrides)
+        return NewsSource.objects.create(**payload)
+
+    def test_window_bounds_floor_to_daily_and_major_race_intervals(self):
+        from stable.services.production_windows import current_window_bounds
+
+        now = datetime(2026, 7, 1, 10, 17, 33, tzinfo=dt_timezone.utc)
+
+        daily = current_window_bounds(now, minutes=15)
+        major = current_window_bounds(now, minutes=5)
+
+        self.assertEqual(daily.start, datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc))
+        self.assertEqual(daily.end, datetime(2026, 7, 1, 10, 30, tzinfo=dt_timezone.utc))
+        self.assertEqual(major.start, datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc))
+        self.assertEqual(major.end, datetime(2026, 7, 1, 10, 20, tzinfo=dt_timezone.utc))
+
+    def test_lookback_windows_are_capped_to_three_hours(self):
+        from stable.services.production_windows import due_window_starts
+
+        now = datetime(2026, 7, 1, 12, 0, tzinfo=dt_timezone.utc)
+        starts = due_window_starts(
+            last_window_start=datetime(2026, 7, 1, 1, 0, tzinfo=dt_timezone.utc),
+            now=now,
+            minutes=15,
+            lookback_hours=3,
+        )
+
+        self.assertEqual(starts[0], datetime(2026, 7, 1, 9, 0, tzinfo=dt_timezone.utc))
+        self.assertEqual(starts[-1], datetime(2026, 7, 1, 11, 45, tzinfo=dt_timezone.utc))
+        self.assertEqual(len(starts), 12)
+
+    def test_claim_window_respects_active_lease_and_reclaims_expired_lease(self):
+        from stable.services.production_windows import claim_window
+
+        window_start = datetime(2026, 7, 1, 10, 0, tzinfo=dt_timezone.utc)
+        window = ProductionWindow.objects.create(
+            kind=ProductionWindowKind.PUBLISH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            scope_key="region:hong_kong",
+            window_start=window_start,
+            window_end=window_start + timedelta(minutes=15),
+        )
+
+        first = claim_window(window, now=window_start, lease_minutes=30)
+        second = claim_window(window, now=window_start + timedelta(minutes=5), lease_minutes=30)
+        third = claim_window(window, now=window_start + timedelta(minutes=31), lease_minutes=30)
+
+        window.refresh_from_db()
+        self.assertTrue(first.claimed)
+        self.assertFalse(second.claimed)
+        self.assertEqual(second.reason, "lease_active")
+        self.assertTrue(third.claimed)
+        self.assertEqual(window.attempt_count, 2)
+
+    def test_major_race_window_uses_local_time_and_overlaps_by_region(self):
+        from stable.services.production_windows import active_major_race_window, update_major_race_boost_window
+
+        timed = MajorRaceEvent.objects.create(
+            name="日本德比",
+            normalized_name="日本德比",
+            year=2026,
+            racing_region=RacingRegion.JAPAN,
+            race_grade=RaceGrade.G1,
+            timezone_name="Asia/Tokyo",
+            local_date=datetime(2026, 5, 31).date(),
+            local_start_time=datetime(2026, 5, 31, 15, 40).time(),
+        )
+        date_level = MajorRaceEvent.objects.create(
+            name="女皇杯",
+            normalized_name="女皇杯",
+            year=2026,
+            racing_region=RacingRegion.HONG_KONG,
+            race_grade=RaceGrade.G1,
+            timezone_name="Asia/Hong_Kong",
+            local_date=datetime(2026, 4, 26).date(),
+        )
+        update_major_race_boost_window(timed)
+        update_major_race_boost_window(date_level)
+
+        japan_window = active_major_race_window(
+            RacingRegion.JAPAN,
+            now=datetime(2026, 5, 31, 5, 0, tzinfo=dt_timezone.utc),
+        )
+        hk_window = active_major_race_window(
+            RacingRegion.HONG_KONG,
+            now=datetime(2026, 4, 26, 10, 0, tzinfo=dt_timezone.utc),
+        )
+        uk_window = active_major_race_window(
+            RacingRegion.UNITED_KINGDOM,
+            now=datetime(2026, 5, 31, 5, 0, tzinfo=dt_timezone.utc),
+        )
+
+        self.assertIsNotNone(japan_window)
+        self.assertIsNotNone(hk_window)
+        self.assertIsNone(uk_window)
+        self.assertEqual(japan_window.events[0].name, "日本德比")
+        self.assertEqual(hk_window.events[0].name, "女皇杯")
+
+    def test_import_major_race_events_csv_upserts_by_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = Path(tmp) / "major-races.csv"
+            csv_path.write_text(
+                "\n".join(
+                    [
+                        "name,normalized_name,year,racing_region,race_grade,timezone_name,local_date,local_start_time,is_active,aliases,notes",
+                        "皋月赏,皋月赏,2026,japan,G1,Asia/Tokyo,2026-04-19,15:40,true,皐月賞|Satsuki Sho,first",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            call_command("import_major_race_events", "--csv", str(csv_path))
+            csv_path.write_text(
+                "\n".join(
+                    [
+                        "name,normalized_name,year,racing_region,race_grade,timezone_name,local_date,local_start_time,is_active,aliases,notes",
+                        "皋月赏,皋月赏,2026,japan,G1,Asia/Tokyo,2026-04-19,15:45,true,皐月賞|Satsuki Sho,updated",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            call_command("import_major_race_events", "--csv", str(csv_path))
+
+        event = MajorRaceEvent.objects.get(normalized_name="皋月赏", year=2026, racing_region=RacingRegion.JAPAN)
+        self.assertEqual(MajorRaceEvent.objects.count(), 1)
+        self.assertEqual(event.local_start_time.strftime("%H:%M"), "15:45")
+        self.assertEqual(event.notes, "updated")
+        self.assertIsNotNone(event.boost_start_at)
+
+    def test_select_production_sources_filters_approval_backoff_and_pause(self):
+        from stable.services.production_windows import select_production_sources
+
+        due = self._source(name="due", source_mode=SourceMode.LATEST)
+        self._source(name="not approved", source_mode=SourceMode.OFFICIAL, production_approved=False)
+        self._source(name="paused", source_mode=SourceMode.ACCESS, manual_pause_reason="manual")
+        self._source(
+            name="backoff",
+            source_site=SourceSite.SCMP_RACING,
+            source_mode=SourceMode.LATEST,
+            backoff_until=timezone.now() + timedelta(hours=1),
+        )
+
+        selection = select_production_sources(
+            now=timezone.now(),
+            allowed_regions={RacingRegion.HONG_KONG},
+        )
+
+        self.assertEqual([item.source for item in selection.selected], [due])
+        self.assertIn("production_not_approved", {item.reason for item in selection.skipped})
+        self.assertIn("manual_pause", {item.reason for item in selection.skipped})
+        self.assertIn("backoff_active", {item.reason for item in selection.skipped})
+
+    def test_select_production_sources_skips_active_crawl_window(self):
+        from stable.services.production_windows import select_production_sources
+
+        source = self._source(name="running", source_mode=SourceMode.LATEST)
+        now = datetime(2026, 7, 1, 10, 17, tzinfo=dt_timezone.utc)
+        ProductionWindow.objects.create(
+            kind=ProductionWindowKind.CRAWL,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            source=source,
+            scope_key=f"source:{source.id}",
+            window_start=datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+            window_end=datetime(2026, 7, 1, 10, 30, tzinfo=dt_timezone.utc),
+            status=ProductionWindowStatus.RUNNING,
+            lease_expires_at=now + timedelta(minutes=20),
+        )
+
+        selection = select_production_sources(now=now, allowed_regions={RacingRegion.HONG_KONG})
+
+        self.assertEqual(selection.selected, [])
+        self.assertIn("crawl_window_running", {item.reason for item in selection.skipped})
+
+    @override_settings(MULTIREGION_CRAWL_DEFAULT_INTERVAL_MINUTES=15)
+    def test_production_approved_sources_default_to_15_minute_due_interval(self):
+        from stable.services.production_windows import select_production_sources
+
+        now = datetime(2026, 7, 1, 10, 30, tzinfo=dt_timezone.utc)
+        due = self._source(
+            name="due after default interval",
+            source_mode=SourceMode.LATEST,
+            crawl_interval_minutes=240,
+            effective_crawl_interval_minutes=None,
+            last_crawl_at=now - timedelta(minutes=20),
+        )
+        self._source(
+            name="not due before default interval",
+            source_site=SourceSite.SCMP_RACING,
+            source_mode=SourceMode.LATEST,
+            crawl_interval_minutes=240,
+            effective_crawl_interval_minutes=None,
+            last_crawl_at=now - timedelta(minutes=10),
+        )
+
+        selection = select_production_sources(now=now, allowed_regions={RacingRegion.HONG_KONG})
+
+        self.assertEqual([item.source for item in selection.selected], [due])
+        self.assertIn("not_due", {item.reason for item in selection.skipped})
+
+    def test_source_error_backoff_and_recovery_update_runtime_fields(self):
+        from stable.services.production_windows import record_source_crawl_result
+
+        source = self._source()
+        now = timezone.now()
+
+        record_source_crawl_result(source, success=False, error_category=SourceErrorCategory.TIMEOUT, now=now)
+        record_source_crawl_result(source, success=False, error_category=SourceErrorCategory.TIMEOUT, now=now + timedelta(minutes=1))
+        record_source_crawl_result(source, success=False, error_category=SourceErrorCategory.HTTP_429, now=now + timedelta(minutes=2))
+        source.refresh_from_db()
+        self.assertEqual(source.failure_streak, 3)
+        self.assertEqual(source.last_error_category, SourceErrorCategory.HTTP_429)
+        self.assertIsNotNone(source.backoff_until)
+        self.assertGreaterEqual(source.effective_crawl_interval_minutes, 60)
+
+        for offset in range(3, 6):
+            record_source_crawl_result(source, success=True, now=now + timedelta(minutes=offset))
+        source.refresh_from_db()
+        self.assertEqual(source.failure_streak, 0)
+        self.assertEqual(source.success_streak, 3)
+        self.assertIsNone(source.backoff_until)
+        self.assertEqual(source.effective_crawl_interval_minutes, 15)
+
+    def test_classify_source_error_maps_common_failure_shapes(self):
+        from stable.services.production_windows import classify_source_error
+
+        self.assertEqual(classify_source_error(status_code=403), SourceErrorCategory.HTTP_403)
+        self.assertEqual(classify_source_error(status_code=429), SourceErrorCategory.HTTP_429)
+        self.assertEqual(classify_source_error(status_code=503), SourceErrorCategory.SERVER_ERROR)
+        self.assertEqual(classify_source_error(message="request timeout"), SourceErrorCategory.TIMEOUT)
+        self.assertEqual(classify_source_error(message="captcha required"), SourceErrorCategory.CAPTCHA_OR_BLOCKED)
+        self.assertEqual(classify_source_error(message="parse failed"), SourceErrorCategory.PARSE_ERROR)
+        self.assertEqual(classify_source_error(empty_success=True), SourceErrorCategory.EMPTY_SUCCESS)
+
+    def test_builtin_source_sync_preserves_manual_production_runtime_fields(self):
+        sync_builtin_sources()
+        source = NewsSource.objects.get(source_site=SourceSite.HKJC_NEWS, source_mode=SourceMode.LATEST)
+        source.enabled = True
+        source.production_approved = True
+        source.effective_crawl_interval_minutes = 45
+        source.backoff_until = timezone.now() + timedelta(hours=2)
+        source.manual_pause_reason = "operator pause"
+        source.allow_event_boost = False
+        source.save(
+            update_fields=[
+                "enabled",
+                "production_approved",
+                "effective_crawl_interval_minutes",
+                "backoff_until",
+                "manual_pause_reason",
+                "allow_event_boost",
+                "updated_at",
+            ]
+        )
+
+        sync_builtin_sources()
+
+        source.refresh_from_db()
+        self.assertTrue(source.enabled)
+        self.assertTrue(source.production_approved)
+        self.assertEqual(source.effective_crawl_interval_minutes, 45)
+        self.assertIsNotNone(source.backoff_until)
+        self.assertEqual(source.manual_pause_reason, "operator pause")
+        self.assertFalse(source.allow_event_boost)
+
+    def test_crawl_news_source_task_updates_window_after_real_success(self):
+        from stable.tasks import crawl_news_source_task
+
+        source = self._source()
+        window = ProductionWindow.objects.create(
+            kind=ProductionWindowKind.CRAWL,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            source=source,
+            scope_key=f"source:{source.id}",
+            window_start=datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+            window_end=datetime(2026, 7, 1, 10, 30, tzinfo=dt_timezone.utc),
+            status=ProductionWindowStatus.RUNNING,
+        )
+
+        with patch("stable.tasks._crawl_international_source", return_value={"new_count": 2, "seen_count": 1, "crawl_job_id": 123}):
+            result = crawl_news_source_task.run(source.id, window.id)
+
+        window.refresh_from_db()
+        self.assertEqual(result["new_count"], 2)
+        self.assertEqual(window.status, ProductionWindowStatus.SUCCEEDED)
+        self.assertEqual(window.reason_summary, "completed")
+        self.assertEqual(window.result_payload["new_count"], 2)
+
+    def test_crawl_news_source_task_classifies_http_status_failures(self):
+        from stable.tasks import crawl_news_source_task
+
+        source = self._source()
+        window = ProductionWindow.objects.create(
+            kind=ProductionWindowKind.CRAWL,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            source=source,
+            scope_key=f"source:{source.id}",
+            window_start=datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+            window_end=datetime(2026, 7, 1, 10, 30, tzinfo=dt_timezone.utc),
+            status=ProductionWindowStatus.RUNNING,
+        )
+        response = Mock(status_code=429)
+        error = requests.HTTPError("rate limited")
+        error.response = response
+
+        with patch("stable.tasks._crawl_international_source", side_effect=error):
+            with self.assertRaises(requests.HTTPError):
+                crawl_news_source_task.run(source.id, window.id)
+
+        source.refresh_from_db()
+        window.refresh_from_db()
+        self.assertEqual(source.last_error_category, SourceErrorCategory.HTTP_429)
+        self.assertEqual(window.status, ProductionWindowStatus.FAILED)
+        self.assertEqual(window.reason_summary, "crawl_failed")
+        self.assertEqual(window.result_payload["error_category"], SourceErrorCategory.HTTP_429)
+
+    @override_settings(
+        MULTIREGION_PRODUCTION_WINDOWS_ENABLED=False,
+        MULTIREGION_PRODUCTION_WINDOWS_CRAWL_ENABLED=True,
+    )
+    def test_crawl_production_sources_window_task_stays_disabled_by_default(self):
+        from stable.tasks import crawl_production_sources_window_task
+
+        source = self._source()
+        result = crawl_production_sources_window_task.run()
+
+        self.assertTrue(result["skipped"])
+        self.assertEqual(result["reason"], "disabled")
+        self.assertEqual(ProductionWindow.objects.count(), 0)
+        self.assertEqual(CrawlJob.objects.filter(source=source).count(), 0)
+
+    @override_settings(
+        MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_CRAWL_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_CRAWL_DEFAULT_INTERVAL_MINUTES=15,
+    )
+    def test_crawl_production_sources_window_task_claims_source_windows(self):
+        from stable.tasks import crawl_news_source_task, crawl_production_sources_window_task
+
+        source = self._source()
+
+        with patch("stable.tasks.dispatch_task", return_value={"queued": True}) as dispatch:
+            result = crawl_production_sources_window_task.run(now_iso="2026-07-01T10:17:00+00:00")
+
+        window = ProductionWindow.objects.get(kind=ProductionWindowKind.CRAWL, source=source)
+        self.assertEqual(result["triggered_source_ids"], [source.id])
+        self.assertEqual(window.status, ProductionWindowStatus.RUNNING)
+        self.assertEqual(window.reason_summary, "dispatched")
+        self.assertEqual(window.scope_key, f"source:{source.id}")
+        self.assertEqual(window.window_start, datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc))
+        dispatch.assert_called_once_with(crawl_news_source_task, source.id, window.id)
+
+    @override_settings(
+        MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_CRAWL_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_CRAWL_DEFAULT_INTERVAL_MINUTES=15,
+    )
+    def test_crawl_window_task_only_fetches_latest_missing_window(self):
+        from stable.tasks import crawl_news_source_task, crawl_production_sources_window_task
+
+        source = self._source(last_crawl_at=datetime(2026, 7, 1, 10, 0, tzinfo=dt_timezone.utc))
+        ProductionWindow.objects.create(
+            kind=ProductionWindowKind.CRAWL,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            source=source,
+            scope_key=f"source:{source.id}",
+            window_start=datetime(2026, 7, 1, 10, 0, tzinfo=dt_timezone.utc),
+            window_end=datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+            status=ProductionWindowStatus.SUCCEEDED,
+        )
+
+        with patch("stable.tasks.dispatch_task", return_value={"queued": True}) as dispatch:
+            result = crawl_production_sources_window_task.run(now_iso="2026-07-01T10:47:00+00:00")
+
+        starts = list(
+            ProductionWindow.objects.filter(kind=ProductionWindowKind.CRAWL, source=source)
+            .order_by("window_start")
+            .values_list("window_start", flat=True)
+        )
+        self.assertEqual(
+            starts,
+            [
+                datetime(2026, 7, 1, 10, 0, tzinfo=dt_timezone.utc),
+                datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+                datetime(2026, 7, 1, 10, 30, tzinfo=dt_timezone.utc),
+                datetime(2026, 7, 1, 10, 45, tzinfo=dt_timezone.utc),
+            ],
+        )
+        self.assertEqual(dispatch.call_count, 1)
+        self.assertEqual(result["triggered_source_ids"], [source.id])
+        latest = ProductionWindow.objects.get(kind=ProductionWindowKind.CRAWL, source=source, window_start=datetime(2026, 7, 1, 10, 45, tzinfo=dt_timezone.utc))
+        coalesced = ProductionWindow.objects.filter(kind=ProductionWindowKind.CRAWL, source=source, reason_summary="coalesced_to_latest_crawl_window")
+        self.assertEqual(latest.status, ProductionWindowStatus.RUNNING)
+        self.assertEqual(coalesced.count(), 2)
+        dispatch.assert_called_once_with(crawl_news_source_task, source.id, latest.id)
+
+    @override_settings(
+        MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_CRAWL_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_CRAWL_DEFAULT_INTERVAL_MINUTES=15,
+    )
+    def test_crawl_window_task_coalesces_stale_running_windows(self):
+        from stable.tasks import crawl_news_source_task, crawl_production_sources_window_task
+
+        now = datetime(2026, 7, 1, 10, 47, tzinfo=dt_timezone.utc)
+        source = self._source(last_crawl_at=datetime(2026, 7, 1, 10, 0, tzinfo=dt_timezone.utc))
+        ProductionWindow.objects.create(
+            kind=ProductionWindowKind.CRAWL,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            source=source,
+            scope_key=f"source:{source.id}",
+            window_start=datetime(2026, 7, 1, 10, 0, tzinfo=dt_timezone.utc),
+            window_end=datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+            status=ProductionWindowStatus.SUCCEEDED,
+        )
+        stale = ProductionWindow.objects.create(
+            kind=ProductionWindowKind.CRAWL,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            source=source,
+            scope_key=f"source:{source.id}",
+            window_start=datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+            window_end=datetime(2026, 7, 1, 10, 30, tzinfo=dt_timezone.utc),
+            status=ProductionWindowStatus.RUNNING,
+            lease_expires_at=now - timedelta(minutes=1),
+        )
+
+        with patch("stable.tasks.dispatch_task", return_value={"queued": True}) as dispatch:
+            crawl_production_sources_window_task.run(now_iso=now.isoformat())
+
+        stale.refresh_from_db()
+        latest = ProductionWindow.objects.get(
+            kind=ProductionWindowKind.CRAWL,
+            source=source,
+            window_start=datetime(2026, 7, 1, 10, 45, tzinfo=dt_timezone.utc),
+        )
+        self.assertEqual(stale.status, ProductionWindowStatus.SKIPPED)
+        self.assertEqual(stale.reason_summary, "coalesced_to_latest_crawl_window")
+        dispatch.assert_called_once_with(crawl_news_source_task, source.id, latest.id)
+
+
+class PublishWindowServiceTests(TestCase):
+    def _article(self, **overrides):
+        payload = {
+            "source_site": SourceSite.HKJC_NEWS,
+            "source_mode": SourceMode.LATEST,
+            "source_article_id": overrides.pop("source_article_id", f"publish-{NewsArticle.objects.count()}"),
+            "racing_region": RacingRegion.HONG_KONG,
+            "source_language": SourceLanguage.ENGLISH,
+            "title_ja": overrides.pop("title_ja", "Publish article"),
+            "body_ja_raw": "Publish body. " * 20,
+            "body_ja_normalized": "Publish body. " * 20,
+            "translated_title_zh": overrides.pop("translated_title_zh", "发布文章"),
+            "title_zh": overrides.pop("title_zh", "发布文章"),
+            "translated_summary_zh": "摘要",
+            "summary_zh": "摘要",
+            "translated_body_zh": "正文。" * 30,
+            "body_zh": "正文。" * 30,
+            "published_at": timezone.now(),
+            "source_url": overrides.pop("source_url", f"https://example.com/{NewsArticle.objects.count()}"),
+            "review_mode": ReviewMode.AUTO,
+            "automation_status": AutomationStatus.PUBLISH_READY,
+            "score_total": overrides.pop("score_total", 80),
+            "quality_score": 80,
+            "rewrite_confidence": 80,
+        }
+        payload.update(overrides)
+        return NewsArticle.objects.create(**payload)
+
+    def _window(self):
+        start = datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc)
+        return ProductionWindow.objects.create(
+            kind=ProductionWindowKind.PUBLISH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            scope_key="region:hong_kong",
+            window_start=start,
+            window_end=start + timedelta(minutes=15),
+        )
+
+    @override_settings(
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_PUBLISH_REGION_WINDOW_MAX=5,
+        MULTIREGION_PUBLISH_REGION_WINDOW_MIN=1,
+        MULTIREGION_PUBLISH_SOFT_FILL_MIN_SCORE=45,
+        MULTIREGION_PUBLISH_SITE_HOURLY_MAX_DAILY=60,
+    )
+    def test_select_publish_candidates_dedupes_scores_and_records_reasons(self):
+        from stable.services.publishing_windows import select_publish_candidates
+
+        for score in [95, 90, 85, 80, 75, 70]:
+            self._article(score_total=score, title_zh=f"新闻 {score}", source_article_id=f"a-{score}")
+        duplicate = self._article(score_total=94, title_zh="新闻 95", source_article_id="duplicate")
+        blocked = self._article(score_total=100, title_zh="", translated_title_zh="", title_ja="", source_article_id="blocked")
+        window = self._window()
+
+        result = select_publish_candidates(RacingRegion.HONG_KONG, window=window, now=timezone.now())
+
+        self.assertEqual(len(result.selected), 5)
+        self.assertNotIn(duplicate, result.selected)
+        reasons = set(WindowCandidateDecision.objects.filter(window=window).values_list("reason", flat=True))
+        self.assertIn("dedupe_loser", reasons)
+        self.assertIn("hard_gate_blocked", reasons)
+        self.assertIn("region_window_limit", reasons)
+        self.assertEqual(blocked.workflow_status, WorkflowStatus.PENDING_TRANSLATION)
+
+    @override_settings(
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_PUBLISH_REGION_WINDOW_MAX=5,
+        MULTIREGION_PUBLISH_REGION_WINDOW_MIN=1,
+        MULTIREGION_PUBLISH_SOFT_FILL_MIN_SCORE=45,
+        MULTIREGION_PUBLISH_SITE_HOURLY_MAX_DAILY=60,
+    )
+    def test_soft_fill_selects_one_web_only_article_above_min_score(self):
+        from stable.services.publishing_windows import select_publish_candidates
+
+        article = self._article(score_total=45, source_article_id="soft-fill")
+        window = self._window()
+
+        result = select_publish_candidates(RacingRegion.HONG_KONG, window=window, now=timezone.now())
+
+        self.assertEqual(result.selected, [article])
+        article.refresh_from_db()
+        self.assertTrue(article.decision_reason["region_minimum_fill"])
+        self.assertTrue(article.decision_reason["disable_auto_qq"])
+
+    @override_settings(
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_PUBLISH_REGION_WINDOW_MAX=5,
+        MULTIREGION_PUBLISH_SITE_HOURLY_MAX_DAILY=0,
+    )
+    def test_publish_quota_blocks_selection_with_structured_reason(self):
+        from stable.services.publishing_windows import select_publish_candidates
+
+        self._article(score_total=95)
+        window = self._window()
+
+        result = select_publish_candidates(RacingRegion.HONG_KONG, window=window, now=timezone.now())
+
+        self.assertEqual(result.selected, [])
+        self.assertIn("site_hour_quota_exhausted", result.zero_reasons)
+        self.assertTrue(
+            WindowCandidateDecision.objects.filter(window=window, reason="site_hour_quota_exhausted").exists()
+        )
+
+    @override_settings(
+        MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_PUBLISH_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_PUBLISH_REGION_WINDOW_MAX=5,
+        MULTIREGION_PUBLISH_SITE_HOURLY_MAX_DAILY=60,
+        QQ_PUSH_ENABLED=False,
+    )
+    def test_publish_region_window_task_publishes_selected_articles(self):
+        from stable.tasks import publish_region_window_task
+
+        article = self._article(score_total=95, source_article_id="publish-task")
+
+        result = publish_region_window_task.run(RacingRegion.HONG_KONG, now_iso="2026-07-01T10:17:00+00:00")
+
+        article.refresh_from_db()
+        window = ProductionWindow.objects.get(kind=ProductionWindowKind.PUBLISH, racing_region=RacingRegion.HONG_KONG)
+        self.assertEqual(result["published_article_ids"], [article.id])
+        self.assertEqual(window.status, ProductionWindowStatus.SUCCEEDED)
+        self.assertEqual(article.workflow_status, WorkflowStatus.PUBLISHED)
+
+    @override_settings(
+        MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_PUBLISH_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_PUBLISH_REGION_WINDOW_MAX=5,
+        MULTIREGION_PUBLISH_SITE_HOURLY_MAX_DAILY=60,
+        QQ_PUSH_ENABLED=False,
+    )
+    def test_publish_region_window_task_backfills_missing_recent_windows(self):
+        from stable.services.publishing_windows import PublishSelectionResult
+        from stable.tasks import publish_region_window_task
+
+        ProductionWindow.objects.create(
+            kind=ProductionWindowKind.PUBLISH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            scope_key="region:hong_kong",
+            window_start=datetime(2026, 7, 1, 10, 0, tzinfo=dt_timezone.utc),
+            window_end=datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+            status=ProductionWindowStatus.SUCCEEDED,
+        )
+
+        with patch("stable.tasks.select_publish_candidates", return_value=PublishSelectionResult(selected=[])) as select:
+            result = publish_region_window_task.run(RacingRegion.HONG_KONG, now_iso="2026-07-01T10:47:00+00:00")
+
+        starts = list(
+            ProductionWindow.objects.filter(kind=ProductionWindowKind.PUBLISH, racing_region=RacingRegion.HONG_KONG)
+            .order_by("window_start")
+            .values_list("window_start", flat=True)
+        )
+        self.assertEqual(
+            starts,
+            [
+                datetime(2026, 7, 1, 10, 0, tzinfo=dt_timezone.utc),
+                datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+                datetime(2026, 7, 1, 10, 30, tzinfo=dt_timezone.utc),
+                datetime(2026, 7, 1, 10, 45, tzinfo=dt_timezone.utc),
+            ],
+        )
+        self.assertEqual(select.call_count, 3)
+        expected_window_ids = list(
+            ProductionWindow.objects.exclude(window_start=datetime(2026, 7, 1, 10, 0, tzinfo=dt_timezone.utc))
+            .order_by("window_start")
+            .values_list("id", flat=True)
+        )
+        self.assertEqual(result["window_ids"], expected_window_ids)
+
+    @override_settings(
+        MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_PUBLISH_ENABLED=True,
+    )
+    def test_auto_publish_batch_delegates_when_new_windows_are_enabled(self):
+        from stable.tasks import auto_publish_batch_task
+
+        result = auto_publish_batch_task.run()
+
+        self.assertTrue(result["skipped"])
+        self.assertEqual(result["reason"], "multiregion_windows_enabled")
+
+
+class QQWindowServiceTests(TestCase):
+    def _target(self, **overrides):
+        payload = {
+            "name": "HK QQ",
+            "group_id": overrides.pop("group_id", f"group-{PushTarget.objects.count()}"),
+            "allowed_regions": [RacingRegion.HONG_KONG],
+            "is_active": True,
+            "push_scope": "high_value_only",
+            "importance_strategy": "ranked",
+        }
+        payload.update(overrides)
+        return PushTarget.objects.create(**payload)
+
+    def _article(self, **overrides):
+        payload = {
+            "source_site": SourceSite.SKY_SPORTS_RACING,
+            "source_mode": SourceMode.ACCESS,
+            "source_article_id": overrides.pop("source_article_id", f"qq-{NewsArticle.objects.count()}"),
+            "racing_region": RacingRegion.HONG_KONG,
+            "source_language": SourceLanguage.ENGLISH,
+            "title_ja": "QQ article",
+            "body_ja_raw": "QQ body. " * 20,
+            "body_ja_normalized": "QQ body. " * 20,
+            "title_zh": "QQ 新闻",
+            "summary_zh": "摘要",
+            "body_zh": "正文。" * 30,
+            "published_at": timezone.now(),
+            "source_url": overrides.pop("source_url", f"https://example.com/qq-{NewsArticle.objects.count()}"),
+            "workflow_status": WorkflowStatus.PUBLISHED,
+            "published_to_web_at": timezone.now(),
+            "published_by_mode": PublishedByMode.AUTO,
+            "auto_publish_at": timezone.now(),
+            "score_total": 90,
+        }
+        payload.update(overrides)
+        return NewsArticle.objects.create(**payload)
+
+    def _window(self):
+        start = datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc)
+        target = self._target()
+        return ProductionWindow.objects.create(
+            kind=ProductionWindowKind.QQ_PUSH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            target=target,
+            scope_key=f"region:hong_kong:target:{target.id}",
+            window_start=start,
+            window_end=start + timedelta(minutes=15),
+        ), target
+
+    @override_settings(
+        MULTIREGION_QQ_REGION_WINDOW_MAX=3,
+        MULTIREGION_QQ_GROUP_HOURLY_MAX_DAILY=12,
+        MULTIREGION_QQ_SITE_HOURLY_MAX_DAILY=40,
+        SITE_URL="https://umafans.run",
+    )
+    def test_qq_window_limits_region_to_three_high_value_articles(self):
+        from stable.services.qq_windows import select_qq_window_deliveries
+
+        window, target = self._window()
+        articles = [self._article(source_article_id=f"ranked-{index}", title_zh=f"重点 {index}") for index in range(4)]
+
+        result = select_qq_window_deliveries(RacingRegion.HONG_KONG, window=window, targets=[target], now=timezone.now())
+
+        self.assertEqual(len(result.deliveries), 3)
+        self.assertTrue({delivery.article_id for delivery in result.deliveries}.issubset({article.id for article in articles}))
+        self.assertTrue(
+            WindowTargetDecision.objects.filter(window=window, reason="region_window_limit").exists()
+        )
+
+    @override_settings(
+        MULTIREGION_QQ_REGION_WINDOW_MAX=3,
+        MULTIREGION_QQ_GROUP_HOURLY_MAX_DAILY=12,
+        MULTIREGION_QQ_SITE_HOURLY_MAX_DAILY=40,
+    )
+    def test_qq_window_skips_soft_fill_articles(self):
+        from stable.services.qq_windows import select_qq_window_deliveries
+
+        window, target = self._window()
+        self._article(source_article_id="soft", decision_reason={"disable_auto_qq": True, "region_minimum_fill": True})
+
+        result = select_qq_window_deliveries(RacingRegion.HONG_KONG, window=window, targets=[target], now=timezone.now())
+
+        self.assertEqual(result.deliveries, [])
+        self.assertIn("soft_fill_no_auto_qq", result.zero_reasons)
+        self.assertTrue(
+            WindowTargetDecision.objects.filter(window=window, reason="soft_fill_no_auto_qq").exists()
+        )
+
+    @override_settings(
+        MULTIREGION_QQ_REGION_WINDOW_MAX=3,
+        MULTIREGION_QQ_GROUP_HOURLY_MAX_DAILY=0,
+        MULTIREGION_QQ_SITE_HOURLY_MAX_DAILY=40,
+    )
+    def test_qq_window_records_group_quota_zero_reason(self):
+        from stable.services.qq_windows import select_qq_window_deliveries
+
+        window, target = self._window()
+        self._article(source_article_id="quota")
+
+        result = select_qq_window_deliveries(RacingRegion.HONG_KONG, window=window, targets=[target], now=timezone.now())
+
+        self.assertEqual(result.deliveries, [])
+        self.assertIn("group_hour_quota_exhausted", result.zero_reasons)
+        self.assertTrue(
+            WindowTargetDecision.objects.filter(window=window, reason="group_hour_quota_exhausted").exists()
+        )
+
+    @override_settings(
+        MULTIREGION_QQ_REGION_WINDOW_MAX=3,
+        MULTIREGION_QQ_GROUP_HOURLY_MAX_DAILY=12,
+        MULTIREGION_QQ_SITE_HOURLY_MAX_DAILY=0,
+    )
+    def test_qq_site_quota_failure_does_not_consume_group_quota(self):
+        from stable.services.qq_windows import select_qq_window_deliveries
+
+        window, target = self._window()
+        self._article(source_article_id="site-quota")
+
+        result = select_qq_window_deliveries(RacingRegion.HONG_KONG, window=window, targets=[target], now=timezone.now())
+
+        self.assertEqual(result.deliveries, [])
+        self.assertIn("site_hour_quota_exhausted", result.zero_reasons)
+        group_ledger = QuotaLedger.objects.get(
+            kind=QuotaLedgerKind.QQ_PUSH,
+            scope=QuotaLedgerScope.GROUP_HOUR,
+            scope_key=f"group:{target.group_id}",
+        )
+        self.assertEqual(group_ledger.used, 0)
+
+    @override_settings(
+        MULTIREGION_QQ_REGION_WINDOW_MAX=3,
+        MULTIREGION_QQ_GROUP_HOURLY_MAX_DAILY=12,
+        MULTIREGION_QQ_SITE_HOURLY_MAX_DAILY=40,
+    )
+    def test_qq_existing_delivery_is_skipped_before_quota_reservation(self):
+        from stable.services.qq_windows import select_qq_window_deliveries
+
+        window, target = self._window()
+        article = self._article(source_article_id="already-queued")
+        QQPushDelivery.objects.create(article=article, target=target, status=QQPushDeliveryStatus.PENDING)
+
+        result = select_qq_window_deliveries(RacingRegion.HONG_KONG, window=window, targets=[target], now=timezone.now())
+
+        self.assertEqual(result.deliveries, [])
+        self.assertIn("already_queued", result.zero_reasons)
+        self.assertFalse(QuotaLedger.objects.filter(kind=QuotaLedgerKind.QQ_PUSH).exists())
+        self.assertTrue(WindowTargetDecision.objects.filter(window=window, reason="already_queued").exists())
+
+    @override_settings(
+        MULTIREGION_QQ_REGION_WINDOW_MAX=3,
+        MULTIREGION_QQ_GROUP_HOURLY_MAX_DAILY=12,
+        MULTIREGION_QQ_SITE_HOURLY_MAX_DAILY=40,
+    )
+    def test_qq_retryable_existing_delivery_reserves_quota(self):
+        from stable.services.qq_windows import select_qq_window_deliveries
+
+        window, target = self._window()
+        article = self._article(source_article_id="retry-skipped")
+        delivery = QQPushDelivery.objects.create(
+            article=article,
+            target=target,
+            status=QQPushDeliveryStatus.SKIPPED,
+            attempt_count=1,
+            max_attempts=3,
+        )
+
+        result = select_qq_window_deliveries(RacingRegion.HONG_KONG, window=window, targets=[target], now=timezone.now())
+
+        self.assertEqual(result.deliveries, [delivery])
+        self.assertTrue(WindowTargetDecision.objects.filter(window=window, reason="retry_existing").exists())
+        group_ledger = QuotaLedger.objects.get(
+            kind=QuotaLedgerKind.QQ_PUSH,
+            scope=QuotaLedgerScope.GROUP_HOUR,
+            scope_key=f"group:{target.group_id}",
+        )
+        site_ledger = QuotaLedger.objects.get(
+            kind=QuotaLedgerKind.QQ_PUSH,
+            scope=QuotaLedgerScope.SITE_HOUR,
+            scope_key="site",
+        )
+        self.assertEqual(group_ledger.used, 1)
+        self.assertEqual(site_ledger.used, 1)
+
+    @override_settings(
+        MULTIREGION_QQ_REGION_WINDOW_MAX=3,
+        MULTIREGION_QQ_GROUP_HOURLY_MAX_DAILY=12,
+        MULTIREGION_QQ_SITE_HOURLY_MAX_DAILY=0,
+    )
+    def test_qq_retryable_existing_delivery_respects_quota(self):
+        from stable.services.qq_windows import select_qq_window_deliveries
+
+        window, target = self._window()
+        article = self._article(source_article_id="retry-site-quota")
+        QQPushDelivery.objects.create(
+            article=article,
+            target=target,
+            status=QQPushDeliveryStatus.SKIPPED,
+            attempt_count=1,
+            max_attempts=3,
+        )
+
+        result = select_qq_window_deliveries(RacingRegion.HONG_KONG, window=window, targets=[target], now=timezone.now())
+
+        self.assertEqual(result.deliveries, [])
+        self.assertIn("site_hour_quota_exhausted", result.zero_reasons)
+        self.assertTrue(WindowTargetDecision.objects.filter(window=window, reason="site_hour_quota_exhausted").exists())
+        group_ledger = QuotaLedger.objects.get(
+            kind=QuotaLedgerKind.QQ_PUSH,
+            scope=QuotaLedgerScope.GROUP_HOUR,
+            scope_key=f"group:{target.group_id}",
+        )
+        self.assertEqual(group_ledger.used, 0)
+
+    @override_settings(
+        MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_QQ_REGION_WINDOW_MAX=3,
+        MULTIREGION_QQ_GROUP_HOURLY_MAX_DAILY=12,
+        MULTIREGION_QQ_SITE_HOURLY_MAX_DAILY=40,
+        QQ_PUSH_ENABLED=True,
+        SITE_URL="https://umafans.run",
+    )
+    def test_qq_region_window_task_creates_and_dispatches_deliveries(self):
+        from stable.tasks import qq_push_delivery_task, qq_region_window_task
+
+        self._target()
+        article = self._article(source_article_id="qq-task")
+
+        with (
+            patch("stable.tasks.BotPusher.is_online", return_value=(True, "")),
+            patch("stable.tasks.dispatch_task", return_value={"queued": True}) as dispatch,
+        ):
+            result = qq_region_window_task.run(RacingRegion.HONG_KONG, now_iso="2026-07-01T10:17:00+00:00")
+
+        delivery = QQPushDelivery.objects.get(article=article)
+        window = ProductionWindow.objects.get(kind=ProductionWindowKind.QQ_PUSH, racing_region=RacingRegion.HONG_KONG)
+        self.assertEqual(result["delivery_ids"], [delivery.id])
+        self.assertEqual(window.status, ProductionWindowStatus.SUCCEEDED)
+        dispatch.assert_called_once_with(qq_push_delivery_task, delivery.id)
+
+    @override_settings(
+        MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_QQ_REGION_WINDOW_MAX=3,
+        MULTIREGION_QQ_GROUP_HOURLY_MAX_DAILY=12,
+        MULTIREGION_QQ_SITE_HOURLY_MAX_DAILY=40,
+        QQ_PUSH_ENABLED=True,
+        SITE_URL="https://umafans.run",
+    )
+    def test_qq_region_window_task_records_onebot_offline_before_delivery_selection(self):
+        from stable.tasks import qq_region_window_task
+
+        self._target()
+        self._article(source_article_id="qq-offline")
+
+        with (
+            patch("stable.tasks.BotPusher.is_online", return_value=(False, "onebot_offline")),
+            patch("stable.tasks.dispatch_task", return_value={"queued": True}) as dispatch,
+        ):
+            result = qq_region_window_task.run(RacingRegion.HONG_KONG, now_iso="2026-07-01T10:17:00+00:00")
+
+        window = ProductionWindow.objects.get(kind=ProductionWindowKind.QQ_PUSH, racing_region=RacingRegion.HONG_KONG)
+        self.assertEqual(result["delivery_ids"], [])
+        self.assertIn("onebot_offline", result["zero_reasons"])
+        self.assertEqual(window.status, ProductionWindowStatus.FAILED)
+        self.assertEqual(window.reason_summary, "onebot_offline")
+        self.assertFalse(QQPushDelivery.objects.exists())
+        self.assertFalse(QuotaLedger.objects.filter(kind=QuotaLedgerKind.QQ_PUSH).exists())
+        dispatch.assert_not_called()
+
+    @override_settings(
+        MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_QQ_REGION_WINDOW_MAX=3,
+        MULTIREGION_QQ_GROUP_HOURLY_MAX_DAILY=12,
+        MULTIREGION_QQ_SITE_HOURLY_MAX_DAILY=40,
+        QQ_PUSH_ENABLED=True,
+        SITE_URL="https://umafans.run",
+    )
+    def test_qq_region_window_task_only_sends_latest_missing_window(self):
+        from stable.services.qq_windows import QQWindowResult
+        from stable.tasks import qq_region_window_task
+
+        ProductionWindow.objects.create(
+            kind=ProductionWindowKind.QQ_PUSH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            scope_key="region:hong_kong:qq",
+            window_start=datetime(2026, 7, 1, 10, 0, tzinfo=dt_timezone.utc),
+            window_end=datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+            status=ProductionWindowStatus.SUCCEEDED,
+        )
+
+        with (
+            patch("stable.tasks.BotPusher.is_online", return_value=(True, "")),
+            patch("stable.tasks.select_qq_window_deliveries", return_value=QQWindowResult(deliveries=[])) as select,
+        ):
+            result = qq_region_window_task.run(RacingRegion.HONG_KONG, now_iso="2026-07-01T10:47:00+00:00")
+
+        starts = list(
+            ProductionWindow.objects.filter(kind=ProductionWindowKind.QQ_PUSH, racing_region=RacingRegion.HONG_KONG)
+            .order_by("window_start")
+            .values_list("window_start", flat=True)
+        )
+        self.assertEqual(
+            starts,
+            [
+                datetime(2026, 7, 1, 10, 0, tzinfo=dt_timezone.utc),
+                datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+                datetime(2026, 7, 1, 10, 30, tzinfo=dt_timezone.utc),
+                datetime(2026, 7, 1, 10, 45, tzinfo=dt_timezone.utc),
+            ],
+        )
+        self.assertEqual(select.call_count, 1)
+        latest = ProductionWindow.objects.get(
+            kind=ProductionWindowKind.QQ_PUSH,
+            racing_region=RacingRegion.HONG_KONG,
+            window_start=datetime(2026, 7, 1, 10, 45, tzinfo=dt_timezone.utc),
+        )
+        coalesced = ProductionWindow.objects.filter(
+            kind=ProductionWindowKind.QQ_PUSH,
+            racing_region=RacingRegion.HONG_KONG,
+            reason_summary="coalesced_to_latest_qq_window",
+        )
+        self.assertEqual(latest.status, ProductionWindowStatus.SUCCEEDED)
+        self.assertEqual(coalesced.count(), 2)
+        self.assertEqual(result["window_ids"], [latest.id])
+
+    @override_settings(
+        MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED=True,
+        MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_QQ_REGION_WINDOW_MAX=3,
+        MULTIREGION_QQ_GROUP_HOURLY_MAX_DAILY=12,
+        MULTIREGION_QQ_SITE_HOURLY_MAX_DAILY=40,
+        QQ_PUSH_ENABLED=True,
+        SITE_URL="https://umafans.run",
+    )
+    def test_qq_region_window_task_coalesces_stale_running_windows(self):
+        from stable.services.qq_windows import QQWindowResult
+        from stable.tasks import qq_region_window_task
+
+        now = datetime(2026, 7, 1, 10, 47, tzinfo=dt_timezone.utc)
+        ProductionWindow.objects.create(
+            kind=ProductionWindowKind.QQ_PUSH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            scope_key="region:hong_kong:qq",
+            window_start=datetime(2026, 7, 1, 10, 0, tzinfo=dt_timezone.utc),
+            window_end=datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+            status=ProductionWindowStatus.SUCCEEDED,
+        )
+        stale = ProductionWindow.objects.create(
+            kind=ProductionWindowKind.QQ_PUSH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            scope_key="region:hong_kong:qq",
+            window_start=datetime(2026, 7, 1, 10, 15, tzinfo=dt_timezone.utc),
+            window_end=datetime(2026, 7, 1, 10, 30, tzinfo=dt_timezone.utc),
+            status=ProductionWindowStatus.RUNNING,
+            lease_expires_at=now - timedelta(minutes=1),
+        )
+
+        with (
+            patch("stable.tasks.BotPusher.is_online", return_value=(True, "")),
+            patch("stable.tasks.select_qq_window_deliveries", return_value=QQWindowResult(deliveries=[])) as select,
+        ):
+            result = qq_region_window_task.run(RacingRegion.HONG_KONG, now_iso=now.isoformat())
+
+        stale.refresh_from_db()
+        latest = ProductionWindow.objects.get(
+            kind=ProductionWindowKind.QQ_PUSH,
+            racing_region=RacingRegion.HONG_KONG,
+            window_start=datetime(2026, 7, 1, 10, 45, tzinfo=dt_timezone.utc),
+        )
+        self.assertEqual(stale.status, ProductionWindowStatus.SKIPPED)
+        self.assertEqual(stale.reason_summary, "coalesced_to_latest_qq_window")
+        self.assertEqual(result["window_ids"], [latest.id])
+        select.assert_called_once()
+
+
 class MultiRegionNewsProductionTests(TestCase):
     def _article(self, **overrides):
         payload = {
@@ -1684,6 +2912,93 @@ class MultiRegionNewsProductionTests(TestCase):
         self.assertContains(response, "中国香港")
         self.assertContains(response, "HK overview source")
         self.assertContains(response, "QQ")
+
+    def test_region_overview_links_to_window_detail(self):
+        User.objects.create_superuser("window-admin", "window-admin@example.com", "pass")
+        self.client.login(username="window-admin", password="pass")
+        window = ProductionWindow.objects.create(
+            kind=ProductionWindowKind.PUBLISH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            scope_key="region:hong_kong",
+            window_start=timezone.now().replace(second=0, microsecond=0),
+            window_end=timezone.now().replace(second=0, microsecond=0) + timedelta(minutes=15),
+            status=ProductionWindowStatus.SUCCEEDED,
+            reason_summary="published",
+        )
+
+        response = self.client.get(reverse("console-region-production"), {"region": RacingRegion.HONG_KONG})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("console-production-window-detail", args=[window.id]))
+
+    @override_settings(
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_PUBLISH_SITE_HOURLY_MAX_DAILY=60,
+    )
+    def test_publish_window_preview_does_not_write_business_state(self):
+        User.objects.create_superuser("preview-admin", "preview-admin@example.com", "pass")
+        self.client.login(username="preview-admin", password="pass")
+        window_start = timezone.now().replace(second=0, microsecond=0)
+        window = ProductionWindow.objects.create(
+            kind=ProductionWindowKind.PUBLISH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            scope_key="region:hong_kong",
+            window_start=window_start,
+            window_end=window_start + timedelta(minutes=15),
+            status=ProductionWindowStatus.SUCCEEDED,
+        )
+        article = self._article(
+            source_article_id="mr-preview-window",
+            automation_status=AutomationStatus.PUBLISH_READY,
+            review_mode=ReviewMode.AUTO,
+            score_total=90,
+        )
+
+        response = self.client.get(reverse("console-production-window-preview", args=[window.id]))
+
+        article.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Lucky Star 在沙田取胜")
+        self.assertFalse(WindowCandidateDecision.objects.filter(window=window).exists())
+        self.assertFalse(QuotaLedger.objects.filter(kind=QuotaLedgerKind.WEB_PUBLISH).exists())
+        self.assertNotEqual(article.workflow_status, WorkflowStatus.PUBLISHED)
+
+    @override_settings(
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_PUBLISH_SITE_HOURLY_MAX_DAILY=60,
+    )
+    def test_publish_window_manual_rerun_records_operator_and_rerun_count(self):
+        user = User.objects.create_superuser("rerun-admin", "rerun-admin@example.com", "pass")
+        self.client.login(username="rerun-admin", password="pass")
+        window_start = timezone.now().replace(second=0, microsecond=0)
+        window = ProductionWindow.objects.create(
+            kind=ProductionWindowKind.PUBLISH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.HONG_KONG,
+            scope_key="region:hong_kong",
+            window_start=window_start,
+            window_end=window_start + timedelta(minutes=15),
+            status=ProductionWindowStatus.SUCCEEDED,
+        )
+        article = self._article(
+            source_article_id="mr-rerun-window",
+            automation_status=AutomationStatus.PUBLISH_READY,
+            review_mode=ReviewMode.AUTO,
+            score_total=90,
+        )
+
+        response = self.client.post(reverse("console-production-window-rerun", args=[window.id]))
+
+        window.refresh_from_db()
+        article.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(window.rerun_count, 1)
+        self.assertEqual(window.triggered_by, user)
+        self.assertEqual(window.status, ProductionWindowStatus.SUCCEEDED)
+        self.assertEqual(article.workflow_status, WorkflowStatus.PUBLISHED)
+        self.assertTrue(OperationLog.objects.filter(action_type="production_window_rerun", target_id=window.id).exists())
 
 
 class TermRegionFilterTests(TestCase):

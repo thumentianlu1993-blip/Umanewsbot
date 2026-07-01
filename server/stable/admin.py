@@ -11,6 +11,7 @@ from .models import (
     ArticleStatus,
     AutomationLog,
     CrawlJob,
+    MajorRaceEvent,
     MediaAsset,
     NewsArticle,
     NewsImage,
@@ -18,18 +19,23 @@ from .models import (
     NewsSource,
     NotificationLog,
     OperationLog,
+    ProductionWindow,
     PushLog,
     PushTarget,
     QQPushDelivery,
+    QuotaLedger,
     TaskExecutionLog,
     TermCandidate,
     TermCandidateEvidence,
     TermAlias,
     TermEntry,
     TranslationRun,
+    WindowCandidateDecision,
+    WindowTargetDecision,
     WorkflowStatus,
 )
 from .services.operations import log_operation
+from .services.production_windows import update_major_race_boost_window
 from .services.pushing import enqueue_push_for_article
 from .services.queueing import dispatch_task
 from .tasks import crawl_news_source_task, translate_article_task
@@ -112,6 +118,7 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "automation_status",
         "review_mode",
         "gate_issue_summary",
+        "automation_reason_summary",
         "score_total",
         "status",
         "is_first_crawled",
@@ -245,6 +252,18 @@ class NewsArticleAdmin(admin.ModelAdmin):
 
     gate_issue_summary.short_description = "门禁"
 
+    def automation_reason_summary(self, obj):
+        if obj.decision_reason:
+            if obj.decision_reason.get("region_minimum_fill"):
+                return "保底发布"
+            if obj.decision_reason.get("publish_policy"):
+                return obj.decision_reason["publish_policy"].get("reason", "-")
+        if obj.duplicate_of_id:
+            return f"去重 -> #{obj.duplicate_of_id}"
+        return obj.decision_summary or "-"
+
+    automation_reason_summary.short_description = "自动化原因"
+
     def duplicate_article_link(self, obj):
         if not obj.duplicate_of_id:
             return "-"
@@ -303,12 +322,27 @@ class NewsSourceAdmin(admin.ModelAdmin):
         "source_kind",
         "source_type",
         "enabled",
+        "production_approved",
         "crawl_interval_minutes",
+        "effective_crawl_interval_minutes",
+        "backoff_until",
+        "failure_streak",
+        "last_error_category",
         "last_crawl_at",
         "last_crawl_status",
         "test_crawl_link",
     )
-    list_filter = ("enabled", "racing_region", "source_language", "source_kind", "source_type", "adapter_key")
+    list_filter = (
+        "enabled",
+        "production_approved",
+        "allow_event_boost",
+        "racing_region",
+        "source_language",
+        "source_kind",
+        "source_type",
+        "adapter_key",
+        "last_error_category",
+    )
     search_fields = ("name", "homepage_url", "feed_url", "notes")
 
     def test_crawl_link(self, obj):
@@ -335,6 +369,92 @@ class NewsSourceAdmin(admin.ModelAdmin):
             admin=request.user,
         )
         return redirect(reverse("admin:stable_newssource_change", args=[source.pk]))
+
+
+@admin.register(MajorRaceEvent)
+class MajorRaceEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "year",
+        "racing_region",
+        "race_grade",
+        "local_date",
+        "local_start_time",
+        "boost_start_at",
+        "boost_end_at",
+        "is_active",
+    )
+    list_filter = ("racing_region", "race_grade", "is_active", "local_date")
+    search_fields = ("name", "normalized_name", "external_id", "aliases", "notes")
+    readonly_fields = ("boost_start_at", "boost_end_at", "created_at", "updated_at")
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        update_major_race_boost_window(obj)
+
+
+class WindowCandidateDecisionInline(admin.TabularInline):
+    model = WindowCandidateDecision
+    extra = 0
+    readonly_fields = ("article", "status", "reason", "score", "rank", "payload", "created_at")
+    can_delete = False
+
+
+class WindowTargetDecisionInline(admin.TabularInline):
+    model = WindowTargetDecision
+    extra = 0
+    readonly_fields = ("target", "article", "status", "reason", "payload", "created_at")
+    can_delete = False
+
+
+@admin.register(ProductionWindow)
+class ProductionWindowAdmin(admin.ModelAdmin):
+    list_display = (
+        "kind",
+        "mode",
+        "racing_region",
+        "scope_key",
+        "window_start",
+        "status",
+        "reason_summary",
+        "attempt_count",
+        "rerun_count",
+    )
+    list_filter = ("kind", "mode", "status", "racing_region", "window_start")
+    search_fields = ("scope_key", "reason_summary", "last_error")
+    readonly_fields = (
+        "kind",
+        "mode",
+        "racing_region",
+        "source",
+        "target",
+        "scope_key",
+        "window_start",
+        "window_end",
+        "status",
+        "claimed_at",
+        "lease_expires_at",
+        "attempt_count",
+        "scheduled_at",
+        "started_at",
+        "finished_at",
+        "reason_summary",
+        "result_payload",
+        "rerun_count",
+        "last_error",
+        "triggered_by",
+        "created_at",
+        "updated_at",
+    )
+    inlines = [WindowCandidateDecisionInline, WindowTargetDecisionInline]
+
+
+@admin.register(QuotaLedger)
+class QuotaLedgerAdmin(admin.ModelAdmin):
+    list_display = ("kind", "scope", "scope_key", "window_start", "limit", "used", "updated_at")
+    list_filter = ("kind", "scope", "window_start")
+    search_fields = ("scope_key",)
+    readonly_fields = ("kind", "scope", "scope_key", "window_start", "limit", "used", "payload", "created_at", "updated_at")
 
 
 @admin.register(TermEntry)
