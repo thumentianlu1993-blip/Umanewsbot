@@ -1824,3 +1824,82 @@ QQ_PUSH_ENABLED=false
 ```
 
 修改 `.env` 后重启 `web / worker / beat`，再执行 `audit_multiregion_news_production` 和日志检查。
+
+## 2026-07-01 全部 OpenSpec 归档与生产部署
+
+### 范围
+
+- 归档 `add-netkeiba-horse-data-import`、`expand-international-racing-coverage`、`guard-qqbot-offline-send`。
+- 同步正式规格到 `openspec/specs/external-horse-data-import/`、`openspec/specs/international-racing-coverage/` 及相关能力规格。
+- 补齐 `ExternalDataSource` choices：`sporting_life`、`france_galop`、`geny_france`、`horse_racing_nation`。
+- 新增并应用迁移 `stable.0016_alter_externaldataimporterror_source_and_more`。
+
+### 本地验证
+
+- `openspec list --json`：`changes=[]`。
+- `openspec validate --all`：12 项通过。
+- `DB_ENGINE=sqlite python server/manage.py check`：通过。
+- `DB_ENGINE=sqlite python server/manage.py makemigrations --check --dry-run`：`No changes detected`。
+- `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python server/manage.py test stable --noinput`：362 项通过。
+- `git diff --check`：通过。
+
+### 生产部署
+
+部署前检查：
+
+- 服务器 `/opt/umanewsbot` 部署前 HEAD：`538a1a9`。
+- `docker compose -f docker-compose.prod.lowcost.yml ps`：`web / db / redis` healthy，`worker / beat / nginx` 运行。
+- `ExternalDataImportRun(status="started")=0`。
+- `ExternalDataImportLock` 中 HKJC 与 netkeiba 均未占用锁。
+- HKJC 长窗口 dry-run 未运行，仍按此前记录暂停在 `hkjc-slow-dryrun.state=92`。
+
+备份：
+
+- `backups/db/pre-archive-all-20260701_153301.sql.gz`
+- `gzip -t`：通过。
+
+执行：
+
+```bash
+cd /opt/umanewsbot
+git fetch origin main
+git pull --ff-only origin main
+bash ./deploy_lowcost.sh
+```
+
+结果：
+
+- 服务器已快进到 `8c83708`。
+- `web / worker / beat` 已重建。
+- 迁移日志确认 `Applying stable.0016_alter_externaldataimporterror_source_and_more... OK`。
+- `collectstatic` 完成，`web` healthy。
+
+### 生产验收
+
+- `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check`：通过。
+- `showmigrations stable`：`0016_alter_externaldataimporterror_source_and_more` 为 `[X]`。
+- `ExternalDataSource.values`：`netkeiba / hkjc / sporting_life / france_galop / geny_france / horse_racing_nation`。
+- `http://127.0.0.1/healthz/`：`200`。
+- `http://umafans.run/healthz/`：`200`。
+- `http://umafans.run/`：`200`。
+- `http://umafans.run/admin/login/`：`200`。
+- `http://umafans.run/admin/regions/`：未登录请求 `302` 到登录页；已登录浏览器可打开地区生产页。
+- 浏览器验收：首页地区 tab 正常，香港/英国地区页可渲染已发布国际新闻，后台地区生产页显示五地区来源、今日新增、待审核、公开和 QQ 状态。
+
+### 生产开关与来源状态
+
+当前生产 settings：
+
+```text
+NEWS_SOURCE_POLL_ENABLED=True
+NEWS_SOURCE_POLL_INTERVAL_MINUTES=30
+NEWS_SOURCE_POLL_MAX_SOURCES=12
+NEWS_SOURCE_POLL_ALLOWED_REGIONS=japan,hong_kong,united_kingdom,france,united_states
+MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=hong_kong,united_kingdom,france,united_states
+MULTIREGION_AUTO_PUBLISH_REGION_DAILY_LIMITS=hong_kong:5,united_kingdom:5,france:3,united_states:3
+QQ_PUSH_ENABLED=True
+QQ_PUSH_SCOPE=high_value_only
+QQ_PUSH_IMPORTANCE_STRATEGY=ranked
+```
+
+enabled 来源最近状态显示五地区均有来源记录，多数为 `success`。当前仅 `Sponichi 新闻ランキング` 最近一次为上游 `502 Bad Gateway`，其余日本、香港、英国、法国、美国 enabled 来源最近状态为 `success`。该 502 属于来源站点临时响应异常，不阻断本次部署验收。
