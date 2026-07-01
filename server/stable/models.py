@@ -209,6 +209,10 @@ class TaskStatus(models.TextChoices):
 class ExternalDataSource(models.TextChoices):
     NETKEIBA = "netkeiba", "netkeiba"
     HKJC = "hkjc", "HKJC"
+    SPORTING_LIFE = "sporting_life", "Sporting Life"
+    FRANCE_GALOP = "france_galop", "France Galop"
+    GENY_FRANCE = "geny_france", "Geny France"
+    HORSE_RACING_NATION = "horse_racing_nation", "Horse Racing Nation"
 
 
 class ExternalImportStatus(models.TextChoices):

@@ -45,6 +45,7 @@ from stable.models import (
     ArticleTranslationStatus,
     AutomationStatus,
     ContentCategory,
+    ExternalDataSource,
     ExternalDataImportLock,
     ExternalDataImportRun,
     ExternalHorse,
@@ -2992,6 +2993,23 @@ class HKJCExternalDataImportTests(TestCase):
 
         self.assertEqual(mock_get.call_count, 2)
         self.assertEqual(ExternalRace.objects.count(), 0)
+
+
+class ExternalDataSourceChoicesTests(TestCase):
+    def test_all_external_importer_sources_are_declared_choices(self):
+        from stable.services.external_france_racing_data import (
+            FRANCE_EXTERNAL_SOURCE,
+            GENY_FRANCE_EXTERNAL_SOURCE,
+        )
+        from stable.services.external_uk_racing_data import UK_EXTERNAL_SOURCE
+        from stable.services.external_us_racing_data import US_EXTERNAL_SOURCE
+
+        declared_sources = set(ExternalDataSource.values)
+
+        self.assertIn(UK_EXTERNAL_SOURCE, declared_sources)
+        self.assertIn(FRANCE_EXTERNAL_SOURCE, declared_sources)
+        self.assertIn(GENY_FRANCE_EXTERNAL_SOURCE, declared_sources)
+        self.assertIn(US_EXTERNAL_SOURCE, declared_sources)
 
 
 class UKExternalDataImportTests(TestCase):
