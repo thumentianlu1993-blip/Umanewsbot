@@ -2108,3 +2108,30 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
   - 抓取窗口：`succeeded/completed=260`，`skipped/coalesced_to_latest_crawl_window=109`，后者符合停机 / 延迟恢复时只补最近窗口的设计。
   - 来源状态：16 个 `enabled=true` 且 `production_approved=true` 来源最新抓取均为 `success`；`TDN France Galop 关键词英文新闻` 和 `TDN 美国新闻` 仍显示已过期 `backoff_until`，但最新抓取窗口已成功完成，当前不影响运行。
 - 结论：白天最近几个自然窗口满足本期诉求：五地区窗口按 15 分钟节奏产生，发布 / QQ 上限未突破，0 结果有明确原因，生产服务和队列健康。
+
+### 2026-07-02 11:07 最新窗口按地区拆因
+
+- 复核口径：最新 4 个发布窗口（`10:15 / 10:30 / 10:45 / 11:00`，CST）+ 发布候选 3 小时回看。
+- 五地区最新 4 个发布窗口均为 `succeeded / no_ready_candidates`，均未发布新文章。
+- 日本：
+  - 最近 4 个发布窗口共有 `18` 条候选决策，全部为 `blocked / hard_gate_blocked`。
+  - 主要原因：部分文章翻译失败；部分文章进入 `manual_review_required`；高分候选中存在 `core_term_missing` 和轻微数字缺失提示。
+  - 结论：日本不是新闻源无内容，也不是抓取整体失效；主因是抓到的候选未通过自动发布门禁或需要人工处理。
+- 中国香港：
+  - `HKJC Racing News` 与 `SCMP Racing` 最近 3 小时抓取均成功，最新消息分别为 `新增 0，重复 5`、`新增 0，重复 4`。
+  - 最近 3 小时没有新入库香港文章，也没有发布候选。
+  - 结论：主因是来源没有新稿，只有重复旧稿。
+- 英国：
+  - `Sporting Life Racing`、`Sky Sports Racing 新闻`、`Sky Sports Racing Top Stories` 最近 3 小时抓取均成功，最新消息为新增 0、重复旧稿。
+  - 最近 3 小时没有新入库英国文章，也没有发布候选。
+  - 结论：主因是来源没有新稿，只有重复旧稿。
+- 法国：
+  - `France Galop 英文新闻` 最近抓取成功，新增 0、重复 20。
+  - `TDN France Galop 关键词英文新闻` 在 `08:25-09:05` 出现过 `525` / read timeout，`10:10` 已恢复成功，`failure_streak=0`，最新消息为 `新增 0，重复 20`。
+  - 最近 3 小时没有新入库法国文章，也没有发布候选。
+  - 结论：当前主因是来源没有新稿；早间 TDN 短暂失败已恢复，不是最新窗口 0 发布主因。
+- 美国：
+  - `Horse Racing Nation 新闻` 与 `Horse Racing Nation Trending` 最近抓取成功，新增 0、重复旧稿。
+  - `TDN 美国新闻` 在 `08:25-09:05` 出现过 read timeout，`10:10` 已恢复成功，`failure_streak=0`，最新消息为 `新增 0，重复 20`。
+  - 最近 3 小时没有新入库美国文章，也没有发布候选。
+  - 结论：当前主因是来源没有新稿；早间 TDN 短暂失败已恢复，不是最新窗口 0 发布主因。
