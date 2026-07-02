@@ -2145,6 +2145,16 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - 来源状态：16 个生产批准来源中 14 个最新抓取为 `success`；`TDN France Galop 关键词英文新闻` 与 `TDN 美国新闻` 在 `15:02` 各出现一次 read timeout，`failure_streak=1`，属于同一上游站短时超时。
 - 结论：窗口调度、发布和 QQ 链路正常运转；当前 0 发布不是系统停摆，而是候选未通过自动发布资格或来源暂无新稿。后续可改进 `WindowCandidateDecision.payload`，在 `hard_gate_blocked` 时写入更具体的 blocker 明细，降低排障成本。
 
+### 2026-07-03 00:13 今日窗口复核
+
+- 复核口径：`2026-07-03 00:00` 至 `00:13`，服务器时区 CST；因刚过零点，今日目前只有 `00:00` 一个自然窗口。
+- 抓取窗口：五地区均成功。日本 `5` 个来源新增 `0`、重复 `274`；香港 `2` 个来源新增 `0`、重复 `9`；英国 `3` 个来源新增 `0`、重复 `42`；法国 `2` 个来源新增 `0`、重复 `40`；美国 `3` 个来源新增 `1`、重复 `47`。
+- 新入库文章：美国 TDN 新闻 `article_id=6500`，标题 `Book'em Danno Day Scheduled For July 17 At Monmouth Park`，已翻译，当前 `manual_review_required / pending_review`，未自动发布。
+- 发布窗口：五地区均 `succeeded`，网页发布 `0` 篇，原因均为 `no_ready_candidates`；日本有 `2` 条 blocked 候选、英国 `4` 条、美国 `4` 条。
+- QQ 窗口：五地区均 `succeeded`，delivery `0` 条；日本 / 美国原因 `already_sent`，香港 / 英国 / 法国原因 `no_eligible_articles`。
+- 来源状态：16 个生产批准来源最新抓取均为 `success`，前一日 TDN France / TDN 美国 read timeout 已恢复。
+- 结论：今日首个窗口调度正常，暂无发布不是系统问题；需要继续等更多自然窗口累积样本。
+
 ### 2026-07-02 榜单唤醒未发布文章上线准备
 
 - 变更：`revive-ranked-news-for-publish`。
