@@ -2089,3 +2089,22 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - `Sponichi 新闻ランキング` 当前失败为上游 `502`，如连续失败达到阈值会进入来源 backoff；必要时可在后台单来源暂停或降频。
 - `TDN 美国新闻` 每轮最多 20 条列表且详情请求超时为 15 秒，单轮耗时可能偏长；如持续占用 worker，可另起优化将每轮详情数量做成配置或拆分任务。
 - 生产构建上下文约 425MB，紧急修复发布时镜像构建前置上传较慢；后续应优化 `.dockerignore`。
+
+### 2026-07-02 白天自然窗口复核
+
+- 生产代码：`a122130`，`origin/main` 同步到同一提交。
+- 容器状态：`web / worker / beat / db / redis / nginx` 均运行；`web` 与 `redis / db` healthy。
+- 健康检查：
+  - `http://127.0.0.1/healthz/`：`200`。
+  - `http://umafans.run/healthz/`：`200`。
+  - `http://umafans.run/`：`200`。
+  - 抽检 `/news/6374/`、`/news/6426/`、`/news/6368/`：均 `200`。
+- Celery：`inspect active reserved` 返回空，无积压任务。
+- 开关配置：抓取 / 发布 / QQ 生产窗口均为 `true`；允许五地区；日常 `15` 分钟、重要赛事 `5` 分钟；发布每地区每窗口 `1-5` 篇；QQ 每地区每窗口最多 `3` 篇；当前没有地区处于重要赛事升频窗口。
+- 最近 6 小时窗口结果：
+  - 发布窗口：五地区各 `24` 个窗口。非零发布为美国 `04:30` 1 篇，日本 `04:45` 2 篇、`05:30` 4 篇、`06:30 / 08:15 / 09:45` 各 1 篇；所有非零窗口均未超过 5 篇。
+  - 0 发布原因：其余发布窗口均为 `no_ready_candidates`。
+  - QQ 窗口：五地区各 `24` 个窗口。实际发送 6 条，美国 3 条、日本 3 条，目标均为 `UmaFans测试群(1026525240)`；其余窗口为 `no_eligible_articles` 或 `already_sent`。
+  - 抓取窗口：`succeeded/completed=260`，`skipped/coalesced_to_latest_crawl_window=109`，后者符合停机 / 延迟恢复时只补最近窗口的设计。
+  - 来源状态：16 个 `enabled=true` 且 `production_approved=true` 来源最新抓取均为 `success`；`TDN France Galop 关键词英文新闻` 和 `TDN 美国新闻` 仍显示已过期 `backoff_until`，但最新抓取窗口已成功完成，当前不影响运行。
+- 结论：白天最近几个自然窗口满足本期诉求：五地区窗口按 15 分钟节奏产生，发布 / QQ 上限未突破，0 结果有明确原因，生产服务和队列健康。

@@ -746,9 +746,9 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - 国际新闻源默认关闭；生产启用前应先完成一次整体 review，再按地区逐个灰度启用，并用后台“测试抓取”或命令行小样本复验页面结构。
   - HKJC 正式网络导入仍应小批量、低频、单来源互斥，并从 `--payload-file --dry-run` 或单场小样本开始；如样本超过 `max_races / max_horses`，应先拆分 payload，而不是依赖程序截断。
 
-## 2026-07-01 多地区新闻增量窗口本地实现
+## 2026-07-01 多地区新闻增量窗口实现与生产验证
 
-- OpenSpec change：`increase-multiregion-news-volume`，当前处于本地实现中，尚未归档或部署生产。
+- OpenSpec change：`increase-multiregion-news-volume`，已完成实现、归档、部署生产，并开启抓取 / 发布 / QQ 三条生产窗口。
 - 已新增窗口运行模型：`ProductionWindow`、`WindowCandidateDecision`、`WindowTargetDecision`、`QuotaLedger`、`MajorRaceEvent`；`NewsSource` 增加生产批准、有效抓取间隔、backoff、人工暂停、错误分类、连续成功/失败和重要赛事升频字段。
 - 已实现日常/重要赛事窗口服务：日常 15 分钟、重要赛事 5 分钟、最多 3 小时回看；重要赛事按地区当地时间录入，开跑前 3 小时到开跑后 1 小时升频，无开跑时间时按当地日期级窗口处理。
 - 已实现新抓取窗口：只选择 `enabled=true`、`production_approved=true`、未暂停、未 backoff 的来源；连续失败 3 次自动降频，403/429/验证码类错误使用更保守 backoff，连续成功 3 次恢复默认 15 分钟。
@@ -756,7 +756,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 已实现新 QQ 窗口：只推高价值/榜单稿；每地区每窗口最多 3 篇；保底文章不自动 QQ；群小时和全站小时配额写入 `QuotaLedger`；0 推送原因写入 `WindowTargetDecision` 和窗口 payload。
 - `2026-07-02` review 返修后，抓取和 QQ 补跑都只对最近一个缺失窗口执行真实动作，较早缺失窗口会记录为 `coalesced_to_latest_*_window` 的 `SKIPPED` 窗口，避免停机恢复后集中补抓或集中补推；已有 `SKIPPED/FAILED` QQ delivery 若重新进入发送，也必须先重新占用群小时和全站小时配额，`PENDING/RETRYING/SENDING/SENT` 或已达到最大尝试次数的 delivery 仍不会重复占配额。本轮进一步修正窗口真实状态口径：抓取窗口只在真实抓取任务完成后写 `SUCCEEDED/FAILED`，来源存在 lease 未过期的运行中抓取窗口时不再重复派发；HTTP 403/429 等状态码会进入来源错误分类；QQ 窗口在占配额和创建 delivery 前先检查 OneBot 在线状态，离线时直接在窗口记录 `onebot_offline` 并不派发消息。
 - 已扩展 `audit_multiregion_news_production`：输出生产批准来源数、暂停/backoff 来源数、最近窗口结果、0 原因和配额打满记录；新增 `production_summary_task` 每日生成同一份摘要。
-- 新窗口 Beat 已接入但默认关闭；生产迁移和重启后不会自动进入高频抓取/发布/QQ。
+- 新窗口 Beat 已接入；生产显式开启后进入五地区常态窗口，不依赖旧 `auto_publish_batch_task` 提高频率。
 - 新增管理入口：
   - `MajorRaceEvent`、`ProductionWindow`、`QuotaLedger` 已注册 Django Admin。
   - `NewsSourceAdmin` 显示生产批准、有效间隔、backoff、失败连续次数和错误分类。
@@ -767,3 +767,11 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - 模型/窗口/来源/发布/QQ/重要赛事导入相关目标测试通过。
   - `2026-07-02` review 返修后，窗口相关目标测试 26 项通过，完整 `stable` 测试 399 项通过；`DB_ENGINE=sqlite manage.py check`、`openspec validate increase-multiregion-news-volume --strict`、`openspec validate --all` 和 `git diff --check` 均通过。
   - 临时 SQLite 迁移后 `audit_multiregion_news_production` 可输出有效 JSON。
+- 生产运行验证：
+  - `2026-07-02` 已部署到生产 `a122130`，容器 `web / worker / beat` 正常，`http://umafans.run/healthz/`、首页和抽检 `/news/<article_id>/` 均返回 `200`，Celery `active/reserved` 为空。
+  - 生产配置确认：`MULTIREGION_PRODUCTION_WINDOWS_ENABLED=true`，抓取 / 发布 / QQ 子开关均为 `true`；允许地区为日本、中国香港、英国、法国、美国；日常窗口 `15` 分钟，重要赛事窗口 `5` 分钟；发布每地区每窗口 `1-5` 篇，QQ 每地区每窗口最多 `3` 篇；当前没有地区处于重要赛事升频窗口。
+  - `2026-07-02 04:18-10:18` 最近 6 小时窗口复核：发布窗口和 QQ 窗口各地区均产生 `24` 个日常窗口；抓取窗口统计为 `260` 个 `succeeded/completed`，`109` 个 `skipped/coalesced_to_latest_crawl_window`，符合恢复补跑只抓最近窗口的设计。
+  - 最近 6 小时发布窗口中，美国 `04:30` 发布 `1` 篇，日本 `04:45` 发布 `2` 篇、`05:30` 发布 `4` 篇、`06:30 / 08:15 / 09:45` 各发布 `1` 篇；所有非零窗口均未超过每地区每窗口 `5` 篇，其余窗口均有 `no_ready_candidates` 原因。该时段 `published_to_web_at` 另包含香港 `1` 篇和美国 `3` 篇上线初始批次 / 旧自动发布文章，不属于本次新窗口发布。
+  - 最近 6 小时 QQ 实际发送 `6` 条，目标均为 `UmaFans测试群(1026525240)`；美国 `3` 条，日本 `3` 条，未超过每地区每窗口 `3` 条。0 推送窗口记录为 `no_eligible_articles` 或 `already_sent`。
+  - 来源复核显示 16 个生产批准来源最近抓取均为 `success`；`TDN France Galop 关键词英文新闻` 和 `TDN 美国新闻` 虽有已过期 `backoff_until` 残留，但最新 `10:00` 抓取窗口均为 `succeeded/completed`，当前不影响抓取。
+  - Ops 通知开关已开启，最近 6 小时产生 `ops_summary` QQ 通知 `2` 条并发送成功；邮件 / 短信 / 微信渠道按 MVP 预留逻辑记录为 `skipped` 或未配置。
