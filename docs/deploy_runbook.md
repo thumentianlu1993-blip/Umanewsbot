@@ -2136,6 +2136,15 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
   - 最近 3 小时没有新入库美国文章，也没有发布候选。
   - 结论：当前主因是来源没有新稿；早间 TDN 短暂失败已恢复，不是最新窗口 0 发布主因。
 
+### 2026-07-02 15:10 最近 2 小时窗口复核
+
+- 复核口径：`13:15` 至 `15:00` 自然窗口，服务器时区 CST。
+- 发布窗口：五地区每 15 分钟均生成窗口且状态为 `succeeded`；本时段网页发布 `0` 篇，原因均为 `no_ready_candidates`。
+- QQ 窗口：五地区每 15 分钟均生成窗口且状态为 `succeeded`；本时段 QQ delivery `0` 条，原因均为 `no_eligible_articles`。
+- 抓取窗口：最近 2 小时新入库 `8` 篇，按地区为日本 `5`、香港 `1`、英国 `2`、法国 `0`、美国 `0`；其中日本存在翻译失败稿，其他候选多为 `manual_review_required / pending_review`，未达到自动发布条件。
+- 来源状态：16 个生产批准来源中 14 个最新抓取为 `success`；`TDN France Galop 关键词英文新闻` 与 `TDN 美国新闻` 在 `15:02` 各出现一次 read timeout，`failure_streak=1`，属于同一上游站短时超时。
+- 结论：窗口调度、发布和 QQ 链路正常运转；当前 0 发布不是系统停摆，而是候选未通过自动发布资格或来源暂无新稿。后续可改进 `WindowCandidateDecision.payload`，在 `hard_gate_blocked` 时写入更具体的 blocker 明细，降低排障成本。
+
 ### 2026-07-02 榜单唤醒未发布文章上线准备
 
 - 变更：`revive-ranked-news-for-publish`。
