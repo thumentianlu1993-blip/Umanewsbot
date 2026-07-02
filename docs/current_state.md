@@ -776,3 +776,11 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - 来源复核显示 16 个生产批准来源最近抓取均为 `success`；`TDN France Galop 关键词英文新闻` 和 `TDN 美国新闻` 虽有已过期 `backoff_until` 残留，但最新 `10:00` 抓取窗口均为 `succeeded/completed`，当前不影响抓取。
   - Ops 通知开关已开启，最近 6 小时产生 `ops_summary` QQ 通知 `2` 条并发送成功；邮件 / 短信 / 微信渠道按 MVP 预留逻辑记录为 `skipped` 或未配置。
   - `2026-07-02 11:07` 继续复核最新 4 个发布窗口（`10:15 / 10:30 / 10:45 / 11:00`）：五地区均未发布新文章。日本有 `18` 条候选决策，全部为 `hard_gate_blocked`，主要来自翻译失败、人工审核要求和核心术语缺失；香港、英国、法国、美国没有进入发布候选的文章。最近 3 小时抓取显示非日本来源均成功运行但新增为 `0`、只命中重复旧稿；`TDN France Galop 关键词英文新闻`、`TDN 美国新闻` 曾在 `08:25-09:05` 超时或 `525`，`10:10` 已恢复成功且失败 streak 为 `0`。因此最新窗口 0 发布的主因是“日本候选被门禁/审核拦住，非日本暂无新稿”，不是生产调度或整体抓取失效。
+
+## 2026-07-02 榜单唤醒未发布文章提案
+
+- OpenSpec change：`revive-ranked-news-for-publish`，当前已创建 proposal、design、delta specs 和 tasks，尚未实现。
+- 用户确认的产品规则：榜单二次命中不是直接发布按钮，而是“这篇文章值得重新认真看一次”的强信号。未发布文章从普通来源升级为榜单来源时，应允许低分忽略、价值不足转人工、待翻译或翻译失败文章被唤醒；翻译失败或待翻译文章需要自动重试翻译；翻译成功后重新评分，高价值来源信号参与自动发布判断。
+- 边界：榜单唤醒不得绕过翻译成功、自动评分、发布校验、发布窗口配额和 QQ 限流；人工拒绝、撤回、已发布、高度重复 blocker、正文缺失、核心术语缺失等硬门禁仍不自动复活。
+- 规格影响：修改 `automation-publish-gates` 和 `multiregion-news-production`，新增榜单唤醒、翻译重试、重新评分、按唤醒时间进入发布候选池以及窗口决策留痕要求。
+- 验证：`openspec validate revive-ranked-news-for-publish --strict` 通过；`openspec validate --all` 通过，15 项；`git diff --check` 通过。
