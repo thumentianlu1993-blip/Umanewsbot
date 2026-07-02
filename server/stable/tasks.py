@@ -43,6 +43,7 @@ from stable.services.automation import (
     mark_automation_failed,
     prepare_base_translation_for_publish,
     publish_article_automatically,
+    revive_article_after_ranked_source_elevation,
     score_article_for_automation,
 )
 from stable.services.ingestion import upsert_article_from_draft
@@ -235,11 +236,32 @@ def _qq_push_after_source_elevation(article: NewsArticle, *, source_elevated: bo
         return {"article_id": article.id, "queued": False, "error": str(exc)}
 
 
+def _ranked_revival_after_source_elevation(article: NewsArticle, *, source_elevated: bool) -> dict | None:
+    if not source_elevated or is_article_public(article):
+        return None
+    try:
+        result = revive_article_after_ranked_source_elevation(article)
+        payload = {
+            "article_id": article.id,
+            "revived": bool(getattr(result, "revived", False)),
+            "action": getattr(result, "action", ""),
+            "reason": getattr(result, "reason", ""),
+        }
+        if payload["action"] == "translation_retry":
+            payload["dispatch_result"] = _json_safe_dispatch_result(dispatch_task(translate_article_task, article.id))
+        elif payload["action"] == "rescore":
+            payload["dispatch_result"] = _json_safe_dispatch_result(dispatch_task(process_article_automation_task, article.id))
+        return payload
+    except Exception as exc:
+        return {"article_id": article.id, "revived": False, "action": "error", "error": str(exc)}
+
+
 def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None) -> dict:
     adapter = NetkeibaAdapter()
     job = _start_crawl_job(source)
     new_count = 0
     seen_count = 0
+    ranked_revival_results: list[dict] = []
     try:
         for page in range(1, pages + 1):
             stubs = adapter.fetch_listing(mode, page)
@@ -256,6 +278,12 @@ def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None
                     _auto_translate_article_after_ingest(article)
                 else:
                     seen_count += 1
+                    revival_result = _ranked_revival_after_source_elevation(
+                        article,
+                        source_elevated=bool(getattr(upsert_result, "source_elevated", False)),
+                    )
+                    if revival_result:
+                        ranked_revival_results.append(revival_result)
                     _qq_push_after_source_elevation(
                         article,
                         source_elevated=bool(getattr(upsert_result, "source_elevated", False)),
@@ -263,7 +291,12 @@ def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None
             if mode in {SourceMode.ACCESS, SourceMode.ATTENTION}:
                 break
         _finish_crawl_job(job, success_count=new_count, fail_count=seen_count)
-        return {"new_count": new_count, "seen_count": seen_count, "crawl_job_id": job.id}
+        return {
+            "new_count": new_count,
+            "seen_count": seen_count,
+            "crawl_job_id": job.id,
+            "ranked_revival_results": ranked_revival_results,
+        }
     except Exception as exc:
         _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, error_message=str(exc))
         raise
@@ -319,6 +352,7 @@ def _crawl_international_source(source: NewsSource) -> dict:
     job = _start_crawl_job(source)
     new_count = 0
     seen_count = 0
+    ranked_revival_results: list[dict] = []
     try:
         for stub in adapter.fetch_listing(source.source_mode, 1):
             detail = adapter.fetch_detail(stub.source_url)
@@ -331,12 +365,23 @@ def _crawl_international_source(source: NewsSource) -> dict:
                 _auto_translate_article_after_ingest(article)
             else:
                 seen_count += 1
+                revival_result = _ranked_revival_after_source_elevation(
+                    article,
+                    source_elevated=bool(getattr(upsert_result, "source_elevated", False)),
+                )
+                if revival_result:
+                    ranked_revival_results.append(revival_result)
                 _qq_push_after_source_elevation(
                     article,
                     source_elevated=bool(getattr(upsert_result, "source_elevated", False)),
                 )
         _finish_crawl_job(job, success_count=new_count, fail_count=seen_count)
-        return {"new_count": new_count, "seen_count": seen_count, "crawl_job_id": job.id}
+        return {
+            "new_count": new_count,
+            "seen_count": seen_count,
+            "crawl_job_id": job.id,
+            "ranked_revival_results": ranked_revival_results,
+        }
     except Exception as exc:
         _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, error_message=str(exc))
         raise
@@ -422,6 +467,7 @@ def crawl_news_source_task(source_id: int, window_id: int | None = None) -> dict
                 "new_count": result.get("new_count", 0),
                 "seen_count": result.get("seen_count", 0),
                 "crawl_job_id": result.get("crawl_job_id"),
+                "ranked_revival_results": result.get("ranked_revival_results", []),
             },
         )
         _log_success(log, f"source={source_id} new={result['new_count']} seen={result['seen_count']}")

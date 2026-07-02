@@ -12,6 +12,7 @@ from stable.models import (
     AutomationPhase,
     AutomationResult,
     AutomationStatus,
+    ArticleTranslationStatus,
     ContentCategory,
     NewsArticle,
     NotificationType,
@@ -252,6 +253,146 @@ class AutomationDecision:
     content_category: str
     decision_summary: str
     decision_reason: dict
+
+
+@dataclass(frozen=True)
+class RankedRevivalResult:
+    article_id: int
+    revived: bool
+    action: str
+    reason: str = ""
+
+
+TERMINAL_RANKED_REVIVAL_STATUSES = {
+    WorkflowStatus.PUBLISHED,
+    WorkflowStatus.WITHDRAWN,
+    WorkflowStatus.REJECTED,
+    WorkflowStatus.DUPLICATE,
+}
+REVIVABLE_IGNORED_REASON_KEYWORDS = ("分数低", "发布价值不足", "价值或确定性不足")
+
+
+def _has_blocker(article: NewsArticle) -> bool:
+    return any((issue or {}).get("severity") == "blocker" for issue in (article.gate_issues or []))
+
+
+def _ranked_revival_payload(article: NewsArticle, *, now, action: str) -> dict:
+    previous = article.decision_reason.get("ranked_revival", {}) if isinstance(article.decision_reason, dict) else {}
+    payload = {
+        "revived_at": now.isoformat(),
+        "source_site": article.source_site,
+        "source_mode": article.source_mode,
+        "previous_workflow_status": article.workflow_status,
+        "previous_automation_status": article.automation_status,
+        "previous_translation_status": article.translation_status,
+        "action": action,
+    }
+    if action == "translation_retry":
+        payload["translation_retry_requested_at"] = now.isoformat()
+    if previous:
+        payload["previous_revival"] = previous
+    return payload
+
+
+def _translation_incomplete(article: NewsArticle) -> bool:
+    if article.translation_status != ArticleTranslationStatus.TRANSLATED:
+        return True
+    return not (article.translated_title_zh and article.translated_body_zh)
+
+
+def _ignored_reason_is_revivable(article: NewsArticle) -> bool:
+    reason = article.decision_reason if isinstance(article.decision_reason, dict) else {}
+    hard_rules = [str(item) for item in reason.get("hard_rules") or []]
+    summary = str(reason.get("summary") or article.decision_summary or "")
+    text = " ".join([*hard_rules, summary])
+    if any(keyword in text for keyword in REVIVABLE_IGNORED_REASON_KEYWORDS):
+        return True
+    return not hard_rules and not summary
+
+
+def revive_article_after_ranked_source_elevation(article: NewsArticle, *, now=None) -> RankedRevivalResult:
+    now = now or timezone.now()
+    if article.workflow_status in TERMINAL_RANKED_REVIVAL_STATUSES:
+        return RankedRevivalResult(article_id=article.id, revived=False, action="blocked", reason="terminal_status")
+    if _has_blocker(article):
+        return RankedRevivalResult(article_id=article.id, revived=False, action="blocked", reason="hard_gate_blocker")
+
+    reason = dict(article.decision_reason or {})
+    existing_revival = reason.get("ranked_revival") or {}
+    if (
+        existing_revival.get("action") == "translation_retry"
+        and existing_revival.get("translation_retry_requested_at")
+        and article.translation_status in {ArticleTranslationStatus.PENDING, ArticleTranslationStatus.TRANSLATING}
+        and article.workflow_status == WorkflowStatus.PENDING_TRANSLATION
+    ):
+        return RankedRevivalResult(
+            article_id=article.id,
+            revived=False,
+            action="already_retrying_translation",
+            reason="translation_retry_in_progress",
+        )
+
+    if _translation_incomplete(article) or article.workflow_status == WorkflowStatus.TRANSLATION_FAILED:
+        action = "translation_retry"
+        reason["ranked_revival"] = _ranked_revival_payload(article, now=now, action=action)
+        article.ranked_revived_at = now
+        article.workflow_status = WorkflowStatus.PENDING_TRANSLATION
+        article.translation_status = ArticleTranslationStatus.PENDING
+        article.automation_status = AutomationStatus.PENDING
+        article.review_mode = ""
+        article.decision_reason = reason
+        article.save(
+            update_fields=[
+                "ranked_revived_at",
+                "workflow_status",
+                "translation_status",
+                "automation_status",
+                "review_mode",
+                "decision_reason",
+                "updated_at",
+            ]
+        )
+        log_automation(
+            article,
+            phase=AutomationPhase.SCORE,
+            result=AutomationResult.SUCCESS,
+            reason="榜单唤醒：重新派发翻译",
+            payload={"ranked_revival": reason["ranked_revival"]},
+        )
+        return RankedRevivalResult(article_id=article.id, revived=True, action=action)
+
+    if article.workflow_status not in {WorkflowStatus.IGNORED, WorkflowStatus.PENDING_REVIEW, WorkflowStatus.PENDING_EDIT}:
+        return RankedRevivalResult(article_id=article.id, revived=False, action="blocked", reason="status_not_revivable")
+    if article.workflow_status == WorkflowStatus.IGNORED and not _ignored_reason_is_revivable(article):
+        return RankedRevivalResult(article_id=article.id, revived=False, action="blocked", reason="hard_rule_ignored")
+
+    action = "rescore"
+    reason["ranked_revival"] = _ranked_revival_payload(article, now=now, action=action)
+    article.ranked_revived_at = now
+    article.workflow_status = WorkflowStatus.PENDING_EDIT
+    article.review_mode = ReviewMode.AUTO
+    article.automation_status = AutomationStatus.PENDING
+    article.automation_error_message = ""
+    article.decision_reason = reason
+    article.save(
+        update_fields=[
+            "ranked_revived_at",
+            "workflow_status",
+            "review_mode",
+            "automation_status",
+            "automation_error_message",
+            "decision_reason",
+            "updated_at",
+        ]
+    )
+    log_automation(
+        article,
+        phase=AutomationPhase.SCORE,
+        result=AutomationResult.SUCCESS,
+        reason="榜单唤醒：重新评分",
+        payload={"ranked_revival": reason["ranked_revival"]},
+    )
+    return RankedRevivalResult(article_id=article.id, revived=True, action=action)
 
 
 def _source_text(article: NewsArticle) -> str:

@@ -2078,6 +2078,43 @@ class PublishWindowServiceTests(TestCase):
         )
 
     @override_settings(
+        MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS=["hong_kong"],
+        MULTIREGION_PUBLISH_REGION_WINDOW_MAX=5,
+        MULTIREGION_PUBLISH_REGION_WINDOW_MIN=1,
+        MULTIREGION_PUBLISH_SOFT_FILL_MIN_SCORE=45,
+        MULTIREGION_PUBLISH_SITE_HOURLY_MAX_DAILY=60,
+        MULTIREGION_PUBLISH_CANDIDATE_LOOKBACK_HOURS=3,
+    )
+    def test_ranked_revived_article_enters_publish_window_after_first_seen_lookback(self):
+        from stable.services.publishing_windows import select_publish_candidates
+
+        now = datetime(2026, 7, 1, 10, 20, tzinfo=dt_timezone.utc)
+        article = self._article(
+            source_article_id="ranked-revived-candidate",
+            first_seen_at=now - timedelta(hours=6),
+            score_total=90,
+            decision_reason={
+                "ranked_revival": {
+                    "revived_at": (now - timedelta(minutes=20)).isoformat(),
+                    "source_site": SourceSite.HKJC_NEWS,
+                    "source_mode": SourceMode.ACCESS,
+                }
+            },
+        )
+        article.ranked_revived_at = now - timedelta(minutes=20)
+        article.save(update_fields=["ranked_revived_at", "updated_at"])
+        window = self._window()
+
+        result = select_publish_candidates(RacingRegion.HONG_KONG, window=window, now=now)
+
+        self.assertEqual(result.selected, [article])
+        decision = WindowCandidateDecision.objects.get(window=window, article=article)
+        self.assertEqual(decision.status, WindowDecisionStatus.SELECTED)
+        self.assertTrue(decision.payload["ranked_revival"])
+        self.assertEqual(decision.payload["ranked_revived_at"], article.ranked_revived_at.isoformat())
+        self.assertEqual(decision.payload["ranked_revival_source_mode"], SourceMode.ACCESS)
+
+    @override_settings(
         MULTIREGION_PRODUCTION_WINDOWS_ENABLED=True,
         MULTIREGION_PRODUCTION_WINDOWS_PUBLISH_ENABLED=True,
         MULTIREGION_PRODUCTION_WINDOWS_ALLOWED_REGIONS=["hong_kong"],
@@ -9255,6 +9292,231 @@ class PublicHomeInfoFeedTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class RankedNewsRevivalTests(TestCase):
+    def _article(self, **overrides):
+        payload = {
+            "source_site": SourceSite.NETKEIBA,
+            "source_mode": SourceMode.ACCESS,
+            "source_article_id": overrides.pop("source_article_id", f"ranked-revival-{NewsArticle.objects.count()}"),
+            "racing_region": RacingRegion.JAPAN,
+            "source_language": SourceLanguage.JAPANESE,
+            "title_ja": overrides.pop("title_ja", "ランキング再浮上ニュース"),
+            "body_ja_raw": overrides.pop("body_ja_raw", "レース前の展望記事です。" * 20),
+            "body_ja_normalized": overrides.pop("body_ja_normalized", "レース前の展望記事です。" * 20),
+            "translated_title_zh": overrides.pop("translated_title_zh", "榜单唤醒新闻"),
+            "title_zh": overrides.pop("title_zh", "榜单唤醒新闻"),
+            "translated_summary_zh": overrides.pop("translated_summary_zh", "榜单唤醒摘要"),
+            "summary_zh": overrides.pop("summary_zh", "榜单唤醒摘要"),
+            "translated_body_zh": overrides.pop("translated_body_zh", "榜单唤醒正文。" * 30),
+            "body_zh": overrides.pop("body_zh", "榜单唤醒正文。" * 30),
+            "published_at": timezone.now(),
+            "source_url": overrides.pop("source_url", f"https://example.com/ranked/{NewsArticle.objects.count()}"),
+            "translation_status": ArticleTranslationStatus.TRANSLATED,
+            "workflow_status": WorkflowStatus.PENDING_REVIEW,
+            "review_mode": ReviewMode.MANUAL,
+            "automation_status": AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            "score_total": 40,
+            "quality_score": 60,
+            "decision_reason": {},
+            "gate_issues": [],
+        }
+        payload.update(overrides)
+        return NewsArticle.objects.create(**payload)
+
+    def test_ranked_revived_at_is_nullable_indexed_model_field(self):
+        field = NewsArticle._meta.get_field("ranked_revived_at")
+
+        self.assertTrue(field.null)
+        self.assertTrue(field.blank)
+        self.assertTrue(field.db_index)
+
+    def test_low_score_ignored_article_is_revived_for_rescore(self):
+        from stable.services.automation import revive_article_after_ranked_source_elevation
+
+        now = datetime(2026, 7, 1, 10, 20, tzinfo=dt_timezone.utc)
+        article = self._article(
+            workflow_status=WorkflowStatus.IGNORED,
+            review_mode=ReviewMode.IGNORED,
+            automation_status=AutomationStatus.IGNORED,
+            score_total=30,
+            ignored_at=now - timedelta(hours=1),
+            decision_reason={"scores": {"total": 30}, "summary": "忽略：总分 30，发布价值不足"},
+        )
+
+        result = revive_article_after_ranked_source_elevation(article, now=now)
+
+        article.refresh_from_db()
+        self.assertTrue(result.revived)
+        self.assertEqual(result.action, "rescore")
+        self.assertEqual(article.ranked_revived_at, now)
+        self.assertEqual(article.workflow_status, WorkflowStatus.PENDING_EDIT)
+        self.assertEqual(article.automation_status, AutomationStatus.PENDING)
+        self.assertEqual(article.decision_reason["ranked_revival"]["previous_workflow_status"], WorkflowStatus.IGNORED)
+        self.assertEqual(article.decision_reason["ranked_revival"]["previous_automation_status"], AutomationStatus.IGNORED)
+        self.assertEqual(article.decision_reason["ranked_revival"]["source_mode"], SourceMode.ACCESS)
+
+    def test_hard_rule_ignored_article_is_not_revived(self):
+        from stable.services.automation import revive_article_after_ranked_source_elevation
+
+        now = datetime(2026, 7, 1, 10, 22, tzinfo=dt_timezone.utc)
+        article = self._article(
+            workflow_status=WorkflowStatus.IGNORED,
+            review_mode=ReviewMode.IGNORED,
+            automation_status=AutomationStatus.IGNORED,
+            score_total=60,
+            ignored_at=now - timedelta(hours=1),
+            decision_reason={
+                "hard_rules": ["正文过短或为空"],
+                "scores": {"total": 60},
+                "summary": "忽略：正文过短或为空",
+            },
+        )
+
+        result = revive_article_after_ranked_source_elevation(article, now=now)
+
+        article.refresh_from_db()
+        self.assertFalse(result.revived)
+        self.assertEqual(result.action, "blocked")
+        self.assertEqual(result.reason, "hard_rule_ignored")
+        self.assertEqual(article.workflow_status, WorkflowStatus.IGNORED)
+        self.assertIsNone(article.ranked_revived_at)
+        self.assertNotIn("ranked_revival", article.decision_reason)
+
+    def test_manual_value_insufficient_article_is_revived_for_rescore_without_blocker(self):
+        from stable.services.automation import revive_article_after_ranked_source_elevation
+
+        now = datetime(2026, 7, 1, 10, 25, tzinfo=dt_timezone.utc)
+        article = self._article(
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            review_mode=ReviewMode.MANUAL,
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            score_total=50,
+            decision_reason={"summary": "转人工：总分 50，价值或确定性不足"},
+        )
+
+        result = revive_article_after_ranked_source_elevation(article, now=now)
+
+        article.refresh_from_db()
+        self.assertTrue(result.revived)
+        self.assertEqual(result.action, "rescore")
+        self.assertEqual(article.ranked_revived_at, now)
+        self.assertEqual(article.workflow_status, WorkflowStatus.PENDING_EDIT)
+        self.assertEqual(article.review_mode, ReviewMode.AUTO)
+        self.assertEqual(article.automation_status, AutomationStatus.PENDING)
+
+    def test_translation_failed_article_is_revived_for_one_translation_retry(self):
+        from stable.services.automation import revive_article_after_ranked_source_elevation
+
+        now = datetime(2026, 7, 1, 10, 30, tzinfo=dt_timezone.utc)
+        article = self._article(
+            workflow_status=WorkflowStatus.TRANSLATION_FAILED,
+            translation_status=ArticleTranslationStatus.FAILED,
+            translated_title_zh="",
+            title_zh="",
+            translated_summary_zh="",
+            summary_zh="",
+            translated_body_zh="",
+            body_zh="",
+            review_mode=ReviewMode.MANUAL,
+            automation_status=AutomationStatus.FAILED,
+            translation_error_message="provider timeout",
+        )
+
+        result = revive_article_after_ranked_source_elevation(article, now=now)
+
+        article.refresh_from_db()
+        self.assertTrue(result.revived)
+        self.assertEqual(result.action, "translation_retry")
+        self.assertEqual(article.ranked_revived_at, now)
+        self.assertEqual(article.workflow_status, WorkflowStatus.PENDING_TRANSLATION)
+        self.assertEqual(article.translation_status, ArticleTranslationStatus.PENDING)
+        self.assertEqual(article.decision_reason["ranked_revival"]["translation_retry_requested_at"], now.isoformat())
+
+    def test_pending_translation_article_is_revived_but_not_marked_publish_ready(self):
+        from stable.services.automation import revive_article_after_ranked_source_elevation
+
+        now = datetime(2026, 7, 1, 10, 35, tzinfo=dt_timezone.utc)
+        article = self._article(
+            workflow_status=WorkflowStatus.PENDING_TRANSLATION,
+            translation_status=ArticleTranslationStatus.PENDING,
+            translated_title_zh="",
+            title_zh="",
+            translated_summary_zh="",
+            summary_zh="",
+            translated_body_zh="",
+            body_zh="",
+            automation_status=AutomationStatus.PENDING,
+        )
+
+        result = revive_article_after_ranked_source_elevation(article, now=now)
+
+        article.refresh_from_db()
+        self.assertTrue(result.revived)
+        self.assertEqual(result.action, "translation_retry")
+        self.assertEqual(article.workflow_status, WorkflowStatus.PENDING_TRANSLATION)
+        self.assertNotEqual(article.automation_status, AutomationStatus.PUBLISH_READY)
+
+    def test_ranked_revival_does_not_revive_terminal_or_blocked_articles(self):
+        from stable.services.automation import revive_article_after_ranked_source_elevation
+
+        now = datetime(2026, 7, 1, 10, 40, tzinfo=dt_timezone.utc)
+        blocked_cases = [
+            self._article(source_article_id="revival-rejected", workflow_status=WorkflowStatus.REJECTED),
+            self._article(source_article_id="revival-withdrawn", workflow_status=WorkflowStatus.WITHDRAWN),
+            self._article(source_article_id="revival-duplicate", workflow_status=WorkflowStatus.DUPLICATE),
+            self._article(
+                source_article_id="revival-blocker",
+                workflow_status=WorkflowStatus.PENDING_REVIEW,
+                gate_issues=[{"code": "core_term_missing", "severity": "blocker"}],
+            ),
+        ]
+
+        for article in blocked_cases:
+            result = revive_article_after_ranked_source_elevation(article, now=now)
+            article.refresh_from_db()
+
+            self.assertFalse(result.revived)
+            self.assertEqual(result.action, "blocked")
+            self.assertIsNone(article.ranked_revived_at)
+            self.assertNotIn("ranked_revival", article.decision_reason)
+
+    def test_repeated_ranked_revival_does_not_repeat_translation_retry(self):
+        from stable.services.automation import revive_article_after_ranked_source_elevation
+
+        first_revived_at = datetime(2026, 7, 1, 10, 30, tzinfo=dt_timezone.utc)
+        second_seen_at = datetime(2026, 7, 1, 10, 35, tzinfo=dt_timezone.utc)
+        article = self._article(
+            workflow_status=WorkflowStatus.PENDING_TRANSLATION,
+            translation_status=ArticleTranslationStatus.PENDING,
+            translated_title_zh="",
+            title_zh="",
+            translated_summary_zh="",
+            summary_zh="",
+            translated_body_zh="",
+            body_zh="",
+            decision_reason={
+                "ranked_revival": {
+                    "revived_at": first_revived_at.isoformat(),
+                    "action": "translation_retry",
+                    "translation_retry_requested_at": first_revived_at.isoformat(),
+                }
+            },
+        )
+        article.ranked_revived_at = first_revived_at
+        article.save(update_fields=["ranked_revived_at", "decision_reason", "updated_at"])
+
+        result = revive_article_after_ranked_source_elevation(article, now=second_seen_at)
+
+        article.refresh_from_db()
+        self.assertFalse(result.revived)
+        self.assertEqual(result.action, "already_retrying_translation")
+        self.assertEqual(article.ranked_revived_at, first_revived_at)
+        self.assertEqual(
+            article.decision_reason["ranked_revival"]["translation_retry_requested_at"],
+            first_revived_at.isoformat(),
+        )
+
+
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, AUTOMATION_ENABLED=True, REWRITE_PROVIDER="fallback")
 class AutomationFlowTests(TestCase):
     def _translated_article(self, **overrides):
@@ -10997,6 +11259,76 @@ class CrawlAutoTranslateTests(TestCase):
         mocked_dispatch.assert_called_once_with(qq_auto_push_article_task, article.id)
 
     @override_settings(AUTO_TRANSLATE_ON_INGEST=False, QQ_PUSH_ENABLED=True)
+    def test_source_elevated_unpublished_article_runs_ranked_revival_without_qq_push(self):
+        sync_builtin_sources()
+        source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.ACCESS)
+        stub = type("Stub", (), {"source_article_id": "seen-ranked-unpublished"})()
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.ACCESS,
+            source_article_id="seen-ranked-unpublished",
+            title_ja="榜单提升未公开",
+            body_ja_raw="本文",
+            body_ja_normalized="本文",
+            published_at=timezone.now(),
+            source_url="https://example.com/news/seen-ranked-unpublished",
+            workflow_status=WorkflowStatus.IGNORED,
+            automation_status=AutomationStatus.IGNORED,
+            review_mode=ReviewMode.IGNORED,
+        )
+
+        with patch("stable.tasks.NetkeibaAdapter.fetch_listing", return_value=[stub]), patch(
+            "stable.tasks.NetkeibaAdapter.fetch_detail", return_value=object()
+        ), patch("stable.tasks.NetkeibaAdapter.normalize_source_payload", return_value=object()), patch(
+            "stable.tasks.upsert_article_from_draft",
+            return_value=ArticleUpsertResult(article=article, created=False, source_elevated=True),
+        ), patch("stable.tasks.revive_article_after_ranked_source_elevation", return_value=Mock(action="rescore")) as mocked_revival, patch(
+            "stable.tasks.dispatch_task"
+        ) as mocked_dispatch:
+            result = _crawl_netkeiba_mode("access", 1, source=source)
+
+        self.assertEqual(result["new_count"], 0)
+        self.assertEqual(result["seen_count"], 1)
+        mocked_revival.assert_called_once()
+        self.assertEqual(mocked_revival.call_args.args[0], article)
+        self.assertFalse(any(call_args.args and call_args.args[0] is qq_auto_push_article_task for call_args in mocked_dispatch.call_args_list))
+
+    @override_settings(AUTO_TRANSLATE_ON_INGEST=False, QQ_PUSH_ENABLED=True)
+    def test_source_elevated_revival_dispatch_result_is_json_safe(self):
+        sync_builtin_sources()
+        source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.ACCESS)
+        stub = type("Stub", (), {"source_article_id": "seen-ranked-json-safe"})()
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.ACCESS,
+            source_article_id="seen-ranked-json-safe",
+            title_ja="榜单提升 JSON 化",
+            body_ja_raw="本文",
+            body_ja_normalized="本文",
+            published_at=timezone.now(),
+            source_url="https://example.com/news/seen-ranked-json-safe",
+            workflow_status=WorkflowStatus.IGNORED,
+            automation_status=AutomationStatus.IGNORED,
+            review_mode=ReviewMode.IGNORED,
+        )
+        async_result = type("AsyncResult", (), {"id": "ranked-revival-task-1"})()
+
+        with patch("stable.tasks.NetkeibaAdapter.fetch_listing", return_value=[stub]), patch(
+            "stable.tasks.NetkeibaAdapter.fetch_detail", return_value=object()
+        ), patch("stable.tasks.NetkeibaAdapter.normalize_source_payload", return_value=object()), patch(
+            "stable.tasks.upsert_article_from_draft",
+            return_value=ArticleUpsertResult(article=article, created=False, source_elevated=True),
+        ), patch("stable.tasks.revive_article_after_ranked_source_elevation", return_value=Mock(action="rescore")), patch(
+            "stable.tasks.dispatch_task", return_value=async_result
+        ):
+            result = _crawl_netkeiba_mode("access", 1, source=source)
+
+        self.assertEqual(
+            result["ranked_revival_results"][0]["dispatch_result"],
+            {"task_id": "ranked-revival-task-1"},
+        )
+
+    @override_settings(AUTO_TRANSLATE_ON_INGEST=False, QQ_PUSH_ENABLED=True)
     def test_international_source_elevated_public_article_dispatches_qq_auto_push(self):
         sync_builtin_sources()
         source = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
@@ -11037,6 +11369,51 @@ class CrawlAutoTranslateTests(TestCase):
         self.assertEqual(result["new_count"], 0)
         self.assertEqual(result["seen_count"], 1)
         mocked_dispatch.assert_called_once_with(qq_auto_push_article_task, article.id)
+
+    @override_settings(AUTO_TRANSLATE_ON_INGEST=False, QQ_PUSH_ENABLED=True)
+    def test_international_source_elevated_unpublished_article_runs_ranked_revival_without_qq_push(self):
+        sync_builtin_sources()
+        source = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
+        stub = type("Stub", (), {"source_url": "https://www.skysports.com/racing/news/sky-ranked-unpublished"})()
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.SKY_SPORTS_RACING,
+            source_mode=SourceMode.ACCESS,
+            source_article_id="sky-ranked-unpublished",
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            source_language=SourceLanguage.ENGLISH,
+            title_ja="Sky ranked unpublished",
+            body_ja_raw="Body",
+            body_ja_normalized="Body",
+            published_at=timezone.now(),
+            source_url=stub.source_url,
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            review_mode=ReviewMode.MANUAL,
+        )
+
+        class FakeInternationalAdapter:
+            def fetch_listing(self, mode, page):
+                return [stub]
+
+            def fetch_detail(self, source_url):
+                return object()
+
+            def normalize_source_payload(self, stub, detail):
+                return object()
+
+        with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {source.adapter_key: FakeInternationalAdapter}), patch(
+            "stable.tasks.upsert_article_from_draft",
+            return_value=ArticleUpsertResult(article=article, created=False, source_elevated=True),
+        ), patch("stable.tasks.revive_article_after_ranked_source_elevation", return_value=Mock(action="rescore")) as mocked_revival, patch(
+            "stable.tasks.dispatch_task"
+        ) as mocked_dispatch:
+            result = _crawl_international_source(source)
+
+        self.assertEqual(result["new_count"], 0)
+        self.assertEqual(result["seen_count"], 1)
+        mocked_revival.assert_called_once()
+        self.assertEqual(mocked_revival.call_args.args[0], article)
+        self.assertFalse(any(call_args.args and call_args.args[0] is qq_auto_push_article_task for call_args in mocked_dispatch.call_args_list))
 
     @override_settings(AUTO_TRANSLATE_ON_INGEST=False)
     def test_jra_detail_structure_error_skips_article_and_continues(self):

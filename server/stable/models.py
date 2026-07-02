@@ -497,6 +497,7 @@ class NewsArticle(TimestampedModel):
     is_first_crawled = models.BooleanField(default=True)
     first_seen_at = models.DateTimeField(default=timezone.now)
     last_seen_at = models.DateTimeField(default=timezone.now)
+    ranked_revived_at = models.DateTimeField(null=True, blank=True, db_index=True)
     crawl_status = models.CharField(max_length=16, choices=CrawlStatus.choices, default=CrawlStatus.SUCCESS)
     status = models.CharField(max_length=32, choices=ArticleStatus.choices, default=ArticleStatus.CRAWLED)
     workflow_status = models.CharField(

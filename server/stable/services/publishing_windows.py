@@ -7,6 +7,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from stable.models import (
@@ -43,14 +44,28 @@ def hard_gate_article(article: NewsArticle) -> tuple[bool, str]:
 
 def _candidate_queryset(region: str, *, now):
     lookback_hours = int(getattr(settings, "MULTIREGION_PUBLISH_CANDIDATE_LOOKBACK_HOURS", 3))
+    cutoff = now - timedelta(hours=lookback_hours)
     return (
         NewsArticle.objects.filter(
             racing_region=region,
-            first_seen_at__gte=now - timedelta(hours=lookback_hours),
         )
+        .filter(Q(first_seen_at__gte=cutoff) | Q(ranked_revived_at__gte=cutoff))
         .exclude(workflow_status__in=[WorkflowStatus.PUBLISHED, WorkflowStatus.WITHDRAWN, WorkflowStatus.IGNORED])
-        .order_by("-score_total", "-quality_score", "-first_seen_at", "id")
+        .order_by("-score_total", "-quality_score", "-ranked_revived_at", "-first_seen_at", "id")
     )
+
+
+def _candidate_payload(article: NewsArticle, *, extra: dict | None = None) -> dict:
+    revival = (article.decision_reason or {}).get("ranked_revival") or {}
+    payload = {
+        "ranked_revival": bool(article.ranked_revived_at),
+        "ranked_revived_at": article.ranked_revived_at.isoformat() if article.ranked_revived_at else "",
+        "ranked_revival_source_site": revival.get("source_site", ""),
+        "ranked_revival_source_mode": revival.get("source_mode", ""),
+    }
+    if extra:
+        payload.update(extra)
+    return payload
 
 
 def _record_candidate(
@@ -119,7 +134,13 @@ def select_publish_candidates(region: str, *, window: ProductionWindow, now=None
     for article in _candidate_queryset(region, now=now):
         allowed, reason = hard_gate_article(article)
         if not allowed:
-            _record_candidate(window=window, article=article, status=WindowDecisionStatus.BLOCKED, reason=reason)
+            _record_candidate(
+                window=window,
+                article=article,
+                status=WindowDecisionStatus.BLOCKED,
+                reason=reason,
+                payload=_candidate_payload(article),
+            )
             continue
         fingerprint = content_fingerprint(article)
         previous = fingerprints.get(fingerprint)
@@ -129,7 +150,7 @@ def select_publish_candidates(region: str, *, window: ProductionWindow, now=None
                 article=article,
                 status=WindowDecisionStatus.SKIPPED,
                 reason="dedupe_loser",
-                payload={"winner_article_id": previous.id, "fingerprint": fingerprint},
+                payload=_candidate_payload(article, extra={"winner_article_id": previous.id, "fingerprint": fingerprint}),
             )
             continue
         fingerprints[fingerprint] = article
@@ -154,6 +175,7 @@ def select_publish_candidates(region: str, *, window: ProductionWindow, now=None
                     article=article,
                     status=WindowDecisionStatus.SKIPPED,
                     reason=quota_reason,
+                    payload=_candidate_payload(article),
                 )
             return PublishSelectionResult(selected=[], zero_reasons=[quota_reason])
 
@@ -164,6 +186,7 @@ def select_publish_candidates(region: str, *, window: ProductionWindow, now=None
             status=WindowDecisionStatus.SELECTED,
             reason="region_minimum_fill" if article.decision_reason.get("region_minimum_fill") else "selected",
             rank=rank,
+            payload=_candidate_payload(article),
         )
     for article in ready:
         if article.id not in selected_ids:
@@ -172,6 +195,7 @@ def select_publish_candidates(region: str, *, window: ProductionWindow, now=None
                 article=article,
                 status=WindowDecisionStatus.SKIPPED,
                 reason="region_window_limit" if len(selected) >= max_count else "below_min_score",
+                payload=_candidate_payload(article),
             )
 
     zero_reasons: list[str] = []

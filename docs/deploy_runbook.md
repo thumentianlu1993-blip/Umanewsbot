@@ -2135,3 +2135,15 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
   - `TDN 美国新闻` 在 `08:25-09:05` 出现过 read timeout，`10:10` 已恢复成功，`failure_streak=0`，最新消息为 `新增 0，重复 20`。
   - 最近 3 小时没有新入库美国文章，也没有发布候选。
   - 结论：当前主因是来源没有新稿；早间 TDN 短暂失败已恢复，不是最新窗口 0 发布主因。
+
+### 2026-07-02 榜单唤醒未发布文章上线准备
+
+- 变更：`revive-ranked-news-for-publish`。
+- 本地实现状态：已完成并归档，待部署生产。
+- 数据库迁移：新增 `server/stable/migrations/0019_newsarticle_ranked_revived_at.py`，为 `NewsArticle` 增加 nullable/indexed `ranked_revived_at` 字段；历史文章默认 `NULL`，不回填。
+- 部署步骤：
+  1. 合并并部署代码。
+  2. 在生产容器内执行 Django migration，确认 `0019` 应用成功。
+  3. 执行 `manage.py check`、`/healthz/`、首页和后台 smoke。
+  4. 观察最近发布窗口的 `WindowCandidateDecision.payload.ranked_revival`、翻译重试任务、重新评分结果和 QQ delivery。
+- 回滚边界：如需回滚代码，`ranked_revived_at` 字段可留存不用，不影响旧逻辑；如需删除字段，后续单独做清理迁移。

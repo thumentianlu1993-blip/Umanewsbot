@@ -32,8 +32,8 @@
   - `server/stable/services/ingestion.py`：继续识别 `source_elevated`，并为未发布文章输出唤醒信号。
   - `server/stable/tasks.py`：在抓取 upsert 后编排榜单唤醒、翻译重试、重新评分和已有 QQ 补推。
   - `server/stable/services/automation.py`：复用现有评分和门禁，但需要支持榜单唤醒元数据与可复活状态。
-  - `server/stable/services/publishing_windows.py`：候选查询需要按榜单唤醒时间或等价标记拾取候选。
-  - `server/stable/models.py` / migrations：如现有 JSON 字段不足以可靠查询唤醒时间，可能新增轻量字段；若可用现有字段和查询完成，则不新增迁移。
+  - `server/stable/services/publishing_windows.py`：候选查询需要按榜单唤醒时间拾取候选。
+  - `server/stable/models.py` / migrations：新增 nullable 且可索引的 `ranked_revived_at` 时间字段；`decision_reason` 继续保存可读审计元数据。
 - 测试：
   - 覆盖普通文章进入榜单后复活低分忽略、价值不足人工审核、翻译失败重试、已发布只 QQ 补推、人工拒绝/撤回/blocker 不复活。
   - 覆盖发布窗口按榜单唤醒时间纳入候选，并记录窗口候选决策。

@@ -34,9 +34,9 @@
 
 备选方案是在发布窗口里检查 `NewsSnapshot` 是否出现榜单快照。这个方案会让发布窗口承担过多抓取语义，也难以及时触发翻译重试。选择 upsert 后编排，是因为来源升级信号在这里最准确，且已有抓取任务已经处理 `source_elevated`。
 
-### 2. 使用显式唤醒元数据驱动候选窗口
+### 2. 使用显式唤醒字段和元数据驱动候选窗口
 
-榜单唤醒必须写入稳定元数据，例如 `decision_reason.ranked_revival`，包含：
+榜单唤醒必须写入 `NewsArticle.ranked_revived_at`，作为发布窗口查询和排序使用的稳定时间字段。同时写入审计元数据，例如 `decision_reason.ranked_revival`，包含：
 
 - `revived_at`
 - `source_site`
@@ -45,7 +45,7 @@
 - `previous_automation_status`
 - `action`
 
-发布窗口候选查询应把“首次入库时间在回看范围内”扩展为“首次入库时间或最近榜单唤醒时间在回看范围内”。如果 JSON 查询在 SQLite / PostgreSQL 上实现复杂或不可维护，实施时可以新增 `ranked_revived_at` 之类的轻量字段和迁移，避免依赖脆弱 JSON 查询。
+发布窗口候选查询应把“首次入库时间在回看范围内”扩展为“首次入库时间或 `ranked_revived_at` 在回看范围内”。不使用 JSON 时间查询作为候选窗口主依据，因为 SQLite / PostgreSQL 的 JSON 时间比较、索引和测试口径更容易分叉。
 
 备选方案是直接更新 `first_seen_at`。不采用该方案，因为 `first_seen_at` 是文章首次进入系统的事实时间，改写它会污染审计和来源新鲜度判断。
 
@@ -91,24 +91,24 @@
 - [Risk] 低质量文章因榜单信号被过度发布。  
   Mitigation: 榜单只提升评分信号，不绕过翻译成功、正文完整、核心术语、重复检测和地区/来源自动发布策略。
 
-- [Risk] 发布窗口 JSON 查询唤醒时间性能或兼容性不好。  
-  Mitigation: 如果实现中查询复杂，新增索引友好的 `ranked_revived_at` 字段；保持迁移小且可回滚。
+- [Risk] 发布窗口按唤醒时间补量增加候选查询复杂度。
+  Mitigation: 使用索引友好的 `ranked_revived_at` 字段；JSON 只作为审计信息，不作为窗口主查询条件。
 
 - [Risk] 翻译失败文章进入榜单后增加模型调用量。  
   Mitigation: 只在 `source_elevated=true` 且文章可复活时重试；同一篇文章同一轮唤醒只触发一次重试。
 
 ## Migration Plan
 
-1. 本地实现并完成 SQLite 测试；如新增字段，生成 Django migration。
-2. 部署前确认当前生产无长时间运行中的导入或部署冲突任务。
-3. 部署后运行迁移、`manage.py check`、目标测试和健康检查。
-4. 观察生产窗口账本：确认榜单唤醒候选、翻译重试、重新评分和发布窗口决策均可追溯。
+1. 新增 nullable `ranked_revived_at` 字段并生成 Django migration；历史文章默认 `NULL`，不做批量回填。
+2. 本地实现并完成 SQLite 测试。
+3. 部署前确认当前生产无长时间运行中的导入或部署冲突任务。
+4. 部署后运行迁移、`manage.py check`、目标测试和健康检查。
+5. 观察生产窗口账本：确认榜单唤醒候选、翻译重试、重新评分和发布窗口决策均可追溯。
 
 Rollback 策略：
 
-- 如未新增字段：回滚代码即可，已有 JSON 元数据不影响旧逻辑。
-- 如新增 `ranked_revived_at` 字段：回滚代码后字段可保留不用；必要时后续单独清理迁移。
+- 回滚代码后 `ranked_revived_at` 字段可保留不用；已有 JSON 元数据不影响旧逻辑，必要时后续单独清理迁移。
 
 ## Open Questions
 
-- 实施时是否需要新增 `ranked_revived_at` 字段，取决于现有 JSON 元数据查询能否保持清晰、可测且跨 SQLite / PostgreSQL 稳定。
+- 无。

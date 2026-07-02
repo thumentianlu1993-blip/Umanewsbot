@@ -478,3 +478,14 @@ QQ 窗口同样不能把“delivery 已入队”当成“QQ 已成功发送”�
 - 人工拒绝、撤回、已发布、高度重复、正文缺失、核心术语缺失等硬门禁不被榜单绕过。
 
 这样可以把榜单价值信号用在“重新认真处理”上，同时保留现有自动发布体系的可解释性和安全边界。
+
+## 为什么榜单唤醒时间使用 `ranked_revived_at` 字段而不是只写 JSON
+
+发布窗口需要稳定查询“最近 3 小时首次入库或最近 3 小时被榜单唤醒”的候选。如果只把唤醒时间写在 `decision_reason` JSON 里，SQLite 测试和 PostgreSQL 生产在 JSON 时间比较、索引和查询性能上都更容易分叉。
+
+因此 `revive-ranked-news-for-publish` 采用双轨记录：
+
+- `NewsArticle.ranked_revived_at` 是候选窗口查询和排序使用的 nullable/indexed 时间字段，历史文章默认 `NULL`，不做回填。
+- `decision_reason.ranked_revival` 保存可读审计信息，包括唤醒时间、来源站点、来源模式、原 workflow/automation/translation 状态和执行动作。
+
+这样既保证发布窗口查询简单可靠，也保留后台和窗口账本排查所需的上下文。
