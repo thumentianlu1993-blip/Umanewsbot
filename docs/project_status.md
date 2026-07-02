@@ -201,7 +201,7 @@
 - 2026-07-02 白天复核最近 6 小时自然窗口：生产已运行 `a122130`，公网 `/healthz/`、首页和抽检文章页均返回 `200`，Celery 队列为空。发布 / QQ 各地区均有 `24` 个 15 分钟日常窗口；抓取窗口 `260` 个成功、`109` 个因恢复补跑合并跳过。新窗口实际发布美国 `1` 篇、日本 `9` 篇，所有非零窗口均未超过每地区 `5` 篇；QQ 实际发送美国 `3` 条、日本 `3` 条，未超过每地区每窗口 `3` 条；其余 0 发布 / 0 推送窗口均有 `no_ready_candidates`、`no_eligible_articles` 或 `already_sent` 原因。16 个生产批准来源最新抓取均为 `success`。
 - 2026-07-02 11:07 追加按地区拆因：最新 4 个发布窗口五地区均 0 发布；日本有候选但全部被 `hard_gate_blocked`（翻译失败、人工审核要求、核心术语缺失），香港 / 英国 / 法国 / 美国没有进入发布候选的文章。最近 3 小时非日本来源抓取成功但新增为 0、只命中重复旧稿；TDN France / TDN 美国早间短暂超时后已恢复，当前不是 0 发布主因。
 - 2026-07-02 OpenSpec change `revive-ranked-news-for-publish` 已完成本地实现：未发布文章从普通来源升级为榜单来源时会写入 `ranked_revived_at` 和 `decision_reason.ranked_revival`；低分 ignored、价值不足人工状态、翻译失败和待翻译文章可被唤醒，翻译未完成先重试，已翻译文章重新进入自动化评分；人工拒绝、撤回、重复 blocker 和硬门禁不绕过。发布窗口候选回看同时支持 `first_seen_at` 与 `ranked_revived_at`，候选决策 payload 会记录榜单唤醒来源和时间；已发布文章仍只沿用现有 QQ 补推，不重复发布。
-- 2026-07-02 `revive-ranked-news-for-publish` 验证：目标榜单唤醒测试通过，完整 `stable` 测试通过 418 项；`manage.py check`、`makemigrations --check --dry-run`、OpenSpec 严格校验、全量 OpenSpec 校验和 `git diff --check` 均通过。OpenSpec change 已归档，部署时需应用迁移 `0019_newsarticle_ranked_revived_at`。
+- 2026-07-02 `revive-ranked-news-for-publish` 验证与上线：目标榜单唤醒测试通过，完整 `stable` 测试通过 418 项；`manage.py check`、`makemigrations --check --dry-run`、OpenSpec 严格校验、全量 OpenSpec 校验和 `git diff --check` 均通过。OpenSpec change 已归档并部署生产 `a774672`，迁移 `0019_newsarticle_ranked_revived_at` 已应用；生产 `/healthz/`、首页、后台登录入口、容器状态、Celery 队列和日志 smoke 均通过。
 - 目标服务器：阿里云香港 ECS，采用低成本部署方案（本机 PostgreSQL + OSS）
 - 仓库线上基线：`main` 分支已包含生产化改造与低成本部署脚本
 - 已发现并修复一项部署兼容性风险：

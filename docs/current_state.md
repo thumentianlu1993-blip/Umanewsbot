@@ -779,11 +779,12 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 2026-07-02 榜单唤醒未发布文章实现
 
-- OpenSpec change：`revive-ranked-news-for-publish`，当前已完成本地实现并归档，待部署生产。
+- OpenSpec change：`revive-ranked-news-for-publish`，当前已完成实现、归档和生产部署。生产服务器 `/opt/umanewsbot` 已部署到 `a774672`，部署前备份 `.env` 为 `.env.backup.ranked-revival-20260702_145529`，数据库备份为 `backups/db/pre-ranked-revival-20260702_145529.sql.gz`。
 - 用户确认的产品规则：榜单二次命中不是直接发布按钮，而是“这篇文章值得重新认真看一次”的强信号。未发布文章从普通来源升级为榜单来源时，应允许低分忽略、价值不足转人工、待翻译或翻译失败文章被唤醒；翻译失败或待翻译文章需要自动重试翻译；翻译成功后重新评分，高价值来源信号参与自动发布判断。
 - 边界：榜单唤醒不得绕过翻译成功、自动评分、发布校验、发布窗口配额和 QQ 限流；人工拒绝、撤回、已发布、高度重复 blocker、正文缺失、核心术语缺失等硬门禁仍不自动复活。
 - 规格影响：修改 `automation-publish-gates` 和 `multiregion-news-production`，新增榜单唤醒、翻译重试、重新评分、按唤醒时间进入发布候选池以及窗口决策留痕要求。
 - 代码实现：新增 `NewsArticle.ranked_revived_at` nullable/indexed 字段和迁移 `0019_newsarticle_ranked_revived_at.py`；新增 `revive_article_after_ranked_source_elevation()` 服务，记录 `decision_reason.ranked_revival`，区分 `translation_retry / rescore / blocked / already_retrying_translation`；netkeiba 榜单和国际榜单抓取在 `source_elevated=true` 时对未发布文章执行榜单唤醒，已发布文章继续沿用现有 QQ 补推；发布窗口候选查询支持 `first_seen_at` 或 `ranked_revived_at` 最近 3 小时，并在 `WindowCandidateDecision.payload` 写入榜单唤醒来源和时间。
 - 测试进展：已按 TDD RED-GREEN 补充并跑通 `server/stable/tests.py` 中的榜单唤醒测试，覆盖 nullable/indexed `ranked_revived_at` 字段契约、低分 ignored 复活、价值不足人工状态复活、翻译失败/待翻译重试、人工终态/duplicate/blocker 不复活、重复榜单命中幂等、发布窗口按 `ranked_revived_at` 回看、以及 netkeiba/国际榜单抓取对未发布文章走唤醒而非 QQ 直推。
 - 验证：`DB_ENGINE=sqlite manage.py check` 通过；`DB_ENGINE=sqlite manage.py makemigrations --check --dry-run` 通过；`DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true manage.py test stable --noinput` 通过，418 项；归档前 `openspec validate revive-ranked-news-for-publish --strict` 通过，归档后 `openspec validate --all` 通过，14 项；`git diff --check` 通过。
-- 上线注意事项：部署时需应用迁移 `0019`。回滚代码后 `ranked_revived_at` 字段可保留不用；如需彻底清理，后续单独做迁移。上线后应观察发布窗口候选决策中的 `ranked_revival` payload、翻译重试数量、重新评分结果和 QQ 是否仍只推已发布/合格文章。
+- 上线结果：迁移 `stable.0019_newsarticle_ranked_revived_at` 已应用；`manage.py check` 通过；生产模型确认 `ranked_revived_at null=True db_index=True`，榜单唤醒服务可 import；`http://127.0.0.1/healthz/`、`http://umafans.run/healthz/`、首页和后台登录入口均返回 `200`；`web / worker / beat` 已重建并运行，Celery `active/reserved` 为空，近 80 行 `web / worker / beat` 日志未见 traceback/error。
+- 上线后观察：继续观察发布窗口候选决策中的 `ranked_revival` payload、翻译重试数量、重新评分结果和 QQ 是否仍只推已发布/合格文章。回滚代码后 `ranked_revived_at` 字段可保留不用；如需彻底清理，后续单独做清理迁移。

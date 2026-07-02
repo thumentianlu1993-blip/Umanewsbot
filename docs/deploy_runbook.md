@@ -2139,11 +2139,18 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 ### 2026-07-02 榜单唤醒未发布文章上线准备
 
 - 变更：`revive-ranked-news-for-publish`。
-- 本地实现状态：已完成并归档，待部署生产。
+- 状态：已完成、归档并部署生产。
 - 数据库迁移：新增 `server/stable/migrations/0019_newsarticle_ranked_revived_at.py`，为 `NewsArticle` 增加 nullable/indexed `ranked_revived_at` 字段；历史文章默认 `NULL`，不回填。
-- 部署步骤：
-  1. 合并并部署代码。
-  2. 在生产容器内执行 Django migration，确认 `0019` 应用成功。
-  3. 执行 `manage.py check`、`/healthz/`、首页和后台 smoke。
-  4. 观察最近发布窗口的 `WindowCandidateDecision.payload.ranked_revival`、翻译重试任务、重新评分结果和 QQ delivery。
+- 部署记录：
+  - 本地提交 `a774672` 已推送到 `origin/main`，服务器 `/opt/umanewsbot` 从 `a122130` 快进到 `a774672`。
+  - 部署前备份 `.env`：`.env.backup.ranked-revival-20260702_145529`。
+  - 部署前数据库备份：`backups/db/pre-ranked-revival-20260702_145529.sql.gz`，已执行 `gzip -t` 校验。
+  - 执行 `bash ./deploy_lowcost.sh` 成功，`web / worker / beat` 已重建，`db / redis / nginx` 正常。
+  - `showmigrations stable` 确认 `[X] 0019_newsarticle_ranked_revived_at`。
+  - `manage.py check` 通过；生产 shell 确认 `NewsArticle.ranked_revived_at` 为 `null=True db_index=True`，`revive_article_after_ranked_source_elevation` 可 import。
+  - `http://127.0.0.1/healthz/` 返回 `{"status":"ok"}`，`http://umafans.run/healthz/`、首页和 `/admin/login/` 均返回 `200`。
+  - Celery `active/reserved` 为空，`web / worker / beat` 近 80 行日志未见 traceback/error。
+- 后续观察：
+  1. 观察最近发布窗口的 `WindowCandidateDecision.payload.ranked_revival`、翻译重试任务、重新评分结果和 QQ delivery。
+  2. 当新着顺旧稿后续进入榜单时，确认未发布文章走“重试翻译 / 重新评分 / 发布窗口候选”链路，而不是直接发布或直接 QQ 推送。
 - 回滚边界：如需回滚代码，`ranked_revived_at` 字段可留存不用，不影响旧逻辑；如需删除字段，后续单独做清理迁移。
