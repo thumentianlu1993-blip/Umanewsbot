@@ -671,6 +671,17 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py p
 - 内置 fixture smoke 应生成 `10` 条候选和 `1` 条冲突。
 - 命令不修改正式术语库、候选池、外部马名索引，也不派发翻译、自动发布或 QQ 推送任务。
 
+### 本次执行记录（2026-07-04）
+
+- 服务器 `/opt/umanewsbot` 从 `4323d32` 快进到 `e81733f`。
+- 部署前备份 `.env`：`.env.backup.termbase-seed-20260704_012005`。
+- 本次新增依赖 `opencc-python-reimplemented==0.1.7`，已重建并重启 `web / worker / beat`。
+- 迁移结果：`No migrations to apply`。
+- `python manage.py check`：通过，`0` issues。
+- 生产 smoke：`candidate_count=10`、`conflict_count=1`、`incomplete=false`、`dry_run_error_count=0`，首条候选 `BEAUTY GENERATION`，末条候选 `ディープインパクト`。
+- 健康检查：`http://127.0.0.1/healthz/` 与 `http://umafans.run/healthz/` 均返回 `200`。
+- 本次只上线种子准备命令和审核文件生成能力，未导入正式术语，未写 `TermEntry`、`TermAlias`、`TermCandidate` 或外部马名索引。
+
 ## 全球赛马数据库导入入口
 
 香港、英国、法国、美国真实赛马数据库导入属于高风险生产数据操作，不能只凭本地 proof、fixture 测试或少量 dry-run 进入正式写库。
