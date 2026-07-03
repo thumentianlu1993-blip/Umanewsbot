@@ -1,7 +1,7 @@
 # 项目状态文档
 
-最后更新时间：`2026-06-30`
-当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP、公开首页资讯流、抓取新鲜度修复、后台快速术语创建与当前稿术语应用、外部马名索引识别链路、榜单重点 QQ 推送、公开文章 ID URL 和国际赛马资讯扩展均已部署生产）
+最后更新时间：`2026-07-04`
+当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP、公开首页资讯流、抓取新鲜度修复、后台快速术语创建与当前稿术语应用、外部马名索引识别链路、榜单重点 QQ 推送、公开文章 ID URL、国际赛马资讯扩展、多地区生产窗口和术语种子数据准备均已完成代码侧落地）
 
 > 角色说明：
 > 本文档用于保留项目级概览与摘要信息。
@@ -166,6 +166,8 @@
 ## 6. 当前待办（项目级摘要）
 
 - 观察公开首页资讯流生产运行，重点看首页、详情页、图片、静态资源和移动端首屏密度
+- 多地区术语库与外部马名索引：`2026-07-03` 生产只读核对显示，正式术语库 `TermEntry=2054` 和 `TermAlias=2057` 仍全部为日文；术语候选池也全部为日文候选。外部马名索引 `ExternalHorseAlias=12425` 中日本 `netkeiba/ja=12421`，香港 HKJC 仅有小样本英文/繁中别名各 `2` 条；英国、法国、美国当前生产 `External*` 表无写入。当前应把多地区识别能力理解为“模型、导入命令和语言分流链路已具备”，不应理解为各地区术语库或外部马名库已补齐。
+- 术语种子数据准备：OpenSpec change `prepare-termbase-seed-data` 已完成实现、验证和归档；本地首版已新增 `prepare_termbase_seed_data` 管理命令、`stable.services.termbase_seed` 服务层、HKJC/WP Stud fixture、操作文档和后台术语导入模板更新；内置 fixture smoke 可生成 `seed_candidates.csv`、`seed_conflicts.csv` 与 `summary.json`，候选主表严格兼容现有 `import_terms` 字段，中文目标译名统一简体化，第一版不直接入库，不做 HKJC `racecards` PDF/排位表全量抽取，默认输出到独立 runtime 目录。
 - 观察自动发布质量与自动化日志
 - 补充翻译 warning 可视化和术语库补全流程
 - 继续评审 OpenSpec change `expand-international-racing-coverage` 的本地实现：多地区新闻源、公开首页地区 tab、`TermEntry + TermAlias` 多语言术语概念模型、群级 QQ 推送配置、HKJC 外部数据导入和全球数据源 spike 已完成本地实现与 review 返修；上线前 review 已补齐快照 metadata 不保存整页 HTML、TDN 缺详情日期时保留列表 API 时间、英文外部马名索引识别、跨语言术语 upsert 主原文保护、术语批量别名匹配、HKJC entries/results 马匹上限统计、英文术语生命周期大小写不敏感、术语启停同步别名状态、术语导入别名冲突保护、TDN/TDN France canonical 去重和术语列表语言筛选翻页保留，尚未部署生产

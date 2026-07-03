@@ -622,6 +622,79 @@ docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py impo
 docker compose -f docker-compose.prod.lowcost.yml exec web python manage.py import_terms
 ```
 
+如需导入本地整理好的 CSV，先上传到服务器，再复制进 `web` 容器可见路径后执行 dry-run 与正式导入：
+
+```bash
+cd /opt/umanewsbot
+mkdir -p imports/terms-<批次>
+scp <本地CSV> root@<服务器IP>:/opt/umanewsbot/imports/terms-<批次>/
+docker compose -f docker-compose.prod.lowcost.yml exec -T web mkdir -p /tmp/terms
+docker cp imports/terms-<批次>/<文件名>.csv umanewsbot-web-1:/tmp/terms/
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_terms /tmp/terms/<文件名>.csv --dry-run
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py import_terms /tmp/terms/<文件名>.csv
+```
+
+## 术语种子数据准备部署与验证
+
+### 适用场景
+
+用于上线 `prepare_termbase_seed_data` 管理命令和 HKJC/WP Stud 术语种子候选生成能力。该能力只生成本地审核文件，不直接写入 `TermEntry`、`TermAlias`、`TermCandidate`、`ExternalHorse` 或 `ExternalHorseAlias`。
+
+### 部署步骤
+
+本能力新增 Python 依赖，生产部署必须重建 `web / worker / beat` 镜像：
+
+```bash
+cd /opt/umanewsbot
+cp .env .env.backup.termbase-seed-$(date +%Y%m%d_%H%M%S)
+git pull --ff-only origin main
+docker compose -f docker-compose.prod.lowcost.yml build web worker beat
+docker compose -f docker-compose.prod.lowcost.yml up -d web worker beat
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py migrate --noinput
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check
+```
+
+### 生产 smoke 验证
+
+先使用内置 fixture 生成一批不触网的候选文件：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py prepare_termbase_seed_data \
+  --source hkjc \
+  --source wpstud \
+  --output-dir /tmp/termbase_seed_smoke
+```
+
+预期结果：
+
+- `seed_candidates.csv`、`seed_conflicts.csv`、`summary.json` 均生成。
+- 内置 fixture smoke 应生成 `10` 条候选和 `1` 条冲突。
+- 命令不修改正式术语库、候选池、外部马名索引，也不派发翻译、自动发布或 QQ 推送任务。
+
+## 全球赛马数据库导入入口
+
+香港、英国、法国、美国真实赛马数据库导入属于高风险生产数据操作，不能只凭本地 proof、fixture 测试或少量 dry-run 进入正式写库。
+
+执行前必须先阅读并按顺序使用：
+
+- `docs/global_racing_database_handoff.md`：当前 proof 边界和未完成项。
+- `docs/global_racing_sync_manifest.md`：当前主树同步范围、已验证命令和防误用验证。
+- `docs/global_racing_next_run_checklist.md`：下一轮按 HKJC -> UK -> France -> US 开跑的检查表。
+- `docs/global_racing_full_crawl_runbook.md`：完整 plan-only、小批 dry-run、离线审计和 commit 门禁命令。
+- `docs/global_racing_full_crawl_completion_audit.md`：完整目标完成判定和禁止误用证据。
+
+生产写库前必须满足：
+
+- 每地最新 60 天 `plan-only` 已保存。
+- 具体批次执行前已使用 `render_global_racing_batch_command --plan-file ... --all-batches --output-dir ...` 或 `--batch N` 从 plan 文件渲染精确命令，并复核 `source`、`target_key`、`target_count`、`suggested_output_path`、`command_line` 和 `tee_command_line`。
+- 每地所有 plan 批次均已小批 dry-run，且 `completion.is_complete=true`。
+- 所有涉及马匹 profile 或等价详情字段已覆盖。
+- `audit_global_racing_import_outputs --fail-on-incomplete` 输出 `commit_candidate_ready=true` 且 `blocking_reasons=[]`。
+- 数据库备份、导入锁检查、健康检查和用户显式确认齐全。
+- 写库后记录 `run_id`、表计数、coverage、请求数、失败摘要、锁释放、健康检查和回滚口径。
+
+当前 `runtime/global_racing_import/proof-20260627` 只能通过 proof-only 审计；按 commit 候选口径会被正确阻断。不得把这组 proof JSON 当作最近 60 天完整抓取或生产写库依据。
+
 ### 核验正式术语
 
 ```bash

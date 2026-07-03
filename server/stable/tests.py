@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from datetime import datetime, timedelta, timezone as dt_timezone
 import json
 from pathlib import Path
@@ -88,6 +89,7 @@ from stable.models import (
     TermCandidateEvidence,
     TermCandidateStatus,
     TermEntry,
+    TermType,
     TaskExecutionLog,
     TaskStatus,
     WindowCandidateDecision,
@@ -12003,3 +12005,264 @@ class TermCandidateReviewTests(TestCase):
         self.assertGreaterEqual(payload["candidate_news_count"], 1)
         self.assertIn("race_priority", payload["articles"][0])
         self.assertIn("term_candidate_count", payload["articles"][0])
+
+
+class TermbaseSeedDataPreparationTests(TestCase):
+    def _write_fixture(self, root: Path, name: str, text: str) -> None:
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    def _read_csv(self, path: Path) -> list[dict]:
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            return list(csv.DictReader(handle))
+
+    def test_prepare_seed_command_generates_review_files_without_db_writes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_dir = root / "fixtures"
+            output_dir = root / "out"
+            terms_seed_before = Path("server/stable/data/terms_seed.csv").read_text(encoding="utf-8")
+            counts_before = {
+                "term_entries": TermEntry.objects.count(),
+                "term_aliases": TermAlias.objects.count(),
+                "term_candidates": TermCandidate.objects.count(),
+                "external_horses": ExternalHorse.objects.count(),
+                "external_aliases": ExternalHorseAlias.objects.count(),
+            }
+            self._write_fixture(
+                input_dir,
+                "hkjc_local_horses.html",
+                """
+                <table data-source-url="https://racing.hkjc.com/en-us/local/information/selecthorse">
+                  <tr><th>English Name</th><th>Chinese Name</th><th>Former Name</th><th>Region</th></tr>
+                  <tr><td>BEAUTY GENERATION</td><td>美麗傳承</td><td>Montaigna</td><td>hk</td></tr>
+                </table>
+                """,
+            )
+            self._write_fixture(
+                input_dir,
+                "wpstud_horses.html",
+                """
+                <table data-source-url="https://www.wpstud.com/Translation/Horse/Horse.htm">
+                  <tr><th>日文馬名</th><th>英文馬名</th><th>中文馬名</th><th>代表地區</th></tr>
+                  <tr><td>ディープインパクト</td><td>Deep Impact</td><td>大震撼</td><td>jp</td></tr>
+                  <tr><td></td><td>BEAUTY GENERATION</td><td>美麗傳承號</td><td>hk</td></tr>
+                </table>
+                """,
+            )
+
+            out = StringIO()
+            call_command(
+                "prepare_termbase_seed_data",
+                "--source",
+                "hkjc",
+                "--source",
+                "wpstud",
+                "--input-dir",
+                str(input_dir),
+                "--output-dir",
+                str(output_dir),
+                stdout=out,
+            )
+
+            candidates_path = output_dir / "seed_candidates.csv"
+            conflicts_path = output_dir / "seed_conflicts.csv"
+            summary_path = output_dir / "summary.json"
+            self.assertTrue(candidates_path.exists())
+            self.assertTrue(conflicts_path.exists())
+            self.assertTrue(summary_path.exists())
+            self.assertEqual(Path("server/stable/data/terms_seed.csv").read_text(encoding="utf-8"), terms_seed_before)
+            self.assertEqual(TermEntry.objects.count(), counts_before["term_entries"])
+            self.assertEqual(TermAlias.objects.count(), counts_before["term_aliases"])
+            self.assertEqual(TermCandidate.objects.count(), counts_before["term_candidates"])
+            self.assertEqual(ExternalHorse.objects.count(), counts_before["external_horses"])
+            self.assertEqual(ExternalHorseAlias.objects.count(), counts_before["external_aliases"])
+
+            with candidates_path.open("r", encoding="utf-8-sig", newline="") as handle:
+                reader = csv.reader(handle)
+                self.assertEqual(
+                    next(reader),
+                    [
+                        "term_type",
+                        "source_language",
+                        "source_ja",
+                        "target_zh",
+                        "aliases_ja",
+                        "aliases_zh",
+                        "priority",
+                        "is_active",
+                        "notes",
+                        "race_grade",
+                    ],
+                )
+            preview = preview_term_import(csv_text=candidates_path.read_text(encoding="utf-8-sig"), import_mode="create")
+            self.assertEqual(preview["summary"]["error_count"], 0)
+
+            rows = self._read_csv(candidates_path)
+            beauty_rows = [row for row in rows if row["source_ja"] == "BEAUTY GENERATION"]
+            self.assertEqual(beauty_rows[0]["target_zh"], "美丽传承")
+            self.assertIn("美丽传承号", beauty_rows[0]["aliases_zh"])
+            self.assertIn("original_zh_hant=美麗傳承", beauty_rows[0]["notes"])
+            self.assertIn("source_tier=official", beauty_rows[0]["notes"])
+
+            deep_impact = next(row for row in rows if row["source_ja"] == "ディープインパクト")
+            self.assertEqual(deep_impact["target_zh"], "大震撼")
+            self.assertIn("source_tier=community", deep_impact["notes"])
+            self.assertIn("requires_review=true", deep_impact["notes"])
+            self.assertEqual(rows[-1]["source_ja"], "ディープインパクト")
+
+            conflicts = self._read_csv(conflicts_path)
+            self.assertEqual(conflicts[0]["recommended_target_zh"], "美丽传承")
+            self.assertIn("美丽传承号", conflicts[0]["alternate_target_zh"])
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            self.assertFalse(summary["incomplete"])
+            self.assertEqual(summary["candidate_count"], len(rows))
+
+    def test_prepare_seed_command_marks_network_failures_incomplete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "out"
+            with patch("stable.services.termbase_seed.requests.get", side_effect=requests.Timeout("slow")):
+                out = StringIO()
+                call_command(
+                    "prepare_termbase_seed_data",
+                    "--source",
+                    "hkjc",
+                    "--allow-network",
+                    "--max-requests",
+                    "1",
+                    "--timeout-seconds",
+                    "1",
+                    "--output-dir",
+                    str(output_dir),
+                    stdout=out,
+                )
+
+            summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+            self.assertTrue(summary["incomplete"])
+            self.assertEqual(summary["request_count"], 1)
+            self.assertIn("slow", summary["failures"][0]["error"])
+
+    def test_prepare_seed_command_stops_all_sources_at_max_requests(self):
+        class Response:
+            status_code = 200
+            url = "https://example.com/ok"
+            encoding = "utf-8"
+            text = """
+            <table data-source-url="https://example.com/ok">
+              <tr><th>English Name</th><th>Chinese Name</th><th>Region</th></tr>
+              <tr><td>ROMANTIC WARRIOR</td><td>浪漫勇士</td><td>hk</td></tr>
+            </table>
+            """
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "out"
+            with patch("stable.services.termbase_seed.requests.get", return_value=Response()) as get:
+                out = StringIO()
+                call_command(
+                    "prepare_termbase_seed_data",
+                    "--source",
+                    "hkjc",
+                    "--source",
+                    "wpstud",
+                    "--allow-network",
+                    "--max-requests",
+                    "1",
+                    "--request-interval-seconds",
+                    "0",
+                    "--output-dir",
+                    str(output_dir),
+                    stdout=out,
+                )
+
+            summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(get.call_count, 1)
+            self.assertEqual(summary["request_count"], 1)
+            self.assertTrue(summary["incomplete"])
+            self.assertEqual(summary["failures"][0]["error"], "max_requests=1 reached")
+            self.assertEqual(summary["failures"][0]["source"], "hkjc")
+
+    def test_prepare_seed_command_internal_preview_uses_upsert_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            input_dir = Path(tmp) / "fixtures"
+            output_dir = Path(tmp) / "out"
+            self._write_fixture(
+                input_dir,
+                "hkjc_local_horses.html",
+                """
+                <table data-source-url="https://racing.hkjc.com/en-us/local/information/selecthorse">
+                  <tr><th>English Name</th><th>Chinese Name</th><th>Region</th></tr>
+                  <tr><td>ROMANTIC WARRIOR</td><td>浪漫勇士</td><td>hk</td></tr>
+                </table>
+                """,
+            )
+            TermEntry.objects.create(
+                term_type=TermType.HORSE,
+                source_language=SourceLanguage.ENGLISH,
+                source_ja="ROMANTIC WARRIOR",
+                target_zh="浪漫勇士",
+            )
+
+            out = StringIO()
+            call_command(
+                "prepare_termbase_seed_data",
+                "--source",
+                "hkjc",
+                "--input-dir",
+                str(input_dir),
+                "--output-dir",
+                str(output_dir),
+                stdout=out,
+            )
+
+            payload = json.loads(out.getvalue())
+            self.assertEqual(payload["dry_run_error_count"], 0)
+            create_preview = preview_term_import(
+                csv_text=(output_dir / "seed_candidates.csv").read_text(encoding="utf-8-sig"),
+                import_mode="create",
+            )
+            self.assertGreater(create_preview["summary"]["error_count"], 0)
+
+    def test_prepare_seed_command_rejects_deferred_racecard_pdf_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(CommandError):
+                call_command(
+                    "prepare_termbase_seed_data",
+                    "--source",
+                    "hkjc_racecards_pdf",
+                    "--output-dir",
+                    str(Path(tmp) / "out"),
+                )
+
+    def test_prepare_seed_command_defaults_to_independent_runtime_output_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_dir = root / "fixtures"
+            default_dir = root / "runtime" / "termbase_seed" / "fixed"
+            self._write_fixture(
+                input_dir,
+                "hkjc_local_horses.html",
+                """
+                <table data-source-url="https://racing.hkjc.com/en-us/local/information/selecthorse">
+                  <tr><th>English Name</th><th>Chinese Name</th><th>Region</th></tr>
+                  <tr><td>ROMANTIC WARRIOR</td><td>浪漫勇士</td><td>hk</td></tr>
+                </table>
+                """,
+            )
+
+            with patch("stable.management.commands.prepare_termbase_seed_data.default_output_dir", return_value=default_dir):
+                out = StringIO()
+                call_command(
+                    "prepare_termbase_seed_data",
+                    "--source",
+                    "hkjc",
+                    "--input-dir",
+                    str(input_dir),
+                    stdout=out,
+                )
+
+            payload = json.loads(out.getvalue())
+            self.assertEqual(payload["output_dir"], str(default_dir))
+            self.assertTrue((default_dir / "seed_candidates.csv").exists())
+            self.assertTrue((default_dir / "seed_conflicts.csv").exists())
+            self.assertNotEqual(default_dir, Path("server/stable/data"))

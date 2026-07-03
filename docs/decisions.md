@@ -489,3 +489,24 @@ QQ 窗口同样不能把“delivery 已入队”当成“QQ 已成功发送”�
 - `decision_reason.ranked_revival` 保存可读审计信息，包括唤醒时间、来源站点、来源模式、原 workflow/automation/translation 状态和执行动作。
 
 这样既保证发布窗口查询简单可靠，也保留后台和窗口账本排查所需的上下文。
+## 为什么术语种子数据准备先用 HKJC 体系和 WP Stud 且先审核不入库
+
+当前多地区新闻源已经上线，但正式术语库和术语候选池仍主要是日文内容。为了补齐香港和国际赛马新闻的中文译名基础，第一批术语种子数据准备选择 HKJC 体系和 WP Stud：
+
+- HKJC 体系包含较权威的中英文、繁中/英文对照，适合作为香港和国际赛马译名的主来源。
+- WP Stud 属于高质量民间整理，适合作为别名、补充候选和译名冲突佐证，但不直接等同官方译名。
+- 当 HKJC 和 WP Stud 都有译名时，以 HKJC 作为主译名，WP Stud 进入别名或备注；只有 WP Stud 时，作为需要人工审核的主译名候选。
+
+第一版只输出 `seed_candidates.csv` 和 `seed_conflicts.csv`，不直接写入 `TermEntry`，原因是：
+
+- 术语会影响翻译、自动评分、标签和发布校验，必须保持正式库可信。
+- 种子候选需要人工审核冲突、繁简转换、地区归属和术语类型。
+- `seed_candidates.csv` 严格兼容现有 `import_terms` 字段，便于复用已验证的 dry-run 与幂等导入流程。
+- 所有中文目标译名统一输出简体中文；来源为繁体中文时，先做繁简转换并保留原始繁体证据。
+
+`2026-07-03` plan-eng-review 后补充锁定：
+
+- 第一版 HKJC 只做稳定 HTML/文本入口，`racecards` PDF、排位表 PDF 或网页排位表全量抽取延后。
+- 实现前必须先做 HKJC 与 WP Stud source discovery，固定 URL、字段、fixture 和不可用入口。
+- 默认输出目录为 `runtime/termbase_seed/<timestamp>/`，不得覆盖正式 `server/stable/data/terms_seed.csv`。
+- 若新增繁简转换依赖，必须同步 `requirements.txt` 并测试；触网执行必须记录 timeout、非 2xx、解析失败和 incomplete 来源。
