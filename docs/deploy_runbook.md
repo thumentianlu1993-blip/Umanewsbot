@@ -682,6 +682,17 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py p
 - 健康检查：`http://127.0.0.1/healthz/` 与 `http://umafans.run/healthz/` 均返回 `200`。
 - 本次只上线种子准备命令和审核文件生成能力，未导入正式术语，未写 `TermEntry`、`TermAlias`、`TermCandidate` 或外部马名索引。
 
+### 第一批正式术语导入记录（2026-07-04）
+
+- 导入文件：`/opt/umanewsbot/imports/termbase-seed-fixture-review-20260704_024950/seed_candidates.csv`。
+- 数据库备份：`backups/db/pre-termbase-seed-import-20260704_030722.sql.gz`，已通过 `gzip -t`。
+- dry-run：总计 `10` 条，新增 `8` 条，更新 `2` 条，错误 `0` 条。
+- 正式导入：总计 `10` 条，新增 `8` 条，更新 `2` 条，跳过 `0` 条。
+- 导入后计数：`TermEntry=2062`、`TermAlias=2068`；按原文语言分布为 `en=8`、`ja=2054`。
+- 新增英文术语：`BEAUTY GENERATION`、`KA YING RISING`、`ROMANTIC WARRIOR`、`Hong Kong Cup`、`Zac Purton`、`John Size`、`Sha Tin`、`Declared Starter`。
+- 本批地区证据保留在 `notes` 的 `region=hk`，`TermEntry.racing_region` 仍为空；如后续需要地区统计按香港归类，应另用带 `racing_region=hk` 的审核 CSV 执行 upsert。
+- 导入后 `http://umafans.run/healthz/` 返回 `200`。
+
 ## 全球赛马数据库导入入口
 
 香港、英国、法国、美国真实赛马数据库导入属于高风险生产数据操作，不能只凭本地 proof、fixture 测试或少量 dry-run 进入正式写库。
