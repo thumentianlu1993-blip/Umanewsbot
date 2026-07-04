@@ -1,5 +1,46 @@
 # 部署运行手册
 
+## 2026-07-04 赛事日历 MVP 与 HKJC overseas 术语种子 smoke 上线
+
+- 本地上线提交：`f3c4c46`（`Add race calendar and HKJC overseas termbase seeds`），已推送 `origin/main`。
+- 生产服务器：`/opt/umanewsbot` 从 `3aa22fb` 快进到 `f3c4c46`。
+- 上线前本地验证：
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py test stable --noinput`：通过，442 项。
+  - `openspec validate --all`：通过，17 项。
+  - `git diff --check`：通过。
+- 上线前生产检查：
+  - `ExternalDataImportRun(status="started")=0`。
+  - `ExternalDataImportLock.locked_by_run_id` 当前为空。
+  - `web / worker / beat / db / redis / nginx` 上线前均在运行。
+- 备份：
+  - `.env`：`.env.backup.race-calendar-hkjc-overseas-20260704_182412`。
+  - 数据库：`backups/db/rds_horse_news_race_calendar_manual_20260704_182458.sql.gz`，大小约 `63M`，已执行 `gzip -t` 校验。
+  - 注意：首次尝试 `deploy/backup_db.sh` 时因脚本读取 `.env` 中 OSS 目标且临时 `postgres:16` 容器不在 Compose 网络内，产生 20 字节无效备份；该无效文件已删除。本次有效备份改用正在运行的 `db` 容器执行 `pg_dump`。
+- 部署命令：
+  - `git fetch origin main && git pull --ff-only origin main`
+  - `./deploy_lowcost.sh`
+- 部署结果：
+  - `web / worker / beat` 已重建并启动，`db / redis / nginx` 正常。
+  - `manage.py check`：通过。
+  - `showmigrations stable` 确认 `[X] 0020_raceevent_articleracelink_raceeventalias_and_more`。
+  - `collectstatic` 成功，公开 CSS 指纹更新。
+- 赛事日历种子：
+  - `python manage.py import_race_events --csv stable/data/race_events_seed_sample.csv --dry-run`：通过，将处理 5 条。
+  - 正式导入结果：`created=5 updated=0 aliases=10`。
+  - 生产计数：`RaceEvent=5`、`RaceEventAlias=10`、`ArticleRaceLink=0`、`P0/P1=5`。
+- 线上路由验收：
+  - 服务器内 `Host: umafans.run`：`/healthz/`、`/`、`/races/`、`/admin/login/` 均返回 `200`，未登录 `/admin/race-events/` 返回 `302`。
+  - 赛事详情：`/races/2026/takarazuka-kinen/` 返回 `200`，包含“基础资料”和“出马表”区块。
+  - 本机经公网 IP + `Host: umafans.run`：`/healthz/`、`/races/`、`/races/2026/takarazuka-kinen/` 均返回 `200`。
+  - 本机环境中 `umafans.run` DNS 一度解析到 `198.18.0.181`，因此本次公网验收以 `47.239.167.86` + `Host` 头为准。
+- HKJC overseas 术语种子 smoke：
+  - 命令：`python manage.py prepare_termbase_seed_data --source hkjc_overseas --input-dir stable/fixtures/termbase_seed --output-dir runtime/termbase_seed/hkjc-overseas-deploy-smoke-20260704_183048`
+  - 结果：`candidate_count=9`、`conflict_count=0`、`request_count=0`、`dry_run_error_count=0`、`incomplete=false`。
+  - 本次只生成人工审核工件，不正式导入 `TermEntry` / `TermAlias`。
+- 后续注意：
+  - 生产 Docker build 上下文超过 `700MB`，主要来自服务器工作区未跟踪的 `runtime / imports / napcat / backups` 等运行产物；后续应单独补 `.dockerignore` 或调整部署目录，降低构建时间和传输成本。
+  - `deploy/backup_db.sh` 在当前生产 `.env` 下会被 `BACKUP_TARGET=oss` 覆盖，并且临时容器访问 Compose 内部 `db` 主机名失败；后续应修正为显式接入 Compose 网络或提供 db 容器备份路径，避免产生误导性空备份。
+
 ## 服务器信息记录方式
 
 不要把敏感信息硬编码进仓库，但应按如下方式记录：

@@ -1,7 +1,7 @@
 # 项目状态文档
 
 最后更新时间：`2026-07-04`
-当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP、公开首页资讯流、抓取新鲜度修复、后台快速术语创建与当前稿术语应用、外部马名索引识别链路、榜单重点 QQ 推送、公开文章 ID URL、国际赛马资讯扩展、多地区生产窗口和术语种子数据准备均已部署生产）
+当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP、公开首页资讯流、抓取新鲜度修复、后台快速术语创建与当前稿术语应用、外部马名索引识别链路、榜单重点 QQ 推送、公开文章 ID URL、国际赛马资讯扩展、多地区生产窗口、术语种子数据准备和赛事日历 MVP 均已部署生产）
 
 > 角色说明：
 > 本文档用于保留项目级概览与摘要信息。
@@ -47,7 +47,7 @@
 - 榜单来源提升：已部署 `netkeiba:latest -> access/attention` 主来源提升，访问量榜和注目数榜不互相覆盖，并为 QQ 榜单推送暴露 `source_elevated` 信号。
 - 榜单重点推送：已部署 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，`QQ_PUSH_SCOPE=high_value_only` 下只推 netkeiba 访问量榜 / 注目数榜且无 blocker 的公开文章。
 - 公开文章 ID URL：已部署公开详情主路径 `/news/<article_id>/`，非纯数字旧 slug URL 跳转到 ID URL，QQ 消息链接不再包含标题全文。
-- 赛事日历 / 年度赛事页 MVP：本地已实现 `RaceEvent` 产品层、公开 `/races/` 赛事日历、年度详情页、后台 `/admin/race-events/` 工作台、CSV 种子导入、候选资料写入/应用、新闻自动/手动关联和人工移除保护；当前尚未部署生产，第一版只覆盖 P0/P1 重点赛事，不建设马匹数据库或完整赛果库。
+- 赛事日历 / 年度赛事页 MVP：已部署生产 `f3c4c46`。已实现 `RaceEvent` 产品层、公开 `/races/` 赛事日历、年度详情页、后台 `/admin/race-events/` 工作台、CSV 种子导入、候选资料写入/应用、新闻自动/手动关联和人工移除保护；生产已导入 5 条 P0/P1 赛事种子与 10 条别名，第一版不建设马匹数据库或完整赛果库。
 - 国际赛马资讯扩展：已部署多地区新闻源、公开首页地区 tab、多语言术语别名、群级 QQ 地区配置和 HKJC 受控导入；生产第一版已启用 `Sponichi`、`HKJC Racing News`、`SCMP Racing`、`Sporting Life Racing`、`Sky Sports Racing`、`France Galop English News`、`TDN France keyword`、`TDN`、`Horse Racing Nation`，其中 `BHA` 因生产探测返回 `403` 暂停启用。
 - 全球赛马数据库抓取能力：香港 HKJC、英国 Sporting Life、法国 Geny、美国 Horse Racing Nation 的受控 importer 能力已部署；`2026-06-30` 已开始香港 HKJC 慢速真实 dry-run，最新 plan 为 `146` 场且前两场完整 dry-run 成功，仍未执行生产 `--commit`。
 - 香港 HKJC 长窗口 dry-run：`2026-06-30` 已按用户要求启动到 `2024-07-01` 的慢速后台抓取计划，plan 共 `1496` 场；为部署多地区新闻常态生产，当前 dry-run worker 已暂停在 `hkjc-slow-dryrun.state=92`，仍未写正式表。
