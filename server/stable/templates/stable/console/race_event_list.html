@@ -1,0 +1,146 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}赛事日历管理 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">赛事日历管理</h2>
+      <p class="page-subtitle">按年份维护重点赛事资料、候选资料和前台展示状态。自动弱匹配进入候选，人工移除会被保护。</p>
+    </div>
+    <div class="toolbar">
+      <a class="btn" href="{% url 'console-race-event-create' %}">新建赛事</a>
+      <a class="btn secondary" href="{{ django_admin_url }}stable/raceevent/">Django Admin</a>
+    </div>
+  </div>
+
+  <form class="filter-bar" method="get">
+    <label>
+      搜索
+      <input type="search" name="q" value="{{ filters.q }}" placeholder="赛事名 / 马场 / slug">
+    </label>
+    <label>
+      年份
+      <select name="year">
+        <option value="">全部</option>
+        {% for year in years %}
+          <option value="{{ year }}" {% if filters.year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      地区
+      <select name="region">
+        <option value="">全部</option>
+        {% for value,label in regions %}
+          <option value="{{ value }}" {% if filters.region == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Priority
+      <select name="priority">
+        <option value="">全部</option>
+        {% for value,label in priorities %}
+          <option value="{{ value }}" {% if filters.priority == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      状态
+      <select name="status">
+        <option value="">全部</option>
+        {% for value,label in statuses %}
+          <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      展示
+      <select name="visibility">
+        <option value="">全部</option>
+        {% for value,label in visibilities %}
+          <option value="{{ value }}" {% if filters.visibility == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      完整度
+      <select name="quality">
+        <option value="">全部</option>
+        {% for value,label in qualities %}
+          <option value="{{ value }}" {% if filters.quality == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="btn secondary" type="submit">筛选</button>
+    <a class="btn ghost" href="{% url 'console-race-event-list' %}">清除</a>
+  </form>
+
+  <section class="panel">
+    <div class="article-meta" style="margin-bottom: 12px;">
+      <span class="badge success">高置信名称命中可自动展示</span>
+      <span class="badge warning">弱匹配进入候选</span>
+      <span class="badge">人工移除不会自动恢复</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>赛事</th>
+            <th>日期</th>
+            <th>地区 / 马场</th>
+            <th>等级 / Surface</th>
+            <th>Priority</th>
+            <th>状态</th>
+            <th>展示</th>
+            <th>资料</th>
+            <th>候选 / 新闻</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in race_events %}
+            <tr>
+              <td>
+                <strong>{{ event.chinese_name }}</strong>
+                <div class="muted">{{ event.original_name }} · {{ event.year }} · {{ event.slug }}</div>
+              </td>
+              <td>
+                {% if event.local_date %}{{ event.local_date|date:"Y-m-d" }}{% else %}<span class="muted">未设置</span>{% endif %}
+                {% if event.local_start_time %}<div class="muted">{{ event.local_start_time|time:"H:i" }}</div>{% endif %}
+              </td>
+              <td>{{ event.get_country_region_display }}<div class="muted">{{ event.racecourse }}</div></td>
+              <td>{{ event.grade_text }}<div class="muted">{{ event.get_surface_display }}</div></td>
+              <td><span class="badge gold">{{ event.priority }}</span></td>
+              <td><span class="badge {% if event.status == 'running' %}success{% endif %}">{{ event.get_status_display }}</span></td>
+              <td><span class="badge {% if event.visibility_status == 'published' %}success{% endif %}">{{ event.get_visibility_status_display }}</span></td>
+              <td>{{ event.get_data_quality_status_display }}</td>
+              <td>
+                <a href="{% url 'console-race-event-edit' event.id %}#candidates">{{ event.candidate_count }} 候选</a>
+                <div><a href="{% url 'console-race-event-edit' event.id %}#news-links">{{ event.linked_article_count }} 新闻</a></div>
+              </td>
+              <td>
+                <div class="article-actions">
+                  <a class="btn ghost" href="{% url 'console-race-event-edit' event.id %}">维护</a>
+                  {% if event.visibility_status == 'published' %}
+                    <a class="btn secondary" href="{{ event.public_path }}" target="_blank" rel="noreferrer">预览</a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="10" class="muted">还没有符合条件的赛事。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="pagination">
+        {% if page_obj.has_previous %}<a class="btn ghost" href="?{% if pagination_querystring %}{{ pagination_querystring }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>{% endif %}
+        <span class="muted">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+        {% if page_obj.has_next %}<a class="btn ghost" href="?{% if pagination_querystring %}{{ pagination_querystring }}&amp;{% endif %}page={{ page_obj.next_page_number }}">下一页</a>{% endif %}
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

@@ -338,6 +338,75 @@ class RaceGrade(models.TextChoices):
     OTHER = "OTHER", "其他"
 
 
+class RaceEventSurface(models.TextChoices):
+    TURF = "turf", "草地"
+    DIRT = "dirt", "泥地"
+    JUMPS = "jumps", "障碍"
+
+
+class RaceEventPriority(models.TextChoices):
+    P0 = "P0", "P0"
+    P1 = "P1", "P1"
+    P2 = "P2", "P2"
+
+
+class RaceEventStatus(models.TextChoices):
+    SCHEDULED = "scheduled", "赛前"
+    RUNNING = "running", "进行中"
+    FINISHED = "finished", "已结束"
+    POSTPONED = "postponed", "延期"
+    CANCELLED = "cancelled", "取消"
+
+
+class RaceEventVisibility(models.TextChoices):
+    DRAFT = "draft", "草稿"
+    PUBLISHED = "published", "展示"
+    HIDDEN = "hidden", "隐藏"
+
+
+class RaceEventDataQuality(models.TextChoices):
+    INCOMPLETE = "incomplete", "不完整"
+    PARTIAL = "partial", "部分完整"
+    COMPLETE = "complete", "完整"
+
+
+class RaceEventModule(models.TextChoices):
+    BASIC = "basic", "基础资料"
+    HISTORY_WINNERS = "history_winners", "历史冠军"
+    RUNNERS = "runners", "出马表/闸位"
+    RESULTS = "results", "赛果"
+    NEWS_LINKS = "news_links", "相关新闻"
+    DYNAMIC_FIELDS = "dynamic_fields", "动态字段"
+
+
+class RaceEventCandidateStatus(models.TextChoices):
+    PENDING = "pending", "待确认"
+    APPLIED = "applied", "已应用"
+    IGNORED = "ignored", "已忽略"
+    FAILED = "failed", "失败"
+
+
+class RaceRunnerStatus(models.TextChoices):
+    DECLARED = "declared", "已出走登记"
+    RUNNING = "running", "进行中"
+    SCRATCHED = "scratched", "退赛"
+    WITHDRAWN = "withdrawn", "取消出走"
+    UNKNOWN = "unknown", "未知"
+
+
+class ArticleRaceLinkStatus(models.TextChoices):
+    AUTO = "auto", "自动展示"
+    CANDIDATE = "candidate", "候选"
+    MANUAL = "manual", "人工确认"
+    REMOVED = "removed", "人工移除"
+
+
+class ArticleRaceLinkType(models.TextChoices):
+    PRE_RACE = "pre_race", "赛前新闻"
+    POST_RACE = "post_race", "赛后新闻"
+    RELATED = "related", "相关新闻"
+
+
 class TermCandidateStatus(models.TextChoices):
     PENDING = "pending", "待审核"
     ACCEPTED = "accepted", "已接受"
@@ -441,6 +510,293 @@ class MajorRaceEvent(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.name} {self.year} {self.racing_region}"
+
+
+class RaceEvent(TimestampedModel):
+    year = models.PositiveSmallIntegerField()
+    slug = models.SlugField(max_length=160)
+    series_key = models.SlugField(max_length=160, blank=True)
+    original_name = models.CharField(max_length=255)
+    chinese_name = models.CharField(max_length=255)
+    country_region = models.CharField(max_length=32, choices=RacingRegion.choices)
+    racecourse = models.CharField(max_length=255)
+    grade_text = models.CharField(max_length=128)
+    normalized_grade = models.CharField(max_length=32, choices=RaceGrade.choices, blank=True)
+    surface = models.CharField(max_length=16, choices=RaceEventSurface.choices)
+    distance_text = models.CharField(max_length=128, blank=True)
+    eligibility_text = models.CharField(max_length=255, blank=True)
+    race_datetime = models.DateTimeField(null=True, blank=True)
+    timezone_name = models.CharField(max_length=64, default="Asia/Tokyo")
+    local_date = models.DateField(null=True, blank=True)
+    local_start_time = models.TimeField(null=True, blank=True)
+    priority = models.CharField(max_length=2, choices=RaceEventPriority.choices, default=RaceEventPriority.P2)
+    status = models.CharField(max_length=16, choices=RaceEventStatus.choices, default=RaceEventStatus.SCHEDULED)
+    visibility_status = models.CharField(
+        max_length=16,
+        choices=RaceEventVisibility.choices,
+        default=RaceEventVisibility.DRAFT,
+    )
+    data_quality_status = models.CharField(
+        max_length=16,
+        choices=RaceEventDataQuality.choices,
+        default=RaceEventDataQuality.INCOMPLETE,
+    )
+    is_featured = models.BooleanField(default=False)
+    result_confirmed_at = models.DateTimeField(null=True, blank=True)
+    source_refs = models.JSONField(default=dict, blank=True)
+    manual_lock_flags = models.JSONField(default=dict, blank=True)
+    external_race = models.ForeignKey(
+        "ExternalRace",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="race_events",
+    )
+    major_race_event = models.ForeignKey(
+        MajorRaceEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="race_events",
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("local_date", "local_start_time", "country_region", "chinese_name")
+        constraints = [
+            models.UniqueConstraint(fields=("year", "slug"), name="uq_race_event_year_slug"),
+        ]
+        indexes = [
+            models.Index(fields=("visibility_status", "local_date"), name="race_event_visible_date_idx"),
+            models.Index(fields=("country_region", "local_date"), name="race_event_region_date_idx"),
+            models.Index(fields=("priority", "visibility_status"), name="race_event_priority_idx"),
+            models.Index(fields=("status", "visibility_status"), name="race_event_status_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.chinese_name or self.original_name} {self.year}"
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base = slugify(self.original_name or self.chinese_name, allow_unicode=False) or f"race-{self.year}"
+            self.slug = base[:160]
+        if not self.series_key:
+            self.series_key = self.slug
+        super().save(*args, **kwargs)
+
+    @property
+    def is_public(self) -> bool:
+        return self.visibility_status == RaceEventVisibility.PUBLISHED
+
+    @property
+    def public_path(self) -> str:
+        return f"/races/{self.year}/{self.slug}/"
+
+    def get_absolute_url(self) -> str:
+        return self.public_path
+
+    @property
+    def is_key_race(self) -> bool:
+        return self.priority in {RaceEventPriority.P0, RaceEventPriority.P1} or self.is_featured
+
+
+class RaceEventAlias(TimestampedModel):
+    event = models.ForeignKey(RaceEvent, on_delete=models.CASCADE, related_name="aliases")
+    text = models.CharField(max_length=255)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, blank=True)
+    alias_type = models.CharField(max_length=32, default="alias")
+    source = models.CharField(max_length=128, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ("event", "source_language", "alias_type", "text")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("event", "source_language", "text"),
+                name="uq_race_alias_event_lang_text",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("source_language", "text"), name="race_alias_lang_text_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.text} -> {self.event}"
+
+
+class RaceEventRunner(TimestampedModel):
+    event = models.ForeignKey(RaceEvent, on_delete=models.CASCADE, related_name="runners")
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    horse_number = models.CharField(max_length=32, blank=True)
+    barrier = models.CharField(max_length=32, blank=True)
+    horse_name = models.CharField(max_length=255)
+    jockey_name = models.CharField(max_length=255, blank=True)
+    trainer_name = models.CharField(max_length=255, blank=True)
+    carried_weight = models.CharField(max_length=64, blank=True)
+    odds_value = models.CharField(max_length=64, blank=True)
+    popularity = models.CharField(max_length=64, blank=True)
+    running_status = models.CharField(
+        max_length=16,
+        choices=RaceRunnerStatus.choices,
+        default=RaceRunnerStatus.DECLARED,
+    )
+    dynamic_updated_at = models.DateTimeField(null=True, blank=True)
+    manual_lock_flags = models.JSONField(default=dict, blank=True)
+    source_refs = models.JSONField(default=dict, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("event", "sort_order", "horse_number", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("event", "horse_number"),
+                condition=~models.Q(horse_number=""),
+                name="uq_race_runner_event_no",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("event", "running_status"), name="race_runner_status_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.event} #{self.horse_number} {self.horse_name}".strip()
+
+
+class RaceEventResult(TimestampedModel):
+    event = models.ForeignKey(RaceEvent, on_delete=models.CASCADE, related_name="results")
+    finish_position = models.PositiveSmallIntegerField()
+    horse_number = models.CharField(max_length=32, blank=True)
+    horse_name = models.CharField(max_length=255)
+    jockey_name = models.CharField(max_length=255, blank=True)
+    trainer_name = models.CharField(max_length=255, blank=True)
+    finish_time = models.CharField(max_length=64, blank=True)
+    margin = models.CharField(max_length=64, blank=True)
+    odds_value = models.CharField(max_length=64, blank=True)
+    popularity = models.CharField(max_length=64, blank=True)
+    barrier = models.CharField(max_length=32, blank=True)
+    carried_weight = models.CharField(max_length=64, blank=True)
+    running_status = models.CharField(max_length=16, choices=RaceRunnerStatus.choices, blank=True)
+    is_confirmed = models.BooleanField(default=True)
+    source_refs = models.JSONField(default=dict, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("event", "finish_position", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("event", "finish_position"), name="uq_race_result_event_pos"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.event} {self.finish_position} {self.horse_name}"
+
+
+class RaceEventHistoryWinner(TimestampedModel):
+    event = models.ForeignKey(RaceEvent, on_delete=models.CASCADE, related_name="history_winners")
+    winner_year = models.PositiveSmallIntegerField()
+    horse_name = models.CharField(max_length=255)
+    jockey_name = models.CharField(max_length=255, blank=True)
+    trainer_name = models.CharField(max_length=255, blank=True)
+    finish_time = models.CharField(max_length=64, blank=True)
+    margin = models.CharField(max_length=64, blank=True)
+    source_refs = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("event", "-winner_year")
+        constraints = [
+            models.UniqueConstraint(fields=("event", "winner_year"), name="uq_race_history_event_year"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.winner_year} {self.horse_name}"
+
+
+class RaceEventDataCandidate(TimestampedModel):
+    event = models.ForeignKey(RaceEvent, on_delete=models.CASCADE, related_name="data_candidates")
+    module = models.CharField(max_length=32, choices=RaceEventModule.choices)
+    source_name = models.CharField(max_length=128)
+    source_url = models.URLField(max_length=1000, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=RaceEventCandidateStatus.choices,
+        default=RaceEventCandidateStatus.PENDING,
+    )
+    confidence = models.PositiveSmallIntegerField(default=0)
+    candidate_payload = models.JSONField(default=dict, blank=True)
+    diff_payload = models.JSONField(default=dict, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    fetched_at = models.DateTimeField(default=timezone.now)
+    applied_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="applied_race_event_candidates",
+    )
+    applied_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-fetched_at", "-id")
+        indexes = [
+            models.Index(fields=("event", "module", "status"), name="race_candidate_module_idx"),
+            models.Index(fields=("source_name", "fetched_at"), name="race_candidate_source_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.event} {self.module} {self.source_name}"
+
+
+class ArticleRaceLink(TimestampedModel):
+    event = models.ForeignKey(RaceEvent, on_delete=models.CASCADE, related_name="article_links")
+    article = models.ForeignKey("NewsArticle", on_delete=models.CASCADE, related_name="race_links")
+    link_type = models.CharField(
+        max_length=16,
+        choices=ArticleRaceLinkType.choices,
+        default=ArticleRaceLinkType.RELATED,
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=ArticleRaceLinkStatus.choices,
+        default=ArticleRaceLinkStatus.CANDIDATE,
+    )
+    source = models.CharField(max_length=64, blank=True)
+    confidence = models.PositiveSmallIntegerField(default=0)
+    matched_text = models.CharField(max_length=255, blank=True)
+    match_reason = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    confirmed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="confirmed_race_article_links",
+    )
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    removed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="removed_race_article_links",
+    )
+    removed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("event", "-confidence", "-created_at")
+        constraints = [
+            models.UniqueConstraint(fields=("event", "article"), name="uq_article_race_link"),
+        ]
+        indexes = [
+            models.Index(fields=("event", "status", "link_type"), name="race_link_status_type_idx"),
+            models.Index(fields=("article", "status"), name="race_link_article_status_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.event} <-> {self.article_id} ({self.status})"
+
+    @property
+    def is_public(self) -> bool:
+        return self.status in {ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL}
 
 
 class CrawlJob(TimestampedModel):

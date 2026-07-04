@@ -29,6 +29,17 @@
       {% if article.cover_image_url %}
         <img class="article-cover" src="{{ article.cover_image_url }}" alt="">
       {% endif %}
+      {% if race_links %}
+        <section class="race-related-box">
+          <h2>关联赛事</h2>
+          {% for link in race_links %}
+            <a href="{{ link.event.public_path }}">
+              <strong>{{ link.event.chinese_name }} {{ link.event.year }}</strong>
+              <span>{{ link.get_link_type_display }} · {{ link.event.racecourse }}</span>
+            </a>
+          {% endfor %}
+        </section>
+      {% endif %}
       <div class="article-body">{{ article.effective_body|linebreaks }}</div>
       <section class="source-box">
         <p><strong>来源说明：</strong>{{ article.source_note|default:article.get_source_site_display }}</p>

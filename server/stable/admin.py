@@ -8,6 +8,7 @@ from django.utils.html import format_html
 
 from .forms import NewsArticleAdminForm, NewsImageAdminForm, NewsSourceForm, PushArticleForm
 from .models import (
+    ArticleRaceLink,
     ArticleStatus,
     AutomationLog,
     CrawlJob,
@@ -24,6 +25,12 @@ from .models import (
     PushTarget,
     QQPushDelivery,
     QuotaLedger,
+    RaceEvent,
+    RaceEventAlias,
+    RaceEventDataCandidate,
+    RaceEventHistoryWinner,
+    RaceEventResult,
+    RaceEventRunner,
     TaskExecutionLog,
     TermCandidate,
     TermCandidateEvidence,
@@ -86,6 +93,14 @@ class QQPushDeliveryInline(admin.TabularInline):
         "sent_at",
         "created_at",
     )
+    can_delete = False
+
+
+class ArticleRaceLinkInline(admin.TabularInline):
+    model = ArticleRaceLink
+    extra = 0
+    readonly_fields = ("source", "confidence", "matched_text", "match_reason", "created_at", "updated_at")
+    fields = ("event", "link_type", "status", "source", "confidence", "matched_text", "match_reason", "created_at")
     can_delete = False
 
 
@@ -169,6 +184,7 @@ class NewsArticleAdmin(admin.ModelAdmin):
         AutomationLogInline,
         PushLogInline,
         QQPushDeliveryInline,
+        ArticleRaceLinkInline,
     ]
     actions = ["mark_pending_review", "mark_published_ready", "queue_translation"]
 
@@ -391,6 +407,149 @@ class MajorRaceEventAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
         update_major_race_boost_window(obj)
+
+
+class RaceEventAliasInline(admin.TabularInline):
+    model = RaceEventAlias
+    extra = 0
+
+
+class RaceEventRunnerInline(admin.TabularInline):
+    model = RaceEventRunner
+    extra = 0
+    fields = (
+        "sort_order",
+        "horse_number",
+        "barrier",
+        "horse_name",
+        "jockey_name",
+        "trainer_name",
+        "carried_weight",
+        "odds_value",
+        "popularity",
+        "running_status",
+        "dynamic_updated_at",
+    )
+
+
+class RaceEventResultInline(admin.TabularInline):
+    model = RaceEventResult
+    extra = 0
+    fields = (
+        "finish_position",
+        "horse_number",
+        "horse_name",
+        "jockey_name",
+        "trainer_name",
+        "finish_time",
+        "margin",
+        "odds_value",
+        "popularity",
+        "is_confirmed",
+    )
+
+
+class RaceEventHistoryWinnerInline(admin.TabularInline):
+    model = RaceEventHistoryWinner
+    extra = 0
+
+
+class RaceEventDataCandidateInline(admin.TabularInline):
+    model = RaceEventDataCandidate
+    extra = 0
+    readonly_fields = ("source_name", "source_url", "status", "confidence", "fetched_at", "applied_by", "applied_at")
+    can_delete = False
+
+
+class RaceEventArticleLinkInline(admin.TabularInline):
+    model = ArticleRaceLink
+    extra = 0
+    readonly_fields = ("source", "confidence", "matched_text", "match_reason", "created_at", "updated_at")
+    fields = ("article", "link_type", "status", "source", "confidence", "matched_text", "match_reason", "created_at")
+
+
+@admin.register(RaceEvent)
+class RaceEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "chinese_name",
+        "original_name",
+        "year",
+        "country_region",
+        "racecourse",
+        "grade_text",
+        "surface",
+        "priority",
+        "status",
+        "visibility_status",
+        "data_quality_status",
+        "local_date",
+        "is_featured",
+    )
+    list_filter = (
+        "year",
+        "country_region",
+        "priority",
+        "status",
+        "visibility_status",
+        "data_quality_status",
+        "surface",
+        "normalized_grade",
+    )
+    search_fields = ("chinese_name", "original_name", "slug", "series_key", "racecourse", "aliases__text")
+    readonly_fields = ("created_at", "updated_at")
+    prepopulated_fields = {"slug": ("original_name",)}
+    inlines = [
+        RaceEventAliasInline,
+        RaceEventRunnerInline,
+        RaceEventResultInline,
+        RaceEventHistoryWinnerInline,
+        RaceEventDataCandidateInline,
+        RaceEventArticleLinkInline,
+    ]
+
+
+@admin.register(RaceEventDataCandidate)
+class RaceEventDataCandidateAdmin(admin.ModelAdmin):
+    list_display = ("event", "module", "source_name", "status", "confidence", "fetched_at", "applied_by", "applied_at")
+    list_filter = ("module", "status", "source_name", "fetched_at")
+    search_fields = ("event__chinese_name", "event__original_name", "source_name", "source_url", "error_message")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(RaceEventAlias)
+class RaceEventAliasAdmin(admin.ModelAdmin):
+    list_display = ("event", "text", "source_language", "alias_type", "source", "is_active")
+    list_filter = ("source_language", "alias_type", "is_active")
+    search_fields = ("event__chinese_name", "event__original_name", "text", "source")
+
+
+@admin.register(RaceEventRunner)
+class RaceEventRunnerAdmin(admin.ModelAdmin):
+    list_display = ("event", "sort_order", "horse_number", "barrier", "horse_name", "jockey_name", "running_status")
+    list_filter = ("running_status", "event__country_region", "event__year")
+    search_fields = ("event__chinese_name", "event__original_name", "horse_name", "jockey_name", "trainer_name")
+
+
+@admin.register(RaceEventResult)
+class RaceEventResultAdmin(admin.ModelAdmin):
+    list_display = ("event", "finish_position", "horse_number", "horse_name", "jockey_name", "margin", "is_confirmed")
+    list_filter = ("is_confirmed", "event__country_region", "event__year")
+    search_fields = ("event__chinese_name", "event__original_name", "horse_name", "jockey_name", "trainer_name")
+
+
+@admin.register(RaceEventHistoryWinner)
+class RaceEventHistoryWinnerAdmin(admin.ModelAdmin):
+    list_display = ("event", "winner_year", "horse_name", "jockey_name", "trainer_name", "margin")
+    list_filter = ("winner_year", "event__country_region")
+    search_fields = ("event__chinese_name", "event__original_name", "horse_name", "jockey_name", "trainer_name")
+
+
+@admin.register(ArticleRaceLink)
+class ArticleRaceLinkAdmin(admin.ModelAdmin):
+    list_display = ("event", "article", "link_type", "status", "source", "confidence", "confirmed_at", "removed_at")
+    list_filter = ("link_type", "status", "source", "event__country_region")
+    search_fields = ("event__chinese_name", "event__original_name", "article__title_ja", "article__title_zh", "matched_text")
+    readonly_fields = ("created_at", "updated_at")
 
 
 class WindowCandidateDecisionInline(admin.TabularInline):

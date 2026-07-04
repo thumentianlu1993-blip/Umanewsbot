@@ -47,6 +47,9 @@
           <a class="nav-link {% if '/admin/regions/' in active_path %}active{% endif %}" href="{% url 'console-region-production' %}">
             <span>地区生产</span>
           </a>
+          <a class="nav-link {% if '/admin/race-events/' in active_path %}active{% endif %}" href="{% url 'console-race-event-list' %}">
+            <span>赛事日历</span>
+          </a>
           <a class="nav-link {% if '/admin/candidates/' in active_path %}active{% endif %}" href="{% url 'console-candidate-list' %}">
             <span>候选新闻池</span>
             <span class="badge warning">{{ pending_edit_count }}</span>

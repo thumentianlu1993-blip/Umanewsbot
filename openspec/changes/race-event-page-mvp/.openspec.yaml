@@ -1,0 +1,13 @@
+schema: spec-driven
+created: 2026-07-03
+profile: feature
+phase: reviewed
+journal:
+  - event: plan-reviewed
+    date: "2026-07-04T01:30:58+08:00"
+    session: 1
+    mode: full
+    rounds: 2
+    issues_resolved: 6
+    artifacts_modified: [design.md, specs/race-event-pages/spec.md, tasks.md]
+    note: "Round 1 resolved MajorRaceEvent boundary, global grade/surface normalization, audit logging, docs coverage, query performance, and TDD hypotheses; Round 2 converged."

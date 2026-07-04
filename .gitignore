@@ -15,6 +15,8 @@ deploy/certs/*.pem
 backups/
 tmp/
 *.log
+.claude/
+runtime/termbase_seed/
 
 sample_news.json
 netkeiba_page1.html

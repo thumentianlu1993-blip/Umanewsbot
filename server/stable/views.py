@@ -25,6 +25,7 @@ from .forms import (
     ArticleQuickTermForm,
     BackendAuthenticationForm,
     NewsSourceForm,
+    RaceEventForm,
     TermCandidateAcceptForm,
     TermCandidateMergeForm,
     TermCandidateReviewForm,
@@ -32,6 +33,9 @@ from .forms import (
     TermImportForm,
 )
 from .models import (
+    ArticleRaceLink,
+    ArticleRaceLinkStatus,
+    ArticleRaceLinkType,
     AutomationLog,
     AutomationStatus,
     ArticleTranslationStatus,
@@ -50,6 +54,13 @@ from .models import (
     PushTarget,
     QuotaLedger,
     QuotaLedgerKind,
+    RaceEvent,
+    RaceEventCandidateStatus,
+    RaceEventDataCandidate,
+    RaceEventDataQuality,
+    RaceEventPriority,
+    RaceEventStatus,
+    RaceEventVisibility,
     RacingRegion,
     ReviewMode,
     SourceLanguage,
@@ -73,6 +84,7 @@ from .services.publishing_windows import select_publish_candidates
 from .services.pushing import enqueue_push_for_article
 from .services.qq_windows import select_qq_window_deliveries
 from .services.queueing import dispatch_task
+from .services.race_events import apply_data_candidate, associate_articles_for_event, confirm_article_link, remove_article_link
 from .services.sources import sync_builtin_sources
 from .services.storage import current_media_provider
 from .services.term_admin import (
@@ -102,6 +114,8 @@ PUBLIC_FEED_PAGE_SIZE = 12
 PUBLIC_HOT_CANDIDATE_LIMIT = 48
 PUBLIC_HOT_DISPLAY_LIMIT = 6
 QUICK_TERM_FOLLOWUP_SESSION_KEY = "article_quick_term_followup"
+RACE_CALENDAR_PAGE_SIZE = 40
+RACE_CALENDAR_WINDOW_DAYS = 30
 PUBLIC_REGION_TABS = [
     {"value": "", "label": "综合"},
     {"value": RacingRegion.JAPAN, "label": "日本"},
@@ -345,6 +359,224 @@ def _attach_source_health(sources):
     for source in source_list:
         source.health = _source_health(source, now=now)
     return source_list
+
+
+def _race_event_filters(queryset, request: HttpRequest):
+    query = request.GET.get("q", "").strip()
+    year = request.GET.get("year", "").strip()
+    region = request.GET.get("region", "").strip()
+    priority = request.GET.get("priority", "").strip()
+    status = request.GET.get("status", "").strip()
+    visibility = request.GET.get("visibility", "").strip()
+    quality = request.GET.get("quality", "").strip()
+    if query:
+        queryset = queryset.filter(
+            Q(chinese_name__icontains=query)
+            | Q(original_name__icontains=query)
+            | Q(slug__icontains=query)
+            | Q(racecourse__icontains=query)
+            | Q(aliases__text__icontains=query)
+        ).distinct()
+    if year.isdigit():
+        queryset = queryset.filter(year=int(year))
+    if region:
+        queryset = queryset.filter(country_region=region)
+    if priority:
+        queryset = queryset.filter(priority=priority)
+    if status:
+        queryset = queryset.filter(status=status)
+    if visibility:
+        queryset = queryset.filter(visibility_status=visibility)
+    if quality:
+        queryset = queryset.filter(data_quality_status=quality)
+    return queryset
+
+
+@login_required
+def race_event_list(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    queryset = RaceEvent.objects.annotate(
+        candidate_count=Count("data_candidates", distinct=True),
+        linked_article_count=Count("article_links", filter=Q(article_links__status__in=[ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL]), distinct=True),
+    ).order_by("local_date", "local_start_time", "country_region", "chinese_name")
+    queryset = _race_event_filters(queryset, request)
+    paginator = Paginator(queryset, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
+    years = RaceEvent.objects.order_by("-year").values_list("year", flat=True).distinct()
+    return render(
+        request,
+        "stable/console/race_event_list.html",
+        _console_context(
+            request,
+            page_obj=page_obj,
+            race_events=page_obj.object_list,
+            years=years,
+            regions=RacingRegion.choices,
+            priorities=RaceEventPriority.choices,
+            statuses=RaceEventStatus.choices,
+            visibilities=RaceEventVisibility.choices,
+            qualities=RaceEventDataQuality.choices,
+            filters={
+                "q": request.GET.get("q", ""),
+                "year": request.GET.get("year", ""),
+                "region": request.GET.get("region", ""),
+                "priority": request.GET.get("priority", ""),
+                "status": request.GET.get("status", ""),
+                "visibility": request.GET.get("visibility", ""),
+                "quality": request.GET.get("quality", ""),
+            },
+            pagination_querystring=pagination_params.urlencode(),
+        ),
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def race_event_edit(request: HttpRequest, event_id: int | None = None):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    event = get_object_or_404(RaceEvent, pk=event_id) if event_id else RaceEvent()
+    if request.method == "POST":
+        form = RaceEventForm(request.POST, instance=event)
+        if form.is_valid():
+            event = form.save()
+            log_operation(
+                action_type="race_event_saved",
+                target_type="race_event",
+                target_id=event.pk,
+                detail=f"保存赛事 {event}",
+                admin=request.user,
+            )
+            messages.success(request, "赛事资料已保存。")
+            return redirect("console-race-event-edit", event_id=event.pk)
+    else:
+        form = RaceEventForm(instance=event)
+    candidates = []
+    links = {"linked": [], "candidate": [], "removed": []}
+    runners = []
+    results = []
+    history_winners = []
+    logs = []
+    if event.pk:
+        candidates = event.data_candidates.select_related("applied_by").all()[:30]
+        for link in event.article_links.select_related("article").all()[:80]:
+            if link.status == ArticleRaceLinkStatus.REMOVED:
+                links["removed"].append(link)
+            elif link.status == ArticleRaceLinkStatus.CANDIDATE:
+                links["candidate"].append(link)
+            else:
+                links["linked"].append(link)
+        runners = event.runners.all()
+        results = event.results.all()
+        history_winners = event.history_winners.all()
+        logs = OperationLog.objects.filter(target_type__in=["race_event", "article_race_link"]).filter(
+            Q(target_id=str(event.pk)) | Q(detail__icontains=f"event={event.pk}")
+        )[:20]
+    return render(
+        request,
+        "stable/console/race_event_form.html",
+        _console_context(
+            request,
+            form=form,
+            event=event,
+            page_title="新建赛事" if not event.pk else f"{event.chinese_name} {event.year}",
+            candidates=candidates,
+            links=links,
+            runners=runners,
+            results=results,
+            history_winners=history_winners,
+            logs=logs,
+        ),
+    )
+
+
+@login_required
+@require_POST
+def race_event_apply_candidate(request: HttpRequest, candidate_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    candidate = get_object_or_404(RaceEventDataCandidate.objects.select_related("event"), pk=candidate_id)
+    apply_data_candidate(candidate, user=request.user)
+    messages.success(request, "候选资料已应用。")
+    return redirect("console-race-event-edit", event_id=candidate.event_id)
+
+
+@login_required
+@require_POST
+def race_event_associate_articles(request: HttpRequest, event_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    event = get_object_or_404(RaceEvent, pk=event_id)
+    result = associate_articles_for_event(event)
+    messages.success(request, f"自动关联完成：新增 {result['created']}，更新 {result['updated']}，跳过已移除 {result['skipped_removed']}。")
+    return redirect("console-race-event-edit", event_id=event.pk)
+
+
+@login_required
+@require_POST
+def race_event_link_article(request: HttpRequest, event_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    event = get_object_or_404(RaceEvent, pk=event_id)
+    article_id = (request.POST.get("article_id") or "").strip()
+    if not article_id.isdigit():
+        messages.error(request, "请输入有效的文章 ID。")
+        return redirect("console-race-event-edit", event_id=event.pk)
+    article = get_object_or_404(NewsArticle, pk=int(article_id))
+    link, _ = ArticleRaceLink.objects.update_or_create(
+        event=event,
+        article=article,
+        defaults={
+            "status": ArticleRaceLinkStatus.MANUAL,
+            "link_type": request.POST.get("link_type") or ArticleRaceLinkType.RELATED,
+            "source": "manual",
+            "confidence": 100,
+            "match_reason": "后台手动添加",
+            "confirmed_by": request.user,
+            "confirmed_at": timezone.now(),
+        },
+    )
+    log_operation(
+        action_type="race_article_link_added",
+        target_type="article_race_link",
+        target_id=link.pk,
+        detail=f"手动添加赛事新闻关联 event={event.pk} article={article.pk}",
+        admin=request.user,
+    )
+    messages.success(request, "文章已关联到赛事。")
+    return redirect("console-race-event-edit", event_id=event.pk)
+
+
+@login_required
+@require_POST
+def race_event_confirm_link(request: HttpRequest, link_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    link = get_object_or_404(ArticleRaceLink.objects.select_related("event"), pk=link_id)
+    confirm_article_link(link, user=request.user)
+    messages.success(request, "关联已确认。")
+    return redirect("console-race-event-edit", event_id=link.event_id)
+
+
+@login_required
+@require_POST
+def race_event_remove_link(request: HttpRequest, link_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    link = get_object_or_404(ArticleRaceLink.objects.select_related("event"), pk=link_id)
+    remove_article_link(link, user=request.user)
+    messages.success(request, "关联已移除，自动任务不会重新公开该关联。")
+    return redirect("console-race-event-edit", event_id=link.event_id)
 
 
 @login_required
@@ -1711,6 +1943,122 @@ def _build_hot_articles(queryset) -> list[dict]:
     return sorted(entries, key=_hot_article_sort_key, reverse=True)[:PUBLIC_HOT_DISPLAY_LIMIT]
 
 
+def _race_calendar_queryset(request: HttpRequest):
+    queryset = RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED)
+    tab = request.GET.get("tab", "key").strip() or "key"
+    region = request.GET.get("region", "").strip()
+    direction = request.GET.get("direction", "").strip()
+    cursor = request.GET.get("cursor", "").strip()
+    today = timezone.localdate()
+    if tab == "key":
+        queryset = queryset.filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
+    if region:
+        queryset = queryset.filter(country_region=region)
+    if cursor:
+        try:
+            cursor_date = datetime.fromisoformat(cursor).date()
+        except ValueError:
+            cursor_date = today
+        if direction == "past":
+            queryset = queryset.filter(local_date__lt=cursor_date).order_by("-local_date", "-local_start_time", "id")
+        elif direction == "future":
+            queryset = queryset.filter(local_date__gt=cursor_date).order_by("local_date", "local_start_time", "id")
+        else:
+            queryset = queryset.order_by("local_date", "local_start_time", "id")
+    else:
+        start = today - timedelta(days=RACE_CALENDAR_WINDOW_DAYS)
+        end = today + timedelta(days=RACE_CALENDAR_WINDOW_DAYS)
+        queryset = queryset.filter(Q(local_date__gte=start, local_date__lte=end) | Q(local_date__isnull=True)).order_by("local_date", "local_start_time", "id")
+    return queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE], {"tab": tab, "region": region, "direction": direction, "cursor": cursor}
+
+
+def _group_race_events_by_date(events):
+    groups: list[dict] = []
+    current_date = object()
+    current_group = None
+    for event in events:
+        event.top_results = list(event.results.all()[:5])
+        if event.local_date != current_date:
+            current_date = event.local_date
+            current_group = {"date": event.local_date, "events": []}
+            groups.append(current_group)
+        current_group["events"].append(event)
+    return groups
+
+
+def public_race_calendar(request: HttpRequest):
+    events, filters = _race_calendar_queryset(request)
+    events = list(events)
+    if filters["direction"] == "past":
+        events = list(reversed(events))
+    groups = _group_race_events_by_date(events)
+    region_tabs = [{"value": "", "label": "全部", "is_active": filters["region"] == "", "url": f"?tab={filters['tab']}"}]
+    for value, label in RacingRegion.choices:
+        if value == RacingRegion.OTHER:
+            continue
+        region_tabs.append(
+            {
+                "value": value,
+                "label": label,
+                "is_active": filters["region"] == value,
+                "url": f"?tab={filters['tab']}&region={value}",
+            }
+        )
+    tab_base = f"&region={filters['region']}" if filters["region"] else ""
+    previous_cursor = events[0].local_date.isoformat() if events and events[0].local_date else ""
+    next_cursor = events[-1].local_date.isoformat() if events and events[-1].local_date else ""
+    return render(
+        request,
+        "stable/public/race_calendar.html",
+        {
+            "groups": groups,
+            "filters": filters,
+            "region_tabs": region_tabs,
+            "all_tab_url": f"?tab=all{tab_base}",
+            "key_tab_url": f"?tab=key{tab_base}",
+            "previous_url": f"?tab={filters['tab']}{tab_base}&direction=past&cursor={previous_cursor}" if previous_cursor else "",
+            "next_url": f"?tab={filters['tab']}{tab_base}&direction=future&cursor={next_cursor}" if next_cursor else "",
+        },
+    )
+
+
+def public_race_detail(request: HttpRequest, year: int, slug: str):
+    event = get_object_or_404(
+        RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED).prefetch_related(
+            "runners",
+            "results",
+            "history_winners",
+            "article_links__article",
+        ),
+        year=year,
+        slug=slug,
+    )
+    public_links = [
+        link
+        for link in event.article_links.all()
+        if link.status in {ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL}
+        and link.article.workflow_status == WorkflowStatus.PUBLISHED
+        and link.article.published_to_web_at is not None
+    ]
+    news_groups = {
+        "pre_race": [link.article for link in public_links if link.link_type == ArticleRaceLinkType.PRE_RACE],
+        "post_race": [link.article for link in public_links if link.link_type == ArticleRaceLinkType.POST_RACE],
+        "related": [link.article for link in public_links if link.link_type == ArticleRaceLinkType.RELATED],
+    }
+    return render(
+        request,
+        "stable/public/race_detail.html",
+        {
+            "event": event,
+            "runners": event.runners.all(),
+            "results": event.results.all(),
+            "history_winners": event.history_winners.all(),
+            "top_results": list(event.results.all()[:5]),
+            "news_groups": news_groups,
+        },
+    )
+
+
 def public_news_feed(request: HttpRequest):
     active_region = _resolve_public_region(request.GET.get("region", ""))
     queryset = _public_published_articles(active_region)
@@ -1739,12 +2087,18 @@ def public_news_feed(request: HttpRequest):
 
 def public_article_detail(request: HttpRequest, article_id: int):
     article = get_object_or_404(
-        NewsArticle,
+        NewsArticle.objects.prefetch_related("race_links__event"),
         workflow_status=WorkflowStatus.PUBLISHED,
         published_to_web_at__isnull=False,
         pk=article_id,
     )
-    return render(request, "stable/public/detail.html", {"article": article})
+    race_links = [
+        link
+        for link in article.race_links.all()
+        if link.status in {ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL}
+        and link.event.visibility_status == RaceEventVisibility.PUBLISHED
+    ]
+    return render(request, "stable/public/detail.html", {"article": article, "race_links": race_links})
 
 
 def legacy_public_article_detail(request: HttpRequest, slug: str):

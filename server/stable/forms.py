@@ -3,7 +3,20 @@ from __future__ import annotations
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 
-from .models import NewsArticle, NewsImage, NewsSource, PushTarget, RaceGrade, RacingRegion, SourceLanguage, TermCandidate, TermEntry, TermType
+from .models import (
+    NewsArticle,
+    NewsImage,
+    NewsSource,
+    PushTarget,
+    RaceEvent,
+    RaceEventAlias,
+    RaceGrade,
+    RacingRegion,
+    SourceLanguage,
+    TermCandidate,
+    TermEntry,
+    TermType,
+)
 from .services.term_admin import serialize_aliases, sync_term_source_aliases, validate_term_payload
 
 
@@ -99,6 +112,77 @@ class NewsSourceForm(forms.ModelForm):
         instance.default_tags = tags
         if commit:
             instance.save()
+        return instance
+
+
+class RaceEventForm(forms.ModelForm):
+    aliases_text = forms.CharField(label="别名", required=False, widget=forms.Textarea(attrs={"rows": 3}))
+
+    class Meta:
+        model = RaceEvent
+        fields = [
+            "year",
+            "slug",
+            "series_key",
+            "original_name",
+            "chinese_name",
+            "country_region",
+            "racecourse",
+            "grade_text",
+            "normalized_grade",
+            "surface",
+            "distance_text",
+            "eligibility_text",
+            "race_datetime",
+            "timezone_name",
+            "local_date",
+            "local_start_time",
+            "priority",
+            "status",
+            "visibility_status",
+            "data_quality_status",
+            "is_featured",
+            "notes",
+        ]
+        widgets = {
+            "eligibility_text": forms.Textarea(attrs={"rows": 2}),
+            "notes": forms.Textarea(attrs={"rows": 3}),
+            "race_datetime": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "local_date": forms.DateInput(attrs={"type": "date"}),
+            "local_start_time": forms.TimeInput(attrs={"type": "time"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["normalized_grade"].choices = [("", "未设置"), *RaceGrade.choices]
+        if self.instance.pk:
+            self.fields["aliases_text"].initial = "\n".join(
+                self.instance.aliases.filter(is_active=True).order_by("source_language", "text").values_list("text", flat=True)
+            )
+
+    def clean_aliases_text(self):
+        raw = self.cleaned_data.get("aliases_text") or ""
+        aliases: list[str] = []
+        seen: set[str] = set()
+        for item in raw.replace(";", "\n").replace("|", "\n").splitlines():
+            value = item.strip()
+            if value and value not in seen:
+                seen.add(value)
+                aliases.append(value)
+        return aliases
+
+    def save(self, commit=True):
+        instance = super().save(commit=commit)
+        if commit:
+            aliases = self.cleaned_data.get("aliases_text") or []
+            instance.aliases.update(is_active=False)
+            for alias in aliases:
+                RaceEventAlias.objects.update_or_create(
+                    event=instance,
+                    source_language="",
+                    text=alias,
+                    defaults={"alias_type": "alias", "source": "manual", "is_active": True},
+                )
         return instance
 
 

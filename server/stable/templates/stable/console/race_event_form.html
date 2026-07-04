@@ -1,0 +1,307 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}{{ page_title }} - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">{{ page_title }}</h2>
+      <p class="page-subtitle">
+        {% if event.pk %}
+          RaceEvent #{{ event.id }} · {{ event.priority }} · {{ event.get_country_region_display }} · {{ event.racecourse }}
+        {% else %}
+          创建一个可进入赛事日历的年度赛事记录。
+        {% endif %}
+      </p>
+    </div>
+    <div class="toolbar">
+      <a class="btn ghost" href="{% url 'console-race-event-list' %}">返回赛事列表</a>
+      {% if event.pk and event.visibility_status == 'published' %}
+        <a class="btn secondary" href="{{ event.public_path }}" target="_blank" rel="noreferrer">预览前台</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if event.pk %}
+    <section class="panel">
+      <div class="article-meta">
+        <span class="badge {% if event.visibility_status == 'published' %}success{% endif %}">{{ event.get_visibility_status_display }}</span>
+        <span class="badge {% if event.status == 'running' %}success{% endif %}">{{ event.get_status_display }}</span>
+        <span class="badge gold">{{ event.priority }}</span>
+        <span class="badge">{{ event.get_data_quality_status_display }}</span>
+        {% if event.updated_at %}<span class="muted">最近更新 {{ event.updated_at|date:"Y-m-d H:i" }}</span>{% endif %}
+      </div>
+    </section>
+  {% endif %}
+
+  <section class="panel">
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-grid">
+        {% for field in form %}
+          <div class="field {% if field.name == 'aliases_text' or field.name == 'eligibility_text' or field.name == 'notes' %}full{% endif %}">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<div class="help">{{ field.help_text }}</div>{% endif %}
+            {% if field.errors %}<div class="help" style="color: var(--danger);">{{ field.errors|join:' ' }}</div>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      <div class="toolbar" style="margin-top: 18px;">
+        <button type="submit">保存</button>
+        {% if event.pk %}<a class="btn secondary" href="{% url 'console-race-event-create' %}">新建下一场</a>{% endif %}
+      </div>
+    </form>
+  </section>
+
+  {% if event.pk %}
+    <section class="panel">
+      <div class="section-head">
+        <div>
+          <h3>资料完整度与前台摘要</h3>
+          <p class="muted">日期和国家/地区用于页面级筛选；日历卡片不展示赔率。</p>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><strong>{{ runners|length }}</strong><span>出马表</span></div>
+        <div class="stat-card"><strong>{{ results|length }}</strong><span>赛果</span></div>
+        <div class="stat-card"><strong>{{ history_winners|length }}</strong><span>历史冠军</span></div>
+        <div class="stat-card"><strong>{{ candidates|length }}</strong><span>候选资料</span></div>
+      </div>
+    </section>
+
+    <section class="panel" id="candidates">
+      <div class="section-head">
+        <div>
+          <h3>候选资料确认</h3>
+          <p class="muted">候选资料默认不公开；应用时只更新被确认模块，人工锁定字段不会被覆盖。</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>模块</th>
+              <th>来源</th>
+              <th>置信度</th>
+              <th>状态</th>
+              <th>抓取时间</th>
+              <th>差异</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for candidate in candidates %}
+              <tr>
+                <td>{{ candidate.get_module_display }}</td>
+                <td>
+                  {{ candidate.source_name }}
+                  {% if candidate.source_url %}<div><a href="{{ candidate.source_url }}" target="_blank" rel="noreferrer">来源链接</a></div>{% endif %}
+                </td>
+                <td>{{ candidate.confidence }}%</td>
+                <td><span class="badge {% if candidate.status == 'applied' %}success{% endif %}">{{ candidate.get_status_display }}</span></td>
+                <td>{{ candidate.fetched_at|date:"Y-m-d H:i" }}</td>
+                <td><code>{{ candidate.diff_payload|truncatechars:120 }}</code></td>
+                <td>
+                  {% if candidate.status == 'pending' %}
+                    <form method="post" action="{% url 'console-race-event-apply-candidate' candidate.id %}">
+                      {% csrf_token %}
+                      <button class="btn secondary" type="submit">应用</button>
+                    </form>
+                  {% else %}
+                    <span class="muted">已处理</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="7" class="muted">暂无候选资料。可通过管理命令写入候选池。</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <div>
+          <h3>出马表</h3>
+          <p class="muted">赔率、热门度和出走状态属于动态字段；日历不展示赔率。</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>马号</th>
+              <th>闸位</th>
+              <th>马名</th>
+              <th>骑师</th>
+              <th>练马师</th>
+              <th>负磅</th>
+              <th>赔率 / 热门</th>
+              <th>出走状态</th>
+              <th>更新时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for runner in runners %}
+              <tr>
+                <td>{{ runner.horse_number|default:"-" }}</td>
+                <td>{{ runner.barrier|default:"-" }}</td>
+                <td><strong>{{ runner.horse_name }}</strong></td>
+                <td>{{ runner.jockey_name|default:"-" }}</td>
+                <td>{{ runner.trainer_name|default:"-" }}</td>
+                <td>{{ runner.carried_weight|default:"-" }}</td>
+                <td>{{ runner.odds_value|default:"-" }} / {{ runner.popularity|default:"-" }}</td>
+                <td>{{ runner.get_running_status_display }}</td>
+                <td>{% if runner.dynamic_updated_at %}{{ runner.dynamic_updated_at|date:"m-d H:i" }}{% else %}<span class="muted">-</span>{% endif %}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="9" class="muted">暂无出马表。</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head"><h3>赛果</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>名次</th>
+              <th>马号</th>
+              <th>马名</th>
+              <th>骑师</th>
+              <th>时间</th>
+              <th>马身差</th>
+              <th>确认</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for result in results %}
+              <tr>
+                <td>{{ result.finish_position }}</td>
+                <td>{{ result.horse_number|default:"-" }}</td>
+                <td><strong>{{ result.horse_name }}</strong></td>
+                <td>{{ result.jockey_name|default:"-" }}</td>
+                <td>{{ result.finish_time|default:"-" }}</td>
+                <td>{{ result.margin|default:"-" }}</td>
+                <td>{{ result.is_confirmed|yesno:"已确认,待确认" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="7" class="muted">暂无赛果。</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" id="news-links">
+      <div class="section-head">
+        <div>
+          <h3>关联新闻纠偏</h3>
+          <p class="muted">标题/摘要高置信命中可自动展示；弱匹配进入候选；人工移除后不会再次自动公开。</p>
+        </div>
+        <form method="post" action="{% url 'console-race-event-associate' event.id %}">
+          {% csrf_token %}
+          <button class="btn secondary" type="submit">运行自动关联</button>
+        </form>
+      </div>
+
+      <form class="filter-bar" method="post" action="{% url 'console-race-event-link-article' event.id %}">
+        {% csrf_token %}
+        <label>
+          手动添加文章 ID
+          <input type="number" name="article_id" min="1" placeholder="NewsArticle ID">
+        </label>
+        <label>
+          分组
+          <select name="link_type">
+            <option value="related">相关新闻</option>
+            <option value="pre_race">赛前新闻</option>
+            <option value="post_race">赛后新闻</option>
+          </select>
+        </label>
+        <button class="btn secondary" type="submit">添加关联</button>
+      </form>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>状态</th>
+              <th>分组</th>
+              <th>文章</th>
+              <th>原因</th>
+              <th>置信度</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for link in links.linked %}
+              <tr>
+                <td><span class="badge success">{{ link.get_status_display }}</span></td>
+                <td>{{ link.get_link_type_display }}</td>
+                <td><a href="{% url 'console-candidate-detail' link.article.id %}">{{ link.article.effective_title|truncatechars:48 }}</a></td>
+                <td>{{ link.match_reason|default:"人工确认" }}</td>
+                <td>{{ link.confidence }}</td>
+                <td>
+                  <form method="post" action="{% url 'console-race-event-remove-link' link.id %}">
+                    {% csrf_token %}
+                    <button class="btn danger" type="submit">移除</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+            {% for link in links.candidate %}
+              <tr>
+                <td><span class="badge warning">{{ link.get_status_display }}</span></td>
+                <td>{{ link.get_link_type_display }}</td>
+                <td><a href="{% url 'console-candidate-detail' link.article.id %}">{{ link.article.effective_title|truncatechars:48 }}</a></td>
+                <td>{{ link.match_reason }}</td>
+                <td>{{ link.confidence }}</td>
+                <td>
+                  <div class="article-actions">
+                    <form method="post" action="{% url 'console-race-event-confirm-link' link.id %}">
+                      {% csrf_token %}
+                      <button class="btn secondary" type="submit">确认</button>
+                    </form>
+                    <form method="post" action="{% url 'console-race-event-remove-link' link.id %}">
+                      {% csrf_token %}
+                      <button class="btn danger" type="submit">误判</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+            {% for link in links.removed %}
+              <tr>
+                <td><span class="badge">已移除</span></td>
+                <td>{{ link.get_link_type_display }}</td>
+                <td>{{ link.article.effective_title|truncatechars:48 }}</td>
+                <td>{{ link.match_reason|default:"人工移除保护" }}</td>
+                <td>{{ link.confidence }}</td>
+                <td><span class="muted">不会自动恢复</span></td>
+              </tr>
+            {% empty %}
+              {% if not links.linked and not links.candidate %}
+                <tr><td colspan="6" class="muted">暂无关联新闻。</td></tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head"><h3>最近操作日志</h3></div>
+      {% for log in logs %}
+        <p class="muted">{{ log.created_at|date:"Y-m-d H:i" }} · {{ log.admin|default:"系统" }} · {{ log.action_type }} · {{ log.detail|truncatechars:120 }}</p>
+      {% empty %}
+        <p class="muted">暂无操作日志。</p>
+      {% endfor %}
+    </section>
+  {% endif %}
+{% endblock %}

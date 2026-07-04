@@ -13,6 +13,8 @@ def healthcheck(_request):
 
 urlpatterns = [
     path("", stable_views.public_news_feed, name="public-news-feed"),
+    path("races/", stable_views.public_race_calendar, name="public-race-calendar"),
+    path("races/<int:year>/<slug:slug>/", stable_views.public_race_detail, name="public-race-detail"),
     path("news/<int:article_id>/", stable_views.public_article_detail, name="public-article-detail"),
     path("news/<str:slug>/", stable_views.legacy_public_article_detail, name="legacy-public-article-detail"),
     path("admin/", include("stable.urls")),

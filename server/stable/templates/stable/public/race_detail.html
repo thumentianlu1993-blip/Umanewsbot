@@ -1,0 +1,197 @@
+{% extends "stable/public/base.html" %}
+
+{% block title %}{{ event.chinese_name }} {{ event.year }}{% endblock %}
+
+{% block content %}
+  <main class="race-page">
+    <nav class="article-actions" aria-label="赛事操作">
+      <a href="{% url 'public-race-calendar' %}">返回赛事日历</a>
+      <a href="/">返回首页</a>
+    </nav>
+
+    <section class="race-detail-hero {% if event.status == 'finished' %}finished{% endif %}">
+      <div class="race-hero-meta">
+        <span>{{ event.year }}</span>
+        <span>{{ event.get_country_region_display }}</span>
+        <span>{{ event.racecourse }}</span>
+        <span>{{ event.grade_text }}</span>
+        <span>{{ event.get_surface_display }}</span>
+      </div>
+      <h1>{{ event.chinese_name }}</h1>
+      <p>{{ event.original_name }}</p>
+      <div class="race-hero-status">
+        {% if event.status == 'running' %}
+          <strong>进行中</strong>
+          <span>最终赛果确认后将切换为赛后结果</span>
+        {% elif event.status == 'finished' and top_results %}
+          <strong>{{ top_results.0.horse_name }}</strong>
+          <span>冠军 · {% if top_results.0.margin %}{{ top_results.0.margin }}{% else %}赛果已确认{% endif %}</span>
+        {% else %}
+          <strong>{% if event.local_date %}{{ event.local_date|date:"Y-m-d" }}{% else %}日期待定{% endif %}</strong>
+          <span>{% if event.local_start_time %}{{ event.local_start_time|time:"H:i" }}{% else %}时间待定{% endif %}</span>
+        {% endif %}
+      </div>
+      {% if event.status == 'finished' and top_results %}
+        <ol class="race-hero-results">
+          {% for result in top_results %}
+            <li><span>{{ result.finish_position }}</span>{{ result.horse_name }}{% if result.margin %}<em>{{ result.margin }}</em>{% endif %}</li>
+          {% endfor %}
+        </ol>
+      {% endif %}
+    </section>
+
+    <nav class="race-tabs race-detail-tabs" aria-label="赛事详情模块">
+      <a href="#overview" class="active">概览</a>
+      {% if results %}<a href="#results">赛果</a>{% endif %}
+      <a href="#news">新闻</a>
+      <a href="#history">历史</a>
+    </nav>
+
+    <section class="race-panel" id="overview">
+      <h2>基础资料</h2>
+      <div class="race-info-grid">
+        <div><strong>日期</strong><span>{% if event.local_date %}{{ event.local_date|date:"Y-m-d" }}{% else %}待定{% endif %}</span></div>
+        <div><strong>时间</strong><span>{% if event.local_start_time %}{{ event.local_start_time|time:"H:i" }}{% else %}待定{% endif %}</span></div>
+        <div><strong>马场</strong><span>{{ event.racecourse }}</span></div>
+        <div><strong>地区</strong><span>{{ event.get_country_region_display }}</span></div>
+        <div><strong>等级</strong><span>{{ event.grade_text }}</span></div>
+        <div><strong>Surface</strong><span>{{ event.get_surface_display }}</span></div>
+        {% if event.distance_text %}<div><strong>距离</strong><span>{{ event.distance_text }}</span></div>{% endif %}
+        {% if event.eligibility_text %}<div><strong>参赛条件</strong><span>{{ event.eligibility_text }}</span></div>{% endif %}
+      </div>
+
+      <h2>出马表</h2>
+      <div class="race-table-wrap">
+        <table class="race-table compact">
+          <thead>
+            <tr>
+              <th>马号</th>
+              <th>闸位</th>
+              <th>马名</th>
+              <th>骑师</th>
+              <th>练马师</th>
+              <th>负磅</th>
+              <th>赔率 / 热门</th>
+              <th>出走状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for runner in runners %}
+              <tr>
+                <td>{{ runner.horse_number|default:"-" }}</td>
+                <td>{{ runner.barrier|default:"-" }}</td>
+                <td><strong>{{ runner.horse_name }}</strong></td>
+                <td>{{ runner.jockey_name|default:"-" }}</td>
+                <td>{{ runner.trainer_name|default:"-" }}</td>
+                <td>{{ runner.carried_weight|default:"-" }}</td>
+                <td>
+                  {{ runner.odds_value|default:"-" }} / {{ runner.popularity|default:"-" }}
+                  {% if runner.dynamic_updated_at %}<span>{{ runner.dynamic_updated_at|date:"m-d H:i" }} 更新</span>{% endif %}
+                </td>
+                <td>{{ runner.get_running_status_display }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="8">暂无出马表。</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    {% if results %}
+      <section class="race-panel" id="results">
+        <h2>赛果</h2>
+        <div class="race-table-wrap">
+          <table class="race-table compact">
+            <thead>
+              <tr>
+                <th>名次</th>
+                <th>马号</th>
+                <th>马名</th>
+                <th>骑师</th>
+                <th>练马师</th>
+                <th>时间</th>
+                <th>马身差</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for result in results %}
+                <tr>
+                  <td>{{ result.finish_position }}</td>
+                  <td>{{ result.horse_number|default:"-" }}</td>
+                  <td><strong>{{ result.horse_name }}</strong></td>
+                  <td>{{ result.jockey_name|default:"-" }}</td>
+                  <td>{{ result.trainer_name|default:"-" }}</td>
+                  <td>{{ result.finish_time|default:"-" }}</td>
+                  <td>{{ result.margin|default:"-" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+
+    <section class="race-panel" id="news">
+      <h2>相关新闻</h2>
+      <div class="race-news-groups">
+        <div>
+          <h3>赛前新闻</h3>
+          {% for article in news_groups.pre_race %}
+            <a class="race-news-link" href="{{ article.public_path }}">{{ article.effective_title }}</a>
+          {% empty %}
+            <p>暂无赛前新闻。</p>
+          {% endfor %}
+        </div>
+        <div>
+          <h3>赛后新闻</h3>
+          {% for article in news_groups.post_race %}
+            <a class="race-news-link" href="{{ article.public_path }}">{{ article.effective_title }}</a>
+          {% empty %}
+            <p>暂无赛后新闻。</p>
+          {% endfor %}
+        </div>
+        <div>
+          <h3>相关新闻</h3>
+          {% for article in news_groups.related %}
+            <a class="race-news-link" href="{{ article.public_path }}">{{ article.effective_title }}</a>
+          {% empty %}
+            <p>暂无相关新闻。</p>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    <section class="race-panel" id="history">
+      <h2>近年冠军</h2>
+      <div class="race-table-wrap">
+        <table class="race-table compact">
+          <thead>
+            <tr>
+              <th>年份</th>
+              <th>冠军</th>
+              <th>骑师</th>
+              <th>练马师</th>
+              <th>时间</th>
+              <th>马身差</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for winner in history_winners %}
+              <tr>
+                <td>{{ winner.winner_year }}</td>
+                <td><strong>{{ winner.horse_name }}</strong></td>
+                <td>{{ winner.jockey_name|default:"-" }}</td>
+                <td>{{ winner.trainer_name|default:"-" }}</td>
+                <td>{{ winner.finish_time|default:"-" }}</td>
+                <td>{{ winner.margin|default:"-" }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6">暂无历史冠军资料。</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+{% endblock %}

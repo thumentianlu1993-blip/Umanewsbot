@@ -22,12 +22,21 @@ class Command(BaseCommand):
     help = "从 HKJC 与 WP Stud 准备人工审核用中文术语种子 CSV，不写正式术语库。"
 
     def add_arguments(self, parser):
-        parser.add_argument("--source", action="append", default=[], help="来源，可重复传入：hkjc、wpstud。")
+        parser.add_argument("--source", action="append", default=[], help="来源，可重复传入：hkjc、hkjc_overseas、wpstud。")
         parser.add_argument("--region", action="append", default=[], help="预留地区过滤参数；首版输出仍按香港优先、日本最后排序。")
         parser.add_argument("--input-dir", help="本地 fixture 或缓存 HTML 目录；未触网时默认读取内置 fixture。")
         parser.add_argument("--output-dir", help="输出目录；默认 runtime/termbase_seed/<timestamp>/。")
         parser.add_argument("--allow-network", action="store_true", help="允许访问 HKJC 或 WP Stud 网络页面。")
         parser.add_argument("--limit-pages", type=int, help="每个来源最多抓取页面数。")
+        parser.add_argument("--limit-horses", type=int, help="HKJC 详情页最多抽取马匹数；用于安全小批抓取。")
+        parser.add_argument("--limit-meetings", type=int, help="HKJC overseas 自动发现时最多处理 meeting 数。")
+        parser.add_argument("--limit-races", type=int, help="HKJC overseas 自动发现时最多处理 race card 数；默认 3。")
+        parser.add_argument(
+            "--hkjc-overseas-race",
+            action="append",
+            default=[],
+            help="精确指定 HKJC overseas Race Card，可重复传入：RaceDate=YYYY-MM-DD,Racecourse=<code>,RaceNo=<number>。",
+        )
         parser.add_argument("--max-requests", type=int, default=20, help="本次触网最大请求数。")
         parser.add_argument("--request-interval-seconds", type=float, default=3, help="触网请求间隔秒数。")
         parser.add_argument("--timeout-seconds", type=float, default=15, help="单次请求超时秒数。")
@@ -41,6 +50,10 @@ class Command(BaseCommand):
             request_interval_seconds=options["request_interval_seconds"],
             timeout_seconds=options["timeout_seconds"],
             limit_pages=options["limit_pages"],
+            limit_horses=options["limit_horses"],
+            limit_meetings=options["limit_meetings"],
+            limit_races=options["limit_races"],
+            hkjc_overseas_races=tuple(options["hkjc_overseas_race"]),
         )
         try:
             records, requests_info, failures = collect_seed_records(

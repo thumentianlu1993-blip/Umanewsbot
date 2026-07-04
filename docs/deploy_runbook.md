@@ -183,6 +183,57 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py s
 
 若单篇 JRA 详情页结构异常，预期行为是跳过该篇、继续处理同轮其他新闻，并在 `last_crawl_message` / `CrawlJob.error_message` 中留下“跳过 N 条”摘要；列表页、网络或数据库异常仍按整轮失败排查。
 
+## 赛事日历 / 年度赛事页运维
+
+### 后台入口
+
+- 业务后台：`/admin/race-events/`
+- Django Admin 兜底：`/django-admin/stable/raceevent/`
+- 前台赛事日历：`/races/`
+- 前台年度赛事详情：`/races/<year>/<slug>/`
+
+### CSV 种子导入
+
+样例文件：
+
+```bash
+server/stable/data/race_events_seed_sample.csv
+```
+
+本地或生产容器内导入：
+
+```bash
+python manage.py import_race_events --csv server/stable/data/race_events_seed_sample.csv --dry-run
+python manage.py import_race_events --csv server/stable/data/race_events_seed_sample.csv
+```
+
+CSV 导入只创建或更新 `RaceEvent` 与 `RaceEventAlias`，不会创建新闻，不会触发 QQ 推送。
+
+### 候选资料抓取
+
+指定网站或人工缓存的候选资料应先写入 JSON，再进入候选池：
+
+```bash
+python manage.py fetch_race_event_candidates --event-id <race_event_id> --source json --payload-file /path/to/candidate.json
+```
+
+候选资料只写入 `RaceEventDataCandidate`，不会自动覆盖公开字段。运营人员需要在 `/admin/race-events/<id>/` 中按模块应用。
+
+### 赛中字段只读调研
+
+赛中字段调研只记录 URL、样例和失败原因，不写入公开赛事状态或赛果：
+
+```bash
+python manage.py research_live_race_fields --url https://example.com/race-page
+```
+
+### 停用 / 回滚边界
+
+- 前台可通过从导航移除 `/races/` 入口或把赛事 `visibility_status` 改为 `hidden` 临时下线。
+- 候选抓取命令不应配置为常驻调度；如来源异常，停止执行命令即可。
+- `RaceEvent` 数据不影响新闻抓取、翻译、自动发布或 QQ 推送主链路。
+- 人工移除的 `ArticleRaceLink(status=removed)` 是保护记录，不应批量删除，否则自动关联可能重新出现。
+
 ## 2026-06-25 三个运营改造 change 合并、部署与归档
 
 ### 合并范围
@@ -690,8 +741,125 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py p
 - 正式导入：总计 `10` 条，新增 `8` 条，更新 `2` 条，跳过 `0` 条。
 - 导入后计数：`TermEntry=2062`、`TermAlias=2068`；按原文语言分布为 `en=8`、`ja=2054`。
 - 新增英文术语：`BEAUTY GENERATION`、`KA YING RISING`、`ROMANTIC WARRIOR`、`Hong Kong Cup`、`Zac Purton`、`John Size`、`Sha Tin`、`Declared Starter`。
-- 本批地区证据保留在 `notes` 的 `region=hk`，`TermEntry.racing_region` 仍为空；如后续需要地区统计按香港归类，应另用带 `racing_region=hk` 的审核 CSV 执行 upsert。
+- 首次导入时本批地区证据只保留在 `notes` 的 `region=hk`，未写入 `TermEntry.racing_region`；随后已执行地区补写 upsert。
+- 地区补写备份：`backups/db/pre-termbase-seed-region-upsert-20260704_031950.sql.gz`。
+- 地区补写注意：`racing_region` 必须使用模型合法值，例如 `hong_kong`、`japan`，不能使用短码 `hk`、`jp`。短码版本 dry-run 会被“地区不合法”阻断且不会写库。
+- 地区补写结果：改用 `hong_kong/japan` 后 dry-run 为总计 `10` 条、更新 `10` 条、错误 `0` 条；正式 upsert 为更新 `10` 条、跳过 `0` 条。补写后分布为 `en/hong_kong=8`、`ja/japan=2`、既有旧日文术语空地区 `2052`。
 - 导入后 `http://umafans.run/healthz/` 返回 `200`。
+
+### WP Stud 第一批全量审核候选记录（2026-07-04）
+
+- 本地审核目录：`runtime/termbase_seed/wpstud-full-review-20260704/`。
+- 审核文件：`seed_candidates.csv`、`seed_candidates_with_region.csv`、`seed_conflicts.csv`、`summary.json`。
+- 生成结果：候选 `210` 条、冲突 `0` 条、`incomplete=false`；全部为 `term_type=horse`、`source_language=ja`、`source_tier=community`、`requires_review=true`，中文译名已简体化。
+- 带地区导入候选：`seed_candidates_with_region.csv`，统一设置 `racing_region=hong_kong`，用于描述香港或海外来港赛马候选。
+- 生产 dry-run 文件：`/opt/umanewsbot/imports/wpstud_full_review_20260704_seed_candidates_with_region.csv`。
+- 生产 dry-run 结果：总计 `210` 条，新增 `210` 条，更新 `0` 条，错误 `0` 条。
+- 当前状态：未正式导入。WP Stud 属于社区整理来源，应先人工确认，再按“备份数据库 -> 容器内复制 CSV -> `import_terms --dry-run` -> 正式 `import_terms` -> 计数与 `/healthz/` 验证 -> 文档回写”流程执行。
+- HKJC 后续注意：真实 HKJC 页面当前可访问并返回 `200`；本地已补专用抽取路径，从 `selecthorse` 发现字母页、从字母页拿 `horseid + 英文名`，再抓繁中马匹详情页对齐中文名。小批命令应使用 `--limit-horses` 控制马匹详情页数量，并继续用 `--max-requests` 做硬上限。
+
+### HKJC 真实页面术语种子小批 smoke（2026-07-04）
+
+本地真实 smoke 命令：
+
+```bash
+DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py prepare_termbase_seed_data \
+  --source hkjc \
+  --allow-network \
+  --limit-pages 1 \
+  --limit-horses 3 \
+  --max-requests 10 \
+  --request-interval-seconds 0 \
+  --timeout-seconds 20 \
+  --output-dir runtime/termbase_seed/hkjc-live-smoke-20260704
+```
+
+结果：
+
+- `candidate_count=3`、`conflict_count=0`、`request_count=5`、`incomplete=false`。
+- 请求链路为 `selecthorse -> selecthorsebychar?ordertype=A -> 3` 个 `zh-hk/local/information/horse?horseid=...` 详情页，全部返回 `200`。
+- 生成样例：`AERIS NOVA -> 风再起时`、`AERODYNAMICS -> 友莹光`、`AWESOME FLUKE -> 非惟侥幸`。
+- 本次只生成本地审核文件，未写正式术语库。生产执行时仍应先低频、带 `--limit-horses`，并在审核 CSV 后再走 `import_terms --dry-run` 与正式导入。
+
+### HKJC 第一批正式候选抓取记录（2026-07-04）
+
+本地低频命令：
+
+```bash
+DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py prepare_termbase_seed_data \
+  --source hkjc \
+  --allow-network \
+  --limit-pages 1 \
+  --limit-horses 100 \
+  --max-requests 130 \
+  --request-interval-seconds 2 \
+  --timeout-seconds 25 \
+  --output-dir runtime/termbase_seed/hkjc-formal-review-20260704_100horses
+```
+
+结果：
+
+- 审核目录：`runtime/termbase_seed/hkjc-formal-review-20260704_100horses/`。
+- `seed_candidates.csv` 已直接包含 `racing_region` 列，HKJC 候选使用模型合法值 `hong_kong`。
+- `candidate_count=100`、`conflict_count=0`、`request_count=103`、`incomplete=false`。
+- 请求链路覆盖 `selecthorse`、`selecthorsebychar?ordertype=A/B` 和 `100` 个 `zh-hk/local/information/horse?horseid=...` 详情页，全部返回 `200`。
+- 候选分布：`horse=100`、`source_language=en`、`racing_region=hong_kong`、`source_tier=official`、`requires_review=false`。
+- 抽检样例：`A AMERIC TE SPECSO -> 有财有势`、`A TIME FOR US -> 开心孖宝`、`ABSOLUTE AWAKENED -> 活力精神`。
+- 临时 SQLite 迁移库导入预检：`import_terms --dry-run` 显示总计 `100` 条、新增 `100` 条、更新 `0` 条、错误 `0` 条。
+- 当前状态：本批尚未导入生产正式术语库，也尚未部署 HKJC 抽取代码到生产。
+
+### HKJC 主审核候选扩展批次（2026-07-04）
+
+用户要求“多来一些，一起审核”后，已生成更大的 HKJC 主审核文件；该文件覆盖前一份 `100` 条小批，审核时优先使用本批：
+
+```bash
+DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py prepare_termbase_seed_data \
+  --source hkjc \
+  --allow-network \
+  --limit-pages 1 \
+  --limit-horses 500 \
+  --max-requests 560 \
+  --request-interval-seconds 1.5 \
+  --timeout-seconds 25 \
+  --output-dir runtime/termbase_seed/hkjc-formal-review-20260704_500horses
+```
+
+结果：
+
+- 审核目录：`runtime/termbase_seed/hkjc-formal-review-20260704_500horses/`。
+- `candidate_count=500`、`conflict_count=0`、`request_count=509`、`incomplete=false`。
+- 所有请求均返回 `200`，无 `failures`。
+- CSV 抽检：`500` 条唯一英文马名，全部为 `term_type=horse`、`source_language=en`、`racing_region=hong_kong`、`source_tier=official`、`requires_review=false`。
+- 抽检样例：`A AMERIC TE SPECSO -> 有财有势`、`A TIME FOR US -> 开心孖宝`、`ABSOLUTE AWAKENED -> 活力精神`；末段覆盖到 `HYMNBOOK -> 北斗福星`。
+- 临时 SQLite 迁移库导入预检：`import_terms --dry-run` 显示总计 `500` 条、新增 `500` 条、更新 `0` 条、错误 `0` 条。
+- 当前状态：本批尚未导入生产正式术语库。
+
+### HKJC overseas live dry-run 记录（2026-07-04）
+
+本地低上限 live dry-run 命令如下；本次只触网读取 HKJC overseas 入口页并生成审核产物，不写正式术语库、不部署生产：
+
+```bash
+tmp_db="/tmp/umanews_hkjc_overseas_live_$(date +%Y%m%d_%H%M%S).sqlite3"
+out_dir="runtime/termbase_seed/hkjc-overseas-live-smoke-$(date +%Y%m%d_%H%M%S)"
+DB_ENGINE=sqlite SQLITE_DB_PATH="$tmp_db" .venv/bin/python server/manage.py migrate --noinput
+DB_ENGINE=sqlite SQLITE_DB_PATH="$tmp_db" .venv/bin/python server/manage.py prepare_termbase_seed_data \
+  --source hkjc_overseas \
+  --allow-network \
+  --limit-meetings 1 \
+  --limit-races 1 \
+  --max-requests 6 \
+  --request-interval-seconds 3 \
+  --timeout-seconds 15 \
+  --output-dir "$out_dir"
+```
+
+结果：
+
+- 审核目录：`runtime/termbase_seed/hkjc-overseas-live-smoke-20260704_174924/`。
+- `candidate_count=0`、`conflict_count=0`、`skipped_races=0`、`request_count=1`、`dry_run_error_count=0`。
+- 请求 `https://racing.hkjc.com/en-us/overseas/` 返回 `200`。
+- `incomplete=true`，失败类型为 `render_fallback_unavailable`，原因是直接 HTML 中没有 Race Card 链接。
+- 结论：当前代码能安全暴露 HKJC overseas 的 Next.js shell 边界，不会把空 HTML 当作成功空结果；如需稳定生成海外 Race Card 候选，下一步应补浏览器渲染缓存或解析 HKJC 前端 API，再重新执行小批 live dry-run。
 
 ## 全球赛马数据库导入入口
 
