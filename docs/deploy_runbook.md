@@ -1,5 +1,39 @@
 # 部署运行手册
 
+## 2026-07-06 HKJC 术语种子抽取返修上线
+
+- 本地上线提交：`4b6e840`（`Harden HKJC termbase seed extraction`），已推送 `origin/main`。
+- 生产服务器：`/opt/umanewsbot` 从 `9b3bb86` 快进到 `4b6e840`。
+- 上线前本地验证：
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py test stable.tests.TermbaseSeedDataPreparationTests --noinput`：通过，21 项。
+  - `DB_ENGINE=sqlite .venv/bin/python server/manage.py check`：通过。
+  - `openspec validate --all`：通过，17 项。
+  - `git diff --check`：通过。
+- 上线前生产检查：
+  - `ExternalDataImportRun(status="started")=0`。
+  - `ExternalDataImportLock.locked_by_run_id` 当前为空。
+  - `web / worker / beat / db / redis / nginx` 上线前均在运行，`web` 为 healthy。
+- 备份：
+  - `.env`：`.env.backup.harden-hkjc-termbase-20260706_043557`。
+  - 数据库：`backups/db/pre-harden-hkjc-termbase-20260706_043557.sql.gz`，大小约 `71M`，已执行 `gzip -t` 校验。
+- 部署命令：
+  - `git fetch origin main && git pull --ff-only origin main`
+  - `./deploy_lowcost.sh`
+- 部署结果：
+  - `web / worker / beat` 已重建并启动，`db / redis / nginx` 正常。
+  - 服务器内 `/healthz/` 返回 `200`，内容为 `{"status": "ok"}`。
+  - `manage.py check`：通过。
+  - `showmigrations stable` 确认 `[X] 0020_raceevent_articleracelink_raceeventalias_and_more`。
+  - 服务器内 `Host: umafans.run`：`/`、`/races/`、`/admin/login/` 均返回 `200`。
+  - 本机经 `--resolve umafans.run:80:47.239.167.86` 访问公网 `/healthz/` 返回 `200`。
+- 术语种子 smoke：
+  - 命令：`python manage.py prepare_termbase_seed_data --source hkjc_overseas --input-dir stable/fixtures/termbase_seed --output-dir runtime/termbase_seed/harden-hkjc-termbase-smoke-20260706_045028`
+  - 结果：`candidate_count=9`、`conflict_count=0`、`request_count=0`、`dry_run_error_count=0`、`incomplete=false`。
+  - 生产 shell smoke 已验证 HKJC/QIDS 同英文名、不同 `QIDSCode` 的加拿大马不会误合并：两个候选分别生成 `hkjc_overseas:horse:can001` 与 `hkjc_overseas:horse:can002`，地区均落为 `other`。
+  - 本次未导入正式术语，生产计数保持 `TermEntry=15321`、`TermAlias=15537`。
+- 后续注意：
+  - 本次生产 Docker build 上下文已超过 `1.6GB`，主要来自服务器工作区运行产物；后续应补 `.dockerignore` 或隔离 `runtime / imports / backups / napcat` 等目录，降低构建时间与断线风险。
+
 ## 2026-07-04 赛事日历 MVP 与 HKJC overseas 术语种子 smoke 上线
 
 - 本地上线提交：`f3c4c46`（`Add race calendar and HKJC overseas termbase seeds`），已推送 `origin/main`。
