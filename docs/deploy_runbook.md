@@ -794,9 +794,11 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py p
 - 审核文件：`seed_candidates.csv`、`seed_candidates_with_region.csv`、`seed_conflicts.csv`、`summary.json`。
 - 生成结果：候选 `210` 条、冲突 `0` 条、`incomplete=false`；全部为 `term_type=horse`、`source_language=ja`、`source_tier=community`、`requires_review=true`，中文译名已简体化。
 - 带地区导入候选：`seed_candidates_with_region.csv`，统一设置 `racing_region=hong_kong`，用于描述香港或海外来港赛马候选。
-- 生产 dry-run 文件：`/opt/umanewsbot/imports/wpstud_full_review_20260704_seed_candidates_with_region.csv`。
+- 生产导入文件：`/opt/umanewsbot/imports/wpstud-full-review-20260704/seed_candidates_with_region.csv`。
 - 生产 dry-run 结果：总计 `210` 条，新增 `210` 条，更新 `0` 条，错误 `0` 条。
-- 当前状态：未正式导入。WP Stud 属于社区整理来源，应先人工确认，再按“备份数据库 -> 容器内复制 CSV -> `import_terms --dry-run` -> 正式 `import_terms` -> 计数与 `/healthz/` 验证 -> 文档回写”流程执行。
+- 数据库备份：`backups/db/pre-hkjc-wpstud-term-import-20260704_182155.sql.gz`，已通过 `gzip -t`。
+- 正式导入结果：总计 `210` 条，新增 `210` 条，更新 `0` 条，跳过 `0` 条。
+- 当前状态：已正式导入。本批是社区来源，后续若发现与 HKJC 官方译名冲突，应以 HKJC 作为主译名，WP Stud 作为别名或证据处理。
 - HKJC 后续注意：真实 HKJC 页面当前可访问并返回 `200`；本地已补专用抽取路径，从 `selecthorse` 发现字母页、从字母页拿 `horseid + 英文名`，再抓繁中马匹详情页对齐中文名。小批命令应使用 `--limit-horses` 控制马匹详情页数量，并继续用 `--max-requests` 做硬上限。
 
 ### HKJC 真实页面术语种子小批 smoke（2026-07-04）
@@ -872,8 +874,105 @@ DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py
 - 所有请求均返回 `200`，无 `failures`。
 - CSV 抽检：`500` 条唯一英文马名，全部为 `term_type=horse`、`source_language=en`、`racing_region=hong_kong`、`source_tier=official`、`requires_review=false`。
 - 抽检样例：`A AMERIC TE SPECSO -> 有财有势`、`A TIME FOR US -> 开心孖宝`、`ABSOLUTE AWAKENED -> 活力精神`；末段覆盖到 `HYMNBOOK -> 北斗福星`。
-- 临时 SQLite 迁移库导入预检：`import_terms --dry-run` 显示总计 `500` 条、新增 `500` 条、更新 `0` 条、错误 `0` 条。
-- 当前状态：本批尚未导入生产正式术语库。
+- 生产 dry-run：总计 `500` 条，新增 `500` 条，更新 `0` 条，错误 `0` 条。
+- 数据库备份：`backups/db/pre-hkjc-wpstud-term-import-20260704_182155.sql.gz`，已通过 `gzip -t`。
+- 正式导入结果：总计 `500` 条，新增 `500` 条，更新 `0` 条，跳过 `0` 条。
+
+### HKJC 本地马 A-Z 字母拆批导入记录（2026-07-04）
+
+全量无 checkpoint 抓取运行过久后，已新增 `--hkjc-letter` 参数并改为按 A-Z 字母拆批。每个字母段均使用如下模式：
+
+```bash
+DB_ENGINE=sqlite SQLITE_DB_PATH=/tmp/umanews_hkjc_letter.sqlite3 CELERY_TASK_ALWAYS_EAGER=true \
+  .venv/bin/python server/manage.py prepare_termbase_seed_data \
+  --source hkjc \
+  --allow-network \
+  --limit-pages 1 \
+  --hkjc-letter <A-Z> \
+  --max-requests 600 \
+  --request-interval-seconds 0.15 \
+  --timeout-seconds 20 \
+  --output-dir runtime/termbase_seed/hkjc-formal-review-20260704_letter_<A-Z>
+```
+
+字母段生成结果：
+
+- `A=60`、`B=54`、`C=103`、`D=43`、`E=32`、`F=70`、`G=87`、`H=56`
+- `I=28`、`J=23`
+- `K=42`、`L=68`、`M=84`、`N=33`、`O=12`、`P=72`、`Q=7`、`R=52`、`S=162`、`T=70`、`U=5`、`V=32`、`W=44`、`X=0`、`Y=14`、`Z=4`
+- 所有字母段均为 `incomplete=false`、`failures=0`。
+
+生产导入：
+
+- `I` 批：生产 dry-run 总计 `28`、新增 `28`、错误 `0`；备份 `backups/db/pre-hkjc-letter-I-term-import-20260704_185212.sql.gz`；正式导入新增 `28`。
+- `J` 批：生产 dry-run 总计 `23`、新增 `23`、错误 `0`；备份 `backups/db/pre-hkjc-letter-J-term-import-20260704_185400.sql.gz`；正式导入新增 `23`。
+- `K-Z` 合并批：生产 dry-run 总计 `701`、新增 `699`、更新 `2`、错误 `0`；备份 `backups/db/pre-hkjc-letters-K-Z-term-import-20260704_191425.sql.gz`；正式导入新增 `699`、更新 `2`。
+- `A-H` 合并复跑批：生产 dry-run 总计 `505`、新增 `5`、更新 `500`、错误 `0`；备份 `backups/db/pre-hkjc-letters-A-H-term-import-20260704_192843.sql.gz`；正式导入新增 `5`、更新 `500`。
+
+导入后生产计数：`TermEntry=3527`、`TermAlias=3743`；`source_language=en/racing_region=hong_kong` 合计 `1263` 条，其中 HKJC 当前本地马英文术语 `1258` 条。`http://umafans.run/healthz/` 返回 `200`。
+
+### HKJC 本地赛果回溯术语导入记录（2026-07-04）
+
+本轮新增 HKJC 本地赛果术语抽取参数，用于按日期范围抓取 `en-us` / `zh-hk` 赛果页并对齐输出 `horse`、`jockey` 和 `race` 候选：
+
+```bash
+.venv/bin/python server/manage.py prepare_termbase_seed_data \
+  --source hkjc \
+  --allow-network \
+  --limit-pages 0 \
+  --hkjc-skip-horse-details \
+  --hkjc-local-results-start-date 2024-01-01 \
+  --hkjc-local-results-end-date 2024-01-31 \
+  --max-requests 260 \
+  --request-interval-seconds 0.2 \
+  --timeout-seconds 20 \
+  --output-dir runtime/termbase_seed/hkjc-local-results-202401
+```
+
+实现细节：
+
+- HKJC 赛日首页通常直接显示第 1 场，只给第 2 场之后的链接；生成器会根据同一赛日同一马场链接自动补抓 `RaceNo=1`。
+- HKJC 下拉列表不会稳定覆盖 2024 年初旧赛日；生成器会把 landing 赛日与日期范围逐日探测合并去重，以支持 2024-01-01 起回溯。
+- 补历史赛果时应使用 `--limit-pages 0 --hkjc-skip-horse-details`，避免每个月重复抓取当前本地马详情页。
+- 单次网络异常会重试一次；最终失败才写入 `failures` 并标记 `incomplete=true`。
+- 若 HKJC 双语页面都能访问但没有赛果主体表，生成器记录为 `skipped_races/local_result_not_available`，不导入空数据，也不单独阻断整月。
+
+生产导入：
+
+- `2024-01`：原始批次 `runtime/termbase_seed/hkjc-local-results-202401/` 因 `2024-01-24 ST Race 1` 繁中页一次超时而 `incomplete=true`；单日重跑 `runtime/termbase_seed/hkjc-local-results-20240124-retry/` 成功后，合并去重为 `runtime/termbase_seed/hkjc-local-results-202401-complete/seed_candidates.csv`。合并候选 `864` 条（`horse=761`、`race=79`、`jockey=24`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202401-complete/seed_candidates.csv`；dry-run 总计 `864`、新增 `710`、更新 `154`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202401-term-import-20260704_200627.sql.gz` 通过 `gzip -t`；正式导入新增 `710`、更新 `154`、跳过 `0`。
+- `2024-02`：输出 `runtime/termbase_seed/hkjc-local-results-202402/seed_candidates.csv`，候选 `828` 条（`horse=736`、`race=68`、`jockey=24`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202402/seed_candidates.csv`；dry-run 总计 `828`、新增 `163`、更新 `665`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202402-term-import-20260704_201806.sql.gz` 通过 `gzip -t`；正式导入新增 `163`、更新 `665`、跳过 `0`。
+- `2024-03`：输出 `runtime/termbase_seed/hkjc-local-results-202403/seed_candidates.csv`，候选 `883` 条（`horse=777`、`race=79`、`jockey=27`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202403/seed_candidates.csv`；dry-run 总计 `883`、新增 `137`、更新 `746`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202403-term-import-20260704_202942.sql.gz` 通过 `gzip -t`；正式导入新增 `137`、更新 `746`、跳过 `0`。
+- `2024-04`：输出 `runtime/termbase_seed/hkjc-local-results-202404/seed_candidates.csv`，候选 `839` 条（`horse=740`、`race=68`、`jockey=31`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202404/seed_candidates.csv`；dry-run 总计 `839`、新增 `126`、更新 `713`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202404-term-import-20260704_204225.sql.gz` 通过 `gzip -t`；正式导入新增 `126`、更新 `713`、跳过 `0`。
+- `2024-05`：输出 `runtime/termbase_seed/hkjc-local-results-202405/seed_candidates.csv`，候选 `842` 条（`horse=740`、`race=78`、`jockey=24`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202405/seed_candidates.csv`；dry-run 总计 `842`、新增 `113`、更新 `729`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202405-term-import-20260704_205324.sql.gz` 通过 `gzip -t`；正式导入新增 `113`、更新 `729`、跳过 `0`。
+- `2024-06`：输出 `runtime/termbase_seed/hkjc-local-results-202406/seed_candidates.csv`，候选 `782` 条（`horse=697`、`race=62`、`jockey=23`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202406/seed_candidates.csv`；dry-run 总计 `782`、新增 `92`、更新 `690`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202406-term-import-20260704_210352.sql.gz` 通过 `gzip -t`；正式导入新增 `92`、更新 `690`、跳过 `0`。
+- `2024-07`：输出 `runtime/termbase_seed/hkjc-local-results-202407/seed_candidates.csv`，候选 `647` 条（`horse=575`、`race=49`、`jockey=23`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202407/seed_candidates.csv`；dry-run 总计 `647`、新增 `74`、更新 `573`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202407-term-import-20260704_211425.sql.gz` 通过 `gzip -t`；正式导入新增 `74`、更新 `573`、跳过 `0`。
+- `2024-08`：输出 `runtime/termbase_seed/hkjc-local-results-202408/`，逐日扫描 `32` 个请求，候选 `0`、冲突 `0`、失败 `0`、`incomplete=false`；本月无需生产导入。
+- `2024-09`：输出 `runtime/termbase_seed/hkjc-local-results-202409/seed_candidates.csv`，候选 `626` 条（`horse=549`、`race=54`、`jockey=23`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202409/seed_candidates.csv`；dry-run 总计 `626`、新增 `62`、更新 `564`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202409-term-import-20260704_213327.sql.gz` 通过 `gzip -t`；正式导入新增 `62`、更新 `564`、跳过 `0`。
+- `2024-10`：输出 `runtime/termbase_seed/hkjc-local-results-202410/seed_candidates.csv`，候选 `834` 条（`horse=735`、`race=75`、`jockey=24`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202410/seed_candidates.csv`；dry-run 总计 `834`、新增 `104`、更新 `730`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202410-term-import-20260704_214522.sql.gz` 通过 `gzip -t`；正式导入新增 `104`、更新 `730`、跳过 `0`。
+- `2024-11`：输出 `runtime/termbase_seed/hkjc-local-results-202411/seed_candidates.csv`，候选 `850` 条（`horse=757`、`race=69`、`jockey=24`）。首次生成时 `2024-11-13 HV Race 7-9` 页面返回双语空壳赛果页，修复后重跑记录为 `skipped_races/local_result_not_available` 且 `incomplete=false`；生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202411/seed_candidates.csv`；dry-run 总计 `850`、新增 `97`、更新 `753`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202411-term-import-20260704_221006.sql.gz` 通过 `gzip -t`；正式导入新增 `97`、更新 `753`、跳过 `0`。
+- `2024-12`：输出 `runtime/termbase_seed/hkjc-local-results-202412/seed_candidates.csv`，候选 `957` 条（`horse=832`、`race=78`、`jockey=47`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202412/seed_candidates.csv`；dry-run 总计 `957`、新增 `135`、更新 `822`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202412-term-import-20260704_222551.sql.gz` 通过 `gzip -t`；正式导入新增 `135`、更新 `822`、跳过 `0`。
+- `2025-01`：输出 `runtime/termbase_seed/hkjc-local-results-202501/seed_candidates.csv`，候选 `913` 条（`horse=804`、`race=78`、`jockey=31`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202501/seed_candidates.csv`；dry-run 总计 `913`、新增 `73`、更新 `840`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202501-term-import-20260704_224151.sql.gz` 通过 `gzip -t`；正式导入新增 `73`、更新 `840`、跳过 `0`。
+- `2025-02`：输出 `runtime/termbase_seed/hkjc-local-results-202502/seed_candidates.csv`，候选 `794` 条（`horse=703`、`race=60`、`jockey=31`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202502/seed_candidates.csv`；dry-run 总计 `794`、新增 `38`、更新 `756`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202502-term-import-20260704_225443.sql.gz` 通过 `gzip -t`；正式导入新增 `38`、更新 `756`、跳过 `0`。
+- `2025-03`：输出 `runtime/termbase_seed/hkjc-local-results-202503/seed_candidates.csv`，候选 `914` 条（`horse=803`、`race=78`、`jockey=33`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202503/seed_candidates.csv`；dry-run 总计 `914`、新增 `30`、更新 `884`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202503-term-import-20260704_231134.sql.gz` 通过 `gzip -t`；正式导入新增 `30`、更新 `884`、跳过 `0`。
+- `2025-04`：输出 `runtime/termbase_seed/hkjc-local-results-202504/seed_candidates.csv`，候选 `893` 条（`horse=782`、`race=78`、`jockey=33`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202504/seed_candidates.csv`；dry-run 总计 `893`、新增 `58`、更新 `835`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202504-term-import-20260704_232559.sql.gz` 通过 `gzip -t`；正式导入新增 `58`、更新 `835`、跳过 `0`。
+- `2025-05`：输出 `runtime/termbase_seed/hkjc-local-results-202505/seed_candidates.csv`，候选 `920` 条（`horse=816`、`race=79`、`jockey=25`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202505/seed_candidates.csv`；dry-run 总计 `920`、新增 `38`、更新 `882`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202505-term-import-20260704_234206.sql.gz` 通过 `gzip -t`；正式导入新增 `38`、更新 `882`、跳过 `0`。
+- `2025-06`：输出 `runtime/termbase_seed/hkjc-local-results-202506/seed_candidates.csv`，候选 `826` 条（`horse=741`、`race=63`、`jockey=22`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202506/seed_candidates.csv`；dry-run 总计 `826`、新增 `44`、更新 `782`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202506-term-import-20260704_235659.sql.gz` 通过 `gzip -t`；正式导入新增 `44`、更新 `782`、跳过 `0`。
+- `2025-07`：输出 `runtime/termbase_seed/hkjc-local-results-202507/seed_candidates.csv`，候选 `675` 条（`horse=603`、`race=49`、`jockey=23`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202507/seed_candidates.csv`；dry-run 总计 `675`、新增 `19`、更新 `656`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202507-term-import-20260705_000915.sql.gz` 通过 `gzip -t`；正式导入新增 `19`、更新 `656`、跳过 `0`。
+
+`2025-08`：输出 `runtime/termbase_seed/hkjc-local-results-202508/`，逐日扫描请求 `32` 次，候选 `0`、冲突 `0`、失败 `0`、`incomplete=false`，无需导入。
+- `2025-09`：输出 `runtime/termbase_seed/hkjc-local-results-202509/seed_candidates.csv`，候选 `632` 条（`horse=560`、`race=49`、`jockey=23`）。`2025-09-21 ST Race 9-10` 页面返回双语空壳赛果页，记录为 `skipped_races/local_result_not_available` 且 `incomplete=false`；生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202509/seed_candidates.csv`；dry-run 总计 `632`、新增 `17`、更新 `615`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202509-term-import-20260705_002604.sql.gz` 通过 `gzip -t`；正式导入新增 `17`、更新 `615`、跳过 `0`。
+- `2025-10`：输出 `runtime/termbase_seed/hkjc-local-results-202510/seed_candidates.csv`，候选 `882` 条（`horse=786`、`race=73`、`jockey=23`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202510/seed_candidates.csv`；dry-run 总计 `882`、新增 `41`、更新 `841`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202510-term-import-20260705_004245.sql.gz` 通过 `gzip -t`；正式导入新增 `41`、更新 `841`、跳过 `0`。
+- `2025-11`：输出 `runtime/termbase_seed/hkjc-local-results-202511/seed_candidates.csv`，候选 `933` 条（`horse=826`、`race=81`、`jockey=26`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202511/seed_candidates.csv`；dry-run 总计 `933`、新增 `45`、更新 `888`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202511-term-import-20260705_010022.sql.gz` 通过 `gzip -t`；正式导入新增 `45`、更新 `888`、跳过 `0`。
+- `2025-12`：输出 `runtime/termbase_seed/hkjc-local-results-202512/seed_candidates.csv`，候选 `912` 条（`horse=803`、`race=68`、`jockey=41`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202512/seed_candidates.csv`；dry-run 总计 `912`、新增 `42`、更新 `870`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202512-term-import-20260705_011812.sql.gz` 通过 `gzip -t`；正式导入新增 `42`、更新 `870`、跳过 `0`。
+- `2026-01`：输出 `runtime/termbase_seed/hkjc-local-results-202601/seed_candidates.csv`，候选 `978` 条（`horse=875`、`race=78`、`jockey=25`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202601/seed_candidates.csv`；dry-run 总计 `978`、新增 `28`、更新 `950`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202601-term-import-20260705_013522.sql.gz` 通过 `gzip -t`；正式导入新增 `28`、更新 `950`、跳过 `0`。
+- `2026-02`：输出 `runtime/termbase_seed/hkjc-local-results-202602/seed_candidates.csv`，候选 `930` 条（`horse=836`、`race=69`、`jockey=25`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202602/seed_candidates.csv`；dry-run 总计 `930`、新增 `18`、更新 `912`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202602-term-import-20260705_015108.sql.gz` 通过 `gzip -t`；正式导入新增 `18`、更新 `912`、跳过 `0`。
+- `2026-03`：输出 `runtime/termbase_seed/hkjc-local-results-202603/seed_candidates.csv`，候选 `944` 条（`horse=838`、`race=81`、`jockey=25`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202603/seed_candidates.csv`；dry-run 总计 `944`、新增 `18`、更新 `926`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202603-term-import-20260705_020814.sql.gz` 通过 `gzip -t`；正式导入新增 `18`、更新 `926`、跳过 `0`。
+- `2026-04`：输出 `runtime/termbase_seed/hkjc-local-results-202604/seed_candidates.csv`，候选 `975` 条（`horse=859`、`race=83`、`jockey=33`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202604/seed_candidates.csv`；dry-run 总计 `975`、新增 `41`、更新 `934`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202604-term-import-20260705_022703.sql.gz` 通过 `gzip -t`；正式导入新增 `41`、更新 `934`、跳过 `0`。
+- `2026-05`：输出 `runtime/termbase_seed/hkjc-local-results-202605/seed_candidates.csv`，候选 `979` 条（`horse=873`、`race=80`、`jockey=26`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202605/seed_candidates.csv`；dry-run 总计 `979`、新增 `33`、更新 `946`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202605-term-import-20260705_024451.sql.gz` 通过 `gzip -t`；正式导入新增 `33`、更新 `946`、跳过 `0`。
+- `2026-06`：输出 `runtime/termbase_seed/hkjc-local-results-202606/seed_candidates.csv`，候选 `844` 条（`horse=757`、`race=63`、`jockey=24`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-202606/seed_candidates.csv`；dry-run 总计 `844`、新增 `20`、更新 `824`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-202606-term-import-20260705_025830.sql.gz` 通过 `gzip -t`；正式导入新增 `20`、更新 `824`、跳过 `0`。
+- `2026-07-01` 至 `2026-07-04`：输出 `runtime/termbase_seed/hkjc-local-results-20260701-20260704/seed_candidates.csv`，候选 `310` 条（`horse=265`、`race=21`、`jockey=24`），生产文件为 `/opt/umanewsbot/imports/hkjc-local-results-20260701-20260704/seed_candidates.csv`；dry-run 总计 `310`、新增 `5`、更新 `305`、错误 `0`；备份 `backups/db/pre-hkjc-local-results-20260701-20260704-term-import-20260705_030505.sql.gz` 通过 `gzip -t`；正式导入新增 `5`、更新 `305`、跳过 `0`。
+
+导入后生产计数：`TermEntry=5948`、`TermAlias=6164`；`source_language=en/racing_region=hong_kong` 分布为 `horse=2479`、`jockey=70`、`race=1132`，另保留既有 `fixed_phrase=1`、`racecourse=1`、`trainer=1`。`http://127.0.0.1/healthz/` 返回 `200`。HKJC 香港本地赛果已回溯到 `2026-07-04`；仍需继续 HKJC overseas 与 WP Stud 赛事/骑手缺口。
 
 ### HKJC overseas live dry-run 记录（2026-07-04）
 
@@ -901,6 +1000,78 @@ DB_ENGINE=sqlite SQLITE_DB_PATH="$tmp_db" .venv/bin/python server/manage.py prep
 - 请求 `https://racing.hkjc.com/en-us/overseas/` 返回 `200`。
 - `incomplete=true`，失败类型为 `render_fallback_unavailable`，原因是直接 HTML 中没有 Race Card 链接。
 - 结论：当前代码能安全暴露 HKJC overseas 的 Next.js shell 边界，不会把空 HTML 当作成功空结果；如需稳定生成海外 Race Card 候选，下一步应补浏览器渲染缓存或解析 HKJC 前端 API，再重新执行小批 live dry-run。
+
+### HKJC overseas QIDS 回溯与生产导入记录（2026-07-05）
+
+本轮未部署新的生成器代码到生产；生成器在本地通过 HKJC QIDS GraphQL 抽取海外 Race Card 中英对照，产物审核后上传生产并使用既有 `import_terms` 导入。
+
+本地生成范围：
+
+- 日期范围：`2024-01-01` 至 `2026-07-04`。
+- 月度目录：`runtime/termbase_seed/hkjc-overseas-qids-YYYYMM/`。
+- 合并目录：`runtime/termbase_seed/hkjc-overseas-qids-merged-20240101-20260704/`。
+- 合并结果：原始行 `11633`、候选 `7691`、冲突 `3`、`incomplete=false`。
+- 候选类型：`horse=6481`、`jockey=847`、`race=363`。
+
+生产导入：
+
+- 生产文件：`/opt/umanewsbot/imports/hkjc-overseas-qids-merged-20240101-20260704/seed_candidates.csv`。
+- 容器文件：`/app/server/runtime/imports/hkjc-overseas-qids-merged-20240101-20260704/seed_candidates.csv`。
+- dry-run：总计 `7691`、新增 `7688`、更新 `3`、错误 `0`。
+- 备份：`backups/db/pre-hkjc-overseas-qids-term-import-20260705_040238.sql.gz`，已通过 `gzip -t`。
+- 正式导入：总计 `7691`、新增 `7482`、更新 `209`、跳过 `0`。
+
+导入后发现当前 `import_terms` 的 upsert 身份是 `term_type + source_language + source_ja`，不会按 `racing_region` 拆分；同名国际骑师会被后导入来源更新地区。为保留香港本地赛果骑师地区，已执行 HKJC 本地骑师地区恢复：
+
+- 恢复文件：`runtime/termbase_seed/hkjc-local-jockey-region-restore-20260705/seed_candidates.csv`。
+- 生产文件：`/opt/umanewsbot/imports/hkjc-local-jockey-region-restore-20260705/seed_candidates.csv`。
+- dry-run：总计 `69`、新增 `0`、更新 `69`、错误 `0`。
+- 备份：`backups/db/pre-hkjc-local-jockey-region-restore-20260705_040950.sql.gz`，已通过 `gzip -t`。
+- 正式导入：总计 `69`、新增 `0`、更新 `69`、跳过 `0`。
+
+恢复后核验：
+
+- `TermEntry=13430`、`TermAlias=13646`。
+- HKJC overseas 官方来源计数：`7483`。
+- `source_language=en/racing_region=hong_kong`：`horse=2479`、`jockey=69`、`race=1132`，另有 `fixed_phrase=1`、`racecourse=1`、`trainer=1`。
+- `http://127.0.0.1/healthz/` 返回 `200`。
+
+注意：共享国际骑师当前只能作为同一个英文源术语存在，不能同时保留多个地区版本；这不会影响英文原文命中和中文译名应用，但地区统计需要按当前主记录解释。
+
+### WP Stud 赛事/骑师/马场生产导入记录（2026-07-05）
+
+本轮继续处理当前发现的 WP Stud 赛事、骑师和马场页面。WP Stud 属社区来源，导入时必须避免覆盖 HKJC 官方主译名。
+
+本地生成：
+
+- 缓存目录：`runtime/termbase_seed/source_cache_wpstud_extra_20260705/`。
+- 输出目录：`runtime/termbase_seed/wpstud-race-jockey-racecourse-review-20260705/`。
+- 来源：`Translation/Race` 目录下 `21` 个赛事页面、`Translation/jockey.htm`、`Translation/racecourse/RaceCourse.htm`。
+- 完整候选：`2095` 条，冲突 `17` 条，`incomplete=false`。
+- 完整候选类型：`race=1392`、`jockey=276`、`racecourse=427`。
+
+生产完整 dry-run：
+
+- 文件：`/app/server/runtime/imports/wpstud-race-jockey-racecourse-review-20260705/seed_candidates.csv`。
+- 结果：总计 `2095`、新增 `1891`、更新 `204`、错误 `0`。
+- 更新命中：`204` 条中 `199` 条命中 HKJC overseas 官方术语、`3` 条命中 HKJC 本地官方术语、`2` 条命中其他既有术语。
+- 处理：生成 `seed_candidates_new_only.csv` 仅导入新增项，生成 `seed_candidates_skipped_existing.csv` 留作人工审核和别名决策依据。
+
+过滤后导入：
+
+- 过滤文件：`/opt/umanewsbot/imports/wpstud-race-jockey-racecourse-review-20260705/seed_candidates_new_only.csv`。
+- 跳过清单：`/opt/umanewsbot/imports/wpstud-race-jockey-racecourse-review-20260705/seed_candidates_skipped_existing.csv`。
+- dry-run：总计 `1891`、新增 `1891`、更新 `0`、错误 `0`。
+- 备份：`backups/db/pre-wpstud-race-jockey-racecourse-term-import-20260705_072047.sql.gz`，已通过 `gzip -t`。
+- 正式导入：总计 `1891`、新增 `1891`、更新 `0`、跳过 `0`。
+
+导入后核验：
+
+- `TermEntry=15321`、`TermAlias=15537`。
+- WP Stud 新增英文社区术语计数：`1891`。
+- WP Stud 全部相关术语计数：`2103`，包含此前已导入的 `210` 条日文马名社区术语和本轮 `1891` 条英文社区术语。
+- `source_language=en` 已覆盖香港、英国、法国、美国、日本和 other 的马名、赛事、骑师和马场。
+- `http://127.0.0.1/healthz/` 返回 `200`。
 
 ## 全球赛马数据库导入入口
 

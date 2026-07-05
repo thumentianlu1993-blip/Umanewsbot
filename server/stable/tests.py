@@ -12163,7 +12163,9 @@ class TermbaseSeedDataPreparationTests(TestCase):
             summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
             self.assertTrue(summary["incomplete"])
             self.assertEqual(summary["request_count"], 1)
-            self.assertIn("slow", summary["failures"][0]["error"])
+            self.assertEqual(summary["failures"][0]["error"], "max_requests=1 reached")
+            self.assertEqual(len(summary["requests"]), 1)
+            self.assertIn("slow", summary["requests"][0]["error"])
 
     def test_prepare_seed_command_extracts_hkjc_horses_from_letter_and_detail_pages(self):
         class Response:
@@ -12228,6 +12230,181 @@ class TermbaseSeedDataPreparationTests(TestCase):
             self.assertFalse(summary["incomplete"])
             self.assertEqual(summary["candidate_count"], 2)
 
+    def test_prepare_seed_command_filters_hkjc_horses_by_letter(self):
+        class Response:
+            status_code = 200
+            encoding = "utf-8"
+
+            def __init__(self, url: str, text: str):
+                self.url = url
+                self.text = text
+
+        responses = {
+            "https://racing.hkjc.com/en-us/local/information/selecthorse": """
+                <a href="/en-us/local/information/selecthorsebychar?ordertype=A">A</a>
+                <a href="/en-us/local/information/selecthorsebychar?ordertype=B">B</a>
+            """,
+            "https://racing.hkjc.com/en-us/local/information/selecthorsebychar?ordertype=B": """
+                <a href="/en-us/local/information/horse?horseid=HK_2024_K491">BEAUTY BOLT</a>
+            """,
+            "https://racing.hkjc.com/zh-hk/local/information/horse?horseid=HK_2024_K491": """
+                <table class="horseProfile"><tr><td><span class="title_text">美麗閃電 (K491)</span></td></tr></table>
+            """,
+        }
+
+        def fake_get(url, **_kwargs):
+            return Response(url, responses[url])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "out"
+            with patch("stable.services.termbase_seed.requests.get", side_effect=fake_get) as get:
+                out = StringIO()
+                call_command(
+                    "prepare_termbase_seed_data",
+                    "--source",
+                    "hkjc",
+                    "--allow-network",
+                    "--limit-pages",
+                    "1",
+                    "--hkjc-letter",
+                    "B",
+                    "--max-requests",
+                    "10",
+                    "--request-interval-seconds",
+                    "0",
+                    "--output-dir",
+                    str(output_dir),
+                    stdout=out,
+                )
+
+            requested_urls = [call_args.args[0] for call_args in get.call_args_list]
+            self.assertIn("https://racing.hkjc.com/en-us/local/information/selecthorsebychar?ordertype=B", requested_urls)
+            self.assertNotIn("https://racing.hkjc.com/en-us/local/information/selecthorsebychar?ordertype=A", requested_urls)
+            rows = self._read_csv(output_dir / "seed_candidates.csv")
+            self.assertEqual([row["source_ja"] for row in rows], ["BEAUTY BOLT"])
+
+    def test_prepare_seed_command_extracts_hkjc_local_result_terms(self):
+        class Response:
+            status_code = 200
+            encoding = "utf-8"
+
+            def __init__(self, url: str, text: str):
+                self.url = url
+                self.text = text
+
+        landing = """
+            <select id="selectId">
+              <option value='{"date":"24/06/2026","venue":""}'>24/06/2026</option>
+            </select>
+        """
+        date_page = """
+            <a href="/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=2">Race 2</a>
+        """
+        en_race = """
+            <table>
+              <tr><td>RACE 1 (796)</td><td></td><td></td></tr>
+              <tr><td>Class 5 - 2200M</td><td>Going :</td><td>GOOD</td></tr>
+              <tr><td>ICE HOUSE STREET HANDICAP</td><td>Course :</td><td>TURF</td></tr>
+            </table>
+            <table>
+              <tr><th>Pla.</th><th>Horse No.</th><th>Horse</th><th>Jockey</th><th>Trainer</th></tr>
+              <tr><td>1</td><td>3</td><td><a href="/en-us/local/information/horse?horseid=HK_2023_J524">ROSEWOOD FLEETFOOT (J524)</a></td><td>K Teetan</td><td>P F Yiu</td></tr>
+              <tr><td>2</td><td>4</td><td><a href="/en-us/local/information/horse?horseid=HK_2024_K500">GOLDEN FORTUNE (K500)</a></td><td>H Bowman</td><td>K L Man</td></tr>
+            </table>
+        """
+        zh_race = """
+            <table>
+              <tr><td>第 1 場 (796)</td><td></td><td></td></tr>
+              <tr><td>第五班 - 2200米</td><td>場地狀況 :</td><td>好地</td></tr>
+              <tr><td>雪廠街讓賽</td><td>賽道 :</td><td>草地</td></tr>
+            </table>
+            <table>
+              <tr><th>名次</th><th>馬號</th><th>馬名</th><th>騎師</th><th>練馬師</th></tr>
+              <tr><td>1</td><td>3</td><td><a href="/zh-hk/local/information/horse?horseid=HK_2023_J524">捷足奔馳 (J524)</a></td><td>田泰安</td><td>姚本輝</td></tr>
+              <tr><td>2</td><td>4</td><td><a href="/zh-hk/local/information/horse?horseid=HK_2024_K500">連連好運 (K500)</a></td><td>布文</td><td>文家良</td></tr>
+            </table>
+        """
+        responses = {
+            "https://racing.hkjc.com/en-us/local/information/localresults": landing,
+            "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026/06/24": date_page,
+            "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=1": en_race,
+            "https://racing.hkjc.com/zh-hk/local/information/localresults?racedate=2026/06/24&Racecourse=HV&RaceNo=1": zh_race,
+        }
+
+        def fake_get(url, **_kwargs):
+            return Response(url, responses[url])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "out"
+            with patch("stable.services.termbase_seed.requests.get", side_effect=fake_get) as get:
+                out = StringIO()
+                call_command(
+                    "prepare_termbase_seed_data",
+                    "--source",
+                    "hkjc",
+                    "--allow-network",
+                    "--limit-pages",
+                    "0",
+                    "--hkjc-skip-horse-details",
+                    "--hkjc-local-results-start-date",
+                    "2026-06-24",
+                    "--hkjc-local-results-end-date",
+                    "2026-06-24",
+                    "--limit-races",
+                    "1",
+                    "--max-requests",
+                    "10",
+                    "--request-interval-seconds",
+                    "0",
+                    "--output-dir",
+                    str(output_dir),
+                    stdout=out,
+                )
+
+            self.assertEqual(get.call_count, 4)
+            rows = self._read_csv(output_dir / "seed_candidates.csv")
+            by_source = {row["source_ja"]: row for row in rows}
+            self.assertEqual(by_source["ICE HOUSE STREET HANDICAP"]["target_zh"], "雪厂街让赛")
+            self.assertEqual(by_source["ROSEWOOD FLEETFOOT"]["target_zh"], "捷足奔驰")
+            self.assertEqual(by_source["GOLDEN FORTUNE"]["target_zh"], "连连好运")
+            self.assertEqual(by_source["K Teetan"]["target_zh"], "田泰安")
+            self.assertEqual(by_source["H Bowman"]["target_zh"], "布文")
+            self.assertTrue(all(row["source_language"] == SourceLanguage.ENGLISH for row in rows))
+            self.assertTrue(all(row["racing_region"] == RacingRegion.HONG_KONG for row in rows))
+            self.assertTrue(all("source=hkjc" in row["notes"] for row in rows))
+            self.assertTrue(all("requires_review=false" in row["notes"] for row in rows))
+
+            summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+            evidence = json.loads((output_dir / "source_evidence.json").read_text(encoding="utf-8"))
+            self.assertFalse(summary["incomplete"])
+            self.assertEqual(summary["candidate_count"], len(rows))
+            horse_evidence = next(item for item in evidence["candidates"] if item["source_text"] == "ROSEWOOD FLEETFOOT")
+            self.assertEqual(horse_evidence["race_key"]["RaceDate"], "20260624")
+            self.assertEqual(horse_evidence["horse_id"], "HK_2023_J524")
+
+    def test_hkjc_local_result_empty_bilingual_card_is_skipped(self):
+        from stable.services.termbase_seed import (
+            HKJCLocalResultRaceKey,
+            build_seed_result,
+            parse_hkjc_local_result_pair,
+        )
+
+        race_key = HKJCLocalResultRaceKey(race_date="20241113", racecourse="HV", race_no="7")
+        records, failures = parse_hkjc_local_result_pair(
+            "<html><body>Results</body></html>",
+            "<html><body>賽果</body></html>",
+            race_key=race_key,
+            en_url="https://example.test/en",
+            zh_url="https://example.test/zh",
+            fetch_mode="network",
+        )
+        result = build_seed_result(records, failures=failures)
+
+        self.assertEqual(records, [])
+        self.assertFalse(result.summary["incomplete"])
+        self.assertEqual(result.summary["failures"], failures)
+        self.assertEqual(result.summary["skipped_races"][0]["error"], "local_result_not_available")
+
     def test_prepare_seed_command_stops_all_sources_at_max_requests(self):
         class Response:
             status_code = 200
@@ -12266,6 +12443,28 @@ class TermbaseSeedDataPreparationTests(TestCase):
             self.assertTrue(summary["incomplete"])
             self.assertEqual(summary["failures"][0]["error"], "max_requests=1 reached")
             self.assertEqual(summary["failures"][0]["source"], "hkjc")
+
+    def test_seed_network_retry_attempts_count_against_max_requests(self):
+        from stable.services.termbase_seed import MaxRequestsReached, SeedFetchOptions, SeedNetworkClient
+
+        options = SeedFetchOptions(allow_network=True, max_requests=1, request_interval_seconds=0)
+        get_client = SeedNetworkClient(options)
+        with patch("stable.services.termbase_seed.requests.get", side_effect=requests.Timeout("GET timeout")) as get:
+            with self.assertRaises(MaxRequestsReached):
+                get_client.get_text("https://example.test/get", source="hkjc")
+
+        self.assertEqual(get.call_count, 1)
+        self.assertEqual(len(get_client.requests), 1)
+        self.assertIn("GET timeout", get_client.requests[0].error)
+
+        post_client = SeedNetworkClient(options)
+        with patch("stable.services.termbase_seed.requests.post", side_effect=requests.Timeout("POST timeout")) as post:
+            with self.assertRaises(MaxRequestsReached):
+                post_client.post_json("https://example.test/post", source="hkjc_overseas", payload={})
+
+        self.assertEqual(post.call_count, 1)
+        self.assertEqual(len(post_client.requests), 1)
+        self.assertIn("POST timeout", post_client.requests[0].error)
 
     def test_prepare_seed_command_internal_preview_uses_upsert_mode(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -12540,6 +12739,291 @@ class TermbaseSeedDataPreparationTests(TestCase):
             self.assertTrue(summary["incomplete"])
             self.assertIn("render_fallback_unavailable", evidence["failures"][0]["error"])
 
+    def test_prepare_seed_command_extracts_hkjc_overseas_qids_date_range(self):
+        class TextResponse:
+            status_code = 200
+            encoding = "utf-8"
+
+            def __init__(self, url: str, text: str):
+                self.url = url
+                self.text = text
+
+        class JsonResponse:
+            status_code = 200
+            url = "https://info.cld.hkjc.com/graphql/base/"
+
+            def json(self):
+                return {
+                    "data": {
+                        "raceMeetingProfile": [
+                            {
+                                "date": "2026-06-20",
+                                "venueCode": "S5",
+                                "races": [
+                                    {
+                                        "no": 1,
+                                        "raceName_en": "King Charles III Stakes",
+                                        "raceName_ch": "英皇查理斯三世錦標",
+                                        "countryCodeNm": {"code": "GB", "english": "United Kingdom", "chinese": "英國"},
+                                        "runners": [
+                                            {
+                                                "no": "1",
+                                                "horse": {"id": "GB001", "name_en": "ROYAL ASCOT", "name_ch": "皇家雅士谷"},
+                                                "jockey": {"code": "RM", "name_en": "Ryan Moore", "name_ch": "莫雅"},
+                                            },
+                                            {
+                                                "no": "2",
+                                                "horse": {"id": "GB002", "name_en": "BLUE POINT", "name_ch": "藍點"},
+                                                "jockey": {"code": "WB", "name_en": "William Buick", "name_ch": "布宜學"},
+                                            },
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                }
+
+        def fake_get(url, **_kwargs):
+            return TextResponse(
+                url,
+                """
+                <html><body>
+                  <a href="/en-us/overseas/results?RaceDate=20260620&Racecourse=S5">Overseas Results</a>
+                </body></html>
+                """,
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "out"
+            with patch("stable.services.termbase_seed.requests.get", side_effect=fake_get), patch(
+                "stable.services.termbase_seed.requests.post", return_value=JsonResponse()
+            ):
+                out = StringIO()
+                call_command(
+                    "prepare_termbase_seed_data",
+                    "--source",
+                    "hkjc_overseas",
+                    "--allow-network",
+                    "--hkjc-overseas-start-date",
+                    "2026-06-20",
+                    "--hkjc-overseas-end-date",
+                    "2026-06-20",
+                    "--request-interval-seconds",
+                    "0",
+                    "--max-requests",
+                    "4",
+                    "--output-dir",
+                    str(output_dir),
+                    stdout=out,
+                )
+
+            rows = self._read_csv(output_dir / "seed_candidates.csv")
+            by_source = {row["source_ja"]: row for row in rows}
+            self.assertEqual(by_source["ROYAL ASCOT"]["target_zh"], "皇家雅士谷")
+            self.assertEqual(by_source["BLUE POINT"]["target_zh"], "蓝点")
+            self.assertEqual(by_source["William Buick"]["target_zh"], "布宜学")
+            self.assertEqual(by_source["King Charles III Stakes"]["target_zh"], "英皇查理斯三世锦标")
+            self.assertTrue(all(row["racing_region"] == RacingRegion.UNITED_KINGDOM for row in rows))
+
+            summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+            evidence = json.loads((output_dir / "source_evidence.json").read_text(encoding="utf-8"))
+            self.assertFalse(summary["incomplete"])
+            self.assertEqual(summary["request_count"], 2)
+            royal_ascot = next(item for item in evidence["candidates"] if item["source_text"] == "ROYAL ASCOT")
+            self.assertEqual(royal_ascot["fetch_mode"], "qids_graphql")
+            self.assertEqual(royal_ascot["horse_profile"]["simulcastHorseId"], "GB001")
+            self.assertEqual(royal_ascot["entity_key"], "hkjc_overseas:horse:gb001")
+            self.assertIn("entity_key=hkjc_overseas:horse:gb001", by_source["ROYAL ASCOT"]["notes"])
+
+    def test_hkjc_overseas_qids_uses_global_entity_key_for_duplicate_english_horse_names(self):
+        class TextResponse:
+            status_code = 200
+            encoding = "utf-8"
+
+            def __init__(self, url: str, text: str):
+                self.url = url
+                self.text = text
+
+        class JsonResponse:
+            status_code = 200
+            url = "https://info.cld.hkjc.com/graphql/base/"
+
+            def json(self):
+                return {
+                    "data": {
+                        "raceMeetingProfile": [
+                            {
+                                "date": "2026-06-20",
+                                "venueCode": "S5",
+                                "races": [
+                                    {
+                                        "no": 1,
+                                        "raceName_en": "Duplicate Test Stakes",
+                                        "raceName_ch": "重名測試錦標",
+                                        "countryCodeNm": {"code": "GB", "english": "United Kingdom", "chinese": "英國"},
+                                        "runners": [
+                                            {
+                                                "no": "1",
+                                                "horse": {"id": "GB001", "name_en": "DUPLICATE NAME", "name_ch": "第一重名"},
+                                                "jockey": {"code": "RM", "name_en": "Ryan Moore", "name_ch": "莫雅"},
+                                            },
+                                            {
+                                                "no": "2",
+                                                "horse": {"id": "GB002", "name_en": "DUPLICATE NAME", "name_ch": "第二重名"},
+                                                "jockey": {"code": "WB", "name_en": "William Buick", "name_ch": "布宜學"},
+                                            },
+                                        ],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                }
+
+        def fake_get(url, **_kwargs):
+            return TextResponse(
+                url,
+                '<a href="/en-us/overseas/results?RaceDate=20260620&Racecourse=S5">Overseas Results</a>',
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "out"
+            with patch("stable.services.termbase_seed.requests.get", side_effect=fake_get), patch(
+                "stable.services.termbase_seed.requests.post", return_value=JsonResponse()
+            ):
+                call_command(
+                    "prepare_termbase_seed_data",
+                    "--source",
+                    "hkjc_overseas",
+                    "--allow-network",
+                    "--hkjc-overseas-start-date",
+                    "2026-06-20",
+                    "--hkjc-overseas-end-date",
+                    "2026-06-20",
+                    "--request-interval-seconds",
+                    "0",
+                    "--max-requests",
+                    "4",
+                    "--output-dir",
+                    str(output_dir),
+                    stdout=StringIO(),
+                )
+
+            rows = [row for row in self._read_csv(output_dir / "seed_candidates.csv") if row["source_ja"] == "DUPLICATE NAME"]
+            self.assertEqual([row["target_zh"] for row in rows], ["第一重名", "第二重名"])
+            self.assertIn("entity_key=hkjc_overseas:horse:gb001", rows[0]["notes"])
+            self.assertIn("entity_key=hkjc_overseas:horse:gb002", rows[1]["notes"])
+            evidence = json.loads((output_dir / "source_evidence.json").read_text(encoding="utf-8"))
+            duplicate_evidence = [item for item in evidence["candidates"] if item["source_text"] == "DUPLICATE NAME"]
+            self.assertEqual({item["entity_key"] for item in duplicate_evidence}, {"hkjc_overseas:horse:gb001", "hkjc_overseas:horse:gb002"})
+
+    def test_hkjc_overseas_qids_maps_ire_and_can_to_other(self):
+        from stable.services.termbase_seed import build_seed_result, parse_hkjc_overseas_race_key
+        from stable.services.termbase_seed import _records_from_hkjc_overseas_qids_meeting
+
+        race_key = parse_hkjc_overseas_race_key("RaceDate=2026-06-20,Racecourse=S5,RaceNo=0")
+        records = _records_from_hkjc_overseas_qids_meeting(
+            {},
+            races=[
+                {
+                    "no": 1,
+                    "raceName_en": "Irish Stakes",
+                    "raceName_ch": "愛爾蘭錦標",
+                    "countryCodeNm": {"code": "IRE", "english": "Ireland", "chinese": "愛爾蘭"},
+                    "runners": [{"no": "1", "horse": {"id": "IRE001", "name_en": "IRISH HORSE", "name_ch": "愛爾蘭馬"}}],
+                },
+                {
+                    "no": 2,
+                    "raceName_en": "Canadian Stakes",
+                    "raceName_ch": "加拿大錦標",
+                    "countryCodeNm": {"code": "CAN", "english": "Canada", "chinese": "加拿大"},
+                    "runners": [{"no": "1", "horse": {"id": "CAN001", "name_en": "CANADIAN HORSE", "name_ch": "加拿大馬"}}],
+                },
+            ],
+            race_key=race_key,
+        )
+        result = build_seed_result(records)
+
+        by_source = {row["source_ja"]: row for row in result.candidates}
+        self.assertEqual(by_source["IRISH HORSE"]["racing_region"], RacingRegion.OTHER)
+        self.assertEqual(by_source["CANADIAN HORSE"]["racing_region"], RacingRegion.OTHER)
+
+    def test_hkjc_overseas_qids_limits_merged_evidence_samples(self):
+        class TextResponse:
+            status_code = 200
+            encoding = "utf-8"
+
+            def __init__(self, url: str, text: str):
+                self.url = url
+                self.text = text
+
+        class JsonResponse:
+            status_code = 200
+            url = "https://info.cld.hkjc.com/graphql/base/"
+
+            def json(self):
+                return {
+                    "data": {
+                        "raceMeetingProfile": [
+                            {
+                                "date": "2026-06-20",
+                                "venueCode": "S5",
+                                "races": [
+                                    {
+                                        "no": race_no,
+                                        "raceName_en": f"Evidence Race {race_no}",
+                                        "raceName_ch": f"證據賽{race_no}",
+                                        "countryCodeNm": {"code": "GB", "english": "United Kingdom", "chinese": "英國"},
+                                        "runners": [
+                                            {
+                                                "no": "1",
+                                                "horse": {"id": f"GB{race_no:03d}", "name_en": f"HORSE {race_no}", "name_ch": f"馬{race_no}"},
+                                                "jockey": {"code": "RM", "name_en": "Ryan Moore", "name_ch": "莫雅"},
+                                            }
+                                        ],
+                                    }
+                                    for race_no in range(1, 13)
+                                ],
+                            }
+                        ]
+                    }
+                }
+
+        def fake_get(url, **_kwargs):
+            return TextResponse(
+                url,
+                '<a href="/en-us/overseas/results?RaceDate=20260620&Racecourse=S5">Overseas Results</a>',
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "out"
+            with patch("stable.services.termbase_seed.requests.get", side_effect=fake_get), patch(
+                "stable.services.termbase_seed.requests.post", return_value=JsonResponse()
+            ):
+                call_command(
+                    "prepare_termbase_seed_data",
+                    "--source",
+                    "hkjc_overseas",
+                    "--allow-network",
+                    "--hkjc-overseas-start-date",
+                    "2026-06-20",
+                    "--hkjc-overseas-end-date",
+                    "2026-06-20",
+                    "--request-interval-seconds",
+                    "0",
+                    "--max-requests",
+                    "4",
+                    "--output-dir",
+                    str(output_dir),
+                    stdout=StringIO(),
+                )
+
+            evidence = json.loads((output_dir / "source_evidence.json").read_text(encoding="utf-8"))
+            ryan_moore = next(item for item in evidence["candidates"] if item["source_text"] == "Ryan Moore")
+            self.assertEqual(len(ryan_moore["evidence_samples"]), 10)
+            self.assertEqual([sample["race_key"]["RaceNo"] for sample in ryan_moore["evidence_samples"]], [str(item) for item in range(1, 11)])
+
     def test_prepare_seed_command_records_hkjc_overseas_unavailable_race_as_skipped(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -12583,6 +13067,72 @@ class TermbaseSeedDataPreparationTests(TestCase):
             summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
             self.assertFalse(summary["incomplete"])
             self.assertEqual(summary["skipped_races"][0]["error"], "race_card_not_available")
+
+    def test_prepare_seed_command_extracts_wpstud_race_jockey_and_racecourse_tables(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_dir = root / "fixtures"
+            output_dir = root / "out"
+            self._write_fixture(
+                input_dir,
+                "wpstud_raceuk.htm",
+                """
+                <html><body><h1>英國</h1>
+                  <table>
+                    <tr><th>賽事日文名稱</th><th>賽事英文名稱</th><th>賽事中文名稱</th><th>級數</th></tr>
+                    <tr><td>ダービーS</td><td>Derby Stakes</td><td>英國打吡大賽</td><td>I</td></tr>
+                  </table>
+                </body></html>
+                """,
+            )
+            self._write_fixture(
+                input_dir,
+                "wpstud_jockey.htm",
+                """
+                <html><body><h1>騎師日－英－中對照翻譯</h1>
+                  <table>
+                    <tr><th>日文</th><th>英文</th><th>中文</th><th>出生地</th><th>據點</th></tr>
+                    <tr><td>ライアン・ムーア</td><td>Ryan Moore</td><td>莫雅</td><td>英國</td><td>英國</td></tr>
+                  </table>
+                </body></html>
+                """,
+            )
+            self._write_fixture(
+                input_dir,
+                "wpstud_racecourse.htm",
+                """
+                <html><body><h1>馬場中－英－日對照</h1>
+                  <table>
+                    <tr><th>馬場中文名稱</th><th>所在國家／地區</th><th>馬場英文名稱</th><th>馬場日文名稱</th></tr>
+                    <tr><td>沙田</td><td>香港</td><td>Sha Tin</td><td>シャティン</td></tr>
+                  </table>
+                </body></html>
+                """,
+            )
+
+            out = StringIO()
+            call_command(
+                "prepare_termbase_seed_data",
+                "--source",
+                "wpstud",
+                "--input-dir",
+                str(input_dir),
+                "--output-dir",
+                str(output_dir),
+                stdout=out,
+            )
+
+            rows = self._read_csv(output_dir / "seed_candidates.csv")
+            by_source = {row["source_ja"]: row for row in rows}
+            self.assertEqual(by_source["Derby Stakes"]["term_type"], TermType.RACE)
+            self.assertEqual(by_source["Derby Stakes"]["target_zh"], "英国打吡大赛")
+            self.assertEqual(by_source["Derby Stakes"]["racing_region"], RacingRegion.UNITED_KINGDOM)
+            self.assertEqual(by_source["Derby Stakes"]["race_grade"], "G1")
+            self.assertEqual(by_source["Ryan Moore"]["term_type"], TermType.JOCKEY)
+            self.assertEqual(by_source["Ryan Moore"]["racing_region"], RacingRegion.UNITED_KINGDOM)
+            self.assertEqual(by_source["Sha Tin"]["term_type"], TermType.RACECOURSE)
+            self.assertEqual(by_source["Sha Tin"]["racing_region"], RacingRegion.HONG_KONG)
+            self.assertTrue(all("source_tier=community" in row["notes"] for row in rows))
 
 
 class RaceEventPageMVPTests(TestCase):

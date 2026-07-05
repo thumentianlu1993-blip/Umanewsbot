@@ -7,7 +7,7 @@ import re
 import time
 import unicodedata
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urljoin, urlparse, urlunparse
@@ -74,6 +74,7 @@ REGION_ORDER = {
     "japan": 100,
 }
 SOURCE_ORDER = {"hkjc": 0, "hkjc_overseas": 1, "wpstud": 10}
+MAX_EVIDENCE_SAMPLES_PER_CANDIDATE = 10
 DEFAULT_SOURCE_URLS = {
     "hkjc": [
         "https://racing.hkjc.com/en-us/local/information/selecthorse",
@@ -91,6 +92,143 @@ DEFAULT_SOURCE_URLS = {
         "https://www.wpstud.com/horseintro/jpnhorse/JpnHorse.htm",
     ],
 }
+HKJC_QIDS_GRAPHQL_URL = "https://info.cld.hkjc.com/graphql/base/"
+HKJC_OVERSEAS_RACE_CARD_PROFILE_QUERY = """
+query RaceCardProfile($date: String, $venueCode: String, $type: STStatType, $ids: [String!], $raceNumber: String, $meetingDate: String) {
+  raceMeetingProfile(date: $date, venueCode: $venueCode) {
+    totalNumberOfRace
+    status
+    pmPools {
+      leg {
+        races
+      }
+      status
+      oddsType
+    }
+    races {
+      id
+      no
+      status
+      postTime
+      raceName_en
+      raceName_ch
+      raceResults {
+        status
+      }
+      countryCodeNm {
+        code
+        english
+        chinese
+      }
+      distance
+      raceCourse {
+        code
+        description_en
+        description_ch
+      }
+      raceTrack {
+        code
+        description_en
+        description_ch
+      }
+      raceType_en
+      raceType_ch
+      raceClass_en
+      raceClass_ch
+      country_en
+      country_ch
+      winningMargin {
+        seqNo
+        lbw
+      }
+      go_en
+      go_ch
+      remarks {
+        name_en
+        name_ch
+        seqNo
+      }
+      runners {
+        horse {
+          name_en
+          name_ch
+          id
+        }
+        status
+        color
+        no
+        handicapWeight
+        jockey {
+          code
+          name_en
+          name_ch
+        }
+        trainer {
+          code
+          name_en
+          name_ch
+        }
+        id
+        last6run
+        internationalRating
+        currentRating
+        sire
+        sexNm {
+          chinese
+          english
+          code
+        }
+        age
+        barrierDrawNumber
+        gearInfo
+        stat(type: $type) {
+          statType
+          numStarts
+          numFirst
+          numSecond
+          numThird
+        }
+        damNm {
+          code
+          chinese
+          english
+        }
+        sireOfDamNm {
+          code
+          chinese
+          english
+        }
+        ownerNm {
+          code
+          chinese
+          english
+        }
+        colorNm {
+          code
+          chinese
+          english
+        }
+      }
+    }
+    date
+    venueCode
+  }
+
+  simulcastHorse(ids: $ids, raceNumber: $raceNumber, meetingDate: $meetingDate, venCode: $venueCode) {
+    id
+    brandNumber
+    earings
+    performanceStats {
+      type
+      firstPlace
+      secondPlace
+      thirdPlace
+      totalRun
+      ssn
+    }
+  }
+}
+"""
 
 
 class TermbaseSeedError(Exception):
@@ -115,6 +253,13 @@ class SeedFetchOptions:
     limit_horses: int | None = None
     limit_meetings: int | None = None
     limit_races: int | None = None
+    hkjc_local_results_start_date: str = ""
+    hkjc_local_results_end_date: str = ""
+    hkjc_local_results_skip_races: int = 0
+    hkjc_overseas_start_date: str = ""
+    hkjc_overseas_end_date: str = ""
+    hkjc_skip_horse_details: bool = False
+    hkjc_letters: tuple[str, ...] = ()
     hkjc_overseas_races: tuple[str, ...] = ()
 
 
@@ -183,6 +328,34 @@ class HKJCOverseasRaceKey:
             f"?RaceDate={self.race_date}&Racecourse={self.racecourse}&RaceNo={self.race_no}"
         )
 
+    def results_url(self, language: str, *, include_race_no: bool = False) -> str:
+        url = f"https://racing.hkjc.com/{language}/overseas/results?RaceDate={self.race_date}&Racecourse={self.racecourse}"
+        if include_race_no and self.race_no and self.race_no != "0":
+            url += f"&RaceNo={self.race_no}"
+        return url
+
+
+@dataclass(frozen=True)
+class HKJCLocalResultRaceKey:
+    race_date: str
+    racecourse: str
+    race_no: str
+
+    @property
+    def identity(self) -> str:
+        return f"{self.race_date}:{self.racecourse}:{self.race_no}"
+
+    @property
+    def params(self) -> dict[str, str]:
+        return {"RaceDate": self.race_date, "Racecourse": self.racecourse, "RaceNo": self.race_no}
+
+    def url(self, language: str) -> str:
+        return (
+            f"https://racing.hkjc.com/{language}/local/information/localresults"
+            f"?racedate={self.race_date[:4]}/{self.race_date[4:6]}/{self.race_date[6:]}"
+            f"&Racecourse={self.racecourse}&RaceNo={self.race_no}"
+        )
+
 
 def default_output_dir() -> Path:
     stamp = timezone.localtime().strftime("%Y%m%d_%H%M%S")
@@ -228,6 +401,11 @@ _TRADITIONAL_TO_SIMPLIFIED_FALLBACK = str.maketrans(
         "歡": "欢",
         "聲": "声",
         "貴": "贵",
+        "廠": "厂",
+        "讓": "让",
+        "馳": "驰",
+        "連": "连",
+        "運": "运",
         "婦": "妇",
         "鑽": "钻",
         "強": "强",
@@ -325,6 +503,11 @@ def _parse_race_key_date(value: str) -> date | None:
     parsed = dateparse.parse_date(normalized)
     if parsed:
         return parsed
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(raw, fmt).date()
+        except ValueError:
+            continue
     if re.fullmatch(r"\d{8}", raw):
         try:
             return datetime.strptime(raw, "%Y%m%d").date()
@@ -333,12 +516,25 @@ def _parse_race_key_date(value: str) -> date | None:
     return None
 
 
+def _format_race_key_date(value: date) -> str:
+    return value.strftime("%Y%m%d")
+
+
 def stable_entity_key(*values: str) -> str:
     for value in values:
         key = source_text_identity(value or "")
         if key:
             return key
     return ""
+
+
+def global_entity_key(source: str, term_type: str, identifier: str) -> str:
+    source_key = source_text_identity(source)
+    type_key = source_text_identity(term_type)
+    identifier_key = source_text_identity(identifier)
+    if not source_key or not type_key or not identifier_key:
+        return ""
+    return f"{source_key}:{type_key}:{identifier_key}"
 
 
 def validate_sources(sources: list[str]) -> list[str]:
@@ -356,31 +552,69 @@ def validate_sources(sources: list[str]) -> list[str]:
 
 class SeedNetworkClient:
     user_agent = "umanewsbot/1.0 (+https://umafans.run; termbase seed preparation)"
+    max_attempts = 2
 
     def __init__(self, options: SeedFetchOptions):
         self.options = options
         self.requests: list[RequestRecord] = []
 
     def get_text(self, url: str, *, source: str) -> str | None:
-        if len(self.requests) >= self.options.max_requests:
-            raise MaxRequestsReached(f"max_requests={self.options.max_requests} reached")
-        if self.requests and self.options.request_interval_seconds > 0:
-            time.sleep(self.options.request_interval_seconds)
-        try:
-            response = requests.get(
-                url,
-                timeout=self.options.timeout_seconds,
-                headers={"User-Agent": self.user_agent},
-            )
-        except requests.RequestException as exc:
-            self.requests.append(RequestRecord(source=source, url=url, error=str(exc)))
-            return None
-        self.requests.append(RequestRecord(source=source, url=getattr(response, "url", url), status_code=response.status_code))
-        if response.status_code < 200 or response.status_code >= 300:
-            self.requests[-1].error = f"HTTP {response.status_code}"
-            return None
-        response.encoding = response.encoding or "utf-8"
-        return response.text
+        for attempt in range(1, self.max_attempts + 1):
+            if len(self.requests) >= self.options.max_requests:
+                raise MaxRequestsReached(f"max_requests={self.options.max_requests} reached")
+            if self.requests and self.options.request_interval_seconds > 0:
+                time.sleep(self.options.request_interval_seconds)
+            try:
+                response = requests.get(
+                    url,
+                    timeout=self.options.timeout_seconds,
+                    headers={"User-Agent": self.user_agent},
+                )
+            except requests.RequestException as exc:
+                self.requests.append(RequestRecord(source=source, url=url, error=str(exc)))
+                if attempt < self.max_attempts:
+                    continue
+                return None
+            self.requests.append(RequestRecord(source=source, url=getattr(response, "url", url), status_code=response.status_code))
+            if response.status_code < 200 or response.status_code >= 300:
+                self.requests[-1].error = f"HTTP {response.status_code}"
+                return None
+            response.encoding = response.encoding or "utf-8"
+            return response.text
+        return None
+
+    def post_json(self, url: str, *, source: str, payload: dict[str, Any]) -> dict[str, Any] | None:
+        for attempt in range(1, self.max_attempts + 1):
+            if len(self.requests) >= self.options.max_requests:
+                raise MaxRequestsReached(f"max_requests={self.options.max_requests} reached")
+            if self.requests and self.options.request_interval_seconds > 0:
+                time.sleep(self.options.request_interval_seconds)
+            try:
+                response = requests.post(
+                    url,
+                    json=payload,
+                    timeout=self.options.timeout_seconds,
+                    headers={
+                        "User-Agent": self.user_agent,
+                        "Accept": "*/*",
+                        "Content-Type": "application/json",
+                    },
+                )
+            except requests.RequestException as exc:
+                self.requests.append(RequestRecord(source=source, url=url, error=str(exc)))
+                if attempt < self.max_attempts:
+                    continue
+                return None
+            self.requests.append(RequestRecord(source=source, url=getattr(response, "url", url), status_code=response.status_code))
+            if response.status_code < 200 or response.status_code >= 300:
+                self.requests[-1].error = f"HTTP {response.status_code}"
+                return None
+            try:
+                return response.json()
+            except ValueError as exc:
+                self.requests[-1].error = f"invalid JSON: {exc}"
+                return None
+        return None
 
 
 def collect_seed_records(
@@ -439,7 +673,7 @@ def collect_seed_records(
                         )
                     break
                 records.extend(parse_source_html(html, source=source, source_url=url, fallback_region=_region_from_url(url)))
-                if source == "hkjc":
+                if source == "hkjc" and not options.hkjc_skip_horse_details:
                     try:
                         records.extend(
                             _collect_hkjc_horse_detail_records(
@@ -447,6 +681,7 @@ def collect_seed_records(
                                 html=html,
                                 source_url=url,
                                 limit_horses=options.limit_horses,
+                                allowed_letters=options.hkjc_letters,
                             )
                         )
                     except MaxRequestsReached as exc:
@@ -460,6 +695,13 @@ def collect_seed_records(
                         )
                         requests_info.extend(client.requests)
                         return records, requests_info, failures
+            if source == "hkjc" and options.hkjc_local_results_start_date:
+                local_records, local_failures = _collect_hkjc_local_result_network_records(
+                    client,
+                    options=options,
+                )
+                records.extend(local_records)
+                failures.extend(local_failures)
         requests_info.extend(client.requests)
         return records, requests_info, failures
 
@@ -479,9 +721,22 @@ def collect_seed_records(
             failures.append({"source": source, "url": str(root), "error": "no fixture files found", "status_code": ""})
             continue
         for path in sorted(set(matched)):
-            html = path.read_text(encoding="utf-8")
+            html = _read_seed_fixture_text(path)
             records.extend(parse_source_html(html, source=source, source_url=_source_url_from_html(html) or path.as_posix()))
     return records, requests_info, failures
+
+
+def _read_seed_fixture_text(path: Path) -> str:
+    encodings = ("utf-8", "utf-8-sig", "big5", "gb18030", "cp950", "shift_jis", "cp932")
+    last_error: UnicodeDecodeError | None = None
+    for encoding in encodings:
+        try:
+            return path.read_text(encoding=encoding)
+        except UnicodeDecodeError as exc:
+            last_error = exc
+    if last_error:
+        raise last_error
+    return path.read_text(encoding="utf-8")
 
 
 def _fixture_patterns_for_source(source: str) -> list[str]:
@@ -509,6 +764,27 @@ def _collect_hkjc_overseas_network_records(
     records: list[RawSeedRecord] = []
     failures: list[dict[str, str]] = []
     race_keys = exact_keys
+    if race_keys or options.hkjc_overseas_start_date:
+        if not race_keys:
+            race_keys, discovery_failures = _discover_hkjc_overseas_meeting_keys_from_local_results(client, options=options)
+            failures.extend(discovery_failures)
+        if options.limit_meetings is not None:
+            race_keys = _limit_hkjc_overseas_meetings(race_keys, options.limit_meetings)
+        for race_key in race_keys:
+            try:
+                parsed, skipped, parse_failures = _collect_hkjc_overseas_qids_records(
+                    client,
+                    race_key=race_key,
+                    max_races=options.limit_races,
+                )
+            except MaxRequestsReached as exc:
+                failures.append(_failure("hkjc_overseas", race_key.results_url("en-us"), str(exc), race_key=race_key))
+                break
+            records.extend(parsed)
+            failures.extend(skipped)
+            failures.extend(parse_failures)
+        return records, failures
+
     if not race_keys:
         landing_url = DEFAULT_SOURCE_URLS["hkjc_overseas"][0]
         try:
@@ -556,6 +832,216 @@ def _collect_hkjc_overseas_network_records(
     return records, failures
 
 
+def _discover_hkjc_overseas_meeting_keys_from_local_results(
+    client: SeedNetworkClient,
+    *,
+    options: SeedFetchOptions,
+) -> tuple[list[HKJCOverseasRaceKey], list[dict[str, str]]]:
+    start = _parse_race_key_date(options.hkjc_overseas_start_date)
+    end = _parse_race_key_date(options.hkjc_overseas_end_date) if options.hkjc_overseas_end_date else timezone.localdate()
+    landing_url = DEFAULT_SOURCE_URLS["hkjc_overseas"][0]
+    if not start or not end:
+        return [], [_failure("hkjc_overseas", landing_url, "HKJC overseas date format must be YYYY-MM-DD")]
+    if start > end:
+        return [], [_failure("hkjc_overseas", landing_url, "HKJC overseas start date must be before end date")]
+
+    keys: list[HKJCOverseasRaceKey] = []
+    failures: list[dict[str, str]] = []
+    seen: set[str] = set()
+    current = start
+    while current <= end:
+        date_key = _format_race_key_date(current)
+        url = _hkjc_local_result_date_url(date_key)
+        try:
+            html = client.get_text(url, source="hkjc_overseas")
+        except MaxRequestsReached as exc:
+            failures.append(_failure("hkjc_overseas", url, str(exc)))
+            break
+        if not html:
+            failures.append(_failure_from_last_request(client, url, "hkjc_overseas"))
+            current += timedelta(days=1)
+            continue
+        final_url = client.requests[-1].url if client.requests else url
+        redirected_key = _hkjc_overseas_result_key_from_url(final_url)
+        if redirected_key and redirected_key.identity not in seen:
+            seen.add(redirected_key.identity)
+            keys.append(redirected_key)
+        for key in _discover_hkjc_overseas_result_meeting_keys(html, source_url=url):
+            if key.identity in seen:
+                continue
+            seen.add(key.identity)
+            keys.append(key)
+        current += timedelta(days=1)
+    return sorted(keys, key=lambda item: (item.race_date, item.racecourse)), failures
+
+
+def _hkjc_overseas_result_key_from_url(url: str) -> HKJCOverseasRaceKey | None:
+    if "overseas/results" not in (url or "").lower():
+        return None
+    params = parse_qs(urlparse(url).query)
+    parsed = _parse_race_key_date(_first_value(params, "RaceDate"))
+    racecourse = _first_value(params, "Racecourse").strip().upper()
+    if not parsed or not re.fullmatch(r"S\d+", racecourse):
+        return None
+    return HKJCOverseasRaceKey(race_date=_format_race_key_date(parsed), racecourse=racecourse, race_no="0")
+
+
+def _discover_hkjc_overseas_result_meeting_keys(html: str, *, source_url: str) -> list[HKJCOverseasRaceKey]:
+    soup = BeautifulSoup(html or "", "lxml")
+    keys: list[HKJCOverseasRaceKey] = []
+    seen: set[str] = set()
+    for anchor in soup.find_all("a", href=True):
+        href = str(anchor.get("href") or "")
+        if "overseas/results" not in href.lower():
+            continue
+        absolute = urljoin(source_url, href)
+        params = parse_qs(urlparse(absolute).query)
+        parsed = _parse_race_key_date(_first_value(params, "RaceDate"))
+        racecourse = _first_value(params, "Racecourse").strip().upper()
+        if not parsed or not re.fullmatch(r"S\d+", racecourse):
+            continue
+        key = HKJCOverseasRaceKey(race_date=_format_race_key_date(parsed), racecourse=racecourse, race_no="0")
+        if key.identity in seen:
+            continue
+        seen.add(key.identity)
+        keys.append(key)
+    return keys
+
+
+def _collect_hkjc_overseas_qids_records(
+    client: SeedNetworkClient,
+    *,
+    race_key: HKJCOverseasRaceKey,
+    max_races: int | None,
+) -> tuple[list[RawSeedRecord], list[dict[str, str]], list[dict[str, str]]]:
+    race_number = race_key.race_no if race_key.race_no and race_key.race_no != "0" else "1"
+    payload = {
+        "variables": {
+            "date": f"{race_key.race_date[:4]}-{race_key.race_date[4:6]}-{race_key.race_date[6:]}",
+            "venueCode": race_key.racecourse,
+            "ids": [],
+            "raceNumber": race_number,
+            "meetingDate": race_key.race_date,
+        },
+        "query": HKJC_OVERSEAS_RACE_CARD_PROFILE_QUERY,
+    }
+    data = client.post_json(HKJC_QIDS_GRAPHQL_URL, source="hkjc_overseas", payload=payload)
+    if not data:
+        return [], [], [_failure_from_last_request(client, HKJC_QIDS_GRAPHQL_URL, "hkjc_overseas")]
+    errors = data.get("errors") if isinstance(data, dict) else None
+    if errors:
+        message = "; ".join(str(item.get("message") or item) for item in errors if isinstance(item, dict)) or "qids_graphql_error"
+        return [], [], [_failure("hkjc_overseas", HKJC_QIDS_GRAPHQL_URL, message, race_key=race_key)]
+    profile = ((data.get("data") or {}).get("raceMeetingProfile") or []) if isinstance(data, dict) else []
+    if isinstance(profile, dict):
+        profile = [profile]
+    meeting = profile[0] if profile else {}
+    races = list((meeting or {}).get("races") or [])
+    if race_key.race_no and race_key.race_no != "0":
+        races = [race for race in races if str(race.get("no") or "") == race_key.race_no]
+    elif max_races is not None:
+        races = races[: max(0, max_races)]
+    if not races:
+        return [], [_failure("hkjc_overseas", race_key.results_url("en-us"), "race_card_not_available", failure_type="skipped_races", race_key=race_key)], []
+    return _records_from_hkjc_overseas_qids_meeting(meeting, races=races, race_key=race_key), [], []
+
+
+def _records_from_hkjc_overseas_qids_meeting(
+    meeting: dict[str, Any],
+    *,
+    races: list[dict[str, Any]],
+    race_key: HKJCOverseasRaceKey,
+) -> list[RawSeedRecord]:
+    records: list[RawSeedRecord] = []
+    meeting_url = race_key.results_url("en-us")
+    for race in races:
+        race_no = str(race.get("no") or "")
+        race_name_en = _clean_hkjc_local_text(str(race.get("raceName_en") or ""))
+        race_name_zh = _clean_hkjc_local_text(str(race.get("raceName_ch") or ""))
+        region = _hkjc_overseas_region_from_race(race) or _hkjc_overseas_region_from_text(race_key.racecourse) or "other"
+        evidence_url = race_key.results_url("en-us", include_race_no=True)
+        base_evidence = {
+            "source": "hkjc_overseas",
+            "race_key": {**race_key.params, "RaceNo": race_no or race_key.race_no},
+            "en_url": evidence_url,
+            "zh_url": race_key.results_url("zh-hk", include_race_no=True),
+            "fetch_mode": "qids_graphql",
+            "region": region,
+            "raw_region": _hkjc_overseas_raw_region_from_race(race) or race_key.racecourse,
+        }
+        if race_name_en and race_name_zh:
+            records.append(
+                RawSeedRecord(
+                    term_type=TermType.RACE,
+                    source_language=SourceLanguage.ENGLISH,
+                    source_text=race_name_en,
+                    target_zh=to_simplified_chinese(race_name_zh),
+                    original_target_zh=race_name_zh,
+                    source="hkjc_overseas",
+                    region=region,
+                    entity_key=stable_entity_key(race_name_en),
+                    evidence_url=evidence_url or meeting_url,
+                    race_grade=_race_grade_from_name(race_name_en),
+                    evidence={**base_evidence, "entity": "race", "alignment": "qids_race_no"},
+                )
+            )
+        seen_jockeys: set[str] = set()
+        for runner in race.get("runners") or []:
+            horse = runner.get("horse") or {}
+            jockey = runner.get("jockey") or {}
+            horse_en = _clean_hkjc_local_text(str(horse.get("name_en") or ""))
+            horse_zh = _clean_hkjc_local_text(str(horse.get("name_ch") or ""))
+            horse_no = str(runner.get("no") or "")
+            horse_id = str(horse.get("id") or "")
+            if horse_en and horse_zh:
+                records.append(
+                    RawSeedRecord(
+                        term_type=TermType.HORSE,
+                        source_language=SourceLanguage.ENGLISH,
+                        source_text=horse_en,
+                        target_zh=to_simplified_chinese(horse_zh),
+                        original_target_zh=horse_zh,
+                        source="hkjc_overseas",
+                        region=region,
+                        entity_key=global_entity_key("hkjc_overseas", TermType.HORSE, horse_id)
+                        or global_entity_key(
+                            "hkjc_overseas",
+                            TermType.HORSE,
+                            f"{race_key.identity}:{race_no}:{horse_no}",
+                        )
+                        or stable_entity_key(horse_en),
+                        evidence_url=evidence_url or meeting_url,
+                        evidence={
+                            **base_evidence,
+                            "entity": "horse",
+                            "horse_no": horse_no,
+                            "alignment": "qids_runner_no",
+                            "horse_profile": {"simulcastHorseId": horse_id} if horse_id else {},
+                        },
+                    )
+                )
+            jockey_en = _clean_hkjc_local_text(str(jockey.get("name_en") or ""))
+            jockey_zh = _clean_hkjc_local_text(str(jockey.get("name_ch") or ""))
+            jockey_key = source_text_identity(jockey_en)
+            if jockey_en and jockey_zh and jockey_key not in seen_jockeys:
+                seen_jockeys.add(jockey_key)
+                records.append(
+                    RawSeedRecord(
+                        term_type=TermType.JOCKEY,
+                        source_language=SourceLanguage.ENGLISH,
+                        source_text=jockey_en,
+                        target_zh=to_simplified_chinese(jockey_zh),
+                        original_target_zh=jockey_zh,
+                        source="hkjc_overseas",
+                        region=region,
+                        entity_key=stable_entity_key(jockey_en),
+                        evidence_url=evidence_url or meeting_url,
+                        evidence={**base_evidence, "entity": "jockey", "horse_no": horse_no, "alignment": "qids_runner_no"},
+                    )
+                )
+    return records
+
+
 def _collect_hkjc_overseas_fixture_records(
     root: Path,
     *,
@@ -570,7 +1056,7 @@ def _collect_hkjc_overseas_fixture_records(
     failures: list[dict[str, str]] = []
     racecard_files: dict[str, dict[str, Path]] = {}
     for path in matched:
-        html = path.read_text(encoding="utf-8")
+        html = _read_seed_fixture_text(path)
         if _looks_like_hkjc_overseas_racecard(html):
             race_key = _race_key_from_html(html, fallback_url=_source_url_from_html(html) or path.as_posix())
             language = _racecard_language_from_html(html) or _language_from_path(path)
@@ -588,25 +1074,27 @@ def _collect_hkjc_overseas_fixture_records(
             break
         en_path = files.get("en-us")
         zh_path = files.get("zh-hk")
-        race_key = _race_key_from_html(en_path.read_text(encoding="utf-8") if en_path else zh_path.read_text(encoding="utf-8"), fallback_url=(en_path or zh_path).as_posix())
+        en_html = _read_seed_fixture_text(en_path) if en_path else ""
+        zh_html = _read_seed_fixture_text(zh_path) if zh_path else ""
+        race_key = _race_key_from_html(en_html if en_path else zh_html, fallback_url=(en_path or zh_path).as_posix())
         if not race_key:
             continue
         if not en_path or not zh_path:
             failures.append(_failure("hkjc_overseas", (en_path or zh_path).as_posix(), "missing bilingual fixture", race_key=race_key))
             continue
         parsed, skipped, parse_failures = parse_hkjc_overseas_racecard_pair(
-            en_path.read_text(encoding="utf-8"),
-            zh_path.read_text(encoding="utf-8"),
+            en_html,
+            zh_html,
             race_key=race_key,
-            en_url=_source_url_from_html(en_path.read_text(encoding="utf-8")) or en_path.as_posix(),
-            zh_url=_source_url_from_html(zh_path.read_text(encoding="utf-8")) or zh_path.as_posix(),
+            en_url=_source_url_from_html(en_html) or en_path.as_posix(),
+            zh_url=_source_url_from_html(zh_html) or zh_path.as_posix(),
             fetch_mode="fixture",
         )
         records.extend(parsed)
         failures.extend(skipped)
         failures.extend(parse_failures)
         processed += 1
-    return _dedupe_raw_records(records), failures
+    return records, failures
 
 
 def _failure(
@@ -616,7 +1104,7 @@ def _failure(
     *,
     status_code: str = "",
     failure_type: str = "failure",
-    race_key: HKJCOverseasRaceKey | None = None,
+    race_key: HKJCOverseasRaceKey | HKJCLocalResultRaceKey | None = None,
 ) -> dict[str, str]:
     payload = {"source": source, "url": url, "error": error, "status_code": status_code, "type": failure_type}
     if race_key:
@@ -826,7 +1314,12 @@ def parse_hkjc_overseas_racecard_pair(
                     original_target_zh=horse_zh,
                     source="hkjc_overseas",
                     region=region,
-                    entity_key=stable_entity_key(horse_en),
+                    entity_key=global_entity_key(
+                        "hkjc_overseas",
+                        TermType.HORSE,
+                        str((horse_profile or {}).get("simulcastHorseId") or ""),
+                    )
+                    or stable_entity_key(horse_en),
                     evidence_url=en_url,
                     evidence={
                         **base_evidence,
@@ -857,6 +1350,359 @@ def parse_hkjc_overseas_racecard_pair(
                 )
             )
     return _dedupe_raw_records(records), [], []
+
+
+def _collect_hkjc_local_result_network_records(
+    client: SeedNetworkClient,
+    *,
+    options: SeedFetchOptions,
+) -> tuple[list[RawSeedRecord], list[dict[str, str]]]:
+    start = _parse_race_key_date(options.hkjc_local_results_start_date)
+    end = _parse_race_key_date(options.hkjc_local_results_end_date) if options.hkjc_local_results_end_date else timezone.localdate()
+    landing_url = "https://racing.hkjc.com/en-us/local/information/localresults"
+    if not start or not end:
+        return [], [_failure("hkjc", landing_url, "HKJC local results date format must be YYYY-MM-DD")]
+    if start > end:
+        return [], [_failure("hkjc", landing_url, "HKJC local results start date must be before end date")]
+
+    records: list[RawSeedRecord] = []
+    failures: list[dict[str, str]] = []
+    try:
+        landing_html = client.get_text(landing_url, source="hkjc")
+    except MaxRequestsReached as exc:
+        return records, [_failure("hkjc", landing_url, str(exc))]
+    if not landing_html:
+        return records, [_failure_from_last_request(client, landing_url, "hkjc")]
+
+    meetings = _discover_hkjc_local_result_meetings(landing_html, start_date=start, end_date=end, source_url=landing_url)
+    meetings = _merge_hkjc_local_result_meetings(meetings, _hkjc_local_result_date_range_meetings(start, end, source_url=landing_url))
+    if options.limit_meetings is not None:
+        meetings = meetings[: max(0, options.limit_meetings)]
+    race_keys: list[HKJCLocalResultRaceKey] = []
+    for meeting in meetings:
+        date_url = _hkjc_local_result_date_url(meeting["race_date"])
+        try:
+            date_html = client.get_text(date_url, source="hkjc")
+        except MaxRequestsReached as exc:
+            failures.append(_failure("hkjc", date_url, str(exc)))
+            return records, failures
+        if not date_html:
+            failures.append(_failure_from_last_request(client, date_url, "hkjc"))
+            continue
+        race_keys.extend(_discover_hkjc_local_result_race_keys(date_html, source_url=date_url))
+
+    race_keys = _dedupe_hkjc_local_race_keys(race_keys)
+    skip_races = max(0, options.hkjc_local_results_skip_races)
+    if skip_races:
+        race_keys = race_keys[skip_races:]
+    if options.limit_races is not None:
+        race_keys = race_keys[: max(0, options.limit_races)]
+
+    for race_key in race_keys:
+        en_url = race_key.url("en-us")
+        zh_url = race_key.url("zh-hk")
+        try:
+            en_html = client.get_text(en_url, source="hkjc")
+            zh_html = client.get_text(zh_url, source="hkjc")
+        except MaxRequestsReached as exc:
+            failures.append(_failure("hkjc", en_url, str(exc), race_key=race_key))
+            break
+        if not en_html or not zh_html:
+            failures.append(_failure("hkjc", en_url, "local_result_fetch_failed", race_key=race_key))
+            continue
+        parsed, parse_failures = parse_hkjc_local_result_pair(
+            en_html,
+            zh_html,
+            race_key=race_key,
+            en_url=en_url,
+            zh_url=zh_url,
+            fetch_mode="direct",
+        )
+        records.extend(parsed)
+        failures.extend(parse_failures)
+    return _dedupe_raw_records(records), failures
+
+
+def _hkjc_local_result_date_url(race_date: str) -> str:
+    return (
+        "https://racing.hkjc.com/en-us/local/information/localresults"
+        f"?racedate={race_date[:4]}/{race_date[4:6]}/{race_date[6:]}"
+    )
+
+
+def _discover_hkjc_local_result_meetings(
+    html: str,
+    *,
+    start_date: date,
+    end_date: date,
+    source_url: str,
+) -> list[dict[str, str]]:
+    soup = BeautifulSoup(html or "", "lxml")
+    meetings: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for option in soup.select("select#selectId option"):
+        raw_value = str(option.get("value") or "")
+        if not raw_value:
+            continue
+        try:
+            payload = json.loads(raw_value)
+        except json.JSONDecodeError:
+            continue
+        parsed = _parse_race_key_date(str(payload.get("date") or ""))
+        if not parsed or parsed < start_date or parsed > end_date:
+            continue
+        key = (_format_race_key_date(parsed), "")
+        if key in seen:
+            continue
+        seen.add(key)
+        meetings.append({"race_date": key[0], "racecourse": "", "source_url": source_url})
+    return sorted(meetings, key=lambda item: (item["race_date"], item["racecourse"]))
+
+
+def _hkjc_local_result_date_range_meetings(start_date: date, end_date: date, *, source_url: str) -> list[dict[str, str]]:
+    meetings: list[dict[str, str]] = []
+    current = start_date
+    while current <= end_date:
+        meetings.append({"race_date": _format_race_key_date(current), "racecourse": "", "source_url": source_url})
+        current += timedelta(days=1)
+    return meetings
+
+
+def _merge_hkjc_local_result_meetings(*groups: list[dict[str, str]]) -> list[dict[str, str]]:
+    seen: set[str] = set()
+    merged: list[dict[str, str]] = []
+    for group in groups:
+        for meeting in group:
+            race_date = meeting.get("race_date", "")
+            if not race_date or race_date in seen:
+                continue
+            seen.add(race_date)
+            merged.append(meeting)
+    return sorted(merged, key=lambda item: item["race_date"])
+
+
+def _discover_hkjc_local_result_race_keys(html: str, *, source_url: str) -> list[HKJCLocalResultRaceKey]:
+    soup = BeautifulSoup(html or "", "lxml")
+    keys: list[HKJCLocalResultRaceKey] = []
+    seen: set[str] = set()
+    for anchor in soup.find_all("a", href=True):
+        href = str(anchor.get("href") or "")
+        if "localresults" not in href.lower() or not re.search(r"RaceNo=", href, re.I):
+            continue
+        absolute = urljoin(source_url, href)
+        params = parse_qs(urlparse(absolute).query)
+        parsed = _parse_race_key_date(_first_value(params, "racedate"))
+        racecourse = _first_value(params, "Racecourse").strip().upper()
+        race_no = _first_value(params, "RaceNo").strip()
+        if not parsed or racecourse not in {"HV", "ST"} or not race_no.isdigit():
+            continue
+        race_key = HKJCLocalResultRaceKey(
+            race_date=_format_race_key_date(parsed),
+            racecourse=racecourse,
+            race_no=str(int(race_no)),
+        )
+        if race_key.identity in seen:
+            continue
+        seen.add(race_key.identity)
+        keys.append(race_key)
+    for race_date, racecourse in sorted({(key.race_date, key.racecourse) for key in keys}):
+        race_one = HKJCLocalResultRaceKey(race_date=race_date, racecourse=racecourse, race_no="1")
+        if race_one.identity not in seen:
+            seen.add(race_one.identity)
+            keys.append(race_one)
+    return sorted(keys, key=lambda item: (item.race_date, item.racecourse, int(item.race_no)))
+
+
+def _dedupe_hkjc_local_race_keys(keys: list[HKJCLocalResultRaceKey]) -> list[HKJCLocalResultRaceKey]:
+    seen: set[str] = set()
+    result: list[HKJCLocalResultRaceKey] = []
+    for key in sorted(keys, key=lambda item: (item.race_date, item.racecourse, int(item.race_no))):
+        if key.identity in seen:
+            continue
+        seen.add(key.identity)
+        result.append(key)
+    return result
+
+
+def parse_hkjc_local_result_pair(
+    en_html: str,
+    zh_html: str,
+    *,
+    race_key: HKJCLocalResultRaceKey,
+    en_url: str,
+    zh_url: str,
+    fetch_mode: str,
+) -> tuple[list[RawSeedRecord], list[dict[str, str]]]:
+    en_card = _extract_hkjc_local_result_card(en_html, language="en-us", source_url=en_url)
+    zh_card = _extract_hkjc_local_result_card(zh_html, language="zh-hk", source_url=zh_url)
+    if not en_card["rows"] and not zh_card["rows"]:
+        return [], [_failure("hkjc", en_url, "local_result_not_available", failure_type="skipped_races", race_key=race_key)]
+    if not en_card["rows"] or not zh_card["rows"]:
+        return [], [_failure("hkjc", en_url, "local_result_parse_failed", race_key=race_key)]
+
+    base_evidence = {
+        "source": "hkjc",
+        "race_key": race_key.params,
+        "en_url": en_url,
+        "zh_url": zh_url,
+        "fetch_mode": fetch_mode,
+        "region": "hk",
+    }
+    records: list[RawSeedRecord] = []
+    if en_card["race_name"] and zh_card["race_name"]:
+        records.append(
+            RawSeedRecord(
+                term_type=TermType.RACE,
+                source_language=SourceLanguage.ENGLISH,
+                source_text=en_card["race_name"],
+                target_zh=to_simplified_chinese(zh_card["race_name"]),
+                original_target_zh=zh_card["race_name"],
+                source="hkjc",
+                region="hk",
+                entity_key=stable_entity_key(en_card["race_name"]),
+                evidence_url=en_url,
+                race_grade=_race_grade_from_name(en_card["race_name"]),
+                evidence={**base_evidence, "entity": "race", "alignment": "race_key"},
+            )
+        )
+
+    zh_by_no = {row.get("horse_no") or str(index + 1): row for index, row in enumerate(zh_card["rows"])}
+    seen_jockeys: set[str] = set()
+    for index, en_row in enumerate(en_card["rows"]):
+        row_key = en_row.get("horse_no") or str(index + 1)
+        zh_row = zh_by_no.get(row_key) or (zh_card["rows"][index] if index < len(zh_card["rows"]) else {})
+        horse_en = en_row.get("horse", "")
+        horse_zh = zh_row.get("horse", "")
+        horse_id = en_row.get("horse_id") or zh_row.get("horse_id") or ""
+        if horse_en and horse_zh:
+            records.append(
+                RawSeedRecord(
+                    term_type=TermType.HORSE,
+                    source_language=SourceLanguage.ENGLISH,
+                    source_text=horse_en,
+                    target_zh=to_simplified_chinese(horse_zh),
+                    original_target_zh=horse_zh,
+                    source="hkjc",
+                    region="hk",
+                    entity_key=global_entity_key("hkjc", TermType.HORSE, horse_id) or stable_entity_key(horse_en),
+                    evidence_url=en_url,
+                    evidence={**base_evidence, "entity": "horse", "horse_no": row_key, "horse_id": horse_id, "alignment": "horse_no"},
+                )
+            )
+        jockey_en = en_row.get("jockey", "")
+        jockey_zh = zh_row.get("jockey", "")
+        jockey_key = source_text_identity(jockey_en)
+        if jockey_en and jockey_zh and jockey_key not in seen_jockeys:
+            seen_jockeys.add(jockey_key)
+            records.append(
+                RawSeedRecord(
+                    term_type=TermType.JOCKEY,
+                    source_language=SourceLanguage.ENGLISH,
+                    source_text=jockey_en,
+                    target_zh=to_simplified_chinese(jockey_zh),
+                    original_target_zh=jockey_zh,
+                    source="hkjc",
+                    region="hk",
+                    entity_key=stable_entity_key(jockey_en),
+                    evidence_url=en_url,
+                    evidence={**base_evidence, "entity": "jockey", "horse_no": row_key, "alignment": "horse_no"},
+                )
+            )
+    return _dedupe_raw_records(records), []
+
+
+def _extract_hkjc_local_result_card(html: str, *, language: str, source_url: str) -> dict[str, Any]:
+    soup = BeautifulSoup(html or "", "lxml")
+    return {
+        "language": language,
+        "source_url": source_url,
+        "race_name": _extract_hkjc_local_result_race_name(soup),
+        "rows": _extract_hkjc_local_result_rows(soup, source_url=source_url),
+    }
+
+
+def _extract_hkjc_local_result_race_name(soup: BeautifulSoup) -> str:
+    for table in soup.find_all("table"):
+        rows = _table_rows(table)
+        text = " ".join(" ".join(row) for row in rows)
+        if not re.search(r"\bRACE\b|第\s*\d+\s*場", text, re.I):
+            continue
+        if not re.search(r"Going|Course|場地狀況|賽道", text, re.I):
+            continue
+        for row in rows:
+            if len(row) >= 3 and re.search(r"Course|賽道", row[1], re.I):
+                return _clean_hkjc_local_text(row[0])
+    return ""
+
+
+def _extract_hkjc_local_result_rows(soup: BeautifulSoup, *, source_url: str) -> list[dict[str, str]]:
+    for table in soup.find_all("table"):
+        rows = _table_rows(table)
+        if not rows:
+            continue
+        headers = [_hkjc_local_result_header_key(value) for value in rows[0]]
+        if "horse" not in headers or "jockey" not in headers:
+            continue
+        parsed_rows: list[dict[str, str]] = []
+        for values in rows[1:]:
+            row = {headers[index]: values[index] for index in range(min(len(headers), len(values))) if headers[index]}
+            horse_text = _clean_hkjc_local_horse_name(row.get("horse", ""))
+            if not horse_text:
+                continue
+            row["horse"] = horse_text
+            row["horse_id"] = _hkjc_local_horse_id_from_row(table, row.get("horse_no", ""), row.get("horse", ""), source_url=source_url)
+            row["jockey"] = _clean_hkjc_local_text(row.get("jockey", ""))
+            parsed_rows.append(row)
+        if parsed_rows:
+            return parsed_rows
+    return []
+
+
+def _hkjc_local_result_header_key(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value or "").strip().lower()
+    normalized = normalized.replace(" ", "_").replace(".", "")
+    mapping = {
+        "pla": "finish_position",
+        "名次": "finish_position",
+        "horse_no": "horse_no",
+        "馬號": "horse_no",
+        "马号": "horse_no",
+        "horse": "horse",
+        "馬名": "horse",
+        "马名": "horse",
+        "jockey": "jockey",
+        "騎師": "jockey",
+        "骑师": "jockey",
+        "trainer": "trainer",
+        "練馬師": "trainer",
+        "练马师": "trainer",
+    }
+    return mapping.get(normalized, "")
+
+
+def _clean_hkjc_local_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value or "").strip()
+
+
+def _clean_hkjc_local_horse_name(value: str) -> str:
+    return re.sub(r"\s*\([A-Z0-9]+\)\s*$", "", _clean_hkjc_local_text(value)).strip()
+
+
+def _hkjc_local_horse_id_from_row(table, horse_no: str, horse_name: str, *, source_url: str) -> str:
+    for tr in table.find_all("tr"):
+        cells = [_clean_hkjc_local_text(cell.get_text(" ", strip=True)) for cell in tr.find_all(["th", "td"], recursive=False)]
+        if horse_no and len(cells) >= 3 and cells[1] != horse_no:
+            continue
+        if horse_name and len(cells) >= 3 and horse_name not in _clean_hkjc_local_horse_name(cells[2]):
+            continue
+        link = tr.find("a", href=True)
+        if not link:
+            continue
+        absolute = urljoin(source_url, str(link.get("href") or ""))
+        horse_id = _query_param(absolute, "horseid")
+        if horse_id:
+            return horse_id
+    return ""
 
 
 def _looks_like_next_shell(html: str) -> bool:
@@ -1012,6 +1858,35 @@ def _hkjc_overseas_region(en_card: dict[str, Any], zh_card: dict[str, Any], race
     return "other"
 
 
+def _hkjc_overseas_region_from_race(race: dict[str, Any]) -> str:
+    raw_values = [
+        str(((race.get("countryCodeNm") or {}).get("code")) or ""),
+        str(((race.get("countryCodeNm") or {}).get("english")) or ""),
+        str(((race.get("countryCodeNm") or {}).get("chinese")) or ""),
+        str(race.get("country_en") or ""),
+        str(race.get("country_ch") or ""),
+    ]
+    for raw in raw_values:
+        region = _hkjc_overseas_region_from_text(raw)
+        if region:
+            return region
+    return ""
+
+
+def _hkjc_overseas_raw_region_from_race(race: dict[str, Any]) -> str:
+    country = race.get("countryCodeNm") or {}
+    for value in [
+        country.get("english"),
+        country.get("chinese"),
+        country.get("code"),
+        race.get("country_en"),
+        race.get("country_ch"),
+    ]:
+        if value:
+            return str(value)
+    return ""
+
+
 def _hkjc_overseas_region_from_text(value: str) -> str:
     normalized = (value or "").strip().lower()
     normalized = normalized.replace("-", "_").replace(" ", "_")
@@ -1020,8 +1895,10 @@ def _hkjc_overseas_region_from_text(value: str) -> str:
         "hong_kong": "hk",
         "香港": "hk",
         "gb": "gb",
+        "gb/ire": "gb",
         "uk": "gb",
         "united_kingdom": "gb",
+        "great_britain": "gb",
         "england": "gb",
         "英國": "gb",
         "英国": "gb",
@@ -1036,8 +1913,17 @@ def _hkjc_overseas_region_from_text(value: str) -> str:
         "美國": "us",
         "美国": "us",
         "jp": "jp",
+        "jpn": "jp",
         "japan": "jp",
         "日本": "jp",
+        "aus": "other",
+        "australia": "other",
+        "can": "other",
+        "canada": "other",
+        "ire": "other",
+        "ireland": "other",
+        "new_zealand": "other",
+        "uae": "other",
     }
     if normalized in mapping:
         return mapping[normalized]
@@ -1070,6 +1956,8 @@ def _region_from_url(url: str) -> str:
 def parse_source_html(html: str, *, source: str, source_url: str = "", fallback_region: str = "other") -> list[RawSeedRecord]:
     soup = BeautifulSoup(html or "", "lxml")
     records: list[RawSeedRecord] = []
+    if source == "wpstud":
+        records.extend(_records_from_wpstud_tables(soup, source_url=source_url, fallback_region=fallback_region))
     for table in soup.find_all("table"):
         rows = _table_rows(table)
         if not rows:
@@ -1084,15 +1972,139 @@ def parse_source_html(html: str, *, source: str, source_url: str = "", fallback_
     return _dedupe_raw_records(records)
 
 
+def _records_from_wpstud_tables(soup: BeautifulSoup, *, source_url: str, fallback_region: str) -> list[RawSeedRecord]:
+    records: list[RawSeedRecord] = []
+    page_text = soup.get_text(" ", strip=True)
+    for table in soup.find_all("table"):
+        rows = _table_rows(table)
+        if len(rows) < 2:
+            continue
+        headers = [_wpstud_header_key(value) for value in rows[0]]
+        for values in rows[1:]:
+            row = {headers[index]: values[index].strip() for index in range(min(len(headers), len(values))) if headers[index]}
+            target = row.get("target_zh", "").strip()
+            english_name = row.get("english_name", "").strip()
+            if not target or not english_name:
+                continue
+            term_type = _wpstud_term_type(row, page_text)
+            if not term_type:
+                continue
+            region = _wpstud_region(row, source_url=source_url, fallback_region=fallback_region)
+            records.append(
+                RawSeedRecord(
+                    term_type=term_type,
+                    source_language=SourceLanguage.ENGLISH,
+                    source_text=english_name,
+                    target_zh=to_simplified_chinese(target),
+                    original_target_zh=target,
+                    source="wpstud",
+                    region=region,
+                    entity_key=stable_entity_key(english_name),
+                    evidence_url=source_url,
+                    race_grade=_wpstud_race_grade(row.get("race_grade", "")) if term_type == TermType.RACE else "",
+                )
+            )
+    return records
+
+
+def _wpstud_header_key(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value or "").strip().lower()
+    normalized = normalized.replace(" ", "").replace("／", "/")
+    mapping = {
+        "賽事日文名稱": "japanese_name",
+        "赛事日文名称": "japanese_name",
+        "賽事英文名稱": "english_name",
+        "赛事英文名称": "english_name",
+        "賽事中文名稱": "target_zh",
+        "赛事中文名称": "target_zh",
+        "級數": "race_grade",
+        "级数": "race_grade",
+        "日文": "japanese_name",
+        "英文": "english_name",
+        "中文": "target_zh",
+        "出生地": "origin",
+        "據點": "base",
+        "据点": "base",
+        "馬場中文名稱": "target_zh",
+        "马场中文名称": "target_zh",
+        "所在國家/地區": "region",
+        "所在国家/地区": "region",
+        "馬場英文名稱": "english_name",
+        "马场英文名称": "english_name",
+        "馬場日文名稱": "japanese_name",
+        "马场日文名称": "japanese_name",
+    }
+    return mapping.get(normalized, "")
+
+
+def _wpstud_term_type(row: dict[str, str], page_text: str) -> str:
+    if row.get("race_grade"):
+        return TermType.RACE
+    if row.get("region") and "馬場" in page_text:
+        return TermType.RACECOURSE
+    if row.get("origin") or row.get("base") or "騎師" in page_text:
+        return TermType.JOCKEY
+    return ""
+
+
+def _wpstud_region(row: dict[str, str], *, source_url: str, fallback_region: str) -> str:
+    for value in [row.get("region", ""), row.get("base", ""), row.get("origin", "")]:
+        region = _wpstud_region_from_text(value)
+        if region:
+            return region
+    source_key = source_url.lower()
+    filename_mapping = {
+        "racehk": "hk",
+        "racejra": "jp",
+        "racenra": "jp",
+        "raceuk": "gb",
+        "racefr": "fr",
+        "raceus": "us",
+    }
+    for marker, region in filename_mapping.items():
+        if marker in source_key:
+            return region
+    return normalize_region(fallback_region)
+
+
+def _wpstud_region_from_text(value: str) -> str:
+    raw = value or ""
+    if "香港" in raw:
+        return "hk"
+    if "日本" in raw:
+        return "jp"
+    if "英國" in raw or "英国" in raw:
+        return "gb"
+    if "法國" in raw or "法国" in raw:
+        return "fr"
+    if "美國" in raw or "美国" in raw:
+        return "us"
+    return ""
+
+
+def _wpstud_race_grade(value: str) -> str:
+    raw = (value or "").strip().upper()
+    mapping = {
+        "I": "G1",
+        "II": "G2",
+        "III": "G3",
+        "G1": "G1",
+        "G2": "G2",
+        "G3": "G3",
+    }
+    return mapping.get(raw, "")
+
+
 def _collect_hkjc_horse_detail_records(
     client: SeedNetworkClient,
     *,
     html: str,
     source_url: str,
     limit_horses: int | None = None,
+    allowed_letters: tuple[str, ...] = (),
 ) -> list[RawSeedRecord]:
     records: list[RawSeedRecord] = []
-    for letter_url in _hkjc_letter_urls(html, source_url=source_url):
+    for letter_url in _hkjc_letter_urls(html, source_url=source_url, allowed_letters=allowed_letters):
         if limit_horses is not None and len(records) >= limit_horses:
             break
         letter_html = client.get_text(letter_url, source="hkjc")
@@ -1104,6 +2116,7 @@ def _collect_hkjc_horse_detail_records(
                 html=letter_html,
                 source_url=letter_url,
                 limit_horses=None if limit_horses is None else max(0, limit_horses - len(records)),
+                allowed_letters=allowed_letters,
             )
         )
     for link in _hkjc_horse_links(html, source_url=source_url):
@@ -1123,10 +2136,11 @@ def _collect_hkjc_horse_detail_records(
     return _dedupe_raw_records(records)
 
 
-def _hkjc_letter_urls(html: str, *, source_url: str) -> list[str]:
+def _hkjc_letter_urls(html: str, *, source_url: str, allowed_letters: tuple[str, ...] = ()) -> list[str]:
     parsed = urlparse(source_url)
     if "selecthorse" not in parsed.path.lower() or "selecthorsebychar" in parsed.path.lower():
         return []
+    allowed = {letter.strip().upper() for letter in allowed_letters if letter and letter.strip()}
     soup = BeautifulSoup(html or "", "lxml")
     urls: list[str] = []
     seen: set[str] = set()
@@ -1136,6 +2150,8 @@ def _hkjc_letter_urls(html: str, *, source_url: str) -> list[str]:
         query = parse_qs(urlparse(absolute).query)
         order_type = (query.get("ordertype") or [""])[0].strip()
         if not order_type or not re.fullmatch(r"[A-Z]", order_type):
+            continue
+        if allowed and order_type.upper() not in allowed:
             continue
         if absolute not in seen:
             seen.add(absolute)
@@ -1182,7 +2198,7 @@ def _hkjc_record_from_horse_detail(html: str, *, english_name: str, horse_id: st
         original_target_zh=target,
         source="hkjc",
         region="hk",
-        entity_key=stable_entity_key(horse_id, english_name, target),
+        entity_key=global_entity_key("hkjc", TermType.HORSE, horse_id) or stable_entity_key(english_name, target),
         evidence_url=source_url,
     )
 
@@ -1425,7 +2441,7 @@ def build_seed_result(records: list[RawSeedRecord], *, requests_info: list[Reque
             source_evidence["conflicts"].extend(rows)
         for record in _output_records_for_group(group, primary):
             candidate_rows.append(_candidate_row(record, primary, aliases_zh))
-            source_evidence["candidates"].append(_record_evidence(record, primary))
+            source_evidence["candidates"].append(_record_evidence(record, primary, group))
 
     blocking_failures = [item for item in failures if item.get("type") != "skipped_races"]
     summary = {
@@ -1520,6 +2536,7 @@ def _candidate_row(record: RawSeedRecord, primary: RawSeedRecord, aliases_zh: li
         "sources": ",".join(sorted({item.source for item in [record, primary]})),
         "source_tier": source_tier,
         "requires_review": requires_review,
+        "entity_key": primary.entity_key,
         "evidence": record.evidence_url or primary.evidence_url,
     }
     original_values = []
@@ -1552,7 +2569,7 @@ def _evidence_summary(group: list[RawSeedRecord]) -> str:
     return " | ".join(dict.fromkeys(values))
 
 
-def _record_evidence(record: RawSeedRecord, primary: RawSeedRecord) -> dict[str, Any]:
+def _record_evidence(record: RawSeedRecord, primary: RawSeedRecord, group: list[RawSeedRecord]) -> dict[str, Any]:
     payload = {
         "term_type": primary.term_type,
         "source_language": record.source_language,
@@ -1560,6 +2577,7 @@ def _record_evidence(record: RawSeedRecord, primary: RawSeedRecord) -> dict[str,
         "target_zh": primary.target_zh,
         "source": record.source,
         "source_tier": record.source_tier,
+        "entity_key": primary.entity_key,
         "region": normalize_region(primary.region),
         "racing_region": import_region_value(primary.region),
         "evidence_url": record.evidence_url or primary.evidence_url,
@@ -1568,7 +2586,34 @@ def _record_evidence(record: RawSeedRecord, primary: RawSeedRecord) -> dict[str,
         payload["original_zh_hant"] = record.original_target_zh
     if record.evidence:
         payload.update(record.evidence)
+    evidence_samples = _record_evidence_samples(group)
+    if evidence_samples:
+        payload["evidence_samples"] = evidence_samples
     return payload
+
+
+def _record_evidence_samples(group: list[RawSeedRecord]) -> list[dict[str, Any]]:
+    samples: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in group:
+        sample: dict[str, Any] = {
+            "source": item.source,
+            "source_text": item.source_text,
+            "target_zh": item.target_zh,
+            "evidence_url": item.evidence_url,
+        }
+        if item.original_target_zh:
+            sample["original_zh_hant"] = item.original_target_zh
+        if item.evidence:
+            sample.update(item.evidence)
+        key = json.dumps(sample, ensure_ascii=False, sort_keys=True)
+        if key in seen:
+            continue
+        seen.add(key)
+        samples.append(sample)
+        if len(samples) >= MAX_EVIDENCE_SAMPLES_PER_CANDIDATE:
+            break
+    return samples
 
 
 def write_seed_files(result: BuildResult, output_dir: Path) -> dict[str, str]:
