@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, Iterable
@@ -55,6 +56,8 @@ BASIC_EVENT_FIELDS = {
     "is_featured",
     "source_refs",
 }
+
+HORSE_COUNTRY_SUFFIX_RE = re.compile(r"\s*[\(\（][A-Z]{2,3}[\)\）]\s*$")
 
 
 @dataclass
@@ -154,6 +157,10 @@ def _set_unlocked_event_fields(event: RaceEvent, payload: dict) -> list[str]:
     return updated_fields
 
 
+def _clean_race_horse_name(value: Any) -> str:
+    return HORSE_COUNTRY_SUFFIX_RE.sub("", str(value or "").strip()).strip()
+
+
 def _replace_runners(event: RaceEvent, items: Iterable[dict]) -> int:
     if _locked(event, RaceEventModule.RUNNERS):
         return 0
@@ -166,7 +173,7 @@ def _replace_runners(event: RaceEvent, items: Iterable[dict]) -> int:
                 sort_order=int(item.get("sort_order") or index),
                 horse_number=str(item.get("horse_number") or ""),
                 barrier=str(item.get("barrier") or ""),
-                horse_name=str(item.get("horse_name") or "").strip(),
+                horse_name=_clean_race_horse_name(item.get("horse_name")),
                 jockey_name=str(item.get("jockey_name") or ""),
                 trainer_name=str(item.get("trainer_name") or ""),
                 carried_weight=str(item.get("carried_weight") or ""),
@@ -194,7 +201,7 @@ def _replace_results(event: RaceEvent, items: Iterable[dict]) -> int:
                 event=event,
                 finish_position=int(item["finish_position"]),
                 horse_number=str(item.get("horse_number") or ""),
-                horse_name=str(item.get("horse_name") or "").strip(),
+                horse_name=_clean_race_horse_name(item.get("horse_name")),
                 jockey_name=str(item.get("jockey_name") or ""),
                 trainer_name=str(item.get("trainer_name") or ""),
                 finish_time=str(item.get("finish_time") or ""),
@@ -225,7 +232,7 @@ def _replace_history_winners(event: RaceEvent, items: Iterable[dict]) -> int:
             RaceEventHistoryWinner(
                 event=event,
                 winner_year=int(item["winner_year"]),
-                horse_name=str(item.get("horse_name") or "").strip(),
+                horse_name=_clean_race_horse_name(item.get("horse_name")),
                 jockey_name=str(item.get("jockey_name") or ""),
                 trainer_name=str(item.get("trainer_name") or ""),
                 finish_time=str(item.get("finish_time") or ""),
@@ -353,7 +360,7 @@ def update_runner_dynamic_fields(event: RaceEvent, updates: Iterable[dict], *, s
     now = timezone.now()
     for item in updates:
         horse_number = str(item.get("horse_number") or "")
-        horse_name = str(item.get("horse_name") or "")
+        horse_name = _clean_race_horse_name(item.get("horse_name"))
         queryset = event.runners.all()
         runner = None
         if horse_number:

@@ -1,5 +1,60 @@
 # 部署运行手册
 
+## 2026-07-06 赛事日历 2026 日本与香港正式导入
+
+- 生产服务器：`/opt/umanewsbot`，当前导入时 `HEAD=c996621`。
+- 导入前检查：
+  - `web` healthy，`worker / beat / db / redis / nginx` 正常运行。
+  - `ExternalDataImportRun(status="started")=0`。
+  - `ExternalDataImportLock.locked_by_run_id` 为空。
+- 日本 2026 JRA 中央重赏批次：
+  - 官方来源：`https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html`。
+  - 本地产物：`runtime/race_event_imports/2026/japan-jra-central-graded-20260706/`。
+  - 范围：JRA 中央 `G1/G2/G3/J-G1/J-G2/J-G3`，不含 Listed/Open 和地方交流重赏。
+  - 生成结果：`140` 场，`G1=24`、`G2=38`、`G3=68`、`JG1=2`、`JG2=3`、`JG3=5`；`finished=74`、`scheduled=66`。
+  - 备份：首次 `pg_dump -U postgres` 因生产库角色不是 `postgres` 失败且未写库；有效备份改用运行中的 `db` 容器执行 `pg_dump -U horse_news -d horse_news`，文件为 `backups/db/pre-race-events-jra-2026-20260706_113855.sql.gz`，大小约 `72M`，`gzip -t` 通过。
+  - 生产 dry-run：`python manage.py import_race_events --csv /tmp/race_events_japan_jra_2026.csv --dry-run` 通过。
+  - 正式导入：`created=139 updated=1 aliases=413`；`宝塚記念` 更新既有样例 `takarazuka-kinen`。
+  - 导入后计数：`RaceEvent=144`、`RaceEventAlias=423`、`japan/year=2026` 为 `140` 场。
+  - 前台验收：`/races/?region=japan`、`/races/2026/takarazuka-kinen/`、`/races/2026/jra-2026-1227-01/` 和 `/races/2026/jra-2026-0104-01/` 均返回 `200` 并显示基础资料。
+- 香港 2026 HKJC 分级赛批次：
+  - 官方来源：`https://racing.hkjc.com/zh-hk/international-racing/g2-g3-races/index`、`https://campaigns.hkjc.com/racing-event-hub/ch/`，并用 HKJC 本地赛果页补马场、距离和场地。
+  - 本地产物：`runtime/race_event_imports/2026/hong-kong-hkjc-pattern-20260706/`。
+  - 范围：HKJC 当前公开 2025/26 马季内、比赛日期落在 2026 年的香港本地 `G1/G2/G3`，共 `19` 场；不包含四岁马经典赛、Listed/Open、地区重赏，也不猜测尚未由 HKJC 公开 2026/27 日期的 2026 年末香港国际赛。
+  - 生成结果：`19` 场，`G1=8`、`G2=2`、`G3=9`；全部为 `finished`；已过滤非单场赛事卡片 `沙田煞科日`。
+  - 备份：`backups/db/pre-race-events-hk-2026-20260706_115242.sql.gz`，大小约 `72M`，`gzip -t` 通过。
+  - 生产 dry-run：`python manage.py import_race_events --csv /tmp/race_events_hong_kong_hkjc_2026.csv --dry-run` 通过。
+  - 正式导入：`created=19 updated=0 aliases=74`。
+  - 导入后计数：`RaceEvent=163`、`RaceEventAlias=497`、`hong_kong/year=2026` 为 `20` 条，其中 `19` 条为本批 HKJC 官方源，另 `1` 条为既有香港杯样例。
+  - 前台验收：`/races/?tab=all&region=hong_kong`、`/races/?tab=key&region=hong_kong&direction=past&cursor=2026-07-06`、`/races/2026/hkjc-2026-0125-05/`、`/races/2026/hkjc-2026-0426-13/`、`/races/2026/hkjc-2026-0114-03/` 均返回 `200` 并显示简体中文名、繁体原名、马场、距离、基础资料和出马表占位。
+- 操作注意：
+  - 生产主机 `imports/` 目录没有挂载到 `web` 容器；CSV 上传到 `/opt/umanewsbot/imports/...` 后，需要再 `docker cp` 到 `umanewsbot-web-1:/tmp/...` 执行导入命令。
+  - HKJC 官方页当前未公开 2026/27 马季年底香港国际赛日期明细；后续应等官方赛期公开后再补 2026 年末香港 G1，而不是沿用样例日期。
+
+## 2026-07-06 赛事日历线上验收与示例审核包
+
+- 生产服务器：`/opt/umanewsbot` 当前 `HEAD=c996621`。
+- 线上验收：
+  - 公网 `http://umafans.run/healthz/` 返回 `200`，内容为 `{"status": "ok"}`。
+  - 公网 `/races/` 返回 `200`。
+  - 公网 `/admin/login/` 返回 `200`。
+  - `web` 为 healthy，`worker / beat / db / redis / nginx` 正常运行。
+  - `manage.py check` 通过。
+  - `showmigrations stable` 确认 `[X] 0020_raceevent_articleracelink_raceeventalias_and_more`。
+  - `ExternalDataImportRun(status="started")=0`，导入锁为空。
+- 生产赛事模块当前计数：
+  - `RaceEvent=5`、`RaceEventAlias=10`。
+  - `RaceEventRunner=0`、`RaceEventResult=0`、`RaceEventDataCandidate=0`、`ArticleRaceLink=0`。
+  - 五地区各 1 条样例赛事。
+- 示例审核包：
+  - 路径：`runtime/race_event_review_samples/japan-cup-2025-20260706/`。
+  - 官方来源：`https://japanracing.jp/en/japancup/news_results/news2025/251130-02.html`。
+  - 文件：`race_events_sample.csv`、`race_event_candidate_payload.json`、`source_official.html`、`README.md`。
+  - 样例为 `2025 Japan Cup`，日本 `G1`，非 listed，非地区重赏；解析出基础资料 1 组、出走表 17 匹、正式完赛赛果 16 条。
+  - `DB_ENGINE=sqlite .venv/bin/python server/manage.py import_race_events --csv runtime/race_event_review_samples/japan-cup-2025-20260706/race_events_sample.csv --dry-run` 通过。
+  - `race_event_candidate_payload.json` 已通过 JSON 格式校验。
+  - 本次不写生产库；CSV 中 `visibility_status=draft`，等待人工审核后再进入小流量多次正式爬取。
+
 ## 2026-07-06 HKJC 术语种子抽取返修上线
 
 - 本地上线提交：`4b6e840`（`Harden HKJC termbase seed extraction`），已推送 `origin/main`。

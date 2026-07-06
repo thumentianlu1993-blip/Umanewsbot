@@ -13293,6 +13293,54 @@ class RaceEventPageMVPTests(TestCase):
         )
         self.assertEqual(removed_link.status, ArticleRaceLinkStatus.REMOVED)
 
+    def test_candidate_apply_strips_trailing_horse_country_suffixes(self):
+        runner_candidate = RaceEventDataCandidate.objects.create(
+            event=self.event,
+            module=RaceEventModule.RUNNERS,
+            source_name="fixture",
+            candidate_payload={
+                "items": [
+                    {"horse_number": "1", "horse_name": "Calandagan (IRE)", "jockey_name": "Mickael Barzalona"}
+                ]
+            },
+        )
+        result_candidate = RaceEventDataCandidate.objects.create(
+            event=self.event,
+            module=RaceEventModule.RESULTS,
+            source_name="fixture",
+            candidate_payload={
+                "items": [
+                    {"finish_position": 1, "horse_number": "1", "horse_name": "Calandagan (IRE)", "jockey_name": "Mickael Barzalona"}
+                ]
+            },
+        )
+        history_candidate = RaceEventDataCandidate.objects.create(
+            event=self.event,
+            module=RaceEventModule.HISTORY_WINNERS,
+            source_name="fixture",
+            candidate_payload={
+                "items": [
+                    {"winner_year": 2025, "horse_name": "Masquerade Ball（JPN）", "jockey_name": "Christophe Lemaire"}
+                ]
+            },
+        )
+
+        apply_data_candidate(runner_candidate, user=self.user)
+        apply_data_candidate(result_candidate, user=self.user)
+        apply_data_candidate(history_candidate, user=self.user)
+        update_result = update_runner_dynamic_fields(
+            self.event,
+            [{"horse_name": "Calandagan (IRE)", "odds_value": "2.1"}],
+            source_name="fixture",
+        )
+
+        self.assertTrue(RaceEventRunner.objects.filter(event=self.event, horse_name="Calandagan").exists())
+        self.assertFalse(RaceEventRunner.objects.filter(event=self.event, horse_name__contains="(IRE)").exists())
+        self.assertTrue(RaceEventResult.objects.filter(event=self.event, horse_name="Calandagan").exists())
+        self.assertTrue(RaceEventHistoryWinner.objects.filter(event=self.event, horse_name="Masquerade Ball").exists())
+        self.assertEqual(update_result["updated"], 1)
+        self.assertEqual(self.event.runners.get(horse_number="1").odds_value, "2.1")
+
     def test_dynamic_field_update_and_removed_article_link_protection(self):
         RaceEventRunner.objects.create(event=self.event, horse_number="1", horse_name="贝拉吉奥歌剧", odds_value="4.0")
         update_result = update_runner_dynamic_fields(
