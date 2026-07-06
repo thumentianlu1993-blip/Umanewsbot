@@ -1,5 +1,48 @@
 # 部署运行手册
 
+## 2026-07-06 英国 BHA Flat 2026 Group 赛事 OCR 导入
+
+- 生产服务器：`/opt/umanewsbot`，导入时 `HEAD=87319b4`。
+- 官方来源：`https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Flat_Pattern_Listed_2026.pdf`。
+- 本地产物：`runtime/race_event_imports/2026/united-kingdom-bha-pattern-20260706/`。
+- 解析方式：
+  - BHA Flat 官方 PDF 正文页无可用文本层，普通 PDF 文本抽取为空。
+  - 本次使用 `pdftoppm` 渲染详情页，再通过 macOS Vision OCR 生成 `flat_detail_ocr.jsonl`。
+  - 赛事名、日期、场地和等级来自官方详情页 OCR；距离字段来自 OCR，明显残缺项已清空或人工清理，并统一保留 `data_quality_status=partial`。
+  - 场地规则：Kempton Park / Lingfield Park / Newcastle / Southwell / Wolverhampton / Chelmsford City 或 OCR 含 `AWT` 时记为 `synthetic`，其他 Flat 赛事记为 `turf`。
+- 范围：
+  - British Flat Pattern and Listed Races 2026 中 `Group 1 / Group 2 / Group 3`。
+  - 排除 Listed。
+- 生成结果：
+  - `138` 场；`G1=33`、`G2=42`、`G3=63`。
+  - `finished=59`、`scheduled=79`。
+  - `synthetic=6`、`turf=132`。
+- 本地验证：
+  - `DB_ENGINE=sqlite .venv/bin/python server/manage.py import_race_events --csv runtime/race_event_imports/2026/united-kingdom-bha-pattern-20260706/race_events_united_kingdom_bha_flat_2026.csv --dry-run` 通过。
+- 生产导入前检查：
+  - `web` healthy，`db/redis` healthy，`worker/beat/nginx` 正常运行。
+  - `RaceEvent=857`、`RaceEventAlias=2863`、`UK2026=65`、`UKFlatExisting=0`。
+  - `TaskExecutionLog(task_name="import_race_events", status="started")=0`。
+- 备份：
+  - `backups/db/pre-race-events-uk-bha-flat-2026-20260706_222151.sql.gz`，约 `74M`，`gzip -t` 通过。
+- 生产文件：
+  - Host 路径：`/opt/umanewsbot/imports/race-events-uk-bha-flat-2026-20260706/race_events_united_kingdom_bha_flat_2026.csv`。
+  - 注意：`imports/` 未挂载到 `web` 容器；已使用 `docker cp` 复制到 `web:/tmp/race_events_united_kingdom_bha_flat_2026.csv` 后执行管理命令。
+- 生产 dry-run：
+  - `docker compose exec -T web python manage.py import_race_events --csv /tmp/race_events_united_kingdom_bha_flat_2026.csv --dry-run` 通过。
+- 正式导入：
+  - `created=138 updated=0 aliases=414`。
+- 导入后计数：
+  - `RaceEvent=995`、`RaceEventAlias=3277`。
+  - `UK2026=203`、`UKFlat2026=138`、`UKFlatVisible=138`、`UKFlatSynthetic=6`。
+- 页面验收：
+  - `/races/?tab=all&region=united_kingdom` 返回 `200`，可命中 `CORAL-ECLIPSE` 与“复合赛道”。
+  - `/races/2026/uk-bha-flat-2026-0704-058/` 返回 `200`，显示 `CORAL-ECLIPSE`。
+  - `/races/2026/uk-bha-flat-2026-0905-102/` 返回 `200`，显示 `UNIBET SEPTEMBER STAKES` 与“复合赛道”。
+- 剩余缺口：
+  - HKJC 尚未公开 2026/27 马季年末香港本地 G1/G2/G3 日期明细。
+  - 英国 Jump 2026 年 10-12 月需要 2026/27 官方书或其他官方结构化来源。
+
 ## 2026-07-06 赛事日历 2026 NAR / 美国 / 英国 Jump / 法国正式导入
 
 - 生产服务器：`/opt/umanewsbot`。
