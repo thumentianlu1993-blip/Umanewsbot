@@ -341,6 +341,7 @@ class RaceGrade(models.TextChoices):
 class RaceEventSurface(models.TextChoices):
     TURF = "turf", "草地"
     DIRT = "dirt", "泥地"
+    SYNTHETIC = "synthetic", "复合赛道"
     JUMPS = "jumps", "障碍"
 
 

@@ -87,6 +87,7 @@ from stable.models import (
     RaceEventResult,
     RaceEventRunner,
     RaceEventStatus,
+    RaceEventSurface,
     RaceEventVisibility,
     RaceRunnerStatus,
     ArticleRaceLink,
@@ -13428,6 +13429,22 @@ class RaceEventPageMVPTests(TestCase):
 
         self.assertIn("第 2 行字段校验失败", str(context.exception))
         self.assertFalse(RaceEvent.objects.filter(slug="bad-race").exists())
+
+    def test_csv_import_supports_synthetic_surface(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = Path(tmp) / "synthetic-races.csv"
+            csv_path.write_text(
+                "year,slug,original_name,chinese_name,country_region,racecourse,grade_text,surface,local_date,visibility_status\n"
+                "2026,synthetic-stakes,Synthetic Stakes,Synthetic Stakes,united_states,Turfway Park,G3,synthetic,2026-03-21,published\n",
+                encoding="utf-8",
+            )
+            call_command("import_race_events", "--csv", str(csv_path), stdout=StringIO())
+
+        event = RaceEvent.objects.get(slug="synthetic-stakes")
+        response = self.client.get(reverse("public-race-detail", args=[event.year, event.slug]))
+
+        self.assertEqual(event.surface, RaceEventSurface.SYNTHETIC)
+        self.assertContains(response, "复合赛道")
 
     def test_seed_sample_import_covers_five_regions_and_calendar_visibility(self):
         sample_path = Path(django_settings.BASE_DIR) / "stable" / "data" / "race_events_seed_sample.csv"
