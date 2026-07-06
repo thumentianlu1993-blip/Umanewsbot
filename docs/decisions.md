@@ -163,6 +163,18 @@ OneBot HTTP API 可以直接发送群消息，一旦公网裸露且 token 泄露
 - 仍保留官方原始 surface code 到 `source_refs`，便于之后做更细的赛道材质标准化。
 - 这是枚举与展示层补充，不改变 `RaceEvent` 主表结构或现有 turf/dirt/jumps 数据语义。
 
+## 为什么赛果同着使用唯一排序位写库并保留官方名次
+
+JRA 官方赛果会出现同着，例如两匹马同为第 `2` 名。当前 `RaceEventResult` 对 `(event, finish_position)` 有唯一约束，不能直接写入两条相同 `finish_position`。
+
+因此 2026 JRA 详情导入采用两层口径：
+
+- `RaceEventResult.finish_position` 保存唯一排序位，用于数据库约束、排序和稳定渲染。
+- `source_refs.official_finish_position` 与 `source_refs.jra_finish_position_text` 保存官方名次。
+- 前台赛事日历和赛事详情页优先展示官方名次；没有官方名次时才展示排序位。
+
+这样既不破坏当前数据库约束，也不会在用户可见页面把同着第 `2` 名错误展示成第 `3` 名。后续若要彻底支持同着、DNF、取消和除外的完整赛果语义，可以再扩展 `RaceEventResult` 的展示名次字段或调整唯一约束。
+
 ## 为什么引入 OpenSpec + Codex 领域代理
 
 项目已经进入自动化运营、HTTPS、部署稳定化和运维完善并行推进阶段，跨模块与生产高风险改动会逐渐增加。
@@ -580,3 +592,30 @@ QQ 窗口同样不能把“delivery 已入队”当成“QQ 已成功发送”�
 - HKJC overseas 精确 Race Card 输入使用可重复的 `--hkjc-overseas-race RaceDate=YYYY-MM-DD,Racecourse=<code>,RaceNo=<number>`，参数格式错误时必须拒绝执行，不能静默回退到自动发现。
 - 渲染 fallback 只作为人工审核种子准备的可选能力；本变更默认不把 Playwright、浏览器二进制或图形系统依赖加入生产镜像。
 - 若直接请求无法得到 Race Card 内容且没有可用渲染器或渲染后缓存，命令必须记录 `render_fallback_unavailable` 或等价原因，并把结果标记为 `incomplete=true`，不能把缺失当作空数据成功。
+
+## 为什么术语最终导入不强行合并既有日文 alias 占用
+
+HKJC 官方来源适合作为国际和香港赛马术语主译名，但生产库中已经存在大量日本日文主词和自动维护的日文 `TermAlias`。当 HKJC 日本马英文词条需要补日文 alias 时，如果对应日文名已被既有词条或 alias 占用，直接把 alias 迁移或复制到英文词条会产生两个风险：
+
+- 中文目标一致时，强行合并会破坏既有日文词条的历史引用和审核痕迹。
+- 中文目标不一致时，例如 `Raijin / ライジン` 或 `Scintillation / シンチレーション`，强行合并会把不同概念或地区译名折叠到同一个词条，影响翻译保护和术语应用。
+
+因此 `2026-07-06/07` 最终术语导入采用保守策略：
+
+- HKJC 英文词条保留官方主译名和地区。
+- 只在无冲突时补充日文 alias。
+- 已被既有日文主词或 alias 占用的日文名记录为 skipped，不自动迁移、不停用官方英文主词。
+- 后续如果要合并个别概念，必须通过人工审核确认是同一匹马、同一中文目标和同一适用地区后，再单条处理。
+
+## 为什么美国 2026 赛事详情先用 TOBA + HRN，而不强抓 Equibase chart
+
+2026 美国分级赛基础范围以 TOBA 官方 American Graded Stakes 表为准；TOBA 表提供赛事、日期、赛场、等级、字段和部分 Equibase chart URL，适合定义“哪些比赛应进入赛事日历”。
+
+赛后详情方面，Equibase chart HTML/PDF 入口当前返回 `Pardon Our Interruption` 防护页，不应尝试绕过风控或把防护页当作可解析来源。因此本轮详情导入采用：
+
+- TOBA 官方表确定 2026 已完赛 Grade 1/2/3 范围，并优先使用 TOBA `chart_url` 中的 RaceNo 辅助匹配。
+- Horse Racing Nation track-day 页面作为可访问公开来源，提供出走表和可见结果顺序。
+- HRN 马名展示字段剥离 `(IRE)/(GB)/(SAF)` 等国籍后缀，原始写法保存在 `source_refs.horse_name_raw`。
+- HRN 未公开 payout / also-rans 结果块的赛事，只导入出走表，不从 TOBA `winner` 字段猜完整名次。
+
+这样能先让前台展示美国已完赛分级赛的出走表和可确认赛果，同时保留来源边界；后续若 Equibase 或赛场官方 chart 有稳定可访问入口，再用更权威来源覆盖对应 `results` 模块。

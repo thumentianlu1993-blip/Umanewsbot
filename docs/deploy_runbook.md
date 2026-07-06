@@ -1,5 +1,237 @@
 # 部署运行手册
 
+## 2026-07-06/07 HKJC / WP Stud 术语库最终清洗与生产导入
+
+- 生产服务器：`/opt/umanewsbot`，导入时 `HEAD=b1ddb54`。
+- 本地产物：`runtime/termbase_seed/final-reviewed-import-20260706/`。
+  - `seed_candidates_final.csv`：最终导入主表，共 `11257` 行。
+  - `hkjc_japan_ja_aliases.csv`：HKJC 日本地区英文马名对应日文 alias，共 `907` 行，其中马名 `883` 行。
+  - `japan_aliases_missing.csv`：仍缺日文 alias 的日本地区非马名条目，共 `123` 行，包含骑师 `93`、赛事 `30`。
+  - `wpstud_horse_skipped_hkjc_alias_overlap.csv`：WP Stud HorseList 中因 HKJC 官方词条已覆盖而跳过的马名 `10` 行。
+  - `repair_report.json`：清洗和导入统计。
+- 输入来源：
+  - HKJC overseas / QIDS 既有审核候选 `7691` 条。
+  - WP Stud race / jockey / racecourse 既有审核候选 `1891` 条。
+  - WP Stud HorseList 全量马名 `1866` 条，来源 `https://www.wpstud.com/Translation/Horse/HorseList.html`。
+- 清洗规则：
+  - 马名尾部国别后缀如 `(JPN)`、`(IRE)`、`(GB)` 不进入正式 `source_ja`，原始写法保留在证据中。
+  - 带年份或替代名称的复合赛事名拆为独立术语，例如 `International Stakes` 与 `Benson & Hedges Gold Cup Stakes`。
+  - `target_zh` 统一简体中文。
+  - HKJC 官方主译名优先；WP Stud 作为社区来源、别名或佐证，不覆盖 HKJC 官方主译名。
+- 清洗统计：
+  - 去除马名国别后缀 `6481` 次。
+  - 拆分年份赛事标记 `59` 次。
+  - 去重 `254` 行。
+  - 最终马名分布包括 `horse|en|japan=880`、`horse|ja|japan=531`，并覆盖英、法、美、香港和 other 地区。
+- 本地验证：
+  - 最终 CSV 质量检查：马名国别后缀 `0`、赛事年份标记 `0`、HTML entity 残留 `0`、空值 `0`。
+  - 临时 SQLite `import_terms --dry-run`：总计 `11257`、新增 `11254`、更新 `3`、错误 `0`。
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py test stable.tests.TermbaseSeedDataPreparationTests --noinput`：通过，`21` 项。
+- 生产导入前检查：
+  - `web` healthy，`db/redis` healthy，`worker/beat/nginx` 正常运行。
+  - `manage.py check` 通过。
+  - `http://127.0.0.1/healthz/` 返回 `{"status":"ok"}`。
+  - 导入前 `TermEntry=15321`、`TermAlias=15537`。
+  - `ExternalDataImportRun(status="started")=0`，`ExternalDataImportLock.locked_by_run_id` 非空计数为 `0`。
+- 备份：
+  - `backups/db/pre-final-termbase-review-20260706_234427.sql.gz`，约 `75M`，`gzip -t` 通过。
+- 生产文件：
+  - Host 路径：`/opt/umanewsbot/imports/final-termbase-review-20260706/`。
+  - Web 容器路径：`/tmp/final-termbase-review-20260706/`。
+- 生产 dry-run：
+  - `preview_summary`: 总计 `11257`、新增 `1169`、更新 `10088`、错误 `0`。
+  - `import_result`: 新增 `1169`、更新 `10088`、跳过 `0`。
+  - `repair_stats`: `horse_suffix_cleaned=6282`、`horse_suffix_deactivated_duplicates=94`、`race_year_cleaned_primary=119`、`race_year_deactivated_duplicates=9`、`race_year_split_created=68`、`race_year_split_existing=5`。
+  - `alias_stats`: `alias_upserted=874`、`alias_deactivated_duplicate_ja_entries=27`、`alias_skipped_existing_alias_owner=27`、`alias_skipped_existing_same_language_entry=5`、`alias_skipped_conflicting_same_language_entry=1`。
+  - `quality`: active 马名国别后缀 `0`、active 赛事年份标记 `0`。
+- 正式导入：
+  - 使用 `apply_final_termbase_repair.py` 在事务中先清理既有 active 脏词，再调用 `preview_term_import / commit_term_import`，最后应用跨语言 alias。
+  - 正式导入结果与 dry-run 一致：新增 `1169`、更新 `10088`、错误/跳过 `0`。
+- 导入后生产计数：
+  - `TermEntry=16558`。
+  - `TermAlias=19293`。
+  - active `TermEntry=16428`。
+  - `source_language=en/racing_region=japan/term_type=horse` 为 `880` 条。
+  - WP Stud 日文马名 active 词条 `3235` 条。
+  - active 马名国别后缀术语 `0`。
+  - active 赛事年份标记术语 `0`。
+  - `ExternalDataImportRun(status="started")=0`，导入锁为空。
+- 抽样验收：
+  - `A Bit Of Spirit` 为 active，中文 `点燃斗志`，别名含英文原文；`A Bit Of Spirit (IRE)` 无 active 词条。
+  - `International Stakes -> 国际锦标` 与 `Benson & Hedges Gold Cup Stakes -> 宾臣暨赫捷仕金杯` 均为 active 独立赛事术语。
+  - `A Shin Resume -> 荣进重启` 挂日文 alias `エイシンレジューム`。
+  - `Dragon -> 腾龙` 挂日文 alias `ドラゴン`。
+  - `Dynamic -> 鲜明新曲` 挂日文 alias `ダイナマイク`。
+  - `Sophia -> 才情苏菲` 挂日文 alias `ソフィア`。
+  - `ハーパー` 不保留 active 独立 WP Stud 词条，因为对应概念已由 HKJC 官方 row / alias 覆盖。
+- alias 占用说明：
+  - `26` 个 HKJC 日本马英文词条未直接新增日文 alias，是因为对应日文名已被生产中 existing `TermAlias` 或日文主词占用；其中大多数中文目标一致。
+  - `Raijin / ライジン` 当前生产已有日文词 `ライジン -> 雷神`，本次 HKJC 英文主词为 `Raijin -> 霹雳雷公`，按冲突处理跳过 alias 合并。
+  - `Scintillation / シンチレーション` 当前生产已有香港地区占用 `シンチレーション -> 灿惑`，本次 HKJC 英文主词为 `Scintillation -> 烁亮丽`，按 alias owner 占用跳过。
+- 导入后验证：
+  - `manage.py check` 通过。
+  - `http://127.0.0.1/healthz/` 与 Host `umafans.run` 健康检查均返回 `{"status":"ok"}`。
+
+## 2026-07-06/07 香港 HKJC 与美国 HRN 2026 出走表 / 赛果导入
+
+- 生产服务器：`/opt/umanewsbot`，导入时 JRA 同着展示修复仍为 `web` 容器热补丁状态；后续容器重建前仍需通过 git 镜像部署固化。
+- 香港官方来源：
+  - HKJC 繁中日汇总页：`https://racing.hkjc.com/zh-hk/local/information/resultsall?Racecourse=<ST/HV>&racedate=YYYY/MM/DD`。
+  - HKJC 繁中单场完整赛果页：`https://racing.hkjc.com/zh-hk/local/information/localresults?...&RaceNo=N`。
+- 香港本地产物：`runtime/race_event_detail_imports/2026/hong-kong-hkjc-details-20260706/`。
+  - `hkjc_detail_candidates_2026.jsonl`：生产导入用候选包。
+  - `hkjc_detail_review_2026.csv`：人工快速核对用摘要。
+  - `summary.json`：生成统计。
+  - `sources/`：HKJC `resultsall` 与 `localresults` 页面缓存。
+- 香港生成结果：
+  - `19` 场 HKJC 当前已公开 2026 本地 G1/G2/G3。
+  - `182` 条出走表。
+  - `181` 条数字名次赛果。
+  - `WV` 写入 `RaceEventRunner.running_status=withdrawn`，不进入 `RaceEventResult`。
+  - 展示字段繁转简，原始繁中马名、骑师、练马师保存在 `source_refs`。
+- 香港生产导入前备份：
+  - `backups/db/pre-race-event-details-hk-2026-20260706_234317.sql.gz`，约 `75M`，`gzip -t` 通过。
+- 香港生产 dry-run：
+  - `{"dry_run": true, "events": 19, "items": {"runners": 182, "results": 181}}`。
+- 香港正式导入：
+  - `applied=38`、`candidates=38`、`events=19`、`runners=182`、`results=181`。
+- 香港页面验收：
+  - `/races/2026/hkjc-2026-0125-05/` 返回 `200`，显示董事杯冠军 `浪漫勇士`、完整出走表和赛果；`祝愿 / 阳光勇士` 同为官方第 `4` 名，完成时间均为 `1:33.18`。
+  - `/races/2026/hkjc-2026-0621-19/` 返回 `200`，显示精英碟出走表中 `非惟侥幸` 为取消出走，赛果保留 `11` 条已确认名次。
+- 美国范围来源：
+  - TOBA 官方 2026 American Graded Stakes 表确定 Grade 1/2/3 已完赛范围和 `chart_url` / RaceNo。
+  - Horse Racing Nation track-day 页面提供公开可访问出走表和可见结果顺序。
+  - Equibase chart HTML/PDF 当前仍返回 `Pardon Our Interruption` 防护页，不能作为批量抓取来源。
+- 美国本地产物：`runtime/race_event_detail_imports/2026/united-states-hrn-details-20260706/`。
+  - `us_hrn_detail_candidates_2026.jsonl`：生产导入用候选包。
+  - `us_hrn_detail_review_2026.csv`：人工快速核对用摘要。
+  - `summary.json`：生成统计。
+  - `sources/`：HRN date / track-day 页面缓存。
+- 美国生成结果：
+  - `195` 场 TOBA 已完赛 Grade 1/2/3。
+  - `1710` 条出走表。
+  - `1448` 条可确认赛果。
+  - 马名展示字段剥离 `(IRE)/(GB)/(SAF)` 等国籍后缀，原始写法保存在 `source_refs.horse_name_raw`。
+  - HRN 对 Kentucky Derby / Oaks 等少量页面只公开出走表、不公开 payout / also-rans 结果块；本批不使用 TOBA `winner` 字段猜完整名次，因此这些场次暂不显示赛果。
+  - 初次 apply 因 HRN HTML 重复渲染同一出走马导致 `(event, horse_number)` 唯一约束冲突；旧 pending 候选已标为 failed，生成器改为按 `horse_number + horse_name + horse_url` 去重后重跑。
+- 美国生产导入前备份：
+  - `backups/db/pre-race-event-details-us-hrn-2026-20260707_000230.sql.gz`，约 `75M`，`gzip -t` 通过。
+- 美国生产 dry-run：
+  - 修正版：`{"dry_run": true, "events": 195, "items": {"runners": 1710, "results": 1448}}`。
+- 美国正式导入：
+  - 修正版 apply 成功：`applied=390`、`candidates=390`、`events=195`、`runners=1710`、`results=1448`。
+- 导入后生产详情总计：
+  - `RaceEventRunner=3260`。
+  - `RaceEventResult=2977`。
+  - `RaceEventHistoryWinner=0`。
+  - `RaceEventDataCandidate=992`、`AppliedCandidates=990`、`FailedCandidates=2`、`PendingCandidates=0`。
+  - 美国详情行：`Runner=1710`、`Result=1448`。
+- 美国页面验收：
+  - `/races/2026/us-toba-2026-0108-001/` 返回 `200`，显示 Robert J. Frankel S. 冠军 `Paradise Lake`、出走表和赛果。
+  - `/races/2026/us-toba-2026-0502-119/` 返回 `200`，显示 Kentucky Derby 出走表；因 HRN 未公开结果块，暂不显示赛果。
+  - `http://umafans.run/healthz/` 返回 `{"status": "ok"}`。
+
+## 2026-07-06 NAR 2026 地方/交流重赏出走表 / 赛果导入
+
+- 生产服务器：`/opt/umanewsbot`，导入时 `HEAD=b1ddb54`，且 JRA 同着展示修复仍为 `web` 容器热补丁状态。
+- 官方来源：
+  - NAR ダートグレード特设赛事页：`https://www.keiba.go.jp/dirtgraderace/2026/<race>/racecard.html` 或 `introduction.html`。
+  - 出馬表：`https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/DebaTable?...`。
+  - 競走成績：`https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?...`。
+- 本地产物：`runtime/race_event_detail_imports/2026/japan-nar-details-20260706/`。
+  - `nar_detail_candidates_2026.jsonl`：生产导入用候选包。
+  - `nar_detail_review_2026.csv`：人工快速核对用摘要。
+  - `summary.json`：生成统计和未公布出走表缺口。
+  - `sources/`：NAR 特设页、出馬表页和競走成績页缓存。
+- 生成结果：
+  - `21` 场当前官方可用赛事。
+  - `256` 条出走表。
+  - `242` 条数字名次赛果。
+  - `20` 场已完赛写出走表和赛果。
+  - `2026-07-08` スパーキングレディーカップ仅官方已公布出走表，未有赛果。
+  - `25` 场未来赛事仍停留在 `introduction.html`，未公布出走表，记录为 `racecard_not_published`。
+- 状态处理：
+  - `除外` 写入 `RaceEventRunner.running_status=scratched`。
+  - `取消` 写入 `withdrawn`。
+  - 空白着顺写入 `unknown`。
+  - 只有数字着顺进入 `RaceEventResult`。
+- 生产导入前备份：
+  - `backups/db/pre-race-event-details-nar-2026-20260706_232856.sql.gz`，约 `75M`，`gzip -t` 通过。
+- 生产 dry-run：
+  - 结果：`{"dry_run": true, "events": 21, "items": {"runners": 256, "results": 242}}`。
+- 正式导入：
+  - `applied=41`、`candidates=41`、`events=21`、`runners=256`、`results=242`。
+- 导入后计数：
+  - `RaceEventRunner=1368`。
+  - `RaceEventResult=1348`。
+  - `RaceEventHistoryWinner=0`。
+  - `RaceEventDataCandidate=233`、`AppliedCandidates=232`、`FailedCandidates=1`。
+  - 当前详情表行仍全部属于日本地区。
+- 页面验收：
+  - `/races/2026/nar-dirt-2026-0701-20/` 返回 `200`，显示帝王賞冠军 `ミッキーファイト`、出走表、赛果和 `2:02.8`。
+  - `/races/2026/nar-dirt-2026-0708-21/` 返回 `200`，显示スパーキングレディーカップ出走表，包含 `レクランスリール` 与 `アピーリングルック`，未显示赛果区块。
+  - `http://umafans.run/healthz/` 返回 `{"status": "ok"}`。
+  - `manage.py check` 通过。
+- 剩余日本详情缺口：
+  - JRA 未来 `66` 场未公布出走表 / 赛果。
+  - NAR 未来 `25` 场仍为 `introduction.html`，未公布出走表 / 赛果。
+  - 后续应按官方发布节奏刷新，不猜测名单。
+
+## 2026-07-06 JRA 2026 已完赛重赏出走表 / 赛果导入
+
+- 生产服务器：`/opt/umanewsbot`，导入时 `HEAD=b1ddb54`。
+- 官方来源：
+  - JRA 2026 重赏列表：`https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html`。
+  - JRA 普通重赏结果页：`/datafile/seiseki/replay/2026/<id>.html`。
+  - JRA G1 结果页：`/datafile/seiseki/g1/<race>/result/<race>2026.html`。
+- 本地产物：`runtime/race_event_detail_imports/2026/japan-jra-details-20260706/`。
+  - `jra_detail_candidates_2026.jsonl`：生产导入用候选包。
+  - `jra_detail_review_2026.csv`：人工快速核对用摘要。
+  - `summary.json`：生成统计。
+  - `sources/`：JRA 结果页缓存。
+- 生成结果：
+  - `74` 场 JRA 已完赛中央重赏。
+  - `1112` 条出走表。
+  - `1106` 条数字名次赛果。
+  - `取消=2`、`除外=2`、`中止=2` 不进入 `RaceEventResult`，但保留在 `RaceEventRunner.running_status`。
+- 同着处理：
+  - `RaceEventResult.finish_position` 当前有唯一约束，因此用于前台排序和数据库唯一位。
+  - JRA 官方名次保存在 `source_refs.official_finish_position` 和 `source_refs.jra_finish_position_text`。
+  - 前台详情页和日历页优先展示 `official_finish_position`，因此安田記念同着第 2 名会显示两匹第 `2` 名。
+- 本地验证：
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py test stable.tests.RaceEventPageMVPTests --noinput`：通过，`17` 项。
+  - `DB_ENGINE=sqlite .venv/bin/python server/manage.py check`：通过。
+  - `git diff --check`：通过。
+- 生产导入前检查：
+  - `web` healthy，`db/redis` healthy，`worker/beat/nginx` 正常运行。
+  - 导入前详情表均为空：`RaceEventRunner=0`、`RaceEventResult=0`、`RaceEventHistoryWinner=0`、`RaceEventDataCandidate=0`。
+- 备份：
+  - `backups/db/pre-race-event-details-jra-2026-20260706_224953.sql.gz`，约 `75M`，`gzip -t` 通过。
+- 生产 dry-run：
+  - 通过临时脚本 `imports/race-event-details-jra-2026-20260706/apply_race_event_detail_jsonl.py` 在 `web` 容器内执行。
+  - 结果：`{"dry_run": true, "events": 74, "items": {"runners": 1112, "results": 1106}}`。
+- 首次正式 apply：
+  - 在 `オーシャンS` 遇到 JRA 同着，触发 `uq_race_result_event_pos` 唯一约束冲突后停止。
+  - 停止时已有 `Runner=332`、`Result=316`、`Candidate=44`、`AppliedCandidates=43`、`PendingCandidates=1`。
+  - 修正候选包后重新从头 apply，旧 pending 候选标记为 `failed`，错误说明为 `superseded by rerun after duplicate finish-position normalization`。
+- 正式导入结果：
+  - 第二次 apply 成功：`applied=148`、`candidates=148`、`events=74`、`runners=1112`、`results=1106`。
+  - 导入后生产：`RaceEventRunner=1112`、`RaceEventResult=1106`、`RaceEventDataCandidate=192`、`AppliedCandidates=191`、`FailedCandidates=1`。
+  - 宝塚記念：`runners=18`、`results=17`，冠军为 `メイショウタバル`。
+  - 安田記念：`ワールズエンド` 与 `ガイアフォース` 均保留 `official_finish_position=2`。
+- 前台展示热补丁：
+  - 为立即正确展示同着名次，已将本地 `server/stable/views.py`、`server/stable/templates/stable/public/race_detail.html`、`server/stable/templates/stable/public/race_calendar.html` 复制到 `umanewsbot-web-1` 容器并重启同一容器。
+  - 容器重建会丢失该热补丁；后续正式部署前必须先将这三处改动通过 git 提交/部署固化。
+- 验收：
+  - `http://umafans.run/healthz/` 返回 `{"status": "ok"}`。
+  - `/races/2026/takarazuka-kinen/` 返回 `200`，显示 `メイショウタバル`、出马表、赛果和 `2:12.1`。
+  - `/races/2026/jra-2026-0607-01/` 返回 `200`，`ワールズエンド` 与 `ガイアフォース` 在头部摘要和赛果表中均显示第 `2` 名，`ガイアフォース` 显示 `同着`。
+  - `web` healthy，`worker / beat / db / redis / nginx` 正常运行。
+- 剩余工作：
+  - 继续补 JRA 未完赛场次的赛前出走表。
+  - 继续补 NAR、HKJC、美国、英国、法国的出走表和赛果。
+  - 在出走表和赛果稳定后，再开始导入历届冠军。
+
 ## 2026-07-06 英国 BHA Flat 2026 Group 赛事 OCR 导入
 
 - 生产服务器：`/opt/umanewsbot`，导入时 `HEAD=87319b4`。

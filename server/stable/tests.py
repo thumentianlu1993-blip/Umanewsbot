@@ -12769,7 +12769,7 @@ class TermbaseSeedDataPreparationTests(TestCase):
                                         "runners": [
                                             {
                                                 "no": "1",
-                                                "horse": {"id": "GB001", "name_en": "ROYAL ASCOT", "name_ch": "皇家雅士谷"},
+                                                "horse": {"id": "GB001", "name_en": "ROYAL ASCOT (GB)", "name_ch": "皇家雅士谷"},
                                                 "jockey": {"code": "RM", "name_en": "Ryan Moore", "name_ch": "莫雅"},
                                             },
                                             {
@@ -12822,6 +12822,7 @@ class TermbaseSeedDataPreparationTests(TestCase):
             rows = self._read_csv(output_dir / "seed_candidates.csv")
             by_source = {row["source_ja"]: row for row in rows}
             self.assertEqual(by_source["ROYAL ASCOT"]["target_zh"], "皇家雅士谷")
+            self.assertNotIn("ROYAL ASCOT (GB)", by_source)
             self.assertEqual(by_source["BLUE POINT"]["target_zh"], "蓝点")
             self.assertEqual(by_source["William Buick"]["target_zh"], "布宜学")
             self.assertEqual(by_source["King Charles III Stakes"]["target_zh"], "英皇查理斯三世锦标")
@@ -13110,6 +13111,18 @@ class TermbaseSeedDataPreparationTests(TestCase):
                 </body></html>
                 """,
             )
+            self._write_fixture(
+                input_dir,
+                "wpstud_horselist.html",
+                """
+                <html><body><h1>馬名日－英－中對照翻譯</h1>
+                  <table>
+                    <tr><th>日文馬名</th><th>英文馬名</th><th>中文馬名</th><th>原產地</th><th>代表地區</th></tr>
+                    <tr><td>イクイノックス</td><td>Equinox</td><td>春秋分</td><td>日本</td><td>日本</td></tr>
+                  </table>
+                </body></html>
+                """,
+            )
 
             out = StringIO()
             call_command(
@@ -13133,6 +13146,11 @@ class TermbaseSeedDataPreparationTests(TestCase):
             self.assertEqual(by_source["Ryan Moore"]["racing_region"], RacingRegion.UNITED_KINGDOM)
             self.assertEqual(by_source["Sha Tin"]["term_type"], TermType.RACECOURSE)
             self.assertEqual(by_source["Sha Tin"]["racing_region"], RacingRegion.HONG_KONG)
+            self.assertEqual(by_source["イクイノックス"]["term_type"], TermType.HORSE)
+            self.assertEqual(by_source["イクイノックス"]["source_language"], SourceLanguage.JAPANESE)
+            self.assertEqual(by_source["イクイノックス"]["aliases_ja"], "Equinox")
+            self.assertEqual(by_source["イクイノックス"]["target_zh"], "春秋分")
+            self.assertEqual(by_source["イクイノックス"]["racing_region"], RacingRegion.JAPAN)
             self.assertTrue(all("source_tier=community" in row["notes"] for row in rows))
 
 
@@ -13220,6 +13238,18 @@ class RaceEventPageMVPTests(TestCase):
         self.assertContains(detail, "赛前新闻")
         self.assertContains(article_detail, "关联赛事")
         self.assertContains(article_detail, "宝塚纪念 2026")
+
+    def test_public_detail_prefers_official_finish_position_for_dead_heats(self):
+        self.event.status = RaceEventStatus.FINISHED
+        self.event.save(update_fields=["status", "updated_at"])
+        RaceEventResult.objects.create(event=self.event, finish_position=2, horse_name="ワールズエンド", source_refs={"official_finish_position": 2})
+        RaceEventResult.objects.create(event=self.event, finish_position=3, horse_name="ガイアフォース", margin="同着", source_refs={"official_finish_position": 2})
+
+        detail = self.client.get(self.event.public_path)
+
+        self.assertContains(detail, "<td>2</td>", count=2, html=True)
+        self.assertContains(detail, "ガイアフォース")
+        self.assertContains(detail, "同着")
 
     def test_public_detail_hides_race_links_for_articles_not_published_to_web(self):
         article = self._article(
@@ -13341,6 +13371,86 @@ class RaceEventPageMVPTests(TestCase):
         self.assertTrue(RaceEventHistoryWinner.objects.filter(event=self.event, horse_name="Masquerade Ball").exists())
         self.assertEqual(update_result["updated"], 1)
         self.assertEqual(self.event.runners.get(horse_number="1").odds_value, "2.1")
+
+    def test_import_race_event_detail_candidates_dry_run_does_not_write(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            payload_path = Path(tmp) / "details.jsonl"
+            payload_path.write_text(
+                json.dumps(
+                    {
+                        "year": self.event.year,
+                        "slug": self.event.slug,
+                        "source_name": "fixture",
+                        "modules": {
+                            RaceEventModule.RUNNERS: {
+                                "items": [{"horse_number": "1", "horse_name": "Calandagan (IRE)"}]
+                            },
+                            RaceEventModule.RESULTS: {
+                                "items": [{"finish_position": 1, "horse_name": "Calandagan (IRE)"}]
+                            },
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            out = StringIO()
+
+            call_command("import_race_event_detail_candidates", "--jsonl", str(payload_path), "--dry-run", stdout=out)
+
+        self.assertIn("dry-run 通过", out.getvalue())
+        self.assertFalse(RaceEventDataCandidate.objects.filter(event=self.event).exists())
+        self.assertFalse(RaceEventRunner.objects.filter(event=self.event).exists())
+        self.assertFalse(RaceEventResult.objects.filter(event=self.event).exists())
+
+    def test_import_race_event_detail_candidates_can_apply_runners_and_results(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            payload_path = Path(tmp) / "details.jsonl"
+            payload_path.write_text(
+                json.dumps(
+                    {
+                        "year": self.event.year,
+                        "slug": self.event.slug,
+                        "source_name": "fixture",
+                        "source_url": "https://example.com/result.html",
+                        "modules": {
+                            RaceEventModule.RUNNERS: {
+                                "items": [
+                                    {
+                                        "sort_order": 1,
+                                        "horse_number": "1",
+                                        "barrier": "7",
+                                        "horse_name": "Calandagan (IRE)",
+                                        "jockey_name": "Mickael Barzalona",
+                                        "carried_weight": "58.0",
+                                    }
+                                ]
+                            },
+                            RaceEventModule.RESULTS: {
+                                "items": [
+                                    {
+                                        "finish_position": 1,
+                                        "horse_number": "1",
+                                        "barrier": "7",
+                                        "horse_name": "Calandagan (IRE)",
+                                        "jockey_name": "Mickael Barzalona",
+                                        "finish_time": "2:22.1",
+                                        "is_confirmed": True,
+                                    }
+                                ]
+                            },
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            call_command("import_race_event_detail_candidates", "--jsonl", str(payload_path), "--apply", stdout=StringIO())
+
+        self.assertEqual(RaceEventDataCandidate.objects.filter(event=self.event, status="applied").count(), 2)
+        self.assertTrue(RaceEventRunner.objects.filter(event=self.event, horse_name="Calandagan", barrier="7").exists())
+        self.assertTrue(RaceEventResult.objects.filter(event=self.event, horse_name="Calandagan", finish_time="2:22.1").exists())
 
     def test_dynamic_field_update_and_removed_article_link_protection(self):
         RaceEventRunner.objects.create(event=self.event, horse_number="1", horse_name="贝拉吉奥歌剧", odds_value="4.0")

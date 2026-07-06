@@ -1978,12 +1978,20 @@ def _group_race_events_by_date(events):
     current_group = None
     for event in events:
         event.top_results = list(event.results.all()[:5])
+        _attach_result_display_positions(event.top_results)
         if event.local_date != current_date:
             current_date = event.local_date
             current_group = {"date": event.local_date, "events": []}
             groups.append(current_group)
         current_group["events"].append(event)
     return groups
+
+
+def _attach_result_display_positions(results):
+    for result in results:
+        source_refs = result.source_refs or {}
+        result.display_finish_position = source_refs.get("official_finish_position") or result.finish_position
+    return results
 
 
 def public_race_calendar(request: HttpRequest):
@@ -2045,15 +2053,17 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         "post_race": [link.article for link in public_links if link.link_type == ArticleRaceLinkType.POST_RACE],
         "related": [link.article for link in public_links if link.link_type == ArticleRaceLinkType.RELATED],
     }
+    results = _attach_result_display_positions(list(event.results.all()))
+    top_results = results[:5]
     return render(
         request,
         "stable/public/race_detail.html",
         {
             "event": event,
             "runners": event.runners.all(),
-            "results": event.results.all(),
+            "results": results,
             "history_winners": event.history_winners.all(),
-            "top_results": list(event.results.all()[:5]),
+            "top_results": top_results,
             "news_groups": news_groups,
         },
     )

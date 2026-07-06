@@ -17,6 +17,10 @@ tmp/
 *.log
 .claude/
 runtime/termbase_seed/
+runtime/race_event_detail_imports/
+runtime/race_event_exports/
+runtime/race_event_imports/
+runtime/race_event_review_samples/
 
 sample_news.json
 netkeiba_page1.html

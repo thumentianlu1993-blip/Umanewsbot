@@ -87,6 +87,7 @@ DEFAULT_SOURCE_URLS = {
     ],
     "wpstud": [
         "https://www.wpstud.com/",
+        "https://www.wpstud.com/Translation/Horse/HorseList.html",
         "https://www.wpstud.com/Translation/Horse/Horse.htm",
         "https://www.wpstud.com/Translation/Horse/HK/Horse_HK.htm",
         "https://www.wpstud.com/horseintro/jpnhorse/JpnHorse.htm",
@@ -579,7 +580,8 @@ class SeedNetworkClient:
             if response.status_code < 200 or response.status_code >= 300:
                 self.requests[-1].error = f"HTTP {response.status_code}"
                 return None
-            response.encoding = response.encoding or "utf-8"
+            if not response.encoding or response.encoding.lower() in {"iso-8859-1", "latin-1"}:
+                response.encoding = response.apparent_encoding or "utf-8"
             return response.text
         return None
 
@@ -989,8 +991,8 @@ def _records_from_hkjc_overseas_qids_meeting(
         for runner in race.get("runners") or []:
             horse = runner.get("horse") or {}
             jockey = runner.get("jockey") or {}
-            horse_en = _clean_hkjc_local_text(str(horse.get("name_en") or ""))
-            horse_zh = _clean_hkjc_local_text(str(horse.get("name_ch") or ""))
+            horse_en = _clean_hkjc_local_horse_name(str(horse.get("name_en") or ""))
+            horse_zh = _clean_hkjc_local_horse_name(str(horse.get("name_ch") or ""))
             horse_no = str(runner.get("no") or "")
             horse_id = str(horse.get("id") or "")
             if horse_en and horse_zh:
@@ -1301,8 +1303,8 @@ def parse_hkjc_overseas_racecard_pair(
     for index, en_row in enumerate(en_card["rows"]):
         row_key = en_row.get("horse_no") or str(index + 1)
         zh_row = zh_by_no.get(row_key) or (zh_card["rows"][index] if index < len(zh_card["rows"]) else {})
-        horse_en = en_row.get("horse", "")
-        horse_zh = zh_row.get("horse", "")
+        horse_en = _clean_hkjc_local_horse_name(en_row.get("horse", ""))
+        horse_zh = _clean_hkjc_local_horse_name(zh_row.get("horse", ""))
         horse_profile = en_row.get("horse_profile") or zh_row.get("horse_profile") or {}
         if horse_en and horse_zh:
             records.append(
@@ -1990,16 +1992,27 @@ def _records_from_wpstud_tables(soup: BeautifulSoup, *, source_url: str, fallbac
             if not term_type:
                 continue
             region = _wpstud_region(row, source_url=source_url, fallback_region=fallback_region)
+            japanese_name = row.get("japanese_name", "").strip()
+            source_language = SourceLanguage.ENGLISH
+            source_text = english_name
+            aliases_source: list[str] = []
+            entity_key = stable_entity_key(english_name)
+            if term_type == TermType.HORSE and japanese_name:
+                source_language = SourceLanguage.JAPANESE
+                source_text = japanese_name
+                aliases_source = [english_name]
+                entity_key = stable_entity_key(english_name, japanese_name)
             records.append(
                 RawSeedRecord(
                     term_type=term_type,
-                    source_language=SourceLanguage.ENGLISH,
-                    source_text=english_name,
+                    source_language=source_language,
+                    source_text=source_text,
                     target_zh=to_simplified_chinese(target),
                     original_target_zh=target,
                     source="wpstud",
                     region=region,
-                    entity_key=stable_entity_key(english_name),
+                    entity_key=entity_key,
+                    aliases_source=aliases_source,
                     evidence_url=source_url,
                     race_grade=_wpstud_race_grade(row.get("race_grade", "")) if term_type == TermType.RACE else "",
                 )
@@ -2040,6 +2053,8 @@ def _wpstud_header_key(value: str) -> str:
 def _wpstud_term_type(row: dict[str, str], page_text: str) -> str:
     if row.get("race_grade"):
         return TermType.RACE
+    if row.get("japanese_name") and row.get("english_name") and "馬名" in page_text:
+        return TermType.HORSE
     if row.get("region") and "馬場" in page_text:
         return TermType.RACECOURSE
     if row.get("origin") or row.get("base") or "騎師" in page_text:

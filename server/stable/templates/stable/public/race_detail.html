@@ -34,7 +34,7 @@
       {% if event.status == 'finished' and top_results %}
         <ol class="race-hero-results">
           {% for result in top_results %}
-            <li><span>{{ result.finish_position }}</span>{{ result.horse_name }}{% if result.margin %}<em>{{ result.margin }}</em>{% endif %}</li>
+            <li><span>{{ result.display_finish_position }}</span>{{ result.horse_name }}{% if result.margin %}<em>{{ result.margin }}</em>{% endif %}</li>
           {% endfor %}
         </ol>
       {% endif %}
@@ -117,7 +117,7 @@
             <tbody>
               {% for result in results %}
                 <tr>
-                  <td>{{ result.finish_position }}</td>
+                  <td>{{ result.display_finish_position }}</td>
                   <td>{{ result.horse_number|default:"-" }}</td>
                   <td><strong>{{ result.horse_name }}</strong></td>
                   <td>{{ result.jockey_name|default:"-" }}</td>
