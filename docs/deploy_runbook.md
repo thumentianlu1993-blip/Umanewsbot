@@ -1,5 +1,54 @@
 # 部署运行手册
 
+## 2026-07-06 赛事日历 2026 NAR / 美国 / 英国 Jump / 法国正式导入
+
+- 生产服务器：`/opt/umanewsbot`。
+- 日本 NAR/交流ダートグレード批次：
+  - 官方来源：`https://www.keiba.go.jp/dirtgraderace/2026/racelist/index.html`、`https://www.keiba.go.jp/pdf/uploads/20251110_01_01.pdf`。
+  - 本地产物：`runtime/race_event_imports/2026/japan-nar-dirt-graded-20260706/`。
+  - 范围：地方竞马场 JpnⅠ/JpnⅡ/JpnⅢ 与大井东京大赏典 GⅠ，共 `46` 场；排除已在 JRA 中央批次导入的中央场 G/J-G 赛事。
+  - 生成结果：`JPN3=21`、`JPN2=12`、`JPN1=12`、`G1=1`；`finished=20`、`scheduled=26`；官方网页给出发走时刻 `22` 场，另 `24` 场时刻待定。
+  - 备份：`backups/db/pre-race-events-japan-nar-2026-20260706_133705.sql.gz`，约 `73M`，`gzip -t` 通过。
+  - 生产 dry-run：`python manage.py import_race_events --csv /tmp/race_events_japan_nar_dirt_graded_2026.csv --dry-run` 通过。
+  - 正式导入：`created=46 updated=0 aliases=105`。
+  - 验收：生产计数 `Japan2026=186`、`NAR2026=46`、`NARWithTime=22`、`NARPendingTime=24`；公网 `/races/2026/nar-dirt-2026-0701-20/` 显示帝王赏与 `20:05`，`/races/2026/nar-dirt-2026-1229-46/` 显示东京大赏典与“待定”。
+- 复合赛道支持上线：
+  - 本地提交并推送 `9dc9b4d Support synthetic race event surface`。
+  - 新增 `RaceEventSurface.SYNTHETIC=synthetic/复合赛道` 与迁移 `stable.0021_alter_raceevent_surface`。
+  - 本地验证：`RaceEventPageMVPTests` 14 项、`manage.py check`、`makemigrations --check --dry-run` 和 `git diff --check` 通过。
+  - 生产部署：从 `40133ec` 快进到 `9dc9b4d`，`.env` 已备份为 `.env.backup.synthetic-surface-<timestamp>`，Docker build context 约 `878.5kB`；部署后 `web/worker/beat` 重建，`manage.py check` 通过，`showmigrations stable` 显示 `[X] 0021_alter_raceevent_surface`，生产 shell 确认 `synthetic 复合赛道`。
+- 美国 TOBA Grade 批次：
+  - 官方来源：`https://toba.org/graded-stakes/2026-races/`。
+  - 本地产物：`runtime/race_event_imports/2026/united-states-toba-graded-20260706/`。
+  - 范围：当前 TOBA 表内 Grade 1/2/3，共 `411` 条；排除 Listed `200` 条与其他非分级黑体 `12` 条。当前 TOBA 表解析为 `411` 条 Grade，而页面公告口径写 `410`，本次以当前官方表格行为准并在 `summary.json` 记录差异。
+  - 生成结果：`G1=92`、`G2=136`、`G3=183`；`370` 条有日期并公开展示，`41` 条空日期或 `not run` 作为 draft 底表记录保留；surface 为 `dirt=222`、`turf=186`、`synthetic=3`。
+  - 备份：`backups/db/pre-race-events-us-toba-graded-2026-20260706_134731.sql.gz`，约 `73M`，`gzip -t` 通过。
+  - 正式导入：dry-run 通过后 `created=411 updated=0 aliases=1550`。
+  - 验收：`USTOBA2026=411`、`USTOBAVisible=370`、`USTOBADraft=41`、`Synthetic=3`；`/races/2026/us-toba-2026-0321-068/` 返回 `200` 并显示 `JEFF RUBY STEAKS` 与“复合赛道”，undated draft 详情返回 `404`。
+- 英国 BHA Jump 批次：
+  - 官方来源：`https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2526.pdf`。
+  - 本地产物：`runtime/race_event_imports/2026/united-kingdom-bha-pattern-20260706/`。
+  - 范围：BHA 2025/2026 Jump Pattern and Listed 书中日期落在 2026 年 1-4 月的 Grade 1/2/3；排除 Listed、Premier Handicap 和 2025 年赛季内赛事。本官方书当前只能覆盖 2026 年 1-4 月，2026 年 10-12 月需等待 2026/27 官方书或其他官方结构化来源。
+  - 生成结果：`64` 场，`G1=28`、`G2=36`、`G3=0`。
+  - 备份：`backups/db/pre-race-events-uk-bha-jump-2026-20260706_214916.sql.gz`，约 `74M`，`gzip -t` 通过。
+  - 正式导入：dry-run 通过后 `created=64 updated=0 aliases=192`。
+  - 验收：`UKJump2026=64`、`UKJumpVisible=64`；`/races/2026/uk-bha-jump-2026-0313-042/` 返回 `200` 并显示 `Boodles Cheltenham Gold Cup Chase`、`Cheltenham` 与“障碍”。
+- 法国 France Galop Groupe 批次：
+  - 官方来源：`https://www.france-galop.com/sites/default/files/2026-02/groupes_listed_plat_2026_v7.pdf`、`https://www.france-galop.com/sites/default/files/2026-01/groupes_listed_obstacles_2026_v4.pdf`。
+  - 本地产物：`runtime/race_event_imports/2026/france-france-galop-group-20260706/`。
+  - 范围：逐赛条件页中 `Groupe I / Groupe II / Groupe III`；排除 Listed。因 PDF 文字层存在 `CHANTILL Y`、`Prix Saint` 等抽取伪影，本批已做马场名修正并在 `source_refs.racecourse_parser_fix` 记录。
+  - 生成结果：`173` 条，Flat `113`、障碍 `60`；`G1=37`、`G2=38`、`G3=98`。
+  - 备份：`backups/db/pre-race-events-france-galop-group-2026-20260706_215904.sql.gz`，约 `74M`，`gzip -t` 通过。
+  - 正式导入：dry-run 通过后 `created=173 updated=0 aliases=519`。
+  - 验收：`FranceGalop2026=173`、`FranceFlat=113`、`FranceJumps=60`；`/races/2026/fr-france-galop-2026-0426-014/` 返回 `200` 并显示 `PRIX GANAY`、`ParisLongchamp` 与“草地”，`/races/2026/fr-france-galop-2026-0517-138/` 返回 `200` 并显示 `GRAND STEEPLE-CHASE DE PARIS`、`Auteuil` 与“障碍”。
+- 导入后总计：
+  - 生产 `RaceEvent=857`、`RaceEventAlias=2863`。
+  - 2026 五地区计数：日本 `186`、香港 `20`、美国 `412`、英国 `65`、法国 `174`。
+- 剩余缺口：
+  - HKJC 尚未公开 2026/27 马季年末香港国际赛等日期明细。
+  - BHA Flat 2026 官方 PDF 正文页文字层为空，需要 OCR 或找到另一官方结构化源后再补英国 Flat Group 1/2/3。
+  - 英国 Jump 2026 年 10-12 月需要 2026/27 官方书或其他官方结构化源。
+
 ## 2026-07-06 赛事日历 2026 日本与香港正式导入
 
 - 生产服务器：`/opt/umanewsbot`，当前导入时 `HEAD=c996621`。

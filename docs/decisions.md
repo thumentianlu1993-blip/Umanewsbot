@@ -152,6 +152,17 @@ OneBot HTTP API 可以直接发送群消息，一旦公网裸露且 token 泄露
 - 生产可通过 `REWRITE_PROVIDER` 切换到 SiliconFlow 或 OpenAI-compatible provider
 - 自动化主流程可以先验证状态机、日志和发布闭环，再优化真实改写质量
 
+## 为什么赛事日历新增“复合赛道”surface
+
+2026 美国 TOBA Grade 批次中存在 `Sur=A` 的 all-weather / synthetic 赛事，例如 Turfway Park 的 Jeff Ruby Steaks。若把这些赛事硬映射为 `dirt`，前台会显示“泥地”，与官方赛道类型不一致。
+
+因此 `RaceEventSurface` 新增 `synthetic=复合赛道`：
+
+- 可以准确承载美国 all-weather / synthetic 赛事。
+- 后续英国、法国或其他地区出现 Polytrack、PSF、Tapeta 等复合赛道时可复用同一字段值。
+- 仍保留官方原始 surface code 到 `source_refs`，便于之后做更细的赛道材质标准化。
+- 这是枚举与展示层补充，不改变 `RaceEvent` 主表结构或现有 turf/dirt/jumps 数据语义。
+
 ## 为什么引入 OpenSpec + Codex 领域代理
 
 项目已经进入自动化运营、HTTPS、部署稳定化和运维完善并行推进阶段，跨模块与生产高风险改动会逐渐增加。
