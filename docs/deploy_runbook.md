@@ -31,6 +31,27 @@
   - 生产主机 `imports/` 目录没有挂载到 `web` 容器；CSV 上传到 `/opt/umanewsbot/imports/...` 后，需要再 `docker cp` 到 `umanewsbot-web-1:/tmp/...` 执行导入命令。
   - HKJC 官方页当前未公开 2026/27 马季年底香港国际赛日期明细；后续应等官方赛期公开后再补 2026 年末香港 G1，而不是沿用样例日期。
 
+## 2026-07-06 赛事马名后缀清洗与 Docker build context 修复上线
+
+- 本地提交：
+  - `3a25233`：记录日本/香港赛事导入，并在赛事候选资料应用层清洗马名末尾国籍后缀。
+  - `b6cbe7c`：新增 `.dockerignore`，排除 `.git / .venv / runtime / imports / backups / napcat / logs / server/staticfiles / server/media` 等运行产物。
+- 上线前本地验证：
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py test stable.tests.RaceEventPageMVPTests --noinput`：通过，13 项。
+  - `DB_ENGINE=sqlite .venv/bin/python server/manage.py check`：通过。
+  - `git diff --check`：通过。
+- 生产操作：
+  - 首次部署 `3a25233` 前确认 `ExternalDataImportRun(status="started")=0`、导入锁为空，并备份 `.env` 为 `.env.backup.race-event-horse-suffix-20260706_115804`。
+  - 首次构建因仓库没有 `.dockerignore`，Docker build context 持续增长到 `3GB+` 仍未进入构建；中断后确认旧容器仍正常、`web` healthy、`manage.py check` 通过。
+  - 推送 `b6cbe7c` 后，生产从 `3a25233` 快进到 `b6cbe7c`，并备份 `.env` 为 `.env.backup.race-event-dockerignore-20260706_120450`。
+  - 重新部署时 build context 降至约 `877.5kB`，镜像构建、容器重建、迁移检查和 collectstatic 均完成；`web / worker / beat` 已重建，`db / redis / nginx` 正常。
+- 部署后验证：
+  - 生产 `HEAD=b6cbe7c`。
+  - `manage.py check` 通过。
+  - 容器内 `_clean_race_horse_name("Calandagan (IRE)") == "Calandagan"`，`_clean_race_horse_name("Masquerade Ball（JPN）") == "Masquerade Ball"`。
+  - 生产计数保持 `RaceEvent=163`、`RaceEventAlias=497`、`Japan2026=140`、`HK2026=20`。
+  - 通过公网 Host 验收：`/healthz/`、`/races/`、`/races/2026/takarazuka-kinen/`、`/races/2026/hkjc-2026-0125-05/`、`/races/?tab=all&region=hong_kong` 均返回 `200`。
+
 ## 2026-07-06 赛事日历线上验收与示例审核包
 
 - 生产服务器：`/opt/umanewsbot` 当前 `HEAD=c996621`。
