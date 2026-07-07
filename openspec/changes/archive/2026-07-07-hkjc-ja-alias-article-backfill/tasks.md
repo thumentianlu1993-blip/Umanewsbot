@@ -28,5 +28,5 @@
 
 - [x] 5.1 (application) 运行 `DB_ENGINE=sqlite python manage.py check`
 - [x] 5.2 (application) 运行 `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable`
-- [ ] 5.3 (operations) 在生产执行前准备数据库备份、记录当前 commit/container/healthz，并先跑 dry-run artifact 供人工复核
-- [ ] 5.4 (operations) 生产 apply 后抽查术语后台搜索、受影响文章页面、summary 计数和 `/healthz/`，并将命令与 artifact 路径写回文档
+- [x] 5.3 (operations) 在生产执行前准备数据库备份、记录当前 commit/container/healthz，并先跑 dry-run artifact 供人工复核
+- [x] 5.4 (operations) 生产 apply 后抽查术语后台搜索、受影响文章页面、summary 计数和 `/healthz/`，并将命令与 artifact 路径写回文档

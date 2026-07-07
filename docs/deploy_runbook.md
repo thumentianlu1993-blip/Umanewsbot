@@ -10,6 +10,39 @@
 - 数据库迁移：无。
 - artifact 默认目录：`runtime/term_backfills/<operation>-<timestamp>/`。
 
+### 生产执行记录
+
+- 生产服务器：`/opt/umanewsbot`。
+- 部署提交：先从 `b1ddb54` 快进到 `4bffbe6`，随后因文章回填 dry-run 性能问题补丁再次快进到 `a65c1ed` 并重建 `web / worker / beat`。
+- 部署前备份：
+  - `.env.backup.hkjc-ja-alias-backfill-20260707_184118`
+  - `backups/db/pre-hkjc-ja-alias-backfill-20260707_184118.sql.gz`，已执行 `gzip -t`。
+- 生产部署：
+  - `git merge --ff-only origin/main` 后执行 `bash ./deploy_lowcost.sh`。
+  - 无新增迁移，`web` healthy，`worker / beat / db / redis / nginx` 正常。
+  - 生产保留既有 tracked 热补丁 `server/stable/templates/stable/public/race_detail.html` 中取消/延期状态展示；本次镜像重建前已恢复该热补丁，避免回退线上现有赛事详情表现。
+- 验证：
+  - `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check`：通过。
+  - `http://127.0.0.1/healthz/`：`200`。
+  - `http://umafans.run/healthz/`：`200`。
+  - 生产 HEAD：`a65c1ed`。
+- HKJC alias 合并：
+  - 首次 dry-run：`runtime/term_backfills/hkjc-ja-alias-merge-20260707_185042/`，容器内 artifact；summary 为 `candidate=112 skipped=0 scanned=112`，全部 `same_target_primary_owner`。
+  - 正式 apply：`runtime/term_backfills/hkjc-ja-alias-merge-apply-20260707_185254/`，容器内 artifact；summary 为 `applied=112 skipped=0 unchanged=0`。
+  - 重建后 post-apply smoke 已复制到宿主机：`runtime/term_backfills/hkjc-ja-alias-merge-postapply-smoke-20260707_192810/`，summary 为 `candidate=0 skipped=0 scanned=0`。
+  - 数据库验收：`TermEntry(notes__contains="hkjc_ja_alias_merged_into_term_id=")=112`，HKJC active 日语 alias 数为 `268`。
+- 文章字段回填：
+  - 首次未优化 dry-run 在生产扫描中过慢，已终止；随后补丁 `a65c1ed` 预加载 alias map，避免文章字段循环内重复查 alias。
+  - dry-run artifact 已复制到宿主机：`runtime/term_backfills/hkjc-ja-article-backfill-20260707_192910/`。
+  - dry-run summary：`scanned_articles=713`、`matched_articles=7`、`planned_fields=29`、`skipped_fields=2`、`replacement_count=37`，耗时约 `4.8s`。
+  - apply artifact 已复制到宿主机：`runtime/term_backfills/hkjc-ja-article-backfill-apply-20260707_192931/`。
+  - apply summary：`updated_fields=29`、`skipped_fields=2`、`stale_fields=0`。
+- `Kalamatianos / カラマティアノス` 抽检：
+  - 生产 term `6443`：`Kalamatianos -> 欢快舞步`，`racing_region=japan`。
+  - active alias：`Kalamatianos` (`en`, primary) 与 `カラマティアノス` (`ja`, alias)。
+  - 文章 `7117` dry-run artifact 已复制到宿主机：`runtime/term_backfills/kalamatianos-article-7117-20260707_192945/`，summary 为 `planned=0 scanned=1`，因为文章字段已无残留原文。
+  - `http://127.0.0.1/news/7117/` 返回 `200`，页面包含 `欢快舞步`。
+
 ### 生产执行前检查
 
 1. 记录生产当前 commit、`docker compose ps`、`web / worker / beat / db / redis / nginx` 状态。
