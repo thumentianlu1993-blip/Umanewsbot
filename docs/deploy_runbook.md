@@ -36,6 +36,17 @@
   - 法国来源：总数 `4`、启用 `3`、生产批准 `3`、paused/backoff 均为 `0`。
   - 法国文章：今日新入库 `4`、最近 24 小时 `4`、公开 `0`；workflow 为 `pending_review=29`，automation 为 `manual_review_required=29`，当前公开 0 的原因是正常门禁转人工，不是抓取或白名单失败。
 
+### 21:00 线上回归复核
+
+- 生产仓库：`HEAD=dcb9b90`。
+- 容器：`web / worker / beat / db / redis / nginx` 均运行，`web` 与 `db / redis` healthy。
+- 健康检查：`manage.py check` 通过；`http://127.0.0.1/healthz/`、`http://umafans.run/healthz/`、首页和 `/admin/login/` 均返回 `200`。
+- 配置：`MULTIREGION_PRODUCTION_WINDOWS_ENABLED`、抓取 / 发布 / QQ 子开关和 `NEWS_SOURCE_POLL_ENABLED` 均为 `true`；`MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES` 已包含 `tdn_france:access` 与 `tdn:access`。
+- `tdn_france_broad` 只读探测：accepted，HTTP `200`、列表 `20`、详情样本 `2`、详情错误 `0`；重复率 `0.5`，原因是自然窗口已入库同批文章。
+- 自然抓取窗口：`CrawlJob#9355` 已由生产窗口派发并仍在运行中，已通过 `source_config=21` 入库 `10` 篇法国文章，其中 `9` 篇已翻译、`1` 篇翻译中。Celery active 显示该 task 正在 worker 内运行，worker 日志持续出现 SiliconFlow `200 OK`，判断为单轮处理耗时偏长但仍在推进。
+- 最近 90 分钟窗口：五地区发布和 QQ 窗口均为 `succeeded`；0 发布 / 0 推送原因均有记录，主要为 `no_ready_candidates`、`no_eligible_articles` 或 `already_sent`。
+- 英文门禁重处理 dry-run：香港、美国无可释放候选；英国 `7242` 仍为真实 blocker；法国 `7250/7251/7252` 仍为真实 blocker。本次回归未执行 `--commit`。
+
 ## 2026-07-07 HKJC 日语 alias 合并与已发布文章术语回填工具
 
 - 本地 change：`hkjc-ja-alias-article-backfill`。

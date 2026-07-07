@@ -57,6 +57,7 @@
 - 多地区新闻常态生产：`operate-multiregion-news-production` 已实现、部署生产并归档；`2026-07-01` 已继续归档 `add-netkeiba-horse-data-import`、`expand-international-racing-coverage`、`guard-qqbot-offline-send`，生产服务器运行 `8c83708`，已具备只读审计、通用 enabled 新闻来源轮询、非日本默认人工审核、地区/来源自动发布灰度、后台地区生产概览、QQ 国际新闻地区标签和运行手册。当前 `NEWS_SOURCE_POLL_ENABLED=true`，轮询覆盖五个地区，每轮最多 12 个来源；非日本自动发布 allowlist 已开启香港、英国、法国、美国四个地区并保留每日小上限护栏，正式群仍需显式配置地区。
 - 法国新闻源扩展：`2026-07-07` OpenSpec change `expand-france-news-sources` 已部署生产提交 `bfc3445`。新增 `tdn_france_broad` 英文补充来源，生产只读探测 accepted：HTTP `200`、列表 `20`、详情样本 `5`、详情错误 `0`、重复 `0`。生产已启用 `NewsSource#21`，`enabled=true`、`production_approved=true`、有效轮询 `15` 分钟；发布白名单已加入 `tdn_france:access` 和 canonical 入库使用的 `tdn:access`。真实抓取验证已入库法国新来源文章 `4` 篇，均完成翻译并进入正常人工复核，当前无来源白名单或抓取失败阻断。
 - 英文术语门禁误挡修复：`2026-07-07` OpenSpec change `fix-english-term-gate-region-filter` 已部署生产提交 `bfc3445`。英文发布校验第一版改为同地区 + 全局术语范围，配置化高歧义英文词降级为 warning；新增近期误挡文章重处理命令和生产审计 `gate_issues` 摘要。上线后 dry-run 验证：香港、美国、法国最近 3 小时无可释放 `core_term_missing` 候选；英国有 `1` 篇候选但仍是真实核心术语缺失，未执行 commit。
+- `2026-07-07 21:00` 线上回归复核：生产 `HEAD=dcb9b90`，服务健康；`tdn_france_broad` 再次探测 accepted，生产自然窗口已通过 `source_config=21` 入库法国文章 `10` 篇，其中 `9` 篇已翻译、`1` 篇翻译中。该来源当前 `CrawlJob#9355` 仍在运行，Celery 日志显示模型接口持续 `200 OK`，结论为单轮处理耗时偏长但仍在推进；最近 90 分钟发布/QQ 窗口均有成功账本和明确 0 原因。英文门禁 dry-run 未发现可释放误挡文章。
 - 后台术语运营：候选详情页和文章编辑台支持原文选区快速加入术语库；新增术语成功后可一次性将该术语应用到当前文章已有中文稿
 - 前后台移动端适配
 
