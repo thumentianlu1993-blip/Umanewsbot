@@ -1305,9 +1305,19 @@ class AdapterTests(TestCase):
                 return None
 
             def json(self):
-                return [{"url": "https://www.thoroughbreddailynews.com/france-galop-story/", "title": "France Galop story"}]
+                return [{"id": 101, "url": "https://www.thoroughbreddailynews.com/france-galop-story/", "title": "France Galop story"}]
 
-        with patch("stable.adapters.international.requests.get", return_value=FakeResponse()):
+        class FakePostResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "link": "https://www.thoroughbreddailynews.com/france-galop-story/",
+                    "date_gmt": "2026-07-07T01:02:03",
+                }
+
+        with patch("stable.adapters.international.requests.get", side_effect=[FakeResponse(), FakePostResponse()]):
             stubs = adapter.fetch_listing(SourceMode.LATEST, 1)
 
         self.assertEqual(len(stubs), 1)
@@ -1321,20 +1331,35 @@ class AdapterTests(TestCase):
         responses = [
             [
                 {
+                    "id": 101,
                     "url": "https://www.thoroughbreddailynews.com/french-racing-story/",
                     "title": "French racing story",
                 }
             ],
             [
                 {
+                    "id": 101,
                     "url": "https://www.thoroughbreddailynews.com/french-racing-story/",
                     "title": "French racing story duplicate",
                 },
                 {
+                    "id": 202,
                     "url": "https://www.thoroughbreddailynews.com/parislongchamp-story/",
                     "title": "ParisLongchamp story",
                 },
             ],
+            {
+                "link": "https://www.thoroughbreddailynews.com/french-racing-story/",
+                "date_gmt": "2026-07-07T01:02:03",
+            },
+            {
+                "link": "https://www.thoroughbreddailynews.com/french-racing-story/",
+                "date_gmt": "2026-07-07T01:02:03",
+            },
+            {
+                "link": "https://www.thoroughbreddailynews.com/parislongchamp-story/",
+                "date_gmt": "2026-07-07T02:03:04",
+            },
         ]
 
         class FakeResponse:
@@ -1349,7 +1374,13 @@ class AdapterTests(TestCase):
 
         with patch(
             "stable.adapters.international.requests.get",
-            side_effect=[FakeResponse(payload) for payload in responses],
+            side_effect=[
+                FakeResponse(responses[0]),
+                FakeResponse(responses[2]),
+                FakeResponse(responses[1]),
+                FakeResponse(responses[3]),
+                FakeResponse(responses[4]),
+            ],
         ):
             adapter.search_queries = ("French racing", "ParisLongchamp")
             stubs = adapter.fetch_listing(SourceMode.ACCESS, 1)
@@ -1359,6 +1390,7 @@ class AdapterTests(TestCase):
         self.assertEqual(stubs[0].source_site, SourceSite.TDN_FRANCE)
         self.assertEqual(adapter.canonical_source_site, SourceSite.TDN)
         self.assertEqual(adapter.racing_region, RacingRegion.FRANCE)
+        self.assertEqual(stubs[0].published_at, datetime(2026, 7, 7, 1, 2, 3, tzinfo=dt_timezone.utc))
 
     def test_tdn_france_broad_keyword_listing_keeps_successful_queries_when_one_query_fails(self):
         adapter = TDNFranceBroadKeywordAdapter()
@@ -1373,16 +1405,30 @@ class AdapterTests(TestCase):
             def json(self):
                 return [
                     {
+                        "id": 101,
                         "url": "https://www.thoroughbreddailynews.com/french-racing-story/",
                         "title": "French racing story",
                     }
                 ]
 
+        class FakePostResponse:
+            status_code = 200
+            url = "https://www.thoroughbreddailynews.com/wp-json/wp/v2/posts/101"
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "link": "https://www.thoroughbreddailynews.com/french-racing-story/",
+                    "date_gmt": "2026-07-07T01:02:03",
+                }
+
         response = Mock(status_code=503)
         error = requests.HTTPError("503 Server Error")
         error.response = response
 
-        with patch("stable.adapters.international.requests.get", side_effect=[FakeResponse(), error]):
+        with patch("stable.adapters.international.requests.get", side_effect=[FakeResponse(), FakePostResponse(), error]):
             adapter.search_queries = ("French racing", "ParisLongchamp")
             stubs = adapter.fetch_listing(SourceMode.ACCESS, 1)
 
@@ -1394,6 +1440,112 @@ class AdapterTests(TestCase):
             "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=French%20racing&per_page=20",
         )
         self.assertEqual(adapter.last_listing_query_errors, [{"query": "ParisLongchamp", "error": "503 Server Error"}])
+
+    def test_tdn_france_broad_keyword_listing_filters_historical_search_results(self):
+        adapter = TDNFranceBroadKeywordAdapter()
+        adapter.search_queries = ("French racing",)
+
+        class FakeResponse:
+            status_code = 200
+
+            def __init__(self, payload, url):
+                self.payload = payload
+                self.url = url
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self.payload
+
+        responses = [
+            FakeResponse(
+                [
+                    {
+                        "id": 101,
+                        "url": "https://www.thoroughbreddailynews.com/old-french-racing-story/",
+                        "title": "Old French racing story",
+                    },
+                    {
+                        "id": 202,
+                        "url": "https://www.thoroughbreddailynews.com/new-french-racing-story/",
+                        "title": "New French racing story",
+                    },
+                ],
+                "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=French%20racing&per_page=20",
+            ),
+            FakeResponse(
+                {
+                    "link": "https://www.thoroughbreddailynews.com/old-french-racing-story/",
+                    "date_gmt": "2022-03-21T13:11:40",
+                },
+                "https://www.thoroughbreddailynews.com/wp-json/wp/v2/posts/101",
+            ),
+            FakeResponse(
+                {
+                    "link": "https://www.thoroughbreddailynews.com/new-french-racing-story/",
+                    "date_gmt": "2026-07-07T01:02:03",
+                },
+                "https://www.thoroughbreddailynews.com/wp-json/wp/v2/posts/202",
+            ),
+        ]
+
+        with (
+            patch("stable.adapters.international.requests.get", side_effect=responses),
+            patch("stable.adapters.international.timezone.now", return_value=datetime(2026, 7, 7, 3, 0, tzinfo=dt_timezone.utc)),
+        ):
+            stubs = adapter.fetch_listing(SourceMode.ACCESS, 1)
+
+        self.assertEqual([stub.title_ja for stub in stubs], ["New French racing story"])
+        self.assertEqual(stubs[0].published_at, datetime(2026, 7, 7, 1, 2, 3, tzinfo=dt_timezone.utc))
+        self.assertEqual(len(adapter.skipped_items), 1)
+        self.assertIn("stale_published_at", adapter.skipped_items[0])
+
+    def test_tdn_france_broad_keyword_listing_skips_search_items_without_post_date(self):
+        adapter = TDNFranceBroadKeywordAdapter()
+        adapter.search_queries = ("French racing",)
+
+        class FakeResponse:
+            status_code = 200
+
+            def __init__(self, payload, url):
+                self.payload = payload
+                self.url = url
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self.payload
+
+        responses = [
+            FakeResponse(
+                [
+                    {
+                        "id": 101,
+                        "url": "https://www.thoroughbreddailynews.com/no-date-french-racing-story/",
+                        "title": "No date French racing story",
+                    }
+                ],
+                "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=French%20racing&per_page=20",
+            ),
+            FakeResponse(
+                {
+                    "link": "https://www.thoroughbreddailynews.com/no-date-french-racing-story/",
+                },
+                "https://www.thoroughbreddailynews.com/wp-json/wp/v2/posts/101",
+            ),
+        ]
+
+        with (
+            patch("stable.adapters.international.requests.get", side_effect=responses),
+            patch("stable.adapters.international.timezone.now", return_value=datetime(2026, 7, 7, 3, 0, tzinfo=dt_timezone.utc)),
+        ):
+            stubs = adapter.fetch_listing(SourceMode.ACCESS, 1)
+
+        self.assertEqual(stubs, [])
+        self.assertEqual(len(adapter.skipped_items), 1)
+        self.assertIn("missing_published_at", adapter.skipped_items[0])
 
     def test_tdn_france_broad_keyword_listing_raises_when_all_queries_fail(self):
         adapter = TDNFranceBroadKeywordAdapter()
@@ -12511,6 +12663,40 @@ class CrawlAutoTranslateTests(TestCase):
         self.assertIn("parse failed 跳过 1 条", job.error_message)
         self.assertIn("empty detail body", job.error_message)
         self.assertIn("parse failed 跳过 1 条", source.last_crawl_message)
+
+    @override_settings(AUTO_TRANSLATE_ON_INGEST=False)
+    def test_international_listing_skips_are_recorded_without_marking_source_failed(self):
+        sync_builtin_sources()
+        source = NewsSource.objects.get(source_site=SourceSite.TDN_FRANCE, source_mode=SourceMode.ACCESS)
+
+        class FakeInternationalAdapter:
+            def __init__(self):
+                self.skipped_items = [
+                    "https://www.thoroughbreddailynews.com/old-story/: stale_published_at 2022-03-21T13:11:40+00:00"
+                ]
+
+            def fetch_listing(self, mode, page):
+                return []
+
+            def fetch_detail(self, source_url):
+                raise AssertionError("no detail fetch expected")
+
+            def normalize_source_payload(self, stub, detail):
+                raise AssertionError("no draft expected")
+
+        with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {source.adapter_key: FakeInternationalAdapter}):
+            result = _crawl_international_source(source)
+
+        source.refresh_from_db()
+        job = CrawlJob.objects.get(pk=result["crawl_job_id"])
+        self.assertEqual(result["new_count"], 0)
+        self.assertEqual(result["seen_count"], 0)
+        self.assertEqual(result["skipped_count"], 1)
+        self.assertEqual(job.status, TaskStatus.SUCCESS)
+        self.assertIn("跳过 1 条", job.error_message)
+        self.assertIn("stale_published_at", job.error_message)
+        self.assertEqual(source.last_crawl_status, TaskStatus.SUCCESS)
+        self.assertIn("stale_published_at", source.last_crawl_message)
 
     @override_settings(AUTO_TRANSLATE_ON_INGEST=False)
     def test_international_all_detail_parse_errors_mark_source_failed(self):

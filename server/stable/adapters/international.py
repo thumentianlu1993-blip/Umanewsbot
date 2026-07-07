@@ -4,7 +4,7 @@ import hashlib
 import html as html_lib
 import json
 import re
-from datetime import datetime, timezone as dt_timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 from urllib.parse import urljoin, urlsplit
 
 import requests
@@ -47,6 +47,10 @@ class SimpleInternationalNewsAdapter(SourceAdapter):
     prefer_meta_title = True
     last_listing_http_status: int | None = None
     last_listing_final_url = ""
+
+    def __init__(self) -> None:
+        self.skipped_items: list[str] = []
+        self.last_listing_query_errors: list[dict[str, str]] = []
 
     def fetch_listing(self, mode: SourceMode, page_or_month: str | int) -> list[SourceArticleStub]:
         url = self.listing_url(page_or_month, mode=mode)
@@ -392,11 +396,15 @@ class TDNAdapter(SimpleInternationalNewsAdapter):
     title_selector = "h1, .entry-title"
     body_selector = "span[itemprop='articleBody'], .entry-content, article, main"
     api_url = "https://www.thoroughbreddailynews.com/wp-json/wp/v2/posts?per_page=20"
+    resolve_missing_api_dates = False
+    max_api_article_age: timedelta | None = None
 
     def listing_url(self, page_or_month: str | int, mode: SourceMode | str | None = None) -> str:
         return self.api_url
 
     def fetch_listing(self, mode: SourceMode, page_or_month: str | int) -> list[SourceArticleStub]:
+        if not getattr(self, "_preserve_skipped_items", False):
+            self.skipped_items = []
         response = requests.get(
             self.listing_url(page_or_month, mode=mode),
             headers={"User-Agent": "umanewsbot/1.0 (+https://umafans.run)"},
@@ -421,6 +429,13 @@ class TDNAdapter(SimpleInternationalNewsAdapter):
             article_url = raw_url.split("?", 1)[0]
             if article_url in seen:
                 continue
+            published_at = self._resolved_api_datetime(item)
+            if published_at is None:
+                self.skipped_items.append(f"{article_url}: missing_published_at")
+                continue
+            if self._is_stale_api_article(published_at):
+                self.skipped_items.append(f"{article_url}: stale_published_at {published_at.isoformat()}")
+                continue
             seen.add(article_url)
             stubs.append(
                 SourceArticleStub(
@@ -429,7 +444,7 @@ class TDNAdapter(SimpleInternationalNewsAdapter):
                     source_article_id=self._article_id(article_url),
                     source_url=article_url,
                     title_ja=raw_title,
-                    published_at=self._api_datetime(item),
+                    published_at=published_at,
                     rank=self._listing_rank(raw_title, index, resolved_mode),
                     metadata={"listing_url": self.listing_url(page_or_month, mode=mode)},
                 )
@@ -450,14 +465,57 @@ class TDNAdapter(SimpleInternationalNewsAdapter):
             text = unescaped
         return normalize_whitespace(text)
 
-    def _api_datetime(self, item: dict) -> datetime:
+    def _api_datetime(self, item: dict) -> datetime | None:
         raw = item.get("date_gmt") or item.get("date") or ""
         parsed = dateparse.parse_datetime(str(raw))
         if parsed is None:
-            return timezone.now()
+            return None
         if timezone.is_naive(parsed):
             parsed = timezone.make_aware(parsed, timezone=dt_timezone.utc)
         return parsed
+
+    def _resolved_api_datetime(self, item: dict) -> datetime | None:
+        parsed = self._api_datetime(item)
+        if parsed is not None or not self.resolve_missing_api_dates:
+            return parsed
+        post_item = self._fetch_api_post_item(item)
+        if not post_item:
+            return None
+        return self._api_datetime(post_item)
+
+    def _fetch_api_post_item(self, item: dict) -> dict | None:
+        post_url = self._api_post_url(item)
+        if not post_url:
+            return None
+        response = requests.get(
+            post_url,
+            headers={"User-Agent": "umanewsbot/1.0 (+https://umafans.run)"},
+            timeout=15,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return payload if isinstance(payload, dict) else None
+
+    def _api_post_url(self, item: dict) -> str:
+        links = item.get("_links") if isinstance(item, dict) else None
+        if isinstance(links, dict):
+            self_links = links.get("self")
+            if isinstance(self_links, list):
+                for candidate in self_links:
+                    if isinstance(candidate, dict) and candidate.get("href"):
+                        return str(candidate["href"])
+        post_id = item.get("id")
+        if post_id:
+            return urljoin(self.base_url, f"/wp-json/wp/v2/posts/{post_id}")
+        return ""
+
+    def _is_stale_api_article(self, published_at: datetime) -> bool:
+        if self.max_api_article_age is None:
+            return False
+        comparable = published_at
+        if timezone.is_naive(comparable):
+            comparable = timezone.make_aware(comparable, timezone=dt_timezone.utc)
+        return comparable < timezone.now() - self.max_api_article_age
 
 
 class TDNFranceKeywordAdapter(TDNAdapter):
@@ -465,6 +523,8 @@ class TDNFranceKeywordAdapter(TDNAdapter):
     canonical_source_site = SourceSite.TDN
     api_url = "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=France%20Galop&per_page=20"
     racing_region = RacingRegion.FRANCE
+    resolve_missing_api_dates = True
+    max_api_article_age = timedelta(days=3)
 
 
 class TDNFranceBroadKeywordAdapter(TDNFranceKeywordAdapter):
@@ -479,37 +539,42 @@ class TDNFranceBroadKeywordAdapter(TDNFranceKeywordAdapter):
         resolved_mode = mode or self.source_mode
         stubs: list[SourceArticleStub] = []
         seen: set[str] = set()
+        self.skipped_items = []
         query_errors: list[dict[str, str]] = []
         first_error: Exception | None = None
         successful_query_count = 0
         last_success_http_status: int | None = None
         last_success_final_url = ""
-        for query in self.search_queries:
-            self.api_url = (
-                "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?"
-                f"search={requests.utils.quote(query)}&per_page=20"
-            )
-            try:
-                query_stubs = super().fetch_listing(resolved_mode, page_or_month)
-                successful_query_count += 1
-                last_success_http_status = self.last_listing_http_status
-                last_success_final_url = self.last_listing_final_url
-            except Exception as exc:
-                if first_error is None:
-                    first_error = exc
-                query_errors.append({"query": query, "error": str(exc)})
-                continue
-            for stub in query_stubs:
-                if stub.source_url in seen:
+        self._preserve_skipped_items = True
+        try:
+            for query in self.search_queries:
+                self.api_url = (
+                    "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?"
+                    f"search={requests.utils.quote(query)}&per_page=20"
+                )
+                try:
+                    query_stubs = super().fetch_listing(resolved_mode, page_or_month)
+                    successful_query_count += 1
+                    last_success_http_status = self.last_listing_http_status
+                    last_success_final_url = self.last_listing_final_url
+                except Exception as exc:
+                    if first_error is None:
+                        first_error = exc
+                    query_errors.append({"query": query, "error": str(exc)})
                     continue
-                seen.add(stub.source_url)
-                stub.metadata["listing_query"] = query
-                stubs.append(stub)
-                if len(stubs) >= 20:
-                    self.last_listing_query_errors = query_errors
-                    self.last_listing_http_status = last_success_http_status
-                    self.last_listing_final_url = last_success_final_url
-                    return stubs
+                for stub in query_stubs:
+                    if stub.source_url in seen:
+                        continue
+                    seen.add(stub.source_url)
+                    stub.metadata["listing_query"] = query
+                    stubs.append(stub)
+                    if len(stubs) >= 20:
+                        self.last_listing_query_errors = query_errors
+                        self.last_listing_http_status = last_success_http_status
+                        self.last_listing_final_url = last_success_final_url
+                        return stubs
+        finally:
+            self._preserve_skipped_items = False
         self.last_listing_query_errors = query_errors
         if stubs:
             self.last_listing_http_status = last_success_http_status
