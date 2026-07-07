@@ -801,6 +801,34 @@ class ArticleTermBackfillTests(TestCase):
         self.assertEqual(result["rows"][0]["action"], "stale")
         self.assertEqual(article.body_zh, "人工改过的カラマティアノス。")
 
+    def test_plan_preloads_aliases_instead_of_querying_per_field(self):
+        term = self._term()
+        TermAlias.objects.create(term=term, source_language=SourceLanguage.JAPANESE, text="カラマティアノス")
+        other = self._term(source_ja="Lucky Sweynesse", target_zh="金钻贵人")
+        TermAlias.objects.create(term=other, source_language=SourceLanguage.JAPANESE, text="ラッキースワイネス")
+        self._article()
+        self._article(
+            title_ja="無関係",
+            body_ja_raw="無関係",
+            body_ja_normalized="無関係",
+            translated_title_zh="普通新闻",
+            translated_body_zh="没有待替换术语。",
+            translated_summary_zh="普通摘要。",
+            base_translation_zh="没有待替换术语。",
+            title_zh="普通新闻",
+            body_zh="没有待替换术语。",
+            summary_zh="普通摘要。",
+            push_summary_zh="普通摘要。",
+        )
+
+        from stable.services.term_maintenance import plan_article_term_backfill
+
+        with CaptureQueriesContext(connection) as queries:
+            result = plan_article_term_backfill(term_ids=[term.pk, other.pk], source_language=SourceLanguage.JAPANESE)
+
+        self.assertGreaterEqual(result["summary"]["planned_fields"], 1)
+        self.assertLessEqual(len(queries), 4)
+
 
 class TermMaintenanceCommandTests(TestCase):
     def _term(self, **overrides):

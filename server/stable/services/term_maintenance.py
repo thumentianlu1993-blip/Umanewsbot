@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from stable.models import NewsArticle, SourceLanguage, TermAlias, TermAliasType, TermEntry, TermType, WorkflowStatus
 from stable.services.term_admin import source_text_identity, sync_all_term_alias_active, upsert_term_source_alias
-from stable.services.terms import apply_single_term_mapping, source_term_matches_text
+from stable.services.terms import source_term_matches_text, source_terms_by_entry
 
 
 MERGE_NOTE_MARKER = "hkjc_ja_alias_merged_into_term_id"
@@ -343,9 +343,14 @@ def apply_hkjc_ja_alias_merge(plan_rows: Iterable[dict]) -> dict:
     return {"summary": _merge_summary(result_rows), "rows": result_rows}
 
 
-def _matches_for_term(text: str, term: TermEntry, source_language: str) -> list[dict]:
+def _matches_for_source_terms(
+    text: str,
+    term: TermEntry,
+    source_language: str,
+    source_terms: Iterable[str],
+) -> list[dict]:
     matches: list[dict] = []
-    for source_text in term.source_terms_for_language(source_language):
+    for source_text in source_terms:
         if source_term_matches_text(text or "", source_text, source_language):
             matches.append(
                 {
@@ -356,6 +361,35 @@ def _matches_for_term(text: str, term: TermEntry, source_language: str) -> list[
                 }
             )
     return matches
+
+
+def _replace_source_term(text: str, source_text: str, target: str, source_language: str) -> str:
+    if not source_text:
+        return text
+    if source_language == SourceLanguage.ENGLISH:
+        pattern = re.compile(r"(?<![0-9A-Za-z])" + re.escape(source_text) + r"(?![0-9A-Za-z])", re.IGNORECASE)
+        return pattern.sub(target, text)
+    return text.replace(source_text, target)
+
+
+def _apply_term_mapping_for_source_terms(
+    text: str,
+    term: TermEntry,
+    source_language: str,
+    source_terms: Iterable[str],
+) -> str:
+    mapped = text
+    for source_text in sorted(source_terms, key=len, reverse=True):
+        mapped = _replace_source_term(mapped, source_text, term.target_zh, source_language)
+    return mapped
+
+
+def _field_contains_any_source_term(text: str, source_language: str, source_terms: Iterable[str]) -> bool:
+    value = text or ""
+    for source_text in source_terms:
+        if source_term_matches_text(value, source_text, source_language):
+            return True
+    return False
 
 
 def _replacement_count(text: str, source_text: str, source_language: str) -> int:
@@ -401,6 +435,8 @@ def plan_article_term_backfill(
 ) -> dict:
     term_id_list = [int(term_id) for term_id in term_ids if term_id]
     terms = list(TermEntry.objects.filter(pk__in=term_id_list, is_active=True).order_by("-priority", "source_ja"))
+    terms_by_source_language: dict[str, dict[int, list[str]]] = {}
+    flat_source_terms_by_language: dict[str, list[str]] = {}
     articles = _article_queryset(
         article_ids=article_ids,
         source_language=source_language,
@@ -416,19 +452,33 @@ def plan_article_term_backfill(
     for article in articles:
         scanned_articles += 1
         article_language = article.source_language or SourceLanguage.JAPANESE
+        if article_language not in terms_by_source_language:
+            language_terms = source_terms_by_entry(terms, article_language)
+            terms_by_source_language[article_language] = language_terms
+            flat_source_terms_by_language[article_language] = [
+                source_text for source_terms in language_terms.values() for source_text in source_terms
+            ]
+        language_terms = terms_by_source_language[article_language]
+        flat_source_terms = flat_source_terms_by_language[article_language]
         manual_fields = set(article.manually_edited_fields or [])
         for field_name in BACKFILL_FIELDS:
             before = getattr(article, field_name, "") or ""
             if not before:
                 unchanged_fields += 1
                 continue
+            if not _field_contains_any_source_term(before, article_language, flat_source_terms):
+                unchanged_fields += 1
+                continue
             after = before
             matches: list[dict] = []
             for term in terms:
-                term_matches = _matches_for_term(after, term, article_language)
+                source_terms = language_terms.get(term.pk, [])
+                if not source_terms:
+                    continue
+                term_matches = _matches_for_source_terms(after, term, article_language, source_terms)
                 if not term_matches:
                     continue
-                next_after = apply_single_term_mapping(after, term, article_language)
+                next_after = _apply_term_mapping_for_source_terms(after, term, article_language, source_terms)
                 if next_after != after:
                     matches.extend(term_matches)
                     after = next_after
