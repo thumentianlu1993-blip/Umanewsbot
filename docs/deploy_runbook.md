@@ -47,6 +47,19 @@
 - 最近 90 分钟窗口：五地区发布和 QQ 窗口均为 `succeeded`；0 发布 / 0 推送原因均有记录，主要为 `no_ready_candidates`、`no_eligible_articles` 或 `already_sent`。
 - 英文门禁重处理 dry-run：香港、美国无可释放候选；英国 `7242` 仍为真实 blocker；法国 `7250/7251/7252` 仍为真实 blocker。本次回归未执行 `--commit`。
 
+### TDN broad 历史旧文事故与临时止血
+
+- 发现问题：`tdn_france_broad` 抓入 2020、2022、2023、2024 年历史旧文，并因 `published_at` 被错误写为当前时间进入自动发布流程。
+- 根因：TDN WordPress `search` API 返回相关性搜索结果，search item 不带 `date/date_gmt`；当前 adapter 在缺失日期时兜底为 `timezone.now()`，详情页解析也没有拿到真实发布时间。
+- 已执行止血：生产 `NewsSource#21` 已设置 `enabled=false`、`production_approved=false`，并写入 `manual_pause_reason`，保留其他法国来源继续运行。
+- 已确认受影响的已公开旧文：
+  - `7255`：真实日期 `2022-03-21`。
+  - `7263`：真实日期 `2020-04-07`。
+  - `7264`：真实日期 `2020-03-16`。
+  - `7265`：真实日期 `2020-03-13`。
+  - `7271`：真实日期 `2024-11-08`。
+- 修复方向：`tdn_france_broad` 必须用 search item 的 `id` 或 `_links.self` 二次读取 post API 获取真实 `date_gmt`，并丢弃超过生产新鲜度窗口的文章；修复和回归前不得重新启用 `NewsSource#21`。
+
 ## 2026-07-07 HKJC 日语 alias 合并与已发布文章术语回填工具
 
 - 本地 change：`hkjc-ja-alias-article-backfill`。
