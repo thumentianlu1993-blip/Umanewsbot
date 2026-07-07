@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0",
+  "entries": [
+    {
+      "source": "plan-eng-review",
+      "session": 1,
+      "round": 1,
+      "timestamp": "2026-07-07T15:57:19+08:00",
+      "last_updated": "2026-07-07T15:57:19+08:00",
+      "mode": "full",
+      "artifacts_modified": [
+        "design.md",
+        "specs/termbase-and-race-priority/spec.md",
+        "tasks.md"
+      ],
+      "rounds_total_for_session": 1,
+      "issues_resolved": 4,
+      "findings": [
+        {
+          "id": "F-001",
+          "severity": "warning",
+          "category": "architecture",
+          "summary": "Article backfill artifact only required summaries, which was not enough for field-level rollback.",
+          "resolution": "Design/spec/tasks now require full before/after values in JSON artifacts.",
+          "status": "resolved",
+          "round_found": 1,
+          "round_resolved": 1
+        },
+        {
+          "id": "F-002",
+          "severity": "warning",
+          "category": "architecture",
+          "summary": "Alias merge apply did not explicitly guard against active owner collisions before writing a target alias.",
+          "resolution": "Design/spec/tasks now require active owner recheck and skip artifact with owner term id.",
+          "status": "resolved",
+          "round_found": 1,
+          "round_resolved": 1
+        },
+        {
+          "id": "F-003",
+          "severity": "warning",
+          "category": "scope",
+          "summary": "Production apply range was left as an open question and could permit broad writes.",
+          "resolution": "Design/tasks now require reviewed artifact or explicit filters and reject unbounded article apply.",
+          "status": "resolved",
+          "round_found": 1,
+          "round_resolved": 1
+        },
+        {
+          "id": "F-004",
+          "severity": "warning",
+          "category": "test",
+          "summary": "Tests did not cover unbounded apply rejection or full artifact rollback data.",
+          "resolution": "Tasks now include tests for full before/after artifacts and apply rejection without reviewed scope.",
+          "status": "resolved",
+          "round_found": 1,
+          "round_resolved": 1
+        }
+      ]
+    }
+  ]
+}

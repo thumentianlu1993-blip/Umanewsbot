@@ -1,5 +1,103 @@
 # 部署运行手册
 
+## 2026-07-07 HKJC 日语 alias 合并与已发布文章术语回填工具
+
+- 本地 change：`hkjc-ja-alias-article-backfill`。
+- 新增服务层：`server/stable/services/term_maintenance.py`。
+- 新增管理命令：
+  - `merge_hkjc_ja_aliases`：生成/应用 HKJC horse 日语 alias 概念合并计划。
+  - `backfill_article_terms`：生成/应用已发布文章字段级术语回填 diff。
+- 数据库迁移：无。
+- artifact 默认目录：`runtime/term_backfills/<operation>-<timestamp>/`。
+
+### 生产执行前检查
+
+1. 记录生产当前 commit、`docker compose ps`、`web / worker / beat / db / redis / nginx` 状态。
+2. 执行 `python manage.py check`。
+3. 检查 `http://127.0.0.1/healthz/` 和公网 `/healthz/`。
+4. 确认 `ExternalDataImportRun(status="started")=0` 且外部导入锁为空。
+5. 执行数据库备份并用 `gzip -t` 校验备份。
+
+### HKJC 日语 alias 概念合并
+
+dry-run 示例：
+
+```bash
+python manage.py merge_hkjc_ja_aliases \
+  --racing-region japan \
+  --output-dir runtime/term_backfills/hkjc-ja-alias-merge-YYYYMMDD_HHMMSS
+```
+
+如果使用人工准备的候选文件，候选 CSV/JSON 至少应包含 `target_term_id` 和 `source_text`：
+
+```bash
+python manage.py merge_hkjc_ja_aliases \
+  --candidate-file imports/hkjc-ja-alias-candidates.csv \
+  --output-dir runtime/term_backfills/hkjc-ja-alias-merge-YYYYMMDD_HHMMSS
+```
+
+复核 `merge_plan.json`、`merge_plan_review.csv` 和 `summary.json` 后，正式 apply 必须指定已审核 plan：
+
+```bash
+python manage.py merge_hkjc_ja_aliases \
+  --apply \
+  --plan-file runtime/term_backfills/hkjc-ja-alias-merge-YYYYMMDD_HHMMSS/merge_plan.json \
+  --output-dir runtime/term_backfills/hkjc-ja-alias-merge-apply-YYYYMMDD_HHMMSS
+```
+
+apply 安全边界：
+
+- 只自动处理 active 英文目标概念 + active 日语主术语 + 同 `term_type` + 同规范化 `target_zh` 的安全项。
+- apply 前会重新检查当前 term/alias 状态。
+- 若日语 source text 被其它 active 概念主原文或 active alias 占用，则写入 skipped，不在目标概念上创建重复 alias。
+- 合并成功后，目标概念新增日语 alias，冗余日语主术语会停用，notes 写入 `hkjc_ja_alias_merged_into_term_id=<target>`。
+
+### 已发布文章术语回填
+
+推荐先使用 merge apply artifact 或明确 term id 生成 dry-run diff：
+
+```bash
+python manage.py backfill_article_terms \
+  --merge-plan-file runtime/term_backfills/hkjc-ja-alias-merge-apply-YYYYMMDD_HHMMSS/merge_apply.json \
+  --source-language ja \
+  --limit 50 \
+  --output-dir runtime/term_backfills/article-term-backfill-YYYYMMDD_HHMMSS
+```
+
+也可以明确指定 term/article 范围：
+
+```bash
+python manage.py backfill_article_terms \
+  --term-id <TERM_ID> \
+  --article-id <ARTICLE_ID> \
+  --output-dir runtime/term_backfills/article-term-backfill-YYYYMMDD_HHMMSS
+```
+
+复核 `article_backfill_diff.json`、`article_backfill_diff_review.csv` 和 `summary.json` 后，正式 apply 推荐读取已审核 diff：
+
+```bash
+python manage.py backfill_article_terms \
+  --apply \
+  --diff-file runtime/term_backfills/article-term-backfill-YYYYMMDD_HHMMSS/article_backfill_diff.json \
+  --output-dir runtime/term_backfills/article-term-backfill-apply-YYYYMMDD_HHMMSS
+```
+
+文章回填安全边界：
+
+- 默认只扫描 `workflow_status=published` 且 `published_to_web_at` 非空的已发布文章。
+- JSON artifact 保存完整 before/after 字段值，可用于字段级回滚；CSV 仅用于人工快速复核。
+- 默认跳过 `manually_edited_fields` 中记录的发布字段。
+- 不重新抓取、不重新翻译、不调用 AI 改写、不改变发布状态、审核状态、workflow 状态或 QQ 推送状态。
+- `--apply` 若没有 `--diff-file`，必须显式提供 term 范围和 article/date/source/limit 过滤之一；无范围写入会被拒绝。
+
+### 验收与回滚
+
+- 合并后抽查后台术语搜索：英文名和日文名都应命中目标 HKJC 概念；被合并的日语主术语应为 inactive 且 notes 记录合并目标。
+- 回填后抽查受影响文章前台页面和后台字段，确认只发生术语替换。
+- 复查 `/healthz/`、summary 计数和 skipped/review 项。
+- 如 alias 合并错误，按 apply artifact 删除目标 alias，并恢复源 term `is_active=true` 和必要 notes。
+- 如文章字段替换错误，优先使用 `article_backfill_diff.json` 中的完整 `before` 值恢复；大范围异常时使用生产数据库备份。
+
 ## 2026-07-06/07 HKJC / WP Stud 术语库最终清洗与生产导入
 
 - 生产服务器：`/opt/umanewsbot`，导入时 `HEAD=b1ddb54`。

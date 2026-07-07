@@ -521,6 +521,385 @@ class TermResolverTests(TestCase):
         self.assertEqual(names, ["マヤノライジン"])
 
 
+class TermAliasConceptMergeTests(TestCase):
+    def _term(self, **overrides):
+        payload = {
+            "term_type": TermType.HORSE,
+            "source_language": SourceLanguage.ENGLISH,
+            "source_ja": f"Target {TermEntry.objects.count()}",
+            "target_zh": "测试译名",
+            "racing_region": RacingRegion.JAPAN,
+            "priority": 10,
+        }
+        payload.update(overrides)
+        return TermEntry.objects.create(**payload)
+
+    def test_plan_reports_same_target_japanese_primary_owner_without_writing(self):
+        target = self._term(source_ja="Kalamatianos", target_zh="欢快舞步")
+        source = self._term(
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="カラマティアノス",
+            target_zh="欢快舞步",
+        )
+
+        from stable.services.term_maintenance import plan_hkjc_ja_alias_merge
+
+        result = plan_hkjc_ja_alias_merge(target_term_ids=[target.pk])
+
+        self.assertEqual(result["summary"]["candidate_count"], 1)
+        row = result["rows"][0]
+        self.assertEqual(row["action"], "candidate")
+        self.assertEqual(row["source_text"], "カラマティアノス")
+        self.assertEqual(row["owner_term_id"], source.pk)
+        self.assertFalse(TermAlias.objects.filter(term=target, text="カラマティアノス").exists())
+
+    def test_plan_treats_primary_alias_for_same_term_as_single_owner(self):
+        target = self._term(source_ja="Kalamatianos", target_zh="欢快舞步")
+        source = self._term(
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="カラマティアノス",
+            target_zh="欢快舞步",
+        )
+        TermAlias.objects.create(
+            term=source,
+            source_language=SourceLanguage.JAPANESE,
+            text="カラマティアノス",
+            alias_type=TermAliasType.PRIMARY,
+            is_active=True,
+        )
+
+        from stable.services.term_maintenance import plan_hkjc_ja_alias_merge
+
+        result = plan_hkjc_ja_alias_merge(target_term_ids=[target.pk])
+
+        self.assertEqual(result["summary"]["candidate_count"], 1)
+        row = result["rows"][0]
+        self.assertEqual(row["action"], "candidate")
+        self.assertEqual(row["owner_kind"], "primary")
+        self.assertEqual(row["owner_term_id"], source.pk)
+
+    def test_plan_skips_conflicting_target_translation_from_candidate_file(self):
+        target = self._term(source_ja="Raijin", target_zh="霹雳雷公")
+        self._term(
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="ライジン",
+            target_zh="雷神",
+        )
+
+        from stable.services.term_maintenance import plan_hkjc_ja_alias_merge
+
+        result = plan_hkjc_ja_alias_merge(
+            target_term_ids=[target.pk],
+            candidate_rows=[{"target_term_id": target.pk, "source_text": "ライジン"}],
+        )
+
+        self.assertEqual(result["summary"]["skipped_count"], 1)
+        self.assertEqual(result["rows"][0]["reason"], "target_zh_conflict")
+        self.assertFalse(TermAlias.objects.filter(term=target, text="ライジン").exists())
+
+    def test_plan_skips_active_alias_owner_on_another_concept(self):
+        target = self._term(source_ja="Scintillation", target_zh="烁亮丽")
+        other = self._term(source_ja="Other", target_zh="灿惑")
+        TermAlias.objects.create(
+            term=other,
+            source_language=SourceLanguage.JAPANESE,
+            text="シンチレーション",
+            alias_type=TermAliasType.ALIAS,
+            is_active=True,
+        )
+
+        from stable.services.term_maintenance import plan_hkjc_ja_alias_merge
+
+        result = plan_hkjc_ja_alias_merge(
+            target_term_ids=[target.pk],
+            candidate_rows=[{"target_term_id": target.pk, "source_text": "シンチレーション"}],
+        )
+
+        row = result["rows"][0]
+        self.assertEqual(row["action"], "skipped")
+        self.assertEqual(row["reason"], "active_alias_owner")
+        self.assertEqual(row["owner_term_id"], other.pk)
+
+    def test_apply_merges_alias_deactivates_source_and_is_idempotent(self):
+        target = self._term(source_ja="Kalamatianos", target_zh="欢快舞步")
+        source = self._term(
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="カラマティアノス",
+            target_zh="欢快舞步",
+        )
+
+        from stable.services.term_maintenance import apply_hkjc_ja_alias_merge, plan_hkjc_ja_alias_merge
+
+        plan = plan_hkjc_ja_alias_merge(target_term_ids=[target.pk])
+        first = apply_hkjc_ja_alias_merge(plan["rows"])
+        second = apply_hkjc_ja_alias_merge(plan["rows"])
+
+        source.refresh_from_db()
+        self.assertEqual(first["summary"]["applied_count"], 1)
+        self.assertFalse(source.is_active)
+        self.assertIn(f"hkjc_ja_alias_merged_into_term_id={target.pk}", source.notes)
+        self.assertEqual(TermAlias.objects.filter(term=target, source_language=SourceLanguage.JAPANESE, text="カラマティアノス").count(), 1)
+        self.assertEqual(second["summary"]["skipped_count"], 1)
+
+    def test_apply_rechecks_stale_plan_before_writing(self):
+        target = self._term(source_ja="Kalamatianos", target_zh="欢快舞步")
+        source = self._term(
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="カラマティアノス",
+            target_zh="欢快舞步",
+        )
+
+        from stable.services.term_maintenance import apply_hkjc_ja_alias_merge, plan_hkjc_ja_alias_merge
+
+        plan = plan_hkjc_ja_alias_merge(target_term_ids=[target.pk])
+        source.target_zh = "不同译名"
+        source.save(update_fields=["target_zh", "updated_at"])
+
+        result = apply_hkjc_ja_alias_merge(plan["rows"])
+
+        source.refresh_from_db()
+        self.assertEqual(result["summary"]["skipped_count"], 1)
+        self.assertTrue(source.is_active)
+        self.assertFalse(TermAlias.objects.filter(term=target, text="カラマティアノス").exists())
+
+
+class ArticleTermBackfillTests(TestCase):
+    def _term(self, **overrides):
+        payload = {
+            "term_type": TermType.HORSE,
+            "source_language": SourceLanguage.ENGLISH,
+            "source_ja": "Kalamatianos",
+            "target_zh": "欢快舞步",
+            "racing_region": RacingRegion.JAPAN,
+            "priority": 100,
+        }
+        payload.update(overrides)
+        return TermEntry.objects.create(**payload)
+
+    def _article(self, **overrides):
+        now = timezone.now()
+        payload = {
+            "source_site": SourceSite.NETKEIBA,
+            "source_mode": SourceMode.LATEST,
+            "source_article_id": overrides.pop("source_article_id", f"article-term-backfill-{NewsArticle.objects.count()}"),
+            "racing_region": RacingRegion.JAPAN,
+            "source_language": SourceLanguage.JAPANESE,
+            "title_ja": "カラマティアノス近況",
+            "body_ja_raw": "カラマティアノスが出走予定。",
+            "body_ja_normalized": "カラマティアノスが出走予定。",
+            "translated_title_zh": "カラマティアノス近况",
+            "translated_body_zh": "カラマティアノス将出赛。",
+            "translated_summary_zh": "カラマティアノス消息。",
+            "base_translation_zh": "カラマティアノス将出赛。",
+            "title_zh": "カラマティアノス近况",
+            "body_zh": "カラマティアノス将出赛。",
+            "summary_zh": "カラマティアノス消息。",
+            "push_summary_zh": "カラマティアノス消息。",
+            "published_at": now,
+            "published_to_web_at": now,
+            "workflow_status": WorkflowStatus.PUBLISHED,
+            "published_by_mode": PublishedByMode.AUTO,
+            "source_url": overrides.pop("source_url", f"https://example.com/article-term-backfill-{NewsArticle.objects.count()}"),
+        }
+        payload.update(overrides)
+        return NewsArticle.objects.create(**payload)
+
+    def test_plan_outputs_full_field_diff_without_writing(self):
+        term = self._term()
+        TermAlias.objects.create(term=term, source_language=SourceLanguage.JAPANESE, text="カラマティアノス")
+        article = self._article()
+
+        from stable.services.term_maintenance import plan_article_term_backfill
+
+        result = plan_article_term_backfill(term_ids=[term.pk], article_ids=[article.pk])
+
+        self.assertGreaterEqual(result["summary"]["planned_fields"], 1)
+        row = [item for item in result["rows"] if item["field"] == "body_zh"][0]
+        self.assertEqual(row["before"], "カラマティアノス将出赛。")
+        self.assertEqual(row["after"], "欢快舞步将出赛。")
+        article.refresh_from_db()
+        self.assertEqual(article.body_zh, "カラマティアノス将出赛。")
+
+    def test_apply_updates_only_planned_fields_and_is_idempotent(self):
+        term = self._term()
+        TermAlias.objects.create(term=term, source_language=SourceLanguage.JAPANESE, text="カラマティアノス")
+        article = self._article()
+
+        from stable.services.term_maintenance import apply_article_term_backfill, plan_article_term_backfill
+
+        plan = plan_article_term_backfill(term_ids=[term.pk], article_ids=[article.pk])
+        first = apply_article_term_backfill(plan["rows"])
+        second = apply_article_term_backfill(plan["rows"])
+
+        article.refresh_from_db()
+        self.assertIn("欢快舞步", article.body_zh)
+        self.assertEqual(first["summary"]["updated_fields"], plan["summary"]["planned_fields"])
+        self.assertGreaterEqual(second["summary"]["stale_fields"] + second["summary"]["unchanged_fields"], 1)
+
+    def test_manual_publish_field_is_skipped_but_machine_field_updates(self):
+        term = self._term()
+        TermAlias.objects.create(term=term, source_language=SourceLanguage.JAPANESE, text="カラマティアノス")
+        article = self._article(manually_edited_fields=["body_zh"])
+
+        from stable.services.term_maintenance import apply_article_term_backfill, plan_article_term_backfill
+
+        plan = plan_article_term_backfill(term_ids=[term.pk], article_ids=[article.pk])
+        body_row = [item for item in plan["rows"] if item["field"] == "body_zh"][0]
+        self.assertEqual(body_row["action"], "skipped")
+        self.assertEqual(body_row["reason"], "manual_field")
+
+        apply_article_term_backfill(plan["rows"])
+
+        article.refresh_from_db()
+        self.assertEqual(article.body_zh, "カラマティアノス将出赛。")
+        self.assertEqual(article.translated_body_zh, "欢快舞步将出赛。")
+
+    def test_backfill_apply_preserves_publish_workflow_and_qq_delivery_state(self):
+        term = self._term()
+        TermAlias.objects.create(term=term, source_language=SourceLanguage.JAPANESE, text="カラマティアノス")
+        article = self._article()
+        target = PushTarget.objects.create(name="测试群", group_id="1001")
+        delivery = QQPushDelivery.objects.create(article=article, target=target, status=QQPushDeliveryStatus.SENT, message_id="msg-1")
+        before_status = (article.workflow_status, article.published_to_web_at, article.published_by_mode, delivery.status)
+
+        from stable.services.term_maintenance import apply_article_term_backfill, plan_article_term_backfill
+
+        plan = plan_article_term_backfill(term_ids=[term.pk], article_ids=[article.pk])
+        apply_article_term_backfill(plan["rows"])
+
+        article.refresh_from_db()
+        delivery.refresh_from_db()
+        self.assertEqual((article.workflow_status, article.published_to_web_at, article.published_by_mode, delivery.status), before_status)
+        self.assertEqual(QQPushDelivery.objects.filter(article=article).count(), 1)
+
+    def test_unpublished_articles_are_excluded_by_default(self):
+        term = self._term()
+        TermAlias.objects.create(term=term, source_language=SourceLanguage.JAPANESE, text="カラマティアノス")
+        article = self._article(workflow_status=WorkflowStatus.PENDING_REVIEW, published_to_web_at=None)
+
+        from stable.services.term_maintenance import plan_article_term_backfill
+
+        result = plan_article_term_backfill(term_ids=[term.pk], article_ids=[article.pk])
+
+        self.assertEqual(result["summary"]["scanned_articles"], 0)
+        self.assertEqual(result["rows"], [])
+
+    def test_stale_field_value_is_not_overwritten(self):
+        term = self._term()
+        TermAlias.objects.create(term=term, source_language=SourceLanguage.JAPANESE, text="カラマティアノス")
+        article = self._article()
+
+        from stable.services.term_maintenance import apply_article_term_backfill, plan_article_term_backfill
+
+        plan = plan_article_term_backfill(term_ids=[term.pk], article_ids=[article.pk])
+        article.body_zh = "人工改过的カラマティアノス。"
+        article.save(update_fields=["body_zh", "updated_at"])
+
+        result = apply_article_term_backfill([row for row in plan["rows"] if row["field"] == "body_zh"])
+
+        article.refresh_from_db()
+        self.assertEqual(result["rows"][0]["action"], "stale")
+        self.assertEqual(article.body_zh, "人工改过的カラマティアノス。")
+
+
+class TermMaintenanceCommandTests(TestCase):
+    def _term(self, **overrides):
+        payload = {
+            "term_type": TermType.HORSE,
+            "source_language": SourceLanguage.ENGLISH,
+            "source_ja": "Kalamatianos",
+            "target_zh": "欢快舞步",
+            "racing_region": RacingRegion.JAPAN,
+        }
+        payload.update(overrides)
+        return TermEntry.objects.create(**payload)
+
+    def _article(self, **overrides):
+        now = timezone.now()
+        payload = {
+            "source_site": SourceSite.NETKEIBA,
+            "source_mode": SourceMode.LATEST,
+            "source_article_id": overrides.pop("source_article_id", f"term-command-{NewsArticle.objects.count()}"),
+            "racing_region": RacingRegion.JAPAN,
+            "source_language": SourceLanguage.JAPANESE,
+            "title_ja": "カラマティアノス",
+            "body_ja_raw": "カラマティアノス",
+            "body_ja_normalized": "カラマティアノス",
+            "translated_title_zh": "カラマティアノス",
+            "translated_body_zh": "カラマティアノス",
+            "translated_summary_zh": "カラマティアノス",
+            "base_translation_zh": "カラマティアノス",
+            "title_zh": "カラマティアノス",
+            "body_zh": "カラマティアノス",
+            "summary_zh": "カラマティアノス",
+            "push_summary_zh": "カラマティアノス",
+            "published_at": now,
+            "published_to_web_at": now,
+            "workflow_status": WorkflowStatus.PUBLISHED,
+            "source_url": overrides.pop("source_url", f"https://example.com/term-command-{NewsArticle.objects.count()}"),
+        }
+        payload.update(overrides)
+        return NewsArticle.objects.create(**payload)
+
+    def test_merge_command_defaults_to_dry_run_and_writes_artifacts(self):
+        target = self._term()
+        self._term(source_language=SourceLanguage.JAPANESE, source_ja="カラマティアノス")
+        out = StringIO()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            call_command("merge_hkjc_ja_aliases", "--target-term-id", str(target.pk), "--output-dir", tmp, stdout=out)
+            artifact = Path(tmp) / "merge_plan.json"
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+
+        self.assertIn("dry-run", out.getvalue())
+        self.assertEqual(payload["summary"]["candidate_count"], 1)
+        self.assertFalse(TermAlias.objects.filter(term=target, text="カラマティアノス").exists())
+
+    def test_merge_command_apply_requires_plan_file_and_writes_alias(self):
+        target = self._term()
+        source = self._term(source_language=SourceLanguage.JAPANESE, source_ja="カラマティアノス")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            call_command("merge_hkjc_ja_aliases", "--target-term-id", str(target.pk), "--output-dir", tmp, stdout=StringIO())
+            call_command("merge_hkjc_ja_aliases", "--apply", "--plan-file", str(Path(tmp) / "merge_plan.json"), "--output-dir", tmp, stdout=StringIO())
+
+        source.refresh_from_db()
+        self.assertFalse(source.is_active)
+        self.assertTrue(TermAlias.objects.filter(term=target, text="カラマティアノス").exists())
+
+    def test_backfill_command_writes_full_diff_and_apply_updates_article(self):
+        term = self._term()
+        TermAlias.objects.create(term=term, source_language=SourceLanguage.JAPANESE, text="カラマティアノス")
+        article = self._article()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            call_command(
+                "backfill_article_terms",
+                "--term-id",
+                str(term.pk),
+                "--article-id",
+                str(article.pk),
+                "--output-dir",
+                tmp,
+                stdout=StringIO(),
+            )
+            diff_path = Path(tmp) / "article_backfill_diff.json"
+            payload = json.loads(diff_path.read_text(encoding="utf-8"))
+            body_row = [row for row in payload["rows"] if row["field"] == "body_zh"][0]
+            call_command("backfill_article_terms", "--apply", "--diff-file", str(diff_path), "--output-dir", tmp, stdout=StringIO())
+
+        article.refresh_from_db()
+        self.assertEqual(body_row["before"], "カラマティアノス")
+        self.assertEqual(body_row["after"], "欢快舞步")
+        self.assertEqual(article.body_zh, "欢快舞步")
+
+    def test_backfill_command_apply_rejects_unbounded_write(self):
+        term = self._term()
+
+        with self.assertRaises(CommandError):
+            call_command("backfill_article_terms", "--apply", "--term-id", str(term.pk), stdout=StringIO())
+
+
 class RaceGradeTests(TestCase):
     def test_normalize_race_grade_covers_common_jra_classes(self):
         from stable.services.automation import normalize_race_grade

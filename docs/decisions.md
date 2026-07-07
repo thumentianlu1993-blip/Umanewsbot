@@ -226,6 +226,31 @@ OpenSpec 项目上下文与任务规则以 `openspec/config.yaml` 为准；项�
 
 本轮保留 `TermEntry.source_ja / aliases_ja` 作为兼容字段，迁移会把旧数据回填为 `ja` 别名。后续如果要彻底重命名旧字段，应另起清理 change。
 
+## 为什么 HKJC 日语 alias 合并会停用冗余日语主术语
+
+HKJC 官方英文概念和既有日语主术语如果拥有同一术语类型和同一中文目标，继续保留两个 active `TermEntry` 会让后台搜索、文章术语替换和后续审计出现“同一实体多概念”的歧义。
+
+因此 `hkjc-ja-alias-article-backfill` 采用保守合并策略：
+
+- HKJC 英文 `TermEntry` 作为正式概念承载标准中文译名。
+- 日语 source text 写入该概念的 `TermAlias(source_language=ja)`。
+- 原独立日语主术语停用，并在 notes 记录合并目标 term id。
+
+这样做不会删除历史记录，也解释了术语库中少量 inactive 术语的来源：它们可能是已经被更完整概念吸收的历史主术语，而不是应继续参与匹配的正式概念。若中文目标、术语类型或 active owner 存在冲突，系统只输出人工复核记录，不自动合并。
+
+## 为什么已发布文章术语回填不重新翻译整篇文章
+
+术语补齐后，历史已发布文章中可能仍保留日文或英文 source text。这个问题的修复目标是“精确替换术语”，不是重做内容生产。
+
+因此文章回填采用字段级 diff/apply：
+
+- dry-run 输出完整 before/after 字段值和人工复核 CSV。
+- apply 只替换明确命中的 source text。
+- 默认跳过人工编辑过的发布字段。
+- 不重新抓取、不重新翻译、不调用 AI 改写、不改变发布、审核、workflow 或 QQ 推送状态。
+
+这能把生产写入范围限制在可审计、可恢复的最小改动内；大范围内容重译或风格重写应另起 change。
+
 ## 为什么公开首页升级先做主 OpenSpec change
 
 公开首页从 MVP 页面升级为 Web + 移动 H5 成熟资讯流，虽然主要发生在模板、样式和视图层，但它会影响前台信息架构、后续子能力边界和用户内容消费路径，因此先创建主 OpenSpec change `upgrade-public-home-info-feed` 作为指导规范。

@@ -1,0 +1,13 @@
+schema: spec-driven
+created: 2026-07-07
+profile: feature
+phase: reviewed
+journal:
+  - event: plan-reviewed
+    date: "2026-07-07T15:57:19+08:00"
+    session: 1
+    mode: full
+    rounds: 1
+    issues_resolved: 4
+    artifacts_modified: [design.md, specs/termbase-and-race-priority/spec.md, tasks.md]
+    note: "Resolved rollback artifact, alias collision, apply scope, and test coverage gaps."
