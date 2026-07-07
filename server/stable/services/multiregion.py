@@ -144,6 +144,58 @@ def _count_by(queryset, field: str) -> dict[str, int]:
     return {row[field] or "": row["count"] for row in queryset.values(field).annotate(count=Count("id"))}
 
 
+def _gate_issue_summary(queryset) -> dict[str, Any]:
+    code_counts: dict[str, int] = {}
+    blocker_counts: dict[str, int] = {}
+    examples: list[dict[str, Any]] = []
+    downgraded_terms: dict[str, int] = {}
+    region_excluded_terms: dict[str, int] = {}
+    for article in queryset.exclude(gate_issues=[]).order_by("-first_seen_at", "-id")[:500]:
+        for issue in article.gate_issues or []:
+            code = issue.get("code") or ""
+            if not code:
+                continue
+            code_counts[code] = code_counts.get(code, 0) + 1
+            if issue.get("severity") == "blocker":
+                blocker_counts[code] = blocker_counts.get(code, 0) + 1
+            payload = issue.get("payload") or {}
+            source_term = payload.get("source_ja") or ""
+            if code == "ambiguous_term_downgraded" and source_term:
+                downgraded_terms[source_term] = downgraded_terms.get(source_term, 0) + 1
+            if code == "term_region_excluded" and source_term:
+                region_excluded_terms[source_term] = region_excluded_terms.get(source_term, 0) + 1
+            if len(examples) < 20 and code in {"core_term_missing", "ambiguous_term_downgraded", "term_region_excluded"}:
+                examples.append(
+                    {
+                        "article_id": article.id,
+                        "article_title": article.effective_title,
+                        "code": code,
+                        "severity": issue.get("severity"),
+                        "source_ja": source_term,
+                        "term_type": payload.get("term_type"),
+                        "term_region": payload.get("term_region"),
+                        "article_region": payload.get("article_region") or article.racing_region,
+                        "reason": payload.get("reason") or issue.get("message"),
+                    }
+                )
+    return {
+        "codes": code_counts,
+        "blockers": blocker_counts,
+        "downgraded_terms": downgraded_terms,
+        "region_excluded_terms": region_excluded_terms,
+        "examples": examples,
+    }
+
+
+def _parse_failed_source_ids(queryset) -> list[int]:
+    return list(
+        queryset.filter(last_crawl_status=TaskStatus.FAILED)
+        .filter(Q(last_crawl_message__icontains="parse") | Q(last_crawl_message__icontains="empty detail"))
+        .order_by("id")
+        .values_list("id", flat=True)
+    )
+
+
 def _window_rows(region: str, *, limit: int = 4) -> list[dict[str, Any]]:
     return [
         {
@@ -202,6 +254,7 @@ def summarize_multiregion_news_production(*, now=None) -> dict[str, Any]:
             source_language__in=[SourceLanguage.JAPANESE, SourceLanguage.ENGLISH, SourceLanguage.CHINESE_TRADITIONAL],
         )
         external_aliases = ExternalHorseAlias.objects.filter(racing_region=region)
+        gate_issues = _gate_issue_summary(recent_articles)
         regions[region] = {
             "label": region_label(region),
             "sources": {
@@ -214,6 +267,7 @@ def summarize_multiregion_news_production(*, now=None) -> dict[str, Any]:
                 "crawl_statuses": _count_by(sources, "last_crawl_status"),
                 "success_no_new": sources.filter(last_crawl_status=TaskStatus.SUCCESS, last_crawl_message__icontains="新增 0").count(),
                 "failed": sources.filter(last_crawl_status=TaskStatus.FAILED).count(),
+                "parse_failed_source_ids": _parse_failed_source_ids(sources),
             },
             "articles": {
                 "total": articles.count(),
@@ -237,6 +291,11 @@ def summarize_multiregion_news_production(*, now=None) -> dict[str, Any]:
                     published_to_web_at__gte=today_start,
                 ).count(),
                 "public_total": articles.filter(workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at__isnull=False).count(),
+                "gate_issues": gate_issues,
+                "gate_blockers": gate_issues["blockers"],
+                "gate_blocker_examples": [
+                    example for example in gate_issues["examples"] if example.get("severity") == "blocker"
+                ],
             },
             "qq_delivery": _count_by(qq_recent, "status"),
             "production_windows": _window_rows(region),

@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0",
+  "entries": [
+    {
+      "source": "plan-eng-review",
+      "session": 1,
+      "round": 1,
+      "timestamp": "2026-07-07T14:44:13+08:00",
+      "last_updated": "2026-07-07T14:44:13+08:00",
+      "mode": "full",
+      "artifacts_modified": [
+        "proposal.md",
+        "design.md",
+        "tasks.md",
+        "specs/termbase-and-race-priority/spec.md"
+      ],
+      "rounds_total_for_session": 1,
+      "issues_resolved": 3,
+      "findings": [
+        {
+          "id": "F-001",
+          "severity": "warning",
+          "category": "architecture",
+          "summary": "跨地区术语的 v1 承载方式不明确，可能让实现阶段把 notes/source metadata 变成隐式契约。",
+          "resolution": "明确 v1 只校验同地区和全局术语，跨地区通用词先治理为全局术语。",
+          "status": "resolved",
+          "round_found": 1,
+          "round_resolved": 1
+        },
+        {
+          "id": "F-002",
+          "severity": "warning",
+          "category": "code-quality",
+          "summary": "高歧义术语治理在配置清单和新增 TermEntry 字段之间未定，增加实现和迁移风险。",
+          "resolution": "明确 v1 不新增字段，先使用 settings 配置和确定性规则止血。",
+          "status": "resolved",
+          "round_found": 1,
+          "round_resolved": 1
+        },
+        {
+          "id": "F-003",
+          "severity": "info",
+          "category": "test",
+          "summary": "验证任务缺少全量 OpenSpec 校验。",
+          "resolution": "补充 openspec validate --all 到验证任务。",
+          "status": "resolved",
+          "round_found": 1,
+          "round_resolved": 1
+        }
+      ]
+    }
+  ]
+}

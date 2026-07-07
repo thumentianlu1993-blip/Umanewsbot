@@ -352,11 +352,16 @@ def _crawl_international_source(source: NewsSource) -> dict:
     job = _start_crawl_job(source)
     new_count = 0
     seen_count = 0
+    skipped_errors: list[str] = []
     ranked_revival_results: list[dict] = []
     try:
         for stub in adapter.fetch_listing(source.source_mode, 1):
-            detail = adapter.fetch_detail(stub.source_url)
-            draft = adapter.normalize_source_payload(stub, detail)
+            try:
+                detail = adapter.fetch_detail(stub.source_url)
+                draft = adapter.normalize_source_payload(stub, detail)
+            except Exception as exc:
+                skipped_errors.append(f"{stub.source_url}: {exc}")
+                continue
             upsert_result = upsert_article_from_draft(draft, crawl_job=job)
             article, created = upsert_result
             if created:
@@ -375,15 +380,25 @@ def _crawl_international_source(source: NewsSource) -> dict:
                     article,
                     source_elevated=bool(getattr(upsert_result, "source_elevated", False)),
                 )
-        _finish_crawl_job(job, success_count=new_count, fail_count=seen_count)
+        message = ""
+        if skipped_errors:
+            message = f"新增 {new_count}，重复 {seen_count}；parse failed 跳过 {len(skipped_errors)} 条：{skipped_errors[0][:120]}"
+        if skipped_errors and new_count == 0 and seen_count == 0:
+            error_message = message or "parse failed: no parsable article details"
+            _finish_crawl_job(job, success_count=new_count, fail_count=len(skipped_errors), error_message=error_message)
+            raise RuntimeError(error_message)
+        _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, message=message)
         return {
             "new_count": new_count,
             "seen_count": seen_count,
+            "skipped_count": len(skipped_errors),
             "crawl_job_id": job.id,
             "ranked_revival_results": ranked_revival_results,
         }
     except Exception as exc:
-        _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, error_message=str(exc))
+        job.refresh_from_db(fields=["status"])
+        if job.status == TaskStatus.STARTED:
+            _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, error_message=str(exc))
         raise
 
 

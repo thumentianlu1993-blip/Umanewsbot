@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from django.conf import settings
+
 from stable.models import NewsSource, RacingRegion, SourceKind, SourceLanguage, SourceMode, SourceSite, SourceType
 
 
@@ -243,6 +245,24 @@ BUILTIN_SOURCE_DEFINITIONS = [
         "priority": 47,
     },
     {
+        "name": "TDN 法国宽关键词英文新闻",
+        "homepage_url": "https://www.thoroughbreddailynews.com/",
+        "feed_url": "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=French%20racing&per_page=20",
+        "source_type": SourceType.BUILTIN,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.FRANCE,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.NEWS,
+        "adapter_key": "tdn_france_broad",
+        "source_site": SourceSite.TDN_FRANCE,
+        "source_mode": SourceMode.ACCESS,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 360,
+        "notes": "TDN 公开 API 多关键词搜索 French racing / ParisLongchamp / Deauville / Chantilly；canonical source site 为 TDN，默认灰度关闭。",
+        "priority": 46,
+    },
+    {
         "name": "At The Races 法国相关英文新闻",
         "homepage_url": "https://www.attheraces.com/",
         "feed_url": "https://www.attheraces.com/news",
@@ -347,6 +367,26 @@ BUILTIN_SOURCE_DEFINITIONS = [
 ]
 
 
+def _supported_production_languages() -> set[str]:
+    configured = getattr(
+        settings,
+        "MULTIREGION_SUPPORTED_PRODUCTION_SOURCE_LANGUAGES",
+        [SourceLanguage.JAPANESE, SourceLanguage.ENGLISH, SourceLanguage.CHINESE_TRADITIONAL],
+    )
+    return {str(item).strip() for item in configured if str(item).strip()}
+
+
+def _prepare_builtin_source_payload(payload: dict) -> dict:
+    prepared = dict(payload)
+    if prepared.get("source_language") not in _supported_production_languages():
+        prepared["production_approved"] = False
+        note = prepared.get("notes") or ""
+        marker = "source_language_not_supported"
+        if marker not in note:
+            prepared["notes"] = f"{note}\n{marker}".strip()
+    return prepared
+
+
 def sync_builtin_sources() -> list[NewsSource]:
     sources: list[NewsSource] = []
     protected_fields = {
@@ -362,7 +402,8 @@ def sync_builtin_sources() -> list[NewsSource]:
         "last_error_category",
         "allow_event_boost",
     }
-    for payload in BUILTIN_SOURCE_DEFINITIONS:
+    for raw_payload in BUILTIN_SOURCE_DEFINITIONS:
+        payload = _prepare_builtin_source_payload(raw_payload)
         lookup = {
             "source_site": payload["source_site"],
             "source_mode": payload["source_mode"],
@@ -375,7 +416,9 @@ def sync_builtin_sources() -> list[NewsSource]:
         if not created:
             update_fields = []
             for field_name, value in payload.items():
-                if field_name in protected_fields:
+                if field_name in protected_fields and field_name != "production_approved":
+                    continue
+                if field_name == "production_approved" and raw_payload.get("source_language") in _supported_production_languages():
                     continue
                 if getattr(source, field_name) != value:
                     setattr(source, field_name, value)

@@ -12,7 +12,7 @@ from bs4 import BeautifulSoup
 from django.utils import dateparse, timezone
 
 from stable.models import RacingRegion, SourceKind, SourceLanguage, SourceMode, SourceSite
-from stable.services.http import get_bytes
+from stable.services.http import DEFAULT_HEADERS, get_bytes
 from stable.services.text import extract_article_text, normalize_whitespace
 
 from .base import CanonicalNewsDraft, SourceAdapter, SourceArticleDetail, SourceArticleStub
@@ -45,10 +45,17 @@ class SimpleInternationalNewsAdapter(SourceAdapter):
     link_path_keywords: tuple[str, ...] = ("/news", "/article", "/articles", "/press-release", "/press-releases")
     exclude_path_keywords: tuple[str, ...] = ("/author/", "/authors/", "/tag/", "/tags/")
     prefer_meta_title = True
+    last_listing_http_status: int | None = None
+    last_listing_final_url = ""
 
     def fetch_listing(self, mode: SourceMode, page_or_month: str | int) -> list[SourceArticleStub]:
         url = self.listing_url(page_or_month, mode=mode)
-        html = str(get_bytes(url, encoding="utf-8"))
+        response = requests.get(url, headers=DEFAULT_HEADERS, timeout=15)
+        self.last_listing_http_status = getattr(response, "status_code", None)
+        self.last_listing_final_url = getattr(response, "url", url)
+        response.raise_for_status()
+        response.encoding = "utf-8"
+        html = response.text
         return self.parse_listing_html(html, url=url, mode=mode)
 
     def fetch_detail(self, source_article_id_or_url: str) -> SourceArticleDetail:
@@ -395,6 +402,8 @@ class TDNAdapter(SimpleInternationalNewsAdapter):
             headers={"User-Agent": "umanewsbot/1.0 (+https://umafans.run)"},
             timeout=15,
         )
+        self.last_listing_http_status = getattr(response, "status_code", None)
+        self.last_listing_final_url = getattr(response, "url", self.listing_url(page_or_month, mode=mode))
         response.raise_for_status()
         payload = response.json()
         if not isinstance(payload, list):
@@ -456,6 +465,58 @@ class TDNFranceKeywordAdapter(TDNAdapter):
     canonical_source_site = SourceSite.TDN
     api_url = "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=France%20Galop&per_page=20"
     racing_region = RacingRegion.FRANCE
+
+
+class TDNFranceBroadKeywordAdapter(TDNFranceKeywordAdapter):
+    source_mode = SourceMode.ACCESS
+    search_queries = ("French racing", "ParisLongchamp", "Deauville", "Chantilly")
+    last_listing_query_errors: list[dict[str, str]]
+
+    def listing_url(self, page_or_month: str | int, mode: SourceMode | str | None = None) -> str:
+        return "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=French%20racing&per_page=20"
+
+    def fetch_listing(self, mode: SourceMode, page_or_month: str | int) -> list[SourceArticleStub]:
+        resolved_mode = mode or self.source_mode
+        stubs: list[SourceArticleStub] = []
+        seen: set[str] = set()
+        query_errors: list[dict[str, str]] = []
+        first_error: Exception | None = None
+        successful_query_count = 0
+        last_success_http_status: int | None = None
+        last_success_final_url = ""
+        for query in self.search_queries:
+            self.api_url = (
+                "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?"
+                f"search={requests.utils.quote(query)}&per_page=20"
+            )
+            try:
+                query_stubs = super().fetch_listing(resolved_mode, page_or_month)
+                successful_query_count += 1
+                last_success_http_status = self.last_listing_http_status
+                last_success_final_url = self.last_listing_final_url
+            except Exception as exc:
+                if first_error is None:
+                    first_error = exc
+                query_errors.append({"query": query, "error": str(exc)})
+                continue
+            for stub in query_stubs:
+                if stub.source_url in seen:
+                    continue
+                seen.add(stub.source_url)
+                stub.metadata["listing_query"] = query
+                stubs.append(stub)
+                if len(stubs) >= 20:
+                    self.last_listing_query_errors = query_errors
+                    self.last_listing_http_status = last_success_http_status
+                    self.last_listing_final_url = last_success_final_url
+                    return stubs
+        self.last_listing_query_errors = query_errors
+        if stubs:
+            self.last_listing_http_status = last_success_http_status
+            self.last_listing_final_url = last_success_final_url
+        if not stubs and successful_query_count == 0 and first_error is not None:
+            raise first_error
+        return stubs
 
 
 class HorseRacingNationAdapter(SimpleInternationalNewsAdapter):
@@ -549,6 +610,7 @@ INTERNATIONAL_ADAPTERS = {
     "france_galop_news": FranceGalopEnglishNewsAdapter,
     "tdn": TDNAdapter,
     "tdn_france": TDNFranceKeywordAdapter,
+    "tdn_france_broad": TDNFranceBroadKeywordAdapter,
     "horse_racing_nation": HorseRacingNationAdapter,
     "at_the_races_france": AtTheRacesFranceAdapter,
     "bloodhorse": BloodHorseAdapter,
@@ -565,6 +627,7 @@ FIRST_VERSION_INTERNATIONAL_ADAPTER_KEYS = (
     "bha",
     "france_galop_news",
     "tdn_france",
+    "tdn_france_broad",
     "tdn",
     "horse_racing_nation",
 )
@@ -581,6 +644,7 @@ FIRST_VERSION_INTERNATIONAL_PROBES = (
     ("bha", SourceMode.OFFICIAL),
     ("france_galop_news", SourceMode.OFFICIAL),
     ("tdn_france", SourceMode.LATEST),
+    ("tdn_france_broad", SourceMode.ACCESS),
     ("tdn", SourceMode.LATEST),
     ("horse_racing_nation", SourceMode.ACCESS),
     ("horse_racing_nation", SourceMode.LATEST),

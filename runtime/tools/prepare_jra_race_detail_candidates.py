@@ -41,7 +41,12 @@ def _download(url: str, path: Path, *, allow_network: bool, timeout: int) -> byt
 
 
 def _extract_result_links(list_html_path: Path) -> list[str]:
-    soup = BeautifulSoup(list_html_path.read_text(encoding="utf-8"), "html.parser")
+    raw = list_html_path.read_bytes()
+    try:
+        list_html = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        list_html = _decode_jra_html(raw)
+    soup = BeautifulSoup(list_html, "html.parser")
     links = []
     for href in (a.get("href") for a in soup.find_all("a", href=True)):
         if JRA_RESULT_RE.search(href):

@@ -39,15 +39,27 @@ STOPWORDS = {
     "le",
     "les",
     "l",
+    "longines",
     "pmu",
+    "pool",
     "prix",
     "qatar",
     "racing",
+    "saint",
     "shadwell",
     "studs",
     "sumbe",
     "the",
     "world",
+    # Venue words commonly appear in French race titles and cause false positives
+    # between multiple races on the same card.
+    "auteuil",
+    "chantilly",
+    "cloud",
+    "compiegne",
+    "deauville",
+    "longchamp",
+    "paris",
 }
 
 
@@ -141,7 +153,9 @@ def _race_match(expected: str, actual: str) -> bool:
     if not expected_tokens or not actual_tokens:
         return False
     overlap = len(expected_tokens & actual_tokens)
-    return overlap >= min(2, len(expected_tokens)) and overlap / max(len(expected_tokens), 1) >= 0.45
+    if len(expected_tokens) <= 2:
+        return expected_tokens <= actual_tokens
+    return overlap >= max(2, round(len(expected_tokens) * 0.67))
 
 
 def _zeturf_url(event: dict, *, r_number: int, c_number: int) -> str:

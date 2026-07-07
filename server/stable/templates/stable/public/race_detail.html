@@ -23,6 +23,12 @@
         {% if event.status == 'running' %}
           <strong>进行中</strong>
           <span>最终赛果确认后将切换为赛后结果</span>
+        {% elif event.status == 'cancelled' %}
+          <strong>取消</strong>
+          <span>{% if event.local_date %}原定 {{ event.local_date|date:"Y-m-d" }}{% else %}日期待定{% endif %}</span>
+        {% elif event.status == 'postponed' %}
+          <strong>延期</strong>
+          <span>{% if event.local_date %}调整至 {{ event.local_date|date:"Y-m-d" }}{% else %}日期待定{% endif %}</span>
         {% elif event.status == 'finished' and top_results %}
           <strong>{{ top_results.0.horse_name }}</strong>
           <span>冠军 · {% if top_results.0.margin %}{{ top_results.0.margin }}{% else %}赛果已确认{% endif %}</span>
@@ -52,6 +58,7 @@
       <div class="race-info-grid">
         <div><strong>日期</strong><span>{% if event.local_date %}{{ event.local_date|date:"Y-m-d" }}{% else %}待定{% endif %}</span></div>
         <div><strong>时间</strong><span>{% if event.local_start_time %}{{ event.local_start_time|time:"H:i" }}{% else %}待定{% endif %}</span></div>
+        <div><strong>状态</strong><span>{{ event.get_status_display }}</span></div>
         <div><strong>马场</strong><span>{{ event.racecourse }}</span></div>
         <div><strong>地区</strong><span>{{ event.get_country_region_display }}</span></div>
         <div><strong>等级</strong><span>{{ event.grade_text }}</span></div>
@@ -162,36 +169,36 @@
       </div>
     </section>
 
-    <section class="race-panel" id="history">
-      <h2>近年冠军</h2>
-      <div class="race-table-wrap">
-        <table class="race-table compact">
-          <thead>
-            <tr>
-              <th>年份</th>
-              <th>冠军</th>
-              <th>骑师</th>
-              <th>练马师</th>
-              <th>时间</th>
-              <th>马身差</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for winner in history_winners %}
+    {% if history_winners %}
+      <section class="race-panel" id="history">
+        <h2>近年冠军</h2>
+        <div class="race-table-wrap">
+          <table class="race-table compact">
+            <thead>
               <tr>
-                <td>{{ winner.winner_year }}</td>
-                <td><strong>{{ winner.horse_name }}</strong></td>
-                <td>{{ winner.jockey_name|default:"-" }}</td>
-                <td>{{ winner.trainer_name|default:"-" }}</td>
-                <td>{{ winner.finish_time|default:"-" }}</td>
-                <td>{{ winner.margin|default:"-" }}</td>
+                <th>年份</th>
+                <th>冠军</th>
+                <th>骑师</th>
+                <th>练马师</th>
+                <th>时间</th>
+                <th>马身差</th>
               </tr>
-            {% empty %}
-              <tr><td colspan="6">暂无历史冠军资料。</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </section>
+            </thead>
+            <tbody>
+              {% for winner in history_winners %}
+                <tr>
+                  <td>{{ winner.winner_year }}</td>
+                  <td><strong>{{ winner.horse_name }}</strong></td>
+                  <td>{{ winner.jockey_name|default:"-" }}</td>
+                  <td>{{ winner.trainer_name|default:"-" }}</td>
+                  <td>{{ winner.finish_time|default:"-" }}</td>
+                  <td>{{ winner.margin|default:"-" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
   </main>
 {% endblock %}

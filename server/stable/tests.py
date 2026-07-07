@@ -40,6 +40,7 @@ from stable.adapters.international import (
     SponichiAdapter,
     SportingLifeAdapter,
     TDNAdapter,
+    TDNFranceBroadKeywordAdapter,
     TDNFranceKeywordAdapter,
 )
 from stable.adapters.netkeiba import NetkeibaAdapter
@@ -1237,6 +1238,9 @@ class AdapterTests(TestCase):
         adapter = TDNAdapter()
 
         class FakeResponse:
+            status_code = 200
+            url = "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=French%20racing&per_page=20"
+
             def raise_for_status(self):
                 return None
 
@@ -1310,6 +1314,99 @@ class AdapterTests(TestCase):
         self.assertEqual(adapter.racing_region, RacingRegion.FRANCE)
         self.assertEqual(stubs[0].source_site, SourceSite.TDN_FRANCE)
         self.assertEqual(stubs[0].title_ja, "France Galop story")
+
+    def test_tdn_france_broad_keyword_listing_aggregates_and_dedupes_queries(self):
+        adapter = TDNFranceBroadKeywordAdapter()
+
+        responses = [
+            [
+                {
+                    "url": "https://www.thoroughbreddailynews.com/french-racing-story/",
+                    "title": "French racing story",
+                }
+            ],
+            [
+                {
+                    "url": "https://www.thoroughbreddailynews.com/french-racing-story/",
+                    "title": "French racing story duplicate",
+                },
+                {
+                    "url": "https://www.thoroughbreddailynews.com/parislongchamp-story/",
+                    "title": "ParisLongchamp story",
+                },
+            ],
+        ]
+
+        class FakeResponse:
+            def __init__(self, payload):
+                self.payload = payload
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self.payload
+
+        with patch(
+            "stable.adapters.international.requests.get",
+            side_effect=[FakeResponse(payload) for payload in responses],
+        ):
+            adapter.search_queries = ("French racing", "ParisLongchamp")
+            stubs = adapter.fetch_listing(SourceMode.ACCESS, 1)
+
+        self.assertEqual([stub.title_ja for stub in stubs], ["French racing story", "ParisLongchamp story"])
+        self.assertEqual([stub.source_mode for stub in stubs], [SourceMode.ACCESS, SourceMode.ACCESS])
+        self.assertEqual(stubs[0].source_site, SourceSite.TDN_FRANCE)
+        self.assertEqual(adapter.canonical_source_site, SourceSite.TDN)
+        self.assertEqual(adapter.racing_region, RacingRegion.FRANCE)
+
+    def test_tdn_france_broad_keyword_listing_keeps_successful_queries_when_one_query_fails(self):
+        adapter = TDNFranceBroadKeywordAdapter()
+
+        class FakeResponse:
+            status_code = 200
+            url = "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=French%20racing&per_page=20"
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return [
+                    {
+                        "url": "https://www.thoroughbreddailynews.com/french-racing-story/",
+                        "title": "French racing story",
+                    }
+                ]
+
+        response = Mock(status_code=503)
+        error = requests.HTTPError("503 Server Error")
+        error.response = response
+
+        with patch("stable.adapters.international.requests.get", side_effect=[FakeResponse(), error]):
+            adapter.search_queries = ("French racing", "ParisLongchamp")
+            stubs = adapter.fetch_listing(SourceMode.ACCESS, 1)
+
+        self.assertEqual([stub.title_ja for stub in stubs], ["French racing story"])
+        self.assertEqual(stubs[0].metadata["listing_query"], "French racing")
+        self.assertEqual(adapter.last_listing_http_status, 200)
+        self.assertEqual(
+            adapter.last_listing_final_url,
+            "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=French%20racing&per_page=20",
+        )
+        self.assertEqual(adapter.last_listing_query_errors, [{"query": "ParisLongchamp", "error": "503 Server Error"}])
+
+    def test_tdn_france_broad_keyword_listing_raises_when_all_queries_fail(self):
+        adapter = TDNFranceBroadKeywordAdapter()
+        response = Mock(status_code=503)
+        error = requests.HTTPError("503 Server Error")
+        error.response = response
+
+        with patch("stable.adapters.international.requests.get", side_effect=[error, error]):
+            adapter.search_queries = ("French racing", "ParisLongchamp")
+            with self.assertRaises(requests.HTTPError):
+                adapter.fetch_listing(SourceMode.ACCESS, 1)
+
+        self.assertEqual(len(adapter.last_listing_query_errors), 2)
 
     def test_tdn_france_keyword_draft_uses_tdn_canonical_source_site(self):
         adapter = TDNFranceKeywordAdapter()
@@ -1739,6 +1836,292 @@ class InternationalSourceMetadataTests(TestCase):
         snapshot = NewsSnapshot.objects.get(article=result.article)
         self.assertEqual(snapshot.snapshot_metadata.get("author"), "HKJC")
         self.assertNotIn("html", snapshot.snapshot_metadata)
+
+
+class FranceNewsSourceExpansionTests(TestCase):
+    class FakeAcceptedFranceAdapter:
+        source_site = SourceSite.AT_THE_RACES
+        source_mode = SourceMode.LATEST
+        racing_region = RacingRegion.FRANCE
+        source_language = SourceLanguage.ENGLISH
+
+        def listing_url(self, page_or_month, mode=None):
+            return "https://example.com/france/news"
+
+        def fetch_listing(self, mode, page_or_month):
+            self.last_listing_http_status = 200
+            self.last_listing_final_url = "https://example.com/france/news?page=1"
+            return [
+                SourceArticleStub(
+                    source_site=self.source_site,
+                    source_mode=mode,
+                    source_article_id="fr-accepted-1",
+                    source_url="https://example.com/france/news/fr-accepted-1",
+                    title_ja="Prix de l'Arc de Triomphe latest",
+                    published_at=timezone.now(),
+                )
+            ]
+
+        def fetch_detail(self, source_url):
+            return SourceArticleDetail(
+                title_ja="Prix de l'Arc de Triomphe latest",
+                body_ja_raw="France racing body with enough detail for a stable probe. " * 4,
+                body_ja_normalized="France racing body with enough detail for a stable probe. " * 4,
+                published_at=timezone.now(),
+                images=[],
+                original_content_html="<html><article>France racing body</article></html>",
+            )
+
+    class FakeBlockedFranceAdapter(FakeAcceptedFranceAdapter):
+        source_language = SourceLanguage.ENGLISH
+
+        def fetch_listing(self, mode, page_or_month):
+            self.last_listing_http_status = 403
+            self.last_listing_final_url = "https://example.com/france/news/challenge"
+            response = Mock(status_code=403)
+            error = requests.HTTPError("403 Client Error: Forbidden")
+            error.response = response
+            raise error
+
+    class FakePartialDetailFailureFranceAdapter(FakeAcceptedFranceAdapter):
+        def fetch_listing(self, mode, page_or_month):
+            self.last_listing_http_status = 200
+            self.last_listing_final_url = "https://example.com/france/news?page=1"
+            return [
+                SourceArticleStub(
+                    source_site=self.source_site,
+                    source_mode=mode,
+                    source_article_id="fr-bad-detail",
+                    source_url="https://example.com/france/news/fr-bad-detail",
+                    title_ja="Bad detail article",
+                    published_at=timezone.now(),
+                ),
+                SourceArticleStub(
+                    source_site=self.source_site,
+                    source_mode=mode,
+                    source_article_id="fr-good-detail",
+                    source_url="https://example.com/france/news/fr-good-detail",
+                    title_ja="Good detail article",
+                    published_at=timezone.now(),
+                ),
+            ]
+
+        def fetch_detail(self, source_url):
+            if source_url.endswith("/fr-bad-detail"):
+                raise ValueError("empty detail body")
+            return super().fetch_detail(source_url)
+
+    class FakePartialQueryFailureFranceAdapter(FakeAcceptedFranceAdapter):
+        def fetch_listing(self, mode, page_or_month):
+            stubs = super().fetch_listing(mode, page_or_month)
+            self.last_listing_query_errors = [{"query": "ParisLongchamp", "error": "503 Server Error"}]
+            return stubs
+
+    def test_france_source_probe_reports_accepted_result_and_remains_read_only(self):
+        from stable.management.commands import probe_international_news_sources as probe_command
+
+        before = {
+            "articles": NewsArticle.objects.count(),
+            "crawl_jobs": CrawlJob.objects.count(),
+            "sources": NewsSource.objects.count(),
+        }
+        out = StringIO()
+        adapters = {**probe_command.INTERNATIONAL_ADAPTERS, "fake_france_accepted": self.FakeAcceptedFranceAdapter}
+
+        with patch.object(probe_command, "INTERNATIONAL_ADAPTERS", adapters):
+            call_command(
+                "probe_international_news_sources",
+                "--source",
+                "fake_france_accepted",
+                "--json",
+                stdout=out,
+            )
+
+        payload = json.loads(out.getvalue())
+        after = {
+            "articles": NewsArticle.objects.count(),
+            "crawl_jobs": CrawlJob.objects.count(),
+            "sources": NewsSource.objects.count(),
+        }
+        self.assertEqual(before, after)
+        self.assertEqual(payload[0]["source"], "fake_france_accepted")
+        self.assertEqual(payload[0]["region"], RacingRegion.FRANCE)
+        self.assertEqual(payload[0]["source_language"], SourceLanguage.ENGLISH)
+        self.assertEqual(payload[0]["status"], "accepted")
+        self.assertEqual(payload[0]["http_status"], 200)
+        self.assertEqual(payload[0]["final_url"], "https://example.com/france/news?page=1")
+        self.assertGreaterEqual(payload[0]["parse_quality"]["list_count"], 1)
+        self.assertGreaterEqual(payload[0]["parse_quality"]["detail_body_length"], 80)
+
+    def test_france_source_probe_marks_access_limited_candidate_deferred(self):
+        from stable.management.commands import probe_international_news_sources as probe_command
+
+        out = StringIO()
+        adapters = {**probe_command.INTERNATIONAL_ADAPTERS, "fake_france_blocked": self.FakeBlockedFranceAdapter}
+
+        with patch.object(probe_command, "INTERNATIONAL_ADAPTERS", adapters):
+            call_command(
+                "probe_international_news_sources",
+                "--source",
+                "fake_france_blocked",
+                "--json",
+                stdout=out,
+            )
+
+        payload = json.loads(out.getvalue())
+        self.assertEqual(payload[0]["status"], "deferred")
+        self.assertEqual(payload[0]["deferred_reason"], "access_limited")
+        self.assertEqual(payload[0]["http_status"], 403)
+        self.assertEqual(payload[0]["final_url"], "https://example.com/france/news/challenge")
+        self.assertIn("403", payload[0]["error"])
+
+    def test_france_source_probe_skips_single_detail_error_and_keeps_sampling(self):
+        from stable.management.commands import probe_international_news_sources as probe_command
+
+        out = StringIO()
+        adapters = {
+            **probe_command.INTERNATIONAL_ADAPTERS,
+            "fake_france_partial_detail_failure": self.FakePartialDetailFailureFranceAdapter,
+        }
+
+        with patch.object(probe_command, "INTERNATIONAL_ADAPTERS", adapters):
+            call_command(
+                "probe_international_news_sources",
+                "--source",
+                "fake_france_partial_detail_failure",
+                "--json",
+                stdout=out,
+            )
+
+        payload = json.loads(out.getvalue())
+        self.assertEqual(payload[0]["status"], "accepted")
+        self.assertEqual(payload[0]["deferred_reason"], "")
+        self.assertEqual(payload[0]["parse_quality"]["list_count"], 2)
+        self.assertEqual(payload[0]["parse_quality"]["detail_sample_count"], 1)
+        self.assertEqual(payload[0]["parse_quality"]["detail_error_count"], 1)
+        self.assertEqual(len(payload[0]["articles"]), 1)
+        self.assertEqual(payload[0]["sample_errors"][0]["url"], "https://example.com/france/news/fr-bad-detail")
+        self.assertIn("empty detail body", payload[0]["sample_errors"][0]["error"])
+
+    def test_france_source_probe_reports_partial_query_errors(self):
+        from stable.management.commands import probe_international_news_sources as probe_command
+
+        out = StringIO()
+        adapters = {
+            **probe_command.INTERNATIONAL_ADAPTERS,
+            "fake_france_partial_query_failure": self.FakePartialQueryFailureFranceAdapter,
+        }
+
+        with patch.object(probe_command, "INTERNATIONAL_ADAPTERS", adapters):
+            call_command(
+                "probe_international_news_sources",
+                "--source",
+                "fake_france_partial_query_failure",
+                "--json",
+                stdout=out,
+            )
+
+        payload = json.loads(out.getvalue())
+        self.assertEqual(payload[0]["status"], "accepted")
+        self.assertEqual(payload[0]["query_errors"], [{"query": "ParisLongchamp", "error": "503 Server Error"}])
+
+    @override_settings(MULTIREGION_SUPPORTED_PRODUCTION_SOURCE_LANGUAGES=["ja", "en", "zh-hant"])
+    def test_sync_builtin_sources_does_not_production_approve_unsupported_french_source(self):
+        from stable.services import sources as source_service
+
+        french_definition = {
+            "name": "France French candidate",
+            "homepage_url": "https://example.com/fr/",
+            "feed_url": "https://example.com/fr/news",
+            "source_type": "builtin",
+            "language": SourceLanguage.FRENCH,
+            "racing_region": RacingRegion.FRANCE,
+            "source_language": SourceLanguage.FRENCH,
+            "source_kind": "news",
+            "adapter_key": "fake_france_french",
+            "source_site": SourceSite.AT_THE_RACES,
+            "source_mode": SourceMode.OFFICIAL,
+            "enabled": True,
+            "production_approved": True,
+            "crawl_interval_minutes": 15,
+            "notes": "French-only candidate.",
+            "priority": 80,
+        }
+
+        with patch.object(source_service, "BUILTIN_SOURCE_DEFINITIONS", [french_definition]):
+            synced = source_service.sync_builtin_sources()
+
+        source = synced[0]
+        self.assertEqual(source.source_language, SourceLanguage.FRENCH)
+        self.assertTrue(source.enabled)
+        self.assertFalse(source.production_approved)
+        self.assertIn("source_language_not_supported", source.notes)
+
+    def test_france_audit_distinguishes_no_new_parse_failure_and_gate_blocked(self):
+        from stable.services.multiregion import summarize_multiregion_news_production
+
+        no_new = NewsSource.objects.create(
+            name="France no new",
+            homepage_url="https://example.com/no-new",
+            feed_url="https://example.com/no-new/feed",
+            racing_region=RacingRegion.FRANCE,
+            source_language=SourceLanguage.ENGLISH,
+            adapter_key="fake_no_new",
+            source_site=SourceSite.FRANCE_GALOP_NEWS,
+            source_mode=SourceMode.OFFICIAL,
+            enabled=True,
+            production_approved=True,
+            last_crawl_status=TaskStatus.SUCCESS,
+            last_crawl_message="成功，新增 0，重复 12",
+        )
+        parse_failed = NewsSource.objects.create(
+            name="France parse failed",
+            homepage_url="https://example.com/parse",
+            feed_url="https://example.com/parse/feed",
+            racing_region=RacingRegion.FRANCE,
+            source_language=SourceLanguage.ENGLISH,
+            adapter_key="fake_parse_failed",
+            source_site=SourceSite.TDN_FRANCE,
+            source_mode=SourceMode.LATEST,
+            enabled=True,
+            production_approved=True,
+            last_crawl_status=TaskStatus.FAILED,
+            last_crawl_message="parse failed: empty detail body",
+        )
+        blocked_article = NewsArticle.objects.create(
+            source_site=SourceSite.TDN_FRANCE,
+            source_mode=SourceMode.LATEST,
+            source_config=no_new,
+            source_article_id="fr-gate-blocked",
+            source_url="https://example.com/fr-gate-blocked",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.FRANCE,
+            title_ja="French racing blocked",
+            body_ja_raw="French racing body. " * 20,
+            body_ja_normalized="French racing body. " * 20,
+            translated_title_zh="法国新闻",
+            translated_body_zh="法国新闻正文。" * 20,
+            published_at=timezone.now(),
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            gate_issues=[
+                {
+                    "code": "core_term_missing",
+                    "severity": "blocker",
+                    "payload": {"source_ja": "Prix de Diane", "term_region": RacingRegion.FRANCE},
+                }
+            ],
+        )
+
+        summary = summarize_multiregion_news_production()
+        france = summary["regions"][RacingRegion.FRANCE]
+
+        self.assertEqual(france["sources"]["success_no_new"], 1)
+        self.assertEqual(france["sources"]["failed"], 1)
+        self.assertIn(parse_failed.id, france["sources"]["parse_failed_source_ids"])
+        self.assertEqual(france["articles"]["automation"][AutomationStatus.MANUAL_REVIEW_REQUIRED], 1)
+        self.assertEqual(france["articles"]["gate_blockers"]["core_term_missing"], 1)
+        self.assertEqual(france["articles"]["gate_blocker_examples"][0]["article_id"], blocked_article.id)
 
 
 class ProductionWindowModelTests(TestCase):
@@ -10348,6 +10731,243 @@ class AutomationFlowTests(TestCase):
         self.assertFalse(outcome.passed)
         self.assertTrue(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
 
+    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=["class", "content", "agent"])
+    def test_english_short_core_entity_not_in_ambiguity_config_still_blocks(self):
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_ja="Cody",
+            target_zh="科迪",
+            priority=100,
+        )
+        article = self._translated_article(
+            source_article_id="english-short-core-entity-still-blocks",
+            source_site=SourceSite.TDN,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            title_ja="Cody returns in stakes company",
+            body_ja_raw="Cody returns in stakes company after a sharp workout at Saratoga. " * 6,
+            body_ja_normalized="Cody returns in stakes company after a sharp workout at Saratoga. " * 6,
+            translated_title_zh="美国让赛马匹复出",
+            title_zh="美国让赛马匹复出",
+            translated_body_zh="这是一篇美国赛事新闻，介绍一匹马训练后复出。" * 12,
+            body_zh="这是一篇美国赛事新闻，介绍一匹马训练后复出。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertFalse(outcome.passed)
+        blockers = [issue for issue in outcome.issues if issue["code"] == "core_term_missing"]
+        self.assertEqual([issue["payload"]["source_ja"] for issue in blockers], ["Cody"])
+        self.assertFalse(any(issue["code"] == "ambiguous_term_downgraded" for issue in outcome.issues))
+
+    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=["class", "content", "agent"])
+    def test_english_high_ambiguity_common_word_is_downgraded_from_blocker(self):
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            source_ja="Class",
+            target_zh="高班",
+            priority=100,
+        )
+        article = self._translated_article(
+            source_article_id="english-ambiguous-class-downgraded",
+            source_site=SourceSite.HKJC_NEWS,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            title_ja="Class 3 handicap preview at Sha Tin",
+            body_ja_raw="Class 3 handicap runners are ready at Sha Tin. The preview focuses on barrier draws and pace. " * 5,
+            body_ja_normalized="Class 3 handicap runners are ready at Sha Tin. The preview focuses on barrier draws and pace. " * 5,
+            translated_title_zh="沙田三班让赛前瞻",
+            title_zh="沙田三班让赛前瞻",
+            translated_body_zh="这是一篇沙田赛事前瞻，重点分析档位和步速。" * 12,
+            body_zh="这是一篇沙田赛事前瞻，重点分析档位和步速。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertTrue(outcome.passed)
+        self.assertFalse(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
+        downgraded = [issue for issue in outcome.issues if issue["code"] == "ambiguous_term_downgraded"]
+        self.assertTrue(downgraded)
+        self.assertIn(downgraded[0]["severity"], {"warning", "info"})
+        self.assertEqual(downgraded[0]["payload"]["source_ja"], "Class")
+        self.assertIn("high_ambiguity", downgraded[0]["payload"]["reason"])
+
+    def test_english_term_gate_ignores_other_region_terms_but_keeps_global_terms(self):
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            source_ja="LINK",
+            target_zh="连捷",
+            priority=100,
+        )
+        TermEntry.objects.create(
+            term_type="race",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region="",
+            source_ja="Breeders' Cup",
+            target_zh="育马者杯",
+            race_grade="G1",
+            priority=100,
+        )
+        article = self._translated_article(
+            source_article_id="english-region-filter-global-term",
+            source_site=SourceSite.TDN,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            title_ja="Breeders' Cup preview includes a LINK to entries",
+            body_ja_raw="Breeders' Cup preview includes a LINK to the entries page and a full field analysis. " * 6,
+            body_ja_normalized="Breeders' Cup preview includes a LINK to the entries page and a full field analysis. " * 6,
+            translated_title_zh="美国大赛前瞻",
+            title_zh="美国大赛前瞻",
+            translated_body_zh="这是一篇美国大赛前瞻，提到报名和阵容分析。" * 12,
+            body_zh="这是一篇美国大赛前瞻，提到报名和阵容分析。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+
+        blockers = [issue for issue in outcome.issues if issue["code"] == "core_term_missing"]
+        self.assertFalse(outcome.passed)
+        self.assertEqual([issue["payload"]["source_ja"] for issue in blockers], ["Breeders' Cup"])
+        excluded = outcome.details.get("term_gate_region_excluded_terms", [])
+        self.assertEqual(excluded[0]["source_ja"], "LINK")
+        self.assertEqual(excluded[0]["term_region"], RacingRegion.HONG_KONG)
+        self.assertEqual(excluded[0]["article_region"], RacingRegion.UNITED_STATES)
+
+    def test_english_same_region_core_term_still_blocks_auto_publish(self):
+        TermEntry.objects.create(
+            term_type="race",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_ja="Breeders' Cup Classic",
+            target_zh="育马者杯经典赛",
+            race_grade="G1",
+            priority=100,
+        )
+        article = self._translated_article(
+            source_article_id="english-same-region-core-term-blocks",
+            source_site=SourceSite.TDN,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            title_ja="Breeders' Cup Classic entries confirmed",
+            body_ja_raw="Breeders' Cup Classic entries confirmed after the latest round of workouts. " * 8,
+            body_ja_normalized="Breeders' Cup Classic entries confirmed after the latest round of workouts. " * 8,
+            translated_title_zh="美国大赛报名确认",
+            title_zh="美国大赛报名确认",
+            translated_body_zh="这是一篇美国大赛报名新闻，介绍最新训练后的阵容。" * 12,
+            body_zh="这是一篇美国大赛报名新闻，介绍最新训练后的阵容。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+        apply_validation_outcome(article, outcome)
+
+        article.refresh_from_db()
+        self.assertFalse(outcome.passed)
+        self.assertEqual(article.automation_status, AutomationStatus.MANUAL_REVIEW_REQUIRED)
+        self.assertEqual(article.workflow_status, WorkflowStatus.PENDING_REVIEW)
+        self.assertTrue(any(issue["payload"].get("source_ja") == "Breeders' Cup Classic" for issue in article.gate_issues))
+
+    @override_settings(MULTIREGION_PUBLISH_CANDIDATE_LOOKBACK_HOURS=3)
+    def test_reprocess_term_gate_blocked_articles_only_rechecks_latest_lookback_window(self):
+        recent = self._translated_article(
+            source_article_id="term-gate-reprocess-recent",
+            source_site=SourceSite.HKJC_NEWS,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            gate_issues=[{"code": "core_term_missing", "severity": "blocker", "payload": {"source_ja": "Class"}}],
+            first_seen_at=timezone.now() - timedelta(hours=2),
+        )
+        stale = self._translated_article(
+            source_article_id="term-gate-reprocess-stale",
+            source_site=SourceSite.HKJC_NEWS,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            gate_issues=[{"code": "core_term_missing", "severity": "blocker", "payload": {"source_ja": "Class"}}],
+            first_seen_at=timezone.now() - timedelta(hours=6),
+        )
+        rejected = self._translated_article(
+            source_article_id="term-gate-reprocess-rejected",
+            source_site=SourceSite.HKJC_NEWS,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            workflow_status=WorkflowStatus.REJECTED,
+            gate_issues=[{"code": "core_term_missing", "severity": "blocker", "payload": {"source_ja": "Class"}}],
+            first_seen_at=timezone.now() - timedelta(hours=1),
+        )
+        out = StringIO()
+
+        call_command(
+            "reprocess_term_gate_blocked_articles",
+            "--region",
+            RacingRegion.HONG_KONG,
+            "--dry-run",
+            "--json",
+            stdout=out,
+        )
+
+        payload = json.loads(out.getvalue())
+        recent.refresh_from_db()
+        stale.refresh_from_db()
+        rejected.refresh_from_db()
+        self.assertEqual(payload["candidate_ids"], [recent.id])
+        self.assertIn(stale.id, payload["skipped"]["outside_lookback"])
+        self.assertIn(rejected.id, payload["skipped"]["manual_terminal_state"])
+        self.assertEqual(recent.automation_status, AutomationStatus.MANUAL_REVIEW_REQUIRED)
+
+    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=["class"])
+    def test_reprocess_term_gate_blocked_articles_commit_revalidates_without_direct_publish(self):
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            source_ja="Class",
+            target_zh="高班",
+            priority=100,
+        )
+        article = self._translated_article(
+            source_article_id="term-gate-reprocess-commit",
+            source_site=SourceSite.HKJC_NEWS,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            title_ja="Class 3 handicap preview at Sha Tin",
+            body_ja_raw="Class 3 handicap runners are ready at Sha Tin. The preview focuses on barrier draws and pace. " * 5,
+            body_ja_normalized="Class 3 handicap runners are ready at Sha Tin. The preview focuses on barrier draws and pace. " * 5,
+            translated_title_zh="沙田三班让赛前瞻",
+            title_zh="沙田三班让赛前瞻",
+            translated_body_zh="这是一篇沙田赛事前瞻，重点分析档位和步速。" * 12,
+            body_zh="这是一篇沙田赛事前瞻，重点分析档位和步速。" * 12,
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            gate_issues=[{"code": "core_term_missing", "severity": "blocker", "payload": {"source_ja": "Class"}}],
+            first_seen_at=timezone.now() - timedelta(hours=1),
+        )
+        out = StringIO()
+
+        call_command(
+            "reprocess_term_gate_blocked_articles",
+            "--region",
+            RacingRegion.HONG_KONG,
+            "--commit",
+            "--json",
+            stdout=out,
+        )
+
+        payload = json.loads(out.getvalue())
+        article.refresh_from_db()
+        self.assertEqual(payload["revalidated_to_publish_ready_ids"], [article.id])
+        self.assertEqual(article.automation_status, AutomationStatus.PUBLISH_READY)
+        self.assertNotEqual(article.workflow_status, WorkflowStatus.PUBLISHED)
+        self.assertIsNotNone(article.ranked_revived_at)
+
     def test_duplicate_detection_blocks_highly_similar_article(self):
         published = self._translated_article(
             source_article_id="published-duplicate-source",
@@ -11845,6 +12465,81 @@ class CrawlAutoTranslateTests(TestCase):
         mocked_revival.assert_called_once()
         self.assertEqual(mocked_revival.call_args.args[0], article)
         self.assertFalse(any(call_args.args and call_args.args[0] is qq_auto_push_article_task for call_args in mocked_dispatch.call_args_list))
+
+    @override_settings(AUTO_TRANSLATE_ON_INGEST=False)
+    def test_international_detail_parse_error_skips_article_and_continues(self):
+        sync_builtin_sources()
+        source = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
+        bad_stub = type("Stub", (), {"source_url": "https://www.skysports.com/racing/news/bad-detail"})()
+        good_stub = type("Stub", (), {"source_url": "https://www.skysports.com/racing/news/good-detail"})()
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.SKY_SPORTS_RACING,
+            source_mode=SourceMode.ACCESS,
+            source_article_id="good-detail",
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            source_language=SourceLanguage.ENGLISH,
+            title_ja="Sky good detail",
+            body_ja_raw="Body",
+            body_ja_normalized="Body",
+            published_at=timezone.now(),
+            source_url=good_stub.source_url,
+            workflow_status=WorkflowStatus.PENDING_TRANSLATION,
+        )
+
+        class FakeInternationalAdapter:
+            def fetch_listing(self, mode, page):
+                return [bad_stub, good_stub]
+
+            def fetch_detail(self, source_url):
+                if source_url == bad_stub.source_url:
+                    raise ValueError("empty detail body")
+                return object()
+
+            def normalize_source_payload(self, stub, detail):
+                return object()
+
+        with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {source.adapter_key: FakeInternationalAdapter}), patch(
+            "stable.tasks.upsert_article_from_draft", return_value=ArticleUpsertResult(article=article, created=True)
+        ):
+            result = _crawl_international_source(source)
+
+        source.refresh_from_db()
+        job = CrawlJob.objects.get(pk=result["crawl_job_id"])
+        self.assertEqual(result["new_count"], 1)
+        self.assertEqual(result["skipped_count"], 1)
+        self.assertEqual(job.status, TaskStatus.SUCCESS)
+        self.assertIn("parse failed 跳过 1 条", job.error_message)
+        self.assertIn("empty detail body", job.error_message)
+        self.assertIn("parse failed 跳过 1 条", source.last_crawl_message)
+
+    @override_settings(AUTO_TRANSLATE_ON_INGEST=False)
+    def test_international_all_detail_parse_errors_mark_source_failed(self):
+        sync_builtin_sources()
+        source = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
+        bad_stub = type("Stub", (), {"source_url": "https://www.skysports.com/racing/news/bad-detail"})()
+
+        class FakeInternationalAdapter:
+            def fetch_listing(self, mode, page):
+                return [bad_stub]
+
+            def fetch_detail(self, source_url):
+                raise ValueError("empty detail body")
+
+            def normalize_source_payload(self, stub, detail):
+                return object()
+
+        with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {source.adapter_key: FakeInternationalAdapter}):
+            with self.assertRaises(RuntimeError):
+                _crawl_international_source(source)
+
+        source.refresh_from_db()
+        job = CrawlJob.objects.latest("id")
+        self.assertEqual(job.status, TaskStatus.FAILED)
+        self.assertEqual(job.fail_count, 1)
+        self.assertIn("parse failed 跳过 1 条", job.error_message)
+        self.assertIn("empty detail body", job.error_message)
+        self.assertEqual(source.last_crawl_status, TaskStatus.FAILED)
+        self.assertIn("parse failed 跳过 1 条", source.last_crawl_message)
 
     @override_settings(AUTO_TRANSLATE_ON_INGEST=False)
     def test_jra_detail_structure_error_skips_article_and_continues(self):

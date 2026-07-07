@@ -131,6 +131,47 @@ python manage.py backfill_article_terms \
 - 如 alias 合并错误，按 apply artifact 删除目标 alias，并恢复源 term `is_active=true` 和必要 notes。
 - 如文章字段替换错误，优先使用 `article_backfill_diff.json` 中的完整 `before` 值恢复；大范围异常时使用生产数据库备份。
 
+## 2026-07-07 法国新闻源扩展与英文术语门禁修复待上线
+
+- 本次待上线 OpenSpec changes：
+  - `expand-france-news-sources`
+  - `fix-english-term-gate-region-filter`
+- 代码范围：
+  - 法国新增 `tdn_france_broad` 英文补充来源，默认 `enabled=false`、`production_approved=false`。
+  - `probe_international_news_sources` 增加 `status/deferred_reason/http_status/final_url/parse_quality/query_errors/sample_errors`。
+  - 国际来源抓取支持单篇详情解析失败跳过继续，全部详情失败时来源 / CrawlJob 标记为 failed。
+  - 来源同步新增 `MULTIREGION_SUPPORTED_PRODUCTION_SOURCE_LANGUAGES=ja,en,zh-hant`，法语源不会被误批准生产。
+  - 英文发布校验按文章地区 + 全局术语过滤，并对配置化高歧义英文词降级为 warning。
+  - 新增 `reprocess_term_gate_blocked_articles` 受控重处理命令，不直接公开发布文章。
+- 本地上线前验证：
+  - `DB_ENGINE=sqlite .venv/bin/python server/manage.py test stable.tests.FranceNewsSourceExpansionTests ...`
+  - `DB_ENGINE=sqlite .venv/bin/python server/manage.py test stable.tests.TermRegionFilterTests ...`
+  - `DB_ENGINE=sqlite .venv/bin/python server/manage.py check`
+  - `openspec validate expand-france-news-sources --strict`
+  - `openspec validate fix-english-term-gate-region-filter --strict`
+  - `openspec validate --all`
+  - `git diff --check`
+- 生产部署前检查：
+  - `git rev-parse --short HEAD`
+  - `docker compose -f docker-compose.prod.lowcost.yml ps`
+  - `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check`
+  - `curl -fsS http://127.0.0.1/healthz/`
+  - 确认 `ExternalDataImportRun(status="started")=0` 且外部导入锁为空。
+  - 执行生产数据库备份，并用 `gzip -t` 校验。
+- 生产部署：
+  - `/opt/umanewsbot` 执行 `git pull --ff-only origin main`。
+  - 执行 `bash ./deploy_lowcost.sh` 重建 `web / worker / beat`。
+  - 执行 `python manage.py sync_builtin_sources`，确认 `TDN 法国宽关键词英文新闻` 已写入 `NewsSource` 且默认未批准生产。
+- 上线后验证：
+  - `python manage.py probe_international_news_sources --source tdn_france_broad --json` 应返回 `accepted` 或明确 `deferred_reason`；若 `query_errors` 非空，记录部分关键词失败但不直接误判整体不可用。
+  - `python manage.py reprocess_term_gate_blocked_articles --region hong_kong --dry-run --json`、`--region united_kingdom`、`--region united_states` 应输出候选、跳过和预计重校验结果，不直接发布。
+  - `python manage.py audit_multiregion_news_production --json` 应能展示 `gate_issues`、`gate_blockers`、法国来源 parse failed/source no-new 等摘要。
+  - `http://127.0.0.1/healthz/`、`http://umafans.run/healthz/`、首页、后台登录入口均应正常。
+- 回滚：
+  - 代码异常：回滚到部署前 git ref 后执行 `bash ./deploy_lowcost.sh`。
+  - 法国新增来源异常：在后台或 shell 将 `tdn_france_broad` 对应 `NewsSource.production_approved=false` 或 `enabled=false`。
+  - 英文门禁误放宽：临时清空或收紧 `MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS`，必要时回滚代码。
+
 ## 2026-07-06/07 HKJC / WP Stud 术语库最终清洗与生产导入
 
 - 生产服务器：`/opt/umanewsbot`，导入时 `HEAD=b1ddb54`。

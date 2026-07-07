@@ -23,6 +23,7 @@ from stable.models import (
     WorkflowStatus,
 )
 from stable.services.terms import (
+    _find_source_term_match,
     recognize_horse_names,
     serialize_recognized_horse_names,
     source_term_matches_text,
@@ -40,6 +41,7 @@ SEVERITY_INFO = "info"
 ROUTE_AUTO = "auto"
 ROUTE_MANUAL = "manual_review"
 ROUTE_DUPLICATE = "duplicate"
+GLOBAL_RACING_REGION = ""
 
 
 @dataclass
@@ -191,6 +193,45 @@ def _source_term_hit(text: str, source_terms: list[str], source_language: str | 
     return any(source_term_matches_text(text, term, source_language) for term in source_terms)
 
 
+def _setting_list(name: str) -> set[str]:
+    value = getattr(settings, name, [])
+    if isinstance(value, str):
+        items = value.split(",")
+    else:
+        items = value or []
+    return {str(item).strip().casefold() for item in items if str(item).strip()}
+
+
+def _term_gate_region_allowed(entry: TermEntry, article: NewsArticle, source_language: str | None) -> bool:
+    if source_language != SourceLanguage.ENGLISH:
+        return True
+    term_region = entry.racing_region or GLOBAL_RACING_REGION
+    return term_region in {GLOBAL_RACING_REGION, article.racing_region or GLOBAL_RACING_REGION}
+
+
+def _ambiguous_english_term_reason(entry: TermEntry, source_terms: list[str], *, is_core: bool) -> str:
+    configured = _setting_list("MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS")
+    candidates = [entry.source_ja, *source_terms]
+    if any((candidate or "").strip().casefold() in configured for candidate in candidates):
+        return "high_ambiguity_config"
+    if is_core:
+        return ""
+    visible_candidates = [(candidate or "").strip() for candidate in candidates if (candidate or "").strip()]
+    if any(candidate.isascii() and candidate.isalpha() and len(candidate) <= 4 for candidate in visible_candidates):
+        return "short_english_token"
+    if any(candidate.isascii() and candidate.isupper() and len(candidate) <= 8 for candidate in visible_candidates):
+        return "uppercase_english_token"
+    return ""
+
+
+def _matched_source_term(text: str, source_terms: list[str], source_language: str | None) -> str:
+    for term in source_terms:
+        matched = _find_source_term_match(text, term, source_language)
+        if matched:
+            return matched
+    return ""
+
+
 def _is_core_term(
     entry: TermEntry,
     source: str,
@@ -302,6 +343,8 @@ def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
         "recognized_horse_names": [],
         "external_horse_names": [],
         "missing_known_terms": [],
+        "term_gate_region_excluded_terms": [],
+        "ambiguous_term_downgrades": [],
         "missing_numbers": [],
         "quote_fragments_checked": [],
         "issues": [],
@@ -395,9 +438,59 @@ def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
         source_hit = _source_term_hit(source, source_terms, article_source_language)
         if not source_hit:
             continue
+        if not _term_gate_region_allowed(entry, article, article_source_language):
+            payload = {
+                "term_id": entry.id,
+                "source_ja": entry.source_ja,
+                "matched_text": _matched_source_term(source, source_terms, article_source_language),
+                "term_type": entry.term_type,
+                "term_region": entry.racing_region or GLOBAL_RACING_REGION,
+                "article_region": article.racing_region or GLOBAL_RACING_REGION,
+                "source_language": entry.source_language,
+                "reason": "region_mismatch",
+            }
+            details["term_gate_region_excluded_terms"].append(payload)
+            issues.append(
+                _issue(
+                    "term_region_excluded",
+                    SEVERITY_INFO,
+                    "英文术语因地区不匹配已排除：" + entry.source_ja,
+                    payload=payload,
+                )
+            )
+            continue
         if not _term_preserved(entry, publish_text, article_source_language, source_terms):
             missing_terms.append(entry.source_ja)
             is_core = _is_core_term(entry, source, title, first_block, article_source_language, source_terms)
+            ambiguous_reason = (
+                _ambiguous_english_term_reason(entry, source_terms, is_core=is_core)
+                if article_source_language == SourceLanguage.ENGLISH
+                else ""
+            )
+            if ambiguous_reason:
+                payload = {
+                    "term_id": entry.id,
+                    "source_ja": entry.source_ja,
+                    "matched_text": _matched_source_term(source, source_terms, article_source_language),
+                    "source_language": entry.source_language,
+                    "target_zh": entry.target_zh,
+                    "term_type": entry.term_type,
+                    "priority": entry.priority,
+                    "position": "core" if is_core else "background",
+                    "term_region": entry.racing_region or GLOBAL_RACING_REGION,
+                    "article_region": article.racing_region or GLOBAL_RACING_REGION,
+                    "reason": ambiguous_reason,
+                }
+                details["ambiguous_term_downgrades"].append(payload)
+                issues.append(
+                    _issue(
+                        "ambiguous_term_downgraded",
+                        SEVERITY_WARNING,
+                        "高歧义英文术语已降级：" + entry.source_ja,
+                        payload=payload,
+                    )
+                )
+                continue
             issues.append(
                 _issue(
                     "core_term_missing" if is_core else "background_term_missing",
