@@ -1,8 +1,9 @@
 # 部署运行手册
 
-## 2026-07-07 马匹详情页 MVP 待部署
+## 2026-07-08 马匹详情页 MVP 生产部署
 
 - 本地 change：`horse-profile-page-mvp`。
+- 部署提交：`2b28755 Add horse profile page MVP`。
 - 工作树：`/Users/mentianlu/.codex/worktrees/race-detail-page/umanews`。
 - 新增迁移：`stable.0022_horseprofile_horsefollow_articlehorselink_and_more`。
 - 新增公开入口：`/horses/`、`/horses/<id>/`、`/horses/follows/`。
@@ -11,6 +12,35 @@
   - `generate_horse_profiles`：从 active horse `TermEntry` 生成草稿 `HorseProfile`。
   - `complete_horse_profiles`：生成全地区 P0 马资料补全 dry-run artifact，或应用已审核 artifact。
   - `scan_article_horse_links`：历史已发布文章马匹关联 dry-run / commit 回填。
+
+### 生产执行记录
+
+- 生产服务器：`/opt/umanewsbot`。
+- 部署前 HEAD：`01c0b9b`。
+- 部署后 HEAD：`2b28755`。
+- 部署前检查：`docker compose -f docker-compose.prod.lowcost.yml ps` 正常，`manage.py check` 通过，本地 `/healthz/` 与公网 `/healthz/` 返回 `200`，`ExternalDataImportRun(status="started")=0` 且 `ExternalDataImportLock.locked_by_run_id` 为空。
+- `.env` 备份：`.env.backup.horse-profile-page-mvp-20260708_040446`。
+- 数据库备份：`backups/db/pre-horse-profile-page-mvp-20260708_040503.sql.gz`，约 `85M`，已执行 `gzip -t`。
+- 生产 `.env` 已显式补入保守默认：
+  - `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`
+  - `HORSE_PROFILE_COMPLETION_REQUEST_INTERVAL_SECONDS=8`
+  - `HORSE_PROFILE_COMPLETION_CACHE_DIR=runtime/horse_profile_completion/cache`
+- 部署方式：`git pull --ff-only origin main` 从 `01c0b9b` 快进到 `2b28755`，随后执行 `bash ./deploy_lowcost.sh`。
+- 迁移：`stable.0022_horseprofile_horsefollow_articlehorselink_and_more` 已应用。
+- 部署后状态：`web / worker / beat / db / redis / nginx` 正常，`web` 与 `db / redis` healthy，`manage.py check` 通过。
+- P0 草稿生成：`generate_horse_profiles` 创建 `21596` 个 `HorseProfile`，全部为 `draft`，`published=0`。
+- 上线 smoke：
+  - 本地 `/healthz/`、`/horses/`、`/horses/follows/`、`/admin/login/`、`/news/5738/` 均返回 `200`。
+  - 草稿样例 `/horses/1/` 返回 `404`。
+  - 未登录 `/admin/horse-profiles/` 返回 `302`。
+  - Host `umafans.run` 的 `/horses/` 返回 `200`，公网 `http://umafans.run/healthz/` 与 `http://umafans.run/horses/` 返回 `200`。
+- 历史新闻马匹关联 dry-run：`scan_article_horse_links --dry-run --limit 500` 返回 `created=0 updated=0 candidate=0 skipped_removed=0 skipped_manual=0`，原因是当前所有马匹仍为草稿，前台关联面无公开马匹可展示。
+- 全地区补全 dry-run：artifact 已复制到宿主机 `runtime/horse_profile_completion/dry-run-20260708_041343/`，包含 `horse_profile_completion_plan.json`、`horse_profile_completion_review.csv` 和 `summary.json`。
+  - 覆盖 P0 马 `21596` 匹。
+  - `complete_pedigree_2gen=0`，`not_complete=21596`，`complete_ratio=0.0`，`not_complete_ratio=1.0`。
+  - 失败原因：`no_external_match=15293`、`source_unavailable=6301`、`profile_only=2`。
+  - 按地区 `france / hong_kong / japan / other / united_kingdom / united_states` 的 `not_complete_ratio` 均为 `1.0`。
+  - 本次未执行 `--commit`；后续必须先人工审核 `horse_profile_completion_review.csv`，再使用 `--artifact --confirm-reviewed-artifact` 应用。
 
 ### 生产部署前检查
 
