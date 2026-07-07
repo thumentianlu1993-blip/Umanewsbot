@@ -13,13 +13,13 @@
 
 ## 3. 部署与生产数据处理
 
-- [ ] 3.1 (operations) 部署前记录生产 commit、容器状态、健康检查和数据库备份结果。
-- [ ] 3.2 (operations) 将修复代码部署到生产并重建 `web / worker / beat`，确认 `manage.py check` 与 `/healthz/` 通过。
-- [ ] 3.3 (operations) 清理已确认误发布的 TDN France 历史旧文，将其撤出公开前台并保留可追溯原因。
-- [ ] 3.4 (operations) 重新启用 `NewsSource#21 TDN 法国宽关键词英文新闻`，恢复 `enabled=true` 与 `production_approved=true`。
-- [ ] 3.5 (operations) 执行线上回归：只读探测、一次真实抓取或最近窗口审计，确认不会再抓入 2020/2022 等历史旧文。
+- [x] 3.1 (operations) 部署前记录生产 commit、容器状态、健康检查和数据库备份结果。
+- [x] 3.2 (operations) 将修复代码部署到生产并重建 `web / worker / beat`，确认 `manage.py check` 与 `/healthz/` 通过。
+- [x] 3.3 (operations) 清理已确认误发布的 TDN France 历史旧文，将其撤出公开前台并保留可追溯原因。
+- [x] 3.4 (operations) 重新启用 `NewsSource#21 TDN 法国宽关键词英文新闻`，恢复 `enabled=true` 与 `production_approved=true`。
+- [x] 3.5 (operations) 执行线上回归：只读探测、一次真实抓取或最近窗口审计，确认不会再抓入 2020/2022 等历史旧文。
 
 ## 4. 文档与归档
 
-- [ ] 4.1 (operations) 更新 `docs/current_state.md`、`docs/deploy_runbook.md` 和 `docs/project_status.md`，记录修复、清理和重新启用结果。
-- [ ] 4.2 (operations) 完成 OpenSpec 归档，确保规格同步到正式 spec。
+- [x] 4.1 (operations) 更新 `docs/current_state.md`、`docs/deploy_runbook.md` 和 `docs/project_status.md`，记录修复、清理和重新启用结果。
+- [x] 4.2 (operations) 完成 OpenSpec 归档，确保规格同步到正式 spec。

@@ -136,6 +136,24 @@ TBD - created by archiving change fix-crawl-freshness-and-jra-date-parse. Update
 - **WHEN** JRA 抓取跳过一篇详情结构异常新闻
 - **THEN** 本轮 `CrawlJob` 和 `NewsSource.last_crawl_message` SHALL 包含跳过数量或首个跳过原因摘要
 
+### Requirement: 抓取适配器不得把缺失发布时间兜底为当前时间
+系统 SHALL 在新闻抓取适配器中区分可信发布时间和缺失发布时间。对于依赖发布时间判断新鲜度、发布窗口或生产来源安全性的来源，系统 MUST NOT 将缺失或不可解析的发布时间兜底为当前时间。
+
+#### Scenario: 缺失日期的生产搜索结果不入库
+- **WHEN** 生产新闻搜索来源返回的条目缺少可信发布时间
+- **THEN** 系统 SHALL 跳过该条目或通过可信结构化详情补齐发布时间
+- **AND** 系统 SHALL NOT 把该条目发布时间设置为抓取执行时间
+
+#### Scenario: 单条日期不可用不拖垮整轮抓取
+- **WHEN** 同一轮抓取中某一条新闻无法取得可信发布时间
+- **THEN** 系统 SHALL 记录该条跳过原因并继续处理其他条目
+- **AND** 只有在来源没有任何可处理条目且符合既有失败条件时，才将整轮抓取记录为失败
+
+#### Scenario: 跳过原因进入来源健康摘要
+- **WHEN** 抓取轮次因缺失日期或历史旧文跳过部分条目
+- **THEN** `CrawlJob` 或 `NewsSource.last_crawl_message` SHALL 包含可理解的跳过摘要
+- **AND** 后台或审计输出 SHALL 能区分成功无新增、重复旧稿、历史旧文过滤和解析失败
+
 ### Requirement: netkeiba 榜单命中必须提升新着来源文章
 系统 SHALL 在同一 netkeiba 文章先由新着顺入库、后续又被访问量榜或注目数榜命中时，将文章主来源从 `netkeiba:latest` 提升为对应榜单来源，同时继续记录榜单快照。
 

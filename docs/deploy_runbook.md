@@ -60,6 +60,38 @@
   - `7271`：真实日期 `2024-11-08`。
 - 修复方向：`tdn_france_broad` 必须用 search item 的 `id` 或 `_links.self` 二次读取 post API 获取真实 `date_gmt`，并丢弃超过生产新鲜度窗口的文章；修复和回归前不得重新启用 `NewsSource#21`。
 
+### TDN broad 历史旧文修复上线
+
+- 本地 change：`fix-tdn-france-search-date-freshness`。
+- 部署提交：`ad587ce Fix TDN France search result freshness`。
+- 生产服务器：`/opt/umanewsbot`。
+- 部署前状态：
+  - 生产 `HEAD=96fde81`。
+  - `web / worker / beat / db / redis / nginx` 运行正常，`web` healthy。
+  - `manage.py check` 通过，本地与公网 `/healthz/` 均返回 `{"status": "ok"}`。
+  - `ExternalDataImportRun(status=started)=0`，外部导入锁 `0`。
+- 部署前备份：
+  - 数据库：`backups/db/pre-tdn-france-freshness-20260707_223913.sql.gz`，已执行 `gzip -t`。
+- 部署方式：
+  - 本地生成 `/tmp/umanews-ad587ce.bundle` 并 `scp` 到生产机。
+  - 生产机执行 `git fetch /tmp/umanews-ad587ce.bundle HEAD:refs/remotes/origin/main`、`git merge --ff-only refs/remotes/origin/main`，从 `96fde81` 快进到 `ad587ce`。
+  - 执行 `bash ./deploy_lowcost.sh`，镜像重建成功，迁移显示 `No migrations to apply`，`web / worker / beat` 已重建。
+- 修复内容：
+  - `TDNFranceKeywordAdapter` / `TDNFranceBroadKeywordAdapter` 对 search item 缺失日期时，使用 `id` 或 `_links.self` 二次读取 post API 的真实 `date_gmt/date`。
+  - 缺失真实日期的 search item 跳过，不再兜底为当前时间。
+  - 法国 TDN search 来源只接受真实发布时间在 3 天新鲜度窗口内的文章，历史旧文写入跳过摘要。
+  - 国际来源抓取任务会把 listing 阶段跳过写入 `CrawlJob` / `NewsSource.last_crawl_message`；纯旧文过滤不标记为来源失败。
+- 生产清理：
+  - 已将误发布旧文 `7255/7263/7264/7265/7271` 标记为 `workflow_status=withdrawn`、`automation_status=manual_review_required`，清空 `published_to_web_at`，写入 `withdrawn_at`、`decision_reason.tdn_france_stale_cleanup` 与 `editor_notes`。
+  - 公网 `/news/7255/`、`/news/7263/`、`/news/7264/`、`/news/7265/`、`/news/7271/` 均返回 `404`。
+- 重新启用：
+  - `NewsSource#21 TDN 法国宽关键词英文新闻` 已恢复 `enabled=true`、`production_approved=true`，并清空 `manual_pause_reason`。
+- 上线后验证：
+  - 生产 `HEAD=ad587ce`，`manage.py check` 通过，容器正常，本地与公网 `/healthz/` 均返回 `{"status": "ok"}`。
+  - 只读探测 `probe_international_news_sources --source tdn_france_broad --json` 返回 HTTP `200`，但当前 `status=deferred`、`deferred_reason=empty_sample`、`list_count=0`，原因是搜索结果经新鲜度过滤后没有可采样的新鲜文章。
+  - 手动真实抓取 `CrawlJob#9445` 成功：`new_count=0`、`seen_count=0`、`skipped_count=80`，首条跳过原因包含 `stale_published_at`，`NEW_ARTICLES=[]`。
+  - 结论：来源已重新打开，旧文不再入库；当前没有新稿是 TDN 搜索结果全部被新鲜度过滤后的正常结果。
+
 ## 2026-07-07 HKJC 日语 alias 合并与已发布文章术语回填工具
 
 - 本地 change：`hkjc-ja-alias-article-backfill`。
