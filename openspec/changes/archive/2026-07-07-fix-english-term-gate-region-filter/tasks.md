@@ -22,4 +22,4 @@
 - [x] 3.3 (application) 补充非同地区术语不阻断当前地区文章、全局术语仍纳入校验的测试。
 - [x] 3.4 (application) 补充重处理 dry-run、提交、跳过人工终态和重新进入发布候选的测试。
 - [x] 3.5 (operations) 执行 `DB_ENGINE=sqlite python manage.py check`、目标测试、`openspec validate fix-english-term-gate-region-filter --strict`、`openspec validate --all` 和 `git diff --check`。
-- [ ] 3.6 (operations) 上线后只读验证香港、英国、美国最近窗口的 `core_term_missing` blocker 数、`publish_ready` 数和公开数量，并记录到运行文档。
+- [x] 3.6 (operations) 上线后只读验证香港、英国、美国最近窗口的 `core_term_missing` blocker 数、`publish_ready` 数和公开数量，并记录到运行文档。

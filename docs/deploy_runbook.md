@@ -1,5 +1,41 @@
 # 部署运行手册
 
+## 2026-07-07 法国新闻源扩展与英文术语门禁地区过滤上线
+
+- 本地 changes：`expand-france-news-sources`、`fix-english-term-gate-region-filter`。
+- 部署提交：`bfc3445 Prepare France source expansion and English term gate fix`。
+- 生产服务器：`/opt/umanewsbot`。
+- 部署前状态：生产 `HEAD=538011e`，外部导入运行数 `0`、导入锁 `0`。
+- 部署前备份：
+  - 数据库：`backups/db/pre-france-source-term-gate-20260707_200124.sql.gz`，已执行 `gzip -t`。
+  - `.env`：补法国来源发布白名单前分别备份为 `.env.backup.france-tdn-access-<timestamp>` 与 `.env.backup.france-tdn-canonical-access-<timestamp>`。
+- 部署方式：
+  - 生产机访问 GitHub HTTPS 超时，未能直接 `git fetch origin main`。
+  - 本地生成 `/tmp/umanews-bfc3445.bundle` 并 `scp` 到生产机。
+  - 生产机执行 `git fetch /tmp/umanews-bfc3445.bundle HEAD:refs/remotes/origin/main`、`git merge --ff-only refs/remotes/origin/main`，从 `538011e` 快进到 `bfc3445`。
+  - 执行 `bash ./deploy_lowcost.sh`，镜像重建成功，迁移显示 `No migrations to apply`，`web / worker / beat` 已重建。
+- 基础验证：
+  - `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check`：通过。
+  - `http://127.0.0.1/healthz/`、Host `umafans.run` `/healthz/` 和公网 `http://umafans.run/healthz/`：均返回 `{"status": "ok"}`。
+- 法国新来源验证：
+  - 已执行 `sync_builtin_sources()`，生产内置来源数 `21`。
+  - `tdn_france_broad` 只读探测 accepted：HTTP `200`、列表 `20`、详情样本 `5`、详情错误 `0`、重复 `0`。
+  - 已启用 `NewsSource#21 TDN 法国宽关键词英文新闻`：`enabled=true`、`production_approved=true`、`effective_crawl_interval_minutes=15`。
+  - 生产 `.env` 中 `MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES` 已加入 `tdn_france:access` 与 canonical 入库后的 `tdn:access`；`NEWS_SOURCE_POLL_ALLOWED_SOURCES=` 为空，表示抓取不额外限源。
+  - 手动真实抓取验证入库 `4` 篇法国新来源文章，article IDs 为 `7250-7253`。为补生产配置而重启时中断了该人工抓取，`CrawlJob#9330` 已标记为 `failed`，`success_count=4`，错误说明为部署配置重启中断；这不是来源访问失败。
+  - 文章 `7250-7253` 已完成补翻译和自动化重评，当前均为 `manual_review_required / pending_review`；`7250-7252` 因真实 `core_term_missing` blocker 转人工，`7253` 因总分 `69` 转人工。
+- 英文门禁验证：
+  - `reprocess_term_gate_blocked_articles --dry-run --json`：
+    - `hong_kong`：最近 3 小时无可释放候选。
+    - `united_states`：最近 3 小时无可释放候选。
+    - `france`：最近 3 小时无可释放候选。
+    - `united_kingdom`：有 `1` 篇候选，但重校验后仍被真实核心术语缺失阻断。
+  - 本次未执行 `--commit`，因为没有因地区过滤修复可释放的近期误挡文章。
+- 最终审计：
+  - 容器内审计文件：`runtime/multiregion_audit/post-france-source-term-gate-final-20260707_202851.json`。
+  - 法国来源：总数 `4`、启用 `3`、生产批准 `3`、paused/backoff 均为 `0`。
+  - 法国文章：今日新入库 `4`、最近 24 小时 `4`、公开 `0`；workflow 为 `pending_review=29`，automation 为 `manual_review_required=29`，当前公开 0 的原因是正常门禁转人工，不是抓取或白名单失败。
+
 ## 2026-07-07 HKJC 日语 alias 合并与已发布文章术语回填工具
 
 - 本地 change：`hkjc-ja-alias-article-backfill`。

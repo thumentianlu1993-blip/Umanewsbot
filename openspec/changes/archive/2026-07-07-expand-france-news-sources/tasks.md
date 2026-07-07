@@ -19,5 +19,5 @@
 - [x] 3.2 (application) 补充 `NewsSource` 同步和生产批准开关测试，确认未批准来源不进入生产窗口。
 - [x] 3.3 (application) 补充审计输出测试，覆盖法国来源成功无新增、解析失败和入库后门禁阻断。
 - [x] 3.4 (operations) 执行 `DB_ENGINE=sqlite python manage.py check`、目标测试、`openspec validate expand-france-news-sources --strict`、`openspec validate --all` 和 `git diff --check`。
-- [ ] 3.5 (operations) 上线前执行真实只读探测并保存结果，确认至少 1 个新增法国来源 accepted；上线后观察法国最近若干窗口的抓取成功率、新增量、重复量、候选量和公开量。
+- [x] 3.5 (operations) 上线前执行真实只读探测并保存结果，确认至少 1 个新增法国来源 accepted；上线后观察法国最近若干窗口的抓取成功率、新增量、重复量、候选量和公开量。
 - [x] 3.6 (operations) 更新 `docs/current_state.md`、`docs/project_status.md` 和 `docs/deploy_runbook.md`，记录法国新增来源、启用状态、验收结果和后续风险。

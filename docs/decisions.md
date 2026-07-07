@@ -1,5 +1,18 @@
 # 关键决策
 
+## 为什么法国 TDN broad 上线时同时允许 `tdn_france:access` 和 `tdn:access`
+
+`tdn_france_broad` 是法国新闻补充来源，但为了和既有 TDN 去重共用同一篇原文，入库时会使用 canonical source site `tdn`，同时通过 `source_config` 保留“这是法国来源发现的文章”。
+
+生产发布白名单判断会先看文章主来源 `article.source_site:article.source_mode`，不匹配时再看 `source_config_id`。如果只允许 `tdn_france:access`，抓取可以成功，但自动发布策略可能看到文章主来源 `tdn:access` 后判定为 `source_not_allowed`。
+
+因此 `2026-07-07` 上线法国 TDN broad 时，生产 `.env` 同时加入：
+
+- `tdn_france:access`：表达运营意图，即法国补充来源被允许。
+- `tdn:access`：匹配 canonical 入库后的文章主来源，避免发布策略误挡。
+
+这不会放开所有 TDN 普通新闻；它只匹配 access 模式，并且文章仍需满足地区、评分、术语门禁、发布窗口配额和 QQ 限流。
+
 ## 为什么使用香港 ECS
 
 当前阶段选择香港 ECS，主要基于以下考虑：
