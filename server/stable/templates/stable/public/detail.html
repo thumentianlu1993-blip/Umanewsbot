@@ -25,6 +25,9 @@
         {% empty %}
           <span>新闻</span>
         {% endfor %}
+        {% for link in horse_links %}
+          <a href="{{ link.horse_profile.public_path }}">{{ link.horse_profile.display_name }}</a>
+        {% endfor %}
       </div>
       {% if article.cover_image_url %}
         <img class="article-cover" src="{{ article.cover_image_url }}" alt="">

@@ -1,0 +1,41 @@
+{% extends "stable/public/base.html" %}
+
+{% block title %}马匹资料{% endblock %}
+
+{% block content %}
+  <main class="horse-page">
+    <section class="home-lead">
+      <span class="section-kicker">Horse Profiles</span>
+      <h1>马匹资料</h1>
+    </section>
+
+    <form class="public-filter-bar" method="get">
+      <input type="search" name="q" value="{{ filters.q }}" placeholder="搜索马名、英文名或国家">
+      {% if filters.region %}<input type="hidden" name="region" value="{{ filters.region }}">{% endif %}
+      <button type="submit">搜索</button>
+    </form>
+
+    <nav class="region-tabs" aria-label="地区筛选">
+      {% for tab in region_tabs %}
+        <a class="{% if tab.is_active %}active{% endif %}" href="{% url 'public-horse-index' %}{% if tab.value %}?region={{ tab.value }}{% endif %}">{{ tab.label }}</a>
+      {% endfor %}
+    </nav>
+
+    <section class="horse-grid">
+      {% for profile in horse_profiles %}
+        <a class="horse-card" href="{{ profile.public_path }}">
+          <strong>{{ profile.display_name }}</strong>
+          <span>{{ profile.original_name|default:profile.english_name|default:"-" }}</span>
+          <div class="horse-card-meta">
+            <span>{{ profile.get_racing_region_display }}</span>
+            <span>{{ profile.get_completeness_status_display }}</span>
+          </div>
+        </a>
+      {% empty %}
+        {% include "stable/public/_empty_state.html" %}
+      {% endfor %}
+    </section>
+
+    {% include "stable/public/_pagination.html" %}
+  </main>
+{% endblock %}

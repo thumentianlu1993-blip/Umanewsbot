@@ -408,6 +408,67 @@ class ArticleRaceLinkType(models.TextChoices):
     RELATED = "related", "相关新闻"
 
 
+class HorseProfileStatus(models.TextChoices):
+    DRAFT = "draft", "草稿"
+    READY = "ready", "待发布"
+    PUBLISHED = "published", "展示"
+    HIDDEN = "hidden", "隐藏"
+
+
+class HorseProfileCompleteness(models.TextChoices):
+    EMPTY = "empty", "空壳"
+    PROFILE_ONLY = "profile_only", "仅基础资料"
+    PARTIAL_PEDIGREE = "partial_pedigree", "部分血统"
+    COMPLETE_PEDIGREE_2GEN = "complete_pedigree_2gen", "完整二代血统"
+
+
+class HorseProfileModule(models.TextChoices):
+    PROFILE = "profile", "基础资料"
+    PEDIGREE = "pedigree", "血统"
+    RACE_RECORD = "race_record", "参赛履历"
+    ALIASES = "aliases", "别名"
+
+
+class HorseProfileCandidateStatus(models.TextChoices):
+    PENDING = "pending", "待确认"
+    APPLIED = "applied", "已应用"
+    IGNORED = "ignored", "已忽略"
+    CONFLICT = "conflict", "冲突"
+    FAILED = "failed", "失败"
+
+
+class ArticleHorseLinkStatus(models.TextChoices):
+    AUTO = "auto", "自动展示"
+    CANDIDATE = "candidate", "候选"
+    MANUAL = "manual", "人工确认"
+    REMOVED = "removed", "人工移除"
+
+
+class HorseRaceLinkType(models.TextChoices):
+    MAJOR_WIN = "major_win", "主胜鞍赛事"
+    RELATED = "related", "相关赛事"
+    MANUAL = "manual", "人工相关"
+
+
+class HorseRaceResultStatus(models.TextChoices):
+    WON = "won", "胜出"
+    PLACED = "placed", "上名"
+    UNPLACED = "unplaced", "未上名"
+    SCRATCHED = "scratched", "退赛"
+    UNKNOWN = "unknown", "未知"
+
+
+class HorseCompletionFailureReason(models.TextChoices):
+    NO_EXTERNAL_MATCH = "no_external_match", "无外部命中"
+    AMBIGUOUS_MATCH = "ambiguous_match", "歧义命中"
+    SOURCE_UNAVAILABLE = "source_unavailable", "来源不可用"
+    RATE_LIMITED = "rate_limited", "来源限流"
+    MISSING_PEDIGREE_FIELDS = "missing_pedigree_fields", "血统字段缺失"
+    PROFILE_ONLY = "profile_only", "仅基础资料"
+    MANUAL_LOCK_SKIPPED = "manual_lock_skipped", "人工锁定跳过"
+    NOT_ATTEMPTED = "not_attempted", "未尝试"
+
+
 class TermCandidateStatus(models.TextChoices):
     PENDING = "pending", "待审核"
     ACCEPTED = "accepted", "已接受"
@@ -798,6 +859,288 @@ class ArticleRaceLink(TimestampedModel):
     @property
     def is_public(self) -> bool:
         return self.status in {ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL}
+
+
+class HorseProfile(TimestampedModel):
+    primary_term = models.OneToOneField("TermEntry", on_delete=models.PROTECT, related_name="horse_profile")
+    display_name_zh = models.CharField(max_length=255, blank=True)
+    original_name = models.CharField(max_length=255, blank=True)
+    english_name = models.CharField(max_length=255, blank=True)
+    japanese_name = models.CharField(max_length=255, blank=True)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    country = models.CharField(max_length=128, blank=True)
+    sex = models.CharField(max_length=64, blank=True)
+    color = models.CharField(max_length=128, blank=True)
+    birth_date = models.DateField(null=True, blank=True)
+    owner_name = models.CharField(max_length=255, blank=True)
+    trainer_name = models.CharField(max_length=255, blank=True)
+    breeder_name = models.CharField(max_length=255, blank=True)
+    intro = models.TextField(blank=True)
+
+    sire_text = models.CharField(max_length=255, blank=True)
+    dam_text = models.CharField(max_length=255, blank=True)
+    sire_sire_text = models.CharField(max_length=255, blank=True)
+    sire_dam_text = models.CharField(max_length=255, blank=True)
+    dam_sire_text = models.CharField(max_length=255, blank=True)
+    dam_dam_text = models.CharField(max_length=255, blank=True)
+    sire_term = models.ForeignKey("TermEntry", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    dam_term = models.ForeignKey("TermEntry", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    sire_sire_term = models.ForeignKey("TermEntry", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    sire_dam_term = models.ForeignKey("TermEntry", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    dam_sire_term = models.ForeignKey("TermEntry", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    dam_dam_term = models.ForeignKey("TermEntry", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    sire_horse_profile = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="sire_children")
+    dam_horse_profile = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="dam_children")
+    sire_sire_horse_profile = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    sire_dam_horse_profile = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    dam_sire_horse_profile = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    dam_dam_horse_profile = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+
+    review_status = models.CharField(max_length=16, choices=HorseProfileStatus.choices, default=HorseProfileStatus.DRAFT)
+    completeness_status = models.CharField(
+        max_length=32,
+        choices=HorseProfileCompleteness.choices,
+        default=HorseProfileCompleteness.EMPTY,
+    )
+    is_featured = models.BooleanField(default=False)
+    published_at = models.DateTimeField(null=True, blank=True)
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="published_horse_profiles",
+    )
+    hidden_at = models.DateTimeField(null=True, blank=True)
+    hidden_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="hidden_horse_profiles",
+    )
+    review_notes = models.TextField(blank=True)
+    manual_lock_flags = models.JSONField(default=dict, blank=True)
+    source_refs = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("racing_region", "display_name_zh", "original_name", "id")
+        indexes = [
+            models.Index(fields=("review_status", "racing_region"), name="horse_status_region_idx"),
+            models.Index(fields=("racing_region", "display_name_zh"), name="horse_region_name_idx"),
+            models.Index(fields=("completeness_status", "review_status"), name="horse_complete_status_idx"),
+            models.Index(fields=("is_featured", "review_status"), name="horse_featured_status_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.display_name
+
+    @property
+    def display_name(self) -> str:
+        return self.display_name_zh or self.primary_term.target_zh or self.original_name or self.english_name or self.japanese_name
+
+    @property
+    def is_public(self) -> bool:
+        return self.review_status == HorseProfileStatus.PUBLISHED
+
+    @property
+    def public_path(self) -> str:
+        if not self.pk:
+            return ""
+        return f"/horses/{self.pk}/"
+
+    def get_absolute_url(self) -> str:
+        return self.public_path
+
+
+class HorseProfileDataCandidate(TimestampedModel):
+    profile = models.ForeignKey(HorseProfile, on_delete=models.CASCADE, related_name="data_candidates")
+    module = models.CharField(max_length=32, choices=HorseProfileModule.choices)
+    source_name = models.CharField(max_length=128)
+    source_url = models.URLField(max_length=1000, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=HorseProfileCandidateStatus.choices,
+        default=HorseProfileCandidateStatus.PENDING,
+    )
+    confidence = models.PositiveSmallIntegerField(default=0)
+    candidate_payload = models.JSONField(default=dict, blank=True)
+    diff_payload = models.JSONField(default=dict, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    fetched_at = models.DateTimeField(default=timezone.now)
+    applied_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="applied_horse_profile_candidates",
+    )
+    applied_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
+    result_summary = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-fetched_at", "-id")
+        indexes = [
+            models.Index(fields=("profile", "module", "status"), name="horse_candidate_module_idx"),
+            models.Index(fields=("source_name", "fetched_at"), name="horse_candidate_source_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.profile} {self.module} {self.source_name}"
+
+
+class HorseRaceRecord(TimestampedModel):
+    horse_profile = models.ForeignKey(HorseProfile, on_delete=models.CASCADE, related_name="race_records")
+    event = models.ForeignKey(RaceEvent, on_delete=models.SET_NULL, null=True, blank=True, related_name="horse_records")
+    result = models.ForeignKey(RaceEventResult, on_delete=models.SET_NULL, null=True, blank=True, related_name="horse_records")
+    race_name = models.CharField(max_length=255)
+    race_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    race_date = models.DateField(null=True, blank=True)
+    grade_text = models.CharField(max_length=128, blank=True)
+    normalized_grade = models.CharField(max_length=32, choices=RaceGrade.choices, blank=True)
+    racecourse = models.CharField(max_length=255, blank=True)
+    distance_text = models.CharField(max_length=128, blank=True)
+    surface = models.CharField(max_length=16, choices=RaceEventSurface.choices, blank=True)
+    finish_position = models.CharField(max_length=32, blank=True)
+    result_status = models.CharField(max_length=16, choices=HorseRaceResultStatus.choices, default=HorseRaceResultStatus.UNKNOWN)
+    is_major_win = models.BooleanField(default=False)
+    major_win_order = models.PositiveSmallIntegerField(default=0)
+    source_name = models.CharField(max_length=128, blank=True)
+    source_url = models.URLField(max_length=1000, blank=True)
+    source_refs = models.JSONField(default=dict, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("horse_profile", "-race_date", "-race_year", "major_win_order", "id")
+        indexes = [
+            models.Index(fields=("horse_profile", "result_status"), name="horse_record_result_idx"),
+            models.Index(fields=("horse_profile", "is_major_win"), name="horse_record_major_idx"),
+            models.Index(fields=("event", "result_status"), name="horse_record_event_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.horse_profile} {self.race_name}"
+
+
+class HorseRaceLink(TimestampedModel):
+    horse_profile = models.ForeignKey(HorseProfile, on_delete=models.CASCADE, related_name="race_links")
+    event = models.ForeignKey(RaceEvent, on_delete=models.CASCADE, related_name="horse_links")
+    link_type = models.CharField(max_length=16, choices=HorseRaceLinkType.choices, default=HorseRaceLinkType.RELATED)
+    status = models.CharField(
+        max_length=16,
+        choices=ArticleHorseLinkStatus.choices,
+        default=ArticleHorseLinkStatus.CANDIDATE,
+    )
+    source = models.CharField(max_length=64, blank=True)
+    confidence = models.PositiveSmallIntegerField(default=0)
+    metadata = models.JSONField(default=dict, blank=True)
+    confirmed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="confirmed_horse_race_links",
+    )
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    removed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="removed_horse_race_links",
+    )
+    removed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("horse_profile", "link_type", "-confidence", "-created_at")
+        constraints = [
+            models.UniqueConstraint(fields=("horse_profile", "event", "link_type"), name="uq_horse_race_link"),
+        ]
+        indexes = [
+            models.Index(fields=("horse_profile", "status", "link_type"), name="horse_race_link_status_idx"),
+            models.Index(fields=("event", "status"), name="horse_race_link_event_idx"),
+        ]
+
+    @property
+    def is_public(self) -> bool:
+        return self.status in {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL}
+
+
+class ArticleHorseLink(TimestampedModel):
+    horse_profile = models.ForeignKey(HorseProfile, on_delete=models.CASCADE, related_name="article_links")
+    article = models.ForeignKey("NewsArticle", on_delete=models.CASCADE, related_name="horse_links")
+    status = models.CharField(
+        max_length=16,
+        choices=ArticleHorseLinkStatus.choices,
+        default=ArticleHorseLinkStatus.CANDIDATE,
+    )
+    source = models.CharField(max_length=64, blank=True)
+    confidence = models.PositiveSmallIntegerField(default=0)
+    matched_text = models.CharField(max_length=255, blank=True)
+    match_reason = models.TextField(blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    confirmed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="confirmed_horse_article_links",
+    )
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    removed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="removed_horse_article_links",
+    )
+    removed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("horse_profile", "-confidence", "-created_at")
+        constraints = [
+            models.UniqueConstraint(fields=("horse_profile", "article"), name="uq_article_horse_link"),
+        ]
+        indexes = [
+            models.Index(fields=("horse_profile", "status"), name="horse_link_status_idx"),
+            models.Index(fields=("article", "status"), name="horse_link_article_status_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.horse_profile} <-> {self.article_id} ({self.status})"
+
+    @property
+    def is_public(self) -> bool:
+        return self.status in {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL}
+
+
+class HorseFollow(TimestampedModel):
+    token_hash = models.CharField(max_length=64, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="horse_follows",
+    )
+    horse_profile = models.ForeignKey(HorseProfile, on_delete=models.CASCADE, related_name="follows")
+    include_descendants = models.BooleanField(default=True)
+    descendant_depth = models.PositiveSmallIntegerField(default=2)
+    followed_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("-followed_at", "-id")
+        constraints = [
+            models.UniqueConstraint(fields=("token_hash", "horse_profile"), name="uq_horse_follow_token_profile"),
+        ]
+        indexes = [
+            models.Index(fields=("horse_profile", "include_descendants"), name="horse_follow_desc_idx"),
+            models.Index(fields=("user", "horse_profile"), name="horse_follow_user_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.token_hash[:8]} -> {self.horse_profile_id}"
 
 
 class CrawlJob(TimestampedModel):

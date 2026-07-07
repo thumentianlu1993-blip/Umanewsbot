@@ -1,0 +1,137 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}马匹审核 - 赛马新闻后台{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">马匹审核</h2>
+      <p class="page-subtitle">P0 马默认生成草稿；管理员审核、补资料并手动发布后，前台才会展示。</p>
+    </div>
+    <div class="toolbar">
+      <a class="btn secondary" href="{{ django_admin_url }}stable/horseprofile/">Django Admin</a>
+    </div>
+  </div>
+
+  <form class="filter-bar" method="get">
+    <label>
+      搜索
+      <input type="search" name="q" value="{{ filters.q }}" placeholder="马名 / 原名 / 英文名">
+    </label>
+    <label>
+      地区
+      <select name="region">
+        <option value="">全部</option>
+        {% for value,label in regions %}
+          <option value="{{ value }}" {% if filters.region == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      审核状态
+      <select name="status">
+        <option value="">全部</option>
+        {% for value,label in statuses %}
+          <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      完整度
+      <select name="completeness">
+        <option value="">全部</option>
+        {% for value,label in completenesses %}
+          <option value="{{ value }}" {% if filters.completeness == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      主胜鞍
+      <select name="major_win">
+        <option value="">全部</option>
+        <option value="yes" {% if filters.major_win == "yes" %}selected{% endif %}>有胜利</option>
+        <option value="no" {% if filters.major_win == "no" %}selected{% endif %}>无胜利</option>
+      </select>
+    </label>
+    <label>
+      相关新闻
+      <select name="has_news">
+        <option value="">全部</option>
+        <option value="yes" {% if filters.has_news == "yes" %}selected{% endif %}>有</option>
+        <option value="no" {% if filters.has_news == "no" %}selected{% endif %}>无</option>
+      </select>
+    </label>
+    <label>
+      关注
+      <select name="has_follows">
+        <option value="">全部</option>
+        <option value="yes" {% if filters.has_follows == "yes" %}selected{% endif %}>有</option>
+        <option value="no" {% if filters.has_follows == "no" %}selected{% endif %}>无</option>
+      </select>
+    </label>
+    <label>
+      前台
+      <select name="public">
+        <option value="">全部</option>
+        <option value="yes" {% if filters.public == "yes" %}selected{% endif %}>可见</option>
+        <option value="no" {% if filters.public == "no" %}selected{% endif %}>不可见</option>
+      </select>
+    </label>
+    <button class="btn secondary" type="submit">筛选</button>
+    <a class="btn ghost" href="{% url 'console-horse-profile-list' %}">清除</a>
+  </form>
+
+  <section class="panel">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>马匹</th>
+            <th>地区</th>
+            <th>审核 / 完整度</th>
+            <th>候选 / 参赛 / 新闻</th>
+            <th>关注</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for profile in horse_profiles %}
+            <tr>
+              <td>
+                <strong>{{ profile.display_name }}</strong>
+                <div class="muted">#{{ profile.id }} · {{ profile.original_name|default:profile.primary_term.source_ja }}</div>
+              </td>
+              <td>{{ profile.get_racing_region_display }}</td>
+              <td>
+                <span class="badge {% if profile.review_status == 'published' %}success{% elif profile.review_status == 'draft' %}warning{% endif %}">{{ profile.get_review_status_display }}</span>
+                <div class="muted">{{ profile.get_completeness_status_display }}</div>
+              </td>
+              <td>
+                <a href="{% url 'console-horse-profile-detail' profile.id %}#candidates">{{ profile.candidate_count }} 候选</a>
+                <div class="muted">{{ profile.race_record_count }} 参赛 · {{ profile.article_link_count }} 新闻</div>
+              </td>
+              <td>{{ profile.follow_count }}</td>
+              <td>
+                <div class="article-actions">
+                  <a class="btn ghost" href="{% url 'console-horse-profile-detail' profile.id %}">维护</a>
+                  {% if profile.review_status == 'published' %}
+                    <a class="btn secondary" href="{{ profile.public_path }}" target="_blank" rel="noreferrer">前台</a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="muted">还没有符合条件的马匹资料。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="pagination">
+        {% if page_obj.has_previous %}<a class="btn ghost" href="?{% if pagination_querystring %}{{ pagination_querystring }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>{% endif %}
+        <span class="muted">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+        {% if page_obj.has_next %}<a class="btn ghost" href="?{% if pagination_querystring %}{{ pagination_querystring }}&amp;{% endif %}page={{ page_obj.next_page_number }}">下一页</a>{% endif %}
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

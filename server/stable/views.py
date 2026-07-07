@@ -11,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import LoginView, LogoutView
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
+from django.core.signing import BadSignature, SignatureExpired
 from django.db import transaction
 from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponseForbidden, JsonResponse
@@ -24,6 +25,9 @@ from .forms import (
     ArticleEditorForm,
     ArticleQuickTermForm,
     BackendAuthenticationForm,
+    HorseArticleLinkForm,
+    HorseProfileForm,
+    HorseRaceRecordForm,
     NewsSourceForm,
     RaceEventForm,
     TermCandidateAcceptForm,
@@ -36,10 +40,20 @@ from .models import (
     ArticleRaceLink,
     ArticleRaceLinkStatus,
     ArticleRaceLinkType,
+    ArticleHorseLink,
+    ArticleHorseLinkStatus,
     AutomationLog,
     AutomationStatus,
     ArticleTranslationStatus,
     CrawlJob,
+    HorseFollow,
+    HorseProfile,
+    HorseProfileCandidateStatus,
+    HorseProfileCompleteness,
+    HorseProfileDataCandidate,
+    HorseProfileStatus,
+    HorseRaceLink,
+    HorseRaceRecord,
     MediaAsset,
     NewsArticle,
     NewsImage,
@@ -75,6 +89,21 @@ from .models import (
     WindowTargetDecision,
     WorkflowStatus,
 )
+from .services.horse_profiles import (
+    FOLLOW_COOKIE_NAME,
+    apply_data_candidate as apply_horse_data_candidate,
+    follow_horse,
+    followed_articles,
+    major_win_records,
+    scan_article_horse_links,
+    set_follow_cookie,
+    signed_follow_token,
+    token_hash_from_cookie,
+    token_hash_from_raw,
+    transition_review_status,
+    unfollow_horse,
+    update_completeness,
+)
 from .services.media_assets import localize_news_image, set_cover_asset
 from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
 from .services.onebot import BotPusher
@@ -107,6 +136,7 @@ from .tasks import (
     process_article_automation_task,
     publish_article_automatically,
     qq_push_delivery_task,
+    scan_article_horse_links_task,
     translate_article_task,
 )
 
@@ -116,6 +146,8 @@ PUBLIC_HOT_DISPLAY_LIMIT = 6
 QUICK_TERM_FOLLOWUP_SESSION_KEY = "article_quick_term_followup"
 RACE_CALENDAR_PAGE_SIZE = 40
 RACE_CALENDAR_WINDOW_DAYS = 30
+HORSE_PROFILE_PAGE_SIZE = 40
+PUBLIC_HORSE_PAGE_SIZE = 24
 PUBLIC_REGION_TABS = [
     {"value": "", "label": "综合"},
     {"value": RacingRegion.JAPAN, "label": "日本"},
@@ -577,6 +609,350 @@ def race_event_remove_link(request: HttpRequest, link_id: int):
     remove_article_link(link, user=request.user)
     messages.success(request, "关联已移除，自动任务不会重新公开该关联。")
     return redirect("console-race-event-edit", event_id=link.event_id)
+
+
+def _horse_profile_filters(queryset, request: HttpRequest):
+    query = request.GET.get("q", "").strip()
+    region = request.GET.get("region", "").strip()
+    status = request.GET.get("status", "").strip()
+    completeness = request.GET.get("completeness", "").strip()
+    major_win = request.GET.get("major_win", "").strip()
+    has_news = request.GET.get("has_news", "").strip()
+    has_follows = request.GET.get("has_follows", "").strip()
+    public = request.GET.get("public", "").strip()
+    if query:
+        queryset = queryset.filter(
+            Q(display_name_zh__icontains=query)
+            | Q(original_name__icontains=query)
+            | Q(english_name__icontains=query)
+            | Q(japanese_name__icontains=query)
+            | Q(primary_term__target_zh__icontains=query)
+            | Q(primary_term__source_ja__icontains=query)
+        )
+    if region:
+        queryset = queryset.filter(racing_region=region)
+    if status:
+        queryset = queryset.filter(review_status=status)
+    if completeness:
+        queryset = queryset.filter(completeness_status=completeness)
+    if major_win == "yes":
+        queryset = queryset.filter(race_records__result_status="won").distinct()
+    elif major_win == "no":
+        queryset = queryset.exclude(race_records__result_status="won").distinct()
+    if has_news == "yes":
+        queryset = queryset.filter(article_links__status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL]).distinct()
+    elif has_news == "no":
+        queryset = queryset.exclude(article_links__status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL]).distinct()
+    if has_follows == "yes":
+        queryset = queryset.filter(follows__isnull=False).distinct()
+    elif has_follows == "no":
+        queryset = queryset.filter(follows__isnull=True)
+    if public == "yes":
+        queryset = queryset.filter(review_status=HorseProfileStatus.PUBLISHED)
+    elif public == "no":
+        queryset = queryset.exclude(review_status=HorseProfileStatus.PUBLISHED)
+    return queryset
+
+
+@login_required
+def horse_profile_list(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    queryset = (
+        HorseProfile.objects.select_related("primary_term")
+        .annotate(
+            article_link_count=Count("article_links", filter=Q(article_links__status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL]), distinct=True),
+            candidate_count=Count("data_candidates", filter=Q(data_candidates__status=HorseProfileCandidateStatus.PENDING), distinct=True),
+            follow_count=Count("follows", distinct=True),
+            race_record_count=Count("race_records", distinct=True),
+        )
+        .order_by("racing_region", "display_name_zh", "original_name", "id")
+    )
+    queryset = _horse_profile_filters(queryset, request)
+    paginator = Paginator(queryset, HORSE_PROFILE_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
+    return render(
+        request,
+        "stable/console/horse_profile_list.html",
+        _console_context(
+            request,
+            page_obj=page_obj,
+            horse_profiles=page_obj.object_list,
+            regions=RacingRegion.choices,
+            statuses=HorseProfileStatus.choices,
+            completenesses=HorseProfileCompleteness.choices,
+            filters={
+                "q": request.GET.get("q", ""),
+                "region": request.GET.get("region", ""),
+                "status": request.GET.get("status", ""),
+                "completeness": request.GET.get("completeness", ""),
+                "major_win": request.GET.get("major_win", ""),
+                "has_news": request.GET.get("has_news", ""),
+                "has_follows": request.GET.get("has_follows", ""),
+                "public": request.GET.get("public", ""),
+            },
+            pagination_querystring=pagination_params.urlencode(),
+        ),
+    )
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def horse_profile_detail(request: HttpRequest, profile_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    profile = get_object_or_404(
+        HorseProfile.objects.select_related("primary_term", "sire_horse_profile", "dam_horse_profile"),
+        pk=profile_id,
+    )
+    if request.method == "POST":
+        form = HorseProfileForm(request.POST, instance=profile)
+        if form.is_valid():
+            profile = form.save()
+            update_completeness(profile)
+            log_operation(
+                action_type="horse_profile_saved",
+                target_type="horse_profile",
+                target_id=profile.pk,
+                detail=f"保存马匹资料 {profile.display_name}",
+                admin=request.user,
+            )
+            messages.success(request, "马匹资料已保存。")
+            return redirect("console-horse-profile-detail", profile_id=profile.pk)
+    else:
+        form = HorseProfileForm(instance=profile)
+    race_record_form = HorseRaceRecordForm()
+    article_link_form = HorseArticleLinkForm()
+    candidates = profile.data_candidates.select_related("applied_by").all()[:40]
+    race_records = profile.race_records.select_related("event").all()[:80]
+    article_links = {
+        "linked": [],
+        "candidate": [],
+        "removed": [],
+    }
+    for link in profile.article_links.select_related("article").all()[:100]:
+        if link.status == ArticleHorseLinkStatus.REMOVED:
+            article_links["removed"].append(link)
+        elif link.status == ArticleHorseLinkStatus.CANDIDATE:
+            article_links["candidate"].append(link)
+        else:
+            article_links["linked"].append(link)
+    race_links = profile.race_links.select_related("event").all()[:60]
+    logs = OperationLog.objects.filter(target_type__in=["horse_profile", "horse_article_link", "horse_race_record"]).filter(
+        Q(target_id=str(profile.pk)) | Q(detail__icontains=f"profile={profile.pk}")
+    )[:20]
+    return render(
+        request,
+        "stable/console/horse_profile_detail.html",
+        _console_context(
+            request,
+            profile=profile,
+            form=form,
+            race_record_form=race_record_form,
+            article_link_form=article_link_form,
+            candidates=candidates,
+            race_records=race_records,
+            major_wins=major_win_records(profile),
+            article_links=article_links,
+            race_links=race_links,
+            follow_count=profile.follows.count(),
+            descendant_follow_count=profile.follows.filter(include_descendants=True).count(),
+            logs=logs,
+        ),
+    )
+
+
+@login_required
+@require_POST
+def horse_profile_status(request: HttpRequest, profile_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    profile = get_object_or_404(HorseProfile, pk=profile_id)
+    status = request.POST.get("status", "").strip()
+    if status not in {HorseProfileStatus.DRAFT, HorseProfileStatus.READY, HorseProfileStatus.PUBLISHED, HorseProfileStatus.HIDDEN}:
+        messages.error(request, "无效的审核状态。")
+        return redirect("console-horse-profile-detail", profile_id=profile.pk)
+    transition_review_status(profile, status, user=request.user, note=request.POST.get("note", "").strip())
+    messages.success(request, "审核状态已更新。")
+    return redirect("console-horse-profile-detail", profile_id=profile.pk)
+
+
+@login_required
+@require_POST
+def horse_profile_apply_candidate(request: HttpRequest, candidate_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    candidate = get_object_or_404(HorseProfileDataCandidate.objects.select_related("profile"), pk=candidate_id)
+    action = request.POST.get("action", "apply")
+    if action == "apply":
+        apply_horse_data_candidate(candidate, user=request.user)
+        messages.success(request, "候选资料已应用。")
+    elif action in {"ignore", "conflict"}:
+        candidate.status = HorseProfileCandidateStatus.IGNORED if action == "ignore" else HorseProfileCandidateStatus.CONFLICT
+        candidate.applied_by = request.user
+        candidate.applied_at = timezone.now()
+        candidate.result_summary = request.POST.get("note", "").strip()
+        candidate.save(update_fields=["status", "applied_by", "applied_at", "result_summary", "updated_at"])
+        messages.success(request, "候选资料状态已更新。")
+    else:
+        messages.error(request, "无效的候选处理动作。")
+    return redirect("console-horse-profile-detail", profile_id=candidate.profile_id)
+
+
+@login_required
+@require_POST
+def horse_profile_add_race_record(request: HttpRequest, profile_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    profile = get_object_or_404(HorseProfile, pk=profile_id)
+    form = HorseRaceRecordForm(request.POST)
+    if form.is_valid():
+        record = form.save(commit=False)
+        record.horse_profile = profile
+        record.source_name = record.source_name or "manual"
+        record.save()
+        log_operation(
+            action_type="horse_race_record_saved",
+            target_type="horse_race_record",
+            target_id=record.pk,
+            detail=f"手动添加马匹参赛履历 profile={profile.pk} race={record.race_name}",
+            admin=request.user,
+        )
+        messages.success(request, "参赛履历已添加。")
+    else:
+        messages.error(request, "参赛履历表单有误，请检查必填项。")
+    return redirect("console-horse-profile-detail", profile_id=profile.pk)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def horse_profile_edit_race_record(request: HttpRequest, record_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    record = get_object_or_404(HorseRaceRecord.objects.select_related("horse_profile"), pk=record_id)
+    if request.method == "POST":
+        form = HorseRaceRecordForm(request.POST, instance=record)
+        if form.is_valid():
+            record = form.save()
+            log_operation(
+                action_type="horse_race_record_saved",
+                target_type="horse_race_record",
+                target_id=record.pk,
+                detail=f"编辑马匹参赛履历 profile={record.horse_profile_id} race={record.race_name}",
+                admin=request.user,
+            )
+            messages.success(request, "参赛履历已保存。")
+            return redirect("console-horse-profile-detail", profile_id=record.horse_profile_id)
+    else:
+        form = HorseRaceRecordForm(instance=record)
+    return render(
+        request,
+        "stable/console/horse_race_record_form.html",
+        _console_context(request, record=record, profile=record.horse_profile, form=form),
+    )
+
+
+@login_required
+@require_POST
+def horse_profile_delete_race_record(request: HttpRequest, record_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    record = get_object_or_404(HorseRaceRecord.objects.select_related("horse_profile"), pk=record_id)
+    profile_id = record.horse_profile_id
+    record.delete()
+    messages.success(request, "参赛履历已删除。")
+    return redirect("console-horse-profile-detail", profile_id=profile_id)
+
+
+@login_required
+@require_POST
+def horse_profile_scan_articles(request: HttpRequest, profile_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    profile = get_object_or_404(HorseProfile, pk=profile_id)
+    result = scan_article_horse_links(profile=profile, commit=True)
+    messages.success(request, f"重新扫描完成：新增 {result['created']}，更新 {result['updated']}，候选命中 {result['candidate']}。")
+    return redirect("console-horse-profile-detail", profile_id=profile.pk)
+
+
+@login_required
+@require_POST
+def horse_profile_add_article_link(request: HttpRequest, profile_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    profile = get_object_or_404(HorseProfile, pk=profile_id)
+    form = HorseArticleLinkForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "请输入有效的文章 ID。")
+        return redirect("console-horse-profile-detail", profile_id=profile.pk)
+    article = get_object_or_404(NewsArticle, pk=form.cleaned_data["article_id"])
+    link, _ = ArticleHorseLink.objects.update_or_create(
+        horse_profile=profile,
+        article=article,
+        defaults={
+            "status": form.cleaned_data["status"],
+            "source": "manual",
+            "confidence": 100,
+            "match_reason": "后台手动添加",
+            "confirmed_by": request.user,
+            "confirmed_at": timezone.now(),
+        },
+    )
+    log_operation(
+        action_type="horse_article_link_added",
+        target_type="horse_article_link",
+        target_id=link.pk,
+        detail=f"手动添加马匹新闻关联 profile={profile.pk} article={article.pk}",
+        admin=request.user,
+    )
+    messages.success(request, "文章关联已添加。")
+    return redirect("console-horse-profile-detail", profile_id=profile.pk)
+
+
+@login_required
+@require_POST
+def horse_profile_article_link_status(request: HttpRequest, link_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    link = get_object_or_404(ArticleHorseLink.objects.select_related("horse_profile"), pk=link_id)
+    action = request.POST.get("action", "").strip()
+    if action == "confirm":
+        link.status = ArticleHorseLinkStatus.MANUAL
+        link.confirmed_by = request.user
+        link.confirmed_at = timezone.now()
+        link.removed_by = None
+        link.removed_at = None
+        link.save(update_fields=["status", "confirmed_by", "confirmed_at", "removed_by", "removed_at", "updated_at"])
+        messages.success(request, "新闻关联已确认。")
+    elif action == "remove":
+        link.status = ArticleHorseLinkStatus.REMOVED
+        link.removed_by = request.user
+        link.removed_at = timezone.now()
+        link.save(update_fields=["status", "removed_by", "removed_at", "updated_at"])
+        messages.success(request, "新闻关联已移除，自动扫描不会重新公开。")
+    elif action == "reset":
+        link.status = ArticleHorseLinkStatus.CANDIDATE
+        link.confirmed_by = None
+        link.confirmed_at = None
+        link.removed_by = None
+        link.removed_at = None
+        link.save(update_fields=["status", "confirmed_by", "confirmed_at", "removed_by", "removed_at", "updated_at"])
+        messages.success(request, "新闻关联已重置为候选。")
+    else:
+        messages.error(request, "无效的关联操作。")
+    return redirect("console-horse-profile-detail", profile_id=link.horse_profile_id)
 
 
 @login_required
@@ -1696,6 +2072,7 @@ def article_editor(request: HttpRequest, article_id: int):
                 from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article
 
                 enqueue_qq_auto_push_for_article(article.id)
+                dispatch_task(scan_article_horse_links_task, article_id=article.id, commit=True)
             action_map = {
                 "save": "article_saved",
                 "autosave": "article_autosaved",
@@ -1879,6 +2256,31 @@ def _region_tab_context(active_region: str) -> list[dict]:
             }
         )
     return tabs
+
+
+def _public_horse_queryset():
+    return (
+        HorseProfile.objects.filter(review_status=HorseProfileStatus.PUBLISHED)
+        .select_related("primary_term", "sire_horse_profile", "dam_horse_profile")
+        .order_by("-is_featured", "racing_region", "display_name_zh", "original_name", "id")
+    )
+
+
+def _follow_token_hash_from_request(request: HttpRequest) -> str:
+    cookie_value = request.COOKIES.get(FOLLOW_COOKIE_NAME, "")
+    if not cookie_value:
+        return ""
+    try:
+        return token_hash_from_cookie(cookie_value)
+    except (BadSignature, SignatureExpired):
+        return ""
+
+
+def _public_followed_entries(request: HttpRequest, *, limit: int = 6) -> list[dict]:
+    token_hash = _follow_token_hash_from_request(request)
+    if not token_hash:
+        return []
+    return followed_articles(token_hash, limit=limit)
 
 
 def _race_priority_score(article: NewsArticle) -> int:
@@ -2090,6 +2492,7 @@ def public_news_feed(request: HttpRequest):
             "hot_articles": hot_articles,
             "region_tabs": _region_tab_context(active_region),
             "active_region": active_region,
+            "followed_entries": _public_followed_entries(request),
             "pagination_querystring": pagination_params.urlencode(),
         },
     )
@@ -2097,7 +2500,7 @@ def public_news_feed(request: HttpRequest):
 
 def public_article_detail(request: HttpRequest, article_id: int):
     article = get_object_or_404(
-        NewsArticle.objects.prefetch_related("race_links__event"),
+        NewsArticle.objects.prefetch_related("race_links__event", "horse_links__horse_profile"),
         workflow_status=WorkflowStatus.PUBLISHED,
         published_to_web_at__isnull=False,
         pk=article_id,
@@ -2108,7 +2511,125 @@ def public_article_detail(request: HttpRequest, article_id: int):
         if link.status in {ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL}
         and link.event.visibility_status == RaceEventVisibility.PUBLISHED
     ]
-    return render(request, "stable/public/detail.html", {"article": article, "race_links": race_links})
+    horse_links = [
+        link
+        for link in article.horse_links.all()
+        if link.status in {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL}
+        and link.horse_profile.review_status == HorseProfileStatus.PUBLISHED
+    ]
+    return render(request, "stable/public/detail.html", {"article": article, "race_links": race_links, "horse_links": horse_links})
+
+
+def public_horse_index(request: HttpRequest):
+    queryset = _public_horse_queryset()
+    query = request.GET.get("q", "").strip()
+    region = _resolve_public_region(request.GET.get("region", ""))
+    if query:
+        queryset = queryset.filter(
+            Q(display_name_zh__icontains=query)
+            | Q(original_name__icontains=query)
+            | Q(english_name__icontains=query)
+            | Q(japanese_name__icontains=query)
+            | Q(country__icontains=query)
+        )
+    if region:
+        queryset = queryset.filter(racing_region=region)
+    paginator = Paginator(queryset, PUBLIC_HORSE_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
+    return render(
+        request,
+        "stable/public/horse_index.html",
+        {
+            "page_obj": page_obj,
+            "horse_profiles": page_obj.object_list,
+            "region_tabs": _region_tab_context(region),
+            "filters": {"q": query, "region": region},
+            "pagination_querystring": pagination_params.urlencode(),
+        },
+    )
+
+
+def public_horse_detail(request: HttpRequest, profile_id: int):
+    profile = get_object_or_404(
+        _public_horse_queryset()
+        .prefetch_related(
+            "article_links__article",
+            "race_links__event",
+            "race_records__event",
+            "sire_children",
+            "dam_children",
+        ),
+        pk=profile_id,
+    )
+    public_article_links = [
+        link
+        for link in profile.article_links.all()
+        if link.status in {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL}
+        and link.article.workflow_status == WorkflowStatus.PUBLISHED
+        and link.article.published_to_web_at is not None
+    ]
+    public_race_links = [
+        link
+        for link in profile.race_links.all()
+        if link.status in {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL}
+        and link.event.visibility_status == RaceEventVisibility.PUBLISHED
+    ]
+    race_records = list(profile.race_records.all()[:20])
+    token_hash = _follow_token_hash_from_request(request)
+    is_following = bool(token_hash and HorseFollow.objects.filter(token_hash=token_hash, horse_profile=profile).exists())
+    descendants = (
+        HorseProfile.objects.filter(Q(sire_horse_profile=profile) | Q(dam_horse_profile=profile), review_status=HorseProfileStatus.PUBLISHED)
+        .order_by("racing_region", "display_name_zh", "id")[:12]
+    )
+    return render(
+        request,
+        "stable/public/horse_detail.html",
+        {
+            "profile": profile,
+            "major_wins": major_win_records(profile),
+            "article_links": public_article_links[:12],
+            "race_links": public_race_links[:12],
+            "race_records": race_records,
+            "descendants": descendants,
+            "is_following": is_following,
+        },
+    )
+
+
+@require_POST
+def public_horse_follow(request: HttpRequest, profile_id: int):
+    profile = get_object_or_404(HorseProfile, pk=profile_id, review_status=HorseProfileStatus.PUBLISHED)
+    signed_token = request.COOKIES.get(FOLLOW_COOKIE_NAME, "")
+    token_hash = _follow_token_hash_from_request(request)
+    if not token_hash:
+        signed_token = signed_follow_token()
+        token_hash = token_hash_from_cookie(signed_token)
+    include_descendants = request.POST.get("include_descendants", "1") == "1"
+    if request.POST.get("intent") == "unfollow":
+        unfollow_horse(token_hash, profile)
+        messages.success(request, "已取消关注。")
+    else:
+        follow_horse(token_hash, profile, include_descendants=include_descendants)
+        messages.success(request, "已关注这匹马。")
+    response = redirect(profile.public_path)
+    set_follow_cookie(response, signed_token)
+    return response
+
+
+def public_horse_follows(request: HttpRequest):
+    token_hash = _follow_token_hash_from_request(request)
+    follows = []
+    entries = []
+    if token_hash:
+        follows = (
+            HorseFollow.objects.filter(token_hash=token_hash, horse_profile__review_status=HorseProfileStatus.PUBLISHED)
+            .select_related("horse_profile")
+            .order_by("-followed_at", "-id")
+        )
+        entries = followed_articles(token_hash, limit=40)
+    return render(request, "stable/public/horse_follows.html", {"follows": follows, "followed_entries": entries})
 
 
 def legacy_public_article_detail(request: HttpRequest, slug: str):

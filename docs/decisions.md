@@ -1,5 +1,61 @@
 # 关键决策
 
+## 为什么马匹详情页使用 ID URL、草稿默认不可见并由后台审核发布
+
+马匹名称存在多语言、重名、改译、别名和后续术语合并风险。若把公开 URL 绑定到马名或 slug，后续改名会带来重定向、重复页面和 SEO/缓存一致性问题。
+
+因此马匹详情页 MVP 使用稳定唯一 ID：
+
+- 公开索引：`/horses/`
+- 公开详情：`/horses/<HorseProfile.id>/`
+- 关注管理：`/horses/follows/`
+
+P0 马匹页可以从 active horse `TermEntry` 默认生成，但生成后状态为 `draft`，前台返回 404；只有后台 `/admin/horse-profiles/` 人工审核、补充资料并手动发布后才公开展示。为了支持运营抢先建入口，管理员即使在资料完全空壳时也可以强制发布，但该动作会记录发布人、发布时间和备注。
+
+## 为什么马匹关注对普通用户开放且只保存 token hash
+
+关注功能的产品目标是让用户在新闻首页看到“关注马及其子孙代”的相关新闻，而不是后台运营专属标记。因此普通未登录用户也可以关注马匹。
+
+实现采用匿名签名 cookie：
+
+- cookie 保存签名后的随机 token，`HttpOnly`、`SameSite=Lax`，HTTPS 配置下启用 `Secure`。
+- 数据库 `HorseFollow` 只保存 `token_hash`，不保存明文 token。
+- 关注 POST 保持 CSRF 保护。
+- 子孙代新闻只通过 `sire_horse_profile` / `dam_horse_profile` 的直接 profile 关系递归查询，纯文本血统不参与后代查询。
+
+## 为什么用 HorseRaceRecord 承载完整参赛履历
+
+马匹页第一版需要展示主胜鞍，但后续目标是每匹马的完整参赛履历。如果只建“主胜鞍表”，未来会重复建模参赛事实，也难以表达参加但未获胜、退赛、未上名等结果。
+
+因此本轮新增 `HorseRaceRecord` 作为马-比赛事实表：
+
+- 可选关联 `RaceEvent` / `RaceEventResult`，同时保存比赛快照字段。
+- 覆盖参加过的比赛，不限于赢过的比赛。
+- 主胜鞍由最高等级胜利和人工 `is_major_win` 标记共同决定。
+- 无胜利、新马/未胜利、无重赏和人工指定场景都可以保守展示。
+
+## 为什么外部血统补全走 dry-run artifact 而不是直接写公开数据
+
+马匹资料需要尝试从外部数据补完整二代血统，但来源覆盖率、命名歧义、地区差异和反爬/限流都会影响准确性。直接从公开页或审核页实时请求第三方，会放大延迟、稳定性和来源合规风险。
+
+因此补全策略是：
+
+- 公开 `/horses/`、`/horses/<id>/`、首页关注模块和新闻详情 tag 只读本地数据库，不访问外部网络。
+- `complete_horse_profiles --dry-run` 基于本地 `ExternalHorse` / `ExternalHorseAlias` 缓存生成 artifact、CSV 和 summary。
+- summary 必须包含全局/按地区完整二代成功率、未补全占比、逐马失败原因、source URL 和候选 diff。
+- `--commit` 必须读取已审核 artifact，并显式提供 `--confirm-reviewed-artifact`，不允许边抓边写。
+- `new-village/KeibaScraper` 只作为受控 netkeiba 导入链路的可信数据源参考；项目当前采用本地缓存和低频导入，避免公开请求路径触网。
+
+## 为什么马名和术语匹配一律大小写不敏感
+
+外部赛马数据和新闻源对英文马名、赛事名、骑师名等术语的大小写并不稳定：HKJC 可能使用全大写，新闻标题可能使用标题式大小写，人工术语库也可能保留来源原始写法。如果按大小写精确匹配，会导致同一匹马在补全、新闻关联、术语替换和翻译保护链路中被误判为未命中。
+
+因此所有含拉丁字母的术语匹配采用大小写不敏感规则：
+
+- 术语解析、术语替换和单条术语应用对拉丁字母忽略大小写，并保留英文词边界保护。
+- 外部马名 alias 和 `HorseProfile` 补全匹配使用大小写不敏感的规范化 key。
+- 前台展示仍保留数据库中的原始写法；大小写不敏感只影响匹配与替换，不自动改写术语主数据。
+
 ## 为什么法国 TDN broad 上线时同时允许 `tdn_france:access` 和 `tdn:access`
 
 `tdn_france_broad` 是法国新闻补充来源，但为了和既有 TDN 去重共用同一篇原文，入库时会使用 canonical source site `tdn`，同时通过 `source_config` 保留“这是法国来源发现的文章”。
@@ -749,3 +805,48 @@ HKJC 官方来源适合作为国际和香港赛马术语主译名，但生产库
 - 对无可靠匹配或无结构化表的赛事保留为空，不使用模糊搜索结果强行写库。
 
 同时，前台模板已调整为只有存在 `history_winners` 时才展示“近年冠军”区块，避免无数据赛事出现空标题。
+
+## 为什么马匹详情页先走受审核的产品层，而不是直接暴露术语或外部表
+
+`2026-07-07` 马匹详情页 MVP 提案已锁定为独立 `HorseProfile` 产品层，不能把 `TermEntry` 或 `ExternalHorse` 直接当成公开详情页。原因是术语库负责翻译保护和概念识别，外部表负责来源抓取证据；公开马匹页需要审核状态、展示名快照、简介、重点新闻、血统、参赛履历、关注关系和人工覆盖痕迹，这些都属于产品层能力。
+
+因此第一版采用以下规则：
+
+- P0 马默认由 active `TermEntry(term_type=horse, target_zh nonempty)` 生成 `HorseProfile` 草稿，但前台不可见；后台审核补充后手动发布，状态为 `draft -> ready -> published -> hidden`。
+- 管理员允许强制发布空壳页；未发布或隐藏的马匹详情页在前台返回 `404`。
+- 公开 URL 只使用唯一 ID：`/horses/<id>/`，不使用 slug，避免马名、多语言和改名带来的长期兼容问题。
+- 展示字段优先使用 `HorseProfile` 快照，再回退到绑定的 `TermEntry`；术语变化不应自动改写已人工确认的马匹页展示。
+- 文章马匹关系使用 `ArticleHorseLink`，前台和关注流只消费 `auto/manual`，不重新扫描正文；人工移除写入 `removed` 并保护不被自动重建。
+- 关注功能对匿名普通用户开放，使用 `follower_token + cookie`；首页新增“我的关注”模块，展示关注马匹及可选子孙代的相关新闻。
+- 马匹与比赛关系使用 `HorseRaceRecord` 记录参加过的比赛，并从获胜记录派生重点胜利；第一版前台先展示重点胜利和关联赛事，不做完整履历表。
+- 血统展示必须尽力补齐完整二代，六个文本字段齐全才算补全成功；文本足够用于展示，只有能高可信绑定时才链接 `TermEntry` / `HorseProfile`。
+- 外部资料补全覆盖所有地区 P0 马，必须先 dry-run，输出补全成功/失败占比和具体失败原因；高置信唯一匹配才写草稿字段，歧义或冲突进入 `HorseProfileDataCandidate` 供后台审核。
+- 日本来源优先参考 `netkeiba` / `JBIS`，并把 GitHub `new-village/KeibaScraper` 作为可信参考来源或可选依赖候选；香港、英国、法国、美国分别以 HKJC、Sporting Life / Racing Post、Geny / France Galop、Horse Racing Nation / Equibase 为第一批候选来源。
+
+## 为什么马匹关注 token 只在 cookie 明文存在，数据库只存 hash
+
+马匹关注第一版不引入注册账号，但匿名 `follower_token` 仍然代表当前浏览器的关注身份。如果把明文 token 写进数据库、日志或 artifact，一旦后台导出、错误日志或调试文件泄露，别人就可能复用该 token 查看或修改关注列表。
+
+因此 `horse-profile-page-mvp` 工程审查后锁定：
+
+- 浏览器 cookie 保存签名随机 `follower_token`。
+- cookie 使用 `HttpOnly`、`SameSite=Lax`，并随 HTTPS 安全 cookie 配置启用 `Secure`。
+- 数据库 `HorseFollow` 只保存不可反推的 `token_hash`，不保存明文 token。
+- 关注 POST 继续使用 Django CSRF；服务端从 cookie 解析 token，前端脚本不读取 token。
+- 页面 HTML、URL、日志、补全 artifact 和运行报告都不得输出明文 token。
+
+这样可以保留匿名关注的低门槛，同时降低数据库或运营 artifact 泄露后的横向风险。
+
+## 为什么马匹外部补全 commit 必须读取已审核 artifact
+
+马匹资料补全会写入 `HorseProfile`、`HorseProfileDataCandidate` 和 `HorseRaceRecord`，一旦把错误血统、错误马匹匹配或错误参赛记录写入产品层，会影响公开详情页、关注流和后续人工审核。外部来源又存在限流、同名马、地区差异和字段缺失，不能让 `--commit` 一边实时抓取一边直接写库。
+
+因此本变更要求：
+
+- dry-run 先输出 source evidence、before/after diff、补全状态、失败原因和未补全占比。
+- commit 必须读取同一批次已审核 dry-run artifact，并要求显式确认参数。
+- commit 只能写入 artifact 覆盖的马匹和字段，不得重新抓取外部来源后绕过审核直接写库。
+- artifact 缺少 batch id、生成时间、source 摘要、diff 或审核确认标记时，命令必须拒绝写入。
+- 回滚优先使用 commit artifact 中保存的 before 值；大范围异常再使用生产数据库备份。
+
+这个约束和现有术语合并、文章术语回填的“先生成可审 diff，再 apply 已审核 artifact”保持一致。

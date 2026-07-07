@@ -17,6 +17,25 @@
 
     {% include "stable/public/_headline.html" %}
 
+    {% if followed_entries %}
+      <section class="follow-news-panel" aria-label="我的关注">
+        <div class="section-head">
+          <div>
+            <h2>我的关注</h2>
+          </div>
+          <a href="{% url 'public-horse-follows' %}">管理</a>
+        </div>
+        <div class="follow-news-list">
+          {% for entry in followed_entries %}
+            <a class="follow-news-item" href="{{ entry.article.public_path }}">
+              <strong>{{ entry.article.effective_title }}</strong>
+              <span>{{ entry.horse_profile.display_name }} · {{ entry.article.published_to_web_at|date:"m-d H:i" }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+
     <div class="home-layout">
       <section class="news-list" aria-label="最新新闻">
         {% for article in feed_articles %}

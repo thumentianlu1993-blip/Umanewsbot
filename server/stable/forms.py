@@ -4,6 +4,11 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm
 
 from .models import (
+    ArticleHorseLinkStatus,
+    HorseProfile,
+    HorseProfileCompleteness,
+    HorseRaceRecord,
+    HorseRaceResultStatus,
     NewsArticle,
     NewsImage,
     NewsSource,
@@ -18,6 +23,29 @@ from .models import (
     TermType,
 )
 from .services.term_admin import serialize_aliases, sync_term_source_aliases, validate_term_payload
+
+
+HORSE_PROFILE_LOCK_CHOICES = [
+    ("display_name_zh", "中文展示名"),
+    ("original_name", "原始名称"),
+    ("english_name", "英文名"),
+    ("japanese_name", "日文名"),
+    ("racing_region", "地区"),
+    ("country", "国家/地区"),
+    ("sex", "性别"),
+    ("color", "毛色"),
+    ("birth_date", "出生日期"),
+    ("owner_name", "马主"),
+    ("trainer_name", "练马师"),
+    ("breeder_name", "生产牧场"),
+    ("intro", "简介"),
+    ("sire_text", "父"),
+    ("dam_text", "母"),
+    ("sire_sire_text", "父父"),
+    ("sire_dam_text", "父母"),
+    ("dam_sire_text", "母父"),
+    ("dam_dam_text", "母母"),
+]
 
 
 class BackendAuthenticationForm(AuthenticationForm):
@@ -184,6 +212,155 @@ class RaceEventForm(forms.ModelForm):
                     defaults={"alias_type": "alias", "source": "manual", "is_active": True},
                 )
         return instance
+
+
+class HorseProfileForm(forms.ModelForm):
+    locked_fields = forms.MultipleChoiceField(
+        label="人工锁定字段",
+        required=False,
+        choices=HORSE_PROFILE_LOCK_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        help_text="被锁定字段不会被外部补全候选覆盖。",
+    )
+
+    class Meta:
+        model = HorseProfile
+        fields = [
+            "display_name_zh",
+            "original_name",
+            "english_name",
+            "japanese_name",
+            "racing_region",
+            "country",
+            "sex",
+            "color",
+            "birth_date",
+            "owner_name",
+            "trainer_name",
+            "breeder_name",
+            "intro",
+            "sire_text",
+            "dam_text",
+            "sire_sire_text",
+            "sire_dam_text",
+            "dam_sire_text",
+            "dam_dam_text",
+            "sire_horse_profile",
+            "dam_horse_profile",
+            "is_featured",
+            "review_notes",
+            "locked_fields",
+        ]
+        widgets = {
+            "birth_date": forms.DateInput(attrs={"type": "date"}),
+            "intro": forms.Textarea(attrs={"rows": 4}),
+            "review_notes": forms.Textarea(attrs={"rows": 3}),
+        }
+        labels = {
+            "display_name_zh": "中文展示名",
+            "original_name": "原始名称",
+            "english_name": "英文名",
+            "japanese_name": "日文名",
+            "racing_region": "地区",
+            "country": "国家/地区",
+            "sex": "性别",
+            "color": "毛色",
+            "birth_date": "出生日期",
+            "owner_name": "马主",
+            "trainer_name": "练马师",
+            "breeder_name": "生产牧场",
+            "intro": "简介",
+            "sire_text": "父",
+            "dam_text": "母",
+            "sire_sire_text": "父父",
+            "sire_dam_text": "父母",
+            "dam_sire_text": "母父",
+            "dam_dam_text": "母母",
+            "sire_horse_profile": "父系马匹页面",
+            "dam_horse_profile": "母系马匹页面",
+            "is_featured": "推荐展示",
+            "review_notes": "审核备注",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["racing_region"].choices = RacingRegion.choices
+        parent_queryset = HorseProfile.objects.exclude(pk=self.instance.pk).order_by("racing_region", "display_name_zh", "original_name", "id")
+        self.fields["sire_horse_profile"].queryset = parent_queryset
+        self.fields["dam_horse_profile"].queryset = parent_queryset
+        self.fields["sire_horse_profile"].required = False
+        self.fields["dam_horse_profile"].required = False
+        self.fields["locked_fields"].initial = sorted((self.instance.manual_lock_flags or {}).keys())
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        selected = set(self.cleaned_data.get("locked_fields") or [])
+        existing = instance.manual_lock_flags or {}
+        instance.manual_lock_flags = {field: True for field in selected if field in dict(HORSE_PROFILE_LOCK_CHOICES)}
+        for key, value in existing.items():
+            if key not in dict(HORSE_PROFILE_LOCK_CHOICES) and value:
+                instance.manual_lock_flags[key] = value
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+
+class HorseRaceRecordForm(forms.ModelForm):
+    class Meta:
+        model = HorseRaceRecord
+        fields = [
+            "event",
+            "race_name",
+            "race_year",
+            "race_date",
+            "grade_text",
+            "normalized_grade",
+            "racecourse",
+            "distance_text",
+            "surface",
+            "finish_position",
+            "result_status",
+            "is_major_win",
+            "major_win_order",
+            "source_name",
+            "source_url",
+        ]
+        widgets = {
+            "race_date": forms.DateInput(attrs={"type": "date"}),
+        }
+        labels = {
+            "event": "关联赛事",
+            "race_name": "比赛名",
+            "race_year": "年份",
+            "race_date": "比赛日期",
+            "grade_text": "等级文本",
+            "normalized_grade": "标准等级",
+            "racecourse": "马场",
+            "distance_text": "距离",
+            "surface": "场地",
+            "finish_position": "名次",
+            "result_status": "结果",
+            "is_major_win": "主胜鞍",
+            "major_win_order": "主胜鞍排序",
+            "source_name": "来源名",
+            "source_url": "来源链接",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["normalized_grade"].choices = [("", "未设置"), *RaceGrade.choices]
+        self.fields["surface"].required = False
+        self.fields["result_status"].choices = HorseRaceResultStatus.choices
+        self.fields["major_win_order"].required = False
+
+    def clean_major_win_order(self):
+        return self.cleaned_data.get("major_win_order") or 0
+
+
+class HorseArticleLinkForm(forms.Form):
+    article_id = forms.IntegerField(label="文章 ID", min_value=1)
+    status = forms.ChoiceField(label="状态", choices=[(ArticleHorseLinkStatus.MANUAL, "人工确认"), (ArticleHorseLinkStatus.CANDIDATE, "候选")])
 
 
 class ArticleEditorForm(forms.ModelForm):

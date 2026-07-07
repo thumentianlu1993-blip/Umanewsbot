@@ -59,6 +59,16 @@ from stable.models import (
     ExternalRaceOdds,
     ExternalRaceResult,
     CrawlJob,
+    ArticleHorseLink,
+    ArticleHorseLinkStatus,
+    HorseFollow,
+    HorseProfile,
+    HorseProfileCompleteness,
+    HorseProfileDataCandidate,
+    HorseProfileModule,
+    HorseProfileStatus,
+    HorseRaceRecord,
+    HorseRaceResultStatus,
     NewsImage,
     NewsArticle,
     NewsSnapshot,
@@ -166,6 +176,20 @@ from stable.services.external_horse_data import (
     ExternalHorseDataNetworkDisabled,
     ImportOptions,
 )
+from stable.services.horse_profile_completion import CompletionOptions, apply_completion_artifact, plan_profile_completion
+from stable.services.horse_profiles import (
+    FOLLOW_COOKIE_NAME,
+    apply_data_candidate as apply_horse_data_candidate,
+    follow_horse,
+    followed_articles,
+    generate_p0_horse_profiles,
+    get_descendant_horse_ids,
+    major_win_records,
+    scan_article_horse_links,
+    signed_follow_token,
+    token_hash_from_cookie,
+    update_completeness,
+)
 from stable.services.external_hkjc_data import HKJCExternalDataImporter, HKJCImportError, HKJCImportOptions
 from stable.tasks import (
     _crawl_jra_source,
@@ -178,6 +202,7 @@ from stable.tasks import (
     process_article_automation_task,
     qq_auto_push_article_task,
     qq_push_delivery_task,
+    scan_article_horse_links_task,
     score_article_task,
     send_notification_task,
     translate_article_task,
@@ -314,6 +339,21 @@ class TermResolverTests(TestCase):
 
         self.assertEqual([term.target_zh for term in terms], ["测试马7"])
         self.assertLessEqual(len(captured.captured_queries), 3)
+
+    def test_latin_term_matching_is_case_insensitive_without_language_filter(self):
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Lucky Star",
+            target_zh="幸运星",
+            priority=100,
+        )
+
+        terms = resolve_terms("lucky star returns at Sha Tin", limit=5)
+        mapped = apply_term_mappings("LUCKY STAR returns at Sha Tin")
+
+        self.assertEqual([term.target_zh for term in terms], ["幸运星"])
+        self.assertEqual(mapped, "幸运星 returns at Sha Tin")
 
     def test_english_article_does_not_use_japanese_horse_heuristic(self):
         recognized = recognize_horse_names("ASCOT PREVIEW", "TITLE runs at Ascot.", source_language=SourceLanguage.ENGLISH)
@@ -14922,3 +14962,375 @@ class RaceEventPageMVPTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertLessEqual(len(context), 8)
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+class HorseProfilePageMvpTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="editor", password="pass", is_staff=True)
+
+    def _term(self, source_ja="イクイノックス", target_zh="春秋分", priority=100, region=RacingRegion.JAPAN):
+        return TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.JAPANESE,
+            source_ja=source_ja,
+            target_zh=target_zh,
+            racing_region=region,
+            priority=priority,
+            is_active=True,
+        )
+
+    def _profile(self, **overrides):
+        term = overrides.pop("primary_term", None) or self._term()
+        defaults = {
+            "primary_term": term,
+            "display_name_zh": term.target_zh,
+            "original_name": term.source_ja,
+            "racing_region": term.racing_region,
+            "review_status": HorseProfileStatus.PUBLISHED,
+        }
+        defaults.update(overrides)
+        return HorseProfile.objects.create(**defaults)
+
+    def _article(self, title="春秋分胜出宝塚纪念", body="春秋分在比赛中表现出色。"):
+        now = timezone.now()
+        return NewsArticle.objects.create(
+            source_site=SourceSite.NETKEIBA,
+            source_mode=SourceMode.LATEST,
+            racing_region=RacingRegion.JAPAN,
+            source_language=SourceLanguage.JAPANESE,
+            source_article_id=str(uuid.uuid4()),
+            title_ja=title,
+            body_ja_raw=body,
+            body_ja_normalized=body,
+            title_zh=title,
+            summary_zh="摘要",
+            body_zh=body,
+            published_at=now,
+            published_to_web_at=now,
+            source_url="https://example.com/news",
+            workflow_status=WorkflowStatus.PUBLISHED,
+        )
+
+    def test_p0_generation_is_draft_and_public_requires_manual_publish(self):
+        term = self._term()
+        result = generate_p0_horse_profiles()
+        profile = HorseProfile.objects.get(primary_term=term)
+        draft_response = self.client.get(reverse("public-horse-detail", args=[profile.id]))
+        self.client.force_login(self.user)
+        transition_response = self.client.post(
+            reverse("console-horse-profile-status", args=[profile.id]),
+            {"status": HorseProfileStatus.PUBLISHED, "note": "允许空壳强制发布"},
+            follow=True,
+        )
+        published_response = self.client.get(reverse("public-horse-detail", args=[profile.id]))
+
+        self.assertEqual(result["created"], 1)
+        self.assertEqual(profile.review_status, HorseProfileStatus.DRAFT)
+        self.assertEqual(draft_response.status_code, 404)
+        self.assertEqual(transition_response.status_code, 200)
+        self.assertContains(published_response, "春秋分")
+
+    def test_completeness_requires_all_six_pedigree_fields_and_descendants_use_profile_links(self):
+        parent = self._profile(sire_text="父", dam_text="母", sire_sire_text="父父", sire_dam_text="父母", dam_sire_text="母父")
+        self.assertEqual(update_completeness(parent), HorseProfileCompleteness.PARTIAL_PEDIGREE)
+        parent.dam_dam_text = "母母"
+        parent.save(update_fields=["dam_dam_text"])
+        self.assertEqual(update_completeness(parent), HorseProfileCompleteness.COMPLETE_PEDIGREE_2GEN)
+
+        child = self._profile(primary_term=self._term("キタサンブラック", "北部玄驹"), sire_horse_profile=parent)
+        grandchild = self._profile(primary_term=self._term("イクイノックス2", "子代马"), dam_horse_profile=child)
+
+        self.assertEqual(get_descendant_horse_ids(parent, depth=2, public_only=True), {child.id, grandchild.id})
+
+    def test_major_win_records_choose_highest_grade_and_allow_manual_marks(self):
+        profile = self._profile()
+        g2 = HorseRaceRecord.objects.create(
+            horse_profile=profile,
+            race_name="札幌记念",
+            normalized_grade=RaceGrade.G2,
+            result_status=HorseRaceResultStatus.WON,
+        )
+        g1 = HorseRaceRecord.objects.create(
+            horse_profile=profile,
+            race_name="宝塚纪念",
+            normalized_grade=RaceGrade.G1,
+            result_status=HorseRaceResultStatus.WON,
+        )
+        manual = HorseRaceRecord.objects.create(
+            horse_profile=profile,
+            race_name="人工主胜鞍",
+            normalized_grade=RaceGrade.G3,
+            result_status=HorseRaceResultStatus.PLACED,
+            is_major_win=True,
+        )
+
+        self.assertEqual(set(major_win_records(profile).values_list("id", flat=True)), {g1.id, manual.id})
+        self.assertNotIn(g2.id, set(major_win_records(profile).values_list("id", flat=True)))
+
+    def test_article_horse_scan_and_detail_tags_respect_removed_and_public_rules(self):
+        profile = self._profile()
+        article = self._article()
+        result = scan_article_horse_links(article=article, commit=True)
+        detail_response = self.client.get(reverse("public-article-detail", args=[article.id]))
+        link = ArticleHorseLink.objects.get(article=article, horse_profile=profile)
+        link.status = ArticleHorseLinkStatus.REMOVED
+        link.save(update_fields=["status"])
+        second = scan_article_horse_links(article=article, commit=True)
+        removed_response = self.client.get(reverse("public-article-detail", args=[article.id]))
+
+        self.assertEqual(result["created"], 1)
+        self.assertContains(detail_response, profile.display_name)
+        self.assertEqual(second["skipped_removed"], 1)
+        self.assertNotContains(removed_response, profile.public_path)
+
+    def test_anonymous_follow_stores_only_token_hash_and_feed_includes_descendant_news(self):
+        parent = self._profile()
+        child = self._profile(primary_term=self._term("キタサンブラック", "北部玄驹"), sire_horse_profile=parent)
+        article = self._article(title="北部玄驹子嗣新闻", body="北部玄驹相关。")
+        ArticleHorseLink.objects.create(horse_profile=child, article=article, status=ArticleHorseLinkStatus.MANUAL)
+        signed_token = signed_follow_token()
+        token_hash = token_hash_from_cookie(signed_token)
+        follow_horse(token_hash, parent, include_descendants=True)
+        self.client.cookies[FOLLOW_COOKIE_NAME] = signed_token
+        response = self.client.get(reverse("public-news-feed"))
+
+        self.assertEqual(HorseFollow.objects.get().token_hash, token_hash)
+        self.assertNotIn(signed_token, HorseFollow.objects.get().token_hash)
+        self.assertEqual(followed_articles(token_hash)[0]["article"].id, article.id)
+        self.assertContains(response, "我的关注")
+        self.assertContains(response, "北部玄驹子嗣新闻")
+
+    def test_follow_feed_and_manage_page_hide_unpublished_profiles(self):
+        profile = self._profile()
+        article = self._article(title="春秋分相关新闻", body="春秋分相关。")
+        ArticleHorseLink.objects.create(horse_profile=profile, article=article, status=ArticleHorseLinkStatus.MANUAL)
+        signed_token = signed_follow_token()
+        token_hash = token_hash_from_cookie(signed_token)
+        follow_horse(token_hash, profile, include_descendants=True)
+        profile.review_status = HorseProfileStatus.HIDDEN
+        profile.save(update_fields=["review_status"])
+        self.client.cookies[FOLLOW_COOKIE_NAME] = signed_token
+
+        feed_response = self.client.get(reverse("public-news-feed"))
+        follows_response = self.client.get(reverse("public-horse-follows"))
+
+        self.assertEqual(followed_articles(token_hash), [])
+        self.assertNotContains(feed_response, "follow-news-panel")
+        self.assertNotContains(follows_response, profile.display_name)
+
+    def test_public_follow_view_sets_cookie_attributes(self):
+        profile = self._profile()
+        response = self.client.post(reverse("public-horse-follow", args=[profile.id]), {"include_descendants": "1"})
+        cookie = response.cookies[FOLLOW_COOKIE_NAME]
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(cookie["httponly"])
+        self.assertEqual(cookie["samesite"], "Lax")
+        self.assertEqual(HorseFollow.objects.count(), 1)
+
+    def test_profile_save_form_cannot_publish_without_status_transition(self):
+        profile = self._profile(review_status=HorseProfileStatus.DRAFT)
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("console-horse-profile-detail", args=[profile.id]),
+            {
+                "display_name_zh": "春秋分",
+                "original_name": "イクイノックス",
+                "racing_region": RacingRegion.JAPAN,
+                "review_status": HorseProfileStatus.PUBLISHED,
+            },
+            follow=True,
+        )
+        profile.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(profile.review_status, HorseProfileStatus.DRAFT)
+        self.assertIsNone(profile.published_at)
+        self.assertIsNone(profile.published_by)
+
+    def test_console_workbench_supports_review_candidate_record_and_article_link(self):
+        profile = self._profile(review_status=HorseProfileStatus.DRAFT)
+        article = self._article()
+        candidate = HorseProfileDataCandidate.objects.create(
+            profile=profile,
+            module=HorseProfileModule.PEDIGREE,
+            source_name="fixture",
+            candidate_payload={
+                "sire_text": "父",
+                "dam_text": "母",
+                "sire_sire_text": "父父",
+                "sire_dam_text": "父母",
+                "dam_sire_text": "母父",
+                "dam_dam_text": "母母",
+            },
+        )
+        self.client.force_login(self.user)
+        list_response = self.client.get(reverse("console-horse-profile-list"), {"status": HorseProfileStatus.DRAFT})
+        detail_response = self.client.get(reverse("console-horse-profile-detail", args=[profile.id]))
+        candidate_response = self.client.post(reverse("console-horse-profile-apply-candidate", args=[candidate.id]), {"action": "apply"}, follow=True)
+        record_response = self.client.post(
+            reverse("console-horse-profile-add-race-record", args=[profile.id]),
+            {"race_name": "宝塚纪念", "normalized_grade": RaceGrade.G1, "result_status": HorseRaceResultStatus.WON},
+            follow=True,
+        )
+        link_response = self.client.post(
+            reverse("console-horse-profile-add-article-link", args=[profile.id]),
+            {"article_id": article.id, "status": ArticleHorseLinkStatus.MANUAL},
+            follow=True,
+        )
+
+        profile.refresh_from_db()
+        record = HorseRaceRecord.objects.get(horse_profile=profile, race_name="宝塚纪念")
+        edit_response = self.client.post(
+            reverse("console-horse-profile-edit-race-record", args=[record.id]),
+            {"race_name": "宝塚纪念", "race_year": 2026, "normalized_grade": RaceGrade.G1, "result_status": HorseRaceResultStatus.WON},
+            follow=True,
+        )
+        self.assertContains(list_response, "春秋分")
+        self.assertContains(detail_response, "候选资料 diff")
+        self.assertContains(candidate_response, "候选资料已应用")
+        self.assertEqual(profile.completeness_status, HorseProfileCompleteness.COMPLETE_PEDIGREE_2GEN)
+        self.assertContains(record_response, "参赛履历已添加")
+        self.assertContains(edit_response, "参赛履历已保存")
+        record.refresh_from_db()
+        self.assertEqual(record.race_year, 2026)
+        self.assertContains(link_response, "文章关联已添加")
+        self.assertTrue(ArticleHorseLink.objects.filter(horse_profile=profile, article=article, status=ArticleHorseLinkStatus.MANUAL).exists())
+
+    def test_completion_plan_is_dry_run_and_reports_missing_reasons(self):
+        profile = self._profile(review_status=HorseProfileStatus.DRAFT)
+        horse = ExternalHorse.objects.create(
+            source=ExternalDataSource.NETKEIBA,
+            racing_region=RacingRegion.JAPAN,
+            horse_id="h1",
+            horse_name="イクイノックス",
+            normalized_horse_name="イクイノックス",
+            father_name="父",
+            mother_name="母",
+            raw_payload={
+                "sire_sire": "父父",
+                "sire_dam": "父母",
+                "dam_sire": "母父",
+                "dam_dam": "母母",
+            },
+        )
+        ExternalHorseAlias.objects.create(
+            source=ExternalDataSource.NETKEIBA,
+            racing_region=RacingRegion.JAPAN,
+            horse=horse,
+            external_horse_id=horse.horse_id,
+            name_ja="イクイノックス",
+            normalized_name="イクイノックス",
+        )
+        before_candidates = HorseProfileDataCandidate.objects.count()
+        plan = plan_profile_completion(CompletionOptions(limit=10))
+        profile.refresh_from_db()
+
+        self.assertEqual(HorseProfileDataCandidate.objects.count(), before_candidates)
+        self.assertEqual(profile.sire_text, "")
+        self.assertEqual(plan["summary"]["total"], 1)
+        self.assertEqual(plan["summary"]["complete_pedigree_2gen"], 1)
+        self.assertEqual(plan["summary"]["regions"][RacingRegion.JAPAN]["complete_ratio"], 1.0)
+        self.assertEqual(plan["summary"]["regions"][RacingRegion.JAPAN]["not_complete_ratio"], 0.0)
+        self.assertEqual(plan["rows"][0]["completion_status"], HorseProfileCompleteness.COMPLETE_PEDIGREE_2GEN)
+
+    def test_scan_article_horse_links_task_skips_stale_explicit_ids(self):
+        self._profile()
+        article = self._article()
+
+        article_result = scan_article_horse_links_task.run(article_id=article.id + 1000, commit=True)
+        profile_result = scan_article_horse_links_task.run(profile_id=999999, commit=True)
+
+        self.assertEqual(article_result["reason"], "article_not_found")
+        self.assertEqual(profile_result["reason"], "horse_profile_not_found")
+        self.assertFalse(ArticleHorseLink.objects.exists())
+
+    @override_settings(HORSE_PROFILE_COMPLETION_BATCH_LIMIT=1)
+    def test_completion_command_without_limit_covers_all_p0_profiles(self):
+        self._profile(review_status=HorseProfileStatus.DRAFT)
+        self._profile(primary_term=self._term("キタサンブラック", "北部玄驹"), review_status=HorseProfileStatus.DRAFT)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stdout = StringIO()
+            call_command("complete_horse_profiles", "--dry-run", "--output-dir", tmpdir, stdout=stdout)
+            summary = json.loads((Path(tmpdir) / "summary.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(summary["total"], 2)
+
+    def test_completion_plan_matches_external_names_case_insensitively(self):
+        term = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Lucky Star",
+            target_zh="幸运星",
+            racing_region=RacingRegion.HONG_KONG,
+            priority=100,
+            is_active=True,
+        )
+        profile = self._profile(primary_term=term, review_status=HorseProfileStatus.DRAFT, english_name="lucky star")
+        horse = ExternalHorse.objects.create(
+            source=ExternalDataSource.HKJC,
+            racing_region=RacingRegion.HONG_KONG,
+            horse_id="HKH001",
+            horse_name="Lucky Star",
+            normalized_horse_name="Lucky Star",
+            father_name="父",
+            mother_name="母",
+            raw_payload={
+                "sire_sire": "父父",
+                "sire_dam": "父母",
+                "dam_sire": "母父",
+                "dam_dam": "母母",
+            },
+        )
+        ExternalHorseAlias.objects.create(
+            source=ExternalDataSource.HKJC,
+            racing_region=RacingRegion.HONG_KONG,
+            horse=horse,
+            external_horse_id=horse.horse_id,
+            source_language=SourceLanguage.ENGLISH,
+            name_en="Lucky Star",
+            normalized_name="Lucky Star",
+        )
+
+        plan = plan_profile_completion(CompletionOptions(limit=10))
+
+        self.assertEqual(plan["summary"]["total"], 1)
+        self.assertEqual(plan["summary"]["complete_pedigree_2gen"], 1)
+        self.assertEqual(plan["rows"][0]["profile_id"], profile.id)
+
+    def test_completion_apply_records_pre_apply_diff(self):
+        profile = self._profile(review_status=HorseProfileStatus.DRAFT)
+        payload = {
+            "rows": [
+                {
+                    "profile_id": profile.id,
+                    "source": ExternalDataSource.NETKEIBA,
+                    "source_url": "https://example.com/horse",
+                    "confidence": 95,
+                    "failure_reason": "",
+                    "profile_payload": {"country": "日本"},
+                    "pedigree_payload": {
+                        "sire_text": "父",
+                        "dam_text": "母",
+                        "sire_sire_text": "父父",
+                        "sire_dam_text": "父母",
+                        "dam_sire_text": "母父",
+                        "dam_dam_text": "母母",
+                    },
+                    "source_evidence": {"external_horse_id": "h1"},
+                }
+            ]
+        }
+
+        result = apply_completion_artifact(payload)
+        profile.refresh_from_db()
+        candidate = HorseProfileDataCandidate.objects.get(profile=profile)
+
+        self.assertEqual(result["applied"], 1)
+        self.assertEqual(profile.sire_text, "父")
+        self.assertEqual(candidate.diff_payload["profile"]["country"]["current"], "")
+        self.assertEqual(candidate.diff_payload["profile"]["country"]["candidate"], "日本")
+        self.assertEqual(candidate.diff_payload["pedigree"]["sire_text"]["current"], "")
+        self.assertEqual(candidate.diff_payload["pedigree"]["sire_text"]["candidate"], "父")

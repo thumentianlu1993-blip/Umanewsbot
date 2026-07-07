@@ -16,6 +16,7 @@ from stable.models import (
     AutomationPhase,
     AutomationStatus,
     CrawlJob,
+    HorseProfile,
     NewsArticle,
     NewsSource,
     NotificationLog,
@@ -85,6 +86,19 @@ from stable.services.external_horse_data import ExternalHorseDataImporter, Impor
 
 User = get_user_model()
 JRA_SKIPPABLE_DETAIL_ERRORS = (ValueError, AttributeError, IndexError, TypeError)
+
+
+@shared_task
+def scan_article_horse_links_task(article_id: int | None = None, profile_id: int | None = None, limit: int = 500, commit: bool = True) -> dict:
+    from stable.services.horse_profiles import scan_article_horse_links
+
+    article = NewsArticle.objects.filter(pk=article_id).first() if article_id else None
+    profile = HorseProfile.objects.filter(pk=profile_id).first() if profile_id else None
+    if article_id and article is None:
+        return {"skipped": True, "reason": "article_not_found", "article_id": article_id}
+    if profile_id and profile is None:
+        return {"skipped": True, "reason": "horse_profile_not_found", "profile_id": profile_id}
+    return scan_article_horse_links(article=article, profile=profile, limit=limit, commit=commit)
 
 
 def _log_start(task_name: str, payload: dict | None = None) -> TaskExecutionLog:
@@ -923,6 +937,7 @@ def publish_region_window_task(region: str, now_iso: str | None = None) -> dict:
             for article in selection.selected:
                 try:
                     publish_article_automatically(article)
+                    dispatch_task(scan_article_horse_links_task, article_id=article.id, commit=True)
                     window_published_ids.append(article.id)
                 except Exception:
                     window_failed_ids.append(article.id)
@@ -1060,6 +1075,7 @@ def auto_publish_batch_task(limit: int | None = None) -> dict:
             if not is_ready_for_auto_publish(article):
                 return
             publish_article_automatically(article)
+            dispatch_task(scan_article_horse_links_task, article_id=article.id, commit=True)
             published_ids.append(article.id)
             region_run_counts[region] = region_run_counts.get(region, 0) + 1
         except Exception as exc:
@@ -1527,6 +1543,7 @@ def publish_article(article: NewsArticle, user) -> None:
     from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article
 
     enqueue_qq_auto_push_for_article(article.id)
+    dispatch_task(scan_article_horse_links_task, article_id=article.id, commit=True)
     log_operation(
         action_type="article_published",
         target_type="article",

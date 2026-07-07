@@ -50,6 +50,9 @@
           <a class="nav-link {% if '/admin/race-events/' in active_path %}active{% endif %}" href="{% url 'console-race-event-list' %}">
             <span>赛事日历</span>
           </a>
+          <a class="nav-link {% if '/admin/horse-profiles/' in active_path %}active{% endif %}" href="{% url 'console-horse-profile-list' %}">
+            <span>马匹审核</span>
+          </a>
           <a class="nav-link {% if '/admin/candidates/' in active_path %}active{% endif %}" href="{% url 'console-candidate-list' %}">
             <span>候选新闻池</span>
             <span class="badge warning">{{ pending_edit_count }}</span>

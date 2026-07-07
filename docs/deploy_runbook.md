@@ -1,5 +1,129 @@
 # 部署运行手册
 
+## 2026-07-07 马匹详情页 MVP 待部署
+
+- 本地 change：`horse-profile-page-mvp`。
+- 工作树：`/Users/mentianlu/.codex/worktrees/race-detail-page/umanews`。
+- 新增迁移：`stable.0022_horseprofile_horsefollow_articlehorselink_and_more`。
+- 新增公开入口：`/horses/`、`/horses/<id>/`、`/horses/follows/`。
+- 新增后台入口：`/admin/horse-profiles/`。
+- 新增管理命令：
+  - `generate_horse_profiles`：从 active horse `TermEntry` 生成草稿 `HorseProfile`。
+  - `complete_horse_profiles`：生成全地区 P0 马资料补全 dry-run artifact，或应用已审核 artifact。
+  - `scan_article_horse_links`：历史已发布文章马匹关联 dry-run / commit 回填。
+
+### 生产部署前检查
+
+1. 记录生产 `HEAD`：`git rev-parse --short HEAD`。
+2. 检查容器：`docker compose -f docker-compose.prod.lowcost.yml ps`。
+3. 执行 Django check：`docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check`。
+4. 检查本地和公网健康：`curl -fsS http://127.0.0.1/healthz/`、`curl -fsS http://umafans.run/healthz/`。
+5. 确认外部导入没有运行：`ExternalDataImportRun(status="started")=0`，`ExternalDataImportLock.locked_by_run_id` 为空。
+6. 备份数据库并执行 `gzip -t`。
+7. 备份 `.env`，确认新增配置默认保守：
+   - `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`
+   - `HORSE_PROFILE_COMPLETION_REQUEST_INTERVAL_SECONDS=8`
+   - `HORSE_PROFILE_COMPLETION_CACHE_DIR=runtime/horse_profile_completion/cache`
+
+### 部署与迁移
+
+```bash
+git pull --ff-only origin main
+bash ./deploy_lowcost.sh
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py showmigrations stable | grep 0022
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check
+```
+
+期望：`stable.0022_horseprofile_horsefollow_articlehorselink_and_more` 已应用，`manage.py check` 通过。
+
+### P0 草稿生成
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py generate_horse_profiles
+```
+
+验收：
+
+- 新增 `HorseProfile` 均为 `review_status=draft`。
+- 公开 `/horses/` 不展示草稿。
+- 任意草稿 `/horses/<id>/` 返回 404。
+
+### 全地区资料补全 dry-run
+
+先只生成 artifact，不写主表：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py complete_horse_profiles \
+  --dry-run \
+  --output-dir runtime/horse_profile_completion/dry-run-YYYYMMDD_HHMMSS
+```
+
+不传 `--limit` 时必须覆盖所有地区全部 P0 马；`--limit` 仅用于显式采样或拆批演练，不能用于最终全量验收。
+
+必须复核输出：
+
+- `horse_profile_completion_plan.json`
+- `horse_profile_completion_review.csv`
+- `summary.json`
+- 全局和按地区完整二代成功率。
+- 未补全占比和逐马失败原因。
+- source URL、候选 diff、歧义和不可用来源原因。
+
+人工审核 artifact 后，才允许 commit：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py complete_horse_profiles \
+  --commit \
+  --artifact runtime/horse_profile_completion/dry-run-YYYYMMDD_HHMMSS/horse_profile_completion_plan.json \
+  --confirm-reviewed-artifact
+```
+
+### 历史新闻马匹关联回填
+
+先 dry-run：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py scan_article_horse_links \
+  --dry-run \
+  --limit 500
+```
+
+确认候选和人工移除保护后再 commit：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py scan_article_horse_links \
+  --commit \
+  --limit 500
+```
+
+可按范围拆批：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py scan_article_horse_links \
+  --commit \
+  --article-from-id <START_ID> \
+  --article-to-id <END_ID> \
+  --limit 500
+```
+
+### 上线 smoke
+
+- `/healthz/`：本地和公网均 `200`。
+- 首页 `/`：返回 `200`，有关注 cookie 时展示“我的关注”模块。
+- `/horses/`：返回 `200`，只展示已发布马匹。
+- 样例 `/horses/<published_id>/`：返回 `200`，展示基础资料、二代血统、主胜鞍、相关新闻、相关赛事和关注按钮。
+- 样例 `/horses/<draft_id>/`：返回 `404`。
+- `/admin/horse-profiles/`：未登录跳转登录；staff 登录后可访问列表和详情。
+- 新闻详情 `/news/<article_id>/`：只展示已发布且 `auto/manual` 状态的马匹 tag；候选、移除和未公开马匹不展示。
+- 关注 POST 后 cookie 应为 `HttpOnly`、`SameSite=Lax`，数据库只出现 `token_hash`。
+
+### 回滚
+
+- 代码异常：回滚到部署前 git ref 后执行 `bash ./deploy_lowcost.sh`。
+- 迁移异常：优先使用数据库备份恢复；如必须迁回，先确认没有新写入 `HorseProfile` / `HorseFollow` / `ArticleHorseLink` 数据。
+- 补全误写：优先按 artifact 的 diff 和 `HorseProfileDataCandidate` 审计恢复字段；大范围异常使用部署前数据库备份。
+- 公开入口异常：先将受影响 `HorseProfile.review_status` 批量改回 `hidden` 或 `draft`，再修代码。
+
 ## 2026-07-07 法国新闻源扩展与英文术语门禁地区过滤上线
 
 - 本地 changes：`expand-france-news-sources`、`fix-english-term-gate-region-filter`。

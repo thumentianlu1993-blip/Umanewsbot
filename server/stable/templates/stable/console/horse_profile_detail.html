@@ -1,0 +1,286 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}{{ profile.display_name }} - 马匹审核{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">{{ profile.display_name }}</h2>
+      <p class="page-subtitle">HorseProfile #{{ profile.id }} · TermEntry #{{ profile.primary_term_id }} · {{ profile.get_racing_region_display }}</p>
+    </div>
+    <div class="toolbar">
+      <a class="btn ghost" href="{% url 'console-horse-profile-list' %}">返回列表</a>
+      {% if profile.review_status == 'published' %}
+        <a class="btn secondary" href="{{ profile.public_path }}" target="_blank" rel="noreferrer">预览前台</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="article-meta">
+      <span class="badge {% if profile.review_status == 'published' %}success{% elif profile.review_status == 'draft' %}warning{% endif %}">{{ profile.get_review_status_display }}</span>
+      <span class="badge">{{ profile.get_completeness_status_display }}</span>
+      {% if profile.is_featured %}<span class="badge gold">推荐</span>{% endif %}
+      {% if profile.published_at %}<span class="muted">发布 {{ profile.published_at|date:"Y-m-d H:i" }}</span>{% endif %}
+    </div>
+    <form class="toolbar" style="margin-top: 14px;" method="post" action="{% url 'console-horse-profile-status' profile.id %}">
+      {% csrf_token %}
+      <label>
+        审核动作
+        <select name="status">
+          <option value="ready">标记待发布</option>
+          <option value="published">发布到前台</option>
+          <option value="hidden">下线隐藏</option>
+          <option value="draft">退回草稿</option>
+        </select>
+      </label>
+      <label>
+        备注
+        <input type="text" name="note" placeholder="发布、下线或退回原因">
+      </label>
+      <button class="btn secondary" type="submit">更新状态</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <h3>基础资料与血统</h3>
+        <p class="muted">空壳也允许管理员强制发布；字段锁定后不会被补全候选覆盖。</p>
+      </div>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-grid">
+        {% for field in form %}
+          <div class="field {% if field.name == 'intro' or field.name == 'review_notes' or field.name == 'locked_fields' %}full{% endif %}">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<div class="help">{{ field.help_text }}</div>{% endif %}
+            {% if field.errors %}<div class="help" style="color: var(--danger);">{{ field.errors|join:' ' }}</div>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      <div class="toolbar" style="margin-top: 18px;">
+        <button type="submit">保存资料</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="stats-grid">
+      <div class="stat-card"><strong>{{ race_records|length }}</strong><span>参赛记录</span></div>
+      <div class="stat-card gold"><strong>{{ major_wins|length }}</strong><span>主胜鞍候选</span></div>
+      <div class="stat-card"><strong>{{ article_links.linked|length }}</strong><span>公开新闻关联</span></div>
+      <div class="stat-card gold"><strong>{{ follow_count }}</strong><span>关注数</span></div>
+    </div>
+  </section>
+
+  <section class="panel" id="candidates">
+    <div class="section-head">
+      <div>
+        <h3>候选资料 diff</h3>
+        <p class="muted">外部补全只进入候选或已审核 artifact，应用时跳过人工锁定字段。</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>模块</th>
+            <th>来源</th>
+            <th>状态</th>
+            <th>差异</th>
+            <th>处理</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for candidate in candidates %}
+            <tr>
+              <td>{{ candidate.get_module_display }}<div class="muted">{{ candidate.confidence }}%</div></td>
+              <td>
+                {{ candidate.source_name }}
+                {% if candidate.source_url %}<div><a href="{{ candidate.source_url }}" target="_blank" rel="noreferrer">来源链接</a></div>{% endif %}
+              </td>
+              <td><span class="badge {% if candidate.status == 'applied' %}success{% elif candidate.status == 'conflict' %}warning{% endif %}">{{ candidate.get_status_display }}</span></td>
+              <td><code>{{ candidate.diff_payload|truncatechars:180 }}</code></td>
+              <td>
+                {% if candidate.status == 'pending' %}
+                  <div class="article-actions">
+                    <form method="post" action="{% url 'console-horse-profile-apply-candidate' candidate.id %}">
+                      {% csrf_token %}
+                      <button class="btn secondary" name="action" value="apply" type="submit">应用</button>
+                    </form>
+                    <form method="post" action="{% url 'console-horse-profile-apply-candidate' candidate.id %}">
+                      {% csrf_token %}
+                      <button class="btn ghost" name="action" value="ignore" type="submit">忽略</button>
+                    </form>
+                    <form method="post" action="{% url 'console-horse-profile-apply-candidate' candidate.id %}">
+                      {% csrf_token %}
+                      <button class="btn ghost" name="action" value="conflict" type="submit">冲突</button>
+                    </form>
+                  </div>
+                {% else %}
+                  <span class="muted">{{ candidate.result_summary|default:"已处理" }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="muted">暂无候选资料。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="race-records">
+    <div class="section-head">
+      <div>
+        <h3>参赛履历与主胜鞍</h3>
+        <p class="muted">关联应覆盖参加过的比赛；主胜鞍由最高等级胜利和人工标记共同决定。</p>
+      </div>
+    </div>
+    <form method="post" action="{% url 'console-horse-profile-add-race-record' profile.id %}">
+      {% csrf_token %}
+      <div class="form-grid">
+        {% for field in race_record_form %}
+          <div class="field">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<div class="help" style="color: var(--danger);">{{ field.errors|join:' ' }}</div>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      <div class="toolbar" style="margin-top: 18px;">
+        <button class="btn secondary" type="submit">添加履历</button>
+      </div>
+    </form>
+    <div class="table-wrap" style="margin-top: 18px;">
+      <table>
+        <thead>
+          <tr>
+            <th>比赛</th>
+            <th>日期 / 地点</th>
+            <th>等级 / 结果</th>
+            <th>来源</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for record in race_records %}
+            <tr>
+              <td>
+                <strong>{{ record.race_name }}</strong>
+                {% if record.event %}<div><a href="{% url 'console-race-event-edit' record.event.id %}">关联赛事 #{{ record.event.id }}</a></div>{% endif %}
+              </td>
+              <td>{{ record.race_date|date:"Y-m-d"|default:record.race_year }}<div class="muted">{{ record.racecourse }}</div></td>
+              <td>{{ record.grade_text|default:record.get_normalized_grade_display }}<div class="muted">{{ record.get_result_status_display }} · {{ record.finish_position|default:"-" }}</div></td>
+              <td>
+                {{ record.source_name|default:"manual" }}
+                {% if record.source_url %}<div><a href="{{ record.source_url }}" target="_blank" rel="noreferrer">来源</a></div>{% endif %}
+              </td>
+              <td>
+                <a class="btn secondary" href="{% url 'console-horse-profile-edit-race-record' record.id %}">编辑</a>
+                <form method="post" action="{% url 'console-horse-profile-delete-race-record' record.id %}">
+                  {% csrf_token %}
+                  <button class="btn ghost" type="submit">删除</button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="muted">暂无参赛履历。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="news-links">
+    <div class="section-head">
+      <div>
+        <h3>相关新闻关联</h3>
+        <p class="muted">自动展示和人工确认会出现在前台；候选与移除不会展示。</p>
+      </div>
+      <form method="post" action="{% url 'console-horse-profile-scan-articles' profile.id %}">
+        {% csrf_token %}
+        <button class="btn secondary" type="submit">重新扫描</button>
+      </form>
+    </div>
+    <form class="filter-bar" method="post" action="{% url 'console-horse-profile-add-article-link' profile.id %}">
+      {% csrf_token %}
+      {% for field in article_link_form %}
+        <label>
+          {{ field.label }}
+          {{ field }}
+        </label>
+      {% endfor %}
+      <button class="btn secondary" type="submit">手动添加</button>
+    </form>
+    {% for group_name,group_links in article_links.items %}
+      <div class="table-wrap" style="margin-top: 18px;">
+        <table>
+          <thead>
+            <tr>
+              <th>{% if group_name == "linked" %}公开关联{% elif group_name == "candidate" %}候选关联{% else %}已移除{% endif %}</th>
+              <th>状态</th>
+              <th>命中</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for link in group_links %}
+              <tr>
+                <td><strong>{{ link.article.effective_title }}</strong><div class="muted">Article #{{ link.article_id }}</div></td>
+                <td><span class="badge {% if link.status == 'manual' or link.status == 'auto' %}success{% elif link.status == 'removed' %}warning{% endif %}">{{ link.get_status_display }}</span></td>
+                <td>{{ link.matched_text|default:"-" }}<div class="muted">{{ link.match_reason }}</div></td>
+                <td>
+                  <div class="article-actions">
+                    <form method="post" action="{% url 'console-horse-profile-article-link-status' link.id %}">
+                      {% csrf_token %}
+                      <button class="btn secondary" name="action" value="confirm" type="submit">确认</button>
+                    </form>
+                    <form method="post" action="{% url 'console-horse-profile-article-link-status' link.id %}">
+                      {% csrf_token %}
+                      <button class="btn ghost" name="action" value="remove" type="submit">移除</button>
+                    </form>
+                    <form method="post" action="{% url 'console-horse-profile-article-link-status' link.id %}">
+                      {% csrf_token %}
+                      <button class="btn ghost" name="action" value="reset" type="submit">重置</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="muted">暂无记录。</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endfor %}
+  </section>
+
+  <section class="panel">
+    <div class="section-head"><h3>相关赛事与关注摘要</h3></div>
+    <div class="article-meta">
+      <span>直接关注 {{ follow_count }}</span>
+      <span>包含子孙代 {{ descendant_follow_count }}</span>
+      <span>相关赛事 {{ race_links|length }}</span>
+    </div>
+    {% if race_links %}
+      <div class="table-wrap" style="margin-top: 14px;">
+        <table>
+          <thead><tr><th>赛事</th><th>状态</th><th>类型</th></tr></thead>
+          <tbody>
+            {% for link in race_links %}
+              <tr>
+                <td><a href="{% url 'console-race-event-edit' link.event.id %}">{{ link.event.chinese_name }} {{ link.event.year }}</a></td>
+                <td>{{ link.get_status_display }}</td>
+                <td>{{ link.get_link_type_display }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

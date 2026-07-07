@@ -1,0 +1,128 @@
+{% extends "stable/public/base.html" %}
+
+{% block title %}{{ profile.display_name }}{% endblock %}
+
+{% block content %}
+  <main class="horse-page">
+    <article class="horse-detail-hero">
+      <nav class="article-actions" aria-label="马匹操作">
+        <a href="{% url 'public-horse-index' %}">返回马匹</a>
+      </nav>
+      <div class="horse-title-row">
+        <div>
+          <div class="article-meta">
+            <span>{{ profile.get_racing_region_display }}</span>
+            <span>{{ profile.get_completeness_status_display }}</span>
+            {% if profile.is_featured %}<span>推荐</span>{% endif %}
+          </div>
+          <h1>{{ profile.display_name }}</h1>
+          <p>{{ profile.original_name|default:profile.english_name|default:profile.japanese_name }}</p>
+        </div>
+        <form method="post" action="{% url 'public-horse-follow' profile.id %}">
+          {% csrf_token %}
+          {% if is_following %}
+            <button type="submit" name="intent" value="unfollow">取消关注</button>
+          {% else %}
+            <input type="hidden" name="include_descendants" value="1">
+            <button type="submit">关注</button>
+          {% endif %}
+        </form>
+      </div>
+    </article>
+
+    <div class="horse-detail-layout">
+      <section class="horse-panel">
+        <h2>基础资料</h2>
+        <dl class="horse-facts">
+          <div><dt>国家/地区</dt><dd>{{ profile.country|default:"-" }}</dd></div>
+          <div><dt>性别</dt><dd>{{ profile.sex|default:"-" }}</dd></div>
+          <div><dt>毛色</dt><dd>{{ profile.color|default:"-" }}</dd></div>
+          <div><dt>出生日期</dt><dd>{{ profile.birth_date|date:"Y-m-d"|default:"-" }}</dd></div>
+          <div><dt>马主</dt><dd>{{ profile.owner_name|default:"-" }}</dd></div>
+          <div><dt>练马师</dt><dd>{{ profile.trainer_name|default:"-" }}</dd></div>
+          <div><dt>生产牧场</dt><dd>{{ profile.breeder_name|default:"-" }}</dd></div>
+        </dl>
+        {% if profile.intro %}<p class="horse-intro">{{ profile.intro }}</p>{% endif %}
+      </section>
+
+      <section class="horse-panel">
+        <h2>二代血统</h2>
+        <div class="pedigree-grid">
+          <div><span>父</span><strong>{% if profile.sire_horse_profile and profile.sire_horse_profile.is_public %}<a href="{{ profile.sire_horse_profile.public_path }}">{{ profile.sire_text|default:profile.sire_horse_profile.display_name }}</a>{% else %}{{ profile.sire_text|default:"-" }}{% endif %}</strong></div>
+          <div><span>母</span><strong>{% if profile.dam_horse_profile and profile.dam_horse_profile.is_public %}<a href="{{ profile.dam_horse_profile.public_path }}">{{ profile.dam_text|default:profile.dam_horse_profile.display_name }}</a>{% else %}{{ profile.dam_text|default:"-" }}{% endif %}</strong></div>
+          <div><span>父父</span><strong>{{ profile.sire_sire_text|default:"-" }}</strong></div>
+          <div><span>父母</span><strong>{{ profile.sire_dam_text|default:"-" }}</strong></div>
+          <div><span>母父</span><strong>{{ profile.dam_sire_text|default:"-" }}</strong></div>
+          <div><span>母母</span><strong>{{ profile.dam_dam_text|default:"-" }}</strong></div>
+        </div>
+      </section>
+
+      <section class="horse-panel">
+        <h2>主胜鞍</h2>
+        <div class="horse-list">
+          {% for record in major_wins %}
+            <div class="horse-list-item">
+              <strong>{{ record.race_name }}</strong>
+              <span>{{ record.race_date|date:"Y-m-d"|default:record.race_year }} · {{ record.grade_text|default:record.get_normalized_grade_display }}</span>
+            </div>
+          {% empty %}
+            <p class="muted">暂无主胜鞍记录。</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="horse-panel">
+        <h2>参赛履历</h2>
+        <div class="horse-list">
+          {% for record in race_records %}
+            <div class="horse-list-item">
+              <strong>{{ record.race_name }}</strong>
+              <span>{{ record.race_date|date:"Y-m-d"|default:record.race_year }} · {{ record.get_result_status_display }} · {{ record.finish_position|default:"-" }}</span>
+            </div>
+          {% empty %}
+            <p class="muted">暂无参赛履历。</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="horse-panel">
+        <h2>相关新闻</h2>
+        <div class="horse-list">
+          {% for link in article_links %}
+            <a class="horse-list-item" href="{{ link.article.public_path }}">
+              <strong>{{ link.article.effective_title }}</strong>
+              <span>{{ link.article.published_to_web_at|date:"Y-m-d H:i" }}</span>
+            </a>
+          {% empty %}
+            <p class="muted">暂无相关新闻。</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="horse-panel">
+        <h2>相关赛事</h2>
+        <div class="horse-list">
+          {% for link in race_links %}
+            <a class="horse-list-item" href="{{ link.event.public_path }}">
+              <strong>{{ link.event.chinese_name }} {{ link.event.year }}</strong>
+              <span>{{ link.get_link_type_display }} · {{ link.event.racecourse }}</span>
+            </a>
+          {% empty %}
+            <p class="muted">暂无相关赛事。</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="horse-panel">
+        <h2>子孙代</h2>
+        <div class="horse-chip-list">
+          {% for horse in descendants %}
+            <a href="{{ horse.public_path }}">{{ horse.display_name }}</a>
+          {% empty %}
+            <span>暂无公开子孙代资料。</span>
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+  </main>
+{% endblock %}

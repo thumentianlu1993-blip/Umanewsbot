@@ -42,7 +42,8 @@ a {
 
 .home-page,
 .article-page,
-.race-page {
+.race-page,
+.horse-page {
   width: min(1160px, 100%);
   margin: 0 auto;
   padding: 18px;
@@ -483,6 +484,238 @@ a {
   font-size: 12px;
 }
 
+.tag-list a {
+  padding: 3px 8px;
+  color: #194f7a;
+  background: #e8f1f8;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.public-flash-stack {
+  width: min(1160px, 100%);
+  margin: 10px auto 0;
+  padding: 0 18px;
+}
+
+.public-flash {
+  padding: 10px 12px;
+  color: #166a3a;
+  background: #e9f6ef;
+  border: 1px solid #cde8d8;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.public-filter-bar {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.public-filter-bar input {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 10px 12px;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.public-filter-bar button,
+.horse-title-row button {
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  color: #ffffff;
+  background: #1f8b4c;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 800;
+}
+
+.follow-news-panel,
+.horse-detail-hero,
+.horse-panel,
+.horse-card {
+  background: #ffffff;
+  border: 1px solid #e5ebf1;
+  border-radius: 8px;
+}
+
+.follow-news-panel {
+  margin-bottom: 16px;
+  padding: 14px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-head h2,
+.horse-panel h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.section-head a {
+  color: #1f8b4c;
+  font-weight: 800;
+}
+
+.follow-news-list,
+.horse-list {
+  display: grid;
+  gap: 8px;
+}
+
+.follow-news-item,
+.horse-list-item {
+  display: block;
+  padding: 10px 0;
+  border-top: 1px solid #eef2f6;
+}
+
+.follow-news-item:first-child,
+.horse-list-item:first-child {
+  border-top: 0;
+}
+
+.follow-news-item strong,
+.horse-list-item strong {
+  display: block;
+  line-height: 1.45;
+}
+
+.follow-news-item span,
+.horse-list-item span {
+  display: block;
+  margin-top: 3px;
+  color: #7a8796;
+  font-size: 13px;
+}
+
+.horse-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.horse-card {
+  display: block;
+  min-height: 118px;
+  padding: 14px;
+}
+
+.horse-card strong {
+  display: block;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.horse-card > span {
+  display: block;
+  margin-top: 4px;
+  color: #5f6f82;
+  font-size: 13px;
+}
+
+.horse-card-meta,
+.horse-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.horse-card-meta span,
+.horse-chip-list a,
+.horse-chip-list span {
+  padding: 3px 8px;
+  color: #435166;
+  background: #f1f5f8;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.horse-detail-hero,
+.horse-panel {
+  padding: 16px;
+}
+
+.horse-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.horse-title-row h1 {
+  margin: 8px 0 4px;
+  font-size: 32px;
+  line-height: 1.2;
+}
+
+.horse-title-row p,
+.muted {
+  color: #7a8796;
+}
+
+.horse-title-row p {
+  margin: 0;
+}
+
+.horse-detail-layout {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.horse-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.horse-facts div,
+.pedigree-grid div {
+  padding: 10px;
+  background: #f7fafc;
+  border-radius: 8px;
+}
+
+.horse-facts dt,
+.pedigree-grid span {
+  color: #7a8796;
+  font-size: 12px;
+}
+
+.horse-facts dd,
+.pedigree-grid strong {
+  display: block;
+  margin: 3px 0 0;
+  color: #19202b;
+  font-weight: 800;
+}
+
+.horse-intro {
+  margin: 14px 0 0;
+  color: #435166;
+  line-height: 1.7;
+}
+
+.pedigree-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
 .hot-panel {
   padding: 14px;
 }
@@ -573,7 +806,8 @@ a {
 
   .home-page,
   .article-page,
-  .race-page {
+  .race-page,
+  .horse-page {
     padding: 28px 24px;
   }
 
@@ -632,6 +866,10 @@ a {
   .race-news-groups {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .horse-detail-layout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 599px) {
@@ -645,13 +883,20 @@ a {
   }
 
   .site-nav {
-    gap: 12px;
+    gap: 10px;
     font-size: 13px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .site-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .home-page,
   .article-page,
-  .race-page {
+  .race-page,
+  .horse-page {
     padding: 10px 12px 12px;
   }
 
@@ -790,5 +1035,17 @@ a {
 
   .race-detail-hero h1 {
     font-size: 26px;
+  }
+
+  .horse-title-row {
+    display: grid;
+  }
+
+  .horse-title-row h1 {
+    font-size: 26px;
+  }
+
+  .horse-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

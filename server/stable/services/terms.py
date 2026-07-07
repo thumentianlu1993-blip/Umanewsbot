@@ -93,9 +93,15 @@ def source_terms_by_entry(entries: Iterable[TermEntry], source_language: str | N
     }
 
 
+def _contains_latin_letter(value: str) -> bool:
+    return bool(re.search(r"[A-Za-z]", value or ""))
+
+
 def _source_term_pattern(candidate: str, source_language: str | None):
-    if source_language == SourceLanguage.ENGLISH:
-        return re.compile(r"(?<![0-9A-Za-z])" + re.escape(candidate) + r"(?![0-9A-Za-z])", re.IGNORECASE)
+    if source_language == SourceLanguage.ENGLISH or _contains_latin_letter(candidate):
+        prefix = r"(?<![0-9A-Za-z])" if candidate[:1].isascii() and candidate[:1].isalnum() else ""
+        suffix = r"(?![0-9A-Za-z])" if candidate[-1:].isascii() and candidate[-1:].isalnum() else ""
+        return re.compile(prefix + re.escape(candidate) + suffix, re.IGNORECASE)
     return None
 
 

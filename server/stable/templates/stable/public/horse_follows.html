@@ -1,0 +1,39 @@
+{% extends "stable/public/base.html" %}
+
+{% block title %}我的关注{% endblock %}
+
+{% block content %}
+  <main class="horse-page">
+    <section class="home-lead">
+      <span class="section-kicker">Following</span>
+      <h1>我的关注</h1>
+    </section>
+
+    <section class="horse-panel">
+      <h2>关注的马</h2>
+      <div class="horse-chip-list">
+        {% for follow in follows %}
+          <a href="{{ follow.horse_profile.public_path }}">
+            {{ follow.horse_profile.display_name }}{% if follow.include_descendants %} · 含子孙代{% endif %}
+          </a>
+        {% empty %}
+          <span>还没有关注任何马匹。</span>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="horse-panel">
+      <h2>关注新闻</h2>
+      <div class="horse-list">
+        {% for entry in followed_entries %}
+          <a class="horse-list-item" href="{{ entry.article.public_path }}">
+            <strong>{{ entry.article.effective_title }}</strong>
+            <span>{{ entry.horse_profile.display_name }} · {{ entry.article.published_to_web_at|date:"Y-m-d H:i" }}</span>
+          </a>
+        {% empty %}
+          <p class="muted">暂无关注新闻。</p>
+        {% endfor %}
+      </div>
+    </section>
+  </main>
+{% endblock %}

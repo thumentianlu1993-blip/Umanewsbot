@@ -1,0 +1,33 @@
+{% extends "stable/console/base.html" %}
+
+{% block title %}编辑参赛履历 - 马匹审核{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div>
+      <h2 class="page-title">编辑参赛履历</h2>
+      <p class="page-subtitle">{{ profile.display_name }} · HorseRaceRecord #{{ record.id }}</p>
+    </div>
+    <div class="toolbar">
+      <a class="btn ghost" href="{% url 'console-horse-profile-detail' profile.id %}#race-records">返回马匹</a>
+    </div>
+  </div>
+
+  <section class="panel">
+    <form method="post">
+      {% csrf_token %}
+      <div class="form-grid">
+        {% for field in form %}
+          <div class="field">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<div class="help" style="color: var(--danger);">{{ field.errors|join:' ' }}</div>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      <div class="toolbar" style="margin-top: 18px;">
+        <button type="submit">保存履历</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}
