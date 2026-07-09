@@ -875,7 +875,7 @@ a {
 @media (max-width: 599px) {
   .site-header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     min-height: 50px;
     height: auto;
     gap: 6px;
@@ -883,21 +883,24 @@ a {
   }
 
   .site-brand {
+    align-self: flex-start;
     font-size: 18px;
   }
 
   .site-nav {
+    display: grid;
     width: 100%;
-    flex: 0 0 auto;
-    justify-content: space-between;
-    flex-wrap: nowrap;
-    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
     font-size: 13px;
   }
 
   .site-nav a {
-    flex: 0 0 auto;
+    display: block;
+    min-width: 0;
+    padding: 3px 0;
     line-height: 1.2;
+    text-align: center;
     white-space: nowrap;
   }
 
