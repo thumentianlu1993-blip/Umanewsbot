@@ -874,8 +874,10 @@ a {
 
 @media (max-width: 599px) {
   .site-header {
-    height: 50px;
-    padding: 0 14px;
+    min-height: 50px;
+    height: auto;
+    gap: 10px;
+    padding: 8px 14px;
   }
 
   .site-brand {
@@ -883,14 +885,16 @@ a {
   }
 
   .site-nav {
+    flex: 1 1 220px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
     gap: 10px;
     font-size: 13px;
-    overflow-x: auto;
-    scrollbar-width: none;
   }
 
-  .site-nav::-webkit-scrollbar {
-    display: none;
+  .site-nav a {
+    flex: 0 0 auto;
+    line-height: 1.2;
   }
 
   .home-page,
@@ -905,6 +909,19 @@ a {
     margin: 0 0 8px;
   }
 
+  .region-tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    margin-bottom: 12px;
+  }
+
+  .region-tabs a {
+    flex: 1 1 calc(33.333% - 8px);
+    min-width: 72px;
+    padding: 7px 8px;
+    text-align: center;
+  }
+
   .section-kicker {
     margin-bottom: 1px;
     font-size: 12px;
@@ -912,6 +929,14 @@ a {
 
   .home-lead h1 {
     font-size: 23px;
+  }
+
+  .public-filter-bar {
+    flex-wrap: wrap;
+  }
+
+  .public-filter-bar input {
+    flex-basis: min(100%, 220px);
   }
 
   .race-lead h1 {
