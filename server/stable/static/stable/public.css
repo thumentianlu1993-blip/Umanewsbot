@@ -874,23 +874,34 @@ a {
 
 @media (max-width: 599px) {
   .site-header {
-    height: 50px;
-    padding: 0 14px;
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 50px;
+    height: auto;
+    gap: 6px;
+    padding: 10px 14px;
   }
 
   .site-brand {
+    align-self: flex-start;
     font-size: 18px;
   }
 
   .site-nav {
-    gap: 10px;
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
     font-size: 13px;
-    overflow-x: auto;
-    scrollbar-width: none;
   }
 
-  .site-nav::-webkit-scrollbar {
-    display: none;
+  .site-nav a {
+    display: block;
+    min-width: 0;
+    padding: 3px 0;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
   }
 
   .home-page,
@@ -905,6 +916,19 @@ a {
     margin: 0 0 8px;
   }
 
+  .region-tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    margin-bottom: 12px;
+  }
+
+  .region-tabs a {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+    padding: 7px 8px;
+    text-align: center;
+  }
+
   .section-kicker {
     margin-bottom: 1px;
     font-size: 12px;
@@ -912,6 +936,19 @@ a {
 
   .home-lead h1 {
     font-size: 23px;
+  }
+
+  .public-filter-bar {
+    flex-wrap: wrap;
+  }
+
+  .public-filter-bar input {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .public-filter-bar button {
+    width: 100%;
   }
 
   .race-lead h1 {

@@ -32,7 +32,7 @@
           </div>
         </a>
       {% empty %}
-        {% include "stable/public/_empty_state.html" %}
+        {% include "stable/public/_empty_state.html" with empty_state_text="目前还没有已发布马匹资料。" %}
       {% endfor %}
     </section>
 

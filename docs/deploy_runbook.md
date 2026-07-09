@@ -78,6 +78,41 @@ done
   - 按地区 `france / hong_kong / japan / other / united_kingdom / united_states` 的 `not_complete_ratio` 均为 `1.0`。
   - 本次未执行 `--commit`；后续必须先人工审核 `horse_profile_completion_review.csv`，再使用 `--artifact --confirm-reviewed-artifact` 应用。
 
+### 线上浏览器验收记录
+
+- 时间：`2026-07-08`。
+- 方式：先尝试 Codex 内置浏览器访问生产页，两次打开 `http://umafans.run/horses/` 超时；随后使用系统 Chrome headless 生成桌面 / 移动截图和 CDP 布局指标。
+- 本地验收产物：`/tmp/umanews-horse-acceptance/`。
+  - `horses-desktop.png`
+  - `horses-mobile.png`
+  - `home-desktop.png`
+  - `home-mobile.png`
+  - `follows-desktop.png`
+  - `follows-mobile.png`
+  - `horses.html`
+  - `horses-search-region.html`
+  - `home.html`
+  - `news-5738.html`
+- 公网 HTTP 复核：
+  - `http://umafans.run/healthz/` 返回 `200`。
+  - `http://umafans.run/horses/` 返回 `200`。
+  - `http://umafans.run/horses/follows/` 返回 `200`。
+  - `http://umafans.run/horses/1/` 返回 `404`，符合草稿不公开策略。
+  - `http://umafans.run/admin/horse-profiles/` 返回 `302` 到 `/admin/login/?next=/admin/horse-profiles/`。
+- Chrome 布局复核：
+  - 桌面 `/horses/` 标题为“马匹资料”，包含搜索框、地区筛选和空状态；页面 `clientWidth=1440`、`scrollWidth=1440`，无页面级横向溢出。
+  - 移动 `/horses/` 标题为“马匹资料”，导航 DOM 包含“首页 / 赛事日历 / 马匹 / 我的关注”，搜索框存在；页面 `clientWidth=390`、`scrollWidth=390`，无页面级横向溢出。
+  - 移动首页导航 DOM 包含“马匹”和“我的关注”，页面 `clientWidth=390`、`scrollWidth=390`。
+  - 移动 `/horses/1/` 显示 404 页，页面 `clientWidth=390`、`scrollWidth=390`。
+  - `/horses/?q=test&region=japan` 保留搜索词 `test`，并正确激活“日本”地区筛选。
+- 当前体验问题：
+  - `/horses/` 空状态文案为“目前还没有已发布文章。”，语义应改为马匹资料。
+  - 移动端顶部导航和地区筛选依赖横向滑动，功能可用但“马匹 / 我的关注”和最右侧“美国”入口不够显眼。
+- 未覆盖项：
+  - 生产当前没有已发布马匹，未在生产发布测试数据；因此未完整验收已发布马匹详情、关注按钮 POST、新闻详情马匹 tag 和关注新闻流。
+  - 未持有 staff 登录态，后台审核列表 / 详情只验收到未登录跳转。
+  - UmaNews 生产 SSH 只以 `root@47.239.167.86` 为准；其他项目服务器不属于本项目验收范围。
+
 ### 生产部署前检查
 
 1. 记录生产 `HEAD`：`git rev-parse --short HEAD`。

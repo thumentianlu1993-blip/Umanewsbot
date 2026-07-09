@@ -15346,6 +15346,12 @@ class HorseProfilePageMvpTests(TestCase):
         self.assertEqual(transition_response.status_code, 200)
         self.assertContains(published_response, "春秋分")
 
+    def test_horse_index_uses_horse_empty_copy(self):
+        response = self.client.get(reverse("public-horse-index"))
+
+        self.assertContains(response, "目前还没有已发布马匹资料。")
+        self.assertNotContains(response, "目前还没有已发布文章。")
+
     def test_completeness_requires_all_six_pedigree_fields_and_descendants_use_profile_links(self):
         parent = self._profile(sire_text="父", dam_text="母", sire_sire_text="父父", sire_dam_text="父母", dam_sire_text="母父")
         self.assertEqual(update_completeness(parent), HorseProfileCompleteness.PARTIAL_PEDIGREE)
