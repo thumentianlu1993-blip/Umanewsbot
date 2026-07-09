@@ -1,0 +1,16 @@
+schema: spec-driven
+profile: feature
+phase: reviewed
+created: 2026-07-09
+journal:
+  - event: plan-reviewed
+    date: "2026-07-10T00:50:41+08:00"
+    session: 1
+    mode: full
+    rounds: 1
+    issues_resolved: 2
+    artifacts_modified:
+      - design.md
+      - specs/automation-publish-gates/spec.md
+      - tasks.md
+    note: "Resolved ordinary-word seed traceability and audited-batch dry-run acceptance coverage."

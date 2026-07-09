@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "entries": [
+    {
+      "source": "plan-eng-review",
+      "session": 1,
+      "round": 1,
+      "timestamp": "2026-07-10T00:50:35+08:00",
+      "last_updated": "2026-07-10T00:50:35+08:00",
+      "mode": "full",
+      "artifacts_modified": [
+        "design.md",
+        "specs/automation-publish-gates/spec.md",
+        "tasks.md"
+      ],
+      "rounds_total_for_session": 1,
+      "issues_resolved": 2,
+      "findings": [
+        {
+          "id": "F-001",
+          "severity": "warning",
+          "category": "consistency",
+          "summary": "普通英文词集合缺少仓库内可追溯来源和维护边界。",
+          "resolution": "已在 design/spec/tasks 中要求普通词种子来自可 review 的配置、常量或审核 artifact。",
+          "status": "resolved",
+          "round_found": 1,
+          "round_resolved": 1
+        },
+        {
+          "id": "F-002",
+          "severity": "warning",
+          "category": "test",
+          "summary": "计划缺少用本批 103 篇旧 core blocker 和 13 篇新增清除投影做回归验收的要求。",
+          "resolution": "已在 spec/tasks 中加入按地区聚合 dry-run 输出和对照本批审计投影的验收任务。",
+          "status": "resolved",
+          "round_found": 1,
+          "round_resolved": 1
+        }
+      ]
+    }
+  ]
+}

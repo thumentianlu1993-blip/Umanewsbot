@@ -1,5 +1,41 @@
 # 部署运行手册
 
+## 2026-07-10 英文术语门禁上下文判定上线
+
+- 本地 change：`classify-english-term-gate-context`。
+- 工作树：`/Users/mentianlu/.codex/worktrees/audit-overseas-candidate-pool/umanews`。
+- 范围：英文来源文章的术语保留门禁、旧 `core_term_missing` 候选完整重校验命令。
+- 行为边界：
+  - 普通英文词种子默认按普通词降级为 warning，不生成 `core_term_missing` blocker。
+  - 只有 `wins / returns / runs / targets / entered` 等强动作上下文才把普通词种子保守维持为 blocker。
+  - `race / jockey / trainer`、真实赛事结构词和未进入普通词种子的 horse term 继续按真实专名或保守缺失处理。
+  - `reprocess_term_gate_blocked_articles --commit` 只对完整门禁通过文章调用 `apply_validation_outcome()` 并写 `ranked_revived_at`，不会直接公开发布文章。
+- 本地上线前验证：
+  - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true ... manage.py test stable.tests.AutomationFlowTests...`：11 项目标测试通过。
+  - `DB_ENGINE=sqlite ... manage.py check`：通过。
+  - `openspec validate classify-english-term-gate-context --strict`：通过。
+  - `git diff --check`：通过。
+- 生产上线后第一步必须只读 dry-run，人工确认前不得执行 `--commit`。若在 `2026-07-10` 执行，`--hours 240` 足以覆盖北京时间 `2026-07-01 00:00` 以来数据；若推迟执行，需要增大 `--hours` 覆盖完整窗口。
+
+```bash
+cd /opt/umanewsbot
+TS=$(date +%Y%m%d_%H%M%S)
+OUT_DIR="runtime/multiregion_candidate_audit/reprocess_full_dryrun_${TS}"
+mkdir -p "${OUT_DIR}"
+
+for REGION in hong_kong united_kingdom united_states france; do
+  docker compose -f docker-compose.prod.lowcost.yml exec -T web \
+    python manage.py reprocess_term_gate_blocked_articles \
+      --region "${REGION}" \
+      --hours 240 \
+      --dry-run \
+      --json \
+    > "${OUT_DIR}/${REGION}.json"
+done
+```
+
+- dry-run 审核口径：检查四个 JSON 的 `summary.revalidated_to_publish_ready_count`、`summary.common_word_downgraded_count`、`summary.proper_term_blocker_count`、`outcomes[].english_term_classifications` 和 `outcomes[].proper_term_blockers`；对照本批人工审计投影，普通词相关旧 blocker 新增清除应约为 `13` 篇量级，真实赛事/马名专名不得被普通词规则误放行。
+
 ## 2026-07-08 马匹详情页 MVP 生产部署
 
 - 本地 change：`horse-profile-page-mvp`。

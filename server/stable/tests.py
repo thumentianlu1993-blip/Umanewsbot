@@ -10988,6 +10988,266 @@ class AutomationFlowTests(TestCase):
         self.assertEqual(downgraded[0]["payload"]["source_ja"], "Class")
         self.assertIn("high_ambiguity", downgraded[0]["payload"]["reason"])
 
+    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    def test_english_common_word_context_downgrades_review_seed_terms(self):
+        for source_ja, target_zh in [
+            ("Contact", "接触"),
+            ("Number", "号码"),
+            ("Live", "直播"),
+            ("Were", "曾经"),
+            ("AGENDA", "议程"),
+            ("Tuesday", "战神日"),
+        ]:
+            TermEntry.objects.create(
+                term_type="horse",
+                source_language=SourceLanguage.ENGLISH,
+                racing_region=RacingRegion.UNITED_KINGDOM,
+                source_ja=source_ja,
+                target_zh=target_zh,
+                priority=100,
+            )
+        article = self._translated_article(
+            source_article_id="english-common-word-context-downgrade",
+            source_site=SourceSite.SKY_SPORTS_RACING,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            title_ja="Agenda for Tuesday racing coverage",
+            body_ja_raw=(
+                "Contact the racecourse office for the live stream number. "
+                "The races were moved after the going changed. "
+                "The agenda also includes odds updates and stable news. "
+            )
+            * 5,
+            body_ja_normalized=(
+                "Contact the racecourse office for the live stream number. "
+                "The races were moved after the going changed. "
+                "The agenda also includes odds updates and stable news. "
+            )
+            * 5,
+            translated_title_zh="周二赛马报道日程",
+            title_zh="周二赛马报道日程",
+            translated_body_zh="报道日程包括视频信号、赔率更新和马房消息。" * 12,
+            body_zh="报道日程包括视频信号、赔率更新和马房消息。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertTrue(outcome.passed)
+        self.assertFalse(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
+        downgraded = [issue for issue in outcome.issues if issue["code"] == "english_term_common_word_downgraded"]
+        self.assertEqual({issue["payload"]["source_ja"] for issue in downgraded}, {"Contact", "Number", "Live", "Were", "AGENDA", "Tuesday"})
+        for issue in downgraded:
+            self.assertIn(issue["severity"], {"warning", "info"})
+            self.assertEqual(issue["payload"]["term_semantic_classification"], "common_word")
+            self.assertGreaterEqual(issue["payload"]["confidence"], 0.8)
+            self.assertTrue(issue["payload"]["classification_reason"])
+            self.assertTrue(issue["payload"]["matched_context"])
+
+    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    def test_english_common_seed_with_race_marker_defaults_to_common_word_without_entity_context(self):
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_ja="Classic",
+            target_zh="经典名驹",
+            priority=100,
+        )
+        article = self._translated_article(
+            source_article_id="english-classic-common-seed-default",
+            source_site=SourceSite.HORSE_RACING_NATION,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            title_ja="Classic racing coverage continues this weekend",
+            body_ja_raw="Classic racing coverage continues this weekend with broadcast updates and analysis. " * 8,
+            body_ja_normalized="Classic racing coverage continues this weekend with broadcast updates and analysis. " * 8,
+            translated_title_zh="周末赛马报道继续",
+            title_zh="周末赛马报道继续",
+            translated_body_zh="本周末继续提供赛马报道、转播更新和分析。" * 12,
+            body_zh="本周末继续提供赛马报道、转播更新和分析。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertTrue(outcome.passed)
+        self.assertFalse(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
+        downgraded = [issue for issue in outcome.issues if issue["code"] == "english_term_common_word_downgraded"]
+        self.assertEqual(len(downgraded), 1)
+        self.assertEqual(downgraded[0]["payload"]["source_ja"], "Classic")
+        self.assertEqual(downgraded[0]["payload"]["term_semantic_classification"], "common_word")
+        self.assertEqual(downgraded[0]["payload"]["classification_reason"], "ordinary_english_seed_default")
+
+    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    def test_english_common_word_weak_racing_title_context_still_downgrades(self):
+        for source_ja, target_zh in [
+            ("Contact", "常联系"),
+            ("Live", "直播"),
+        ]:
+            TermEntry.objects.create(
+                term_type="horse",
+                source_language=SourceLanguage.ENGLISH,
+                racing_region=RacingRegion.UNITED_KINGDOM,
+                source_ja=source_ja,
+                target_zh=target_zh,
+                priority=100,
+            )
+        article = self._translated_article(
+            source_article_id="english-common-weak-racing-title-context",
+            source_site=SourceSite.SKY_SPORTS_RACING,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            title_ja="Contact and live updates from York",
+            body_ja_raw=(
+                "Live stable updates and contact details are available before the meeting. "
+                "The racecourse office number was also updated for visitors. "
+            )
+            * 8,
+            body_ja_normalized=(
+                "Live stable updates and contact details are available before the meeting. "
+                "The racecourse office number was also updated for visitors. "
+            )
+            * 8,
+            translated_title_zh="约克赛前实时资讯",
+            title_zh="约克赛前实时资讯",
+            translated_body_zh="赛前提供实时马房动态、联系方式和访客信息。" * 12,
+            body_zh="赛前提供实时马房动态、联系方式和访客信息。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertTrue(outcome.passed)
+        self.assertFalse(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
+        downgraded = [issue for issue in outcome.issues if issue["code"] == "english_term_common_word_downgraded"]
+        self.assertEqual({issue["payload"]["source_ja"] for issue in downgraded}, {"Contact", "Live"})
+        self.assertEqual({issue["payload"]["term_semantic_classification"] for issue in downgraded}, {"common_word"})
+
+    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    def test_english_common_word_seeds_stay_blocked_in_entity_context(self):
+        for source_ja, target_zh in [
+            ("Contact", "常联系"),
+            ("Live", "直播"),
+            ("Action", "大有作为"),
+        ]:
+            TermEntry.objects.create(
+                term_type="horse",
+                source_language=SourceLanguage.ENGLISH,
+                racing_region=RacingRegion.UNITED_KINGDOM,
+                source_ja=source_ja,
+                target_zh=target_zh,
+                priority=100,
+            )
+        article = self._translated_article(
+            source_article_id="english-common-seed-entity-context-blocks",
+            source_site=SourceSite.SKY_SPORTS_RACING,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            title_ja="Contact wins at York as Live returns after trial",
+            body_ja_raw=(
+                "Contact wins at York after a strong finish. "
+                "Live returns after trial work, while Action will target the Derby next month. "
+            )
+            * 6,
+            body_ja_normalized=(
+                "Contact wins at York after a strong finish. "
+                "Live returns after trial work, while Action will target the Derby next month. "
+            )
+            * 6,
+            translated_title_zh="英国赛驹在约克取胜",
+            title_zh="英国赛驹在约克取胜",
+            translated_body_zh="英国赛驹在约克取胜，另一匹赛驹试闸后复出。" * 12,
+            body_zh="英国赛驹在约克取胜，另一匹赛驹试闸后复出。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+
+        blockers = [issue for issue in outcome.issues if issue["code"] == "core_term_missing"]
+        self.assertFalse(outcome.passed)
+        self.assertEqual({issue["payload"]["source_ja"] for issue in blockers}, {"Contact", "Live", "Action"})
+        self.assertFalse(any(issue["code"] == "english_term_common_word_downgraded" for issue in outcome.issues))
+        for issue in blockers:
+            self.assertEqual(issue["payload"]["term_semantic_classification"], "uncertain")
+            self.assertIn(
+                issue["payload"]["classification_reason"],
+                {"common_seed_entity_context", "common_seed_context_uncertain"},
+            )
+
+    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    def test_english_proper_race_terms_still_block_with_semantic_payload(self):
+        for source_ja, target_zh, region in [
+            ("Belmont Stakes", "贝蒙锦标", RacingRegion.UNITED_STATES),
+            ("Kentucky Derby", "肯塔基打吡", RacingRegion.UNITED_STATES),
+        ]:
+            TermEntry.objects.create(
+                term_type="race",
+                source_language=SourceLanguage.ENGLISH,
+                racing_region=region,
+                source_ja=source_ja,
+                target_zh=target_zh,
+                race_grade="G1",
+                priority=100,
+            )
+        article = self._translated_article(
+            source_article_id="english-proper-race-term-still-blocks",
+            source_site=SourceSite.HORSE_RACING_NATION,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            title_ja="Belmont Stakes winner points to Kentucky Derby",
+            body_ja_raw="Belmont Stakes winner is being prepared for a Kentucky Derby campaign. " * 8,
+            body_ja_normalized="Belmont Stakes winner is being prepared for a Kentucky Derby campaign. " * 8,
+            translated_title_zh="美国冠军马备战大赛",
+            title_zh="美国冠军马备战大赛",
+            translated_body_zh="这匹美国冠军马正准备下一场重要赛事。" * 12,
+            body_zh="这匹美国冠军马正准备下一场重要赛事。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+
+        blockers = [issue for issue in outcome.issues if issue["code"] == "core_term_missing"]
+        self.assertFalse(outcome.passed)
+        self.assertEqual({issue["payload"]["source_ja"] for issue in blockers}, {"Belmont Stakes", "Kentucky Derby"})
+        self.assertFalse(any(issue["code"] == "english_term_common_word_downgraded" for issue in outcome.issues))
+        for issue in blockers:
+            self.assertEqual(issue["payload"]["term_semantic_classification"], "proper_noun")
+            self.assertTrue(issue["payload"]["classification_reason"])
+
+    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    def test_english_dual_use_terms_remain_blocked_in_strong_entity_context(self):
+        for source_ja, target_zh in [
+            ("Tuesday", "战神日"),
+            ("GOOD JOB", "极速雕神"),
+            ("Fast Track", "捷径快途"),
+        ]:
+            TermEntry.objects.create(
+                term_type="horse",
+                source_language=SourceLanguage.ENGLISH,
+                racing_region=RacingRegion.UNITED_KINGDOM,
+                source_ja=source_ja,
+                target_zh=target_zh,
+                priority=100,
+            )
+        article = self._translated_article(
+            source_article_id="english-dual-use-strong-entity-context-blocks",
+            source_site=SourceSite.SKY_SPORTS_RACING,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            title_ja="Tuesday wins as GOOD JOB returns and Fast Track entered",
+            body_ja_raw="Tuesday wins after a strong finish. GOOD JOB returns from a break and Fast Track entered the next race. " * 8,
+            body_ja_normalized="Tuesday wins after a strong finish. GOOD JOB returns from a break and Fast Track entered the next race. " * 8,
+            translated_title_zh="两匹马前往约克",
+            title_zh="两匹马前往约克",
+            translated_body_zh="两匹马在最新试闸后前往约克。" * 12,
+            body_zh="两匹马在最新试闸后前往约克。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+
+        blockers = [issue for issue in outcome.issues if issue["code"] == "core_term_missing"]
+        self.assertFalse(outcome.passed)
+        self.assertEqual({issue["payload"]["source_ja"] for issue in blockers}, {"Tuesday", "GOOD JOB", "Fast Track"})
+        for issue in blockers:
+            self.assertEqual(issue["payload"]["term_semantic_classification"], "uncertain")
+            self.assertTrue(issue["payload"]["classification_reason"])
+
     def test_english_term_gate_ignores_other_region_terms_but_keeps_global_terms(self):
         TermEntry.objects.create(
             term_type="horse",
@@ -11029,6 +11289,8 @@ class AutomationFlowTests(TestCase):
         self.assertEqual(excluded[0]["source_ja"], "LINK")
         self.assertEqual(excluded[0]["term_region"], RacingRegion.HONG_KONG)
         self.assertEqual(excluded[0]["article_region"], RacingRegion.UNITED_STATES)
+        self.assertNotIn("term_semantic_classification", excluded[0])
+        self.assertFalse(any(issue["code"] == "english_term_common_word_downgraded" for issue in outcome.issues))
 
     def test_english_same_region_core_term_still_blocks_auto_publish(self):
         TermEntry.objects.create(
@@ -11111,9 +11373,62 @@ class AutomationFlowTests(TestCase):
         stale.refresh_from_db()
         rejected.refresh_from_db()
         self.assertEqual(payload["candidate_ids"], [recent.id])
+        self.assertEqual(payload["summary"]["candidate_count"], 1)
+        self.assertIn(RacingRegion.HONG_KONG, payload["summary_by_region"])
+        self.assertEqual(payload["summary_by_region"][RacingRegion.HONG_KONG]["candidate_count"], 1)
         self.assertIn(stale.id, payload["skipped"]["outside_lookback"])
         self.assertIn(rejected.id, payload["skipped"]["manual_terminal_state"])
         self.assertEqual(recent.automation_status, AutomationStatus.MANUAL_REVIEW_REQUIRED)
+
+    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    def test_reprocess_term_gate_blocked_articles_reports_common_word_downgrades_and_region_summary(self):
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            source_ja="Contact",
+            target_zh="接触",
+            priority=100,
+        )
+        article = self._translated_article(
+            source_article_id="term-gate-reprocess-common-word-summary",
+            source_site=SourceSite.SKY_SPORTS_RACING,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            title_ja="Contact details updated for racegoers",
+            body_ja_raw="Contact details and the office number were updated before the meeting. " * 8,
+            body_ja_normalized="Contact details and the office number were updated before the meeting. " * 8,
+            translated_title_zh="观众联系方式更新",
+            title_zh="观众联系方式更新",
+            translated_body_zh="赛前更新了观众联系方式和办公室电话。" * 12,
+            body_zh="赛前更新了观众联系方式和办公室电话。" * 12,
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            gate_issues=[{"code": "core_term_missing", "severity": "blocker", "payload": {"source_ja": "Contact"}}],
+            first_seen_at=timezone.now() - timedelta(hours=1),
+        )
+        out = StringIO()
+
+        call_command(
+            "reprocess_term_gate_blocked_articles",
+            "--region",
+            RacingRegion.UNITED_KINGDOM,
+            "--dry-run",
+            "--json",
+            stdout=out,
+        )
+
+        payload = json.loads(out.getvalue())
+        article.refresh_from_db()
+        self.assertEqual(payload["candidate_ids"], [article.id])
+        self.assertEqual(payload["revalidated_to_publish_ready_ids"], [article.id])
+        self.assertEqual(payload["summary"]["common_word_downgraded_count"], 1)
+        self.assertEqual(payload["summary"]["proper_term_blocker_count"], 0)
+        self.assertEqual(payload["summary_by_region"][RacingRegion.UNITED_KINGDOM]["revalidated_to_publish_ready_count"], 1)
+        outcome = payload["outcomes"][0]
+        self.assertEqual(outcome["english_term_classifications"][0]["source_ja"], "Contact")
+        self.assertEqual(outcome["english_term_classifications"][0]["term_semantic_classification"], "common_word")
+        self.assertEqual(article.automation_status, AutomationStatus.MANUAL_REVIEW_REQUIRED)
 
     @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=["class"])
     def test_reprocess_term_gate_blocked_articles_commit_revalidates_without_direct_publish(self):

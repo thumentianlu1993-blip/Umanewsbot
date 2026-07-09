@@ -43,6 +43,57 @@ ROUTE_MANUAL = "manual_review"
 ROUTE_DUPLICATE = "duplicate"
 GLOBAL_RACING_REGION = ""
 
+# Seeded from runtime/multiregion_candidate_audit/reprocess_dryrun_20260708/
+# still_potential_core_terms_breakdown_classified.csv after the July 2026
+# overseas candidate-pool review. These are ordinary English words/phrases
+# that may also exist as horse terms, so context still decides final handling.
+ENGLISH_COMMON_WORD_TERM_SEEDS = {
+    "ace",
+    "agenda",
+    "action",
+    "classic",
+    "contact",
+    "determined",
+    "digital",
+    "embraces",
+    "ensured",
+    "fast track",
+    "find",
+    "good job",
+    "however",
+    "hopeful",
+    "item",
+    "live",
+    "number",
+    "rating",
+    "son",
+    "step forward",
+    "subsequent",
+    "tuesday",
+    "were",
+}
+ENGLISH_DUAL_USE_COMMON_WORD_TERMS = {
+    "ace",
+    "classic",
+    "fast track",
+    "good job",
+    "hopeful",
+    "step forward",
+    "tuesday",
+}
+ENGLISH_RACE_NAME_MARKERS = {
+    "classic",
+    "cup",
+    "derby",
+    "futurity",
+    "guineas",
+    "handicap",
+    "invitational",
+    "oaks",
+    "prix",
+    "stakes",
+}
+
 
 @dataclass
 class GateIssue:
@@ -76,6 +127,23 @@ class ValidationOutcome:
     @property
     def warnings(self) -> list[dict]:
         return [issue for issue in self.issues if issue.get("severity") == SEVERITY_WARNING]
+
+
+@dataclass(frozen=True)
+class EnglishTermMatchContext:
+    matched_text: str
+    matched_context: str
+    position: str
+    tokens_before: tuple[str, ...] = ()
+    tokens_after: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class EnglishTermSemanticDecision:
+    classification: str
+    confidence: float
+    reason: str
+    match: EnglishTermMatchContext
 
 
 def _source_text(article: NewsArticle) -> str:
@@ -232,6 +300,150 @@ def _matched_source_term(text: str, source_terms: list[str], source_language: st
     return ""
 
 
+def _source_term_match_span(text: str, candidate: str, source_language: str | None) -> tuple[int, int, str] | None:
+    if not candidate:
+        return None
+    if source_language == SourceLanguage.ENGLISH:
+        pattern = re.compile(r"(?<![0-9A-Za-z])" + re.escape(candidate) + r"(?![0-9A-Za-z])", re.IGNORECASE)
+        match = pattern.search(text or "")
+        return (match.start(), match.end(), match.group(0)) if match else None
+    index = (text or "").find(candidate)
+    return (index, index + len(candidate), candidate) if index >= 0 else None
+
+
+def _source_term_match_context(
+    source: str,
+    title: str,
+    first_block: str,
+    source_terms: list[str],
+    source_language: str | None,
+) -> EnglishTermMatchContext:
+    for position, text in (("title", title), ("lead", first_block), ("body", source)):
+        for term in source_terms:
+            span = _source_term_match_span(text, term, source_language)
+            if not span:
+                continue
+            start, end, matched = span
+            context_start = max(0, start - 80)
+            context_end = min(len(text or ""), end + 80)
+            snippet = (text or "")[context_start:context_end].strip()
+            tokens_before = tuple(re.findall(r"[A-Za-z0-9']+", (text or "")[context_start:start])[-8:])
+            tokens_after = tuple(re.findall(r"[A-Za-z0-9']+", (text or "")[end:context_end])[:8])
+            return EnglishTermMatchContext(
+                matched_text=matched,
+                matched_context=snippet,
+                position=position,
+                tokens_before=tokens_before,
+                tokens_after=tokens_after,
+            )
+    return EnglishTermMatchContext(matched_text="", matched_context="", position="unknown")
+
+
+def _english_term_candidate_keys(entry: TermEntry, source_terms: list[str]) -> set[str]:
+    return {
+        (candidate or "").strip().casefold()
+        for candidate in [entry.source_ja, *source_terms]
+        if (candidate or "").strip()
+    }
+
+
+def _settings_common_english_terms() -> set[str]:
+    configured = _setting_list("MULTIREGION_TERM_GATE_COMMON_ENGLISH_TERMS")
+    return ENGLISH_COMMON_WORD_TERM_SEEDS | configured
+
+
+def _looks_like_race_name(text: str) -> bool:
+    normalized = (text or "").strip().casefold()
+    if not normalized:
+        return False
+    tokens = re.findall(r"[a-z0-9']+", normalized)
+    return any(token in ENGLISH_RACE_NAME_MARKERS for token in tokens)
+
+
+def _english_match_looks_like_entity_context(entry: TermEntry, context: EnglishTermMatchContext) -> bool:
+    if entry.term_type != TermType.HORSE:
+        return False
+    snippet = context.matched_context or ""
+    matched = re.escape(context.matched_text or entry.source_ja)
+    if re.search(
+        matched + r"\s+(?:wins?|won|returns?|returned|runs?|ran|heads?|headed|targets?|targeted|entered|prepares?)\b",
+        snippet,
+        re.IGNORECASE,
+    ):
+        return True
+    if re.search(
+        matched
+        + r"\s+(?:will|would|could|may|might|can|is|was|being|has been)\s+"
+        + r"(?:target|return|run|head|enter|prepare|trial)\b",
+        snippet,
+        re.IGNORECASE,
+    ):
+        return True
+    return False
+
+
+def _english_match_looks_like_common_word_context(entry: TermEntry, context: EnglishTermMatchContext) -> bool:
+    matched = (context.matched_text or entry.source_ja or "").strip().casefold()
+    snippet = f" {context.matched_context.casefold()} "
+    if not matched:
+        return False
+    common_patterns = {
+        "agenda": [r"\bagenda\s+(?:for|also|includes?)\b", r"\bthe\s+agenda\b"],
+        "contact": [r"\bcontact\s+(?:the|details?|office|us)\b"],
+        "live": [r"\blive\s+(?:stream|coverage|updates?|broadcast)\b", r"\bwatch\s+live\b"],
+        "number": [r"\bnumber\s+of\b", r"\b(?:office|stream|racecard|contact)\s+number\b"],
+        "were": [r"\bwere\s+\w+ed\b", r"\b(?:races?|they|there)\s+were\b"],
+    }
+    for pattern in common_patterns.get(matched, []):
+        if re.search(pattern, snippet):
+            return True
+    return False
+
+
+def _english_term_semantic_payload(decision: EnglishTermSemanticDecision) -> dict:
+    return {
+        "term_semantic_classification": decision.classification,
+        "confidence": decision.confidence,
+        "classification_reason": decision.reason,
+        "matched_text": decision.match.matched_text,
+        "matched_context": decision.match.matched_context,
+        "match_position": decision.match.position,
+        "tokens_before": list(decision.match.tokens_before),
+        "tokens_after": list(decision.match.tokens_after),
+    }
+
+
+def _classify_english_term_context(
+    entry: TermEntry,
+    source: str,
+    title: str,
+    first_block: str,
+    source_terms: list[str],
+    *,
+    is_core: bool,
+) -> EnglishTermSemanticDecision | None:
+    if not is_core:
+        return None
+    match = _source_term_match_context(source, title, first_block, source_terms, SourceLanguage.ENGLISH)
+    keys = _english_term_candidate_keys(entry, source_terms)
+    common_terms = _settings_common_english_terms()
+    has_common_seed = bool(keys & common_terms)
+
+    if entry.term_type in {TermType.RACE, TermType.JOCKEY, TermType.TRAINER}:
+        return EnglishTermSemanticDecision("proper_noun", 0.95, f"{entry.term_type}_term_type", match)
+    if has_common_seed:
+        if _english_match_looks_like_entity_context(entry, match):
+            return EnglishTermSemanticDecision("uncertain", 0.45, "common_seed_entity_context", match)
+        if _english_match_looks_like_common_word_context(entry, match):
+            return EnglishTermSemanticDecision("common_word", 0.9, "ordinary_english_context", match)
+        return EnglishTermSemanticDecision("common_word", 0.85, "ordinary_english_seed_default", match)
+    if _looks_like_race_name(entry.source_ja) or any(_looks_like_race_name(term) for term in source_terms):
+        return EnglishTermSemanticDecision("proper_noun", 0.9, "race_name_marker", match)
+    if entry.term_type == TermType.HORSE:
+        return EnglishTermSemanticDecision("proper_noun", 0.8, "horse_term_without_common_seed", match)
+    return EnglishTermSemanticDecision("uncertain", 0.4, "unclassified_english_term", match)
+
+
 def _is_core_term(
     entry: TermEntry,
     source: str,
@@ -331,7 +543,12 @@ def detect_duplicate_issue(article: NewsArticle, content_source: str) -> GateIss
     )
 
 
-def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
+def validate_rewrite(
+    article: NewsArticle,
+    *,
+    term_entries: list[TermEntry] | None = None,
+    terms_by_language: dict[str, dict[int, list[str]]] | None = None,
+) -> ValidationOutcome:
     source = _source_text(article)
     content_source = _content_source()
     publish_text = _publish_text(article, content_source)
@@ -345,6 +562,7 @@ def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
         "missing_known_terms": [],
         "term_gate_region_excluded_terms": [],
         "ambiguous_term_downgrades": [],
+        "english_term_classifications": [],
         "missing_numbers": [],
         "quote_fragments_checked": [],
         "issues": [],
@@ -428,11 +646,16 @@ def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
     missing_terms: list[str] = []
     title = article.title_ja or ""
     first_block = (article.body_ja_normalized or article.body_ja_raw or "")[:500]
-    term_entries = list(TermEntry.objects.filter(
-        is_active=True,
-        term_type__in=[TermType.HORSE, TermType.RACE, TermType.JOCKEY, TermType.TRAINER],
-    ))
-    terms_by_entry = source_terms_by_entry(term_entries, article_source_language)
+    if term_entries is None:
+        term_entries = list(TermEntry.objects.filter(
+            is_active=True,
+            term_type__in=[TermType.HORSE, TermType.RACE, TermType.JOCKEY, TermType.TRAINER],
+        ))
+    terms_by_entry = (
+        terms_by_language.get(article_source_language)
+        if terms_by_language and article_source_language in terms_by_language
+        else source_terms_by_entry(term_entries, article_source_language)
+    )
     for entry in term_entries:
         source_terms = terms_by_entry.get(entry.pk, [])
         source_hit = _source_term_hit(source, source_terms, article_source_language)
@@ -491,6 +714,36 @@ def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
                     )
                 )
                 continue
+            semantic_decision = (
+                _classify_english_term_context(entry, source, title, first_block, source_terms, is_core=is_core)
+                if article_source_language == SourceLanguage.ENGLISH
+                else None
+            )
+            semantic_payload = _english_term_semantic_payload(semantic_decision) if semantic_decision else {}
+            if semantic_decision:
+                classification_payload = {
+                    "term_id": entry.id,
+                    "source_ja": entry.source_ja,
+                    "source_language": entry.source_language,
+                    "target_zh": entry.target_zh,
+                    "term_type": entry.term_type,
+                    "priority": entry.priority,
+                    "position": "core" if is_core else "background",
+                    "term_region": entry.racing_region or GLOBAL_RACING_REGION,
+                    "article_region": article.racing_region or GLOBAL_RACING_REGION,
+                    **semantic_payload,
+                }
+                details["english_term_classifications"].append(classification_payload)
+                if semantic_decision.classification == "common_word" and semantic_decision.confidence >= 0.8:
+                    issues.append(
+                        _issue(
+                            "english_term_common_word_downgraded",
+                            SEVERITY_WARNING,
+                            "普通英文词命中已降级：" + entry.source_ja,
+                            payload=classification_payload,
+                        )
+                    )
+                    continue
             issues.append(
                 _issue(
                     "core_term_missing" if is_core else "background_term_missing",
@@ -498,12 +751,16 @@ def validate_rewrite(article: NewsArticle) -> ValidationOutcome:
                     ("核心术语未稳定保留：" if is_core else "背景术语未稳定保留：") + entry.source_ja,
                     route=ROUTE_MANUAL if is_core else ROUTE_AUTO,
                     payload={
+                        "term_id": entry.id,
                         "source_ja": entry.source_ja,
                         "source_language": entry.source_language,
                         "target_zh": entry.target_zh,
                         "term_type": entry.term_type,
                         "priority": entry.priority,
                         "position": "core" if is_core else "background",
+                        "term_region": entry.racing_region or GLOBAL_RACING_REGION,
+                        "article_region": article.racing_region or GLOBAL_RACING_REGION,
+                        **semantic_payload,
                     },
                 )
             )
