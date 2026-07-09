@@ -874,10 +874,12 @@ a {
 
 @media (max-width: 599px) {
   .site-header {
+    flex-direction: column;
+    align-items: flex-start;
     min-height: 50px;
     height: auto;
-    gap: 10px;
-    padding: 8px 14px;
+    gap: 6px;
+    padding: 10px 14px;
   }
 
   .site-brand {
@@ -885,9 +887,10 @@ a {
   }
 
   .site-nav {
-    flex: 1 1 220px;
-    justify-content: flex-end;
-    flex-wrap: wrap;
+    width: 100%;
+    flex: 0 0 auto;
+    justify-content: space-between;
+    flex-wrap: nowrap;
     gap: 10px;
     font-size: 13px;
   }
@@ -895,6 +898,7 @@ a {
   .site-nav a {
     flex: 0 0 auto;
     line-height: 1.2;
+    white-space: nowrap;
   }
 
   .home-page,
@@ -916,8 +920,8 @@ a {
   }
 
   .region-tabs a {
-    flex: 1 1 calc(33.333% - 8px);
-    min-width: 72px;
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
     padding: 7px 8px;
     text-align: center;
   }
@@ -936,7 +940,12 @@ a {
   }
 
   .public-filter-bar input {
-    flex-basis: min(100%, 220px);
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .public-filter-bar button {
+    width: 100%;
   }
 
   .race-lead h1 {
