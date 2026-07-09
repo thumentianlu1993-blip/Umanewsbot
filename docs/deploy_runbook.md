@@ -34,7 +34,24 @@ for REGION in hong_kong united_kingdom united_states france; do
 done
 ```
 
-- dry-run 审核口径：检查四个 JSON 的 `summary.revalidated_to_publish_ready_count`、`summary.common_word_downgraded_count`、`summary.proper_term_blocker_count`、`outcomes[].english_term_classifications` 和 `outcomes[].proper_term_blockers`；对照本批人工审计投影，普通词相关旧 blocker 新增清除应约为 `13` 篇量级，真实赛事/马名专名不得被普通词规则误放行。
+- dry-run 审核口径：检查四个 JSON 的 `summary.revalidated_to_publish_ready_count`、`summary.common_word_downgraded_count`、`summary.proper_term_blocker_count`、`outcomes[].english_term_classifications` 和 `outcomes[].proper_term_blockers`；对照本批人工审计投影，重点确认普通词旧 blocker 被清除、真实赛事/马名专名没有被普通词规则误放行。
+
+### 生产执行记录
+
+- 部署前生产 HEAD：`65988b0`。该提交含服务器侧已上线但尚未回主线的移动端马匹导航修复；上线前已在本地把 `production/main` 合并回 `origin/main`，避免部署时覆盖线上修复。
+- 部署提交：`43898ff`。
+- `.env` 备份：`.env.backup.english-term-context-20260710_030705`。
+- 数据库备份：`backups/db/pre-english-term-context-20260710_030705.sql.gz`，已通过 `gzip -t`。
+- 部署方式：`git pull --ff-only origin main` 从 `65988b0` 快进到 `43898ff`，随后执行 `bash ./deploy_lowcost.sh`。
+- 迁移：无新增迁移，`migrate` 输出 `No migrations to apply`。
+- 部署后状态：`web / worker / beat / db / redis / nginx` 正常，`web`、`db`、`redis` healthy，生产 `manage.py check` 通过，本地和公网 `/healthz/` 返回 `{"status": "ok"}`，首页返回 `200`，后台登录入口返回 `200`。
+- 完整只读 dry-run 产物：`runtime/multiregion_candidate_audit/reprocess_full_dryrun_20260710_030944/`。
+  - 香港：候选 `17`，可恢复候选 `3`，仍阻断 `14`，普通词降级 `9` 次，真实专名 blocker `33` 次。
+  - 英国：候选 `37`，可恢复候选 `5`，仍阻断 `32`，普通词降级 `119` 次，真实专名 blocker `140` 次。
+  - 美国：候选 `79`，可恢复候选 `22`，仍阻断 `57`，普通词降级 `1` 次，真实专名 blocker `366` 次。
+  - 法国：候选 `13`，可恢复候选 `7`，仍阻断 `6`，普通词降级 `13` 次，真实专名 blocker `10` 次。
+  - 合计：候选 `146`，可恢复候选 `37`，仍阻断 `109`，普通词降级 `142` 次，真实专名 blocker `549` 次。
+- 本次仅执行 `--dry-run`，未执行 `--commit`，未恢复候选，未公开发布文章。后续 commit 前必须先人工抽检 dry-run JSON 中的 `english_term_classifications` 和 `proper_term_blockers`。
 
 ## 2026-07-08 马匹详情页 MVP 生产部署
 

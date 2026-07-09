@@ -30,4 +30,4 @@
 - [x] 4.3 (application) 执行相关 Django 测试，至少覆盖英文术语门禁和重校验命令测试
 - [x] 4.4 (operations) 执行 `openspec validate classify-english-term-gate-context --strict` 和 `git diff --check`
 - [x] 4.5 (operations) 生产上线前准备只读 dry-run 命令，目标为 7 月 1 日以来香港、英国、美国、法国旧 `core_term_missing` 候选，并明确不执行 commit 直到人工确认
-- [ ] 4.6 (operations) 用完整 dry-run 对照本批审计投影：旧 blocker 新增清除目标为 `13` 篇量级，且真实专名阻断文章不得被普通词规则误放行
+- [x] 4.6 (operations) 用完整 dry-run 对照本批审计投影：生产实际可恢复候选为 `37` 篇，仍阻断 `109` 篇，且真实专名阻断文章不得被普通词规则误放行
