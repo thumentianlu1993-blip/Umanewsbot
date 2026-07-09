@@ -130,6 +130,36 @@ done
   - 未持有 staff 登录态，后台审核列表 / 详情只验收到未登录跳转。
   - UmaNews 生产 SSH 只以 `root@47.239.167.86` 为准；其他项目服务器不属于本项目验收范围。
 
+### 样本发布与最终前台验收记录
+
+- 时间：`2026-07-10`。
+- 服务器：`root@47.239.167.86:/opt/umanewsbot`，最终 `HEAD=65988b0`。
+- 代码部署：
+  - `34143ce`：修复 `/horses/` 空状态文案，并调整移动导航 / 地区筛选初版布局。
+  - `d21d6ab`：继续收敛移动端导航和地区筛选裁切问题。
+  - `65988b0`：移动一级导航改为两列 grid，确保“首页 / 赛事日历 / 马匹 / 我的关注”全部在屏内。
+- 备份：
+  - `.env.backup.horse-public-polish-20260710_010639`
+  - `backups/db/pre-horse-public-polish-20260710_010639.sql.gz`
+  - `backups/db/pre-horse-sample-profiles-20260710_011038.sql.gz`
+  - `.env.backup.horse-mobile-polish-20260710_011811`
+  - `backups/db/pre-horse-mobile-polish-20260710_011811.sql.gz`
+  - 上述数据库备份均已执行 `gzip -t`。
+- 样本数据：
+  - `春秋分`：`/horses/13113/`，netkeiba 来源 `https://db.netkeiba.com/horse/2019105219/`，参赛履历 `10` 条，相关新闻人工关联 `5` 篇。
+  - `北十字星`：`/horses/3873/`，netkeiba 来源 `https://db.netkeiba.com/horse/2022105102/`，参赛履历 `11` 条，相关新闻人工关联 `5` 篇。
+  - 两匹马均为 `review_status=published`、`completeness_status=complete_pedigree_2gen`。
+- 前台验收：
+  - `http://umafans.run/horses/13113/` 显示春秋分基础资料、完整二代血统、主胜鞍、参赛履历和相关新闻。
+  - `http://umafans.run/horses/3873/` 显示北十字星基础资料、完整二代血统、主胜鞍、参赛履历和相关新闻。
+  - `http://umafans.run/news/7248/` 显示马匹 tag `春秋分`，点击进入 `/horses/13113/`。
+  - 匿名关注 / 取消关注链路通过；关注后 `/horses/follows/` 显示春秋分及其关联新闻，验收后已取消关注，样本 `HorseFollow` 计数为 `0`。
+  - `/horses/?q=croix&region=japan` 可命中北十字星，`/horses/?q=EQUINOX&region=japan` 可命中春秋分，英文大小写搜索正常。
+  - Codex 浏览器移动 viewport `390x844` 复核 `scrollWidth=390`，四个一级导航入口和六个地区按钮坐标均在屏内。
+- 生产健康：
+  - `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check` 通过。
+  - 本地容器和公网 `http://umafans.run/healthz/` 均返回 `200` / `{"status": "ok"}`。
+
 ### 生产部署前检查
 
 1. 记录生产 `HEAD`：`git rev-parse --short HEAD`。
