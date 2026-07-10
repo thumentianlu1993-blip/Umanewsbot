@@ -3762,3 +3762,22 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 7. 只执行 apply-check 生成、带 `--expected-sha256` 的 importer 命令。任何 blocker 出现时重新生成相应证据，不得手改 apply-check 结果绕过。
 
 本轮只完成本地实现与测试，未执行生产赛事抓取或写入。多地区新闻迁移编号为 `stable.0023_multiregion_news_attribution`，部署时必须先确认 `stable.0022_horseprofile_horsefollow_articlehorselink_and_more` 已应用。
+
+### 2026-07-11 赛事编排与多地区归属灰度部署记录
+
+- 发布提交：`38974f1`；部署前生产提交：`de4bb78`。
+- 环境备份：`.env.backup.multiregion-orchestration-20260711_034313`。
+- 数据库备份：`backups/db/pre-multiregion-orchestration-20260711_034313.sql.gz`，约 `101M`，`gzip -t` 通过。
+- 迁移：`stable.0023_multiregion_news_attribution` 已应用，`NewsArticleRelatedRegion=0`，未回填旧文章。
+- 灰度开关：`MULTIREGION_ATTRIBUTION_ENABLED=false`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`。
+- 五地区只读验收 artifact：`runtime/deployment_acceptance/multiregion-20260711_0352-enabled-dry-run/`。命令仅对子进程临时设置两个开关为 true，没有修改 web/worker/beat 的运行配置。
+- 验收结论：英文门禁继续保留 blocker，没有候选被直接发布；但法国样本 `7031` 被推断为英国主地区，日本样本也出现改为中国香港，且部分样本关联三至四个地区。归属产品口径未通过，不得开启生产开关或执行 commit。
+- 赛事编排命令已部署并通过 `--help` smoke；本次未运行网络 prepare、未执行赛事 apply。
+- 部署后：六个容器正常，Django check 通过；本地和 Host `/healthz/` 正常；首页、法国/英国地区页、后台登录均为 `200`；web/worker 近 15 分钟未见 error/traceback。
+
+后续启用前必须先完成：
+
+1. 产品确认主地区是否允许被弱实体信号覆盖，以及赛事、马、骑手、来源之间的优先级。
+2. 产品确认关联地区上限，避免普通文章一次进入三至四个地区池。
+3. 修正规则后重新执行五地区真实文章 dry-run，并人工抽检 `old_regions / new_regions / blockers`。
+4. 五地区均通过后才修改 `.env` 开关并重建 web/worker/beat；仍先保持 `--commit` 禁止，观察自然新稿后再决定历史回填。
