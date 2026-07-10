@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -16,22 +17,29 @@ MODULES_ALLOWING_BATCH_IMPORT = {
 }
 
 
-def _read_jsonl(path: Path) -> list[dict]:
+def _read_jsonl_bytes(raw: bytes) -> list[dict]:
     records: list[dict] = []
-    with path.open("r", encoding="utf-8-sig") as handle:
-        for line_number, line in enumerate(handle, start=1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise CommandError(f"第 {line_number} 行不是合法 JSON：{exc}") from exc
-            if not isinstance(record, dict):
-                raise CommandError(f"第 {line_number} 行必须是 JSON 对象")
-            record["_line_number"] = line_number
-            records.append(record)
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise CommandError(f"JSONL 不是合法 UTF-8：{exc}") from exc
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise CommandError(f"第 {line_number} 行不是合法 JSON：{exc}") from exc
+        if not isinstance(record, dict):
+            raise CommandError(f"第 {line_number} 行必须是 JSON 对象")
+        record["_line_number"] = line_number
+        records.append(record)
     return records
+
+
+def _read_jsonl(path: Path) -> list[dict]:
+    return _read_jsonl_bytes(path.read_bytes())
 
 
 def _normalize_module_payload(module: str, payload) -> dict:
@@ -76,6 +84,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--jsonl", required=True, help="候选 JSONL 文件路径。每行一场赛事。")
+        parser.add_argument("--expected-sha256", help="正式写入前必须匹配的候选文件 SHA-256。")
         parser.add_argument("--dry-run", action="store_true", help="只校验，不写入候选池或正式表。")
         parser.add_argument("--apply", action="store_true", help="保存候选后立即应用到正式表。")
         parser.add_argument("--confidence", type=int, default=90, help="候选默认置信度。")
@@ -85,7 +94,18 @@ class Command(BaseCommand):
         if not path.exists():
             raise CommandError(f"JSONL 文件不存在：{path}")
 
-        records = _read_jsonl(path)
+        try:
+            raw = path.read_bytes()
+        except OSError as exc:
+            raise CommandError(f"无法读取 JSONL 文件：{path}: {exc}") from exc
+        expected_sha256 = str(options.get("expected_sha256") or "").strip().lower()
+        actual_sha256 = hashlib.sha256(raw).hexdigest()
+        if expected_sha256 and actual_sha256 != expected_sha256:
+            raise CommandError(
+                f"candidate_sha256_mismatch: expected={expected_sha256} actual={actual_sha256}"
+            )
+
+        records = _read_jsonl_bytes(raw)
         parsed = [_validate_record(record) for record in records]
 
         event_count = len(parsed)

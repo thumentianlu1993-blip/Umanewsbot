@@ -10,6 +10,8 @@ from pathlib import Path
 from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
+from race_event_request_budget import before_network_request
+
 from bs4 import BeautifulSoup
 
 
@@ -34,6 +36,7 @@ def _download(url: str, path: Path, *, allow_network: bool, timeout: int) -> byt
     if not allow_network:
         raise RuntimeError(f"缺少缓存且未允许网络请求：{path}")
     request = Request(url, headers={"User-Agent": "UmaFansBot/1.0"})
+    before_network_request(url)
     with urlopen(request, timeout=timeout) as response:
         body = response.read()
     path.write_bytes(body)

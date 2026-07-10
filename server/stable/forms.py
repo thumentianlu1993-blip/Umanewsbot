@@ -23,6 +23,7 @@ from .models import (
     TermType,
 )
 from .services.term_admin import serialize_aliases, sync_term_source_aliases, validate_term_payload
+from .services.news_attribution import set_article_regions
 
 
 HORSE_PROFILE_LOCK_CHOICES = [
@@ -63,7 +64,17 @@ class BackendAuthenticationForm(AuthenticationForm):
 class NewsArticleAdminForm(forms.ModelForm):
     class Meta:
         model = NewsArticle
-        fields = ["title_zh", "body_zh", "summary_zh", "push_summary_zh", "editor_notes", "workflow_status", "status"]
+        fields = [
+            "content_category",
+            "attribution_locked",
+            "title_zh",
+            "body_zh",
+            "summary_zh",
+            "push_summary_zh",
+            "editor_notes",
+            "workflow_status",
+            "status",
+        ]
         widgets = {
             "body_zh": forms.Textarea(attrs={"rows": 16, "cols": 140}),
             "summary_zh": forms.Textarea(attrs={"rows": 4, "cols": 120}),
@@ -370,11 +381,34 @@ class ArticleEditorForm(forms.ModelForm):
         help_text="多个标签用逗号分隔，例如：赛事, 马匹, 赛后复盘",
     )
     publish_without_cover = forms.BooleanField(required=False, widget=forms.HiddenInput())
+    related_regions = forms.MultipleChoiceField(
+        label="关联地区",
+        choices=RacingRegion.choices,
+        required=False,
+        help_text="文章同时属于其他地区时勾选。主地区不需要重复勾选。",
+    )
+    related_regions_present = forms.CharField(
+        required=False,
+        initial="1",
+        widget=forms.HiddenInput(),
+    )
 
     class Meta:
         model = NewsArticle
-        fields = ["title_zh", "summary_zh", "body_zh", "source_note", "editor_notes"]
+        fields = [
+            "racing_region",
+            "related_regions",
+            "content_category",
+            "attribution_locked",
+            "title_zh",
+            "summary_zh",
+            "body_zh",
+            "source_note",
+            "editor_notes",
+        ]
         widgets = {
+            "racing_region": forms.Select(),
+            "content_category": forms.Select(),
             "title_zh": forms.TextInput(attrs={"placeholder": "请输入中文标题"}),
             "summary_zh": forms.Textarea(attrs={"rows": 4, "placeholder": "请输入中文摘要"}),
             "body_zh": forms.Textarea(attrs={"rows": 26, "placeholder": "支持普通文本和基础 Markdown 风格书写"}),
@@ -385,6 +419,18 @@ class ArticleEditorForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["tags_text"].initial = ", ".join(self.instance.tags_json or [])
+        self.fields["related_regions"].initial = [
+            link.region for link in self.instance.related_region_links.all()
+        ] if self.instance.pk else []
+        self.fields["racing_region"].required = False
+        self.fields["content_category"].required = False
+        self.fields["attribution_locked"].required = False
+        self.fields["related_regions"].choices = [
+            (value, label) for value, label in RacingRegion.choices if value != RacingRegion.OTHER
+        ]
+        self.fields["racing_region"].choices = [
+            (value, label) for value, label in RacingRegion.choices if value != RacingRegion.OTHER
+        ]
 
     def clean_title_zh(self):
         value = self.cleaned_data["title_zh"].strip()
@@ -398,6 +444,23 @@ class ArticleEditorForm(forms.ModelForm):
             raise forms.ValidationError("正文不能为空。")
         return value
 
+    def clean_racing_region(self):
+        return self.cleaned_data.get("racing_region") or self.instance.racing_region or RacingRegion.JAPAN
+
+    def clean_content_category(self):
+        return self.cleaned_data.get("content_category") or self.instance.content_category or "news"
+
+    def clean_related_regions(self):
+        if (
+            self.is_bound
+            and "related_regions_present" not in self.data
+            and "related_regions" not in self.data
+        ):
+            return [link.region for link in self.instance.related_region_links.all()]
+        regions = list(self.cleaned_data.get("related_regions") or [])
+        primary = self.cleaned_data.get("racing_region")
+        return [region for region in regions if region != primary]
+
     def save(self, commit=True):
         instance = super().save(commit=False)
         tags = [item.strip() for item in self.cleaned_data.get("tags_text", "").split(",") if item.strip()]
@@ -405,7 +468,20 @@ class ArticleEditorForm(forms.ModelForm):
         if commit:
             instance.mark_manual_edits(["title_zh", "summary_zh", "body_zh", "source_note", "editor_notes", "tags_json"])
             instance.save()
+            self.save_related_regions(instance)
         return instance
+
+    def save_related_regions(self, instance: NewsArticle) -> None:
+        set_article_regions(
+            instance,
+            primary_region=instance.racing_region,
+            related_regions=self.cleaned_data.get("related_regions") or [],
+            attribution_source="manual",
+            reason="article_editor",
+            evidence={"form": "ArticleEditorForm"},
+            content_category=instance.content_category,
+            save=True,
+        )
 
 
 class TermEntryForm(forms.ModelForm):

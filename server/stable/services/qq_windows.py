@@ -21,6 +21,7 @@ from stable.models import (
     WorkflowStatus,
 )
 from stable.services.qq_auto_push import ensure_qq_push_deliveries, should_push_news_to_qq
+from stable.services.news_attribution import filter_articles_visible_in_region
 
 
 @dataclass(frozen=True)
@@ -55,15 +56,15 @@ def _record_target_decision(
 
 def _candidate_queryset(region: str, *, now):
     lookback_hours = int(getattr(settings, "MULTIREGION_PUBLISH_CANDIDATE_LOOKBACK_HOURS", 3))
-    return (
+    queryset = (
         NewsArticle.objects.filter(
-            racing_region=region,
             workflow_status=WorkflowStatus.PUBLISHED,
             published_to_web_at__isnull=False,
             published_to_web_at__gte=now - timedelta(hours=lookback_hours),
         )
         .order_by("-score_total", "-published_to_web_at", "id")
     )
+    return filter_articles_visible_in_region(queryset, region)
 
 
 def _quota_ledger(*, kind: str, scope: str, scope_key: str, window: ProductionWindow, limit: int) -> QuotaLedger:

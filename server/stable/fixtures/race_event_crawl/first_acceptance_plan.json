@@ -1,0 +1,211 @@
+{
+  "run_id": "first-acceptance-race-event-crawl",
+  "target_layer": "race_event",
+  "first_acceptance": true,
+  "allow_network": false,
+  "batch_size": 3,
+  "rate_limit": {
+    "request_interval_seconds": 1,
+    "max_requests": 30
+  },
+  "output_dir": "runtime/race_event_crawl_runs/first-acceptance-race-event-crawl",
+  "adapters": [
+    "jra_detail",
+    "jra_history_winners",
+    "hkjc_detail",
+    "hkjc_history_winners",
+    "uk_sporting_life_detail",
+    "uk_sporting_life_history_winners",
+    "france_zeturf_detail",
+    "france_wikipedia_history_winners",
+    "us_hrn_detail",
+    "us_toba_history_winners"
+  ],
+  "regions": [
+    {
+      "region": "japan",
+      "source": "jra",
+      "source_authority": "official",
+      "series": [
+        {
+          "series_key": "tokyo-yushun",
+          "slugs": {
+            "2026": "jra-2026-tokyo-yushun"
+          },
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        }
+      ],
+      "modules": {
+        "runners": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        },
+        "results": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        },
+        "history_winners": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        }
+      }
+    },
+    {
+      "region": "hong_kong",
+      "source": "hkjc",
+      "source_authority": "official",
+      "series": [
+        {
+          "series_key": "hong-kong-cup",
+          "slugs": {
+            "2026": "hkjc-2026-hong-kong-cup"
+          },
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        }
+      ],
+      "modules": {
+        "runners": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        },
+        "results": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        },
+        "history_winners": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        }
+      }
+    },
+    {
+      "region": "united_kingdom",
+      "source": "sporting_life",
+      "source_authority": "third_party_high_access",
+      "series": [
+        {
+          "series_key": "uk-derby",
+          "slugs": {
+            "2026": "uk-derby-2026"
+          },
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        }
+      ],
+      "modules": {
+        "runners": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        },
+        "results": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        },
+        "history_winners": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        }
+      }
+    },
+    {
+      "region": "france",
+      "source": "zeturf",
+      "source_authority": "third_party_high_access",
+      "series": [
+        {
+          "series_key": "prix-de-l-arc-de-triomphe",
+          "slugs": {
+            "2026": "fr-france-galop-2026-prix-de-l-arc-de-triomphe"
+          },
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        }
+      ],
+      "modules": {
+        "runners": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        },
+        "results": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        },
+        "history_winners": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        }
+      }
+    },
+    {
+      "region": "united_states",
+      "source": "horse_racing_nation",
+      "source_authority": "third_party_high_access",
+      "series": [
+        {
+          "series_key": "kentucky-derby",
+          "slugs": {
+            "2026": "us-toba-2026-kentucky-derby"
+          },
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        }
+      ],
+      "modules": {
+        "runners": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        },
+        "results": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        },
+        "history_winners": {
+          "years": {
+            "start": 2026,
+            "end": 2026
+          }
+        }
+      }
+    }
+  ]
+}

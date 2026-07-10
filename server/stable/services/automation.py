@@ -31,6 +31,7 @@ from stable.services.terms import (
     source_terms_by_entry,
 )
 from stable.services.multiregion import auto_publish_policy_for_article
+from stable.services.news_attribution import classify_news_content
 from stable.services.race_grades import better_race_priority, normalize_race_grade, race_priority_for_grade
 
 
@@ -449,23 +450,25 @@ def log_automation(
 
 
 def classify_content_category(article: NewsArticle) -> str:
+    if (article.source_language or SourceLanguage.JAPANESE) == SourceLanguage.ENGLISH:
+        return classify_news_content(article)
     text = _source_text(article)
     title = article.title_ja or ""
     source_language = article.source_language or SourceLanguage.JAPANESE
     if article.source_site == "jra" or _contains_language_keyword(f"{title}\n{text}", OFFICIAL_KEYWORDS_BY_LANGUAGE, source_language):
-        return ContentCategory.OFFICIAL
+        return ContentCategory.OFFICIAL_NOTICE
     quote_count = text.count("「") + text.count("『")
     if _contains_language_keyword(text, INTERVIEW_KEYWORDS_BY_LANGUAGE, source_language) or (
         quote_count >= 4 and any(word in text for word in ["騎手", "調教師", "師"])
     ):
-        return ContentCategory.INTERVIEW
+        return ContentCategory.FEATURE
     if _contains_language_keyword(text, POST_RACE_KEYWORDS_BY_LANGUAGE, source_language):
-        return ContentCategory.POST_RACE
+        return ContentCategory.RESULT_BRIEF
     if _contains_language_keyword(text, PRE_RACE_KEYWORDS_BY_LANGUAGE, source_language):
-        return ContentCategory.PRE_RACE
+        return ContentCategory.PREVIEW
     if len(text) < 900:
-        return ContentCategory.FLASH
-    return ContentCategory.OTHER
+        return ContentCategory.NEWS
+    return ContentCategory.NEWS
 
 
 def p0_horse_hits(article: NewsArticle) -> list[dict]:
@@ -551,7 +554,7 @@ def _hard_rule_decision(article: NewsArticle, category: str) -> tuple[str | None
         return ReviewMode.IGNORED, RiskLevel.MEDIUM, ["疑似广告或导航类页面"], checks
 
     quote_count = text.count("「") + text.count("『")
-    if category == ContentCategory.INTERVIEW and (quote_count >= 8 or len(body) > 2400):
+    if category in {ContentCategory.INTERVIEW, ContentCategory.FEATURE} and (quote_count >= 8 or len(body) > 2400):
         checks.append("长采访或引语较多，后续作为 warning 记录")
     if article.translation_status != "translated":
         reasons.append("翻译尚未成功完成")
@@ -595,7 +598,16 @@ def score_article_for_automation(article: NewsArticle) -> AutomationDecision:
         value_score += 6
     if high_focus_hits:
         value_score += 10
-    if category in {ContentCategory.FLASH, ContentCategory.OFFICIAL, ContentCategory.POST_RACE, ContentCategory.PRE_RACE}:
+    if category in {
+        ContentCategory.FLASH,
+        ContentCategory.OFFICIAL,
+        ContentCategory.POST_RACE,
+        ContentCategory.PRE_RACE,
+        ContentCategory.NEWS,
+        ContentCategory.OFFICIAL_NOTICE,
+        ContentCategory.RESULT_BRIEF,
+        ContentCategory.PREVIEW,
+    }:
         value_score += 8
     age_hours = max(0, int((timezone.now() - article.published_at).total_seconds() // 3600))
     recency_score = 10 if age_hours <= 12 else 6 if age_hours <= 48 else 2

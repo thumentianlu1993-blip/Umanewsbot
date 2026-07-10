@@ -1,0 +1,18 @@
+{
+  "official": {
+    "description": "官方赛事、赛果或主办机构来源。默认优先用于候选与审计。",
+    "sources": ["jra", "nar", "hkjc"]
+  },
+  "third_party_high_access": {
+    "description": "可访问性高、结构稳定、适合作为受控候选来源的第三方站点。不得伪装为官方源。",
+    "sources": ["sporting_life", "zeturf", "horse_racing_nation"]
+  },
+  "third_party": {
+    "description": "第三方结构化或半结构化来源，需要更强人工复核或前序依赖。",
+    "sources": ["equibase"]
+  },
+  "reference": {
+    "description": "参考来源，主要用于历届冠军或佐证，进入 apply 前必须保留来源等级并通过人工确认。",
+    "sources": ["france_wikipedia", "toba"]
+  }
+}

@@ -29,6 +29,7 @@ from stable.services.terms import (
     source_term_matches_text,
     source_terms_by_entry,
 )
+from stable.services.news_attribution import article_region_set
 
 
 _NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
@@ -274,7 +275,13 @@ def _term_gate_region_allowed(entry: TermEntry, article: NewsArticle, source_lan
     if source_language != SourceLanguage.ENGLISH:
         return True
     term_region = entry.racing_region or GLOBAL_RACING_REGION
-    return term_region in {GLOBAL_RACING_REGION, article.racing_region or GLOBAL_RACING_REGION}
+    if term_region == GLOBAL_RACING_REGION:
+        return True
+    return term_region in article_region_set(article)
+
+
+def _article_regions_payload(article: NewsArticle) -> list[str]:
+    return sorted(article_region_set(article)) or [article.racing_region or GLOBAL_RACING_REGION]
 
 
 def _ambiguous_english_term_reason(entry: TermEntry, source_terms: list[str], *, is_core: bool) -> str:
@@ -289,6 +296,13 @@ def _ambiguous_english_term_reason(entry: TermEntry, source_terms: list[str], *,
         return "short_english_token"
     if any(candidate.isascii() and candidate.isupper() and len(candidate) <= 8 for candidate in visible_candidates):
         return "uppercase_english_token"
+    return ""
+
+
+def _ignored_source_term_reason(matched_source_term: str) -> str:
+    configured = _setting_list("MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS")
+    if (matched_source_term or "").strip().casefold() in configured:
+        return "confirmed_non_term_config"
     return ""
 
 
@@ -561,6 +575,7 @@ def validate_rewrite(
         "external_horse_names": [],
         "missing_known_terms": [],
         "term_gate_region_excluded_terms": [],
+        "ignored_non_term_gate_terms": [],
         "ambiguous_term_downgrades": [],
         "english_term_classifications": [],
         "missing_numbers": [],
@@ -661,6 +676,30 @@ def validate_rewrite(
         source_hit = _source_term_hit(source, source_terms, article_source_language)
         if not source_hit:
             continue
+        matched_source_term = _matched_source_term(source, source_terms, article_source_language)
+        ignored_reason = _ignored_source_term_reason(matched_source_term)
+        if ignored_reason:
+            payload = {
+                "term_id": entry.id,
+                "source_ja": entry.source_ja,
+                "matched_text": matched_source_term,
+                "term_type": entry.term_type,
+                "term_region": entry.racing_region or GLOBAL_RACING_REGION,
+                "article_region": article.racing_region or GLOBAL_RACING_REGION,
+                "article_regions": _article_regions_payload(article),
+                "source_language": entry.source_language,
+                "reason": ignored_reason,
+            }
+            details["ignored_non_term_gate_terms"].append(payload)
+            issues.append(
+                _issue(
+                    "non_term_gate_ignored",
+                    SEVERITY_INFO,
+                    "已确认非术语不参与发布阻断：" + entry.source_ja,
+                    payload=payload,
+                )
+            )
+            continue
         if not _term_gate_region_allowed(entry, article, article_source_language):
             payload = {
                 "term_id": entry.id,
@@ -669,6 +708,7 @@ def validate_rewrite(
                 "term_type": entry.term_type,
                 "term_region": entry.racing_region or GLOBAL_RACING_REGION,
                 "article_region": article.racing_region or GLOBAL_RACING_REGION,
+                "article_regions": _article_regions_payload(article),
                 "source_language": entry.source_language,
                 "reason": "region_mismatch",
             }
@@ -702,6 +742,7 @@ def validate_rewrite(
                     "position": "core" if is_core else "background",
                     "term_region": entry.racing_region or GLOBAL_RACING_REGION,
                     "article_region": article.racing_region or GLOBAL_RACING_REGION,
+                    "article_regions": _article_regions_payload(article),
                     "reason": ambiguous_reason,
                 }
                 details["ambiguous_term_downgrades"].append(payload)

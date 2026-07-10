@@ -27,6 +27,7 @@ from stable.models import (
     TermEntry,
     WorkflowStatus,
 )
+from stable.services.news_attribution import filter_articles_visible_in_region
 
 PRODUCTION_REGIONS = [
     RacingRegion.JAPAN,
@@ -237,7 +238,8 @@ def summarize_multiregion_news_production(*, now=None) -> dict[str, Any]:
     for region in PRODUCTION_REGIONS:
         sources = NewsSource.objects.filter(racing_region=region, deleted_at__isnull=True)
         enabled_sources = sources.filter(enabled=True)
-        articles = NewsArticle.objects.filter(racing_region=region)
+        primary_articles = NewsArticle.objects.filter(racing_region=region)
+        articles = filter_articles_visible_in_region(NewsArticle.objects.all(), region)
         active_articles = articles.exclude(
             workflow_status__in=[
                 WorkflowStatus.PUBLISHED,
@@ -247,8 +249,9 @@ def summarize_multiregion_news_production(*, now=None) -> dict[str, Any]:
             ]
         )
         recent_articles = articles.filter(first_seen_at__gte=recent_start)
-        qq_recent = QQPushDelivery.objects.filter(article__racing_region=region, created_at__gte=recent_start)
-        term_candidates = TermCandidate.objects.filter(evidence__article__racing_region=region).distinct()
+        visible_article_ids = articles.values("id")
+        qq_recent = QQPushDelivery.objects.filter(article_id__in=visible_article_ids, created_at__gte=recent_start)
+        term_candidates = TermCandidate.objects.filter(evidence__article_id__in=visible_article_ids).distinct()
         term_entries = TermEntry.objects.filter(
             Q(racing_region="") | Q(racing_region=region),
             source_language__in=[SourceLanguage.JAPANESE, SourceLanguage.ENGLISH, SourceLanguage.CHINESE_TRADITIONAL],
@@ -271,6 +274,8 @@ def summarize_multiregion_news_production(*, now=None) -> dict[str, Any]:
             },
             "articles": {
                 "total": articles.count(),
+                "primary_total": primary_articles.count(),
+                "related_visible_total": articles.exclude(racing_region=region).count(),
                 "today_new": articles.filter(first_seen_at__gte=today_start).count(),
                 "recent_24h": recent_articles.count(),
                 "workflow": _count_by(active_articles, "workflow_status"),

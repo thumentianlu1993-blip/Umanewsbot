@@ -12,6 +12,7 @@ from django.db.models import F, Q
 from django.utils import timezone
 
 from stable.models import (
+    ContentCategory,
     NewsArticle,
     PushTarget,
     QQPushDelivery,
@@ -21,6 +22,12 @@ from stable.models import (
     SourceMode,
     SourceSite,
     WorkflowStatus,
+)
+from stable.services.news_attribution import (
+    article_region_set,
+    article_related_region_labels,
+    region_label,
+    related_region_queries_enabled,
 )
 
 from .onebot import BotPusher
@@ -110,6 +117,20 @@ def article_region(article: NewsArticle) -> str:
     return (getattr(article, "racing_region", "") or "").strip()
 
 
+def article_regions(article: NewsArticle) -> set[str]:
+    regions = article_region_set(article, include_related=related_region_queries_enabled())
+    return {region for region in regions if region in FIRST_PHASE_REGIONS}
+
+
+def content_category_allowed_for_qq(article: NewsArticle) -> bool:
+    category = article.content_category or ContentCategory.NEWS
+    configured = getattr(settings, "MULTIREGION_QQ_ALLOWED_CONTENT_CATEGORIES", [])
+    allowed = {str(item).strip() for item in configured if str(item).strip()}
+    if not allowed:
+        return True
+    return category in allowed
+
+
 def is_article_public(article: NewsArticle) -> bool:
     return article.workflow_status == WorkflowStatus.PUBLISHED and article.published_to_web_at is not None
 
@@ -150,11 +171,13 @@ def should_push_news_to_qq(
         return PushEligibility(False, "article_not_public")
     if has_publish_blocker(article):
         return PushEligibility(False, "has_blocker")
-    region = article_region(article)
-    if region not in FIRST_PHASE_REGIONS:
+    regions = article_regions(article)
+    if not regions:
         return PushEligibility(False, "region_missing")
-    if target is not None and region not in target_allowed_regions(target):
+    if target is not None and not regions.intersection(target_allowed_regions(target)):
         return PushEligibility(False, "region_not_allowed")
+    if not content_category_allowed_for_qq(article):
+        return PushEligibility(False, "content_category_not_qq_eligible")
     resolved_scope = target_push_scope(target, scope)
     if resolved_scope == SCOPE_ALL_PUBLIC:
         return PushEligibility(True)
@@ -204,8 +227,15 @@ def build_qq_auto_push_message(article: NewsArticle, public_url: str | None = No
         summary = _truncate_with_ellipsis(summary)
     url = public_url or build_public_article_url(article)
     lines = [f"【UmaFans】{title}"]
-    if article_region(article) and article_region(article) != RacingRegion.JAPAN:
-        lines.append(f"地区：{article.get_racing_region_display()}")
+    primary_label = region_label(article.racing_region)
+    related_labels = article_related_region_labels(
+        article,
+        include_related=related_region_queries_enabled(),
+    )
+    if primary_label != "日本" or related_labels:
+        lines.append(f"地区：{primary_label}")
+    if related_labels:
+        lines.append(f"关联地区：{' / '.join(related_labels)}")
     if summary:
         lines.append(summary)
     lines.append(f"阅读全文：{url}")

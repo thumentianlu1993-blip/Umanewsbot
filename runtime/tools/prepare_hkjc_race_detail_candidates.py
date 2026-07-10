@@ -10,6 +10,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
+from race_event_request_budget import before_network_request
+
 from bs4 import BeautifulSoup
 
 try:
@@ -70,6 +72,7 @@ def _download(url: str, path: Path, *, allow_network: bool, timeout: int) -> str
             "Accept-Language": "zh-HK,zh;q=0.9,en;q=0.8",
         },
     )
+    before_network_request(url)
     with urlopen(request, timeout=timeout) as response:
         body = response.read()
     text = body.decode("utf-8", errors="replace")

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.db import models
 from django.utils import timezone
@@ -113,11 +114,19 @@ class AutomationStatus(models.TextChoices):
 
 
 class ContentCategory(models.TextChoices):
-    FLASH = "flash", "快讯"
-    PRE_RACE = "pre_race", "赛前前瞻"
-    POST_RACE = "post_race", "赛后结果/复盘"
-    OFFICIAL = "official", "官方公告"
-    INTERVIEW = "interview", "采访/人物"
+    NEWS = "news", "新闻"
+    PREVIEW = "preview", "赛前展望"
+    RESULT_BRIEF = "result_brief", "赛果简报"
+    OFFICIAL_NOTICE = "official_notice", "官方通知"
+    RACECARD_UPDATE = "racecard_update", "出赛/排位更新"
+    TIPS = "tips", "赛前预测/投注倾向"
+    FEATURE = "feature", "特写"
+    SALES_BREEDING = "sales_breeding", "育马/拍卖/机构"
+    FLASH = "flash", "快讯（旧）"
+    PRE_RACE = "pre_race", "赛前前瞻（旧）"
+    POST_RACE = "post_race", "赛后结果/复盘（旧）"
+    OFFICIAL = "official", "官方公告（旧）"
+    INTERVIEW = "interview", "采访/人物（旧）"
     OTHER = "other", "其他"
 
 
@@ -1236,7 +1245,15 @@ class NewsArticle(TimestampedModel):
     duplicate_reason = models.TextField(blank=True)
     automation_warning_email_signature = models.CharField(max_length=64, blank=True)
     automation_warning_email_sent_at = models.DateTimeField(null=True, blank=True)
-    content_category = models.CharField(max_length=32, choices=ContentCategory.choices, blank=True)
+    content_category = models.CharField(
+        max_length=32,
+        choices=ContentCategory.choices,
+        default=ContentCategory.NEWS,
+        blank=True,
+    )
+    attribution_source = models.CharField(max_length=64, blank=True)
+    attribution_summary = models.JSONField(default=dict, blank=True)
+    attribution_locked = models.BooleanField(default=False)
     editor_notes = models.TextField(blank=True)
     manually_edited_fields = models.JSONField(default=list, blank=True)
     translation_metadata = models.JSONField(default=dict, blank=True)
@@ -1350,6 +1367,36 @@ class NewsArticle(TimestampedModel):
             return ""
         return f"/news/{self.pk}/"
 
+    @property
+    def region_display_text(self) -> str:
+        from stable.services.news_attribution import (
+            article_related_region_labels,
+            related_region_queries_enabled,
+        )
+
+        primary = self.get_racing_region_display()
+        related = article_related_region_labels(
+            self,
+            include_related=related_region_queries_enabled(),
+        )
+        if related:
+            return f"{primary} · 相关：{' / '.join(related)}"
+        return primary
+
+    @property
+    def related_region_display_text(self) -> str:
+        from stable.services.news_attribution import (
+            article_related_region_labels,
+            related_region_queries_enabled,
+        )
+
+        return " / ".join(
+            article_related_region_labels(
+                self,
+                include_related=related_region_queries_enabled(),
+            )
+        )
+
     def get_absolute_url(self) -> str:
         return self.public_path
 
@@ -1439,6 +1486,42 @@ class NewsArticle(TimestampedModel):
                     seen.add(normalized)
                     merged_tags.append(normalized)
             self.tags_json = merged_tags
+
+
+class NewsArticleRelatedRegion(TimestampedModel):
+    article = models.ForeignKey(
+        NewsArticle,
+        on_delete=models.CASCADE,
+        related_name="related_region_links",
+    )
+    region = models.CharField(max_length=32, choices=RacingRegion.choices)
+    source = models.CharField(max_length=64, blank=True)
+    reason = models.CharField(max_length=255, blank=True)
+    confidence = models.PositiveSmallIntegerField(default=0)
+    is_manual = models.BooleanField(default=False)
+    evidence = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("region", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("article", "region"), name="uq_article_related_region"),
+        ]
+        indexes = [
+            models.Index(fields=("region", "article"), name="related_region_article_idx"),
+            models.Index(fields=("article", "region"), name="article_related_region_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.article_id}:{self.region}"
+
+    def clean(self):
+        super().clean()
+        if self.article_id and self.article.racing_region == self.region:
+            raise ValidationError({"region": "关联地区不能与文章主地区相同。"})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
 
 class NewsImage(TimestampedModel):

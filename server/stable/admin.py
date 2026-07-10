@@ -15,6 +15,7 @@ from .models import (
     MajorRaceEvent,
     MediaAsset,
     NewsArticle,
+    NewsArticleRelatedRegion,
     NewsImage,
     NewsSnapshot,
     NewsSource,
@@ -104,6 +105,13 @@ class ArticleRaceLinkInline(admin.TabularInline):
     can_delete = False
 
 
+class NewsArticleRelatedRegionInline(admin.TabularInline):
+    model = NewsArticleRelatedRegion
+    extra = 0
+    fields = ("region", "source", "reason", "confidence", "is_manual", "created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at")
+
+
 class TranslationRunInline(admin.TabularInline):
     model = TranslationRun
     extra = 0
@@ -171,6 +179,8 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "is_first_crawled",
         "first_seen_at",
         "last_seen_at",
+        "attribution_source",
+        "attribution_summary",
         "gate_issue_summary",
         "duplicate_article_link",
         "push_action_link",
@@ -185,6 +195,7 @@ class NewsArticleAdmin(admin.ModelAdmin):
         PushLogInline,
         QQPushDeliveryInline,
         ArticleRaceLinkInline,
+        NewsArticleRelatedRegionInline,
     ]
     actions = ["mark_pending_review", "mark_published_ready", "queue_translation"]
 
@@ -207,7 +218,7 @@ class NewsArticleAdmin(admin.ModelAdmin):
         ),
         ("来源原文", {"fields": ("title_ja", "body_ja_raw", "body_ja_normalized")}),
         ("翻译参考", {"fields": ("translated_title_zh", "translated_summary_zh", "translated_body_zh")}),
-        ("自动化运营", {"fields": ("review_mode", "risk_level", "automation_status", "content_category", "score_total", "quality_score", "rewrite_confidence", "decision_summary", "decision_reason", "gate_issues", "gate_issue_summary", "base_translation_zh", "rewrite_title_zh", "rewrite_summary_zh", "rewrite_body_zh", "published_by_mode", "auto_publish_at", "automation_error_message")}),
+        ("自动化运营", {"fields": ("review_mode", "risk_level", "automation_status", "content_category", "attribution_source", "attribution_locked", "attribution_summary", "score_total", "quality_score", "rewrite_confidence", "decision_summary", "decision_reason", "gate_issues", "gate_issue_summary", "base_translation_zh", "rewrite_title_zh", "rewrite_summary_zh", "rewrite_body_zh", "published_by_mode", "auto_publish_at", "automation_error_message")}),
         ("重复内容", {"fields": ("duplicate_of", "duplicate_article_link", "duplicate_score", "duplicate_reason", "automation_warning_email_signature", "automation_warning_email_sent_at")}),
         ("发布内容", {"fields": ("title_zh", "summary_zh", "body_zh", "source_note", "editor_notes", "workflow_status", "status")}),
         ("追踪信息", {"fields": ("is_first_crawled", "first_seen_at", "last_seen_at")}),

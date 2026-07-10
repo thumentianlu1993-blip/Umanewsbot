@@ -108,6 +108,7 @@ from .services.media_assets import localize_news_image, set_cover_asset
 from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
 from .services.onebot import BotPusher
 from .services.operations import log_operation
+from .services.news_attribution import filter_articles_visible_in_region
 from .services.production_windows import claim_window
 from .services.publishing_windows import select_publish_candidates
 from .services.pushing import enqueue_push_for_article
@@ -2068,6 +2069,7 @@ def article_editor(request: HttpRequest, article_id: int):
                 if article.workflow_status in {WorkflowStatus.PENDING_TRANSLATION, WorkflowStatus.TRANSLATION_FAILED}:
                     article.workflow_status = WorkflowStatus.PENDING_EDIT
             article.save()
+            form.save_related_regions(article)
             if intent == "publish":
                 from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article
 
@@ -2229,12 +2231,12 @@ def operation_log_list(request: HttpRequest):
 def _public_published_articles(region: str = ""):
     queryset = (
         NewsArticle.objects.select_related("cover_media_asset")
-        .prefetch_related("images")
+        .prefetch_related("images", "related_region_links")
         .filter(workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at__isnull=False)
         .order_by("-published_to_web_at", "-id")
     )
     if region:
-        queryset = queryset.filter(racing_region=region)
+        queryset = filter_articles_visible_in_region(queryset, region)
     return queryset
 
 
@@ -2500,7 +2502,11 @@ def public_news_feed(request: HttpRequest):
 
 def public_article_detail(request: HttpRequest, article_id: int):
     article = get_object_or_404(
-        NewsArticle.objects.prefetch_related("race_links__event", "horse_links__horse_profile"),
+        NewsArticle.objects.prefetch_related(
+            "race_links__event",
+            "horse_links__horse_profile",
+            "related_region_links",
+        ),
         workflow_status=WorkflowStatus.PUBLISHED,
         published_to_web_at__isnull=False,
         pk=article_id,

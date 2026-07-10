@@ -22,6 +22,7 @@ from stable.models import (
 )
 
 from .sources import find_builtin_source
+from .news_attribution import apply_article_attribution
 from .storage import download_image
 
 
@@ -145,7 +146,8 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
                 article.source_mode = draft.source_mode
                 article.source_config = source_config or article.source_config
                 article.crawl_job = crawl_job or article.crawl_job
-                article.racing_region = source_metadata["racing_region"]
+                if not article.attribution_locked:
+                    article.racing_region = source_metadata["racing_region"]
                 article.source_language = source_metadata["source_language"]
                 if source_config:
                     article.source_note = source_config.name
@@ -186,4 +188,5 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
                 except Exception:
                     image.local_path = ""
             image.save()
+        apply_article_attribution(article, source_config=article.source_config)
     return ArticleUpsertResult(article=article, created=created, source_elevated=source_elevated)

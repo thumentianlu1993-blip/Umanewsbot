@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 import requests
 from django.conf import settings as django_settings
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -44,6 +45,7 @@ from stable.adapters.international import (
     TDNFranceKeywordAdapter,
 )
 from stable.adapters.netkeiba import NetkeibaAdapter
+from stable.forms import ArticleEditorForm
 from stable.models import (
     ArticleTranslationStatus,
     AutomationStatus,
@@ -71,6 +73,7 @@ from stable.models import (
     HorseRaceResultStatus,
     NewsImage,
     NewsArticle,
+    NewsArticleRelatedRegion,
     NewsSnapshot,
     NewsSource,
     NotificationLog,
@@ -144,6 +147,7 @@ from stable.services.race_events import (
 )
 from stable.services.sources import BUILTIN_SOURCE_DEFINITIONS, sync_builtin_sources
 from stable.services.ingestion import ArticleUpsertResult, upsert_article_from_draft
+from stable.services.news_attribution import apply_article_attribution, article_region_set, filter_articles_visible_in_region
 from stable.services.term_admin import commit_term_import, preview_term_import
 from stable.services.term_candidate_review import accept_candidate, merge_candidate, set_candidate_status
 from stable.services.term_discovery import (
@@ -210,6 +214,478 @@ from stable.tasks import (
 
 
 User = get_user_model()
+
+
+class MultiRegionAttributionAndGateTests(TestCase):
+    def _article(self, **overrides):
+        payload = {
+            "source_site": SourceSite.TDN_FRANCE,
+            "source_mode": SourceMode.LATEST,
+            "source_article_id": overrides.pop("source_article_id", f"multi-{NewsArticle.objects.count()}"),
+            "racing_region": RacingRegion.FRANCE,
+            "source_language": SourceLanguage.ENGLISH,
+            "title_ja": "Ascot Gold Cup preview for Desert Crown",
+            "body_ja_raw": "Ascot Gold Cup preview for Desert Crown. " * 8,
+            "body_ja_normalized": "Ascot Gold Cup preview for Desert Crown. " * 8,
+            "translated_title_zh": "沙漠皇冠出战雅士谷金杯",
+            "translated_summary_zh": "沙漠皇冠将出战英国赛事。",
+            "translated_body_zh": "沙漠皇冠将出战雅士谷金杯。" * 12,
+            "title_zh": "沙漠皇冠出战雅士谷金杯",
+            "summary_zh": "沙漠皇冠将出战英国赛事。",
+            "body_zh": "沙漠皇冠将出战雅士谷金杯。" * 12,
+            "published_at": timezone.now(),
+            "source_url": overrides.pop("source_url", f"https://example.com/multi-{NewsArticle.objects.count()}"),
+            "translation_status": ArticleTranslationStatus.TRANSLATED,
+            "automation_status": AutomationStatus.PUBLISH_READY,
+            "workflow_status": WorkflowStatus.PENDING_REVIEW,
+            "review_mode": ReviewMode.AUTO,
+            "score_total": 90,
+            "quality_score": 90,
+        }
+        payload.update(overrides)
+        return NewsArticle.objects.create(**payload)
+
+    def test_attribution_promotes_event_region_and_keeps_france_related(self):
+        article = self._article()
+
+        result = apply_article_attribution(article, force=True)
+        article.refresh_from_db()
+
+        self.assertEqual(result.primary_region, RacingRegion.UNITED_KINGDOM)
+        self.assertEqual(article.racing_region, RacingRegion.UNITED_KINGDOM)
+        self.assertEqual(article.content_category, ContentCategory.PREVIEW)
+        self.assertEqual(article_region_set(article), {RacingRegion.UNITED_KINGDOM, RacingRegion.FRANCE})
+
+    def test_event_location_outranks_country_context(self):
+        article = self._article(
+            title_ja="Japanese star runs at Ascot",
+            body_ja_raw="A Japanese star runs at Ascot in the feature race. " * 8,
+            body_ja_normalized="A Japanese star runs at Ascot in the feature race. " * 8,
+        )
+
+        result = apply_article_attribution(article, force=True)
+        article.refresh_from_db()
+
+        self.assertEqual(result.primary_region, RacingRegion.UNITED_KINGDOM)
+        self.assertEqual(
+            article_region_set(article),
+            {RacingRegion.JAPAN, RacingRegion.UNITED_KINGDOM, RacingRegion.FRANCE},
+        )
+        self.assertEqual(article.attribution_summary["evidence"]["event_keyword_matches"], {
+            RacingRegion.UNITED_KINGDOM: ["ascot"],
+        })
+
+    def test_source_url_does_not_override_content_or_source_region(self):
+        article = self._article(
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            title_ja="Trainer announces stable update",
+            body_ja_raw="The trainer shared a routine stable update. " * 8,
+            body_ja_normalized="The trainer shared a routine stable update. " * 8,
+            source_url="https://example.com/france/longchamp/archive",
+        )
+
+        result = apply_article_attribution(article, force=True)
+        article.refresh_from_db()
+
+        self.assertEqual(result.primary_region, RacingRegion.UNITED_KINGDOM)
+        self.assertEqual(article_region_set(article), {RacingRegion.UNITED_KINGDOM})
+
+    def test_multiple_context_regions_fall_back_to_source_region(self):
+        article = self._article(
+            racing_region=RacingRegion.UNITED_STATES,
+            title_ja="Japanese and French breeding discussion",
+            body_ja_raw="Japanese and French breeding trends were discussed without a named race. " * 8,
+            body_ja_normalized="Japanese and French breeding trends were discussed without a named race. " * 8,
+        )
+
+        result = apply_article_attribution(article, force=True)
+        article.refresh_from_db()
+
+        self.assertEqual(result.primary_region, RacingRegion.UNITED_STATES)
+        self.assertEqual(
+            article_region_set(article),
+            {RacingRegion.JAPAN, RacingRegion.FRANCE, RacingRegion.UNITED_STATES},
+        )
+        self.assertEqual(result.reason, "source_region_with_ambiguous_context")
+
+    def test_ireland_content_is_temporarily_grouped_with_uk_and_tagged(self):
+        article = self._article(
+            title_ja="Irish Derby result at the Curragh",
+            body_ja_raw="Irish Derby result at the Curragh. " * 8,
+            body_ja_normalized="Irish Derby result at the Curragh. " * 8,
+        )
+
+        apply_article_attribution(article, force=True)
+        article.refresh_from_db()
+
+        self.assertIn(RacingRegion.UNITED_KINGDOM, article_region_set(article))
+        self.assertIn("ireland", article.tags_json)
+
+    def test_english_term_gate_accepts_terms_from_related_regions(self):
+        article = self._article(racing_region=RacingRegion.FRANCE)
+        NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.UNITED_KINGDOM, source="test")
+        TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            source_ja="Desert Crown",
+            target_zh="沙漠皇冠",
+            is_active=True,
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertTrue(outcome.passed, outcome.details)
+        self.assertEqual(outcome.details["term_gate_region_excluded_terms"], [])
+
+    @override_settings(MULTIREGION_RELATED_REGION_QUERIES_ENABLED=True)
+    def test_public_feed_region_filter_includes_related_region_articles(self):
+        article = self._article(
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+        )
+        NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.FRANCE, source="test")
+
+        visible = filter_articles_visible_in_region(
+            NewsArticle.objects.filter(workflow_status=WorkflowStatus.PUBLISHED),
+            RacingRegion.FRANCE,
+        )
+        response = self.client.get("/", {"region": RacingRegion.FRANCE})
+
+        self.assertEqual(list(visible), [article])
+        self.assertContains(response, article.title_zh)
+
+    @override_settings(QQ_PUSH_SCOPE="all_public")
+    def test_qq_eligibility_matches_related_region_and_blocks_tips_category(self):
+        article = self._article(
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+            content_category=ContentCategory.NEWS,
+        )
+        NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.FRANCE, source="test")
+        target = PushTarget.objects.create(
+            name="France group",
+            group_id="france-1",
+            allowed_regions=[RacingRegion.FRANCE],
+            is_active=True,
+        )
+
+        self.assertTrue(should_push_news_to_qq(article, target=target).allowed)
+        article.content_category = ContentCategory.TIPS
+        article.save(update_fields=["content_category", "updated_at"])
+
+        result = should_push_news_to_qq(article, target=target)
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.reason, "content_category_not_qq_eligible")
+
+    @override_settings(
+        QQ_PUSH_SCOPE="all_public",
+        MULTIREGION_RELATED_REGION_QUERIES_ENABLED=False,
+    )
+    def test_qq_single_region_fallback_ignores_related_regions(self):
+        article = self._article(
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+            content_category=ContentCategory.NEWS,
+        )
+        NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.FRANCE, source="test")
+        target = PushTarget.objects.create(
+            name="France fallback group",
+            group_id="france-fallback",
+            allowed_regions=[RacingRegion.FRANCE],
+            is_active=True,
+        )
+
+        result = should_push_news_to_qq(article, target=target)
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.reason, "region_not_allowed")
+        self.assertNotIn("关联地区", build_qq_auto_push_message(article))
+
+    @override_settings(QQ_PUSH_SCOPE="all_public")
+    def test_qq_default_categories_exclude_other(self):
+        article = self._article(
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+            content_category=ContentCategory.OTHER,
+        )
+        target = PushTarget.objects.create(
+            name="UK group",
+            group_id="uk-other",
+            allowed_regions=[RacingRegion.UNITED_KINGDOM],
+            is_active=True,
+        )
+
+        result = should_push_news_to_qq(article, target=target)
+
+        self.assertNotIn(ContentCategory.OTHER, django_settings.MULTIREGION_QQ_ALLOWED_CONTENT_CATEGORIES)
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.reason, "content_category_not_qq_eligible")
+
+    def test_article_editor_can_unlock_manual_attribution(self):
+        article = self._article(
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            attribution_locked=True,
+        )
+        NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.FRANCE, source="manual")
+        form = ArticleEditorForm(
+            data={
+                "racing_region": RacingRegion.UNITED_KINGDOM,
+                "related_regions": [RacingRegion.FRANCE],
+                "content_category": ContentCategory.NEWS,
+                "title_zh": article.title_zh,
+                "summary_zh": article.summary_zh,
+                "body_zh": article.body_zh,
+                "source_note": article.source_note,
+                "editor_notes": article.editor_notes,
+                "tags_text": "",
+            },
+            instance=article,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        article.refresh_from_db()
+
+        self.assertFalse(article.attribution_locked)
+        self.assertEqual(article_region_set(article), {RacingRegion.UNITED_KINGDOM, RacingRegion.FRANCE})
+
+    def test_article_editor_can_clear_all_related_regions(self):
+        article = self._article(racing_region=RacingRegion.UNITED_KINGDOM)
+        NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.FRANCE, source="manual")
+        form = ArticleEditorForm(
+            data={
+                "racing_region": RacingRegion.UNITED_KINGDOM,
+                "related_regions_present": "1",
+                "content_category": ContentCategory.NEWS,
+                "title_zh": article.title_zh,
+                "summary_zh": article.summary_zh,
+                "body_zh": article.body_zh,
+                "source_note": article.source_note,
+                "editor_notes": article.editor_notes,
+                "tags_text": "",
+            },
+            instance=article,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        article.refresh_from_db()
+
+        self.assertEqual(article_region_set(article), {RacingRegion.UNITED_KINGDOM})
+        self.assertFalse(article.related_region_links.exists())
+
+    def test_legacy_editor_payload_without_region_fields_preserves_related_regions(self):
+        article = self._article(racing_region=RacingRegion.UNITED_KINGDOM)
+        NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.FRANCE, source="manual")
+        form = ArticleEditorForm(
+            data={
+                "title_zh": article.title_zh,
+                "summary_zh": article.summary_zh,
+                "body_zh": article.body_zh,
+                "source_note": article.source_note,
+                "editor_notes": article.editor_notes,
+                "tags_text": "",
+            },
+            instance=article,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        self.assertEqual(article_region_set(article), {RacingRegion.UNITED_KINGDOM, RacingRegion.FRANCE})
+
+    def test_related_region_validation_returns_field_error_for_primary_region(self):
+        article = self._article(racing_region=RacingRegion.UNITED_KINGDOM)
+        link = NewsArticleRelatedRegion(article=article, region=RacingRegion.UNITED_KINGDOM)
+
+        with self.assertRaises(ValidationError) as raised:
+            link.full_clean()
+
+        self.assertIn("region", raised.exception.message_dict)
+        self.assertIn("不能与文章主地区相同", raised.exception.message_dict["region"][0])
+
+    def test_region_display_and_qq_message_show_primary_before_related_regions(self):
+        article = self._article(
+            racing_region=RacingRegion.UNITED_STATES,
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+        )
+        NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.JAPAN, source="test")
+        NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.FRANCE, source="test")
+
+        message = build_qq_auto_push_message(article)
+        response = self.client.get(article.public_path)
+
+        self.assertEqual(article.region_display_text, "美国 · 相关：日本 / 法国")
+        self.assertIn("地区：美国", message)
+        self.assertIn("关联地区：日本 / 法国", message)
+        self.assertContains(response, "主地区：")
+        self.assertContains(response, "美国")
+        self.assertContains(response, "关联地区：")
+        self.assertContains(response, "日本 / 法国")
+
+    @override_settings(MULTIREGION_RELATED_REGION_QUERIES_ENABLED=False)
+    def test_public_region_display_fallback_hides_related_regions_without_deleting_them(self):
+        article = self._article(
+            racing_region=RacingRegion.UNITED_STATES,
+            workflow_status=WorkflowStatus.PUBLISHED,
+            published_to_web_at=timezone.now(),
+        )
+        NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.JAPAN, source="test")
+        NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.FRANCE, source="test")
+
+        detail_response = self.client.get(article.public_path)
+        home_response = self.client.get("/")
+
+        self.assertEqual(article.region_display_text, "美国")
+        self.assertEqual(article.related_region_display_text, "")
+        self.assertContains(detail_response, "主地区：")
+        self.assertContains(detail_response, "美国")
+        self.assertNotContains(detail_response, "关联地区：")
+        self.assertContains(home_response, article.title_zh)
+        self.assertNotContains(home_response, "相关：日本")
+        self.assertEqual(article.related_region_links.count(), 2)
+
+    def test_publish_window_records_related_unpublished_article_without_publishing_it(self):
+        from stable.services.publishing_windows import select_publish_candidates
+
+        article = self._article(racing_region=RacingRegion.UNITED_KINGDOM)
+        NewsArticleRelatedRegion.objects.create(article=article, region=RacingRegion.FRANCE, source="test")
+        start = timezone.now().replace(second=0, microsecond=0)
+        window = ProductionWindow.objects.create(
+            kind=ProductionWindowKind.PUBLISH,
+            mode=ProductionWindowMode.DAILY,
+            racing_region=RacingRegion.FRANCE,
+            scope_key="region:france",
+            window_start=start,
+            window_end=start + timedelta(minutes=15),
+        )
+
+        result = select_publish_candidates(RacingRegion.FRANCE, window=window, now=timezone.now())
+
+        self.assertEqual(result.selected, [])
+        self.assertTrue(
+            WindowCandidateDecision.objects.filter(
+                window=window,
+                article=article,
+                reason="related_region_waiting_primary_region",
+            ).exists()
+        )
+
+    def test_reprocess_command_dry_run_does_not_write_and_commit_only_restores_candidate(self):
+        article = self._article(
+            racing_region=RacingRegion.FRANCE,
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            gate_issues=[
+                {
+                    "code": "term_region_excluded",
+                    "severity": "info",
+                    "payload": {"source_ja": "Desert Crown", "term_region": RacingRegion.UNITED_KINGDOM},
+                }
+            ],
+        )
+        TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            source_ja="Desert Crown",
+            target_zh="沙漠皇冠",
+            is_active=True,
+        )
+
+        dry_run_output = StringIO()
+        call_command(
+            "reprocess_multiregion_attribution_gates",
+            "--region",
+            RacingRegion.FRANCE,
+            "--dry-run",
+            "--json",
+            stdout=dry_run_output,
+        )
+        article.refresh_from_db()
+        self.assertEqual(article.racing_region, RacingRegion.FRANCE)
+        self.assertFalse(article.related_region_links.exists())
+        self.assertIn(str(article.id), dry_run_output.getvalue())
+
+        call_command(
+            "reprocess_multiregion_attribution_gates",
+            "--region",
+            RacingRegion.FRANCE,
+            "--commit",
+            stdout=StringIO(),
+        )
+        article.refresh_from_db()
+        self.assertEqual(article.racing_region, RacingRegion.UNITED_KINGDOM)
+        self.assertEqual(article.workflow_status, WorkflowStatus.PENDING_EDIT)
+        self.assertIsNone(article.published_to_web_at)
+        self.assertEqual(article_region_set(article), {RacingRegion.UNITED_KINGDOM, RacingRegion.FRANCE})
+
+    def test_reprocess_dry_run_respects_manual_attribution_lock(self):
+        article = self._article(
+            racing_region=RacingRegion.FRANCE,
+            attribution_locked=True,
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            gate_issues=[{"code": "term_region_excluded", "severity": "info"}],
+        )
+        output = StringIO()
+
+        call_command(
+            "reprocess_multiregion_attribution_gates",
+            "--region",
+            RacingRegion.FRANCE,
+            "--dry-run",
+            "--json",
+            stdout=output,
+        )
+        payload = json.loads(output.getvalue())
+        outcome = next(item for item in payload["outcomes"] if item["article_id"] == article.id)
+
+        self.assertTrue(outcome["attribution_locked"])
+        self.assertFalse(outcome["attribution_applied"])
+        self.assertEqual(outcome["new_regions"], {"primary": RacingRegion.FRANCE, "related": []})
+        self.assertEqual(outcome["inferred_regions"]["primary"], RacingRegion.UNITED_KINGDOM)
+
+    def test_reprocess_limit_counts_valid_candidates_instead_of_scanned_rows(self):
+        unrelated = self._article(
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            gate_issues=[{"code": "quality_warning", "severity": "warning"}],
+        )
+        first_candidate = self._article(
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            gate_issues=[{"code": "core_term_missing", "severity": "blocker"}],
+        )
+        second_candidate = self._article(
+            automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+            gate_issues=[{"code": "term_region_excluded", "severity": "info"}],
+        )
+        output = StringIO()
+
+        call_command(
+            "reprocess_multiregion_attribution_gates",
+            "--dry-run",
+            "--limit",
+            "1",
+            "--json",
+            stdout=output,
+        )
+        payload = json.loads(output.getvalue())
+
+        self.assertEqual(payload["candidate_ids"], [first_candidate.id])
+        self.assertEqual(payload["candidate_count"], 1)
+        self.assertEqual(payload["scanned_count"], 3)
+        self.assertTrue(payload["has_more_candidates"])
+        self.assertIn(unrelated.id, payload["skipped"]["no_reprocessable_gate"])
+        self.assertNotIn(second_candidate.id, payload["candidate_ids"])
 
 
 class TermResolverTests(TestCase):
@@ -1339,6 +1815,7 @@ class AdapterTests(TestCase):
 
     def test_tdn_france_keyword_listing_marks_france_region(self):
         adapter = TDNFranceKeywordAdapter()
+        adapter.max_api_article_age = None
 
         class FakeResponse:
             def raise_for_status(self):
@@ -1367,6 +1844,7 @@ class AdapterTests(TestCase):
 
     def test_tdn_france_broad_keyword_listing_aggregates_and_dedupes_queries(self):
         adapter = TDNFranceBroadKeywordAdapter()
+        adapter.max_api_article_age = None
 
         responses = [
             [
@@ -1434,6 +1912,7 @@ class AdapterTests(TestCase):
 
     def test_tdn_france_broad_keyword_listing_keeps_successful_queries_when_one_query_fails(self):
         adapter = TDNFranceBroadKeywordAdapter()
+        adapter.max_api_article_age = None
 
         class FakeResponse:
             status_code = 200
@@ -1858,6 +2337,39 @@ class IngestionSourceElevationTests(TestCase):
         self.assertEqual(article.source_mode, SourceMode.ACCESS)
         self.assertEqual(article.source_config, ranked_source)
         self.assertTrue(self.source_elevated(result))
+
+    def test_source_elevation_preserves_manually_locked_primary_region(self):
+        initial = upsert_article_from_draft(
+            self.make_source_draft(
+                "sky-ranked-locked-region",
+                SourceMode.LATEST,
+                source_site=SourceSite.SKY_SPORTS_RACING,
+                racing_region=RacingRegion.UNITED_KINGDOM,
+                source_language=SourceLanguage.ENGLISH,
+            )
+        )
+        article = self.unpack_article(initial)
+        article.racing_region = RacingRegion.FRANCE
+        article.attribution_locked = True
+        article.save(update_fields=["racing_region", "attribution_locked", "updated_at"])
+
+        result = upsert_article_from_draft(
+            self.make_source_draft(
+                "sky-ranked-locked-region",
+                SourceMode.ACCESS,
+                source_site=SourceSite.SKY_SPORTS_RACING,
+                rank=1,
+                racing_region=RacingRegion.UNITED_KINGDOM,
+                source_language=SourceLanguage.ENGLISH,
+            )
+        )
+
+        article = self.unpack_article(result)
+        article.refresh_from_db()
+        self.assertTrue(self.source_elevated(result))
+        self.assertEqual(article.source_mode, SourceMode.ACCESS)
+        self.assertEqual(article.racing_region, RacingRegion.FRANCE)
+        self.assertTrue(article.attribution_locked)
 
     def test_latest_source_does_not_override_international_ranked_source(self):
         ranked_draft = self.make_source_draft(
@@ -10693,7 +11205,7 @@ class AutomationFlowTests(TestCase):
 
         decision = score_article_for_automation(article)
 
-        self.assertEqual(decision.content_category, ContentCategory.PRE_RACE)
+        self.assertEqual(decision.content_category, ContentCategory.PREVIEW)
         self.assertEqual(decision.decision_reason["signals"]["race_priority"], "P0")
         self.assertIn("withdrawn", decision.decision_reason["signals"]["high_focus_hits"])
         self.assertIn("entries", decision.decision_reason["signals"]["high_focus_hits"])
@@ -11247,6 +11759,97 @@ class AutomationFlowTests(TestCase):
         for issue in blockers:
             self.assertEqual(issue["payload"]["term_semantic_classification"], "uncertain")
             self.assertTrue(issue["payload"]["classification_reason"])
+
+    @override_settings(MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS=["google play", "トレセン"])
+    def test_confirmed_non_terms_are_ignored_by_publish_gate(self):
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_ja="Google Play",
+            target_zh="谷歌商店",
+            priority=100,
+        )
+        english_article = self._translated_article(
+            source_article_id="english-non-term-ignored",
+            source_site=SourceSite.TDN,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            title_ja="Google Play links appear in the racing app article",
+            body_ja_raw="Google Play links appear in this article footer while the racing news continues. " * 8,
+            body_ja_normalized="Google Play links appear in this article footer while the racing news continues. " * 8,
+            translated_title_zh="应用页链接出现在赛马新闻中",
+            title_zh="应用页链接出现在赛马新闻中",
+            translated_body_zh="这是一篇赛马新闻，页脚含有应用下载链接。" * 12,
+            body_zh="这是一篇赛马新闻，页脚含有应用下载链接。" * 12,
+        )
+
+        english_outcome = validate_rewrite(english_article)
+
+        self.assertTrue(english_outcome.passed)
+        self.assertFalse(any(issue["code"] == "core_term_missing" for issue in english_outcome.issues))
+        self.assertTrue(any(issue["code"] == "non_term_gate_ignored" for issue in english_outcome.issues))
+
+        TermEntry.objects.create(
+            term_type="horse",
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="トレセン",
+            target_zh="训练中心",
+            priority=100,
+        )
+        japanese_article = self._translated_article(
+            source_article_id="japanese-non-term-ignored",
+            title_ja="トレセンニュース 調整順調",
+            body_ja_raw="トレセンニュースとして各馬の調整過程を紹介する。" * 8,
+            body_ja_normalized="トレセンニュースとして各馬の調整過程を紹介する。" * 8,
+            translated_title_zh="训练新闻 调整顺利",
+            title_zh="训练新闻 调整顺利",
+            translated_body_zh="这是一篇介绍各马调整过程的新闻。" * 12,
+            body_zh="这是一篇介绍各马调整过程的新闻。" * 12,
+        )
+
+        japanese_outcome = validate_rewrite(japanese_article)
+
+        self.assertTrue(japanese_outcome.passed)
+        self.assertFalse(any(issue["code"] == "core_term_missing" for issue in japanese_outcome.issues))
+        self.assertTrue(any(issue["code"] == "non_term_gate_ignored" for issue in japanese_outcome.issues))
+
+    @override_settings(MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS=["lane"])
+    def test_ignored_alias_does_not_bypass_gate_for_another_matched_source_term(self):
+        entry = TermEntry.objects.create(
+            term_type=TermType.RACE,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            source_ja="Royal Ascot",
+            target_zh="皇家雅士谷赛马周",
+            priority=100,
+        )
+        TermAlias.objects.create(
+            term=entry,
+            source_language=SourceLanguage.ENGLISH,
+            text="Lane",
+            alias_type=TermAliasType.ALIAS,
+            is_active=True,
+        )
+        article = self._translated_article(
+            source_article_id="english-ignore-alias-isolation",
+            source_site=SourceSite.SKY_SPORTS_RACING,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            title_ja="Royal Ascot entries announced",
+            body_ja_raw="Royal Ascot entries were announced for the feature race. " * 8,
+            body_ja_normalized="Royal Ascot entries were announced for the feature race. " * 8,
+            translated_title_zh="重要赛事报名名单公布",
+            title_zh="重要赛事报名名单公布",
+            translated_body_zh="重要赛事报名名单已经公布，参赛阵容受到关注。" * 12,
+            body_zh="重要赛事报名名单已经公布，参赛阵容受到关注。" * 12,
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertFalse(outcome.passed)
+        self.assertTrue(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
+        self.assertFalse(any(issue["code"] == "non_term_gate_ignored" for issue in outcome.issues))
 
     def test_english_term_gate_ignores_other_region_terms_but_keeps_global_terms(self):
         TermEntry.objects.create(
@@ -15115,6 +15718,22 @@ class RaceEventPageMVPTests(TestCase):
         self.assertEqual(first_result["created"], 1)
         self.assertEqual(second_result["skipped_removed"], 1)
         self.assertEqual(link.status, ArticleRaceLinkStatus.REMOVED)
+
+    def test_auto_association_maps_current_content_categories_to_race_link_types(self):
+        preview = self._article(content_category=ContentCategory.PREVIEW)
+        result_brief = self._article(content_category=ContentCategory.RESULT_BRIEF)
+
+        summary = associate_articles_for_event(self.event, articles=[preview, result_brief])
+
+        self.assertEqual(summary["created"], 2)
+        self.assertEqual(
+            ArticleRaceLink.objects.get(event=self.event, article=preview).link_type,
+            ArticleRaceLinkType.PRE_RACE,
+        )
+        self.assertEqual(
+            ArticleRaceLink.objects.get(event=self.event, article=result_brief).link_type,
+            ArticleRaceLinkType.POST_RACE,
+        )
 
     def test_auto_association_does_not_overwrite_manual_article_link(self):
         article = self._article(content_category=ContentCategory.PRE_RACE)

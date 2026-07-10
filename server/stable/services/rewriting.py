@@ -55,6 +55,14 @@ def _first_sentence(text: str, max_length: int = 160) -> str:
 
 def _category_instruction(category: str) -> str:
     instructions = {
+        ContentCategory.NEWS: "新闻：标题直接给信息点，首段先交代最重要事实。",
+        ContentCategory.PREVIEW: "赛前展望：突出赛事、时间、参赛马和看点。",
+        ContentCategory.RESULT_BRIEF: "赛果简报：突出结果、名次、关键表现和后续影响。",
+        ContentCategory.OFFICIAL_NOTICE: "官方通知：保持公告口径，语言克制，不扩大解读。",
+        ContentCategory.RACECARD_UPDATE: "出赛/排位更新：突出赛事、名单变化和时间节点。",
+        ContentCategory.TIPS: "赛前预测/投注倾向：保留判断来源，不扩大确定性。",
+        ContentCategory.FEATURE: "特写：保留人物和背景信息，避免替受访者加工观点。",
+        ContentCategory.SALES_BREEDING: "育马/拍卖/机构：突出交易、血统、机构动作和影响范围。",
         ContentCategory.FLASH: "快讯类：用短标题和短首段，突出发生了什么。",
         ContentCategory.PRE_RACE: "赛前前瞻：突出赛事、时间、参赛马和看点。",
         ContentCategory.POST_RACE: "赛果/复盘：突出结果、名次、关键表现和后续影响。",
@@ -62,7 +70,7 @@ def _category_instruction(category: str) -> str:
         ContentCategory.INTERVIEW: "采访/人物：保留引语边界，避免替受访者加工观点。",
         ContentCategory.OTHER: "其他：保守改写，优先准确和自然。",
     }
-    return instructions.get(category, instructions[ContentCategory.OTHER])
+    return instructions.get(category, instructions[ContentCategory.NEWS])
 
 
 _CONTROL_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
@@ -92,6 +100,10 @@ class FallbackRewriteProvider(RewriteProvider):
                 ContentCategory.OFFICIAL,
                 ContentCategory.PRE_RACE,
                 ContentCategory.POST_RACE,
+                ContentCategory.NEWS,
+                ContentCategory.PREVIEW,
+                ContentCategory.RESULT_BRIEF,
+                ContentCategory.OFFICIAL_NOTICE,
             }
             else 55
         )

@@ -1,0 +1,21 @@
+schema: spec-driven
+created: 2026-07-09
+profile: feature
+phase: implemented
+journal:
+  - event: plan-reviewed
+    date: "2026-07-10T04:00:12+08:00"
+    session: 1
+    mode: full
+    rounds: 1
+    issues_resolved: 3
+    artifacts_modified: [design.md, specs/race-event-data-crawl-orchestration/spec.md, tasks.md]
+    note: "Resolved adapter contract, target RaceEvent preflight, and five-region acceptance fixture coverage."
+  - event: implemented
+    date: "2026-07-10T23:41:33+08:00"
+    session: 1
+    note: "Implemented independent expected targets, combined candidates, shared request budgets, regional adapter acceptance, strict apply evidence, docs, and regression coverage; no real crawl or production write was run."
+  - event: review-fixes-applied
+    date: "2026-07-11T00:37:30+08:00"
+    session: 1
+    note: "Integrated latest main, resolved migration numbering, bound network inputs to approved expected targets, rejected empty or untraceable candidates, strengthened apply evidence and approval metadata, and passed 48 targeted plus 588 full stable tests; no production write was run."

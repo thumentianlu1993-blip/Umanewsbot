@@ -67,6 +67,30 @@
           <div class="help">{{ form.tags_text.help_text }} 系统会先自动摘取正文中命中的马名标签。</div>
           {% if form.tags_text.errors %}<div class="help" style="color: var(--danger);">{{ form.tags_text.errors|join:' ' }}</div>{% endif %}
         </div>
+        <div class="grid-2">
+          <div class="field">
+            <label for="{{ form.racing_region.id_for_label }}">主地区</label>
+            {{ form.racing_region }}
+            {% if form.racing_region.errors %}<div class="help" style="color: var(--danger);">{{ form.racing_region.errors|join:' ' }}</div>{% endif %}
+          </div>
+          <div class="field">
+            <label for="{{ form.content_category.id_for_label }}">内容类型</label>
+            {{ form.content_category }}
+            {% if form.content_category.errors %}<div class="help" style="color: var(--danger);">{{ form.content_category.errors|join:' ' }}</div>{% endif %}
+          </div>
+        </div>
+        <div class="field" style="margin-bottom: 14px;">
+          <label for="{{ form.related_regions.id_for_label }}">关联地区</label>
+          {{ form.related_regions_present }}
+          {{ form.related_regions }}
+          <div class="help">{{ form.related_regions.help_text }}</div>
+          {% if form.related_regions.errors %}<div class="help" style="color: var(--danger);">{{ form.related_regions.errors|join:' ' }}</div>{% endif %}
+        </div>
+        <div class="field" style="margin-bottom: 14px;">
+          <label>{{ form.attribution_locked }} 锁定归属</label>
+          <div class="help">锁定后，后续自动抓取不会覆盖当前地区归属。</div>
+          {% if form.attribution_locked.errors %}<div class="help" style="color: var(--danger);">{{ form.attribution_locked.errors|join:' ' }}</div>{% endif %}
+        </div>
         <div class="field" style="margin-bottom: 14px;">
           <label for="{{ form.body_zh.id_for_label }}">正文</label>
           {{ form.body_zh }}

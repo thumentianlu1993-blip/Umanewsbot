@@ -11,7 +11,7 @@
       </nav>
       <div class="article-meta">
         <span>{{ article.published_to_web_at|date:"Y-m-d H:i" }}</span>
-        <span>{{ article.get_racing_region_display }}</span>
+        <span>{{ article.region_display_text }}</span>
         <span>{{ article.source_note|default:article.get_source_site_display }}</span>
         <span>{{ article.get_source_language_display }}</span>
       </div>
@@ -46,7 +46,10 @@
       <div class="article-body">{{ article.effective_body|linebreaks }}</div>
       <section class="source-box">
         <p><strong>来源说明：</strong>{{ article.source_note|default:article.get_source_site_display }}</p>
-        <p><strong>地区：</strong>{{ article.get_racing_region_display }}</p>
+        <p><strong>主地区：</strong>{{ article.get_racing_region_display }}</p>
+        {% if article.related_region_display_text %}
+          <p><strong>关联地区：</strong>{{ article.related_region_display_text }}</p>
+        {% endif %}
         <p><strong>原文语言：</strong>{{ article.get_source_language_display }}</p>
         <p><strong>原文链接：</strong><a href="{{ article.source_url }}" target="_blank" rel="noreferrer">{{ article.source_url }}</a></p>
       </section>

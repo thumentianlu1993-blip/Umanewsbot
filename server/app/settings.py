@@ -230,6 +230,25 @@ MULTIREGION_TERM_GATE_COMMON_ENGLISH_TERMS = env_list(
     "MULTIREGION_TERM_GATE_COMMON_ENGLISH_TERMS",
     "",
 )
+MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS = env_list(
+    "MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS",
+    "Alex Hammond,Alive MediCare,Alrazeen,Amenity Support,AmWager,Antelligence Consulting,Assort Work,"
+    "Bentiga Orsa,Booked,Brien,CONY JAPAN,Cosmo Achieve,Delma Siliri,DMCA,DYM Career,Flickerjab,"
+    "French Blue,Ghostzapper,Glenmalure Flyer,Good,Good Partners,Google,Google Play,HIWU,HorseCenter,"
+    "Japan Create,Jiair Madrik,Joint Service,Jpn,Katzoff,Kotohodo Sayouni,Ladies VS Rookies Battle,"
+    "Lane,Law,Long Pour,Look,Medaglia,MEDILCY,Merry Christmas,Mid Century,Midshipman,Minute,Motorboat,"
+    "Nebula Disc,Noble Granz,NRs,OBSAPR,Our Moneyman,Paddy Power,PayPay,PUBLISHERID,Ragozin,Redbarn,"
+    "ReFa,Sax Appeal,Ship Ship Hooray,TAGID,Ten Sovereigns,Thoroughmanager,Tiz,Touch,TVh,Vase,Vidiprinter,"
+    "Wide Blizzard,アーバン,イベント,オーナー,オープン,サイト,サノノ,システム,ショウナン,スター,スーパー,"
+    "ソンシ,ダービー,チーム,トレセン,トレーニング・センター,フリー,ペース,ボートレースレディースVSルーキーズバトル,"
+    "マーク,メール,ユタカ,ユース,リーディング,レコード",
+)
+MULTIREGION_ATTRIBUTION_ENABLED = env_bool("MULTIREGION_ATTRIBUTION_ENABLED", True)
+MULTIREGION_RELATED_REGION_QUERIES_ENABLED = env_bool("MULTIREGION_RELATED_REGION_QUERIES_ENABLED", True)
+MULTIREGION_QQ_ALLOWED_CONTENT_CATEGORIES = env_list(
+    "MULTIREGION_QQ_ALLOWED_CONTENT_CATEGORIES",
+    "news,preview,result_brief,feature,flash,pre_race,post_race,official,interview",
+)
 MULTIREGION_SUPPORTED_PRODUCTION_SOURCE_LANGUAGES = env_list(
     "MULTIREGION_SUPPORTED_PRODUCTION_SOURCE_LANGUAGES",
     "ja,en,zh-hant",

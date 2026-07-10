@@ -241,6 +241,85 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py s
 - 迁移异常：优先使用数据库备份恢复；如必须迁回，先确认没有新写入 `HorseProfile` / `HorseFollow` / `ArticleHorseLink` 数据。
 - 补全误写：优先按 artifact 的 diff 和 `HorseProfileDataCandidate` 审计恢复字段；大范围异常使用部署前数据库备份。
 - 公开入口异常：先将受影响 `HorseProfile.review_status` 批量改回 `hidden` 或 `draft`，再修代码。
+## 2026-07-10 RaceEvent 赛事信息编排工具运行边界
+
+本工具对应 OpenSpec change `orchestrate-race-event-data-crawls`，第一版只服务 `RaceEvent*` 产品层赛事详情回填，不写 `ExternalRace*` / `ExternalHorse*`，不创建新闻文章，不触发翻译、自动发布或 QQ 推送。长期历史抓取必须手动分批或一次性容器执行，不加入 Celery Beat。
+
+本地/生产通用阶段：
+
+1. 校验并创建运行目录：
+   - `python server/manage.py orchestrate_race_event_crawl --plan <plan.json> --stage plan`
+   - 该阶段会在任何网络请求前生成不可随抓取结果缩减的 `<run_dir>/expected_targets.json`，并生成 `<run_dir>/review/expected_targets_review.csv`。快照绑定 plan SHA-256；清单为空、目标重复、正式 `RaceEvent` 缺失或恢复时 plan 已变化都会停止后续真实抓取。
+   - 第一批真实抓取前必须人工查看 review CSV，逐行确认赛事中英文名、年份、地区、slug 和 `preflight_status=ready`。发现缺漏或错配时修改 plan / `RaceEvent` 后创建新 run，不得用实际抓到的候选反推或缩减应到范围。
+2. 准备候选来源与 adapter 产物：
+   - `python server/manage.py orchestrate_race_event_crawl --plan <plan.json> --stage prepare`
+   - plan 未设置 `allow_network=true` 时，声明需要网络的 adapter 会被阻止。
+   - `batch_size` 会限制单地区目标赛事年份数量；`rate_limit.max_requests` 与 `request_interval_seconds` 会由该 run 的全部网络 adapter 共同执行。累计状态保存在 `<run_dir>/request_budget.json`，失败请求也计数；artifact 损坏时停止请求，不重置额度。
+   - 全部 adapter 成功后会生成 `<run_dir>/candidates/combined_candidates.jsonl`，同时保留每个 adapter 的原始、review 和归一化产物。
+3. 覆盖审计：
+   - `python server/manage.py orchestrate_race_event_crawl --plan <plan.json> --stage audit --series-mapping <series_mapping.json> --run-dir <run_dir>`
+   - 未显式传 `--candidate-jsonl` 时默认审计 run state 中的 combined candidate；只有调试单独文件时才覆盖该参数。
+   - blocker 包括 `missing_event_candidate`、`unexpected_candidate`、`missing_race_event`、缺模块、未审核 mapping、重复候选、source URL 一对多、manual lock、候选更不完整等。即使实际候选为零，也必须按独立应到清单逐项报缺，不能空跑通过。
+4. Django dry-run：
+   - `python server/manage.py orchestrate_race_event_crawl --plan <plan.json> --stage dry-run --run-dir <run_dir>`
+   - 未显式传 `--candidate-jsonl` 时同样默认使用 combined candidate。
+   - dry-run 仍会按 `year + slug` 查询 `RaceEvent`，因此深历史目标行缺失时必须先处理 seed review artifact。
+   - 成功后固定生成结构化 `<run_dir>/dry_run.json`，其中 `status=passed`，并记录候选 JSONL 的绝对路径、大小和 SHA-256；`dry_run.txt` 只保留 importer 原始输出，不可单独作为 apply 证据。
+5. apply-check：
+   - `python server/manage.py orchestrate_race_event_crawl --plan <plan.json> --stage apply-check --coverage-audit <coverage_audit.json> --dry-run-artifact <run_dir>/dry_run.json --confirmations <confirmations.json> --production-evidence <production_evidence.json> --apply-scope <apply_scope.json> --candidate-jsonl <candidates.jsonl> --run-dir <run_dir>`
+   - 只生成显式 apply 命令，不自动执行正式写入。
+   - `coverage_audit.json`、`dry_run.json` 和待 apply JSONL 的 SHA-256 必须完全一致；候选在审计后有任何修改，都必须重新执行 audit 和 dry-run。旧审计产物缺少候选身份时会被阻止，不能通过显式传入另一份 `--candidate-jsonl` 绕过。
+   - coverage 发现同一赛事不同模块使用不同来源或 source authority 时，会输出 `mixed_source_strategies[].strategy_sha256`；对应人工确认必须在 `mixed_source_strategy_sha256s` 中逐项列出这些哈希。
+   - coverage 会输出 `actual_apply_scopes`。单一组合可继续使用顶层 `region/source/modules`；多组合必须在 `apply_scope.json` 中使用 `{"scopes": [...]}`，且每个实际组合都要有对应 confirmation。范围不完全一致时返回 `apply_scope_mismatch`，不会生成命令。
+   - 全绿后生成 `<run_dir>/approved/candidates-<sha256>.jsonl`。显式命令只引用该绝对路径，并带 `--expected-sha256 <sha256>`；不得去掉哈希参数或改回普通 combined candidate 路径。
+6. 中断恢复：
+   - `python server/manage.py orchestrate_race_event_crawl --stage resume --state <run_dir>/state.json`
+   - state 会记录每个 adapter 的输入指纹、必需输出路径/大小/SHA-256、成功/失败结果和恢复历史；只有输入未变化且全部必需输出仍存在、哈希一致时才会跳过。输出缺失、变化或旧 state 没有输出哈希时会重新执行 adapter。
+   - audit 被 blocker 阻止后，可修正候选 JSONL 或 series mapping，再执行同一 resume 命令重跑 coverage audit；dry-run 和 apply-check 的成功/失败也会写入同一 state，resume 会使用保存的阶段输入依次重跑必要门禁。
+
+生产 apply 前必须具备：
+
+- coverage audit 无 blocker。
+- `import_race_event_detail_candidates --dry-run` 证据通过。
+- 首批“地区 + 来源 + 模块组合”人工确认记录。
+- 候选记录均有合法 `source_authority`；adapter 候选中的 `adapter_key`、`source_provider`、地区、模块和权威等级与 manifest 一致；混合来源策略已按 coverage 输出的策略哈希人工确认。
+- `actual_apply_scopes` 中每个“地区 + 来源 + 模块组合”均被 apply scope 和 confirmation 覆盖。
+- approved candidate 文件存在，最终 importer 命令携带匹配的 `--expected-sha256`；执行时哈希不一致必须零写入失败。
+- `ExternalDataImportRun(status="started")=0` 且 `ExternalDataImportLock.locked_by_run_id` 非空并指向 started run 的计数为 `0`；持久化但 `locked_by_run_id=None` 的空闲锁行不算活跃锁。
+- `/healthz/` 本地与 Host 健康。
+- 数据库备份路径和 `gzip -t` 结果。
+- 数据库备份路径必须指向实际可读取的备份文件；仅填写字符串或伪造 `gzip` 状态无法通过 apply-check。
+- 已有正式数据 diff/review 必须显式记录 `status=approved`，特别是会按模块整体替换的 `runners/results/history_winners`。
+
+第一验收 fixture 位于 `server/stable/fixtures/race_event_crawl/first_acceptance_plan.json`，必须覆盖日本、香港、英国、法国、美国五地区少数核心赛事系列，并同时包含 `runners`、`results`、`history_winners` 三模块。来源权威等级矩阵位于 `server/stable/fixtures/race_event_crawl/source_authority_matrix.json`。
+
+用户在第一批真实抓取前只需协助一次应到清单审核：Codex 提供实际 CSV 路径后，确认每行赛事中英文名、年份、地区和 slug 正确，并指出缺少或多出的赛事。请求上限、间隔、adapter 选择、候选哈希、coverage 和 apply 证据等技术项由工程侧负责；若用户未确认清单，第一批真实网络抓取不应开始。
+
+## 2026-07-10 英法赛事详情生产复核与 Grand Prix de Saint-Cloud 历史冠军修复
+
+- 生产服务器：`/opt/umanewsbot`。
+- 生产预检：
+  - `HEAD=65988b0`。
+  - `web / db / redis` healthy，`worker / beat / nginx` 运行。
+  - `python manage.py check` 通过。
+  - `http://127.0.0.1/healthz/` 与 Host `umafans.run` `/healthz/` 均返回 `{"status": "ok"}`。
+  - `ExternalDataImportRun(status="started")=0`，HKJC / netkeiba 导入锁为空。
+- 复核结论：
+  - 生产英法赛事详情已经正式导入，不需要重复 apply 整批规范 JSONL。
+  - 英国：`sporting_life` runners/results applied `116 + 116`，`sporting_life_gap` runners/results applied `6 + 6`；`Jane Seymour Nov. Hurdle` 在线状态为 `cancelled`。
+  - 法国：`zeturf` runners/results 已 applied；`GRAND PRIX DE SAINT-CLOUD` 当前正式出走表 / 赛果均来自正确 `R1C5` 页面，冠军为 `CALANDAGAN`。
+  - 发现遗留污染：该赛事 `RaceEventHistoryWinner` 中 `2026` 年冠军仍来自早先误配 `R1C4` 的 `ZELMAN`。
+- 修复流程：
+  - 生成单场 JSONL：`grand_prix_saint_cloud_history_repair_20260710.jsonl`，只包含 `fr-france-galop-2026-0705-044` 的 `history_winners` 7 条。
+  - 生产 dry-run：`events=1 modules=1 items={"history_winners": 7}`。
+  - 写入前备份：`backups/db/pre-race-detail-gpsc-history-repair-20260710_025949.sql.gz`，约 `96M`，`gzip -t` 通过。
+  - 正式 apply：`events=1 candidates=1 applied=1 items={"history_winners": 7}`，新增 applied candidate `2914`。
+- 验收：
+  - `RaceEventRunner=5096`、`RaceEventResult=4572`、`RaceEventHistoryWinner=5731`、`RaceEventDataCandidate=2914`。
+  - `RaceEventDataCandidate(status="pending")=0`、`failed=2`。
+  - `GRAND PRIX DE SAINT-CLOUD` 历史冠军 `2026` 已为 `CALANDAGAN`，source 指向 ZEturf `R1C5`。
+  - 公网 `/races/2026/fr-france-galop-2026-0705-044/` 返回页面包含 `CALANDAGAN`，未再显示 `ZELMAN`。
+  - 本地和 Host `/healthz/` 均返回 `{"status": "ok"}`。
 
 ## 2026-07-07 法国新闻源扩展与英文术语门禁地区过滤上线
 
@@ -3551,6 +3630,47 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
   - 最近 3 小时没有新入库美国文章，也没有发布候选。
   - 结论：当前主因是来源没有新稿；早间 TDN 短暂失败已恢复，不是最新窗口 0 发布主因。
 
+## 多地区归属与英文门禁上线检查
+
+适用 change：`support-multiregion-news-attribution-and-english-gates`。
+
+上线前：
+
+1. 备份生产数据库。
+2. 确认待部署代码包含迁移 `stable.0023_multiregion_news_attribution`，并依赖已上线的 `stable.0022_horseprofile_horsefollow_articlehorselink_and_more`。
+3. 本地或 CI 需通过：
+   - `DB_ENGINE=sqlite .venv/bin/python server/manage.py check`
+   - `.venv/bin/python server/manage.py makemigrations --check --dry-run`
+   - `.venv/bin/python server/manage.py test stable.tests.MultiRegionAttributionAndGateTests stable.tests.IngestionSourceElevationTests stable.tests.InternationalSourceMetadataTests stable.tests.MultiRegionNewsProductionTests stable.tests.TermRegionFilterTests stable.tests.QQAutoPushTests stable.tests.QQWindowServiceTests stable.tests.PublishWindowServiceTests --keepdb`
+   - `openspec validate support-multiregion-news-attribution-and-english-gates --strict`
+4. 如本地没有 `.env`，`docker compose ... config` 可临时复制 `.env.example` 为 `.env`，校验后立即删除。
+
+上线后：
+
+1. 执行迁移并确认：
+   - `.venv/bin/python server/manage.py showmigrations stable | grep 0022`
+2. 先 dry-run 重算近期英文门禁文章：
+   - `.venv/bin/python server/manage.py reprocess_multiregion_attribution_gates --region france --hours 6 --dry-run --json`
+   - `.venv/bin/python server/manage.py reprocess_multiregion_attribution_gates --region united_kingdom --hours 6 --dry-run --json`
+   - `.venv/bin/python server/manage.py reprocess_multiregion_attribution_gates --region hong_kong --hours 6 --dry-run --json`
+3. 抽样确认 `old_regions / new_regions / inferred_regions / attribution_locked / attribution_applied / blockers` 符合预期后，再按地区小批量 commit。人工锁定文章应保持 `attribution_applied=false`，且 `new_regions` 代表 commit 实际会使用的地区；`scanned_count / candidate_count / has_more_candidates` 用于判断是否需要继续分批，`--limit` 按有效候选数量计算。commit 只恢复候选，不直接发布。
+4. 验收公开页：
+   - `/`
+   - `/?region=france`
+   - `/?region=united_kingdom`
+   - 抽样文章详情页确认地区标签显示多个地区。
+   - 确认主地区单独显示且关联地区不会排在主地区之前；文章编辑页取消全部关联地区后可保存为空。
+5. 验收窗口审计：
+   - `audit_multiregion_news_production --json` 中确认 `primary_total / related_visible_total`、发布 0 原因、QQ 0 原因正常。
+6. 回滚时可先设置：
+   - `MULTIREGION_ATTRIBUTION_ENABLED=false`
+   - `MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`
+   - 必要时收窄 `MULTIREGION_QQ_ALLOWED_CONTENT_CATEGORIES`
+
+`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false` 必须同时让公开地区 tab、公开列表卡片/文章详情地区展示、发布窗口、QQ 窗口和文章发布后的 QQ 即时任务只使用主地区；关联地区数据不删除。验收回滚配置时至少用一篇“英国主地区 + 法国关联地区”文章确认：法国群返回 `region_not_allowed`，首页卡片和文章详情不显示法国关联地区。
+
+迁移回滚一般不建议删除 `NewsArticleRelatedRegion` 表；代码回滚后该表可闲置，不影响旧主地区逻辑。
+
 ### 2026-07-02 15:10 最近 2 小时窗口复核
 
 - 复核口径：`13:15` 至 `15:00` 自然窗口，服务器时区 CST。
@@ -3630,3 +3750,15 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
   1. 观察最近发布窗口的 `WindowCandidateDecision.payload.ranked_revival`、翻译重试任务、重新评分结果和 QQ delivery。
   2. 当新着顺旧稿后续进入榜单时，确认未发布文章走“重试翻译 / 重新评分 / 发布窗口候选”链路，而不是直接发布或直接 QQ 推送。
 - 回滚边界：如需回滚代码，`ranked_revived_at` 字段可留存不用，不影响旧逻辑；如需删除字段，后续单独做清理迁移。
+
+### 2026-07-11 赛事历史抓取证据链验收步骤
+
+1. 先运行 plan 阶段，检查 `<run>/expected_targets.json` 和 `review/expected_targets_review.csv`；不得直接修改应到 JSON。
+2. 审核无误后编辑固定的 `review/expected_targets_approval.json`，把 `status` 设为 `approved`，填写 `approved_by / approved_at`，并保持其中 `expected_targets_identity.sha256` 与当前文件一致。
+3. 只有审批通过后才允许网络 prepare。确认 `<run>/input/events_<region>.csv` 仅包含该地区本次计划目标；不要把工作区共享 `events.csv` 复制进 run 目录代替生成文件。
+4. coverage 必须无 blocker；重点检查 `series_needs_review`、`empty_<module>`、`source_url_missing` 和应到/实到差异。
+5. apply-check 前准备真实数据库 gzip 备份。工具会完整读取并解压校验，手工写 `backup_gzip_test=passed` 不能替代真实文件。
+6. 每个实际 `region + source + modules` 确认记录必须包含 `status=approved`、`confirmed_by`、`confirmed_at`；coverage、dry-run、当前应到清单和批准候选的 SHA-256 必须一致。
+7. 只执行 apply-check 生成、带 `--expected-sha256` 的 importer 命令。任何 blocker 出现时重新生成相应证据，不得手改 apply-check 结果绕过。
+
+本轮只完成本地实现与测试，未执行生产赛事抓取或写入。多地区新闻迁移编号为 `stable.0023_multiregion_news_attribution`，部署时必须先确认 `stable.0022_horseprofile_horsefollow_articlehorselink_and_more` 已应用。

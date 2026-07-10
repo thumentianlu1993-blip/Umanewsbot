@@ -22,6 +22,7 @@ from stable.models import (
     WorkflowStatus,
 )
 from stable.services.automation import is_ready_for_auto_publish
+from stable.services.news_attribution import article_region_set, filter_articles_visible_in_region
 
 
 @dataclass(frozen=True)
@@ -45,14 +46,13 @@ def hard_gate_article(article: NewsArticle) -> tuple[bool, str]:
 def _candidate_queryset(region: str, *, now):
     lookback_hours = int(getattr(settings, "MULTIREGION_PUBLISH_CANDIDATE_LOOKBACK_HOURS", 3))
     cutoff = now - timedelta(hours=lookback_hours)
-    return (
-        NewsArticle.objects.filter(
-            racing_region=region,
-        )
+    queryset = (
+        NewsArticle.objects.all()
         .filter(Q(first_seen_at__gte=cutoff) | Q(ranked_revived_at__gte=cutoff))
         .exclude(workflow_status__in=[WorkflowStatus.PUBLISHED, WorkflowStatus.WITHDRAWN, WorkflowStatus.IGNORED])
         .order_by("-score_total", "-quality_score", "-ranked_revived_at", "-first_seen_at", "id")
     )
+    return filter_articles_visible_in_region(queryset, region)
 
 
 def _candidate_payload(article: NewsArticle, *, extra: dict | None = None) -> dict:
@@ -62,6 +62,8 @@ def _candidate_payload(article: NewsArticle, *, extra: dict | None = None) -> di
         "ranked_revived_at": article.ranked_revived_at.isoformat() if article.ranked_revived_at else "",
         "ranked_revival_source_site": revival.get("source_site", ""),
         "ranked_revival_source_mode": revival.get("source_mode", ""),
+        "primary_region": article.racing_region,
+        "visible_regions": sorted(article_region_set(article)),
     }
     if extra:
         payload.update(extra)
@@ -132,6 +134,15 @@ def select_publish_candidates(region: str, *, window: ProductionWindow, now=None
     ready: list[NewsArticle] = []
     fingerprints: dict[str, NewsArticle] = {}
     for article in _candidate_queryset(region, now=now):
+        if article.racing_region != region:
+            _record_candidate(
+                window=window,
+                article=article,
+                status=WindowDecisionStatus.SKIPPED,
+                reason="related_region_waiting_primary_region",
+                payload=_candidate_payload(article),
+            )
+            continue
         allowed, reason = hard_gate_article(article)
         if not allowed:
             _record_candidate(

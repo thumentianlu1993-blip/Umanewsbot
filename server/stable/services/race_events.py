@@ -415,9 +415,9 @@ def _article_text(article: NewsArticle, *fields: str) -> str:
 
 
 def _classify_article_link(article: NewsArticle, event: RaceEvent) -> str:
-    if article.content_category == ContentCategory.PRE_RACE:
+    if article.content_category in {ContentCategory.PRE_RACE, ContentCategory.PREVIEW, ContentCategory.TIPS}:
         return ArticleRaceLinkType.PRE_RACE
-    if article.content_category == ContentCategory.POST_RACE:
+    if article.content_category in {ContentCategory.POST_RACE, ContentCategory.RESULT_BRIEF}:
         return ArticleRaceLinkType.POST_RACE
     if event.local_date and article.published_at:
         article_date = timezone.localdate(article.published_at)

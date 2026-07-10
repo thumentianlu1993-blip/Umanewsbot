@@ -50,6 +50,7 @@ from stable.services.automation import (
 from stable.services.ingestion import upsert_article_from_draft
 from stable.services.multiregion import auto_publish_count_today, auto_publish_policy_for_article
 from stable.services.multiregion import summarize_multiregion_news_production
+from stable.services.news_attribution import apply_article_attribution
 from stable.services.notifications import send_automation_notification, send_high_value_warning_notification
 from stable.services.operations import log_operation
 from stable.services.ops_notifications import send_production_summary_notification
@@ -813,6 +814,8 @@ def score_article_task(article_id: int) -> dict:
     log = _log_start("score_article", {"article_id": article_id})
     article = NewsArticle.objects.get(pk=article_id)
     try:
+        apply_article_attribution(article)
+        article.refresh_from_db()
         decision = score_article_for_automation(article)
         apply_score_decision(article, decision)
         _log_success(log, decision.decision_summary)
