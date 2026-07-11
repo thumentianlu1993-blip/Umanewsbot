@@ -95,6 +95,35 @@ class RaceEventCrawlOrchestrationTestCase(TestCase):
             ["https://www.jra.go.jp/datafile/seiseki/g1/derby/result/derby2026.html"],
         )
 
+    def test_jra_history_current_winner_is_enriched_from_detail_result(self):
+        tool = self._runtime_tool("prepare_jra_history_winner_candidates.py")
+        items = [
+            {
+                "winner_year": 2026,
+                "horse_name": "ロブチェン",
+                "jockey_name": "松山 弘平",
+                "trainer_name": "",
+                "finish_time": "",
+                "margin": "",
+                "source_refs": {"primary": "https://www.jra.go.jp/history"},
+            }
+        ]
+
+        result = tool._enrich_current_winner(
+            items,
+            event={"year": "2026"},
+            detail_winner={
+                "horse_name": "ロブチェン",
+                "trainer_name": "杉山 晴紀",
+                "finish_time": "2:22.7",
+                "source_refs": {"primary": "https://www.jra.go.jp/derby2026"},
+            },
+        )
+
+        self.assertEqual(result[0]["trainer_name"], "杉山 晴紀")
+        self.assertEqual(result[0]["finish_time"], "2:22.7")
+        self.assertEqual(result[0]["source_refs"]["current_result"], "https://www.jra.go.jp/derby2026")
+
     def _race_event(self, *, year=2026, slug="uk-derby-2026", series_key="uk-derby", region=RacingRegion.UNITED_KINGDOM, locks=None):
         return RaceEvent.objects.create(
             year=year,
@@ -1131,6 +1160,50 @@ class RaceEventCrawlCoverageAuditTests(RaceEventCrawlOrchestrationTestCase):
             self.assertIn("candidate_less_complete", _field(result, "blocker_codes"))
             review_rows = list(csv.DictReader(_artifact_path(result, "review_csv").open(encoding="utf-8")))
             self.assertEqual(review_rows[0]["status"], "blocked")
+
+    def test_coverage_audit_blocks_equal_count_candidate_with_less_complete_fields(self):
+        module = self._module()
+        event = self._race_event()
+        RaceEventHistoryWinner.objects.create(
+            event=event,
+            winner_year=2026,
+            horse_name="Existing One",
+            jockey_name="Existing Jockey",
+            trainer_name="Existing Trainer",
+            finish_time="2:30.00",
+        )
+        record = self._candidate_record()
+        record["modules"][RaceEventModule.HISTORY_WINNERS]["items"] = [
+            {
+                "winner_year": 2026,
+                "horse_name": "Existing One",
+                "jockey_name": "Existing Jockey",
+                "trainer_name": "",
+                "finish_time": "",
+            }
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            result = module.audit_coverage(
+                plan_path=self._write_json(tmp_path / "plan.json", self._base_plan(tmp_path)),
+                candidate_jsonl=self._write_jsonl(tmp_path / "candidates.jsonl", [record]),
+                series_mapping_path=self._write_json(
+                    tmp_path / "series_mapping.json", {"uk-derby": {"status": "approved"}}
+                ),
+                run_dir=tmp_path,
+            )
+
+            self.assertIn("candidate_less_complete", _field(result, "blocker_codes"))
+            blocker = next(
+                item
+                for item in _field(result, "blockers")
+                if item["code"] == "candidate_less_complete"
+                and item.get("field_completeness_regressions")
+            )
+            self.assertEqual(
+                set(blocker["field_completeness_regressions"]),
+                {"trainer_name", "finish_time"},
+            )
 
     def test_coverage_warning_only_candidate_remains_complete(self):
         module = self._module()

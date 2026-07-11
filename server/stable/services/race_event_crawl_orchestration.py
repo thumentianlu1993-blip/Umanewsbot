@@ -215,8 +215,12 @@ DEFAULT_ADAPTER_MANIFESTS.update(
             "source_authority": "official",
             "requires_network": True,
             "supports_year_range": True,
-            "command": ["{python}", "runtime/tools/prepare_jra_history_winner_candidates.py", "--events-csv", "{events_csv}", "--output-dir", "{adapter_output_dir}", "{network_flag}"],
-            "inputs": {"events_csv": {"required": True, "artifact": "input/events.csv"}},
+            "command": ["{python}", "runtime/tools/prepare_jra_history_winner_candidates.py", "--events-csv", "{events_csv}", "--detail-jsonl", "{detail_jsonl}", "--output-dir", "{adapter_output_dir}", "{network_flag}"],
+            "inputs": {
+                "events_csv": {"required": True, "artifact": "input/events.csv"},
+                "detail_jsonl": {"required": True, "artifact": "candidates/jra_detail.jsonl"},
+            },
+            "dependencies": [{"artifact": "candidates/jra_detail.jsonl", "stage": "prepare"}],
             "outputs": [
                 {"key": "candidate_jsonl", "path": "jra_history_winner_candidates_2026.jsonl", "standard_name": "candidates/jra_history_winners.jsonl", "required": True},
                 {"key": "review_csv", "path": "jra_history_winner_review_2026.csv", "standard_name": "review/jra_history_winners.csv", "required": True},
@@ -1933,6 +1937,61 @@ def _check_existing_data_diff(
     if existing and candidate < existing:
         row_blocker_codes.append("candidate_less_complete")
         _append_issue(blockers, "candidate_less_complete", year=event.year, slug=event.slug, module=module, existing=existing, candidate=candidate)
+    existing_fields = _existing_critical_field_counts(event, module)
+    candidate_fields = _critical_field_counts(_payload_items(payload), module)
+    regressions = {
+        field: {"existing": count, "candidate": candidate_fields.get(field, 0)}
+        for field, count in existing_fields.items()
+        if candidate_fields.get(field, 0) < count
+    }
+    if regressions:
+        row_blocker_codes.append("candidate_less_complete")
+        _append_issue(
+            blockers,
+            "candidate_less_complete",
+            year=event.year,
+            slug=event.slug,
+            module=module,
+            field_completeness_regressions=regressions,
+        )
+
+
+CRITICAL_MODULE_FIELDS = {
+    RaceEventModule.RUNNERS: ["horse_number", "horse_name", "jockey_name", "trainer_name", "carried_weight", "running_status"],
+    RaceEventModule.RESULTS: ["finish_position", "horse_number", "horse_name", "jockey_name", "trainer_name", "finish_time", "running_status"],
+    RaceEventModule.HISTORY_WINNERS: ["winner_year", "horse_name", "jockey_name", "trainer_name", "finish_time"],
+}
+
+
+def _critical_field_counts(items: list[Any], module: str) -> dict[str, int]:
+    fields = CRITICAL_MODULE_FIELDS.get(module, [])
+    return {
+        field: sum(
+            1
+            for item in items
+            if isinstance(item, dict)
+            and _critical_field_value(item, module, field) not in (None, "")
+        )
+        for field in fields
+    }
+
+
+def _critical_field_value(item: dict[str, Any], module: str, field: str) -> Any:
+    if module == RaceEventModule.RUNNERS and field == "running_status":
+        return item.get(field) or "declared"
+    return item.get(field)
+
+
+def _existing_critical_field_counts(event: RaceEvent, module: str) -> dict[str, int]:
+    fields = CRITICAL_MODULE_FIELDS.get(module, [])
+    if not fields:
+        return {}
+    related = {
+        RaceEventModule.RUNNERS: event.runners,
+        RaceEventModule.RESULTS: event.results,
+        RaceEventModule.HISTORY_WINNERS: event.history_winners,
+    }[module]
+    return _critical_field_counts(list(related.values(*fields)), module)
 
 
 def _append_issue(target: list[dict[str, Any]], code: str, **payload: Any) -> None:

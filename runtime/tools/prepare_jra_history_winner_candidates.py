@@ -210,6 +210,33 @@ def _history_item(row: dict) -> dict:
     }
 
 
+def _read_detail_winners(path: Path) -> dict[str, dict]:
+    winners = {}
+    with path.open("r", encoding="utf-8-sig") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            results = ((record.get("modules") or {}).get("results") or {}).get("items") or []
+            winner = next((item for item in results if int(item.get("finish_position") or 0) == 1), None)
+            if winner:
+                winners[str(record.get("slug") or "")] = winner
+    return winners
+
+
+def _enrich_current_winner(items: list[dict], *, event: dict, detail_winner: dict | None) -> list[dict]:
+    if not detail_winner:
+        return items
+    current = next((item for item in items if int(item.get("winner_year") or 0) == int(event["year"])), None)
+    if current is None or _normalize_name(current.get("horse_name") or "") != _normalize_name(detail_winner.get("horse_name") or ""):
+        return items
+    for field in ["jockey_name", "trainer_name", "finish_time", "margin"]:
+        if not current.get(field) and detail_winner.get(field):
+            current[field] = detail_winner[field]
+    current.setdefault("source_refs", {})["current_result"] = (detail_winner.get("source_refs") or {}).get("primary", "")
+    return items
+
+
 def prepare(args: argparse.Namespace) -> dict:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -217,6 +244,7 @@ def prepare(args: argparse.Namespace) -> dict:
     source_dir.mkdir(exist_ok=True)
 
     events = _read_jra_events(Path(args.events_csv))
+    detail_winners = _read_detail_winners(Path(args.detail_jsonl))
     event_keys = {event["slug"]: _event_match_keys(event) for event in events}
     rows_by_key: dict[str, list[dict]] = defaultdict(list)
     downloaded_years = []
@@ -270,6 +298,11 @@ def prepare(args: argparse.Namespace) -> dict:
                 # inside the winner cell for a single race.
                 by_year.setdefault(int(row["winner_year"]), row)
             items = [_history_item(row) for _, row in sorted(by_year.items(), reverse=True)]
+            items = _enrich_current_winner(
+                items,
+                event=event,
+                detail_winner=detail_winners.get(event["slug"]),
+            )
             if not items:
                 summary["unmatched_events"] += 1
                 unmatched_rows.append(
@@ -339,6 +372,7 @@ def prepare(args: argparse.Namespace) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate JRA 2026 race historical winner candidates from official graded-race lists.")
     parser.add_argument("--events-csv", required=True)
+    parser.add_argument("--detail-jsonl", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--start-year", type=int, default=2002)
     parser.add_argument("--end-year", type=int, default=2026)

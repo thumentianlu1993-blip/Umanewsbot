@@ -310,4 +310,5 @@
 - v3 已在 `60/60` 请求预算内完成日港英法抓取；HRN 通过同源留存页恢复出 24 匹参赛马。Equibase 执行暴露生产镜像缺少 `pdfplumber`，当前补齐依赖后从失败状态 resume；尚未 dry-run 或写库。
 - `pdfplumber` 部署后 11 个 adapter 均完成，Equibase 产出 Kentucky Derby 18 条正式赛果。coverage 仍阻断法国空历史和美国空 HRN 赛果与非空 Equibase 赛果的误重复；审计已修为“非空候选优先、只有空候选仍阻断”，法国待用留存 Wikipedia 原件 resume。尚未 dry-run 或写库。
 - 法国恢复后 coverage 已达 `5/5` 且 blocker 为 0，首轮 dry-run 通过。正式 apply 前又发现 combined candidate 仍携带 HRN 空赛果模块；当前增加聚合层空模块剔除并重新生成证据，避免 apply scope 与实际候选不一致。尚未正式写库。
+- 空模块剔除后的 coverage/dry-run 已通过，但字段级 review 发现 JRA 当届历史冠军会丢练马师和完赛时间。当前已增加关键字段完整性阻断，并让 JRA history 从同批 detail 补齐当届冠军；真实缓存 smoke 通过。尚未正式写库。
 - 2026-07-11 国际新闻生产验收未通过：最近 24 小时英文稿 `50` 篇中 `25` 篇仍有 `core_term_missing`；`America/Oaks` 等已降级，但一批被错误登记为马名的普通词仍作为 proper noun 阻断。地区新增/公开为日本 `114/21`、香港 `3/0`、英国 `12/2`、法国 `1/0`、美国 `34/13`；法国宽关键词新源 24 小时新增 `0`，香港/英国/美国后续扩源尚未实施。重处理 dry-run 即使 `limit=5` 也存在长时间满核问题，修复前不得在生产批量运行。

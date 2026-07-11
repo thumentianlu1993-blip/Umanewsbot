@@ -3832,6 +3832,8 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - 法国 Wikipedia 历史 adapter 在请求预算耗尽后产出空文件时，使用同一历史批次留存的 `source_wiki_search_prix_de_diane_longines.json` 与 `source_wiki_page_prix_de_diane.html` 恢复；仍由原 adapter 重新解析，不直接复制候选 JSONL。
 - 当前 adapter canonical query 为 `Prix de Diane`，原搜索缓存请求为同赛事 `Prix de Diane Longines`；保留原文件并以完全相同 SHA-256 建立 `source_wiki_search_prix_de_diane.json` 缓存别名，两个原始证据一并留存。
 - aggregate 生成正式 `combined_candidates.jsonl` 时必须剔除显式 `items=[]` 模块；若一条记录剔除后没有模块，则整条不进入 combined 文件。每次该规则变化后必须重新计算 candidate identity、coverage 和 dry-run，不得沿用旧 apply-check 证据。
+- `candidate_less_complete` 不只比较行数，还必须逐模块比较关键字段非空数量；候选总行数相同但会把已有练马师、骑手、完赛时间等字段覆盖为空时，同样阻断 apply 并在 blocker 写入 `field_completeness_regressions`。
+- JRA 重赏年度列表不含练马师和完赛时间；`jra_history_winners` 必须依赖同批 `jra_detail`，用当届冠军赛果补齐这些字段并保留 `current_result` 来源。第一批真实缓存 smoke 应确认 2026 日本德比历史冠军为 `ロブチェン / 杉山 晴紀 / 2:22.7`。
 
 ### 2026-07-11 国际新闻门禁与产量验收
 
