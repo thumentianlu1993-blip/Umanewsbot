@@ -3802,3 +3802,14 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - 接口验收：本机与公网 `/healthz/`、`/`、`/?region=france`、`/?region=united_kingdom`、`/races/`、`/admin/login/` 均返回 `200`。
 - 浏览器验收：应用内浏览器真实打开首页、法国频道、英国频道、赛事日历和后台登录页；页面标题、地区导航、新闻列表、赛事表格和登录控件均正常渲染。
 - 生产开关继续保持 `MULTIREGION_ATTRIBUTION_ENABLED=false`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`。`support-multiregion-news-attribution-and-english-gates` 的五地区产品抽样仍未通过，任务 `9.6` 不得勾选；本次未执行 `reprocess_multiregion_attribution_gates --commit`，也未执行赛事网络 prepare/apply。
+
+### 2026-07-11 第一批赛事应到清单
+
+- 生产 run：`runtime/race_event_crawl_runs/first-acceptance-race-event-crawl-20260711/`。
+- 本地审核副本：同路径同步到本地工作区，运行产物由 `.gitignore` 排除。
+- 审核 CSV：`review/expected_targets_review.csv`；审批文件：`review/expected_targets_approval.json`。
+- 范围：日本、香港、英国、法国、美国各 1 场已完赛核心赛事，三模块均为 `runners / results / history_winners`。
+- 结果：`expected_targets=5`，五地区齐全，全部 `preflight_status=ready`；审批状态为 `pending`。
+- 本次 `allow_network=false`，只执行 `plan`，没有网络请求、候选生成或数据库赛事详情写入。
+- 原 fixture 中香港杯、凯旋门和简短肯塔基德比种子包含未来赛事或空壳展示行；本批改用生产中已完赛且已有三模块基线的正式赛事行，以便后续验证抓取差异和覆盖保护。
+- 用户确认 CSV 中赛事原名、中文名、年份、地区和 slug 前，不得批准应到清单或进入网络 `prepare`。

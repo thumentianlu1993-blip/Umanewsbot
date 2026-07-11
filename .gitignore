@@ -21,6 +21,8 @@ runtime/race_event_detail_imports/
 runtime/race_event_exports/
 runtime/race_event_history_imports/
 runtime/race_event_imports/
+runtime/race_event_crawl_plans/
+runtime/race_event_crawl_runs/
 runtime/race_event_review_samples/
 runtime/multiregion_candidate_audit/
 runtime/term_review/
