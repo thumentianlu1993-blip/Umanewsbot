@@ -437,22 +437,36 @@ def apply_article_attribution(
     force: bool = False,
     save: bool = True,
 ) -> AttributionResult:
-    result = infer_article_attribution(article, source_config=source_config)
-    if getattr(settings, "MULTIREGION_ATTRIBUTION_ENABLED", True) and (force or not article.attribution_locked):
-        set_article_regions(
-            article,
-            primary_region=result.primary_region,
-            related_regions=result.related_regions,
-            attribution_source=result.source,
-            reason=result.reason,
-            evidence=result.evidence,
-            content_category=result.content_category,
-            save=save,
+    enabled = bool(getattr(settings, "MULTIREGION_ATTRIBUTION_ENABLED", True))
+    if not enabled or (article.attribution_locked and not force):
+        content_category = article.content_category or classify_news_content(article)
+        if save and not article.content_category:
+            article.content_category = content_category
+            article.save(update_fields=["content_category", "updated_at"])
+        return AttributionResult(
+            primary_region=normalize_region(article.racing_region) or RacingRegion.JAPAN,
+            related_regions=_dedupe_regions(
+                article.related_region_links.values_list("region", flat=True),
+                exclude=article.racing_region,
+            ),
+            content_category=content_category,
+            source=article.attribution_source or "existing",
+            reason="attribution_disabled" if not enabled else "attribution_locked",
+            evidence={},
         )
-        if save and result.evidence.get("ireland_keywords") and "ireland" not in (article.tags_json or []):
-            article.tags_json = [*(article.tags_json or []), "ireland"]
-            article.save(update_fields=["tags_json", "updated_at"])
-    elif save and not article.content_category:
-        article.content_category = result.content_category
-        article.save(update_fields=["content_category", "updated_at"])
+
+    result = infer_article_attribution(article, source_config=source_config)
+    set_article_regions(
+        article,
+        primary_region=result.primary_region,
+        related_regions=result.related_regions,
+        attribution_source=result.source,
+        reason=result.reason,
+        evidence=result.evidence,
+        content_category=result.content_category,
+        save=save,
+    )
+    if save and result.evidence.get("ireland_keywords") and "ireland" not in (article.tags_json or []):
+        article.tags_json = [*(article.tags_json or []), "ireland"]
+        article.save(update_fields=["tags_json", "updated_at"])
     return result

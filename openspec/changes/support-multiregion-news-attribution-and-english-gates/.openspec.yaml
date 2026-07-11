@@ -31,3 +31,7 @@ journal:
     date: "2026-07-10T23:41:33+08:00"
     session: 1
     note: "Scoped ignored non-term aliases to the actual matched source term and passed 40 targeted plus 555 full stable tests; production dry-run remains pending."
+  - event: production-hotfix-applied
+    date: "2026-07-11T09:35:00+08:00"
+    session: 1
+    note: "Short-circuited attribution inference when the production feature flag is disabled or manual attribution is locked, preventing full term scans in crawl workers. Passed 30 targeted and 591 full stable tests; production attribution switches remain disabled and five-region acceptance remains pending."

@@ -245,6 +245,38 @@ class MultiRegionAttributionAndGateTests(TestCase):
         payload.update(overrides)
         return NewsArticle.objects.create(**payload)
 
+    @override_settings(MULTIREGION_ATTRIBUTION_ENABLED=False)
+    @patch("stable.services.news_attribution.infer_article_attribution")
+    def test_disabled_attribution_does_not_scan_terms_or_change_regions(self, infer_mock):
+        article = self._article(racing_region=RacingRegion.FRANCE)
+        NewsArticleRelatedRegion.objects.create(
+            article=article,
+            region=RacingRegion.UNITED_KINGDOM,
+            source="existing",
+        )
+
+        result = apply_article_attribution(article)
+        article.refresh_from_db()
+
+        infer_mock.assert_not_called()
+        self.assertEqual(result.reason, "attribution_disabled")
+        self.assertEqual(result.primary_region, RacingRegion.FRANCE)
+        self.assertEqual(result.related_regions, [RacingRegion.UNITED_KINGDOM])
+        self.assertEqual(article.racing_region, RacingRegion.FRANCE)
+
+    @patch("stable.services.news_attribution.infer_article_attribution")
+    def test_locked_attribution_does_not_scan_terms_without_force(self, infer_mock):
+        article = self._article(
+            racing_region=RacingRegion.FRANCE,
+            attribution_locked=True,
+        )
+
+        result = apply_article_attribution(article)
+
+        infer_mock.assert_not_called()
+        self.assertEqual(result.reason, "attribution_locked")
+        self.assertEqual(result.primary_region, RacingRegion.FRANCE)
+
     def test_attribution_promotes_event_region_and_keeps_france_related(self):
         article = self._article()
 

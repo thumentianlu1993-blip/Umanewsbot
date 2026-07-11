@@ -87,3 +87,16 @@
 - **WHEN** 运维人员通过配置关闭相关地区参与查询
 - **THEN** 首页地区 tab、发布窗口、QQ 自动推送和地区审计 SHALL 只按 `NewsArticle.racing_region` 判断地区
 - **AND** 系统 SHALL 保留已保存的相关地区数据，便于重新开启后继续使用
+
+### Requirement: 归属开关关闭或人工锁定时必须跳过自动推断
+系统 MUST 在多地区自动归属关闭，或文章已人工锁定且未显式 force 时，直接使用当前已保存地区，不得继续执行完整术语扫描和自动归属计算。
+
+#### Scenario: 生产灰度开关关闭
+- **WHEN** `MULTIREGION_ATTRIBUTION_ENABLED=false` 且新文章进入抓取或评分流程
+- **THEN** 系统 MUST 保留文章当前主地区和关联地区
+- **AND** 系统 MUST NOT 调用完整自动归属推断
+
+#### Scenario: 人工归属已锁定
+- **WHEN** 文章 `attribution_locked=true` 且调用方未传入 force
+- **THEN** 系统 MUST 返回当前已保存归属
+- **AND** 系统 MUST NOT 扫描术语库或覆盖人工结果

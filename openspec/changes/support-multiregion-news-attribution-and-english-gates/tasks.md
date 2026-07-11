@@ -70,3 +70,10 @@
 - [x] 10.1 (integration) 将普通词忽略判断收窄到当前文章实际命中的 source term，禁止同一术语记录内的其他 alias 连带绕过核心术语门禁
 - [x] 10.2 (application) 增加 ignored alias 与可信专名共存的回归测试，确认未被忽略的实际命中仍产生 `core_term_missing`
 - [x] 10.3 (operations) 更新项目状态并重新运行目标测试、完整 `stable` 测试、Django/OpenSpec/迁移和 diff 校验
+
+## 11. 生产灰度性能修复
+
+- [x] 11.1 (integration) 在 `MULTIREGION_ATTRIBUTION_ENABLED=false` 时直接返回当前归属，禁止先扫描术语库再判断开关。
+- [x] 11.2 (integration) 人工归属锁定且未 force 时复用当前归属，避免无意义推断并保护人工结果。
+- [x] 11.3 (application) 增加关闭开关和人工锁定均不调用自动推断的回归测试。
+- [x] 11.4 (operations) 记录生产 CPU 热点、修复边界和验证结果；保持五地区产品抽样任务未完成、生产开关关闭。
