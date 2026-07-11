@@ -1354,6 +1354,15 @@ def aggregate_candidate_artifacts(*, results: list[dict[str, Any]], run_dir: str
         source_paths.append(str(path.resolve()))
         for record in _read_jsonl(path):
             record.pop("_line_number", None)
+            modules = record.get("modules") if isinstance(record.get("modules"), dict) else None
+            if modules is not None:
+                record["modules"] = {
+                    module: payload
+                    for module, payload in modules.items()
+                    if not _is_explicitly_empty_module_payload(payload)
+                }
+                if not record["modules"]:
+                    continue
             records.append(record)
     output_path = Path(run_dir) / "candidates" / "combined_candidates.jsonl"
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1367,6 +1376,12 @@ def aggregate_candidate_artifacts(*, results: list[dict[str, Any]], run_dir: str
         "record_count": len(records),
         "source_paths": source_paths,
     }
+
+
+def _is_explicitly_empty_module_payload(payload: Any) -> bool:
+    if isinstance(payload, list):
+        return not payload
+    return isinstance(payload, dict) and isinstance(payload.get("items"), list) and not payload["items"]
 
 
 def _previous_adapter_outputs_valid(

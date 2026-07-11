@@ -594,6 +594,31 @@ class RaceEventCrawlAdapterManifestTests(RaceEventCrawlOrchestrationTestCase):
             self.assertEqual(len(combined_records), 2)
             self.assertEqual(result["identity"]["sha256"], module.file_identity(combined_path)["sha256"])
 
+    def test_combined_candidates_drop_empty_modules_and_empty_records(self):
+        module = self._module()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            detail = self._candidate_record()
+            detail["modules"][RaceEventModule.RESULTS] = {"items": []}
+            empty = self._candidate_record(source_url="https://source.test/empty")
+            empty["modules"] = {RaceEventModule.RESULTS: {"items": []}}
+            source_path = self._write_jsonl(tmp_path / "source.jsonl", [detail, empty])
+
+            result = module.aggregate_candidate_artifacts(
+                results=[{"artifacts": {"candidate_jsonl": {"path": str(source_path)}}}],
+                run_dir=tmp_path,
+            )
+
+            combined_records = [
+                json.loads(line)
+                for line in Path(result["path"]).read_text(encoding="utf-8").splitlines()
+            ]
+            self.assertEqual(len(combined_records), 1)
+            self.assertEqual(
+                set(combined_records[0]["modules"]),
+                {RaceEventModule.RUNNERS, RaceEventModule.HISTORY_WINNERS},
+            )
+
     def test_resume_skips_unchanged_successful_adapter_and_retries_failed_adapter(self):
         self._race_event()
         with tempfile.TemporaryDirectory() as tmp:
