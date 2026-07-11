@@ -5,6 +5,7 @@ import argparse
 import csv
 import json
 import re
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urljoin
@@ -43,25 +44,58 @@ def _download(url: str, path: Path, *, allow_network: bool, timeout: int) -> byt
     return body
 
 
-def _extract_result_links(list_html_path: Path) -> list[str]:
+def _normalize_match_text(value: str) -> str:
+    value = unicodedata.normalize("NFKC", value or "")
+    return re.sub(r"[^0-9A-Za-z\u3040-\u30ff\u3400-\u9fff]+", "", value).casefold()
+
+
+def _extract_result_entries(list_html_path: Path) -> list[dict[str, str]]:
     raw = list_html_path.read_bytes()
     try:
         list_html = raw.decode("utf-8")
     except UnicodeDecodeError:
         list_html = _decode_jra_html(raw)
     soup = BeautifulSoup(list_html, "html.parser")
-    links = []
-    for href in (a.get("href") for a in soup.find_all("a", href=True)):
+    entries = []
+    for anchor in soup.find_all("a", href=True):
+        href = anchor.get("href")
         if JRA_RESULT_RE.search(href):
-            links.append(urljoin(JRA_BASE_URL, href))
+            row = anchor.find_parent("tr")
+            entries.append(
+                {
+                    "source_url": urljoin(JRA_BASE_URL, href),
+                    "row_text": _text(row),
+                }
+            )
     seen = set()
-    unique_links = []
-    for link in links:
-        if link in seen:
+    unique_entries = []
+    for entry in entries:
+        source_url = entry["source_url"]
+        if source_url in seen:
             continue
-        seen.add(link)
-        unique_links.append(link)
-    return unique_links
+        seen.add(source_url)
+        unique_entries.append(entry)
+    return unique_entries
+
+
+def _match_result_links(list_html_path: Path, events: list[dict]) -> list[str]:
+    entries = _extract_result_entries(list_html_path)
+    matched_links = []
+    for event in events:
+        names = [event.get("original_name") or ""]
+        names.extend((event.get("aliases") or "").split("|"))
+        keys = {_normalize_match_text(name) for name in names if _normalize_match_text(name)}
+        matches = [
+            entry["source_url"]
+            for entry in entries
+            if any(key in _normalize_match_text(entry["row_text"]) for key in keys)
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"JRA 结果页匹配数量异常：slug={event.get('slug')} matches={len(matches)}"
+            )
+        matched_links.append(matches[0])
+    return matched_links
 
 
 def _source_filename(source_url: str) -> str:
@@ -215,11 +249,9 @@ def prepare_candidates(args) -> dict:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     finished_events = _read_finished_events(Path(args.events_csv))
-    result_links = _extract_result_links(Path(args.source_html))
-    if len(result_links) < len(finished_events):
-        raise RuntimeError(f"结果页链接不足：links={len(result_links)} finished_events={len(finished_events)}")
     if args.limit:
         finished_events = finished_events[: args.limit]
+    result_links = _match_result_links(Path(args.source_html), finished_events)
 
     jsonl_path = output_dir / "jra_detail_candidates_2026.jsonl"
     review_csv_path = output_dir / "jra_detail_review_2026.csv"

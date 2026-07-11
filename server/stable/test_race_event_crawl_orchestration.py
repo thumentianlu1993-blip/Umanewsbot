@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import gzip
+import importlib.util
 import json
 import os
 import stat
@@ -60,6 +61,39 @@ class RaceEventCrawlOrchestrationTestCase(TestCase):
         from stable.services import race_event_crawl_orchestration
 
         return race_event_crawl_orchestration
+
+    def _runtime_tool(self, filename: str):
+        tools_dir = Path(__file__).resolve().parents[2] / "runtime" / "tools"
+        sys.path.insert(0, str(tools_dir))
+        try:
+            spec = importlib.util.spec_from_file_location(filename.removesuffix(".py"), tools_dir / filename)
+            module = importlib.util.module_from_spec(spec)
+            assert spec.loader is not None
+            spec.loader.exec_module(module)
+            return module
+        finally:
+            sys.path.remove(str(tools_dir))
+
+    def test_jra_detail_subset_matches_result_link_by_race_name(self):
+        tool = self._runtime_tool("prepare_jra_race_detail_candidates.py")
+        html = """
+        <table>
+          <tr><td>GIII 中山金杯</td><td><a href="/datafile/seiseki/replay/2026/001.html">レース結果</a></td></tr>
+          <tr><td>GI 日本ダービー</td><td><a href="/datafile/seiseki/g1/derby/result/derby2026.html">レース結果</a></td></tr>
+        </table>
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "jra.html"
+            source.write_bytes(html.encode("cp932"))
+            links = tool._match_result_links(
+                source,
+                [{"slug": "jra-2026-0531-01", "original_name": "日本ダービー", "aliases": "日本德比"}],
+            )
+
+        self.assertEqual(
+            links,
+            ["https://www.jra.go.jp/datafile/seiseki/g1/derby/result/derby2026.html"],
+        )
 
     def _race_event(self, *, year=2026, slug="uk-derby-2026", series_key="uk-derby", region=RacingRegion.UNITED_KINGDOM, locks=None):
         return RaceEvent.objects.create(
