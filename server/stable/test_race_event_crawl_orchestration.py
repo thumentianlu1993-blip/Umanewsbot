@@ -964,6 +964,31 @@ class RaceEventCrawlCoverageAuditTests(RaceEventCrawlOrchestrationTestCase):
             self.assertNotIn("missing_results", _field(result, "blocker_codes"))
             self.assertNotIn("missing_history_winners", _field(result, "blocker_codes"))
 
+    def test_coverage_audit_ignores_empty_module_when_another_record_has_items(self):
+        module = self._module()
+        self._race_event()
+        detail = self._candidate_record()
+        results = self._candidate_record()
+        detail["modules"][RaceEventModule.RESULTS] = {"items": []}
+        results["modules"] = {
+            RaceEventModule.RESULTS: results["modules"][RaceEventModule.RESULTS],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            result = module.audit_coverage(
+                plan_path=self._write_json(tmp_path / "plan.json", self._base_plan(tmp_path)),
+                candidate_jsonl=self._write_jsonl(tmp_path / "candidates.jsonl", [detail, results]),
+                series_mapping_path=self._write_json(
+                    tmp_path / "series_mapping.json", {"uk-derby": {"status": "approved"}}
+                ),
+                run_dir=tmp_path,
+            )
+
+            self.assertEqual(_field(result, "status"), "passed")
+            self.assertEqual(_field(result, "complete_count"), 1)
+            self.assertNotIn("duplicate_candidate", _field(result, "blocker_codes"))
+            self.assertNotIn("empty_results", _field(result, "blocker_codes"))
+
     def test_coverage_audit_reports_missing_module_and_excludes_it_from_complete_count(self):
         module = self._module()
         self._race_event()

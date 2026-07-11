@@ -1598,6 +1598,7 @@ def audit_coverage(
 
         module_candidates: dict[str, list[tuple[Any, dict[str, Any]]]] = {}
         module_sources: dict[str, list[dict[str, str]]] = {}
+        empty_module_declarations: set[str] = set()
         for record in event_records:
             provenance_codes = _candidate_provenance_codes(
                 record,
@@ -1620,6 +1621,9 @@ def audit_coverage(
                 source_targets.setdefault(source_url, set()).add((year, slug, series_key))
             for module, payload in modules.items():
                 module_name = str(module)
+                if not _payload_items(payload):
+                    empty_module_declarations.add(module_name)
+                    continue
                 module_candidates.setdefault(module_name, []).append((payload, record))
                 module_sources.setdefault(module_name, []).append(
                     {
@@ -1654,7 +1658,7 @@ def audit_coverage(
 
         missing_modules = [module for module in TARGET_MODULES if module not in module_candidates]
         for module in missing_modules:
-            code = f"missing_{module}"
+            code = f"empty_{module}" if module in empty_module_declarations else f"missing_{module}"
             row_blocker_codes.append(code)
             _append_issue(blockers, code, year=year, slug=slug, module=module)
 
@@ -1664,10 +1668,6 @@ def audit_coverage(
                 row_blocker_codes.append("duplicate_candidate")
                 _append_issue(blockers, "duplicate_candidate", year=year, slug=slug, module=module)
             seen_candidates.add(identity)
-            if not _payload_items(candidates[0][0]):
-                code = f"empty_{module}"
-                row_blocker_codes.append(code)
-                _append_issue(blockers, code, year=year, slug=slug, module=module)
             if event is not None and _module_locked(event, module):
                 row_blocker_codes.append("manual_lock_conflict")
                 _append_issue(blockers, "manual_lock_conflict", year=year, slug=slug, module=module)
