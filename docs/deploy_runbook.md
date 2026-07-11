@@ -3816,6 +3816,6 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 
 首批 prepare 前镜像检查：
 
-- `Dockerfile` 必须把 `runtime/tools` 复制到 `/app/server/runtime/tools`；`.dockerignore` 只放行该工具目录，仍排除 plans、runs、抓取缓存和其他 runtime artifact。
-- 部署后先在 web 容器执行 `test -f /app/server/runtime/tools/race_event_request_budget.py`，并逐项检查 plan 中注册 adapter 的脚本存在，再恢复 network run。
+- `Dockerfile` 必须把 `runtime/tools` 复制到 `/app/runtime/tools`，并让 `/app/server/runtime` 符号链接到 `/app/runtime`；Django 与 AdapterRunner 必须看到同一个 run 根目录。`.dockerignore` 只放行工具目录，仍排除 plans、runs、抓取缓存和其他 runtime artifact。
+- 部署后同时检查 `/app/runtime/tools/race_event_request_budget.py` 和 `/app/server/runtime/tools/race_event_request_budget.py`，并逐项检查 plan 中注册 adapter 的脚本存在，再恢复 network run。
 - 该检查只确认执行文件可用，不代表允许绕过应到审批、请求预算、coverage、dry-run 或 apply-check。

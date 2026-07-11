@@ -14,12 +14,13 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
 
 COPY server /app/server
-COPY runtime/tools /app/server/runtime/tools
+COPY runtime/tools /app/runtime/tools
 COPY deploy /app/deploy
 COPY .env.example /app/.env.example
 
 RUN chmod +x /app/deploy/docker/*.sh \
-    && mkdir -p /app/logs /app/server/staticfiles
+    && mkdir -p /app/logs /app/server/staticfiles \
+    && ln -s /app/runtime /app/server/runtime
 
 WORKDIR /app/server
 
