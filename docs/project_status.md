@@ -312,4 +312,5 @@
 - 法国恢复后 coverage 已达 `5/5` 且 blocker 为 0，首轮 dry-run 通过。正式 apply 前又发现 combined candidate 仍携带 HRN 空赛果模块；当前增加聚合层空模块剔除并重新生成证据，避免 apply scope 与实际候选不一致。尚未正式写库。
 - 空模块剔除后的 coverage/dry-run 已通过，但字段级 review 发现 JRA 当届历史冠军会丢练马师和完赛时间。当前已增加关键字段完整性阻断，并让 JRA history 从同批 detail 补齐当届冠军；真实缓存 smoke 通过。尚未正式写库。
 - 最终候选 `2dd40a...8eac5` 已通过 coverage `5/5` 和 dry-run，JRA 字段退化已消除。剩余业务变化为英国补 2020 冠军及 2021 时间、法国练马师/冠军人名规范化及完赛时间补充；等待用户确认 mixed-source 与覆盖变化后进入 apply-check，尚未写库。
+- 用户确认后第一批五地区赛事已正式写入：apply-check 8 个 scope 全绿，15 个候选全部 applied；写后合计 runners 75、results 64、history winners 47，服务健康。写前 105M 数据库备份已通过 gzip/SHA 校验，最终运行证据已同步到生产宿主机和本地审核目录。
 - 2026-07-11 国际新闻生产验收未通过：最近 24 小时英文稿 `50` 篇中 `25` 篇仍有 `core_term_missing`；`America/Oaks` 等已降级，但一批被错误登记为马名的普通词仍作为 proper noun 阻断。地区新增/公开为日本 `114/21`、香港 `3/0`、英国 `12/2`、法国 `1/0`、美国 `34/13`；法国宽关键词新源 24 小时新增 `0`，香港/英国/美国后续扩源尚未实施。重处理 dry-run 即使 `limit=5` 也存在长时间满核问题，修复前不得在生产批量运行。
