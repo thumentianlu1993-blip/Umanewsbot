@@ -338,12 +338,18 @@
 - 用户已确认赛事日历增加年份筛选和赛事名称搜索，作为历史年度赛事入口。
 - 用户已确认 artifact 为唯一批量审批/apply 凭证，同时增加后台汇总和冲突查看入口。
 - 用户已确认达标 published 历史赛事允许被搜索引擎收录，使用分片 sitemap 排除草稿/冲突/空壳/not_held。
-- OpenSpec 文档已通过两轮 Full 工程审核并获得 APPROVED；`test_cases.md` 已建立 160 个唯一用例。下一阶段为 `/opsx:apply` 代码实现，生产和网络门禁仍关闭。
+- OpenSpec 文档已通过两轮 Full 工程审核并获得 APPROVED；`test_cases.md` 已建立 160 个唯一用例。代码实现、clean review、生产部署和 2026 mapping 已完成，生产历史功能和网络门禁仍关闭。
+
+### 2026-07-12 历史赛事工具上线与系列身份基线
+
+- 历史赛事编排工具已随 `c3b66a6` 部署，模型、只读 inventory、五地区 catalog parser、批次 importer、年份搜索、分片 sitemap 与共享 Redis 缓存均已上线；历史功能和网络开关仍关闭。
+- 2026 mapping 已完成审核和提交：清理 3 条确认重复赛事后，现有 `992` 场赛事全部绑定 `992` 个稳定系列，五地区 `review_required=0 / conflict=0 / unbound=0`，幂等复跑无新增写入。
+- 当前尚未创建历史年度总账或 1984–2025 赛事。下一阶段只推进五地区 1984–当前官方逐年目录 source cache、系列 timeline 和只读总账审批，不能从 2026 现役系列机械外推历史分母。
 
 ### 2026-07-12 历史赛事回填实现进度
 
-- 已完成 `/opsx:apply` 第一阶段：稳定赛事系列、年度应到总账、official finish position、并列冠军迁移，以及离线 inventory artifact/审批/幂等 commit 基础能力。
-- 历史功能和网络开关继续默认关闭，当前没有部署、生产迁移、历史抓取或历史数据写入。
-- 后续仍需完成 2026 系列 mapping、五地区逐年目录 adapter、总账切批/详情 importer、公开搜索与 sitemap，并按既定流程完成测试、反复 code review 后才可上线抓取。
+- 已完成 `/opsx:apply`、完整测试、反复 review、生产迁移和 2026 系列 mapping；稳定赛事系列、年度应到总账、official finish position、并列冠军迁移，以及离线 inventory artifact/审批/幂等 commit 基础能力均已上线。
+- 历史功能和网络开关继续默认关闭；生产当前只有 2026 系列绑定，没有历史年度总账、1984–2025 赛事或历史公开数据。
+- 后续仍需完成五地区逐年官方 source cache、年度总账审批、首批详情验收和分年代带回填；所有写入继续走既定 artifact、coverage、备份和写后核验门禁。
 - 当前 OpenSpec 任务进度 `62/82`；代码与自动化测试任务已完成，包含五地区目录 cache parser、标准候选命令、共享预算/缓存锁、历史网络日志、批次 importer、公开搜索、动态冠军、sitemap 缓存与索引。完整 `stable` 回归最终 `743/743`，Django/迁移/OpenSpec/Compose/实际 Docker 镜像检查通过。
 - 多轮代码 review 的全部技术 finding 已修复并逐轮复审，最终 review clean。剩余 `20` 项均为生产 mapping、官方逐年 source cache、总账审批、首批及四年代带抓取落库和最终审计；生产功能和网络开关继续关闭，尚未部署或写入本变更的历史数据。

@@ -3856,7 +3856,7 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - 部署后：`web / worker / beat / db / redis / nginx` 正常，web/db/redis healthy；Django check、内外 healthz、`/races/` 和日本德比详情均通过，近 5 分钟日志无 traceback/error。
 - 数据抽检：英国马名 `13/13`、骑师 `9/13` 命中；美国马名 `2/18`、骑师 `11/18`；法国马名 `1/7`、骑师 `0/7`；日本德比马名 `1/18`、骑师 `0/18`。日本当前页面大量原文属于术语库覆盖缺口，不应通过页面层临时翻译解决。
 
-## 2026-07-12 历史赛事回填安全门禁（尚未上线）
+## 2026-07-12 历史赛事回填安全门禁
 
 - 默认配置必须保持：`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。
 - 保守预算默认值：单 run 请求预算 `250`、source cache 上限 `2147483648` bytes、启动前最小剩余磁盘 `5368709120` bytes。plan 只能声明更小或相等的请求/cache 上限，磁盘不足时 fail closed。
@@ -3865,6 +3865,18 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - inventory commit 必须使用既有 artifact，禁止边生成边写：`python server/manage.py build_historical_race_inventory --artifact-dir <artifact-dir> --approval <artifact-dir/approval.json> --commit`。执行前必须人工核对 conflict=0、review、summary、manifest SHA 和 approval 的批准人/时间。
 - 首次部署只允许空模型与只读工具：先备份数据库，执行迁移和 `manage.py check`，检查旧赛事 URL/页面，再检查只读总账后台。不得在同一步开启历史功能、网络或提交总账。
 - 网络 prepare 还必须同时满足：功能开关开启、网络总开关开启、plan `allow_network=true`、应到 artifact 已批准、共享请求预算有效、source cache/磁盘预检通过。任一条件缺失不得启动 adapter。
-- 当前代码仍处于本地 apply 阶段；必须完成完整实现、全量测试、code review 修复并重新 review 至无 actionable finding 后，才进入本节部署步骤。
+- 代码、全量测试、clean review、生产迁移和 2026 mapping 已完成；后续逐年目录和历史详情仍必须继续遵守本节门禁。
 - 用户已授权在上述准备门禁全部通过后自主执行生产抓取和落库。执行期间可临时开启功能/网络开关；每批完成或中止后必须恢复 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，并确认历史年度赛事没有被意外公开。
 - `RACE_EVENT_PUBLIC_CACHE_SECONDS` 默认 `300` 秒，生产 `RACE_EVENT_CACHE_URL` 应指向共享 Redis（建议独立 DB，例如 `redis://redis:6379/2`）；测试使用 LocMem。赛事或历史总账状态变更会主动清理 sitemap 数量和赛事年份缓存，Redis 暂时不可用时回退数据库。部署迁移后须抽查 sitemap 分片数量、年份筛选，并确认 `race_event_visible_year_idx`、`race_event_sitemap_idx`、`race_result_official_event_idx` 已创建。
+
+## 2026-07-12 历史赛事编排工具首次生产部署与 2026 mapping
+
+- 部署提交：`c3b66a6`；生产从 `dc6e434` 快进，并执行 `bash ./deploy_lowcost.sh`。
+- 部署前 `.env` 备份：`.env.backup.historical-race-backfill-20260712_044501`。数据库备份：`backups/db/pre-historical-race-backfill-20260712_044501.sql.gz`，`110878772` bytes，SHA-256 `524accd73e30e3d4a87ca4c974b06811edbf78f80b755cb55d86121eaaccffeb`。
+- mapping 写入前备份：`backups/db/pre-2026-race-series-mapping-20260712_051047.sql.gz`，`111044004` bytes，SHA-256 `701b951aca74ba1a7dad5665eb4dd9f333bd2233aa0f275011a36ae132510453`。两份备份均通过 `gzip -t`。
+- 迁移验收：`0024_historical_race_inventory`、`0026_historical_race_query_indexes` 已应用；三个目标索引存在。`manage.py migrate stable 0023 --plan` 已完整列出 reverse plan；真实恢复入口仍为 `deploy/restore_db.sh <backup>`。
+- 初始 dry-run 为 `995` 场、`786` 自动批准、`209` 待审、`212` 冲突。完成日本/香港稳定 key 审核、美国重复空壳清理、英国 Gold Cup 合并及相似名称显式区分后，最终 artifact 为 `runtime/historical_race_inventory/mapping-2026-approved-20260712_051808/`，结果 `992/992 approved`、`0 review_required`、`0 conflict`。
+- mapping commit 仅在一次性管理容器中设置 `HISTORICAL_RACE_BACKFILL_ENABLED=true`，未开启网络；首次结果 `series_created=992 / events_bound=992`，幂等复跑 `0/0`。常驻 web/worker/beat 从未开启历史功能。
+- 写后验收：`RaceSeries=992`、2026 `RaceEvent=992`、已绑定 `992`、未绑定 `0`；日本 `186`、香港 `20`、英国 `202`、法国 `174`、美国 `410`。`HistoricalRaceEventTarget=0`，1984–2025 赛事及其公开数均为 `0`。
+- URL 抽检：`/races/`、`/races/2026/gold-cup/`、日本德比、香港董事杯均返回 `200`。已合并的 BHA 重复地址 `/races/2026/uk-bha-flat-2026-0618-045/` 返回 `404`，其 slug 已作为主赛事别名保留，正式入口固定为 `/races/2026/gold-cup/`。
+- 最终开关：`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`；共享页面缓存为 `redis://redis:6379/2`。容器正常，内外 `/healthz/` 为 `200`，近 10 分钟无 traceback/error。

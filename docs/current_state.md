@@ -989,8 +989,18 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 历史总账 Django admin 为只读入口，支持地区、年份、系列、expectation/resolution 状态和名称筛选；无新增、编辑、删除或直接 apply 动作。
 - 新增默认关闭配置：`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，并设置请求、source cache 和最小剩余磁盘预算。历史 prepare 必须同时通过功能开关、网络开关、plan 显式授权和预算校验。
 - 当前相关模型、service、command、后台、旧赛事页面和旧编排回归共 `122` 项通过；空 SQLite 正向迁移、反向回滚、再迁移、Django check 和迁移漂移检查通过。完整实现、全量回归、代码 review 和生产验收仍未完成。
-- 后续 apply 已推进到 `62/82` 项，代码与自动化测试任务已全部完成：除 2026 mapping、总账切批、历史 importer、公开搜索和分片 sitemap 外，已新增五地区统一离线目录 adapter、`parse_historical_race_catalog` 标准候选命令、共享 source cache/请求预算锁、历史网络运行日志，以及 sitemap/年份缓存和查询索引。五地区三年代测试摘录只验证解析契约，不代表生产目录已收齐。
+- 后续 apply 与生产准备已推进到 `65/82` 项，代码与自动化测试任务已全部完成：除总账切批、历史 importer、公开搜索和分片 sitemap 外，已新增五地区统一离线目录 adapter、`parse_historical_race_catalog` 标准候选命令、共享 source cache/请求预算锁、历史网络运行日志，以及 sitemap/年份缓存和查询索引。五地区三年代测试摘录只验证解析契约，不代表生产目录已收齐。
 - 本轮专项测试覆盖目录、模型、artifact、批次、日志、缓存和编排，完整 `stable` 回归最终为 `743/743`；Django check、迁移无漂移、OpenSpec strict/all `23/23`、三套 Compose 配置、实际 Docker 镜像构建及容器内 `/app/runtime` 路径检查均通过。
-- 已完成多轮 `/review -> 修复 -> 重新 review`：修复目录年份/香港赛季与 provenance、稳定 key 冲突、批准人和人工锁、artifact/cache 路径边界、apply-check cache 保护、已导入/永久缺档状态漂移、共享 Redis cache 降级，以及受保护 cache 不可覆盖和大文件分块校验。最终一轮 review 无 actionable finding，代码门禁 clean；尚未部署本变更、触网或写入生产历史赛事。
-- 剩余 `20` 项全部是生产操作：2026 mapping 审核、逐年官方 source cache/总账、首批五地区验收、分年代带抓取落库和最终审计。1984 起官方年鉴 cache 尚未收齐，不能把测试 fixture 当作生产总账分母。
+- 已完成多轮 `/review -> 修复 -> 重新 review`：修复目录年份/香港赛季与 provenance、稳定 key 冲突、批准人和人工锁、artifact/cache 路径边界、apply-check cache 保护、已导入/永久缺档状态漂移、共享 Redis cache 降级，以及受保护 cache 不可覆盖和大文件分块校验。最终一轮 review 无 actionable finding，代码门禁 clean；工具已部署并完成 2026 mapping，但尚未创建历史总账、抓取 1984–2025 详情或公开历史赛事。
+- 生产部署和 2026 mapping 已完成，当前进度 `65/82`。剩余 `17` 项全部是生产操作：逐年官方 source cache/总账、首批五地区验收、分年代带抓取落库和最终审计。1984 起官方年鉴 cache 尚未收齐，不能把测试 fixture 当作生产总账分母。
+
+## 2026-07-12 历史赛事工具生产部署与 2026 系列 mapping
+
+- 生产已从 `dc6e434` 快进部署至 `c3b66a6`。迁移 `stable.0024_historical_race_inventory` 与 `stable.0026_historical_race_query_indexes` 已应用，三个历史查询索引均存在；Django check、内外 `/healthz/`、赛事日历和抽检详情页通过。
+- 部署前备份为 `.env.backup.historical-race-backfill-20260712_044501` 与 `backups/db/pre-historical-race-backfill-20260712_044501.sql.gz`；mapping 写入前备份为 `backups/db/pre-2026-race-series-mapping-20260712_051047.sql.gz`。两份数据库备份均通过 `gzip -t` 和 SHA-256 校验。
+- 2026 初始 mapping 对 `995` 场赛事识别出日本/香港日期型 key、美国两组重复 key 和英国名称相似冲突。美国两个无日期空壳的别名、历届冠军和候选均与正式赛事重复，已在事务断言后删除；英国 Gold Cup 重复记录的出马表、赛果、冠军、候选和 BHA 官方来源已合并到既有 `/races/2026/gold-cup/` 主记录。
+- 最终批准 artifact 为 `runtime/historical_race_inventory/mapping-2026-approved-20260712_051808/`：`event_count=992`、`approved=992`、`review_required=0`、`conflict=0`。日本 JRA key 使用 JRA 官方英文重赏表/赛程，NAR 使用 `keiba.go.jp` 官方详情 URL，香港使用 HKJC 官方英文赛果术语；override 审核证据位于 `mapping-overrides-2026/`。
+- 受控 commit 新建 `992` 个 `RaceSeries` 并绑定全部 `992` 场 2026 `RaceEvent`；幂等复跑返回 `series_created=0 / events_bound=0`。地区计数为日本 `186`、香港 `20`、英国 `202`、法国 `174`、美国 `410`，未绑定赛事为 `0`。
+- 常驻生产配置最终确认 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`、`RACE_EVENT_CACHE_URL=redis://redis:6379/2`。当前 `HistoricalRaceEventTarget=0`、1984–2025 `RaceEvent=0`、公开历史赛事 `0`，尚未开始逐年目录抓取或历史详情落库。
+- 下一步是任务 8.3：按五地区逐年采集 1984–当前官方 catalog source cache，生成只读年度总账；测试 fixture 不得充当生产完整目录。
 - 用户已授权：准备任务、完整测试和 clean review 全部完成后，可自主执行生产部署、抓取与分批落库，无需逐批再次确认；最终必须恢复关闭历史功能/网络开关，历史年度赛事保持 draft，不提前公开。

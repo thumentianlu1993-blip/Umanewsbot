@@ -34,7 +34,7 @@
 - [x] 3.1 (application) 为生产 995 个 2026 `RaceEvent` 生成只读稳定系列 mapping artifact
 - [x] 3.2 (integration) 识别并阻断带年份/日期的不稳定 key、同年重复 key 和名称相似冲突
 - [x] 3.3 (application) 实现从已批准 mapping artifact 幂等创建系列并绑定现有年度赛事的命令
-- [ ] 3.4 (operations) 审核五地区 mapping 汇总、美国重复 key 和日本/香港日期型 key，保留批准证据
+- [x] 3.4 (operations) 审核五地区 mapping 汇总、美国重复 key 和日本/香港日期型 key，保留批准证据
 
 ## 4. 五地区历史年度目录适配器
 
@@ -87,8 +87,8 @@
 
 ## 8. 生产总账与第一批验收
 
-- [ ] 8.1 (operations) 部署空模型和只读 inventory 工具，完成生产备份、迁移、健康和回滚演练
-- [ ] 8.2 (operations) 对现有 2026 系列执行 mapping dry-run、人工审核 artifact 并受控 commit
+- [x] 8.1 (operations) 部署空模型和只读 inventory 工具，完成生产备份、迁移、健康和回滚演练
+- [x] 8.2 (operations) 对现有 2026 系列执行 mapping dry-run、人工审核 artifact 并受控 commit
 - [ ] 8.3 (operations) 五地区逐年生成 1984–当前年度 catalog source cache 和只读年度总账
 - [ ] 8.4 (operations) 审核历史独有系列、创办年、改名迁场、取消/not-held 和身份冲突
 - [ ] 8.5 (operations) 批准年度总账 manifest，确认全局/地区/年代/系列分母和请求预算
