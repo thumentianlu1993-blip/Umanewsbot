@@ -14,6 +14,7 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
 
 COPY server /app/server
+COPY runtime/tools /app/server/runtime/tools
 COPY deploy /app/deploy
 COPY .env.example /app/.env.example
 
@@ -23,4 +24,3 @@ RUN chmod +x /app/deploy/docker/*.sh \
 WORKDIR /app/server
 
 CMD ["/app/deploy/docker/start-web.sh"]
-

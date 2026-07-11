@@ -3813,3 +3813,9 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - 本次 `allow_network=false`，只执行 `plan`，没有网络请求、候选生成或数据库赛事详情写入。
 - 原 fixture 中香港杯、凯旋门和简短肯塔基德比种子包含未来赛事或空壳展示行；本批改用生产中已完赛且已有三模块基线的正式赛事行，以便后续验证抓取差异和覆盖保护。
 - 用户确认 CSV 中赛事原名、中文名、年份、地区和 slug 前，不得批准应到清单或进入网络 `prepare`。
+
+首批 prepare 前镜像检查：
+
+- `Dockerfile` 必须把 `runtime/tools` 复制到 `/app/server/runtime/tools`；`.dockerignore` 只放行该工具目录，仍排除 plans、runs、抓取缓存和其他 runtime artifact。
+- 部署后先在 web 容器执行 `test -f /app/server/runtime/tools/race_event_request_budget.py`，并逐项检查 plan 中注册 adapter 的脚本存在，再恢复 network run。
+- 该检查只确认执行文件可用，不代表允许绕过应到审批、请求预算、coverage、dry-run 或 apply-check。

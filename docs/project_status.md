@@ -305,3 +305,4 @@
 - 2026-07-11 已部署生产提交 `6e2cc92`：赛事历史抓取编排已归档并上线，多地区归属模型/迁移已上线但两个功能开关继续关闭。部署前 `.env` 与数据库备份均已完成并校验；归属短路热修复使 worker CPU 从持续高占用恢复至空闲约 `0.04%`。Django、容器、Celery、健康检查、首页、法国/英国频道、赛事日历及后台登录页回归通过。`support-multiregion-news-attribution-and-english-gates` 仍待五地区产品口径验收，不得开启开关或提交历史重算。
 - 2026-07-11 `support-multiregion-news-attribution-and-english-gates` 已在用户接受任务 `9.6` 未完成警告后归档；六组 delta spec 已同步到正式规格，OpenSpec 全量 `21` 项通过，当前无 active change。归档不代表五地区产品归属验收通过，多地区生产开关仍须保持关闭。
 - 2026-07-11 已生成赛事编排第一批五地区应到清单：日本德比、富卫保险女皇杯、BETFRED DERBY、PRIX DE DIANE LONGINES、KENTUCKY DERBY PRESENTED BY WOODFORD RESERVE 各 1 场，三模块齐全且 5 行预检均为 `ready`。run 审批仍为 `pending`、网络关闭，等待用户审核 `expected_targets_review.csv`，尚未开始真实抓取。
+- 用户已批准上述清单；网络版 run 与原清单逐字段一致。prepare 前检查发现生产镜像遗漏 `runtime/tools` adapter 脚本，当前先修复 Docker 构建内容并部署，尚未发出网络请求。

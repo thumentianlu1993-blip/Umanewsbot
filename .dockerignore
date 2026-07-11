@@ -5,7 +5,9 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
-runtime/
+runtime/*
+!runtime/tools/
+!runtime/tools/**
 imports/
 backups/
 napcat/
