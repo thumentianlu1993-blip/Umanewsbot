@@ -3834,6 +3834,7 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - aggregate 生成正式 `combined_candidates.jsonl` 时必须剔除显式 `items=[]` 模块；若一条记录剔除后没有模块，则整条不进入 combined 文件。每次该规则变化后必须重新计算 candidate identity、coverage 和 dry-run，不得沿用旧 apply-check 证据。
 - `candidate_less_complete` 不只比较行数，还必须逐模块比较关键字段非空数量；候选总行数相同但会把已有练马师、骑手、完赛时间等字段覆盖为空时，同样阻断 apply 并在 blocker 写入 `field_completeness_regressions`。
 - JRA 重赏年度列表不含练马师和完赛时间；`jra_history_winners` 必须依赖同批 `jra_detail`，用当届冠军赛果补齐这些字段并保留 `current_result` 来源。第一批真实缓存 smoke 应确认 2026 日本德比历史冠军为 `ロブチェン / 杉山 晴紀 / 2:22.7`。
+- 第一批最终证据：候选 SHA-256 `2dd40a141219f7fd39799b7f586efb862f2332e8e037e4091f46c88bee48eac5`；coverage `passed / 5/5 / blocker=0`；dry-run `events=11 / modules=15 / runners=75 / results=64 / history_winners=47`；请求数 `60`。正式 apply 前仍须取得七个实际地区/来源/module scope 的人工确认、法国和美国 mixed-source strategy SHA 确认，以及字段 diff review 批准。
 
 ### 2026-07-11 国际新闻门禁与产量验收
 
