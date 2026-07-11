@@ -864,6 +864,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 上述归属短路热修复已在生产验证：当 `MULTIREGION_ATTRIBUTION_ENABLED=false` 时，真实文章调用 `apply_article_attribution(save=False)` 不会调用 `infer_article_attribution()`，返回 `attribution_disabled`。worker 从部署前两个进程持续高 CPU 恢复到约 `0.04%`，旧抓取积压已消化，Celery reserved 为空，日志未见 traceback/error。
 - 生产 `MULTIREGION_ATTRIBUTION_ENABLED=false`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false` 继续保持关闭；此前五地区 dry-run 的产品归属口径仍未通过，因此 `support-multiregion-news-attribution-and-english-gates` 保持 active，任务 `9.6` 继续待办，未执行历史归属 commit。
 - 生产回归通过：六个容器正常，Django check 通过；本机与公网 `/healthz/`、首页、法国/英国地区页、赛事日历和后台登录页均正常。已通过应用内浏览器真实打开首页、法国频道、英国频道、赛事日历和后台登录页，页面标题、地区导航和文章列表正常渲染。
+- `2026-07-11` 经用户确认，`support-multiregion-news-attribution-and-english-gates` 已同步六组 delta spec 后归档至 `openspec/changes/archive/2026-07-11-support-multiregion-news-attribution-and-english-gates/`，当前无 active OpenSpec change。正式规格新增 `multiregion-news-attribution`，并同步英文门禁、国际内容分类、发布窗口、公开地区 tab 和 QQ 多地区规则；OpenSpec 全量 `21` 项通过。归档时保留任务 `9.6` 未完成警告：五地区生产 dry-run 的产品归属口径仍未通过，生产两个多地区开关继续关闭。
 
 ## 2026-07-01 多地区新闻增量窗口实现与生产验证
 

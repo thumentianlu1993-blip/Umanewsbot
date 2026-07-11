@@ -303,3 +303,4 @@
 - 2026-07-11 第六轮赛事抓取返修：批量 importer 已整批事务化；应到快照保存完整 adapter 输入且审批后 `RaceEvent` 漂移会阻断；pending 混合来源确认不再提供策略 SHA。按用户决定暂不强制哈希参数、暂不增加请求预算并发锁。目标测试 `67` 项、完整 `stable` 回归 `589` 项通过，Django/迁移/OpenSpec/diff 校验均通过；`orchestrate-race-event-data-crawls` 已同步正式规格并归档。
 - 2026-07-11 生产部署前发现多地区归属开关关闭后仍扫描完整术语库，导致 crawl worker 高 CPU；已增加禁用/人工锁定短路，目标测试 `30` 项、完整回归 `591` 项通过。归属开关保持关闭，五地区产品抽样仍待修正口径后重验。
 - 2026-07-11 已部署生产提交 `6e2cc92`：赛事历史抓取编排已归档并上线，多地区归属模型/迁移已上线但两个功能开关继续关闭。部署前 `.env` 与数据库备份均已完成并校验；归属短路热修复使 worker CPU 从持续高占用恢复至空闲约 `0.04%`。Django、容器、Celery、健康检查、首页、法国/英国频道、赛事日历及后台登录页回归通过。`support-multiregion-news-attribution-and-english-gates` 仍待五地区产品口径验收，不得开启开关或提交历史重算。
+- 2026-07-11 `support-multiregion-news-attribution-and-english-gates` 已在用户接受任务 `9.6` 未完成警告后归档；六组 delta spec 已同步到正式规格，OpenSpec 全量 `21` 项通过，当前无 active change。归档不代表五地区产品归属验收通过，多地区生产开关仍须保持关闭。
