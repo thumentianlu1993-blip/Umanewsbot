@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.contrib import admin, messages
+from django.db.models import Count
 from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
@@ -12,6 +13,7 @@ from .models import (
     ArticleStatus,
     AutomationLog,
     CrawlJob,
+    HistoricalRaceEventTarget,
     MajorRaceEvent,
     MediaAsset,
     NewsArticle,
@@ -32,6 +34,9 @@ from .models import (
     RaceEventHistoryWinner,
     RaceEventResult,
     RaceEventRunner,
+    RaceSeries,
+    RaceSeriesName,
+    RaceSeriesRelation,
     TaskExecutionLog,
     TermCandidate,
     TermCandidateEvidence,
@@ -477,6 +482,126 @@ class RaceEventArticleLinkInline(admin.TabularInline):
     extra = 0
     readonly_fields = ("source", "confidence", "matched_text", "match_reason", "created_at", "updated_at")
     fields = ("article", "link_type", "status", "source", "confidence", "matched_text", "match_reason", "created_at")
+
+
+class HistoricalInventoryReadOnlyAdmin(admin.ModelAdmin):
+    actions = None
+
+    def get_readonly_fields(self, request, obj=None):
+        return tuple(field.name for field in self.model._meta.fields)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class HistoricalTargetModuleFilter(admin.SimpleListFilter):
+    title = "资料模块"
+    parameter_name = "module"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("basic", "基础资料"),
+            ("runners", "出马表"),
+            ("results", "赛果"),
+            ("history_winners", "冠军覆盖"),
+        )
+
+    def queryset(self, request, queryset):
+        return queryset.filter(module_statuses__has_key=self.value()) if self.value() else queryset
+
+
+@admin.register(RaceSeries)
+class RaceSeriesAdmin(HistoricalInventoryReadOnlyAdmin):
+    list_display = (
+        "key",
+        "country_region",
+        "canonical_name_original",
+        "chinese_name",
+        "founded_year",
+        "ended_year",
+        "status",
+        "review_status",
+    )
+    list_filter = ("country_region", "status", "review_status")
+    search_fields = ("key", "canonical_name_original", "chinese_name", "names__text")
+    list_per_page = 100
+
+
+@admin.register(RaceSeriesName)
+class RaceSeriesNameAdmin(HistoricalInventoryReadOnlyAdmin):
+    list_display = ("text", "series", "source_language", "name_type", "valid_from_year", "valid_to_year")
+    list_filter = ("source_language", "name_type", "is_active")
+    search_fields = ("text", "normalized_text", "series__key", "series__canonical_name_original")
+    list_select_related = ("series",)
+    list_per_page = 100
+
+
+@admin.register(RaceSeriesRelation)
+class RaceSeriesRelationAdmin(HistoricalInventoryReadOnlyAdmin):
+    list_display = ("from_series", "relation_type", "to_series", "effective_year", "review_status", "approved_by")
+    list_filter = ("relation_type", "review_status", "effective_year")
+    search_fields = (
+        "from_series__key",
+        "to_series__key",
+        "from_series__canonical_name_original",
+        "to_series__canonical_name_original",
+    )
+    list_select_related = ("from_series", "to_series", "approved_by")
+    list_per_page = 100
+
+
+@admin.register(HistoricalRaceEventTarget)
+class HistoricalRaceEventTargetAdmin(HistoricalInventoryReadOnlyAdmin):
+    change_list_template = "admin/stable/historical_race_event_target/change_list.html"
+    list_display = (
+        "year",
+        "race_series",
+        "country_region",
+        "expectation_status",
+        "resolution_status",
+        "original_name",
+        "event",
+        "last_checked_at",
+    )
+    list_filter = (
+        "country_region",
+        "year",
+        "expectation_status",
+        "resolution_status",
+        HistoricalTargetModuleFilter,
+        "race_series",
+    )
+    search_fields = (
+        "race_series__key",
+        "race_series__canonical_name_original",
+        "race_series__chinese_name",
+        "original_name",
+        "chinese_name",
+    )
+    list_select_related = ("race_series", "event")
+    list_per_page = 100
+
+    def changelist_view(self, request, extra_context=None):
+        queryset = self.get_queryset(request)
+        summary = {
+            "target_count": queryset.count(),
+            "by_region": list(
+                queryset.values("country_region").annotate(count=Count("id")).order_by("country_region")
+            ),
+            "by_expectation": list(
+                queryset.values("expectation_status").annotate(count=Count("id")).order_by("expectation_status")
+            ),
+            "by_resolution": list(
+                queryset.values("resolution_status").annotate(count=Count("id")).order_by("resolution_status")
+            ),
+        }
+        return super().changelist_view(
+            request,
+            extra_context={**(extra_context or {}), "inventory_summary": summary},
+        )
 
 
 @admin.register(RaceEvent)

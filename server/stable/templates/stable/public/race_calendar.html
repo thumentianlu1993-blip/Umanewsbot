@@ -20,6 +20,26 @@
       {% endfor %}
     </nav>
 
+    <form class="public-filter-bar race-calendar-filters" method="get">
+      <input type="hidden" name="tab" value="{{ filters.tab }}">
+      {% if filters.region %}<input type="hidden" name="region" value="{{ filters.region }}">{% endif %}
+      <label>
+        <span>年份</span>
+        <select name="year">
+          <option value="">全部年份</option>
+          {% for year in years %}
+            <option value="{{ year }}" {% if filters.year == year|stringformat:"s" %}selected{% endif %}>{{ year }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>赛事名称</span>
+        <input type="search" name="q" value="{{ filters.q }}" placeholder="中文名、原名或历史名称">
+      </label>
+      <button type="submit">筛选</button>
+      {% if filters.year or filters.q %}<a href="{{ clear_search_url }}">清除</a>{% endif %}
+    </form>
+
     <div class="race-load-actions">
       {% if previous_url %}<a href="{{ previous_url }}">加载更早赛事</a>{% endif %}
       {% if next_url %}<a href="{{ next_url }}">加载未来赛事</a>{% endif %}

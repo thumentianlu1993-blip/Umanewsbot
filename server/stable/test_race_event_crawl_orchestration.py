@@ -1811,6 +1811,25 @@ class RaceEventCrawlApplyCheckTests(RaceEventCrawlOrchestrationTestCase):
             )
 
             confirmation["mixed_source_strategy_sha256s"] = [strategy_sha256]
+            source_cache = tmp_path / "source" / "official.html"
+            source_cache.parent.mkdir(parents=True, exist_ok=True)
+            source_cache.write_bytes(b"official evidence")
+            source_cache_identity = module.file_identity(source_cache)
+            self._write_json(
+                tmp_path / "source_cache_manifest.json",
+                {
+                    "schema_version": "1.0",
+                    "root": str(tmp_path),
+                    "files": {
+                        "source/official.html": {
+                            **source_cache_identity,
+                            "path": "source/official.html",
+                            "source_url": "https://official.test/result",
+                            "protected_by": [],
+                        }
+                    },
+                },
+            )
             allowed = module.evaluate_apply_check(
                 run_dir=tmp_path,
                 coverage_audit=coverage,
@@ -1820,6 +1839,13 @@ class RaceEventCrawlApplyCheckTests(RaceEventCrawlOrchestrationTestCase):
                 apply_scope={"scopes": [sporting_life_scope, toba_scope]},
             )
             self.assertTrue(_field(allowed, "is_apply_allowed"))
+            protected_manifest = json.loads(
+                (tmp_path / "source_cache_manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                protected_manifest["files"]["source/official.html"]["protected_by"],
+                [_field(allowed, "approved_candidate_identity")["sha256"]],
+            )
 
 
 class RaceEventCrawlRunStateTests(RaceEventCrawlOrchestrationTestCase):

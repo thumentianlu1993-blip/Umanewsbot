@@ -1,0 +1,4 @@
+record_type,year,series_key,canonical_name_original,original_name,chinese_name,grade_text,racecourse,local_date,distance_text,surface,expectation_status,founded_year,ended_year,series_status,season_label,source_scope,discipline
+catalog,1984,france-prix-de-larc-de-triomphe,Prix de l'Arc de Triomphe,Prix de l'Arc de Triomphe,凯旋门大赛,Groupe I,Longchamp,1984-10-07,2400m,turf,held,1920,,active,,flat,flat
+catalog,2000,france-prix-de-larc-de-triomphe,Prix de l'Arc de Triomphe,Prix de l'Arc de Triomphe,凯旋门大赛,Groupe 1,Longchamp,2000-10-01,2400m,turf,held,1920,,active,,flat,flat
+catalog,2026,france-prix-de-larc-de-triomphe,Prix de l'Arc de Triomphe,Prix de l'Arc de Triomphe,凯旋门大赛,Gr 1,ParisLongchamp,2026-10-04,2400m,turf,held,1920,,active,,flat,flat

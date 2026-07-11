@@ -8,6 +8,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from stable.models import RaceEvent, RaceEventModule
+from stable.services.historical_race_inventory import InventoryValidationError, sanitize_structured_row_evidence
 from stable.services.race_events import apply_data_candidate, save_data_candidate
 
 
@@ -55,6 +56,10 @@ def _normalize_module_payload(module: str, payload) -> dict:
         raise CommandError(f"{module}.items 必须是数组")
     if any(not isinstance(item, dict) for item in items):
         raise CommandError(f"{module}.items 内每一项必须是对象")
+    try:
+        payload["items"] = [sanitize_structured_row_evidence(item) for item in items]
+    except InventoryValidationError as exc:
+        raise CommandError(f"{module} 包含不允许的整页或超大 raw payload：{exc}") from exc
     return payload
 
 
@@ -132,7 +137,13 @@ class Command(BaseCommand):
                     "slug": event.slug,
                     "source_name": source_name,
                     "source_url": source_url,
-                    "modules": modules,
+                    "modules": {
+                        module: {
+                            "item_count": len(module_payload.get("items") or []),
+                            "source_cache_identity": module_payload.get("source_cache_identity") or {},
+                        }
+                        for module, module_payload in modules.items()
+                    },
                 }
                 for module, module_payload in modules.items():
                     candidate = save_data_candidate(

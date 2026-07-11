@@ -949,3 +949,48 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 已部署生产提交 `d071952`，无新增迁移。生产 `web / worker / beat` 重建正常，内外 healthz、赛事日历和日本德比详情均返回 `200`，近 5 分钟服务日志无 traceback/error。
 - 线上首批术语覆盖抽检：香港赛果已是中文原文；英国马名 `13/13`、骑师 `9/13` 命中；美国马名 `2/18`、骑师 `11/18` 命中；法国马名 `1/7`、骑师 `0/7` 命中；日本德比马名 `1/18`、骑师 `0/18` 命中。日本德比当前冠军 `ロブチェン` 和骑师 `松山 弘平` 尚无 active 正式术语，页面按规则保留原文，后续需补词库而不是改展示逻辑。
 - 部署前 `.env` 备份为 `.env.backup.race-display-20260712_002533`；数据库备份为 `backups/db/pre-race-display-20260712_002533.sql.gz`，约 `105M`，gzip 校验通过，SHA-256 为 `99994e84d3154dd9d4c1503b96688cd24bf7e00d9ad13aca02a965a69d64a8c0`。
+## 2026-07-12 五地区赛事追溯至 1984 年目标启动
+
+- 新长期目标已锁定：日本、中国香港、英国、法国、美国赛事采用相同历史深度，统一追溯至 1984 年，并沿用应到清单、跨来源关联、去重补漏、五地区抽样、覆盖审计、dry-run、备份、分批写入和写后核验门禁。
+- 生产只读基线：`RaceEvent=995`，全部为 2026 年；日本 `186`、香港 `20`、英国 `203`、法国 `174`、美国 `412`。按现有系列机械乘以 1984–2026 的 43 年，理论上限约 `42,785` 个年度对象，但该数字尚未扣除创办年、停办/取消和历史等级范围变化。
+- 当前前置缺口：编排器支持年份范围，但要求每个年份先存在正式 `RaceEvent`；日本、香港部分 `series_key` 带 2026 日期，美国另有两个同年重复系列键，不能直接复制当前赛历生成历史年度对象。
+- 已创建 OpenSpec change `backfill-race-events-to-1984`，完成 proposal、design、4 份 delta spec 和 tasks；`/grill-me` 共锁定 22 个产品决策。两轮 `/plan-eng-review` 已收敛，最终 verdict 为 APPROVED，审查记录见 `engineering_review.md`。当前只获准进入“编写完整测试用例”阶段，尚未实现代码、触网、创建历史赛事或写生产数据。
+- `/grill-me` Q1 已确认选择 A：历史范围为当前五地区全部 graded/pattern 系列，包括日本 JRA/NAR 分级赛、香港分级赛、英国/法国 Pattern Race 和美国 Graded Stakes；明确排除普通赛、让赛和未胜利赛。
+- `/grill-me` Q2 已确认选择 A：入选赛事系列按完整系列史收录，从 `max(1984, 实际创办年)` 开始；赛事升级为分级赛之前的届次也纳入，并保存当年真实等级。
+- `/grill-me` Q3 已确认选择 A：纳入 1984–当前年度任一年曾属于 graded/pattern 体系、但后来停办、降级退出或不在 2026 当前目录中的历史独有系列。完整目录必须逐年发现，不能只从现役 2026 系列向前复制。
+- `/grill-me` Q4 已确认选择 A：已排期后取消的年度赛事创建 `RaceEvent(status=cancelled)`；当年根本未举办的系列只在应到清单记录 `not_held`、原因和证据，不创建虚假赛事，且不作为漏抓。
+- `/grill-me` Q5 已确认选择 A：历史年份只有可信完整赛果而无独立 racecard 时，可从完整赛果派生出马表并标记 `derived_from_results`；仅复制有证据字段，赔率、闸位等未知值保持为空。
+- `/grill-me` Q6 已确认选择 A：年度冠军以该年正式赛果为唯一主事实，历届冠军按稳定系列动态汇总；只有缺完整赛果而有可信冠军证据的年份才用 `RaceEventHistoryWinner` 补位，禁止向每届复制整张冠军表。
+- `/grill-me` Q7 已确认选择 A：稳定赛事系列身份按权威沿革认定；冠名、名称、场地、距离和等级变化不自动切断系列，合并/拆分/替代必须人工确认并记录前身后继，名称相似只生成待审候选。
+- `/grill-me` Q8 已确认选择 A：字段级来源权威顺序为当年主办方/监管机构官方结果、官方历史档案/年鉴、高可信专业数据库、参考来源；低级来源只补空，同级或更高级冲突阻断相应写入范围并人工审核。
+- `/grill-me` Q9 已确认选择 A；工程审查将不可执行的停办系列近年锚点澄清为：每地区 3 个代表系列、约 9 个真实 held/cancelled 年度目标，地区整体覆盖 1980 年代、2000 年前后和近年，约 45 场，并覆盖长寿、改名/迁场、历史独有或停办系列。
+- `/grill-me` Q10 已确认选择 A：覆盖完整目标可按批准 scope 先写入；`source_unavailable / identity_review_required` 持续挂在总缺口账本且不计完成，不冻结其他完整目标，也不得用空记录占位。
+- `/grill-me` Q11 已确认选择 A：永久不可得必须完成官方/监管档案与至少一个独立可信来源的双来源核查，保留完整证据并人工批准；超时、403、限流和页面改版只算暂时不可用。
+- `/grill-me` Q12 已确认选择 A：当前年度未来赛事或官方确认宽限期内赛事标记 `not_due`，进入总清单但不计缺失；到期后再转为应到，历史完成率与滚动当前赛季分开统计。
+- `/grill-me` Q13 已确认选择 A：批准批次中身份完整且出马表/赛果达到年度可得标准的历史赛事可自动公开；身份待审、来源冲突或资料不足保持 draft，已确认取消赛事可带说明公开。
+- `/grill-me` Q14 已确认选择 A：后续更权威/更完整来源通过新候选 diff 和批准批次修正机器字段，人工锁字段不覆盖；旧值、来源快照、批次、原因和回滚证据必须保留。
+- `/grill-me` Q15 已确认选择 A：马名/骑师名缺中文术语不阻止结构化历史赛事写入和公开，页面保留原文并生成术语缺口；术语补齐后动态显示中文，禁止自动音译直接写正式词库。
+- `/grill-me` Q16 已确认选择 A：首批后全量按 `2016–2025 → 2006–2015 → 1996–2005 → 1984–1995` 从新到旧推进；标准批次每地区最多 50 个目标，任何地区不得比最慢地区领先超过 100 个同年代带标准目标。
+- `/grill-me` Q17 已确认选择 A：最终以 `accounted_rate=100%` 收口，同时独立报告 `data_complete_rate`；全部目标必须写入、确认 not_held/not_due，或经双来源批准 permanently_unavailable，永久缺档不得伪装成数据完整。
+- `/grill-me` Q18 已确认选择 A：历史参赛记录不自动批量创建 HorseProfile，只关联现有正式术语/马匹资料；未识别人马进入候选和术语缺口，避免同名误合并与空壳资料。
+- `/grill-me` Q19 已确认选择 B：不新增公开赛事系列页；历史数据继续落在年度 RaceEvent 详情页，稳定系列仅用于后台身份、历届冠军汇总和年度关联。
+- `/grill-me` Q20 已确认选择 A：赛事日历增加年份筛选和赛事名称搜索，结果进入现有年度详情页；不新增系列页，也不要求按短窗口连续翻到 1984 年。
+- `/grill-me` Q21 已确认选择 A：哈希锁定 artifact 是审批与 apply 唯一凭证；后台增加按地区/年代/系列/状态/冲突查看的汇总入口，但不得绕过 artifact 直接批量写入。
+- `/grill-me` Q22 已确认选择 A：质量达标且 published 的历史年度赛事允许搜索引擎收录并进入分片 sitemap；draft、身份冲突、资料不足和 not_held 不收录。
+- 本轮 `/grill-me` 已完成关键产品分支确认，下一步进入 OpenSpec design、delta specs 和 tasks 编写。
+- `backfill-race-events-to-1984` 已完成两轮 Full `/plan-eng-review`，最终 APPROVED；随后已创建 `test_cases.md`，共 160 个唯一测试用例，覆盖范围、系列/迁移、年度状态机、来源权威、artifact、五地区 adapter、批次、导入、公开页面、运维和非目标回归。OpenSpec change strict、全量 22 项和 `git diff --check` 均通过。当前按用户流程进入 `/opsx:apply`，尚未上线、触网或写生产历史赛事。
+
+## 2026-07-12 历史赛事回填 apply 第一阶段
+
+- `backfill-race-events-to-1984` 已进入 `/opsx:apply`，当前仅完成本地模型、迁移和只读 inventory 基础能力；尚未部署、触网、提交历史总账或创建历史年度赛事。
+- 新增稳定系列、历史名称、系列关系和年度应到总账模型；`RaceEvent.race_series` 为 nullable，旧 `series_key` 和公开 slug 保持兼容。赛果新增独立 `official_finish_position`，迁移会优先读取旧 `source_refs` 官方名次并回退存储顺序，历史冠军唯一约束已支持并列冠军。
+- 新增离线 `build_historical_race_inventory`：默认只生成 series/target/conflict/gap/summary/manifest/approval artifact；commit 必须开启功能开关并验证批准人、时间、manifest SHA 和全部文件 SHA，且 commit 阶段不重新生成输入、不触网。
+- 已实现字段级来源权威合并、同级冲突阻断、人工锁保护、系列关系防环、名称模糊匹配只进待审、双状态转换、永久缺档独立双来源校验和 accounted/data-complete 分开统计。
+- 历史总账 Django admin 为只读入口，支持地区、年份、系列、expectation/resolution 状态和名称筛选；无新增、编辑、删除或直接 apply 动作。
+- 新增默认关闭配置：`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，并设置请求、source cache 和最小剩余磁盘预算。历史 prepare 必须同时通过功能开关、网络开关、plan 显式授权和预算校验。
+- 当前相关模型、service、command、后台、旧赛事页面和旧编排回归共 `122` 项通过；空 SQLite 正向迁移、反向回滚、再迁移、Django check 和迁移漂移检查通过。完整实现、全量回归、代码 review 和生产验收仍未完成。
+- 后续 apply 已推进到 `62/82` 项，代码与自动化测试任务已全部完成：除 2026 mapping、总账切批、历史 importer、公开搜索和分片 sitemap 外，已新增五地区统一离线目录 adapter、`parse_historical_race_catalog` 标准候选命令、共享 source cache/请求预算锁、历史网络运行日志，以及 sitemap/年份缓存和查询索引。五地区三年代测试摘录只验证解析契约，不代表生产目录已收齐。
+- 本轮专项测试覆盖目录、模型、artifact、批次、日志、缓存和编排，完整 `stable` 回归最终为 `743/743`；Django check、迁移无漂移、OpenSpec strict/all `23/23`、三套 Compose 配置、实际 Docker 镜像构建及容器内 `/app/runtime` 路径检查均通过。
+- 已完成多轮 `/review -> 修复 -> 重新 review`：修复目录年份/香港赛季与 provenance、稳定 key 冲突、批准人和人工锁、artifact/cache 路径边界、apply-check cache 保护、已导入/永久缺档状态漂移、共享 Redis cache 降级，以及受保护 cache 不可覆盖和大文件分块校验。最终一轮 review 无 actionable finding，代码门禁 clean；尚未部署本变更、触网或写入生产历史赛事。
+- 剩余 `20` 项全部是生产操作：2026 mapping 审核、逐年官方 source cache/总账、首批五地区验收、分年代带抓取落库和最终审计。1984 起官方年鉴 cache 尚未收齐，不能把测试 fixture 当作生产总账分母。
+- 用户已授权：准备任务、完整测试和 clean review 全部完成后，可自主执行生产部署、抓取与分批落库，无需逐批再次确认；最终必须恢复关闭历史功能/网络开关，历史年度赛事保持 draft，不提前公开。

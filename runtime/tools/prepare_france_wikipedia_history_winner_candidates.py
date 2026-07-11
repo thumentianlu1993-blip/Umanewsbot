@@ -13,6 +13,7 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from race_event_request_budget import before_network_request
+from race_event_source_cache import write_source_cache_text
 
 from bs4 import BeautifulSoup
 
@@ -88,7 +89,7 @@ def _request_text(url: str, cache_path: Path, *, allow_network: bool, timeout: i
     before_network_request(url)
     with urlopen(request, timeout=timeout) as response:
         text = response.read().decode("utf-8", errors="replace")
-    cache_path.write_text(text, encoding="utf-8")
+    write_source_cache_text(cache_path, text, source_url=url)
     return text
 
 

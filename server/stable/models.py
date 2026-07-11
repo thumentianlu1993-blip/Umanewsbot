@@ -380,6 +380,49 @@ class RaceEventDataQuality(models.TextChoices):
     COMPLETE = "complete", "完整"
 
 
+class RaceSeriesStatus(models.TextChoices):
+    ACTIVE = "active", "现行"
+    DISCONTINUED = "discontinued", "已停办"
+    UNKNOWN = "unknown", "待确认"
+
+
+class RaceSeriesReviewStatus(models.TextChoices):
+    PENDING = "pending", "待审核"
+    APPROVED = "approved", "已批准"
+    REJECTED = "rejected", "已驳回"
+
+
+class RaceSeriesNameType(models.TextChoices):
+    CANONICAL = "canonical", "正式名称"
+    HISTORICAL = "historical", "历史名称"
+    SPONSORED = "sponsored", "冠名名称"
+    ALIAS = "alias", "别名"
+
+
+class RaceSeriesRelationType(models.TextChoices):
+    PREDECESSOR = "predecessor", "前身"
+    SUCCESSOR = "successor", "后继"
+    MERGED_INTO = "merged_into", "并入"
+    SPLIT_INTO = "split_into", "拆分为"
+    REPLACED_BY = "replaced_by", "被替代"
+
+
+class HistoricalRaceExpectationStatus(models.TextChoices):
+    HELD = "held", "应举办"
+    CANCELLED = "cancelled", "已取消"
+    NOT_DUE = "not_due", "尚未到期"
+    NOT_HELD = "not_held", "该年未举办"
+
+
+class HistoricalRaceResolutionStatus(models.TextChoices):
+    PENDING = "pending", "待处理"
+    READY = "ready", "可导入"
+    SOURCE_UNAVAILABLE = "source_unavailable", "来源暂不可得"
+    IDENTITY_REVIEW_REQUIRED = "identity_review_required", "系列身份待审"
+    PERMANENTLY_UNAVAILABLE = "permanently_unavailable", "永久不可得"
+    IMPORTED = "imported", "已导入"
+
+
 class RaceEventModule(models.TextChoices):
     BASIC = "basic", "基础资料"
     HISTORY_WINNERS = "history_winners", "历史冠军"
@@ -583,6 +626,141 @@ class MajorRaceEvent(TimestampedModel):
         return f"{self.name} {self.year} {self.racing_region}"
 
 
+class RaceSeries(TimestampedModel):
+    key = models.SlugField(max_length=160, unique=True)
+    country_region = models.CharField(max_length=32, choices=RacingRegion.choices)
+    canonical_name_original = models.CharField(max_length=255)
+    chinese_name = models.CharField(max_length=255, blank=True)
+    founded_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    ended_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    status = models.CharField(max_length=16, choices=RaceSeriesStatus.choices, default=RaceSeriesStatus.UNKNOWN)
+    review_status = models.CharField(
+        max_length=16,
+        choices=RaceSeriesReviewStatus.choices,
+        default=RaceSeriesReviewStatus.PENDING,
+    )
+    source_refs = models.JSONField(default=dict, blank=True)
+    manual_lock_flags = models.JSONField(default=dict, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("country_region", "canonical_name_original", "key")
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(founded_year__isnull=True)
+                    | models.Q(ended_year__isnull=True)
+                    | models.Q(founded_year__lte=models.F("ended_year"))
+                ),
+                name="race_series_valid_years",
+            )
+        ]
+        indexes = [
+            models.Index(fields=("country_region", "status"), name="race_series_region_status_idx"),
+            models.Index(fields=("review_status", "country_region"), name="race_series_review_region_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.founded_year and self.ended_year and self.founded_year > self.ended_year:
+            raise ValidationError({"ended_year": "终止年份不能早于创办年份。"})
+
+    def __str__(self) -> str:
+        return self.chinese_name or self.canonical_name_original
+
+
+class RaceSeriesName(TimestampedModel):
+    series = models.ForeignKey(RaceSeries, on_delete=models.CASCADE, related_name="names")
+    text = models.CharField(max_length=255)
+    normalized_text = models.CharField(max_length=255, db_index=True, blank=True)
+    source_language = models.CharField(max_length=8, choices=SourceLanguage.choices, blank=True)
+    name_type = models.CharField(
+        max_length=16,
+        choices=RaceSeriesNameType.choices,
+        default=RaceSeriesNameType.ALIAS,
+    )
+    valid_from_year = models.PositiveSmallIntegerField(default=0)
+    valid_to_year = models.PositiveSmallIntegerField(default=0)
+    source_refs = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ("series", "valid_from_year", "name_type", "text")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("series", "source_language", "normalized_text", "valid_from_year"),
+                name="uq_series_name_lang_text_from",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(valid_from_year=0)
+                    | models.Q(valid_to_year=0)
+                    | models.Q(valid_from_year__lte=models.F("valid_to_year"))
+                ),
+                name="series_name_valid_years",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.valid_from_year and self.valid_to_year and self.valid_from_year > self.valid_to_year:
+            raise ValidationError({"valid_to_year": "名称有效期终止年份不能早于起始年份。"})
+
+    def save(self, *args, **kwargs):
+        self.normalized_text = " ".join(self.text.casefold().split())
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = set(update_fields) | {"normalized_text"}
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.text} -> {self.series}"
+
+
+class RaceSeriesRelation(TimestampedModel):
+    from_series = models.ForeignKey(RaceSeries, on_delete=models.CASCADE, related_name="outgoing_relations")
+    to_series = models.ForeignKey(RaceSeries, on_delete=models.CASCADE, related_name="incoming_relations")
+    relation_type = models.CharField(max_length=16, choices=RaceSeriesRelationType.choices)
+    effective_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    source_refs = models.JSONField(default=dict, blank=True)
+    review_status = models.CharField(
+        max_length=16,
+        choices=RaceSeriesReviewStatus.choices,
+        default=RaceSeriesReviewStatus.PENDING,
+    )
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_race_series_relations",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("from_series", "effective_year", "relation_type", "to_series")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("from_series", "to_series", "relation_type"),
+                name="uq_series_relation_direction_type",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(from_series=models.F("to_series")),
+                name="series_relation_no_self",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.from_series_id and self.from_series_id == self.to_series_id:
+            raise ValidationError({"to_series": "赛事系列不能与自身建立沿革关系。"})
+        if self.review_status == RaceSeriesReviewStatus.APPROVED and not (self.approved_by_id and self.approved_at):
+            raise ValidationError("批准系列关系时必须记录批准人和批准时间。")
+
+    def __str__(self) -> str:
+        return f"{self.from_series} {self.relation_type} {self.to_series}"
+
+
 class RaceEvent(TimestampedModel):
     year = models.PositiveSmallIntegerField()
     slug = models.SlugField(max_length=160)
@@ -616,6 +794,13 @@ class RaceEvent(TimestampedModel):
     result_confirmed_at = models.DateTimeField(null=True, blank=True)
     source_refs = models.JSONField(default=dict, blank=True)
     manual_lock_flags = models.JSONField(default=dict, blank=True)
+    race_series = models.ForeignKey(
+        RaceSeries,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="annual_events",
+    )
     external_race = models.ForeignKey(
         "ExternalRace",
         on_delete=models.SET_NULL,
@@ -636,9 +821,19 @@ class RaceEvent(TimestampedModel):
         ordering = ("local_date", "local_start_time", "country_region", "chinese_name")
         constraints = [
             models.UniqueConstraint(fields=("year", "slug"), name="uq_race_event_year_slug"),
+            models.UniqueConstraint(
+                fields=("race_series", "year"),
+                condition=models.Q(race_series__isnull=False),
+                name="uq_race_event_series_year",
+            ),
         ]
         indexes = [
             models.Index(fields=("visibility_status", "local_date"), name="race_event_visible_date_idx"),
+            models.Index(fields=("visibility_status", "year"), name="race_event_visible_year_idx"),
+            models.Index(
+                fields=("visibility_status", "data_quality_status", "year", "slug"),
+                name="race_event_sitemap_idx",
+            ),
             models.Index(fields=("country_region", "local_date"), name="race_event_region_date_idx"),
             models.Index(fields=("priority", "visibility_status"), name="race_event_priority_idx"),
             models.Index(fields=("status", "visibility_status"), name="race_event_status_idx"),
@@ -651,8 +846,13 @@ class RaceEvent(TimestampedModel):
         if not self.slug:
             base = slugify(self.original_name or self.chinese_name, allow_unicode=False) or f"race-{self.year}"
             self.slug = base[:160]
-        if not self.series_key:
+        if self.race_series_id:
+            self.series_key = self.race_series.key
+        elif not self.series_key:
             self.series_key = self.slug
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = set(update_fields) | {"slug", "series_key"}
         super().save(*args, **kwargs)
 
     @property
@@ -669,6 +869,115 @@ class RaceEvent(TimestampedModel):
     @property
     def is_key_race(self) -> bool:
         return self.priority in {RaceEventPriority.P0, RaceEventPriority.P1} or self.is_featured
+
+
+class HistoricalRaceEventTarget(TimestampedModel):
+    race_series = models.ForeignKey(RaceSeries, on_delete=models.PROTECT, related_name="historical_targets")
+    year = models.PositiveSmallIntegerField()
+    country_region = models.CharField(max_length=32, choices=RacingRegion.choices)
+    expectation_status = models.CharField(
+        max_length=16,
+        choices=HistoricalRaceExpectationStatus.choices,
+        default=HistoricalRaceExpectationStatus.HELD,
+    )
+    resolution_status = models.CharField(
+        max_length=32,
+        choices=HistoricalRaceResolutionStatus.choices,
+        default=HistoricalRaceResolutionStatus.PENDING,
+    )
+    original_name = models.CharField(max_length=255, blank=True)
+    chinese_name = models.CharField(max_length=255, blank=True)
+    grade_text = models.CharField(max_length=128, blank=True)
+    normalized_grade = models.CharField(max_length=32, choices=RaceGrade.choices, blank=True)
+    racecourse = models.CharField(max_length=255, blank=True)
+    surface = models.CharField(max_length=16, choices=RaceEventSurface.choices, blank=True)
+    distance_text = models.CharField(max_length=128, blank=True)
+    local_date = models.DateField(null=True, blank=True)
+    module_statuses = models.JSONField(default=dict, blank=True)
+    field_provenance = models.JSONField(default=dict, blank=True)
+    source_refs = models.JSONField(default=dict, blank=True)
+    event = models.OneToOneField(
+        RaceEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="historical_target",
+    )
+    last_checked_at = models.DateTimeField(null=True, blank=True)
+    permanent_unavailable_approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_permanent_race_gaps",
+    )
+    permanent_unavailable_approved_at = models.DateTimeField(null=True, blank=True)
+    permanent_unavailable_evidence = models.JSONField(default=dict, blank=True)
+    last_run_id = models.CharField(max_length=64, blank=True)
+    artifact_sha256 = models.CharField(max_length=64, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("country_region", "year", "race_series")
+        constraints = [
+            models.UniqueConstraint(fields=("race_series", "year"), name="uq_historical_target_series_year"),
+            models.CheckConstraint(
+                condition=~models.Q(
+                    expectation_status=HistoricalRaceExpectationStatus.NOT_HELD,
+                    event__isnull=False,
+                ),
+                name="hist_target_not_held_no_event",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(
+                    expectation_status=HistoricalRaceExpectationStatus.NOT_DUE,
+                    resolution_status=HistoricalRaceResolutionStatus.IMPORTED,
+                ),
+                name="hist_target_not_due_unimported",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("country_region", "year", "expectation_status", "resolution_status"),
+                name="hist_target_region_year_idx",
+            ),
+            models.Index(fields=("resolution_status", "last_checked_at"), name="hist_target_resolution_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.race_series_id and self.country_region != self.race_series.country_region:
+            raise ValidationError({"country_region": "年度目标地区必须与赛事系列一致。"})
+        if self.expectation_status == HistoricalRaceExpectationStatus.NOT_HELD and self.event_id:
+            raise ValidationError({"event": "未举办年份不能关联虚构赛事。"})
+        if self.expectation_status == HistoricalRaceExpectationStatus.NOT_DUE:
+            if self.resolution_status == HistoricalRaceResolutionStatus.IMPORTED:
+                raise ValidationError({"resolution_status": "尚未到期的年度目标不能标记为已导入。"})
+        if self.resolution_status == HistoricalRaceResolutionStatus.IMPORTED and not self.event_id:
+            raise ValidationError({"event": "标记已导入前必须关联正式赛事。"})
+        if self.resolution_status == HistoricalRaceResolutionStatus.PERMANENTLY_UNAVAILABLE:
+            if not (
+                self.permanent_unavailable_approved_by_id
+                and self.permanent_unavailable_approved_at
+                and self.permanent_unavailable_evidence
+            ):
+                raise ValidationError("永久不可得必须记录批准人、批准时间和双来源证据。")
+        if self.event_id:
+            if self.event.year != self.year:
+                raise ValidationError({"event": "关联赛事年份必须与年度目标一致。"})
+            if self.event.race_series_id != self.race_series_id:
+                raise ValidationError({"event": "关联赛事必须属于同一赛事系列。"})
+
+    def save(self, *args, **kwargs):
+        if self.race_series_id:
+            self.country_region = self.race_series.country_region
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = set(update_fields) | {"country_region"}
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.race_series} {self.year}"
 
 
 class RaceEventAlias(TimestampedModel):
@@ -736,6 +1045,7 @@ class RaceEventRunner(TimestampedModel):
 class RaceEventResult(TimestampedModel):
     event = models.ForeignKey(RaceEvent, on_delete=models.CASCADE, related_name="results")
     finish_position = models.PositiveSmallIntegerField()
+    official_finish_position = models.PositiveSmallIntegerField(null=True, blank=True)
     horse_number = models.CharField(max_length=32, blank=True)
     horse_name = models.CharField(max_length=255)
     jockey_name = models.CharField(max_length=255, blank=True)
@@ -756,6 +1066,12 @@ class RaceEventResult(TimestampedModel):
         constraints = [
             models.UniqueConstraint(fields=("event", "finish_position"), name="uq_race_result_event_pos"),
         ]
+        indexes = [
+            models.Index(
+                fields=("official_finish_position", "event"),
+                name="race_result_official_event_idx",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.event} {self.finish_position} {self.horse_name}"
@@ -774,7 +1090,10 @@ class RaceEventHistoryWinner(TimestampedModel):
     class Meta:
         ordering = ("event", "-winner_year")
         constraints = [
-            models.UniqueConstraint(fields=("event", "winner_year"), name="uq_race_history_event_year"),
+            models.UniqueConstraint(
+                fields=("event", "winner_year", "horse_name"),
+                name="uq_race_history_event_year_horse",
+            ),
         ]
 
     def __str__(self) -> str:

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from django.contrib.auth.signals import user_logged_in, user_logged_out, user_login_failed
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
+from stable.models import HistoricalRaceEventTarget, RaceEvent
 from stable.services.operations import log_operation
+from stable.services.race_event_public_cache import invalidate_public_race_cache
 
 
 @receiver(user_logged_in)
@@ -40,3 +43,9 @@ def _handle_login_failed(sender, credentials, request, **kwargs):
         detail=f"登录失败: {username}",
         admin=None,
     )
+
+
+@receiver([post_save, post_delete], sender=RaceEvent)
+@receiver([post_save, post_delete], sender=HistoricalRaceEventTarget)
+def _invalidate_public_race_cache(sender, **kwargs):
+    invalidate_public_race_cache()

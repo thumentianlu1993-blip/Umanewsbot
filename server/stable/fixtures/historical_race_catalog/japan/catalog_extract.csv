@@ -1,0 +1,5 @@
+record_type,year,series_key,canonical_name_original,original_name,chinese_name,grade_text,racecourse,local_date,distance_text,surface,expectation_status,founded_year,ended_year,series_status,season_label,source_scope,discipline
+catalog,1984,japan-tokyo-yushun,東京優駿,東京優駿,日本德比,GⅠ,東京,1984-05-27,芝2400m,芝,held,1932,,active,,jra,flat
+catalog,2000,japan-tokyo-yushun,東京優駿,東京優駿,日本德比,GI,東京,2000-05-28,芝2400m,芝,held,1932,,active,,jra,flat
+catalog,2026,japan-tokyo-yushun,東京優駿,東京優駿,日本德比,G1,東京,2026-05-31,芝2400m,芝,held,1932,,active,,jra,flat
+catalog,1999,japan-nakayama-daishogai,中山大障害,中山大障害,中山大障碍,J-G1,中山,1999-12-18,障害4100m,障碍,held,1934,,active,,jra,jumps

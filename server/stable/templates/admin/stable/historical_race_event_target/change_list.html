@@ -1,0 +1,28 @@
+{% extends "admin/change_list.html" %}
+
+{% block result_list %}
+  <div class="module" style="margin-bottom: 16px; overflow-x: auto;">
+    <table>
+      <caption>历史赛事总账汇总（筛选前全局）</caption>
+      <tbody>
+        <tr>
+          <th scope="row">目标总数</th>
+          <td>{{ inventory_summary.target_count }}</td>
+        </tr>
+        <tr>
+          <th scope="row">地区</th>
+          <td>{% for item in inventory_summary.by_region %}{{ item.country_region }}: {{ item.count }}{% if not forloop.last %}；{% endif %}{% endfor %}</td>
+        </tr>
+        <tr>
+          <th scope="row">举办事实</th>
+          <td>{% for item in inventory_summary.by_expectation %}{{ item.expectation_status }}: {{ item.count }}{% if not forloop.last %}；{% endif %}{% endfor %}</td>
+        </tr>
+        <tr>
+          <th scope="row">处理状态</th>
+          <td>{% for item in inventory_summary.by_resolution %}{{ item.resolution_status }}: {{ item.count }}{% if not forloop.last %}；{% endif %}{% endfor %}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {{ block.super }}
+{% endblock %}

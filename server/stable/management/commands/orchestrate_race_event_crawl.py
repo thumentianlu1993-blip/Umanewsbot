@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
+from stable.models import TaskExecutionLog, TaskStatus
 from stable.services import race_event_crawl_orchestration as orchestration
 
 
@@ -69,7 +71,7 @@ class Command(BaseCommand):
         orchestration.validate_plan(plan)
         orchestration.validate_prepare_authorization(plan)
         state = orchestration.create_run(plan_path, options.get("run_dir"))
-        results = orchestration.prepare_adapters(plan, state, resume=False)
+        results = self._prepare_with_historical_log(plan, state, resume=False)
         self.stdout.write(
             self.style.SUCCESS(
                 f"prepare 完成：adapters={len(results)} run_dir={state.run_dir} "
@@ -204,7 +206,7 @@ class Command(BaseCommand):
         state.resume_history.append(resume_entry)
         state.write()
         try:
-            results = orchestration.prepare_adapters(plan, state, resume=True)
+            results = self._prepare_with_historical_log(plan, state, resume=True)
             resume_audit = original_stage in {
                 "audit",
                 "audit_failed",
@@ -259,6 +261,65 @@ class Command(BaseCommand):
                 ensure_ascii=False,
             )
         )
+
+    def _prepare_with_historical_log(self, plan, state, *, resume: bool):
+        if not plan.get("historical_inventory_sha256"):
+            return orchestration.prepare_adapters(plan, state, resume=resume)
+
+        task_name = "historical_race_network_resume" if resume else "historical_race_network_prepare"
+        payload = {
+            "run_id": str(state.run_id),
+            "inventory_sha256": str(plan["historical_inventory_sha256"]),
+            "target_count": int(state.artifacts.get("expected_target_count") or 0),
+            "regions": sorted(
+                {
+                    str(region.get("region") or "")
+                    for region in plan.get("regions", [])
+                    if str(region.get("region") or "")
+                }
+            ),
+            "resume": resume,
+            "from_stage": str(state.stage or ""),
+        }
+        log = TaskExecutionLog.objects.create(
+            task_name=task_name,
+            status=TaskStatus.STARTED,
+            payload=payload,
+            detail="历史赛事网络运行已开始。",
+            started_at=timezone.now(),
+        )
+        try:
+            results = orchestration.prepare_adapters(plan, state, resume=resume)
+        except Exception as exc:
+            log.status = TaskStatus.FAILED
+            log.detail = self._safe_network_error(exc)
+            log.finished_at = timezone.now()
+            log.save(update_fields=["status", "detail", "finished_at", "updated_at"])
+            raise
+        log.status = TaskStatus.SUCCESS
+        log.payload = {**payload, "adapter_count": len(results)}
+        log.detail = "历史赛事网络运行完成。"
+        log.finished_at = timezone.now()
+        log.save(update_fields=["status", "payload", "detail", "finished_at", "updated_at"])
+        return results
+
+    @staticmethod
+    def _safe_network_error(error: Exception) -> str:
+        detail = str(error).replace("\x00", " ")
+        detail = re.sub(
+            r"(?i)\b(api[_-]?key|token|secret|password)\s*[=:]\s*\S+",
+            r"\1=[redacted]",
+            detail,
+        )
+        lowered = detail.casefold()
+        document_offsets = [
+            offset
+            for marker in ("<html", "<!doctype html", "%pdf")
+            if (offset := lowered.find(marker)) >= 0
+        ]
+        if document_offsets:
+            detail = detail[: min(document_offsets)].rstrip() + " [upstream document omitted]"
+        return " ".join(detail.split())[:2000]
 
     def _run_dir_from_plan(self, plan_path: Path) -> str:
         plan = orchestration.load_plan(plan_path)

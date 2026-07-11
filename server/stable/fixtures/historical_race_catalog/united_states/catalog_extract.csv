@@ -1,0 +1,4 @@
+record_type,year,series_key,canonical_name_original,original_name,chinese_name,grade_text,racecourse,local_date,distance_text,surface,expectation_status,founded_year,ended_year,series_status,season_label,source_scope,discipline
+catalog,1984,united-states-kentucky-derby,Kentucky Derby,Kentucky Derby,肯塔基德比,Grade I,Churchill Downs,1984-05-05,1 1/4 miles,dirt,held,1875,,active,,graded_stakes,flat
+catalog,2000,united-states-kentucky-derby,Kentucky Derby,Kentucky Derby,肯塔基德比,G 1,Churchill Downs,2000-05-06,1 1/4 miles,dirt,held,1875,,active,,graded_stakes,flat
+catalog,2026,united-states-kentucky-derby,Kentucky Derby,Kentucky Derby,肯塔基德比,Grade 1,Churchill Downs,2026-05-02,1 1/4 miles,dirt,held,1875,,active,,graded_stakes,flat

@@ -1,0 +1,4 @@
+record_type,year,series_key,canonical_name_original,original_name,chinese_name,grade_text,racecourse,local_date,distance_text,surface,expectation_status,founded_year,ended_year,series_status,season_label,source_scope,discipline
+timeline,1988,hong-kong-hong-kong-cup,Hong Kong Cup,Hong Kong Invitation Cup,香港杯,Ungraded,Sha Tin,1988-01-24,1800m,turf,held,1988,,active,1987/88,international,flat
+catalog,2000,hong-kong-hong-kong-cup,Hong Kong Cup,Hong Kong Cup,香港杯,Group 1,Sha Tin,2000-12-17,2000m,turf,held,1988,,active,2000/01,international,flat
+catalog,2026,hong-kong-hong-kong-cup,Hong Kong Cup,Hong Kong Cup,香港杯,香港一級賽,Sha Tin,2026-12-13,2000m,turf,held,1988,,active,2026/27,international,flat

@@ -12,6 +12,7 @@ from urllib.parse import urljoin
 from urllib.request import Request, urlopen
 
 from race_event_request_budget import before_network_request
+from race_event_source_cache import write_source_cache
 
 from bs4 import BeautifulSoup
 
@@ -40,7 +41,7 @@ def _download(url: str, path: Path, *, allow_network: bool, timeout: int) -> byt
     before_network_request(url)
     with urlopen(request, timeout=timeout) as response:
         body = response.read()
-    path.write_bytes(body)
+    write_source_cache(path, body, source_url=url)
     return body
 
 

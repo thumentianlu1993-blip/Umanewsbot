@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 from race_event_request_budget import before_network_request
+from race_event_source_cache import write_source_cache_text
 
 from prepare_uk_sportinglife_race_detail_candidates import (
     SL_BASE_URL,
@@ -60,7 +61,7 @@ def _cached_html(
         reuse_path = reuse_dir / detail_filename
         if reuse_path.exists():
             text = reuse_path.read_text(encoding="utf-8", errors="replace")
-            path.write_text(text, encoding="utf-8")
+            write_source_cache_text(path, text, source_url=f"reuse:{reuse_path}")
             return text
     if not allow_network:
         raise RuntimeError(f"缺少缓存且未允许网络请求：{path}")
@@ -89,7 +90,7 @@ def _cached_html(
         stderr = result.stderr.decode("utf-8", errors="replace").strip()
         raise RuntimeError(f"下载失败 exit={result.returncode}: {stderr}")
     text = result.stdout.decode("utf-8", errors="replace")
-    path.write_text(text, encoding="utf-8")
+    write_source_cache_text(path, text, source_url=url)
     return text
 
 

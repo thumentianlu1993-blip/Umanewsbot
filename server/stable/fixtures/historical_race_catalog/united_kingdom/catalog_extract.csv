@@ -1,0 +1,6 @@
+record_type,year,series_key,canonical_name_original,original_name,chinese_name,grade_text,racecourse,local_date,distance_text,surface,expectation_status,founded_year,ended_year,series_status,season_label,source_scope,discipline
+catalog,1984,united-kingdom-derby-stakes,Derby Stakes,Derby Stakes,叶森德比,Group 1,Epsom,1984-06-06,1m 4f,turf,held,1780,,active,,flat,flat
+catalog,2000,united-kingdom-derby-stakes,Derby Stakes,Derby Stakes,叶森德比,Group 1,Epsom,2000-06-10,1m 4f,turf,held,1780,,active,,flat,flat
+catalog,2026,united-kingdom-derby-stakes,Derby Stakes,Derby Stakes,叶森德比,Group 1,Epsom,2026-06-06,1m 4f,turf,held,1780,,active,,flat,flat
+catalog,2019,united-kingdom-grand-national,Grand National,Grand National,英国国家障碍大赛,Grade 3,Aintree,2019-04-06,4m 2f,jumps,held,1839,,active,,jumps,jumps
+timeline,2020,united-kingdom-grand-national,Grand National,Grand National,英国国家障碍大赛,Grade 3,Aintree,,4m 2f,jumps,cancelled,1839,,active,,jumps,jumps

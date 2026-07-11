@@ -14,6 +14,8 @@ def healthcheck(_request):
 urlpatterns = [
     path("", stable_views.public_news_feed, name="public-news-feed"),
     path("races/", stable_views.public_race_calendar, name="public-race-calendar"),
+    path("sitemap.xml", stable_views.public_sitemap_index, name="public-sitemap-index"),
+    path("sitemaps/races-<int:shard>.xml", stable_views.public_race_sitemap_shard, name="public-race-sitemap-shard"),
     path("races/<int:year>/<slug:slug>/", stable_views.public_race_detail, name="public-race-detail"),
     path("horses/", stable_views.public_horse_index, name="public-horse-index"),
     path("horses/follows/", stable_views.public_horse_follows, name="public-horse-follows"),

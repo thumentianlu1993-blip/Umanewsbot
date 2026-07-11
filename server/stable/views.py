@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import unicodedata
 import uuid
@@ -15,9 +16,9 @@ from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.core.signing import BadSignature, SignatureExpired
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, F, Q
 from django.db.models.functions import Lower
-from django.http import HttpRequest, HttpResponseForbidden, JsonResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.html import format_html
@@ -49,6 +50,7 @@ from .models import (
     AutomationStatus,
     ArticleTranslationStatus,
     CrawlJob,
+    HistoricalRaceResolutionStatus,
     HorseFollow,
     HorseProfile,
     HorseProfileCandidateStatus,
@@ -75,7 +77,9 @@ from .models import (
     RaceEventCandidateStatus,
     RaceEventDataCandidate,
     RaceEventDataQuality,
+    RaceEventHistoryWinner,
     RaceEventPriority,
+    RaceEventResult,
     RaceEventStatus,
     RaceEventVisibility,
     RacingRegion,
@@ -112,6 +116,10 @@ from .services.media_assets import localize_news_image, set_cover_asset
 from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
 from .services.onebot import BotPusher
 from .services.operations import log_operation
+from .services.race_event_public_cache import (
+    public_race_calendar_years,
+    public_race_sitemap_count,
+)
 from .services.news_attribution import filter_articles_visible_in_region
 from .services.production_windows import claim_window
 from .services.publishing_windows import select_publish_candidates
@@ -2357,12 +2365,30 @@ def _race_calendar_queryset(request: HttpRequest):
     region = request.GET.get("region", "").strip()
     direction = request.GET.get("direction", "").strip()
     cursor = request.GET.get("cursor", "").strip()
+    year = request.GET.get("year", "").strip()
+    query = request.GET.get("q", "").strip()
     today = timezone.localdate()
     if tab == "key":
         queryset = queryset.filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
     if region:
         queryset = queryset.filter(country_region=region)
-    if cursor:
+    if year.isdigit():
+        queryset = queryset.filter(year=int(year))
+    if query:
+        series_name_match = (
+            Q(race_series__names__text__icontains=query)
+            & (Q(race_series__names__valid_from_year=0) | Q(race_series__names__valid_from_year__lte=F("year")))
+            & (Q(race_series__names__valid_to_year=0) | Q(race_series__names__valid_to_year__gte=F("year")))
+        )
+        queryset = queryset.filter(
+            Q(chinese_name__icontains=query)
+            | Q(original_name__icontains=query)
+            | Q(aliases__text__icontains=query)
+            | Q(race_series__canonical_name_original__icontains=query)
+            | Q(race_series__chinese_name__icontains=query)
+            | series_name_match
+        ).distinct()
+    if cursor and not (year or query):
         try:
             cursor_date = datetime.fromisoformat(cursor).date()
         except ValueError:
@@ -2373,11 +2399,20 @@ def _race_calendar_queryset(request: HttpRequest):
             queryset = queryset.filter(local_date__gt=cursor_date).order_by("local_date", "local_start_time", "id")
         else:
             queryset = queryset.order_by("local_date", "local_start_time", "id")
-    else:
+    elif not (year or query):
         start = today - timedelta(days=RACE_CALENDAR_WINDOW_DAYS)
         end = today + timedelta(days=RACE_CALENDAR_WINDOW_DAYS)
         queryset = queryset.filter(Q(local_date__gte=start, local_date__lte=end) | Q(local_date__isnull=True)).order_by("local_date", "local_start_time", "id")
-    return queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE], {"tab": tab, "region": region, "direction": direction, "cursor": cursor}
+    else:
+        queryset = queryset.order_by("local_date", "local_start_time", "id")
+    return queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE], {
+        "tab": tab,
+        "region": region,
+        "direction": direction,
+        "cursor": cursor,
+        "year": year,
+        "q": query,
+    }
 
 
 def _group_race_events_by_date(events):
@@ -2399,7 +2434,11 @@ def _group_race_events_by_date(events):
 def _attach_result_display_positions(results):
     for result in results:
         source_refs = result.source_refs or {}
-        result.display_finish_position = source_refs.get("official_finish_position") or result.finish_position
+        result.display_finish_position = (
+            result.official_finish_position
+            or source_refs.get("official_finish_position")
+            or result.finish_position
+        )
     return results
 
 
@@ -2515,7 +2554,18 @@ def public_race_calendar(request: HttpRequest):
     if filters["direction"] == "past":
         events = list(reversed(events))
     groups = _group_race_events_by_date(events)
-    region_tabs = [{"value": "", "label": "全部", "is_active": filters["region"] == "", "url": f"?tab={filters['tab']}"}]
+    def filter_url(**changes):
+        params = request.GET.copy()
+        params.pop("cursor", None)
+        params.pop("direction", None)
+        for key, value in changes.items():
+            if value:
+                params[key] = value
+            else:
+                params.pop(key, None)
+        return f"?{params.urlencode()}" if params else "?"
+
+    region_tabs = [{"value": "", "label": "全部", "is_active": filters["region"] == "", "url": filter_url(region="")}]
     for value, label in RacingRegion.choices:
         if value == RacingRegion.OTHER:
             continue
@@ -2524,10 +2574,9 @@ def public_race_calendar(request: HttpRequest):
                 "value": value,
                 "label": label,
                 "is_active": filters["region"] == value,
-                "url": f"?tab={filters['tab']}&region={value}",
+                "url": filter_url(region=value),
             }
         )
-    tab_base = f"&region={filters['region']}" if filters["region"] else ""
     previous_cursor = events[0].local_date.isoformat() if events and events[0].local_date else ""
     next_cursor = events[-1].local_date.isoformat() if events and events[-1].local_date else ""
     return render(
@@ -2536,12 +2585,47 @@ def public_race_calendar(request: HttpRequest):
         {
             "groups": groups,
             "filters": filters,
+            "years": public_race_calendar_years(),
             "region_tabs": region_tabs,
-            "all_tab_url": f"?tab=all{tab_base}",
-            "key_tab_url": f"?tab=key{tab_base}",
-            "previous_url": f"?tab={filters['tab']}{tab_base}&direction=past&cursor={previous_cursor}" if previous_cursor else "",
-            "next_url": f"?tab={filters['tab']}{tab_base}&direction=future&cursor={next_cursor}" if next_cursor else "",
+            "all_tab_url": filter_url(tab="all"),
+            "key_tab_url": filter_url(tab="key"),
+            "clear_search_url": filter_url(year="", q=""),
+            "previous_url": filter_url(direction="past", cursor=previous_cursor) if previous_cursor and not (filters["year"] or filters["q"]) else "",
+            "next_url": filter_url(direction="future", cursor=next_cursor) if next_cursor and not (filters["year"] or filters["q"]) else "",
         },
+    )
+
+
+def _series_history_winners(event: RaceEvent):
+    if not event.race_series_id:
+        return list(event.history_winners.all())
+    result_winners = list(
+        RaceEventResult.objects.select_related("event")
+        .filter(
+            event__race_series_id=event.race_series_id,
+            event__visibility_status=RaceEventVisibility.PUBLISHED,
+        )
+        .filter(
+            Q(official_finish_position=1)
+            | Q(official_finish_position__isnull=True, finish_position=1)
+        )
+        .order_by("-event__year", "finish_position", "id")
+    )
+    covered_years = set()
+    for winner in result_winners:
+        winner.winner_year = winner.event.year
+        covered_years.add(winner.event.year)
+    fallback_winners = list(
+        RaceEventHistoryWinner.objects.filter(
+            event__race_series_id=event.race_series_id,
+            event__visibility_status=RaceEventVisibility.PUBLISHED,
+        )
+        .exclude(winner_year__in=covered_years)
+        .order_by("-winner_year", "horse_name", "id")
+    )
+    return sorted(
+        [*result_winners, *fallback_winners],
+        key=lambda winner: (-winner.winner_year, winner.horse_name, winner.pk),
     )
 
 
@@ -2570,7 +2654,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
     }
     runners = _sort_runners_for_display(list(event.runners.all()), event.country_region)
     results = _attach_result_display_positions(list(event.results.all()))
-    history_winners = list(event.history_winners.all())
+    history_winners = _series_history_winners(event)
     _attach_race_term_display_names(
         [
             (event, runners),
@@ -2590,6 +2674,50 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "top_results": top_results,
             "news_groups": news_groups,
         },
+    )
+
+
+def _race_sitemap_queryset():
+    return (
+        RaceEvent.objects.filter(
+            visibility_status=RaceEventVisibility.PUBLISHED,
+            data_quality_status=RaceEventDataQuality.COMPLETE,
+        )
+        .filter(
+            Q(historical_target__isnull=True)
+            | Q(historical_target__resolution_status=HistoricalRaceResolutionStatus.IMPORTED)
+        )
+        .order_by("year", "slug", "id")
+    )
+
+
+@require_GET
+def public_sitemap_index(request: HttpRequest):
+    shard_size = max(1, settings.RACE_EVENT_SITEMAP_SHARD_SIZE)
+    shard_count = math.ceil(public_race_sitemap_count(_race_sitemap_queryset()) / shard_size)
+    base_url = settings.SITE_URL.rstrip("/")
+    return render(
+        request,
+        "stable/public/sitemap_index.xml",
+        {"shards": [f"{base_url}/sitemaps/races-{index}.xml" for index in range(1, shard_count + 1)]},
+        content_type="application/xml",
+    )
+
+
+@require_GET
+def public_race_sitemap_shard(request: HttpRequest, shard: int):
+    shard_size = max(1, settings.RACE_EVENT_SITEMAP_SHARD_SIZE)
+    start = (shard - 1) * shard_size
+    queryset = _race_sitemap_queryset()
+    if shard < 1 or start >= public_race_sitemap_count(queryset):
+        return HttpResponse(status=404)
+    events = queryset[start : start + shard_size]
+    base_url = settings.SITE_URL.rstrip("/")
+    return render(
+        request,
+        "stable/public/race_sitemap.xml",
+        {"events": events, "base_url": base_url},
+        content_type="application/xml",
     )
 
 

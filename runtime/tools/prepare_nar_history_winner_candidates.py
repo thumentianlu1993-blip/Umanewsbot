@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urljoin, urlparse
 from urllib.request import Request, urlopen
 
 from race_event_request_budget import before_network_request
+from race_event_source_cache import write_source_cache_text
 
 from bs4 import BeautifulSoup
 
@@ -40,7 +41,7 @@ def _download(url: str, path: Path, *, allow_network: bool, timeout: int, sleep_
     before_network_request(url)
     with urlopen(request, timeout=timeout) as response:
         text = response.read().decode("utf-8", errors="replace")
-    path.write_text(text, encoding="utf-8")
+    write_source_cache_text(path, text, source_url=url)
     return text
 
 

@@ -3855,3 +3855,16 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - 部署方式：生产 `git pull --ff-only origin main` 快进到 `d071952`，执行 `bash ./deploy_lowcost.sh`；无新增迁移。
 - 部署后：`web / worker / beat / db / redis / nginx` 正常，web/db/redis healthy；Django check、内外 healthz、`/races/` 和日本德比详情均通过，近 5 分钟日志无 traceback/error。
 - 数据抽检：英国马名 `13/13`、骑师 `9/13` 命中；美国马名 `2/18`、骑师 `11/18`；法国马名 `1/7`、骑师 `0/7`；日本德比马名 `1/18`、骑师 `0/18`。日本当前页面大量原文属于术语库覆盖缺口，不应通过页面层临时翻译解决。
+
+## 2026-07-12 历史赛事回填安全门禁（尚未上线）
+
+- 默认配置必须保持：`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。
+- 保守预算默认值：单 run 请求预算 `250`、source cache 上限 `2147483648` bytes、启动前最小剩余磁盘 `5368709120` bytes。plan 只能声明更小或相等的请求/cache 上限，磁盘不足时 fail closed。
+- 离线 plan 命令可在功能关闭时执行：`python server/manage.py build_historical_race_inventory --catalog-jsonl <catalog.jsonl> --timeline-jsonl <timeline.jsonl> --output-dir <artifact-dir>`。它只生成审核文件，不写数据库、不发网络请求。
+- 官方 source cache 先使用 `python server/manage.py parse_historical_race_catalog --source-manifest <manifest.json> [--source-manifest ...] --output-dir <candidate-dir>` 离线生成 `catalog_candidate.jsonl` 和 `series_timeline_candidate.jsonl`；manifest 必须绑定 provider、支持年份、source URL、cache SHA-256 和 parser version，输出目录必须为空。`server/stable/fixtures/historical_race_catalog/` 只是解析测试摘录，禁止作为生产完整目录审批依据。
+- inventory commit 必须使用既有 artifact，禁止边生成边写：`python server/manage.py build_historical_race_inventory --artifact-dir <artifact-dir> --approval <artifact-dir/approval.json> --commit`。执行前必须人工核对 conflict=0、review、summary、manifest SHA 和 approval 的批准人/时间。
+- 首次部署只允许空模型与只读工具：先备份数据库，执行迁移和 `manage.py check`，检查旧赛事 URL/页面，再检查只读总账后台。不得在同一步开启历史功能、网络或提交总账。
+- 网络 prepare 还必须同时满足：功能开关开启、网络总开关开启、plan `allow_network=true`、应到 artifact 已批准、共享请求预算有效、source cache/磁盘预检通过。任一条件缺失不得启动 adapter。
+- 当前代码仍处于本地 apply 阶段；必须完成完整实现、全量测试、code review 修复并重新 review 至无 actionable finding 后，才进入本节部署步骤。
+- 用户已授权在上述准备门禁全部通过后自主执行生产抓取和落库。执行期间可临时开启功能/网络开关；每批完成或中止后必须恢复 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，并确认历史年度赛事没有被意外公开。
+- `RACE_EVENT_PUBLIC_CACHE_SECONDS` 默认 `300` 秒，生产 `RACE_EVENT_CACHE_URL` 应指向共享 Redis（建议独立 DB，例如 `redis://redis:6379/2`）；测试使用 LocMem。赛事或历史总账状态变更会主动清理 sitemap 数量和赛事年份缓存，Redis 暂时不可用时回退数据库。部署迁移后须抽查 sitemap 分片数量、年份筛选，并确认 `race_event_visible_year_idx`、`race_event_sitemap_idx`、`race_result_official_event_idx` 已创建。

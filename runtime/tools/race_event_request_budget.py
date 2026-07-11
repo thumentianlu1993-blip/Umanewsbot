@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import os
 import time
+import fcntl
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -49,49 +51,62 @@ def _write_state(path: Path | None, state: dict) -> None:
     temporary.replace(path)
 
 
+@contextmanager
+def _budget_lock(path: Path | None):
+    if path is None:
+        yield
+        return
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        yield
+
+
 def before_network_request(url: str, *, method: str = "GET") -> None:
     max_requests = _max_requests()
     interval = _request_interval()
     path = _artifact_path()
-    state = _read_state(path)
-    request_count = int(state.get("request_count") or 0)
-    if max_requests and request_count >= max_requests:
+    with _budget_lock(path):
+        state = _read_state(path)
+        request_count = int(state.get("request_count") or 0)
+        if max_requests and request_count >= max_requests:
+            state.update(
+                {
+                    "status": "limit_exceeded",
+                    "max_requests": max_requests,
+                    "request_interval_seconds": interval,
+                    "stopped_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            _write_state(path, state)
+            raise RequestBudgetExceeded(
+                f"race event crawl request budget exhausted: {request_count}/{max_requests}"
+            )
+
+        last_started = float(state.get("last_request_started_at_epoch") or 0.0)
+        remaining = interval - (time.time() - last_started)
+        if remaining > 0:
+            time.sleep(remaining)
+
+        started_epoch = time.time()
+        requests = state.get("requests") if isinstance(state.get("requests"), list) else []
+        requests.append(
+            {
+                "sequence": request_count + 1,
+                "method": method,
+                "url": url,
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         state.update(
             {
-                "status": "limit_exceeded",
+                "status": "active",
                 "max_requests": max_requests,
                 "request_interval_seconds": interval,
-                "stopped_at": datetime.now(timezone.utc).isoformat(),
+                "request_count": request_count + 1,
+                "last_request_started_at_epoch": started_epoch,
+                "requests": requests[-200:],
             }
         )
         _write_state(path, state)
-        raise RequestBudgetExceeded(
-            f"race event crawl request budget exhausted: {request_count}/{max_requests}"
-        )
-
-    last_started = float(state.get("last_request_started_at_epoch") or 0.0)
-    remaining = interval - (time.time() - last_started)
-    if remaining > 0:
-        time.sleep(remaining)
-
-    started_epoch = time.time()
-    requests = state.get("requests") if isinstance(state.get("requests"), list) else []
-    requests.append(
-        {
-            "sequence": request_count + 1,
-            "method": method,
-            "url": url,
-            "started_at": datetime.now(timezone.utc).isoformat(),
-        }
-    )
-    state.update(
-        {
-            "status": "active",
-            "max_requests": max_requests,
-            "request_interval_seconds": interval,
-            "request_count": request_count + 1,
-            "last_request_started_at_epoch": started_epoch,
-            "requests": requests[-200:],
-        }
-    )
-    _write_state(path, state)

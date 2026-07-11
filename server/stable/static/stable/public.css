@@ -535,6 +535,40 @@ a {
   font-weight: 800;
 }
 
+.race-calendar-filters {
+  align-items: end;
+}
+
+.race-calendar-filters label {
+  display: grid;
+  flex: 0 0 150px;
+  gap: 4px;
+  color: #435166;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.race-calendar-filters label:nth-of-type(2) {
+  flex: 1 1 320px;
+}
+
+.race-calendar-filters input,
+.race-calendar-filters select {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  background: #ffffff;
+  font: inherit;
+}
+
+.race-calendar-filters a {
+  min-height: 40px;
+  padding: 10px 12px;
+  color: #435166;
+  font-weight: 700;
+}
+
 .follow-news-panel,
 .horse-detail-hero,
 .horse-panel,

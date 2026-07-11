@@ -29,6 +29,7 @@ from stable.models import (
     WorkflowStatus,
 )
 from stable.services.operations import log_operation
+from stable.services.historical_race_inventory import sanitize_structured_row_evidence
 from stable.services.terms import source_term_matches_text
 
 
@@ -167,6 +168,7 @@ def _replace_runners(event: RaceEvent, items: Iterable[dict]) -> int:
     event.runners.all().delete()
     created = []
     for index, item in enumerate(items, start=1):
+        raw_payload = sanitize_structured_row_evidence(item)
         created.append(
             RaceEventRunner(
                 event=event,
@@ -181,11 +183,12 @@ def _replace_runners(event: RaceEvent, items: Iterable[dict]) -> int:
                 popularity=str(item.get("popularity") or ""),
                 running_status=str(item.get("running_status") or RaceRunnerStatus.DECLARED),
                 source_refs=item.get("source_refs") or {},
-                raw_payload=item,
+                raw_payload=raw_payload,
             )
         )
-    RaceEventRunner.objects.bulk_create([item for item in created if item.horse_name])
-    return len(created)
+    persisted = [item for item in created if item.horse_name]
+    RaceEventRunner.objects.bulk_create(persisted)
+    return len(persisted)
 
 
 def _replace_results(event: RaceEvent, items: Iterable[dict]) -> int:
@@ -196,10 +199,12 @@ def _replace_results(event: RaceEvent, items: Iterable[dict]) -> int:
     for item in items:
         if not item.get("finish_position") or not item.get("horse_name"):
             continue
+        raw_payload = sanitize_structured_row_evidence(item)
         created.append(
             RaceEventResult(
                 event=event,
                 finish_position=int(item["finish_position"]),
+                official_finish_position=int(item.get("official_finish_position") or item["finish_position"]),
                 horse_number=str(item.get("horse_number") or ""),
                 horse_name=_clean_race_horse_name(item.get("horse_name")),
                 jockey_name=str(item.get("jockey_name") or ""),
@@ -213,7 +218,7 @@ def _replace_results(event: RaceEvent, items: Iterable[dict]) -> int:
                 running_status=str(item.get("running_status") or ""),
                 is_confirmed=bool(item.get("is_confirmed", True)),
                 source_refs=item.get("source_refs") or {},
-                raw_payload=item,
+                raw_payload=raw_payload,
             )
         )
     RaceEventResult.objects.bulk_create(created)

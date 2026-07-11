@@ -3,16 +3,19 @@ from __future__ import annotations
 import csv
 import gzip
 import hashlib
+import importlib.util
 import json
 import os
 import shlex
 import sys
 import shutil
 import subprocess
+from functools import lru_cache
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.utils import timezone
@@ -21,10 +24,13 @@ from stable.models import (
     ExternalDataImportLock,
     ExternalDataImportRun,
     ExternalImportStatus,
+    HistoricalRaceEventTarget,
+    HistoricalRaceResolutionStatus,
     RaceEvent,
     RaceEventModule,
     RacingRegion,
 )
+from stable.services.historical_race_batches import target_identity
 
 
 TARGET_LAYER = "race_event"
@@ -42,6 +48,41 @@ TARGET_MODULES = [
 ]
 SOURCE_AUTHORITY_LEVELS = {"official", "third_party_high_access", "third_party", "reference"}
 REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
+@lru_cache(maxsize=1)
+def _source_cache_tool():
+    path = REPO_ROOT / "runtime" / "tools" / "race_event_source_cache.py"
+    spec = importlib.util.spec_from_file_location("race_event_source_cache_for_orchestration", path)
+    if spec is None or spec.loader is None:
+        raise PlanValidationError(f"source cache protection tool is unavailable: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def protect_approved_run_source_cache(run_dir: str | Path, *, artifact_sha256: str) -> dict[str, Any]:
+    run_path = Path(run_dir)
+    manifest_path = run_path / "source_cache_manifest.json"
+    if not manifest_path.is_file():
+        return {"status": "not_present", "protected_count": 0}
+    try:
+        manifest = _read_json(manifest_path)
+    except (OSError, json.JSONDecodeError, PlanValidationError) as exc:
+        raise PlanValidationError(f"source cache manifest cannot be protected: {exc}") from exc
+    files = manifest.get("files") if isinstance(manifest.get("files"), dict) else None
+    if files is None:
+        raise PlanValidationError("source cache manifest cannot be protected: files are invalid")
+    paths = sorted(files)
+    try:
+        _source_cache_tool().protect_source_cache_files(
+            manifest_path,
+            paths,
+            artifact_sha256=artifact_sha256,
+        )
+    except Exception as exc:
+        raise PlanValidationError(f"source cache protection failed: {exc}") from exc
+    return {"status": "protected", "protected_count": len(paths)}
 
 
 DEFAULT_SOURCE_AUTHORITY_MATRIX = {
@@ -479,6 +520,16 @@ class AdapterRunner:
             ),
             "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT": str(budget_artifact),
             "RACE_EVENT_CRAWL_BATCH_SIZE": str(execution_policy.get("batch_size") or 0),
+            "RACE_EVENT_CRAWL_MAX_SOURCE_CACHE_BYTES": str(
+                execution_policy.get("max_source_cache_bytes") or 0
+            ),
+            "RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES": str(
+                execution_policy.get("min_free_disk_bytes") or 0
+            ),
+            "RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT": str(run_path.resolve()),
+            "RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST": str(
+                (run_path / "source_cache_manifest.json").resolve()
+            ),
         }
         completed = subprocess.run(
             command,
@@ -802,8 +853,9 @@ def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
     regions = plan.get("regions")
     if not isinstance(regions, list) or not regions:
         raise PlanValidationError("plan must include regions")
+    historical = bool(plan.get("historical_inventory_sha256"))
     for region_plan in regions:
-        _validate_region_plan(region_plan, batch_size=batch_size)
+        _validate_region_plan(region_plan, batch_size=batch_size, historical=historical)
     adapters = plan.get("adapters") or []
     if not isinstance(adapters, list):
         raise PlanValidationError("adapters must be a list")
@@ -816,25 +868,76 @@ def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
             raise PlanValidationError("adapter must be a registered key or complete manifest object")
     if plan.get("first_acceptance"):
         validate_first_acceptance_plan(plan)
+    if plan.get("historical_inventory_sha256"):
+        validate_historical_plan_budgets(plan)
     return plan
 
 
-def _validate_region_plan(region_plan: dict[str, Any], *, batch_size: int) -> None:
+def validate_historical_plan_budgets(
+    plan: dict[str, Any],
+    *,
+    cache_path: str | Path | None = None,
+) -> dict[str, int]:
+    try:
+        max_source_cache_bytes = int(plan["max_source_cache_bytes"])
+        min_free_disk_bytes = int(plan["min_free_disk_bytes"])
+        max_requests = int((plan.get("rate_limit") or {})["max_requests"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise PlanValidationError(
+            "historical plan requires numeric max_source_cache_bytes, min_free_disk_bytes and rate_limit.max_requests"
+        ) from exc
+    if max_source_cache_bytes <= 0 or min_free_disk_bytes <= 0:
+        raise PlanValidationError("historical cache and disk budgets must be positive")
+    if max_source_cache_bytes > settings.HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES:
+        raise PlanValidationError("historical max_source_cache_bytes exceeds configured safety ceiling")
+    if max_requests > settings.HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET:
+        raise PlanValidationError("historical request budget exceeds configured safety ceiling")
+    probe = Path(cache_path or plan.get("source_cache_dir") or REPO_ROOT / "runtime")
+    while not probe.exists() and probe != probe.parent:
+        probe = probe.parent
+    free_disk_bytes = shutil.disk_usage(probe).free
+    if free_disk_bytes < min_free_disk_bytes:
+        raise PlanValidationError(
+            f"historical free disk budget is not met: free={free_disk_bytes} required={min_free_disk_bytes}"
+        )
+    return {
+        "max_source_cache_bytes": max_source_cache_bytes,
+        "min_free_disk_bytes": min_free_disk_bytes,
+        "free_disk_bytes": free_disk_bytes,
+        "max_requests": max_requests,
+    }
+
+
+def _validate_region_plan(region_plan: dict[str, Any], *, batch_size: int, historical: bool = False) -> None:
     region = region_plan.get("region")
     if region not in TARGET_REGIONS:
         raise PlanValidationError(f"unsupported region: {region}")
     authority = region_plan.get("source_authority")
     if authority not in SOURCE_AUTHORITY_LEVELS:
         raise PlanValidationError(f"unsupported source_authority: {authority}")
-    series = region_plan.get("series")
-    if not isinstance(series, list) or not series:
-        raise PlanValidationError(f"{region} must include explicit series list")
     modules = region_plan.get("modules")
     if not isinstance(modules, dict):
         raise PlanValidationError(f"{region} modules must be an object")
     missing = [module for module in TARGET_MODULES if module not in modules]
     if missing:
         raise PlanValidationError(f"missing required modules: {', '.join(missing)}")
+    if historical:
+        targets = region_plan.get("targets")
+        if not isinstance(targets, list) or not targets:
+            raise PlanValidationError(f"{region} historical plan must include target snapshot rows")
+        if len(targets) > batch_size:
+            raise PlanValidationError(
+                f"{region} target count {len(targets)} exceeds batch_size {batch_size}"
+            )
+        for target in targets:
+            if not isinstance(target, dict) or not target.get("target_id") or not str(
+                target.get("target_sha256") or ""
+            ).strip():
+                raise PlanValidationError(f"{region} historical target is missing id or SHA")
+        return
+    series = region_plan.get("series")
+    if not isinstance(series, list) or not series:
+        raise PlanValidationError(f"{region} must include explicit series list")
     ranges = [_years_tuple(modules[module].get("years")) for module in TARGET_MODULES]
     if any(value is None for value in ranges) or len(set(ranges)) != 1:
         raise PlanValidationError("module history depth must match for runners/results/history_winners")
@@ -946,6 +1049,8 @@ def _race_event_adapter_input(event: RaceEvent) -> dict[str, Any]:
 
 
 def expected_targets_from_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    if plan.get("historical_inventory_sha256"):
+        return _historical_expected_targets_from_plan(plan)
     targets: list[dict[str, Any]] = []
     seen: set[tuple[int, str]] = set()
     for region_plan in plan.get("regions") or []:
@@ -986,6 +1091,56 @@ def expected_targets_from_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
     if not targets:
         raise PlanValidationError("expected_target_empty")
     return targets
+
+
+def _historical_expected_targets_from_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    inventory_sha = str(plan.get("historical_inventory_sha256") or "")
+    target_rows = [
+        (region_plan, row)
+        for region_plan in plan.get("regions") or []
+        for row in region_plan.get("targets") or []
+    ]
+    target_ids = [int(row["target_id"]) for _region_plan, row in target_rows]
+    if len(target_ids) != len(set(target_ids)):
+        raise PlanValidationError("duplicate historical target id")
+    targets_by_id = HistoricalRaceEventTarget.objects.select_related("race_series", "event").in_bulk(target_ids)
+    results: list[dict[str, Any]] = []
+    for region_plan, approved in target_rows:
+        target = targets_by_id.get(int(approved["target_id"]))
+        if target is None:
+            raise PlanValidationError(f"historical target disappeared: {approved['target_id']}")
+        actual_identity = target_identity(target)
+        if actual_identity["target_sha256"] != approved["target_sha256"]:
+            raise PlanValidationError(f"historical target changed after approval: {target.pk}")
+        if target.country_region != region_plan["region"]:
+            raise PlanValidationError(f"historical target region mismatch: {target.pk}")
+        if target.artifact_sha256 != inventory_sha:
+            raise PlanValidationError(f"historical target inventory artifact mismatch: {target.pk}")
+        if target.resolution_status != HistoricalRaceResolutionStatus.READY or target.event is None:
+            raise PlanValidationError(f"historical target is outside ready ledger scope: {target.pk}")
+        event = target.event
+        results.append(
+            {
+                "historical_target_id": target.pk,
+                "historical_target_sha256": actual_identity["target_sha256"],
+                "year": target.year,
+                "slug": event.slug,
+                "series_key": target.race_series.key,
+                "racing_region": target.country_region,
+                "source": str(region_plan.get("source") or ""),
+                "source_authority": str(region_plan.get("source_authority") or ""),
+                "modules": sorted((region_plan.get("modules") or {}).keys()),
+                "race_event_id": event.pk,
+                "race_event_original_name": event.original_name,
+                "race_event_chinese_name": event.chinese_name,
+                "race_event_series_key": event.series_key,
+                "adapter_input": _race_event_adapter_input(event),
+                "preflight_status": "ready",
+            }
+        )
+    if not results:
+        raise PlanValidationError("expected_target_empty")
+    return results
 
 
 def ensure_expected_targets_snapshot(
@@ -1443,6 +1598,8 @@ def _execution_policy_for_manifest(plan: dict[str, Any], manifest: AdapterManife
         "start_year": min((value[0] for value in valid_ranges), default=None),
         "end_year": max((value[1] for value in valid_ranges), default=None),
         "racing_region": manifest.region,
+        "max_source_cache_bytes": int(plan.get("max_source_cache_bytes") or 0),
+        "min_free_disk_bytes": int(plan.get("min_free_disk_bytes") or 0),
     }
 
 
@@ -1456,6 +1613,12 @@ def _manifest_from_plan_adapter(adapter_payload: Any) -> AdapterManifest:
 
 def validate_prepare_authorization(plan: dict[str, Any]) -> None:
     allow_network = bool(plan.get("allow_network", False))
+    if plan.get("historical_inventory_sha256"):
+        validate_historical_plan_budgets(plan)
+        if not settings.HISTORICAL_RACE_BACKFILL_ENABLED:
+            raise PlanValidationError("historical race backfill is disabled")
+        if allow_network and not settings.HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK:
+            raise PlanValidationError("historical race backfill network access is disabled")
     for adapter in plan.get("adapters") or []:
         if _adapter_requires_network(adapter) and not allow_network:
             raise PlanValidationError("network access requires explicit allow_network=true")
@@ -2164,6 +2327,7 @@ def evaluate_apply_check(
 
     apply_command = ""
     approved_candidate_identity: dict[str, Any] = {}
+    source_cache_protection: dict[str, Any] = {}
     if not blockers:
         approved_path = (
             Path(run_dir)
@@ -2187,6 +2351,14 @@ def evaluate_apply_check(
                 f"--jsonl {shlex.quote(str(approved_path.resolve()))} "
                 f"--expected-sha256 {candidate_identity['sha256']} --apply"
             )
+            try:
+                source_cache_protection = protect_approved_run_source_cache(
+                    run_path,
+                    artifact_sha256=approved_candidate_identity["sha256"],
+                )
+            except PlanValidationError as exc:
+                _append_issue(blockers, "source_cache_protection_failed", error=str(exc))
+                apply_command = ""
 
     result = {
         "is_apply_allowed": not blockers,
@@ -2198,6 +2370,7 @@ def evaluate_apply_check(
         "declared_apply_scopes": declared_apply_scopes,
         "candidate_identity": candidate_identity,
         "approved_candidate_identity": approved_candidate_identity,
+        "source_cache_protection": source_cache_protection,
         "coverage_candidate_identity": coverage_identity,
         "dry_run_candidate_identity": dry_run_payload.get("candidate_identity", {}),
         "coverage_expected_targets_identity": coverage_expected_identity,
