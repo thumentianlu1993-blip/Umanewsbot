@@ -306,3 +306,4 @@
 - 2026-07-11 `support-multiregion-news-attribution-and-english-gates` 已在用户接受任务 `9.6` 未完成警告后归档；六组 delta spec 已同步到正式规格，OpenSpec 全量 `21` 项通过，当前无 active change。归档不代表五地区产品归属验收通过，多地区生产开关仍须保持关闭。
 - 2026-07-11 已生成赛事编排第一批五地区应到清单：日本德比、富卫保险女皇杯、BETFRED DERBY、PRIX DE DIANE LONGINES、KENTUCKY DERBY PRESENTED BY WOODFORD RESERVE 各 1 场，三模块齐全且 5 行预检均为 `ready`。run 审批仍为 `pending`、网络关闭，等待用户审核 `expected_targets_review.csv`，尚未开始真实抓取。
 - 用户已批准上述清单；网络版 run 与原清单逐字段一致。prepare 前检查发现生产镜像遗漏 `runtime/tools` adapter 脚本，当前先修复 Docker 构建内容并部署，尚未发出网络请求。
+- 2026-07-11 国际新闻生产验收未通过：最近 24 小时英文稿 `50` 篇中 `25` 篇仍有 `core_term_missing`；`America/Oaks` 等已降级，但一批被错误登记为马名的普通词仍作为 proper noun 阻断。地区新增/公开为日本 `114/21`、香港 `3/0`、英国 `12/2`、法国 `1/0`、美国 `34/13`；法国宽关键词新源 24 小时新增 `0`，香港/英国/美国后续扩源尚未实施。重处理 dry-run 即使 `limit=5` 也存在长时间满核问题，修复前不得在生产批量运行。

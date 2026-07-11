@@ -916,3 +916,13 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 验证：`DB_ENGINE=sqlite manage.py check` 通过；`DB_ENGINE=sqlite manage.py makemigrations --check --dry-run` 通过；`DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true manage.py test stable --noinput` 通过，418 项；归档前 `openspec validate revive-ranked-news-for-publish --strict` 通过，归档后 `openspec validate --all` 通过，14 项；`git diff --check` 通过。
 - 上线结果：迁移 `stable.0019_newsarticle_ranked_revived_at` 已应用；`manage.py check` 通过；生产模型确认 `ranked_revived_at null=True db_index=True`，榜单唤醒服务可 import；`http://127.0.0.1/healthz/`、`http://umafans.run/healthz/`、首页和后台登录入口均返回 `200`；`web / worker / beat` 已重建并运行，Celery `active/reserved` 为空，近 80 行 `web / worker / beat` 日志未见 traceback/error。
 - 上线后观察：继续观察发布窗口候选决策中的 `ranked_revival` payload、翻译重试数量、重新评分结果和 QQ 是否仍只推已发布/合格文章。回滚代码后 `ranked_revived_at` 字段可保留不用；如需彻底清理，后续单独做清理迁移。
+
+## 2026-07-11 国际新闻门禁与产量生产验收
+
+- 验收窗口：截至 `2026-07-11 17:18 CST` 的最近 24 小时。抓取/发布窗口调度正常，所有启用来源最新状态均为 `success`；但业务验收未通过。
+- 门禁：最近 24 小时英文新稿 `50` 篇，公开 `15` 篇，`25` 篇仍有 `core_term_missing` blocker，共 `136` 条。`America`、`Oaks` 已按普通词/高歧义词降级，且没有 `term_semantic_classification=common_word` 的 blocker；但 `something`、`versatile`、`brilliant`、`incredible`、`reputation`、`threat`、`title`、`too soon`、`yet` 等普通词因术语库被错误标为 `horse`，仍走 `horse_term_without_common_seed -> proper_noun` 并阻断发布。因此门禁优化有效但不完整。
+- `reprocess_term_gate_blocked_articles --dry-run` 存在严重性能问题：生产上 `limit=5` 仍长时间占用单核，多个并发验收进程一度使 web 容器 CPU 达约 `185%`；已终止本次启动的全部进程，web CPU 恢复约 `0.08%`，健康检查正常。修复前不得在生产批量运行该命令。
+- 来源与产量：当前生产批准并启用来源为日本 `6`、香港 `2`、英国 `3`、法国 `3`、美国 `3`。法国新增宽关键词 TDN 来源已启用，但最近 24 小时新增 `0`，主要命中 `stale_published_at` 后跳过；At The Races 法国源仍未批准。香港、英国、美国没有完成后续讨论的新一轮扩源。
+- 最近 24 小时按主地区统计：日本新增/公开 `114/21`，香港 `3/0`，英国 `12/2`，法国 `1/0`，美国 `34/13`。香港 3 篇为待审核 `2`、翻译失败 `1`；法国 1 篇翻译失败；英国 12 篇中待审核 `6`、翻译失败 `2`、忽略 `2`、公开 `2`；美国 34 篇中待审核 `17`、翻译失败 `4`、公开 `13`。
+- 最近 8 个发布窗口：日本发布 `5` 篇、英国 `1` 篇，香港/法国/美国均为 `0`，0 原因均为 `no_ready_candidates`。结论是美国总体产出已可用、英国抓取量达到最低规模但发布转化偏低，香港和法国仍明显不足，尚未达到各地区常态丰富产出的目标。
+- 验收期间并行赛事 adapter 部署重建了 web/worker/beat，17:15 抓取窗口短暂留下运行中记录，随后从 `11` 条降至 `1` 条，Celery 抓取队列清空且健康检查恢复。该暂态由并行部署造成，不作为新闻调度持续故障结论。

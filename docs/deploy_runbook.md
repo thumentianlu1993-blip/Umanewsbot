@@ -3819,3 +3819,11 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - `Dockerfile` 必须把 `runtime/tools` 复制到 `/app/runtime/tools`，并让 `/app/server/runtime` 符号链接到 `/app/runtime`；Django 与 AdapterRunner 必须看到同一个 run 根目录。`.dockerignore` 只放行工具目录，仍排除 plans、runs、抓取缓存和其他 runtime artifact。
 - 部署后同时检查 `/app/runtime/tools/race_event_request_budget.py` 和 `/app/server/runtime/tools/race_event_request_budget.py`，并逐项检查 plan 中注册 adapter 的脚本存在，再恢复 network run。
 - 该检查只确认执行文件可用，不代表允许绕过应到审批、请求预算、coverage、dry-run 或 apply-check。
+
+### 2026-07-11 国际新闻门禁与产量验收
+
+- 最近 24 小时英文新稿 `50`、公开 `15`、存在 `core_term_missing` 的文章 `25`。普通词降级已有生产命中，但错误登记为 `horse` 的普通词会被 `horse_term_without_common_seed` 强制判为 proper noun，仍可误挡发布。
+- 最近 24 小时地区新增/公开：日本 `114/21`、香港 `3/0`、英国 `12/2`、法国 `1/0`、美国 `34/13`。所有启用来源最新抓取均成功；香港/法国低产主要是有效新稿不足、翻译失败和门禁待审核，不是全局抓取调度停摆。
+- 当前启用且生产批准来源数：日本 `6`、香港 `2`、英国 `3`、法国 `3`、美国 `3`。法国宽关键词 TDN 源最近 24 小时新增 `0`，At The Races 法国源仍关闭；后续国际扩源尚未落地。
+- 禁止直接在生产批量执行 `reprocess_term_gate_blocked_articles`：本次发现 `--limit 5 --dry-run` 仍会长时间占用单核。若需复验，先在代码侧优化术语匹配/缓存和候选边界，在隔离环境做性能测试，再使用生产只读小样本。
+- 本次误启动的重处理进程已全部终止，web CPU 恢复、`/healthz/` 返回 `200`。验收过程中并行赛事 adapter 部署重建 web/worker/beat，17:15 抓取窗口短暂中断后继续排空；该部署不改变上述 24 小时新闻验收结论。
