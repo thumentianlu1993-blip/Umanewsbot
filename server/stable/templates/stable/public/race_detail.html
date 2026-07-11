@@ -30,7 +30,7 @@
           <strong>延期</strong>
           <span>{% if event.local_date %}调整至 {{ event.local_date|date:"Y-m-d" }}{% else %}日期待定{% endif %}</span>
         {% elif event.status == 'finished' and top_results %}
-          <strong>{{ top_results.0.horse_name }}</strong>
+          <strong>{{ top_results.0.display_horse_name }}</strong>
           <span>冠军 · {% if top_results.0.margin %}{{ top_results.0.margin }}{% else %}赛果已确认{% endif %}</span>
         {% else %}
           <strong>{% if event.local_date %}{{ event.local_date|date:"Y-m-d" }}{% else %}日期待定{% endif %}</strong>
@@ -40,7 +40,7 @@
       {% if event.status == 'finished' and top_results %}
         <ol class="race-hero-results">
           {% for result in top_results %}
-            <li><span>{{ result.display_finish_position }}</span>{{ result.horse_name }}{% if result.margin %}<em>{{ result.margin }}</em>{% endif %}</li>
+            <li><span>{{ result.display_finish_position }}</span>{{ result.display_horse_name }}{% if result.margin %}<em>{{ result.margin }}</em>{% endif %}</li>
           {% endfor %}
         </ol>
       {% endif %}
@@ -87,8 +87,8 @@
               <tr>
                 <td>{{ runner.horse_number|default:"-" }}</td>
                 <td>{{ runner.barrier|default:"-" }}</td>
-                <td><strong>{{ runner.horse_name }}</strong></td>
-                <td>{{ runner.jockey_name|default:"-" }}</td>
+                <td><strong>{{ runner.display_horse_name }}</strong></td>
+                <td>{{ runner.display_jockey_name|default:"-" }}</td>
                 <td>{{ runner.trainer_name|default:"-" }}</td>
                 <td>{{ runner.carried_weight|default:"-" }}</td>
                 <td>
@@ -126,8 +126,8 @@
                 <tr>
                   <td>{{ result.display_finish_position }}</td>
                   <td>{{ result.horse_number|default:"-" }}</td>
-                  <td><strong>{{ result.horse_name }}</strong></td>
-                  <td>{{ result.jockey_name|default:"-" }}</td>
+                  <td><strong>{{ result.display_horse_name }}</strong></td>
+                  <td>{{ result.display_jockey_name|default:"-" }}</td>
                   <td>{{ result.trainer_name|default:"-" }}</td>
                   <td>{{ result.finish_time|default:"-" }}</td>
                   <td>{{ result.margin|default:"-" }}</td>
@@ -188,8 +188,8 @@
               {% for winner in history_winners %}
                 <tr>
                   <td>{{ winner.winner_year }}</td>
-                  <td><strong>{{ winner.horse_name }}</strong></td>
-                  <td>{{ winner.jockey_name|default:"-" }}</td>
+                  <td><strong>{{ winner.display_horse_name }}</strong></td>
+                  <td>{{ winner.display_jockey_name|default:"-" }}</td>
                   <td>{{ winner.trainer_name|default:"-" }}</td>
                   <td>{{ winner.finish_time|default:"-" }}</td>
                   <td>{{ winner.margin|default:"-" }}</td>

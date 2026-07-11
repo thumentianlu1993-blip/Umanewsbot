@@ -47,7 +47,7 @@
               {% if event.status == 'finished' and event.top_results %}
                 <ol class="race-top-results">
                   {% for result in event.top_results %}
-                    <li>{{ result.display_finish_position }}. {{ result.horse_name }}{% if result.margin %}<span>{{ result.margin }}</span>{% endif %}</li>
+                    <li>{{ result.display_finish_position }}. {{ result.display_horse_name }}{% if result.margin %}<span>{{ result.margin }}</span>{% endif %}</li>
                   {% endfor %}
                 </ol>
               {% endif %}
@@ -87,7 +87,7 @@
                 <td>
                   {% if event.status == 'finished' and event.top_results %}
                     {% for result in event.top_results %}
-                      {{ result.display_finish_position }}.{{ result.horse_name }}{% if result.margin %}({{ result.margin }}){% endif %}{% if not forloop.last %} / {% endif %}
+                      {{ result.display_finish_position }}.{{ result.display_horse_name }}{% if result.margin %}({{ result.margin }}){% endif %}{% if not forloop.last %} / {% endif %}
                     {% endfor %}
                   {% else %}
                     {{ event.distance_text|default:"赛前资料待补充" }}

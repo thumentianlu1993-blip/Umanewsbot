@@ -15496,6 +15496,25 @@ class RaceEventPageMVPTests(TestCase):
         self.assertNotContains(response, "隐藏赛事")
         self.assertNotContains(response, "3.5")
 
+    def test_public_calendar_uses_term_name_for_top_results(self):
+        self.event.status = RaceEventStatus.FINISHED
+        self.event.save(update_fields=["status", "updated_at"])
+        TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.JAPANESE,
+            racing_region=RacingRegion.JAPAN,
+            source_ja="ロブチェン",
+            target_zh="凌驾",
+        )
+        RaceEventResult.objects.create(event=self.event, finish_position=1, horse_name="ロブチェン")
+
+        response = self.client.get(
+            reverse("public-race-calendar"),
+            {"tab": "all", "direction": "future", "cursor": "2026-06-28"},
+        )
+
+        self.assertContains(response, "凌驾")
+
     def test_public_detail_shows_runner_odds_results_and_article_backlink(self):
         RaceEventRunner.objects.create(event=self.event, horse_number="1", horse_name="贝拉吉オ歌剧", odds_value="3.5", popularity="1")
         RaceEventResult.objects.create(event=self.event, finish_position=1, horse_name="贝拉吉オ歌剧", margin="颈位")
@@ -15516,6 +15535,89 @@ class RaceEventPageMVPTests(TestCase):
         self.assertContains(detail, "赛前新闻")
         self.assertContains(article_detail, "关联赛事")
         self.assertContains(article_detail, "宝塚纪念 2026")
+
+    def test_public_detail_uses_region_term_names_for_runners_results_and_history(self):
+        global_horse = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.JAPANESE,
+            source_ja="ロブチェン",
+            target_zh="全局译名",
+            priority=100,
+        )
+        TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.JAPANESE,
+            racing_region=RacingRegion.JAPAN,
+            source_ja="ロブチェン",
+            target_zh="凌驾",
+            priority=10,
+        )
+        jockey = TermEntry.objects.create(
+            term_type=TermType.JOCKEY,
+            source_language=SourceLanguage.JAPANESE,
+            racing_region=RacingRegion.JAPAN,
+            source_ja="松山弘平",
+            target_zh="松山弘平",
+        )
+        TermAlias.objects.create(
+            term=jockey,
+            source_language=SourceLanguage.JAPANESE,
+            text="松山 弘平",
+        )
+        RaceEventRunner.objects.create(
+            event=self.event,
+            horse_number="17",
+            horse_name="ロブチェン",
+            jockey_name="松山 弘平",
+        )
+        RaceEventResult.objects.create(
+            event=self.event,
+            finish_position=1,
+            horse_number="17",
+            horse_name="ロブチェン",
+            jockey_name="松山 弘平",
+        )
+        RaceEventHistoryWinner.objects.create(
+            event=self.event,
+            winner_year=2025,
+            horse_name="ロブチェン",
+            jockey_name="松山 弘平",
+        )
+
+        detail = self.client.get(self.event.public_path)
+
+        self.assertContains(detail, "凌驾", count=3)
+        self.assertContains(detail, "松山弘平", count=3)
+        self.assertNotContains(detail, "全局译名")
+        self.assertEqual(global_horse.racing_region, "")
+        self.assertEqual(detail.context["results"][0].display_horse_name, "凌驾")
+
+    def test_public_detail_sorts_runners_by_natural_horse_number_then_barrier(self):
+        RaceEventRunner.objects.create(event=self.event, sort_order=1, horse_number="17", barrier="8", horse_name="第十七号")
+        RaceEventRunner.objects.create(event=self.event, sort_order=2, horse_number="2", barrier="1", horse_name="第二号")
+        RaceEventRunner.objects.create(event=self.event, sort_order=3, horse_number="10", barrier="5", horse_name="第十号")
+        RaceEventRunner.objects.create(event=self.event, sort_order=4, horse_number="1A", barrier="1", horse_name="第一号A")
+        RaceEventRunner.objects.create(event=self.event, sort_order=5, horse_number="", barrier="3", horse_name="闸位回退")
+
+        detail = self.client.get(self.event.public_path)
+
+        self.assertEqual(
+            [runner.horse_name for runner in detail.context["runners"]],
+            ["第一号A", "第二号", "闸位回退", "第十号", "第十七号"],
+        )
+
+    def test_public_detail_keeps_original_name_when_no_active_term_matches(self):
+        RaceEventResult.objects.create(
+            event=self.event,
+            finish_position=1,
+            horse_name="未收录马名",
+            jockey_name="未收录骑师",
+        )
+
+        detail = self.client.get(self.event.public_path)
+
+        self.assertEqual(detail.context["results"][0].display_horse_name, "未收录马名")
+        self.assertEqual(detail.context["results"][0].display_jockey_name, "未收录骑师")
 
     def test_public_detail_prefers_official_finish_position_for_dead_heats(self):
         self.event.status = RaceEventStatus.FINISHED

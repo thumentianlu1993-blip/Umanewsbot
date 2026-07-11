@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 import uuid
 from datetime import datetime, time, timedelta
 from pathlib import Path
@@ -14,6 +16,7 @@ from django.core.paginator import Paginator
 from django.core.signing import BadSignature, SignatureExpired
 from django.db import transaction
 from django.db.models import Count, Q
+from django.db.models.functions import Lower
 from django.http import HttpRequest, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -83,6 +86,7 @@ from .models import (
     TaskStatus,
     TermCandidate,
     TermCandidateStatus,
+    TermAlias,
     TermEntry,
     TermType,
     WindowCandidateDecision,
@@ -2388,6 +2392,7 @@ def _group_race_events_by_date(events):
             current_group = {"date": event.local_date, "events": []}
             groups.append(current_group)
         current_group["events"].append(event)
+    _attach_race_term_display_names([(event, event.top_results) for event in events])
     return groups
 
 
@@ -2396,6 +2401,112 @@ def _attach_result_display_positions(results):
         source_refs = result.source_refs or {}
         result.display_finish_position = source_refs.get("official_finish_position") or result.finish_position
     return results
+
+
+def _race_name_identity(value: str) -> str:
+    return unicodedata.normalize("NFKC", value or "").strip().lower()
+
+
+def _race_number_sort_key(value: str):
+    normalized = unicodedata.normalize("NFKC", value or "").strip().upper()
+    if not normalized:
+        return (2, 0, "")
+    match = re.match(r"^(\d+)(.*)$", normalized)
+    if match:
+        return (0, int(match.group(1)), match.group(2).strip())
+    return (1, 0, normalized)
+
+
+def _runner_display_sort_key(runner, country_region: str):
+    # These regions currently publish a stable race/program number. Draw is the
+    # fallback for feeds that omit it; keeping this mapping explicit allows a
+    # region to switch its primary convention without changing stored source order.
+    primary_field_by_region = {
+        RacingRegion.JAPAN: "horse_number",
+        RacingRegion.HONG_KONG: "horse_number",
+        RacingRegion.UNITED_KINGDOM: "horse_number",
+        RacingRegion.FRANCE: "horse_number",
+        RacingRegion.UNITED_STATES: "horse_number",
+    }
+    primary_field = primary_field_by_region.get(country_region, "horse_number")
+    secondary_field = "barrier" if primary_field == "horse_number" else "horse_number"
+    primary_value = getattr(runner, primary_field, "") or getattr(runner, secondary_field, "")
+    return (
+        _race_number_sort_key(primary_value),
+        _race_number_sort_key(getattr(runner, secondary_field, "")),
+        runner.sort_order,
+        runner.pk,
+    )
+
+
+def _sort_runners_for_display(runners, country_region: str):
+    return sorted(runners, key=lambda runner: _runner_display_sort_key(runner, country_region))
+
+
+def _attach_race_term_display_names(event_records):
+    records = [(event, item) for event, items in event_records for item in items]
+    source_names = {
+        str(value).strip()
+        for _event, item in records
+        for value in (getattr(item, "horse_name", ""), getattr(item, "jockey_name", ""))
+        if value
+    }
+    names_by_type = {
+        TermType.HORSE: {
+            _race_name_identity(item.horse_name)
+            for _event, item in records
+            if getattr(item, "horse_name", "")
+        },
+        TermType.JOCKEY: {
+            _race_name_identity(item.jockey_name)
+            for _event, item in records
+            if getattr(item, "jockey_name", "")
+        },
+    }
+    all_names = set().union(*names_by_type.values())
+    query_names = {value.lower() for value in source_names} | all_names
+    candidates: dict[tuple[str, str], list[TermEntry]] = {}
+    if all_names:
+        primary_terms = (
+            TermEntry.objects.filter(is_active=True, term_type__in=names_by_type)
+            .annotate(source_name_lower=Lower("source_ja"))
+            .filter(source_name_lower__in=query_names)
+        )
+        for term in primary_terms:
+            identity = _race_name_identity(term.source_ja)
+            if identity in names_by_type[term.term_type]:
+                candidates.setdefault((term.term_type, identity), []).append(term)
+
+        aliases = (
+            TermAlias.objects.select_related("term")
+            .filter(is_active=True, term__is_active=True, term__term_type__in=names_by_type)
+            .annotate(source_name_lower=Lower("text"))
+            .filter(source_name_lower__in=query_names)
+        )
+        for alias in aliases:
+            identity = _race_name_identity(alias.text)
+            if identity in names_by_type[alias.term.term_type]:
+                candidates.setdefault((alias.term.term_type, identity), []).append(alias.term)
+
+    def display_name(value: str, term_type: str, country_region: str) -> str:
+        identity = _race_name_identity(value)
+        matches = candidates.get((term_type, identity), [])
+        if not matches:
+            return value
+        term = min(
+            matches,
+            key=lambda item: (
+                0 if item.racing_region == country_region else 1 if not item.racing_region else 2,
+                -item.priority,
+                item.pk,
+            ),
+        )
+        return term.target_zh or value
+
+    for event, item in records:
+        item.display_horse_name = display_name(item.horse_name, TermType.HORSE, event.country_region)
+        item.display_jockey_name = display_name(item.jockey_name, TermType.JOCKEY, event.country_region)
+    return event_records
 
 
 def public_race_calendar(request: HttpRequest):
@@ -2457,16 +2568,25 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         "post_race": [link.article for link in public_links if link.link_type == ArticleRaceLinkType.POST_RACE],
         "related": [link.article for link in public_links if link.link_type == ArticleRaceLinkType.RELATED],
     }
+    runners = _sort_runners_for_display(list(event.runners.all()), event.country_region)
     results = _attach_result_display_positions(list(event.results.all()))
+    history_winners = list(event.history_winners.all())
+    _attach_race_term_display_names(
+        [
+            (event, runners),
+            (event, results),
+            (event, history_winners),
+        ]
+    )
     top_results = results[:5]
     return render(
         request,
         "stable/public/race_detail.html",
         {
             "event": event,
-            "runners": event.runners.all(),
+            "runners": runners,
             "results": results,
-            "history_winners": event.history_winners.all(),
+            "history_winners": history_winners,
             "top_results": top_results,
             "news_groups": news_groups,
         },
