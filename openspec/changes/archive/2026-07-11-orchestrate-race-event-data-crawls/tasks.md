@@ -96,3 +96,11 @@
 - [x] 11.5 (integration) apply-check 复核 coverage 与当前应到清单身份、真实解压校验 gzip 备份，并要求每条范围确认包含 approved 状态、批准人和批准时间。
 - [x] 11.6 (application) 补齐应到审批、地区输入、空模块、mapping typo、证据调包、伪 gzip、确认元数据和来源 URL 测试。
 - [x] 11.7 (operations) 更新 OpenSpec 与项目运行文档，并执行目标测试、完整 stable 回归、Django/迁移/OpenSpec/diff 校验。
+
+## 12. 第六轮 Code review 定向返修
+
+- [x] 12.1 (application) 将候选保存与正式 apply 包裹在整批数据库事务中，任一模块失败时回滚本批全部候选和正式数据。
+- [x] 12.2 (integration) 将 adapter 所需完整赛事字段写入应到快照；prepare 只从批准快照生成地区 CSV，并在当前 `RaceEvent` 与快照不一致时阻断。
+- [x] 12.3 (integration) 混合来源策略 SHA 只接受带 `status=approved`、批准人和批准时间的确认记录。
+- [x] 12.4 (application) 增加批量中途失败回滚、审批后 `source_refs` 漂移、pending 混合来源策略确认测试。
+- [x] 12.5 (operations) 按产品决定保留可选 `--expected-sha256` 和当前请求预算并发模型，更新规格与运行文档并完成验证。

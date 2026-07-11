@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 
 from stable.models import RaceEvent, RaceEventModule
 from stable.services.race_events import apply_data_candidate, save_data_candidate
@@ -124,28 +125,29 @@ class Command(BaseCommand):
 
         candidate_count = 0
         applied_count = 0
-        for event, source_name, modules, source_url in parsed:
-            raw_payload = {
-                "year": event.year,
-                "slug": event.slug,
-                "source_name": source_name,
-                "source_url": source_url,
-                "modules": modules,
-            }
-            for module, module_payload in modules.items():
-                candidate = save_data_candidate(
-                    event=event,
-                    module=module,
-                    source_name=source_name,
-                    source_url=source_url,
-                    candidate_payload=module_payload,
-                    raw_payload=raw_payload,
-                    confidence=options["confidence"],
-                )
-                candidate_count += 1
-                if options["apply"]:
-                    apply_data_candidate(candidate)
-                    applied_count += 1
+        with transaction.atomic():
+            for event, source_name, modules, source_url in parsed:
+                raw_payload = {
+                    "year": event.year,
+                    "slug": event.slug,
+                    "source_name": source_name,
+                    "source_url": source_url,
+                    "modules": modules,
+                }
+                for module, module_payload in modules.items():
+                    candidate = save_data_candidate(
+                        event=event,
+                        module=module,
+                        source_name=source_name,
+                        source_url=source_url,
+                        candidate_payload=module_payload,
+                        raw_payload=raw_payload,
+                        confidence=options["confidence"],
+                    )
+                    candidate_count += 1
+                    if options["apply"]:
+                        apply_data_candidate(candidate)
+                        applied_count += 1
 
         self.stdout.write(
             self.style.SUCCESS(

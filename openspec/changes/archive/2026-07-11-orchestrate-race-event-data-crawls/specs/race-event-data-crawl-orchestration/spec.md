@@ -385,3 +385,27 @@
 - **WHEN** 备份无法完整解压，或确认缺少 approved 状态、批准人、批准时间任一字段
 - **THEN** apply-check MUST 生成 blocker
 - **AND** 系统 MUST NOT 生成 apply 命令
+
+### Requirement: 批量正式写入必须保持原子性
+系统 MUST 在同一数据库事务内保存并应用一批赛事候选，不得在命令失败后留下已提交的前半批数据。
+
+#### Scenario: 后续模块应用失败
+- **WHEN** 本批前序模块已经处理，但后续模块在转换或写库时抛出异常
+- **THEN** 系统 MUST 回滚本批创建的全部候选和正式赛事数据
+- **AND** 操作者重新执行前 MUST 看到数据库仍处于批次开始前状态
+
+### Requirement: 应到批准必须绑定 adapter 的完整输入
+系统 MUST 将 adapter 所需的完整赛事字段保存在应到快照中，并只从批准快照生成地区 CSV。
+
+#### Scenario: 审批后赛事抓取字段变化
+- **WHEN** 应到清单获批后，当前 `RaceEvent` 的名称、别名、日期、系列、赛场或 `source_refs` 与快照不一致
+- **THEN** prepare MUST 阻止执行
+- **AND** 系统 MUST 要求重新生成并审批应到清单
+
+### Requirement: 混合来源策略只接受完整批准记录
+系统 MUST 只从通过统一批准校验的 confirmation 读取混合来源策略 SHA。
+
+#### Scenario: Pending 记录包含正确策略 SHA
+- **WHEN** confirmation 的策略 SHA 正确但状态不是 `approved`，或缺少批准人/时间
+- **THEN** apply-check MUST 输出 `mixed_source_confirmation_missing`
+- **AND** 系统 MUST NOT 将该记录与其他范围确认拼接后放行

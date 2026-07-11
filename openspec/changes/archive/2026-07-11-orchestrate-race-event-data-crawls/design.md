@@ -148,6 +148,14 @@ coverage 每个目标分别维护 blocker codes 和 warning codes。只有 block
 
 coverage 只接受显式 `mapping_status=approved`，模块存在但 `items=[]` 仍视为缺失有效内容，候选缺少 `source_url` 时禁止通过。apply-check 重新计算当前应到清单身份并与 coverage 对账，实际读取完整 gzip 备份验证可解压；范围确认同样必须包含 approved 状态、批准人和批准时间。任何一层证据缺失、失配或拼写错误都 fail closed。
 
+### 20. 批量写入原子性与批准输入不可漂移
+
+`expected_targets.json` 必须保存生成 adapter CSV 所需的完整赛事输入，包括名称、别名、日期、赛场、系列和 `source_refs`。prepare 只从该批准快照生成 CSV，同时重新计算当前 `RaceEvent` 的输入；任一字段变化时停止并要求重新生成快照和审批，不得静默使用数据库新值。
+
+正式 importer 在候选保存和 apply 外层使用一个数据库事务。即使后续赛事或模块在类型转换、约束校验或正式写入时失败，先前已处理内容也必须全部回滚。混合来源策略 SHA 只从完整 approved 确认中收集；pending 或缺少批准元数据的记录不能提供策略批准。
+
+按本轮用户决定，`--expected-sha256` 继续保持可选以保留现有单场人工修复入口；请求预算暂不增加跨进程锁。两项均不改变当前显式 apply 和手动分批运行口径。
+
 ## Risks / Trade-offs
 
 - [Risk] 现有 `runtime/tools` 脚本参数和输出格式不完全一致 -> Mitigation: adapter 层为每个 source 定义 manifest，统一校验必需产物，缺失时失败。

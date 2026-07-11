@@ -3763,6 +3763,13 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 
 本轮只完成本地实现与测试，未执行生产赛事抓取或写入。多地区新闻迁移编号为 `stable.0023_multiregion_news_attribution`，部署时必须先确认 `stable.0022_horseprofile_horsefollow_articlehorselink_and_more` 已应用。
 
+第六轮返修补充：
+
+- prepare 会比较当前 `RaceEvent` 与批准快照中的完整 adapter 输入。出现 `changed after approval` 时不要修改快照或 CSV，应删除本次未执行的 run artifact，重新运行 plan 并重新审批。
+- importer 的候选保存和 apply 已整批事务化；命令失败后应先确认本批候选和正式赛事数据均未变化，再修正输入重跑。
+- 混合来源策略确认必须由 `status=approved` 且带批准人、批准时间的记录提供；pending 记录中的策略 SHA 不生效。
+- 当前仍按手动单进程方式执行同一 run，不要同时启动两个 prepare/resume。`--expected-sha256` 保持兼容性可选，但规范批量流程仍只使用 apply-check 生成的命令。
+
 ### 2026-07-11 赛事编排与多地区归属灰度部署记录
 
 - 发布提交：`38974f1`；部署前生产提交：`de4bb78`。

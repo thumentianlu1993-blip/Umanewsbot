@@ -720,7 +720,9 @@ class RaceEventCrawlCoverageAuditTests(RaceEventCrawlOrchestrationTestCase):
 
     def test_expected_targets_require_matching_approval_and_generate_region_scoped_input(self):
         module = self._module()
-        self._race_event()
+        event = self._race_event()
+        event.source_refs = {"chart_url": "https://source.test/approved-chart"}
+        event.save(update_fields=["source_refs", "updated_at"])
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             plan_path = self._write_json(tmp_path / "plan-source.json", self._base_plan(tmp_path))
@@ -755,6 +757,17 @@ class RaceEventCrawlCoverageAuditTests(RaceEventCrawlOrchestrationTestCase):
             )
             rows = list(csv.DictReader(Path(inputs[RacingRegion.UNITED_KINGDOM]).open(encoding="utf-8-sig")))
             self.assertEqual([(row["year"], row["slug"]) for row in rows], [("2026", "uk-derby-2026")])
+            self.assertIn("approved-chart", rows[0]["source_refs"])
+
+            event.source_refs = {"chart_url": "https://source.test/changed-after-approval"}
+            event.save(update_fields=["source_refs", "updated_at"])
+            with self.assertRaisesMessage(module.PlanValidationError, "changed after approval"):
+                module.materialize_adapter_event_inputs(
+                    expected_snapshot=json.loads(
+                        Path(state.artifacts["expected_targets"]).read_text(encoding="utf-8")
+                    ),
+                    run_dir=tmp_path,
+                )
 
     def test_coverage_audit_blocks_empty_candidate_file_against_expected_targets(self):
         module = self._module()
@@ -1617,6 +1630,28 @@ class RaceEventCrawlApplyCheckTests(RaceEventCrawlOrchestrationTestCase):
             self.assertIn("apply_scope_mismatch", _field(blocked, "blocker_codes"))
             self.assertIn("confirmation_missing", _field(blocked, "blocker_codes"))
             self.assertIn("first_batch_confirmation_missing", _field(blocked, "blocker_codes"))
+
+            pending_strategy = module.evaluate_apply_check(
+                run_dir=tmp_path,
+                coverage_audit=coverage,
+                dry_run_artifact=dry_run,
+                confirmations=[
+                    confirmation,
+                    self._approved_confirmation(toba_scope),
+                    {
+                        "status": "pending",
+                        "confirmed_by": "operator",
+                        "confirmed_at": "2026-07-10T04:30:00+08:00",
+                        "mixed_source_strategy_sha256s": [strategy_sha256],
+                    },
+                ],
+                production_evidence=evidence,
+                apply_scope={"scopes": [sporting_life_scope, toba_scope]},
+            )
+            self.assertIn(
+                "mixed_source_confirmation_missing",
+                _field(pending_strategy, "blocker_codes"),
+            )
 
             confirmation["mixed_source_strategy_sha256s"] = [strategy_sha256]
             allowed = module.evaluate_apply_check(

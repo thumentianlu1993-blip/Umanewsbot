@@ -916,6 +916,31 @@ def validate_first_acceptance_fixture(plan_path: str | Path) -> dict[str, Any]:
     return validate_first_acceptance_plan(plan)
 
 
+def _race_event_adapter_input(event: RaceEvent) -> dict[str, Any]:
+    return {
+        "year": event.year,
+        "slug": event.slug,
+        "series_key": event.series_key,
+        "original_name": event.original_name,
+        "chinese_name": event.chinese_name,
+        "aliases": "|".join(
+            event.aliases.filter(is_active=True)
+            .order_by("source_language", "text")
+            .values_list("text", flat=True)
+        ),
+        "country_region": event.country_region,
+        "racing_region": event.country_region,
+        "racecourse": event.racecourse,
+        "grade_text": event.grade_text,
+        "normalized_grade": event.normalized_grade,
+        "surface": event.surface,
+        "distance_text": event.distance_text,
+        "status": event.status,
+        "local_date": event.local_date.isoformat() if event.local_date else "",
+        "source_refs": json.dumps(event.source_refs or {}, ensure_ascii=False, sort_keys=True),
+    }
+
+
 def expected_targets_from_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
     targets: list[dict[str, Any]] = []
     seen: set[tuple[int, str]] = set()
@@ -950,6 +975,7 @@ def expected_targets_from_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
                         "race_event_original_name": str(event.original_name or "") if event else "",
                         "race_event_chinese_name": str(event.chinese_name or "") if event else "",
                         "race_event_series_key": str(event.series_key or "") if event else "",
+                        "adapter_input": _race_event_adapter_input(event) if event else {},
                         "preflight_status": "ready" if event else "missing_race_event",
                     }
                 )
@@ -1097,6 +1123,7 @@ def materialize_adapter_event_inputs(
         rows: list[dict[str, Any]] = []
         for target in sorted(targets, key=lambda item: (int(item["year"]), str(item["slug"]))):
             event = RaceEvent.objects.filter(
+                pk=target.get("race_event_id"),
                 year=int(target["year"]),
                 slug=str(target["slug"]),
             ).first()
@@ -1104,30 +1131,16 @@ def materialize_adapter_event_inputs(
                 raise PlanValidationError(
                     f"expected target RaceEvent disappeared: year={target['year']} slug={target['slug']}"
                 )
-            rows.append(
-                {
-                    "year": event.year,
-                    "slug": event.slug,
-                    "series_key": event.series_key,
-                    "original_name": event.original_name,
-                    "chinese_name": event.chinese_name,
-                    "aliases": "|".join(
-                        event.aliases.filter(is_active=True)
-                        .order_by("source_language", "text")
-                        .values_list("text", flat=True)
-                    ),
-                    "country_region": event.country_region,
-                    "racing_region": event.country_region,
-                    "racecourse": event.racecourse,
-                    "grade_text": event.grade_text,
-                    "normalized_grade": event.normalized_grade,
-                    "surface": event.surface,
-                    "distance_text": event.distance_text,
-                    "status": event.status,
-                    "local_date": event.local_date.isoformat() if event.local_date else "",
-                    "source_refs": json.dumps(event.source_refs or {}, ensure_ascii=False),
-                }
-            )
+            approved_input = target.get("adapter_input")
+            if not isinstance(approved_input, dict) or not approved_input:
+                raise PlanValidationError(
+                    f"expected target is missing approved adapter input: year={target['year']} slug={target['slug']}"
+                )
+            if _race_event_adapter_input(event) != approved_input:
+                raise PlanValidationError(
+                    f"expected target RaceEvent changed after approval: year={target['year']} slug={target['slug']}"
+                )
+            rows.append({field: approved_input.get(field, "") for field in fieldnames})
         with path.open("w", encoding="utf-8-sig", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=fieldnames)
             writer.writeheader()
@@ -2051,6 +2064,7 @@ def evaluate_apply_check(
     confirmed_strategy_sha256s = {
         str(value)
         for confirmation in confirmations or []
+        if _is_approved_confirmation(confirmation)
         for value in confirmation.get("mixed_source_strategy_sha256s") or []
     }
     missing_strategy_sha256s = required_strategy_sha256s - confirmed_strategy_sha256s
@@ -2142,11 +2156,7 @@ def _has_matching_confirmation(
 ) -> bool:
     scope_modules = set(apply_scope.get("modules") or [])
     for confirmation in confirmations or []:
-        if confirmation.get("status") != "approved":
-            continue
-        if not str(confirmation.get("confirmed_by") or "").strip():
-            continue
-        if not str(confirmation.get("confirmed_at") or "").strip():
+        if not _is_approved_confirmation(confirmation):
             continue
         if confirmation.get("region") != apply_scope.get("region") or confirmation.get("source") != apply_scope.get("source"):
             continue
@@ -2154,6 +2164,14 @@ def _has_matching_confirmation(
             continue
         return True
     return False
+
+
+def _is_approved_confirmation(confirmation: dict[str, Any]) -> bool:
+    return bool(
+        confirmation.get("status") == "approved"
+        and str(confirmation.get("confirmed_by") or "").strip()
+        and str(confirmation.get("confirmed_at") or "").strip()
+    )
 
 
 def _normalized_scopes(value: Any) -> list[dict[str, Any]]:

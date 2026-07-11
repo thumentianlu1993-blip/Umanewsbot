@@ -300,3 +300,4 @@
 - 赛事抓取编排已补齐应到审批、地区专属 adapter 输入、空内容与来源 URL 门禁、应到身份复核、真实 gzip 校验和完整人工批准元数据。
 - 目标测试 `48` 项、完整 `stable` 回归 `588` 项通过；Django check、迁移漂移、两个 change 严格校验、OpenSpec 全量 `21` 项和 `git diff --check` 均通过。
 - 后续 review 中纯技术问题由 Codex 直接判断修复；产品能力、运营口径和交互变化仍由用户审核。
+- 2026-07-11 第六轮赛事抓取返修：批量 importer 已整批事务化；应到快照保存完整 adapter 输入且审批后 `RaceEvent` 漂移会阻断；pending 混合来源确认不再提供策略 SHA。按用户决定暂不强制哈希参数、暂不增加请求预算并发锁。目标测试 `67` 项、完整 `stable` 回归 `589` 项通过，Django/迁移/OpenSpec/diff 校验均通过；`orchestrate-race-event-data-crawls` 已同步正式规格并归档。

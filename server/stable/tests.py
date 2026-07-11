@@ -15698,6 +15698,43 @@ class RaceEventPageMVPTests(TestCase):
         self.assertTrue(RaceEventRunner.objects.filter(event=self.event, horse_name="Calandagan", barrier="7").exists())
         self.assertTrue(RaceEventResult.objects.filter(event=self.event, horse_name="Calandagan", finish_time="2:22.1").exists())
 
+    def test_import_race_event_detail_candidates_rolls_back_the_whole_batch_on_apply_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            payload_path = Path(tmp) / "details.jsonl"
+            payload_path.write_text(
+                json.dumps(
+                    {
+                        "year": self.event.year,
+                        "slug": self.event.slug,
+                        "source_name": "fixture",
+                        "source_url": "https://example.com/result.html",
+                        "modules": {
+                            RaceEventModule.RUNNERS: {
+                                "items": [{"horse_number": "1", "horse_name": "Calandagan"}]
+                            },
+                            RaceEventModule.RESULTS: {
+                                "items": [{"finish_position": "invalid", "horse_name": "Calandagan"}]
+                            },
+                        },
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(ValueError):
+                call_command(
+                    "import_race_event_detail_candidates",
+                    "--jsonl",
+                    str(payload_path),
+                    "--apply",
+                    stdout=StringIO(),
+                )
+
+        self.assertFalse(RaceEventDataCandidate.objects.filter(event=self.event).exists())
+        self.assertFalse(RaceEventRunner.objects.filter(event=self.event).exists())
+        self.assertFalse(RaceEventResult.objects.filter(event=self.event).exists())
+
     def test_dynamic_field_update_and_removed_article_link_protection(self):
         RaceEventRunner.objects.create(event=self.event, horse_number="1", horse_name="贝拉吉奥歌剧", odds_value="4.0")
         update_result = update_runner_dynamic_fields(
