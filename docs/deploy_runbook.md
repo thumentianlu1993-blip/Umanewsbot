@@ -3844,3 +3844,14 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - 当前启用且生产批准来源数：日本 `6`、香港 `2`、英国 `3`、法国 `3`、美国 `3`。法国宽关键词 TDN 源最近 24 小时新增 `0`，At The Races 法国源仍关闭；后续国际扩源尚未落地。
 - 禁止直接在生产批量执行 `reprocess_term_gate_blocked_articles`：本次发现 `--limit 5 --dry-run` 仍会长时间占用单核。若需复验，先在代码侧优化术语匹配/缓存和候选边界，在隔离环境做性能测试，再使用生产只读小样本。
 - 本次误启动的重处理进程已全部终止，web CPU 恢复、`/healthz/` 返回 `200`。验收过程中并行赛事 adapter 部署重建 web/worker/beat，17:15 抓取窗口短暂中断后继续排空；该部署不改变上述 24 小时新闻验收结论。
+# 2026-07-12 赛事名称中文展示与出马表排序上线
+
+- 部署提交：`d071952`。
+- 产品行为：赛事详情、历史冠军和赛事日历赛果中的马名/骑师名精确命中 active 正式术语主原文或别名时展示中文译名；未命中保留原文。出马表按马号自然升序，缺号回退闸位，赛果仍按完赛名次。
+- 本地验证：赛事页目标测试 `23` 项、完整 `stable` 回归 `612` 项、Django check、迁移漂移、OpenSpec 严格校验和 `git diff --check` 全部通过。
+- 部署前生产 HEAD：`8fbc6c6`；外部导入、外部锁和抓取中任务均为 `0`，内外 healthz 正常。
+- `.env` 备份：`.env.backup.race-display-20260712_002533`。
+- 数据库备份：`backups/db/pre-race-display-20260712_002533.sql.gz`，约 `105M`，已通过 `gzip -t`；SHA-256 为 `99994e84d3154dd9d4c1503b96688cd24bf7e00d9ad13aca02a965a69d64a8c0`。
+- 部署方式：生产 `git pull --ff-only origin main` 快进到 `d071952`，执行 `bash ./deploy_lowcost.sh`；无新增迁移。
+- 部署后：`web / worker / beat / db / redis / nginx` 正常，web/db/redis healthy；Django check、内外 healthz、`/races/` 和日本德比详情均通过，近 5 分钟日志无 traceback/error。
+- 数据抽检：英国马名 `13/13`、骑师 `9/13` 命中；美国马名 `2/18`、骑师 `11/18`；法国马名 `1/7`、骑师 `0/7`；日本德比马名 `1/18`、骑师 `0/18`。日本当前页面大量原文属于术语库覆盖缺口，不应通过页面层临时翻译解决。

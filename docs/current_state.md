@@ -945,4 +945,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 公开赛事详情页和赛事日历赛果将马名、骑师名批量关联 active `TermEntry / TermAlias`；精确命中时展示正式中文译名，候选优先级为赛事同地区、全局、其他地区，未命中保留来源原文。
 - 出马表不再使用抓取来源行序直接展示。当前日本、香港、英国、法国、美国均优先按马号自然升序，缺马号时回退闸位，再回退来源 `sort_order`；支持 `1A / 2 / 10` 等编号。
 - 修复只改变公开展示，不覆盖 `RaceEventRunner / RaceEventResult / RaceEventHistoryWinner` 中的来源原文，也不改变赛果名次顺序。
-- 本地 `RaceEventPageMVPTests` 已通过；尚未部署生产。
+- 本地目标测试 `23` 项、完整 `stable` 回归 `612` 项、Django check、迁移漂移检查、OpenSpec 严格校验和 `git diff --check` 均通过。
+- 已部署生产提交 `d071952`，无新增迁移。生产 `web / worker / beat` 重建正常，内外 healthz、赛事日历和日本德比详情均返回 `200`，近 5 分钟服务日志无 traceback/error。
+- 线上首批术语覆盖抽检：香港赛果已是中文原文；英国马名 `13/13`、骑师 `9/13` 命中；美国马名 `2/18`、骑师 `11/18` 命中；法国马名 `1/7`、骑师 `0/7` 命中；日本德比马名 `1/18`、骑师 `0/18` 命中。日本德比当前冠军 `ロブチェン` 和骑师 `松山 弘平` 尚无 active 正式术语，页面按规则保留原文，后续需补词库而不是改展示逻辑。
+- 部署前 `.env` 备份为 `.env.backup.race-display-20260712_002533`；数据库备份为 `backups/db/pre-race-display-20260712_002533.sql.gz`，约 `105M`，gzip 校验通过，SHA-256 为 `99994e84d3154dd9d4c1503b96688cd24bf7e00d9ad13aca02a965a69d64a8c0`。
