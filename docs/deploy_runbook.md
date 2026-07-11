@@ -3826,6 +3826,8 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - 日本阻断原因是 `prepare_jra_race_detail_candidates.py` 以前按列表序号绑定结果页。单赛事子集会误取 JRA 全年列表第一场，本次把日本德比错配成中山金杯。修复后必须按 `original_name / aliases` 在列表行文本中唯一匹配；零个或多个匹配都直接失败。
 - 美国采用明确的混合来源策略：HRN 提供参赛名单，Equibase PDF 提供正式赛果，TOBA 年度分级赛页面提供历届冠军。TOBA 线上 2023-2026 页面当前返回 403，v3 使用此前已成功抓取并留存的同源原始页面；不得手工拼写候选数据。
 - v3 与用户批准的五场应到清单逐字段一致，只新增 `us_equibase_results` adapter。prepare 前复用缓存后仍须重新生成候选、运行 mixed-source coverage audit，并确认五个地区的 `runners / results / history_winners` 全部完整；审计未通过时继续禁止 dry-run 和写库。
+- adapter 镜像 smoke 不只检查脚本文件存在和 `py_compile`；还要逐项 import 非主应用依赖。Equibase PDF adapter 需要 `pdfplumber==0.11.9`，生产镜像必须通过 `python -c 'import pdfplumber'` 后才允许 resume。
+- v3 空缓存重抓在法国探测阶段用尽 `60/60` 请求预算，HRN 因此先生成空候选；不提高预算，改为补入此前留存的同源 HRN 日期页和 Churchill Downs 赛场页。resume 后 HRN 得到 24 匹参赛马且无新增请求，再继续 Equibase 和 TOBA。
 
 ### 2026-07-11 国际新闻门禁与产量验收
 
