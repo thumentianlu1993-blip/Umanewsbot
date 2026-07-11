@@ -860,6 +860,10 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - `2026-07-10` 第三轮审查按确认范围只修复公开展示回退：`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false` 时，首页卡片和文章详情也只显示主地区，关联地区数据保留。按当前决策不收紧 `other` 关联地区的后台保存规则。目标测试 `20` 项、完整 `stable` 回归 `540` 项通过；Django check、迁移漂移、OpenSpec 严格校验和 `git diff --check` 均通过。生产 dry-run 与部署仍未执行。
 - `2026-07-11` 已将分支快进合并最新 `origin/main`；多地区新闻迁移顺延为 `0023_multiregion_news_attribution` 并依赖主干 horse profile `0022`。赛事历史抓取编排第五轮审查补齐基础证据链；第六轮定向返修进一步让批量候选保存/apply 整批事务回滚、把完整 adapter 输入写入批准快照并在 `RaceEvent` 漂移时阻断、只从完整 approved 记录读取混合来源策略 SHA。按用户决定，不强制所有 importer apply 提供 `--expected-sha256`，暂不增加请求预算并发锁。OpenSpec change `orchestrate-race-event-data-crawls` 已同步正式规格并归档到 `openspec/changes/archive/2026-07-11-orchestrate-race-event-data-crawls/`。目标测试 `67` 项、完整 `stable` 回归 `589` 项通过；Django check、迁移漂移、两个 change 严格校验、OpenSpec 全量 `21` 项和 `git diff --check` 均通过。本轮生产部署进行中，尚未运行赛事网络抓取或写入。
 - `2026-07-11` 上线等待空闲窗口时发现生产 worker 在归属开关关闭后仍执行完整术语扫描，两个 crawl worker 长时间高 CPU。已修正 `apply_article_attribution()`：开关关闭或人工归属锁定且未 force 时直接返回当前归属，仅对历史空内容类别做轻量分类，不调用 `infer_article_attribution()`。目标测试 `30` 项、完整 `stable` 回归 `591` 项通过；生产开关继续关闭，五地区产品抽样仍未通过，本修复待随本轮部署上线。
+- `2026-07-11` 已完成赛事历史抓取编排与多地区归属基础代码上线，生产代码提交为 `6e2cc92`。部署前备份 `.env.backup.orchestration-hotfix-20260711_093556` 和 `backups/db/pre-orchestration-hotfix-20260711_093556.sql.gz`，数据库备份约 `102M` 且 `gzip -t` 通过。`stable.0023_multiregion_news_attribution` 已应用，无新增待执行迁移。
+- 上述归属短路热修复已在生产验证：当 `MULTIREGION_ATTRIBUTION_ENABLED=false` 时，真实文章调用 `apply_article_attribution(save=False)` 不会调用 `infer_article_attribution()`，返回 `attribution_disabled`。worker 从部署前两个进程持续高 CPU 恢复到约 `0.04%`，旧抓取积压已消化，Celery reserved 为空，日志未见 traceback/error。
+- 生产 `MULTIREGION_ATTRIBUTION_ENABLED=false`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false` 继续保持关闭；此前五地区 dry-run 的产品归属口径仍未通过，因此 `support-multiregion-news-attribution-and-english-gates` 保持 active，任务 `9.6` 继续待办，未执行历史归属 commit。
+- 生产回归通过：六个容器正常，Django check 通过；本机与公网 `/healthz/`、首页、法国/英国地区页、赛事日历和后台登录页均正常。已通过应用内浏览器真实打开首页、法国频道、英国频道、赛事日历和后台登录页，页面标题、地区导航和文章列表正常渲染。
 
 ## 2026-07-01 多地区新闻增量窗口实现与生产验证
 

@@ -3788,3 +3788,17 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 2. 产品确认关联地区上限，避免普通文章一次进入三至四个地区池。
 3. 修正规则后重新执行五地区真实文章 dry-run，并人工抽检 `old_regions / new_regions / blockers`。
 4. 五地区均通过后才修改 `.env` 开关并重建 web/worker/beat；仍先保持 `--commit` 禁止，观察自然新稿后再决定历史回填。
+
+### 2026-07-11 赛事编排归档与归属短路热修复上线
+
+- 生产发布提交：`6e2cc92`；本次更新前生产提交：`87ac1b2`。
+- 上线前停止 beat 防止继续派发，确认没有运行中的外部数据导入；停止旧 worker 后不 purge Redis 队列，使未确认任务由新 worker 恢复处理。
+- 环境备份：`.env.backup.orchestration-hotfix-20260711_093556`。
+- 数据库备份：`backups/db/pre-orchestration-hotfix-20260711_093556.sql.gz`，约 `102M`，`gzip -t` 通过。
+- 执行 `bash ./deploy_lowcost.sh` 成功；无新增迁移，`stable.0023_multiregion_news_attribution` 保持已应用。web、worker、beat 已按新镜像重建，db、redis、nginx 正常。
+- 上线过程中发现归属功能关闭时 `apply_article_attribution()` 仍先执行完整术语扫描，造成两个 crawl worker 子进程长时间高 CPU。提交 `6e2cc92` 将功能关闭和人工锁定场景前置短路；本地完整 `stable` 测试 `591` 项通过。
+- 生产只读验证使用现有文章调用 `apply_article_attribution(save=False)`，并 mock `infer_article_attribution()`：结果为 `attribution_disabled` 且 mock 未被调用。worker CPU 后续降至约 `0.04%`；抓取积压已处理，Celery reserved 为空，仅观察到正常术语发现任务；近 10 分钟日志无 traceback/error。
+- 外部数据导入锁表保留 `hkjc / netkeiba` 两条来源记录，但 `locked_by_run_id` 和 `acquired_at` 均为空，不是持有中的锁；运行中导入为 `0`。
+- 接口验收：本机与公网 `/healthz/`、`/`、`/?region=france`、`/?region=united_kingdom`、`/races/`、`/admin/login/` 均返回 `200`。
+- 浏览器验收：应用内浏览器真实打开首页、法国频道、英国频道、赛事日历和后台登录页；页面标题、地区导航、新闻列表、赛事表格和登录控件均正常渲染。
+- 生产开关继续保持 `MULTIREGION_ATTRIBUTION_ENABLED=false`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`。`support-multiregion-news-attribution-and-english-gates` 的五地区产品抽样仍未通过，任务 `9.6` 不得勾选；本次未执行 `reprocess_multiregion_attribution_gates --commit`，也未执行赛事网络 prepare/apply。
