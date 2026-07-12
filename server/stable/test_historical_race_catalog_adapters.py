@@ -258,6 +258,41 @@ class HistoricalRaceCatalogAdapterTests(SimpleTestCase):
             with self.assertRaisesMessage(InventoryValidationError, "never entered"):
                 discover_catalog_and_timeline([manifest])
 
+    def test_not_held_catalog_row_may_preserve_unknown_flat_surface(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = self._csv(
+                root,
+                [
+                    {
+                        "record_type": "catalog",
+                        "year": "1998",
+                        "series_key": "us-arlington-million",
+                        "canonical_name_original": "Arlington Million",
+                        "original_name": "Arlington Million",
+                        "chinese_name": "",
+                        "grade_text": "G1",
+                        "racecourse": "Arlington Intl.",
+                        "local_date": "",
+                        "distance_text": "",
+                        "surface": "",
+                        "expectation_status": "not_held",
+                        "founded_year": "",
+                        "ended_year": "",
+                        "series_status": "unknown",
+                        "season_label": "",
+                        "source_scope": "international_cataloguing_standards_asterisk_not_held",
+                        "discipline": "flat",
+                    }
+                ],
+            )
+            manifest = self._manifest(root / "manifest-root", "united_states", source_csv=source)
+
+            rows = parse_historical_catalog_manifest(manifest)
+
+        self.assertEqual(rows[0]["expectation_status"], "not_held")
+        self.assertEqual(rows[0]["surface"], "")
+
     def test_catalog_rejects_non_graded_entry(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

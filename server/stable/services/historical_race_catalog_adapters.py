@@ -144,8 +144,10 @@ def _normalized_grade(config: CatalogAdapterConfig, grade_text: str, *, record_t
     raise InventoryValidationError(f"{config.key} unsupported historical grade: {grade_text}")
 
 
-def _surface(value: str) -> str:
+def _surface(value: str, *, allow_blank: bool = False) -> str:
     normalized = str(value or "").strip().casefold()
+    if not normalized and allow_blank:
+        return ""
     aliases = {
         "turf": RaceEventSurface.TURF,
         "grass": RaceEventSurface.TURF,
@@ -296,7 +298,10 @@ def parse_historical_catalog_manifest(manifest_path: str | Path) -> list[dict[st
                 original_name = str(row["original_name"] or "").strip()
                 if not series_key or not original_name:
                     raise InventoryValidationError(f"{adapter_key} missing series identity at {relative}:{line_number}")
-                surface = _surface(row["surface"])
+                surface = _surface(
+                    row["surface"],
+                    allow_blank=expectation != HistoricalRaceExpectationStatus.HELD,
+                )
                 discipline = _discipline(row["discipline"], surface=surface, adapter_key=adapter_key)
                 location = f"{relative}:{line_number}"
                 season_label = _season_label(
@@ -331,6 +336,11 @@ def parse_historical_catalog_manifest(manifest_path: str | Path) -> list[dict[st
                 raw_source_path = str(row.get("raw_source_cache_path") or "").strip()
                 raw_source_sha = str(row.get("raw_source_cache_sha256") or "").strip()
                 raw_source_url = str(row.get("raw_source_url") or "").strip()
+                source_duplicate_count = str(row.get("source_duplicate_count") or "1").strip()
+                if not source_duplicate_count.isdigit() or int(source_duplicate_count) < 1:
+                    raise InventoryValidationError(
+                        f"{adapter_key} source duplicate count is invalid at {location}"
+                    )
                 if any((raw_source_path, raw_source_sha, raw_source_url)) and not (
                     raw_source_path
                     and re.fullmatch(r"[0-9a-fA-F]{64}", raw_source_sha)
@@ -375,6 +385,7 @@ def parse_historical_catalog_manifest(manifest_path: str | Path) -> list[dict[st
                             "raw_source_cache_path": raw_source_path,
                             "raw_source_cache_sha256": raw_source_sha,
                             "raw_source_url": raw_source_url,
+                            "source_duplicate_count": int(source_duplicate_count),
                             "parser_version": ADAPTER_PARSER_VERSION,
                             "manifest_path": str(path),
                             "season_label": season_label,

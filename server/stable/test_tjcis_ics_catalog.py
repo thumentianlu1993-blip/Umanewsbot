@@ -127,6 +127,31 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
 
         self.assertEqual([row["original_name"] for row in rows], ["Prix Exemple"])
 
+    def test_legacy_country_codes_reset_previous_region_context(self):
+        pages = [
+            "British Race G1 .... 80,000 .... 3up .... 8 T .... Ascot\nPt I—GB",
+            "Irish Race G1 .... 80,000 .... 3up .... 8 T .... Curragh\nIRELAND\nPt I—IRE",
+            "Italian Race G1 .... 80,000 .... 3up .... 1600 T .... Milan\nITALY\nPt I—ITY",
+            "Japan Race G1 .... 80,000 .... 3up .... 1600 T .... Tokyo\nPt II—JPN",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=1998)
+
+        self.assertEqual(
+            [(row["country_region"], row["original_name"]) for row in rows],
+            [("united_kingdom", "British Race"), ("japan", "Japan Race")],
+        )
+
+    def test_race_range_prefix_is_not_mistaken_for_country_code(self):
+        pages = [
+            "Acorn S. G1 .... 80,000 .... 3yo f .... 8 D .... Belmont\nPt I—USA",
+            "Canadian Turf S. G3 .... 80,000 .... 4up .... 8 T .... Gulfstream\nPt I—Can-Chu",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=1998)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Acorn S", "Canadian Turf S"])
+
     def test_approximate_distance_and_appendix_boundary_are_handled(self):
         pages = [
             "Beaumont S. G3 .... 250,000 .... 3yo f .... a7 D .... Keeneland\nPt I—UNITED STATES OF AMERICA",
@@ -137,6 +162,12 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
 
         self.assertEqual([row["original_name"] for row in rows], ["Beaumont S"])
         self.assertEqual(rows[0]["distance_text"], "7")
+
+        suffix_rows = self.module.parse_ics_pages(
+            ["Legacy S. G3 .... 100,000 .... 3up .... 12a T .... Newbury\nPt I—GB"],
+            year=1998,
+        )
+        self.assertEqual(suffix_rows[0]["distance_text"], "12")
 
     def test_synthetic_surface_and_same_name_collisions_are_not_silently_collapsed(self):
         pages = [
@@ -151,6 +182,25 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
         self.assertEqual(len({row["series_key"] for row in rows}), 2)
         self.assertTrue(all(row["series_key"].startswith("united-states-example-s-") for row in rows))
 
+        no_course_rows = self.module.parse_ics_pages(
+            [
+                "Lexington S. G3 .... 100,000 .... 3up .... 10 T\n"
+                "Lexington S. G2 .... 100,000 .... 3up .... 8.5 D\n"
+                "Pt I—USA"
+            ],
+            year=1998,
+        )
+        self.assertEqual(len({row["series_key"] for row in no_course_rows}), 2)
+
+    def test_exact_source_duplicate_counts_for_reconciliation_but_yields_one_target(self):
+        row = "Laurel Dash S. G3 .... 100,000 .... 3up .... 6 T .... Laurel Race Course"
+        page = f"{row}\n{row}\nTotal Graded races: .... 2\nPt I—USA"
+
+        rows = self.module.parse_ics_pages([page], year=1998)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["source_duplicate_count"], 2)
+
     def test_declared_graded_total_mismatch_fails_closed(self):
         page = (
             "Example S. G3 .... 100,000 .... 3up .... 8 D .... Belmont Park\n"
@@ -159,6 +209,20 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
 
         with self.assertRaisesRegex(self.module.IcsCatalogError, "graded total mismatch"):
             self.module.parse_ics_pages([page], year=2016)
+
+    def test_asterisk_catalog_row_becomes_not_held_without_inventing_surface(self):
+        page = (
+            "Ordinary incomplete race ................ Arlington Intl.\n"
+            "*Arlington Million G1 ........................ Arlington Intl.\n"
+            "Total Graded races: .... 1\nPt I—USA"
+        )
+
+        rows = self.module.parse_ics_pages([page], year=1998)
+
+        self.assertEqual(rows[0]["original_name"], "Arlington Million")
+        self.assertEqual(rows[0]["expectation_status"], "not_held")
+        self.assertEqual(rows[0]["surface"], "")
+        self.assertIn("asterisk_not_held", rows[0]["source_scope"])
 
     def test_jump_country_headers_do_not_leak_between_regions(self):
         pages = [

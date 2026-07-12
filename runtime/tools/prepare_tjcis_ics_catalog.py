@@ -66,17 +66,45 @@ CSV_FIELDS = [
     "raw_source_cache_path",
     "raw_source_cache_sha256",
     "raw_source_url",
+    "source_duplicate_count",
 ]
 GRADE_RE = re.compile(r"(?<![A-Z])(?:HK\s*)?G\s*([123])(?!\d)", re.I)
 LISTED_RE = re.compile(r"\((?:L|LR)\)", re.I)
 DOTS_RE = re.compile(r"\s*\.{2,}\s*")
 AGE_RE = re.compile(r"\b(?:[2-9](?:yo|up)|[2-9]-[2-9]yo)\b", re.I)
-DISTANCE_SURFACE_RE = re.compile(r"\b(?:a\s*)?(\d+(?:\.\d+)?)\s*(T|D|AWT)\b", re.I)
-ROW_END_RE = re.compile(r"\b(?:[2-9](?:yo|up)|[2-9]-[2-9]yo)\b.*\b(?:a\s*)?\d+(?:\.\d+)?(?:\s*(?:T|D|AWT))?\b", re.I)
+DISTANCE_SURFACE_RE = re.compile(r"\b(?:a\s*)?(\d+(?:\.\d+)?)(?:\s*a)?\s*(T|D|AWT)\b", re.I)
+ROW_END_RE = re.compile(r"\b(?:[2-9](?:yo|up)|[2-9]-[2-9]yo)\b.*\b(?:a\s*)?\d+(?:\.\d+)?(?:\s*a)?(?:\s*(?:T|D|AWT))?\b", re.I)
 DECLARED_TOTAL_RE = re.compile(r"Total\s+(?:Graded|Group)\s+races\s*:\s*\.*\s*(\d+)", re.I)
 UNSUPPORTED_SECTION_RE = re.compile(
     r"PT(?:I|II|IV)[—-](?:ARGENTINA|AUSTRALIA|BRAZIL|CANADA|CHILE|CZECHREPUBLIC|GERMAN(?:Y|JUMPS)|INDIA|IRELAND|IRISHJUMPS|ITALY|ITALIANJUMPS|KOREA|MACAU|MALAYSIA|NEWZEALAND(?:JUMPS)?|PANAMA|PERU|PUERTORICO|SCANDINAVIA|SINGAPORE|SOUTHAFRICA|SPAIN|SWITZERLANDJUMPS|UNITEDARABEMIRATES|URUGUAY|VENEZUELA)"
 )
+UNSUPPORTED_COUNTRY_TITLES = {
+    "ARGENTINA",
+    "AUSTRALIA",
+    "BRAZIL",
+    "CANADA",
+    "CHILE",
+    "CZECHREPUBLIC",
+    "GERMANY",
+    "INDIA",
+    "IRELAND",
+    "ITALY",
+    "KOREA",
+    "MACAU",
+    "MALAYSIA",
+    "NEWZEALAND",
+    "PANAMA",
+    "PERU",
+    "PUERTORICO",
+    "SCANDINAVIA",
+    "SINGAPORE",
+    "SOUTHAFRICA",
+    "SPAIN",
+    "SWITZERLAND",
+    "UNITEDARABEMIRATES",
+    "URUGUAY",
+    "VENEZUELA",
+}
 
 
 class IcsCatalogError(RuntimeError):
@@ -198,6 +226,13 @@ def _page_context(text: str) -> tuple[str | None, str]:
     return None, "flat"
 
 
+def _has_unsupported_country_title(text: str, compact_page: str) -> bool:
+    if UNSUPPORTED_SECTION_RE.search(compact_page):
+        return True
+    titles = {re.sub(r"[^A-Z]", "", line.upper()) for line in text.splitlines()}
+    return bool(titles & UNSUPPORTED_COUNTRY_TITLES)
+
+
 def _hong_kong_segment(text: str) -> str:
     match = re.search(r"(?:^|\n)\s*H\s*O\s*N\s*G\s+K\s*O\s*N\s*G\s*(?:\n|$)", text, re.I)
     if not match:
@@ -235,7 +270,7 @@ def _metadata_line(line: str) -> bool:
 
 
 def _record_complete(value: str) -> bool:
-    return bool(ROW_END_RE.search(value))
+    return bool(ROW_END_RE.search(value) or (value.lstrip().startswith("*") and GRADE_RE.search(value)))
 
 
 def _clean_name(value: str) -> str:
@@ -248,17 +283,19 @@ def _parse_record(raw: str, *, region: str, discipline: str, year: int, season_l
     grade = GRADE_RE.search(raw)
     if not grade:
         return None
-    name = _clean_name(raw[: grade.start()])
+    not_held = raw.lstrip().startswith("*")
+    name = _clean_name(raw[: grade.start()]).lstrip("*").strip()
     if not name or name.upper() in {"RACE", "PURSE"}:
         return None
     suffix = raw[grade.end() :]
     surface_match = DISTANCE_SURFACE_RE.search(suffix)
     distance = surface_match.group(1) if surface_match else ""
-    surface_code = surface_match.group(2).upper() if surface_match else "D"
+    surface_code = surface_match.group(2).upper() if surface_match else ""
     surface = "jumps" if discipline == "jumps" else {
         "T": "turf",
         "D": "dirt",
         "AWT": "synthetic",
+        "": "" if not_held else "dirt",
     }[surface_code]
     columns = [part.strip(" .") for part in DOTS_RE.split(raw) if part.strip(" .")]
     racecourse = columns[-1] if len(columns) > 1 else ""
@@ -275,35 +312,68 @@ def _parse_record(raw: str, *, region: str, discipline: str, year: int, season_l
         "local_date": "",
         "distance_text": distance,
         "surface": surface,
-        "expectation_status": "held",
+        "expectation_status": "not_held" if not_held else "held",
         "founded_year": "",
         "ended_year": "",
         "series_status": "unknown",
         "season_label": season_label if region == "hong_kong" else "",
-        "source_scope": "international_cataloguing_standards",
+        "source_scope": (
+            "international_cataloguing_standards_asterisk_not_held"
+            if not_held
+            else "international_cataloguing_standards"
+        ),
         "discipline": discipline,
     }
 
 
-def _disambiguate_same_year_keys(rows: list[dict]) -> None:
-    grouped: dict[tuple[str, str], list[dict]] = {}
+def _deduplicate_and_disambiguate_same_year_keys(rows: list[dict]) -> list[dict]:
+    exact_rows: dict[tuple, dict] = {}
     for row in rows:
+        fingerprint = tuple(
+            row.get(field)
+            for field in (
+                "country_region",
+                "year",
+                "series_key",
+                "original_name",
+                "grade_text",
+                "racecourse",
+                "distance_text",
+                "surface",
+                "discipline",
+                "expectation_status",
+            )
+        )
+        existing = exact_rows.get(fingerprint)
+        if existing is None:
+            row["source_duplicate_count"] = 1
+            exact_rows[fingerprint] = row
+        else:
+            existing["source_duplicate_count"] += 1
+    deduplicated = list(exact_rows.values())
+    grouped: dict[tuple[str, str], list[dict]] = {}
+    for row in deduplicated:
         grouped.setdefault((row["country_region"], row["series_key"]), []).append(row)
     for duplicates in grouped.values():
         if len(duplicates) < 2:
             continue
         seen = set()
         for row in duplicates:
-            course_slug = stable_series_key(row["country_region"], row["racecourse"]).split(
+            identity_text = " ".join(
+                str(row.get(field) or "")
+                for field in ("racecourse", "discipline", "distance_text", "surface", "grade_text")
+            )
+            identity_slug = stable_series_key(row["country_region"], identity_text).split(
                 REGION_PREFIXES[row["country_region"]] + "-", 1
             )[-1]
-            proposed = f"{row['series_key']}-{course_slug}"
+            proposed = f"{row['series_key']}-{identity_slug}"
             if proposed in seen:
                 raise IcsCatalogError(
                     f"{row['year']} 同名同场赛事无法自动区分：{row['original_name']}/{row['racecourse']}"
                 )
             row["series_key"] = proposed
             seen.add(proposed)
+    return deduplicated
 
 
 def _declared_totals(pages: list[str]) -> dict[tuple[str, str], int]:
@@ -318,7 +388,7 @@ def _declared_totals(pages: list[str]) -> dict[tuple[str, str], int]:
         compact_page = re.sub(r"\s+", "", unicodedata.normalize("NFKC", page_text)).upper()
         if detected_region:
             current_region, current_discipline = detected_region, detected_discipline
-        elif UNSUPPORTED_SECTION_RE.search(compact_page):
+        elif _has_unsupported_country_title(page_text, compact_page):
             current_region, current_discipline = None, "flat"
         if current_region == "other":
             current_region = "hong_kong"
@@ -343,7 +413,7 @@ def parse_ics_pages(pages: list[str], *, year: int) -> list[dict]:
         compact_page = re.sub(r"\s+", "", unicodedata.normalize("NFKC", page_text)).upper()
         if detected_region:
             current_region, current_discipline = detected_region, detected_discipline
-        elif UNSUPPORTED_SECTION_RE.search(compact_page):
+        elif _has_unsupported_country_title(page_text, compact_page):
             current_region, current_discipline = None, "flat"
         region, discipline = current_region, current_discipline
         if not region:
@@ -359,6 +429,18 @@ def parse_ics_pages(pages: list[str], *, year: int) -> list[dict]:
             line = re.sub(r"\s+", " ", raw_line).strip()
             if _metadata_line(line):
                 continue
+            if line.lstrip().startswith("*") and (GRADE_RE.search(line) or LISTED_RE.search(line)):
+                buffer = []
+                row = _parse_record(
+                    line,
+                    region=region,
+                    discipline=discipline,
+                    year=year,
+                    season_label=season,
+                )
+                if row:
+                    rows.append(row)
+                continue
             buffer.append(line)
             combined = " ".join(buffer)
             if not _record_complete(combined):
@@ -371,7 +453,6 @@ def parse_ics_pages(pages: list[str], *, year: int) -> list[dict]:
             current_region, current_discipline = None, "flat"
     if not rows:
         raise IcsCatalogError(f"{year} Blue Book parsed zero graded rows")
-    _disambiguate_same_year_keys(rows)
     parsed_totals = {}
     for row in rows:
         key = (row["country_region"], row["discipline"])
@@ -382,7 +463,7 @@ def parse_ics_pages(pages: list[str], *, year: int) -> list[dict]:
                 f"{year} {key[0]}/{key[1]} graded total mismatch: "
                 f"parsed={parsed_totals.get(key, 0)} declared={declared}"
             )
-    return rows
+    return _deduplicate_and_disambiguate_same_year_keys(rows)
 
 
 def _pdf_pages(path: Path) -> list[str]:
