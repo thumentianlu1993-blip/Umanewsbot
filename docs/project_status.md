@@ -353,3 +353,9 @@
 - 后续仍需完成五地区逐年官方 source cache、年度总账审批、首批详情验收和分年代带回填；所有写入继续走既定 artifact、coverage、备份和写后核验门禁。
 - 当前 OpenSpec 任务进度 `62/82`；代码与自动化测试任务已完成，包含五地区目录 cache parser、标准候选命令、共享预算/缓存锁、历史网络日志、批次 importer、公开搜索、动态冠军、sitemap 缓存与索引。完整 `stable` 回归最终 `743/743`，Django/迁移/OpenSpec/Compose/实际 Docker 镜像检查通过。
 - 多轮代码 review 的全部技术 finding 已修复并逐轮复审，最终 review clean。剩余 `20` 项均为生产 mapping、官方逐年 source cache、总账审批、首批及四年代带抓取落库和最终审计；生产功能和网络开关继续关闭，尚未部署或写入本变更的历史数据。
+
+### 2026-07-12 历史目录年鉴解析器就绪
+
+- TJCIS International Cataloguing Standards 1998–2026 整本年鉴已确定为五地区共同年度 graded/group 目录骨架；原始 PDF、派生 CSV 和逐行 provenance 受共享预算/cache 门禁管理。
+- 解析器通过 1998 老版和 2016 整书烟测；2016 法/英/日/美平地数量与书内总数精确一致。专项回归与最终 clean review 已通过，等待提交部署后执行生产抓取。
+- 1984–1997 仍是任务 `8.3` 正式缺口。1998–2026 候选只形成部分只读总账，不批准完整 manifest、不创建历史 `RaceEvent`，直到旧年代来源和身份 timeline 补齐。

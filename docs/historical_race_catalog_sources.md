@@ -70,3 +70,12 @@
 - `catalog` 只接受该地区允许的 graded/group 等级；`timeline` 可额外接受 `Listed / Open / Ungraded`，仅用于已在任一年度进入范围的系列补足升格前、降级后、取消或未举办届次。只有 timeline、从未进入 catalog 的系列必须失败。
 - 运行示例：`python server/manage.py parse_historical_race_catalog --source-manifest <manifest.json> [--source-manifest <manifest.json> ...] --output-dir <candidate-dir>`，随后使用 `python server/manage.py build_historical_race_inventory --catalog-jsonl <candidate-dir>/catalog_candidate.jsonl --timeline-jsonl <candidate-dir>/series_timeline_candidate.jsonl --output-dir <inventory-dir>`。
 - `server/stable/fixtures/historical_race_catalog/` 只用于验证五地区、三年代和旧格式解析契约，是小型测试摘录，不是权威完整年度目录，也不得直接作为生产 inventory 批准依据。生产逐年 source cache 收集仍属于任务 `8.3`。
+
+## TJCIS / IFHA International Cataloguing Standards 年鉴
+
+- 官方历年入口为 `https://www.tjcis.com/default.asp?content=PASSYR`，当前版入口为 `https://www.tjcis.com/default.asp?content=ICS`。官方页面提供 1998–2025 历年整本 PDF 和 2026 当前整本 PDF，每本只代表其标注年度，可作为五地区逐年 graded/group 目录共同骨架。
+- 年鉴覆盖法国、英国、日本、美国和香港；香港在不同年代分布于 Part I/Part II，英法日美障碍赛还可能位于 Part IV。解析必须按分册和国家页头切换，不能把相邻国家赛事串入目标地区。
+- `runtime/tools/prepare_tjcis_ics_catalog.py` 低频下载官方索引和 PDF。所有请求经过共享 request budget，原始文件经过 source cache/磁盘预算并记录 URL、大小和 SHA-256；派生 CSV 每行继续保存原始 PDF 路径、SHA-256 和 URL。
+- 解析器只输出 G1/G2/G3，Listed/LR 不进入 catalog；平地章节若自报 `Total Graded/Group races`，解析数必须完全一致。`awt` 映射为 synthetic，同年同地区同名赛事按赛场形成不同待审 key，禁止静默覆盖。
+- 正式命令：`python runtime/tools/prepare_tjcis_ics_catalog.py --years 1998-2026 --output-dir <source-dir> --allow-network`。中断后可加 `--resume`，但只复用 source-cache manifest、大小和 SHA-256 全部一致的缓存；全缓存离线复跑不要求开启网络开关。
+- 年鉴解决 1998–2026 的目录骨架，不替代主办方正式赛果，也不补齐 1984–1997。完整总账批准前仍须按地区补齐 1984–1997 官方年鉴/目录，并审核改名、迁场、前分级和停办 timeline。

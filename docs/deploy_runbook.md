@@ -3880,3 +3880,12 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - 写后验收：`RaceSeries=992`、2026 `RaceEvent=992`、已绑定 `992`、未绑定 `0`；日本 `186`、香港 `20`、英国 `202`、法国 `174`、美国 `410`。`HistoricalRaceEventTarget=0`，1984–2025 赛事及其公开数均为 `0`。
 - URL 抽检：`/races/`、`/races/2026/gold-cup/`、日本德比、香港董事杯均返回 `200`。已合并的 BHA 重复地址 `/races/2026/uk-bha-flat-2026-0618-045/` 返回 `404`，其 slug 已作为主赛事别名保留，正式入口固定为 `/races/2026/gold-cup/`。
 - 最终开关：`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`；共享页面缓存为 `redis://redis:6379/2`。容器正常，内外 `/healthz/` 为 `200`，近 10 分钟无 traceback/error。
+
+## TJCIS 年鉴目录生产生成
+
+1. 部署已 review 提交，确认生产镜像内 `python -c 'import pdfplumber, bs4'` 通过。
+2. 设置独立 run 目录、请求预算 artifact、source-cache manifest 和磁盘预算。1998–2026 首次下载需要 2 个索引请求和 29 个 PDF 请求，但不得超过历史回填全局上限。
+3. 仅在下载窗口临时开启两个历史开关，执行 `python runtime/tools/prepare_tjcis_ics_catalog.py --years 1998-2026 --output-dir <run-dir> --allow-network`。中断后用同目录追加 `--resume`，禁止手工替换缓存。
+4. 对五个 `manifest_<region>.json` 运行 `parse_historical_race_catalog`，再用 `build_historical_race_inventory` 生成部分只读总账 artifact。核对每年五地区非零、平地自报总数一致、conflict/review/gap 和原始 PDF SHA。
+5. 1984–1997 未补齐前不得批准完整 inventory manifest、不得 commit 总账，也不得启动历史详情全量 apply。
+6. 无论成功或失败都恢复两个开关为 `false`，验证内外 `/healthz/`、当前赛事页、`HistoricalRaceEventTarget=0` 和 1984–2025 公开赛事数为 `0`。

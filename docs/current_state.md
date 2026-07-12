@@ -1004,3 +1004,12 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 常驻生产配置最终确认 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`、`RACE_EVENT_CACHE_URL=redis://redis:6379/2`。当前 `HistoricalRaceEventTarget=0`、1984–2025 `RaceEvent=0`、公开历史赛事 `0`，尚未开始逐年目录抓取或历史详情落库。
 - 下一步是任务 8.3：按五地区逐年采集 1984–当前官方 catalog source cache，生成只读年度总账；测试 fixture 不得充当生产完整目录。
 - 用户已授权：准备任务、完整测试和 clean review 全部完成后，可自主执行生产部署、抓取与分批落库，无需逐批再次确认；最终必须恢复关闭历史功能/网络开关，历史年度赛事保持 draft，不提前公开。
+
+## 2026-07-12 TJCIS 1998–2026 历史目录解析准备
+
+- 新增 `prepare_tjcis_ics_catalog.py`，从 TJCIS 官方索引发现 1998–2026 International Cataloguing Standards 整本 PDF，统一解析日本、香港、英国、法国、美国平地及目标地区障碍分级赛。
+- 真实网络必须同时具备 CLI `--allow-network` 和两个历史开关，并复用共享 request budget/source cache。`--resume` 只复用 manifest、大小和 SHA 一致的缓存；全缓存重放可在网络开关关闭时执行。
+- 解析只接受 G1/G2/G3，支持老版点阵列、跨页名称、香港 Part I/II 赛季、Part IV 障碍页、AWT 和同名异场防覆盖。平地章节与年鉴自报 Graded/Group 总数强制对账。
+- 真实 2016 整书烟测的平地对账为法国 `114`、英国 `151`、日本 `128`、美国 `464`，全部与书内统计一致；1998 老版五地区也已真实解析通过。
+- 新增/相关测试 `67` 项通过；完整 stable 发现 `724` 项，从错误 cwd 运行时仅有 2 个旧测试因相对 fixture 路径报错，从仓库根目录复跑均通过。`py_compile`、`git diff --check` 和最终 clean review 通过。
+- 任务 `8.3` 仍未勾选：下一步部署后生成 1998–2026 source cache/部分候选总账，再补齐 1984–1997。完整总账、身份审核和批准完成前不得宣称全量完成。

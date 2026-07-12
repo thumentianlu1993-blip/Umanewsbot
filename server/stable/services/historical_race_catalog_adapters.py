@@ -59,7 +59,7 @@ ADAPTER_CONFIGS = {
     "japan_official_catalog": CatalogAdapterConfig(
         key="japan_official_catalog",
         region=RacingRegion.JAPAN,
-        providers=frozenset({"jra", "nar"}),
+        providers=frozenset({"jra", "nar", "tjcis"}),
         grade_patterns=_patterns(
             (r"^(?:G1|GI|GⅠ)$", RaceGrade.G1),
             (r"^(?:G2|GII|GⅡ)$", RaceGrade.G2),
@@ -76,7 +76,7 @@ ADAPTER_CONFIGS = {
     "hkjc_official_catalog": CatalogAdapterConfig(
         key="hkjc_official_catalog",
         region=RacingRegion.HONG_KONG,
-        providers=frozenset({"hkjc"}),
+        providers=frozenset({"hkjc", "tjcis"}),
         grade_patterns=_patterns(
             (r"^(?:G1|Group 1|香港一級賽)$", RaceGrade.G1),
             (r"^(?:G2|Group 2|香港二級賽)$", RaceGrade.G2),
@@ -86,7 +86,7 @@ ADAPTER_CONFIGS = {
     "bha_pattern_catalog": CatalogAdapterConfig(
         key="bha_pattern_catalog",
         region=RacingRegion.UNITED_KINGDOM,
-        providers=frozenset({"bha", "bhb", "jockey_club_archive"}),
+        providers=frozenset({"bha", "bhb", "jockey_club_archive", "tjcis"}),
         grade_patterns=_patterns(
             (r"^(?:Group|Grade)\s*1$", RaceGrade.G1),
             (r"^(?:Group|Grade)\s*2$", RaceGrade.G2),
@@ -96,7 +96,7 @@ ADAPTER_CONFIGS = {
     "france_galop_pattern_catalog": CatalogAdapterConfig(
         key="france_galop_pattern_catalog",
         region=RacingRegion.FRANCE,
-        providers=frozenset({"france_galop"}),
+        providers=frozenset({"france_galop", "tjcis"}),
         grade_patterns=_patterns(
             (r"^(?:Groupe|Group|Gr)\s*(?:I|1)$", RaceGrade.G1),
             (r"^(?:Groupe|Group|Gr)\s*(?:II|2)$", RaceGrade.G2),
@@ -106,7 +106,7 @@ ADAPTER_CONFIGS = {
     "toba_graded_stakes_catalog": CatalogAdapterConfig(
         key="toba_graded_stakes_catalog",
         region=RacingRegion.UNITED_STATES,
-        providers=frozenset({"toba", "agsc"}),
+        providers=frozenset({"toba", "agsc", "tjcis"}),
         grade_patterns=_patterns(
             (r"^(?:Grade|G)\s*(?:I|1)$", RaceGrade.G1),
             (r"^(?:Grade|G)\s*(?:II|2)$", RaceGrade.G2),
@@ -328,6 +328,17 @@ def parse_historical_catalog_manifest(manifest_path: str | Path) -> list[dict[st
                     raise InventoryValidationError(
                         f"{adapter_key} missing source_scope at {relative}:{line_number}"
                     )
+                raw_source_path = str(row.get("raw_source_cache_path") or "").strip()
+                raw_source_sha = str(row.get("raw_source_cache_sha256") or "").strip()
+                raw_source_url = str(row.get("raw_source_url") or "").strip()
+                if any((raw_source_path, raw_source_sha, raw_source_url)) and not (
+                    raw_source_path
+                    and re.fullmatch(r"[0-9a-fA-F]{64}", raw_source_sha)
+                    and raw_source_url.startswith(("https://", "http://"))
+                ):
+                    raise InventoryValidationError(
+                        f"{adapter_key} raw source provenance is incomplete at {location}"
+                    )
                 candidates.append(
                     {
                         "record_type": record_type,
@@ -361,6 +372,9 @@ def parse_historical_catalog_manifest(manifest_path: str | Path) -> list[dict[st
                             "source_url": source_url,
                             "source_cache_path": relative,
                             "source_cache_sha256": expected_sha,
+                            "raw_source_cache_path": raw_source_path,
+                            "raw_source_cache_sha256": raw_source_sha,
+                            "raw_source_url": raw_source_url,
                             "parser_version": ADAPTER_PARSER_VERSION,
                             "manifest_path": str(path),
                             "season_label": season_label,
