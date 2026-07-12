@@ -44,6 +44,13 @@ REGION_PREFIXES = {
     "france": "france",
     "united_states": "united-states",
 }
+MIN_REGION_ROWS = {
+    "japan": 50,
+    "hong_kong": 3,
+    "united_kingdom": 50,
+    "france": 50,
+    "united_states": 300,
+}
 CSV_FIELDS = [
     "record_type",
     "year",
@@ -506,6 +513,18 @@ def _missing_regions(rows: list[dict]) -> list[str]:
     ]
 
 
+def _implausibly_small_regions(rows: list[dict]) -> dict[str, int]:
+    counts = {
+        region: sum(row.get("country_region") == region for row in rows)
+        for region in REGION_ADAPTERS
+    }
+    return {
+        region: count
+        for region, count in counts.items()
+        if count and count < MIN_REGION_ROWS[region]
+    }
+
+
 def prepare_catalog(args) -> dict:
     years = sorted(set(args.years))
     if not years or years[0] < 1998:
@@ -560,6 +579,13 @@ def prepare_catalog(args) -> dict:
                 raise IcsCatalogError(
                     f"{year} Blue Book 未解析出地区分级赛：{', '.join(missing_regions)}"
                 )
+            implausible_regions = _implausibly_small_regions(rows)
+            if implausible_regions:
+                details = ", ".join(
+                    f"{region}={count}<{MIN_REGION_ROWS[region]}"
+                    for region, count in implausible_regions.items()
+                )
+                raise IcsCatalogError(f"{year} Blue Book 地区解析数量异常偏低：{details}")
         except IcsCatalogError as exc:
             if not args.continue_on_year_error:
                 raise

@@ -414,6 +414,9 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
                 self.module,
                 "parse_ics_pages",
                 side_effect=[self.module.IcsCatalogError("1999 source conflict"), successful_rows],
+            ), mock.patch.dict(
+                self.module.MIN_REGION_ROWS,
+                {region: 1 for region in self.module.REGION_ADAPTERS},
             ):
                 result = self.module.prepare_catalog(args)
 
@@ -437,6 +440,23 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
         missing = self.module._missing_regions(incomplete)
 
         self.assertEqual(missing, ["hong_kong"])
+
+    def test_region_minimum_guard_catches_truncated_section_without_declared_total(self):
+        rows = [
+            {"country_region": region}
+            for region, minimum in self.module.MIN_REGION_ROWS.items()
+            for _ in range(minimum)
+        ]
+        rows = [
+            row
+            for index, row in enumerate(rows)
+            if not (row["country_region"] == "united_states" and index % 2 == 0)
+        ]
+
+        implausible = self.module._implausibly_small_regions(rows)
+
+        self.assertIn("united_states", implausible)
+        self.assertNotIn("japan", implausible)
 
     def test_parsed_rows_write_to_region_csv_with_raw_pdf_provenance(self):
         rows = self.module.parse_ics_pages(
