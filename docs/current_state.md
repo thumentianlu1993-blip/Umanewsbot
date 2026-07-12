@@ -1023,3 +1023,12 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 部分 inventory v3：`runtime/historical_race_inventory/tjcis-inventory-partial-2016-2021-v3-20260712/`，`target_count=3,252`、`series_count=1,313`、`conflict_count=82`、`accounted_count=2`；冲突主要为历史标点/空格/命名差异，manifest SHA-256 `f422c8fc82a616d49c634e96e263745d8b0250026be7af939f9f1a06bc9ba955`。
 - v3 仅是只读部分总账证据，未批准、未 commit。生产保持 `HistoricalRaceEventTarget=0`、1984–2025 `RaceEvent=0`、公开历史赛事 `0`；两个历史开关均为 `false`，公网 healthz 为 `200`。
 - 因完整年度总账尚未形成，未启动赛事详情全量抓取。下一步按错误族修复/交叉核对 25 个年度，再做系列身份审核；只有 1984–当前总账完整且批准后才能进入详情批次。
+
+## 2026-07-12 TJCIS 1998–2026 年度目录第二轮修复
+
+- 已修复旧版国家码、带空格年龄、等级紧贴奖金、空页眉误拼、障碍赛距离缺失、重复声明翻倍，以及同名赛事候选 key 不稳定等问题。
+- 专项解析器测试 `36` 项、目录相关组合测试 `49` 项通过，`git diff --check` 通过；复审未发现新的 actionable finding。
+- 29 本 PDF 全量离线回放后，直接通过年份由 `3` 个增至 `11` 个：`2005 / 2007 / 2009 / 2012–2016 / 2020–2022`。2015 美国章节从错误的 `212` 条恢复为 `468` 条；2022 同名英国障碍赛已保留为不同审核候选。
+- 全地区审计确认共有 `22` 个年份、`31` 个地区/项目组合存在“正文显式 G1/G2/G3 行与页脚声明小计不一致”。完整记录位于 `diagnostics/declared_count_reconciliation.json/csv`；不得删除、隐藏或用总数机械补造赛事。
+- 已生成 1998–2026 共 29 份只读页文本诊断缓存，供相邻年和地区官方目录交叉核验；诊断缓存不能替代原始 PDF 和 SHA 证据。
+- 生产仍为 `HistoricalRaceEventTarget=0`、pre-2026 `RaceEvent=0`、历史公开数 `0`；两个历史开关保持 `false`。下一步先完成 31 项来源冲突核验并生成完整身份审核包。

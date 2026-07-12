@@ -3887,7 +3887,7 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 2. 设置独立 run 目录、请求预算 artifact、source-cache manifest 和磁盘预算。1998–2026 首次下载需要 2 个索引请求和 29 个 PDF 请求，但不得超过历史回填全局上限。
 3. 仅在下载窗口临时开启两个历史开关，执行 `python runtime/tools/prepare_tjcis_ics_catalog.py --years 1998-2026 --output-dir <run-dir> --allow-network`。中断后用同目录追加 `--resume`，禁止手工替换缓存。
 4. 对五个 `manifest_<region>.json` 运行 `parse_historical_race_catalog`，再用 `build_historical_race_inventory` 生成部分只读总账 artifact。核对每年五地区非零、平地自报总数一致、conflict/review/gap 和原始 PDF SHA。
-5. 1984–1997 未补齐前不得批准完整 inventory manifest、不得 commit 总账，也不得启动历史详情全量 apply。
+5. `1998–当前` 可作为独立完整年代 scope 生成和批准 inventory manifest，并在该 scope 逐年五地区完整、来源/身份冲突清零后执行总账与详情 apply；不得把该批准外推为 `1984–1997` 已完成。
 6. 无论成功或失败都恢复两个开关为 `false`，验证内外 `/healthz/`、当前赛事页、`HistoricalRaceEventTarget=0` 和 1984–2025 公开赛事数为 `0`。
 
 ### 2026-07-12 首次 TJCIS 执行记录
@@ -3896,3 +3896,10 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - 最终成功年只有 `2016 / 2020 / 2021`；`summary.json` 中 25 个 `year_errors` 是后续修复入口，不得删除、改成 warning 或从完成率分母隐藏。
 - v3 candidate/inventory 路径分别为 `tjcis-candidates-2016-2021-v3-20260712/` 和 `tjcis-inventory-partial-2016-2021-v3-20260712/`。`conflict_count=82`，因此 approval 保持空白，禁止执行 `build_historical_race_inventory --commit`。
 - 本轮没有数据库备份，因为全程只读且未进入 commit；写后核验为 targets/pre-2026/public-pre-2026 全部 `0`。常驻开关始终 `false`，生产 HEAD `3dc8dff` 后继续健康。
+
+### 2026-07-12 第二轮年度目录修复记录
+
+- 修复后严格通过年份为 `2005 / 2007 / 2009 / 2012 / 2013 / 2014 / 2015 / 2016 / 2020 / 2021 / 2022`。
+- `diagnostics/declared_count_reconciliation.json/csv` 记录 `22` 年、`31` 个地区/项目的正文显式行与页脚声明差异。该文件是来源核验输入，不是 approval；禁止依据差额自动增加或删除赛事。
+- 页文本诊断缓存覆盖 1998–2026 全部 29 本 PDF，只用于快速差异定位。正式候选仍须绑定原 PDF 的 source-cache manifest、大小和 SHA-256。
+- 当前不得运行 inventory commit 或历史详情抓取。先以地区官方年度目录核验差异，并在完整候选上生成身份 conflict/review 文件；涉及系列合并、拆分、前后继或同名异赛时必须交产品审核。

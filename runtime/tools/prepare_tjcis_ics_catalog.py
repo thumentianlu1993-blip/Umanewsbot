@@ -75,13 +75,19 @@ CSV_FIELDS = [
     "raw_source_url",
     "source_duplicate_count",
 ]
-GRADE_RE = re.compile(r"(?<![A-Z])(?:HK\s*)?G\s*([123])(?!\d)", re.I)
+GRADE_RE = re.compile(r"(?<![A-Z])(?:HK\s*)?G\s*([123])(?=$|[^0-9]|\d{1,3},\d{3})", re.I)
 LISTED_RE = re.compile(r"\((?:L|LR)\)", re.I)
 DOTS_RE = re.compile(r"\s*\.{2,}\s*")
-AGE_RE = re.compile(r"\b(?:[2-9](?:yo|up)|[2-9]-[2-9]yo)\b", re.I)
+AGE_RE = re.compile(r"\b(?:[2-9]\s*(?:yo|up)|[2-9]\s*-\s*[2-9]\s*yo)\b", re.I)
 DISTANCE_SURFACE_RE = re.compile(r"\b(?:a\s*)?(\d+(?:\.\d+)?)(?:\s*a)?\s*(T|D|AWT)\b", re.I)
-ROW_END_RE = re.compile(r"\b(?:[2-9](?:yo|up)|[2-9]-[2-9]yo)\b.*\b(?:a\s*)?\d+(?:\.\d+)?(?:\s*a)?(?:\s*(?:T|D|AWT))?\b", re.I)
+JUMP_DISTANCE_RE = re.compile(r"\b(\d+(?:\.\d+)?)\b")
+ROW_END_RE = re.compile(
+    r"\b(?:[2-9]\s*(?:yo|up)|[2-9]\s*-\s*[2-9]\s*yo)\b.*"
+    r"\b(?:a\s*)?\d+(?:\.\d+)?(?:\s*a)?(?:\s*(?:T|D|AWT))?\b",
+    re.I,
+)
 DECLARED_TOTAL_RE = re.compile(r"Total\s+(?:Graded|Group)\s+races\s*:\s*\.*\s*(\d+)", re.I)
+DECLARED_GRADE_RE = re.compile(r"Number\s+of\s+G\s*([123])\s+races\s*:\s*\.*\s*(\d+)", re.I)
 UNSUPPORTED_SECTION_RE = re.compile(
     r"PT(?:I|II|IV)[—-](?:ARGENTINA|AUSTRALIA|BRAZIL|CANADA|CHILE|CZECHREPUBLIC|GERMAN(?:Y|JUMPS)|INDIA|IRELAND|IRISHJUMPS|ITALY|ITALIANJUMPS|KOREA|MACAU|MALAYSIA|NEWZEALAND(?:JUMPS)?|PANAMA|PERU|PUERTORICO|SCANDINAVIA|SINGAPORE|SOUTHAFRICA|SPAIN|SWITZERLANDJUMPS|UNITEDARABEMIRATES|URUGUAY|VENEZUELA|INDEX)"
 )
@@ -205,6 +211,12 @@ def stable_series_key(region: str, name: str) -> str:
     return f"{REGION_PREFIXES[region]}-{slug}"
 
 
+def _raw_identity_slug(value: str) -> str:
+    ascii_value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_value.casefold()).strip("-")
+    return slug or hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
 def canonical_series_name(name: str) -> str:
     value = re.sub(r"\[[^\]]*]", " ", name)
     value = re.sub(r"\s+", " ", value).strip()
@@ -224,7 +236,7 @@ def _page_context(text: str) -> tuple[str | None, str]:
             return "japan", "jumps"
         if "USAJUMPS" in upper or "UNITEDSTATESJUMPS" in upper:
             return "united_states", "jumps"
-    if re.search(r"PTI[—-](?:FR|FRA|FRANCE)(?=[^A-Z]|$)", upper):
+    if re.search(r"PTI[—-](?:FRANCE|FRA|FR)", upper):
         return "france", "flat"
     if re.search(r"PTI[—-](?:GB|GREATBRITAIN)", upper):
         return "united_kingdom", "flat"
@@ -232,15 +244,19 @@ def _page_context(text: str) -> tuple[str | None, str]:
         return "united_states", "flat"
     if re.search(r"PT(?:I|II)[—-](?:JPN|JAPAN)", upper):
         return "japan", "flat"
-    if re.search(r"PT(?:I|II)[—-](?:HK|HKG|HONGKONG)(?=[^A-Z]|$)", upper):
+    if re.search(r"PT(?:I|II)[—-](?:HONGKONG|HKG|HK)", upper):
         return "hong_kong", "flat"
     if "PTI—OTHER" in upper or "PTI-OTHER" in upper:
         return "other", "flat"
     return None, "flat"
 
 
-def _has_unsupported_country_title(text: str, compact_page: str) -> bool:
-    if UNSUPPORTED_SECTION_RE.search(compact_page):
+def _has_unsupported_country_title(text: str) -> bool:
+    compact_lines = [
+        re.sub(r"\s+", "", unicodedata.normalize("NFKC", line)).upper()
+        for line in text.splitlines()
+    ]
+    if any(UNSUPPORTED_SECTION_RE.match(line) for line in compact_lines):
         return True
     titles = {re.sub(r"[^A-Z]", "", line.upper()) for line in text.splitlines()}
     return bool(titles & UNSUPPORTED_COUNTRY_TITLES)
@@ -310,7 +326,15 @@ def _parse_record(raw: str, *, region: str, discipline: str, year: int, season_l
         return None
     suffix = raw[grade.end() :]
     surface_match = DISTANCE_SURFACE_RE.search(suffix)
-    distance = surface_match.group(1) if surface_match else ""
+    age_match = AGE_RE.search(suffix)
+    jump_distance_match = JUMP_DISTANCE_RE.search(suffix[age_match.end() :]) if age_match else None
+    distance = (
+        surface_match.group(1)
+        if surface_match
+        else jump_distance_match.group(1)
+        if discipline == "jumps" and jump_distance_match
+        else ""
+    )
     surface_code = surface_match.group(2).upper() if surface_match else ""
     surface = "jumps" if discipline == "jumps" else {
         "T": "turf",
@@ -378,7 +402,8 @@ def _deduplicate_and_disambiguate_same_year_keys(rows: list[dict]) -> list[dict]
     for duplicates in grouped.values():
         if len(duplicates) < 2:
             continue
-        seen = set()
+        proposed_rows: list[tuple[dict, str]] = []
+        proposed_counts: dict[str, int] = {}
         for row in duplicates:
             identity_text = " ".join(
                 str(row.get(field) or "")
@@ -388,6 +413,13 @@ def _deduplicate_and_disambiguate_same_year_keys(rows: list[dict]) -> list[dict]
                 REGION_PREFIXES[row["country_region"]] + "-", 1
             )[-1]
             proposed = f"{row['series_key']}-{identity_slug}"
+            proposed_rows.append((row, proposed))
+            proposed_counts[proposed] = proposed_counts.get(proposed, 0) + 1
+        seen = set()
+        for row, proposed in proposed_rows:
+            if proposed_counts[proposed] > 1:
+                full_name_slug = _raw_identity_slug(row["original_name"])
+                proposed = f"{proposed}-{full_name_slug}"
             if proposed in seen:
                 raise IcsCatalogError(
                     f"{row['year']} 同名同场赛事无法自动区分：{row['original_name']}/{row['racecourse']}"
@@ -397,8 +429,9 @@ def _deduplicate_and_disambiguate_same_year_keys(rows: list[dict]) -> list[dict]
     return deduplicated
 
 
-def _declared_totals(pages: list[str]) -> dict[tuple[str, str], int]:
-    totals: dict[tuple[str, str], int] = {}
+def _declared_counts(pages: list[str]) -> tuple[dict[tuple[str, str], int], dict[tuple[str, str], dict[str, int]]]:
+    total_values: dict[tuple[str, str], set[int]] = {}
+    grade_values: dict[tuple[str, str], dict[str, set[int]]] = {}
     current_region = None
     current_discipline = "flat"
     for page_text in pages:
@@ -406,19 +439,43 @@ def _declared_totals(pages: list[str]) -> dict[tuple[str, str], int]:
         if appendix_starts:
             page_text = page_text[: appendix_starts.start()]
         detected_region, detected_discipline = _page_context(page_text)
-        compact_page = re.sub(r"\s+", "", unicodedata.normalize("NFKC", page_text)).upper()
         if detected_region:
             current_region, current_discipline = detected_region, detected_discipline
-        elif _has_unsupported_country_title(page_text, compact_page):
+        elif _has_unsupported_country_title(page_text):
             current_region, current_discipline = None, "flat"
         if current_region == "other":
             current_region = "hong_kong"
         if current_region:
             for match in DECLARED_TOTAL_RE.finditer(page_text):
                 key = (current_region, current_discipline)
-                totals[key] = totals.get(key, 0) + int(match.group(1))
+                total_values.setdefault(key, set()).add(int(match.group(1)))
+            for match in DECLARED_GRADE_RE.finditer(page_text):
+                key = (current_region, current_discipline)
+                grade = f"G{match.group(1)}"
+                grade_values.setdefault(key, {}).setdefault(grade, set()).add(int(match.group(2)))
         if appendix_starts:
             current_region, current_discipline = None, "flat"
+    conflicts = {key: sorted(values) for key, values in total_values.items() if len(values) > 1}
+    grade_conflicts = {
+        (key, grade): sorted(values)
+        for key, grades in grade_values.items()
+        for grade, values in grades.items()
+        if len(values) > 1
+    }
+    if conflicts or grade_conflicts:
+        raise IcsCatalogError(
+            f"official declared count conflict: totals={conflicts} grades={grade_conflicts}"
+        )
+    totals = {key: next(iter(values)) for key, values in total_values.items()}
+    grades = {
+        key: {grade: next(iter(values)) for grade, values in values_by_grade.items()}
+        for key, values_by_grade in grade_values.items()
+    }
+    return totals, grades
+
+
+def _declared_totals(pages: list[str]) -> dict[tuple[str, str], int]:
+    totals, _grades = _declared_counts(pages)
     return totals
 
 
@@ -431,10 +488,9 @@ def parse_ics_pages(pages: list[str], *, year: int) -> list[dict]:
         if appendix_starts:
             page_text = page_text[: appendix_starts.start()]
         detected_region, detected_discipline = _page_context(page_text)
-        compact_page = re.sub(r"\s+", "", unicodedata.normalize("NFKC", page_text)).upper()
         if detected_region:
             current_region, current_discipline = detected_region, detected_discipline
-        elif _has_unsupported_country_title(page_text, compact_page):
+        elif _has_unsupported_country_title(page_text):
             current_region, current_discipline = None, "flat"
         region, discipline = current_region, current_discipline
         if not region:
@@ -482,11 +538,22 @@ def parse_ics_pages(pages: list[str], *, year: int) -> list[dict]:
     for row in rows:
         key = (row["country_region"], row["discipline"])
         parsed_totals[key] = parsed_totals.get(key, 0) + 1
-    for key, declared in _declared_totals(pages).items():
+    declared_totals, declared_grades = _declared_counts(pages)
+    for key, declared in declared_totals.items():
         if parsed_totals.get(key, 0) != declared:
+            parsed_grades = {
+                grade: sum(
+                    row["country_region"] == key[0]
+                    and row["discipline"] == key[1]
+                    and row["grade_text"] == grade
+                    for row in rows
+                )
+                for grade in ("G1", "G2", "G3")
+            }
             raise IcsCatalogError(
                 f"{year} {key[0]}/{key[1]} graded total mismatch: "
-                f"parsed={parsed_totals.get(key, 0)} declared={declared}"
+                f"parsed={parsed_totals.get(key, 0)} declared={declared}; "
+                f"parsed_grades={parsed_grades} declared_grades={declared_grades.get(key, {})}"
             )
     return _deduplicate_and_disambiguate_same_year_keys(rows)
 

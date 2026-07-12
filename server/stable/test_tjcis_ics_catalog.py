@@ -127,6 +127,19 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
 
         self.assertEqual([row["original_name"] for row in rows], ["Prix Exemple"])
 
+    def test_blank_section_footer_does_not_join_with_race_name_as_country(self):
+        pages = [
+            "Acorn S. G1 .... 80,000 .... 3yo f .... 8 D .... Belmont\nPt I—USA",
+            "Pt I—\nIndiana General Assembly Distaff S. G3 .... 80,000 .... 3up f/m .... 8 D .... Indiana",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=2015)
+
+        self.assertEqual(
+            [row["original_name"] for row in rows],
+            ["Acorn S", "Indiana General Assembly Distaff S"],
+        )
+
     def test_legacy_country_codes_reset_previous_region_context(self):
         pages = [
             "British Race G1 .... 80,000 .... 3up .... 8 T .... Ascot\nPt I—GB",
@@ -151,6 +164,19 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
         rows = self.module.parse_ics_pages(pages, year=1998)
 
         self.assertEqual([row["original_name"] for row in rows], ["Acorn S", "Canadian Turf S"])
+
+    def test_legacy_country_code_with_page_range_sets_target_context(self):
+        pages = [
+            "Prix Exemple G3 .... 80,000 .... 3up .... 2000 T .... Chantilly\nPt I—FR Abb-Cor",
+            "Hong Kong Example G1 .... 80,000 .... 3up .... 1600 T .... Sha Tin\nPt II—HK Cha-Que",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=2005)
+
+        self.assertEqual(
+            [(row["country_region"], row["original_name"]) for row in rows],
+            [("france", "Prix Exemple"), ("hong_kong", "Hong Kong Example")],
+        )
 
     def test_approximate_distance_and_appendix_boundary_are_handled(self):
         pages = [
@@ -177,6 +203,54 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
             year=2016,
         )
         self.assertEqual([row["original_name"] for row in appendix_rows], ["Valid S"])
+
+    def test_spaced_age_notation_is_parsed(self):
+        rows = self.module.parse_ics_pages(
+            ["Washington Park H. G3 .... 300,000 .... 3 up .... 9.5 .... Arlington Park\nPt I—USA"],
+            year=2009,
+        )
+
+        self.assertEqual([row["original_name"] for row in rows], ["Washington Park H"])
+
+    def test_grade_joined_directly_to_comma_separated_purse_is_parsed(self):
+        rows = self.module.parse_ics_pages(
+            [
+                "Poule d'Essai des Pouliches G11,700,000 .... 3yo f .... 1600 T .... Longchamp\n"
+                "Pt I—FR"
+            ],
+            year=2000,
+        )
+
+        self.assertEqual(rows[0]["grade_text"], "G1")
+        self.assertEqual(rows[0]["original_name"], "Poule d'Essai des Pouliches")
+
+    def test_jump_distance_disambiguates_same_name_at_same_course(self):
+        rows = self.module.parse_ics_pages(
+            [
+                "Gold Cup H. Stp.[Sponsor] G3 .... 175,000 .... 4up .... 3.25 .... Newbury\n"
+                "Gold Cup H. Stp. G3 .... 53,000 .... 5up .... 2.50 .... Newbury\n"
+                "Pt IV—GB JUMPS"
+            ],
+            year=2009,
+        )
+
+        self.assertEqual({row["distance_text"] for row in rows}, {"2.50", "3.25"})
+        self.assertEqual(len({row["series_key"] for row in rows}), 2)
+
+    def test_full_sponsored_name_preserves_distinct_same_course_jump_races_for_review(self):
+        records = [
+            "[Paddy Power] Gold Cup H. Stp G3 .... 150,000 .... 4up .... 2.5 .... Cheltenham",
+            "[Racing Post] Gold Cup H. Stp G3 .... 150,000 .... 4up .... 2.5 .... Cheltenham",
+        ]
+        rows = self.module.parse_ics_pages(["\n".join([*records, "Pt IV—GB JUMPS"])], year=2022)
+        reversed_rows = self.module.parse_ics_pages(
+            ["\n".join([*reversed(records), "Pt IV—GB JUMPS"])],
+            year=2022,
+        )
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(len({row["series_key"] for row in rows}), 2)
+        self.assertEqual({row["series_key"] for row in rows}, {row["series_key"] for row in reversed_rows})
 
     def test_synthetic_surface_and_same_name_collisions_are_not_silently_collapsed(self):
         pages = [
@@ -218,6 +292,27 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
 
         with self.assertRaisesRegex(self.module.IcsCatalogError, "graded total mismatch"):
             self.module.parse_ics_pages([page], year=2016)
+
+    def test_identical_repeated_declared_counts_are_not_added_twice(self):
+        pages = [
+            "Example S. G3 .... 100,000 .... 3up .... 8 D .... Belmont Park\n"
+            "Number of G3 races: .... 1\nTotal Graded races: .... 1\nPt I—USA",
+            "Number of G3 races: .... 1\nTotal Graded races: .... 1\nPt I—USA",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=2011)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Example S"])
+
+    def test_conflicting_declared_counts_fail_closed(self):
+        pages = [
+            "Example S. G3 .... 100,000 .... 3up .... 8 D .... Belmont Park\n"
+            "Total Graded races: .... 1\nPt I—USA",
+            "Total Graded races: .... 2\nPt I—USA",
+        ]
+
+        with self.assertRaisesRegex(self.module.IcsCatalogError, "official declared count conflict"):
+            self.module.parse_ics_pages(pages, year=2011)
 
     def test_asterisk_catalog_row_becomes_not_held_without_inventing_surface(self):
         page = (
