@@ -41,6 +41,7 @@ from stable.services.validation import (
     ValidationBatchContext,
     apply_validation_outcome,
     validate_rewrite,
+    _content_source,
     _visible_source_parts,
 )
 
@@ -277,6 +278,46 @@ def release_reprocess_lease(*, owner_token: str) -> bool:
 
 _ENGLISH_BUCKET_TOKEN_RE = re.compile(r"[0-9A-Za-z]+(?:['’.-][0-9A-Za-z]+)*")
 _FALLBACK_BUCKET = "__fallback__"
+
+
+def _reprocess_article_fields() -> tuple[str, ...]:
+    fields = {
+        "id",
+        "title_ja",
+        "body_ja_normalized",
+        "body_ja_raw",
+        "source_language",
+        "racing_region",
+        "source_url",
+        "title_zh",
+        "translated_title_zh",
+        "summary_zh",
+        "translated_summary_zh",
+        "push_summary_zh",
+        "body_zh",
+        "translated_body_zh",
+        "rewrite_confidence",
+        "published_at",
+        "first_seen_at",
+        "gate_issues",
+        "workflow_status",
+        "automation_status",
+        "review_mode",
+        "risk_level",
+        "decision_summary",
+        "decision_reason",
+        "automation_error_message",
+        "automation_warning_email_signature",
+        "duplicate_of_id",
+        "duplicate_score",
+        "duplicate_reason",
+        "published_to_web_at",
+        "public_slug",
+        "updated_at",
+    }
+    if getattr(settings, "AUTO_REWRITE_ENABLED", False) and _content_source() == "rewrite":
+        fields.update({"rewrite_title_zh", "rewrite_summary_zh", "rewrite_body_zh"})
+    return tuple(sorted(fields))
 
 
 def _term_bucket_key(value: str, language: str) -> str:
@@ -702,7 +743,9 @@ def _run_reprocess_dry_run(
                 break
         selected_map = {
             article.id: article
-            for article in NewsArticle.objects.filter(id__in=selected_ids).prefetch_related("related_region_links")
+            for article in NewsArticle.objects.filter(id__in=selected_ids)
+            .only(*_reprocess_article_fields())
+            .prefetch_related("related_region_links")
         }
         selected = [selected_map[article_id] for article_id in selected_ids]
         context: ValidationBatchContext | None = None
@@ -904,7 +947,13 @@ def commit_reprocess_run(*, dry_run_id: int, manifest_sha256: str) -> dict:
         with transaction.atomic():
             locked_run = TermGateReprocessRun.objects.select_for_update().get(pk=run.pk)
             _lock_term_snapshot_tables()
-            articles = list(NewsArticle.objects.select_for_update().filter(id__in=expected).order_by("id"))
+            articles = list(
+                NewsArticle.objects.select_for_update()
+                .filter(id__in=expected)
+                .only(*_reprocess_article_fields())
+                .prefetch_related("related_region_links")
+                .order_by("id")
+            )
             stable_articles = []
             for article in articles:
                 if article_input_fingerprint(article) != expected[article.id]["input_sha256"]:
