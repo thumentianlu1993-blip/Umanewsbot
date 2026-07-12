@@ -298,6 +298,8 @@ def _reprocess_article_fields() -> tuple[str, ...]:
         "translated_body_zh",
         "rewrite_confidence",
         "published_at",
+        "published_at_verified",
+        "published_at_evidence",
         "first_seen_at",
         "gate_issues",
         "workflow_status",

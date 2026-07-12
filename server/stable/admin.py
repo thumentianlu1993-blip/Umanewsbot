@@ -12,6 +12,7 @@ from .forms import NewsArticleAdminForm, NewsImageAdminForm, NewsSourceForm, Pus
 from .models import (
     ArticleRaceLink,
     ArticleStatus,
+    ArticleTranslationStatus,
     AutomationLog,
     CrawlJob,
     HistoricalRaceEventTarget,
@@ -148,6 +149,10 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "source_site",
         "source_mode",
         "published_at",
+        "published_at_verified",
+        "translation_error_category",
+        "translation_retry_count",
+        "translation_next_retry_at",
         "workflow_status",
         "automation_status",
         "review_mode",
@@ -156,6 +161,9 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "score_total",
         "status",
         "is_first_crawled",
+        "published_at_verified",
+        "translation_error_category",
+        "translation_retry_exhausted_at",
         "push_action_link",
     )
     list_filter = (
@@ -187,11 +195,16 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "translated_body_zh",
         "translated_summary_zh",
         "published_at",
+        "published_at_verified",
+        "published_at_evidence",
         "is_first_crawled",
         "first_seen_at",
         "last_seen_at",
         "attribution_source",
         "attribution_summary",
+        "attribution_status",
+        "attribution_confidence",
+        "attribution_rule_version",
         "gate_issue_summary",
         "duplicate_article_link",
         "push_action_link",
@@ -208,7 +221,7 @@ class NewsArticleAdmin(admin.ModelAdmin):
         ArticleRaceLinkInline,
         NewsArticleRelatedRegionInline,
     ]
-    actions = ["mark_pending_review", "mark_published_ready", "queue_translation"]
+    actions = ["mark_pending_review", "mark_published_ready", "queue_translation", "retry_failed_translations"]
 
     fieldsets = (
         (
@@ -224,11 +237,13 @@ class NewsArticleAdmin(admin.ModelAdmin):
                     "source_article_id",
                     "source_url",
                     "published_at",
+                    "published_at_verified",
+                    "published_at_evidence",
                 )
             },
         ),
         ("来源原文", {"fields": ("title_ja", "body_ja_raw", "body_ja_normalized")}),
-        ("翻译参考", {"fields": ("translated_title_zh", "translated_summary_zh", "translated_body_zh")}),
+        ("翻译参考", {"fields": ("translated_title_zh", "translated_summary_zh", "translated_body_zh", "translation_error_category", "translation_retry_count", "translation_next_retry_at", "translation_retry_exhausted_at")}),
         ("自动化运营", {"fields": ("review_mode", "risk_level", "automation_status", "content_category", "attribution_source", "attribution_locked", "attribution_summary", "score_total", "quality_score", "rewrite_confidence", "decision_summary", "decision_reason", "gate_issues", "gate_issue_summary", "base_translation_zh", "rewrite_title_zh", "rewrite_summary_zh", "rewrite_body_zh", "published_by_mode", "auto_publish_at", "automation_error_message")}),
         ("重复内容", {"fields": ("duplicate_of", "duplicate_article_link", "duplicate_score", "duplicate_reason", "automation_warning_email_signature", "automation_warning_email_sent_at")}),
         ("发布内容", {"fields": ("title_zh", "summary_zh", "body_zh", "source_note", "editor_notes", "workflow_status", "status")}),
@@ -266,6 +281,18 @@ class NewsArticleAdmin(admin.ModelAdmin):
         for article in queryset:
             dispatch_task(translate_article_task, article.id)
         self.message_user(request, f"已将 {queryset.count()} 篇文章加入翻译队列。", messages.SUCCESS)
+
+    @admin.action(description="立即重试失败翻译")
+    def retry_failed_translations(self, request, queryset):
+        from stable.services.translation_recovery import request_manual_translation_retry
+
+        accepted = 0
+        for article in queryset:
+            result = request_manual_translation_retry(article, requested_by=request.user)
+            if result.accepted:
+                accepted += 1
+                dispatch_task(translate_article_task, article.id)
+        self.message_user(request, f"已接受 {accepted} 篇失败文章的翻译重试请求。", messages.SUCCESS)
 
     def push_action_link(self, obj):
         url = reverse("admin:stable_newsarticle_push", args=[obj.pk])
@@ -345,6 +372,10 @@ class NewsArticleAdmin(admin.ModelAdmin):
 
     def translate_view(self, request: HttpRequest, article_id: int):
         article = get_object_or_404(NewsArticle, pk=article_id)
+        if article.translation_status == ArticleTranslationStatus.FAILED:
+            from stable.services.translation_recovery import request_manual_translation_retry
+
+            request_manual_translation_retry(article, requested_by=request.user)
         dispatch_task(translate_article_task, article.id)
         self.message_user(request, f"已将《{article}》加入翻译队列。", messages.SUCCESS)
         return HttpResponseRedirect(reverse("admin:stable_newsarticle_change", args=[article.pk]))
@@ -848,8 +879,8 @@ class HorseIdentityConflictAdmin(admin.ModelAdmin):
 
 @admin.register(PushTarget)
 class PushTargetAdmin(admin.ModelAdmin):
-    list_display = ("name", "group_id", "allowed_regions", "push_scope", "importance_strategy", "is_default", "is_active", "updated_at")
-    list_filter = ("push_scope", "importance_strategy", "is_default", "is_active")
+    list_display = ("name", "group_id", "allowed_regions", "multiregion_test_enabled", "push_scope", "importance_strategy", "is_default", "is_active", "updated_at")
+    list_filter = ("multiregion_test_enabled", "push_scope", "importance_strategy", "is_default", "is_active")
     search_fields = ("name", "group_id")
 
 

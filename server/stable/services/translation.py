@@ -364,15 +364,23 @@ def translate_article(article: NewsArticle) -> TranslationResult:
         article.source_language or SourceLanguage.JAPANESE,
         settings.TRANSLATION_TERM_LIMIT,
     )
-    run = TranslationRun.objects.create(
-        article=article,
-        provider_name=provider.name,
-        model_name=getattr(settings, "TRANSLATION_MODEL", ""),
-        terms_used=serialize_terms(terms),
-        prompt_excerpt=source_text[:800],
-        raw_response={},
-        status="started",
-    )
+    run = article.translation_runs.filter(status="started").order_by("-created_at", "-id").first()
+    if run is None:
+        run = TranslationRun.objects.create(
+            article=article,
+            provider_name=provider.name,
+            model_name=getattr(settings, "TRANSLATION_MODEL", ""),
+            terms_used=serialize_terms(terms),
+            prompt_excerpt=source_text[:800],
+            raw_response={},
+            status="started",
+        )
+    else:
+        run.provider_name = provider.name
+        run.model_name = getattr(settings, "TRANSLATION_MODEL", "")
+        run.terms_used = serialize_terms(terms)
+        run.prompt_excerpt = source_text[:800]
+        run.save(update_fields=["provider_name", "model_name", "terms_used", "prompt_excerpt", "updated_at"])
     try:
         result = provider.translate(article)
         run.status = "success"

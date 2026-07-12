@@ -1,5 +1,19 @@
 # 关键决策
 
+## 2026-07-13：法国新鲜度与多地区归属工程评审决策
+
+- 归属采用 `MULTIREGION_ATTRIBUTION_MODE=off|shadow|enforce` 单一模式；旧布尔变量只作兼容映射，相关地区查询仍使用独立开关。
+- 新增结构化文章状态字段与 `MultiregionAttributionRun/Lock`；不得复用外键指向术语门禁 run 的 `TermGateReprocessLock`。
+- shadow 审计与 applied 审计分命名空间保存；归属 commit 必须绑定成功 dry-run 和 manifest，支持逐篇事务、断点续跑和重复提交幂等。
+- gold set 使用真实生产输入快照、双人标注与裁决，至少 250 篇且五地区各 40 篇；任一地区样本或准确率不足均为 no-go。
+- 批量归属必须预加载术语、别名和赛事证据；250 篇 PostgreSQL 验收目标为 SQL `<=30`、耗时 `<=30s`、RSS 增量 `<=256 MiB`。
+- 部署后默认不启用：先 off 部署，再 shadow 验证，再仅新文章 enforce，观察至少 24 小时后才可逐步开放相关地区查询、近期回填和正式群。
+- 本地实现完成不等于生产资格通过。测试 fixture 和 CSV 模板不能替代至少 250 篇真实生产输入的双人标注与裁决；该数据集未完成时，change 保持 `implementing`，生产归属必须为 `off`。
+- 法国时间修复、翻译失败重试和历史归属回填均采用“先 dry-run 生成持久 run/manifest，再人工审核并锁定 commit”的路径；不得通过启动服务或迁移隐式修改旧文章、公开状态或 QQ 交付。
+- manifest 必须同时绑定候选结果、规则版本、术语/配置/gold 快照和质量指标；commit 直接应用审核结果，不重新推断，并将归属写入、门禁重校验和 cursor 更新纳入逐篇原子流程。
+- `new_articles` 及后续阶段的自然流只对新入库文章 enforce，旧文章重复抓取仅 shadow；历史修改必须走 manifest。`web_test_groups/recent_backfill` 阶段只有显式标记 `multiregion_test_enabled` 的 QQ 群读取相关地区，`formal_groups` 后才扩大到正式群。
+- 翻译终态失败邮件默认启用并发送至用户确认的 `754652181@qq.com`；自动 selector 先原子 claim 再入队，避免 worker 积压时重复塞入同一篇文章。
+
 ## 2026-07-12：门禁补跑不得复活来源日期可信度不足的历史库存
 
 - 英文术语门禁重处理只负责重新判断术语上下文，不改变来源新鲜度标准；候选仍必须满足其抓取时适用的来源日期和新鲜度要求。

@@ -842,6 +842,16 @@ def validate_rewrite(
         issues.append(_issue("body_too_short", SEVERITY_BLOCKER, "发布正文过短", route=ROUTE_MANUAL))
     if not article.source_url:
         issues.append(_issue("missing_source_url", SEVERITY_BLOCKER, "缺少原文链接", route=ROUTE_MANUAL))
+    if article.published_at_verified is False:
+        issues.append(
+            _issue(
+                "published_at_unverified",
+                SEVERITY_BLOCKER,
+                "发布时间缺少可信来源证据",
+                route=ROUTE_MANUAL,
+                payload={"published_at_evidence": article.published_at_evidence or {}},
+            )
+        )
     if content_source == "rewrite" and article.rewrite_confidence < int(getattr(settings, "REWRITE_CONFIDENCE_MIN", 60)):
         issues.append(
             _issue(

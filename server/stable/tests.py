@@ -290,7 +290,7 @@ class MultiRegionAttributionAndGateTests(TestCase):
         self.assertEqual(result.primary_region, RacingRegion.UNITED_KINGDOM)
         self.assertEqual(article.racing_region, RacingRegion.UNITED_KINGDOM)
         self.assertEqual(article.content_category, ContentCategory.PREVIEW)
-        self.assertEqual(article_region_set(article), {RacingRegion.UNITED_KINGDOM, RacingRegion.FRANCE})
+        self.assertEqual(article_region_set(article), {RacingRegion.UNITED_KINGDOM})
 
     def test_event_location_outranks_country_context(self):
         article = self._article(
@@ -305,7 +305,7 @@ class MultiRegionAttributionAndGateTests(TestCase):
         self.assertEqual(result.primary_region, RacingRegion.UNITED_KINGDOM)
         self.assertEqual(
             article_region_set(article),
-            {RacingRegion.JAPAN, RacingRegion.UNITED_KINGDOM, RacingRegion.FRANCE},
+            {RacingRegion.UNITED_KINGDOM},
         )
         self.assertEqual(article.attribution_summary["evidence"]["event_keyword_matches"], {
             RacingRegion.UNITED_KINGDOM: ["ascot"],
@@ -374,7 +374,11 @@ class MultiRegionAttributionAndGateTests(TestCase):
         self.assertTrue(outcome.passed, outcome.details)
         self.assertEqual(outcome.details["term_gate_region_excluded_terms"], [])
 
-    @override_settings(MULTIREGION_RELATED_REGION_QUERIES_ENABLED=True)
+    @override_settings(
+        MULTIREGION_ATTRIBUTION_MODE="enforce",
+        MULTIREGION_RELATED_REGION_QUERIES_ENABLED=True,
+        MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE="web_test_groups",
+    )
     def test_public_feed_region_filter_includes_related_region_articles(self):
         article = self._article(
             racing_region=RacingRegion.UNITED_KINGDOM,
@@ -392,7 +396,12 @@ class MultiRegionAttributionAndGateTests(TestCase):
         self.assertEqual(list(visible), [article])
         self.assertContains(response, article.title_zh)
 
-    @override_settings(QQ_PUSH_SCOPE="all_public")
+    @override_settings(
+        QQ_PUSH_SCOPE="all_public",
+        MULTIREGION_ATTRIBUTION_MODE="enforce",
+        MULTIREGION_RELATED_REGION_QUERIES_ENABLED=True,
+        MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE="web_test_groups",
+    )
     def test_qq_eligibility_matches_related_region_and_blocks_tips_category(self):
         article = self._article(
             racing_region=RacingRegion.UNITED_KINGDOM,
@@ -406,6 +415,7 @@ class MultiRegionAttributionAndGateTests(TestCase):
             group_id="france-1",
             allowed_regions=[RacingRegion.FRANCE],
             is_active=True,
+            multiregion_test_enabled=True,
         )
 
         self.assertTrue(should_push_news_to_qq(article, target=target).allowed)
@@ -545,6 +555,11 @@ class MultiRegionAttributionAndGateTests(TestCase):
         self.assertIn("region", raised.exception.message_dict)
         self.assertIn("不能与文章主地区相同", raised.exception.message_dict["region"][0])
 
+    @override_settings(
+        MULTIREGION_ATTRIBUTION_MODE="enforce",
+        MULTIREGION_RELATED_REGION_QUERIES_ENABLED=True,
+        MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE="web_test_groups",
+    )
     def test_region_display_and_qq_message_show_primary_before_related_regions(self):
         article = self._article(
             racing_region=RacingRegion.UNITED_STATES,
@@ -587,6 +602,11 @@ class MultiRegionAttributionAndGateTests(TestCase):
         self.assertNotContains(home_response, "相关：日本")
         self.assertEqual(article.related_region_links.count(), 2)
 
+    @override_settings(
+        MULTIREGION_ATTRIBUTION_MODE="enforce",
+        MULTIREGION_RELATED_REGION_QUERIES_ENABLED=True,
+        MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE="web_test_groups",
+    )
     def test_publish_window_records_related_unpublished_article_without_publishing_it(self):
         from stable.services.publishing_windows import select_publish_candidates
 
@@ -613,6 +633,10 @@ class MultiRegionAttributionAndGateTests(TestCase):
             ).exists()
         )
 
+    @override_settings(
+        MULTIREGION_ATTRIBUTION_GOLD_VERSION="gold-test-v1",
+        MULTIREGION_ATTRIBUTION_GOLD_SNAPSHOT_SHA256="a" * 64,
+    )
     def test_reprocess_command_dry_run_does_not_write_and_commit_only_restores_candidate(self):
         article = self._article(
             racing_region=RacingRegion.FRANCE,
@@ -649,18 +673,39 @@ class MultiRegionAttributionAndGateTests(TestCase):
         self.assertFalse(article.related_region_links.exists())
         self.assertIn(str(article.id), dry_run_output.getvalue())
 
+        dry_run_payload = json.loads(dry_run_output.getvalue())
+        from stable.models import MultiregionAttributionRun
+        from stable.services.attribution_runs import _manifest_sha256
+
+        run = MultiregionAttributionRun.objects.get(pk=dry_run_payload["run_id"])
+        run.metrics = {"qualified": True}
+        run.manifest_sha256 = _manifest_sha256(
+            rows=list(run.candidate_payload or []),
+            rule_version=run.rule_version,
+            term_version=run.term_version,
+            gold_version=run.gold_version,
+            settings_sha256=run.settings_sha256,
+            term_snapshot_sha256=run.term_snapshot_sha256,
+            gold_snapshot_sha256=run.gold_snapshot_sha256,
+            metrics=run.metrics,
+        )
+        run.save(update_fields=["metrics", "manifest_sha256", "updated_at"])
+        dry_run_payload["manifest_sha256"] = run.manifest_sha256
+
         call_command(
             "reprocess_multiregion_attribution_gates",
-            "--region",
-            RacingRegion.FRANCE,
             "--commit",
+            "--run-id",
+            dry_run_payload["run_id"],
+            "--manifest-sha256",
+            dry_run_payload["manifest_sha256"],
             stdout=StringIO(),
         )
         article.refresh_from_db()
         self.assertEqual(article.racing_region, RacingRegion.UNITED_KINGDOM)
         self.assertEqual(article.workflow_status, WorkflowStatus.PENDING_EDIT)
         self.assertIsNone(article.published_to_web_at)
-        self.assertEqual(article_region_set(article), {RacingRegion.UNITED_KINGDOM, RacingRegion.FRANCE})
+        self.assertEqual(article_region_set(article), {RacingRegion.UNITED_KINGDOM})
 
     def test_reprocess_dry_run_respects_manual_attribution_lock(self):
         article = self._article(
@@ -2064,12 +2109,12 @@ class AdapterTests(TestCase):
             adapter.search_queries = ("French racing", "ParisLongchamp")
             stubs = adapter.fetch_listing(SourceMode.ACCESS, 1)
 
-        self.assertEqual([stub.title_ja for stub in stubs], ["French racing story", "ParisLongchamp story"])
+        self.assertEqual([stub.title_ja for stub in stubs], ["ParisLongchamp story", "French racing story"])
         self.assertEqual([stub.source_mode for stub in stubs], [SourceMode.ACCESS, SourceMode.ACCESS])
         self.assertEqual(stubs[0].source_site, SourceSite.TDN_FRANCE)
         self.assertEqual(adapter.canonical_source_site, SourceSite.TDN)
         self.assertEqual(adapter.racing_region, RacingRegion.FRANCE)
-        self.assertEqual(stubs[0].published_at, datetime(2026, 7, 7, 1, 2, 3, tzinfo=dt_timezone.utc))
+        self.assertEqual(stubs[0].published_at, datetime(2026, 7, 7, 2, 3, 4, tzinfo=dt_timezone.utc))
 
     def test_tdn_france_broad_keyword_listing_keeps_successful_queries_when_one_query_fails(self):
         adapter = TDNFranceBroadKeywordAdapter()

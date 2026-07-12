@@ -1104,6 +1104,41 @@ def region_production(request: HttpRequest):
     if selected_region:
         sources = sources.filter(racing_region=selected_region)
     sources = _attach_source_health(sources.order_by("-enabled", "-priority", "name")[:50])
+    from stable.models import MultiregionAttributionRun
+    from stable.services.news_attribution import (
+        ATTRIBUTION_RULE_VERSION,
+        attribution_mode,
+        related_region_queries_enabled,
+    )
+
+    latest_attribution_run = (
+        MultiregionAttributionRun.objects.exclude(rule_version="").order_by("-started_at", "-id").first()
+    )
+    latest_attribution_qualified = bool(
+        latest_attribution_run
+        and latest_attribution_run.status == "completed"
+        and latest_attribution_run.rule_version == ATTRIBUTION_RULE_VERSION
+        and latest_attribution_run.gold_version not in {"", "pending-review"}
+        and len(latest_attribution_run.gold_snapshot_sha256 or "") == 64
+        and (latest_attribution_run.metrics or {}).get("qualified")
+    )
+    failure_queryset = NewsArticle.objects.filter(
+        translation_status=ArticleTranslationStatus.FAILED,
+    )
+    if selected_region:
+        failure_queryset = failure_queryset.filter(racing_region=selected_region)
+    translation_failures = list(failure_queryset.order_by("-updated_at", "-id")[:50])
+    for article in translation_failures:
+        if article.translation_retry_exhausted_at:
+            article.ops_failure_reason = "translation_retry_exhausted"
+        elif article.translation_next_retry_at:
+            article.ops_failure_reason = "translation_retry_waiting"
+        else:
+            article.ops_failure_reason = article.translation_error_category or "translation_failed"
+    attribution_queryset = NewsArticle.objects.filter(attribution_status="needs_review")
+    if selected_region:
+        attribution_queryset = attribution_queryset.filter(racing_region=selected_region)
+    attribution_reviews = list(attribution_queryset.order_by("-updated_at", "-id")[:50])
     return render(
         request,
         "stable/console/region_production.html",
@@ -1113,6 +1148,13 @@ def region_production(request: HttpRequest):
             sources=sources,
             selected_region=selected_region,
             production_regions=PRODUCTION_REGIONS,
+            attribution_mode=attribution_mode(),
+            attribution_rollout_stage=getattr(settings, "MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE", "off"),
+            related_region_queries_enabled=related_region_queries_enabled(),
+            latest_attribution_run=latest_attribution_run,
+            latest_attribution_qualified=latest_attribution_qualified,
+            translation_failures=translation_failures,
+            attribution_reviews=attribution_reviews,
         ),
     )
 

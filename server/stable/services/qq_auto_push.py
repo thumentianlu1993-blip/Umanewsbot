@@ -117,8 +117,17 @@ def article_region(article: NewsArticle) -> str:
     return (getattr(article, "racing_region", "") or "").strip()
 
 
-def article_regions(article: NewsArticle) -> set[str]:
-    regions = article_region_set(article, include_related=related_region_queries_enabled())
+def related_regions_enabled_for_target(target: PushTarget | None) -> bool:
+    if not related_region_queries_enabled():
+        return False
+    rollout_stage = str(getattr(settings, "MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE", "off") or "off").strip().lower()
+    if target is not None and rollout_stage in {"web_test_groups", "recent_backfill"}:
+        return bool(target.multiregion_test_enabled)
+    return rollout_stage == "formal_groups" or target is None
+
+
+def article_regions(article: NewsArticle, *, target: PushTarget | None = None) -> set[str]:
+    regions = article_region_set(article, include_related=related_regions_enabled_for_target(target))
     return {region for region in regions if region in FIRST_PHASE_REGIONS}
 
 
@@ -171,7 +180,7 @@ def should_push_news_to_qq(
         return PushEligibility(False, "article_not_public")
     if has_publish_blocker(article):
         return PushEligibility(False, "has_blocker")
-    regions = article_regions(article)
+    regions = article_regions(article, target=target)
     if not regions:
         return PushEligibility(False, "region_missing")
     if target is not None and not regions.intersection(target_allowed_regions(target)):
@@ -218,7 +227,12 @@ def _existing_summary(article: NewsArticle) -> str:
     return ""
 
 
-def build_qq_auto_push_message(article: NewsArticle, public_url: str | None = None) -> str:
+def build_qq_auto_push_message(
+    article: NewsArticle,
+    public_url: str | None = None,
+    *,
+    target: PushTarget | None = None,
+) -> str:
     title = _collapse_text(article.effective_title)
     summary = _existing_summary(article)
     if not summary:
@@ -230,7 +244,7 @@ def build_qq_auto_push_message(article: NewsArticle, public_url: str | None = No
     primary_label = region_label(article.racing_region)
     related_labels = article_related_region_labels(
         article,
-        include_related=related_region_queries_enabled(),
+        include_related=related_regions_enabled_for_target(target),
     )
     if primary_label != "日本" or related_labels:
         lines.append(f"地区：{primary_label}")
@@ -363,7 +377,7 @@ def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
         return _set_delivery_not_eligible(delivery, reason=eligibility.reason or "not_eligible")
 
     public_url = build_public_article_url(article)
-    message = build_qq_auto_push_message(article, public_url=public_url)
+    message = build_qq_auto_push_message(article, public_url=public_url, target=delivery.target)
     pusher = BotPusher()
     online, status_error = pusher.is_online()
     if not online:

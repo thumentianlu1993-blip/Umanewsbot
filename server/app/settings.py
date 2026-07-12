@@ -279,8 +279,50 @@ MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS = env_list(
     "ソンシ,ダービー,チーム,トレセン,トレーニング・センター,フリー,ペース,ボートレースレディースVSルーキーズバトル,"
     "マーク,メール,ユタカ,ユース,リーディング,レコード",
 )
-MULTIREGION_ATTRIBUTION_ENABLED = env_bool("MULTIREGION_ATTRIBUTION_ENABLED", True)
-MULTIREGION_RELATED_REGION_QUERIES_ENABLED = env_bool("MULTIREGION_RELATED_REGION_QUERIES_ENABLED", True)
+MULTIREGION_ATTRIBUTION_ENABLED = env_bool("MULTIREGION_ATTRIBUTION_ENABLED", False)
+_raw_attribution_mode = env("MULTIREGION_ATTRIBUTION_MODE", "") or ""
+if _raw_attribution_mode.strip():
+    MULTIREGION_ATTRIBUTION_MODE = _raw_attribution_mode.strip().lower()
+else:
+    MULTIREGION_ATTRIBUTION_MODE = "enforce" if MULTIREGION_ATTRIBUTION_ENABLED else "off"
+if MULTIREGION_ATTRIBUTION_MODE not in {"off", "shadow", "enforce"}:
+    MULTIREGION_ATTRIBUTION_MODE = "off"
+MULTIREGION_RELATED_REGION_QUERIES_ENABLED = env_bool("MULTIREGION_RELATED_REGION_QUERIES_ENABLED", False)
+TDN_FRANCE_SEARCH_QUERIES = env_list(
+    "TDN_FRANCE_SEARCH_QUERIES",
+    "France Galop,French racing,ParisLongchamp,Deauville,Chantilly,Arqana",
+)
+TDN_FRANCE_FRESHNESS_DAYS = max(1, int(env("TDN_FRANCE_FRESHNESS_DAYS", "3")))
+TRANSLATION_AUTO_RETRY_ENABLED = env_bool("TRANSLATION_AUTO_RETRY_ENABLED", False)
+TRANSLATION_AUTO_RETRY_MAX_ATTEMPTS = max(1, int(env("TRANSLATION_AUTO_RETRY_MAX_ATTEMPTS", "3")))
+TRANSLATION_AUTO_RETRY_BACKOFF_SECONDS = [
+    max(1, int(value)) for value in env_list("TRANSLATION_AUTO_RETRY_BACKOFF_SECONDS", "60,300,900")
+]
+TRANSLATION_AUTO_RETRY_BATCH_SIZE = max(1, int(env("TRANSLATION_AUTO_RETRY_BATCH_SIZE", "10")))
+TRANSLATION_AUTO_RETRY_JITTER_SECONDS = max(0, int(env("TRANSLATION_AUTO_RETRY_JITTER_SECONDS", "15")))
+TRANSLATION_STALE_AFTER_SECONDS = max(60, int(env("TRANSLATION_STALE_AFTER_SECONDS", "1800")))
+TRANSLATION_FAILURE_EMAIL_ENABLED = env_bool("TRANSLATION_FAILURE_EMAIL_ENABLED", True)
+TRANSLATION_FAILURE_NOTIFY_EMAILS = env_list("TRANSLATION_FAILURE_NOTIFY_EMAILS", "754652181@qq.com")
+MULTIREGION_ATTRIBUTION_LEASE_MINUTES = max(1, int(env("MULTIREGION_ATTRIBUTION_LEASE_MINUTES", "30")))
+MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE = env("MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE", "off").strip().lower()
+if MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE not in {
+    "off",
+    "shadow",
+    "new_articles",
+    "web_test_groups",
+    "recent_backfill",
+    "formal_groups",
+}:
+    MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE = "off"
+MULTIREGION_ATTRIBUTION_GOLD_VERSION = env("MULTIREGION_ATTRIBUTION_GOLD_VERSION", "pending-review").strip()
+MULTIREGION_ATTRIBUTION_GOLD_SNAPSHOT_SHA256 = env(
+    "MULTIREGION_ATTRIBUTION_GOLD_SNAPSHOT_SHA256",
+    "",
+).strip().lower()
+MULTIREGION_ATTRIBUTION_OVERALL_ACCURACY_MIN = float(env("MULTIREGION_ATTRIBUTION_OVERALL_ACCURACY_MIN", "0.95"))
+MULTIREGION_ATTRIBUTION_REGION_ACCURACY_MIN = float(env("MULTIREGION_ATTRIBUTION_REGION_ACCURACY_MIN", "0.90"))
+MULTIREGION_ATTRIBUTION_RELATED_PRECISION_MIN = float(env("MULTIREGION_ATTRIBUTION_RELATED_PRECISION_MIN", "0.95"))
+MULTIREGION_ATTRIBUTION_RELATED_RECALL_MIN = float(env("MULTIREGION_ATTRIBUTION_RELATED_RECALL_MIN", "0.90"))
 MULTIREGION_QQ_ALLOWED_CONTENT_CATEGORIES = env_list(
     "MULTIREGION_QQ_ALLOWED_CONTENT_CATEGORIES",
     "news,preview,result_brief,feature,flash,pre_race,post_race,official,interview",
@@ -448,6 +490,14 @@ CELERY_BEAT_SCHEDULE = {
     "crawl-enabled-news-sources": {
         "task": "stable.tasks.crawl_enabled_news_sources_task",
         "schedule": crontab(minute=f"*/{NEWS_SOURCE_POLL_INTERVAL_MINUTES}"),
+    },
+    "retry-failed-translations": {
+        "task": "stable.tasks.translation_retry_selector_task",
+        "schedule": crontab(minute="*"),
+    },
+    "recover-stale-translations": {
+        "task": "stable.tasks.recover_stale_translations_task",
+        "schedule": crontab(minute="*/5"),
     },
     "crawl-production-sources-window": {
         "task": "stable.tasks.crawl_production_sources_window_task",

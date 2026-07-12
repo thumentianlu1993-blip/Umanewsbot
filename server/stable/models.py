@@ -282,6 +282,22 @@ class TermGateReprocessStatus(models.TextChoices):
     COMMITTED = "committed", "已提交"
 
 
+class AttributionStatus(models.TextChoices):
+    APPLIED = "applied", "已应用"
+    FALLBACK = "fallback", "来源兜底"
+    NEEDS_REVIEW = "needs_review", "待复核"
+    LOCKED_SKIP = "locked_skip", "人工锁定跳过"
+
+
+class MultiregionAttributionRunStatus(models.TextChoices):
+    PENDING = "pending", "待执行"
+    RUNNING = "running", "执行中"
+    COMPLETED = "completed", "已完成"
+    PARTIAL = "partial", "部分完成"
+    FAILED = "failed", "失败"
+    REJECTED = "rejected", "已拒绝"
+
+
 class TranslationStatus(models.TextChoices):
     STARTED = "started", "进行中"
     SUCCESS = "success", "成功"
@@ -1794,6 +1810,8 @@ class NewsArticle(TimestampedModel):
     body_zh = models.TextField(blank=True)
     push_summary_zh = models.TextField(blank=True)
     published_at = models.DateTimeField()
+    published_at_verified = models.BooleanField(null=True, blank=True, default=None)
+    published_at_evidence = models.JSONField(default=dict, blank=True)
     source_url = models.URLField(max_length=1000)
     is_first_crawled = models.BooleanField(default=True)
     first_seen_at = models.DateTimeField(default=timezone.now)
@@ -1846,6 +1864,9 @@ class NewsArticle(TimestampedModel):
     attribution_source = models.CharField(max_length=64, blank=True)
     attribution_summary = models.JSONField(default=dict, blank=True)
     attribution_locked = models.BooleanField(default=False)
+    attribution_status = models.CharField(max_length=32, choices=AttributionStatus.choices, blank=True, db_index=True)
+    attribution_confidence = models.PositiveSmallIntegerField(null=True, blank=True)
+    attribution_rule_version = models.CharField(max_length=64, blank=True)
     editor_notes = models.TextField(blank=True)
     manually_edited_fields = models.JSONField(default=list, blank=True)
     translation_metadata = models.JSONField(default=dict, blank=True)
@@ -1855,11 +1876,14 @@ class NewsArticle(TimestampedModel):
         default=ArticleTranslationStatus.PENDING,
     )
     translation_error_message = models.TextField(blank=True)
+    translation_error_category = models.CharField(max_length=64, blank=True)
     translation_started_at = models.DateTimeField(null=True, blank=True)
     translated_at = models.DateTimeField(null=True, blank=True)
     translation_model = models.CharField(max_length=128, blank=True)
     translation_provider = models.CharField(max_length=64, blank=True)
     translation_retry_count = models.PositiveIntegerField(default=0)
+    translation_next_retry_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    translation_retry_exhausted_at = models.DateTimeField(null=True, blank=True)
     tags_json = models.JSONField(default=list, blank=True)
     source_note = models.CharField(max_length=255, blank=True)
     public_slug = models.SlugField(max_length=255, blank=True)
@@ -2675,6 +2699,7 @@ class PushTarget(TimestampedModel):
     group_id = models.CharField(max_length=64, unique=True)
     is_default = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    multiregion_test_enabled = models.BooleanField(default=False)
     allowed_regions = models.JSONField(default=list, blank=True)
     push_scope = models.CharField(max_length=32, choices=QQPushScope.choices, blank=True, default=QQPushScope.INHERIT)
     importance_strategy = models.CharField(
@@ -2989,6 +3014,56 @@ class TermGateReprocessLock(TimestampedModel):
     key = models.CharField(max_length=64, unique=True)
     locked_by_run = models.ForeignKey(
         TermGateReprocessRun,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="leases",
+    )
+    owner_token = models.CharField(max_length=64, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("key",)
+
+
+class MultiregionAttributionRun(TimestampedModel):
+    mode = models.CharField(max_length=16, choices=(("dry_run", "Dry run"), ("commit", "Commit")))
+    selectors = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=MultiregionAttributionRunStatus.choices,
+        default=MultiregionAttributionRunStatus.PENDING,
+    )
+    cursor = models.PositiveIntegerField(default=0)
+    completed_article_ids = models.JSONField(default=list, blank=True)
+    rule_version = models.CharField(max_length=64, blank=True)
+    term_version = models.CharField(max_length=64, blank=True)
+    gold_version = models.CharField(max_length=64, blank=True)
+    settings_sha256 = models.CharField(max_length=64, blank=True)
+    term_snapshot_sha256 = models.CharField(max_length=64, blank=True)
+    gold_snapshot_sha256 = models.CharField(max_length=64, blank=True)
+    candidate_fingerprint = models.CharField(max_length=64, blank=True)
+    candidate_payload = models.JSONField(default=list, blank=True)
+    outcomes = models.JSONField(default=list, blank=True)
+    metrics = models.JSONField(default=dict, blank=True)
+    manifest_sha256 = models.CharField(max_length=64, blank=True, db_index=True)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-started_at", "-id")
+        indexes = [
+            models.Index(fields=("status", "-started_at"), name="attr_run_status_idx"),
+            models.Index(fields=("mode", "-started_at"), name="attr_run_mode_idx"),
+        ]
+
+
+class MultiregionAttributionLock(TimestampedModel):
+    key = models.CharField(max_length=64, unique=True)
+    locked_by_run = models.ForeignKey(
+        MultiregionAttributionRun,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

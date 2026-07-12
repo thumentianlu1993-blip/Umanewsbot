@@ -1,5 +1,15 @@
 # 部署运行手册
 
+## 待实施：法国新鲜度与多地区归属上线门禁
+
+- 对应 change：`fix-france-news-freshness-and-multiregion-attribution`。当前仅完成工程评审，以下为未来实施后的上线约束，不代表功能已上线。
+- 部署前必须确认本地 HEAD、服务器 HEAD、tracked/untracked 文件、Nginx 运行配置、数据库备份及 `web/worker/beat` 当前环境变量；部署后再次核对三个服务读取一致配置。
+- 首次部署必须设置 `MULTIREGION_ATTRIBUTION_MODE=off`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`、`TRANSLATION_AUTO_RETRY_ENABLED=false`，不得因迁移成功自动开启行为。
+- 开启 shadow 前必须完成至少 250 篇版本化 gold set、生产快照 SHA 校验、全部质量阈值和 250 篇 PostgreSQL 性能验收；任何单地区 no-go 都应阻止继续灰度。
+- enforce commit 必须引用成功 dry-run 的 run ID 与 manifest，检查文章、人工锁定、规则、术语和 gold 版本漂移；部分失败使用同一 run/manifest resume，不新建无关批次。
+- 回滚顺序：先关闭相关地区查询，再把归属 mode 降为 shadow 或 off，再关闭翻译自动重试；保留运行账本用于审计。只有数据库结构或数据损坏时才使用部署前备份恢复。
+- 验收必须覆盖 `/healthz/`、首页、五地区页、文章详情、运营后台、worker/beat 日志、来源/翻译/门禁/窗口/网页/QQ 分层计数，以及单文章单次公开和单群单次交付。
+
 ## 2026-07-12 英文术语门禁受控发布与 TDN France 旧库存清理
 
 - 发布前备份：`backups/db/pre-term-gate-publish-20260712_182052.sql.gz`，约 `110M`，SHA-256 `0edfbf7cae1a23ce71cb2d8de3b5d1d4b85c276daf1504f3971fac90c618144c`。
@@ -3998,3 +4008,19 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - 最终成功年只有 `2016 / 2020 / 2021`；`summary.json` 中 25 个 `year_errors` 是后续修复入口，不得删除、改成 warning 或从完成率分母隐藏。
 - v3 candidate/inventory 路径分别为 `tjcis-candidates-2016-2021-v3-20260712/` 和 `tjcis-inventory-partial-2016-2021-v3-20260712/`。`conflict_count=82`，因此 approval 保持空白，禁止执行 `build_historical_race_inventory --commit`。
 - 本轮没有数据库备份，因为全程只读且未进入 commit；写后核验为 targets/pre-2026/public-pre-2026 全部 `0`。常驻开关始终 `false`，生产 HEAD `3dc8dff` 后继续健康。
+
+## 2026-07-13 法国新鲜度与多地区归属待部署清单
+
+本节描述尚未执行的生产步骤。代码部署与迁移不得自动开启归属、相关地区查询或翻译失败重试。
+
+1. 部署前记录生产 HEAD、工作区、容器、Nginx、Celery active/reserved、外部导入与锁、法国来源状态；备份 `.env` 和 PostgreSQL，并校验备份。
+2. 显式保持 `MULTIREGION_ATTRIBUTION_MODE=off`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`、`TRANSLATION_AUTO_RETRY_ENABLED=false`，再部署代码并应用 `stable.0029_france_freshness_translation_attribution`。
+   同时确认 `TRANSLATION_FAILURE_EMAIL_ENABLED=true`、`TRANSLATION_FAILURE_NOTIFY_EMAILS=754652181@qq.com`，并通过现有 SMTP 配置发送一封受控测试邮件。
+3. 验证 `web/worker/beat` 使用相同安全配置，执行 `manage.py check`，检查迁移、容器、日志、内外 `/healthz/`、首页、五地区页和运营后台。
+4. 对 TDN France 和 France Galop 执行只读 probe；France Galop 旧时间只先运行 `repair_france_galop_published_at` dry-run，保存 manifest、证据和漂移检查结果，不直接改库。
+5. 使用真实生产文章建立至少 250 篇有效、五地区各至少 40 篇、双人标注并裁决的 gold CSV，配置非 `pending-review` 的 `MULTIREGION_ATTRIBUTION_GOLD_VERSION` 和该 CSV 的 `MULTIREGION_ATTRIBUTION_GOLD_SNAPSHOT_SHA256`，再执行 `evaluate_multiregion_attribution_gold --labels <csv> --json`。任一质量门槛不通过即 no-go。
+6. 使用 `reprocess_multiregion_attribution_gates --dry-run --gold-labels <csv>` 生成绑定 gold 指标的持久 run ID 与 manifest；人工审核主地区变化、全部 `needs_review` 和无依据扩散后，才允许对锁定 run 执行 commit。`pending-review`、无有效 SHA、有效分母不足 250 或指标 no-go 均会拒绝 commit。
+7. 翻译失败先审核 `429/503/504/timeout` 清单，再小批开启 selector；确认不会直接公开文章或创建 QQ delivery。耗尽和人工重试入口必须可见。
+8. 归属灰度顺序固定为：off 部署、shadow、仅新文章 enforce、网页和显式测试群相关查询、最近 72 小时受控回填、正式群。进入测试群阶段前，仅对指定 `PushTarget` 设置 `multiregion_test_enabled=true`；其余群保持 false，最终 `formal_groups` 阶段才扩大。每阶段记录指标并至少观察约定窗口。
+9. 回滚先关闭相关地区查询，再把归属切回 `off`，最后关闭翻译自动重试；保留已写审计与 run，不用反向迁移删除证据。数据库异常时按备份恢复流程处理。
+10. 至少验收 3 个日常窗口和 1 个可模拟的重要赛事窗口，按来源候选、翻译、归属、门禁、公开和 QQ 分层记录数量与零发布原因，完成后再更新状态文档并归档 change。
