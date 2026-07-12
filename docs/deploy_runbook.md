@@ -1,5 +1,26 @@
 # 部署运行手册
 
+## 2026-07-12 英文术语命中级上下文门禁 shadow 部署
+
+- 生产提交：`f221c7df`；迁移：`stable.0028_term_gate_reprocess_runs`。
+- 部署前备份：`.env.backup.english-term-context-20260712_171023`；数据库 `backups/db/pre-english-term-context-20260712_171023.sql.gz`，`109M`，`gzip -t` 通过，SHA-256 `8f1cb6d3380db6c92671348d60a1c1d1633939bc637a38bcc2bdc796116486e1`。
+- 生产模式：`ENGLISH_TERM_CONTEXT_MODE=shadow`，`web/worker/beat` 必须一致。快速关闭时改为 `off` 并重建三个服务；未完成 24 小时观察前禁止 `enforce`。
+- 100 篇基准事实：run `#6`，美国近 168 小时，候选 `100`，耗时 `7.5323s`、SQL `19`、RSS 增量 `36,503,552` bytes；索引 `1`，赛事实体/英文 alias/额外马名术语/重复语料预取 `2/1/0/1`；可恢复 `20`、仍阻断 `80`。
+- 小批 dry-run：香港 run `#7` 为 `12/16` 可恢复；英国 `#8` 为 `3/20`；法国 `#9` 为 `6/13`；美国 `#10` 为 `9/20`。NFKC span 修复后法国 run `#11` 仍为 `6/13`，`Exactly` 命中文本与原文 span 已准确。所有 run 均为 dry-run，生产 `committed=0`、租约为空。
+- 验收：最终本地专项 `81`、完整 `stable` `870`；生产 Django check、迁移、内外 `/healthz/`、容器日志、首页、新闻详情和后台未登录跳转通过。
+
+观察命令：
+
+```bash
+cd /opt/umanewsbot
+docker compose -f docker-compose.prod.lowcost.yml exec -T web \
+  python manage.py shell -c 'from django.conf import settings; print(settings.ENGLISH_TERM_CONTEXT_MODE)'
+docker compose -f docker-compose.prod.lowcost.yml exec -T web \
+  python manage.py shell -c 'from stable.models import TermGateReprocessRun,TermGateReprocessLock; print(list(TermGateReprocessRun.objects.values("id","mode","status","statistics").order_by("-id")[:12])); print(list(TermGateReprocessLock.objects.values()))'
+```
+
+回滚只切配置即可：把 `ENGLISH_TERM_CONTEXT_MODE=off`，重建 `web/worker/beat` 并确认三个容器均读取 `off`。运行账本表保留审计，不回滚迁移、不删除 run。若必须恢复部署前数据库，使用上述 `pre-english-term-context` 备份。任何 commit 必须在 enforce 抽检通过后引用同一 dry-run 的 `--run-id` 与 `--manifest-sha256`，且先核对术语/设置/文章指纹无漂移。
+
 ## 2026-07-12 P0 马资料补全基础能力部署
 
 - 生产提交：`ce676998`；部署前 `HEAD=31cc82c`。

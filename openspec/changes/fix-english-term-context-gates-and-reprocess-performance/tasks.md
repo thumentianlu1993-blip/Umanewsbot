@@ -3,7 +3,7 @@
 - [x] 0.1 (integration) 正确性 PASS：固定真实单词型马名回归集零误放行，固定普通语法回归集零 `core_term_missing`；任一真实专名误放行为 BLOCKER
 - [x] 0.2 (application) 状态安全 PASS：`off` 与 `shadow` 对文章门禁/工作流零写入差异，dry-run 对文章零写入，重复 commit 零重复副作用；任一状态越权为 BLOCKER
 - [x] 0.3 (application) 一致性 PASS：全局快照漂移整批拒绝、单篇输入漂移逐篇跳过、同一未漂移输入的 dry-run/commit 结果摘要一致；静默覆盖漂移为 BLOCKER
-- [ ] 0.4 (application) 性能 PASS：PostgreSQL 生产等价 100 篇完整 dry-run（含候选选择、批次上下文、重复检测和审计持久化）不超过 60 秒、总 SQL 不超过 35 条、术语索引仅构建一次、赛事实体预取不超过 2 次、外部马名 alias 预取不超过 1 次、正式马名术语复用批次数据且额外预取为 0、重复语料预取不超过 1 次、峰值 RSS 增量不超过 256 MiB；任一硬指标失败为 BLOCKER
+- [x] 0.4 (application) 性能 PASS：PostgreSQL 生产等价 100 篇完整 dry-run（含候选选择、批次上下文、重复检测和审计持久化）不超过 60 秒、总 SQL 不超过 35 条、术语索引仅构建一次、赛事实体预取不超过 2 次、外部马名 alias 预取不超过 1 次、正式马名术语复用批次数据且额外预取为 0、重复语料预取不超过 1 次、峰值 RSS 增量不超过 256 MiB；任一硬指标失败为 BLOCKER
 - [x] 0.5 (operations) 产量 `2-5` 篇/天是上线后观测目标而非正确性门槛；低于目标触发规则覆盖复盘，高于目标触发误放抽检，但均不得替代真实专名零误放要求
 
 ## 1. 命中实例与批次上下文
@@ -73,12 +73,12 @@
 
 - [x] 7.1 (application) 运行新增命中级分类、门禁和重处理目标测试并修复失败
 - [x] 7.2 (application) 运行完整 `stable` 测试、Django check、migration apply/rollback/重新 apply、迁移漂移检查和 `git diff --check`
-- [ ] 7.3 (operations) 在 PostgreSQL 生产等价数据上执行固定 100 篇完整 dry-run 基准，证明 60 秒内完成、总 SQL 不超过 35 条、术语索引只构建一次、赛事实体/外部马名 alias/额外马名术语/重复语料预取分别不超过 `2/1/0/1` 次、峰值 RSS 增量不超过 256 MiB，并记录 CPU/内存和运行记录
+- [x] 7.3 (operations) 在 PostgreSQL 生产等价数据上执行固定 100 篇完整 dry-run 基准，证明 60 秒内完成、总 SQL 不超过 35 条、术语索引只构建一次、赛事实体/外部马名 alias/额外马名术语/重复语料预取分别不超过 `2/1/0/1` 次、峰值 RSS 增量不超过 256 MiB，并记录 CPU/内存和运行记录
 - [x] 7.4 (operations) 严格校验本 change 和全部 OpenSpec specs，确认 proposal/design/spec/tasks/test_cases 一致
 
 ## 8. 生产灰度与验收
 
-- [ ] 8.1 (operations) 部署前备份数据库和环境配置，核对服务器 HEAD、`.env`、容器环境、compose 状态，确认无外部导入、无有效重处理租约且健康检查正常
+- [x] 8.1 (operations) 部署前备份数据库和环境配置，核对服务器 HEAD、`.env`、容器环境、compose 状态，确认无外部导入、无有效重处理租约且健康检查正常
 - [ ] 8.2 (operations) 部署并迁移后验证 web/worker/beat migration、日志和 `/healthz/`；保持历史 commit 禁止，将模式从 `off` 切到 `shadow` 并观察至少 24 小时
 - [ ] 8.3 (operations) 按香港、英国、法国、美国分别执行小批量 dry-run，人工抽检真实单词型马名、普通词和 uncertain 样本
 - [ ] 8.4 (operations) shadow 抽检通过后切 `enforce`；对近 7 天 36 篇基线候选生成分地区 dry-run 运行记录，审核 run ID/manifest 后小批量 commit，使其只重新进入发布窗口
