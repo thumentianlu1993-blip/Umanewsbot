@@ -88,9 +88,9 @@ ADAPTER_CONFIGS = {
         region=RacingRegion.UNITED_KINGDOM,
         providers=frozenset({"bha", "bhb", "jockey_club_archive", "tjcis"}),
         grade_patterns=_patterns(
-            (r"^(?:Group|Grade)\s*1$", RaceGrade.G1),
-            (r"^(?:Group|Grade)\s*2$", RaceGrade.G2),
-            (r"^(?:Group|Grade)\s*3$", RaceGrade.G3),
+            (r"^(?:(?:Group|Grade)\s*1|G1)$", RaceGrade.G1),
+            (r"^(?:(?:Group|Grade)\s*2|G2)$", RaceGrade.G2),
+            (r"^(?:(?:Group|Grade)\s*3|G3)$", RaceGrade.G3),
         ),
     ),
     "france_galop_pattern_catalog": CatalogAdapterConfig(
@@ -98,9 +98,9 @@ ADAPTER_CONFIGS = {
         region=RacingRegion.FRANCE,
         providers=frozenset({"france_galop", "tjcis"}),
         grade_patterns=_patterns(
-            (r"^(?:Groupe|Group|Gr)\s*(?:I|1)$", RaceGrade.G1),
-            (r"^(?:Groupe|Group|Gr)\s*(?:II|2)$", RaceGrade.G2),
-            (r"^(?:Groupe|Group|Gr)\s*(?:III|3)$", RaceGrade.G3),
+            (r"^(?:(?:Groupe|Group|Gr)\s*(?:I|1)|G1)$", RaceGrade.G1),
+            (r"^(?:(?:Groupe|Group|Gr)\s*(?:II|2)|G2)$", RaceGrade.G2),
+            (r"^(?:(?:Groupe|Group|Gr)\s*(?:III|3)|G3)$", RaceGrade.G3),
         ),
     ),
     "toba_graded_stakes_catalog": CatalogAdapterConfig(

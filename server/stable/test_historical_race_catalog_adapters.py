@@ -13,10 +13,12 @@ from django.core.management import call_command
 
 from stable.models import RaceEventSurface, RaceGrade, RacingRegion
 from stable.services.historical_race_catalog_adapters import (
+    ADAPTER_CONFIGS,
     ADAPTER_PARSER_VERSION,
     CATALOG_SCHEMA_VERSION,
     discover_catalog_and_timeline,
     parse_historical_catalog_manifest,
+    _normalized_grade,
 )
 from stable.services.historical_race_inventory import InventoryValidationError
 
@@ -71,6 +73,14 @@ def _sha256(path: Path) -> str:
 
 
 class HistoricalRaceCatalogAdapterTests(SimpleTestCase):
+    def test_tjcis_compact_grades_are_accepted_by_uk_and_france_adapters(self):
+        for adapter_key in ("bha_pattern_catalog", "france_galop_pattern_catalog"):
+            config = ADAPTER_CONFIGS[adapter_key]
+            with self.subTest(adapter_key=adapter_key):
+                self.assertEqual(_normalized_grade(config, "G1", record_type="catalog"), RaceGrade.G1)
+                self.assertEqual(_normalized_grade(config, "G2", record_type="catalog"), RaceGrade.G2)
+                self.assertEqual(_normalized_grade(config, "G3", record_type="catalog"), RaceGrade.G3)
+
     def _manifest(
         self,
         root: Path,
