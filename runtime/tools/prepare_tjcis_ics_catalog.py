@@ -534,6 +534,7 @@ def prepare_catalog(args) -> dict:
     csv_by_region: dict[str, list[dict]] = {region: [] for region in REGION_ADAPTERS}
     raw_sources = []
     counts = {}
+    year_errors = {}
     for year in years:
         url = all_links[year]
         pdf_path = output_dir / "source" / f"tjcis_ics_{year}.pdf"
@@ -544,7 +545,13 @@ def prepare_catalog(args) -> dict:
             reuse_existing=args.resume,
         )
         raw_sources.append(identity)
-        rows = parse_ics_pages(_pdf_pages(pdf_path), year=year)
+        try:
+            rows = parse_ics_pages(_pdf_pages(pdf_path), year=year)
+        except IcsCatalogError as exc:
+            if not args.continue_on_year_error:
+                raise
+            year_errors[str(year)] = str(exc)
+            continue
         counts[str(year)] = {}
         for region in REGION_ADAPTERS:
             region_rows = [row for row in rows if row["country_region"] == region]
@@ -564,6 +571,8 @@ def prepare_catalog(args) -> dict:
 
     manifest_paths = []
     for region, adapter_key in REGION_ADAPTERS.items():
+        if not csv_by_region[region]:
+            raise IcsCatalogError(f"没有任何成功年份可供 {region} 生成 manifest")
         manifest = {
             "schema_version": "1.0",
             "adapter_key": adapter_key,
@@ -574,6 +583,7 @@ def prepare_catalog(args) -> dict:
             "cache_files": csv_by_region[region],
             "raw_sources": raw_sources,
             "index_sources": index_identities,
+            "excluded_year_errors": year_errors,
         }
         path = output_dir / f"manifest_{region}.json"
         path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -583,6 +593,9 @@ def prepare_catalog(args) -> dict:
         "years": years,
         "counts": counts,
         "manifest_paths": manifest_paths,
+        "successful_years": sorted(int(year) for year in counts),
+        "year_errors": year_errors,
+        "status": "partial" if year_errors else "complete",
         "network_switches_after_run": "operator_must_restore_both_to_false",
     }
     (output_dir / "summary.json").write_text(
@@ -610,13 +623,14 @@ def main() -> int:
     parser.add_argument("--timeout-seconds", type=int, default=60)
     parser.add_argument("--allow-network", action="store_true")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--continue-on-year-error", action="store_true")
     args = parser.parse_args()
     try:
         result = prepare_catalog(args)
     except IcsCatalogError as exc:
         parser.error(str(exc))
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
-    return 0
+    return 2 if result["year_errors"] else 0
 
 
 if __name__ == "__main__":

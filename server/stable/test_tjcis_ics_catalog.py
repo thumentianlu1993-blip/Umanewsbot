@@ -352,6 +352,7 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
                 resume=True,
                 allow_network=False,
                 timeout_seconds=10,
+                continue_on_year_error=False,
             )
             with mock.patch.object(self.module, "require_network_gates") as gates, mock.patch.object(
                 self.module, "download_to_cache", side_effect=self.module.IcsCatalogError("stop after gate check")
@@ -360,6 +361,69 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
                     self.module.prepare_catalog(args)
 
         gates.assert_not_called()
+
+    def test_continue_on_year_error_writes_partial_manifests_without_hiding_gap(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source"
+            source.mkdir()
+            for name in (
+                "tjcis_past_editions.html",
+                "tjcis_current_editions.html",
+                "tjcis_ics_1999.pdf",
+                "tjcis_ics_2000.pdf",
+            ):
+                (source / name).touch()
+            args = SimpleNamespace(
+                years=[1999, 2000],
+                output_dir=str(root),
+                resume=True,
+                allow_network=False,
+                timeout_seconds=10,
+                continue_on_year_error=True,
+            )
+            identity = {"path": "fixture", "size": 0, "sha256": "a" * 64, "source_url": "https://example.test"}
+            successful_rows = [
+                {
+                    "record_type": "catalog",
+                    "country_region": region,
+                    "year": 2000,
+                    "series_key": f"{region}-example",
+                    "canonical_name_original": "Example",
+                    "original_name": "Example",
+                    "chinese_name": "",
+                    "grade_text": "G1",
+                    "racecourse": "Example",
+                    "local_date": "",
+                    "distance_text": "1600",
+                    "surface": "turf",
+                    "expectation_status": "held",
+                    "founded_year": "",
+                    "ended_year": "",
+                    "series_status": "unknown",
+                    "season_label": "1999/00" if region == "hong_kong" else "",
+                    "source_scope": "fixture",
+                    "discipline": "flat",
+                    "source_duplicate_count": 1,
+                }
+                for region in self.module.REGION_ADAPTERS
+            ]
+            with mock.patch.object(self.module, "download_to_cache", return_value=identity), mock.patch.object(
+                self.module, "discover_edition_links", return_value={1999: "https://example.test/1999.pdf", 2000: "https://example.test/2000.pdf"}
+            ), mock.patch.object(self.module, "_pdf_pages", return_value=["fixture"]), mock.patch.object(
+                self.module,
+                "parse_ics_pages",
+                side_effect=[self.module.IcsCatalogError("1999 source conflict"), successful_rows],
+            ):
+                result = self.module.prepare_catalog(args)
+
+            summary = json.loads((root / "summary.json").read_text(encoding="utf-8"))
+            manifest = json.loads((root / "manifest_japan.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["status"], "partial")
+        self.assertEqual(result["successful_years"], [2000])
+        self.assertIn("1999", summary["year_errors"])
+        self.assertIn("1999", manifest["excluded_year_errors"])
 
     def test_parsed_rows_write_to_region_csv_with_raw_pdf_provenance(self):
         rows = self.module.parse_ics_pages(
