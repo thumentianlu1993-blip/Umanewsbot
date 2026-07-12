@@ -2,6 +2,8 @@
 
 ## 当前结论
 
+`2026-07-12` P0 马资料补全基础能力已部署生产提交 `ce676998`。本地分支先变基到最新 `origin/main=31cc82c`，P0 迁移因主干已有 `0023/0024/0026` 顺延为 `stable.0027_p0_horse_profile_completion`；最新主干上术语解析/旧马匹页/P0 定向测试 `104` 项通过，补齐临时环境 `pdfplumber` 后完整 `stable` `813` 项全部通过，Django check、迁移一致性、OpenSpec strict/all 和 `git diff --check` 通过。生产部署前 `HEAD=31cc82c`，容器、内外 `/healthz/`、公网 `/horses/` 正常，外部导入 started/锁和 Celery active/reserved 均为空，未发现历史回填进程；备份 `.env.backup.p0-horse-profile-20260712_162039` 与 `backups/db/pre-p0-horse-profile-20260712_162039.sql.gz`（109MB，`gzip -t` 通过）。生产已显式保持 `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`，并新增批次上限 `10`、强制来源 URL、在役履历新鲜度 `1` 天。部署后 `0027` 已应用，`manage.py check`、内外健康页、马匹页和 Django Admin 跳转通过，`web/worker/beat` 日志无 traceback；既有 `HorseRaceRecord=21`，全部回填幂等键、空键 `0`。P0 来源 dry-run 为 `term_candidates=21596`、`major_race_candidates=992`，实际重点赛事证据含 runner `5096`、result `4572`；为遵守“五地区各 10 匹先人工跑通”，本次未执行 `--sync-sources --commit`，生产 `HorseP0Source/HorseIdentityConflict/HorseProfileCompletionRun` 仍为 `0`，也未启用网络补全或自动首次发布。
+
 项目当前已经完成正式域名 HTTP 接入修复，`umafans.run` 与 `www.umafans.run` 已可访问。  
 “自动化内容运营 + AI 编辑改写 MVP”已完成代码侧与生产侧上线，当前处于上线后观察与质量抽检阶段。
 

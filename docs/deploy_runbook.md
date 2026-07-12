@@ -1,5 +1,19 @@
 # 部署运行手册
 
+## 2026-07-12 P0 马资料补全基础能力部署
+
+- 生产提交：`ce676998`；部署前 `HEAD=31cc82c`。
+- 迁移：P0 原开发编号 `0023` 因最新主干已有迁移而顺延为 `stable.0027_p0_horse_profile_completion`。
+- 部署前检查：`web/worker/beat/db/redis/nginx` 正常；本地与公网 `/healthz/`、公网 `/horses/` 正常；`ExternalDataImportRun(status=started)=0`、导入锁 `0`、Celery active/reserved 为空，未发现历史回填进程；磁盘剩余约 `19GB`。
+- 备份：`.env.backup.p0-horse-profile-20260712_162039`；数据库 `backups/db/pre-p0-horse-profile-20260712_162039.sql.gz`，`109MB`，已通过 `gzip -t`。
+- 生产显式配置：`HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`、`HORSE_PROFILE_COMPLETION_REQUEST_INTERVAL_SECONDS=8`、`HORSE_PROFILE_COMPLETION_CACHE_DIR=runtime/horse_profile_completion/cache`、`HORSE_PROFILE_COMPLETION_BATCH_LIMIT=10`、`HORSE_PROFILE_COMPLETION_REQUIRE_SOURCE_URL=true`、`HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS=1`。
+- 部署后：`0027` 已应用，`manage.py check` 通过；内外 `/healthz/` 返回 `200`，`/horses/` 返回 `200`，身份冲突 Django Admin 未登录跳转正常；容器健康，`web/worker/beat` 日志无 traceback。
+- 数据抽检：`HorseRaceRecord=21`、非空幂等键 `21`、空键 `0`；新 P0 来源、身份冲突、补全 run 均为 `0`。
+- P0 dry-run：`term_candidates=21596`、`major_race_candidates=992`；其中重点赛事含 runner `5096`、result `4572`。本次未执行 `p0_horse_profiles --sync-sources --commit`，避免绕过“五地区各 10 匹先人工跑通”直接全量写入数千匹马。
+- 本地上线验证：最新主干定向 `104` 项通过，完整 `stable` `813` 项全部通过；Django check、迁移一致性、OpenSpec strict/all、`git diff --check` 通过。
+
+回滚代码可使用部署前提交 `31cc82c`；若需要恢复迁移前数据库，使用上述 `pre-p0-horse-profile` 备份。`0027` 新表和字段在代码回滚后可暂时保留不用，只有确认需要彻底恢复时才执行数据库恢复。
+
 ## 2026-07-10 英文术语门禁上下文判定上线
 
 - 本地 change：`classify-english-term-gate-context`。
