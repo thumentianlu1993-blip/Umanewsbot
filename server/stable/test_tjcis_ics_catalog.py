@@ -425,6 +425,19 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
         self.assertIn("1999", summary["year_errors"])
         self.assertIn("1999", manifest["excluded_year_errors"])
 
+    def test_continue_on_year_error_isolates_missing_region_coverage(self):
+        incomplete = [
+            {
+                "country_region": region,
+                "year": 2020,
+            }
+            for region in self.module.REGION_ADAPTERS
+            if region != "hong_kong"
+        ]
+        missing = self.module._missing_regions(incomplete)
+
+        self.assertEqual(missing, ["hong_kong"])
+
     def test_parsed_rows_write_to_region_csv_with_raw_pdf_provenance(self):
         rows = self.module.parse_ics_pages(
             ["Example S. G3 .... 100,000 .... 3up .... 8 D .... Belmont Park\nPt I—UNITED STATES OF AMERICA"],

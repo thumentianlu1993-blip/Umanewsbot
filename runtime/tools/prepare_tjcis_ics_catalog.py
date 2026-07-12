@@ -498,6 +498,14 @@ def _write_year_region_csv(output_dir: Path, rows: list[dict], *, year: int, raw
     return path
 
 
+def _missing_regions(rows: list[dict]) -> list[str]:
+    return [
+        region
+        for region in REGION_ADAPTERS
+        if not any(row.get("country_region") == region for row in rows)
+    ]
+
+
 def prepare_catalog(args) -> dict:
     years = sorted(set(args.years))
     if not years or years[0] < 1998:
@@ -547,6 +555,11 @@ def prepare_catalog(args) -> dict:
         raw_sources.append(identity)
         try:
             rows = parse_ics_pages(_pdf_pages(pdf_path), year=year)
+            missing_regions = _missing_regions(rows)
+            if missing_regions:
+                raise IcsCatalogError(
+                    f"{year} Blue Book 未解析出地区分级赛：{', '.join(missing_regions)}"
+                )
         except IcsCatalogError as exc:
             if not args.continue_on_year_error:
                 raise
@@ -555,8 +568,6 @@ def prepare_catalog(args) -> dict:
         counts[str(year)] = {}
         for region in REGION_ADAPTERS:
             region_rows = [row for row in rows if row["country_region"] == region]
-            if not region_rows:
-                raise IcsCatalogError(f"{year} Blue Book 未解析出 {region} 分级赛")
             csv_path = _write_year_region_csv(
                 output_dir,
                 region_rows,
