@@ -771,6 +771,26 @@ class TermGateReprocessContractTests(TestCase):
         self.assertIn(related_term.id, [entry.id for entry in context.term_entries])
         self.assertIn(related_term.id, context.term_entry_ids_by_article[article.id])
 
+    @override_settings(AUTO_DUPLICATE_HIGH_THRESHOLD=0.86, AUTO_DUPLICATE_REVIEW_THRESHOLD=0.72)
+    def test_prefetched_duplicate_candidates_do_not_lazy_load_deferred_fields(self):
+        from stable.services.term_gate_reprocessing import build_validation_batch_context
+        from stable.services.validation import validate_rewrite
+
+        duplicate = self._article(
+            source_article_id="duplicate-corpus-projection",
+            workflow_status=WorkflowStatus.PUBLISHED,
+            automation_status=AutomationStatus.AUTO_PUBLISHED,
+        )
+        duplicate.published_to_web_at = timezone.now()
+        duplicate.save(update_fields=["published_to_web_at", "updated_at"])
+        article = self._article(source_article_id="duplicate-corpus-candidate")
+
+        context = build_validation_batch_context([article])
+        with CaptureQueriesContext(connection) as queries:
+            validate_rewrite(article, batch_context=context)
+
+        self.assertEqual(len(queries), 0)
+
     def test_batch_term_index_strips_sentence_punctuation_from_bucket_tokens(self):
         from stable.services.term_gate_reprocessing import build_validation_batch_context
 
