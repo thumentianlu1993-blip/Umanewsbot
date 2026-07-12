@@ -15,7 +15,7 @@ from typing import Any, Callable
 
 from django.conf import settings
 from django.db import connection, transaction
-from django.db.models import Q
+from django.db.models import Q, prefetch_related_objects
 from django.utils import timezone
 
 from stable.models import (
@@ -31,10 +31,12 @@ from stable.models import (
     TermGateReprocessLock,
     TermGateReprocessRun,
     TermGateReprocessStatus,
+    TermTranslationStatus,
     TermType,
     WorkflowStatus,
 )
 from stable.services.terms import _comparable_horse_name, recognize_horse_names_batch
+from stable.services.news_attribution import article_region_set
 from stable.services.validation import (
     ValidationBatchContext,
     apply_validation_outcome,
@@ -169,15 +171,20 @@ def _term_snapshot_sha256_from_loaded(entries, aliases) -> str:
     )
 
 
-def build_term_snapshot_sha256(*, progress_callback: Callable[[], None] | None = None) -> str:
+def build_term_snapshot_sha256(
+    *,
+    term_ids: list[int] | None = None,
+    progress_callback: Callable[[], None] | None = None,
+) -> str:
     if progress_callback:
         progress_callback()
-    entries = list(
-        TermEntry.objects.filter(
-            is_active=True,
-            term_type__in=[TermType.HORSE, TermType.RACE, TermType.JOCKEY, TermType.TRAINER],
-        )
+    entry_queryset = TermEntry.objects.filter(
+        is_active=True,
+        term_type__in=[TermType.HORSE, TermType.RACE, TermType.JOCKEY, TermType.TRAINER],
     )
+    if term_ids is not None:
+        entry_queryset = entry_queryset.filter(id__in=term_ids)
+    entries = list(entry_queryset)
     if progress_callback:
         progress_callback()
     aliases = list(
@@ -303,8 +310,18 @@ def build_validation_batch_context(
     if progress_callback:
         progress_callback()
     entry_queryset = TermEntry.objects.filter(
-            is_active=True,
-            term_type__in=[TermType.HORSE, TermType.RACE, TermType.JOCKEY, TermType.TRAINER],
+        is_active=True,
+        term_type__in=[TermType.HORSE, TermType.RACE, TermType.JOCKEY, TermType.TRAINER],
+    )
+    languages = {article.source_language or SourceLanguage.JAPANESE for article in articles}
+    if languages == {SourceLanguage.ENGLISH}:
+        prefetch_related_objects(articles, "related_region_links")
+        regions = {region for article in articles for region in article_region_set(article)}
+        pending_horse = Q(term_type=TermType.HORSE) & (
+            Q(target_zh="") | ~Q(translation_status=TermTranslationStatus.TRANSLATED)
+        )
+        entry_queryset = entry_queryset.filter(
+            Q(racing_region="") | Q(racing_region__in=regions) | pending_horse
         )
     if lock_terms:
         entry_queryset = entry_queryset.select_for_update()
@@ -319,7 +336,6 @@ def build_validation_batch_context(
     aliases_by_term_language: dict[tuple[int, str], list[str]] = {}
     for alias in aliases:
         aliases_by_term_language.setdefault((alias.term_id, alias.source_language), []).append(alias.text)
-    languages = {article.source_language or SourceLanguage.JAPANESE for article in articles}
     terms_by_language: dict[str, dict[int, list[str]]] = {}
     for language in languages:
         mapping: dict[int, list[str]] = {}
@@ -843,7 +859,7 @@ def commit_reprocess_run(*, dry_run_id: int, manifest_sha256: str) -> dict:
         return {"status": "already_committed", "restored_candidate_ids": run.result_payload.get("committed_candidate_ids", [])}
     if run.manifest_sha256 != manifest_sha256:
         raise ValueError("manifest SHA-256 不匹配")
-    if run.rule_version != RULE_VERSION or run.settings_sha256 != build_settings_sha256() or run.term_snapshot_sha256 != build_term_snapshot_sha256():
+    if run.rule_version != RULE_VERSION or run.settings_sha256 != build_settings_sha256():
         TermGateReprocessRun.objects.filter(pk=run.pk).update(
             status=TermGateReprocessStatus.REJECTED,
             error_message="global_snapshot_drift",
@@ -929,7 +945,10 @@ def commit_reprocess_run(*, dry_run_id: int, manifest_sha256: str) -> dict:
                 NewsArticle.objects.filter(pk=article.pk).update(ranked_revived_at=now, updated_at=now)
                 restored.append(article.id)
             final_settings_sha256 = build_settings_sha256()
-            final_term_snapshot_sha256 = build_term_snapshot_sha256(progress_callback=commit_progress)
+            final_term_snapshot_sha256 = build_term_snapshot_sha256(
+                term_ids=[entry.id for entry in context.term_entries],
+                progress_callback=commit_progress,
+            )
             if (
                 locked_run.rule_version != RULE_VERSION
                 or locked_run.settings_sha256 != final_settings_sha256

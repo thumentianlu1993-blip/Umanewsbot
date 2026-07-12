@@ -25,6 +25,7 @@ from stable.models import (
     ExternalDataSource,
     ExternalHorseAlias,
     NewsArticle,
+    NewsArticleRelatedRegion,
     QQPushDelivery,
     RaceEvent,
     RaceEventRunner,
@@ -427,7 +428,7 @@ class TermGateReprocessContractTests(TestCase):
 
         with patch(
             "stable.services.term_gate_reprocessing.build_term_snapshot_sha256",
-            side_effect=[run.term_snapshot_sha256, "f" * 64],
+            return_value="f" * 64,
         ):
             payload = self._commit(dry_run["run_id"], dry_run["manifest_sha256"])
 
@@ -698,6 +699,77 @@ class TermGateReprocessContractTests(TestCase):
 
         self.assertLess(context.term_pattern_check_count, 20)
         self.assertIn(self.term.id, context.term_entry_ids_by_article[article.id])
+
+    def test_batch_context_excludes_translated_terms_from_unrelated_regions(self):
+        from stable.services.term_gate_reprocessing import build_validation_batch_context
+
+        unrelated = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_ja="Regional Outsider",
+            target_zh="地区外马名",
+            priority=100,
+        )
+        article = self._article(
+            source_article_id="region-filtered-term-index",
+            body="Regional Outsider and Brilliant were both mentioned in the report. " * 5,
+        )
+
+        context = build_validation_batch_context([article])
+
+        self.assertIn(self.term.id, [entry.id for entry in context.term_entries])
+        self.assertNotIn(unrelated.id, [entry.id for entry in context.term_entries])
+        self.assertNotIn(unrelated.id, context.term_entry_ids_by_article[article.id])
+
+    def test_batch_context_keeps_pending_horse_terms_across_regions(self):
+        from stable.services.term_gate_reprocessing import build_validation_batch_context
+
+        pending = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_ja="Pending Regional Horse",
+            target_zh="",
+            priority=100,
+        )
+        article = self._article(
+            source_article_id="pending-cross-region-term-index",
+            body="Pending Regional Horse will make its next start after training well. " * 5,
+        )
+
+        context = build_validation_batch_context([article])
+
+        self.assertIn(pending.id, [entry.id for entry in context.term_entries])
+        self.assertIn(pending.id, context.term_entry_ids_by_article[article.id])
+
+    def test_batch_context_keeps_terms_from_related_regions(self):
+        from stable.services.term_gate_reprocessing import build_validation_batch_context
+
+        related_term = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_ja="Related Region Runner",
+            target_zh="关联地区赛驹",
+            priority=100,
+        )
+        article = self._article(
+            source_article_id="related-region-term-index",
+            body="Related Region Runner will make its next start after training well. " * 5,
+        )
+        NewsArticleRelatedRegion.objects.create(
+            article=article,
+            region=RacingRegion.UNITED_STATES,
+            source="test",
+            reason="cross-region coverage",
+            confidence=100,
+        )
+
+        context = build_validation_batch_context([article])
+
+        self.assertIn(related_term.id, [entry.id for entry in context.term_entries])
+        self.assertIn(related_term.id, context.term_entry_ids_by_article[article.id])
 
     def test_batch_term_index_strips_sentence_punctuation_from_bucket_tokens(self):
         from stable.services.term_gate_reprocessing import build_validation_batch_context
