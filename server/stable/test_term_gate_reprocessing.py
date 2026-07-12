@@ -674,6 +674,22 @@ class TermGateReprocessContractTests(TestCase):
         self.assertTrue(expected)
         self.assertEqual(actual, expected)
 
+    def test_english_batch_alias_prefetch_skips_ngram_candidate_expansion(self):
+        from stable.services.term_gate_reprocessing import build_validation_batch_context
+
+        article = self._article(
+            source_article_id="english-alias-no-ngram-expansion",
+            body=("This long racing report discusses runners, trainers, jockeys, results and future plans. " * 200),
+        )
+
+        with patch(
+            "stable.services.terms._non_japanese_alias_candidate_keys",
+            side_effect=AssertionError("English batch should not generate n-gram keys"),
+        ):
+            context = build_validation_batch_context([article])
+
+        self.assertIn(article.id, context.recognized_horses_by_article)
+
     def test_batch_term_index_only_checks_buckets_present_in_each_article(self):
         from stable.services.term_gate_reprocessing import build_validation_batch_context
 

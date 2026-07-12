@@ -509,10 +509,10 @@ def _recognize_non_japanese_external_aliases(
             _comparable_horse_name(term, source_language) for term in _known_horse_terms(source_language)
         }
     candidates: dict[str, dict] = {}
-    candidate_keys = _non_japanese_alias_candidate_keys(full_text, source_language)
-    if not candidate_keys:
-        return formal_matches[:limit] if limit is not None else formal_matches
     if aliases is None:
+        candidate_keys = _non_japanese_alias_candidate_keys(full_text, source_language)
+        if not candidate_keys:
+            return formal_matches[:limit] if limit is not None else formal_matches
         queryset = ExternalHorseAlias.objects.filter(source_language=source_language).exclude(normalized_name="")
         if source_language == SourceLanguage.ENGLISH:
             queryset = queryset.annotate(normalized_key=Lower("normalized_name")).filter(normalized_key__in=candidate_keys)
@@ -603,15 +603,11 @@ def recognize_horse_names_batch(
     for language, rows in grouped.items():
         if progress_callback:
             progress_callback()
-        candidate_keys: set[str] = set()
-        for _, full_text in rows:
-            candidate_keys.update(_non_japanese_alias_candidate_keys(full_text, language))
         queryset = ExternalHorseAlias.objects.filter(source_language=language).exclude(normalized_name="")
-        if language == SourceLanguage.ENGLISH:
-            queryset = queryset.annotate(normalized_key=Lower("normalized_name")).filter(
-                normalized_key__in=candidate_keys
-            )
-        else:
+        if language != SourceLanguage.ENGLISH:
+            candidate_keys: set[str] = set()
+            for _, full_text in rows:
+                candidate_keys.update(_non_japanese_alias_candidate_keys(full_text, language))
             queryset = queryset.filter(normalized_name__in=candidate_keys)
         query_counter = {"count": 0}
 
