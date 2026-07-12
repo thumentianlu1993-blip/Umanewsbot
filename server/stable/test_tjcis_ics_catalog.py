@@ -169,6 +169,15 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
         )
         self.assertEqual(suffix_rows[0]["distance_text"], "12")
 
+        appendix_rows = self.module.parse_ics_pages(
+            [
+                "Valid S. G1 .... 100,000 .... 3up .... 8 T .... Ascot\nPt I—GB\n"
+                "Appendix to POST PUBLICATION CHANGES\nOld S. G1 .... 100,000 .... 3up .... 8 T .... Ascot"
+            ],
+            year=2016,
+        )
+        self.assertEqual([row["original_name"] for row in appendix_rows], ["Valid S"])
+
     def test_synthetic_surface_and_same_name_collisions_are_not_silently_collapsed(self):
         pages = [
             "Example S. G3 .... 100,000 .... 3up .... 8 AWT .... Golden Gate\n"
@@ -242,6 +251,48 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
                 ("united_states", "US Jump"),
             ],
         )
+
+    def test_jump_country_title_and_index_reset_context(self):
+        pages = [
+            "British Chase G1 .... 100,000 .... 5up .... 3 .... Kempton\nPt IV—GREAT BRITAIN JUMPS",
+            "IRISH JUMP RACES\nIrish Chase G1 .... 100,000 .... 5up .... 3 .... Leopardstown",
+            "INDEX\nUnited States Jumps\nRace Page G1 .... 1 .... 5up .... 3 .... 4-1\nPt IV—INDEX",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=2016)
+
+        self.assertEqual([row["original_name"] for row in rows], ["British Chase"])
+
+    def test_incomplete_listed_row_does_not_attach_to_next_graded_race(self):
+        page = (
+            "Example Listed Hurdle (L) .... 70,000 .... 4-5yo .... Auteuil\n"
+            "Example Chase G2 .... 100,000 .... 5up .... 3 .... Auteuil\n"
+            "Pt IV—FRENCH JUMPS"
+        )
+
+        rows = self.module.parse_ics_pages([page], year=2016)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Example Chase"])
+
+    def test_combined_currency_header_is_removed_from_first_race_name(self):
+        page = (
+            "HONG KONG (HK Dollars) (Meters & Surface) Bauhinia Sprint Trophy G3 "
+            ".... 10,000,000 .... 3up .... 1000 T .... Sha Tin\nPt II—HONG KONG"
+        )
+
+        rows = self.module.parse_ics_pages([page], year=2016)
+
+        self.assertEqual(rows[0]["original_name"], "Bauhinia Sprint Trophy")
+
+    def test_hong_kong_part_two_header_with_following_newline_is_detected(self):
+        page = (
+            "Hong Kong Classic Cup HK G1 .... 10,000,000 .... 4yo .... 1800 T .... Sha Tin\n"
+            "Pt II—HONG KONG\nHONG KONG"
+        )
+
+        rows = self.module.parse_ics_pages([page], year=2016)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Hong Kong Classic Cup"])
 
     def test_series_keys_remove_sponsors_and_stay_stable_across_editions(self):
         old = self.module.stable_series_key("united_kingdom", "Tingle Creek Trophy Stp. [Old Sponsor]")
@@ -457,6 +508,17 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
 
         self.assertIn("united_states", implausible)
         self.assertNotIn("japan", implausible)
+
+    def test_suspicious_name_guard_rejects_index_and_listed_row_contamination(self):
+        rows = [
+            {"original_name": "Race Page G1 index material"},
+            {"original_name": "Listed Hurdle (L) 70,000 Example Chase"},
+            {"original_name": "Normal Stakes"},
+        ]
+
+        suspicious = self.module._suspicious_catalog_names(rows)
+
+        self.assertEqual(len(suspicious), 2)
 
     def test_parsed_rows_write_to_region_csv_with_raw_pdf_provenance(self):
         rows = self.module.parse_ics_pages(

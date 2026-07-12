@@ -83,7 +83,7 @@ DISTANCE_SURFACE_RE = re.compile(r"\b(?:a\s*)?(\d+(?:\.\d+)?)(?:\s*a)?\s*(T|D|AW
 ROW_END_RE = re.compile(r"\b(?:[2-9](?:yo|up)|[2-9]-[2-9]yo)\b.*\b(?:a\s*)?\d+(?:\.\d+)?(?:\s*a)?(?:\s*(?:T|D|AWT))?\b", re.I)
 DECLARED_TOTAL_RE = re.compile(r"Total\s+(?:Graded|Group)\s+races\s*:\s*\.*\s*(\d+)", re.I)
 UNSUPPORTED_SECTION_RE = re.compile(
-    r"PT(?:I|II|IV)[—-](?:ARGENTINA|AUSTRALIA|BRAZIL|CANADA|CHILE|CZECHREPUBLIC|GERMAN(?:Y|JUMPS)|INDIA|IRELAND|IRISHJUMPS|ITALY|ITALIANJUMPS|KOREA|MACAU|MALAYSIA|NEWZEALAND(?:JUMPS)?|PANAMA|PERU|PUERTORICO|SCANDINAVIA|SINGAPORE|SOUTHAFRICA|SPAIN|SWITZERLANDJUMPS|UNITEDARABEMIRATES|URUGUAY|VENEZUELA)"
+    r"PT(?:I|II|IV)[—-](?:ARGENTINA|AUSTRALIA|BRAZIL|CANADA|CHILE|CZECHREPUBLIC|GERMAN(?:Y|JUMPS)|INDIA|IRELAND|IRISHJUMPS|ITALY|ITALIANJUMPS|KOREA|MACAU|MALAYSIA|NEWZEALAND(?:JUMPS)?|PANAMA|PERU|PUERTORICO|SCANDINAVIA|SINGAPORE|SOUTHAFRICA|SPAIN|SWITZERLANDJUMPS|UNITEDARABEMIRATES|URUGUAY|VENEZUELA|INDEX)"
 )
 UNSUPPORTED_COUNTRY_TITLES = {
     "ARGENTINA",
@@ -95,7 +95,11 @@ UNSUPPORTED_COUNTRY_TITLES = {
     "GERMANY",
     "INDIA",
     "IRELAND",
+    "IRISHJUMPRACES",
     "ITALY",
+    "ITALIANJUMPRACES",
+    "GERMANJUMPRACES",
+    "INDEX",
     "KOREA",
     "MACAU",
     "MALAYSIA",
@@ -209,6 +213,8 @@ def canonical_series_name(name: str) -> str:
 
 def _page_context(text: str) -> tuple[str | None, str]:
     upper = unicodedata.normalize("NFKC", text).upper().replace(" ", "")
+    if re.search(r"PTIV[—-]INDEX", upper):
+        return None, "flat"
     if "JUMPS" in upper or "JUMPRACES" in upper:
         if "GBJUMPS" in upper or "GREATBRITAINJUMPS" in upper or "GREATBRITAINJUMPRACES" in upper:
             return "united_kingdom", "jumps"
@@ -218,7 +224,7 @@ def _page_context(text: str) -> tuple[str | None, str]:
             return "japan", "jumps"
         if "USAJUMPS" in upper or "UNITEDSTATESJUMPS" in upper:
             return "united_states", "jumps"
-    if re.search(r"PTI[—-](?:FR|FRA|FRANCE)(?:[A-Z-]|$)", upper):
+    if re.search(r"PTI[—-](?:FR|FRA|FRANCE)(?=[^A-Z]|$)", upper):
         return "france", "flat"
     if re.search(r"PTI[—-](?:GB|GREATBRITAIN)", upper):
         return "united_kingdom", "flat"
@@ -226,7 +232,7 @@ def _page_context(text: str) -> tuple[str | None, str]:
         return "united_states", "flat"
     if re.search(r"PT(?:I|II)[—-](?:JPN|JAPAN)", upper):
         return "japan", "flat"
-    if re.search(r"PT(?:I|II)[—-](?:HK|HKG|HONGKONG)(?:[A-Z-]|$)", upper):
+    if re.search(r"PT(?:I|II)[—-](?:HK|HKG|HONGKONG)(?=[^A-Z]|$)", upper):
         return "hong_kong", "flat"
     if "PTI—OTHER" in upper or "PTI-OTHER" in upper:
         return "other", "flat"
@@ -283,6 +289,14 @@ def _record_complete(value: str) -> bool:
 def _clean_name(value: str) -> str:
     value = DOTS_RE.sub(" ", value)
     value = re.sub(r"\s+", " ", value).strip(" .")
+    value = re.sub(
+        r"^(?:(?:HONG KONG|JAPAN|UNITED STATES OF AMERICA)\s+)?"
+        r"(?:(?:JAPANESE|UNITED STATES) JUMP ?RACES\s+)?"
+        r"(?:\([^)]*(?:DOLLARS|POUNDS|YEN|METERS|FURLONGS|SURFACE)[^)]*\)\s*)+",
+        "",
+        value,
+        flags=re.I,
+    ).strip()
     return value
 
 
@@ -388,7 +402,7 @@ def _declared_totals(pages: list[str]) -> dict[tuple[str, str], int]:
     current_region = None
     current_discipline = "flat"
     for page_text in pages:
-        appendix_starts = re.search(r"(?:^|\n)\s*APPENDIX\s*-", page_text, re.I)
+        appendix_starts = re.search(r"(?:^|\n)\s*APPENDIX\b", page_text, re.I)
         if appendix_starts:
             page_text = page_text[: appendix_starts.start()]
         detected_region, detected_discipline = _page_context(page_text)
@@ -413,7 +427,7 @@ def parse_ics_pages(pages: list[str], *, year: int) -> list[dict]:
     current_region = None
     current_discipline = "flat"
     for page_text in pages:
-        appendix_starts = re.search(r"(?:^|\n)\s*APPENDIX\s*-", page_text, re.I)
+        appendix_starts = re.search(r"(?:^|\n)\s*APPENDIX\b", page_text, re.I)
         if appendix_starts:
             page_text = page_text[: appendix_starts.start()]
         detected_region, detected_discipline = _page_context(page_text)
@@ -448,6 +462,10 @@ def parse_ics_pages(pages: list[str], *, year: int) -> list[dict]:
                 if row:
                     rows.append(row)
                 continue
+            if buffer and (GRADE_RE.search(line) or LISTED_RE.search(line)):
+                buffered = " ".join(buffer)
+                if GRADE_RE.search(buffered) or LISTED_RE.search(buffered):
+                    buffer = []
             buffer.append(line)
             combined = " ".join(buffer)
             if not _record_complete(combined):
@@ -525,6 +543,16 @@ def _implausibly_small_regions(rows: list[dict]) -> dict[str, int]:
     }
 
 
+def _suspicious_catalog_names(rows: list[dict]) -> list[str]:
+    suspicious = []
+    for row in rows:
+        name = str(row.get("original_name") or "")
+        upper = name.upper()
+        if len(name) > 160 or "RACE PAGE" in upper or "(L)" in upper or "TOTAL RACES" in upper:
+            suspicious.append(name)
+    return suspicious
+
+
 def prepare_catalog(args) -> dict:
     years = sorted(set(args.years))
     if not years or years[0] < 1998:
@@ -586,6 +614,11 @@ def prepare_catalog(args) -> dict:
                     for region, count in implausible_regions.items()
                 )
                 raise IcsCatalogError(f"{year} Blue Book 地区解析数量异常偏低：{details}")
+            suspicious_names = _suspicious_catalog_names(rows)
+            if suspicious_names:
+                raise IcsCatalogError(
+                    f"{year} Blue Book 出现疑似跨行/索引污染：{suspicious_names[:3]}"
+                )
         except IcsCatalogError as exc:
             if not args.continue_on_year_error:
                 raise
