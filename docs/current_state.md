@@ -1065,3 +1065,13 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 部分 inventory v3：`runtime/historical_race_inventory/tjcis-inventory-partial-2016-2021-v3-20260712/`，`target_count=3,252`、`series_count=1,313`、`conflict_count=82`、`accounted_count=2`；冲突主要为历史标点/空格/命名差异，manifest SHA-256 `f422c8fc82a616d49c634e96e263745d8b0250026be7af939f9f1a06bc9ba955`。
 - v3 仅是只读部分总账证据，未批准、未 commit。生产保持 `HistoricalRaceEventTarget=0`、1984–2025 `RaceEvent=0`、公开历史赛事 `0`；两个历史开关均为 `false`，公网 healthz 为 `200`。
 - 因完整年度总账尚未形成，未启动赛事详情全量抓取。下一步按错误族修复/交叉核对 25 个年度，再做系列身份审核；只有 1984–当前总账完整且批准后才能进入详情批次。
+
+## 2026-07-13 法国新鲜度与多地区归属代码安全关闭上线
+
+- 生产源码已从 `c998eb3f` 快进到 `badc10e028aa3c1f6f2984bbfad8c1e202101cdc`，基于最新代码重建 `umanewsbot:prod`，并成功应用 `stable.0029_france_freshness_translation_attribution`。`web / worker / beat / db / redis / nginx` 均正常运行，最近部署日志未发现 traceback、error、critical 或 exception。
+- 部署前已保存 `.env.backup.france-multiregion-20260713_041004`；有效数据库备份为 `backups/db/pre-france-multiregion-20260713_041111.sql.gz`，大小约 114 MiB，SHA256 为 `a92e95fd8b10ceb7cd3721d4984d8f8d699b23edf6686615e289a12e6aa0c898`，`gzip -t` 通过。首次中断文件已明确改名为 `.incomplete`，不得用于恢复。
+- 本次只部署代码，不启用新行为。`web / worker / beat` 实际设置均为 `MULTIREGION_ATTRIBUTION_MODE=off`、归属写入关闭、相关地区查询关闭、灰度阶段 `off`、gold 版本 `pending-review`、翻译自动重试关闭。新归属运行表可正常查询，当前 run/lock 均为 0。
+- 邮件告警接收地址已配置为 `754652181@qq.com`，但生产尚无 SMTP/EMAIL_HOST 凭据，因此 `TRANSLATION_FAILURE_EMAIL_ENABLED=false`。在完成 SMTP 配置和测试邮件前，不得宣称邮件通知可用或开启该开关。
+- 运行验收：服务器内部 `http://127.0.0.1/healthz/` 与公网 `http://umafans.run/healthz/` 返回 200；浏览器真实打开首页、法国频道和 `/news/8093/` 详情页均正常，详情页含 8 个正文段落且无前端错误。HTTPS 仍未接入证书，Nginx 443 TLS server 块原本即为注释状态，本次不将 HTTPS 计为已完成能力。
+- 法国只读 probe 未写文章：France Galop / TDN France / TDN France Broad 分别得到 `20 / 4 / 12` 条列表候选，三个来源均为 accepted，抽取的 6 篇详情全部成功；最新样本时间覆盖 2026-07-10 至 2026-07-12，未再返回 2020/2022 历史稿。生产法国来源 13/14/21 仍为 enabled、production approved、最近抓取 success。
+- OpenSpec 当前完成 `59/68`。真实至少 250 篇双人审核 gold set、生产 gold/dry-run、人工复核、时间修复与翻译小批处理、shadow/enforce 灰度、网页/测试群/正式群扩展和窗口数量验收均未完成，因此 change 保持 `implementing`，不得归档。

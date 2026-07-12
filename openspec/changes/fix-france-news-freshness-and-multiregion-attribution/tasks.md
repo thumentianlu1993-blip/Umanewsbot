@@ -91,8 +91,8 @@
 
 ## 9. 生产部署与灰度验收
 
-- [ ] 9.1 (operations) 部署前确认生产 HEAD、tracked/untracked 状态、容器、Nginx runtime config、外部导入/锁、Celery active/reserved、web/worker/beat 当前开关和法国来源状态，并生成 `.env` 与数据库备份及校验值 (adr: adr-010-staged-rollout)
-- [ ] 9.2 (operations) 部署代码和迁移，确认 web/worker/beat 均为 attribution mode=off、相关查询关闭、翻译自动重试关闭，并验证迁移、容器、日志、内外 `/healthz/`、首页、地区页和后台入口 (req: req-attribution-rollout)
+- [x] 9.1 (operations) 部署前确认生产 HEAD、tracked/untracked 状态、容器、Nginx runtime config、外部导入/锁、Celery active/reserved、web/worker/beat 当前开关和法国来源状态，并生成 `.env` 与数据库备份及校验值 (adr: adr-010-staged-rollout)
+- [x] 9.2 (operations) 部署代码和迁移，确认 web/worker/beat 均为 attribution mode=off、相关查询关闭、翻译自动重试关闭，并验证迁移、容器、日志、内外 `/healthz/`、首页、地区页和后台入口 (req: req-attribution-rollout)
 - [ ] 9.3 (operations) 在生产执行 TDN/France Galop 只读 probe、gold set 与最近 72 小时持久归属 dry-run，保存 run ID/manifest/runtime 导出并按质量与性能硬门槛判定 go/no-go (req: req-attribution-dry-run) (req: req-attribution-quality)
 - [ ] 9.4 (operations) 人工审核所有主地区变化、全部 `needs_review`、France Galop 时间修复和 `7871/7699` 等翻译重试清单 (req: req-attribution-dry-run) (req: req-attribution-quality)
 - [ ] 9.5 (operations) 使用锁定 manifest 小批修复可信发布时间并重试瞬时翻译失败，验证不直接重复发布或创建 QQ 交付 (req: req-recent-manifest-backfill)

@@ -4015,7 +4015,7 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 
 1. 部署前记录生产 HEAD、工作区、容器、Nginx、Celery active/reserved、外部导入与锁、法国来源状态；备份 `.env` 和 PostgreSQL，并校验备份。
 2. 显式保持 `MULTIREGION_ATTRIBUTION_MODE=off`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`、`TRANSLATION_AUTO_RETRY_ENABLED=false`，再部署代码并应用 `stable.0029_france_freshness_translation_attribution`。
-   同时确认 `TRANSLATION_FAILURE_EMAIL_ENABLED=true`、`TRANSLATION_FAILURE_NOTIFY_EMAILS=754652181@qq.com`，并通过现有 SMTP 配置发送一封受控测试邮件。
+   邮件接收地址设置为 `754652181@qq.com`；若生产缺少 SMTP/EMAIL_HOST 配置，则必须保持 `TRANSLATION_FAILURE_EMAIL_ENABLED=false`。只有 SMTP 配置完成且受控测试邮件成功后才允许开启。
 3. 验证 `web/worker/beat` 使用相同安全配置，执行 `manage.py check`，检查迁移、容器、日志、内外 `/healthz/`、首页、五地区页和运营后台。
 4. 对 TDN France 和 France Galop 执行只读 probe；France Galop 旧时间只先运行 `repair_france_galop_published_at` dry-run，保存 manifest、证据和漂移检查结果，不直接改库。
 5. 使用真实生产文章建立至少 250 篇有效、五地区各至少 40 篇、双人标注并裁决的 gold CSV，配置非 `pending-review` 的 `MULTIREGION_ATTRIBUTION_GOLD_VERSION` 和该 CSV 的 `MULTIREGION_ATTRIBUTION_GOLD_SNAPSHOT_SHA256`，再执行 `evaluate_multiregion_attribution_gold --labels <csv> --json`。任一质量门槛不通过即 no-go。
@@ -4024,3 +4024,13 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 8. 归属灰度顺序固定为：off 部署、shadow、仅新文章 enforce、网页和显式测试群相关查询、最近 72 小时受控回填、正式群。进入测试群阶段前，仅对指定 `PushTarget` 设置 `multiregion_test_enabled=true`；其余群保持 false，最终 `formal_groups` 阶段才扩大。每阶段记录指标并至少观察约定窗口。
 9. 回滚先关闭相关地区查询，再把归属切回 `off`，最后关闭翻译自动重试；保留已写审计与 run，不用反向迁移删除证据。数据库异常时按备份恢复流程处理。
 10. 至少验收 3 个日常窗口和 1 个可模拟的重要赛事窗口，按来源候选、翻译、归属、门禁、公开和 QQ 分层记录数量与零发布原因，完成后再更新状态文档并归档 change。
+
+## 2026-07-13 `fix-france-news-freshness-and-multiregion-attribution` 安全关闭部署记录
+
+1. 部署前生产 HEAD 为 `c998eb3f`；容器健康、Celery active/reserved 为空、外部导入和归属锁均为 0，法国来源 13/14/21 已启用且最近抓取成功。
+2. 环境备份：`.env.backup.france-multiregion-20260713_041004`。数据库有效备份：`backups/db/pre-france-multiregion-20260713_041111.sql.gz`，SHA256 `a92e95fd8b10ceb7cd3721d4984d8f8d699b23edf6686615e289a12e6aa0c898`；恢复前必须再次执行 `gzip -t`。带 `.incomplete` 后缀的首次文件禁止使用。
+3. 生产拉取 commit `badc10e028aa3c1f6f2984bbfad8c1e202101cdc`，执行 `docker compose -f docker-compose.prod.lowcost.yml build web`、`migrate --noinput`、`up -d --remove-orphans` 和 `collectstatic --noinput`；`stable.0029` 应显示 `[X]`。
+4. 部署后必须从 `web / worker / beat` 三个容器分别读取 Django settings，确认 attribution mode/rollout 均为 `off`，相关地区查询、翻译自动重试和失败邮件均为 false，gold version 为 `pending-review`。
+5. 健康验收以 `http://127.0.0.1/healthz/`、`http://umafans.run/healthz/`、首页、法国频道和新闻详情页为准；当前 HTTPS server 块仍注释，不能使用 HTTPS 失败判断本次应用部署失败，也不能对外宣称 HTTPS 已完成。
+6. 只读来源探测命令：`python manage.py probe_international_news_sources --source france_galop_news --source tdn_france --source tdn_france_broad --limit 2 --json`。2026-07-13 验收列表数为 `20 / 4 / 12`，均 accepted，详情错误为 0；该命令只做网络与数据库重复检查，不写入文章。
+7. 后续启用前先配置 SMTP 并测试 `754652181@qq.com` 收件，再建立有效 gold set、执行生产 dry-run 和人工复核；严格按 shadow、仅新文章 enforce、网页/测试群、72 小时回填、正式群顺序推进。任一质量门槛失败即停止扩大。

@@ -42,3 +42,11 @@ journal:
     tests_passed: 968
     tests_skipped: 1
     note: "修复灰度越界、manifest 重算与漂移、lease/门禁 resume、翻译回收竞态和邮件通知、发布时间证据、gold 有效分母及测试群隔离；最终 review 无待修复问题，生产任务仍未执行。"
+  - event: production-code-deployed-safe-off
+    date: "2026-07-13T04:17:23+08:00"
+    session: 1
+    branch: codex/fix-english-term-context-gates-release
+    commit: badc10e028aa3c1f6f2984bbfad8c1e202101cdc
+    tasks_completed: 59
+    tasks_total: 68
+    note: "生产已应用 stable.0029 并完成容器、HTTP 页面、日志、运行开关和法国三来源只读 probe 验收；归属、相关地区查询、翻译自动重试及邮件通知均保持关闭，gold set 与后续灰度仍待完成。"
