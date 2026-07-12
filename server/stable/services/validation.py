@@ -363,18 +363,39 @@ def _matched_source_term(text: str, source_terms: list[str], source_language: st
     return ""
 
 
+def _nfkc_text_with_source_offsets(text: str) -> tuple[str, list[int]]:
+    normalized_parts: list[str] = []
+    source_offsets: list[int] = []
+    for index, character in enumerate(text or ""):
+        normalized = unicodedata.normalize("NFKC", character)
+        normalized_parts.append(normalized)
+        source_offsets.extend([index] * len(normalized))
+    return "".join(normalized_parts), source_offsets
+
+
+def _source_span_from_normalized(
+    source_offsets: list[int],
+    start: int,
+    end: int,
+) -> tuple[int, int]:
+    if start >= end or not source_offsets:
+        return start, end
+    return source_offsets[start], source_offsets[end - 1] + 1
+
+
 def _source_term_match_span(text: str, candidate: str, source_language: str | None) -> tuple[int, int, str] | None:
     if not candidate:
         return None
     if source_language == SourceLanguage.ENGLISH:
-        normalized_text = unicodedata.normalize("NFKC", text or "")
+        normalized_text, source_offsets = _nfkc_text_with_source_offsets(text or "")
         normalized_candidate = unicodedata.normalize("NFKC", candidate)
         pattern = re.compile(r"(?<![0-9A-Za-z])" + re.escape(normalized_candidate) + r"(?![0-9A-Za-z])", re.IGNORECASE)
         match = pattern.search(normalized_text)
         if not match:
             return None
-        original = (text or "")[match.start() : match.end()]
-        return (match.start(), match.end(), original or match.group(0))
+        source_start, source_end = _source_span_from_normalized(source_offsets, match.start(), match.end())
+        original = (text or "")[source_start:source_end]
+        return (source_start, source_end, original or match.group(0))
     index = (text or "").find(candidate)
     return (index, index + len(candidate), candidate) if index >= 0 else None
 
@@ -416,29 +437,30 @@ def _all_source_term_match_contexts(
     matches: list[EnglishTermMatchContext] = []
     seen: set[tuple[str, int, int]] = set()
     for field, text in (("title", title), ("body", body)):
-        normalized_text = unicodedata.normalize("NFKC", text or "")
+        normalized_text, source_offsets = _nfkc_text_with_source_offsets(text or "")
         for term in sorted(source_terms, key=lambda value: (-len(value), value.casefold())):
             normalized_term = unicodedata.normalize("NFKC", term or "")
             if not normalized_term:
                 continue
             pattern = re.compile(r"(?<![0-9A-Za-z])" + re.escape(normalized_term) + r"(?![0-9A-Za-z])", re.IGNORECASE)
             for match in pattern.finditer(normalized_text):
-                key = (field, match.start(), match.end())
+                source_start, source_end = _source_span_from_normalized(source_offsets, match.start(), match.end())
+                key = (field, source_start, source_end)
                 if key in seen:
                     continue
                 seen.add(key)
-                context_start = max(0, match.start() - 80)
-                context_end = min(len(text or ""), match.end() + 80)
+                context_start = max(0, source_start - 80)
+                context_end = min(len(text or ""), source_end + 80)
                 snippet = (text or "")[context_start:context_end].strip()
-                position = "title" if field == "title" else ("lead" if match.start() < 500 else "body")
+                position = "title" if field == "title" else ("lead" if source_start < 500 else "body")
                 matches.append(
                     EnglishTermMatchContext(
-                        matched_text=(text or "")[match.start() : match.end()] or match.group(0),
+                        matched_text=(text or "")[source_start:source_end] or match.group(0),
                         matched_context=snippet,
                         position=position,
-                        tokens_before=tuple(re.findall(r"[A-Za-z0-9']+", (text or "")[context_start : match.start()])[-8:]),
-                        tokens_after=tuple(re.findall(r"[A-Za-z0-9']+", (text or "")[match.end() : context_end])[:8]),
-                        matched_span=(match.start(), match.end()),
+                        tokens_before=tuple(re.findall(r"[A-Za-z0-9']+", (text or "")[context_start:source_start])[-8:]),
+                        tokens_after=tuple(re.findall(r"[A-Za-z0-9']+", (text or "")[source_end:context_end])[:8]),
+                        matched_span=(source_start, source_end),
                     )
                 )
     order = {"title": 0, "lead": 1, "body": 2}

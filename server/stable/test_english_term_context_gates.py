@@ -290,6 +290,21 @@ class EnglishTermContextGateTests(TestCase):
         self.assertEqual(classifications[0]["matched_text"], "Ｂｒｉｌｌｉａｎｔ")
         self.assertEqual(classifications[0]["term_semantic_classification"], "proper_noun")
 
+    def test_nfkc_expansion_before_match_keeps_original_text_span(self):
+        self._term("Exactly", target="正是如此")
+        article = self._article(
+            title="Runner update",
+            body="The ﬁlly was exactly where the trainer expected after the race. " * 5,
+        )
+
+        outcome = validate_rewrite(article)
+
+        classifications = self._classifications(outcome, "Exactly")
+        self.assertTrue(classifications)
+        self.assertEqual(classifications[0]["matched_text"], "exactly")
+        start, end = classifications[0]["matched_span"]
+        self.assertEqual(article.body_ja_normalized[start:end], "exactly")
+
     def test_html_attributes_scripts_and_navigation_are_not_match_sources(self):
         self._term("Title", target="冠军头衔")
         normalized = (
