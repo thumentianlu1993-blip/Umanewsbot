@@ -3889,3 +3889,10 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 4. 对五个 `manifest_<region>.json` 运行 `parse_historical_race_catalog`，再用 `build_historical_race_inventory` 生成部分只读总账 artifact。核对每年五地区非零、平地自报总数一致、conflict/review/gap 和原始 PDF SHA。
 5. 1984–1997 未补齐前不得批准完整 inventory manifest、不得 commit 总账，也不得启动历史详情全量 apply。
 6. 无论成功或失败都恢复两个开关为 `false`，验证内外 `/healthz/`、当前赛事页、`HistoricalRaceEventTarget=0` 和 1984–2025 公开赛事数为 `0`。
+
+### 2026-07-12 首次 TJCIS 执行记录
+
+- 生产直连 TJCIS 超时，禁止继续盲目重试；本次采用同一工具本机受控抓取、生产离线 SHA 复验。原始目录为 `runtime/historical_race_inventory/tjcis-ics-1998-2026-relay-20260712/`，31 个 cache 文件全部验证通过。
+- 最终成功年只有 `2016 / 2020 / 2021`；`summary.json` 中 25 个 `year_errors` 是后续修复入口，不得删除、改成 warning 或从完成率分母隐藏。
+- v3 candidate/inventory 路径分别为 `tjcis-candidates-2016-2021-v3-20260712/` 和 `tjcis-inventory-partial-2016-2021-v3-20260712/`。`conflict_count=82`，因此 approval 保持空白，禁止执行 `build_historical_race_inventory --commit`。
+- 本轮没有数据库备份，因为全程只读且未进入 commit；写后核验为 targets/pre-2026/public-pre-2026 全部 `0`。常驻开关始终 `false`，生产 HEAD `3dc8dff` 后继续健康。

@@ -1010,6 +1010,16 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 新增 `prepare_tjcis_ics_catalog.py`，从 TJCIS 官方索引发现 1998–2026 International Cataloguing Standards 整本 PDF，统一解析日本、香港、英国、法国、美国平地及目标地区障碍分级赛。
 - 真实网络必须同时具备 CLI `--allow-network` 和两个历史开关，并复用共享 request budget/source cache。`--resume` 只复用 manifest、大小和 SHA 一致的缓存；全缓存重放可在网络开关关闭时执行。
 - 解析只接受 G1/G2/G3，支持老版点阵列、跨页名称、香港 Part I/II 赛季、Part IV 障碍页、AWT 和同名异场防覆盖。平地章节与年鉴自报 Graded/Group 总数强制对账。
-- 真实 2016 整书烟测的平地对账为法国 `114`、英国 `151`、日本 `128`、美国 `464`，全部与书内统计一致；1998 老版五地区也已真实解析通过。
+- 真实 2016 整书烟测已用于锁定版式；后续全书生产验收发现 1998 年鉴正文等级标记与页尾 G1/G2/G3 汇总互相矛盾，因此 1998 不再视为通过，必须进入来源交叉核对。
 - 新增/相关测试 `67` 项通过；完整 stable 发现 `724` 项，从错误 cwd 运行时仅有 2 个旧测试因相对 fixture 路径报错，从仓库根目录复跑均通过。`py_compile`、`git diff --check` 和最终 clean review 通过。
 - 任务 `8.3` 仍未勾选：下一步部署后生成 1998–2026 source cache/部分候选总账，再补齐 1984–1997。完整总账、身份审核和批准完成前不得宣称全量完成。
+
+## 2026-07-12 TJCIS 生产 source cache 与部分总账结果
+
+- 生产机到 `tjcis.com:443` 连续 TLS/连接超时，2 次请求均未收到字节；改由本机同一正式工具在共享预算/source-cache 门禁下抓取，再将原始字节、manifest 和 SHA 完整同步生产，生产离线复验。
+- 已缓存 1998–2026 共 `29` 本官方 PDF，加 2 个官方索引，总请求 `31/40`，原始 cache `82,494,754` bytes。生产逐文件大小/SHA 校验 `31/31` 通过；source summary SHA-256 为 `1a7aba7afac63b768fdcf8f994a9725a2471bddb6900c3313e4c1c7b537c7505`。
+- 严格年度验收最终仅通过 `2016 / 2020 / 2021`；其余 `25` 年存在正文/页尾数量不一致、章节缺失、同名身份冲突或地区数量异常。1984–1997 仍完全缺少 TJCIS 在线整本覆盖。
+- 标准候选 v3：`runtime/historical_race_inventory/tjcis-candidates-2016-2021-v3-20260712/`，共 `3,252` 行，日本 `404`、香港 `97`、英国 `894`、法国 `485`、美国 `1,372`，索引/附录/Listed 粘连质量扫描为 `0`；manifest SHA-256 `48b02ef77c02ef81e959331e5c927ddff412514c15caa8a0a6afbd23e67af1ac`。
+- 部分 inventory v3：`runtime/historical_race_inventory/tjcis-inventory-partial-2016-2021-v3-20260712/`，`target_count=3,252`、`series_count=1,313`、`conflict_count=82`、`accounted_count=2`；冲突主要为历史标点/空格/命名差异，manifest SHA-256 `f422c8fc82a616d49c634e96e263745d8b0250026be7af939f9f1a06bc9ba955`。
+- v3 仅是只读部分总账证据，未批准、未 commit。生产保持 `HistoricalRaceEventTarget=0`、1984–2025 `RaceEvent=0`、公开历史赛事 `0`；两个历史开关均为 `false`，公网 healthz 为 `200`。
+- 因完整年度总账尚未形成，未启动赛事详情全量抓取。下一步按错误族修复/交叉核对 25 个年度，再做系列身份审核；只有 1984–当前总账完整且批准后才能进入详情批次。
