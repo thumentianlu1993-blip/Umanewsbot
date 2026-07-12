@@ -13,6 +13,7 @@
           <div class="article-meta">
             <span>{{ profile.get_racing_region_display }}</span>
             <span>{{ profile.get_completeness_status_display }}</span>
+            {% if not profile.display_name_zh and not profile.primary_term.target_zh %}<span>中文译名待补</span>{% endif %}
             {% if profile.is_featured %}<span>推荐</span>{% endif %}
           </div>
           <h1>{{ profile.display_name }}</h1>

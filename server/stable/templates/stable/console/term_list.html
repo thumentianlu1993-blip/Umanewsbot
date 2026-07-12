@@ -35,6 +35,12 @@
           <option value="{{ value }}" {% if request.GET.racing_region == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
+      <select name="translation_status">
+        <option value="">全部翻译状态</option>
+        {% for value, label in translation_status_choices %}
+          <option value="{{ value }}" {% if request.GET.translation_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
       <select name="is_active">
         <option value="">全部状态</option>
         <option value="true" {% if request.GET.is_active == 'true' %}selected{% endif %}>启用中</option>
@@ -78,7 +84,13 @@
               </td>
               <td>{{ term.get_source_language_display }}</td>
               <td>{{ term.get_racing_region_display|default:"全局通用" }}</td>
-              <td>{{ term.target_zh }}</td>
+              <td>
+                {% if term.has_translation %}
+                  {{ term.target_zh }}
+                {% else %}
+                  <span class="badge warning">中文名待补</span>
+                {% endif %}
+              </td>
               <td>{{ term.get_term_type_display }}</td>
               <td>{{ term.race_grade|default:"-" }}</td>
               <td>{{ term.aliases_ja|length }}</td>
@@ -124,7 +136,13 @@
             {% endif %}
           </div>
           <h3 class="article-title">{{ term.source_ja }}</h3>
-          <p class="term-mobile-target">{{ term.target_zh }}</p>
+          <p class="term-mobile-target">
+            {% if term.has_translation %}
+              {{ term.target_zh }}
+            {% else %}
+              <span class="badge warning">中文名待补</span>
+            {% endif %}
+          </p>
           <div class="term-mobile-meta">
             <div><strong>原文别名</strong><span>{{ term.aliases_ja|length }}</span></div>
             <div><strong>中文别名</strong><span>{{ term.aliases_zh|length }}</span></div>

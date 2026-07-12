@@ -78,6 +78,9 @@ done
   - `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`
   - `HORSE_PROFILE_COMPLETION_REQUEST_INTERVAL_SECONDS=8`
   - `HORSE_PROFILE_COMPLETION_CACHE_DIR=runtime/horse_profile_completion/cache`
+  - `HORSE_PROFILE_COMPLETION_BATCH_LIMIT=10`
+  - `HORSE_PROFILE_COMPLETION_REQUIRE_SOURCE_URL=true`
+  - `HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS=1`
 - 部署方式：`git pull --ff-only origin main` 从 `01c0b9b` 快进到 `2b28755`，随后执行 `bash ./deploy_lowcost.sh`。
 - 迁移：`stable.0022_horseprofile_horsefollow_articlehorselink_and_more` 已应用。
 - 部署后状态：`web / worker / beat / db / redis / nginx` 正常，`web` 与 `db / redis` healthy，`manage.py check` 通过。
@@ -172,17 +175,42 @@ done
    - `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`
    - `HORSE_PROFILE_COMPLETION_REQUEST_INTERVAL_SECONDS=8`
    - `HORSE_PROFILE_COMPLETION_CACHE_DIR=runtime/horse_profile_completion/cache`
+   - `HORSE_PROFILE_COMPLETION_BATCH_LIMIT=10`
+   - `HORSE_PROFILE_COMPLETION_REQUIRE_SOURCE_URL=true`
+   - `HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS=1`
 
 ### 部署与迁移
+
+P0 马资料补全专项上线前额外确认：
+
+- `stable.0027_p0_horse_profile_completion` 会为自然键唯一的既有 `HorseRaceRecord` 回填幂等键；已有重复组保持空键，需先在 dry-run 报告中人工处理。
+- 已审核 artifact 必须同时具备顶层 `reviewed`、行级 `reviewed=true`、有效 `reviewer_id`，以及 `profile/pedigree/race_record/major_wins` 四模块 `approved`；缺少来源 URL、低置信、未审核或冲突模块不得写主表。
+- `p0_horse_profiles --sync-sources --commit` 只新增、刷新或恢复来源，不撤销历史来源；可配合 `--region` 做单地区同步。
+- `p0_horse_profiles --sync-sources --commit --full-reconcile` 才是全地区完整来源对账，会把本轮不再成立的受管来源标记为 `revoked`；只应在重点赛事/出赛表/赛果导入完成且本地结构化数据为完整快照时执行，不能与 `--region` 同时使用。
+- 队列排查可用 `--queue --profile-id <id>` 精确选择一匹或重复指定多匹；`--limit-per-region` 必须大于 0。
+- 马匹自身 `racing_region` 不因海外参赛而修改；抽检跨地区样本时同时核对 `HorseProfile.racing_region` 和 `HorseP0Source.racing_region`。
+- 抽检同场同名马时必须核对 `HorseP0Source.participant_key`：不同马号应为不同 `number:<horse_number>`，每个参赛键最多一条 active 来源；身份纠正应留下 revoked 旧行和 active 新行。
+- 参赛记录后补马号时，普通增量同步后应确认旧 identity 键已迁移为 number 键且仍只有一条 active 来源；runner/result 两边马号冲突时应只产生 pending `HorseIdentityConflict`，不得生成 active P0 来源。
+- 抽检同来源 identity 的同类型重复输入：两条 runner 或两条 result 使用不同马号时，应汇总为一条 pending 身份冲突，证据包含全部记录 ID 和马号，active P0 来源计数为 0。
+- 解决马号冲突时必须同时填写 `resolved_profile` 和 evidence 候选内的 `resolved_horse_number`；下一次同步只允许选中马号产生 active 来源。抽检冲突成员 URL 完整保留，完全无 URL 的冲突仍在 pending 列表中。
+- 跨来源自动归并数据库已有马时，必须完整且唯一命中经术语库归一的马名、父名、母名和出生年份；来源 ID 只能在自身命名空间内作为直接证据。
+- 身份不确定时应生成 `HorseIdentityConflict(status=pending)`，即使尚无 `HorseProfile` 也必须关联候选术语和原始证据，不得写入马匹主表；全量对账不得撤销仍在输入中的待处理来源或仅临时缺少 URL 的来源。
+- Celery Beat 每天 `09:20` 运行 `stable.tasks.notify_p0_horse_identity_conflicts_task`，复用 `MULTIREGION_OPS_NOTIFICATIONS_*` 通知配置。部署后应抽查任务日志、pending 冲突数和 `${DJANGO_ADMIN_URL}stable/horseidentityconflict/?status__exact=pending`。
+- Django Admin 处理身份冲突时应填写 `resolved_profile` 与 `resolution_notes`，并将状态改为 `resolved` 或 `ignored`；系统自动记录 `resolved_by/resolved_at`。
+- 人工执行完整资料 ready 前必须设置明确的 `HorseProfile.source_refs.p0_completion` 整匹马资料 URL；不能仅以单场赛果 URL 作为基础资料和血统来源。
+- P0 artifact 和后台人工候选写入赛绩后，抽检 `HorseRaceRecord.idempotency_key` 非空；同一赛绩重复审核不得增加记录数，缺少 `source_name` 或 `source_url` 的候选必须保持 pending/冲突且不落主表。
+- 后台手工新增/编辑赛绩也应抽检幂等键：重复提交不增加记录数，修改比赛名/日期/来源后键随之更新，若命中另一既有记录则页面提示冲突并保留原记录。
+- 编辑 importer 生成的赛绩后，必须确认原 `source_refs/raw_payload` 未变化，操作日志包含字段 before/after；后台“在役待刷新”筛选应与 `HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS` 一致。
+- 对含 external result/race ID 的赛绩执行人工改名后重跑相同 importer，确认幂等键仍为 external-ID 语义且记录数不增加。
 
 ```bash
 git pull --ff-only origin main
 bash ./deploy_lowcost.sh
-docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py showmigrations stable | grep 0022
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py showmigrations stable | grep 0027
 docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check
 ```
 
-期望：`stable.0022_horseprofile_horsefollow_articlehorselink_and_more` 已应用，`manage.py check` 通过。
+期望：`stable.0027_p0_horse_profile_completion` 已应用，`manage.py check` 通过。
 
 ### P0 草稿生成
 

@@ -52,6 +52,8 @@ from .models import (
     CrawlJob,
     HistoricalRaceResolutionStatus,
     HorseFollow,
+    HorseP0SourceStatus,
+    HorseP0SourceType,
     HorseProfile,
     HorseProfileCandidateStatus,
     HorseProfileCompleteness,
@@ -59,6 +61,7 @@ from .models import (
     HorseProfileStatus,
     HorseRaceLink,
     HorseRaceRecord,
+    HorseRaceResultStatus,
     MediaAsset,
     NewsArticle,
     NewsImage,
@@ -92,6 +95,7 @@ from .models import (
     TermCandidateStatus,
     TermAlias,
     TermEntry,
+    TermTranslationStatus,
     TermType,
     WindowCandidateDecision,
     WindowTargetDecision,
@@ -112,6 +116,7 @@ from .services.horse_profiles import (
     unfollow_horse,
     update_completeness,
 )
+from .services.horse_race_records import upsert_race_record
 from .services.media_assets import localize_news_image, set_cover_asset
 from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
 from .services.onebot import BotPusher
@@ -122,6 +127,7 @@ from .services.race_event_public_cache import (
 )
 from .services.news_attribution import filter_articles_visible_in_region
 from .services.production_windows import claim_window
+from .services.p0_horse_profiles import active_record_freshness_cutoff
 from .services.publishing_windows import select_publish_candidates
 from .services.pushing import enqueue_push_for_article
 from .services.qq_windows import select_qq_window_deliveries
@@ -283,6 +289,7 @@ def _term_filters(queryset, request: HttpRequest):
     racing_region = request.GET.get("racing_region", "").strip()
     is_active = request.GET.get("is_active", "").strip()
     has_alias = request.GET.get("has_alias", "").strip()
+    translation_status = request.GET.get("translation_status", "").strip()
 
     if query:
         normalized_query = query.casefold()
@@ -307,6 +314,8 @@ def _term_filters(queryset, request: HttpRequest):
         queryset = queryset.filter(Q(source_language=source_language) | Q(source_aliases__source_language=source_language)).distinct()
     if racing_region:
         queryset = queryset.filter(racing_region=racing_region)
+    if translation_status:
+        queryset = queryset.filter(translation_status=translation_status)
     if is_active == "true":
         queryset = queryset.filter(is_active=True)
     elif is_active == "false":
@@ -633,6 +642,10 @@ def _horse_profile_filters(queryset, request: HttpRequest):
     has_news = request.GET.get("has_news", "").strip()
     has_follows = request.GET.get("has_follows", "").strip()
     public = request.GET.get("public", "").strip()
+    p0_source = request.GET.get("p0_source", "").strip()
+    name_status = request.GET.get("name_status", "").strip()
+    sync_status = request.GET.get("sync_status", "").strip()
+    candidate_status = request.GET.get("candidate_status", "").strip()
     if query:
         queryset = queryset.filter(
             Q(display_name_zh__icontains=query)
@@ -664,6 +677,21 @@ def _horse_profile_filters(queryset, request: HttpRequest):
         queryset = queryset.filter(review_status=HorseProfileStatus.PUBLISHED)
     elif public == "no":
         queryset = queryset.exclude(review_status=HorseProfileStatus.PUBLISHED)
+    if p0_source:
+        queryset = queryset.filter(p0_sources__source_type=p0_source, p0_sources__status=HorseP0SourceStatus.ACTIVE).distinct()
+    if name_status == "pending":
+        queryset = queryset.filter(primary_term__translation_status=TermTranslationStatus.PENDING)
+    elif name_status == "translated":
+        queryset = queryset.filter(primary_term__translation_status=TermTranslationStatus.TRANSLATED).exclude(primary_term__target_zh="")
+    if sync_status == "stale":
+        queryset = queryset.filter(racing_career_status="active").filter(
+            Q(records_synced_through__isnull=True)
+            | Q(records_synced_through__lt=active_record_freshness_cutoff())
+        )
+    elif sync_status == "fresh":
+        queryset = queryset.exclude(records_synced_through__isnull=True)
+    if candidate_status in HorseProfileCandidateStatus.values:
+        queryset = queryset.filter(data_candidates__status=candidate_status).distinct()
     return queryset
 
 
@@ -679,6 +707,7 @@ def horse_profile_list(request: HttpRequest):
             candidate_count=Count("data_candidates", filter=Q(data_candidates__status=HorseProfileCandidateStatus.PENDING), distinct=True),
             follow_count=Count("follows", distinct=True),
             race_record_count=Count("race_records", distinct=True),
+            p0_source_count=Count("p0_sources", filter=Q(p0_sources__status=HorseP0SourceStatus.ACTIVE), distinct=True),
         )
         .order_by("racing_region", "display_name_zh", "original_name", "id")
     )
@@ -697,6 +726,8 @@ def horse_profile_list(request: HttpRequest):
             regions=RacingRegion.choices,
             statuses=HorseProfileStatus.choices,
             completenesses=HorseProfileCompleteness.choices,
+            p0_source_types=HorseP0SourceType.choices,
+            candidate_statuses=HorseProfileCandidateStatus.choices,
             filters={
                 "q": request.GET.get("q", ""),
                 "region": request.GET.get("region", ""),
@@ -706,6 +737,10 @@ def horse_profile_list(request: HttpRequest):
                 "has_news": request.GET.get("has_news", ""),
                 "has_follows": request.GET.get("has_follows", ""),
                 "public": request.GET.get("public", ""),
+                "p0_source": request.GET.get("p0_source", ""),
+                "name_status": request.GET.get("name_status", ""),
+                "sync_status": request.GET.get("sync_status", ""),
+                "candidate_status": request.GET.get("candidate_status", ""),
             },
             pagination_querystring=pagination_params.urlencode(),
         ),
@@ -741,6 +776,7 @@ def horse_profile_detail(request: HttpRequest, profile_id: int):
     race_record_form = HorseRaceRecordForm()
     article_link_form = HorseArticleLinkForm()
     candidates = profile.data_candidates.select_related("applied_by").all()[:40]
+    p0_sources = profile.p0_sources.select_related("term", "race_event").all()[:40]
     race_records = profile.race_records.select_related("event").all()[:80]
     article_links = {
         "linked": [],
@@ -768,6 +804,7 @@ def horse_profile_detail(request: HttpRequest, profile_id: int):
             race_record_form=race_record_form,
             article_link_form=article_link_form,
             candidates=candidates,
+            p0_sources=p0_sources,
             race_records=race_records,
             major_wins=major_win_records(profile),
             article_links=article_links,
@@ -804,8 +841,12 @@ def horse_profile_apply_candidate(request: HttpRequest, candidate_id: int):
     candidate = get_object_or_404(HorseProfileDataCandidate.objects.select_related("profile"), pk=candidate_id)
     action = request.POST.get("action", "apply")
     if action == "apply":
-        apply_horse_data_candidate(candidate, user=request.user)
-        messages.success(request, "候选资料已应用。")
+        try:
+            apply_horse_data_candidate(candidate, user=request.user)
+        except ValueError:
+            messages.error(request, "只有待确认候选可以应用。")
+        else:
+            messages.success(request, "候选资料已应用。")
     elif action in {"ignore", "conflict"}:
         candidate.status = HorseProfileCandidateStatus.IGNORED if action == "ignore" else HorseProfileCandidateStatus.CONFLICT
         candidate.applied_by = request.user
@@ -827,18 +868,21 @@ def horse_profile_add_race_record(request: HttpRequest, profile_id: int):
     profile = get_object_or_404(HorseProfile, pk=profile_id)
     form = HorseRaceRecordForm(request.POST)
     if form.is_valid():
-        record = form.save(commit=False)
-        record.horse_profile = profile
-        record.source_name = record.source_name or "manual"
-        record.save()
+        payload = _horse_race_record_payload(form)
+        try:
+            upsert = upsert_race_record(profile, payload)
+        except ValueError as exc:
+            messages.error(request, f"参赛履历未保存：{exc}")
+            return redirect("console-horse-profile-detail", profile_id=profile.pk)
+        record = upsert.record
         log_operation(
             action_type="horse_race_record_saved",
             target_type="horse_race_record",
             target_id=record.pk,
-            detail=f"手动添加马匹参赛履历 profile={profile.pk} race={record.race_name}",
+            detail=f"手动添加马匹参赛履历 profile={profile.pk} race={record.race_name} action={upsert.action}",
             admin=request.user,
         )
-        messages.success(request, "参赛履历已添加。")
+        messages.success(request, "参赛履历已添加。" if upsert.action == "created" else "已存在相同参赛履历，未重复添加。")
     else:
         messages.error(request, "参赛履历表单有误，请检查必填项。")
     return redirect("console-horse-profile-detail", profile_id=profile.pk)
@@ -854,16 +898,28 @@ def horse_profile_edit_race_record(request: HttpRequest, record_id: int):
     if request.method == "POST":
         form = HorseRaceRecordForm(request.POST, instance=record)
         if form.is_valid():
-            record = form.save()
-            log_operation(
-                action_type="horse_race_record_saved",
-                target_type="horse_race_record",
-                target_id=record.pk,
-                detail=f"编辑马匹参赛履历 profile={record.horse_profile_id} race={record.race_name}",
-                admin=request.user,
-            )
-            messages.success(request, "参赛履历已保存。")
-            return redirect("console-horse-profile-detail", profile_id=record.horse_profile_id)
+            try:
+                upsert = upsert_race_record(
+                    record.horse_profile,
+                    _horse_race_record_payload(form),
+                    record=record,
+                )
+            except ValueError as exc:
+                form.add_error(None, str(exc))
+            else:
+                record = upsert.record
+                log_operation(
+                    action_type="horse_race_record_saved",
+                    target_type="horse_race_record",
+                    target_id=record.pk,
+                    detail=(
+                        f"编辑马匹参赛履历 profile={record.horse_profile_id} "
+                        f"race={record.race_name} action={upsert.action} diff={upsert.diff}"
+                    ),
+                    admin=request.user,
+                )
+                messages.success(request, "参赛履历已保存。")
+                return redirect("console-horse-profile-detail", profile_id=record.horse_profile_id)
     else:
         form = HorseRaceRecordForm(instance=record)
     return render(
@@ -871,6 +927,30 @@ def horse_profile_edit_race_record(request: HttpRequest, record_id: int):
         "stable/console/horse_race_record_form.html",
         _console_context(request, record=record, profile=record.horse_profile, form=form),
     )
+
+
+def _horse_race_record_payload(form: HorseRaceRecordForm) -> dict:
+    cleaned = form.cleaned_data
+    race_date = cleaned.get("race_date")
+    event = cleaned.get("event")
+    return {
+        "event_id": event.pk if event else None,
+        "race_name": cleaned.get("race_name") or "",
+        "race_year": cleaned.get("race_year"),
+        "race_date": race_date.isoformat() if race_date else "",
+        "grade_text": cleaned.get("grade_text") or "",
+        "normalized_grade": cleaned.get("normalized_grade") or "",
+        "racecourse": cleaned.get("racecourse") or "",
+        "distance_text": cleaned.get("distance_text") or "",
+        "surface": cleaned.get("surface") or "",
+        "finish_position": cleaned.get("finish_position") or "",
+        "result_status": cleaned.get("result_status") or HorseRaceResultStatus.UNKNOWN,
+        "is_major_win": bool(cleaned.get("is_major_win")),
+        "major_win_order": cleaned.get("major_win_order") or 0,
+        "source_name": cleaned.get("source_name") or "manual",
+        "source_url": cleaned.get("source_url") or "",
+        "source_refs": {"entry_method": "manual_console"},
+    }
 
 
 @login_required
@@ -1341,6 +1421,7 @@ def term_list(request: HttpRequest):
                 (SourceLanguage.CHINESE_TRADITIONAL, "繁体中文"),
             ],
             racing_region_choices=RacingRegion.choices,
+            translation_status_choices=TermTranslationStatus.choices,
             pagination_querystring=pagination_params.urlencode(),
         ),
     )
@@ -1361,6 +1442,7 @@ def term_create(request: HttpRequest):
             "racing_region": source_term.racing_region,
             "source_ja": source_term.source_ja,
             "target_zh": source_term.target_zh,
+            "translation_status": source_term.translation_status,
             "race_grade": source_term.race_grade,
             "priority": source_term.priority,
             "is_active": source_term.is_active,
@@ -3102,6 +3184,8 @@ def _term_payload(term: TermEntry) -> dict:
         "racing_region": term.racing_region,
         "source_ja": term.source_ja,
         "target_zh": term.target_zh,
+        "translation_status": term.translation_status,
+        "has_translation": term.has_translation,
         "aliases_ja": term.aliases_ja,
         "aliases_zh": term.aliases_zh,
         "race_grade": term.race_grade,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from datetime import datetime, timedelta, timezone as dt_timezone
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -64,7 +65,10 @@ from stable.models import (
     ArticleHorseLink,
     ArticleHorseLinkStatus,
     HorseFollow,
+    HorseIdentityConflict,
+    HorseIdentityConflictStatus,
     HorseProfile,
+    HorseProfileCandidateStatus,
     HorseProfileCompleteness,
     HorseProfileDataCandidate,
     HorseProfileModule,
@@ -1013,6 +1017,131 @@ class TermResolverTests(TestCase):
         self.assertTrue(formal.has_translation)
         self.assertEqual(apply_term_mappings("マヤノライジンが出走"), "摩耶雷神が出走")
         self.assertNotIn("マヤノライジン", extract_unknown_horse_names("マヤノライジンが出走", ""))
+
+    def test_pending_horse_term_is_recognized_and_preserved_without_replacement(self):
+        TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Forever Young",
+            target_zh="",
+            racing_region=RacingRegion.JAPAN,
+            priority=100,
+            is_active=True,
+        )
+
+        recognized = recognize_horse_names(
+            "FOREVER YOUNG aims at the Breeders' Cup",
+            "Forever Young remains on the dirt championship trail.",
+            source_language=SourceLanguage.ENGLISH,
+        )
+
+        self.assertEqual(resolve_terms_for_language("FOREVER YOUNG returns", SourceLanguage.ENGLISH, limit=5)[0].target_zh, "")
+        self.assertEqual(apply_term_mappings("FOREVER YOUNG returns", source_language=SourceLanguage.ENGLISH), "FOREVER YOUNG returns")
+        self.assertEqual(len(recognized), 1)
+        self.assertEqual(recognized[0].source, "formal_pending_term")
+        self.assertEqual(recognized[0].matched_text, "FOREVER YOUNG")
+        self.assertTrue(recognized[0].needs_preserve)
+        self.assertFalse(recognized[0].has_translation)
+
+    def test_validate_rewrite_requires_pending_horse_original_preserved(self):
+        TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Forever Young",
+            target_zh="",
+            racing_region=RacingRegion.JAPAN,
+            priority=100,
+            is_active=True,
+        )
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.TDN,
+            source_mode=SourceMode.LATEST,
+            source_article_id="pending-horse-original-required",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            title_ja="Forever Young targets the Breeders' Cup Classic",
+            body_ja_raw="Forever Young will continue his preparation for the Breeders' Cup Classic. " * 8,
+            body_ja_normalized="Forever Young will continue his preparation for the Breeders' Cup Classic. " * 8,
+            translated_title_zh="日本泥地名马瞄准育马者杯经典赛",
+            title_zh="日本泥地名马瞄准育马者杯经典赛",
+            translated_body_zh="这匹日本泥地名马将继续备战育马者杯经典赛。" * 12,
+            body_zh="这匹日本泥地名马将继续备战育马者杯经典赛。" * 12,
+            published_at=timezone.now(),
+            source_url="https://example.com/pending-horse-original-required",
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertFalse(outcome.passed)
+        self.assertTrue(any(issue["code"] == "pending_horse_original_missing" for issue in outcome.issues))
+
+    def test_pending_horse_chinese_alias_does_not_replace_original_name_requirement(self):
+        TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Forever Young",
+            target_zh="",
+            aliases_zh=["青春永驻"],
+            racing_region=RacingRegion.JAPAN,
+            priority=100,
+            is_active=True,
+        )
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.TDN,
+            source_mode=SourceMode.LATEST,
+            source_article_id="pending-horse-chinese-alias-only",
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            title_ja="Forever Young targets the Breeders' Cup Classic",
+            body_ja_raw="Forever Young will continue his preparation for the Breeders' Cup Classic. " * 8,
+            body_ja_normalized="Forever Young will continue his preparation for the Breeders' Cup Classic. " * 8,
+            translated_title_zh="青春永驻瞄准育马者杯经典赛",
+            title_zh="青春永驻瞄准育马者杯经典赛",
+            translated_body_zh="青春永驻将继续备战育马者杯经典赛。" * 12,
+            body_zh="青春永驻将继续备战育马者杯经典赛。" * 12,
+            published_at=timezone.now(),
+            source_url="https://example.com/pending-horse-chinese-alias-only",
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertFalse(outcome.passed)
+        self.assertTrue(any(issue["code"] == "pending_horse_original_missing" for issue in outcome.issues))
+
+    def test_horse_term_is_recognized_by_english_name_and_chinese_translation(self):
+        term = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Forever Young",
+            target_zh="青春永驻",
+            translation_status="translated",
+            is_active=True,
+        )
+
+        english = recognize_horse_names("Forever Young returns", "", source_language=SourceLanguage.ENGLISH)
+        chinese = recognize_horse_names("青春永驻即将复出", "", source_language=SourceLanguage.CHINESE)
+
+        self.assertEqual(english[0].name_ja, term.source_ja)
+        self.assertEqual(chinese[0].name_ja, term.source_ja)
+        self.assertEqual(chinese[0].matched_text, "青春永驻")
+
+    def test_ambiguous_translated_horse_name_is_preserved_instead_of_auto_replaced(self):
+        for target in ("孪生星", "双星"):
+            TermEntry.objects.create(
+                term_type=TermType.HORSE,
+                source_language=SourceLanguage.ENGLISH,
+                source_ja="Twin Star",
+                target_zh=target,
+                translation_status="translated",
+                is_active=True,
+            )
+
+        mapped = apply_term_mappings("Twin Star returns", source_language=SourceLanguage.ENGLISH)
+        recognized = recognize_horse_names("Twin Star returns", "", source_language=SourceLanguage.ENGLISH)
+
+        self.assertEqual(mapped, "Twin Star returns")
+        self.assertTrue(recognized[0].needs_preserve)
+        self.assertIn("ambiguous_formal_horse_name", recognized[0].conflict_flags)
 
     def test_common_word_external_alias_requires_strong_horse_context(self):
         TermEntry.objects.create(
@@ -12288,6 +12417,7 @@ class TermConsoleTests(TestCase):
             term_type="horse",
             source_ja="イクイノックス",
             target_zh="春秋分",
+            translation_status="translated",
             aliases_ja=["イクイノ"],
             aliases_zh=["春秋分马"],
             priority=100,
@@ -12299,6 +12429,34 @@ class TermConsoleTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "术语映射")
         self.assertContains(response, "イクイノックス")
+
+    def test_term_list_filters_and_labels_pending_horse_translation(self):
+        pending = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Forever Young",
+            target_zh="",
+            translation_status="pending",
+            racing_region=RacingRegion.UNITED_STATES,
+        )
+
+        response = self.client.get(reverse("console-term-list"), {"translation_status": "pending"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, pending.source_ja)
+        self.assertContains(response, "中文名待补")
+        self.assertNotContains(response, self.term.source_ja)
+
+    def test_term_api_exposes_translation_status(self):
+        self.term.translation_status = "translated"
+        self.term.save(update_fields=["translation_status", "updated_at"])
+
+        response = self.client.get(reverse("api-term-detail", args=[self.term.id]))
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["translation_status"], "translated")
+        self.assertTrue(payload["has_translation"])
 
     def test_term_list_can_search_japanese_and_chinese_aliases(self):
         response = self.client.get(reverse("console-term-list"), {"q": "イクイノ"})
@@ -16283,7 +16441,13 @@ class HorseProfilePageMvpTests(TestCase):
         candidate_response = self.client.post(reverse("console-horse-profile-apply-candidate", args=[candidate.id]), {"action": "apply"}, follow=True)
         record_response = self.client.post(
             reverse("console-horse-profile-add-race-record", args=[profile.id]),
-            {"race_name": "宝塚纪念", "normalized_grade": RaceGrade.G1, "result_status": HorseRaceResultStatus.WON},
+            {
+                "race_name": "宝塚纪念",
+                "normalized_grade": RaceGrade.G1,
+                "result_status": HorseRaceResultStatus.WON,
+                "source_name": "manual",
+                "source_url": "https://example.com/takarazuka-kinen",
+            },
             follow=True,
         )
         link_response = self.client.post(
@@ -16296,7 +16460,14 @@ class HorseProfilePageMvpTests(TestCase):
         record = HorseRaceRecord.objects.get(horse_profile=profile, race_name="宝塚纪念")
         edit_response = self.client.post(
             reverse("console-horse-profile-edit-race-record", args=[record.id]),
-            {"race_name": "宝塚纪念", "race_year": 2026, "normalized_grade": RaceGrade.G1, "result_status": HorseRaceResultStatus.WON},
+            {
+                "race_name": "宝塚纪念",
+                "race_year": 2026,
+                "normalized_grade": RaceGrade.G1,
+                "result_status": HorseRaceResultStatus.WON,
+                "source_name": "manual",
+                "source_url": "https://example.com/takarazuka-kinen",
+            },
             follow=True,
         )
         self.assertContains(list_response, "春秋分")
@@ -16309,6 +16480,177 @@ class HorseProfilePageMvpTests(TestCase):
         self.assertEqual(record.race_year, 2026)
         self.assertContains(link_response, "文章关联已添加")
         self.assertTrue(ArticleHorseLink.objects.filter(horse_profile=profile, article=article, status=ArticleHorseLinkStatus.MANUAL).exists())
+
+    def test_race_record_candidates_share_idempotent_upsert(self):
+        profile = self._profile()
+        payload = {
+            "items": [
+                {
+                    "race_name": "宝塚纪念",
+                    "race_year": 2026,
+                    "race_date": "2026-06-28",
+                    "racecourse": "阪神",
+                    "normalized_grade": RaceGrade.G1,
+                    "finish_position": "1",
+                    "result_status": HorseRaceResultStatus.WON,
+                }
+            ]
+        }
+        candidates = [
+            HorseProfileDataCandidate.objects.create(
+                profile=profile,
+                module=HorseProfileModule.RACE_RECORD,
+                source_name="jra",
+                source_url="https://example.com/takarazuka-kinen",
+                candidate_payload=payload,
+            )
+            for _ in range(2)
+        ]
+
+        first = apply_horse_data_candidate(candidates[0], user=self.user)
+        second = apply_horse_data_candidate(candidates[1], user=self.user)
+        record = HorseRaceRecord.objects.get(horse_profile=profile, race_name="宝塚纪念")
+
+        self.assertIn("'created': 1", first["updated_fields"][0])
+        self.assertIn("'unchanged': 1", second["updated_fields"][0])
+        self.assertTrue(record.idempotency_key)
+        self.assertEqual(HorseRaceRecord.objects.filter(horse_profile=profile, race_name="宝塚纪念").count(), 1)
+
+    def test_race_record_candidate_without_source_url_stays_pending(self):
+        profile = self._profile()
+        candidate = HorseProfileDataCandidate.objects.create(
+            profile=profile,
+            module=HorseProfileModule.RACE_RECORD,
+            source_name="manual",
+            source_url="",
+            candidate_payload={"items": [{"race_name": "来源缺失赛事", "race_year": 2026}]},
+        )
+
+        with self.assertRaisesMessage(ValueError, "source_url is required"):
+            apply_horse_data_candidate(candidate, user=self.user)
+        candidate.refresh_from_db()
+
+        self.assertEqual(candidate.status, HorseProfileCandidateStatus.PENDING)
+        self.assertFalse(HorseRaceRecord.objects.filter(horse_profile=profile).exists())
+
+    def test_manual_race_record_add_and_edit_use_idempotency_service(self):
+        profile = self._profile()
+        self.client.force_login(self.user)
+        payload = {
+            "race_name": "安田纪念",
+            "race_year": 2026,
+            "race_date": "2026-06-07",
+            "racecourse": "东京",
+            "normalized_grade": RaceGrade.G1,
+            "result_status": HorseRaceResultStatus.WON,
+            "source_name": "manual",
+            "source_url": "https://example.com/yasuda-kinen",
+        }
+
+        self.client.post(reverse("console-horse-profile-add-race-record", args=[profile.id]), payload)
+        self.client.post(reverse("console-horse-profile-add-race-record", args=[profile.id]), payload)
+        record = HorseRaceRecord.objects.get(horse_profile=profile, race_name="安田纪念")
+        original_key = record.idempotency_key
+        edit_payload = {**payload, "race_name": "安田记念（修正）"}
+        response = self.client.post(
+            reverse("console-horse-profile-edit-race-record", args=[record.id]),
+            edit_payload,
+        )
+        record.refresh_from_db()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(HorseRaceRecord.objects.filter(horse_profile=profile).count(), 1)
+        self.assertTrue(record.idempotency_key)
+        self.assertNotEqual(record.idempotency_key, original_key)
+        self.assertEqual(record.race_name, "安田记念（修正）")
+
+    def test_manual_race_record_requires_source_url(self):
+        profile = self._profile()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("console-horse-profile-add-race-record", args=[profile.id]),
+            {
+                "race_name": "来源缺失赛事",
+                "result_status": HorseRaceResultStatus.UNKNOWN,
+                "source_name": "manual",
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "参赛履历表单有误")
+        self.assertFalse(HorseRaceRecord.objects.filter(horse_profile=profile).exists())
+
+    def test_manual_race_record_edit_preserves_import_source_evidence(self):
+        from stable.services.horse_race_records import upsert_race_record
+
+        profile = self._profile()
+        record = HorseRaceRecord.objects.create(
+            horse_profile=profile,
+            race_name="Imported Race",
+            race_date=datetime(2026, 6, 7).date(),
+            result_status=HorseRaceResultStatus.WON,
+            source_name="jra",
+            source_url="https://example.com/imported-race",
+            source_refs={"external_result_id": "JRA-RESULT-7", "official": "https://example.com/official"},
+            raw_payload={
+                "external_result_id": "JRA-RESULT-7",
+                "horse_number": "7",
+                "raw_status": "confirmed",
+            },
+        )
+        original_source_refs = dict(record.source_refs)
+        original_raw_payload = dict(record.raw_payload)
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("console-horse-profile-edit-race-record", args=[record.id]),
+            {
+                "race_name": "Imported Race Corrected",
+                "race_date": "2026-06-07",
+                "result_status": HorseRaceResultStatus.WON,
+                "source_name": "jra",
+                "source_url": "https://example.com/imported-race",
+            },
+        )
+        record.refresh_from_db()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(record.race_name, "Imported Race Corrected")
+        self.assertEqual(record.source_refs, original_source_refs)
+        self.assertEqual(record.raw_payload, original_raw_payload)
+        self.assertTrue(record.idempotency_key)
+
+        upsert_race_record(
+            profile,
+            {
+                "external_result_id": "JRA-RESULT-7",
+                "race_name": "Imported Race",
+                "race_date": "2026-06-07",
+                "result_status": HorseRaceResultStatus.WON,
+                "source_name": "jra",
+                "source_url": "https://example.com/imported-race",
+            },
+        )
+        self.assertEqual(HorseRaceRecord.objects.filter(horse_profile=profile).count(), 1)
+
+    @override_settings(HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS=1)
+    def test_stale_profile_filter_uses_completion_freshness_cutoff(self):
+        profile = self._profile(
+            primary_term=self._term("FRESHNESS-HORSE", "新鲜度测试马"),
+            records_synced_through=timezone.localdate() - timedelta(days=1),
+            racing_career_status="active",
+        )
+        self.client.force_login(self.user)
+
+        fresh_response = self.client.get(reverse("console-horse-profile-list"), {"sync_status": "stale"})
+        profile.records_synced_through = timezone.localdate() - timedelta(days=2)
+        profile.save(update_fields=["records_synced_through", "updated_at"])
+        stale_response = self.client.get(reverse("console-horse-profile-list"), {"sync_status": "stale"})
+
+        self.assertNotContains(fresh_response, "新鲜度测试马")
+        self.assertContains(stale_response, "新鲜度测试马")
 
     def test_completion_plan_is_dry_run_and_reports_missing_reasons(self):
         profile = self._profile(review_status=HorseProfileStatus.DRAFT)
@@ -16445,3 +16787,1825 @@ class HorseProfilePageMvpTests(TestCase):
         self.assertEqual(candidate.diff_payload["profile"]["country"]["candidate"], "日本")
         self.assertEqual(candidate.diff_payload["pedigree"]["sire_text"]["current"], "")
         self.assertEqual(candidate.diff_payload["pedigree"]["sire_text"]["candidate"], "父")
+
+
+class P0HorseProfileDataCompletionTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="p0-reviewer", password="pass")
+
+    def _term(self, source="Forever Young", target="", region=RacingRegion.UNITED_STATES):
+        from stable.models import TermTranslationStatus
+
+        return TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            source_ja=source,
+            target_zh=target,
+            translation_status=TermTranslationStatus.TRANSLATED if target else TermTranslationStatus.PENDING,
+            racing_region=region,
+            priority=100,
+            is_active=True,
+        )
+
+    def _profile(self, **overrides):
+        from stable.models import HorseRacingCareerStatus
+
+        term = overrides.pop("primary_term", None) or self._term()
+        defaults = {
+            "primary_term": term,
+            "display_name_zh": term.target_zh,
+            "original_name": term.source_ja,
+            "english_name": term.source_ja,
+            "racing_region": term.racing_region,
+            "country": "美国",
+            "sex": "牡",
+            "color": "鹿毛",
+            "birth_date": datetime(2021, 2, 24).date(),
+            "owner_name": "Susumu Fujita",
+            "trainer_name": "Yoshito Yahagi",
+            "breeder_name": "Northern Racing",
+            "sire_text": "Real Steel",
+            "dam_text": "Forever Darling",
+            "sire_sire_text": "Deep Impact",
+            "sire_dam_text": "Loves Only Me",
+            "dam_sire_text": "Congrats",
+            "dam_dam_text": "Darling My Darling",
+            "review_status": HorseProfileStatus.READY,
+            "racing_career_status": HorseRacingCareerStatus.RETIRED,
+            "records_synced_through": datetime(2026, 11, 8).date(),
+        }
+        defaults.update(overrides)
+        return HorseProfile.objects.create(**defaults)
+
+    def _approve_required_modules(self, profile):
+        from stable.models import HorseRacingCareerStatus
+
+        profile.racing_career_status = profile.racing_career_status or HorseRacingCareerStatus.RETIRED
+        profile.full_profile_reviewed_at = timezone.now()
+        profile.full_profile_reviewed_by = self.user
+        profile.save(
+            update_fields=[
+                "racing_career_status",
+                "full_profile_reviewed_at",
+                "full_profile_reviewed_by",
+                "updated_at",
+            ]
+        )
+        for module in (
+            HorseProfileModule.PROFILE,
+            HorseProfileModule.PEDIGREE,
+            HorseProfileModule.RACE_RECORD,
+            HorseProfileModule.MAJOR_WINS,
+        ):
+            HorseProfileDataCandidate.objects.create(
+                profile=profile,
+                module=module,
+                source_name="test_manual_review",
+                source_url="https://example.com/review",
+                status="applied",
+                confidence=100,
+                candidate_payload={"reviewed": True, "module": module},
+                applied_by=self.user,
+                applied_at=timezone.now(),
+            )
+
+    def _reviewed_artifact_row(self, profile, *, race_payload=None, profile_payload=None, pedigree_payload=None):
+        return {
+            "profile_id": profile.id,
+            "reviewed": True,
+            "source_name": "official",
+            "source_url": "https://example.com/profile",
+            "confidence": 100,
+            "module_reviews": {
+                "profile": {"status": "approved", "confidence": 100},
+                "pedigree": {"status": "approved", "confidence": 100},
+                "race_record": {"status": "approved", "confidence": 100},
+                "major_wins": {"status": "approved", "confidence": 100},
+            },
+            "profile_payload": profile_payload or {},
+            "pedigree_payload": pedigree_payload or {},
+            "race_history_payload": race_payload or [],
+        }
+
+    def _race_event(
+        self,
+        *,
+        region=RacingRegion.UNITED_STATES,
+        grade=RaceGrade.G1,
+        year=2026,
+        horse_name="Forever Young",
+        source_namespace="official",
+        external_horse_id="",
+    ):
+        event = RaceEvent.objects.create(
+            year=year,
+            slug=f"{region.lower()}-{grade.lower()}-{year}-{RaceEvent.objects.count()}",
+            original_name="Breeders' Cup Classic",
+            chinese_name="育马者杯经典赛",
+            country_region=region,
+            racecourse="Del Mar",
+            grade_text=grade,
+            normalized_grade=grade,
+            surface=RaceEventSurface.DIRT,
+            local_date=datetime(year, 11, 7).date(),
+            priority=RaceEventPriority.P0,
+            status=RaceEventStatus.FINISHED,
+            visibility_status=RaceEventVisibility.PUBLISHED,
+            source_refs={"official": "https://example.com/race"},
+        )
+        result_source_refs = {"result": "https://example.com/result", "source": source_namespace}
+        result_raw_payload = {}
+        if external_horse_id:
+            result_source_refs["external_horse_id"] = external_horse_id
+            result_raw_payload["horse_id"] = external_horse_id
+        RaceEventResult.objects.create(
+            event=event,
+            finish_position=1,
+            horse_number="1",
+            horse_name=horse_name,
+            jockey_name="Ryusei Sakai",
+            trainer_name="Yoshito Yahagi",
+            source_refs=result_source_refs,
+            raw_payload=result_raw_payload,
+        )
+        return event
+
+    def _complete_records(self, profile):
+        HorseRaceRecord.objects.create(
+            horse_profile=profile,
+            race_name="Breeders' Cup Classic",
+            race_year=2026,
+            race_date=datetime(2026, 11, 7).date(),
+            grade_text="G1",
+            normalized_grade=RaceGrade.G1,
+            racecourse="Del Mar",
+            distance_text="2000m",
+            surface=RaceEventSurface.DIRT,
+            finish_position="1",
+            result_status=HorseRaceResultStatus.WON,
+            is_major_win=True,
+            source_name="official",
+            source_url="https://example.com/result",
+        )
+        HorseRaceRecord.objects.create(
+            horse_profile=profile,
+            race_name="Saudi Cup",
+            race_year=2026,
+            race_date=datetime(2026, 2, 21).date(),
+            grade_text="G1",
+            normalized_grade=RaceGrade.G1,
+            racecourse="King Abdulaziz",
+            distance_text="1800m",
+            surface=RaceEventSurface.DIRT,
+            finish_position="2",
+            result_status=HorseRaceResultStatus.PLACED,
+            source_name="official",
+            source_url="https://example.com/saudi-cup",
+        )
+
+    def test_major_race_participant_without_translation_enters_p0_queue(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import build_p0_completion_queue, sync_p0_horse_sources
+
+        self._race_event(region=RacingRegion.UNITED_STATES, grade=RaceGrade.G1, horse_name="Forever Young")
+
+        summary = sync_p0_horse_sources(commit=True)
+        queue = build_p0_completion_queue(regions=[RacingRegion.UNITED_STATES], limit_per_region=10)
+        profile = HorseProfile.objects.get(original_name="Forever Young")
+
+        self.assertEqual(summary["created_profiles"], 1)
+        self.assertEqual(profile.display_name_zh, "")
+        self.assertEqual(profile.review_status, HorseProfileStatus.DRAFT)
+        self.assertTrue(
+            HorseP0Source.objects.filter(
+                profile=profile,
+                source_type="major_race_participant",
+                race_event__normalized_grade=RaceGrade.G1,
+            ).exists()
+        )
+        self.assertEqual([item.profile_id for item in queue[RacingRegion.UNITED_STATES]], [profile.id])
+
+    def test_p0_source_sync_covers_all_five_regions_and_rejects_non_major_grade(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        major_cases = [
+            (RacingRegion.JAPAN, RaceGrade.JPN1, "Japan Hero"),
+            (RacingRegion.HONG_KONG, RaceGrade.G1, "Hong Kong Hero"),
+            (RacingRegion.UNITED_KINGDOM, RaceGrade.G2, "United Kingdom Hero"),
+            (RacingRegion.FRANCE, RaceGrade.G3, "France Hero"),
+            (RacingRegion.UNITED_STATES, RaceGrade.G1, "United States Hero"),
+        ]
+        for region, grade, horse_name in major_cases:
+            self._race_event(region=region, grade=grade, horse_name=horse_name)
+        self._race_event(region=RacingRegion.UNITED_STATES, grade=RaceGrade.LISTED, horse_name="Listed Only")
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        self.assertEqual(summary["created_sources"], 5)
+        self.assertEqual(HorseP0Source.objects.count(), 5)
+        self.assertFalse(HorseProfile.objects.filter(original_name="Listed Only").exists())
+
+    def test_full_source_sync_includes_global_translated_horse_terms(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        term = self._term(source="Global Horse", target="全局马", region="")
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        profile = HorseProfile.objects.get(primary_term=term)
+        self.assertEqual(summary["term_sources"], 1)
+        self.assertTrue(HorseP0Source.objects.filter(profile=profile, source_type="term_active_with_zh").exists())
+
+    def test_full_profile_completeness_requires_required_modules_but_not_intro_or_news(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import evaluate_full_profile_completeness
+
+        profile = self._profile(intro="")
+        self._complete_records(profile)
+        HorseP0Source.objects.create(
+            profile=profile,
+            source_type="major_race_participant",
+            source_url="https://example.com/race",
+            observed_at=timezone.now(),
+            metadata={"race_grade": RaceGrade.G1},
+        )
+        self._approve_required_modules(profile)
+
+        complete = evaluate_full_profile_completeness(profile)
+        profile.breeder_name = ""
+        profile.save(update_fields=["breeder_name", "updated_at"])
+        missing_basic = evaluate_full_profile_completeness(profile)
+
+        self.assertTrue(complete.is_complete)
+        self.assertNotIn("intro", complete.blocking_reasons)
+        self.assertNotIn("article_links", complete.blocking_reasons)
+        self.assertFalse(missing_basic.is_complete)
+        self.assertIn("basic_facts.breeder_name", missing_basic.blocking_reasons)
+
+    def test_active_horse_history_must_record_sync_window_and_stale_state(self):
+        from stable.models import HorseP0Source, HorseRacingCareerStatus
+        from stable.services.p0_horse_profiles import evaluate_full_profile_completeness
+
+        profile = self._profile()
+        self._complete_records(profile)
+        profile.racing_career_status = HorseRacingCareerStatus.ACTIVE
+        profile.records_synced_through = datetime(2026, 6, 30).date()
+        profile.save(update_fields=["racing_career_status", "records_synced_through", "updated_at"])
+        HorseP0Source.objects.create(profile=profile, source_type="term_active_with_zh", source_url="https://example.com/term")
+        self._approve_required_modules(profile)
+
+        stale = evaluate_full_profile_completeness(profile, as_of=datetime(2026, 11, 8).date())
+        profile.records_synced_through = datetime(2026, 11, 8).date()
+        profile.save(update_fields=["records_synced_through", "updated_at"])
+        fresh = evaluate_full_profile_completeness(profile, as_of=datetime(2026, 11, 8).date())
+
+        self.assertFalse(stale.is_complete)
+        self.assertIn("race_history.sync_window_stale", stale.blocking_reasons)
+        self.assertTrue(fresh.is_complete)
+
+    @override_settings(HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS=1)
+    def test_active_horse_history_uses_default_freshness_cutoff(self):
+        from stable.models import HorseP0Source, HorseRacingCareerStatus
+        from stable.services.p0_horse_profiles import evaluate_full_profile_completeness
+
+        profile = self._profile(racing_career_status=HorseRacingCareerStatus.ACTIVE)
+        self._complete_records(profile)
+        HorseP0Source.objects.create(profile=profile, source_type="term_active_with_zh", source_url="https://example.com/term")
+        self._approve_required_modules(profile)
+        profile.records_synced_through = timezone.localdate() - timedelta(days=2)
+        profile.save(update_fields=["records_synced_through", "updated_at"])
+
+        stale = evaluate_full_profile_completeness(profile)
+        profile.records_synced_through = timezone.localdate() - timedelta(days=1)
+        profile.save(update_fields=["records_synced_through", "updated_at"])
+        fresh = evaluate_full_profile_completeness(profile)
+
+        self.assertIn("race_history.sync_window_stale", stale.blocking_reasons)
+        self.assertTrue(fresh.is_complete)
+
+    def test_reviewed_completion_batch_is_idempotent_and_respects_manual_locks(self):
+        from stable.services.p0_horse_profiles import apply_reviewed_completion_artifact
+
+        profile = self._profile(country="美国", manual_lock_flags={"country": True})
+        payload = {
+            "reviewed": True,
+            "reviewer_id": self.user.id,
+            "rows": [
+                self._reviewed_artifact_row(
+                    profile,
+                    profile_payload={
+                        "country": "日本",
+                        "owner_name": "Susumu Fujita",
+                        "trainer_name": "Yoshito Yahagi",
+                    },
+                    pedigree_payload={
+                        "sire_text": "Real Steel",
+                        "dam_text": "Forever Darling",
+                        "sire_sire_text": "Deep Impact",
+                        "sire_dam_text": "Loves Only Me",
+                        "dam_sire_text": "Congrats",
+                        "dam_dam_text": "Darling My Darling",
+                    },
+                    race_payload=[
+                        {
+                            "race_name": "Breeders' Cup Classic",
+                            "race_year": 2026,
+                            "race_date": "2026-11-07",
+                            "normalized_grade": RaceGrade.G1,
+                            "finish_position": "1",
+                            "result_status": HorseRaceResultStatus.WON,
+                            "is_major_win": True,
+                            "source_name": "official",
+                            "source_url": "https://example.com/result",
+                        }
+                    ],
+                )
+            ],
+        }
+
+        first = apply_reviewed_completion_artifact(payload, commit=True)
+        second = apply_reviewed_completion_artifact(payload, commit=True)
+        profile.refresh_from_db()
+
+        self.assertEqual(first["applied_profiles"], 1)
+        self.assertEqual(second["applied_profiles"], 0)
+        self.assertEqual(profile.country, "美国")
+        self.assertEqual(profile.review_status, HorseProfileStatus.READY)
+        self.assertEqual(HorseRaceRecord.objects.filter(horse_profile=profile, race_name="Breeders' Cup Classic").count(), 1)
+
+    def test_reviewed_artifact_keeps_manual_p0_source_active_for_each_profile(self):
+        from stable.models import HorseP0Source, HorseP0SourceStatus, HorseP0SourceType
+        from stable.services.p0_horse_profiles import apply_reviewed_completion_artifact
+
+        first_profile = self._profile(primary_term=self._term(source="First Manual Source"))
+        second_profile = self._profile(primary_term=self._term(source="Second Manual Source"))
+        payload = {
+            "reviewed": True,
+            "reviewer_id": self.user.id,
+            "rows": [
+                {**self._reviewed_artifact_row(first_profile), "source_url": "https://example.com/horse/first"},
+                {**self._reviewed_artifact_row(second_profile), "source_url": "https://example.com/horse/second"},
+            ],
+        }
+
+        apply_reviewed_completion_artifact(payload, commit=True)
+
+        active_sources = HorseP0Source.objects.filter(
+            source_type=HorseP0SourceType.MANUAL,
+            status=HorseP0SourceStatus.ACTIVE,
+        )
+        self.assertEqual(active_sources.filter(profile=first_profile).count(), 1)
+        self.assertEqual(active_sources.filter(profile=second_profile).count(), 1)
+        self.assertEqual(active_sources.count(), 2)
+
+    def test_unapproved_modules_never_write_even_when_artifact_is_reviewed(self):
+        from stable.services.p0_horse_profiles import apply_reviewed_completion_artifact
+
+        profile = self._profile(owner_name="Old Owner", sire_text="Old Sire")
+        row = self._reviewed_artifact_row(
+            profile,
+            profile_payload={"owner_name": "Approved Owner"},
+            pedigree_payload={"sire_text": "Unapproved Sire"},
+            race_payload=[
+                {
+                    "race_name": "Unapproved Race",
+                    "race_date": "2026-01-01",
+                    "source_name": "official",
+                    "source_url": "https://example.com/unapproved-race",
+                }
+            ],
+        )
+        row["module_reviews"]["pedigree"]["status"] = "pending"
+        row["module_reviews"]["race_record"]["status"] = "conflict"
+        row["module_reviews"]["major_wins"]["status"] = "pending"
+
+        summary = apply_reviewed_completion_artifact(
+            {"reviewed": True, "reviewer_id": self.user.id, "rows": [row]},
+            commit=True,
+        )
+        profile.refresh_from_db()
+
+        self.assertEqual(profile.owner_name, "Approved Owner")
+        self.assertEqual(profile.sire_text, "Old Sire")
+        self.assertFalse(HorseRaceRecord.objects.filter(horse_profile=profile, race_name="Unapproved Race").exists())
+        self.assertEqual(summary["skipped_unreviewed_modules"], 3)
+        self.assertNotEqual(profile.completeness_status, HorseProfileCompleteness.COMPLETE_PROFILE_FULL)
+
+    def test_approved_race_module_without_record_source_never_writes(self):
+        from stable.services.p0_horse_profiles import apply_reviewed_completion_artifact
+
+        profile = self._profile()
+        row = self._reviewed_artifact_row(
+            profile,
+            race_payload=[
+                {
+                    "race_name": "Missing Source Race",
+                    "race_date": "2026-01-01",
+                    "source_name": "official",
+                    "source_url": "",
+                }
+            ],
+        )
+
+        summary = apply_reviewed_completion_artifact(
+            {"reviewed": True, "reviewer_id": self.user.id, "rows": [row]},
+            commit=True,
+        )
+
+        self.assertEqual(summary["skipped_missing_source_url"], 1)
+        self.assertFalse(HorseRaceRecord.objects.filter(horse_profile=profile, race_name="Missing Source Race").exists())
+
+    def test_reviewed_artifact_without_reviewer_never_writes(self):
+        from stable.services.p0_horse_profiles import apply_reviewed_completion_artifact
+
+        profile = self._profile(owner_name="Old Owner")
+        row = self._reviewed_artifact_row(profile, profile_payload={"owner_name": "No Reviewer"})
+
+        summary = apply_reviewed_completion_artifact(
+            {"reviewed": True, "rows": [row]},
+            commit=True,
+        )
+        profile.refresh_from_db()
+
+        self.assertEqual(summary["skipped_missing_reviewer"], 1)
+        self.assertEqual(profile.owner_name, "Old Owner")
+        self.assertFalse(HorseProfileDataCandidate.objects.filter(profile=profile).exists())
+
+    def test_legacy_race_record_is_adopted_instead_of_duplicated(self):
+        from stable.services.p0_horse_profiles import apply_reviewed_completion_artifact
+
+        profile = self._profile()
+        legacy = HorseRaceRecord.objects.create(
+            horse_profile=profile,
+            race_name="Breeders' Cup Classic",
+            race_year=2026,
+            race_date=datetime(2026, 11, 7).date(),
+            racecourse="Del Mar",
+            finish_position="1",
+            result_status=HorseRaceResultStatus.WON,
+            source_name="official",
+            source_url="https://example.com/result",
+        )
+        row = self._reviewed_artifact_row(
+            profile,
+            race_payload=[
+                {
+                    "race_name": "Breeders' Cup Classic",
+                    "race_year": 2026,
+                    "race_date": "2026-11-07",
+                    "racecourse": "Del Mar",
+                    "finish_position": "1",
+                    "result_status": HorseRaceResultStatus.WON,
+                    "source_name": "official",
+                    "source_url": "https://example.com/result",
+                }
+            ],
+        )
+
+        summary = apply_reviewed_completion_artifact(
+            {"reviewed": True, "reviewer_id": self.user.id, "rows": [row]},
+            commit=True,
+        )
+        legacy.refresh_from_db()
+
+        self.assertEqual(HorseRaceRecord.objects.filter(horse_profile=profile).count(), 1)
+        self.assertTrue(legacy.idempotency_key)
+        self.assertEqual(summary["race_records_adopted"], 1)
+
+    def test_duplicate_legacy_race_records_become_conflict_without_third_copy(self):
+        from stable.services.p0_horse_profiles import apply_reviewed_completion_artifact
+
+        profile = self._profile()
+        record_data = {
+            "race_name": "Duplicate Race",
+            "race_year": 2026,
+            "race_date": datetime(2026, 5, 1).date(),
+            "racecourse": "Test Course",
+            "source_name": "official",
+            "source_url": "https://example.com/duplicate-race",
+        }
+        HorseRaceRecord.objects.create(horse_profile=profile, **record_data)
+        HorseRaceRecord.objects.create(horse_profile=profile, **record_data)
+        row = self._reviewed_artifact_row(
+            profile,
+            race_payload=[
+                {
+                    **record_data,
+                    "race_date": "2026-05-01",
+                    "result_status": HorseRaceResultStatus.UNKNOWN,
+                }
+            ],
+        )
+
+        summary = apply_reviewed_completion_artifact(
+            {"reviewed": True, "reviewer_id": self.user.id, "rows": [row]},
+            commit=True,
+        )
+
+        self.assertEqual(HorseRaceRecord.objects.filter(horse_profile=profile, race_name="Duplicate Race").count(), 2)
+        self.assertEqual(summary["skipped_conflict_modules"], 1)
+        self.assertTrue(
+            HorseProfileDataCandidate.objects.filter(
+                profile=profile,
+                module=HorseProfileModule.RACE_RECORD,
+                status="conflict",
+            ).exists()
+        )
+
+    def test_duplicate_external_identity_records_block_third_copy_despite_field_changes(self):
+        from stable.services.horse_race_records import AmbiguousLegacyRaceRecordError, upsert_race_record
+
+        profile = self._profile()
+        for index, race_name in enumerate(("Old Race Name", "Corrected Race Name"), start=1):
+            HorseRaceRecord.objects.create(
+                horse_profile=profile,
+                race_name=race_name,
+                race_year=2026,
+                source_name="official",
+                source_url=f"https://example.com/legacy-result/{index}",
+                source_refs={"external_result_id": "DUPLICATE-EXTERNAL-1"},
+                idempotency_key="",
+            )
+
+        with self.assertRaises(AmbiguousLegacyRaceRecordError):
+            upsert_race_record(
+                profile,
+                {
+                    "external_result_id": "DUPLICATE-EXTERNAL-1",
+                    "race_name": "Latest Official Race Name",
+                    "race_year": 2026,
+                    "source_name": "official",
+                    "source_url": "https://example.com/latest-result",
+                },
+            )
+
+        self.assertEqual(HorseRaceRecord.objects.filter(horse_profile=profile).count(), 2)
+
+    def test_external_identity_adopts_legacy_record_with_source_only_in_evidence(self):
+        from stable.services.horse_race_records import upsert_race_record
+
+        profile = self._profile()
+        legacy = HorseRaceRecord.objects.create(
+            horse_profile=profile,
+            race_name="Old Race Name",
+            race_year=2026,
+            source_name="",
+            source_url="https://example.com/old-result",
+            source_refs={
+                "source": "official",
+                "external_result_id": "EVIDENCE-SOURCE-1",
+            },
+            idempotency_key="",
+        )
+
+        result = upsert_race_record(
+            profile,
+            {
+                "external_result_id": "EVIDENCE-SOURCE-1",
+                "race_name": "Corrected Race Name",
+                "race_year": 2026,
+                "source_name": "official",
+                "source_url": "https://example.com/corrected-result",
+            },
+        )
+
+        legacy.refresh_from_db()
+        self.assertEqual(result.record.id, legacy.id)
+        self.assertEqual(result.action, "adopted")
+        self.assertEqual(legacy.source_name, "official")
+        self.assertEqual(HorseRaceRecord.objects.filter(horse_profile=profile).count(), 1)
+
+    def test_race_record_source_namespace_is_case_insensitive_for_idempotency(self):
+        from stable.services.horse_race_records import upsert_race_record
+
+        profile = self._profile()
+        first = upsert_race_record(
+            profile,
+            {
+                "external_result_id": "SOURCE-CASE-1",
+                "race_name": "Source Case Race",
+                "race_year": 2026,
+                "source_name": "Official",
+                "source_url": "https://example.com/source-case",
+            },
+        )
+        second = upsert_race_record(
+            profile,
+            {
+                "external_result_id": "SOURCE-CASE-1",
+                "race_name": "Source Case Race",
+                "race_year": 2026,
+                "source_name": "official",
+                "source_url": "https://example.com/source-case",
+            },
+        )
+
+        self.assertEqual(second.record.id, first.record.id)
+        self.assertEqual(HorseRaceRecord.objects.filter(horse_profile=profile).count(), 1)
+
+    def test_editing_legacy_record_rejects_other_record_with_same_external_identity(self):
+        from stable.services.horse_race_records import DuplicateRaceRecordError, upsert_race_record
+
+        profile = self._profile()
+        records = []
+        for index, race_name in enumerate(("First Legacy Name", "Second Legacy Name"), start=1):
+            records.append(
+                HorseRaceRecord.objects.create(
+                    horse_profile=profile,
+                    race_name=race_name,
+                    race_year=2026,
+                    source_name="official",
+                    source_url=f"https://example.com/edit-legacy/{index}",
+                    source_refs={"external_result_id": "EDIT-DUPLICATE-1"},
+                    idempotency_key="",
+                )
+            )
+
+        with self.assertRaises(DuplicateRaceRecordError):
+            upsert_race_record(
+                profile,
+                {
+                    "race_name": "Edited Legacy Name",
+                    "race_year": 2026,
+                    "source_name": "official",
+                    "source_url": "https://example.com/edit-legacy/1",
+                },
+                record=records[0],
+            )
+
+        for record in records:
+            record.refresh_from_db()
+            self.assertEqual(record.idempotency_key, "")
+
+    def test_race_record_correction_is_reported_and_audited(self):
+        from stable.services.p0_horse_profiles import apply_reviewed_completion_artifact
+
+        profile = self._profile()
+        base_record = {
+            "external_result_id": "official-result-1",
+            "race_name": "Breeders' Cup Classic",
+            "race_year": 2026,
+            "race_date": "2026-11-07",
+            "racecourse": "Del Mar",
+            "finish_position": "2",
+            "result_status": HorseRaceResultStatus.PLACED,
+            "source_name": "official",
+            "source_url": "https://example.com/result",
+        }
+        first_row = self._reviewed_artifact_row(profile, race_payload=[base_record])
+        apply_reviewed_completion_artifact(
+            {"reviewed": True, "reviewer_id": self.user.id, "rows": [first_row]},
+            commit=True,
+        )
+        corrected = {**base_record, "finish_position": "", "result_status": HorseRaceResultStatus.DISQUALIFIED}
+        second_row = self._reviewed_artifact_row(profile, race_payload=[corrected])
+
+        summary = apply_reviewed_completion_artifact(
+            {"reviewed": True, "reviewer_id": self.user.id, "rows": [second_row]},
+            commit=True,
+        )
+        record = HorseRaceRecord.objects.get(horse_profile=profile, race_name="Breeders' Cup Classic")
+        audit = HorseProfileDataCandidate.objects.filter(profile=profile, module=HorseProfileModule.RACE_RECORD).latest("id")
+
+        self.assertEqual(summary["race_records_updated"], 1)
+        self.assertEqual(record.result_status, HorseRaceResultStatus.DISQUALIFIED)
+        self.assertEqual(audit.diff_payload["records"][0]["before"]["result_status"], HorseRaceResultStatus.PLACED)
+        self.assertEqual(audit.diff_payload["records"][0]["after"]["result_status"], HorseRaceResultStatus.DISQUALIFIED)
+
+    def test_complete_profile_rejects_unknown_career_and_any_unsourced_record(self):
+        from stable.models import HorseP0Source, HorseRacingCareerStatus
+        from stable.services.p0_horse_profiles import evaluate_full_profile_completeness
+
+        profile = self._profile(racing_career_status=HorseRacingCareerStatus.UNKNOWN)
+        self._complete_records(profile)
+        HorseP0Source.objects.create(profile=profile, source_type="manual", source_url="https://example.com/profile")
+        self._approve_required_modules(profile)
+        unknown = evaluate_full_profile_completeness(profile)
+
+        profile.racing_career_status = HorseRacingCareerStatus.RETIRED
+        profile.save(update_fields=["racing_career_status", "updated_at"])
+        HorseRaceRecord.objects.filter(horse_profile=profile, race_name="Saudi Cup").update(source_url="")
+        unsourced = evaluate_full_profile_completeness(profile)
+
+        self.assertIn("racing_career_status.unknown", unknown.blocking_reasons)
+        self.assertIn("race_history.source_url", unsourced.blocking_reasons)
+
+    def test_latest_module_conflict_invalidates_historical_approval(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import apply_reviewed_completion_artifact, evaluate_full_profile_completeness
+
+        profile = self._profile(completeness_status=HorseProfileCompleteness.COMPLETE_PROFILE_FULL)
+        self._complete_records(profile)
+        HorseP0Source.objects.create(profile=profile, source_type="manual", source_url="https://example.com/profile")
+        self._approve_required_modules(profile)
+        self.assertTrue(evaluate_full_profile_completeness(profile).is_complete)
+        row = self._reviewed_artifact_row(profile)
+        row["module_reviews"]["race_record"]["status"] = "conflict"
+        apply_reviewed_completion_artifact(
+            {"reviewed": True, "reviewer_id": self.user.id, "rows": [row]},
+            commit=True,
+        )
+        profile.refresh_from_db()
+
+        evaluation = evaluate_full_profile_completeness(profile)
+
+        self.assertFalse(evaluation.is_complete)
+        self.assertIn("review.module.race_record", evaluation.blocking_reasons)
+        self.assertNotEqual(profile.completeness_status, HorseProfileCompleteness.COMPLETE_PROFILE_FULL)
+
+    def test_cross_region_participant_reuses_identity_without_changing_home_region(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        term = self._term(region=RacingRegion.JAPAN)
+        profile = self._profile(
+            primary_term=term,
+            racing_region=RacingRegion.JAPAN,
+            country="日本",
+            source_refs={"horse_identity_keys": ["official:FY-001"]},
+        )
+        self._race_event(
+            region=RacingRegion.UNITED_STATES,
+            horse_name="Forever Young",
+            source_namespace="official",
+            external_horse_id="FY-001",
+        )
+
+        summary = sync_p0_horse_sources(commit=True)
+        profile.refresh_from_db()
+        source = HorseP0Source.objects.get(profile=profile, source_type="major_race_participant")
+
+        self.assertEqual(summary["created_profiles"], 0)
+        self.assertEqual(TermEntry.objects.filter(term_type=TermType.HORSE, source_ja__iexact="Forever Young").count(), 1)
+        self.assertEqual(profile.racing_region, RacingRegion.JAPAN)
+        self.assertEqual(source.racing_region, RacingRegion.UNITED_STATES)
+
+    def test_same_region_same_name_without_strong_identity_is_ambiguous(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        first_term = self._term(source="Twin Star", region=RacingRegion.UNITED_STATES)
+        first_profile = self._profile(primary_term=first_term, original_name="Twin Star", english_name="Twin Star")
+        self._race_event(region=RacingRegion.UNITED_STATES, horse_name="Twin Star")
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        self.assertEqual(summary["ambiguous_participants"], 1)
+        self.assertFalse(
+            HorseP0Source.objects.filter(
+                profile=first_profile,
+                source_type="major_race_participant",
+            ).exists()
+        )
+
+    def test_same_region_same_name_with_distinct_external_ids_creates_distinct_profiles(self):
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        first_term = self._term(source="Twin Star", region=RacingRegion.UNITED_STATES)
+        first_profile = self._profile(
+            primary_term=first_term,
+            original_name="Twin Star",
+            english_name="Twin Star",
+            source_refs={"horse_identity_keys": ["official:TWIN-A"]},
+        )
+        self._race_event(
+            region=RacingRegion.UNITED_STATES,
+            horse_name="Twin Star",
+            source_namespace="official",
+            external_horse_id="TWIN-B",
+        )
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        profiles = HorseProfile.objects.filter(original_name="Twin Star").order_by("id")
+        self.assertEqual(summary["ambiguous_participants"], 0)
+        self.assertEqual(profiles.count(), 2)
+        self.assertEqual(profiles.first(), first_profile)
+        self.assertIn("official:twin-b", profiles.last().source_refs["horse_identity_keys"])
+
+    def test_same_event_same_name_runners_are_kept_separate_by_horse_number(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(
+            horse_name="Twin Star",
+            source_namespace="official",
+            external_horse_id="TWIN-A",
+        )
+        first_result = event.results.get()
+        first_result.horse_number = "3"
+        first_result.save(update_fields=["horse_number", "updated_at"])
+        RaceEventResult.objects.create(
+            event=event,
+            finish_position=2,
+            horse_number="8",
+            horse_name="Twin Star",
+            source_refs={
+                "result": "https://example.com/result/2",
+                "source": "official",
+                "external_horse_id": "TWIN-B",
+            },
+            raw_payload={"horse_id": "TWIN-B"},
+        )
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        self.assertEqual(summary["major_race_sources"], 2)
+        self.assertEqual(HorseProfile.objects.filter(original_name="Twin Star").count(), 2)
+        self.assertEqual(HorseP0Source.objects.filter(race_event=event, status="active").count(), 2)
+
+    def test_same_event_same_name_without_external_ids_uses_horse_number_identity(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(horse_name="Twin Star", external_horse_id="")
+        first_result = event.results.get()
+        first_result.horse_number = "3"
+        first_result.save(update_fields=["horse_number", "updated_at"])
+        RaceEventResult.objects.create(
+            event=event,
+            finish_position=2,
+            horse_number="8",
+            horse_name="Twin Star",
+            source_refs={"result": "https://example.com/result/2", "source": "official"},
+        )
+
+        summary = sync_p0_horse_sources(commit=True)
+        second_summary = sync_p0_horse_sources(commit=True)
+
+        sources = HorseP0Source.objects.filter(race_event=event, status="active").order_by("participant_key")
+        self.assertEqual(summary["major_race_sources"], 2)
+        self.assertEqual(second_summary["major_race_sources"], 2)
+        self.assertEqual(HorseProfile.objects.filter(original_name="Twin Star").count(), 2)
+        self.assertEqual(set(sources.values_list("participant_key", flat=True)), {"number:3", "number:8"})
+        self.assertEqual(sources.values_list("profile_id", flat=True).distinct().count(), 2)
+
+    def test_runner_and_result_pair_by_external_id_when_result_has_no_number(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(horse_name="Asymmetric Star", external_horse_id="ASYM-1")
+        result = event.results.get()
+        result.horse_number = ""
+        result.save(update_fields=["horse_number", "updated_at"])
+        runner = RaceEventRunner.objects.create(
+            event=event,
+            horse_number="7",
+            horse_name="Asymmetric Star",
+            source_refs={
+                "runner": "https://example.com/runner/7",
+                "source": "official",
+                "external_horse_id": "ASYM-1",
+            },
+            raw_payload={"horse_id": "ASYM-1"},
+        )
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        source = HorseP0Source.objects.get(race_event=event, status="active")
+        self.assertEqual(summary["major_race_sources"], 1)
+        self.assertEqual(source.participant_key, "number:7")
+        self.assertEqual(source.race_runner, runner)
+        self.assertEqual(source.race_result, result)
+
+    def test_participant_key_upgrades_from_external_identity_to_horse_number(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(horse_name="Key Upgrade", external_horse_id="UPGRADE-1")
+        result = event.results.get()
+        result.horse_number = ""
+        result.save(update_fields=["horse_number", "updated_at"])
+        sync_p0_horse_sources(commit=True)
+        source = HorseP0Source.objects.get(race_event=event, status="active")
+        self.assertTrue(source.participant_key.startswith("identity:"))
+
+        result.horse_number = "7"
+        result.save(update_fields=["horse_number", "updated_at"])
+        summary = sync_p0_horse_sources(commit=True)
+        source.refresh_from_db()
+
+        self.assertEqual(summary["major_race_sources"], 1)
+        self.assertEqual(source.participant_key, "number:7")
+        self.assertEqual(HorseP0Source.objects.filter(race_event=event, status="active").count(), 1)
+
+    def test_conflicting_runner_and_result_numbers_create_identity_conflict(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(horse_name="Number Conflict", external_horse_id="CONFLICT-1")
+        result = event.results.get()
+        result.horse_number = "8"
+        result.save(update_fields=["horse_number", "updated_at"])
+        RaceEventRunner.objects.create(
+            event=event,
+            horse_number="3",
+            horse_name="Number Conflict",
+            source_refs={
+                "runner": "https://example.com/runner/3",
+                "source": "official",
+                "external_horse_id": "CONFLICT-1",
+            },
+            raw_payload={"horse_id": "CONFLICT-1"},
+        )
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        conflict = HorseIdentityConflict.objects.get(race_event=event)
+        pairing = conflict.evidence_payload["pairing_conflict"]
+        self.assertEqual(summary["ambiguous_participants"], 1)
+        self.assertEqual(pairing["runner_number"], "3")
+        self.assertEqual(pairing["result_number"], "8")
+        self.assertFalse(HorseP0Source.objects.filter(race_event=event, status="active").exists())
+
+    def test_same_identity_with_different_result_numbers_creates_one_conflict(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(horse_name="Result Number Conflict", external_horse_id="RESULT-CONFLICT")
+        first_result = event.results.get()
+        first_result.horse_number = "3"
+        first_result.save(update_fields=["horse_number", "updated_at"])
+        RaceEventResult.objects.create(
+            event=event,
+            horse_number="8",
+            horse_name="Result Number Conflict",
+            finish_position=2,
+            source_refs={
+                "result": "https://example.com/result/8",
+                "source": "official",
+                "external_horse_id": "RESULT-CONFLICT",
+            },
+            raw_payload={"horse_id": "RESULT-CONFLICT"},
+        )
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        conflict = HorseIdentityConflict.objects.get(race_event=event)
+        pairing = conflict.evidence_payload["pairing_conflict"]
+        self.assertEqual(summary["ambiguous_participants"], 1)
+        self.assertEqual(pairing["horse_numbers"], ["3", "8"])
+        self.assertEqual(len(pairing["result_ids"]), 2)
+        self.assertFalse(HorseP0Source.objects.filter(race_event=event, status="active").exists())
+
+    def test_same_identity_with_different_runner_numbers_creates_one_conflict(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(horse_name="Runner Number Conflict", external_horse_id="RUNNER-CONFLICT")
+        event.results.all().delete()
+        for horse_number in ("3", "8"):
+            RaceEventRunner.objects.create(
+                event=event,
+                horse_number=horse_number,
+                horse_name="Runner Number Conflict",
+                source_refs={
+                    "runner": f"https://example.com/runner/{horse_number}",
+                    "source": "official",
+                    "external_horse_id": "RUNNER-CONFLICT",
+                },
+                raw_payload={"horse_id": "RUNNER-CONFLICT"},
+            )
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        conflict = HorseIdentityConflict.objects.get(race_event=event)
+        pairing = conflict.evidence_payload["pairing_conflict"]
+        self.assertEqual(summary["ambiguous_participants"], 1)
+        self.assertEqual(pairing["horse_numbers"], ["3", "8"])
+        self.assertEqual(len(pairing["runner_ids"]), 2)
+        self.assertFalse(HorseP0Source.objects.filter(race_event=event, status="active").exists())
+
+    def test_overlapping_identity_keys_create_one_complete_conflict_group(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(horse_name="Linked Identity", external_horse_id="IDENTITY-A")
+        first_result = event.results.get()
+        first_result.horse_number = "3"
+        first_result.raw_payload = {"horse_id": "IDENTITY-B"}
+        first_result.save(update_fields=["horse_number", "raw_payload", "updated_at"])
+        second_result = RaceEventResult.objects.create(
+            event=event,
+            horse_number="8",
+            horse_name="Linked Identity",
+            finish_position=2,
+            source_refs={
+                "result": "https://example.com/result/8",
+                "source": "official",
+                "external_horse_id": "IDENTITY-A",
+            },
+        )
+        third_result = RaceEventResult.objects.create(
+            event=event,
+            horse_number="9",
+            horse_name="Linked Identity",
+            finish_position=3,
+            source_refs={
+                "result": "https://example.com/result/9",
+                "source": "official",
+                "external_horse_id": "IDENTITY-B",
+            },
+        )
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        conflict = HorseIdentityConflict.objects.get(race_event=event)
+        pairing = conflict.evidence_payload["pairing_conflict"]
+        self.assertEqual(summary["ambiguous_participants"], 1)
+        self.assertEqual(pairing["horse_numbers"], ["3", "8", "9"])
+        self.assertEqual(
+            set(pairing["result_ids"]),
+            {first_result.id, second_result.id, third_result.id},
+        )
+        self.assertEqual(
+            set(pairing["identity_keys"]),
+            {"official:identity-a", "official:identity-b"},
+        )
+        self.assertFalse(HorseP0Source.objects.filter(race_event=event, status="active").exists())
+
+    def test_resolved_number_conflict_requires_and_uses_selected_horse_number(self):
+        from django.core.exceptions import ValidationError
+
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(horse_name="Resolved Number Conflict", external_horse_id="RESOLVED-CONFLICT")
+        result = event.results.get()
+        result.horse_number = "8"
+        result.save(update_fields=["horse_number", "updated_at"])
+        runner = RaceEventRunner.objects.create(
+            event=event,
+            horse_number="3",
+            horse_name="Resolved Number Conflict",
+            source_refs={
+                "runner": "https://example.com/runner/3",
+                "source": "official",
+                "external_horse_id": "RESOLVED-CONFLICT",
+            },
+            raw_payload={"horse_id": "RESOLVED-CONFLICT"},
+        )
+        sync_p0_horse_sources(commit=True)
+        conflict = HorseIdentityConflict.objects.get(race_event=event)
+        resolved_profile = self._profile(
+            primary_term=self._term(source="Resolved Number Conflict Profile"),
+            original_name="Resolved Number Conflict",
+        )
+        conflict.status = HorseIdentityConflictStatus.RESOLVED
+        conflict.resolved_profile = resolved_profile
+        with self.assertRaises(ValidationError):
+            conflict.full_clean()
+        conflict.resolved_horse_number = "3"
+        conflict.full_clean()
+        conflict.save(
+            update_fields=["status", "resolved_profile", "resolved_horse_number", "updated_at"]
+        )
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        source = HorseP0Source.objects.get(race_event=event, status="active")
+        self.assertEqual(summary["major_race_sources"], 1)
+        self.assertEqual(source.profile, resolved_profile)
+        self.assertEqual(source.participant_key, "number:3")
+        self.assertEqual(source.race_runner, runner)
+        self.assertIsNone(source.race_result)
+
+    def test_conflict_uses_url_from_any_member_and_persists_without_urls(self):
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(horse_name="Conflict URL", external_horse_id="CONFLICT-URL")
+        event.source_refs = {}
+        event.save(update_fields=["source_refs", "updated_at"])
+        first_result = event.results.get()
+        first_result.horse_number = "3"
+        first_result.source_refs = {"source": "official", "external_horse_id": "CONFLICT-URL"}
+        first_result.save(update_fields=["horse_number", "source_refs", "updated_at"])
+        second_result = RaceEventResult.objects.create(
+            event=event,
+            horse_number="8",
+            horse_name="Conflict URL",
+            finish_position=2,
+            source_refs={
+                "result": "https://example.com/result/8",
+                "source": "official",
+                "external_horse_id": "CONFLICT-URL",
+            },
+        )
+
+        sync_p0_horse_sources(commit=True)
+
+        conflict = HorseIdentityConflict.objects.get(race_event=event)
+        self.assertEqual(conflict.source_url, second_result.source_refs["result"])
+        self.assertEqual(conflict.evidence_payload["pairing_conflict"]["source_urls"], [second_result.source_refs["result"]])
+
+        no_url_event = self._race_event(
+            horse_name="Conflict No URL",
+            external_horse_id="CONFLICT-NO-URL",
+        )
+        no_url_event.source_refs = {}
+        no_url_event.save(update_fields=["source_refs", "updated_at"])
+        no_url_first = no_url_event.results.get()
+        no_url_first.horse_number = "3"
+        no_url_first.source_refs = {"source": "official", "external_horse_id": "CONFLICT-NO-URL"}
+        no_url_first.save(update_fields=["horse_number", "source_refs", "updated_at"])
+        RaceEventResult.objects.create(
+            event=no_url_event,
+            horse_number="8",
+            horse_name="Conflict No URL",
+            finish_position=2,
+            source_refs={"source": "official", "external_horse_id": "CONFLICT-NO-URL"},
+        )
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        no_url_conflict = HorseIdentityConflict.objects.get(race_event=no_url_event)
+        self.assertEqual(no_url_conflict.source_url, "")
+        self.assertEqual(no_url_conflict.evidence_payload["pairing_conflict"]["source_urls"], [])
+        self.assertGreaterEqual(summary["missing_source_url_participants"], 1)
+
+    def test_resolved_number_conflict_without_selected_member_url_returns_to_pending(self):
+        from django.core.exceptions import ValidationError
+
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(horse_name="Missing Selected URL", external_horse_id="MISSING-URL")
+        event.source_refs = {}
+        event.save(update_fields=["source_refs", "updated_at"])
+        first_result = event.results.get()
+        first_result.horse_number = "3"
+        first_result.source_refs = {"source": "official", "external_horse_id": "MISSING-URL"}
+        first_result.save(update_fields=["horse_number", "source_refs", "updated_at"])
+        RaceEventResult.objects.create(
+            event=event,
+            horse_number="8",
+            horse_name="Missing Selected URL",
+            finish_position=2,
+            source_refs={
+                "result": "https://example.com/result/8",
+                "source": "official",
+                "external_horse_id": "MISSING-URL",
+            },
+        )
+        sync_p0_horse_sources(commit=True)
+        conflict = HorseIdentityConflict.objects.get(race_event=event)
+        resolved_profile = self._profile(
+            primary_term=self._term(source="Missing Selected URL Profile"),
+            original_name="Missing Selected URL",
+        )
+        conflict.status = HorseIdentityConflictStatus.RESOLVED
+        conflict.resolved_profile = resolved_profile
+        conflict.resolved_horse_number = "3"
+        with self.assertRaises(ValidationError):
+            conflict.full_clean()
+
+        HorseIdentityConflict.objects.filter(pk=conflict.pk).update(
+            status=HorseIdentityConflictStatus.RESOLVED,
+            resolved_profile=resolved_profile,
+            resolved_horse_number="3",
+        )
+        sync_p0_horse_sources(commit=True)
+
+        conflict.refresh_from_db()
+        self.assertEqual(conflict.status, HorseIdentityConflictStatus.PENDING)
+        self.assertIsNone(conflict.resolved_profile)
+        self.assertEqual(conflict.resolved_horse_number, "")
+        self.assertEqual(
+            conflict.evidence_payload["resolution_failure"]["reason"],
+            "resolved_member_missing_source_url",
+        )
+        self.assertFalse(HorseP0Source.objects.filter(race_event=event, status="active").exists())
+
+    def test_resolved_number_conflict_without_selected_member_returns_to_pending(self):
+        from unittest.mock import patch
+
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(horse_name="Missing Selected Member", external_horse_id="MISSING-MEMBER")
+        first_result = event.results.get()
+        first_result.horse_number = "3"
+        first_result.save(update_fields=["horse_number", "updated_at"])
+        RaceEventResult.objects.create(
+            event=event,
+            horse_number="8",
+            horse_name="Missing Selected Member",
+            finish_position=2,
+            source_refs={
+                "result": "https://example.com/result/8",
+                "source": "official",
+                "external_horse_id": "MISSING-MEMBER",
+            },
+        )
+        sync_p0_horse_sources(commit=True)
+        conflict = HorseIdentityConflict.objects.get(race_event=event)
+        resolved_profile = self._profile(
+            primary_term=self._term(source="Missing Selected Member Profile"),
+            original_name="Missing Selected Member",
+        )
+        conflict.status = HorseIdentityConflictStatus.RESOLVED
+        conflict.resolved_profile = resolved_profile
+        conflict.resolved_horse_number = "3"
+        conflict.full_clean()
+        conflict.save(
+            update_fields=["status", "resolved_profile", "resolved_horse_number", "updated_at"]
+        )
+
+        with patch("stable.services.p0_horse_profiles._resolved_conflict_member", return_value=None):
+            sync_p0_horse_sources(commit=True)
+
+        conflict.refresh_from_db()
+        self.assertEqual(conflict.status, HorseIdentityConflictStatus.PENDING)
+        self.assertIsNone(conflict.resolved_profile)
+        self.assertEqual(conflict.resolved_horse_number, "")
+        self.assertEqual(
+            conflict.evidence_payload["resolution_failure"]["reason"],
+            "resolved_member_missing",
+        )
+
+    def test_idempotency_backfill_reads_external_id_from_source_refs(self):
+        import importlib
+
+        from django.apps import apps
+        from stable.services.horse_race_records import upsert_race_record
+
+        profile = self._profile()
+        record = HorseRaceRecord.objects.create(
+            horse_profile=profile,
+            race_name="Source Refs Race",
+            race_year=2026,
+            source_name="",
+            source_url="https://example.com/source-refs-race",
+            source_refs={
+                "source": "official",
+                "external_result_id": "  RESULT-FROM-SOURCE-REFS  ",
+            },
+            raw_payload={},
+            idempotency_key="",
+        )
+        migration = importlib.import_module("stable.migrations.0027_p0_horse_profile_completion")
+
+        migration.backfill_horse_record_idempotency_keys(apps, None)
+
+        record.refresh_from_db()
+        expected_raw = f"{profile.id}|external|official|RESULT-FROM-SOURCE-REFS"
+        self.assertEqual(record.idempotency_key, hashlib.sha256(expected_raw.encode("utf-8")).hexdigest())
+        self.assertEqual(record.source_name, "official")
+
+        result = upsert_race_record(
+            profile,
+            {
+                "race_name": "Source Refs Race",
+                "race_year": 2026,
+                "source_name": "official",
+                "source_url": "https://example.com/source-refs-race",
+                "external_result_id": "RESULT-FROM-SOURCE-REFS",
+            },
+        )
+
+        self.assertEqual(result.record.id, record.id)
+        self.assertEqual(HorseRaceRecord.objects.filter(horse_profile=profile).count(), 1)
+
+    def test_cross_source_id_difference_stays_ambiguous_without_pedigree_identity(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        term = self._term(source="Twin Star", region=RacingRegion.UNITED_STATES)
+        profile = self._profile(
+            primary_term=term,
+            original_name="Twin Star",
+            english_name="Twin Star",
+            source_refs={"horse_identity_keys": ["netkeiba:TWIN-A"]},
+        )
+        event = self._race_event(
+            region=RacingRegion.UNITED_STATES,
+            horse_name="Twin Star",
+            source_namespace="hkjc",
+            external_horse_id="TWIN-B",
+        )
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        self.assertEqual(summary["ambiguous_participants"], 1)
+        self.assertEqual(HorseProfile.objects.filter(original_name="Twin Star").count(), 1)
+        self.assertFalse(HorseP0Source.objects.filter(profile=profile, race_event=event).exists())
+        self.assertTrue(
+            HorseIdentityConflict.objects.filter(
+                candidate_profiles=profile,
+                race_event=event,
+                status=HorseIdentityConflictStatus.PENDING,
+            ).exists()
+        )
+
+    def test_duplicate_source_identity_records_conflict_for_every_matched_profile(self):
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        profiles = [
+            self._profile(
+                primary_term=self._term(source=name),
+                original_name=name,
+                source_refs={"horse_identity_keys": ["official:COLLISION"]},
+            )
+            for name in ("First Runner", "Second Runner")
+        ]
+        self._race_event(
+            horse_name="Unknown Runner",
+            source_namespace="official",
+            external_horse_id="COLLISION",
+        )
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        self.assertEqual(summary["ambiguous_participants"], 1)
+        conflict = HorseIdentityConflict.objects.get(status=HorseIdentityConflictStatus.PENDING)
+        self.assertEqual(set(conflict.candidate_profiles.all()), set(profiles))
+
+    def test_identity_conflict_is_persisted_without_existing_profile(self):
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        terms = [self._term(source="Twin Star") for _ in range(2)]
+        event = self._race_event(horse_name="Twin Star", external_horse_id="")
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        self.assertEqual(summary["ambiguous_participants"], 1)
+        conflict = HorseIdentityConflict.objects.get(race_event=event)
+        self.assertEqual(conflict.status, HorseIdentityConflictStatus.PENDING)
+        self.assertEqual(set(conflict.candidate_terms.all()), set(terms))
+        self.assertEqual(conflict.candidate_profiles.count(), 0)
+
+    def test_resolved_identity_conflict_is_applied_on_next_sync(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        terms = [self._term(source="Twin Star") for _ in range(2)]
+        event = self._race_event(horse_name="Twin Star", external_horse_id="")
+        sync_p0_horse_sources(commit=True)
+        conflict = HorseIdentityConflict.objects.get(race_event=event)
+        resolved_profile = self._profile(
+            primary_term=terms[0],
+            original_name="Twin Star",
+            english_name="Twin Star",
+        )
+        conflict.status = HorseIdentityConflictStatus.RESOLVED
+        conflict.resolved_profile = resolved_profile
+        conflict.full_clean()
+        conflict.save(update_fields=["status", "resolved_profile", "updated_at"])
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        self.assertEqual(summary["major_race_sources"], 1)
+        self.assertTrue(HorseP0Source.objects.filter(profile=resolved_profile, race_event=event).exists())
+
+    def test_pedigree_identity_matches_multilingual_name_to_existing_profile(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        term = self._term(source="Forever Young", target="青春永驻", region=RacingRegion.JAPAN)
+        profile = self._profile(primary_term=term, racing_region=RacingRegion.JAPAN)
+        event = self._race_event(
+            region=RacingRegion.UNITED_STATES,
+            horse_name="青春永驻",
+            source_namespace="hkjc",
+            external_horse_id="HK-FY",
+        )
+        result = event.results.get()
+        result.raw_payload.update(
+            {
+                "sire_name": "Real Steel",
+                "dam_name": "Forever Darling",
+                "birth_year": 2021,
+            }
+        )
+        result.save(update_fields=["raw_payload", "updated_at"])
+
+        summary = sync_p0_horse_sources(commit=True)
+
+        self.assertEqual(summary["ambiguous_participants"], 0)
+        self.assertEqual(HorseProfile.objects.filter(primary_term=term).count(), 1)
+        self.assertTrue(HorseP0Source.objects.filter(profile=profile, race_event=event).exists())
+        profile.refresh_from_db()
+        self.assertIn("hkjc:hk-fy", profile.source_refs["horse_identity_keys"])
+
+    def test_multilingual_identity_index_prefetches_term_aliases(self):
+        from stable.services.p0_horse_profiles import _horse_name_identity_index
+
+        terms = [self._term(source=f"Runner {index}") for index in range(4)]
+        for index, term in enumerate(terms):
+            TermAlias.objects.create(
+                term=term,
+                source_language=SourceLanguage.CHINESE,
+                text=f"赛驹{index}",
+            )
+
+        with self.assertNumQueries(2):
+            identity_index = _horse_name_identity_index()
+
+        self.assertIn(terms[0].id, identity_index["赛驹0"])
+
+    def test_existing_event_binding_does_not_override_corrected_external_identity(self):
+        from stable.models import HorseP0Source, HorseP0SourceStatus
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(
+            region=RacingRegion.UNITED_STATES,
+            horse_name="Twin Star",
+            source_namespace="official",
+            external_horse_id="TWIN-A",
+        )
+        sync_p0_horse_sources(commit=True)
+        old_source = HorseP0Source.objects.get(race_event=event, source_type="major_race_participant")
+        result = event.results.get()
+        result.source_refs["external_horse_id"] = "TWIN-B"
+        result.raw_payload["horse_id"] = "TWIN-B"
+        result.save(update_fields=["source_refs", "raw_payload", "updated_at"])
+
+        summary = sync_p0_horse_sources(commit=True, reconcile=True)
+        old_source.refresh_from_db()
+
+        self.assertEqual(summary["ambiguous_participants"], 0)
+        self.assertEqual(old_source.status, HorseP0SourceStatus.REVOKED)
+        self.assertEqual(HorseProfile.objects.filter(original_name="Twin Star").count(), 2)
+        active_source = HorseP0Source.objects.get(
+            race_event=event,
+            source_type="major_race_participant",
+            status=HorseP0SourceStatus.ACTIVE,
+        )
+        self.assertIn("official:twin-b", active_source.profile.source_refs["horse_identity_keys"])
+
+    def test_full_reconcile_keeps_existing_source_when_identity_is_ambiguous(self):
+        from stable.models import HorseP0Source, HorseP0SourceStatus
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(horse_name="Twin Star")
+        sync_p0_horse_sources(commit=True)
+        source = HorseP0Source.objects.get(race_event=event)
+        duplicate_term = self._term(source="Twin Star", region=RacingRegion.UNITED_STATES)
+        self._profile(primary_term=duplicate_term, original_name="Twin Star", english_name="Twin Star")
+        result = event.results.get()
+        result.source_refs.pop("external_horse_id", None)
+        result.raw_payload = {}
+        result.save(update_fields=["source_refs", "raw_payload", "updated_at"])
+
+        summary = sync_p0_horse_sources(commit=True, reconcile=True)
+        source.refresh_from_db()
+
+        self.assertEqual(summary["ambiguous_participants"], 1)
+        self.assertEqual(source.status, HorseP0SourceStatus.ACTIVE)
+
+    def test_conflict_flag_creates_latest_conflict_audit(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import apply_reviewed_completion_artifact, evaluate_full_profile_completeness
+
+        profile = self._profile(completeness_status=HorseProfileCompleteness.COMPLETE_PROFILE_FULL)
+        self._complete_records(profile)
+        HorseP0Source.objects.create(profile=profile, source_type="manual", source_url="https://example.com/profile")
+        self._approve_required_modules(profile)
+        row = self._reviewed_artifact_row(profile)
+        row["module_reviews"]["race_record"]["conflict"] = "new_source_disagrees"
+
+        apply_reviewed_completion_artifact(
+            {"reviewed": True, "reviewer_id": self.user.id, "rows": [row]},
+            commit=True,
+        )
+
+        latest = profile.data_candidates.filter(module=HorseProfileModule.RACE_RECORD).order_by("-fetched_at", "-id").first()
+        self.assertEqual(latest.status, "conflict")
+        self.assertFalse(evaluate_full_profile_completeness(profile).is_complete)
+
+    def test_generic_completeness_refresh_preserves_valid_full_profile(self):
+        from stable.models import HorseP0Source
+        from stable.services.horse_profiles import update_completeness
+
+        profile = self._profile(completeness_status=HorseProfileCompleteness.COMPLETE_PROFILE_FULL)
+        self._complete_records(profile)
+        HorseP0Source.objects.create(profile=profile, source_type="manual", source_url="https://example.com/profile")
+        self._approve_required_modules(profile)
+
+        result = update_completeness(profile)
+
+        self.assertEqual(result, HorseProfileCompleteness.COMPLETE_PROFILE_FULL)
+        profile.refresh_from_db()
+        self.assertEqual(profile.completeness_status, HorseProfileCompleteness.COMPLETE_PROFILE_FULL)
+
+    def test_queue_uses_home_region_once_and_prioritizes_manual_source(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import build_p0_completion_queue
+
+        term_profile = self._profile(original_name="Term First", english_name="Term First", racing_region=RacingRegion.JAPAN)
+        manual_profile = self._profile(
+            primary_term=self._term(source="Manual First", region=RacingRegion.JAPAN),
+            original_name="Manual First",
+            english_name="Manual First",
+            racing_region=RacingRegion.JAPAN,
+        )
+        HorseP0Source.objects.create(
+            profile=term_profile,
+            source_type="term_active_with_zh",
+            racing_region=RacingRegion.JAPAN,
+        )
+        HorseP0Source.objects.create(
+            profile=term_profile,
+            source_type="major_race_participant",
+            racing_region=RacingRegion.UNITED_STATES,
+            horse_name="Term First",
+        )
+        HorseP0Source.objects.create(
+            profile=manual_profile,
+            source_type="manual",
+            racing_region=RacingRegion.JAPAN,
+        )
+
+        queue = build_p0_completion_queue(
+            regions=[RacingRegion.JAPAN, RacingRegion.UNITED_STATES],
+            limit_per_region=1,
+        )
+
+        self.assertEqual([item.profile_id for item in queue[RacingRegion.JAPAN]], [manual_profile.id])
+        self.assertEqual(queue[RacingRegion.UNITED_STATES], [])
+
+    def test_queue_prioritizes_incomplete_profile_before_complete_manual_profile(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import build_p0_completion_queue
+
+        incomplete_profile = self._profile(
+            primary_term=self._term(source="Incomplete Queue Horse", region=RacingRegion.JAPAN),
+            racing_region=RacingRegion.JAPAN,
+            completeness_status=HorseProfileCompleteness.EMPTY,
+        )
+        complete_profile = self._profile(
+            primary_term=self._term(source="Complete Queue Horse", region=RacingRegion.JAPAN),
+            racing_region=RacingRegion.JAPAN,
+            completeness_status=HorseProfileCompleteness.COMPLETE_PROFILE_FULL,
+        )
+        HorseP0Source.objects.create(
+            profile=incomplete_profile,
+            source_type="term_active_with_zh",
+            racing_region=RacingRegion.JAPAN,
+        )
+        HorseP0Source.objects.create(
+            profile=complete_profile,
+            source_type="manual",
+            racing_region=RacingRegion.JAPAN,
+        )
+
+        queue = build_p0_completion_queue(
+            regions=[RacingRegion.JAPAN],
+            limit_per_region=1,
+        )
+
+        self.assertEqual([item.profile_id for item in queue[RacingRegion.JAPAN]], [incomplete_profile.id])
+
+    def test_queue_prioritizes_stale_retired_profile_and_ignores_empty_external_keys(self):
+        from stable.models import HorseP0Source, HorseRacingCareerStatus
+        from stable.services.p0_horse_profiles import build_p0_completion_queue
+
+        stale_profile = self._profile(
+            primary_term=self._term(source="Stale Retired Queue Horse", region=RacingRegion.JAPAN),
+            racing_region=RacingRegion.JAPAN,
+            completeness_status=HorseProfileCompleteness.COMPLETE_PROFILE_FULL,
+            racing_career_status=HorseRacingCareerStatus.RETIRED,
+            records_synced_through=datetime(2026, 1, 1).date(),
+            source_refs={"horse_identity_keys": []},
+        )
+        fresh_profile = self._profile(
+            primary_term=self._term(source="Fresh Retired Queue Horse", region=RacingRegion.JAPAN),
+            racing_region=RacingRegion.JAPAN,
+            completeness_status=HorseProfileCompleteness.COMPLETE_PROFILE_FULL,
+            racing_career_status=HorseRacingCareerStatus.RETIRED,
+            records_synced_through=datetime(2026, 11, 8).date(),
+        )
+        self._complete_records(stale_profile)
+        self._complete_records(fresh_profile)
+        for profile in (stale_profile, fresh_profile):
+            HorseP0Source.objects.create(
+                profile=profile,
+                source_type="manual",
+                racing_region=RacingRegion.JAPAN,
+            )
+
+        queue = build_p0_completion_queue(
+            regions=[RacingRegion.JAPAN],
+            limit_per_region=1,
+        )
+
+        self.assertEqual([item.profile_id for item in queue[RacingRegion.JAPAN]], [stale_profile.id])
+        self.assertNotIn("external_identity", queue[RacingRegion.JAPAN][0].reasons)
+
+    def test_identity_conflict_notification_task_notifies_admin(self):
+        from stable.tasks import notify_p0_horse_identity_conflicts_task
+
+        HorseIdentityConflict.objects.create(
+            fingerprint="identity-notification",
+            horse_name="Twin Star",
+            source_url="https://example.com/race",
+            status=HorseIdentityConflictStatus.PENDING,
+        )
+
+        with patch("stable.tasks.send_ops_notification") as notify:
+            result = notify_p0_horse_identity_conflicts_task.run()
+
+        self.assertEqual(result["conflict_count"], 1)
+        notify.assert_called_once()
+        self.assertEqual(
+            notify.call_args.kwargs["payload"]["admin_url"],
+            f"{django_settings.DJANGO_ADMIN_URL}stable/horseidentityconflict/?status__exact=pending",
+        )
+
+    def test_admin_can_filter_and_resolve_identity_conflict(self):
+        from django.contrib import admin
+
+        from stable.admin import HorseIdentityConflictAdmin
+        from stable.tasks import notify_p0_horse_identity_conflicts_task
+
+        conflict = HorseIdentityConflict.objects.create(
+            fingerprint="identity-admin-resolution",
+            horse_name="Twin Star",
+            status=HorseIdentityConflictStatus.PENDING,
+        )
+        profile = self._profile()
+        self.user.is_staff = True
+        self.user.is_superuser = True
+        self.user.save(update_fields=["is_staff", "is_superuser"])
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse("admin:stable_horseidentityconflict_changelist"),
+            {"status__exact": HorseIdentityConflictStatus.PENDING},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Twin Star")
+        conflict.status = HorseIdentityConflictStatus.RESOLVED
+        conflict.resolved_profile = profile
+        conflict.resolution_notes = "已人工确认并完成术语拆分"
+        request = Mock(user=self.user)
+        HorseIdentityConflictAdmin(HorseIdentityConflict, admin.site).save_model(
+            request,
+            conflict,
+            form=Mock(),
+            change=True,
+        )
+        conflict.refresh_from_db()
+        self.assertEqual(conflict.resolved_by, self.user)
+        self.assertIsNotNone(conflict.resolved_at)
+        with patch("stable.tasks.send_ops_notification") as notify:
+            result = notify_p0_horse_identity_conflicts_task.run()
+        self.assertEqual(result["conflict_count"], 0)
+        notify.assert_not_called()
+
+    def test_sync_revokes_missing_managed_sources_without_deleting_history(self):
+        from stable.models import HorseP0Source, HorseP0SourceStatus
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        term = self._term(target="青春永驻", region=RacingRegion.JAPAN)
+        profile = self._profile(primary_term=term, racing_region=RacingRegion.JAPAN)
+        sync_p0_horse_sources(commit=True)
+        source = HorseP0Source.objects.get(profile=profile, source_type="term_active_with_zh")
+        term.is_active = False
+        term.save(update_fields=["is_active", "updated_at"])
+
+        summary = sync_p0_horse_sources(commit=True, reconcile=True)
+        source.refresh_from_db()
+
+        self.assertEqual(summary["revoked_sources"], 1)
+        self.assertEqual(source.status, HorseP0SourceStatus.REVOKED)
+        self.assertIsNotNone(source.revoked_at)
+        self.assertTrue(source.revoked_reason)
+
+    def test_scoped_source_sync_does_not_revoke_other_regions(self):
+        from stable.models import HorseP0Source, HorseP0SourceStatus
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        term = self._term(target="青春永驻", region=RacingRegion.JAPAN)
+        profile = self._profile(primary_term=term, racing_region=RacingRegion.JAPAN)
+        sync_p0_horse_sources(commit=True)
+        source = HorseP0Source.objects.get(profile=profile, source_type="term_active_with_zh")
+        term.is_active = False
+        term.save(update_fields=["is_active", "updated_at"])
+
+        summary = sync_p0_horse_sources(commit=True, regions=[RacingRegion.UNITED_STATES], reconcile=True)
+        source.refresh_from_db()
+
+        self.assertEqual(summary["revoked_sources"], 0)
+        self.assertEqual(source.status, HorseP0SourceStatus.ACTIVE)
+
+    def test_full_reconcile_preserves_existing_source_when_url_is_temporarily_missing(self):
+        from stable.models import HorseP0Source, HorseP0SourceStatus
+        from stable.services.p0_horse_profiles import sync_p0_horse_sources
+
+        event = self._race_event(external_horse_id="FY-001")
+        sync_p0_horse_sources(commit=True)
+        source = HorseP0Source.objects.get(race_event=event)
+        result = event.results.get()
+        result.source_refs = {"source": "official", "external_horse_id": "FY-001"}
+        result.raw_payload = {"horse_id": "FY-001"}
+        result.save(update_fields=["source_refs", "raw_payload", "updated_at"])
+        event.source_refs = {}
+        event.save(update_fields=["source_refs", "updated_at"])
+
+        summary = sync_p0_horse_sources(commit=True, reconcile=True)
+        source.refresh_from_db()
+
+        self.assertEqual(summary["missing_source_url_participants"], 1)
+        self.assertEqual(summary["revoked_sources"], 0)
+        self.assertEqual(source.status, HorseP0SourceStatus.ACTIVE)
+
+    def test_conflict_candidate_cannot_be_applied_through_generic_endpoint(self):
+        profile = self._profile(country="美国")
+        candidate = HorseProfileDataCandidate.objects.create(
+            profile=profile,
+            module=HorseProfileModule.PROFILE,
+            source_name="p0_completion_artifact",
+            status=HorseProfileCandidateStatus.CONFLICT,
+            candidate_payload={"country": "法国"},
+        )
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("console-horse-profile-apply-candidate", args=[candidate.id]),
+            {"action": "apply"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        profile.refresh_from_db()
+        candidate.refresh_from_db()
+        self.assertEqual(profile.country, "美国")
+        self.assertEqual(candidate.status, HorseProfileCandidateStatus.CONFLICT)
+
+    def test_management_command_supports_profile_ids_and_explicit_full_reconcile(self):
+        from stable.services import p0_horse_profiles
+
+        output = StringIO()
+        with patch.object(p0_horse_profiles, "build_p0_completion_queue", return_value={}) as build_queue:
+            call_command("p0_horse_profiles", "--queue", "--profile-id", "42", "--json", stdout=output)
+        build_queue.assert_called_once_with(regions=None, limit_per_region=10, profile_ids=[42])
+
+        with patch.object(p0_horse_profiles, "sync_p0_horse_sources", return_value={}) as sync_sources:
+            call_command("p0_horse_profiles", "--sync-sources", "--commit", "--full-reconcile", stdout=StringIO())
+        sync_sources.assert_called_once_with(commit=True, regions=None, reconcile=True)
+
+        with self.assertRaises(CommandError):
+            call_command(
+                "p0_horse_profiles",
+                "--sync-sources",
+                "--commit",
+                "--full-reconcile",
+                "--region",
+                RacingRegion.JAPAN,
+                stdout=StringIO(),
+            )
+
+    def test_first_publish_remains_manual_after_profile_becomes_complete(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import mark_profile_completion_ready
+
+        profile = self._profile(review_status=HorseProfileStatus.DRAFT)
+        self._complete_records(profile)
+        HorseP0Source.objects.create(profile=profile, source_type="term_active_with_zh", source_url="https://example.com/term")
+
+        result = mark_profile_completion_ready(profile, reviewer=self.user)
+        self.assertEqual(result["status"], "blocked")
+        self.assertIn("review.source_url", result["blocking_reasons"])
+
+        profile.source_refs = {"p0_completion": "https://example.com/horse-profile"}
+        profile.save(update_fields=["source_refs", "updated_at"])
+        result = mark_profile_completion_ready(profile, reviewer=self.user)
+        profile.refresh_from_db()
+
+        self.assertEqual(result["status"], "ready_for_manual_publish")
+        self.assertEqual(profile.review_status, HorseProfileStatus.READY)
+        self.assertIsNone(profile.published_at)
+        self.assertNotEqual(profile.review_status, HorseProfileStatus.PUBLISHED)
+
+    def test_public_horse_pages_never_trigger_p0_sync_or_completion_adapters(self):
+        from stable.services import p0_horse_profiles
+
+        profile = self._profile(review_status=HorseProfileStatus.PUBLISHED)
+        with patch.object(p0_horse_profiles, "sync_p0_horse_sources") as sync_sources, patch.object(
+            p0_horse_profiles,
+            "complete_p0_horse_profiles",
+        ) as complete_profiles:
+            index_response = self.client.get(reverse("public-horse-index"))
+            detail_response = self.client.get(reverse("public-horse-detail", args=[profile.id]))
+
+        self.assertEqual(index_response.status_code, 200)
+        self.assertEqual(detail_response.status_code, 200)
+        sync_sources.assert_not_called()
+        complete_profiles.assert_not_called()
+
+    def test_public_horse_detail_uses_original_name_when_translation_is_pending(self):
+        profile = self._profile(
+            display_name_zh="",
+            original_name="Forever Young",
+            english_name="Forever Young",
+            review_status=HorseProfileStatus.PUBLISHED,
+        )
+
+        response = self.client.get(reverse("public-horse-detail", args=[profile.id]))
+
+        self.assertContains(response, "Forever Young")
+        self.assertContains(response, "中文译名待补")

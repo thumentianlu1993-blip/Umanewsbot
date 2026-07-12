@@ -16,6 +16,8 @@ from stable.models import (
     AutomationPhase,
     AutomationStatus,
     CrawlJob,
+    HorseIdentityConflict,
+    HorseIdentityConflictStatus,
     HorseProfile,
     NewsArticle,
     NewsSource,
@@ -53,7 +55,7 @@ from stable.services.multiregion import summarize_multiregion_news_production
 from stable.services.news_attribution import apply_article_attribution
 from stable.services.notifications import send_automation_notification, send_high_value_warning_notification
 from stable.services.operations import log_operation
-from stable.services.ops_notifications import send_production_summary_notification
+from stable.services.ops_notifications import send_ops_notification, send_production_summary_notification
 from stable.services.onebot import BotPusher
 from stable.services.production_windows import (
     active_major_race_window,
@@ -1447,6 +1449,29 @@ def production_summary_task() -> dict:
     send_production_summary_notification(payload)
     _log_success(log, "production summary generated")
     return payload
+
+
+@shared_task
+def notify_p0_horse_identity_conflicts_task() -> dict:
+    log = _log_start("notify_p0_horse_identity_conflicts")
+    conflicts = HorseIdentityConflict.objects.filter(status=HorseIdentityConflictStatus.PENDING)
+    conflict_count = conflicts.count()
+    if conflict_count:
+        conflict_ids = list(conflicts.values_list("id", flat=True)[:50])
+        send_ops_notification(
+            notification_type=NotificationType.OPS_ANOMALY,
+            title="UmaFans P0 马名歧义待处理",
+            payload={
+                "conflict_count": conflict_count,
+                "conflict_ids": conflict_ids,
+                "admin_url": (
+                    f"{settings.DJANGO_ADMIN_URL}stable/horseidentityconflict/"
+                    "?status__exact=pending"
+                ),
+            },
+        )
+    _log_success(log, f"conflicts={conflict_count}")
+    return {"conflict_count": conflict_count}
 
 
 def _qq_push_retry_countdown(attempt_count: int) -> int:

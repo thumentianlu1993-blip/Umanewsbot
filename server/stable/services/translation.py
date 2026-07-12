@@ -225,6 +225,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             f"- [{term.term_type}] {term.matched_text or term.source_ja} => {term.target_zh}"
             + (f"（备注：{term.notes}）" if term.notes else "")
             for term in terms
+            if (term.target_zh or "").strip()
         ]
         source_text = article.body_ja_normalized or article.body_ja_raw
         unknown_horse_limit = max(1, int(settings.TRANSLATION_UNKNOWN_HORSE_LIMIT))

@@ -5,6 +5,7 @@ from django.db.models import Count
 from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
+from django.utils import timezone
 from django.utils.html import format_html
 
 from .forms import NewsArticleAdminForm, NewsImageAdminForm, NewsSourceForm, PushArticleForm
@@ -14,6 +15,10 @@ from .models import (
     AutomationLog,
     CrawlJob,
     HistoricalRaceEventTarget,
+    HorseIdentityConflict,
+    HorseIdentityConflictStatus,
+    HorseP0Source,
+    HorseProfileCompletionRun,
     MajorRaceEvent,
     MediaAsset,
     NewsArticle,
@@ -754,9 +759,90 @@ class QuotaLedgerAdmin(admin.ModelAdmin):
 
 @admin.register(TermEntry)
 class TermEntryAdmin(admin.ModelAdmin):
-    list_display = ("source_ja", "source_language", "racing_region", "target_zh", "term_type", "race_grade", "priority", "is_active", "updated_at")
-    list_filter = ("source_language", "racing_region", "term_type", "race_grade", "is_active")
+    list_display = (
+        "source_ja",
+        "source_language",
+        "racing_region",
+        "target_zh",
+        "translation_status",
+        "term_type",
+        "race_grade",
+        "priority",
+        "is_active",
+        "updated_at",
+    )
+    list_filter = ("source_language", "racing_region", "term_type", "translation_status", "race_grade", "is_active")
     search_fields = ("source_ja", "target_zh", "notes")
+
+
+@admin.register(HorseProfileCompletionRun)
+class HorseProfileCompletionRunAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "status", "dry_run", "regions", "artifact_path", "started_at", "finished_at", "created_at")
+    list_filter = ("status", "dry_run", "created_at")
+    search_fields = ("name", "artifact_path", "error_message")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(HorseP0Source)
+class HorseP0SourceAdmin(admin.ModelAdmin):
+    list_display = (
+        "profile",
+        "source_type",
+        "status",
+        "racing_region",
+        "race_grade",
+        "race_event",
+        "participant_key",
+        "term",
+        "observed_at",
+    )
+    list_filter = ("source_type", "status", "racing_region", "race_grade")
+    search_fields = (
+        "profile__display_name_zh",
+        "profile__original_name",
+        "horse_name",
+        "participant_key",
+        "source_url",
+        "evidence_summary",
+    )
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(HorseIdentityConflict)
+class HorseIdentityConflictAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "horse_name",
+        "horse_number",
+        "status",
+        "race_event",
+        "resolved_profile",
+        "resolved_horse_number",
+        "observed_at",
+        "resolved_at",
+    )
+    list_filter = ("status", "race_event__country_region", "observed_at", "resolved_at")
+    search_fields = (
+        "horse_name",
+        "horse_number",
+        "resolved_horse_number",
+        "fingerprint",
+        "sire_name",
+        "dam_name",
+        "source_url",
+        "resolution_notes",
+    )
+    raw_id_fields = ("candidate_terms", "candidate_profiles", "resolved_profile", "race_event")
+    readonly_fields = ("fingerprint", "evidence_payload", "observed_at", "resolved_at", "resolved_by", "created_at", "updated_at")
+
+    def save_model(self, request, obj, form, change):
+        if obj.status in {HorseIdentityConflictStatus.RESOLVED, HorseIdentityConflictStatus.IGNORED}:
+            obj.resolved_by = request.user
+            obj.resolved_at = timezone.now()
+        else:
+            obj.resolved_by = None
+            obj.resolved_at = None
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(PushTarget)

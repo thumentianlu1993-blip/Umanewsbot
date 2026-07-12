@@ -258,6 +258,11 @@ def _term_preserved(
     return any(candidate and _normalize_term_text(candidate) in normalized_publish for candidate in candidates)
 
 
+def _pending_horse_original_preserved(publish_text: str, source_terms: list[str]) -> bool:
+    normalized_publish = _normalize_term_text(publish_text)
+    return any(term and _normalize_term_text(term) in normalized_publish for term in source_terms)
+
+
 def _source_term_hit(text: str, source_terms: list[str], source_language: str | None) -> bool:
     return any(source_term_matches_text(text, term, source_language) for term in source_terms)
 
@@ -272,6 +277,8 @@ def _setting_list(name: str) -> set[str]:
 
 
 def _term_gate_region_allowed(entry: TermEntry, article: NewsArticle, source_language: str | None) -> bool:
+    if entry.is_pending_horse_translation:
+        return True
     if source_language != SourceLanguage.ENGLISH:
         return True
     term_region = entry.racing_region or GLOBAL_RACING_REGION
@@ -722,9 +729,32 @@ def validate_rewrite(
                 )
             )
             continue
-        if not _term_preserved(entry, publish_text, article_source_language, source_terms):
+        preserved = (
+            _pending_horse_original_preserved(publish_text, source_terms)
+            if entry.is_pending_horse_translation
+            else _term_preserved(entry, publish_text, article_source_language, source_terms)
+        )
+        if not preserved:
             missing_terms.append(entry.source_ja)
             is_core = _is_core_term(entry, source, title, first_block, article_source_language, source_terms)
+            if entry.is_pending_horse_translation:
+                issues.append(
+                    _issue(
+                        "pending_horse_original_missing",
+                        SEVERITY_BLOCKER if is_core else SEVERITY_WARNING,
+                        "暂无中文译名马名未保留原文：" + entry.source_ja,
+                        route=ROUTE_MANUAL if is_core else ROUTE_AUTO,
+                        payload={
+                            "source_ja": entry.source_ja,
+                            "matched_text": _matched_source_term(source, source_terms, article_source_language),
+                            "source_language": entry.source_language,
+                            "term_type": entry.term_type,
+                            "priority": entry.priority,
+                            "position": "core" if is_core else "background",
+                        },
+                    )
+                )
+                continue
             ambiguous_reason = (
                 _ambiguous_english_term_reason(entry, source_terms, is_core=is_core)
                 if article_source_language == SourceLanguage.ENGLISH

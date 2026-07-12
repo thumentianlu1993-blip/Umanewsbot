@@ -304,6 +304,9 @@ EXTERNAL_HORSE_DATA_FETCH_HORSE_DETAIL = env_bool("EXTERNAL_HORSE_DATA_FETCH_HOR
 HORSE_PROFILE_COMPLETION_ALLOW_NETWORK = env_bool("HORSE_PROFILE_COMPLETION_ALLOW_NETWORK", False)
 HORSE_PROFILE_COMPLETION_REQUEST_INTERVAL_SECONDS = float(env("HORSE_PROFILE_COMPLETION_REQUEST_INTERVAL_SECONDS", "8"))
 HORSE_PROFILE_COMPLETION_CACHE_DIR = env("HORSE_PROFILE_COMPLETION_CACHE_DIR", "runtime/horse_profile_completion/cache")
+HORSE_PROFILE_COMPLETION_BATCH_LIMIT = int(env("HORSE_PROFILE_COMPLETION_BATCH_LIMIT", "10"))
+HORSE_PROFILE_COMPLETION_REQUIRE_SOURCE_URL = env_bool("HORSE_PROFILE_COMPLETION_REQUIRE_SOURCE_URL", True)
+HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS = int(env("HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS", "1"))
 HKJC_IMPORT_NETWORK_BASE_URL = env("HKJC_IMPORT_NETWORK_BASE_URL", "https://racing.hkjc.com")
 HKJC_IMPORT_REQUEST_INTERVAL_SECONDS = float(env("HKJC_IMPORT_REQUEST_INTERVAL_SECONDS", "8"))
 HKJC_IMPORT_MAX_RACES_PER_RUN = int(env("HKJC_IMPORT_MAX_RACES_PER_RUN", "20"))
@@ -463,6 +466,10 @@ CELERY_BEAT_SCHEDULE = {
     "production-summary-daily": {
         "task": "stable.tasks.production_summary_task",
         "schedule": crontab(minute=5, hour=9),
+    },
+    "p0-horse-identity-conflicts-daily": {
+        "task": "stable.tasks.notify_p0_horse_identity_conflicts_task",
+        "schedule": crontab(minute=20, hour=9),
     },
 }
 

@@ -35,6 +35,7 @@ from stable.models import (
     WorkflowStatus,
 )
 from stable.services.operations import log_operation
+from stable.services.horse_race_records import upsert_race_record
 from stable.services.terms import source_term_matches_text
 
 
@@ -204,7 +205,18 @@ def calculate_completeness(profile: HorseProfile) -> str:
 
 
 def update_completeness(profile: HorseProfile, *, save: bool = True) -> str:
-    completeness = calculate_completeness(profile)
+    from stable.services.p0_horse_profiles import evaluate_full_profile_completeness
+
+    should_check_full_profile = (
+        profile.completeness_status == HorseProfileCompleteness.COMPLETE_PROFILE_FULL
+        or profile.p0_sources.filter(status="active").exists()
+    )
+    full_evaluation = evaluate_full_profile_completeness(profile) if should_check_full_profile else None
+    completeness = (
+        HorseProfileCompleteness.COMPLETE_PROFILE_FULL
+        if full_evaluation and full_evaluation.is_complete
+        else calculate_completeness(profile)
+    )
     profile.completeness_status = completeness
     if save:
         profile.save(update_fields=["completeness_status", "updated_at"])
@@ -459,6 +471,8 @@ def save_data_candidate(
 
 
 def apply_data_candidate(candidate: HorseProfileDataCandidate, *, user: User | None = None) -> dict[str, Any]:
+    if candidate.status != HorseProfileCandidateStatus.PENDING:
+        raise ValueError("only pending horse profile candidates can be applied")
     profile = candidate.profile
     payload = candidate.candidate_payload or {}
     manual_lock_flags = profile.manual_lock_flags or {}
@@ -482,29 +496,18 @@ def apply_data_candidate(candidate: HorseProfileDataCandidate, *, user: User | N
                 profile.save(update_fields=[*updated_fields, "completeness_status", "updated_at"])
         elif candidate.module == HorseProfileModule.RACE_RECORD:
             items = payload.get("items") if isinstance(payload, dict) else []
-            created_count = 0
+            action_counts: dict[str, int] = {}
             for item in items or []:
                 if not item.get("race_name"):
                     continue
-                HorseRaceRecord.objects.create(
-                    horse_profile=profile,
-                    race_name=str(item.get("race_name") or ""),
-                    race_year=item.get("race_year"),
-                    race_date=item.get("race_date") or None,
-                    grade_text=str(item.get("grade_text") or ""),
-                    normalized_grade=str(item.get("normalized_grade") or ""),
-                    racecourse=str(item.get("racecourse") or ""),
-                    distance_text=str(item.get("distance_text") or ""),
-                    surface=str(item.get("surface") or ""),
-                    finish_position=str(item.get("finish_position") or ""),
-                    result_status=str(item.get("result_status") or HorseRaceResultStatus.UNKNOWN),
-                    source_name=candidate.source_name,
-                    source_url=candidate.source_url,
-                    source_refs=item.get("source_refs") or {},
-                    raw_payload=item,
-                )
-                created_count += 1
-            updated_fields.append(f"race_records:{created_count}")
+                record_payload = {
+                    **item,
+                    "source_name": item.get("source_name") or candidate.source_name,
+                    "source_url": item.get("source_url") or candidate.source_url,
+                }
+                upsert = upsert_race_record(profile, record_payload)
+                action_counts[upsert.action] = action_counts.get(upsert.action, 0) + 1
+            updated_fields.append(f"race_records:{action_counts}")
         else:
             updated_fields.append("aliases:review_required")
         candidate.status = HorseProfileCandidateStatus.APPLIED
