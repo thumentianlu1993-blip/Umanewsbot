@@ -1,5 +1,14 @@
 # 部署运行手册
 
+## 2026-07-12 英文术语门禁受控发布与 TDN France 旧库存清理
+
+- 发布前备份：`backups/db/pre-term-gate-publish-20260712_182052.sql.gz`，约 `110M`，SHA-256 `0edfbf7cae1a23ce71cb2d8de3b5d1d4b85c276daf1504f3971fac90c618144c`。
+- 锁定 run/manifest 提交后恢复香港 `7`、英国 `3`、美国 `9`、法国 `5`，自然窗口共公开 `24` 篇；不得手工伪造未来窗口。
+- 复核发现法国 5 篇来自修复前污染批次 `CrawlJob#9408`，官方日期均超过来源 3 天新鲜度。清理前追加备份 `backups/db/pre-term-gate-stale-cleanup-20260712_185347.sql.gz`，约 `100M`，SHA-256 `a16f85f74d2d1d9de44debbf54f1bf096cff2ad2ce0a17f448ba259e6738a118`。
+- 清理范围不是只撤回 5 篇公开文章，而是将 `CrawlJob#9408` 全部 20 篇统一设为 `workflow_status=withdrawn`、`automation_status=manual_review_required`，清空 `published_to_web_at`，写入 `withdrawn_at`、`decision_reason.tdn_france_stale_cleanup` 和操作日志，避免待审核旧文再次进入补跑。
+- 最终公开 19 篇，QQ 交付 `0`；`NewsSource#21` 保持 `enabled=true / production_approved=true`，因为修复后的新抓取已能读取真实日期并过滤旧文。
+- 常驻 `web/worker/beat` 必须继续保持 `ENGLISH_TERM_CONTEXT_MODE=shadow`，本轮不切全局 `enforce`。
+
 ## 2026-07-12 英文术语命中级上下文门禁 shadow 部署
 
 - 生产提交：`f221c7df`；迁移：`stable.0028_term_gate_reprocess_runs`。
