@@ -4,7 +4,9 @@ import re
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
+from typing import Callable
 
+from django.db import connection
 from django.db.models.functions import Lower
 
 from stable.models import ExternalHorseAlias, NewsArticle, SourceLanguage, TermAlias, TermEntry, TermType
@@ -495,20 +497,31 @@ def _recognize_non_japanese_external_aliases(
     full_text: str,
     source_language: str,
     limit: int | None,
+    *,
+    aliases: Iterable[ExternalHorseAlias] | None = None,
+    known_horse_terms: set[str] | None = None,
+    progress_callback: Callable[[], None] | None = None,
 ) -> list[RecognizedHorseName]:
-    formal_matches = _recognize_formal_horse_terms(full_text, source_language, limit=None)
-    known_horse_terms = {_comparable_horse_name(term, source_language) for term in _known_horse_terms(source_language)}
+    formal_matches: list[RecognizedHorseName] = []
+    if known_horse_terms is None:
+        formal_matches = _recognize_formal_horse_terms(full_text, source_language, limit=None)
+        known_horse_terms = {
+            _comparable_horse_name(term, source_language) for term in _known_horse_terms(source_language)
+        }
     candidates: dict[str, dict] = {}
     candidate_keys = _non_japanese_alias_candidate_keys(full_text, source_language)
     if not candidate_keys:
-        return []
-    queryset = ExternalHorseAlias.objects.filter(source_language=source_language).exclude(normalized_name="")
-    if source_language == SourceLanguage.ENGLISH:
-        queryset = queryset.annotate(normalized_key=Lower("normalized_name")).filter(normalized_key__in=candidate_keys)
-    else:
-        queryset = queryset.filter(normalized_name__in=candidate_keys)
-    queryset = queryset.order_by("normalized_name", "-confidence", "-last_seen_at", "external_horse_id")
-    for alias in queryset:
+        return formal_matches[:limit] if limit is not None else formal_matches
+    if aliases is None:
+        queryset = ExternalHorseAlias.objects.filter(source_language=source_language).exclude(normalized_name="")
+        if source_language == SourceLanguage.ENGLISH:
+            queryset = queryset.annotate(normalized_key=Lower("normalized_name")).filter(normalized_key__in=candidate_keys)
+        else:
+            queryset = queryset.filter(normalized_name__in=candidate_keys)
+        aliases = queryset.order_by("normalized_name", "-confidence", "-last_seen_at", "external_horse_id")
+    for index, alias in enumerate(aliases, start=1):
+        if progress_callback and index % 100 == 1:
+            progress_callback()
         alias_text = _normalize_horse_name(alias.normalized_name or alias.name_en or alias.name_zh_hant or alias.name_ja)
         comparable_alias = _comparable_horse_name(alias_text, source_language)
         if not comparable_alias or comparable_alias in known_horse_terms:
@@ -557,6 +570,77 @@ def _recognize_non_japanese_external_aliases(
     combined = [*formal_matches, *recognized]
     combined.sort(key=lambda item: (item.first_position, -len(item.matched_text), -item.confidence, item.name_ja))
     return combined[:limit] if limit is not None else combined
+
+
+def recognize_horse_names_batch(
+    articles: Iterable[NewsArticle],
+    *,
+    limit: int | None = 12,
+    progress_callback: Callable[[], None] | None = None,
+    known_horse_terms_by_language: dict[str, set[str]] | None = None,
+    query_count_callback: Callable[[str, int], None] | None = None,
+) -> dict[int, list[RecognizedHorseName]]:
+    article_list = list(articles)
+    recognized: dict[int, list[RecognizedHorseName]] = {}
+    grouped: dict[str, list[tuple[NewsArticle, str]]] = {}
+    for article in article_list:
+        if progress_callback:
+            progress_callback()
+        language = article.source_language or SourceLanguage.JAPANESE
+        full_text = "\n".join(
+            part for part in [article.title_ja or "", article.body_ja_normalized or article.body_ja_raw or ""] if part
+        )
+        if language == SourceLanguage.JAPANESE:
+            recognized[article.id] = recognize_horse_names(
+                article.title_ja,
+                article.body_ja_normalized or article.body_ja_raw,
+                limit=limit,
+                source_language=language,
+            )
+            continue
+        grouped.setdefault(language, []).append((article, full_text))
+
+    for language, rows in grouped.items():
+        if progress_callback:
+            progress_callback()
+        candidate_keys: set[str] = set()
+        for _, full_text in rows:
+            candidate_keys.update(_non_japanese_alias_candidate_keys(full_text, language))
+        queryset = ExternalHorseAlias.objects.filter(source_language=language).exclude(normalized_name="")
+        if language == SourceLanguage.ENGLISH:
+            queryset = queryset.annotate(normalized_key=Lower("normalized_name")).filter(
+                normalized_key__in=candidate_keys
+            )
+        else:
+            queryset = queryset.filter(normalized_name__in=candidate_keys)
+        query_counter = {"count": 0}
+
+        def count_query(execute, sql, params, many, context):
+            query_counter["count"] += 1
+            return execute(sql, params, many, context)
+
+        with connection.execute_wrapper(count_query):
+            aliases = list(queryset.order_by("normalized_name", "-confidence", "-last_seen_at", "external_horse_id"))
+        if query_count_callback:
+            query_count_callback("horse_alias_prefetch_count", query_counter["count"])
+        if progress_callback:
+            progress_callback()
+        if known_horse_terms_by_language is not None:
+            known_terms = known_horse_terms_by_language.get(language, set())
+        else:
+            known_terms = {_comparable_horse_name(term, language) for term in _known_horse_terms(language)}
+            if query_count_callback:
+                query_count_callback("horse_term_prefetch_count", 2)
+        for article, full_text in rows:
+            recognized[article.id] = _recognize_non_japanese_external_aliases(
+                full_text,
+                language,
+                limit,
+                aliases=aliases,
+                known_horse_terms=known_terms,
+                progress_callback=progress_callback,
+            )
+    return recognized
 
 
 def recognize_horse_names(

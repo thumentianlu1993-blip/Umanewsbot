@@ -273,6 +273,15 @@ class ExternalImportStatus(models.TextChoices):
     PAUSED = "paused", "可继续"
 
 
+class TermGateReprocessStatus(models.TextChoices):
+    PENDING = "pending", "待执行"
+    RUNNING = "running", "执行中"
+    SUCCEEDED = "succeeded", "已完成"
+    FAILED = "failed", "失败"
+    REJECTED = "rejected", "已拒绝"
+    COMMITTED = "committed", "已提交"
+
+
 class TranslationStatus(models.TextChoices):
     STARTED = "started", "进行中"
     SUCCESS = "success", "成功"
@@ -2946,3 +2955,48 @@ class OperationLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.action_type} {self.target_type} {self.target_id}".strip()
+
+
+class TermGateReprocessRun(TimestampedModel):
+    mode = models.CharField(max_length=16, choices=(("dry_run", "Dry run"), ("commit", "Commit")))
+    selectors = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=TermGateReprocessStatus.choices,
+        default=TermGateReprocessStatus.PENDING,
+    )
+    cursor = models.TextField(blank=True)
+    rule_version = models.CharField(max_length=64, blank=True)
+    settings_sha256 = models.CharField(max_length=64, blank=True)
+    term_snapshot_sha256 = models.CharField(max_length=64, blank=True)
+    candidate_payload = models.JSONField(default=list, blank=True)
+    result_payload = models.JSONField(default=dict, blank=True)
+    manifest_sha256 = models.CharField(max_length=64, blank=True)
+    statistics = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-started_at", "-id")
+        indexes = [
+            models.Index(fields=("status", "-started_at"), name="termgate_run_status_idx"),
+            models.Index(fields=("mode", "-started_at"), name="termgate_run_mode_idx"),
+        ]
+
+
+class TermGateReprocessLock(TimestampedModel):
+    key = models.CharField(max_length=64, unique=True)
+    locked_by_run = models.ForeignKey(
+        TermGateReprocessRun,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="leases",
+    )
+    owner_token = models.CharField(max_length=64, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("key",)

@@ -12140,7 +12140,8 @@ class AutomationFlowTests(TestCase):
         self.assertEqual(payload["summary"]["candidate_count"], 1)
         self.assertIn(RacingRegion.HONG_KONG, payload["summary_by_region"])
         self.assertEqual(payload["summary_by_region"][RacingRegion.HONG_KONG]["candidate_count"], 1)
-        self.assertIn(stale.id, payload["skipped"]["outside_lookback"])
+        self.assertEqual(payload["outside_lookback_count"], 1)
+        self.assertNotIn("outside_lookback", payload["skipped"])
         self.assertIn(rejected.id, payload["skipped"]["manual_terminal_state"])
         self.assertEqual(recent.automation_status, AutomationStatus.MANUAL_REVIEW_REQUIRED)
 
@@ -12227,14 +12228,26 @@ class AutomationFlowTests(TestCase):
             "reprocess_term_gate_blocked_articles",
             "--region",
             RacingRegion.HONG_KONG,
+            "--dry-run",
+            "--json",
+            stdout=out,
+        )
+        dry_run = json.loads(out.getvalue())
+        out = StringIO()
+        call_command(
+            "reprocess_term_gate_blocked_articles",
             "--commit",
+            "--run-id",
+            str(dry_run["run_id"]),
+            "--manifest-sha256",
+            dry_run["manifest_sha256"],
             "--json",
             stdout=out,
         )
 
         payload = json.loads(out.getvalue())
         article.refresh_from_db()
-        self.assertEqual(payload["revalidated_to_publish_ready_ids"], [article.id])
+        self.assertEqual(payload["restored_candidate_ids"], [article.id])
         self.assertEqual(article.automation_status, AutomationStatus.PUBLISH_READY)
         self.assertNotEqual(article.workflow_status, WorkflowStatus.PUBLISHED)
         self.assertIsNotNone(article.ranked_revived_at)

@@ -47,6 +47,7 @@ from .models import (
     TermCandidateEvidence,
     TermAlias,
     TermEntry,
+    TermGateReprocessRun,
     TranslationRun,
     WindowCandidateDecision,
     WindowTargetDecision,
@@ -930,3 +931,24 @@ class NotificationLogAdmin(admin.ModelAdmin):
     list_filter = ("type", "channel", "status")
     search_fields = ("target", "payload_summary", "error_message")
     readonly_fields = ("type", "channel", "target", "status", "payload_summary", "error_message", "sent_at", "created_at")
+
+
+@admin.register(TermGateReprocessRun)
+class TermGateReprocessRunAdmin(admin.ModelAdmin):
+    list_display = ("id", "mode", "status", "started_at", "finished_at", "manifest_sha256")
+    list_filter = ("mode", "status", "started_at")
+    search_fields = ("id", "manifest_sha256", "error_message")
+    readonly_fields = (
+        "mode", "selectors", "status", "cursor", "rule_version", "settings_sha256",
+        "term_snapshot_sha256", "candidate_payload", "result_payload", "manifest_sha256",
+        "statistics", "error_message", "started_at", "finished_at", "created_at", "updated_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
