@@ -1,5 +1,13 @@
 # 当前状态
 
+## 2026-07-13 组合镜像恢复后三窗口只读验收
+
+- 本次以北京时间 `11:15 / 11:30 / 11:45` 三个生产窗口为验收对象，并追加观察 `12:00` 窗口。当前 `web / worker / beat` 仍统一使用 AMD64 组合镜像 `sha256:383a36c1...c7b4`，容器健康，最近 90 分钟日志未发现 traceback/error/critical/exception，也没有超过 30 分钟的 ProductionWindow 卡死。
+- 抓取主链路已恢复，但尚不能记为“完全正常”。`11:15` 为 `8 succeeded + 9 coalesced`，`11:30` 为 `9 succeeded + 8 coalesced`，`11:45` 的 17 个已启用且生产批准来源全部 succeeded。追加观察时，`12:00` 为 `10 succeeded + 6 coalesced`，同一批 6 个来源已在 `12:15` 成功抓取，证明合并不只是重建后追赶，也是当前调度算法的常态。来源以 `last_crawl_at` 滚动到期、beat 每 5 分钟检查，因此实际间隔约为 15–20 分钟，单个 15 分钟 bucket 不保证固定出现全部 17 条来源记录。
+- 三窗口的抓取结果为日本新增 `9`，其他四地区来源均成功返回列表，但候选全为已入库重复稿，所以无新稿；不是来源失效或抓取报错。发布窗口全部 succeeded：`11:15` 日本发布 3 篇，`11:30` 日本发布 2 篇，`11:45` 因硬门禁/翻译等待发布 0 篇；其他地区均为 `no_ready_candidates`。QQ 窗口无失败，本时段实际成功交付 1 条，其余均有 `no_eligible_articles / already_sent` 明确原因。
+- 尚存三类问题：文章 `8208` 为可重试 timeout，但生产 `TRANSLATION_AUTO_RETRY_ENABLED=false` 且到期后未自动重试；新稿 `8211 / 8215` 因 `Translation response appears incomplete` 被分类为 `unknown` 并停在 `translation_failed`，同样不会自愈。JRA 来源每轮还会跳过 `060302.pdf` 一条解析异常，来源整体仍成功。数据库另有 28 条历史 `CrawlJob(status=started)` 脏记录，最新一条为当日 `07:20`，它们没有对应运行任务、不阻断当前窗口，但会干扰运营观测。
+- 结论：镜像/schema 不兼容造成的新闻写入故障已解除，抓取、发布、QQ 和 HTTP 主链路正在运行；但需先处理翻译失败自愈口径、JRA 固定 PDF 跳过和历史卡死记录，并明确是接受滚动 15–20 分钟口径还是改为对齐的严格 15 分钟调度，才能宣称“完全正常”。
+
 ## 当前结论
 
 `2026-07-13` change `fix-france-news-freshness-and-multiregion-attribution` 已完成本地代码实现与三轮 review/返修，最终一轮 review 无待修复问题，仍处于 `implementing`，未部署生产。TDN 法国入口已改为按发布时间倒序且带 `after` 的 posts 查询；France Galop 已保存可验证的详情页时间证据并禁止 fallback 覆盖可信时间；瞬时翻译失败具备分类、退避、原子 claim、队列去重、耗尽邮件通知和人工重试，终态邮件收件人为 `754652181@qq.com`；多地区归属具备 `off|shadow|enforce`、仅新文章 enforce、分层证据、fail-closed、持久 dry-run/manifest/lease/resume、gold 生产资格硬门禁和运营可观测性。相关地区网页查询从 `web_test_groups` 阶段开始，QQ 在该阶段只对 `PushTarget.multiregion_test_enabled=true` 的显式测试群生效，正式群到 `formal_groups` 才启用。安全默认值仍为归属 `off`、相关地区查询关闭、自动翻译重试关闭。最终专项 `120` 项通过，完整 `stable` 回归 `968` 项通过，其中仅 PostgreSQL 专项性能契约 `1` 项在 SQLite 按设计跳过；Django、迁移、Python 编译、两个生产 Compose、OpenSpec strict/all、diff 和敏感信息检查均通过。OpenSpec 当前完成 `57/68` 项；剩余是建立至少 250 篇真实生产双人标注并裁决的 gold set，以及生产备份、部署、shadow/enforce 灰度、真实窗口与 QQ 验收。没有真实 gold 数据和生产证据前不得宣称归属质量达标、不得启用相关地区查询或归档 change。

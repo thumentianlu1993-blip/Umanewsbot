@@ -1,5 +1,13 @@
 # 部署运行手册
 
+## 2026-07-13 组合镜像恢复后窗口验收口径
+
+- 验收不得只看 ProductionWindow `status=succeeded`；必须同时核对来源级 `seen/new`、文章翻译/门禁/发布状态、QQ delivery、超时任务和容器日志。
+- `coalesced_to_latest_crawl_window` 表示过期 bucket 的抓取被合并到最新窗口，不是来源网络报错。当前来源以上次完成时间滚动到期，beat 每 5 分钟检查，因此该原因会常态出现，15 分钟配置的实际间隔可为 15–20 分钟。判断积压应看来源是否超过 20 分钟仍无后续 succeeded，不能只看是否出现 coalesced。
+- 2026-07-13 首次恢复验收：`11:15=8 succeeded + 9 coalesced`，`11:30=9 succeeded + 8 coalesced`，`11:45=17 succeeded`，`12:00=10 succeeded + 6 coalesced`；后一批 6 个来源已在 `12:15` succeeded，各来源无抓取失败。三窗口日本抓取新增 9，其他四地区为成功抓取但全部重复；网页发布日本 `3 + 2 + 0`，其他地区无 ready 候选，QQ 成功交付 1 条且零产出有明确原因。
+- 运行健康查询应排除历史脏数据：当前库内有 28 条无对应运行任务的历史 `CrawlJob(status=started)`，判断当前卡死应以最近窗口、Celery active/reserved 和容器进程交叉确认。清理前先生成记录清单并备份，不直接删除。
+- 本次发现翻译失败 `8208 / 8211 / 8215`：`8208` 为到期 transient timeout，`8211 / 8215` 为 incomplete response 且当前分类为 unknown。生产自动重试安全开关仍为 false，所以这三篇不会自行恢复；未完成小批验收和 SMTP 测试前不得为了清空失败盲目全局开启。
+
 ## 待实施：法国新鲜度与多地区归属上线门禁
 
 - 对应 change：`fix-france-news-freshness-and-multiregion-attribution`。当前仅完成工程评审，以下为未来实施后的上线约束，不代表功能已上线。
