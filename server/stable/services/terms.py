@@ -232,6 +232,7 @@ ENGLISH_COMMON_WORD_TERM_SEEDS = {
     "positive",
     "rating",
     "sign",
+    "significantly",
     "significant figures",
     "son",
     "step forward",

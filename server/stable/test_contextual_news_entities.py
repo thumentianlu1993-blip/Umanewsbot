@@ -176,6 +176,7 @@ class ContextualEntityResolutionTests(TestCase):
             "winning streak": "连捷",
             "positive": "乐观正面",
             "sign": "先兆",
+            "Significantly": "够分量",
             "Falcon May": "猎鹰五月",
         }
         for source, target in ordinary.items():
@@ -183,7 +184,8 @@ class ContextualEntityResolutionTests(TestCase):
         self._term("Do Deuce", "多爵")
         body = (
             "There was more than enough time as the years roll on. We stayed in contact and took a step forward. "
-            "The significant figures ended a winning streak, but the team stayed positive. It was a sign, Falcon May wrote. "
+            "The significant figures ended a winning streak, but the team moved significantly faster and stayed positive. "
+            "It was a sign, Falcon May wrote. "
             "Do Deuce won the race under his jockey and will run again next month."
         )
 
@@ -954,6 +956,26 @@ class MachineTagsLinksAndValidationTests(TestCase):
 
         mismatch = [issue for issue in outcome.issues if issue["code"] == "machine_entity_type_mismatch"]
         self.assertEqual(mismatch[0]["payload"]["tags"], ["汉密尔顿"])
+
+    def test_validation_keeps_machine_tag_when_same_horse_is_accepted_elsewhere(self):
+        TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_ja="Do Deuce",
+            target_zh="多爵",
+            priority=100,
+        )
+        article = self._article(
+            title_ja="Do Deuce won the race",
+            body=("The report mentioned Do Deuce before reviewing the meeting. " * 6),
+            tags_json=["多爵"],
+            translation_metadata={"machine_horse_tags": ["多爵"]},
+        )
+
+        outcome = validate_rewrite(article)
+
+        self.assertNotIn("machine_entity_type_mismatch", {issue["code"] for issue in outcome.issues})
 
 
 @override_settings(**BASE_SETTINGS)

@@ -934,12 +934,24 @@ def validate_rewrite(
         for item in rejected_horse_candidates
         if item.target_zh
     }
+    accepted_horse_targets = {
+        item.target_zh
+        for item in entity_resolution.entities
+        if item.entity_type == "horse" and item.target_zh
+    }
+    rejected_horse_targets -= accepted_horse_targets
     stale_machine_tags = sorted(rejected_horse_targets & set(article.tags_json or []))
     rejected_horse_term_ids = {
         item.term_id
         for item in rejected_horse_candidates
         if item.term_id
     }
+    accepted_horse_term_ids = {
+        item.term_id
+        for item in entity_resolution.entities
+        if item.entity_type == "horse" and item.term_id
+    }
+    rejected_horse_term_ids -= accepted_horse_term_ids
     if batch_context is not None:
         auto_link_term_ids = (batch_context.auto_horse_term_ids_by_article or {}).get(article.id, set())
     else:
