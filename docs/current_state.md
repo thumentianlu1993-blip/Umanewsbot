@@ -1,5 +1,13 @@
 # 当前状态
 
+## 2026-07-13 batch003 Hampton 移师纠正与 250 场只读工件
+
+- 用户提供 Racing Post 正式赛果，确认 2025 Hampton Novices' Chase 并非整届取消：原定 `2025-01-11 / Warwick` 的场次标记 `ABANDONED`，同一届赛事于 `2025-01-19 / Windsor` 移师举办。Racing Post 与 Sporting Life 均给出 `3m53y`、3 匹实际出走、3 条赛果，冠军为 `Jingko Blue`，Sporting Life 状态为 `WEIGHEDIN`。
+- batch003 已用 Windsor 实际赛果替换旧 Warwick 弃赛候选；旧页面只保留为原场次变更证据，不再作为年度缺口或取消结论。英国候选现为 50 场、`522 runners / 423 results`；五地区合计为 250 场、`2638 runners / 2349 results`。
+- 生产只读日期 artifact 位于 `runtime/historical_race_batches/2016-2025-batch-003-20260713/date-discovery-artifact`，manifest SHA-256 为 `9fe1f9e403c3200d392d8b211ee5658f7e78fc05a21ebad5b5d168e575d6850d`，候选 SHA-256 为 `d6e0aea5a24fb0118e3d5f05a4987b428381f7e0cdc5735738dfe941d9ccfd54`。结果为五地区各 50、`250 candidate / 0 gap`、250 个唯一 target 与来源 URL；审批仍为 `pending`，批准 ID 为 0。
+- 只读生成前后，batch003 的 250 个 target 均保持 `held / pending`，materialized event 为 0、published 为 0；常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，healthz 正常，本轮没有生产数据库写入。
+- 后续不得直接导入当前详情包。日期 apply 后先以独立权威字段工件把 Hampton 年度赛事的 `racecourse` 从总账原定值 Warwick 校正为实际举办地 Windsor；字段 apply 会改变 target SHA，随后必须重新导出 event input、重建详情来源/最终详情包并重新 dry-run。日期、字段和详情三次写入分别需要审批、备份与写后核验。
+
 ## 2026-07-13 后续标准批次重复选样门禁已实现
 
 - batch002 写后生成旧 batch003 时，4 个仍为 pending 的已交代 gap 再次进入选样：英国 Classic Handicap Chase、Dick Poole Fillies Stakes，以及美国 Brooklyn、Cougar II。该工件与 batch002 重叠 4 条，视为无效，不得审批或进入抓取。
@@ -1247,8 +1255,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 ## 2026-07-13 第三标准批次只读证据完成
 
 - batch003 selection 固定为五地区各 50 场、共 250 场，与 batch002 零重叠；本轮没有执行生产写入。
-- 日期及详情来源已完成离线缓存和逐 URL/SHA 校验。可导入的 249 场共解析 `2,635 runners / 2,346 results`；归一化为 `249 candidate / 0 issue`，最终详情包为 `249 candidate / 1 gap`，候选 SHA-256 为 `31c8cf61191d937c766f98b50a656ec98e92f774b59e5d0635fd54090ee2ad1a`。
-- 唯一 gap 为 `target_id=60693`、2025 Hampton Novices' Chase。Sporting Life 页面明确标记 `ABANDONED`，保留 9 匹声明马、0 条赛果；在用户确认 expectation correction 前保持 `held/pending`，不得自动改为 `cancelled`。
+- 首次日期及详情来源快照完成离线缓存和逐 URL/SHA 校验，当时为 249 场、`2,635 runners / 2,346 results`，最终详情包为 `249 candidate / 1 gap`，候选 SHA-256 为 `31c8cf61191d937c766f98b50a656ec98e92f774b59e5d0635fd54090ee2ad1a`。该快照已被后续 Hampton 移师纠正取代，不得审批或写入。
+- 首次快照把 `target_id=60693` 的 Warwick 原场次 `ABANDONED` 误当成 2025 Hampton Novices' Chase 年度 gap。用户随后提供 Windsor 正式赛果，已确认同届赛事于 `2025-01-19` 移师正常举办；当前口径以上方 `250 candidate / 0 gap` 工件为准。
 - 修复了 ZEturf 发现页把实际缓存 URL 重写成另一目标 slug 的身份错误，并把 NAR `keiba.go.jp` 与法国 Zone-Turf 同步登记到日期校验、补充来源审批和最终详情打包三层。年度日历的 `flat/jumps` 只证明竞赛类型，不再用它覆盖已审核的 `surface`；Hoppings Stakes 保持 Newcastle synthetic。
 - 专项 73 项、完整 `stable 1161/1161`（1 skip）、Django check、迁移无漂移、OpenSpec strict `25/25` 和 `git diff --check` 全部通过；代码复审无剩余可修复问题。
 - 生产仍运行 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`。先前候选镜像 `sha256:9cd0b966...45bc1` 不包含本轮来源修复，已视为过期；必须从最新 main 重建可复现 AMD64 镜像后，才允许连接生产库生成日期/来源 artifact、dry-run 和后续受控写入。历史公开展示继续关闭。
@@ -1259,4 +1267,4 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 切换前发现两条正常新闻抓取任务正在执行，因此先停止 beat 并等待任务自然完成；确认 Celery active/reserved、外部导入、外部锁和 one-off 历史写入均为空后才继续。生产 `web / worker / beat` 已统一切换到新镜像。
 - `.env` 备份为 `.env.backup.main-3939992c-20260713_185140`。数据库备份为 `backups/db/pre-main-3939992c-20260713_185140.sql.gz`，大小 `125,782,755` bytes，SHA-256 `21903cf8d9494ef6053414a34c2e2f6ab01406b9ffebcf56ff3fd10eedfc0967`，`gzip -t` 通过；旧镜像回滚标签为 `umanewsbot:rollback-pre-3939992c-20260713_185140`。
 - 无待应用迁移；Django check、静态资源、worker ping、内外 healthz、首页、赛事页和近期错误日志均通过。常驻历史写入/网络、历史公开、多地区归属及相关地区查询开关继续关闭。
-- 本协调流程没有执行 batch003 历史写入。历史任务现仅获准使用新镜像重新生成一次性只读 artifact；预期为 `249 candidate / 1 Hampton ABANDONED gap`，后续 approval、日期 apply、详情 apply 仍分别受独立备份和门禁约束。
+- 本协调流程没有执行 batch003 历史写入。使用新镜像重建的一次性只读 artifact 已经 Hampton 移师纠正后收口为 `250 candidate / 0 gap`；后续 approval、日期 apply、Hampton 场地字段 apply、详情 apply 仍分别受独立备份和门禁约束。

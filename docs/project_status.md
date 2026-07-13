@@ -7,6 +7,12 @@
 > 本文档用于保留项目级概览与摘要信息。
 > 当前真实工作状态、最近一次关键修复、线上实际进展，请以 [docs/current_state.md](E:/Codex/docs/current_state.md) 为准。
 
+## 2026-07-13 batch003 Hampton 移师纠正
+
+- 2025 Hampton Novices' Chase 原定 Warwick 场次虽为 `ABANDONED`，但同一届赛事于 `2025-01-19` 移师 Windsor 正常举办；Racing Post 与 Sporting Life 交叉确认 3 匹出走、3 条赛果，冠军 `Jingko Blue`。
+- batch003 生产只读日期 artifact 已重建为五地区各 50、`250 candidate / 0 gap`。manifest SHA-256 为 `9fe1f9e403c3200d392d8b211ee5658f7e78fc05a21ebad5b5d168e575d6850d`，审批仍为 pending，生产数据库未写入，历史公开仍为 0。
+- 获得审批后先执行日期 apply，再通过权威字段门禁把 Hampton 场地由原定 Warwick 校正为实际 Windsor；字段更新后重新导出并打包全部详情，不复用当前 target SHA 的详情包。
+
 ## 2026-07-13 标准批次重复选样门禁
 
 - batch002 的 4 个 pending gap 曾再次占用旧 batch003 配额；该旧工件作废，不得审批。
@@ -460,7 +466,7 @@
 - 新镜像切换后的 14:45 自然窗口已完成：17 个抓取、5 个发布、5 个 QQ 窗口全部成功，seen 472/new 3，新增 NULL 归属版本为 0。当前“主线源码、可复现镜像、生产数据库”重新一致。
 - 第二标准批次五地区详情证据已收敛为 `246/250`：日本 50、美国 48、香港 50、英国 48、法国 50，246 个详情 URL 全局唯一且来源缓存身份可核验。两场美国 `not run` 和两场英国 `ABANDONED` 保留为显式缺口；香港跨年字段及英国紧凑英制距离解析修复已完成 `stable 1149` 项回归和 clean review，等待合入 main、交付可复现 AMD64 镜像后重新构建日期 artifact。尚未执行本批生产写入，历史公开开关继续关闭。
 - 紧凑英制距离修复已合入 `main@d8b65fe7` 并切换生产镜像 `sha256:77eb1138...c3da0`；web/worker/beat 镜像一致，迁移无变化，Django、健康检查、页面和日志验收通过。新镜像只读重建 batch002 得到预期 `246 candidate / 4 gap`，manifest 尚未审批或写入；历史常驻写入、网络和公开开关保持关闭。
-- 第三标准批次已完成五地区各 50 场的只读来源准备。249 场具备完整候选，共 `2,635 runners / 2,346 results`；唯一缺口为 2025 Hampton Novices' Chase，Sporting Life 标记 `ABANDONED`，等待产品确认 cancelled 口径。
-- batch003 日期归一化为 `249/249`、零问题，详情打包为 `249 candidate / 1 gap`。NAR 与 Zone-Turf 来源门禁、ZEturf 实际缓存 URL 身份及年度日历 surface 误覆盖问题均已修复；完整 `stable` 回归 `1161 passed / 1 skipped`，复审无待修项。
-- batch003 尚未写生产，公开开关仍关闭。旧候选镜像 `sha256:9cd0b966...45bc1` 已过期；需先把本轮源码合入 main 并重建可复现 AMD64 镜像，再在生产总帐上生成正式 artifact。
-- batch003 来源门禁已合入 `main@3939992c`，生产 `web / worker / beat` 已统一切换到可复现 AMD64 镜像 `sha256:87c435cf...e78ec`。切换前排空两条新闻抓取任务并完成数据库备份；迁移无变化，Django、健康检查、页面和日志验收通过。历史任务现只获准重建一次性只读 artifact，尚未执行 batch003 写入，公开开关继续关闭。
+- 第三标准批次首次只读来源快照为 249 场、`2,635 runners / 2,346 results`，曾把 2025 Hampton 的 Warwick 原场次 `ABANDONED` 误作年度 gap；该快照已作废，不得审批。
+- 用户提供 Windsor 正式赛果后，batch003 已修正为 `250 candidate / 0 gap`、`2638 runners / 2349 results`，日期归一化 `250/250` 且零问题。NAR 与 Zone-Turf 来源门禁、ZEturf 实际缓存 URL 身份及年度日历 surface 误覆盖问题均已修复；完整 `stable` 回归 `1161 passed / 1 skipped`，复审无待修项。
+- batch003 尚未写生产，公开状态仍关闭。旧候选镜像 `sha256:9cd0b966...45bc1` 已过期；本轮源码和可复现 AMD64 镜像已经合入并切换，生产总账上的正式只读 artifact 也已按最新 250/0 口径生成。
+- batch003 来源门禁已合入 `main@3939992c`，生产 `web / worker / beat` 已统一切换到可复现 AMD64 镜像 `sha256:87c435cf...e78ec`。切换前排空两条新闻抓取任务并完成数据库备份；迁移无变化，Django、健康检查、页面和日志验收通过。一次性只读 artifact 已重建为 250/0，但尚未批准或执行 batch003 写入，公开状态继续关闭。

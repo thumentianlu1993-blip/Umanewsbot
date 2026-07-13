@@ -1,5 +1,15 @@
 # 部署运行手册
 
+## 2026-07-13 batch003 Hampton 移师纠正后的写入门禁
+
+1. 当前唯一有效日期 artifact 为 `runtime/historical_race_batches/2016-2025-batch-003-20260713/date-discovery-artifact`，manifest SHA-256 `9fe1f9e403c3200d392d8b211ee5658f7e78fc05a21ebad5b5d168e575d6850d`，候选 SHA-256 `d6e0aea5a24fb0118e3d5f05a4987b428381f7e0cdc5735738dfe941d9ccfd54`。必须严格为 250 candidate、0 gap、五地区各 50、250 个唯一 target/URL。
+2. Hampton `target_id=60693` 必须为 `2025-01-19 / Windsor / 3m53y`，直接来源为 Sporting Life race `840094`；Racing Post result `886116` 为交叉证据。旧 Warwick race `838507` 只保留为原场次弃赛证据，不得进入 candidate、gap 或 cancelled approval。
+3. approval 当前必须保持 `pending` 且 `approved_target_ids=[]`。只有用户明确批准上述 manifest 后，才填写全部 250 个 ID；日期 commit 前重新核对 artifact 字节身份、生产镜像、Celery/外部导入锁和常驻开关，并创建通过非空、`gzip -t` 与 SHA-256 校验的数据库备份。
+4. 日期 apply 只允许一次性容器临时设置 `HISTORICAL_RACE_BACKFILL_ENABLED=true`，不得修改 `.env`。写后应得到 250 个 ready target 与 250 个 finished/draft RaceEvent，published 必须为 0。
+5. 日期 apply 后不得直接提交当前详情包。先按写后 target SHA 生成 Hampton 单目标权威字段候选，把 `racecourse` 从 Warwick 校正为 Windsor；候选至少绑定实际赛果 URL、缓存 SHA 和解析版本。字段 `--dry-run` 必须只显示该目标预期字段变化且无人工锁跳过；再做独立数据库备份后 apply。
+6. 字段 apply 改变 Hampton target SHA 后，重新导出 250 场 event input，重新建立/核验详情来源 artifact，并重打包 250 场详情；旧包必须因 target SHA 漂移而拒绝。新的详情包须为 250 scope、0 gap、250 个唯一来源，Hampton 为 3 runners / 3 results、冠军 Jingko Blue。
+7. 最终详情 dry-run、写前第三份备份、apply 和逐 target 写后核验全部通过后，才算 batch003 导入完成。全过程保持历史赛事 `draft`、published 0、常驻历史网络/写入开关 false；不得重启或重建生产容器。
+
 ## 2026-07-13 后续标准批次既有选样排除门禁
 
 - 旧 batch003 与 batch002 重叠 4 个 pending gap，必须删除或隔离，禁止审批、抓取或写入。新批次只允许由包含本门禁的已提交 AMD64 镜像生成。
@@ -4228,11 +4238,11 @@ docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
 
 1. 先合入包含 NAR、Zone-Turf 和 ZEturf 实际缓存 URL 修复的最新 main；旧候选镜像 `sha256:9cd0b966...45bc1` 不得用于 batch003。
 2. 在独立上下文构建两次 AMD64 镜像，核对 image ID、revision、Git tree 和 source archive SHA-256；只上报候选，不直接 retag、重启或写生产。
-3. 由生产协调线程切换后，使用新镜像连接生产库执行一次性只读日期 artifact 构建，预期严格为 `249 candidate / 1 gap`；gap 只能是 `target_id=60693` Hampton Novices' Chase。
-4. Hampton 的 `ABANDONED` 证据需产品确认后才能通过 expectation correction 改为 `cancelled`。确认前可继续审批和导入其余 249 场，但 approval target IDs 不得包含该目标。
-5. 日期 apply 前执行数据库备份、非空检查、`gzip -t` 和 SHA-256；仅对单命令临时打开写入门禁。写后重新导出 249 个 materialized event input，禁止复用日期 apply 前的 target SHA。
-6. 补充详情来源 artifact 必须接受并验证 `keiba_go_jp/nar` 与 `zone_turf`，apply 后再次导出 event input，再生成最终详情包、coverage 和 importer dry-run。
-7. 详情 apply 前另做一份数据库备份。写后逐目标核对 runner/result 数、累计计数、OperationLog、draft/published 状态和三容器常驻开关；`RACE_EVENT_HISTORICAL_PUBLIC_ENABLED` 全程保持关闭。
+3. 由生产协调线程切换后，首次一次性只读日期 artifact 曾为 `249 candidate / 1 gap`；该工件已被 Hampton 移师证据推翻并隔离，不得审批或写入。当前唯一有效预期为 `250 candidate / 0 gap`。
+4. Hampton 的 Warwick `ABANDONED` 只证明原定场次未举行；同一届已于 Windsor 正常完成，因此不得执行 cancelled expectation correction。日期 apply 后另走权威字段门禁把实际场地校正为 Windsor。
+5. 日期 apply 前执行数据库备份、非空检查、`gzip -t` 和 SHA-256；仅对单命令临时打开写入门禁。写后先生成 Hampton 单目标权威字段 artifact，把实际场地校正为 Windsor；字段 dry-run 和第二份备份通过后再 apply。
+6. Hampton 字段 apply 后重新导出 250 个 materialized event input，禁止复用日期或字段 apply 前的 target SHA。补充详情来源 artifact 必须接受并验证 `keiba_go_jp/nar` 与 `zone_turf`，apply 后再次导出 event input，再生成最终详情包、coverage 和 importer dry-run。
+7. 详情 apply 前另做一份数据库备份。写后逐目标核对 runner/result 数、累计计数、OperationLog、draft/published 状态和三容器常驻开关；历史赛事必须继续保持 draft、published 0。
 
 ## 2026-07-13 `main@3939992c` batch003 来源门禁镜像切换
 
@@ -4253,4 +4263,4 @@ docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
 4. 先重建 web/worker，确认 web healthy、worker ping；最后重建 beat。三容器实际 image ID 均为 `sha256:87c435cf...e78ec`。
 5. 内部和公网 healthz 为 `ok`，公网首页和 `/races/` 为 `200`，近期 web/worker/beat 日志无 traceback/critical/integrityerror/exception。
 6. `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，多地区归属和相关查询开关也保持关闭；本次未执行历史写入。
-7. 切换完成后仅允许历史任务重建一次性只读 batch003 artifact。预期必须为 `249 candidate / 1 gap`，且唯一 gap 为 Hampton Novices' Chase `ABANDONED`；任何写入仍需新的 approval、备份、dry-run 与写后核验。
+7. 切换完成后的只读 batch003 artifact 已按 Hampton 移师证据重建为 `250 candidate / 0 gap`。任何写入仍需新的 approval、备份、dry-run 与写后核验；日期 apply 后还必须先校正 Hampton 场地并重打详情包。
