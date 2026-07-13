@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import inspect
 import math
 import re
 from dataclasses import dataclass
@@ -11,9 +12,10 @@ from openai import OpenAI
 from stable.models import NewsArticle, SourceLanguage, TranslationRun
 
 from .terms import (
-    apply_term_mappings,
-    recognize_horse_names,
-    resolve_terms_for_language,
+    ArticleEntityResolution,
+    apply_contextual_term_mappings,
+    recognized_horses_from_resolution,
+    resolve_article_entities,
     serialize_recognized_horse_names,
     serialize_terms,
 )
@@ -36,35 +38,46 @@ class TranslationResponseError(ValueError):
 class TranslationProvider:
     name = "base"
 
-    def translate(self, article: NewsArticle) -> TranslationResult:
+    def translate(
+        self,
+        article: NewsArticle,
+        *,
+        entity_resolution: ArticleEntityResolution | None = None,
+    ) -> TranslationResult:
         raise NotImplementedError
 
 
 class DummyTranslationProvider(TranslationProvider):
     name = "dummy"
 
-    def translate(self, article: NewsArticle) -> TranslationResult:
+    def translate(
+        self,
+        article: NewsArticle,
+        *,
+        entity_resolution: ArticleEntityResolution | None = None,
+    ) -> TranslationResult:
         body = article.body_ja_normalized or article.body_ja_raw
         source_language = article.source_language or SourceLanguage.JAPANESE
-        mapped_title = apply_term_mappings(article.title_ja, source_language=source_language)
-        mapped_body = apply_term_mappings(body, source_language=source_language)
+        resolution = entity_resolution or resolve_article_entities(
+            article.title_ja,
+            body,
+            source_language=source_language,
+        )
+        mapped_title = apply_contextual_term_mappings(article.title_ja, resolution)
+        mapped_body = apply_contextual_term_mappings(body, resolution)
         return TranslationResult(
             title_zh=f"[未配置真实翻译模型] {mapped_title}",
             body_zh=mapped_body,
             push_summary_zh=mapped_body[:140],
-            metadata={"provider": self.name, "model": "dummy"},
+            metadata={
+                "provider": self.name,
+                "model": "dummy",
+                "terms": serialize_terms(resolution.accepted_terms),
+                "entities": [item.as_dict() for item in resolution.entities],
+                "suppressed_entities": [item.as_dict() for item in resolution.suppressed_candidates],
+                "machine_horse_tags": resolution.machine_horse_tags,
+            },
         )
-
-
-def _article_term_text(article: NewsArticle) -> str:
-    return "\n".join(
-        part
-        for part in [
-            article.title_ja or "",
-            article.body_ja_normalized or article.body_ja_raw or "",
-        ]
-        if part
-    )
 
 
 class OpenAICompatibleTranslationProvider(TranslationProvider):
@@ -201,13 +214,18 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
 
     @staticmethod
     def _protect_unknown_horse_names(text: str, unknown_horse_names: list[str]) -> tuple[str, dict[str, str]]:
+        placeholders = {
+            f"__UMA_KEEP_{index}__": name
+            for index, name in enumerate(sorted(set(unknown_horse_names), key=lambda item: (-len(item), item)), start=1)
+        }
+        return OpenAICompatibleTranslationProvider._protect_with_placeholders(text, placeholders), placeholders
+
+    @staticmethod
+    def _protect_with_placeholders(text: str, placeholders: dict[str, str]) -> str:
         protected = text or ""
-        placeholders: dict[str, str] = {}
-        for index, name in enumerate(sorted(unknown_horse_names, key=len, reverse=True), start=1):
-            placeholder = f"__UMA_KEEP_{index}__"
+        for placeholder, name in placeholders.items():
             protected = protected.replace(name, placeholder)
-            placeholders[placeholder] = name
-        return protected, placeholders
+        return protected
 
     @staticmethod
     def _restore_unknown_horse_placeholders(text: str, placeholders: dict[str, str]) -> str:
@@ -226,34 +244,36 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             return usage
         return {"repr": repr(usage)}
 
-    def translate(self, article: NewsArticle) -> TranslationResult:
-        terms = resolve_terms_for_language(
-            _article_term_text(article),
-            article.source_language or SourceLanguage.JAPANESE,
-            settings.TRANSLATION_TERM_LIMIT,
+    def translate(
+        self,
+        article: NewsArticle,
+        *,
+        entity_resolution: ArticleEntityResolution | None = None,
+    ) -> TranslationResult:
+        source_text = article.body_ja_normalized or article.body_ja_raw
+        source_language = article.source_language or SourceLanguage.JAPANESE
+        resolution = entity_resolution or resolve_article_entities(
+            article.title_ja,
+            source_text,
+            source_language=source_language,
         )
+        terms = resolution.accepted_terms[: settings.TRANSLATION_TERM_LIMIT]
         glossary_lines = [
             f"- [{term.term_type}] {term.matched_text or term.source_ja} => {term.target_zh}"
             + (f"（备注：{term.notes}）" if term.notes else "")
             for term in terms
             if (term.target_zh or "").strip()
         ]
-        source_text = article.body_ja_normalized or article.body_ja_raw
         unknown_horse_limit = max(1, int(settings.TRANSLATION_UNKNOWN_HORSE_LIMIT))
-        recognized_horses = recognize_horse_names(
-            article.title_ja,
-            source_text,
-            limit=None,
-            source_language=article.source_language or SourceLanguage.JAPANESE,
-        )
+        recognized_horses = recognized_horses_from_resolution(resolution)
         unknown_horse_names = [
             item.matched_text or item.name_ja
             for item in recognized_horses
             if item.needs_preserve and (item.matched_text or item.name_ja)
         ][:unknown_horse_limit]
-        protected_title, title_placeholders = self._protect_unknown_horse_names(article.title_ja, unknown_horse_names)
-        protected_body, body_placeholders = self._protect_unknown_horse_names(source_text, unknown_horse_names)
-        horse_placeholders = {**title_placeholders, **body_placeholders}
+        _, horse_placeholders = self._protect_unknown_horse_names("", unknown_horse_names)
+        protected_title = self._protect_with_placeholders(article.title_ja, horse_placeholders)
+        protected_body = self._protect_with_placeholders(source_text, horse_placeholders)
         unknown_horse_lines = [
             f"- {placeholder} => {name}（译文中先原样复制占位符，系统会还原为日文马名）"
             for placeholder, name in horse_placeholders.items()
@@ -277,14 +297,21 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             content = choice.message.content or "{}"
             payload = json.loads(content)
 
-            title_zh = self._restore_unknown_horse_placeholders((payload.get("title_zh") or "").strip(), horse_placeholders)
-            body_zh = self._restore_unknown_horse_placeholders((payload.get("body_zh") or "").strip(), horse_placeholders)
-            push_summary_zh = self._restore_unknown_horse_placeholders((payload.get("push_summary_zh") or "").strip(), horse_placeholders)
+            mapped_title = apply_contextual_term_mappings((payload.get("title_zh") or "").strip(), resolution)
+            mapped_body = apply_contextual_term_mappings((payload.get("body_zh") or "").strip(), resolution)
+            mapped_summary = apply_contextual_term_mappings((payload.get("push_summary_zh") or "").strip(), resolution)
+            title_zh = self._restore_unknown_horse_placeholders(mapped_title, horse_placeholders)
+            body_zh = self._restore_unknown_horse_placeholders(mapped_body, horse_placeholders)
+            push_summary_zh = self._restore_unknown_horse_placeholders(mapped_summary, horse_placeholders)
 
             last_metadata = {
                 "provider": self.name,
                 "model": settings.TRANSLATION_MODEL,
                 "terms": serialize_terms(terms),
+                "entities": [item.as_dict() for item in resolution.entities],
+                "suppressed_entities": [item.as_dict() for item in resolution.suppressed_candidates],
+                "accepted_term_ids": sorted(resolution.accepted_term_ids),
+                "machine_horse_tags": resolution.machine_horse_tags,
                 "unknown_horse_names": unknown_horse_names,
                 "recognized_horse_names": serialize_recognized_horse_names(recognized_horses),
                 "external_horse_names": [
@@ -333,11 +360,10 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                     continue
                 last_metadata["warning"] = "Translation response changed unknown horse names; accepted with warning"
 
-            source_language = article.source_language or SourceLanguage.JAPANESE
             return TranslationResult(
-                title_zh=apply_term_mappings(title_zh, source_language=source_language),
-                body_zh=apply_term_mappings(body_zh, source_language=source_language),
-                push_summary_zh=apply_term_mappings(push_summary_zh or body_zh[:160], source_language=source_language)[:300],
+                title_zh=title_zh,
+                body_zh=body_zh,
+                push_summary_zh=(push_summary_zh or body_zh[:160])[:300],
                 metadata=last_metadata,
             )
 
@@ -370,11 +396,12 @@ def get_translation_provider() -> TranslationProvider:
 def translate_article(article: NewsArticle) -> TranslationResult:
     provider = get_translation_provider()
     source_text = article.body_ja_normalized or article.body_ja_raw
-    terms = resolve_terms_for_language(
-        _article_term_text(article),
-        article.source_language or SourceLanguage.JAPANESE,
-        settings.TRANSLATION_TERM_LIMIT,
+    resolution = resolve_article_entities(
+        article.title_ja,
+        source_text,
+        source_language=article.source_language or SourceLanguage.JAPANESE,
     )
+    terms = resolution.accepted_terms[: settings.TRANSLATION_TERM_LIMIT]
     run = article.translation_runs.filter(status="started").order_by("-created_at", "-id").first()
     if run is None:
         run = TranslationRun.objects.create(
@@ -393,7 +420,10 @@ def translate_article(article: NewsArticle) -> TranslationResult:
         run.prompt_excerpt = source_text[:800]
         run.save(update_fields=["provider_name", "model_name", "terms_used", "prompt_excerpt", "updated_at"])
     try:
-        result = provider.translate(article)
+        if "entity_resolution" in inspect.signature(provider.translate).parameters:
+            result = provider.translate(article, entity_resolution=resolution)
+        else:
+            result = provider.translate(article)
         run.status = "success"
         run.model_name = result.metadata.get("model") or run.model_name
         run.raw_response = result.metadata

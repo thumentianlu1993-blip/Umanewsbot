@@ -19,6 +19,8 @@ from django.db.models import Q, prefetch_related_objects
 from django.utils import timezone
 
 from stable.models import (
+    ArticleHorseLink,
+    ArticleHorseLinkStatus,
     ArticleRaceLinkStatus,
     AutomationStatus,
     NewsArticle,
@@ -35,7 +37,7 @@ from stable.models import (
     TermType,
     WorkflowStatus,
 )
-from stable.services.terms import _comparable_horse_name, recognize_horse_names_batch
+from stable.services.terms import _comparable_horse_name, recognize_horse_names_batch, resolve_article_entities_batch
 from stable.services.news_attribution import article_region_set
 from stable.services.validation import (
     ValidationBatchContext,
@@ -306,6 +308,9 @@ def _reprocess_article_fields() -> tuple[str, ...]:
         "automation_status",
         "review_mode",
         "risk_level",
+        "tags_json",
+        "translation_metadata",
+        "manually_edited_fields",
         "decision_summary",
         "decision_reason",
         "automation_error_message",
@@ -516,6 +521,17 @@ def build_validation_batch_context(
     )
     if progress_callback:
         progress_callback()
+    entity_resolutions = resolve_article_entities_batch(articles)
+    accepted_term_ids_by_article = {
+        article_id: resolution.accepted_term_ids
+        for article_id, resolution in entity_resolutions.items()
+    }
+    auto_horse_term_ids_by_article: dict[int, set[int]] = {article.id: set() for article in articles}
+    for article_id, term_id in ArticleHorseLink.objects.filter(
+        article_id__in=[article.id for article in articles],
+        status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.CANDIDATE],
+    ).values_list("article_id", "horse_profile__primary_term_id"):
+        auto_horse_term_ids_by_article.setdefault(article_id, set()).add(term_id)
     term_snapshot_sha256 = _term_snapshot_sha256_from_loaded(entries, all_aliases)
     if progress_callback:
         progress_callback()
@@ -531,6 +547,9 @@ def build_validation_batch_context(
         duplicate_candidates=duplicate_candidates,
         term_entry_ids_by_article=term_entry_ids_by_article,
         structured_entities_by_article=structured_entities_by_article,
+        entity_resolutions_by_article=entity_resolutions,
+        accepted_term_ids_by_article=accepted_term_ids_by_article,
+        auto_horse_term_ids_by_article=auto_horse_term_ids_by_article,
         term_snapshot_sha256=term_snapshot_sha256,
         entity_prefetch_count=entity_prefetch_count,
         race_entity_prefetch_count=query_counts["race_entity_prefetch_count"],

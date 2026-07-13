@@ -706,8 +706,16 @@ def discover_term_candidates_task(article_id: int) -> dict:
 
 
 @shared_task
-def translate_article_task(article_id: int, preclaimed_retry: bool = False, force: bool = False) -> dict:
-    log = _log_start("translate_article", {"article_id": article_id, "force": force})
+def translate_article_task(
+    article_id: int,
+    preclaimed_retry: bool = False,
+    force: bool = False,
+    suppress_automation: bool = False,
+) -> dict:
+    log = _log_start(
+        "translate_article",
+        {"article_id": article_id, "force": force, "suppress_automation": suppress_automation},
+    )
     article = None
     claimed_retry = False
     force_published = False
@@ -782,7 +790,7 @@ def translate_article_task(article_id: int, preclaimed_retry: bool = False, forc
             reason["translation_recovery"] = {"recovered_at": timezone.now().isoformat()}
             article.decision_reason = reason
         article.save()
-        if getattr(settings, "AUTOMATION_ENABLED", False) and not force_published:
+        if getattr(settings, "AUTOMATION_ENABLED", False) and not force_published and not suppress_automation:
             dispatch_task(process_article_automation_task, article.id)
         _log_success(log, f"translated article={article_id}")
         return {

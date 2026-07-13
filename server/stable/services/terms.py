@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from typing import Callable
 
 from django.db import connection
+from django.db.models import Q
 from django.db.models.functions import Lower
 
 from stable.models import ExternalHorseAlias, NewsArticle, SourceLanguage, TermAlias, TermEntry, TermType
@@ -43,6 +44,61 @@ class RecognizedHorseName:
     first_position: int
     detection_reason: str
     conflict_flags: list[str]
+
+
+@dataclass
+class ArticleEntity:
+    entity_type: str
+    matched_text: str
+    canonical_text: str
+    target_zh: str
+    field_name: str
+    start: int
+    end: int
+    confidence: int
+    evidence: list[str]
+    conflict_flags: list[str]
+    needs_preserve: bool = False
+    term_id: int | None = None
+    external_horse_ids: list[str] | None = None
+    priority: int = 0
+    term_type: str = ""
+
+    def as_dict(self) -> dict:
+        payload = asdict(self)
+        payload["external_horse_ids"] = list(self.external_horse_ids or [])
+        return payload
+
+
+@dataclass
+class ArticleEntityResolution:
+    source_language: str
+    entities: list[ArticleEntity]
+    suppressed_candidates: list[ArticleEntity]
+    accepted_terms: list[ResolvedTerm]
+    machine_horse_tags: list[str]
+
+    @property
+    def accepted_term_ids(self) -> set[int]:
+        return {item.term_id for item in self.entities if item.term_id and item.entity_type != "common_word"}
+
+    def as_dict(self) -> dict:
+        return {
+            "source_language": self.source_language,
+            "entities": [item.as_dict() for item in self.entities],
+            "suppressed_candidates": [item.as_dict() for item in self.suppressed_candidates],
+            "accepted_terms": serialize_terms(self.accepted_terms),
+            "accepted_term_ids": sorted(self.accepted_term_ids),
+            "machine_horse_tags": list(self.machine_horse_tags),
+        }
+
+
+@dataclass
+class ArticleEntityIndex:
+    entries_by_language: dict[str, list[TermEntry]]
+    terms_by_language: dict[str, dict[int, list[str]]]
+    external_aliases_by_language: dict[str, list[ExternalHorseAlias]]
+    non_horse_words_by_language: dict[str, set[str]]
 
 
 def _dedupe_source_terms(values: Iterable[str]) -> list[str]:
@@ -89,7 +145,8 @@ def _entry_source_terms(
 
 
 def _normalized_term_candidate(value: str) -> str:
-    return " ".join(unicodedata.normalize("NFKC", value or "").casefold().split())
+    normalized = unicodedata.normalize("NFKC", value or "").replace("’", "'").replace("‘", "'")
+    return " ".join(normalized.casefold().split())
 
 
 def _ambiguous_horse_candidates(entries: Iterable[TermEntry], terms_by_entry: dict[int, list[str]]) -> set[str]:
@@ -121,7 +178,8 @@ def _source_term_pattern(candidate: str, source_language: str | None):
     if source_language == SourceLanguage.ENGLISH or _contains_latin_letter(candidate):
         prefix = r"(?<![0-9A-Za-z])" if candidate[:1].isascii() and candidate[:1].isalnum() else ""
         suffix = r"(?![0-9A-Za-z])" if candidate[-1:].isascii() and candidate[-1:].isalnum() else ""
-        return re.compile(prefix + re.escape(candidate) + suffix, re.IGNORECASE)
+        escaped = "".join(r"['’‘]" if character in "'’‘" else re.escape(character) for character in candidate)
+        return re.compile(prefix + escaped + suffix, re.IGNORECASE)
     return None
 
 
@@ -146,6 +204,842 @@ def _replace_source_term(text: str, candidate: str, target: str, source_language
     if pattern:
         return pattern.sub(target, text)
     return text.replace(candidate, target)
+
+
+_PERSON_TERM_TYPES = {TermType.JOCKEY, TermType.TRAINER, TermType.OWNER}
+ENGLISH_COMMON_WORD_TERM_SEEDS = {
+    "ace",
+    "action",
+    "agenda",
+    "classic",
+    "contact",
+    "determined",
+    "digital",
+    "embraces",
+    "enough",
+    "ensured",
+    "falcon may",
+    "fast track",
+    "find",
+    "good job",
+    "however",
+    "hopeful",
+    "item",
+    "live",
+    "more than enough",
+    "number",
+    "positive",
+    "rating",
+    "sign",
+    "significant figures",
+    "son",
+    "step forward",
+    "subsequent",
+    "tuesday",
+    "were",
+    "winning streak",
+    "years",
+}
+_ENGLISH_PERSON_NAME_RE = re.compile(
+    r"(?<![0-9A-Za-z])(?:[A-Z][A-Za-z'’.-]+\s+){1,3}[A-Z][A-Za-z'’.-]+(?![0-9A-Za-z])"
+)
+_ENGLISH_PERSON_AFTER_RE = re.compile(
+    r"^\s+(?:has\s+joined|joined|joins|was\s+appointed|is\s+appointed|said|says|told|according\s+to)\b",
+    re.IGNORECASE,
+)
+_ENGLISH_PERSON_ROLE_RE = re.compile(
+    r"\b(?:as|the)\s+(?:bloodstock\s+and\s+sales\s+)?(?:coordinator|trainer|jockey|manager|director|agent|owner)\b",
+    re.IGNORECASE,
+)
+_ENGLISH_STRONG_HORSE_AFTER_RE = re.compile(
+    r"^\s*(?:\([A-Z]{2,3}\)|,?\s*(?:colt|filly|gelding|mare|horse)\b|"
+    r"(?:wins?|won|finished|runs?|ran|returns?|heads?|targets?|entered|defeated|is\s+trained|was\s+ridden|"
+    r"will\s+(?:run|target|race|start)|is\s+entered)\b)",
+    re.IGNORECASE,
+)
+_ENGLISH_STRONG_HORSE_BEFORE_RE = re.compile(
+    r"(?:^|\b)(?:stall|draw|odds|sire|dam|runner|horse|filly|colt|gelding|mare|\d+)\s*(?:[:#-]|\s)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _entity_candidate_keys(text: str, source_language: str) -> set[str]:
+    if source_language == SourceLanguage.ENGLISH:
+        words = re.findall(
+            r"[0-9A-Za-z]+(?:['’.-][0-9A-Za-z]+)*['’]?",
+            unicodedata.normalize("NFKC", text or ""),
+        )
+        keys: set[str] = set()
+        for start in range(len(words)):
+            for end in range(start + 1, min(len(words), start + 6) + 1):
+                keys.add(" ".join(words[start:end]).casefold())
+        return keys
+    if source_language == SourceLanguage.JAPANESE:
+        keys: set[str] = set()
+        for match in _KATAKANA_TOKEN_RE.finditer(text or ""):
+            token = _normalize_horse_name(match.group(0))
+            if not token:
+                continue
+            keys.add(token)
+            for size in range(2, min(16, len(token)) + 1):
+                for start in range(0, len(token) - size + 1):
+                    keys.add(token[start : start + size])
+        for chunk in re.findall(r"[一-龥々〆ヵヶ]{2,}", text or ""):
+            for size in range(2, min(12, len(chunk)) + 1):
+                for start in range(0, len(chunk) - size + 1):
+                    keys.add(chunk[start : start + size])
+        latin_words = re.findall(r"[0-9A-Za-z]+(?:['’.-][0-9A-Za-z]+)*", text or "")
+        for start in range(len(latin_words)):
+            for end in range(start + 1, min(len(latin_words), start + 6) + 1):
+                phrase = " ".join(latin_words[start:end])
+                keys.update({phrase, phrase.casefold()})
+        return keys
+    return _non_japanese_alias_candidate_keys(text, source_language)
+
+
+def _build_article_entity_index(rows: Iterable[tuple[str, str]]) -> ArticleEntityIndex:
+    keys_by_language: dict[str, set[str]] = {}
+    for language, text in rows:
+        keys_by_language.setdefault(language, set()).update(_entity_candidate_keys(text, language))
+
+    entries_by_language: dict[str, list[TermEntry]] = {}
+    terms_by_language: dict[str, dict[int, list[str]]] = {}
+    external_aliases_by_language: dict[str, list[ExternalHorseAlias]] = {}
+    non_horse_words_by_language: dict[str, set[str]] = {}
+    for language, keys in keys_by_language.items():
+        if not keys:
+            entries_by_language[language] = []
+            terms_by_language[language] = {}
+            external_aliases_by_language[language] = []
+            non_horse_words_by_language[language] = set(_HORSE_STOPWORDS) if language == SourceLanguage.JAPANESE else set()
+            continue
+        normalized_keys = {_normalized_term_candidate(item) for item in keys if item}
+        query_keys = {
+            variant
+            for item in normalized_keys
+            for variant in (item, item.replace("'", "’"), item.replace("'", "‘"))
+        }
+        alias_queryset = TermAlias.objects.filter(is_active=True, source_language=language)
+        if language == SourceLanguage.ENGLISH:
+            alias_queryset = alias_queryset.annotate(candidate_key=Lower("text")).filter(candidate_key__in=query_keys)
+        else:
+            alias_queryset = alias_queryset.annotate(candidate_key=Lower("text")).filter(
+                Q(text__in=keys) | Q(candidate_key__in=query_keys)
+            )
+        matched_aliases = list(alias_queryset.order_by("term_id", "alias_type", "text"))
+        alias_term_ids = {alias.term_id for alias in matched_aliases}
+
+        entry_queryset = TermEntry.objects.filter(is_active=True)
+        if language == SourceLanguage.ENGLISH:
+            entry_queryset = entry_queryset.annotate(candidate_key=Lower("source_ja")).filter(
+                Q(candidate_key__in=query_keys) | Q(pk__in=alias_term_ids)
+            )
+        else:
+            entry_queryset = entry_queryset.annotate(candidate_key=Lower("source_ja")).filter(
+                Q(source_ja__in=keys)
+                | Q(candidate_key__in=query_keys)
+                | Q(target_zh__in=keys)
+                | Q(pk__in=alias_term_ids)
+            )
+        entries = list(entry_queryset.order_by("-priority", "source_ja", "id"))
+        terms_by_entry: dict[int, list[str]] = {}
+        for entry in entries:
+            if entry.source_language == language:
+                terms_by_entry.setdefault(entry.id, []).extend(entry.all_japanese_terms())
+            if entry.target_zh and entry.target_zh in keys:
+                terms_by_entry.setdefault(entry.id, []).append(entry.target_zh)
+            if language in {SourceLanguage.CHINESE, SourceLanguage.CHINESE_TRADITIONAL}:
+                terms_by_entry.setdefault(entry.id, []).extend([entry.target_zh, *(entry.aliases_zh or [])])
+        for alias in matched_aliases:
+            terms_by_entry.setdefault(alias.term_id, []).append(alias.text)
+        terms_by_entry = {
+            term_id: _dedupe_source_terms(values)
+            for term_id, values in terms_by_entry.items()
+        }
+
+        external_queryset = ExternalHorseAlias.objects.filter(source_language=language).exclude(normalized_name="")
+        if language == SourceLanguage.ENGLISH:
+            external_queryset = external_queryset.annotate(candidate_key=Lower("normalized_name")).filter(
+                candidate_key__in=query_keys
+            )
+        else:
+            external_queryset = external_queryset.filter(normalized_name__in=keys)
+        external_aliases = list(
+            external_queryset.order_by("normalized_name", "-confidence", "-last_seen_at", "external_horse_id")
+        )
+        entries_by_language[language] = entries
+        terms_by_language[language] = terms_by_entry
+        external_aliases_by_language[language] = external_aliases
+        non_horse_words = set(_HORSE_STOPWORDS) if language == SourceLanguage.JAPANESE else set()
+        for entry in entries:
+            if entry.term_type != TermType.FIXED_PHRASE or _NON_HORSE_NOTE_MARKER not in (entry.notes or "").casefold():
+                continue
+            non_horse_words.update(terms_by_entry.get(entry.id, []))
+        non_horse_words_by_language[language] = non_horse_words
+    return ArticleEntityIndex(
+        entries_by_language,
+        terms_by_language,
+        external_aliases_by_language,
+        non_horse_words_by_language,
+    )
+
+
+def _iter_candidate_matches(text: str, candidate: str, source_language: str):
+    pattern = _source_term_pattern(candidate, source_language)
+    if pattern:
+        yield from pattern.finditer(text or "")
+        return
+    start = 0
+    while candidate and (position := (text or "").find(candidate, start)) >= 0:
+        yield _SpanMatch(position, position + len(candidate), candidate)
+        start = position + len(candidate)
+
+
+@dataclass(frozen=True)
+class _SpanMatch:
+    _start: int
+    _end: int
+    _text: str
+
+    def start(self) -> int:
+        return self._start
+
+    def end(self) -> int:
+        return self._end
+
+    def group(self, _index: int = 0) -> str:
+        return self._text
+
+
+def _overlaps(start: int, end: int, entities: Iterable[ArticleEntity]) -> bool:
+    return any(start < item.end and end > item.start for item in entities)
+
+
+def _english_strong_horse_context(text: str, start: int, end: int) -> bool:
+    before = text[max(0, start - 32) : start]
+    after = text[end : min(len(text), end + 56)]
+    if _ENGLISH_STRONG_HORSE_AFTER_RE.search(after) or _ENGLISH_STRONG_HORSE_BEFORE_RE.search(before):
+        return True
+    return False
+
+
+def _english_title_proper_horse_context(field_name: str, matched_text: str) -> bool:
+    if field_name != "title":
+        return False
+    words = re.findall(r"[A-Za-z][A-Za-z'’.-]*", matched_text or "")
+    return (
+        len(words) >= 2
+        and all(word[:1].isupper() for word in words)
+        and _normalized_term_candidate(matched_text) not in ENGLISH_COMMON_WORD_TERM_SEEDS
+    )
+
+
+def _person_term_lookup(entries: list[TermEntry]) -> dict[str, TermEntry]:
+    return {
+        _normalized_term_candidate(entry.source_ja): entry
+        for entry in entries
+        if entry.term_type in _PERSON_TERM_TYPES
+    }
+
+
+def _make_entity(
+    entity_type: str,
+    matched_text: str,
+    field_name: str,
+    start: int,
+    end: int,
+    *,
+    canonical_text: str = "",
+    target_zh: str = "",
+    confidence: int = 0,
+    evidence: Iterable[str] = (),
+    conflict_flags: Iterable[str] = (),
+    needs_preserve: bool = False,
+    term: TermEntry | None = None,
+    external_horse_ids: Iterable[str] = (),
+) -> ArticleEntity:
+    return ArticleEntity(
+        entity_type=entity_type,
+        matched_text=matched_text,
+        canonical_text=canonical_text or matched_text,
+        target_zh=target_zh,
+        field_name=field_name,
+        start=start,
+        end=end,
+        confidence=confidence,
+        evidence=list(evidence),
+        conflict_flags=list(conflict_flags),
+        needs_preserve=needs_preserve,
+        term_id=term.id if term else None,
+        external_horse_ids=list(external_horse_ids),
+        priority=term.priority if term else 0,
+        term_type=term.term_type if term else "",
+    )
+
+
+def _resolve_english_entities(
+    title: str,
+    body: str,
+    source_language: str,
+    entries: list[TermEntry],
+    terms_by_entry: dict[int, list[str]],
+    external_aliases: list[ExternalHorseAlias],
+) -> tuple[list[ArticleEntity], list[ArticleEntity]]:
+    fields = (("title", title), ("body", body))
+    entities: list[ArticleEntity] = []
+    suppressed: list[ArticleEntity] = []
+    person_terms = _person_term_lookup(entries)
+
+    for field_name, text in fields:
+        for entry in entries:
+            if entry.term_type not in _PERSON_TERM_TYPES:
+                continue
+            for candidate in sorted(terms_by_entry.get(entry.id, []), key=len, reverse=True):
+                for match in _iter_candidate_matches(text, candidate, source_language):
+                    entities.append(
+                        _make_entity(
+                            "person",
+                            match.group(0),
+                            field_name,
+                            match.start(),
+                            match.end(),
+                            canonical_text=entry.source_ja,
+                            target_zh=entry.target_zh,
+                            confidence=100,
+                            evidence=["formal_person_term"],
+                            term=entry,
+                        )
+                    )
+
+        for match in _ENGLISH_PERSON_NAME_RE.finditer(text):
+            if _overlaps(match.start(), match.end(), [item for item in entities if item.field_name == field_name]):
+                continue
+            matched = match.group(0)
+            if matched.split()[-1].casefold() in {"sales", "racing", "stud", "farm", "park", "stables"}:
+                continue
+            after = text[match.end() : min(len(text), match.end() + 120)]
+            if not (_ENGLISH_PERSON_AFTER_RE.search(after) or _ENGLISH_PERSON_ROLE_RE.search(after)):
+                continue
+            term = person_terms.get(_normalized_term_candidate(matched))
+            entities.append(
+                _make_entity(
+                    "person",
+                    matched,
+                    field_name,
+                    match.start(),
+                    match.end(),
+                    canonical_text=term.source_ja if term else matched,
+                    target_zh=term.target_zh if term else "",
+                    confidence=95,
+                    evidence=["person_job_context"],
+                    term=term,
+                )
+            )
+
+    people_by_surname: dict[str, dict[str, ArticleEntity]] = {}
+    first_person_positions: dict[str, int] = {}
+    for person in entities:
+        parts = re.findall(r"[A-Za-z][A-Za-z'’.-]*", person.canonical_text)
+        if len(parts) < 2:
+            continue
+        surname = parts[-1].casefold()
+        people_by_surname.setdefault(surname, {})[person.canonical_text.casefold()] = person
+        global_position = person.start if person.field_name == "title" else len(title) + 1 + person.start
+        canonical_key = person.canonical_text.casefold()
+        first_person_positions[canonical_key] = min(first_person_positions.get(canonical_key, global_position), global_position)
+    for surname, owners in sorted(people_by_surname.items()):
+        display_surname = next(iter(owners.values())).canonical_text.split()[-1]
+        pattern = _source_term_pattern(display_surname, SourceLanguage.ENGLISH)
+        for field_name, text in fields:
+            for match in pattern.finditer(text):
+                field_people = [item for item in entities if item.field_name == field_name]
+                if _overlaps(match.start(), match.end(), field_people):
+                    continue
+                if len(owners) != 1:
+                    suppressed.append(
+                        _make_entity(
+                            "ambiguous",
+                            match.group(0),
+                            field_name,
+                            match.start(),
+                            match.end(),
+                            confidence=0,
+                            evidence=["person_surname_candidate"],
+                            conflict_flags=["ambiguous_person_surname"],
+                        )
+                    )
+                    continue
+                owner = next(iter(owners.values()))
+                global_position = match.start() if field_name == "title" else len(title) + 1 + match.start()
+                if global_position <= first_person_positions[owner.canonical_text.casefold()]:
+                    suppressed.append(
+                        _make_entity(
+                            "ambiguous",
+                            match.group(0),
+                            field_name,
+                            match.start(),
+                            match.end(),
+                            confidence=0,
+                            evidence=["person_surname_candidate"],
+                            conflict_flags=["surname_before_full_name"],
+                        )
+                    )
+                    continue
+                entities.append(
+                    _make_entity(
+                        "person",
+                        match.group(0),
+                        field_name,
+                        match.start(),
+                        match.end(),
+                        canonical_text=owner.canonical_text,
+                        target_zh=owner.target_zh,
+                        confidence=95,
+                        evidence=["person_surname_coreference"],
+                        term=next((entry for entry in entries if entry.id == owner.term_id), None),
+                    )
+                )
+
+    for field_name, text in fields:
+        field_people = [item for item in entities if item.field_name == field_name and item.entity_type == "person"]
+        for entry in entries:
+            if entry.term_type in _PERSON_TERM_TYPES:
+                continue
+            for candidate in sorted(terms_by_entry.get(entry.id, []), key=len, reverse=True):
+                for match in _iter_candidate_matches(text, candidate, source_language):
+                    if _overlaps(match.start(), match.end(), field_people):
+                        suppressed.append(
+                            _make_entity(
+                                "horse" if entry.term_type == TermType.HORSE else "term",
+                                match.group(0),
+                                field_name,
+                                match.start(),
+                                match.end(),
+                                canonical_text=entry.source_ja,
+                                target_zh=entry.target_zh,
+                                confidence=0,
+                                evidence=["term_candidate"],
+                                conflict_flags=["inside_person_span"],
+                                term=entry,
+                            )
+                        )
+                        continue
+                    if entry.term_type == TermType.HORSE:
+                        strong = _english_strong_horse_context(
+                            text, match.start(), match.end()
+                        ) or _english_title_proper_horse_context(field_name, match.group(0))
+                        entities.append(
+                            _make_entity(
+                                "horse" if strong else "common_word",
+                                match.group(0),
+                                field_name,
+                                match.start(),
+                                match.end(),
+                                canonical_text=entry.source_ja,
+                                target_zh=entry.target_zh,
+                                confidence=95 if strong else 90,
+                                evidence=["strong_horse_context" if strong else "ordinary_english_context"],
+                                conflict_flags=[] if strong else ["horse_term_without_strong_context"],
+                                term=entry,
+                            )
+                        )
+                    else:
+                        entities.append(
+                            _make_entity(
+                                "term",
+                                match.group(0),
+                                field_name,
+                                match.start(),
+                                match.end(),
+                                canonical_text=entry.source_ja,
+                                target_zh=entry.target_zh,
+                                confidence=95,
+                                evidence=["formal_term"],
+                                term=entry,
+                            )
+                        )
+
+        for alias in external_aliases:
+            alias_text = _normalize_horse_name(alias.normalized_name or alias.name_en or alias.name_ja)
+            for match in _iter_candidate_matches(text, alias_text, source_language):
+                if _overlaps(match.start(), match.end(), field_people):
+                    suppressed.append(
+                        _make_entity(
+                            "horse",
+                            match.group(0),
+                            field_name,
+                            match.start(),
+                            match.end(),
+                            canonical_text=alias_text,
+                            confidence=0,
+                            evidence=["external_horse_alias"],
+                            conflict_flags=["inside_person_span"],
+                            external_horse_ids=[alias.external_horse_id],
+                        )
+                    )
+                    continue
+                if any(
+                    item.field_name == field_name
+                    and item.start == match.start()
+                    and item.end == match.end()
+                    and item.entity_type in {"horse", "common_word"}
+                    for item in entities
+                ):
+                    continue
+                strong = _english_strong_horse_context(
+                    text, match.start(), match.end()
+                ) or _english_title_proper_horse_context(field_name, match.group(0))
+                entities.append(
+                    _make_entity(
+                        "horse" if strong else "common_word",
+                        match.group(0),
+                        field_name,
+                        match.start(),
+                        match.end(),
+                        canonical_text=alias_text,
+                        confidence=alias.confidence if strong else 85,
+                        evidence=["external_horse_alias", "strong_horse_context" if strong else "ordinary_english_context"],
+                        conflict_flags=[] if strong else ["horse_alias_without_strong_context"],
+                        needs_preserve=strong,
+                        external_horse_ids=[alias.external_horse_id],
+                    )
+                )
+    return entities, suppressed
+
+
+def _resolve_japanese_entities(
+    title: str,
+    body: str,
+    entries: list[TermEntry],
+    terms_by_entry: dict[int, list[str]],
+    external_aliases: list[ExternalHorseAlias],
+    non_horse_words: set[str],
+) -> tuple[list[ArticleEntity], list[ArticleEntity]]:
+    fields = (("title", title), ("body", body))
+    entities: list[ArticleEntity] = []
+    suppressed: list[ArticleEntity] = []
+    horse_candidates: dict[str, list[TermEntry]] = {}
+    all_term_candidates: dict[str, list[TermEntry]] = {}
+    for entry in entries:
+        for candidate in terms_by_entry.get(entry.id, []):
+            all_term_candidates.setdefault(candidate, []).append(entry)
+            if entry.term_type == TermType.HORSE:
+                horse_candidates.setdefault(candidate, []).append(entry)
+    aliases_by_name: dict[str, list[ExternalHorseAlias]] = {}
+    for alias in external_aliases:
+        name = _normalize_horse_name(alias.normalized_name or alias.name_ja)
+        if name:
+            aliases_by_name.setdefault(name, []).append(alias)
+
+    for field_name, text in fields:
+        protected_spans: list[ArticleEntity] = []
+        for match in _KATAKANA_TOKEN_RE.finditer(text):
+            token = match.group(0)
+            exact_terms = horse_candidates.get(token, [])
+            exact_non_horse_terms = [
+                term for term in all_term_candidates.get(token, []) if term.term_type != TermType.HORSE
+            ]
+            internal_terms = [
+                (candidate, term)
+                for candidate, term_list in all_term_candidates.items()
+                if candidate != token and candidate in token
+                for term in term_list
+            ]
+            internal_horse_terms = [item for item in internal_terms if item[1].term_type == TermType.HORSE]
+            aliases = aliases_by_name.get(_normalize_horse_name(token), [])
+            strong = _strong_horse_context(
+                text, title if field_name == "title" else "", match.start(), match.end(), token
+            ) or _score_heuristic_candidate(text, title, match.start(), match.end(), token) >= 3
+            if token in non_horse_words and not exact_terms and not aliases and not internal_terms and not _strong_horse_context(
+                text, title if field_name == "title" else "", match.start(), match.end(), token
+            ):
+                continue
+            if exact_terms:
+                term = exact_terms[0]
+                entity = _make_entity(
+                    "horse",
+                    token,
+                    field_name,
+                    match.start(),
+                    match.end(),
+                    canonical_text=term.source_ja,
+                    target_zh=term.target_zh,
+                    confidence=100,
+                    evidence=["formal_full_horse_term"],
+                    needs_preserve=not term.has_translation,
+                    term=term,
+                )
+            elif aliases:
+                entity = _make_entity(
+                    "unknown_horse",
+                    token,
+                    field_name,
+                    match.start(),
+                    match.end(),
+                    confidence=max(alias.confidence for alias in aliases),
+                    evidence=["external_full_horse_alias"],
+                    needs_preserve=True,
+                    external_horse_ids=[alias.external_horse_id for alias in aliases if alias.external_horse_id],
+                )
+            elif exact_non_horse_terms:
+                continue
+            elif internal_horse_terms or strong:
+                entity = _make_entity(
+                    "unknown_horse",
+                    token,
+                    field_name,
+                    match.start(),
+                    match.end(),
+                    confidence=90 if internal_horse_terms else 78,
+                    evidence=[
+                        "longest_full_horse_token",
+                        "internal_horse_term" if internal_horse_terms else "strong_horse_context",
+                    ],
+                    needs_preserve=True,
+                )
+            else:
+                continue
+            entities.append(entity)
+            protected_spans.append(entity)
+            for candidate, term in internal_terms:
+                offset = token.find(candidate)
+                suppressed.append(
+                    _make_entity(
+                        "horse" if term.term_type == TermType.HORSE else "term",
+                        candidate,
+                        field_name,
+                        match.start() + offset,
+                        match.start() + offset + len(candidate),
+                        canonical_text=term.source_ja,
+                        target_zh=term.target_zh,
+                        confidence=0,
+                        evidence=["formal_internal_horse_term"],
+                        conflict_flags=["inside_longer_entity"],
+                        term=term,
+                    )
+                )
+
+        for entry in entries:
+            for candidate in sorted(terms_by_entry.get(entry.id, []), key=len, reverse=True):
+                for match in _iter_candidate_matches(text, candidate, SourceLanguage.JAPANESE):
+                    if _overlaps(match.start(), match.end(), protected_spans):
+                        continue
+                    entity_type = "horse" if entry.term_type == TermType.HORSE else (
+                        "person" if entry.term_type in _PERSON_TERM_TYPES else "term"
+                    )
+                    entities.append(
+                        _make_entity(
+                            entity_type,
+                            match.group(0),
+                            field_name,
+                            match.start(),
+                            match.end(),
+                            canonical_text=entry.source_ja,
+                            target_zh=entry.target_zh,
+                            confidence=100,
+                            evidence=["formal_term"],
+                            needs_preserve=entry.term_type == TermType.HORSE and not entry.has_translation,
+                            term=entry,
+                        )
+                    )
+    return entities, suppressed
+
+
+def _resolve_formal_entities(
+    title: str,
+    body: str,
+    source_language: str,
+    entries: list[TermEntry],
+    terms_by_entry: dict[int, list[str]],
+    external_aliases: list[ExternalHorseAlias],
+) -> tuple[list[ArticleEntity], list[ArticleEntity]]:
+    entities: list[ArticleEntity] = []
+    suppressed: list[ArticleEntity] = []
+    for field_name, text in (("title", title), ("body", body)):
+        candidates: list[ArticleEntity] = []
+        for entry in entries:
+            entity_type = "horse" if entry.term_type == TermType.HORSE else (
+                "person" if entry.term_type in _PERSON_TERM_TYPES else "term"
+            )
+            for candidate in terms_by_entry.get(entry.id, []):
+                for match in _iter_candidate_matches(text, candidate, source_language):
+                    candidates.append(
+                        _make_entity(
+                            entity_type,
+                            match.group(0),
+                            field_name,
+                            match.start(),
+                            match.end(),
+                            canonical_text=entry.source_ja,
+                            target_zh=entry.target_zh,
+                            confidence=100,
+                            evidence=["formal_term"],
+                            needs_preserve=entry.term_type == TermType.HORSE and not entry.has_translation,
+                            term=entry,
+                        )
+                    )
+        for alias in external_aliases:
+            alias_text = _normalize_horse_name(
+                alias.normalized_name or alias.name_zh_hant or alias.name_en or alias.name_ja
+            )
+            for match in _iter_candidate_matches(text, alias_text, source_language):
+                candidates.append(
+                    _make_entity(
+                        "horse",
+                        match.group(0),
+                        field_name,
+                        match.start(),
+                        match.end(),
+                        canonical_text=alias_text,
+                        confidence=alias.confidence,
+                        evidence=["external_horse_alias"],
+                        needs_preserve=True,
+                        external_horse_ids=[alias.external_horse_id],
+                    )
+                )
+        accepted_for_field: list[ArticleEntity] = []
+        for candidate in sorted(
+            candidates,
+            key=lambda item: (item.start, -(item.end - item.start), -item.priority, item.entity_type),
+        ):
+            if _overlaps(candidate.start, candidate.end, accepted_for_field):
+                candidate.conflict_flags.append("inside_longer_entity")
+                suppressed.append(candidate)
+                continue
+            accepted_for_field.append(candidate)
+        entities.extend(accepted_for_field)
+    return entities, suppressed
+
+
+def _accepted_terms_from_entities(entities: list[ArticleEntity], entries: list[TermEntry]) -> list[ResolvedTerm]:
+    entries_by_id = {entry.id: entry for entry in entries}
+    accepted: list[ResolvedTerm] = []
+    seen: set[tuple[int, str]] = set()
+    for entity in entities:
+        if entity.entity_type in {"common_word", "unknown_horse", "ambiguous"} or not entity.term_id or not entity.target_zh:
+            continue
+        key = (entity.term_id, entity.matched_text.casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        entry = entries_by_id[entity.term_id]
+        accepted.append(
+            ResolvedTerm(
+                term_type=entry.term_type,
+                source_ja=entry.source_ja,
+                target_zh=entry.target_zh,
+                matched_text=entity.matched_text,
+                race_grade=getattr(entry, "race_grade", ""),
+                priority=entry.priority,
+                notes=entry.notes,
+            )
+        )
+    accepted.sort(key=lambda item: (-item.priority, -len(item.matched_text), item.matched_text.casefold()))
+    return accepted
+
+
+def resolve_article_entities(
+    title_text: str,
+    body_text: str,
+    *,
+    source_language: str = SourceLanguage.JAPANESE,
+    preloaded_index: ArticleEntityIndex | None = None,
+) -> ArticleEntityResolution:
+    title = title_text or ""
+    body = body_text or ""
+    full_text = "\n".join(part for part in (title, body) if part)
+    index = preloaded_index or _build_article_entity_index([(source_language, full_text)])
+    entries = index.entries_by_language.get(source_language, [])
+    terms_by_entry = index.terms_by_language.get(source_language, {})
+    external_aliases = index.external_aliases_by_language.get(source_language, [])
+    non_horse_words = index.non_horse_words_by_language.get(source_language, set())
+    if source_language == SourceLanguage.JAPANESE:
+        entities, suppressed = _resolve_japanese_entities(
+            title, body, entries, terms_by_entry, external_aliases, non_horse_words
+        )
+    elif source_language == SourceLanguage.ENGLISH:
+        entities, suppressed = _resolve_english_entities(
+            title, body, source_language, entries, terms_by_entry, external_aliases
+        )
+    else:
+        entities, suppressed = _resolve_formal_entities(
+            title, body, source_language, entries, terms_by_entry, external_aliases
+        )
+    entities.sort(key=lambda item: (0 if item.field_name == "title" else 1, item.start, -item.end, item.entity_type, item.matched_text))
+    suppressed.sort(key=lambda item: (0 if item.field_name == "title" else 1, item.start, -item.end, item.matched_text))
+    accepted_terms = _accepted_terms_from_entities(entities, entries)
+    tags: list[str] = []
+    for entity in entities:
+        if entity.entity_type not in {"horse", "unknown_horse"}:
+            continue
+        tag = (entity.target_zh or (entity.matched_text if entity.needs_preserve else "")).strip()
+        if tag and tag not in tags:
+            tags.append(tag)
+    return ArticleEntityResolution(source_language, entities, suppressed, accepted_terms, tags[:12])
+
+
+def resolve_article_entities_batch(
+    articles: Iterable[NewsArticle],
+) -> dict[int, ArticleEntityResolution]:
+    article_list = list(articles)
+    rows = []
+    for article in article_list:
+        language = article.source_language or SourceLanguage.JAPANESE
+        text = "\n".join(
+            part for part in (article.title_ja or "", article.body_ja_normalized or article.body_ja_raw or "") if part
+        )
+        rows.append((language, text))
+    index = _build_article_entity_index(rows)
+    return {
+        article.id: resolve_article_entities(
+            article.title_ja,
+            article.body_ja_normalized or article.body_ja_raw,
+            source_language=article.source_language or SourceLanguage.JAPANESE,
+            preloaded_index=index,
+        )
+        for article in article_list
+    }
+
+
+def apply_contextual_term_mappings(
+    text: str,
+    resolution: ArticleEntityResolution,
+) -> str:
+    mapped = text or ""
+    for term in sorted(resolution.accepted_terms, key=lambda item: len(item.matched_text), reverse=True):
+        mapped = _replace_source_term(mapped, term.matched_text, term.target_zh, resolution.source_language)
+    return mapped
+
+
+def recognized_horses_from_resolution(resolution: ArticleEntityResolution) -> list[RecognizedHorseName]:
+    recognized: list[RecognizedHorseName] = []
+    seen: set[tuple[str, str]] = set()
+    for item in resolution.entities:
+        if item.entity_type not in {"horse", "unknown_horse"}:
+            continue
+        key = (item.field_name, item.matched_text)
+        if key in seen:
+            continue
+        seen.add(key)
+        source = "external_alias" if item.external_horse_ids else (
+            "formal_term" if item.entity_type == "horse" and item.term_id else "heuristic"
+        )
+        recognized.append(
+            RecognizedHorseName(
+                name_ja=item.canonical_text,
+                source=source,
+                matched_text=item.matched_text,
+                confidence=item.confidence,
+                external_horse_ids=list(item.external_horse_ids or []),
+                primary_external_horse_id=(item.external_horse_ids or [""])[0],
+                needs_preserve=item.needs_preserve,
+                has_translation=bool(item.target_zh),
+                first_position=item.start,
+                detection_reason=item.evidence[0] if item.evidence else "article_entity_resolution",
+                conflict_flags=list(item.conflict_flags),
+            )
+        )
+    return recognized
 
 
 def _resolve_terms_from_entries(text: str, entries, *, source_language: str | None, limit: int) -> list[ResolvedTerm]:
@@ -274,7 +1168,15 @@ def apply_created_term_to_article(article: NewsArticle, term: TermEntry) -> Arti
     )
 
 
-def extract_horse_tags(text: str, limit: int = 12, source_language: str | None = None) -> list[str]:
+def extract_horse_tags(
+    text: str,
+    limit: int = 12,
+    source_language: str | None = None,
+    *,
+    entity_resolution: ArticleEntityResolution | None = None,
+) -> list[str]:
+    if entity_resolution is not None:
+        return list(entity_resolution.machine_horse_tags[:limit])
     tags: list[str] = []
     seen: set[str] = set()
     terms = (
@@ -297,9 +1199,11 @@ def extract_horse_tags(text: str, limit: int = 12, source_language: str | None =
 
 _KATAKANA_TOKEN_RE = re.compile(r"[ァ-ヴー]{3,}")
 _HORSE_CONTEXT_RE = re.compile(r"(?:\d+着|\d+番人気|[牡牝セ]\d歳|父|母|産駒|騎手)$")
-_STRONG_HORSE_BEFORE_RE = re.compile(r"(?:^|[\s\n　])(?:\d+着|\d+番人気|[牡牝セ]\d歳|父|母|母父|産駒|馬名|出走馬)[:：\s　]*$")
+_STRONG_HORSE_BEFORE_RE = re.compile(
+    r"(?:^|[\s\n　])(?:\d+着|\d+番人気|\d+枠\d+番|\d+番|[牡牝セ]\d歳|父|母|母父|産駒|馬名|出走馬)[:：\s　]*$"
+)
 _STRONG_HORSE_AFTER_RE = re.compile(
-    r"^(?:[\s　]*(?:\(|（|騎手|ジョッキー|号)|(?:が|は|も)?(?:出走|勝利|優勝|重賞|参戦|遠征|帰厩|始動|引退|登録|騎乗|制覇|V))"
+    r"^(?:[\s　]*(?:\(|（|騎手|ジョッキー|号|[牡牝セ]\d(?:歳)?)|(?:が|は|も)?(?:出走|勝利|優勝|重賞|参戦|遠征|帰厩|始動|引退|登録|騎乗|制覇|V))"
 )
 _HORSE_STOPWORDS = {
     "コメント",

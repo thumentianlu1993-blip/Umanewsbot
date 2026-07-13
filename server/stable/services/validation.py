@@ -13,6 +13,8 @@ from django.utils import timezone
 from django.utils.html import strip_tags
 
 from stable.models import (
+    ArticleHorseLink,
+    ArticleHorseLinkStatus,
     AutomationLog,
     AutomationPhase,
     AutomationResult,
@@ -26,8 +28,12 @@ from stable.models import (
     WorkflowStatus,
 )
 from stable.services.terms import (
+    ArticleEntityResolution,
+    ENGLISH_COMMON_WORD_TERM_SEEDS,
     _find_source_term_match,
     recognize_horse_names,
+    recognized_horses_from_resolution,
+    resolve_article_entities,
     serialize_recognized_horse_names,
     source_term_matches_text,
     source_terms_by_entry,
@@ -47,35 +53,9 @@ ROUTE_MANUAL = "manual_review"
 ROUTE_DUPLICATE = "duplicate"
 GLOBAL_RACING_REGION = ""
 
-# Seeded from runtime/multiregion_candidate_audit/reprocess_dryrun_20260708/
-# still_potential_core_terms_breakdown_classified.csv after the July 2026
-# overseas candidate-pool review. These are ordinary English words/phrases
-# that may also exist as horse terms, so context still decides final handling.
-ENGLISH_COMMON_WORD_TERM_SEEDS = {
-    "ace",
-    "agenda",
-    "action",
-    "classic",
-    "contact",
-    "determined",
-    "digital",
-    "embraces",
-    "ensured",
-    "fast track",
-    "find",
-    "good job",
-    "however",
-    "hopeful",
-    "item",
-    "live",
-    "number",
-    "rating",
-    "son",
-    "step forward",
-    "subsequent",
-    "tuesday",
-    "were",
-}
+# Seeded from runtime/multiregion_candidate_audit and the 2026-07-13
+# production article review. The shared set lives in terms.py so article-level
+# resolution and the publish gate use the same ordinary-word vocabulary.
 ENGLISH_DUAL_USE_COMMON_WORD_TERMS = {
     "ace",
     "classic",
@@ -141,6 +121,9 @@ class ValidationBatchContext:
     duplicate_candidates: list[NewsArticle]
     term_entry_ids_by_article: dict[int, set[int]]
     structured_entities_by_article: dict[int, dict[str, list[str]]]
+    entity_resolutions_by_article: dict[int, ArticleEntityResolution] | None = None
+    accepted_term_ids_by_article: dict[int, set[int]] | None = None
+    auto_horse_term_ids_by_article: dict[int, set[int]] | None = None
     term_snapshot_sha256: str = ""
     term_index_build_count: int = 1
     entity_prefetch_count: int = 0
@@ -832,6 +815,7 @@ def validate_rewrite(
         "missing_numbers": [],
         "quote_fragments_checked": [],
         "issues": [],
+        "article_entities": [],
     }
 
     if not _publish_title(article, content_source):
@@ -864,16 +848,20 @@ def validate_rewrite(
 
     preserve_limit = 12
     article_source_language = article.source_language or SourceLanguage.JAPANESE
-    recognized_horses = (
-        batch_context.recognized_horses_by_article.get(article.id, [])
+    entity_resolution = (
+        (batch_context.entity_resolutions_by_article or {}).get(article.id)
         if batch_context is not None
-        else recognize_horse_names(
+        else None
+    )
+    if entity_resolution is None:
+        entity_resolution = resolve_article_entities(
             article.title_ja,
             article.body_ja_normalized or article.body_ja_raw,
-            limit=None,
             source_language=article_source_language,
         )
-    )
+    recognized_horses = recognized_horses_from_resolution(entity_resolution)
+    details["article_entities"] = [item.as_dict() for item in entity_resolution.entities]
+    details["accepted_term_ids"] = sorted(entity_resolution.accepted_term_ids)
     if progress_callback:
         progress_callback()
     details["recognized_horse_names"] = serialize_recognized_horse_names(recognized_horses)
@@ -925,8 +913,68 @@ def validate_rewrite(
             )
         )
 
+    rejected_horse_candidates = [
+        *[
+            item
+            for item in entity_resolution.entities
+            if item.entity_type == "common_word" and item.term_type == TermType.HORSE
+        ],
+        *[
+            item
+            for item in entity_resolution.suppressed_candidates
+            if item.term_type == TermType.HORSE
+            and any(flag in {"inside_person_span", "inside_longer_entity"} for flag in item.conflict_flags)
+        ],
+    ]
+    rejected_horse_targets = {
+        item.target_zh
+        for item in rejected_horse_candidates
+        if item.target_zh
+    }
+    stale_machine_tags = sorted(rejected_horse_targets & set(article.tags_json or []))
+    rejected_horse_term_ids = {
+        item.term_id
+        for item in rejected_horse_candidates
+        if item.term_id
+    }
+    if batch_context is not None:
+        auto_link_term_ids = (batch_context.auto_horse_term_ids_by_article or {}).get(article.id, set())
+    else:
+        auto_link_term_ids = set(
+            ArticleHorseLink.objects.filter(
+                article=article,
+                status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.CANDIDATE],
+            ).values_list("horse_profile__primary_term_id", flat=True)
+        )
+    stale_auto_link_term_ids = sorted(rejected_horse_term_ids & auto_link_term_ids)
+    if stale_machine_tags or stale_auto_link_term_ids:
+        issues.append(
+            _issue(
+                "machine_entity_type_mismatch",
+                SEVERITY_BLOCKER,
+                "机器马名标签与正文实体类型不一致：" + "、".join(stale_machine_tags[:6]),
+                route=ROUTE_MANUAL,
+                payload={
+                    "tags": stale_machine_tags,
+                    "auto_link_term_ids": stale_auto_link_term_ids,
+                    "entity_type": "common_word",
+                },
+            )
+        )
+
     missing_terms: list[str] = []
     first_block = gate_body[:500]
+    accepted_term_ids = (
+        (batch_context.accepted_term_ids_by_article or {}).get(article.id, entity_resolution.accepted_term_ids)
+        if batch_context is not None
+        else entity_resolution.accepted_term_ids
+    )
+    context_suppressed_term_ids = {
+        item.term_id
+        for item in entity_resolution.suppressed_candidates
+        if item.term_id
+        and any(flag in {"inside_person_span", "inside_longer_entity"} for flag in item.conflict_flags)
+    }
     if batch_context is not None:
         matched_ids = batch_context.term_entry_ids_by_article.get(article.id, set())
         term_entries = [entry for entry in batch_context.term_entries if entry.id in matched_ids]
@@ -980,6 +1028,10 @@ def validate_rewrite(
                     payload=payload,
                 )
             )
+            continue
+        if entry.id in context_suppressed_term_ids:
+            continue
+        if article_source_language != SourceLanguage.ENGLISH and entry.id not in accepted_term_ids:
             continue
         if not _term_gate_region_allowed(entry, article, article_source_language):
             payload = {

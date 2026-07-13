@@ -36,7 +36,7 @@ from stable.models import (
 )
 from stable.services.operations import log_operation
 from stable.services.horse_race_records import upsert_race_record
-from stable.services.terms import source_term_matches_text
+from stable.services.terms import ArticleEntityResolution, resolve_article_entities, source_term_matches_text
 
 
 User = get_user_model()
@@ -363,6 +363,105 @@ def _match_article(article: NewsArticle, profile: HorseProfile, terms: list[tupl
     return None
 
 
+def reconcile_article_horse_links(
+    article: NewsArticle,
+    resolution: ArticleEntityResolution,
+    *,
+    commit: bool = True,
+) -> dict[str, list]:
+    horse_entities = [item for item in resolution.entities if item.entity_type in {"horse", "unknown_horse"}]
+    term_ids = {item.term_id for item in horse_entities if item.term_id}
+    candidate_names = {
+        value.strip()
+        for item in horse_entities
+        for value in (item.canonical_text, item.matched_text, item.target_zh)
+        if value and value.strip()
+    }
+    profile_filter = Q(primary_term_id__in=term_ids)
+    for name in sorted(candidate_names):
+        profile_filter |= (
+            Q(original_name__iexact=name)
+            | Q(english_name__iexact=name)
+            | Q(japanese_name__iexact=name)
+            | Q(display_name_zh__iexact=name)
+        )
+    profiles = list(
+        HorseProfile.objects.filter(profile_filter, review_status=HorseProfileStatus.PUBLISHED)
+        .select_related("primary_term")
+        .order_by("id")
+    ) if term_ids or candidate_names else []
+    desired: dict[int, dict] = {}
+    for profile in profiles:
+        matches = [
+            item
+            for item in horse_entities
+            if item.term_id == profile.primary_term_id
+            or any(
+                value and value.casefold() in {
+                    profile.original_name.casefold(),
+                    profile.english_name.casefold(),
+                    profile.japanese_name.casefold(),
+                    profile.display_name_zh.casefold(),
+                }
+                for value in (item.canonical_text, item.matched_text, item.target_zh)
+            )
+        ]
+        if not matches:
+            continue
+        match = sorted(matches, key=lambda item: (item.field_name != "title", item.start, -item.confidence))[0]
+        status = ArticleHorseLinkStatus.AUTO if match.field_name == "title" else ArticleHorseLinkStatus.CANDIDATE
+        desired[profile.id] = {
+            "status": status,
+            "source": "contextual_entity_resolution",
+            "confidence": match.confidence,
+            "matched_text": match.matched_text[:255],
+            "match_reason": ",".join(match.evidence),
+            "metadata": {"entity": match.as_dict()},
+        }
+
+    existing = list(ArticleHorseLink.objects.filter(article=article).order_by("id"))
+    existing_by_profile = {item.horse_profile_id: item for item in existing}
+    protected = [item for item in existing if item.status in {ArticleHorseLinkStatus.MANUAL, ArticleHorseLinkStatus.REMOVED}]
+    delete_links = [
+        item
+        for item in existing
+        if item.status in {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.CANDIDATE}
+        and item.horse_profile_id not in desired
+    ]
+    create_payloads = [
+        {"horse_profile_id": profile_id, **payload}
+        for profile_id, payload in desired.items()
+        if profile_id not in existing_by_profile
+    ]
+    update_payloads = [
+        {"link_id": existing_by_profile[profile_id].id, "horse_profile_id": profile_id, **payload}
+        for profile_id, payload in desired.items()
+        if profile_id in existing_by_profile
+        and existing_by_profile[profile_id].status not in {ArticleHorseLinkStatus.MANUAL, ArticleHorseLinkStatus.REMOVED}
+    ]
+    result = {
+        "create": create_payloads,
+        "update": update_payloads,
+        "delete_ids": [item.id for item in delete_links],
+        "protected_ids": [item.id for item in protected],
+        "protected": [{"link_id": item.id, "status": item.status} for item in protected],
+    }
+    if not commit:
+        return result
+    if delete_links:
+        ArticleHorseLink.objects.filter(id__in=result["delete_ids"]).delete()
+    for payload in create_payloads:
+        profile_id = payload["horse_profile_id"]
+        defaults = {key: value for key, value in payload.items() if key != "horse_profile_id"}
+        ArticleHorseLink.objects.create(article=article, horse_profile_id=profile_id, **defaults)
+    for payload in update_payloads:
+        link_id = payload["link_id"]
+        defaults = {key: value for key, value in payload.items() if key not in {"link_id", "horse_profile_id"}}
+        defaults["updated_at"] = timezone.now()
+        ArticleHorseLink.objects.filter(pk=link_id).update(**defaults)
+    return result
+
+
 def scan_article_horse_links(
     *,
     article: NewsArticle | None = None,
@@ -370,6 +469,23 @@ def scan_article_horse_links(
     limit: int = 500,
     commit: bool = True,
 ) -> dict[str, int]:
+    if article is not None and profile is None:
+        resolution = resolve_article_entities(
+            article.title_ja,
+            article.body_ja_normalized or article.body_ja_raw,
+            source_language=article.source_language or SourceLanguage.JAPANESE,
+        )
+        reconciled = reconcile_article_horse_links(article, resolution, commit=commit)
+        result = {
+            "created": len(reconciled["create"]),
+            "updated": len(reconciled["update"]),
+            "deleted": len(reconciled["delete_ids"]),
+            "candidate": sum(item["status"] == ArticleHorseLinkStatus.CANDIDATE for item in [*reconciled["create"], *reconciled["update"]]),
+            "skipped_removed": sum(item["status"] == ArticleHorseLinkStatus.REMOVED for item in reconciled["protected"]),
+            "skipped_manual": sum(item["status"] == ArticleHorseLinkStatus.MANUAL for item in reconciled["protected"]),
+        }
+        _task_log("horse_article_link_scan", TaskStatus.SUCCESS, payload=result, detail=f"马匹新闻关联扫描完成：{result}")
+        return result
     profiles = HorseProfile.objects.filter(review_status=HorseProfileStatus.PUBLISHED).select_related("primary_term").prefetch_related("primary_term__source_aliases")
     if profile is not None:
         profiles = profiles.filter(pk=profile.pk)
