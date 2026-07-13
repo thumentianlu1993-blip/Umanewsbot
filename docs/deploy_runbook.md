@@ -1,14 +1,15 @@
 # 部署运行手册
 
-## 2026-07-13 batch003 Hampton 移师纠正后的写入门禁
+## 2026-07-13 batch003 250 场正式导入记录
 
-1. 当前唯一有效日期 artifact 为 `runtime/historical_race_batches/2016-2025-batch-003-20260713/date-discovery-artifact`，manifest SHA-256 `9fe1f9e403c3200d392d8b211ee5658f7e78fc05a21ebad5b5d168e575d6850d`，候选 SHA-256 `d6e0aea5a24fb0118e3d5f05a4987b428381f7e0cdc5735738dfe941d9ccfd54`。必须严格为 250 candidate、0 gap、五地区各 50、250 个唯一 target/URL。
-2. Hampton `target_id=60693` 必须为 `2025-01-19 / Windsor / 3m53y`，直接来源为 Sporting Life race `840094`；Racing Post result `886116` 为交叉证据。旧 Warwick race `838507` 只保留为原场次弃赛证据，不得进入 candidate、gap 或 cancelled approval。
-3. approval 当前必须保持 `pending` 且 `approved_target_ids=[]`。只有用户明确批准上述 manifest 后，才填写全部 250 个 ID；日期 commit 前重新核对 artifact 字节身份、生产镜像、Celery/外部导入锁和常驻开关，并创建通过非空、`gzip -t` 与 SHA-256 校验的数据库备份。
-4. 日期 apply 只允许一次性容器临时设置 `HISTORICAL_RACE_BACKFILL_ENABLED=true`，不得修改 `.env`。写后应得到 250 个 ready target 与 250 个 finished/draft RaceEvent，published 必须为 0。
-5. 日期 apply 后不得直接提交当前详情包。先按写后 target SHA 生成 Hampton 单目标权威字段候选，把 `racecourse` 从 Warwick 校正为 Windsor；候选至少绑定实际赛果 URL、缓存 SHA 和解析版本。字段 `--dry-run` 必须只显示该目标预期字段变化且无人工锁跳过；再做独立数据库备份后 apply。
-6. 字段 apply 改变 Hampton target SHA 后，重新导出 250 场 event input，重新建立/核验详情来源 artifact，并重打包 250 场详情；旧包必须因 target SHA 漂移而拒绝。新的详情包须为 250 scope、0 gap、250 个唯一来源，Hampton 为 3 runners / 3 results、冠军 Jingko Blue。
-7. 最终详情 dry-run、写前第三份备份、apply 和逐 target 写后核验全部通过后，才算 batch003 导入完成。全过程保持历史赛事 `draft`、published 0、常驻历史网络/写入开关 false；不得重启或重建生产容器。
+1. 运行镜像固定为 `sha256:87c435cfc50344d0ca94f46e44d4bea97ab11361f88f7c708b6457331aee78ec`；revision `3939992c7d3753779fc34de81c595f5a34d7ed2b`。本批没有 build、retag、recreate 或 restart。
+2. 日期 artifact manifest `9fe1f9e403c3200d392d8b211ee5658f7e78fc05a21ebad5b5d168e575d6850d`、候选 `d6e0aea5a24fb0118e3d5f05a4987b428381f7e0cdc5735738dfe941d9ccfd54`，批准并 apply 250/250。备份 `pre-band-2016-2025-batch003-date-apply-20260713_221215.sql.gz`，`126708226` bytes，SHA-256 `a3fd8fe037af4192a8989e779afacbd5ff00734f92a0d12b694b25cf8767ebb0`。
+3. 日期 apply 后必须全量比较带单位距离，不能只修 Hampton。字段 artifact manifest `46f01221d397c1a704e83734736cfc26f66cc68db561fec783e926acdcde5f2e`、候选 `593cca7e75e8311c2be0ab7b38bae0775582eab62efe46983c9d41d7b92822c4`；250 个距离加 Hampton 场地共 251 field，0 conflict/skip。备份 `pre-band-2016-2025-batch003-authoritative-fields-20260713_222355.sql.gz`，`126816801` bytes，SHA-256 `d38743cf9b22df9bbf6f7e1ddb0a9d6b69a5a2ba8384775f33f95854977ffd34`。
+4. 详情来源 artifact manifest `9f2b6080f29c295ed10cdfad8070155c1253891332c60b75b342fb07e7adc4c7`、候选 `b6564d0a3f86537dd5b9d6e9a5538be688bfdcadf5d68a6f4ab79bc40cee610e`，check/apply 250/250。有效备份 `pre-band-2016-2025-batch003-detail-source-20260713_222952.sql.gz`，`126842211` bytes，SHA-256 `ec7c67431c6f5af9502aa82fc4731fb4ae34e275b1e6912a31bff6396c86b77a`；同前缀 `.incomplete` 文件不得恢复。
+5. 来源 apply 后重新导出 event input 并打包，最终候选 SHA-256 `426af99cf541b43aa2e73e839989de40f2d2a15ab6298cda4cec4026cafe0a59`，250 scope / 0 gap / 250 唯一 URL。旧候选 `971c94342bb9165956a9bdb20a4cf694a51de2fabfc5a76e1cb918f3e12fbb57` 必须且确实因 target SHA 漂移失败；新包 dry-run 250/250 通过。
+6. 最终备份 `pre-band-2016-2025-batch003-final-detail-20260713_223807.sql.gz`，`126955401` bytes，SHA-256 `b1209f61542532907b83b42cf58febdb244729a7b32cb51da0b273034b433ac6`。详情 apply 250/250；逐 target 验收地区计数为法国 `50/437/323`、香港 `50/465/456`、日本 `50/749/742`、英国 `50/522/423`、美国 `50/465/405`，格式为 events/runners/results，error 0。
+7. Hampton `60693` 验收值为 `2025-01-19 / Windsor / 3m53y`，3 runners / 3 results，冠军 Jingko Blue。批次后累计 `791 imported / 30126 pending / 0 ready`、`8361 runners / 7492 results / published 0`。
+8. 写入只在一次性容器临时启用 `HISTORICAL_RACE_BACKFILL_ENABLED=true`；常驻 web/worker/beat 的写入与网络开关均为 false。无 one-off，Django check、内外 HTTP healthz、`/races/` 和容器状态通过。公网 HTTPS 仍未接入，本次公网验收以正式 HTTP 入口为准。
 
 ## 2026-07-13 后续标准批次既有选样排除门禁
 

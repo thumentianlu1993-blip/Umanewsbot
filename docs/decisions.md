@@ -1,5 +1,12 @@
 # 关键决策
 
+## 2026-07-13：逐届距离必须从批准来源写回并保留原单位
+
+- 日期发现候选中的 `distance_evidence` 是逐届实际距离证据；总账里的裸数字只适合历史身份初筛，不能直接作为 RaceEvent 的最终展示值。`2000`、`3` 等裸值必须分别写成来源原文 `2000m`、`3m53y`，不得依靠地区猜测补单位。
+- 日期 artifact apply 当前只更新 `local_date`、直接来源和 materialize 状态，不会自动覆盖 `distance_text`。因此每个正式批次在日期 apply 后必须比较全部 event 与批准候选；有差异时通过权威字段 artifact 写回逐届距离并保存来源 URL、snapshot SHA、parser version 与 authority provenance。
+- 距离修正会改变 target SHA。后续详情来源 artifact、event input 和最终详情包必须按新 SHA 依次重建；旧包应被门禁拒绝。该规则适用于公制、英制和各地区特有写法，不把换算米数替代来源原文。
+- batch003 按此规则修正全部 250 场距离，其中 Hampton 同时校正场地；dry-run 为 250 scope、251 field、0 冲突。以后不得只抽检单场距离，也不得把“补单位”视为不影响数据身份的展示层修改。
+
 ## 2026-07-13：原定场次弃赛不等于年度赛事取消
 
 - 年度赛事身份判断必须继续追踪改期、移师和补赛。原定日期/场地页面标记 `ABANDONED`，只能证明该场次没有按原计划举行；只要同一赛事线在同一届次于其他日期或场地正式跑完，该 target 仍为 `held`，不得改为 `cancelled` 或保留年度 gap。

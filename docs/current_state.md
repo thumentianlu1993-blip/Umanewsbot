@@ -1,12 +1,14 @@
 # 当前状态
 
-## 2026-07-13 batch003 Hampton 移师纠正与 250 场只读工件
+## 2026-07-13 2016-2025 标准批次三号 250 场正式导入
 
-- 用户提供 Racing Post 正式赛果，确认 2025 Hampton Novices' Chase 并非整届取消：原定 `2025-01-11 / Warwick` 的场次标记 `ABANDONED`，同一届赛事于 `2025-01-19 / Windsor` 移师举办。Racing Post 与 Sporting Life 均给出 `3m53y`、3 匹实际出走、3 条赛果，冠军为 `Jingko Blue`，Sporting Life 状态为 `WEIGHEDIN`。
-- batch003 已用 Windsor 实际赛果替换旧 Warwick 弃赛候选；旧页面只保留为原场次变更证据，不再作为年度缺口或取消结论。英国候选现为 50 场、`522 runners / 423 results`；五地区合计为 250 场、`2638 runners / 2349 results`。
-- 生产只读日期 artifact 位于 `runtime/historical_race_batches/2016-2025-batch-003-20260713/date-discovery-artifact`，manifest SHA-256 为 `9fe1f9e403c3200d392d8b211ee5658f7e78fc05a21ebad5b5d168e575d6850d`，候选 SHA-256 为 `d6e0aea5a24fb0118e3d5f05a4987b428381f7e0cdc5735738dfe941d9ccfd54`。结果为五地区各 50、`250 candidate / 0 gap`、250 个唯一 target 与来源 URL；审批仍为 `pending`，批准 ID 为 0。
-- 只读生成前后，batch003 的 250 个 target 均保持 `held / pending`，materialized event 为 0、published 为 0；常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，healthz 正常，本轮没有生产数据库写入。
-- 后续不得直接导入当前详情包。日期 apply 后先以独立权威字段工件把 Hampton 年度赛事的 `racecourse` 从总账原定值 Warwick 校正为实际举办地 Windsor；字段 apply 会改变 target SHA，随后必须重新导出 event input、重建详情来源/最终详情包并重新 dry-run。日期、字段和详情三次写入分别需要审批、备份与写后核验。
+- 用户批准日期 artifact manifest `9fe1f9e403c3200d392d8b211ee5658f7e78fc05a21ebad5b5d168e575d6850d` 的全部 250 个目标，五地区各 50、0 gap、250 个唯一来源 URL。日期 apply 250/250 成功，生成 250 个 `finished / draft` RaceEvent；写前备份 `pre-band-2016-2025-batch003-date-apply-20260713_221215.sql.gz` 为 `126708226` bytes、SHA-256 `a3fd8fe037af4192a8989e779afacbd5ff00734f92a0d12b694b25cf8767ebb0`。
+- 写后检查发现日期工件保存了逐届带单位距离，但日期 apply 只负责日期与 materialize，RaceEvent 仍沿用总账裸数字。权威字段 artifact 因此覆盖 250 个 `distance_text`，并额外把 Hampton 场地由 Warwick 校正为 Windsor；manifest `46f01221d397c1a704e83734736cfc26f66cc68db561fec783e926acdcde5f2e`，候选 `593cca7e75e8311c2be0ab7b38bae0775582eab62efe46983c9d41d7b92822c4`，dry-run/apply 均为 250 scope、251 field、0 人工锁跳过、0 冲突。写前备份 `pre-band-2016-2025-batch003-authoritative-fields-20260713_222355.sql.gz` 为 `126816801` bytes、SHA-256 `d38743cf9b22df9bbf6f7e1ddb0a9d6b69a5a2ba8384775f33f95854977ffd34`。
+- 详情来源 artifact manifest `9f2b6080f29c295ed10cdfad8070155c1253891332c60b75b342fb07e7adc4c7`，候选 `b6564d0a3f86537dd5b9d6e9a5538be688bfdcadf5d68a6f4ab79bc40cee610e`，check/apply 均为 250；来源分布 JRA 49、NAR 1、Equibase 50、HKJC 50、Sporting Life 50、ZEturf 49、Zone-Turf 1。写前有效备份 `pre-band-2016-2025-batch003-detail-source-20260713_222952.sql.gz` 为 `126842211` bytes、SHA-256 `ec7c67431c6f5af9502aa82fc4731fb4ae34e275b1e6912a31bff6396c86b77a`；前一份 `.incomplete` 文件未通过当时校验，禁止作为恢复点。
+- 来源 apply 后重新导出的最终详情候选 SHA-256 为 `426af99cf541b43aa2e73e839989de40f2d2a15ab6298cda4cec4026cafe0a59`，250 scope / 0 gap / 250 唯一 URL。旧包 `971c94342bb9165956a9bdb20a4cf694a51de2fabfc5a76e1cb918f3e12fbb57` 已因 target SHA 漂移被明确拒绝，新包 dry-run 250/250 通过；写前备份 `pre-band-2016-2025-batch003-final-detail-20260713_223807.sql.gz` 为 `126955401` bytes、SHA-256 `b1209f61542532907b83b42cf58febdb244729a7b32cb51da0b273034b433ac6`。
+- 正式详情导入 250/250 成功：法国 `437 runners / 323 results`、香港 `465 / 456`、日本 `749 / 742`、英国 `522 / 423`、美国 `465 / 405`，合计 `2638 / 2349`。逐 target 数量、马号/存储名次唯一性、500 个 applied candidate 的来源名/URL/cache identity、module 状态和 250 条导入日志全部一致，error 0。
+- Hampton target `60693` 最终为 `2025-01-19 / Windsor / 3m53y / imported / draft`，出走和赛果均为 3 条，冠军 `Jingko Blue`；旧 Warwick 弃赛页只保留为原场次变更证据。生产历史累计为 `791 imported / 30126 pending / 0 ready`、`8361 runners / 7492 results`、materialized 791、published 0。
+- 生产继续运行镜像 `sha256:87c435cfc50344d0ca94f46e44d4bea97ab11361f88f7c708b6457331aee78ec`，本批未重建或重启服务。web/worker/beat 常驻历史写入与网络开关均为 false，无 one-off 容器；Django check、内部及公网 HTTP healthz、`/races/` 均通过。日志唯一异常为外部扫描器使用未授权 Host `azenv.net` 被 Django 正确拒绝，发生在最终导入前，与本批无关。
 
 ## 2026-07-13 后续标准批次重复选样门禁已实现
 

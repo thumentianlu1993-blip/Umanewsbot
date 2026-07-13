@@ -7,11 +7,12 @@
 > 本文档用于保留项目级概览与摘要信息。
 > 当前真实工作状态、最近一次关键修复、线上实际进展，请以 [docs/current_state.md](E:/Codex/docs/current_state.md) 为准。
 
-## 2026-07-13 batch003 Hampton 移师纠正
+## 2026-07-13 第三标准批次 250 场导入完成
 
-- 2025 Hampton Novices' Chase 原定 Warwick 场次虽为 `ABANDONED`，但同一届赛事于 `2025-01-19` 移师 Windsor 正常举办；Racing Post 与 Sporting Life 交叉确认 3 匹出走、3 条赛果，冠军 `Jingko Blue`。
-- batch003 生产只读日期 artifact 已重建为五地区各 50、`250 candidate / 0 gap`。manifest SHA-256 为 `9fe1f9e403c3200d392d8b211ee5658f7e78fc05a21ebad5b5d168e575d6850d`，审批仍为 pending，生产数据库未写入，历史公开仍为 0。
-- 获得审批后先执行日期 apply，再通过权威字段门禁把 Hampton 场地由原定 Warwick 校正为实际 Windsor；字段更新后重新导出并打包全部详情，不复用当前 target SHA 的详情包。
+- batch003 五地区各 50 场已完成日期、带原单位距离、实际场地、详情来源、出马表和赛果正式导入。写后逐场验收 error 0；新增法国 `437/323`、香港 `465/456`、日本 `749/742`、英国 `522/423`、美国 `465/405`，合计 `2638 runners / 2349 results`。
+- 2025 Hampton Novices' Chase 最终按同届移师处理为 `2025-01-19 / Windsor / 3m53y`，3 匹出走、3 条赛果，冠军 `Jingko Blue`；Warwick `ABANDONED` 页面不再构成年度 gap。
+- 日期、权威字段、详情来源和最终详情四个写阶段均使用独立 artifact、dry-run/check 与有效数据库备份。最终详情候选 SHA-256 为 `426af99cf541b43aa2e73e839989de40f2d2a15ab6298cda4cec4026cafe0a59`；旧包已按 target SHA 漂移门禁拒绝。
+- 生产历史累计为 `791 imported / 30126 pending / 0 ready`、`8361 runners / 7492 results`，791 个历史赛事全部 draft，published 0。运行镜像与常驻服务未变化，历史写入/网络开关继续关闭。
 
 ## 2026-07-13 标准批次重复选样门禁
 
