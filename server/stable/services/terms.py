@@ -228,6 +228,7 @@ ENGLISH_COMMON_WORD_TERM_SEEDS = {
     "live",
     "more than enough",
     "number",
+    "nyra",
     "positive",
     "rating",
     "sign",
@@ -258,7 +259,8 @@ _ENGLISH_STRONG_HORSE_AFTER_RE = re.compile(
     re.IGNORECASE,
 )
 _ENGLISH_STRONG_HORSE_BEFORE_RE = re.compile(
-    r"(?:^|\b)(?:stall|draw|odds|sire|dam|runner|horse|filly|colt|gelding|mare|\d+)\s*(?:[:#-]|\s)\s*$",
+    r"(?:(?:^|\b)(?:stall|draw|odds|sire|dam|runner|horse|filly|colt|gelding|mare)\s*(?:[:#-]|\s)\s*|"
+    r"(?:^|\n)\s*\d+\s+|\binner\s+)$",
     re.IGNORECASE,
 )
 
@@ -431,6 +433,20 @@ def _english_title_proper_horse_context(field_name: str, matched_text: str) -> b
         len(words) >= 2
         and all(word[:1].isupper() for word in words)
         and _normalized_term_candidate(matched_text) not in ENGLISH_COMMON_WORD_TERM_SEEDS
+    )
+
+
+def _english_candidate_strong_horse_context(
+    text: str,
+    field_name: str,
+    start: int,
+    end: int,
+    matched_text: str,
+) -> bool:
+    if _normalized_term_candidate(matched_text) == "nyra":
+        return False
+    return _english_strong_horse_context(text, start, end) or _english_title_proper_horse_context(
+        field_name, matched_text
     )
 
 
@@ -625,9 +641,9 @@ def _resolve_english_entities(
                         )
                         continue
                     if entry.term_type == TermType.HORSE:
-                        strong = _english_strong_horse_context(
-                            text, match.start(), match.end()
-                        ) or _english_title_proper_horse_context(field_name, match.group(0))
+                        strong = _english_candidate_strong_horse_context(
+                            text, field_name, match.start(), match.end(), match.group(0)
+                        )
                         entities.append(
                             _make_entity(
                                 "horse" if strong else "common_word",
@@ -682,13 +698,12 @@ def _resolve_english_entities(
                     item.field_name == field_name
                     and item.start == match.start()
                     and item.end == match.end()
-                    and item.entity_type in {"horse", "common_word"}
                     for item in entities
                 ):
                     continue
-                strong = _english_strong_horse_context(
-                    text, match.start(), match.end()
-                ) or _english_title_proper_horse_context(field_name, match.group(0))
+                strong = _english_candidate_strong_horse_context(
+                    text, field_name, match.start(), match.end(), match.group(0)
+                )
                 entities.append(
                     _make_entity(
                         "horse" if strong else "common_word",
@@ -733,8 +748,53 @@ def _resolve_japanese_entities(
 
     for field_name, text in fields:
         protected_spans: list[ArticleEntity] = []
+        for match in _JAPANESE_KATAKANA_PERSON_RE.finditer(text):
+            matched = match.group(0).strip()
+            exact_people = [
+                term
+                for term in all_term_candidates.get(matched, [])
+                if term.term_type in _PERSON_TERM_TYPES
+            ]
+            person = _make_entity(
+                "person",
+                matched,
+                field_name,
+                match.start(),
+                match.start() + len(matched),
+                canonical_text=exact_people[0].source_ja if exact_people else matched,
+                target_zh=exact_people[0].target_zh if exact_people else "",
+                confidence=100 if exact_people else 96,
+                evidence=["formal_person_term" if exact_people else "japanese_person_role_context"],
+                term=exact_people[0] if exact_people else None,
+            )
+            entities.append(person)
+            protected_spans.append(person)
+            for candidate, term_list in all_term_candidates.items():
+                offset = matched.find(candidate)
+                if offset < 0:
+                    continue
+                for term in term_list:
+                    if term.term_type in _PERSON_TERM_TYPES and candidate == matched:
+                        continue
+                    suppressed.append(
+                        _make_entity(
+                            "horse" if term.term_type == TermType.HORSE else "term",
+                            candidate,
+                            field_name,
+                            match.start() + offset,
+                            match.start() + offset + len(candidate),
+                            canonical_text=term.source_ja,
+                            target_zh=term.target_zh,
+                            confidence=0,
+                            evidence=["term_candidate"],
+                            conflict_flags=["inside_person_span"],
+                            term=term,
+                        )
+                    )
         for match in _KATAKANA_TOKEN_RE.finditer(text):
             token = match.group(0)
+            if _overlaps(match.start(), match.end(), protected_spans):
+                continue
             exact_terms = horse_candidates.get(token, [])
             exact_non_horse_terms = [
                 term for term in all_term_candidates.get(token, []) if term.term_type != TermType.HORSE
@@ -750,9 +810,8 @@ def _resolve_japanese_entities(
             strong = _strong_horse_context(
                 text, title if field_name == "title" else "", match.start(), match.end(), token
             ) or _score_heuristic_candidate(text, title, match.start(), match.end(), token) >= 3
-            if token in non_horse_words and not exact_terms and not aliases and not internal_terms and not _strong_horse_context(
-                text, title if field_name == "title" else "", match.start(), match.end(), token
-            ):
+            common_word_strong = _strong_japanese_common_word_horse_context(text, match.start(), match.end())
+            if token in non_horse_words and not common_word_strong:
                 continue
             if exact_terms:
                 term = exact_terms[0]
@@ -827,6 +886,25 @@ def _resolve_japanese_entities(
                     entity_type = "horse" if entry.term_type == TermType.HORSE else (
                         "person" if entry.term_type in _PERSON_TERM_TYPES else "term"
                     )
+                    if entry.term_type == TermType.HORSE and candidate in non_horse_words:
+                        strong = _strong_japanese_common_word_horse_context(text, match.start(), match.end())
+                        if not strong:
+                            entities.append(
+                                _make_entity(
+                                    "common_word",
+                                    match.group(0),
+                                    field_name,
+                                    match.start(),
+                                    match.end(),
+                                    canonical_text=entry.source_ja,
+                                    target_zh=entry.target_zh,
+                                    confidence=95,
+                                    evidence=["ordinary_japanese_context"],
+                                    conflict_flags=["horse_term_without_strong_context"],
+                                    term=entry,
+                                )
+                            )
+                            continue
                     entities.append(
                         _make_entity(
                             entity_type,
@@ -1198,12 +1276,16 @@ def extract_horse_tags(
 
 
 _KATAKANA_TOKEN_RE = re.compile(r"[ァ-ヴー]{3,}")
+_JAPANESE_KATAKANA_PERSON_RE = re.compile(
+    r"[ァ-ヴー]{3,}(?:[・\s　][ァ-ヴー]{3,})*\s*(?=騎手|ジョッキー|調教師)"
+)
 _HORSE_CONTEXT_RE = re.compile(r"(?:\d+着|\d+番人気|[牡牝セ]\d歳|父|母|産駒|騎手)$")
 _STRONG_HORSE_BEFORE_RE = re.compile(
     r"(?:^|[\s\n　])(?:\d+着|\d+番人気|\d+枠\d+番|\d+番|[牡牝セ]\d歳|父|母|母父|産駒|馬名|出走馬)[:：\s　]*$"
 )
 _STRONG_HORSE_AFTER_RE = re.compile(
-    r"^(?:[\s　]*(?:\(|（|騎手|ジョッキー|号|[牡牝セ]\d(?:歳)?)|(?:が|は|も)?(?:出走|勝利|優勝|重賞|参戦|遠征|帰厩|始動|引退|登録|騎乗|制覇|V))"
+    r"^(?:[\s　]*(?:\(|（|号|[牡牝セ]\d(?:歳)?)|(?:が|は|も)?(?:出走|勝利|優勝|重賞|参戦|遠征|"
+    r"帰厩|始動|引退|登録|騎乗|制覇|挑戦|挑む|狙う|目指す|向かう|V))"
 )
 _HORSE_STOPWORDS = {
     "コメント",
@@ -1220,12 +1302,34 @@ _HORSE_STOPWORDS = {
     "トップ",
     "ファン",
     "リベンジ",
+    "セール",
+    "セレクトセール",
+    "セッション",
+    "ステークス",
+    "ユーロ",
+    "豪快",
+    "期待",
 }
 _NON_HORSE_NOTE_MARKER = "non_horse_common_word"
 
 
 def _normalize_horse_name(value: str) -> str:
     return unicodedata.normalize("NFKC", value or "").strip()
+
+
+def _strong_japanese_common_word_horse_context(text: str, start: int, end: int) -> bool:
+    before = text[max(0, start - 16) : start]
+    after = text[end : min(len(text), end + 24)]
+    if _STRONG_HORSE_BEFORE_RE.search(before):
+        return True
+    if re.match(r"^[\s　]*[（(][牡牝セ]\d", after):
+        return True
+    return bool(
+        re.match(
+            r"^[\s　]*(?:が|は|も)?(?:出走|勝利|優勝|参戦|遠征|帰厩|始動|引退|登録|制覇)",
+            after,
+        )
+    )
 
 
 def non_horse_common_words() -> set[str]:
@@ -1307,6 +1411,8 @@ def _strong_horse_context(full_text: str, title: str, match_start: int, match_en
         return True
     if _STRONG_HORSE_AFTER_RE.search(after):
         return True
+    if re.match(r"^[\s　]*(?:が|は|も).{0,14}(?:出走|参戦|挑戦|挑む|狙う|目指す|向かう|勝利|優勝)", after):
+        return True
     if candidate in title:
         index = title.find(candidate)
         title_after = title[index + len(candidate) : index + len(candidate) + 16] if index >= 0 else ""
@@ -1318,8 +1424,6 @@ def _score_heuristic_candidate(full_text: str, title: str, match_start: int, mat
     before = full_text[max(0, match_start - 8) : match_start]
     after = full_text[match_end : min(len(full_text), match_end + 8)]
     score = 1
-    if candidate in title:
-        score += 3
     if _HORSE_CONTEXT_RE.search(before):
         score += 2
     if after.startswith(("(", "（")):

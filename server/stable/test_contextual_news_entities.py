@@ -259,6 +259,32 @@ class ContextualEntityResolutionTests(TestCase):
 
         self.assertEqual([item["target_zh"] for item in hits], ["多爵"])
 
+    def test_distinctive_horse_metaphor_keeps_dayjur_without_upgrading_ordinary_words(self):
+        self._term("Dayjur", "多爵")
+        self._term("the years", "好年月")
+
+        resolution = _resolve(
+            "A racing life remembered",
+            "The years roll on as the younger men channel their inner Dayjur across the field.",
+            SourceLanguage.ENGLISH,
+        )
+
+        self.assertEqual([(item.matched_text, item.target_zh) for item in _entities(resolution, "horse")], [("Dayjur", "多爵")])
+        self.assertTrue(any(item.matched_text == "The years" for item in _entities(resolution, "common_word")))
+
+    def test_organization_and_distance_number_are_not_strong_horse_context(self):
+        self._term("Nyra", "年华")
+        self._term("Miles", "道远千里")
+
+        resolution = _resolve(
+            "Distance change at Saratoga",
+            "NYRA ran two similar races before changing the distance from a mile to 1 1/16 miles for safety.",
+            SourceLanguage.ENGLISH,
+        )
+
+        self.assertEqual(_entities(resolution, "horse"), [])
+        self.assertEqual({item.matched_text.casefold() for item in _entities(resolution, "common_word")}, {"nyra", "miles"})
+
     def test_strong_racecard_and_result_context_can_upgrade_same_shape_horse(self):
         self._term("Contact", "常联系")
 
@@ -356,6 +382,58 @@ class JapaneseCompleteHorseNameTests(TestCase):
         resolution = _resolve("タイプを解説", "このタイプはコースに合う。", SourceLanguage.JAPANESE)
 
         self.assertFalse(any(item.matched_text == "タイプ" and item.entity_type == "unknown_horse" for item in resolution.entities))
+
+    def test_japanese_sale_words_and_expectation_are_not_horse_entities(self):
+        for source, target in {
+            "セレクトセール": "精选拍卖会",
+            "セール": "拍卖会",
+            "期待": "期待",
+            "豪快": "豪迈",
+        }.items():
+            self._internal_term(source, target)
+        ExternalHorseAlias.objects.create(
+            source="fixture",
+            source_language=SourceLanguage.JAPANESE,
+            racing_region=RacingRegion.JAPAN,
+            external_horse_id="SESSION-1",
+            name_ja="セッション",
+            normalized_name="セッション",
+            confidence=100,
+        )
+
+        resolution = _resolve(
+            "セレクトセール2026",
+            "今年のセレクトセール当歳セッションでは、豪快な走りへの期待が集まる。",
+            SourceLanguage.JAPANESE,
+        )
+
+        rejected = {"セレクトセール", "セール", "セッション", "豪快", "期待"}
+        self.assertFalse(
+            any(
+                item.matched_text in rejected and item.entity_type in {"horse", "unknown_horse"}
+                for item in resolution.entities
+            )
+        )
+        self.assertEqual(resolution.machine_horse_tags, [])
+
+    def test_katakana_name_before_jockey_role_is_a_person_not_a_horse(self):
+        self._internal_term("スミヨン", "苏铭伦")
+        self._internal_term("クリストフ", "基斯杜化")
+
+        resolution = _resolve(
+            "ジャンプラ賞結果",
+            "クリストフ・スミヨン騎手が勝利し、40万ユーロの賞金を獲得した。",
+            SourceLanguage.JAPANESE,
+        )
+
+        people = _entities(resolution, "person")
+        self.assertTrue(any(item.matched_text == "クリストフ・スミヨン" for item in people))
+        self.assertFalse(
+            any(item.matched_text in {"クリストフ", "スミヨン", "ユーロ"} for item in _entities(resolution, "horse"))
+        )
+        self.assertFalse(
+            any(item.matched_text in {"クリストフ", "スミヨン", "ユーロ"} for item in _entities(resolution, "unknown_horse"))
+        )
 
     def test_exact_katakana_fixed_phrase_is_resolved_as_term_without_special_note(self):
         term = TermEntry.objects.create(
