@@ -1,5 +1,15 @@
 # 部署运行手册
 
+## 2026-07-14 国际新闻正文边界修复部署与回归
+
+1. 最终上线提交为 `514af8a22aec18f01cf0193344ae3b7a45c4dbc4`，Git tree `b62a80cc34b2b65c47f6dd7d541c455d04a0ef5c`。使用 `git archive` 独立构建上下文，archive SHA-256 `507b95c9b3e3ab66b67e4813b6b4814d2e4bc3d6cb2aae6abc7ad357322ad039`；缓存/无缓存双构建的 `/app` manifest 一致，SHA-256 `2ada2d84788d048fcfd86d589762c2b159256d1a884581ac819a614aacf92aea`。
+2. 正式镜像 `umanewsbot:main-514af8a2-amd64-20260714-050736`，image ID `sha256:954673cc74049d4b882e492ec29b072aba01aeb1a3ae440cc85415209c8a2f8a`。切换前 worker active/reserved、外部导入 run/lock 均为空；候选镜像 Django check、迁移漂移和正文边界 27 项测试通过。
+3. 最终切换前备份 `.env.backup.pre-main-514af8a2-20260714-051127`；数据库 `backups/db/pre-main-514af8a2-20260714-051127.sql.gz` 为 `158552943` bytes，SHA-256 `9fc72efba29ee8d32c9709665809d259ca49e47a217c43626c99b084d99d4b0a`，`gzip -t` 通过。旧镜像回滚 tag 为 `umanewsbot:rollback-pre-514af8a2-20260714-051127`，image ID `sha256:5d7c09bd25fbb45999f2e8109995736f93f4d3011e37299033cae4773e4968c1`。
+4. 将候选 retag 为 `umanewsbot:prod` 后，依次执行 migrate、Django check、`makemigrations --check --dry-run` 和 collectstatic，再只重建 web/worker；四篇目标文及五篇抽检文回归完成、worker 清空后，以同一镜像重建 beat。最终 web/worker/beat 镜像 ID 和 revision 一致。
+5. 文章修复必须先运行 `python manage.py repair_article_content_boundaries --article-id <ID>...` 查看 SHA/长度/规则计数，再追加 `--commit`；随后用 `python manage.py translate_news --article-id <ID>... --sync --force` 重译。每批都要比对 `workflow_status`、`published_to_web_at` 和 `QQPushDelivery`，禁止重复公开或群发。
+6. 本次目标 `8086/8267/8316/8318` 均保持已发布和原发布时间，QQ delivery 为 0；随机样本 `8306/8311/8326/8331/8336` 最终保存正文与当前重解析逐字一致，状态 `ok`、无博彩/链接/编辑注/页脚噪声。已发布 `8326` 保持 `2026-07-13T17:47:04.152562Z`，QQ delivery 为 0。
+7. 回归通过内外 `/healthz/`、首页、后台登录、`/news/8086/`、`/news/8267/`、`/news/8316/`、`/news/8318/`、`/news/8326/` 和近 200 行 web/worker 日志；Celery active/reserved 为空。若回滚，先停 beat 并排空 worker，将 `umanewsbot:rollback-pre-514af8a2-20260714-051127` retag 为 `prod` 后重建 web/worker/beat；本次无迁移，只有确认数据损坏时才恢复数据库备份。
+
 ## 2026-07-14 batch004 250 场正式导入记录
 
 1. 运行镜像保持 `sha256:87c435cfc50344d0ca94f46e44d4bea97ab11361f88f7c708b6457331aee78ec`；本批没有 build、retag、recreate 或 restart，所有管理命令均使用显式 `docker run --rm`，禁止 Docker Compose。

@@ -1,5 +1,15 @@
 # 当前状态
 
+## 2026-07-14 国际新闻正文边界与博彩噪声修复已上线
+
+- OpenSpec change `tighten-international-article-content-boundaries` 已完成提案、Full 工程评审、测试优先实现和多轮零问题 review。最终本地验证为正文边界目标测试 `27` 项、完整 `stable` `1198` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、OpenSpec strict 和 diff check 均通过。
+- 国际来源正文现在只接受可信正文选择器；未命中时显式失败，不再回退整页。Sporting Life 会移除页面框架、社交组件、推荐区、责任博彩、博彩推广、独立跳转 URL 和 `BOOK NOW` 等 CTA，同时保留赔率及赛事标题、马主等专名中的博彩公司名称；TDN 会移除编辑注、纯跳转说明、完整赛果/活动链接、`Read Today's Paper` 和含 `click here` 的行动句。
+- 历史修复命令只接受显式文章 ID、默认 dry-run，commit 后记录清理规则与 `OperationLog`；同步强制重译不会改变公开状态、原发布时间或触发 QQ。翻译完整性门禁新增非空行覆盖判断，避免“日期表完整但中文自然缩短”被误判截断，同时仍拦截尾部条目缺失。
+- 最终生产 revision 为 `514af8a22aec18f01cf0193344ae3b7a45c4dbc4`，web/worker/beat 均运行镜像 `sha256:954673cc74049d4b882e492ec29b072aba01aeb1a3ae440cc85415209c8a2f8a`。源码 tree 为 `b62a80cc34b2b65c47f6dd7d541c455d04a0ef5c`，archive SHA-256 为 `507b95c9b3e3ab66b67e4813b6b4814d2e4bc3d6cb2aae6abc7ad357322ad039`，双构建 `/app` manifest SHA-256 为 `2ada2d84788d048fcfd86d589762c2b159256d1a884581ac819a614aacf92aea`。
+- 最终切换前备份为 `.env.backup.pre-main-514af8a2-20260714-051127` 和 `backups/db/pre-main-514af8a2-20260714-051127.sql.gz`；数据库备份 `158552943` bytes、SHA-256 `9fc72efba29ee8d32c9709665809d259ca49e47a217c43626c99b084d99d4b0a`，`gzip -t` 通过，旧镜像回滚 tag 为 `umanewsbot:rollback-pre-514af8a2-20260714-051127`。
+- 文章 `8086/8267/8316/8318` 均已按保存 HTML 离线修复并强制重译，继续保持 `published`、原 `published_to_web_at` 与 QQ delivery `0`；公开详情全部返回 `200`。生产随机抽检 `8306/8311/8326/8331/8336` 后又修复并重译存量旧解析结果，五篇保存正文与当前重解析逐字一致、解析状态均为 `ok`、噪声标记为 `0`；已发布样本 `8326` 保持原发布时间 `2026-07-13T17:47:04.152562Z` 且 QQ delivery `0`。
+- 部署后 migrate 无待应用迁移，Django check、内外 `/healthz/`、首页、后台登录和目标公开页面均为 `200`，web/worker 日志无异常。beat 已恢复，Celery active/reserved 均为空；生产写入窗口已交还历史 batch005 会话，本会话收到其完成回报前不再重启或重建生产容器。
+
 ## 2026-07-14 2016-2025 标准批次四号 250 场正式导入
 
 - batch004 五地区各 50 场、共 250 场已完成日期、直接详情来源、出马表和赛果正式导入；日期 artifact manifest 为 `30ff2c0fe14e4d6ce7d9ee7123d882d99838853e381627b552b9b0ac19dd2ea0`，详情来源 manifest 为 `cf5bfdc1cc8c6c82732d6485e1815f582a47d057010e4d1c0214ec3103fd46a8`，最终详情候选 SHA-256 为 `ddd1f8256cef0b17aabc33ea66f7a0638a2d6498c2d23342daff8835b10a5156`。

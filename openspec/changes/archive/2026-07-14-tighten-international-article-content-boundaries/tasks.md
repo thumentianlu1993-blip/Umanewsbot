@@ -25,13 +25,13 @@
 
 ## 4. 生产部署与历史修复
 
-- [ ] 4.1 (operations) 部署前核对生产 `HEAD`、容器、任务和健康状态，备份 `.env` 与 PostgreSQL 并验证备份可读
-- [ ] 4.2 (operations) 部署经 review 的 commit，运行 Django 检查、目标测试和 `/healthz/`，记录仓库预期与服务器运行态
-- [ ] 4.3 (operations) 对文章 `8086`、`8267`、`8316`、`8318` 先执行离线正文修复 dry-run，核对差异后 commit，再按显式 ID 同步强制重译和校验；保持既有公开状态且禁止重复发布和 QQ 分发
-- [ ] 4.4 (operations) 逐篇验收后台与公开详情，确认页面框架、编辑注、跳转 CTA 和不允许的博彩内容均已消失
-- [ ] 4.5 (operations) 随机抽取 Sporting Life、TDN 近期新文章回归正文首尾、博彩噪声和解析失败可见性
+- [x] 4.1 (operations) 部署前核对生产 `HEAD`、容器、任务和健康状态，备份 `.env` 与 PostgreSQL 并验证备份可读
+- [x] 4.2 (operations) 部署经 review 的 commit，运行 Django 检查、目标测试和 `/healthz/`，记录仓库预期与服务器运行态
+- [x] 4.3 (operations) 对文章 `8086`、`8267`、`8316`、`8318` 先执行离线正文修复 dry-run，核对差异后 commit，再按显式 ID 同步强制重译和校验；保持既有公开状态且禁止重复发布和 QQ 分发
+- [x] 4.4 (operations) 逐篇验收后台与公开详情，确认页面框架、编辑注、跳转 CTA 和不允许的博彩内容均已消失
+- [x] 4.5 (operations) 随机抽取 Sporting Life、TDN 近期新文章回归正文首尾、博彩噪声和解析失败可见性
 
 ## 5. 文档与收尾
 
-- [ ] 5.1 (operations) 更新 `docs/current_state.md`、`docs/project_status.md`、`docs/decisions.md` 和 `docs/deploy_runbook.md`，记录正文边界决策、生产 commit、备份、历史修复和回归证据
-- [ ] 5.2 (operations) 确认 OpenSpec 任务、规格和生产事实一致，为同步与归档准备最终验证证据
+- [x] 5.1 (operations) 更新 `docs/current_state.md`、`docs/project_status.md`、`docs/decisions.md` 和 `docs/deploy_runbook.md`，记录正文边界决策、生产 commit、备份、历史修复和回归证据
+- [x] 5.2 (operations) 确认 OpenSpec 任务、规格和生产事实一致，为同步与归档准备最终验证证据
