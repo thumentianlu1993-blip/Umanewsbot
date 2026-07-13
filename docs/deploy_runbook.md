@@ -1,5 +1,12 @@
 # 部署运行手册
 
+## 2026-07-14 已耗尽地区进度门禁交付要求
+
+- 交付前必须确认代码包含 `eligible_pending_by_region` 与 `progress_guard_regions`，并通过历史批次专项、完整 `stable`、Django check、迁移漂移和 OpenSpec strict。该修复无迁移、无新环境变量，不改变常驻历史开关。
+- 生成下一标准批次时仍必须传入所有既有 gap 的 `--exclude-selection-snapshot`。审核 summary 时同时核对：`remaining_pending_by_region` 仍包含待审排除项，`eligible_pending_by_region` 已扣除排除项，`progress_guard_regions` 只列本批后仍有可抓目标的地区。
+- 若两个或以上 `progress_guard_regions` 的 prospective accounted 差超过 100，命令必须失败；恰为 100 可继续。某地区抓空或仅剩显式排除项时可退出比较，但不得据此修改其 expectation/resolution 或从总账删除。
+- 当前代码尚未部署。必须从合入最新 main 的干净 tree 构建可复现 AMD64 镜像，由生产协调线程完成镜像切换和健康验收后，才可用于后续批次 artifact；不得从本地分支直接执行生产写入。
+
 ## 2026-07-13 后续标准批次既有选样排除门禁
 
 - 旧 batch003 与 batch002 重叠 4 个 pending gap，必须删除或隔离，禁止审批、抓取或写入。新批次只允许由包含本门禁的已提交 AMD64 镜像生成。

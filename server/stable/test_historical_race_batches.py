@@ -294,6 +294,148 @@ class HistoricalRaceBatchTests(TestCase):
             )
             self.assertTrue(all(target.event_id is None for target in regional))
 
+    def test_band_batch_progress_guard_still_blocks_101_between_unfinished_regions(self):
+        for region in (RacingRegion.JAPAN, RacingRegion.UNITED_KINGDOM):
+            series = self._series(region, "unfinished-lead")
+            for year in (2025, 2024):
+                self._target(
+                    series,
+                    year,
+                    resolution=HistoricalRaceResolutionStatus.PENDING,
+                    with_event=False,
+                )
+
+        with patch(
+            "stable.services.historical_race_batches.accounted_progress_by_region",
+            return_value={RacingRegion.JAPAN: 101, RacingRegion.UNITED_KINGDOM: 0},
+        ), self.assertRaisesMessage(InventoryValidationError, "lead exceeds 100"):
+            select_historical_band_batch_targets(
+                year_start=2016,
+                year_end=2025,
+                inventory_manifest_sha256="a" * 64,
+                region_limit=1,
+            )
+
+    def test_band_batch_progress_guard_allows_exactly_100_between_unfinished_regions(self):
+        for region in (RacingRegion.JAPAN, RacingRegion.UNITED_KINGDOM):
+            series = self._series(region, "unfinished-boundary")
+            for year in (2025, 2024):
+                self._target(
+                    series,
+                    year,
+                    resolution=HistoricalRaceResolutionStatus.PENDING,
+                    with_event=False,
+                )
+
+        with patch(
+            "stable.services.historical_race_batches.accounted_progress_by_region",
+            return_value={RacingRegion.JAPAN: 100, RacingRegion.UNITED_KINGDOM: 0},
+        ):
+            targets = select_historical_band_batch_targets(
+                year_start=2016,
+                year_end=2025,
+                inventory_manifest_sha256="a" * 64,
+                region_limit=1,
+            )
+
+        self.assertEqual(len(targets), 2)
+
+    def test_band_batch_progress_guard_ignores_regions_exhausted_after_selection(self):
+        japan = self._target(
+            self._series(RacingRegion.JAPAN, "exhausted"),
+            2025,
+            resolution=HistoricalRaceResolutionStatus.PENDING,
+            with_event=False,
+        )
+        uk_series = self._series(RacingRegion.UNITED_KINGDOM, "still-pending")
+        for year in (2025, 2024):
+            self._target(
+                uk_series,
+                year,
+                resolution=HistoricalRaceResolutionStatus.PENDING,
+                with_event=False,
+            )
+
+        with patch(
+            "stable.services.historical_race_batches.accounted_progress_by_region",
+            return_value={RacingRegion.JAPAN: 201, RacingRegion.UNITED_KINGDOM: 101},
+        ):
+            targets = select_historical_band_batch_targets(
+                year_start=2016,
+                year_end=2025,
+                inventory_manifest_sha256="a" * 64,
+                region_limit=1,
+            )
+
+        self.assertIn(japan, targets)
+        self.assertEqual(len(targets), 2)
+
+    def test_band_batch_progress_guard_treats_excluded_only_region_as_exhausted(self):
+        excluded = self._target(
+            self._series(RacingRegion.FRANCE, "excluded-only"),
+            2025,
+            resolution=HistoricalRaceResolutionStatus.PENDING,
+            with_event=False,
+        )
+        japan_series = self._series(RacingRegion.JAPAN, "continues-after-exclusion")
+        for year in (2025, 2024):
+            self._target(
+                japan_series,
+                year,
+                resolution=HistoricalRaceResolutionStatus.PENDING,
+                with_event=False,
+            )
+
+        with patch(
+            "stable.services.historical_race_batches.accounted_progress_by_region",
+            return_value={RacingRegion.JAPAN: 201, RacingRegion.FRANCE: 0},
+        ):
+            targets = select_historical_band_batch_targets(
+                year_start=2016,
+                year_end=2025,
+                inventory_manifest_sha256="a" * 64,
+                region_limit=1,
+                excluded_target_ids=[excluded.pk],
+            )
+
+        self.assertEqual(len(targets), 1)
+        self.assertEqual(targets[0].country_region, RacingRegion.JAPAN)
+
+    def test_band_batch_artifact_keeps_unselected_pending_region_in_progress_guard(self):
+        japan_series = self._series(RacingRegion.JAPAN, "partial-selection")
+        selected = self._target(
+            japan_series,
+            2025,
+            resolution=HistoricalRaceResolutionStatus.PENDING,
+            with_event=False,
+        )
+        self._target(
+            japan_series,
+            2024,
+            resolution=HistoricalRaceResolutionStatus.PENDING,
+            with_event=False,
+        )
+        self._target(
+            self._series(RacingRegion.FRANCE, "unselected-pending"),
+            2025,
+            resolution=HistoricalRaceResolutionStatus.PENDING,
+            with_event=False,
+        )
+
+        with patch(
+            "stable.services.historical_race_batches.accounted_progress_by_region",
+            return_value={RacingRegion.JAPAN: 101, RacingRegion.FRANCE: 0},
+        ), TemporaryDirectory() as tmp, self.assertRaisesMessage(
+            InventoryValidationError, "lead exceeds 100"
+        ):
+            write_band_batch_artifact(
+                [selected],
+                output_dir=Path(tmp) / "partial",
+                inventory_manifest_sha256="a" * 64,
+                year_start=2016,
+                year_end=2025,
+            )
+
     def test_band_batch_command_writes_reviewable_immutable_artifact(self):
         for region in (
             RacingRegion.JAPAN,
@@ -402,7 +544,9 @@ class HistoricalRaceBatchTests(TestCase):
             self.assertEqual(summary["excluded_target_count"], 1)
             self.assertEqual(summary["excluded_pending_by_region"], {RacingRegion.JAPAN: 1})
             self.assertEqual(summary["available_pending_by_region"][RacingRegion.JAPAN], 2)
+            self.assertEqual(summary["eligible_pending_by_region"][RacingRegion.JAPAN], 1)
             self.assertEqual(summary["remaining_pending_by_region"][RacingRegion.JAPAN], 1)
+            self.assertNotIn(RacingRegion.JAPAN, summary["progress_guard_regions"])
             self.assertEqual(
                 manifest["artifacts"]["excluded_selection_snapshot_001"]["path"],
                 "exclusions/selection-001.json",

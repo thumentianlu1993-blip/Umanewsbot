@@ -1,5 +1,12 @@
 # 当前状态
 
+## 2026-07-14 已耗尽地区不再冻结历史标准批次
+
+- 既有地区进度护栏会把五地区永久放在同一比较集合；当中国香港等低容量地区已经没有可选目标时，仍会以其较低 accounted 数阻止英国、美国等高容量地区继续推进，与 1998–2026 正式总账全量完成目标冲突。
+- 标准批次现在只比较“本批选择后仍有未排除可选 pending due 目标”的地区。地区抓空后退出领先比较；仍未完成地区之间继续严格执行 100 个标准目标上限，101 拒绝、100 放行。
+- selection snapshot 显式排除的待审目标继续保留在 `available/remaining pending`、总账分母和缺口账本中，但不把只有待审排除项的地区视为仍可抓。artifact summary 新增 `eligible_pending_by_region` 和 `progress_guard_regions`，明确记录放行依据。
+- OpenSpec 增补已完成 Full 工程评审；新增回归先在旧实现上失败，修复后历史批次专项 `66` 项和完整 `stable 1171` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、OpenSpec strict、diff check 和最终代码 review 均通过。代码当前仅在分支 `codex/fix-historical-exhausted-region-progress`，尚未部署；生产历史写入/网络和公开开关不得因此开启。
+
 ## 2026-07-13 后续标准批次重复选样门禁已实现
 
 - batch002 写后生成旧 batch003 时，4 个仍为 pending 的已交代 gap 再次进入选样：英国 Classic Handicap Chase、Dick Poole Fillies Stakes，以及美国 Brooklyn、Cougar II。该工件与 batch002 重叠 4 条，视为无效，不得审批或进入抓取。

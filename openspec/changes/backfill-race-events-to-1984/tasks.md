@@ -77,6 +77,7 @@
 - [x] 5.22 (integration) 实现权威基础字段批次验证与整批原子apply服务，绑定target/inventory/字段artifact身份并限制可更新字段和来源证据
 - [x] 5.23 (application) 新增权威基础字段JSONL管理命令，强制expected SHA、dry-run逐字段diff、人工锁展示和apply前全批身份复核
 - [x] 5.24 (integration) 为年代带标准批次增加既有selection snapshot排除输入，在地区limit前跳过已交代gap，并复制/哈希绑定排除证据且保持总账分母不变
+- [x] 5.25 (integration) 将地区进度护栏限定为本批后仍有未排除可选pending due目标的地区，已耗尽地区退出比较且待审排除目标继续保留总账分母
 
 ## 6. 公开页面、搜索与索引
 
@@ -112,6 +113,7 @@
 - [x] 7.22 (integration) 补JRA年度表对齐、美国同名场地区分/移师、Equibase Yearbook出马/退赛/赛果和新来源审批测试
 - [x] 7.23 (application) 补权威字段批次单位保留、未知字段/证据缺失、SHA漂移、人工锁、整批回滚和旧详情SHA失效回归测试
 - [x] 7.24 (integration) 补标准批次排除snapshot的跨inventory、SHA漂移、重复target、limit前补位、artifact复制和remaining分母测试
+- [x] 7.25 (integration) 补未完成地区101/100领先边界、已耗尽地区退出、仅剩排除目标和单一未完成地区测试
 
 ## 8. 生产总账与第一批验收
 

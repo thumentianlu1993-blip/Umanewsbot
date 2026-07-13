@@ -470,6 +470,7 @@ def _validate_region_limit_and_progress(
     *,
     approved_region_limit: int,
     current_progress: dict[str, int],
+    progress_regions: Iterable[str] | None = None,
 ) -> None:
     if approved_region_limit <= 0 or approved_region_limit > STANDARD_REGION_BATCH_LIMIT:
         raise InventoryValidationError(
@@ -481,10 +482,55 @@ def _validate_region_limit_and_progress(
     progress = dict(current_progress)
     for region, count in counts.items():
         progress[region] = progress.get(region, 0) + count
-    all_regions = [region for region in RacingRegion.values if region != RacingRegion.OTHER]
-    values = [progress.get(region, 0) for region in all_regions]
+    compared_regions = (
+        [region for region in RacingRegion.values if region != RacingRegion.OTHER]
+        if progress_regions is None
+        else sorted(set(progress_regions))
+    )
+    values = [progress.get(region, 0) for region in compared_regions]
     if values and max(values) - min(values) > MAX_REGION_PROGRESS_LEAD:
         raise InventoryValidationError("historical region progress lead exceeds 100 standard targets")
+
+
+def _eligible_pending_band_targets(
+    *,
+    year_start: int,
+    year_end: int,
+    inventory_manifest_sha256: str,
+    excluded_target_ids: Iterable[int] | None = None,
+):
+    queryset = HistoricalRaceEventTarget.objects.filter(
+        year__gte=year_start,
+        year__lte=year_end,
+        artifact_sha256=inventory_manifest_sha256,
+        race_series__review_status=RaceSeriesReviewStatus.APPROVED,
+        expectation_status__in=[
+            HistoricalRaceExpectationStatus.HELD,
+            HistoricalRaceExpectationStatus.CANCELLED,
+        ],
+        resolution_status=HistoricalRaceResolutionStatus.PENDING,
+        event__isnull=True,
+    )
+    excluded_ids = {int(target_id) for target_id in excluded_target_ids or []}
+    return queryset.exclude(pk__in=excluded_ids) if excluded_ids else queryset
+
+
+def _counts_by_region(queryset) -> dict[str, int]:
+    return {
+        row["country_region"]: row["count"]
+        for row in queryset.values("country_region").annotate(count=Count("id"))
+    }
+
+
+def _unfinished_regions_after_selection(
+    eligible_counts: dict[str, int],
+    selected_counts: Counter,
+) -> set[str]:
+    return {
+        region
+        for region, eligible_count in eligible_counts.items()
+        if eligible_count - selected_counts.get(region, 0) > 0
+    }
 
 
 def select_historical_band_batch_targets(
@@ -504,32 +550,27 @@ def select_historical_band_batch_targets(
             f"historical region limit must be between 1 and {STANDARD_REGION_BATCH_LIMIT}"
         )
     excluded_ids = {int(target_id) for target_id in excluded_target_ids or []}
+    eligible = _eligible_pending_band_targets(
+        year_start=year_start,
+        year_end=year_end,
+        inventory_manifest_sha256=inventory_manifest_sha256,
+        excluded_target_ids=excluded_ids,
+    )
+    eligible_counts = _counts_by_region(eligible)
     selected: list[HistoricalRaceEventTarget] = []
     for region in sorted(region for region in RacingRegion.values if region != RacingRegion.OTHER):
         queryset = (
-            HistoricalRaceEventTarget.objects.select_related("race_series", "event")
-            .filter(
-                country_region=region,
-                year__gte=year_start,
-                year__lte=year_end,
-                artifact_sha256=inventory_manifest_sha256,
-                race_series__review_status=RaceSeriesReviewStatus.APPROVED,
-                expectation_status__in=[
-                    HistoricalRaceExpectationStatus.HELD,
-                    HistoricalRaceExpectationStatus.CANCELLED,
-                ],
-                resolution_status=HistoricalRaceResolutionStatus.PENDING,
-                event__isnull=True,
-            )
+            eligible.select_related("race_series", "event")
+            .filter(country_region=region)
             .order_by("-year", "race_series__key", "id")
         )
-        if excluded_ids:
-            queryset = queryset.exclude(pk__in=excluded_ids)
         selected.extend(list(queryset[:region_limit]))
+    selected_counts = Counter(target.country_region for target in selected)
     _validate_region_limit_and_progress(
-        Counter(target.country_region for target in selected),
+        selected_counts,
         approved_region_limit=region_limit,
         current_progress=accounted_progress_by_region(year_start=year_start, year_end=year_end),
+        progress_regions=_unfinished_regions_after_selection(eligible_counts, selected_counts),
     )
     return selected
 
@@ -569,10 +610,20 @@ def write_band_batch_artifact(
             raise InventoryValidationError(f"target is not due for detail crawl: {target.pk}")
         if target.resolution_status != HistoricalRaceResolutionStatus.PENDING or target.event_id is not None:
             raise InventoryValidationError(f"target is not pending and unmaterialized: {target.pk}")
+    eligible = _eligible_pending_band_targets(
+        year_start=year_start,
+        year_end=year_end,
+        inventory_manifest_sha256=inventory_manifest_sha256,
+        excluded_target_ids=excluded_ids,
+    )
+    eligible_counts = _counts_by_region(eligible)
+    selected_counts = Counter(target.country_region for target in rows)
+    progress_guard_regions = _unfinished_regions_after_selection(eligible_counts, selected_counts)
     _validate_region_limit_and_progress(
-        Counter(target.country_region for target in rows),
+        selected_counts,
         approved_region_limit=STANDARD_REGION_BATCH_LIMIT,
         current_progress=accounted_progress_by_region(year_start=year_start, year_end=year_end),
+        progress_regions=progress_guard_regions,
     )
     root = Path(output_dir)
     try:
@@ -651,7 +702,6 @@ def write_band_batch_artifact(
         row["country_region"]: row["count"]
         for row in pending.filter(pk__in=excluded_ids).values("country_region").annotate(count=Count("id"))
     }
-    selected_counts = Counter(target.country_region for target in rows)
     summary = {
         "schema_version": "1.0",
         "year_band": {"start": year_start, "end": year_end},
@@ -660,6 +710,7 @@ def write_band_batch_artifact(
         "snapshot_sha256": snapshot["snapshot_sha256"],
         "selected_by_region": dict(sorted(selected_counts.items())),
         "available_pending_by_region": dict(sorted(available_counts.items())),
+        "eligible_pending_by_region": dict(sorted(eligible_counts.items())),
         "excluded_snapshot_count": len(exclusions),
         "excluded_target_count": len(excluded_ids),
         "excluded_pending_by_region": dict(sorted(excluded_pending_counts.items())),
@@ -667,6 +718,7 @@ def write_band_batch_artifact(
             region: available_counts.get(region, 0) - selected_counts.get(region, 0)
             for region in sorted(region for region in RacingRegion.values if region != RacingRegion.OTHER)
         },
+        "progress_guard_regions": sorted(progress_guard_regions),
         "accounted_by_region": accounted_progress_by_region(year_start=year_start, year_end=year_end),
     }
     summary_path = root / "summary.json"

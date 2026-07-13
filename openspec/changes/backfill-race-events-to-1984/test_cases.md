@@ -202,6 +202,10 @@
 | TC-BATCH-016 | 空批次、重复target、年代外或inventory SHA漂移 | 生成artifact | fail closed，不生成可批准清单 | A/S |
 | TC-BATCH-017 | 上批gap仍pending且提供上批selection snapshot | 生成下一标准批次 | limit前排除旧target并补入新target；排除snapshot复制进manifest，gap仍留remaining分母 | A/S |
 | TC-BATCH-018 | 排除snapshot跨inventory、内部SHA漂移、target重复或与新selection相交 | 生成artifact | fail closed，不生成可批准清单且不改变target状态 | A/S |
+| TC-BATCH-019 | 低容量地区在本批后无未排除可选 pending due 目标 | 生成后续批次 | 该地区退出领先比较，其他未完成地区继续推进 | A |
+| TC-BATCH-020 | 某地区仅剩 selection snapshot 显式排除的待审目标 | 生成后续批次 | 不冻结其他地区；待审目标仍保留总账分母和 remaining pending | A |
+| TC-BATCH-021 | 只剩一个地区有未排除可选 pending due 目标 | 生成后续批次 | 不因缺少比较对象而拒绝 | A |
+| TC-BATCH-022 | 未入选本批的地区仍有可选 pending due 目标且领先差为 101 | 生成下一批 | 该地区仍参与比较并拒绝批次 | A |
 
 ## 10. 详情导入、冠军和原子写入
 
