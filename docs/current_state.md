@@ -1,5 +1,14 @@
 # 当前状态
 
+## 2026-07-13 2016–2025 标准批次二号 246 场正式导入
+
+- 生产已使用可复现主线镜像 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0` 完成第二标准批次。日期 artifact manifest SHA-256 为 `9ed3b7138012b4ce1732cf1f071d13cb16678a97983ea63d94329fe84c902e68`，批准 246 场、保留 4 个显式 gap；日期 apply 246/246 成功，目标由 pending 变为 ready，并生成 246 个 finished/draft 年度赛事。
+- 详情来源 artifact manifest SHA-256 为 `ae9d20aa62062e62a0bc8561e69b2cd06493b2d3eab50e175a82913d077b44d9`，来源分布为 JRA 50、Equibase 48、HKJC 50、Sporting Life 48、ZEturf 50。只读 check 246/246 通过，来源 apply 246/246 成功；来源写入后重新导出 event input 并生成最终详情候选，候选 SHA-256 为 `735ec0dacafd9c388adb678b93ab402e45f991cb0e143c89a6fe067e606fc459`，246 scopes / 0 gaps，生产 dry-run 全部通过。
+- 三道写前备份均通过 `gzip -t`：日期 apply 前 `pre-band-2016-2025-batch002-date-apply-20260713_164248.sql.gz` 为 `150494499` bytes、SHA-256 `379f86de4408ff0a66dbdee200514a56a53a10404b579c49a3fb13462541b7c7`；详情来源 apply 前 `pre-band-2016-2025-batch002-detail-apply-20260713_165007.sql.gz` 为 `124141632` bytes、SHA-256 `0b0423aee6ffbe4094a71c3ff533e47538f1ccb8b3a918aa3d07863b76809540`；最终详情导入前 `pre-band-2016-2025-batch002-candidate-import-20260713_165304.sql.gz` 为 `124218014` bytes、SHA-256 `a22967b6e0574faab9ae865d908f69474234dfff862092025471cf7eff660545`。
+- 正式详情导入 246/246 成功，新增日本 `730 runners / 722 results`、美国 `468 / 406`、香港 `463 / 453`、英国 `464 / 417`、法国 `424 / 328`，合计 `2549 runners / 2326 results`。写后逐场核对 candidate 数量、马号唯一性、名次唯一性、applied candidate 来源名/URL、target module 状态和 draft 可见性，error 0。
+- 生产历史累计为 `541 imported / 30376 pending`、`5723 runners / 5143 results`，materialized events 为 541，published 为 0。本批 246 场仍全部 draft；4 个 gap 继续保持 pending，未把 `ABANDONED` 或 `not run` 自动改成产品总账结论。
+- 常驻 `.env` 和运行中 web 均保持 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`；web/worker/beat 镜像未变化，无遗留 one-off 容器，内外 HTTP healthz 正常，近 30 分钟日志错误扫描为空。历史前台展示继续关闭。
+
 ## 2026-07-13 2016–2025 标准批次二号详情证据门禁
 
 - 第二标准批次 250 个目标已完成五地区详情来源发现。当前可直接进入日期工件的证据为 246 场：日本 50、美国 48、香港 50、英国 48、法国 50；246 个来源 URL 全局唯一，来源缓存逐文件大小和 SHA-256 可核验。详情解析合计日本/美国 `1198 runners / 1128 results`、香港 `463 / 453`、英国 `464 / 417`、法国 `424 / 328`。

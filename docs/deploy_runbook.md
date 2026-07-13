@@ -1,5 +1,15 @@
 # 部署运行手册
 
+## 2026-07-13 2016–2025 第二标准批次 246 场日期与详情导入
+
+- 运行镜像固定为 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`；revision `d8b65fe7d63e913cf826d02a74cdebaec60351ce`，Git tree `fda256535ae3b9f435cf8c7b069ff26d04503d99`。本批不得重建或重启生产容器。
+- 日期 artifact：manifest `9ed3b713...02e68`，批准 246、gap 4。写前备份 `pre-band-2016-2025-batch002-date-apply-20260713_164248.sql.gz`，`150494499` bytes，SHA-256 `379f86de...b7c7`；apply 后 246 target 为 ready、246 event 为 finished/draft、published 0。
+- 详情来源 artifact：manifest `ae9d20aa...b44d9`，check/apply 均为 246。写前备份 `pre-band-2016-2025-batch002-detail-apply-20260713_165007.sql.gz`，`124141632` bytes，SHA-256 `0b0423ae...9540`。来源 apply 后必须重新导出 event input，不得继续使用旧 target SHA 的导入包。
+- 最终详情候选：`detail-package-v3/packaged_candidates.jsonl`，SHA-256 `735ec0dacafd9c388adb678b93ab402e45f991cb0e143c89a6fe067e606fc459`，246 scopes / 0 gaps，dry-run 通过。最终写前备份 `pre-band-2016-2025-batch002-candidate-import-20260713_165304.sql.gz`，`124218014` bytes，SHA-256 `a22967b6...0545`；apply 246/246 成功。
+- 写后必须运行逐 target 验证脚本，核对候选与实际 runners/results、马号、名次、applied candidate 来源名/URL、module 状态和 visibility。已验收各地区为法国 `50/424/328`、香港 `50/463/453`、日本 `50/730/722`、英国 `48/464/417`、美国 `48/468/406`，error 0；历史累计 `541 imported / 5723 runners / 5143 results / published 0`。
+- 一次性管理容器可以临时设置 `HISTORICAL_RACE_BACKFILL_ENABLED=true`；常驻 `.env`、web/worker/beat 必须继续为写入 false、网络 false。本批验收后无 one-off 容器，三应用容器镜像不变，HTTP 内外 healthz 正常，近 30 分钟错误扫描为空。
+- 回滚按失败层级选择：日期或 materialize 错误用第一份备份；来源证据错误用第二份备份；来源正确但 runners/results 错误用第三份备份。恢复前先停历史 one-off，保留 artifact、source cache 和日志；恢复后重跑 target 状态、逐场详情、published=0、常驻开关和 HTTP healthz 验收。
+
 ## 2026-07-13 法港英 150 场字段校正与详情导入
 
 - 字段 artifact：manifest `d6f6e29a...a2857`，候选 `59acc224...f50ac`；dry-run 为 150 scopes / 164 fields / 0 manual skip。写前备份 `pre-fr-hk-uk-field-corrections-20260713_134732.sql.gz`，`148521701` bytes，SHA-256 `30dc58d2...c94ce`，gzip 通过。

@@ -1,5 +1,12 @@
 # 关键决策
 
+## 2026-07-13：详情来源审批与最终数据导入必须使用不同形态的候选
+
+- `manage_historical_race_detail_sources` 必须读取仍带 `year / slug` 的原始解析候选，用于按年度赛事建立来源审批 artifact；不得把只含 target 绑定信息的最终导入包反向当作来源发现输入。
+- 来源 artifact apply 会把批准证据写入 target 与 RaceEvent，并改变 target SHA。因此来源 apply 后必须重新导出 event input，再运行 `package_historical_race_detail_candidates.py` 生成新的最终导入包。
+- `import_historical_race_event_candidates` 只接受这个写后重打包文件，并同时锁定文件 SHA-256、target SHA、inventory artifact SHA、来源 URL 和 source-cache identity。任何来源审批后的旧包都应因 target SHA 漂移而拒绝。
+- 该分层只改变技术证据链，不改变产品语义：`ABANDONED`、`not run`、`cancelled`、`not_held` 仍按各自审核规则处理，不能因详情来源存在就自动修改总账。
+
 ## 2026-07-13：年度来源的 `not run` 只能生成审核证据，不自动改总账
 
 - TOBA 等权威年度表若将某赛事明确标为 `not run`，来源发现工具应输出结构化 `source_reports_not_run`，保留来源赛事名、场地和状态。
