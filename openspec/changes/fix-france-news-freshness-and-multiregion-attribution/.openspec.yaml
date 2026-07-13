@@ -50,3 +50,11 @@ journal:
     tasks_completed: 59
     tasks_total: 68
     note: "生产已应用 stable.0029 并完成容器、HTTP 页面、日志、运行开关和法国三来源只读 probe 验收；归属、相关地区查询、翻译自动重试及邮件通知均保持关闭，gold set 与后续灰度仍待完成。"
+  - event: production-runtime-recovered-combined-image
+    date: "2026-07-13T10:18:00+08:00"
+    session: 1
+    branch: codex/fix-english-term-context-gates-release
+    image: sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4
+    tasks_completed: 59
+    tasks_total: 68
+    note: "验收发现历史任务旧底座镜像覆盖并导致 0029 schema 不兼容；已先回滚恢复新闻写入，再切换合入 main 的历史+新闻组合镜像，真实抓取、五地区页面、迁移、开关与日志通过，gold/灰度任务仍未完成。"

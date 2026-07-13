@@ -4105,3 +4105,11 @@ docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
 - 证据包必须为 150 条 provider、150 条 succeeded ledger、150 个唯一 URL 和 150 个逐文件大小/SHA 匹配的缓存身份；英国 Aintree Bowl/Hurdle 应分别为 race ID `850965/850966`。任一详情 URL 被不同 target 复用时立即停止。
 - 整个过程保持 `RACE_EVENT_HISTORICAL_PUBLIC_ENABLED=false`；仅在单条命令需要时临时打开历史回填写入门禁，并在命令结束后恢复。生产 web/worker/beat 的常驻开关不得因一次性命令改变。
 - 本批日期写入已使用 artifact manifest `e5ede9033485f59faac8d27c5371bd4749c17235119f4eea173cca07cc389b03` 完成 150 个 target；写前备份为 `backups/db/pre-band-2016-2025-fr-hk-uk-date-apply-20260713_122142.sql.gz`，大小 `121,994,037` bytes，SHA-256 `dae5869d58eb7e854d359f333e979b52647da75db667db930ff53d1cce5f521f`。详情写入因优先执行 Git 固化而暂停，不得越过新的源码提交/合并/可复现镜像门禁继续。
+
+### 运行镜像被旧底座覆盖后的恢复记录
+
+1. 症状：服务器 HEAD 为最新，但容器缺少 `0029` 和新增 settings；数据库已有 `0029`，新文章插入报 `attribution_rule_version` 非空约束错误。先检查 `docker inspect <web> --format '{{.Image}}'`、镜像内迁移文件和 `showmigrations`，不要仅执行 `git rev-parse HEAD`。
+2. 紧急恢复：保留故障镜像 tag，确认 active/reserved/one-off 为空后，把已验证的 `pre-irishracing-20260713` 临时切回 `prod`，只重建 `web/worker/beat`，不重启数据库。恢复后用真实来源抓取验证新增文章和新字段。
+3. 最终镜像：`umanewsbot:merged-main-historical-amd64-20260713-1008`，image ID `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`；回滚 tag `pre-merged-main-historical-20260713-1015`。
+4. 切换流程：先停止 beat，等待 worker active/reserved 和 one-off 清空；运行 `migrate --noinput` 确认无待迁移，再强制重建 `web/worker/beat`。完成后验证 image ID、`0027-0029`、64 个模型、归属/重试安全开关、历史管理命令、五地区页、后台、healthz 和最近日志。
+5. 数据验收：恢复后的 netkeiba 抓取新增 3、重复 117；恢复阶段总计新增 9 篇且全部翻译完成，新文章 `attribution_rule_version` NULL 数为 0。任何后续镜像若重新出现 57 models 或不识别 `0029`，立即按故障镜像处理并回滚。

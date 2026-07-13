@@ -1142,3 +1142,11 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - Aintree Bowl 现绑定 Sporting Life race ID `850965`，Aintree Hurdle 保持 `850966`；详情 URL 去重以移除 fragment 后的规范 URL 为准。生产只读 artifact 首次构建另发现 47 场英国距离证据缺显式单位或为紧凑分数写法，现已按 `<5 mile / >=5 furlong` 和 mile/furlong/yard 规则规范化，并修复 `71/2f` 的距离消歧误读。专项 57 项及完整 `stable 1128` 项通过，Django check、迁移漂移、OpenSpec strict 和 diff 检查通过，最终复审无剩余可修复问题。
 - 日期 artifact v2 已批准并受控提交，manifest SHA-256 为 `e5ede9033485f59faac8d27c5371bd4749c17235119f4eea173cca07cc389b03`；写入前备份 `pre-band-2016-2025-fr-hk-uk-date-apply-20260713_122142.sql.gz` 为 `121,994,037` bytes，SHA-256 `dae5869d58eb7e854d359f333e979b52647da75db667db930ff53d1cce5f521f`，`gzip -t` 通过。
 - 150 个目标现均为 `ready` 并 materialize 为 150 个 draft `RaceEvent`；生产历史累计为 `145 imported + 150 ready`、2026 年前赛事 `295`，详情仍为 `1,640 runners / 1,523 results`，证明本次只写日期与赛事壳，未提前导入详情。用户要求先完成源码 Git 固化，后续详情打包、coverage、dry-run、第二次备份和正式导入现已暂停。历史公开展示开关继续关闭。
+
+## 2026-07-13 线上验收发现旧底座镜像覆盖并完成组合镜像恢复
+
+- `10:00` 左右验收发现生产仓库 HEAD 虽为 `1a70b22e`，运行镜像却已被历史赛事任务从旧代码底座重建为 `deadheat-fix-amd64-20260713`。该镜像仅加载 57 个模型，不认识 `stable.0027-0029` 和新增设置；数据库已经应用 `0029`，因此 netkeiba 新稿插入触发 `attribution_rule_version` 非空约束失败。问题属于应用镜像与数据库 schema 不匹配，不是来源失效。
+- 已在 Celery/one-off 为空时短时切回 `pre-irishracing-20260713`，恢复后 netkeiba 完整抓取成功：新增 `3`、重复 `117`；本次恢复后共新增 9 篇，9 篇均完成翻译，`attribution_rule_version IS NULL=0`。由验收同步探测中断产生的 `CrawlJob 16266` 已显式标记失败并注明原因，未遗留伪运行状态。
+- 历史赛事 worktree 已合入 `origin/main@1a70b22e`，组合源码通过专项 `323` 项、完整 `stable 1093` 项（1 skip）、Django/迁移/OpenSpec/diff 检查。生产最终切换到 AMD64 组合镜像 `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`，镜像 tag 为 `umanewsbot:merged-main-historical-amd64-20260713-1008`；内容 commit 标签 `0068715fceb0f629b5bfcb0c0b760427dfc6edc5`，构建上下文树 SHA256 `e51e6992e57649445aeff2aa7f2a0c925f3c5c742771fceac13053459beceec6`。
+- 最终运行验收：`web/worker/beat` 使用上述同一镜像，`stable.0029` 已应用，Django check 通过；归属、相关地区查询、翻译自动重试与失败邮件继续关闭。五地区页、后台登录入口和 HTTP `/healthz/` 全部返回 200，最近日志无 traceback/error/not-null constraint。
+- 组合镜像包含历史任务尚未全部提交到 `main` 的实现，虽然已绑定内容 commit、上下文树 SHA 和回滚镜像，但仍不是最终可复现发布。历史任务完成当前批次后必须提交并推送全部生产代码；后续生产重建必须先合入最新 `origin/main`，禁止从旧分支或旧上下文直接覆盖 `umanewsbot:prod`。
