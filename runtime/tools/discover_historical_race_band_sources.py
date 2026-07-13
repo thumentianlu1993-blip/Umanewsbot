@@ -91,14 +91,20 @@ FRENCH_MONTHS = {
 BHA_COURSES = {
     "AINTREE": "Aintree",
     "ASCOT": "Ascot",
+    "CHESTER": "Chester",
     "CHELTENHAM": "Cheltenham",
+    "DONCASTER": "Doncaster",
     "EPSOMDOWNS": "Epsom Downs",
     "GOODWOOD": "Goodwood",
     "HAYDOCKPARK": "Haydock Park",
     "KEMPTONPARK": "Kempton Park",
+    "LINGFIELDPARK": "Lingfield",
     "NEWBURY": "Newbury",
     "NEWMARKET": "Newmarket",
+    "NEWCASTLE": "Newcastle",
+    "SALISBURY": "Salisbury",
     "SANDOWNPARK": "Sandown Park",
+    "WARWICK": "Warwick",
     "WETHERBY": "Wetherby",
     "WINCANTON": "Wincanton",
     "YORK": "York",
@@ -179,6 +185,10 @@ CALENDAR_SERIES_ALIASES = {
     "united-kingdom-ascot-hurdle": (
         "Howden Ascot Hurdle",
     ),
+    "united-kingdom-classic-novices-hurdle": (
+        "SSS Super Alloys Novices Hurdle",
+        "Classic Novices Hurdle",
+    ),
     "united-kingdom-aintree-mares-nhf": (
         "Goffs Nickel Coin Mares Standard Open NH Flat Race",
         "Nickel Coin Mares NHF Race",
@@ -218,6 +228,7 @@ CALENDAR_SERIES_RELOCATIONS = {
 
 HKJC_PATTERN_RACECOURSES = {
     "JANUARYCUP": "Happy Valley",
+    "JANUARYCUPH": "Happy Valley",
 }
 
 
@@ -367,8 +378,8 @@ def match_official_schedule_targets(targets: list[dict], schedule_rows: list[dic
         identity = (
             source.get("edition_year"),
             source.get("local_date"),
-            source.get("racecourse"),
-            source.get("race_name"),
+            _calendar_course_key(str(source.get("racecourse") or "")),
+            _calendar_key(str(source.get("race_name") or "")),
             source.get("distance_text"),
         )
         if identity not in seen_sources:
@@ -397,14 +408,16 @@ def match_official_schedule_targets(targets: list[dict], schedule_rows: list[dic
         if not candidates:
             issues.append({"target_id": target.get("target_id"), "code": "official_schedule_match_missing"})
             continue
+        target_grade = str(target.get("normalized_grade") or "").upper()
+        grade_candidates = [
+            (score, source)
+            for score, source in candidates
+            if target_grade and str(source.get("normalized_grade") or "").upper() == target_grade
+        ]
+        if grade_candidates:
+            candidates = grade_candidates
         best_score = max(score for score, _source in candidates)
         best = [source for score, source in candidates if abs(score - best_score) < 1e-9]
-        target_grade = str(target.get("normalized_grade") or "").upper()
-        grade_matches = [
-            source for source in best if target_grade and str(source.get("normalized_grade") or "").upper() == target_grade
-        ]
-        if grade_matches:
-            best = grade_matches
         distance_matches = [source for source in best if _distance_compatible(target, source)]
         if distance_matches:
             best = distance_matches
@@ -615,10 +628,16 @@ def parse_hkjc_pattern_schedule_text(text: str, *, edition_year: int | None = No
         if match is None:
             continue
         year = 2000 + int(match.group("year"))
+        month = int(match.group("month"))
+        if edition_year is not None and not (
+            (year == edition_year and month <= 6)
+            or (year == edition_year - 1 and month >= 7)
+        ):
+            continue
         race_name = _collapse(match.group("name"))
         rows.append(
             {
-                "local_date": _iso_date(year, int(match.group("month")), int(match.group("day"))),
+                "local_date": _iso_date(year, month, int(match.group("day"))),
                 "edition_year": edition_year or year,
                 "racecourse": HKJC_PATTERN_RACECOURSES.get(_calendar_key(race_name), "Sha Tin"),
                 "race_name": race_name,
@@ -740,7 +759,19 @@ def parse_bha_flat_schedule_text(text: str, *, year: int) -> list[dict]:
         rf"(?P<month>[A-Z][a-z]{{2,3}})\.?\s*(?P<day>\d{{1,2}})\s+"
         rf"(?P<name>.+?)\(P(?P<grade>[123])(?:\.[A-Z])*\.\)",
     )
-    for line in text.splitlines():
+    raw_lines = text.splitlines()
+    logical_lines = []
+    for index, line in enumerate(raw_lines):
+        combined = line
+        if not re.search(r"\(P[123]", combined):
+            for continuation in raw_lines[index + 1 : index + 3]:
+                if re.match(r"^\s*(?:(?:[A-Z][a-z]{2,3}\.?|[”\"])\s*\d{1,2})\b", continuation):
+                    break
+                combined += continuation.strip()
+                if re.search(r"\(P[123]", combined):
+                    break
+        logical_lines.append(combined)
+    for line in logical_lines:
         match = pattern.search(line)
         if match is None:
             continue

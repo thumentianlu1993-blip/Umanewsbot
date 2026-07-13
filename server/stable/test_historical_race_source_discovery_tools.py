@@ -394,10 +394,28 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         )
         self.assertEqual({row["edition_year"] for row in rows}, {2025})
 
+    def test_hkjc_pattern_book_excludes_prior_season_history_rows(self):
+        text = """
+        23/01/22 Centenary Sprint Cup G1 12,000,000 3yo+ 1200 01/12/21 17/01/22 N/A N/A 21
+        24/01/21 Centenary Sprint Cup G1 12,000,000 3yo+ 1200 01/12/20 18/01/21 N/A N/A 21
+        """
+
+        rows = self.tool.parse_hkjc_pattern_schedule_text(text, edition_year=2022)
+
+        self.assertEqual([row["local_date"] for row in rows], ["2022-01-23"])
+
     def test_hkjc_pattern_book_assigns_january_cup_to_happy_valley(self):
         rows = self.tool.parse_hkjc_pattern_schedule_text(
             "08/01/25 January Cup G3 4,200,000 3yo+ 1800 09/12/24 02/01/25 N/A N/A 24",
             edition_year=2025,
+        )
+
+        self.assertEqual(rows[0]["racecourse"], "Happy Valley")
+
+    def test_hkjc_pattern_book_assigns_parenthesized_january_cup_to_happy_valley(self):
+        rows = self.tool.parse_hkjc_pattern_schedule_text(
+            "11/01/23 January Cup (H) G3 3,900,000 3yo+ 1800 12/12/22 05/01/23 N/A N/A 24",
+            edition_year=2023,
         )
 
         self.assertEqual(rows[0]["racecourse"], "Happy Valley")
@@ -508,6 +526,52 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
             ],
         )
 
+    def test_bha_flat_book_supports_all_batch_002_racecourses(self):
+        text = """
+        ” 5 DONCASTER Sept. 13 BETFREDCHAMPAGNE(P2.C.G.) 7F+ 2CG 136
+        ” 5 LINGFIELDPARK May 10 BETFREDCHARTWELL(P3.F.) 7F+ 3+F 50
+        ” 5 CHESTER May 7 BoodlesChesterVase(P3.C.G.) 12F+ 3CG 43
+        ” 5 NEWCASTLE June 28 PertempsNetworkChipchase(P3.) 6F 3+ 85
+        ” 5 SALISBURY Sept. 4 IRE-IncentiveDickPoole(P3.F.) 6F 2F 132
+        """
+
+        rows = self.tool.parse_bha_flat_schedule_text(text, year=2025)
+
+        self.assertEqual(
+            [(row["local_date"], row["racecourse"]) for row in rows],
+            [
+                ("2025-09-13", "Doncaster"),
+                ("2025-05-10", "Lingfield"),
+                ("2025-05-07", "Chester"),
+                ("2025-06-28", "Newcastle"),
+                ("2025-09-04", "Salisbury"),
+            ],
+        )
+
+    def test_bha_flat_book_joins_wrapped_race_names(self):
+        text = """
+        ” 5 LINGFIELDPARK May 10 IRE-INCENTIVE,ITPAYSTOBUYIRISH
+                         CHARTWELL(P3.F.) 7F 3+F 52
+        ” 23 NEWCASTLE June 28 JENNINGSBETNUNSTREETNEWCASTLE
+                         OPENNOWCHIPCHASE(P3.) 6F 3+ 87
+        ” 29 SALISBURY Sept. 4 IRE-INCENTIVE,ITPAYSTOBUYIRISH
+                         DICKPOOLE(P3.F.) 6F 2F 129
+        ” 4 NEWMARKET Oct. 10 NEWMARKETACADEMYGODOLPHIN
+                         BEACONPROJECTCORNWALLIS(P3.) 5F 2 154
+        """
+
+        rows = self.tool.parse_bha_flat_schedule_text(text, year=2025)
+
+        self.assertEqual(
+            [(row["racecourse"], row["race_name"]) for row in rows],
+            [
+                ("Lingfield", "IRE-INCENTIVE,ITPAYSTOBUYIRISHCHARTWELL"),
+                ("Newcastle", "JENNINGSBETNUNSTREETNEWCASTLEOPENNOWCHIPCHASE"),
+                ("Salisbury", "IRE-INCENTIVE,ITPAYSTOBUYIRISHDICKPOOLE"),
+                ("Newmarket", "NEWMARKETACADEMYGODOLPHINBEACONPROJECTCORNWALLIS"),
+            ],
+        )
+
     def test_bha_jump_book_resolves_season_year_boundary(self):
         text = """
         Nov. 2 Ascot SodexoLive!GoldCupH’Cap 4+ Prem 27
@@ -541,6 +605,15 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
             [(row["local_date"], row["distance_text"]) for row in rows],
             [("2025-04-04", "2m4f"), ("2025-04-05", "3m1/2f")],
         )
+
+    def test_bha_jump_book_supports_warwick(self):
+        rows = self.tool.parse_bha_jump_schedule_text(
+            "Jan.11 Warwick WigleyGroupClassicH'CapChase 3m5f Prem 100,000",
+            season_start_year=2024,
+        )
+
+        self.assertEqual(rows[0]["local_date"], "2025-01-11")
+        self.assertEqual(rows[0]["racecourse"], "Warwick")
 
     def test_bha_jump_detail_distance_disambiguates_same_name(self):
         targets = [
@@ -664,6 +737,34 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(result["issues"], [])
         self.assertEqual(result["matches"][0]["local_date"], "2024-12-08")
         self.assertEqual(result["matches"][0]["target_id"], 1)
+
+    def test_official_schedule_match_deduplicates_apostrophe_variants(self):
+        target = {
+            "target_id": 21,
+            "series_key": "hong-kong-chairman-s-trophy",
+            "year": 2022,
+            "country_region": "hong_kong",
+            "original_name": "Chairman's Trophy",
+            "racecourse": "Sha Tin",
+            "distance_text": "1600m",
+            "normalized_grade": "G2",
+        }
+        schedule = [
+            {
+                "edition_year": 2022,
+                "local_date": "2022-04-03",
+                "racecourse": "Sha Tin",
+                "race_name": race_name,
+                "normalized_grade": "G2",
+                "distance_text": "1600m",
+            }
+            for race_name in ("Chairman's Trophy", "Chairman’s Trophy")
+        ]
+
+        result = self.tool.match_official_schedule_targets([target], schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(len(result["matches"]), 1)
 
     def test_official_schedule_match_disambiguates_same_name_by_distance(self):
         targets = [
@@ -843,6 +944,63 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(result["issues"], [])
         self.assertEqual(result["matches"][0]["local_date"], "2025-09-27")
         self.assertEqual(result["matches"][0]["racecourse"], "Auteuil")
+
+    def test_official_schedule_match_prefers_matching_grade_before_name_score(self):
+        target = {
+            "target_id": 22,
+            "series_key": "united-kingdom-darley",
+            "year": 2025,
+            "country_region": "united_kingdom",
+            "original_name": "Darley S",
+            "racecourse": "Newmarket",
+            "distance_text": "9f",
+            "normalized_grade": "G3",
+        }
+        schedule = [
+            {
+                "local_date": "2025-10-11",
+                "racecourse": "Newmarket",
+                "race_name": "DARLEY DEWHURST",
+                "normalized_grade": "G1",
+                "distance_text": "7f",
+            },
+            {
+                "local_date": "2025-10-11",
+                "racecourse": "Newmarket",
+                "race_name": "SPACE BLUES DARLEY",
+                "normalized_grade": "G3",
+                "distance_text": "9f",
+            },
+        ]
+
+        result = self.tool.match_official_schedule_targets([target], schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["matches"][0]["race_name"], "SPACE BLUES DARLEY")
+
+    def test_official_schedule_match_uses_classic_novices_sponsor_alias(self):
+        target = {
+            "target_id": 23,
+            "series_key": "united-kingdom-classic-novices-hurdle",
+            "year": 2025,
+            "country_region": "united_kingdom",
+            "original_name": "Classic Novices Hurdle [AIS]",
+            "racecourse": "Cheltenham",
+            "distance_text": "2m4f",
+            "normalized_grade": "G2",
+        }
+        schedule = [{
+            "local_date": "2025-01-25",
+            "racecourse": "Cheltenham",
+            "race_name": "SSS SUPER ALLOYS NOVICES HURDLE",
+            "normalized_grade": "G2",
+            "distance_text": "2m4f",
+        }]
+
+        result = self.tool.match_official_schedule_targets([target], schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["matches"][0]["local_date"], "2025-01-25")
 
     def test_official_schedule_match_accepts_unique_named_distance_change(self):
         targets = [{
