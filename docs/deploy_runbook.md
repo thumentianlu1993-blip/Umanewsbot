@@ -1,11 +1,21 @@
 # 部署运行手册
 
+## 2026-07-14 batch004 250 场正式导入记录
+
+1. 运行镜像保持 `sha256:87c435cfc50344d0ca94f46e44d4bea97ab11361f88f7c708b6457331aee78ec`；本批没有 build、retag、recreate 或 restart，所有管理命令均使用显式 `docker run --rm`，禁止 Docker Compose。
+2. 日期 artifact manifest `30ff2c0fe14e4d6ce7d9ee7123d882d99838853e381627b552b9b0ac19dd2ea0`，批准并 apply 250/250；五地区各 50，日期、event 和直接来源 250/250，published 0。
+3. 详情来源 artifact manifest `cf5bfdc1cc8c6c82732d6485e1815f582a47d057010e4d1c0214ec3103fd46a8`，check/apply 250/250。来源 apply 后重新导出 event input；最终候选 SHA-256 `ddd1f8256cef0b17aabc33ea66f7a0638a2d6498c2d23342daff8835b10a5156`，250 scopes / 0 gaps，dry-run 通过。
+4. 最终写前有效备份 `/opt/umanewsbot/backups/db/pre-batch004-detail-import-20260714_0325.dump`，`129830849` bytes，SHA-256 `e50bd095bfa141ea0f05bf77fda68a508808dcddac4cbacb8fdb4ce3860e758a`，`pg_restore -l` 通过。流式截断文件 `pre-batch004-detail-source-apply-20260714_031200.sql.gz` 的 `gzip -t` 失败，禁止恢复。
+5. 最终详情 apply 250/250，写后为 `2563 runners / 2311 results`、500 applied candidates、250 import logs，重复非空马号和重复名次均为 0。NSA target `74171` 因官方 PDF 不给马号，允许 8/7 条空 `horse_number`，不得补造号码。
+6. 批次后累计 `1041 imported / 29876 pending / 0 ready`，250 场全部 draft，历史 published 0。常驻写入/网络开关 false，无 one-off，三个公网 healthz 为 `ok`。
+7. batch005 前必须由生产协调线程从含 `main@614f810e` 的干净 tree 构建并切换 AMD64 镜像；历史线程不得自行重建或重启生产。切换后再生成下一标准批次，并继续传入既有排除 snapshot。
+
 ## 2026-07-14 已耗尽地区进度门禁交付要求
 
 - 交付前必须确认代码包含 `eligible_pending_by_region` 与 `progress_guard_regions`，并通过历史批次专项、完整 `stable`、Django check、迁移漂移和 OpenSpec strict。该修复无迁移、无新环境变量，不改变常驻历史开关。
 - 生成下一标准批次时仍必须传入所有既有 gap 的 `--exclude-selection-snapshot`。审核 summary 时同时核对：`remaining_pending_by_region` 仍包含待审排除项，`eligible_pending_by_region` 已扣除排除项，`progress_guard_regions` 只列本批后仍有可抓目标的地区。
 - 若两个或以上 `progress_guard_regions` 的 prospective accounted 差超过 100，命令必须失败；恰为 100 可继续。某地区抓空或仅剩显式排除项时可退出比较，但不得据此修改其 expectation/resolution 或从总账删除。
-- 当前代码尚未部署。必须从合入最新 main 的干净 tree 构建可复现 AMD64 镜像，由生产协调线程完成镜像切换和健康验收后，才可用于后续批次 artifact；不得从本地分支直接执行生产写入。
+- 代码已合入 `main@614f810e`，尚未部署。必须从最新 main 的干净 tree 构建可复现 AMD64 镜像，由生产协调线程完成镜像切换和健康验收后，才可用于后续批次 artifact；不得从本地分支直接执行生产写入。
 
 ## 2026-07-13 后续标准批次既有选样排除门禁
 
@@ -4235,9 +4245,9 @@ docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
 
 1. 先合入包含 NAR、Zone-Turf 和 ZEturf 实际缓存 URL 修复的最新 main；旧候选镜像 `sha256:9cd0b966...45bc1` 不得用于 batch003。
 2. 在独立上下文构建两次 AMD64 镜像，核对 image ID、revision、Git tree 和 source archive SHA-256；只上报候选，不直接 retag、重启或写生产。
-3. 由生产协调线程切换后，使用新镜像连接生产库执行一次性只读日期 artifact 构建，预期严格为 `249 candidate / 1 gap`；gap 只能是 `target_id=60693` Hampton Novices' Chase。
-4. Hampton 的 `ABANDONED` 证据需产品确认后才能通过 expectation correction 改为 `cancelled`。确认前可继续审批和导入其余 249 场，但 approval target IDs 不得包含该目标。
-5. 日期 apply 前执行数据库备份、非空检查、`gzip -t` 和 SHA-256；仅对单命令临时打开写入门禁。写后重新导出 249 个 materialized event input，禁止复用日期 apply 前的 target SHA。
+3. 首次只读 artifact 曾得到 `249 candidate / 1 gap`，但 Hampton 后续证据证明同届移师 Windsor 正常举办；该旧 artifact 已作废，唯一有效口径为 `250 candidate / 0 gap`。
+4. Hampton 的 Warwick `ABANDONED` 不能用于 expectation correction；日期 apply 后通过独立权威字段 artifact 把实际场地改为 Windsor，并保留原页面为变更证据。
+5. 日期 apply 前执行数据库备份、非空检查、`gzip -t` 和 SHA-256；仅对单命令临时打开写入门禁。权威字段 apply 后重新导出 250 个 materialized event input，禁止复用旧 target SHA。
 6. 补充详情来源 artifact 必须接受并验证 `keiba_go_jp/nar` 与 `zone_turf`，apply 后再次导出 event input，再生成最终详情包、coverage 和 importer dry-run。
 7. 详情 apply 前另做一份数据库备份。写后逐目标核对 runner/result 数、累计计数、OperationLog、draft/published 状态和三容器常驻开关；`RACE_EVENT_HISTORICAL_PUBLIC_ENABLED` 全程保持关闭。
 
@@ -4260,4 +4270,4 @@ docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
 4. 先重建 web/worker，确认 web healthy、worker ping；最后重建 beat。三容器实际 image ID 均为 `sha256:87c435cf...e78ec`。
 5. 内部和公网 healthz 为 `ok`，公网首页和 `/races/` 为 `200`，近期 web/worker/beat 日志无 traceback/critical/integrityerror/exception。
 6. `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，多地区归属和相关查询开关也保持关闭；本次未执行历史写入。
-7. 切换完成后仅允许历史任务重建一次性只读 batch003 artifact。预期必须为 `249 candidate / 1 gap`，且唯一 gap 为 Hampton Novices' Chase `ABANDONED`；任何写入仍需新的 approval、备份、dry-run 与写后核验。
+7. 切换完成后的旧预期曾为 `249 candidate / 1 gap`，后续已由 Hampton 移师证据修正为 `250 candidate / 0 gap` 并按独立 approval、备份、dry-run 与写后核验完成导入；旧 Hampton gap 不得恢复。

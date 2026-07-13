@@ -1,18 +1,34 @@
 # 当前状态
 
+## 2026-07-14 2016-2025 标准批次四号 250 场正式导入
+
+- batch004 五地区各 50 场、共 250 场已完成日期、直接详情来源、出马表和赛果正式导入；日期 artifact manifest 为 `30ff2c0fe14e4d6ce7d9ee7123d882d99838853e381627b552b9b0ac19dd2ea0`，详情来源 manifest 为 `cf5bfdc1cc8c6c82732d6485e1815f582a47d057010e4d1c0214ec3103fd46a8`，最终详情候选 SHA-256 为 `ddd1f8256cef0b17aabc33ea66f7a0638a2d6498c2d23342daff8835b10a5156`。
+- 日期 apply、详情来源 apply 和最终详情 apply 均为 250/250。正式详情新增 `2563 runners / 2311 results`；500 个模块候选全部为 `applied`，逐场马号与名次唯一性、module 状态和 250 条导入日志一致。250 场保持 draft，published 0。
+- 来源分布为 JRA 官方 50、HKJC 官方 50、NSA 官方 1、Sporting Life 50、ZEturf 50、Equibase 49。NSA `target_id=74171` 的官方 PDF 不提供马号，因而该场 8 条 runners 与 7 条 results 的 `horse_number` 为空；姓名、骑手和名次完整，作为非阻断来源格式例外进入最终统一审核。
+- 226 个 target 的 `module_statuses.term_gaps` 记录了术语库暂缺中文映射；原文赛事数据已经完整导入，这些翻译缺口不改变 imported 状态，也不阻断后续批次，统一留到正式总账数据收集完成后的审核与术语补全。
+- 最终写前 PostgreSQL custom-format 备份为 `/opt/umanewsbot/backups/db/pre-batch004-detail-import-20260714_0325.dump`，大小 `129830849` bytes，`pg_restore -l` 通过，SHA-256 为 `e50bd095bfa141ea0f05bf77fda68a508808dcddac4cbacb8fdb4ce3860e758a`。此前流式生成的 `pre-batch004-detail-source-apply-20260714_031200.sql.gz` 未通过 `gzip -t`，不得用于恢复。
+- 写后生产累计为 `1041 imported / 29876 pending / 0 ready`，本批 250 场合计 `2563 runners / 2311 results`；全体历史 published 仍为 0。常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，无 one-off，三个公网 healthz 均为 `ok`。
+- batch005 生成必须等待包含 `main@614f810e` 已耗尽地区进度门禁的可复现 AMD64 镜像完成生产切换；历史线程不得自行重建或重启生产。
+
+## 2026-07-13 2016-2025 标准批次三号 250 场正式导入
+
+- batch003 五地区各 50 场已完成日期、带原单位距离、实际场地、详情来源、出马表和赛果正式导入，新增 `2638 runners / 2349 results`；写后累计为 `791 imported / 30126 pending / 0 ready`、`8361 runners / 7492 results`，全部 draft、published 0。
+- 2025 Hampton Novices' Chase 按同届移师处理为 `2025-01-19 / Windsor / 3m53y`，3 匹出走、3 条赛果，冠军 `Jingko Blue`；Warwick 原定场次 `ABANDONED` 只保留为变更证据，不构成年度取消或缺口。
+- 最终详情候选 SHA-256 为 `426af99cf541b43aa2e73e839989de40f2d2a15ab6298cda4cec4026cafe0a59`。日期、权威字段、详情来源和最终详情四个写阶段均有独立门禁与备份，逐 target 验收 error 0。
+
 ## 2026-07-14 已耗尽地区不再冻结历史标准批次
 
 - 既有地区进度护栏会把五地区永久放在同一比较集合；当中国香港等低容量地区已经没有可选目标时，仍会以其较低 accounted 数阻止英国、美国等高容量地区继续推进，与 1998–2026 正式总账全量完成目标冲突。
 - 标准批次现在只比较“本批选择后仍有未排除可选 pending due 目标”的地区。地区抓空后退出领先比较；仍未完成地区之间继续严格执行 100 个标准目标上限，101 拒绝、100 放行。
 - selection snapshot 显式排除的待审目标继续保留在 `available/remaining pending`、总账分母和缺口账本中，但不把只有待审排除项的地区视为仍可抓。artifact summary 新增 `eligible_pending_by_region` 和 `progress_guard_regions`，明确记录放行依据。
-- OpenSpec 增补已完成 Full 工程评审；新增回归先在旧实现上失败，修复后历史批次专项 `66` 项和完整 `stable 1171` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、OpenSpec strict、diff check 和最终代码 review 均通过。代码当前仅在分支 `codex/fix-historical-exhausted-region-progress`，尚未部署；生产历史写入/网络和公开开关不得因此开启。
+- OpenSpec 增补已完成 Full 工程评审；新增回归先在旧实现上失败，修复后历史批次专项 `66` 项和完整 `stable 1171` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、OpenSpec strict、diff check 和最终代码 review 均通过。代码已合入 `main@614f810e`，尚未部署；生产历史写入/网络和公开开关不得因此开启。
 
 ## 2026-07-13 后续标准批次重复选样门禁已实现
 
 - batch002 写后生成旧 batch003 时，4 个仍为 pending 的已交代 gap 再次进入选样：英国 Classic Handicap Chase、Dick Poole Fillies Stakes，以及美国 Brooklyn、Cougar II。该工件与 batch002 重叠 4 条，视为无效，不得审批或进入抓取。
 - `build_historical_race_band_batch` 已增加可重复 `--exclude-selection-snapshot`。命令校验旧快照 schema、inventory SHA、内部 snapshot SHA、target 数量/唯一性和稳定身份，在地区 limit 前排除旧 target，并把输入原字节复制到新 artifact、以固定键写入 manifest 文件身份。
 - 排除只影响本批选样：被排除 gap 继续保持 pending，仍计入 `available/remaining pending`，不计入 accounted/imported，也不修改 held/not_held/cancelled 口径。旧目标已导入导致当前 target SHA 改变时，只要 series/year/region/inventory 稳定，历史快照仍可作为排除证据。
-- 42 项批次与日期发现聚焦测试、完整 `stable 1157` 项回归、Django check、迁移漂移、OpenSpec strict/all 和第二轮代码 review 均通过。batch002 真实 250 目标快照已通过新读取器；代码尚未提交或部署，生产仍运行 `sha256:77eb1138...c3da0`，公开展示和常驻历史写入/网络开关保持关闭。
+- 42 项批次与日期发现聚焦测试、完整 `stable 1157` 项回归、Django check、迁移漂移、OpenSpec strict/all 和第二轮代码 review 均通过。batch002 真实 250 目标快照已通过新读取器；该门禁后续已经提交并用于 batch003/batch004，公开展示和常驻历史写入/网络开关保持关闭。
 
 ## 2026-07-13 2016–2025 标准批次二号 246 场正式导入
 
@@ -1254,8 +1270,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 ## 2026-07-13 第三标准批次只读证据完成
 
 - batch003 selection 固定为五地区各 50 场、共 250 场，与 batch002 零重叠；本轮没有执行生产写入。
-- 日期及详情来源已完成离线缓存和逐 URL/SHA 校验。可导入的 249 场共解析 `2,635 runners / 2,346 results`；归一化为 `249 candidate / 0 issue`，最终详情包为 `249 candidate / 1 gap`，候选 SHA-256 为 `31c8cf61191d937c766f98b50a656ec98e92f774b59e5d0635fd54090ee2ad1a`。
-- 唯一 gap 为 `target_id=60693`、2025 Hampton Novices' Chase。Sporting Life 页面明确标记 `ABANDONED`，保留 9 匹声明马、0 条赛果；在用户确认 expectation correction 前保持 `held/pending`，不得自动改为 `cancelled`。
+- 首次离线快照曾为 `249 candidate / 1 gap`、`2,635 runners / 2,346 results`，候选 SHA-256 `31c8cf61191d937c766f98b50a656ec98e92f774b59e5d0635fd54090ee2ad1a`；该快照遗漏 Hampton 移师后的实际赛果，已隔离并被上方 batch003 正式结果取代，不得审批或恢复。
+- `target_id=60693` 的 Warwick 页面只证明原定场次 `ABANDONED`；用户提供 Windsor 正式结果后已按正常举办收口，不能再作为 gap 或 cancelled 候选。
 - 修复了 ZEturf 发现页把实际缓存 URL 重写成另一目标 slug 的身份错误，并把 NAR `keiba.go.jp` 与法国 Zone-Turf 同步登记到日期校验、补充来源审批和最终详情打包三层。年度日历的 `flat/jumps` 只证明竞赛类型，不再用它覆盖已审核的 `surface`；Hoppings Stakes 保持 Newcastle synthetic。
 - 专项 73 项、完整 `stable 1161/1161`（1 skip）、Django check、迁移无漂移、OpenSpec strict `25/25` 和 `git diff --check` 全部通过；代码复审无剩余可修复问题。
 - 生产仍运行 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`。先前候选镜像 `sha256:9cd0b966...45bc1` 不包含本轮来源修复，已视为过期；必须从最新 main 重建可复现 AMD64 镜像后，才允许连接生产库生成日期/来源 artifact、dry-run 和后续受控写入。历史公开展示继续关闭。
@@ -1266,4 +1282,4 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 切换前发现两条正常新闻抓取任务正在执行，因此先停止 beat 并等待任务自然完成；确认 Celery active/reserved、外部导入、外部锁和 one-off 历史写入均为空后才继续。生产 `web / worker / beat` 已统一切换到新镜像。
 - `.env` 备份为 `.env.backup.main-3939992c-20260713_185140`。数据库备份为 `backups/db/pre-main-3939992c-20260713_185140.sql.gz`，大小 `125,782,755` bytes，SHA-256 `21903cf8d9494ef6053414a34c2e2f6ab01406b9ffebcf56ff3fd10eedfc0967`，`gzip -t` 通过；旧镜像回滚标签为 `umanewsbot:rollback-pre-3939992c-20260713_185140`。
 - 无待应用迁移；Django check、静态资源、worker ping、内外 healthz、首页、赛事页和近期错误日志均通过。常驻历史写入/网络、历史公开、多地区归属及相关地区查询开关继续关闭。
-- 本协调流程没有执行 batch003 历史写入。历史任务现仅获准使用新镜像重新生成一次性只读 artifact；预期为 `249 candidate / 1 Hampton ABANDONED gap`，后续 approval、日期 apply、详情 apply 仍分别受独立备份和门禁约束。
+- 该镜像切换步骤本身没有执行 batch003 写入；随后历史线程已按独立 approval、备份和门禁完成上方 250/250 正式导入。旧的 `249 candidate / 1 Hampton gap` 预期已经作废。

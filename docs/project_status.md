@@ -11,7 +11,20 @@
 
 - 标准批次进度护栏改为只比较本批后仍有未排除可抓 pending due 目标的地区；低容量地区抓空后退出比较，其他未完成地区仍严格遵守 100 场领先上限。
 - 待审 selection snapshot 排除项继续保留总账和 remaining pending 分母，不会被技术修复伪装成完成；artifact summary 新增可抓分母和实际护栏地区，便于审批追溯。
-- OpenSpec、测试优先实现和最终 review 已完成；专项 `66` 项、完整 `stable 1171` 项通过，`1` 项按设计跳过。分支尚未合入或部署，生产历史开关和公开展示保持关闭。
+- OpenSpec、测试优先实现和最终 review 已完成；专项 `66` 项、完整 `stable 1171` 项通过，`1` 项按设计跳过。代码已合入 `main@614f810e`，尚待可复现 AMD64 镜像切换；生产历史开关和公开展示保持关闭。
+
+## 2026-07-14 第四标准批次 250 场导入完成
+
+- batch004 五地区各 50 场已完成日期、详情来源、出马表和赛果正式导入；新增 `2563 runners / 2311 results`，500 个模块候选全部 applied，逐场验收无重复非空马号或重复名次。
+- 最终详情候选 SHA-256 为 `ddd1f8256cef0b17aabc33ea66f7a0638a2d6498c2d23342daff8835b10a5156`；最终写前有效备份 SHA-256 为 `e50bd095bfa141ea0f05bf77fda68a508808dcddac4cbacb8fdb4ce3860e758a`。
+- NSA 官方 PDF 不提供 `target_id=74171` 的马号，8 条 runners 与 7 条 results 保留空号并进入最终统一审核，不阻断后续批次。
+- 226 场存在术语库暂缺中文映射的非阻断记录；原文出马表和赛果已完整入库，术语补全待总账数据收集完成后统一审核。
+- 生产累计为 `1041 imported / 29876 pending / 0 ready`；本批全部 draft，历史 published 0，常驻写入/网络开关 false。batch005 等待 `main@614f810e` 镜像由生产协调线程切换。
+
+## 2026-07-13 第三标准批次 250 场导入完成
+
+- batch003 五地区各 50 场已完成正式导入，新增 `2638 runners / 2349 results`；写后累计 `791 imported / 30126 pending / 0 ready`、`8361 runners / 7492 results`，全部 draft、published 0。
+- 2025 Hampton Novices' Chase 已按 Windsor 移师后的正式赛果收口为 `2025-01-19 / Windsor / 3m53y`，冠军 `Jingko Blue`，Warwick `ABANDONED` 不再视为年度 gap。
 
 ## 2026-07-13 标准批次重复选样门禁
 
@@ -466,7 +479,6 @@
 - 新镜像切换后的 14:45 自然窗口已完成：17 个抓取、5 个发布、5 个 QQ 窗口全部成功，seen 472/new 3，新增 NULL 归属版本为 0。当前“主线源码、可复现镜像、生产数据库”重新一致。
 - 第二标准批次五地区详情证据已收敛为 `246/250`：日本 50、美国 48、香港 50、英国 48、法国 50，246 个详情 URL 全局唯一且来源缓存身份可核验。两场美国 `not run` 和两场英国 `ABANDONED` 保留为显式缺口；香港跨年字段及英国紧凑英制距离解析修复已完成 `stable 1149` 项回归和 clean review，等待合入 main、交付可复现 AMD64 镜像后重新构建日期 artifact。尚未执行本批生产写入，历史公开开关继续关闭。
 - 紧凑英制距离修复已合入 `main@d8b65fe7` 并切换生产镜像 `sha256:77eb1138...c3da0`；web/worker/beat 镜像一致，迁移无变化，Django、健康检查、页面和日志验收通过。新镜像只读重建 batch002 得到预期 `246 candidate / 4 gap`，manifest 尚未审批或写入；历史常驻写入、网络和公开开关保持关闭。
-- 第三标准批次已完成五地区各 50 场的只读来源准备。249 场具备完整候选，共 `2,635 runners / 2,346 results`；唯一缺口为 2025 Hampton Novices' Chase，Sporting Life 标记 `ABANDONED`，等待产品确认 cancelled 口径。
-- batch003 日期归一化为 `249/249`、零问题，详情打包为 `249 candidate / 1 gap`。NAR 与 Zone-Turf 来源门禁、ZEturf 实际缓存 URL 身份及年度日历 surface 误覆盖问题均已修复；完整 `stable` 回归 `1161 passed / 1 skipped`，复审无待修项。
-- batch003 尚未写生产，公开开关仍关闭。旧候选镜像 `sha256:9cd0b966...45bc1` 已过期；需先把本轮源码合入 main 并重建可复现 AMD64 镜像，再在生产总帐上生成正式 artifact。
-- batch003 来源门禁已合入 `main@3939992c`，生产 `web / worker / beat` 已统一切换到可复现 AMD64 镜像 `sha256:87c435cf...e78ec`。切换前排空两条新闻抓取任务并完成数据库备份；迁移无变化，Django、健康检查、页面和日志验收通过。历史任务现只获准重建一次性只读 artifact，尚未执行 batch003 写入，公开开关继续关闭。
+- 第三标准批次首次只读快照为 249 场、`2,635 runners / 2,346 results`，曾把 Hampton 的 Warwick 原场次 `ABANDONED` 误作年度 gap；该快照已隔离，不得审批。
+- 用户提供 Windsor 正式结果后，batch003 已修正为 `250 candidate / 0 gap`、`2638 runners / 2349 results`，并完成 250/250 正式导入。NAR、Zone-Turf、ZEturf URL 身份和 surface 门禁修复继续有效。
+- batch003 来源门禁已合入 `main@3939992c` 并由可复现 AMD64 镜像 `sha256:87c435cf...e78ec` 执行；正式写入后的最终状态以上方“第三标准批次 250 场导入完成”为准，公开状态继续关闭。
