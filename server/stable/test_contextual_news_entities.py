@@ -123,12 +123,17 @@ class ContextualEntityResolutionTests(TestCase):
         hamilton = self._term("Hamilton", "汉密尔顿")
 
         resolution = _resolve(
-            "Grace Hamilton joins Four Star Sales",
-            "Grace Hamilton has joined Four Star Sales as Bloodstock and Sales Coordinator.",
+            "Grace Hamilton Joins Four Star Sales As Bloodstock And Sales Coordinator",
+            (
+                "Grace Hamilton has joined Four Star Sales as Bloodstock and Sales Coordinator. "
+                "The company announced on Monday. Hamilton joins Four Star following graduation."
+            ),
             SourceLanguage.ENGLISH,
         )
 
-        self.assertEqual([item.matched_text for item in _entities(resolution, "person")], ["Grace Hamilton", "Grace Hamilton"])
+        people = _entities(resolution, "person")
+        self.assertEqual([item.matched_text for item in people], ["Grace Hamilton", "Grace Hamilton", "Hamilton"])
+        self.assertTrue(all(item.canonical_text == "Grace Hamilton" for item in people))
         self.assertFalse(_entities(resolution, "horse"))
         suppressed = [item for item in resolution.suppressed_candidates if item.term_id == hamilton.id]
         self.assertTrue(suppressed)

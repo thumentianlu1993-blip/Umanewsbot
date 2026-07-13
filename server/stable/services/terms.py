@@ -528,12 +528,29 @@ def _resolve_english_entities(
                     )
 
         for match in _ENGLISH_PERSON_NAME_RE.finditer(text):
-            if _overlaps(match.start(), match.end(), [item for item in entities if item.field_name == field_name]):
+            start = match.start()
+            end = match.end()
+            word_matches = list(re.finditer(r"[A-Z][A-Za-z'’.-]+", match.group(0)))
+            # The broad capitalized-name matcher is intentionally permissive,
+            # but headlines such as "Grace Hamilton Joins Four Star Sales"
+            # would otherwise greedily absorb the verb and following words.
+            # Prefer the shortest 2+ word prefix immediately followed by a
+            # known person verb.
+            for word_count in range(2, len(word_matches) + 1):
+                candidate_end = start + word_matches[word_count - 1].end()
+                candidate_after = text[candidate_end : min(len(text), candidate_end + 120)]
+                if _ENGLISH_PERSON_AFTER_RE.search(candidate_after):
+                    end = candidate_end
+                    break
+            if _overlaps(start, end, [item for item in entities if item.field_name == field_name]):
                 continue
-            matched = match.group(0)
+            matched = text[start:end]
+            name_parts = matched.split()
+            if any(part.endswith(".") and len(part.rstrip(".")) > 1 for part in name_parts[:-1]):
+                continue
             if matched.split()[-1].casefold() in {"sales", "racing", "stud", "farm", "park", "stables"}:
                 continue
-            after = text[match.end() : min(len(text), match.end() + 120)]
+            after = text[end : min(len(text), end + 120)]
             if not (_ENGLISH_PERSON_AFTER_RE.search(after) or _ENGLISH_PERSON_ROLE_RE.search(after)):
                 continue
             term = person_terms.get(_normalized_term_candidate(matched))
@@ -542,8 +559,8 @@ def _resolve_english_entities(
                     "person",
                     matched,
                     field_name,
-                    match.start(),
-                    match.end(),
+                    start,
+                    end,
                     canonical_text=term.source_ja if term else matched,
                     target_zh=term.target_zh if term else "",
                     confidence=95,
