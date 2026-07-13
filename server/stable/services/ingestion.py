@@ -110,6 +110,9 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
     source_config = find_builtin_source(draft.source_site, draft.source_mode)
     source_metadata = _source_metadata(draft, source_config)
     draft_metadata = _draft_metadata(draft)
+    has_published_evidence = "published_at_verified" in draft_metadata
+    draft_published_verified = draft_metadata.get("published_at_verified") if has_published_evidence else None
+    draft_published_evidence = draft_metadata.get("published_at_evidence") or {}
     article_source_site = _draft_article_source_site(draft)
     source_elevated = False
     with transaction.atomic():
@@ -128,6 +131,8 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
                 "original_content_html": _draft_html(draft),
                 "original_author": draft.metadata.get("author", ""),
                 "published_at": draft.published_at,
+                "published_at_verified": draft_published_verified if has_published_evidence else None,
+                "published_at_evidence": draft_published_evidence,
                 "source_url": draft.source_url,
                 "is_first_crawled": True,
                 "first_seen_at": now,
@@ -156,7 +161,19 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
             article.body_ja_normalized = draft.body_ja_normalized or article.body_ja_normalized
             article.original_content_html = _draft_html(draft) or article.original_content_html
             article.original_author = draft.metadata.get("author", article.original_author)
-            article.published_at = draft.published_at or article.published_at
+            if not has_published_evidence:
+                article.published_at = draft.published_at or article.published_at
+            elif draft_published_verified is True and draft.published_at:
+                previous_published_at = article.published_at
+                evidence = dict(draft_published_evidence)
+                if previous_published_at and previous_published_at != draft.published_at:
+                    evidence["previous_published_at"] = previous_published_at.isoformat()
+                article.published_at = draft.published_at
+                article.published_at_verified = True
+                article.published_at_evidence = evidence
+            elif draft_published_verified is False and article.published_at_verified is not True:
+                article.published_at_verified = False
+                article.published_at_evidence = draft_published_evidence
             article.source_url = draft.source_url or article.source_url
             article.last_seen_at = now
             article.crawl_status = CrawlStatus.SUCCESS
@@ -188,5 +205,5 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
                 except Exception:
                     image.local_path = ""
             image.save()
-        apply_article_attribution(article, source_config=article.source_config)
+        apply_article_attribution(article, source_config=article.source_config, is_new_article=created)
     return ArticleUpsertResult(article=article, created=created, source_elevated=source_elevated)

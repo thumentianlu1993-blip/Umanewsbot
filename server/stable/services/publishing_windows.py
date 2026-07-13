@@ -132,6 +132,7 @@ def select_publish_candidates(region: str, *, window: ProductionWindow, now=None
     normal_threshold = int(getattr(settings, "AUTO_REVIEW_THRESHOLD", 75))
 
     ready: list[NewsArticle] = []
+    blocking_reasons: list[str] = []
     fingerprints: dict[str, NewsArticle] = {}
     for article in _candidate_queryset(region, now=now):
         if article.racing_region != region:
@@ -142,9 +143,18 @@ def select_publish_candidates(region: str, *, window: ProductionWindow, now=None
                 reason="related_region_waiting_primary_region",
                 payload=_candidate_payload(article),
             )
+            blocking_reasons.append("related_region_visible")
             continue
         allowed, reason = hard_gate_article(article)
         if not allowed:
+            if article.published_at_verified is False:
+                reason = "published_at_unverified"
+            elif article.translation_retry_exhausted_at:
+                reason = "translation_retry_exhausted"
+            elif article.translation_next_retry_at:
+                reason = "translation_retry_waiting"
+            elif article.attribution_status == "needs_review":
+                reason = "attribution_needs_review"
             _record_candidate(
                 window=window,
                 article=article,
@@ -152,6 +162,7 @@ def select_publish_candidates(region: str, *, window: ProductionWindow, now=None
                 reason=reason,
                 payload=_candidate_payload(article),
             )
+            blocking_reasons.append(reason)
             continue
         fingerprint = content_fingerprint(article)
         previous = fingerprints.get(fingerprint)
@@ -212,7 +223,7 @@ def select_publish_candidates(region: str, *, window: ProductionWindow, now=None
     zero_reasons: list[str] = []
     if not selected:
         if not ready:
-            zero_reasons.append("no_ready_candidates")
+            zero_reasons.extend(list(dict.fromkeys(blocking_reasons)) or ["no_ready_candidates"])
         else:
             zero_reasons.append("all_candidates_below_min_score")
     return PublishSelectionResult(selected=selected, zero_reasons=zero_reasons)

@@ -20,9 +20,20 @@
     <div class="article-meta">
       <span class="badge {% if profile.review_status == 'published' %}success{% elif profile.review_status == 'draft' %}warning{% endif %}">{{ profile.get_review_status_display }}</span>
       <span class="badge">{{ profile.get_completeness_status_display }}</span>
+      {% if profile.primary_term.translation_status == "pending" %}<span class="badge warning">中文名待补</span>{% endif %}
       {% if profile.is_featured %}<span class="badge gold">推荐</span>{% endif %}
       {% if profile.published_at %}<span class="muted">发布 {{ profile.published_at|date:"Y-m-d H:i" }}</span>{% endif %}
     </div>
+    <div class="muted" style="margin-top: 10px;">
+      P0 来源 {{ p0_sources|length }} 条 · 履历同步 {{ profile.records_synced_through|date:"Y-m-d"|default:"-" }} · 完整资料审核 {{ profile.full_profile_reviewed_at|date:"Y-m-d H:i"|default:"-" }}
+    </div>
+    {% if p0_sources %}
+      <div class="horse-chip-list" style="margin-top: 10px;">
+        {% for source in p0_sources %}
+          <span>{{ source.get_source_type_display }}{% if source.race_event %} · {{ source.race_event.chinese_name|default:source.race_event.original_name }}{% endif %}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
     <form class="toolbar" style="margin-top: 14px;" method="post" action="{% url 'console-horse-profile-status' profile.id %}">
       {% csrf_token %}
       <label>
@@ -120,6 +131,12 @@
                       <button class="btn ghost" name="action" value="conflict" type="submit">冲突</button>
                     </form>
                   </div>
+                {% elif candidate.status == 'conflict' %}
+                  <form method="post" action="{% url 'console-horse-profile-apply-candidate' candidate.id %}">
+                    {% csrf_token %}
+                    <input name="note" type="text" placeholder="处理说明" required>
+                    <button class="btn secondary" name="action" value="ignore" type="submit">标记已处理</button>
+                  </form>
                 {% else %}
                   <span class="muted">{{ candidate.result_summary|default:"已处理" }}</span>
                 {% endif %}

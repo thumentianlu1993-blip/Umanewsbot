@@ -135,6 +135,7 @@ class OpenAICompatibleRewriteProvider(RewriteProvider):
             f"- [{term.term_type}] {term.matched_text or term.source_ja} => {term.target_zh}"
             + (f"（备注：{term.notes}）" if term.notes else "")
             for term in terms
+            if (term.target_zh or "").strip()
         ]
         prompt = (
             f"稿件类型：{article.content_category or ContentCategory.OTHER}\n"

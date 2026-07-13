@@ -39,6 +39,8 @@ HORSE_PROFILE_LOCK_CHOICES = [
     ("owner_name", "马主"),
     ("trainer_name", "练马师"),
     ("breeder_name", "生产牧场"),
+    ("racing_career_status", "赛马生涯状态"),
+    ("records_synced_through", "履历同步日期"),
     ("intro", "简介"),
     ("sire_text", "父"),
     ("dam_text", "母"),
@@ -249,6 +251,8 @@ class HorseProfileForm(forms.ModelForm):
             "owner_name",
             "trainer_name",
             "breeder_name",
+            "racing_career_status",
+            "records_synced_through",
             "intro",
             "sire_text",
             "dam_text",
@@ -264,6 +268,7 @@ class HorseProfileForm(forms.ModelForm):
         ]
         widgets = {
             "birth_date": forms.DateInput(attrs={"type": "date"}),
+            "records_synced_through": forms.DateInput(attrs={"type": "date"}),
             "intro": forms.Textarea(attrs={"rows": 4}),
             "review_notes": forms.Textarea(attrs={"rows": 3}),
         }
@@ -280,6 +285,8 @@ class HorseProfileForm(forms.ModelForm):
             "owner_name": "马主",
             "trainer_name": "练马师",
             "breeder_name": "生产牧场",
+            "racing_career_status": "赛马生涯状态",
+            "records_synced_through": "履历同步至",
             "intro": "简介",
             "sire_text": "父",
             "dam_text": "母",
@@ -364,6 +371,7 @@ class HorseRaceRecordForm(forms.ModelForm):
         self.fields["surface"].required = False
         self.fields["result_status"].choices = HorseRaceResultStatus.choices
         self.fields["major_win_order"].required = False
+        self.fields["source_url"].required = True
 
     def clean_major_win_order(self):
         return self.cleaned_data.get("major_win_order") or 0
@@ -498,10 +506,21 @@ class TermEntryForm(forms.ModelForm):
 
     class Meta:
         model = TermEntry
-        fields = ["term_type", "source_language", "racing_region", "source_ja", "target_zh", "race_grade", "priority", "is_active", "notes"]
+        fields = [
+            "term_type",
+            "source_language",
+            "racing_region",
+            "source_ja",
+            "target_zh",
+            "translation_status",
+            "race_grade",
+            "priority",
+            "is_active",
+            "notes",
+        ]
         widgets = {
             "source_ja": forms.TextInput(attrs={"placeholder": "例如：イクイノックス / Ascot / 香港打吡大赛"}),
-            "target_zh": forms.TextInput(attrs={"placeholder": "例如：春秋分"}),
+            "target_zh": forms.TextInput(attrs={"placeholder": "例如：春秋分；暂无中文名的马可留空"}),
             "priority": forms.NumberInput(attrs={"placeholder": "数字越大优先级越高"}),
             "notes": forms.Textarea(attrs={"rows": 4, "placeholder": "备注、使用场景、特殊说明"}),
         }
@@ -510,6 +529,7 @@ class TermEntryForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["term_type"].choices = TermType.choices
         self.fields["source_language"].required = False
+        self.fields["translation_status"].required = False
         self.fields["source_language"].initial = self.instance.source_language or SourceLanguage.JAPANESE
         self.fields["source_language"].choices = [
             (SourceLanguage.JAPANESE, "日文"),
@@ -530,6 +550,7 @@ class TermEntryForm(forms.ModelForm):
             "racing_region": cleaned_data.get("racing_region"),
             "source_ja": cleaned_data.get("source_ja"),
             "target_zh": cleaned_data.get("target_zh"),
+            "translation_status": cleaned_data.get("translation_status"),
             "aliases_ja": cleaned_data.get("aliases_ja_text", ""),
             "aliases_zh": cleaned_data.get("aliases_zh_text", ""),
             "race_grade": cleaned_data.get("race_grade", ""),
@@ -558,6 +579,7 @@ class TermEntryForm(forms.ModelForm):
                     "racing_region": self.cleaned_data.get("racing_region") or "",
                     "source_ja": self.cleaned_data["source_ja"],
                     "target_zh": self.cleaned_data["target_zh"],
+                    "translation_status": self.cleaned_data.get("translation_status"),
                     "aliases_ja": self.cleaned_data.get("aliases_ja_text", ""),
                     "aliases_zh": self.cleaned_data.get("aliases_zh_text", ""),
                     "race_grade": self.cleaned_data.get("race_grade", ""),
@@ -572,6 +594,7 @@ class TermEntryForm(forms.ModelForm):
         instance.racing_region = normalized["racing_region"]
         instance.source_ja = normalized["source_ja"]
         instance.target_zh = normalized["target_zh"]
+        instance.translation_status = normalized["translation_status"]
         instance.aliases_ja = normalized["aliases_ja"]
         instance.aliases_zh = normalized["aliases_zh"]
         instance.race_grade = normalized["race_grade"]

@@ -77,6 +77,40 @@
         <option value="no" {% if filters.public == "no" %}selected{% endif %}>不可见</option>
       </select>
     </label>
+    <label>
+      P0 来源
+      <select name="p0_source">
+        <option value="">全部</option>
+        {% for value,label in p0_source_types %}
+          <option value="{{ value }}" {% if filters.p0_source == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      中文名
+      <select name="name_status">
+        <option value="">全部</option>
+        <option value="translated" {% if filters.name_status == "translated" %}selected{% endif %}>已有中文名</option>
+        <option value="pending" {% if filters.name_status == "pending" %}selected{% endif %}>中文名待补</option>
+      </select>
+    </label>
+    <label>
+      履历同步
+      <select name="sync_status">
+        <option value="">全部</option>
+        <option value="fresh" {% if filters.sync_status == "fresh" %}selected{% endif %}>有同步日期</option>
+        <option value="stale" {% if filters.sync_status == "stale" %}selected{% endif %}>在役待刷新</option>
+      </select>
+    </label>
+    <label>
+      候选状态
+      <select name="candidate_status">
+        <option value="">全部</option>
+        {% for value,label in candidate_statuses %}
+          <option value="{{ value }}" {% if filters.candidate_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
     <button class="btn secondary" type="submit">筛选</button>
     <a class="btn ghost" href="{% url 'console-horse-profile-list' %}">清除</a>
   </form>
@@ -100,11 +134,13 @@
               <td>
                 <strong>{{ profile.display_name }}</strong>
                 <div class="muted">#{{ profile.id }} · {{ profile.original_name|default:profile.primary_term.source_ja }}</div>
+                {% if profile.primary_term.translation_status == "pending" %}<div class="muted">中文名待补</div>{% endif %}
               </td>
               <td>{{ profile.get_racing_region_display }}</td>
               <td>
                 <span class="badge {% if profile.review_status == 'published' %}success{% elif profile.review_status == 'draft' %}warning{% endif %}">{{ profile.get_review_status_display }}</span>
                 <div class="muted">{{ profile.get_completeness_status_display }}</div>
+                <div class="muted">P0 来源 {{ profile.p0_source_count }} · 履历同步 {{ profile.records_synced_through|date:"Y-m-d"|default:"-" }}</div>
               </td>
               <td>
                 <a href="{% url 'console-horse-profile-detail' profile.id %}#candidates">{{ profile.candidate_count }} 候选</a>

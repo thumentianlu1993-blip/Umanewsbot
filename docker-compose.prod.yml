@@ -7,6 +7,10 @@ services:
     command: /app/deploy/docker/start-web.sh
     env_file:
       - .env
+    environment: &safe_news_modes
+      MULTIREGION_ATTRIBUTION_MODE: ${MULTIREGION_ATTRIBUTION_MODE:-off}
+      MULTIREGION_RELATED_REGION_QUERIES_ENABLED: ${MULTIREGION_RELATED_REGION_QUERIES_ENABLED:-false}
+      TRANSLATION_AUTO_RETRY_ENABLED: ${TRANSLATION_AUTO_RETRY_ENABLED:-false}
     volumes:
       - static_data:/app/server/staticfiles
       - media_data:/app/server/media
@@ -27,6 +31,7 @@ services:
     command: /app/deploy/docker/start-worker.sh
     env_file:
       - .env
+    environment: *safe_news_modes
     volumes:
       - media_data:/app/server/media
       - app_logs:/app/logs
@@ -42,6 +47,7 @@ services:
     command: /app/deploy/docker/start-beat.sh
     env_file:
       - .env
+    environment: *safe_news_modes
     volumes:
       - app_logs:/app/logs
     restart: unless-stopped

@@ -228,14 +228,15 @@ def _quota_rows(*, recent_start) -> list[dict[str, Any]]:
     ]
 
 
-def summarize_multiregion_news_production(*, now=None) -> dict[str, Any]:
+def summarize_multiregion_news_production(*, now=None, regions_filter: list[str] | None = None) -> dict[str, Any]:
     now = now or timezone.now()
     today = timezone.localdate(now)
     today_start = timezone.make_aware(datetime.combine(today, time.min))
     recent_start = now - timedelta(hours=24)
     regions: dict[str, dict[str, Any]] = {}
 
-    for region in PRODUCTION_REGIONS:
+    target_regions = regions_filter or PRODUCTION_REGIONS
+    for region in target_regions:
         sources = NewsSource.objects.filter(racing_region=region, deleted_at__isnull=True)
         enabled_sources = sources.filter(enabled=True)
         primary_articles = NewsArticle.objects.filter(racing_region=region)
@@ -334,8 +335,8 @@ def region_production_rows(*, selected_region: str = "", now=None) -> list[dict[
     from stable.services.production_windows import active_major_race_window
 
     now = now or timezone.now()
-    summary = summarize_multiregion_news_production(now=now)
     regions = [selected_region] if selected_region else PRODUCTION_REGIONS
+    summary = summarize_multiregion_news_production(now=now, regions_filter=regions)
     rows: list[dict[str, Any]] = []
     for region in regions:
         if region not in summary["regions"]:

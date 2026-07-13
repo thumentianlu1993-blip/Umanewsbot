@@ -16,6 +16,8 @@ from stable.models import (
     AutomationPhase,
     AutomationStatus,
     CrawlJob,
+    HorseIdentityConflict,
+    HorseIdentityConflictStatus,
     HorseProfile,
     NewsArticle,
     NewsSource,
@@ -34,6 +36,7 @@ from stable.models import (
     SourceMode,
     TaskExecutionLog,
     TaskStatus,
+    TranslationStatus,
     WorkflowStatus,
 )
 from stable.services.automation import (
@@ -53,7 +56,7 @@ from stable.services.multiregion import summarize_multiregion_news_production
 from stable.services.news_attribution import apply_article_attribution
 from stable.services.notifications import send_automation_notification, send_high_value_warning_notification
 from stable.services.operations import log_operation
-from stable.services.ops_notifications import send_production_summary_notification
+from stable.services.ops_notifications import send_ops_notification, send_production_summary_notification
 from stable.services.onebot import BotPusher
 from stable.services.production_windows import (
     active_major_race_window,
@@ -369,11 +372,14 @@ def _crawl_international_source(source: NewsSource) -> dict:
     seen_count = 0
     detail_errors: list[str] = []
     ranked_revival_results: list[dict] = []
+    unverified_time_count = 0
     try:
         for stub in adapter.fetch_listing(source.source_mode, 1):
             try:
                 detail = adapter.fetch_detail(stub.source_url)
                 draft = adapter.normalize_source_payload(stub, detail)
+                if (getattr(draft, "metadata", {}) or {}).get("published_at_verified") is False:
+                    unverified_time_count += 1
             except Exception as exc:
                 detail_errors.append(f"{stub.source_url}: {exc}")
                 continue
@@ -396,6 +402,7 @@ def _crawl_international_source(source: NewsSource) -> dict:
                     source_elevated=bool(getattr(upsert_result, "source_elevated", False)),
                 )
         listing_skips = list(getattr(adapter, "skipped_items", []) or [])
+        query_errors = list(getattr(adapter, "last_listing_query_errors", []) or [])
         skipped_errors = [*listing_skips, *detail_errors]
         message = ""
         if skipped_errors:
@@ -413,6 +420,15 @@ def _crawl_international_source(source: NewsSource) -> dict:
             "skipped_count": len(skipped_errors),
             "crawl_job_id": job.id,
             "ranked_revival_results": ranked_revival_results,
+            "source_summary": {
+                "new_articles": new_count,
+                "duplicates": seen_count,
+                "historical_filtered": sum("stale_published_at" in item for item in listing_skips),
+                "published_at_missing": sum("missing_published_at" in item for item in listing_skips),
+                "published_at_unverified": unverified_time_count,
+                "query_failures": len(query_errors),
+                "detail_failures": len(detail_errors),
+            },
         }
     except Exception as exc:
         job.refresh_from_db(fields=["status"])
@@ -690,16 +706,40 @@ def discover_term_candidates_task(article_id: int) -> dict:
 
 
 @shared_task
-def translate_article_task(article_id: int) -> dict:
+def translate_article_task(article_id: int, preclaimed_retry: bool = False) -> dict:
     log = _log_start("translate_article", {"article_id": article_id})
     article = None
+    claimed_retry = False
     try:
         article = NewsArticle.objects.get(pk=article_id)
-        previous_attempts = article.translation_runs.count()
-        article.translation_status = ArticleTranslationStatus.TRANSLATING
+        if not preclaimed_retry and article.translation_status == ArticleTranslationStatus.TRANSLATING:
+            reason = "translation_already_claimed"
+            _log_success(log, f"skipped article={article_id} reason={reason}")
+            return {"article_id": article_id, "translated": False, "skipped": True, "reason": reason}
+        if preclaimed_retry:
+            if (
+                article.translation_status != ArticleTranslationStatus.TRANSLATING
+                or not article.translation_runs.filter(status=TranslationStatus.STARTED).exists()
+            ):
+                reason = "preclaimed_retry_state_changed"
+                _log_success(log, f"skipped article={article_id} reason={reason}")
+                return {"article_id": article_id, "translated": False, "skipped": True, "reason": reason}
+            claimed_retry = True
+        else:
+            expected_due_at = article.translation_next_retry_at
+        if not preclaimed_retry and article.translation_status == ArticleTranslationStatus.FAILED and expected_due_at is not None:
+            from stable.services.translation_recovery import claim_translation_retry
+
+            claim = claim_translation_retry(article.id, expected_due_at=expected_due_at, now=timezone.now())
+            if not claim.claimed:
+                _log_success(log, f"skipped article={article_id} reason={claim.reason}")
+                return {"article_id": article_id, "translated": False, "skipped": True, "reason": claim.reason}
+            claimed_retry = True
+            article.refresh_from_db()
+        else:
+            article.translation_status = ArticleTranslationStatus.TRANSLATING
+            article.translation_started_at = timezone.now()
         article.translation_error_message = ""
-        article.translation_started_at = timezone.now()
-        article.translation_retry_count = previous_attempts
         article.translation_provider = settings.TRANSLATION_PROVIDER
         article.translation_model = settings.TRANSLATION_MODEL
         article.save(
@@ -707,7 +747,6 @@ def translate_article_task(article_id: int) -> dict:
                 "translation_status",
                 "translation_error_message",
                 "translation_started_at",
-                "translation_retry_count",
                 "translation_provider",
                 "translation_model",
                 "updated_at",
@@ -718,6 +757,10 @@ def translate_article_task(article_id: int) -> dict:
         article.status = ArticleStatus.TRANSLATED
         article.translation_status = ArticleTranslationStatus.TRANSLATED
         article.translation_error_message = ""
+        article.translation_error_category = ""
+        article.translation_next_retry_at = None
+        article.translation_retry_exhausted_at = None
+        article.translation_started_at = None
         article.translated_at = timezone.now()
         article.translation_model = result.metadata.get("model", "")
         article.translation_provider = result.metadata.get("provider", "")
@@ -725,6 +768,10 @@ def translate_article_task(article_id: int) -> dict:
             article.workflow_status = WorkflowStatus.PENDING_EDIT
         article.automation_status = AutomationStatus.PENDING
         article.translation_metadata = {**article.translation_metadata, **result.metadata}
+        if claimed_retry:
+            reason = dict(article.decision_reason or {})
+            reason["translation_recovery"] = {"recovered_at": timezone.now().isoformat()}
+            article.decision_reason = reason
         article.save()
         if getattr(settings, "AUTOMATION_ENABLED", False):
             dispatch_task(process_article_automation_task, article.id)
@@ -737,35 +784,36 @@ def translate_article_task(article_id: int) -> dict:
         }
     except Exception as exc:
         if article is not None:
-            article.translation_status = ArticleTranslationStatus.FAILED
-            article.translation_error_message = str(exc)
             article.translation_model = article.translation_model or settings.TRANSLATION_MODEL
             article.translation_provider = article.translation_provider or settings.TRANSLATION_PROVIDER
-            if article.workflow_status in {WorkflowStatus.PENDING_TRANSLATION, WorkflowStatus.TRANSLATION_FAILED}:
-                article.workflow_status = WorkflowStatus.TRANSLATION_FAILED
             article.save(
                 update_fields=[
-                    "translation_status",
-                    "translation_error_message",
                     "translation_model",
                     "translation_provider",
-                    "workflow_status",
                     "updated_at",
                 ]
             )
-            if getattr(settings, "AUTOMATION_ENABLED", False):
-                dispatch_task(
-                    send_notification_task,
-                    NotificationType.TRANSLATION_FAILED,
-                    {
-                        "article_id": article.id,
-                        "title": article.effective_title,
-                        "error": str(exc),
-                        "source_url": article.source_url,
-                    },
-                )
+            from stable.services.translation_recovery import record_translation_failure
+
+            record_translation_failure(article, exc, now=timezone.now(), is_retry=claimed_retry)
         _log_failure(log, str(exc))
         raise
+
+
+@shared_task
+def translation_retry_selector_task() -> dict:
+    from stable.services.translation_recovery import dispatch_due_translation_retries
+
+    result = dispatch_due_translation_retries()
+    return {"dispatched_ids": result.dispatched_ids, "skipped_reason": result.skipped_reason}
+
+
+@shared_task
+def recover_stale_translations_task() -> dict:
+    from stable.services.translation_recovery import recover_stale_translations
+
+    result = recover_stale_translations()
+    return {"recovered_ids": result.recovered_ids}
 
 
 @shared_task
@@ -814,7 +862,13 @@ def score_article_task(article_id: int) -> dict:
     log = _log_start("score_article", {"article_id": article_id})
     article = NewsArticle.objects.get(pk=article_id)
     try:
-        apply_article_attribution(article)
+        from stable.services.news_attribution import ATTRIBUTION_RULE_VERSION
+
+        applied_summary = (article.attribution_summary or {}).get("applied") or {}
+        apply_article_attribution(
+            article,
+            is_new_article=applied_summary.get("rule_version") == ATTRIBUTION_RULE_VERSION,
+        )
         article.refresh_from_db()
         decision = score_article_for_automation(article)
         apply_score_decision(article, decision)
@@ -1447,6 +1501,29 @@ def production_summary_task() -> dict:
     send_production_summary_notification(payload)
     _log_success(log, "production summary generated")
     return payload
+
+
+@shared_task
+def notify_p0_horse_identity_conflicts_task() -> dict:
+    log = _log_start("notify_p0_horse_identity_conflicts")
+    conflicts = HorseIdentityConflict.objects.filter(status=HorseIdentityConflictStatus.PENDING)
+    conflict_count = conflicts.count()
+    if conflict_count:
+        conflict_ids = list(conflicts.values_list("id", flat=True)[:50])
+        send_ops_notification(
+            notification_type=NotificationType.OPS_ANOMALY,
+            title="UmaFans P0 马名歧义待处理",
+            payload={
+                "conflict_count": conflict_count,
+                "conflict_ids": conflict_ids,
+                "admin_url": (
+                    f"{settings.DJANGO_ADMIN_URL}stable/horseidentityconflict/"
+                    "?status__exact=pending"
+                ),
+            },
+        )
+    _log_success(log, f"conflicts={conflict_count}")
+    return {"conflict_count": conflict_count}
 
 
 def _qq_push_retry_countdown(attempt_count: int) -> int:

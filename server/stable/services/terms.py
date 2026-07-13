@@ -4,7 +4,9 @@ import re
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
+from typing import Callable
 
+from django.db import connection
 from django.db.models.functions import Lower
 
 from stable.models import ExternalHorseAlias, NewsArticle, SourceLanguage, TermAlias, TermEntry, TermType
@@ -80,8 +82,26 @@ def _entry_source_terms(
     values: list[str] = []
     if source_language is None or source_language == entry.source_language:
         values.extend(entry.all_japanese_terms())
+    if source_language in {SourceLanguage.CHINESE, SourceLanguage.CHINESE_TRADITIONAL}:
+        values.extend([entry.target_zh, *(entry.aliases_zh or [])])
     values.extend(alias_lookup.get(entry.pk, []))
     return _dedupe_source_terms(values)
+
+
+def _normalized_term_candidate(value: str) -> str:
+    return " ".join(unicodedata.normalize("NFKC", value or "").casefold().split())
+
+
+def _ambiguous_horse_candidates(entries: Iterable[TermEntry], terms_by_entry: dict[int, list[str]]) -> set[str]:
+    owners: dict[str, set[int]] = {}
+    for entry in entries:
+        if entry.term_type != TermType.HORSE:
+            continue
+        for candidate in terms_by_entry.get(entry.pk, []):
+            normalized = _normalized_term_candidate(candidate)
+            if normalized:
+                owners.setdefault(normalized, set()).add(entry.pk)
+    return {candidate for candidate, term_ids in owners.items() if len(term_ids) > 1}
 
 
 def source_terms_by_entry(entries: Iterable[TermEntry], source_language: str | None = None) -> dict[int, list[str]]:
@@ -132,10 +152,13 @@ def _resolve_terms_from_entries(text: str, entries, *, source_language: str | No
     results: list[ResolvedTerm] = []
     entries = list(entries)
     terms_by_entry = source_terms_by_entry(entries, source_language)
+    ambiguous_horse_candidates = _ambiguous_horse_candidates(entries, terms_by_entry)
     for entry in entries:
         matched = None
         candidates = terms_by_entry.get(entry.pk, [])
         for candidate in candidates:
+            if entry.term_type == TermType.HORSE and _normalized_term_candidate(candidate) in ambiguous_horse_candidates:
+                continue
             matched_candidate = _find_source_term_match(text, candidate, source_language)
             if matched_candidate:
                 matched = matched_candidate
@@ -191,15 +214,22 @@ def apply_term_mappings(text: str, source_language: str | None = None) -> str:
     mapped = text
     entries = list(TermEntry.objects.filter(is_active=True).order_by("-priority", "source_ja"))
     terms_by_entry = source_terms_by_entry(entries, source_language)
+    ambiguous_horse_candidates = _ambiguous_horse_candidates(entries, terms_by_entry)
     for entry in entries:
+        if not entry.has_translation:
+            continue
         candidates = terms_by_entry.get(entry.pk, [])
         for candidate in sorted(candidates, key=len, reverse=True):
+            if entry.term_type == TermType.HORSE and _normalized_term_candidate(candidate) in ambiguous_horse_candidates:
+                continue
             mapped = _replace_source_term(mapped, candidate, entry.target_zh, source_language)
     return mapped
 
 
 def apply_single_term_mapping(text: str, term: TermEntry, source_language: str | None = None) -> str:
     if not text:
+        return text
+    if not term.has_translation:
         return text
     mapped = text
     candidates = term.source_terms_for_language(source_language) if source_language else term.all_source_terms()
@@ -309,16 +339,61 @@ def non_horse_common_words() -> set[str]:
     return words
 
 
-def _known_horse_terms(source_language: str = SourceLanguage.JAPANESE) -> set[str]:
-    known_horse_terms: set[str] = set()
+def _known_horse_terms_by_candidate(source_language: str = SourceLanguage.JAPANESE) -> dict[str, list[TermEntry]]:
+    known_horse_terms: dict[str, list[TermEntry]] = {}
     entries = list(TermEntry.objects.filter(is_active=True, term_type=TermType.HORSE))
     terms_by_entry = source_terms_by_entry(entries, source_language)
     for entry in entries:
         for candidate in terms_by_entry.get(entry.pk, []):
             normalized = (candidate or "").strip()
             if normalized:
-                known_horse_terms.add(normalized)
+                known_horse_terms.setdefault(normalized, []).append(entry)
     return known_horse_terms
+
+
+def _known_horse_terms(source_language: str = SourceLanguage.JAPANESE) -> set[str]:
+    return set(_known_horse_terms_by_candidate(source_language))
+
+
+def _recognize_formal_horse_terms(full_text: str, source_language: str, limit: int | None) -> list[RecognizedHorseName]:
+    entries = list(TermEntry.objects.filter(is_active=True, term_type=TermType.HORSE).order_by("-priority", "source_ja"))
+    terms_by_entry = source_terms_by_entry(entries, source_language)
+    ambiguous_candidates = _ambiguous_horse_candidates(entries, terms_by_entry)
+    recognized: list[RecognizedHorseName] = []
+    seen: set[tuple[int | str, str]] = set()
+    for entry in entries:
+        for candidate in sorted(terms_by_entry.get(entry.pk, []), key=len, reverse=True):
+            matched_text = _find_source_term_match(full_text, candidate, source_language)
+            if not matched_text:
+                continue
+            position = full_text.find(matched_text)
+            if position < 0 and source_language == SourceLanguage.ENGLISH:
+                position = full_text.casefold().find(matched_text.casefold())
+            normalized_candidate = _normalized_term_candidate(candidate)
+            is_ambiguous = normalized_candidate in ambiguous_candidates
+            key = ("ambiguous" if is_ambiguous else entry.pk, normalized_candidate)
+            if key in seen:
+                continue
+            seen.add(key)
+            has_translation = entry.has_translation
+            recognized.append(
+                RecognizedHorseName(
+                    name_ja=entry.source_ja,
+                    source="formal_ambiguous_term" if is_ambiguous else ("formal_term" if has_translation else "formal_pending_term"),
+                    matched_text=matched_text,
+                    confidence=100,
+                    external_horse_ids=[],
+                    primary_external_horse_id="",
+                    needs_preserve=is_ambiguous or not has_translation,
+                    has_translation=has_translation and not is_ambiguous,
+                    first_position=max(position, 0),
+                    detection_reason="formal_ambiguous_term" if is_ambiguous else ("formal_term" if has_translation else "formal_pending_term"),
+                    conflict_flags=["ambiguous_formal_horse_name"] if is_ambiguous else [],
+                )
+            )
+            break
+    recognized.sort(key=lambda item: (item.first_position, -len(item.matched_text), -item.confidence, item.name_ja))
+    return recognized[:limit] if limit is not None else recognized
 
 
 def _strong_horse_context(full_text: str, title: str, match_start: int, match_end: int, candidate: str) -> bool:
@@ -422,19 +497,31 @@ def _recognize_non_japanese_external_aliases(
     full_text: str,
     source_language: str,
     limit: int | None,
+    *,
+    aliases: Iterable[ExternalHorseAlias] | None = None,
+    known_horse_terms: set[str] | None = None,
+    progress_callback: Callable[[], None] | None = None,
 ) -> list[RecognizedHorseName]:
-    known_horse_terms = {_comparable_horse_name(term, source_language) for term in _known_horse_terms(source_language)}
+    formal_matches: list[RecognizedHorseName] = []
+    if known_horse_terms is None:
+        formal_matches = _recognize_formal_horse_terms(full_text, source_language, limit=None)
+        known_horse_terms = {
+            _comparable_horse_name(term, source_language) for term in _known_horse_terms(source_language)
+        }
     candidates: dict[str, dict] = {}
-    candidate_keys = _non_japanese_alias_candidate_keys(full_text, source_language)
-    if not candidate_keys:
-        return []
-    queryset = ExternalHorseAlias.objects.filter(source_language=source_language).exclude(normalized_name="")
-    if source_language == SourceLanguage.ENGLISH:
-        queryset = queryset.annotate(normalized_key=Lower("normalized_name")).filter(normalized_key__in=candidate_keys)
-    else:
-        queryset = queryset.filter(normalized_name__in=candidate_keys)
-    queryset = queryset.order_by("normalized_name", "-confidence", "-last_seen_at", "external_horse_id")
-    for alias in queryset:
+    if aliases is None:
+        candidate_keys = _non_japanese_alias_candidate_keys(full_text, source_language)
+        if not candidate_keys:
+            return formal_matches[:limit] if limit is not None else formal_matches
+        queryset = ExternalHorseAlias.objects.filter(source_language=source_language).exclude(normalized_name="")
+        if source_language == SourceLanguage.ENGLISH:
+            queryset = queryset.annotate(normalized_key=Lower("normalized_name")).filter(normalized_key__in=candidate_keys)
+        else:
+            queryset = queryset.filter(normalized_name__in=candidate_keys)
+        aliases = queryset.order_by("normalized_name", "-confidence", "-last_seen_at", "external_horse_id")
+    for index, alias in enumerate(aliases, start=1):
+        if progress_callback and index % 100 == 1:
+            progress_callback()
         alias_text = _normalize_horse_name(alias.normalized_name or alias.name_en or alias.name_zh_hant or alias.name_ja)
         comparable_alias = _comparable_horse_name(alias_text, source_language)
         if not comparable_alias or comparable_alias in known_horse_terms:
@@ -480,7 +567,76 @@ def _recognize_non_japanese_external_aliases(
             )
         )
     recognized.sort(key=lambda item: (item.first_position, -len(item.matched_text), -item.confidence, item.name_ja))
-    return recognized[:limit] if limit is not None else recognized
+    combined = [*formal_matches, *recognized]
+    combined.sort(key=lambda item: (item.first_position, -len(item.matched_text), -item.confidence, item.name_ja))
+    return combined[:limit] if limit is not None else combined
+
+
+def recognize_horse_names_batch(
+    articles: Iterable[NewsArticle],
+    *,
+    limit: int | None = 12,
+    progress_callback: Callable[[], None] | None = None,
+    known_horse_terms_by_language: dict[str, set[str]] | None = None,
+    query_count_callback: Callable[[str, int], None] | None = None,
+) -> dict[int, list[RecognizedHorseName]]:
+    article_list = list(articles)
+    recognized: dict[int, list[RecognizedHorseName]] = {}
+    grouped: dict[str, list[tuple[NewsArticle, str]]] = {}
+    for article in article_list:
+        if progress_callback:
+            progress_callback()
+        language = article.source_language or SourceLanguage.JAPANESE
+        full_text = "\n".join(
+            part for part in [article.title_ja or "", article.body_ja_normalized or article.body_ja_raw or ""] if part
+        )
+        if language == SourceLanguage.JAPANESE:
+            recognized[article.id] = recognize_horse_names(
+                article.title_ja,
+                article.body_ja_normalized or article.body_ja_raw,
+                limit=limit,
+                source_language=language,
+            )
+            continue
+        grouped.setdefault(language, []).append((article, full_text))
+
+    for language, rows in grouped.items():
+        if progress_callback:
+            progress_callback()
+        queryset = ExternalHorseAlias.objects.filter(source_language=language).exclude(normalized_name="")
+        if language != SourceLanguage.ENGLISH:
+            candidate_keys: set[str] = set()
+            for _, full_text in rows:
+                candidate_keys.update(_non_japanese_alias_candidate_keys(full_text, language))
+            queryset = queryset.filter(normalized_name__in=candidate_keys)
+        query_counter = {"count": 0}
+
+        def count_query(execute, sql, params, many, context):
+            query_counter["count"] += 1
+            return execute(sql, params, many, context)
+
+        with connection.execute_wrapper(count_query):
+            aliases = list(queryset.order_by("normalized_name", "-confidence", "-last_seen_at", "external_horse_id"))
+        if query_count_callback:
+            query_count_callback("horse_alias_prefetch_count", query_counter["count"])
+        if progress_callback:
+            progress_callback()
+        if known_horse_terms_by_language is not None:
+            known_terms = known_horse_terms_by_language.get(language, set())
+        else:
+            known_terms = {_comparable_horse_name(term, language) for term in _known_horse_terms(language)}
+            if query_count_callback:
+                query_count_callback("horse_term_prefetch_count", 2)
+        for article, full_text in rows:
+            recognized[article.id] = _recognize_non_japanese_external_aliases(
+                full_text,
+                language,
+                limit,
+                aliases=aliases,
+                known_horse_terms=known_terms,
+                progress_callback=progress_callback,
+            )
+    return recognized
 
 
 def recognize_horse_names(
@@ -500,7 +656,7 @@ def recognize_horse_names(
     token_matches = _candidate_tokens(full_text)
     normalized_tokens = {_normalize_horse_name(match.group(0)) for match in token_matches if _normalize_horse_name(match.group(0))}
     alias_lookup = _external_aliases_by_normalized(normalized_tokens, source_language=source_language)
-    known_horse_terms = _known_horse_terms(source_language)
+    known_horse_terms = _known_horse_terms_by_candidate(source_language)
     stopwords = non_horse_common_words()
 
     candidates: dict[str, dict] = {}
@@ -525,8 +681,14 @@ def recognize_horse_names(
         record["first"] = min(record["first"], match.start())
 
         if candidate in known_horse_terms:
-            record["source"] = "formal_term"
+            terms = known_horse_terms[candidate]
+            record["source"] = "formal_ambiguous_term" if len(terms) > 1 else "formal_term"
+            record["term"] = terms[0]
             record["score"] = max(record["score"], 100)
+            if len(terms) > 1:
+                record["conflict_flags"] = sorted(
+                    set([*record["conflict_flags"], "ambiguous_formal_horse_name"])
+                )
             continue
 
         aliases = alias_lookup.get(normalized, [])
@@ -552,19 +714,22 @@ def recognize_horse_names(
     recognized: list[RecognizedHorseName] = []
     for name, meta in candidates.items():
         source = meta["source"]
-        if source == "formal_term":
+        if source in {"formal_term", "formal_ambiguous_term"}:
+            term = meta.get("term")
+            is_ambiguous = source == "formal_ambiguous_term"
+            has_translation = bool(term and term.has_translation and not is_ambiguous)
             recognized.append(
                 RecognizedHorseName(
                     name_ja=name,
-                    source=source,
+                    source=source if is_ambiguous or has_translation else "formal_pending_term",
                     matched_text=name,
                     confidence=100,
                     external_horse_ids=[],
                     primary_external_horse_id="",
-                    needs_preserve=False,
-                    has_translation=True,
+                    needs_preserve=is_ambiguous or not has_translation,
+                    has_translation=has_translation,
                     first_position=meta["first"],
-                    detection_reason="formal_term",
+                    detection_reason=source if is_ambiguous else ("formal_term" if has_translation else "formal_pending_term"),
                     conflict_flags=meta["conflict_flags"],
                 )
             )

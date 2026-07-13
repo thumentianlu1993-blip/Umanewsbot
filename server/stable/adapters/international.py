@@ -6,9 +6,11 @@ import json
 import re
 from datetime import datetime, timedelta, timezone as dt_timezone
 from urllib.parse import urljoin, urlsplit
+from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
+from django.conf import settings
 from django.utils import dateparse, timezone
 
 from stable.models import RacingRegion, SourceKind, SourceLanguage, SourceMode, SourceSite
@@ -385,6 +387,59 @@ class FranceGalopEnglishNewsAdapter(SimpleInternationalNewsAdapter):
     title_selector = "h1, article h1"
     body_selector = "article, .region-content, main"
 
+    def _parse_published_at(self, date_node) -> datetime | None:
+        if date_node is None:
+            return None
+        raw = (date_node.get("datetime") or date_node.get_text(" ", strip=True) or "").strip()
+        parsed = dateparse.parse_datetime(raw)
+        if parsed is None:
+            for pattern in ("%d %B %Y - %H:%M", "%d %B %Y", "%B %d, %Y - %H:%M", "%B %d, %Y"):
+                try:
+                    parsed = datetime.strptime(raw, pattern)
+                    break
+                except ValueError:
+                    continue
+        if parsed is None:
+            return None
+        if timezone.is_naive(parsed):
+            parsed = parsed.replace(tzinfo=ZoneInfo("Europe/Paris"))
+        return parsed.astimezone(dt_timezone.utc)
+
+    def parse_detail_html(self, html: str, *, url: str) -> SourceArticleDetail:
+        detail = super().parse_detail_html(html, url=url)
+        soup = BeautifulSoup(html, "lxml")
+        date_node = soup.select_one(self.date_selector)
+        raw = (
+            (date_node.get("datetime") or date_node.get_text(" ", strip=True) or "").strip()
+            if date_node is not None
+            else ""
+        )
+        detail.metadata["published_at_evidence"] = {
+            "source": "detail" if detail.published_at else "fallback",
+            "raw": raw,
+            "timezone": "Europe/Paris",
+            "verified": bool(detail.published_at),
+        }
+        detail.metadata["published_at_verified"] = bool(detail.published_at)
+        return detail
+
+    def normalize_source_payload(self, stub: SourceArticleStub, detail: SourceArticleDetail) -> CanonicalNewsDraft:
+        draft = super().normalize_source_payload(stub, detail)
+        if detail.published_at:
+            evidence = detail.metadata.get("published_at_evidence") or {}
+            draft.metadata["published_at_verified"] = True
+            draft.metadata["published_at_evidence"] = evidence
+        else:
+            evidence = stub.metadata.get("published_at_evidence") or {
+                "source": "listing",
+                "raw": stub.published_at.isoformat() if stub.published_at else "",
+                "timezone": "UTC",
+                "verified": False,
+            }
+            draft.metadata["published_at_verified"] = False
+            draft.metadata["published_at_evidence"] = evidence
+        return draft
+
 
 class TDNAdapter(SimpleInternationalNewsAdapter):
     source_site = SourceSite.TDN
@@ -521,10 +576,95 @@ class TDNAdapter(SimpleInternationalNewsAdapter):
 class TDNFranceKeywordAdapter(TDNAdapter):
     source_site = SourceSite.TDN_FRANCE
     canonical_source_site = SourceSite.TDN
-    api_url = "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=France%20Galop&per_page=20"
+    api_url = "https://www.thoroughbreddailynews.com/wp-json/wp/v2/posts"
     racing_region = RacingRegion.FRANCE
     resolve_missing_api_dates = True
-    max_api_article_age = timedelta(days=3)
+    search_query = "France Galop"
+
+    @property
+    def max_api_article_age(self) -> timedelta | None:
+        if hasattr(self, "_max_api_article_age_override"):
+            return self._max_api_article_age_override
+        return timedelta(days=max(1, int(getattr(settings, "TDN_FRANCE_FRESHNESS_DAYS", 3))))
+
+    @max_api_article_age.setter
+    def max_api_article_age(self, value: timedelta | None) -> None:
+        self._max_api_article_age_override = value
+
+    def _query_params(self, query: str) -> dict[str, str | int]:
+        age = self.max_api_article_age or timedelta(days=max(1, int(getattr(settings, "TDN_FRANCE_FRESHNESS_DAYS", 3))))
+        cutoff = timezone.now() - age
+        return {
+            "search": query,
+            "orderby": "date",
+            "order": "desc",
+            "after": cutoff.astimezone(dt_timezone.utc).isoformat().replace("+00:00", "Z"),
+            "per_page": 20,
+            "_fields": "id,link,title,date_gmt,date",
+        }
+
+    def _fetch_query(self, query: str, mode: SourceMode) -> list[SourceArticleStub]:
+        params = self._query_params(query)
+        response = requests.get(
+            self.api_url,
+            params=params,
+            headers={"User-Agent": "umanewsbot/1.0 (+https://umafans.run)"},
+            timeout=15,
+        )
+        self.last_listing_http_status = getattr(response, "status_code", None)
+        prepared_url = requests.Request("GET", self.api_url, params=params).prepare().url or self.api_url
+        self.last_listing_final_url = getattr(response, "url", prepared_url) or prepared_url
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, list):
+            return []
+        stubs: list[SourceArticleStub] = []
+        for index, item in enumerate(payload, start=1):
+            if not isinstance(item, dict):
+                continue
+            raw_url = (item.get("link") or item.get("url") or "").strip()
+            raw_title = self._api_title(item.get("title"))
+            if not raw_url or not raw_title:
+                continue
+            article_url = raw_url.split("?", 1)[0]
+            published_at = self._resolved_api_datetime(item)
+            if published_at is None:
+                self.skipped_items.append(f"{article_url}: missing_published_at")
+                continue
+            if self._is_stale_api_article(published_at):
+                self.skipped_items.append(f"{article_url}: stale_published_at {published_at.isoformat()}")
+                continue
+            raw_date = str(item.get("date_gmt") or item.get("date") or "")
+            stubs.append(
+                SourceArticleStub(
+                    source_site=self.source_site,
+                    source_mode=mode,
+                    source_article_id=self._article_id(article_url),
+                    source_url=article_url,
+                    title_ja=raw_title,
+                    published_at=published_at,
+                    rank=self._listing_rank(raw_title, index, mode),
+                    metadata={
+                        "listing_url": self.api_url,
+                        "listing_query": query,
+                        "listing_queries": [query],
+                        "request_url": prepared_url,
+                        "published_at_verified": True,
+                        "published_at_evidence": {
+                            "source": "api",
+                            "raw": raw_date,
+                            "timezone": "UTC",
+                            "verified": True,
+                        },
+                    },
+                )
+            )
+        return stubs
+
+    def fetch_listing(self, mode: SourceMode, page_or_month: str | int) -> list[SourceArticleStub]:
+        self.skipped_items = []
+        self.last_listing_query_errors = []
+        return self._fetch_query(self.search_query, mode or self.source_mode)[:20]
 
 
 class TDNFranceBroadKeywordAdapter(TDNFranceKeywordAdapter):
@@ -532,50 +672,38 @@ class TDNFranceBroadKeywordAdapter(TDNFranceKeywordAdapter):
     search_queries = ("French racing", "ParisLongchamp", "Deauville", "Chantilly")
     last_listing_query_errors: list[dict[str, str]]
 
-    def listing_url(self, page_or_month: str | int, mode: SourceMode | str | None = None) -> str:
-        return "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?search=French%20racing&per_page=20"
-
     def fetch_listing(self, mode: SourceMode, page_or_month: str | int) -> list[SourceArticleStub]:
         resolved_mode = mode or self.source_mode
-        stubs: list[SourceArticleStub] = []
-        seen: set[str] = set()
+        by_url: dict[str, SourceArticleStub] = {}
         self.skipped_items = []
         query_errors: list[dict[str, str]] = []
         first_error: Exception | None = None
         successful_query_count = 0
         last_success_http_status: int | None = None
         last_success_final_url = ""
-        self._preserve_skipped_items = True
-        try:
-            for query in self.search_queries:
-                self.api_url = (
-                    "https://www.thoroughbreddailynews.com/wp-json/wp/v2/search?"
-                    f"search={requests.utils.quote(query)}&per_page=20"
-                )
-                try:
-                    query_stubs = super().fetch_listing(resolved_mode, page_or_month)
-                    successful_query_count += 1
-                    last_success_http_status = self.last_listing_http_status
-                    last_success_final_url = self.last_listing_final_url
-                except Exception as exc:
-                    if first_error is None:
-                        first_error = exc
-                    query_errors.append({"query": query, "error": str(exc)})
+        configured_queries = getattr(settings, "TDN_FRANCE_SEARCH_QUERIES", None)
+        queries = tuple(self.search_queries if "search_queries" in self.__dict__ else (configured_queries or self.search_queries))
+        for query in queries:
+            try:
+                query_stubs = self._fetch_query(query, resolved_mode)
+                successful_query_count += 1
+                last_success_http_status = self.last_listing_http_status
+                last_success_final_url = self.last_listing_final_url
+            except Exception as exc:
+                if first_error is None:
+                    first_error = exc
+                query_errors.append({"query": query, "error": str(exc)})
+                continue
+            for stub in query_stubs:
+                existing = by_url.get(stub.source_url)
+                if existing is None:
+                    by_url[stub.source_url] = stub
                     continue
-                for stub in query_stubs:
-                    if stub.source_url in seen:
-                        continue
-                    seen.add(stub.source_url)
-                    stub.metadata["listing_query"] = query
-                    stubs.append(stub)
-                    if len(stubs) >= 20:
-                        self.last_listing_query_errors = query_errors
-                        self.last_listing_http_status = last_success_http_status
-                        self.last_listing_final_url = last_success_final_url
-                        return stubs
-        finally:
-            self._preserve_skipped_items = False
+                queries_seen = existing.metadata.setdefault("listing_queries", [existing.metadata.get("listing_query")])
+                if query not in queries_seen:
+                    queries_seen.append(query)
         self.last_listing_query_errors = query_errors
+        stubs = sorted(by_url.values(), key=lambda item: (-item.published_at.timestamp(), item.source_url))[:20]
         if stubs:
             self.last_listing_http_status = last_success_http_status
             self.last_listing_final_url = last_success_final_url

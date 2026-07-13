@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Callable
 
 from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.html import strip_tags
 
 from stable.models import (
     AutomationLog,
@@ -130,6 +133,26 @@ class ValidationOutcome:
         return [issue for issue in self.issues if issue.get("severity") == SEVERITY_WARNING]
 
 
+@dataclass
+class ValidationBatchContext:
+    term_entries: list[TermEntry]
+    terms_by_language: dict[str, dict[int, list[str]]]
+    recognized_horses_by_article: dict[int, list]
+    duplicate_candidates: list[NewsArticle]
+    term_entry_ids_by_article: dict[int, set[int]]
+    structured_entities_by_article: dict[int, dict[str, list[str]]]
+    term_snapshot_sha256: str = ""
+    term_index_build_count: int = 1
+    entity_prefetch_count: int = 0
+    race_entity_prefetch_count: int = 0
+    horse_alias_prefetch_count: int = 0
+    horse_term_prefetch_count: int = 0
+    term_entry_prefetch_count: int = 0
+    term_alias_prefetch_count: int = 0
+    duplicate_corpus_prefetch_count: int = 1
+    term_pattern_check_count: int = 0
+
+
 @dataclass(frozen=True)
 class EnglishTermMatchContext:
     matched_text: str
@@ -137,6 +160,7 @@ class EnglishTermMatchContext:
     position: str
     tokens_before: tuple[str, ...] = ()
     tokens_after: tuple[str, ...] = ()
+    matched_span: tuple[int, int] = (0, 0)
 
 
 @dataclass(frozen=True)
@@ -145,10 +169,28 @@ class EnglishTermSemanticDecision:
     confidence: float
     reason: str
     match: EnglishTermMatchContext
+    evidence: tuple[str, ...] = ()
 
 
 def _source_text(article: NewsArticle) -> str:
-    return "\n".join([article.title_ja or "", article.body_ja_normalized or article.body_ja_raw or ""]).strip()
+    title, body = _visible_source_parts(article)
+    return "\n".join([title, body]).strip()
+
+
+def _clean_visible_source_text(text: str) -> str:
+    cleaned = text or ""
+    for tag in ("script", "style", "nav", "aside"):
+        cleaned = re.sub(rf"<{tag}\b[^>]*>.*?</{tag}>", " ", cleaned, flags=re.IGNORECASE | re.DOTALL)
+    cleaned = strip_tags(cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip()
+
+
+def _visible_source_parts(article: NewsArticle) -> tuple[str, str]:
+    return (
+        _clean_visible_source_text(article.title_ja or ""),
+        _clean_visible_source_text(article.body_ja_normalized or article.body_ja_raw or ""),
+    )
 
 
 def _content_source() -> str:
@@ -226,7 +268,7 @@ def _quote_fragments(text: str) -> list[str]:
 
 
 def _normalize_term_text(text: str) -> str:
-    normalized = (text or "").lower()
+    normalized = unicodedata.normalize("NFKC", text or "").lower()
     replacements = {
         "（": "(",
         "）": ")",
@@ -258,6 +300,11 @@ def _term_preserved(
     return any(candidate and _normalize_term_text(candidate) in normalized_publish for candidate in candidates)
 
 
+def _pending_horse_original_preserved(publish_text: str, source_terms: list[str]) -> bool:
+    normalized_publish = _normalize_term_text(publish_text)
+    return any(term and _normalize_term_text(term) in normalized_publish for term in source_terms)
+
+
 def _source_term_hit(text: str, source_terms: list[str], source_language: str | None) -> bool:
     return any(source_term_matches_text(text, term, source_language) for term in source_terms)
 
@@ -272,6 +319,8 @@ def _setting_list(name: str) -> set[str]:
 
 
 def _term_gate_region_allowed(entry: TermEntry, article: NewsArticle, source_language: str | None) -> bool:
+    if entry.is_pending_horse_translation:
+        return True
     if source_language != SourceLanguage.ENGLISH:
         return True
     term_region = entry.racing_region or GLOBAL_RACING_REGION
@@ -314,13 +363,39 @@ def _matched_source_term(text: str, source_terms: list[str], source_language: st
     return ""
 
 
+def _nfkc_text_with_source_offsets(text: str) -> tuple[str, list[int]]:
+    normalized_parts: list[str] = []
+    source_offsets: list[int] = []
+    for index, character in enumerate(text or ""):
+        normalized = unicodedata.normalize("NFKC", character)
+        normalized_parts.append(normalized)
+        source_offsets.extend([index] * len(normalized))
+    return "".join(normalized_parts), source_offsets
+
+
+def _source_span_from_normalized(
+    source_offsets: list[int],
+    start: int,
+    end: int,
+) -> tuple[int, int]:
+    if start >= end or not source_offsets:
+        return start, end
+    return source_offsets[start], source_offsets[end - 1] + 1
+
+
 def _source_term_match_span(text: str, candidate: str, source_language: str | None) -> tuple[int, int, str] | None:
     if not candidate:
         return None
     if source_language == SourceLanguage.ENGLISH:
-        pattern = re.compile(r"(?<![0-9A-Za-z])" + re.escape(candidate) + r"(?![0-9A-Za-z])", re.IGNORECASE)
-        match = pattern.search(text or "")
-        return (match.start(), match.end(), match.group(0)) if match else None
+        normalized_text, source_offsets = _nfkc_text_with_source_offsets(text or "")
+        normalized_candidate = unicodedata.normalize("NFKC", candidate)
+        pattern = re.compile(r"(?<![0-9A-Za-z])" + re.escape(normalized_candidate) + r"(?![0-9A-Za-z])", re.IGNORECASE)
+        match = pattern.search(normalized_text)
+        if not match:
+            return None
+        source_start, source_end = _source_span_from_normalized(source_offsets, match.start(), match.end())
+        original = (text or "")[source_start:source_end]
+        return (source_start, source_end, original or match.group(0))
     index = (text or "").find(candidate)
     return (index, index + len(candidate), candidate) if index >= 0 else None
 
@@ -349,8 +424,47 @@ def _source_term_match_context(
                 position=position,
                 tokens_before=tokens_before,
                 tokens_after=tokens_after,
+                matched_span=(start, end),
             )
     return EnglishTermMatchContext(matched_text="", matched_context="", position="unknown")
+
+
+def _all_source_term_match_contexts(
+    title: str,
+    body: str,
+    source_terms: list[str],
+) -> list[EnglishTermMatchContext]:
+    matches: list[EnglishTermMatchContext] = []
+    seen: set[tuple[str, int, int]] = set()
+    for field, text in (("title", title), ("body", body)):
+        normalized_text, source_offsets = _nfkc_text_with_source_offsets(text or "")
+        for term in sorted(source_terms, key=lambda value: (-len(value), value.casefold())):
+            normalized_term = unicodedata.normalize("NFKC", term or "")
+            if not normalized_term:
+                continue
+            pattern = re.compile(r"(?<![0-9A-Za-z])" + re.escape(normalized_term) + r"(?![0-9A-Za-z])", re.IGNORECASE)
+            for match in pattern.finditer(normalized_text):
+                source_start, source_end = _source_span_from_normalized(source_offsets, match.start(), match.end())
+                key = (field, source_start, source_end)
+                if key in seen:
+                    continue
+                seen.add(key)
+                context_start = max(0, source_start - 80)
+                context_end = min(len(text or ""), source_end + 80)
+                snippet = (text or "")[context_start:context_end].strip()
+                position = "title" if field == "title" else ("lead" if source_start < 500 else "body")
+                matches.append(
+                    EnglishTermMatchContext(
+                        matched_text=(text or "")[source_start:source_end] or match.group(0),
+                        matched_context=snippet,
+                        position=position,
+                        tokens_before=tuple(re.findall(r"[A-Za-z0-9']+", (text or "")[context_start:source_start])[-8:]),
+                        tokens_after=tuple(re.findall(r"[A-Za-z0-9']+", (text or "")[source_end:context_end])[:8]),
+                        matched_span=(source_start, source_end),
+                    )
+                )
+    order = {"title": 0, "lead": 1, "body": 2}
+    return sorted(matches, key=lambda item: (order[item.position], item.matched_span[0], item.matched_span[1]))
 
 
 def _english_term_candidate_keys(entry: TermEntry, source_terms: list[str]) -> set[str]:
@@ -424,7 +538,117 @@ def _english_term_semantic_payload(decision: EnglishTermSemanticDecision) -> dic
         "match_position": decision.match.position,
         "tokens_before": list(decision.match.tokens_before),
         "tokens_after": list(decision.match.tokens_after),
+        "matched_span": list(decision.match.matched_span),
+        "entity_evidence": list(decision.evidence),
     }
+
+
+def _classify_english_term_match_v2(
+    entry: TermEntry,
+    match: EnglishTermMatchContext,
+    *,
+    structured_entities: dict[str, list[str]] | None = None,
+) -> EnglishTermSemanticDecision:
+    if entry.term_type in {TermType.RACE, TermType.JOCKEY, TermType.TRAINER}:
+        return EnglishTermSemanticDecision("proper_noun", 0.95, f"{entry.term_type}_term_type", match)
+    before = [token.casefold() for token in match.tokens_before]
+    after = [token.casefold() for token in match.tokens_after]
+    matched_key = unicodedata.normalize("NFKC", match.matched_text or entry.source_ja).casefold()
+    if matched_key in (structured_entities or {}):
+        return EnglishTermSemanticDecision(
+            "proper_noun", 0.99, "structured_race_entity", match,
+            tuple((structured_entities or {}).get(matched_key, [])),
+        )
+    if len(after) >= 2 and after[0] == "was" and after[1] == matched_key:
+        return EnglishTermSemanticDecision("proper_noun", 0.95, "horse_subject_copular_relation", match)
+    if before and before[-1] in {"was", "is", "as"}:
+        return EnglishTermSemanticDecision("common_word", 0.95, "predicate_adjective_context", match)
+    if match.tokens_after and re.fullmatch(r"[A-Z]{2,3}", match.tokens_after[0]):
+        return EnglishTermSemanticDecision("proper_noun", 0.95, "horse_country_suffix", match)
+    local_context = " ".join([*before[-4:], "__match__", *after[:8]])
+    entity_patterns = [
+        r"__match__\s+(?:wins?|won|finished|runs?|ran|returns?|heads?|targets?|is\s+trained\s+by)\b",
+        r"__match__\s+(?:ridden|trained)\s+by\b",
+    ]
+    if any(re.search(pattern, local_context, re.IGNORECASE) for pattern in entity_patterns):
+        return EnglishTermSemanticDecision("proper_noun", 0.95, "horse_entity_relation", match)
+    common_patterns = {
+        "brilliant": [r"\b(?:a|an)\s+__match__\b"],
+        "something": [r"__match__\s+(?:went|is|was|around)\b"],
+        "versatile": [r"__match__\s+(?:filly|colt|horse|runner)\b"],
+        "incredible": [r"\b(?:as|was|is)\s+__match__\b"],
+        "reputation": [r"\b(?:huge|strong|big)\s+__match__\b"],
+        "threat": [r"\bposed?\s+a\s+__match__\b"],
+        "title": [r"\b(?:another|the)\s+__match__\b"],
+        "soon": [r"\btoo\s+__match__\b"],
+        "yet": [r"\b(?:has|have|had)\s+__match__\s+to\b"],
+        "contact": [r"__match__\s+(?:details?|the|office|us)\b"],
+        "class": [r"__match__\s+\d+\b"],
+    }
+    if any(re.search(pattern, local_context, re.IGNORECASE) for pattern in common_patterns.get(matched_key, [])):
+        return EnglishTermSemanticDecision("common_word", 0.95, "ordinary_english_context", match)
+    return EnglishTermSemanticDecision("uncertain", 0.45, "insufficient_context_evidence", match)
+
+
+def _v2_term_gate_result(
+    entry: TermEntry,
+    matches: list[EnglishTermMatchContext],
+    article: NewsArticle,
+    *,
+    structured_entities: dict[str, list[str]] | None = None,
+) -> tuple[list[dict], GateIssue]:
+    payloads: list[dict] = []
+    decisions = [
+        _classify_english_term_match_v2(entry, match, structured_entities=structured_entities)
+        for match in matches
+    ]
+    for decision in decisions:
+        is_core = decision.match.position in {"title", "lead"} or (
+            entry.priority >= 80 and decision.classification == "proper_noun"
+        )
+        payloads.append(
+            {
+                "term_id": entry.id,
+                "source_ja": entry.source_ja,
+                "source_language": entry.source_language,
+                "target_zh": entry.target_zh,
+                "term_type": entry.term_type,
+                "priority": entry.priority,
+                "position": "core" if is_core else "background",
+                "term_region": entry.racing_region or GLOBAL_RACING_REGION,
+                "article_region": article.racing_region or GLOBAL_RACING_REGION,
+                **_english_term_semantic_payload(decision),
+            }
+        )
+    blocking = [
+        payload for payload in payloads
+        if payload["term_semantic_classification"] in {"proper_noun", "uncertain"} and payload["position"] == "core"
+    ]
+    background = [
+        payload for payload in payloads
+        if payload["term_semantic_classification"] in {"proper_noun", "uncertain"} and payload["position"] == "background"
+    ]
+    if blocking:
+        return payloads, _issue(
+            "core_term_missing",
+            SEVERITY_BLOCKER,
+            "核心术语未稳定保留：" + entry.source_ja,
+            route=ROUTE_MANUAL,
+            payload=blocking[0],
+        )
+    if background:
+        return payloads, _issue(
+            "background_term_missing",
+            SEVERITY_WARNING,
+            "背景术语未稳定保留：" + entry.source_ja,
+            payload=background[0],
+        )
+    return payloads, _issue(
+        "english_term_common_word_downgraded",
+        SEVERITY_WARNING,
+        "普通英文词命中已降级：" + entry.source_ja,
+        payload=payloads[0],
+    )
 
 
 def _classify_english_term_context(
@@ -504,7 +728,13 @@ def _article_similarity_text(article: NewsArticle, content_source: str | None = 
     )
 
 
-def detect_duplicate_issue(article: NewsArticle, content_source: str) -> GateIssue | None:
+def detect_duplicate_issue(
+    article: NewsArticle,
+    content_source: str,
+    *,
+    candidates: list[NewsArticle] | None = None,
+    progress_callback: Callable[[], None] | None = None,
+) -> GateIssue | None:
     lookback_days = int(getattr(settings, "AUTO_DUPLICATE_LOOKBACK_DAYS", 7))
     high_threshold = float(getattr(settings, "AUTO_DUPLICATE_HIGH_THRESHOLD", 0.86))
     review_threshold = float(getattr(settings, "AUTO_DUPLICATE_REVIEW_THRESHOLD", 0.72))
@@ -515,18 +745,27 @@ def detect_duplicate_issue(article: NewsArticle, content_source: str) -> GateIss
     candidate_text = _article_similarity_text(article, content_source)
     if not candidate_text.strip():
         return None
-    queryset = (
-        NewsArticle.objects.filter(
-            Q(workflow_status=WorkflowStatus.PUBLISHED)
-            | Q(review_mode=ReviewMode.AUTO, automation_status=AutomationStatus.PUBLISH_READY),
-            published_at__gte=window_start,
+    queryset = candidates
+    if queryset is None:
+        queryset = list(
+            NewsArticle.objects.filter(
+                Q(workflow_status=WorkflowStatus.PUBLISHED)
+                | Q(review_mode=ReviewMode.AUTO, automation_status=AutomationStatus.PUBLISH_READY),
+                published_at__gte=window_start,
+            )
+            .exclude(pk=article.pk)
+            .order_by("-published_at", "-id")[:80]
         )
-        .exclude(pk=article.pk)
-        .order_by("-published_at", "-id")[:80]
-    )
+    else:
+        queryset = [
+            candidate for candidate in queryset
+            if candidate.pk != article.pk and candidate.published_at and candidate.published_at >= window_start
+        ][:80]
     best_article: NewsArticle | None = None
     best_score = 0.0
-    for other in queryset:
+    for index, other in enumerate(queryset, start=1):
+        if progress_callback and index % 20 == 1:
+            progress_callback()
         score = _jaccard_similarity(candidate_text, _article_similarity_text(other, "base_translation"))
         if score > best_score:
             best_score = score
@@ -562,8 +801,20 @@ def validate_rewrite(
     *,
     term_entries: list[TermEntry] | None = None,
     terms_by_language: dict[str, dict[int, list[str]]] | None = None,
+    batch_context: ValidationBatchContext | None = None,
+    progress_callback: Callable[[], None] | None = None,
 ) -> ValidationOutcome:
-    source = _source_text(article)
+    if progress_callback:
+        progress_callback()
+    context_mode = str(getattr(settings, "ENGLISH_TERM_CONTEXT_MODE", "off") or "off").strip().lower()
+    if context_mode not in {"off", "shadow", "enforce"}:
+        context_mode = "off"
+    visible_title, visible_body = _visible_source_parts(article)
+    legacy_title = article.title_ja or ""
+    legacy_body = article.body_ja_normalized or article.body_ja_raw or ""
+    title = visible_title if context_mode == "enforce" else legacy_title
+    gate_body = visible_body if context_mode == "enforce" else legacy_body
+    source = "\n".join([title, gate_body]).strip()
     content_source = _content_source()
     publish_text = _publish_text(article, content_source)
     publish_body = _publish_body(article, content_source)
@@ -591,6 +842,16 @@ def validate_rewrite(
         issues.append(_issue("body_too_short", SEVERITY_BLOCKER, "发布正文过短", route=ROUTE_MANUAL))
     if not article.source_url:
         issues.append(_issue("missing_source_url", SEVERITY_BLOCKER, "缺少原文链接", route=ROUTE_MANUAL))
+    if article.published_at_verified is False:
+        issues.append(
+            _issue(
+                "published_at_unverified",
+                SEVERITY_BLOCKER,
+                "发布时间缺少可信来源证据",
+                route=ROUTE_MANUAL,
+                payload={"published_at_evidence": article.published_at_evidence or {}},
+            )
+        )
     if content_source == "rewrite" and article.rewrite_confidence < int(getattr(settings, "REWRITE_CONFIDENCE_MIN", 60)):
         issues.append(
             _issue(
@@ -603,12 +864,18 @@ def validate_rewrite(
 
     preserve_limit = 12
     article_source_language = article.source_language or SourceLanguage.JAPANESE
-    recognized_horses = recognize_horse_names(
-        article.title_ja,
-        article.body_ja_normalized or article.body_ja_raw,
-        limit=None,
-        source_language=article_source_language,
+    recognized_horses = (
+        batch_context.recognized_horses_by_article.get(article.id, [])
+        if batch_context is not None
+        else recognize_horse_names(
+            article.title_ja,
+            article.body_ja_normalized or article.body_ja_raw,
+            limit=None,
+            source_language=article_source_language,
+        )
     )
+    if progress_callback:
+        progress_callback()
     details["recognized_horse_names"] = serialize_recognized_horse_names(recognized_horses)
     preservable_horses = [item for item in recognized_horses if item.needs_preserve][:preserve_limit]
     unknown_horses = [item.matched_text or item.name_ja for item in preservable_horses]
@@ -659,8 +926,11 @@ def validate_rewrite(
         )
 
     missing_terms: list[str] = []
-    title = article.title_ja or ""
-    first_block = (article.body_ja_normalized or article.body_ja_raw or "")[:500]
+    first_block = gate_body[:500]
+    if batch_context is not None:
+        matched_ids = batch_context.term_entry_ids_by_article.get(article.id, set())
+        term_entries = [entry for entry in batch_context.term_entries if entry.id in matched_ids]
+        terms_by_language = batch_context.terms_by_language
     if term_entries is None:
         term_entries = list(TermEntry.objects.filter(
             is_active=True,
@@ -671,9 +941,20 @@ def validate_rewrite(
         if terms_by_language and article_source_language in terms_by_language
         else source_terms_by_entry(term_entries, article_source_language)
     )
-    for entry in term_entries:
+    for index, entry in enumerate(term_entries, start=1):
+        if progress_callback and index % 25 == 1:
+            progress_callback()
         source_terms = terms_by_entry.get(entry.pk, [])
-        source_hit = _source_term_hit(source, source_terms, article_source_language)
+        v2_matches = (
+            _all_source_term_match_contexts(visible_title, visible_body, source_terms)
+            if article_source_language == SourceLanguage.ENGLISH and context_mode in {"shadow", "enforce"}
+            else []
+        )
+        source_hit = (
+            bool(v2_matches)
+            if context_mode == "enforce" and article_source_language == SourceLanguage.ENGLISH
+            else _source_term_hit(source, source_terms, article_source_language)
+        )
         if not source_hit:
             continue
         matched_source_term = _matched_source_term(source, source_terms, article_source_language)
@@ -722,9 +1003,76 @@ def validate_rewrite(
                 )
             )
             continue
-        if not _term_preserved(entry, publish_text, article_source_language, source_terms):
+        preserved = (
+            _pending_horse_original_preserved(publish_text, source_terms)
+            if entry.is_pending_horse_translation
+            else _term_preserved(entry, publish_text, article_source_language, source_terms)
+        )
+        if not preserved:
             missing_terms.append(entry.source_ja)
+            classification_payloads: list[dict] = []
+            v2_issue = None
+            if v2_matches:
+                classification_payloads, v2_issue = _v2_term_gate_result(
+                    entry,
+                    v2_matches,
+                    article,
+                    structured_entities=(batch_context.structured_entities_by_article.get(article.id, {}) if batch_context else {}),
+                )
+                if context_mode == "enforce":
+                    details["english_term_classifications"].extend(classification_payloads)
+                    issues.append(v2_issue)
+                    continue
+            if context_mode == "shadow":
+                legacy_is_core = _is_core_term(entry, source, title, first_block, article_source_language, source_terms)
+                legacy_ambiguous = _ambiguous_english_term_reason(entry, source_terms, is_core=legacy_is_core)
+                legacy_semantic = _classify_english_term_context(
+                    entry, source, title, first_block, source_terms, is_core=legacy_is_core
+                )
+                legacy_would_block = bool(
+                    legacy_is_core
+                    and not legacy_ambiguous
+                    and not (
+                        legacy_semantic
+                        and legacy_semantic.classification == "common_word"
+                        and legacy_semantic.confidence >= 0.8
+                    )
+                )
+                shadow = details.setdefault(
+                    "english_term_context_shadow",
+                    {"would_remove_blocker": False, "would_add_blocker": False, "terms": []},
+                )
+                v2_blocks = bool(v2_issue and v2_issue.severity == SEVERITY_BLOCKER)
+                shadow["would_remove_blocker"] = shadow["would_remove_blocker"] or (legacy_would_block and not v2_blocks)
+                shadow["would_add_blocker"] = shadow["would_add_blocker"] or (not legacy_would_block and v2_blocks)
+                shadow["terms"].append(
+                    {
+                        "term_id": entry.id,
+                        "source_ja": entry.source_ja,
+                        "issue": v2_issue.as_dict() if v2_issue else None,
+                        "classifications": classification_payloads,
+                        "reason": "classified" if v2_issue else "not_in_visible_source",
+                    }
+                )
             is_core = _is_core_term(entry, source, title, first_block, article_source_language, source_terms)
+            if entry.is_pending_horse_translation:
+                issues.append(
+                    _issue(
+                        "pending_horse_original_missing",
+                        SEVERITY_BLOCKER if is_core else SEVERITY_WARNING,
+                        "暂无中文译名马名未保留原文：" + entry.source_ja,
+                        route=ROUTE_MANUAL if is_core else ROUTE_AUTO,
+                        payload={
+                            "source_ja": entry.source_ja,
+                            "matched_text": _matched_source_term(source, source_terms, article_source_language),
+                            "source_language": entry.source_language,
+                            "term_type": entry.term_type,
+                            "priority": entry.priority,
+                            "position": "core" if is_core else "background",
+                        },
+                    )
+                )
+                continue
             ambiguous_reason = (
                 _ambiguous_english_term_reason(entry, source_terms, is_core=is_core)
                 if article_source_language == SourceLanguage.ENGLISH
@@ -842,7 +1190,12 @@ def validate_rewrite(
             )
         )
 
-    duplicate_issue = detect_duplicate_issue(article, content_source)
+    duplicate_issue = detect_duplicate_issue(
+        article,
+        content_source,
+        candidates=batch_context.duplicate_candidates if batch_context is not None else None,
+        progress_callback=progress_callback,
+    )
     if duplicate_issue:
         issues.append(duplicate_issue)
 

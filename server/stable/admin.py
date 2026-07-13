@@ -5,15 +5,21 @@ from django.db.models import Count
 from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
+from django.utils import timezone
 from django.utils.html import format_html
 
 from .forms import NewsArticleAdminForm, NewsImageAdminForm, NewsSourceForm, PushArticleForm
 from .models import (
     ArticleRaceLink,
     ArticleStatus,
+    ArticleTranslationStatus,
     AutomationLog,
     CrawlJob,
     HistoricalRaceEventTarget,
+    HorseIdentityConflict,
+    HorseIdentityConflictStatus,
+    HorseP0Source,
+    HorseProfileCompletionRun,
     MajorRaceEvent,
     MediaAsset,
     NewsArticle,
@@ -42,6 +48,7 @@ from .models import (
     TermCandidateEvidence,
     TermAlias,
     TermEntry,
+    TermGateReprocessRun,
     TranslationRun,
     WindowCandidateDecision,
     WindowTargetDecision,
@@ -142,6 +149,10 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "source_site",
         "source_mode",
         "published_at",
+        "published_at_verified",
+        "translation_error_category",
+        "translation_retry_count",
+        "translation_next_retry_at",
         "workflow_status",
         "automation_status",
         "review_mode",
@@ -150,6 +161,9 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "score_total",
         "status",
         "is_first_crawled",
+        "published_at_verified",
+        "translation_error_category",
+        "translation_retry_exhausted_at",
         "push_action_link",
     )
     list_filter = (
@@ -181,11 +195,16 @@ class NewsArticleAdmin(admin.ModelAdmin):
         "translated_body_zh",
         "translated_summary_zh",
         "published_at",
+        "published_at_verified",
+        "published_at_evidence",
         "is_first_crawled",
         "first_seen_at",
         "last_seen_at",
         "attribution_source",
         "attribution_summary",
+        "attribution_status",
+        "attribution_confidence",
+        "attribution_rule_version",
         "gate_issue_summary",
         "duplicate_article_link",
         "push_action_link",
@@ -202,7 +221,7 @@ class NewsArticleAdmin(admin.ModelAdmin):
         ArticleRaceLinkInline,
         NewsArticleRelatedRegionInline,
     ]
-    actions = ["mark_pending_review", "mark_published_ready", "queue_translation"]
+    actions = ["mark_pending_review", "mark_published_ready", "queue_translation", "retry_failed_translations"]
 
     fieldsets = (
         (
@@ -218,11 +237,13 @@ class NewsArticleAdmin(admin.ModelAdmin):
                     "source_article_id",
                     "source_url",
                     "published_at",
+                    "published_at_verified",
+                    "published_at_evidence",
                 )
             },
         ),
         ("来源原文", {"fields": ("title_ja", "body_ja_raw", "body_ja_normalized")}),
-        ("翻译参考", {"fields": ("translated_title_zh", "translated_summary_zh", "translated_body_zh")}),
+        ("翻译参考", {"fields": ("translated_title_zh", "translated_summary_zh", "translated_body_zh", "translation_error_category", "translation_retry_count", "translation_next_retry_at", "translation_retry_exhausted_at")}),
         ("自动化运营", {"fields": ("review_mode", "risk_level", "automation_status", "content_category", "attribution_source", "attribution_locked", "attribution_summary", "score_total", "quality_score", "rewrite_confidence", "decision_summary", "decision_reason", "gate_issues", "gate_issue_summary", "base_translation_zh", "rewrite_title_zh", "rewrite_summary_zh", "rewrite_body_zh", "published_by_mode", "auto_publish_at", "automation_error_message")}),
         ("重复内容", {"fields": ("duplicate_of", "duplicate_article_link", "duplicate_score", "duplicate_reason", "automation_warning_email_signature", "automation_warning_email_sent_at")}),
         ("发布内容", {"fields": ("title_zh", "summary_zh", "body_zh", "source_note", "editor_notes", "workflow_status", "status")}),
@@ -260,6 +281,18 @@ class NewsArticleAdmin(admin.ModelAdmin):
         for article in queryset:
             dispatch_task(translate_article_task, article.id)
         self.message_user(request, f"已将 {queryset.count()} 篇文章加入翻译队列。", messages.SUCCESS)
+
+    @admin.action(description="立即重试失败翻译")
+    def retry_failed_translations(self, request, queryset):
+        from stable.services.translation_recovery import request_manual_translation_retry
+
+        accepted = 0
+        for article in queryset:
+            result = request_manual_translation_retry(article, requested_by=request.user)
+            if result.accepted:
+                accepted += 1
+                dispatch_task(translate_article_task, article.id)
+        self.message_user(request, f"已接受 {accepted} 篇失败文章的翻译重试请求。", messages.SUCCESS)
 
     def push_action_link(self, obj):
         url = reverse("admin:stable_newsarticle_push", args=[obj.pk])
@@ -339,6 +372,10 @@ class NewsArticleAdmin(admin.ModelAdmin):
 
     def translate_view(self, request: HttpRequest, article_id: int):
         article = get_object_or_404(NewsArticle, pk=article_id)
+        if article.translation_status == ArticleTranslationStatus.FAILED:
+            from stable.services.translation_recovery import request_manual_translation_retry
+
+            request_manual_translation_retry(article, requested_by=request.user)
         dispatch_task(translate_article_task, article.id)
         self.message_user(request, f"已将《{article}》加入翻译队列。", messages.SUCCESS)
         return HttpResponseRedirect(reverse("admin:stable_newsarticle_change", args=[article.pk]))
@@ -754,15 +791,96 @@ class QuotaLedgerAdmin(admin.ModelAdmin):
 
 @admin.register(TermEntry)
 class TermEntryAdmin(admin.ModelAdmin):
-    list_display = ("source_ja", "source_language", "racing_region", "target_zh", "term_type", "race_grade", "priority", "is_active", "updated_at")
-    list_filter = ("source_language", "racing_region", "term_type", "race_grade", "is_active")
+    list_display = (
+        "source_ja",
+        "source_language",
+        "racing_region",
+        "target_zh",
+        "translation_status",
+        "term_type",
+        "race_grade",
+        "priority",
+        "is_active",
+        "updated_at",
+    )
+    list_filter = ("source_language", "racing_region", "term_type", "translation_status", "race_grade", "is_active")
     search_fields = ("source_ja", "target_zh", "notes")
+
+
+@admin.register(HorseProfileCompletionRun)
+class HorseProfileCompletionRunAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "status", "dry_run", "regions", "artifact_path", "started_at", "finished_at", "created_at")
+    list_filter = ("status", "dry_run", "created_at")
+    search_fields = ("name", "artifact_path", "error_message")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(HorseP0Source)
+class HorseP0SourceAdmin(admin.ModelAdmin):
+    list_display = (
+        "profile",
+        "source_type",
+        "status",
+        "racing_region",
+        "race_grade",
+        "race_event",
+        "participant_key",
+        "term",
+        "observed_at",
+    )
+    list_filter = ("source_type", "status", "racing_region", "race_grade")
+    search_fields = (
+        "profile__display_name_zh",
+        "profile__original_name",
+        "horse_name",
+        "participant_key",
+        "source_url",
+        "evidence_summary",
+    )
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(HorseIdentityConflict)
+class HorseIdentityConflictAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "horse_name",
+        "horse_number",
+        "status",
+        "race_event",
+        "resolved_profile",
+        "resolved_horse_number",
+        "observed_at",
+        "resolved_at",
+    )
+    list_filter = ("status", "race_event__country_region", "observed_at", "resolved_at")
+    search_fields = (
+        "horse_name",
+        "horse_number",
+        "resolved_horse_number",
+        "fingerprint",
+        "sire_name",
+        "dam_name",
+        "source_url",
+        "resolution_notes",
+    )
+    raw_id_fields = ("candidate_terms", "candidate_profiles", "resolved_profile", "race_event")
+    readonly_fields = ("fingerprint", "evidence_payload", "observed_at", "resolved_at", "resolved_by", "created_at", "updated_at")
+
+    def save_model(self, request, obj, form, change):
+        if obj.status in {HorseIdentityConflictStatus.RESOLVED, HorseIdentityConflictStatus.IGNORED}:
+            obj.resolved_by = request.user
+            obj.resolved_at = timezone.now()
+        else:
+            obj.resolved_by = None
+            obj.resolved_at = None
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(PushTarget)
 class PushTargetAdmin(admin.ModelAdmin):
-    list_display = ("name", "group_id", "allowed_regions", "push_scope", "importance_strategy", "is_default", "is_active", "updated_at")
-    list_filter = ("push_scope", "importance_strategy", "is_default", "is_active")
+    list_display = ("name", "group_id", "allowed_regions", "multiregion_test_enabled", "push_scope", "importance_strategy", "is_default", "is_active", "updated_at")
+    list_filter = ("multiregion_test_enabled", "push_scope", "importance_strategy", "is_default", "is_active")
     search_fields = ("name", "group_id")
 
 
@@ -844,3 +962,24 @@ class NotificationLogAdmin(admin.ModelAdmin):
     list_filter = ("type", "channel", "status")
     search_fields = ("target", "payload_summary", "error_message")
     readonly_fields = ("type", "channel", "target", "status", "payload_summary", "error_message", "sent_at", "created_at")
+
+
+@admin.register(TermGateReprocessRun)
+class TermGateReprocessRunAdmin(admin.ModelAdmin):
+    list_display = ("id", "mode", "status", "started_at", "finished_at", "manifest_sha256")
+    list_filter = ("mode", "status", "started_at")
+    search_fields = ("id", "manifest_sha256", "error_message")
+    readonly_fields = (
+        "mode", "selectors", "status", "cursor", "rule_version", "settings_sha256",
+        "term_snapshot_sha256", "candidate_payload", "result_payload", "manifest_sha256",
+        "statistics", "error_message", "started_at", "finished_at", "created_at", "updated_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

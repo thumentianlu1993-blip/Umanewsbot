@@ -391,8 +391,9 @@ def validate_term_payload(
     if not source_ja:
         errors.setdefault("source_ja", []).append("原文不能为空。")
 
-    if not target_zh:
+    if not target_zh and term_type != TermType.HORSE:
         errors.setdefault("target_zh", []).append("中文译词不能为空。")
+    translation_status = "translated" if target_zh else "pending"
 
     try:
         priority = int(payload.get("priority") if payload.get("priority") not in (None, "") else 0)
@@ -433,6 +434,7 @@ def validate_term_payload(
         "racing_region": racing_region,
         "source_ja": source_ja,
         "target_zh": target_zh,
+        "translation_status": translation_status,
         "aliases_ja": aliases_ja,
         "aliases_zh": aliases_zh,
         "race_grade": race_grade,
@@ -582,6 +584,7 @@ def commit_term_import(preview_rows: list[dict], import_mode: str) -> dict:
             entry.racing_region = payload.get("racing_region", "")
             entry.source_ja = payload_source
         entry.target_zh = payload.get("target_zh", "")
+        entry.translation_status = payload.get("translation_status") or ("translated" if entry.target_zh else "pending")
         entry.aliases_zh = payload.get("aliases_zh", [])
         entry.race_grade = payload.get("race_grade", "")
         entry.priority = payload.get("priority", 0)

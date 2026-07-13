@@ -273,6 +273,31 @@ class ExternalImportStatus(models.TextChoices):
     PAUSED = "paused", "可继续"
 
 
+class TermGateReprocessStatus(models.TextChoices):
+    PENDING = "pending", "待执行"
+    RUNNING = "running", "执行中"
+    SUCCEEDED = "succeeded", "已完成"
+    FAILED = "failed", "失败"
+    REJECTED = "rejected", "已拒绝"
+    COMMITTED = "committed", "已提交"
+
+
+class AttributionStatus(models.TextChoices):
+    APPLIED = "applied", "已应用"
+    FALLBACK = "fallback", "来源兜底"
+    NEEDS_REVIEW = "needs_review", "待复核"
+    LOCKED_SKIP = "locked_skip", "人工锁定跳过"
+
+
+class MultiregionAttributionRunStatus(models.TextChoices):
+    PENDING = "pending", "待执行"
+    RUNNING = "running", "执行中"
+    COMPLETED = "completed", "已完成"
+    PARTIAL = "partial", "部分完成"
+    FAILED = "failed", "失败"
+    REJECTED = "rejected", "已拒绝"
+
+
 class TranslationStatus(models.TextChoices):
     STARTED = "started", "进行中"
     SUCCESS = "success", "成功"
@@ -472,12 +497,14 @@ class HorseProfileCompleteness(models.TextChoices):
     PROFILE_ONLY = "profile_only", "仅基础资料"
     PARTIAL_PEDIGREE = "partial_pedigree", "部分血统"
     COMPLETE_PEDIGREE_2GEN = "complete_pedigree_2gen", "完整二代血统"
+    COMPLETE_PROFILE_FULL = "complete_profile_full", "完整马匹资料"
 
 
 class HorseProfileModule(models.TextChoices):
     PROFILE = "profile", "基础资料"
     PEDIGREE = "pedigree", "血统"
     RACE_RECORD = "race_record", "参赛履历"
+    MAJOR_WINS = "major_wins", "主胜鞍"
     ALIASES = "aliases", "别名"
 
 
@@ -507,7 +534,47 @@ class HorseRaceResultStatus(models.TextChoices):
     PLACED = "placed", "上名"
     UNPLACED = "unplaced", "未上名"
     SCRATCHED = "scratched", "退赛"
+    WITHDRAWN = "withdrawn", "取消出走"
+    DID_NOT_FINISH = "did_not_finish", "未完赛"
+    DISQUALIFIED = "disqualified", "失格"
     UNKNOWN = "unknown", "未知"
+
+
+class TermTranslationStatus(models.TextChoices):
+    PENDING = "pending", "中文名待补"
+    TRANSLATED = "translated", "已有中文名"
+
+
+class HorseRacingCareerStatus(models.TextChoices):
+    ACTIVE = "active", "在役"
+    RETIRED = "retired", "退役"
+    UNKNOWN = "unknown", "未知"
+
+
+class HorseP0SourceType(models.TextChoices):
+    TERM_ACTIVE_WITH_ZH = "term_active_with_zh", "有中文名 active 术语"
+    MAJOR_RACE_PARTICIPANT = "major_race_participant", "重点赛事参赛马"
+    MANUAL = "manual", "人工标记"
+
+
+class HorseP0SourceStatus(models.TextChoices):
+    ACTIVE = "active", "有效"
+    REVOKED = "revoked", "已撤销"
+
+
+class HorseIdentityConflictStatus(models.TextChoices):
+    PENDING = "pending", "待处理"
+    RESOLVED = "resolved", "已解决"
+    IGNORED = "ignored", "已忽略"
+
+
+class HorseCompletionRunStatus(models.TextChoices):
+    PLANNED = "planned", "已计划"
+    RUNNING = "running", "运行中"
+    DRY_RUN = "dry_run", "Dry-run 完成"
+    COMMITTED = "committed", "已写入"
+    FAILED = "failed", "失败"
+    CANCELLED = "cancelled", "已取消"
 
 
 class HorseCompletionFailureReason(models.TextChoices):
@@ -1230,6 +1297,22 @@ class HorseProfile(TimestampedModel):
         choices=HorseProfileCompleteness.choices,
         default=HorseProfileCompleteness.EMPTY,
     )
+    racing_career_status = models.CharField(
+        max_length=16,
+        choices=HorseRacingCareerStatus.choices,
+        default=HorseRacingCareerStatus.UNKNOWN,
+    )
+    records_synced_through = models.DateField(null=True, blank=True)
+    full_profile_reviewed_at = models.DateTimeField(null=True, blank=True)
+    full_profile_reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_full_horse_profiles",
+    )
+    auto_update_enabled = models.BooleanField(default=False)
+    auto_first_publish_enabled = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
     published_at = models.DateTimeField(null=True, blank=True)
     published_by = models.ForeignKey(
@@ -1258,6 +1341,7 @@ class HorseProfile(TimestampedModel):
             models.Index(fields=("racing_region", "display_name_zh"), name="horse_region_name_idx"),
             models.Index(fields=("completeness_status", "review_status"), name="horse_complete_status_idx"),
             models.Index(fields=("is_featured", "review_status"), name="horse_featured_status_idx"),
+            models.Index(fields=("racing_region", "records_synced_through"), name="horse_region_sync_idx"),
         ]
 
     def __str__(self) -> str:
@@ -1281,8 +1365,197 @@ class HorseProfile(TimestampedModel):
         return self.public_path
 
 
+class HorseProfileCompletionRun(TimestampedModel):
+    name = models.CharField(max_length=160, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=HorseCompletionRunStatus.choices,
+        default=HorseCompletionRunStatus.PLANNED,
+    )
+    dry_run = models.BooleanField(default=True)
+    regions = models.JSONField(default=list, blank=True)
+    parameters = models.JSONField(default=dict, blank=True)
+    artifact_path = models.CharField(max_length=1000, blank=True)
+    source_names = models.JSONField(default=list, blank=True)
+    summary = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    operated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="horse_profile_completion_runs",
+    )
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(fields=("status", "created_at"), name="horse_run_status_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.name or f"P0 horse completion run #{self.pk}"
+
+
+class HorseP0Source(TimestampedModel):
+    profile = models.ForeignKey(HorseProfile, on_delete=models.CASCADE, related_name="p0_sources")
+    term = models.ForeignKey("TermEntry", on_delete=models.SET_NULL, null=True, blank=True, related_name="p0_sources")
+    race_event = models.ForeignKey(RaceEvent, on_delete=models.SET_NULL, null=True, blank=True, related_name="horse_p0_sources")
+    race_result = models.ForeignKey(RaceEventResult, on_delete=models.SET_NULL, null=True, blank=True, related_name="horse_p0_sources")
+    race_runner = models.ForeignKey(RaceEventRunner, on_delete=models.SET_NULL, null=True, blank=True, related_name="horse_p0_sources")
+    completion_run = models.ForeignKey(
+        HorseProfileCompletionRun,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="p0_sources",
+    )
+    source_type = models.CharField(max_length=32, choices=HorseP0SourceType.choices)
+    status = models.CharField(max_length=16, choices=HorseP0SourceStatus.choices, default=HorseP0SourceStatus.ACTIVE)
+    racing_region = models.CharField(max_length=32, choices=RacingRegion.choices, default=RacingRegion.JAPAN)
+    race_grade = models.CharField(max_length=32, choices=RaceGrade.choices, blank=True)
+    horse_name = models.CharField(max_length=255, blank=True)
+    participant_key = models.CharField(max_length=255, blank=True)
+    source_url = models.URLField(max_length=1000, blank=True)
+    evidence_summary = models.TextField(blank=True)
+    evidence_payload = models.JSONField(default=dict, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    observed_at = models.DateTimeField(default=timezone.now)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_reason = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("profile", "source_type", "-observed_at", "-id")
+        indexes = [
+            models.Index(fields=("source_type", "status"), name="horse_p0_type_status_idx"),
+            models.Index(fields=("racing_region", "status"), name="horse_p0_region_status_idx"),
+            models.Index(fields=("race_event", "source_type"), name="horse_p0_event_type_idx"),
+            models.Index(fields=("race_event", "participant_key"), name="horse_p0_participant_idx"),
+            models.Index(fields=("completion_run", "status"), name="horse_p0_run_status_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("profile", "source_type", "term"),
+                condition=models.Q(source_type=HorseP0SourceType.TERM_ACTIVE_WITH_ZH),
+                name="uq_horse_p0_term_source",
+            ),
+            models.UniqueConstraint(
+                fields=("profile", "source_type"),
+                condition=models.Q(source_type=HorseP0SourceType.MANUAL),
+                name="uq_horse_p0_manual_source",
+            ),
+            models.UniqueConstraint(
+                fields=("source_type", "race_event", "participant_key"),
+                condition=models.Q(
+                    source_type=HorseP0SourceType.MAJOR_RACE_PARTICIPANT,
+                    status=HorseP0SourceStatus.ACTIVE,
+                ),
+                name="uq_horse_p0_major_race_source",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.profile} {self.source_type}"
+
+
+class HorseIdentityConflict(TimestampedModel):
+    fingerprint = models.CharField(max_length=64, unique=True)
+    status = models.CharField(
+        max_length=16,
+        choices=HorseIdentityConflictStatus.choices,
+        default=HorseIdentityConflictStatus.PENDING,
+    )
+    race_event = models.ForeignKey(
+        RaceEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="horse_identity_conflicts",
+    )
+    horse_name = models.CharField(max_length=255)
+    horse_number = models.CharField(max_length=32, blank=True)
+    source_url = models.URLField(max_length=1000, blank=True)
+    identity_keys = models.JSONField(default=list, blank=True)
+    sire_name = models.CharField(max_length=255, blank=True)
+    dam_name = models.CharField(max_length=255, blank=True)
+    birth_year = models.PositiveSmallIntegerField(null=True, blank=True)
+    candidate_terms = models.ManyToManyField("TermEntry", blank=True, related_name="horse_identity_conflicts")
+    candidate_profiles = models.ManyToManyField(HorseProfile, blank=True, related_name="identity_conflicts")
+    resolved_profile = models.ForeignKey(
+        HorseProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resolved_identity_conflicts",
+    )
+    resolved_horse_number = models.CharField(max_length=32, blank=True)
+    evidence_payload = models.JSONField(default=dict, blank=True)
+    resolution_notes = models.TextField(blank=True)
+    observed_at = models.DateTimeField(default=timezone.now)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resolved_horse_identity_conflicts",
+    )
+
+    class Meta:
+        ordering = ("status", "-observed_at", "-id")
+        indexes = [
+            models.Index(fields=("status", "observed_at"), name="horse_identity_status_idx"),
+            models.Index(fields=("race_event", "status"), name="horse_identity_event_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.horse_name} ({self.get_status_display()})"
+
+    def clean(self):
+        super().clean()
+        if self.status == HorseIdentityConflictStatus.RESOLVED and not self.resolved_profile_id:
+            raise ValidationError({"resolved_profile": "标记为已解决时必须选择最终马匹资料。"})
+        pairing_conflict = (self.evidence_payload or {}).get("pairing_conflict") or {}
+        candidate_numbers = {str(value) for value in pairing_conflict.get("horse_numbers") or []}
+        if self.status == HorseIdentityConflictStatus.RESOLVED and pairing_conflict:
+            if not self.resolved_horse_number:
+                raise ValidationError({"resolved_horse_number": "马号冲突解决时必须选择最终马号。"})
+            if self.resolved_horse_number not in candidate_numbers:
+                raise ValidationError({"resolved_horse_number": "最终马号必须来自冲突证据中的候选马号。"})
+            selected_member = next(
+                (
+                    member
+                    for member in pairing_conflict.get("members") or []
+                    if str(member.get("horse_number") or "") == self.resolved_horse_number
+                ),
+                None,
+            )
+            event_refs = self.race_event.source_refs if self.race_event_id else {}
+            event_source_url = next(
+                (
+                    event_refs.get(key)
+                    for key in ("official", "result", "runner", "source_url", "url")
+                    if isinstance(event_refs, dict) and event_refs.get(key)
+                ),
+                "",
+            )
+            if not (selected_member and selected_member.get("source_url")) and not event_source_url:
+                raise ValidationError(
+                    {"resolved_horse_number": "所选马号及对应赛事缺少来源 URL，暂时不能标记为已解决。"}
+                )
+
+
 class HorseProfileDataCandidate(TimestampedModel):
     profile = models.ForeignKey(HorseProfile, on_delete=models.CASCADE, related_name="data_candidates")
+    completion_run = models.ForeignKey(
+        "HorseProfileCompletionRun",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="candidates",
+    )
     module = models.CharField(max_length=32, choices=HorseProfileModule.choices)
     source_name = models.CharField(max_length=128)
     source_url = models.URLField(max_length=1000, blank=True)
@@ -1320,6 +1593,13 @@ class HorseProfileDataCandidate(TimestampedModel):
 
 class HorseRaceRecord(TimestampedModel):
     horse_profile = models.ForeignKey(HorseProfile, on_delete=models.CASCADE, related_name="race_records")
+    completion_run = models.ForeignKey(
+        "HorseProfileCompletionRun",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="race_records",
+    )
     event = models.ForeignKey(RaceEvent, on_delete=models.SET_NULL, null=True, blank=True, related_name="horse_records")
     result = models.ForeignKey(RaceEventResult, on_delete=models.SET_NULL, null=True, blank=True, related_name="horse_records")
     race_name = models.CharField(max_length=255)
@@ -1336,6 +1616,7 @@ class HorseRaceRecord(TimestampedModel):
     major_win_order = models.PositiveSmallIntegerField(default=0)
     source_name = models.CharField(max_length=128, blank=True)
     source_url = models.URLField(max_length=1000, blank=True)
+    idempotency_key = models.CharField(max_length=255, blank=True)
     source_refs = models.JSONField(default=dict, blank=True)
     raw_payload = models.JSONField(default=dict, blank=True)
 
@@ -1345,6 +1626,14 @@ class HorseRaceRecord(TimestampedModel):
             models.Index(fields=("horse_profile", "result_status"), name="horse_record_result_idx"),
             models.Index(fields=("horse_profile", "is_major_win"), name="horse_record_major_idx"),
             models.Index(fields=("event", "result_status"), name="horse_record_event_idx"),
+            models.Index(fields=("horse_profile", "idempotency_key"), name="horse_record_idem_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("horse_profile", "idempotency_key"),
+                condition=~models.Q(idempotency_key=""),
+                name="uq_horse_record_idempotency",
+            )
         ]
 
     def __str__(self) -> str:
@@ -1521,6 +1810,8 @@ class NewsArticle(TimestampedModel):
     body_zh = models.TextField(blank=True)
     push_summary_zh = models.TextField(blank=True)
     published_at = models.DateTimeField()
+    published_at_verified = models.BooleanField(null=True, blank=True, default=None)
+    published_at_evidence = models.JSONField(default=dict, blank=True)
     source_url = models.URLField(max_length=1000)
     is_first_crawled = models.BooleanField(default=True)
     first_seen_at = models.DateTimeField(default=timezone.now)
@@ -1573,6 +1864,9 @@ class NewsArticle(TimestampedModel):
     attribution_source = models.CharField(max_length=64, blank=True)
     attribution_summary = models.JSONField(default=dict, blank=True)
     attribution_locked = models.BooleanField(default=False)
+    attribution_status = models.CharField(max_length=32, choices=AttributionStatus.choices, blank=True, db_index=True)
+    attribution_confidence = models.PositiveSmallIntegerField(null=True, blank=True)
+    attribution_rule_version = models.CharField(max_length=64, blank=True)
     editor_notes = models.TextField(blank=True)
     manually_edited_fields = models.JSONField(default=list, blank=True)
     translation_metadata = models.JSONField(default=dict, blank=True)
@@ -1582,11 +1876,14 @@ class NewsArticle(TimestampedModel):
         default=ArticleTranslationStatus.PENDING,
     )
     translation_error_message = models.TextField(blank=True)
+    translation_error_category = models.CharField(max_length=64, blank=True)
     translation_started_at = models.DateTimeField(null=True, blank=True)
     translated_at = models.DateTimeField(null=True, blank=True)
     translation_model = models.CharField(max_length=128, blank=True)
     translation_provider = models.CharField(max_length=64, blank=True)
     translation_retry_count = models.PositiveIntegerField(default=0)
+    translation_next_retry_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    translation_retry_exhausted_at = models.DateTimeField(null=True, blank=True)
     tags_json = models.JSONField(default=list, blank=True)
     source_note = models.CharField(max_length=255, blank=True)
     public_slug = models.SlugField(max_length=255, blank=True)
@@ -2210,7 +2507,12 @@ class TermEntry(TimestampedModel):
         blank=True,
     )
     source_ja = models.CharField(max_length=255)
-    target_zh = models.CharField(max_length=255)
+    target_zh = models.CharField(max_length=255, blank=True)
+    translation_status = models.CharField(
+        max_length=16,
+        choices=TermTranslationStatus.choices,
+        default=TermTranslationStatus.TRANSLATED,
+    )
     aliases_ja = models.JSONField(default=list, blank=True)
     aliases_zh = models.JSONField(default=list, blank=True)
     race_grade = models.CharField(max_length=32, choices=RaceGrade.choices, blank=True)
@@ -2225,7 +2527,15 @@ class TermEntry(TimestampedModel):
         ]
 
     def __str__(self) -> str:
-        return f"{self.source_ja} -> {self.target_zh}"
+        return f"{self.source_ja} -> {self.target_zh or '中文名待补'}"
+
+    @property
+    def has_translation(self) -> bool:
+        return bool((self.target_zh or "").strip()) and self.translation_status == TermTranslationStatus.TRANSLATED
+
+    @property
+    def is_pending_horse_translation(self) -> bool:
+        return self.term_type == TermType.HORSE and not self.has_translation
 
     def all_japanese_terms(self) -> list[str]:
         aliases = self.aliases_ja if isinstance(self.aliases_ja, list) else []
@@ -2389,6 +2699,7 @@ class PushTarget(TimestampedModel):
     group_id = models.CharField(max_length=64, unique=True)
     is_default = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    multiregion_test_enabled = models.BooleanField(default=False)
     allowed_regions = models.JSONField(default=list, blank=True)
     push_scope = models.CharField(max_length=32, choices=QQPushScope.choices, blank=True, default=QQPushScope.INHERIT)
     importance_strategy = models.CharField(
@@ -2669,3 +2980,98 @@ class OperationLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.action_type} {self.target_type} {self.target_id}".strip()
+
+
+class TermGateReprocessRun(TimestampedModel):
+    mode = models.CharField(max_length=16, choices=(("dry_run", "Dry run"), ("commit", "Commit")))
+    selectors = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=TermGateReprocessStatus.choices,
+        default=TermGateReprocessStatus.PENDING,
+    )
+    cursor = models.TextField(blank=True)
+    rule_version = models.CharField(max_length=64, blank=True)
+    settings_sha256 = models.CharField(max_length=64, blank=True)
+    term_snapshot_sha256 = models.CharField(max_length=64, blank=True)
+    candidate_payload = models.JSONField(default=list, blank=True)
+    result_payload = models.JSONField(default=dict, blank=True)
+    manifest_sha256 = models.CharField(max_length=64, blank=True)
+    statistics = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-started_at", "-id")
+        indexes = [
+            models.Index(fields=("status", "-started_at"), name="termgate_run_status_idx"),
+            models.Index(fields=("mode", "-started_at"), name="termgate_run_mode_idx"),
+        ]
+
+
+class TermGateReprocessLock(TimestampedModel):
+    key = models.CharField(max_length=64, unique=True)
+    locked_by_run = models.ForeignKey(
+        TermGateReprocessRun,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="leases",
+    )
+    owner_token = models.CharField(max_length=64, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("key",)
+
+
+class MultiregionAttributionRun(TimestampedModel):
+    mode = models.CharField(max_length=16, choices=(("dry_run", "Dry run"), ("commit", "Commit")))
+    selectors = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=MultiregionAttributionRunStatus.choices,
+        default=MultiregionAttributionRunStatus.PENDING,
+    )
+    cursor = models.PositiveIntegerField(default=0)
+    completed_article_ids = models.JSONField(default=list, blank=True)
+    rule_version = models.CharField(max_length=64, blank=True)
+    term_version = models.CharField(max_length=64, blank=True)
+    gold_version = models.CharField(max_length=64, blank=True)
+    settings_sha256 = models.CharField(max_length=64, blank=True)
+    term_snapshot_sha256 = models.CharField(max_length=64, blank=True)
+    gold_snapshot_sha256 = models.CharField(max_length=64, blank=True)
+    candidate_fingerprint = models.CharField(max_length=64, blank=True)
+    candidate_payload = models.JSONField(default=list, blank=True)
+    outcomes = models.JSONField(default=list, blank=True)
+    metrics = models.JSONField(default=dict, blank=True)
+    manifest_sha256 = models.CharField(max_length=64, blank=True, db_index=True)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-started_at", "-id")
+        indexes = [
+            models.Index(fields=("status", "-started_at"), name="attr_run_status_idx"),
+            models.Index(fields=("mode", "-started_at"), name="attr_run_mode_idx"),
+        ]
+
+
+class MultiregionAttributionLock(TimestampedModel):
+    key = models.CharField(max_length=64, unique=True)
+    locked_by_run = models.ForeignKey(
+        MultiregionAttributionRun,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="leases",
+    )
+    owner_token = models.CharField(max_length=64, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("key",)

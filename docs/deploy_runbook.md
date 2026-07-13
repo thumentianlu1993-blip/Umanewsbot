@@ -1,5 +1,59 @@
 # 部署运行手册
 
+## 待实施：法国新鲜度与多地区归属上线门禁
+
+- 对应 change：`fix-france-news-freshness-and-multiregion-attribution`。当前仅完成工程评审，以下为未来实施后的上线约束，不代表功能已上线。
+- 部署前必须确认本地 HEAD、服务器 HEAD、tracked/untracked 文件、Nginx 运行配置、数据库备份及 `web/worker/beat` 当前环境变量；部署后再次核对三个服务读取一致配置。
+- 首次部署必须设置 `MULTIREGION_ATTRIBUTION_MODE=off`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`、`TRANSLATION_AUTO_RETRY_ENABLED=false`，不得因迁移成功自动开启行为。
+- 开启 shadow 前必须完成至少 250 篇版本化 gold set、生产快照 SHA 校验、全部质量阈值和 250 篇 PostgreSQL 性能验收；任何单地区 no-go 都应阻止继续灰度。
+- enforce commit 必须引用成功 dry-run 的 run ID 与 manifest，检查文章、人工锁定、规则、术语和 gold 版本漂移；部分失败使用同一 run/manifest resume，不新建无关批次。
+- 回滚顺序：先关闭相关地区查询，再把归属 mode 降为 shadow 或 off，再关闭翻译自动重试；保留运行账本用于审计。只有数据库结构或数据损坏时才使用部署前备份恢复。
+- 验收必须覆盖 `/healthz/`、首页、五地区页、文章详情、运营后台、worker/beat 日志、来源/翻译/门禁/窗口/网页/QQ 分层计数，以及单文章单次公开和单群单次交付。
+
+## 2026-07-12 英文术语门禁受控发布与 TDN France 旧库存清理
+
+- 发布前备份：`backups/db/pre-term-gate-publish-20260712_182052.sql.gz`，约 `110M`，SHA-256 `0edfbf7cae1a23ce71cb2d8de3b5d1d4b85c276daf1504f3971fac90c618144c`。
+- 锁定 run/manifest 提交后恢复香港 `7`、英国 `3`、美国 `9`、法国 `5`，自然窗口共公开 `24` 篇；不得手工伪造未来窗口。
+- 复核发现法国 5 篇来自修复前污染批次 `CrawlJob#9408`，官方日期均超过来源 3 天新鲜度。清理前追加备份 `backups/db/pre-term-gate-stale-cleanup-20260712_185347.sql.gz`，约 `100M`，SHA-256 `a16f85f74d2d1d9de44debbf54f1bf096cff2ad2ce0a17f448ba259e6738a118`。
+- 清理范围不是只撤回 5 篇公开文章，而是将 `CrawlJob#9408` 全部 20 篇统一设为 `workflow_status=withdrawn`、`automation_status=manual_review_required`，清空 `published_to_web_at`，写入 `withdrawn_at`、`decision_reason.tdn_france_stale_cleanup` 和操作日志，避免待审核旧文再次进入补跑。
+- 最终公开 19 篇，QQ 交付 `0`；`NewsSource#21` 保持 `enabled=true / production_approved=true`，因为修复后的新抓取已能读取真实日期并过滤旧文。
+- 常驻 `web/worker/beat` 必须继续保持 `ENGLISH_TERM_CONTEXT_MODE=shadow`，本轮不切全局 `enforce`。
+
+## 2026-07-12 英文术语命中级上下文门禁 shadow 部署
+
+- 生产提交：`f221c7df`；迁移：`stable.0028_term_gate_reprocess_runs`。
+- 部署前备份：`.env.backup.english-term-context-20260712_171023`；数据库 `backups/db/pre-english-term-context-20260712_171023.sql.gz`，`109M`，`gzip -t` 通过，SHA-256 `8f1cb6d3380db6c92671348d60a1c1d1633939bc637a38bcc2bdc796116486e1`。
+- 生产模式：`ENGLISH_TERM_CONTEXT_MODE=shadow`，`web/worker/beat` 必须一致。快速关闭时改为 `off` 并重建三个服务；未完成 24 小时观察前禁止 `enforce`。
+- 100 篇基准事实：run `#6`，美国近 168 小时，候选 `100`，耗时 `7.5323s`、SQL `19`、RSS 增量 `36,503,552` bytes；索引 `1`，赛事实体/英文 alias/额外马名术语/重复语料预取 `2/1/0/1`；可恢复 `20`、仍阻断 `80`。
+- 小批 dry-run：香港 run `#7` 为 `12/16` 可恢复；英国 `#8` 为 `3/20`；法国 `#9` 为 `6/13`；美国 `#10` 为 `9/20`。NFKC span 修复后法国 run `#11` 仍为 `6/13`，`Exactly` 命中文本与原文 span 已准确。所有 run 均为 dry-run，生产 `committed=0`、租约为空。
+- 验收：最终本地专项 `81`、完整 `stable` `870`；生产 Django check、迁移、内外 `/healthz/`、容器日志、首页、新闻详情和后台未登录跳转通过。
+
+观察命令：
+
+```bash
+cd /opt/umanewsbot
+docker compose -f docker-compose.prod.lowcost.yml exec -T web \
+  python manage.py shell -c 'from django.conf import settings; print(settings.ENGLISH_TERM_CONTEXT_MODE)'
+docker compose -f docker-compose.prod.lowcost.yml exec -T web \
+  python manage.py shell -c 'from stable.models import TermGateReprocessRun,TermGateReprocessLock; print(list(TermGateReprocessRun.objects.values("id","mode","status","statistics").order_by("-id")[:12])); print(list(TermGateReprocessLock.objects.values()))'
+```
+
+回滚只切配置即可：把 `ENGLISH_TERM_CONTEXT_MODE=off`，重建 `web/worker/beat` 并确认三个容器均读取 `off`。运行账本表保留审计，不回滚迁移、不删除 run。若必须恢复部署前数据库，使用上述 `pre-english-term-context` 备份。任何 commit 必须在 enforce 抽检通过后引用同一 dry-run 的 `--run-id` 与 `--manifest-sha256`，且先核对术语/设置/文章指纹无漂移。
+
+## 2026-07-12 P0 马资料补全基础能力部署
+
+- 生产提交：`ce676998`；部署前 `HEAD=31cc82c`。
+- 迁移：P0 原开发编号 `0023` 因最新主干已有迁移而顺延为 `stable.0027_p0_horse_profile_completion`。
+- 部署前检查：`web/worker/beat/db/redis/nginx` 正常；本地与公网 `/healthz/`、公网 `/horses/` 正常；`ExternalDataImportRun(status=started)=0`、导入锁 `0`、Celery active/reserved 为空，未发现历史回填进程；磁盘剩余约 `19GB`。
+- 备份：`.env.backup.p0-horse-profile-20260712_162039`；数据库 `backups/db/pre-p0-horse-profile-20260712_162039.sql.gz`，`109MB`，已通过 `gzip -t`。
+- 生产显式配置：`HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`、`HORSE_PROFILE_COMPLETION_REQUEST_INTERVAL_SECONDS=8`、`HORSE_PROFILE_COMPLETION_CACHE_DIR=runtime/horse_profile_completion/cache`、`HORSE_PROFILE_COMPLETION_BATCH_LIMIT=10`、`HORSE_PROFILE_COMPLETION_REQUIRE_SOURCE_URL=true`、`HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS=1`。
+- 部署后：`0027` 已应用，`manage.py check` 通过；内外 `/healthz/` 返回 `200`，`/horses/` 返回 `200`，身份冲突 Django Admin 未登录跳转正常；容器健康，`web/worker/beat` 日志无 traceback。
+- 数据抽检：`HorseRaceRecord=21`、非空幂等键 `21`、空键 `0`；新 P0 来源、身份冲突、补全 run 均为 `0`。
+- P0 dry-run：`term_candidates=21596`、`major_race_candidates=992`；其中重点赛事含 runner `5096`、result `4572`。本次未执行 `p0_horse_profiles --sync-sources --commit`，避免绕过“五地区各 10 匹先人工跑通”直接全量写入数千匹马。
+- 本地上线验证：最新主干定向 `104` 项通过，完整 `stable` `813` 项全部通过；Django check、迁移一致性、OpenSpec strict/all、`git diff --check` 通过。
+
+回滚代码可使用部署前提交 `31cc82c`；若需要恢复迁移前数据库，使用上述 `pre-p0-horse-profile` 备份。`0027` 新表和字段在代码回滚后可暂时保留不用，只有确认需要彻底恢复时才执行数据库恢复。
+
 ## 2026-07-10 英文术语门禁上下文判定上线
 
 - 本地 change：`classify-english-term-gate-context`。
@@ -78,6 +132,9 @@ done
   - `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`
   - `HORSE_PROFILE_COMPLETION_REQUEST_INTERVAL_SECONDS=8`
   - `HORSE_PROFILE_COMPLETION_CACHE_DIR=runtime/horse_profile_completion/cache`
+  - `HORSE_PROFILE_COMPLETION_BATCH_LIMIT=10`
+  - `HORSE_PROFILE_COMPLETION_REQUIRE_SOURCE_URL=true`
+  - `HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS=1`
 - 部署方式：`git pull --ff-only origin main` 从 `01c0b9b` 快进到 `2b28755`，随后执行 `bash ./deploy_lowcost.sh`。
 - 迁移：`stable.0022_horseprofile_horsefollow_articlehorselink_and_more` 已应用。
 - 部署后状态：`web / worker / beat / db / redis / nginx` 正常，`web` 与 `db / redis` healthy，`manage.py check` 通过。
@@ -130,6 +187,36 @@ done
   - 未持有 staff 登录态，后台审核列表 / 详情只验收到未登录跳转。
   - UmaNews 生产 SSH 只以 `root@47.239.167.86` 为准；其他项目服务器不属于本项目验收范围。
 
+### 样本发布与最终前台验收记录
+
+- 时间：`2026-07-10`。
+- 服务器：`root@47.239.167.86:/opt/umanewsbot`，最终 `HEAD=65988b0`。
+- 代码部署：
+  - `34143ce`：修复 `/horses/` 空状态文案，并调整移动导航 / 地区筛选初版布局。
+  - `d21d6ab`：继续收敛移动端导航和地区筛选裁切问题。
+  - `65988b0`：移动一级导航改为两列 grid，确保“首页 / 赛事日历 / 马匹 / 我的关注”全部在屏内。
+- 备份：
+  - `.env.backup.horse-public-polish-20260710_010639`
+  - `backups/db/pre-horse-public-polish-20260710_010639.sql.gz`
+  - `backups/db/pre-horse-sample-profiles-20260710_011038.sql.gz`
+  - `.env.backup.horse-mobile-polish-20260710_011811`
+  - `backups/db/pre-horse-mobile-polish-20260710_011811.sql.gz`
+  - 上述数据库备份均已执行 `gzip -t`。
+- 样本数据：
+  - `春秋分`：`/horses/13113/`，netkeiba 来源 `https://db.netkeiba.com/horse/2019105219/`，参赛履历 `10` 条，相关新闻人工关联 `5` 篇。
+  - `北十字星`：`/horses/3873/`，netkeiba 来源 `https://db.netkeiba.com/horse/2022105102/`，参赛履历 `11` 条，相关新闻人工关联 `5` 篇。
+  - 两匹马均为 `review_status=published`、`completeness_status=complete_pedigree_2gen`。
+- 前台验收：
+  - `http://umafans.run/horses/13113/` 显示春秋分基础资料、完整二代血统、主胜鞍、参赛履历和相关新闻。
+  - `http://umafans.run/horses/3873/` 显示北十字星基础资料、完整二代血统、主胜鞍、参赛履历和相关新闻。
+  - `http://umafans.run/news/7248/` 显示马匹 tag `春秋分`，点击进入 `/horses/13113/`。
+  - 匿名关注 / 取消关注链路通过；关注后 `/horses/follows/` 显示春秋分及其关联新闻，验收后已取消关注，样本 `HorseFollow` 计数为 `0`。
+  - `/horses/?q=croix&region=japan` 可命中北十字星，`/horses/?q=EQUINOX&region=japan` 可命中春秋分，英文大小写搜索正常。
+  - Codex 浏览器移动 viewport `390x844` 复核 `scrollWidth=390`，四个一级导航入口和六个地区按钮坐标均在屏内。
+- 生产健康：
+  - `docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check` 通过。
+  - 本地容器和公网 `http://umafans.run/healthz/` 均返回 `200` / `{"status": "ok"}`。
+
 ### 生产部署前检查
 
 1. 记录生产 `HEAD`：`git rev-parse --short HEAD`。
@@ -142,17 +229,42 @@ done
    - `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`
    - `HORSE_PROFILE_COMPLETION_REQUEST_INTERVAL_SECONDS=8`
    - `HORSE_PROFILE_COMPLETION_CACHE_DIR=runtime/horse_profile_completion/cache`
+   - `HORSE_PROFILE_COMPLETION_BATCH_LIMIT=10`
+   - `HORSE_PROFILE_COMPLETION_REQUIRE_SOURCE_URL=true`
+   - `HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS=1`
 
 ### 部署与迁移
+
+P0 马资料补全专项上线前额外确认：
+
+- `stable.0027_p0_horse_profile_completion` 会为自然键唯一的既有 `HorseRaceRecord` 回填幂等键；已有重复组保持空键，需先在 dry-run 报告中人工处理。
+- 已审核 artifact 必须同时具备顶层 `reviewed`、行级 `reviewed=true`、有效 `reviewer_id`，以及 `profile/pedigree/race_record/major_wins` 四模块 `approved`；缺少来源 URL、低置信、未审核或冲突模块不得写主表。
+- `p0_horse_profiles --sync-sources --commit` 只新增、刷新或恢复来源，不撤销历史来源；可配合 `--region` 做单地区同步。
+- `p0_horse_profiles --sync-sources --commit --full-reconcile` 才是全地区完整来源对账，会把本轮不再成立的受管来源标记为 `revoked`；只应在重点赛事/出赛表/赛果导入完成且本地结构化数据为完整快照时执行，不能与 `--region` 同时使用。
+- 队列排查可用 `--queue --profile-id <id>` 精确选择一匹或重复指定多匹；`--limit-per-region` 必须大于 0。
+- 马匹自身 `racing_region` 不因海外参赛而修改；抽检跨地区样本时同时核对 `HorseProfile.racing_region` 和 `HorseP0Source.racing_region`。
+- 抽检同场同名马时必须核对 `HorseP0Source.participant_key`：不同马号应为不同 `number:<horse_number>`，每个参赛键最多一条 active 来源；身份纠正应留下 revoked 旧行和 active 新行。
+- 参赛记录后补马号时，普通增量同步后应确认旧 identity 键已迁移为 number 键且仍只有一条 active 来源；runner/result 两边马号冲突时应只产生 pending `HorseIdentityConflict`，不得生成 active P0 来源。
+- 抽检同来源 identity 的同类型重复输入：两条 runner 或两条 result 使用不同马号时，应汇总为一条 pending 身份冲突，证据包含全部记录 ID 和马号，active P0 来源计数为 0。
+- 解决马号冲突时必须同时填写 `resolved_profile` 和 evidence 候选内的 `resolved_horse_number`；下一次同步只允许选中马号产生 active 来源。抽检冲突成员 URL 完整保留，完全无 URL 的冲突仍在 pending 列表中。
+- 跨来源自动归并数据库已有马时，必须完整且唯一命中经术语库归一的马名、父名、母名和出生年份；来源 ID 只能在自身命名空间内作为直接证据。
+- 身份不确定时应生成 `HorseIdentityConflict(status=pending)`，即使尚无 `HorseProfile` 也必须关联候选术语和原始证据，不得写入马匹主表；全量对账不得撤销仍在输入中的待处理来源或仅临时缺少 URL 的来源。
+- Celery Beat 每天 `09:20` 运行 `stable.tasks.notify_p0_horse_identity_conflicts_task`，复用 `MULTIREGION_OPS_NOTIFICATIONS_*` 通知配置。部署后应抽查任务日志、pending 冲突数和 `${DJANGO_ADMIN_URL}stable/horseidentityconflict/?status__exact=pending`。
+- Django Admin 处理身份冲突时应填写 `resolved_profile` 与 `resolution_notes`，并将状态改为 `resolved` 或 `ignored`；系统自动记录 `resolved_by/resolved_at`。
+- 人工执行完整资料 ready 前必须设置明确的 `HorseProfile.source_refs.p0_completion` 整匹马资料 URL；不能仅以单场赛果 URL 作为基础资料和血统来源。
+- P0 artifact 和后台人工候选写入赛绩后，抽检 `HorseRaceRecord.idempotency_key` 非空；同一赛绩重复审核不得增加记录数，缺少 `source_name` 或 `source_url` 的候选必须保持 pending/冲突且不落主表。
+- 后台手工新增/编辑赛绩也应抽检幂等键：重复提交不增加记录数，修改比赛名/日期/来源后键随之更新，若命中另一既有记录则页面提示冲突并保留原记录。
+- 编辑 importer 生成的赛绩后，必须确认原 `source_refs/raw_payload` 未变化，操作日志包含字段 before/after；后台“在役待刷新”筛选应与 `HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS` 一致。
+- 对含 external result/race ID 的赛绩执行人工改名后重跑相同 importer，确认幂等键仍为 external-ID 语义且记录数不增加。
 
 ```bash
 git pull --ff-only origin main
 bash ./deploy_lowcost.sh
-docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py showmigrations stable | grep 0022
+docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py showmigrations stable | grep 0027
 docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py check
 ```
 
-期望：`stable.0022_horseprofile_horsefollow_articlehorselink_and_more` 已应用，`manage.py check` 通过。
+期望：`stable.0027_p0_horse_profile_completion` 已应用，`manage.py check` 通过。
 
 ### P0 草稿生成
 
@@ -3903,3 +4015,28 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - `diagnostics/declared_count_reconciliation.json/csv` 记录 `22` 年、`31` 个地区/项目的正文显式行与页脚声明差异。该文件是来源核验输入，不是 approval；禁止依据差额自动增加或删除赛事。
 - 页文本诊断缓存覆盖 1998–2026 全部 29 本 PDF，只用于快速差异定位。正式候选仍须绑定原 PDF 的 source-cache manifest、大小和 SHA-256。
 - 当前不得运行 inventory commit 或历史详情抓取。先以地区官方年度目录核验差异，并在完整候选上生成身份 conflict/review 文件；涉及系列合并、拆分、前后继或同名异赛时必须交产品审核。
+## 2026-07-13 法国新鲜度与多地区归属待部署清单
+
+本节描述尚未执行的生产步骤。代码部署与迁移不得自动开启归属、相关地区查询或翻译失败重试。
+
+1. 部署前记录生产 HEAD、工作区、容器、Nginx、Celery active/reserved、外部导入与锁、法国来源状态；备份 `.env` 和 PostgreSQL，并校验备份。
+2. 显式保持 `MULTIREGION_ATTRIBUTION_MODE=off`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`、`TRANSLATION_AUTO_RETRY_ENABLED=false`，再部署代码并应用 `stable.0029_france_freshness_translation_attribution`。
+   邮件接收地址设置为 `754652181@qq.com`；若生产缺少 SMTP/EMAIL_HOST 配置，则必须保持 `TRANSLATION_FAILURE_EMAIL_ENABLED=false`。只有 SMTP 配置完成且受控测试邮件成功后才允许开启。
+3. 验证 `web/worker/beat` 使用相同安全配置，执行 `manage.py check`，检查迁移、容器、日志、内外 `/healthz/`、首页、五地区页和运营后台。
+4. 对 TDN France 和 France Galop 执行只读 probe；France Galop 旧时间只先运行 `repair_france_galop_published_at` dry-run，保存 manifest、证据和漂移检查结果，不直接改库。
+5. 使用真实生产文章建立至少 250 篇有效、五地区各至少 40 篇、双人标注并裁决的 gold CSV，配置非 `pending-review` 的 `MULTIREGION_ATTRIBUTION_GOLD_VERSION` 和该 CSV 的 `MULTIREGION_ATTRIBUTION_GOLD_SNAPSHOT_SHA256`，再执行 `evaluate_multiregion_attribution_gold --labels <csv> --json`。任一质量门槛不通过即 no-go。
+6. 使用 `reprocess_multiregion_attribution_gates --dry-run --gold-labels <csv>` 生成绑定 gold 指标的持久 run ID 与 manifest；人工审核主地区变化、全部 `needs_review` 和无依据扩散后，才允许对锁定 run 执行 commit。`pending-review`、无有效 SHA、有效分母不足 250 或指标 no-go 均会拒绝 commit。
+7. 翻译失败先审核 `429/503/504/timeout` 清单，再小批开启 selector；确认不会直接公开文章或创建 QQ delivery。耗尽和人工重试入口必须可见。
+8. 归属灰度顺序固定为：off 部署、shadow、仅新文章 enforce、网页和显式测试群相关查询、最近 72 小时受控回填、正式群。进入测试群阶段前，仅对指定 `PushTarget` 设置 `multiregion_test_enabled=true`；其余群保持 false，最终 `formal_groups` 阶段才扩大。每阶段记录指标并至少观察约定窗口。
+9. 回滚先关闭相关地区查询，再把归属切回 `off`，最后关闭翻译自动重试；保留已写审计与 run，不用反向迁移删除证据。数据库异常时按备份恢复流程处理。
+10. 至少验收 3 个日常窗口和 1 个可模拟的重要赛事窗口，按来源候选、翻译、归属、门禁、公开和 QQ 分层记录数量与零发布原因，完成后再更新状态文档并归档 change。
+
+## 2026-07-13 `fix-france-news-freshness-and-multiregion-attribution` 安全关闭部署记录
+
+1. 部署前生产 HEAD 为 `c998eb3f`；容器健康、Celery active/reserved 为空、外部导入和归属锁均为 0，法国来源 13/14/21 已启用且最近抓取成功。
+2. 环境备份：`.env.backup.france-multiregion-20260713_041004`。数据库有效备份：`backups/db/pre-france-multiregion-20260713_041111.sql.gz`，SHA256 `a92e95fd8b10ceb7cd3721d4984d8f8d699b23edf6686615e289a12e6aa0c898`；恢复前必须再次执行 `gzip -t`。带 `.incomplete` 后缀的首次文件禁止使用。
+3. 生产拉取 commit `badc10e028aa3c1f6f2984bbfad8c1e202101cdc`，执行 `docker compose -f docker-compose.prod.lowcost.yml build web`、`migrate --noinput`、`up -d --remove-orphans` 和 `collectstatic --noinput`；`stable.0029` 应显示 `[X]`。
+4. 部署后必须从 `web / worker / beat` 三个容器分别读取 Django settings，确认 attribution mode/rollout 均为 `off`，相关地区查询、翻译自动重试和失败邮件均为 false，gold version 为 `pending-review`。
+5. 健康验收以 `http://127.0.0.1/healthz/`、`http://umafans.run/healthz/`、首页、法国频道和新闻详情页为准；当前 HTTPS server 块仍注释，不能使用 HTTPS 失败判断本次应用部署失败，也不能对外宣称 HTTPS 已完成。
+6. 只读来源探测命令：`python manage.py probe_international_news_sources --source france_galop_news --source tdn_france --source tdn_france_broad --limit 2 --json`。2026-07-13 验收列表数为 `20 / 4 / 12`，均 accepted，详情错误为 0；该命令只做网络与数据库重复检查，不写入文章。
+7. 后续启用前先配置 SMTP 并测试 `754652181@qq.com` 收件，再建立有效 gold set、执行生产 dry-run 和人工复核；严格按 shadow、仅新文章 enforce、网页/测试群、72 小时回填、正式群顺序推进。任一质量门槛失败即停止扩大。
