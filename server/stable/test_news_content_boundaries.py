@@ -53,6 +53,18 @@ class InternationalNewsContentBoundaryTests(TestCase):
         self.assertEqual(detail.metadata["body_parse_status"], "ok")
         self.assertIn("Article__ArticleBody", detail.metadata["body_selector"])
 
+    def test_sporting_life_removes_production_social_button_component(self):
+        detail = SportingLifeAdapter().parse_detail_html(
+            """<html><head><meta property="og:title" content="Tribute"></head><body>
+            <div class="Article__ArticleBody-sc-production"><p>Real tribute body.</p>
+            <div class="ArticleSocialMediaButtons__StyledInnerContainer-sc-production"><div>Share</div><div>Tweet</div><div>Email</div></div></div>
+            </body></html>""",
+            url="https://www.sportinglife.com/racing/news/tribute/233144",
+        )
+
+        self.assertEqual(detail.body_ja_raw, "Real tribute body.")
+        self.assertEqual(detail.metadata["body_cleaning"]["removed_rules"]["structured_noise"], 1)
+
     def test_sporting_life_8267_removes_betting_noise_but_keeps_exceptions(self):
         detail = SportingLifeAdapter().parse_detail_html(
             fixture_html("sporting_life_8267.html"),
@@ -108,6 +120,18 @@ class InternationalNewsContentBoundaryTests(TestCase):
         self.assertIn("more than enough time", detail.body_ja_raw)
         self.assertIn("paper trail in the formbook", detail.body_ja_raw)
         self.assertNotIn("Read Today's Paper", detail.body_ja_raw)
+
+    def test_tdn_editor_note_link_without_click_here_is_removed(self):
+        detail = TDNAdapter().parse_detail_html(
+            """<html><head><meta property="og:title" content="Guild statement"></head><body>
+            <span itemprop="articleBody"><p>Editor's Note: The following is an edited press release.</p><p>To view July 12 interview with the racing officials.</p><p>The Guild will continue its safety work.</p></span>
+            </body></html>""",
+            url="https://www.thoroughbreddailynews.com/guild-statement/",
+        )
+
+        self.assertEqual(detail.body_ja_raw, "The Guild will continue its safety work.")
+        self.assertEqual(detail.metadata["body_cleaning"]["removed_rules"]["tdn_editor_note"], 1)
+        self.assertEqual(detail.metadata["body_cleaning"]["removed_rules"]["tdn_leading_link"], 1)
 
     def test_missing_trusted_body_selector_never_falls_back_to_page_body(self):
         detail = SportingLifeAdapter().parse_detail_html(

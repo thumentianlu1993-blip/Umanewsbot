@@ -36,6 +36,7 @@ _STRUCTURED_NOISE_SELECTORS = (
     "noscript",
     "[class*='ShareBlock']",
     "[class*='ArticleShare']",
+    "[class*='ArticleSocialMediaButtons__StyledInnerContainer']",
     "[class*='SocialShare']",
 )
 
@@ -43,7 +44,7 @@ _TDN_LEADING_RULES = (
     ("tdn_editor_note", re.compile(r"^editor[’']s note\s*:", re.IGNORECASE)),
     (
         "tdn_leading_link",
-        re.compile(r"^to (?:view|read|access)\b.*\b(?:click|go) here\.?$", re.IGNORECASE),
+        re.compile(r"^to (?:view|read|access)\b", re.IGNORECASE),
     ),
 )
 
