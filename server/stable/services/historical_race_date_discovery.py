@@ -43,6 +43,7 @@ DIRECT_URL_KEYS = {
 }
 DISCOVERY_ADAPTER_ALLOWED_HOSTS = {
     "jra": ("jra.go.jp",),
+    "nar": ("keiba.go.jp",),
     "netkeiba": ("netkeiba.com",),
     "jbis": ("jbis.or.jp",),
     "hkjc": ("hkjc.com",),
@@ -54,6 +55,7 @@ DISCOVERY_ADAPTER_ALLOWED_HOSTS = {
     "france_galop": ("france-galop.com",),
     "pmu": ("pmu.fr",),
     "zeturf": ("zeturf.fr",),
+    "zone_turf": ("zone-turf.fr",),
     "france_irishracing": ("irishracing.com",),
     "equibase": ("equibase.com",),
     "brisnet": ("brisnet.com",),
@@ -64,6 +66,7 @@ DISCOVERY_ADAPTER_ALLOWED_HOSTS = {
 }
 DISCOVERY_ADAPTER_ALLOWED_AUTHORITIES = {
     "jra": {"official"},
+    "nar": {"official"},
     "netkeiba": {"third_party_high_access"},
     "jbis": {"third_party_high_access"},
     "hkjc": {"official"},
@@ -75,6 +78,7 @@ DISCOVERY_ADAPTER_ALLOWED_AUTHORITIES = {
     "france_galop": {"official"},
     "pmu": {"third_party_high_access"},
     "zeturf": {"third_party_high_access"},
+    "zone_turf": {"third_party_database"},
     "france_irishracing": {"third_party_high_access"},
     "equibase": {"third_party"},
     "brisnet": {"third_party"},
@@ -85,6 +89,7 @@ DISCOVERY_ADAPTER_ALLOWED_AUTHORITIES = {
 }
 DISCOVERY_ADAPTER_REGIONS = {
     "jra": RacingRegion.JAPAN,
+    "nar": RacingRegion.JAPAN,
     "netkeiba": RacingRegion.JAPAN,
     "jbis": RacingRegion.JAPAN,
     "hkjc": RacingRegion.HONG_KONG,
@@ -96,6 +101,7 @@ DISCOVERY_ADAPTER_REGIONS = {
     "france_galop": RacingRegion.FRANCE,
     "pmu": RacingRegion.FRANCE,
     "zeturf": RacingRegion.FRANCE,
+    "zone_turf": RacingRegion.FRANCE,
     "france_irishracing": RacingRegion.FRANCE,
     "equibase": RacingRegion.UNITED_STATES,
     "brisnet": RacingRegion.UNITED_STATES,
@@ -105,10 +111,10 @@ DISCOVERY_ADAPTER_REGIONS = {
     "us_hrn": RacingRegion.UNITED_STATES,
 }
 PRIMARY_RESULT_PROVIDERS = {
-    RacingRegion.JAPAN: {"jra", "netkeiba"},
+    RacingRegion.JAPAN: {"jra", "nar", "netkeiba"},
     RacingRegion.HONG_KONG: {"hkjc"},
     RacingRegion.UNITED_KINGDOM: {"uk_racingpost", "uk_skysports", "uk_sportinglife", "uk_irishracing", "uk_bha"},
-    RacingRegion.FRANCE: {"france_galop", "pmu", "zeturf", "france_irishracing"},
+    RacingRegion.FRANCE: {"france_galop", "pmu", "zeturf", "zone_turf", "france_irishracing"},
     RacingRegion.UNITED_STATES: {"equibase", "brisnet", "drf", "nsa", "us_hrn"},
 }
 

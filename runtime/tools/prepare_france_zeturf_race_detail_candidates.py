@@ -366,10 +366,9 @@ def _discover_event_pages(events: list[dict], source_dir: Path, args) -> tuple[d
                         continue
                     if not _race_matches_event(event, parts["race_name"]):
                         continue
-                    matched_url = _zeturf_url(event, r_number=r_number, c_number=c_number)
                     matched[slug] = {
                         "event": event,
-                        "url": matched_url,
+                        "url": url,
                         "html": html,
                         "r": r_number,
                         "c": c_number,

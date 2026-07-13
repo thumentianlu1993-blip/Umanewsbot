@@ -460,3 +460,6 @@
 - 新镜像切换后的 14:45 自然窗口已完成：17 个抓取、5 个发布、5 个 QQ 窗口全部成功，seen 472/new 3，新增 NULL 归属版本为 0。当前“主线源码、可复现镜像、生产数据库”重新一致。
 - 第二标准批次五地区详情证据已收敛为 `246/250`：日本 50、美国 48、香港 50、英国 48、法国 50，246 个详情 URL 全局唯一且来源缓存身份可核验。两场美国 `not run` 和两场英国 `ABANDONED` 保留为显式缺口；香港跨年字段及英国紧凑英制距离解析修复已完成 `stable 1149` 项回归和 clean review，等待合入 main、交付可复现 AMD64 镜像后重新构建日期 artifact。尚未执行本批生产写入，历史公开开关继续关闭。
 - 紧凑英制距离修复已合入 `main@d8b65fe7` 并切换生产镜像 `sha256:77eb1138...c3da0`；web/worker/beat 镜像一致，迁移无变化，Django、健康检查、页面和日志验收通过。新镜像只读重建 batch002 得到预期 `246 candidate / 4 gap`，manifest 尚未审批或写入；历史常驻写入、网络和公开开关保持关闭。
+- 第三标准批次已完成五地区各 50 场的只读来源准备。249 场具备完整候选，共 `2,635 runners / 2,346 results`；唯一缺口为 2025 Hampton Novices' Chase，Sporting Life 标记 `ABANDONED`，等待产品确认 cancelled 口径。
+- batch003 日期归一化为 `249/249`、零问题，详情打包为 `249 candidate / 1 gap`。NAR 与 Zone-Turf 来源门禁、ZEturf 实际缓存 URL 身份及年度日历 surface 误覆盖问题均已修复；完整 `stable` 回归 `1161 passed / 1 skipped`，复审无待修项。
+- batch003 尚未写生产，公开开关仍关闭。旧候选镜像 `sha256:9cd0b966...45bc1` 已过期；需先把本轮源码合入 main 并重建可复现 AMD64 镜像，再在生产总帐上生成正式 artifact。

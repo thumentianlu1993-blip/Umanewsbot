@@ -4223,3 +4223,13 @@ docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
 - 内部和公网 `/healthz/` 为 `ok`，公网首页和 `/races/` 为 `200`，worker ping 正常，Celery active/reserved 为空，近期 web/worker/beat 日志无 error/traceback/exception。
 - `2m4f` 与 `3m21/2f` 的生产纯函数 smoke 分别得到 `2 mile + 4 furlong`、`3 mile + 2.5 furlong`，原始 `distance_text` 保留。
 - 常驻历史写入/网络开关、多地区归属/相关地区查询开关均保持关闭；本次没有执行历史写入。
+
+## 2026-07-13 batch003 生产续跑门禁
+
+1. 先合入包含 NAR、Zone-Turf 和 ZEturf 实际缓存 URL 修复的最新 main；旧候选镜像 `sha256:9cd0b966...45bc1` 不得用于 batch003。
+2. 在独立上下文构建两次 AMD64 镜像，核对 image ID、revision、Git tree 和 source archive SHA-256；只上报候选，不直接 retag、重启或写生产。
+3. 由生产协调线程切换后，使用新镜像连接生产库执行一次性只读日期 artifact 构建，预期严格为 `249 candidate / 1 gap`；gap 只能是 `target_id=60693` Hampton Novices' Chase。
+4. Hampton 的 `ABANDONED` 证据需产品确认后才能通过 expectation correction 改为 `cancelled`。确认前可继续审批和导入其余 249 场，但 approval target IDs 不得包含该目标。
+5. 日期 apply 前执行数据库备份、非空检查、`gzip -t` 和 SHA-256；仅对单命令临时打开写入门禁。写后重新导出 249 个 materialized event input，禁止复用日期 apply 前的 target SHA。
+6. 补充详情来源 artifact 必须接受并验证 `keiba_go_jp/nar` 与 `zone_turf`，apply 后再次导出 event input，再生成最终详情包、coverage 和 importer dry-run。
+7. 详情 apply 前另做一份数据库备份。写后逐目标核对 runner/result 数、累计计数、OperationLog、draft/published 状态和三容器常驻开关；`RACE_EVENT_HISTORICAL_PUBLIC_ENABLED` 全程保持关闭。

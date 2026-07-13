@@ -1243,3 +1243,12 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 部署没有新增迁移；Django check、静态资源收集、内外 healthz、首页、赛事页、worker ping 和近期错误日志均通过。生产纯函数 smoke 已确认 `2m4f` 解析为 2 mile + 4 furlong，`3m21/2f` 解析为 3 mile + 2.5 furlong，且保留来源原文。
 - 常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，多地区归属与相关地区查询也继续关闭。本次只切换代码，没有执行历史赛事写入。
 - 使用新镜像连接生产库只读重建 batch002 日期 artifact，结果精确为 `246 candidate / 4 gap`：法国/香港/日本各 50，英国/美国各 48；4 个 gap 仍是两场英国 `ABANDONED` 和两场美国 TOBA `not run`。manifest SHA-256 为 `9ed3b7138012b4ce1732cf1f071d13cb16678a97983ea63d94329fe84c902e68`，尚未审批、备份或 commit。
+
+## 2026-07-13 第三标准批次只读证据完成
+
+- batch003 selection 固定为五地区各 50 场、共 250 场，与 batch002 零重叠；本轮没有执行生产写入。
+- 日期及详情来源已完成离线缓存和逐 URL/SHA 校验。可导入的 249 场共解析 `2,635 runners / 2,346 results`；归一化为 `249 candidate / 0 issue`，最终详情包为 `249 candidate / 1 gap`，候选 SHA-256 为 `31c8cf61191d937c766f98b50a656ec98e92f774b59e5d0635fd54090ee2ad1a`。
+- 唯一 gap 为 `target_id=60693`、2025 Hampton Novices' Chase。Sporting Life 页面明确标记 `ABANDONED`，保留 9 匹声明马、0 条赛果；在用户确认 expectation correction 前保持 `held/pending`，不得自动改为 `cancelled`。
+- 修复了 ZEturf 发现页把实际缓存 URL 重写成另一目标 slug 的身份错误，并把 NAR `keiba.go.jp` 与法国 Zone-Turf 同步登记到日期校验、补充来源审批和最终详情打包三层。年度日历的 `flat/jumps` 只证明竞赛类型，不再用它覆盖已审核的 `surface`；Hoppings Stakes 保持 Newcastle synthetic。
+- 专项 73 项、完整 `stable 1161/1161`（1 skip）、Django check、迁移无漂移、OpenSpec strict `25/25` 和 `git diff --check` 全部通过；代码复审无剩余可修复问题。
+- 生产仍运行 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`。先前候选镜像 `sha256:9cd0b966...45bc1` 不包含本轮来源修复，已视为过期；必须从最新 main 重建可复现 AMD64 镜像后，才允许连接生产库生成日期/来源 artifact、dry-run 和后续受控写入。历史公开展示继续关闭。

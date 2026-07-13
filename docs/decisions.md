@@ -1,5 +1,17 @@
 # 关键决策
 
+## 2026-07-13：年度日历的竞赛类型不得覆盖赛道表面
+
+- `flat / jumps` 是竞赛类型证据，不等同于 `turf / dirt / synthetic` 赛道表面；年度日历未明确给出表面时，保留总帐已经审核的 `surface`。
+- Newcastle 的 Hoppings Stakes 不得因为进入英国平地赛日历就被改为 turf；障碍赛也不得仅因实际在草地举行就把模型中的 `jumps` 类型改写为 turf。
+- 日期发现 artifact 只处理日期、直接来源和带单位距离；surface 或场地的实质修订继续走独立字段候选、证据 SHA、dry-run 和审核门禁。
+
+## 2026-07-13：新增详情来源必须在三层白名单保持一致
+
+- 一个新来源只有同时登记到直接 URL 的 host/authority/region 校验、补充详情来源 artifact 服务和最终详情 packager 后，才算可用于生产；任一层缺失都应 fail closed。
+- NAR `keiba.go.jp` 定义为日本官方来源；Zone-Turf 定义为法国第三方数据库来源。来源缓存必须逐文件绑定原始 URL、大小和 SHA-256，不能把缓存内容配给后来合成的 URL。
+- ZEturf 发现器必须保存实际下载并缓存的 URL。即使页面内容匹配另一目标，也不得按命中目标重新合成 URL，否则来源 manifest 与候选身份会分离。
+
 ## 2026-07-13：已交代 gap 用历史选样证据排除，不改产品状态
 
 - 上一批已经进入 gap ledger、但仍应保持 pending 的目标，不得反复占用后续标准批次的地区配额；生成新批次时显式传入既有不可变 selection snapshot，在地区 limit 前按 target ID 排除。
