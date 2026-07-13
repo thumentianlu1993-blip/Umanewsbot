@@ -127,6 +127,19 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
 
         self.assertEqual([row["original_name"] for row in rows], ["Prix Exemple"])
 
+    def test_blank_section_footer_does_not_join_with_race_name_as_country(self):
+        pages = [
+            "Acorn S. G1 .... 80,000 .... 3yo f .... 8 D .... Belmont\nPt I—USA",
+            "Pt I—\nIndiana General Assembly Distaff S. G3 .... 80,000 .... 3up f/m .... 8 D .... Indiana",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=2015)
+
+        self.assertEqual(
+            [row["original_name"] for row in rows],
+            ["Acorn S", "Indiana General Assembly Distaff S"],
+        )
+
     def test_legacy_country_codes_reset_previous_region_context(self):
         pages = [
             "British Race G1 .... 80,000 .... 3up .... 8 T .... Ascot\nPt I—GB",
@@ -151,6 +164,19 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
         rows = self.module.parse_ics_pages(pages, year=1998)
 
         self.assertEqual([row["original_name"] for row in rows], ["Acorn S", "Canadian Turf S"])
+
+    def test_legacy_country_code_with_page_range_sets_target_context(self):
+        pages = [
+            "Prix Exemple G3 .... 80,000 .... 3up .... 2000 T .... Chantilly\nPt I—FR Abb-Cor",
+            "Hong Kong Example G1 .... 80,000 .... 3up .... 1600 T .... Sha Tin\nPt II—HK Cha-Que",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=2005)
+
+        self.assertEqual(
+            [(row["country_region"], row["original_name"]) for row in rows],
+            [("france", "Prix Exemple"), ("hong_kong", "Hong Kong Example")],
+        )
 
     def test_approximate_distance_and_appendix_boundary_are_handled(self):
         pages = [
@@ -178,6 +204,193 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
         )
         self.assertEqual([row["original_name"] for row in appendix_rows], ["Valid S"])
 
+        post_publication_rows = self.module.parse_ics_pages(
+            [
+                "Pt IV—FRENCH JUMPS\n"
+                "Troytown Stp. G3 .... 135,000 .... 5up .... 4400 .... Auteuil\n"
+                "** Race additions and changes in red were submitted after publication of the printed book\n"
+                "Avenir (R) G3 AQ .... 34,000 .... 3 yo .... 2400 .... Nantes"
+            ],
+            year=2019,
+        )
+        self.assertEqual([row["original_name"] for row in post_publication_rows], ["Troytown Stp"])
+
+    def test_spaced_age_notation_is_parsed(self):
+        rows = self.module.parse_ics_pages(
+            ["Washington Park H. G3 .... 300,000 .... 3 up .... 9.5 .... Arlington Park\nPt I—USA"],
+            year=2009,
+        )
+
+        self.assertEqual([row["original_name"] for row in rows], ["Washington Park H"])
+
+    def test_legacy_age_range_does_not_drop_wrapped_jump_name(self):
+        page = (
+            "Champion Bumper Open NHF\n"
+            "[Weatherbys] G1 .... 30,000 .... 4-6 .... 2.00 .... Cheltenham\n"
+            "Champion Hurdle Challenge Trophy\n"
+            "[Smurfit] G1 .... 250,000 .... 4up .... 2.00 .... Cheltenham\n"
+            "Pt IV—GB JUMPS"
+        )
+
+        rows = self.module.parse_ics_pages([page], year=2000)
+
+        self.assertEqual(
+            [row["original_name"] for row in rows],
+            ["Champion Bumper Open NHF [Weatherbys]", "Champion Hurdle Challenge Trophy [Smurfit]"],
+        )
+
+    def test_short_y_age_clears_ungraded_jump_before_wrapped_graded_race(self):
+        page = (
+            "UNITED STATES JUMP RACES\n"
+            "Alston Cup .... 35,000 .... 3y .... 2-1/16 M .... Charleston\n"
+            "A.P. Smithwick Hurdle S.\n"
+            "G1 .... 150,000 .... 4up .... 2.06 M .... Saratoga\n"
+            "Pt IV—UNITED STATES JUMPS"
+        )
+
+        rows = self.module.parse_ics_pages([page], year=2023)
+
+        self.assertEqual([row["original_name"] for row in rows], ["A.P. Smithwick Hurdle S"])
+
+    def test_spaced_dot_columns_clear_ungraded_legacy_jump_rows(self):
+        page = (
+            "UNITED STATES JUMP RACES\n"
+            "Crown Royal S. H. . . . 25,000 . . 4up . . 19 . . Pine Mountain\n"
+            "Future Champions Cup . . . 25,000 . . 3yo . . 19 . . Great Meadow\n"
+            "Grand National S. G1 . . . 100,000 . . 5up . . 24 . . Far Hills\n"
+            "Pt IV—UNITED STATES JUMPS"
+        )
+
+        rows = self.module.parse_ics_pages([page], year=1998)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Grand National S"])
+
+    def test_pdf_date_like_age_range_keeps_wrapped_jump_name(self):
+        page = (
+            "Champion Bumper NHF Race\n"
+            "[Weatherbys] G1 .... 30,000 .... 6-Apr .... 2.00 .... Cheltenham\n"
+            "Midlands Grand National H. Stp.\n"
+            "[Marstons Pedigree] G3 .... 80,000 .... 6up .... 4.25 .... Uttoxeter\n"
+            "Pt IV—GB JUMPS"
+        )
+
+        rows = self.module.parse_ics_pages([page], year=2002)
+
+        self.assertEqual(
+            [row["original_name"] for row in rows],
+            ["Champion Bumper NHF Race [Weatherbys]", "Midlands Grand National H. Stp. [Marstons Pedigree]"],
+        )
+
+    def test_page_and_section_headers_do_not_attach_to_first_race(self):
+        pages = [
+            "($=US Dollars) Pt I—USA Ben-Bue\n"
+            "Ben Ali S. G3 .... 100,000 .... 4up .... 9 D .... Keeneland",
+            "Pt IV—FRENCH JUMPS\nFRENCH JUMP RACES\n"
+            "Aguado Hurdle G3 .... 135,000 .... 3yo .... 3500 .... Auteuil",
+            "Pt IV—UNITED STATES JUMPS\nUNITED STATES JUMP RACES\n"
+            "A.P. Smithwick Hurdle G1 .... 150,000 .... 4up .... 2.06 .... Saratoga",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=2023)
+
+        self.assertEqual(
+            [row["original_name"] for row in rows],
+            ["Ben Ali S", "Aguado Hurdle", "A.P. Smithwick Hurdle"],
+        )
+
+    def test_aqps_year_heading_does_not_attach_to_first_group_race(self):
+        page = (
+            "Pt I—FRANCE\n2020 AQPS races:\n"
+            "Antoine de Vazeilhes (Criterium du Centre)\n"
+            "(R) G3 AQ .... 30,000 .... 3yo .... 2400 T .... Vichy"
+        )
+
+        rows = self.module.parse_ics_pages([page], year=2020)
+
+        self.assertEqual(rows[0]["original_name"], "Antoine de Vazeilhes (Criterium du Centre) (R)")
+        self.assertEqual(rows[0]["source_scope"], "international_cataloguing_standards_aqps")
+
+    def test_grade_joined_directly_to_comma_separated_purse_is_parsed(self):
+        rows = self.module.parse_ics_pages(
+            [
+                "Poule d'Essai des Pouliches G11,700,000 .... 3yo f .... 1600 T .... Longchamp\n"
+                "Pt I—FR"
+            ],
+            year=2000,
+        )
+
+        self.assertEqual(rows[0]["grade_text"], "G1")
+        self.assertEqual(rows[0]["original_name"], "Poule d'Essai des Pouliches")
+
+    def test_grade_joined_directly_to_jump_name_is_parsed(self):
+        rows = self.module.parse_ics_pages(
+            ["Finale Junior Novices HurdleG1 .... 30,000 .... 3yo .... 2.00 .... Chepstow\nPt IV—GB JUMPS"],
+            year=2000,
+        )
+
+        self.assertEqual([row["original_name"] for row in rows], ["Finale Junior Novices Hurdle"])
+
+    def test_ocr_column_digit_before_grade_is_not_part_of_jump_name(self):
+        rows = self.module.parse_ics_pages(
+            ["Mildmay Novices Stp. 3G2 .... 75,000 .... 5up .... 3.00 .... Aintree\nPt IV—GB JUMPS"],
+            year=2003,
+        )
+
+        self.assertEqual([row["original_name"] for row in rows], ["Mildmay Novices Stp"])
+
+    def test_jump_distance_disambiguates_same_name_at_same_course(self):
+        rows = self.module.parse_ics_pages(
+            [
+                "Gold Cup H. Stp.[Sponsor] G3 .... 175,000 .... 4up .... 3.25 .... Newbury\n"
+                "Gold Cup H. Stp. G3 .... 53,000 .... 5up .... 2.50 .... Newbury\n"
+                "Pt IV—GB JUMPS"
+            ],
+            year=2009,
+        )
+
+        self.assertEqual({row["distance_text"] for row in rows}, {"2.50", "3.25"})
+        self.assertEqual(len({row["series_key"] for row in rows}), 2)
+
+    def test_full_sponsored_name_preserves_distinct_same_course_jump_races_for_review(self):
+        records = [
+            "[Paddy Power] Gold Cup H. Stp G3 .... 150,000 .... 4up .... 2.5 .... Cheltenham",
+            "[Racing Post] Gold Cup H. Stp G3 .... 150,000 .... 4up .... 2.5 .... Cheltenham",
+        ]
+        rows = self.module.parse_ics_pages(["\n".join([*records, "Pt IV—GB JUMPS"])], year=2022)
+        reversed_rows = self.module.parse_ics_pages(
+            ["\n".join([*reversed(records), "Pt IV—GB JUMPS"])],
+            year=2022,
+        )
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(len({row["series_key"] for row in rows}), 2)
+        self.assertEqual({row["series_key"] for row in rows}, {row["series_key"] for row in reversed_rows})
+
+    def test_global_disambiguation_applies_ambiguous_identity_to_all_years(self):
+        rows = [
+            {
+                "country_region": "united_kingdom",
+                "year": year,
+                "series_key": key,
+                "original_name": name,
+                "racecourse": course,
+                "discipline": "jumps",
+                "distance_text": distance,
+                "surface": "jumps",
+            }
+            for year, key, name, course, distance in (
+                (2020, "united-kingdom-gold-cup-h-stp", "Gold Cup H. Stp. [bet365]", "Sandown", "3.50"),
+                (2021, "united-kingdom-gold-cup-h-stp-a", "[Paddy Power] Gold Cup H. Stp", "Cheltenham", "2.5"),
+                (2021, "united-kingdom-gold-cup-h-stp-b", "[Racing Post] Gold Cup H. Stp", "Cheltenham", "2.50"),
+            )
+        ]
+
+        result = self.module._global_disambiguate_ambiguous_series(rows)
+
+        self.assertEqual(len({row["series_key"] for row in result}), 3)
+        self.assertIn("sandown-jumps-3-5-jumps", result[0]["series_key"])
+        self.assertNotEqual(result[1]["series_key"], result[2]["series_key"])
+
     def test_synthetic_surface_and_same_name_collisions_are_not_silently_collapsed(self):
         pages = [
             "Example S. G3 .... 100,000 .... 3up .... 8 AWT .... Golden Gate\n"
@@ -189,7 +402,7 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
 
         self.assertEqual({row["surface"] for row in rows}, {"synthetic", "dirt"})
         self.assertEqual(len({row["series_key"] for row in rows}), 2)
-        self.assertTrue(all(row["series_key"].startswith("united-states-example-s-") for row in rows))
+        self.assertTrue(all(row["series_key"].startswith("united-states-example-") for row in rows))
 
         no_course_rows = self.module.parse_ics_pages(
             [
@@ -218,6 +431,89 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
 
         with self.assertRaisesRegex(self.module.IcsCatalogError, "graded total mismatch"):
             self.module.parse_ics_pages([page], year=2016)
+
+    def test_declared_grade_distribution_mismatch_fails_even_when_total_matches(self):
+        page = (
+            "Example S. G2 .... 100,000 .... 3up .... 8 D .... Belmont Park\n"
+            "Number of G1 races: .... 1\nTotal Graded races: .... 1\nPt I—USA"
+        )
+
+        with self.assertRaisesRegex(self.module.IcsCatalogError, "graded total mismatch"):
+            self.module.parse_ics_pages([page], year=2016)
+
+    def test_approved_mode_records_declared_conflict_without_inventing_rows(self):
+        page = (
+            "Example S. G3 .... 100,000 .... 3up .... 8 D .... Belmont Park\n"
+            "Number of G3 races: .... 2\nTotal Graded races: .... 2\nPt I—USA"
+        )
+        conflicts = []
+
+        rows = self.module.parse_ics_pages([page], year=2016, declared_count_conflicts=conflicts)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Example S"])
+        self.assertEqual(
+            conflicts,
+            [
+                {
+                    "year": 2016,
+                    "region": "united_states",
+                    "discipline": "flat",
+                    "parsed_total": 1,
+                    "declared_total": 2,
+                    "parsed_grades": {"G1": 0, "G2": 0, "G3": 1},
+                    "declared_grades": {"G3": 2},
+                }
+            ],
+        )
+
+    def test_source_conflict_approval_binds_policy_review_and_unique_keys(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            review = root / "review.csv"
+            review.write_text("year,region\n2016,united_states\n", encoding="utf-8")
+            approval_path = root / "approval.json"
+            approval_path.write_text(
+                json.dumps(
+                    {
+                        "status": "approved",
+                        "approved_by": "owner",
+                        "approved_at": "2026-07-12T12:00:00+08:00",
+                        "policy": self.module.SOURCE_CONFLICT_POLICY,
+                        "review_path": review.name,
+                        "review_sha256": self.module._sha256(review),
+                        "expected_conflict_keys": ["2016:united_states:flat"],
+                        "expected_conflicts_sha256": "a" * 64,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            expected_approval_sha = self.module._sha256(approval_path)
+
+            approval, identity = self.module._load_source_conflict_approval(str(approval_path))
+
+        self.assertEqual(approval["approved_by"], "owner")
+        self.assertEqual(identity["sha256"], expected_approval_sha)
+
+    def test_identical_repeated_declared_counts_are_not_added_twice(self):
+        pages = [
+            "Example S. G3 .... 100,000 .... 3up .... 8 D .... Belmont Park\n"
+            "Number of G3 races: .... 1\nTotal Graded races: .... 1\nPt I—USA",
+            "Number of G3 races: .... 1\nTotal Graded races: .... 1\nPt I—USA",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=2011)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Example S"])
+
+    def test_conflicting_declared_counts_fail_closed(self):
+        pages = [
+            "Example S. G3 .... 100,000 .... 3up .... 8 D .... Belmont Park\n"
+            "Total Graded races: .... 1\nPt I—USA",
+            "Total Graded races: .... 2\nPt I—USA",
+        ]
+
+        with self.assertRaisesRegex(self.module.IcsCatalogError, "official declared count conflict"):
+            self.module.parse_ics_pages(pages, year=2011)
 
     def test_asterisk_catalog_row_becomes_not_held_without_inventing_surface(self):
         page = (
@@ -252,6 +548,17 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
             ],
         )
 
+    def test_legacy_ire_jump_header_resets_uk_context(self):
+        pages = [
+            "British Chase G1 .... 100,000 .... 5up .... 3 .... Kempton\nPt IV—GB JUMPS",
+            "Pt IV—IRE Ark-Hat\nIRELAND JUMPRACES\n"
+            "Arkle Perpetual Challenge Cup Novice Stp. G2 .... 45,000 .... 5up .... 2.1 .... Leopardstown",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=2001)
+
+        self.assertEqual([row["original_name"] for row in rows], ["British Chase"])
+
     def test_jump_country_title_and_index_reset_context(self):
         pages = [
             "British Chase G1 .... 100,000 .... 5up .... 3 .... Kempton\nPt IV—GREAT BRITAIN JUMPS",
@@ -274,6 +581,19 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
 
         self.assertEqual([row["original_name"] for row in rows], ["Example Chase"])
 
+    def test_ungraded_jump_row_with_age_does_not_attach_to_wrapped_graded_race(self):
+        page = (
+            "FRENCH JUMP RACES\n($=US Dollars)\n"
+            "Aguado Hurdle .... 113,085 .... 3yo .... Auteuil\n"
+            "Alain du Breil Course de Haies d'Ete des\n"
+            "4 Ans Hurdle G1 .... 188,475 .... 4yo .... Auteuil\n"
+            "Pt IV—FR JUMPS"
+        )
+
+        rows = self.module.parse_ics_pages([page], year=1999)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Alain du Breil Course de Haies d'Ete des 4 Ans Hurdle"])
+
     def test_combined_currency_header_is_removed_from_first_race_name(self):
         page = (
             "HONG KONG (HK Dollars) (Meters & Surface) Bauhinia Sprint Trophy G3 "
@@ -283,6 +603,43 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
         rows = self.module.parse_ics_pages([page], year=2016)
 
         self.assertEqual(rows[0]["original_name"], "Bauhinia Sprint Trophy")
+
+    def test_hong_kong_sar_and_legacy_currency_headers_are_removed(self):
+        current = self.module.parse_ics_pages(
+            [
+                "HONG KONG SAR, China (HK Dollars) (Meters & Surface) Bauhinia Sprint Trophy G3 "
+                ".... 10,000,000 .... 3up .... 1000 T .... Sha Tin\nPt I—HONG KONG"
+            ],
+            year=2022,
+        )
+        legacy_name = self.module._clean_name(
+            "(HK$) ($=US Dollars) (Meters & Surface Type) Bauhinia Sprint Trophy"
+        )
+
+        self.assertEqual(current[0]["original_name"], "Bauhinia Sprint Trophy")
+        self.assertEqual(legacy_name, "Bauhinia Sprint Trophy")
+
+    def test_short_u_age_clears_ungraded_us_jump_rows(self):
+        page = (
+            "Pt IV—UNITED STATES JUMPS\n"
+            "New Jersey Hunt Cup S .... 50,000 .... 4u .... 3.25 .... Far Hills\n"
+            "New York Turf Writers Cup H. G1 .... 150,000 .... 4up .... 2.25 .... Saratoga"
+        )
+
+        rows = self.module.parse_ics_pages([page], year=2006)
+
+        self.assertEqual([row["original_name"] for row in rows], ["New York Turf Writers Cup H"])
+
+    def test_missing_age_ungraded_jump_row_clears_before_graded_race(self):
+        page = (
+            "Pt IV—UNITED STATES JUMPS\n"
+            "Joseph M. Rogers S. .... 30,000 .... 2.25 .... Fair Hill\n"
+            "Marcellus Frost S. G3 .... 50,000 .... 4up .... 2 .... Percy Warner"
+        )
+
+        rows = self.module.parse_ics_pages([page], year=2006)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Marcellus Frost S"])
 
     def test_hong_kong_part_two_header_with_following_newline_is_detected(self):
         page = (
@@ -303,6 +660,36 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
         self.assertEqual(
             self.module.canonical_series_name("Tingle Creek Trophy Stp. [Betfair]"),
             "Tingle Creek Trophy Stp.",
+        )
+
+    def test_series_keys_normalize_apostrophe_spacing_camel_case_and_handicap_marker(self):
+        self.assertEqual(
+            self.module.stable_series_key("france", "Prix d'Aumale"),
+            self.module.stable_series_key("france", "Prix d’Aumale"),
+        )
+        self.assertEqual(
+            self.module.stable_series_key("japan", "Jiji PressHai Flower Cup"),
+            self.module.stable_series_key("japan", "Jiji Press Hai Flower Cup"),
+        )
+        self.assertEqual(
+            self.module.stable_series_key("hong_kong", "Bauhinia Sprint Trophy (H)"),
+            self.module.stable_series_key("hong_kong", "Bauhinia Sprint Trophy"),
+        )
+        self.assertEqual(
+            self.module.canonical_series_name("Bauhinia Sprint Trophy (H)"),
+            "Bauhinia Sprint Trophy",
+        )
+        self.assertEqual(
+            self.module.stable_series_key("united_states", "Ancient Title Breeders' Cup H"),
+            self.module.stable_series_key("united_states", "Ancient Title Breeders' Cup S"),
+        )
+        self.assertEqual(
+            self.module.stable_series_key("united_states", "Hard Scuffle Steeplechase S. (R)"),
+            self.module.stable_series_key("united_states", "Hard Scuffle Steeplechase"),
+        )
+        self.assertEqual(
+            self.module.stable_series_key("united_kingdom", "Haldon Gold Challenge Cup H. Stp."),
+            self.module.stable_series_key("united_kingdom", "Haldon Gold Challenge Cup Stp."),
         )
 
     def test_unknown_or_zero_row_page_fails_closed(self):
@@ -513,12 +900,15 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
         rows = [
             {"original_name": "Race Page G1 index material"},
             {"original_name": "Listed Hurdle (L) 70,000 Example Chase"},
+            {"original_name": "First S 25,000 4u Far Hills Second Hurdle"},
+            {"original_name": "Oka Sho (Japanese 1,000 Guineas)"},
+            {"original_name": "Challenger S. [$100,000 Michelob Ultra]"},
             {"original_name": "Normal Stakes"},
         ]
 
         suspicious = self.module._suspicious_catalog_names(rows)
 
-        self.assertEqual(len(suspicious), 2)
+        self.assertEqual(len(suspicious), 3)
 
     def test_parsed_rows_write_to_region_csv_with_raw_pdf_provenance(self):
         rows = self.module.parse_ics_pages(

@@ -5,39 +5,41 @@
 - Change：`backfill-race-events-to-1984`
 - Review mode：Full
 - Profile：`feature`
-- 收敛轮次：2
+- 本次复审轮次：2
 - 最终结论：**APPROVED**
 
-本结论只批准进入“编写完整测试用例”阶段，不代表允许实现、上线、触网或生产写入。后续必须继续遵循：测试用例 -> `/opsx:apply` -> 代码 review/修复/复审直至无可修复问题 -> 上线与抓取。
+本结论批准进入“先编写完整测试用例，再执行实现”的阶段，不代表允许直接开启公开展示。1998–2026 详情抓取和生产写入可在测试、实现、代码 review 与复审无问题后按批准批次执行；正式展示开关必须保持关闭，直到该阶段全量重复/漏抓审计和前台验收通过。
 
-## 第一轮发现与返修
+## 本次第一轮发现与返修
 
-1. 年度总账把客观举办事实和处理状态混在单一 disposition 中，容易产生 `not_held + imported` 等非法组合。
-   - 已拆分 `expectation_status` 与 `resolution_status`，并要求模型和共享状态转换服务双重校验。
-2. 逐年 graded/pattern 目录只能发现分级年份，无法满足“升格前和降级后的完整系列史”。
-   - 已增加 lineage/timeline discovery 阶段和标准 timeline artifact。
-3. 现有赛果/历史冠军唯一约束无法可靠表达并列冠军。
-   - 已设计 `official_finish_position` 数据迁移，并放宽历史补位唯一约束到马匹维度。
-4. 生产网络没有全局关闭门禁，source cache 也没有磁盘预算。
-   - 已增加默认关闭的功能/网络开关、共享请求预算、缓存字节上限、最小磁盘和 cache 保留要求。
-5. “停办系列也必须抽近年”在逻辑上不可满足。
-   - 已改为每地区 3 系列、约 9 个真实 held/cancelled 目标，地区整体覆盖三年代；停办系列在真实范围取样。
-6. 赛事 slug 和地区同步护栏不够确定。
-   - 已锁定稳定地区前缀 slug、创建后 URL 不随名称变化；全量默认每地区 50 目标，领先限制按 100 个标准目标计算。
-7. 百万级 runner/result 若重复保存整页原件会导致数据库和备份膨胀。
-   - 已限定数据库只保存结构化事实与有限 provenance，HTML/PDF 留在受控 cache，并增加容量预估门禁。
-8. 缺少 TDD 可量化阈值与关键操作日志要求。
-   - 已新增 `Pre-declared hypotheses`，覆盖 50,000 目标内存/耗时、后台查询、首批选择、网络预算和原子回滚；commit、mapping、永久缺档、publication 和网络 run 均要求操作日志。
+1. 规格仍残留“当前首批必须包含1980年代”和旧批次 `1996–2005 / 1984–1995`，与已经批准的分阶段顺序冲突。
+   - 已统一为先执行1998–2026：首批覆盖2000年前后、中间年份和近年，随后按 `2016–2025 -> 2006–2015 -> 1998–2005` 推进；公开验收后才调研、建账和验收1984–1997。
+2. 现有选择器只接受 `ready + RaceEvent`，但生产新总账30,917条目标均为 `pending`，日期发现和首批选择会互相等待。
+   - 已改为两阶段固定范围：先从批准总账按身份和时间锚点固定约45个 `target_id`，日期发现apply后仍使用相同target_id生成详情计划，并绑定apply后的新target SHA。
+3. 目录解析器假设 `local_date.year == year`，无法表达2001届布里斯托尔新秀跨栏赛于2002-01-11举行等跨年届次。
+   - 已锁定“届次年份”和“实际日期”双语义：URL与系列年度仍使用届次年份；跨年日期必须提供actual_year、原因、权威证据和人工批准。
+4. 日期apply只写 `local_date/source_refs`，没有把目标转为ready并materialize，后续编排器仍无法消费。
+   - 已要求同一事务完成非破坏来源合并、pending到ready、draft/cancelled RaceEvent materialize、OperationLog和前后target SHA输出；任一步失败整批回滚。
 
-## 第二轮复审
+## 本次第二轮发现与返修
 
-- 架构：保持 Django 单体、管理命令/服务/adapter 分层，不引入新服务或前端构建系统。
-- 模型与迁移：新增表均可空部署；`RaceEvent.race_series` 和 official finish position 为 nullable 兼容迁移；唯一约束调整是放宽历史冠军并增加稳定系列年度约束。
-- 状态与事务：总账状态维度分离；artifact commit、详情 apply 和 publication scope 有明确事务与回滚边界。
-- 网络与生产：默认关闭、审批绑定、请求/缓存/磁盘预算、备份和写后核验完整。
-- 性能：流式 artifact、分页、索引、标准批次、source payload 边界和 sitemap 分片均有实现与验证任务。
-- 权限与审计：后台只读汇总保持 staff 权限，不能绕过 artifact；关键状态进入操作/任务日志。
-- 测试：82 项任务格式合法且无重复编号；所有 requirement 均有模型、服务、adapter、页面、测试和生产验收任务。
-- 文档：proposal、design、4 份 delta spec、tasks 均通过 `openspec validate --strict`，`git diff --check` 通过。
+1. 直接来源URL若只依赖已批准artifact，仍可能被污染为任意网络请求入口。
+   - 已增加adapter级HTTPS host白名单，并要求校验候选URL、重定向链和最终URL；内网、非HTTP(S)与未批准host均fail closed。
+2. 五地区距离单位没有形成明确契约，英国 `3m 210y` 可能被误读为米制数字。
+   - 已要求保留来源 `distance_text`，显式记录value/unit/measurement system；英国mile/furlong/yard与米制metre分开解析，裸数字不得猜测，派生换算不得覆盖原文。
+3. cancelled赛事可能没有赛果页，若统一要求result URL会错误阻断。
+   - 已增加 `cancellation_url`：批准的预定日期和权威取消证据可使cancelled目标ready并materialize，但不得创建虚假runners/results。
+4. 任务清单仍把1998–2026建账写成未完成的1984–当前总账，无法反映生产真实状态。
+   - 已将1998–2026总账生成、身份审核和生产commit标记完成；1984–1997调研、审批、早期验收和抓取保留为公开1998–2026之后的独立任务。
 
-第二轮未发现剩余可修复问题。来源是否真实覆盖到 1984 年属于 adapter spike 和生产证据任务，不以计划中的推测结论替代。
+## 最终复审
+
+- 架构：保持Django单体，复用 `HistoricalRaceEventTarget`、`RaceEvent`、现有编排器、adapter、source cache、OperationLog和artifact审批，不新增模型或独立服务。
+- 数据流：批准总账 -> pending预发现抽样 -> date/source discovery -> 人工审批 -> 原子ready/materialize -> 同target_id详情plan -> coverage/diff -> 受控写入，边界完整。
+- 身份安全：series/year/expectation不由日期apply修改；跨年只改变实际日期语义；apply前后SHA可追溯。
+- 来源安全：五地区来源矩阵、声明/实际出走/退出/赛果/取消证据分离、host白名单、重定向与磁盘/请求预算均有实现和测试任务。
+- 产品顺序：1998–2026全量详情完成并审计后才打开该阶段展示；随后再推进1984–1997目录，符合用户批准顺序。
+- 测试：98项任务格式和编号唯一；新增测试覆盖五地区离线fixture、日期冲突、跨年、取消、原子回滚、SHA漂移、同target_id复核、URL边界和距离单位。
+- 静态验证：`openspec validate backfill-race-events-to-1984 --strict`、`openspec validate --all --strict`、`git diff --check` 均通过。
+
+最终未发现剩余可修复的方案问题。真实来源的可访问性和历史覆盖深度仍必须由首批source cache证据与gap ledger验证，不能用计划假设代替生产事实。

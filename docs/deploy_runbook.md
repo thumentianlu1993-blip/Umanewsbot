@@ -61,6 +61,28 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web \
 - 本地上线验证：最新主干定向 `104` 项通过，完整 `stable` `813` 项全部通过；Django check、迁移一致性、OpenSpec strict/all、`git diff --check` 通过。
 
 回滚代码可使用部署前提交 `31cc82c`；若需要恢复迁移前数据库，使用上述 `pre-p0-horse-profile` 备份。`0027` 新表和字段在代码回滚后可暂时保留不用，只有确认需要彻底恢复时才执行数据库恢复。
+## 2026-07-13 美国Equibase六场补源与第一批45场完成
+
+- 范围：美国Ack Ack、Iroquois、Davona Dale三个系列的2000/2012六届。
+- 正式来源：Equibase官方单场standard PDF；date/source artifact manifest SHA-256为 `42c9ced9b8e41509853560efbde10a659059ff12f8ea26d602827ff452d49b46`，source-cache manifest SHA-256为 `d0ede01337e393d05a069d7be2ba3f87df795699a06fc113dbe47c3b1d34c49e`，请求账本SHA-256为 `2a90a32dd059f1c098f10be8e05daf86cb9d8aa29972a08f27be16e874e671a5`。
+- 详情候选：`runtime/historical_first_acceptance_1998_2026/equibase-official-release-20260713/detail-package/historical_detail_candidates.jsonl`，SHA-256 `94b62febe849b9a0562e5ab641d87671ae3468a202355b5336a7f4405e8abe75`；dry-run为6 scopes，正式apply写入 `58 runners / 58 results`。
+- 日期apply前备份：`backups/db/pre-equibase-us-date-apply-20260713_083026.sql.gz`，`120405132` bytes，SHA-256 `65da811725111da6c556d077118571da0d9bf5bed628d15c27ea7021052ad2e5`。
+- 详情apply前备份：`backups/db/pre-equibase-us-detail-apply-20260713_083319.sql.gz`，`120406520` bytes，SHA-256 `ad547a575ac03de17d8314821b3111b30ef5151231f2c4d33e5fe263c99d09c1`。
+- 两份备份均通过 `gzip -t`。写后第一批selection snapshot为 `45/45 imported`，共 `468 runners / 429 results`，历史published为 `0`。
+- 部署镜像：`umanewsbot:equibase-20260713`，镜像ID `sha256:1d079975672300bdd42c9f9cdbbac86d63446529904aafb7044e50b5817f5d11`；回滚镜像 `umanewsbot:pre-equibase-20260713`。
+- 长期开关继续为 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。单次管理命令只通过容器环境临时开启写入能力，不修改 `.env`；45场全部保持draft。
+- 写后数据库约 `796 MB`；Django check、web健康、内外 `/healthz/`、web/worker/beat近10分钟错误日志均通过。
+
+## 2026-07-13 法国历史详情补充来源与六场导入
+
+- 范围：法国2012/2025的 Arc de Triomphe、Criterium de Saint-Cloud、Prix d'Ispahan，共6个历史目标。
+- 来源 artifact：`runtime/historical_first_acceptance_1998_2026/detail-source-artifacts/france-zeturf-20260713/`，manifest SHA-256 `9062fc049ed8c1f7ff712dd5af7280a46348ab096cd8dd9d59f6fd80d9060c6f`。
+- 详情候选：`runtime/historical_first_acceptance_1998_2026/detail-package-france-zeturf/historical_detail_candidates.jsonl`，SHA-256 `38c2aea7f704d828e92073373b2ef225372037b00790576d115ed5502cf4e392`。
+- 来源写入前备份：`backups/db/pre-france-detail-source-apply-20260713_063352.sql.gz`，115M，SHA-256 `04d6322db1b407b675cc6d40302ad1afcb8ef94aa741cccb7e436843d84f8b70`。
+- 详情导入前备份：`backups/db/pre-france-detail-import-20260713_063554.sql.gz`，115M，SHA-256 `8f13612d674031eed4287dfa5f4b6e9686a63db8767560f7a057201c38478c6d`。
+- 两份备份均通过 `gzip -t`。来源 check 为6/6，详情 dry-run 为6 scopes；正式导入新增 `70 runners / 41 results / 12 applied candidates`。
+- 写后首批状态：`33 imported / 3 ready / 9 pending`；36个历史RaceEvent全部为draft。`.env` 中 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，不得因单次 `docker exec -e` 写入而修改长期配置。
+- 写后 Django check、本机/公网 healthz、容器状态和15分钟错误日志均正常。
 
 ## 2026-07-10 英文术语门禁上下文判定上线
 
@@ -4007,7 +4029,7 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 2. 设置独立 run 目录、请求预算 artifact、source-cache manifest 和磁盘预算。1998–2026 首次下载需要 2 个索引请求和 29 个 PDF 请求，但不得超过历史回填全局上限。
 3. 仅在下载窗口临时开启两个历史开关，执行 `python runtime/tools/prepare_tjcis_ics_catalog.py --years 1998-2026 --output-dir <run-dir> --allow-network`。中断后用同目录追加 `--resume`，禁止手工替换缓存。
 4. 对五个 `manifest_<region>.json` 运行 `parse_historical_race_catalog`，再用 `build_historical_race_inventory` 生成部分只读总账 artifact。核对每年五地区非零、平地自报总数一致、conflict/review/gap 和原始 PDF SHA。
-5. 1984–1997 未补齐前不得批准完整 inventory manifest、不得 commit 总账，也不得启动历史详情全量 apply。
+5. `1998–当前` 可作为独立完整年代 scope 生成和批准 inventory manifest，并在该 scope 逐年五地区完整、来源/身份冲突清零后执行总账与详情 apply；不得把该批准外推为 `1984–1997` 已完成。
 6. 无论成功或失败都恢复两个开关为 `false`，验证内外 `/healthz/`、当前赛事页、`HistoricalRaceEventTarget=0` 和 1984–2025 公开赛事数为 `0`。
 
 ### 2026-07-12 首次 TJCIS 执行记录
@@ -4017,6 +4039,12 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 - v3 candidate/inventory 路径分别为 `tjcis-candidates-2016-2021-v3-20260712/` 和 `tjcis-inventory-partial-2016-2021-v3-20260712/`。`conflict_count=82`，因此 approval 保持空白，禁止执行 `build_historical_race_inventory --commit`。
 - 本轮没有数据库备份，因为全程只读且未进入 commit；写后核验为 targets/pre-2026/public-pre-2026 全部 `0`。常驻开关始终 `false`，生产 HEAD `3dc8dff` 后继续健康。
 
+### 2026-07-12 第二轮年度目录修复记录
+
+- 修复后严格通过年份为 `2005 / 2007 / 2009 / 2012 / 2013 / 2014 / 2015 / 2016 / 2020 / 2021 / 2022`。
+- `diagnostics/declared_count_reconciliation.json/csv` 记录 `22` 年、`31` 个地区/项目的正文显式行与页脚声明差异。该文件是来源核验输入，不是 approval；禁止依据差额自动增加或删除赛事。
+- 页文本诊断缓存覆盖 1998–2026 全部 29 本 PDF，只用于快速差异定位。正式候选仍须绑定原 PDF 的 source-cache manifest、大小和 SHA-256。
+- 当前不得运行 inventory commit 或历史详情抓取。先以地区官方年度目录核验差异，并在完整候选上生成身份 conflict/review 文件；涉及系列合并、拆分、前后继或同名异赛时必须交产品审核。
 ## 2026-07-13 法国新鲜度与多地区归属待部署清单
 
 本节描述尚未执行的生产步骤。代码部署与迁移不得自动开启归属、相关地区查询或翻译失败重试。
@@ -4042,6 +4070,49 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 5. 健康验收以 `http://127.0.0.1/healthz/`、`http://umafans.run/healthz/`、首页、法国频道和新闻详情页为准；当前 HTTPS server 块仍注释，不能使用 HTTPS 失败判断本次应用部署失败，也不能对外宣称 HTTPS 已完成。
 6. 只读来源探测命令：`python manage.py probe_international_news_sources --source france_galop_news --source tdn_france --source tdn_france_broad --limit 2 --json`。2026-07-13 验收列表数为 `20 / 4 / 12`，均 accepted，详情错误为 0；该命令只做网络与数据库重复检查，不写入文章。
 7. 后续启用前先配置 SMTP 并测试 `754652181@qq.com` 收件，再建立有效 gold set、执行生产 dry-run 和人工复核；严格按 shadow、仅新文章 enforce、网页/测试群、72 小时回填、正式群顺序推进。任一质量门槛失败即停止扩大。
+## 2026-07-13 历史赛事第一批详情生产写入记录
+
+- 详情候选：`runtime/historical_first_acceptance_1998_2026/detail-crawl/historical_detail_candidates.jsonl`，27 场，SHA-256 `c999be2b2b0790837f8a6f5888e7068e775c783a57c6f8e7f3298e41e9b67a04`。写入前验证 `source_cache_manifest.json` 所列每个文件的相对路径、大小和 SHA。
+- production dry-run 为 `scopes=27` 并通过。详情写入前备份为 `backups/db/pre-historical-detail-first-acceptance-20260713_055500.sql.gz`，约 139 MB，`gzip -t` 通过，SHA-256 `5f0f9d94406d55954b078339f2a3796556f6ffc98b47c43d6bf2d14bbccde9ff`。
+- 正式写入只在单次容器命令临时注入 `HISTORICAL_RACE_BACKFILL_ENABLED=true`，不得修改常驻 `.env`：
+
+```bash
+docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
+  python manage.py import_historical_race_event_candidates \
+  --jsonl /tmp/historical-first-acceptance/historical_detail_candidates.jsonl \
+  --expected-sha256 c999be2b2b0790837f8a6f5888e7068e775c783a57c6f8e7f3298e41e9b67a04 \
+  --apply
+```
+
+- 写后核验：27 个 target 为 imported；香港/日本各 9 场、英国 6 场、美国 3 场；`Runner=297`、`Result=287`、`DataCandidate=54`，逐目标无条数偏差，27 条导入 OperationLog 存在。法国 9 场保持 ready，英国 3 场和美国 6 场保持 pending。
+- 可见性与运行态：36 个已建 `RaceEvent` 全部 draft、published 为 0；常驻两个历史开关均为 `false`。内外 healthz 为 `ok`，服务容器正常，最近 20 分钟 web/worker/beat 无错误日志。
+- 容量：详情缓存约 5.4 MB、38 个文件；当前数据库约 832 MB。本批核心新增 638 行和 27 条操作日志，现有索引及相关表规模未发现扩大批次 blocker。
+- 回滚时先停止后续历史写入，确认目标 scope 未被后续批次修改，再按数据库恢复流程使用上述备份；不得只删除 runners/results 而保留 imported 总账状态。
+
+## 2026-07-13 2016–2025 日美批次恢复记录
+
+- 最近续跑备份为 `backups/db/pre-band-2016-2025-jra-us-resume2-20260713_014638.sql.gz`，大小 `117832357`，SHA-256 `f765240eecea8e1bc758dca7b73590c90f9bf8c8078ff3757d9c375328dfaf78`。
+- 跨架构构建必须核验镜像 `Architecture`。本机 ARM64 镜像曾使 AMD64 生产容器 unhealthy，已即时使用预留镜像回滚；后续采用生产机原生 AMD64 构建。
+- importer 按年度 scope 独立事务提交。中途失败时只查询仍为 `ready` 的目标，重新导出当前 target SHA、package 和 dry-run，不重放已 imported scope 的旧候选。
+- Equibase 续跑必须通过重复 `horse_number` 和重复存储 `finish_position` 检查；退赛使用 `SCR-n`，并列名次保存在 `official_finish_position`。
+- 最终核验为 98 个批准详情目标全部 imported，`Runner=1157`、`Result=1080`；healthz 正常，常驻历史功能和网络开关为 false。
+
+## 2026-07-13 NSA 补齐与旧底座 P0 记录
+
+- NSA 候选 `final_candidates_nsa.jsonl` 固定 SHA-256 为 `478e263ee1b2e07ca6ef3cba23c683549393400b263ae250eef9b15fa0c3a1ff`。生产 dry-run 为 2 scopes，备份 `pre-band-2016-2025-nsa-import-20260713_015750.sql.gz` 大小 `117926527` bytes、SHA-256 `9a34f879a98e0fd8bda27b426b81f009bf6fcef0ce882b031589fe7c8867f3bc`，正式写入新增 `15 runners / 14 results`。
+- 写后标准批次日美 100 个目标为 `100/100 imported`、`1172 runners / 1094 results`；生产累计查询中的 `105 imported / 1221 runners / 1139 results` 另含第一批验收的 5 场美国赛事，不得混作本批分母。
+- P0 触发条件：生产数据库已应用 `stable.0029`，但运行镜像来自未合入 main 的历史分支，netkeiba 新增报 `null value in column attribution_rule_version violates not-null constraint`。此时立即停止批量写入、镜像构建和容器重启，确认没有运行中的 one-off 事务，并把镜像恢复权交给生产协调线程。
+- 兼容镜像构建门禁：合入最新 main；`showmigrations stable` 覆盖生产已应用叶节点；Django check 和 `makemigrations --check` 通过；历史、新闻新增、法国新鲜度、翻译恢复、多地区归属、P0 马匹组合测试通过；完整 stable 回归通过；构建 AMD64 后先报告镜像 ID，不直接重启生产。
+- 本次兼容镜像已在 `/opt/umanewsbot-builds/merged-historical-main-20260713-1008` 独立上下文构建，tag 为 `umanewsbot:merged-main-historical-amd64-20260713-1008`，ID 为 `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`。镜像标签记录 revision `0068715fceb0f629b5bfcb0c0b760427dfc6edc5` 和 source tree `e51e6992e57649445aeff2aa7f2a0c925f3c5c742771fceac13053459beceec6`；服务器与本机构建上下文哈希一致，镜像内 `0029`、历史详情服务和 NSA parser 存在，临时 SQLite check/migration drift 通过。
+- 构建本身未 retag `umanewsbot:prod`、未修改 compose、未重启容器、未连接生产数据库。最终切换必须由生产协调线程执行，并在切换后重做新增文章、翻译、历史只读计数、三个服务 settings、healthz 和近期错误日志验收。
+
+## 2026-07-13 兼容镜像切换后的历史批次恢复
+
+- 当前生产固定镜像 ID 为 `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`，回滚标签为 `pre-merged-main-historical-20260713-1015`。继续历史批次时禁止运行 build、retag、compose recreate 或服务 restart。
+- 法港英 150 场在生产写入前必须保持以下顺序：同步只读证据包 -> normalize/build 日期 artifact -> 核对 `150 ready` -> 审批 -> 数据库备份及 `gzip -t`/SHA -> 日期 commit -> 重新导出 event input -> 打包详情 -> coverage/dry-run -> 第二份数据库备份 -> 详情 commit -> 逐目标及全局写后核验。
+- 证据包必须为 150 条 provider、150 条 succeeded ledger、150 个唯一 URL 和 150 个逐文件大小/SHA 匹配的缓存身份；英国 Aintree Bowl/Hurdle 应分别为 race ID `850965/850966`。任一详情 URL 被不同 target 复用时立即停止。
+- 整个过程保持 `RACE_EVENT_HISTORICAL_PUBLIC_ENABLED=false`；仅在单条命令需要时临时打开历史回填写入门禁，并在命令结束后恢复。生产 web/worker/beat 的常驻开关不得因一次性命令改变。
+- 本批日期写入已使用 artifact manifest `e5ede9033485f59faac8d27c5371bd4749c17235119f4eea173cca07cc389b03` 完成 150 个 target；写前备份为 `backups/db/pre-band-2016-2025-fr-hk-uk-date-apply-20260713_122142.sql.gz`，大小 `121,994,037` bytes，SHA-256 `dae5869d58eb7e854d359f333e979b52647da75db667db930ff53d1cce5f521f`。详情写入因优先执行 Git 固化而暂停，不得越过新的源码提交/合并/可复现镜像门禁继续。
 
 ### 运行镜像被旧底座覆盖后的恢复记录
 

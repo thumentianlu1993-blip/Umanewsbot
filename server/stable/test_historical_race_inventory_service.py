@@ -457,6 +457,37 @@ class HistoricalRaceInventoryArtifactTests(TestCase):
 
         self.assertGreaterEqual(result["conflict_count"], 1)
 
+    def test_same_series_name_punctuation_and_diacritics_do_not_create_conflicts(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "catalog.jsonl"
+            rows = [
+                {
+                    "series_key": "france-automne-hurdle-g-p-d",
+                    "region": RacingRegion.FRANCE,
+                    "year": year,
+                    "canonical_name_original": name,
+                    "original_name": name,
+                    "grade_text": "G1",
+                }
+                for year, name in (
+                    (2000, "Automne Hurdle (G.P. d’Essai)"),
+                    (2001, "Automne Hurdle(G.P. d'Essai)"),
+                    (2002, "Automne Hurdle (G P d Essai)"),
+                    (2003, "AutomneHurdle (G P d Essai) (H)"),
+                    (2004, "AutomneHurdle (G P d Essai) S"),
+                )
+            ]
+            source.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8")
+
+            result = build_inventory_artifact(
+                catalog_paths=[source],
+                timeline_paths=[],
+                output_dir=root / "artifact",
+            )
+
+        self.assertEqual(result["conflict_count"], 0)
+
     def test_artifact_byte_change_invalidates_approval(self):
         with TemporaryDirectory() as tmp:
             artifact, approval = self._artifact(Path(tmp))

@@ -9,9 +9,9 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urljoin
-from urllib.request import Request, urlopen
 
 from race_event_request_budget import before_network_request
+from race_event_safe_http import fetch_https, validate_https_url
 from race_event_source_cache import write_source_cache_text
 
 from bs4 import BeautifulSoup
@@ -48,6 +48,7 @@ def _event_match_keys(value: str) -> list[str]:
     raw = value or ""
     variants = [raw]
     variants.append(re.sub(r"\s*\([^)]*\)", "", raw))
+    variants.append(re.sub(r"\s*\[[^]]*\]", "", raw))
     variants.append(re.split(r"\s+PRESENTED BY\s+", raw, flags=re.IGNORECASE)[0])
     variants.append(re.split(r"\s+AT\s+", raw, flags=re.IGNORECASE)[0])
     for variant in variants:
@@ -93,16 +94,20 @@ def _trainer_jockey_from_cell(cell) -> tuple[str, str, str]:
 
 
 def _download(url: str, path: Path, *, allow_network: bool, timeout: int, sleep_seconds: float) -> str:
+    validate_https_url(url, allowed_hosts=("horseracingnation.com",))
     if path.exists():
         return path.read_text(encoding="utf-8", errors="replace")
     if not allow_network:
         raise RuntimeError(f"缺少缓存且未允许网络请求：{path}")
     if sleep_seconds > 0:
         time.sleep(sleep_seconds)
-    request = Request(url, headers={"User-Agent": "umanewsbot/1.0 (+https://umafans.run; low-frequency race detail import)"})
     before_network_request(url)
-    with urlopen(request, timeout=timeout) as response:
-        body = response.read()
+    body, _response = fetch_https(
+        url,
+        allowed_hosts=("horseracingnation.com",),
+        timeout=timeout,
+        headers={"User-Agent": "umanewsbot/1.0 (+https://umafans.run; low-frequency race detail import)"},
+    )
     text = body.decode("utf-8", errors="replace")
     write_source_cache_text(path, text, source_url=url)
     return text
@@ -116,6 +121,17 @@ def _slug_filename(prefix: str, value: str) -> str:
 def _read_events(csv_path: Path) -> list[dict]:
     with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
         return list(csv.DictReader(handle))
+
+
+def _approved_result_url(event: dict, *, provider: str) -> str:
+    try:
+        source_refs = json.loads(event.get("source_refs") or "{}")
+    except (TypeError, json.JSONDecodeError):
+        return ""
+    evidence = (((source_refs.get("detail_discovery") or {}).get("urls") or {}).get("result_url") or {})
+    if evidence.get("source_provider") != provider:
+        return ""
+    return str(evidence.get("url") or "").strip()
 
 
 def _track_links_from_date_page(html: str, *, source_url: str, race_date: str) -> dict[str, dict]:
@@ -356,22 +372,31 @@ def prepare_candidates(args) -> dict:
                 summary["skipped"].append({"slug": event["slug"], "reason": "missing_date_or_racecourse"})
                 continue
             try:
-                if race_date not in date_cache:
-                    date_url = f"{HRN_BASE_URL}/entries-results/{race_date}"
-                    date_html = _download(
-                        date_url,
-                        source_dir / _slug_filename("source_hrn_date", race_date),
-                        allow_network=args.allow_network,
-                        timeout=args.timeout_seconds,
-                        sleep_seconds=args.sleep_seconds,
-                    )
-                    date_cache[race_date] = _track_links_from_date_page(date_html, source_url=date_url, race_date=race_date)
-                    summary["date_pages"] += 1
-                track = _match_track(date_cache[race_date], racecourse)
-                if track is None:
-                    summary["skipped"].append({"slug": event["slug"], "reason": "track_not_found", "race_date": race_date, "racecourse": racecourse})
-                    continue
-                track_url = track["url"]
+                track_url = _approved_result_url(event, provider="us_hrn")
+                if track_url:
+                    match = re.search(r"/entries-results/([^/]+)/\d{4}-\d{2}-\d{2}", track_url)
+                    track = {
+                        "track_name": racecourse,
+                        "track_slug": match.group(1) if match else _norm(racecourse),
+                        "url": track_url,
+                    }
+                else:
+                    if race_date not in date_cache:
+                        date_url = f"{HRN_BASE_URL}/entries-results/{race_date}"
+                        date_html = _download(
+                            date_url,
+                            source_dir / _slug_filename("source_hrn_date", race_date),
+                            allow_network=args.allow_network,
+                            timeout=args.timeout_seconds,
+                            sleep_seconds=args.sleep_seconds,
+                        )
+                        date_cache[race_date] = _track_links_from_date_page(date_html, source_url=date_url, race_date=race_date)
+                        summary["date_pages"] += 1
+                    track = _match_track(date_cache[race_date], racecourse)
+                    if track is None:
+                        summary["skipped"].append({"slug": event["slug"], "reason": "track_not_found", "race_date": race_date, "racecourse": racecourse})
+                        continue
+                    track_url = track["url"]
                 if track_url not in track_cache:
                     track_html = _download(
                         track_url,

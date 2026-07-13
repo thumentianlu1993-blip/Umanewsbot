@@ -597,7 +597,7 @@ class AttributionRunLedgerTests(TransactionTestCase):
         )
 
         blocker = create_attribution_run(mode="dry_run", selectors={"kind": "blocker"})
-        self.assertTrue(acquire_attribution_lease(blocker, now=NOW).acquired)
+        self.assertTrue(acquire_attribution_lease(blocker).acquired)
         article = article_with_text("Prix de Diane at Chantilly")
         run = create_attribution_dry_run([article], rule_version="multiregion-v2", gold_version="gold-v1", metrics={"qualified": True})
 

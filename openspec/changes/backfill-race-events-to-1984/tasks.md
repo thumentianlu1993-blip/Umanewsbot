@@ -62,6 +62,18 @@
 - [x] 5.7 (application) 实现写后年度赛事/模块/来源/可见性计数核验并只在全绿后标记 imported
 - [x] 5.8 (integration) 实现约 45 场第一批选择器，校验五地区、三系列、三个年代和代表性类型
 - [x] 5.9 (integration) 实现每地区默认 50 目标的年代带批次和按目标数计算的地区护栏，禁止领先超过 100 个标准目标
+- [x] 5.10 (integration) 实现历史date/source discovery artifact，从pending总账固定target_id并绑定selection snapshot、apply前inventory/target SHA、请求账本、source cache manifest、review、gap与approval
+- [ ] 5.11 (integration) 实现日本 JRA/netkeiba/JBIS、中国香港 HKJC、英国 Racing Post/Sky Sports/BHA、法国 France Galop/PMU、美国 Equibase/BRIS/DRF/BloodHorse/NSA 日期与直接页面发现适配器
+- [x] 5.12 (application) 实现批准后的目标日期/直接来源定位原子apply，保留既有source_refs，支持有证据跨年日期与cancelled证据，转ready、materialize并写OperationLog及前后target SHA
+- [ ] 5.13 (integration) 扩展详情adapter优先消费直接result/racecard/cancellation URL，并分离declared/actual/non-runner/result/cancellation来源状态
+- [x] 5.14 (integration) 扩展第一批选择器与管理命令，支持pending预发现抽样、1998–2026三时间锚点、同target_id后发现复核，并为1984–1997保留独立早期验收门禁
+- [ ] 5.15 (integration) 为日期发现和详情adapter实现HTTPS host/重定向/最终URL白名单校验，拒绝内网、非HTTP(S)与未批准host
+- [x] 5.16 (integration) 实现地区距离解析契约，保留distance_text并记录显式distance value/unit/measurement system及可追溯派生换算
+- [x] 5.17 (application) 实现ready/materialized目标的detail-source artifact、审批校验、target/event非破坏apply和批准capture精确绑定
+- [x] 5.18 (integration) 实现英法 IrishRacing 历史详情备用 adapter，分离地区 provider、actual/results 语义、马号/闸位和并列名次
+- [x] 5.19 (integration) 实现美国 Equibase 单场 PDF 详情 adapter，绑定批准 source cache，复核日期/赛场/场次并保留联合投注编号
+- [x] 5.20 (integration) 实现五地区年代带标准批次artifact命令，固定pending总账范围、地区上限、进度护栏、审核CSV、manifest和approval
+- [x] 5.21 (integration) 实现JRA年度表/单场结果和TOBA/Equibase Yearbook批次来源发现与离线详情解析，显式补齐地区距离单位并保留退赛马
 
 ## 6. 公开页面、搜索与索引
 
@@ -84,28 +96,41 @@
 - [x] 7.8 (integration) 补充历史 URL 稳定性、标准批次上限/地区进度、raw payload 边界和磁盘预算测试
 - [x] 7.9 (application) 执行 Django check、迁移漂移、目标测试、完整 stable 回归和查询性能检查
 - [x] 7.10 (operations) 执行 OpenSpec strict/all、git diff、Compose 配置和 Docker 镜像 source cache 路径校验
+- [x] 7.11 (integration) 先补五地区date/source discovery离线fixture、冲突、无日期、直接URL、取消证据、跨年届次和来源权威测试
+- [x] 7.12 (integration) 补declared/actual/non-runner/result分离、results派生和不伪造racecard测试
+- [x] 7.13 (application) 补日期apply哈希漂移、source_refs非破坏合并、pending到ready、materialize、前后SHA、跨年日期、原子回滚、身份字段不可修改和OperationLog测试
+- [x] 7.14 (integration) 补pending预发现抽样、selection snapshot不漏项、同target_id后发现复核、1998–2026首批三时间锚点与1984–1997早期验收门禁测试
+- [x] 7.16 (integration) 补URL白名单、内网地址、重定向越界和最终host校验测试
+- [x] 7.17 (integration) 补英里/弗隆/码、米制、混合单位、裸数字拒绝和原始distance_text不被覆盖测试
+- [x] 7.18 (operations) 执行新增目标测试、完整stable回归、OpenSpec strict/all、Django check、迁移漂移和diff检查
+- [x] 7.19 (integration) 补detail-source缓存复制、审批漂移、target原子性、target/event双层证据、dry-run命令和同URL不同capture拒绝测试
+- [x] 7.20 (integration) 补Equibase standard PDF空格表头、联合投注编号、完整runners/results和赛事身份错配拒绝测试
+- [x] 7.21 (integration) 补年代带批次年份边界、pending筛选、每地区稳定顺序、artifact身份和空/非法批次拒绝测试
+- [x] 7.22 (integration) 补JRA年度表对齐、美国同名场地区分/移师、Equibase Yearbook出马/退赛/赛果和新来源审批测试
 
 ## 8. 生产总账与第一批验收
 
 - [x] 8.1 (operations) 部署空模型和只读 inventory 工具，完成生产备份、迁移、健康和回滚演练
 - [x] 8.2 (operations) 对现有 2026 系列执行 mapping dry-run、人工审核 artifact 并受控 commit
-- [ ] 8.3 (operations) 五地区逐年生成 1984–当前年度 catalog source cache 和只读年度总账
-- [ ] 8.4 (operations) 审核历史独有系列、创办年、改名迁场、取消/not-held 和身份冲突
-- [ ] 8.5 (operations) 批准年度总账 manifest，确认全局/地区/年代/系列分母和请求预算
-- [ ] 8.6 (operations) 生成并审核约 45 场五地区跨年代第一批应到清单，网络默认关闭
-- [ ] 8.7 (operations) 分地区开启第一批网络抓取，执行 coverage、gap ledger 和字段级 diff 审核
-- [ ] 8.8 (operations) 对完整 scope 执行 dry-run、生产备份、apply-check、正式写入和写后核验
+- [x] 8.3 (operations) 五地区逐年生成并受控写入 1998–2026 catalog source cache 和年度总账
+- [x] 8.4 (operations) 审核 1998–2026 历史独有系列、改名迁场、取消/not-held 和身份冲突，不以 TJCIS 首末出现年推断创办/停办年
+- [x] 8.5 (operations) 批准并写入 1998–2026 年度总账 manifest，核验全局/地区/年代/系列分母且保持历史展示开关关闭
+- [x] 8.6 (operations) 生成并审核约 45 场五地区 1998–2026 三时间锚点第一批应到清单，网络默认关闭
+- [x] 8.7 (operations) 分地区开启第一批网络抓取，执行 coverage、gap ledger 和字段级 diff 审核
+- [x] 8.8 (operations) 对完整 scope 执行 dry-run、生产备份、apply-check、正式写入和写后核验
 - [ ] 8.9 (operations) 验收五地区前台年度详情、年份搜索、历届冠军、可见性和 sitemap，未通过不得扩大批次
-- [ ] 8.10 (operations) 核对生产全局开关、请求/缓存/磁盘预算、source cache 保留和 web/worker/beat 日志
-- [ ] 8.11 (operations) 根据第一批 dry-run 评估新增行数、索引和数据库增长，确认容量后才批准扩大批次
+- [x] 8.10 (operations) 核对生产全局开关、请求/缓存/磁盘预算、source cache 保留和 web/worker/beat 日志
+- [x] 8.11 (operations) 根据第一批 dry-run 评估新增行数、索引和数据库增长，确认容量后才批准扩大批次
 
 ## 9. 全量年代带回填与最终审计
 
 - [ ] 9.1 (operations) 完成 2016–2025 五地区批次抓取、缺口审核、分批写入和写后核验
 - [ ] 9.2 (operations) 完成 2006–2015 五地区批次抓取、缺口审核、分批写入和写后核验
-- [ ] 9.3 (operations) 完成 1996–2005 五地区批次抓取、缺口审核、分批写入和写后核验
-- [ ] 9.4 (operations) 完成 1984–1995 五地区批次抓取、缺口审核、分批写入和写后核验
-- [ ] 9.5 (operations) 对全部暂时缺口执行补源和身份复核，永久不可得逐项完成双来源证据审批
-- [ ] 9.6 (operations) 生成最终 accounted/data-complete 报告，证明 accounted_rate=100% 并按地区/年代/系列披露永久缺档
-- [ ] 9.7 (operations) 完成生产全量计数、重复/漏抓审计、备份恢复抽演、服务性能和公开页面最终验收
-- [ ] 9.8 (operations) 更新 current_state、project_status、decisions、deploy_runbook 和来源缺口文档，归档 OpenSpec change
+- [ ] 9.3 (operations) 完成 1998–2005 五地区批次抓取、缺口审核、分批写入和写后核验
+- [ ] 9.4 (operations) 完成 1998–2026 全量重复/漏抓审计、前台验收并显式批准该阶段 publication scope 后开启正式展示
+- [ ] 9.5 (operations) 调研、生成、审核并批准 1984–1997 五地区 catalog source cache、系列身份和年度总账
+- [ ] 9.6 (operations) 完成 1984–1997 五地区早期页面结构验收，再按批准年代带抓取、审核、分批写入和写后核验
+- [ ] 9.7 (operations) 对全部暂时缺口执行补源和身份复核，永久不可得逐项完成双来源证据审批
+- [ ] 9.8 (operations) 生成最终 accounted/data-complete 报告，证明 accounted_rate=100% 并按地区/年代/系列披露永久缺档
+- [ ] 9.9 (operations) 完成生产全量计数、重复/漏抓审计、备份恢复抽演、服务性能和公开页面最终验收
+- [ ] 9.10 (operations) 更新 current_state、project_status、decisions、deploy_runbook 和来源缺口文档，归档 OpenSpec change

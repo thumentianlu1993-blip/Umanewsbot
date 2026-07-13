@@ -25,7 +25,7 @@ from stable.services.historical_race_inventory import (
 
 
 CATALOG_SCHEMA_VERSION = "1.0"
-ADAPTER_PARSER_VERSION = "2026.07.1"
+ADAPTER_PARSER_VERSION = "2026.07.4"
 REQUIRED_COLUMNS = {
     "record_type",
     "year",

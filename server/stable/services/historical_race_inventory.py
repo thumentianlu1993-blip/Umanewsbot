@@ -4,6 +4,7 @@ import csv
 import hashlib
 import json
 import re
+import unicodedata
 from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -154,6 +155,16 @@ def _value_identity(value: Any) -> str:
     if isinstance(value, str):
         return " ".join(value.casefold().split())
     return canonical_json(value)
+
+
+def _series_name_identity(value: str) -> str:
+    value = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", value)
+    value = re.sub(r"\s*\(\s*[HR]\s*\)\s*$", "", value, flags=re.I)
+    value = re.sub(r"\bH\.?\s+(?=(?:Stp|Hurdle)\b)", "", value, flags=re.I)
+    value = re.sub(r"(?:\s+[SHR]\.?)\s*$", "", value, flags=re.I)
+    punctuation_spaced = "".join(" " if unicodedata.category(char)[0] in {"P", "S"} else char for char in value)
+    ascii_value = unicodedata.normalize("NFKD", punctuation_spaced).encode("ascii", "ignore").decode("ascii")
+    return " ".join(re.findall(r"[a-z0-9]+", ascii_value.casefold()))
 
 
 def sanitize_structured_row_evidence(payload: dict[str, Any], *, max_bytes: int = 64 * 1024) -> dict[str, Any]:
@@ -670,8 +681,8 @@ def build_inventory_artifact(
                 elif (
                     existing_series["canonical_name_original"]
                     and row["canonical_name_original"]
-                    and _value_identity(existing_series["canonical_name_original"])
-                    != _value_identity(row["canonical_name_original"])
+                    and _series_name_identity(existing_series["canonical_name_original"])
+                    != _series_name_identity(row["canonical_name_original"])
                 ):
                     conflicts.append(
                         {
@@ -1392,7 +1403,7 @@ def publish_historical_target(
     with transaction.atomic():
         locked_target = (
             HistoricalRaceEventTarget.objects.select_for_update()
-            .select_related("event", "race_series")
+            .select_related("race_series")
             .get(pk=target.pk)
         )
         blockers = historical_publication_blockers(locked_target)

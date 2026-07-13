@@ -10,9 +10,9 @@ import unicodedata
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.request import Request, urlopen
 
 from race_event_request_budget import before_network_request
+from race_event_safe_http import fetch_https, validate_https_url
 from race_event_source_cache import write_source_cache_text
 
 from bs4 import BeautifulSoup
@@ -60,9 +60,14 @@ STOPWORDS = {
     "chantilly",
     "cloud",
     "compiegne",
+    "criterium",
     "deauville",
     "longchamp",
     "paris",
+}
+
+ZETURF_SERIES_ALIASES = {
+    "france-chantilly-g-p-de": ("Grand Prix de Chantilly",),
 }
 
 
@@ -101,16 +106,20 @@ def _strip_country_suffix(value: str) -> str:
 
 
 def _download(url: str, path: Path, *, allow_network: bool, timeout: int, sleep_seconds: float) -> str:
+    validate_https_url(url, allowed_hosts={"zeturf.fr"})
     if path.exists():
         return path.read_text(encoding="utf-8", errors="replace")
     if not allow_network:
         raise RuntimeError(f"缺少缓存且未允许网络请求：{path}")
     if sleep_seconds > 0:
         time.sleep(sleep_seconds)
-    request = Request(url, headers={"User-Agent": "umanewsbot/1.0 (+https://umafans.run; low-frequency race detail import)"})
     before_network_request(url)
-    with urlopen(request, timeout=timeout) as response:
-        body = response.read()
+    body, _response_meta = fetch_https(
+        url,
+        allowed_hosts={"zeturf.fr"},
+        timeout=timeout,
+        headers={"User-Agent": "umanewsbot/1.0 (+https://umafans.run; low-frequency race detail import)"},
+    )
     text = body.decode("utf-8", errors="replace")
     write_source_cache_text(path, text, source_url=url)
     return text
@@ -162,6 +171,26 @@ def _race_match(expected: str, actual: str) -> bool:
     return overlap >= max(2, round(len(expected_tokens) * 0.67))
 
 
+def _event_match_names(event: dict) -> list[str]:
+    names = [str(event.get("original_name") or "").strip()]
+    try:
+        source_refs = json.loads(event.get("source_refs") or "{}")
+    except (TypeError, json.JSONDecodeError):
+        source_refs = {}
+    calendar_name = str((source_refs.get("calendar_discovery") or {}).get("race_name") or "").strip()
+    if calendar_name:
+        names.append(calendar_name)
+    slug = str(event.get("slug") or "")
+    for series_key, aliases in ZETURF_SERIES_ALIASES.items():
+        if series_key.casefold() in slug.casefold():
+            names.extend(aliases)
+    return list(dict.fromkeys(name for name in names if name))
+
+
+def _race_matches_event(event: dict, actual: str) -> bool:
+    return any(_race_match(name, actual) for name in _event_match_names(event))
+
+
 def _zeturf_url(event: dict, *, r_number: int, c_number: int) -> str:
     course_slug = _slugify(event.get("racecourse") or "")
     race_slug = _slugify(event.get("original_name") or "")
@@ -195,8 +224,12 @@ def _cell_text(node, selector: str) -> str:
 
 
 def _horse_name(node) -> str:
-    link = node.select_one("a.horse-name")
-    value = link.get("title") if link and link.get("title") else (link.get_text(" ", strip=True) if link else "")
+    horse_node = node.select_one(".horse-name")
+    value = (
+        horse_node.get("title")
+        if horse_node and horse_node.get("title")
+        else (horse_node.get_text(" ", strip=True) if horse_node else "")
+    )
     return _strip_country_suffix(value)
 
 
@@ -216,11 +249,12 @@ def _parse_page(html: str, *, source_url: str) -> tuple[list[dict], list[dict], 
             horse_name = _horse_name(tr)
             if not horse_name:
                 continue
-            jockey = _cell_text(tr, ".second-line a.jockey")
+            jockey = _cell_text(tr, ".second-line .jockey")
             trainer = ""
-            trainer_node = tr.select_one(".second-line span")
-            if trainer_node:
-                trainer = _collapse(trainer_node.get_text(" ", strip=True))
+            for trainer_node in tr.select(".second-line > span"):
+                if "jockey" not in (trainer_node.get("class") or []):
+                    trainer = _collapse(trainer_node.get_text(" ", strip=True))
+                    break
             running_status = "withdrawn" if tr.select_one(".non-partant") or "(NP)" in tr.get_text(" ", strip=True) else "declared"
             source_refs = {
                 "primary": source_url,
@@ -311,7 +345,11 @@ def _discover_event_pages(events: list[dict], source_dir: Path, args) -> tuple[d
             if any(_venue_match(course, parts["venue"]) for course in target_courses):
                 candidate_rs.append(r_number)
         for r_number in candidate_rs:
+            if not unmatched:
+                break
             for c_number in range(1, args.max_c + 1):
+                if not unmatched:
+                    break
                 sample_event = next(iter(unmatched.values()), date_events[0])
                 url = _zeturf_url(sample_event, r_number=r_number, c_number=c_number)
                 cache_path = source_dir / f"source_zt_{race_date}_R{r_number}C{c_number}.html"
@@ -326,7 +364,7 @@ def _discover_event_pages(events: list[dict], source_dir: Path, args) -> tuple[d
                 for slug, event in list(unmatched.items()):
                     if not _venue_match(event["racecourse"], parts["venue"]):
                         continue
-                    if not _race_match(event["original_name"], parts["race_name"]):
+                    if not _race_matches_event(event, parts["race_name"]):
                         continue
                     matched_url = _zeturf_url(event, r_number=r_number, c_number=c_number)
                     matched[slug] = {

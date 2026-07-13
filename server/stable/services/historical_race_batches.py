@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import csv
 import json
+import re
 from collections import Counter, defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -21,7 +24,11 @@ from stable.models import (
     RaceSeriesReviewStatus,
     RacingRegion,
 )
-from stable.services.historical_race_inventory import InventoryValidationError, canonical_json
+from stable.services.historical_race_inventory import (
+    InventoryValidationError,
+    canonical_json,
+    file_identity,
+)
 
 
 STANDARD_REGION_BATCH_LIMIT = 50
@@ -38,6 +45,15 @@ def historical_event_slug(target: HistoricalRaceEventTarget) -> str:
     base = stable_key if stable_key.startswith(prefix) else f"{prefix}{stable_key}"
     suffix = f"-{target.year}"
     return f"{base[: 160 - len(suffix)]}{suffix}"
+
+
+def _locked_historical_target(target_id: int):
+    # event is nullable; joining it here makes PostgreSQL reject FOR UPDATE.
+    return (
+        HistoricalRaceEventTarget.objects.select_for_update()
+        .select_related("race_series")
+        .filter(pk=target_id)
+    )
 
 
 def materialize_historical_event(target: HistoricalRaceEventTarget, *, actor=None) -> RaceEvent | None:
@@ -62,7 +78,7 @@ def materialize_historical_event(target: HistoricalRaceEventTarget, *, actor=Non
     if conflict:
         raise InventoryValidationError(f"historical slug conflict: {target.year}/{slug}")
     with transaction.atomic():
-        locked = HistoricalRaceEventTarget.objects.select_for_update().select_related("race_series", "event").get(pk=target.pk)
+        locked = _locked_historical_target(target.pk).get()
         event = locked.event or RaceEvent.objects.filter(race_series=locked.race_series, year=locked.year).first()
         created = event is None
         if event is None:
@@ -155,6 +171,67 @@ def target_identity(target: HistoricalRaceEventTarget) -> dict[str, Any]:
     return payload
 
 
+def write_event_input_csvs(
+    targets: Iterable[HistoricalRaceEventTarget], *, output_dir: str | Path
+) -> dict[str, Any]:
+    rows_by_region: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    targets = list(targets)
+    for target in targets:
+        if target.resolution_status != HistoricalRaceResolutionStatus.READY or not target.event_id:
+            raise InventoryValidationError("event input target must be ready and materialized")
+        event = target.event
+        identity = target_identity(target)
+        rows_by_region[target.country_region].append(
+            {
+                "target_id": target.pk,
+                "target_sha256": identity["target_sha256"],
+                "inventory_artifact_sha256": target.artifact_sha256,
+                "year": event.year,
+                "slug": event.slug,
+                "original_name": event.original_name,
+                "chinese_name": event.chinese_name,
+                "country_region": event.country_region,
+                "racecourse": event.racecourse,
+                "grade_text": event.grade_text,
+                "normalized_grade": event.normalized_grade,
+                "surface": event.surface,
+                "distance_text": event.distance_text,
+                "status": event.status,
+                "local_date": event.local_date.isoformat() if event.local_date else "",
+                "source_refs": canonical_json(event.source_refs or {}),
+            }
+        )
+    root = Path(output_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "target_id",
+        "target_sha256",
+        "inventory_artifact_sha256",
+        "year",
+        "slug",
+        "original_name",
+        "chinese_name",
+        "country_region",
+        "racecourse",
+        "grade_text",
+        "normalized_grade",
+        "surface",
+        "distance_text",
+        "status",
+        "local_date",
+        "source_refs",
+    ]
+    files: dict[str, str] = {}
+    for region, rows in sorted(rows_by_region.items()):
+        path = root / f"events_{region}.csv"
+        with path.open("w", encoding="utf-8-sig", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(sorted(rows, key=lambda row: (int(row["year"]), row["slug"])))
+        files[region] = str(path)
+    return {"target_count": len(targets), "region_count": len(files), "files": files}
+
+
 def _closest_by_year(targets: list[HistoricalRaceEventTarget], anchor: int) -> HistoricalRaceEventTarget | None:
     return min(targets, key=lambda target: (abs(target.year - anchor), target.year, target.pk)) if targets else None
 
@@ -162,29 +239,47 @@ def _closest_by_year(targets: list[HistoricalRaceEventTarget], anchor: int) -> H
 def select_first_acceptance_targets(
     *,
     series_keys_by_region: dict[str, list[str]],
-    current_year: int,
+    anchors: tuple[int, int, int] | None = None,
+    current_year: int | None = None,
+    require_ready: bool = True,
+    required_target_ids: Iterable[int] | None = None,
 ) -> list[HistoricalRaceEventTarget]:
     selected: list[HistoricalRaceEventTarget] = []
-    anchors = (1988, 2000, current_year - 1)
+    if anchors is None:
+        if current_year is None:
+            raise InventoryValidationError("first acceptance requires explicit anchors")
+        anchors = (1988, 2000, current_year - 1)
+    if len(anchors) != 3 or len(set(anchors)) != 3:
+        raise InventoryValidationError("first acceptance requires 3 unique anchors")
+    fixed_ids = {int(value) for value in required_target_ids or []}
+    if required_target_ids is not None and len(fixed_ids) != FIRST_ACCEPTANCE_TARGETS_PER_REGION * 5:
+        raise InventoryValidationError("post-discovery acceptance must use the same target ids")
     for region in sorted(region for region in RacingRegion.values if region not in {RacingRegion.OTHER}):
         series_keys = list(dict.fromkeys(series_keys_by_region.get(region) or []))
         if len(series_keys) != FIRST_ACCEPTANCE_SERIES_PER_REGION:
             raise InventoryValidationError(f"{region} first acceptance requires exactly 3 series")
-        candidates = list(
-            HistoricalRaceEventTarget.objects.select_related("race_series", "event")
-            .filter(
+        queryset = HistoricalRaceEventTarget.objects.select_related("race_series", "event").filter(
                 country_region=region,
                 race_series__key__in=series_keys,
                 race_series__review_status=RaceSeriesReviewStatus.APPROVED,
-                resolution_status=HistoricalRaceResolutionStatus.READY,
                 expectation_status__in=[
                     HistoricalRaceExpectationStatus.HELD,
                     HistoricalRaceExpectationStatus.CANCELLED,
                 ],
+            )
+        if require_ready:
+            queryset = queryset.filter(
+                resolution_status=HistoricalRaceResolutionStatus.READY,
                 event__isnull=False,
             )
-            .order_by("year", "race_series__key", "id")
-        )
+        else:
+            queryset = queryset.filter(
+                resolution_status=HistoricalRaceResolutionStatus.PENDING,
+                event__isnull=True,
+            )
+        if required_target_ids is not None:
+            queryset = queryset.filter(pk__in=fixed_ids)
+        candidates = list(queryset.order_by("year", "race_series__key", "id"))
         by_series: dict[str, list[HistoricalRaceEventTarget]] = defaultdict(list)
         for target in candidates:
             by_series[target.race_series.key].append(target)
@@ -197,8 +292,9 @@ def select_first_acceptance_targets(
                 candidate = _closest_by_year(rows, anchor)
                 if candidate and candidate not in region_selected:
                     region_selected.append(candidate)
-        for anchor in anchors:
-            if not any(abs(target.year - anchor) <= (5 if anchor != current_year - 1 else 3) for target in region_selected):
+        for index, anchor in enumerate(anchors):
+            tolerance = 3 if index == len(anchors) - 1 else 5
+            if not any(abs(target.year - anchor) <= tolerance for target in region_selected):
                 pool = [target for target in candidates if target not in region_selected]
                 candidate = _closest_by_year(pool, anchor)
                 if candidate:
@@ -216,19 +312,21 @@ def select_first_acceptance_targets(
             raise InventoryValidationError(f"{region} cannot supply 9 first-acceptance targets")
         if len({target.race_series.key for target in region_selected}) != FIRST_ACCEPTANCE_SERIES_PER_REGION:
             raise InventoryValidationError(f"{region} first acceptance does not cover 3 series")
-        if not any(1984 <= target.year <= 1994 for target in region_selected):
-            raise InventoryValidationError(f"{region} first acceptance misses the 1980s/early era")
-        if not any(1995 <= target.year <= 2005 for target in region_selected):
-            raise InventoryValidationError(f"{region} first acceptance misses the around-2000 era")
-        if not any(target.year >= current_year - 3 for target in region_selected):
-            raise InventoryValidationError(f"{region} first acceptance misses the recent era")
+        for index, anchor in enumerate(anchors):
+            tolerance = 3 if index == len(anchors) - 1 else 5
+            if not any(abs(target.year - anchor) <= tolerance for target in region_selected):
+                raise InventoryValidationError(f"{region} first acceptance misses anchor {anchor}")
         selected.extend(region_selected)
     if not FIRST_ACCEPTANCE_TOTAL_MIN <= len(selected) <= FIRST_ACCEPTANCE_TOTAL_MAX:
         raise InventoryValidationError(f"first acceptance total is outside 40-50: {len(selected)}")
+    if required_target_ids is not None and {target.pk for target in selected} != fixed_ids:
+        raise InventoryValidationError("post-discovery acceptance must use the same target ids")
     return selected
 
 
-def accounted_progress_by_region() -> dict[str, int]:
+def accounted_progress_by_region(
+    *, year_start: int | None = None, year_end: int | None = None
+) -> dict[str, int]:
     progress = dict.fromkeys(
         [region for region in RacingRegion.values if region != RacingRegion.OTHER],
         0,
@@ -244,6 +342,10 @@ def accounted_progress_by_region() -> dict[str, int]:
             HistoricalRaceResolutionStatus.PERMANENTLY_UNAVAILABLE,
         ]
     )
+    if year_start is not None:
+        rows = rows.filter(year__gte=year_start)
+    if year_end is not None:
+        rows = rows.filter(year__lte=year_end)
     progress.update(
         {
             row["country_region"]: row["count"]
@@ -251,6 +353,222 @@ def accounted_progress_by_region() -> dict[str, int]:
         }
     )
     return progress
+
+
+def _validate_region_limit_and_progress(
+    counts: Counter,
+    *,
+    approved_region_limit: int,
+    current_progress: dict[str, int],
+) -> None:
+    if approved_region_limit <= 0 or approved_region_limit > STANDARD_REGION_BATCH_LIMIT:
+        raise InventoryValidationError(
+            f"approved region limit must be between 1 and {STANDARD_REGION_BATCH_LIMIT}"
+        )
+    over = {region: count for region, count in counts.items() if count > approved_region_limit}
+    if over:
+        raise InventoryValidationError(f"historical region batch limit exceeded: {dict(sorted(over.items()))}")
+    progress = dict(current_progress)
+    for region, count in counts.items():
+        progress[region] = progress.get(region, 0) + count
+    all_regions = [region for region in RacingRegion.values if region != RacingRegion.OTHER]
+    values = [progress.get(region, 0) for region in all_regions]
+    if values and max(values) - min(values) > MAX_REGION_PROGRESS_LEAD:
+        raise InventoryValidationError("historical region progress lead exceeds 100 standard targets")
+
+
+def select_historical_band_batch_targets(
+    *,
+    year_start: int,
+    year_end: int,
+    inventory_manifest_sha256: str,
+    region_limit: int = STANDARD_REGION_BATCH_LIMIT,
+) -> list[HistoricalRaceEventTarget]:
+    if year_start > year_end:
+        raise InventoryValidationError("historical year band start must not exceed end")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(inventory_manifest_sha256 or "")):
+        raise InventoryValidationError("historical inventory manifest SHA is invalid")
+    if region_limit <= 0 or region_limit > STANDARD_REGION_BATCH_LIMIT:
+        raise InventoryValidationError(
+            f"historical region limit must be between 1 and {STANDARD_REGION_BATCH_LIMIT}"
+        )
+    selected: list[HistoricalRaceEventTarget] = []
+    for region in sorted(region for region in RacingRegion.values if region != RacingRegion.OTHER):
+        queryset = (
+            HistoricalRaceEventTarget.objects.select_related("race_series", "event")
+            .filter(
+                country_region=region,
+                year__gte=year_start,
+                year__lte=year_end,
+                artifact_sha256=inventory_manifest_sha256,
+                race_series__review_status=RaceSeriesReviewStatus.APPROVED,
+                expectation_status__in=[
+                    HistoricalRaceExpectationStatus.HELD,
+                    HistoricalRaceExpectationStatus.CANCELLED,
+                ],
+                resolution_status=HistoricalRaceResolutionStatus.PENDING,
+                event__isnull=True,
+            )
+            .order_by("-year", "race_series__key", "id")
+        )
+        selected.extend(list(queryset[:region_limit]))
+    _validate_region_limit_and_progress(
+        Counter(target.country_region for target in selected),
+        approved_region_limit=region_limit,
+        current_progress=accounted_progress_by_region(year_start=year_start, year_end=year_end),
+    )
+    return selected
+
+
+def write_band_batch_artifact(
+    targets: Iterable[HistoricalRaceEventTarget],
+    *,
+    output_dir: str | Path,
+    inventory_manifest_sha256: str,
+    year_start: int,
+    year_end: int,
+) -> dict[str, Any]:
+    rows = list(targets)
+    if not rows:
+        raise InventoryValidationError("historical band batch has no pending targets")
+    if len({target.pk for target in rows}) != len(rows):
+        raise InventoryValidationError("historical band batch contains duplicate targets")
+    for target in rows:
+        if not year_start <= target.year <= year_end:
+            raise InventoryValidationError(f"target is outside historical year band: {target.pk}")
+        if target.artifact_sha256 != inventory_manifest_sha256:
+            raise InventoryValidationError(f"target inventory manifest mismatch: {target.pk}")
+        if target.race_series.review_status != RaceSeriesReviewStatus.APPROVED:
+            raise InventoryValidationError(f"target series is not approved: {target.pk}")
+        if target.expectation_status not in {
+            HistoricalRaceExpectationStatus.HELD,
+            HistoricalRaceExpectationStatus.CANCELLED,
+        }:
+            raise InventoryValidationError(f"target is not due for detail crawl: {target.pk}")
+        if target.resolution_status != HistoricalRaceResolutionStatus.PENDING or target.event_id is not None:
+            raise InventoryValidationError(f"target is not pending and unmaterialized: {target.pk}")
+    _validate_region_limit_and_progress(
+        Counter(target.country_region for target in rows),
+        approved_region_limit=STANDARD_REGION_BATCH_LIMIT,
+        current_progress=accounted_progress_by_region(year_start=year_start, year_end=year_end),
+    )
+    root = Path(output_dir)
+    try:
+        root.mkdir(parents=True, exist_ok=False)
+    except FileExistsError as exc:
+        raise InventoryValidationError(f"historical band artifact output already exists: {root}") from exc
+    snapshot_path = root / "selection_snapshot.json"
+    snapshot = write_batch_snapshot(
+        rows,
+        output_path=snapshot_path,
+        inventory_manifest_sha256=inventory_manifest_sha256,
+    )
+    review_path = root / "expected_targets_review.csv"
+    review_fields = [
+        "target_id",
+        "country_region",
+        "year",
+        "series_key",
+        "original_name",
+        "chinese_name",
+        "racecourse",
+        "grade_text",
+        "expectation_status",
+        "resolution_status",
+        "operator_decision",
+        "operator_notes",
+    ]
+    with review_path.open("w", encoding="utf-8-sig", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=review_fields)
+        writer.writeheader()
+        for target in rows:
+            writer.writerow(
+                {
+                    "target_id": target.pk,
+                    "country_region": target.country_region,
+                    "year": target.year,
+                    "series_key": target.race_series.key,
+                    "original_name": target.original_name,
+                    "chinese_name": target.chinese_name,
+                    "racecourse": target.racecourse,
+                    "grade_text": target.grade_text,
+                    "expectation_status": target.expectation_status,
+                    "resolution_status": target.resolution_status,
+                    "operator_decision": "",
+                    "operator_notes": "",
+                }
+            )
+    pending = HistoricalRaceEventTarget.objects.filter(
+        year__gte=year_start,
+        year__lte=year_end,
+        artifact_sha256=inventory_manifest_sha256,
+        race_series__review_status=RaceSeriesReviewStatus.APPROVED,
+        expectation_status__in=[
+            HistoricalRaceExpectationStatus.HELD,
+            HistoricalRaceExpectationStatus.CANCELLED,
+        ],
+        resolution_status=HistoricalRaceResolutionStatus.PENDING,
+        event__isnull=True,
+    )
+    available_counts = {
+        row["country_region"]: row["count"]
+        for row in pending.values("country_region").annotate(count=Count("id"))
+    }
+    selected_counts = Counter(target.country_region for target in rows)
+    summary = {
+        "schema_version": "1.0",
+        "year_band": {"start": year_start, "end": year_end},
+        "inventory_manifest_sha256": inventory_manifest_sha256,
+        "target_count": len(rows),
+        "snapshot_sha256": snapshot["snapshot_sha256"],
+        "selected_by_region": dict(sorted(selected_counts.items())),
+        "available_pending_by_region": dict(sorted(available_counts.items())),
+        "remaining_pending_by_region": {
+            region: available_counts.get(region, 0) - selected_counts.get(region, 0)
+            for region in sorted(region for region in RacingRegion.values if region != RacingRegion.OTHER)
+        },
+        "accounted_by_region": accounted_progress_by_region(year_start=year_start, year_end=year_end),
+    }
+    summary_path = root / "summary.json"
+    summary_path.write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    manifest = {
+        "schema_version": "1.0",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "year_band": summary["year_band"],
+        "inventory_manifest_sha256": inventory_manifest_sha256,
+        "target_count": len(rows),
+        "artifacts": {
+            "selection_snapshot": file_identity(snapshot_path, relative_to=root).as_dict(),
+            "expected_targets_review": file_identity(review_path, relative_to=root).as_dict(),
+            "summary": file_identity(summary_path, relative_to=root).as_dict(),
+        },
+    }
+    manifest_path = root / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    approval = {
+        "status": "pending",
+        "approved_by": "",
+        "approved_at": "",
+        "approved_target_ids": [],
+        "manifest_identity": file_identity(manifest_path, relative_to=root).as_dict(),
+    }
+    approval_path = root / "approval.json"
+    approval_path.write_text(
+        json.dumps(approval, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return {
+        "output_dir": str(root),
+        "manifest": str(manifest_path),
+        "approval": str(approval_path),
+        **summary,
+    }
 
 
 def validate_standard_batch(
@@ -261,18 +579,11 @@ def validate_standard_batch(
 ) -> list[HistoricalRaceEventTarget]:
     rows = list(targets)
     counts = Counter(target.country_region for target in rows)
-    if approved_region_limit <= 0:
-        raise InventoryValidationError("approved region limit must be positive")
-    over = {region: count for region, count in counts.items() if count > approved_region_limit}
-    if over:
-        raise InventoryValidationError(f"historical region batch limit exceeded: {dict(sorted(over.items()))}")
-    progress = dict(current_progress or {})
-    for region, count in counts.items():
-        progress[region] = progress.get(region, 0) + count
-    all_regions = [region for region in RacingRegion.values if region != RacingRegion.OTHER]
-    values = [progress.get(region, 0) for region in all_regions]
-    if values and max(values) - min(values) > MAX_REGION_PROGRESS_LEAD:
-        raise InventoryValidationError("historical region progress lead exceeds 100 standard targets")
+    _validate_region_limit_and_progress(
+        counts,
+        approved_region_limit=approved_region_limit,
+        current_progress=dict(current_progress or {}),
+    )
     for target in rows:
         if target.resolution_status != HistoricalRaceResolutionStatus.READY or target.event_id is None:
             raise InventoryValidationError(f"target is outside ready approved ledger scope: {target.pk}")

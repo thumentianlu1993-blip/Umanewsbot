@@ -117,12 +117,14 @@ held/due 年度目标必须有：
 第一批选择规则：
 
 - 每地区 3 个系列。
-- 每地区约 9 个真实 held/cancelled 年度目标，地区样本整体覆盖 1980 年代、2000 年前后和近年。
+- 每地区约9个真实held/cancelled年度目标；1998–2026阶段覆盖2000年前后、中间年份和近年，1984–1997阶段另行覆盖早期年代。
 - 长寿现役系列优先取三个年代锚点；历史停办系列无法覆盖近年时取其可举办范围内代表年份，并由同地区其他系列补足近年锚点。
 - 覆盖长寿、改名/迁场、历史独有或停办系列。
 - 目标约 45 个年度赛事。
 
-后续按 `2016–2025 → 2006–2015 → 1996–2005 → 1984–1995` 推进。标准全量批次每地区最多 50 个 held/cancelled 年度目标；变更批次上限必须写入 plan 和审批。地区同步以同一年代带已 accounted/imported 的 due 目标数计算，任何地区不得比最慢地区领先超过 100 个标准目标，避免通过拆小或放大批次绕过护栏。
+后续先按 `2016–2025 → 2006–2015 → 1998–2005` 推进；1984–1997目录和早期验收完成后再推进该阶段。标准全量批次每地区最多50个held/cancelled年度目标；变更批次上限必须写入plan和审批。地区同步以同一年代带已accounted/imported的due目标数计算，任何地区不得比最慢地区领先超过100个标准目标，避免通过拆小或放大批次绕过护栏。
+
+年代带标准批次必须由正式命令从批准总账中选择 `pending`、未materialize的 held/cancelled 目标，按年份从新到旧、系列key和target id确定稳定顺序。每批输出不可变selection snapshot、完整CSV审核表、地区/剩余分母summary、manifest和pending approval；空批次、重复target、年代带外目标、inventory SHA不符或非pending目标不得生成成功artifact。
 
 ### 8. 允许完整 scope 先写，缺口不消失
 
@@ -168,6 +170,37 @@ published 且质量达标的年度页进入分片 sitemap；draft、冲突、空
 
 inventory commit、series mapping、永久不可得批准、publication transition、网络 run 开始/失败/恢复和写后核验必须写 `OperationLog` 或 `TaskExecutionLog`，日志保存 artifact SHA、目标范围、操作者、状态和摘要，不保存整页原件或敏感环境变量。
 
+### 11. 历史详情抓取前必须先发现日期与直接来源页面
+
+逐年分级目录能够证明赛事属于某个年度，但多数目录不提供精确比赛日期；现有英法详情 adapter 按日期页定位赛事，空 `local_date` 会直接跳过。因此在 `HistoricalRaceEventTarget` materialize 和详情 prepare 之间增加独立的 date/source discovery 阶段，不新增模型：
+
+1. 从已批准总账的 `pending` held/cancelled 目标按地区、系列和时间锚点选择固定 `target_id`，生成不可变selection snapshot；discovery artifact必须复制并绑定该snapshot、apply前target SHA和inventory manifest SHA。snapshot中的目标即使没有候选也必须进入gap ledger，artifact不得省略或替换；此时不得要求目标已经 `ready` 或已有 `RaceEvent`。
+2. 按地区来源优先级抓取年度日期、赛果页和可得的赛前页面，所有请求继续走共享预算与 source cache manifest。
+3. 输出 `date_source_candidates.jsonl`、人工 review、缺口账本、summary 和 manifest；同一目标出现多日期、跨赛事匹配或低权威覆盖高权威时阻断。
+4. 批准 apply 保留既有 `source_refs`，只补充 `local_date`、顶层稳定直接 URL 键及 `source_refs.detail_discovery` provenance；不得改变 series/year/expectation 等赛事身份。held 目标必须有结果页或可继续定位结果的权威直接赛事页；cancelled 目标可用 `cancellation_url` 代替结果页。满足门禁后，同一事务把 `pending` 转为 `ready` 并 materialize draft/cancelled `RaceEvent`，输出 apply 前后 target SHA 映射；失败必须整批回滚。
+5. 赛事届次年份与实际举办日年份必须分开：`HistoricalRaceEventTarget.year` 和公开 URL 继续表示届次年份；`local_date` 表示实际日期。二者不同时，候选必须提供 `actual_year`、跨年原因和权威证据并经人工批准，保存到 `source_refs.detail_discovery`；不得沿用目录 adapter 的“日期年份必须等于届次年份”假设。
+6. 详情 adapter 优先消费 `source_refs.result_url / declared_runners_url / actual_runners_url / non_runner_url / cancellation_url`，不得重新进行无边界全网猜测。
+7. 第一批采用两阶段固定范围：预发现选择器从批准总账锁定约45个 `target_id`；日期 apply/materialize 后，详情计划必须使用相同 `target_id`，并绑定 apply 后新 target SHA，禁止悄悄用容易抓取的目标替换失败目标。
+8. discovery 与详情 adapter 必须为各来源声明允许的 HTTPS host；候选 URL、每次重定向和最终 URL 都必须落在对应 adapter 白名单，拒绝凭 artifact 抓取任意 host、内网地址或非 HTTP(S) scheme。
+9. 距离字段保留来源原文，并在 provenance 中显式记录 `distance_value`、`distance_unit` 和 `measurement_system`。英国/爱尔兰语境中的 `m/f/y` 分别按 mile/furlong/yard 解释，法国、日本、香港等来源的 `m` 按来源定义为 metre；没有显式单位不得猜测或仅凭裸数字换算。可选标准化值只能作为派生字段并保留换算公式，不能覆盖 `distance_text`。
+10. target 已完成日期 apply/materialize 后才发现更完整的直接详情页时，不重跑或篡改原 date/source artifact。系统生成独立 detail-source artifact，把当前 target SHA、inventory SHA、provider/authority、直接 URL 和已验证 source-cache 字节复制到新 manifest；人工审批后原子、非破坏地把补充证据同时写入 target 与 event 的 `detail_discovery.approved_detail_sources`，状态仍为 ready。详情 packager 必须同时匹配批准 URL 和批准 capture 的 `source_url/size/SHA-256`，同 URL 后续不同正文不得替代已批准 capture。
+
+地区来源矩阵：
+
+- 日本：JRA 官方结果优先；官方年代不足时 netkeiba 补历史赛果/实际出走，JBIS 只补血统、胜马或沿革证据。
+- 中国香港：HKJC Results / Race Card 为主源。
+- 英国：Racing Post Full Result 提供实际出走和赛果；Sky Sports Racecard 补赛前声明和退出马；BHA 仅用于 2014 年后官方校验。主源当前无法抓取时，IrishRacing 可作为较低权威的正式详情备用源，仅提供 actual runners/results。
+- 法国：France Galop 为主源，PMU 补 racecard/results。主源只提供沿革或暂时无法取得逐马详情时，IrishRacing 可作为较低权威的正式详情备用源，仅提供 actual runners/results。
+- 美国：Equibase historical chart 为主源，优先绑定可独立校验日期、赛场代码和场次号的单场 standard PDF；失效的整日 PDF 索引不得作为成功证据。BRISnet chart、DRF、BloodHorse 交叉校验；美国障碍赛事使用 NSA。
+
+`declared runners`、`actual runners`、`non-runners`、`results` 和 `cancellation` 必须保存独立 source URL 与来源权威。只有完整赛果存在时才允许从 results 派生 actual runners，并标记 `derived_from_results=true`；不得声称取得了赛前 racecard。
+
+IrishRacing 在工程上拆为 `uk_irishracing` 与 `france_irishracing` 两个 provider：两者共用同一 HTTPS host，但 artifact 和 adapter 必须按 target 地区拒绝交叉使用。结果页中的实际出走按马号存储排序，闸位另存；并列名次用唯一连续 `finish_position` 保持存储顺序，官方并列位次保存在 `official_finish_position`。
+
+Equibase 单场 PDF 详情 adapter 只接受 date/source discovery 已批准的精确 URL 和对应 source-cache 字节。解析后必须把 PDF 页眉日期、赛场和场次号与 target 映射再次比对；`1a` 等联合投注编号必须作为独立实际出走保留，runners 按马号排序，results 保持官方完赛顺序。
+
+当前执行顺序按用户批准调整为：先完成并验收 1998–2026，再调研和建立 1984–1997 目录。1998–2026 第一批每地区仍取 3 个系列、约 9 个目标，但年代锚点调整为 2000 年前后、中间年份和近年；1984–1997 建账后另行执行五地区早期年代验收，保留原定1980年代旧页面结构门禁。
+
 ## Risks / Trade-offs
 
 - [历史年度目录无法在线获取] → 支持官方 PDF/纸本目录扫描的离线 source cache，缺失进入证据账本，不复制当前目录。
@@ -178,6 +211,8 @@ inventory commit、series mapping、永久不可得批准、publication transiti
 - [自动发布历史赛事产生空壳 SEO 页面] → 发布门槛、分片 sitemap 过滤和 draft 默认状态。
 - [冠军动态汇总查询变慢] → 对 series/year 建索引，详情页只查询有限年份并允许缓存。
 - [来源许可或版权限制] → 数据库只保存结构化事实和必要 provenance；原始文档保存在受控 source cache，不公开转载整页内容。
+- [直接来源URL被污染或重定向越界] → adapter级HTTPS host白名单同时校验候选、重定向链和最终URL，拒绝内网与非批准host。
+- [地区距离单位误读] → 保留来源原文和显式单位，标准化仅作可追溯派生，不以裸数字跨单位比较或覆盖原值。
 
 ## Migration Plan
 
@@ -186,10 +221,10 @@ inventory commit、series mapping、永久不可得批准、publication transiti
 3. 应用已批准 mapping，绑定现有年度赛事；保留原 `series_key` 兼容。
 4. 部署 inventory 命令、后台只读汇总、总账 artifact 和测试；网络默认关闭。
 5. 为五地区逐一加入年度目录 adapter，先离线 cache/dry-run。
-6. 生成 1984–当前总账并人工批准系列冲突、not-held 和历史独有系列。
-7. 执行约 45 场第一批跨年代详情验收；完整 scope 备份、apply、写后核验。
-8. 开启年代带批次，逐批更新完成率和缺口账本。
-9. 数据达到公开门槛后启用日历年份/搜索、动态冠军和 sitemap。
+6. 先生成并批准1998–当前总账，完成日期发现和约45场五地区首批详情验收。
+7. 按2016–2025、2006–2015、1998–2005推进完整scope备份、apply和写后核验。
+8. 调研并生成1984–1997总账，完成独立早期验收后推进该年代带。
+9. 逐批更新完成率和缺口账本，数据达到公开门槛后启用日历年份/搜索、动态冠军和sitemap。
 
 回滚时先停止新 run；代码回滚后保留新增表和 nullable FK不影响旧页面。单批数据异常使用 apply artifact 保存的 before 值回滚；大范围异常使用批次前数据库备份。不得通过删除总账掩盖已发现缺口。
 
