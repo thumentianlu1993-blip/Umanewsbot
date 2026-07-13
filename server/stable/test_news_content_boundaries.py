@@ -69,6 +69,22 @@ class InternationalNewsContentBoundaryTests(TestCase):
         self.assertGreaterEqual(detail.metadata["body_cleaning"]["removed_count"], 3)
         self.assertIn("betting_promotion", detail.metadata["body_cleaning"]["removed_rules"])
 
+    def test_sporting_life_minified_sibling_blocks_are_cleaned_independently(self):
+        detail = SportingLifeAdapter().parse_detail_html(
+            """<html><head><meta property="og:title" content="Festival preview"></head><body>
+            <div class="Article__ArticleBody-sc-production-8267"><div>
+            <p>The Sky Bet Go Racing In Yorkshire Summer Festival returns this week.</p><p>Blue Horizon is 7/2 for the feature race.</p><p>Each person is given a £100 charity bet for the meeting.</p><h2>More from Sporting Life</h2><p>Free bets and safer gambling.</p>
+            </div></div></body></html>""",
+            url="https://www.sportinglife.com/racing/news/festival-preview/233189",
+        )
+
+        self.assertEqual(detail.metadata["body_parse_status"], "ok")
+        self.assertIn("Sky Bet Go Racing In Yorkshire Summer Festival", detail.body_ja_raw)
+        self.assertIn("Blue Horizon is 7/2", detail.body_ja_raw)
+        self.assertNotIn("charity bet", detail.body_ja_raw)
+        self.assertNotIn("More from Sporting Life", detail.body_ja_raw)
+        self.assertNotIn("Free bets", detail.body_ja_raw)
+
     def test_tdn_8316_removes_results_cta_and_tail(self):
         detail = TDNAdapter().parse_detail_html(
             fixture_html("tdn_8316.html"),

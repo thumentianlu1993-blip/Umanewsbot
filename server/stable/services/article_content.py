@@ -10,7 +10,10 @@ from stable.models import SourceSite
 from stable.services.text import extract_article_text, normalize_whitespace
 
 
-_PARAGRAPH_SPLIT_RE = re.compile(r"\n{2,}")
+# ``extract_article_text`` emits a newline at every block boundary. Pretty
+# printed HTML may add another newline between sibling tags, while minified
+# production HTML does not, so a single newline is the stable DOM boundary.
+_PARAGRAPH_SPLIT_RE = re.compile(r"\n+")
 # These expressions deliberately do not match a bare bookmaker name, "bet" in
 # a sponsored race title, or factual odds. Only explicit promotion/advice
 # signals are removed.
