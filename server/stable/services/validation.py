@@ -923,7 +923,10 @@ def validate_rewrite(
             item
             for item in entity_resolution.suppressed_candidates
             if item.term_type == TermType.HORSE
-            and any(flag in {"inside_person_span", "inside_longer_entity"} for flag in item.conflict_flags)
+            and any(
+                flag in {"inside_person_span", "inside_longer_entity", "inside_common_word_span"}
+                for flag in item.conflict_flags
+            )
         ],
     ]
     rejected_horse_targets = {
@@ -973,7 +976,10 @@ def validate_rewrite(
         item.term_id
         for item in entity_resolution.suppressed_candidates
         if item.term_id
-        and any(flag in {"inside_person_span", "inside_longer_entity"} for flag in item.conflict_flags)
+        and any(
+            flag in {"inside_person_span", "inside_longer_entity", "inside_common_word_span"}
+            for flag in item.conflict_flags
+        )
     }
     if batch_context is not None:
         matched_ids = batch_context.term_entry_ids_by_article.get(article.id, set())

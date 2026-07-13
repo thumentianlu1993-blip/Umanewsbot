@@ -419,20 +419,36 @@ class JapaneseCompleteHorseNameTests(TestCase):
     def test_katakana_name_before_jockey_role_is_a_person_not_a_horse(self):
         self._internal_term("スミヨン", "苏铭伦")
         self._internal_term("クリストフ", "基斯杜化")
+        self._internal_term("ユー", "你")
 
         resolution = _resolve(
             "ジャンプラ賞結果",
-            "クリストフ・スミヨン騎手が勝利し、40万ユーロの賞金を獲得した。",
+            "クリストフ・スミヨン騎手が勝利した。陣営はクリストフを称賛し、40万ユーロの賞金を獲得した。",
             SourceLanguage.JAPANESE,
         )
 
         people = _entities(resolution, "person")
         self.assertTrue(any(item.matched_text == "クリストフ・スミヨン" for item in people))
-        self.assertFalse(
-            any(item.matched_text in {"クリストフ", "スミヨン", "ユーロ"} for item in _entities(resolution, "horse"))
+        self.assertTrue(
+            any(
+                item.matched_text == "クリストフ" and "japanese_person_coreference" in item.evidence
+                for item in people
+            )
         )
         self.assertFalse(
-            any(item.matched_text in {"クリストフ", "スミヨン", "ユーロ"} for item in _entities(resolution, "unknown_horse"))
+            any(item.matched_text in {"クリストフ", "スミヨン", "ユーロ", "ユー"} for item in _entities(resolution, "horse"))
+        )
+        self.assertFalse(
+            any(
+                item.matched_text in {"クリストフ", "スミヨン", "ユーロ", "ユー"}
+                for item in _entities(resolution, "unknown_horse")
+            )
+        )
+        self.assertTrue(
+            any(
+                item.matched_text == "ユー" and "inside_common_word_span" in item.conflict_flags
+                for item in resolution.suppressed_candidates
+            )
         )
 
     def test_exact_katakana_fixed_phrase_is_resolved_as_term_without_special_note(self):

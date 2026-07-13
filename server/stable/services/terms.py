@@ -791,6 +791,34 @@ def _resolve_japanese_entities(
                             term=term,
                         )
                     )
+        person_alias_owners: dict[str, list[ArticleEntity]] = {}
+        for person in protected_spans:
+            for part in re.findall(r"[ァ-ヴー]{3,}", person.matched_text):
+                person_alias_owners.setdefault(part, []).append(person)
+        for alias_text, owners in person_alias_owners.items():
+            canonical_owners = {owner.canonical_text for owner in owners}
+            if len(canonical_owners) != 1:
+                continue
+            owner = owners[0]
+            for alias_match in re.finditer(re.escape(alias_text), text):
+                if alias_match.start() <= owner.start or _overlaps(
+                    alias_match.start(), alias_match.end(), protected_spans
+                ):
+                    continue
+                coreference = _make_entity(
+                    "person",
+                    alias_match.group(0),
+                    field_name,
+                    alias_match.start(),
+                    alias_match.end(),
+                    canonical_text=owner.canonical_text,
+                    target_zh=owner.target_zh,
+                    confidence=94,
+                    evidence=["japanese_person_coreference"],
+                    term=next((entry for entry in entries if entry.id == owner.term_id), None),
+                )
+                entities.append(coreference)
+                protected_spans.append(coreference)
         for match in _KATAKANA_TOKEN_RE.finditer(text):
             token = match.group(0)
             if _overlaps(match.start(), match.end(), protected_spans):
@@ -811,7 +839,36 @@ def _resolve_japanese_entities(
                 text, title if field_name == "title" else "", match.start(), match.end(), token
             ) or _score_heuristic_candidate(text, title, match.start(), match.end(), token) >= 3
             common_word_strong = _strong_japanese_common_word_horse_context(text, match.start(), match.end())
-            if token in non_horse_words and not common_word_strong:
+            if token in non_horse_words and not common_word_strong and not exact_non_horse_terms:
+                common_word = _make_entity(
+                    "common_word",
+                    token,
+                    field_name,
+                    match.start(),
+                    match.end(),
+                    confidence=100,
+                    evidence=["japanese_common_word_seed"],
+                    conflict_flags=["horse_candidate_common_word"],
+                )
+                entities.append(common_word)
+                protected_spans.append(common_word)
+                for candidate, term in internal_terms:
+                    offset = token.find(candidate)
+                    suppressed.append(
+                        _make_entity(
+                            "horse" if term.term_type == TermType.HORSE else "term",
+                            candidate,
+                            field_name,
+                            match.start() + offset,
+                            match.start() + offset + len(candidate),
+                            canonical_text=term.source_ja,
+                            target_zh=term.target_zh,
+                            confidence=0,
+                            evidence=["term_candidate"],
+                            conflict_flags=["inside_common_word_span"],
+                            term=term,
+                        )
+                    )
                 continue
             if exact_terms:
                 term = exact_terms[0]
