@@ -1,5 +1,15 @@
 # 部署运行手册
 
+## 2026-07-13 法港英 150 场字段校正与详情导入
+
+- 字段 artifact：manifest `d6f6e29a...a2857`，候选 `59acc224...f50ac`；dry-run 为 150 scopes / 164 fields / 0 manual skip。写前备份 `pre-fr-hk-uk-field-corrections-20260713_134732.sql.gz`，`148521701` bytes，SHA-256 `30dc58d2...c94ce`，gzip 通过。
+- 字段 apply 只在一次性管理容器临时设置 `HISTORICAL_RACE_BACKFILL_ENABLED=true`；写后核对 150 个 target SHA 改变、164 个字段/provenance、150 条目标日志和 1 条批次日志。常驻 web/worker/beat 设置未修改。
+- 字段变化后旧详情候选 `38e05d...1950` 必须且确实被生产拒绝；重新导出候选 `a8fc8fbf...68da` 为 150 scopes / 0 gaps，法港英 runners/results 分别 `449/330`、`515/506`、`570/458`，150 个 URL 全局唯一，dry-run 通过。
+- 详情写前备份 `pre-fr-hk-uk-detail-import-20260713_135954.sql.gz`，`148554120` bytes，SHA-256 `610c5407...f4db`，gzip 通过。apply 150/150 成功，写后逐 target 数量、candidate applied、source cache identity、马号/名次唯一性和 150 条导入日志全部通过。
+- 最终生产历史为 295 imported、3174 runners、2817 results，295 个 pre-2026 RaceEvent 全部 draft，published 0；常驻历史写入与网络开关 false。150 个详情缓存 `38383091` bytes，大小/SHA `150/150` 通过。内外 healthz、Django check、容器和日志正常。
+- 写后自然窗口：14:00 CST 的 17 个 crawl、5 个 publish、5 个 qq_push 均 succeeded；crawl seen/new/failed 为 `470/5/0`。publish 未发布且失败 0，零产出原因为 `hard_gate_blocked`、`no_ready_candidates`；QQ 未新增投递且失败 0，原因为 `already_sent`、`no_eligible_articles`。窗口后内外 healthz 正常，web/worker/beat 近 20 分钟错误扫描为 0。
+- 回滚字段错误时优先使用字段写前备份；字段正确但详情错误时使用详情写前备份。恢复前先停一次性历史写入并记录当前 artifact/日志，不删除 source cache；恢复后重新执行 target、字段 provenance、详情计数和 published=0 验收。
+
 ## 2026-07-13 `main@df2732c3` 权威字段门禁镜像切换
 
 - 目标镜像：`umanewsbot:main-df2732c3-amd64-20260713-1321`，image ID `sha256:27d5d51cbe2ae6d23cb99dc758da01addc2d5935504a950bbb8a2685bce2bf13`；两次构建一致，架构 `amd64`，revision `df2732c3b8ae47619728c52f54a95204f5d6b574`，Git tree `d2ce464b80ec595f82dc19a531c982429bb639af`，源码归档 SHA-256 `441eb2acb5c061aae5d22671e82ddccfafb2cb08af62711b030c0031354d8d5d`。

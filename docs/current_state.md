@@ -1,5 +1,15 @@
 # 当前状态
 
+## 2026-07-13 2016–2025 标准批次法港英 150 场正式导入
+
+- 法国、香港、英国各 50 场的基础字段先经独立权威字段 artifact 校正。evidence manifest SHA-256 为 `d6f6e29a7243b2d709ef117a85fb315d2067b60870e6d72145dc81d0ab6a2857`，候选 SHA-256 为 `59acc224101cccf1a4b98dfc2e64173bbbf81406027b8ecd269871e643cf50ac`；生产 dry-run 精确得到 150 个 scope、164 个字段，其中距离 150、场地 8、surface 6，人工锁跳过 0。
+- 字段写入前备份 `backups/db/pre-fr-hk-uk-field-corrections-20260713_134732.sql.gz` 为 `148521701` bytes，SHA-256 `30dc58d2d7f7eb099dfebf7ebf059e13f28aee13b5b0bd69b41bbe5cdd6c94ce`，`gzip -t` 通过。原子 apply 后 150 个 target SHA 全部改变，164 个值和字段 provenance 逐项一致，150 条目标日志和 1 条批次日志齐全；常驻历史写入/网络开关仍为 false。
+- 旧详情候选 `38e05d7786fcfa5adf91eee19dc08d3eb86c55f8cc5a29a86bead32b6f771950` 已在生产因 `historical target changed after candidate approval` 被明确拒绝。重新导出并打包的新候选 SHA-256 为 `a8fc8fbf94c5a90e0d62be6f8727c38cbbcd14577c1894d8869d9974b33368da`，150 场、0 gap、150 个全局唯一详情 URL，正式 dry-run 全部通过。
+- 详情写入前第二份备份 `backups/db/pre-fr-hk-uk-detail-import-20260713_135954.sql.gz` 为 `148554120` bytes，SHA-256 `610c540758ac0665342d219841ee91592bc36f5f0641ed2f263eec507250f4db`，`gzip -t` 通过。正式 apply 150/150 成功：法国 `449 runners / 330 results`，香港 `515 / 506`，英国 `570 / 458`；合计新增 `1534 runners / 1294 results / 300 applied candidates` 和 150 条导入日志。
+- 写后验收 error 0：每场 runners/results 与候选完全一致，马号和存储名次无重复，candidate source name/URL/cache identity 均匹配批准证据，target 全部 imported、module 状态完整。生产历史累计为 `295 imported / 30622 pending`、2026 年前 `295` 场且全部 draft，历史 runners/results 为 `3174 / 2817`，published 为 0。
+- 150 个详情 source cache 共 `38383091` bytes，生产逐文件大小和 SHA-256 `150/150` 通过。数据库约 `850877463` bytes；Django check、内外 healthz、容器和 web/worker/beat 日志均正常。历史公开展示继续关闭，本批未改变新闻或公开页面开关。
+- 写入后的 14:00 CST 自然窗口验收通过：17 个抓取窗口、5 个发布窗口、5 个 QQ 推送窗口均 succeeded；抓取处理 470 条、产生 5 条新稿、失败 0。发布与 QQ 均为门禁解释明确的正常零产出，分别是 `hard_gate_blocked` / `no_ready_candidates` 和 `already_sent` / `no_eligible_articles`，失败文章与失败投递均为 0；随后内外 healthz 正常，web/worker/beat 近 20 分钟错误扫描为 0。
+
 ## 2026-07-13 权威字段门禁固化与可复现镜像切换
 
 - 权威字段批次门禁源码、测试、OpenSpec 与运行文档已提交为 `df2732c3b8ae47619728c52f54a95204f5d6b574`，历史分支和远端 `main` 同步快进；提交前完整 `stable` 回归 `1136/1136` 通过，1 项按设计跳过，最终代码 review 无待修问题。
