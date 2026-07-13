@@ -26,6 +26,13 @@ _BETTING_PROMOTION_RE = re.compile(
     r"\bdownload (?:our|the) app\b.*\b(?:bet|offer|tip))",
     re.IGNORECASE,
 )
+_STANDALONE_URL_RE = re.compile(r"^https?://\S+$", re.IGNORECASE)
+_LINK_CTA_SENTENCE_RE = re.compile(
+    r"(?:^|\s+)(?:"
+    r"click here\b[^.!?]*\.?|"
+    r"(?:to|for)\b[^.!?]{0,180}\bclick here\.?)",
+    re.IGNORECASE,
+)
 
 _STRUCTURED_NOISE_SELECTORS = (
     "nav",
@@ -133,6 +140,28 @@ def _remove_betting_promotions(paragraphs: list[str], removed: Counter[str]) -> 
     return kept
 
 
+def _remove_standalone_urls(paragraphs: list[str], removed: Counter[str]) -> list[str]:
+    kept: list[str] = []
+    for paragraph in paragraphs:
+        if _STANDALONE_URL_RE.fullmatch(paragraph):
+            removed["standalone_url"] += 1
+        else:
+            kept.append(paragraph)
+    return kept
+
+
+def _strip_link_ctas(paragraphs: list[str], removed: Counter[str]) -> list[str]:
+    kept: list[str] = []
+    for paragraph in paragraphs:
+        cleaned, count = _LINK_CTA_SENTENCE_RE.subn("", paragraph)
+        cleaned = cleaned.strip()
+        if count:
+            removed["link_cta"] += count
+        if cleaned:
+            kept.append(cleaned)
+    return kept
+
+
 def _strip_sporting_life_inline_noise(paragraphs: list[str], removed: Counter[str]) -> list[str]:
     kept: list[str] = []
     for paragraph in paragraphs:
@@ -151,6 +180,8 @@ def clean_international_article_body(node: Tag, *, source_site: SourceSite | str
     removed: Counter[str] = Counter()
     _remove_structured_noise(node, removed)
     paragraphs = _paragraphs(node)
+    paragraphs = _remove_standalone_urls(paragraphs, removed)
+    paragraphs = _strip_link_ctas(paragraphs, removed)
     source = _source_value(source_site)
 
     if source in {SourceSite.TDN, SourceSite.TDN_FRANCE}:

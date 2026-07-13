@@ -150,6 +150,21 @@ class InternationalNewsContentBoundaryTests(TestCase):
         self.assertNotIn("More from Sporting Life", detail.body_ja_raw)
         self.assertNotIn("Free bets", detail.body_ja_raw)
 
+    def test_sporting_life_removes_standalone_bookmaker_redirect_url(self):
+        detail = SportingLifeAdapter().parse_detail_html(
+            """<html><head><meta property="og:title" content="Oaks preview"></head><body>
+            <div class="Article__ArticleBody-sc-production"><p>The Sky Bet Oaks favourite is 7/2.</p>
+            <p>The trainer expects her to stay the trip.</p>
+            <a href="https://ads.skybet.com/redirect.aspx?pid=123">https://ads.skybet.com/redirect.aspx?pid=123</a></div>
+            </body></html>""",
+            url="https://www.sportinglife.com/racing/news/oaks-preview/233195",
+        )
+
+        self.assertIn("Sky Bet Oaks favourite is 7/2", detail.body_ja_raw)
+        self.assertIn("expects her to stay the trip", detail.body_ja_raw)
+        self.assertNotIn("ads.skybet.com", detail.body_ja_raw)
+        self.assertEqual(detail.metadata["body_cleaning"]["removed_rules"]["standalone_url"], 1)
+
     def test_tdn_8316_removes_results_cta_and_tail(self):
         detail = TDNAdapter().parse_detail_html(
             fixture_html("tdn_8316.html"),
@@ -185,6 +200,22 @@ class InternationalNewsContentBoundaryTests(TestCase):
         self.assertEqual(detail.body_ja_raw, "The Guild will continue its safety work.")
         self.assertEqual(detail.metadata["body_cleaning"]["removed_rules"]["tdn_editor_note"], 1)
         self.assertEqual(detail.metadata["body_cleaning"]["removed_rules"]["tdn_leading_link"], 1)
+
+    def test_tdn_strips_link_cta_sentences_but_keeps_event_facts(self):
+        detail = TDNAdapter().parse_detail_html(
+            """<html><head><meta property="og:title" content="Fund event"></head><body>
+            <span itemprop="articleBody"><p>The silent auction closes at 9 p.m. To view auction items, click here.</p>
+            <p>Tickets are available for $50, including the buffet and one drink.</p>
+            <p>To purchase tickets, click here. To sign up as a sponsor, click here.</p></span>
+            </body></html>""",
+            url="https://www.thoroughbreddailynews.com/fund-event/",
+        )
+
+        self.assertIn("silent auction closes at 9 p.m.", detail.body_ja_raw)
+        self.assertIn("Tickets are available for $50", detail.body_ja_raw)
+        self.assertNotIn("click here", detail.body_ja_raw.lower())
+        self.assertNotIn("sign up as a sponsor", detail.body_ja_raw.lower())
+        self.assertEqual(detail.metadata["body_cleaning"]["removed_rules"]["link_cta"], 3)
 
     def test_missing_trusted_body_selector_never_falls_back_to_page_body(self):
         detail = SportingLifeAdapter().parse_detail_html(
