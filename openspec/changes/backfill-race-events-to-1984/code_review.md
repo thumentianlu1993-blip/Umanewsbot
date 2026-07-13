@@ -40,6 +40,7 @@
 27. 生产协调复审发现历史镜像基线落后于已应用 `stable.0027–0029` 的数据库。当前 worktree 合入 `origin/main@1a70b22e`，保留双方服务和迁移；修复 main 中 lease 测试固定绝对时间导致半小时后失效的问题。历史与法国/归属/翻译组合 323 项、完整 stable 1093 项均通过，重新 review 无剩余可修复问题。
 28. 2016–2025 法港英详情抓取复审发现 Aintree Bowl 被误配到同日 Aintree Hurdle。新增审核系列别名、详情 URL 全局占用门禁，并将 URL fragment 从占用键中剔除，避免同一页面用带/不带 `#video-player` 的写法绕过去重。重抓后法港英各 50 场、合计 150 个详情 URL 全局唯一；专项 204 项及完整 stable 1126 项通过，重新 review 无剩余可修复问题。
 29. 生产只读日期 artifact 首次构建暴露 47 场英国距离证据缺少显式单位或使用 `1m71/2f` 紧凑写法。扩展既有地区补单位入口：英国裸数字按 `<5 mile / >=5 furlong`，紧凑 mile/furlong/yard 写法展开；复审同时修复距离消歧把 `71/2f` 错读为 `70.5f` 的十倍级错误。57 项专项和完整 stable 1128 项通过，第三轮 review 无剩余可修复问题。
+30. 法港英 150 场生产只读导出发现日期 apply 只物化原始清单字段，未消费审核证据里的显式距离单位。新增权威基础字段 JSONL 批次门禁，绑定整文件、target、inventory 和字段证据 SHA，限制可更新字段，保护人工锁，并同时锁定 target 与 RaceEvent 后整批原子写入。首轮复审补 RaceEvent 行锁、非法 target_id 统一错误和文件 SHA/禁用开关/重复目标测试；第二轮 review 无剩余可修复问题。
 
 ## 最终结论
 
@@ -49,7 +50,7 @@
 
 - Django check：通过
 - `makemigrations --check --dry-run`：无变化
-- `stable`完整测试：1128项通过，1项按设计跳过
+- `stable`完整测试：1136项通过，1项按设计跳过
 - OpenSpec change strict：通过
 - OpenSpec all strict：25项通过
 - `git diff --check`：通过

@@ -98,6 +98,8 @@
 
 低级来源只补空。同级或更高级来源冲突时，target 转为 `identity_review_required` 或字段冲突 blocker。每个应用字段保存来源、快照和批次；后续改进必须生成 before/after diff。`manual_lock_flags` 继续保护人工字段。
 
+权威基础字段修正使用独立 JSONL 批次，不与详情模块候选隐式混写。每条记录绑定当前 `target_sha256`、inventory artifact、字段批次 artifact、来源 authority/URL/snapshot/parser 和待更新字段；命令还要用 `--expected-sha256` 绑定整份 JSONL 原始字节。`--dry-run` 必须复用服务层权威合并规则并输出逐字段 before/after、人工锁跳过和同级冲突；`--apply` 先按稳定顺序锁定整批 target、再次校验全部身份，再在单个外层事务内应用所有 scope 和 `OperationLog`。任一 target 漂移、未知字段、来源证据不完整、同级冲突或中途异常都回滚整批。字段修正后 target SHA 会变化，因此后续详情包必须重新导出 event input、重新打包并重新 dry-run，禁止继续使用修正前的详情候选。
+
 ### 6. 三模块深度一致，但历史冠军不做 O(n²) 复制
 
 held/due 年度目标必须有：

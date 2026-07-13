@@ -1167,3 +1167,11 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 历史赛事 worktree 已合入 `origin/main@1a70b22e`，组合源码通过专项 `323` 项、完整 `stable 1093` 项（1 skip）、Django/迁移/OpenSpec/diff 检查。生产最终切换到 AMD64 组合镜像 `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`，镜像 tag 为 `umanewsbot:merged-main-historical-amd64-20260713-1008`；内容 commit 标签 `0068715fceb0f629b5bfcb0c0b760427dfc6edc5`，构建上下文树 SHA256 `e51e6992e57649445aeff2aa7f2a0c925f3c5c742771fceac13053459beceec6`。
 - 最终运行验收：`web/worker/beat` 使用上述同一镜像，`stable.0029` 已应用，Django check 通过；归属、相关地区查询、翻译自动重试与失败邮件继续关闭。五地区页、后台登录入口和 HTTP `/healthz/` 全部返回 200，最近日志无 traceback/error/not-null constraint。
 - 组合镜像包含历史任务尚未全部提交到 `main` 的实现，虽然已绑定内容 commit、上下文树 SHA 和回滚镜像，但仍不是最终可复现发布。历史任务完成当前批次后必须提交并推送全部生产代码；后续生产重建必须先合入最新 `origin/main`，禁止从旧分支或旧上下文直接覆盖 `umanewsbot:prod`。
+
+## 2026-07-13 法港英详情导入前字段门禁与 Git 固化
+
+- 生产只读导出的法港英 150 个 ready 目标与审核证据对比后确认：日期 apply 已物化赛事日期和来源，但 `distance_text` 仍沿用原始 TJCIS 裸数字，未保留法国/香港的米制 `m` 和英国的 `mile/furlong/yard` 单位；另有 8 个权威场地名和 6 个法国 surface 差异需要在详情导入前校正。
+- 已新增 `import_historical_race_event_field_candidates` 管理命令和整批服务。候选 JSONL 同时绑定整文件 SHA、target SHA、inventory artifact SHA、字段证据 SHA 和逐来源快照；仅允许基础字段白名单，dry-run 输出逐字段 before/after，apply 保护人工锁并同时锁定 target/RaceEvent，任一目标漂移或后段失败都会整批回滚。
+- 基础字段 apply 会改变 target SHA，旧详情候选因此自动失效；正确顺序固定为字段 dry-run/备份/apply、重新导出 event input、重新打包详情、coverage、详情 dry-run/第二次备份/apply。禁止手工修改生产 `RaceEvent` 或复用旧候选绕过身份校验。
+- 本轮目标/相邻测试 `34/89` 项通过；在临时 Redis 和 macOS 真实临时目录下完整 `stable` 回归 `1136/1136` 通过，1 项按设计跳过。Django check、迁移无漂移、OpenSpec strict 和 `git diff --check` 均通过；两轮代码复审最终无待修问题。
+- 当前生产仍运行 `main@304ebdb6` 对应可复现 AMD64 镜像，历史公开数据保持关闭。本轮字段门禁尚未部署，也未执行字段或详情生产写入；先完成源码提交、推送和合入最新 `main`，再由最新主线构建并受控替换生产镜像。

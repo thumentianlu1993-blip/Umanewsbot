@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from typing import Any
+import ipaddress
+import re
 import unicodedata
+from datetime import date
+from typing import Any
+from urllib.parse import urlparse
 
 from django.db import transaction
 from django.db.models.functions import Lower
@@ -12,6 +16,9 @@ from stable.models import (
     HistoricalRaceExpectationStatus,
     HistoricalRaceResolutionStatus,
     OperationLog,
+    RaceEvent,
+    RaceEventSurface,
+    RaceGrade,
     RaceEventHistoryWinner,
     RaceEventModule,
     TermAlias,
@@ -49,6 +56,14 @@ UPDATABLE_BASIC_FIELDS = (
     "distance_text",
     "local_date",
 )
+MAX_AUTHORITATIVE_FIELD_BATCH_SIZE = 250
+AUTHORITATIVE_FIELD_TEXT_LIMITS = {
+    "original_name": 255,
+    "chinese_name": 255,
+    "racecourse": 255,
+    "grade_text": 128,
+    "distance_text": 128,
+}
 
 
 def derive_runners_from_complete_results(result_payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -486,3 +501,266 @@ def apply_authoritative_event_fields(
         "after": after,
         "skipped_manual": [item["field"] for item in merged["skipped_manual"]],
     }
+
+
+def _is_sha256(value: Any) -> bool:
+    return bool(re.fullmatch(r"[0-9a-f]{64}", str(value or "").lower()))
+
+
+def _validate_authoritative_source_url(value: Any) -> str:
+    source_url = str(value or "").strip()
+    parsed = urlparse(source_url)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise InventoryValidationError("authoritative field source URL must be unauthenticated HTTPS")
+    hostname = parsed.hostname.rstrip(".").casefold()
+    if hostname in {"localhost", "metadata.google.internal"} or hostname.endswith((".local", ".internal")):
+        raise InventoryValidationError("authoritative field source URL uses a private host")
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        address = None
+    if address and not address.is_global:
+        raise InventoryValidationError("authoritative field source URL uses a non-public IP")
+    return source_url
+
+
+def _normalize_authoritative_field_value(field: str, value: Any) -> Any:
+    if field in AUTHORITATIVE_FIELD_TEXT_LIMITS:
+        if not isinstance(value, str) or not value.strip():
+            raise InventoryValidationError(f"authoritative field value is invalid: {field}")
+        normalized = value.strip()
+        if len(normalized) > AUTHORITATIVE_FIELD_TEXT_LIMITS[field]:
+            raise InventoryValidationError(f"authoritative field value is too long: {field}")
+        return normalized
+    if field == "normalized_grade":
+        normalized = str(value or "").strip()
+        if normalized not in RaceGrade.values:
+            raise InventoryValidationError("authoritative normalized grade is invalid")
+        return normalized
+    if field == "surface":
+        normalized = str(value or "").strip()
+        if normalized not in RaceEventSurface.values:
+            raise InventoryValidationError("authoritative surface is invalid")
+        return normalized
+    if field == "local_date":
+        if isinstance(value, date):
+            return value
+        try:
+            return date.fromisoformat(str(value or ""))
+        except ValueError as exc:
+            raise InventoryValidationError("authoritative local date is invalid") from exc
+    raise InventoryValidationError(f"authoritative field is not updatable: {field}")
+
+
+def _normalize_authoritative_field_candidates(candidates: Any) -> list[dict[str, Any]]:
+    if not isinstance(candidates, list) or not candidates:
+        raise InventoryValidationError("authoritative field candidates are missing")
+    normalized_candidates = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            raise InventoryValidationError("authoritative field candidate must be an object")
+        source_id = str(candidate.get("source_id") or "").strip()
+        parser_version = str(candidate.get("parser_version") or "").strip()
+        snapshot_sha256 = str(candidate.get("snapshot_sha256") or "").lower()
+        if not source_id or not parser_version or not _is_sha256(snapshot_sha256):
+            raise InventoryValidationError("authoritative field source evidence is incomplete")
+        fields = candidate.get("fields")
+        if not isinstance(fields, dict) or not fields:
+            raise InventoryValidationError("authoritative field candidate has no fields")
+        unknown_fields = set(fields) - set(UPDATABLE_BASIC_FIELDS)
+        if unknown_fields:
+            raise InventoryValidationError(
+                f"authoritative field is not updatable: {','.join(sorted(unknown_fields))}"
+            )
+        normalized_candidates.append(
+            {
+                "source_authority": str(candidate.get("source_authority") or "").strip(),
+                "source_id": source_id,
+                "source_url": _validate_authoritative_source_url(candidate.get("source_url")),
+                "snapshot_sha256": snapshot_sha256,
+                "parser_version": parser_version,
+                "fields": {
+                    field: _normalize_authoritative_field_value(field, value)
+                    for field, value in fields.items()
+                },
+            }
+        )
+    return normalized_candidates
+
+
+def _report_field_value(value: Any) -> Any:
+    return value.isoformat() if isinstance(value, date) else value
+
+
+def _preview_authoritative_event_fields(
+    target: HistoricalRaceEventTarget,
+    candidates: Any,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    if target.event is None:
+        raise InventoryValidationError("authoritative field update requires a RaceEvent")
+    normalized_candidates = _normalize_authoritative_field_candidates(candidates)
+    existing = {field: getattr(target.event, field) for field in UPDATABLE_BASIC_FIELDS}
+    merged = merge_authoritative_fields(
+        normalized_candidates,
+        existing_fields=existing,
+        existing_provenance=target.field_provenance,
+        manual_locks=target.event.manual_lock_flags,
+    )
+    if merged["blocked"]:
+        raise InventoryValidationError(
+            f"authoritative event field conflict: {[item['field'] for item in merged['conflicts']]}"
+        )
+    before = {}
+    after = {}
+    for field in UPDATABLE_BASIC_FIELDS:
+        value = merged["fields"].get(field, existing[field])
+        if value != existing[field]:
+            before[field] = _report_field_value(existing[field])
+            after[field] = _report_field_value(value)
+    return (
+        {
+            "target_id": target.pk,
+            "before": before,
+            "after": after,
+            "skipped_manual": sorted(item["field"] for item in merged["skipped_manual"]),
+            "lower_authority_disagreements": len(merged["lower_authority_disagreements"]),
+        },
+        normalized_candidates,
+    )
+
+
+def _validate_authoritative_field_record(
+    record: Any,
+    target: HistoricalRaceEventTarget,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    required = {
+        "target_id",
+        "target_sha256",
+        "inventory_artifact_sha256",
+        "field_artifact_sha256",
+        "candidates",
+    }
+    if not isinstance(record, dict) or set(record) != required:
+        raise InventoryValidationError("authoritative field record shape is invalid")
+    try:
+        record_target_id = int(record["target_id"])
+    except (TypeError, ValueError) as exc:
+        raise InventoryValidationError("authoritative field target id is invalid") from exc
+    if record_target_id != target.pk:
+        raise InventoryValidationError("authoritative field target id is invalid")
+    if target_identity(target)["target_sha256"] != str(record["target_sha256"]):
+        raise InventoryValidationError("historical target changed after field approval")
+    if target.artifact_sha256 != str(record["inventory_artifact_sha256"]):
+        raise InventoryValidationError("historical target inventory artifact mismatch")
+    if not _is_sha256(record["field_artifact_sha256"]):
+        raise InventoryValidationError("authoritative field artifact SHA is invalid")
+    report, normalized_candidates = _preview_authoritative_event_fields(target, record["candidates"])
+    report["field_artifact_sha256"] = str(record["field_artifact_sha256"]).lower()
+    return report, normalized_candidates
+
+
+def _authoritative_field_records_by_id(records: Any) -> dict[int, dict[str, Any]]:
+    if not isinstance(records, list) or not records:
+        raise InventoryValidationError("authoritative field batch is empty")
+    if len(records) > MAX_AUTHORITATIVE_FIELD_BATCH_SIZE:
+        raise InventoryValidationError("authoritative field batch exceeds 250 targets")
+    records_by_id = {}
+    for record in records:
+        try:
+            target_id = int(record["target_id"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise InventoryValidationError("authoritative field target id is invalid") from exc
+        if target_id in records_by_id:
+            raise InventoryValidationError("authoritative field batch has duplicate targets")
+        records_by_id[target_id] = record
+    return records_by_id
+
+
+def validate_authoritative_event_field_batch(records: Any) -> dict[str, Any]:
+    records_by_id = _authoritative_field_records_by_id(records)
+    targets = HistoricalRaceEventTarget.objects.select_related("race_series", "event").in_bulk(records_by_id)
+    if set(targets) != set(records_by_id):
+        raise InventoryValidationError("authoritative field target is missing")
+    scopes = []
+    for target_id in sorted(records_by_id):
+        report, _normalized = _validate_authoritative_field_record(records_by_id[target_id], targets[target_id])
+        scopes.append(report)
+    return {
+        "scope_count": len(scopes),
+        "updated_scope_count": sum(bool(scope["after"]) for scope in scopes),
+        "updated_field_count": sum(len(scope["after"]) for scope in scopes),
+        "scopes": scopes,
+    }
+
+
+def apply_authoritative_event_field_batch(
+    records: Any,
+    *,
+    candidate_sha256: str,
+    actor=None,
+) -> dict[str, Any]:
+    if not _is_sha256(candidate_sha256):
+        raise InventoryValidationError("authoritative field candidate SHA is invalid")
+    records_by_id = _authoritative_field_records_by_id(records)
+    with transaction.atomic():
+        locked_targets = list(
+            HistoricalRaceEventTarget.objects.select_for_update()
+            .select_related("race_series")
+            .filter(pk__in=records_by_id)
+            .order_by("pk")
+        )
+        targets = {target.pk: target for target in locked_targets}
+        if set(targets) != set(records_by_id):
+            raise InventoryValidationError("authoritative field target is missing")
+        event_ids = [target.event_id for target in locked_targets if target.event_id]
+        locked_events = RaceEvent.objects.select_for_update().in_bulk(event_ids)
+        if len(locked_events) != len(event_ids):
+            raise InventoryValidationError("authoritative field RaceEvent is missing")
+        for target in locked_targets:
+            if target.event_id:
+                target.event = locked_events[target.event_id]
+        validated = []
+        for target_id in sorted(records_by_id):
+            report, normalized_candidates = _validate_authoritative_field_record(
+                records_by_id[target_id], targets[target_id]
+            )
+            validated.append((report, normalized_candidates))
+        scopes = []
+        for report, normalized_candidates in validated:
+            result = apply_authoritative_event_fields(
+                target_id=report["target_id"],
+                artifact_sha256=report["field_artifact_sha256"],
+                candidates=normalized_candidates,
+                actor=actor,
+            )
+            target = HistoricalRaceEventTarget.objects.select_related("race_series", "event").get(
+                pk=report["target_id"]
+            )
+            scopes.append(
+                {
+                    **report,
+                    "skipped_manual": result["skipped_manual"],
+                    "after_target_sha256": target_identity(target)["target_sha256"],
+                }
+            )
+        summary = {
+            "scope_count": len(scopes),
+            "updated_scope_count": sum(bool(scope["after"]) for scope in scopes),
+            "updated_field_count": sum(len(scope["after"]) for scope in scopes),
+            "scopes": scopes,
+        }
+        OperationLog.objects.create(
+            admin=actor,
+            action_type="historical_event_fields_batch_applied",
+            target_type="historical_race_event_target_batch",
+            target_id=candidate_sha256,
+            detail=canonical_json(
+                {
+                    "candidate_sha256": candidate_sha256,
+                    "scope_count": summary["scope_count"],
+                    "updated_scope_count": summary["updated_scope_count"],
+                    "updated_field_count": summary["updated_field_count"],
+                }
+            ),
+        )
+        return summary

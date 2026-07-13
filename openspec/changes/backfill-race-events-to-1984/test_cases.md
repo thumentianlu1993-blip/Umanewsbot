@@ -231,6 +231,12 @@
 | TC-IMPORT-024 | JRA英文年度表与日文官方结果表 | source discovery | 以日期/赛场唯一对齐官方单场结果，歧义不猜测 | A/F |
 | TC-IMPORT-025 | 美国同名赛事或Belmont工程期移师 | TOBA discovery | 先按赛事名和场地区分；年度表名称唯一时允许记录实际移师场地 | A/F |
 | TC-IMPORT-026 | Equibase Yearbook含实际出赛与退赛 | 离线解析 | runners按马号含退赛，results仅含实际出赛并按官方名次 | A/F |
+| TC-IMPORT-027 | event距离为裸数字、批准来源为`2400m` | 权威字段dry-run | 输出`2400 -> 2400m`，保留来源/snapshot/parser，不写库 | A/S |
+| TC-IMPORT-028 | 英国批准来源为`3m 210y` | 权威字段apply | 原样保存mile/yard文本，不解释为metre，写before/after日志 | A/S |
+| TC-IMPORT-029 | 字段候选包含未知字段或缺source URL/snapshot | dry-run/apply | fail closed，所有target和event零变化 | A/S |
+| TC-IMPORT-030 | 权威字段批次审批后一个target SHA漂移 | apply | 写入前整批失败，前序scope和OperationLog均不落库 | A/S |
+| TC-IMPORT-031 | 字段批次后半scope异常 | apply | 外层事务回滚前序event字段、provenance和日志 | A/S |
+| TC-IMPORT-032 | 字段批次成功后复用旧详情候选 | detail dry-run | 因target SHA变化阻断，必须重新导出、打包和dry-run | A/S |
 
 ## 11. 公开页面、后台、搜索和 sitemap
 

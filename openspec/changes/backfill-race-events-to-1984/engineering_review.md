@@ -43,3 +43,16 @@
 - 静态验证：`openspec validate backfill-race-events-to-1984 --strict`、`openspec validate --all --strict`、`git diff --check` 均通过。
 
 最终未发现剩余可修复的方案问题。真实来源的可访问性和历史覆盖深度仍必须由首批source cache证据与gap ledger验证，不能用计划假设代替生产事实。
+
+## 2026-07-13 权威基础字段批量入口补充复审
+
+- Review mode：Full（profile：`feature`）
+- 触发证据：法港英150场日期apply后的生产event input中，123场`distance_text`仍是目录裸数字；批准的`detail_discovery.distance_evidence`已保存显式单位。另有8场官方/高可信赛历场地修正和6场法国平地surface修正尚未进入年度赛事字段。
+- 复用边界：继续复用`merge_authoritative_fields()`、`apply_authoritative_event_fields()`、`target_identity()`、`OperationLog`和历史总开关；只新增有界批次服务与Django管理命令，不新增模型、迁移、依赖、Celery任务或网络入口。
+- 输入契约：JSONL整文件绑定`--expected-sha256`；每条记录绑定当前target SHA、inventory SHA、字段artifact SHA，并只允许既有基础字段白名单。每个来源候选必须有authority、source ID、HTTPS URL、snapshot SHA和parser version。
+- 原子性：服务按target ID稳定顺序锁定整批，先完成全部身份和字段dry-run校验，再进入同一外层事务逐scope调用既有字段服务。任一漂移、冲突、未知字段、证据缺失或中途异常回滚全部event字段、target provenance和OperationLog。
+- 数据流：字段批次成功后target SHA必然变化，因此150场详情必须重新导出event input、重新package、重新coverage和dry-run；旧详情候选不能续用。
+- 性能与运行：单批最多250个target，查询和日志规模有界；命令不触网，apply继续要求`HISTORICAL_RACE_BACKFILL_ENABLED=true`，生产常驻开关不变。
+- 测试门禁：先新增TC-IMPORT-027至032，再实现单位保留、未知字段/证据缺失、人工锁、target漂移、批次中途异常整批回滚和旧详情SHA失效测试；随后执行目标测试、完整stable回归、Django check、迁移漂移、OpenSpec strict/all和代码review复审。
+
+补充复审结论：**APPROVED**。该修复落实既有字段权威和距离单位规格，不改变产品范围；可进入测试先行和实现阶段，生产写入仍须经过候选审计、dry-run、备份与写后核验。

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -753,3 +754,258 @@ class HistoricalRaceImporterTests(HistoricalRaceBatchTests):
 
         target.event.refresh_from_db()
         self.assertEqual(target.event.racecourse, before)
+
+    def _authoritative_field_record(self, target, *, fields=None, **candidate_overrides):
+        candidate = {
+            "source_authority": "official",
+            "source_id": "official-result-2025",
+            "source_url": "https://official.test/results/2025",
+            "snapshot_sha256": "b" * 64,
+            "parser_version": "2026.07.1",
+            "fields": fields if fields is not None else {"distance_text": "2400m"},
+        }
+        candidate.update(candidate_overrides)
+        return {
+            "target_id": target.pk,
+            "target_sha256": target_identity(target)["target_sha256"],
+            "inventory_artifact_sha256": target.artifact_sha256,
+            "field_artifact_sha256": "c" * 64,
+            "candidates": [candidate],
+        }
+
+    def _write_authoritative_field_jsonl(self, root: Path, records: list[dict]):
+        path = root / "authoritative_fields.jsonl"
+        path.write_text(
+            "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records),
+            encoding="utf-8",
+        )
+        return path, hashlib.sha256(path.read_bytes()).hexdigest()
+
+    @override_settings(HISTORICAL_RACE_BACKFILL_ENABLED=True)
+    def test_authoritative_field_command_dry_run_then_preserves_explicit_distance_unit(self):
+        target = self._ready_target()
+        target.event.distance_text = "2400"
+        target.event.save(update_fields={"distance_text"})
+        record = self._authoritative_field_record(target)
+        with TemporaryDirectory() as tmp:
+            path, candidate_sha = self._write_authoritative_field_jsonl(Path(tmp), [record])
+            dry_run_output = StringIO()
+            call_command(
+                "import_historical_race_event_field_candidates",
+                "--jsonl",
+                str(path),
+                "--expected-sha256",
+                candidate_sha,
+                "--dry-run",
+                stdout=dry_run_output,
+                verbosity=0,
+            )
+            target.event.refresh_from_db()
+            self.assertEqual(target.event.distance_text, "2400")
+            report = json.loads(dry_run_output.getvalue())
+            self.assertEqual(report["updated_field_count"], 1)
+            self.assertEqual(report["scopes"][0]["before"], {"distance_text": "2400"})
+            self.assertEqual(report["scopes"][0]["after"], {"distance_text": "2400m"})
+
+            call_command(
+                "import_historical_race_event_field_candidates",
+                "--jsonl",
+                str(path),
+                "--expected-sha256",
+                candidate_sha,
+                "--apply",
+                verbosity=0,
+            )
+
+        target.event.refresh_from_db()
+        self.assertEqual(target.event.distance_text, "2400m")
+        log = OperationLog.objects.get(action_type="historical_event_fields_updated")
+        self.assertEqual(json.loads(log.detail)["before"], {"distance_text": "2400"})
+        self.assertEqual(json.loads(log.detail)["after"], {"distance_text": "2400m"})
+
+    def test_authoritative_field_command_rejects_unknown_field_and_incomplete_evidence(self):
+        target = self._ready_target()
+        cases = [
+            self._authoritative_field_record(target, fields={"country_region": RacingRegion.FRANCE}),
+            self._authoritative_field_record(target, snapshot_sha256=""),
+            self._authoritative_field_record(target, source_url="http://official.test/results/2025"),
+        ]
+        for index, record in enumerate(cases):
+            with self.subTest(index=index), TemporaryDirectory() as tmp:
+                path, candidate_sha = self._write_authoritative_field_jsonl(Path(tmp), [record])
+                with self.assertRaises(CommandError):
+                    call_command(
+                        "import_historical_race_event_field_candidates",
+                        "--jsonl",
+                        str(path),
+                        "--expected-sha256",
+                        candidate_sha,
+                        "--dry-run",
+                        verbosity=0,
+                    )
+        target.event.refresh_from_db()
+        self.assertEqual(target.event.country_region, target.country_region)
+
+    def test_authoritative_field_command_rejects_wrong_file_sha_and_duplicate_targets(self):
+        target = self._ready_target()
+        record = self._authoritative_field_record(target)
+        with TemporaryDirectory() as tmp:
+            path, _candidate_sha = self._write_authoritative_field_jsonl(Path(tmp), [record])
+            with self.assertRaisesMessage(CommandError, "candidate_sha256_mismatch"):
+                call_command(
+                    "import_historical_race_event_field_candidates",
+                    "--jsonl",
+                    str(path),
+                    "--expected-sha256",
+                    "0" * 64,
+                    "--dry-run",
+                    verbosity=0,
+                )
+            duplicate_path, duplicate_sha = self._write_authoritative_field_jsonl(
+                Path(tmp), [record, record]
+            )
+            with self.assertRaisesMessage(CommandError, "duplicate targets"):
+                call_command(
+                    "import_historical_race_event_field_candidates",
+                    "--jsonl",
+                    str(duplicate_path),
+                    "--expected-sha256",
+                    duplicate_sha,
+                    "--dry-run",
+                    verbosity=0,
+                )
+
+    def test_authoritative_field_command_rejects_apply_when_backfill_is_disabled(self):
+        target = self._ready_target()
+        record = self._authoritative_field_record(target)
+        with TemporaryDirectory() as tmp:
+            path, candidate_sha = self._write_authoritative_field_jsonl(Path(tmp), [record])
+            with self.assertRaisesMessage(CommandError, "historical race backfill is disabled"):
+                call_command(
+                    "import_historical_race_event_field_candidates",
+                    "--jsonl",
+                    str(path),
+                    "--expected-sha256",
+                    candidate_sha,
+                    "--apply",
+                    verbosity=0,
+                )
+
+        target.event.refresh_from_db()
+        self.assertEqual(target.event.distance_text, "")
+
+    @override_settings(HISTORICAL_RACE_BACKFILL_ENABLED=True)
+    def test_authoritative_field_command_preserves_manual_lock(self):
+        target = self._ready_target()
+        target.event.distance_text = "3m"
+        target.event.manual_lock_flags = {"distance_text": True}
+        target.event.save(update_fields={"distance_text", "manual_lock_flags"})
+        record = self._authoritative_field_record(target, fields={"distance_text": "3m 210y"})
+        with TemporaryDirectory() as tmp:
+            path, candidate_sha = self._write_authoritative_field_jsonl(Path(tmp), [record])
+            output = StringIO()
+            call_command(
+                "import_historical_race_event_field_candidates",
+                "--jsonl",
+                str(path),
+                "--expected-sha256",
+                candidate_sha,
+                "--apply",
+                stdout=output,
+                verbosity=0,
+            )
+
+        target.event.refresh_from_db()
+        self.assertEqual(target.event.distance_text, "3m")
+        self.assertEqual(json.loads(output.getvalue())["scopes"][0]["skipped_manual"], ["distance_text"])
+
+    @override_settings(HISTORICAL_RACE_BACKFILL_ENABLED=True)
+    def test_authoritative_field_command_rejects_one_drifted_target_before_any_write(self):
+        first = self._ready_target()
+        second = self._target(self._series(RacingRegion.FRANCE, "field-drift"), 1985)
+        records = [
+            self._authoritative_field_record(first, fields={"distance_text": "2400m"}),
+            self._authoritative_field_record(second, fields={"distance_text": "2000m"}),
+        ]
+        second.event.racecourse = "Changed after approval"
+        second.event.save(update_fields={"racecourse"})
+        with TemporaryDirectory() as tmp:
+            path, candidate_sha = self._write_authoritative_field_jsonl(Path(tmp), records)
+            with self.assertRaisesMessage(CommandError, "changed after field approval"):
+                call_command(
+                    "import_historical_race_event_field_candidates",
+                    "--jsonl",
+                    str(path),
+                    "--expected-sha256",
+                    candidate_sha,
+                    "--apply",
+                    verbosity=0,
+                )
+
+        first.event.refresh_from_db()
+        self.assertEqual(first.event.distance_text, "")
+        self.assertFalse(OperationLog.objects.filter(action_type="historical_event_fields_updated").exists())
+
+    @override_settings(HISTORICAL_RACE_BACKFILL_ENABLED=True)
+    def test_authoritative_field_command_rolls_back_whole_batch_on_late_failure(self):
+        first = self._ready_target()
+        second = self._target(self._series(RacingRegion.FRANCE, "field-rollback"), 1985)
+        records = [self._authoritative_field_record(first), self._authoritative_field_record(second)]
+        original = apply_authoritative_event_fields
+        calls = {"count": 0}
+
+        def fail_second(**kwargs):
+            calls["count"] += 1
+            if calls["count"] == 2:
+                raise RuntimeError("simulated field apply failure")
+            return original(**kwargs)
+
+        with TemporaryDirectory() as tmp:
+            path, candidate_sha = self._write_authoritative_field_jsonl(Path(tmp), records)
+            with patch(
+                "stable.services.historical_race_importer.apply_authoritative_event_fields",
+                side_effect=fail_second,
+            ):
+                with self.assertRaisesMessage(RuntimeError, "simulated field apply failure"):
+                    call_command(
+                        "import_historical_race_event_field_candidates",
+                        "--jsonl",
+                        str(path),
+                        "--expected-sha256",
+                        candidate_sha,
+                        "--apply",
+                        verbosity=0,
+                    )
+
+        first.event.refresh_from_db()
+        second.event.refresh_from_db()
+        self.assertEqual(first.event.distance_text, "")
+        self.assertEqual(second.event.distance_text, "")
+        self.assertFalse(OperationLog.objects.filter(action_type="historical_event_fields_updated").exists())
+
+    @override_settings(HISTORICAL_RACE_BACKFILL_ENABLED=True)
+    def test_authoritative_field_apply_invalidates_old_detail_target_sha(self):
+        target = self._ready_target()
+        old_target_sha = target_identity(target)["target_sha256"]
+        record = self._authoritative_field_record(target)
+        with TemporaryDirectory() as tmp:
+            path, candidate_sha = self._write_authoritative_field_jsonl(Path(tmp), [record])
+            call_command(
+                "import_historical_race_event_field_candidates",
+                "--jsonl",
+                str(path),
+                "--expected-sha256",
+                candidate_sha,
+                "--apply",
+                verbosity=0,
+            )
+
+        with self.assertRaisesMessage(InventoryValidationError, "changed after candidate approval"):
+            apply_historical_target_candidate(
+                target_id=target.pk,
+                expected_target_sha256=old_target_sha,
+                inventory_artifact_sha256=target.artifact_sha256,
+                source_name="fixture",
+                source_url="https://official.test/result",
+                modules={"results": self._results()},
+            )

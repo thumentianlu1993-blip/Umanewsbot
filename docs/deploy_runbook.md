@@ -4131,3 +4131,9 @@ docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
 3. 最终镜像：`umanewsbot:merged-main-historical-amd64-20260713-1008`，image ID `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`；回滚 tag `pre-merged-main-historical-20260713-1015`。
 4. 切换流程：先停止 beat，等待 worker active/reserved 和 one-off 清空；运行 `migrate --noinput` 确认无待迁移，再强制重建 `web/worker/beat`。完成后验证 image ID、`0027-0029`、64 个模型、归属/重试安全开关、历史管理命令、五地区页、后台、healthz 和最近日志。
 5. 数据验收：恢复后的 netkeiba 抓取新增 3、重复 117；恢复阶段总计新增 9 篇且全部翻译完成，新文章 `attribution_rule_version` NULL 数为 0。任何后续镜像若重新出现 57 models 或不识别 `0029`，立即按故障镜像处理并回滚。
+## 历史赛事权威字段批次部署门禁
+
+- 生产执行 `import_historical_race_event_field_candidates` 前，运行镜像必须来自包含该命令的最新 `main` AMD64 构建，并记录 Git commit、tree/context SHA 和 image ID；禁止从未提交 worktree 或旧底座直接重建 `prod`。
+- 先执行 `--dry-run --expected-sha256 <整文件SHA>`，核对目标数、逐字段 before/after、人工锁和零漂移；apply 前完成数据库备份、SHA-256 与 `gzip -t` 校验。
+- apply 只临时启用 `HISTORICAL_RACE_BACKFILL_ENABLED` 的单命令环境，不修改常驻配置；结束后复核常驻历史网络/写入门禁和历史赛事 draft 状态。
+- 字段 apply 后必须重新导出 event input 并重新生成详情候选。旧详情候选的 target SHA 应失败，不能为赶进度跳过重新 coverage、dry-run 和第二次写前备份。

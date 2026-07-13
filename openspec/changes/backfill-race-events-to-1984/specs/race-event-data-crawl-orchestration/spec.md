@@ -243,6 +243,22 @@
 - **THEN** apply MUST 保留人工值
 - **AND** diff SHALL 显示冲突和跳过原因
 
+#### Scenario: 日期发现已保存显式距离单位但年度赛事仍为裸数字
+- **WHEN** 已批准日期来源在 provenance 中保存 `2400m` 或 `3m 210y`，而 materialize 后的年度赛事仍保留目录裸数字
+- **THEN** 系统 SHALL 通过独立权威字段批次生成 before/after diff 并更新未锁定的 `RaceEvent.distance_text`
+- **AND** 批次 MUST 保留原目录值、显式单位来源、snapshot、parser 和变更 artifact，不得按地区猜测裸数字
+- **AND** 字段更新后详情候选 MUST 重新绑定新的 target SHA
+
+#### Scenario: 权威字段批次中一个 target 在审批后漂移
+- **WHEN** 批次 JSONL 已批准，但任一 target 的字段、provenance、状态或 event identity 在 apply 前变化
+- **THEN** apply MUST 在写入任何 scope 前失败
+- **AND** 整批年度赛事、target provenance 和 OperationLog MUST 保持不变
+
+#### Scenario: 权威字段批次中途写入失败
+- **WHEN** 前若干 scope 已进入外层事务而后续 scope 抛出校验或数据库异常
+- **THEN** 系统 MUST 回滚整批字段变更和日志
+- **AND** 运营方 MAY 修复候选后重新生成新 SHA 的批次，不得续用部分成功状态
+
 ### Requirement: 写后核验必须回写总账而不删除缺口
 系统 MUST 在每个 apply scope 后核对年度赛事、runner、result、冠军覆盖、可见性和来源计数，并将成功目标更新为 imported。失败或未选目标 MUST 保留原状态和证据。
 
