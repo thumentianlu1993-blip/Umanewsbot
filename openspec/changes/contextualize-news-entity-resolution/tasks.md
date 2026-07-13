@@ -34,7 +34,7 @@
 
 - [x] 4.1 (application) 运行全部问题文章目标测试、术语/翻译/标签/校验/马匹关联相关测试，并验收 20 篇批量解析 `<=8` 查询且 10/20 篇查询数相同
 - [x] 4.2 (application) 运行完整 `stable` 测试、Django check、`makemigrations --check --dry-run`、OpenSpec strict 和 diff check
-- [x] 4.3 (application) 完成 9 轮只读代码 review；直接修复技术问题并重复 review，最终一轮零问题
+- [x] 4.3 (application) 完成 10 轮代码 review；直接修复技术问题，并在生产同型 PostgreSQL 候选测试发现锁语义问题后继续复核至零问题
 
 ## 5. 生产部署与问题文章修复
 

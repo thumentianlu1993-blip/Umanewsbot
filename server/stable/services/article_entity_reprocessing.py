@@ -72,7 +72,7 @@ def build_article_entity_reprocess_plan(
 
 def _commit_article(article_id: int, *, translate_sync: bool) -> dict:
     with transaction.atomic():
-        article = NewsArticle.objects.select_for_update().select_related("source_config").get(pk=article_id)
+        article = NewsArticle.objects.select_for_update().get(pk=article_id)
         before_public = {
             "id": article.id,
             "workflow_status": article.workflow_status,
