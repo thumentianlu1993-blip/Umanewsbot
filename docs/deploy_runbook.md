@@ -4233,3 +4233,24 @@ docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
 5. 日期 apply 前执行数据库备份、非空检查、`gzip -t` 和 SHA-256；仅对单命令临时打开写入门禁。写后重新导出 249 个 materialized event input，禁止复用日期 apply 前的 target SHA。
 6. 补充详情来源 artifact 必须接受并验证 `keiba_go_jp/nar` 与 `zone_turf`，apply 后再次导出 event input，再生成最终详情包、coverage 和 importer dry-run。
 7. 详情 apply 前另做一份数据库备份。写后逐目标核对 runner/result 数、累计计数、OperationLog、draft/published 状态和三容器常驻开关；`RACE_EVENT_HISTORICAL_PUBLIC_ENABLED` 全程保持关闭。
+
+## 2026-07-13 `main@3939992c` batch003 来源门禁镜像切换
+
+### 镜像与恢复点
+
+- 新镜像 tag：`umanewsbot:main-3939992c-amd64-20260713-1847`。
+- Image ID：`sha256:87c435cfc50344d0ca94f46e44d4bea97ab11361f88f7c708b6457331aee78ec`，`linux/amd64`。
+- Revision：`3939992c7d3753779fc34de81c595f5a34d7ed2b`；Git tree：`0464a1aae6f587e3ba021421ac84b44a3d9379dd`；source archive SHA-256：`a787391c84a4ba3bb22c2ab638f1e36453d3ff8869bb95aeb5001b1dd448bb21`。
+- 环境备份：`.env.backup.main-3939992c-20260713_185140`。
+- 数据库备份：`backups/db/pre-main-3939992c-20260713_185140.sql.gz`，`125,782,755` bytes，SHA-256 `21903cf8d9494ef6053414a34c2e2f6ab01406b9ffebcf56ff3fd10eedfc0967`，非空且 `gzip -t` 通过。
+- 旧镜像回滚标签：`umanewsbot:rollback-pre-3939992c-20260713_185140`，指向 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`。
+
+### 切换与验收
+
+1. 预检发现两条 `crawl_news_source_task` active；先停止 beat，让任务自然完成。确认 active/reserved、外部导入、外部锁和历史 one-off 为空后才创建备份和停止 worker。
+2. 使用数据库容器内 `pg_dump` 生成备份并完成非空、`gzip -t`、SHA-256 校验；未调用当前存在宿主机依赖问题的 `backup_db.sh`。
+3. Retag 后使用一次性新镜像 web 容器执行迁移、Django check 和 collectstatic；结果为无待应用迁移、check 通过、2 个静态文件复制、127 个未变化、360 个 post-process。
+4. 先重建 web/worker，确认 web healthy、worker ping；最后重建 beat。三容器实际 image ID 均为 `sha256:87c435cf...e78ec`。
+5. 内部和公网 healthz 为 `ok`，公网首页和 `/races/` 为 `200`，近期 web/worker/beat 日志无 traceback/critical/integrityerror/exception。
+6. `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，多地区归属和相关查询开关也保持关闭；本次未执行历史写入。
+7. 切换完成后仅允许历史任务重建一次性只读 batch003 artifact。预期必须为 `249 candidate / 1 gap`，且唯一 gap 为 Hampton Novices' Chase `ABANDONED`；任何写入仍需新的 approval、备份、dry-run 与写后核验。

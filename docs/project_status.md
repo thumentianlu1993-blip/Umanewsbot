@@ -463,3 +463,4 @@
 - 第三标准批次已完成五地区各 50 场的只读来源准备。249 场具备完整候选，共 `2,635 runners / 2,346 results`；唯一缺口为 2025 Hampton Novices' Chase，Sporting Life 标记 `ABANDONED`，等待产品确认 cancelled 口径。
 - batch003 日期归一化为 `249/249`、零问题，详情打包为 `249 candidate / 1 gap`。NAR 与 Zone-Turf 来源门禁、ZEturf 实际缓存 URL 身份及年度日历 surface 误覆盖问题均已修复；完整 `stable` 回归 `1161 passed / 1 skipped`，复审无待修项。
 - batch003 尚未写生产，公开开关仍关闭。旧候选镜像 `sha256:9cd0b966...45bc1` 已过期；需先把本轮源码合入 main 并重建可复现 AMD64 镜像，再在生产总帐上生成正式 artifact。
+- batch003 来源门禁已合入 `main@3939992c`，生产 `web / worker / beat` 已统一切换到可复现 AMD64 镜像 `sha256:87c435cf...e78ec`。切换前排空两条新闻抓取任务并完成数据库备份；迁移无变化，Django、健康检查、页面和日志验收通过。历史任务现只获准重建一次性只读 artifact，尚未执行 batch003 写入，公开开关继续关闭。

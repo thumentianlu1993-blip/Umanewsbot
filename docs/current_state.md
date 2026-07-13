@@ -1252,3 +1252,11 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 修复了 ZEturf 发现页把实际缓存 URL 重写成另一目标 slug 的身份错误，并把 NAR `keiba.go.jp` 与法国 Zone-Turf 同步登记到日期校验、补充来源审批和最终详情打包三层。年度日历的 `flat/jumps` 只证明竞赛类型，不再用它覆盖已审核的 `surface`；Hoppings Stakes 保持 Newcastle synthetic。
 - 专项 73 项、完整 `stable 1161/1161`（1 skip）、Django check、迁移无漂移、OpenSpec strict `25/25` 和 `git diff --check` 全部通过；代码复审无剩余可修复问题。
 - 生产仍运行 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`。先前候选镜像 `sha256:9cd0b966...45bc1` 不包含本轮来源修复，已视为过期；必须从最新 main 重建可复现 AMD64 镜像后，才允许连接生产库生成日期/来源 artifact、dry-run 和后续受控写入。历史公开展示继续关闭。
+
+## 2026-07-13 batch003 来源门禁镜像生产切换
+
+- batch003 来源门禁修复已合入 `main@3939992c7d3753779fc34de81c595f5a34d7ed2b`，生产现运行 AMD64 镜像 `sha256:87c435cfc50344d0ca94f46e44d4bea97ab11361f88f7c708b6457331aee78ec`。镜像标签绑定 Git tree `0464a1aae6f587e3ba021421ac84b44a3d9379dd` 和 source archive SHA-256 `a787391c84a4ba3bb22c2ab638f1e36453d3ff8869bb95aeb5001b1dd448bb21`。
+- 切换前发现两条正常新闻抓取任务正在执行，因此先停止 beat 并等待任务自然完成；确认 Celery active/reserved、外部导入、外部锁和 one-off 历史写入均为空后才继续。生产 `web / worker / beat` 已统一切换到新镜像。
+- `.env` 备份为 `.env.backup.main-3939992c-20260713_185140`。数据库备份为 `backups/db/pre-main-3939992c-20260713_185140.sql.gz`，大小 `125,782,755` bytes，SHA-256 `21903cf8d9494ef6053414a34c2e2f6ab01406b9ffebcf56ff3fd10eedfc0967`，`gzip -t` 通过；旧镜像回滚标签为 `umanewsbot:rollback-pre-3939992c-20260713_185140`。
+- 无待应用迁移；Django check、静态资源、worker ping、内外 healthz、首页、赛事页和近期错误日志均通过。常驻历史写入/网络、历史公开、多地区归属及相关地区查询开关继续关闭。
+- 本协调流程没有执行 batch003 历史写入。历史任务现仅获准使用新镜像重新生成一次性只读 artifact；预期为 `249 candidate / 1 Hampton ABANDONED gap`，后续 approval、日期 apply、详情 apply 仍分别受独立备份和门禁约束。
