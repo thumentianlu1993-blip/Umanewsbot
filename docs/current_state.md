@@ -6,7 +6,7 @@
 - 日期 apply、详情来源 apply 和最终详情 apply 均为 250/250。正式详情新增 `2563 runners / 2311 results`；500 个模块候选全部为 `applied`，逐场马号与名次唯一性、module 状态和 250 条导入日志一致。250 场保持 draft，published 0。
 - 来源分布为 JRA 官方 50、HKJC 官方 50、NSA 官方 1、Sporting Life 50、ZEturf 50、Equibase 49。NSA `target_id=74171` 的官方 PDF 不提供马号，因而该场 8 条 runners 与 7 条 results 的 `horse_number` 为空；姓名、骑手和名次完整，作为非阻断来源格式例外进入最终统一审核。
 - 226 个 target 的 `module_statuses.term_gaps` 记录了术语库暂缺中文映射；原文赛事数据已经完整导入，这些翻译缺口不改变 imported 状态，也不阻断后续批次，统一留到正式总账数据收集完成后的审核与术语补全。
-- 最终写前 PostgreSQL custom-format 备份为 `/opt/umanewsbot/backups/db/pre-batch004-detail-import-20260714_0325.dump`，大小 `129830849` bytes，`pg_restore -l` 通过，SHA-256 为 `e50bd095bfa141ea0f05bf77fda68a508808dcddac4cbacb8fdb4ce3860e758a`。此前流式生成的 `pre-batch004-detail-source-apply-20260714_031200.sql.gz` 未通过 `gzip -t`，不得用于恢复。
+- 详情来源写前流式备份 `pre-batch004-detail-source-apply-20260714_031200.sql.gz` 在进程尚未结束时曾被中途检查并报截断；进程完成后文件为 `128991200` bytes，`gzip -t` 通过，SHA-256 为 `dbe05660aaae9e1957c21b84d714c3340a81a3a59aedef4dcf5f99caae5509e5`，现为有效恢复点。最终详情写前另有更靠后的 PostgreSQL custom-format 备份 `/opt/umanewsbot/backups/db/pre-batch004-detail-import-20260714_0325.dump`，大小 `129830849` bytes，`pg_restore -l` 通过，SHA-256 为 `e50bd095bfa141ea0f05bf77fda68a508808dcddac4cbacb8fdb4ce3860e758a`。
 - 写后生产累计为 `1041 imported / 29876 pending / 0 ready`，本批 250 场合计 `2563 runners / 2311 results`；全体历史 published 仍为 0。常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，无 one-off，三个公网 healthz 均为 `ok`。
 - batch005 生成必须等待包含 `main@614f810e` 已耗尽地区进度门禁的可复现 AMD64 镜像完成生产切换；历史线程不得自行重建或重启生产。
 

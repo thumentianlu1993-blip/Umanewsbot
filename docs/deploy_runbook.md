@@ -5,7 +5,7 @@
 1. 运行镜像保持 `sha256:87c435cfc50344d0ca94f46e44d4bea97ab11361f88f7c708b6457331aee78ec`；本批没有 build、retag、recreate 或 restart，所有管理命令均使用显式 `docker run --rm`，禁止 Docker Compose。
 2. 日期 artifact manifest `30ff2c0fe14e4d6ce7d9ee7123d882d99838853e381627b552b9b0ac19dd2ea0`，批准并 apply 250/250；五地区各 50，日期、event 和直接来源 250/250，published 0。
 3. 详情来源 artifact manifest `cf5bfdc1cc8c6c82732d6485e1815f582a47d057010e4d1c0214ec3103fd46a8`，check/apply 250/250。来源 apply 后重新导出 event input；最终候选 SHA-256 `ddd1f8256cef0b17aabc33ea66f7a0638a2d6498c2d23342daff8835b10a5156`，250 scopes / 0 gaps，dry-run 通过。
-4. 最终写前有效备份 `/opt/umanewsbot/backups/db/pre-batch004-detail-import-20260714_0325.dump`，`129830849` bytes，SHA-256 `e50bd095bfa141ea0f05bf77fda68a508808dcddac4cbacb8fdb4ce3860e758a`，`pg_restore -l` 通过。流式截断文件 `pre-batch004-detail-source-apply-20260714_031200.sql.gz` 的 `gzip -t` 失败，禁止恢复。
+4. 详情来源写前流式备份 `pre-batch004-detail-source-apply-20260714_031200.sql.gz` 的首次校验发生在进程未结束时，曾报截断；最终文件 `128991200` bytes，`gzip -t` 通过，SHA-256 `dbe05660aaae9e1957c21b84d714c3340a81a3a59aedef4dcf5f99caae5509e5`，可用于回到来源 apply 前。最终详情写前另有 `/opt/umanewsbot/backups/db/pre-batch004-detail-import-20260714_0325.dump`，`129830849` bytes，SHA-256 `e50bd095bfa141ea0f05bf77fda68a508808dcddac4cbacb8fdb4ce3860e758a`，`pg_restore -l` 通过。
 5. 最终详情 apply 250/250，写后为 `2563 runners / 2311 results`、500 applied candidates、250 import logs，重复非空马号和重复名次均为 0。NSA target `74171` 因官方 PDF 不给马号，允许 8/7 条空 `horse_number`，不得补造号码。
 6. 批次后累计 `1041 imported / 29876 pending / 0 ready`，250 场全部 draft，历史 published 0。常驻写入/网络开关 false，无 one-off，三个公网 healthz 为 `ok`。
 7. batch005 前必须由生产协调线程从含 `main@614f810e` 的干净 tree 构建并切换 AMD64 镜像；历史线程不得自行重建或重启生产。切换后再生成下一标准批次，并继续传入既有排除 snapshot。
