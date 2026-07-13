@@ -14,8 +14,9 @@ from django.conf import settings
 from django.utils import dateparse, timezone
 
 from stable.models import RacingRegion, SourceKind, SourceLanguage, SourceMode, SourceSite
+from stable.services.article_content import ArticleContentCleanResult, clean_international_article_body
 from stable.services.http import DEFAULT_HEADERS, get_bytes
-from stable.services.text import extract_article_text, normalize_whitespace
+from stable.services.text import normalize_whitespace
 
 from .base import CanonicalNewsDraft, SourceAdapter, SourceArticleDetail, SourceArticleStub
 
@@ -136,13 +137,17 @@ class SimpleInternationalNewsAdapter(SourceAdapter):
         soup = BeautifulSoup(html, "lxml")
         title_meta = soup.select_one("meta[property='og:title'], meta[name='twitter:title']")
         title_node = soup.select_one(self.title_selector) or soup.select_one("title")
-        body_node = soup.select_one(self.body_selector) or soup.body
+        body_node, matched_body_selector = self._select_body_node(soup)
         date_node = soup.select_one(self.date_selector)
         author_node = soup.select_one(self.author_selector)
         meta_title = title_meta.get("content", "").strip() if title_meta and title_meta.get("content") else ""
         node_title = title_node.get_text(" ", strip=True) if title_node else ""
         title = normalize_whitespace(meta_title if self.prefer_meta_title and meta_title else node_title or meta_title)
-        body_raw = extract_article_text(body_node)
+        if body_node is None:
+            clean_result = ArticleContentCleanResult(text="", status="selector_not_found", removed_rules={})
+        else:
+            clean_result = clean_international_article_body(body_node, source_site=self.source_site)
+        body_raw = clean_result.text
         body_normalized = normalize_whitespace(body_raw)
         published_at = self._parse_published_at(date_node)
         return SourceArticleDetail(
@@ -156,9 +161,21 @@ class SimpleInternationalNewsAdapter(SourceAdapter):
                 "source_url": url,
                 "region": self.racing_region,
                 "source_language": self.source_language,
+                "body_parse_status": clean_result.status,
+                "body_selector": matched_body_selector,
+                "body_cleaning": clean_result.metadata(),
             },
             original_content_html=html,
         )
+
+    def _select_body_node(self, soup: BeautifulSoup):
+        for selector in (part.strip() for part in self.body_selector.split(",")):
+            if not selector:
+                continue
+            node = soup.select_one(selector)
+            if node is not None:
+                return node, selector
+        return None, ""
 
     def _parse_published_at(self, date_node) -> datetime | None:
         if date_node is None:
@@ -307,6 +324,7 @@ class SportingLifeAdapter(SimpleInternationalNewsAdapter):
     racing_region = RacingRegion.UNITED_KINGDOM
     source_language = SourceLanguage.ENGLISH
     link_path_keywords = ("/racing/news",)
+    body_selector = "[class*='Article__ArticleBody'], article .article-body, article, main"
 
 
 class BHAAdapter(SimpleInternationalNewsAdapter):
@@ -720,7 +738,7 @@ class HorseRacingNationAdapter(SimpleInternationalNewsAdapter):
     source_language = SourceLanguage.ENGLISH
     link_path_keywords = ("/news/",)
     title_selector = "h1"
-    body_selector = "article, main, body"
+    body_selector = "article, main"
 
     def parse_listing_html(self, html: str, *, url: str, mode: SourceMode | str | None = None) -> list[SourceArticleStub]:
         soup = BeautifulSoup(html, "lxml")

@@ -706,12 +706,16 @@ def discover_term_candidates_task(article_id: int) -> dict:
 
 
 @shared_task
-def translate_article_task(article_id: int, preclaimed_retry: bool = False) -> dict:
-    log = _log_start("translate_article", {"article_id": article_id})
+def translate_article_task(article_id: int, preclaimed_retry: bool = False, force: bool = False) -> dict:
+    log = _log_start("translate_article", {"article_id": article_id, "force": force})
     article = None
     claimed_retry = False
+    force_published = False
+    previous_automation_status = ""
     try:
         article = NewsArticle.objects.get(pk=article_id)
+        force_published = bool(force and article.workflow_status == WorkflowStatus.PUBLISHED)
+        previous_automation_status = article.automation_status
         if not preclaimed_retry and article.translation_status == ArticleTranslationStatus.TRANSLATING:
             reason = "translation_already_claimed"
             _log_success(log, f"skipped article={article_id} reason={reason}")
@@ -727,7 +731,12 @@ def translate_article_task(article_id: int, preclaimed_retry: bool = False) -> d
             claimed_retry = True
         else:
             expected_due_at = article.translation_next_retry_at
-        if not preclaimed_retry and article.translation_status == ArticleTranslationStatus.FAILED and expected_due_at is not None:
+        if (
+            not force
+            and not preclaimed_retry
+            and article.translation_status == ArticleTranslationStatus.FAILED
+            and expected_due_at is not None
+        ):
             from stable.services.translation_recovery import claim_translation_retry
 
             claim = claim_translation_retry(article.id, expected_due_at=expected_due_at, now=timezone.now())
@@ -753,7 +762,7 @@ def translate_article_task(article_id: int, preclaimed_retry: bool = False) -> d
             ]
         )
         result = translate_article(article)
-        article.apply_translation_result(result)
+        article.apply_translation_result(result, force=force)
         article.status = ArticleStatus.TRANSLATED
         article.translation_status = ArticleTranslationStatus.TRANSLATED
         article.translation_error_message = ""
@@ -766,14 +775,14 @@ def translate_article_task(article_id: int, preclaimed_retry: bool = False) -> d
         article.translation_provider = result.metadata.get("provider", "")
         if article.workflow_status in {WorkflowStatus.PENDING_TRANSLATION, WorkflowStatus.TRANSLATION_FAILED}:
             article.workflow_status = WorkflowStatus.PENDING_EDIT
-        article.automation_status = AutomationStatus.PENDING
+        article.automation_status = previous_automation_status if force_published else AutomationStatus.PENDING
         article.translation_metadata = {**article.translation_metadata, **result.metadata}
         if claimed_retry:
             reason = dict(article.decision_reason or {})
             reason["translation_recovery"] = {"recovered_at": timezone.now().isoformat()}
             article.decision_reason = reason
         article.save()
-        if getattr(settings, "AUTOMATION_ENABLED", False):
+        if getattr(settings, "AUTOMATION_ENABLED", False) and not force_published:
             dispatch_task(process_article_automation_task, article.id)
         _log_success(log, f"translated article={article_id}")
         return {
@@ -795,7 +804,13 @@ def translate_article_task(article_id: int, preclaimed_retry: bool = False) -> d
             )
             from stable.services.translation_recovery import record_translation_failure
 
-            record_translation_failure(article, exc, now=timezone.now(), is_retry=claimed_retry)
+            record_translation_failure(
+                article,
+                exc,
+                now=timezone.now(),
+                is_retry=claimed_retry,
+                preserve_publication=force_published,
+            )
         _log_failure(log, str(exc))
         raise
 

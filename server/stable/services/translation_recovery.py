@@ -134,20 +134,25 @@ def record_translation_failure(
     *,
     now: datetime | None = None,
     is_retry: bool,
+    preserve_publication: bool = False,
 ) -> TranslationErrorClassification:
     now = now or timezone.now()
     classified = classify_translation_error(error, now=now)
     if is_retry:
         article.translation_retry_count += 1
     article.translation_status = ArticleTranslationStatus.FAILED
-    article.workflow_status = WorkflowStatus.TRANSLATION_FAILED
-    article.automation_status = AutomationStatus.FAILED
+    if not preserve_publication:
+        article.workflow_status = WorkflowStatus.TRANSLATION_FAILED
+        article.automation_status = AutomationStatus.FAILED
     article.translation_error_message = classified.error_summary
     article.translation_error_category = classified.category
     article.translation_started_at = None
     max_attempts = int(getattr(settings, "TRANSLATION_AUTO_RETRY_MAX_ATTEMPTS", 3))
     exhausted = is_retry and article.translation_retry_count >= max_attempts
-    if classified.auto_retryable and not exhausted:
+    if preserve_publication:
+        article.translation_next_retry_at = None
+        article.translation_retry_exhausted_at = None
+    elif classified.auto_retryable and not exhausted:
         next_attempt = article.translation_retry_count + 1
         article.translation_next_retry_at = now + timedelta(
             seconds=retry_delay_seconds(
