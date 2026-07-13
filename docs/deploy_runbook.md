@@ -4155,3 +4155,13 @@ docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
 - 先执行 `--dry-run --expected-sha256 <整文件SHA>`，核对目标数、逐字段 before/after、人工锁和零漂移；apply 前完成数据库备份、SHA-256 与 `gzip -t` 校验。
 - apply 只临时启用 `HISTORICAL_RACE_BACKFILL_ENABLED` 的单命令环境，不修改常驻配置；结束后复核常驻历史网络/写入门禁和历史赛事 draft 状态。
 - 字段 apply 后必须重新导出 event input 并重新生成详情候选。旧详情候选的 target SHA 应失败，不能为赶进度跳过重新 coverage、dry-run 和第二次写前备份。
+
+## 2026-07-13 `main@58786b91` 可复现镜像部署记录
+
+- 构建上下文：`/opt/umanewsbot-builds/main-58786b91-20260713-1435`；revision `58786b91fba9c44054a6102055766824677bcbcb`，Git tree `5d8b7ccf775f6be7051c88e8f440b034ad02f4df`，source archive SHA-256 `184f05c39d3df5dd0bb1f410bdccda418ed3052964edea99b07faf22723fa07e`。
+- 两次独立 AMD64 build 得到相同 image ID `sha256:c6a3670fdc42db9c0b8ded5772630ac1b0511b98a521ea7f4a9cbe7e25864691`；正式 tag 为 `umanewsbot:main-58786b91-amd64-20260713-1435`，生产 `umanewsbot:prod` 当前指向该 ID。
+- 部署前 `.env` 备份为 `.env.backup.main-58786b91-20260713_143748`；数据库备份为 `backups/db/pre-main-58786b91-20260713_143748.sql.gz`，大小 `149,960,820` bytes，SHA-256 `9f29cd1a28b41761591a1966c68125c611a36290953cf0d845cdcead05891f27`，`gzip -t` 通过。回滚 tag 为 `pre-main-58786b91-20260713-1439`，对应旧 image ID `sha256:27d5d51cbe2ae6d23cb99dc758da01addc2d5935504a950bbb8a2685bce2bf13`。
+- 切换前必须验证 origin/main、服务器 HEAD 与构建 revision 一致，外部导入、术语门禁、归属锁、worker active/reserved 均为空；停止 beat、排空 worker 后才允许 retag 和重建 `web / worker / beat`。某一步 shell 管道提前退出时，先确认是否已经 retag/recreate，不得盲目重放整段脚本。
+- 切换后验收：三容器 image ID 一致；架构为 amd64；`stable.0029_france_freshness_translation_attribution` 已应用；64 个模型、Django check、五地区频道、赛事页、马匹页、后台和 healthz 正常；近期 web/worker/beat 日志无 ERROR、CRITICAL、Traceback 或 IntegrityError。
+- 首个完整自然窗口为 `2026-07-13 14:45 CST`：crawl `17/17`、publish `5/5`、QQ push `5/5` 全部 succeeded，crawl seen `472`、new `3`；新增文章 `attribution_rule_version IS NULL=0`。发布和 QQ 的零产出原因均为当前门禁下的正常 `hard_gate_blocked`、`translation_retry_waiting`、`no_ready_candidates` 或 `no_eligible_articles`。
+- 历史数据门禁：`HistoricalRaceEventTarget=30,917`，2026 年前 `RaceEvent=295`、`RaceEventRunner=3,174`、`RaceEventResult=2,817`，全部 `draft`、published `0`；常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false` 和 `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。一次性来源缓存或写入只在单命令环境中临时开启，命令结束后必须再次核对常驻值。

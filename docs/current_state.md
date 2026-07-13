@@ -1202,3 +1202,12 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 基础字段 apply 会改变 target SHA，旧详情候选因此自动失效；正确顺序固定为字段 dry-run/备份/apply、重新导出 event input、重新打包详情、coverage、详情 dry-run/第二次备份/apply。禁止手工修改生产 `RaceEvent` 或复用旧候选绕过身份校验。
 - 本轮目标/相邻测试 `34/89` 项通过；在临时 Redis 和 macOS 真实临时目录下完整 `stable` 回归 `1136/1136` 通过，1 项按设计跳过。Django check、迁移无漂移、OpenSpec strict 和 `git diff --check` 均通过；两轮代码复审最终无待修问题。
 - 当前生产仍运行 `main@304ebdb6` 对应可复现 AMD64 镜像，历史公开数据保持关闭。本轮字段门禁尚未部署，也未执行字段或详情生产写入；先完成源码提交、推送和合入最新 `main`，再由最新主线构建并受控替换生产镜像。
+
+## 2026-07-13 历史来源匹配器主线固化与可复现镜像切换
+
+- 历史赛事全部必须保留的源码已提交并合入 `main@58786b91fba9c44054a6102055766824677bcbcb`。该版本新增 JRA 当前赛事别名、TOBA 核心限定词全词匹配、同一结果 URL 跨目标复用阻断，以及 TOBA `not run` 证据解析；完整 `stable` 回归为 `1141 passed / 1 skipped`，迁移无漂移，OpenSpec strict/all `25/25`，最终代码复审无 actionable finding。
+- 在生产独立上下文 `/opt/umanewsbot-builds/main-58786b91-20260713-1435` 两次构建得到相同 AMD64 image ID `sha256:c6a3670fdc42db9c0b8ded5772630ac1b0511b98a521ea7f4a9cbe7e25864691`。镜像标签绑定 Git tree `5d8b7ccf775f6be7051c88e8f440b034ad02f4df` 和 source archive SHA-256 `184f05c39d3df5dd0bb1f410bdccda418ed3052964edea99b07faf22723fa07e`，已替换生产 `web / worker / beat`。
+- 切换前数据库备份为 `backups/db/pre-main-58786b91-20260713_143748.sql.gz`，大小 `149,960,820` bytes，SHA-256 `9f29cd1a28b41761591a1966c68125c611a36290953cf0d845cdcead05891f27`，`gzip -t` 通过；旧镜像保留为 `pre-main-58786b91-20260713-1439`。
+- 部署后 `stable.0029_france_freshness_translation_attribution` 已应用、64 个模型可加载，五地区页面、赛事页、马匹页、后台、内外 healthz 和近期日志均通过。生产历史总账 `30,917` 个目标，历史赛事 `295` 场、`3,174 runners / 2,817 results`，全部仍为 `draft`，published 为 `0`；常驻历史写入与网络开关均为 `false`。
+- 切换后的 `14:45` 自然窗口完整通过：`17` 个 crawl、`5` 个 publish、`5` 个 QQ 窗口全部 succeeded；抓取共 seen `472`、new `3`，新增文章 `attribution_rule_version IS NULL=0`，web/worker/beat 近期错误日志均为 `0`。
+- `2016–2025` 第二标准批次已固定五地区各 50 场。日美离线来源发现得到 JRA 50 条、Equibase 48 条，共 98 个唯一 URL；Brooklyn 与 Cougar II 的 2025 届由 TOBA 标记为 `not run`，继续等待产品口径审核，其余 248 个目标不受阻塞。
