@@ -1075,3 +1075,11 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 运行验收：服务器内部 `http://127.0.0.1/healthz/` 与公网 `http://umafans.run/healthz/` 返回 200；浏览器真实打开首页、法国频道和 `/news/8093/` 详情页均正常，详情页含 8 个正文段落且无前端错误。HTTPS 仍未接入证书，Nginx 443 TLS server 块原本即为注释状态，本次不将 HTTPS 计为已完成能力。
 - 法国只读 probe 未写文章：France Galop / TDN France / TDN France Broad 分别得到 `20 / 4 / 12` 条列表候选，三个来源均为 accepted，抽取的 6 篇详情全部成功；最新样本时间覆盖 2026-07-10 至 2026-07-12，未再返回 2020/2022 历史稿。生产法国来源 13/14/21 仍为 enabled、production approved、最近抓取 success。
 - OpenSpec 当前完成 `59/68`。真实至少 250 篇双人审核 gold set、生产 gold/dry-run、人工复核、时间修复与翻译小批处理、shadow/enforce 灰度、网页/测试群/正式群扩展和窗口数量验收均未完成，因此 change 保持 `implementing`，不得归档。
+
+## 2026-07-13 线上验收发现旧底座镜像覆盖并完成组合镜像恢复
+
+- `10:00` 左右验收发现生产仓库 HEAD 虽为 `1a70b22e`，运行镜像却已被历史赛事任务从旧代码底座重建为 `deadheat-fix-amd64-20260713`。该镜像仅加载 57 个模型，不认识 `stable.0027-0029` 和新增设置；数据库已经应用 `0029`，因此 netkeiba 新稿插入触发 `attribution_rule_version` 非空约束失败。问题属于应用镜像与数据库 schema 不匹配，不是来源失效。
+- 已在 Celery/one-off 为空时短时切回 `pre-irishracing-20260713`，恢复后 netkeiba 完整抓取成功：新增 `3`、重复 `117`；本次恢复后共新增 9 篇，9 篇均完成翻译，`attribution_rule_version IS NULL=0`。由验收同步探测中断产生的 `CrawlJob 16266` 已显式标记失败并注明原因，未遗留伪运行状态。
+- 历史赛事 worktree 已合入 `origin/main@1a70b22e`，组合源码通过专项 `323` 项、完整 `stable 1093` 项（1 skip）、Django/迁移/OpenSpec/diff 检查。生产最终切换到 AMD64 组合镜像 `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`，镜像 tag 为 `umanewsbot:merged-main-historical-amd64-20260713-1008`；内容 commit 标签 `0068715fceb0f629b5bfcb0c0b760427dfc6edc5`，构建上下文树 SHA256 `e51e6992e57649445aeff2aa7f2a0c925f3c5c742771fceac13053459beceec6`。
+- 最终运行验收：`web/worker/beat` 使用上述同一镜像，`stable.0029` 已应用，Django check 通过；归属、相关地区查询、翻译自动重试与失败邮件继续关闭。五地区页、后台登录入口和 HTTP `/healthz/` 全部返回 200，最近日志无 traceback/error/not-null constraint。
+- 组合镜像包含历史任务尚未全部提交到 `main` 的实现，虽然已绑定内容 commit、上下文树 SHA 和回滚镜像，但仍不是最终可复现发布。历史任务完成当前批次后必须提交并推送全部生产代码；后续生产重建必须先合入最新 `origin/main`，禁止从旧分支或旧上下文直接覆盖 `umanewsbot:prod`。

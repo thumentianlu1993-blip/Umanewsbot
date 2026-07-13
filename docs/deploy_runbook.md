@@ -4034,3 +4034,11 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 5. 健康验收以 `http://127.0.0.1/healthz/`、`http://umafans.run/healthz/`、首页、法国频道和新闻详情页为准；当前 HTTPS server 块仍注释，不能使用 HTTPS 失败判断本次应用部署失败，也不能对外宣称 HTTPS 已完成。
 6. 只读来源探测命令：`python manage.py probe_international_news_sources --source france_galop_news --source tdn_france --source tdn_france_broad --limit 2 --json`。2026-07-13 验收列表数为 `20 / 4 / 12`，均 accepted，详情错误为 0；该命令只做网络与数据库重复检查，不写入文章。
 7. 后续启用前先配置 SMTP 并测试 `754652181@qq.com` 收件，再建立有效 gold set、执行生产 dry-run 和人工复核；严格按 shadow、仅新文章 enforce、网页/测试群、72 小时回填、正式群顺序推进。任一质量门槛失败即停止扩大。
+
+### 运行镜像被旧底座覆盖后的恢复记录
+
+1. 症状：服务器 HEAD 为最新，但容器缺少 `0029` 和新增 settings；数据库已有 `0029`，新文章插入报 `attribution_rule_version` 非空约束错误。先检查 `docker inspect <web> --format '{{.Image}}'`、镜像内迁移文件和 `showmigrations`，不要仅执行 `git rev-parse HEAD`。
+2. 紧急恢复：保留故障镜像 tag，确认 active/reserved/one-off 为空后，把已验证的 `pre-irishracing-20260713` 临时切回 `prod`，只重建 `web/worker/beat`，不重启数据库。恢复后用真实来源抓取验证新增文章和新字段。
+3. 最终镜像：`umanewsbot:merged-main-historical-amd64-20260713-1008`，image ID `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`；回滚 tag `pre-merged-main-historical-20260713-1015`。
+4. 切换流程：先停止 beat，等待 worker active/reserved 和 one-off 清空；运行 `migrate --noinput` 确认无待迁移，再强制重建 `web/worker/beat`。完成后验证 image ID、`0027-0029`、64 个模型、归属/重试安全开关、历史管理命令、五地区页、后台、healthz 和最近日志。
+5. 数据验收：恢复后的 netkeiba 抓取新增 3、重复 117；恢复阶段总计新增 9 篇且全部翻译完成，新文章 `attribution_rule_version` NULL 数为 0。任何后续镜像若重新出现 57 models 或不识别 `0029`，立即按故障镜像处理并回滚。
