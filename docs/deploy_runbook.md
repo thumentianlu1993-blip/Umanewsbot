@@ -4173,3 +4173,35 @@ docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
 - 香港赛季目标的赛事日期跨自然年时，provider 必须同时写 `actual_year=<local_date.year>` 和非空 `cross_year_reason=hong_kong_racing_season_spans_calendar_years`。英国来源距离可保留 `2m4f`、`3m21/2f` 等原文，解析结果必须拆成 mile/furlong/yard 组件，不能改写成裸数字或公制猜测。
 - 当前生产镜像不含紧凑英制距离修复。必须先把修复提交并合入最新 main，运行完整组合回归，构建可复现 AMD64 镜像并按共享生产切换门禁部署；随后重新 normalize/build，预期结果才是 `246 candidate / 4 gap`。旧 `219/31` artifact 不得审批或 commit。
 - 新 artifact 仍须经历 manifest 审批、数据库备份、`gzip -t`、SHA-256、dry-run、单命令临时写入开关、写后逐目标核验和常驻开关复核。详情候选必须在日期 apply 改变 target SHA 后重新导出并重新打包，公开展示开关保持关闭。
+
+## 2026-07-13 `main@d8b65fe7` 不可变镜像切换记录
+
+### 切换对象与回滚点
+
+- 新镜像：`umanewsbot:main-d8b65fe7-amd64-20260713-1630`，image ID `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`，架构 `linux/amd64`。
+- 镜像标签：revision `d8b65fe7d63e913cf826d02a74cdebaec60351ce`，Git tree `fda256535ae3b9f435cf8c7b069ff26d04503d99`，source archive SHA-256 `2b085d0226580295f9a844fbc92df48405cd9bb3b467786230fac8941fa60520`。
+- 旧镜像：`sha256:c6a3670fdc42db9c0b8ded5772630ac1b0511b98a521ea7f4a9cbe7e25864691`，回滚标签 `umanewsbot:rollback-pre-d8b65fe7-20260713_163805`。
+- 环境备份：`.env.backup.main-d8b65fe7-20260713_163805`。
+- 数据库备份：`backups/db/pre-main-d8b65fe7-20260713_163805.sql.gz`，`124,020,905` bytes，SHA-256 `33f5ef3520e833a8cf343ca87831a7620c9cb80ba095e74c5cadb716d55ccfa2`，`gzip -t` 通过。
+
+### 排空与切换顺序
+
+1. 核对候选镜像 ID/架构、当前三容器 image ID、内外 healthz、外部导入/锁、one-off 进程及 Celery active/reserved。
+2. 停止 beat，再次确认 active/reserved、外部导入和锁均为空；随后停止 worker，不 purge Redis 队列。
+3. 将候选镜像 retag 为 `umanewsbot:prod`，使用一次性 web 容器执行 `migrate --noinput`、`check` 和 `collectstatic --noinput`。
+4. 先重建 web/worker，等待 web healthy 和 worker ping；最后重建 beat，避免迁移或容器切换期间重复调度。
+5. 核对 web/worker/beat 实际 `.Image` 均为新 image ID，再检查内外 healthz、首页、赛事页、Django check、常驻开关和近期错误日志。
+
+### 备份脚本异常与本次回退
+
+- 本次直接执行 `BACKUP_TARGET=local ./deploy/backup_db.sh` 失败：宿主机无法解析 Compose 内部主机名 `db`，随后宿主机 Python 因缺少 `oss2` 再次失败。该命令产生的同时间文件不得作为有效恢复点。
+- 本次改用数据库容器内 `pg_dump`，由宿主机管道压缩到独立 `pre-main-d8b65fe7-*.sql.gz`，并强制执行非空检查、`gzip -t` 和 SHA-256 后才继续部署。
+- 后续使用低成本 Compose 部署时，在修复备份脚本前必须验证备份命令退出码、文件非空和 `gzip -t`；不得仅凭脚本打印 `Backup created` 视为成功。失败时使用已验证的容器内 `pg_dump` 回退路径，不得跳过备份。
+
+### 验收结果
+
+- 无待应用迁移，Django check 通过；129 个静态文件复制并完成 360 项 post-process。
+- web/worker/beat 均运行 `sha256:77eb1138...c3da0`；db、redis healthy，nginx 正常。
+- 内部和公网 `/healthz/` 为 `ok`，公网首页和 `/races/` 为 `200`，worker ping 正常，Celery active/reserved 为空，近期 web/worker/beat 日志无 error/traceback/exception。
+- `2m4f` 与 `3m21/2f` 的生产纯函数 smoke 分别得到 `2 mile + 4 furlong`、`3 mile + 2.5 furlong`，原始 `distance_text` 保留。
+- 常驻历史写入/网络开关、多地区归属/相关地区查询开关均保持关闭；本次没有执行历史写入。

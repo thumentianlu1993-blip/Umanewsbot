@@ -1218,3 +1218,12 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 部署后 `stable.0029_france_freshness_translation_attribution` 已应用、64 个模型可加载，五地区页面、赛事页、马匹页、后台、内外 healthz 和近期日志均通过。生产历史总账 `30,917` 个目标，历史赛事 `295` 场、`3,174 runners / 2,817 results`，全部仍为 `draft`，published 为 `0`；常驻历史写入与网络开关均为 `false`。
 - 切换后的 `14:45` 自然窗口完整通过：`17` 个 crawl、`5` 个 publish、`5` 个 QQ 窗口全部 succeeded；抓取共 seen `472`、new `3`，新增文章 `attribution_rule_version IS NULL=0`，web/worker/beat 近期错误日志均为 `0`。
 - `2016–2025` 第二标准批次已固定五地区各 50 场。日美离线来源发现得到 JRA 50 条、Equibase 48 条，共 98 个唯一 URL；Brooklyn 与 Cougar II 的 2025 届由 TOBA 标记为 `not run`，继续等待产品口径审核，其余 248 个目标不受阻塞。
+
+## 2026-07-13 紧凑英制距离修复生产切换
+
+- 紧凑英制距离修复已进入 `main@d8b65fe7d63e913cf826d02a74cdebaec60351ce`，并由生产机独立构建为 AMD64 镜像 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`。镜像标签绑定 Git tree `fda256535ae3b9f435cf8c7b069ff26d04503d99` 和 source archive SHA-256 `2b085d0226580295f9a844fbc92df48405cd9bb3b467786230fac8941fa60520`。
+- 切换前确认外部导入、外部锁、Celery active/reserved 和 one-off 写入均为空；停止 beat、排空并停止 worker 后才 retag。生产 `web / worker / beat` 现统一运行上述镜像，旧镜像 `sha256:c6a3670f...64691` 已保留为 `rollback-pre-d8b65fe7-20260713_163805`。
+- `.env` 备份为 `.env.backup.main-d8b65fe7-20260713_163805`。数据库备份为 `backups/db/pre-main-d8b65fe7-20260713_163805.sql.gz`，大小 `124,020,905` bytes，SHA-256 `33f5ef3520e833a8cf343ca87831a7620c9cb80ba095e74c5cadb716d55ccfa2`，`gzip -t` 通过。
+- 部署没有新增迁移；Django check、静态资源收集、内外 healthz、首页、赛事页、worker ping 和近期错误日志均通过。生产纯函数 smoke 已确认 `2m4f` 解析为 2 mile + 4 furlong，`3m21/2f` 解析为 3 mile + 2.5 furlong，且保留来源原文。
+- 常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，多地区归属与相关地区查询也继续关闭。本次只切换代码，没有执行历史赛事写入。
+- 使用新镜像连接生产库只读重建 batch002 日期 artifact，结果精确为 `246 candidate / 4 gap`：法国/香港/日本各 50，英国/美国各 48；4 个 gap 仍是两场英国 `ABANDONED` 和两场美国 TOBA `not run`。manifest SHA-256 为 `9ed3b7138012b4ce1732cf1f071d13cb16678a97983ea63d94329fe84c902e68`，尚未审批、备份或 commit。
