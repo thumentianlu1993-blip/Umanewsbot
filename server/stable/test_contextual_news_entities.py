@@ -1065,6 +1065,19 @@ class ReprocessArticleEntitiesCommandTests(TestCase):
         self.assertEqual(article.tags_json, ["好运宝宝"])
         self.assertFalse(OperationLog.objects.filter(action_type="article_entities_reprocessed").exists())
 
+    def test_dry_run_cleans_legacy_horse_targets_even_with_incomplete_provenance(self):
+        article = self._article("8318-incomplete-provenance")
+        article.tags_json = ["好运宝宝", "专题"]
+        article.translation_metadata = {"machine_horse_tags": ["已替换机器标签"]}
+        article.save(update_fields=["tags_json", "translation_metadata", "updated_at"])
+
+        payload = self._command("--article-id", str(article.id))
+
+        article.refresh_from_db()
+        self.assertEqual(payload["articles"][0]["tags"]["delete"], ["好运宝宝"])
+        self.assertEqual(payload["articles"][0]["tags"]["after"], ["专题"])
+        self.assertEqual(article.tags_json, ["好运宝宝", "专题"])
+
     def test_commit_preserves_public_identity_time_and_qq_delivery(self):
         article = self._article("8318-commit")
         before_time = article.published_to_web_at
@@ -1135,3 +1148,24 @@ class ReprocessArticleEntitiesCommandTests(TestCase):
 
         self.assertEqual(payload["articles"][0]["status"], "committed")
         translate.assert_called_once_with(article.id, force=True, suppress_automation=True)
+        article.refresh_from_db()
+        self.assertEqual(article.tags_json, [])
+
+    def test_sync_translation_uses_legacy_tag_plan_captured_before_new_provenance(self):
+        article = self._article("entity-translation-provenance-order")
+
+        def simulate_translation(article_id: int, **_kwargs):
+            NewsArticle.objects.filter(pk=article_id).update(
+                tags_json=["好运宝宝"],
+                translation_metadata={"machine_horse_tags": []},
+            )
+
+        with patch(
+            "stable.services.article_entity_reprocessing.translate_article_task.run",
+            side_effect=simulate_translation,
+        ):
+            payload = self._command("--article-id", str(article.id), "--commit", "--translate-sync")
+
+        article.refresh_from_db()
+        self.assertEqual(payload["articles"][0]["status"], "committed")
+        self.assertEqual(article.tags_json, [])

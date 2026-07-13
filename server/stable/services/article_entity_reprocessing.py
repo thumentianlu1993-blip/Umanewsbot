@@ -4,7 +4,7 @@ from typing import Iterable
 
 from django.db import transaction
 
-from stable.models import NewsArticle, OperationLog, TermEntry, TermType
+from stable.models import NewsArticle, OperationLog, SourceLanguage, TermEntry, TermType
 from stable.services.horse_profiles import reconcile_article_horse_links
 from stable.services.terms import ArticleEntityResolution, resolve_article_entities
 from stable.tasks import translate_article_task
@@ -29,14 +29,15 @@ def _tag_plan(article: NewsArticle, resolution: ArticleEntityResolution) -> dict
             "delete": [],
         }
     previous_machine = set((article.translation_metadata or {}).get("machine_horse_tags") or [])
-    if previous_machine:
-        legacy_candidates = previous_machine
-    else:
-        legacy_candidates = set(
-            TermEntry.objects.filter(is_active=True, term_type=TermType.HORSE, target_zh__in=current)
-            .exclude(target_zh="")
-            .values_list("target_zh", flat=True)
-        )
+    active_horse_targets = set(
+        TermEntry.objects.filter(is_active=True, term_type=TermType.HORSE, target_zh__in=current)
+        .exclude(target_zh="")
+        .values_list("target_zh", flat=True)
+    )
+    # Explicit reprocessing owns all unlocked horse-term tags on the selected
+    # article.  Always include active horse targets: an interrupted/older run
+    # may already have written incomplete provenance while leaving legacy tags.
+    legacy_candidates = previous_machine | active_horse_targets
     delete = [tag for tag in current if tag in legacy_candidates and tag not in machine_tags and tag not in defaults]
     after = [tag for tag in current if tag not in delete]
     for tag in [*_source_default_tags(article), *machine_tags]:
@@ -59,7 +60,7 @@ def build_article_entity_reprocess_plan(
     resolution = resolution or resolve_article_entities(
         article.title_ja,
         article.body_ja_normalized or article.body_ja_raw,
-        source_language=article.source_language,
+        source_language=article.source_language or SourceLanguage.JAPANESE,
     )
     return {
         "article_id": article.id,
@@ -79,15 +80,21 @@ def _commit_article(article_id: int, *, translate_sync: bool) -> dict:
             "published_to_web_at": article.published_to_web_at,
             "qq_delivery_count": article.qq_push_deliveries.count(),
         }
+        pre_translation_resolution = resolve_article_entities(
+            article.title_ja,
+            article.body_ja_normalized or article.body_ja_raw,
+            source_language=article.source_language or SourceLanguage.JAPANESE,
+        )
+        pre_translation_tag_plan = _tag_plan(article, pre_translation_resolution)
         if translate_sync:
             translate_article_task.run(article.id, force=True, suppress_automation=True)
             article.refresh_from_db()
         resolution = resolve_article_entities(
             article.title_ja,
             article.body_ja_normalized or article.body_ja_raw,
-            source_language=article.source_language,
+            source_language=article.source_language or SourceLanguage.JAPANESE,
         )
-        tag_plan = _tag_plan(article, resolution)
+        tag_plan = pre_translation_tag_plan if translate_sync else _tag_plan(article, resolution)
         if not tag_plan["locked"]:
             article.tags_json = tag_plan["after"]
         metadata = dict(article.translation_metadata or {})
