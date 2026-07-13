@@ -149,6 +149,17 @@ def _normalized_term_candidate(value: str) -> str:
     return " ".join(normalized.casefold().split())
 
 
+def _term_query_key_variants(value: str) -> set[str]:
+    variants = {value, value.replace("'", "’"), value.replace("'", "‘")}
+    if value and value[-1].isalnum():
+        variants.add(f"{value}.")
+    if " " in value:
+        head, tail = value.rsplit(" ", 1)
+        variants.add(f"{head}, {tail}")
+        variants.add(f"{head}, {tail}.")
+    return variants
+
+
 def _ambiguous_horse_candidates(entries: Iterable[TermEntry], terms_by_entry: dict[int, list[str]]) -> set[str]:
     owners: dict[str, set[int]] = {}
     for entry in entries:
@@ -317,11 +328,7 @@ def _build_article_entity_index(rows: Iterable[tuple[str, str]]) -> ArticleEntit
             non_horse_words_by_language[language] = set(_HORSE_STOPWORDS) if language == SourceLanguage.JAPANESE else set()
             continue
         normalized_keys = {_normalized_term_candidate(item) for item in keys if item}
-        query_keys = {
-            variant
-            for item in normalized_keys
-            for variant in (item, item.replace("'", "’"), item.replace("'", "‘"))
-        }
+        query_keys = {variant for item in normalized_keys for variant in _term_query_key_variants(item)}
         alias_queryset = TermAlias.objects.filter(is_active=True, source_language=language)
         if language == SourceLanguage.ENGLISH:
             alias_queryset = alias_queryset.annotate(candidate_key=Lower("text")).filter(candidate_key__in=query_keys)
@@ -857,9 +864,10 @@ def _resolve_japanese_entities(
                 text, title if field_name == "title" else "", match.start(), match.end(), token
             ) or _score_heuristic_candidate(text, title, match.start(), match.end(), token) >= 3
             common_word_strong = _strong_japanese_common_word_horse_context(text, match.start(), match.end())
+            race_abbreviation = _inside_japanese_race_abbreviation(text, match.end(), token)
             if (
-                token in non_horse_words
-                and (token in _HORSE_ALWAYS_COMMON_WORDS or not common_word_strong)
+                (token in non_horse_words or race_abbreviation)
+                and (race_abbreviation or token in _HORSE_ALWAYS_COMMON_WORDS or not common_word_strong)
                 and not exact_non_horse_terms
             ):
                 common_word = _make_entity(
@@ -965,9 +973,10 @@ def _resolve_japanese_entities(
                     entity_type = "horse" if entry.term_type == TermType.HORSE else (
                         "person" if entry.term_type in _PERSON_TERM_TYPES else "term"
                     )
-                    if entry.term_type == TermType.HORSE and candidate in non_horse_words:
+                    race_abbreviation = _inside_japanese_race_abbreviation(text, match.end(), candidate)
+                    if entry.term_type == TermType.HORSE and (candidate in non_horse_words or race_abbreviation):
                         strong = _strong_japanese_common_word_horse_context(text, match.start(), match.end())
-                        if candidate in _HORSE_ALWAYS_COMMON_WORDS or not strong:
+                        if race_abbreviation or candidate in _HORSE_ALWAYS_COMMON_WORDS or not strong:
                             entities.append(
                                 _make_entity(
                                     "common_word",
@@ -1397,6 +1406,7 @@ _HORSE_STOPWORDS = {
     "天才",
 }
 _HORSE_ALWAYS_COMMON_WORDS = {"ユタカ"}
+_JAPANESE_RACE_ABBREVIATION_SUFFIXES = {"ジャパン": {"C", "Ｃ"}}
 _NON_HORSE_NOTE_MARKER = "non_horse_common_word"
 
 
@@ -1417,6 +1427,11 @@ def _strong_japanese_common_word_horse_context(text: str, start: int, end: int) 
             after,
         )
     )
+
+
+def _inside_japanese_race_abbreviation(text: str, end: int, candidate: str) -> bool:
+    suffixes = _JAPANESE_RACE_ABBREVIATION_SUFFIXES.get(candidate, set())
+    return bool(suffixes and text[end : end + 1] in suffixes)
 
 
 def non_horse_common_words() -> set[str]:

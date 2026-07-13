@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from django.conf import settings
 from openai import OpenAI
 
-from stable.models import NewsArticle, SourceLanguage, TranslationRun
+from stable.models import NewsArticle, SourceLanguage, TermType, TranslationRun
 
 from .terms import (
     ArticleEntityResolution,
@@ -110,6 +110,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             "如果原文包含排行榜、分点、小标题或项目符号，译文必须保留相同的顺序和完整信息。"
             "如果识别到马名但术语表没有提供中文译名，必须保留该马名的原始写法，不得音译、意译或自行猜译。"
             "若原文中出现 __UMA_KEEP_数字__ 形式的占位符，请在译文中原样复制该占位符，不要翻译或删除。"
+            "若原文中出现 __UMA_TERM_数字__ 形式的人名占位符，也必须在译文中原样复制，系统会按术语表还原。"
             "输出必须是 JSON 对象，且只包含 title_zh、body_zh、push_summary_zh 三个键。"
             f"{retry_hint}"
             "\n\n"
@@ -235,6 +236,34 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         return restored
 
     @staticmethod
+    def _person_term_placeholders(terms: list) -> tuple[dict[str, str], dict[str, str]]:
+        mappings: dict[str, str] = {}
+        conflicts: set[str] = set()
+        for term in terms:
+            if term.term_type not in {TermType.JOCKEY, TermType.TRAINER, TermType.OWNER}:
+                continue
+            source = (term.matched_text or term.source_ja or "").strip()
+            target = (term.target_zh or "").strip()
+            if not source or not target:
+                continue
+            if source in mappings and mappings[source] != target:
+                conflicts.add(source)
+                continue
+            mappings[source] = target
+        for source in conflicts:
+            mappings.pop(source, None)
+        source_placeholders: dict[str, str] = {}
+        target_placeholders: dict[str, str] = {}
+        for index, (source, target) in enumerate(
+            sorted(mappings.items(), key=lambda item: (-len(item[0]), item[0], item[1])),
+            start=1,
+        ):
+            placeholder = f"__UMA_TERM_{index}__"
+            source_placeholders[placeholder] = source
+            target_placeholders[placeholder] = target
+        return source_placeholders, target_placeholders
+
+    @staticmethod
     def _usage_to_dict(usage) -> dict:
         if usage is None:
             return {}
@@ -258,8 +287,14 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             source_language=source_language,
         )
         terms = resolution.accepted_terms[: settings.TRANSLATION_TERM_LIMIT]
+        person_source_placeholders, person_target_placeholders = self._person_term_placeholders(terms)
+        person_placeholder_by_source = {
+            source: placeholder for placeholder, source in person_source_placeholders.items()
+        }
         glossary_lines = [
-            f"- [{term.term_type}] {term.matched_text or term.source_ja} => {term.target_zh}"
+            f"- [{term.term_type}] "
+            f"{person_placeholder_by_source.get((term.matched_text or term.source_ja or '').strip(), term.matched_text or term.source_ja)}"
+            f" => {term.target_zh}"
             + (f"（备注：{term.notes}）" if term.notes else "")
             for term in terms
             if (term.target_zh or "").strip()
@@ -274,6 +309,8 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         _, horse_placeholders = self._protect_unknown_horse_names("", unknown_horse_names)
         protected_title = self._protect_with_placeholders(article.title_ja, horse_placeholders)
         protected_body = self._protect_with_placeholders(source_text, horse_placeholders)
+        protected_title = self._protect_with_placeholders(protected_title, person_source_placeholders)
+        protected_body = self._protect_with_placeholders(protected_body, person_source_placeholders)
         unknown_horse_lines = [
             f"- {placeholder} => {name}（译文中先原样复制占位符，系统会还原为日文马名）"
             for placeholder, name in horse_placeholders.items()
@@ -303,6 +340,9 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             title_zh = self._restore_unknown_horse_placeholders(mapped_title, horse_placeholders)
             body_zh = self._restore_unknown_horse_placeholders(mapped_body, horse_placeholders)
             push_summary_zh = self._restore_unknown_horse_placeholders(mapped_summary, horse_placeholders)
+            title_zh = self._restore_unknown_horse_placeholders(title_zh, person_target_placeholders)
+            body_zh = self._restore_unknown_horse_placeholders(body_zh, person_target_placeholders)
+            push_summary_zh = self._restore_unknown_horse_placeholders(push_summary_zh, person_target_placeholders)
 
             last_metadata = {
                 "provider": self.name,
@@ -329,6 +369,10 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                     if item.source == "external_alias"
                 ],
                 "unknown_horse_placeholders": horse_placeholders,
+                "person_term_placeholders": {
+                    placeholder: {"source": source, "target": person_target_placeholders[placeholder]}
+                    for placeholder, source in person_source_placeholders.items()
+                },
                 "raw": payload,
                 "finish_reason": getattr(choice, "finish_reason", ""),
                 "usage": self._usage_to_dict(getattr(response, "usage", None)),
@@ -359,6 +403,23 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                 if attempt < max_attempts:
                     continue
                 last_metadata["warning"] = "Translation response changed unknown horse names; accepted with warning"
+
+            translated_text = "\n".join([title_zh or "", body_zh or ""])
+            missing_person_targets = sorted(
+                {target for target in person_target_placeholders.values() if target not in translated_text}
+            )
+            if missing_person_targets:
+                last_metadata["missing_person_term_targets"] = missing_person_targets
+                retry_hint = (
+                    "\n\n注意：上一版没有保留部分人名术语占位符。"
+                    "请原样复制所有 __UMA_TERM_数字__ 占位符，不要音译或删除。"
+                )
+                if attempt < max_attempts:
+                    continue
+                raise TranslationResponseError(
+                    "Translation response changed required person terms",
+                    metadata=last_metadata,
+                )
 
             return TranslationResult(
                 title_zh=title_zh,

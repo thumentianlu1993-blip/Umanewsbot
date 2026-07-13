@@ -33,7 +33,7 @@ from stable.models import (
     TermType,
     WorkflowStatus,
 )
-from stable.services.translation import OpenAICompatibleTranslationProvider, translate_article
+from stable.services.translation import OpenAICompatibleTranslationProvider, TranslationResponseError, translate_article
 from stable.services.rewriting import FallbackRewriteProvider, OpenAICompatibleRewriteProvider
 from stable.services.validation import validate_rewrite
 
@@ -456,6 +456,24 @@ class JapaneseCompleteHorseNameTests(TestCase):
         self.assertEqual(false_matches, set())
         self.assertEqual(set(resolution.machine_horse_tags), {"爱丽世界", "夏威夷王"})
 
+    def test_japan_inside_japan_cup_abbreviation_is_not_the_horse_japan(self):
+        self._internal_term("ジャパン", "日出之国")
+
+        race_only = _resolve(
+            "名馬を振り返る",
+            "06年に天皇賞、宝塚記念、ジャパンC、有馬記念を制覇した。",
+            SourceLanguage.JAPANESE,
+        )
+        actual_horse = _resolve(
+            "ジャパンが出走",
+            "ジャパンが次走の重賞に出走する。",
+            SourceLanguage.JAPANESE,
+        )
+
+        self.assertEqual(race_only.machine_horse_tags, [])
+        self.assertTrue(any(item.matched_text == "ジャパン" and item.entity_type == "common_word" for item in race_only.entities))
+        self.assertEqual(actual_horse.machine_horse_tags, ["日出之国"])
+
     def test_katakana_name_before_jockey_role_is_a_person_not_a_horse(self):
         self._internal_term("スミヨン", "苏铭伦")
         self._internal_term("クリストフ", "基斯杜化")
@@ -704,6 +722,66 @@ class ContextualTranslationConsistencyTests(TestCase):
         self.assertNotIn("O'Brien", result.body_zh)
         self.assertIn("岳品贤", result.body_zh)
         self.assertTrue(any(item.get("evidence") == ["person_surname_coreference"] for item in result.metadata["entities"]))
+
+    def test_person_term_placeholder_restores_required_jockey_mapping(self):
+        TermEntry.objects.create(
+            term_type=TermType.JOCKEY,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_ja="Irad Ortiz Jr.",
+            target_zh="奥天信",
+            priority=100,
+        )
+        article = self._article(
+            "Stewards review the incident",
+            "Jockey Irad Ortiz Jr. was knocked off balance while riding Mindframe.",
+        )
+        provider = OpenAICompatibleTranslationProvider(api_key="test", base_url="https://example.com/v1")
+        response = _fake_response(
+            {
+                "title_zh": "裁判复核事故",
+                "body_zh": "骑师__UMA_TERM_1__策骑Mindframe时失去平衡。",
+                "push_summary_zh": "__UMA_TERM_1__在事故中失去平衡。",
+            }
+        )
+
+        with patch.object(provider, "_request_completion", return_value=response) as request:
+            result = provider.translate(article)
+
+        prompt = request.call_args.args[0][1]["content"]
+        self.assertIn("__UMA_TERM_1__", prompt)
+        self.assertIn("奥天信", result.body_zh)
+        self.assertNotIn("__UMA_TERM_", result.body_zh)
+        self.assertEqual(
+            result.metadata["person_term_placeholders"],
+            {"__UMA_TERM_1__": {"source": "Irad Ortiz Jr.", "target": "奥天信"}},
+        )
+
+    def test_person_term_placeholder_loss_rejects_transliterated_name(self):
+        TermEntry.objects.create(
+            term_type=TermType.JOCKEY,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_ja="Irad Ortiz Jr.",
+            target_zh="奥天信",
+            priority=100,
+        )
+        article = self._article(
+            "Stewards review the incident",
+            "Jockey Irad Ortiz Jr. was knocked off balance while riding Mindframe.",
+        )
+        provider = OpenAICompatibleTranslationProvider(api_key="test", base_url="https://example.com/v1")
+        response = _fake_response(
+            {
+                "title_zh": "裁判复核事故",
+                "body_zh": "小伊拉德·奥尔蒂斯策骑Mindframe时失去平衡。",
+                "push_summary_zh": "小伊拉德·奥尔蒂斯在事故中失去平衡。",
+            }
+        )
+
+        with patch.object(provider, "_request_completion", return_value=response):
+            with self.assertRaisesRegex(TranslationResponseError, "required person terms"):
+                provider.translate(article)
 
     def test_fallback_rewrite_does_not_reintroduce_rejected_horse_mapping(self):
         TermEntry.objects.create(
