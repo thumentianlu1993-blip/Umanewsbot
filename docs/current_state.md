@@ -1,5 +1,14 @@
 # 当前状态
 
+## 2026-07-13 权威字段门禁固化与可复现镜像切换
+
+- 权威字段批次门禁源码、测试、OpenSpec 与运行文档已提交为 `df2732c3b8ae47619728c52f54a95204f5d6b574`，历史分支和远端 `main` 同步快进；提交前完整 `stable` 回归 `1136/1136` 通过，1 项按设计跳过，最终代码 review 无待修问题。
+- 生产从干净 detached worktree 构建 `umanewsbot:main-df2732c3-amd64-20260713-1321`，两次构建 image ID 均为 `sha256:27d5d51cbe2ae6d23cb99dc758da01addc2d5935504a950bbb8a2685bce2bf13`；架构 `amd64`，revision `df2732c3...6b574`，Git tree `d2ce464b80ec595f82dc19a531c982429bb639af`，已提交源码归档 SHA-256 `441eb2acb5c061aae5d22671e82ddccfafb2cb08af62711b030c0031354d8d5d`。
+- 切换前停止 beat 并等待 worker active/reserved 清空；外部导入、术语重处理、多地区归属 live lock 均为 0，无 one-off 容器。`.env` 备份为 `.env.backup.main-df2732c3-20260713_132757`；数据库备份 `backups/db/pre-main-df2732c3-20260713_132757.sql.gz` 为 `148455898` bytes，`gzip -t` 通过，SHA-256 `87cc176658cd2e57fa72c703bc1446e1e1930147a875d82cfccab7470d964776`。旧镜像回滚 tag 为 `pre-main-df2732c3-20260713-1327`。
+- 新镜像连接生产数据库执行 migrate 无待迁移，Django check、迁移漂移和新命令 help 均通过；随后重建 `web / worker / beat`。三容器统一使用 `sha256:27d5d51c...bf13`，web healthy，`stable.0029`、64 个模型、历史新命令和静态资源正常。
+- 安全状态保持不变：历史回填/网络常驻开关 false，多地区归属 mode off，相关地区查询、翻译自动重试和失败邮件 false；生产仍为 `145 imported + 150 ready`、2026 年前赛事 `295`、历史 published `0`。本轮没有执行权威字段或详情生产写入。
+- 内外 `/healthz/`、五地区首页筛选、赛事页、马匹页和后台均返回 200。切换后的 `13:30` 自然窗口中 5 个到期来源全部抓取 succeeded，五地区 publish/QQ 窗口全部 succeeded，日本正常发布文章 `8238`；web/worker/beat 日志无 traceback/error/constraint 异常。
+
 ## 2026-07-13 历史源码固化与可复现生产镜像切换
 
 - 历史赛事全部保留能力已提交并推送，分支与远端 `main` 均已快进到 `304ebdb67562e655929d263a3af98b8f17905752`。源码完整 `stable` 回归为 `1128 passed / 1 skipped`，OpenSpec strict、Django check、迁移漂移与 diff check 通过。

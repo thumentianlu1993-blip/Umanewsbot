@@ -1,5 +1,13 @@
 # 部署运行手册
 
+## 2026-07-13 `main@df2732c3` 权威字段门禁镜像切换
+
+- 目标镜像：`umanewsbot:main-df2732c3-amd64-20260713-1321`，image ID `sha256:27d5d51cbe2ae6d23cb99dc758da01addc2d5935504a950bbb8a2685bce2bf13`；两次构建一致，架构 `amd64`，revision `df2732c3b8ae47619728c52f54a95204f5d6b574`，Git tree `d2ce464b80ec595f82dc19a531c982429bb639af`，源码归档 SHA-256 `441eb2acb5c061aae5d22671e82ddccfafb2cb08af62711b030c0031354d8d5d`。
+- 切换前备份：`.env.backup.main-df2732c3-20260713_132757`；数据库 `backups/db/pre-main-df2732c3-20260713_132757.sql.gz`，`148455898` bytes，SHA-256 `87cc176658cd2e57fa72c703bc1446e1e1930147a875d82cfccab7470d964776`，`gzip -t` 通过。旧镜像回滚 tag：`pre-main-df2732c3-20260713-1327`，image ID `sha256:e7ab7af0061d7362ad0582224baffc79eda07bd6d8f6467bfa573f760853877d`。
+- 切换流程：停止 beat，等待 worker active/reserved 清空，核对外部导入/术语重处理/多地区归属 live lock 为 0；新镜像先执行 migrate、Django check 和 migration drift，再强制重建 `web / worker / beat` 并执行 collectstatic。无新增迁移，无生产历史数据写入。
+- 验收：三应用容器 image ID 一致，web healthy，`0029` 和 64 models 正常；新命令 `import_historical_race_event_field_candidates` 可发现。历史写入/网络常驻开关 false，归属 mode off，历史 published 为 0。内外 healthz、五地区首页、赛事/马匹/后台均通过；`13:30` 自然窗口抓取 5/5、发布 5/5、QQ 5/5 succeeded，日志无异常。
+- 回滚：停止 beat 并排空 worker，把 `pre-main-df2732c3-20260713-1327` retag 为 `prod`，只重建 `web / worker / beat`。本次无数据库迁移，通常不恢复数据库；仅在后续字段写入造成确认的数据损坏时使用备份。
+
 ## 2026-07-13 `main@304ebdb6` 可复现镜像切换
 
 - 目标镜像：`umanewsbot:main-304ebdb6-amd64-20260713-1230`，image ID `sha256:e7ab7af0061d7362ad0582224baffc79eda07bd6d8f6467bfa573f760853877d`，revision `304ebdb67562e655929d263a3af98b8f17905752`，Git tree `5dfef5c7d219e63cd0b156071c89508cb42543ce`，context SHA-256 `a77a271cde3d0d06e25f9075036de5fc99415e832f2da052c84bf40bf956a7b5`。两次构建 image ID 一致。
