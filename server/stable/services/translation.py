@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass
 
@@ -150,6 +151,10 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
     def _count_sentences(text: str) -> int:
         return sum(text.count(char) for char in "。！？!?；;")
 
+    @staticmethod
+    def _count_nonempty_lines(text: str) -> int:
+        return sum(1 for line in (text or "").splitlines() if line.strip())
+
     def _ends_with_complete_sentence(self, text: str) -> bool:
         stripped = (text or "").rstrip()
         if not stripped:
@@ -171,12 +176,18 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         target_sentence_count = self._count_sentences(target)
         source_list_count = len(self._LIST_MARKER_RE.findall(source))
         target_list_count = len(self._LIST_MARKER_RE.findall(target))
+        source_line_count = self._count_nonempty_lines(source)
+        target_line_count = self._count_nonempty_lines(target)
+        has_line_coverage = source_line_count >= 5 and target_line_count >= max(
+            4,
+            math.ceil(source_line_count * 0.8),
+        )
 
         if self._ends_with_complete_sentence(source) and not self._ends_with_complete_sentence(target):
             return True
         if source_list_count >= 2 and target_list_count < source_list_count:
             return True
-        if len(source) >= 600 and len(target) < max(320, int(len(source) * 0.58)):
+        if len(source) >= 600 and len(target) < max(320, int(len(source) * 0.58)) and not has_line_coverage:
             if target_sentence_count < max(4, int(source_sentence_count * 0.7)):
                 return True
         return False

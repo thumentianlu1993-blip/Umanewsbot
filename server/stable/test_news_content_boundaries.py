@@ -26,6 +26,7 @@ from stable.models import (
     SourceSite,
     WorkflowStatus,
 )
+from stable.services.translation import OpenAICompatibleTranslationProvider
 from stable.tasks import translate_article_task
 
 
@@ -86,6 +87,52 @@ class InternationalNewsContentBoundaryTests(TestCase):
         self.assertNotIn("gambling problem", detail.body_ja_raw)
         self.assertGreaterEqual(detail.metadata["body_cleaning"]["removed_count"], 3)
         self.assertIn("betting_promotion", detail.metadata["body_cleaning"]["removed_rules"])
+
+    def test_schedule_translation_line_coverage_is_not_mistaken_for_truncation(self):
+        provider = OpenAICompatibleTranslationProvider(api_key="test", base_url="https://example.com/v1")
+        source = "\n\n".join(
+            [
+                "The festival returns this week.",
+                "The programme runs for nine days.",
+                "Full list of racecourses and dates",
+                *[
+                    f"Friday July {day} - Racecourse {day} family programme with live music and a full afternoon card"
+                    for day in range(17, 27)
+                ],
+            ]
+        )
+        complete = "\n".join(
+            [
+                "赛马节本周回归，活动为期九天。",
+                "完整赛马场及日期列表：",
+                *[f"7月{day}日周五 - 第{day}赛马场" for day in range(17, 27)],
+            ]
+        )
+
+        self.assertFalse(provider._looks_incomplete(source, complete))
+
+    def test_schedule_translation_missing_tail_lines_is_still_incomplete(self):
+        provider = OpenAICompatibleTranslationProvider(api_key="test", base_url="https://example.com/v1")
+        source = "\n\n".join(
+            [
+                "The festival returns this week.",
+                "The programme runs for nine days.",
+                "Full list of racecourses and dates",
+                *[
+                    f"Friday July {day} - Racecourse {day} family programme with live music and a full afternoon card"
+                    for day in range(17, 27)
+                ],
+            ]
+        )
+        truncated = "\n".join(
+            [
+                "赛马节本周回归。",
+                "完整赛马场及日期列表：",
+                *[f"7月{day}日周五 - 第{day}赛马场" for day in range(17, 21)],
+            ]
+        )
+
+        self.assertTrue(provider._looks_incomplete(source, truncated))
 
     def test_sporting_life_minified_sibling_blocks_are_cleaned_independently(self):
         detail = SportingLifeAdapter().parse_detail_html(
