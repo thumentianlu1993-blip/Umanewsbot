@@ -150,6 +150,10 @@
 | TC-ART-013 | 非 staff/匿名用户 | 访问总账后台 URL | 302 登录或 403，不泄露 artifact 路径 | A |
 | TC-ART-014 | commit、mapping、permanent approval、publication | 检查日志 | OperationLog/TaskExecutionLog 绑定 SHA、范围、操作者、结果 | A |
 | TC-ART-015 | 日志输入含环境变量/整页 HTML | 检查日志 | 不保存秘密、整页原件或完整敏感响应 | A |
+| TC-ART-016 | ready目标发现补充详情直链 | 生成detail-source artifact | 复制并绑定当前target/inventory SHA、URL和source-cache字节身份 | A/S |
+| TC-ART-017 | detail-source审批后修改候选或缓存一个字节 | check/commit | manifest校验失败，target/event零写入 | A/S |
+| TC-ART-018 | detail-source审批后target来源变化 | commit | target SHA漂移整批阻断，无成功日志 | A/S |
+| TC-ART-019 | 同一详情URL出现不同缓存正文 | package | source URL/size/SHA任一不同均拒绝，不以同URL替换capture | A/F |
 
 ## 8. 五地区历史目录与 timeline adapter
 
@@ -194,6 +198,8 @@
 | TC-BATCH-012 | candidate 超出应到 | coverage | unexpected candidate blocker | A |
 | TC-BATCH-013 | source URL/provenance 缺失 | coverage | blocker，不生成 apply scope | A |
 | TC-BATCH-014 | 2016–2025 完成后 | 生成下一年代 | 可进入 2006–2015；不得跳过未 accounted 的当前年代缺口报告 | A/O |
+| TC-BATCH-015 | 2016–2025含五地区pending目标 | 生成标准批次 | 每地区最多50个，按新到旧稳定选择，只包含pending未materialize due目标 | A/O |
+| TC-BATCH-016 | 空批次、重复target、年代外或inventory SHA漂移 | 生成artifact | fail closed，不生成可批准清单 | A/S |
 
 ## 10. 详情导入、冠军和原子写入
 
@@ -217,6 +223,14 @@
 | TC-IMPORT-016 | 同一 artifact 重跑 | apply | 幂等，无重复行和重复日志副作用 | A |
 | TC-IMPORT-017 | raw payload 含整页 HTML/PDF bytes | 标准化/apply | 拒绝或剥离整页内容，只留结构化行和 cache identity | A |
 | TC-IMPORT-018 | importer 收到错误 expected SHA | apply | 写入前失败，所有正式表零变化 | A/S |
+| TC-IMPORT-019 | IrishRacing 英法备用详情页 | parse/package | 仅产生 actual runners/results，马号与闸位分离，赛事身份不符时拒绝 | A |
+| TC-IMPORT-020 | 法国 target 使用 uk_irishracing provider | artifact build | 地区不匹配并 fail closed | A/S |
+| TC-IMPORT-021 | IrishRacing 赛果有并列名次 | parse/apply | 存储顺序唯一，official_finish_position 保留官方并列位次 | A |
+| TC-IMPORT-022 | Equibase standard PDF含空格表头和`1a`联合投注编号 | parse/package | 完整保留所有实际出走，runners按马号、results按官方顺序 | A/F |
+| TC-IMPORT-023 | Equibase PDF页眉日期、赛场或场次与target不符 | parse/package | fail closed，不生成可写入候选 | A/F |
+| TC-IMPORT-024 | JRA英文年度表与日文官方结果表 | source discovery | 以日期/赛场唯一对齐官方单场结果，歧义不猜测 | A/F |
+| TC-IMPORT-025 | 美国同名赛事或Belmont工程期移师 | TOBA discovery | 先按赛事名和场地区分；年度表名称唯一时允许记录实际移师场地 | A/F |
+| TC-IMPORT-026 | Equibase Yearbook含实际出赛与退赛 | 离线解析 | runners按马号含退赛，results仅含实际出赛并按官方名次 | A/F |
 
 ## 11. 公开页面、后台、搜索和 sitemap
 

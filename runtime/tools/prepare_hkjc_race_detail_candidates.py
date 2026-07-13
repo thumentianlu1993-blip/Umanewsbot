@@ -8,9 +8,9 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
-from urllib.request import Request, urlopen
 
 from race_event_request_budget import before_network_request
+from race_event_safe_http import fetch_https, validate_https_url
 from race_event_source_cache import write_source_cache_text
 
 from bs4 import BeautifulSoup
@@ -22,7 +22,7 @@ except ImportError:  # pragma: no cover - local fallback for environments withou
 
 
 COUNTRY_SUFFIX_RE = re.compile(r"\s*[\(\（][A-Z]{2,3}[\)\）]\s*$")
-HKJC_HORSE_CODE_RE = re.compile(r"\s*[\(\（][A-Z]\d{3}[\)\）]\s*$")
+HKJC_HORSE_CODE_RE = re.compile(r"\s*[\(\（][A-Z]{1,2}\d{3}[\)\）]\s*$")
 RACE_NO_RE = re.compile(r"第\s*(\d+)\s*場")
 REPLAY_NO_RE = re.compile(r"[?&]no=(\d+)")
 FINISH_POSITION_RE = re.compile(r"^(\d+)")
@@ -62,20 +62,21 @@ def _normalize_title(value: str) -> str:
 
 
 def _download(url: str, path: Path, *, allow_network: bool, timeout: int) -> str:
+    validate_https_url(url, allowed_hosts=("hkjc.com",))
     if path.exists():
         return path.read_text(encoding="utf-8", errors="replace")
     if not allow_network:
         raise RuntimeError(f"缺少缓存且未允许网络请求：{path}")
-    request = Request(
+    before_network_request(url)
+    body, _response = fetch_https(
         url,
+        allowed_hosts=("hkjc.com",),
+        timeout=timeout,
         headers={
             "User-Agent": "UmaFansBot/1.0",
             "Accept-Language": "zh-HK,zh;q=0.9,en;q=0.8",
         },
     )
-    before_network_request(url)
-    with urlopen(request, timeout=timeout) as response:
-        body = response.read()
     text = body.decode("utf-8", errors="replace")
     write_source_cache_text(path, text, source_url=url)
     return text
@@ -105,6 +106,17 @@ def _source_filename(url: str) -> str:
 def _read_events(csv_path: Path) -> list[dict]:
     with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
         return list(csv.DictReader(handle))
+
+
+def _approved_result_url(event: dict, *, provider: str) -> str:
+    try:
+        source_refs = json.loads(event.get("source_refs") or "{}")
+    except (TypeError, json.JSONDecodeError):
+        return ""
+    evidence = (((source_refs.get("detail_discovery") or {}).get("urls") or {}).get("result_url") or {})
+    if evidence.get("source_provider") != provider:
+        return ""
+    return str(evidence.get("url") or "").strip()
 
 
 def _extract_race_title(block) -> str:
@@ -262,8 +274,12 @@ def _parse_local_result_page(html: str, *, source_url: str, race_no: str, race_t
     rows: list[dict] = []
     for index, tr in enumerate(result_table.select("tr")[1:], start=1):
         cells = [_text(cell) for cell in tr.find_all(["td", "th"], recursive=False)]
-        if len(cells) < 12:
+        if len(cells) < 11:
             continue
+        legacy_layout = len(cells) == 11
+        running_positions = "" if legacy_layout else cells[9]
+        finish_time = cells[9] if legacy_layout else cells[10]
+        odds_value = cells[10] if legacy_layout else cells[11]
         horse_name_hant = _strip_country_suffix(cells[2])
         if not horse_name_hant:
             continue
@@ -282,7 +298,7 @@ def _parse_local_result_page(html: str, *, source_url: str, race_no: str, race_t
             "jockey_name_hant": cells[3],
             "trainer_name_hant": cells[4],
             "body_weight": cells[6],
-            "running_positions": cells[9],
+            "running_positions": running_positions,
         }
         row = {
             "sort_order": index,
@@ -295,8 +311,8 @@ def _parse_local_result_page(html: str, *, source_url: str, race_no: str, race_t
             "carried_weight": cells[5],
             "barrier": cells[7],
             "margin": _to_simplified(margin_hant, converter),
-            "finish_time": cells[10],
-            "odds_value": cells[11],
+            "finish_time": finish_time,
+            "odds_value": odds_value,
             "running_status": _runner_status_from_finish_text(cells[0]),
             "source_refs": source_refs,
         }
@@ -393,42 +409,57 @@ def prepare_candidates(args) -> dict:
             try:
                 source_refs = json.loads(event.get("source_refs") or "{}")
                 result_source = source_refs.get("result_source") or ""
-                result_title = source_refs.get("result_title") or ""
-                if not result_source or not result_title:
-                    summary["skipped"].append({"slug": event["slug"], "reason": "missing_result_source_or_title"})
-                    continue
-                if result_source not in page_cache:
-                    html = _download(
-                        result_source,
-                        source_dir / _source_filename(result_source),
+                result_title = source_refs.get("result_title") or event.get("original_name") or ""
+                approved_url = _approved_result_url(event, provider="hkjc")
+                if approved_url:
+                    race_no = str((parse_qs(urlparse(approved_url).query).get("RaceNo") or [""])[0]).strip()
+                    if not race_no:
+                        raise RuntimeError(f"HKJC approved result URL has no RaceNo: {event['slug']}")
+                    local_url = _localresults_url(approved_url, race_no)
+                    local_html = _download(
+                        local_url,
+                        source_dir / _source_filename(local_url),
                         allow_network=args.allow_network,
                         timeout=args.timeout_seconds,
                     )
-                    page_cache[result_source] = _parse_results_all_page(html, source_url=result_source, converter=converter)
                     summary["source_pages"] += 1
-                title_key = _normalize_title(result_title)
-                parsed = page_cache[result_source].get(title_key)
-                if parsed is None:
-                    available_titles = [race["race_title_hant"] for race in page_cache[result_source].values()]
-                    summary["errors"].append(
-                        {
-                            "slug": event["slug"],
-                            "result_source": result_source,
-                            "result_title": result_title,
-                            "reason": "result_title_not_found",
-                            "available_titles": available_titles,
-                        }
+                    parsed = {"race_no": race_no, "race_title_hant": result_title}
+                else:
+                    if not result_source or not result_title:
+                        summary["skipped"].append({"slug": event["slug"], "reason": "missing_result_source_or_title"})
+                        continue
+                    if result_source not in page_cache:
+                        html = _download(
+                            result_source,
+                            source_dir / _source_filename(result_source),
+                            allow_network=args.allow_network,
+                            timeout=args.timeout_seconds,
+                        )
+                        page_cache[result_source] = _parse_results_all_page(html, source_url=result_source, converter=converter)
+                        summary["source_pages"] += 1
+                    title_key = _normalize_title(result_title)
+                    parsed = page_cache[result_source].get(title_key)
+                    if parsed is None:
+                        available_titles = [race["race_title_hant"] for race in page_cache[result_source].values()]
+                        summary["errors"].append(
+                            {
+                                "slug": event["slug"],
+                                "result_source": result_source,
+                                "result_title": result_title,
+                                "reason": "result_title_not_found",
+                                "available_titles": available_titles,
+                            }
+                        )
+                        if args.fail_fast:
+                            raise RuntimeError(f"HKJC result title not found: {event['slug']} {result_title}")
+                        continue
+                    local_url = _localresults_url(result_source, parsed["race_no"])
+                    local_html = _download(
+                        local_url,
+                        source_dir / _source_filename(local_url),
+                        allow_network=args.allow_network,
+                        timeout=args.timeout_seconds,
                     )
-                    if args.fail_fast:
-                        raise RuntimeError(f"HKJC result title not found: {event['slug']} {result_title}")
-                    continue
-                local_url = _localresults_url(result_source, parsed["race_no"])
-                local_html = _download(
-                    local_url,
-                    source_dir / _source_filename(local_url),
-                    allow_network=args.allow_network,
-                    timeout=args.timeout_seconds,
-                )
                 runners, results, local_metadata = _parse_local_result_page(
                     local_html,
                     source_url=local_url,

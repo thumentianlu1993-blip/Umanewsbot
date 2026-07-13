@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -26,6 +27,28 @@ def _load_budget_module():
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)
+    return module
+
+
+def _load_safe_http_module():
+    path = Path(__file__).resolve().parents[2] / "runtime" / "tools" / "race_event_safe_http.py"
+    spec = importlib.util.spec_from_file_location("race_event_safe_http_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_date_source_cache_module():
+    path = Path(__file__).resolve().parents[2] / "runtime" / "tools" / "cache_historical_race_date_sources.py"
+    spec = importlib.util.spec_from_file_location("historical_date_source_cache_under_test", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.path.insert(0, str(path.parent))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.pop(0)
     return module
 
 
@@ -231,3 +254,168 @@ class RaceEventSourceCacheTests(SimpleTestCase):
 
         self.assertEqual(sum(outcomes), 10)
         self.assertEqual(state["request_count"], 10)
+
+
+class RaceEventSafeHttpTests(SimpleTestCase):
+    def setUp(self):
+        self.module = _load_safe_http_module()
+
+    def test_rejects_non_https_private_and_unapproved_initial_urls(self):
+        for url in (
+            "http://www.racingpost.com/results/1",
+            "https://127.0.0.1/results/1",
+            "https://metadata.google.internal/results/1",
+            "https://attacker.example/results/1",
+        ):
+            with self.subTest(url=url), self.assertRaises(self.module.SafeHttpError):
+                self.module.validate_https_url(url, allowed_hosts=("racingpost.com",))
+
+    def test_redirect_handler_rejects_unapproved_redirect_before_following_it(self):
+        handler = self.module.ValidatingRedirectHandler(("racingpost.com",))
+        request = self.module.Request("https://www.racingpost.com/results/1")
+
+        with self.assertRaisesMessage(self.module.SafeHttpError, "outside allowlist"):
+            handler.redirect_request(
+                request,
+                None,
+                302,
+                "Found",
+                {},
+                "https://attacker.example/collect",
+            )
+
+    def test_fetch_rejects_unapproved_final_url(self):
+        response = type(
+            "Response",
+            (),
+            {
+                "read": lambda self: b"body",
+                "geturl": lambda self: "https://attacker.example/final",
+                "status": 200,
+                "headers": {},
+                "__enter__": lambda self: self,
+                "__exit__": lambda self, *args: None,
+            },
+        )()
+        opener = type("Opener", (), {"open": lambda self, request, timeout: response})()
+
+        with patch.object(self.module, "build_opener", return_value=opener):
+            with self.assertRaisesMessage(self.module.SafeHttpError, "outside allowlist"):
+                self.module.fetch_https(
+                    "https://www.racingpost.com/results/1",
+                    allowed_hosts=("racingpost.com",),
+                    timeout=10,
+                )
+
+
+class HistoricalRaceDateSourceCacheTests(SimpleTestCase):
+    def setUp(self):
+        self.module = _load_date_source_cache_module()
+
+    def test_network_requires_cli_and_both_historical_switches(self):
+        enabled = {
+            "HISTORICAL_RACE_BACKFILL_ENABLED": "true",
+            "HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK": "true",
+        }
+        self.module.require_network_gates(allow_network=True, environ=enabled)
+
+        for allow_network, environ in (
+            (False, enabled),
+            (True, {**enabled, "HISTORICAL_RACE_BACKFILL_ENABLED": "false"}),
+            (True, {**enabled, "HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK": "false"}),
+        ):
+            with self.subTest(allow_network=allow_network, environ=environ):
+                with self.assertRaises(self.module.DateSourceCacheError):
+                    self.module.require_network_gates(allow_network=allow_network, environ=environ)
+
+    def test_cache_deduplicates_urls_and_preserves_all_target_references(self):
+        rows = [
+            {
+                "adapter_key": "france_galop",
+                "series_key": "arc",
+                "edition_year": 2000,
+                "urls": {"result_url": {"url": "https://www.france-galop.com/history"}},
+            },
+            {
+                "adapter_key": "france_galop",
+                "series_key": "arc",
+                "edition_year": 2012,
+                "urls": {"result_url": {"url": "https://www.france-galop.com/history"}},
+            },
+        ]
+        identity = {"path": "france_galop/source.html", "sha256": "a" * 64, "size": 4}
+        with TemporaryDirectory() as tmp, patch.object(
+            self.module, "before_network_request"
+        ) as budget, patch.object(
+            self.module,
+            "fetch_https",
+            return_value=(b"body", {"status": 200, "final_url": rows[0]["urls"]["result_url"]["url"], "redirect_chain": []}),
+        ) as fetch, patch.object(
+            self.module, "write_source_cache", return_value=identity
+        ) as cache:
+            result = self.module.cache_provider_rows(rows, output_root=Path(tmp), timeout=10)
+
+        budget.assert_called_once_with("https://www.france-galop.com/history")
+        fetch.assert_called_once()
+        cache.assert_called_once()
+        self.assertEqual(result["request_count"], 1)
+        self.assertEqual(result["failure_count"], 0)
+        self.assertEqual(len(result["request_ledger"][0]["target_references"]), 2)
+
+    def test_pdf_url_rejects_http_200_antibot_html(self):
+        with self.assertRaisesMessage(self.module.DateSourceCacheError, "not a PDF"):
+            self.module.validate_source_body(
+                "https://www.equibase.com/static/chart/pdf/CD102900USA9.pdf",
+                b"<!doctype html><title>Pardon Our Interruption</title>",
+                {"content-type": "text/html; charset=UTF-8"},
+            )
+
+    def test_equibase_pdf_cfm_rejects_http_200_incapsula_html(self):
+        with self.assertRaisesMessage(self.module.DateSourceCacheError, "not a PDF"):
+            self.module.validate_source_body(
+                "https://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=9&TID=CD",
+                b'<html><p>To regain access, enable JavaScript.</p><img src="/_Incapsula_Resource">',
+                {"content-type": "text/html; charset=UTF-8"},
+            )
+
+    def test_html_url_rejects_known_antibot_page(self):
+        with self.assertRaisesMessage(self.module.DateSourceCacheError, "anti-bot"):
+            self.module.validate_source_body(
+                "https://www.racingpost.com/results/1",
+                b"<html><title>Access Denied</title></html>",
+                {"content-type": "text/html"},
+            )
+
+    def test_irishracing_http_200_unavailable_page_is_rejected(self):
+        with self.assertRaisesMessage(self.module.DateSourceCacheError, "unavailable"):
+            self.module.validate_source_body(
+                "https://www.irishracing.com/raceresults/Sun-29th-Oct-2000/ChurchillDowns/1600",
+                b"<html><title>Information Not Available</title></html>",
+                {"content-type": "text/html"},
+            )
+
+    def test_failed_content_validation_preserves_response_metadata_in_ledger(self):
+        row = {
+            "adapter_key": "equibase",
+            "series_key": "ack-ack",
+            "edition_year": 2025,
+            "urls": {"result_url": {"url": "https://www.equibase.com/static/chart/pdf/fixture.pdf"}},
+        }
+        response = {
+            "status": 200,
+            "final_url": row["urls"]["result_url"]["url"],
+            "redirect_chain": ["https://www.equibase.com/static/chart/pdf/fixture.pdf"],
+            "headers": {"content-type": "text/html"},
+        }
+        with TemporaryDirectory() as tmp, patch.object(
+            self.module, "before_network_request"
+        ), patch.object(
+            self.module, "fetch_https", return_value=(b"<html>blocked</html>", response)
+        ):
+            result = self.module.cache_provider_rows([row], output_root=Path(tmp), timeout=10)
+
+        failed = result["request_ledger"][0]
+        self.assertEqual(failed["status"], "failed")
+        self.assertEqual(failed["http_status"], 200)
+        self.assertEqual(failed["final_url"], response["final_url"])
+        self.assertEqual(failed["redirect_chain"], response["redirect_chain"])

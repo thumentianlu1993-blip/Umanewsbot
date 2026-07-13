@@ -9,10 +9,10 @@ import time
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
-from urllib.parse import urljoin
-from urllib.request import Request, urlopen
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from race_event_request_budget import before_network_request
+from race_event_safe_http import SafeHttpError, fetch_https, validate_https_url
 from race_event_source_cache import write_source_cache_text
 
 from bs4 import BeautifulSoup
@@ -33,6 +33,12 @@ def _collapse(value: str) -> str:
 
 
 def _norm(value: str) -> str:
+    for compact, expanded in (
+        ("HANDICAPCHASE", " HANDICAP CHASE "),
+        ("HANDICAPHURDLE", " HANDICAP HURDLE "),
+        ("GOLDCUP", " GOLD CUP "),
+    ):
+        value = re.sub(compact, expanded, value or "", flags=re.IGNORECASE)
     value = (value or "").lower().replace("&", " and ")
     value = re.sub(r"[()']", " ", value)
     value = re.sub(r"\bregistered as\b", " ", value)
@@ -65,6 +71,26 @@ TOKEN_STOPWORDS = {
     "registered",
     "sponsored",
     "the",
+}
+
+SPORTING_LIFE_SERIES_ALIASES = {
+    "GBR_AINTREE_BRIDLE_ROAD_HANDICAP_HURDLE": ("William Hill Top Price Guarantee Handicap Hurdle",),
+    "GBR_ASCOT_BETFAIR_EXCHANGE_TROPHY_HANDICAP_HURDLE": ("Ascot Rotary Club Festive Handicap Hurdle",),
+    "GBR_ASCOT_HURST_PARK_HANDICAP_CHASE": ("Grundon Waste Management Handicap Chase",),
+    "GBR_CHELTENHAM_COUNTDOWN_PODCAST_HANDICAP_CHASE": ("Betfair Exchange Handicap Chase",),
+    "GBR_CHELTENHAM_DECEMBER_GOLD_CUP": ("December Gold Cup Handicap Chase",),
+    "GBR_CHELTENHAM_NOVEMBER_LONG_DISTANCE_HANDICAP_CHASE": ("Oddschecker Handicap Chase",),
+    "GBR_WINCANTON_BADGER_BEERS_HANDICAP_CHASE": ("64th Badger Beers Handicap Chase",),
+    "united-kingdom-1965-stp": ("Ladbrokes 1965 Chase",),
+    "united-kingdom-abernant": ("Abernant Stakes",),
+    "united-kingdom-april-mares-novices-stp": ("Aston Martin Mares Novices Handicap Chase",),
+    "united-kingdom-atalanta": ("Atalanta Stakes",),
+    "united-kingdom-becher-stp": ("Becher Handicap Chase",),
+    "united-kingdom-bowl-stp": (
+        "Brooklands Golden Miller Chronograph Bowl Chase",
+        "Aintree Bowl Chase",
+        "Bowl Chase",
+    ),
 }
 
 
@@ -106,16 +132,20 @@ def _strip_country_suffix(value: str) -> str:
 
 
 def _download(url: str, path: Path, *, allow_network: bool, timeout: int, sleep_seconds: float) -> str:
+    validate_https_url(url, allowed_hosts=("sportinglife.com",))
     if path.exists():
         return path.read_text(encoding="utf-8", errors="replace")
     if not allow_network:
         raise RuntimeError(f"缺少缓存且未允许网络请求：{path}")
     if sleep_seconds > 0:
         time.sleep(sleep_seconds)
-    request = Request(url, headers={"User-Agent": "umanewsbot/1.0 (+https://umafans.run; low-frequency race detail import)"})
     before_network_request(url)
-    with urlopen(request, timeout=timeout) as response:
-        body = response.read()
+    body, _response = fetch_https(
+        url,
+        allowed_hosts=("sportinglife.com",),
+        timeout=timeout,
+        headers={"User-Agent": "umanewsbot/1.0 (+https://umafans.run; low-frequency race detail import)"},
+    )
     text = body.decode("utf-8", errors="replace")
     write_source_cache_text(path, text, source_url=url)
     return text
@@ -149,6 +179,45 @@ def _read_events(paths: list[Path]) -> list[dict]:
                 if row.get("status") == "finished":
                     events.append(row)
     return events
+
+
+def _approved_result_url(event: dict, *, provider: str) -> str:
+    try:
+        source_refs = json.loads(event.get("source_refs") or "{}")
+    except (TypeError, json.JSONDecodeError):
+        return ""
+    evidence = (((source_refs.get("detail_discovery") or {}).get("urls") or {}).get("result_url") or {})
+    if evidence.get("source_provider") != provider:
+        return ""
+    return str(evidence.get("url") or "").strip()
+
+
+def _event_match_names(event: dict) -> list[str]:
+    names = [str(event.get("original_name") or "").strip()]
+    try:
+        source_refs = json.loads(event.get("source_refs") or "{}")
+    except (TypeError, json.JSONDecodeError):
+        source_refs = {}
+    calendar_name = str((source_refs.get("calendar_discovery") or {}).get("race_name") or "").strip()
+    if calendar_name:
+        names.append(calendar_name)
+    slug = str(event.get("slug") or "")
+    for series_key, aliases in SPORTING_LIFE_SERIES_ALIASES.items():
+        if series_key.casefold() in slug.casefold():
+            names.extend(aliases)
+    return list(dict.fromkeys(name for name in names if name))
+
+
+def _claim_detail_url(claims: dict[str, str], *, detail_url: str, slug: str) -> None:
+    parts = urlsplit(detail_url)
+    claim_key = urlunsplit((parts.scheme, parts.netloc, parts.path, parts.query, ""))
+    previous_slug = claims.get(claim_key)
+    if previous_slug and previous_slug != slug:
+        raise RuntimeError(
+            f"Sporting Life detail URL already assigned to another target: "
+            f"{detail_url} ({previous_slug}, {slug})"
+        )
+    claims[claim_key] = slug
 
 
 def _course_match(event_course: str, sl_course: str) -> bool:
@@ -193,7 +262,8 @@ def _summary_races(date_html: str) -> tuple[list[dict], dict[int, str]]:
 
 
 def _find_race_summary(event: dict, races: list[dict]) -> dict | None:
-    event_keys = _event_match_keys(event["original_name"])
+    event_names = _event_match_names(event)
+    event_keys = list(dict.fromkeys(key for name in event_names for key in _event_match_keys(name)))
     candidates = [
         race
         for race in races
@@ -203,8 +273,9 @@ def _find_race_summary(event: dict, races: list[dict]) -> dict | None:
         race_key = _norm(race.get("name") or "")
         if any(key and (key in race_key or race_key in key) for key in event_keys):
             return race
-    event_tokens = _name_tokens(event["original_name"])
-    if not event_tokens:
+    event_variants = [(_name_tokens(name), _norm(name)) for name in event_names]
+    event_variants = [(tokens, key) for tokens, key in event_variants if tokens]
+    if not event_variants:
         return None
     grade = (event.get("normalized_grade") or "").upper()
     scored = []
@@ -213,15 +284,19 @@ def _find_race_summary(event: dict, races: list[dict]) -> dict | None:
         if grade and grade not in race_name.upper().replace("GRADE ", "G").replace("GROUP ", "G"):
             continue
         race_tokens = _name_tokens(race_name)
-        overlap = len(event_tokens & race_tokens)
-        if overlap < min(2, len(event_tokens)):
-            continue
-        event_key = event_keys[0] if event_keys else _norm(event["original_name"])
         race_key = _norm(race_name)
-        ratio = SequenceMatcher(None, event_key, race_key).ratio()
-        coverage = overlap / max(len(event_tokens), 1)
-        race_coverage = overlap / max(len(race_tokens), 1)
-        scored.append((coverage * 0.45 + race_coverage * 0.35 + ratio * 0.2, overlap, ratio, race))
+        variant_scores = []
+        for event_tokens, event_key in event_variants:
+            overlap = len(event_tokens & race_tokens)
+            if overlap < min(2, len(event_tokens)):
+                continue
+            ratio = SequenceMatcher(None, event_key, race_key).ratio()
+            coverage = overlap / max(len(event_tokens), 1)
+            race_coverage = overlap / max(len(race_tokens), 1)
+            variant_scores.append((coverage * 0.45 + race_coverage * 0.35 + ratio * 0.2, overlap, ratio))
+        if variant_scores:
+            score, overlap, ratio = max(variant_scores)
+            scored.append((score, overlap, ratio, race))
     scored.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
     if scored and scored[0][0] >= 0.42:
         return scored[0][3]
@@ -358,6 +433,7 @@ def prepare_candidates(args) -> dict:
         "errors": [],
     }
     date_cache: dict[str, tuple[list[dict], dict[int, str]]] = {}
+    detail_url_claims: dict[str, str] = {}
     review_rows = []
     with jsonl_path.open("w", encoding="utf-8") as jsonl:
         for event in events:
@@ -366,30 +442,37 @@ def prepare_candidates(args) -> dict:
                 summary["skipped"].append({"slug": event["slug"], "reason": "missing_date"})
                 continue
             try:
-                if race_date not in date_cache:
-                    date_url = f"{SL_BASE_URL}/racing/results/{race_date}"
-                    date_html = _download(
-                        date_url,
-                        source_dir / _source_filename("source_sl_results", race_date),
-                        allow_network=args.allow_network,
-                        timeout=args.timeout_seconds,
-                        sleep_seconds=args.sleep_seconds,
-                    )
-                    date_cache[race_date] = _summary_races(date_html)
-                    summary["date_pages"] += 1
-                races, urls = date_cache[race_date]
-                race_summary = _find_race_summary(event, races)
-                if race_summary is None:
-                    summary["skipped"].append({"slug": event["slug"], "reason": "race_not_found", "date": race_date, "racecourse": event.get("racecourse"), "name": event.get("original_name")})
-                    continue
-                race_id = int((race_summary.get("race_summary_reference") or {}).get("id") or 0)
-                detail_url = urls.get(race_id)
+                detail_url = _approved_result_url(event, provider="uk_sportinglife")
+                race_id = 0
                 if not detail_url:
-                    detail_url = (
-                        f"{SL_BASE_URL}/racing/results/{race_date}/"
-                        f"{_slugify(race_summary.get('course_name') or event.get('racecourse') or '')}/"
-                        f"{race_id}/{_slugify(race_summary.get('name') or event.get('original_name') or '')}"
-                    )
+                    if race_date not in date_cache:
+                        date_url = f"{SL_BASE_URL}/racing/results/{race_date}"
+                        date_html = _download(
+                            date_url,
+                            source_dir / _source_filename("source_sl_results", race_date),
+                            allow_network=args.allow_network,
+                            timeout=args.timeout_seconds,
+                            sleep_seconds=args.sleep_seconds,
+                        )
+                        date_cache[race_date] = _summary_races(date_html)
+                        summary["date_pages"] += 1
+                    races, urls = date_cache[race_date]
+                    race_summary = _find_race_summary(event, races)
+                    if race_summary is None:
+                        summary["skipped"].append({"slug": event["slug"], "reason": "race_not_found", "date": race_date, "racecourse": event.get("racecourse"), "name": event.get("original_name")})
+                        continue
+                    race_id = int((race_summary.get("race_summary_reference") or {}).get("id") or 0)
+                    detail_url = urls.get(race_id)
+                    if not detail_url:
+                        detail_url = (
+                            f"{SL_BASE_URL}/racing/results/{race_date}/"
+                            f"{_slugify(race_summary.get('course_name') or event.get('racecourse') or '')}/"
+                            f"{race_id}/{_slugify(race_summary.get('name') or event.get('original_name') or '')}"
+                        )
+                if not race_id:
+                    match = re.search(r"/racing/results/\d{4}-\d{2}-\d{2}/[^/]+/(\d+)/", detail_url)
+                    race_id = int(match.group(1)) if match else 0
+                _claim_detail_url(detail_url_claims, detail_url=detail_url, slug=event["slug"])
                 detail_html = _download(
                     detail_url,
                     source_dir / _source_filename("source_sl_detail", str(race_id)),

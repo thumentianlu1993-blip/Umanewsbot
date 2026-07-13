@@ -184,6 +184,10 @@ def validate_historical_target_candidate(
     result_items = results_payload.get("items")
     if not results_payload.get("is_complete") or not isinstance(result_items, list) or not result_items:
         raise InventoryValidationError("held historical target requires complete results")
+    finish_positions = [item.get("finish_position") for item in result_items]
+    populated_positions = [value for value in finish_positions if value not in (None, "")]
+    if len(populated_positions) != len(set(populated_positions)):
+        raise InventoryValidationError("complete results contain duplicate finish_position")
     runners_payload = modules.get(RaceEventModule.RUNNERS) or {}
     runner_items = runners_payload.get("items") if isinstance(runners_payload.get("items"), list) else []
     if not runner_items:
@@ -196,6 +200,10 @@ def validate_historical_target_candidate(
         }
     elif not runners_payload.get("is_complete"):
         raise InventoryValidationError("held historical target requires complete runners")
+    horse_numbers = [str(item.get("horse_number") or "").strip() for item in runner_items]
+    populated_numbers = [value for value in horse_numbers if value]
+    if len(populated_numbers) != len(set(populated_numbers)):
+        raise InventoryValidationError("complete runners contain duplicate horse_number")
     normalized = {
         RaceEventModule.RUNNERS: runners_payload,
         RaceEventModule.RESULTS: results_payload,
@@ -217,7 +225,7 @@ def apply_historical_target_candidate(
     with transaction.atomic():
         target = (
             HistoricalRaceEventTarget.objects.select_for_update()
-            .select_related("race_series", "event")
+            .select_related("race_series")
             .get(pk=target_id)
         )
         normalized_modules = validate_historical_target_candidate(
@@ -310,7 +318,7 @@ def apply_historical_champion_supplement(
     with transaction.atomic():
         target = (
             HistoricalRaceEventTarget.objects.select_for_update()
-            .select_related("race_series", "event")
+            .select_related("race_series")
             .get(pk=target_id)
         )
         if target_identity(target)["target_sha256"] != expected_target_sha256:
@@ -419,7 +427,7 @@ def apply_authoritative_event_fields(
     with transaction.atomic():
         target = (
             HistoricalRaceEventTarget.objects.select_for_update()
-            .select_related("event", "race_series")
+            .select_related("race_series")
             .get(pk=target_id)
         )
         if target.event is None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -28,10 +29,14 @@ from stable.models import (
     TermEntry,
 )
 from stable.services.historical_race_batches import (
+    _locked_historical_target,
     materialize_historical_event,
+    select_historical_band_batch_targets,
     select_first_acceptance_targets,
     target_identity,
     validate_standard_batch,
+    write_band_batch_artifact,
+    write_event_input_csvs,
     write_batch_snapshot,
 )
 from stable.services.historical_race_inventory import InventoryValidationError
@@ -112,6 +117,72 @@ class HistoricalRaceBatchTests(TestCase):
         self.assertEqual(repeated.visibility_status, RaceEventVisibility.PUBLISHED)
         self.assertEqual(RaceEvent.objects.count(), 1)
 
+    def test_materialize_lock_query_does_not_join_nullable_event_relation(self):
+        target = self._target(self._series(RacingRegion.UNITED_KINGDOM, "lock-query"), 2000)
+
+        queryset = _locked_historical_target(target.pk)
+
+        self.assertIn("race_series", queryset.query.select_related)
+        self.assertNotIn("event", queryset.query.select_related)
+
+    def test_historical_target_lock_queries_never_join_nullable_event(self):
+        services = Path(__file__).resolve().parent / "services"
+        forbidden = re.compile(
+            r"select_for_update\(\)[\s\S]{0,180}select_related\([^\n]*[\"']event[\"']"
+        )
+        for name in (
+            "historical_race_batches.py",
+            "historical_race_date_discovery.py",
+            "historical_race_importer.py",
+            "historical_race_inventory.py",
+        ):
+            with self.subTest(name=name):
+                self.assertNotRegex((services / name).read_text(encoding="utf-8"), forbidden)
+
+    def test_event_input_export_writes_ready_materialized_targets_by_region(self):
+        target = self._target(self._series(RacingRegion.HONG_KONG, "event-export"), 2000)
+        target.event.source_refs = {"detail_discovery": {"urls": {"result_url": {"url": "https://hkjc.com/result"}}}}
+        target.event.save(update_fields={"source_refs"})
+
+        with TemporaryDirectory() as tmp:
+            result = write_event_input_csvs([target], output_dir=Path(tmp))
+            output = Path(result["files"][RacingRegion.HONG_KONG])
+            rows = output.read_text(encoding="utf-8-sig")
+
+        self.assertEqual(result["target_count"], 1)
+        self.assertIn(target.event.slug, rows)
+        self.assertIn("detail_discovery", rows)
+        self.assertIn(target_identity(target)["target_sha256"], rows)
+        self.assertIn(target.artifact_sha256, rows)
+
+    def test_event_input_export_rejects_pending_or_unmaterialized_target(self):
+        target = self._target(
+            self._series(RacingRegion.UNITED_STATES, "event-export-pending"),
+            2000,
+            resolution=HistoricalRaceResolutionStatus.PENDING,
+            with_event=False,
+        )
+
+        with TemporaryDirectory() as tmp, self.assertRaisesMessage(
+            InventoryValidationError, "ready and materialized"
+        ):
+            write_event_input_csvs([target], output_dir=Path(tmp))
+
+    def test_event_input_export_command_accepts_approval_target_ids(self):
+        target = self._target(self._series(RacingRegion.JAPAN, "event-export-command"), 2000)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ids = root / "approval.json"
+            ids.write_text(json.dumps({"approved_target_ids": [target.pk]}), encoding="utf-8")
+
+            call_command(
+                "export_historical_race_event_inputs",
+                target_ids_json=str(ids),
+                output_dir=str(root / "events"),
+            )
+
+            self.assertTrue((root / "events" / "events_japan.csv").is_file())
+
     def test_not_held_target_never_creates_fake_event(self):
         target = self._target(
             self._series(RacingRegion.FRANCE, "not-held"),
@@ -143,7 +214,8 @@ class HistoricalRaceBatchTests(TestCase):
 
         targets = select_first_acceptance_targets(
             series_keys_by_region=selected_series,
-            current_year=2026,
+            anchors=(1988, 2000, 2025),
+            require_ready=True,
         )
 
         self.assertEqual(len(targets), 45)
@@ -172,6 +244,138 @@ class HistoricalRaceBatchTests(TestCase):
                     RacingRegion.FRANCE: 0,
                     RacingRegion.UNITED_STATES: 0,
                 },
+            )
+
+    def test_band_batch_selects_pending_targets_per_region_in_newest_year_order(self):
+        regions = [
+            RacingRegion.JAPAN,
+            RacingRegion.HONG_KONG,
+            RacingRegion.UNITED_KINGDOM,
+            RacingRegion.FRANCE,
+            RacingRegion.UNITED_STATES,
+        ]
+        for region in regions:
+            series = self._series(region, "band")
+            for year in range(2016, 2026):
+                self._target(
+                    series,
+                    year,
+                    resolution=HistoricalRaceResolutionStatus.PENDING,
+                    with_event=False,
+                )
+            self._target(
+                self._series(region, "outside-band"),
+                2015,
+                resolution=HistoricalRaceResolutionStatus.PENDING,
+                with_event=False,
+            )
+            self._target(
+                self._series(region, "already-imported"),
+                2025,
+                resolution=HistoricalRaceResolutionStatus.IMPORTED,
+                with_event=True,
+            )
+
+        targets = select_historical_band_batch_targets(
+            year_start=2016,
+            year_end=2025,
+            inventory_manifest_sha256="a" * 64,
+            region_limit=3,
+        )
+
+        self.assertEqual(len(targets), 15)
+        for region in regions:
+            regional = [target for target in targets if target.country_region == region]
+            self.assertEqual([target.year for target in regional], [2025, 2024, 2023])
+            self.assertTrue(
+                all(target.resolution_status == HistoricalRaceResolutionStatus.PENDING for target in regional)
+            )
+            self.assertTrue(all(target.event_id is None for target in regional))
+
+    def test_band_batch_command_writes_reviewable_immutable_artifact(self):
+        for region in (
+            RacingRegion.JAPAN,
+            RacingRegion.HONG_KONG,
+            RacingRegion.UNITED_KINGDOM,
+            RacingRegion.FRANCE,
+            RacingRegion.UNITED_STATES,
+        ):
+            self._target(
+                self._series(region, "command-band"),
+                2025,
+                resolution=HistoricalRaceResolutionStatus.PENDING,
+                with_event=False,
+            )
+
+        with TemporaryDirectory() as tmp:
+            output_dir = Path(tmp) / "band"
+            call_command(
+                "build_historical_race_band_batch",
+                "--year-start",
+                "2016",
+                "--year-end",
+                "2025",
+                "--region-limit",
+                "1",
+                "--inventory-manifest-sha256",
+                "a" * 64,
+                "--output-dir",
+                str(output_dir),
+                verbosity=0,
+            )
+
+            snapshot = json.loads((output_dir / "selection_snapshot.json").read_text(encoding="utf-8"))
+            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+            approval = json.loads((output_dir / "approval.json").read_text(encoding="utf-8"))
+            review = (output_dir / "expected_targets_review.csv").read_text(encoding="utf-8-sig")
+
+        self.assertEqual(snapshot["target_count"], 5)
+        self.assertEqual(set(snapshot["region_counts"].values()), {1})
+        self.assertEqual(manifest["year_band"], {"start": 2016, "end": 2025})
+        self.assertEqual(approval["status"], "pending")
+        self.assertEqual(approval["approved_target_ids"], [])
+        self.assertEqual(review.count("\n"), 6)
+
+    def test_band_batch_artifact_rejects_empty_duplicate_and_non_pending_targets(self):
+        with TemporaryDirectory() as tmp, self.assertRaisesMessage(
+            InventoryValidationError, "no pending targets"
+        ):
+            write_band_batch_artifact(
+                [],
+                output_dir=Path(tmp) / "empty",
+                inventory_manifest_sha256="a" * 64,
+                year_start=2016,
+                year_end=2025,
+            )
+
+        target = self._target(
+            self._series(RacingRegion.JAPAN, "invalid-band"),
+            2025,
+            resolution=HistoricalRaceResolutionStatus.PENDING,
+            with_event=False,
+        )
+        with TemporaryDirectory() as tmp, self.assertRaisesMessage(
+            InventoryValidationError, "duplicate targets"
+        ):
+            write_band_batch_artifact(
+                [target, target],
+                output_dir=Path(tmp) / "duplicate",
+                inventory_manifest_sha256="a" * 64,
+                year_start=2016,
+                year_end=2025,
+            )
+
+        target.resolution_status = HistoricalRaceResolutionStatus.IMPORTED
+        target.save(update_fields={"resolution_status"})
+        with TemporaryDirectory() as tmp, self.assertRaisesMessage(
+            InventoryValidationError, "not pending"
+        ):
+            write_band_batch_artifact(
+                [target],
+                output_dir=Path(tmp) / "imported",
+                inventory_manifest_sha256="a" * 64,
+                year_start=2016,
+                year_end=2025,
             )
 
     def test_batch_snapshot_binds_target_and_inventory_identities(self):
@@ -303,6 +507,43 @@ class HistoricalRaceImporterTests(HistoricalRaceBatchTests):
         target.refresh_from_db()
         self.assertEqual(target.resolution_status, HistoricalRaceResolutionStatus.READY)
         self.assertFalse(RaceEventDataCandidate.objects.exists())
+
+    def test_duplicate_runner_horse_numbers_fail_during_validation(self):
+        target = self._ready_target()
+        runners = {
+            "is_complete": True,
+            "items": [
+                {"horse_number": "SCR", "horse_name": "One"},
+                {"horse_number": "SCR", "horse_name": "Two"},
+            ],
+        }
+        with self.assertRaisesMessage(InventoryValidationError, "duplicate horse_number"):
+            apply_historical_target_candidate(
+                target_id=target.pk,
+                expected_target_sha256=target_identity(target)["target_sha256"],
+                inventory_artifact_sha256="a" * 64,
+                source_name="fixture",
+                source_url="https://official.test/result",
+                modules={"runners": runners, "results": self._results()},
+            )
+
+        self.assertFalse(target.event.runners.exists())
+
+    def test_duplicate_storage_finish_positions_fail_during_validation(self):
+        target = self._ready_target()
+        results = self._results()
+        results["items"][1]["finish_position"] = 1
+        with self.assertRaisesMessage(InventoryValidationError, "duplicate finish_position"):
+            apply_historical_target_candidate(
+                target_id=target.pk,
+                expected_target_sha256=target_identity(target)["target_sha256"],
+                inventory_artifact_sha256="a" * 64,
+                source_name="fixture",
+                source_url="https://official.test/result",
+                modules={"results": results},
+            )
+
+        self.assertFalse(target.event.results.exists())
 
     def test_field_completeness_regression_is_blocked(self):
         target = self._ready_target()

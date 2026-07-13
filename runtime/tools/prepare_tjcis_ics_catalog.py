@@ -29,7 +29,7 @@ from race_event_source_cache import write_source_cache  # noqa: E402
 BASE_URL = "https://www.tjcis.com"
 PAST_EDITIONS_URL = f"{BASE_URL}/default.asp?content=PASSYR"
 CURRENT_EDITION_URL = f"{BASE_URL}/default.asp?content=ICS"
-PARSER_VERSION = "2026.07.1"
+PARSER_VERSION = "2026.07.4"
 REGION_ADAPTERS = {
     "japan": "japan_official_catalog",
     "hong_kong": "hkjc_official_catalog",
@@ -75,21 +75,30 @@ CSV_FIELDS = [
     "raw_source_url",
     "source_duplicate_count",
 ]
-GRADE_RE = re.compile(r"(?<![A-Z])(?:HK\s*)?G\s*([123])(?=$|[^0-9]|\d{1,3},\d{3})", re.I)
+GRADE_RE = re.compile(r"(?:HK\s*)?G\s*([123])(?=$|[^0-9]|\d{1,3},\d{3})", re.I)
 LISTED_RE = re.compile(r"\((?:L|LR)\)", re.I)
-DOTS_RE = re.compile(r"\s*\.{2,}\s*")
-AGE_RE = re.compile(r"\b(?:[2-9]\s*(?:yo|up)|[2-9]\s*-\s*[2-9]\s*yo)\b", re.I)
+DOTS_RE = re.compile(r"\s*(?:\.\s*){2,}")
+AGE_PATTERN = (
+    r"(?:[2-9]\s*(?:y(?:o)?|u(?:p)?)|[2-9]\s*[-/]\s*[2-9](?:\s*y(?:o)?)?"
+    r"|[2-9]-(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec))"
+)
+AGE_RE = re.compile(rf"\b{AGE_PATTERN}\b", re.I)
 DISTANCE_SURFACE_RE = re.compile(r"\b(?:a\s*)?(\d+(?:\.\d+)?)(?:\s*a)?\s*(T|D|AWT)\b", re.I)
 JUMP_DISTANCE_RE = re.compile(r"\b(\d+(?:\.\d+)?)\b")
 ROW_END_RE = re.compile(
-    r"\b(?:[2-9]\s*(?:yo|up)|[2-9]\s*-\s*[2-9]\s*yo)\b.*"
+    rf"\b{AGE_PATTERN}\b.*"
     r"\b(?:a\s*)?\d+(?:\.\d+)?(?:\s*a)?(?:\s*(?:T|D|AWT))?\b",
     re.I,
 )
 DECLARED_TOTAL_RE = re.compile(r"Total\s+(?:Graded|Group)\s+races\s*:\s*\.*\s*(\d+)", re.I)
 DECLARED_GRADE_RE = re.compile(r"Number\s+of\s+G\s*([123])\s+races\s*:\s*\.*\s*(\d+)", re.I)
+SUPPLEMENT_BOUNDARY_RE = re.compile(
+    r"(?:^|\n)[ \t]*(?:APPENDIX\b|\*+[ \t]*Race additions and changes in red\b)",
+    re.I,
+)
+SOURCE_CONFLICT_POLICY = "explicit_graded_rows_with_regional_official_corrections"
 UNSUPPORTED_SECTION_RE = re.compile(
-    r"PT(?:I|II|IV)[—-](?:ARGENTINA|AUSTRALIA|BRAZIL|CANADA|CHILE|CZECHREPUBLIC|GERMAN(?:Y|JUMPS)|INDIA|IRELAND|IRISHJUMPS|ITALY|ITALIANJUMPS|KOREA|MACAU|MALAYSIA|NEWZEALAND(?:JUMPS)?|PANAMA|PERU|PUERTORICO|SCANDINAVIA|SINGAPORE|SOUTHAFRICA|SPAIN|SWITZERLANDJUMPS|UNITEDARABEMIRATES|URUGUAY|VENEZUELA|INDEX)"
+    r"PT(?:I|II|IV)[—-](?:ARGENTINA|AUSTRALIA|BRAZIL|CANADA|CHILE|CZECHREPUBLIC|GERMAN(?:Y|JUMPS)|INDIA|IRE(?:LAND)?(?:JUMPS?)?|IRISHJUMPS|ITALY|ITALIANJUMPS|KOREA|MACAU|MALAYSIA|NEWZEALAND(?:JUMPS)?|PANAMA|PERU|PUERTORICO|SCANDINAVIA|SINGAPORE|SOUTHAFRICA|SPAIN|SWITZERLANDJUMPS|UNITEDARABEMIRATES|URUGUAY|VENEZUELA|INDEX)"
 )
 UNSUPPORTED_COUNTRY_TITLES = {
     "ARGENTINA",
@@ -101,6 +110,7 @@ UNSUPPORTED_COUNTRY_TITLES = {
     "GERMANY",
     "INDIA",
     "IRELAND",
+    "IRELANDJUMPRACES",
     "IRISHJUMPRACES",
     "ITALY",
     "ITALIANJUMPRACES",
@@ -204,7 +214,9 @@ def discover_edition_links(html: str, *, base_url: str, years) -> dict[int, str]
 
 def stable_series_key(region: str, name: str) -> str:
     value = canonical_series_name(name)
-    ascii_value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    value = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", value)
+    punctuation_spaced = "".join(" " if unicodedata.category(char)[0] in {"P", "S"} else char for char in value)
+    ascii_value = unicodedata.normalize("NFKD", punctuation_spaced).encode("ascii", "ignore").decode("ascii")
     slug = re.sub(r"[^a-z0-9]+", "-", ascii_value.casefold()).strip("-")
     if not slug:
         slug = hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
@@ -219,6 +231,9 @@ def _raw_identity_slug(value: str) -> str:
 
 def canonical_series_name(name: str) -> str:
     value = re.sub(r"\[[^\]]*]", " ", name)
+    value = re.sub(r"\s*\(\s*[HR]\s*\)\s*$", "", value, flags=re.I)
+    value = re.sub(r"\bH\.?\s+(?=(?:Stp|Hurdle)\b)", "", value, flags=re.I)
+    value = re.sub(r"(?:\s+[SHR]\.?)\s*$", "", value, flags=re.I)
     value = re.sub(r"\s+", " ", value).strip()
     return value
 
@@ -288,32 +303,51 @@ def _metadata_line(line: str) -> bool:
     compact = re.sub(r"\s+", "", line).upper()
     return (
         not compact
+        or re.search(r"PT(?:I|II|IV)[—-]", compact) is not None
         or compact.startswith(("PTI—", "PTII—", "PTIV—", "PARTI", "PARTII", "PARTIV"))
         or compact.startswith(("RACEPURSE", "RACEAGE", "GRADESIN", "RACESIN", "NUMBEROF", "TOTAL"))
         or compact.startswith(("UNITEDSTATESOFAMERICA(", "(USDOLLARS)", "(DOLLARS)", "(POUNDS)", "(FRANCS)", "(EURO)", "(YEN)"))
         or ("SURFACETYPE" in compact and ("METERS" in compact or "FURLONGS" in compact))
-        or compact in {"FRANCE", "JAPAN", "HONGKONG", "GREATBRITAIN", "GREATBRITAINJUMPRACES", "UNITEDSTATESOFAMERICA", "OTHERRACES"}
+        or compact in {
+            "FRANCE",
+            "JAPAN",
+            "HONGKONG",
+            "GREATBRITAIN",
+            "GREATBRITAINJUMPRACES",
+            "FRENCHJUMPRACES",
+            "JAPANESEJUMPRACES",
+            "UNITEDSTATESJUMPS",
+            "UNITEDSTATESJUMPRACES",
+            "UNITEDSTATESOFAMERICA",
+            "OTHERRACES",
+        }
+        or re.fullmatch(r"\d{4}AQPSRACES:?", compact) is not None
         or compact.startswith("(RACINGSEASON")
         or re.fullmatch(r"\d+-\d+", compact) is not None
     )
 
 
-def _record_complete(value: str) -> bool:
-    return bool(ROW_END_RE.search(value) or (value.lstrip().startswith("*") and GRADE_RE.search(value)))
+def _record_complete(value: str, *, discipline: str) -> bool:
+    if value.lstrip().startswith("*") and GRADE_RE.search(value):
+        return True
+    if discipline == "jumps":
+        return bool((GRADE_RE.search(value) or LISTED_RE.search(value)) and AGE_RE.search(value))
+    return bool(ROW_END_RE.search(value))
 
 
 def _clean_name(value: str) -> str:
     value = DOTS_RE.sub(" ", value)
     value = re.sub(r"\s+", " ", value).strip(" .")
     value = re.sub(
-        r"^(?:(?:HONG KONG|JAPAN|UNITED STATES OF AMERICA)\s+)?"
+        r"^(?:(?:HONG KONG(?:\s+SAR,?\s*CHINA)?|JAPAN|UNITED STATES OF AMERICA)\s+)?"
         r"(?:(?:JAPANESE|UNITED STATES) JUMP ?RACES\s+)?"
-        r"(?:\([^)]*(?:DOLLARS|POUNDS|YEN|METERS|FURLONGS|SURFACE)[^)]*\)\s*)+",
+        r"(?:\([^)]*(?:DOLLARS|POUNDS|YEN|METERS|FURLONGS|SURFACE|HK\$)[^)]*\)\s*)+",
         "",
         value,
         flags=re.I,
     ).strip()
-    return value
+    value = re.sub(r"\s+[123]\s*$", "", value)
+    return value.strip(" .")
 
 
 def _parse_record(raw: str, *, region: str, discipline: str, year: int, season_label: str) -> dict | None:
@@ -325,6 +359,7 @@ def _parse_record(raw: str, *, region: str, discipline: str, year: int, season_l
     if not name or name.upper() in {"RACE", "PURSE"}:
         return None
     suffix = raw[grade.end() :]
+    is_aqps = region == "france" and re.match(r"\s*AQ\b", suffix, re.I) is not None
     surface_match = DISTANCE_SURFACE_RE.search(suffix)
     age_match = AGE_RE.search(suffix)
     jump_distance_match = JUMP_DISTANCE_RE.search(suffix[age_match.end() :]) if age_match else None
@@ -363,7 +398,11 @@ def _parse_record(raw: str, *, region: str, discipline: str, year: int, season_l
         "series_status": "unknown",
         "season_label": season_label if region == "hong_kong" else "",
         "source_scope": (
-            "international_cataloguing_standards_asterisk_not_held"
+            "international_cataloguing_standards_aqps_asterisk_not_held"
+            if is_aqps and not_held
+            else "international_cataloguing_standards_aqps"
+            if is_aqps
+            else "international_cataloguing_standards_asterisk_not_held"
             if not_held
             else "international_cataloguing_standards"
         ),
@@ -429,13 +468,63 @@ def _deduplicate_and_disambiguate_same_year_keys(rows: list[dict]) -> list[dict]
     return deduplicated
 
 
+def _normalized_identity_component(value: str) -> str:
+    text = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", str(value or ""))
+    punctuation_spaced = "".join(" " if unicodedata.category(char)[0] in {"P", "S"} else char for char in text)
+    ascii_value = unicodedata.normalize("NFKD", punctuation_spaced).encode("ascii", "ignore").decode("ascii")
+    return " ".join(re.findall(r"[a-z0-9]+", ascii_value.casefold()))
+
+
+def _global_disambiguate_ambiguous_series(rows: list[dict]) -> list[dict]:
+    grouped: dict[tuple[str, str], list[dict]] = {}
+    for row in rows:
+        identity = _normalized_identity_component(canonical_series_name(row["original_name"]))
+        grouped.setdefault((row["country_region"], identity), []).append(row)
+
+    for candidates in grouped.values():
+        if len({row["series_key"] for row in candidates}) < 2:
+            continue
+        proposed_buckets: dict[str, list[dict]] = {}
+        for row in candidates:
+            distance = str(row.get("distance_text") or "").strip()
+            try:
+                distance = f"{float(distance):g}" if distance else ""
+            except ValueError:
+                pass
+            identity_text = " ".join(
+                str(value or "")
+                for value in (
+                    row.get("racecourse"),
+                    row.get("discipline"),
+                    distance,
+                    row.get("surface"),
+                )
+            )
+            suffix = _raw_identity_slug(_normalized_identity_component(identity_text))
+            base = stable_series_key(row["country_region"], row["original_name"])
+            proposed_buckets.setdefault(f"{base}-{suffix}", []).append(row)
+
+        for proposed, bucket in proposed_buckets.items():
+            year_counts: dict[int, int] = {}
+            for row in bucket:
+                year_counts[row["year"]] = year_counts.get(row["year"], 0) + 1
+            requires_full_name = any(count > 1 for count in year_counts.values())
+            for row in bucket:
+                row["series_key"] = (
+                    f"{proposed}-{_raw_identity_slug(_normalized_identity_component(row['original_name']))}"
+                    if requires_full_name
+                    else proposed
+                )
+    return rows
+
+
 def _declared_counts(pages: list[str]) -> tuple[dict[tuple[str, str], int], dict[tuple[str, str], dict[str, int]]]:
     total_values: dict[tuple[str, str], set[int]] = {}
     grade_values: dict[tuple[str, str], dict[str, set[int]]] = {}
     current_region = None
     current_discipline = "flat"
     for page_text in pages:
-        appendix_starts = re.search(r"(?:^|\n)\s*APPENDIX\b", page_text, re.I)
+        appendix_starts = SUPPLEMENT_BOUNDARY_RE.search(page_text)
         if appendix_starts:
             page_text = page_text[: appendix_starts.start()]
         detected_region, detected_discipline = _page_context(page_text)
@@ -479,12 +568,17 @@ def _declared_totals(pages: list[str]) -> dict[tuple[str, str], int]:
     return totals
 
 
-def parse_ics_pages(pages: list[str], *, year: int) -> list[dict]:
+def parse_ics_pages(
+    pages: list[str],
+    *,
+    year: int,
+    declared_count_conflicts: list[dict] | None = None,
+) -> list[dict]:
     rows = []
     current_region = None
     current_discipline = "flat"
     for page_text in pages:
-        appendix_starts = re.search(r"(?:^|\n)\s*APPENDIX\b", page_text, re.I)
+        appendix_starts = SUPPLEMENT_BOUNDARY_RE.search(page_text)
         if appendix_starts:
             page_text = page_text[: appendix_starts.start()]
         detected_region, detected_discipline = _page_context(page_text)
@@ -506,6 +600,14 @@ def parse_ics_pages(pages: list[str], *, year: int) -> list[dict]:
             line = re.sub(r"\s+", " ", raw_line).strip()
             if _metadata_line(line):
                 continue
+            if buffer:
+                buffered = " ".join(buffer)
+                if (
+                    DOTS_RE.search(buffered)
+                    and AGE_RE.search(buffered)
+                    and not (GRADE_RE.search(buffered) or LISTED_RE.search(buffered))
+                ):
+                    buffer = []
             if line.lstrip().startswith("*") and (GRADE_RE.search(line) or LISTED_RE.search(line)):
                 buffer = []
                 row = _parse_record(
@@ -520,11 +622,11 @@ def parse_ics_pages(pages: list[str], *, year: int) -> list[dict]:
                 continue
             if buffer and (GRADE_RE.search(line) or LISTED_RE.search(line)):
                 buffered = " ".join(buffer)
-                if GRADE_RE.search(buffered) or LISTED_RE.search(buffered):
+                if GRADE_RE.search(buffered) or LISTED_RE.search(buffered) or DOTS_RE.search(buffered):
                     buffer = []
             buffer.append(line)
             combined = " ".join(buffer)
-            if not _record_complete(combined):
+            if not _record_complete(combined, discipline=discipline):
                 continue
             row = _parse_record(combined, region=region, discipline=discipline, year=year, season_label=season)
             if row:
@@ -540,22 +642,85 @@ def parse_ics_pages(pages: list[str], *, year: int) -> list[dict]:
         parsed_totals[key] = parsed_totals.get(key, 0) + 1
     declared_totals, declared_grades = _declared_counts(pages)
     for key, declared in declared_totals.items():
-        if parsed_totals.get(key, 0) != declared:
-            parsed_grades = {
-                grade: sum(
-                    row["country_region"] == key[0]
-                    and row["discipline"] == key[1]
-                    and row["grade_text"] == grade
-                    for row in rows
-                )
-                for grade in ("G1", "G2", "G3")
+        parsed_grades = {
+            grade: sum(
+                row["country_region"] == key[0]
+                and row["discipline"] == key[1]
+                and row["grade_text"] == grade
+                for row in rows
+            )
+            for grade in ("G1", "G2", "G3")
+        }
+        expected_grades = declared_grades.get(key, {})
+        grade_mismatch = any(parsed_grades[grade] != value for grade, value in expected_grades.items())
+        if parsed_totals.get(key, 0) != declared or grade_mismatch:
+            conflict = {
+                "year": year,
+                "region": key[0],
+                "discipline": key[1],
+                "parsed_total": parsed_totals.get(key, 0),
+                "declared_total": declared,
+                "parsed_grades": parsed_grades,
+                "declared_grades": expected_grades,
             }
+            if declared_count_conflicts is not None:
+                declared_count_conflicts.append(conflict)
+                continue
             raise IcsCatalogError(
                 f"{year} {key[0]}/{key[1]} graded total mismatch: "
                 f"parsed={parsed_totals.get(key, 0)} declared={declared}; "
-                f"parsed_grades={parsed_grades} declared_grades={declared_grades.get(key, {})}"
+                f"parsed_grades={parsed_grades} declared_grades={expected_grades}"
             )
     return _deduplicate_and_disambiguate_same_year_keys(rows)
+
+
+def _load_source_conflict_approval(path_value: str | None) -> tuple[dict | None, dict | None]:
+    if not path_value:
+        return None, None
+    path = Path(path_value).resolve()
+    try:
+        approval = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise IcsCatalogError(f"无法读取来源冲突审批：{path}") from exc
+    required = (
+        "status",
+        "approved_by",
+        "approved_at",
+        "policy",
+        "review_path",
+        "review_sha256",
+        "expected_conflict_keys",
+        "expected_conflicts_sha256",
+    )
+    missing = [field for field in required if not approval.get(field)]
+    if missing:
+        raise IcsCatalogError(f"来源冲突审批缺少字段：{missing}")
+    if approval["status"] != "approved" or approval["policy"] != SOURCE_CONFLICT_POLICY:
+        raise IcsCatalogError("来源冲突审批状态或策略不匹配")
+    configured_review_path = Path(approval["review_path"])
+    review_path = (
+        configured_review_path.resolve()
+        if configured_review_path.is_absolute()
+        else (path.parent / configured_review_path).resolve()
+    )
+    if not review_path.is_file() or _sha256(review_path) != approval["review_sha256"]:
+        raise IcsCatalogError("来源冲突审核文件身份不匹配")
+    keys = approval["expected_conflict_keys"]
+    if not isinstance(keys, list) or len(keys) != len({str(key) for key in keys}):
+        raise IcsCatalogError("来源冲突审批键必须是无重复列表")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(approval["expected_conflicts_sha256"])):
+        raise IcsCatalogError("来源冲突 payload SHA 格式错误")
+    return approval, {"path": str(path), "sha256": _sha256(path)}
+
+
+def _source_conflict_key(conflict: dict) -> str:
+    return f"{conflict['year']}:{conflict['region']}:{conflict['discipline']}"
+
+
+def _source_conflicts_sha256(conflicts: list[dict]) -> str:
+    payload = sorted(conflicts, key=_source_conflict_key)
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _pdf_pages(path: Path) -> list[str]:
@@ -615,7 +780,14 @@ def _suspicious_catalog_names(rows: list[dict]) -> list[str]:
     for row in rows:
         name = str(row.get("original_name") or "")
         upper = name.upper()
-        if len(name) > 160 or "RACE PAGE" in upper or "(L)" in upper or "TOTAL RACES" in upper:
+        name_without_qualifiers = re.sub(r"\([^)]*\)|\[[^]]*]", " ", name)
+        if (
+            len(name) > 160
+            or "RACE PAGE" in upper
+            or "(L)" in upper
+            or "TOTAL RACES" in upper
+            or re.search(r"\b\d{1,3},\d{3}\b", name_without_qualifiers)
+        ):
             suspicious.append(name)
     return suspicious
 
@@ -628,6 +800,10 @@ def prepare_catalog(args) -> dict:
     if output_dir.exists() and any(output_dir.iterdir()) and not args.resume:
         raise IcsCatalogError(f"输出目录非空：{output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
+    source_conflict_approval, source_conflict_approval_identity = _load_source_conflict_approval(
+        getattr(args, "source_conflict_approval", None)
+    )
+    approved_conflict_keys = set(source_conflict_approval["expected_conflict_keys"]) if source_conflict_approval else set()
 
     expected_sources = [
         output_dir / "source" / "tjcis_past_editions.html",
@@ -657,6 +833,8 @@ def prepare_catalog(args) -> dict:
     raw_sources = []
     counts = {}
     year_errors = {}
+    source_count_conflicts = []
+    accepted_years: dict[int, tuple[list[dict], dict, str]] = {}
     for year in years:
         url = all_links[year]
         pdf_path = output_dir / "source" / f"tjcis_ics_{year}.pdf"
@@ -668,7 +846,19 @@ def prepare_catalog(args) -> dict:
         )
         raw_sources.append(identity)
         try:
-            rows = parse_ics_pages(_pdf_pages(pdf_path), year=year)
+            year_source_conflicts = [] if source_conflict_approval else None
+            rows = parse_ics_pages(
+                _pdf_pages(pdf_path),
+                year=year,
+                declared_count_conflicts=year_source_conflicts,
+            )
+            if year_source_conflicts is not None:
+                unexpected = {
+                    _source_conflict_key(conflict) for conflict in year_source_conflicts
+                } - approved_conflict_keys
+                if unexpected:
+                    raise IcsCatalogError(f"出现未审批的来源计数冲突：{sorted(unexpected)}")
+                source_count_conflicts.extend(year_source_conflicts)
             missing_regions = _missing_regions(rows)
             if missing_regions:
                 raise IcsCatalogError(
@@ -691,6 +881,24 @@ def prepare_catalog(args) -> dict:
                 raise
             year_errors[str(year)] = str(exc)
             continue
+        accepted_years[year] = (rows, identity, url)
+
+    actual_conflict_keys = {_source_conflict_key(conflict) for conflict in source_count_conflicts}
+    if source_conflict_approval and actual_conflict_keys != approved_conflict_keys:
+        raise IcsCatalogError(
+            "来源冲突审批集合与实际不一致："
+            f"missing={sorted(approved_conflict_keys - actual_conflict_keys)} "
+            f"unexpected={sorted(actual_conflict_keys - approved_conflict_keys)}"
+        )
+    if source_conflict_approval and _source_conflicts_sha256(source_count_conflicts) != source_conflict_approval[
+        "expected_conflicts_sha256"
+    ]:
+        raise IcsCatalogError("来源冲突完整 payload 与审批 SHA 不一致")
+
+    _global_disambiguate_ambiguous_series(
+        [row for rows, _identity, _url in accepted_years.values() for row in rows]
+    )
+    for year, (rows, identity, url) in accepted_years.items():
         counts[str(year)] = {}
         for region in REGION_ADAPTERS:
             region_rows = [row for row in rows if row["country_region"] == region]
@@ -721,6 +929,8 @@ def prepare_catalog(args) -> dict:
             "raw_sources": raw_sources,
             "index_sources": index_identities,
             "excluded_year_errors": year_errors,
+            "source_count_conflicts": source_count_conflicts,
+            "source_conflict_approval": source_conflict_approval_identity,
         }
         path = output_dir / f"manifest_{region}.json"
         path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -732,7 +942,15 @@ def prepare_catalog(args) -> dict:
         "manifest_paths": manifest_paths,
         "successful_years": sorted(int(year) for year in counts),
         "year_errors": year_errors,
-        "status": "partial" if year_errors else "complete",
+        "source_count_conflicts": source_count_conflicts,
+        "source_conflict_approval": source_conflict_approval_identity,
+        "status": (
+            "partial"
+            if year_errors
+            else "complete_with_approved_source_conflicts"
+            if source_count_conflicts
+            else "complete"
+        ),
         "network_switches_after_run": "operator_must_restore_both_to_false",
     }
     (output_dir / "summary.json").write_text(
@@ -761,6 +979,7 @@ def main() -> int:
     parser.add_argument("--allow-network", action="store_true")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--continue-on-year-error", action="store_true")
+    parser.add_argument("--source-conflict-approval")
     args = parser.parse_args()
     try:
         result = prepare_catalog(args)

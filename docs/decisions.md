@@ -34,6 +34,35 @@
 生产 dry-run 显示当前范围包含 `21596` 条有译名马术语、`992` 场重点赛事，赛事证据已有 runner `5096` 条、result `4572` 条。直接执行 `p0_horse_profiles --sync-sources --commit` 会一次写入全量术语来源并分析数千条参赛身份，超出已经确认的“日本、中国香港、英国、法国、美国各先抽 10 匹人工跑通”范围。
 
 因此 P0 基础代码和迁移可以先上线，但来源同步 commit 必须继续服从样本优先：先完成五地区 adapter、统一 artifact、每地区 10 匹 dry-run 和人工审核，再选择受控写入方式。上线本身不得隐式启用网络补全、全量来源写入或自动首次发布；当前生产保持 `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`，`HorseP0Source` 为空属于有意状态，不是部署失败。
+## 为什么美国历史平地赛优先使用Equibase单场standard PDF
+
+Equibase旧 `eqbPDFChartPlus.cfm` 和整日PDF索引可能返回防护HTML或失效链接，但同一官方体系的单场standard PDF仍可稳定提供完整实际出走、马号、闸位、骑手、练马师、负磅和官方赛果。因此美国历史平地赛继续以Equibase为主源，日期发现阶段直接绑定可验证的单场PDF，不把HTTP 200防护页或404整日索引视为成功证据。
+
+详情生成必须使用target在日期apply时记录的唯一source-cache manifest，并逐文件匹配批准URL、大小和SHA-256；随后再复核PDF页眉日期、赛场和场次。每次只允许一个已批准manifest，禁止把批准manifest与其他manifest中的PDF混用。`1a`等联合投注编号独立保留，runners按马号排序，results按官方完赛顺序保存。
+
+## 为什么 materialize 后发现的详情页使用独立补充来源 artifact
+
+日期发现 artifact 已经批准并把目标 materialize 后，后续可能找到更完整的专业数据库详情页。此时重做原日期 artifact 会破坏既有审批身份，也会让日期证据与详情正文混在一起。因此补充详情页使用独立 detail-source artifact：绑定当前 target SHA、inventory SHA、provider/authority、直接 URL，并复制批准的 source-cache 字节；apply 只向 target 与 RaceEvent 的 `detail_discovery.approved_detail_sources` 追加证据，不改变赛事身份、ready 状态或 draft 可见性。
+
+详情打包必须同时匹配批准 capture 的 `source_url / size / SHA-256`。即使 URL 相同，只要缓存正文不同也必须拒绝，避免网站后来更新的页面无声替代人工批准版本。提交时同时锁定 target 与 RaceEvent，防止并发来源维护互相覆盖。
+
+## 为什么赛事详情来源必须按地区分层，并区分赛前声明与实际出走
+
+不同地区的历史赛果权威入口和保存深度不同，不能使用一个第三方站点覆盖所有地区。日本采用 JRA 主源、netkeiba 历史补源和 JBIS 血统/沿革补源；中国香港采用 HKJC 官方 Race Card / Results；英国采用 Racing Post Full Result 作为历史实际出走与赛果主源，Sky Sports Racecard 补赛前页面，BHA 只承担 2014 年后官方校验；法国采用 France Galop 主源、PMU 补源；美国采用 Equibase historical charts 主源，BRISnet、DRF、BloodHorse 交叉校验，美国障碍赛事补用 NSA。
+
+数据层必须分别保存 `declared_runners_source`、`actual_runners_source`、`non_runner_source` 和 `result_source`。Full Result 或 chart 中的 runners 只证明实际出走，不能冒充赛前声明出马表；找不到历史 racecard 时应明确标记赛前表缺失，而不是从赛果反推。所有来源还需保留原始 URL、抓取时间、来源权威级别和解析版本。
+
+## 为什么同名赛事审核结论要生成新总账而不覆盖原始目录
+
+TJCIS 的简写、赞助名和场地/距离字段会把同名不同赛、迁场沿革及年度改场混在一起。`2026-07-13` 的人工审核把 `102` 个临时 Key 归入 `58` 条正式赛事线，并修正京都雌马、Bristol届次、Louisville 2008、Keeneland First Lady年度名和NYRA Matron 2018等已确认异常。为保留可追溯性，原始 v10 总账保持不变，审核结果写入独立 v11；每个年度目标保留 `provisional_series_key`、正式 `series_key`、身份决策来源和别名。
+
+赛事身份判断以沿革、场地、距离原单位、竞赛类型、年龄性别条件和同年并存情况共同决定，不能仅按裸赛事名或裸距离自动合并。实际年份与届次年份必须分开，例如 Bristol Novices' Hurdle 的 2001 届实际于 `2002-01-11` 举办。Ascot约3m金杯线中文主名确认为 `阿斯科特秋季金杯让磅障碍追逐赛`。高相似名称最终采用“15对名称变体合并、Prince of Wales's与Princess of Wales's保持独立”的审核结论，原始写法继续作为别名留存。
+
+## 为什么历史赛事身份审核必须提供逐届参赛证据并保留距离原单位
+
+同名赛事只比较名称、赛场和裸距离，容易把不同赛事错误合并，也可能把真实举办年份误判为 `not_held`。因此身份审核表必须把系列展开为逐年届次：能取得正式赛果时展示冠军马，能取得出马表或赛果明细时展示1号马；两者都不能可靠取得时保留该年度官方目录链接，不用模糊匹配填充空白。目录状态与官方赛果冲突时只标记待审，不自动修改总账。
+
+不同地区和竞赛类型的距离单位不同，任何身份规则都不得直接比较 `distance_text` 裸数字。审核产物先保留 TJCIS 原始距离文本和竞赛类型；后续标准化模型必须分别保存原始数值、原始单位、统一换算值及换算规则来源，只有单位明确后才允许参与距离一致性判断。
 
 ## 为什么技术审查问题默认直接修复，产品能力与交互仍需用户审核
 
@@ -1120,3 +1149,30 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 归属能力必须先完成至少 250 篇有效、五地区覆盖且双人审核裁决的 gold set，并通过既定准确率、扩散率、锁定覆盖与性能门槛；不得以代码已部署替代生产资格。
 - 失败邮件固定发往 `754652181@qq.com`，但只有在生产 SMTP 参数配置完成并通过测试发送后才允许开启；无 SMTP 时保持关闭并依赖现有后台/运行日志感知失败。
 - 本次验收以 HTTP 运行态为准。HTTPS server 块仍未启用，证书接入继续作为独立运维事项，不与本 change 的代码部署混为一谈。
+## 2026-07-13 历史第一批允许完整子 scope 独立写入
+
+- 第一批 45 场不要求为了等待某一地区来源而冻结其他已完整目标；满足当前 target/inventory SHA、审核直链、source cache identity、完整 runners/results 和 production dry-run 的 27 场可作为完整子 scope 正式写入。
+- 法国 9 场详情缺口、英国 2000 年 3 场日期缺口和美国 2000/2012 年 6 场日期缺口必须继续留在总账，分别保持 `ready` 或 `pending`，不得用空候选、仅冠军信息或推测日期标记完成。
+- 本次写入只改变结构化数据状态，不构成 publication scope 批准。36 个已建赛事继续保持 draft，两个历史开关保持关闭；只有补齐五地区样本并完成前台、搜索、历届冠军、可见性和 sitemap 验收后，才讨论扩大公开范围。
+
+## 2026-07-13 IrishRacing 作为英法历史详情备用源
+
+- 当 Racing Post / France Galop / PMU 等主源只提供沿革证据或当前受反爬限制时，允许 IrishRacing 作为较低权威的正式详情备用源。主源链接与交叉核验证据仍保留，不将备用源提升为地区第一权威。
+- IrishRacing 结果页只证明 actual runners 与 results，不冒充 declared runners/racecard。马号和闸位分字段保存，出马表按马号排序；并列官方名次保存在 `official_finish_position`。
+- 工程上拆为 `uk_irishracing` 和 `france_irishracing`，即使 host 相同也不允许跨地区候选或 artifact apply。HTTP 200 但显示 `Information Not Available` 的页面必须视为抓取失败。
+
+## 2026-07-13 近年日美来源与字段口径
+
+- 2025 美国平地分级赛由 TOBA 年表定位，直接结果使用可缓存的 Equibase Yearbook 单场页；旧 `tvg` 静态整日 PDF 规则只用于已验证旧年份。
+- TJCIS 裸距离按地区显式补单位：日本、香港、法国为米，美国平地为 furlong；美国障碍和英国保存来源中的 mile/furlong/yard 组合。
+- Equibase 退赛程序号 `SCR` 内部保存为稳定 `SCR-n`；官方并列名次写入 `official_finish_position`，唯一 `finish_position` 仅作稳定存储顺序。
+- 年度权威表赛事名唯一且有工程期移师证据时，允许以当年实际场地定位结果，不因此拆分稳定赛事系列。
+
+## 为什么迁移前进后禁止部署旧应用底座
+
+- 历史赛事能力可以在独立分支长期迭代，但每次生产构建前必须先合入最新 `origin/main`，检查当前生产已应用迁移及所有新增非空字段的创建路径，并运行历史链路与新闻主链路组合回归。
+- 数据库已应用 `stable.0027–0029` 后，缺少对应模型/服务写入逻辑的旧镜像即使 healthz 正常，也可能让新文章在数据库约束处失败；因此 healthz 不能替代真实新增 smoke 或近期任务错误日志检查。
+- 生产发生 schema/application 不兼容时，优先停止新的 one-off 写入、构建和重启，由单一生产协调线程选择短时回滚或兼容镜像替换。历史批次不得抢占新闻主链路恢复。
+- 生产兼容镜像已由单一协调线程完成切换；历史回填线程后续只能在既有镜像上执行已批准的数据操作，不得自行重建、retag 或重启生产服务。任何后续代码部署必须先合入最新 main 并重新交付镜像 ID。
+- 历史详情来源必须在整个批次内一对一绑定目标；同一详情 URL 即使仅 fragment 不同也视为同一来源页面，发现复用必须阻断，不得用同日同场相似赛事填充。
+- 生产当前运行的组合镜像在历史源码完整进入 Git 前属于临时可运行状态；法港英 150 场日期 apply 完成后暂停详情写入，优先提交源码、推送分支、合入最新 main，并从可复现 Git tree 重建 AMD64 镜像。

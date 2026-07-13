@@ -17,6 +17,22 @@
 项目当前已经完成正式域名 HTTP 接入修复，`umafans.run` 与 `www.umafans.run` 已可访问。  
 “自动化内容运营 + AI 编辑改写 MVP”已完成代码侧与生产侧上线，当前处于上线后观察与质量抽检阶段。
 
+`2026-07-13` 五地区历史赛事第一批验收已全部完成生产详情写入：selection snapshot 中 `45/45` 个目标均为 `imported`，对应 `45` 个历史 `RaceEvent`、`468 runners / 429 results`，全部保持 `draft`，历史公开数为 `0`。法国和英国2000年样本已使用按地区隔离的 IrishRacing 正式备用详情源补齐；美国2000/2012六场使用 Equibase 官方单场 standard PDF 补齐，共新增 `58 runners / 58 results`，逐场胜马和1号马核验通过。美国详情候选固定 SHA-256 为 `94b62febe849b9a0562e5ab641d87671ae3468a202355b5336a7f4405e8abe75`。
+
+美国补源的证据链已收紧为 target 批准记录 → date/source cache manifest 的大小与 SHA-256 → 单场 PDF 的 URL、大小与 SHA-256 → PDF 页眉日期/赛场/场次复核；`1a` 等联合投注编号作为独立实际出走保留。日期 apply 前备份为 `backups/db/pre-equibase-us-date-apply-20260713_083026.sql.gz`（`120405132` bytes，SHA-256 `65da811725111da6c556d077118571da0d9bf5bed628d15c27ea7021052ad2e5`）；详情 apply 前备份为 `backups/db/pre-equibase-us-detail-apply-20260713_083319.sql.gz`（`120406520` bytes，SHA-256 `ad547a575ac03de17d8314821b3111b30ef5151231f2c4d33e5fe263c99d09c1`），两份均通过 `gzip -t`。生产镜像为 `umanewsbot:equibase-20260713`，回滚镜像为 `umanewsbot:pre-equibase-20260713`；数据库约 `796 MB`，内外 healthz、Django check 和近10分钟日志正常。`.env` 继续保持 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，历史线上展示暂不开放。
+
+`2026-07-13` 高相似名称审核已完成：`15` 对确认合并为名称变体，`Prince of Wales's` 与 `Princess of Wales's` 确认保持为不同赛事。最终身份总账为 `runtime/historical_race_inventory/tjcis-inventory-1998-2026-v12-final-20260713/`，保留 `30,917` 个年度目标和 `2,334` 条正式赛事线；高相似名称合并没有删除任何年度目标。最终工作簿为 `outputs/race_identity_review_20260712/TJCIS_1998-2026_赛事系列身份审核最终结论版.xlsx`，结构化校验、SHA-256、公式和视觉检查均通过。至此1998–2026同名簇与高相似名称身份审核全部完成，生产数据库仍未写入，历史公开开关继续关闭。
+
+`2026-07-13` 已完成 TJCIS 1998–2026 的 `25` 个同名赛事簇逐项人工审核，并生成审核后身份决策与总账 v11。`102` 个临时 Series Key 已归入 `58` 条正式赛事线；审核后年度目标由 `30,919` 行变为 `30,917` 行，仅消除两组经确认的重复年度表达：Bristol Novices' Hurdle 的 2001 届（实际于 `2002-01-11` 在 Huntingdon 举办）和 Louisville Stakes 2008 改场记录。京都雌马锦标 `2005–2009` 已由 `not_held` 修正为 `held`；Keeneland First Lady 2000 年年度显示名修为 `Galaxy Stakes`；NYRA Matron 2018 场地修为 turf。正式产物为 `runtime/historical_race_inventory/tjcis-inventory-1998-2026-v11-approved-20260713/`，审核工作簿为 `outputs/race_identity_review_20260712/TJCIS_1998-2026_赛事系列身份审核结论版.xlsx`。逐届证据合并后为 `685` 届，可靠冠军 `473` 届、1号马 `164` 届。结构化校验、SHA-256 清单和工作簿视觉检查均通过。本次未写生产数据库、未部署，历史公开开关继续关闭。
+
+同名簇身份边界已经审核完成，Ascot 约 3m 金杯线中文主名已确认为 `阿斯科特秋季金杯让磅障碍追逐赛`。`16` 对高相似名称也已完成审核，其中 `15` 对合并为名称变体，Prince/Princess of Wales's 保持独立。1998–2026 身份冲突审核现已清零。
+
+同日补充确定五地区赛事详情的来源优先级：日本以 JRA 为官方主源，netkeiba 补历史出马表/赛果，JBIS 补血统与赛事沿革；中国香港以 HKJC Race Card / Results 为绝对主源；英国以 Racing Post Full Result 采实际出走和赛果，Sky Sports Racecard 补赛前声明出马表，BHA 仅用于 2014 年后官方校验；法国以 France Galop 为主、PMU 补充；美国以 Equibase historical charts 为主，BRISnet chart archive、DRF 和 BloodHorse 交叉校验，美国障碍赛另以 NSA 为重要来源。`declared runners`、`actual runners`、`non-runners` 和 `results` 必须分别记录及保留各自来源，不能用完赛结果中的实际出走马冒充赛前出马表。
+
+`2026-07-12` 已把 TJCIS 1998–2026 身份审核表扩展为逐届证据版，产物为 `outputs/race_identity_review_20260712/TJCIS_1998-2026_赛事系列身份审核.xlsx`。该文件是人工审核前的原始证据快照，范围含 `25` 个同名簇、`102` 个临时 series key 和 `687` 个原始年度行；经生产库、JRA、TOBA、Wikipedia 历届冠军表和 Racing Post 单届赛果交叉补证，审前快照取得冠军 `474` 行、1号马 `164` 行。其同名簇结论和京都雌马冲突已由 `2026-07-13` 结论版及 v11 总账取代，原文件仅作审计留存。距离继续保留 TJCIS 原文，不允许跨地区直接比较裸数字；正式标准化前必须同时保存原值、原单位和统一换算值。
+
+同日生产库只读覆盖复核：`RaceEvent=992`，其中 `finished=503 / scheduled=484 / cancelled=5`；有出马表的赛事 `505/992`（约 `50.9%`），有赛果的赛事 `503/992`（约 `50.7%`）。所有 `503` 场已完赛赛事均同时有出马表和赛果，因此按已完赛赛事为分母时两项覆盖均为 `100%`。现有模型没有独立的逐模块 `is_complete` 数据库字段，上述百分比是“存在正式模块数据”的运行态口径；全赛事约一半无赛果主要因为尚未开赛，而不是完赛后漏抓。
+
 `2026-07-11` 已在生产库生成赛事编排第一批五地区应到清单，run 为 `runtime/race_event_crawl_runs/first-acceptance-race-event-crawl-20260711/`。本批每地区 1 场、共 5 场，分别为日本德比、富卫保险女皇杯、BETFRED DERBY、PRIX DE DIANE LONGINES、KENTUCKY DERBY PRESENTED BY WOODFORD RESERVE；三模块目标均为 `runners / results / history_winners`，5 行 `preflight_status` 全部为 `ready`。审批文件仍为 `pending`，plan 中 `allow_network=false`，本次没有访问外部网站、没有生成候选、没有写赛事详情。人工审核入口为 `review/expected_targets_review.csv`；只有用户确认赛事名称、年份、地区和 slug 后才允许填写审批并创建可触网的新 plan。
 
 用户已确认第一批范围与中英文名。网络版 run `first-acceptance-race-event-crawl-network-20260711` 已生成，并与原审批清单逐字段对比一致；进入 prepare 前发现生产镜像未包含 adapter 所需的 `runtime/tools/*.py`。首次镜像补包后，真实 prepare 进一步暴露 Django 工作目录 `/app/server` 与 AdapterRunner 仓库根 `/app` 对相对 runtime 路径的解释不一致，`jra_detail` 在零网络请求时失败。最终镜像约定统一为 `/app/runtime`，并由 `/app/server/runtime` 符号链接到同一目录；运行计划、审批和失败 state 保持不变，修复后使用 resume 重试。
@@ -1083,3 +1099,46 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 运行验收：服务器内部 `http://127.0.0.1/healthz/` 与公网 `http://umafans.run/healthz/` 返回 200；浏览器真实打开首页、法国频道和 `/news/8093/` 详情页均正常，详情页含 8 个正文段落且无前端错误。HTTPS 仍未接入证书，Nginx 443 TLS server 块原本即为注释状态，本次不将 HTTPS 计为已完成能力。
 - 法国只读 probe 未写文章：France Galop / TDN France / TDN France Broad 分别得到 `20 / 4 / 12` 条列表候选，三个来源均为 accepted，抽取的 6 篇详情全部成功；最新样本时间覆盖 2026-07-10 至 2026-07-12，未再返回 2020/2022 历史稿。生产法国来源 13/14/21 仍为 enabled、production approved、最近抓取 success。
 - OpenSpec 当前完成 `59/68`。真实至少 250 篇双人审核 gold set、生产 gold/dry-run、人工复核、时间修复与翻译小批处理、shadow/enforce 灰度、网页/测试群/正式群扩展和窗口数量验收均未完成，因此 change 保持 `implementing`，不得归档。
+## 2026-07-13 历史赛事第一批生产详情写入
+
+- 第一批 selection snapshot 固定为五地区各 9 场、共 45 场，绑定 inventory manifest `ac61298f242b2c649c403eae4741771a43cdb027befef20bc75e18fe34bcbad7`。日期发现审核后形成 `36 ready / 9 pending gap`：日本、香港、法国各 9 场有日期；英国 6 场有日期、2000 年 3 场缺口；美国 3 场有日期、2000/2012 年 6 场缺口。
+- 日期 apply 已创建 36 个 draft `RaceEvent`。详情抓取完成香港 9 场、日本 9 场、英国 6 场、美国 3 场；法国 9 场因尚无达到完整出马表与赛果要求的解析链路，继续作为显式详情 gap，不用空候选占位。
+- 完整详情候选为 27 场，SHA-256 `c999be2b2b0790837f8a6f5888e7068e775c783a57c6f8e7f3298e41e9b67a04`。生产 dry-run 通过后，新建详情写入前备份 `backups/db/pre-historical-detail-first-acceptance-20260713_055500.sql.gz`，大小约 139 MB，`gzip -t` 通过，SHA-256 `5f0f9d94406d55954b078339f2a3796556f6ffc98b47c43d6bf2d14bbccde9ff`。
+- 正式 apply 成功：27 个目标全部转为 `imported`，写入 `RaceEventRunner=297`、`RaceEventResult=287`、`RaceEventDataCandidate=54`，候选状态全部为 `applied`，并生成 27 条 `historical_target_imported` 操作日志。逐目标核验与候选条数完全一致。
+- 第一批最终状态为 `27 imported / 9 ready / 9 pending`：法国 9 场保持 ready 等待详情；英国 2000 年 3 场、美国 2000/2012 年 6 场保持 pending 等待日期来源。36 个已建赛事全部为 draft，published 为 0。
+- 详情 source cache 在生产保留 38 个文件、约 5.4 MB，manifest 所列 18 个源文件大小和 SHA-256 全部通过。当前数据库约 832,322,583 bytes；本批核心新增 638 行，另有 27 条操作日志，相关表容量无扩大批次 blocker。
+- 常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`；内外 `/healthz/` 均为 `ok`，容器正常，`web / worker / beat` 最近 20 分钟无 traceback/error。历史公开展示仍关闭，未执行前台发布验收。
+
+## 2026-07-13 法国第一批详情补源进展
+
+- 已从 ZEturf 精确定位并受控缓存法国 2012/2025 六场详情页；请求预算上限 50，实际仅抓取 R1/C1–C6 范围，缓存 manifest 保留逐文件大小、SHA-256 和来源 URL。2000 年页面在 ZEturf 已过期，仍保持缺口。
+- 真实缓存首次回放暴露 2012 旧页面使用 `span.horse-name`、骑师/练马师节点结构变化，以及 2025 `Criterium de Saint-Cloud` 被误配到同日 `Criterium International`。已按 TDD 修复，法国 adapter 网络层同时改为统一 HTTPS host/重定向安全校验。
+- 离线重跑结果为 `6/6` 唯一命中、`runners=70`、`results=41`、`skipped=0`、`errors=0`；runners 保留非出走状态，2012 旧页马名、骑师和练马师均可解析。
+- 这六场尚未写生产：现有 target 批准的是 France Galop 日期/历史页，ZEturf 直接详情 URL 仍需通过独立、哈希锁定的来源补充 artifact 写回 target，之后才能由详情 packager 接受。禁止手工改 `source_refs` 或绕过 URL 绑定。
+- 新增目标测试和完整 `stable` 回归均通过，完整测试现为 826 项；重新代码复审无 actionable finding。
+
+## 2026-07-13 2016–2025 标准批次一号日美写入
+
+- 首个年代带标准批次已批准 250 场，五地区各 50；selection snapshot 文件 SHA-256 为 `0724d55c904eb4072c8dfe741648a9678a71b447bc07fe59705ffa412a5be036`，approval SHA-256 为 `a046e17e2b5388ce7508eb644bcbf9437ec5af7d2ca7aa0523eccac84dd80a88`。
+- 日本 50 场使用 JRA 官方年度表和单场赛果；美国 48 场由 TOBA 年表定位 Equibase Yearbook 单场结果，2 场障碍赛使用 NSA 官方结果。日期 artifact 中日美 `100 ready`，法港英 `150 gap`。
+- 日期写入前备份 `pre-band-2016-2025-jra-us-date-apply-20260713_011232.sql.gz`，大小 `117378172`，SHA-256 `d93a26469dee057a70164eb7dc4f7f6a459fcf3c85f846b1713c0555213d6847`；100 场均已 materialize。
+- 详情来源 artifact `c91872542a03db6519d29148c442ca9d38adc9cc52db6c247806eb5773ba9aec` 批准 98 场。日本 50 场和美国平地 48 场最终全部 imported，共 `1157 runners / 1080 results`；两场 NSA 障碍赛仍为 ready 详情缺口。
+- Equibase 退赛现使用稳定 `SCR-n`；存储名次连续唯一并以 `official_finish_position` 保留并列。dry-run 会提前拒绝重复马号和重复存储名次，完整 `stable` 回归 `865/865` 通过。
+- 一次 ARM64 镜像误部署使 web unhealthy，未迁移且未写详情数据，已立即回滚；后续改在生产机原生构建并核验 AMD64。当前 healthz 正常，常驻两个历史开关和公开开关仍关闭。
+
+## 2026-07-13 NSA 两场补齐与生产兼容阻断
+
+- 美国两场障碍赛已由 NSA 官方结果 PDF 补齐：A.P. Smithwick Memorial 为 `8 runners / 8 results`，Beverly R. Steinman Memorial 为 `7 runners / 6 results`；后者保留 faller CARLOUN 为 runner，不伪造完赛名次。候选 SHA-256 为 `478e263ee1b2e07ca6ef3cba23c683549393400b263ae250eef9b15fa0c3a1ff`。
+- 写入前备份为 `backups/db/pre-band-2016-2025-nsa-import-20260713_015750.sql.gz`，大小 `117926527` bytes，SHA-256 `9a34f879a98e0fd8bda27b426b81f009bf6fcef0ce882b031589fe7c8867f3bc`。dry-run 与正式 apply 均通过；至此标准批次日美 100 场全部 imported，共 `1172 runners / 1094 results`，常驻历史功能、网络和公开展示开关继续关闭。
+- 随后发现生产 `umanewsbot:prod` 被历史分支旧底座镜像覆盖：镜像含历史能力，但缺少 `origin/main@badc10e0` 的法国新鲜度、翻译恢复、多地区归属代码及 `stable.0027–0029` 对应写路径。数据库已经应用 `0029`，netkeiba 新增触发 `attribution_rule_version` 非空约束错误；收到 P0 后已立即停止新的历史写入、生产构建和容器重启，恢复动作由生产协调线程接管。
+- 当前历史 worktree 已合入 `origin/main@1a70b22e`，保留全部历史能力并通过 Django check、迁移无漂移、323 项组合测试、完整 `stable 1093/1093`（1 skip）、OpenSpec strict `25/25` 和 `git diff --check`。生产镜像替换继续由生产协调线程统一执行。
+- 生产协调已短时切回 `umanewsbot:pre-irishracing-20260713`（`sha256:982fac66…`），恢复后成功新增并翻译 9 篇 netkeiba 文章，新增 NULL 约束异常为 0。独立 staging 已构建兼容镜像 `umanewsbot:merged-main-historical-amd64-20260713-1008`，完整 ID `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`，内容 commit `0068715fceb0f629b5bfcb0c0b760427dfc6edc5`，构建树 SHA-256 `e51e6992e57649445aeff2aa7f2a0c925f3c5c742771fceac13053459beceec6`。该镜像尚未 retag 为 prod、未重启容器，等待生产协调线程最终切换。
+
+## 2026-07-13 兼容镜像切换与法港英 150 场详情证据
+
+- 生产 `web / worker / beat` 已由协调线程正式切换到兼容镜像 `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`；`stable.0027–0029`、Django check、64 个模型、新闻新开关关闭、历史命令、五地区页面/后台/healthz 和日志均通过。回滚镜像为 `pre-merged-main-historical-20260713-1015`。历史线程不得再次重建或重启生产容器。
+- 2016–2025 标准批次剩余法国、香港、英国各 50 场已完成日期定位与详情抓取：法国 `449 runners / 330 results`，香港 `515 / 506`，英国修正 Aintree Bowl 误配后为 `570 / 458`；三地区均 `50/50` 无跳过、无错误。
+- 详情来源按目标一一对应，三地区分别 50 个唯一 URL、全局 `150/150` 唯一。统一日期发现证据包包含 150 条 provider 记录、150 条成功请求账本和 150 个逐文件大小/SHA-256 验证的缓存文件，共 `38,383,091` bytes，绑定 inventory manifest `ac61298f242b2c649c403eae4741771a43cdb027befef20bc75e18fe34bcbad7`。
+- Aintree Bowl 现绑定 Sporting Life race ID `850965`，Aintree Hurdle 保持 `850966`；详情 URL 去重以移除 fragment 后的规范 URL 为准。生产只读 artifact 首次构建另发现 47 场英国距离证据缺显式单位或为紧凑分数写法，现已按 `<5 mile / >=5 furlong` 和 mile/furlong/yard 规则规范化，并修复 `71/2f` 的距离消歧误读。专项 57 项及完整 `stable 1128` 项通过，Django check、迁移漂移、OpenSpec strict 和 diff 检查通过，最终复审无剩余可修复问题。
+- 日期 artifact v2 已批准并受控提交，manifest SHA-256 为 `e5ede9033485f59faac8d27c5371bd4749c17235119f4eea173cca07cc389b03`；写入前备份 `pre-band-2016-2025-fr-hk-uk-date-apply-20260713_122142.sql.gz` 为 `121,994,037` bytes，SHA-256 `dae5869d58eb7e854d359f333e979b52647da75db667db930ff53d1cce5f521f`，`gzip -t` 通过。
+- 150 个目标现均为 `ready` 并 materialize 为 150 个 draft `RaceEvent`；生产历史累计为 `145 imported + 150 ready`、2026 年前赛事 `295`，详情仍为 `1,640 runners / 1,523 results`，证明本次只写日期与赛事壳，未提前导入详情。用户要求先完成源码 Git 固化，后续详情打包、coverage、dry-run、第二次备份和正式导入现已暂停。历史公开展示开关继续关闭。
