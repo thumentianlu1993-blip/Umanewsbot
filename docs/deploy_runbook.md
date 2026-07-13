@@ -1,5 +1,13 @@
 # 部署运行手册
 
+## 2026-07-13 后续标准批次既有选样排除门禁
+
+- 旧 batch003 与 batch002 重叠 4 个 pending gap，必须删除或隔离，禁止审批、抓取或写入。新批次只允许由包含本门禁的已提交 AMD64 镜像生成。
+- 生成时追加 `--exclude-selection-snapshot /workspace/runtime/historical_race_batches/2016-2025-batch-002-20260713/selection_snapshot.json`；如还有其他仍含 pending gap 的旧批次，可重复传入该参数。不得手工摘取或改写 snapshot。
+- 命令成功后必须核对：五地区各 50、与所有排除 snapshot 的 target ID 交集为 0、manifest 中存在 `excluded_selection_snapshot_NNN` 文件身份、复制件逐字节一致、summary 的 `excluded_pending_by_region` 与已知 gap 相符，且 `remaining_pending_by_region` 未扣除排除 gap。
+- 当前实现仅在本地通过 42 项聚焦测试、完整 `stable 1157` 项、Django check、迁移漂移和 OpenSpec strict/all；尚未部署。部署前先提交并同步 main，再交付可复现 AMD64 镜像；本门禁不要求重启常驻 web/worker/beat，可由协调线程批准后仅用于一次性只读批次生成。
+- 全程保持生产常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false` 和历史公开关闭；本步骤不得执行生产数据库写入。
+
 ## 2026-07-13 2016–2025 第二标准批次 246 场日期与详情导入
 
 - 运行镜像固定为 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`；revision `d8b65fe7d63e913cf826d02a74cdebaec60351ce`，Git tree `fda256535ae3b9f435cf8c7b069ff26d04503d99`。本批不得重建或重启生产容器。

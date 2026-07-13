@@ -42,6 +42,7 @@
 29. 生产只读日期 artifact 首次构建暴露 47 场英国距离证据缺少显式单位或使用 `1m71/2f` 紧凑写法。扩展既有地区补单位入口：英国裸数字按 `<5 mile / >=5 furlong`，紧凑 mile/furlong/yard 写法展开；复审同时修复距离消歧把 `71/2f` 错读为 `70.5f` 的十倍级错误。57 项专项和完整 stable 1128 项通过，第三轮 review 无剩余可修复问题。
 30. 法港英 150 场生产只读导出发现日期 apply 只物化原始清单字段，未消费审核证据里的显式距离单位。新增权威基础字段 JSONL 批次门禁，绑定整文件、target、inventory 和字段证据 SHA，限制可更新字段，保护人工锁，并同时锁定 target 与 RaceEvent 后整批原子写入。首轮复审补 RaceEvent 行锁、非法 target_id 统一错误和文件 SHA/禁用开关/重复目标测试；第二轮 review 无剩余可修复问题。
 31. 2016–2025 第二标准批次日美离线发现复审发现 JRA 五个障碍/赞助名称缺少官方日文别名，且 Breeders' Cup Juvenile 被短名称评分误配到 Juvenile Turf 的同一 URL。补齐显式 JRA 别名、TOBA 核心限定词完整单词匹配和同 URL 双 target 整体拒绝；复审进一步修复 `Turfway` 子串误判，并将 TOBA `not run` 行输出为只读 `source_reports_not_run` 审核证据。重新生成后日美 98 个可抓目标对应 98 个唯一 URL，Brooklyn/Cougar II 两条明确保留为产品审核项；重新 review 无剩余可修复问题。
+32. batch002完成后发现4个仍为pending的已交代gap会再次占用batch003配额。新增可重复`--exclude-selection-snapshot`，共享校验不可变snapshot身份，在地区limit前排除、复制原字节并绑定manifest，同时保持remaining分母不变。首轮实现review发现把排除文件列表放入`manifest.artifacts`会破坏既有单文件identity映射契约，已改为`excluded_selection_snapshot_NNN`稳定artifact键；第二轮review无剩余可修复问题。batch002真实250目标snapshot已通过新读取器，42项聚焦测试和1157项完整stable回归通过。
 
 ## 最终结论
 
@@ -51,7 +52,7 @@
 
 - Django check：通过
 - `makemigrations --check --dry-run`：无变化
-- `stable`完整测试：1141项通过，1项按设计跳过
+- `stable`完整测试：1157项通过，1项按设计跳过
 - OpenSpec change strict：通过
 - OpenSpec all strict：25项通过
 - `git diff --check`：通过

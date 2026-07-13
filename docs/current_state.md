@@ -1,5 +1,12 @@
 # 当前状态
 
+## 2026-07-13 后续标准批次重复选样门禁已实现
+
+- batch002 写后生成旧 batch003 时，4 个仍为 pending 的已交代 gap 再次进入选样：英国 Classic Handicap Chase、Dick Poole Fillies Stakes，以及美国 Brooklyn、Cougar II。该工件与 batch002 重叠 4 条，视为无效，不得审批或进入抓取。
+- `build_historical_race_band_batch` 已增加可重复 `--exclude-selection-snapshot`。命令校验旧快照 schema、inventory SHA、内部 snapshot SHA、target 数量/唯一性和稳定身份，在地区 limit 前排除旧 target，并把输入原字节复制到新 artifact、以固定键写入 manifest 文件身份。
+- 排除只影响本批选样：被排除 gap 继续保持 pending，仍计入 `available/remaining pending`，不计入 accounted/imported，也不修改 held/not_held/cancelled 口径。旧目标已导入导致当前 target SHA 改变时，只要 series/year/region/inventory 稳定，历史快照仍可作为排除证据。
+- 42 项批次与日期发现聚焦测试、完整 `stable 1157` 项回归、Django check、迁移漂移、OpenSpec strict/all 和第二轮代码 review 均通过。batch002 真实 250 目标快照已通过新读取器；代码尚未提交或部署，生产仍运行 `sha256:77eb1138...c3da0`，公开展示和常驻历史写入/网络开关保持关闭。
+
 ## 2026-07-13 2016–2025 标准批次二号 246 场正式导入
 
 - 生产已使用可复现主线镜像 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0` 完成第二标准批次。日期 artifact manifest SHA-256 为 `9ed3b7138012b4ce1732cf1f071d13cb16678a97983ea63d94329fe84c902e68`，批准 246 场、保留 4 个显式 gap；日期 apply 246/246 成功，目标由 pending 变为 ready，并生成 246 个 finished/draft 年度赛事。

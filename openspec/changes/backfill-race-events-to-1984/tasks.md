@@ -76,6 +76,7 @@
 - [x] 5.21 (integration) 实现JRA年度表/单场结果和TOBA/Equibase Yearbook批次来源发现与离线详情解析，显式补齐地区距离单位并保留退赛马
 - [x] 5.22 (integration) 实现权威基础字段批次验证与整批原子apply服务，绑定target/inventory/字段artifact身份并限制可更新字段和来源证据
 - [x] 5.23 (application) 新增权威基础字段JSONL管理命令，强制expected SHA、dry-run逐字段diff、人工锁展示和apply前全批身份复核
+- [x] 5.24 (integration) 为年代带标准批次增加既有selection snapshot排除输入，在地区limit前跳过已交代gap，并复制/哈希绑定排除证据且保持总账分母不变
 
 ## 6. 公开页面、搜索与索引
 
@@ -110,6 +111,7 @@
 - [x] 7.21 (integration) 补年代带批次年份边界、pending筛选、每地区稳定顺序、artifact身份和空/非法批次拒绝测试
 - [x] 7.22 (integration) 补JRA年度表对齐、美国同名场地区分/移师、Equibase Yearbook出马/退赛/赛果和新来源审批测试
 - [x] 7.23 (application) 补权威字段批次单位保留、未知字段/证据缺失、SHA漂移、人工锁、整批回滚和旧详情SHA失效回归测试
+- [x] 7.24 (integration) 补标准批次排除snapshot的跨inventory、SHA漂移、重复target、limit前补位、artifact复制和remaining分母测试
 
 ## 8. 生产总账与第一批验收
 

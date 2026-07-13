@@ -5,6 +5,7 @@ import csv
 import json
 import re
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -37,6 +38,115 @@ FIRST_ACCEPTANCE_TARGETS_PER_REGION = 9
 FIRST_ACCEPTANCE_SERIES_PER_REGION = 3
 FIRST_ACCEPTANCE_TOTAL_MIN = 40
 FIRST_ACCEPTANCE_TOTAL_MAX = 50
+SELECTION_SNAPSHOT_SCHEMA_VERSION = "1.0"
+
+
+@dataclass(frozen=True)
+class ImmutableSelectionSnapshot:
+    source_path: Path
+    raw_bytes: bytes
+    payload: dict[str, Any]
+    targets_by_id: dict[int, dict[str, Any]]
+
+
+def read_immutable_selection_snapshot(
+    path: str | Path,
+    *,
+    inventory_manifest_sha256: str,
+) -> ImmutableSelectionSnapshot:
+    source = Path(path)
+    try:
+        raw_bytes = source.read_bytes()
+        payload = json.loads(raw_bytes.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise InventoryValidationError("historical selection snapshot is unreadable") from exc
+    if not isinstance(payload, dict) or payload.get("schema_version") != SELECTION_SNAPSHOT_SCHEMA_VERSION:
+        raise InventoryValidationError("historical selection snapshot schema is invalid")
+    if payload.get("inventory_manifest_sha256") != inventory_manifest_sha256:
+        raise InventoryValidationError("historical selection snapshot inventory mismatch")
+    claimed_snapshot_sha = str(payload.get("snapshot_sha256") or "")
+    snapshot_payload = dict(payload)
+    snapshot_payload.pop("snapshot_sha256", None)
+    actual_snapshot_sha = hashlib.sha256(canonical_json(snapshot_payload).encode("utf-8")).hexdigest()
+    if claimed_snapshot_sha != actual_snapshot_sha:
+        raise InventoryValidationError("historical selection snapshot SHA is invalid")
+    rows = payload.get("targets")
+    if not isinstance(rows, list) or not rows:
+        raise InventoryValidationError("historical selection snapshot has no targets")
+    targets_by_id: dict[int, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise InventoryValidationError("historical selection snapshot target identity is invalid")
+        try:
+            target_id = int(row["target_id"])
+            year = int(row["year"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise InventoryValidationError("historical selection snapshot target identity is invalid") from exc
+        if (
+            target_id <= 0
+            or year <= 0
+            or target_id in targets_by_id
+            or not re.fullmatch(r"[0-9a-f]{64}", str(row.get("target_sha256") or ""))
+            or not str(row.get("series_key") or "").strip()
+            or not str(row.get("country_region") or "").strip()
+            or row.get("artifact_sha256") != inventory_manifest_sha256
+        ):
+            raise InventoryValidationError("historical selection snapshot target identity is invalid")
+        targets_by_id[target_id] = row
+    if int(payload.get("target_count", -1)) != len(targets_by_id):
+        raise InventoryValidationError("historical selection snapshot target count is inconsistent")
+    expected_region_counts = dict(
+        sorted(Counter(str(row["country_region"]) for row in targets_by_id.values()).items())
+    )
+    if "region_counts" in payload and payload.get("region_counts") != expected_region_counts:
+        raise InventoryValidationError("historical selection snapshot region counts are inconsistent")
+    return ImmutableSelectionSnapshot(
+        source_path=source,
+        raw_bytes=raw_bytes,
+        payload=payload,
+        targets_by_id=targets_by_id,
+    )
+
+
+def validate_selection_snapshot_target_identities(
+    snapshots: Iterable[ImmutableSelectionSnapshot],
+    *,
+    inventory_manifest_sha256: str,
+) -> set[int]:
+    expected_by_id: dict[int, dict[str, Any]] = {}
+    for snapshot in snapshots:
+        if snapshot.payload.get("inventory_manifest_sha256") != inventory_manifest_sha256:
+            raise InventoryValidationError("historical selection snapshot inventory mismatch")
+        for target_id, row in snapshot.targets_by_id.items():
+            previous = expected_by_id.get(target_id)
+            stable_identity = (row["series_key"], int(row["year"]), row["country_region"])
+            if previous is not None and stable_identity != (
+                previous["series_key"],
+                int(previous["year"]),
+                previous["country_region"],
+            ):
+                raise InventoryValidationError("historical selection snapshot target identity is invalid")
+            expected_by_id[target_id] = row
+    if not expected_by_id:
+        return set()
+    current = {
+        target.pk: target
+        for target in HistoricalRaceEventTarget.objects.select_related("race_series").filter(
+            pk__in=expected_by_id,
+            artifact_sha256=inventory_manifest_sha256,
+        )
+    }
+    if set(current) != set(expected_by_id):
+        raise InventoryValidationError("historical selection snapshot target identity is invalid")
+    for target_id, row in expected_by_id.items():
+        target = current[target_id]
+        if (
+            target.race_series.key != row["series_key"]
+            or target.year != int(row["year"])
+            or target.country_region != row["country_region"]
+        ):
+            raise InventoryValidationError("historical selection snapshot target identity is invalid")
+    return set(expected_by_id)
 
 
 def historical_event_slug(target: HistoricalRaceEventTarget) -> str:
@@ -383,6 +493,7 @@ def select_historical_band_batch_targets(
     year_end: int,
     inventory_manifest_sha256: str,
     region_limit: int = STANDARD_REGION_BATCH_LIMIT,
+    excluded_target_ids: Iterable[int] | None = None,
 ) -> list[HistoricalRaceEventTarget]:
     if year_start > year_end:
         raise InventoryValidationError("historical year band start must not exceed end")
@@ -392,6 +503,7 @@ def select_historical_band_batch_targets(
         raise InventoryValidationError(
             f"historical region limit must be between 1 and {STANDARD_REGION_BATCH_LIMIT}"
         )
+    excluded_ids = {int(target_id) for target_id in excluded_target_ids or []}
     selected: list[HistoricalRaceEventTarget] = []
     for region in sorted(region for region in RacingRegion.values if region != RacingRegion.OTHER):
         queryset = (
@@ -411,6 +523,8 @@ def select_historical_band_batch_targets(
             )
             .order_by("-year", "race_series__key", "id")
         )
+        if excluded_ids:
+            queryset = queryset.exclude(pk__in=excluded_ids)
         selected.extend(list(queryset[:region_limit]))
     _validate_region_limit_and_progress(
         Counter(target.country_region for target in selected),
@@ -427,12 +541,20 @@ def write_band_batch_artifact(
     inventory_manifest_sha256: str,
     year_start: int,
     year_end: int,
+    exclusion_snapshots: Iterable[ImmutableSelectionSnapshot] | None = None,
 ) -> dict[str, Any]:
     rows = list(targets)
+    exclusions = list(exclusion_snapshots or [])
+    excluded_ids = validate_selection_snapshot_target_identities(
+        exclusions,
+        inventory_manifest_sha256=inventory_manifest_sha256,
+    )
     if not rows:
         raise InventoryValidationError("historical band batch has no pending targets")
     if len({target.pk for target in rows}) != len(rows):
         raise InventoryValidationError("historical band batch contains duplicate targets")
+    if {target.pk for target in rows} & excluded_ids:
+        raise InventoryValidationError("historical band batch selection intersects exclusion snapshots")
     for target in rows:
         if not year_start <= target.year <= year_end:
             raise InventoryValidationError(f"target is outside historical year band: {target.pk}")
@@ -463,6 +585,17 @@ def write_band_batch_artifact(
         output_path=snapshot_path,
         inventory_manifest_sha256=inventory_manifest_sha256,
     )
+    exclusion_artifacts: dict[str, dict[str, Any]] = {}
+    if exclusions:
+        exclusion_root = root / "exclusions"
+        exclusion_root.mkdir()
+        for index, exclusion in enumerate(exclusions, start=1):
+            copied_path = exclusion_root / f"selection-{index:03d}.json"
+            copied_path.write_bytes(exclusion.raw_bytes)
+            exclusion_artifacts[f"excluded_selection_snapshot_{index:03d}"] = file_identity(
+                copied_path,
+                relative_to=root,
+            ).as_dict()
     review_path = root / "expected_targets_review.csv"
     review_fields = [
         "target_id",
@@ -514,6 +647,10 @@ def write_band_batch_artifact(
         row["country_region"]: row["count"]
         for row in pending.values("country_region").annotate(count=Count("id"))
     }
+    excluded_pending_counts = {
+        row["country_region"]: row["count"]
+        for row in pending.filter(pk__in=excluded_ids).values("country_region").annotate(count=Count("id"))
+    }
     selected_counts = Counter(target.country_region for target in rows)
     summary = {
         "schema_version": "1.0",
@@ -523,6 +660,9 @@ def write_band_batch_artifact(
         "snapshot_sha256": snapshot["snapshot_sha256"],
         "selected_by_region": dict(sorted(selected_counts.items())),
         "available_pending_by_region": dict(sorted(available_counts.items())),
+        "excluded_snapshot_count": len(exclusions),
+        "excluded_target_count": len(excluded_ids),
+        "excluded_pending_by_region": dict(sorted(excluded_pending_counts.items())),
         "remaining_pending_by_region": {
             region: available_counts.get(region, 0) - selected_counts.get(region, 0)
             for region in sorted(region for region in RacingRegion.values if region != RacingRegion.OTHER)
@@ -544,6 +684,7 @@ def write_band_batch_artifact(
             "selection_snapshot": file_identity(snapshot_path, relative_to=root).as_dict(),
             "expected_targets_review": file_identity(review_path, relative_to=root).as_dict(),
             "summary": file_identity(summary_path, relative_to=root).as_dict(),
+            **exclusion_artifacts,
         },
     }
     manifest_path = root / "manifest.json"
@@ -598,7 +739,7 @@ def write_batch_snapshot(
 ) -> dict[str, Any]:
     rows = [target_identity(target) for target in targets]
     payload = {
-        "schema_version": "1.0",
+        "schema_version": SELECTION_SNAPSHOT_SCHEMA_VERSION,
         "inventory_manifest_sha256": inventory_manifest_sha256,
         "target_count": len(rows),
         "region_counts": dict(sorted(Counter(row["country_region"] for row in rows).items())),

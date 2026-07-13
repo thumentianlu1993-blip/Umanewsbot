@@ -1,3 +1,13 @@
 schema: spec-driven
 profile: feature
 created: 2026-07-11
+phase: reviewed
+journal:
+  - event: plan-reviewed
+    date: "2026-07-13T17:05:21+08:00"
+    session: 1
+    mode: full
+    rounds: 1
+    issues_resolved: 0
+    artifacts_modified: [design.md, specs/race-event-data-crawl-orchestration/spec.md, tasks.md, test_cases.md]
+    note: "Approved the immutable prior-selection exclusion amendment; no remaining architecture, test, performance, or consistency issues."

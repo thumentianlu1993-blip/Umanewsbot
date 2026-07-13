@@ -32,6 +32,7 @@ from stable.models import (
 from stable.services.historical_race_batches import (
     _locked_historical_target,
     materialize_historical_event,
+    read_immutable_selection_snapshot,
     select_historical_band_batch_targets,
     select_first_acceptance_targets,
     target_identity,
@@ -40,7 +41,7 @@ from stable.services.historical_race_batches import (
     write_event_input_csvs,
     write_batch_snapshot,
 )
-from stable.services.historical_race_inventory import InventoryValidationError
+from stable.services.historical_race_inventory import InventoryValidationError, canonical_json
 from stable.services.historical_race_importer import (
     apply_authoritative_event_fields,
     apply_historical_champion_supplement,
@@ -336,6 +337,241 @@ class HistoricalRaceBatchTests(TestCase):
         self.assertEqual(approval["status"], "pending")
         self.assertEqual(approval["approved_target_ids"], [])
         self.assertEqual(review.count("\n"), 6)
+
+    def test_band_batch_excludes_prior_selection_before_region_limit_and_preserves_denominator(self):
+        targets_by_region: dict[str, list[HistoricalRaceEventTarget]] = {}
+        for region in (
+            RacingRegion.JAPAN,
+            RacingRegion.HONG_KONG,
+            RacingRegion.UNITED_KINGDOM,
+            RacingRegion.FRANCE,
+            RacingRegion.UNITED_STATES,
+        ):
+            series = self._series(region, "excluded-band")
+            targets_by_region[region] = [
+                self._target(
+                    series,
+                    year,
+                    resolution=HistoricalRaceResolutionStatus.PENDING,
+                    with_event=False,
+                )
+                for year in (2025, 2024)
+            ]
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prior_snapshot_path = root / "prior-selection.json"
+            write_batch_snapshot(
+                [targets_by_region[RacingRegion.JAPAN][0]],
+                output_path=prior_snapshot_path,
+                inventory_manifest_sha256="a" * 64,
+            )
+            prior_bytes = prior_snapshot_path.read_bytes()
+            output_dir = root / "band"
+
+            call_command(
+                "build_historical_race_band_batch",
+                "--year-start",
+                "2016",
+                "--year-end",
+                "2025",
+                "--region-limit",
+                "1",
+                "--inventory-manifest-sha256",
+                "a" * 64,
+                "--exclude-selection-snapshot",
+                str(prior_snapshot_path),
+                "--output-dir",
+                str(output_dir),
+                verbosity=0,
+            )
+
+            selection = json.loads((output_dir / "selection_snapshot.json").read_text(encoding="utf-8"))
+            summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+            manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+            copied_path = output_dir / "exclusions" / "selection-001.json"
+
+            selected_japan = [
+                row for row in selection["targets"] if row["country_region"] == RacingRegion.JAPAN
+            ]
+            self.assertEqual(
+                [row["target_id"] for row in selected_japan],
+                [targets_by_region[RacingRegion.JAPAN][1].pk],
+            )
+            self.assertEqual(copied_path.read_bytes(), prior_bytes)
+            self.assertEqual(summary["excluded_target_count"], 1)
+            self.assertEqual(summary["excluded_pending_by_region"], {RacingRegion.JAPAN: 1})
+            self.assertEqual(summary["available_pending_by_region"][RacingRegion.JAPAN], 2)
+            self.assertEqual(summary["remaining_pending_by_region"][RacingRegion.JAPAN], 1)
+            self.assertEqual(
+                manifest["artifacts"]["excluded_selection_snapshot_001"]["path"],
+                "exclusions/selection-001.json",
+            )
+            self.assertEqual(
+                manifest["artifacts"]["excluded_selection_snapshot_001"]["sha256"],
+                hashlib.sha256(prior_bytes).hexdigest(),
+            )
+
+    def test_band_batch_accepts_repeated_snapshot_and_changed_current_target_sha(self):
+        series = self._series(RacingRegion.JAPAN, "imported-exclusion")
+        previous = self._target(
+            series,
+            2025,
+            resolution=HistoricalRaceResolutionStatus.PENDING,
+            with_event=False,
+        )
+        replacement = self._target(
+            series,
+            2024,
+            resolution=HistoricalRaceResolutionStatus.PENDING,
+            with_event=False,
+        )
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prior_path = root / "prior.json"
+            write_batch_snapshot(
+                [previous],
+                output_path=prior_path,
+                inventory_manifest_sha256="a" * 64,
+            )
+            previous.resolution_status = HistoricalRaceResolutionStatus.IMPORTED
+            previous.original_name = "Changed after successful import"
+            previous.save(update_fields={"resolution_status", "original_name"})
+            output_dir = root / "band"
+
+            call_command(
+                "build_historical_race_band_batch",
+                "--year-start",
+                "2016",
+                "--year-end",
+                "2025",
+                "--region-limit",
+                "1",
+                "--inventory-manifest-sha256",
+                "a" * 64,
+                "--exclude-selection-snapshot",
+                str(prior_path),
+                "--exclude-selection-snapshot",
+                str(prior_path),
+                "--output-dir",
+                str(output_dir),
+                verbosity=0,
+            )
+
+            selection = json.loads((output_dir / "selection_snapshot.json").read_text(encoding="utf-8"))
+            summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual([row["target_id"] for row in selection["targets"]], [replacement.pk])
+            self.assertEqual(summary["excluded_snapshot_count"], 2)
+            self.assertEqual(summary["excluded_target_count"], 1)
+            self.assertEqual(summary["excluded_pending_by_region"], {})
+            self.assertEqual((output_dir / "exclusions" / "selection-001.json").read_bytes(), prior_path.read_bytes())
+            self.assertEqual((output_dir / "exclusions" / "selection-002.json").read_bytes(), prior_path.read_bytes())
+
+    def test_band_batch_command_rejects_invalid_exclusion_without_output(self):
+        target = self._target(
+            self._series(RacingRegion.JAPAN, "invalid-exclusion"),
+            2025,
+            resolution=HistoricalRaceResolutionStatus.PENDING,
+            with_event=False,
+        )
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            valid_path = root / "valid.json"
+            write_batch_snapshot(
+                [target],
+                output_path=valid_path,
+                inventory_manifest_sha256="a" * 64,
+            )
+            cross_inventory_path = root / "cross-inventory.json"
+            write_batch_snapshot(
+                [target],
+                output_path=cross_inventory_path,
+                inventory_manifest_sha256="b" * 64,
+            )
+            drifted_path = root / "drifted.json"
+            drifted_payload = json.loads(valid_path.read_text(encoding="utf-8"))
+            drifted_payload["targets"][0]["year"] = 2024
+            drifted_path.write_text(json.dumps(drifted_payload), encoding="utf-8")
+            unknown_target_path = root / "unknown-target.json"
+            unknown_payload = json.loads(valid_path.read_text(encoding="utf-8"))
+            unknown_payload["targets"][0]["target_id"] = target.pk + 1000
+            unsigned = dict(unknown_payload)
+            unsigned.pop("snapshot_sha256")
+            unknown_payload["snapshot_sha256"] = hashlib.sha256(
+                canonical_json(unsigned).encode("utf-8")
+            ).hexdigest()
+            unknown_target_path.write_text(json.dumps(unknown_payload), encoding="utf-8")
+            duplicate_target_path = root / "duplicate-target.json"
+            duplicate_payload = json.loads(valid_path.read_text(encoding="utf-8"))
+            duplicate_payload["targets"].append(dict(duplicate_payload["targets"][0]))
+            duplicate_payload["target_count"] = 2
+            duplicate_payload["region_counts"] = {RacingRegion.JAPAN: 2}
+            duplicate_unsigned = dict(duplicate_payload)
+            duplicate_unsigned.pop("snapshot_sha256")
+            duplicate_payload["snapshot_sha256"] = hashlib.sha256(
+                canonical_json(duplicate_unsigned).encode("utf-8")
+            ).hexdigest()
+            duplicate_target_path.write_text(json.dumps(duplicate_payload), encoding="utf-8")
+
+            for label, exclusion_path, message in (
+                ("cross", cross_inventory_path, "inventory mismatch"),
+                ("drift", drifted_path, "SHA is invalid"),
+                ("unknown", unknown_target_path, "target identity is invalid"),
+                ("duplicate", duplicate_target_path, "target identity is invalid"),
+            ):
+                with self.subTest(label=label):
+                    output_dir = root / f"output-{label}"
+                    with self.assertRaisesMessage(CommandError, message):
+                        call_command(
+                            "build_historical_race_band_batch",
+                            "--year-start",
+                            "2016",
+                            "--year-end",
+                            "2025",
+                            "--region-limit",
+                            "1",
+                            "--inventory-manifest-sha256",
+                            "a" * 64,
+                            "--exclude-selection-snapshot",
+                            str(exclusion_path),
+                            "--output-dir",
+                            str(output_dir),
+                            verbosity=0,
+                        )
+                    self.assertFalse(output_dir.exists())
+
+    def test_band_batch_artifact_rejects_selection_exclusion_intersection(self):
+        target = self._target(
+            self._series(RacingRegion.FRANCE, "selection-intersection"),
+            2025,
+            resolution=HistoricalRaceResolutionStatus.PENDING,
+            with_event=False,
+        )
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            prior_path = root / "prior.json"
+            write_batch_snapshot(
+                [target],
+                output_path=prior_path,
+                inventory_manifest_sha256="a" * 64,
+            )
+            exclusion = read_immutable_selection_snapshot(
+                prior_path,
+                inventory_manifest_sha256="a" * 64,
+            )
+            output_dir = root / "output"
+
+            with self.assertRaisesMessage(InventoryValidationError, "intersects exclusion"):
+                write_band_batch_artifact(
+                    [target],
+                    output_dir=output_dir,
+                    inventory_manifest_sha256="a" * 64,
+                    year_start=2016,
+                    year_end=2025,
+                    exclusion_snapshots=[exclusion],
+                )
+
+            self.assertFalse(output_dir.exists())
 
     def test_band_batch_artifact_rejects_empty_duplicate_and_non_pending_targets(self):
         with TemporaryDirectory() as tmp, self.assertRaisesMessage(

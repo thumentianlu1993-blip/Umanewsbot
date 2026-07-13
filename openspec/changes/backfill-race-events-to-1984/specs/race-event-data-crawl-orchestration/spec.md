@@ -195,6 +195,14 @@
 - **AND** 输出 SHALL 包含不可变selection snapshot、完整审核CSV、地区分母summary、manifest和pending approval
 - **AND** 空批次、重复target、inventory SHA不符或年代带外目标 MUST fail closed
 
+#### Scenario: 已交代缺口不重复占用后续批次
+- **WHEN** 上一批 selection snapshot 中的目标因缺口审核尚未结论而继续保持pending
+- **AND** 操作者把该不可变snapshot作为下一标准批次的显式排除输入
+- **THEN** 系统 MUST 在地区上限选择前排除这些target并继续选择新的pending目标
+- **AND** 新artifact MUST 复制并哈希绑定排除snapshot，summary MUST 单列排除数量和地区分布
+- **AND** 被排除目标 MUST 继续保留在总账和remaining pending分母中，不得计为accounted/imported或改变expectation/resolution
+- **AND** snapshot SHA、inventory SHA、target身份无效，或新selection与排除集合相交时 MUST fail closed
+
 #### Scenario: 单地区试图连续领先
 - **WHEN** 某地区将比最慢地区领先超过 100 个同年代带标准目标
 - **THEN** 批次生成器 MUST 阻止新计划

@@ -1,5 +1,12 @@
 # 关键决策
 
+## 2026-07-13：已交代 gap 用历史选样证据排除，不改产品状态
+
+- 上一批已经进入 gap ledger、但仍应保持 pending 的目标，不得反复占用后续标准批次的地区配额；生成新批次时显式传入既有不可变 selection snapshot，在地区 limit 前按 target ID 排除。
+- 排除 snapshot 必须自证 schema、inventory SHA、内部 snapshot SHA、target 数量和唯一性，并与当前总账的稳定 series/year/region/inventory 身份一致；当前 target SHA 可因成功导入或权威字段更新而变化，不作为历史排除证据失效条件。
+- 新 artifact 必须复制输入 snapshot 原字节，以固定单文件 artifact 键绑定路径、大小和 SHA-256。多份 snapshot 可重复输入，target ID 去重；最终 selection 与排除集合相交时 fail closed。
+- 该入口只改变选样，不修改 expectation、resolution、event 或来源证据。被排除的 pending gap 继续留在 available/remaining 分母，直到另行完成产品审核、补源或永久不可得审批。
+
 ## 2026-07-13：详情来源审批与最终数据导入必须使用不同形态的候选
 
 - `manage_historical_race_detail_sources` 必须读取仍带 `year / slug` 的原始解析候选，用于按年度赛事建立来源审批 artifact；不得把只含 target 绑定信息的最终导入包反向当作来源发现输入。

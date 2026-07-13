@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import ipaddress
 import json
 import re
@@ -24,6 +23,7 @@ from stable.models import (
 )
 from stable.services.historical_race_batches import (
     materialize_historical_event,
+    read_immutable_selection_snapshot,
     target_identity,
 )
 from stable.services.historical_race_inventory import (
@@ -366,35 +366,11 @@ def _read_selection_snapshot(
     *,
     inventory_manifest_sha256: str,
 ) -> tuple[bytes, dict[str, Any], dict[int, dict[str, Any]]]:
-    source = Path(path)
-    try:
-        selection_bytes = source.read_bytes()
-        selection = json.loads(selection_bytes.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise InventoryValidationError("date discovery selection snapshot is unreadable") from exc
-    if not isinstance(selection, dict) or selection.get("inventory_manifest_sha256") != inventory_manifest_sha256:
-        raise InventoryValidationError("date discovery selection snapshot inventory mismatch")
-    claimed_snapshot_sha = str(selection.get("snapshot_sha256") or "")
-    snapshot_payload = dict(selection)
-    snapshot_payload.pop("snapshot_sha256", None)
-    actual_snapshot_sha = hashlib.sha256(canonical_json(snapshot_payload).encode("utf-8")).hexdigest()
-    if claimed_snapshot_sha != actual_snapshot_sha:
-        raise InventoryValidationError("date discovery selection snapshot SHA is invalid")
-    selection_rows = selection.get("targets")
-    if not isinstance(selection_rows, list) or not selection_rows:
-        raise InventoryValidationError("date discovery selection snapshot has no targets")
-    selection_by_id: dict[int, dict[str, Any]] = {}
-    for row in selection_rows:
-        try:
-            target_id = int(row["target_id"])
-        except (KeyError, TypeError, ValueError) as exc:
-            raise InventoryValidationError("date discovery selection has invalid target id") from exc
-        if target_id in selection_by_id or not str(row.get("target_sha256") or "").strip():
-            raise InventoryValidationError("date discovery selection target identities are invalid")
-        selection_by_id[target_id] = row
-    if int(selection.get("target_count", -1)) != len(selection_by_id):
-        raise InventoryValidationError("date discovery selection target count is inconsistent")
-    return selection_bytes, selection, selection_by_id
+    snapshot = read_immutable_selection_snapshot(
+        path,
+        inventory_manifest_sha256=inventory_manifest_sha256,
+    )
+    return snapshot.raw_bytes, snapshot.payload, snapshot.targets_by_id
 
 
 def build_provider_discovery_candidates(

@@ -200,6 +200,8 @@
 | TC-BATCH-014 | 2016–2025 完成后 | 生成下一年代 | 可进入 2006–2015；不得跳过未 accounted 的当前年代缺口报告 | A/O |
 | TC-BATCH-015 | 2016–2025含五地区pending目标 | 生成标准批次 | 每地区最多50个，按新到旧稳定选择，只包含pending未materialize due目标 | A/O |
 | TC-BATCH-016 | 空批次、重复target、年代外或inventory SHA漂移 | 生成artifact | fail closed，不生成可批准清单 | A/S |
+| TC-BATCH-017 | 上批gap仍pending且提供上批selection snapshot | 生成下一标准批次 | limit前排除旧target并补入新target；排除snapshot复制进manifest，gap仍留remaining分母 | A/S |
+| TC-BATCH-018 | 排除snapshot跨inventory、内部SHA漂移、target重复或与新selection相交 | 生成artifact | fail closed，不生成可批准清单且不改变target状态 | A/S |
 
 ## 10. 详情导入、冠军和原子写入
 

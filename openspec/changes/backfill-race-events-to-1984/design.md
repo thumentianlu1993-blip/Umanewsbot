@@ -128,6 +128,8 @@ held/due 年度目标必须有：
 
 年代带标准批次必须由正式命令从批准总账中选择 `pending`、未materialize的 held/cancelled 目标，按年份从新到旧、系列key和target id确定稳定顺序。每批输出不可变selection snapshot、完整CSV审核表、地区/剩余分母summary、manifest和pending approval；空批次、重复target、年代带外目标、inventory SHA不符或非pending目标不得生成成功artifact。
 
+上一批已经进入 gap ledger、但因产品语义或补源尚未结论而继续保持 `pending` 的目标，不得在后续标准批次中反复占用抓取配额。批次命令通过可重复的 `--exclude-selection-snapshot` 显式接收既有不可变 selection snapshot：每份输入必须校验 schema、inventory manifest SHA、内部 snapshot SHA、target 数量和唯一性；排除必须在地区 limit 之前应用，使各地区仍可选择最多 50 个新的 pending 目标。新 artifact 必须复制排除 snapshot 原字节并在 manifest 中绑定路径、大小和 SHA-256，summary 单列排除的 pending 目标及地区计数；这些目标仍保留在总账分母和 remaining pending 中，不计入 accounted/imported，也不得借排除入口修改 expectation/resolution。任一排除 snapshot 漂移、跨 inventory、目标身份无效，或最终 selection 与排除集合相交时必须 fail closed。
+
 ### 8. 允许完整 scope 先写，缺口不消失
 
 coverage 对每个 target 输出模块结论。完整 target 可形成独立 apply scope；缺口目标保留在总账，不进入 approved candidate，也不阻止其他完整 scope。
