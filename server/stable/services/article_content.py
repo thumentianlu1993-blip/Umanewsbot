@@ -19,6 +19,7 @@ _PARAGRAPH_SPLIT_RE = re.compile(r"\n+")
 # signals are removed.
 _BETTING_PROMOTION_RE = re.compile(
     r"(?:\bbet now\b|\bfree bets?\b|\bbest bets?\b|\bcharity bet\b|"
+    r"\bcharity tipping challenge\b|\bwinning tipster\b|"
     r"\bbetting tips?\b|\bdaily racing tips?\b|\bclaim\s+(?:£|\$|€)\s*\d+|"
     r"\bsign up\b.*\b(?:bet|offer|bonus)\b|\bexclusive offers?\b|"
     r"\bgambling problem\b|\bsafer gambling\b|\bresponsible gambling\b|"
@@ -56,6 +57,14 @@ _TDN_TAIL_RULES = (
 _SPORTING_LIFE_TAIL_RULES = (
     ("sporting_life_more", re.compile(r"^more from sporting life\.?$", re.IGNORECASE)),
     ("sporting_life_like", re.compile(r"^like what you(?:'|’)ve read\??", re.IGNORECASE)),
+)
+
+_SPORTING_LIFE_INLINE_RULES = (
+    (
+        "sponsor_clause",
+        re.compile(r"^backed by [^,]{1,80}(?:again\s+)?for\s+20\d{2},\s*", re.IGNORECASE),
+    ),
+    ("link_cta", re.compile(r"^book now\s+", re.IGNORECASE)),
 )
 
 
@@ -124,6 +133,20 @@ def _remove_betting_promotions(paragraphs: list[str], removed: Counter[str]) -> 
     return kept
 
 
+def _strip_sporting_life_inline_noise(paragraphs: list[str], removed: Counter[str]) -> list[str]:
+    kept: list[str] = []
+    for paragraph in paragraphs:
+        cleaned = paragraph
+        for name, pattern in _SPORTING_LIFE_INLINE_RULES:
+            updated = pattern.sub("", cleaned).strip()
+            if updated != cleaned:
+                removed[name] += 1
+                cleaned = updated
+        if cleaned:
+            kept.append(cleaned)
+    return kept
+
+
 def clean_international_article_body(node: Tag, *, source_site: SourceSite | str) -> ArticleContentCleanResult:
     removed: Counter[str] = Counter()
     _remove_structured_noise(node, removed)
@@ -136,6 +159,7 @@ def clean_international_article_body(node: Tag, *, source_site: SourceSite | str
     elif source == SourceSite.SPORTING_LIFE:
         paragraphs = _truncate_tail(paragraphs, _SPORTING_LIFE_TAIL_RULES, removed)
         paragraphs = _remove_betting_promotions(paragraphs, removed)
+        paragraphs = _strip_sporting_life_inline_noise(paragraphs, removed)
 
     text = normalize_whitespace("\n\n".join(paragraphs))
     return ArticleContentCleanResult(
