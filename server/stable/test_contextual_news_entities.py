@@ -423,6 +423,39 @@ class JapaneseCompleteHorseNameTests(TestCase):
         )
         self.assertEqual(resolution.machine_horse_tags, [])
 
+    def test_recent_japanese_article_common_words_are_not_protected_as_horses(self):
+        common_terms = {
+            "フリー": "自由人",
+            "天才": "天才",
+            "リーチ": "触手可及",
+            "ユタカ": "丰收",
+            "サイン": "先兆",
+            "ファーム": "牧场",
+            "リーディングサイアー": "冠军种公马",
+        }
+        for source, target in common_terms.items():
+            self._internal_term(source, target)
+        self._internal_term("アグネスワールド", "爱丽世界")
+        self._internal_term("キングカメハメハ", "夏威夷王")
+
+        resolution = _resolve(
+            "過去の名勝負と名馬",
+            (
+                "武豊騎手＝栗東・フリー＝は天才と呼ばれ、勝ってリーチ。"
+                "アグネスワールドの4コーナーでユタカは勝利を確信し、残り200メートルでGOサイン。"
+                "その後は社台ファームに放牧された。キングカメハメハは長らくリーディングサイアーに君臨した。"
+            ),
+            SourceLanguage.JAPANESE,
+        )
+
+        false_matches = {
+            item.matched_text
+            for item in resolution.entities
+            if item.entity_type in {"horse", "unknown_horse"} and item.matched_text in common_terms
+        }
+        self.assertEqual(false_matches, set())
+        self.assertEqual(set(resolution.machine_horse_tags), {"爱丽世界", "夏威夷王"})
+
     def test_katakana_name_before_jockey_role_is_a_person_not_a_horse(self):
         self._internal_term("スミヨン", "苏铭伦")
         self._internal_term("クリストフ", "基斯杜化")

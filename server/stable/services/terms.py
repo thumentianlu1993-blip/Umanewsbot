@@ -857,7 +857,11 @@ def _resolve_japanese_entities(
                 text, title if field_name == "title" else "", match.start(), match.end(), token
             ) or _score_heuristic_candidate(text, title, match.start(), match.end(), token) >= 3
             common_word_strong = _strong_japanese_common_word_horse_context(text, match.start(), match.end())
-            if token in non_horse_words and not common_word_strong and not exact_non_horse_terms:
+            if (
+                token in non_horse_words
+                and (token in _HORSE_ALWAYS_COMMON_WORDS or not common_word_strong)
+                and not exact_non_horse_terms
+            ):
                 common_word = _make_entity(
                     "common_word",
                     token,
@@ -963,7 +967,7 @@ def _resolve_japanese_entities(
                     )
                     if entry.term_type == TermType.HORSE and candidate in non_horse_words:
                         strong = _strong_japanese_common_word_horse_context(text, match.start(), match.end())
-                        if not strong:
+                        if candidate in _HORSE_ALWAYS_COMMON_WORDS or not strong:
                             entities.append(
                                 _make_entity(
                                     "common_word",
@@ -1376,15 +1380,23 @@ _HORSE_STOPWORDS = {
     "パーティー",
     "トップ",
     "ファン",
+    "ファーム",
+    "フリー",
     "リベンジ",
+    "リーチ",
+    "リーディングサイアー",
     "セール",
     "セレクトセール",
     "セッション",
     "ステークス",
     "ユーロ",
+    "ユタカ",
     "豪快",
     "期待",
+    "サイン",
+    "天才",
 }
+_HORSE_ALWAYS_COMMON_WORDS = {"ユタカ"}
 _NON_HORSE_NOTE_MARKER = "non_horse_common_word"
 
 
