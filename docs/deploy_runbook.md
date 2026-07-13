@@ -1,5 +1,15 @@
 # 部署运行手册
 
+## 2026-07-13 `main@304ebdb6` 可复现镜像切换
+
+- 目标镜像：`umanewsbot:main-304ebdb6-amd64-20260713-1230`，image ID `sha256:e7ab7af0061d7362ad0582224baffc79eda07bd6d8f6467bfa573f760853877d`，revision `304ebdb67562e655929d263a3af98b8f17905752`，Git tree `5dfef5c7d219e63cd0b156071c89508cb42543ce`，context SHA-256 `a77a271cde3d0d06e25f9075036de5fc99415e832f2da052c84bf40bf956a7b5`。两次构建 image ID 一致。
+- 切换前备份：`.env.backup.main-304ebdb6-20260713_123828`；数据库 `backups/db/pre-main-304ebdb6-20260713_123828.sql.gz`，`148091210` bytes，SHA-256 `f61038e6a9e015f0eb0d59288029903911ebd55ed1acf600eabfb15a4c6ee126`，`gzip -t` 通过。旧镜像回滚 tag 为 `pre-main-304ebdb6-20260713-1240`。
+- 生产主仓库快进时，未跟踪的旧版 `runtime/tools/package_historical_race_detail_candidates.py` 与新主线跟踪路径冲突。该旧文件仅缺少新 provider，无主线之外能力；原文件和 SHA 已保存在 `runtime/deploy/pre-main-304ebdb6-20260713_1239/`，再由跟踪版本接管。不得把备份旧版覆盖回工作树。
+- 切换步骤：停止 beat，等待 Celery active/reserved 清空，核对外部导入、归属和术语重处理 run/lock 均为 0；将旧 `prod` 保留为回滚 tag，再把新镜像 retag 为 `prod`；用新镜像执行 migrate、Django check 和 migration drift，全部通过后 `--force-recreate web worker beat`，最后 collectstatic。
+- 验收结果：三容器 image ID 一致，`0027–0029`、64 models、六个新历史管理命令通过；法国/香港/英国各 `50 ready`，历史公开为 0；关键新开关与历史网络开关继续 false。内外 healthz、首页、五地区 query filter、赛事/马匹页和后台跳转通过，日志无异常，新容器后自然窗口无 failed。
+- `12:45` 自然窗口收口证据：当轮 8 个 due source 抓取全部 succeeded，publish/QQ 各 5 个地区窗口全部 succeeded；netkeiba 新着顺 `seen=116 / new=4`，4 篇全部 translated 且为 publish_ready。
+- 回滚：先停 beat 并排空 worker，将 `pre-main-304ebdb6-20260713-1240` retag 为 `prod`，重建 `web / worker / beat`。数据库本次无新迁移，只有出现数据损坏时才使用上述备份恢复。
+
 ## 2026-07-13 组合镜像恢复后窗口验收口径
 
 - 验收不得只看 ProductionWindow `status=succeeded`；必须同时核对来源级 `seen/new`、文章翻译/门禁/发布状态、QQ delivery、超时任务和容器日志。

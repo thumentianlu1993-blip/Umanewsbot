@@ -1,14 +1,23 @@
 # 当前状态
 
+## 2026-07-13 历史源码固化与可复现生产镜像切换
+
+- 历史赛事全部保留能力已提交并推送，分支与远端 `main` 均已快进到 `304ebdb67562e655929d263a3af98b8f17905752`。源码完整 `stable` 回归为 `1128 passed / 1 skipped`，OpenSpec strict、Django check、迁移漂移与 diff check 通过。
+- 生产最终已切换到从干净已提交 `main` 两次一致构建的 AMD64 镜像 `umanewsbot:main-304ebdb6-amd64-20260713-1230`，image ID 为 `sha256:e7ab7af0061d7362ad0582224baffc79eda07bd6d8f6467bfa573f760853877d`，Git tree 为 `5dfef5c7d219e63cd0b156071c89508cb42543ce`，context SHA-256 为 `a77a271cde3d0d06e25f9075036de5fc99415e832f2da052c84bf40bf956a7b5`。旧组合镜像已保留为回滚 tag `pre-main-304ebdb6-20260713-1240`。
+- 切换前数据库备份为 `backups/db/pre-main-304ebdb6-20260713_123828.sql.gz`，大小 `148091210` bytes，SHA-256 为 `f61038e6a9e015f0eb0d59288029903911ebd55ed1acf600eabfb15a4c6ee126`，`gzip -t` 通过；`.env` 备份为 `.env.backup.main-304ebdb6-20260713_123828`。生产遗留的未跟踪旧版 `package_historical_race_detail_candidates.py` 已按原 SHA 保存在 `runtime/deploy/pre-main-304ebdb6-20260713_1239/`，由正式跟踪的新版接管路径。
+- 切换按单一生产协调流程执行：停 beat，等待唯一术语发现任务自然结束，确认 Celery active/reserved、外部导入、归属与术语重处理锁均为 0；新镜像 migrate 无待迁移，Django check 和 `makemigrations --check --dry-run` 通过后重建 `web / worker / beat`。
+- 上线验收：三个应用容器均使用 `sha256:e7ab7af0...877d`，`stable.0027–0029` 均已应用，64 models 加载正常，历史日期/批次/详情管理命令可用。归属、相关地区查询、翻译自动重试、失败邮件和历史网络/公开开关均继续安全关闭。历史 target 为法国/香港/英国各 `50 ready`，历史公开数为 0。内外 healthz、首页、五地区筛选、赛事页、马匹页与后台跳转均通过，最近日志无异常，新容器后的自然生产窗口无失败。“运行镜像不可复现”风险至此已解除。
+- 新镜像后的北京时间 `12:45` 自然窗口已收口：当轮到期的 8 个抓取窗口全部 succeeded，五地区发布和 QQ 窗口全部 succeeded。netkeiba 新着顺读取 `116`、新增 `4`，文章 `8225–8228` 均已翻译并进入 `publish_ready`，未再出现 schema 约束错误。
+
 ## 2026-07-13 组合镜像恢复后三窗口只读验收
 
-- 本次以北京时间 `11:15 / 11:30 / 11:45` 三个生产窗口为验收对象，并追加观察 `12:00` 窗口。当前 `web / worker / beat` 仍统一使用 AMD64 组合镜像 `sha256:383a36c1...c7b4`，容器健康，最近 90 分钟日志未发现 traceback/error/critical/exception，也没有超过 30 分钟的 ProductionWindow 卡死。
+- 本次以北京时间 `11:15 / 11:30 / 11:45` 三个生产窗口为验收对象，并追加观察 `12:00` 窗口。该次验收时 `web / worker / beat` 统一使用临时 AMD64 组合镜像 `sha256:383a36c1...c7b4`，容器健康，最近 90 分钟日志未发现 traceback/error/critical/exception，也没有超过 30 分钟的 ProductionWindow 卡死。该镜像已由上述可复现主线镜像替代。
 - 抓取主链路已恢复，但尚不能记为“完全正常”。`11:15` 为 `8 succeeded + 9 coalesced`，`11:30` 为 `9 succeeded + 8 coalesced`，`11:45` 的 17 个已启用且生产批准来源全部 succeeded。追加观察时，`12:00` 为 `10 succeeded + 6 coalesced`，同一批 6 个来源已在 `12:15` 成功抓取，证明合并不只是重建后追赶，也是当前调度算法的常态。来源以 `last_crawl_at` 滚动到期、beat 每 5 分钟检查，因此实际间隔约为 15–20 分钟，单个 15 分钟 bucket 不保证固定出现全部 17 条来源记录。
 - 三窗口的抓取结果为日本新增 `9`，其他四地区来源均成功返回列表，但候选全为已入库重复稿，所以无新稿；不是来源失效或抓取报错。发布窗口全部 succeeded：`11:15` 日本发布 3 篇，`11:30` 日本发布 2 篇，`11:45` 因硬门禁/翻译等待发布 0 篇；其他地区均为 `no_ready_candidates`。QQ 窗口无失败，本时段实际成功交付 1 条，其余均有 `no_eligible_articles / already_sent` 明确原因。
 - 尚存三类问题：文章 `8208` 为可重试 timeout，但生产 `TRANSLATION_AUTO_RETRY_ENABLED=false` 且到期后未自动重试；新稿 `8211 / 8215` 因 `Translation response appears incomplete` 被分类为 `unknown` 并停在 `translation_failed`，同样不会自愈。JRA 来源每轮还会跳过 `060302.pdf` 一条解析异常，来源整体仍成功。数据库另有 28 条历史 `CrawlJob(status=started)` 脏记录，最新一条为当日 `07:20`，它们没有对应运行任务、不阻断当前窗口，但会干扰运营观测。
 - 结论：镜像/schema 不兼容造成的新闻写入故障已解除，抓取、发布、QQ 和 HTTP 主链路正在运行；但需先处理翻译失败自愈口径、JRA 固定 PDF 跳过和历史卡死记录，并明确是接受滚动 15–20 分钟口径还是改为对齐的严格 15 分钟调度，才能宣称“完全正常”。
 
-## 当前结论
+## 历史状态记录
 
 `2026-07-13` change `fix-france-news-freshness-and-multiregion-attribution` 已完成本地代码实现与三轮 review/返修，最终一轮 review 无待修复问题，仍处于 `implementing`，未部署生产。TDN 法国入口已改为按发布时间倒序且带 `after` 的 posts 查询；France Galop 已保存可验证的详情页时间证据并禁止 fallback 覆盖可信时间；瞬时翻译失败具备分类、退避、原子 claim、队列去重、耗尽邮件通知和人工重试，终态邮件收件人为 `754652181@qq.com`；多地区归属具备 `off|shadow|enforce`、仅新文章 enforce、分层证据、fail-closed、持久 dry-run/manifest/lease/resume、gold 生产资格硬门禁和运营可观测性。相关地区网页查询从 `web_test_groups` 阶段开始，QQ 在该阶段只对 `PushTarget.multiregion_test_enabled=true` 的显式测试群生效，正式群到 `formal_groups` 才启用。安全默认值仍为归属 `off`、相关地区查询关闭、自动翻译重试关闭。最终专项 `120` 项通过，完整 `stable` 回归 `968` 项通过，其中仅 PostgreSQL 专项性能契约 `1` 项在 SQLite 按设计跳过；Django、迁移、Python 编译、两个生产 Compose、OpenSpec strict/all、diff 和敏感信息检查均通过。OpenSpec 当前完成 `57/68` 项；剩余是建立至少 250 篇真实生产双人标注并裁决的 gold set，以及生产备份、部署、shadow/enforce 灰度、真实窗口与 QQ 验收。没有真实 gold 数据和生产证据前不得宣称归属质量达标、不得启用相关地区查询或归档 change。
 
