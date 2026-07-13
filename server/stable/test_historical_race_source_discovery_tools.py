@@ -133,6 +133,52 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(result["rows"], [])
         self.assertEqual(result["issues"][0]["code"], "source_result_not_unique")
 
+    def test_jra_official_aliases_cover_2025_jump_and_sponsored_names(self):
+        history = """
+        <table><tr><th>月日</th><th>レース名</th><th>競馬場</th><th>結果</th></tr>
+          <tr><td>2月15日 土曜</td><td>J・GⅢ 小倉ジャンプS</td><td>小倉</td><td><a href="/datafile/seiseki/replay/2025/015.html">result</a></td></tr>
+          <tr><td>3月8日 土曜</td><td>GⅢ 中山牝馬S</td><td>中山</td><td><a href="/datafile/seiseki/replay/2025/024.html">result</a></td></tr>
+          <tr><td>5月17日 土曜</td><td>J・GⅡ 京都ハイジャンプ</td><td>京都</td><td><a href="/datafile/seiseki/replay/2025/050.html">result</a></td></tr>
+          <tr><td>8月16日 土曜</td><td>J・GⅢ 新潟ジャンプS</td><td>新潟</td><td><a href="/datafile/seiseki/replay/2025/072.html">result</a></td></tr>
+          <tr><td>11月8日 土曜</td><td>J・GⅢ 京都ジャンプS</td><td>京都</td><td><a href="/datafile/seiseki/replay/2025/100.html">result</a></td></tr>
+        </table>
+        """
+        expected = {
+            "japan-kokura-jump": ("Kokura Jump S", "Kokura", "2025-02-15"),
+            "japan-laurel-racecourse-sho-nakayama-himba": (
+                "Laurel Racecourse Sho Nakayama Himba S",
+                "Nakayama",
+                "2025-03-08",
+            ),
+            "japan-kyoto-high-jump": ("Kyoto High-Jump", "Kyoto", "2025-05-17"),
+            "japan-niigata-jump": ("Niigata Jump S", "Niigata", "2025-08-16"),
+            "japan-kyoto-jump": ("Kyoto Jump S", "Kyoto", "2025-11-08"),
+        }
+        targets = [
+            {
+                "series_key": series_key,
+                "year": 2025,
+                "country_region": "japan",
+                "original_name": original_name,
+                "racecourse": racecourse,
+                "distance_text": "3000m",
+            }
+            for series_key, (original_name, racecourse, _local_date) in expected.items()
+        ]
+
+        result = self.tool.build_jra_provider_rows(
+            targets=targets,
+            year=2025,
+            english_schedule_body=b"",
+            history_body=history.encode("cp932"),
+        )
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(
+            {row["series_key"]: row["local_date"] for row in result["rows"]},
+            {series_key: values[2] for series_key, values in expected.items()},
+        )
+
     def test_toba_same_name_is_disambiguated_by_track(self):
         body = """
         <table><tr><th>Stake</th><th>Gr</th><th>Track</th><th>Winner</th></tr>
@@ -193,6 +239,38 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(result["rows"], [])
         self.assertEqual(result["issues"][0]["code"], "source_match_not_unique")
 
+    def test_toba_not_run_row_is_reported_as_explicit_review_evidence(self):
+        body = """
+        <table><tr><th>Track</th><th>Date</th><th>Stake</th><th>Winner</th></tr>
+          <tr><td>BAQ</td><td>not run</td><td>BROOKLYN S.</td><td></td></tr>
+        </table>
+        """
+        target = {
+            "series_key": "united-states-brooklyn",
+            "year": 2025,
+            "country_region": "united_states",
+            "original_name": "Brooklyn S",
+            "racecourse": "Belmont at Aqueduct",
+            "distance_text": "11",
+        }
+
+        result = self.tool.build_toba_provider_rows(targets=[target], year=2025, body=body)
+
+        self.assertEqual(result["rows"], [])
+        self.assertEqual(
+            result["issues"],
+            [
+                {
+                    "series_key": "united-states-brooklyn",
+                    "edition_year": 2025,
+                    "code": "source_reports_not_run",
+                    "source_name": "BROOKLYN S.",
+                    "source_track": "BAQ",
+                    "source_status": "not run",
+                }
+            ],
+        )
+
     def test_toba_accepts_unique_name_when_annual_race_was_relocated(self):
         body = """
         <table><tr><th>Stake</th><th>Gr</th><th>Track</th><th>Winner</th></tr>
@@ -212,6 +290,90 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
 
         self.assertEqual(result["issues"], [])
         self.assertEqual(result["rows"][0]["local_date"], "2025-07-04")
+
+    def test_toba_core_name_qualifiers_disambiguate_breeders_cup_juvenile(self):
+        body = """
+        <table><tr><th>Stake</th><th>Track</th><th>Winner</th></tr>
+          <tr><td>FANDUEL BREEDERS' CUP JUVENILE PRESENTED BY THOROUGHBRED AFTERCARE ALLIANCE</td><td>DMR</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=9&amp;TID=DMR&amp;DT=10/31/2025">Alpha</a></td></tr>
+          <tr><td>BREEDERS' CUP JUVENILE TURF</td><td>DMR</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=10&amp;TID=DMR&amp;DT=10/31/2025">Beta</a></td></tr>
+        </table>
+        """
+        targets = [
+            {
+                "series_key": "united-states-breeders-cup-juvenile",
+                "year": 2025,
+                "country_region": "united_states",
+                "original_name": "Breeders' Cup Juvenile [FanDuel]",
+                "racecourse": "Del Mar",
+                "distance_text": "8.5",
+            },
+            {
+                "series_key": "united-states-breeders-cup-juvenile-turf",
+                "year": 2025,
+                "country_region": "united_states",
+                "original_name": "Breeders' Cup Juvenile Turf",
+                "racecourse": "Del Mar",
+                "distance_text": "8",
+            },
+        ]
+
+        result = self.tool.build_toba_provider_rows(targets=targets, year=2025, body=body)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(
+            [row["urls"]["result_url"]["url"] for row in result["rows"]],
+            [
+                "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2025-10-31&rn=9&tk=DMR",
+                "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2025-10-31&rn=10&tk=DMR",
+            ],
+        )
+
+    def test_toba_duplicate_result_url_fails_closed_for_both_targets(self):
+        body = """
+        <table><tr><th>Stake</th><th>Track</th><th>Winner</th></tr>
+          <tr><td>ALPHA S.</td><td>DMR</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=9&amp;TID=DMR&amp;DT=10/31/2025">Alpha</a></td></tr>
+          <tr><td>BETA S.</td><td>DMR</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=9&amp;TID=DMR&amp;DT=10/31/2025">Beta</a></td></tr>
+        </table>
+        """
+        targets = [
+            {
+                "series_key": f"united-states-{name.lower()}",
+                "year": 2025,
+                "country_region": "united_states",
+                "original_name": f"{name} S",
+                "racecourse": "Del Mar",
+                "distance_text": "8",
+            }
+            for name in ("Alpha", "Beta")
+        ]
+
+        result = self.tool.build_toba_provider_rows(targets=targets, year=2025, body=body)
+
+        self.assertEqual(result["rows"], [])
+        self.assertEqual(
+            [issue["code"] for issue in result["issues"]],
+            ["duplicate_source_url", "duplicate_source_url"],
+        )
+
+    def test_toba_core_qualifiers_do_not_match_substrings_in_sponsor_names(self):
+        body = """
+        <table><tr><th>Stake</th><th>Track</th><th>Winner</th></tr>
+          <tr><td>TURFWAY ALPHA S.</td><td>DMR</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=9&amp;TID=DMR&amp;DT=10/31/2025">Alpha</a></td></tr>
+        </table>
+        """
+        target = {
+            "series_key": "united-states-alpha",
+            "year": 2025,
+            "country_region": "united_states",
+            "original_name": "Alpha S",
+            "racecourse": "Del Mar",
+            "distance_text": "8",
+        }
+
+        result = self.tool.build_toba_provider_rows(targets=[target], year=2025, body=body)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["rows"][0]["series_key"], "united-states-alpha")
 
     def test_hkjc_pattern_book_schedule_preserves_cross_calendar_season_dates(self):
         text = """

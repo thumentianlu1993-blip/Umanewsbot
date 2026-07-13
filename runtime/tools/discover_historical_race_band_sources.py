@@ -35,6 +35,11 @@ JRA_COURSES = {
 JRA_OFFICIAL_NAME_ALIASES = {
     "japan-hanshin-jump": "阪神ジャンプS",
     "japan-hanshin-spring-jump": "阪神スプリングジャンプ",
+    "japan-kokura-jump": "小倉ジャンプS",
+    "japan-kyoto-high-jump": "京都ハイジャンプ",
+    "japan-kyoto-jump": "京都ジャンプS",
+    "japan-laurel-racecourse-sho-nakayama-himba": "中山牝馬S",
+    "japan-niigata-jump": "新潟ジャンプS",
 }
 
 TRACK_CODES = {
@@ -136,6 +141,8 @@ COMPACT_RACE_WORDS = (
     "MILE",
     "ULTIMA",
 )
+
+TOBA_CORE_NAME_QUALIFIERS = ("FILLIES", "TURF", "SPRINT")
 
 CALENDAR_SERIES_ALIASES = {
     "GBR_AINTREE_BRIDLE_ROAD_HANDICAP_HURDLE": (
@@ -905,6 +912,18 @@ def _best_name_matches(keys: set[str], sources: list[dict]) -> list[dict]:
     return [source for score, source in scored if score == best]
 
 
+def _toba_core_name_qualifiers(value: str) -> set[str]:
+    words = set(re.findall(r"[A-Z0-9]+", unicodedata.normalize("NFKC", value or "").upper()))
+    return {qualifier for qualifier in TOBA_CORE_NAME_QUALIFIERS if qualifier in words}
+
+
+def _toba_core_name_compatible(target: dict, source: dict) -> bool:
+    target_names = [str(target.get("original_name") or "")]
+    target_names.extend(re.split(r"[|,]", str(target.get("aliases") or "")))
+    source_qualifiers = _toba_core_name_qualifiers(str(source.get("race_name") or ""))
+    return any(_toba_core_name_qualifiers(name) == source_qualifiers for name in target_names)
+
+
 def _distance_with_unit(target: dict) -> str:
     value = str(target.get("distance_text") or "").strip()
     region = target.get("country_region")
@@ -1154,22 +1173,84 @@ def parse_toba_schedule(body: str, *, year: int) -> list[dict]:
     return parsed
 
 
+def parse_toba_not_run_schedule(body: str) -> list[dict]:
+    soup = BeautifulSoup(body, "html.parser")
+    parsed = []
+    for table in soup.find_all("table"):
+        table_rows = table.find_all("tr")
+        if not table_rows:
+            continue
+        headers = [
+            _collapse(cell.get_text(" ", strip=True)).lower()
+            for cell in table_rows[0].find_all(["th", "td"])
+        ]
+        stake_index = next((i for i, value in enumerate(headers) if value in {"stake", "stakes"}), None)
+        track_index = next((i for i, value in enumerate(headers) if value == "track"), None)
+        date_index = next((i for i, value in enumerate(headers) if value == "date"), None)
+        if stake_index is None or track_index is None or date_index is None:
+            continue
+        for tr in table_rows[1:]:
+            cells = tr.find_all(["th", "td"])
+            if len(cells) <= max(stake_index, track_index, date_index):
+                continue
+            source_status = _collapse(cells[date_index].get_text(" ", strip=True)).casefold()
+            if source_status != "not run":
+                continue
+            race_name = _collapse(cells[stake_index].get_text(" ", strip=True))
+            parsed.append(
+                {
+                    "race_name": race_name,
+                    "race_key": _normalize_name(race_name),
+                    "track": _collapse(cells[track_index].get_text(" ", strip=True)).upper(),
+                    "source_status": source_status,
+                }
+            )
+        if parsed:
+            break
+    return parsed
+
+
 def build_toba_provider_rows(*, targets: list[dict], year: int, body: str) -> dict:
     sources = parse_toba_schedule(body, year=year)
+    not_run_sources = parse_toba_not_run_schedule(body)
     rows = []
     issues = []
     for target in targets:
         if target.get("country_region") != "united_states" or int(target.get("year") or 0) != year:
             continue
         keys = _target_names(target)
-        name_matches = _best_name_matches(keys, sources)
+        compatible_sources = [
+            source for source in sources if _toba_core_name_compatible(target, source)
+        ]
+        name_matches = _best_name_matches(keys, compatible_sources)
         expected_tracks = TRACK_CODES.get(str(target.get("racecourse") or "").casefold(), set())
-        track_sources = [source for source in sources if source["track"] in expected_tracks]
+        track_sources = [
+            source for source in compatible_sources if source["track"] in expected_tracks
+        ]
         matches = _best_name_matches(keys, track_sources)
         # A unique annual-table name remains authoritative when a race was
         # temporarily moved, as happened during the Belmont reconstruction.
         if not matches and len(name_matches) == 1:
             matches = name_matches
+        not_run_track_sources = [
+            source
+            for source in not_run_sources
+            if source["track"] in expected_tracks and _toba_core_name_compatible(target, source)
+        ]
+        not_run_matches = _best_name_matches(keys, not_run_track_sources)
+        if len(matches) != 1 and len(not_run_matches) == 1:
+            not_run_match = not_run_matches[0]
+            issues.append(
+                {
+                    "series_key": target.get("series_key") or "",
+                    "edition_year": year,
+                    "code": "source_reports_not_run",
+                    "source_name": not_run_match["race_name"],
+                    "source_track": not_run_match["track"],
+                    "source_status": not_run_match["source_status"],
+                }
+            )
+            continue
         if len(matches) != 1:
             issues.append(
                 {
@@ -1192,6 +1273,24 @@ def build_toba_provider_rows(*, targets: list[dict], year: int, body: str) -> di
                 "distance_text": _distance_with_unit(target),
                 "urls": _source_result(match["result_url"], provider="equibase", authority="third_party"),
             }
+        )
+    rows_by_url = defaultdict(list)
+    for row in rows:
+        rows_by_url[row["urls"]["result_url"]["url"]].append(row)
+    duplicate_urls = {url for url, url_rows in rows_by_url.items() if len(url_rows) > 1}
+    if duplicate_urls:
+        duplicate_rows = [
+            row for row in rows if row["urls"]["result_url"]["url"] in duplicate_urls
+        ]
+        rows = [row for row in rows if row["urls"]["result_url"]["url"] not in duplicate_urls]
+        issues.extend(
+            {
+                "series_key": row["series_key"],
+                "edition_year": year,
+                "code": "duplicate_source_url",
+                "source_url": row["urls"]["result_url"]["url"],
+            }
+            for row in duplicate_rows
         )
     return {"rows": rows, "issues": issues}
 

@@ -1,5 +1,12 @@
 # 关键决策
 
+## 2026-07-13：年度来源的 `not run` 只能生成审核证据，不自动改总账
+
+- TOBA 等权威年度表若将某赛事明确标为 `not run`，来源发现工具应输出结构化 `source_reports_not_run`，保留来源赛事名、场地和状态。
+- 该证据说明当前 `held` 预期可能有误，但来源发现阶段不得自行把 target 改为 `not_held`，也不得生成伪结果 URL、RaceEvent 或永久不可得结论。
+- expectation 状态变化属于产品总账决策，需经审核后通过受控 artifact 更新；未批准前目标保持 pending，其他无关目标可继续抓取。
+- TOBA 单场结果 URL 必须一对一绑定 target；同一 URL 若匹配多个系列，所有冲突候选均 fail closed。名称消歧中的 `Fillies`、`Turf`、`Sprint` 按完整单词判断，避免短名称包含或赞助词子串导致串场。
+
 ## 2026-07-13：法国新鲜度与多地区归属工程评审决策
 
 - 归属采用 `MULTIREGION_ATTRIBUTION_MODE=off|shadow|enforce` 单一模式；旧布尔变量只作兼容映射，相关地区查询仍使用独立开关。

@@ -230,6 +230,10 @@
 | TC-IMPORT-023 | Equibase PDF页眉日期、赛场或场次与target不符 | parse/package | fail closed，不生成可写入候选 | A/F |
 | TC-IMPORT-024 | JRA英文年度表与日文官方结果表 | source discovery | 以日期/赛场唯一对齐官方单场结果，歧义不猜测 | A/F |
 | TC-IMPORT-025 | 美国同名赛事或Belmont工程期移师 | TOBA discovery | 先按赛事名和场地区分；年度表名称唯一时允许记录实际移师场地 | A/F |
+| TC-IMPORT-026 | JRA英文表不含障碍赛或赞助名不同 | source discovery | 仅通过显式日文官方别名唯一匹配结果页，未知名称继续进入issue | A/F |
+| TC-IMPORT-027 | TOBA同场同时有Juvenile、Fillies、Turf、Sprint变体 | source discovery | 核心限定词必须按完整单词一致，不能因短名称包含关系串场 | A/F |
+| TC-IMPORT-028 | 两个美国target最终匹配同一Equibase URL | source discovery | 两个候选均移除并输出`duplicate_source_url`，不得进入缓存 | A/F |
+| TC-IMPORT-029 | TOBA年度表将赛事标记为`not run` | source discovery | 输出`source_reports_not_run`审核证据，不自动生成结果URL或改变总账状态 | A/F |
 | TC-IMPORT-026 | Equibase Yearbook含实际出赛与退赛 | 离线解析 | runners按马号含退赛，results仅含实际出赛并按官方名次 | A/F |
 | TC-IMPORT-027 | event距离为裸数字、批准来源为`2400m` | 权威字段dry-run | 输出`2400 -> 2400m`，保留来源/snapshot/parser，不写库 | A/S |
 | TC-IMPORT-028 | 英国批准来源为`3m 210y` | 权威字段apply | 原样保存mile/yard文本，不解释为metre，写before/after日志 | A/S |
