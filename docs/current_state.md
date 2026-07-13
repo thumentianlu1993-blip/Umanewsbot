@@ -1,5 +1,12 @@
 # 当前状态
 
+## 2026-07-13 2016–2025 标准批次二号详情证据门禁
+
+- 第二标准批次 250 个目标已完成五地区详情来源发现。当前可直接进入日期工件的证据为 246 场：日本 50、美国 48、香港 50、英国 48、法国 50；246 个来源 URL 全局唯一，来源缓存逐文件大小和 SHA-256 可核验。详情解析合计日本/美国 `1198 runners / 1128 results`、香港 `463 / 453`、英国 `464 / 417`、法国 `424 / 328`。
+- 4 个目标继续作为显式缺口保留：美国 Brooklyn Stakes 和 Cougar II Stakes 的 2025 届有 TOBA `not run` 证据，等待产品结论；英国 Classic Handicap Chase 和 Dick Poole Fillies Stakes 的 2025 结果页标记 `ABANDONED`，在正式取消证据修正总账前不得按 held 导入。
+- 首次生产只读 artifact 构建为 `219 candidate / 31 gap`。除上述 4 个预期缺口外，15 个香港目标缺少赛季年度与实际自然年的跨年说明，12 个英国目标被 `2m4f`、`3m21/2f` 等紧凑英制距离写法误判。香港 provider 已显式写入 `actual_year` 和 `hong_kong_racing_season_spans_calendar_years`；英制解析器已按测试优先支持紧凑 mile/furlong/yard 组合和粘连分数，同时保留来源原文。
+- 距离修复专项先失败后通过，完整 `stable` 回归为 `1149` 项通过、`1` 项按设计跳过；`git diff --check` 通过，最终代码复审无 actionable finding。当前尚未把本轮修复部署到生产，也未批准或提交二号批次日期 artifact；生产仍为历史 `295 imported / 30622 pending`、`3174 runners / 2817 results`、全部 draft、published 0，常驻历史写入和网络开关保持 false。
+
 ## 2026-07-13 2016–2025 标准批次二号应到与日美来源发现
 
 - 由于 2016–2025 年代带仍有 pending 目标，按 OpenSpec 年代带门禁继续本年代，不提前跳到 2006–2015。生产总账生成第二个标准批次 250 场，五地区各 50；生成前各地区 accounted 均为 53，生成后领先差仍为 0。selection snapshot 内部 SHA-256 为 `fdd297a8c76cca529634128c11c59ea6ed4cf216b13e574a012d5fd35557629b`，manifest 文件 SHA-256 为 `b4db68f36e2ec378b7dffc9f8c8d2286d3cf4d4138499f2eb4fef86c8d3152f8`，审批文件 SHA-256 为 `b2650665588758c9e43cae3f80db30fe7c0f8287657cea468f728b9baf1fd6c2`。

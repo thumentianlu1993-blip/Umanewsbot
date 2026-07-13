@@ -232,6 +232,13 @@ def parse_distance_evidence(distance_text: str, country_region: str) -> dict[str
 
     imperial_regions = {RacingRegion.UNITED_KINGDOM, RacingRegion.UNITED_STATES}
     if country_region in imperial_regions:
+        parseable = re.sub(r"(?<=[A-Za-z])(?=\d)", " ", raw)
+        parseable = re.sub(
+            r"(?<=\d)(?=(?:1/2|1/4|3/4)\s*(?:furlongs?|fur|f)\b)",
+            " ",
+            parseable,
+            flags=re.IGNORECASE,
+        )
         unit_map = {
             "m": "mile",
             "mi": "mile",
@@ -251,8 +258,8 @@ def parse_distance_evidence(distance_text: str, country_region: str) -> dict[str
             r"(miles?|mi|m|furlongs?|fur|f|yards?|yd|y)\b",
             re.IGNORECASE,
         )
-        matches = list(token_pattern.finditer(raw))
-        remainder = token_pattern.sub("", raw).strip(" ,+")
+        matches = list(token_pattern.finditer(parseable))
+        remainder = token_pattern.sub("", parseable).strip(" ,+")
         if not matches or remainder:
             raise InventoryValidationError(f"unsupported imperial distance format: {raw}")
         components = [

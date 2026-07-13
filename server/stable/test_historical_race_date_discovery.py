@@ -853,6 +853,20 @@ class HistoricalRaceDateDiscoveryTests(TestCase):
         mixed = parse_distance_evidence("2m 4f 56y", RacingRegion.UNITED_KINGDOM)
         self.assertEqual([part["unit"] for part in mixed["components"]], ["mile", "furlong", "yard"])
 
+        compact = parse_distance_evidence("2m1f", RacingRegion.UNITED_KINGDOM)
+        self.assertEqual(
+            compact["components"],
+            [{"value": 2, "unit": "mile"}, {"value": 1, "unit": "furlong"}],
+        )
+        self.assertEqual(compact["distance_text"], "2m1f")
+
+        compact_fraction = parse_distance_evidence("3m21/2f", RacingRegion.UNITED_KINGDOM)
+        self.assertEqual(
+            compact_fraction["components"],
+            [{"value": 3, "unit": "mile"}, {"value": 2.5, "unit": "furlong"}],
+        )
+        self.assertEqual(compact_fraction["distance_text"], "3m21/2f")
+
         with self.assertRaisesMessage(InventoryValidationError, "explicit unit"):
             parse_distance_evidence("2400", RacingRegion.FRANCE)
 

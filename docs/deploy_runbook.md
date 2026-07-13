@@ -4165,3 +4165,11 @@ docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
 - 切换后验收：三容器 image ID 一致；架构为 amd64；`stable.0029_france_freshness_translation_attribution` 已应用；64 个模型、Django check、五地区频道、赛事页、马匹页、后台和 healthz 正常；近期 web/worker/beat 日志无 ERROR、CRITICAL、Traceback 或 IntegrityError。
 - 首个完整自然窗口为 `2026-07-13 14:45 CST`：crawl `17/17`、publish `5/5`、QQ push `5/5` 全部 succeeded，crawl seen `472`、new `3`；新增文章 `attribution_rule_version IS NULL=0`。发布和 QQ 的零产出原因均为当前门禁下的正常 `hard_gate_blocked`、`translation_retry_waiting`、`no_ready_candidates` 或 `no_eligible_articles`。
 - 历史数据门禁：`HistoricalRaceEventTarget=30,917`，2026 年前 `RaceEvent=295`、`RaceEventRunner=3,174`、`RaceEventResult=2,817`，全部 `draft`、published `0`；常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false` 和 `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。一次性来源缓存或写入只在单命令环境中临时开启，命令结束后必须再次核对常驻值。
+
+## 2026-07-13 第二标准批次日期工件重建门禁
+
+- 二号批次 selection 为 250 个目标。当前最终来源包只包含 246 个可导入 held 目标，adapter 分布为 `jra=50 / equibase=48 / hkjc=50 / uk_sportinglife=48 / zeturf=50`；source URL、ledger 和 cache identity 必须均为 246 个且一一对应。
+- 不得把四个缺口伪装成 held 候选：Brooklyn Stakes、Cougar II Stakes 保留 TOBA `not run` 审核项；Classic Handicap Chase、Dick Poole Fillies Stakes 保留 Sporting Life `ABANDONED` 证据，后续须通过正式 expectation correction 流程处理。
+- 香港赛季目标的赛事日期跨自然年时，provider 必须同时写 `actual_year=<local_date.year>` 和非空 `cross_year_reason=hong_kong_racing_season_spans_calendar_years`。英国来源距离可保留 `2m4f`、`3m21/2f` 等原文，解析结果必须拆成 mile/furlong/yard 组件，不能改写成裸数字或公制猜测。
+- 当前生产镜像不含紧凑英制距离修复。必须先把修复提交并合入最新 main，运行完整组合回归，构建可复现 AMD64 镜像并按共享生产切换门禁部署；随后重新 normalize/build，预期结果才是 `246 candidate / 4 gap`。旧 `219/31` artifact 不得审批或 commit。
+- 新 artifact 仍须经历 manifest 审批、数据库备份、`gzip -t`、SHA-256、dry-run、单命令临时写入开关、写后逐目标核验和常驻开关复核。详情候选必须在日期 apply 改变 target SHA 后重新导出并重新打包，公开展示开关保持关闭。
