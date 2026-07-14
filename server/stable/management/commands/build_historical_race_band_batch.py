@@ -5,6 +5,7 @@ import json
 from django.core.management.base import BaseCommand, CommandError
 
 from stable.services.historical_race_batches import (
+    STANDARD_REGION_BATCH_LIMIT,
     read_immutable_selection_snapshot,
     select_historical_band_batch_targets,
     validate_selection_snapshot_target_identities,
@@ -19,7 +20,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--year-start", required=True, type=int)
         parser.add_argument("--year-end", required=True, type=int)
-        parser.add_argument("--region-limit", type=int, default=50)
+        parser.add_argument("--region-limit", type=int, default=STANDARD_REGION_BATCH_LIMIT)
         parser.add_argument("--inventory-manifest-sha256", required=True)
         parser.add_argument("--exclude-selection-snapshot", action="append", default=[])
         parser.add_argument("--output-dir", required=True)
@@ -50,6 +51,7 @@ class Command(BaseCommand):
                 inventory_manifest_sha256=options["inventory_manifest_sha256"],
                 year_start=options["year_start"],
                 year_end=options["year_end"],
+                approved_region_limit=options["region_limit"],
                 exclusion_snapshots=exclusions,
             )
         except (InventoryValidationError, OSError, TypeError, ValueError) as exc:

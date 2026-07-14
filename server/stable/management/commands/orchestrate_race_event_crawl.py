@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
@@ -264,6 +265,10 @@ class Command(BaseCommand):
 
     def _prepare_with_historical_log(self, plan, state, *, resume: bool):
         if not plan.get("historical_inventory_sha256"):
+            return orchestration.prepare_adapters(plan, state, resume=resume)
+        if str(getattr(settings, "POSTGRES_APPLICATION_NAME", "")).startswith(
+            "umanews-historical-runner:"
+        ):
             return orchestration.prepare_adapters(plan, state, resume=resume)
 
         task_name = "historical_race_network_resume" if resume else "historical_race_network_prepare"

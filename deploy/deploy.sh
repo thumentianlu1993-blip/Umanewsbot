@@ -11,9 +11,18 @@ fi
 
 COMPOSE="./deploy/docker/compose-wrapper.sh"
 
-"$COMPOSE" -f docker-compose.prod.yml pull redis nginx
+if [ "${HISTORICAL_RUNNER_INITIAL_INSTALL:-false}" = "true" ]; then
+  COMPOSE_FILE=docker-compose.prod.yml ./deploy/historical_runner_preflight.sh --initial-install
+else
+  COMPOSE_FILE=docker-compose.prod.yml ./deploy/historical_runner_preflight.sh
+fi
+"$COMPOSE" -f docker-compose.prod.yml pull nginx
 "$COMPOSE" -f docker-compose.prod.yml build web
-"$COMPOSE" -f docker-compose.prod.yml up -d --remove-orphans
+"$COMPOSE" -f docker-compose.prod.yml stop beat
+COMPOSE_FILE=docker-compose.prod.yml ./deploy/wait_for_celery_drain.sh
+"$COMPOSE" -f docker-compose.prod.yml stop worker
+"$COMPOSE" -f docker-compose.prod.yml up -d --no-deps web
 "$COMPOSE" -f docker-compose.prod.yml exec web python manage.py migrate --noinput
 "$COMPOSE" -f docker-compose.prod.yml exec web python manage.py collectstatic --noinput
+"$COMPOSE" -f docker-compose.prod.yml up -d --no-deps worker beat nginx
 "$COMPOSE" -f docker-compose.prod.yml ps

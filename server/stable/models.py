@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Iterable
 
 from django.conf import settings
@@ -446,6 +447,21 @@ class HistoricalRaceResolutionStatus(models.TextChoices):
     IDENTITY_REVIEW_REQUIRED = "identity_review_required", "系列身份待审"
     PERMANENTLY_UNAVAILABLE = "permanently_unavailable", "永久不可得"
     IMPORTED = "imported", "已导入"
+
+
+class HistoricalBatchPhase(models.TextChoices):
+    CRAWL = "crawl", "抓取"
+    APPLY = "apply", "落库"
+    VERIFY = "verify", "核验"
+
+
+class HistoricalBatchRunStatus(models.TextChoices):
+    PLANNED = "planned", "待执行"
+    RUNNING = "running", "运行中"
+    PAUSED = "paused", "已暂停"
+    COMPLETED = "completed", "已完成"
+    FAILED = "failed", "失败"
+    BLOCKED = "blocked", "已阻断"
 
 
 class RaceEventModule(models.TextChoices):
@@ -1045,6 +1061,114 @@ class HistoricalRaceEventTarget(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.race_series} {self.year}"
+
+
+class HistoricalBatchRun(TimestampedModel):
+    run_id = models.CharField(max_length=64, unique=True)
+    batch_id = models.CharField(max_length=128, db_index=True)
+    phase = models.CharField(max_length=16, choices=HistoricalBatchPhase.choices)
+    status = models.CharField(
+        max_length=16,
+        choices=HistoricalBatchRunStatus.choices,
+        default=HistoricalBatchRunStatus.PLANNED,
+    )
+    network_enabled = models.BooleanField(default=False)
+    write_enabled = models.BooleanField(default=False)
+    image_id = models.CharField(max_length=128)
+    image_revision = models.CharField(max_length=64)
+    artifact_root = models.TextField()
+    plan_sha256 = models.CharField(max_length=64)
+    owner_token_sha256 = models.CharField(max_length=64, blank=True)
+    current_step = models.CharField(max_length=128, blank=True)
+    checkpoint = models.JSONField(default=dict, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    pause_requested_at = models.DateTimeField(null=True, blank=True)
+    pause_requested_by = models.CharField(max_length=128, blank=True)
+    pause_reason = models.TextField(blank=True)
+    paused_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(fields=("status", "-created_at"), name="hist_batch_run_status_idx"),
+            models.Index(fields=("batch_id", "phase"), name="hist_batch_run_batch_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(network_enabled=True, write_enabled=True),
+                name="hist_batch_no_network_write",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(phase=HistoricalBatchPhase.CRAWL, network_enabled=True, write_enabled=False)
+                    | models.Q(phase=HistoricalBatchPhase.APPLY, network_enabled=False, write_enabled=True)
+                    | models.Q(phase=HistoricalBatchPhase.VERIFY, network_enabled=False, write_enabled=False)
+                ),
+                name="hist_batch_phase_permissions",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.network_enabled and self.write_enabled:
+            raise ValidationError("历史 runner 不能同时启用网络和写入权限。")
+        if self.phase == HistoricalBatchPhase.CRAWL and (not self.network_enabled or self.write_enabled):
+            raise ValidationError("抓取阶段必须 network=true 且 write=false。")
+        if self.phase == HistoricalBatchPhase.APPLY and (self.network_enabled or not self.write_enabled):
+            raise ValidationError("落库阶段必须 network=false 且 write=true。")
+        if self.phase == HistoricalBatchPhase.VERIFY and (self.network_enabled or self.write_enabled):
+            raise ValidationError("核验阶段必须 network=false 且 write=false。")
+
+    def __str__(self) -> str:
+        return f"{self.run_id} {self.batch_id} {self.phase}"
+
+
+class HistoricalBatchLock(TimestampedModel):
+    key = models.CharField(max_length=64, unique=True, default="global")
+    locked_by_run = models.ForeignKey(
+        HistoricalBatchRun,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="leases",
+    )
+    owner_token_sha256 = models.CharField(max_length=64, blank=True)
+    acquired_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("key",)
+
+
+class HistoricalBatchRunEvent(TimestampedModel):
+    run = models.ForeignKey(HistoricalBatchRun, on_delete=models.CASCADE, related_name="events")
+    event_type = models.CharField(max_length=32)
+    phase = models.CharField(max_length=16, choices=HistoricalBatchPhase.choices, blank=True)
+    step_id = models.CharField(max_length=128, blank=True)
+    owner_prefix = models.CharField(max_length=16, blank=True)
+    detail = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("created_at", "id")
+        indexes = [
+            models.Index(fields=("run", "created_at"), name="hist_batch_event_run_idx"),
+            models.Index(fields=("event_type", "created_at"), name="hist_batch_event_type_idx"),
+        ]
+
+    def save(self, *args, **kwargs):
+        if len(json.dumps(self.detail, ensure_ascii=False, sort_keys=True).encode("utf-8")) > 8 * 1024:
+            raise ValidationError({"detail": "历史 runner 审计事件不得超过 8 KiB。"})
+        if self.pk and HistoricalBatchRunEvent.objects.filter(pk=self.pk).exists():
+            raise ValidationError("历史 runner 审计事件只能追加，不能修改。")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("历史 runner 审计事件只能追加，不能删除。")
 
 
 class RaceEventAlias(TimestampedModel):

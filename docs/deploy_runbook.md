@@ -1,5 +1,26 @@
 # 部署运行手册
 
+## 待部署：独立 historical runner 与 batch006 单地区 250
+
+1. 当前代码包含迁移 `stable.0031_historical_batch_runner`，但本节写入时生产尚未应用。首次部署前先停 beat、排空 worker、生成并校验数据库和 `.env` 备份，再运行 `COMPOSE_FILE=<生产 compose> ./deploy/historical_runner_preflight.sh --initial-install`。只有 runner 容器、两张 runner 网络、secret 文件和三张表全部不存在才会放行；随后以 `HISTORICAL_RUNNER_INITIAL_INSTALL=true` 执行一次应用部署，并立即恢复 false。
+2. 后续 deploy/rollback 只能走 `historical_runner_preflight.sh`：active run 会收到 pause request，必须等 step/事务安全结束并进入 paused；超时直接停止部署。普通脚本先停 beat，再由 `wait_for_celery_drain.sh` 要求所有 worker 可响应且 active/reserved 均为 0，之后才停 worker；排空失败时 beat 保持停止并中止部署。脚本只允许 `--no-deps` 更新 web/worker/beat/nginx，不得 pull/start/stop/recreate DB、Redis、runner 或 networks。初次 DB/Redis/shared network 只能显式设置 `CONFIRM_INFRASTRUCTURE_BOOTSTRAP=create-db-redis-network` 后单独运行 `bootstrap_infrastructure.sh`。
+3. migration 后使用 `provision_historical_runner.sh` 幂等创建 `umanews-historical-runner-db` internal 网络和 `umanews-historical-runner-egress` 网络，只把既有 DB 以 alias `db` 接入 internal 网络；control role `historical_runner_control` 仅可 SELECT/INSERT/UPDATE Run/Lock、SELECT/INSERT RunEvent，不得 DELETE 审计事件或访问业务表。密码文件必须为 0600。
+4. `historical_runner.sh start` 只接受完整 `sha256:<64>` image ID 和匹配 OCI revision。artifact 挂载到 `/app/historical-runtime`；owner token 与 phase env 必须分别位于 `/opt/umanewsbot/runtime/historical_runner_secrets/<run_id>.token` 和 `<run_id>.<phase>.env`，真实路径不得落在 artifact，且均为 0600。phase env 不得包含重复键且只含 allowlist，`POSTGRES_APPLICATION_NAME=umanews-historical-runner:<run_id>:<phase>`。crawl/verify 必须使用 `historical_runner_control`，apply 必须通过宿主 `HISTORICAL_RUNNER_APPLY_ROLE` 显式绑定既有业务写入角色，两者不得相同。
+5. crawl phase 设置 `HISTORICAL_RACE_BACKFILL_ENABLED=true`、`ALLOW_NETWORK=true`，使用 control role并连接 egress/internal 两网；apply phase 设置 enabled=true、allow_network=false，只连接 internal 网络并使用批准 importer 凭据。任何 phase 均不得复用常驻 `.env`，apply env 不得含翻译、OSS、OneBot、SMTP 或其他 API 密钥。
+6. 启动后运行 `historical_runner_smoke.sh crawl|apply`，验收容器不超过 2 CPU/2 GiB/256 PID、只读根目录；crawl 更新 `stable_raceevent` 必须权限失败但控制表可读，apply `SELECT 1` 必须成功而到 `1.1.1.1:443` 必须失败。再验收双锁、心跳、status JSON、暂停/恢复、日志轮转与 checkpoint，不以“容器 running”代替成功。子进程原始流只进入 256 MiB `/tmp` tmpfs，结束后脱敏写入 `runner-logs`；失败状态必须保留脱敏诊断尾部。
+7. stale takeover 只有租约过期、旧容器不存在、`pg_stat_activity` 无 `umanews-historical-runner:<run_id>:<phase>`、runtime/DB checkpoint 完全一致时才可执行。必须在宿主设置固定 image/run/phase/artifact/token/env 变量及 `HISTORICAL_RUNNER_TAKEOVER_ACTOR/REASON` 后运行 `historical_runner.sh takeover`；脚本实际检查旧容器不存在，并以 internal-only 一次性容器只读挂载 artifact，核对固定 `/app/historical-runtime/runner-state.json`。不得直接调用管理命令伪造 `--container-absent`，也不得传入内容相同的替代 checkpoint。任一条件缺失均停止，不删除 lock、不盲目重跑未 checkpoint 的 apply step。
+8. `status/preflight` 从普通 web 容器执行时看不到宿主 artifact，`checkpoint_matches=null` 只表示未挂载，不能用来批准接管；接管必须走上一步的宿主只读挂载探针。batch006 只有在代码 review 无 actionable finding、可复现 AMD64 镜像、真实 PostgreSQL/Docker smoke 和生产迁移全部通过后生成。生成时传入所有既有 exclusion snapshots，审核每地区 `<=250`、`approved_region_limit=250`、无重复/重叠、remaining/eligible/accounted 数学一致；抓取与落库分阶段审批。全过程保持常驻历史 enabled/network false、published 0。
+
+## 2026-07-14 batch005 250 场正式导入记录
+
+1. batch005 使用固定生产镜像 `sha256:954673cc74049d4b882e492ec29b072aba01aeb1a3ae440cc85415209c8a2f8a` 完成；所有历史管理命令均为显式 `docker run --rm`，没有使用 Docker Compose，也没有重建 DB、Redis 或共享网络。
+2. 日期 artifact manifest `0bedb2ad10d71bc3c22f11b4c42b5ee70708a50c9359b6f661739baff242c861`，详情来源 manifest `c629b5f7e6485f81b7a0a5bcc7252947eddef1a85674d124c9853828a60fcaf7`；两阶段 check/apply 均为 250/250。详情来源 apply 后重新导出 event input，最终候选 `269c65e646b11be0a1edef70c8c088e5b4b9a2b0a69527ca0efc6242cb84d6e3` 为 250 scopes / 0 gaps，dry-run 通过。
+3. 三份 custom-format 写前备份均通过 `pg_restore -l`：日期写前 `/opt/umanewsbot/backups/db/pre-batch005-date-20260714_052929.dump`，SHA-256 `34ca0038ff8795929384b287ea34a7615c2a057b1d49ab10d1eaf6a161c57d2f`；详情来源写前 `pre-batch005-detail-source-20260714_055621.dump`，SHA-256 `0fbf2eb9915ed9e7f52aca515353135527772ea2c4b981cb20241c2d474999b3`；最终详情写前 `pre-batch005-final-20260714_055856.dump`，SHA-256 `82908208d5a32f751c1b7c258c54e3ac66993798d27b66ff6d1405393a10ffa9`。
+4. 写入前因自然新闻窗口已有 active 任务，先停止 beat，再让 active 任务自然结束；随后暂停 worker 的 `celery` consumer，仅保留 Redis 队列，确认 active/reserved 为空后写入。不得终止正在执行的新闻任务，也不得清空队列。
+5. 最终 apply 250/250，验收为法国 `50/414/327`、香港 `50/482/469`、日本 `50/714/710`、英国 `50/489/433`、美国 `50/484/425`，格式为 `events/runners/results`；error 0，250 场全部 draft。
+6. 写后先使用 `celery -A app control add_consumer celery` 恢复 worker 消费，再启动原 beat 容器；web/worker/beat 镜像一致，healthz 正常，历史常驻写入/网络开关 false，无遗留 historical one-off。生产累计 `1291 imported / 29626 pending`、`13507 runners / 12167 results`、published 0。
+7. batch006 前必须先部署并验收独立 historical batch runner 和每地区 250 场新口径。runner 部署不得使用会重建 DB/Redis 的 Compose 操作；必须具备固定镜像、独立锁/心跳/checkpoint、资源限制、普通部署隔离、迁移安全暂停，以及抓取与落库权限分离。
+
 ## 2026-07-14 新闻实体语境修复部署与回归
 
 1. 最终上线提交为 `dc1e5ec584e47ea9d28998f76454d105836b3f0a`，源码 archive SHA-256 `f2eec61f6d2211a76e4456f6b9cbfc3e55a5b610829162b4a68b6039aae6ffe1`；正式镜像 tag 为 `umanewsbot:main-dc1e5ec5-amd64-20260714-075837`，image ID `sha256:5b06821610f0d2214cb24692e58beac4ffda731ddb84674a8855b2a1d4dbb470`。

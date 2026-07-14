@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from stable.management.commands.orchestrate_race_event_crawl import Command
 from stable.models import TaskExecutionLog, TaskStatus
@@ -71,4 +71,21 @@ class HistoricalRaceNetworkLoggingTests(TestCase):
                 resume=False,
             )
 
+        self.assertFalse(TaskExecutionLog.objects.exists())
+
+    @override_settings(
+        POSTGRES_APPLICATION_NAME="umanews-historical-runner:batch006:crawl"
+    )
+    def test_runner_prepare_uses_runner_audit_without_business_task_log(self):
+        command = Command()
+        plan = {
+            "historical_inventory_sha256": "c" * 64,
+            "allow_network": True,
+            "regions": [{"region": "united_states"}],
+        }
+
+        with patch.object(orchestration, "prepare_adapters", return_value=[{"status": "succeeded"}]):
+            result = command._prepare_with_historical_log(plan, self._state(), resume=False)
+
+        self.assertEqual(result, [{"status": "succeeded"}])
         self.assertFalse(TaskExecutionLog.objects.exists())

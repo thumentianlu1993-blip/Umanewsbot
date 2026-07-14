@@ -1,0 +1,12 @@
+schema: spec-driven
+created: 2026-07-14
+phase: reviewed
+journal:
+  - event: plan-reviewed
+    date: "2026-07-14T12:08:26+08:00"
+    session: 1
+    mode: full
+    rounds: 2
+    issues_resolved: 7
+    artifacts_modified: [design.md, specs/historical-batch-runner/spec.md, tasks.md]
+    note: "Round 1 resolved immutable tool paths, deployment isolation, checkpoint and TDD gaps; Round 2 resolved audit, first-migration and stale-takeover boundaries, then converged."

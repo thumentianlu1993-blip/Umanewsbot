@@ -42,6 +42,12 @@
 - QQ 测试群通过 `PushTarget.multiregion_test_enabled` 单独灰度；该字段默认关闭，正式群在最终阶段前继续只按主地区判断。
 - 翻译自动重试耗尽或永久失败会记录终态并发送运营邮件，邮件包含后台快速处理入口；自动重试总开关仍默认关闭。
 
+## 历史赛事数据链路
+
+历史赛事与新闻常态任务分离，按“正式总账 -> selection artifact -> 网络抓取 artifact -> 离线打包/dry-run -> 受控落库 -> 逐场验收”推进。batch006 起标准批次为单地区最多 250 场，仍保留地区进度、排除 snapshot、来源身份、审批 SHA、写前备份和 draft 可见性门禁。
+
+长周期历史任务由独立原生 Docker runner 执行，不加入 Celery/Beat，也不属于普通 Compose project。crawl 与 apply 使用不同网络和数据库角色；runner 只按固定镜像和结构化 plan 执行，依靠数据库租约、runtime 文件锁、心跳和双 checkpoint 恢复。普通应用部署不得处理 runner、DB、Redis 或共享网络。
+
 ## 技术栈主干
 
 - Web / 后台：`Django`

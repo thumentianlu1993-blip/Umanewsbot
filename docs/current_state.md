@@ -1,5 +1,23 @@
 # 当前状态
 
+## 2026-07-14 batch006 扩容与独立 historical runner 本地实现
+
+- OpenSpec change `scale-and-isolate-historical-race-batches` 已完成完整提案、两轮工程评审和测试优先实现。batch006 起标准单地区上限为 250；显式 1-249 仍合法，旧批次可继续显式传 50。selection、writer、validator、summary、manifest 和命令 JSON 使用同一 `approved_region_limit`，100 场地区领先与不可变排除 snapshot 语义不变。
+- 新增 `HistoricalBatchRun`、`HistoricalBatchLock`、`HistoricalBatchRunEvent` 及迁移 `0031_historical_batch_runner`。runner 同时持有 PostgreSQL 租约和 artifact `fcntl` 文件锁，默认 30 秒心跳、180 秒租约；不同 owner 即使租约过期也不能普通启动，必须满足容器不存在、无历史数据库连接、checkpoint 一致并记录操作者/原因后才可接管。
+- runner plan 只接受结构化 argv、批准命令和镜像内工具 SHA；禁止 shell。checkpoint 同时绑定 run、phase、固定镜像、plan、输入和输出 SHA，使用 `fsync + rename` 写文件后更新数据库；分叉、丢失文件或未确认的 apply step 均转 blocked。owner token 只从 artifact 外的 0600 文件读取，数据库和日志仅保留哈希或前缀。
+- 原生 Docker runner 与普通 Compose project 分离：crawl 使用 egress + control-role DB 网络且不能写业务表；apply 只连 internal DB 网络且不能访问公网。容器强制 2 CPU、2 GiB、256 PID、只读根文件系统、drop all capabilities、日志轮转和 `/app/historical-runtime` 挂载，不覆盖镜像 `/app/runtime/tools`。
+- 普通 deploy/rollback 已改为 preflight 后仅以 `--no-deps` 更新 web/worker/beat/nginx，不再 pull/start/recreate DB、Redis、runner 或 networks；首次 runner 建表必须显式使用 host-only initial-install 门禁，基础设施 bootstrap 另设独立确认脚本。
+- 本地 runner 聚焦测试 52 项、runner+历史批次组合 118 项、加历史网络日志组合 122 项、完整 `stable` 1350 项通过（跳过 7 项环境专项）；真实 PostgreSQL 6 项并发/trigger 测试、Django check、migration drift、OpenSpec strict/all 和 shell/diff 校验通过。隔离 Docker smoke 已证明 20 连接唯一 owner、40 秒 step 心跳、暂停/恢复不重复、crawl 业务写入失败、apply 公网连接失败、2 CPU/2 GiB/256 PID 与日志轮转生效；provisioning 二次执行保持幂等。
+- 五轮代码 review 已闭环：前四轮共修复无界子进程输出、失败诊断缺失、任意 checkpoint 路径、文件锁失败遗留 running 租约、runner 删除 RaceEvent、crawl prepare 误写业务 `TaskExecutionLog`、stale takeover 未在宿主核验旧容器七项问题；第五轮没有 actionable finding。进程流先进入容器 256 MiB `/tmp` tmpfs，结束后脱敏写 artifact；runner prepare 改由 append-only run event 审计；接管必须由宿主脚本实际确认旧容器不存在，并以只读挂载核对固定 `runner-state.json`。提交/镜像/生产迁移与普通部署不干扰演练尚未完成，因此 batch006 尚未生成，生产历史公开及常驻网络/写入开关继续关闭。
+
+## 2026-07-14 2016-2025 标准批次五号 250 场正式导入
+
+- batch005 五地区各 50 场、共 250 场已完成日期、详情来源、出马表和赛果正式导入；日期 artifact manifest SHA-256 为 `0bedb2ad10d71bc3c22f11b4c42b5ee70708a50c9359b6f661739baff242c861`，详情来源 manifest SHA-256 为 `c629b5f7e6485f81b7a0a5bcc7252947eddef1a85674d124c9853828a60fcaf7`，最终详情候选 SHA-256 为 `269c65e646b11be0a1edef70c8c088e5b4b9a2b0a69527ca0efc6242cb84d6e3`。
+- 日期、详情来源和最终详情三个写阶段均为 250/250；最终逐 target 验收 `error_count=0`。本批新增法国 `414 runners / 327 results`、香港 `482 / 469`、日本 `714 / 710`、英国 `489 / 433`、美国 `484 / 425`，合计 `2583 runners / 2364 results`。
+- 三个写入阶段均有独立 PostgreSQL custom-format 备份并通过 `pg_restore -l`：日期写前 `pre-batch005-date-20260714_052929.dump`，SHA-256 `34ca0038ff8795929384b287ea34a7615c2a057b1d49ab10d1eaf6a161c57d2f`；详情来源写前 `pre-batch005-detail-source-20260714_055621.dump`，SHA-256 `0fbf2eb9915ed9e7f52aca515353135527772ea2c4b981cb20241c2d474999b3`；最终详情写前 `pre-batch005-final-20260714_055856.dump`，SHA-256 `82908208d5a32f751c1b7c258c54e3ac66993798d27b66ff6d1405393a10ffa9`。
+- 写后生产总账为 `1291 imported / 29626 pending`，共 `13507 runners / 12167 results`；1291 个历史赛事全部保持 draft，published 为 0。写入窗口结束后 worker consumer 与 beat 已恢复，常驻历史写入和网络开关继续为 false。
+- batch006 不在旧的每地区 50 场规则下直接启动。按已批准后续要求，必须先完成“每地区最多 250 场”和独立 historical batch runner 的 OpenSpec、工程评审、测试优先实现、零问题代码复审、部署与验收；公开历史赛事开关继续关闭。
+
 ## 2026-07-14 新闻实体语境判定与完整马名保护已上线
 
 - OpenSpec change `contextualize-news-entity-resolution` 已完成测试优先实现及 `18` 轮 `/review -> 修复`，最终一轮无问题。文章级解析结果统一供翻译、标签、发布校验、自动马匹关联与显式重处理消费；英文人物全名及篇内唯一姓氏回指会压制内部马名，英文普通词/高歧义词需要强马名语境，日文完整未知马名会先整体占位，不再被父马、冠名或短术语拆分。
@@ -16,7 +34,7 @@
 - 最终生产 revision 为 `514af8a22aec18f01cf0193344ae3b7a45c4dbc4`，web/worker/beat 均运行镜像 `sha256:954673cc74049d4b882e492ec29b072aba01aeb1a3ae440cc85415209c8a2f8a`。源码 tree 为 `b62a80cc34b2b65c47f6dd7d541c455d04a0ef5c`，archive SHA-256 为 `507b95c9b3e3ab66b67e4813b6b4814d2e4bc3d6cb2aae6abc7ad357322ad039`，双构建 `/app` manifest SHA-256 为 `2ada2d84788d048fcfd86d589762c2b159256d1a884581ac819a614aacf92aea`。
 - 最终切换前备份为 `.env.backup.pre-main-514af8a2-20260714-051127` 和 `backups/db/pre-main-514af8a2-20260714-051127.sql.gz`；数据库备份 `158552943` bytes、SHA-256 `9fc72efba29ee8d32c9709665809d259ca49e47a217c43626c99b084d99d4b0a`，`gzip -t` 通过，旧镜像回滚 tag 为 `umanewsbot:rollback-pre-514af8a2-20260714-051127`。
 - 文章 `8086/8267/8316/8318` 均已按保存 HTML 离线修复并强制重译，继续保持 `published`、原 `published_to_web_at` 与 QQ delivery `0`；公开详情全部返回 `200`。生产随机抽检 `8306/8311/8326/8331/8336` 后又修复并重译存量旧解析结果，五篇保存正文与当前重解析逐字一致、解析状态均为 `ok`、噪声标记为 `0`；已发布样本 `8326` 保持原发布时间 `2026-07-13T17:47:04.152562Z` 且 QQ delivery `0`。
-- 部署后 migrate 无待应用迁移，Django check、内外 `/healthz/`、首页、后台登录和目标公开页面均为 `200`，web/worker 日志无异常。beat 已恢复，Celery active/reserved 均为空；生产写入窗口已交还历史 batch005 会话，本会话收到其完成回报前不再重启或重建生产容器。
+- 部署后 migrate 无待应用迁移，Django check、内外 `/healthz/`、首页、后台登录和目标公开页面均为 `200`，web/worker 日志无异常。beat 已恢复，Celery active/reserved 均为空；生产写入窗口随后由历史 batch005 完成使用并正常归还。
 
 ## 2026-07-14 2016-2025 标准批次四号 250 场正式导入
 

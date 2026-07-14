@@ -234,7 +234,7 @@ class HistoricalRaceBatchTests(TestCase):
         targets.extend(self._target(second_series, 1984 + index) for index in range(8))
 
         with self.assertRaisesMessage(InventoryValidationError, "limit exceeded"):
-            validate_standard_batch(targets)
+            validate_standard_batch(targets, approved_region_limit=50)
 
         with self.assertRaisesMessage(InventoryValidationError, "lead exceeds 100"):
             validate_standard_batch(

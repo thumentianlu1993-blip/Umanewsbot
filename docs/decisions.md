@@ -1,5 +1,19 @@
 # 关键决策
 
+## 2026-07-14：batch006 起扩大标准批次并使用独立 historical runner
+
+- batch005 继续完整遵守旧标准，即单地区最多 50 场；只有 batch005 全部写入和验收结束后，batch006 及后续标准批次才把单地区上限提高到 250 场。
+- 扩容不能只修改一个命令行默认值。选择器、地区进度护栏、artifact 摘要、测试和运行手册必须使用同一口径；既有排除 snapshot、100 场地区领先护栏和待审 gap 记账规则继续有效，除非后续产品审核另行修改。
+- 后续历史批次使用独立 runner 容器，固定到已验收镜像 revision，显式挂载 runtime artifact，并设置资源限制。普通 web/worker/beat 部署不得重建、停止或接管 runner，也不得借此重建 DB、Redis 或共享网络。
+- runner 必须具有数据库级与应用级互斥锁、心跳、可恢复 checkpoint 和失联接管门禁；迁移前必须安全暂停。抓取阶段只允许 `network=true / write=false`，落库阶段只允许 `network=false / write=true`，任何阶段都不能同时获得两种权限。
+- 上述能力必须走 OpenSpec、工程评审、完整测试、实现和反复代码 review，并在部署验收通过后才允许启动 batch006。历史公开展示继续保持关闭。
+- 实现采用三张独立控制表、PostgreSQL 租约与 `fcntl` 双锁；过期租约不能被普通启动覆盖。接管必须同时证明旧容器不存在、`pg_stat_activity` 无对应 `application_name`、runtime/DB checkpoint 一致，并写入操作者与原因。
+- owner token 原文只能位于 artifact 外的 0600 文件；resume/takeover 也不得通过命令行传 token。crawl control role 对 event 表只允许 append，不能删除审计事件，更不能读取或写入赛事、新闻、术语等业务表。
+- 普通部署首次引入 `0031` 时只能显式设置一次 initial-install 门禁；后续迁移必须让 active runner 安全暂停。数据库、Redis 和共享网络只允许由独立 bootstrap 首次创建，普通 deploy/rollback 永远不隐式补建。
+- 子进程 stdout/stderr 不通过无界内存 pipe 累积，也不把未脱敏原文写入 artifact；先写入 runner 容器受限 `/tmp` tmpfs，结束后统一脱敏并原子写正式日志。stale takeover 只能核对 artifact 根目录固定 `runner-state.json`，不接受任意替代文件。
+- crawl runner 不写旧的业务 `TaskExecutionLog`，网络步骤审计统一进入 append-only `HistoricalBatchRunEvent`；普通非 runner 管理命令仍保留原任务日志。这样 control role 无需获得任何业务表权限。
+- stale takeover 必须从宿主执行 `historical_runner.sh takeover`：脚本先通过 Docker 实际确认固定名称旧容器不存在，再用同 revision、同 phase 数据库凭据、internal-only 网络和只读 artifact 挂载执行接管探针。不得直接把管理命令的 `--container-absent` 当成人工声明使用。
+
 ## 2026-07-14：国际新闻正文清理必须按可信容器与语义噪声 fail closed
 
 - 国际来源正文选择器未命中时必须返回显式失败，不得回退页面 `body`；站点 DOM 漂移应在后台暴露，而不是把导航、推荐、社交和页脚误当新闻发布。

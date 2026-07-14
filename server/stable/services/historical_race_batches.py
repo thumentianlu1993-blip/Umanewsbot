@@ -32,7 +32,7 @@ from stable.services.historical_race_inventory import (
 )
 
 
-STANDARD_REGION_BATCH_LIMIT = 50
+STANDARD_REGION_BATCH_LIMIT = 250
 MAX_REGION_PROGRESS_LEAD = 100
 FIRST_ACCEPTANCE_TARGETS_PER_REGION = 9
 FIRST_ACCEPTANCE_SERIES_PER_REGION = 3
@@ -582,6 +582,7 @@ def write_band_batch_artifact(
     inventory_manifest_sha256: str,
     year_start: int,
     year_end: int,
+    approved_region_limit: int = STANDARD_REGION_BATCH_LIMIT,
     exclusion_snapshots: Iterable[ImmutableSelectionSnapshot] | None = None,
 ) -> dict[str, Any]:
     rows = list(targets)
@@ -621,7 +622,7 @@ def write_band_batch_artifact(
     progress_guard_regions = _unfinished_regions_after_selection(eligible_counts, selected_counts)
     _validate_region_limit_and_progress(
         selected_counts,
-        approved_region_limit=STANDARD_REGION_BATCH_LIMIT,
+        approved_region_limit=approved_region_limit,
         current_progress=accounted_progress_by_region(year_start=year_start, year_end=year_end),
         progress_regions=progress_guard_regions,
     )
@@ -705,6 +706,7 @@ def write_band_batch_artifact(
     summary = {
         "schema_version": "1.0",
         "year_band": {"start": year_start, "end": year_end},
+        "approved_region_limit": approved_region_limit,
         "inventory_manifest_sha256": inventory_manifest_sha256,
         "target_count": len(rows),
         "snapshot_sha256": snapshot["snapshot_sha256"],
@@ -730,6 +732,7 @@ def write_band_batch_artifact(
         "schema_version": "1.0",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "year_band": summary["year_band"],
+        "approved_region_limit": approved_region_limit,
         "inventory_manifest_sha256": inventory_manifest_sha256,
         "target_count": len(rows),
         "artifacts": {

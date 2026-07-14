@@ -11,9 +11,18 @@ fi
 
 COMPOSE="./deploy/docker/compose-wrapper.sh"
 
-"$COMPOSE" -f docker-compose.prod.lowcost.yml pull db redis nginx
+if [ "${HISTORICAL_RUNNER_INITIAL_INSTALL:-false}" = "true" ]; then
+  COMPOSE_FILE=docker-compose.prod.lowcost.yml ./deploy/historical_runner_preflight.sh --initial-install
+else
+  COMPOSE_FILE=docker-compose.prod.lowcost.yml ./deploy/historical_runner_preflight.sh
+fi
+"$COMPOSE" -f docker-compose.prod.lowcost.yml pull nginx
 "$COMPOSE" -f docker-compose.prod.lowcost.yml build web
-"$COMPOSE" -f docker-compose.prod.lowcost.yml up -d --remove-orphans
+"$COMPOSE" -f docker-compose.prod.lowcost.yml stop beat
+COMPOSE_FILE=docker-compose.prod.lowcost.yml ./deploy/wait_for_celery_drain.sh
+"$COMPOSE" -f docker-compose.prod.lowcost.yml stop worker
+"$COMPOSE" -f docker-compose.prod.lowcost.yml up -d --no-deps web
 "$COMPOSE" -f docker-compose.prod.lowcost.yml exec web python manage.py migrate --noinput
 "$COMPOSE" -f docker-compose.prod.lowcost.yml exec web python manage.py collectstatic --noinput
+"$COMPOSE" -f docker-compose.prod.lowcost.yml up -d --no-deps worker beat nginx
 "$COMPOSE" -f docker-compose.prod.lowcost.yml ps

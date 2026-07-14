@@ -7,11 +7,24 @@
 > 本文档用于保留项目级概览与摘要信息。
 > 当前真实工作状态、最近一次关键修复、线上实际进展，请以 [docs/current_state.md](E:/Codex/docs/current_state.md) 为准。
 
+## 2026-07-14 batch006 前置能力已完成本地实现
+
+- `scale-and-isolate-historical-race-batches` 已把 batch006+ 单地区标准上限统一为 250，并新增可恢复的独立 historical runner、迁移 `0031`、最小权限 provisioning、隔离 smoke、迁移暂停 preflight 和独立 infrastructure bootstrap。
+- runner 使用数据库租约 + runtime 文件锁、30 秒心跳/180 秒租约、固定镜像与 plan/input/output SHA checkpoint；crawl 只有网络和控制账本权限，apply 只有内部数据库写入权限，全部历史 RaceEvent 继续保持 draft。
+- 本地 runner 聚焦 52 项、runner+历史批次组合 118 项、加网络日志组合 122 项、完整 `stable 1350` 项回归通过（跳过 7），真实 PostgreSQL 6 项和隔离 Docker lifecycle/权限 smoke 通过；五轮 review 的前四轮共修复 7 项问题，第五轮无 actionable finding。当前仍处于“代码已实现、生产未部署”，完成主线提交、可复现镜像、生产迁移与普通部署不干扰演练前，不得生成或启动 batch006。
+
 ## 2026-07-14 新闻实体语境修复上线
 
 - `contextualize-news-entity-resolution` 已部署 `main@dc1e5ec5`；统一文章级实体解析覆盖翻译、标签、校验和自动关联，解决英文人物/普通词误作马名、姓氏回指以及日文完整马名被内部短术语拆分。
 - 11 篇问题文章已修复并保持原公开状态、发布时间与 QQ 幂等；随机六篇及最终 worker 新处理两篇通过回归。最终验证为目标 `51`、完整 `stable 1249` 项通过（跳过 1），第 18 轮 review 无问题。
 - web/worker/beat 统一镜像为 `sha256:5b06821610f0d2214cb24692e58beac4ffda731ddb84674a8855b2a1d4dbb470`；HTTP 健康、目标详情、空队列及错误日志正常。最近有效写前备份为 `pre-main-624dd5b9-20260714-071014.dump`，SHA-256 `21cdce21f52ded3b48e7c083f2f536eb694130f71ad6a1e38e067620f817fa75`。
+
+## 2026-07-14 第五标准批次 250 场导入完成
+
+- batch005 五地区各 50 场已完成日期、详情来源、出马表和赛果正式导入，最终逐场验收 `0 errors`；新增 `2583 runners / 2364 results`。
+- 最终详情候选 SHA-256 为 `269c65e646b11be0a1edef70c8c088e5b4b9a2b0a69527ca0efc6242cb84d6e3`；最终写前备份为 `pre-batch005-final-20260714_055856.dump`，SHA-256 `82908208d5a32f751c1b7c258c54e3ac66993798d27b66ff6d1405393a10ffa9`，`pg_restore -l` 通过。
+- 生产累计为 `1291 imported / 29626 pending`、`13507 runners / 12167 results`；全部历史赛事仍为 draft，published 0，常驻历史网络/写入开关 false。
+- batch006 前先建设每地区最多 250 场与独立 historical batch runner，完成 OpenSpec、工程审查、测试、实现、零问题 review 和部署验收后再继续抓取。
 
 ## 2026-07-14 国际新闻正文边界修复上线
 
