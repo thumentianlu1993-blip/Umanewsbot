@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+import json
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone as dt_timezone
 from unittest.mock import patch
@@ -969,6 +971,84 @@ class AttributionRunLedgerTests(TransactionTestCase):
         with self.assertRaises(ValidationError):
             commit_attribution_run(run.id, manifest_sha256=run.manifest_sha256)
 
+    def test_dry_run_manifest_preserves_locked_article_regions(self):
+        from stable.services.attribution_runs import create_attribution_dry_run
+
+        add_term("Kentucky Derby", TermType.RACE, RacingRegion.UNITED_STATES)
+        article = article_with_text(
+            "Kentucky Derby entries",
+            region=RacingRegion.FRANCE,
+            locked=True,
+        )
+
+        run = create_attribution_dry_run(
+            [article],
+            rule_version=ATTRIBUTION_RULE_VERSION,
+            gold_version="gold-v1",
+            metrics={"qualified": True},
+        )
+
+        outcome = run.candidate_payload[0]
+        self.assertEqual(outcome["before"]["primary"], RacingRegion.FRANCE)
+        self.assertEqual(outcome["after"]["primary"], RacingRegion.FRANCE)
+        self.assertEqual(outcome["after"]["related"], [])
+        self.assertEqual(outcome["after"]["status"], "locked_skip")
+        self.assertEqual(outcome["after"]["reason"], "attribution_locked")
+        self.assertEqual(outcome["proposed"]["primary"], RacingRegion.UNITED_STATES)
+
+    def test_all_articles_commit_only_updates_attribution(self):
+        from stable.services.attribution_runs import commit_attribution_run, create_attribution_dry_run
+
+        add_term("Prix de Diane", TermType.RACE, RacingRegion.FRANCE)
+        article = article_with_text(
+            "Prix de Diane at Chantilly",
+            region=RacingRegion.UNITED_STATES,
+        )
+        article.workflow_status = "published"
+        article.automation_status = "auto_published"
+        article.save(update_fields=["workflow_status", "automation_status", "updated_at"])
+        run = create_attribution_dry_run(
+            [article],
+            rule_version=ATTRIBUTION_RULE_VERSION,
+            gold_version="gold-v1",
+            metrics={"qualified": True},
+            selectors={"scope": "all_articles", "scope_complete": True},
+        )
+        run.selectors = {**run.selectors, "scope": "gate_candidates"}
+        run.save(update_fields=["selectors", "updated_at"])
+
+        with patch(
+            "stable.services.attribution_runs.apply_validation_outcome",
+            side_effect=AssertionError("all-article attribution backfill must not rewrite gate state"),
+        ):
+            result = commit_attribution_run(run.id, manifest_sha256=run.manifest_sha256)
+
+        article.refresh_from_db()
+        self.assertEqual(result.applied_ids, [article.id])
+        self.assertEqual(result.restored_ids, [])
+        self.assertEqual(result.still_blocked_ids, [])
+        self.assertEqual(article.racing_region, RacingRegion.FRANCE)
+        self.assertEqual(article.workflow_status, "published")
+        self.assertEqual(article.automation_status, "auto_published")
+        self.assertIsNone(article.ranked_revived_at)
+
+    def test_incomplete_all_articles_run_cannot_commit(self):
+        from stable.services.attribution_runs import commit_attribution_run, create_attribution_dry_run
+
+        article = article_with_text("Recent article")
+        run = create_attribution_dry_run(
+            [article],
+            rule_version=ATTRIBUTION_RULE_VERSION,
+            gold_version="gold-v1",
+            metrics={"qualified": True},
+            selectors={"scope": "all_articles", "scope_complete": False},
+        )
+        run.selectors = {**run.selectors, "scope_complete": True}
+        run.save(update_fields=["selectors", "updated_at"])
+
+        with self.assertRaisesMessage(ValidationError, "全量近期文章 run 已截断"):
+            commit_attribution_run(run.id, manifest_sha256=run.manifest_sha256)
+
 
 class AttributionCommandContractTests(TestCase):
     def test_single_review_flag_requires_gold_labels(self):
@@ -978,6 +1058,131 @@ class AttributionCommandContractTests(TestCase):
                 dry_run=True,
                 single_review_gold=True,
             )
+
+    def test_default_scope_keeps_legacy_gate_candidate_filter(self):
+        gate_candidate = article_with_text("Gate candidate")
+        gate_candidate.automation_status = "manual_review_required"
+        gate_candidate.gate_issues = [{"code": "core_term_missing", "severity": "blocker"}]
+        gate_candidate.save(update_fields=["automation_status", "gate_issues", "updated_at"])
+        published = article_with_text("Published article")
+        published.workflow_status = "published"
+        published.save(update_fields=["workflow_status", "updated_at"])
+
+        stdout = io.StringIO()
+        call_command(
+            "reprocess_multiregion_attribution_gates",
+            dry_run=True,
+            json=True,
+            stdout=stdout,
+        )
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["scope"], "gate_candidates")
+        self.assertEqual(payload["candidate_ids"], [gate_candidate.id])
+        self.assertNotIn(published.id, payload["candidate_ids"])
+
+    def test_all_articles_scope_includes_published_and_builds_complete_review_checklist(self):
+        from stable.models import MultiregionAttributionRun
+
+        add_term("Prix de Diane", TermType.RACE, RacingRegion.FRANCE)
+        add_term("Epsom Derby", TermType.RACE, RacingRegion.UNITED_KINGDOM)
+        add_term("Kentucky Derby", TermType.RACE, RacingRegion.UNITED_STATES)
+
+        primary_change = article_with_text(
+            "Prix de Diane at Chantilly",
+            region=RacingRegion.UNITED_STATES,
+        )
+        primary_change.workflow_status = "published"
+        primary_change.save(update_fields=["workflow_status", "updated_at"])
+        needs_review = article_with_text(
+            "Prix de Diane and Epsom Derby double",
+            region=RacingRegion.UNITED_STATES,
+        )
+        locked = article_with_text(
+            "Kentucky Derby entries",
+            region=RacingRegion.FRANCE,
+            locked=True,
+        )
+        excluded = article_with_text("Ignored duplicate")
+        excluded.workflow_status = "ignored"
+        excluded.save(update_fields=["workflow_status", "updated_at"])
+        for region in (
+            RacingRegion.JAPAN,
+            RacingRegion.HONG_KONG,
+            RacingRegion.UNITED_KINGDOM,
+            RacingRegion.FRANCE,
+            RacingRegion.UNITED_STATES,
+        ):
+            article_with_text(f"Routine update for {region}", region=region)
+
+        stdout = io.StringIO()
+        call_command(
+            "reprocess_multiregion_attribution_gates",
+            dry_run=True,
+            scope="all_articles",
+            review_sample_per_region=1,
+            json=True,
+            stdout=stdout,
+        )
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["scope"], "all_articles")
+        self.assertTrue(payload["scope_complete"])
+        self.assertIn(primary_change.id, payload["candidate_ids"])
+        self.assertNotIn(excluded.id, payload["candidate_ids"])
+        self.assertIn(primary_change.id, payload["primary_change_ids"])
+        self.assertIn(needs_review.id, payload["needs_review_ids"])
+        self.assertIn(locked.id, payload["locked_skip_ids"])
+        self.assertIn(locked.id, payload["review_checklist_ids"])
+        self.assertEqual(payload["restored_candidate_ids"], [])
+        self.assertEqual(payload["still_blocked_ids"], [])
+        self.assertEqual(
+            set(payload["validation_passed_ids"] + payload["validation_blocked_ids"]),
+            set(payload["candidate_ids"]),
+        )
+        self.assertTrue(
+            set(payload["primary_change_ids"] + payload["needs_review_ids"]).issubset(
+                payload["review_checklist_ids"]
+            )
+        )
+        self.assertEqual(
+            set(payload["review_sample_ids_by_region"]),
+            {
+                RacingRegion.JAPAN,
+                RacingRegion.HONG_KONG,
+                RacingRegion.UNITED_KINGDOM,
+                RacingRegion.FRANCE,
+                RacingRegion.UNITED_STATES,
+            },
+        )
+        self.assertTrue(all(len(ids) == 1 for ids in payload["review_sample_ids_by_region"].values()))
+        locked_outcome = next(item for item in payload["outcomes"] if item["article_id"] == locked.id)
+        self.assertEqual(locked_outcome["title"], "Kentucky Derby entries")
+        self.assertEqual(locked_outcome["source_url"], locked.source_url)
+        self.assertEqual(locked_outcome["new_regions"]["primary"], RacingRegion.FRANCE)
+        self.assertEqual(locked_outcome["attribution_status"], "locked_skip")
+        run = MultiregionAttributionRun.objects.get(pk=payload["run_id"])
+        self.assertEqual(run.selectors["scope"], "all_articles")
+        self.assertEqual(run.selectors["review_checklist_ids"], payload["review_checklist_ids"])
+
+    def test_limited_all_articles_scope_is_explicitly_incomplete(self):
+        for index in range(3):
+            article_with_text(f"Recent article {index}")
+
+        stdout = io.StringIO()
+        call_command(
+            "reprocess_multiregion_attribution_gates",
+            dry_run=True,
+            scope="all_articles",
+            limit=2,
+            json=True,
+            stdout=stdout,
+        )
+
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["candidate_count"], 2)
+        self.assertTrue(payload["has_more_candidates"])
+        self.assertFalse(payload["scope_complete"])
 
 
 @tag("postgresql", "performance")

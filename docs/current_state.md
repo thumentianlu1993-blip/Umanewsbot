@@ -8,6 +8,8 @@
 - Gold Set 不以首次达标封版；新增来源、规则版本、shadow 误判和运营争议案例必须持续追加到后续版本。相关地区采用“高 precision、允许低 recall”首发策略：precision 硬门槛保持 `>=95%`，recall 从 `>=90%` 调整为 `>=50%`。当前 159 条单审 Gold Set 的最少运营地区样本为法国 11 条、跨地区 24 条，主地区准确率 `98.11%`、相关地区 precision `100%`、recall `54.84%`、过度扩散 `0%`，覆盖与质量门槛均通过，可进入 shadow。
 - 线上 recall 下降代表漏标，只告警并阻止继续扩大灰度，不单独触发自动关闭；precision 低于 95%、明显错标或过度扩散超过 1% 才要求回退。生产归属和相关地区查询继续保持关闭，本轮未连接生产数据库、未部署、未修改生产配置。
 - Gold 生成器与评估器现统一读取 `MULTIREGION_ATTRIBUTION_GOLD_MIN_TOTAL/PER_REGION/CROSS_REGION`，避免自定义门槛时生成结果与资格报告不一致。V3 已合并 `origin/main@9d6dec34` 的新闻实体、日文翻译和内容边界修复；组合专项 `205` 项、完整 `stable` `1321 passed / 1 skipped`。合并后 159 条 Gold 指标完全不变，仍为 `qualified=true / no_go_reasons=[]`；Django check、迁移无漂移、Python 编译、两个生产 Compose、OpenSpec strict/all `28/28` 和 `git diff --check` 均通过。
+- 上线前复核发现旧 `reprocess_multiregion_attribution_gates` 只扫描被英文术语门禁卡住的 `manual_review_required` 文章，不能满足“最近 72 小时全部主地区变化与全部 `needs_review`”的生产验收。现新增显式 `--scope all_articles`：覆盖近期全部有效文章并包含已发布稿，排除 duplicate/rejected/withdrawn/archived/ignored；不传 scope 时仍保持原门禁补跑语义。全量模式默认不截断，显式 `--limit` 时报告 `scope_complete=false`，不得作为 go/no-go 依据。
+- 全量报告固定列出全部主地区变化、全部 `needs_review`、全部 `locked_skip`，并从其余文章按当前主地区为五个运营地区各做内容指纹确定性抽样；完整清单写入持久 run selectors，重复运行同一快照可复核。人工锁定文章在报告和 manifest 中均保留原主/相关地区，同时展示算法 proposed 结果。`scope/scope_complete/commit_policy` 已进入 manifest 绑定契约，截断 run 禁止提交，全量 commit 只写归属。最终定向 `41/41`、完整 `stable 1327 passed / 1 skipped`、Django/迁移/编译、两个 Compose 和 OpenSpec `28/28` 均通过；159 条 Gold 指标不变且 `qualified=true`。生产仍为旧镜像、mode=off、相关地区查询关闭，任务 `9.3` 尚未执行。
 
 ## 2026-07-14 生产 DB/Redis 意外重建事故已恢复
 
@@ -1251,7 +1253,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 邮件告警接收地址已配置为 `754652181@qq.com`，但生产尚无 SMTP/EMAIL_HOST 凭据，因此 `TRANSLATION_FAILURE_EMAIL_ENABLED=false`。在完成 SMTP 配置和测试邮件前，不得宣称邮件通知可用或开启该开关。
 - 运行验收：服务器内部 `http://127.0.0.1/healthz/` 与公网 `http://umafans.run/healthz/` 返回 200；浏览器真实打开首页、法国频道和 `/news/8093/` 详情页均正常，详情页含 8 个正文段落且无前端错误。HTTPS 仍未接入证书，Nginx 443 TLS server 块原本即为注释状态，本次不将 HTTPS 计为已完成能力。
 - 法国只读 probe 未写文章：France Galop / TDN France / TDN France Broad 分别得到 `20 / 4 / 12` 条列表候选，三个来源均为 accepted，抽取的 6 篇详情全部成功；最新样本时间覆盖 2026-07-10 至 2026-07-12，未再返回 2020/2022 历史稿。生产法国来源 13/14/21 仍为 enabled、production approved、最近抓取 success。
-- 该日 OpenSpec 进度为 `59/68`，其双审 Gold 待办已由后续单审资格决策取代。当前 OpenSpec 为 `62/70`：159 条 Gold 已通过本地覆盖与质量门槛，生产 gold/dry-run、人工复核、时间修复与翻译小批处理、shadow/enforce 灰度、网页/测试群/正式群扩展和窗口数量验收仍未完成，因此 change 保持 `implementing`，不得归档。
+- 该日 OpenSpec 进度为 `59/68`，其双审 Gold 待办已由后续单审资格决策取代。当前 OpenSpec 为 `63/71`：159 条 Gold 已通过本地覆盖与质量门槛，生产 gold/dry-run、人工复核、时间修复与翻译小批处理、shadow/enforce 灰度、网页/测试群/正式群扩展和窗口数量验收仍未完成，因此 change 保持 `implementing`，不得归档。
 ## 2026-07-13 历史赛事第一批生产详情写入
 
 - 第一批 selection snapshot 固定为五地区各 9 场、共 45 场，绑定 inventory manifest `ac61298f242b2c649c403eae4741771a43cdb027befef20bc75e18fe34bcbad7`。日期发现审核后形成 `36 ready / 9 pending gap`：日本、香港、法国各 9 场有日期；英国 6 场有日期、2000 年 3 场缺口；美国 3 场有日期、2000/2012 年 6 场缺口。

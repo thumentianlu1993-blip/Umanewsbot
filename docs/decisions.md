@@ -1,5 +1,14 @@
 # 关键决策
 
+## 2026-07-14：归属生产验收必须显式使用全量近期文章范围
+
+- `reprocess_multiregion_attribution_gates` 的默认 `gate_candidates` 范围继续只用于术语门禁候选恢复，保持现有运维兼容；它不能作为多地区归属生产资格证据。
+- 生产 72 小时验收必须显式使用 `--scope all_articles` 且不传 `--limit`。范围包含已发布文章，排除 duplicate/rejected/withdrawn/archived/ignored；任何 `scope_complete=false` 的输出均不得用于 go/no-go。
+- 人工清单必须覆盖全部主地区变化、全部 `needs_review` 和全部人工锁定跳过，再从其余文章按五个运营地区做内容指纹确定性抽样。人工锁定文章在 dry-run manifest 中必须保留原主地区与相关地区。
+- `all_articles` run 的 commit 只应用已审核的主/相关地区与归属审计字段，不重写门禁状态、不设置 `ranked_revived_at`、不改变 published 身份或 QQ 交付；默认 `gate_candidates` commit 才保留原来的门禁恢复语义。
+- `all_articles` run 若因显式 `--limit` 产生 `scope_complete=false`，即使 Gold 指标合格也必须拒绝 commit；人工清单行保留标题、来源 URL、来源站点和发布时间，避免脱离原文只审核数字 ID。
+- `scope/scope_complete/commit_policy` 必须作为 `_run_contract` 写入 manifest 已绑定的 metrics；commit 不得信任可独立修改的 selectors 来决定是否重跑门禁。旧 run 仅为兼容读取 selectors，新全量 run 即使 selectors 后续漂移也仍按锁定契约执行。
+
 ## 2026-07-14：单审 Gold Set 可在完整门槛和 Shadow 验收后支持 Enforce
 
 - `provisional_single_review` 继续作为审核来源和审计事实保留，但不再无条件判定 no-go，也不得伪造 reviewer B 或裁决状态。

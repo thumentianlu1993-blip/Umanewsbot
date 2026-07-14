@@ -4,6 +4,9 @@
 
 - PostgreSQL 性能验收必须使用带真实来源关联的 250 篇文章和当前量级术语/alias，不能使用 `source_config=NULL` 的空 fixture。当前基准规模为 17,474 条术语、21,240 条 alias、38,806 个索引候选和 17 个来源；通过值为 5 SQL、1.66–2.14 秒、约 49 MiB RSS。
 - 单审 Gold Set 使用 `evaluate_multiregion_attribution_gold --provisional`；该参数允许一位审核人的标签进入分母，但不豁免有效样本 150、五个运营地区各 10、跨地区 20 和质量门槛。生成归属 dry-run 时必须同时传 `reprocess_multiregion_attribution_gates --single-review-gold --gold-labels <csv> --dry-run ...`，否则单审标签按严格多人审核口径视为未决。
+- 生产归属资格 dry-run 必须额外传 `--scope all_articles --hours 72`，并且不得传 `--limit`。只有输出 `scope_complete=true` 时，全部 `primary_change_ids`、`needs_review_ids`、`locked_skip_ids` 和 `review_sample_ids_by_region` 才构成完整人工清单。默认 `gate_candidates` 仅用于术语门禁补跑，不得作为 Shadow 上线证据。
+- `all_articles` run 后续按 manifest commit 时只回填归属，不会修改文章门禁、重新入榜时间、发布状态或 QQ 交付；报告中的门禁结果使用 `validation_passed_ids/validation_blocked_ids` 表示，不得把它们误读为已经恢复候选。
+- `scope_complete=false` 的 `all_articles` run 会在 commit 入口被强制拒绝；人工复核以 `review_checklist_ids` 对应的 outcome 为准，outcome 内含标题、来源 URL、来源站点、发布时间、before/after、证据、置信度和状态。
 - 单审文件必须保留 `reviewer_roles=reviewer_a` 和 `adjudicated=false`，不得复制 reviewer B。多人审核发生冲突时仍必须裁决。空白未选择行不进入分母，明确 `exclude` 单独留档。
 - 通过 Gold Set 只允许把生产从 `off` 切到 `shadow`。shadow 至少运行 24 小时，必须复核全部主地区变化、全部 `needs_review`、各地区随机稳定样本和错误日志；未完成前禁止 `enforce`。
 - shadow 验收通过后，第一阶段只对新文章 enforce，`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false` 继续保持关闭；再观察至少 24 小时后才讨论网页/测试 QQ 群相关地区查询。

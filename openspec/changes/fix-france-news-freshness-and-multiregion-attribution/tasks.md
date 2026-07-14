@@ -57,6 +57,7 @@
 - [x] 5.3 (application) 将生产资格门槛接入 dry-run 报告：总体主地区准确率 95%、单地区 90%、相关 precision 95%、recall 50%、无依据变化 2%、过度扩散 1%、锁定覆盖 0；线上 recall 波动只告警并阻止扩大，precision/过度扩散失败要求回退 (req: req-attribution-quality)
 - [x] 5.4 (application) 当任一门槛不达标时输出 no-go 并阻止 commit/启用建议，不允许通过降低阈值自动放行 (req: req-attribution-quality)
 - [x] 5.5 (application) 为最近 72 小时生产样本生成分层抽检清单，完整列出所有主地区变化、全部 `needs_review` 和五地区随机样本 (req: req-attribution-dry-run)
+- [x] 5.5a (application) 修正生产审计入口：新增 `--scope all_articles` 覆盖最近窗口全部有效文章及已发布稿，默认门禁补跑范围保持兼容；输出无截断标记、全部主地区变化、全部 `needs_review`、人工锁定和五地区确定性分层样本，将执行策略绑定 manifest，截断 run 禁止 commit，全量 commit 只写归属且不改变门禁/发布/QQ (req: req-attribution-dry-run)
 - [x] 5.6 (integration) 实现 `AttributionBatchContext`，一次预加载并索引术语/alias/赛事证据供 gold set、dry-run 和 commit 复用，避免逐文章 ORM 扫描 (req: req-attribution-performance)
 - [x] 5.7 (application) 为生产质量报告增加有效分母、缺失/漂移/未决样本、Wilson 区间及 SQL/耗时/RSS/预加载计数 (req: req-attribution-quality)
 - [x] 5.8 (operations) 固化 Gold Set 持续扩充规则：新增来源、规则版本、shadow 误判和运营争议必须进入后续版本，并保留旧版本与指标变化 (req: req-attribution-quality)
