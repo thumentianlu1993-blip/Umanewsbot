@@ -10,9 +10,8 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-from stable.models import AttributionStatus, AutomationStatus, NewsArticle, RacingRegion, WorkflowStatus
+from stable.models import AutomationStatus, NewsArticle, RacingRegion, WorkflowStatus
 from stable.services.news_attribution import ATTRIBUTION_RULE_VERSION
-from stable.services.validation import validate_rewrite
 
 
 TERMINAL_WORKFLOW_STATUSES = {
@@ -27,13 +26,6 @@ AUDIT_EXCLUDED_WORKFLOW_STATUSES = TERMINAL_WORKFLOW_STATUSES - {WorkflowStatus.
 REPROCESS_ISSUE_CODES = {"core_term_missing", "term_region_excluded"}
 AUDIT_SCOPE_GATE_CANDIDATES = "gate_candidates"
 AUDIT_SCOPE_ALL_ARTICLES = "all_articles"
-OPERATIONAL_REGIONS = (
-    RacingRegion.JAPAN,
-    RacingRegion.HONG_KONG,
-    RacingRegion.UNITED_KINGDOM,
-    RacingRegion.FRANCE,
-    RacingRegion.UNITED_STATES,
-)
 
 
 def _has_reprocessable_gate(article: NewsArticle) -> bool:
@@ -73,6 +65,11 @@ class Command(BaseCommand):
             "--single-review-gold",
             action="store_true",
             help="允许单审 Gold Set 进入指标分母；仍须满足全部覆盖与质量门槛。",
+        )
+        parser.add_argument(
+            "--include-gate-validation",
+            action="store_true",
+            help="全量归属审计也逐篇执行发布门禁；耗时较长，默认关闭。",
         )
 
     def handle(self, *args, **options):
@@ -159,10 +156,6 @@ class Command(BaseCommand):
                 has_more_candidates = True
                 break
 
-        restored_ids: list[int] = []
-        still_blocked_ids: list[int] = []
-        validation_passed_ids: list[int] = []
-        validation_blocked_ids: list[int] = []
         from stable.services.attribution_runs import create_attribution_dry_run
 
         gold_metrics = {}
@@ -198,130 +191,36 @@ class Command(BaseCommand):
                 "review_sample_per_region": review_sample_per_region,
             },
         )
-        run_rows = {int(row["article_id"]): row for row in (run.candidate_payload or [])}
-        outcomes: list[dict] = []
-        primary_change_ids: list[int] = []
-        needs_review_ids: list[int] = []
-        locked_skip_ids: list[int] = []
-        for article in candidates:
-            row = run_rows[article.id]
-            before = row["before"]
-            after = row["after"]
-            proposed = row.get("proposed") or after
-            effective_regions = {
-                "primary": after["primary"],
-                "related": list(after.get("related") or []),
-            }
-            article._attribution_region_override = {
-                effective_regions["primary"],
-                *effective_regions["related"],
-            }
-            validation = validate_rewrite(article)
-            if validation.passed:
-                validation_passed_ids.append(article.id)
-                if scope == AUDIT_SCOPE_GATE_CANDIDATES:
-                    restored_ids.append(article.id)
-            else:
-                validation_blocked_ids.append(article.id)
-                if scope == AUDIT_SCOPE_GATE_CANDIDATES:
-                    still_blocked_ids.append(article.id)
-            if before["primary"] != after["primary"]:
-                primary_change_ids.append(article.id)
-            if after.get("status") == AttributionStatus.NEEDS_REVIEW:
-                needs_review_ids.append(article.id)
-            if after.get("status") == AttributionStatus.LOCKED_SKIP:
-                locked_skip_ids.append(article.id)
-            outcomes.append(
-                {
-                    "article_id": article.id,
-                    "title": article.title_ja,
-                    "source_url": article.source_url,
-                    "source_site": article.source_site,
-                    "published_at": article.published_at,
-                    "first_seen_at": article.first_seen_at,
-                    "old_regions": before,
-                    "new_regions": effective_regions,
-                    "inferred_regions": {
-                        "primary": proposed["primary"],
-                        "related": list(proposed.get("related") or []),
-                    },
-                    "attribution_status": after.get("status"),
-                    "attribution_reason": after.get("reason"),
-                    "attribution_confidence": after.get("confidence"),
-                    "attribution_evidence": after.get("evidence") or {},
-                    "attribution_locked": article.attribution_locked,
-                    "attribution_applied": not article.attribution_locked,
-                    "content_category": after.get("content_category"),
-                    "validation_passed": validation.passed,
-                    "validation_reason": validation.reason,
-                    "blockers": [issue for issue in validation.issues if issue.get("severity") == "blocker"],
-                }
-            )
+        from stable.services.attribution_runs import build_attribution_review_report
 
-        required_review_ids = set(primary_change_ids) | set(needs_review_ids) | set(locked_skip_ids)
-        review_sample_ids_by_region: dict[str, list[int]] = {}
-        for region in OPERATIONAL_REGIONS:
-            sample_pool = [
-                row
-                for row in (run.candidate_payload or [])
-                if row["before"]["primary"] == region and int(row["article_id"]) not in required_review_ids
-            ]
-            sample_pool.sort(
-                key=lambda row: hashlib.sha256(
-                    f"{row['article_id']}:{row['fingerprint']}".encode()
-                ).hexdigest()
-            )
-            review_sample_ids_by_region[region] = [
-                int(row["article_id"]) for row in sample_pool[:review_sample_per_region]
-            ]
-        review_checklist_ids = list(dict.fromkeys([
-            *primary_change_ids,
-            *needs_review_ids,
-            *locked_skip_ids,
-            *[
-                article_id
-                for region in OPERATIONAL_REGIONS
-                for article_id in review_sample_ids_by_region[region]
-            ],
-        ]))
+        report = build_attribution_review_report(
+            run,
+            include_gate_validation=(
+                scope == AUDIT_SCOPE_GATE_CANDIDATES or options.get("include_gate_validation", False)
+            ),
+            review_sample_per_region=review_sample_per_region,
+        )
         run.selectors = {
             **(run.selectors or {}),
-            "primary_change_ids": primary_change_ids,
-            "needs_review_ids": needs_review_ids,
-            "locked_skip_ids": locked_skip_ids,
-            "review_sample_ids_by_region": review_sample_ids_by_region,
-            "review_checklist_ids": review_checklist_ids,
+            "primary_change_ids": report["primary_change_ids"],
+            "needs_review_ids": report["needs_review_ids"],
+            "locked_skip_ids": report["locked_skip_ids"],
+            "review_sample_ids_by_region": report["review_sample_ids_by_region"],
+            "review_checklist_ids": report["review_checklist_ids"],
         }
         run.save(update_fields=["selectors", "updated_at"])
         payload = {
             "dry_run": bool(options["dry_run"]),
             "commit": bool(options["commit"]),
-            "scope": scope,
-            "scope_complete": not has_more_candidates,
-            "regions": sorted(regions),
-            "lookback_hours": lookback_hours,
-            "window_start": window_start.isoformat(),
             "scanned_count": scanned_count,
-            "candidate_count": len(candidates),
             "has_more_candidates": has_more_candidates,
-            "candidate_ids": [article.id for article in candidates],
-            "restored_candidate_ids": restored_ids,
-            "still_blocked_ids": still_blocked_ids,
-            "validation_passed_ids": validation_passed_ids,
-            "validation_blocked_ids": validation_blocked_ids,
-            "primary_change_ids": primary_change_ids,
-            "needs_review_ids": needs_review_ids,
-            "locked_skip_ids": locked_skip_ids,
-            "review_sample_ids_by_region": review_sample_ids_by_region,
-            "review_checklist_ids": review_checklist_ids,
             "skipped": skipped,
-            "outcomes": outcomes,
-            "run_id": run.id,
-            "manifest_sha256": run.manifest_sha256,
+            **report,
         }
         if options["json"]:
             self.stdout.write(json.dumps(payload, ensure_ascii=False, indent=2, default=str))
             return
         self.stdout.write(
-            f"candidates={len(candidates)} restored={len(restored_ids)} still_blocked={len(still_blocked_ids)}"
+            f"candidates={len(candidates)} restored={len(report['restored_candidate_ids'])} "
+            f"still_blocked={len(report['still_blocked_ids'])}"
         )

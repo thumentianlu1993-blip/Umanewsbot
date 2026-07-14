@@ -53,11 +53,13 @@
 
 - [x] 5.1 (application) 建立 159 篇版本化单审 gold labels，保存 article/source、输入 SHA、期望地区、审核来源和理由；有效样本 >=150、五个运营地区各 >=10、跨地区 >=20，单审不得伪造第二审核人，多人标注存在冲突时须裁决，未决/漂移样本不进入分母 (req: req-attribution-quality)
 - [x] 5.1a (application) 支持单审部分样本校准：未选择任何地区的行忽略、明确排除保留、原始/规范值可审计；`provisional_single_review` 仅标记审核来源，不再自动 no-go。本批固定 159 条标签，最少地区法国 11、跨地区 24，主地区 98.11%、相关 precision 100%、recall 54.84%，当前覆盖与质量门槛全部通过，可进入 shadow (req: req-attribution-quality)
+- [x] 5.1b (application) 增加 Gold 输入漂移对账：仅在审核快照身份、来源 URL、标题、正文重合/长度比例和当前推断均与人工结论一致时刷新输入 SHA；重复身份、正文异常缩短和推断变化均 fail closed，并使用全新目录保存对账证据 (req: req-attribution-quality)
 - [x] 5.2 (integration) 实现 gold set 评估器，计算总体/分地区主地区准确率、相关地区 precision/recall、无依据主地区变化率、过度扩散率和人工锁定覆盖数 (req: req-attribution-quality)
 - [x] 5.3 (application) 将生产资格门槛接入 dry-run 报告：总体主地区准确率 95%、单地区 90%、相关 precision 95%、recall 50%、无依据变化 2%、过度扩散 1%、锁定覆盖 0；线上 recall 波动只告警并阻止扩大，precision/过度扩散失败要求回退 (req: req-attribution-quality)
 - [x] 5.4 (application) 当任一门槛不达标时输出 no-go 并阻止 commit/启用建议，不允许通过降低阈值自动放行 (req: req-attribution-quality)
 - [x] 5.5 (application) 为最近 72 小时生产样本生成分层抽检清单，完整列出所有主地区变化、全部 `needs_review` 和五地区随机样本 (req: req-attribution-dry-run)
 - [x] 5.5a (application) 修正生产审计入口：新增 `--scope all_articles` 覆盖最近窗口全部有效文章及已发布稿，默认门禁补跑范围保持兼容；输出无截断标记、全部主地区变化、全部 `needs_review`、人工锁定和五地区确定性分层样本，将执行策略绑定 manifest，截断 run 禁止 commit，全量 commit 只写归属且不改变门禁/发布/QQ (req: req-attribution-dry-run)
+- [x] 5.5b (application) 将全量归属报告与逐篇发布门禁拆分：`all_articles` 默认不执行慢速门禁，已有持久 run 可在不重复推断的前提下原子导出报告；文章漂移/缺失自动进入必审清单，候选指纹或 manifest 漂移时拒绝导出与提交 (req: req-attribution-dry-run) (req: req-attribution-run-ledger)
 - [x] 5.6 (integration) 实现 `AttributionBatchContext`，一次预加载并索引术语/alias/赛事证据供 gold set、dry-run 和 commit 复用，避免逐文章 ORM 扫描 (req: req-attribution-performance)
 - [x] 5.7 (application) 为生产质量报告增加有效分母、缺失/漂移/未决样本、Wilson 区间及 SQL/耗时/RSS/预加载计数 (req: req-attribution-quality)
 - [x] 5.8 (operations) 固化 Gold Set 持续扩充规则：新增来源、规则版本、shadow 误判和运营争议必须进入后续版本，并保留旧版本与指标变化 (req: req-attribution-quality)
@@ -91,6 +93,7 @@
 - [x] 8.9 (integration) 在包含 17,474 条术语、38,806 个候选、17 个来源和 250 篇真实校准文章的 PostgreSQL fixture 上验证五轮基准为 5 SQL、1.66–2.14 秒、约 49 MiB RSS，满足 30 SQL、30 秒和 256 MiB 门槛 (req: req-attribution-performance)
 - [x] 8.10 (application) 运行目标测试、完整 `stable` 测试、`manage.py check`、迁移一致性和 Python 编译检查 (adr: adr-002-structured-state)
 - [x] 8.11 (operations) 运行两个生产 Compose config、OpenSpec strict/all、`git diff --check` 和敏感信息检查 (adr: adr-010-staged-rollout)
+- [x] 8.12 (application) 回归 Gold 漂移续签、重复身份、正文异常缩短、run 原子导出、文章/候选指纹漂移和全量审计跳过门禁；完整 stable、真实 PostgreSQL 性能门槛及 OpenSpec strict/all 通过 (req: req-attribution-quality) (req: req-attribution-performance)
 
 ## 9. 生产部署与灰度验收
 

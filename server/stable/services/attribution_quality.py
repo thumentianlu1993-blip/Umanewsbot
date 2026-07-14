@@ -16,6 +16,13 @@ from stable.services.news_attribution import AttributionBatchContext, infer_arti
 DEFAULT_GOLD_MIN_TOTAL = 150
 DEFAULT_GOLD_MIN_PER_REGION = 10
 DEFAULT_GOLD_MIN_CROSS_REGION = 20
+OPERATIONAL_RELATED_REGIONS = {
+    RacingRegion.JAPAN,
+    RacingRegion.HONG_KONG,
+    RacingRegion.UNITED_KINGDOM,
+    RacingRegion.FRANCE,
+    RacingRegion.UNITED_STATES,
+}
 
 
 def gold_coverage_thresholds() -> tuple[int, int, int]:
@@ -183,12 +190,12 @@ def evaluate_gold_set(
         region_correct[label.expected_primary_region] = region_correct.get(label.expected_primary_region, 0) + int(
             is_primary_correct
         )
-        expected_related = set(label.expected_related_regions)
-        actual_related = set(outcome.get("related_regions") or [])
+        expected_related = set(label.expected_related_regions) & OPERATIONAL_RELATED_REGIONS
+        actual_related = set(outcome.get("related_regions") or []) & OPERATIONAL_RELATED_REGIONS
         related_tp += len(expected_related & actual_related)
         related_fp += len(actual_related - expected_related)
         related_fn += len(expected_related - actual_related)
-        unsupported_changes += int(bool(outcome.get("unsupported_primary_change")))
+        unsupported_changes += int(bool(outcome.get("unsupported_primary_change")) and not is_primary_correct)
         over_expansions += int(bool(outcome.get("over_expansion")) or len(actual_related - expected_related) > 2)
         locked_overrides += int(bool(outcome.get("locked_override")))
 

@@ -25,7 +25,10 @@
 - PostgreSQL 性能验收必须使用带真实来源关联的 250 篇文章和当前量级术语/alias，不能使用 `source_config=NULL` 的空 fixture。当前基准规模为 17,474 条术语、21,240 条 alias、38,806 个索引候选和 17 个来源；通过值为 5 SQL、1.66–2.14 秒、约 49 MiB RSS。
 - 单审 Gold Set 使用 `evaluate_multiregion_attribution_gold --provisional`；该参数允许一位审核人的标签进入分母，但不豁免有效样本 150、五个运营地区各 10、跨地区 20 和质量门槛。生成归属 dry-run 时必须同时传 `reprocess_multiregion_attribution_gates --single-review-gold --gold-labels <csv> --dry-run ...`，否则单审标签按严格多人审核口径视为未决。
 - 生产归属资格 dry-run 必须额外传 `--scope all_articles --hours 72`，并且不得传 `--limit`。只有输出 `scope_complete=true` 时，全部 `primary_change_ids`、`needs_review_ids`、`locked_skip_ids` 和 `review_sample_ids_by_region` 才构成完整人工清单。默认 `gate_candidates` 仅用于术语门禁补跑，不得作为 Shadow 上线证据。
-- `all_articles` run 后续按 manifest commit 时只回填归属，不会修改文章门禁、重新入榜时间、发布状态或 QQ 交付；报告中的门禁结果使用 `validation_passed_ids/validation_blocked_ids` 表示，不得把它们误读为已经恢复候选。
+- `all_articles` 默认不执行逐篇发布门禁，`validation_skipped_ids` 应覆盖全部候选；只有显式传 `--include-gate-validation` 才产生 `validation_passed_ids/validation_blocked_ids`。后续按 manifest commit 时只回填归属，不修改文章门禁、重新入榜时间、发布状态或 QQ 交付。
+- dry-run 已持久化但 stdout 报告中断时，使用 `export_multiregion_attribution_run --run-id <id> --manifest-sha256 <sha> --output <new.json>` 原子重建，不重复运行推断。输出文件必须是新路径；`missing_article_ids/drifted_article_ids` 必须全部进入人工清单，非空时不得直接 commit。
+- 单审 Gold 因正文清理发生 SHA 漂移时，先从原 Excel 审核表生成只读 review snapshot，再执行 `reconcile_multiregion_attribution_gold --labels <old.csv> --review-snapshot <snapshot.csv> --output-dir <new-dir>`。只接受 `auto_refreshed`，任何 duplicate、title/source/body/inference blocker 均保留旧 SHA 并从有效分母剔除；不得手改 SHA。
+- France Galop 部署后先运行只读 source probe，样本必须同时有真实页面日期、`published_at_verified=true` 和非空 evidence；随后自然抓取纠正文章时间。禁止用当前抓取时间批量回填旧文。
 - `scope_complete=false` 的 `all_articles` run 会在 commit 入口被强制拒绝；人工复核以 `review_checklist_ids` 对应的 outcome 为准，outcome 内含标题、来源 URL、来源站点、发布时间、before/after、证据、置信度和状态。
 - 当前待切换候选：main `7f0827ad941452524062d478940c85bdfddf4a59`，tag `umanewsbot:main-7f0827ad-amd64-20260714-1707`，image ID `sha256:6ad16e368d7934777a689e537c70618a6321c3466d02f304116e2f61ae2af9a1`。必须先等待 `news-translate-20260713-r3` 自然退出并重新确认 one-off、TranslationRun、Celery active/reserved、归属/外部导入锁均为空；不得在文章正文/指纹仍变化时生成 72 小时 manifest。
 - 单审文件必须保留 `reviewer_roles=reviewer_a` 和 `adjudicated=false`，不得复制 reviewer B。多人审核发生冲突时仍必须裁决。空白未选择行不进入分母，明确 `exclude` 单独留档。

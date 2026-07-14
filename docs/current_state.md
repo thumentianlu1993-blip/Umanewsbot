@@ -1,5 +1,14 @@
 # 当前状态
 
+## 2026-07-14 多地区归属 V3 审计性能与 Gold 漂移修复待部署
+
+- 生产首次 72 小时 `all_articles` dry-run 已持久化 `597` 篇候选，但旧命令在归属推断后又逐篇执行发布门禁，运行超过 30 分钟后被终止，stdout 报告为空；run `#1` 与 manifest 仍在数据库。现已将全量归属审计和发布门禁复核拆开，`all_articles` 默认只生成归属报告，默认门禁补跑范围仍保持原行为。
+- 新增从持久 run 直接导出审核报告的命令，不重复执行归属推断；支持原子写入新 JSON 文件并拒绝覆盖既有证据。文章缺失或指纹漂移会进入必审清单，漂移文章不再使用旧归属结果校验新正文；candidate fingerprint 或 manifest 漂移时拒绝导出/commit。
+- 159 条单审 Gold 在当前生产正文上有 `21` 条输入 SHA 漂移。对照用户原审核快照后，`18` 条满足来源 URL、标题、正文语义/长度和当前推断结论全部稳定，可保守刷新 SHA；`8230` 标题变化、`8088` 正文异常缩短、`7898` 当前推断与人工相关地区结论不同，继续阻断。新增命令只输出对账工件，不修改数据库，重复身份或既有输出目录一律 fail closed。
+- 相关地区 precision/recall 现在只计算日本、中国香港、英国、法国、美国五个实际运营频道；`other` 继续保留为审计证据，但不会因系统没有第六个频道而制造假阳性。低置信度主地区变化若与人工 Gold 主地区一致，不再误计为“无依据变化”。
+- France Galop 英文页面真实日期形如 `Sunday, July 12, 2026 - 19:04`；旧 parser 缺少星期前缀格式，导致新稿被标记为时间不可信。适配器已补充长/短星期格式，来源 probe 同时输出 `published_at_verified` 与证据，部署后须以真实页面确认纠正。
+- 专项 `109` 项通过（另 1 项 SQLite 环境跳过）；完整 `stable 1396` 项通过（7 项环境专项跳过）；一次性 PostgreSQL 16 上 250 篇性能契约通过，测试体 `0.219s`，满足 SQL/30 秒/256 MiB 三项门槛；OpenSpec strict/all `29/29` 通过。当前分支尚未提交或部署，生产归属 mode 与相关地区查询仍保持关闭，Shadow 尚未开始计时。
+
 ## 2026-07-14 batch006 扩容与独立 historical runner 本地实现
 
 - OpenSpec change `scale-and-isolate-historical-race-batches` 已完成完整提案、两轮工程评审和测试优先实现。batch006 起标准单地区上限为 250；显式 1-249 仍合法，旧批次可继续显式传 50。selection、writer、validator、summary、manifest 和命令 JSON 使用同一 `approved_region_limit`，100 场地区领先与不可变排除 snapshot 语义不变。

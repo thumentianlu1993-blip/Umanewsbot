@@ -239,6 +239,19 @@ class FranceGalopPublishedEvidenceTests(TestCase):
 
         self.assertEqual(detail.published_at, datetime(2026, 7, 12, 13, 30, tzinfo=UTC))
 
+    def test_detail_weekday_prefixed_date_is_parsed(self):
+        adapter = FranceGalopEnglishNewsAdapter()
+        detail = adapter.parse_detail_html(
+            """
+            <main><h1>Official update</h1><p class="date">Sunday, July 12, 2026 - 19:04</p>
+            <p>Official racing body.</p></main>
+            """,
+            url="https://www.france-galop.com/en/content/official-update",
+        )
+
+        self.assertEqual(detail.published_at, datetime(2026, 7, 12, 17, 4, tzinfo=UTC))
+        self.assertTrue(detail.metadata["published_at_verified"])
+
     def test_winter_date_uses_paris_standard_time(self):
         adapter = FranceGalopEnglishNewsAdapter()
         detail = adapter.parse_detail_html(

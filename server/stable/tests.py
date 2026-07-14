@@ -2864,6 +2864,8 @@ class FranceNewsSourceExpansionTests(TestCase):
         self.assertEqual(payload[0]["final_url"], "https://example.com/france/news?page=1")
         self.assertGreaterEqual(payload[0]["parse_quality"]["list_count"], 1)
         self.assertGreaterEqual(payload[0]["parse_quality"]["detail_body_length"], 80)
+        self.assertTrue(payload[0]["articles"][0]["published_at_verified"])
+        self.assertIn("published_at_evidence", payload[0]["articles"][0])
 
     def test_france_source_probe_marks_access_limited_candidate_deferred(self):
         from stable.management.commands import probe_international_news_sources as probe_command
