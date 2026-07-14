@@ -11,6 +11,11 @@ from openai import OpenAI
 
 from stable.models import NewsArticle, SourceLanguage, TermType, TranslationRun
 
+from .japanese_racing_translation import (
+    build_japanese_format_plan,
+    japanese_format_placeholder_violations,
+    restore_japanese_format_placeholders,
+)
 from .terms import (
     ArticleEntityResolution,
     apply_contextual_term_mappings,
@@ -47,6 +52,17 @@ class TranslationProvider:
         raise NotImplementedError
 
 
+def _translation_terms(resolution: ArticleEntityResolution) -> list:
+    limit = max(0, int(settings.TRANSLATION_TERM_LIMIT))
+    selected = list(resolution.accepted_terms[:limit])
+    for term in resolution.accepted_terms:
+        if "japanese_racing_translation_seed" not in (term.notes or "").casefold():
+            continue
+        if term not in selected:
+            selected.append(term)
+    return selected
+
+
 class DummyTranslationProvider(TranslationProvider):
     name = "dummy"
 
@@ -63,8 +79,11 @@ class DummyTranslationProvider(TranslationProvider):
             body,
             source_language=source_language,
         )
-        mapped_title = apply_contextual_term_mappings(article.title_ja, resolution)
-        mapped_body = apply_contextual_term_mappings(body, resolution)
+        format_plan = build_japanese_format_plan(article.title_ja, body, resolution)
+        mapped_title = apply_contextual_term_mappings(format_plan.protected_title, resolution)
+        mapped_body = apply_contextual_term_mappings(format_plan.protected_body, resolution)
+        mapped_title = restore_japanese_format_placeholders(mapped_title, format_plan, field_name="title")
+        mapped_body = restore_japanese_format_placeholders(mapped_body, format_plan, field_name="body")
         return TranslationResult(
             title_zh=f"[未配置真实翻译模型] {mapped_title}",
             body_zh=mapped_body,
@@ -76,6 +95,7 @@ class DummyTranslationProvider(TranslationProvider):
                 "entities": [item.as_dict() for item in resolution.entities],
                 "suppressed_entities": [item.as_dict() for item in resolution.suppressed_candidates],
                 "machine_horse_tags": resolution.machine_horse_tags,
+                "japanese_format_normalizations": format_plan.as_dicts(),
             },
         )
 
@@ -109,8 +129,10 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             "请优先遵守术语表中的译法，不要杜撰信息，不要省略关键事实，不要把原文改写成摘要。"
             "如果原文包含排行榜、分点、小标题或项目符号，译文必须保留相同的顺序和完整信息。"
             "如果识别到马名但术语表没有提供中文译名，必须保留该马名的原始写法，不得音译、意译或自行猜译。"
+            "未被术语表或占位符保护的普通片假名是正文词汇，必须按上下文译成中文，不得保留原文。"
             "若原文中出现 __UMA_KEEP_数字__ 形式的占位符，请在译文中原样复制该占位符，不要翻译或删除。"
             "若原文中出现 __UMA_TERM_数字__ 形式的人名占位符，也必须在译文中原样复制，系统会按术语表还原。"
+            "若原文中出现 __UMA_FORMAT_数字__ 形式的固定格式占位符，也必须在对应标题或正文中原样复制，系统会还原为规范格式。"
             "输出必须是 JSON 对象，且只包含 title_zh、body_zh、push_summary_zh 三个键。"
             f"{retry_hint}"
             "\n\n"
@@ -286,7 +308,8 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             source_text,
             source_language=source_language,
         )
-        terms = resolution.accepted_terms[: settings.TRANSLATION_TERM_LIMIT]
+        format_plan = build_japanese_format_plan(article.title_ja, source_text, resolution)
+        terms = _translation_terms(resolution)
         person_source_placeholders, person_target_placeholders = self._person_term_placeholders(terms)
         person_placeholder_by_source = {
             source: placeholder for placeholder, source in person_source_placeholders.items()
@@ -301,14 +324,20 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         ]
         unknown_horse_limit = max(1, int(settings.TRANSLATION_UNKNOWN_HORSE_LIMIT))
         recognized_horses = recognized_horses_from_resolution(resolution)
-        unknown_horse_names = [
-            item.matched_text or item.name_ja
-            for item in recognized_horses
-            if item.needs_preserve and (item.matched_text or item.name_ja)
-        ][:unknown_horse_limit]
+        consumed_entity_keys = format_plan.consumed_entity_keys
+        unknown_horse_names = list(
+            dict.fromkeys(
+                item.matched_text
+                for item in resolution.entities
+                if item.entity_type in {"horse", "unknown_horse"}
+                and item.needs_preserve
+                and item.matched_text
+                and (item.field_name, item.start, item.end) not in consumed_entity_keys
+            )
+        )[:unknown_horse_limit]
         _, horse_placeholders = self._protect_unknown_horse_names("", unknown_horse_names)
-        protected_title = self._protect_with_placeholders(article.title_ja, horse_placeholders)
-        protected_body = self._protect_with_placeholders(source_text, horse_placeholders)
+        protected_title = self._protect_with_placeholders(format_plan.protected_title, horse_placeholders)
+        protected_body = self._protect_with_placeholders(format_plan.protected_body, horse_placeholders)
         protected_title = self._protect_with_placeholders(protected_title, person_source_placeholders)
         protected_body = self._protect_with_placeholders(protected_body, person_source_placeholders)
         unknown_horse_lines = [
@@ -337,12 +366,6 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             mapped_title = apply_contextual_term_mappings((payload.get("title_zh") or "").strip(), resolution)
             mapped_body = apply_contextual_term_mappings((payload.get("body_zh") or "").strip(), resolution)
             mapped_summary = apply_contextual_term_mappings((payload.get("push_summary_zh") or "").strip(), resolution)
-            title_zh = self._restore_unknown_horse_placeholders(mapped_title, horse_placeholders)
-            body_zh = self._restore_unknown_horse_placeholders(mapped_body, horse_placeholders)
-            push_summary_zh = self._restore_unknown_horse_placeholders(mapped_summary, horse_placeholders)
-            title_zh = self._restore_unknown_horse_placeholders(title_zh, person_target_placeholders)
-            body_zh = self._restore_unknown_horse_placeholders(body_zh, person_target_placeholders)
-            push_summary_zh = self._restore_unknown_horse_placeholders(push_summary_zh, person_target_placeholders)
 
             last_metadata = {
                 "provider": self.name,
@@ -369,6 +392,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                     if item.source == "external_alias"
                 ],
                 "unknown_horse_placeholders": horse_placeholders,
+                "japanese_format_normalizations": format_plan.as_dicts(),
                 "person_term_placeholders": {
                     placeholder: {"source": source, "target": person_target_placeholders[placeholder]}
                     for placeholder, source in person_source_placeholders.items()
@@ -379,6 +403,34 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                 "attempt": attempt,
                 "max_attempts": max_attempts,
             }
+
+            format_violations = japanese_format_placeholder_violations(
+                mapped_title,
+                mapped_body,
+                format_plan,
+            )
+            if format_violations:
+                last_metadata["japanese_format_placeholder_violations"] = format_violations
+                retry_hint = (
+                    "\n\n注意：上一版遗漏、重复或跨字段放置了固定格式占位符。"
+                    "请在原占位符所属的标题或正文中各原样复制一次 __UMA_FORMAT_数字__ 占位符。"
+                )
+                if attempt < max_attempts:
+                    continue
+                raise TranslationResponseError(
+                    "Translation response changed required format placeholder",
+                    metadata=last_metadata,
+                )
+
+            title_zh = self._restore_unknown_horse_placeholders(mapped_title, horse_placeholders)
+            body_zh = self._restore_unknown_horse_placeholders(mapped_body, horse_placeholders)
+            push_summary_zh = self._restore_unknown_horse_placeholders(mapped_summary, horse_placeholders)
+            title_zh = self._restore_unknown_horse_placeholders(title_zh, person_target_placeholders)
+            body_zh = self._restore_unknown_horse_placeholders(body_zh, person_target_placeholders)
+            push_summary_zh = self._restore_unknown_horse_placeholders(push_summary_zh, person_target_placeholders)
+            title_zh = restore_japanese_format_placeholders(title_zh, format_plan, field_name="title")
+            body_zh = restore_japanese_format_placeholders(body_zh, format_plan, field_name="body")
+            push_summary_zh = restore_japanese_format_placeholders(push_summary_zh, format_plan)
 
             if not title_zh or not body_zh:
                 retry_hint = "\n\n注意：上一版输出缺少必要字段，请从头完整重译全文。"
@@ -462,7 +514,7 @@ def translate_article(article: NewsArticle) -> TranslationResult:
         source_text,
         source_language=article.source_language or SourceLanguage.JAPANESE,
     )
-    terms = resolution.accepted_terms[: settings.TRANSLATION_TERM_LIMIT]
+    terms = _translation_terms(resolution)
     run = article.translation_runs.filter(status="started").order_by("-created_at", "-id").first()
     if run is None:
         run = TranslationRun.objects.create(

@@ -852,6 +852,11 @@ def _resolve_japanese_entities(
             exact_non_horse_terms = [
                 term for term in all_term_candidates.get(token, []) if term.term_type != TermType.HORSE
             ]
+            exact_common_word_terms = [
+                term
+                for term in exact_non_horse_terms
+                if _NON_HORSE_NOTE_MARKER in (term.notes or "").casefold()
+            ]
             internal_terms = [
                 (candidate, term)
                 for candidate, term_list in all_term_candidates.items()
@@ -899,6 +904,11 @@ def _resolve_japanese_entities(
                             term=term,
                         )
                     )
+                continue
+            if exact_common_word_terms and not common_word_strong:
+                # A reviewed common-word concept wins in ordinary prose, while
+                # explicit racecard/result context can still prove a real horse
+                # with the same surface form below.
                 continue
             if exact_terms:
                 term = exact_terms[0]

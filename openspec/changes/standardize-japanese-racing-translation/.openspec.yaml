@@ -1,0 +1,34 @@
+schema: spec-driven
+created: 2026-07-13
+profile: feature
+phase: reviewed
+journal:
+  - event: proposed
+    date: "2026-07-14T08:29:51+08:00"
+    profile: feature
+    artifacts: [proposal, design, specs, tasks]
+    tasks_total: 31
+    note: "日文普通词、产驹、追切、访谈、出马表与三语术语完整提案"
+  - event: plan-reviewed
+    date: "2026-07-14T08:30:12+08:00"
+    session: 1
+    mode: full
+    rounds: 2
+    issues_resolved: 5
+    artifacts_modified: [design.md, specs/japanese-racing-translation-normalization/spec.md, tasks.md]
+    note: "Round 1 修复强制重译副作用、已消费未知实体、字段级占位检查和迁移边界；Round 2 修复完整马名组件的跨位置短术语替换并收敛。"
+  - event: apply-started
+    date: "2026-07-14T08:35:48+08:00"
+    tasks_total: 31
+    branch: "codex/news-quality-review-20260713"
+  - event: apply-completed
+    date: "2026-07-14T08:48:41+08:00"
+    tasks_completed: 21
+    tasks_remaining: 10
+    note: "完成术语迁移、普通词语义优先级、日文格式计划及主翻译链路接入；20 项新增回归、120 项关联回归和 1269 项 stable 全量测试通过。"
+  - event: code-reviewed
+    date: "2026-07-14T08:58:20+08:00"
+    rounds: 6
+    issues_resolved: 8
+    verdict: approved
+    note: "依次修复跨行访谈、格式占位符重复/跨字段、骑手未定误匹配、停用术语、普通词/真实马语境优先级、基础术语上限与新增机构别名入 prompt 等技术问题；第 6 轮零问题。"
