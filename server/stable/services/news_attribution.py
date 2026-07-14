@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import unicodedata
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Iterable
 
@@ -15,6 +17,7 @@ from stable.models import (
     NewsSource,
     RacingRegion,
     SourceLanguage,
+    SourceSite,
     TermEntry,
     TermType,
 )
@@ -27,6 +30,7 @@ SUPPORTED_REGIONS = {
     RacingRegion.UNITED_KINGDOM,
     RacingRegion.FRANCE,
     RacingRegion.UNITED_STATES,
+    RacingRegion.OTHER,
 }
 ENTITY_TERM_TYPES = {TermType.HORSE, TermType.JOCKEY, TermType.TRAINER, TermType.OWNER}
 EVENT_TERM_TYPES = {TermType.RACE, TermType.RACECOURSE}
@@ -37,6 +41,7 @@ REGION_ORDER = [
     RacingRegion.UNITED_KINGDOM,
     RacingRegion.FRANCE,
     RacingRegion.UNITED_STATES,
+    RacingRegion.OTHER,
 ]
 REGION_KEYWORDS = {
     RacingRegion.JAPAN: [
@@ -146,7 +151,23 @@ EVENT_REGION_KEYWORDS = {
     ],
 }
 IRELAND_KEYWORDS = ["ireland", "irish", "curragh", "leopardstown", "fairyhouse", "naas"]
-ATTRIBUTION_RULE_VERSION = "multiregion-v2"
+OUT_OF_SCOPE_TITLE_KEYWORDS = [
+    "australia",
+    "australian",
+    "canada",
+    "canadian",
+    "ontario",
+    "saudi arabia",
+    "saudi",
+    "dubai",
+    "uae",
+    "yulong",
+    "オーストラリア",
+    "サウジアラビア",
+    "ドバイ",
+]
+GLOBAL_SOURCE_SITES = {SourceSite.TDN, SourceSite.TDN_FRANCE}
+ATTRIBUTION_RULE_VERSION = "multiregion-v3"
 ENFORCE_NEW_ARTICLES_STAGES = {
     "new_articles",
     "web_test_groups",
@@ -171,13 +192,81 @@ class AttributionResult:
 
 
 @dataclass
+class AttributionTermIndex:
+    candidates_by_key: dict[str, list[tuple[int, int, str]]]
+    candidate_count: int = 0
+
+    @staticmethod
+    def _candidate_key(candidate: str) -> str:
+        normalized = unicodedata.normalize("NFKC", candidate or "").casefold()
+        latin_tokens = re.findall(r"[0-9a-z]+", normalized)
+        if latin_tokens:
+            return max(latin_tokens, key=lambda item: (len(item), item))
+        compact = "".join(normalized.split())
+        return compact[:2]
+
+    @staticmethod
+    def _text_keys(text: str) -> set[str]:
+        normalized = unicodedata.normalize("NFKC", text or "").casefold()
+        keys = set(re.findall(r"[0-9a-z]+", normalized))
+        compact = "".join(normalized.split())
+        keys.update(compact[index : index + 2] for index in range(max(0, len(compact) - 1)))
+        if compact:
+            keys.add(compact[:1])
+        return keys
+
+    @classmethod
+    def build(cls, terms_by_entry: dict[int, list[str]]) -> "AttributionTermIndex":
+        candidates: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
+        candidate_count = 0
+        for entry_id, terms in terms_by_entry.items():
+            for order, term in enumerate(terms):
+                key = cls._candidate_key(term)
+                if not key:
+                    continue
+                candidates[key].append((entry_id, order, term))
+                candidate_count += 1
+        return cls(candidates_by_key=dict(candidates), candidate_count=candidate_count)
+
+    def match(self, text: str, source_language: str) -> dict[int, str]:
+        best_matches: dict[int, tuple[int, str]] = {}
+        for key in self._text_keys(text):
+            for entry_id, order, term in self.candidates_by_key.get(key, []):
+                current = best_matches.get(entry_id)
+                if current is not None and current[0] <= order:
+                    continue
+                if source_term_matches_text(text, term, source_language):
+                    best_matches[entry_id] = (order, term)
+        return {entry_id: match[1] for entry_id, match in best_matches.items()}
+
+
+@dataclass
 class AttributionBatchContext:
     entries: list[TermEntry]
+    entries_by_id: dict[int, TermEntry]
     terms_by_language: dict[str, dict[int, list[str]]]
+    term_indexes: dict[str, AttributionTermIndex]
+    source_configs_by_id: dict[int, NewsSource]
     preload_counts: dict[str, int] = field(default_factory=dict)
 
     @classmethod
-    def build(cls) -> "AttributionBatchContext":
+    def build(cls, articles: Iterable[NewsArticle] | None = None) -> "AttributionBatchContext":
+        article_rows = list(articles or [])
+        source_configs_by_id: dict[int, NewsSource] = {}
+        missing_source_ids: set[int] = set()
+        for article in article_rows:
+            source_id = article.source_config_id
+            if not source_id:
+                continue
+            cached = article._state.fields_cache.get("source_config")
+            if cached is not None:
+                source_configs_by_id[source_id] = cached
+            else:
+                missing_source_ids.add(source_id)
+        missing_source_ids.difference_update(source_configs_by_id)
+        if missing_source_ids:
+            source_configs_by_id.update(NewsSource.objects.in_bulk(missing_source_ids))
+
         entries = list(
             TermEntry.objects.filter(
                 is_active=True,
@@ -186,10 +275,23 @@ class AttributionBatchContext:
             ).exclude(racing_region="")
         )
         languages = [SourceLanguage.JAPANESE, SourceLanguage.ENGLISH, SourceLanguage.CHINESE_TRADITIONAL]
+        terms_by_language = {language: source_terms_by_entry(entries, language) for language in languages}
+        term_indexes = {
+            language: AttributionTermIndex.build(terms_by_language[language])
+            for language in languages
+        }
         return cls(
             entries=entries,
-            terms_by_language={language: source_terms_by_entry(entries, language) for language in languages},
-            preload_counts={"term_index_builds": 1, "terms": len(entries)},
+            entries_by_id={entry.pk: entry for entry in entries},
+            terms_by_language=terms_by_language,
+            term_indexes=term_indexes,
+            source_configs_by_id=source_configs_by_id,
+            preload_counts={
+                "term_index_builds": 1,
+                "terms": len(entries),
+                "indexed_candidates": sum(index.candidate_count for index in term_indexes.values()),
+                "sources": len(source_configs_by_id),
+            },
         )
 
 
@@ -368,10 +470,47 @@ def _term_regions(
         *[str(item).casefold() for item in getattr(settings, "MULTIREGION_TERM_GATE_COMMON_ENGLISH_TERMS", [])],
     }
     matches: dict[str, list[dict]] = {"event": [], "entity": [], "france_context": []}
-    for entry in entries:
-        source_terms = terms_by_entry.get(entry.pk, [])
-        matched = next((term for term in source_terms if source_term_matches_text(text, term, source_language)), "")
+    if batch_context is not None and source_language in batch_context.term_indexes:
+        indexed_matches = batch_context.term_indexes[source_language].match(text, source_language)
+        candidates = [
+            (batch_context.entries_by_id[entry_id], matched)
+            for entry_id, matched in indexed_matches.items()
+            if entry_id in batch_context.entries_by_id
+        ]
+    else:
+        candidates = [
+            (
+                entry,
+                next(
+                    (term for term in terms_by_entry.get(entry.pk, []) if source_term_matches_text(text, term, source_language)),
+                    "",
+                ),
+            )
+            for entry in entries
+        ]
+    nested_horse_terms = {
+        shorter.casefold()
+        for shorter_entry, shorter in candidates
+        for longer_entry, longer in candidates
+        if shorter
+        and longer
+        and shorter_entry.term_type == TermType.HORSE
+        and longer_entry.term_type == TermType.HORSE
+        and shorter_entry.pk != longer_entry.pk
+        and len(longer) > len(shorter)
+        and longer.casefold().endswith(shorter.casefold())
+    }
+    for entry, matched in candidates:
         if not matched:
+            continue
+        compact_match = "".join(matched.split())
+        if entry.term_type == TermType.HORSE and matched.casefold() in nested_horse_terms:
+            continue
+        if (
+            entry.term_type == TermType.HORSE
+            and source_language != SourceLanguage.ENGLISH
+            and len(compact_match) <= 2
+        ):
             continue
         if source_language == SourceLanguage.ENGLISH and matched.casefold() in ordinary_terms:
             continue
@@ -380,6 +519,7 @@ def _term_regions(
             "term_type": entry.term_type,
             "source_term": matched,
             "region": entry.racing_region,
+            "priority": entry.priority,
         }
         if entry.term_type in EVENT_TERM_TYPES:
             matches["event"].append(payload)
@@ -394,19 +534,150 @@ def _regions_from_term_payloads(payloads: list[dict]) -> list[str]:
     return _dedupe_regions(item.get("region") for item in payloads)
 
 
+def _is_global_source(
+    article: NewsArticle,
+    source_config: NewsSource | None,
+    *,
+    allow_lazy_source_config: bool = True,
+) -> bool:
+    config = source_config
+    if config is None and allow_lazy_source_config:
+        config = getattr(article, "source_config", None)
+    site = getattr(config, "source_site", "") or article.source_site
+    name = str(getattr(config, "name", "") or "").casefold()
+    return site in GLOBAL_SOURCE_SITES or "tdn" in name or "thoroughbred daily news" in name
+
+
+def _title_context_regions(title_text: str) -> tuple[list[str], dict[str, list[str]], list[str]]:
+    matches = _keyword_regions(title_text)
+    regions = _dedupe_regions(matches.keys())
+    folded = title_text.casefold()
+    if re.search(r"英(?:国|g[1-3]|ダービー|ジュライ|キング|・)", title_text.casefold()):
+        regions = _dedupe_regions([RacingRegion.UNITED_KINGDOM, *regions])
+    if re.search(r"仏(?:国|g[1-3]|ジャック|凱旋門|ムーラン|・)", title_text.casefold()):
+        regions = _dedupe_regions([RacingRegion.FRANCE, *regions])
+    if any(marker in title_text for marker in ["ジュライカップ", "ジュライC"]):
+        regions = _dedupe_regions([RacingRegion.UNITED_KINGDOM, *regions])
+    if any(marker in title_text for marker in ["凱旋門賞", "ジャックルマロワ賞", "ムーランドロンシャン賞"]):
+        regions = _dedupe_regions([RacingRegion.FRANCE, *regions])
+    out_of_scope = [keyword for keyword in OUT_OF_SCOPE_TITLE_KEYWORDS if keyword in folded]
+    if re.search(r"\bdrc\b", folded):
+        out_of_scope.append("dubai_racing_club")
+    if "wbrr" in folded or "world's best racehorse rankings" in folded:
+        out_of_scope.append("world_ranking")
+    return regions, matches, out_of_scope
+
+
+def _leading_entity_regions(title_text: str, payloads: list[dict]) -> list[str]:
+    folded = title_text.casefold()
+    regions: list[str] = []
+    for payload in payloads:
+        term = str(payload.get("source_term") or "").strip()
+        if not term:
+            continue
+        position = folded.find(term.casefold())
+        if position < 0 or position > 48:
+            continue
+        if term.isascii() and " " not in term and term[:1].islower():
+            continue
+        regions.append(payload.get("region") or "")
+    return _dedupe_regions(regions)
+
+
+def _japanese_source_keeps_home_focus(title_text: str, foreign_region: str) -> bool:
+    if "の結果" in title_text and re.match(
+        r"^(?:英|仏)(?:国|g[1-3]|ダービー|ジュライ|キング|ジャック|凱旋門|ムーラン|・)",
+        title_text.casefold(),
+    ):
+        return False
+    if "の結果" in title_text:
+        return True
+    if any(marker in title_text for marker in ["馬券発売", "発売決定", "発売（"]):
+        return False
+    if title_text.startswith("【") and "】" in title_text:
+        return True
+    if any(marker in title_text for marker in ["日本馬", "JRA所属馬", "日本調教馬"]):
+        return True
+    if foreign_region == RacingRegion.FRANCE and any(marker in title_text for marker in ["挑戦", "登録", "予定"]):
+        return True
+    return False
+
+
+def _explicit_title_subject_region(title_text: str) -> str:
+    folded = title_text.casefold().lstrip()
+    prefixes = {
+        RacingRegion.HONG_KONG: ("team hong kong ", "hong kong jockey ", "hong kong trainer "),
+        RacingRegion.UNITED_KINGDOM: ("english trainer ", "british trainer ", "team britain "),
+        RacingRegion.FRANCE: ("french trainer ", "team france "),
+        RacingRegion.JAPAN: ("japanese trainer ", "team japan "),
+        RacingRegion.UNITED_STATES: ("american trainer ", "team usa ", "team united states "),
+    }
+    return next((region for region, values in prefixes.items() if folded.startswith(values)), "")
+
+
+def _event_terms_are_ambiguous(payloads: list[dict]) -> bool:
+    terms = [str(payload.get("source_term") or "").strip() for payload in payloads]
+    return bool(terms) and all(term.isascii() and len(term.split()) == 1 for term in terms)
+
+
+def _credible_entity_regions(payloads: list[dict]) -> list[str]:
+    return _dedupe_regions(
+        payload.get("region")
+        for payload in payloads
+        if (term := str(payload.get("source_term") or "").strip())
+        and (not term.isascii() or len(term.split()) > 1 or "-" in term)
+    )
+
+
+def _subject_should_outrank_event(
+    title_text: str,
+    *,
+    leading_entity_region: str,
+    event_region: str,
+    title_entity_payloads: list[dict],
+) -> bool:
+    if not leading_entity_region or leading_entity_region == event_region:
+        return False
+    folded = title_text.casefold().strip()
+    if folded.startswith(("english trainer ", "british trainer ")):
+        return True
+    if event_region != RacingRegion.FRANCE:
+        return False
+    subject_led_markers = (
+        " makes all for ",
+        " springs surprise in ",
+        " dominates ",
+        " upsets ",
+    )
+    if not any(marker in f" {folded} " for marker in subject_led_markers):
+        return False
+    return any(
+        payload.get("region") == leading_entity_region
+        and folded.startswith(str(payload.get("source_term") or "").casefold().strip())
+        for payload in title_entity_payloads
+    )
+
+
 def infer_article_attribution(
     article: NewsArticle,
     source_config: NewsSource | None = None,
     *,
     batch_context: AttributionBatchContext | None = None,
 ) -> AttributionResult:
+    resolved_source_config = source_config
+    if resolved_source_config is None and batch_context is not None and article.source_config_id:
+        resolved_source_config = batch_context.source_configs_by_id.get(article.source_config_id)
+    configured_region = getattr(resolved_source_config, "racing_region", "")
+    if resolved_source_config is None and batch_context is None:
+        configured_region = getattr(article.source_config, "racing_region", "")
     source_region = normalize_region(
-        getattr(source_config, "racing_region", "") or getattr(article.source_config, "racing_region", "") or article.racing_region
+        configured_region or article.racing_region
     )
     text = _source_text(article)
     title_text = article.title_ja or ""
     lead_text = "\n".join([title_text, (article.body_ja_normalized or article.body_ja_raw or "")[:400]])
     keyword_matches = _keyword_regions(lead_text)
+    title_context_regions, title_keyword_matches, out_of_scope_title_matches = _title_context_regions(title_text)
     event_keyword_matches = _keyword_regions(title_text, EVENT_REGION_KEYWORDS)
     term_matches = _term_regions(article, lead_text, batch_context=batch_context)
     title_term_matches = _term_regions(article, title_text, batch_context=batch_context)
@@ -414,6 +685,8 @@ def infer_article_attribution(
         [*event_keyword_matches.keys(), *_regions_from_term_payloads(title_term_matches["event"])]
     )
     entity_regions = _regions_from_term_payloads(title_term_matches["entity"])
+    credible_entity_regions = _credible_entity_regions(title_term_matches["entity"])
+    leading_entity_regions = _leading_entity_regions(title_text, title_term_matches["entity"])
     context_regions = _dedupe_regions(
         [
             *keyword_matches.keys(),
@@ -421,7 +694,7 @@ def infer_article_attribution(
         ],
         exclude="",
     )
-    ireland_matched = [keyword for keyword in IRELAND_KEYWORDS if keyword in text.casefold()]
+    ireland_matched = [keyword for keyword in IRELAND_KEYWORDS if keyword in title_text.casefold()]
 
     france_theme_markers = [
         "france galop",
@@ -433,16 +706,110 @@ def infer_article_attribution(
     ]
     france_theme_matches = [marker for marker in france_theme_markers if marker in lead_text.casefold()]
     conflict_reasons: list[str] = []
+    related: list[str] = []
+    source_is_global = _is_global_source(
+        article,
+        resolved_source_config,
+        allow_lazy_source_config=batch_context is None,
+    )
+    explicit_subject_region = _explicit_title_subject_region(title_text)
+
+    if len(event_regions) > 1:
+        title_event_candidates = [region for region in event_regions if region in title_context_regions]
+        if source_region in event_regions and not title_event_candidates:
+            event_regions = [source_region]
+        elif len(title_event_candidates) == 1:
+            event_regions = title_event_candidates
+
+    if (
+        len(event_regions) == 1
+        and event_regions[0] != source_region
+        and event_regions[0] not in title_context_regions
+        and not event_keyword_matches
+        and _event_terms_are_ambiguous(title_term_matches["event"])
+    ):
+        event_regions = []
 
     if len(event_regions) > 1:
         conflict_reasons.append("conflicting_event_centres")
         primary = source_region or RacingRegion.JAPAN
-        related: list[str] = []
+        related = []
         status = AttributionStatus.NEEDS_REVIEW
         reason = "conflicting_event_centres"
+    elif source_is_global and out_of_scope_title_matches and not event_regions and not title_context_regions:
+        primary = RacingRegion.OTHER
+        status = AttributionStatus.NEEDS_REVIEW
+        reason = "out_of_scope_title_region"
+        conflict_reasons.append("out_of_scope_region")
     else:
-        if event_regions:
-            primary = event_regions[0]
+        event_region = event_regions[0] if event_regions else ""
+        title_context_region = title_context_regions[0] if len(title_context_regions) == 1 else ""
+        leading_entity_region = leading_entity_regions[0] if len(leading_entity_regions) == 1 else ""
+        if source_is_global:
+            if out_of_scope_title_matches and not event_region and title_context_regions:
+                primary = source_region or title_context_regions[0]
+                related = [RacingRegion.OTHER]
+                reason = "mixed_supported_and_out_of_scope_regions"
+            elif explicit_subject_region and not event_region:
+                primary = explicit_subject_region
+                reason = "explicit_title_subject_region"
+            elif event_region and _subject_should_outrank_event(
+                title_text,
+                leading_entity_region=leading_entity_region,
+                event_region=event_region,
+                title_entity_payloads=title_term_matches["entity"],
+            ):
+                primary = leading_entity_region
+                related = [event_region]
+                reason = "leading_subject_over_event"
+            elif event_region:
+                primary = event_region
+                reason = "event_region"
+            elif title_context_region:
+                primary = title_context_region
+                reason = "title_context_region"
+            elif france_theme_matches:
+                primary = RacingRegion.FRANCE
+                reason = "france_theme"
+            elif len(context_regions) == 1:
+                primary = context_regions[0]
+                reason = "lead_context_region"
+            elif leading_entity_region:
+                primary = leading_entity_region
+                reason = "leading_entity_region"
+            elif source_region:
+                primary = source_region
+                reason = "source_region_with_ambiguous_context" if len(context_regions) > 1 else "source_region"
+            else:
+                primary = RacingRegion.JAPAN
+                reason = "fallback_japan"
+        elif source_region == RacingRegion.JAPAN:
+            foreign_region = event_region or (
+                title_context_region if title_context_region != RacingRegion.JAPAN else ""
+            )
+            if foreign_region and not _japanese_source_keeps_home_focus(title_text, foreign_region):
+                primary = foreign_region
+                reason = "foreign_event_bulletin"
+                if RacingRegion.JAPAN in entity_regions or "日本" in title_text:
+                    related = [RacingRegion.JAPAN]
+            else:
+                primary = RacingRegion.JAPAN
+                reason = "local_source_subject"
+                if foreign_region:
+                    related = [foreign_region]
+        elif explicit_subject_region and explicit_subject_region != source_region:
+            primary = explicit_subject_region
+            reason = "explicit_title_subject_region"
+            if event_region and event_region != primary:
+                related = [event_region]
+        elif event_region and event_region != source_region:
+            primary = event_region
+            reason = "event_region"
+        elif source_region:
+            primary = source_region
+            reason = "local_source_region"
+        elif event_region:
+            primary = event_region
             reason = "event_region"
         elif france_theme_matches:
             primary = RacingRegion.FRANCE
@@ -463,14 +830,13 @@ def infer_article_attribution(
             primary = RacingRegion.JAPAN
             reason = "fallback_japan"
 
-        related = _dedupe_regions(
-            [
-                *entity_regions,
-                *(context_regions if not event_regions and len(context_regions) > 1 else []),
-                RacingRegion.UNITED_KINGDOM if ireland_matched else "",
-            ],
-            exclude=primary,
-        )
+        if source_is_global and reason in {"event_region", "leading_subject_over_event"}:
+            related.extend(credible_entity_regions)
+        if ireland_matched:
+            related.append(RacingRegion.UNITED_KINGDOM)
+        if out_of_scope_title_matches and primary != RacingRegion.OTHER:
+            related.append(RacingRegion.OTHER)
+        related = _dedupe_regions(related, exclude=primary)
         if len(related) > 3:
             conflict_reasons.append("related_region_spread")
             related = []
@@ -485,15 +851,21 @@ def infer_article_attribution(
         "source_region": source_region,
         "event_regions": event_regions,
         "entity_regions": entity_regions,
+        "credible_entity_regions": credible_entity_regions,
         "context_regions": context_regions,
         "keyword_matches": keyword_matches,
+        "title_keyword_matches": title_keyword_matches,
         "event_keyword_matches": event_keyword_matches,
         "term_matches": term_matches,
+        "title_term_matches": title_term_matches,
         "ireland_keywords": ireland_matched,
+        "out_of_scope_title_matches": out_of_scope_title_matches,
         "france_theme_matches": france_theme_matches,
         "positive": {
             "event_location": event_regions,
             "subject_origin": entity_regions,
+            "leading_subject_origin": leading_entity_regions,
+            "explicit_title_subject_origin": explicit_subject_region,
             "context_region": context_regions,
             "france_theme": france_theme_matches,
         },
@@ -612,9 +984,10 @@ def apply_article_attribution(
         )
 
     result = infer_article_attribution(article, source_config=source_config)
-    if mode == "shadow":
+    if mode == "shadow" or result.status == AttributionStatus.NEEDS_REVIEW:
         summary = dict(article.attribution_summary or {})
-        summary["shadow"] = {
+        namespace = "shadow" if mode == "shadow" else "review_candidate"
+        summary[namespace] = {
             "primary_region": result.primary_region,
             "related_regions": result.related_regions,
             "reason": result.reason,

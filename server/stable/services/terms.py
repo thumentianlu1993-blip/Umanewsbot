@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
@@ -117,6 +118,7 @@ def _contains_latin_letter(value: str) -> bool:
     return bool(re.search(r"[A-Za-z]", value or ""))
 
 
+@lru_cache(maxsize=65536)
 def _source_term_pattern(candidate: str, source_language: str | None):
     if source_language == SourceLanguage.ENGLISH or _contains_latin_letter(candidate):
         prefix = r"(?<![0-9A-Za-z])" if candidate[:1].isascii() and candidate[:1].isalnum() else ""

@@ -9,6 +9,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import prefetch_related_objects
 from django.utils import timezone
 
 from stable.models import (
@@ -189,17 +190,20 @@ def create_attribution_dry_run(
     gold_snapshot_sha256: str = "",
     metrics: dict | None = None,
 ) -> MultiregionAttributionRun:
+    article_rows = list(articles)
+    prefetch_related_objects(article_rows, "related_region_links")
     rows = []
-    batch_context = AttributionBatchContext.build()
-    for article in articles:
+    batch_context = AttributionBatchContext.build(article_rows)
+    for article in article_rows:
         result = infer_article_attribution(article, batch_context=batch_context)
+        related_links = article._prefetched_objects_cache.get("related_region_links", [])
         rows.append(
             {
                 "article_id": article.id,
                 "fingerprint": _fingerprint(article),
                 "before": {
                     "primary": article.racing_region,
-                    "related": list(article.related_region_links.values_list("region", flat=True)),
+                    "related": [link.region for link in related_links],
                 },
                 "after": {
                     "primary": result.primary_region,

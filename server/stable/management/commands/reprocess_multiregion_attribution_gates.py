@@ -11,7 +11,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from stable.models import AutomationStatus, NewsArticle, RacingRegion, WorkflowStatus
-from stable.services.news_attribution import infer_article_attribution
+from stable.services.news_attribution import ATTRIBUTION_RULE_VERSION, infer_article_attribution
 from stable.services.validation import validate_rewrite
 
 
@@ -47,10 +47,17 @@ class Command(BaseCommand):
         parser.add_argument("--manifest-sha256")
         parser.add_argument("--resume", action="store_true")
         parser.add_argument("--gold-labels", help="版本化 gold labels CSV；用于计算并绑定本次 dry-run 质量指标。")
+        parser.add_argument(
+            "--single-review-gold",
+            action="store_true",
+            help="允许单审 Gold Set 进入指标分母；仍须满足全部覆盖与质量门槛。",
+        )
 
     def handle(self, *args, **options):
         if options["dry_run"] == options["commit"]:
             raise CommandError("必须且只能指定 --dry-run 或 --commit")
+        if options.get("single_review_gold") and not options.get("gold_labels"):
+            raise CommandError("--single-review-gold 必须与 --gold-labels 一起使用")
 
         if options["commit"]:
             if not options.get("run_id") or not options.get("manifest_sha256"):
@@ -131,11 +138,12 @@ class Command(BaseCommand):
         outcomes: list[dict] = []
         from stable.services.news_attribution import AttributionBatchContext
 
-        batch_context = AttributionBatchContext.build()
+        batch_context = AttributionBatchContext.build(candidates)
         for article in candidates:
+            related_links = article._prefetched_objects_cache.get("related_region_links", [])
             old_regions = {
                 "primary": article.racing_region,
-                "related": list(article.related_region_links.values_list("region", flat=True)),
+                "related": [link.region for link in related_links],
             }
             attribution = infer_article_attribution(article, batch_context=batch_context)
             attribution_applied = not article.attribution_locked
@@ -182,11 +190,16 @@ class Command(BaseCommand):
             configured_sha = getattr(settings, "MULTIREGION_ATTRIBUTION_GOLD_SNAPSHOT_SHA256", "")
             if configured_sha and configured_sha != gold_snapshot_sha256:
                 raise CommandError("gold labels 文件与配置 SHA-256 不匹配")
-            gold_metrics = asdict(evaluate_gold_labels_against_database(load_gold_labels(gold_path)))
+            gold_metrics = asdict(
+                evaluate_gold_labels_against_database(
+                    load_gold_labels(gold_path),
+                    allow_provisional=options.get("single_review_gold", False),
+                )
+            )
 
         run = create_attribution_dry_run(
             candidates,
-            rule_version="multiregion-v2",
+            rule_version=ATTRIBUTION_RULE_VERSION,
             term_version="current",
             gold_version=getattr(settings, "MULTIREGION_ATTRIBUTION_GOLD_VERSION", "pending-review"),
             gold_snapshot_sha256=gold_snapshot_sha256,

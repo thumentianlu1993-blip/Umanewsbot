@@ -1,5 +1,42 @@
 # 当前状态
 
+## 2026-07-14 多地区归属 V3 PostgreSQL 性能达标并调整单审资格口径
+
+- 本地独立 worktree 使用临时 PostgreSQL 16 和当前真实校准快照完成 250 篇性能验收：250 篇文章、17,474 条有效地区术语、21,240 条 alias、38,806 个索引候选、17 个实际来源。首次真实基准暴露每篇文章懒加载一次 `NewsSource` 的 N+1，五轮均为 `254 SQL`；已改为 `AttributionBatchContext` 一次预加载批次来源，并让性能测试中的 250 篇文章绑定真实来源以防回归。
+- 修复后五个独立应用进程的基准均为 `5 SQL`，耗时依次为 `1.657 / 1.764 / 1.764 / 2.135 / 1.674` 秒，RSS 增量约 `49 MiB`，满足 `<=30 SQL / <=30 秒 / <=256 MiB` 门槛。性能问题不再构成当前 no-go。
+- 产品口径调整为：单人审核来源必须显式保留，但单审身份本身不再自动 no-go；首发覆盖门槛为有效样本至少 150 条、五个运营地区各至少 10 条、跨地区至少 20 条。满足覆盖及全部质量/性能门槛后只获得进入生产 shadow 的资格，只有 shadow 至少观察 24 小时且全部主地区变化和 `needs_review` 完成人工复核后，才可对新文章 enforce。
+- Gold Set 不以首次达标封版；新增来源、规则版本、shadow 误判和运营争议案例必须持续追加到后续版本。相关地区采用“高 precision、允许低 recall”首发策略：precision 硬门槛保持 `>=95%`，recall 从 `>=90%` 调整为 `>=50%`。当前 159 条单审 Gold Set 的最少运营地区样本为法国 11 条、跨地区 24 条，主地区准确率 `98.11%`、相关地区 precision `100%`、recall `54.84%`、过度扩散 `0%`，覆盖与质量门槛均通过，可进入 shadow。
+- 线上 recall 下降代表漏标，只告警并阻止继续扩大灰度，不单独触发自动关闭；precision 低于 95%、明显错标或过度扩散超过 1% 才要求回退。生产归属和相关地区查询继续保持关闭，本轮未连接生产数据库、未部署、未修改生产配置。
+- Gold 生成器与评估器现统一读取 `MULTIREGION_ATTRIBUTION_GOLD_MIN_TOTAL/PER_REGION/CROSS_REGION`，避免自定义门槛时生成结果与资格报告不一致。专项 `81` 项、完整 `stable` `1162 passed / 1 skipped`；Django check、迁移无漂移、Python 编译、两个生产 Compose、OpenSpec strict/all `25/25` 和 `git diff --check` 均通过。
+
+## 2026-07-14 生产 DB/Redis 意外重建事故已恢复
+
+- 北京时间 `01:22`，历史任务线程为只读查看命令帮助误用了 `docker compose run --rm -T web`，Compose 意外重建 `umanewsbot-db-1` 与 `umanewsbot-redis-1`。PostgreSQL 日志确认数据库在 `01:22:26` 干净关闭、`01:22:28` 从原数据目录启动，没有重新初始化或恢复错误；`web / worker / beat` 当时没有被重建，生产应用镜像始终为 `sha256:87c435cfc50344d0ca94f46e44d4bea97ab11361f88f7c708b6457331aee78ec`。
+- 重建瞬间中断了 1 条 netkeiba 抓取和 1 条文章自动化链路，并使 Redis 中尚未消费的来源任务丢失；后续自然窗口按最大回看机制重新调度。事故任务最终明确记为 `CrawlJob#17084 failed`，`TaskExecutionLog#108765/#108772/#108773/#108803 failed`，旧 `17:15` 生产窗口统一收口为 `coalesced_to_latest_crawl_window`，不再伪装为运行中。
+- 恢复过程中暴露 `stable_newsarticle_public_slug_46694cb6` 和 `uq_article_source_article_id` 索引异常，并确认故障期间产生 4 组重复 identity、共 5 条冗余文章。权威旧记录保留为 `6809 / 8089 / 8101 / 7514`，重复记录 `8324 / 8328 / 8325 / 8327 / 8329` 的快照、翻译运行、自动化日志和窗口决策已迁回权威行后删除；每次合并均写入 `OperationLog(action_type=incident_duplicate_merge)`。
+- 停止 beat、停止 worker 继续取新任务并排空 active 后，对 `stable_newsarticle` 全部 17 个索引执行 `REINDEX TABLE CONCURRENTLY`，随后执行 `VACUUM (ANALYZE, VERBOSE)`。最终为 `8312` 行、重复 identity `0`、无效/未就绪索引 `0/17`、dead row `0`；索引修复后文章 `8330` 正常自动发布，未再出现索引页或重复键错误。
+- 最新停写备份为 `/opt/umanewsbot/backups/db/pre-newsarticle-dedup-reindex-20260714_020918.sql.gz`，大小 `156642923` bytes，`gzip -t` 通过，SHA-256 `f37ff4835fe13d4c2a016beac433940ef995677e690711dc68ca59f42b149a9e`。较早的索引修复前备份为 `pre-public-slug-reindex-20260714_013400.sql.gz`，大小 `156320990` bytes，SHA-256 `de864deeb53ce96e1b5509b6baffdddac1779aef711954b0783aa9a4c0a6e861`。
+- `02:15` 自然窗口中 17 个生产来源全部 `succeeded`，五地区发布和 QQ 窗口全部 `succeeded`，美国发布 1 篇；公网域名、`www` 和公网 IP `/healthz/` 均返回 200。worker/beat 已恢复，DB/Redis/web 健康，历史任务继续冻结到本次协调线程明确解除。
+
+## 2026-07-13 多地区归属单审校准集完成（历史评估已由 V3 复评取代）
+
+- 用户完成 `multiregion_gold_set_review_20260713.xlsx` 的审稿人 1 标注；因没有第二位审核人，且法国/美国等高量地区只做部分抽样，本轮按显式 `provisional_single_review` 口径固化，不冒充正式双审 Gold Set。规则为：有期望主地区的行进入校准标签，明确 `exclude` 单独保留，主/相关地区均未选择的行视为未选中并忽略。
+- 250 篇候选最终得到 `159` 条有效单审标签、`1` 条明确排除和 `90` 条未选中忽略。期望主地区为日本 `46`、中国香港 `50`、英国 `30`、法国 `11`、美国 `17`、其他 `5`；带期望相关地区的标签 `24` 条。`united_state` 已规范为 `united_states`，“所有地区”已展开为五个支持地区，原始填写值均保存在规范化审计中。
+- 当日实现曾把 `provisional_single_review` 固定作为 no-go；该限制已由 2026-07-14 产品决策取代。现在单审来源继续保留且不得伪造第二审核人，但达到 150 总量、五地区各 10、跨地区 20 和全部质量/性能门槛后可进入 shadow；多人审核出现冲突时仍必须裁决。
+- 对生产数据库执行纯只读评估，159 篇均存在，其中 `5` 篇输入 SHA 已漂移，实际分母 `154`。当前规则主地区准确率 `81.17%`；日本 `79.07%`、中国香港 `88.00%`、英国 `82.76%`、法国 `90.91%`、美国 `81.25%`、其他 `0%`。相关地区 precision `6.90%`、recall `6.67%`，主地区有效错配 `29` 条。主要误差是实体地区压过中心赛事，以及相关地区漏判/误扩散。
+- 批处理还暴露正则重复编译问题：原始 159 篇运行超过 10 分钟后中止；为术语匹配正则增加有界缓存后约 `97` 秒完成，仍高于 250 篇 `30` 秒目标，因此性能同样 no-go。评估结束后生产无残留 one-off，未写数据库、未重启容器、未修改开关。
+- 最终审核与逐篇结果工作簿为 `outputs/20260713-multiregion-gold-final/multiregion_gold_set_final_20260713.xlsx`，SHA-256 `e34726d5c8130dfd716dc3bbe10f67db3dc167f55ae36ae37a7843a99e048fdb`。校准标签 SHA-256 为 `bd94b3a40642328b93fa29f3e8aa9f1680161bb2ee3455d567d15ea377eb3681`。生产 `MULTIREGION_ATTRIBUTION_MODE` 和相关地区查询继续保持关闭。
+
+## 2026-07-13 多地区归属 Gold Set 双人标注已启动
+
+- OpenSpec change `fix-france-news-freshness-and-multiregion-attribution` 的任务 `5.1` 已进入真实数据阶段。新增只读命令 `prepare_multiregion_attribution_gold_review` 生成不可变快照、盲标 CSV、中文口径说明和文件哈希清单；新增 `finalize_multiregion_attribution_gold_review` 校验审核来源、输入漂移和多人冲突。该日原始双审及 `250/40/50` 口径已由 2026-07-14 的单审可用及 `150/10/20` 首发门槛取代。
+- 第一版真实审核包为 `multiregion-gold-v1-20260713`，本地路径 `runtime/multiregion_gold_review/gold-v1-20260713/`，生产只读副本路径 `/opt/umanewsbot/runtime/multiregion_gold_review/gold-v1-20260713/`。manifest SHA-256 为 `1836a9d896ca5b6e09da6da7ed07a2fb3f66f0a02f387010fe4b56475bf5c1ea`。
+- 审核包共 `250` 篇，按当前文章地区分层为日本/中国香港/英国/法国/美国各 `50` 篇，覆盖全部 `17` 个生产新闻来源；`250` 个 URL 和 `250` 个输入 SHA 均唯一。时间范围为日本 `2026-05-25–2026-07-13`、中国香港 `2026-06-23–2026-07-13`、英国/法国 `2026-06-26–2026-07-13`、美国 `2026-06-24–2026-07-12`。
+- 抽样使用与待测归属算法独立的宽地区关键词，只用于优先纳入困难样本，不向审核表泄露算法答案；本包有 `139` 篇疑似跨地区候选。审核包包含第三方正文，已由 `.gitignore` 排除，最终仓库只保存 article ID、source URL、输入 SHA、人工期望地区、审核角色和理由。
+- 该日尚未完成两次独立人工标注和冲突裁决，因此 OpenSpec `5.1` 当时未勾选；该状态已由 2026-07-14 的单审可用决策和 159 条 V3 复评取代。生产 `MULTIREGION_ATTRIBUTION_MODE=off`、相关地区查询与翻译自动重试继续关闭；生产 dry-run 与 Shadow 仍待执行。
+- 本分支已在完成实现后快进合入 `origin/main@693db30e`。生产在本任务期间由并行历史任务切换到 `umanewsbot:main-df2732c3-amd64-20260713-1321`，image ID `sha256:27d5d51cbe2ae6d23cb99dc758da01addc2d5935504a950bbb8a2685bce2bf13`；本任务只读复核确认常驻容器健康、无 one-off 容器、归属相关安全开关仍关闭。
+- 最新主线组合回归为 `1139 passed / 1 skipped`；Django check、迁移漂移、OpenSpec change strict、全仓 25 项 OpenSpec strict 和 `git diff --check` 均通过。macOS 全测须设置 `TMPDIR=/private/tmp`，否则未改动的历史 artifact 测试会因 `/var` 与 `/private/var` 别名产生 16 个伪错误。
+
 ## 2026-07-13 权威字段门禁固化与可复现镜像切换
 
 - 权威字段批次门禁源码、测试、OpenSpec 与运行文档已提交为 `df2732c3b8ae47619728c52f54a95204f5d6b574`，历史分支和远端 `main` 同步快进；提交前完整 `stable` 回归 `1136/1136` 通过，1 项按设计跳过，最终代码 review 无待修问题。
@@ -28,9 +65,9 @@
 
 ## 历史状态记录
 
-`2026-07-13` change `fix-france-news-freshness-and-multiregion-attribution` 已完成本地代码实现与三轮 review/返修，最终一轮 review 无待修复问题，仍处于 `implementing`，未部署生产。TDN 法国入口已改为按发布时间倒序且带 `after` 的 posts 查询；France Galop 已保存可验证的详情页时间证据并禁止 fallback 覆盖可信时间；瞬时翻译失败具备分类、退避、原子 claim、队列去重、耗尽邮件通知和人工重试，终态邮件收件人为 `754652181@qq.com`；多地区归属具备 `off|shadow|enforce`、仅新文章 enforce、分层证据、fail-closed、持久 dry-run/manifest/lease/resume、gold 生产资格硬门禁和运营可观测性。相关地区网页查询从 `web_test_groups` 阶段开始，QQ 在该阶段只对 `PushTarget.multiregion_test_enabled=true` 的显式测试群生效，正式群到 `formal_groups` 才启用。安全默认值仍为归属 `off`、相关地区查询关闭、自动翻译重试关闭。最终专项 `120` 项通过，完整 `stable` 回归 `968` 项通过，其中仅 PostgreSQL 专项性能契约 `1` 项在 SQLite 按设计跳过；Django、迁移、Python 编译、两个生产 Compose、OpenSpec strict/all、diff 和敏感信息检查均通过。OpenSpec 当前完成 `57/68` 项；剩余是建立至少 250 篇真实生产双人标注并裁决的 gold set，以及生产备份、部署、shadow/enforce 灰度、真实窗口与 QQ 验收。没有真实 gold 数据和生产证据前不得宣称归属质量达标、不得启用相关地区查询或归档 change。
+`2026-07-13` change `fix-france-news-freshness-and-multiregion-attribution` 已完成当时版本的本地实现与三轮 review/返修。TDN 法国入口、France Galop 时间证据、翻译恢复、多地区归属运行账本和灰度控制均已实现。该段原记录的“双审 250/40/50”Gold 门槛已由 2026-07-14 决策取代：现有 159 条单审 Gold Set 达到 `150/10/20` 首发覆盖和全部质量门槛，可进入 shadow，但生产 dry-run、至少 24 小时 shadow、全量变化复核、仅新文章 enforce 和相关地区查询灰度仍未完成，不得直接开启相关地区查询或归档 change。
 
-`2026-07-13` OpenSpec change `fix-france-news-freshness-and-multiregion-attribution` 已完成两轮完整工程评审并进入 `reviewed` 阶段，共收敛 11 个架构、测试、性能和一致性问题。方案锁定：TDN 改用日期倒序 posts 查询；France Galop 保存 verified 详情时间且 fallback 不覆盖；瞬时翻译错误最多 3 次退避重试且默认不开自动调度；归属使用 `off|shadow|enforce` 单一模式，相关地区查询独立灰度；归属 dry-run/commit 使用持久 run、独立可续租锁、manifest、断点续跑和幂等保护。生产资格要求至少 250 篇五地区双人标注并裁决的 gold set，总体主地区准确率 `>=95%`、单地区 `>=90%`、相关地区 precision `>=95%`、recall `>=90%`、无依据主地区变化 `<=2%`、过度扩散 `<=1%`、人工锁定覆盖 `0`；250 篇 PostgreSQL 批处理目标为 SQL `<=30`、耗时 `<=30s`、RSS 增量 `<=256 MiB`。灰度顺序为代码部署且 mode=off、shadow、仅新文章 enforce、网页/测试群相关查询、近期 72 小时回填、正式群。当前尚未实现、部署、重试文章或开启多地区归属。
+`2026-07-13` OpenSpec change `fix-france-news-freshness-and-multiregion-attribution` 已完成两轮完整工程评审并进入 `reviewed` 阶段，共收敛 11 个架构、测试、性能和一致性问题。方案锁定：TDN 改用日期倒序 posts 查询；France Galop 保存 verified 详情时间且 fallback 不覆盖；瞬时翻译错误最多 3 次退避重试且默认不开自动调度；归属使用 `off|shadow|enforce` 单一模式，相关地区查询独立灰度；归属 dry-run/commit 使用持久 run、独立可续租锁、manifest、断点续跑和幂等保护。该日原评审口径要求双审、`250/40/50` 覆盖和 related recall `>=90%`，已由 `2026-07-14` 决策修订为单审可用、`150/10/20` 首发覆盖且 recall 首发线 `>=50%`；precision、准确率、扩散和性能门槛不变。灰度顺序仍为代码部署且 mode=off、shadow、仅新文章 enforce、网页/测试群相关查询、近期 72 小时回填、正式群。
 
 `2026-07-12` 法国新闻新鲜度与低产出专项只读排查已完成，本次未修改代码、配置或文章状态。线上三个法国来源都在按有效 15 分钟频率成功轮询，但存在四个独立阻断：一是 `tdn_france` / `tdn_france_broad` 使用 WordPress `/wp/v2/search`，该接口按相关度返回固定历史结果而非按日期倒序，来源 `#21` 每轮因此正确过滤 `80` 条旧文却漏掉最新稿；实测改用 `/wp/v2/posts?search=...&orderby=date&order=desc&after=...`，`2026-07-09` 以来 11 组法国宽关键词可得到 `12` 篇去重候选，其中包含 `2026-07-11` Grand Prix de Paris 调时和 `2026-07-09` France Galop 预算稿。二是 `FranceGalopEnglishNewsAdapter` 列表阶段用 `timezone.now()` 作为发布时间，详情页未解析页面真实时间，重复抓取还会覆盖 `NewsArticle.published_at`；线上 `7871/7699/7031` 的官方真实日期分别为 `2026-07-11 / 2026-07-10 / 2026-07-05`，但数据库时间被刷新为最近轮询时间。三是最新 France Galop 稿 `7871/7699` 已抓入库，却分别因翻译供应商 `503/429` 停在 `translation_failed`，当前没有周期性失败翻译重试，`translation_retry_count=0`。四是生产 `MULTIREGION_ATTRIBUTION_ENABLED=false`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`，全球 TDN 最新流中的法国稿仍按来源默认记为美国，例如 `7872` Grand Prix de Paris 调时稿已入库但主地区为美国。推荐改造为：TDN 直接使用按日期倒序且带 `after` 的 posts 搜索；France Galop 解析正文官方时间并禁止 fallback 时间覆盖可信发布时间；对 `429/503` 增加有上限和退避的自动翻译重试；完成多地区归属复核后开启相关地区查询，使全球来源法国稿同时进入法国池。3 天新鲜度门禁应保留，不应通过提高上限掩盖入口排序和时间可信度问题。
 
@@ -1124,7 +1161,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 邮件告警接收地址已配置为 `754652181@qq.com`，但生产尚无 SMTP/EMAIL_HOST 凭据，因此 `TRANSLATION_FAILURE_EMAIL_ENABLED=false`。在完成 SMTP 配置和测试邮件前，不得宣称邮件通知可用或开启该开关。
 - 运行验收：服务器内部 `http://127.0.0.1/healthz/` 与公网 `http://umafans.run/healthz/` 返回 200；浏览器真实打开首页、法国频道和 `/news/8093/` 详情页均正常，详情页含 8 个正文段落且无前端错误。HTTPS 仍未接入证书，Nginx 443 TLS server 块原本即为注释状态，本次不将 HTTPS 计为已完成能力。
 - 法国只读 probe 未写文章：France Galop / TDN France / TDN France Broad 分别得到 `20 / 4 / 12` 条列表候选，三个来源均为 accepted，抽取的 6 篇详情全部成功；最新样本时间覆盖 2026-07-10 至 2026-07-12，未再返回 2020/2022 历史稿。生产法国来源 13/14/21 仍为 enabled、production approved、最近抓取 success。
-- OpenSpec 当前完成 `59/68`。真实至少 250 篇双人审核 gold set、生产 gold/dry-run、人工复核、时间修复与翻译小批处理、shadow/enforce 灰度、网页/测试群/正式群扩展和窗口数量验收均未完成，因此 change 保持 `implementing`，不得归档。
+- 该日 OpenSpec 进度为 `59/68`，其双审 Gold 待办已由后续单审资格决策取代。当前 OpenSpec 为 `62/70`：159 条 Gold 已通过本地覆盖与质量门槛，生产 gold/dry-run、人工复核、时间修复与翻译小批处理、shadow/enforce 灰度、网页/测试群/正式群扩展和窗口数量验收仍未完成，因此 change 保持 `implementing`，不得归档。
 ## 2026-07-13 历史赛事第一批生产详情写入
 
 - 第一批 selection snapshot 固定为五地区各 9 场、共 45 场，绑定 inventory manifest `ac61298f242b2c649c403eae4741771a43cdb027befef20bc75e18fe34bcbad7`。日期发现审核后形成 `36 ready / 9 pending gap`：日本、香港、法国各 9 场有日期；英国 6 场有日期、2000 年 3 场缺口；美国 3 场有日期、2000/2012 年 6 场缺口。
@@ -1176,6 +1213,15 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 历史赛事 worktree 已合入 `origin/main@1a70b22e`，组合源码通过专项 `323` 项、完整 `stable 1093` 项（1 skip）、Django/迁移/OpenSpec/diff 检查。生产最终切换到 AMD64 组合镜像 `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`，镜像 tag 为 `umanewsbot:merged-main-historical-amd64-20260713-1008`；内容 commit 标签 `0068715fceb0f629b5bfcb0c0b760427dfc6edc5`，构建上下文树 SHA256 `e51e6992e57649445aeff2aa7f2a0c925f3c5c742771fceac13053459beceec6`。
 - 最终运行验收：`web/worker/beat` 使用上述同一镜像，`stable.0029` 已应用，Django check 通过；归属、相关地区查询、翻译自动重试与失败邮件继续关闭。五地区页、后台登录入口和 HTTP `/healthz/` 全部返回 200，最近日志无 traceback/error/not-null constraint。
 - 组合镜像包含历史任务尚未全部提交到 `main` 的实现，虽然已绑定内容 commit、上下文树 SHA 和回滚镜像，但仍不是最终可复现发布。历史任务完成当前批次后必须提交并推送全部生产代码；后续生产重建必须先合入最新 `origin/main`，禁止从旧分支或旧上下文直接覆盖 `umanewsbot:prod`。
+
+## 2026-07-14 多地区归属 V3 单审校准优化
+
+- 用户确认不再补充 Gold Set 或第二审核人；法国、美国未选地区的空白行继续忽略。现有审核包固定为 `159` 条单审标签、`1` 条明确排除、`90` 条未选择，始终标记 `provisional_single_review`，不得用于归属 commit 或生产启用资格。
+- 为避免继续扫描生产数据库，已用审核包冻结文章和一次性术语快照建立本地 SQLite 校准库。旧规则在相同 `159` 条分母上的基线为主地区 `81.76%`、相关 precision `6.67%`、recall `6.45%`；生产此前 154 条结果只因 5 篇输入 SHA 漂移，不再作为算法同分母对比。
+- `multiregion-v3` 增加按语言 token/bigram 的 `AttributionTermIndex`，17,474 条术语、38,806 个候选下，159 篇纯推断约 `0.8` 秒，完整 Docker 评估约 `2–4` 秒；候选命中后仍调用原边界匹配器。主地区达到 `98.11%`，日本/香港/英国/美国 `100%`、法国 `90.91%`、other `60%`；相关 precision `100%`、recall `54.84%`，无依据变化 `1.89%`、过度扩散 `0%`。
+- V3 规则按标题叙事中心、明确赛事、导语唯一上下文、来源 fallback 分层；普通单词马名、短日文马名、同名单词赛事和正文背景不得单独改区。`other` 现在可作为主/相关归属证据持久化，但不新增生产频道、发布配额或 QQ 窗口。文章没有提供的历史参赛地区不为提高 recall 自动补齐。
+- enforce 遇到 `needs_review` 时只写 `review_candidate` 审计，不修改主地区或关联表。归属/相关地区生产开关继续保持关闭，本轮没有部署、生产归属写入、镜像构建或容器重启。
+- 归属与 Gold 审核目标测试 `82` 项通过（其中 1 项 PostgreSQL 专用性能测试在 SQLite 环境按设计跳过）；从仓库根目录、内存 Celery backend 运行最终完整 `stable` 回归为 `1156 passed / 1 skipped`。Django check、迁移无漂移、Python compileall、OpenSpec strict/all `25/25` 均通过。PostgreSQL 250 篇基准、生产 72 小时 dry-run 和灰度仍待后续验证。
 
 ## 2026-07-13 法港英详情导入前字段门禁与 Git 固化
 

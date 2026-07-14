@@ -340,7 +340,7 @@ class MultiRegionAttributionAndGateTests(TestCase):
         self.assertEqual(result.primary_region, RacingRegion.UNITED_STATES)
         self.assertEqual(
             article_region_set(article),
-            {RacingRegion.JAPAN, RacingRegion.FRANCE, RacingRegion.UNITED_STATES},
+            {RacingRegion.UNITED_STATES},
         )
         self.assertEqual(result.reason, "source_region_with_ambiguous_context")
 

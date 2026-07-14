@@ -1,12 +1,17 @@
 ## ADDED Requirements
 
 ### Requirement: 自动归属必须使用分层内容证据 <!-- id: req-attribution-evidence -->
-系统 MUST 区分中心赛事发生地、核心对象所属地、上下文地区和来源 fallback。明确中心赛事发生地 SHALL 优先决定主地区；核心对象所属地 MAY 成为相关地区；普通地名、来源 URL、来源备注和背景履历 MUST NOT 单独决定主地区。
+系统 MUST 区分标题叙事主体、中心赛事发生地、上下文地区和来源 fallback。标题明确以核心对象行动或成果为叙事中心时，其可信所属地 MAY 决定主地区、赛事地成为相关地区；否则明确中心赛事发生地 SHALL 优先决定主地区，核心对象所属地 MAY 成为相关地区。普通地名、来源 URL、来源备注和背景履历 MUST NOT 单独决定主地区。
 
 #### Scenario: 法国马参加英国赛事
 - **WHEN** 文章中心是英国举办的赛事且核心法国马参赛
 - **THEN** 系统 SHALL 将英国设为主地区
 - **AND** SHALL 将法国保存为相关地区及对象证据
+
+#### Scenario: 标题明确以跨地区主体为中心
+- **WHEN** 标题明确以某地区队伍、练马师或核心对象的行动/成果为叙事中心，且同时提到另一地区赛事
+- **THEN** 系统 MAY 将可信主体地区设为主地区
+- **AND** SHALL 将赛事地区保存为相关地区及赛事证据
 
 #### Scenario: 法国机构新闻无具体赛事
 - **WHEN** 文章主题是 France Galop、法国育马场或法国拍卖且没有更强赛事中心
@@ -15,6 +20,16 @@
 #### Scenario: 背景地名不改变主地区
 - **WHEN** 法国只出现在血统、历史履历或普通背景段落
 - **THEN** 系统 MUST NOT 仅凭该命中把法国加入主地区或相关地区
+
+#### Scenario: 非运营地区只保存归属证据
+- **WHEN** 文章明确涉及澳洲、爱尔兰、沙特或迪拜等非五个运营地区
+- **THEN** 系统 MAY 使用 `other` 保存主地区或相关地区证据
+- **AND** MUST NOT 因此创建新的生产频道、发布配额或 QQ 窗口
+
+#### Scenario: 文章未提供的历史履历不得自动补齐
+- **WHEN** 审核结论依赖核心对象过往在其他地区参赛，但标题和导语没有对应可靠证据
+- **THEN** 系统 MUST NOT 仅为提高相关地区召回率自动加入这些历史地区
+- **AND** MAY 将该差异保留为单审校准限制或人工复核项
 
 ### Requirement: 归属结果必须包含置信度、正反证据和冲突状态 <!-- id: req-attribution-confidence -->
 系统 SHALL 输出规则版本、主地区、相关地区、置信度、正反证据和 `applied|fallback|needs_review` 状态。证据不足或冲突时 MUST 保留当前主地区并转人工复核。
@@ -43,7 +58,7 @@
 - **AND** SHALL 在审计中逐项展示证据
 
 ### Requirement: 多地区归属必须通过版本化真实样本质量门槛 <!-- id: req-attribution-quality -->
-系统 SHALL 维护至少 250 篇五地区 gold set，五地区各不少于 40 篇且跨地区样本不少于 50 篇。生产启用前总体主地区准确率 MUST 不低于 95%，单地区 MUST 不低于 90%，相关地区 precision MUST 不低于 95%，recall MUST 不低于 90%，无依据主地区变更 MUST 不高于 2%，过度扩散率 MUST 不高于 1%，人工锁定覆盖 MUST 为 0。
+系统 SHALL 维护至少 150 篇五地区 gold set，五个运营地区各不少于 10 篇且跨地区样本不少于 20 篇。Gold Set MAY 由一位审核人完成；单审来源必须显式保留，不能伪造第二审核人与裁决。生产启用前总体主地区准确率 MUST 不低于 95%，单地区 MUST 不低于 90%，相关地区 precision MUST 不低于 95%，recall MUST 不低于 50%，无依据主地区变更 MUST 不高于 2%，过度扩散率 MUST 不高于 1%，人工锁定覆盖 MUST 为 0。Gold Set SHALL 按新增来源、规则版本、shadow 误判和运营争议持续追加覆盖。
 
 #### Scenario: 指标全部达标
 - **WHEN** 当前规则版本在完整 gold set 上达到全部门槛
@@ -56,9 +71,35 @@
 - **AND** 归属模式 SHALL 保持 `off`，相关地区查询开关 SHALL 保持关闭
 
 #### Scenario: 样本漂移导致分母不足
-- **WHEN** 输入快照缺失或 SHA 漂移导致任一地区有效已裁决样本少于 40 篇
+- **WHEN** 输入快照缺失或 SHA 漂移导致总有效样本少于 150、任一运营地区少于 10 或跨地区样本少于 20
 - **THEN** 系统 MUST 判定 no-go
 - **AND** SHALL 报告缺失、漂移和未裁决样本
+
+#### Scenario: 只有单人审核或部分样本被选择
+- **WHEN** 当前审核只有一个审核人，或部分候选没有选择任何地区
+- **THEN** 系统 SHALL 分别保留有效标签、明确排除和未选中空白行，并将审核来源标记为 `provisional_single_review`
+- **AND** 单审身份本身 MUST NOT 自动判定 no-go
+- **AND** 有效样本仍 MUST 满足相同的覆盖、质量、性能和 shadow 验收门槛，才可进入仅新文章 enforce
+
+#### Scenario: Gold Set 持续扩充
+- **WHEN** 新增新闻来源、修改归属规则、shadow 发现误判或运营形成新的争议案例
+- **THEN** 系统 SHALL 将代表性样本追加到新版本 Gold Set
+- **AND** MUST 保留旧版本、输入 SHA、审核来源和版本间指标变化
+
+#### Scenario: 高 Precision 且 Recall 达到首发线
+- **WHEN** 相关地区 precision 不低于 95%、recall 不低于 50%，且其他质量与覆盖门槛全部达标
+- **THEN** 相关地区能力 MAY 进入生产 shadow 验收
+- **AND** 漏标 SHALL 作为持续优化样本，不得因追求 recall 猜测文章未提供的历史地区
+
+#### Scenario: Precision 或过度扩散失败
+- **WHEN** 相关地区 precision 低于 95% 或过度扩散率高于 1%
+- **THEN** 系统 MUST 判定不具备扩大相关地区灰度的资格
+- **AND** 已启用阶段 SHALL 回退到不影响用户地区展示和 QQ 路由的前一阶段
+
+#### Scenario: 线上 Recall 波动
+- **WHEN** 已启用相关地区能力的近期观测 recall 低于 50%，但 precision 与扩散门槛仍达标
+- **THEN** 系统 SHALL 告警并阻止继续扩大灰度
+- **AND** MUST NOT 仅因漏标自动关闭当前已启用能力
 
 ### Requirement: 生产 dry-run 必须覆盖所有主地区变化和待复核项 <!-- id: req-attribution-dry-run -->
 系统 SHALL 对近期真实文章输出 before/after、证据、置信度和状态。启用前 MUST 人工抽检全部主地区变化、全部 `needs_review` 和按地区分层随机样本。
@@ -85,6 +126,11 @@
 - **WHEN** 文章已有 enforce 或人工应用的归属审计后切入 shadow
 - **THEN** 系统 SHALL 将新推断写入独立 shadow 命名空间
 - **AND** MUST NOT 覆盖 applied/人工审计内容
+
+#### Scenario: Shadow 验收后才能 Enforce
+- **WHEN** Gold Set 已达到覆盖与质量门槛，但生产 shadow 尚未完成至少 24 小时观察和人工差异复核
+- **THEN** 归属模式 MUST NOT 切换为 `enforce`
+- **AND** 相关地区查询开关 MUST 保持关闭
 
 #### Scenario: 旧布尔配置兼容
 - **WHEN** 新 mode 变量未配置而旧归属布尔开关存在

@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone as dt_timezone
 from unittest.mock import patch
 
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.conf import settings
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -14,6 +16,7 @@ from django.test.utils import CaptureQueriesContext
 from stable.models import (
     NewsArticle,
     NewsArticleRelatedRegion,
+    NewsSource,
     RacingRegion,
     SourceLanguage,
     SourceMode,
@@ -22,11 +25,13 @@ from stable.models import (
     TermType,
 )
 from stable.services.news_attribution import (
+    ATTRIBUTION_RULE_VERSION,
     apply_article_attribution,
     filter_articles_visible_in_region,
     infer_article_attribution,
     related_region_queries_enabled,
 )
+from stable.services.terms import source_term_matches_text
 
 
 UTC = dt_timezone.utc
@@ -40,8 +45,10 @@ def article_with_text(
     region: str = RacingRegion.UNITED_STATES,
     source_site: str = SourceSite.TDN,
     locked: bool = False,
+    source_config: NewsSource | None = None,
 ) -> NewsArticle:
     return NewsArticle.objects.create(
+        source_config=source_config,
         source_site=source_site,
         source_mode=SourceMode.LATEST,
         source_article_id=f"attribution-{NewsArticle.objects.count()}",
@@ -125,6 +132,10 @@ class ChangeSettingsContractTests(TestCase):
         self.assertEqual(settings.TRANSLATION_AUTO_RETRY_MAX_ATTEMPTS, 3)
         self.assertEqual(settings.TRANSLATION_AUTO_RETRY_BACKOFF_SECONDS, [60, 300, 900])
         self.assertEqual(settings.TDN_FRANCE_FRESHNESS_DAYS, 3)
+        self.assertEqual(settings.MULTIREGION_ATTRIBUTION_GOLD_MIN_TOTAL, 150)
+        self.assertEqual(settings.MULTIREGION_ATTRIBUTION_GOLD_MIN_PER_REGION, 10)
+        self.assertEqual(settings.MULTIREGION_ATTRIBUTION_GOLD_MIN_CROSS_REGION, 20)
+        self.assertEqual(settings.MULTIREGION_ATTRIBUTION_RELATED_RECALL_MIN, 0.50)
 
     def test_example_env_and_both_production_compose_files_expose_safe_defaults(self):
         from pathlib import Path
@@ -133,11 +144,19 @@ class ChangeSettingsContractTests(TestCase):
         env_text = (repo_root / ".env.example").read_text()
         self.assertIn("MULTIREGION_ATTRIBUTION_MODE=off", env_text)
         self.assertIn("MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false", env_text)
+        self.assertIn("MULTIREGION_ATTRIBUTION_GOLD_MIN_TOTAL=150", env_text)
+        self.assertIn("MULTIREGION_ATTRIBUTION_GOLD_MIN_PER_REGION=10", env_text)
+        self.assertIn("MULTIREGION_ATTRIBUTION_GOLD_MIN_CROSS_REGION=20", env_text)
+        self.assertIn("MULTIREGION_ATTRIBUTION_RELATED_RECALL_MIN=0.50", env_text)
         self.assertIn("TRANSLATION_AUTO_RETRY_ENABLED=false", env_text)
         for filename in ("docker-compose.prod.yml", "docker-compose.prod.lowcost.yml"):
             with self.subTest(filename=filename):
                 compose_text = (repo_root / filename).read_text()
                 self.assertIn("MULTIREGION_ATTRIBUTION_MODE", compose_text)
+                self.assertIn("MULTIREGION_ATTRIBUTION_GOLD_MIN_TOTAL", compose_text)
+                self.assertIn("MULTIREGION_ATTRIBUTION_GOLD_MIN_PER_REGION", compose_text)
+                self.assertIn("MULTIREGION_ATTRIBUTION_GOLD_MIN_CROSS_REGION", compose_text)
+                self.assertIn("MULTIREGION_ATTRIBUTION_RELATED_RECALL_MIN", compose_text)
                 self.assertIn("TRANSLATION_AUTO_RETRY_ENABLED", compose_text)
 
 
@@ -281,6 +300,94 @@ class AttributionEvidenceHierarchyTests(TestCase):
             {RacingRegion.JAPAN, RacingRegion.FRANCE},
         )
 
+    def test_japanese_title_country_shorthand_can_identify_foreign_event(self):
+        article = article_with_text(
+            "25日英キングジョージの馬券発売決定!日本調教馬が出走予定",
+            region=RacingRegion.JAPAN,
+            source_site=SourceSite.JRA,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.UNITED_KINGDOM, {RacingRegion.JAPAN})
+
+    def test_explicit_country_result_bulletin_uses_foreign_event_region(self):
+        article = article_with_text(
+            "英ダービー（G1）の結果",
+            region=RacingRegion.JAPAN,
+            source_site=SourceSite.JRA,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.UNITED_KINGDOM)
+
+    def test_result_bulletin_without_country_prefix_keeps_japanese_source(self):
+        article = article_with_text(
+            "ジュライカップ（G1）の結果",
+            region=RacingRegion.JAPAN,
+            source_site=SourceSite.JRA,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.JAPAN, {RacingRegion.UNITED_KINGDOM})
+
+    def test_local_event_is_not_overridden_by_one_word_horse_match(self):
+        add_term("Relish", TermType.HORSE, RacingRegion.JAPAN)
+        article = article_with_text(
+            "Hayes and Eustace relish tournament theme at Happy Valley",
+            region=RacingRegion.HONG_KONG,
+            source_site=SourceSite.HKJC_NEWS,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.HONG_KONG)
+
+    def test_ambiguous_one_word_event_does_not_override_global_source(self):
+        add_term("Oaks", TermType.RACE, RacingRegion.UNITED_KINGDOM)
+        article = article_with_text(
+            "Maximum Offer Gate To Wire In Indiana Oaks",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.UNITED_STATES, status="fallback")
+
+    def test_explicit_title_subject_can_outrank_local_event(self):
+        article = article_with_text(
+            "Team Hong Kong set for Shergar Cup at Ascot",
+            region=RacingRegion.UNITED_KINGDOM,
+            source_site=SourceSite.SPORTING_LIFE,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.HONG_KONG, {RacingRegion.UNITED_KINGDOM})
+
+    def test_global_source_uses_unique_lead_context_when_title_is_ambiguous(self):
+        article = article_with_text(
+            "Future Prospects Best Of The July Delights",
+            "Newmarket's July Festival and the July Cup are the focus of the week.",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.UNITED_KINGDOM)
+
+    def test_supported_and_out_of_scope_partnership_keeps_source_and_related_other(self):
+        article = article_with_text(
+            "York And Dubai Racing Club Announce International Partnership",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.UNITED_STATES, {RacingRegion.OTHER})
+
     def test_france_breeding_auction_and_institution_topics_are_primary_france(self):
         cases = [
             "France Galop announces new integrity programme",
@@ -311,6 +418,60 @@ class AttributionEvidenceHierarchyTests(TestCase):
 
         self.assertEqual(result.primary_region, RacingRegion.FRANCE)
         self.assertNotIn(RacingRegion.UNITED_KINGDOM, result.related_regions)
+
+    def test_batch_term_index_preserves_alias_case_and_word_boundaries(self):
+        from stable.models import TermAlias
+        from stable.services.news_attribution import AttributionBatchContext
+
+        horse = add_term("Liberty Island", TermType.HORSE, RacingRegion.JAPAN)
+        TermAlias.objects.create(
+            term=horse,
+            source_language=SourceLanguage.ENGLISH,
+            text="LIBERTY ISLAND",
+        )
+        add_term("Contact", TermType.HORSE, RacingRegion.UNITED_KINGDOM)
+        article = article_with_text(
+            "Liberty Island targets Breeders' Cup at Del Mar",
+            "The contractual update contains no separate horse named Contact.",
+        )
+
+        result = infer_article_attribution(article, batch_context=AttributionBatchContext.build())
+
+        self.assertResult(
+            result,
+            RacingRegion.UNITED_STATES,
+            {RacingRegion.JAPAN},
+        )
+        self.assertNotIn(RacingRegion.UNITED_KINGDOM, result.related_regions)
+
+    def test_batch_term_index_shortlists_unrelated_terms(self):
+        from stable.services.news_attribution import AttributionBatchContext
+
+        for index in range(200):
+            add_term(f"Unrelated Candidate {index}", TermType.HORSE, RacingRegion.UNITED_KINGDOM)
+        liberty_island = add_term("Liberty Island", TermType.HORSE, RacingRegion.JAPAN)
+        article = article_with_text("Liberty Island targets Breeders' Cup at Del Mar")
+        context = AttributionBatchContext.build()
+
+        with patch(
+            "stable.services.news_attribution.source_term_matches_text",
+            wraps=source_term_matches_text,
+        ) as matcher:
+            indexed_matches = context.term_indexes[SourceLanguage.ENGLISH].match(
+                article.title_ja,
+                SourceLanguage.ENGLISH,
+            )
+
+        result = infer_article_attribution(article, batch_context=context)
+
+        self.assertResult(
+            result,
+            RacingRegion.UNITED_STATES,
+            {RacingRegion.JAPAN},
+        )
+        self.assertEqual(set(indexed_matches), {liberty_island.pk})
+        self.assertLess(matcher.call_count, 10)
+        self.assertGreater(context.preload_counts["indexed_candidates"], 0)
 
     def test_historical_record_and_pedigree_background_do_not_override_centre(self):
         add_term("American Sire", TermType.HORSE, RacingRegion.UNITED_STATES)
@@ -347,6 +508,46 @@ class AttributionEvidenceHierarchyTests(TestCase):
         self.assertResult(result, RacingRegion.UNITED_STATES, status="needs_review")
         self.assertEqual(result.related_regions, [])
         self.assertIn("related_region_spread", result.conflict_reasons)
+
+    @override_settings(
+        MULTIREGION_ATTRIBUTION_MODE="enforce",
+        MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE="new_articles",
+    )
+    def test_enforce_needs_review_only_saves_candidate_audit(self):
+        article = article_with_text(
+            "Late changes for both Prix de Diane at Chantilly and The Derby at Epsom",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = apply_article_attribution(article, save=True, is_new_article=True)
+
+        article.refresh_from_db()
+        self.assertEqual(result.status, "needs_review")
+        self.assertEqual(article.racing_region, RacingRegion.UNITED_STATES)
+        self.assertEqual(
+            article.attribution_summary["review_candidate"]["primary_region"],
+            RacingRegion.UNITED_STATES,
+        )
+        self.assertFalse(article.related_region_links.exists())
+
+    @override_settings(
+        MULTIREGION_ATTRIBUTION_MODE="enforce",
+        MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE="new_articles",
+    )
+    def test_other_region_can_be_persisted_as_related_evidence(self):
+        article = article_with_text(
+            "York And Dubai Racing Club Announce International Partnership",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = apply_article_attribution(article, save=True, is_new_article=True)
+
+        article.refresh_from_db()
+        self.assertEqual(result.primary_region, RacingRegion.UNITED_STATES)
+        self.assertEqual(
+            set(article.related_region_links.values_list("region", flat=True)),
+            {RacingRegion.OTHER},
+        )
 
     def test_real_three_region_story_is_preserved(self):
         add_term("Japanese Star", TermType.HORSE, RacingRegion.JAPAN)
@@ -420,24 +621,24 @@ class GoldSetQualityTests(TestCase):
         self.assertEqual(report.unresolved_count, 1)
         self.assertEqual(report.drifted_count, 1)
 
-    def test_any_region_below_forty_valid_samples_is_no_go(self):
+    def test_any_region_below_ten_valid_samples_is_no_go(self):
         from stable.services.attribution_quality import evaluate_gold_set
 
         labels = self.labels()
-        for index in range(11):
+        for index in range(len(labels) - 41, len(labels)):
             labels[index] = replace(labels[index], adjudicated=False)
         actual = {label.key: {"input_sha256": label.input_sha256, "primary_region": label.expected_primary_region, "related_regions": label.expected_related_regions} for label in labels}
 
         report = evaluate_gold_set(labels, actual)
 
         self.assertFalse(report.qualified)
-        self.assertEqual(report.region_valid_counts[RacingRegion.JAPAN], 39)
+        self.assertEqual(report.region_valid_counts[RacingRegion.UNITED_STATES], 9)
         self.assertIn("region_sample_count", report.no_go_reasons)
 
-    def test_unresolved_rows_do_not_satisfy_250_valid_sample_minimum(self):
+    def test_unresolved_rows_do_not_satisfy_150_valid_sample_minimum(self):
         from stable.services.attribution_quality import evaluate_gold_set
 
-        labels = self.labels(per_region=52)
+        labels = self.labels(per_region=32)
         for index in range(50, 55):
             labels[index] = replace(labels[index], adjudicated=False)
         actual = {
@@ -451,14 +652,14 @@ class GoldSetQualityTests(TestCase):
 
         report = evaluate_gold_set(labels, actual)
 
-        self.assertEqual(report.total_labels, 260)
-        self.assertEqual(report.valid_denominator, 255)
+        self.assertEqual(report.total_labels, 160)
+        self.assertEqual(report.valid_denominator, 155)
         self.assertTrue(report.qualified)
 
         for index in range(55, 61):
             labels[index] = replace(labels[index], adjudicated=False)
         report = evaluate_gold_set(labels, actual)
-        self.assertEqual(report.valid_denominator, 249)
+        self.assertEqual(report.valid_denominator, 149)
         self.assertFalse(report.qualified)
         self.assertIn("total_sample_count", report.no_go_reasons)
 
@@ -477,6 +678,38 @@ class GoldSetQualityTests(TestCase):
         self.assertLess(report.region_primary_accuracy[RacingRegion.FRANCE], 0.90)
         self.assertFalse(report.qualified)
 
+    def test_other_labels_are_reported_without_becoming_a_sixth_region_gate(self):
+        from stable.services.attribution_quality import GoldLabel, evaluate_gold_set
+
+        labels = self.labels(per_region=50)
+        other = GoldLabel(
+            key="other-0",
+            article_id=999,
+            source_url="https://example.com/other/0",
+            input_sha256="f" * 64,
+            expected_primary_region=RacingRegion.OTHER,
+            expected_related_regions=[],
+            reviewer_roles=["reviewer_a", "reviewer_b"],
+            rationale="非五个运营地区样本",
+            adjudicated=True,
+        )
+        labels.append(other)
+        actual = {
+            label.key: {
+                "input_sha256": label.input_sha256,
+                "primary_region": label.expected_primary_region,
+                "related_regions": label.expected_related_regions,
+            }
+            for label in labels
+        }
+
+        report = evaluate_gold_set(labels, actual)
+
+        self.assertEqual(report.region_valid_counts[RacingRegion.OTHER], 1)
+        self.assertNotIn("region_sample_count", report.no_go_reasons)
+        self.assertNotIn("region_accuracy", report.no_go_reasons)
+        self.assertTrue(report.qualified)
+
     def test_report_includes_precision_recall_spread_lock_and_wilson_intervals(self):
         from stable.services.attribution_quality import evaluate_gold_set
 
@@ -486,12 +719,80 @@ class GoldSetQualityTests(TestCase):
         report = evaluate_gold_set(labels, actual)
 
         self.assertGreaterEqual(report.related_precision, 0.95)
-        self.assertGreaterEqual(report.related_recall, 0.90)
+        self.assertGreaterEqual(report.related_recall, 0.50)
         self.assertLessEqual(report.unsupported_primary_change_rate, 0.02)
         self.assertLessEqual(report.over_expansion_rate, 0.01)
         self.assertEqual(report.locked_override_count, 0)
         self.assertIn("primary_accuracy", report.wilson_intervals)
         self.assertTrue(report.qualified)
+
+    def test_related_recall_at_fifty_percent_can_qualify_when_precision_is_high(self):
+        from stable.services.attribution_quality import evaluate_gold_set
+
+        labels = self.labels(per_region=50)
+        actual = {
+            label.key: {
+                "input_sha256": label.input_sha256,
+                "primary_region": label.expected_primary_region,
+                "related_regions": label.expected_related_regions,
+            }
+            for label in labels
+        }
+        related_labels = [label for label in labels if label.expected_related_regions]
+        for label in related_labels[:25]:
+            actual[label.key]["related_regions"] = []
+
+        report = evaluate_gold_set(labels, actual)
+
+        self.assertEqual(report.related_precision, 1.0)
+        self.assertEqual(report.related_recall, 0.5)
+        self.assertNotIn("related_recall", report.no_go_reasons)
+        self.assertTrue(report.qualified)
+
+    def test_related_recall_below_fifty_percent_remains_no_go(self):
+        from stable.services.attribution_quality import evaluate_gold_set
+
+        labels = self.labels(per_region=50)
+        actual = {
+            label.key: {
+                "input_sha256": label.input_sha256,
+                "primary_region": label.expected_primary_region,
+                "related_regions": label.expected_related_regions,
+            }
+            for label in labels
+        }
+        related_labels = [label for label in labels if label.expected_related_regions]
+        for label in related_labels[:26]:
+            actual[label.key]["related_regions"] = []
+
+        report = evaluate_gold_set(labels, actual)
+
+        self.assertEqual(report.related_precision, 1.0)
+        self.assertEqual(report.related_recall, 0.48)
+        self.assertIn("related_recall", report.no_go_reasons)
+        self.assertFalse(report.qualified)
+
+    def test_related_precision_below_ninety_five_percent_is_no_go_even_with_full_recall(self):
+        from stable.services.attribution_quality import evaluate_gold_set
+
+        labels = self.labels(per_region=50)
+        actual = {
+            label.key: {
+                "input_sha256": label.input_sha256,
+                "primary_region": label.expected_primary_region,
+                "related_regions": list(label.expected_related_regions),
+            }
+            for label in labels
+        }
+        for label in labels[50:53]:
+            actual[label.key]["related_regions"] = [RacingRegion.FRANCE]
+
+        report = evaluate_gold_set(labels, actual)
+
+        self.assertLess(report.related_precision, 0.95)
+        self.assertEqual(report.related_recall, 1.0)
+        self.assertIn("related_precision", report.no_go_reasons)
+        self.assertFalse(report.qualified)
 
 
 class AttributionRunLedgerTests(TransactionTestCase):
@@ -520,7 +821,7 @@ class AttributionRunLedgerTests(TransactionTestCase):
         from stable.services.attribution_runs import commit_attribution_run, create_attribution_dry_run
 
         articles = [article_with_text(f"Prix de Diane at Chantilly {index}") for index in range(3)]
-        run = create_attribution_dry_run(articles, rule_version="multiregion-v2", gold_version="gold-v1", metrics={"qualified": True})
+        run = create_attribution_dry_run(articles, rule_version=ATTRIBUTION_RULE_VERSION, gold_version="gold-v1", metrics={"qualified": True})
 
         with patch("stable.services.attribution_runs.apply_run_outcome", side_effect=[None, RuntimeError("database interruption")]):
             first = commit_attribution_run(run.id, manifest_sha256=run.manifest_sha256)
@@ -539,7 +840,7 @@ class AttributionRunLedgerTests(TransactionTestCase):
         from stable.services.attribution_runs import commit_attribution_run, create_attribution_dry_run
 
         article = article_with_text("Prix de Diane at Chantilly")
-        run = create_attribution_dry_run([article], rule_version="multiregion-v2", gold_version="gold-v1", metrics={"qualified": True})
+        run = create_attribution_dry_run([article], rule_version=ATTRIBUTION_RULE_VERSION, gold_version="gold-v1", metrics={"qualified": True})
 
         first = commit_attribution_run(run.id, manifest_sha256=run.manifest_sha256)
         second = commit_attribution_run(run.id, manifest_sha256=run.manifest_sha256)
@@ -553,7 +854,7 @@ class AttributionRunLedgerTests(TransactionTestCase):
         from stable.services.attribution_runs import commit_attribution_run, create_attribution_dry_run
 
         article = article_with_text("Prix de Diane at Chantilly")
-        run = create_attribution_dry_run([article], rule_version="multiregion-v2", term_version="terms-v1", gold_version="gold-v1", metrics={"qualified": True})
+        run = create_attribution_dry_run([article], rule_version=ATTRIBUTION_RULE_VERSION, term_version="terms-v1", gold_version="gold-v1", metrics={"qualified": True})
         article.attribution_locked = True
         article.save(update_fields=["attribution_locked", "updated_at"])
 
@@ -566,7 +867,7 @@ class AttributionRunLedgerTests(TransactionTestCase):
         from stable.services.attribution_runs import commit_attribution_run, create_attribution_dry_run
 
         article = article_with_text("Prix de Diane at Chantilly", region=RacingRegion.UNITED_STATES)
-        run = create_attribution_dry_run([article], rule_version="multiregion-v2", gold_version="gold-v1", metrics={"qualified": True})
+        run = create_attribution_dry_run([article], rule_version=ATTRIBUTION_RULE_VERSION, gold_version="gold-v1", metrics={"qualified": True})
 
         with patch(
             "stable.services.news_attribution.infer_article_attribution",
@@ -582,10 +883,24 @@ class AttributionRunLedgerTests(TransactionTestCase):
         from stable.services.attribution_runs import commit_attribution_run, create_attribution_dry_run
 
         article = article_with_text("Prix de Diane at Chantilly")
-        run = create_attribution_dry_run([article], rule_version="multiregion-v2", gold_version="gold-v1", metrics={"qualified": True})
+        run = create_attribution_dry_run([article], rule_version=ATTRIBUTION_RULE_VERSION, gold_version="gold-v1", metrics={"qualified": True})
         add_term("Newly Added Horse", TermType.HORSE, RacingRegion.JAPAN)
 
         with self.assertRaises(ValidationError):
+            commit_attribution_run(run.id, manifest_sha256=run.manifest_sha256)
+
+    def test_stale_rule_version_rejects_commit(self):
+        from stable.services.attribution_runs import commit_attribution_run, create_attribution_dry_run
+
+        article = article_with_text("Prix de Diane at Chantilly")
+        run = create_attribution_dry_run(
+            [article],
+            rule_version="multiregion-v2",
+            gold_version="gold-v1",
+            metrics={"qualified": True},
+        )
+
+        with self.assertRaisesMessage(ValidationError, "归属规则版本已漂移"):
             commit_attribution_run(run.id, manifest_sha256=run.manifest_sha256)
 
     def test_commit_respects_lease_held_by_another_run(self):
@@ -599,7 +914,7 @@ class AttributionRunLedgerTests(TransactionTestCase):
         blocker = create_attribution_run(mode="dry_run", selectors={"kind": "blocker"})
         self.assertTrue(acquire_attribution_lease(blocker).acquired)
         article = article_with_text("Prix de Diane at Chantilly")
-        run = create_attribution_dry_run([article], rule_version="multiregion-v2", gold_version="gold-v1", metrics={"qualified": True})
+        run = create_attribution_dry_run([article], rule_version=ATTRIBUTION_RULE_VERSION, gold_version="gold-v1", metrics={"qualified": True})
 
         with self.assertRaises(ValidationError):
             commit_attribution_run(run.id, manifest_sha256=run.manifest_sha256)
@@ -608,7 +923,7 @@ class AttributionRunLedgerTests(TransactionTestCase):
         from stable.services.attribution_runs import commit_attribution_run, create_attribution_dry_run
 
         articles = [article_with_text(f"Prix de Diane at Chantilly {index}") for index in range(2)]
-        run = create_attribution_dry_run(articles, rule_version="multiregion-v2", gold_version="gold-v1", metrics={"qualified": True})
+        run = create_attribution_dry_run(articles, rule_version=ATTRIBUTION_RULE_VERSION, gold_version="gold-v1", metrics={"qualified": True})
 
         with patch(
             "stable.services.attribution_runs.apply_validation_outcome",
@@ -630,7 +945,7 @@ class AttributionRunLedgerTests(TransactionTestCase):
         article = article_with_text("Prix de Diane at Chantilly")
         run = create_attribution_dry_run(
             [article],
-            rule_version="multiregion-v2",
+            rule_version=ATTRIBUTION_RULE_VERSION,
             gold_version="pending-review",
         )
 
@@ -643,7 +958,7 @@ class AttributionRunLedgerTests(TransactionTestCase):
         article = article_with_text("Prix de Diane at Chantilly")
         run = create_attribution_dry_run(
             [article],
-            rule_version="multiregion-v2",
+            rule_version=ATTRIBUTION_RULE_VERSION,
             term_version="terms-v1",
             gold_version="gold-v1",
             metrics={"qualified": True},
@@ -655,6 +970,16 @@ class AttributionRunLedgerTests(TransactionTestCase):
             commit_attribution_run(run.id, manifest_sha256=run.manifest_sha256)
 
 
+class AttributionCommandContractTests(TestCase):
+    def test_single_review_flag_requires_gold_labels(self):
+        with self.assertRaisesMessage(CommandError, "--single-review-gold 必须与 --gold-labels 一起使用"):
+            call_command(
+                "reprocess_multiregion_attribution_gates",
+                dry_run=True,
+                single_review_gold=True,
+            )
+
+
 @tag("postgresql", "performance")
 class AttributionPostgresPerformanceTests(TestCase):
     databases = {"default"}
@@ -664,7 +989,25 @@ class AttributionPostgresPerformanceTests(TestCase):
             self.skipTest("PostgreSQL-only production performance contract")
         from stable.services.attribution_quality import benchmark_attribution_batch
 
-        articles = [article_with_text(f"Prix de Diane at Chantilly fixture {index}") for index in range(250)]
+        source = NewsSource.objects.create(
+            name="TDN performance source",
+            homepage_url="https://example.com/",
+            feed_url="https://example.com/feed",
+            source_site=SourceSite.TDN,
+            source_mode=SourceMode.LATEST,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_language=SourceLanguage.ENGLISH,
+        )
+        created_articles = [
+            article_with_text(
+                f"Prix de Diane at Chantilly fixture {index}",
+                source_config=source,
+            )
+            for index in range(250)
+        ]
+        articles = list(
+            NewsArticle.objects.filter(id__in=[article.id for article in created_articles]).order_by("id")
+        )
 
         with CaptureQueriesContext(connection) as queries:
             report = benchmark_attribution_batch(articles)
@@ -673,3 +1016,4 @@ class AttributionPostgresPerformanceTests(TestCase):
         self.assertLessEqual(report.elapsed_seconds, 30)
         self.assertLessEqual(report.rss_delta_bytes, 256 * 1024 * 1024)
         self.assertEqual(report.preload_counts["term_index_builds"], 1)
+        self.assertEqual(report.preload_counts["sources"], 1)

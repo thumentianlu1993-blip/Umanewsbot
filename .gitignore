@@ -25,6 +25,7 @@ runtime/race_event_crawl_plans/
 runtime/race_event_crawl_runs/
 runtime/race_event_review_samples/
 runtime/multiregion_candidate_audit/
+runtime/multiregion_gold_review/
 runtime/term_review/
 runtime/historical_race_inventory/
 outputs/
