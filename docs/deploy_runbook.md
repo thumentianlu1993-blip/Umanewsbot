@@ -6,6 +6,8 @@
 2. 第三候选规则版本必须为 `multiregion-v3.1`，并包含 precision 优先反例修复：单词赛场仅在明确地点语法中作为强证据，`Jockey Club` 单独出现按机构短语处理，`JRHA` 提供日本上下文，世界排名归属 `other` 并关联五个运营地区。部署前必须保持归属 mode 与相关查询关闭。
 3. 等所有正文修改 one-off 结束、`TranslationRun started=0`、文章 `translating=0`、Celery active/reserved/queue 均为空，并由生产协调任务明确交还稳定快照后，才能开始下一轮只读审计。正文指纹仍在变化时不得抢跑。
 4. 第三候选必须先通过专项、完整 stable、真实 PostgreSQL 250 篇性能、Django check、迁移漂移和 OpenSpec strict/all。构建固定 main revision/tree/source SHA，AMD64 至少两次构建得到同一 image ID。
+   - 当前候选 revision `12f4d0579157f49f2bda8453397d192f42d89127`，tree `f5a7801e77811c736bcab5dfdc4f540bea7602df`，source archive SHA-256 `5a127a646aaa37143590456832ba82e60b77d76dabda7b266f414226d319f6de`，两个独立上下文的 AMD64 image ID 均为 `sha256:c4e0f1e56afcad5975c7eaabec5f63781bb48d24074e348641c35af1801a917b`。
+   - 镜像内 Django check、migration drift 通过；归属 `83` 项在只读挂载仓库两份生产 Compose 静态契约后通过（另 1 项环境跳过）。镜像按设计不复制 Compose 文件，未挂载时仅这 2 个路径契约报 `FileNotFoundError`，不得误报为业务回归。
 5. 使用全新 artifact 目录执行完整 72 小时 `--scope all_articles --hours 72`，不得带 `--limit`、不得覆盖前两轮 report、不得开启门禁验证或 commit 归属；记录 report、manifest、Gold labels 和规则版本 SHA。
 6. 重新评估保守对账后的 Gold，并人工检查全部主地区变化、全部 `needs_review` 和五地区稳定样本。除既有七类边界外，必须逐条复核 `Sale / York / Kelso / Jockey Club / JRHA / world ranking` 反例及法国赛果 `8089`。
 7. 只有第三轮 Gold 满足主地区准确率、五地区分地区准确率、相关 precision `>=95%`、recall `>=50%`、过度扩散 `<=1%`，且人工清单无明确错标，才允许从 `off` 切到 `shadow`。Shadow 计时从生产配置实际启用且健康验收通过时开始。
