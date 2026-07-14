@@ -1,5 +1,13 @@
 # 部署运行手册
 
+## 待执行：多地区归属 V3 第二候选生产只读验收
+
+1. 第一候选的 72 小时 `all_articles` run 虽然 `scope_complete=true` 且 Gold `qualified=true`，但人工检查 27 条主地区变化和 5 条 `needs_review` 后发现 7 类明确错标，结论为 no-go。不得复用该 run 批准 Shadow。
+2. 第二候选必须包含对应真实反例测试，并通过专项、完整 stable、真实 PostgreSQL 250 篇性能、Django check、迁移漂移和 OpenSpec strict/all。构建必须固定 main revision/tree/source SHA，AMD64 至少两次构建得到同一 image ID。
+3. 生产保持 mode `off`、相关地区查询 false。使用第二候选连接生产库执行只读 `--scope all_articles --hours 72`，写入全新 artifact 目录；不得覆盖第一轮报告，不得开启门禁验证，不得 commit 归属。
+4. 重新评估同一份保守对账后的 Gold，并人工检查新 run 的全部主地区变化、全部 `needs_review` 和分地区稳定样本。明确复核普通单词实体、赛果标题、正文首段赛场、日本当前成就/海外梦想、机构全名嵌套赛事词和正文历史背景六类边界。
+5. 只有第二轮 Gold 仍满足主地区/precision/recall/扩散门槛，且人工清单无明确错标，才可部署代码并从 `off` 切到 `shadow`。Shadow 计时从生产配置实际启用且健康验收通过时开始，修复前 run 不计入 24 小时。
+
 ## 待部署：独立 historical runner 与 batch006 单地区 250
 
 1. 当前代码包含迁移 `stable.0031_historical_batch_runner`，但本节写入时生产尚未应用。首次部署前先停 beat、排空 worker、生成并校验数据库和 `.env` 备份，再运行 `COMPOSE_FILE=<生产 compose> ./deploy/historical_runner_preflight.sh --initial-install`。只有 runner 容器、两张 runner 网络、secret 文件和三张表全部不存在才会放行；随后以 `HISTORICAL_RUNNER_INITIAL_INSTALL=true` 执行一次应用部署，并立即恢复 false。

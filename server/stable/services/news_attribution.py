@@ -578,7 +578,7 @@ def _leading_entity_regions(title_text: str, payloads: list[dict]) -> list[str]:
         position = folded.find(term.casefold())
         if position < 0 or position > 48:
             continue
-        if term.isascii() and " " not in term and term[:1].islower():
+        if term.isascii() and " " not in term and "-" not in term:
             continue
         regions.append(payload.get("region") or "")
     return _dedupe_regions(regions)
@@ -600,6 +600,8 @@ def _japanese_source_keeps_home_focus(title_text: str, foreign_region: str) -> b
         return True
     if foreign_region == RacingRegion.FRANCE and any(marker in title_text for marker in ["挑戦", "登録", "予定"]):
         return True
+    if "夢" in title_text:
+        return True
     return False
 
 
@@ -616,8 +618,33 @@ def _explicit_title_subject_region(title_text: str) -> str:
 
 
 def _event_terms_are_ambiguous(payloads: list[dict]) -> bool:
-    terms = [str(payload.get("source_term") or "").strip() for payload in payloads]
-    return bool(terms) and all(term.isascii() and len(term.split()) == 1 for term in terms)
+    return bool(payloads) and all(_event_term_is_ambiguous(payload) for payload in payloads)
+
+
+def _event_term_is_ambiguous(payload: dict) -> bool:
+    return (
+        payload.get("term_type") == TermType.RACE
+        and (term := str(payload.get("source_term") or "").strip()).isascii()
+        and len(term.split()) == 1
+    )
+
+
+def _remove_event_terms_nested_in_entities(event_payloads: list[dict], entity_payloads: list[dict]) -> list[dict]:
+    entity_terms = [
+        str(payload.get("source_term") or "").strip().casefold()
+        for payload in entity_payloads
+        if str(payload.get("source_term") or "").strip()
+    ]
+    return [
+        payload
+        for payload in event_payloads
+        if not any(
+            event_term != entity_term
+            and re.search(rf"(?<!\w){re.escape(event_term)}(?!\w)", entity_term)
+            for entity_term in entity_terms
+            if (event_term := str(payload.get("source_term") or "").strip().casefold())
+        )
+    ]
 
 
 def _credible_entity_regions(payloads: list[dict]) -> list[str]:
@@ -634,28 +661,13 @@ def _subject_should_outrank_event(
     *,
     leading_entity_region: str,
     event_region: str,
-    title_entity_payloads: list[dict],
 ) -> bool:
     if not leading_entity_region or leading_entity_region == event_region:
         return False
     folded = title_text.casefold().strip()
     if folded.startswith(("english trainer ", "british trainer ")):
         return True
-    if event_region != RacingRegion.FRANCE:
-        return False
-    subject_led_markers = (
-        " makes all for ",
-        " springs surprise in ",
-        " dominates ",
-        " upsets ",
-    )
-    if not any(marker in f" {folded} " for marker in subject_led_markers):
-        return False
-    return any(
-        payload.get("region") == leading_entity_region
-        and folded.startswith(str(payload.get("source_term") or "").casefold().strip())
-        for payload in title_entity_payloads
-    )
+    return False
 
 
 def infer_article_attribution(
@@ -681,6 +693,17 @@ def infer_article_attribution(
     event_keyword_matches = _keyword_regions(title_text, EVENT_REGION_KEYWORDS)
     term_matches = _term_regions(article, lead_text, batch_context=batch_context)
     title_term_matches = _term_regions(article, title_text, batch_context=batch_context)
+    title_term_matches["event"] = _remove_event_terms_nested_in_entities(
+        title_term_matches["event"],
+        title_term_matches["entity"],
+    )
+    term_matches["event"] = _remove_event_terms_nested_in_entities(
+        term_matches["event"],
+        term_matches["entity"],
+    )
+    lead_event_regions = _regions_from_term_payloads(
+        [payload for payload in term_matches["event"] if not _event_term_is_ambiguous(payload)]
+    )
     event_regions = _dedupe_regions(
         [*event_keyword_matches.keys(), *_regions_from_term_payloads(title_term_matches["event"])]
     )
@@ -730,6 +753,9 @@ def infer_article_attribution(
     ):
         event_regions = []
 
+    if source_is_global and not event_regions and len(lead_event_regions) == 1:
+        event_regions = lead_event_regions
+
     if len(event_regions) > 1:
         conflict_reasons.append("conflicting_event_centres")
         primary = source_region or RacingRegion.JAPAN
@@ -757,7 +783,6 @@ def infer_article_attribution(
                 title_text,
                 leading_entity_region=leading_entity_region,
                 event_region=event_region,
-                title_entity_payloads=title_term_matches["entity"],
             ):
                 primary = leading_entity_region
                 related = [event_region]
@@ -850,6 +875,7 @@ def infer_article_attribution(
     evidence = {
         "source_region": source_region,
         "event_regions": event_regions,
+        "lead_event_regions": lead_event_regions,
         "entity_regions": entity_regions,
         "credible_entity_regions": credible_entity_regions,
         "context_regions": context_regions,
