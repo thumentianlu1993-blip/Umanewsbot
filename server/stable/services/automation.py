@@ -20,15 +20,13 @@ from stable.models import (
     ReviewMode,
     RiskLevel,
     SourceLanguage,
-    TermEntry,
     TermType,
     WorkflowStatus,
 )
 from stable.services.terms import (
-    extract_unknown_horse_names,
+    ArticleEntityResolution,
+    resolve_article_entities,
     resolve_terms_for_language,
-    source_term_matches_text,
-    source_terms_by_entry,
 )
 from stable.services.multiregion import auto_publish_policy_for_article
 from stable.services.news_attribution import classify_news_content
@@ -471,19 +469,29 @@ def classify_content_category(article: NewsArticle) -> str:
     return ContentCategory.NEWS
 
 
-def p0_horse_hits(article: NewsArticle) -> list[dict]:
-    text = _source_text(article)
+def p0_horse_hits(
+    article: NewsArticle,
+    *,
+    entity_resolution: ArticleEntityResolution | None = None,
+) -> list[dict]:
     hits: list[dict] = []
     seen: set[int] = set()
-    source_language = article.source_language or SourceLanguage.JAPANESE
-    entries = list(TermEntry.objects.filter(is_active=True, term_type=TermType.HORSE).exclude(target_zh=""))
-    terms_by_entry = source_terms_by_entry(entries, source_language)
-    for entry in entries:
-        if entry.pk in seen:
+    resolution = entity_resolution or resolve_article_entities(
+        article.title_ja,
+        article.body_ja_normalized or article.body_ja_raw,
+        source_language=article.source_language or SourceLanguage.JAPANESE,
+    )
+    for entity in resolution.entities:
+        if entity.entity_type != "horse" or not entity.term_id or not entity.target_zh or entity.term_id in seen:
             continue
-        if any(source_term_matches_text(text, term, source_language) for term in terms_by_entry.get(entry.pk, [])):
-            seen.add(entry.pk)
-            hits.append({"source_ja": entry.source_ja, "target_zh": entry.target_zh, "priority": entry.priority})
+        seen.add(entity.term_id)
+        hits.append(
+            {
+                "source_ja": entity.canonical_text,
+                "target_zh": entity.target_zh,
+                "priority": entity.priority,
+            }
+        )
     hits.sort(key=lambda item: (-item["priority"], item["source_ja"]))
     return hits
 
@@ -539,7 +547,12 @@ def _is_duplicate_secondary(article: NewsArticle) -> bool:
     )
 
 
-def _hard_rule_decision(article: NewsArticle, category: str) -> tuple[str | None, str, list[str], list[str]]:
+def _hard_rule_decision(
+    article: NewsArticle,
+    category: str,
+    *,
+    entity_resolution: ArticleEntityResolution,
+) -> tuple[str | None, str, list[str], list[str]]:
     text = _source_text(article)
     body = article.body_ja_normalized or article.body_ja_raw
     reasons: list[str] = []
@@ -562,8 +575,8 @@ def _hard_rule_decision(article: NewsArticle, category: str) -> tuple[str | None
         reasons.append("缺少基准中文翻译")
     if (
         (article.source_language or SourceLanguage.JAPANESE) == SourceLanguage.JAPANESE
-        and extract_unknown_horse_names(article.title_ja, body, limit=3)
-        and not p0_horse_hits(article)
+        and any(item.entity_type == "unknown_horse" and item.needs_preserve for item in entity_resolution.entities)
+        and not p0_horse_hits(article, entity_resolution=entity_resolution)
     ):
         checks.append("存在未收录疑似马名，后续作为 warning 记录")
     if reasons:
@@ -574,8 +587,17 @@ def _hard_rule_decision(article: NewsArticle, category: str) -> tuple[str | None
 def score_article_for_automation(article: NewsArticle) -> AutomationDecision:
     text = _source_text(article)
     category = classify_content_category(article)
-    hard_mode, hard_risk, hard_reasons, checks = _hard_rule_decision(article, category)
-    horse_hits = p0_horse_hits(article)
+    entity_resolution = resolve_article_entities(
+        article.title_ja,
+        article.body_ja_normalized or article.body_ja_raw,
+        source_language=article.source_language or SourceLanguage.JAPANESE,
+    )
+    hard_mode, hard_risk, hard_reasons, checks = _hard_rule_decision(
+        article,
+        category,
+        entity_resolution=entity_resolution,
+    )
+    horse_hits = p0_horse_hits(article, entity_resolution=entity_resolution)
     race_signal = race_priority(article)
     priority = race_signal["priority"]
     source_language = article.source_language or SourceLanguage.JAPANESE

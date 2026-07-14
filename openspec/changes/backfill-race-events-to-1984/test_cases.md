@@ -200,6 +200,12 @@
 | TC-BATCH-014 | 2016–2025 完成后 | 生成下一年代 | 可进入 2006–2015；不得跳过未 accounted 的当前年代缺口报告 | A/O |
 | TC-BATCH-015 | 2016–2025含五地区pending目标 | 生成标准批次 | 每地区最多50个，按新到旧稳定选择，只包含pending未materialize due目标 | A/O |
 | TC-BATCH-016 | 空批次、重复target、年代外或inventory SHA漂移 | 生成artifact | fail closed，不生成可批准清单 | A/S |
+| TC-BATCH-017 | 上批gap仍pending且提供上批selection snapshot | 生成下一标准批次 | limit前排除旧target并补入新target；排除snapshot复制进manifest，gap仍留remaining分母 | A/S |
+| TC-BATCH-018 | 排除snapshot跨inventory、内部SHA漂移、target重复或与新selection相交 | 生成artifact | fail closed，不生成可批准清单且不改变target状态 | A/S |
+| TC-BATCH-019 | 低容量地区在本批后无未排除可选 pending due 目标 | 生成后续批次 | 该地区退出领先比较，其他未完成地区继续推进 | A |
+| TC-BATCH-020 | 某地区仅剩 selection snapshot 显式排除的待审目标 | 生成后续批次 | 不冻结其他地区；待审目标仍保留总账分母和 remaining pending | A |
+| TC-BATCH-021 | 只剩一个地区有未排除可选 pending due 目标 | 生成后续批次 | 不因缺少比较对象而拒绝 | A |
+| TC-BATCH-022 | 未入选本批的地区仍有可选 pending due 目标且领先差为 101 | 生成下一批 | 该地区仍参与比较并拒绝批次 | A |
 
 ## 10. 详情导入、冠军和原子写入
 
@@ -230,6 +236,10 @@
 | TC-IMPORT-023 | Equibase PDF页眉日期、赛场或场次与target不符 | parse/package | fail closed，不生成可写入候选 | A/F |
 | TC-IMPORT-024 | JRA英文年度表与日文官方结果表 | source discovery | 以日期/赛场唯一对齐官方单场结果，歧义不猜测 | A/F |
 | TC-IMPORT-025 | 美国同名赛事或Belmont工程期移师 | TOBA discovery | 先按赛事名和场地区分；年度表名称唯一时允许记录实际移师场地 | A/F |
+| TC-IMPORT-026 | JRA英文表不含障碍赛或赞助名不同 | source discovery | 仅通过显式日文官方别名唯一匹配结果页，未知名称继续进入issue | A/F |
+| TC-IMPORT-027 | TOBA同场同时有Juvenile、Fillies、Turf、Sprint变体 | source discovery | 核心限定词必须按完整单词一致，不能因短名称包含关系串场 | A/F |
+| TC-IMPORT-028 | 两个美国target最终匹配同一Equibase URL | source discovery | 两个候选均移除并输出`duplicate_source_url`，不得进入缓存 | A/F |
+| TC-IMPORT-029 | TOBA年度表将赛事标记为`not run` | source discovery | 输出`source_reports_not_run`审核证据，不自动生成结果URL或改变总账状态 | A/F |
 | TC-IMPORT-026 | Equibase Yearbook含实际出赛与退赛 | 离线解析 | runners按马号含退赛，results仅含实际出赛并按官方名次 | A/F |
 | TC-IMPORT-027 | event距离为裸数字、批准来源为`2400m` | 权威字段dry-run | 输出`2400 -> 2400m`，保留来源/snapshot/parser，不写库 | A/S |
 | TC-IMPORT-028 | 英国批准来源为`3m 210y` | 权威字段apply | 原样保存mile/yard文本，不解释为metre，写before/after日志 | A/S |

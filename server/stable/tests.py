@@ -1844,7 +1844,9 @@ class AdapterTests(TestCase):
           <article>
             <h1>France racing at Deauville</h1>
             <time datetime="2026-06-20T10:30:00+00:00">20 June 2026</time>
-            <div class="article-body"><p>Preview body with enough racing detail.</p></div>
+            <div class="horses-racing-news-content">
+              <div class="article-body"><p>Preview body with enough racing detail.</p></div>
+            </div>
           </article>
         </body></html>
         """
@@ -13192,9 +13194,9 @@ class TranslationWorkflowTests(TestCase):
                     {
                         "content": __import__("json").dumps(
                             {
-                                "title_zh": "キタサンブラック的弟弟シュガークン挑战宝塚纪念",
-                                "body_zh": "シュガークン将向GI宝塚纪念发起挑战。",
-                                "push_summary_zh": "シュガークン挑战宝塚纪念。",
+                                "title_zh": "キタサンブラック的弟弟__UMA_KEEP_1__挑战宝塚纪念",
+                                "body_zh": "__UMA_KEEP_1__将向GI宝塚纪念发起挑战。",
+                                "push_summary_zh": "__UMA_KEEP_1__挑战宝塚纪念。",
                             },
                             ensure_ascii=False,
                         )
@@ -13396,13 +13398,13 @@ class TranslationWorkflowTests(TestCase):
         )
         second = fake_response(
             {
-                "title_zh": "【大阪杯赛后评论】クロワデュノール与北村友一骑手等",
+                "title_zh": "【大阪杯赛后评论】__UMA_KEEP_1__与北村友一骑手等",
                 "body_zh": (
-                    "1着 クロワデュノール(北村友一骑手)\n"
-                    "2着 メイショウタバル(武丰骑手)\n"
-                    "3着 ダノンデサイル(坂井瑠星骑手)。"
+                    "1着 __UMA_KEEP_1__(北村友一骑手)\n"
+                    "2着 __UMA_KEEP_2__(武丰骑手)\n"
+                    "3着 __UMA_KEEP_3__(坂井瑠星骑手)。"
                 ),
-                "push_summary_zh": "クロワデュノール夺冠，メイショウタバル与ダノンデサイル分列二三位。",
+                "push_summary_zh": "__UMA_KEEP_1__夺冠，__UMA_KEEP_2__与__UMA_KEEP_3__分列二三位。",
             }
         )
 
@@ -13455,7 +13457,7 @@ class TranslationWorkflowTests(TestCase):
         self.assertNotIn("__UMA_KEEP_", result.body_zh)
 
     @override_settings(TRANSLATION_MODEL="deepseek-ai/DeepSeek-V3", TRANSLATION_MAX_ATTEMPTS=1)
-    def test_provider_accepts_with_warning_when_unknown_horse_still_missing(self):
+    def test_provider_rejects_when_unknown_horse_still_missing(self):
         self.article.title_ja = "メイショウタバルが出走"
         self.article.body_ja_raw = "1着 メイショウタバル(武豊騎手)。"
         self.article.body_ja_normalized = self.article.body_ja_raw
@@ -13486,14 +13488,8 @@ class TranslationWorkflowTests(TestCase):
         )()
 
         with patch.object(provider, "_request_completion", return_value=type("Response", (), {"choices": [choice], "usage": usage})()):
-            result = provider.translate(self.article)
-
-        self.assertIn("名将原野", result.body_zh)
-        self.assertEqual(
-            result.metadata["warning"],
-            "Translation response changed unknown horse names; accepted with warning",
-        )
-        self.assertIn("メイショウタバル", result.metadata["missing_unknown_horse_names"])
+            with self.assertRaisesRegex(TranslationResponseError, "protected entity placeholder"):
+                provider.translate(self.article)
 
     def test_translate_task_preserves_manually_cleared_summary_and_populates_horse_tags(self):
         TermEntry.objects.create(term_type="horse", source_ja="ソダシ", target_zh="纯净之辉", priority=100)
@@ -16397,7 +16393,10 @@ class HorseProfilePageMvpTests(TestCase):
 
     def test_article_horse_scan_and_detail_tags_respect_removed_and_public_rules(self):
         profile = self._profile()
-        article = self._article()
+        article = self._article(
+            title="イクイノックス宝塚記念勝利",
+            body="イクイノックスはレースで好走した。",
+        )
         result = scan_article_horse_links(article=article, commit=True)
         detail_response = self.client.get(reverse("public-article-detail", args=[article.id]))
         link = ArticleHorseLink.objects.get(article=article, horse_profile=profile)

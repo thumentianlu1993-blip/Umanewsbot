@@ -303,6 +303,53 @@ class HistoricalRaceDetailSourceArtifactTests(TestCase):
         self.assertEqual(detail_row["source_provider"], "jra")
         self.assertEqual(detail_row["source_authority"], "official")
 
+    def test_build_accepts_nar_official_result_page_for_japan(self):
+        self.series.country_region = RacingRegion.JAPAN
+        self.series.save(update_fields={"country_region"})
+        self.event.country_region = RacingRegion.JAPAN
+        self.event.save(update_fields={"country_region"})
+        self.target.country_region = RacingRegion.JAPAN
+        self.target.save(update_fields={"country_region"})
+        self.source_url = (
+            "https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?"
+            "k_raceDate=2025%2f12%2f29&k_raceNo=9&k_babaCode=20"
+        )
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            candidate, cache_manifest = self._inputs(root)
+            row = json.loads(candidate.read_text(encoding="utf-8"))
+            row["source_name"] = "keiba_go_jp"
+            candidate.write_text(json.dumps(row) + "\n", encoding="utf-8")
+            artifact = root / "artifact"
+            build_detail_source_artifact(
+                candidate_jsonl_paths=[candidate],
+                source_cache_manifest_paths=[cache_manifest],
+                output_dir=artifact,
+            )
+            detail_row = json.loads((artifact / "detail_source_candidates.jsonl").read_text(encoding="utf-8"))
+
+        self.assertEqual(detail_row["source_provider"], "nar")
+        self.assertEqual(detail_row["source_authority"], "official")
+
+    def test_build_accepts_zone_turf_database_for_france(self):
+        self.source_url = "https://www.zone-turf.fr/cheval/mission-smart-2088796/"
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            candidate, cache_manifest = self._inputs(root)
+            row = json.loads(candidate.read_text(encoding="utf-8"))
+            row["source_name"] = "zone_turf"
+            candidate.write_text(json.dumps(row) + "\n", encoding="utf-8")
+            artifact = root / "artifact"
+            build_detail_source_artifact(
+                candidate_jsonl_paths=[candidate],
+                source_cache_manifest_paths=[cache_manifest],
+                output_dir=artifact,
+            )
+            detail_row = json.loads((artifact / "detail_source_candidates.jsonl").read_text(encoding="utf-8"))
+
+        self.assertEqual(detail_row["source_provider"], "zone_turf")
+        self.assertEqual(detail_row["source_authority"], "third_party_database")
+
     def test_apply_preserves_primary_evidence_and_records_approved_detail_source(self):
         with TemporaryDirectory() as tmp:
             artifact = self._build(Path(tmp))

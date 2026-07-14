@@ -30,6 +30,7 @@ from stable.services.historical_race_inventory import (
 DETAIL_SOURCE_ARTIFACT_SCHEMA_VERSION = "1.0"
 SOURCE_NAME_TO_PROVIDER = {
     "jra_official_result_page": "jra",
+    "keiba_go_jp": "nar",
     "netkeiba": "netkeiba",
     "hkjc_results_all_zh_hk": "hkjc",
     "sporting_life": "uk_sportinglife",
@@ -40,9 +41,11 @@ SOURCE_NAME_TO_PROVIDER = {
     "equibase_yearbook": "equibase",
     "nsa_official_result_pdf": "nsa",
     "zeturf": "zeturf",
+    "zone_turf": "zone_turf",
 }
 PROVIDER_AUTHORITIES = {
     "jra": "official",
+    "nar": "official",
     "netkeiba": "third_party_high_access",
     "hkjc": "official",
     "uk_sportinglife": "third_party_high_access",
@@ -52,9 +55,11 @@ PROVIDER_AUTHORITIES = {
     "equibase": "third_party",
     "nsa": "official",
     "zeturf": "third_party_high_access",
+    "zone_turf": "third_party_database",
 }
 PROVIDER_REGIONS = {
     "jra": RacingRegion.JAPAN,
+    "nar": RacingRegion.JAPAN,
     "netkeiba": RacingRegion.JAPAN,
     "hkjc": RacingRegion.HONG_KONG,
     "uk_sportinglife": RacingRegion.UNITED_KINGDOM,
@@ -64,6 +69,7 @@ PROVIDER_REGIONS = {
     "equibase": RacingRegion.UNITED_STATES,
     "nsa": RacingRegion.UNITED_STATES,
     "zeturf": RacingRegion.FRANCE,
+    "zone_turf": RacingRegion.FRANCE,
 }
 
 

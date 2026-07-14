@@ -1,18 +1,29 @@
 from __future__ import annotations
 
 import json
+import inspect
+import math
 import re
 from dataclasses import dataclass
 
 from django.conf import settings
 from openai import OpenAI
 
-from stable.models import NewsArticle, SourceLanguage, TranslationRun
+from stable.models import NewsArticle, SourceLanguage, TermType, TranslationRun
 
+from .japanese_racing_translation import (
+    build_japanese_format_plan,
+    build_japanese_seed_term_plan,
+    japanese_format_placeholder_violations,
+    japanese_seed_term_placeholder_violations,
+    restore_japanese_format_placeholders,
+    restore_japanese_seed_term_placeholders,
+)
 from .terms import (
-    apply_term_mappings,
-    recognize_horse_names,
-    resolve_terms_for_language,
+    ArticleEntityResolution,
+    apply_contextual_term_mappings,
+    recognized_horses_from_resolution,
+    resolve_article_entities,
     serialize_recognized_horse_names,
     serialize_terms,
 )
@@ -35,41 +46,86 @@ class TranslationResponseError(ValueError):
 class TranslationProvider:
     name = "base"
 
-    def translate(self, article: NewsArticle) -> TranslationResult:
+    def translate(
+        self,
+        article: NewsArticle,
+        *,
+        entity_resolution: ArticleEntityResolution | None = None,
+    ) -> TranslationResult:
         raise NotImplementedError
+
+
+def _translation_terms(resolution: ArticleEntityResolution) -> list:
+    limit = max(0, int(settings.TRANSLATION_TERM_LIMIT))
+    selected = list(resolution.accepted_terms[:limit])
+    for term in resolution.accepted_terms:
+        if "japanese_racing_translation_seed" not in (term.notes or "").casefold():
+            continue
+        if term not in selected:
+            selected.append(term)
+    return selected
 
 
 class DummyTranslationProvider(TranslationProvider):
     name = "dummy"
 
-    def translate(self, article: NewsArticle) -> TranslationResult:
+    def translate(
+        self,
+        article: NewsArticle,
+        *,
+        entity_resolution: ArticleEntityResolution | None = None,
+    ) -> TranslationResult:
         body = article.body_ja_normalized or article.body_ja_raw
         source_language = article.source_language or SourceLanguage.JAPANESE
-        mapped_title = apply_term_mappings(article.title_ja, source_language=source_language)
-        mapped_body = apply_term_mappings(body, source_language=source_language)
+        resolution = entity_resolution or resolve_article_entities(
+            article.title_ja,
+            body,
+            source_language=source_language,
+        )
+        format_plan = build_japanese_format_plan(article.title_ja, body, resolution)
+        seed_term_plan = build_japanese_seed_term_plan(article.title_ja, body, resolution, format_plan)
+        mapped_title = apply_contextual_term_mappings(seed_term_plan.protected_title, resolution)
+        mapped_body = apply_contextual_term_mappings(seed_term_plan.protected_body, resolution)
+        mapped_title = restore_japanese_seed_term_placeholders(mapped_title, seed_term_plan, field_name="title")
+        mapped_body = restore_japanese_seed_term_placeholders(mapped_body, seed_term_plan, field_name="body")
+        mapped_title = restore_japanese_format_placeholders(mapped_title, format_plan, field_name="title")
+        mapped_body = restore_japanese_format_placeholders(mapped_body, format_plan, field_name="body")
         return TranslationResult(
             title_zh=f"[未配置真实翻译模型] {mapped_title}",
             body_zh=mapped_body,
             push_summary_zh=mapped_body[:140],
-            metadata={"provider": self.name, "model": "dummy"},
+            metadata={
+                "provider": self.name,
+                "model": "dummy",
+                "terms": serialize_terms(resolution.accepted_terms),
+                "entities": [item.as_dict() for item in resolution.entities],
+                "suppressed_entities": [item.as_dict() for item in resolution.suppressed_candidates],
+                "machine_horse_tags": resolution.machine_horse_tags,
+                "japanese_format_normalizations": format_plan.as_dicts(),
+                "japanese_seed_term_normalizations": seed_term_plan.as_dicts(),
+            },
         )
-
-
-def _article_term_text(article: NewsArticle) -> str:
-    return "\n".join(
-        part
-        for part in [
-            article.title_ja or "",
-            article.body_ja_normalized or article.body_ja_raw or "",
-        ]
-        if part
-    )
 
 
 class OpenAICompatibleTranslationProvider(TranslationProvider):
     name = "openai-compatible"
     _SENTENCE_END_RE = re.compile(r"[。！？!?；;…]$")
     _LIST_MARKER_RE = re.compile(r"(?m)^\s*[■◆●▪•]")
+    _PRESERVED_PLACEHOLDER_RE = re.compile(r"__UMA_(?:KEEP|TERM)_\d+__")
+    _ALL_PLACEHOLDER_RE = re.compile(r"__UMA_(?:KEEP|TERM|FORMAT|SEED)_\d+__")
+    _MALFORMED_SUFFIX_RE = re.compile(
+        r"(__UMA_(?:KEEP|TERM|FORMAT|SEED)_\d+__)"
+        r"((?!__UMA_)_|[A-Za-z0-9][A-Za-z0-9_]*__)"
+    )
+    _PLACEHOLDER_FRAGMENT_RE = re.compile(
+        r"(?:(?<![A-Za-z0-9@])_+UMA(?:[_./-]|[ \t]+)?(?:KEEP|TERM|FORMAT|SEED)"
+        r"|(?<![A-Za-z0-9@_])UMA(?:[_./-]|[ \t]+)?(?:KEEP|TERM|FORMAT|SEED)"
+        r"|_{2,}UMA_)"
+        r"(?:[A-Za-z0-9_]*?__|[A-Za-z0-9_]*)",
+        re.IGNORECASE,
+    )
+    _CANONICAL_PLACEHOLDER_PREFIXES = ("UMAKEEP", "UMATERM", "UMAFORMAT", "UMASEED")
+    _PLACEHOLDER_TOKEN_CHAR_RE = re.compile(r"[A-Za-z0-9_./ \t-]")
 
     def __init__(self, *, api_key: str, base_url: str, provider_name: str | None = None) -> None:
         self.name = provider_name or self.name
@@ -95,7 +151,12 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             "请优先遵守术语表中的译法，不要杜撰信息，不要省略关键事实，不要把原文改写成摘要。"
             "如果原文包含排行榜、分点、小标题或项目符号，译文必须保留相同的顺序和完整信息。"
             "如果识别到马名但术语表没有提供中文译名，必须保留该马名的原始写法，不得音译、意译或自行猜译。"
+            "未被术语表或占位符保护的普通片假名是正文词汇，必须按上下文译成中文，不得保留原文。"
             "若原文中出现 __UMA_KEEP_数字__ 形式的占位符，请在译文中原样复制该占位符，不要翻译或删除。"
+            "若原文中出现 __UMA_TERM_数字__ 形式的人名占位符，也必须在译文中原样复制，系统会按术语表还原。"
+            "若原文中出现 __UMA_FORMAT_数字__ 形式的固定格式占位符，也必须在对应标题或正文中原样复制，系统会还原为规范格式。"
+            "若原文中出现 __UMA_SEED_数字__ 形式的种子术语占位符，也必须在对应标题或正文中原样复制，系统会还原为指定译法。"
+            "只可复制原文中实际出现的占位符，不得新造占位符、改变数字或混用 KEEP、TERM、FORMAT、SEED 命名空间。"
             "输出必须是 JSON 对象，且只包含 title_zh、body_zh、push_summary_zh 三个键。"
             f"{retry_hint}"
             "\n\n"
@@ -150,6 +211,10 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
     def _count_sentences(text: str) -> int:
         return sum(text.count(char) for char in "。！？!?；;")
 
+    @staticmethod
+    def _count_nonempty_lines(text: str) -> int:
+        return sum(1 for line in (text or "").splitlines() if line.strip())
+
     def _ends_with_complete_sentence(self, text: str) -> bool:
         stripped = (text or "").rstrip()
         if not stripped:
@@ -171,12 +236,18 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         target_sentence_count = self._count_sentences(target)
         source_list_count = len(self._LIST_MARKER_RE.findall(source))
         target_list_count = len(self._LIST_MARKER_RE.findall(target))
+        source_line_count = self._count_nonempty_lines(source)
+        target_line_count = self._count_nonempty_lines(target)
+        has_line_coverage = source_line_count >= 5 and target_line_count >= max(
+            4,
+            math.ceil(source_line_count * 0.8),
+        )
 
         if self._ends_with_complete_sentence(source) and not self._ends_with_complete_sentence(target):
             return True
         if source_list_count >= 2 and target_list_count < source_list_count:
             return True
-        if len(source) >= 600 and len(target) < max(320, int(len(source) * 0.58)):
+        if len(source) >= 600 and len(target) < max(320, int(len(source) * 0.58)) and not has_line_coverage:
             if target_sentence_count < max(4, int(source_sentence_count * 0.7)):
                 return True
         return False
@@ -190,13 +261,18 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
 
     @staticmethod
     def _protect_unknown_horse_names(text: str, unknown_horse_names: list[str]) -> tuple[str, dict[str, str]]:
+        placeholders = {
+            f"__UMA_KEEP_{index}__": name
+            for index, name in enumerate(sorted(set(unknown_horse_names), key=lambda item: (-len(item), item)), start=1)
+        }
+        return OpenAICompatibleTranslationProvider._protect_with_placeholders(text, placeholders), placeholders
+
+    @staticmethod
+    def _protect_with_placeholders(text: str, placeholders: dict[str, str]) -> str:
         protected = text or ""
-        placeholders: dict[str, str] = {}
-        for index, name in enumerate(sorted(unknown_horse_names, key=len, reverse=True), start=1):
-            placeholder = f"__UMA_KEEP_{index}__"
+        for placeholder, name in placeholders.items():
             protected = protected.replace(name, placeholder)
-            placeholders[placeholder] = name
-        return protected, placeholders
+        return protected
 
     @staticmethod
     def _restore_unknown_horse_placeholders(text: str, placeholders: dict[str, str]) -> str:
@@ -204,6 +280,34 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         for placeholder, name in placeholders.items():
             restored = restored.replace(placeholder, name)
         return restored
+
+    @staticmethod
+    def _person_term_placeholders(terms: list) -> tuple[dict[str, str], dict[str, str]]:
+        mappings: dict[str, str] = {}
+        conflicts: set[str] = set()
+        for term in terms:
+            if term.term_type not in {TermType.JOCKEY, TermType.TRAINER, TermType.OWNER}:
+                continue
+            source = (term.matched_text or term.source_ja or "").strip()
+            target = (term.target_zh or "").strip()
+            if not source or not target:
+                continue
+            if source in mappings and mappings[source] != target:
+                conflicts.add(source)
+                continue
+            mappings[source] = target
+        for source in conflicts:
+            mappings.pop(source, None)
+        source_placeholders: dict[str, str] = {}
+        target_placeholders: dict[str, str] = {}
+        for index, (source, target) in enumerate(
+            sorted(mappings.items(), key=lambda item: (-len(item[0]), item[0], item[1])),
+            start=1,
+        ):
+            placeholder = f"__UMA_TERM_{index}__"
+            source_placeholders[placeholder] = source
+            target_placeholders[placeholder] = target
+        return source_placeholders, target_placeholders
 
     @staticmethod
     def _usage_to_dict(usage) -> dict:
@@ -215,34 +319,285 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             return usage
         return {"repr": repr(usage)}
 
-    def translate(self, article: NewsArticle) -> TranslationResult:
-        terms = resolve_terms_for_language(
-            _article_term_text(article),
-            article.source_language or SourceLanguage.JAPANESE,
-            settings.TRANSLATION_TERM_LIMIT,
+    @staticmethod
+    def _placeholder_retry_context(
+        source_title: str,
+        source_body: str,
+        placeholders: list[str],
+        *,
+        radius: int = 120,
+    ) -> str:
+        contexts: list[str] = []
+        for placeholder in placeholders:
+            for field_name, source in (("标题", source_title), ("正文", source_body)):
+                index = (source or "").find(placeholder)
+                if index < 0:
+                    continue
+                start = max(0, index - radius)
+                end = min(len(source), index + len(placeholder) + radius)
+                snippet = source[start:end].replace("\n", " ").strip()
+                contexts.append(f"- {placeholder}（{field_name}）：…{snippet}…")
+                break
+        return "\n".join(contexts)
+
+    def _placeholder_retry_instruction(
+        self,
+        *,
+        label: str,
+        namespace: str,
+        violations: list[dict],
+        source_title: str,
+        source_body: str,
+    ) -> str:
+        placeholders = sorted({item["placeholder"] for item in violations})
+        contexts = self._placeholder_retry_context(
+            source_title,
+            source_body,
+            placeholders,
         )
+        unexpected = [
+            placeholder
+            for placeholder in placeholders
+            if placeholder not in source_title and placeholder not in source_body
+        ]
+        instruction = (
+            f"\n\n注意：上一版遗漏、重复、跨字段放置或新造了{label}占位符。"
+            f"本次具体异常占位符：{'、'.join(placeholders)}。"
+            f"请从头逐段完整重译，不得合并、压缩或省略原文细节；只可复制原文实际存在的 {namespace}，"
+            "并按原文所属字段及出现次数原样复制，禁止新造占位符或改换命名空间。"
+        )
+        if unexpected:
+            instruction += f"原文不存在以下占位符，译文必须删除：{'、'.join(unexpected)}。"
+        if contexts:
+            instruction += f"\n这些占位符在原文中的局部位置如下：\n{contexts}"
+        return instruction
+
+    @staticmethod
+    def _within_edit_distance(left: str, right: str, *, limit: int = 2) -> bool:
+        if abs(len(left) - len(right)) > limit:
+            return False
+        previous = list(range(len(right) + 1))
+        for row_index, left_character in enumerate(left, start=1):
+            current = [row_index]
+            for column_index, right_character in enumerate(right, start=1):
+                current.append(
+                    min(
+                        current[-1] + 1,
+                        previous[column_index] + 1,
+                        previous[column_index - 1] + (left_character != right_character),
+                    )
+                )
+            if min(current) > limit:
+                return False
+            previous = current
+        return previous[-1] <= limit
+
+    @classmethod
+    def _looks_like_corrupted_internal_token(cls, fragment: str) -> bool:
+        letters = re.sub(r"[^A-Za-z]", "", fragment or "").upper()
+        return any(
+            cls._within_edit_distance(letters, canonical)
+            for canonical in cls._CANONICAL_PLACEHOLDER_PREFIXES
+        )
+
+    @classmethod
+    def _corrupted_internal_token_fragments(cls, value: str) -> set[str]:
+        fragments: set[str] = set()
+        text = value or ""
+        for start, character in enumerate(text):
+            if character != "_":
+                continue
+            if start > 0 and (text[start - 1].isalnum() or text[start - 1] == "@"):
+                continue
+            max_end = min(len(text), start + 84)
+            for end in range(start + 2, max_end):
+                if text[end : end + 2] != "__":
+                    continue
+                fragment = text[start : end + 2]
+                if not all(cls._PLACEHOLDER_TOKEN_CHAR_RE.fullmatch(item) for item in fragment):
+                    break
+                if cls._looks_like_corrupted_internal_token(fragment):
+                    fragments.add(fragment)
+        return fragments
+
+    @classmethod
+    def _apply_contextual_mappings_outside_placeholders(
+        cls,
+        text: str,
+        resolution: ArticleEntityResolution,
+    ) -> str:
+        value = text or ""
+        parts: list[str] = []
+        cursor = 0
+        for match in cls._ALL_PLACEHOLDER_RE.finditer(value):
+            parts.append(apply_contextual_term_mappings(value[cursor : match.start()], resolution))
+            parts.append(match.group(0))
+            cursor = match.end()
+        parts.append(apply_contextual_term_mappings(value[cursor:], resolution))
+        return "".join(parts)
+
+    @classmethod
+    def _preserved_placeholder_violations(
+        cls,
+        title_zh: str,
+        body_zh: str,
+        source_title: str,
+        source_body: str,
+    ) -> list[dict]:
+        values = {"title": title_zh or "", "body": body_zh or ""}
+        sources = {"title": source_title or "", "body": source_body or ""}
+        violations: list[dict] = []
+        for field_name, value in values.items():
+            observed = cls._PRESERVED_PLACEHOLDER_RE.findall(value)
+            expected = cls._PRESERVED_PLACEHOLDER_RE.findall(sources[field_name])
+            for placeholder in sorted(set(observed) | set(expected)):
+                observed_count = observed.count(placeholder)
+                expected_count = expected.count(placeholder)
+                if expected_count == 0:
+                    reason = "wrong_or_unexpected_field"
+                elif observed_count < expected_count:
+                    reason = "missing"
+                elif observed_count > expected_count:
+                    reason = "duplicated"
+                else:
+                    continue
+                violations.append(
+                    {
+                        "placeholder": placeholder,
+                        "field_name": field_name,
+                        "reason": reason,
+                        "count": observed_count,
+                        "expected_count": expected_count,
+                    }
+                )
+        return violations
+
+    @classmethod
+    def _malformed_placeholder_violations(
+        cls,
+        title_zh: str,
+        body_zh: str,
+        summary_zh: str,
+    ) -> list[dict]:
+        violations: list[dict] = []
+        for field_name, value in {
+            "title": title_zh or "",
+            "body": body_zh or "",
+            "summary": summary_zh or "",
+        }.items():
+            exact_matches = list(cls._ALL_PLACEHOLDER_RE.finditer(value))
+            exact_ends = {match.end() for match in exact_matches}
+            for match in exact_matches:
+                if match.start() == 0 or value[match.start() - 1] != "_" or match.start() in exact_ends:
+                    continue
+                prefix_start = match.start()
+                while prefix_start > 0 and value[prefix_start - 1] == "_":
+                    prefix_start -= 1
+                fragment = value[prefix_start : match.end()]
+                violations.append(
+                    {
+                        "placeholder": fragment,
+                        "field_name": field_name,
+                        "reason": "malformed_internal_placeholder_prefix",
+                        "count": value.count(fragment),
+                    }
+                )
+            for placeholder, suffix in cls._MALFORMED_SUFFIX_RE.findall(value):
+                fragment = f"{placeholder}{suffix}"
+                violations.append(
+                    {
+                        "placeholder": fragment,
+                        "field_name": field_name,
+                        "reason": "malformed_internal_placeholder_suffix",
+                        "count": value.count(fragment),
+                    }
+                )
+            remainder = cls._ALL_PLACEHOLDER_RE.sub("", value)
+            fragments = set(cls._PLACEHOLDER_FRAGMENT_RE.findall(remainder))
+            fragments.update(cls._corrupted_internal_token_fragments(remainder))
+            if not fragments:
+                continue
+            for fragment in sorted(fragments):
+                violations.append(
+                    {
+                        "placeholder": fragment,
+                        "field_name": field_name,
+                        "reason": "malformed_internal_placeholder",
+                        "count": remainder.count(fragment),
+                    }
+                )
+        return violations
+
+    @classmethod
+    def _summary_placeholder_violations(
+        cls,
+        summary_zh: str,
+        source_title: str,
+        source_body: str,
+    ) -> list[dict]:
+        observed = cls._ALL_PLACEHOLDER_RE.findall(summary_zh or "")
+        allowed = set(cls._ALL_PLACEHOLDER_RE.findall(f"{source_title}\n{source_body}"))
+        return [
+            {
+                "placeholder": placeholder,
+                "field_name": "summary",
+                "reason": "unexpected_summary_placeholder",
+                "count": observed.count(placeholder),
+            }
+            for placeholder in sorted(set(observed) - allowed)
+        ]
+
+    def translate(
+        self,
+        article: NewsArticle,
+        *,
+        entity_resolution: ArticleEntityResolution | None = None,
+    ) -> TranslationResult:
+        source_text = article.body_ja_normalized or article.body_ja_raw
+        source_language = article.source_language or SourceLanguage.JAPANESE
+        resolution = entity_resolution or resolve_article_entities(
+            article.title_ja,
+            source_text,
+            source_language=source_language,
+        )
+        format_plan = build_japanese_format_plan(article.title_ja, source_text, resolution)
+        seed_term_plan = build_japanese_seed_term_plan(article.title_ja, source_text, resolution, format_plan)
+        terms = _translation_terms(resolution)
+        person_source_placeholders, person_target_placeholders = self._person_term_placeholders(terms)
+        person_placeholder_by_source = {
+            source: placeholder for placeholder, source in person_source_placeholders.items()
+        }
         glossary_lines = [
-            f"- [{term.term_type}] {term.matched_text or term.source_ja} => {term.target_zh}"
+            f"- [{term.term_type}] "
+            f"{person_placeholder_by_source.get((term.matched_text or term.source_ja or '').strip(), term.matched_text or term.source_ja)}"
+            f" => {term.target_zh}"
             + (f"（备注：{term.notes}）" if term.notes else "")
             for term in terms
             if (term.target_zh or "").strip()
         ]
-        source_text = article.body_ja_normalized or article.body_ja_raw
-        unknown_horse_limit = max(1, int(settings.TRANSLATION_UNKNOWN_HORSE_LIMIT))
-        recognized_horses = recognize_horse_names(
-            article.title_ja,
-            source_text,
-            limit=None,
-            source_language=article.source_language or SourceLanguage.JAPANESE,
+        glossary_lines.extend(
+            f"- [seed-placeholder] {item.placeholder} => {item.target_text}"
+            f"（源词：{item.source_text}；译文中必须原样复制占位符，系统会恢复精确中文）"
+            for item in seed_term_plan.items
         )
-        unknown_horse_names = [
-            item.matched_text or item.name_ja
-            for item in recognized_horses
-            if item.needs_preserve and (item.matched_text or item.name_ja)
-        ][:unknown_horse_limit]
-        protected_title, title_placeholders = self._protect_unknown_horse_names(article.title_ja, unknown_horse_names)
-        protected_body, body_placeholders = self._protect_unknown_horse_names(source_text, unknown_horse_names)
-        horse_placeholders = {**title_placeholders, **body_placeholders}
+        unknown_horse_limit = max(1, int(settings.TRANSLATION_UNKNOWN_HORSE_LIMIT))
+        recognized_horses = recognized_horses_from_resolution(resolution)
+        consumed_entity_keys = format_plan.consumed_entity_keys | seed_term_plan.consumed_entity_keys
+        unknown_horse_names = list(
+            dict.fromkeys(
+                item.matched_text
+                for item in resolution.entities
+                if item.entity_type in {"horse", "unknown_horse"}
+                and item.needs_preserve
+                and item.matched_text
+                and (item.field_name, item.start, item.end) not in consumed_entity_keys
+            )
+        )[:unknown_horse_limit]
+        _, horse_placeholders = self._protect_unknown_horse_names("", unknown_horse_names)
+        protected_title = self._protect_with_placeholders(seed_term_plan.protected_title, horse_placeholders)
+        protected_body = self._protect_with_placeholders(seed_term_plan.protected_body, horse_placeholders)
+        protected_title = self._protect_with_placeholders(protected_title, person_source_placeholders)
+        protected_body = self._protect_with_placeholders(protected_body, person_source_placeholders)
         unknown_horse_lines = [
             f"- {placeholder} => {name}（译文中先原样复制占位符，系统会还原为日文马名）"
             for placeholder, name in horse_placeholders.items()
@@ -266,14 +621,18 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             content = choice.message.content or "{}"
             payload = json.loads(content)
 
-            title_zh = self._restore_unknown_horse_placeholders((payload.get("title_zh") or "").strip(), horse_placeholders)
-            body_zh = self._restore_unknown_horse_placeholders((payload.get("body_zh") or "").strip(), horse_placeholders)
-            push_summary_zh = self._restore_unknown_horse_placeholders((payload.get("push_summary_zh") or "").strip(), horse_placeholders)
+            raw_title = (payload.get("title_zh") or "").strip()
+            raw_body = (payload.get("body_zh") or "").strip()
+            raw_summary = (payload.get("push_summary_zh") or "").strip()
 
             last_metadata = {
                 "provider": self.name,
                 "model": settings.TRANSLATION_MODEL,
                 "terms": serialize_terms(terms),
+                "entities": [item.as_dict() for item in resolution.entities],
+                "suppressed_entities": [item.as_dict() for item in resolution.suppressed_candidates],
+                "accepted_term_ids": sorted(resolution.accepted_term_ids),
+                "machine_horse_tags": resolution.machine_horse_tags,
                 "unknown_horse_names": unknown_horse_names,
                 "recognized_horse_names": serialize_recognized_horse_names(recognized_horses),
                 "external_horse_names": [
@@ -291,6 +650,12 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                     if item.source == "external_alias"
                 ],
                 "unknown_horse_placeholders": horse_placeholders,
+                "japanese_format_normalizations": format_plan.as_dicts(),
+                "japanese_seed_term_normalizations": seed_term_plan.as_dicts(),
+                "person_term_placeholders": {
+                    placeholder: {"source": source, "target": person_target_placeholders[placeholder]}
+                    for placeholder, source in person_source_placeholders.items()
+                },
                 "raw": payload,
                 "finish_reason": getattr(choice, "finish_reason", ""),
                 "usage": self._usage_to_dict(getattr(response, "usage", None)),
@@ -298,14 +663,138 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                 "max_attempts": max_attempts,
             }
 
+            format_violations = japanese_format_placeholder_violations(
+                raw_title,
+                raw_body,
+                format_plan,
+            )
+            seed_term_violations = japanese_seed_term_placeholder_violations(
+                raw_title,
+                raw_body,
+                seed_term_plan,
+            )
+            preserved_placeholder_violations = self._preserved_placeholder_violations(
+                raw_title,
+                raw_body,
+                protected_title,
+                protected_body,
+            )
+            summary_placeholder_violations = self._summary_placeholder_violations(
+                raw_summary,
+                protected_title,
+                protected_body,
+            )
+            malformed_placeholder_violations = self._malformed_placeholder_violations(
+                raw_title,
+                raw_body,
+                raw_summary,
+            )
+            if format_violations:
+                last_metadata["japanese_format_placeholder_violations"] = format_violations
+                retry_hint += self._placeholder_retry_instruction(
+                    label="固定格式",
+                    namespace="__UMA_FORMAT_数字__ 占位符",
+                    violations=format_violations,
+                    source_title=protected_title,
+                    source_body=protected_body,
+                )
+            if seed_term_violations:
+                last_metadata["japanese_seed_term_placeholder_violations"] = seed_term_violations
+                retry_hint += self._placeholder_retry_instruction(
+                    label="种子术语",
+                    namespace="__UMA_SEED_数字__ 占位符",
+                    violations=seed_term_violations,
+                    source_title=protected_title,
+                    source_body=protected_body,
+                )
+            if preserved_placeholder_violations:
+                last_metadata["preserved_placeholder_violations"] = preserved_placeholder_violations
+                retry_hint += self._placeholder_retry_instruction(
+                    label="马名或人物",
+                    namespace="__UMA_KEEP_数字__ 或 __UMA_TERM_数字__ 占位符",
+                    violations=preserved_placeholder_violations,
+                    source_title=protected_title,
+                    source_body=protected_body,
+                )
+            if summary_placeholder_violations:
+                last_metadata["summary_placeholder_violations"] = summary_placeholder_violations
+                retry_hint += self._placeholder_retry_instruction(
+                    label="摘要",
+                    namespace="原文标题或正文已有的 KEEP、TERM、FORMAT、SEED 占位符",
+                    violations=summary_placeholder_violations,
+                    source_title=protected_title,
+                    source_body=protected_body,
+                )
+            if malformed_placeholder_violations:
+                last_metadata["malformed_placeholder_violations"] = malformed_placeholder_violations
+                retry_hint += self._placeholder_retry_instruction(
+                    label="畸形内部",
+                    namespace="原文实际存在且格式完整的 KEEP、TERM、FORMAT、SEED 占位符",
+                    violations=malformed_placeholder_violations,
+                    source_title=protected_title,
+                    source_body=protected_body,
+                )
+            if (
+                format_violations
+                or seed_term_violations
+                or preserved_placeholder_violations
+                or summary_placeholder_violations
+                or malformed_placeholder_violations
+            ):
+                if attempt < max_attempts:
+                    continue
+                if format_violations:
+                    raise TranslationResponseError(
+                        "Translation response changed required format placeholder",
+                        metadata=last_metadata,
+                    )
+                if preserved_placeholder_violations and any(
+                    item["placeholder"].startswith("__UMA_TERM_")
+                    for item in preserved_placeholder_violations
+                ):
+                    raise TranslationResponseError(
+                        "Translation response changed required person terms",
+                        metadata=last_metadata,
+                    )
+                raise TranslationResponseError(
+                    (
+                        "Translation response changed required seed term placeholder"
+                        if seed_term_violations
+                        else "Translation response invented protected entity placeholder"
+                    ),
+                    metadata=last_metadata,
+                )
+
+            mapped_title = self._apply_contextual_mappings_outside_placeholders(raw_title, resolution)
+            mapped_body = self._apply_contextual_mappings_outside_placeholders(raw_body, resolution)
+            mapped_summary = self._apply_contextual_mappings_outside_placeholders(raw_summary, resolution)
+
+            title_zh = self._restore_unknown_horse_placeholders(mapped_title, horse_placeholders)
+            body_zh = self._restore_unknown_horse_placeholders(mapped_body, horse_placeholders)
+            push_summary_zh = self._restore_unknown_horse_placeholders(mapped_summary, horse_placeholders)
+            title_zh = self._restore_unknown_horse_placeholders(title_zh, person_target_placeholders)
+            body_zh = self._restore_unknown_horse_placeholders(body_zh, person_target_placeholders)
+            push_summary_zh = self._restore_unknown_horse_placeholders(push_summary_zh, person_target_placeholders)
+            title_zh = restore_japanese_seed_term_placeholders(title_zh, seed_term_plan, field_name="title")
+            body_zh = restore_japanese_seed_term_placeholders(body_zh, seed_term_plan, field_name="body")
+            push_summary_zh = restore_japanese_seed_term_placeholders(push_summary_zh, seed_term_plan)
+            title_zh = restore_japanese_format_placeholders(title_zh, format_plan, field_name="title")
+            body_zh = restore_japanese_format_placeholders(body_zh, format_plan, field_name="body")
+            push_summary_zh = restore_japanese_format_placeholders(push_summary_zh, format_plan)
+
             if not title_zh or not body_zh:
-                retry_hint = "\n\n注意：上一版输出缺少必要字段，请从头完整重译全文。"
+                retry_hint += "\n\n注意：上一版输出缺少必要字段，请从头完整重译全文。"
                 if attempt < max_attempts:
                     continue
                 raise TranslationResponseError("Translation response missing required fields", metadata=last_metadata)
 
             if self._looks_incomplete(source_text, body_zh):
-                retry_hint = "\n\n注意：上一版输出疑似未完整结束。请从头完整翻译全文，不要总结，不要省略最后一段，并确保 body_zh 以完整句子结束。"
+                source_tail = protected_body[-800:].replace("\n", " ").strip()
+                retry_hint += (
+                    "\n\n注意：上一版输出疑似未完整结束。请从头完整翻译全文，不要总结，不要省略最后一段，"
+                    "并确保 body_zh 以完整句子结束；此前所有占位符约束仍然有效。"
+                    + (f"\n请重点核对并完整翻译以下原文末段：…{source_tail}" if source_tail else "")
+                )
                 if attempt < max_attempts:
                     continue
                 raise TranslationResponseError("Translation response appears incomplete", metadata=last_metadata)
@@ -313,7 +802,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             missing_unknown_horse_names = self._missing_unknown_horse_names(title_zh, body_zh, unknown_horse_names)
             if missing_unknown_horse_names:
                 last_metadata["missing_unknown_horse_names"] = missing_unknown_horse_names
-                retry_hint = (
+                retry_hint += (
                     "\n\n注意：上一版把部分未收录中文译名的马名翻掉了。"
                     "请保留对应占位符，不要自行翻译或删除。"
                     f"缺失的原始马名：{'、'.join(missing_unknown_horse_names)}。"
@@ -322,11 +811,27 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                     continue
                 last_metadata["warning"] = "Translation response changed unknown horse names; accepted with warning"
 
-            source_language = article.source_language or SourceLanguage.JAPANESE
+            translated_text = "\n".join([title_zh or "", body_zh or ""])
+            missing_person_targets = sorted(
+                {target for target in person_target_placeholders.values() if target not in translated_text}
+            )
+            if missing_person_targets:
+                last_metadata["missing_person_term_targets"] = missing_person_targets
+                retry_hint += (
+                    "\n\n注意：上一版没有保留部分人名术语占位符。"
+                    "请原样复制所有 __UMA_TERM_数字__ 占位符，不要音译或删除。"
+                )
+                if attempt < max_attempts:
+                    continue
+                raise TranslationResponseError(
+                    "Translation response changed required person terms",
+                    metadata=last_metadata,
+                )
+
             return TranslationResult(
-                title_zh=apply_term_mappings(title_zh, source_language=source_language),
-                body_zh=apply_term_mappings(body_zh, source_language=source_language),
-                push_summary_zh=apply_term_mappings(push_summary_zh or body_zh[:160], source_language=source_language)[:300],
+                title_zh=title_zh,
+                body_zh=body_zh,
+                push_summary_zh=(push_summary_zh or body_zh[:160])[:300],
                 metadata=last_metadata,
             )
 
@@ -359,11 +864,12 @@ def get_translation_provider() -> TranslationProvider:
 def translate_article(article: NewsArticle) -> TranslationResult:
     provider = get_translation_provider()
     source_text = article.body_ja_normalized or article.body_ja_raw
-    terms = resolve_terms_for_language(
-        _article_term_text(article),
-        article.source_language or SourceLanguage.JAPANESE,
-        settings.TRANSLATION_TERM_LIMIT,
+    resolution = resolve_article_entities(
+        article.title_ja,
+        source_text,
+        source_language=article.source_language or SourceLanguage.JAPANESE,
     )
+    terms = _translation_terms(resolution)
     run = article.translation_runs.filter(status="started").order_by("-created_at", "-id").first()
     if run is None:
         run = TranslationRun.objects.create(
@@ -382,7 +888,10 @@ def translate_article(article: NewsArticle) -> TranslationResult:
         run.prompt_excerpt = source_text[:800]
         run.save(update_fields=["provider_name", "model_name", "terms_used", "prompt_excerpt", "updated_at"])
     try:
-        result = provider.translate(article)
+        if "entity_resolution" in inspect.signature(provider.translate).parameters:
+            result = provider.translate(article, entity_resolution=resolution)
+        else:
+            result = provider.translate(article)
         run.status = "success"
         run.model_name = result.metadata.get("model") or run.model_name
         run.raw_response = result.metadata

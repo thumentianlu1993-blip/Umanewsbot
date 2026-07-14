@@ -7,7 +7,7 @@
 - 产品口径调整为：单人审核来源必须显式保留，但单审身份本身不再自动 no-go；首发覆盖门槛为有效样本至少 150 条、五个运营地区各至少 10 条、跨地区至少 20 条。满足覆盖及全部质量/性能门槛后只获得进入生产 shadow 的资格，只有 shadow 至少观察 24 小时且全部主地区变化和 `needs_review` 完成人工复核后，才可对新文章 enforce。
 - Gold Set 不以首次达标封版；新增来源、规则版本、shadow 误判和运营争议案例必须持续追加到后续版本。相关地区采用“高 precision、允许低 recall”首发策略：precision 硬门槛保持 `>=95%`，recall 从 `>=90%` 调整为 `>=50%`。当前 159 条单审 Gold Set 的最少运营地区样本为法国 11 条、跨地区 24 条，主地区准确率 `98.11%`、相关地区 precision `100%`、recall `54.84%`、过度扩散 `0%`，覆盖与质量门槛均通过，可进入 shadow。
 - 线上 recall 下降代表漏标，只告警并阻止继续扩大灰度，不单独触发自动关闭；precision 低于 95%、明显错标或过度扩散超过 1% 才要求回退。生产归属和相关地区查询继续保持关闭，本轮未连接生产数据库、未部署、未修改生产配置。
-- Gold 生成器与评估器现统一读取 `MULTIREGION_ATTRIBUTION_GOLD_MIN_TOTAL/PER_REGION/CROSS_REGION`，避免自定义门槛时生成结果与资格报告不一致。专项 `81` 项、完整 `stable` `1162 passed / 1 skipped`；Django check、迁移无漂移、Python 编译、两个生产 Compose、OpenSpec strict/all `25/25` 和 `git diff --check` 均通过。
+- Gold 生成器与评估器现统一读取 `MULTIREGION_ATTRIBUTION_GOLD_MIN_TOTAL/PER_REGION/CROSS_REGION`，避免自定义门槛时生成结果与资格报告不一致。V3 已合并 `origin/main@9d6dec34` 的新闻实体、日文翻译和内容边界修复；组合专项 `205` 项、完整 `stable` `1321 passed / 1 skipped`。合并后 159 条 Gold 指标完全不变，仍为 `qualified=true / no_go_reasons=[]`；Django check、迁移无漂移、Python 编译、两个生产 Compose、OpenSpec strict/all `28/28` 和 `git diff --check` 均通过。
 
 ## 2026-07-14 生产 DB/Redis 意外重建事故已恢复
 
@@ -36,6 +36,96 @@
 - 该日尚未完成两次独立人工标注和冲突裁决，因此 OpenSpec `5.1` 当时未勾选；该状态已由 2026-07-14 的单审可用决策和 159 条 V3 复评取代。生产 `MULTIREGION_ATTRIBUTION_MODE=off`、相关地区查询与翻译自动重试继续关闭；生产 dry-run 与 Shadow 仍待执行。
 - 本分支已在完成实现后快进合入 `origin/main@693db30e`。生产在本任务期间由并行历史任务切换到 `umanewsbot:main-df2732c3-amd64-20260713-1321`，image ID `sha256:27d5d51cbe2ae6d23cb99dc758da01addc2d5935504a950bbb8a2685bce2bf13`；本任务只读复核确认常驻容器健康、无 one-off 容器、归属相关安全开关仍关闭。
 - 最新主线组合回归为 `1139 passed / 1 skipped`；Django check、迁移漂移、OpenSpec change strict、全仓 25 项 OpenSpec strict 和 `git diff --check` 均通过。macOS 全测须设置 `TMPDIR=/private/tmp`，否则未改动的历史 artifact 测试会因 `/var` 与 `/private/var` 别名产生 16 个伪错误。
+## 2026-07-14 日文赛马翻译与固定格式已上线
+
+- OpenSpec change `standardize-japanese-racing-translation` 已按提案、Full 工程评审、完整测试、apply、多轮 `/review -> 修复`、部署、生产回归和规格同步流程完成，并归档到 `openspec/changes/archive/2026-07-14-standardize-japanese-racing-translation/`。日文普通片假名词现在以非马名固定译法进入文章级实体与翻译链路；拍卖产驹、追切计时、赛后访谈和出马表骑手未定使用字段级确定性格式；未知完整马名继续保留原文。种子术语占位符按字段守恒，恢复时只消除明确的边界重复，不会把“拍卖会会场”这类合法单字相接误删。
+- `社台/Shadai`、`ノーザンホースパーク/Northern Horse Park` 和 `セレクトセール` 已在生产术语库中各自保持唯一概念；目标分别为“社台”“北方马公园”“精选拍卖会”，日英别名完整。英文马名中文目标只在中文/繁中文章中反向匹配，不再把日文普通词 `出走` 识别成英文马名 `Movin Out`。
+- 最终生产 revision 为 `873845dacb1cec0353ed9b9834417a1a00cc6311`，源码 archive SHA-256 为 `2c00bf5bee4e824d5bd3cb408af942b5a255dd88f30de1b24436cab289ec3e09`；web/worker/beat 均运行 AMD64 镜像 `sha256:d3f602de4459158bc372e45bb35f3730a7be21f284dfea32de5535681bd6d791`。本地完整 `stable 1295` 项通过（另 `1` 项按设计跳过），候选 PostgreSQL 的迁移/check/漂移和关联 `84` 项通过，最终 review 零问题。
+- 写入前恢复点为 `.env.backup.pre-873845da-20260714_124940` 与 `backups/db/pre-873845da-20260714_124940.dump`；数据库备份 `134234023` bytes、SHA-256 `413718143809a09686ea18710a4cd8b8f9a9f7643fb6b769cee5daf23ca485a6`，已用 PostgreSQL 容器执行 `pg_restore -l` 验证。旧镜像回滚 tag 为 `umanewsbot:rollback-pre-873845da-20260714-1254`，image ID `sha256:b14844ee027a7902db2ed22c9b310e8240dd2d84f822d2785a28799271e3a1a2`。
+- 目标文章 `8304/8299/8298/8291/8290/8288/8287/8283/8276/8219/8212` 均为 `published + translated`，保留原发布时间、人工字段和 QQ 次数；指定普通词残留、内部占位符和格式错误均为 `0`。`8304` 产驹、`8291` 追切、`8219` 访谈、`8212` 骑手未定及完整未知马名逐项通过。`8287` 使用已通过全部门禁的成功 run `8613`，仅确定性修复两处“类型类型”和一处“公开级级别”，并记录 `OperationLog`；后续失败 run `8622` 未覆盖公开稿。
+- 随机样本 `8337/8366/8356/8307/8367` 均已发布、已翻译且无内部占位符；`8367` 的标签和 machine tags 均不含错误的“出走”。HTTP healthz、首页、后台和 11 篇详情均为 `200`；Redis queue、Celery active/reserved 为空，近 15 分钟无 fatal/traceback。候选数据库已删除，历史写入/网络开关保持 false，历史 published 为 `0`。
+
+## 2026-07-14 新闻实体语境判定与完整马名保护已上线
+
+- OpenSpec change `contextualize-news-entity-resolution` 已完成测试优先实现及 `18` 轮 `/review -> 修复`，最终一轮无问题。文章级解析结果统一供翻译、标签、发布校验、自动马匹关联与显式重处理消费；英文人物全名及篇内唯一姓氏回指会压制内部马名，英文普通词/高歧义词需要强马名语境，日文完整未知马名会先整体占位，不再被父马、冠名或短术语拆分。
+- 最终生产 revision 为 `dc1e5ec584e47ea9d28998f76454d105836b3f0a`，源码 archive SHA-256 为 `f2eec61f6d2211a76e4456f6b9cbfc3e55a5b610829162b4a68b6039aae6ffe1`；web/worker/beat 均运行镜像 `sha256:5b06821610f0d2214cb24692e58beac4ffda731ddb84674a8855b2a1d4dbb470`。本地与候选环境最终目标测试 `51` 项、完整 `stable 1249` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、OpenSpec strict 和 diff check 均通过。
+- 写入前有效恢复点为 `backups/db/pre-main-624dd5b9-20260714-071014.dump`，`133370327` bytes、SHA-256 `21cdce21f52ded3b48e7c083f2f536eb694130f71ad6a1e38e067620f817fa75`，`pg_restore -l` 通过；随机六篇重处理前另有 `pre-random-six-entity-reprocess-20260714-074604.dump`，SHA-256 `0f0876c492d80ab9d8af2bacfe3776e3de5c94642acc427523ddd25d0437cf91`。
+- 目标文章 `8086/8212/8221/8283/8288/8290/8291/8309/8317/8318/8330` 已逐篇完成 dry-run、commit、重译和重新校验；`8317` 正文统一为岳品贤，`8309/8330/8318` 不再产生假马标签，`8086` 只保留真实马名多爵，指定日文完整马名不再拆分。11 篇均保持原 `published`、原发布时间和 QQ 次数，公开页全部为 `200`。
+- 随机样本 `8390/8388/8386/8385/8383/8380` 在最终规则下重处理后 dry-run 无增删差异；最终 worker 自然处理的 `8393/8394` 也通过实体 dry-run 与发布校验。公网 HTTP healthz、首页、后台和目标详情均为 `200`；Celery queue/active/reserved 均为空，最近 15 分钟 web/worker/beat 无 error/traceback，历史写入/网络开关保持关闭且历史 published 为 `0`。
+
+## 2026-07-14 国际新闻正文边界与博彩噪声修复已上线
+
+- OpenSpec change `tighten-international-article-content-boundaries` 已完成提案、Full 工程评审、测试优先实现和多轮零问题 review。最终本地验证为正文边界目标测试 `27` 项、完整 `stable` `1198` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、OpenSpec strict 和 diff check 均通过。
+- 国际来源正文现在只接受可信正文选择器；未命中时显式失败，不再回退整页。Sporting Life 会移除页面框架、社交组件、推荐区、责任博彩、博彩推广、独立跳转 URL 和 `BOOK NOW` 等 CTA，同时保留赔率及赛事标题、马主等专名中的博彩公司名称；TDN 会移除编辑注、纯跳转说明、完整赛果/活动链接、`Read Today's Paper` 和含 `click here` 的行动句。
+- 历史修复命令只接受显式文章 ID、默认 dry-run，commit 后记录清理规则与 `OperationLog`；同步强制重译不会改变公开状态、原发布时间或触发 QQ。翻译完整性门禁新增非空行覆盖判断，避免“日期表完整但中文自然缩短”被误判截断，同时仍拦截尾部条目缺失。
+- 最终生产 revision 为 `514af8a22aec18f01cf0193344ae3b7a45c4dbc4`，web/worker/beat 均运行镜像 `sha256:954673cc74049d4b882e492ec29b072aba01aeb1a3ae440cc85415209c8a2f8a`。源码 tree 为 `b62a80cc34b2b65c47f6dd7d541c455d04a0ef5c`，archive SHA-256 为 `507b95c9b3e3ab66b67e4813b6b4814d2e4bc3d6cb2aae6abc7ad357322ad039`，双构建 `/app` manifest SHA-256 为 `2ada2d84788d048fcfd86d589762c2b159256d1a884581ac819a614aacf92aea`。
+- 最终切换前备份为 `.env.backup.pre-main-514af8a2-20260714-051127` 和 `backups/db/pre-main-514af8a2-20260714-051127.sql.gz`；数据库备份 `158552943` bytes、SHA-256 `9fc72efba29ee8d32c9709665809d259ca49e47a217c43626c99b084d99d4b0a`，`gzip -t` 通过，旧镜像回滚 tag 为 `umanewsbot:rollback-pre-514af8a2-20260714-051127`。
+- 文章 `8086/8267/8316/8318` 均已按保存 HTML 离线修复并强制重译，继续保持 `published`、原 `published_to_web_at` 与 QQ delivery `0`；公开详情全部返回 `200`。生产随机抽检 `8306/8311/8326/8331/8336` 后又修复并重译存量旧解析结果，五篇保存正文与当前重解析逐字一致、解析状态均为 `ok`、噪声标记为 `0`；已发布样本 `8326` 保持原发布时间 `2026-07-13T17:47:04.152562Z` 且 QQ delivery `0`。
+- 部署后 migrate 无待应用迁移，Django check、内外 `/healthz/`、首页、后台登录和目标公开页面均为 `200`，web/worker 日志无异常。beat 已恢复，Celery active/reserved 均为空；生产写入窗口已交还历史 batch005 会话，本会话收到其完成回报前不再重启或重建生产容器。
+
+## 2026-07-14 2016-2025 标准批次四号 250 场正式导入
+
+- batch004 五地区各 50 场、共 250 场已完成日期、直接详情来源、出马表和赛果正式导入；日期 artifact manifest 为 `30ff2c0fe14e4d6ce7d9ee7123d882d99838853e381627b552b9b0ac19dd2ea0`，详情来源 manifest 为 `cf5bfdc1cc8c6c82732d6485e1815f582a47d057010e4d1c0214ec3103fd46a8`，最终详情候选 SHA-256 为 `ddd1f8256cef0b17aabc33ea66f7a0638a2d6498c2d23342daff8835b10a5156`。
+- 日期 apply、详情来源 apply 和最终详情 apply 均为 250/250。正式详情新增 `2563 runners / 2311 results`；500 个模块候选全部为 `applied`，逐场马号与名次唯一性、module 状态和 250 条导入日志一致。250 场保持 draft，published 0。
+- 来源分布为 JRA 官方 50、HKJC 官方 50、NSA 官方 1、Sporting Life 50、ZEturf 50、Equibase 49。NSA `target_id=74171` 的官方 PDF 不提供马号，因而该场 8 条 runners 与 7 条 results 的 `horse_number` 为空；姓名、骑手和名次完整，作为非阻断来源格式例外进入最终统一审核。
+- 226 个 target 的 `module_statuses.term_gaps` 记录了术语库暂缺中文映射；原文赛事数据已经完整导入，这些翻译缺口不改变 imported 状态，也不阻断后续批次，统一留到正式总账数据收集完成后的审核与术语补全。
+- 详情来源写前流式备份 `pre-batch004-detail-source-apply-20260714_031200.sql.gz` 在进程尚未结束时曾被中途检查并报截断；进程完成后文件为 `128991200` bytes，`gzip -t` 通过，SHA-256 为 `dbe05660aaae9e1957c21b84d714c3340a81a3a59aedef4dcf5f99caae5509e5`，现为有效恢复点。最终详情写前另有更靠后的 PostgreSQL custom-format 备份 `/opt/umanewsbot/backups/db/pre-batch004-detail-import-20260714_0325.dump`，大小 `129830849` bytes，`pg_restore -l` 通过，SHA-256 为 `e50bd095bfa141ea0f05bf77fda68a508808dcddac4cbacb8fdb4ce3860e758a`。
+- 写后生产累计为 `1041 imported / 29876 pending / 0 ready`，本批 250 场合计 `2563 runners / 2311 results`；全体历史 published 仍为 0。常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，无 one-off，三个公网 healthz 均为 `ok`。
+- batch005 生成必须等待包含 `main@614f810e` 已耗尽地区进度门禁的可复现 AMD64 镜像完成生产切换；历史线程不得自行重建或重启生产。
+
+## 2026-07-13 2016-2025 标准批次三号 250 场正式导入
+
+- batch003 五地区各 50 场已完成日期、带原单位距离、实际场地、详情来源、出马表和赛果正式导入，新增 `2638 runners / 2349 results`；写后累计为 `791 imported / 30126 pending / 0 ready`、`8361 runners / 7492 results`，全部 draft、published 0。
+- 2025 Hampton Novices' Chase 按同届移师处理为 `2025-01-19 / Windsor / 3m53y`，3 匹出走、3 条赛果，冠军 `Jingko Blue`；Warwick 原定场次 `ABANDONED` 只保留为变更证据，不构成年度取消或缺口。
+- 最终详情候选 SHA-256 为 `426af99cf541b43aa2e73e839989de40f2d2a15ab6298cda4cec4026cafe0a59`。日期、权威字段、详情来源和最终详情四个写阶段均有独立门禁与备份，逐 target 验收 error 0。
+
+## 2026-07-14 已耗尽地区不再冻结历史标准批次
+
+- 既有地区进度护栏会把五地区永久放在同一比较集合；当中国香港等低容量地区已经没有可选目标时，仍会以其较低 accounted 数阻止英国、美国等高容量地区继续推进，与 1998–2026 正式总账全量完成目标冲突。
+- 标准批次现在只比较“本批选择后仍有未排除可选 pending due 目标”的地区。地区抓空后退出领先比较；仍未完成地区之间继续严格执行 100 个标准目标上限，101 拒绝、100 放行。
+- selection snapshot 显式排除的待审目标继续保留在 `available/remaining pending`、总账分母和缺口账本中，但不把只有待审排除项的地区视为仍可抓。artifact summary 新增 `eligible_pending_by_region` 和 `progress_guard_regions`，明确记录放行依据。
+- OpenSpec 增补已完成 Full 工程评审；新增回归先在旧实现上失败，修复后历史批次专项 `66` 项和完整 `stable 1171` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、OpenSpec strict、diff check 和最终代码 review 均通过。代码已合入 `main@614f810e`，尚未部署；生产历史写入/网络和公开开关不得因此开启。
+
+## 2026-07-13 后续标准批次重复选样门禁已实现
+
+- batch002 写后生成旧 batch003 时，4 个仍为 pending 的已交代 gap 再次进入选样：英国 Classic Handicap Chase、Dick Poole Fillies Stakes，以及美国 Brooklyn、Cougar II。该工件与 batch002 重叠 4 条，视为无效，不得审批或进入抓取。
+- `build_historical_race_band_batch` 已增加可重复 `--exclude-selection-snapshot`。命令校验旧快照 schema、inventory SHA、内部 snapshot SHA、target 数量/唯一性和稳定身份，在地区 limit 前排除旧 target，并把输入原字节复制到新 artifact、以固定键写入 manifest 文件身份。
+- 排除只影响本批选样：被排除 gap 继续保持 pending，仍计入 `available/remaining pending`，不计入 accounted/imported，也不修改 held/not_held/cancelled 口径。旧目标已导入导致当前 target SHA 改变时，只要 series/year/region/inventory 稳定，历史快照仍可作为排除证据。
+- 42 项批次与日期发现聚焦测试、完整 `stable 1157` 项回归、Django check、迁移漂移、OpenSpec strict/all 和第二轮代码 review 均通过。batch002 真实 250 目标快照已通过新读取器；该门禁后续已经提交并用于 batch003/batch004，公开展示和常驻历史写入/网络开关保持关闭。
+
+## 2026-07-13 2016–2025 标准批次二号 246 场正式导入
+
+- 生产已使用可复现主线镜像 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0` 完成第二标准批次。日期 artifact manifest SHA-256 为 `9ed3b7138012b4ce1732cf1f071d13cb16678a97983ea63d94329fe84c902e68`，批准 246 场、保留 4 个显式 gap；日期 apply 246/246 成功，目标由 pending 变为 ready，并生成 246 个 finished/draft 年度赛事。
+- 详情来源 artifact manifest SHA-256 为 `ae9d20aa62062e62a0bc8561e69b2cd06493b2d3eab50e175a82913d077b44d9`，来源分布为 JRA 50、Equibase 48、HKJC 50、Sporting Life 48、ZEturf 50。只读 check 246/246 通过，来源 apply 246/246 成功；来源写入后重新导出 event input 并生成最终详情候选，候选 SHA-256 为 `735ec0dacafd9c388adb678b93ab402e45f991cb0e143c89a6fe067e606fc459`，246 scopes / 0 gaps，生产 dry-run 全部通过。
+- 三道写前备份均通过 `gzip -t`：日期 apply 前 `pre-band-2016-2025-batch002-date-apply-20260713_164248.sql.gz` 为 `150494499` bytes、SHA-256 `379f86de4408ff0a66dbdee200514a56a53a10404b579c49a3fb13462541b7c7`；详情来源 apply 前 `pre-band-2016-2025-batch002-detail-apply-20260713_165007.sql.gz` 为 `124141632` bytes、SHA-256 `0b0423aee6ffbe4094a71c3ff533e47538f1ccb8b3a918aa3d07863b76809540`；最终详情导入前 `pre-band-2016-2025-batch002-candidate-import-20260713_165304.sql.gz` 为 `124218014` bytes、SHA-256 `a22967b6e0574faab9ae865d908f69474234dfff862092025471cf7eff660545`。
+- 正式详情导入 246/246 成功，新增日本 `730 runners / 722 results`、美国 `468 / 406`、香港 `463 / 453`、英国 `464 / 417`、法国 `424 / 328`，合计 `2549 runners / 2326 results`。写后逐场核对 candidate 数量、马号唯一性、名次唯一性、applied candidate 来源名/URL、target module 状态和 draft 可见性，error 0。
+- 生产历史累计为 `541 imported / 30376 pending`、`5723 runners / 5143 results`，materialized events 为 541，published 为 0。本批 246 场仍全部 draft；4 个 gap 继续保持 pending，未把 `ABANDONED` 或 `not run` 自动改成产品总账结论。
+- 常驻 `.env` 和运行中 web 均保持 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`；web/worker/beat 镜像未变化，无遗留 one-off 容器，内外 HTTP healthz 正常，近 30 分钟日志错误扫描为空。历史前台展示继续关闭。
+
+## 2026-07-13 2016–2025 标准批次二号详情证据门禁
+
+- 第二标准批次 250 个目标已完成五地区详情来源发现。当前可直接进入日期工件的证据为 246 场：日本 50、美国 48、香港 50、英国 48、法国 50；246 个来源 URL 全局唯一，来源缓存逐文件大小和 SHA-256 可核验。详情解析合计日本/美国 `1198 runners / 1128 results`、香港 `463 / 453`、英国 `464 / 417`、法国 `424 / 328`。
+- 4 个目标继续作为显式缺口保留：美国 Brooklyn Stakes 和 Cougar II Stakes 的 2025 届有 TOBA `not run` 证据，等待产品结论；英国 Classic Handicap Chase 和 Dick Poole Fillies Stakes 的 2025 结果页标记 `ABANDONED`，在正式取消证据修正总账前不得按 held 导入。
+- 首次生产只读 artifact 构建为 `219 candidate / 31 gap`。除上述 4 个预期缺口外，15 个香港目标缺少赛季年度与实际自然年的跨年说明，12 个英国目标被 `2m4f`、`3m21/2f` 等紧凑英制距离写法误判。香港 provider 已显式写入 `actual_year` 和 `hong_kong_racing_season_spans_calendar_years`；英制解析器已按测试优先支持紧凑 mile/furlong/yard 组合和粘连分数，同时保留来源原文。
+- 距离修复专项先失败后通过，完整 `stable` 回归为 `1149` 项通过、`1` 项按设计跳过；`git diff --check` 通过，最终代码复审无 actionable finding。当前尚未把本轮修复部署到生产，也未批准或提交二号批次日期 artifact；生产仍为历史 `295 imported / 30622 pending`、`3174 runners / 2817 results`、全部 draft、published 0，常驻历史写入和网络开关保持 false。
+
+## 2026-07-13 2016–2025 标准批次二号应到与日美来源发现
+
+- 由于 2016–2025 年代带仍有 pending 目标，按 OpenSpec 年代带门禁继续本年代，不提前跳到 2006–2015。生产总账生成第二个标准批次 250 场，五地区各 50；生成前各地区 accounted 均为 53，生成后领先差仍为 0。selection snapshot 内部 SHA-256 为 `fdd297a8c76cca529634128c11c59ea6ed4cf216b13e574a012d5fd35557629b`，manifest 文件 SHA-256 为 `b4db68f36e2ec378b7dffc9f8c8d2286d3cf4d4138499f2eb4fef86c8d3152f8`，审批文件 SHA-256 为 `b2650665588758c9e43cae3f80db30fe7c0f8287657cea468f728b9baf1fd6c2`。
+- 批次审核为 250 个唯一 target、250 个唯一地区/年份/系列组合，核心身份字段无空值，同地区同年无重名；全部继承自已批准总账。年份分布为法国/日本/英国/美国各 50 场 2025，香港为 2024 年 9 场、2023 年 31 场、2022 年 10 场。
+- 复用已缓存 JRA 与 TOBA 2025 年表做零网络离线发现。修复 JRA 五个障碍/赞助名称别名、TOBA 核心限定词串场和同 URL 双 target 后，得到日本 50、美国 48 个候选，共 98 个全局唯一 URL；候选 SHA-256 为 `bff176ca9b55ca11a8a5200c1f27a02e3f14e160877dac79e1092d5409f0560e`。
+- TOBA 权威年表将美国 `Brooklyn Stakes`（target 74077，BAQ）和 `Cougar II Stakes`（target 74108，DMR）明确标为 `not run`。工具只输出 `source_reports_not_run` 审核证据，不自动改总账；两条由产品审核决定是否从 `held` 改为 `not_held`，其余 248 场可继续独立推进。
+- 技术修复按测试优先完成，109 项历史专项与完整 `stable` 1141 项通过，1 项按设计跳过；OpenSpec strict、编译和 diff 检查通过，修复后重新 review 无剩余可修问题。历史公开展示和常驻网络/写入开关继续关闭，尚未对本批执行生产网络抓取或数据库写入。
+
+## 2026-07-13 2016–2025 标准批次法港英 150 场正式导入
+
+- 法国、香港、英国各 50 场的基础字段先经独立权威字段 artifact 校正。evidence manifest SHA-256 为 `d6f6e29a7243b2d709ef117a85fb315d2067b60870e6d72145dc81d0ab6a2857`，候选 SHA-256 为 `59acc224101cccf1a4b98dfc2e64173bbbf81406027b8ecd269871e643cf50ac`；生产 dry-run 精确得到 150 个 scope、164 个字段，其中距离 150、场地 8、surface 6，人工锁跳过 0。
+- 字段写入前备份 `backups/db/pre-fr-hk-uk-field-corrections-20260713_134732.sql.gz` 为 `148521701` bytes，SHA-256 `30dc58d2d7f7eb099dfebf7ebf059e13f28aee13b5b0bd69b41bbe5cdd6c94ce`，`gzip -t` 通过。原子 apply 后 150 个 target SHA 全部改变，164 个值和字段 provenance 逐项一致，150 条目标日志和 1 条批次日志齐全；常驻历史写入/网络开关仍为 false。
+- 旧详情候选 `38e05d7786fcfa5adf91eee19dc08d3eb86c55f8cc5a29a86bead32b6f771950` 已在生产因 `historical target changed after candidate approval` 被明确拒绝。重新导出并打包的新候选 SHA-256 为 `a8fc8fbf94c5a90e0d62be6f8727c38cbbcd14577c1894d8869d9974b33368da`，150 场、0 gap、150 个全局唯一详情 URL，正式 dry-run 全部通过。
+- 详情写入前第二份备份 `backups/db/pre-fr-hk-uk-detail-import-20260713_135954.sql.gz` 为 `148554120` bytes，SHA-256 `610c540758ac0665342d219841ee91592bc36f5f0641ed2f263eec507250f4db`，`gzip -t` 通过。正式 apply 150/150 成功：法国 `449 runners / 330 results`，香港 `515 / 506`，英国 `570 / 458`；合计新增 `1534 runners / 1294 results / 300 applied candidates` 和 150 条导入日志。
+- 写后验收 error 0：每场 runners/results 与候选完全一致，马号和存储名次无重复，candidate source name/URL/cache identity 均匹配批准证据，target 全部 imported、module 状态完整。生产历史累计为 `295 imported / 30622 pending`、2026 年前 `295` 场且全部 draft，历史 runners/results 为 `3174 / 2817`，published 为 0。
+- 150 个详情 source cache 共 `38383091` bytes，生产逐文件大小和 SHA-256 `150/150` 通过。数据库约 `850877463` bytes；Django check、内外 healthz、容器和 web/worker/beat 日志均正常。历史公开展示继续关闭，本批未改变新闻或公开页面开关。
+- 写入后的 14:00 CST 自然窗口验收通过：17 个抓取窗口、5 个发布窗口、5 个 QQ 推送窗口均 succeeded；抓取处理 470 条、产生 5 条新稿、失败 0。发布与 QQ 均为门禁解释明确的正常零产出，分别是 `hard_gate_blocked` / `no_ready_candidates` 和 `already_sent` / `no_eligible_articles`，失败文章与失败投递均为 0；随后内外 healthz 正常，web/worker/beat 近 20 分钟错误扫描为 0。
 
 ## 2026-07-13 权威字段门禁固化与可复现镜像切换
 
@@ -1230,3 +1320,38 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 基础字段 apply 会改变 target SHA，旧详情候选因此自动失效；正确顺序固定为字段 dry-run/备份/apply、重新导出 event input、重新打包详情、coverage、详情 dry-run/第二次备份/apply。禁止手工修改生产 `RaceEvent` 或复用旧候选绕过身份校验。
 - 本轮目标/相邻测试 `34/89` 项通过；在临时 Redis 和 macOS 真实临时目录下完整 `stable` 回归 `1136/1136` 通过，1 项按设计跳过。Django check、迁移无漂移、OpenSpec strict 和 `git diff --check` 均通过；两轮代码复审最终无待修问题。
 - 当前生产仍运行 `main@304ebdb6` 对应可复现 AMD64 镜像，历史公开数据保持关闭。本轮字段门禁尚未部署，也未执行字段或详情生产写入；先完成源码提交、推送和合入最新 `main`，再由最新主线构建并受控替换生产镜像。
+
+## 2026-07-13 历史来源匹配器主线固化与可复现镜像切换
+
+- 历史赛事全部必须保留的源码已提交并合入 `main@58786b91fba9c44054a6102055766824677bcbcb`。该版本新增 JRA 当前赛事别名、TOBA 核心限定词全词匹配、同一结果 URL 跨目标复用阻断，以及 TOBA `not run` 证据解析；完整 `stable` 回归为 `1141 passed / 1 skipped`，迁移无漂移，OpenSpec strict/all `25/25`，最终代码复审无 actionable finding。
+- 在生产独立上下文 `/opt/umanewsbot-builds/main-58786b91-20260713-1435` 两次构建得到相同 AMD64 image ID `sha256:c6a3670fdc42db9c0b8ded5772630ac1b0511b98a521ea7f4a9cbe7e25864691`。镜像标签绑定 Git tree `5d8b7ccf775f6be7051c88e8f440b034ad02f4df` 和 source archive SHA-256 `184f05c39d3df5dd0bb1f410bdccda418ed3052964edea99b07faf22723fa07e`，已替换生产 `web / worker / beat`。
+- 切换前数据库备份为 `backups/db/pre-main-58786b91-20260713_143748.sql.gz`，大小 `149,960,820` bytes，SHA-256 `9f29cd1a28b41761591a1966c68125c611a36290953cf0d845cdcead05891f27`，`gzip -t` 通过；旧镜像保留为 `pre-main-58786b91-20260713-1439`。
+- 部署后 `stable.0029_france_freshness_translation_attribution` 已应用、64 个模型可加载，五地区页面、赛事页、马匹页、后台、内外 healthz 和近期日志均通过。生产历史总账 `30,917` 个目标，历史赛事 `295` 场、`3,174 runners / 2,817 results`，全部仍为 `draft`，published 为 `0`；常驻历史写入与网络开关均为 `false`。
+- 切换后的 `14:45` 自然窗口完整通过：`17` 个 crawl、`5` 个 publish、`5` 个 QQ 窗口全部 succeeded；抓取共 seen `472`、new `3`，新增文章 `attribution_rule_version IS NULL=0`，web/worker/beat 近期错误日志均为 `0`。
+- `2016–2025` 第二标准批次已固定五地区各 50 场。日美离线来源发现得到 JRA 50 条、Equibase 48 条，共 98 个唯一 URL；Brooklyn 与 Cougar II 的 2025 届由 TOBA 标记为 `not run`，继续等待产品口径审核，其余 248 个目标不受阻塞。
+
+## 2026-07-13 紧凑英制距离修复生产切换
+
+- 紧凑英制距离修复已进入 `main@d8b65fe7d63e913cf826d02a74cdebaec60351ce`，并由生产机独立构建为 AMD64 镜像 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`。镜像标签绑定 Git tree `fda256535ae3b9f435cf8c7b069ff26d04503d99` 和 source archive SHA-256 `2b085d0226580295f9a844fbc92df48405cd9bb3b467786230fac8941fa60520`。
+- 切换前确认外部导入、外部锁、Celery active/reserved 和 one-off 写入均为空；停止 beat、排空并停止 worker 后才 retag。生产 `web / worker / beat` 现统一运行上述镜像，旧镜像 `sha256:c6a3670f...64691` 已保留为 `rollback-pre-d8b65fe7-20260713_163805`。
+- `.env` 备份为 `.env.backup.main-d8b65fe7-20260713_163805`。数据库备份为 `backups/db/pre-main-d8b65fe7-20260713_163805.sql.gz`，大小 `124,020,905` bytes，SHA-256 `33f5ef3520e833a8cf343ca87831a7620c9cb80ba095e74c5cadb716d55ccfa2`，`gzip -t` 通过。
+- 部署没有新增迁移；Django check、静态资源收集、内外 healthz、首页、赛事页、worker ping 和近期错误日志均通过。生产纯函数 smoke 已确认 `2m4f` 解析为 2 mile + 4 furlong，`3m21/2f` 解析为 3 mile + 2.5 furlong，且保留来源原文。
+- 常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，多地区归属与相关地区查询也继续关闭。本次只切换代码，没有执行历史赛事写入。
+- 使用新镜像连接生产库只读重建 batch002 日期 artifact，结果精确为 `246 candidate / 4 gap`：法国/香港/日本各 50，英国/美国各 48；4 个 gap 仍是两场英国 `ABANDONED` 和两场美国 TOBA `not run`。manifest SHA-256 为 `9ed3b7138012b4ce1732cf1f071d13cb16678a97983ea63d94329fe84c902e68`，尚未审批、备份或 commit。
+
+## 2026-07-13 第三标准批次只读证据完成
+
+- batch003 selection 固定为五地区各 50 场、共 250 场，与 batch002 零重叠；本轮没有执行生产写入。
+- 首次离线快照曾为 `249 candidate / 1 gap`、`2,635 runners / 2,346 results`，候选 SHA-256 `31c8cf61191d937c766f98b50a656ec98e92f774b59e5d0635fd54090ee2ad1a`；该快照遗漏 Hampton 移师后的实际赛果，已隔离并被上方 batch003 正式结果取代，不得审批或恢复。
+- `target_id=60693` 的 Warwick 页面只证明原定场次 `ABANDONED`；用户提供 Windsor 正式结果后已按正常举办收口，不能再作为 gap 或 cancelled 候选。
+- 修复了 ZEturf 发现页把实际缓存 URL 重写成另一目标 slug 的身份错误，并把 NAR `keiba.go.jp` 与法国 Zone-Turf 同步登记到日期校验、补充来源审批和最终详情打包三层。年度日历的 `flat/jumps` 只证明竞赛类型，不再用它覆盖已审核的 `surface`；Hoppings Stakes 保持 Newcastle synthetic。
+- 专项 73 项、完整 `stable 1161/1161`（1 skip）、Django check、迁移无漂移、OpenSpec strict `25/25` 和 `git diff --check` 全部通过；代码复审无剩余可修复问题。
+- 生产仍运行 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`。先前候选镜像 `sha256:9cd0b966...45bc1` 不包含本轮来源修复，已视为过期；必须从最新 main 重建可复现 AMD64 镜像后，才允许连接生产库生成日期/来源 artifact、dry-run 和后续受控写入。历史公开展示继续关闭。
+
+## 2026-07-13 batch003 来源门禁镜像生产切换
+
+- batch003 来源门禁修复已合入 `main@3939992c7d3753779fc34de81c595f5a34d7ed2b`，生产现运行 AMD64 镜像 `sha256:87c435cfc50344d0ca94f46e44d4bea97ab11361f88f7c708b6457331aee78ec`。镜像标签绑定 Git tree `0464a1aae6f587e3ba021421ac84b44a3d9379dd` 和 source archive SHA-256 `a787391c84a4ba3bb22c2ab638f1e36453d3ff8869bb95aeb5001b1dd448bb21`。
+- 切换前发现两条正常新闻抓取任务正在执行，因此先停止 beat 并等待任务自然完成；确认 Celery active/reserved、外部导入、外部锁和 one-off 历史写入均为空后才继续。生产 `web / worker / beat` 已统一切换到新镜像。
+- `.env` 备份为 `.env.backup.main-3939992c-20260713_185140`。数据库备份为 `backups/db/pre-main-3939992c-20260713_185140.sql.gz`，大小 `125,782,755` bytes，SHA-256 `21903cf8d9494ef6053414a34c2e2f6ab01406b9ffebcf56ff3fd10eedfc0967`，`gzip -t` 通过；旧镜像回滚标签为 `umanewsbot:rollback-pre-3939992c-20260713_185140`。
+- 无待应用迁移；Django check、静态资源、worker ping、内外 healthz、首页、赛事页和近期错误日志均通过。常驻历史写入/网络、历史公开、多地区归属及相关地区查询开关继续关闭。
+- 该镜像切换步骤本身没有执行 batch003 写入；随后历史线程已按独立 approval、备份和门禁完成上方 250/250 正式导入。旧的 `249 candidate / 1 Hampton gap` 预期已经作废。

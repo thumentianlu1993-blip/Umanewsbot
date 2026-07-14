@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlparse
 
 SOURCE_PROVIDERS = {
     "jra_official_result_page": "jra",
+    "keiba_go_jp": "nar",
     "netkeiba": "netkeiba",
     "hkjc_results_all_zh_hk": "hkjc",
     "sporting_life": "uk_sportinglife",
@@ -22,6 +23,7 @@ SOURCE_PROVIDERS = {
     "equibase_yearbook": "equibase",
     "nsa_official_result_pdf": "nsa",
     "zeturf": "zeturf",
+    "zone_turf": "zone_turf",
 }
 
 

@@ -187,7 +187,7 @@
 - **THEN** 第一批计划 MAY 进入应到审批
 
 ### Requirement: 全量批次必须按已批准年代带保持地区同步
-系统 SHALL 先按 `2016–2025`、`2006–2015`、`1998–2005` 从新到旧完成已批准的 1998–2026 总账；1984–1997 总账完成身份审核和五地区早期年代验收后，系统 SHALL 再为该阶段生成独立年代带。每个年代带 MUST 覆盖五地区。标准批次每地区最多 50 个 held/cancelled 年度目标；地区进度 MUST 按同年代带 accounted/imported 的 due 目标数计算，任何地区不得比最慢地区领先超过 100 个标准目标。
+系统 SHALL 先按 `2016–2025`、`2006–2015`、`1998–2005` 从新到旧完成已批准的 1998–2026 总账；1984–1997 总账完成身份审核和五地区早期年代验收后，系统 SHALL 再为该阶段生成独立年代带。每个年代带 MUST 覆盖五地区。标准批次每地区最多 50 个 held/cancelled 年度目标；地区进度 MUST 按同年代带 accounted/imported 的 due 目标数计算，并只在本批完成后仍有未排除可选 `pending` due 目标的地区之间比较，任何此类地区不得比最慢地区领先超过 100 个标准目标。某地区没有剩余可选目标时 MUST 退出比较；显式排除的待审目标仍 MUST 保留在总账分母、remaining pending 和缺口账本中，但 MUST NOT 单独冻结其他地区。
 
 #### Scenario: 生成年代带标准批次artifact
 - **WHEN** 操作者为已批准总账生成指定年代带的下一标准批次
@@ -195,10 +195,28 @@
 - **AND** 输出 SHALL 包含不可变selection snapshot、完整审核CSV、地区分母summary、manifest和pending approval
 - **AND** 空批次、重复target、inventory SHA不符或年代带外目标 MUST fail closed
 
+#### Scenario: 已交代缺口不重复占用后续批次
+- **WHEN** 上一批 selection snapshot 中的目标因缺口审核尚未结论而继续保持pending
+- **AND** 操作者把该不可变snapshot作为下一标准批次的显式排除输入
+- **THEN** 系统 MUST 在地区上限选择前排除这些target并继续选择新的pending目标
+- **AND** 新artifact MUST 复制并哈希绑定排除snapshot，summary MUST 单列排除数量和地区分布
+- **AND** 被排除目标 MUST 继续保留在总账和remaining pending分母中，不得计为accounted/imported或改变expectation/resolution
+- **AND** snapshot SHA、inventory SHA、target身份无效，或新selection与排除集合相交时 MUST fail closed
+
 #### Scenario: 单地区试图连续领先
-- **WHEN** 某地区将比最慢地区领先超过 100 个同年代带标准目标
+- **WHEN** 某个仍有未排除可选 `pending` due 目标的地区将比同类最慢地区领先超过 100 个同年代带标准目标
 - **THEN** 批次生成器 MUST 阻止新计划
 - **AND** 系统 SHALL 提示需要推进落后地区
+
+#### Scenario: 低容量地区已完成当前年代带
+- **WHEN** 某地区在本批选择后已无未排除可选 `pending` due 目标
+- **THEN** 编排器 MUST 将该地区移出本年代带后续进度领先比较
+- **AND** 其他仍未完成地区 MUST 继续相互遵守 100 个标准目标的领先上限
+
+#### Scenario: 地区仅剩显式排除的待审目标
+- **WHEN** 某地区仅剩已由不可变 selection snapshot 显式排除的待审目标
+- **THEN** 编排器 MUST 允许其他地区继续生成标准批次
+- **AND** 被排除目标 MUST 继续计入总账分母、remaining pending 和缺口账本
 
 #### Scenario: plan 修改标准批次上限
 - **WHEN** 操作者需要调整每地区 50 个目标的默认上限

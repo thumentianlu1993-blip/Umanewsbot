@@ -17,6 +17,81 @@
 - 本次权威备份：`/opt/umanewsbot/backups/db/pre-newsarticle-dedup-reindex-20260714_020918.sql.gz`，`156642923` bytes，SHA-256 `f37ff4835fe13d4c2a016beac433940ef995677e690711dc68ca59f42b149a9e`。恢复后必须确认 identity 重复为 0、17 个索引全部 valid/ready、worker active/reserved 与 Redis 队列可解释。
 - 恢复服务时先只启动 worker 消化事故前保留队列并验证一条真实文章写入；队列与 active 清空后再启动 beat。随后至少验收一个完整 15 分钟窗口的来源抓取、五地区发布、QQ、数据库/worker 日志和三个公网 `/healthz/`。
 - 本次 `02:15` 窗口 17 个来源全部 succeeded，发布/QQ 各五地区全部 succeeded，美国发布 1 篇；索引重建后无重复键或索引页错误。若再次出现任一索引结构错误，立即重新冻结生产写入并从上述备份分支排查，不做第二轮在线试错。
+## 2026-07-14 日文赛马翻译与固定格式部署及回归
+
+1. 最终提交为 `873845dacb1cec0353ed9b9834417a1a00cc6311`；干净 `git archive` SHA-256 为 `2c00bf5bee4e824d5bd3cb408af942b5a255dd88f30de1b24436cab289ec3e09`。正式 tag 为 `umanewsbot:main-873845da-amd64-20260714-1248`，AMD64 image ID `sha256:d3f602de4459158bc372e45bb35f3730a7be21f284dfea32de5535681bd6d791`，revision/archive 标签均已核对。
+2. 候选 PostgreSQL `jp-translation-db-b7dab422` 上无待迁移、Django check 和迁移漂移通过，关联 `84` 项测试通过；生产切换前 Redis queue、worker active/reserved、外部导入、归属和术语重处理 live run 均为 0。候选验收完成后已删除该数据库容器。
+3. 写前备份为 `.env.backup.pre-873845da-20260714_124940` 与 `backups/db/pre-873845da-20260714_124940.dump`；数据库文件 `134234023` bytes、SHA-256 `413718143809a09686ea18710a4cd8b8f9a9f7643fb6b769cee5daf23ca485a6`，通过数据库容器内 `pg_restore -l`。回滚 tag `umanewsbot:rollback-pre-873845da-20260714-1254` 指向旧镜像 `sha256:b14844ee027a7902db2ed22c9b310e8240dd2d84f822d2785a28799271e3a1a2`。
+4. 切换时保持 beat 停止，只用最终 `prod` 镜像执行 migrate、Django check 和 `makemigrations --check --dry-run`，再以 `--no-deps` 重建 web/worker。目标文章和随机样本全部通过后才以同镜像重建 beat；最终三服务 image ID 必须完全一致。
+5. 目标 `8304/8299/8298/8291/8290/8288/8287/8283/8276/8219/8212` 必须核对普通词零残留、固定格式、完整未知马名、内部占位符、状态、发布时间、人工字段和 QQ 次数。生产实际 QQ 基线为 `8298/8288/8283` 各 1，其余 0；任何新增均为阻断。
+6. `8287` 的随机模型重译若被门禁拒绝，不得降低门禁。当前公开稿基于成功 run `8613`，只在事务内精确替换两处“类型类型”和一处“公开级级别”，恢复 translated 状态并记录 `article_translation_boundary_repaired`；失败 run `8622` 继续保留审计。随后运行不带重译的 `reprocess_article_entities --article-id 8287 --commit --json` 重建实体 provenance。
+7. 随机回归固定记录 `8337/8366/8356/8307/8367`；`8367` 的 tags 与 machine tags 均不得包含“出走”。最终验收使用 HTTP：healthz、首页、后台及 11 篇详情均为 `200`；HTTPS 尚未启用，不属于本 change 入口。Redis queue、active/reserved 为空，近 15 分钟无 fatal/traceback，历史写入/网络开关 false、历史 published 0。
+8. 回滚先停 beat 并排空 worker，将 `umanewsbot:rollback-pre-873845da-20260714-1254` retag 为 `prod`，再重建 web/worker/beat。代码回滚保留新增术语数据；只有确认生产数据损坏时才恢复上述 custom-format 数据库备份。
+
+## 2026-07-14 新闻实体语境修复部署与回归
+
+1. 最终上线提交为 `dc1e5ec584e47ea9d28998f76454d105836b3f0a`，源码 archive SHA-256 `f2eec61f6d2211a76e4456f6b9cbfc3e55a5b610829162b4a68b6039aae6ffe1`；正式镜像 tag 为 `umanewsbot:main-dc1e5ec5-amd64-20260714-075837`，image ID `sha256:5b06821610f0d2214cb24692e58beac4ffda731ddb84674a8855b2a1d4dbb470`。
+2. 生产写入前备份 `.env.backup.pre-main-624dd5b9-20260714-071014`；数据库 `backups/db/pre-main-624dd5b9-20260714-071014.dump` 为 `133370327` bytes、SHA-256 `21cdce21f52ded3b48e7c083f2f536eb694130f71ad6a1e38e067620f817fa75`，`pg_restore -l` 通过。回滚 tag 为 `umanewsbot:rollback-pre-624dd5b9-20260714-071014`。
+3. 候选镜像必须先通过 Django check、迁移漂移、实体目标测试和完整回归；切换时暂停 beat、等待 worker active/reserved 和 Redis queue 清空，按 web、worker、beat 顺序恢复，并确认三个服务的完整 image ID 一致。
+4. 存量修复只使用 `reprocess_article_entities` 的显式文章 ID：先 dry-run，再逐篇 `--commit`；需要修正文译文时使用同步强制重译，随后再次 dry-run 和 `validate_rewrite`。每轮必须保存 before/after，核对 `workflow_status`、`published_to_web_at`、QQ delivery、人工标签及 `MANUAL/REMOVED` 关联完全不变。
+5. 本次修复 `8086/8212/8221/8283/8288/8290/8291/8309/8317/8318/8330`；11 篇保持原公开身份及 QQ 次数。随机样本 `8390/8388/8386/8385/8383/8380` 最终 dry-run 无增删差异，最终 worker 新处理的 `8393/8394` 也通过实体解析和发布校验。
+6. 上线后以 HTTP 运行态验收：`umafans.run` 与 `www.umafans.run` healthz、首页、后台登录和 11 篇详情均为 `200`。HTTPS 尚未启用，不作为本 change 验收入口。最终 Redis queue、Celery active/reserved 均为空，近 15 分钟 web/worker/beat 无 error/traceback；历史写入/网络开关为 false、归属模式为 off、历史 published 为 0。
+7. 若需回滚，先暂停 beat 并排空 worker，将 `umanewsbot:rollback-pre-624dd5b9-20260714-071014` retag 为 `prod` 后重建 web/worker/beat；本 change 无迁移，只有确认实体重处理造成生产数据损坏时才恢复数据库备份。
+
+## 2026-07-14 国际新闻正文边界修复部署与回归
+
+1. 最终上线提交为 `514af8a22aec18f01cf0193344ae3b7a45c4dbc4`，Git tree `b62a80cc34b2b65c47f6dd7d541c455d04a0ef5c`。使用 `git archive` 独立构建上下文，archive SHA-256 `507b95c9b3e3ab66b67e4813b6b4814d2e4bc3d6cb2aae6abc7ad357322ad039`；缓存/无缓存双构建的 `/app` manifest 一致，SHA-256 `2ada2d84788d048fcfd86d589762c2b159256d1a884581ac819a614aacf92aea`。
+2. 正式镜像 `umanewsbot:main-514af8a2-amd64-20260714-050736`，image ID `sha256:954673cc74049d4b882e492ec29b072aba01aeb1a3ae440cc85415209c8a2f8a`。切换前 worker active/reserved、外部导入 run/lock 均为空；候选镜像 Django check、迁移漂移和正文边界 27 项测试通过。
+3. 最终切换前备份 `.env.backup.pre-main-514af8a2-20260714-051127`；数据库 `backups/db/pre-main-514af8a2-20260714-051127.sql.gz` 为 `158552943` bytes，SHA-256 `9fc72efba29ee8d32c9709665809d259ca49e47a217c43626c99b084d99d4b0a`，`gzip -t` 通过。旧镜像回滚 tag 为 `umanewsbot:rollback-pre-514af8a2-20260714-051127`，image ID `sha256:5d7c09bd25fbb45999f2e8109995736f93f4d3011e37299033cae4773e4968c1`。
+4. 将候选 retag 为 `umanewsbot:prod` 后，依次执行 migrate、Django check、`makemigrations --check --dry-run` 和 collectstatic，再只重建 web/worker；四篇目标文及五篇抽检文回归完成、worker 清空后，以同一镜像重建 beat。最终 web/worker/beat 镜像 ID 和 revision 一致。
+5. 文章修复必须先运行 `python manage.py repair_article_content_boundaries --article-id <ID>...` 查看 SHA/长度/规则计数，再追加 `--commit`；随后用 `python manage.py translate_news --article-id <ID>... --sync --force` 重译。每批都要比对 `workflow_status`、`published_to_web_at` 和 `QQPushDelivery`，禁止重复公开或群发。
+6. 本次目标 `8086/8267/8316/8318` 均保持已发布和原发布时间，QQ delivery 为 0；随机样本 `8306/8311/8326/8331/8336` 最终保存正文与当前重解析逐字一致，状态 `ok`、无博彩/链接/编辑注/页脚噪声。已发布 `8326` 保持 `2026-07-13T17:47:04.152562Z`，QQ delivery 为 0。
+7. 回归通过内外 `/healthz/`、首页、后台登录、`/news/8086/`、`/news/8267/`、`/news/8316/`、`/news/8318/`、`/news/8326/` 和近 200 行 web/worker 日志；Celery active/reserved 为空。若回滚，先停 beat 并排空 worker，将 `umanewsbot:rollback-pre-514af8a2-20260714-051127` retag 为 `prod` 后重建 web/worker/beat；本次无迁移，只有确认数据损坏时才恢复数据库备份。
+
+## 2026-07-14 batch004 250 场正式导入记录
+
+1. 运行镜像保持 `sha256:87c435cfc50344d0ca94f46e44d4bea97ab11361f88f7c708b6457331aee78ec`；本批没有 build、retag、recreate 或 restart，所有管理命令均使用显式 `docker run --rm`，禁止 Docker Compose。
+2. 日期 artifact manifest `30ff2c0fe14e4d6ce7d9ee7123d882d99838853e381627b552b9b0ac19dd2ea0`，批准并 apply 250/250；五地区各 50，日期、event 和直接来源 250/250，published 0。
+3. 详情来源 artifact manifest `cf5bfdc1cc8c6c82732d6485e1815f582a47d057010e4d1c0214ec3103fd46a8`，check/apply 250/250。来源 apply 后重新导出 event input；最终候选 SHA-256 `ddd1f8256cef0b17aabc33ea66f7a0638a2d6498c2d23342daff8835b10a5156`，250 scopes / 0 gaps，dry-run 通过。
+4. 详情来源写前流式备份 `pre-batch004-detail-source-apply-20260714_031200.sql.gz` 的首次校验发生在进程未结束时，曾报截断；最终文件 `128991200` bytes，`gzip -t` 通过，SHA-256 `dbe05660aaae9e1957c21b84d714c3340a81a3a59aedef4dcf5f99caae5509e5`，可用于回到来源 apply 前。最终详情写前另有 `/opt/umanewsbot/backups/db/pre-batch004-detail-import-20260714_0325.dump`，`129830849` bytes，SHA-256 `e50bd095bfa141ea0f05bf77fda68a508808dcddac4cbacb8fdb4ce3860e758a`，`pg_restore -l` 通过。
+5. 最终详情 apply 250/250，写后为 `2563 runners / 2311 results`、500 applied candidates、250 import logs，重复非空马号和重复名次均为 0。NSA target `74171` 因官方 PDF 不给马号，允许 8/7 条空 `horse_number`，不得补造号码。
+6. 批次后累计 `1041 imported / 29876 pending / 0 ready`，250 场全部 draft，历史 published 0。常驻写入/网络开关 false，无 one-off，三个公网 healthz 为 `ok`。
+7. batch005 前必须由生产协调线程从含 `main@614f810e` 的干净 tree 构建并切换 AMD64 镜像；历史线程不得自行重建或重启生产。切换后再生成下一标准批次，并继续传入既有排除 snapshot。
+
+## 2026-07-14 已耗尽地区进度门禁交付要求
+
+- 交付前必须确认代码包含 `eligible_pending_by_region` 与 `progress_guard_regions`，并通过历史批次专项、完整 `stable`、Django check、迁移漂移和 OpenSpec strict。该修复无迁移、无新环境变量，不改变常驻历史开关。
+- 生成下一标准批次时仍必须传入所有既有 gap 的 `--exclude-selection-snapshot`。审核 summary 时同时核对：`remaining_pending_by_region` 仍包含待审排除项，`eligible_pending_by_region` 已扣除排除项，`progress_guard_regions` 只列本批后仍有可抓目标的地区。
+- 若两个或以上 `progress_guard_regions` 的 prospective accounted 差超过 100，命令必须失败；恰为 100 可继续。某地区抓空或仅剩显式排除项时可退出比较，但不得据此修改其 expectation/resolution 或从总账删除。
+- 代码已合入 `main@614f810e`，尚未部署。必须从最新 main 的干净 tree 构建可复现 AMD64 镜像，由生产协调线程完成镜像切换和健康验收后，才可用于后续批次 artifact；不得从本地分支直接执行生产写入。
+
+## 2026-07-13 后续标准批次既有选样排除门禁
+
+- 旧 batch003 与 batch002 重叠 4 个 pending gap，必须删除或隔离，禁止审批、抓取或写入。新批次只允许由包含本门禁的已提交 AMD64 镜像生成。
+- 生成时追加 `--exclude-selection-snapshot /workspace/runtime/historical_race_batches/2016-2025-batch-002-20260713/selection_snapshot.json`；如还有其他仍含 pending gap 的旧批次，可重复传入该参数。不得手工摘取或改写 snapshot。
+- 命令成功后必须核对：五地区各 50、与所有排除 snapshot 的 target ID 交集为 0、manifest 中存在 `excluded_selection_snapshot_NNN` 文件身份、复制件逐字节一致、summary 的 `excluded_pending_by_region` 与已知 gap 相符，且 `remaining_pending_by_region` 未扣除排除 gap。
+- 当前实现仅在本地通过 42 项聚焦测试、完整 `stable 1157` 项、Django check、迁移漂移和 OpenSpec strict/all；尚未部署。部署前先提交并同步 main，再交付可复现 AMD64 镜像；本门禁不要求重启常驻 web/worker/beat，可由协调线程批准后仅用于一次性只读批次生成。
+- 全程保持生产常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false` 和历史公开关闭；本步骤不得执行生产数据库写入。
+
+## 2026-07-13 2016–2025 第二标准批次 246 场日期与详情导入
+
+- 运行镜像固定为 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`；revision `d8b65fe7d63e913cf826d02a74cdebaec60351ce`，Git tree `fda256535ae3b9f435cf8c7b069ff26d04503d99`。本批不得重建或重启生产容器。
+- 日期 artifact：manifest `9ed3b713...02e68`，批准 246、gap 4。写前备份 `pre-band-2016-2025-batch002-date-apply-20260713_164248.sql.gz`，`150494499` bytes，SHA-256 `379f86de...b7c7`；apply 后 246 target 为 ready、246 event 为 finished/draft、published 0。
+- 详情来源 artifact：manifest `ae9d20aa...b44d9`，check/apply 均为 246。写前备份 `pre-band-2016-2025-batch002-detail-apply-20260713_165007.sql.gz`，`124141632` bytes，SHA-256 `0b0423ae...9540`。来源 apply 后必须重新导出 event input，不得继续使用旧 target SHA 的导入包。
+- 最终详情候选：`detail-package-v3/packaged_candidates.jsonl`，SHA-256 `735ec0dacafd9c388adb678b93ab402e45f991cb0e143c89a6fe067e606fc459`，246 scopes / 0 gaps，dry-run 通过。最终写前备份 `pre-band-2016-2025-batch002-candidate-import-20260713_165304.sql.gz`，`124218014` bytes，SHA-256 `a22967b6...0545`；apply 246/246 成功。
+- 写后必须运行逐 target 验证脚本，核对候选与实际 runners/results、马号、名次、applied candidate 来源名/URL、module 状态和 visibility。已验收各地区为法国 `50/424/328`、香港 `50/463/453`、日本 `50/730/722`、英国 `48/464/417`、美国 `48/468/406`，error 0；历史累计 `541 imported / 5723 runners / 5143 results / published 0`。
+- 一次性管理容器可以临时设置 `HISTORICAL_RACE_BACKFILL_ENABLED=true`；常驻 `.env`、web/worker/beat 必须继续为写入 false、网络 false。本批验收后无 one-off 容器，三应用容器镜像不变，HTTP 内外 healthz 正常，近 30 分钟错误扫描为空。
+- 回滚按失败层级选择：日期或 materialize 错误用第一份备份；来源证据错误用第二份备份；来源正确但 runners/results 错误用第三份备份。恢复前先停历史 one-off，保留 artifact、source cache 和日志；恢复后重跑 target 状态、逐场详情、published=0、常驻开关和 HTTP healthz 验收。
+
+## 2026-07-13 法港英 150 场字段校正与详情导入
+
+- 字段 artifact：manifest `d6f6e29a...a2857`，候选 `59acc224...f50ac`；dry-run 为 150 scopes / 164 fields / 0 manual skip。写前备份 `pre-fr-hk-uk-field-corrections-20260713_134732.sql.gz`，`148521701` bytes，SHA-256 `30dc58d2...c94ce`，gzip 通过。
+- 字段 apply 只在一次性管理容器临时设置 `HISTORICAL_RACE_BACKFILL_ENABLED=true`；写后核对 150 个 target SHA 改变、164 个字段/provenance、150 条目标日志和 1 条批次日志。常驻 web/worker/beat 设置未修改。
+- 字段变化后旧详情候选 `38e05d...1950` 必须且确实被生产拒绝；重新导出候选 `a8fc8fbf...68da` 为 150 scopes / 0 gaps，法港英 runners/results 分别 `449/330`、`515/506`、`570/458`，150 个 URL 全局唯一，dry-run 通过。
+- 详情写前备份 `pre-fr-hk-uk-detail-import-20260713_135954.sql.gz`，`148554120` bytes，SHA-256 `610c5407...f4db`，gzip 通过。apply 150/150 成功，写后逐 target 数量、candidate applied、source cache identity、马号/名次唯一性和 150 条导入日志全部通过。
+- 最终生产历史为 295 imported、3174 runners、2817 results，295 个 pre-2026 RaceEvent 全部 draft，published 0；常驻历史写入与网络开关 false。150 个详情缓存 `38383091` bytes，大小/SHA `150/150` 通过。内外 healthz、Django check、容器和日志正常。
+- 写后自然窗口：14:00 CST 的 17 个 crawl、5 个 publish、5 个 qq_push 均 succeeded；crawl seen/new/failed 为 `470/5/0`。publish 未发布且失败 0，零产出原因为 `hard_gate_blocked`、`no_ready_candidates`；QQ 未新增投递且失败 0，原因为 `already_sent`、`no_eligible_articles`。窗口后内外 healthz 正常，web/worker/beat 近 20 分钟错误扫描为 0。
+- 回滚字段错误时优先使用字段写前备份；字段正确但详情错误时使用详情写前备份。恢复前先停一次性历史写入并记录当前 artifact/日志，不删除 source cache；恢复后重新执行 target、字段 provenance、详情计数和 published=0 验收。
 
 ## 2026-07-13 `main@df2732c3` 权威字段门禁镜像切换
 
@@ -46,7 +121,7 @@
 
 ## 待实施：法国新鲜度与多地区归属上线门禁
 
-- 对应 change：`fix-france-news-freshness-and-multiregion-attribution`。当前仅完成工程评审，以下为未来实施后的上线约束，不代表功能已上线。
+- 对应 change：`fix-france-news-freshness-and-multiregion-attribution`。代码已按安全关闭模式部署过，以下仍是生产 dry-run、Shadow、enforce 与相关地区查询的有效上线约束；不得把“代码存在”视为功能已经启用。
 - 部署前必须确认本地 HEAD、服务器 HEAD、tracked/untracked 文件、Nginx 运行配置、数据库备份及 `web/worker/beat` 当前环境变量；部署后再次核对三个服务读取一致配置。
 - 首次部署必须设置 `MULTIREGION_ATTRIBUTION_MODE=off`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`、`TRANSLATION_AUTO_RETRY_ENABLED=false`，不得因迁移成功自动开启行为。
 - 开启 shadow 前必须完成至少 150 篇版本化 Gold Set、五个运营地区各至少 10 篇、跨地区至少 20 篇、生产快照 SHA 校验、全部质量阈值和独立的 250 篇 PostgreSQL 性能验收；任何单地区 no-go 都应阻止继续灰度。
@@ -4215,3 +4290,83 @@ python manage.py evaluate_multiregion_attribution_gold \
 - 批量评估使用 17,474 个活跃地区术语、38,806 个索引候选；159 篇纯推断约 `0.8` 秒，完整 Docker 命令约 `2–4` 秒。索引只生成候选，最终仍调用原边界匹配器；生产 PostgreSQL 250 篇 SQL/RSS 基准仍须按任务 8.9/9.3 单独验收。
 - 该批仍保留 `provisional_single_review` 审核来源，但 159 条有效样本、最少运营地区法国 11 条和跨地区 24 条已达到 `150/10/20` 首发覆盖；相关 precision `100%`、recall `54.84%` 及其他质量指标也已达标。它可以生成进入生产 Shadow 所需的 dry-run，但在生产 dry-run、至少 24 小时 Shadow 和全量变化复核完成前，`MULTIREGION_ATTRIBUTION_MODE` 仍须保持 `off`，相关地区查询保持关闭，不得直接 commit/enforce。
 - 生产只读评估若意外启动多个全术语扫描进程，应立即停止并确认容器内外 one-off 均退出；本轮曾终止两个只读评估进程，未写数据库，后续校准全部切到本地冻结快照。
+## 2026-07-13 `main@58786b91` 可复现镜像部署记录
+
+- 构建上下文：`/opt/umanewsbot-builds/main-58786b91-20260713-1435`；revision `58786b91fba9c44054a6102055766824677bcbcb`，Git tree `5d8b7ccf775f6be7051c88e8f440b034ad02f4df`，source archive SHA-256 `184f05c39d3df5dd0bb1f410bdccda418ed3052964edea99b07faf22723fa07e`。
+- 两次独立 AMD64 build 得到相同 image ID `sha256:c6a3670fdc42db9c0b8ded5772630ac1b0511b98a521ea7f4a9cbe7e25864691`；正式 tag 为 `umanewsbot:main-58786b91-amd64-20260713-1435`，生产 `umanewsbot:prod` 当前指向该 ID。
+- 部署前 `.env` 备份为 `.env.backup.main-58786b91-20260713_143748`；数据库备份为 `backups/db/pre-main-58786b91-20260713_143748.sql.gz`，大小 `149,960,820` bytes，SHA-256 `9f29cd1a28b41761591a1966c68125c611a36290953cf0d845cdcead05891f27`，`gzip -t` 通过。回滚 tag 为 `pre-main-58786b91-20260713-1439`，对应旧 image ID `sha256:27d5d51cbe2ae6d23cb99dc758da01addc2d5935504a950bbb8a2685bce2bf13`。
+- 切换前必须验证 origin/main、服务器 HEAD 与构建 revision 一致，外部导入、术语门禁、归属锁、worker active/reserved 均为空；停止 beat、排空 worker 后才允许 retag 和重建 `web / worker / beat`。某一步 shell 管道提前退出时，先确认是否已经 retag/recreate，不得盲目重放整段脚本。
+- 切换后验收：三容器 image ID 一致；架构为 amd64；`stable.0029_france_freshness_translation_attribution` 已应用；64 个模型、Django check、五地区频道、赛事页、马匹页、后台和 healthz 正常；近期 web/worker/beat 日志无 ERROR、CRITICAL、Traceback 或 IntegrityError。
+- 首个完整自然窗口为 `2026-07-13 14:45 CST`：crawl `17/17`、publish `5/5`、QQ push `5/5` 全部 succeeded，crawl seen `472`、new `3`；新增文章 `attribution_rule_version IS NULL=0`。发布和 QQ 的零产出原因均为当前门禁下的正常 `hard_gate_blocked`、`translation_retry_waiting`、`no_ready_candidates` 或 `no_eligible_articles`。
+- 历史数据门禁：`HistoricalRaceEventTarget=30,917`，2026 年前 `RaceEvent=295`、`RaceEventRunner=3,174`、`RaceEventResult=2,817`，全部 `draft`、published `0`；常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false` 和 `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。一次性来源缓存或写入只在单命令环境中临时开启，命令结束后必须再次核对常驻值。
+
+## 2026-07-13 第二标准批次日期工件重建门禁
+
+- 二号批次 selection 为 250 个目标。当前最终来源包只包含 246 个可导入 held 目标，adapter 分布为 `jra=50 / equibase=48 / hkjc=50 / uk_sportinglife=48 / zeturf=50`；source URL、ledger 和 cache identity 必须均为 246 个且一一对应。
+- 不得把四个缺口伪装成 held 候选：Brooklyn Stakes、Cougar II Stakes 保留 TOBA `not run` 审核项；Classic Handicap Chase、Dick Poole Fillies Stakes 保留 Sporting Life `ABANDONED` 证据，后续须通过正式 expectation correction 流程处理。
+- 香港赛季目标的赛事日期跨自然年时，provider 必须同时写 `actual_year=<local_date.year>` 和非空 `cross_year_reason=hong_kong_racing_season_spans_calendar_years`。英国来源距离可保留 `2m4f`、`3m21/2f` 等原文，解析结果必须拆成 mile/furlong/yard 组件，不能改写成裸数字或公制猜测。
+- 当前生产镜像不含紧凑英制距离修复。必须先把修复提交并合入最新 main，运行完整组合回归，构建可复现 AMD64 镜像并按共享生产切换门禁部署；随后重新 normalize/build，预期结果才是 `246 candidate / 4 gap`。旧 `219/31` artifact 不得审批或 commit。
+- 新 artifact 仍须经历 manifest 审批、数据库备份、`gzip -t`、SHA-256、dry-run、单命令临时写入开关、写后逐目标核验和常驻开关复核。详情候选必须在日期 apply 改变 target SHA 后重新导出并重新打包，公开展示开关保持关闭。
+
+## 2026-07-13 `main@d8b65fe7` 不可变镜像切换记录
+
+### 切换对象与回滚点
+
+- 新镜像：`umanewsbot:main-d8b65fe7-amd64-20260713-1630`，image ID `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`，架构 `linux/amd64`。
+- 镜像标签：revision `d8b65fe7d63e913cf826d02a74cdebaec60351ce`，Git tree `fda256535ae3b9f435cf8c7b069ff26d04503d99`，source archive SHA-256 `2b085d0226580295f9a844fbc92df48405cd9bb3b467786230fac8941fa60520`。
+- 旧镜像：`sha256:c6a3670fdc42db9c0b8ded5772630ac1b0511b98a521ea7f4a9cbe7e25864691`，回滚标签 `umanewsbot:rollback-pre-d8b65fe7-20260713_163805`。
+- 环境备份：`.env.backup.main-d8b65fe7-20260713_163805`。
+- 数据库备份：`backups/db/pre-main-d8b65fe7-20260713_163805.sql.gz`，`124,020,905` bytes，SHA-256 `33f5ef3520e833a8cf343ca87831a7620c9cb80ba095e74c5cadb716d55ccfa2`，`gzip -t` 通过。
+
+### 排空与切换顺序
+
+1. 核对候选镜像 ID/架构、当前三容器 image ID、内外 healthz、外部导入/锁、one-off 进程及 Celery active/reserved。
+2. 停止 beat，再次确认 active/reserved、外部导入和锁均为空；随后停止 worker，不 purge Redis 队列。
+3. 将候选镜像 retag 为 `umanewsbot:prod`，使用一次性 web 容器执行 `migrate --noinput`、`check` 和 `collectstatic --noinput`。
+4. 先重建 web/worker，等待 web healthy 和 worker ping；最后重建 beat，避免迁移或容器切换期间重复调度。
+5. 核对 web/worker/beat 实际 `.Image` 均为新 image ID，再检查内外 healthz、首页、赛事页、Django check、常驻开关和近期错误日志。
+
+### 备份脚本异常与本次回退
+
+- 本次直接执行 `BACKUP_TARGET=local ./deploy/backup_db.sh` 失败：宿主机无法解析 Compose 内部主机名 `db`，随后宿主机 Python 因缺少 `oss2` 再次失败。该命令产生的同时间文件不得作为有效恢复点。
+- 本次改用数据库容器内 `pg_dump`，由宿主机管道压缩到独立 `pre-main-d8b65fe7-*.sql.gz`，并强制执行非空检查、`gzip -t` 和 SHA-256 后才继续部署。
+- 后续使用低成本 Compose 部署时，在修复备份脚本前必须验证备份命令退出码、文件非空和 `gzip -t`；不得仅凭脚本打印 `Backup created` 视为成功。失败时使用已验证的容器内 `pg_dump` 回退路径，不得跳过备份。
+
+### 验收结果
+
+- 无待应用迁移，Django check 通过；129 个静态文件复制并完成 360 项 post-process。
+- web/worker/beat 均运行 `sha256:77eb1138...c3da0`；db、redis healthy，nginx 正常。
+- 内部和公网 `/healthz/` 为 `ok`，公网首页和 `/races/` 为 `200`，worker ping 正常，Celery active/reserved 为空，近期 web/worker/beat 日志无 error/traceback/exception。
+- `2m4f` 与 `3m21/2f` 的生产纯函数 smoke 分别得到 `2 mile + 4 furlong`、`3 mile + 2.5 furlong`，原始 `distance_text` 保留。
+- 常驻历史写入/网络开关、多地区归属/相关地区查询开关均保持关闭；本次没有执行历史写入。
+
+## 2026-07-13 batch003 生产续跑门禁
+
+1. 先合入包含 NAR、Zone-Turf 和 ZEturf 实际缓存 URL 修复的最新 main；旧候选镜像 `sha256:9cd0b966...45bc1` 不得用于 batch003。
+2. 在独立上下文构建两次 AMD64 镜像，核对 image ID、revision、Git tree 和 source archive SHA-256；只上报候选，不直接 retag、重启或写生产。
+3. 首次只读 artifact 曾得到 `249 candidate / 1 gap`，但 Hampton 后续证据证明同届移师 Windsor 正常举办；该旧 artifact 已作废，唯一有效口径为 `250 candidate / 0 gap`。
+4. Hampton 的 Warwick `ABANDONED` 不能用于 expectation correction；日期 apply 后通过独立权威字段 artifact 把实际场地改为 Windsor，并保留原页面为变更证据。
+5. 日期 apply 前执行数据库备份、非空检查、`gzip -t` 和 SHA-256；仅对单命令临时打开写入门禁。权威字段 apply 后重新导出 250 个 materialized event input，禁止复用旧 target SHA。
+6. 补充详情来源 artifact 必须接受并验证 `keiba_go_jp/nar` 与 `zone_turf`，apply 后再次导出 event input，再生成最终详情包、coverage 和 importer dry-run。
+7. 详情 apply 前另做一份数据库备份。写后逐目标核对 runner/result 数、累计计数、OperationLog、draft/published 状态和三容器常驻开关；`RACE_EVENT_HISTORICAL_PUBLIC_ENABLED` 全程保持关闭。
+
+## 2026-07-13 `main@3939992c` batch003 来源门禁镜像切换
+
+### 镜像与恢复点
+
+- 新镜像 tag：`umanewsbot:main-3939992c-amd64-20260713-1847`。
+- Image ID：`sha256:87c435cfc50344d0ca94f46e44d4bea97ab11361f88f7c708b6457331aee78ec`，`linux/amd64`。
+- Revision：`3939992c7d3753779fc34de81c595f5a34d7ed2b`；Git tree：`0464a1aae6f587e3ba021421ac84b44a3d9379dd`；source archive SHA-256：`a787391c84a4ba3bb22c2ab638f1e36453d3ff8869bb95aeb5001b1dd448bb21`。
+- 环境备份：`.env.backup.main-3939992c-20260713_185140`。
+- 数据库备份：`backups/db/pre-main-3939992c-20260713_185140.sql.gz`，`125,782,755` bytes，SHA-256 `21903cf8d9494ef6053414a34c2e2f6ab01406b9ffebcf56ff3fd10eedfc0967`，非空且 `gzip -t` 通过。
+- 旧镜像回滚标签：`umanewsbot:rollback-pre-3939992c-20260713_185140`，指向 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`。
+
+### 切换与验收
+
+1. 预检发现两条 `crawl_news_source_task` active；先停止 beat，让任务自然完成。确认 active/reserved、外部导入、外部锁和历史 one-off 为空后才创建备份和停止 worker。
+2. 使用数据库容器内 `pg_dump` 生成备份并完成非空、`gzip -t`、SHA-256 校验；未调用当前存在宿主机依赖问题的 `backup_db.sh`。
+3. Retag 后使用一次性新镜像 web 容器执行迁移、Django check 和 collectstatic；结果为无待应用迁移、check 通过、2 个静态文件复制、127 个未变化、360 个 post-process。
+4. 先重建 web/worker，确认 web healthy、worker ping；最后重建 beat。三容器实际 image ID 均为 `sha256:87c435cf...e78ec`。
+5. 内部和公网 healthz 为 `ok`，公网首页和 `/races/` 为 `200`，近期 web/worker/beat 日志无 traceback/critical/integrityerror/exception。
+6. `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，多地区归属和相关查询开关也保持关闭；本次未执行历史写入。
+7. 切换完成后的旧预期曾为 `249 candidate / 1 gap`，后续已由 Hampton 移师证据修正为 `250 candidate / 0 gap` 并按独立 approval、备份、dry-run 与写后核验完成导入；旧 Hampton gap 不得恢复。

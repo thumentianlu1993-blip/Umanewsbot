@@ -447,6 +447,38 @@ Owners: 8-CresRan,LLC;
         self.assertEqual(skipped, [])
         self.assertEqual(download.call_count, 2)
 
+    def test_zeturf_discovery_keeps_the_url_that_was_actually_cached(self):
+        module = _load("prepare_france_zeturf_race_detail_candidates.py")
+        events = [
+            {
+                "slug": "france-other-2025",
+                "local_date": "2025-01-01",
+                "racecourse": "Auteuil",
+                "original_name": "Prix Other",
+            },
+            {
+                "slug": "france-test-2025",
+                "local_date": "2025-01-01",
+                "racecourse": "Auteuil",
+                "original_name": "Prix Test",
+            },
+        ]
+        html = "<html><title>01/01/2025 - AUTEUIL - Prix Test: Résultats & Rapports</title></html>"
+        args = SimpleNamespace(
+            max_r=1,
+            max_c=1,
+            allow_network=False,
+            timeout_seconds=10,
+            sleep_seconds=0,
+        )
+        with TemporaryDirectory() as tmp, patch.object(module, "_download", return_value=html):
+            matched, _skipped = module._discover_event_pages(events, Path(tmp), args)
+
+        self.assertEqual(
+            matched["france-test-2025"]["url"],
+            "https://www.zeturf.fr/fr/course-du-jour/2025-01-01/R1C1-auteuil-prix-other",
+        )
+
     def test_irishracing_parser_separates_horse_number_draw_and_non_finishers(self):
         module = _load("prepare_irishracing_race_detail_candidates.py")
         html = """
@@ -711,6 +743,52 @@ Owners: 8-CresRan,LLC;
                 source_url="https://db.netkeiba.com/race/other/",
             )
         )
+
+    def test_detail_packager_accepts_nar_and_zone_turf_sources_only_when_approved(self):
+        module = _load("package_historical_race_detail_candidates.py")
+        cases = (
+            (
+                "keiba_go_jp",
+                "nar",
+                "https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?k_raceNo=9",
+            ),
+            (
+                "zone_turf",
+                "zone_turf",
+                "https://www.zone-turf.fr/cheval/mission-smart-2088796/",
+            ),
+        )
+
+        for source_name, provider, source_url in cases:
+            event = {
+                "source_refs": json.dumps(
+                    {
+                        "detail_discovery": {
+                            "urls": {
+                                "result_url": {
+                                    "url": source_url,
+                                    "source_provider": provider,
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+            with self.subTest(source_name=source_name):
+                self.assertTrue(
+                    module.source_matches_event(
+                        event,
+                        source_name=source_name,
+                        source_url=source_url,
+                    )
+                )
+                self.assertFalse(
+                    module.source_matches_event(
+                        event,
+                        source_name=source_name,
+                        source_url=f"{source_url}different",
+                    )
+                )
 
     def test_detail_packager_accepts_hash_approved_supplemental_source(self):
         module = _load("package_historical_race_detail_candidates.py")

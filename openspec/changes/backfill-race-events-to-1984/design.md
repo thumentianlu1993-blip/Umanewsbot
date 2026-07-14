@@ -124,9 +124,11 @@ held/due 年度目标必须有：
 - 覆盖长寿、改名/迁场、历史独有或停办系列。
 - 目标约 45 个年度赛事。
 
-后续先按 `2016–2025 → 2006–2015 → 1998–2005` 推进；1984–1997目录和早期验收完成后再推进该阶段。标准全量批次每地区最多50个held/cancelled年度目标；变更批次上限必须写入plan和审批。地区同步以同一年代带已accounted/imported的due目标数计算，任何地区不得比最慢地区领先超过100个标准目标，避免通过拆小或放大批次绕过护栏。
+后续先按 `2016–2025 → 2006–2015 → 1998–2005` 推进；1984–1997目录和早期验收完成后再推进该阶段。标准全量批次每地区最多50个held/cancelled年度目标；变更批次上限必须写入plan和审批。地区同步以同一年代带已accounted/imported的due目标数计算，并只比较本批完成后仍有未排除可选 `pending` due 目标的地区；这些未完成地区中，任何地区不得比最慢地区领先超过100个标准目标，避免通过拆小或放大批次绕过护栏。某地区在本批后已无此类目标时退出比较；只有显式排除待审目标的地区也视为当前抓取已耗尽，但排除目标仍保留在总账分母、remaining pending和缺口账本中。
 
 年代带标准批次必须由正式命令从批准总账中选择 `pending`、未materialize的 held/cancelled 目标，按年份从新到旧、系列key和target id确定稳定顺序。每批输出不可变selection snapshot、完整CSV审核表、地区/剩余分母summary、manifest和pending approval；空批次、重复target、年代带外目标、inventory SHA不符或非pending目标不得生成成功artifact。
+
+上一批已经进入 gap ledger、但因产品语义或补源尚未结论而继续保持 `pending` 的目标，不得在后续标准批次中反复占用抓取配额。批次命令通过可重复的 `--exclude-selection-snapshot` 显式接收既有不可变 selection snapshot：每份输入必须校验 schema、inventory manifest SHA、内部 snapshot SHA、target 数量和唯一性；排除必须在地区 limit 之前应用，使各地区仍可选择最多 50 个新的 pending 目标。新 artifact 必须复制排除 snapshot 原字节并在 manifest 中绑定路径、大小和 SHA-256，summary 单列排除的 pending 目标及地区计数；这些目标仍保留在总账分母和 remaining pending 中，不计入 accounted/imported，也不得借排除入口修改 expectation/resolution。任一排除 snapshot 漂移、跨 inventory、目标身份无效，或最终 selection 与排除集合相交时必须 fail closed。
 
 ### 8. 允许完整 scope 先写，缺口不消失
 

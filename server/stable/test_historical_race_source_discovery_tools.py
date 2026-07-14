@@ -133,6 +133,52 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(result["rows"], [])
         self.assertEqual(result["issues"][0]["code"], "source_result_not_unique")
 
+    def test_jra_official_aliases_cover_2025_jump_and_sponsored_names(self):
+        history = """
+        <table><tr><th>月日</th><th>レース名</th><th>競馬場</th><th>結果</th></tr>
+          <tr><td>2月15日 土曜</td><td>J・GⅢ 小倉ジャンプS</td><td>小倉</td><td><a href="/datafile/seiseki/replay/2025/015.html">result</a></td></tr>
+          <tr><td>3月8日 土曜</td><td>GⅢ 中山牝馬S</td><td>中山</td><td><a href="/datafile/seiseki/replay/2025/024.html">result</a></td></tr>
+          <tr><td>5月17日 土曜</td><td>J・GⅡ 京都ハイジャンプ</td><td>京都</td><td><a href="/datafile/seiseki/replay/2025/050.html">result</a></td></tr>
+          <tr><td>8月16日 土曜</td><td>J・GⅢ 新潟ジャンプS</td><td>新潟</td><td><a href="/datafile/seiseki/replay/2025/072.html">result</a></td></tr>
+          <tr><td>11月8日 土曜</td><td>J・GⅢ 京都ジャンプS</td><td>京都</td><td><a href="/datafile/seiseki/replay/2025/100.html">result</a></td></tr>
+        </table>
+        """
+        expected = {
+            "japan-kokura-jump": ("Kokura Jump S", "Kokura", "2025-02-15"),
+            "japan-laurel-racecourse-sho-nakayama-himba": (
+                "Laurel Racecourse Sho Nakayama Himba S",
+                "Nakayama",
+                "2025-03-08",
+            ),
+            "japan-kyoto-high-jump": ("Kyoto High-Jump", "Kyoto", "2025-05-17"),
+            "japan-niigata-jump": ("Niigata Jump S", "Niigata", "2025-08-16"),
+            "japan-kyoto-jump": ("Kyoto Jump S", "Kyoto", "2025-11-08"),
+        }
+        targets = [
+            {
+                "series_key": series_key,
+                "year": 2025,
+                "country_region": "japan",
+                "original_name": original_name,
+                "racecourse": racecourse,
+                "distance_text": "3000m",
+            }
+            for series_key, (original_name, racecourse, _local_date) in expected.items()
+        ]
+
+        result = self.tool.build_jra_provider_rows(
+            targets=targets,
+            year=2025,
+            english_schedule_body=b"",
+            history_body=history.encode("cp932"),
+        )
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(
+            {row["series_key"]: row["local_date"] for row in result["rows"]},
+            {series_key: values[2] for series_key, values in expected.items()},
+        )
+
     def test_toba_same_name_is_disambiguated_by_track(self):
         body = """
         <table><tr><th>Stake</th><th>Gr</th><th>Track</th><th>Winner</th></tr>
@@ -193,6 +239,38 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(result["rows"], [])
         self.assertEqual(result["issues"][0]["code"], "source_match_not_unique")
 
+    def test_toba_not_run_row_is_reported_as_explicit_review_evidence(self):
+        body = """
+        <table><tr><th>Track</th><th>Date</th><th>Stake</th><th>Winner</th></tr>
+          <tr><td>BAQ</td><td>not run</td><td>BROOKLYN S.</td><td></td></tr>
+        </table>
+        """
+        target = {
+            "series_key": "united-states-brooklyn",
+            "year": 2025,
+            "country_region": "united_states",
+            "original_name": "Brooklyn S",
+            "racecourse": "Belmont at Aqueduct",
+            "distance_text": "11",
+        }
+
+        result = self.tool.build_toba_provider_rows(targets=[target], year=2025, body=body)
+
+        self.assertEqual(result["rows"], [])
+        self.assertEqual(
+            result["issues"],
+            [
+                {
+                    "series_key": "united-states-brooklyn",
+                    "edition_year": 2025,
+                    "code": "source_reports_not_run",
+                    "source_name": "BROOKLYN S.",
+                    "source_track": "BAQ",
+                    "source_status": "not run",
+                }
+            ],
+        )
+
     def test_toba_accepts_unique_name_when_annual_race_was_relocated(self):
         body = """
         <table><tr><th>Stake</th><th>Gr</th><th>Track</th><th>Winner</th></tr>
@@ -213,6 +291,90 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(result["issues"], [])
         self.assertEqual(result["rows"][0]["local_date"], "2025-07-04")
 
+    def test_toba_core_name_qualifiers_disambiguate_breeders_cup_juvenile(self):
+        body = """
+        <table><tr><th>Stake</th><th>Track</th><th>Winner</th></tr>
+          <tr><td>FANDUEL BREEDERS' CUP JUVENILE PRESENTED BY THOROUGHBRED AFTERCARE ALLIANCE</td><td>DMR</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=9&amp;TID=DMR&amp;DT=10/31/2025">Alpha</a></td></tr>
+          <tr><td>BREEDERS' CUP JUVENILE TURF</td><td>DMR</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=10&amp;TID=DMR&amp;DT=10/31/2025">Beta</a></td></tr>
+        </table>
+        """
+        targets = [
+            {
+                "series_key": "united-states-breeders-cup-juvenile",
+                "year": 2025,
+                "country_region": "united_states",
+                "original_name": "Breeders' Cup Juvenile [FanDuel]",
+                "racecourse": "Del Mar",
+                "distance_text": "8.5",
+            },
+            {
+                "series_key": "united-states-breeders-cup-juvenile-turf",
+                "year": 2025,
+                "country_region": "united_states",
+                "original_name": "Breeders' Cup Juvenile Turf",
+                "racecourse": "Del Mar",
+                "distance_text": "8",
+            },
+        ]
+
+        result = self.tool.build_toba_provider_rows(targets=targets, year=2025, body=body)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(
+            [row["urls"]["result_url"]["url"] for row in result["rows"]],
+            [
+                "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2025-10-31&rn=9&tk=DMR",
+                "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2025-10-31&rn=10&tk=DMR",
+            ],
+        )
+
+    def test_toba_duplicate_result_url_fails_closed_for_both_targets(self):
+        body = """
+        <table><tr><th>Stake</th><th>Track</th><th>Winner</th></tr>
+          <tr><td>ALPHA S.</td><td>DMR</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=9&amp;TID=DMR&amp;DT=10/31/2025">Alpha</a></td></tr>
+          <tr><td>BETA S.</td><td>DMR</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=9&amp;TID=DMR&amp;DT=10/31/2025">Beta</a></td></tr>
+        </table>
+        """
+        targets = [
+            {
+                "series_key": f"united-states-{name.lower()}",
+                "year": 2025,
+                "country_region": "united_states",
+                "original_name": f"{name} S",
+                "racecourse": "Del Mar",
+                "distance_text": "8",
+            }
+            for name in ("Alpha", "Beta")
+        ]
+
+        result = self.tool.build_toba_provider_rows(targets=targets, year=2025, body=body)
+
+        self.assertEqual(result["rows"], [])
+        self.assertEqual(
+            [issue["code"] for issue in result["issues"]],
+            ["duplicate_source_url", "duplicate_source_url"],
+        )
+
+    def test_toba_core_qualifiers_do_not_match_substrings_in_sponsor_names(self):
+        body = """
+        <table><tr><th>Stake</th><th>Track</th><th>Winner</th></tr>
+          <tr><td>TURFWAY ALPHA S.</td><td>DMR</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=9&amp;TID=DMR&amp;DT=10/31/2025">Alpha</a></td></tr>
+        </table>
+        """
+        target = {
+            "series_key": "united-states-alpha",
+            "year": 2025,
+            "country_region": "united_states",
+            "original_name": "Alpha S",
+            "racecourse": "Del Mar",
+            "distance_text": "8",
+        }
+
+        result = self.tool.build_toba_provider_rows(targets=[target], year=2025, body=body)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["rows"][0]["series_key"], "united-states-alpha")
+
     def test_hkjc_pattern_book_schedule_preserves_cross_calendar_season_dates(self):
         text = """
         22/09/24 Celebration Cup G3 4,200,000 3yo+ 1400 26/08/24 16/09/24 N/A N/A 10
@@ -232,10 +394,28 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         )
         self.assertEqual({row["edition_year"] for row in rows}, {2025})
 
+    def test_hkjc_pattern_book_excludes_prior_season_history_rows(self):
+        text = """
+        23/01/22 Centenary Sprint Cup G1 12,000,000 3yo+ 1200 01/12/21 17/01/22 N/A N/A 21
+        24/01/21 Centenary Sprint Cup G1 12,000,000 3yo+ 1200 01/12/20 18/01/21 N/A N/A 21
+        """
+
+        rows = self.tool.parse_hkjc_pattern_schedule_text(text, edition_year=2022)
+
+        self.assertEqual([row["local_date"] for row in rows], ["2022-01-23"])
+
     def test_hkjc_pattern_book_assigns_january_cup_to_happy_valley(self):
         rows = self.tool.parse_hkjc_pattern_schedule_text(
             "08/01/25 January Cup G3 4,200,000 3yo+ 1800 09/12/24 02/01/25 N/A N/A 24",
             edition_year=2025,
+        )
+
+        self.assertEqual(rows[0]["racecourse"], "Happy Valley")
+
+    def test_hkjc_pattern_book_assigns_parenthesized_january_cup_to_happy_valley(self):
+        rows = self.tool.parse_hkjc_pattern_schedule_text(
+            "11/01/23 January Cup (H) G3 3,900,000 3yo+ 1800 12/12/22 05/01/23 N/A N/A 24",
+            edition_year=2023,
         )
 
         self.assertEqual(rows[0]["racecourse"], "Happy Valley")
@@ -346,6 +526,52 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
             ],
         )
 
+    def test_bha_flat_book_supports_all_batch_002_racecourses(self):
+        text = """
+        ” 5 DONCASTER Sept. 13 BETFREDCHAMPAGNE(P2.C.G.) 7F+ 2CG 136
+        ” 5 LINGFIELDPARK May 10 BETFREDCHARTWELL(P3.F.) 7F+ 3+F 50
+        ” 5 CHESTER May 7 BoodlesChesterVase(P3.C.G.) 12F+ 3CG 43
+        ” 5 NEWCASTLE June 28 PertempsNetworkChipchase(P3.) 6F 3+ 85
+        ” 5 SALISBURY Sept. 4 IRE-IncentiveDickPoole(P3.F.) 6F 2F 132
+        """
+
+        rows = self.tool.parse_bha_flat_schedule_text(text, year=2025)
+
+        self.assertEqual(
+            [(row["local_date"], row["racecourse"]) for row in rows],
+            [
+                ("2025-09-13", "Doncaster"),
+                ("2025-05-10", "Lingfield"),
+                ("2025-05-07", "Chester"),
+                ("2025-06-28", "Newcastle"),
+                ("2025-09-04", "Salisbury"),
+            ],
+        )
+
+    def test_bha_flat_book_joins_wrapped_race_names(self):
+        text = """
+        ” 5 LINGFIELDPARK May 10 IRE-INCENTIVE,ITPAYSTOBUYIRISH
+                         CHARTWELL(P3.F.) 7F 3+F 52
+        ” 23 NEWCASTLE June 28 JENNINGSBETNUNSTREETNEWCASTLE
+                         OPENNOWCHIPCHASE(P3.) 6F 3+ 87
+        ” 29 SALISBURY Sept. 4 IRE-INCENTIVE,ITPAYSTOBUYIRISH
+                         DICKPOOLE(P3.F.) 6F 2F 129
+        ” 4 NEWMARKET Oct. 10 NEWMARKETACADEMYGODOLPHIN
+                         BEACONPROJECTCORNWALLIS(P3.) 5F 2 154
+        """
+
+        rows = self.tool.parse_bha_flat_schedule_text(text, year=2025)
+
+        self.assertEqual(
+            [(row["racecourse"], row["race_name"]) for row in rows],
+            [
+                ("Lingfield", "IRE-INCENTIVE,ITPAYSTOBUYIRISHCHARTWELL"),
+                ("Newcastle", "JENNINGSBETNUNSTREETNEWCASTLEOPENNOWCHIPCHASE"),
+                ("Salisbury", "IRE-INCENTIVE,ITPAYSTOBUYIRISHDICKPOOLE"),
+                ("Newmarket", "NEWMARKETACADEMYGODOLPHINBEACONPROJECTCORNWALLIS"),
+            ],
+        )
+
     def test_bha_jump_book_resolves_season_year_boundary(self):
         text = """
         Nov. 2 Ascot SodexoLive!GoldCupH’Cap 4+ Prem 27
@@ -379,6 +605,15 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
             [(row["local_date"], row["distance_text"]) for row in rows],
             [("2025-04-04", "2m4f"), ("2025-04-05", "3m1/2f")],
         )
+
+    def test_bha_jump_book_supports_warwick(self):
+        rows = self.tool.parse_bha_jump_schedule_text(
+            "Jan.11 Warwick WigleyGroupClassicH'CapChase 3m5f Prem 100,000",
+            season_start_year=2024,
+        )
+
+        self.assertEqual(rows[0]["local_date"], "2025-01-11")
+        self.assertEqual(rows[0]["racecourse"], "Warwick")
 
     def test_bha_jump_detail_distance_disambiguates_same_name(self):
         targets = [
@@ -502,6 +737,34 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(result["issues"], [])
         self.assertEqual(result["matches"][0]["local_date"], "2024-12-08")
         self.assertEqual(result["matches"][0]["target_id"], 1)
+
+    def test_official_schedule_match_deduplicates_apostrophe_variants(self):
+        target = {
+            "target_id": 21,
+            "series_key": "hong-kong-chairman-s-trophy",
+            "year": 2022,
+            "country_region": "hong_kong",
+            "original_name": "Chairman's Trophy",
+            "racecourse": "Sha Tin",
+            "distance_text": "1600m",
+            "normalized_grade": "G2",
+        }
+        schedule = [
+            {
+                "edition_year": 2022,
+                "local_date": "2022-04-03",
+                "racecourse": "Sha Tin",
+                "race_name": race_name,
+                "normalized_grade": "G2",
+                "distance_text": "1600m",
+            }
+            for race_name in ("Chairman's Trophy", "Chairman’s Trophy")
+        ]
+
+        result = self.tool.match_official_schedule_targets([target], schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(len(result["matches"]), 1)
 
     def test_official_schedule_match_disambiguates_same_name_by_distance(self):
         targets = [
@@ -681,6 +944,63 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(result["issues"], [])
         self.assertEqual(result["matches"][0]["local_date"], "2025-09-27")
         self.assertEqual(result["matches"][0]["racecourse"], "Auteuil")
+
+    def test_official_schedule_match_prefers_matching_grade_before_name_score(self):
+        target = {
+            "target_id": 22,
+            "series_key": "united-kingdom-darley",
+            "year": 2025,
+            "country_region": "united_kingdom",
+            "original_name": "Darley S",
+            "racecourse": "Newmarket",
+            "distance_text": "9f",
+            "normalized_grade": "G3",
+        }
+        schedule = [
+            {
+                "local_date": "2025-10-11",
+                "racecourse": "Newmarket",
+                "race_name": "DARLEY DEWHURST",
+                "normalized_grade": "G1",
+                "distance_text": "7f",
+            },
+            {
+                "local_date": "2025-10-11",
+                "racecourse": "Newmarket",
+                "race_name": "SPACE BLUES DARLEY",
+                "normalized_grade": "G3",
+                "distance_text": "9f",
+            },
+        ]
+
+        result = self.tool.match_official_schedule_targets([target], schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["matches"][0]["race_name"], "SPACE BLUES DARLEY")
+
+    def test_official_schedule_match_uses_classic_novices_sponsor_alias(self):
+        target = {
+            "target_id": 23,
+            "series_key": "united-kingdom-classic-novices-hurdle",
+            "year": 2025,
+            "country_region": "united_kingdom",
+            "original_name": "Classic Novices Hurdle [AIS]",
+            "racecourse": "Cheltenham",
+            "distance_text": "2m4f",
+            "normalized_grade": "G2",
+        }
+        schedule = [{
+            "local_date": "2025-01-25",
+            "racecourse": "Cheltenham",
+            "race_name": "SSS SUPER ALLOYS NOVICES HURDLE",
+            "normalized_grade": "G2",
+            "distance_text": "2m4f",
+        }]
+
+        result = self.tool.match_official_schedule_targets([target], schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["matches"][0]["local_date"], "2025-01-25")
 
     def test_official_schedule_match_accepts_unique_named_distance_change(self):
         targets = [{

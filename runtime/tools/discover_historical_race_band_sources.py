@@ -35,6 +35,11 @@ JRA_COURSES = {
 JRA_OFFICIAL_NAME_ALIASES = {
     "japan-hanshin-jump": "阪神ジャンプS",
     "japan-hanshin-spring-jump": "阪神スプリングジャンプ",
+    "japan-kokura-jump": "小倉ジャンプS",
+    "japan-kyoto-high-jump": "京都ハイジャンプ",
+    "japan-kyoto-jump": "京都ジャンプS",
+    "japan-laurel-racecourse-sho-nakayama-himba": "中山牝馬S",
+    "japan-niigata-jump": "新潟ジャンプS",
 }
 
 TRACK_CODES = {
@@ -86,14 +91,20 @@ FRENCH_MONTHS = {
 BHA_COURSES = {
     "AINTREE": "Aintree",
     "ASCOT": "Ascot",
+    "CHESTER": "Chester",
     "CHELTENHAM": "Cheltenham",
+    "DONCASTER": "Doncaster",
     "EPSOMDOWNS": "Epsom Downs",
     "GOODWOOD": "Goodwood",
     "HAYDOCKPARK": "Haydock Park",
     "KEMPTONPARK": "Kempton Park",
+    "LINGFIELDPARK": "Lingfield",
     "NEWBURY": "Newbury",
     "NEWMARKET": "Newmarket",
+    "NEWCASTLE": "Newcastle",
+    "SALISBURY": "Salisbury",
     "SANDOWNPARK": "Sandown Park",
+    "WARWICK": "Warwick",
     "WETHERBY": "Wetherby",
     "WINCANTON": "Wincanton",
     "YORK": "York",
@@ -137,6 +148,8 @@ COMPACT_RACE_WORDS = (
     "ULTIMA",
 )
 
+TOBA_CORE_NAME_QUALIFIERS = ("FILLIES", "TURF", "SPRINT")
+
 CALENDAR_SERIES_ALIASES = {
     "GBR_AINTREE_BRIDLE_ROAD_HANDICAP_HURDLE": (
         "William Hill Top Price Guarantee Handicap Hurdle",
@@ -171,6 +184,10 @@ CALENDAR_SERIES_ALIASES = {
     ),
     "united-kingdom-ascot-hurdle": (
         "Howden Ascot Hurdle",
+    ),
+    "united-kingdom-classic-novices-hurdle": (
+        "SSS Super Alloys Novices Hurdle",
+        "Classic Novices Hurdle",
     ),
     "united-kingdom-aintree-mares-nhf": (
         "Goffs Nickel Coin Mares Standard Open NH Flat Race",
@@ -211,6 +228,7 @@ CALENDAR_SERIES_RELOCATIONS = {
 
 HKJC_PATTERN_RACECOURSES = {
     "JANUARYCUP": "Happy Valley",
+    "JANUARYCUPH": "Happy Valley",
 }
 
 
@@ -360,8 +378,8 @@ def match_official_schedule_targets(targets: list[dict], schedule_rows: list[dic
         identity = (
             source.get("edition_year"),
             source.get("local_date"),
-            source.get("racecourse"),
-            source.get("race_name"),
+            _calendar_course_key(str(source.get("racecourse") or "")),
+            _calendar_key(str(source.get("race_name") or "")),
             source.get("distance_text"),
         )
         if identity not in seen_sources:
@@ -390,14 +408,16 @@ def match_official_schedule_targets(targets: list[dict], schedule_rows: list[dic
         if not candidates:
             issues.append({"target_id": target.get("target_id"), "code": "official_schedule_match_missing"})
             continue
+        target_grade = str(target.get("normalized_grade") or "").upper()
+        grade_candidates = [
+            (score, source)
+            for score, source in candidates
+            if target_grade and str(source.get("normalized_grade") or "").upper() == target_grade
+        ]
+        if grade_candidates:
+            candidates = grade_candidates
         best_score = max(score for score, _source in candidates)
         best = [source for score, source in candidates if abs(score - best_score) < 1e-9]
-        target_grade = str(target.get("normalized_grade") or "").upper()
-        grade_matches = [
-            source for source in best if target_grade and str(source.get("normalized_grade") or "").upper() == target_grade
-        ]
-        if grade_matches:
-            best = grade_matches
         distance_matches = [source for source in best if _distance_compatible(target, source)]
         if distance_matches:
             best = distance_matches
@@ -608,10 +628,16 @@ def parse_hkjc_pattern_schedule_text(text: str, *, edition_year: int | None = No
         if match is None:
             continue
         year = 2000 + int(match.group("year"))
+        month = int(match.group("month"))
+        if edition_year is not None and not (
+            (year == edition_year and month <= 6)
+            or (year == edition_year - 1 and month >= 7)
+        ):
+            continue
         race_name = _collapse(match.group("name"))
         rows.append(
             {
-                "local_date": _iso_date(year, int(match.group("month")), int(match.group("day"))),
+                "local_date": _iso_date(year, month, int(match.group("day"))),
                 "edition_year": edition_year or year,
                 "racecourse": HKJC_PATTERN_RACECOURSES.get(_calendar_key(race_name), "Sha Tin"),
                 "race_name": race_name,
@@ -733,7 +759,19 @@ def parse_bha_flat_schedule_text(text: str, *, year: int) -> list[dict]:
         rf"(?P<month>[A-Z][a-z]{{2,3}})\.?\s*(?P<day>\d{{1,2}})\s+"
         rf"(?P<name>.+?)\(P(?P<grade>[123])(?:\.[A-Z])*\.\)",
     )
-    for line in text.splitlines():
+    raw_lines = text.splitlines()
+    logical_lines = []
+    for index, line in enumerate(raw_lines):
+        combined = line
+        if not re.search(r"\(P[123]", combined):
+            for continuation in raw_lines[index + 1 : index + 3]:
+                if re.match(r"^\s*(?:(?:[A-Z][a-z]{2,3}\.?|[”\"])\s*\d{1,2})\b", continuation):
+                    break
+                combined += continuation.strip()
+                if re.search(r"\(P[123]", combined):
+                    break
+        logical_lines.append(combined)
+    for line in logical_lines:
         match = pattern.search(line)
         if match is None:
             continue
@@ -903,6 +941,18 @@ def _best_name_matches(keys: set[str], sources: list[dict]) -> list[dict]:
         return []
     best = max(score for score, _source in scored)
     return [source for score, source in scored if score == best]
+
+
+def _toba_core_name_qualifiers(value: str) -> set[str]:
+    words = set(re.findall(r"[A-Z0-9]+", unicodedata.normalize("NFKC", value or "").upper()))
+    return {qualifier for qualifier in TOBA_CORE_NAME_QUALIFIERS if qualifier in words}
+
+
+def _toba_core_name_compatible(target: dict, source: dict) -> bool:
+    target_names = [str(target.get("original_name") or "")]
+    target_names.extend(re.split(r"[|,]", str(target.get("aliases") or "")))
+    source_qualifiers = _toba_core_name_qualifiers(str(source.get("race_name") or ""))
+    return any(_toba_core_name_qualifiers(name) == source_qualifiers for name in target_names)
 
 
 def _distance_with_unit(target: dict) -> str:
@@ -1154,22 +1204,84 @@ def parse_toba_schedule(body: str, *, year: int) -> list[dict]:
     return parsed
 
 
+def parse_toba_not_run_schedule(body: str) -> list[dict]:
+    soup = BeautifulSoup(body, "html.parser")
+    parsed = []
+    for table in soup.find_all("table"):
+        table_rows = table.find_all("tr")
+        if not table_rows:
+            continue
+        headers = [
+            _collapse(cell.get_text(" ", strip=True)).lower()
+            for cell in table_rows[0].find_all(["th", "td"])
+        ]
+        stake_index = next((i for i, value in enumerate(headers) if value in {"stake", "stakes"}), None)
+        track_index = next((i for i, value in enumerate(headers) if value == "track"), None)
+        date_index = next((i for i, value in enumerate(headers) if value == "date"), None)
+        if stake_index is None or track_index is None or date_index is None:
+            continue
+        for tr in table_rows[1:]:
+            cells = tr.find_all(["th", "td"])
+            if len(cells) <= max(stake_index, track_index, date_index):
+                continue
+            source_status = _collapse(cells[date_index].get_text(" ", strip=True)).casefold()
+            if source_status != "not run":
+                continue
+            race_name = _collapse(cells[stake_index].get_text(" ", strip=True))
+            parsed.append(
+                {
+                    "race_name": race_name,
+                    "race_key": _normalize_name(race_name),
+                    "track": _collapse(cells[track_index].get_text(" ", strip=True)).upper(),
+                    "source_status": source_status,
+                }
+            )
+        if parsed:
+            break
+    return parsed
+
+
 def build_toba_provider_rows(*, targets: list[dict], year: int, body: str) -> dict:
     sources = parse_toba_schedule(body, year=year)
+    not_run_sources = parse_toba_not_run_schedule(body)
     rows = []
     issues = []
     for target in targets:
         if target.get("country_region") != "united_states" or int(target.get("year") or 0) != year:
             continue
         keys = _target_names(target)
-        name_matches = _best_name_matches(keys, sources)
+        compatible_sources = [
+            source for source in sources if _toba_core_name_compatible(target, source)
+        ]
+        name_matches = _best_name_matches(keys, compatible_sources)
         expected_tracks = TRACK_CODES.get(str(target.get("racecourse") or "").casefold(), set())
-        track_sources = [source for source in sources if source["track"] in expected_tracks]
+        track_sources = [
+            source for source in compatible_sources if source["track"] in expected_tracks
+        ]
         matches = _best_name_matches(keys, track_sources)
         # A unique annual-table name remains authoritative when a race was
         # temporarily moved, as happened during the Belmont reconstruction.
         if not matches and len(name_matches) == 1:
             matches = name_matches
+        not_run_track_sources = [
+            source
+            for source in not_run_sources
+            if source["track"] in expected_tracks and _toba_core_name_compatible(target, source)
+        ]
+        not_run_matches = _best_name_matches(keys, not_run_track_sources)
+        if len(matches) != 1 and len(not_run_matches) == 1:
+            not_run_match = not_run_matches[0]
+            issues.append(
+                {
+                    "series_key": target.get("series_key") or "",
+                    "edition_year": year,
+                    "code": "source_reports_not_run",
+                    "source_name": not_run_match["race_name"],
+                    "source_track": not_run_match["track"],
+                    "source_status": not_run_match["source_status"],
+                }
+            )
+            continue
         if len(matches) != 1:
             issues.append(
                 {
@@ -1192,6 +1304,24 @@ def build_toba_provider_rows(*, targets: list[dict], year: int, body: str) -> di
                 "distance_text": _distance_with_unit(target),
                 "urls": _source_result(match["result_url"], provider="equibase", authority="third_party"),
             }
+        )
+    rows_by_url = defaultdict(list)
+    for row in rows:
+        rows_by_url[row["urls"]["result_url"]["url"]].append(row)
+    duplicate_urls = {url for url, url_rows in rows_by_url.items() if len(url_rows) > 1}
+    if duplicate_urls:
+        duplicate_rows = [
+            row for row in rows if row["urls"]["result_url"]["url"] in duplicate_urls
+        ]
+        rows = [row for row in rows if row["urls"]["result_url"]["url"] not in duplicate_urls]
+        issues.extend(
+            {
+                "series_key": row["series_key"],
+                "edition_year": year,
+                "code": "duplicate_source_url",
+                "source_url": row["urls"]["result_url"]["url"],
+            }
+            for row in duplicate_rows
         )
     return {"rows": rows, "issues": issues}
 

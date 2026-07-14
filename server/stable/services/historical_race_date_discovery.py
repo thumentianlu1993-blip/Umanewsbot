@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import hashlib
 import ipaddress
 import json
 import re
@@ -24,6 +23,7 @@ from stable.models import (
 )
 from stable.services.historical_race_batches import (
     materialize_historical_event,
+    read_immutable_selection_snapshot,
     target_identity,
 )
 from stable.services.historical_race_inventory import (
@@ -43,6 +43,7 @@ DIRECT_URL_KEYS = {
 }
 DISCOVERY_ADAPTER_ALLOWED_HOSTS = {
     "jra": ("jra.go.jp",),
+    "nar": ("keiba.go.jp",),
     "netkeiba": ("netkeiba.com",),
     "jbis": ("jbis.or.jp",),
     "hkjc": ("hkjc.com",),
@@ -54,6 +55,7 @@ DISCOVERY_ADAPTER_ALLOWED_HOSTS = {
     "france_galop": ("france-galop.com",),
     "pmu": ("pmu.fr",),
     "zeturf": ("zeturf.fr",),
+    "zone_turf": ("zone-turf.fr",),
     "france_irishracing": ("irishracing.com",),
     "equibase": ("equibase.com",),
     "brisnet": ("brisnet.com",),
@@ -64,6 +66,7 @@ DISCOVERY_ADAPTER_ALLOWED_HOSTS = {
 }
 DISCOVERY_ADAPTER_ALLOWED_AUTHORITIES = {
     "jra": {"official"},
+    "nar": {"official"},
     "netkeiba": {"third_party_high_access"},
     "jbis": {"third_party_high_access"},
     "hkjc": {"official"},
@@ -75,6 +78,7 @@ DISCOVERY_ADAPTER_ALLOWED_AUTHORITIES = {
     "france_galop": {"official"},
     "pmu": {"third_party_high_access"},
     "zeturf": {"third_party_high_access"},
+    "zone_turf": {"third_party_database"},
     "france_irishracing": {"third_party_high_access"},
     "equibase": {"third_party"},
     "brisnet": {"third_party"},
@@ -85,6 +89,7 @@ DISCOVERY_ADAPTER_ALLOWED_AUTHORITIES = {
 }
 DISCOVERY_ADAPTER_REGIONS = {
     "jra": RacingRegion.JAPAN,
+    "nar": RacingRegion.JAPAN,
     "netkeiba": RacingRegion.JAPAN,
     "jbis": RacingRegion.JAPAN,
     "hkjc": RacingRegion.HONG_KONG,
@@ -96,6 +101,7 @@ DISCOVERY_ADAPTER_REGIONS = {
     "france_galop": RacingRegion.FRANCE,
     "pmu": RacingRegion.FRANCE,
     "zeturf": RacingRegion.FRANCE,
+    "zone_turf": RacingRegion.FRANCE,
     "france_irishracing": RacingRegion.FRANCE,
     "equibase": RacingRegion.UNITED_STATES,
     "brisnet": RacingRegion.UNITED_STATES,
@@ -105,10 +111,10 @@ DISCOVERY_ADAPTER_REGIONS = {
     "us_hrn": RacingRegion.UNITED_STATES,
 }
 PRIMARY_RESULT_PROVIDERS = {
-    RacingRegion.JAPAN: {"jra", "netkeiba"},
+    RacingRegion.JAPAN: {"jra", "nar", "netkeiba"},
     RacingRegion.HONG_KONG: {"hkjc"},
     RacingRegion.UNITED_KINGDOM: {"uk_racingpost", "uk_skysports", "uk_sportinglife", "uk_irishracing", "uk_bha"},
-    RacingRegion.FRANCE: {"france_galop", "pmu", "zeturf", "france_irishracing"},
+    RacingRegion.FRANCE: {"france_galop", "pmu", "zeturf", "zone_turf", "france_irishracing"},
     RacingRegion.UNITED_STATES: {"equibase", "brisnet", "drf", "nsa", "us_hrn"},
 }
 
@@ -232,6 +238,13 @@ def parse_distance_evidence(distance_text: str, country_region: str) -> dict[str
 
     imperial_regions = {RacingRegion.UNITED_KINGDOM, RacingRegion.UNITED_STATES}
     if country_region in imperial_regions:
+        parseable = re.sub(r"(?<=[A-Za-z])(?=\d)", " ", raw)
+        parseable = re.sub(
+            r"(?<=\d)(?=(?:1/2|1/4|3/4)\s*(?:furlongs?|fur|f)\b)",
+            " ",
+            parseable,
+            flags=re.IGNORECASE,
+        )
         unit_map = {
             "m": "mile",
             "mi": "mile",
@@ -251,8 +264,8 @@ def parse_distance_evidence(distance_text: str, country_region: str) -> dict[str
             r"(miles?|mi|m|furlongs?|fur|f|yards?|yd|y)\b",
             re.IGNORECASE,
         )
-        matches = list(token_pattern.finditer(raw))
-        remainder = token_pattern.sub("", raw).strip(" ,+")
+        matches = list(token_pattern.finditer(parseable))
+        remainder = token_pattern.sub("", parseable).strip(" ,+")
         if not matches or remainder:
             raise InventoryValidationError(f"unsupported imperial distance format: {raw}")
         components = [
@@ -359,35 +372,11 @@ def _read_selection_snapshot(
     *,
     inventory_manifest_sha256: str,
 ) -> tuple[bytes, dict[str, Any], dict[int, dict[str, Any]]]:
-    source = Path(path)
-    try:
-        selection_bytes = source.read_bytes()
-        selection = json.loads(selection_bytes.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise InventoryValidationError("date discovery selection snapshot is unreadable") from exc
-    if not isinstance(selection, dict) or selection.get("inventory_manifest_sha256") != inventory_manifest_sha256:
-        raise InventoryValidationError("date discovery selection snapshot inventory mismatch")
-    claimed_snapshot_sha = str(selection.get("snapshot_sha256") or "")
-    snapshot_payload = dict(selection)
-    snapshot_payload.pop("snapshot_sha256", None)
-    actual_snapshot_sha = hashlib.sha256(canonical_json(snapshot_payload).encode("utf-8")).hexdigest()
-    if claimed_snapshot_sha != actual_snapshot_sha:
-        raise InventoryValidationError("date discovery selection snapshot SHA is invalid")
-    selection_rows = selection.get("targets")
-    if not isinstance(selection_rows, list) or not selection_rows:
-        raise InventoryValidationError("date discovery selection snapshot has no targets")
-    selection_by_id: dict[int, dict[str, Any]] = {}
-    for row in selection_rows:
-        try:
-            target_id = int(row["target_id"])
-        except (KeyError, TypeError, ValueError) as exc:
-            raise InventoryValidationError("date discovery selection has invalid target id") from exc
-        if target_id in selection_by_id or not str(row.get("target_sha256") or "").strip():
-            raise InventoryValidationError("date discovery selection target identities are invalid")
-        selection_by_id[target_id] = row
-    if int(selection.get("target_count", -1)) != len(selection_by_id):
-        raise InventoryValidationError("date discovery selection target count is inconsistent")
-    return selection_bytes, selection, selection_by_id
+    snapshot = read_immutable_selection_snapshot(
+        path,
+        inventory_manifest_sha256=inventory_manifest_sha256,
+    )
+    return snapshot.raw_bytes, snapshot.payload, snapshot.targets_by_id
 
 
 def build_provider_discovery_candidates(

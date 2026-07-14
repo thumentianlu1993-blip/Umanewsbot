@@ -2037,7 +2037,7 @@ class NewsArticle(TimestampedModel):
         self.manually_edited_fields = sorted(current)
 
     def _suggested_tags(self) -> list[str]:
-        from stable.services.terms import extract_horse_tags
+        from stable.services.terms import resolve_article_entities
 
         source_text = "\n".join(
             [
@@ -2045,7 +2045,27 @@ class NewsArticle(TimestampedModel):
                 self.body_ja_normalized or self.body_ja_raw or "",
             ]
         ).strip()
-        return extract_horse_tags(source_text, limit=12, source_language=self.source_language or SourceLanguage.JAPANESE)
+        resolution = resolve_article_entities(
+            self.title_ja,
+            self.body_ja_normalized or self.body_ja_raw,
+            source_language=self.source_language or SourceLanguage.JAPANESE,
+        )
+        return resolution.machine_horse_tags[:12]
+
+    def _apply_machine_horse_tags(self, machine_horse_tags: list[str]) -> None:
+        previous_machine_tags = set((self.translation_metadata or {}).get("machine_horse_tags") or [])
+        preserved = [
+            (tag or "").strip()
+            for tag in (self.tags_json or [])
+            if (tag or "").strip() and (tag or "").strip() not in previous_machine_tags
+        ]
+        source_defaults = list(self.source_config.default_tags or []) if self.source_config_id and self.source_config else []
+        merged: list[str] = []
+        for tag in [*preserved, *source_defaults, *machine_horse_tags]:
+            normalized = (tag or "").strip()
+            if normalized and normalized not in merged:
+                merged.append(normalized)
+        self.tags_json = merged
 
     def ensure_editable_fields(self) -> None:
         manual_fields = set(self.manually_edited_fields or [])
@@ -2058,14 +2078,11 @@ class NewsArticle(TimestampedModel):
         if "push_summary_zh" not in manual_fields and not self.push_summary_zh:
             self.push_summary_zh = self.translated_summary_zh or (self.translated_body_zh or "")[:160]
         if "tags_json" not in manual_fields:
-            merged_tags: list[str] = []
-            seen: set[str] = set()
-            for tag in [*(self.tags_json or []), *self._suggested_tags()]:
-                normalized = (tag or "").strip()
-                if normalized and normalized not in seen:
-                    seen.add(normalized)
-                    merged_tags.append(normalized)
-            self.tags_json = merged_tags
+            machine_horse_tags = self._suggested_tags()
+            self._apply_machine_horse_tags(machine_horse_tags)
+            metadata = dict(self.translation_metadata or {})
+            metadata["machine_horse_tags"] = list(machine_horse_tags)
+            self.translation_metadata = metadata
 
     @property
     def has_translation(self) -> bool:
@@ -2093,15 +2110,12 @@ class NewsArticle(TimestampedModel):
             self.summary_zh = summary_zh or body_zh[:160]
         if force or "push_summary_zh" not in manual_fields:
             self.push_summary_zh = summary_zh or body_zh[:160]
-        if force or "tags_json" not in manual_fields:
-            merged_tags: list[str] = []
-            seen: set[str] = set()
-            for tag in [*(self.tags_json or []), *self._suggested_tags()]:
-                normalized = (tag or "").strip()
-                if normalized and normalized not in seen:
-                    seen.add(normalized)
-                    merged_tags.append(normalized)
-            self.tags_json = merged_tags
+        if "tags_json" not in manual_fields:
+            result_metadata = getattr(result, "metadata", {}) or {}
+            machine_horse_tags = result_metadata.get("machine_horse_tags")
+            if machine_horse_tags is None:
+                machine_horse_tags = self._suggested_tags()
+            self._apply_machine_horse_tags(list(machine_horse_tags))
 
 
 class NewsArticleRelatedRegion(TimestampedModel):

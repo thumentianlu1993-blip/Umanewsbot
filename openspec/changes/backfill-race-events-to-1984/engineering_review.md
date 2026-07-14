@@ -56,3 +56,34 @@
 - 测试门禁：先新增TC-IMPORT-027至032，再实现单位保留、未知字段/证据缺失、人工锁、target漂移、批次中途异常整批回滚和旧详情SHA失效测试；随后执行目标测试、完整stable回归、Django check、迁移漂移、OpenSpec strict/all和代码review复审。
 
 补充复审结论：**APPROVED**。该修复落实既有字段权威和距离单位规格，不改变产品范围；可进入测试先行和实现阶段，生产写入仍须经过候选审计、dry-run、备份与写后核验。
+
+## 2026-07-13 标准批次既有选样排除补充复审
+
+- Review mode：Full（profile：`feature`）
+- 审查结论：**APPROVED**
+- Scope Challenge：保持现有Django管理命令与批次服务边界，仅增加可重复的`--exclude-selection-snapshot`输入；不新增模型、迁移、依赖、Celery任务、网络入口或产品状态。
+- 可复用能力：复用`write_batch_snapshot()`的不可变selection格式、现有日期发现快照校验规则、`select_historical_band_batch_targets()`的稳定排序、`write_band_batch_artifact()`的证据封装，以及既有inventory SHA和artifact identity工具。
+- 数据语义：排除只影响本次选样，在地区limit前按target ID跳过；被排除target继续保持pending并留在remaining分母，不修改expectation、resolution或event。历史快照只校验自身身份，不要求其中已导入target仍匹配当前target SHA。
+- Artifact契约：命令先完整读取并校验所有排除快照，再查询选样；输出使用固定文件名复制输入原字节，manifest绑定复制件的路径、大小和SHA，且最终selection与排除集合相交时fail closed。
+- 失败模式：跨inventory、内部SHA漂移、目标ID无效或单份快照内重复、输出写入前集合相交均有明确错误；无效输入不得产生可批准artifact，也不得发生数据库写入。
+- 测试：TC-BATCH-017/018覆盖limit前补位、多个快照去重、原字节复制、manifest身份、remaining分母、跨inventory、SHA漂移和集合相交；测试先于实现落地。
+- 性能：每份快照为已批准标准批次的有界JSON，target ID集合用于数据库排除；不增加网络或无界数据库扫描。
+- NOT in scope：不把gap改成`not_held`或`permanently_unavailable`，不改变公开开关，不自动批准新批次，不重建或重启生产服务。
+- 一致性：`design.md`、增量spec、`tasks.md`和`test_cases.md`已对齐；`openspec validate backfill-race-events-to-1984 --strict`与`openspec validate --all --strict`均通过。
+
+Plan Engineering Review Summary
+================================
+Review rounds: 1（converged at round 1）
+
+Step 0: Scope Challenge — accepted as-is
+Architecture Review: 0 issues found
+Code Quality Review: 0 issues found
+Test Review: 0 gaps identified
+Performance Review: 0 issues found
+Consistency check: All artifacts consistent
+
+What already exists: immutable selection snapshot、stable selector、artifact writer、inventory identity helpers
+NOT in scope: gap产品状态变更、数据库迁移、网络抓取、公开展示和生产容器切换
+Failure modes: 0 critical gaps flagged
+
+Next: Ready for test-first implementation.

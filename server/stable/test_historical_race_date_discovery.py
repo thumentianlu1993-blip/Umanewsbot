@@ -767,6 +767,7 @@ class HistoricalRaceDateDiscoveryTests(TestCase):
     def test_all_regional_adapter_hosts_have_positive_and_negative_cases(self):
         cases = {
             "jra": ("https://www.jra.go.jp/JRADB/accessS.html", "official"),
+            "nar": ("https://www.keiba.go.jp/KeibaWeb/TodayRaceInfo/RaceMarkTable?k_raceNo=9", "official"),
             "netkeiba": ("https://db.netkeiba.com/race/200001010101/", "third_party_high_access"),
             "jbis": ("https://www.jbis.or.jp/race/result/", "third_party_high_access"),
             "hkjc": ("https://racing.hkjc.com/racing/information/English/Racing/LocalResults.aspx", "official"),
@@ -778,6 +779,7 @@ class HistoricalRaceDateDiscoveryTests(TestCase):
             "france_galop": ("https://www.france-galop.com/fr/course/fixture", "official"),
             "pmu": ("https://www.pmu.fr/turf/fixture", "third_party_high_access"),
             "zeturf": ("https://www.zeturf.fr/fr/course-du-jour/fixture", "third_party_high_access"),
+            "zone_turf": ("https://www.zone-turf.fr/rapports/fixture", "third_party_database"),
             "france_irishracing": ("https://www.irishracing.com/raceresults/Sun-1st-Oct-2000/Longchamp/1520", "third_party_high_access"),
             "equibase": ("https://www.equibase.com/premium/chartEmb.cfm", "third_party"),
             "brisnet": ("https://www.brisnet.com/content/results/fixture", "third_party"),
@@ -852,6 +854,20 @@ class HistoricalRaceDateDiscoveryTests(TestCase):
 
         mixed = parse_distance_evidence("2m 4f 56y", RacingRegion.UNITED_KINGDOM)
         self.assertEqual([part["unit"] for part in mixed["components"]], ["mile", "furlong", "yard"])
+
+        compact = parse_distance_evidence("2m1f", RacingRegion.UNITED_KINGDOM)
+        self.assertEqual(
+            compact["components"],
+            [{"value": 2, "unit": "mile"}, {"value": 1, "unit": "furlong"}],
+        )
+        self.assertEqual(compact["distance_text"], "2m1f")
+
+        compact_fraction = parse_distance_evidence("3m21/2f", RacingRegion.UNITED_KINGDOM)
+        self.assertEqual(
+            compact_fraction["components"],
+            [{"value": 3, "unit": "mile"}, {"value": 2.5, "unit": "furlong"}],
+        )
+        self.assertEqual(compact_fraction["distance_text"], "3m21/2f")
 
         with self.assertRaisesMessage(InventoryValidationError, "explicit unit"):
             parse_distance_evidence("2400", RacingRegion.FRANCE)
