@@ -13,8 +13,11 @@ from stable.models import NewsArticle, SourceLanguage, TermType, TranslationRun
 
 from .japanese_racing_translation import (
     build_japanese_format_plan,
+    build_japanese_seed_term_plan,
     japanese_format_placeholder_violations,
+    japanese_seed_term_placeholder_violations,
     restore_japanese_format_placeholders,
+    restore_japanese_seed_term_placeholders,
 )
 from .terms import (
     ArticleEntityResolution,
@@ -80,8 +83,11 @@ class DummyTranslationProvider(TranslationProvider):
             source_language=source_language,
         )
         format_plan = build_japanese_format_plan(article.title_ja, body, resolution)
-        mapped_title = apply_contextual_term_mappings(format_plan.protected_title, resolution)
-        mapped_body = apply_contextual_term_mappings(format_plan.protected_body, resolution)
+        seed_term_plan = build_japanese_seed_term_plan(article.title_ja, body, resolution, format_plan)
+        mapped_title = apply_contextual_term_mappings(seed_term_plan.protected_title, resolution)
+        mapped_body = apply_contextual_term_mappings(seed_term_plan.protected_body, resolution)
+        mapped_title = restore_japanese_seed_term_placeholders(mapped_title, seed_term_plan, field_name="title")
+        mapped_body = restore_japanese_seed_term_placeholders(mapped_body, seed_term_plan, field_name="body")
         mapped_title = restore_japanese_format_placeholders(mapped_title, format_plan, field_name="title")
         mapped_body = restore_japanese_format_placeholders(mapped_body, format_plan, field_name="body")
         return TranslationResult(
@@ -96,6 +102,7 @@ class DummyTranslationProvider(TranslationProvider):
                 "suppressed_entities": [item.as_dict() for item in resolution.suppressed_candidates],
                 "machine_horse_tags": resolution.machine_horse_tags,
                 "japanese_format_normalizations": format_plan.as_dicts(),
+                "japanese_seed_term_normalizations": seed_term_plan.as_dicts(),
             },
         )
 
@@ -133,6 +140,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             "若原文中出现 __UMA_KEEP_数字__ 形式的占位符，请在译文中原样复制该占位符，不要翻译或删除。"
             "若原文中出现 __UMA_TERM_数字__ 形式的人名占位符，也必须在译文中原样复制，系统会按术语表还原。"
             "若原文中出现 __UMA_FORMAT_数字__ 形式的固定格式占位符，也必须在对应标题或正文中原样复制，系统会还原为规范格式。"
+            "若原文中出现 __UMA_SEED_数字__ 形式的种子术语占位符，也必须在对应标题或正文中原样复制，系统会还原为指定译法。"
             "输出必须是 JSON 对象，且只包含 title_zh、body_zh、push_summary_zh 三个键。"
             f"{retry_hint}"
             "\n\n"
@@ -309,6 +317,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             source_language=source_language,
         )
         format_plan = build_japanese_format_plan(article.title_ja, source_text, resolution)
+        seed_term_plan = build_japanese_seed_term_plan(article.title_ja, source_text, resolution, format_plan)
         terms = _translation_terms(resolution)
         person_source_placeholders, person_target_placeholders = self._person_term_placeholders(terms)
         person_placeholder_by_source = {
@@ -324,7 +333,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         ]
         unknown_horse_limit = max(1, int(settings.TRANSLATION_UNKNOWN_HORSE_LIMIT))
         recognized_horses = recognized_horses_from_resolution(resolution)
-        consumed_entity_keys = format_plan.consumed_entity_keys
+        consumed_entity_keys = format_plan.consumed_entity_keys | seed_term_plan.consumed_entity_keys
         unknown_horse_names = list(
             dict.fromkeys(
                 item.matched_text
@@ -336,8 +345,8 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             )
         )[:unknown_horse_limit]
         _, horse_placeholders = self._protect_unknown_horse_names("", unknown_horse_names)
-        protected_title = self._protect_with_placeholders(format_plan.protected_title, horse_placeholders)
-        protected_body = self._protect_with_placeholders(format_plan.protected_body, horse_placeholders)
+        protected_title = self._protect_with_placeholders(seed_term_plan.protected_title, horse_placeholders)
+        protected_body = self._protect_with_placeholders(seed_term_plan.protected_body, horse_placeholders)
         protected_title = self._protect_with_placeholders(protected_title, person_source_placeholders)
         protected_body = self._protect_with_placeholders(protected_body, person_source_placeholders)
         unknown_horse_lines = [
@@ -393,6 +402,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                 ],
                 "unknown_horse_placeholders": horse_placeholders,
                 "japanese_format_normalizations": format_plan.as_dicts(),
+                "japanese_seed_term_normalizations": seed_term_plan.as_dicts(),
                 "person_term_placeholders": {
                     placeholder: {"source": source, "target": person_target_placeholders[placeholder]}
                     for placeholder, source in person_source_placeholders.items()
@@ -422,12 +432,33 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                     metadata=last_metadata,
                 )
 
+            seed_term_violations = japanese_seed_term_placeholder_violations(
+                mapped_title,
+                mapped_body,
+                seed_term_plan,
+            )
+            if seed_term_violations:
+                last_metadata["japanese_seed_term_placeholder_violations"] = seed_term_violations
+                retry_hint = (
+                    "\n\n注意：上一版遗漏、重复或跨字段放置了种子术语占位符。"
+                    "请在原占位符所属的标题或正文中各原样复制一次 __UMA_SEED_数字__ 占位符。"
+                )
+                if attempt < max_attempts:
+                    continue
+                raise TranslationResponseError(
+                    "Translation response changed required seed term placeholder",
+                    metadata=last_metadata,
+                )
+
             title_zh = self._restore_unknown_horse_placeholders(mapped_title, horse_placeholders)
             body_zh = self._restore_unknown_horse_placeholders(mapped_body, horse_placeholders)
             push_summary_zh = self._restore_unknown_horse_placeholders(mapped_summary, horse_placeholders)
             title_zh = self._restore_unknown_horse_placeholders(title_zh, person_target_placeholders)
             body_zh = self._restore_unknown_horse_placeholders(body_zh, person_target_placeholders)
             push_summary_zh = self._restore_unknown_horse_placeholders(push_summary_zh, person_target_placeholders)
+            title_zh = restore_japanese_seed_term_placeholders(title_zh, seed_term_plan, field_name="title")
+            body_zh = restore_japanese_seed_term_placeholders(body_zh, seed_term_plan, field_name="body")
+            push_summary_zh = restore_japanese_seed_term_placeholders(push_summary_zh, seed_term_plan)
             title_zh = restore_japanese_format_placeholders(title_zh, format_plan, field_name="title")
             body_zh = restore_japanese_format_placeholders(body_zh, format_plan, field_name="body")
             push_summary_zh = restore_japanese_format_placeholders(push_summary_zh, format_plan)

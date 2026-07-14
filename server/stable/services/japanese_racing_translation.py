@@ -37,6 +37,8 @@ _UNDECIDED_JOCKEY_RE = re.compile(
     r"(?m)(?P<row>^[^\r\n]*[ァ-ヴー]{3,}[^\r\n]*?)(?P<spacing>[ \t　]+)○○(?=[ \t　]*$)"
 )
 _FORMAT_PLACEHOLDER_RE = re.compile(r"__UMA_FORMAT_\d+__")
+_SEED_TERM_PLACEHOLDER_RE = re.compile(r"__UMA_SEED_\d+__")
+_SEED_TERM_MARKER = "japanese_racing_translation_seed"
 
 
 @dataclass(frozen=True)
@@ -69,6 +71,33 @@ class JapaneseFormatPlan:
             for item in self.items
             for key in item.consumed_entity_keys
         }
+
+    def as_dicts(self) -> list[dict]:
+        return [item.as_dict() for item in self.items]
+
+
+@dataclass(frozen=True)
+class JapaneseSeedTermItem:
+    placeholder: str
+    field_name: str
+    source_text: str
+    target_text: str
+    start: int
+    end: int
+
+    def as_dict(self) -> dict:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class JapaneseSeedTermPlan:
+    protected_title: str
+    protected_body: str
+    items: tuple[JapaneseSeedTermItem, ...] = ()
+
+    @property
+    def consumed_entity_keys(self) -> set[tuple[str, int, int]]:
+        return {(item.field_name, item.start, item.end) for item in self.items}
 
     def as_dicts(self) -> list[dict]:
         return [item.as_dict() for item in self.items]
@@ -358,6 +387,138 @@ def japanese_format_placeholder_violations(
 def restore_japanese_format_placeholders(
     text: str,
     plan: JapaneseFormatPlan,
+    *,
+    field_name: str | None = None,
+) -> str:
+    restored = text or ""
+    for item in plan.items:
+        if field_name is None or item.field_name == field_name:
+            restored = restored.replace(item.placeholder, item.target_text)
+    return restored
+
+
+def build_japanese_seed_term_plan(
+    title_text: str,
+    body_text: str,
+    resolution: ArticleEntityResolution,
+    format_plan: JapaneseFormatPlan,
+) -> JapaneseSeedTermPlan:
+    seeded_terms = {
+        (term.matched_text.casefold(), term.target_zh)
+        for term in resolution.accepted_terms
+        if _SEED_TERM_MARKER in (term.notes or "").casefold()
+        and (term.matched_text or "").strip()
+        and (term.target_zh or "").strip()
+    }
+    format_spans = {
+        field_name: [(item.start, item.end) for item in format_plan.items if item.field_name == field_name]
+        for field_name in ("title", "body")
+    }
+    candidates = []
+    for entity in resolution.entities:
+        if (entity.matched_text.casefold(), entity.target_zh) not in seeded_terms:
+            continue
+        if any(entity.start < end and entity.end > start for start, end in format_spans[entity.field_name]):
+            continue
+        candidates.append(entity)
+
+    selected = []
+    for entity in sorted(
+        candidates,
+        key=lambda item: (
+            0 if item.field_name == "title" else 1,
+            item.start,
+            -item.end,
+            -item.priority,
+        ),
+    ):
+        if any(
+            entity.field_name == current.field_name
+            and entity.start < current.end
+            and entity.end > current.start
+            for current in selected
+        ):
+            continue
+        selected.append(entity)
+
+    items = tuple(
+        JapaneseSeedTermItem(
+            placeholder=f"__UMA_SEED_{index}__",
+            field_name=entity.field_name,
+            source_text=entity.matched_text,
+            target_text=entity.target_zh,
+            start=entity.start,
+            end=entity.end,
+        )
+        for index, entity in enumerate(
+            sorted(
+                selected,
+                key=lambda item: (0 if item.field_name == "title" else 1, item.start, -item.end),
+            ),
+            start=1,
+        )
+    )
+
+    def protect(field_name: str, text: str) -> str:
+        replacements = [
+            (item.start, item.end, item.placeholder)
+            for item in format_plan.items
+            if item.field_name == field_name
+        ]
+        replacements.extend(
+            (item.start, item.end, item.placeholder)
+            for item in items
+            if item.field_name == field_name
+        )
+        protected = text or ""
+        for start, end, placeholder in sorted(replacements, reverse=True):
+            protected = protected[:start] + placeholder + protected[end:]
+        return protected
+
+    return JapaneseSeedTermPlan(
+        protected_title=protect("title", title_text or ""),
+        protected_body=protect("body", body_text or ""),
+        items=items,
+    )
+
+
+def japanese_seed_term_placeholder_violations(
+    title_zh: str,
+    body_zh: str,
+    plan: JapaneseSeedTermPlan,
+) -> list[dict]:
+    values = {"title": title_zh or "", "body": body_zh or ""}
+    expected = {
+        field_name: {item.placeholder for item in plan.items if item.field_name == field_name}
+        for field_name in values
+    }
+    violations: list[dict] = []
+    for field_name, value in values.items():
+        observed = _SEED_TERM_PLACEHOLDER_RE.findall(value)
+        for placeholder in sorted(set(observed) | expected[field_name]):
+            count = observed.count(placeholder)
+            if placeholder not in expected[field_name]:
+                reason = "wrong_or_unexpected_field"
+            elif count == 0:
+                reason = "missing"
+            elif count > 1:
+                reason = "duplicated"
+            else:
+                continue
+            violations.append(
+                {
+                    "placeholder": placeholder,
+                    "field_name": field_name,
+                    "reason": reason,
+                    "count": count,
+                }
+            )
+    return violations
+
+
+def restore_japanese_seed_term_placeholders(
+    text: str,
+    plan: JapaneseSeedTermPlan,
     *,
     field_name: str | None = None,
 ) -> str:

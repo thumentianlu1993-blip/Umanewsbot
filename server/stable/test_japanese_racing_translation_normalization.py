@@ -253,6 +253,53 @@ class JapaneseTranslationProviderIntegrationTests(TestCase):
             "「少女星2025」（公马，父春秋分）",
         )
 
+    def test_seeded_term_placeholder_restores_exact_target_in_title_and_body(self):
+        article = _article(title="レコード更新", body="レコードを更新した。")
+        provider = self._provider()
+        response = _fake_response(
+            title="__UMA_SEED_1__更新",
+            body="__UMA_SEED_2__を更新した。",
+        )
+
+        with patch.object(provider, "_request_completion", return_value=response) as request:
+            result = provider.translate(article)
+
+        prompt = request.call_args.args[0][1]["content"]
+        self.assertIn("__UMA_SEED_1__", prompt)
+        self.assertIn("__UMA_SEED_2__", prompt)
+        self.assertEqual(result.title_zh, "记录更新")
+        self.assertEqual(result.body_zh, "记录を更新した。")
+        self.assertEqual(
+            [item["target_text"] for item in result.metadata["japanese_seed_term_normalizations"]],
+            ["记录", "记录"],
+        )
+
+    @override_settings(TRANSLATION_MAX_ATTEMPTS=2)
+    def test_missing_seed_term_placeholder_retries_then_restores_exact_target(self):
+        article = _article(body="スピードがある。")
+        provider = self._provider()
+        first = _fake_response(body="速度很快。")
+        second = _fake_response(body="__UMA_SEED_1__很快。")
+
+        with patch.object(provider, "_request_completion", side_effect=[first, second]) as request:
+            result = provider.translate(article)
+
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(result.body_zh, "速度很快。")
+
+    @override_settings(TRANSLATION_MAX_ATTEMPTS=1)
+    def test_duplicate_or_cross_field_seed_term_placeholder_fails_explicitly(self):
+        article = _article(body="スピードがある。")
+        provider = self._provider()
+        response = _fake_response(
+            title="__UMA_SEED_1__误入标题",
+            body="__UMA_SEED_1____UMA_SEED_1__很快。",
+        )
+
+        with patch.object(provider, "_request_completion", return_value=response):
+            with self.assertRaisesRegex(TranslationResponseError, "seed term placeholder"):
+                provider.translate(article)
+
     def test_consumed_unknown_yearling_does_not_trigger_old_missing_horse_warning(self):
         _term("フォリー", "青草地")
         article = _article(body="フォリーが出走し、「プティフォリーの2025」が上場した。")
@@ -319,7 +366,7 @@ class JapaneseTranslationProviderIntegrationTests(TestCase):
         with patch.object(
             provider,
             "_request_completion",
-            return_value=_fake_response(body="测试马速度很快。"),
+            return_value=_fake_response(body="测试马__UMA_SEED_1__很快。"),
         ) as request:
             result = provider.translate(article)
 
@@ -346,7 +393,7 @@ class JapaneseTranslationProviderIntegrationTests(TestCase):
         with patch.object(
             provider,
             "_request_completion",
-            return_value=_fake_response(body="春秋分产驹由社台牧场送拍。"),
+            return_value=_fake_response(body="春秋分产驹由__UMA_SEED_1__牧场送拍。"),
         ) as request:
             result = provider.translate(article)
 
@@ -357,7 +404,23 @@ class JapaneseTranslationProviderIntegrationTests(TestCase):
     def test_seeded_common_terms_are_mapped_and_never_become_horse_tags(self):
         article = _article(body="セレクトセールではスムーズなタイプがオープン級を走る。")
         provider = self._provider()
-        response = _fake_response(body="セレクトセールではスムーズなタイプがオープン级を走る。")
+        resolution = resolve_article_entities(
+            article.title_ja,
+            article.body_ja_normalized,
+            source_language=SourceLanguage.JAPANESE,
+        )
+        format_plan = _normalization_module().build_japanese_format_plan(
+            article.title_ja,
+            article.body_ja_normalized,
+            resolution,
+        )
+        seed_plan = _normalization_module().build_japanese_seed_term_plan(
+            article.title_ja,
+            article.body_ja_normalized,
+            resolution,
+            format_plan,
+        )
+        response = _fake_response(body=seed_plan.protected_body)
 
         with patch.object(provider, "_request_completion", return_value=response):
             result = provider.translate(article)

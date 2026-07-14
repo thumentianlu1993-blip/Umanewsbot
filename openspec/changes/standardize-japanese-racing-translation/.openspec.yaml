@@ -32,3 +32,9 @@ journal:
     issues_resolved: 8
     verdict: approved
     note: "依次修复跨行访谈、格式占位符重复/跨字段、骑手未定误匹配、停用术语、普通词/真实马语境优先级、基础术语上限与新增机构别名入 prompt 等技术问题；第 6 轮零问题。"
+  - event: code-reviewed
+    date: "2026-07-14T09:31:50+08:00"
+    rounds: 1
+    issues_resolved: 2
+    verdict: approved
+    note: "上线后回归发现模型同义改写与一篇完整性失败；新增字段级种子术语占位符、同步重译返回值门禁并修复嵌套最长命中，第 7 轮 review 零问题。"

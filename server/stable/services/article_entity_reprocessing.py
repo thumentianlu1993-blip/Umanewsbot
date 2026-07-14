@@ -87,7 +87,12 @@ def _commit_article(article_id: int, *, translate_sync: bool) -> dict:
         )
         pre_translation_tag_plan = _tag_plan(article, pre_translation_resolution)
         if translate_sync:
-            translate_article_task.run(article.id, force=True, suppress_automation=True)
+            translation_outcome = translate_article_task.run(article.id, force=True, suppress_automation=True)
+            if not translation_outcome or not translation_outcome.get("translated"):
+                raise RuntimeError(
+                    "synchronous translation did not complete: "
+                    f"article={article.id} outcome={translation_outcome!r}"
+                )
             article.refresh_from_db()
         resolution = resolve_article_entities(
             article.title_ja,

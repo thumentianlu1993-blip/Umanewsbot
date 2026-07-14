@@ -1281,13 +1281,34 @@ class ReprocessArticleEntitiesCommandTests(TestCase):
     def test_sync_translation_suppresses_automation_dispatch(self):
         article = self._article("entity-translation-success")
 
-        with patch("stable.services.article_entity_reprocessing.translate_article_task.run") as translate:
+        with patch(
+            "stable.services.article_entity_reprocessing.translate_article_task.run",
+            return_value={"translated": True},
+        ) as translate:
             payload = self._command("--article-id", str(article.id), "--commit", "--translate-sync")
 
         self.assertEqual(payload["articles"][0]["status"], "committed")
         translate.assert_called_once_with(article.id, force=True, suppress_automation=True)
         article.refresh_from_db()
         self.assertEqual(article.tags_json, [])
+
+    def test_sync_translation_rejects_skipped_outcome_instead_of_reporting_committed(self):
+        article = self._article("entity-translation-skipped")
+
+        with patch(
+            "stable.services.article_entity_reprocessing.translate_article_task.run",
+            return_value={"translated": False, "skipped": True, "reason": "translation_already_claimed"},
+        ):
+            payload = self._command("--article-id", str(article.id), "--commit", "--translate-sync")
+
+        self.assertEqual(payload["articles"][0]["status"], "failed")
+        self.assertIn("synchronous translation did not complete", payload["articles"][0]["error"])
+        self.assertFalse(
+            OperationLog.objects.filter(
+                action_type="article_entities_reprocessed",
+                target_id=str(article.id),
+            ).exists()
+        )
 
     def test_sync_translation_uses_legacy_tag_plan_captured_before_new_provenance(self):
         article = self._article("entity-translation-provenance-order")
@@ -1297,6 +1318,7 @@ class ReprocessArticleEntitiesCommandTests(TestCase):
                 tags_json=["好运宝宝"],
                 translation_metadata={"machine_horse_tags": []},
             )
+            return {"translated": True}
 
         with patch(
             "stable.services.article_entity_reprocessing.translate_article_task.run",

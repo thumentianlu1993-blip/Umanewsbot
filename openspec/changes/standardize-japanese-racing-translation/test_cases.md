@@ -42,6 +42,9 @@
 - 标题格式占位符只在 `title_zh` 验收，正文格式占位符只在 `body_zh` 验收；摘要不能代替对应字段。
 - 首次遗漏时用现有 retry hint 重试；第二次仍遗漏抛 `TranslationResponseError`。
 - 成功时 `TranslationRun.raw_response.japanese_format_normalizations` 记录 placeholder、rule、field、source、target。
+- 种子术语使用独立的 `__UMA_SEED_n__` 字段级占位符；模型即使倾向把“记录”改成“纪录”，最终仍逐字恢复迁移指定目标。
+- 种子术语占位符遗漏时重试，最终遗漏、重复或跨标题/正文字段放置时显式失败；元数据记录来源 span 与精确目标。
+- `セレクトセール` 内部重叠的 `セール` 不得生成第二个占位符或破坏较长词。
 - 与 `__UMA_KEEP_n__`、`__UMA_TERM_n__` 同时存在时互不覆盖，最终无内部 placeholder 残留。
 
 ## 5. 术语迁移矩阵
@@ -56,6 +59,7 @@
 ## 6. 发布与生产验收
 
 - `translate_news --sync --force --article-id` 允许更新目标中文字段，但保持 `manually_edited_fields` 列表。
+- 同步重译任务返回 skipped/未完成时，该文章必须记为 failed，不得继续写入“重处理成功”日志。
 - 已发布文章保持 ID、`workflow_status`、`published_to_web_at`、发布配额状态和 QQ delivery 数量。
 - 11 篇目标文章逐篇运行翻译与发布校验，公开详情为 HTTP `200`。
 - 随机抽取近期日文新文章，检查普通片假名、产驹/追切/访谈/出马表格式及未知马名；发现新技术漏项继续修复并回归。
