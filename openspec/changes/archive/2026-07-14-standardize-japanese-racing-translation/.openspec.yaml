@@ -1,7 +1,7 @@
 schema: spec-driven
 created: 2026-07-13
 profile: feature
-phase: reviewed
+phase: archived
 journal:
   - event: proposed
     date: "2026-07-14T08:29:51+08:00"
@@ -68,3 +68,19 @@ journal:
     issues_resolved: 0
     verdict: approved
     note: "8287 最终回读暴露种子术语占位符恢复后产生类型类型/公开级级别；新增仅限占位符边界的确定性去重及合法单字边界负例，完整 stable 1295 项通过，review 零问题。"
+  - event: deployed
+    date: "2026-07-14T12:55:00+08:00"
+    revision: "873845dacb1cec0353ed9b9834417a1a00cc6311"
+    image: "sha256:d3f602de4459158bc372e45bb35f3730a7be21f284dfea32de5535681bd6d791"
+    backup: "pre-873845da-20260714_124940.dump"
+    note: "候选 PostgreSQL 迁移、check、漂移及 84 项关联测试通过后，web/worker/beat 切换到同一最终 AMD64 镜像。"
+  - event: production-accepted
+    date: "2026-07-14T13:05:00+08:00"
+    target_articles: 11
+    random_samples: 5
+    errors: 0
+    note: "11 篇目标文章与 5 篇随机样本通过正文、格式、术语、状态、发布时间、人工字段和 QQ 幂等验收；HTTP 页面、Celery、日志和历史开关均正常。"
+  - event: archived
+    date: "2026-07-14T13:14:21+08:00"
+    specs_synced: [japanese-racing-translation-normalization, termbase-and-race-priority]
+    note: "delta specs 已同步到正式规格；change 与全库 strict 校验通过，任务全部完成。"

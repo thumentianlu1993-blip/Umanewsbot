@@ -1,5 +1,14 @@
 # 当前状态
 
+## 2026-07-14 日文赛马翻译与固定格式已上线
+
+- OpenSpec change `standardize-japanese-racing-translation` 已按提案、Full 工程评审、完整测试、apply、多轮 `/review -> 修复`、部署、生产回归和规格同步流程完成，并归档到 `openspec/changes/archive/2026-07-14-standardize-japanese-racing-translation/`。日文普通片假名词现在以非马名固定译法进入文章级实体与翻译链路；拍卖产驹、追切计时、赛后访谈和出马表骑手未定使用字段级确定性格式；未知完整马名继续保留原文。种子术语占位符按字段守恒，恢复时只消除明确的边界重复，不会把“拍卖会会场”这类合法单字相接误删。
+- `社台/Shadai`、`ノーザンホースパーク/Northern Horse Park` 和 `セレクトセール` 已在生产术语库中各自保持唯一概念；目标分别为“社台”“北方马公园”“精选拍卖会”，日英别名完整。英文马名中文目标只在中文/繁中文章中反向匹配，不再把日文普通词 `出走` 识别成英文马名 `Movin Out`。
+- 最终生产 revision 为 `873845dacb1cec0353ed9b9834417a1a00cc6311`，源码 archive SHA-256 为 `2c00bf5bee4e824d5bd3cb408af942b5a255dd88f30de1b24436cab289ec3e09`；web/worker/beat 均运行 AMD64 镜像 `sha256:d3f602de4459158bc372e45bb35f3730a7be21f284dfea32de5535681bd6d791`。本地完整 `stable 1295` 项通过（另 `1` 项按设计跳过），候选 PostgreSQL 的迁移/check/漂移和关联 `84` 项通过，最终 review 零问题。
+- 写入前恢复点为 `.env.backup.pre-873845da-20260714_124940` 与 `backups/db/pre-873845da-20260714_124940.dump`；数据库备份 `134234023` bytes、SHA-256 `413718143809a09686ea18710a4cd8b8f9a9f7643fb6b769cee5daf23ca485a6`，已用 PostgreSQL 容器执行 `pg_restore -l` 验证。旧镜像回滚 tag 为 `umanewsbot:rollback-pre-873845da-20260714-1254`，image ID `sha256:b14844ee027a7902db2ed22c9b310e8240dd2d84f822d2785a28799271e3a1a2`。
+- 目标文章 `8304/8299/8298/8291/8290/8288/8287/8283/8276/8219/8212` 均为 `published + translated`，保留原发布时间、人工字段和 QQ 次数；指定普通词残留、内部占位符和格式错误均为 `0`。`8304` 产驹、`8291` 追切、`8219` 访谈、`8212` 骑手未定及完整未知马名逐项通过。`8287` 使用已通过全部门禁的成功 run `8613`，仅确定性修复两处“类型类型”和一处“公开级级别”，并记录 `OperationLog`；后续失败 run `8622` 未覆盖公开稿。
+- 随机样本 `8337/8366/8356/8307/8367` 均已发布、已翻译且无内部占位符；`8367` 的标签和 machine tags 均不含错误的“出走”。HTTP healthz、首页、后台和 11 篇详情均为 `200`；Redis queue、Celery active/reserved 为空，近 15 分钟无 fatal/traceback。候选数据库已删除，历史写入/网络开关保持 false，历史 published 为 `0`。
+
 ## 2026-07-14 新闻实体语境判定与完整马名保护已上线
 
 - OpenSpec change `contextualize-news-entity-resolution` 已完成测试优先实现及 `18` 轮 `/review -> 修复`，最终一轮无问题。文章级解析结果统一供翻译、标签、发布校验、自动马匹关联与显式重处理消费；英文人物全名及篇内唯一姓氏回指会压制内部马名，英文普通词/高歧义词需要强马名语境，日文完整未知马名会先整体占位，不再被父马、冠名或短术语拆分。

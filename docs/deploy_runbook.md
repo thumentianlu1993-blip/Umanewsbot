@@ -1,5 +1,16 @@
 # 部署运行手册
 
+## 2026-07-14 日文赛马翻译与固定格式部署及回归
+
+1. 最终提交为 `873845dacb1cec0353ed9b9834417a1a00cc6311`；干净 `git archive` SHA-256 为 `2c00bf5bee4e824d5bd3cb408af942b5a255dd88f30de1b24436cab289ec3e09`。正式 tag 为 `umanewsbot:main-873845da-amd64-20260714-1248`，AMD64 image ID `sha256:d3f602de4459158bc372e45bb35f3730a7be21f284dfea32de5535681bd6d791`，revision/archive 标签均已核对。
+2. 候选 PostgreSQL `jp-translation-db-b7dab422` 上无待迁移、Django check 和迁移漂移通过，关联 `84` 项测试通过；生产切换前 Redis queue、worker active/reserved、外部导入、归属和术语重处理 live run 均为 0。候选验收完成后已删除该数据库容器。
+3. 写前备份为 `.env.backup.pre-873845da-20260714_124940` 与 `backups/db/pre-873845da-20260714_124940.dump`；数据库文件 `134234023` bytes、SHA-256 `413718143809a09686ea18710a4cd8b8f9a9f7643fb6b769cee5daf23ca485a6`，通过数据库容器内 `pg_restore -l`。回滚 tag `umanewsbot:rollback-pre-873845da-20260714-1254` 指向旧镜像 `sha256:b14844ee027a7902db2ed22c9b310e8240dd2d84f822d2785a28799271e3a1a2`。
+4. 切换时保持 beat 停止，只用最终 `prod` 镜像执行 migrate、Django check 和 `makemigrations --check --dry-run`，再以 `--no-deps` 重建 web/worker。目标文章和随机样本全部通过后才以同镜像重建 beat；最终三服务 image ID 必须完全一致。
+5. 目标 `8304/8299/8298/8291/8290/8288/8287/8283/8276/8219/8212` 必须核对普通词零残留、固定格式、完整未知马名、内部占位符、状态、发布时间、人工字段和 QQ 次数。生产实际 QQ 基线为 `8298/8288/8283` 各 1，其余 0；任何新增均为阻断。
+6. `8287` 的随机模型重译若被门禁拒绝，不得降低门禁。当前公开稿基于成功 run `8613`，只在事务内精确替换两处“类型类型”和一处“公开级级别”，恢复 translated 状态并记录 `article_translation_boundary_repaired`；失败 run `8622` 继续保留审计。随后运行不带重译的 `reprocess_article_entities --article-id 8287 --commit --json` 重建实体 provenance。
+7. 随机回归固定记录 `8337/8366/8356/8307/8367`；`8367` 的 tags 与 machine tags 均不得包含“出走”。最终验收使用 HTTP：healthz、首页、后台及 11 篇详情均为 `200`；HTTPS 尚未启用，不属于本 change 入口。Redis queue、active/reserved 为空，近 15 分钟无 fatal/traceback，历史写入/网络开关 false、历史 published 0。
+8. 回滚先停 beat 并排空 worker，将 `umanewsbot:rollback-pre-873845da-20260714-1254` retag 为 `prod`，再重建 web/worker/beat。代码回滚保留新增术语数据；只有确认生产数据损坏时才恢复上述 custom-format 数据库备份。
+
 ## 2026-07-14 新闻实体语境修复部署与回归
 
 1. 最终上线提交为 `dc1e5ec584e47ea9d28998f76454d105836b3f0a`，源码 archive SHA-256 `f2eec61f6d2211a76e4456f6b9cbfc3e55a5b610829162b4a68b6039aae6ffe1`；正式镜像 tag 为 `umanewsbot:main-dc1e5ec5-amd64-20260714-075837`，image ID `sha256:5b06821610f0d2214cb24692e58beac4ffda731ddb84674a8855b2a1d4dbb470`。
