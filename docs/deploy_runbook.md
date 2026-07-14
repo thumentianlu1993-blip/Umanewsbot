@@ -15,6 +15,7 @@
 ## 待执行：多地区归属 V3.2 Shadow 部署与 24 小时观察
 
 1. 先将 V3.2 合入最新 `main@c4087e6c`，完整通过 stable、归属/法国/runner 组合、Django check、迁移漂移、OpenSpec 与 diff check；从纯 Git archive 做两个独立 AMD64 构建，image ID 必须一致，并在镜像内复跑专项。
+   - 已完成：revision `fedca1ad01dba7fae9ce79b55d66867bff8f6e81`，tree `04318b57ee43ea70e07085b94ac16086a69b23a0`，source archive SHA-256 `6b91bd43c51b48f9cfc15e27a0fefa2f8247c96607573260110f413ab50521d2`，双构建 AMD64 image ID `sha256:498a226f1b45bd8f09c55f90357fda13f994199fb06591fb82a76b6bcf5c560f`。完整 `stable 1436/1436`（另 7 项环境跳过）；镜像内 Django/migration 与只读挂载真实 Compose 后组合 `192/192`（另 1 项环境跳过）。
 2. 等生产协调任务明确交还部署窗口；复核正文 one-off、TranslationRun、Celery queue/active/reserved、归属/历史 run 与锁、idle transaction 均为空，磁盘高于 5 GiB。先备份数据库和 `.env`，保留当前 prod rollback；仅以 `--no-deps` 更新 web/worker/beat，不得重建 DB/Redis/network。
 3. 部署时保持 `MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`，只把 `MULTIREGION_ATTRIBUTION_MODE` 从 `off` 调为 `shadow`。不得执行归属 commit、72 小时回填、网页/群相关地区查询或 QQ 扩散。
 4. 部署后验证三服务镜像/revision、Django check、迁移、内外 healthz、队列、锁与日志。Shadow 计时从配置生效且健康验收完成时开始，至少运行 24 小时。

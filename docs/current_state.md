@@ -8,6 +8,7 @@
 - 重点反例验收通过：`8105` 为爱尔兰 `other` 主地区并关联英国，`8509` 的完整 `Irish Oaks` 不再被嵌套 `Oaks` 覆盖，`8351/8364` 保持日本主地区并关联法国；法国赛果 `8089` 继续按已确认的赛事优先规则保留法国主地区，原单审 Gold 分歧未自动续签。
 - 本轮只读 run 已完成，未 commit 归属、未改文章/术语/来源/发布/QQ。一次性容器与 V3.2 审计镜像已从生产删除；交还时可用空间 `8,515,672 KiB`，生产仍为 `sha256:b90cdf5c...b70a` / revision `e3efd879`，web/worker 未重启、beat 仍停止，队列、active/reserved、翻译/归属/历史运行项、锁和 idle transaction 均为 0，内外 healthz 正常。
 - 第四轮结论仅批准下一阶段 `Shadow`，不批准 `enforce`、相关地区网页/群查询、历史回填或正式 QQ。V3.2 已合入最新 `main@c4087e6c` 的 historical runner 安全补丁；下一步须对组合提交重新执行完整回归、可复现 AMD64 双构建和受控部署，保持相关地区查询关闭，Shadow 健康运行至少 24 小时后再决定是否进入仅新文章 enforce。
+- 最新主线组合回归已完成：归属/法国/runner 交叉 `192/192`（另 1 项环境跳过）、完整 `stable 1436/1436`（另 7 项环境跳过）、Django check、迁移无漂移、OpenSpec `29/29` 和 diff check 全部通过。最终 revision `fedca1ad01dba7fae9ce79b55d66867bff8f6e81`，tree `04318b57ee43ea70e07085b94ac16086a69b23a0`，纯 Git archive SHA-256 `6b91bd43c51b48f9cfc15e27a0fefa2f8247c96607573260110f413ab50521d2`；两个独立上下文均构建出 AMD64 image `sha256:498a226f1b45bd8f09c55f90357fda13f994199fb06591fb82a76b6bcf5c560f`。镜像内 Django/migration 通过，只读挂载两份真实 Compose 契约后组合测试 `192/192`（另 1 项环境跳过）。
 
 ## 2026-07-15 多地区归属 V3.1 第三轮生产审计 no-go 与 V3.2 修复
 
