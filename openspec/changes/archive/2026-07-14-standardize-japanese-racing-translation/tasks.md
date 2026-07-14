@@ -3,7 +3,7 @@
 - [x] 0.1 (integration) PASS：普通词正样本最终残留指定片假名数量为 `0`，未知马名逐字保留率为 `100%`；BLOCKER：任一普通词残留或未知马名被翻译/拆分
 - [x] 0.2 (integration) PASS：产驹、追切、访谈和骑手未定四类固定格式在全部变体中精确一致，格式占位符遗漏时重试并最终失败；BLOCKER：任一格式依赖模型自由发挥或静默丢失占位符
 - [x] 0.3 (application) PASS：术语迁移首次执行后每个概念唯一，重复执行语义不增行，冲突数据明确失败且不覆盖；BLOCKER：重复概念/别名或人工数据被静默改写
-- [ ] 0.4 (operations) PASS：11 篇目标文章和随机新样本正文正确，目标文章 ID/状态/发布时间/`manually_edited_fields` 标记/QQ delivery 完全不变；BLOCKER：任一公开、人工标记或分发副作用
+- [x] 0.4 (operations) PASS：11 篇目标文章和随机新样本正文正确，目标文章 ID/状态/发布时间/`manually_edited_fields` 标记/QQ delivery 完全不变；BLOCKER：任一公开、人工标记或分发副作用
 
 ## 1. 完整测试用例与失败回归
 
@@ -38,14 +38,14 @@
 
 ## 5. 生产部署与文章修复
 
-- [ ] 5.1 (operations) 协调空闲生产写入窗口，核对精确 commit、容器/Celery/one-off/历史写入门禁和健康状态，备份 `.env` 与 PostgreSQL 并验证恢复清单
-- [ ] 5.2 (operations) 从最终零问题提交构建可复现 AMD64 镜像，在候选 PostgreSQL 上执行迁移、Django check、迁移漂移和目标测试，再依次部署 web/worker/beat
-- [ ] 5.3 (operations) 核对 `社台/Shadai`、`ノーザンホースパーク/Northern Horse Park`、`セレクトセール` 及普通词在生产术语库中概念唯一、目标正确且别名完整
-- [ ] 5.4 (operations) 对 `8304/8299/8298/8291/8290/8288/8287/8283/8276/8219/8212` 记录公开身份、`manually_edited_fields` 标记和 QQ 快照后分批同步强制重译并逐篇重新校验
-- [ ] 5.5 (operations) 逐篇验收普通词、产驹、追切、访谈、出马表与未知马名，保持公开状态/时间/人工标记/QQ 幂等；随机抽取近期新日文文章确认不再出现同类问题
-- [ ] 5.6 (operations) 验收 HTTP healthz、首页、后台、目标详情、web/worker/beat 同镜像、空队列、错误日志及历史赛事安全开关后交还生产写入窗口
+- [x] 5.1 (operations) 协调空闲生产写入窗口，核对精确 commit、容器/Celery/one-off/历史写入门禁和健康状态，备份 `.env` 与 PostgreSQL 并验证恢复清单
+- [x] 5.2 (operations) 从最终零问题提交构建可复现 AMD64 镜像，在候选 PostgreSQL 上执行迁移、Django check、迁移漂移和目标测试，再依次部署 web/worker/beat
+- [x] 5.3 (operations) 核对 `社台/Shadai`、`ノーザンホースパーク/Northern Horse Park`、`セレクトセール` 及普通词在生产术语库中概念唯一、目标正确且别名完整
+- [x] 5.4 (operations) 对 `8304/8299/8298/8291/8290/8288/8287/8283/8276/8219/8212` 记录公开身份、`manually_edited_fields` 标记和 QQ 快照后分批同步强制重译并逐篇重新校验
+- [x] 5.5 (operations) 逐篇验收普通词、产驹、追切、访谈、出马表与未知马名，保持公开状态/时间/人工标记/QQ 幂等；随机抽取近期新日文文章确认不再出现同类问题
+- [x] 5.6 (operations) 验收 HTTP healthz、首页、后台、目标详情、web/worker/beat 同镜像、空队列、错误日志及历史赛事安全开关后交还生产写入窗口
 
 ## 6. 文档、规格与归档
 
-- [ ] 6.1 (operations) 更新 `docs/current_state.md`、`docs/project_status.md`、`docs/decisions.md` 和 `docs/deploy_runbook.md`，记录格式契约、术语迁移、镜像、备份、目标文章与随机回归证据
-- [ ] 6.2 (operations) 同步 delta spec、严格校验全部完成任务并归档 `standardize-japanese-racing-translation`
+- [x] 6.1 (operations) 更新 `docs/current_state.md`、`docs/project_status.md`、`docs/decisions.md` 和 `docs/deploy_runbook.md`，记录格式契约、术语迁移、镜像、备份、目标文章与随机回归证据
+- [x] 6.2 (operations) 同步 delta spec、严格校验全部完成任务并归档 `standardize-japanese-racing-translation`

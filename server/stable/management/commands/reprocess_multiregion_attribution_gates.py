@@ -10,8 +10,8 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-from stable.models import AutomationStatus, NewsArticle, RacingRegion, WorkflowStatus
-from stable.services.news_attribution import infer_article_attribution
+from stable.models import AttributionStatus, AutomationStatus, NewsArticle, RacingRegion, WorkflowStatus
+from stable.services.news_attribution import ATTRIBUTION_RULE_VERSION
 from stable.services.validation import validate_rewrite
 
 
@@ -23,7 +23,17 @@ TERMINAL_WORKFLOW_STATUSES = {
     WorkflowStatus.ARCHIVED,
     WorkflowStatus.IGNORED,
 }
+AUDIT_EXCLUDED_WORKFLOW_STATUSES = TERMINAL_WORKFLOW_STATUSES - {WorkflowStatus.PUBLISHED}
 REPROCESS_ISSUE_CODES = {"core_term_missing", "term_region_excluded"}
+AUDIT_SCOPE_GATE_CANDIDATES = "gate_candidates"
+AUDIT_SCOPE_ALL_ARTICLES = "all_articles"
+OPERATIONAL_REGIONS = (
+    RacingRegion.JAPAN,
+    RacingRegion.HONG_KONG,
+    RacingRegion.UNITED_KINGDOM,
+    RacingRegion.FRANCE,
+    RacingRegion.UNITED_STATES,
+)
 
 
 def _has_reprocessable_gate(article: NewsArticle) -> bool:
@@ -34,12 +44,24 @@ def _has_reprocessable_gate(article: NewsArticle) -> bool:
 
 
 class Command(BaseCommand):
-    help = "重跑多地区归属并重新校验英文术语门禁；commit 只恢复候选，不直接发布。"
+    help = "重跑多地区归属；默认范围重校验英文术语门禁，全量范围只回填归属且不直接发布。"
 
     def add_arguments(self, parser):
         parser.add_argument("--region", action="append", choices=[choice[0] for choice in RacingRegion.choices])
         parser.add_argument("--hours", type=int, help="回看小时数；默认使用 MULTIREGION_PUBLISH_CANDIDATE_LOOKBACK_HOURS。")
-        parser.add_argument("--limit", type=int, default=200)
+        parser.add_argument("--limit", type=int)
+        parser.add_argument(
+            "--scope",
+            choices=[AUDIT_SCOPE_GATE_CANDIDATES, AUDIT_SCOPE_ALL_ARTICLES],
+            default=AUDIT_SCOPE_GATE_CANDIDATES,
+            help="gate_candidates 保持原门禁补跑范围；all_articles 审计近期全部有效文章并包含已发布稿。",
+        )
+        parser.add_argument(
+            "--review-sample-per-region",
+            type=int,
+            default=5,
+            help="全量审计时，在必审项之外按当前主地区确定性抽样的篇数。",
+        )
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument("--commit", action="store_true")
         parser.add_argument("--json", action="store_true", help="以 JSON 输出。")
@@ -47,10 +69,17 @@ class Command(BaseCommand):
         parser.add_argument("--manifest-sha256")
         parser.add_argument("--resume", action="store_true")
         parser.add_argument("--gold-labels", help="版本化 gold labels CSV；用于计算并绑定本次 dry-run 质量指标。")
+        parser.add_argument(
+            "--single-review-gold",
+            action="store_true",
+            help="允许单审 Gold Set 进入指标分母；仍须满足全部覆盖与质量门槛。",
+        )
 
     def handle(self, *args, **options):
         if options["dry_run"] == options["commit"]:
             raise CommandError("必须且只能指定 --dry-run 或 --commit")
+        if options.get("single_review_gold") and not options.get("gold_labels"):
+            raise CommandError("--single-review-gold 必须与 --gold-labels 一起使用")
 
         if options["commit"]:
             if not options.get("run_id") or not options.get("manifest_sha256"):
@@ -96,18 +125,22 @@ class Command(BaseCommand):
             1,
             int(options.get("hours") or getattr(settings, "MULTIREGION_PUBLISH_CANDIDATE_LOOKBACK_HOURS", 3)),
         )
-        limit = max(1, int(options["limit"]))
+        scope = options.get("scope") or AUDIT_SCOPE_GATE_CANDIDATES
+        requested_limit = options.get("limit")
+        limit = max(1, int(requested_limit)) if requested_limit else (
+            200 if scope == AUDIT_SCOPE_GATE_CANDIDATES else None
+        )
+        review_sample_per_region = max(0, int(options.get("review_sample_per_region") or 0))
         window_start = now - timedelta(hours=lookback_hours)
         regions = {region for region in (options.get("region") or []) if region}
-        queryset = (
-            NewsArticle.objects.filter(
-                first_seen_at__gte=window_start,
-                automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
+        queryset = NewsArticle.objects.filter(first_seen_at__gte=window_start)
+        if scope == AUDIT_SCOPE_GATE_CANDIDATES:
+            queryset = queryset.filter(automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED).exclude(
+                workflow_status__in=TERMINAL_WORKFLOW_STATUSES
             )
-            .exclude(workflow_status__in=TERMINAL_WORKFLOW_STATUSES)
-            .order_by("first_seen_at", "id")
-            .prefetch_related("related_region_links")
-        )
+        else:
+            queryset = queryset.exclude(workflow_status__in=AUDIT_EXCLUDED_WORKFLOW_STATUSES)
+        queryset = queryset.order_by("first_seen_at", "id").prefetch_related("related_region_links")
         if regions:
             queryset = queryset.filter(racing_region__in=regions)
 
@@ -117,59 +150,19 @@ class Command(BaseCommand):
         has_more_candidates = False
         for article in queryset.iterator(chunk_size=200):
             scanned_count += 1
-            if not _has_reprocessable_gate(article):
+            if scope == AUDIT_SCOPE_GATE_CANDIDATES and not _has_reprocessable_gate(article):
                 skipped["no_reprocessable_gate"].append(article.id)
                 continue
             candidates.append(article)
-            if len(candidates) > limit:
+            if limit is not None and len(candidates) > limit:
                 candidates.pop()
                 has_more_candidates = True
                 break
 
         restored_ids: list[int] = []
         still_blocked_ids: list[int] = []
-        outcomes: list[dict] = []
-        from stable.services.news_attribution import AttributionBatchContext
-
-        batch_context = AttributionBatchContext.build()
-        for article in candidates:
-            old_regions = {
-                "primary": article.racing_region,
-                "related": list(article.related_region_links.values_list("region", flat=True)),
-            }
-            attribution = infer_article_attribution(article, batch_context=batch_context)
-            attribution_applied = not article.attribution_locked
-            effective_regions = {
-                "primary": attribution.primary_region if attribution_applied else old_regions["primary"],
-                "related": attribution.related_regions if attribution_applied else old_regions["related"],
-            }
-            article._attribution_region_override = {
-                effective_regions["primary"],
-                *effective_regions["related"],
-            }
-            outcome = validate_rewrite(article)
-            if outcome.passed:
-                restored_ids.append(article.id)
-            else:
-                still_blocked_ids.append(article.id)
-            outcomes.append(
-                {
-                    "article_id": article.id,
-                    "old_regions": old_regions,
-                    "new_regions": effective_regions,
-                    "inferred_regions": {
-                        "primary": attribution.primary_region,
-                        "related": attribution.related_regions,
-                    },
-                    "attribution_locked": article.attribution_locked,
-                    "attribution_applied": attribution_applied,
-                    "content_category": attribution.content_category if attribution_applied else article.content_category,
-                    "validation_passed": outcome.passed,
-                    "validation_reason": outcome.reason,
-                    "blockers": [issue for issue in outcome.issues if issue.get("severity") == "blocker"],
-                }
-            )
-
+        validation_passed_ids: list[int] = []
+        validation_blocked_ids: list[int] = []
         from stable.services.attribution_runs import create_attribution_dry_run
 
         gold_metrics = {}
@@ -182,19 +175,129 @@ class Command(BaseCommand):
             configured_sha = getattr(settings, "MULTIREGION_ATTRIBUTION_GOLD_SNAPSHOT_SHA256", "")
             if configured_sha and configured_sha != gold_snapshot_sha256:
                 raise CommandError("gold labels 文件与配置 SHA-256 不匹配")
-            gold_metrics = asdict(evaluate_gold_labels_against_database(load_gold_labels(gold_path)))
+            gold_metrics = asdict(
+                evaluate_gold_labels_against_database(
+                    load_gold_labels(gold_path),
+                    allow_provisional=options.get("single_review_gold", False),
+                )
+            )
 
         run = create_attribution_dry_run(
             candidates,
-            rule_version="multiregion-v2",
+            rule_version=ATTRIBUTION_RULE_VERSION,
             term_version="current",
             gold_version=getattr(settings, "MULTIREGION_ATTRIBUTION_GOLD_VERSION", "pending-review"),
             gold_snapshot_sha256=gold_snapshot_sha256,
             metrics=gold_metrics,
+            selectors={
+                "scope": scope,
+                "lookback_hours": lookback_hours,
+                "window_start": window_start.isoformat(),
+                "regions": sorted(regions),
+                "scope_complete": not has_more_candidates,
+                "review_sample_per_region": review_sample_per_region,
+            },
         )
+        run_rows = {int(row["article_id"]): row for row in (run.candidate_payload or [])}
+        outcomes: list[dict] = []
+        primary_change_ids: list[int] = []
+        needs_review_ids: list[int] = []
+        locked_skip_ids: list[int] = []
+        for article in candidates:
+            row = run_rows[article.id]
+            before = row["before"]
+            after = row["after"]
+            proposed = row.get("proposed") or after
+            effective_regions = {
+                "primary": after["primary"],
+                "related": list(after.get("related") or []),
+            }
+            article._attribution_region_override = {
+                effective_regions["primary"],
+                *effective_regions["related"],
+            }
+            validation = validate_rewrite(article)
+            if validation.passed:
+                validation_passed_ids.append(article.id)
+                if scope == AUDIT_SCOPE_GATE_CANDIDATES:
+                    restored_ids.append(article.id)
+            else:
+                validation_blocked_ids.append(article.id)
+                if scope == AUDIT_SCOPE_GATE_CANDIDATES:
+                    still_blocked_ids.append(article.id)
+            if before["primary"] != after["primary"]:
+                primary_change_ids.append(article.id)
+            if after.get("status") == AttributionStatus.NEEDS_REVIEW:
+                needs_review_ids.append(article.id)
+            if after.get("status") == AttributionStatus.LOCKED_SKIP:
+                locked_skip_ids.append(article.id)
+            outcomes.append(
+                {
+                    "article_id": article.id,
+                    "title": article.title_ja,
+                    "source_url": article.source_url,
+                    "source_site": article.source_site,
+                    "published_at": article.published_at,
+                    "first_seen_at": article.first_seen_at,
+                    "old_regions": before,
+                    "new_regions": effective_regions,
+                    "inferred_regions": {
+                        "primary": proposed["primary"],
+                        "related": list(proposed.get("related") or []),
+                    },
+                    "attribution_status": after.get("status"),
+                    "attribution_reason": after.get("reason"),
+                    "attribution_confidence": after.get("confidence"),
+                    "attribution_evidence": after.get("evidence") or {},
+                    "attribution_locked": article.attribution_locked,
+                    "attribution_applied": not article.attribution_locked,
+                    "content_category": after.get("content_category"),
+                    "validation_passed": validation.passed,
+                    "validation_reason": validation.reason,
+                    "blockers": [issue for issue in validation.issues if issue.get("severity") == "blocker"],
+                }
+            )
+
+        required_review_ids = set(primary_change_ids) | set(needs_review_ids) | set(locked_skip_ids)
+        review_sample_ids_by_region: dict[str, list[int]] = {}
+        for region in OPERATIONAL_REGIONS:
+            sample_pool = [
+                row
+                for row in (run.candidate_payload or [])
+                if row["before"]["primary"] == region and int(row["article_id"]) not in required_review_ids
+            ]
+            sample_pool.sort(
+                key=lambda row: hashlib.sha256(
+                    f"{row['article_id']}:{row['fingerprint']}".encode()
+                ).hexdigest()
+            )
+            review_sample_ids_by_region[region] = [
+                int(row["article_id"]) for row in sample_pool[:review_sample_per_region]
+            ]
+        review_checklist_ids = list(dict.fromkeys([
+            *primary_change_ids,
+            *needs_review_ids,
+            *locked_skip_ids,
+            *[
+                article_id
+                for region in OPERATIONAL_REGIONS
+                for article_id in review_sample_ids_by_region[region]
+            ],
+        ]))
+        run.selectors = {
+            **(run.selectors or {}),
+            "primary_change_ids": primary_change_ids,
+            "needs_review_ids": needs_review_ids,
+            "locked_skip_ids": locked_skip_ids,
+            "review_sample_ids_by_region": review_sample_ids_by_region,
+            "review_checklist_ids": review_checklist_ids,
+        }
+        run.save(update_fields=["selectors", "updated_at"])
         payload = {
             "dry_run": bool(options["dry_run"]),
             "commit": bool(options["commit"]),
+            "scope": scope,
+            "scope_complete": not has_more_candidates,
             "regions": sorted(regions),
             "lookback_hours": lookback_hours,
             "window_start": window_start.isoformat(),
@@ -204,6 +307,13 @@ class Command(BaseCommand):
             "candidate_ids": [article.id for article in candidates],
             "restored_candidate_ids": restored_ids,
             "still_blocked_ids": still_blocked_ids,
+            "validation_passed_ids": validation_passed_ids,
+            "validation_blocked_ids": validation_blocked_ids,
+            "primary_change_ids": primary_change_ids,
+            "needs_review_ids": needs_review_ids,
+            "locked_skip_ids": locked_skip_ids,
+            "review_sample_ids_by_region": review_sample_ids_by_region,
+            "review_checklist_ids": review_checklist_ids,
             "skipped": skipped,
             "outcomes": outcomes,
             "run_id": run.id,

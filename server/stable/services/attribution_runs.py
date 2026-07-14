@@ -9,9 +9,11 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import prefetch_related_objects
 from django.utils import timezone
 
 from stable.models import (
+    AttributionStatus,
     MultiregionAttributionLock,
     MultiregionAttributionRun,
     MultiregionAttributionRunStatus,
@@ -188,36 +190,63 @@ def create_attribution_dry_run(
     term_version: str = "",
     gold_snapshot_sha256: str = "",
     metrics: dict | None = None,
+    selectors: dict | None = None,
 ) -> MultiregionAttributionRun:
+    article_rows = list(articles)
+    prefetch_related_objects(article_rows, "related_region_links")
     rows = []
-    batch_context = AttributionBatchContext.build()
-    for article in articles:
+    batch_context = AttributionBatchContext.build(article_rows)
+    for article in article_rows:
+        related_links = article._prefetched_objects_cache.get("related_region_links", [])
+        before = {
+            "primary": article.racing_region,
+            "related": [link.region for link in related_links],
+        }
         result = infer_article_attribution(article, batch_context=batch_context)
-        rows.append(
-            {
-                "article_id": article.id,
-                "fingerprint": _fingerprint(article),
-                "before": {
-                    "primary": article.racing_region,
-                    "related": list(article.related_region_links.values_list("region", flat=True)),
-                },
-                "after": {
-                    "primary": result.primary_region,
-                    "related": result.related_regions,
-                    "status": result.status,
-                    "confidence": result.confidence,
-                    "evidence": result.evidence,
-                    "reason": result.reason,
-                    "source": result.source,
-                    "content_category": result.content_category,
-                    "rule_version": result.rule_version,
-                },
+        proposed = {
+            "primary": result.primary_region,
+            "related": result.related_regions,
+            "status": result.status,
+            "confidence": result.confidence,
+            "evidence": result.evidence,
+            "reason": result.reason,
+            "source": result.source,
+            "content_category": result.content_category,
+            "rule_version": result.rule_version,
+        }
+        if article.attribution_locked:
+            after = {
+                **before,
+                "status": AttributionStatus.LOCKED_SKIP,
+                "confidence": article.attribution_confidence or 0,
+                "evidence": {"attribution_locked": True},
+                "reason": "attribution_locked",
+                "source": article.attribution_source or "existing",
+                "content_category": article.content_category,
+                "rule_version": article.attribution_rule_version or rule_version,
             }
-        )
+        else:
+            after = proposed
+        row = {
+            "article_id": article.id,
+            "fingerprint": _fingerprint(article),
+            "before": before,
+            "after": after,
+        }
+        if article.attribution_locked:
+            row["proposed"] = proposed
+        rows.append(row)
     settings_sha256 = build_attribution_settings_sha256()
     term_snapshot_sha256 = build_attribution_term_snapshot_sha256(batch_context)
     resolved_gold_snapshot_sha256 = gold_snapshot_sha256 or _sha256({"gold_version": gold_version})
-    resolved_metrics = metrics or {}
+    resolved_metrics = dict(metrics or {})
+    if selectors is not None:
+        scope = str(selectors.get("scope") or "gate_candidates")
+        resolved_metrics["_run_contract"] = {
+            "scope": scope,
+            "scope_complete": bool(selectors.get("scope_complete", True)),
+            "commit_policy": "attribution_only" if scope == "all_articles" else "attribution_and_gate",
+        }
     candidate_fingerprint = _sha256(rows)
     manifest = _manifest_sha256(
         rows=rows,
@@ -231,7 +260,7 @@ def create_attribution_dry_run(
     )
     return create_attribution_run(
         mode="dry_run",
-        selectors={"article_ids": [row["article_id"] for row in rows]},
+        selectors={**(selectors or {}), "article_ids": [row["article_id"] for row in rows]},
         status=MultiregionAttributionRunStatus.COMPLETED,
         rule_version=rule_version,
         term_version=term_version,
@@ -308,11 +337,24 @@ def commit_attribution_run(
         raise ValidationError("gold 快照 SHA-256 无效，禁止 commit")
     if not bool((run.metrics or {}).get("qualified")):
         raise ValidationError("gold 质量门槛未通过，禁止 commit")
+    run_contract = dict((run.metrics or {}).get("_run_contract") or {})
+    if not run_contract:
+        legacy_scope = (run.selectors or {}).get("scope")
+        run_contract = {
+            "scope": legacy_scope or "gate_candidates",
+            "scope_complete": bool((run.selectors or {}).get("scope_complete", legacy_scope != "all_articles")),
+            "commit_policy": "attribution_only" if legacy_scope == "all_articles" else "attribution_and_gate",
+        }
+    if run_contract.get("scope") == "all_articles" and not run_contract.get("scope_complete", False):
+        raise ValidationError("全量近期文章 run 已截断，禁止 commit")
+    if run_contract.get("commit_policy") not in {"attribution_only", "attribution_and_gate"}:
+        raise ValidationError("归属 run commit policy 无效，请重新 dry-run")
     owner_token = uuid.uuid4().hex
     lease = acquire_attribution_lease(run, owner_token=owner_token)
     if not lease.acquired:
         raise ValidationError("已有归属 run 正在提交，请稍后重试")
     completed = list(run.completed_article_ids or [])
+    attribution_only = run_contract["commit_policy"] == "attribution_only"
     already_completed = list(completed)
     applied: list[int] = []
     drifted: dict[int, str] = {}
@@ -336,13 +378,14 @@ def commit_attribution_run(
                         continue
                     apply_run_outcome(article, outcome)
                     validation = validate_rewrite(article)
-                    apply_validation_outcome(article, validation)
-                    if validation.passed:
-                        article.ranked_revived_at = timezone.now()
-                        article.save(update_fields=["ranked_revived_at", "updated_at"])
-                        restored.append(article_id)
-                    else:
-                        still_blocked.append(article_id)
+                    if not attribution_only:
+                        apply_validation_outcome(article, validation)
+                        if validation.passed:
+                            article.ranked_revived_at = timezone.now()
+                            article.save(update_fields=["ranked_revived_at", "updated_at"])
+                            restored.append(article_id)
+                        else:
+                            still_blocked.append(article_id)
                     completed.append(article_id)
                     applied.append(article_id)
                 run.cursor = len(completed)

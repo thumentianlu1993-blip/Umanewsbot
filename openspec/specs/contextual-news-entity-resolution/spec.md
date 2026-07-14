@@ -1,5 +1,4 @@
 # contextual-news-entity-resolution Specification
-
 ## Purpose
 TBD - created by archiving change contextualize-news-entity-resolution. Update Purpose after archive.
 ## Requirements
@@ -106,4 +105,3 @@ TBD - created by archiving change contextualize-news-entity-resolution. Update P
 - **WHEN** 系统为一篇文章重算自动马匹关联
 - **THEN** 系统 SHALL 先按接受实体的 term ID、外部 horse ID 或规范化名称筛选候选 Profile
 - **AND** 系统 MUST NOT 遍历全部已发布马匹后逐一做全文字符串匹配
-

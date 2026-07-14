@@ -78,4 +78,4 @@ Next: Ready for complete test-case specification, then implementation.
 - Round 4：修复 crawl prepare 在最小权限 control role 下误写业务 `TaskExecutionLog`；新增宿主 takeover 探针，实际核验旧容器不存在并只读挂载固定 checkpoint。
 - Round 5：复核模型约束、双锁、心跳、恢复、命令 allowlist、数据库 trigger、Docker 网络/资源、部署与回滚脚本，没有发现新的 actionable finding。
 
-最终验证：runner 聚焦 52 项、runner+历史批次 118 项、加历史网络日志组合 122 项、完整 `stable` 1350 项通过（跳过 7）；真实 PostgreSQL 6 项、Django check、migration drift、shell/diff、OpenSpec strict/all 均通过。
+最终验证：runner 聚焦 52 项、runner+历史批次 118 项、加历史网络日志组合 122 项；合并最新主线后的交叉组合 194 项通过（跳过 1），完整 `stable` 1386 项通过（跳过 7）。真实 PostgreSQL 6 项、Django check、migration drift、shell/diff、OpenSpec strict/all 均通过。

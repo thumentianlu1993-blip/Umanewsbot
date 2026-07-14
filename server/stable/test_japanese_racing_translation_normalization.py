@@ -195,6 +195,48 @@ class JapaneseRacingFormatPlanTests(TestCase):
         self.assertEqual(exact[0].entity_type, "unknown_horse")
         self.assertEqual(exact[0].external_horse_ids, ["SESSION-HORSE"])
 
+    def test_chinese_translation_of_foreign_horse_does_not_match_japanese_common_word(self):
+        foreign_horse = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_ja="Movin Out",
+            target_zh="出走",
+            priority=100,
+        )
+        japanese_horse = _term("テストホース", "测试马")
+
+        resolution = resolve_article_entities(
+            "出走予定",
+            "テストホースが次走に出走する。",
+            source_language=SourceLanguage.JAPANESE,
+        )
+
+        self.assertFalse(any(item.term_id == foreign_horse.id for item in resolution.entities))
+        exact = [item for item in resolution.entities if item.term_id == japanese_horse.id]
+        self.assertEqual([item.matched_text for item in exact], ["テストホース"])
+        self.assertEqual(resolution.machine_horse_tags, ["测试马"])
+
+    def test_chinese_article_still_matches_foreign_horse_by_chinese_target(self):
+        horse = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            source_ja="Romantic Warrior",
+            target_zh="浪漫勇士",
+            priority=100,
+        )
+
+        resolution = resolve_article_entities(
+            "浪漫勇士復出",
+            "浪漫勇士將於下月復出。",
+            source_language=SourceLanguage.CHINESE_TRADITIONAL,
+        )
+
+        exact = [item for item in resolution.entities if item.term_id == horse.id]
+        self.assertEqual([item.matched_text for item in exact], ["浪漫勇士", "浪漫勇士"])
+        self.assertEqual(resolution.machine_horse_tags, ["浪漫勇士"])
+
     def test_workout_time_has_exact_format_and_plain_seconds_are_untouched(self):
         source = "5ハロン64秒5―11秒7をマーク。別の時計は64秒5だった。"
         resolution = resolve_article_entities("", source, source_language=SourceLanguage.JAPANESE)
@@ -272,12 +314,73 @@ class JapaneseTranslationProviderIntegrationTests(TestCase):
         prompt = request.call_args.args[0][1]["content"]
         self.assertIn("__UMA_SEED_1__", prompt)
         self.assertIn("__UMA_SEED_2__", prompt)
+        self.assertIn("[seed-placeholder] __UMA_SEED_1__ => 记录（源词：レコード", prompt)
+        self.assertIn("[seed-placeholder] __UMA_SEED_2__ => 记录（源词：レコード", prompt)
         self.assertEqual(result.title_zh, "记录更新")
         self.assertEqual(result.body_zh, "记录を更新した。")
         self.assertEqual(
             [item["target_text"] for item in result.metadata["japanese_seed_term_normalizations"]],
             ["记录", "记录"],
         )
+
+    def test_seeded_term_restoration_deduplicates_model_suffix_at_placeholder_boundary(self):
+        article = _article(body="タイプは不器用で、オープン級を2勝した。")
+        provider = self._provider()
+        resolution = resolve_article_entities(
+            article.title_ja,
+            article.body_ja_normalized,
+            source_language=SourceLanguage.JAPANESE,
+        )
+        format_plan = _normalization_module().build_japanese_format_plan(
+            article.title_ja,
+            article.body_ja_normalized,
+            resolution,
+        )
+        seed_plan = _normalization_module().build_japanese_seed_term_plan(
+            article.title_ja,
+            article.body_ja_normalized,
+            resolution,
+            format_plan,
+        )
+        placeholders = {item.source_text: item.placeholder for item in seed_plan.items}
+        response = _fake_response(
+            body=(
+                f"虽属不够灵活的{placeholders['タイプ']}类型，"
+                f"但在{placeholders['オープン']}级别赛事两胜。"
+            )
+        )
+
+        with patch.object(provider, "_request_completion", return_value=response):
+            result = provider.translate(article)
+
+        self.assertEqual(result.body_zh, "虽属不够灵活的类型，但在公开级别赛事两胜。")
+        self.assertNotIn("类型类型", result.body_zh)
+        self.assertNotIn("公开级级别", result.body_zh)
+
+    def test_seeded_term_restoration_keeps_legitimate_single_character_boundary(self):
+        module = _normalization_module()
+        plan = module.JapaneseSeedTermPlan(
+            protected_title="",
+            protected_body="__UMA_SEED_1__会场",
+            items=(
+                module.JapaneseSeedTermItem(
+                    placeholder="__UMA_SEED_1__",
+                    field_name="body",
+                    source_text="セール",
+                    target_text="拍卖会",
+                    start=0,
+                    end=3,
+                ),
+            ),
+        )
+
+        restored = module.restore_japanese_seed_term_placeholders(
+            plan.protected_body,
+            plan,
+            field_name="body",
+        )
+
+        self.assertEqual(restored, "拍卖会会场")
 
     @override_settings(TRANSLATION_MAX_ATTEMPTS=2)
     def test_missing_seed_term_placeholder_retries_then_restores_exact_target(self):

@@ -11,7 +11,39 @@
 
 - `scale-and-isolate-historical-race-batches` 已把 batch006+ 单地区标准上限统一为 250，并新增可恢复的独立 historical runner、迁移 `0031`、最小权限 provisioning、隔离 smoke、迁移暂停 preflight 和独立 infrastructure bootstrap。
 - runner 使用数据库租约 + runtime 文件锁、30 秒心跳/180 秒租约、固定镜像与 plan/input/output SHA checkpoint；crawl 只有网络和控制账本权限，apply 只有内部数据库写入权限，全部历史 RaceEvent 继续保持 draft。
-- 本地 runner 聚焦 52 项、runner+历史批次组合 118 项、加网络日志组合 122 项、完整 `stable 1350` 项回归通过（跳过 7），真实 PostgreSQL 6 项和隔离 Docker lifecycle/权限 smoke 通过；五轮 review 的前四轮共修复 7 项问题，第五轮无 actionable finding。当前仍处于“代码已实现、生产未部署”，完成主线提交、可复现镜像、生产迁移与普通部署不干扰演练前，不得生成或启动 batch006。
+- 本地 runner 聚焦 52 项、runner+历史批次组合 118 项、加网络日志组合 122 项；合并最新主线后的交叉组合 194 项通过（跳过 1），完整 `stable 1386` 项回归通过（跳过 7），真实 PostgreSQL 6 项和隔离 Docker lifecycle/权限 smoke 通过。五轮 review 的前四轮共修复 7 项问题，第五轮无 actionable finding。当前仍处于“代码已实现、生产未部署”，完成主线提交、可复现镜像、生产迁移与普通部署不干扰演练前，不得生成或启动 batch006。
+## 2026-07-14 多地区归属 V3 性能与审核策略
+
+- 已用临时 PostgreSQL 16 和真实校准规模完成 250 篇基准。首次发现来源配置 N+1 导致 254 SQL；批上下文增加 17 个来源一次预加载后，五轮稳定为 5 SQL、1.66–2.14 秒、约 49 MiB，性能门槛已通过。
+- 单审身份不再自动 no-go：首发覆盖门槛为有效样本至少 150、五个运营地区各至少 10、跨地区至少 20；达到全部质量/性能门槛后可进入生产 shadow。至少 24 小时 shadow 和全量差异复核通过后，才允许仅新文章 enforce；多人审核冲突仍须裁决。
+- 现有 159 条单审 Gold Set 的最少运营地区样本为法国 11、跨地区 24，主地区准确率 98.11%、相关地区 precision 100%、recall 54.84%、过度扩散 0%，已达到进入 Shadow 的覆盖与质量线。Gold Set 后续持续吸收新增来源、规则改版、shadow 误判和运营争议；生产归属和相关地区查询尚未开启，本轮没有生产操作。
+- Gold 生成器与评估器已共用可配置的 `150/10/20` 默认门槛；合并 `origin/main@9d6dec34` 并补齐全量审计契约后，完整 `stable` 1327 项通过（1 项按设计跳过），159 条 Gold 仍为合格，OpenSpec strict/all 28/28 通过。
+- 上线前补齐了生产审计入口：`--scope all_articles` 才表示最近窗口全量有效文章（包含已发布稿），默认 `gate_candidates` 继续只服务术语门禁补跑。全量审计输出全部主地区变化、全部 `needs_review/locked_skip` 和五地区可重复分层样本；显式 limit 导致不完整时会明确阻断验收。当前改动尚未部署，生产 dry-run 与 24 小时 Shadow 仍待执行。
+- 代码已推送 main `7f0827ad`，可复现 AMD64 候选为 `sha256:6ad16e36...af9a1`，镜像内专项通过。生产切换因正在运行的 186 篇受控翻译重试 one-off 暂停；生产仍是旧镜像，归属 mode=off、相关查询关闭，尚无 72 小时归属 run。
+
+## 2026-07-14 生产 DB/Redis 意外重建恢复
+
+- `01:22` 的误用 `docker compose run` 意外重建 DB/Redis，造成短时连接中断、Redis 待消费任务丢失、新闻索引异常和 4 组重复 article identity。web 镜像未变化，PostgreSQL 为干净关闭后从原目录恢复。
+- 已通过停 beat/排空 worker、完整备份、5 条重复记录受控合并、`stable_newsarticle` 全部 17 个索引并发重建和 `VACUUM ANALYZE` 完成恢复；最终 8312 行、重复 0、无效索引 0、dead row 0。
+- 最新备份为 `pre-newsarticle-dedup-reindex-20260714_020918.sql.gz`，SHA-256 `f37ff4835fe13d4c2a016beac433940ef995677e690711dc68ca59f42b149a9e`。`02:15` 自然窗口 17 个来源、五地区发布和 QQ 全部成功，公网健康检查正常。
+
+## 2026-07-13 多地区归属单审校准结果（已由 V3 复评更新）
+
+- 审稿人 1 已完成部分抽样标注：159 条有效、1 条排除、90 条未选中忽略。没有第二位审核人这一事实继续以 `provisional_single_review` 保留，不伪造 reviewer B；2026-07-14 起单审身份本身不再自动 no-go。
+- 当日生产只读旧规则评估有效分母 154，主地区准确率 81.17%、相关地区 precision 6.90%、recall 6.67%，属于历史基线。冻结 159 条完整分母上的 V3 复评已提升到主地区 98.11%、相关 precision 100%、recall 54.84%，并达到 `150/10/20` 首发覆盖门槛。
+- 已补充单审固化/只读评估、原始值规范化审计和正则模式复用。逐篇结果保存在 `outputs/20260713-multiregion-gold-final/multiregion_gold_set_final_20260713.xlsx`；当前只取得进入 Shadow 的资格，归属 enforce 与相关查询仍不得直接开启。
+
+## 2026-07-13 多地区归属 Gold Set 标注包
+
+- 已从生产库只读生成 `multiregion-gold-v1-20260713` 双人盲标包：共 `250` 篇，五地区各 `50`，覆盖 `17` 个来源，URL 和输入 SHA 各自全量唯一，manifest SHA-256 为 `1836a9d896ca5b6e09da6da7ed07a2fb3f66f0a02f387010fe4b56475bf5c1ea`。
+- 已补齐抽样与合并命令，能阻止同一审核人重复充当双审、正文/身份漂移、未裁决冲突和样本结构不足；正文审核包不进入 Git，正式 Gold Labels 才进入版本控制。
+- 本段是原始候选包记录。用户后续明确不再补第二审核人，OpenSpec `5.1` 已按 159 条单审 Gold Set 完成；若未来增加多人审核，仍需合并冲突并裁决。多地区归属和相关地区查询继续关闭，下一步是生产 Gold/dry-run 与 Shadow 验收。
+- 本分支已同步 `origin/main@693db30e`，最新组合回归 `1139 passed / 1 skipped`，Django、迁移、OpenSpec strict 和 diff 检查通过。
+## 2026-07-14 日文赛马翻译与固定格式上线
+
+- `standardize-japanese-racing-translation` 已部署 `main@873845da` 并归档。普通片假名、完整未知马名、产驹、追切、访谈、骑手未定及三语机构术语均进入确定性翻译契约；种子术语恢复会处理明确边界重复，英文术语中文目标不会反向污染日文普通词。
+- 11 篇目标文章全部保持原公开身份并通过逐篇正文验收；随机样本 `8337/8366/8356/8307/8367` 无占位符或假马标签。最终本地完整 `stable 1295` 项通过（跳过 1），候选 PostgreSQL 关联 84 项和最终零问题 review 通过。
+- web/worker/beat 统一镜像为 `sha256:d3f602de4459158bc372e45bb35f3730a7be21f284dfea32de5535681bd6d791`；HTTP、空队列、术语唯一性、历史安全开关和日志验收正常。最新写前备份为 `pre-873845da-20260714_124940.dump`，SHA-256 `413718143809a09686ea18710a4cd8b8f9a9f7643fb6b769cee5daf23ca485a6`。
 
 ## 2026-07-14 新闻实体语境修复上线
 
@@ -77,17 +109,17 @@
 - 尚不宣称完全正常：当前调度会常态将跨 bucket 到期的旧窗口合并到最新窗口；3 篇翻译失败稿不会在当前安全关闭配置下自愈；JRA 有 1 个固定 PDF 解析跳过；28 条历史 CrawlJob `started` 脏记录会干扰观测。
 - 当前来源是每 5 分钟检查、按上次完成时间滚动到期，15 分钟配置在线上体现为约 15–20 分钟，不能用“每个 bucket 都有 17 条”作为验收口径。
 
-## 2026-07-13 法国新鲜度与多地区归属本地实现
+## 2026-07-13 法国新鲜度与多地区归属本地实现（历史状态）
 
 - change 保持 `implementing`：本地已完成 TDN 日期查询、France Galop 可信时间、翻译失败有界恢复、多地区归属 run/manifest/灰度和运营可观测性，生产尚未部署。
 - 三轮 review/返修后专项 `120` 项全部通过；完整 `stable` 回归 `968` 项通过，PostgreSQL 专项性能契约 `1` 项在 SQLite 按设计跳过，最终 review 无待修复问题。
-- 配置默认保持归属 `off`、相关地区查询关闭、翻译自动重试关闭。当前 OpenSpec 为 `57/68`，真实 250 篇双审 gold set 与全部生产部署、窗口、QQ 验收仍待完成。
+- 配置默认保持归属 `off`、相关地区查询关闭、翻译自动重试关闭。该日 OpenSpec 为 `57/68`；双审与 `250/40/50` 门槛已由 2026-07-14 的单审及 `150/10/20` 决策取代，当前进度和资格以本文顶部为准。
 - 因此代码已具备灰度基础，但功能尚未在线，也不能据本地合成测试宣称多地区归属已达到生产准确率。
 - 终态翻译失败将向 `754652181@qq.com` 发送包含文章、失败分类和后台快速入口的邮件；生产部署仍须确认 SMTP 配置。测试群通过 `PushTarget.multiregion_test_enabled` 显式标记，默认关闭，避免 `web_test_groups` 阶段影响正式群。
 
-## 2026-07-13 法国新鲜度与多地区归属方案完成工程评审
+## 2026-07-13 法国新鲜度与多地区归属方案完成工程评审（历史状态）
 
-- OpenSpec change `fix-france-news-freshness-and-multiregion-attribution` 已完成两轮 full review，计划进入 `reviewed`，尚未实现或部署。
+- OpenSpec change `fix-france-news-freshness-and-multiregion-attribution` 当日已完成两轮 full review 并进入 `reviewed`；后续代码已安全关闭部署，当前仍待生产 dry-run 与 Shadow 验收。
 - 方案覆盖 TDN 日期倒序抓取、France Galop 可信发布时间、瞬时翻译失败有界重试、多地区归属准确度和分阶段上线。
 - 上线前必须通过版本化 gold set、真实生产 dry-run、250 篇批处理性能门槛和单次发布/QQ 交付幂等测试；归属默认 `off`，相关地区查询默认关闭。
 
@@ -95,7 +127,7 @@
 
 法国新闻低产出排查确认不是 3 天门禁过严，而是 TDN 关键词入口按相关度返回历史稿、France Galop 未解析真实发布时间、两篇最新稿因翻译供应商 `429/503` 且没有周期重试，以及多地区归属开关仍关闭四项叠加。TDN 按日期 posts 搜索在 `2026-07-09` 以来可找到 `12` 篇宽口径候选；本次仅记录证据，尚未改代码、重试文章或开启归属。
 
-上述四类问题已纳入新 OpenSpec change `fix-france-news-freshness-and-multiregion-attribution`。该 change 同时要求提高多地区归属准确度，使用至少 250 篇五地区 gold set 和明确 precision/recall/过度扩散门槛控制生产资格，并按 shadow、仅写入、网页/测试群、72 小时回填、正式群五阶段启用。当前 proposal/design/specs/tasks 已创建，尚未进入 apply，生产多地区开关仍为关闭。
+上述四类问题已纳入 OpenSpec change `fix-france-news-freshness-and-multiregion-attribution`。该 change 同时要求提高多地区归属准确度，以真实五地区 Gold Set 和明确 precision/recall/过度扩散门槛控制生产资格，并按 shadow、仅写入、网页/测试群、72 小时回填、正式群五阶段启用。该段为早期规划记录；当前代码已部署为安全关闭，159 条首发 Gold 已达标，生产多地区开关仍为关闭。
 
 历史首批45个目标当前为 `33 imported / 3 ready / 9 pending`。法国2012/2025六场已通过独立补充来源审批链导入 `70` 条出马和 `41` 条赛果；36个已materialize历史赛事仍全部为draft，历史回填与网络开关继续保持false，线上未公开。下一步补法国2000、英国2000和美国2000/2012来源缺口。
 
@@ -478,7 +510,7 @@
 ## 2026-07-13 法国新鲜度与归属能力部署状态
 
 - `fix-france-news-freshness-and-multiregion-attribution` 的代码和 `stable.0029` 已部署到生产 commit `badc10e0`，容器、迁移、HTTP 健康检查、首页、法国频道、详情页及法国三来源只读 probe 均通过。
-- 新归属、相关地区查询、翻译自动重试和失败邮件仍全部关闭；这是安全部署，不是功能灰度完成。至少 250 篇有效 gold set 和生产资格门槛未完成前不得开启 enforce 或归档 change。
+- 新归属、相关地区查询、翻译自动重试和失败邮件仍全部关闭；这是安全部署，不是功能灰度完成。现有 159 条 Gold Set 已取得 Shadow 资格，但生产 dry-run、至少 24 小时 shadow、全量变化复核及后续灰度未完成前不得开启 enforce 或归档 change。
 - 法国来源实时探测已能命中近期英文稿，未复现 2020/2022 历史稿；邮件通知因生产没有 SMTP 配置暂不可用，HTTPS 证书接入仍是独立待办。
 ### 2026-07-13 历史赛事第一批详情生产进展
 
@@ -499,6 +531,13 @@
 - 历史赛事镜像曾以旧代码底座覆盖生产，造成已应用 `0029` 的数据库与旧应用不兼容并阻断 netkeiba 新稿。新闻写入先由临时组合镜像恢复，随后历史实现已完整提交到 Git，生产也已切换到 `main@304ebdb6` 的可复现镜像 `sha256:e7ab7af0...877d`；“仓库 HEAD 与运行镜像内容不同”的发布风险已解除。
 - 法港英 150 场详情导入前只读复核发现原始赛事字段丢失地区距离单位，并有少量场地/surface 需要按已审核权威证据校正。新的整文件 SHA 锁定字段批次命令、RaceEvent 并发锁、整批回滚和旧详情候选失效门禁已完成，完整 `stable` 回归 `1136` 项通过；生产写入暂停，先把本轮源码合入 `main` 并重新交付可复现 AMD64 镜像。
 - 上述门禁已提交到 `main@df2732c3` 并切换为可复现 AMD64 镜像 `sha256:27d5d51c...bf13`；切换前备份、排空 worker、无迁移检查、三容器一致性、五地区页面和首个自然窗口均通过。历史仍为 `145 imported + 150 ready`、published 0，本轮未执行字段或详情写入。
+
+## 2026-07-14 多地区归属 V3 校准状态
+
+- 现有 Gold Set 以用户完成的 `159` 条单审标签固定校准，不再补第二审核人；审核来源始终保留为 `provisional_single_review`。该身份本身不再禁止进入生产 Shadow；只有生产全量 dry-run、至少 24 小时 Shadow 和全量差异复核也通过后，才允许仅对新文章 enforce。
+- 本地冻结快照对比：旧规则主地区 `81.76%`，V3 为 `98.11%`；V3 的日本/香港/英国/美国均 `100%`、法国 `90.91%`，相关 precision `100%`、recall `54.84%`，过度扩散 `0%`。低 recall 主要是文章未提供的历史参赛地区，不自动猜测。
+- 术语候选索引把 159 篇纯推断降到约 `0.8` 秒；相关目标测试 `82` 项通过，最终完整 `stable` 回归 `1156 passed / 1 skipped`，Django/迁移/编译/OpenSpec strict/all 均通过。生产归属、相关地区查询仍关闭，本轮未部署或写生产数据。
+- 下一门禁是 PostgreSQL 250 篇性能基准、生产 72 小时只读 dry-run 和运营复核；未满足前不得归档本 change。
 - 法港英 150 场已完成权威字段校正、旧候选失效验证、重新导出、0-gap 打包、dry-run、第二次备份、正式导入和写后核验。新增 `1534 runners / 1294 results`，标准批次累计 250 场全部 imported；生产历史合计 295 场、3174 runners、2817 results，全部 draft、published 0，常驻历史写入/网络开关保持关闭。
 - 2016–2025 第二标准批次已固定五地区各 50 场并完成日美离线来源发现：日本 50、美国 48 个候选对应 98 个唯一 URL；Brooklyn 与 Cougar II 的 2025 届被 TOBA 明确标为 `not run`，保留为产品审核项。来源匹配技术修复完整 `stable` 1141 项通过，尚未开始本批生产网络抓取或写入。
 - 历史赛事完整源码和来源匹配修复已合入 `main@58786b91`，生产已切换到由该主线两次一致构建的 AMD64 镜像 `sha256:c6a3670f...4691`。迁移、64 个模型、五地区页面、健康检查和日志通过；生产历史仍为 295 场、3174 runners、2817 results，全部 draft、published 0，常驻历史写入/网络开关关闭。

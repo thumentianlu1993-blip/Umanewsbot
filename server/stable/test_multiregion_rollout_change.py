@@ -29,6 +29,7 @@ from stable.models import (
     WindowCandidateDecision,
     WorkflowStatus,
 )
+from stable.services.news_attribution import ATTRIBUTION_RULE_VERSION
 
 
 UTC = dt_timezone.utc
@@ -231,7 +232,7 @@ class BackfillSideEffectTests(TestCase):
             message_id="existing-message",
         )
         before = (article.published_to_web_at, article.auto_publish_at, delivery.status, delivery.message_id)
-        run = create_attribution_dry_run([article], rule_version="multiregion-v2", gold_version="gold-v1", metrics={"qualified": True})
+        run = create_attribution_dry_run([article], rule_version=ATTRIBUTION_RULE_VERSION, gold_version="gold-v1", metrics={"qualified": True})
 
         commit_attribution_run(run.id, manifest_sha256=run.manifest_sha256)
 
@@ -285,7 +286,7 @@ class MultiregionOperationsViewTests(TestCase):
         MultiregionAttributionRun.objects.create(
             mode="dry_run",
             status="completed",
-            rule_version="multiregion-v2",
+            rule_version=ATTRIBUTION_RULE_VERSION,
             gold_version="gold-v1",
             gold_snapshot_sha256="c" * 64,
             metrics={"qualified": True},

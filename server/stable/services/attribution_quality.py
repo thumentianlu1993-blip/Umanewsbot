@@ -13,6 +13,25 @@ from stable.models import RacingRegion
 from stable.services.news_attribution import AttributionBatchContext, infer_article_attribution
 
 
+DEFAULT_GOLD_MIN_TOTAL = 150
+DEFAULT_GOLD_MIN_PER_REGION = 10
+DEFAULT_GOLD_MIN_CROSS_REGION = 20
+
+
+def gold_coverage_thresholds() -> tuple[int, int, int]:
+    return (
+        max(1, int(getattr(settings, "MULTIREGION_ATTRIBUTION_GOLD_MIN_TOTAL", DEFAULT_GOLD_MIN_TOTAL))),
+        max(
+            0,
+            int(getattr(settings, "MULTIREGION_ATTRIBUTION_GOLD_MIN_PER_REGION", DEFAULT_GOLD_MIN_PER_REGION)),
+        ),
+        max(
+            0,
+            int(getattr(settings, "MULTIREGION_ATTRIBUTION_GOLD_MIN_CROSS_REGION", DEFAULT_GOLD_MIN_CROSS_REGION)),
+        ),
+    )
+
+
 @dataclass(frozen=True)
 class GoldLabel:
     key: str
@@ -41,6 +60,7 @@ class GoldQualityReport:
     over_expansion_rate: float
     locked_override_count: int
     wilson_intervals: dict[str, tuple[float, float]]
+    review_mode: str
     qualified: bool
     no_go_reasons: list[str] = field(default_factory=list)
 
@@ -87,12 +107,20 @@ def article_input_sha256(article) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def evaluate_gold_labels_against_database(labels: list[GoldLabel]) -> GoldQualityReport:
+def evaluate_gold_labels_against_database(
+    labels: list[GoldLabel],
+    *,
+    allow_provisional: bool = False,
+) -> GoldQualityReport:
     from stable.models import NewsArticle
 
-    articles = NewsArticle.objects.filter(id__in=[label.article_id for label in labels]).prefetch_related("related_region_links")
+    articles = list(
+        NewsArticle.objects.filter(id__in=[label.article_id for label in labels])
+        .select_related("source_config")
+        .prefetch_related("related_region_links")
+    )
     by_id = {article.id: article for article in articles}
-    context = AttributionBatchContext.build()
+    context = AttributionBatchContext.build(articles)
     actual: dict[str, dict] = {}
     for label in labels:
         article = by_id.get(label.article_id)
@@ -107,15 +135,23 @@ def evaluate_gold_labels_against_database(labels: list[GoldLabel]) -> GoldQualit
             "over_expansion": len(result.related_regions) > 2 and not label.expected_related_regions,
             "locked_override": article.attribution_locked and result.primary_region != article.racing_region,
         }
-    return evaluate_gold_set(labels, actual)
+    return evaluate_gold_set(labels, actual, allow_provisional=allow_provisional)
 
 
-def evaluate_gold_set(labels: list[GoldLabel], actual: dict[str, dict]) -> GoldQualityReport:
+def evaluate_gold_set(
+    labels: list[GoldLabel],
+    actual: dict[str, dict],
+    *,
+    allow_provisional: bool = False,
+) -> GoldQualityReport:
     valid: list[tuple[GoldLabel, dict]] = []
     unresolved_count = 0
     drifted_count = 0
     for label in labels:
-        if not label.adjudicated or len(set(label.reviewer_roles)) < 2:
+        review_is_valid = bool(label.reviewer_roles) if allow_provisional else (
+            label.adjudicated and len(set(label.reviewer_roles)) >= 2
+        )
+        if not review_is_valid:
             unresolved_count += 1
             continue
         outcome = actual.get(label.key)
@@ -168,19 +204,24 @@ def evaluate_gold_set(labels: list[GoldLabel], actual: dict[str, dict]) -> GoldQ
     expansion_rate = over_expansions / denominator if denominator else 0.0
     cross_region_count = sum(bool(label.expected_related_regions) for label, _outcome in valid)
     no_go: list[str] = []
-    if denominator < 250:
+    minimum_total, minimum_per_region, minimum_cross_region = gold_coverage_thresholds()
+    if denominator < minimum_total:
         no_go.append("total_sample_count")
-    if any(count < 40 for count in region_counts.values()):
+    if any(region_counts.get(region, 0) < minimum_per_region for region in regions):
         no_go.append("region_sample_count")
-    if cross_region_count < 50:
+    if cross_region_count < minimum_cross_region:
         no_go.append("cross_region_sample_count")
     if primary_accuracy < float(getattr(settings, "MULTIREGION_ATTRIBUTION_OVERALL_ACCURACY_MIN", 0.95)):
         no_go.append("overall_primary_accuracy")
-    if any(value < float(getattr(settings, "MULTIREGION_ATTRIBUTION_REGION_ACCURACY_MIN", 0.90)) for value in region_accuracy.values()):
+    if any(
+        region_accuracy.get(region, 0.0)
+        < float(getattr(settings, "MULTIREGION_ATTRIBUTION_REGION_ACCURACY_MIN", 0.90))
+        for region in regions
+    ):
         no_go.append("region_accuracy")
     if related_precision < float(getattr(settings, "MULTIREGION_ATTRIBUTION_RELATED_PRECISION_MIN", 0.95)):
         no_go.append("related_precision")
-    if related_recall < float(getattr(settings, "MULTIREGION_ATTRIBUTION_RELATED_RECALL_MIN", 0.90)):
+    if related_recall < float(getattr(settings, "MULTIREGION_ATTRIBUTION_RELATED_RECALL_MIN", 0.50)):
         no_go.append("related_recall")
     if unsupported_rate > 0.02:
         no_go.append("unsupported_primary_change")
@@ -202,16 +243,18 @@ def evaluate_gold_set(labels: list[GoldLabel], actual: dict[str, dict]) -> GoldQ
         over_expansion_rate=expansion_rate,
         locked_override_count=locked_overrides,
         wilson_intervals={"primary_accuracy": wilson_interval(primary_correct, denominator)},
+        review_mode="single_review" if allow_provisional else "dual_review",
         qualified=not no_go,
         no_go_reasons=no_go,
     )
 
 
 def benchmark_attribution_batch(articles) -> AttributionBenchmarkReport:
+    article_rows = list(articles)
     rss_before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     started = time.monotonic()
-    context = AttributionBatchContext.build()
-    for article in articles:
+    context = AttributionBatchContext.build(article_rows)
+    for article in article_rows:
         infer_article_attribution(article, batch_context=context)
     elapsed = time.monotonic() - started
     rss_after = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss

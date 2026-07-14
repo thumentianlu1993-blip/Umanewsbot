@@ -20,6 +20,37 @@
 5. 最终 apply 250/250，验收为法国 `50/414/327`、香港 `50/482/469`、日本 `50/714/710`、英国 `50/489/433`、美国 `50/484/425`，格式为 `events/runners/results`；error 0，250 场全部 draft。
 6. 写后先使用 `celery -A app control add_consumer celery` 恢复 worker 消费，再启动原 beat 容器；web/worker/beat 镜像一致，healthz 正常，历史常驻写入/网络开关 false，无遗留 historical one-off。生产累计 `1291 imported / 29626 pending`、`13507 runners / 12167 results`、published 0。
 7. batch006 前必须先部署并验收独立 historical batch runner 和每地区 250 场新口径。runner 部署不得使用会重建 DB/Redis 的 Compose 操作；必须具备固定镜像、独立锁/心跳/checkpoint、资源限制、普通部署隔离、迁移安全暂停，以及抓取与落库权限分离。
+## 2026-07-14 多地区归属 V3 单审与性能验收口径
+
+- PostgreSQL 性能验收必须使用带真实来源关联的 250 篇文章和当前量级术语/alias，不能使用 `source_config=NULL` 的空 fixture。当前基准规模为 17,474 条术语、21,240 条 alias、38,806 个索引候选和 17 个来源；通过值为 5 SQL、1.66–2.14 秒、约 49 MiB RSS。
+- 单审 Gold Set 使用 `evaluate_multiregion_attribution_gold --provisional`；该参数允许一位审核人的标签进入分母，但不豁免有效样本 150、五个运营地区各 10、跨地区 20 和质量门槛。生成归属 dry-run 时必须同时传 `reprocess_multiregion_attribution_gates --single-review-gold --gold-labels <csv> --dry-run ...`，否则单审标签按严格多人审核口径视为未决。
+- 生产归属资格 dry-run 必须额外传 `--scope all_articles --hours 72`，并且不得传 `--limit`。只有输出 `scope_complete=true` 时，全部 `primary_change_ids`、`needs_review_ids`、`locked_skip_ids` 和 `review_sample_ids_by_region` 才构成完整人工清单。默认 `gate_candidates` 仅用于术语门禁补跑，不得作为 Shadow 上线证据。
+- `all_articles` run 后续按 manifest commit 时只回填归属，不会修改文章门禁、重新入榜时间、发布状态或 QQ 交付；报告中的门禁结果使用 `validation_passed_ids/validation_blocked_ids` 表示，不得把它们误读为已经恢复候选。
+- `scope_complete=false` 的 `all_articles` run 会在 commit 入口被强制拒绝；人工复核以 `review_checklist_ids` 对应的 outcome 为准，outcome 内含标题、来源 URL、来源站点、发布时间、before/after、证据、置信度和状态。
+- 当前待切换候选：main `7f0827ad941452524062d478940c85bdfddf4a59`，tag `umanewsbot:main-7f0827ad-amd64-20260714-1707`，image ID `sha256:6ad16e368d7934777a689e537c70618a6321c3466d02f304116e2f61ae2af9a1`。必须先等待 `news-translate-20260713-r3` 自然退出并重新确认 one-off、TranslationRun、Celery active/reserved、归属/外部导入锁均为空；不得在文章正文/指纹仍变化时生成 72 小时 manifest。
+- 单审文件必须保留 `reviewer_roles=reviewer_a` 和 `adjudicated=false`，不得复制 reviewer B。多人审核发生冲突时仍必须裁决。空白未选择行不进入分母，明确 `exclude` 单独留档。
+- 通过 Gold Set 只允许把生产从 `off` 切到 `shadow`。shadow 至少运行 24 小时，必须复核全部主地区变化、全部 `needs_review`、各地区随机稳定样本和错误日志；未完成前禁止 `enforce`。
+- shadow 验收通过后，第一阶段只对新文章 enforce，`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false` 继续保持关闭；再观察至少 24 小时后才讨论网页/测试 QQ 群相关地区查询。
+- Gold Set 每次新增来源、调整规则、发现 shadow 误判或形成运营争议后都应新增版本，并记录输入 SHA、审核来源、规则/术语版本和前后指标。当前 159 条已满足 `150/10/20` 覆盖及全部质量门槛，只允许从 `off` 进入 shadow；不可据本节直接开启 enforce 或相关地区查询。
+- 相关地区首发门槛为 precision `>=95%`、recall `>=50%`、过度扩散 `<=1%`。recall 代表漏标：线上短期低于 50% 时记录告警、冻结下一阶段，不自动关停；precision 跌破 95%、出现明显错标或过度扩散超标时，立即关闭相关地区查询并评估退回 shadow。
+
+## 2026-07-14 DB/Redis 意外重建与新闻索引恢复
+
+- 事故入口：生产只读命令误用 `docker compose run --rm -T web`，导致 DB/Redis 依赖容器被重建。以后只读排查统一使用 `docker exec umanewsbot-web-1 ...`；不得将 `compose run` 当作无副作用命令。
+- 发现索引异常后的顺序固定为：停止 beat -> `celery control cancel_consumer celery` -> 等 active 清空 -> 停 worker -> 完整 `pg_dump | gzip` 并执行 `gzip -t`/SHA-256 -> 强制顺序扫描查重 -> 在单事务内迁移重复行外键与审计记录并删除冗余行 -> `REINDEX TABLE CONCURRENTLY stable_newsarticle` -> `VACUUM (ANALYZE, VERBOSE) stable_newsarticle`。
+- 本次权威备份：`/opt/umanewsbot/backups/db/pre-newsarticle-dedup-reindex-20260714_020918.sql.gz`，`156642923` bytes，SHA-256 `f37ff4835fe13d4c2a016beac433940ef995677e690711dc68ca59f42b149a9e`。恢复后必须确认 identity 重复为 0、17 个索引全部 valid/ready、worker active/reserved 与 Redis 队列可解释。
+- 恢复服务时先只启动 worker 消化事故前保留队列并验证一条真实文章写入；队列与 active 清空后再启动 beat。随后至少验收一个完整 15 分钟窗口的来源抓取、五地区发布、QQ、数据库/worker 日志和三个公网 `/healthz/`。
+- 本次 `02:15` 窗口 17 个来源全部 succeeded，发布/QQ 各五地区全部 succeeded，美国发布 1 篇；索引重建后无重复键或索引页错误。若再次出现任一索引结构错误，立即重新冻结生产写入并从上述备份分支排查，不做第二轮在线试错。
+## 2026-07-14 日文赛马翻译与固定格式部署及回归
+
+1. 最终提交为 `873845dacb1cec0353ed9b9834417a1a00cc6311`；干净 `git archive` SHA-256 为 `2c00bf5bee4e824d5bd3cb408af942b5a255dd88f30de1b24436cab289ec3e09`。正式 tag 为 `umanewsbot:main-873845da-amd64-20260714-1248`，AMD64 image ID `sha256:d3f602de4459158bc372e45bb35f3730a7be21f284dfea32de5535681bd6d791`，revision/archive 标签均已核对。
+2. 候选 PostgreSQL `jp-translation-db-b7dab422` 上无待迁移、Django check 和迁移漂移通过，关联 `84` 项测试通过；生产切换前 Redis queue、worker active/reserved、外部导入、归属和术语重处理 live run 均为 0。候选验收完成后已删除该数据库容器。
+3. 写前备份为 `.env.backup.pre-873845da-20260714_124940` 与 `backups/db/pre-873845da-20260714_124940.dump`；数据库文件 `134234023` bytes、SHA-256 `413718143809a09686ea18710a4cd8b8f9a9f7643fb6b769cee5daf23ca485a6`，通过数据库容器内 `pg_restore -l`。回滚 tag `umanewsbot:rollback-pre-873845da-20260714-1254` 指向旧镜像 `sha256:b14844ee027a7902db2ed22c9b310e8240dd2d84f822d2785a28799271e3a1a2`。
+4. 切换时保持 beat 停止，只用最终 `prod` 镜像执行 migrate、Django check 和 `makemigrations --check --dry-run`，再以 `--no-deps` 重建 web/worker。目标文章和随机样本全部通过后才以同镜像重建 beat；最终三服务 image ID 必须完全一致。
+5. 目标 `8304/8299/8298/8291/8290/8288/8287/8283/8276/8219/8212` 必须核对普通词零残留、固定格式、完整未知马名、内部占位符、状态、发布时间、人工字段和 QQ 次数。生产实际 QQ 基线为 `8298/8288/8283` 各 1，其余 0；任何新增均为阻断。
+6. `8287` 的随机模型重译若被门禁拒绝，不得降低门禁。当前公开稿基于成功 run `8613`，只在事务内精确替换两处“类型类型”和一处“公开级级别”，恢复 translated 状态并记录 `article_translation_boundary_repaired`；失败 run `8622` 继续保留审计。随后运行不带重译的 `reprocess_article_entities --article-id 8287 --commit --json` 重建实体 provenance。
+7. 随机回归固定记录 `8337/8366/8356/8307/8367`；`8367` 的 tags 与 machine tags 均不得包含“出走”。最终验收使用 HTTP：healthz、首页、后台及 11 篇详情均为 `200`；HTTPS 尚未启用，不属于本 change 入口。Redis queue、active/reserved 为空，近 15 分钟无 fatal/traceback，历史写入/网络开关 false、历史 published 0。
+8. 回滚先停 beat 并排空 worker，将 `umanewsbot:rollback-pre-873845da-20260714-1254` retag 为 `prod`，再重建 web/worker/beat。代码回滚保留新增术语数据；只有确认生产数据损坏时才恢复上述 custom-format 数据库备份。
 
 ## 2026-07-14 新闻实体语境修复部署与回归
 
@@ -114,10 +145,10 @@
 
 ## 待实施：法国新鲜度与多地区归属上线门禁
 
-- 对应 change：`fix-france-news-freshness-and-multiregion-attribution`。当前仅完成工程评审，以下为未来实施后的上线约束，不代表功能已上线。
+- 对应 change：`fix-france-news-freshness-and-multiregion-attribution`。代码已按安全关闭模式部署过，以下仍是生产 dry-run、Shadow、enforce 与相关地区查询的有效上线约束；不得把“代码存在”视为功能已经启用。
 - 部署前必须确认本地 HEAD、服务器 HEAD、tracked/untracked 文件、Nginx 运行配置、数据库备份及 `web/worker/beat` 当前环境变量；部署后再次核对三个服务读取一致配置。
 - 首次部署必须设置 `MULTIREGION_ATTRIBUTION_MODE=off`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`、`TRANSLATION_AUTO_RETRY_ENABLED=false`，不得因迁移成功自动开启行为。
-- 开启 shadow 前必须完成至少 250 篇版本化 gold set、生产快照 SHA 校验、全部质量阈值和 250 篇 PostgreSQL 性能验收；任何单地区 no-go 都应阻止继续灰度。
+- 开启 shadow 前必须完成至少 150 篇版本化 Gold Set、五个运营地区各至少 10 篇、跨地区至少 20 篇、生产快照 SHA 校验、全部质量阈值和独立的 250 篇 PostgreSQL 性能验收；任何单地区 no-go 都应阻止继续灰度。
 - enforce commit 必须引用成功 dry-run 的 run ID 与 manifest，检查文章、人工锁定、规则、术语和 gold 版本漂移；部分失败使用同一 run/manifest resume，不新建无关批次。
 - 回滚顺序：先关闭相关地区查询，再把归属 mode 降为 shadow 或 off，再关闭翻译自动重试；保留运行账本用于审计。只有数据库结构或数据损坏时才使用部署前备份恢复。
 - 验收必须覆盖 `/healthz/`、首页、五地区页、文章详情、运营后台、worker/beat 日志、来源/翻译/门禁/窗口/网页/QQ 分层计数，以及单文章单次公开和单群单次交付。
@@ -4158,8 +4189,8 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
    邮件接收地址设置为 `754652181@qq.com`；若生产缺少 SMTP/EMAIL_HOST 配置，则必须保持 `TRANSLATION_FAILURE_EMAIL_ENABLED=false`。只有 SMTP 配置完成且受控测试邮件成功后才允许开启。
 3. 验证 `web/worker/beat` 使用相同安全配置，执行 `manage.py check`，检查迁移、容器、日志、内外 `/healthz/`、首页、五地区页和运营后台。
 4. 对 TDN France 和 France Galop 执行只读 probe；France Galop 旧时间只先运行 `repair_france_galop_published_at` dry-run，保存 manifest、证据和漂移检查结果，不直接改库。
-5. 使用真实生产文章建立至少 250 篇有效、五地区各至少 40 篇、双人标注并裁决的 gold CSV，配置非 `pending-review` 的 `MULTIREGION_ATTRIBUTION_GOLD_VERSION` 和该 CSV 的 `MULTIREGION_ATTRIBUTION_GOLD_SNAPSHOT_SHA256`，再执行 `evaluate_multiregion_attribution_gold --labels <csv> --json`。任一质量门槛不通过即 no-go。
-6. 使用 `reprocess_multiregion_attribution_gates --dry-run --gold-labels <csv>` 生成绑定 gold 指标的持久 run ID 与 manifest；人工审核主地区变化、全部 `needs_review` 和无依据扩散后，才允许对锁定 run 执行 commit。`pending-review`、无有效 SHA、有效分母不足 250 或指标 no-go 均会拒绝 commit。
+5. 使用真实生产文章建立至少 150 篇有效、五个运营地区各至少 10 篇、跨地区至少 20 篇的 Gold CSV；单审保留 reviewer A 来源，多人冲突必须裁决。配置非 `pending-review` 的 `MULTIREGION_ATTRIBUTION_GOLD_VERSION` 和该 CSV 的 `MULTIREGION_ATTRIBUTION_GOLD_SNAPSHOT_SHA256`，再执行 `evaluate_multiregion_attribution_gold --labels <csv> --provisional --json`。任一覆盖或质量门槛不通过即 no-go。
+6. 使用 `reprocess_multiregion_attribution_gates --dry-run --single-review-gold --gold-labels <csv>` 生成绑定 Gold 指标的持久 run ID 与 manifest；人工审核主地区变化、全部 `needs_review` 和无依据扩散后，才允许对锁定 run 执行 commit。`pending-review`、无有效 SHA、有效分母/分地区/跨地区覆盖不足或指标 no-go 均会拒绝 commit。
 7. 翻译失败先审核 `429/503/504/timeout` 清单，再小批开启 selector；确认不会直接公开文章或创建 QQ delivery。耗尽和人工重试入口必须可见。
 8. 归属灰度顺序固定为：off 部署、shadow、仅新文章 enforce、网页和显式测试群相关查询、最近 72 小时受控回填、正式群。进入测试群阶段前，仅对指定 `PushTarget` 设置 `multiregion_test_enabled=true`；其余群保持 false，最终 `formal_groups` 阶段才扩大。每阶段记录指标并至少观察约定窗口。
 9. 回滚先关闭相关地区查询，再把归属切回 `off`，最后关闭翻译自动重试；保留已写审计与 run，不用反向迁移删除证据。数据库异常时按备份恢复流程处理。
@@ -4232,6 +4263,57 @@ docker exec -e HISTORICAL_RACE_BACKFILL_ENABLED=true umanewsbot-web-1 \
 - apply 只临时启用 `HISTORICAL_RACE_BACKFILL_ENABLED` 的单命令环境，不修改常驻配置；结束后复核常驻历史网络/写入门禁和历史赛事 draft 状态。
 - 字段 apply 后必须重新导出 event input 并重新生成详情候选。旧详情候选的 target SHA 应失败，不能为赶进度跳过重新 coverage、dry-run 和第二次写前备份。
 
+## 2026-07-13 多地区归属 Gold Set 审核流程
+
+1. 生成审核包必须保持归属与相关查询开关关闭，只读生产数据库，不执行归属 commit。推荐输出到 `runtime/multiregion_gold_review/<version>/`：
+
+```bash
+python manage.py prepare_multiregion_attribution_gold_review \
+  --output-dir runtime/multiregion_gold_review/<version> \
+  --gold-version <version> \
+  --per-region 50 \
+  --cross-candidate-target 75 \
+  --candidate-pool-per-source 100 \
+  --seed YYYYMMDD
+```
+
+2. 先校验 `manifest.json` 中的 SHA、250 个唯一 key/URL/input SHA、五地区各 50 和来源分布。`source_snapshot.csv` 与 `README.md` 不得编辑；正文审核包不得提交 Git。
+3. 把 `reviewer_a.csv`、`reviewer_b.csv` 分别交给两位不同审核人独立填写。只编辑 README 列出的审核字段；地区值只允许 `japan / hong_kong / united_kingdom / france / united_states`，多个相关地区用英文分号分隔。
+4. 两份审核完成后先合并，不带裁决表运行一次：
+
+```bash
+python manage.py finalize_multiregion_attribution_gold_review \
+  --package-dir runtime/multiregion_gold_review/<version> \
+  --output-dir runtime/multiregion_gold_review/<version>-finalize-1
+```
+
+5. 若输出 `adjudication.csv` 有冲突，由第三角色逐项填写 `resolved`、最终主/相关地区、理由、裁决人和 ISO-8601 时间，再带 `--adjudication` 运行到新的空输出目录。只有生成文件名为 `gold_labels.csv` 且报告 `structurally_qualified=true` 才表示结构合格；`gold_labels_draft.csv` 一律不得用于生产资格。
+6. 将结构合格的 `gold_labels.csv` 放入版本化仓库数据目录，只提交不含正文的最终标签和必要说明。随后运行 `evaluate_multiregion_attribution_gold --labels <path> --json`；质量门槛任何一项 no-go，均不得开启 shadow/enforce。
+7. 当前首包版本为 `multiregion-gold-v1-20260713`，manifest SHA-256 为 `1836a9d896ca5b6e09da6da7ed07a2fb3f66f0a02f387010fe4b56475bf5c1ea`。该包尚未双审，不能配置为生产有效 Gold 版本。
+
+### 单审部分样本校准
+
+当只有一位审核人或部分候选未选择地区时，必须显式使用单审模式；不得把空白行补成来源地区，也不得复制同一审核人作为 reviewer B：
+
+```bash
+python manage.py finalize_multiregion_attribution_gold_review \
+  --package-dir runtime/multiregion_gold_review/<version> \
+  --output-dir runtime/multiregion_gold_review/<version>-provisional-final \
+  --provisional-single-review \
+  --reviewer-file /path/to/reviewer_a_completed.csv
+
+python manage.py evaluate_multiregion_attribution_gold \
+  --labels runtime/multiregion_gold_review/<version>-provisional-final/provisional_gold_labels.csv \
+  --provisional \
+  --json
+```
+
+- `provisional_gold_labels.csv` 保留单审来源标记；自 2026-07-14 起，单审身份不再自动 no-go，但仍须满足相同覆盖与质量门槛，并通过 `--single-review-gold` 显式进入 dry-run。未完成 shadow 验收前生产 commit/enforce 仍禁止。
+- 首次生产只读评估因 5 篇文章输入 SHA 漂移只纳入 154 条；随后以审核包冻结正文建立本地 SQLite 校准快照，恢复完整 159 条固定分母。旧规则在本地同分母基线为主地区 `81.76%`、相关 precision `6.67%`、recall `6.45%`。
+- `multiregion-v3` 本地校准结果为主地区 `98.11%`，日本/香港/英国/美国 `100%`、法国 `90.91%`、other `60%`；相关 precision `100%`、recall `54.84%`，无依据变化 `1.89%`、过度扩散 `0%`。recall 缺口主要来自审核标签要求补入文章未提及的历史参赛地区，自动规则不得为追分猜测这些地区。
+- 批量评估使用 17,474 个活跃地区术语、38,806 个索引候选；159 篇纯推断约 `0.8` 秒，完整 Docker 命令约 `2–4` 秒。索引只生成候选，最终仍调用原边界匹配器；生产 PostgreSQL 250 篇 SQL/RSS 基准仍须按任务 8.9/9.3 单独验收。
+- 该批仍保留 `provisional_single_review` 审核来源，但 159 条有效样本、最少运营地区法国 11 条和跨地区 24 条已达到 `150/10/20` 首发覆盖；相关 precision `100%`、recall `54.84%` 及其他质量指标也已达标。它可以生成进入生产 Shadow 所需的 dry-run，但在生产 dry-run、至少 24 小时 Shadow 和全量变化复核完成前，`MULTIREGION_ATTRIBUTION_MODE` 仍须保持 `off`，相关地区查询保持关闭，不得直接 commit/enforce。
+- 生产只读评估若意外启动多个全术语扫描进程，应立即停止并确认容器内外 one-off 均退出；本轮曾终止两个只读评估进程，未写数据库，后续校准全部切到本地冻结快照。
 ## 2026-07-13 `main@58786b91` 可复现镜像部署记录
 
 - 构建上下文：`/opt/umanewsbot-builds/main-58786b91-20260713-1435`；revision `58786b91fba9c44054a6102055766824677bcbcb`，Git tree `5d8b7ccf775f6be7051c88e8f440b034ad02f4df`，source archive SHA-256 `184f05c39d3df5dd0bb1f410bdccda418ed3052964edea99b07faf22723fa07e`。

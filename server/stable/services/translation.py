@@ -575,6 +575,11 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             for term in terms
             if (term.target_zh or "").strip()
         ]
+        glossary_lines.extend(
+            f"- [seed-placeholder] {item.placeholder} => {item.target_text}"
+            f"（源词：{item.source_text}；译文中必须原样复制占位符，系统会恢复精确中文）"
+            for item in seed_term_plan.items
+        )
         unknown_horse_limit = max(1, int(settings.TRANSLATION_UNKNOWN_HORSE_LIMIT))
         recognized_horses = recognized_horses_from_resolution(resolution)
         consumed_entity_keys = format_plan.consumed_entity_keys | seed_term_plan.consumed_entity_keys

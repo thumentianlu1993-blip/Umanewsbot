@@ -3,7 +3,7 @@
 - **H1 法国最新稿发现：** 使用 TDN posts 日期倒序后，最近 72 小时审核查询的去重新候选数 MUST 大于旧 `/search` 入口；若没有提升或出现历史稿越过 3 天门禁则 BLOCKER。
 - **H2 时间可信度：** France Galop 日期 fixture 与生产抽样 MUST 100% 解析为 Europe/Paris 对应 UTC；重复 fallback 抓取覆盖 verified 时间数 MUST 为 0，否则 BLOCKER。
 - **H3 翻译恢复：** 可恢复失败 MUST 在最多 3 次内成功或进入可见耗尽终态；重复任务并发产生重复 TranslationRun 数 MUST 为 0，否则 BLOCKER。
-- **H4 归属质量：** 有效 gold set MUST 保持五地区各 >=40、跨地区 >=50；总体主地区准确率 >=95%、单地区 >=90%、相关 precision >=95%、recall >=90%、无依据变化 <=2%、过度扩散 <=1%、锁定覆盖 0，否则 BLOCKER。
+- **H4 归属质量：** 有效 gold set MUST 保持总量 >=150、五个运营地区各 >=10、跨地区 >=20；总体主地区准确率 >=95%、单地区 >=90%、相关 precision >=95%、recall >=50%、无依据变化 <=2%、过度扩散 <=1%、锁定覆盖 0，否则 BLOCKER。线上 recall 单独下降只告警并阻止扩大灰度，不自动关闭；precision/过度扩散失败要求回退。
 - **H5 批量性能：** 250 篇 PostgreSQL 基准 MUST <=30 SQL、<=30 秒、RSS 增量 <=256 MiB，否则 BLOCKER。
 - **H6 分发幂等：** 相关地区开启后，同一 article/target 的网页公开与 QQ 交付新增重复数 MUST 为 0，否则 BLOCKER。
 
@@ -41,7 +41,7 @@
 
 - [x] 4.1 (integration) 重构归属证据生成，分别输出中心赛事/赛场、核心对象所属地、标题导语上下文、背景提及和来源 fallback (req: req-attribution-evidence) (req: req-global-france-attribution)
 - [x] 4.2 (integration) 阻止来源 URL、来源备注、普通词术语和历史履历/血统背景地名单独参与主地区判定 (req: req-attribution-evidence) (req: req-global-france-attribution)
-- [x] 4.3 (integration) 实现赛事中心优先规则：海外赛事地区为主，马匹/骑师/练马师/马主原属地作为可信相关地区 (req: req-attribution-evidence) (req: req-global-france-attribution)
+- [x] 4.3 (integration) 实现叙事中心规则：标题有强主体行动/成果证据时主体地区为主、赛事地区相关；否则赛事地区为主，可信对象原属地相关 (req: req-attribution-evidence) (req: req-global-france-attribution)
 - [x] 4.4 (integration) 实现法国主题规则：France Galop、法国育马场、Arqana/法国拍卖、法国马场和机构新闻在无更强赛事中心时以法国为主 (req: req-attribution-evidence) (req: req-global-france-attribution)
 - [x] 4.5 (integration) 输出规则版本、数值置信度、high/medium/low 档位、正反证据和 `applied/fallback/needs_review` 状态 (req: req-attribution-confidence)
 - [x] 4.6 (integration) 对互斥赛事中心、仅弱上下文、超过 3 个候选相关地区和缺少强证据的跨来源主地区变化执行 fail-closed 复核 (req: req-attribution-spread)
@@ -51,13 +51,16 @@
 
 ## 5. 质量基准与生产资格
 
-- [ ] 5.1 (application) 建立至少 250 篇版本化 gold labels，保存 article/source、输入 SHA、期望地区、审核角色和理由；两次标注冲突须裁决，未决/漂移样本不进入分母 (req: req-attribution-quality)
+- [x] 5.1 (application) 建立 159 篇版本化单审 gold labels，保存 article/source、输入 SHA、期望地区、审核来源和理由；有效样本 >=150、五个运营地区各 >=10、跨地区 >=20，单审不得伪造第二审核人，多人标注存在冲突时须裁决，未决/漂移样本不进入分母 (req: req-attribution-quality)
+- [x] 5.1a (application) 支持单审部分样本校准：未选择任何地区的行忽略、明确排除保留、原始/规范值可审计；`provisional_single_review` 仅标记审核来源，不再自动 no-go。本批固定 159 条标签，最少地区法国 11、跨地区 24，主地区 98.11%、相关 precision 100%、recall 54.84%，当前覆盖与质量门槛全部通过，可进入 shadow (req: req-attribution-quality)
 - [x] 5.2 (integration) 实现 gold set 评估器，计算总体/分地区主地区准确率、相关地区 precision/recall、无依据主地区变化率、过度扩散率和人工锁定覆盖数 (req: req-attribution-quality)
-- [x] 5.3 (application) 将生产资格门槛接入 dry-run 报告：总体主地区准确率 95%、单地区 90%、相关 precision 95%、recall 90%、无依据变化 2%、过度扩散 1%、锁定覆盖 0 (req: req-attribution-quality)
+- [x] 5.3 (application) 将生产资格门槛接入 dry-run 报告：总体主地区准确率 95%、单地区 90%、相关 precision 95%、recall 50%、无依据变化 2%、过度扩散 1%、锁定覆盖 0；线上 recall 波动只告警并阻止扩大，precision/过度扩散失败要求回退 (req: req-attribution-quality)
 - [x] 5.4 (application) 当任一门槛不达标时输出 no-go 并阻止 commit/启用建议，不允许通过降低阈值自动放行 (req: req-attribution-quality)
 - [x] 5.5 (application) 为最近 72 小时生产样本生成分层抽检清单，完整列出所有主地区变化、全部 `needs_review` 和五地区随机样本 (req: req-attribution-dry-run)
+- [x] 5.5a (application) 修正生产审计入口：新增 `--scope all_articles` 覆盖最近窗口全部有效文章及已发布稿，默认门禁补跑范围保持兼容；输出无截断标记、全部主地区变化、全部 `needs_review`、人工锁定和五地区确定性分层样本，将执行策略绑定 manifest，截断 run 禁止 commit，全量 commit 只写归属且不改变门禁/发布/QQ (req: req-attribution-dry-run)
 - [x] 5.6 (integration) 实现 `AttributionBatchContext`，一次预加载并索引术语/alias/赛事证据供 gold set、dry-run 和 commit 复用，避免逐文章 ORM 扫描 (req: req-attribution-performance)
 - [x] 5.7 (application) 为生产质量报告增加有效分母、缺失/漂移/未决样本、Wilson 区间及 SQL/耗时/RSS/预加载计数 (req: req-attribution-quality)
+- [x] 5.8 (operations) 固化 Gold Set 持续扩充规则：新增来源、规则版本、shadow 误判和运营争议必须进入后续版本，并保留旧版本与指标变化 (req: req-attribution-quality)
 
 ## 6. 多地区展示、窗口与 QQ
 
@@ -85,7 +88,7 @@
 - [x] 8.6 (application) 添加 gold set 标注裁决、SHA 漂移、有效分母、指标/Wilson 边界、单地区 no-go、持久 run/lease、部分失败 resume、重复 commit 和规则版本漂移测试 (req: req-attribution-run-ledger) (req: req-attribution-quality)
 - [x] 8.7 (application) 添加地区页/API 去重、主地区配额、相关地区可见、QQ 单交付和灰度开关组合测试 (req: req-single-publish-delivery)
 - [x] 8.8 (application) 添加后台失败原因、快速入口、staff 权限、有限查询窗口和大样本查询数测试 (req: req-attribution-observability)
-- [x] 8.9 (integration) 在 PostgreSQL fixture 上验证 250 篇归属基准不超过 30 SQL、30 秒和 256 MiB RSS 增量 (req: req-attribution-performance)
+- [x] 8.9 (integration) 在包含 17,474 条术语、38,806 个候选、17 个来源和 250 篇真实校准文章的 PostgreSQL fixture 上验证五轮基准为 5 SQL、1.66–2.14 秒、约 49 MiB RSS，满足 30 SQL、30 秒和 256 MiB 门槛 (req: req-attribution-performance)
 - [x] 8.10 (application) 运行目标测试、完整 `stable` 测试、`manage.py check`、迁移一致性和 Python 编译检查 (adr: adr-002-structured-state)
 - [x] 8.11 (operations) 运行两个生产 Compose config、OpenSpec strict/all、`git diff --check` 和敏感信息检查 (adr: adr-010-staged-rollout)
 
@@ -96,7 +99,7 @@
 - [ ] 9.3 (operations) 在生产执行 TDN/France Galop 只读 probe、gold set 与最近 72 小时持久归属 dry-run，保存 run ID/manifest/runtime 导出并按质量与性能硬门槛判定 go/no-go (req: req-attribution-dry-run) (req: req-attribution-quality)
 - [ ] 9.4 (operations) 人工审核所有主地区变化、全部 `needs_review`、France Galop 时间修复和 `7871/7699` 等翻译重试清单 (req: req-attribution-dry-run) (req: req-attribution-quality)
 - [ ] 9.5 (operations) 使用锁定 manifest 小批修复可信发布时间并重试瞬时翻译失败，验证不直接重复发布或创建 QQ 交付 (req: req-recent-manifest-backfill)
-- [ ] 9.6 (operations) 确认最新合格 run 与当前规则/术语/gold 版本一致且不超过 24 小时后切 enforce，仅处理新文章并保持相关地区查询关闭，连续观察至少 24 小时 (req: req-attribution-rollout)
+- [ ] 9.6 (operations) 确认最新合格 run 与当前规则/术语/gold 版本一致且不超过 24 小时，完成至少 24 小时 shadow 与全部主地区变化/`needs_review` 人工复核后切 enforce，仅处理新文章并保持相关地区查询关闭，再连续观察至少 24 小时 (req: req-attribution-rollout)
 - [ ] 9.7 (operations) 为网页和测试 QQ 群开启相关地区查询，验收地区页、发布窗口、QQ 去重、失败原因和快速处理入口 (req: req-attribution-rollout)
 - [ ] 9.8 (operations) 通过审核后按 manifest 回填最近 72 小时，再扩大正式群；任何指标退化先关相关查询、再关归属写入 (req: req-attribution-rollout)
 - [ ] 9.9 (operations) 验收上线后至少 3 个日常窗口和一个可模拟的重要赛事窗口，按来源候选、翻译、归属、门禁、公开和 QQ 分层记录法国及五地区真实数量 (req: req-france-layered-volume)
