@@ -360,6 +360,106 @@ class AttributionEvidenceHierarchyTests(TestCase):
 
         self.assertResult(result, RacingRegion.UNITED_STATES, status="fallback")
 
+    def test_single_word_horse_does_not_take_iowa_oaks_from_global_source(self):
+        add_term("Oaks", TermType.RACE, RacingRegion.UNITED_KINGDOM)
+        add_term("Prairie Meadows", TermType.RACECOURSE, RacingRegion.UNITED_STATES)
+        add_term("Perfect", TermType.HORSE, RacingRegion.OTHER)
+        article = article_with_text(
+            "Mizumi Remains Perfect with Workman-Like Iowa Oaks Effort",
+            "Mizumi won the Iowa Oaks at Prairie Meadows in the United States.",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.UNITED_STATES)
+
+    def test_one_word_racecourse_is_strong_title_event_evidence(self):
+        add_term("Wolverhampton", TermType.RACECOURSE, RacingRegion.UNITED_KINGDOM)
+        add_term("Grand Prix de Saint-Cloud", TermType.RACE, RacingRegion.FRANCE)
+        article = article_with_text(
+            "Coronet's Daughter Martinet Debuts at Wolverhampton",
+            "Her dam previously won the Grand Prix de Saint-Cloud in France.",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.UNITED_KINGDOM)
+
+    def test_one_word_out_of_scope_racecourse_beats_foreign_horse_origin(self):
+        add_term("Killarney", TermType.RACECOURSE, RacingRegion.OTHER)
+        add_term("Benvenuto Cellini", TermType.HORSE, RacingRegion.UNITED_KINGDOM)
+        article = article_with_text(
+            "Oklahoma Set for Benvenuto Cellini Maiden",
+            "The maiden will be staged at Killarney.",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.OTHER, {RacingRegion.UNITED_KINGDOM})
+
+    def test_local_source_is_not_reassigned_by_historical_lead_event(self):
+        add_term("Prix Jean Prat", TermType.RACE, RacingRegion.FRANCE)
+        article = article_with_text(
+            "Newmarket Hope Returns to Training",
+            "The colt previously ran in the Prix Jean Prat before returning home.",
+            region=RacingRegion.UNITED_KINGDOM,
+            source_site=SourceSite.SPORTING_LIFE,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.UNITED_KINGDOM)
+
+    def test_race_result_keeps_event_primary_over_winning_horse_origin(self):
+        add_term("Prix Jean Prat", TermType.RACE, RacingRegion.FRANCE)
+        add_term("Thesecretadversary", TermType.HORSE, RacingRegion.UNITED_KINGDOM)
+        article = article_with_text(
+            "Thesecretadversary Makes All For Prix Jean Prat Triumph",
+            region=RacingRegion.FRANCE,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.FRANCE)
+
+    def test_full_organisation_name_suppresses_nested_race_name(self):
+        add_term("Jockey Club", TermType.RACE, RacingRegion.OTHER)
+        add_term("The Jockey Club", TermType.ORG, RacingRegion.UNITED_KINGDOM)
+        article = article_with_text(
+            "Turnover and Attendances Up as The Jockey Club Announces its 2025 Financial Results",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.UNITED_KINGDOM)
+
+    def test_partial_word_does_not_suppress_real_event_name(self):
+        add_term("World Cup", TermType.RACE, RacingRegion.UNITED_KINGDOM)
+        add_term("World Cupid", TermType.HORSE, RacingRegion.UNITED_STATES)
+        article = article_with_text(
+            "World Cupid Takes Aim at the World Cup",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.UNITED_KINGDOM, {RacingRegion.UNITED_STATES})
+
+    def test_japanese_current_achievement_is_not_replaced_by_future_overseas_dream(self):
+        article = article_with_text(
+            "武豊5000勝達成! 父の故郷・函館で初メモリアル 次の夢は凱旋門賞だ",
+            region=RacingRegion.JAPAN,
+            source_site=SourceSite.SPONICHI,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.JAPAN, {RacingRegion.FRANCE})
+
     def test_explicit_title_subject_can_outrank_local_event(self):
         article = article_with_text(
             "Team Hong Kong set for Shergar Cup at Ascot",
