@@ -366,6 +366,15 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             f"请从头逐段完整重译，不得合并、压缩或省略原文细节；只可复制原文实际存在的 {namespace}，"
             "并按原文所属字段及出现次数原样复制，禁止新造占位符或改换命名空间。"
         )
+        if any(
+            item.get("reason") == "duplicated"
+            and str(item.get("placeholder", "")).startswith("__UMA_KEEP_")
+            for item in violations
+        ):
+            instruction += (
+                "若原文后句省略马名而中文需要补出主语或指代，请使用“该马”“其”等中文指代，"
+                "不得在省略位置再次复制 KEEP 占位符；只有原文显式出现马名的位置才复制该占位符。"
+            )
         if unexpected:
             instruction += f"原文不存在以下占位符，译文必须删除：{'、'.join(unexpected)}。"
         if contexts:

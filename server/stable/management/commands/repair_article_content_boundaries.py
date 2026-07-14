@@ -70,9 +70,13 @@ class Command(BaseCommand):
             parse_status = detail.metadata.get("body_parse_status")
             if parse_status != "ok" or not detail.body_ja_normalized:
                 raise CommandError(f"文章 {article.id} 正文重解析失败: {parse_status or 'unknown'}")
+            if not detail.title_ja:
+                raise CommandError(f"文章 {article.id} 标题重解析失败")
 
             before_sha = _sha256(article.body_ja_raw)
             after_sha = _sha256(detail.body_ja_raw)
+            before_title_sha = _sha256(article.title_ja)
+            after_title_sha = _sha256(detail.title_ja)
             payload = {
                 "article_id": article.id,
                 "source_site": article.source_site,
@@ -83,7 +87,13 @@ class Command(BaseCommand):
                 "after_sha256": after_sha,
                 "before_length": len(article.body_ja_raw or ""),
                 "after_length": len(detail.body_ja_raw or ""),
-                "changed": before_sha != after_sha,
+                "before_title": article.title_ja,
+                "after_title": detail.title_ja,
+                "before_title_sha256": before_title_sha,
+                "after_title_sha256": after_title_sha,
+                "body_changed": before_sha != after_sha,
+                "title_changed": before_title_sha != after_title_sha,
+                "changed": before_sha != after_sha or before_title_sha != after_title_sha,
             }
             payloads.append(payload)
 
@@ -94,6 +104,7 @@ class Command(BaseCommand):
                 **payload,
                 "repaired_at": timezone.now().isoformat(),
             }
+            article.title_ja = detail.title_ja
             article.body_ja_raw = detail.body_ja_raw
             article.body_ja_normalized = detail.body_ja_normalized
             article.translation_metadata = {
@@ -105,6 +116,7 @@ class Command(BaseCommand):
             }
             article.save(
                 update_fields=[
+                    "title_ja",
                     "body_ja_raw",
                     "body_ja_normalized",
                     "translation_metadata",
@@ -115,6 +127,9 @@ class Command(BaseCommand):
                 action_type="article_content_boundary_repaired",
                 target_type="article",
                 target_id=article.id,
-                detail=f"离线正文边界修复 {before_sha[:12]} -> {after_sha[:12]}",
+                detail=(
+                    f"离线正文边界修复 title={before_title_sha[:12]}->{after_title_sha[:12]} "
+                    f"body={before_sha[:12]}->{after_sha[:12]}"
+                ),
             )
         return payloads

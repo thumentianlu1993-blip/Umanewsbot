@@ -48,6 +48,17 @@ _STRUCTURED_NOISE_SELECTORS = (
     "[class*='SocialShare']",
 )
 
+_SPONICHI_STRUCTURED_NOISE_SELECTORS = (
+    "figure",
+    "#article_more_area",
+    "#login_article_more_area",
+)
+
+_SPONICHI_PROMOTION_RE = re.compile(
+    r"(?:スポニチ予想.*(?:販売中|プリントサービス)|e-printservice\.net)",
+    re.IGNORECASE,
+)
+
 _TDN_LEADING_RULES = (
     ("tdn_editor_note", re.compile(r"^editor[’']s note\s*:", re.IGNORECASE)),
     (
@@ -105,6 +116,17 @@ def _remove_structured_noise(node: Tag, removed: Counter[str]) -> None:
             removed["structured_noise"] += len(matches)
 
 
+def _remove_source_structured_noise(node: Tag, source: str, removed: Counter[str]) -> None:
+    if source != SourceSite.SPONICHI:
+        return
+    for selector in _SPONICHI_STRUCTURED_NOISE_SELECTORS:
+        matches = list(node.select(selector))
+        for match in matches:
+            match.decompose()
+        if matches:
+            removed["sponichi_structured_noise"] += len(matches)
+
+
 def _paragraphs(node: Tag) -> list[str]:
     raw = extract_article_text(node)
     return [normalize_whitespace(part) for part in _PARAGRAPH_SPLIT_RE.split(raw) if normalize_whitespace(part)]
@@ -135,6 +157,16 @@ def _remove_betting_promotions(paragraphs: list[str], removed: Counter[str]) -> 
     for paragraph in paragraphs:
         if _BETTING_PROMOTION_RE.search(paragraph):
             removed["betting_promotion"] += 1
+        else:
+            kept.append(paragraph)
+    return kept
+
+
+def _remove_sponichi_promotions(paragraphs: list[str], removed: Counter[str]) -> list[str]:
+    kept: list[str] = []
+    for paragraph in paragraphs:
+        if _SPONICHI_PROMOTION_RE.search(paragraph):
+            removed["sponichi_betting_promotion"] += 1
         else:
             kept.append(paragraph)
     return kept
@@ -178,12 +210,12 @@ def _strip_sporting_life_inline_noise(paragraphs: list[str], removed: Counter[st
 
 def clean_international_article_body(node: Tag, *, source_site: SourceSite | str) -> ArticleContentCleanResult:
     removed: Counter[str] = Counter()
+    source = _source_value(source_site)
     _remove_structured_noise(node, removed)
+    _remove_source_structured_noise(node, source, removed)
     paragraphs = _paragraphs(node)
     paragraphs = _remove_standalone_urls(paragraphs, removed)
     paragraphs = _strip_link_ctas(paragraphs, removed)
-    source = _source_value(source_site)
-
     if source in {SourceSite.TDN, SourceSite.TDN_FRANCE}:
         paragraphs = _drop_leading(paragraphs, _TDN_LEADING_RULES, removed)
         paragraphs = _truncate_tail(paragraphs, _TDN_TAIL_RULES, removed)
@@ -191,6 +223,8 @@ def clean_international_article_body(node: Tag, *, source_site: SourceSite | str
         paragraphs = _truncate_tail(paragraphs, _SPORTING_LIFE_TAIL_RULES, removed)
         paragraphs = _remove_betting_promotions(paragraphs, removed)
         paragraphs = _strip_sporting_life_inline_noise(paragraphs, removed)
+    elif source == SourceSite.SPONICHI:
+        paragraphs = _remove_sponichi_promotions(paragraphs, removed)
 
     text = normalize_whitespace("\n\n".join(paragraphs))
     return ArticleContentCleanResult(

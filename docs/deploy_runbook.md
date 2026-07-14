@@ -1,5 +1,14 @@
 # 部署运行手册
 
+## 2026-07-15 新闻统一镜像切换与存量重跑记录
+
+1. 最终新闻代码 revision 为 `bdc0eeff78e111d7fa8a697cbb3557888f864fb8`，正式 AMD64 image ID 为 `sha256:c975a4faf979a1f78cdb203b810d4f5726aca114175007fc01c176044f13841c`。错误 revision 标签的 `sha256:427e1f733115d487981ee131da4ed6d75a681c1b690aa21978a00897616206d8` 禁止部署。
+2. 写前备份 `/opt/umanewsbot/backups/db/post-news-final-pre-unified-bdc0eeff-20260715_033227.dump` 为 `140310729` bytes，SHA-256 `3e93fd9dba4fb80d3b415a2f97fce1d02337054d6afeb14a725b859cf67a5a74`，数据库容器内 `pg_restore -l` 通过。回滚 tag `umanewsbot:rollback-pre-unified-bdc0eeff-20260715_0335` 指向切换前镜像。
+3. 切换遵循安全边界：beat 停止、正文 one-off 退出、TranslationRun started 和 NewsArticle translating 为 0、Celery active/reserved/Redis queue 可解释后，才以 `--no-deps` 更新 web/worker/beat。不得重建 DB、Redis、historical runner 或共享网络。
+4. Sponichi 遗留队列仅在证明 Redis 中恰好是 79 条相同文章 ID 的旧 `process_article_automation_task` 后，通过 WATCH 校验并删除；审计 artifact 为 `sponichi_stale_automation_queue_cleanup.json`，SHA-256 `bf2fde83e050d70c44799a217e922054d7dc727a80701806d26ecbaddee3e92f`。不得将这一做法扩展成通用清队列操作。
+5. 最终必须核对：三服务 image/revision 一致、healthz 和 PostgreSQL 正常、正文 one-off=0、TranslationRun started=0、NewsArticle translating=0、Celery active/reserved/queue=0、历史锁与事务=0、近 10 分钟无 error/traceback/fatal。
+6. 历史开关继续保持 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。当前可用磁盘约 3.0 GiB，低于 5 GiB 门槛；不得因新闻窗口交还而启动 batch006。
+
 ## 待执行：多地区归属 V3 第三候选生产只读验收
 
 1. 第一候选人工复核发现 7 类明确错标；第二候选虽完成 `591` 篇完整审计，但 Gold 主地区 `91.67%`、相关 recall `48%`，机器与人工均为 no-go。前两轮 report 均不得复用来批准 Shadow。
