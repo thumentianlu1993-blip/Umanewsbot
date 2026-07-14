@@ -303,6 +303,27 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             return usage
         return {"repr": repr(usage)}
 
+    @staticmethod
+    def _placeholder_retry_context(
+        source_title: str,
+        source_body: str,
+        placeholders: list[str],
+        *,
+        radius: int = 120,
+    ) -> str:
+        contexts: list[str] = []
+        for placeholder in placeholders:
+            for field_name, source in (("标题", source_title), ("正文", source_body)):
+                index = (source or "").find(placeholder)
+                if index < 0:
+                    continue
+                start = max(0, index - radius)
+                end = min(len(source), index + len(placeholder) + radius)
+                snippet = source[start:end].replace("\n", " ").strip()
+                contexts.append(f"- {placeholder}（{field_name}）：…{snippet}…")
+                break
+        return "\n".join(contexts)
+
     def translate(
         self,
         article: NewsArticle,
@@ -421,7 +442,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             )
             if format_violations:
                 last_metadata["japanese_format_placeholder_violations"] = format_violations
-                retry_hint = (
+                retry_hint += (
                     "\n\n注意：上一版遗漏、重复或跨字段放置了固定格式占位符。"
                     "请在原占位符所属的标题或正文中各原样复制一次 __UMA_FORMAT_数字__ 占位符。"
                 )
@@ -439,14 +460,21 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             )
             if seed_term_violations:
                 last_metadata["japanese_seed_term_placeholder_violations"] = seed_term_violations
-                affected_placeholders = "、".join(
-                    sorted({item["placeholder"] for item in seed_term_violations})
+                affected_placeholder_list = sorted(
+                    {item["placeholder"] for item in seed_term_violations}
                 )
-                retry_hint = (
+                affected_placeholders = "、".join(affected_placeholder_list)
+                retry_context = self._placeholder_retry_context(
+                    protected_title,
+                    protected_body,
+                    affected_placeholder_list,
+                )
+                retry_hint += (
                     "\n\n注意：上一版遗漏、重复或跨字段放置了种子术语占位符。"
                     f"本次具体异常占位符：{affected_placeholders}。"
                     "请从头逐段完整重译，不得合并、压缩或省略原文细节；"
                     "在原占位符所属的标题或正文中各原样复制一次 __UMA_SEED_数字__ 占位符。"
+                    + (f"\n这些占位符在原文中的局部位置如下：\n{retry_context}" if retry_context else "")
                 )
                 if attempt < max_attempts:
                     continue
@@ -469,13 +497,18 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             push_summary_zh = restore_japanese_format_placeholders(push_summary_zh, format_plan)
 
             if not title_zh or not body_zh:
-                retry_hint = "\n\n注意：上一版输出缺少必要字段，请从头完整重译全文。"
+                retry_hint += "\n\n注意：上一版输出缺少必要字段，请从头完整重译全文。"
                 if attempt < max_attempts:
                     continue
                 raise TranslationResponseError("Translation response missing required fields", metadata=last_metadata)
 
             if self._looks_incomplete(source_text, body_zh):
-                retry_hint = "\n\n注意：上一版输出疑似未完整结束。请从头完整翻译全文，不要总结，不要省略最后一段，并确保 body_zh 以完整句子结束。"
+                source_tail = protected_body[-800:].replace("\n", " ").strip()
+                retry_hint += (
+                    "\n\n注意：上一版输出疑似未完整结束。请从头完整翻译全文，不要总结，不要省略最后一段，"
+                    "并确保 body_zh 以完整句子结束；此前所有占位符约束仍然有效。"
+                    + (f"\n请重点核对并完整翻译以下原文末段：…{source_tail}" if source_tail else "")
+                )
                 if attempt < max_attempts:
                     continue
                 raise TranslationResponseError("Translation response appears incomplete", metadata=last_metadata)
@@ -483,7 +516,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             missing_unknown_horse_names = self._missing_unknown_horse_names(title_zh, body_zh, unknown_horse_names)
             if missing_unknown_horse_names:
                 last_metadata["missing_unknown_horse_names"] = missing_unknown_horse_names
-                retry_hint = (
+                retry_hint += (
                     "\n\n注意：上一版把部分未收录中文译名的马名翻掉了。"
                     "请保留对应占位符，不要自行翻译或删除。"
                     f"缺失的原始马名：{'、'.join(missing_unknown_horse_names)}。"
@@ -498,7 +531,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             )
             if missing_person_targets:
                 last_metadata["missing_person_term_targets"] = missing_person_targets
-                retry_hint = (
+                retry_hint += (
                     "\n\n注意：上一版没有保留部分人名术语占位符。"
                     "请原样复制所有 __UMA_TERM_数字__ 占位符，不要音译或删除。"
                 )

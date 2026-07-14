@@ -44,7 +44,7 @@ SILICONFLOW_API_KEY=你的硅基流动Key
 SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
 TRANSLATION_TIMEOUT_SECONDS=90
 TRANSLATION_MAX_TOKENS=2400
-TRANSLATION_MAX_ATTEMPTS=2
+TRANSLATION_MAX_ATTEMPTS=3
 TRANSLATION_UNKNOWN_HORSE_LIMIT=12
 TRANSLATION_TERM_LIMIT=20
 AUTO_TRANSLATE_ON_INGEST=true
@@ -56,7 +56,7 @@ AUTO_TRANSLATE_SYNC=true
 - `SILICONFLOW_BASE_URL` 使用官方 OpenAI-compatible 接口地址。
 - `TRANSLATION_MODEL` 我默认给你设成了 `deepseek-ai/DeepSeek-V3`。
 - `TRANSLATION_MAX_TOKENS` 用来限制单次翻译输出上限，长文建议保持在 `2400` 左右。
-- `TRANSLATION_MAX_ATTEMPTS` 控制遇到疑似半截译文时的自动重试次数，默认 `2` 次。
+- `TRANSLATION_MAX_ATTEMPTS` 控制占位符遗漏、疑似半截译文等校验失败时的最大翻译尝试次数，默认 `3` 次；重试提示会累计保留此前约束，并附上缺失占位符的原文位置，避免修复一种违规时引入另一种违规。
 - `TRANSLATION_UNKNOWN_HORSE_LIMIT` 控制“未在术语库命中、需要按日文原样保留”的疑似马名提取上限。
 - `AUTO_TRANSLATE_ON_INGEST=true` 表示新稿落库后默认自动触发翻译。
 - `AUTO_TRANSLATE_SYNC=true` 表示抓取任务内同步等待翻译完成，适合你现在这种“进后台就想直接看到译文”的工作方式。

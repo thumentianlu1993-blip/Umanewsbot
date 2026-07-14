@@ -288,7 +288,26 @@ class JapaneseTranslationProviderIntegrationTests(TestCase):
         retry_prompt = request.call_args_list[1].args[0][1]["content"]
         self.assertIn("本次具体异常占位符：__UMA_SEED_1__", retry_prompt)
         self.assertIn("不得合并、压缩或省略原文细节", retry_prompt)
+        self.assertIn("__UMA_SEED_1__（正文）", retry_prompt)
         self.assertEqual(result.body_zh, "速度很快。")
+
+    @override_settings(TRANSLATION_MAX_ATTEMPTS=3)
+    def test_retry_keeps_seed_constraint_when_next_attempt_is_incomplete(self):
+        article = _article(body="スピードがある。" + "長い文章です。" * 100)
+        provider = self._provider()
+        first = _fake_response(body="速度很快。")
+        second = _fake_response(body="__UMA_SEED_1__だけ")
+        third = _fake_response(body="__UMA_SEED_1__很快。" + "完整翻译。" * 100)
+
+        with patch.object(provider, "_request_completion", side_effect=[first, second, third]) as request:
+            result = provider.translate(article)
+
+        self.assertEqual(request.call_count, 3)
+        final_prompt = request.call_args_list[2].args[0][1]["content"]
+        self.assertIn("本次具体异常占位符：__UMA_SEED_1__", final_prompt)
+        self.assertIn("此前所有占位符约束仍然有效", final_prompt)
+        self.assertIn("请重点核对并完整翻译以下原文末段", final_prompt)
+        self.assertTrue(result.body_zh.startswith("速度很快。"))
 
     @override_settings(TRANSLATION_MAX_ATTEMPTS=1)
     def test_duplicate_or_cross_field_seed_term_placeholder_fails_explicitly(self):

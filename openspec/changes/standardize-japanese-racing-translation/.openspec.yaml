@@ -38,3 +38,9 @@ journal:
     issues_resolved: 2
     verdict: approved
     note: "上线后回归发现模型同义改写与一篇完整性失败；新增字段级种子术语占位符、同步重译返回值门禁并修复嵌套最长命中，第 7 轮 review 零问题。"
+  - event: code-reviewed
+    date: "2026-07-14T10:14:06+08:00"
+    rounds: 2
+    issues_resolved: 1
+    verdict: approved
+    note: "8287 生产回归暴露两次尝试不足以跨占位符与完整性门禁收敛；默认提升为三次并累计重试约束、附缺失位置上下文，第 9 轮 review 零问题。"
