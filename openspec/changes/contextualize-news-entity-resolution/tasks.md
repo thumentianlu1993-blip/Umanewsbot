@@ -38,13 +38,13 @@
 
 ## 5. 生产部署与问题文章修复
 
-- [ ] 5.1 (operations) 协调并取得空闲生产写入窗口，核对精确 commit、容器、Celery、外部导入/历史写入锁和健康状态，备份 `.env` 与 PostgreSQL 并验证可读
-- [ ] 5.2 (operations) 从经 review 的精确提交构建可复现 AMD64 镜像，运行候选 check、迁移漂移和目标测试后部署 web/worker/beat
-- [ ] 5.3 (operations) 对文章 `8317`、`8309`、`8086`、`8330`、`8318` 执行实体/标签 dry-run、commit、显式重译和重新校验
-- [ ] 5.4 (operations) 对文章 `8291`、`8290`、`8283`、`8288`、`8221`、`8212` 执行完整马名保护 dry-run、commit、显式重译和重新校验
-- [ ] 5.5 (operations) 逐篇验收正文、标签和自动马匹关联，保持公开 ID、状态、原发布时间及 QQ 幂等；随机抽取英文/日文新文章确认不再出现同类误识别
+- [x] 5.1 (operations) 已取得空闲生产写入窗口并核对 commit/容器/Celery/历史写入门禁；有效 custom-format 备份 `pre-main-624dd5b9-20260714-071014.dump` 为 `133370327` bytes、SHA-256 `21cdce21f52ded3b48e7c083f2f536eb694130f71ad6a1e38e067620f817fa75`，`pg_restore -l` 通过
+- [x] 5.2 (operations) 已从最终 review 提交 `dc1e5ec584e47ea9d28998f76454d105836b3f0a` 构建并部署 AMD64 镜像 `sha256:5b06821610f0d2214cb24692e58beac4ffda731ddb84674a8855b2a1d4dbb470`；候选 check、迁移漂移、目标测试通过，web/worker/beat 镜像一致
+- [x] 5.3 (operations) 已对 `8317/8309/8086/8330/8318` 完成 dry-run、commit、显式重译、实体/标签重处理和重新校验；人物、普通词误标清零，`8086` 仅保留真实马名 `多爵`
+- [x] 5.4 (operations) 已对 `8291/8290/8283/8288/8221/8212` 完成完整马名保护 dry-run、commit、显式重译和重新校验；指定完整日文名不再被内部短术语拆分
+- [x] 5.5 (operations) 11 篇目标文全部保持原 `published` 状态、发布时间和 QQ 次数，公开详情均为 `200`；随机样本 `8390/8388/8386/8385/8383/8380` 及最终 worker 自然处理的 `8393/8394` 均无同类实体误识别，最终 dry-run 无增删差异
 
 ## 6. 文档、规格与归档
 
-- [ ] 6.1 (operations) 更新 `docs/current_state.md`、`docs/project_status.md`、`docs/decisions.md` 和 `docs/deploy_runbook.md`，记录实体判定、生产镜像、备份、逐篇修复和随机回归证据
+- [x] 6.1 (operations) 更新 `docs/current_state.md`、`docs/project_status.md`、`docs/decisions.md` 和 `docs/deploy_runbook.md`，记录实体判定、生产镜像、备份、逐篇修复和随机回归证据
 - [ ] 6.2 (operations) 同步 delta spec、严格校验全部完成任务并归档 `contextualize-news-entity-resolution`

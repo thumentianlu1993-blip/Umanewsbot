@@ -7,6 +7,12 @@
 > 本文档用于保留项目级概览与摘要信息。
 > 当前真实工作状态、最近一次关键修复、线上实际进展，请以 [docs/current_state.md](E:/Codex/docs/current_state.md) 为准。
 
+## 2026-07-14 新闻实体语境修复上线
+
+- `contextualize-news-entity-resolution` 已部署 `main@dc1e5ec5`；统一文章级实体解析覆盖翻译、标签、校验和自动关联，解决英文人物/普通词误作马名、姓氏回指以及日文完整马名被内部短术语拆分。
+- 11 篇问题文章已修复并保持原公开状态、发布时间与 QQ 幂等；随机六篇及最终 worker 新处理两篇通过回归。最终验证为目标 `51`、完整 `stable 1249` 项通过（跳过 1），第 18 轮 review 无问题。
+- web/worker/beat 统一镜像为 `sha256:5b06821610f0d2214cb24692e58beac4ffda731ddb84674a8855b2a1d4dbb470`；HTTP 健康、目标详情、空队列及错误日志正常。最近有效写前备份为 `pre-main-624dd5b9-20260714-071014.dump`，SHA-256 `21cdce21f52ded3b48e7c083f2f536eb694130f71ad6a1e38e067620f817fa75`。
+
 ## 2026-07-14 国际新闻正文边界修复上线
 
 - `tighten-international-article-content-boundaries` 已完成完整 OpenSpec 流程并部署 `main@514af8a2`；web/worker/beat 同为镜像 `sha256:954673cc74049d4b882e492ec29b072aba01aeb1a3ae440cc85415209c8a2f8a`。

@@ -1,5 +1,15 @@
 # 部署运行手册
 
+## 2026-07-14 新闻实体语境修复部署与回归
+
+1. 最终上线提交为 `dc1e5ec584e47ea9d28998f76454d105836b3f0a`，源码 archive SHA-256 `f2eec61f6d2211a76e4456f6b9cbfc3e55a5b610829162b4a68b6039aae6ffe1`；正式镜像 tag 为 `umanewsbot:main-dc1e5ec5-amd64-20260714-075837`，image ID `sha256:5b06821610f0d2214cb24692e58beac4ffda731ddb84674a8855b2a1d4dbb470`。
+2. 生产写入前备份 `.env.backup.pre-main-624dd5b9-20260714-071014`；数据库 `backups/db/pre-main-624dd5b9-20260714-071014.dump` 为 `133370327` bytes、SHA-256 `21cdce21f52ded3b48e7c083f2f536eb694130f71ad6a1e38e067620f817fa75`，`pg_restore -l` 通过。回滚 tag 为 `umanewsbot:rollback-pre-624dd5b9-20260714-071014`。
+3. 候选镜像必须先通过 Django check、迁移漂移、实体目标测试和完整回归；切换时暂停 beat、等待 worker active/reserved 和 Redis queue 清空，按 web、worker、beat 顺序恢复，并确认三个服务的完整 image ID 一致。
+4. 存量修复只使用 `reprocess_article_entities` 的显式文章 ID：先 dry-run，再逐篇 `--commit`；需要修正文译文时使用同步强制重译，随后再次 dry-run 和 `validate_rewrite`。每轮必须保存 before/after，核对 `workflow_status`、`published_to_web_at`、QQ delivery、人工标签及 `MANUAL/REMOVED` 关联完全不变。
+5. 本次修复 `8086/8212/8221/8283/8288/8290/8291/8309/8317/8318/8330`；11 篇保持原公开身份及 QQ 次数。随机样本 `8390/8388/8386/8385/8383/8380` 最终 dry-run 无增删差异，最终 worker 新处理的 `8393/8394` 也通过实体解析和发布校验。
+6. 上线后以 HTTP 运行态验收：`umafans.run` 与 `www.umafans.run` healthz、首页、后台登录和 11 篇详情均为 `200`。HTTPS 尚未启用，不作为本 change 验收入口。最终 Redis queue、Celery active/reserved 均为空，近 15 分钟 web/worker/beat 无 error/traceback；历史写入/网络开关为 false、归属模式为 off、历史 published 为 0。
+7. 若需回滚，先暂停 beat 并排空 worker，将 `umanewsbot:rollback-pre-624dd5b9-20260714-071014` retag 为 `prod` 后重建 web/worker/beat；本 change 无迁移，只有确认实体重处理造成生产数据损坏时才恢复数据库备份。
+
 ## 2026-07-14 国际新闻正文边界修复部署与回归
 
 1. 最终上线提交为 `514af8a22aec18f01cf0193344ae3b7a45c4dbc4`，Git tree `b62a80cc34b2b65c47f6dd7d541c455d04a0ef5c`。使用 `git archive` 独立构建上下文，archive SHA-256 `507b95c9b3e3ab66b67e4813b6b4814d2e4bc3d6cb2aae6abc7ad357322ad039`；缓存/无缓存双构建的 `/app` manifest 一致，SHA-256 `2ada2d84788d048fcfd86d589762c2b159256d1a884581ac819a614aacf92aea`。

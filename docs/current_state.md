@@ -1,5 +1,13 @@
 # 当前状态
 
+## 2026-07-14 新闻实体语境判定与完整马名保护已上线
+
+- OpenSpec change `contextualize-news-entity-resolution` 已完成测试优先实现及 `18` 轮 `/review -> 修复`，最终一轮无问题。文章级解析结果统一供翻译、标签、发布校验、自动马匹关联与显式重处理消费；英文人物全名及篇内唯一姓氏回指会压制内部马名，英文普通词/高歧义词需要强马名语境，日文完整未知马名会先整体占位，不再被父马、冠名或短术语拆分。
+- 最终生产 revision 为 `dc1e5ec584e47ea9d28998f76454d105836b3f0a`，源码 archive SHA-256 为 `f2eec61f6d2211a76e4456f6b9cbfc3e55a5b610829162b4a68b6039aae6ffe1`；web/worker/beat 均运行镜像 `sha256:5b06821610f0d2214cb24692e58beac4ffda731ddb84674a8855b2a1d4dbb470`。本地与候选环境最终目标测试 `51` 项、完整 `stable 1249` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、OpenSpec strict 和 diff check 均通过。
+- 写入前有效恢复点为 `backups/db/pre-main-624dd5b9-20260714-071014.dump`，`133370327` bytes、SHA-256 `21cdce21f52ded3b48e7c083f2f536eb694130f71ad6a1e38e067620f817fa75`，`pg_restore -l` 通过；随机六篇重处理前另有 `pre-random-six-entity-reprocess-20260714-074604.dump`，SHA-256 `0f0876c492d80ab9d8af2bacfe3776e3de5c94642acc427523ddd25d0437cf91`。
+- 目标文章 `8086/8212/8221/8283/8288/8290/8291/8309/8317/8318/8330` 已逐篇完成 dry-run、commit、重译和重新校验；`8317` 正文统一为岳品贤，`8309/8330/8318` 不再产生假马标签，`8086` 只保留真实马名多爵，指定日文完整马名不再拆分。11 篇均保持原 `published`、原发布时间和 QQ 次数，公开页全部为 `200`。
+- 随机样本 `8390/8388/8386/8385/8383/8380` 在最终规则下重处理后 dry-run 无增删差异；最终 worker 自然处理的 `8393/8394` 也通过实体 dry-run 与发布校验。公网 HTTP healthz、首页、后台和目标详情均为 `200`；Celery queue/active/reserved 均为空，最近 15 分钟 web/worker/beat 无 error/traceback，历史写入/网络开关保持关闭且历史 published 为 `0`。
+
 ## 2026-07-14 国际新闻正文边界与博彩噪声修复已上线
 
 - OpenSpec change `tighten-international-article-content-boundaries` 已完成提案、Full 工程评审、测试优先实现和多轮零问题 review。最终本地验证为正文边界目标测试 `27` 项、完整 `stable` `1198` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、OpenSpec strict 和 diff check 均通过。
