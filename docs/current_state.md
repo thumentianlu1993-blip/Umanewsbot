@@ -1,5 +1,15 @@
 # 当前状态
 
+## 2026-07-15 7 月 13 日起新闻质量修复、全量重跑与生产回归完成
+
+- “正文边界与博彩噪声”“实体识别与马名保护”“日文翻译与赛马固定格式”三类问题均已完成 OpenSpec、测试、实现、复审、部署和线上回归。最终代码 revision 为 `bdc0eeff78e111d7fa8a697cbb3557888f864fb8`，生产 web/worker/beat 统一运行 image `sha256:c975a4faf979a1f78cdb203b810d4f5726aca114175007fc01c176044f13841c`。
+- 北京时间 2026-07-13 起冻结清单共 `357` 篇，其中 `343` 篇可处理、`14` 篇重复稿；可处理稿最终 `218 published / 105 pending_review / 20 ignored`。冻结清单 `343/343` 已有成功处理结论，剩余 0。用户点名的 19 篇全部为 translated + published，生产详情页均返回 HTTP 200。
+- Sponichi 来源级修复覆盖 `81` 篇：`79` 篇赛马稿完成清洗、重译、实体与门禁重建，`2` 篇 BOATRACE 非赛马稿 `8264/8274` 明确 ignored；79 篇最终为 `47 published / 22 pending_review / 10 ignored`。本轮新发布 47 篇关闭 QQ 自动交付，新增 QQ delivery 为 0。
+- 最终验收脚本覆盖全部 357 篇、19 篇目标稿和随机样本 `8109/8186/8263/8368/8451`，`issue_count=0`；浏览器复核目标 `8086/8212/8304/8317` 及上述 5 篇随机稿，未发现框架噪声、博彩噪声、内部占位符或错误公开内容。
+- 最终源码完整 `stable 1423/1423` 通过（环境专项跳过 7），跨新闻边界、实体、日文、多地区归属和历史 runner 的组合测试 `272/272` 通过（跳过 1）；Django check、迁移漂移和 OpenSpec 全量校验均通过。未知马名重复占位继续 fail closed，重试提示只允许用“该马/其”修复省略主语，不降低发布门禁。
+- 最新可恢复数据库备份为 `/opt/umanewsbot/backups/db/post-news-final-pre-unified-bdc0eeff-20260715_033227.dump`，`140310729` bytes，SHA-256 `3e93fd9dba4fb80d3b415a2f97fce1d02337054d6afeb14a725b859cf67a5a74`，`pg_restore -l` 通过。最终 Redis/Celery 队列、active、reserved、TranslationRun started、NewsArticle translating、历史 running/applying、idle-in-transaction 均为 0，`/healthz/` 正常。
+- 历史常驻网络与写入开关仍为 false，多地区归属 mode 仍为 off。清理未引用镜像层后生产可用磁盘约 `3.0 GiB`，仍低于 historical runner 的 `5 GiB` 硬门槛，因此新闻任务已完成但 batch006 继续 no-go，等待独立磁盘治理。
+
 ## 2026-07-14 多地区归属 V3 首轮生产审计人工复核未通过
 
 - 已用候选镜像对生产最近 72 小时执行新的 `all_articles` 只读审计：共 `596` 篇、全部范围完整，`27` 条主地区变化、`5` 条 `needs_review`、`0` 条锁定/缺失/漂移；端到端约 `29.36s`，不再重复执行发布门禁。159 条单审 Gold 经保守对账后有效 `156` 条，主地区准确率 `96.15%`、五运营地区相关 precision `100%`、recall `52%`，机器报告为 `qualified=true`。
