@@ -237,12 +237,16 @@ class SponichiAdapter(SimpleInternationalNewsAdapter):
     listing_path = "/gamble/"
     racing_region = RacingRegion.JAPAN
     source_language = SourceLanguage.JAPANESE
-    include_keywords = ("競馬", "keiba", "race", "horse", "s000040")
+    include_keywords = ("競馬", "keiba", "horse", "s00004", "b00004")
+    exclude_keywords = ("ボート", "boatrace", "競輪", "オートレース")
     link_path_keywords = ("/gamble/news/", "/news/")
     article_selector = (
         ".tab-gamble a[href], .tab-contents a[href], li.cateGamble a[href], "
         "article a[href], h1 a[href], h2 a[href], h3 a[href]"
     )
+    title_selector = "[data-component='article-header'] h1"
+    body_selector = "[data-component='article-body']"
+    prefer_meta_title = False
 
     def listing_url(self, page_or_month: str | int, mode: SourceMode | str | None = None) -> str:
         if mode == SourceMode.ACCESS:

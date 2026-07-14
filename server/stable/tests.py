@@ -1842,9 +1842,9 @@ class AdapterTests(TestCase):
         detail_html = """
         <html><body>
           <article>
-            <h1>France racing at Deauville</h1>
+            <header data-component="article-header"><h1>France racing at Deauville</h1></header>
             <time datetime="2026-06-20T10:30:00+00:00">20 June 2026</time>
-            <div class="horses-racing-news-content">
+            <div class="horses-racing-news-content" data-component="article-body">
               <div class="article-body"><p>Preview body with enough racing detail.</p></div>
             </div>
           </article>

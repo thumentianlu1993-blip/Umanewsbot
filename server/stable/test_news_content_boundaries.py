@@ -11,7 +11,7 @@ from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from stable.adapters.international import SportingLifeAdapter, TDNAdapter
+from stable.adapters.international import SponichiAdapter, SportingLifeAdapter, TDNAdapter
 from stable.models import (
     ArticleTranslationStatus,
     NewsArticle,
@@ -38,6 +38,76 @@ def fixture_html(name: str) -> str:
 
 
 class InternationalNewsContentBoundaryTests(TestCase):
+    def test_sponichi_extracts_component_title_and_body_without_page_shell(self):
+        detail = SponichiAdapter().parse_detail_html(
+            """
+            <html><head>
+              <meta property="og:title" content="浜中 武豊の快挙に花 - スポニチ Sponichi Annex ギャンブル">
+            </head><body><main><article>
+              <header data-component="article-header">
+                <div class="copyright-link">スポニチアネックス取材班</div>
+                <h1 class="heading">浜中 武豊の快挙に花</h1>
+                <p data-component="date-format">[ 2026年7月13日 05:30 ]</p>
+              </header>
+              <div data-component="article-body">
+                <figure><img src="photo.webp"><figcaption>記念うちわ Photo By スポニチ</figcaption></figure>
+                <!-- google_ad_section_start(name=s1) -->
+                <!-- 前文 -->
+                <p>武豊を祝うため、浜中俊は特製うちわを用意していた。</p>
+                <p>浜中は「ちょっと気まずかったです」と笑った。</p>
+                <p>浦和競馬の出走表とスポニチ予想がコンビニ各社で1枚200円で販売中。詳しくはhttps://www.e-printservice.net/content_detail/spopriへ。</p>
+                <!-- google_ad_section_end(name=s1) -->
+                <div id="article_more_area"><a href="/articles/full.html">続きを表示</a></div>
+                <div id="login_article_more_area">ログインして続きを読む</div>
+              </div>
+              <div data-component="article-links">スポニチ記者の予想が最大3か月無料！</div>
+              <section>ギャンブルのニュース ニュース一覧を見る</section>
+            </article></main></body></html>
+            """,
+            url="https://www.sponichi.co.jp/gamble/news/2026/07/13/kiji/example.html",
+        )
+
+        self.assertEqual(detail.title_ja, "浜中 武豊の快挙に花")
+        self.assertIn("特製うちわを用意", detail.body_ja_raw)
+        self.assertIn("ちょっと気まずかった", detail.body_ja_raw)
+        self.assertNotIn("Sponichi Annex", detail.title_ja)
+        self.assertNotIn("ギャンブル", detail.title_ja)
+        self.assertNotIn("Photo By", detail.body_ja_raw)
+        self.assertNotIn("google_ad_section", detail.body_ja_raw)
+        self.assertNotIn("前文", detail.body_ja_raw)
+        self.assertNotIn("スポニチ予想", detail.body_ja_raw)
+        self.assertNotIn("e-printservice.net", detail.body_ja_raw)
+        self.assertNotIn("続きを表示", detail.body_ja_raw)
+        self.assertNotIn("ログインして続きを読む", detail.body_ja_raw)
+        self.assertNotIn("スポニチ記者の予想", detail.body_ja_raw)
+        self.assertNotIn("ニュース一覧", detail.body_ja_raw)
+        self.assertEqual(detail.metadata["body_selector"], "[data-component='article-body']")
+        self.assertEqual(
+            detail.metadata["body_cleaning"]["removed_rules"]["sponichi_structured_noise"],
+            3,
+        )
+
+    def test_sponichi_listing_rejects_boatrace_substring_and_keeps_horse_racing(self):
+        stubs = SponichiAdapter().parse_listing_html(
+            """
+            <ul class="tab-contents">
+              <li><a href="/gamble/news/2026/07/13/kiji/20260713s00053000001000c.html">【津ボート BOATRACE】地元3Vへ真っ向勝負</a></li>
+              <li><a href="/gamble/news/2026/07/13/kiji/20260713s00004000002000c.html">イクイノックス産駒が落札</a></li>
+              <li><a href="/gamble/news/2026/07/13/kiji/20260713s00004200003000c.html">【次走】ルガル、スプリンターズSへ</a></li>
+              <li><a href="/gamble/news/2026/07/13/kiji/20260713b00004000004000c.html">【動画】豪華な誘導馬が登場</a></li>
+            </ul>
+            """,
+            url="https://www.sponichi.co.jp/gamble/",
+            mode=SourceMode.LATEST,
+        )
+
+        self.assertEqual(len(stubs), 3)
+        self.assertTrue(all("s00053" not in stub.source_url for stub in stubs))
+        self.assertEqual(
+            {stub.source_url.split("/")[-1][8:15] for stub in stubs},
+            {"s000040", "s000042", "b000040"},
+        )
+
     def test_sporting_life_8086_extracts_only_real_article_body(self):
         detail = SportingLifeAdapter().parse_detail_html(
             fixture_html("sporting_life_8086.html"),
@@ -350,6 +420,57 @@ class RepairArticleContentBoundariesCommandTests(TestCase):
         self.article.refresh_from_db()
         self.assertEqual(self.article.body_ja_raw, before_body)
         self.assertFalse(OperationLog.objects.filter(action_type="article_content_boundary_repaired").exists())
+
+    def test_sponichi_commit_repairs_source_title_and_body_from_saved_html(self):
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.SPONICHI,
+            source_mode=SourceMode.LATEST,
+            source_article_id="sponichi-boundary-repair",
+            racing_region=RacingRegion.JAPAN,
+            source_language=SourceLanguage.JAPANESE,
+            title_ja="本当の見出し - スポニチ Sponichi Annex ギャンブル",
+            body_ja_raw="記事 スポニチアネックス取材班 ニュース一覧を見る",
+            body_ja_normalized="記事 スポニチアネックス取材班 ニュース一覧を見る",
+            original_content_html="""
+            <html><head><meta property="og:title" content="本当の見出し - スポニチ Sponichi Annex ギャンブル"></head>
+            <body><article>
+              <header data-component="article-header"><h1>本当の見出し</h1></header>
+              <div data-component="article-body">
+                <figure><figcaption>Photo By スポニチ</figcaption></figure>
+                <p>これが保存済みHTMLから復元する本当の本文です。</p>
+                <div id="article_more_area">続きを表示</div>
+              </div>
+              <section>ギャンブルのニュース一覧を見る</section>
+            </article></body></html>
+            """,
+            translated_title_zh="旧标题",
+            translated_body_zh="旧译文",
+            published_at=timezone.now(),
+            source_url="https://www.sponichi.co.jp/gamble/news/example.html",
+            workflow_status=WorkflowStatus.PENDING_REVIEW,
+        )
+
+        out = StringIO()
+        call_command(
+            "repair_article_content_boundaries",
+            "--article-id",
+            str(article.id),
+            "--commit",
+            stdout=out,
+        )
+
+        payload = json.loads(out.getvalue())["articles"][0]
+        article.refresh_from_db()
+        self.assertEqual(article.title_ja, "本当の見出し")
+        self.assertEqual(article.body_ja_raw, "これが保存済みHTMLから復元する本当の本文です。")
+        self.assertNotIn("ギャンブル", article.body_ja_raw)
+        self.assertTrue(payload["title_changed"])
+        self.assertTrue(payload["changed"])
+        self.assertEqual(payload["body_selector"], "[data-component='article-body']")
+        self.assertEqual(
+            article.translation_metadata["content_boundary_repair"]["after_title"],
+            "本当の見出し",
+        )
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, AUTOMATION_ENABLED=False)
