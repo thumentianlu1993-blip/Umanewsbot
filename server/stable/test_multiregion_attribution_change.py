@@ -484,6 +484,21 @@ class AttributionEvidenceHierarchyTests(TestCase):
 
         self.assertResult(result, RacingRegion.HONG_KONG)
 
+    def test_local_subject_preparing_for_foreign_event_keeps_home_region(self):
+        add_term("The Everest", TermType.RACE, RacingRegion.OTHER)
+        add_term("Sha Tin", TermType.RACECOURSE, RacingRegion.HONG_KONG)
+        article = article_with_text(
+            "Hayes thrilled with stronger Ka Ying in early preparation for The Everest",
+            "The Hong Kong star continues building fitness at Sha Tin.",
+            region=RacingRegion.HONG_KONG,
+            source_site=SourceSite.SCMP_RACING,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.HONG_KONG, {RacingRegion.OTHER})
+        self.assertEqual(result.reason, "local_source_future_target")
+
     def test_partial_word_does_not_suppress_real_event_name(self):
         add_term("World Cup", TermType.RACE, RacingRegion.UNITED_KINGDOM)
         add_term("World Cupid", TermType.HORSE, RacingRegion.UNITED_STATES)

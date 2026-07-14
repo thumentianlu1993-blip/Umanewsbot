@@ -3,11 +3,11 @@
 ## 待执行：多地区归属 V3 第三候选生产只读验收
 
 1. 第一候选人工复核发现 7 类明确错标；第二候选虽完成 `591` 篇完整审计，但 Gold 主地区 `91.67%`、相关 recall `48%`，机器与人工均为 no-go。前两轮 report 均不得复用来批准 Shadow。
-2. 第三候选规则版本必须为 `multiregion-v3.1`，并包含 precision 优先反例修复：单词赛场仅在明确地点语法中作为强证据，`Jockey Club` 单独出现按机构短语处理，`JRHA` 提供日本上下文，世界排名归属 `other` 并关联五个运营地区。部署前必须保持归属 mode 与相关查询关闭。
+2. 第三候选规则版本必须为 `multiregion-v3.1`，并包含 precision 优先反例修复：单词赛场仅在明确地点语法中作为强证据，`Jockey Club` 单独出现按机构短语处理，`JRHA` 提供日本上下文，世界排名归属 `other` 并关联五个运营地区，本地主体备战海外赛事时仅在正文仍有本地证据的条件下保留本地主地区。部署前必须保持归属 mode 与相关查询关闭。
 3. 等所有正文修改 one-off 结束、`TranslationRun started=0`、文章 `translating=0`、Celery active/reserved/queue 均为空，并由生产协调任务明确交还稳定快照后，才能开始下一轮只读审计。正文指纹仍在变化时不得抢跑。
 4. 第三候选必须先通过专项、完整 stable、真实 PostgreSQL 250 篇性能、Django check、迁移漂移和 OpenSpec strict/all。构建固定 main revision/tree/source SHA，AMD64 至少两次构建得到同一 image ID。
-   - 当前候选 revision `12f4d0579157f49f2bda8453397d192f42d89127`，tree `f5a7801e77811c736bcab5dfdc4f540bea7602df`，source archive SHA-256 `5a127a646aaa37143590456832ba82e60b77d76dabda7b266f414226d319f6de`，两个独立上下文的 AMD64 image ID 均为 `sha256:c4e0f1e56afcad5975c7eaabec5f63781bb48d24074e348641c35af1801a917b`。
-   - 镜像内 Django check、migration drift 通过；归属 `83` 项在只读挂载仓库两份生产 Compose 静态契约后通过（另 1 项环境跳过）。镜像按设计不复制 Compose 文件，未挂载时仅这 2 个路径契约报 `FileNotFoundError`，不得误报为业务回归。
+   - 过渡候选 revision `12f4d0579157f49f2bda8453397d192f42d89127` / AMD64 image `sha256:c4e0f1e56afcad5975c7eaabec5f63781bb48d24074e348641c35af1801a917b` 缺少最后补入的香港本地主体备战海外赛事规则，明确禁止部署。最终规则提交后必须重新生成 source archive、双构建并回写新的 revision/tree/source SHA/image ID。
+   - 镜像按设计不复制两份生产 Compose 静态文件；镜像内归属测试必须只读挂载这两份契约。未挂载时仅对应路径报 `FileNotFoundError` 不算业务回归，但最终镜像仍必须在挂载后全绿。
 5. 使用全新 artifact 目录执行完整 72 小时 `--scope all_articles --hours 72`，不得带 `--limit`、不得覆盖前两轮 report、不得开启门禁验证或 commit 归属；记录 report、manifest、Gold labels 和规则版本 SHA。
 6. 重新评估保守对账后的 Gold，并人工检查全部主地区变化、全部 `needs_review` 和五地区稳定样本。除既有七类边界外，必须逐条复核 `Sale / York / Kelso / Jockey Club / JRHA / world ranking` 反例及法国赛果 `8089`。
 7. 只有第三轮 Gold 满足主地区准确率、五地区分地区准确率、相关 precision `>=95%`、recall `>=50%`、过度扩散 `<=1%`，且人工清单无明确错标，才允许从 `off` 切到 `shadow`。Shadow 计时从生产配置实际启用且健康验收通过时开始。

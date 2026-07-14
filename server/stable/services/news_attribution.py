@@ -614,6 +614,30 @@ def _japanese_source_keeps_home_focus(title_text: str, foreign_region: str) -> b
     return False
 
 
+def _local_source_keeps_home_focus(
+    title_text: str,
+    *,
+    source_region: str,
+    event_region: str,
+    context_regions: list[str],
+) -> bool:
+    if not source_region or not event_region or source_region == event_region:
+        return False
+    if source_region not in context_regions:
+        return False
+    folded = title_text.casefold()
+    return any(
+        marker in folded
+        for marker in (
+            "preparation for",
+            "prepares for",
+            "preparing for",
+            "builds towards",
+            "building towards",
+        )
+    )
+
+
 def _explicit_title_subject_region(title_text: str) -> str:
     folded = title_text.casefold().lstrip()
     prefixes = {
@@ -847,6 +871,15 @@ def infer_article_attribution(
             reason = "explicit_title_subject_region"
             if event_region and event_region != primary:
                 related = [event_region]
+        elif event_region and event_region != source_region and _local_source_keeps_home_focus(
+            title_text,
+            source_region=source_region,
+            event_region=event_region,
+            context_regions=context_regions,
+        ):
+            primary = source_region
+            related = [event_region]
+            reason = "local_source_future_target"
         elif event_region and event_region != source_region:
             primary = event_region
             reason = "event_region"
