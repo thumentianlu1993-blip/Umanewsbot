@@ -24,7 +24,12 @@ from stable.models import (
     TermType,
     WorkflowStatus,
 )
-from stable.services.terms import resolve_article_entities
+from stable.services.terms import (
+    ArticleEntity,
+    ArticleEntityResolution,
+    ResolvedTerm,
+    resolve_article_entities,
+)
 from stable.services.translation import (
     OpenAICompatibleTranslationProvider,
     TranslationResponseError,
@@ -290,6 +295,223 @@ class JapaneseTranslationProviderIntegrationTests(TestCase):
         self.assertIn("不得合并、压缩或省略原文细节", retry_prompt)
         self.assertIn("__UMA_SEED_1__（正文）", retry_prompt)
         self.assertEqual(result.body_zh, "速度很快。")
+
+    @override_settings(TRANSLATION_MAX_ATTEMPTS=2)
+    def test_retry_reports_seed_and_unexpected_format_violations_together(self):
+        article = _article(body="スピードがある。")
+        provider = self._provider()
+        first = _fake_response(body="__UMA_FORMAT_1__很快。")
+        second = _fake_response(body="__UMA_SEED_1__很快。")
+
+        with patch.object(provider, "_request_completion", side_effect=[first, second]) as request:
+            result = provider.translate(article)
+
+        retry_prompt = request.call_args_list[1].args[0][1]["content"]
+        self.assertIn("本次具体异常占位符：__UMA_FORMAT_1__", retry_prompt)
+        self.assertIn("原文不存在以下占位符，译文必须删除：__UMA_FORMAT_1__", retry_prompt)
+        self.assertIn("本次具体异常占位符：__UMA_SEED_1__", retry_prompt)
+        self.assertEqual(result.body_zh, "速度很快。")
+
+    @override_settings(TRANSLATION_MAX_ATTEMPTS=2)
+    def test_retry_rejects_invented_keep_and_term_placeholders(self):
+        article = _article(body="スピードがある。")
+        provider = self._provider()
+        first = _fake_response(
+            body="__UMA_SEED_1__很快。__UMA_KEEP_999____UMA_TERM_999__"
+        )
+        second = _fake_response(body="__UMA_SEED_1__很快。")
+
+        with patch.object(provider, "_request_completion", side_effect=[first, second]) as request:
+            result = provider.translate(article)
+
+        retry_prompt = request.call_args_list[1].args[0][1]["content"]
+        self.assertIn("本次具体异常占位符：__UMA_KEEP_999__、__UMA_TERM_999__", retry_prompt)
+        self.assertIn(
+            "原文不存在以下占位符，译文必须删除：__UMA_KEEP_999__、__UMA_TERM_999__",
+            retry_prompt,
+        )
+        self.assertNotIn("__UMA_", result.body_zh)
+
+    def test_repeated_entity_placeholder_matching_source_count_is_allowed(self):
+        article = _article(body="1番 ノリヤンモーニンが先行し、ノリヤンモーニンが勝った。")
+        provider = self._provider()
+        response = _fake_response(
+            body="1号 __UMA_KEEP_1__领放，__UMA_KEEP_1__获胜。",
+            summary="__UMA_KEEP_1__获胜。",
+        )
+
+        with patch.object(provider, "_request_completion", return_value=response):
+            result = provider.translate(article)
+
+        self.assertEqual(result.body_zh.count("ノリヤンモーニン"), 2)
+
+    @override_settings(TRANSLATION_MAX_ATTEMPTS=2)
+    def test_retry_requires_every_repeated_entity_placeholder_occurrence(self):
+        article = _article(body="1番 ノリヤンモーニンが先行し、ノリヤンモーニンが勝った。")
+        provider = self._provider()
+        first = _fake_response(body="1号 __UMA_KEEP_1__领放并获胜。")
+        second = _fake_response(body="1号 __UMA_KEEP_1__领放，__UMA_KEEP_1__获胜。")
+
+        with patch.object(provider, "_request_completion", side_effect=[first, second]) as request:
+            result = provider.translate(article)
+
+        retry_prompt = request.call_args_list[1].args[0][1]["content"]
+        self.assertIn("本次具体异常占位符：__UMA_KEEP_1__", retry_prompt)
+        self.assertIn("按原文所属字段及出现次数原样复制", retry_prompt)
+        self.assertEqual(result.body_zh.count("ノリヤンモーニン"), 2)
+
+    @override_settings(TRANSLATION_MAX_ATTEMPTS=2)
+    def test_retry_rejects_invented_placeholder_in_push_summary(self):
+        article = _article(body="スピードがある。")
+        provider = self._provider()
+        first = _fake_response(
+            body="__UMA_SEED_1__很快。",
+            summary="__UMA_KEEP_999__状态良好。",
+        )
+        second = _fake_response(body="__UMA_SEED_1__很快。", summary="速度表现出色。")
+
+        with patch.object(provider, "_request_completion", side_effect=[first, second]) as request:
+            result = provider.translate(article)
+
+        retry_prompt = request.call_args_list[1].args[0][1]["content"]
+        self.assertIn("本次具体异常占位符：__UMA_KEEP_999__", retry_prompt)
+        self.assertNotIn("__UMA_", result.push_summary_zh)
+
+    @override_settings(TRANSLATION_MAX_ATTEMPTS=2)
+    def test_retry_rejects_malformed_internal_placeholders_in_body_and_summary(self):
+        article = _article(body="スピードがある。")
+        provider = self._provider()
+        first = _fake_response(
+            body=(
+                "__UMA_SEED_1__X很快。__UMA_KEEP_X____UMA_KEEP_3__"
+                "__UMA_KEEP_1_____UMA_KEEP_2__999__"
+            ),
+            summary="速度出色。__UMA_KEEPP_1__状态良好。",
+        )
+        second = _fake_response(body="__UMA_SEED_1__很快。", summary="速度出色。")
+
+        with patch.object(provider, "_request_completion", side_effect=[first, second]) as request:
+            result = provider.translate(article)
+
+        retry_prompt = request.call_args_list[1].args[0][1]["content"]
+        self.assertIn("__UMA_KEEP_X__", retry_prompt)
+        self.assertIn("___UMA_KEEP_3__", retry_prompt)
+        self.assertIn("__UMA_KEEP_1___", retry_prompt)
+        self.assertIn("__UMA_KEEP_2__999__", retry_prompt)
+        self.assertIn("__UMA_KEEPP_1__", retry_prompt)
+        self.assertNotIn("__UMA_KEEPP_1__状态良好", retry_prompt)
+        self.assertNotIn("__UMA_", result.body_zh)
+        self.assertNotIn("__UMA_", result.push_summary_zh)
+
+    @override_settings(TRANSLATION_MAX_ATTEMPTS=2)
+    def test_retry_rejects_case_mutated_and_partial_internal_placeholder_prefixes(self):
+        article = _article(body="スピードがある。")
+        provider = self._provider()
+        first = _fake_response(
+            title="__Uma_FORMAT_1__标题。UMA_FORMAT_2__副标题",
+            body=(
+                "__UMA_SEED_1__很快。__uma_keep_1____UMAKEEP_2____UMA-KEEP_3__"
+                "__UM_KEEP_4____U_MA_TERM_4____UMAKEPP_5__。"
+                "__UM__KEEP_6__。_X_UMA_KEEP_7__"
+            ),
+            summary="_UMA_TERM_1__状态良好。__UMA TERM_2__。UMA/TERM_3__",
+        )
+        second = _fake_response(body="__UMA_SEED_1__很快。", summary="速度表现出色。")
+
+        with patch.object(provider, "_request_completion", side_effect=[first, second]) as request:
+            result = provider.translate(article)
+
+        retry_prompt = request.call_args_list[1].args[0][1]["content"]
+        self.assertIn("__Uma_FORMAT_1__", retry_prompt)
+        self.assertIn("UMA_FORMAT_2__", retry_prompt)
+        self.assertIn("__uma_keep_1__", retry_prompt)
+        self.assertIn("__UMAKEEP_2__", retry_prompt)
+        self.assertIn("__UMA-KEEP_3__", retry_prompt)
+        self.assertIn("__UM_KEEP_4__", retry_prompt)
+        self.assertIn("__U_MA_TERM_4__", retry_prompt)
+        self.assertIn("__UMAKEPP_5__", retry_prompt)
+        self.assertIn("__UM__KEEP_6__", retry_prompt)
+        self.assertIn("_X_UMA_KEEP_7__", retry_prompt)
+        self.assertIn("_UMA_TERM_1__", retry_prompt)
+        self.assertIn("__UMA TERM_2__", retry_prompt)
+        self.assertIn("UMA/TERM_3__", retry_prompt)
+        self.assertNotRegex(result.title_zh, r"(?i)UMA_(?:KEEP|TERM|FORMAT|SEED)")
+        self.assertNotRegex(result.body_zh, r"(?i)UMA_(?:KEEP|TERM|FORMAT|SEED)")
+        self.assertNotRegex(result.push_summary_zh, r"(?i)UMA_(?:KEEP|TERM|FORMAT|SEED)")
+
+    def test_contextual_term_mapping_does_not_rewrite_valid_placeholder_namespace(self):
+        article = _article(
+            body="MYSTERY runs. KEEP is retired.",
+            source_language=SourceLanguage.ENGLISH,
+        )
+        entity = ArticleEntity(
+            entity_type="unknown_horse",
+            matched_text="MYSTERY",
+            canonical_text="MYSTERY",
+            target_zh="",
+            field_name="body",
+            start=0,
+            end=7,
+            confidence=90,
+            evidence=["test"],
+            conflict_flags=[],
+            needs_preserve=True,
+        )
+        term = ResolvedTerm(
+            term_type=TermType.FIXED_PHRASE,
+            source_ja="KEEP",
+            target_zh="保持",
+            matched_text="KEEP",
+            race_grade="",
+            priority=100,
+            notes="",
+        )
+        resolution = ArticleEntityResolution(
+            source_language=SourceLanguage.ENGLISH,
+            entities=[entity],
+            suppressed_candidates=[],
+            accepted_terms=[term],
+            machine_horse_tags=["MYSTERY"],
+        )
+        provider = self._provider()
+        response = _fake_response(
+            body="__UMA_KEEP_1__参赛，KEEP已经退役。",
+            summary="__UMA_KEEP_1__参赛。",
+        )
+
+        with patch.object(provider, "_request_completion", return_value=response):
+            result = provider.translate(article, entity_resolution=resolution)
+
+        self.assertEqual(result.body_zh, "MYSTERY参赛，保持已经退役。")
+        self.assertEqual(result.push_summary_zh, "MYSTERY参赛。")
+
+    def test_closed_placeholder_may_touch_normal_ascii_prose(self):
+        provider = self._provider()
+        violations = provider._malformed_placeholder_violations(
+            "__UMA_FORMAT_1__GI首胜",
+            "__UMA_SEED_1__3连胜，__UMA_KEEP_1__GI首胜。",
+            "__UMA_TERM_1__3岁时获胜。",
+        )
+
+        self.assertEqual(violations, [])
+        self.assertEqual(
+            provider._summary_placeholder_violations(
+                "__UMA_KEEP_1__3岁将出战。",
+                "",
+                "__UMA_KEEP_1__（3歳）がGIに出走する。",
+            ),
+            [],
+        )
+
+    def test_legitimate_identifier_containing_uma_prefix_is_not_a_placeholder(self):
+        provider = self._provider()
+        violations = provider._malformed_placeholder_violations(
+            "YUMA_RACING发布消息，__UMAFANS__上线，@UMA_KEEP_1__可用。",
+            "PUMA_RACING赞助赛事，@uma_musu与@_UMAhorse同步发布。",
+            "Yuma_Racing状态良好，代号为_UMAJI。",
+        )
+
+        self.assertEqual(violations, [])
 
     @override_settings(TRANSLATION_MAX_ATTEMPTS=3)
     def test_retry_keeps_seed_constraint_when_next_attempt_is_incomplete(self):

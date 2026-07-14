@@ -111,6 +111,21 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
     name = "openai-compatible"
     _SENTENCE_END_RE = re.compile(r"[。！？!?；;…]$")
     _LIST_MARKER_RE = re.compile(r"(?m)^\s*[■◆●▪•]")
+    _PRESERVED_PLACEHOLDER_RE = re.compile(r"__UMA_(?:KEEP|TERM)_\d+__")
+    _ALL_PLACEHOLDER_RE = re.compile(r"__UMA_(?:KEEP|TERM|FORMAT|SEED)_\d+__")
+    _MALFORMED_SUFFIX_RE = re.compile(
+        r"(__UMA_(?:KEEP|TERM|FORMAT|SEED)_\d+__)"
+        r"((?!__UMA_)_|[A-Za-z0-9][A-Za-z0-9_]*__)"
+    )
+    _PLACEHOLDER_FRAGMENT_RE = re.compile(
+        r"(?:(?<![A-Za-z0-9@])_+UMA(?:[_./-]|[ \t]+)?(?:KEEP|TERM|FORMAT|SEED)"
+        r"|(?<![A-Za-z0-9@_])UMA(?:[_./-]|[ \t]+)?(?:KEEP|TERM|FORMAT|SEED)"
+        r"|_{2,}UMA_)"
+        r"(?:[A-Za-z0-9_]*?__|[A-Za-z0-9_]*)",
+        re.IGNORECASE,
+    )
+    _CANONICAL_PLACEHOLDER_PREFIXES = ("UMAKEEP", "UMATERM", "UMAFORMAT", "UMASEED")
+    _PLACEHOLDER_TOKEN_CHAR_RE = re.compile(r"[A-Za-z0-9_./ \t-]")
 
     def __init__(self, *, api_key: str, base_url: str, provider_name: str | None = None) -> None:
         self.name = provider_name or self.name
@@ -141,6 +156,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             "若原文中出现 __UMA_TERM_数字__ 形式的人名占位符，也必须在译文中原样复制，系统会按术语表还原。"
             "若原文中出现 __UMA_FORMAT_数字__ 形式的固定格式占位符，也必须在对应标题或正文中原样复制，系统会还原为规范格式。"
             "若原文中出现 __UMA_SEED_数字__ 形式的种子术语占位符，也必须在对应标题或正文中原样复制，系统会还原为指定译法。"
+            "只可复制原文中实际出现的占位符，不得新造占位符、改变数字或混用 KEEP、TERM、FORMAT、SEED 命名空间。"
             "输出必须是 JSON 对象，且只包含 title_zh、body_zh、push_summary_zh 三个键。"
             f"{retry_hint}"
             "\n\n"
@@ -324,6 +340,213 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                 break
         return "\n".join(contexts)
 
+    def _placeholder_retry_instruction(
+        self,
+        *,
+        label: str,
+        namespace: str,
+        violations: list[dict],
+        source_title: str,
+        source_body: str,
+    ) -> str:
+        placeholders = sorted({item["placeholder"] for item in violations})
+        contexts = self._placeholder_retry_context(
+            source_title,
+            source_body,
+            placeholders,
+        )
+        unexpected = [
+            placeholder
+            for placeholder in placeholders
+            if placeholder not in source_title and placeholder not in source_body
+        ]
+        instruction = (
+            f"\n\n注意：上一版遗漏、重复、跨字段放置或新造了{label}占位符。"
+            f"本次具体异常占位符：{'、'.join(placeholders)}。"
+            f"请从头逐段完整重译，不得合并、压缩或省略原文细节；只可复制原文实际存在的 {namespace}，"
+            "并按原文所属字段及出现次数原样复制，禁止新造占位符或改换命名空间。"
+        )
+        if unexpected:
+            instruction += f"原文不存在以下占位符，译文必须删除：{'、'.join(unexpected)}。"
+        if contexts:
+            instruction += f"\n这些占位符在原文中的局部位置如下：\n{contexts}"
+        return instruction
+
+    @staticmethod
+    def _within_edit_distance(left: str, right: str, *, limit: int = 2) -> bool:
+        if abs(len(left) - len(right)) > limit:
+            return False
+        previous = list(range(len(right) + 1))
+        for row_index, left_character in enumerate(left, start=1):
+            current = [row_index]
+            for column_index, right_character in enumerate(right, start=1):
+                current.append(
+                    min(
+                        current[-1] + 1,
+                        previous[column_index] + 1,
+                        previous[column_index - 1] + (left_character != right_character),
+                    )
+                )
+            if min(current) > limit:
+                return False
+            previous = current
+        return previous[-1] <= limit
+
+    @classmethod
+    def _looks_like_corrupted_internal_token(cls, fragment: str) -> bool:
+        letters = re.sub(r"[^A-Za-z]", "", fragment or "").upper()
+        return any(
+            cls._within_edit_distance(letters, canonical)
+            for canonical in cls._CANONICAL_PLACEHOLDER_PREFIXES
+        )
+
+    @classmethod
+    def _corrupted_internal_token_fragments(cls, value: str) -> set[str]:
+        fragments: set[str] = set()
+        text = value or ""
+        for start, character in enumerate(text):
+            if character != "_":
+                continue
+            if start > 0 and (text[start - 1].isalnum() or text[start - 1] == "@"):
+                continue
+            max_end = min(len(text), start + 84)
+            for end in range(start + 2, max_end):
+                if text[end : end + 2] != "__":
+                    continue
+                fragment = text[start : end + 2]
+                if not all(cls._PLACEHOLDER_TOKEN_CHAR_RE.fullmatch(item) for item in fragment):
+                    break
+                if cls._looks_like_corrupted_internal_token(fragment):
+                    fragments.add(fragment)
+        return fragments
+
+    @classmethod
+    def _apply_contextual_mappings_outside_placeholders(
+        cls,
+        text: str,
+        resolution: ArticleEntityResolution,
+    ) -> str:
+        value = text or ""
+        parts: list[str] = []
+        cursor = 0
+        for match in cls._ALL_PLACEHOLDER_RE.finditer(value):
+            parts.append(apply_contextual_term_mappings(value[cursor : match.start()], resolution))
+            parts.append(match.group(0))
+            cursor = match.end()
+        parts.append(apply_contextual_term_mappings(value[cursor:], resolution))
+        return "".join(parts)
+
+    @classmethod
+    def _preserved_placeholder_violations(
+        cls,
+        title_zh: str,
+        body_zh: str,
+        source_title: str,
+        source_body: str,
+    ) -> list[dict]:
+        values = {"title": title_zh or "", "body": body_zh or ""}
+        sources = {"title": source_title or "", "body": source_body or ""}
+        violations: list[dict] = []
+        for field_name, value in values.items():
+            observed = cls._PRESERVED_PLACEHOLDER_RE.findall(value)
+            expected = cls._PRESERVED_PLACEHOLDER_RE.findall(sources[field_name])
+            for placeholder in sorted(set(observed) | set(expected)):
+                observed_count = observed.count(placeholder)
+                expected_count = expected.count(placeholder)
+                if expected_count == 0:
+                    reason = "wrong_or_unexpected_field"
+                elif observed_count < expected_count:
+                    reason = "missing"
+                elif observed_count > expected_count:
+                    reason = "duplicated"
+                else:
+                    continue
+                violations.append(
+                    {
+                        "placeholder": placeholder,
+                        "field_name": field_name,
+                        "reason": reason,
+                        "count": observed_count,
+                        "expected_count": expected_count,
+                    }
+                )
+        return violations
+
+    @classmethod
+    def _malformed_placeholder_violations(
+        cls,
+        title_zh: str,
+        body_zh: str,
+        summary_zh: str,
+    ) -> list[dict]:
+        violations: list[dict] = []
+        for field_name, value in {
+            "title": title_zh or "",
+            "body": body_zh or "",
+            "summary": summary_zh or "",
+        }.items():
+            exact_matches = list(cls._ALL_PLACEHOLDER_RE.finditer(value))
+            exact_ends = {match.end() for match in exact_matches}
+            for match in exact_matches:
+                if match.start() == 0 or value[match.start() - 1] != "_" or match.start() in exact_ends:
+                    continue
+                prefix_start = match.start()
+                while prefix_start > 0 and value[prefix_start - 1] == "_":
+                    prefix_start -= 1
+                fragment = value[prefix_start : match.end()]
+                violations.append(
+                    {
+                        "placeholder": fragment,
+                        "field_name": field_name,
+                        "reason": "malformed_internal_placeholder_prefix",
+                        "count": value.count(fragment),
+                    }
+                )
+            for placeholder, suffix in cls._MALFORMED_SUFFIX_RE.findall(value):
+                fragment = f"{placeholder}{suffix}"
+                violations.append(
+                    {
+                        "placeholder": fragment,
+                        "field_name": field_name,
+                        "reason": "malformed_internal_placeholder_suffix",
+                        "count": value.count(fragment),
+                    }
+                )
+            remainder = cls._ALL_PLACEHOLDER_RE.sub("", value)
+            fragments = set(cls._PLACEHOLDER_FRAGMENT_RE.findall(remainder))
+            fragments.update(cls._corrupted_internal_token_fragments(remainder))
+            if not fragments:
+                continue
+            for fragment in sorted(fragments):
+                violations.append(
+                    {
+                        "placeholder": fragment,
+                        "field_name": field_name,
+                        "reason": "malformed_internal_placeholder",
+                        "count": remainder.count(fragment),
+                    }
+                )
+        return violations
+
+    @classmethod
+    def _summary_placeholder_violations(
+        cls,
+        summary_zh: str,
+        source_title: str,
+        source_body: str,
+    ) -> list[dict]:
+        observed = cls._ALL_PLACEHOLDER_RE.findall(summary_zh or "")
+        allowed = set(cls._ALL_PLACEHOLDER_RE.findall(f"{source_title}\n{source_body}"))
+        return [
+            {
+                "placeholder": placeholder,
+                "field_name": "summary",
+                "reason": "unexpected_summary_placeholder",
+                "count": observed.count(placeholder),
+            }
+            for placeholder in sorted(set(observed) - allowed)
+        ]
+
     def translate(
         self,
         article: NewsArticle,
@@ -393,9 +616,9 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             content = choice.message.content or "{}"
             payload = json.loads(content)
 
-            mapped_title = apply_contextual_term_mappings((payload.get("title_zh") or "").strip(), resolution)
-            mapped_body = apply_contextual_term_mappings((payload.get("body_zh") or "").strip(), resolution)
-            mapped_summary = apply_contextual_term_mappings((payload.get("push_summary_zh") or "").strip(), resolution)
+            raw_title = (payload.get("title_zh") or "").strip()
+            raw_body = (payload.get("body_zh") or "").strip()
+            raw_summary = (payload.get("push_summary_zh") or "").strip()
 
             last_metadata = {
                 "provider": self.name,
@@ -436,52 +659,110 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             }
 
             format_violations = japanese_format_placeholder_violations(
-                mapped_title,
-                mapped_body,
+                raw_title,
+                raw_body,
                 format_plan,
+            )
+            seed_term_violations = japanese_seed_term_placeholder_violations(
+                raw_title,
+                raw_body,
+                seed_term_plan,
+            )
+            preserved_placeholder_violations = self._preserved_placeholder_violations(
+                raw_title,
+                raw_body,
+                protected_title,
+                protected_body,
+            )
+            summary_placeholder_violations = self._summary_placeholder_violations(
+                raw_summary,
+                protected_title,
+                protected_body,
+            )
+            malformed_placeholder_violations = self._malformed_placeholder_violations(
+                raw_title,
+                raw_body,
+                raw_summary,
             )
             if format_violations:
                 last_metadata["japanese_format_placeholder_violations"] = format_violations
-                retry_hint += (
-                    "\n\n注意：上一版遗漏、重复或跨字段放置了固定格式占位符。"
-                    "请在原占位符所属的标题或正文中各原样复制一次 __UMA_FORMAT_数字__ 占位符。"
+                retry_hint += self._placeholder_retry_instruction(
+                    label="固定格式",
+                    namespace="__UMA_FORMAT_数字__ 占位符",
+                    violations=format_violations,
+                    source_title=protected_title,
+                    source_body=protected_body,
                 )
+            if seed_term_violations:
+                last_metadata["japanese_seed_term_placeholder_violations"] = seed_term_violations
+                retry_hint += self._placeholder_retry_instruction(
+                    label="种子术语",
+                    namespace="__UMA_SEED_数字__ 占位符",
+                    violations=seed_term_violations,
+                    source_title=protected_title,
+                    source_body=protected_body,
+                )
+            if preserved_placeholder_violations:
+                last_metadata["preserved_placeholder_violations"] = preserved_placeholder_violations
+                retry_hint += self._placeholder_retry_instruction(
+                    label="马名或人物",
+                    namespace="__UMA_KEEP_数字__ 或 __UMA_TERM_数字__ 占位符",
+                    violations=preserved_placeholder_violations,
+                    source_title=protected_title,
+                    source_body=protected_body,
+                )
+            if summary_placeholder_violations:
+                last_metadata["summary_placeholder_violations"] = summary_placeholder_violations
+                retry_hint += self._placeholder_retry_instruction(
+                    label="摘要",
+                    namespace="原文标题或正文已有的 KEEP、TERM、FORMAT、SEED 占位符",
+                    violations=summary_placeholder_violations,
+                    source_title=protected_title,
+                    source_body=protected_body,
+                )
+            if malformed_placeholder_violations:
+                last_metadata["malformed_placeholder_violations"] = malformed_placeholder_violations
+                retry_hint += self._placeholder_retry_instruction(
+                    label="畸形内部",
+                    namespace="原文实际存在且格式完整的 KEEP、TERM、FORMAT、SEED 占位符",
+                    violations=malformed_placeholder_violations,
+                    source_title=protected_title,
+                    source_body=protected_body,
+                )
+            if (
+                format_violations
+                or seed_term_violations
+                or preserved_placeholder_violations
+                or summary_placeholder_violations
+                or malformed_placeholder_violations
+            ):
                 if attempt < max_attempts:
                     continue
+                if format_violations:
+                    raise TranslationResponseError(
+                        "Translation response changed required format placeholder",
+                        metadata=last_metadata,
+                    )
+                if preserved_placeholder_violations and any(
+                    item["placeholder"].startswith("__UMA_TERM_")
+                    for item in preserved_placeholder_violations
+                ):
+                    raise TranslationResponseError(
+                        "Translation response changed required person terms",
+                        metadata=last_metadata,
+                    )
                 raise TranslationResponseError(
-                    "Translation response changed required format placeholder",
+                    (
+                        "Translation response changed required seed term placeholder"
+                        if seed_term_violations
+                        else "Translation response invented protected entity placeholder"
+                    ),
                     metadata=last_metadata,
                 )
 
-            seed_term_violations = japanese_seed_term_placeholder_violations(
-                mapped_title,
-                mapped_body,
-                seed_term_plan,
-            )
-            if seed_term_violations:
-                last_metadata["japanese_seed_term_placeholder_violations"] = seed_term_violations
-                affected_placeholder_list = sorted(
-                    {item["placeholder"] for item in seed_term_violations}
-                )
-                affected_placeholders = "、".join(affected_placeholder_list)
-                retry_context = self._placeholder_retry_context(
-                    protected_title,
-                    protected_body,
-                    affected_placeholder_list,
-                )
-                retry_hint += (
-                    "\n\n注意：上一版遗漏、重复或跨字段放置了种子术语占位符。"
-                    f"本次具体异常占位符：{affected_placeholders}。"
-                    "请从头逐段完整重译，不得合并、压缩或省略原文细节；"
-                    "在原占位符所属的标题或正文中各原样复制一次 __UMA_SEED_数字__ 占位符。"
-                    + (f"\n这些占位符在原文中的局部位置如下：\n{retry_context}" if retry_context else "")
-                )
-                if attempt < max_attempts:
-                    continue
-                raise TranslationResponseError(
-                    "Translation response changed required seed term placeholder",
-                    metadata=last_metadata,
-                )
+            mapped_title = self._apply_contextual_mappings_outside_placeholders(raw_title, resolution)
+            mapped_body = self._apply_contextual_mappings_outside_placeholders(raw_body, resolution)
+            mapped_summary = self._apply_contextual_mappings_outside_placeholders(raw_summary, resolution)
 
             title_zh = self._restore_unknown_horse_placeholders(mapped_title, horse_placeholders)
             body_zh = self._restore_unknown_horse_placeholders(mapped_body, horse_placeholders)

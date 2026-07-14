@@ -713,7 +713,11 @@ class ContextualTranslationConsistencyTests(TestCase):
         )
         provider = OpenAICompatibleTranslationProvider(api_key="test", base_url="https://example.com/v1")
         response = _fake_response(
-            {"title_zh": "Donnacha O'Brien谈计划", "body_zh": "Donnacha O'Brien检视了马匹。O'Brien表示下月参赛。", "push_summary_zh": "O'Brien谈计划。"}
+            {
+                "title_zh": "__UMA_TERM_1__谈计划",
+                "body_zh": "__UMA_TERM_1__检视了马匹。__UMA_TERM_2__表示下月参赛。",
+                "push_summary_zh": "__UMA_TERM_2__谈计划。",
+            }
         )
 
         with patch.object(provider, "_request_completion", return_value=response):

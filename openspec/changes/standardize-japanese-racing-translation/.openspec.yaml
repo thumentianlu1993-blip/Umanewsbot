@@ -44,3 +44,9 @@ journal:
     issues_resolved: 1
     verdict: approved
     note: "8287 生产回归暴露两次尝试不足以跨占位符与完整性门禁收敛；默认提升为三次并累计重试约束、附缺失位置上下文，第 9 轮 review 零问题。"
+  - event: code-reviewed
+    date: "2026-07-14T11:51:46+08:00"
+    rounds: 13
+    issues_resolved: 14
+    verdict: approved
+    note: "生产 8287 暴露模型可能新造、改写或拆分内部占位符；追加 raw response 字段级守恒、摘要编号白名单、畸形 token 有界识别、术语映射 span 隔离及对应正反例，连续修复后最终 review 零问题。"
