@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
 
 BLOCK_TAGS = {
@@ -67,6 +67,8 @@ def extract_article_text(node: Tag | BeautifulSoup | None) -> str:
 
     def visit(current: Tag | BeautifulSoup) -> None:
         for child in current.children:
+            if isinstance(child, Comment):
+                continue
             if isinstance(child, NavigableString):
                 text = str(child)
                 if text:
