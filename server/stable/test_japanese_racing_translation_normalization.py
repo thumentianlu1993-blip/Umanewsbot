@@ -449,6 +449,54 @@ class JapaneseTranslationProviderIntegrationTests(TestCase):
         self.assertEqual(result.body_zh.count("ノリヤンモーニン"), 2)
 
     @override_settings(TRANSLATION_MAX_ATTEMPTS=2)
+    def test_retry_uses_pronoun_for_excess_unknown_horse_reference(self):
+        ExternalHorseAlias.objects.create(
+            source="fixture",
+            source_language=SourceLanguage.JAPANESE,
+            racing_region=RacingRegion.JAPAN,
+            external_horse_id="NORIYAN-MORNIN",
+            name_ja="ノリヤンモーニン",
+            normalized_name="ノリヤンモーニン",
+            confidence=100,
+        )
+        article = _article(body="ノリヤンモーニンが先行した。そのまま押し切った。")
+        provider = self._provider()
+        first = _fake_response(
+            body="__UMA_KEEP_1__领放，__UMA_KEEP_1__坚持到了最后。",
+        )
+        second = _fake_response(
+            body="__UMA_KEEP_1__领放，该马坚持到了最后。",
+        )
+
+        with patch.object(provider, "_request_completion", side_effect=[first, second]) as request:
+            result = provider.translate(article)
+
+        retry_prompt = request.call_args_list[1].args[0][1]["content"]
+        self.assertIn("只有原文显式出现马名的位置才复制该占位符", retry_prompt)
+        self.assertEqual(result.body_zh, "ノリヤンモーニン领放，该马坚持到了最后。")
+
+    @override_settings(TRANSLATION_MAX_ATTEMPTS=1)
+    def test_excess_unknown_horse_placeholder_still_fails_closed(self):
+        ExternalHorseAlias.objects.create(
+            source="fixture",
+            source_language=SourceLanguage.JAPANESE,
+            racing_region=RacingRegion.JAPAN,
+            external_horse_id="NORIYAN-MORNIN",
+            name_ja="ノリヤンモーニン",
+            normalized_name="ノリヤンモーニン",
+            confidence=100,
+        )
+        article = _article(body="ノリヤンモーニンが先行した。そのまま押し切った。")
+        provider = self._provider()
+        response = _fake_response(
+            body="__UMA_KEEP_1__领放，__UMA_KEEP_1__坚持到了最后。",
+        )
+
+        with patch.object(provider, "_request_completion", return_value=response):
+            with self.assertRaisesRegex(TranslationResponseError, "invented protected entity placeholder"):
+                provider.translate(article)
+
+    @override_settings(TRANSLATION_MAX_ATTEMPTS=2)
     def test_retry_requires_every_repeated_entity_placeholder_occurrence(self):
         article = _article(body="1番 ノリヤンモーニンが先行し、ノリヤンモーニンが勝った。")
         provider = self._provider()
