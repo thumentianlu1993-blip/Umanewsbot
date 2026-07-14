@@ -1,0 +1,13 @@
+schema: spec-driven
+created: 2026-07-14
+profile: feature
+phase: reviewed
+journal:
+  - event: plan-reviewed
+    date: "2026-07-15T06:34:00+08:00"
+    session: 1
+    mode: full
+    rounds: 2
+    issues_resolved: 7
+    artifacts_modified: [proposal.md, design.md, tasks.md, specs/historical-race-batch-artifact-pipeline/spec.md, specs/race-event-data-crawl-orchestration/spec.md]
+    note: "Resolved typed recipe scope binding, runtime resource identity, evidence-backed gaps, database read-only verification, per-shard artifact roots, directory-atomic publication and 1250-target performance contracts; final review approved."
