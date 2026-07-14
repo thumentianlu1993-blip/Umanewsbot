@@ -7,6 +7,7 @@
 - 生产归属资格 dry-run 必须额外传 `--scope all_articles --hours 72`，并且不得传 `--limit`。只有输出 `scope_complete=true` 时，全部 `primary_change_ids`、`needs_review_ids`、`locked_skip_ids` 和 `review_sample_ids_by_region` 才构成完整人工清单。默认 `gate_candidates` 仅用于术语门禁补跑，不得作为 Shadow 上线证据。
 - `all_articles` run 后续按 manifest commit 时只回填归属，不会修改文章门禁、重新入榜时间、发布状态或 QQ 交付；报告中的门禁结果使用 `validation_passed_ids/validation_blocked_ids` 表示，不得把它们误读为已经恢复候选。
 - `scope_complete=false` 的 `all_articles` run 会在 commit 入口被强制拒绝；人工复核以 `review_checklist_ids` 对应的 outcome 为准，outcome 内含标题、来源 URL、来源站点、发布时间、before/after、证据、置信度和状态。
+- 当前待切换候选：main `7f0827ad941452524062d478940c85bdfddf4a59`，tag `umanewsbot:main-7f0827ad-amd64-20260714-1707`，image ID `sha256:6ad16e368d7934777a689e537c70618a6321c3466d02f304116e2f61ae2af9a1`。必须先等待 `news-translate-20260713-r3` 自然退出并重新确认 one-off、TranslationRun、Celery active/reserved、归属/外部导入锁均为空；不得在文章正文/指纹仍变化时生成 72 小时 manifest。
 - 单审文件必须保留 `reviewer_roles=reviewer_a` 和 `adjudicated=false`，不得复制 reviewer B。多人审核发生冲突时仍必须裁决。空白未选择行不进入分母，明确 `exclude` 单独留档。
 - 通过 Gold Set 只允许把生产从 `off` 切到 `shadow`。shadow 至少运行 24 小时，必须复核全部主地区变化、全部 `needs_review`、各地区随机稳定样本和错误日志；未完成前禁止 `enforce`。
 - shadow 验收通过后，第一阶段只对新文章 enforce，`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false` 继续保持关闭；再观察至少 24 小时后才讨论网页/测试 QQ 群相关地区查询。
