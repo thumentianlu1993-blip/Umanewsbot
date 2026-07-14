@@ -1,5 +1,14 @@
 # 当前状态
 
+## 2026-07-15 多地区归属 V3.2 第四轮生产审计通过 Shadow 门禁
+
+- 已从用户实际填写的审核人 A 工作表恢复最初 159 条审核快照，地区答案沿用既有规范化导出，SHA、原文标题和原文正文使用审核时内容。保守对账结果为 `131 unchanged / 22 auto_refreshed / 6 blocked`，有效分母 `153`；6 条阻断为 `8168/8157/8230/8088/8089/7898`，未手改 SHA、未补造审核人 B。新 Gold SHA-256 为 `ff2a450aac170b846be43a99469ee1e6e3ef3c3adbd5ed3aaef203536da777be`，对账表 SHA-256 为 `3f029eb8357872df6a0fda808e0048232e4b507bba887008c37b34f50fcbacc1`，evaluation SHA-256 为 `5f6834e773c9a3289b7d45c8c5d5f38223538b8939b0eb5710dcedc851abb667`。
+- V3.2 第四轮生产 72 小时 `all_articles` dry-run 为 run `#5`，覆盖 `525` 篇且 `scope_complete=true`，产生 `21` 条主地区变化、`3` 条 `needs_review`、`49` 条完整人工清单；文章缺失和候选正文漂移均为 `0`。报告位于 `/opt/umanewsbot/runtime/multiregion_attribution/v3.2-production-audit-v4-20260715/report.json`，SHA-256 `5f892441535c0583ddd85e18d633f5c9d65f7022b6594acc485b1cd91aa8e3c2`，manifest SHA-256 `6edd94e076f222ac3a9b63f38622d4d7ae9a9989bc810e21ae26aa348aecfe1e`。
+- 有效 Gold 上主地区准确率 `98.04%`，日本/中国香港/英国/美国均为 `100%`，法国 `90.91%`；相关 precision `100%`、recall `70.83%`、过度扩散 `0%`，机器结论 `qualified=true`。全部 49 条清单已逐条复核，未发现需要阻止 Shadow 的明确错标；`8028/8049/8090/8484/8507` 仍有可接受的相关地区漏标，只影响 recall。人工审计文件 SHA-256 为 `c51b237432afab1a3714af9945661339d3e59fc827ab71873e37ae2605efbfbf`。
+- 重点反例验收通过：`8105` 为爱尔兰 `other` 主地区并关联英国，`8509` 的完整 `Irish Oaks` 不再被嵌套 `Oaks` 覆盖，`8351/8364` 保持日本主地区并关联法国；法国赛果 `8089` 继续按已确认的赛事优先规则保留法国主地区，原单审 Gold 分歧未自动续签。
+- 本轮只读 run 已完成，未 commit 归属、未改文章/术语/来源/发布/QQ。一次性容器与 V3.2 审计镜像已从生产删除；交还时可用空间 `8,515,672 KiB`，生产仍为 `sha256:b90cdf5c...b70a` / revision `e3efd879`，web/worker 未重启、beat 仍停止，队列、active/reserved、翻译/归属/历史运行项、锁和 idle transaction 均为 0，内外 healthz 正常。
+- 第四轮结论仅批准下一阶段 `Shadow`，不批准 `enforce`、相关地区网页/群查询、历史回填或正式 QQ。V3.2 已合入最新 `main@c4087e6c` 的 historical runner 安全补丁；下一步须对组合提交重新执行完整回归、可复现 AMD64 双构建和受控部署，保持相关地区查询关闭，Shadow 健康运行至少 24 小时后再决定是否进入仅新文章 enforce。
+
 ## 2026-07-15 多地区归属 V3.1 第三轮生产审计 no-go 与 V3.2 修复
 
 - 已将最新主线 `e3efd879` 合入多地区分支并构建 V3.1 可复现 AMD64 审计镜像 `sha256:bf666bcba703421ae491476991c9e7131607acca2a86626c74195cfdb41ce802`。第三轮生产 72 小时 `all_articles` dry-run 为 run `#4`，覆盖 `531` 篇且 `scope_complete=true`，产生 `20` 条主地区变化、`5` 条 `needs_review`、`49` 条完整人工清单；锁、缺失和候选正文漂移均为 `0`。报告位于 `/opt/umanewsbot/runtime/multiregion_attribution/v3.1-production-audit-v3-20260715/report.json`，SHA-256 `0524534d8c831da7147bf3a59ca162566dcaa11c7163c5b143f7ba52de6f1d1e`，manifest SHA-256 `b081c7dd7923193a03f3bab0663b8fb3bd1198335f87a1e2df1ddc7f05822454`。

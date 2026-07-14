@@ -1,6 +1,6 @@
 # 部署运行手册
 
-## 待执行：多地区归属 V3.2 第四候选生产只读验收
+## 已完成：多地区归属 V3.2 第四候选生产只读验收
 
 1. V3.1 第三轮报告固定为 `/opt/umanewsbot/runtime/multiregion_attribution/v3.1-production-audit-v3-20260715/report.json`，SHA-256 `0524534d8c831da7147bf3a59ca162566dcaa11c7163c5b143f7ba52de6f1d1e`；run `#4` / manifest `b081c7dd7923193a03f3bab0663b8fb3bd1198335f87a1e2df1ddc7f05822454`。该轮有效 Gold `147`、相关 precision `93.75%`，明确 no-go，不得 commit 或批准 Shadow。
 2. V3.2 必须包含 `Killarney maiden`、`Irish Oaks`/`Oaks` 嵌套和日本马“凱旋門賞へ”真实反例，以及 Gold 问题 ID 诊断字段。完成提交后重新生成纯 Git archive，使用两个独立上下文构建相同 AMD64 image ID，并在镜像内通过 Django、migration 与归属专项；V3.1 镜像 `sha256:bf666bc...e802` 已从生产删除，不得复用。
@@ -9,6 +9,16 @@
 4. 使用 V3.2 和新 Gold 在全新目录执行 `--scope all_articles --hours 72 --dry-run --single-review-gold`；不得传 `--limit`、不得 `--include-gate-validation`、不得 `--commit`。报告必须 `scope_complete=true`，并记录规则版本、run ID、manifest、Gold SHA、全部问题 ID 和完整人工清单。
 5. 人工检查全部主地区变化、全部 `needs_review` 和五地区稳定样本，重点复核 `8105/8509/8351/8364`、既有 `Sale/York/Kelso/Jockey Club/JRHA/world ranking` 反例及法国赛果 `8089`。只有有效样本至少 150、五地区各至少 10、跨地区至少 20、主地区与分地区准确率达标、相关 precision `>=95%`、recall `>=50%`、过度扩散 `<=1%`，且人工无明确错标，才允许开始 Shadow。
 6. 审计结束后删除一次性容器和本轮载入的可再生候选镜像，不删除或 retag `umanewsbot:prod` 与现有 rollback；回报 `df`。可用空间低于 5 GiB 时立即停止并交还 historical runner，不降低其门槛。
+
+验收结果：原审核快照保守对账为 `153/159` 有效，Gold SHA `ff2a450a...77be`；run `#5` 覆盖 `525` 篇且范围完整，报告 SHA `5f892441...e3c2`、manifest `6edd94e0...fe1e`。主地区准确率 `98.04%`、相关 precision `100%`、recall `70.83%`、过度扩散 `0%`；49 条人工清单无阻断错标，结论为 `go_for_shadow_only`。审计容器和镜像已清理，窗口已交还。
+
+## 待执行：多地区归属 V3.2 Shadow 部署与 24 小时观察
+
+1. 先将 V3.2 合入最新 `main@c4087e6c`，完整通过 stable、归属/法国/runner 组合、Django check、迁移漂移、OpenSpec 与 diff check；从纯 Git archive 做两个独立 AMD64 构建，image ID 必须一致，并在镜像内复跑专项。
+2. 等生产协调任务明确交还部署窗口；复核正文 one-off、TranslationRun、Celery queue/active/reserved、归属/历史 run 与锁、idle transaction 均为空，磁盘高于 5 GiB。先备份数据库和 `.env`，保留当前 prod rollback；仅以 `--no-deps` 更新 web/worker/beat，不得重建 DB/Redis/network。
+3. 部署时保持 `MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`，只把 `MULTIREGION_ATTRIBUTION_MODE` 从 `off` 调为 `shadow`。不得执行归属 commit、72 小时回填、网页/群相关地区查询或 QQ 扩散。
+4. 部署后验证三服务镜像/revision、Django check、迁移、内外 healthz、队列、锁与日志。Shadow 计时从配置生效且健康验收完成时开始，至少运行 24 小时。
+5. 观察期结束后导出新文章的 Shadow 运行记录，检查任务失败、耗时、锁/漂移、主地区变化与相关地区假阳性；任何明确错标或运行异常都退回 off。通过后另行审批“仅新文章 enforce”，不得连带开启网页、测试群、历史回填或正式群。
 
 ## 2026-07-15 新闻统一镜像切换与存量重跑记录
 
