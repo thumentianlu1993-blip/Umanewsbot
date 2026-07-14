@@ -36,12 +36,12 @@
 | batch006 单地区 250 与旧 50 兼容 | TC-BATCH-001 至 018 |
 | runner 模型、迁移和审计 | TC-MODEL-001 至 015 |
 | 双锁、租约、心跳和接管 | TC-LOCK-001 至 020 |
-| 结构化 plan、allowlist 和工具身份 | TC-PLAN-001 至 018 |
-| step、checkpoint、暂停和恢复 | TC-STATE-001 至 020 |
-| crawl/apply 权限与网络隔离 | TC-PERM-001 至 016 |
-| Docker 与普通部署隔离 | TC-OPS-001 至 020 |
+| 结构化 plan、allowlist 和工具身份 | TC-PLAN-001 至 019 |
+| step、checkpoint、暂停和恢复 | TC-STATE-001 至 021 |
+| crawl/apply 权限、网络隔离与资源预算 | TC-PERM-001 至 026 |
+| Docker 与普通部署隔离 | TC-OPS-001 至 024 |
 | 日志、状态、安全和公开边界 | TC-OBS-001 至 014 |
-| 生产部署与 batch006 验收 | TC-PROD-001 至 018 |
+| 生产部署与 batch006 验收 | TC-PROD-001 至 019 |
 
 ## 2. batch006 地区上限与 artifact
 
@@ -133,6 +133,7 @@
 | TC-PLAN-016 | 输入路径越出批准 batch root | 校验 | 拒绝 path traversal/symlink escape | A |
 | TC-PLAN-017 | 输出路径越出批准 batch root | 校验 | 拒绝，未创建外部文件 | A |
 | TC-PLAN-018 | 重复 step id 或循环依赖 | 校验 | 拒绝并指出 step | A |
+| TC-PLAN-019 | 生产工具根中的非赛事/不消费预算脚本 | 校验匹配 SHA 的 crawl plan | 显式白名单拒绝，不能借镜像内任意工具绕过预算 | A |
 
 ## 6. Step、checkpoint、暂停和恢复
 
@@ -158,6 +159,7 @@
 | TC-STATE-018 | paused run | 合法 resume | 重验双锁/state 后继续 | A/S |
 | TC-STATE-019 | completed run | resume | 幂等返回 completed，不重复 step | A/S |
 | TC-STATE-020 | 未 checkpoint 的 apply step 进程丢失 | resume | blocked，要求 importer/DB 核验，不盲目跳过或重写 | P/S |
+| TC-STATE-021 | 首个 crawl step 写入请求账本后失败 | 删除账本并 resume | 失败收尾 checkpoint 保留已消费身份；删除后 blocked，不重置额度 | A/S |
 
 ## 7. Crawl/Apply 数据库角色与网络隔离
 
@@ -179,6 +181,16 @@
 | TC-PERM-014 | crawl write=true 或 apply network=true | 启动 | fail closed | A/H |
 | TC-PERM-015 | DB 容器连接 default+internal networks | 检查 | 不被重建，原网络不变，internal alias=db | D |
 | TC-PERM-016 | crawl 同时连 egress+internal control 网络 | 尝试通过 DB 转发到 default | Docker 不路由，无法访问 default 其他服务 | D |
+| TC-PERM-017 | 宿主预置无限/超限 `RACE_EVENT_CRAWL_*` | 执行 crawl `python_tool` 环境探针 | 子进程只看到 settings 批准值，不能继承无限/超限值 | A |
+| TC-PERM-018 | 同一 crawl run 含多个网络 step | 检查子进程环境 | 全部共享 artifact 根目录中的同一请求账本和 cache manifest | A |
+| TC-PERM-019 | 容器内 artifact 可用空间低于批准底线 | 执行 crawl runner | 取得租约和执行 step 前失败，零网络请求 | A |
+| TC-PERM-020 | verify/apply runner | 执行普通 step | 不注入 crawl 网络环境，不改变既有 phase 权限 | A |
+| TC-PERM-021 | 绕过宿主脚本直接使用异常 crawl settings | 执行 Django runner 服务 | 数值边界校验失败，零 step、零租约 | A |
+| TC-PERM-022 | checkpoint 后请求账本/cache manifest 被修改或删除 | resume | checkpoint 漂移，run blocked，不执行后续 step | A |
+| TC-PERM-023 | checkpoint 记录资源文件不存在，暂停期间被外部创建 | resume | 存在状态漂移，run blocked，不接受伪造账本 | A |
+| TC-PERM-024 | 固定请求账本或 cache manifest 是 symlink/目录 | 启动 crawl | 租约和 step 前失败，不读取 artifact 外文件 | A |
+| TC-PERM-025 | 升级前非终态 crawl checkpoint 缺少资源身份 | resume | blocked；旧 completed run 仍可幂等读取 | A |
+| TC-PERM-026 | runner management step 嵌套 AdapterRunner | 子 policy 放宽值并指定自己的 run 目录 | 保留父账本/cache 路径，数值只收紧不放宽 | A |
 
 ## 8. Docker 生命周期与普通部署隔离
 
@@ -204,6 +216,10 @@
 | TC-OPS-018 | 后续 migration、runner apply 活跃 | preflight | 等事务完成和 paused；期间不 migrate | P/D |
 | TC-OPS-019 | pause 超时 | deploy | 整体停止，现有服务保持运行 | H/D |
 | TC-OPS-020 | shell 文件 | `sh -n`/ShellCheck 契约 | 语法通过，无 `docker compose down`、volume/network 删除或 DB/Redis recreate | H/C |
+| TC-OPS-021 | crawl env 请求预算为 0、251 或非整数 | 启动脚本校验 | 创建容器前失败；1 和 250 合法 | H/S |
+| TC-OPS-022 | crawl env cache 为 0、超过 2 GiB 或非整数 | 启动脚本校验 | 创建容器前失败；1 和 2 GiB 合法 | H/S |
+| TC-OPS-023 | crawl env 磁盘底线小于 5 GiB 或非整数 | 启动脚本校验 | 创建容器前失败；5 GiB 及以上合法 | H/S |
+| TC-OPS-024 | artifact 文件系统实时可用空间低于 env 底线 | 启动 crawl | `docker create` 前失败，容器不存在 | H/S |
 
 ## 9. 可观测性、日志、安全和公开边界
 
@@ -246,6 +262,7 @@
 | TC-PROD-016 | batch006 正式总账与全部 exclusion snapshots | 生成 selection | 每地区<=250、无重复/重叠、summary 数学与护栏正确 | O |
 | TC-PROD-017 | batch006 selection 通过审核 | 启动 crawl runner | 仅网络阶段，write=false，公开开关不变 | O |
 | TC-PROD-018 | runner 部署验收结束 | 检查公网/新闻链路 | healthz、web/worker/beat、自然新闻窗口正常；历史 published=0 | O |
+| TC-PROD-019 | 生产 artifact 文件系统 | 启动 batch006 crawl 前检查 | 可用空间至少 5 GiB，预算账本/cache manifest 路径和三项硬上限可见 | O |
 
 ## 11. 必跑验证矩阵
 

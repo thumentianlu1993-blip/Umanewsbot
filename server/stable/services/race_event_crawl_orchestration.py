@@ -511,25 +511,67 @@ class AdapterRunner:
         if not workdir.is_absolute():
             workdir = REPO_ROOT / workdir
         execution_policy = dict(execution_policy or {})
-        budget_artifact = run_path / "request_budget.json"
+        budget_artifact = Path(
+            os.environ.get("RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT")
+            or run_path / "request_budget.json"
+        )
+        source_cache_root = Path(
+            os.environ.get("RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT") or run_path
+        ).resolve()
+        source_cache_manifest = Path(
+            os.environ.get("RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST")
+            or source_cache_root / "source_cache_manifest.json"
+        ).resolve()
+
+        def stricter_upper(policy_value: Any, environment_key: str) -> int:
+            policy_limit = max(0, int(policy_value or 0))
+            parent_limit = max(0, int(os.environ.get(environment_key, "0") or 0))
+            if parent_limit and policy_limit:
+                return min(parent_limit, policy_limit)
+            return parent_limit or policy_limit
+
+        def stricter_lower(policy_value: Any, environment_key: str) -> int:
+            return max(
+                max(0, int(policy_value or 0)),
+                max(0, int(os.environ.get(environment_key, "0") or 0)),
+            )
+
+        request_interval = max(
+            max(0.0, float(execution_policy.get("request_interval_seconds") or 0)),
+            max(
+                0.0,
+                float(
+                    os.environ.get("RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS", "0")
+                    or 0
+                ),
+            ),
+        )
+        request_interval_text = f"{request_interval:g}"
         environment = {
             **os.environ,
-            "RACE_EVENT_CRAWL_MAX_REQUESTS": str(execution_policy.get("max_requests") or 0),
-            "RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS": str(
-                execution_policy.get("request_interval_seconds") or 0
+            "RACE_EVENT_CRAWL_MAX_REQUESTS": str(
+                stricter_upper(
+                    execution_policy.get("max_requests"),
+                    "RACE_EVENT_CRAWL_MAX_REQUESTS",
+                )
             ),
+            "RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS": request_interval_text,
             "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT": str(budget_artifact),
             "RACE_EVENT_CRAWL_BATCH_SIZE": str(execution_policy.get("batch_size") or 0),
             "RACE_EVENT_CRAWL_MAX_SOURCE_CACHE_BYTES": str(
-                execution_policy.get("max_source_cache_bytes") or 0
+                stricter_upper(
+                    execution_policy.get("max_source_cache_bytes"),
+                    "RACE_EVENT_CRAWL_MAX_SOURCE_CACHE_BYTES",
+                )
             ),
             "RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES": str(
-                execution_policy.get("min_free_disk_bytes") or 0
+                stricter_lower(
+                    execution_policy.get("min_free_disk_bytes"),
+                    "RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES",
+                )
             ),
-            "RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT": str(run_path.resolve()),
-            "RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST": str(
-                (run_path / "source_cache_manifest.json").resolve()
-            ),
+            "RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT": str(source_cache_root),
+            "RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST": str(source_cache_manifest),
         }
         completed = subprocess.run(
             command,

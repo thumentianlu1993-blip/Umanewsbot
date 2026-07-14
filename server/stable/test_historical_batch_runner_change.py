@@ -3,6 +3,7 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from io import StringIO
@@ -249,6 +250,38 @@ class HistoricalBatchRunnerPlanTests(SimpleTestCase):
             outside.write_text("print('unsafe')\n", encoding="utf-8")
             plan["steps"][0]["argv"][1] = str(outside)
             with self.assertRaisesMessage(RunnerPlanError, "tool path"):
+                validate_runner_plan(plan)
+
+    def test_production_tool_root_rejects_non_historical_python_tool_even_with_matching_sha(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = self._plan(root)
+            tool_root = root / "tools"
+            unsafe = tool_root / "finalize_termbase_review_batch.py"
+            unsafe.write_text("import requests\nrequests.get('https://example.com')\n", encoding="utf-8")
+            plan["steps"][0]["argv"][1] = str(unsafe)
+            plan["tool_manifest"] = {
+                unsafe.name: hashlib.sha256(unsafe.read_bytes()).hexdigest()
+            }
+            with (
+                patch(
+                    "stable.services.historical_batch_runner.RUNNER_IMMUTABLE_TOOL_ROOT",
+                    tool_root.resolve(),
+                    create=True,
+                ),
+                self.assertRaisesMessage(RunnerPlanError, "not approved"),
+            ):
+                validate_runner_plan(plan)
+            approved = tool_root / "discover_historical_race_band_sources.py"
+            approved.write_text("print('offline discovery')\n", encoding="utf-8")
+            plan["steps"][0]["argv"][1] = str(approved)
+            plan["tool_manifest"] = {
+                approved.name: hashlib.sha256(approved.read_bytes()).hexdigest()
+            }
+            with patch(
+                "stable.services.historical_batch_runner.RUNNER_IMMUTABLE_TOOL_ROOT",
+                tool_root.resolve(),
+            ):
                 validate_runner_plan(plan)
 
     def test_apply_step_requires_approval_and_expected_sha(self):
@@ -811,6 +844,456 @@ class HistoricalBatchRunnerLeaseTests(TestCase):
 
 
 class HistoricalBatchRunnerExecutionTests(TestCase):
+    def _environment_probe_run(self, root: Path) -> tuple[HistoricalBatchRun, Path, Path, Path]:
+        artifact_root = root / "artifacts"
+        tool_root = root / "tools"
+        artifact_root.mkdir()
+        tool_root.mkdir()
+        output_path = artifact_root / "environment.json"
+        tool_path = tool_root / "environment_probe.py"
+        tool_path.write_text(
+            "import json, os, sys\n"
+            "from pathlib import Path\n"
+            "keys = sys.argv[2:]\n"
+            "Path(sys.argv[1]).write_text(json.dumps({key: os.environ.get(key) for key in keys}), encoding='utf-8')\n",
+            encoding="utf-8",
+        )
+        keys = [
+            "RACE_EVENT_CRAWL_MAX_REQUESTS",
+            "RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS",
+            "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT",
+            "RACE_EVENT_CRAWL_MAX_SOURCE_CACHE_BYTES",
+            "RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES",
+            "RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT",
+            "RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST",
+        ]
+        plan = {
+            "schema_version": "1.0",
+            "batch_id": "2016-2025-batch-006-budget",
+            "phase": "crawl",
+            "network_enabled": True,
+            "write_enabled": False,
+            "image_id": "sha256:" + "1" * 64,
+            "image_revision": "a" * 40,
+            "artifact_root": str(artifact_root),
+            "tool_root": str(tool_root),
+            "tool_manifest": {tool_path.name: hashlib.sha256(tool_path.read_bytes()).hexdigest()},
+            "steps": [
+                {
+                    "id": "environment-probe",
+                    "kind": "python_tool",
+                    "argv": ["python", str(tool_path), str(output_path), *keys],
+                    "inputs": [],
+                    "outputs": [str(output_path)],
+                }
+            ],
+        }
+        plan_path = artifact_root / "runner-plan.json"
+        plan_path.write_text(json.dumps(plan), encoding="utf-8")
+        run = create_runner_run(
+            batch_id=plan["batch_id"],
+            phase=plan["phase"],
+            artifact_root=str(artifact_root),
+            plan_sha256=hashlib.sha256(plan_path.read_bytes()).hexdigest(),
+            image_id=plan["image_id"],
+            image_revision=plan["image_revision"],
+        )
+        return run, plan_path, tool_root, output_path
+
+    def _resource_checkpoint_run(self, root: Path) -> tuple[HistoricalBatchRun, Path, Path, Path]:
+        artifact_root = root / "artifacts"
+        tool_root = root / "tools"
+        artifact_root.mkdir()
+        tool_root.mkdir()
+        output_path = artifact_root / "resource-output.json"
+        tool_path = tool_root / "resource_writer.py"
+        tool_path.write_text(
+            "import json, os, sys\n"
+            "from pathlib import Path\n"
+            "budget = Path(os.environ['RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT'])\n"
+            "manifest = Path(os.environ['RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST'])\n"
+            "budget.write_text(json.dumps({'request_count': 1}), encoding='utf-8')\n"
+            "manifest.write_text(json.dumps({'schema_version': '1.0', 'files': {}}), encoding='utf-8')\n"
+            "Path(sys.argv[1]).write_text('{}', encoding='utf-8')\n",
+            encoding="utf-8",
+        )
+        plan = {
+            "schema_version": "1.0",
+            "batch_id": "2016-2025-batch-006-resource-checkpoint",
+            "phase": "crawl",
+            "network_enabled": True,
+            "write_enabled": False,
+            "image_id": "sha256:" + "1" * 64,
+            "image_revision": "a" * 40,
+            "artifact_root": str(artifact_root),
+            "tool_root": str(tool_root),
+            "tool_manifest": {tool_path.name: hashlib.sha256(tool_path.read_bytes()).hexdigest()},
+            "steps": [
+                {
+                    "id": "resource-writer",
+                    "kind": "python_tool",
+                    "argv": ["python", str(tool_path), str(output_path)],
+                    "inputs": [],
+                    "outputs": [str(output_path)],
+                }
+            ],
+        }
+        plan_path = artifact_root / "runner-plan.json"
+        plan_path.write_text(json.dumps(plan), encoding="utf-8")
+        run = create_runner_run(
+            batch_id=plan["batch_id"],
+            phase=plan["phase"],
+            artifact_root=str(artifact_root),
+            plan_sha256=hashlib.sha256(plan_path.read_bytes()).hexdigest(),
+            image_id=plan["image_id"],
+            image_revision=plan["image_revision"],
+        )
+        return run, plan_path, tool_root, output_path
+
+    @override_settings(
+        HISTORICAL_RACE_BACKFILL_ENABLED=True,
+        HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=True,
+        HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET=17,
+        HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES=4096,
+        HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES=5 * 1024 * 1024 * 1024,
+    )
+    def test_crawl_overrides_child_resource_environment_with_shared_artifact_paths(self):
+        with TemporaryDirectory() as tmp:
+            run, plan_path, tool_root, output_path = self._environment_probe_run(Path(tmp))
+            artifact_root = Path(run.artifact_root)
+            malicious = {
+                "RACE_EVENT_CRAWL_MAX_REQUESTS": "0",
+                "RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS": "0",
+                "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT": "/tmp/escaped-budget.json",
+                "RACE_EVENT_CRAWL_MAX_SOURCE_CACHE_BYTES": str(9 * 1024 * 1024 * 1024),
+                "RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES": "1",
+                "RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT": "/tmp/escaped-cache",
+                "RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST": "/tmp/escaped-manifest.json",
+            }
+            with (
+                self.settings(HISTORICAL_RUNNER_TOOL_ROOT=str(tool_root)),
+                patch.dict(os.environ, malicious),
+                patch(
+                    "shutil.disk_usage",
+                    return_value=SimpleNamespace(free=10 * 1024 * 1024 * 1024),
+                ),
+            ):
+                execute_runner_plan(
+                    run=run,
+                    plan_path=plan_path,
+                    owner_token="owner",
+                    lock_path=artifact_root / ".runner.lock",
+                )
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["RACE_EVENT_CRAWL_MAX_REQUESTS"], "17")
+            self.assertEqual(payload["RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS"], "1")
+            self.assertEqual(
+                payload["RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT"],
+                str(artifact_root / "runner-request-budget.json"),
+            )
+            self.assertEqual(payload["RACE_EVENT_CRAWL_MAX_SOURCE_CACHE_BYTES"], "4096")
+            self.assertEqual(
+                payload["RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES"],
+                str(5 * 1024 * 1024 * 1024),
+            )
+            self.assertEqual(payload["RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT"], str(artifact_root))
+            self.assertEqual(
+                payload["RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST"],
+                str(artifact_root / "runner-source-cache-manifest.json"),
+            )
+
+    def test_crawl_rejects_invalid_settings_before_lease_or_step(self):
+        invalid_settings = (
+            {"HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET": 0},
+            {"HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET": 251},
+            {"HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET": "not-an-integer"},
+            {"HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES": 0},
+            {"HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES": 2 * 1024 * 1024 * 1024 + 1},
+            {"HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES": "not-an-integer"},
+            {"HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES": 5 * 1024 * 1024 * 1024 - 1},
+            {"HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES": "not-an-integer"},
+        )
+        for index, override in enumerate(invalid_settings):
+            with self.subTest(override=override), TemporaryDirectory() as tmp:
+                run, plan_path, tool_root, output_path = self._environment_probe_run(Path(tmp))
+                artifact_root = Path(run.artifact_root)
+                configured = {
+                    "HISTORICAL_RUNNER_TOOL_ROOT": str(tool_root),
+                    "HISTORICAL_RACE_BACKFILL_ENABLED": True,
+                    "HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK": True,
+                    "HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET": 17,
+                    "HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES": 4096,
+                    "HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES": 5 * 1024 * 1024 * 1024,
+                    **override,
+                }
+                with override_settings(**configured):
+                    with self.assertRaises(RunnerStateError):
+                        execute_runner_plan(
+                            run=run,
+                            plan_path=plan_path,
+                            owner_token=f"owner-{index}",
+                            lock_path=artifact_root / ".runner.lock",
+                        )
+                run.refresh_from_db()
+                self.assertEqual(run.status, HistoricalBatchRunStatus.PLANNED)
+                self.assertFalse(output_path.exists())
+                self.assertFalse(HistoricalBatchLock.objects.exists())
+
+    @override_settings(
+        HISTORICAL_RACE_BACKFILL_ENABLED=True,
+        HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=True,
+        HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET=17,
+        HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES=4096,
+        HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES=5 * 1024 * 1024 * 1024,
+    )
+    def test_crawl_rejects_insufficient_artifact_disk_before_lease(self):
+        with TemporaryDirectory() as tmp:
+            run, plan_path, tool_root, output_path = self._environment_probe_run(Path(tmp))
+            artifact_root = Path(run.artifact_root)
+            with (
+                self.settings(HISTORICAL_RUNNER_TOOL_ROOT=str(tool_root)),
+                patch(
+                    "shutil.disk_usage",
+                    return_value=SimpleNamespace(free=5 * 1024 * 1024 * 1024 - 1),
+                ),
+                self.assertRaisesMessage(RunnerStateError, "free disk"),
+            ):
+                execute_runner_plan(
+                    run=run,
+                    plan_path=plan_path,
+                    owner_token="owner",
+                    lock_path=artifact_root / ".runner.lock",
+                )
+            run.refresh_from_db()
+            self.assertEqual(run.status, HistoricalBatchRunStatus.PLANNED)
+            self.assertFalse(output_path.exists())
+            self.assertFalse(HistoricalBatchLock.objects.exists())
+
+    @override_settings(
+        HISTORICAL_RACE_BACKFILL_ENABLED=True,
+        HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=True,
+        HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET=17,
+        HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES=4096,
+        HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES=5 * 1024 * 1024 * 1024,
+    )
+    def test_crawl_checkpoint_blocks_modified_or_deleted_resource_artifacts(self):
+        mutations = ("delete-budget", "modify-manifest")
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), TemporaryDirectory() as tmp:
+                run, plan_path, tool_root, _output_path = self._resource_checkpoint_run(Path(tmp))
+                artifact_root = Path(run.artifact_root)
+                with (
+                    self.settings(HISTORICAL_RUNNER_TOOL_ROOT=str(tool_root)),
+                    patch("shutil.disk_usage", return_value=SimpleNamespace(free=10 * 1024**3)),
+                ):
+                    execute_runner_plan(
+                        run=run,
+                        plan_path=plan_path,
+                        owner_token="owner",
+                        lock_path=artifact_root / ".runner.lock",
+                    )
+                    self.assertEqual(len(run.checkpoint["resource_artifacts"]), 2)
+                    if mutation == "delete-budget":
+                        (artifact_root / "runner-request-budget.json").unlink()
+                    else:
+                        (artifact_root / "runner-source-cache-manifest.json").write_text(
+                            '{"changed": true}', encoding="utf-8"
+                        )
+                    with self.assertRaisesMessage(RunnerStateError, "checkpoint"):
+                        execute_runner_plan(
+                            run=run,
+                            plan_path=plan_path,
+                            owner_token="owner",
+                            lock_path=artifact_root / ".runner.lock",
+                        )
+                    run.refresh_from_db()
+                    self.assertEqual(run.status, HistoricalBatchRunStatus.BLOCKED)
+
+    @override_settings(
+        HISTORICAL_RACE_BACKFILL_ENABLED=True,
+        HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=True,
+        HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET=17,
+        HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES=4096,
+        HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES=5 * 1024 * 1024 * 1024,
+    )
+    def test_crawl_checkpoint_blocks_resource_artifact_created_after_absent_checkpoint(self):
+        with TemporaryDirectory() as tmp:
+            run, plan_path, tool_root, _output_path = self._environment_probe_run(Path(tmp))
+            artifact_root = Path(run.artifact_root)
+            with (
+                self.settings(HISTORICAL_RUNNER_TOOL_ROOT=str(tool_root)),
+                patch("shutil.disk_usage", return_value=SimpleNamespace(free=10 * 1024**3)),
+            ):
+                execute_runner_plan(
+                    run=run,
+                    plan_path=plan_path,
+                    owner_token="owner",
+                    lock_path=artifact_root / ".runner.lock",
+                )
+                self.assertEqual(
+                    run.checkpoint["resource_artifacts"],
+                    [
+                        {"exists": False, "path": str(artifact_root / "runner-request-budget.json")},
+                        {
+                            "exists": False,
+                            "path": str(artifact_root / "runner-source-cache-manifest.json"),
+                        },
+                    ],
+                )
+                (artifact_root / "runner-request-budget.json").write_text(
+                    '{"request_count": 0}', encoding="utf-8"
+                )
+                with self.assertRaisesMessage(RunnerStateError, "checkpoint"):
+                    execute_runner_plan(
+                        run=run,
+                        plan_path=plan_path,
+                        owner_token="owner",
+                        lock_path=artifact_root / ".runner.lock",
+                    )
+                run.refresh_from_db()
+                self.assertEqual(run.status, HistoricalBatchRunStatus.BLOCKED)
+
+    @override_settings(
+        HISTORICAL_RACE_BACKFILL_ENABLED=True,
+        HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=True,
+        HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET=17,
+        HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES=4096,
+        HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES=5 * 1024 * 1024 * 1024,
+    )
+    def test_crawl_first_step_failure_checkpoints_consumed_resource_artifacts(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run, plan_path, tool_root, _output_path = self._resource_checkpoint_run(root)
+            artifact_root = Path(run.artifact_root)
+            tool_path = tool_root / "resource_writer.py"
+            tool_path.write_text(
+                tool_path.read_text(encoding="utf-8")
+                + "raise SystemExit(9)\n",
+                encoding="utf-8",
+            )
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan["tool_manifest"][tool_path.name] = hashlib.sha256(
+                tool_path.read_bytes()
+            ).hexdigest()
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            run.plan_sha256 = hashlib.sha256(plan_path.read_bytes()).hexdigest()
+            run.save(update_fields={"plan_sha256", "updated_at"})
+
+            with (
+                self.settings(HISTORICAL_RUNNER_TOOL_ROOT=str(tool_root)),
+                patch("shutil.disk_usage", return_value=SimpleNamespace(free=10 * 1024**3)),
+            ):
+                with self.assertRaisesMessage(RunnerStateError, "resource-writer"):
+                    execute_runner_plan(
+                        run=run,
+                        plan_path=plan_path,
+                        owner_token="owner",
+                        lock_path=artifact_root / ".runner.lock",
+                    )
+                run.refresh_from_db()
+                budget_path = artifact_root / "runner-request-budget.json"
+                self.assertTrue(budget_path.is_file())
+                self.assertEqual(run.checkpoint["resource_artifacts"][0]["exists"], True)
+
+                budget_path.unlink()
+                with self.assertRaisesMessage(RunnerStateError, "checkpoint"):
+                    execute_runner_plan(
+                        run=run,
+                        plan_path=plan_path,
+                        owner_token="owner",
+                        lock_path=artifact_root / ".runner.lock",
+                    )
+                run.refresh_from_db()
+                self.assertEqual(run.status, HistoricalBatchRunStatus.BLOCKED)
+
+    @override_settings(
+        HISTORICAL_RACE_BACKFILL_ENABLED=True,
+        HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=True,
+        HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET=17,
+        HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES=4096,
+        HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES=5 * 1024 * 1024 * 1024,
+    )
+    def test_crawl_rejects_symlink_or_directory_resource_artifact_before_lease(self):
+        for kind in ("symlink", "directory"):
+            with self.subTest(kind=kind), TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                run, plan_path, tool_root, output_path = self._environment_probe_run(root)
+                artifact_root = Path(run.artifact_root)
+                budget_path = artifact_root / "runner-request-budget.json"
+                if kind == "symlink":
+                    outside = root / "outside-budget.json"
+                    outside.write_text('{"request_count": 0}', encoding="utf-8")
+                    budget_path.symlink_to(outside)
+                else:
+                    budget_path.mkdir()
+                with (
+                    self.settings(HISTORICAL_RUNNER_TOOL_ROOT=str(tool_root)),
+                    patch("shutil.disk_usage", return_value=SimpleNamespace(free=10 * 1024**3)),
+                    self.assertRaisesMessage(RunnerStateError, "regular file"),
+                ):
+                    execute_runner_plan(
+                        run=run,
+                        plan_path=plan_path,
+                        owner_token="owner",
+                        lock_path=artifact_root / ".runner.lock",
+                    )
+                run.refresh_from_db()
+                self.assertEqual(run.status, HistoricalBatchRunStatus.PLANNED)
+                self.assertFalse(output_path.exists())
+                self.assertFalse(HistoricalBatchLock.objects.exists())
+
+    @override_settings(
+        HISTORICAL_RACE_BACKFILL_ENABLED=True,
+        HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=True,
+        HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET=17,
+        HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES=4096,
+        HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES=5 * 1024 * 1024 * 1024,
+    )
+    def test_legacy_nonterminal_crawl_checkpoint_blocks_but_completed_remains_readable(self):
+        for status, should_block in (
+            (HistoricalBatchRunStatus.PLANNED, True),
+            (HistoricalBatchRunStatus.COMPLETED, False),
+        ):
+            with self.subTest(status=status), TemporaryDirectory() as tmp:
+                run, plan_path, tool_root, _output_path = self._environment_probe_run(Path(tmp))
+                artifact_root = Path(run.artifact_root)
+                legacy_state = {
+                    "schema_version": "1.0",
+                    "run_id": run.run_id,
+                    "batch_id": run.batch_id,
+                    "phase": run.phase,
+                    "image_id": run.image_id,
+                    "image_revision": run.image_revision,
+                    "plan_sha256": run.plan_sha256,
+                    "completed_steps": [{"id": "environment-probe", "outputs": []}],
+                }
+                write_runtime_state(artifact_root / "runner-state.json", legacy_state)
+                run.status = status
+                run.checkpoint = legacy_state
+                run.save(update_fields={"status", "checkpoint", "updated_at"})
+                with (
+                    self.settings(HISTORICAL_RUNNER_TOOL_ROOT=str(tool_root)),
+                    patch("shutil.disk_usage", return_value=SimpleNamespace(free=10 * 1024**3)),
+                ):
+                    if should_block:
+                        with self.assertRaisesMessage(RunnerStateError, "resource artifact"):
+                            execute_runner_plan(
+                                run=run,
+                                plan_path=plan_path,
+                                owner_token="owner",
+                                lock_path=artifact_root / ".runner.lock",
+                            )
+                        run.refresh_from_db()
+                        self.assertEqual(run.status, HistoricalBatchRunStatus.BLOCKED)
+                    else:
+                        result = execute_runner_plan(
+                            run=run,
+                            plan_path=plan_path,
+                            owner_token="owner",
+                            lock_path=artifact_root / ".runner.lock",
+                        )
+                        self.assertEqual(result.status, HistoricalBatchRunStatus.COMPLETED)
+
     @override_settings(
         HISTORICAL_RACE_BACKFILL_ENABLED=True,
         HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=False,
@@ -1042,6 +1525,7 @@ class HistoricalBatchRunnerExecutionTests(TestCase):
             self.assertGreater((artifact_root / "runner-logs" / "large-output.stdout.log").stat().st_size, 100000)
             self.assertIsNot(observed["stdout"], subprocess.PIPE)
             self.assertIsNot(observed["stderr"], subprocess.PIPE)
+            self.assertIsNone(observed["env"])
             self.assertIsNone(HistoricalBatchLock.objects.get(key="global").locked_by_run_id)
 
 
@@ -1052,6 +1536,135 @@ class HistoricalBatchRunnerOperationsContractTests(SimpleTestCase):
         path = self.root / relative
         self.assertTrue(path.is_file(), f"missing operations script: {relative}")
         return path.read_text(encoding="utf-8")
+
+    def _run_crawl_start_validation(
+        self,
+        *,
+        request_budget: str = "250",
+        cache_bytes: str = str(2 * 1024 * 1024 * 1024),
+        disk_floor: str = str(5 * 1024 * 1024 * 1024),
+        available_kib: str = str(10 * 1024 * 1024),
+    ) -> tuple[subprocess.CompletedProcess[str], bool]:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            artifact_root = root / "artifact"
+            secret_root = root / "secrets"
+            bin_root = root / "bin"
+            artifact_root.mkdir()
+            secret_root.mkdir()
+            bin_root.mkdir()
+            run_id = "budget-validation"
+            token = secret_root / f"{run_id}.token"
+            env_file = secret_root / f"{run_id}.crawl.env"
+            token.write_text("owner-token\n", encoding="utf-8")
+            token.chmod(0o600)
+            env_file.write_text(
+                "\n".join(
+                    [
+                        "DEBUG=false",
+                        "SECRET_KEY=test",
+                        "DB_ENGINE=postgres",
+                        "POSTGRES_DB=test",
+                        "POSTGRES_USER=historical_runner_control",
+                        "POSTGRES_PASSWORD=test",
+                        "POSTGRES_HOST=db",
+                        "POSTGRES_PORT=5432",
+                        f"POSTGRES_APPLICATION_NAME=umanews-historical-runner:{run_id}:crawl",
+                        "HISTORICAL_RACE_BACKFILL_ENABLED=true",
+                        "HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=true",
+                        f"HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET={request_budget}",
+                        f"HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES={cache_bytes}",
+                        f"HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES={disk_floor}",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            env_file.chmod(0o600)
+            marker = root / "docker-create-called"
+            docker = bin_root / "docker"
+            docker.write_text(
+                "#!/bin/sh\n"
+                "case \"$1 $2\" in\n"
+                "  'image inspect') printf '%s\\n' \"$HISTORICAL_RUNNER_IMAGE_REVISION\" ;;\n"
+                "  'container inspect') exit 1 ;;\n"
+                "  'network inspect') exit 0 ;;\n"
+                "  'network connect') exit 0 ;;\n"
+                "  'create '*) : > \"$FAKE_DOCKER_CREATE_MARKER\" ;;\n"
+                "  'start '*) exit 0 ;;\n"
+                "esac\n",
+                encoding="utf-8",
+            )
+            docker.chmod(0o755)
+            df = bin_root / "df"
+            df.write_text(
+                "#!/bin/sh\n"
+                "printf '%s\\n' 'Filesystem 1024-blocks Used Available Capacity Mounted on'\n"
+                "printf 'fake 20000000 1 %s 1%% /\\n' \"$FAKE_DF_AVAILABLE_KIB\"\n",
+                encoding="utf-8",
+            )
+            df.chmod(0o755)
+            environment = {
+                **os.environ,
+                "PATH": f"{bin_root}:{os.environ['PATH']}",
+                "HISTORICAL_RUNNER_CONTAINER_NAME": "budget-validation-runner",
+                "HISTORICAL_RUNNER_SECRET_DIR": str(secret_root),
+                "HISTORICAL_RUNNER_IMAGE_ID": "sha256:" + "1" * 64,
+                "HISTORICAL_RUNNER_IMAGE_REVISION": "a" * 40,
+                "HISTORICAL_RUNNER_RUN_ID": run_id,
+                "HISTORICAL_RUNNER_PHASE": "crawl",
+                "HISTORICAL_RUNNER_ARTIFACT_DIR": str(artifact_root),
+                "HISTORICAL_RUNNER_PLAN_RELATIVE_PATH": "runner-plan.json",
+                "HISTORICAL_RUNNER_OWNER_TOKEN_FILE": str(token),
+                "HISTORICAL_RUNNER_ENV_FILE": str(env_file),
+                "FAKE_DOCKER_CREATE_MARKER": str(marker),
+                "FAKE_DF_AVAILABLE_KIB": available_kib,
+            }
+            result = subprocess.run(
+                ["sh", str(self.root / "deploy/historical_runner.sh"), "start"],
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+            return result, marker.exists()
+
+    def test_runner_script_rejects_out_of_bounds_resource_settings_before_docker_create(self):
+        invalid = (
+            {"request_budget": "0"},
+            {"request_budget": "251"},
+            {"request_budget": "not-an-integer"},
+            {"cache_bytes": "0"},
+            {"cache_bytes": str(2 * 1024 * 1024 * 1024 + 1)},
+            {"cache_bytes": "not-an-integer"},
+            {"disk_floor": str(5 * 1024 * 1024 * 1024 - 1)},
+            {"disk_floor": "not-an-integer"},
+        )
+        for values in invalid:
+            with self.subTest(values=values):
+                result, create_called = self._run_crawl_start_validation(**values)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertFalse(create_called)
+
+    def test_runner_script_accepts_resource_boundaries(self):
+        for values in (
+            {"request_budget": "1", "cache_bytes": "1"},
+            {
+                "request_budget": "250",
+                "cache_bytes": str(2 * 1024 * 1024 * 1024),
+                "disk_floor": str(5 * 1024 * 1024 * 1024),
+            },
+        ):
+            with self.subTest(values=values):
+                result, create_called = self._run_crawl_start_validation(**values)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertTrue(create_called)
+
+    def test_runner_script_rejects_insufficient_real_time_artifact_disk(self):
+        result, create_called = self._run_crawl_start_validation(
+            available_kib=str(5 * 1024 * 1024 - 1)
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(create_called)
 
     def test_runner_script_enforces_identity_resources_mounts_and_phase_env(self):
         text = self._read("deploy/historical_runner.sh")

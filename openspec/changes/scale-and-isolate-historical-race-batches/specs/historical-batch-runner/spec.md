@@ -100,6 +100,54 @@ runner MUST 只执行版本化 plan 中的结构化 argv，使用 `shell=false`�
 - **THEN** runner MUST 在取得业务权限前失败
 - **AND** 系统 MUST 记录非法权限组合
 
+### Requirement: crawl 子进程 MUST 继承不可放宽的共享资源预算
+系统 MUST 对同一 crawl run 的所有 step 强制使用同一请求预算账本和 source-cache manifest。子进程的请求总数上限不得超过 250、请求间隔不得低于 1 秒，source cache 不得超过 2 GiB，artifact 文件系统必须保留至少 5 GiB 可用空间；调用方在 phase env、宿主环境或 plan 中提供的更宽松值 MUST 被拒绝或覆盖。宿主脚本与 Django 执行服务 MUST 分别校验这些边界。
+
+#### Scenario: 子进程环境尝试关闭预算
+- **WHEN** crawl runner 的宿主环境预先设置 `RACE_EVENT_CRAWL_MAX_REQUESTS=0` 或更高值
+- **THEN** 父进程 MUST 使用批准的 `HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET` 覆盖该值
+- **AND** 请求账本、cache 根目录和 cache manifest MUST 固定在当前 artifact 根目录
+
+#### Scenario: phase env 尝试放宽资源上限
+- **WHEN** crawl env 声明请求预算大于 250、cache 大于 2 GiB 或磁盘底线小于 5 GiB
+- **THEN** 宿主启动脚本 MUST 在创建容器前失败
+- **AND** 不得执行任何网络 step
+
+#### Scenario: artifact 文件系统实时空间不足
+- **WHEN** 宿主或容器内检查发现 artifact 文件系统可用空间低于批准底线
+- **THEN** runner MUST 在取得执行租约或创建容器前失败
+- **AND** 运维人员不得通过降低底线继续抓取
+
+#### Scenario: 直接调用管理命令绕过宿主脚本
+- **WHEN** crawl settings 的请求预算为 0 或大于 250、cache 为 0 或大于 2 GiB、磁盘底线小于 5 GiB
+- **THEN** Django 执行服务 MUST 在取得租约和执行 step 前失败
+- **AND** 不得依赖宿主脚本是唯一校验层
+
+#### Scenario: 暂停期间请求账本被删除或改小
+- **WHEN** crawl 已完成至少一个 step 并保存 checkpoint，随后请求账本或 cache manifest 的存在状态、大小或 SHA 发生变化
+- **THEN** resume MUST 将 run 标记为 blocked
+- **AND** 不得以新的 250 次预算继续执行
+
+#### Scenario: 首个 crawl step 失败或进程失联
+- **WHEN** runner 已保存资源基线后启动首个 crawl step，step 消耗请求后失败、中断或父进程失联
+- **THEN** 可控失败路径 MUST 在释放租约前保存失败时的资源身份
+- **AND** 无法执行失败收尾的恢复路径 MUST 以基线和磁盘资源不一致为由 blocked，不得静默重置额度
+
+#### Scenario: 资源账本路径是 symlink 或旧 checkpoint 缺少身份
+- **WHEN** 固定请求账本/cache manifest 路径是 symlink、非普通文件，或非终态 crawl checkpoint 没有资源身份字段
+- **THEN** runner MUST 在执行下一 step 前 blocked
+- **AND** 不得跟随 artifact 外目标或无证据继承旧额度
+
+#### Scenario: plan 选择未批准或不消费预算的 Python 工具
+- **WHEN** 生产 `/app/runtime/tools` 中的工具不在显式赛事 runner 白名单，即使 plan manifest 的 SHA 匹配
+- **THEN** plan 校验 MUST 拒绝该 step
+- **AND** 新工具必须通过代码、测试和固定镜像更新后才能使用
+
+#### Scenario: runner 内嵌套调用 AdapterRunner
+- **WHEN** crawl management step 再启动 adapter，且 adapter policy 试图更换账本/cache 路径或放宽父级数值
+- **THEN** adapter MUST 保留父级固定路径
+- **AND** 请求/cache 上限 MUST 取较小值，请求间隔/磁盘底线 MUST 取较大值
+
 ### Requirement: runner 必须实施资源和日志边界
 runner MUST 配置 CPU、内存、PID 和日志轮转上限，并把完整日志保存到批次 runtime 目录。数据库只保存有界摘要，任何凭据或敏感环境变量不得进入 artifact 或日志。
 

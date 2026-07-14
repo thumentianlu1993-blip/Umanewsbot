@@ -7,11 +7,12 @@
 > 本文档用于保留项目级概览与摘要信息。
 > 当前真实工作状态、最近一次关键修复、线上实际进展，请以 [docs/current_state.md](E:/Codex/docs/current_state.md) 为准。
 
-## 2026-07-14 batch006 前置能力已完成本地实现
+## 2026-07-14 batch006 前置能力已部署，资源门禁补丁待上线
 
-- `scale-and-isolate-historical-race-batches` 已把 batch006+ 单地区标准上限统一为 250，并新增可恢复的独立 historical runner、迁移 `0031`、最小权限 provisioning、隔离 smoke、迁移暂停 preflight 和独立 infrastructure bootstrap。
+- `scale-and-isolate-historical-race-batches` 已把 batch006+ 单地区标准上限统一为 250，并将可恢复的独立 historical runner、迁移 `0031`、最小权限 provisioning、隔离 smoke、迁移暂停 preflight 和独立 infrastructure bootstrap 部署到生产。当前生产镜像为 `sha256:33055eb8...25385` / revision `8741de98`。
 - runner 使用数据库租约 + runtime 文件锁、30 秒心跳/180 秒租约、固定镜像与 plan/input/output SHA checkpoint；crawl 只有网络和控制账本权限，apply 只有内部数据库写入权限，全部历史 RaceEvent 继续保持 draft。
-- 本地 runner 聚焦 52 项、runner+历史批次组合 118 项、加网络日志组合 122 项；合并最新主线后的交叉组合 194 项通过（跳过 1），完整 `stable 1386` 项回归通过（跳过 7），真实 PostgreSQL 6 项和隔离 Docker lifecycle/权限 smoke 通过。五轮 review 的前四轮共修复 7 项问题，第五轮无 actionable finding。当前仍处于“代码已实现、生产未部署”，完成主线提交、可复现镜像、生产迁移与普通部署不干扰演练前，不得生成或启动 batch006。
+- 生产 runner smoke、双锁、暂停/恢复、越权拒绝和普通部署不干扰均已通过；batch006 selection 已生成 `1061` 场，五地区为 `250/61/250/250/250`，与前四个有效批次零重叠。正式网络抓取尚未启动。
+- smoke 后发现直接 `python_tool` 未强制继承请求/cache/磁盘预算，且生产仅余约 2.8 GiB，低于 5 GiB 门禁。已按 OpenSpec 补充宿主与 Django 双层校验、共享账本、失败/强杀 checkpoint、显式赛事工具白名单及嵌套 AdapterRunner 收紧继承；第七轮 review 无问题，本地 runner `64/64`、historical 组合 `200/200`、完整 `stable 1399/1399` 通过（跳过 7）。待提交、新镜像、释放生产空间和强化 smoke 完成后才允许启动 batch006。
 ## 2026-07-14 多地区归属 V3 性能与审核策略
 
 - 已用临时 PostgreSQL 16 和真实校准规模完成 250 篇基准。首次发现来源配置 N+1 导致 254 SQL；批上下文增加 17 个来源一次预加载后，五轮稳定为 5 SQL、1.66–2.14 秒、约 49 MiB，性能门槛已通过。

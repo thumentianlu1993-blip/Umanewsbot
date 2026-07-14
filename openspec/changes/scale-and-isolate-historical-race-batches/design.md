@@ -76,6 +76,10 @@ runner 由专用原生 Docker 启动脚本创建，不复用普通 `.env`：
 
 runner DB 网络只在一次性 provisioning 中创建，并把现有 DB 容器以 `db` alias 连接进去；不重建 DB，也不修改普通共享网络。crawl egress 网络不承载生产 DB alias。control role 只获得 runner 三张控制表及其序列的必要权限；apply 凭据继续使用既有 importer 所需权限，但只出现在 internal-only 容器。crawl/apply 都使用显式环境变量 allowlist，apply 环境不得携带翻译、OSS、OneBot 等外部 API 密钥。凭据文件必须位于服务器、权限 `0600`，不得写入仓库、artifact、日志或镜像。
 
+crawl runner 不得直接信任 phase env 中的底层 `RACE_EVENT_CRAWL_*` 值。执行每个 crawl step 前，父进程必须使用设置层已经批准的 `HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET`、`HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES` 和 `HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES` 覆盖子进程环境，并把共享请求账本、source-cache 根目录和 manifest 固定到当前 artifact 根目录；两者不得是 symlink 或非普通文件。嵌套 `orchestrate_race_event_crawl -> AdapterRunner` 必须保留父级固定路径，并在子级 policy 与父级值之间选择更严格者：请求/cache 取较小值，请求间隔/磁盘底线取较大值。生产不可变工具根 `/app/runtime/tools` 只允许显式列出的赛事发现、缓存、详情解析、打包、导出和 smoke 工具，术语/任意脚本即使 SHA 正确也不得进入 runner plan。这样同一 run 的所有直接和嵌套 step 共用一个累计预算，调用方不能通过 plan、宿主环境或不消费预算 helper 的无关工具绕过。取得双锁后、首个 step 前必须先保存资源基线；每个 step 成功后以及任何已启动 step 的可控失败收尾时，还必须把请求账本与 cache manifest 的存在状态、大小和 SHA 作为 checkpoint 顶层身份保存。resume 前任一文件被创建、删除或修改都必须 blocked，不能重置累计预算；强杀导致无法执行失败收尾时，基线与磁盘资源的漂移同样阻断恢复。升级前缺少该字段的旧 checkpoint 只允许已完成 run 做幂等读取，非终态 crawl 不得继续执行。
+
+宿主启动脚本还必须在创建容器前执行两层 fail-closed 校验：请求预算只能是 `1..250`，source cache 只能是 `1..2147483648` bytes，最小剩余空间不得低于 `5368709120` bytes；crawl 启动时 artifact 所在文件系统的实时可用空间也必须达到该底线。应用服务在取得租约前重复校验三项 settings 和容器内 artifact 文件系统，避免绕过宿主脚本直接运行管理命令。磁盘不足时不得降低门槛，应先清理可再生镜像/构建上下文或扩容。请求间隔固定为至少 1 秒，不再接受 plan 或 phase env 降为 0。
+
 替代方案是同一网络和同一 `.env` 仅靠布尔开关；这无法抵抗误命令或代码缺陷，因此不足以满足权限隔离。
 
 ### 6. runner 不属于普通 Compose project
@@ -99,6 +103,7 @@ runner 提供 `status --json`，至少显示 run id、batch id、phase、state�
 - [250 场会增加单批抓取时间和 artifact 体积] -> 保留共享请求预算、资源限制和逐 step checkpoint；选择/抓取/写入仍可按地区或阶段拆分，不要求单容器完成所有网络来源。
 - [租约在网络抖动时可能误判过期] -> 180 秒租约配 30 秒心跳，接管还需要容器不存在、无活动事务和 checkpoint 三重验证。
 - [专用 PostgreSQL 角色和网络增加运维复杂度] -> provisioning 脚本幂等创建/校验，不持有销毁 DB/Redis 的命令；部署手册记录回收与审计步骤。
+- [长批次或错误 phase env 绕过共享请求/缓存预算] -> runner 父进程强制覆盖子进程环境，宿主和应用双重校验 250 请求、2 GiB cache 与 5 GiB 磁盘底线；预算账本和 cache manifest 固定在本批 artifact。
 - [apply 容器不能访问公网会暴露既有命令的隐式网络依赖] -> apply 前在隔离网络做 dry-run；任何隐式请求都应失败并改为 crawl 阶段缓存 artifact，而不是放宽网络。
 - [文件锁依赖共享 runtime 挂载] -> 数据库租约仍提供跨主机保护；runtime 未挂载或不可写时 runner 直接拒绝启动。
 - [普通部署仍可能由人工直接执行危险 Docker 命令] -> 脚本 preflight 和运行手册明确禁止；runner 状态、网络和容器 identity 纳入部署验收。

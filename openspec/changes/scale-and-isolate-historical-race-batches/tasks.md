@@ -11,6 +11,13 @@
 - [x] 1.2 (application) 新增 runner 模型、双锁、心跳租约、暂停、恢复、checkpoint 分叉、owner token 哈希、子进程组清理、stale takeover 和 draft 不变测试，并先确认缺失实现导致失败。
 - [x] 1.3 (integration) 新增结构化 plan、allowlist、路径边界、shell 拒绝、输入输出 SHA 和敏感值脱敏测试，并先确认缺失实现导致失败。
 - [x] 1.4 (operations) 新增 runner 启动/预检脚本的静态契约测试，覆盖固定镜像、资源限制、独立网络、phase 凭据、普通部署隔离和迁移暂停门禁。
+- [x] 1.5 (integration) 新增 crawl 子进程预算覆盖、共享账本/cache 路径、容器内磁盘不足 fail-closed 测试，并先确认现实现按预期失败。
+- [x] 1.6 (operations) 新增宿主脚本数值边界与启动前实时磁盘门禁测试，覆盖请求 `1..250`、cache `<=2 GiB`、磁盘底线 `>=5 GiB`。
+- [x] 1.7 (integration) 新增请求账本/cache manifest 的 checkpoint 存在状态与 SHA 漂移测试，先确认删除、创建或修改仍会被旧实现放行。
+- [x] 1.8 (integration) 新增资源账本 symlink/非普通文件和旧版非终态 checkpoint 测试，先确认现实现会跟随或继续执行。
+- [x] 1.9 (integration) 新增生产工具根显式赛事工具白名单测试，确认术语联网脚本即使 SHA 匹配仍被旧实现放行。
+- [x] 1.10 (integration) 新增 AdapterRunner 父级固定路径与更严格数值继承测试，先确认嵌套编排会重置账本和间隔。
+- [x] 1.11 (integration) 新增首个 crawl step 消耗请求后失败的恢复测试，先确认失败前没有资源 checkpoint 时可删除账本并重置额度。
 
 ## 2. 批次上限与 artifact 一致性
 
@@ -26,6 +33,12 @@
 - [x] 3.4 (integration) 实现 shell-free step 执行、子进程组清理、8 KiB 脱敏摘要、完整日志归档、输入输出身份、fsync+rename runtime state、数据库双 checkpoint、resume 校验和分叉阻断。
 - [x] 3.5 (application) 新增 `run_historical_batch_stage` 与 runner status/pause/resume/takeover 管理命令，提供稳定 JSON 输出和正确退出码。
 - [x] 3.6 (application) 在 runner 完成和失败路径核对历史常驻开关及目标 visibility，禁止任何隐式发布。
+- [x] 3.7 (integration) 为 crawl step 构造受控子进程环境，强制覆盖请求预算、请求间隔、请求账本、cache 上限、磁盘底线、cache 根目录和 manifest，并在租约前重复检查 artifact 文件系统实时可用空间。
+- [x] 3.8 (integration) 将 crawl 请求账本与 cache manifest 的最新存在状态、大小和 SHA 写入顶层 checkpoint，并在 completed/resume/下一 step 前验证，漂移时 fail closed。
+- [x] 3.9 (integration) 启动与 checkpoint 校验先拒绝资源账本 symlink/非普通文件；旧版缺少资源身份的非终态 crawl blocked，仅保留 completed 幂等兼容。
+- [x] 3.10 (integration) 对生产不可变工具根实施显式赛事 Python 工具白名单；保持测试临时工具根可注入，生产新增工具需代码 review。
+- [x] 3.11 (integration) AdapterRunner 检测父级 `RACE_EVENT_CRAWL_*` 约束，路径原样继承，数值按更严格者合并，普通非 runner 编排保持原路径。
+- [x] 3.12 (integration) crawl 取得双锁后先保存资源基线；任何已启动 step 的失败收尾在释放锁前刷新资源身份，强杀后恢复则由基线漂移 fail closed。
 
 ## 4. 生产隔离与生命周期脚本
 
@@ -35,6 +48,7 @@
 - [x] 4.4 (operations) 将普通 deploy/rollback 改为 `--no-deps` 只更新应用容器并增加 runner 迁移前暂停 preflight，包含首次建表 host-only 门禁，确保不 pull/start/stop/recreate runner、DB、Redis 或 networks，超时直接停止部署。
 - [x] 4.5 (operations) 新增必须单独确认的 infrastructure bootstrap，承接初次 DB/Redis/shared network 建立；普通 deploy 缺少基础设施时只报错，不自动调用 bootstrap。
 - [x] 4.6 (operations) 更新 `.env.example` 的非敏感 runner 配置说明，并补充凭据文件权限、固定镜像和网络命名约定。
+- [x] 4.7 (operations) 在原生 runner 启动脚本校验三项历史资源配置的数值边界，并在 crawl `docker create` 前按 artifact 文件系统实时可用空间执行 fail-closed 门禁。
 
 ## 5. 文档与静态验证
 
@@ -43,6 +57,7 @@
 - [x] 5.3 (application) 运行 runner 与历史批次聚焦测试、完整 `stable` 回归、Django check 和 `makemigrations --check --dry-run`。
 - [x] 5.4 (operations) 运行本 change strict 校验及全量 OpenSpec 校验，逐项核对 proposal/design/spec/tasks/test cases 一致性。
 - [x] 5.5 (application) 执行反复 `/review -> 修复 -> 重新 review`，直到第五轮没有任何 actionable finding；前四轮共修复 7 项问题。
+- [x] 5.6 (application) 完成资源预算补丁的聚焦/完整回归、OpenSpec/shell/diff 校验与反复 `/review -> 修复 -> 重新 review`，第七轮没有 actionable finding。
 
 ## 6. 部署与 batch006 前验收
 

@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import tempfile
@@ -37,6 +38,38 @@ RUNNER_HEARTBEAT_SECONDS = 30
 RUNNER_LEASE_SECONDS = 180
 RUNNER_SUMMARY_BYTES = 8 * 1024
 RUNNER_STREAM_SUMMARY_BYTES = 3 * 1024
+RUNNER_MAX_CRAWL_REQUESTS = 250
+RUNNER_MAX_SOURCE_CACHE_BYTES = 2 * 1024 * 1024 * 1024
+RUNNER_MIN_FREE_DISK_BYTES = 5 * 1024 * 1024 * 1024
+RUNNER_REQUEST_INTERVAL_SECONDS = 1
+RUNNER_IMMUTABLE_TOOL_ROOT = Path("/app/runtime/tools").resolve()
+_APPROVED_HISTORICAL_PYTHON_TOOLS = {
+    "cache_historical_race_date_sources.py",
+    "discover_historical_race_band_sources.py",
+    "export_race_events_full.py",
+    "historical_runner_smoke_probe.py",
+    "package_historical_race_detail_candidates.py",
+    "prepare_cached_historical_race_details.py",
+    "prepare_france_wikipedia_history_winner_candidates.py",
+    "prepare_france_zeturf_gap_candidates.py",
+    "prepare_france_zeturf_race_detail_candidates.py",
+    "prepare_hkjc_history_winner_candidates.py",
+    "prepare_hkjc_race_detail_candidates.py",
+    "prepare_irishracing_race_detail_candidates.py",
+    "prepare_jra_history_winner_candidates.py",
+    "prepare_jra_race_detail_candidates.py",
+    "prepare_nar_history_winner_candidates.py",
+    "prepare_nar_race_detail_candidates.py",
+    "prepare_netkeiba_race_detail_candidates.py",
+    "prepare_tjcis_ics_catalog.py",
+    "prepare_uk_sportinglife_gap_candidates.py",
+    "prepare_uk_sportinglife_history_winner_candidates.py",
+    "prepare_uk_sportinglife_race_detail_candidates.py",
+    "prepare_us_equibase_archived_race_detail_candidates.py",
+    "prepare_us_equibase_result_candidates.py",
+    "prepare_us_hrn_race_detail_candidates.py",
+    "prepare_us_toba_history_winner_candidates.py",
+}
 _SHELL_PROGRAMS = {"bash", "dash", "fish", "sh", "zsh"}
 _SHELL_FLAGS = {"-c", "-lc"}
 _PYTHON_PROGRAMS = {"python", "python3"}
@@ -356,6 +389,13 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
                 raise RunnerPlanError(f"runner step {step_id} has no tool path")
             tool = _ensure_within(argv[1], tool_root, "tool path")
             relative = tool.relative_to(tool_root).as_posix()
+            if (
+                tool_root == RUNNER_IMMUTABLE_TOOL_ROOT
+                and relative not in _APPROVED_HISTORICAL_PYTHON_TOOLS
+            ):
+                raise RunnerPlanError(
+                    f"runner step {step_id} Python tool is not approved for historical batches"
+                )
             expected = plan["tool_manifest"].get(relative)
             if not expected or not tool.is_file() or _sha256_file(tool) != expected:
                 raise RunnerPlanError(f"runner step {step_id} tool SHA does not match manifest")
@@ -718,6 +758,53 @@ def _file_identity(path: Path) -> dict[str, Any]:
     return {"path": str(path), "size": path.stat().st_size, "sha256": _sha256_file(path)}
 
 
+def _crawl_resource_paths(artifact_root: Path) -> tuple[Path, Path]:
+    root = artifact_root.resolve()
+    return (
+        root / "runner-request-budget.json",
+        root / "runner-source-cache-manifest.json",
+    )
+
+
+def _crawl_resource_artifacts(artifact_root: Path) -> list[dict[str, Any]]:
+    artifacts = []
+    for path in _crawl_resource_paths(artifact_root):
+        if path.is_symlink() or (path.exists() and not path.is_file()):
+            raise RunnerStateError(f"runner resource artifact is not a regular file: {path}")
+        if path.is_file():
+            artifacts.append({"exists": True, **_file_identity(path)})
+        else:
+            artifacts.append({"exists": False, "path": str(path)})
+    return artifacts
+
+
+def _crawl_resource_artifacts_match(
+    artifact_root: Path,
+    artifacts: Any,
+) -> bool:
+    if not isinstance(artifacts, list) or len(artifacts) != 2:
+        return False
+    expected_paths = [str(path) for path in _crawl_resource_paths(artifact_root)]
+    if [item.get("path") for item in artifacts if isinstance(item, dict)] != expected_paths:
+        return False
+    for item in artifacts:
+        path = Path(item["path"])
+        if path.is_symlink():
+            return False
+        if item.get("exists") is False:
+            if path.exists():
+                return False
+            continue
+        if (
+            item.get("exists") is not True
+            or not path.is_file()
+            or path.stat().st_size != item.get("size")
+            or _sha256_file(path) != item.get("sha256")
+        ):
+            return False
+    return True
+
+
 def _verify_declared_inputs(step: dict[str, Any]) -> list[dict[str, Any]]:
     identities = []
     for value in step.get("inputs", []):
@@ -728,8 +815,13 @@ def _verify_declared_inputs(step: dict[str, Any]) -> list[dict[str, Any]]:
     return identities
 
 
-def _state_payload(run: HistoricalBatchRun, completed_steps: list[dict[str, Any]]) -> dict[str, Any]:
-    return {
+def _state_payload(
+    run: HistoricalBatchRun,
+    completed_steps: list[dict[str, Any]],
+    *,
+    resource_artifacts: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    payload = {
         "schema_version": "1.0",
         "run_id": run.run_id,
         "batch_id": run.batch_id,
@@ -739,6 +831,28 @@ def _state_payload(run: HistoricalBatchRun, completed_steps: list[dict[str, Any]
         "plan_sha256": run.plan_sha256,
         "completed_steps": completed_steps,
     }
+    if resource_artifacts is not None:
+        payload["resource_artifacts"] = resource_artifacts
+    return payload
+
+
+def _persist_runtime_checkpoint(
+    *,
+    run: HistoricalBatchRun,
+    state_path: Path,
+    completed_steps: list[dict[str, Any]],
+    resource_artifacts: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    state = _state_payload(
+        run,
+        completed_steps,
+        resource_artifacts=resource_artifacts,
+    )
+    write_runtime_state(state_path, state)
+    with transaction.atomic():
+        run.checkpoint = state
+        run.save(update_fields={"checkpoint", "updated_at"})
+    return state
 
 
 def _checkpoint_matches(run: HistoricalBatchRun, state: dict[str, Any]) -> bool:
@@ -757,6 +871,10 @@ def _checkpoint_matches(run: HistoricalBatchRun, state: dict[str, Any]) -> bool:
             path = Path(output["path"])
             if not path.is_file() or _sha256_file(path) != output["sha256"]:
                 return False
+    if "resource_artifacts" in state and not _crawl_resource_artifacts_match(
+        Path(run.artifact_root), state["resource_artifacts"]
+    ):
+        return False
     return run.checkpoint == state
 
 
@@ -807,6 +925,58 @@ def _terminate_process_group(process: subprocess.Popen[str], grace_seconds: int 
     process.wait()
 
 
+def _crawl_step_environment(artifact_root: Path) -> dict[str, str]:
+    try:
+        request_budget = int(settings.HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET)
+        max_cache_bytes = int(settings.HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES)
+        min_free_disk_bytes = int(settings.HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES)
+    except (TypeError, ValueError) as exc:
+        raise RunnerStateError("historical crawl resource settings must be integers") from exc
+    if not 1 <= request_budget <= RUNNER_MAX_CRAWL_REQUESTS:
+        raise RunnerStateError(
+            f"historical crawl request budget must be between 1 and {RUNNER_MAX_CRAWL_REQUESTS}"
+        )
+    if not 1 <= max_cache_bytes <= RUNNER_MAX_SOURCE_CACHE_BYTES:
+        raise RunnerStateError(
+            "historical crawl source cache budget must be between 1 and "
+            f"{RUNNER_MAX_SOURCE_CACHE_BYTES} bytes"
+        )
+    if min_free_disk_bytes < RUNNER_MIN_FREE_DISK_BYTES:
+        raise RunnerStateError(
+            f"historical crawl free disk floor must be at least {RUNNER_MIN_FREE_DISK_BYTES} bytes"
+        )
+    for path in _crawl_resource_paths(artifact_root):
+        if path.is_symlink() or (path.exists() and not path.is_file()):
+            raise RunnerStateError(f"runner resource artifact is not a regular file: {path}")
+    free_disk_bytes = shutil.disk_usage(artifact_root).free
+    if free_disk_bytes < min_free_disk_bytes:
+        raise RunnerStateError(
+            "historical crawl artifact free disk is below the configured floor: "
+            f"free={free_disk_bytes} minimum={min_free_disk_bytes}"
+        )
+
+    root = artifact_root.resolve()
+    child_env = os.environ.copy()
+    child_env.update(
+        {
+            "RACE_EVENT_CRAWL_MAX_REQUESTS": str(request_budget),
+            "RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS": str(
+                RUNNER_REQUEST_INTERVAL_SECONDS
+            ),
+            "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT": str(
+                root / "runner-request-budget.json"
+            ),
+            "RACE_EVENT_CRAWL_MAX_SOURCE_CACHE_BYTES": str(max_cache_bytes),
+            "RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES": str(min_free_disk_bytes),
+            "RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT": str(root),
+            "RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST": str(
+                root / "runner-source-cache-manifest.json"
+            ),
+        }
+    )
+    return child_env
+
+
 def execute_runner_plan(
     *,
     run: HistoricalBatchRun,
@@ -841,6 +1011,7 @@ def execute_runner_plan(
         raise RunnerStateError("non-crawl runner cannot enable historical network gate")
 
     root = Path(run.artifact_root)
+    child_env: dict[str, str] | None = None
     expected_lock_path = root / ".runner.lock"
     if expected_lock_path.is_symlink() or Path(lock_path).absolute() != expected_lock_path.absolute():
         raise RunnerPlanError("runner lock file must be the fixed artifact-root .runner.lock")
@@ -853,6 +1024,10 @@ def execute_runner_plan(
     run.refresh_from_db()
     if run.status == HistoricalBatchRunStatus.COMPLETED:
         if not state_path.exists() or not _checkpoint_matches(run, load_runtime_state(state_path)):
+            run.status = HistoricalBatchRunStatus.BLOCKED
+            run.error_message = "completed runner checkpoint is missing or inconsistent"
+            run.save(update_fields={"status", "error_message", "updated_at"})
+            _append_event(run, "blocked", owner_token=owner_token, detail={"reason": run.error_message})
             raise RunnerStateError("completed runner checkpoint is missing or inconsistent")
         return run
     if run.checkpoint and not state_path.exists():
@@ -883,6 +1058,18 @@ def execute_runner_plan(
         run.save(update_fields={"status", "error_message", "updated_at"})
         _append_event(run, "blocked", owner_token=owner_token, detail={"reason": run.error_message})
         raise RunnerStateError(run.error_message)
+    if (
+        run.phase == HistoricalBatchPhase.CRAWL
+        and completed
+        and "resource_artifacts" not in run.checkpoint
+    ):
+        run.status = HistoricalBatchRunStatus.BLOCKED
+        run.error_message = "legacy crawl checkpoint has no resource artifact identity"
+        run.save(update_fields={"status", "error_message", "updated_at"})
+        _append_event(run, "blocked", owner_token=owner_token, detail={"reason": run.error_message})
+        raise RunnerStateError(run.error_message)
+    if run.phase == HistoricalBatchPhase.CRAWL:
+        child_env = _crawl_step_environment(root)
     published_before = (
         set(
             RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED).values_list(
@@ -894,6 +1081,7 @@ def execute_runner_plan(
     )
     lease = acquire_runner_lease(run=run, owner_token=owner_token, lock_path=lock_path)
     active_process: subprocess.Popen[str] | None = None
+    step_process_started = False
     previous_handlers: dict[int, Any] = {}
 
     def interrupt_handler(signum, _frame):
@@ -902,8 +1090,34 @@ def execute_runner_plan(
     for signum in (signal.SIGINT, signal.SIGTERM):
         previous_handlers[signum] = signal.signal(signum, interrupt_handler)
     try:
+        if run.phase == HistoricalBatchPhase.CRAWL and "resource_artifacts" not in run.checkpoint:
+            _persist_runtime_checkpoint(
+                run=run,
+                state_path=state_path,
+                completed_steps=completed,
+                resource_artifacts=_crawl_resource_artifacts(root),
+            )
         for step in plan["steps"]:
+            step_process_started = False
             run.refresh_from_db()
+            if (
+                run.phase == HistoricalBatchPhase.CRAWL
+                and completed
+                and "resource_artifacts" in run.checkpoint
+                and not _crawl_resource_artifacts_match(
+                    root, run.checkpoint["resource_artifacts"]
+                )
+            ):
+                run.status = HistoricalBatchRunStatus.BLOCKED
+                run.error_message = "crawl resource artifact checkpoint changed between steps"
+                run.save(update_fields={"status", "error_message", "updated_at"})
+                _append_event(
+                    run,
+                    "blocked",
+                    owner_token=owner_token,
+                    detail={"reason": run.error_message},
+                )
+                raise RunnerStateError(run.error_message)
             if run.pause_requested_at:
                 run.status = HistoricalBatchRunStatus.PAUSED
                 run.paused_at = timezone.now()
@@ -926,11 +1140,13 @@ def execute_runner_plan(
                 active_process = subprocess.Popen(
                     step["argv"],
                     cwd=str(Path(__file__).resolve().parents[2]),
+                    env=child_env,
                     stdout=stdout_stream,
                     stderr=stderr_stream,
                     shell=False,
                     start_new_session=True,
                 )
+                step_process_started = True
                 try:
                     while True:
                         try:
@@ -976,12 +1192,25 @@ def execute_runner_plan(
                 "outputs": outputs,
             }
             completed.append(record)
-            state = _state_payload(run, completed)
-            write_runtime_state(state_path, state)
             with transaction.atomic():
-                run.checkpoint = state
-                run.save(update_fields={"checkpoint", "updated_at"})
-                _append_event(run, "step_completed", owner_token=owner_token, step_id=step["id"], detail=record)
+                _persist_runtime_checkpoint(
+                    run=run,
+                    state_path=state_path,
+                    completed_steps=completed,
+                    resource_artifacts=(
+                        _crawl_resource_artifacts(root)
+                        if run.phase == HistoricalBatchPhase.CRAWL
+                        else None
+                    ),
+                )
+                _append_event(
+                    run,
+                    "step_completed",
+                    owner_token=owner_token,
+                    step_id=step["id"],
+                    detail=record,
+                )
+            step_process_started = False
         if published_before is not None:
             published_after = set(
                 RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED).values_list(
@@ -1000,6 +1229,21 @@ def execute_runner_plan(
     except BaseException as exc:
         if active_process is not None:
             _terminate_process_group(active_process)
+        checkpoint_error = ""
+        if (
+            run.phase == HistoricalBatchPhase.CRAWL
+            and step_process_started
+            and run.status != HistoricalBatchRunStatus.BLOCKED
+        ):
+            try:
+                _persist_runtime_checkpoint(
+                    run=run,
+                    state_path=state_path,
+                    completed_steps=completed,
+                    resource_artifacts=_crawl_resource_artifacts(root),
+                )
+            except Exception as resource_exc:
+                checkpoint_error = f"; resource checkpoint failed: {resource_exc}"
         run.refresh_from_db()
         published_changed = bool(
             published_before is not None
@@ -1013,6 +1257,12 @@ def execute_runner_plan(
         if published_changed:
             run.status = HistoricalBatchRunStatus.BLOCKED
             run.error_message = "failed historical runner changed published RaceEvent count"
+        elif checkpoint_error:
+            run.status = HistoricalBatchRunStatus.BLOCKED
+            run.error_message = _tail_utf8(
+                redact_runner_text(f"{exc}{checkpoint_error}", secret_values),
+                RUNNER_SUMMARY_BYTES,
+            )
         elif run.status != HistoricalBatchRunStatus.BLOCKED:
             run.status = HistoricalBatchRunStatus.FAILED
             run.error_message = _tail_utf8(

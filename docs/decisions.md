@@ -1,5 +1,16 @@
 # 关键决策
 
+## 2026-07-14：historical runner 资源门禁必须由宿主与应用双层强制
+
+- crawl phase 的 `RACE_EVENT_CRAWL_*` 不能直接继承 plan 或宿主环境。runner 父进程必须用批准 settings 覆盖子进程，并让同一 run 的所有 step 共用 artifact 根目录下的请求账本和 source-cache manifest。
+- 请求预算必须为 `1..250`，source cache 必须为 `1..2147483648` bytes，请求间隔至少 1 秒，磁盘底线不得低于 `5368709120` bytes。`0` 不得解释为无限；直接调用 Django 管理命令也必须执行同一边界校验。
+- 宿主脚本在 `docker create` 前检查 phase env 数值和 artifact 文件系统实时可用空间；Django 服务在取得数据库租约前重复检查容器内文件系统。任一层失败都不得创建 runner、取得租约或执行网络 step。
+- 每个 crawl step 后将请求账本与 cache manifest 的存在状态、大小和 SHA 保存为 checkpoint 顶层身份；下一 step、resume 和 completed 幂等检查都必须重新核验。资源账本漂移一律 blocked，不能把删除后的空账本视作新额度。
+- crawl 取得双锁后必须在首个 step 前保存资源基线；任何已启动 step 的失败收尾必须在释放锁前刷新资源身份，无法收尾的强杀恢复由基线漂移 fail closed。
+- 生产 `/app/runtime/tools` 不再接受“镜像内任意 SHA 匹配脚本”，只允许显式赛事发现、缓存、详情解析、打包、导出和 smoke 工具。新增历史工具必须更新白名单、测试和固定镜像；术语或其他直接联网脚本不得借 crawl egress 绕过赛事预算。
+- `orchestrate_race_event_crawl` 内部的 AdapterRunner 不得重新生成自己的请求账本/cache 路径覆盖 runner 父级。父级路径原样继承；请求数/cache bytes 使用父子较小值，请求间隔/磁盘底线使用父子较大值。
+- 生产磁盘不足时只能清理可再生构建上下文/镜像或扩容，不能临时降低 5 GiB 底线。第一版 runner smoke 后发现这一旁路时，batch006 仍未发出真实网络请求，因此按本决策先修补、重新 review/部署/smoke，再开始正式抓取。
+
 ## 2026-07-14：batch006 起扩大标准批次并使用独立 historical runner
 
 - batch005 继续完整遵守旧标准，即单地区最多 50 场；只有 batch005 全部写入和验收结束后，batch006 及后续标准批次才把单地区上限提高到 250 场。
