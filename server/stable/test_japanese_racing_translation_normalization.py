@@ -606,6 +606,26 @@ class JapaneseTranslationProviderIntegrationTests(TestCase):
             [],
         )
 
+    def test_closed_placeholders_may_be_separated_by_ascii_race_abbreviation(self):
+        provider = self._provider()
+
+        violations = provider._malformed_placeholder_violations(
+            "",
+            "其母赢得__UMA_KEEP_2__C__UMA_KEEP_3__＆母马短途赛。",
+            "__UMA_KEEP_2__GI__UMA_KEEP_3__冠军。",
+        )
+
+        self.assertEqual(violations, [])
+        malformed = provider._malformed_placeholder_violations(
+            "",
+            "__UMA_KEEP_2__999__并非合法相邻占位符。",
+            "",
+        )
+        self.assertEqual(
+            [item["placeholder"] for item in malformed],
+            ["__UMA_KEEP_2__999__"],
+        )
+
     def test_legitimate_identifier_containing_uma_prefix_is_not_a_placeholder(self):
         provider = self._provider()
         violations = provider._malformed_placeholder_violations(

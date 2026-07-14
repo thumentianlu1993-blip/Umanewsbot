@@ -503,6 +503,15 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                     }
                 )
             for placeholder, suffix in cls._MALFORMED_SUFFIX_RE.findall(value):
+                adjacent_placeholder = cls._ALL_PLACEHOLDER_RE.search(suffix)
+                if adjacent_placeholder:
+                    ascii_bridge = suffix[: adjacent_placeholder.start()]
+                    if (
+                        ascii_bridge
+                        and ascii_bridge.isalnum()
+                        and adjacent_placeholder.end() == len(suffix)
+                    ):
+                        continue
                 fragment = f"{placeholder}{suffix}"
                 violations.append(
                     {
