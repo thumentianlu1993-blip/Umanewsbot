@@ -25,8 +25,8 @@
 - `scale-and-isolate-historical-race-batches` 已把 batch006+ 单地区标准上限统一为 250，并将可恢复的独立 historical runner、迁移 `0031`、最小权限 provisioning、隔离 smoke、迁移暂停 preflight 和独立 infrastructure bootstrap 部署到生产。当前生产镜像为 `sha256:33055eb8...25385` / revision `8741de98`。
 - runner 使用数据库租约 + runtime 文件锁、30 秒心跳/180 秒租约、固定镜像与 plan/input/output SHA checkpoint；crawl 只有网络和控制账本权限，apply 只有内部数据库写入权限，全部历史 RaceEvent 继续保持 draft。
 - 生产 runner smoke、双锁、暂停/恢复、越权拒绝和普通部署不干扰均已通过；batch006 selection 已生成 `1061` 场，五地区为 `250/61/250/250/250`，与前四个有效批次零重叠。正式网络抓取尚未启动。
-- smoke 后发现直接 `python_tool` 未强制继承请求/cache/磁盘预算，且生产仅余约 2.8 GiB，低于 5 GiB 门禁。已按 OpenSpec 补充宿主与 Django 双层校验、共享账本、失败/强杀 checkpoint、显式赛事工具白名单及嵌套 AdapterRunner 收紧继承；第七轮 review 无问题，本地 runner `64/64`、historical 组合 `200/200`。合入最新主线后交叉专项 `233/233`（跳过 1）、完整 `stable 1409/1409` 通过（跳过 7）。释放生产空间、部署候选和强化 smoke 完成后才允许启动 batch006。
-- 组合提交 `82fa4a3f` 的两个独立本地 AMD64 构建 image ID 一致为 `sha256:01397d15...44daed`；候选 tag `umanewsbot:main-82fa4a3f-amd64-20260714-2135`，镜像内 check、migration drift、runtime 专项 `231/231` 通过（跳过 1）。仍未 retag `prod`、未部署、未连接生产、未启动 batch006；必须等待新闻维护窗口重新交还后先治理磁盘并执行 hardened smoke。
+- smoke 后发现直接 `python_tool` 未强制继承请求/cache/磁盘预算，且生产仅余约 2.8 GiB，低于 5 GiB 门禁。已按 OpenSpec 补充宿主与 Django 双层校验、共享账本、失败/强杀 checkpoint、显式赛事工具白名单及嵌套 AdapterRunner 收紧继承；第七轮 review 无问题，本地 runner `64/64`、historical 组合 `200/200`。最终合入最新主线后交叉专项 `208/208`（跳过 1）、完整 `stable 1417/1417` 通过（跳过 7）。释放生产空间、部署候选和强化 smoke 完成后才允许启动 batch006。
+- 最终组合提交 `84217c56` 的两个独立本地 AMD64 构建 image ID 一致为 `sha256:119f59e3...fa8d97`；候选 tag `umanewsbot:main-84217c56-amd64-20260714-2210`，镜像内 check、migration drift、runtime 专项 `239/239` 通过（跳过 1）。旧 `82fa4a3f` 候选明确作废。仍未 retag `prod`、未部署、未连接生产、未启动 batch006；必须等待新闻维护窗口重新交还后先治理磁盘并执行 hardened smoke。
 ## 2026-07-14 多地区归属 V3 性能与审核策略
 
 - 已用临时 PostgreSQL 16 和真实校准规模完成 250 篇基准。首次发现来源配置 N+1 导致 254 SQL；批上下文增加 17 个来源一次预加载后，五轮稳定为 5 SQL、1.66–2.14 秒、约 49 MiB，性能门槛已通过。
