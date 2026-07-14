@@ -1,12 +1,14 @@
 # 部署运行手册
 
-## 待执行：多地区归属 V3 第二候选生产只读验收
+## 待执行：多地区归属 V3 第三候选生产只读验收
 
-1. 第一候选的 72 小时 `all_articles` run 虽然 `scope_complete=true` 且 Gold `qualified=true`，但人工检查 27 条主地区变化和 5 条 `needs_review` 后发现 7 类明确错标，结论为 no-go。不得复用该 run 批准 Shadow。
-2. 第二候选必须包含对应真实反例测试，并通过专项、完整 stable、真实 PostgreSQL 250 篇性能、Django check、迁移漂移和 OpenSpec strict/all。构建必须固定 main revision/tree/source SHA，AMD64 至少两次构建得到同一 image ID。
-3. 生产保持 mode `off`、相关地区查询 false。使用第二候选连接生产库执行只读 `--scope all_articles --hours 72`，写入全新 artifact 目录；不得覆盖第一轮报告，不得开启门禁验证，不得 commit 归属。
-4. 重新评估同一份保守对账后的 Gold，并人工检查新 run 的全部主地区变化、全部 `needs_review` 和分地区稳定样本。明确复核普通单词实体、赛果标题、正文首段赛场、日本当前成就/海外梦想、机构全名嵌套赛事词和正文历史背景六类边界。
-5. 只有第二轮 Gold 仍满足主地区/precision/recall/扩散门槛，且人工清单无明确错标，才可部署代码并从 `off` 切到 `shadow`。Shadow 计时从生产配置实际启用且健康验收通过时开始，修复前 run 不计入 24 小时。
+1. 第一候选人工复核发现 7 类明确错标；第二候选虽完成 `591` 篇完整审计，但 Gold 主地区 `91.67%`、相关 recall `48%`，机器与人工均为 no-go。前两轮 report 均不得复用来批准 Shadow。
+2. 第三候选规则版本必须为 `multiregion-v3.1`，并包含 precision 优先反例修复：单词赛场仅在明确地点语法中作为强证据，`Jockey Club` 单独出现按机构短语处理，`JRHA` 提供日本上下文，世界排名归属 `other` 并关联五个运营地区。部署前必须保持归属 mode 与相关查询关闭。
+3. 等所有正文修改 one-off 结束、`TranslationRun started=0`、文章 `translating=0`、Celery active/reserved/queue 均为空，并由生产协调任务明确交还稳定快照后，才能开始下一轮只读审计。正文指纹仍在变化时不得抢跑。
+4. 第三候选必须先通过专项、完整 stable、真实 PostgreSQL 250 篇性能、Django check、迁移漂移和 OpenSpec strict/all。构建固定 main revision/tree/source SHA，AMD64 至少两次构建得到同一 image ID。
+5. 使用全新 artifact 目录执行完整 72 小时 `--scope all_articles --hours 72`，不得带 `--limit`、不得覆盖前两轮 report、不得开启门禁验证或 commit 归属；记录 report、manifest、Gold labels 和规则版本 SHA。
+6. 重新评估保守对账后的 Gold，并人工检查全部主地区变化、全部 `needs_review` 和五地区稳定样本。除既有七类边界外，必须逐条复核 `Sale / York / Kelso / Jockey Club / JRHA / world ranking` 反例及法国赛果 `8089`。
+7. 只有第三轮 Gold 满足主地区准确率、五地区分地区准确率、相关 precision `>=95%`、recall `>=50%`、过度扩散 `<=1%`，且人工清单无明确错标，才允许从 `off` 切到 `shadow`。Shadow 计时从生产配置实际启用且健康验收通过时开始。
 
 ## 待部署：独立 historical runner 与 batch006 单地区 250
 

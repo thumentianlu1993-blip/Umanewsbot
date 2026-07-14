@@ -30,6 +30,7 @@ from stable.models import (
 )
 from stable.services.news_attribution import (
     ATTRIBUTION_RULE_VERSION,
+    OPERATIONAL_REGIONS,
     apply_article_attribution,
     filter_articles_visible_in_region,
     infer_article_attribution,
@@ -387,6 +388,40 @@ class AttributionEvidenceHierarchyTests(TestCase):
 
         self.assertResult(result, RacingRegion.UNITED_KINGDOM)
 
+    def test_one_word_racecourse_without_location_context_is_ambiguous(self):
+        add_term("Kelso", TermType.RACECOURSE, RacingRegion.UNITED_KINGDOM)
+        article = article_with_text(
+            "Mi Bago and Zulu Kingdom share Kelso in thrilling dead heat",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.UNITED_STATES, status="fallback")
+
+    def test_generic_sale_term_does_not_override_hong_kong_context(self):
+        add_term("Sale", TermType.RACECOURSE, RacingRegion.OTHER)
+        article = article_with_text(
+            "Deep Field youngster tops Hong Kong International Sale",
+            region=RacingRegion.HONG_KONG,
+            source_site=SourceSite.HKJC_NEWS,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.HONG_KONG)
+
+    def test_jrha_sale_is_japan_context_even_when_sale_term_is_generic(self):
+        add_term("Sale", TermType.RACECOURSE, RacingRegion.OTHER)
+        article = article_with_text(
+            '"We Are Expecting A Lot" - Equinox Excitement Ahead Of JRHA Sale',
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.JAPAN)
+
     def test_one_word_out_of_scope_racecourse_beats_foreign_horse_origin(self):
         add_term("Killarney", TermType.RACECOURSE, RacingRegion.OTHER)
         add_term("Benvenuto Cellini", TermType.HORSE, RacingRegion.UNITED_KINGDOM)
@@ -437,6 +472,18 @@ class AttributionEvidenceHierarchyTests(TestCase):
 
         self.assertResult(result, RacingRegion.UNITED_KINGDOM)
 
+    def test_jockey_club_phrase_alone_is_not_race_evidence(self):
+        add_term("Jockey Club", TermType.RACE, RacingRegion.OTHER)
+        article = article_with_text(
+            "The Hong Kong Jockey Club Champion Awards Final Nominees",
+            region=RacingRegion.HONG_KONG,
+            source_site=SourceSite.HKJC_NEWS,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.HONG_KONG)
+
     def test_partial_word_does_not_suppress_real_event_name(self):
         add_term("World Cup", TermType.RACE, RacingRegion.UNITED_KINGDOM)
         add_term("World Cupid", TermType.HORSE, RacingRegion.UNITED_STATES)
@@ -459,6 +506,16 @@ class AttributionEvidenceHierarchyTests(TestCase):
         result = infer_article_attribution(article)
 
         self.assertResult(result, RacingRegion.JAPAN, {RacingRegion.FRANCE})
+
+    def test_world_ranking_is_related_to_all_operational_regions(self):
+        article = article_with_text(
+            "World's Best Racehorse Rankings Released",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.OTHER, set(OPERATIONAL_REGIONS))
 
     def test_explicit_title_subject_can_outrank_local_event(self):
         article = article_with_text(

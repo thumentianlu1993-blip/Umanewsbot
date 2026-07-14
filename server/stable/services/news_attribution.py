@@ -167,7 +167,14 @@ OUT_OF_SCOPE_TITLE_KEYWORDS = [
     "ドバイ",
 ]
 GLOBAL_SOURCE_SITES = {SourceSite.TDN, SourceSite.TDN_FRANCE}
-ATTRIBUTION_RULE_VERSION = "multiregion-v3"
+OPERATIONAL_REGIONS = (
+    RacingRegion.JAPAN,
+    RacingRegion.HONG_KONG,
+    RacingRegion.UNITED_KINGDOM,
+    RacingRegion.FRANCE,
+    RacingRegion.UNITED_STATES,
+)
+ATTRIBUTION_RULE_VERSION = "multiregion-v3.1"
 ENFORCE_NEW_ARTICLES_STAGES = {
     "new_articles",
     "web_test_groups",
@@ -560,6 +567,8 @@ def _title_context_regions(title_text: str) -> tuple[list[str], dict[str, list[s
         regions = _dedupe_regions([RacingRegion.UNITED_KINGDOM, *regions])
     if any(marker in title_text for marker in ["凱旋門賞", "ジャックルマロワ賞", "ムーランドロンシャン賞"]):
         regions = _dedupe_regions([RacingRegion.FRANCE, *regions])
+    if "jrha" in folded:
+        regions = _dedupe_regions([RacingRegion.JAPAN, *regions])
     out_of_scope = [keyword for keyword in OUT_OF_SCOPE_TITLE_KEYWORDS if keyword in folded]
     if re.search(r"\bdrc\b", folded):
         out_of_scope.append("dubai_racing_club")
@@ -617,16 +626,22 @@ def _explicit_title_subject_region(title_text: str) -> str:
     return next((region for region, values in prefixes.items() if folded.startswith(values)), "")
 
 
-def _event_terms_are_ambiguous(payloads: list[dict]) -> bool:
-    return bool(payloads) and all(_event_term_is_ambiguous(payload) for payload in payloads)
+def _event_terms_are_ambiguous(payloads: list[dict], text: str) -> bool:
+    return bool(payloads) and all(_event_term_is_ambiguous(payload, text) for payload in payloads)
 
 
-def _event_term_is_ambiguous(payload: dict) -> bool:
-    return (
-        payload.get("term_type") == TermType.RACE
-        and (term := str(payload.get("source_term") or "").strip()).isascii()
-        and len(term.split()) == 1
-    )
+def _event_term_is_ambiguous(payload: dict, text: str) -> bool:
+    term = str(payload.get("source_term") or "").strip()
+    if term.casefold() == "jockey club":
+        return True
+    if not term.isascii() or len(term.split()) != 1:
+        return False
+    if payload.get("term_type") == TermType.RACECOURSE:
+        return not re.search(
+            rf"\b(?:at|in|to|from)\s+(?:the\s+)?{re.escape(term.casefold())}\b",
+            text.casefold(),
+        )
+    return payload.get("term_type") == TermType.RACE
 
 
 def _remove_event_terms_nested_in_entities(event_payloads: list[dict], entity_payloads: list[dict]) -> list[dict]:
@@ -702,7 +717,7 @@ def infer_article_attribution(
         term_matches["entity"],
     )
     lead_event_regions = _regions_from_term_payloads(
-        [payload for payload in term_matches["event"] if not _event_term_is_ambiguous(payload)]
+        [payload for payload in term_matches["event"] if not _event_term_is_ambiguous(payload, lead_text)]
     )
     event_regions = _dedupe_regions(
         [*event_keyword_matches.keys(), *_regions_from_term_payloads(title_term_matches["event"])]
@@ -749,7 +764,7 @@ def infer_article_attribution(
         and event_regions[0] != source_region
         and event_regions[0] not in title_context_regions
         and not event_keyword_matches
-        and _event_terms_are_ambiguous(title_term_matches["event"])
+        and _event_terms_are_ambiguous(title_term_matches["event"], title_text)
     ):
         event_regions = []
 
@@ -764,9 +779,14 @@ def infer_article_attribution(
         reason = "conflicting_event_centres"
     elif source_is_global and out_of_scope_title_matches and not event_regions and not title_context_regions:
         primary = RacingRegion.OTHER
-        status = AttributionStatus.NEEDS_REVIEW
-        reason = "out_of_scope_title_region"
-        conflict_reasons.append("out_of_scope_region")
+        if "world_ranking" in out_of_scope_title_matches:
+            related = list(OPERATIONAL_REGIONS)
+            status = AttributionStatus.APPLIED
+            reason = "world_ranking_all_regions"
+        else:
+            status = AttributionStatus.NEEDS_REVIEW
+            reason = "out_of_scope_title_region"
+            conflict_reasons.append("out_of_scope_region")
     else:
         event_region = event_regions[0] if event_regions else ""
         title_context_region = title_context_regions[0] if len(title_context_regions) == 1 else ""
