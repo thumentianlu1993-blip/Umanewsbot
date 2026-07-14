@@ -8,6 +8,7 @@
 4. 第三候选必须先通过专项、完整 stable、真实 PostgreSQL 250 篇性能、Django check、迁移漂移和 OpenSpec strict/all。构建固定 main revision/tree/source SHA，AMD64 至少两次构建得到同一 image ID。
    - 过渡候选 revision `12f4d0579157f49f2bda8453397d192f42d89127` / AMD64 image `sha256:c4e0f1e56afcad5975c7eaabec5f63781bb48d24074e348641c35af1801a917b` 缺少最后补入的香港本地主体备战海外赛事规则，明确禁止部署。最终规则提交后必须重新生成 source archive、双构建并回写新的 revision/tree/source SHA/image ID。
    - 镜像按设计不复制两份生产 Compose 静态文件；镜像内归属测试必须只读挂载这两份契约。未挂载时仅对应路径报 `FileNotFoundError` 不算业务回归，但最终镜像仍必须在挂载后全绿。
+   - 最终候选 revision `8c6262cd08e450a8a5eb9f1d30990e22b2bbe0f0`，tree `e989cdb5d8bc624e8d4c3af7bebdc36c97c2b3ea`，source archive SHA-256 `077ed612bd669ce1b8fdaf622d1c2e703a782e21e06c82ecebb48f21693b0019`，两个独立上下文的 AMD64 image ID 均为 `sha256:413b7add4089975d1a77743d391919410da0094437e226104a552844bd4167ec`。镜像内 Django check、migration drift 和归属 `84/84` 通过（另 1 项环境跳过）。
 5. 使用全新 artifact 目录执行完整 72 小时 `--scope all_articles --hours 72`，不得带 `--limit`、不得覆盖前两轮 report、不得开启门禁验证或 commit 归属；记录 report、manifest、Gold labels 和规则版本 SHA。
 6. 重新评估保守对账后的 Gold，并人工检查全部主地区变化、全部 `needs_review` 和五地区稳定样本。除既有七类边界外，必须逐条复核 `Sale / York / Kelso / Jockey Club / JRHA / world ranking` 反例及法国赛果 `8089`。
 7. 只有第三轮 Gold 满足主地区准确率、五地区分地区准确率、相关 precision `>=95%`、recall `>=50%`、过度扩散 `<=1%`，且人工清单无明确错标，才允许从 `off` 切到 `shadow`。Shadow 计时从生产配置实际启用且健康验收通过时开始。
