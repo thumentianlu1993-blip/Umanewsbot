@@ -1,5 +1,13 @@
 # 当前状态
 
+## 2026-07-15 historical runner 工具根补丁部署与强化 smoke 完成
+
+- 最新 `main@c4087e6c1e66605feb44d3650039fab2e19567e7` 已部署到生产，web/worker/beat 统一运行 AMD64 image `sha256:5eb6471c8c1e96c90198e519c4d02f1b74316d6a13dbc93e9b63c0981ad22600`；Git tree 为 `95f7ba384c791e16b7f401dfca9adb744bbb4ed0`，source archive SHA-256 为 `5051285c4bc8b5daa1355eec5be433f95d7193e8302126e3bfb359309672aec7`。旧生产镜像保留为 `umanewsbot:rollback-pre-c4087e6c-20260715-0610`。
+- 写前 custom-format 备份为 `/opt/umanewsbot/backups/db/pre-main-c4087e6c-20260715_060549.dump`，`141446379` bytes，SHA-256 `60331b0840a98e00370f2a5c10724d2e0e9ee370724ac572be8b0cd54781e341`，`pg_restore -l` 通过；环境备份为 `/opt/umanewsbot/.env.backup.pre-main-c4087e6c-20260715_060549`。
+- historical runner provisioning 已幂等通过。新镜像 crawl smoke 证明 control role 无赛事业务表写权限，apply 隔离容器可连接 PostgreSQL 但无公网出口；40 秒 step 在暂停请求后完整结束并进入 `paused`，恢复后未重复第一步且完成第二步。生产 artifact 子目录伪工具根 `/app/historical-runtime/batch-006` 被 `production runner must use the immutable image tool root` 拒绝，且拒绝发生在创建 `HistoricalBatchRun` 之前，残留 run 为 0。
+- 收口时 `manage_historical_batch_runner preflight` 为 `migration_safe`，无 runner 容器、active historical run、TranslationRun started、NewsArticle translating、Celery active/reserved 或 Redis queue；web healthy、worker consumer 取消、beat 保持 `Created`。历史常驻 enabled/network 均为 false，多地区归属仍为 off，历史 published 为 0，生产可用磁盘 `7856596 KiB`（约 7.49 GiB），高于 5 GiB 门槛。
+- batch006 selection 仍为 1061 场、五地区 `250/61/250/250/250`，正式网络抓取尚未启动。下一步是生成绑定 selection/manifest/image/tool SHA 的不可变审批与 runner plan，再按每个 crawl run 最多 250 次请求分片执行；不得复用 batch005 的 `tmp/` 临时脚本。
+
 ## 2026-07-15 7 月 13 日起新闻质量修复、全量重跑与生产回归完成
 
 - “正文边界与博彩噪声”“实体识别与马名保护”“日文翻译与赛马固定格式”三类问题均已完成 OpenSpec、测试、实现、复审、部署和线上回归。最终代码 revision 为 `bdc0eeff78e111d7fa8a697cbb3557888f864fb8`，生产 web/worker/beat 统一运行 image `sha256:c975a4faf979a1f78cdb203b810d4f5726aca114175007fc01c176044f13841c`。

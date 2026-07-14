@@ -17,7 +17,7 @@
 4. 重新评估同一份保守对账后的 Gold，并人工检查新 run 的全部主地区变化、全部 `needs_review` 和分地区稳定样本。明确复核普通单词实体、赛果标题、正文首段赛场、日本当前成就/海外梦想、机构全名嵌套赛事词和正文历史背景六类边界。
 5. 只有第二轮 Gold 仍满足主地区/precision/recall/扩散门槛，且人工清单无明确错标，才可部署代码并从 `off` 切到 `shadow`。Shadow 计时从生产配置实际启用且健康验收通过时开始，修复前 run 不计入 24 小时。
 
-## 待部署：独立 historical runner 与 batch006 单地区 250
+## 已部署：独立 historical runner 与 batch006 单地区 250
 
 1. 迁移 `stable.0031_historical_batch_runner` 已在生产应用；首次 initial-install 门禁已经消费，不得再次使用。写前备份为 `/opt/umanewsbot/backups/db/pre-main-8741de98-20260714_185105.dump`，SHA-256 `f5126ea6f69dbfbc11dc40f0c85cf1dbf05a6e2c7c678e2ccf123ea46b10073e`，`pg_restore -l` 通过。后续部署一律走普通 runner preflight。
 2. 后续 deploy/rollback 只能走 `historical_runner_preflight.sh`：active run 会收到 pause request，必须等 step/事务安全结束并进入 paused；超时直接停止部署。普通脚本先停 beat，再由 `wait_for_celery_drain.sh` 要求所有 worker 可响应且 active/reserved 均为 0，之后才停 worker；排空失败时 beat 保持停止并中止部署。脚本只允许 `--no-deps` 更新 web/worker/beat/nginx，不得 pull/start/stop/recreate DB、Redis、runner 或 networks。初次 DB/Redis/shared network 只能显式设置 `CONFIRM_INFRASTRUCTURE_BOOTSTRAP=create-db-redis-network` 后单独运行 `bootstrap_infrastructure.sh`。
@@ -34,6 +34,9 @@
 7. stale takeover 只有租约过期、旧容器不存在、`pg_stat_activity` 无 `umanews-historical-runner:<run_id>:<phase>`、runtime/DB checkpoint 完全一致时才可执行。必须在宿主设置固定 image/run/phase/artifact/token/env 变量及 `HISTORICAL_RUNNER_TAKEOVER_ACTOR/REASON` 后运行 `historical_runner.sh takeover`；脚本实际检查旧容器不存在，并以 internal-only 一次性容器只读挂载 artifact，核对固定 `/app/historical-runtime/runner-state.json`。不得直接调用管理命令伪造 `--container-absent`，也不得传入内容相同的替代 checkpoint。任一条件缺失均停止，不删除 lock、不盲目重跑未 checkpoint 的 apply step。
 8. `status/preflight` 从普通 web 容器执行时看不到宿主 artifact，`checkpoint_matches=null` 只表示未挂载，不能用来批准接管；接管必须走上一步的宿主只读挂载探针。batch006 selection 已生成 `1061` 场，法国/香港/日本/英国/美国为 `250/61/250/250/250`，与既有有效批次零重叠；manifest SHA-256 `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`。资源门禁补丁完成新镜像、生产至少 5 GiB 可用空间和强化 smoke 前，不得启动正式 crawl。全过程保持常驻历史 enabled/network false、published 0。
 9. 资源门禁最终候选固定为 `umanewsbot:main-84217c56-amd64-20260714-2220`，image ID `sha256:2e8bd05f5c138a8dfd5d5012c5ecfc811422fef2ec3ae5cbe4ed2ed45b28b31e`，revision `84217c56a3c483d9ff08029729f16c11bd1f42ad`，tree `61341c7e3256ec417d243a809254afd91acab6b2`，source archive SHA-256 `aee41ac51b5347d5a1c146074079fed49e1b23dc08518ddeef36405fe6d406af`；两个独立源码上下文构建 ID 一致，镜像内 check、migration drift、runtime 专项 `239/239` 通过（跳过 1）。过渡候选 `82fa4a3f/sha256:01397d15...` 缺少最新归属反例修复，`sha256:119f59e3...` 的 revision 标签不是有效 Git 对象，二者均禁止部署。镜像内 runtime 专项须从 `/app` 运行；生产 Compose 静态契约文件按设计不在运行镜像中，该测试只能在完整源码树执行。部署前仍须重新 fetch 最新 main、核对候选 revision 未落后，并取得新闻维护窗口的明确交接。
+10. 2026-07-15 最终部署使用包含生产工具根补丁的 `main@c4087e6c`，image ID `sha256:5eb6471c8c1e96c90198e519c4d02f1b74316d6a13dbc93e9b63c0981ad22600`，tree `95f7ba384c791e16b7f401dfca9adb744bbb4ed0`，source archive SHA-256 `5051285c4bc8b5daa1355eec5be433f95d7193e8302126e3bfb359309672aec7`；旧镜像回滚标签为 `umanewsbot:rollback-pre-c4087e6c-20260715-0610`。写前备份 `/opt/umanewsbot/backups/db/pre-main-c4087e6c-20260715_060549.dump` 为 `141446379` bytes，SHA-256 `60331b0840a98e00370f2a5c10724d2e0e9ee370724ac572be8b0cd54781e341`，`pg_restore -l` 通过。
+11. 部署后重新执行 provisioning、crawl/apply 隔离、40 秒 step 暂停/恢复与工具根拒绝 smoke。artifact 子目录 `/app/historical-runtime/batch-006` 不能自声明为 tool root；拒绝必须发生在创建 `HistoricalBatchRun` 前。apply 的旧 Python smoke plan 现在按设计被“仅允许审批感知管理命令”拒绝，网络/角色隔离使用相同容器参数的短时 apply 容器验证，不能把旧 plan 强行加入白名单。
+12. 收口状态以 `manage_historical_batch_runner preflight --json` 返回 `migration_safe` 为准；web/worker/beat 必须为同一 image，worker consumer 保持取消、beat 保持 `Created`，常驻历史 enabled/network false、published 0。2026-07-15 收口可用空间为 `7856596 KiB`。batch006 正式 plan 仍须绑定 selection、manifest、审批、image 和 tool SHA，并将 1061 个目标按单 run 请求预算不超过 250 分片；禁止把 batch005 `tmp/` 脚本复制进 artifact。
 
 ## 2026-07-14 batch005 250 场正式导入记录
 

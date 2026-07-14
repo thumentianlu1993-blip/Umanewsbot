@@ -65,7 +65,7 @@
 
 ## 6. 部署与 batch006 前验收
 
-- [ ] 6.1 (operations) 从最新 main 的干净 tree 构建可复现 AMD64 镜像，记录 image ID、revision、tree 和源码 SHA，并在不启动 runner 的情况下应用迁移。
-- [ ] 6.2 (operations) 执行 runner 网络/control role provisioning 和只读 smoke run，验收双锁、心跳、状态、暂停、恢复、资源与日志轮转。
-- [ ] 6.3 (operations) 证明 crawl 无业务表写权限、apply 无公网出口、普通 web/worker/beat 部署不影响 runner、迁移 preflight 能阻断未安全暂停状态。
+- [x] 6.1 (operations) 从最新 main 的干净 tree 构建可复现 AMD64 镜像，记录 image ID、revision、tree 和源码 SHA，并在不启动 runner 的情况下应用迁移。
+- [x] 6.2 (operations) 执行 runner 网络/control role provisioning 和只读 smoke run，验收双锁、心跳、状态、暂停、恢复、资源与日志轮转。
+- [x] 6.3 (operations) 证明 crawl 无业务表写权限、apply 无公网出口、普通 web/worker/beat 部署不影响 runner、迁移 preflight 能阻断未安全暂停状态。
 - [ ] 6.4 (operations) 保持历史公开及常驻网络/写入开关关闭，生成并审核 batch006 每地区最多 250 场 selection artifact 后再恢复正式历史抓取。
