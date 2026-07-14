@@ -10,3 +10,43 @@ journal:
     issues_resolved: 7
     artifacts_modified: [design.md, specs/historical-batch-runner/spec.md, tasks.md]
     note: "Round 1 resolved immutable tool paths, deployment isolation, checkpoint and TDD gaps; Round 2 resolved audit, first-migration and stale-takeover boundaries, then converged."
+  - event: plan-reviewed-followup
+    date: "2026-07-14T19:40:00+08:00"
+    session: 2
+    mode: full
+    rounds: 1
+    issues_resolved: 1
+    artifacts_modified: [design.md, specs/historical-batch-runner/spec.md, tasks.md, test_cases.md]
+    note: "Production smoke follow-up locks request, cache, disk and interval budgets at both host and Django layers before batch006 network work."
+  - event: plan-reviewed-followup
+    date: "2026-07-14T20:22:00+08:00"
+    session: 3
+    mode: full
+    rounds: 1
+    issues_resolved: 1
+    artifacts_modified: [design.md, specs/historical-batch-runner/spec.md, tasks.md, test_cases.md]
+    note: "Checkpoint now binds request-ledger and cache-manifest existence and SHA so resume cannot reset the aggregate crawl budget."
+  - event: plan-reviewed-followup
+    date: "2026-07-14T20:27:00+08:00"
+    session: 4
+    mode: full
+    rounds: 1
+    issues_resolved: 1
+    artifacts_modified: [design.md, specs/historical-batch-runner/spec.md, tasks.md, test_cases.md]
+    note: "Resource artifacts reject symlinks and legacy nonterminal crawl checkpoints cannot resume without aggregate-budget evidence."
+  - event: plan-reviewed-followup
+    date: "2026-07-14T20:31:00+08:00"
+    session: 5
+    mode: full
+    rounds: 1
+    issues_resolved: 1
+    artifacts_modified: [design.md, specs/historical-batch-runner/spec.md, tasks.md, test_cases.md]
+    note: "Production immutable tools now use an explicit historical-race allowlist so unrelated network scripts cannot bypass the shared budget."
+  - event: plan-reviewed-followup
+    date: "2026-07-14T20:36:00+08:00"
+    session: 6
+    mode: full
+    rounds: 1
+    issues_resolved: 1
+    artifacts_modified: [design.md, specs/historical-batch-runner/spec.md, tasks.md, test_cases.md]
+    note: "Nested AdapterRunner calls preserve parent ledger/cache paths and can only tighten numeric crawl limits."

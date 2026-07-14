@@ -42,6 +42,53 @@ validate_env_file() {
   done < "$file"
 }
 
+env_value() {
+  file="$1"
+  key="$2"
+  value="$(awk -F= -v expected="$key" '$1 == expected { print substr($0, index($0, "=") + 1); found=1 } END { exit !found }' "$file")" || {
+    echo "runner env is missing required key: $key" >&2
+    exit 1
+  }
+  printf '%s\n' "$value"
+}
+
+validate_integer_range() {
+  label="$1"
+  value="$2"
+  minimum="$3"
+  maximum="$4"
+  case "$value" in
+    ''|*[!0-9]*) echo "$label must be an integer" >&2; exit 1 ;;
+  esac
+  [ "${#value}" -le 19 ] || { echo "$label is too large" >&2; exit 1; }
+  [ "$value" -ge "$minimum" ] && [ "$value" -le "$maximum" ] || {
+    echo "$label must be between $minimum and $maximum" >&2
+    exit 1
+  }
+}
+
+validate_crawl_resources() {
+  env_file="$1"
+  artifact_dir="$2"
+  request_budget="$(env_value "$env_file" HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET)"
+  cache_bytes="$(env_value "$env_file" HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES)"
+  disk_floor="$(env_value "$env_file" HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES)"
+  validate_integer_range "historical crawl request budget" "$request_budget" 1 250
+  validate_integer_range "historical crawl source cache bytes" "$cache_bytes" 1 2147483648
+  validate_integer_range "historical crawl free disk floor" "$disk_floor" 5368709120 9223372036854775807
+
+  available_kib="$(df -Pk "$artifact_dir" | awk 'NR == 2 { print $4 }')"
+  case "$available_kib" in
+    ''|*[!0-9]*) echo "cannot determine artifact filesystem free space" >&2; exit 1 ;;
+  esac
+  required_kib="$(( disk_floor / 1024 ))"
+  [ "$(( disk_floor % 1024 ))" -eq 0 ] || required_kib="$(( required_kib + 1 ))"
+  [ "$available_kib" -ge "$required_kib" ] || {
+    echo "artifact filesystem free space is below the historical crawl floor" >&2
+    exit 1
+  }
+}
+
 start_runner() {
   : "${HISTORICAL_RUNNER_IMAGE_ID:?full immutable image ID is required}"
   : "${HISTORICAL_RUNNER_IMAGE_REVISION:?image revision is required}"
@@ -106,6 +153,7 @@ start_runner() {
       }
       grep -Fqx 'HISTORICAL_RACE_BACKFILL_ENABLED=true' "$env_path"
       grep -Fqx 'HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=true' "$env_path"
+      validate_crawl_resources "$env_path" "$artifact_dir"
       ;;
     apply)
       : "${HISTORICAL_RUNNER_APPLY_ROLE:?approved apply database role is required}"

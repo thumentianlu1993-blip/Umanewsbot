@@ -1,15 +1,30 @@
 # 部署运行手册
 
+## 待执行：多地区归属 V3 第二候选生产只读验收
+
+1. 第一候选的 72 小时 `all_articles` run 虽然 `scope_complete=true` 且 Gold `qualified=true`，但人工检查 27 条主地区变化和 5 条 `needs_review` 后发现 7 类明确错标，结论为 no-go。不得复用该 run 批准 Shadow。
+2. 第二候选必须包含对应真实反例测试，并通过专项、完整 stable、真实 PostgreSQL 250 篇性能、Django check、迁移漂移和 OpenSpec strict/all。构建必须固定 main revision/tree/source SHA，AMD64 至少两次构建得到同一 image ID。
+3. 生产保持 mode `off`、相关地区查询 false。使用第二候选连接生产库执行只读 `--scope all_articles --hours 72`，写入全新 artifact 目录；不得覆盖第一轮报告，不得开启门禁验证，不得 commit 归属。
+4. 重新评估同一份保守对账后的 Gold，并人工检查新 run 的全部主地区变化、全部 `needs_review` 和分地区稳定样本。明确复核普通单词实体、赛果标题、正文首段赛场、日本当前成就/海外梦想、机构全名嵌套赛事词和正文历史背景六类边界。
+5. 只有第二轮 Gold 仍满足主地区/precision/recall/扩散门槛，且人工清单无明确错标，才可部署代码并从 `off` 切到 `shadow`。Shadow 计时从生产配置实际启用且健康验收通过时开始，修复前 run 不计入 24 小时。
+
 ## 待部署：独立 historical runner 与 batch006 单地区 250
 
-1. 当前代码包含迁移 `stable.0031_historical_batch_runner`，但本节写入时生产尚未应用。首次部署前先停 beat、排空 worker、生成并校验数据库和 `.env` 备份，再运行 `COMPOSE_FILE=<生产 compose> ./deploy/historical_runner_preflight.sh --initial-install`。只有 runner 容器、两张 runner 网络、secret 文件和三张表全部不存在才会放行；随后以 `HISTORICAL_RUNNER_INITIAL_INSTALL=true` 执行一次应用部署，并立即恢复 false。
+1. 迁移 `stable.0031_historical_batch_runner` 已在生产应用；首次 initial-install 门禁已经消费，不得再次使用。写前备份为 `/opt/umanewsbot/backups/db/pre-main-8741de98-20260714_185105.dump`，SHA-256 `f5126ea6f69dbfbc11dc40f0c85cf1dbf05a6e2c7c678e2ccf123ea46b10073e`，`pg_restore -l` 通过。后续部署一律走普通 runner preflight。
 2. 后续 deploy/rollback 只能走 `historical_runner_preflight.sh`：active run 会收到 pause request，必须等 step/事务安全结束并进入 paused；超时直接停止部署。普通脚本先停 beat，再由 `wait_for_celery_drain.sh` 要求所有 worker 可响应且 active/reserved 均为 0，之后才停 worker；排空失败时 beat 保持停止并中止部署。脚本只允许 `--no-deps` 更新 web/worker/beat/nginx，不得 pull/start/stop/recreate DB、Redis、runner 或 networks。初次 DB/Redis/shared network 只能显式设置 `CONFIRM_INFRASTRUCTURE_BOOTSTRAP=create-db-redis-network` 后单独运行 `bootstrap_infrastructure.sh`。
 3. migration 后使用 `provision_historical_runner.sh` 幂等创建 `umanews-historical-runner-db` internal 网络和 `umanews-historical-runner-egress` 网络，只把既有 DB 以 alias `db` 接入 internal 网络；control role `historical_runner_control` 仅可 SELECT/INSERT/UPDATE Run/Lock、SELECT/INSERT RunEvent，不得 DELETE 审计事件或访问业务表。密码文件必须为 0600。
 4. `historical_runner.sh start` 只接受完整 `sha256:<64>` image ID 和匹配 OCI revision。artifact 挂载到 `/app/historical-runtime`；owner token 与 phase env 必须分别位于 `/opt/umanewsbot/runtime/historical_runner_secrets/<run_id>.token` 和 `<run_id>.<phase>.env`，真实路径不得落在 artifact，且均为 0600。phase env 不得包含重复键且只含 allowlist，`POSTGRES_APPLICATION_NAME=umanews-historical-runner:<run_id>:<phase>`。crawl/verify 必须使用 `historical_runner_control`，apply 必须通过宿主 `HISTORICAL_RUNNER_APPLY_ROLE` 显式绑定既有业务写入角色，两者不得相同。
 5. crawl phase 设置 `HISTORICAL_RACE_BACKFILL_ENABLED=true`、`ALLOW_NETWORK=true`，使用 control role并连接 egress/internal 两网；apply phase 设置 enabled=true、allow_network=false，只连接 internal 网络并使用批准 importer 凭据。任何 phase 均不得复用常驻 `.env`，apply env 不得含翻译、OSS、OneBot、SMTP 或其他 API 密钥。
+   - crawl env 必须显式设置请求预算 `1..250`、source cache `1..2147483648` bytes、磁盘底线至少 `5368709120` bytes。启动脚本会在 `docker create` 前读取 `df -Pk`；空间不足直接停止，禁止降低底线绕过。
+   - Django runner 会再次校验同一边界，并覆盖子进程的 `RACE_EVENT_CRAWL_*`：请求间隔固定 1 秒，请求账本为 `<artifact>/runner-request-budget.json`，cache 根目录为 artifact，manifest 为 `<artifact>/runner-source-cache-manifest.json`。正式启动后应检查这些文件路径，不得看到 `/tmp` 或 artifact 外路径。
+   - 请求账本和 cache manifest 的存在状态、大小、SHA 会保存在 `runner-state.json` 与数据库 checkpoint 顶层。暂停后不得手工删除、改小或预建这些文件；任何漂移都会把 run 转为 blocked，必须保留现场审核，不能通过新建 run 规避已经消费的请求额度。
+   - runner 取得双锁后会在首个 crawl step 前保存资源基线；step 可控失败时会在释放锁前刷新失败时身份。若宿主强杀导致无法收尾，恢复必须因基线漂移 blocked，先审计现场，不得删除账本重跑。
+   - `python_tool` 还必须位于生产赛事工具显式白名单。新增脚本即使已经进入镜像和 tool manifest，也必须先更新 runner 白名单与回归测试；看到 `Python tool is not approved for historical batches` 时不得临时改 plan 运行无关脚本。
+   - 若 plan 使用 `orchestrate_race_event_crawl`，其 AdapterRunner 必须继续写上述父级账本和 manifest。adapter 自己的 policy 只能把请求/cache 调低或把间隔/磁盘底线调高；运行后若在 adapter 子目录出现新的 `request_budget.json`，视为门禁回归并停止批次。
 6. 启动后运行 `historical_runner_smoke.sh crawl|apply`，验收容器不超过 2 CPU/2 GiB/256 PID、只读根目录；crawl 更新 `stable_raceevent` 必须权限失败但控制表可读，apply `SELECT 1` 必须成功而到 `1.1.1.1:443` 必须失败。再验收双锁、心跳、status JSON、暂停/恢复、日志轮转与 checkpoint，不以“容器 running”代替成功。子进程原始流只进入 256 MiB `/tmp` tmpfs，结束后脱敏写入 `runner-logs`；失败状态必须保留脱敏诊断尾部。
 7. stale takeover 只有租约过期、旧容器不存在、`pg_stat_activity` 无 `umanews-historical-runner:<run_id>:<phase>`、runtime/DB checkpoint 完全一致时才可执行。必须在宿主设置固定 image/run/phase/artifact/token/env 变量及 `HISTORICAL_RUNNER_TAKEOVER_ACTOR/REASON` 后运行 `historical_runner.sh takeover`；脚本实际检查旧容器不存在，并以 internal-only 一次性容器只读挂载 artifact，核对固定 `/app/historical-runtime/runner-state.json`。不得直接调用管理命令伪造 `--container-absent`，也不得传入内容相同的替代 checkpoint。任一条件缺失均停止，不删除 lock、不盲目重跑未 checkpoint 的 apply step。
-8. `status/preflight` 从普通 web 容器执行时看不到宿主 artifact，`checkpoint_matches=null` 只表示未挂载，不能用来批准接管；接管必须走上一步的宿主只读挂载探针。batch006 只有在代码 review 无 actionable finding、可复现 AMD64 镜像、真实 PostgreSQL/Docker smoke 和生产迁移全部通过后生成。生成时传入所有既有 exclusion snapshots，审核每地区 `<=250`、`approved_region_limit=250`、无重复/重叠、remaining/eligible/accounted 数学一致；抓取与落库分阶段审批。全过程保持常驻历史 enabled/network false、published 0。
+8. `status/preflight` 从普通 web 容器执行时看不到宿主 artifact，`checkpoint_matches=null` 只表示未挂载，不能用来批准接管；接管必须走上一步的宿主只读挂载探针。batch006 selection 已生成 `1061` 场，法国/香港/日本/英国/美国为 `250/61/250/250/250`，与既有有效批次零重叠；manifest SHA-256 `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`。资源门禁补丁完成新镜像、生产至少 5 GiB 可用空间和强化 smoke 前，不得启动正式 crawl。全过程保持常驻历史 enabled/network false、published 0。
+9. 资源门禁最终候选固定为 `umanewsbot:main-84217c56-amd64-20260714-2210`，image ID `sha256:119f59e30fde8d69789189ee5b96347face03696d12c1c5d615ab5b473fa8d97`，revision `84217c563d77994fb09193d0266d10dd29de734e`，tree `61341c7e3256ec417d243a809254afd91acab6b2`，source archive SHA-256 `aee41ac51b5347d5a1c146074079fed49e1b23dc08518ddeef36405fe6d406af`；两个独立源码上下文构建 ID 一致，镜像内 check、migration drift、runtime 专项 `239/239` 通过（跳过 1）。过渡候选 `82fa4a3f/sha256:01397d15...` 缺少最新归属反例修复，禁止部署。镜像内 runtime 专项须从 `/app` 运行；生产 Compose 静态契约文件按设计不在运行镜像中，该测试只能在完整源码树执行。部署前仍须重新 fetch 最新 main、核对候选 revision 未落后，并取得新闻维护窗口的明确交接。
 
 ## 2026-07-14 batch005 250 场正式导入记录
 
@@ -25,7 +40,10 @@
 - PostgreSQL 性能验收必须使用带真实来源关联的 250 篇文章和当前量级术语/alias，不能使用 `source_config=NULL` 的空 fixture。当前基准规模为 17,474 条术语、21,240 条 alias、38,806 个索引候选和 17 个来源；通过值为 5 SQL、1.66–2.14 秒、约 49 MiB RSS。
 - 单审 Gold Set 使用 `evaluate_multiregion_attribution_gold --provisional`；该参数允许一位审核人的标签进入分母，但不豁免有效样本 150、五个运营地区各 10、跨地区 20 和质量门槛。生成归属 dry-run 时必须同时传 `reprocess_multiregion_attribution_gates --single-review-gold --gold-labels <csv> --dry-run ...`，否则单审标签按严格多人审核口径视为未决。
 - 生产归属资格 dry-run 必须额外传 `--scope all_articles --hours 72`，并且不得传 `--limit`。只有输出 `scope_complete=true` 时，全部 `primary_change_ids`、`needs_review_ids`、`locked_skip_ids` 和 `review_sample_ids_by_region` 才构成完整人工清单。默认 `gate_candidates` 仅用于术语门禁补跑，不得作为 Shadow 上线证据。
-- `all_articles` run 后续按 manifest commit 时只回填归属，不会修改文章门禁、重新入榜时间、发布状态或 QQ 交付；报告中的门禁结果使用 `validation_passed_ids/validation_blocked_ids` 表示，不得把它们误读为已经恢复候选。
+- `all_articles` 默认不执行逐篇发布门禁，`validation_skipped_ids` 应覆盖全部候选；只有显式传 `--include-gate-validation` 才产生 `validation_passed_ids/validation_blocked_ids`。后续按 manifest commit 时只回填归属，不修改文章门禁、重新入榜时间、发布状态或 QQ 交付。
+- dry-run 已持久化但 stdout 报告中断时，使用 `export_multiregion_attribution_run --run-id <id> --manifest-sha256 <sha> --output <new.json>` 原子重建，不重复运行推断。输出文件必须是新路径；`missing_article_ids/drifted_article_ids` 必须全部进入人工清单，非空时不得直接 commit。
+- 单审 Gold 因正文清理发生 SHA 漂移时，先从原 Excel 审核表生成只读 review snapshot，再执行 `reconcile_multiregion_attribution_gold --labels <old.csv> --review-snapshot <snapshot.csv> --output-dir <new-dir>`。只接受 `auto_refreshed`，任何 duplicate、title/source/body/inference blocker 均保留旧 SHA 并从有效分母剔除；不得手改 SHA。
+- France Galop 部署后先运行只读 source probe，样本必须同时有真实页面日期、`published_at_verified=true` 和非空 evidence；随后自然抓取纠正文章时间。禁止用当前抓取时间批量回填旧文。
 - `scope_complete=false` 的 `all_articles` run 会在 commit 入口被强制拒绝；人工复核以 `review_checklist_ids` 对应的 outcome 为准，outcome 内含标题、来源 URL、来源站点、发布时间、before/after、证据、置信度和状态。
 - 当前待切换候选：main `7f0827ad941452524062d478940c85bdfddf4a59`，tag `umanewsbot:main-7f0827ad-amd64-20260714-1707`，image ID `sha256:6ad16e368d7934777a689e537c70618a6321c3466d02f304116e2f61ae2af9a1`。必须先等待 `news-translate-20260713-r3` 自然退出并重新确认 one-off、TranslationRun、Celery active/reserved、归属/外部导入锁均为空；不得在文章正文/指纹仍变化时生成 72 小时 manifest。
 - 单审文件必须保留 `reviewer_roles=reviewer_a` 和 `adjudicated=false`，不得复制 reviewer B。多人审核发生冲突时仍必须裁决。空白未选择行不进入分母，明确 `exclude` 单独留档。

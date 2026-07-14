@@ -1,5 +1,30 @@
 # 关键决策
 
+## 2026-07-14：Gold 合格不能覆盖生产差异人工复核失败
+
+- Gold 的 `qualified=true` 只证明冻结样本达到覆盖和指标门槛，不等于当前 72 小时生产文章可安全上线。只要全部主地区变化或 `needs_review` 中存在明确错标，本轮仍为 no-go，必须修规则、补回归并重新生成完整 run。
+- 主地区遵循 precision 优先：赛事或赛场的明确证据高于参赛马来源；ASCII 单词实体、嵌套在机构全名内的赛事词和正文历史背景不得轻易夺取主地区。无法可靠裁决时允许漏标或进入 `needs_review`，不得为提高 recall 制造错标。
+- 日本来源报道当前日本成就、仅把海外赛事作为未来梦想时，主地区保持日本，海外目标进入相关地区。正文首段赛事只在标题没有可靠赛事、且首段仅出现一个非歧义赛事地区时补充主地区证据。
+- 每次规则修复后必须重跑完整 72 小时 `all_articles`，人工检查全部主地区变化和全部 `needs_review`；不能复用修复前的 Gold 指标或审核结论批准 Shadow。
+
+## 2026-07-14：全量归属审计不再隐式执行发布门禁，Gold 漂移采用保守续签
+
+- `--scope all_articles` 用于验证归属差异，不用于恢复术语门禁；默认不得逐篇调用 `validate_rewrite()`。确需同时复核门禁时必须显式传 `--include-gate-validation`，默认 `gate_candidates` 仍保持原门禁补跑语义。
+- 持久 dry-run 是审计真相。报告进程中断后应使用同一 run ID 与 manifest 导出，不重复推断；导出必须验证 manifest 和 candidate fingerprint，原子写新文件并拒绝覆盖既有证据。文章缺失/漂移必须进入必审清单，不能拿旧归属结果校验已变化正文。
+- Gold 输入 SHA 只可在原审核身份、来源 URL、规范化标题、正文长度/语义以及当前推断与人工结论均稳定时自动刷新。重复 key/article、正文异常缩短、标题变化或推断变化均保持漂移，不以“凑足 150 条”为由放宽。
+- 相关地区质量门槛只评估五个实际运营频道；`other` 可保存为证据，但不计入五频道 precision/recall。低置信度主地区变化只有在同时违背人工期望时才算无依据变化，避免把 Gold 明确认可的变化反向计为错误。
+
+## 2026-07-14：historical runner 资源门禁必须由宿主与应用双层强制
+
+- crawl phase 的 `RACE_EVENT_CRAWL_*` 不能直接继承 plan 或宿主环境。runner 父进程必须用批准 settings 覆盖子进程，并让同一 run 的所有 step 共用 artifact 根目录下的请求账本和 source-cache manifest。
+- 请求预算必须为 `1..250`，source cache 必须为 `1..2147483648` bytes，请求间隔至少 1 秒，磁盘底线不得低于 `5368709120` bytes。`0` 不得解释为无限；直接调用 Django 管理命令也必须执行同一边界校验。
+- 宿主脚本在 `docker create` 前检查 phase env 数值和 artifact 文件系统实时可用空间；Django 服务在取得数据库租约前重复检查容器内文件系统。任一层失败都不得创建 runner、取得租约或执行网络 step。
+- 每个 crawl step 后将请求账本与 cache manifest 的存在状态、大小和 SHA 保存为 checkpoint 顶层身份；下一 step、resume 和 completed 幂等检查都必须重新核验。资源账本漂移一律 blocked，不能把删除后的空账本视作新额度。
+- crawl 取得双锁后必须在首个 step 前保存资源基线；任何已启动 step 的失败收尾必须在释放锁前刷新资源身份，无法收尾的强杀恢复由基线漂移 fail closed。
+- 生产 `/app/runtime/tools` 不再接受“镜像内任意 SHA 匹配脚本”，只允许显式赛事发现、缓存、详情解析、打包、导出和 smoke 工具。新增历史工具必须更新白名单、测试和固定镜像；术语或其他直接联网脚本不得借 crawl egress 绕过赛事预算。
+- `orchestrate_race_event_crawl` 内部的 AdapterRunner 不得重新生成自己的请求账本/cache 路径覆盖 runner 父级。父级路径原样继承；请求数/cache bytes 使用父子较小值，请求间隔/磁盘底线使用父子较大值。
+- 生产磁盘不足时只能清理可再生构建上下文/镜像或扩容，不能临时降低 5 GiB 底线。第一版 runner smoke 后发现这一旁路时，batch006 仍未发出真实网络请求，因此按本决策先修补、重新 review/部署/smoke，再开始正式抓取。
+
 ## 2026-07-14：batch006 起扩大标准批次并使用独立 historical runner
 
 - batch005 继续完整遵守旧标准，即单地区最多 50 场；只有 batch005 全部写入和验收结束后，batch006 及后续标准批次才把单地区上限提高到 250 场。

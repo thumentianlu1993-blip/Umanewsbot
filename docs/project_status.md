@@ -3,15 +3,30 @@
 最后更新时间：`2026-07-14`
 当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP、公开首页资讯流、抓取新鲜度修复、后台快速术语创建与当前稿术语应用、外部马名索引识别链路、榜单重点 QQ 推送、公开文章 ID URL、国际赛马资讯扩展、多地区生产窗口、术语种子数据准备、赛事日历 MVP 和马匹详情页 MVP 均已部署生产）
 
+## 2026-07-14 多地区归属 V3 首轮生产审计 no-go
+
+- 首轮候选在生产 72 小时只读范围内完成 `596` 篇审计，约 `29.36s`；Gold 有效 156 条，主地区准确率 `96.15%`、相关 precision `100%`、recall `52%`，机器门槛合格。
+- 人工全量复核主地区变化与 `needs_review` 仍发现 7 类错标，涉及普通单词马名、赛事与马来源优先级、日本当前成就/海外梦想、机构名嵌套赛事词及正文历史背景。因此生产继续 `off`，没有开始 Shadow。
+- 反例已固化并完成规则修复；专项 117、完整 stable 1404、真实 PostgreSQL 250 篇性能、Django/迁移和 OpenSpec 29/29 均通过。下一步是第二候选的生产只读重跑和同口径人工验收，不以旧 `qualified=true` 直接上线。
+
+## 2026-07-14 多地区归属 V3 生产审计性能修复
+
+- 生产首个 72 小时全量 run 已覆盖 597 篇，但旧报告阶段因逐篇发布门禁超过 30 分钟而中断。当前分支已把全量归属报告与门禁复核拆开，并支持从持久 run 原子重建审核 JSON；缺失/漂移文章自动必审，run 内容漂移直接拒绝。
+- 159 条单审 Gold 当前有 21 条正文 SHA 漂移；原审核快照对账预计可安全续签 18 条，标题变化、正文异常缩短和推断变化各 1 条继续阻断。该结果尚待新代码部署后在生产只读命令中生成正式 artifact 与 SHA。
+- France Galop 已补星期前缀英文日期解析和 probe 时间证据字段；部署后应能把真实官方日期标为 verified，而不是使用抓取时间。当前生产多地区 mode 与相关查询仍关闭，尚未进入 24 小时 Shadow。
+- 本地专项 109 项、完整 stable 1396 项、一次性 PostgreSQL 250 篇性能契约和 OpenSpec 29/29 均通过。下一步是提交/构建安全关闭候选，生产只读重建 Gold 与 72 小时报告，再依据完整清单决定是否开始 Shadow。
+
 > 角色说明：
 > 本文档用于保留项目级概览与摘要信息。
 > 当前真实工作状态、最近一次关键修复、线上实际进展，请以 [docs/current_state.md](E:/Codex/docs/current_state.md) 为准。
 
-## 2026-07-14 batch006 前置能力已完成本地实现
+## 2026-07-14 batch006 前置能力已部署，资源门禁补丁待上线
 
-- `scale-and-isolate-historical-race-batches` 已把 batch006+ 单地区标准上限统一为 250，并新增可恢复的独立 historical runner、迁移 `0031`、最小权限 provisioning、隔离 smoke、迁移暂停 preflight 和独立 infrastructure bootstrap。
+- `scale-and-isolate-historical-race-batches` 已把 batch006+ 单地区标准上限统一为 250，并将可恢复的独立 historical runner、迁移 `0031`、最小权限 provisioning、隔离 smoke、迁移暂停 preflight 和独立 infrastructure bootstrap 部署到生产。当前生产镜像为 `sha256:33055eb8...25385` / revision `8741de98`。
 - runner 使用数据库租约 + runtime 文件锁、30 秒心跳/180 秒租约、固定镜像与 plan/input/output SHA checkpoint；crawl 只有网络和控制账本权限，apply 只有内部数据库写入权限，全部历史 RaceEvent 继续保持 draft。
-- 本地 runner 聚焦 52 项、runner+历史批次组合 118 项、加网络日志组合 122 项；合并最新主线后的交叉组合 194 项通过（跳过 1），完整 `stable 1386` 项回归通过（跳过 7），真实 PostgreSQL 6 项和隔离 Docker lifecycle/权限 smoke 通过。五轮 review 的前四轮共修复 7 项问题，第五轮无 actionable finding。当前仍处于“代码已实现、生产未部署”，完成主线提交、可复现镜像、生产迁移与普通部署不干扰演练前，不得生成或启动 batch006。
+- 生产 runner smoke、双锁、暂停/恢复、越权拒绝和普通部署不干扰均已通过；batch006 selection 已生成 `1061` 场，五地区为 `250/61/250/250/250`，与前四个有效批次零重叠。正式网络抓取尚未启动。
+- smoke 后发现直接 `python_tool` 未强制继承请求/cache/磁盘预算，且生产仅余约 2.8 GiB，低于 5 GiB 门禁。已按 OpenSpec 补充宿主与 Django 双层校验、共享账本、失败/强杀 checkpoint、显式赛事工具白名单及嵌套 AdapterRunner 收紧继承；第七轮 review 无问题，本地 runner `64/64`、historical 组合 `200/200`。最终合入最新主线后交叉专项 `208/208`（跳过 1）、完整 `stable 1417/1417` 通过（跳过 7）。释放生产空间、部署候选和强化 smoke 完成后才允许启动 batch006。
+- 最终组合提交 `84217c56` 的两个独立本地 AMD64 构建 image ID 一致为 `sha256:119f59e3...fa8d97`；候选 tag `umanewsbot:main-84217c56-amd64-20260714-2210`，镜像内 check、migration drift、runtime 专项 `239/239` 通过（跳过 1）。旧 `82fa4a3f` 候选明确作废。仍未 retag `prod`、未部署、未连接生产、未启动 batch006；必须等待新闻维护窗口重新交还后先治理磁盘并执行 hardened smoke。
 ## 2026-07-14 多地区归属 V3 性能与审核策略
 
 - 已用临时 PostgreSQL 16 和真实校准规模完成 250 篇基准。首次发现来源配置 N+1 导致 254 SQL；批上下文增加 17 个来源一次预加载后，五轮稳定为 5 SQL、1.66–2.14 秒、约 49 MiB，性能门槛已通过。

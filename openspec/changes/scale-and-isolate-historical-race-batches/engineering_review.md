@@ -79,3 +79,27 @@ Next: Ready for complete test-case specification, then implementation.
 - Round 5：复核模型约束、双锁、心跳、恢复、命令 allowlist、数据库 trigger、Docker 网络/资源、部署与回滚脚本，没有发现新的 actionable finding。
 
 最终验证：runner 聚焦 52 项、runner+历史批次 118 项、加历史网络日志组合 122 项；合并最新主线后的交叉组合 194 项通过（跳过 1），完整 `stable` 1386 项通过（跳过 7）。真实 PostgreSQL 6 项、Django check、migration drift、shell/diff、OpenSpec strict/all 均通过。
+
+## 生产 smoke 后资源门禁增补评审
+
+评审时间：`2026-07-14T19:40:00+08:00`
+评审模式：Full（`.openspec.yaml` 未声明 profile，按 `feature`）
+结论：APPROVED
+
+生产 runner smoke 证明了网络和数据库权限隔离，但正式 batch006 启动前发现 runner 的直接 `python_tool` 子进程没有继承编排服务已有的请求预算和 source-cache 环境。若不修复，底层工具会把缺失的请求上限解释为无限，并且宿主 env 可以把 5 GiB 磁盘底线调低。
+
+本轮工程评审形成并解决 `F-008`：仅在 `historical_runner.sh` 校验数值仍可被直接调用 Django 管理命令绕过。最终设计采用三层约束：宿主脚本校验数值并检查实时磁盘、Django 服务重复校验 settings 和磁盘、crawl 父进程覆盖所有子进程的共享预算账本/cache 路径与上限。请求间隔固定至少 1 秒。改动不触及赛事身份、selection、importer、公开状态、数据库结构或其他 phase。
+
+评审确认新增测试覆盖恶意宿主环境、同 run 多 step 共享账本、异常 settings 直调旁路、磁盘不足、脚本上下边界及 verify/apply 不受影响。不存在未解决架构、迁移、性能或产品交互问题，可以进入测试优先实现。
+
+实现后第二轮复审发现并解决 `F-009`：请求账本路径虽已固定，但未进入 runner checkpoint，暂停期间删除或改小账本会重置整批累计额度。设计补充为 checkpoint 顶层保存请求账本和 cache manifest 的存在状态、大小、SHA；completed、resume 和下一 step 前均核验，任何创建、删除或修改都转 blocked。该补充不改变 plan schema、旧 checkpoint 读取或赛事业务数据。
+
+第三轮复审发现并解决 `F-010`：`Path.is_file()` 会跟随 symlink，且升级前的非终态 checkpoint 没有资源身份。最终约束为资源账本固定路径在任何读取前拒绝 symlink/非普通文件；旧 completed checkpoint 只读兼容，旧 paused/failed/planned crawl 不得继续执行，必须 blocked 并保留现场。
+
+第四轮复审发现并解决 `F-011`：镜像内任意 SHA 匹配的 Python 工具都能进入 crawl，其中术语清理脚本可直接联网且不消费赛事预算。生产 `/app/runtime/tools` 改为显式赛事 runner 白名单；离线测试临时工具根仍可注入，生产新增工具必须经过代码、测试和新固定镜像。
+
+第五轮复审发现并解决 `F-012`：允许的 `orchestrate_race_event_crawl` 会由 `AdapterRunner` 再覆盖父级请求账本、cache 路径和请求间隔。嵌套 adapter 改为继承父级固定路径，并对 policy 只允许收紧：请求/cache 取较小值，间隔/磁盘底线取较大值；普通非 runner 编排仍使用自身 run 目录。
+
+第六轮复审发现并解决 `F-013`：资源身份只在 step 成功后写 checkpoint，首个 crawl step 消耗请求后失败时仍可在恢复前删除账本并重置累计额度。runner 现于取得双锁后先保存资源基线；任何已启动 step 的可控失败在释放锁前刷新失败时资源身份，异常强杀未执行收尾时则由基线与磁盘漂移阻断恢复。
+
+第七轮复审重新核对宿主与应用双层资源校验、共享账本、失败/强杀恢复、工具白名单、嵌套 AdapterRunner、数据库与文件 checkpoint 原子性及非 crawl 兼容路径，没有发现新的 actionable finding。runner 聚焦 `64/64`、historical 组合 `200/200`、补丁完整 `stable 1399/1399` 通过；两次合入最新多地区归属主线后，最终交叉专项 `208/208`（跳过 1）、完整 `stable 1417/1417` 通过（跳过 7 个既有环境专项），最终 AMD64 镜像内 runtime 专项 `239/239` 通过（跳过 1）。Django check、migration drift、shell、diff 和 OpenSpec strict/all 通过。

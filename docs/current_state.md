@@ -1,5 +1,30 @@
 # 当前状态
 
+## 2026-07-14 多地区归属 V3 首轮生产审计人工复核未通过
+
+- 已用候选镜像对生产最近 72 小时执行新的 `all_articles` 只读审计：共 `596` 篇、全部范围完整，`27` 条主地区变化、`5` 条 `needs_review`、`0` 条锁定/缺失/漂移；端到端约 `29.36s`，不再重复执行发布门禁。159 条单审 Gold 经保守对账后有效 `156` 条，主地区准确率 `96.15%`、五运营地区相关 precision `100%`、recall `52%`，机器报告为 `qualified=true`。
+- 人工逐条检查全部主地区变化和 `needs_review` 后，仍发现 7 类不可接受错标：普通英文单词马名压过美国赛事、法国赛果被冠军马来源压到英国、正文首段爱尔兰赛场被外籍马名压过、日本当前成就被未来凯旋门梦想改成法国、英国 Jockey Club 机构新闻被嵌套赛事词改成其他，以及英国赛场标题被正文中的法国历史背景压过。因此首轮结论明确为 no-go，生产 `MULTIREGION_ATTRIBUTION_MODE=off`、相关地区查询关闭，Shadow 尚未开始计时。
+- 修正规则采用 precision 优先：ASCII 单词实体不再单独夺取主地区；明确赛事/赛场优先于参赛马来源；正文首段只有唯一且非歧义赛事证据时才补足标题；机构全名可屏蔽其内部完整词边界的伪赛事命中；日本稿的当前成就加“未来梦想”保持日本主地区、海外目标只作相关地区。7 个真实反例已固化为回归测试。
+- 修复后专项 `117` 项通过（1 项 SQLite 环境跳过），完整 `stable 1404` 项通过（7 项环境专项跳过），真实 PostgreSQL 16 的 250 篇性能契约测试体约 `0.266s`；Django check、迁移无漂移、OpenSpec strict/all `29/29` 通过。下一门禁是提交并构建第二候选，再重跑同一 72 小时范围并人工检查全部变化；未通过前不得进入 Shadow。
+
+## 2026-07-14 多地区归属 V3 审计性能与 Gold 漂移修复待部署
+
+- 生产首次 72 小时 `all_articles` dry-run 已持久化 `597` 篇候选，但旧命令在归属推断后又逐篇执行发布门禁，运行超过 30 分钟后被终止，stdout 报告为空；run `#1` 与 manifest 仍在数据库。现已将全量归属审计和发布门禁复核拆开，`all_articles` 默认只生成归属报告，默认门禁补跑范围仍保持原行为。
+- 新增从持久 run 直接导出审核报告的命令，不重复执行归属推断；支持原子写入新 JSON 文件并拒绝覆盖既有证据。文章缺失或指纹漂移会进入必审清单，漂移文章不再使用旧归属结果校验新正文；candidate fingerprint 或 manifest 漂移时拒绝导出/commit。
+- 159 条单审 Gold 在当前生产正文上有 `21` 条输入 SHA 漂移。对照用户原审核快照后，`18` 条满足来源 URL、标题、正文语义/长度和当前推断结论全部稳定，可保守刷新 SHA；`8230` 标题变化、`8088` 正文异常缩短、`7898` 当前推断与人工相关地区结论不同，继续阻断。新增命令只输出对账工件，不修改数据库，重复身份或既有输出目录一律 fail closed。
+- 相关地区 precision/recall 现在只计算日本、中国香港、英国、法国、美国五个实际运营频道；`other` 继续保留为审计证据，但不会因系统没有第六个频道而制造假阳性。低置信度主地区变化若与人工 Gold 主地区一致，不再误计为“无依据变化”。
+- France Galop 英文页面真实日期形如 `Sunday, July 12, 2026 - 19:04`；旧 parser 缺少星期前缀格式，导致新稿被标记为时间不可信。适配器已补充长/短星期格式，来源 probe 同时输出 `published_at_verified` 与证据，部署后须以真实页面确认纠正。
+- 专项 `109` 项通过（另 1 项 SQLite 环境跳过）；完整 `stable 1396` 项通过（7 项环境专项跳过）；一次性 PostgreSQL 16 上 250 篇性能契约通过，测试体 `0.219s`，满足 SQL/30 秒/256 MiB 三项门槛；OpenSpec strict/all `29/29` 通过。当前分支尚未提交或部署，生产归属 mode 与相关地区查询仍保持关闭，Shadow 尚未开始计时。
+
+## 2026-07-14 historical runner 生产上线、batch006 selection 与资源门禁补丁
+
+- 独立 historical runner 第一版已完成生产部署：web/worker/beat 统一运行 image `sha256:33055eb824e4166470d692206404bebbff4057df44647bd2b3029adb21c25385`、revision `8741de98c59430c040afa1ce1737e948ba14eac3`，迁移 `stable.0031_historical_batch_runner` 已应用。写前 custom-format 备份为 `/opt/umanewsbot/backups/db/pre-main-8741de98-20260714_185105.dump`，`137354931` bytes，SHA-256 `f5126ea6f69dbfbc11dc40f0c85cf1dbf05a6e2c7c678e2ccf123ea46b10073e`，`pg_restore -l` 通过。
+- 生产 provisioning 已创建 internal DB/egress 两张 runner 网络、最小权限 `historical_runner_control` 角色和 0600 secret 目录。`runner-smoke-20260714-1920` 已证明 crawl 业务表写入被 PostgreSQL 拒绝、apply 无公网出口、双锁冲突、40 秒 step 心跳、暂停/恢复不重复、checkpoint SHA、迁移 preflight 和普通 `--no-deps` web 更新不干扰 DB/Redis/runner 网络；smoke 容器与一次性 secret 已清理。
+- batch006 selection 已在生产正式总账上生成于 `/opt/umanewsbot/runtime/historical_race_batches/2016-2025-batch-006-20260714`：共 `1061` 场，法国 `250`、香港 `61`、日本 `250`、英国 `250`、美国 `250`；与 batch002、有效 batch003、batch004、batch005 共 `1000` 个旧 target 交集为 0，香港已抓空并退出后续地区进度比较。manifest SHA-256 为 `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`，正式总账 SHA-256 为 `ac61298f242b2c649c403eae4741771a43cdb027befef20bc75e18fe34bcbad7`。
+- 正式网络抓取尚未启动。生产 smoke 后发现直接 `python_tool` 子进程未继承编排层的请求预算、source-cache 上限和磁盘底线；生产 artifact 文件系统当时仅余约 `2.8 GiB`，低于批准的 `5 GiB`。本线程在任何 batch006 网络请求前主动停止，未产生真实请求账本、source cache 或赛事写入。
+- 现已在同一 OpenSpec change 中补充资源门禁：宿主脚本与 Django 服务双重拒绝请求预算超出 `1..250`、cache 超出 `1..2 GiB`、磁盘底线低于 `5 GiB`；crawl 父进程固定 1 秒请求间隔，并把共享请求账本/cache manifest 路径绑定到当前 artifact。嵌套 AdapterRunner 保留父级路径，数值只允许收紧；请求账本和 cache manifest 的存在状态、大小与 SHA 进入顶层 checkpoint，首步前保存基线且任何失败收尾刷新身份，暂停或失败期间创建、删除、修改会 blocked；固定生产工具根只允许显式赛事工具，术语等无关联网脚本即使 SHA 匹配也会拒绝。新增用例均先证明旧实现放行。第七轮复审无 actionable finding，runner `64/64`、historical 组合 `200/200`；最终合入最新多地区归属主线后交叉专项 `208/208`（跳过 1）、完整 `stable 1417/1417` 通过（跳过 7）。完成生产磁盘治理、候选部署与强化 smoke 前，batch006 继续保持未启动，历史常驻开关与公开开关保持关闭。
+- 最终组合提交 `84217c563d77994fb09193d0266d10dd29de734e` 的 Git tree 为 `61341c7e3256ec417d243a809254afd91acab6b2`，source archive SHA-256 为 `aee41ac51b5347d5a1c146074079fed49e1b23dc08518ddeef36405fe6d406af`。两个独立源码上下文的本地 AMD64 构建得到相同 image ID `sha256:119f59e30fde8d69789189ee5b96347face03696d12c1c5d615ab5b473fa8d97`，正式候选 tag 为 `umanewsbot:main-84217c56-amd64-20260714-2210`；镜像内 Django check、migration drift 和 runtime 专项 `239/239` 通过（跳过 1）。过渡候选 `82fa4a3f/sha256:01397d15...` 缺少最新归属反例修复，明确不得部署。镜像按设计不复制生产 Compose 静态文件，该契约测试只在完整源码树执行。当前仅待生产磁盘治理、窗口交接、候选部署和强化 smoke。
+
 ## 2026-07-14 batch006 扩容与独立 historical runner 本地实现
 
 - OpenSpec change `scale-and-isolate-historical-race-batches` 已完成完整提案、两轮工程评审和测试优先实现。batch006 起标准单地区上限为 250；显式 1-249 仍合法，旧批次可继续显式传 50。selection、writer、validator、summary、manifest 和命令 JSON 使用同一 `approved_region_limit`，100 场地区领先与不可变排除 snapshot 语义不变。

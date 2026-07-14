@@ -272,6 +272,210 @@ class AttributionGoldReviewTests(TestCase):
         self.assertNotIn("provisional_single_review", provisional.no_go_reasons)
         self.assertIn("total_sample_count", provisional.no_go_reasons)
 
+    def test_gold_drift_reconciliation_refreshes_only_semantically_stable_content(self):
+        from stable.services.attribution_gold_reconciliation import reconcile_gold_label_drift
+        from stable.services.attribution_quality import article_input_sha256, load_gold_labels
+
+        article = make_article(
+            region=RacingRegion.UNITED_STATES,
+            index=99,
+            title="Saratoga race update",
+        )
+        core_body = "Saratoga hosted a United States race with the same runners and result. " * 12
+        old_body = f"Navigation and advertising. {core_body} Footer and related links."
+        article.body_ja_raw = old_body
+        article.body_ja_normalized = old_body
+        article.save(update_fields=["body_ja_raw", "body_ja_normalized", "updated_at"])
+        old_sha = article_input_sha256(article)
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            labels_path = root / "labels.csv"
+            label_fields = [
+                "key",
+                "article_id",
+                "source_url",
+                "input_sha256",
+                "expected_primary_region",
+                "expected_related_regions",
+                "reviewer_roles",
+                "rationale",
+                "adjudicated",
+            ]
+            with labels_path.open("w", newline="", encoding="utf-8-sig") as handle:
+                writer = csv.DictWriter(handle, fieldnames=label_fields)
+                writer.writeheader()
+                writer.writerow(
+                    {
+                        "key": "stable-drift",
+                        "article_id": article.id,
+                        "source_url": article.source_url,
+                        "input_sha256": old_sha,
+                        "expected_primary_region": RacingRegion.UNITED_STATES,
+                        "expected_related_regions": "",
+                        "reviewer_roles": "reviewer_a",
+                        "rationale": "美国赛事",
+                        "adjudicated": "false",
+                    }
+                )
+            snapshot_path = root / "snapshot.csv"
+            with snapshot_path.open("w", newline="", encoding="utf-8-sig") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=[
+                        "key",
+                        "article_id",
+                        "source_url",
+                        "input_sha256",
+                        "title_original",
+                        "body_original",
+                    ],
+                )
+                writer.writeheader()
+                writer.writerow(
+                    {
+                        "key": "stable-drift",
+                        "article_id": article.id,
+                        "source_url": article.source_url,
+                        "input_sha256": old_sha,
+                        "title_original": article.title_ja,
+                        "body_original": old_body,
+                    }
+                )
+
+            article.body_ja_raw = core_body
+            article.body_ja_normalized = core_body
+            article.save(update_fields=["body_ja_raw", "body_ja_normalized", "updated_at"])
+            current_sha = article_input_sha256(article)
+            summary = reconcile_gold_label_drift(
+                labels_path=labels_path,
+                review_snapshot_path=snapshot_path,
+                output_dir=root / "out",
+            )
+
+            reconciled = load_gold_labels(root / "out" / "provisional_gold_labels_reconciled.csv")
+            self.assertEqual(summary["auto_refreshed_count"], 1)
+            self.assertEqual(summary["blocked_count"], 0)
+            self.assertEqual(reconciled[0].input_sha256, current_sha)
+
+            article.title_ja = "Different story title"
+            article.save(update_fields=["title_ja", "updated_at"])
+            blocked = reconcile_gold_label_drift(
+                labels_path=labels_path,
+                review_snapshot_path=snapshot_path,
+                output_dir=root / "blocked",
+            )
+            self.assertEqual(blocked["auto_refreshed_count"], 0)
+            self.assertEqual(blocked["blocked_count"], 1)
+            with (root / "blocked" / "gold_drift_reconciliation.csv").open(
+                newline="", encoding="utf-8-sig"
+            ) as handle:
+                row = next(csv.DictReader(handle))
+            self.assertIn("title_changed", row["reasons"])
+
+    def test_gold_drift_reconciliation_rejects_duplicate_snapshot_identity(self):
+        from stable.services.attribution_gold_reconciliation import reconcile_gold_label_drift
+        from stable.services.attribution_quality import article_input_sha256
+
+        article = make_article(region=RacingRegion.FRANCE, index=101, title="Prix de Diane update")
+        article.body_ja_normalized = "France racing report with complete reviewed context. " * 10
+        article.save(update_fields=["body_ja_normalized", "updated_at"])
+        input_sha = article_input_sha256(article)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            labels_path = root / "labels.csv"
+            label_row = {
+                "key": "duplicate-snapshot",
+                "article_id": article.id,
+                "source_url": article.source_url,
+                "input_sha256": input_sha,
+                "expected_primary_region": RacingRegion.FRANCE,
+                "expected_related_regions": "",
+                "reviewer_roles": "reviewer_a",
+                "rationale": "法国赛事",
+                "adjudicated": "false",
+            }
+            with labels_path.open("w", newline="", encoding="utf-8-sig") as handle:
+                writer = csv.DictWriter(handle, fieldnames=list(label_row))
+                writer.writeheader()
+                writer.writerow(label_row)
+            snapshot_path = root / "snapshot.csv"
+            snapshot_row = {
+                "key": label_row["key"],
+                "article_id": article.id,
+                "source_url": article.source_url,
+                "input_sha256": input_sha,
+                "title_original": article.title_ja,
+                "body_original": article.body_ja_normalized,
+            }
+            with snapshot_path.open("w", newline="", encoding="utf-8-sig") as handle:
+                writer = csv.DictWriter(handle, fieldnames=list(snapshot_row))
+                writer.writeheader()
+                writer.writerows([snapshot_row, snapshot_row])
+
+            with self.assertRaisesMessage(ValueError, "review snapshot 存在重复"):
+                reconcile_gold_label_drift(
+                    labels_path=labels_path,
+                    review_snapshot_path=snapshot_path,
+                    output_dir=root / "out",
+                )
+
+    def test_gold_drift_reconciliation_rejects_drastic_body_shrink(self):
+        from stable.services.attribution_gold_reconciliation import reconcile_gold_label_drift
+        from stable.services.attribution_quality import article_input_sha256
+
+        article = make_article(region=RacingRegion.HONG_KONG, index=102, title="Sha Tin update")
+        reviewed_body = "Hong Kong racing result and runner details. " * 100
+        article.body_ja_normalized = reviewed_body
+        article.save(update_fields=["body_ja_normalized", "updated_at"])
+        input_sha = article_input_sha256(article)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            labels_path = root / "labels.csv"
+            label_row = {
+                "key": "body-shrink",
+                "article_id": article.id,
+                "source_url": article.source_url,
+                "input_sha256": input_sha,
+                "expected_primary_region": RacingRegion.HONG_KONG,
+                "expected_related_regions": "",
+                "reviewer_roles": "reviewer_a",
+                "rationale": "香港赛事",
+                "adjudicated": "false",
+            }
+            with labels_path.open("w", newline="", encoding="utf-8-sig") as handle:
+                writer = csv.DictWriter(handle, fieldnames=list(label_row))
+                writer.writeheader()
+                writer.writerow(label_row)
+            snapshot_path = root / "snapshot.csv"
+            snapshot_row = {
+                "key": label_row["key"],
+                "article_id": article.id,
+                "source_url": article.source_url,
+                "input_sha256": input_sha,
+                "title_original": article.title_ja,
+                "body_original": reviewed_body,
+            }
+            with snapshot_path.open("w", newline="", encoding="utf-8-sig") as handle:
+                writer = csv.DictWriter(handle, fieldnames=list(snapshot_row))
+                writer.writeheader()
+                writer.writerow(snapshot_row)
+            article.body_ja_normalized = reviewed_body[:200]
+            article.save(update_fields=["body_ja_normalized", "updated_at"])
+
+            summary = reconcile_gold_label_drift(
+                labels_path=labels_path,
+                review_snapshot_path=snapshot_path,
+                output_dir=root / "out",
+            )
+
+            self.assertEqual(summary["blocked_count"], 1)
+            with (root / "out" / "gold_drift_reconciliation.csv").open(
+                newline="", encoding="utf-8-sig"
+            ) as handle:
+                row = next(csv.DictReader(handle))
+            self.assertIn("body_length_ratio_low", row["reasons"])
+
     @override_settings(
         MULTIREGION_ATTRIBUTION_GOLD_MIN_TOTAL=5,
         MULTIREGION_ATTRIBUTION_GOLD_MIN_PER_REGION=1,

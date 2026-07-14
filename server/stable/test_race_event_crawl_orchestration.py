@@ -10,6 +10,7 @@ import sys
 import tempfile
 from io import StringIO
 from pathlib import Path
+from unittest.mock import patch
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -592,6 +593,82 @@ class RaceEventCrawlAdapterManifestTests(RaceEventCrawlOrchestrationTestCase):
             budget = json.loads((tmp_path / "request_budget.json").read_text(encoding="utf-8"))
             self.assertEqual(budget["request_count"], 1)
             self.assertEqual(budget["status"], "limit_exceeded")
+
+    def test_adapter_runner_preserves_parent_runner_paths_and_stricter_resource_limits(self):
+        module = self._module()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            parent_root = tmp_path / "parent-runner"
+            parent_root.mkdir()
+            script = self._script(
+                tmp_path,
+                "import json, os, sys\n"
+                "from pathlib import Path\n"
+                "keys = sys.argv[2:]\n"
+                "Path(sys.argv[1]).write_text(json.dumps({key: os.environ.get(key) for key in keys}))\n",
+            )
+            output = "environment.json"
+            keys = [
+                "RACE_EVENT_CRAWL_MAX_REQUESTS",
+                "RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS",
+                "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT",
+                "RACE_EVENT_CRAWL_MAX_SOURCE_CACHE_BYTES",
+                "RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES",
+                "RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT",
+                "RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST",
+            ]
+            manifest = module.AdapterManifest.from_dict(
+                {
+                    "key": "parent_budget_probe",
+                    "region": RacingRegion.UNITED_KINGDOM,
+                    "source": "sporting_life",
+                    "modules": [RaceEventModule.RESULTS],
+                    "source_authority": "third_party_high_access",
+                    "requires_network": True,
+                    "command": [
+                        sys.executable,
+                        str(script),
+                        "{adapter_output_dir}/environment.json",
+                        *keys,
+                    ],
+                    "outputs": [{"key": "environment", "path": output, "required": True}],
+                }
+            )
+            parent_environment = {
+                "RACE_EVENT_CRAWL_MAX_REQUESTS": "17",
+                "RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS": "1",
+                "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT": str(
+                    parent_root / "runner-request-budget.json"
+                ),
+                "RACE_EVENT_CRAWL_MAX_SOURCE_CACHE_BYTES": "4096",
+                "RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES": str(5 * 1024**3),
+                "RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT": str(parent_root),
+                "RACE_EVENT_CRAWL_SOURCE_CACHE_MANIFEST": str(
+                    parent_root / "runner-source-cache-manifest.json"
+                ),
+            }
+            with patch.dict(os.environ, parent_environment):
+                result = module.AdapterRunner(manifest).run(
+                    inputs={},
+                    run_dir=tmp_path,
+                    allow_network=True,
+                    execution_policy={
+                        "max_requests": 250,
+                        "request_interval_seconds": 0,
+                        "max_source_cache_bytes": 2 * 1024**3,
+                        "min_free_disk_bytes": 1,
+                    },
+                )
+            self.assertEqual(_field(result, "status"), "succeeded")
+            payload = json.loads(
+                (
+                    tmp_path
+                    / "adapter_runs"
+                    / "parent_budget_probe"
+                    / "environment.json"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(payload, parent_environment)
 
     def test_candidate_artifacts_are_combined_for_downstream_stages(self):
         module = self._module()

@@ -18,6 +18,7 @@ from stable.models import (
     MultiregionAttributionRun,
     MultiregionAttributionRunStatus,
     NewsArticle,
+    RacingRegion,
 )
 from stable.services.news_attribution import (
     ATTRIBUTION_RULE_VERSION,
@@ -43,6 +44,15 @@ class AttributionCommitResult:
     drifted: dict[int, str] = field(default_factory=dict)
     restored_ids: list[int] = field(default_factory=list)
     still_blocked_ids: list[int] = field(default_factory=list)
+
+
+OPERATIONAL_REGIONS = (
+    RacingRegion.JAPAN,
+    RacingRegion.HONG_KONG,
+    RacingRegion.UNITED_KINGDOM,
+    RacingRegion.FRANCE,
+    RacingRegion.UNITED_STATES,
+)
 
 
 def _fingerprint(article: NewsArticle) -> str:
@@ -124,6 +134,24 @@ def _manifest_sha256(
             "gold_snapshot_sha256": gold_snapshot_sha256,
             "metrics": metrics,
         }
+    )
+
+
+def verify_attribution_run_manifest(run: MultiregionAttributionRun) -> bool:
+    rows = list(run.candidate_payload or [])
+    current_manifest = _manifest_sha256(
+        rows=rows,
+        rule_version=run.rule_version,
+        term_version=run.term_version,
+        gold_version=run.gold_version,
+        settings_sha256=run.settings_sha256,
+        term_snapshot_sha256=run.term_snapshot_sha256,
+        gold_snapshot_sha256=run.gold_snapshot_sha256,
+        metrics=dict(run.metrics or {}),
+    )
+    return (
+        current_manifest == run.manifest_sha256
+        and run.candidate_fingerprint == _sha256(rows)
     )
 
 
@@ -277,6 +305,219 @@ def create_attribution_dry_run(
     )
 
 
+def build_attribution_review_report(
+    run: MultiregionAttributionRun,
+    *,
+    include_gate_validation: bool = False,
+    review_sample_per_region: int | None = None,
+) -> dict:
+    """Build an audit report from a persisted run without repeating attribution inference."""
+    rows = list(run.candidate_payload or [])
+    article_ids = [int(row["article_id"]) for row in rows]
+    articles_by_id = NewsArticle.objects.in_bulk(article_ids)
+    selectors = dict(run.selectors or {})
+    run_contract = dict((run.metrics or {}).get("_run_contract") or {})
+    scope = str(run_contract.get("scope") or selectors.get("scope") or "gate_candidates")
+    scope_complete = bool(
+        run_contract.get(
+            "scope_complete",
+            selectors.get("scope_complete", scope != "all_articles"),
+        )
+    )
+    sample_size = max(
+        0,
+        int(
+            selectors.get("review_sample_per_region", 5)
+            if review_sample_per_region is None
+            else review_sample_per_region
+        ),
+    )
+
+    primary_change_ids: list[int] = []
+    needs_review_ids: list[int] = []
+    locked_skip_ids: list[int] = []
+    validation_passed_ids: list[int] = []
+    validation_blocked_ids: list[int] = []
+    validation_skipped_ids: list[int] = []
+    restored_ids: list[int] = []
+    still_blocked_ids: list[int] = []
+    missing_article_ids: list[int] = []
+    drifted_article_ids: list[int] = []
+    outcomes: list[dict] = []
+
+    for row in rows:
+        article_id = int(row["article_id"])
+        before = dict(row.get("before") or {})
+        after = dict(row.get("after") or {})
+        proposed = dict(row.get("proposed") or after)
+        if before.get("primary") != after.get("primary"):
+            primary_change_ids.append(article_id)
+        if after.get("status") == AttributionStatus.NEEDS_REVIEW:
+            needs_review_ids.append(article_id)
+        if after.get("status") == AttributionStatus.LOCKED_SKIP:
+            locked_skip_ids.append(article_id)
+
+        article = articles_by_id.get(article_id)
+        if article is None:
+            missing_article_ids.append(article_id)
+            validation_skipped_ids.append(article_id)
+            outcomes.append(
+                {
+                    "article_id": article_id,
+                    "article_missing": True,
+                    "fingerprint_matches": False,
+                    "old_regions": before,
+                    "new_regions": {
+                        "primary": after.get("primary"),
+                        "related": list(after.get("related") or []),
+                    },
+                    "inferred_regions": {
+                        "primary": proposed.get("primary"),
+                        "related": list(proposed.get("related") or []),
+                    },
+                    "attribution_status": after.get("status"),
+                    "attribution_reason": after.get("reason"),
+                    "attribution_confidence": after.get("confidence"),
+                    "attribution_evidence": after.get("evidence") or {},
+                    "content_category": after.get("content_category"),
+                    "validation_evaluated": False,
+                    "validation_passed": None,
+                    "validation_reason": "article_missing",
+                    "blockers": [],
+                }
+            )
+            continue
+
+        fingerprint_matches = _fingerprint(article) == row.get("fingerprint")
+        if not fingerprint_matches:
+            drifted_article_ids.append(article_id)
+        validation = None
+        validation_skip_reason = "not_evaluated"
+        if include_gate_validation and fingerprint_matches:
+            article._attribution_region_override = {
+                after.get("primary"),
+                *list(after.get("related") or []),
+            } - {None, ""}
+            try:
+                validation = validate_rewrite(article)
+            finally:
+                delattr(article, "_attribution_region_override")
+            if validation.passed:
+                validation_passed_ids.append(article_id)
+                if scope == "gate_candidates":
+                    restored_ids.append(article_id)
+            else:
+                validation_blocked_ids.append(article_id)
+                if scope == "gate_candidates":
+                    still_blocked_ids.append(article_id)
+        else:
+            validation_skipped_ids.append(article_id)
+            if include_gate_validation:
+                validation_skip_reason = "article_fingerprint_drift"
+
+        outcomes.append(
+            {
+                "article_id": article_id,
+                "article_missing": False,
+                "fingerprint_matches": fingerprint_matches,
+                "title": article.title_ja,
+                "source_url": article.source_url,
+                "source_site": article.source_site,
+                "published_at": article.published_at,
+                "first_seen_at": article.first_seen_at,
+                "old_regions": before,
+                "new_regions": {
+                    "primary": after.get("primary"),
+                    "related": list(after.get("related") or []),
+                },
+                "inferred_regions": {
+                    "primary": proposed.get("primary"),
+                    "related": list(proposed.get("related") or []),
+                },
+                "attribution_status": after.get("status"),
+                "attribution_reason": after.get("reason"),
+                "attribution_confidence": after.get("confidence"),
+                "attribution_evidence": after.get("evidence") or {},
+                "attribution_locked": article.attribution_locked,
+                "attribution_applied": not article.attribution_locked,
+                "content_category": after.get("content_category"),
+                "validation_evaluated": validation is not None,
+                "validation_passed": validation.passed if validation is not None else None,
+                "validation_reason": validation.reason if validation is not None else validation_skip_reason,
+                "blockers": (
+                    [issue for issue in validation.issues if issue.get("severity") == "blocker"]
+                    if validation is not None
+                    else []
+                ),
+            }
+        )
+
+    required_review_ids = (
+        set(primary_change_ids)
+        | set(needs_review_ids)
+        | set(locked_skip_ids)
+        | set(missing_article_ids)
+        | set(drifted_article_ids)
+    )
+    review_sample_ids_by_region: dict[str, list[int]] = {}
+    for region in OPERATIONAL_REGIONS:
+        sample_pool = [
+            row
+            for row in rows
+            if (row.get("before") or {}).get("primary") == region
+            and int(row["article_id"]) not in required_review_ids
+        ]
+        sample_pool.sort(
+            key=lambda row: hashlib.sha256(
+                f"{row['article_id']}:{row['fingerprint']}".encode()
+            ).hexdigest()
+        )
+        review_sample_ids_by_region[region] = [
+            int(row["article_id"]) for row in sample_pool[:sample_size]
+        ]
+    review_checklist_ids = list(
+        dict.fromkeys(
+            [
+                *primary_change_ids,
+                *needs_review_ids,
+                *locked_skip_ids,
+                *missing_article_ids,
+                *drifted_article_ids,
+                *[
+                    article_id
+                    for region in OPERATIONAL_REGIONS
+                    for article_id in review_sample_ids_by_region[region]
+                ],
+            ]
+        )
+    )
+    return {
+        "run_id": run.id,
+        "run_status": run.status,
+        "manifest_sha256": run.manifest_sha256,
+        "scope": scope,
+        "scope_complete": scope_complete,
+        "regions": list(selectors.get("regions") or []),
+        "lookback_hours": selectors.get("lookback_hours"),
+        "window_start": selectors.get("window_start"),
+        "candidate_count": len(rows),
+        "candidate_ids": article_ids,
+        "restored_candidate_ids": restored_ids,
+        "still_blocked_ids": still_blocked_ids,
+        "validation_included": include_gate_validation,
+        "validation_passed_ids": validation_passed_ids,
+        "validation_blocked_ids": validation_blocked_ids,
+        "validation_skipped_ids": validation_skipped_ids,
+        "primary_change_ids": primary_change_ids,
+        "needs_review_ids": needs_review_ids,
+        "locked_skip_ids": locked_skip_ids,
+        "review_sample_ids_by_region": review_sample_ids_by_region,
+        "review_checklist_ids": review_checklist_ids,
+        "missing_article_ids": missing_article_ids,
+        "drifted_article_ids": drifted_article_ids,
+        "metrics": run.metrics or {},
+        "outcomes": outcomes,
+    }
 def apply_run_outcome(article: NewsArticle, outcome: dict) -> None:
     after = outcome.get("after") or {}
     set_article_regions(
@@ -307,17 +548,7 @@ def commit_attribution_run(
         raise ValidationError("只有成功或可续跑的 dry-run 才能 commit")
     if run.mode != "dry_run" or run.manifest_sha256 != manifest_sha256:
         raise ValidationError("run 或 manifest 不匹配")
-    current_manifest = _manifest_sha256(
-        rows=list(run.candidate_payload or []),
-        rule_version=run.rule_version,
-        term_version=run.term_version,
-        gold_version=run.gold_version,
-        settings_sha256=run.settings_sha256,
-        term_snapshot_sha256=run.term_snapshot_sha256,
-        gold_snapshot_sha256=run.gold_snapshot_sha256,
-        metrics=dict(run.metrics or {}),
-    )
-    if current_manifest != run.manifest_sha256:
+    if not verify_attribution_run_manifest(run):
         raise ValidationError("run 内容已偏离审核 manifest，请重新 dry-run")
     if run.status == MultiregionAttributionRunStatus.PARTIAL and not resume:
         raise ValidationError("部分完成的 run 必须使用 --resume")
@@ -377,8 +608,8 @@ def commit_attribution_run(
                         drifted[article_id] = "article_fingerprint"
                         continue
                     apply_run_outcome(article, outcome)
-                    validation = validate_rewrite(article)
                     if not attribution_only:
+                        validation = validate_rewrite(article)
                         apply_validation_outcome(article, validation)
                         if validation.passed:
                             article.ranked_revived_at = timezone.now()
