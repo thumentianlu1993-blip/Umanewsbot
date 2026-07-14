@@ -49,6 +49,7 @@ _APPROVED_HISTORICAL_PYTHON_TOOLS = {
     "discover_historical_race_band_sources.py",
     "export_race_events_full.py",
     "historical_runner_smoke_probe.py",
+    "merge_historical_race_batch_fragments.py",
     "package_historical_race_detail_candidates.py",
     "prepare_cached_historical_race_details.py",
     "prepare_france_wikipedia_history_winner_candidates.py",
@@ -353,9 +354,147 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
         raise RunnerPlanError("runner plan steps must be a non-empty list")
     if not isinstance(plan["tool_manifest"], dict):
         raise RunnerPlanError("runner tool manifest must be an object")
+    resource_limits = plan.get("resource_limits")
+    if resource_limits is not None:
+        if phase != HistoricalBatchPhase.CRAWL or not isinstance(resource_limits, dict):
+            raise RunnerPlanError("runner resource_limits are only valid for crawl plans")
+        required_resource_limits = {
+            "request_budget",
+            "max_source_cache_bytes",
+            "min_free_disk_bytes",
+            "request_interval_seconds",
+        }
+        if set(resource_limits) != required_resource_limits:
+            raise RunnerPlanError("runner resource_limits fields are invalid")
+        if (
+            not isinstance(resource_limits["request_budget"], int)
+            or isinstance(resource_limits["request_budget"], bool)
+            or not 1 <= resource_limits["request_budget"] <= RUNNER_MAX_CRAWL_REQUESTS
+            or not isinstance(resource_limits["max_source_cache_bytes"], int)
+            or isinstance(resource_limits["max_source_cache_bytes"], bool)
+            or not 1 <= resource_limits["max_source_cache_bytes"] <= RUNNER_MAX_SOURCE_CACHE_BYTES
+            or not isinstance(resource_limits["min_free_disk_bytes"], int)
+            or isinstance(resource_limits["min_free_disk_bytes"], bool)
+            or resource_limits["min_free_disk_bytes"] < RUNNER_MIN_FREE_DISK_BYTES
+            or isinstance(resource_limits["request_interval_seconds"], bool)
+            or resource_limits["request_interval_seconds"] != RUNNER_REQUEST_INTERVAL_SECONDS
+        ):
+            raise RunnerPlanError("runner resource_limits are outside approved boundaries")
+    if "selection_identity" in plan and resource_limits is None:
+        raise RunnerPlanError("formal historical crawl plan requires resource_limits")
 
     artifact_root = Path(str(plan["artifact_root"])).resolve()
     tool_root = Path(str(plan["tool_root"])).resolve()
+    if "selection_identity" in plan:
+        selection_identity = plan["selection_identity"]
+        approved_target_ids = (
+            selection_identity.get("approved_target_ids")
+            if isinstance(selection_identity, dict)
+            else None
+        )
+        if (
+            not isinstance(selection_identity, dict)
+            or set(selection_identity) != {"sha256", "approved_target_ids"}
+            or not re.fullmatch(r"[0-9a-f]{64}", str(selection_identity.get("sha256") or ""))
+            or not isinstance(approved_target_ids, list)
+            or not approved_target_ids
+            or any(not isinstance(value, int) or isinstance(value, bool) or value <= 0 for value in approved_target_ids)
+            or len(approved_target_ids) != len(set(approved_target_ids))
+            or len(approved_target_ids) > RUNNER_MAX_CRAWL_REQUESTS
+        ):
+            raise RunnerPlanError("formal historical crawl plan has invalid selection_identity")
+        batch_identity = plan.get("batch_identity")
+        required_batch_identities = {
+            "selection",
+            "approval",
+            "batch_manifest",
+            "descriptor",
+        }
+        if not isinstance(batch_identity, dict) or set(batch_identity) != required_batch_identities:
+            raise RunnerPlanError("formal historical crawl plan has invalid batch_identity")
+        identity_paths: dict[str, Path] = {}
+        for label, identity in batch_identity.items():
+            if (
+                not isinstance(identity, dict)
+                or not re.fullmatch(r"[0-9a-f]{64}", str(identity.get("sha256") or ""))
+                or not isinstance(identity.get("size"), int)
+                or isinstance(identity.get("size"), bool)
+                or identity["size"] < 0
+            ):
+                raise RunnerPlanError(f"formal batch identity is invalid: {label}")
+            path = _ensure_within(
+                _declared_path(identity, label=f"batch identity {label}"),
+                artifact_root,
+                f"batch identity {label}",
+            )
+            identity_paths[label] = path
+            if (
+                path.is_symlink()
+                or not path.is_file()
+                or path.stat().st_size != identity["size"]
+                or _sha256_file(path) != identity["sha256"]
+            ):
+                raise RunnerPlanError(f"formal batch identity changed: {label}")
+        if selection_identity["sha256"] != batch_identity["selection"]["sha256"]:
+            raise RunnerPlanError("formal selection identity does not match batch selection")
+        try:
+            selection_payload = json.loads(identity_paths["selection"].read_bytes())
+            approval_payload = json.loads(identity_paths["approval"].read_bytes())
+            manifest_payload = json.loads(identity_paths["batch_manifest"].read_bytes())
+            selection_ids = {
+                int(row["target_id"])
+                for row in selection_payload["targets"]
+                if isinstance(row, dict)
+                and not isinstance(row.get("target_id"), bool)
+            }
+            raw_approval_ids = approval_payload["approved_target_ids"]
+            if any(
+                not isinstance(value, int) or isinstance(value, bool)
+                for value in raw_approval_ids
+            ):
+                raise ValueError
+            approval_ids = set(raw_approval_ids)
+        except (KeyError, TypeError, ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RunnerPlanError("formal selection or approval content is invalid") from exc
+        approved_scope = set(approved_target_ids)
+        approval_manifest_identity = (
+            approval_payload.get("manifest_identity")
+            if isinstance(approval_payload, dict)
+            else None
+        )
+        manifest_selection_identity = (
+            (manifest_payload.get("artifacts") or {}).get("selection_snapshot")
+            if isinstance(manifest_payload, dict)
+            and isinstance(manifest_payload.get("artifacts"), dict)
+            else None
+        )
+        if (
+            not isinstance(selection_payload, dict)
+            or not isinstance(selection_payload.get("targets"), list)
+            or not isinstance(approval_payload, dict)
+            or approval_payload.get("status") != "approved"
+            or not str(approval_payload.get("approved_by") or "").strip()
+            or not str(approval_payload.get("approved_at") or "").strip()
+            or not isinstance(approval_payload.get("approved_target_ids"), list)
+            or not isinstance(approval_manifest_identity, dict)
+            or approval_manifest_identity.get("sha256")
+            != batch_identity["batch_manifest"]["sha256"]
+            or approval_manifest_identity.get("size")
+            != batch_identity["batch_manifest"]["size"]
+            or not isinstance(manifest_selection_identity, dict)
+            or manifest_selection_identity.get("sha256")
+            != batch_identity["selection"]["sha256"]
+            or manifest_selection_identity.get("size")
+            != batch_identity["selection"]["size"]
+            or manifest_payload.get("target_count") != len(selection_ids)
+            or manifest_payload.get("inventory_manifest_sha256")
+            != selection_payload.get("inventory_manifest_sha256")
+            or len(selection_ids) != len(selection_payload["targets"])
+            or len(approval_ids) != len(approval_payload["approved_target_ids"])
+            or not approved_scope <= selection_ids
+            or not approved_scope <= approval_ids
+        ):
+            raise RunnerPlanError("formal shard scope is not covered by selection and approval")
     if (
         (
             artifact_root == RUNNER_PRODUCTION_ARTIFACT_ROOT
@@ -368,6 +507,7 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
         )
     seen: set[str] = set()
     normalized_steps: list[dict[str, Any]] = []
+    formal_plan = "selection_identity" in plan
     for raw_step in plan["steps"]:
         if not isinstance(raw_step, dict):
             raise RunnerPlanError("runner step must be an object")
@@ -382,14 +522,79 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
             raise RunnerPlanError(f"runner step {step_id} argv must be a string array")
         if not isinstance(step.get("inputs", []), list) or not isinstance(step.get("outputs", []), list):
             raise RunnerPlanError(f"runner step {step_id} inputs and outputs must be lists")
+        declared_input_paths: list[Path] = []
         for value in step.get("inputs", []):
             if not isinstance(value, dict) or not re.fullmatch(r"[0-9a-f]{64}", str(value.get("sha256") or "")):
                 raise RunnerPlanError(f"runner step {step_id} input requires a SHA-256 identity")
             input_path = _ensure_within(_declared_path(value, label="input"), artifact_root, "input path")
             if not input_path.is_file() or _sha256_file(input_path) != value["sha256"]:
                 raise RunnerPlanError(f"runner step {step_id} input SHA does not match")
+            declared_input_paths.append(input_path)
+        declared_output_paths: list[Path] = []
         for value in step.get("outputs", []):
-            _ensure_within(_declared_path(value, label="output"), artifact_root, "output path")
+            output_path = _ensure_within(
+                _declared_path(value, label="output"),
+                artifact_root,
+                "output path",
+            )
+            if formal_plan and output_path.relative_to(artifact_root).parts[:1] != ("outputs",):
+                raise RunnerPlanError(
+                    f"formal runner step {step_id} output must stay under outputs/"
+                )
+            declared_output_paths.append(output_path)
+        if formal_plan:
+            input_root = artifact_root / "inputs"
+            raw_input_directories = step.get("input_directories", [])
+            if not isinstance(raw_input_directories, list):
+                raise RunnerPlanError(
+                    f"formal runner step {step_id} input_directories must be a list"
+                )
+            declared_input_directories: list[Path] = []
+            for value in raw_input_directories:
+                directory = _ensure_within(
+                    _declared_path(value, label="input directory"),
+                    input_root,
+                    "input directory",
+                )
+                if directory == input_root or directory.is_symlink() or not directory.is_dir():
+                    raise RunnerPlanError(
+                        f"formal runner step {step_id} input directory is invalid"
+                    )
+                directory_members = list(directory.rglob("*"))
+                if any(path.is_symlink() for path in directory_members):
+                    raise RunnerPlanError(
+                        f"formal runner step {step_id} input directory contains a symlink"
+                    )
+                directory_files = {
+                    path.resolve() for path in directory_members if path.is_file()
+                }
+                if not directory_files or not directory_files <= set(declared_input_paths):
+                    raise RunnerPlanError(
+                        f"formal runner step {step_id} input directory files are not declared"
+                    )
+                declared_input_directories.append(directory)
+            for argument in argv[2:]:
+                argument_path = Path(argument)
+                if not argument_path.is_absolute():
+                    continue
+                try:
+                    artifact_argument = argument_path.resolve()
+                    artifact_argument.relative_to(artifact_root)
+                except ValueError:
+                    continue
+                if artifact_argument == input_root or input_root in artifact_argument.parents:
+                    if not any(
+                        artifact_argument == input_path
+                        for input_path in declared_input_paths
+                    ) and artifact_argument not in declared_input_directories:
+                        raise RunnerPlanError(
+                            f"formal runner step {step_id} argv uses an undeclared input path"
+                        )
+                    continue
+                if artifact_argument not in declared_output_paths:
+                    raise RunnerPlanError(
+                        f"formal runner step {step_id} argv uses an undeclared artifact path"
+                    )
         executable = argv[0].casefold()
         if executable in _SHELL_PROGRAMS and any(flag in argv[1:3] for flag in _SHELL_FLAGS):
             raise RunnerPlanError(f"runner step {step_id} cannot invoke a shell")
@@ -451,6 +656,39 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
     normalized["tool_root"] = str(tool_root)
     normalized["steps"] = normalized_steps
     return normalized
+
+
+def validate_runner_resource_limits(plan: dict[str, Any]) -> dict[str, int]:
+    """Bind a formal crawl plan to the effective runner phase settings."""
+
+    limits = plan.get("resource_limits")
+    if limits is None:
+        return {}
+    if plan.get("phase") != HistoricalBatchPhase.CRAWL:
+        raise RunnerPlanError("resource identity is only supported for crawl plans")
+    try:
+        effective = {
+            "request_budget": int(settings.HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET),
+            "max_source_cache_bytes": int(
+                settings.HISTORICAL_RACE_BACKFILL_MAX_SOURCE_CACHE_BYTES
+            ),
+            "min_free_disk_bytes": int(
+                settings.HISTORICAL_RACE_BACKFILL_MIN_FREE_DISK_BYTES
+            ),
+            "request_interval_seconds": RUNNER_REQUEST_INTERVAL_SECONDS,
+        }
+    except (TypeError, ValueError) as exc:
+        raise RunnerStateError("historical crawl resource settings must be integers") from exc
+    if limits != effective:
+        differences = {
+            key: {"plan": limits.get(key), "effective": effective[key]}
+            for key in effective
+            if limits.get(key) != effective[key]
+        }
+        raise RunnerStateError(
+            f"historical crawl resource identity does not match runner settings: {differences}"
+        )
+    return effective
 
 
 def redact_runner_text(value: str, secret_values: Iterable[str]) -> str:

@@ -1,5 +1,14 @@
 # 当前状态
 
+## 2026-07-15 historical batch 正式流水线本地实现待最终验收
+
+- OpenSpec change `formalize-historical-batch-crawl-pipeline` 已完成提案、完整测试用例和两轮工程评审，最终计划结论为 approved。代码已实现不可变 selection/approval/manifest/image/tool 身份、typed recipe 目标绑定、每 shard 最多 250 场、正式资源身份、目录原子发布、日期/详情碎片合并和三阶段数据库只读 verifier。
+- 首批 typed policy 覆盖 discovery、cache、JRA、HKJC、英国 Sporting Life、法国 ZEturf、美国 Equibase、cached parser、packager 和 tracked merger。正式 plan 不接受 descriptor 自带 argv、无 policy 工具、`tmp/` 脚本、artifact 内工具或跨 shard scope；runner 会在创建 run 和取锁前比较资源 settings，并交叉验证 shard target IDs 同时属于冻结 selection 与正式 approval。
+- merger 对 complete/gap 做精确分母，来源冲突和不完整碎片进入带输入 SHA 与绑定时间的 gap；人工补证必须绑定 target SHA、旧值、HTTPS 来源、审核人和合法时间。逐届距离保留来源原单位，不做跨地区猜测或强制换算。
+- verifier 在 PostgreSQL 事务开始时设置 `SET TRANSACTION READ ONLY`，一次预取 target/event/runners/results/applied candidates；检查日期、正式来源、模块、数量、provenance 和 draft visibility，拒绝 gap 已公开，并按 `applied_at/id` 核验每模块最新 APPLIED candidate、保留旧记录审计。1250 targets 性能合同已在本地通过：plan/merge 小于 1 秒级且 verifier 不超过 20 SQL。
+- 当前本地 pipeline+runner 联合回归 `107/107` 通过（3 个环境专项跳过），反复 code review 已在第 19 轮达到零 actionable finding。最终门禁通过：完整 stable `1466/1466`（10 skip）、历史组合 `263/263`（3 skip）、1250-target 性能 `2/2`、真实 PostgreSQL 16 READ ONLY 注入 `1/1`、OpenSpec `30/30`，Django check、迁移漂移、Python/shell/diff 均通过；提交/镜像/生产部署仍待执行。生产仍为 `main@c4087e6c` / image `sha256:5eb6471c...22600`，batch006 没有发出正式网络请求或写入赛事业务表，公开与常驻历史开关继续关闭。
+- batch006 固定身份仍为 1061 targets、地区 `250/61/250/250/250`；manifest `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`、selection `b9a3ad6556cfd03e9a57874bec763f75ad4c45e7642751140cb063f1d0553637`、approval `a119e3bcfd3bc8940cf8b792e246e462b405c292b77f2996739b435c9185d835`。
+
 ## 2026-07-15 historical runner 工具根补丁部署与强化 smoke 完成
 
 - 最新 `main@c4087e6c1e66605feb44d3650039fab2e19567e7` 已部署到生产，web/worker/beat 统一运行 AMD64 image `sha256:5eb6471c8c1e96c90198e519c4d02f1b74316d6a13dbc93e9b63c0981ad22600`；Git tree 为 `95f7ba384c791e16b7f401dfca9adb744bbb4ed0`，source archive SHA-256 为 `5051285c4bc8b5daa1355eec5be433f95d7193e8302126e3bfb359309672aec7`。旧生产镜像保留为 `umanewsbot:rollback-pre-c4087e6c-20260715-0610`。

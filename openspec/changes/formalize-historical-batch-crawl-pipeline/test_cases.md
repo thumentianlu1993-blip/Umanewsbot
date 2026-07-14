@@ -35,6 +35,7 @@
 | TC-PLAN-014 | 目标输出目录已存在且非空 | 生成 plan | 拒绝覆盖 | S/C |
 | TC-PLAN-015 | descriptor 引用 artifact 根外路径 | 生成 plan | path escape 拒绝 | S/C |
 | TC-PLAN-016 | descriptor 引用 symlink 输入 | 生成 plan | 拒绝 symlink，不跟随到根外 | S/C |
+| TC-PLAN-017 | selection 的 target ID/year 使用布尔值 | 生成 plan | 拒绝，布尔值不能冒充整数身份 | S/C |
 
 ## 3. Shard 覆盖与 typed recipe 目标绑定
 
@@ -58,6 +59,10 @@
 | TC-SHARD-016 | 使用 `tmp/` 脚本 | 生成 plan | 拒绝 | S/C |
 | TC-SHARD-017 | 使用 artifact 内 Python 脚本 | 生成 plan | immutable tool root 拒绝 | S/C/R |
 | TC-SHARD-018 | recipe 输入 target 顺序变化 | 生成 plan | scope 和 plan SHA 不受顺序影响 | S/C |
+| TC-SHARD-019 | discovery recipe 缺少 `year` 或 selection 混入其他年份 | 生成 plan | 拒绝，实际 scope 必须与该年 shard 精确一致 | S/C |
+| TC-SHARD-020 | 详情 recipe 的非零 `limit` 小于 shard 目标数 | 生成 plan | 拒绝，禁止静默截断目标 | S/C |
+| TC-SHARD-021 | 法国 recipe 的日期范围排除任一 events CSV 目标 | 生成 plan | scope mismatch 拒绝 | S/C |
+| TC-SHARD-022 | fragment/gap 同时声明 target ID 与系列届次但两者冲突 | 生成 plan/merge | 拒绝，不任选其中一个身份 | S/C |
 
 首批 typed recipe 必须各有成功和 scope mismatch 用例：
 
@@ -90,6 +95,8 @@
 | TC-RESOURCE-010 | formal descriptor 请求 legacy plan | 生成 plan | 禁止降级 | S/C |
 | TC-RESOURCE-011 | 两个 shard 依次运行 | 检查资源 artifact | 各自拥有独立 ledger/cache manifest/state/checkpoint | R/O |
 | TC-RESOURCE-012 | shard 暂停后篡改 ledger | resume | blocked，不创建新额度 | R |
+| TC-RESOURCE-013 | resource_limits 任一整数字段为布尔值 | validate | 拒绝 | S/R |
+| TC-RESOURCE-014 | plan shard IDs 不属于 selection 或 approval | validate | 在创建 run 前拒绝 | S/R |
 
 ## 5. Date fragment 合并
 
@@ -110,6 +117,11 @@
 | TC-DATE-013 | 法港日纯数字距离 | merge | 只有有明确来源单位时写 `m`，不跨地区猜单位 | S |
 | TC-DATE-014 | 英美原文为 `2m4f`、`3m210y`、`8.5f` | merge | 原单位原样保留 | S |
 | TC-DATE-015 | 输入文件顺序反转 | merge | provider/gap/summary SHA 相同 | S |
+| TC-DATE-016 | 日期外形合法但日历不存在 | merge | 不进入 complete，生成有证据 invalid_fragment gap | S |
+| TC-DATE-017 | gap recorded_at 不是合法带时区时间 | merge | 拒绝 | S |
+| TC-DATE-018 | 真实 provider 行只有系列+届次、不含 target SHA | merge | 从冻结 selection 补入身份；若显式 SHA 存在则仍必须匹配 | S |
+| TC-DATE-019 | discovery/package gap 为 JSON 数组且只有 reason/code | merge | 用 selection、输入文件 SHA 与绑定时间规范化为正式 gap | S |
+| TC-DATE-020 | gap 行内自带与实际文件不符的 evidence identity | merge | 以实际读取文件的 size/SHA/行号重新绑定，不信任内嵌身份 | S |
 
 ## 6. Detail fragment 合并
 
@@ -120,7 +132,7 @@
 | TC-DETAIL-003 | candidate 缺 results | merge | 同上 | S |
 | TC-DETAIL-004 | runners/results `is_complete=false` | merge | 不进入 complete | S |
 | TC-DETAIL-005 | runners/items 为空 | merge | 不进入 complete | S |
-| TC-DETAIL-006 | 同一马号重复 | merge | conflict/incomplete gap | S |
+| TC-DETAIL-006 | 同一非空马号重复 | merge | conflict/incomplete gap | S |
 | TC-DETAIL-007 | 同一有效名次重复 | merge | conflict/incomplete gap | S |
 | TC-DETAIL-008 | 退赛/未完赛状态 | merge | 可无数值名次但保留状态，不伪造名次 | S |
 | TC-DETAIL-009 | 同 target 两份 canonical candidate 相同 | merge | 去重并记录两份输入身份 | S |
@@ -135,19 +147,22 @@
 | TC-DETAIL-018 | 输入顺序和 JSON key 顺序变化 | merge | candidate/gap/summary SHA 相同 | S |
 | TC-DETAIL-019 | 马名/骑手原文含 Unicode | merge | UTF-8 canonical 输出无损 | S |
 | TC-DETAIL-020 | 地区距离单位各异 | merge | 不统一换算，原始值及 provenance 保留 | S |
+| TC-DETAIL-021 | 权威来源未提供马号 | merge | 多个空马号允许，但马名和其他完整性仍必须满足 | S |
 
 ## 7. 人工 evidence fragment
 
 | ID | 前置条件 | 操作 | 预期 | 层级 |
 | --- | --- | --- | --- | --- |
 | TC-EVIDENCE-001 | target SHA 与 expected old value 匹配 | 应用人工补证 | 生效并保留 URL/authority/reason/reviewer/time | S |
-| TC-EVIDENCE-002 | target SHA 已变化 | 应用补证 | 拒绝，候选不变 | S |
-| TC-EVIDENCE-003 | expected old value 不匹配 | 应用补证 | 拒绝 | S |
+| TC-EVIDENCE-002 | target SHA 已变化 | 应用补证 | 该 target 转 conflict gap，其他 target 继续，候选不被覆盖 | S |
+| TC-EVIDENCE-003 | expected old value 不匹配 | 应用补证 | 该 target 转 conflict gap，其他 target 继续 | S |
 | TC-EVIDENCE-004 | 同字段两份人工补证新值不同 | merge | conflict gap | S |
 | TC-EVIDENCE-005 | 缺来源 URL 或理由 | merge | 拒绝 | S |
 | TC-EVIDENCE-006 | 来源 URL 为 HTTP/file | merge | 拒绝 | S |
 | TC-EVIDENCE-007 | 补证只修日期，不声明其他字段 | merge | 仅日期变化，其他字段保持原值 | S |
 | TC-EVIDENCE-008 | 扫描 tracked merger/descriptor fixtures | 静态检查 | 不含生产 target ID 常量或 batch006 绝对路径 | S |
+| TC-EVIDENCE-009 | reviewed_at 非法或无时区 | merge | 拒绝 | S |
+| TC-EVIDENCE-010 | 补证尝试修改 target/selection 身份字段 | merge | 拒绝 | S |
 
 ## 8. 原子发布、路径和恢复
 
@@ -161,6 +176,7 @@
 | TC-ATOMIC-006 | 输出路径逃逸 artifact 根 | 发布 | 拒绝 | S/C |
 | TC-ATOMIC-007 | source-cache/resource artifact 为 symlink | checkpoint/merge | 拒绝 | S/R |
 | TC-ATOMIC-008 | shard 完成后普通 web 部署 | runner 状态检查 | checkpoint/output 不受影响 | R/O |
+| TC-ATOMIC-009 | 最终目录 rename 成功后父目录 fsync 失败 | 发布 | 返回失败并删除最终目录，重跑不被半确认产物阻塞 | S/C |
 
 ## 9. 数据库阶段 verifier
 
@@ -182,6 +198,8 @@
 | TC-VERIFY-014 | verifier 内注入 UPDATE | 运行 | PostgreSQL 拒绝写入，业务值不变 | C/PostgreSQL |
 | TC-VERIFY-015 | 相同输入重复 verify | 运行两次 | 输出 canonical 业务结果一致，数据库零变化 | C |
 | TC-VERIFY-016 | 1250 targets | verify | 查询数不超过 20，无逐 target 查询 | C/PostgreSQL |
+| TC-VERIFY-017 | gap target 已有关联 published event | verify | 非零退出并计入 published count | C |
+| TC-VERIFY-018 | 同一模块保留多条历史 APPLIED candidate | verify final | 按 applied_at/id 取最新一条核验，旧记录只保留审计 | C |
 
 ## 10. 性能与资源
 

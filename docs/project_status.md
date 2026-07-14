@@ -1,5 +1,11 @@
 # 项目状态文档
 
+## 2026-07-15 historical batch 正式流水线实现进入完整回归
+
+- `formalize-historical-batch-crawl-pipeline` 已完成方案、工程评审、完整实现和零问题 code review。最终本地门禁通过：pipeline+runner `107/107`、完整 stable `1466/1466`、历史组合 `263/263`、1250 targets 性能 `2/2`、真实 PostgreSQL 16 READ ONLY 注入 `1/1`、OpenSpec `30/30`；生产部署与 batch006 正式运行待继续。
+- 本轮仍是本地实现状态：完整 stable、PostgreSQL 复验、零问题 review、提交/可复现 AMD64 镜像及生产部署尚未完成。生产 batch006 仍为 1061 场 approved selection，网络抓取、赛事写入和公开展示均未启动。
+- batch006 正式身份：manifest `62aca6...6e3`、selection `b9a3ad...637`、approval `a119e3...835`；正式 descriptor 必须将五地区 `250/61/250/250/250` 精确覆盖且每 shard 不超过 250 个批准目标。
+
 ## 2026-07-15 historical runner 新镜像已部署，batch006 待正式审批与分片 crawl
 
 - 生产已统一切换到 `main@c4087e6c` / image `sha256:5eb6471c8c1e96c90198e519c4d02f1b74316d6a13dbc93e9b63c0981ad22600`，写前数据库备份 SHA-256 为 `60331b0840a98e00370f2a5c10724d2e0e9ee370724ac572be8b0cd54781e341`，旧镜像回滚标签已保留。

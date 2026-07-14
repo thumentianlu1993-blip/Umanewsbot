@@ -15,6 +15,7 @@ from stable.services.historical_batch_runner import (
     runner_secret_values_from_environment,
     runner_status_payload,
     validate_runner_plan,
+    validate_runner_resource_limits,
 )
 
 
@@ -33,6 +34,7 @@ class Command(BaseCommand):
         try:
             plan_bytes = plan_path.read_bytes()
             plan = validate_runner_plan(json.loads(plan_bytes))
+            validate_runner_resource_limits(plan)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             raise CommandError(f"runner plan 无效：{exc}") from exc
         if Path(plan["tool_root"]).resolve() != Path(

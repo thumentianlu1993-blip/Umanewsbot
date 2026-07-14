@@ -46,6 +46,8 @@
 
 历史赛事与新闻常态任务分离，按“正式总账 -> selection artifact -> 网络抓取 artifact -> 离线打包/dry-run -> 受控落库 -> 逐场验收”推进。batch006 起标准批次为单地区最多 250 场，仍保留地区进度、排除 snapshot、来源身份、审批 SHA、写前备份和 draft 可见性门禁。
 
+正式批次使用 typed recipe 的分片计划：每个 shard 从实际输入内容证明 target scope，plan 同时绑定 selection、approval、manifest、镜像、工具和资源预算。日期与详情碎片只产生完整候选或带证据 gap；数据库写后由只读 verifier 核对来源、模块、数量、provenance 和 draft 状态。地区距离单位按来源原文保留，不在编排层统一换算。
+
 长周期历史任务由独立原生 Docker runner 执行，不加入 Celery/Beat，也不属于普通 Compose project。crawl 与 apply 使用不同网络和数据库角色；runner 只按固定镜像和结构化 plan 执行，依靠数据库租约、runtime 文件锁、心跳和双 checkpoint 恢复。普通应用部署不得处理 runner、DB、Redis 或共享网络。
 
 ## 技术栈主干

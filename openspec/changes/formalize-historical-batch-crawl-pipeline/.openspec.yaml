@@ -1,8 +1,25 @@
 schema: spec-driven
 created: 2026-07-14
 profile: feature
-phase: reviewed
+phase: applying
 journal:
+  - event: implementation-verified
+    date: "2026-07-15T12:55:00+08:00"
+    session: 1
+    tests: "stable 1466/1466 (10 skips); historical combination 263/263 (3 skips); 1250-target performance 2/2; PostgreSQL 16 read-only injection 1/1; OpenSpec 30/30"
+    note: "Django check, migration drift, Python compile, runner shell syntax and diff checks also passed. Temporary PostgreSQL container and network were removed."
+  - event: code-review-approved
+    date: "2026-07-15T12:10:00+08:00"
+    session: 1
+    rounds: 19
+    final_findings: 0
+    tests: "pipeline+runner 107/107 passed, 3 environment skips"
+    note: "Repeated review/fix cycles closed identity agreement, evidence provenance, target-local evidence conflicts, semantic year/limit/date scope, atomic publication and runner/verifier hardening. The final full review found no actionable issue."
+  - event: implementation-local
+    date: "2026-07-15T08:25:00+08:00"
+    session: 1
+    tests: "pipeline+runner 107/107 passed, 3 environment skips; 1250-target performance contract passed"
+    note: "Implemented typed shard plans, immutable batch/resource identities, atomic fragment merger and read-only stage verifier. Full stable, final review, commit and production rollout remain pending."
   - event: plan-reviewed
     date: "2026-07-15T06:34:00+08:00"
     session: 1

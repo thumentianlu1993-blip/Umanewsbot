@@ -1,5 +1,12 @@
 # 关键决策
 
+## 2026-07-15：正式历史批次按冻结输入、证据 gap 和只读验收推进
+
+- batch006 及后续正式抓取必须由 tracked plan builder 生成结构化 runner plan；selection、approval、batch manifest、descriptor、image revision 和 tool SHA 均为不可变身份，typed recipe 必须从实际 CSV/JSONL 内容证明与 shard scope 精确一致，禁止手写任意 argv 或使用 `tmp/` 工具。
+- complete 与 gap 共同构成 selection 的精确分母。来源冲突、无效或暂不可得可以进入带证据的 gap 并继续其他目标；人工补证的 target SHA 或旧值漂移只把该目标转为 conflict gap。无证据遗漏、complete/gap 重叠、来源缓存漂移和结构不合法的补证仍整体 fail closed。零星歧义累计到最终统一审核，不中断整批正式总账收集。
+- 数据库 verifier 检查冻结候选身份对写后 target/event 状态的结果，不把写前 target hash 与合法写后的当前 target hash 机械比较。PostgreSQL verifier 必须在事务第一阶段设置 READ ONLY，任何完整或 gap target 的赛事均不得为 published；同模块历史 APPLIED candidate 允许保留，但必须按 `applied_at/id` 核验最新一条。
+- 地区距离单位保留来源原文及 provenance；英美 `m/f/y`、法港日公制等不在合并层强制换算。只有来源明确给出单位时才补单位，不能凭地区猜测。
+
 ## 2026-07-15：新闻重跑发布与未知马名门禁
 
 1. 7 月 13 日起新闻按创建时间冻结清单重跑；重复稿不重复处理，可处理稿必须有明确成功、人工复核或忽略终态，不能以“命令执行过”代替逐篇对账。

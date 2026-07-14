@@ -1,5 +1,15 @@
 # 部署运行手册
 
+## 待执行：batch006 正式流水线部署与运行
+
+1. 先完成 `formalize-historical-batch-crawl-pipeline` 的完整 stable、真实 PostgreSQL READ ONLY、OpenSpec strict/all、迁移漂移、shell/diff 和零问题 review；不得用聚焦测试代替最终门禁。提交并 fast-forward 最新 main 后，从干净 source archive 双构建 AMD64，要求 image ID 完全一致且 revision/tree/source SHA 可追溯。
+2. batch006 只接受现有冻结身份：1061 targets，法国/香港/日本/英国/美国 `250/61/250/250/250`；manifest `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`、selection `b9a3ad6556cfd03e9a57874bec763f75ad4c45e7642751140cb063f1d0553637`、approval `a119e3bcfd3bc8940cf8b792e246e462b405c292b77f2996739b435c9185d835`。任一字节漂移停止，不重新生成审批掩盖漂移。
+3. 使用 `build_historical_batch_crawl_plan --descriptor <tracked-artifact>/descriptor.json --shard-id <region-NN> --output-dir <new-empty-dir>` 为每个 shard 原子生成 `scope.json`、`runner-plan.json`、stage manifest 和 summary。每个 shard 只能包含一个地区、最多 250 targets/请求；runner plan 必须使用镜像内 `/app/runtime/tools`，不得指向 `tmp/`、artifact 子目录或宿主脚本。
+4. 每个 crawl shard 使用独立 artifact 根、请求账本、source-cache manifest、runner state 和 checkpoint。启动前执行资源 preflight，生产可用磁盘至少 5 GiB；网络阶段 `network=true/write=false`，写入阶段 `network=false/write=true`。暂停、失败或恢复时不得删除或缩小账本/cache 以重获额度。
+5. date/detail merger 只读取冻结输入和 source-cache manifest，输出 `complete.jsonl + gaps.jsonl + manifest.json + summary.json`。输出目录必须不存在；工具在同父目录构建临时目录，fsync 完成后一次 rename。来源冲突、不完整碎片和暂不可得进入带证据 gap；无证据遗漏、人工补证漂移、非法时间、非 HTTPS 来源或 cache SHA/size 漂移停止当前 shard。
+6. 每一写入阶段先生成独立 custom-format 数据库备份并记录 bytes/SHA/`pg_restore -l`；先 dry-run，再 apply。写后立即运行 `verify_historical_race_batch_stage --stage date|detail-source|final --artifact-dir <merged-artifact> --output <new-report.json>`。报告必须 `error_count=0`、published=0；verifier 不得连接网络或创建 HistoricalBatchRun。
+7. 少量身份/来源歧义写入统一 gap/review ledger 后继续其他 shard，不逐条等待用户。整批结束时才汇总 complete/gap、逐地区 events/runners/results、来源、冲突及待审项；全过程保持 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false` 的常驻服务配置和历史公开关闭。
+
 ## 2026-07-15 新闻统一镜像切换与存量重跑记录
 
 1. 最终新闻代码 revision 为 `bdc0eeff78e111d7fa8a697cbb3557888f864fb8`，正式 AMD64 image ID 为 `sha256:c975a4faf979a1f78cdb203b810d4f5726aca114175007fc01c176044f13841c`。错误 revision 标签的 `sha256:427e1f733115d487981ee131da4ed6d75a681c1b690aa21978a00897616206d8` 禁止部署。
