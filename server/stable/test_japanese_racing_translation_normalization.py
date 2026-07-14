@@ -195,6 +195,48 @@ class JapaneseRacingFormatPlanTests(TestCase):
         self.assertEqual(exact[0].entity_type, "unknown_horse")
         self.assertEqual(exact[0].external_horse_ids, ["SESSION-HORSE"])
 
+    def test_chinese_translation_of_foreign_horse_does_not_match_japanese_common_word(self):
+        foreign_horse = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_ja="Movin Out",
+            target_zh="出走",
+            priority=100,
+        )
+        japanese_horse = _term("テストホース", "测试马")
+
+        resolution = resolve_article_entities(
+            "出走予定",
+            "テストホースが次走に出走する。",
+            source_language=SourceLanguage.JAPANESE,
+        )
+
+        self.assertFalse(any(item.term_id == foreign_horse.id for item in resolution.entities))
+        exact = [item for item in resolution.entities if item.term_id == japanese_horse.id]
+        self.assertEqual([item.matched_text for item in exact], ["テストホース"])
+        self.assertEqual(resolution.machine_horse_tags, ["测试马"])
+
+    def test_chinese_article_still_matches_foreign_horse_by_chinese_target(self):
+        horse = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            racing_region=RacingRegion.HONG_KONG,
+            source_ja="Romantic Warrior",
+            target_zh="浪漫勇士",
+            priority=100,
+        )
+
+        resolution = resolve_article_entities(
+            "浪漫勇士復出",
+            "浪漫勇士將於下月復出。",
+            source_language=SourceLanguage.CHINESE_TRADITIONAL,
+        )
+
+        exact = [item for item in resolution.entities if item.term_id == horse.id]
+        self.assertEqual([item.matched_text for item in exact], ["浪漫勇士", "浪漫勇士"])
+        self.assertEqual(resolution.machine_horse_tags, ["浪漫勇士"])
+
     def test_workout_time_has_exact_format_and_plain_seconds_are_untouched(self):
         source = "5ハロン64秒5―11秒7をマーク。別の時計は64秒5だった。"
         resolution = resolve_article_entities("", source, source_language=SourceLanguage.JAPANESE)

@@ -345,19 +345,19 @@ def _build_article_entity_index(rows: Iterable[tuple[str, str]]) -> ArticleEntit
                 Q(candidate_key__in=query_keys) | Q(pk__in=alias_term_ids)
             )
         else:
-            entry_queryset = entry_queryset.annotate(candidate_key=Lower("source_ja")).filter(
+            entry_filter = (
                 Q(source_ja__in=keys)
                 | Q(candidate_key__in=query_keys)
-                | Q(target_zh__in=keys)
                 | Q(pk__in=alias_term_ids)
             )
+            if language in {SourceLanguage.CHINESE, SourceLanguage.CHINESE_TRADITIONAL}:
+                entry_filter |= Q(target_zh__in=keys)
+            entry_queryset = entry_queryset.annotate(candidate_key=Lower("source_ja")).filter(entry_filter)
         entries = list(entry_queryset.order_by("-priority", "source_ja", "id"))
         terms_by_entry: dict[int, list[str]] = {}
         for entry in entries:
             if entry.source_language == language:
                 terms_by_entry.setdefault(entry.id, []).extend(entry.all_japanese_terms())
-            if entry.target_zh and entry.target_zh in keys:
-                terms_by_entry.setdefault(entry.id, []).append(entry.target_zh)
             if language in {SourceLanguage.CHINESE, SourceLanguage.CHINESE_TRADITIONAL}:
                 terms_by_entry.setdefault(entry.id, []).extend([entry.target_zh, *(entry.aliases_zh or [])])
         for alias in matched_aliases:

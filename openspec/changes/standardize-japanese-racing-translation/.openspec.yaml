@@ -56,3 +56,9 @@ journal:
     issues_resolved: 1
     verdict: approved
     note: "8287 生产回归显示不透明 SEED 编号缺少逐出现次语义；初始 prompt 新增编号到精确中文及源词映射，107 项关联回归通过，本轮 review 零问题。"
+  - event: code-reviewed
+    date: "2026-07-14T12:27:00+08:00"
+    rounds: 2
+    issues_resolved: 1
+    verdict: approved
+    note: "随机样本 8367 暴露英文马名中文译名反向污染日文普通词；限定 target_zh 仅用于中文/繁中文章匹配并保留跨语言中文正例，157 项关联回归通过，最终 review 零问题。"
