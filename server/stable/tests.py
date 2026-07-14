@@ -16393,7 +16393,10 @@ class HorseProfilePageMvpTests(TestCase):
 
     def test_article_horse_scan_and_detail_tags_respect_removed_and_public_rules(self):
         profile = self._profile()
-        article = self._article()
+        article = self._article(
+            title="イクイノックス宝塚記念勝利",
+            body="イクイノックスはレースで好走した。",
+        )
         result = scan_article_horse_links(article=article, commit=True)
         detail_response = self.client.get(reverse("public-article-detail", args=[article.id]))
         link = ArticleHorseLink.objects.get(article=article, horse_profile=profile)

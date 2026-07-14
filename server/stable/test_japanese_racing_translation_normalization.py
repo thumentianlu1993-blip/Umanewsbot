@@ -323,6 +323,65 @@ class JapaneseTranslationProviderIntegrationTests(TestCase):
             ["记录", "记录"],
         )
 
+    def test_seeded_term_restoration_deduplicates_model_suffix_at_placeholder_boundary(self):
+        article = _article(body="タイプは不器用で、オープン級を2勝した。")
+        provider = self._provider()
+        resolution = resolve_article_entities(
+            article.title_ja,
+            article.body_ja_normalized,
+            source_language=SourceLanguage.JAPANESE,
+        )
+        format_plan = _normalization_module().build_japanese_format_plan(
+            article.title_ja,
+            article.body_ja_normalized,
+            resolution,
+        )
+        seed_plan = _normalization_module().build_japanese_seed_term_plan(
+            article.title_ja,
+            article.body_ja_normalized,
+            resolution,
+            format_plan,
+        )
+        placeholders = {item.source_text: item.placeholder for item in seed_plan.items}
+        response = _fake_response(
+            body=(
+                f"虽属不够灵活的{placeholders['タイプ']}类型，"
+                f"但在{placeholders['オープン']}级别赛事两胜。"
+            )
+        )
+
+        with patch.object(provider, "_request_completion", return_value=response):
+            result = provider.translate(article)
+
+        self.assertEqual(result.body_zh, "虽属不够灵活的类型，但在公开级别赛事两胜。")
+        self.assertNotIn("类型类型", result.body_zh)
+        self.assertNotIn("公开级级别", result.body_zh)
+
+    def test_seeded_term_restoration_keeps_legitimate_single_character_boundary(self):
+        module = _normalization_module()
+        plan = module.JapaneseSeedTermPlan(
+            protected_title="",
+            protected_body="__UMA_SEED_1__会场",
+            items=(
+                module.JapaneseSeedTermItem(
+                    placeholder="__UMA_SEED_1__",
+                    field_name="body",
+                    source_text="セール",
+                    target_text="拍卖会",
+                    start=0,
+                    end=3,
+                ),
+            ),
+        )
+
+        restored = module.restore_japanese_seed_term_placeholders(
+            plan.protected_body,
+            plan,
+            field_name="body",
+        )
+
+        self.assertEqual(restored, "拍卖会会场")
+
     @override_settings(TRANSLATION_MAX_ATTEMPTS=2)
     def test_missing_seed_term_placeholder_retries_then_restores_exact_target(self):
         article = _article(body="スピードがある。")

@@ -525,5 +525,33 @@ def restore_japanese_seed_term_placeholders(
     restored = text or ""
     for item in plan.items:
         if field_name is None or item.field_name == field_name:
-            restored = restored.replace(item.placeholder, item.target_text)
+            search_from = 0
+            while True:
+                start = restored.find(item.placeholder, search_from)
+                if start < 0:
+                    break
+                suffix_start = start + len(item.placeholder)
+                suffix = restored[suffix_start:]
+                overlap = _seed_term_boundary_overlap(item.target_text, suffix)
+                restored = (
+                    restored[:start]
+                    + item.target_text
+                    + suffix[overlap:]
+                )
+                search_from = start + len(item.target_text)
     return restored
+
+
+def _seed_term_boundary_overlap(target_text: str, following_text: str) -> int:
+    """Return only unambiguous overlap introduced beside a seed placeholder."""
+
+    max_overlap = min(len(target_text), len(following_text))
+    for length in range(max_overlap, 1, -1):
+        if target_text[-length:] == following_text[:length]:
+            return length
+
+    # `公开级` + `级别` is a common model expansion around the protected term.
+    # Other one-character overlaps may be legitimate, e.g. `拍卖会` + `会场`.
+    if target_text.endswith("级") and following_text.startswith("级别"):
+        return 1
+    return 0
