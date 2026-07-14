@@ -285,6 +285,9 @@ class JapaneseTranslationProviderIntegrationTests(TestCase):
             result = provider.translate(article)
 
         self.assertEqual(request.call_count, 2)
+        retry_prompt = request.call_args_list[1].args[0][1]["content"]
+        self.assertIn("本次具体异常占位符：__UMA_SEED_1__", retry_prompt)
+        self.assertIn("不得合并、压缩或省略原文细节", retry_prompt)
         self.assertEqual(result.body_zh, "速度很快。")
 
     @override_settings(TRANSLATION_MAX_ATTEMPTS=1)

@@ -43,7 +43,7 @@
 - 首次遗漏时用现有 retry hint 重试；第二次仍遗漏抛 `TranslationResponseError`。
 - 成功时 `TranslationRun.raw_response.japanese_format_normalizations` 记录 placeholder、rule、field、source、target。
 - 种子术语使用独立的 `__UMA_SEED_n__` 字段级占位符；模型即使倾向把“记录”改成“纪录”，最终仍逐字恢复迁移指定目标。
-- 种子术语占位符遗漏时重试，最终遗漏、重复或跨标题/正文字段放置时显式失败；元数据记录来源 span 与精确目标。
+- 种子术语占位符遗漏时，重试提示列出具体异常编号并要求从头逐段完整重译；最终遗漏、重复或跨标题/正文字段放置时显式失败，元数据记录来源 span 与精确目标。
 - `セレクトセール` 内部重叠的 `セール` 不得生成第二个占位符或破坏较长词。
 - 与 `__UMA_KEEP_n__`、`__UMA_TERM_n__` 同时存在时互不覆盖，最终无内部 placeholder 残留。
 

@@ -439,9 +439,14 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             )
             if seed_term_violations:
                 last_metadata["japanese_seed_term_placeholder_violations"] = seed_term_violations
+                affected_placeholders = "、".join(
+                    sorted({item["placeholder"] for item in seed_term_violations})
+                )
                 retry_hint = (
                     "\n\n注意：上一版遗漏、重复或跨字段放置了种子术语占位符。"
-                    "请在原占位符所属的标题或正文中各原样复制一次 __UMA_SEED_数字__ 占位符。"
+                    f"本次具体异常占位符：{affected_placeholders}。"
+                    "请从头逐段完整重译，不得合并、压缩或省略原文细节；"
+                    "在原占位符所属的标题或正文中各原样复制一次 __UMA_SEED_数字__ 占位符。"
                 )
                 if attempt < max_attempts:
                     continue
