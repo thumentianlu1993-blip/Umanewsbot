@@ -272,6 +272,8 @@ class JapaneseTranslationProviderIntegrationTests(TestCase):
         prompt = request.call_args.args[0][1]["content"]
         self.assertIn("__UMA_SEED_1__", prompt)
         self.assertIn("__UMA_SEED_2__", prompt)
+        self.assertIn("[seed-placeholder] __UMA_SEED_1__ => 记录（源词：レコード", prompt)
+        self.assertIn("[seed-placeholder] __UMA_SEED_2__ => 记录（源词：レコード", prompt)
         self.assertEqual(result.title_zh, "记录更新")
         self.assertEqual(result.body_zh, "记录を更新した。")
         self.assertEqual(
