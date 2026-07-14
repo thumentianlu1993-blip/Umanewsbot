@@ -411,7 +411,16 @@ class FranceGalopEnglishNewsAdapter(SimpleInternationalNewsAdapter):
         raw = (date_node.get("datetime") or date_node.get_text(" ", strip=True) or "").strip()
         parsed = dateparse.parse_datetime(raw)
         if parsed is None:
-            for pattern in ("%d %B %Y - %H:%M", "%d %B %Y", "%B %d, %Y - %H:%M", "%B %d, %Y"):
+            for pattern in (
+                "%A, %B %d, %Y - %H:%M",
+                "%A, %B %d, %Y",
+                "%a, %B %d, %Y - %H:%M",
+                "%a, %B %d, %Y",
+                "%d %B %Y - %H:%M",
+                "%d %B %Y",
+                "%B %d, %Y - %H:%M",
+                "%B %d, %Y",
+            ):
                 try:
                     parsed = datetime.strptime(raw, pattern)
                     break

@@ -165,6 +165,10 @@ class Command(BaseCommand):
                         )
                         continue
                     published_at = detail.published_at or stub.published_at
+                    published_evidence = (detail.metadata or {}).get("published_at_evidence") or {}
+                    published_verified = (detail.metadata or {}).get("published_at_verified")
+                    if published_verified is None:
+                        published_verified = detail.published_at is not None
                     body_length = len(detail.body_ja_normalized or detail.body_ja_raw or "")
                     source_result["parse_quality"]["detail_sample_count"] += 1
                     source_result["parse_quality"]["detail_body_length"] = max(
@@ -176,6 +180,8 @@ class Command(BaseCommand):
                             "title": detail.title_ja or stub.title_ja,
                             "url": stub.source_url,
                             "published_at": published_at.isoformat() if published_at else "",
+                            "published_at_verified": bool(published_verified),
+                            "published_at_evidence": published_evidence,
                             "body_length": body_length,
                             "has_html": bool(detail.original_content_html),
                             "rank": stub.rank,

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import io
 import json
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone as dt_timezone
 from unittest.mock import patch
@@ -712,6 +714,47 @@ class GoldSetQualityTests(TestCase):
         self.assertNotIn("region_accuracy", report.no_go_reasons)
         self.assertTrue(report.qualified)
 
+    def test_out_of_scope_related_evidence_does_not_reduce_operational_precision(self):
+        from stable.services.attribution_quality import GoldLabel, evaluate_gold_set
+
+        labels = self.labels(per_region=50)
+        label = labels[0]
+        labels[0] = replace(label, expected_related_regions=[RacingRegion.OTHER])
+        actual = {
+            item.key: {
+                "input_sha256": item.input_sha256,
+                "primary_region": item.expected_primary_region,
+                "related_regions": [RacingRegion.OTHER] if item.key == label.key else item.expected_related_regions,
+            }
+            for item in labels
+        }
+
+        report = evaluate_gold_set(labels, actual)
+
+        self.assertEqual(report.related_precision, 1.0)
+        self.assertEqual(report.related_recall, 1.0)
+        self.assertTrue(report.qualified)
+
+    def test_gold_supported_low_confidence_primary_change_is_not_unsupported(self):
+        from stable.services.attribution_quality import evaluate_gold_set
+
+        labels = self.labels(per_region=50)
+        actual = {
+            label.key: {
+                "input_sha256": label.input_sha256,
+                "primary_region": label.expected_primary_region,
+                "related_regions": label.expected_related_regions,
+                "unsupported_primary_change": True,
+            }
+            for label in labels
+        }
+
+        report = evaluate_gold_set(labels, actual)
+
+        self.assertEqual(report.unsupported_primary_change_rate, 0.0)
+        self.assertNotIn("unsupported_primary_change", report.no_go_reasons)
+        self.assertTrue(report.qualified)
+
     def test_report_includes_precision_recall_spread_lock_and_wilson_intervals(self):
         from stable.services.attribution_quality import evaluate_gold_set
 
@@ -1020,6 +1063,9 @@ class AttributionRunLedgerTests(TransactionTestCase):
         with patch(
             "stable.services.attribution_runs.apply_validation_outcome",
             side_effect=AssertionError("all-article attribution backfill must not rewrite gate state"),
+        ), patch(
+            "stable.services.attribution_runs.validate_rewrite",
+            side_effect=AssertionError("all-article attribution backfill must not scan publish gates"),
         ):
             result = commit_attribution_run(run.id, manifest_sha256=run.manifest_sha256)
 
@@ -1116,14 +1162,18 @@ class AttributionCommandContractTests(TestCase):
             article_with_text(f"Routine update for {region}", region=region)
 
         stdout = io.StringIO()
-        call_command(
-            "reprocess_multiregion_attribution_gates",
-            dry_run=True,
-            scope="all_articles",
-            review_sample_per_region=1,
-            json=True,
-            stdout=stdout,
-        )
+        with patch(
+            "stable.services.attribution_runs.validate_rewrite",
+            side_effect=AssertionError("all-article audit must skip publish-gate validation by default"),
+        ):
+            call_command(
+                "reprocess_multiregion_attribution_gates",
+                dry_run=True,
+                scope="all_articles",
+                review_sample_per_region=1,
+                json=True,
+                stdout=stdout,
+            )
 
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload["scope"], "all_articles")
@@ -1136,10 +1186,10 @@ class AttributionCommandContractTests(TestCase):
         self.assertIn(locked.id, payload["review_checklist_ids"])
         self.assertEqual(payload["restored_candidate_ids"], [])
         self.assertEqual(payload["still_blocked_ids"], [])
-        self.assertEqual(
-            set(payload["validation_passed_ids"] + payload["validation_blocked_ids"]),
-            set(payload["candidate_ids"]),
-        )
+        self.assertFalse(payload["validation_included"])
+        self.assertEqual(payload["validation_passed_ids"], [])
+        self.assertEqual(payload["validation_blocked_ids"], [])
+        self.assertEqual(set(payload["validation_skipped_ids"]), set(payload["candidate_ids"]))
         self.assertTrue(
             set(payload["primary_change_ids"] + payload["needs_review_ids"]).issubset(
                 payload["review_checklist_ids"]
@@ -1183,6 +1233,131 @@ class AttributionCommandContractTests(TestCase):
         self.assertEqual(payload["candidate_count"], 2)
         self.assertTrue(payload["has_more_candidates"])
         self.assertFalse(payload["scope_complete"])
+
+    def test_existing_run_can_export_review_without_inference_or_gate_validation(self):
+        from stable.services.attribution_runs import create_attribution_dry_run
+
+        add_term("Prix de Diane", TermType.RACE, RacingRegion.FRANCE)
+        article = article_with_text(
+            "Prix de Diane at Chantilly",
+            region=RacingRegion.UNITED_STATES,
+        )
+        run = create_attribution_dry_run(
+            [article],
+            rule_version=ATTRIBUTION_RULE_VERSION,
+            gold_version="gold-v1",
+            metrics={"qualified": True},
+            selectors={
+                "scope": "all_articles",
+                "scope_complete": True,
+                "review_sample_per_region": 1,
+            },
+        )
+
+        stdout = io.StringIO()
+        with patch(
+            "stable.services.attribution_runs.infer_article_attribution",
+            side_effect=AssertionError("existing-run export must not infer again"),
+        ), patch(
+            "stable.services.attribution_runs.validate_rewrite",
+            side_effect=AssertionError("existing-run export must not validate gates by default"),
+        ):
+            call_command(
+                "export_multiregion_attribution_run",
+                run_id=run.id,
+                manifest_sha256=run.manifest_sha256,
+                json=True,
+                stdout=stdout,
+            )
+
+        payload = json.loads(stdout.getvalue())
+        self.assertTrue(payload["exported_from_existing_run"])
+        self.assertEqual(payload["candidate_ids"], [article.id])
+        self.assertEqual(payload["primary_change_ids"], [article.id])
+        self.assertEqual(payload["validation_skipped_ids"], [article.id])
+        self.assertTrue(payload["outcomes"][0]["fingerprint_matches"])
+
+    def test_existing_run_export_writes_new_json_file_atomically_and_refuses_overwrite(self):
+        from stable.services.attribution_runs import create_attribution_dry_run
+
+        article = article_with_text("Prix de Diane at Chantilly")
+        run = create_attribution_dry_run(
+            [article],
+            rule_version=ATTRIBUTION_RULE_VERSION,
+            gold_version="gold-v1",
+            metrics={"qualified": True},
+            selectors={"scope": "all_articles", "scope_complete": True},
+        )
+
+        with TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "audit" / "run.json"
+            call_command(
+                "export_multiregion_attribution_run",
+                run_id=run.id,
+                manifest_sha256=run.manifest_sha256,
+                output=str(output_path),
+                stdout=io.StringIO(),
+            )
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["candidate_ids"], [article.id])
+            self.assertEqual(list(output_path.parent.glob("*.tmp")), [])
+
+            with self.assertRaisesMessage(CommandError, "拒绝覆盖"):
+                call_command(
+                    "export_multiregion_attribution_run",
+                    run_id=run.id,
+                    manifest_sha256=run.manifest_sha256,
+                    output=str(output_path),
+                    stdout=io.StringIO(),
+                )
+
+    def test_existing_run_export_requires_review_and_skips_validation_after_article_drift(self):
+        from stable.services.attribution_runs import build_attribution_review_report, create_attribution_dry_run
+
+        article = article_with_text("Prix de Diane at Chantilly")
+        run = create_attribution_dry_run(
+            [article],
+            rule_version=ATTRIBUTION_RULE_VERSION,
+            gold_version="gold-v1",
+            metrics={"qualified": True},
+            selectors={"scope": "all_articles", "scope_complete": True},
+        )
+        article.body_ja_normalized = "Article changed after the persisted dry-run."
+        article.save(update_fields=["body_ja_normalized", "updated_at"])
+
+        with patch(
+            "stable.services.attribution_runs.validate_rewrite",
+            side_effect=AssertionError("drifted article must not be validated against stale attribution"),
+        ):
+            report = build_attribution_review_report(run, include_gate_validation=True)
+
+        self.assertEqual(report["drifted_article_ids"], [article.id])
+        self.assertIn(article.id, report["review_checklist_ids"])
+        self.assertEqual(report["validation_skipped_ids"], [article.id])
+        self.assertEqual(report["outcomes"][0]["validation_reason"], "article_fingerprint_drift")
+
+    def test_existing_run_export_rejects_candidate_fingerprint_drift(self):
+        from stable.services.attribution_runs import create_attribution_dry_run
+
+        article = article_with_text("Prix de Diane at Chantilly")
+        run = create_attribution_dry_run(
+            [article],
+            rule_version=ATTRIBUTION_RULE_VERSION,
+            gold_version="gold-v1",
+            metrics={"qualified": True},
+            selectors={"scope": "all_articles", "scope_complete": True},
+        )
+        run.candidate_fingerprint = "0" * 64
+        run.save(update_fields=["candidate_fingerprint", "updated_at"])
+
+        with self.assertRaisesMessage(CommandError, "偏离原审核 manifest"):
+            call_command(
+                "export_multiregion_attribution_run",
+                run_id=run.id,
+                manifest_sha256=run.manifest_sha256,
+                json=True,
+                stdout=io.StringIO(),
+            )
 
 
 @tag("postgresql", "performance")

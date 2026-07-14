@@ -3,6 +3,13 @@
 最后更新时间：`2026-07-14`
 当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP、公开首页资讯流、抓取新鲜度修复、后台快速术语创建与当前稿术语应用、外部马名索引识别链路、榜单重点 QQ 推送、公开文章 ID URL、国际赛马资讯扩展、多地区生产窗口、术语种子数据准备、赛事日历 MVP 和马匹详情页 MVP 均已部署生产）
 
+## 2026-07-14 多地区归属 V3 生产审计性能修复
+
+- 生产首个 72 小时全量 run 已覆盖 597 篇，但旧报告阶段因逐篇发布门禁超过 30 分钟而中断。当前分支已把全量归属报告与门禁复核拆开，并支持从持久 run 原子重建审核 JSON；缺失/漂移文章自动必审，run 内容漂移直接拒绝。
+- 159 条单审 Gold 当前有 21 条正文 SHA 漂移；原审核快照对账预计可安全续签 18 条，标题变化、正文异常缩短和推断变化各 1 条继续阻断。该结果尚待新代码部署后在生产只读命令中生成正式 artifact 与 SHA。
+- France Galop 已补星期前缀英文日期解析和 probe 时间证据字段；部署后应能把真实官方日期标为 verified，而不是使用抓取时间。当前生产多地区 mode 与相关查询仍关闭，尚未进入 24 小时 Shadow。
+- 本地专项 109 项、完整 stable 1396 项、一次性 PostgreSQL 250 篇性能契约和 OpenSpec 29/29 均通过。下一步是提交/构建安全关闭候选，生产只读重建 Gold 与 72 小时报告，再依据完整清单决定是否开始 Shadow。
+
 > 角色说明：
 > 本文档用于保留项目级概览与摘要信息。
 > 当前真实工作状态、最近一次关键修复、线上实际进展，请以 [docs/current_state.md](E:/Codex/docs/current_state.md) 为准。
@@ -12,7 +19,7 @@
 - `scale-and-isolate-historical-race-batches` 已把 batch006+ 单地区标准上限统一为 250，并将可恢复的独立 historical runner、迁移 `0031`、最小权限 provisioning、隔离 smoke、迁移暂停 preflight 和独立 infrastructure bootstrap 部署到生产。当前生产镜像为 `sha256:33055eb8...25385` / revision `8741de98`。
 - runner 使用数据库租约 + runtime 文件锁、30 秒心跳/180 秒租约、固定镜像与 plan/input/output SHA checkpoint；crawl 只有网络和控制账本权限，apply 只有内部数据库写入权限，全部历史 RaceEvent 继续保持 draft。
 - 生产 runner smoke、双锁、暂停/恢复、越权拒绝和普通部署不干扰均已通过；batch006 selection 已生成 `1061` 场，五地区为 `250/61/250/250/250`，与前四个有效批次零重叠。正式网络抓取尚未启动。
-- smoke 后发现直接 `python_tool` 未强制继承请求/cache/磁盘预算，且生产仅余约 2.8 GiB，低于 5 GiB 门禁。已按 OpenSpec 补充宿主与 Django 双层校验、共享账本、失败/强杀 checkpoint、显式赛事工具白名单及嵌套 AdapterRunner 收紧继承；第七轮 review 无问题，本地 runner `64/64`、historical 组合 `200/200`、完整 `stable 1399/1399` 通过（跳过 7）。待提交、新镜像、释放生产空间和强化 smoke 完成后才允许启动 batch006。
+- smoke 后发现直接 `python_tool` 未强制继承请求/cache/磁盘预算，且生产仅余约 2.8 GiB，低于 5 GiB 门禁。已按 OpenSpec 补充宿主与 Django 双层校验、共享账本、失败/强杀 checkpoint、显式赛事工具白名单及嵌套 AdapterRunner 收紧继承；第七轮 review 无问题，本地 runner `64/64`、historical 组合 `200/200`。合入最新主线后交叉专项 `233/233`（跳过 1）、完整 `stable 1409/1409` 通过（跳过 7）。待新镜像、释放生产空间和强化 smoke 完成后才允许启动 batch006。
 ## 2026-07-14 多地区归属 V3 性能与审核策略
 
 - 已用临时 PostgreSQL 16 和真实校准规模完成 250 篇基准。首次发现来源配置 N+1 导致 254 SQL；批上下文增加 17 个来源一次预加载后，五轮稳定为 5 SQL、1.66–2.14 秒、约 49 MiB，性能门槛已通过。

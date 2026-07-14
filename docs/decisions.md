@@ -1,5 +1,12 @@
 # 关键决策
 
+## 2026-07-14：全量归属审计不再隐式执行发布门禁，Gold 漂移采用保守续签
+
+- `--scope all_articles` 用于验证归属差异，不用于恢复术语门禁；默认不得逐篇调用 `validate_rewrite()`。确需同时复核门禁时必须显式传 `--include-gate-validation`，默认 `gate_candidates` 仍保持原门禁补跑语义。
+- 持久 dry-run 是审计真相。报告进程中断后应使用同一 run ID 与 manifest 导出，不重复推断；导出必须验证 manifest 和 candidate fingerprint，原子写新文件并拒绝覆盖既有证据。文章缺失/漂移必须进入必审清单，不能拿旧归属结果校验已变化正文。
+- Gold 输入 SHA 只可在原审核身份、来源 URL、规范化标题、正文长度/语义以及当前推断与人工结论均稳定时自动刷新。重复 key/article、正文异常缩短、标题变化或推断变化均保持漂移，不以“凑足 150 条”为由放宽。
+- 相关地区质量门槛只评估五个实际运营频道；`other` 可保存为证据，但不计入五频道 precision/recall。低置信度主地区变化只有在同时违背人工期望时才算无依据变化，避免把 Gold 明确认可的变化反向计为错误。
+
 ## 2026-07-14：historical runner 资源门禁必须由宿主与应用双层强制
 
 - crawl phase 的 `RACE_EVENT_CRAWL_*` 不能直接继承 plan 或宿主环境。runner 父进程必须用批准 settings 覆盖子进程，并让同一 run 的所有 step 共用 artifact 根目录下的请求账本和 source-cache manifest。

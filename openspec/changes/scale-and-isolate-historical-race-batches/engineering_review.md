@@ -102,4 +102,4 @@ Next: Ready for complete test-case specification, then implementation.
 
 第六轮复审发现并解决 `F-013`：资源身份只在 step 成功后写 checkpoint，首个 crawl step 消耗请求后失败时仍可在恢复前删除账本并重置累计额度。runner 现于取得双锁后先保存资源基线；任何已启动 step 的可控失败在释放锁前刷新失败时资源身份，异常强杀未执行收尾时则由基线与磁盘漂移阻断恢复。
 
-第七轮复审重新核对宿主与应用双层资源校验、共享账本、失败/强杀恢复、工具白名单、嵌套 AdapterRunner、数据库与文件 checkpoint 原子性及非 crawl 兼容路径，没有发现新的 actionable finding。最终 runner 聚焦 `64/64`、historical 组合 `200/200`、完整 `stable 1399/1399` 通过（跳过 7 个既有环境专项）；Django check、migration drift、shell、diff 和 OpenSpec strict/all 通过。
+第七轮复审重新核对宿主与应用双层资源校验、共享账本、失败/强杀恢复、工具白名单、嵌套 AdapterRunner、数据库与文件 checkpoint 原子性及非 crawl 兼容路径，没有发现新的 actionable finding。runner 聚焦 `64/64`、historical 组合 `200/200`、补丁完整 `stable 1399/1399` 通过；合入最新多地区归属主线后交叉专项 `233/233`（跳过 1）、完整 `stable 1409/1409` 通过（跳过 7 个既有环境专项）。Django check、migration drift、shell、diff 和 OpenSpec strict/all 通过。

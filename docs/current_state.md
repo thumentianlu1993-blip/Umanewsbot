@@ -1,12 +1,21 @@
 # 当前状态
 
+## 2026-07-14 多地区归属 V3 审计性能与 Gold 漂移修复待部署
+
+- 生产首次 72 小时 `all_articles` dry-run 已持久化 `597` 篇候选，但旧命令在归属推断后又逐篇执行发布门禁，运行超过 30 分钟后被终止，stdout 报告为空；run `#1` 与 manifest 仍在数据库。现已将全量归属审计和发布门禁复核拆开，`all_articles` 默认只生成归属报告，默认门禁补跑范围仍保持原行为。
+- 新增从持久 run 直接导出审核报告的命令，不重复执行归属推断；支持原子写入新 JSON 文件并拒绝覆盖既有证据。文章缺失或指纹漂移会进入必审清单，漂移文章不再使用旧归属结果校验新正文；candidate fingerprint 或 manifest 漂移时拒绝导出/commit。
+- 159 条单审 Gold 在当前生产正文上有 `21` 条输入 SHA 漂移。对照用户原审核快照后，`18` 条满足来源 URL、标题、正文语义/长度和当前推断结论全部稳定，可保守刷新 SHA；`8230` 标题变化、`8088` 正文异常缩短、`7898` 当前推断与人工相关地区结论不同，继续阻断。新增命令只输出对账工件，不修改数据库，重复身份或既有输出目录一律 fail closed。
+- 相关地区 precision/recall 现在只计算日本、中国香港、英国、法国、美国五个实际运营频道；`other` 继续保留为审计证据，但不会因系统没有第六个频道而制造假阳性。低置信度主地区变化若与人工 Gold 主地区一致，不再误计为“无依据变化”。
+- France Galop 英文页面真实日期形如 `Sunday, July 12, 2026 - 19:04`；旧 parser 缺少星期前缀格式，导致新稿被标记为时间不可信。适配器已补充长/短星期格式，来源 probe 同时输出 `published_at_verified` 与证据，部署后须以真实页面确认纠正。
+- 专项 `109` 项通过（另 1 项 SQLite 环境跳过）；完整 `stable 1396` 项通过（7 项环境专项跳过）；一次性 PostgreSQL 16 上 250 篇性能契约通过，测试体 `0.219s`，满足 SQL/30 秒/256 MiB 三项门槛；OpenSpec strict/all `29/29` 通过。当前分支尚未提交或部署，生产归属 mode 与相关地区查询仍保持关闭，Shadow 尚未开始计时。
+
 ## 2026-07-14 historical runner 生产上线、batch006 selection 与资源门禁补丁
 
 - 独立 historical runner 第一版已完成生产部署：web/worker/beat 统一运行 image `sha256:33055eb824e4166470d692206404bebbff4057df44647bd2b3029adb21c25385`、revision `8741de98c59430c040afa1ce1737e948ba14eac3`，迁移 `stable.0031_historical_batch_runner` 已应用。写前 custom-format 备份为 `/opt/umanewsbot/backups/db/pre-main-8741de98-20260714_185105.dump`，`137354931` bytes，SHA-256 `f5126ea6f69dbfbc11dc40f0c85cf1dbf05a6e2c7c678e2ccf123ea46b10073e`，`pg_restore -l` 通过。
 - 生产 provisioning 已创建 internal DB/egress 两张 runner 网络、最小权限 `historical_runner_control` 角色和 0600 secret 目录。`runner-smoke-20260714-1920` 已证明 crawl 业务表写入被 PostgreSQL 拒绝、apply 无公网出口、双锁冲突、40 秒 step 心跳、暂停/恢复不重复、checkpoint SHA、迁移 preflight 和普通 `--no-deps` web 更新不干扰 DB/Redis/runner 网络；smoke 容器与一次性 secret 已清理。
 - batch006 selection 已在生产正式总账上生成于 `/opt/umanewsbot/runtime/historical_race_batches/2016-2025-batch-006-20260714`：共 `1061` 场，法国 `250`、香港 `61`、日本 `250`、英国 `250`、美国 `250`；与 batch002、有效 batch003、batch004、batch005 共 `1000` 个旧 target 交集为 0，香港已抓空并退出后续地区进度比较。manifest SHA-256 为 `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`，正式总账 SHA-256 为 `ac61298f242b2c649c403eae4741771a43cdb027befef20bc75e18fe34bcbad7`。
 - 正式网络抓取尚未启动。生产 smoke 后发现直接 `python_tool` 子进程未继承编排层的请求预算、source-cache 上限和磁盘底线；生产 artifact 文件系统当时仅余约 `2.8 GiB`，低于批准的 `5 GiB`。本线程在任何 batch006 网络请求前主动停止，未产生真实请求账本、source cache 或赛事写入。
-- 现已在同一 OpenSpec change 中补充资源门禁：宿主脚本与 Django 服务双重拒绝请求预算超出 `1..250`、cache 超出 `1..2 GiB`、磁盘底线低于 `5 GiB`；crawl 父进程固定 1 秒请求间隔，并把共享请求账本/cache manifest 路径绑定到当前 artifact。嵌套 AdapterRunner 保留父级路径，数值只允许收紧；请求账本和 cache manifest 的存在状态、大小与 SHA 进入顶层 checkpoint，首步前保存基线且任何失败收尾刷新身份，暂停或失败期间创建、删除、修改会 blocked；固定生产工具根只允许显式赛事工具，术语等无关联网脚本即使 SHA 匹配也会拒绝。新增用例均先证明旧实现放行。第七轮复审无 actionable finding，runner `64/64`、historical 组合 `200/200`、完整 `stable 1399/1399` 通过（跳过 7）；当前仅待提交/候选镜像、生产磁盘治理与强化 smoke，完成前 batch006 继续保持未启动，历史常驻开关与公开开关保持关闭。
+- 现已在同一 OpenSpec change 中补充资源门禁：宿主脚本与 Django 服务双重拒绝请求预算超出 `1..250`、cache 超出 `1..2 GiB`、磁盘底线低于 `5 GiB`；crawl 父进程固定 1 秒请求间隔，并把共享请求账本/cache manifest 路径绑定到当前 artifact。嵌套 AdapterRunner 保留父级路径，数值只允许收紧；请求账本和 cache manifest 的存在状态、大小与 SHA 进入顶层 checkpoint，首步前保存基线且任何失败收尾刷新身份，暂停或失败期间创建、删除、修改会 blocked；固定生产工具根只允许显式赛事工具，术语等无关联网脚本即使 SHA 匹配也会拒绝。新增用例均先证明旧实现放行。第七轮复审无 actionable finding，runner `64/64`、historical 组合 `200/200`；合入最新多地区归属主线后交叉专项 `233/233`（跳过 1）、完整 `stable 1409/1409` 通过（跳过 7）。当前仅待候选镜像、生产磁盘治理与强化 smoke，完成前 batch006 继续保持未启动，历史常驻开关与公开开关保持关闭。
 
 ## 2026-07-14 batch006 扩容与独立 historical runner 本地实现
 
