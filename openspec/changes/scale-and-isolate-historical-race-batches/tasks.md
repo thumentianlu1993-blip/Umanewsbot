@@ -18,6 +18,8 @@
 - [x] 1.9 (integration) 新增生产工具根显式赛事工具白名单测试，确认术语联网脚本即使 SHA 匹配仍被旧实现放行。
 - [x] 1.10 (integration) 新增 AdapterRunner 父级固定路径与更严格数值继承测试，先确认嵌套编排会重置账本和间隔。
 - [x] 1.11 (integration) 新增首个 crawl step 消耗请求后失败的恢复测试，先确认失败前没有资源 checkpoint 时可删除账本并重置额度。
+- [x] 1.12 (integration) 新增生产 artifact plan 不得把 `tool_root` 指向 artifact 内自带脚本的回归测试，并先确认旧校验会错误放行。
+- [x] 1.13 (integration) 新增正式 stage 命令在工具根与 settings 不一致时不得创建 run 的回归测试，并先确认旧流程会留下无效控制记录。
 
 ## 2. 批次上限与 artifact 一致性
 
@@ -39,6 +41,7 @@
 - [x] 3.10 (integration) 对生产不可变工具根实施显式赛事 Python 工具白名单；保持测试临时工具根可注入，生产新增工具需代码 review。
 - [x] 3.11 (integration) AdapterRunner 检测父级 `RACE_EVENT_CRAWL_*` 约束，路径原样继承，数值按更严格者合并，普通非 runner 编排保持原路径。
 - [x] 3.12 (integration) crawl 取得双锁后先保存资源基线；任何已启动 step 的失败收尾在释放锁前刷新资源身份，强杀后恢复则由基线漂移 fail closed。
+- [x] 3.13 (integration) 生产 `/app/historical-runtime` plan 在遍历 step 前强制使用 `/app/runtime/tools`；正式管理命令还会在创建 run 前比对 settings 工具根，不再依赖执行阶段才阻止 artifact 工具旁路。
 
 ## 4. 生产隔离与生命周期脚本
 
@@ -58,6 +61,7 @@
 - [x] 5.4 (operations) 运行本 change strict 校验及全量 OpenSpec 校验，逐项核对 proposal/design/spec/tasks/test cases 一致性。
 - [x] 5.5 (application) 执行反复 `/review -> 修复 -> 重新 review`，直到第五轮没有任何 actionable finding；前四轮共修复 7 项问题。
 - [x] 5.6 (application) 完成资源预算补丁的聚焦/完整回归、OpenSpec/shell/diff 校验与反复 `/review -> 修复 -> 重新 review`，第七轮没有 actionable finding。
+- [x] 5.7 (integration) 完成生产工具根旁路补丁的测试优先实现；两轮复审修复生产子目录放行与拒绝前残留 run，最终 review 无 actionable finding，组合 `250/250`、完整 `stable 1425/1425` 通过。
 
 ## 6. 部署与 batch006 前验收
 

@@ -134,6 +134,8 @@
 | TC-PLAN-017 | 输出路径越出批准 batch root | 校验 | 拒绝，未创建外部文件 | A |
 | TC-PLAN-018 | 重复 step id 或循环依赖 | 校验 | 拒绝并指出 step | A |
 | TC-PLAN-019 | 生产工具根中的非赛事/不消费预算脚本 | 校验匹配 SHA 的 crawl plan | 显式白名单拒绝，不能借镜像内任意工具绕过预算 | A |
+| TC-PLAN-020 | 生产 artifact plan 把 `tool_root` 指向 artifact 内目录 | 校验匹配 SHA 的 crawl plan | 在 step 校验前拒绝，生产只能使用镜像内不可变工具根 | A |
+| TC-PLAN-021 | plan 工具根与运行 settings 不一致 | 通过正式 stage 命令启动 | 在创建 `HistoricalBatchRun` 前拒绝，不留下无效控制记录 | A |
 
 ## 6. Step、checkpoint、暂停和恢复
 

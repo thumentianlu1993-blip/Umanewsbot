@@ -284,6 +284,16 @@ class HistoricalBatchRunnerPlanTests(SimpleTestCase):
             ):
                 validate_runner_plan(plan)
 
+    def test_production_artifact_root_requires_immutable_image_tool_root(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = self._plan(root)
+            production_artifact_root = Path("/app/historical-runtime/batch-006")
+            plan["artifact_root"] = str(production_artifact_root)
+            plan["steps"][0]["outputs"] = [str(production_artifact_root / "out.json")]
+            with self.assertRaisesMessage(RunnerPlanError, "immutable image tool root"):
+                validate_runner_plan(plan)
+
     def test_apply_step_requires_approval_and_expected_sha(self):
         with TemporaryDirectory() as tmp:
             plan = self._plan(Path(tmp), phase="apply")
@@ -563,6 +573,61 @@ class HistoricalBatchRunnerStateTests(SimpleTestCase):
 
 
 class HistoricalBatchRunnerCommandTests(TestCase):
+    def test_run_stage_rejects_tool_root_mismatch_before_creating_run(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            artifact_root = root / "artifacts"
+            tool_root = root / "artifact-tools"
+            image_tool_root = root / "image-tools"
+            artifact_root.mkdir()
+            tool_root.mkdir()
+            image_tool_root.mkdir()
+            tool = tool_root / "sample.py"
+            tool.write_text("print('unsafe')\n", encoding="utf-8")
+            plan = {
+                "schema_version": "1.0",
+                "batch_id": "2016-2025-batch-006-tool-root-mismatch",
+                "phase": "crawl",
+                "network_enabled": True,
+                "write_enabled": False,
+                "image_id": "sha256:" + "1" * 64,
+                "image_revision": "a" * 40,
+                "artifact_root": str(artifact_root),
+                "tool_root": str(tool_root),
+                "tool_manifest": {
+                    tool.name: hashlib.sha256(tool.read_bytes()).hexdigest()
+                },
+                "steps": [
+                    {
+                        "id": "sample",
+                        "kind": "python_tool",
+                        "argv": ["python", str(tool)],
+                        "inputs": [],
+                        "outputs": [str(artifact_root / "out.json")],
+                    }
+                ],
+            }
+            plan_path = artifact_root / "runner-plan.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            token_path = root / "owner.token"
+            token_path.write_text("command-owner\n", encoding="utf-8")
+            token_path.chmod(0o600)
+            with (
+                override_settings(HISTORICAL_RUNNER_TOOL_ROOT=str(image_tool_root)),
+                self.assertRaisesMessage(CommandError, "immutable image tool root"),
+            ):
+                call_command(
+                    "run_historical_batch_stage",
+                    plan=str(plan_path),
+                    owner_token_file=str(token_path),
+                    lock_file=str(artifact_root / ".runner.lock"),
+                    run_id="mismatched-tool-root",
+                    stdout=StringIO(),
+                )
+            self.assertFalse(
+                HistoricalBatchRun.objects.filter(run_id="mismatched-tool-root").exists()
+            )
+
     def test_run_stage_command_creates_and_completes_registered_run(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
