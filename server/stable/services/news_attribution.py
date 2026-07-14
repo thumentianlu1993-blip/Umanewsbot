@@ -174,7 +174,7 @@ OPERATIONAL_REGIONS = (
     RacingRegion.FRANCE,
     RacingRegion.UNITED_STATES,
 )
-ATTRIBUTION_RULE_VERSION = "multiregion-v3.1"
+ATTRIBUTION_RULE_VERSION = "multiregion-v3.2"
 ENFORCE_NEW_ARTICLES_STAGES = {
     "new_articles",
     "web_test_groups",
@@ -607,8 +607,11 @@ def _japanese_source_keeps_home_focus(title_text: str, foreign_region: str) -> b
         return True
     if any(marker in title_text for marker in ["日本馬", "JRA所属馬", "日本調教馬"]):
         return True
-    if foreign_region == RacingRegion.FRANCE and any(marker in title_text for marker in ["挑戦", "登録", "予定"]):
-        return True
+    if foreign_region == RacingRegion.FRANCE:
+        if any(marker in title_text for marker in ["挑戦", "登録", "予定", "目指", "参戦", "遠征"]):
+            return True
+        if re.search(r"(?:凱旋門賞|ジャックルマロワ賞|ムーランドロンシャン賞)\s*へ(?:$|[\s　、。!！])", title_text):
+            return True
     if "夢" in title_text:
         return True
     return False
@@ -661,11 +664,43 @@ def _event_term_is_ambiguous(payload: dict, text: str) -> bool:
     if not term.isascii() or len(term.split()) != 1:
         return False
     if payload.get("term_type") == TermType.RACECOURSE:
-        return not re.search(
-            rf"\b(?:at|in|to|from)\s+(?:the\s+)?{re.escape(term.casefold())}\b",
-            text.casefold(),
+        folded = text.casefold()
+        escaped = re.escape(term.casefold())
+        return not (
+            re.search(rf"\b(?:at|in|to|from)\s+(?:the\s+)?{escaped}\b", folded)
+            or re.search(
+                rf"\b{escaped}(?:'s)?\s+(?:maiden|race|fixture|meeting|stakes|card|course)\b",
+                folded,
+            )
         )
     return payload.get("term_type") == TermType.RACE
+
+
+def _remove_event_terms_nested_in_events(event_payloads: list[dict], text: str) -> list[dict]:
+    terms = [
+        (payload, str(payload.get("source_term") or "").strip().casefold())
+        for payload in event_payloads
+        if str(payload.get("source_term") or "").strip()
+    ]
+    folded = text.casefold()
+    retained: list[dict] = []
+    for payload, term in terms:
+        containers = [
+            longer_term
+            for longer_payload, longer_term in terms
+            if payload is not longer_payload
+            and term != longer_term
+            and re.search(rf"(?<!\w){re.escape(term)}(?!\w)", longer_term)
+        ]
+        if not containers:
+            retained.append(payload)
+            continue
+        residual = folded
+        for longer_term in containers:
+            residual = re.sub(rf"(?<!\w){re.escape(longer_term)}(?!\w)", " ", residual)
+        if re.search(rf"(?<!\w){re.escape(term)}(?!\w)", residual):
+            retained.append(payload)
+    return retained
 
 
 def _remove_event_terms_nested_in_entities(event_payloads: list[dict], entity_payloads: list[dict]) -> list[dict]:
@@ -736,10 +771,15 @@ def infer_article_attribution(
         title_term_matches["event"],
         title_term_matches["entity"],
     )
+    title_term_matches["event"] = _remove_event_terms_nested_in_events(
+        title_term_matches["event"],
+        title_text,
+    )
     term_matches["event"] = _remove_event_terms_nested_in_entities(
         term_matches["event"],
         term_matches["entity"],
     )
+    term_matches["event"] = _remove_event_terms_nested_in_events(term_matches["event"], lead_text)
     lead_event_regions = _regions_from_term_payloads(
         [payload for payload in term_matches["event"] if not _event_term_is_ambiguous(payload, lead_text)]
     )

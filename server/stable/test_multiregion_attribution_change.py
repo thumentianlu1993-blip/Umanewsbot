@@ -435,6 +435,59 @@ class AttributionEvidenceHierarchyTests(TestCase):
 
         self.assertResult(result, RacingRegion.OTHER, {RacingRegion.UNITED_KINGDOM})
 
+    def test_one_word_racecourse_with_race_noun_beats_foreign_horse_origin(self):
+        add_term("Killarney", TermType.RACECOURSE, RacingRegion.OTHER)
+        add_term("Benvenuto Cellini", TermType.HORSE, RacingRegion.UNITED_KINGDOM)
+        article = article_with_text(
+            "Oklahoma Set for Benvenuto Cellini Maiden",
+            "The Killarney maiden is the next target.",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.OTHER, {RacingRegion.UNITED_KINGDOM})
+
+    def test_longer_out_of_scope_race_name_suppresses_nested_uk_race_name(self):
+        add_term("Irish Oaks", TermType.RACE, RacingRegion.OTHER)
+        add_term("Oaks", TermType.RACE, RacingRegion.UNITED_KINGDOM)
+        article = article_with_text(
+            "Earth Shot and Thundering On Among 11 Irish Oaks Confirmations",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.OTHER, {RacingRegion.UNITED_KINGDOM})
+
+    def test_nested_race_name_does_not_hide_a_separate_shorter_race_mention(self):
+        add_term("Irish Oaks", TermType.RACE, RacingRegion.OTHER)
+        add_term("Oaks", TermType.RACE, RacingRegion.UNITED_KINGDOM)
+        article = article_with_text(
+            "Irish Oaks contenders could later meet in the Oaks at Epsom",
+            region=RacingRegion.UNITED_STATES,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.UNITED_KINGDOM)
+        retained_terms = {
+            item["source_term"]
+            for item in result.evidence["title_term_matches"]["event"]
+        }
+        self.assertEqual(retained_terms, {"Irish Oaks", "Oaks"})
+
+    def test_japanese_horse_heading_to_arc_keeps_japan_primary(self):
+        article = article_with_text(
+            "アドマイヤテラ 10・4凱旋門賞へ 友道師「力の要る馬場は合っている」",
+            region=RacingRegion.JAPAN,
+            source_site=SourceSite.SPONICHI,
+        )
+
+        result = infer_article_attribution(article)
+
+        self.assertResult(result, RacingRegion.JAPAN, {RacingRegion.FRANCE})
+
     def test_local_source_is_not_reassigned_by_historical_lead_event(self):
         add_term("Prix Jean Prat", TermType.RACE, RacingRegion.FRANCE)
         article = article_with_text(
@@ -796,6 +849,30 @@ class GoldSetQualityTests(TestCase):
         self.assertEqual(report.valid_denominator, 248)
         self.assertEqual(report.unresolved_count, 1)
         self.assertEqual(report.drifted_count, 1)
+        self.assertEqual(report.unresolved_article_ids, [labels[0].article_id])
+        self.assertEqual(report.drifted_article_ids, [labels[1].article_id])
+
+    def test_quality_report_lists_primary_and_related_mismatch_article_ids(self):
+        from stable.services.attribution_quality import evaluate_gold_set
+
+        labels = self.labels()
+        actual = {
+            label.key: {
+                "input_sha256": label.input_sha256,
+                "primary_region": label.expected_primary_region,
+                "related_regions": label.expected_related_regions,
+            }
+            for label in labels
+        }
+        actual[labels[0].key]["primary_region"] = RacingRegion.OTHER
+        actual[labels[1].key]["related_regions"] = [RacingRegion.UNITED_STATES]
+        actual[labels[2].key]["related_regions"] = []
+
+        report = evaluate_gold_set(labels, actual)
+
+        self.assertEqual(report.primary_mismatch_article_ids, [labels[0].article_id])
+        self.assertEqual(report.related_false_positive_article_ids, [labels[1].article_id])
+        self.assertEqual(report.related_false_negative_article_ids, [labels[1].article_id, labels[2].article_id])
 
     def test_any_region_below_ten_valid_samples_is_no_go(self):
         from stable.services.attribution_quality import evaluate_gold_set

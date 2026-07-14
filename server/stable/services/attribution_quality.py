@@ -69,6 +69,11 @@ class GoldQualityReport:
     wilson_intervals: dict[str, tuple[float, float]]
     review_mode: str
     qualified: bool
+    unresolved_article_ids: list[int] = field(default_factory=list)
+    drifted_article_ids: list[int] = field(default_factory=list)
+    primary_mismatch_article_ids: list[int] = field(default_factory=list)
+    related_false_positive_article_ids: list[int] = field(default_factory=list)
+    related_false_negative_article_ids: list[int] = field(default_factory=list)
     no_go_reasons: list[str] = field(default_factory=list)
 
 
@@ -154,16 +159,20 @@ def evaluate_gold_set(
     valid: list[tuple[GoldLabel, dict]] = []
     unresolved_count = 0
     drifted_count = 0
+    unresolved_article_ids: list[int] = []
+    drifted_article_ids: list[int] = []
     for label in labels:
         review_is_valid = bool(label.reviewer_roles) if allow_provisional else (
             label.adjudicated and len(set(label.reviewer_roles)) >= 2
         )
         if not review_is_valid:
             unresolved_count += 1
+            unresolved_article_ids.append(label.article_id)
             continue
         outcome = actual.get(label.key)
         if not outcome or outcome.get("input_sha256") != label.input_sha256:
             drifted_count += 1
+            drifted_article_ids.append(label.article_id)
             continue
         valid.append((label, outcome))
 
@@ -183,10 +192,15 @@ def evaluate_gold_set(
     unsupported_changes = 0
     over_expansions = 0
     locked_overrides = 0
+    primary_mismatch_article_ids: list[int] = []
+    related_false_positive_article_ids: list[int] = []
+    related_false_negative_article_ids: list[int] = []
     for label, outcome in valid:
         region_counts[label.expected_primary_region] = region_counts.get(label.expected_primary_region, 0) + 1
         is_primary_correct = outcome.get("primary_region") == label.expected_primary_region
         primary_correct += int(is_primary_correct)
+        if not is_primary_correct:
+            primary_mismatch_article_ids.append(label.article_id)
         region_correct[label.expected_primary_region] = region_correct.get(label.expected_primary_region, 0) + int(
             is_primary_correct
         )
@@ -195,6 +209,10 @@ def evaluate_gold_set(
         related_tp += len(expected_related & actual_related)
         related_fp += len(actual_related - expected_related)
         related_fn += len(expected_related - actual_related)
+        if actual_related - expected_related:
+            related_false_positive_article_ids.append(label.article_id)
+        if expected_related - actual_related:
+            related_false_negative_article_ids.append(label.article_id)
         unsupported_changes += int(bool(outcome.get("unsupported_primary_change")) and not is_primary_correct)
         over_expansions += int(bool(outcome.get("over_expansion")) or len(actual_related - expected_related) > 2)
         locked_overrides += int(bool(outcome.get("locked_override")))
@@ -252,6 +270,11 @@ def evaluate_gold_set(
         wilson_intervals={"primary_accuracy": wilson_interval(primary_correct, denominator)},
         review_mode="single_review" if allow_provisional else "dual_review",
         qualified=not no_go,
+        unresolved_article_ids=unresolved_article_ids,
+        drifted_article_ids=drifted_article_ids,
+        primary_mismatch_article_ids=primary_mismatch_article_ids,
+        related_false_positive_article_ids=related_false_positive_article_ids,
+        related_false_negative_article_ids=related_false_negative_article_ids,
         no_go_reasons=no_go,
     )
 

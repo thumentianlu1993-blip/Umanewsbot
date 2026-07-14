@@ -1,5 +1,13 @@
 # 当前状态
 
+## 2026-07-15 多地区归属 V3.1 第三轮生产审计 no-go 与 V3.2 修复
+
+- 已将最新主线 `e3efd879` 合入多地区分支并构建 V3.1 可复现 AMD64 审计镜像 `sha256:bf666bcba703421ae491476991c9e7131607acca2a86626c74195cfdb41ce802`。第三轮生产 72 小时 `all_articles` dry-run 为 run `#4`，覆盖 `531` 篇且 `scope_complete=true`，产生 `20` 条主地区变化、`5` 条 `needs_review`、`49` 条完整人工清单；锁、缺失和候选正文漂移均为 `0`。报告位于 `/opt/umanewsbot/runtime/multiregion_attribution/v3.1-production-audit-v3-20260715/report.json`，SHA-256 `0524534d8c831da7147bf3a59ca162566dcaa11c7163c5b143f7ba52de6f1d1e`，manifest SHA-256 `b081c7dd7923193a03f3bab0663b8fb3bd1198335f87a1e2df1ddc7f05822454`。
+- 最新新闻正文修复使单审 Gold 再有 `12` 条输入 SHA 漂移，有效分母降为 `147`；V3.1 在有效样本上的主地区准确率 `96.60%`、相关 precision `93.75%`、recall `65.22%`、过度扩散 `0%`。有效样本不足 150 且 precision 低于 95%，机器结论明确 no-go；生产归属 mode 与相关地区查询继续关闭，Shadow 未开始。
+- 人工复核另发现三类真实规则缺口：`8105` 的 `Killarney maiden` 未被识别为爱尔兰赛事语法而被英国马名覆盖；`8509` 的完整赛事 `Irish Oaks` 与内部短词 `Oaks` 同时命中制造假冲突；`8351/8364` 的日本马“凱旋門賞へ”被误作法国主地区。规则已升级为 `multiregion-v3.2`：单词赛场仅增加受限赛事名词搭配、长赛事名只抑制没有独立出现的内部短赛事词、日本来源明确“海外赛事へ”保持日本主地区并关联目标地区。
+- Gold 评估报告现直接列出未决、SHA 漂移、主地区错标、相关地区假阳性和漏标的 article IDs，下一轮不再只有百分比。V3.2 归属专项 `89/89`、交叉组合 `282/282`（另 1 项环境跳过）、完整 `stable 1434/1434`（另 7 项环境跳过）通过；PostgreSQL 16 的 250 篇性能测试体 `0.257s`，Django check、迁移漂移、OpenSpec `29/29` 和 diff check 通过。
+- 第三轮审计容器已退出，V3.1 候选镜像已从生产删除；生产 `prod` 未变为 `sha256:b90cdf5cd6366a4c0cabe2d90e980cc6605640058a057560b8546ff90c47b70a` / revision `e3efd879`，回滚镜像保留。交还窗口时可用空间 `8,518,868 KiB`，翻译/归属/历史运行项、队列、active/reserved 和 idle transaction 均为 0，内外 healthz 正常。下一步是提交并双构建 V3.2，待新生产只读窗口保守续签 12 条 Gold SHA 后重跑第四轮完整审计；证据通过前不得开启 Shadow。
+
 ## 2026-07-15 7 月 13 日起新闻质量修复、全量重跑与生产回归完成
 
 - “正文边界与博彩噪声”“实体识别与马名保护”“日文翻译与赛马固定格式”三类问题均已完成 OpenSpec、测试、实现、复审、部署和线上回归。最终代码 revision 为 `bdc0eeff78e111d7fa8a697cbb3557888f864fb8`，生产 web/worker/beat 统一运行 image `sha256:c975a4faf979a1f78cdb203b810d4f5726aca114175007fc01c176044f13841c`。

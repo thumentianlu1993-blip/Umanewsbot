@@ -1,5 +1,14 @@
 # 部署运行手册
 
+## 待执行：多地区归属 V3.2 第四候选生产只读验收
+
+1. V3.1 第三轮报告固定为 `/opt/umanewsbot/runtime/multiregion_attribution/v3.1-production-audit-v3-20260715/report.json`，SHA-256 `0524534d8c831da7147bf3a59ca162566dcaa11c7163c5b143f7ba52de6f1d1e`；run `#4` / manifest `b081c7dd7923193a03f3bab0663b8fb3bd1198335f87a1e2df1ddc7f05822454`。该轮有效 Gold `147`、相关 precision `93.75%`，明确 no-go，不得 commit 或批准 Shadow。
+2. V3.2 必须包含 `Killarney maiden`、`Irish Oaks`/`Oaks` 嵌套和日本马“凱旋門賞へ”真实反例，以及 Gold 问题 ID 诊断字段。完成提交后重新生成纯 Git archive，使用两个独立上下文构建相同 AMD64 image ID，并在镜像内通过 Django、migration 与归属专项；V3.1 镜像 `sha256:bf666bc...e802` 已从生产删除，不得复用。
+3. 新窗口中先用原审核 snapshot 对 12 条 Gold SHA 漂移执行保守 reconcile。只接受来源 URL、标题、正文语义/长度和人工结论均稳定的 `auto_refreshed`；任何 blocker 继续退出分母，禁止手改 SHA 或补造 reviewer B。新 Gold CSV、summary、reconciliation 和 evaluation 必须进入新的只读 artifact 目录并记录 SHA。
+4. 使用 V3.2 和新 Gold 在全新目录执行 `--scope all_articles --hours 72 --dry-run --single-review-gold`；不得传 `--limit`、不得 `--include-gate-validation`、不得 `--commit`。报告必须 `scope_complete=true`，并记录规则版本、run ID、manifest、Gold SHA、全部问题 ID 和完整人工清单。
+5. 人工检查全部主地区变化、全部 `needs_review` 和五地区稳定样本，重点复核 `8105/8509/8351/8364`、既有 `Sale/York/Kelso/Jockey Club/JRHA/world ranking` 反例及法国赛果 `8089`。只有有效样本至少 150、五地区各至少 10、跨地区至少 20、主地区与分地区准确率达标、相关 precision `>=95%`、recall `>=50%`、过度扩散 `<=1%`，且人工无明确错标，才允许开始 Shadow。
+6. 审计结束后删除一次性容器和本轮载入的可再生候选镜像，不删除或 retag `umanewsbot:prod` 与现有 rollback；回报 `df`。可用空间低于 5 GiB 时立即停止并交还 historical runner，不降低其门槛。
+
 ## 2026-07-15 新闻统一镜像切换与存量重跑记录
 
 1. 最终新闻代码 revision 为 `bdc0eeff78e111d7fa8a697cbb3557888f864fb8`，正式 AMD64 image ID 为 `sha256:c975a4faf979a1f78cdb203b810d4f5726aca114175007fc01c176044f13841c`。错误 revision 标签的 `sha256:427e1f733115d487981ee131da4ed6d75a681c1b690aa21978a00897616206d8` 禁止部署。
@@ -9,7 +18,7 @@
 5. 最终必须核对：三服务 image/revision 一致、healthz 和 PostgreSQL 正常、正文 one-off=0、TranslationRun started=0、NewsArticle translating=0、Celery active/reserved/queue=0、历史锁与事务=0、近 10 分钟无 error/traceback/fatal。
 6. 历史开关继续保持 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。当前可用磁盘约 3.0 GiB，低于 5 GiB 门槛；不得因新闻窗口交还而启动 batch006。
 
-## 待执行：多地区归属 V3 第三候选生产只读验收
+## 已完成且 no-go：多地区归属 V3.1 第三候选生产只读验收
 
 1. 第一候选人工复核发现 7 类明确错标；第二候选虽完成 `591` 篇完整审计，但 Gold 主地区 `91.67%`、相关 recall `48%`，机器与人工均为 no-go。前两轮 report 均不得复用来批准 Shadow。
 2. 第三候选规则版本必须为 `multiregion-v3.1`，并包含 precision 优先反例修复：单词赛场仅在明确地点语法中作为强证据，`Jockey Club` 单独出现按机构短语处理，`JRHA` 提供日本上下文，世界排名归属 `other` 并关联五个运营地区，本地主体备战海外赛事时仅在正文仍有本地证据的条件下保留本地主地区。部署前必须保持归属 mode 与相关查询关闭。
