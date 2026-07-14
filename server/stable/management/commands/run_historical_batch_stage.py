@@ -5,6 +5,7 @@ import json
 import stat
 from pathlib import Path
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from stable.models import HistoricalBatchRun
@@ -34,6 +35,12 @@ class Command(BaseCommand):
             plan = validate_runner_plan(json.loads(plan_bytes))
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             raise CommandError(f"runner plan 无效：{exc}") from exc
+        if Path(plan["tool_root"]).resolve() != Path(
+            settings.HISTORICAL_RUNNER_TOOL_ROOT
+        ).resolve():
+            raise CommandError(
+                "runner tool_root does not match immutable image tool root"
+            )
         try:
             mode = stat.S_IMODE(token_path.stat().st_mode)
             if mode != 0o600:

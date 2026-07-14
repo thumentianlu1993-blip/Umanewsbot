@@ -43,6 +43,7 @@ RUNNER_MAX_SOURCE_CACHE_BYTES = 2 * 1024 * 1024 * 1024
 RUNNER_MIN_FREE_DISK_BYTES = 5 * 1024 * 1024 * 1024
 RUNNER_REQUEST_INTERVAL_SECONDS = 1
 RUNNER_IMMUTABLE_TOOL_ROOT = Path("/app/runtime/tools").resolve()
+RUNNER_PRODUCTION_ARTIFACT_ROOT = Path("/app/historical-runtime").resolve()
 _APPROVED_HISTORICAL_PYTHON_TOOLS = {
     "cache_historical_race_date_sources.py",
     "discover_historical_race_band_sources.py",
@@ -355,6 +356,16 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
 
     artifact_root = Path(str(plan["artifact_root"])).resolve()
     tool_root = Path(str(plan["tool_root"])).resolve()
+    if (
+        (
+            artifact_root == RUNNER_PRODUCTION_ARTIFACT_ROOT
+            or RUNNER_PRODUCTION_ARTIFACT_ROOT in artifact_root.parents
+        )
+        and tool_root != RUNNER_IMMUTABLE_TOOL_ROOT
+    ):
+        raise RunnerPlanError(
+            "production runner must use the immutable image tool root"
+        )
     seen: set[str] = set()
     normalized_steps: list[dict[str, Any]] = []
     for raw_step in plan["steps"]:

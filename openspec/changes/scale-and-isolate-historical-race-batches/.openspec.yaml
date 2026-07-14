@@ -50,3 +50,11 @@ journal:
     issues_resolved: 1
     artifacts_modified: [design.md, specs/historical-batch-runner/spec.md, tasks.md, test_cases.md]
     note: "Nested AdapterRunner calls preserve parent ledger/cache paths and can only tighten numeric crawl limits."
+  - event: implementation-reviewed-followup
+    date: "2026-07-15T05:46:00+08:00"
+    session: 7
+    mode: focused
+    rounds: 2
+    issues_resolved: 2
+    artifacts_modified: [tasks.md, test_cases.md]
+    note: "Production plans now reject artifact-local tool roots across the mounted subtree and before creating a run; the final review found no actionable issue."
