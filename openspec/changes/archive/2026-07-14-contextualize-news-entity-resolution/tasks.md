@@ -47,4 +47,4 @@
 ## 6. 文档、规格与归档
 
 - [x] 6.1 (operations) 更新 `docs/current_state.md`、`docs/project_status.md`、`docs/decisions.md` 和 `docs/deploy_runbook.md`，记录实体判定、生产镜像、备份、逐篇修复和随机回归证据
-- [ ] 6.2 (operations) 同步 delta spec、严格校验全部完成任务并归档 `contextualize-news-entity-resolution`
+- [x] 6.2 (operations) 同步 delta spec、严格校验全部完成任务并归档 `contextualize-news-entity-resolution`
