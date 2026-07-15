@@ -1,522 +1,141 @@
 ---
 name: plan-eng-review
-description: |
-  Engineering review of OpenSpec implementation plans for this Django/Celery
-  news platform. Lock in architecture, data flow, database migrations, task
-  behavior, test coverage, performance, deployment safety, and documentation
-  consistency before coding. Use when asked to review a plan, run architecture
-  review, or gate an OpenSpec change before implementation.
-user-invocable: true
-allowed-tools: Bash, Read, Write, Edit, Grep, Glob, AskUserQuestion
+description: Umanews 仓库级方案审核兜底。工作流进入方案审核阶段，且当前环境没有更合适的 Codex 原生方案审核能力时自动使用，无需用户再次点名；也可响应用户明确要求审核 plan/spec/design。仅用于实现前方案审核，不用于编写方案、实现代码、实现后代码审核、部署或驱动/维护 OpenSpec 工作流状态。
 ---
 
-# Engineering Plan Review (Umanewsbot + OpenSpec)
+# Umanews 通用方案审核（repository fallback）
 
-沿用 `/plan-eng-review` 工作流，但审查对象是当前仓库：Django 单体、
-PostgreSQL/SQLite、Celery/Redis、Django 模板前端、Docker Compose、
-Nginx、OSS/本地媒体存储，以及中文仓库协作规则。
+这是项目内的只读审核兜底 skill，不是 Codex 内置 skill。优先使用当前环境提供的 Codex 原生方案审核能力；工作流进入“方案审核”阶段且没有合适原生能力时，必须自动使用本 skill，不等待用户再次输入 skill 名称。
 
-核心原则：
+## 目标
 
-- 先闭环可用，再优化扩展。
-- 保留 Django 单体与 Docker Compose 主干，除非规格明确批准调整。
-- 所有重要状态、决策、排查过程必须写回仓库文档。
-- 生产相关结论必须区分“仓库预期”和“服务器真实运行态”。
-- 新增协作文档、OpenSpec 产物和代理说明默认使用中文。
+在开发开始前，对用户指定的 `plan`、`spec`、`design`、`test_cases`、`tasks` 和 `rollout`
+做工程审核，尽早暴露会导致返工、数据损坏、任务重复、性能退化或上线失败的问题。
 
----
+## 边界
 
-## Engineering Preferences
+- 只读审核：不得修改被审方案、代码、测试、状态文件或项目文档。
+- 不运行部署、迁移、生产命令或真实网络请求。
+- 不调用 OpenSpec CLI，不读取或写入 change phase、journal、ledger 等流程状态。
+- 不承担代码审核；实现后的代码由该需求首次代码审核建立的 reviewer 会话执行 `/review`。
+- 不因自动触发而扩大范围：仍只审核已经指定或在当前任务目录中发现的方案输入，不编写或修改方案。
+- 可以把既有 `openspec/changes/<change>/` 中的文件作为普通输入读取，但不能依赖 OpenSpec 流程语义推进工作。
 
-- 最小可行改动：优先复用现有模型、服务、任务、模板和部署脚本。
-- 测试不可省：业务逻辑、模型、任务、管理命令、API 和运维脚本必须有可复跑验证。
-- 显式优于聪明：状态机、环境变量、迁移、任务副作用和回滚路径必须写清楚。
-- 失败可见：抓取、翻译、改写、发布、通知、术语发现失败要有日志、状态或后台痕迹。
-- 生产可逆：高风险能力通过 `.env` 开关、灰度、备份、回滚或停用路径降低错误成本。
-- 文档同步：影响项目状态、部署、决策或产品链路时，同步更新 `docs/`。
+## 输入发现
 
-## Step 0: Read Profile & Determine Review Mode
+1. 读取仓库根目录 `AGENTS.md`，并遵守其作用域规则。
+2. 读取 `docs/current_state.md`，确认当前真实状态、并行工作和生产边界。
+3. 读取用户明确指定的方案文件。
+4. 在指定工作目录中按实际存在情况读取：
+   - `spec.md`
+   - `design.md`
+   - `test_cases.md`
+   - `tasks.md`
+   - `rollout.md`
+5. 若用户指定的是既有 `openspec/changes/<change>/`，可读取该目录下等价文件以及相关 delta spec；不要读取或修改流程状态文件。
+6. 只按审核所需追踪相关代码、模型、迁移、Celery task、部署配置和文档，不做无边界全仓扫描。
 
-### 0.1 Locate Active Change
+输入不完整时，不要补写或猜测缺失方案。`spec.md`、`design.md`、`test_cases.md`、
+`tasks.md` 或 `rollout.md` 缺失时，必须把缺失项及其对安全检查点、在途 worktree、恢复
+handoff 或发布边界的影响列为 finding；只有完全无法确定审核对象时才向用户请求路径或名称。
 
-If the user supplied a change name, use `openspec/changes/<name>/`.
-Otherwise detect active changes:
+## 审核清单
 
-```bash
-find openspec/changes -mindepth 1 -maxdepth 1 -type d ! -name archive
-```
+逐项检查，并用具体文件与代码路径验证：
 
-- No active change: ask the user which plan to review.
-- One active change: use it.
-- Multiple active changes: ask the user to choose one.
+### 范围与验收
 
-### 0.2 Read `.openspec.yaml`
+- 目标、非目标、用户可见行为和验收标准是否明确。
+- `spec`、`design`、`test_cases`、`tasks` 之间是否一一对应。
+- `rollout` 是否覆盖在途任务/worktree、安全检查点、恢复 handoff、发布状态和失败边界，
+  并与其他四份 artifact 一致。
+- 是否明确兼容性、错误路径、回滚后行为和“不做什么”。
 
-Read `<change>/.openspec.yaml` before reviewing.
+### 架构与数据流
 
-- If `profile` exists, use it.
-- If `profile` is missing, follow the backward-compatibility guidance from
-  [`.codex/skills/workflow-spine/REFERENCE.md`](../workflow-spine/REFERENCE.md):
-  default to `feature`, note the assumption, and ask the user to confirm if the
-  scope is ambiguous.
+- 请求、采集、翻译、审核、发布、分发等数据流是否闭环。
+- 模块职责、接口、状态机、失败传播和重试边界是否清晰。
+- 是否引入不必要的主干重构、双写、隐式耦合或不可逆状态。
 
-Review mode:
+### 数据库与迁移
 
-| Profile | Review Mode | Steps Included | Max Convergence Rounds |
-| --- | --- | --- | --- |
-| `feature` | Full | Scope Challenge, Architecture, Code Quality, Test, Performance | 2 |
-| `bug-fix` | Quick | Skip Scope Challenge; Architecture constraint compliance only; Code Quality full; Test regression only; Skip Performance | 1 |
-| `ui-polish` | Quick | Skip Scope Challenge; Architecture constraint compliance only; Code Quality full; Skip logic Test; Skip Performance | 1 |
+- 模型约束、索引、唯一性、空值语义和历史数据兼容是否明确。
+- schema migration 与 data migration 是否拆分合理、可重复、可观测、可回滚。
+- 大表锁、长事务、批次大小、并发写入和部署顺序是否安全。
 
-Announce at start:
+### Celery、并发与幂等
+
+- task 的幂等键、锁粒度、lease/超时、重试和重复投递行为是否明确。
+- worker 崩溃、网络超时、部分成功、并发调度和补偿路径是否覆盖。
+- 是否避免在锁或事务中执行长时间网络调用。
+
+### 性能与容量
+
+- 查询数量、索引命中、分页/批处理、内存占用和队列压力是否有边界。
+- 是否定义代表性数据规模、超时、限速和可观察指标。
+
+### 部署、回滚与生产边界
+
+- 代码、迁移、flag、worker、web、定时任务的上线顺序是否明确。
+- 回滚对新旧 schema、积压队列和已写入数据是否安全。
+- 本地 SQLite、本地 PostgreSQL/Docker、预发布和生产验证不得混为一谈。
+- 生产写入、外部调用、发布开关和共享维护窗口必须有显式授权与闸门。
+
+### 测试矩阵
+
+- `test_cases.md` 是否在实现前完整覆盖正常、边界、失败、并发、幂等、迁移与回滚行为。
+- 每项关键行为是否有可自动化的 RED 证据，以及测试能捕获的具体 mutation。
+- 是否区分隔离测试、集成测试、全量回归和生产形状的只读/受控验证。
+- 是否禁止真实网络和生产依赖进入自动化测试。
+
+### 文档一致性
+
+- 是否列出实施完成后需要更新的 `docs/current_state.md`、`docs/decisions.md`、`docs/project_status.md`。
+- 涉及部署、排障或运维时，是否覆盖 `docs/deploy_runbook.md` 以及相应部署/回滚文档。
+- 方案描述是否与仓库当前实现和长期目标一致。
+
+## Finding 严重度
+
+- `blocker`：继续实施很可能造成数据损坏、安全/生产事故，或核心范围无法判定。
+- `high`：核心行为、数据模型、并发、迁移、回滚或关键测试存在实质缺口。
+- `medium`：会提高返工或运维风险，但可在不改变核心架构的情况下补足。
+- `low`：非阻断的清晰度、可维护性或补充验证建议。
+
+## 连续复审边界
+
+- 同一需求首次方案审核建立 reviewer 会话；同一方案的后续复审必须回到首次方案 reviewer 的同一会话与上下文。
+- 只有原 reviewer 明确确认会话不可恢复时才允许新建 reviewer；必须交接不可恢复原因、上轮 findings 与已知问题。
+- 复审只核对上轮 findings、对应方案修复与直接触及路径，不重新展开完整清单，也不得扩展成新的通用体系或无关 P2/P3 加固。
+- 只有当前具体漏洞的直接 P0/P1 回归可以新增阻塞；其他新发现作为后续建议记录并结束本需求的方案审核。
+
+## 输出格式
+
+先输出 findings，按 `blocker -> high -> medium -> low` 排序。每条必须包含：
 
 ```text
-Review mode: [Full|Quick] (profile: [feature|bug-fix|ui-polish])
+[severity] 简短标题
+- 证据：文件路径:行号（可列多个）
+- 问题：当前方案为什么不足
+- 影响：最可能出现的失败方式
+- 要求：可验证的修正条件
 ```
 
-### 0.3 Read Project Constraints
+没有 finding 时明确写“未发现阻断或需修正的问题”，不要为了填充而制造建议。随后给出：
 
-Before reviewing artifacts, read these files in order:
+- 已审核输入清单
+- 已覆盖的审核维度
+- 残余风险或未能验证的外部条件
 
-1. `AGENTS.md`
-2. `README.md`
-3. `docs/project_overview.md`
-4. `docs/current_state.md`
-5. `docs/decisions.md`
-6. `docs/deploy_runbook.md`
-7. `docs/session_bootstrap.md`
-8. `openspec/config.yaml`
-
-If the plan touches deployment, rollback, backups, HTTPS, Nginx, production
-settings, or server operations, also read:
-
-- `docs/deploy_production.md`
-- `docs/alicloud_hongkong_step_by_step.md`
-- `docs/rollback_guide.md`
-- `docs/backup_recovery.md`
-
-Key constraints to enforce:
-
-- Python 3.12 + Django 5.2; production PostgreSQL, local/test SQLite support.
-- Celery Worker/Beat run crawl, translation, automation, publishing and notification tasks; Redis is broker/result backend.
-- Frontend is Django templates under `server/stable/templates/` and CSS under `server/stable/static/`; no independent frontend build system.
-- Data model changes require Django migrations under `server/stable/migrations/`.
-- Domain logic and integrations belong in `server/stable/services/` and `server/stable/adapters/`; `tasks.py` should orchestrate.
-- Runtime config comes from `.env` and `.env.example`; never commit secrets or real `.env`.
-- Production uses `Dockerfile`, `docker-compose*.yml`, `deploy/`, Nginx, Gunicorn, PostgreSQL, Redis, and optional OSS.
-- OpenSpec `tasks.md` items must use `(application)`, `(integration)`, or `(operations)` domain prefixes, with implementation tasks before validation tasks.
-- Production conclusions must verify server `HEAD`, `.env`, container env, Nginx config, compose state, and logs when applicable.
-
-### 0.4 Read OpenSpec Artifacts
-
-Read the active change artifacts in order:
-
-1. `proposal.md`
-2. `design.md`
-3. `specs/**/*.md`
-4. `tasks.md`
-
-If an artifact is missing, decide whether the profile permits it. For larger
-features and production-risk changes, missing `design.md`, specs, or tasks is a
-review blocker.
-
----
-
-## Step 0.5: Scope Challenge
-
-Quick mode skips this step.
-
-Before reviewing quality, answer:
-
-1. What existing code already solves each sub-problem?
-   - Search `server/stable/models.py`, `services/`, `adapters/`, `tasks.py`,
-     `views.py`, `forms.py`, management commands, templates, deploy scripts,
-     and docs.
-   - Prefer reusing current services such as `translation`, `automation`,
-     `rewriting`, `validation`, `term_admin`, `term_discovery`, `pushing`,
-     `notifications`, `storage`, and `operations`.
-
-2. What is the minimum set of changes for the stated goal?
-   - Flag unrelated refactors, architecture splits, new services, new
-     dependencies, or deployment changes not required by the spec.
-
-3. Complexity check:
-   - More than 8 files, more than 2 new services/models/tasks, or any new
-     cross-cutting dependency requires explicit justification.
-   - New migrations require data/backfill/default behavior and rollback notes.
-   - New production knobs require `.env.example`, settings integration, docs,
-     and a verification path.
-
-4. OpenSpec completeness check:
-   - Every requirement in `specs/**/*.md` has implementation tasks.
-   - Every task has `(application)`, `(integration)`, or `(operations)`.
-   - Tasks with no matching requirement or design decision are possible scope
-     creep unless clearly labeled as validation, migration, or docs.
-
-If scope should be reduced, ask the user one issue at a time using the question
-format below. If the AskUserQuestion tool is unavailable, ask a concise
-plain-text question and wait.
-
----
-
-## Review Sections
-
-### 1. Architecture Review
-
-Quick mode only runs the Constraint Compliance Check.
-
-#### Constraint Compliance Check
-
-Any violation here is a critical issue:
-
-- Django monolith: no service split, separate SPA, background system, or
-  alternative framework unless the spec explicitly approves it.
-- Database: model changes have migrations; migrations are safe for PostgreSQL
-  production and SQLite tests; defaults/nullability/backfills are explicit.
-- Task chain: Celery work is idempotent where retries or repeated dispatch are
-  possible; failures update `TaskExecutionLog`, domain status fields, or
-  operation logs as appropriate.
-- Settings: new runtime config is read in `server/app/settings.py`, documented
-  in `.env.example`, and has conservative defaults.
-- Secrets: no API keys, tokens, server passwords, or full `.env` values enter
-  repo files.
-- Frontend: template/static changes follow existing backend-rendered structure
-  and staff/public route separation; no new build pipeline.
-- Auth/admin: staff-only operations keep existing backend auth behavior; public
-  routes do not expose operations-only data.
-- Integrations: network calls keep timeout/error behavior and are mockable in
-  tests; external API changes do not break local/CI runs.
-- Deployment: Compose/Nginx/script changes preserve web/worker/beat/db/redis
-  roles and include verification, rollback and docs when production-facing.
-- Documentation: changes that affect project state, deployment, rollback,
-  product flow, or decisions update the required `docs/` files.
-
-#### Quality Evaluation
-
-Evaluate the plan against current architecture:
-
-- Model boundaries: persistent state belongs in models/migrations; derived
-  decisions should be reproducible from saved fields or logged metadata.
-- Service boundaries: business logic and external integration live in services
-  or adapters; views and tasks should orchestrate rather than own core logic.
-- Data flow: crawl -> upsert article -> optional term discovery -> translation
-  -> automation score/rewrite/validate -> publish -> optional QQ/manual push.
-- Transactions: accepting/merging terms, publishing, state transitions and log
-  writes that must stay consistent use transactions or clear compensation.
-- State machines: `WorkflowStatus`, `ArticleTranslationStatus`,
-  `AutomationStatus`, candidate statuses, notification statuses and push
-  statuses remain coherent.
-- Rollout: production-risk features have `.env` switches, conservative
-  defaults and a low-volume validation path.
-- Failure scenarios: for each new codepath, name one realistic failure and how
-  the plan handles it.
-
-Stop after each architecture issue and ask the user how to resolve it.
-
-### 2. Code Quality Review
-
-Evaluate:
-
-- DRY violations. Mandatory cross-boundary DRY check: when the plan introduces
-  a helper, service, management command, serializer/payload, status enum,
-  parser, importer, validator, notification, or deploy script logic, open the
-  host module end-to-end and search related names/shapes nearby before
-  approving a new abstraction.
-- Existing patterns: follow similar code in `services/`, `tasks.py`, forms,
-  views, templates, management commands and deploy scripts.
-- Error handling: no silent broad failures for crawl, translation, AI rewrite,
-  OSS, OneBot, email, import, publish, or deployment scripts.
-- Query quality: avoid N+1 queries in list/detail views and batch tasks; use
-  queryset filters, `select_related`, `prefetch_related`, indexes or pagination
-  where needed.
-- Validation: forms, management commands and services should share validation
-  for CSV/import-like flows rather than fork rules.
-- User-facing copy: Chinese UI and docs remain natural and consistent; machine
-  keywords required by OpenSpec stay English.
-- Config hygiene: `.env.example`, settings defaults and docs describe any new
-  knob; production defaults are safe.
-- Logs/audit: operationally important actions write `OperationLog`,
-  `TaskExecutionLog`, `AutomationLog`, `NotificationLog` or equivalent state
-  where current patterns expect it.
-- Dependency hygiene: new Python packages, system packages or Docker images are
-  justified and reflected in requirements/deploy assets.
-
-Stop after each code-quality issue and ask the user how to resolve it.
-
-### 3. Test Review
-
-Quick mode behavior:
-
-- `bug-fix`: require at least one regression test that fails on the old behavior.
-- `ui-polish`: skip logic-test diagramming, but require a browser/manual
-  verification task if templates/CSS or visible workflows change.
-
-Full mode: diagram and verify coverage for:
-
-- Model and migration behavior, including defaults, constraints and old-data
-  compatibility.
-- Service logic, adapters, parsers, validators, importers and state transitions.
-- Celery task orchestration with `CELERY_TASK_ALWAYS_EAGER=true` where possible.
-- Views/forms/API endpoints and staff/public authorization boundaries.
-- Management commands and deploy/ops scripts touched by the plan.
-- External integrations with mocks/fakes: netkeiba, JRA, OpenAI-compatible
-  translation/rewrite, SiliconFlow, OSS, OneBot, SMTP/email.
-- Edge cases: empty input, duplicate data, retry/re-dispatch, timeouts, partial
-  failures, disabled feature flags, production/local config differences.
-
-Standard verification commands to expect when relevant:
-
-```bash
-cd server
-DB_ENGINE=sqlite python manage.py check
-DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable
-cd ..
-docker compose -f docker-compose.prod.yml config
-docker compose -f docker-compose.prod.lowcost.yml config
-```
-
-For deployment or production-risk changes, tasks must include the applicable
-runbook checks: backups, `git rev-parse --short HEAD`, `.env` key inspection,
-container state, Nginx runtime config, web/worker/beat logs, `/healthz/`, and
-domain/admin route smoke checks.
-
-#### TDD-Discipline Gate (from `tdd` skill Part 2)
-
-Applies when the change has quantifiable acceptance criteria such as latency,
-coverage, batch size, quality threshold, success rate, or before/after metrics.
-
-- Required: `tasks.md` has `## 0. Pre-declared hypotheses` before measurement
-  tasks, with explicit PASS/BLOCKER thresholds.
-- If missing: flag as warning, not blocker. Recommend adding the template from
-  `.codex/skills/tdd/SKILL.md` Part 2 Rule 2.
-- Not applicable: single regression bug fix with no measurement, pure refactor
-  with no outcome metric, or UI copy/layout polish without measurable targets.
-
-Stop after each test gap and ask the user how to resolve it.
-
-### 4. Performance Review
-
-Quick mode skips this step.
-
-Evaluate:
-
-- Database: batch tasks, candidate lists, public feed/detail, admin filters and
-  import commands avoid unbounded scans and N+1 queries.
-- Celery: long-running tasks have reasonable batching, timeouts, retry/idempotent
-  behavior, and do not block crawl/translation/publish chains unnecessarily.
-- Network/API: scraping, translation, rewrite, OSS, OneBot and email calls use
-  current timeout patterns and avoid redundant calls.
-- Frontend rendering: templates and CSS keep pages scannable and mobile-safe;
-  no heavy rendering work in views without pagination.
-- Media/static: OSS/local storage behavior remains compatible; static/media
-  routing through Nginx is preserved.
-- Deployment/runtime: Gunicorn, worker, beat and Redis assumptions remain valid
-  under both production compose files.
-
-Stop after each performance issue and ask the user how to resolve it.
-
----
-
-## AskUserQuestion Format
-
-One issue per question. Use this shape:
+最后一行必须且只能是以下之一：
 
 ```text
-Context: [current artifact/task being reviewed]
-Problem: [plain explanation and why it matters]
-RECOMMENDATION: Choose [X] because [reason]
-Options:
-A) Complete approach - (~X min with AI)
-B) Simpler approach - (~Y min with AI)
-C) Skip / defer - [risk]
+VERDICT: APPROVED
 ```
 
----
-
-## Required Outputs
-
-### What Already Exists
-
-List reusable code and patterns already present, such as models, services,
-adapters, task helpers, forms, management commands, templates, deploy scripts,
-and docs.
-
-### NOT in Scope
-
-List work considered and explicitly deferred, with one-line rationale each.
-
-### Failure Modes
-
-For each new codepath, include one realistic failure scenario and whether:
-
-1. A test covers it.
-2. Error handling or rollback exists.
-3. The operator/user sees a clear signal or the failure is silent.
-
-If a failure mode has no test, no handling and silent user/operator impact,
-flag it as a critical gap.
-
-### Completion Summary
+或：
 
 ```text
-Plan Engineering Review Summary
-================================
-Review rounds: N (converged at round N / max rounds reached)
-
-Step 0: Scope Challenge — [accepted as-is / scope reduced / skipped]
-Architecture Review: N issues found
-Code Quality Review: N issues found
-Test Review: N gaps identified
-Performance Review: N issues found
-Consistency check: N inconsistencies found and fixed / All artifacts consistent
-
-What already exists: [listed]
-NOT in scope: [listed]
-Failure modes: N critical gaps flagged
-
-Next: Ready for implementation.
+VERDICT: REVISE
 ```
 
----
-
-## Artifact Consistency Check (Mandatory)
-
-After review issues are resolved and artifacts are updated:
-
-1. Re-read `proposal.md`, `design.md`, `tasks.md`, and all `specs/**/*.md`.
-2. Check every review decision against every artifact that references the same
-   topic.
-3. Fix inconsistencies immediately.
-4. Report the result in the completion summary.
-
-Check especially:
-
-| Topic | Stale Locations |
-| --- | --- |
-| Model/migration fields | design decisions, spec fields, task steps |
-| Env flags/settings | design, tasks, `.env.example` docs tasks |
-| Celery task flow | design flow, spec scenarios, task ordering |
-| Auth/admin/public routes | specs, design, templates/API tasks |
-| Deployment/rollback | design risks, operations tasks, docs tasks |
-| Test/verification commands | tasks, design migration plan, runbook updates |
-
----
-
-## Convergence Check (Mandatory)
-
-Goal: ensure review fixes did not introduce second-order issues.
-
-1. Count artifact files modified and issues resolved in this pass as
-   `delta_this_pass`.
-2. If `delta_this_pass > 0` and `round < max_rounds`, run a focused re-review:
-   - Round 2 reads only modified artifacts plus directly referenced spec/design
-     passages unless ledger data is missing.
-   - De-duplicate findings already resolved or deferred in this session.
-   - Ask about genuinely new issues one at a time.
-   - Run Artifact Consistency Check again.
-3. If `delta_this_pass == 0` or `round == max_rounds`, produce the completion
-   summary. If max rounds are reached with unresolved issues, list them under
-   `Remaining issues — defer to next session`.
-
-Round cap:
-
-- Full mode: 2.
-- Quick mode: 1.
-
----
-
-## Write Ledger Entry
-
-Before writing the journal event, persist the audit trail to
-`<change>/.sidecar/ledger.json` using `ledger.json schema v1.0` in
-[`references/gate-templates.md`](references/gate-templates.md#ledgerjson-schema-v10).
-
-Skip this step when `<change>/.sidecar/` does not exist. Do not auto-create
-sidecar for legacy changes. Continue to YAML state using in-memory counts.
-
-Required ledger behavior:
-
-- One `plan-eng-review` session writes one entry; Round 2 updates the same entry.
-- Use `date -Iseconds` immediately before the write for `timestamp` or `last_updated`.
-- If `ledger.json` is malformed, back it up to `.json.bak.<unix-ns>` and reset to `{"schema_version":"1.0","entries":[]}` before appending.
-- Track `source`, `session`, `round`, `timestamp`, `last_updated`, `mode`,
-  `artifacts_modified`, `rounds_total_for_session`, `issues_resolved`, and
-  `findings`.
-- Findings use stable ids `F-001`, `F-002`, ... and fields `id`, `severity`,
-  `category`, `summary`, `resolution`, `status`, `round_found`,
-  `round_resolved`.
-
----
-
-## Write YAML State
-
-After the ledger entry, or after intentionally skipping legacy sidecar, update
-`<change>/.openspec.yaml`:
-
-- Set `phase: reviewed`.
-- Append one `plan-reviewed` journal event following
-  [`.codex/skills/workflow-spine/REFERENCE.md`](../workflow-spine/REFERENCE.md).
-- Run `date -Iseconds` immediately before writing; do not hand-type timestamps.
-- `rounds` and `issues_resolved` must match the ledger entry or in-memory
-  legacy counts.
-
-Template:
-
-```yaml
-- event: plan-reviewed
-  date: "<date -Iseconds output>"
-  session: 1
-  mode: full
-  rounds: 2
-  issues_resolved: 5
-  artifacts_modified: [design.md, tasks.md]
-  note: "Round 1 resolved ...; Round 2 converged."
-```
-
-Post-write, read `.openspec.yaml` back and verify:
-
-- `phase` is `reviewed`.
-- The new timestamp is later than previous events.
-- `session` is incremented correctly for repeated `plan-reviewed` events.
-- Listed modified artifacts exist and are non-empty.
-
----
-
-## Next-Step Output
-
-After the summary, print:
-
-```text
-## 下一步
-
-Profile: [profile] | Phase: reviewed | Review rounds: N
-
-推荐: /openspec-apply-change — 开始逐 task 实现
-
-可选: /push — 先提交已审查的 OpenSpec 文档
-   └ 仅提交 OpenSpec 文档，phase 保持 reviewed
-   └ 实现者开新对话后运行 /openspec-apply-change {change-name}
-
-不建议: /openspec-archive-change — 还没有代码实现
-```
-
----
-
-## Escalation
-
-Stop and escalate when:
-
-- Tried 3 times without resolving the same issue.
-- Security, secrets, production data, migration rollback, or HTTPS behavior is
-  uncertain.
-- The scope cannot be verified from repository artifacts.
-- The plan requires real server inspection but no server access/context exists.
-
-Use:
-
-```text
-STATUS: BLOCKED | NEEDS_CONTEXT
-REASON: [1-2 sentences]
-ATTEMPTED: [what was tried]
-RECOMMENDATION: [what to do next]
-```
+存在任何 `blocker`、`high` 或尚未落实的必要 `medium` finding 时使用 `REVISE`。

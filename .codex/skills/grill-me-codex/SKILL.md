@@ -1,120 +1,45 @@
 ---
 name: grill-me-codex
-description: Two-act plan hardening. ACT 1 (you ↔ Claude) — Claude interviews you relentlessly about a plan or design, one question at a time, recommending an answer for each and exploring the codebase when it can answer itself, until every branch of the decision tree is resolved. ACT 2 (Claude ↔ Codex) — Claude writes the locked plan to PLAN.md and OpenAI Codex adversarially reviews it in a read-only sandbox (VERDICT:APPROVED/REVISE), Claude revises and re-submits to the SAME Codex session until APPROVED or a MAX_ROUNDS cap, then you sign off before any code. Use when the user says "/grill-me-codex", "grill me then have codex review", "grill me and stress-test the plan", "interview me about this plan then get a second model on it", or is about to build something high-stakes (auth, schema, concurrency, migrations, payments) and wants both alignment AND a cross-model sanity check before implementation. Builds on Matt Pocock's grill-me (MIT). For the docs-aware variant use /grill-with-docs-codex; if you already have a plan and want only the Codex review use /codex-review. NOT for reviewing already-written code (use /codex:review) and NOT for trivial changes.
+description: Umanews 的 Codex 原生只读需求探索访谈。用于用户明确调用 /grill-me-codex，或任务需求不清、关键决策分支多、高风险且需要逐项锁定意图时；一问一答并为每题给出推荐答案与理由。不要用于已经清晰的简单任务、spec/design 编写、方案审核、代码审核、实现、发布或生产操作。
 ---
 
-# Grill-Me-Codex — Get Grilled, Then Get Reviewed
+# Umanews 只读探索访谈
 
-Two acts, two different jobs:
+本 skill 只服务工作流第 1 阶段“项目探索”。目标是在不修改仓库、不生成正式方案产物的前提下，把用户意图、关键约束和决策边界逐项锁定。
 
-- **Act 1 fixes the #1 failure mode: building the wrong thing.** Claude interrogates *you* until intent is locked — no guessing at ambiguity. (This act is Matt Pocock's `grill-me`, used under MIT — see `THIRD-PARTY-NOTICES.md`.)
-- **Act 2 fixes the #2 failure mode: a plan that sounds right but breaks.** A *different model* (Codex) adversarially attacks the locked plan. Cross-model = no echo chamber.
+## 开始前
 
-You enter at two points only: answering the grill, and signing off the converged plan. Codex is read-only the whole time and never touches a file.
+1. 阅读 `AGENTS.md`、`docs/codex_workflow.md`、`docs/session_bootstrap.md` 及其要求的状态文档。
+2. 根据任务只读检查相关代码、测试、配置和历史文档。能从仓库事实确定的内容先自行查证，不把可查问题抛给用户。
+3. 复述已确认的目标、非目标和已知约束；用户已明确或仓库已证实的事项不得重复询问。
 
----
+## 访谈方式
 
-## ACT 1 — GRILL (you ↔ Claude)
+- 一次只问一个问题，并等待用户回答后再继续。
+- 每个问题都给出一个明确的推荐答案和简短理由，同时说明其他选择的关键代价。
+- 按依赖顺序遍历决策树：先产品行为与范围，再数据/状态与失败边界，最后运维、回滚和验收。
+- 用户回答会使后续分支失效时，立即裁剪这些分支，不做形式化追问。
+- 新发现与既有答案冲突时，指出具体证据和冲突，只重新确认受影响的决策。
+- 对认证、迁移、并发、生产写入、数据删除、外部通知等高风险边界保持 fail closed。
+- 用户可随时说“停止”“先到这里”或同义语句结束访谈；不得以“还没问完”为由继续。
 
-> Interview me relentlessly about every aspect of this plan until we reach a shared understanding. Walk down each branch of the design tree, resolving dependencies between decisions one-by-one. For each question, provide your recommended answer.
->
-> Ask the questions one at a time, waiting for my answer before continuing.
->
-> If a question can be answered by exploring the codebase, explore the codebase instead.
+## 探索期硬边界
 
-When the decision tree is resolved and we're aligned, **write the agreed plan to `PLAN.md`** in this structure, then move to Act 2:
+- 只读：不得编辑文件、生成或更新计划/审核日志、spec、design、test cases 或 tasks。
+- 不得启动其他模型、嵌套会话、审核命令或任何方案/代码审核循环。
+- 不得实现代码、补测试、提交、推送、创建 PR、部署或执行生产写入。
+- 不得调用已禁用的 OpenSpec skills。
+- 本 skill 结束不代表方案审核通过，也不构成实现或发布授权。
 
-```markdown
-# Plan: <task>
-_Locked via grill — by Claude + <user>_
+## 结束输出
 
-## Goal
-<one paragraph — reflects what the grilling actually settled>
+访谈自然收敛或用户要求停止时，只在对话回复中输出：
 
-## Approach
-<numbered, concrete steps>
+1. 已锁定决策；
+2. 仍未决事项及其影响；
+3. 建议进入的下一阶段。
 
-## Key decisions & tradeoffs
-<the contestable choices the grill resolved — name them so Codex has something to bite>
-
-## Risks / open questions
-<anything still genuinely open>
-
-## Out of scope
-<bounds the grill established>
-```
-
-Initialize `PLAN-REVIEW-LOG.md`:
-```markdown
-# Plan Review Log: <task>
-Act 1 (grill) complete — plan locked with the user. MAX_ROUNDS=<n>.
-```
-
----
-
-## ACT 2 — REVIEW (Claude ↔ Codex)
-
-Now hand the locked plan to Codex for adversarial review. Same engine, mechanics verified end-to-end (2026-06-04).
-
-### Prerequisites (verify once, fast)
-- `codex --version` ≥ 0.130 (older CLIs error on the default `gpt-5.5` model).
-- Codex authenticated (prior `codex login`; ChatGPT account is fine). On auth/model error, surface it — don't silently retry.
-- Do NOT pin `-m`. Use the config default. Pinning `gpt-5.x-codex` variants 400s on ChatGPT-account auth.
-
-### Tunables (read from args, else default)
-| Var | Default | Meaning |
-|-----|---------|---------|
-| `MAX_ROUNDS` | `5` | Hard cap on review rounds. The loop ALWAYS terminates here. |
-| `PLAN_FILE` | `PLAN.md` | The plan Act 1 produced. |
-| `LOG_FILE` | `PLAN-REVIEW-LOG.md` | Append-only argument transcript. The artifact. |
-
-If invoked with e.g. `rounds=3`, use that for `MAX_ROUNDS`. Echo resolved values before starting.
-
-### The review prompt (sent each round)
-> You are an adversarial reviewer for an implementation plan. Be skeptical and specific — your job is to find what breaks, not to be agreeable. Read the plan at `PLAN.md` and any repo files you need (you are read-only). Identify concrete flaws: security holes, race conditions, missing edge cases, schema conflicts, wrong assumptions, observability gaps, simpler alternatives. For each, give a one-line fix. Do NOT modify any files. End your reply with EXACTLY one line: `VERDICT: APPROVED` if the plan is sound enough to implement, or `VERDICT: REVISE` if it still has material problems.
-
-### Round 1 — fresh session (capture `thread_id`)
-```bash
-codex exec -s read-only --json -o /tmp/codex-verdict.txt "$(cat REVIEW_PROMPT)" \
-  2>/dev/null | grep '"type":"thread.started"'
-```
-Parse `thread_id` from the `{"type":"thread.started","thread_id":"..."}` line → that's `THREAD_ID`. The critique is in `/tmp/codex-verdict.txt`. Confirm success by the verdict file + a `thread.started` line; if neither appears, the run failed (auth/model) — stop and tell the user. `2>/dev/null` suppresses cosmetic MCP/auth stderr noise.
-
-### Rounds 2..MAX — resume the SAME session (Codex remembers its prior critiques)
-```bash
-# resume REJECTS -s. Force read-only via -c sandbox_mode, or Codex inherits
-# config.toml (possibly danger-full-access) and could WRITE files. This is the
-# single most important safety line in the skill — verified 2026-06-04.
-codex exec resume "$THREAD_ID" -c sandbox_mode="read-only" --json \
-  -o /tmp/codex-verdict.txt \
-  "I revised the plan. Re-review PLAN.md — check whether your prior findings are addressed and flag anything new. End with VERDICT: APPROVED or VERDICT: REVISE." \
-  2>/dev/null >/dev/null
-```
-Both `codex exec` and `codex exec resume` support `--json` and `-o/--output-last-message`.
-
-### Each round, after Codex returns
-1. Read `/tmp/codex-verdict.txt`; append to `LOG_FILE`: `## Round <n> — Codex` + the full critique.
-2. Grep the last line for the verdict:
-   - `VERDICT: APPROVED` → break to Resolution (converged).
-   - `VERDICT: REVISE` → Claude decides **what's actually worth acting on** (Claude is final arbiter — Codex advises, doesn't command). Revise `PLAN_FILE`. Append `### Claude's response` to `LOG_FILE`: what changed, what was rejected, why. Increment round.
-3. If round > `MAX_ROUNDS` → break to Resolution (deadlock).
-
-### Resolution (you sign off — final gate)
-- **APPROVED:** present the final `PLAN_FILE`, a 3-bullet summary of what the two acts improved, and the round count. Ask: *"Grilled + survived N rounds of Codex. Implement it now?"* Code only on yes. **No code is written during either act.**
-- **MAX_ROUNDS hit without APPROVED (deadlock):** do NOT fake convergence. List each unresolved point + Claude's counter-position; hand it to the user to break the tie. A flagged disagreement beats a false "approved."
-
----
-
-## Hard rules
-- Act 1 always precedes Act 2 — don't write `PLAN.md` until the grill has actually resolved the decision tree with the user.
-- Codex is read-only EVERY round — `-s read-only` first call, `-c sandbox_mode="read-only"` on every resume (resume has no `-s`). It never writes.
-- The loop ALWAYS terminates at `MAX_ROUNDS`.
-- Claude is final arbiter on every REVISE — incorporate good critiques, reject bad ones *with a logged reason*. Don't cave to everything (defeats the cross-model check) and don't ignore it (defeats the point).
-- Code only after the user's final sign-off.
-- `LOG_FILE` is the deliverable — keep the whole argument.
-
-## What NOT to do
-- Don't review already-written code — that's `/codex:review`.
-- Don't pin a `-codex` model variant on ChatGPT-account auth — it 400s.
-- Don't let Codex edit files. Read-only, always.
-- Don't skip Act 1 — the grill is half the value.
+若关键分支已锁定，下一阶段是工作流第 2 阶段，由主代理在
+`docs/changes/<slug>/` 编写 `spec.md`、`design.md`、`test_cases.md`、`tasks.md` 和
+`rollout.md` 五份持久产物。结束输出必须明确完成这五份文件的 rollout 交接；本 skill
+自身不写入这些文件。

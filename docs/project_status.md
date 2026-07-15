@@ -1,5 +1,19 @@
 # 项目状态文档
 
+## 2026-07-15 Codex 原生工作流迁移待审核
+
+- durable change 为 `docs/changes/codex-native-workflow-migration/`；本地治理变更尚未发布。
+- 已建立 review fingerprint 与 workflow contract 验证：fingerprint `24/24`、transition/index `10/10`、workflow contract tests `26/26` 已通过；base/commit 只接受 clean tree，发布前未提交改动统一走 `--uncommitted`。
+- 新流程已在本地工作树补齐实际原生 review、既有在途任务安全检查点迁移、全 subagent 静默和有限发布收尾；尚未 commit、push、合并、部署或写生产。
+- 任意 subagent active 时主代理只能派新 subagent 或等待/接收结果。同一需求首次方案审核与首次代码审核各建立 reviewer 会话，后续复审复用各自原会话；仅会话不可恢复时新建并记录原因与交接。
+- 复审只核对上轮具体漏洞、对应修复和直接触及路径；仅该漏洞的直接 P0/P1 回归可新增阻塞，其他新发现记为后续建议后结束。CLI/subagent 原生 review 固定内层只读，completed/exit 0 不等于门禁通过。
+- 发布门只要求最新成功审核后取得本任务用户明确授权，且实际发布内容与受审内容一致；staging 前完整 fingerprint 必须不变，显式 stage 后只允许经 approved parent/clean/content hash 校验的 status/index 表示变化。本迁移仍未发布。
+- `.codex/agents/reviewer.toml` 已同步相同动态 freeze 规则，checker 有独立 mutation 防止其退回手工路径列举或部分 fingerprint。
+- 活跃 `grill-me-codex` 已改为 Codex 原生只读一问一答探索；旧 Claude/nested review 版本完整归档，不再主动调用。
+- 旧 OpenSpec “下一步”交接已由新流程取代；既有任务不伪造历史 RED、不重做已完成生产动作，只对安全检查点后的剩余行为按测试先行、subagent 实现和同一需求既有 reviewer 会话推进。
+- 新任务规格目录为 `docs/changes/<slug>/`；本迁移五份 durable artifacts 已补齐并记录 bootstrap 例外与真实 RED/GREEN。既有 OpenSpec artifacts 和本文后续旧流程叙述仅作历史/在途上下文，不再构成现行执行指令。
+- 本需求方案 reviewer 已按限定范围复审并返回 `APPROVED`；代码 reviewer 当前仍为 `REVISE`，三项 actionable finding 的候选修复待同一代码 reviewer 会话复审。不得声称代码 review 已通过；本迁移尚未发布。
+
 ## 2026-07-15 batch006 五地区详情抓取冲刺
 
 - 1061 场正式 selection 的年度日期已达到 `1050 complete + 11 evidence gap`，完整记账率 100%。零星日美缺口继续累计到最终审核，不中断地区或年代分片。
@@ -320,15 +334,15 @@
 - [后台使用说明](E:/Codex/docs/backend_usage.md)
 - [PRD 归档说明](E:/Codex/docs/PRD/README.md)
 
-### 4.6 OpenSpec / Codex 协作资产
+### 4.6 Codex 协作资产
 
-- OpenSpec 项目配置：`openspec/config.yaml`
-- OpenSpec 规格与变更目录：`openspec/specs/`、`openspec/changes/`
-- Codex OpenSpec skills：`.codex/skills/openspec-*`
-- Codex 工程计划审查 skill：`.codex/skills/plan-eng-review`，配套 `tdd`、`workflow-spine` 与 `gate-templates.md` 引用；`2026-06-26` 新工作树 `/Users/mentianlu/.codex/worktrees/openspec-ready-20260626/umanews` 已补齐并验证这些入口
+- 当前规则入口：`AGENTS.md`、`docs/codex_workflow.md`
+- 新任务持久规格：`docs/changes/<slug>/`
+- 工程计划审核 fallback：`.codex/skills/plan-eng-review`
 - Codex 领域代理：`application`、`integration`、`operations`
-- Codex 只读安全审查代理：`security-scanner`
-- 较大功能、跨模块、架构和生产高风险变更采用“探索 -> 提案/规格/设计/任务 -> 实现 -> 验证 -> 归档”流程
+- Codex 只读审核代理：`reviewer`、`security-scanner`
+- OpenSpec legacy 配置与历史/在途 artifacts：`openspec/config.yaml`、`openspec/specs/`、`openspec/changes/`；相关 skills 与 workflow-spine 已停用，不作为新流程入口或门禁
+- 当前流程为“探索 -> spec/design -> 方案审核 -> 测试先行 -> 子代理实现 -> 新子代理 `/review` -> 用户授权后发布”
 - `start-hkjc-data-import-and-global-spikes` 已完成 `/plan-eng-review`、TDD 红灯测试、最小实现、read-only spike、生产部署、验证和归档；生产服务镜像来自 `b0361cf`。2026-06-26 已在生产执行一次 HKJC fixture 样本 commit（`run_id=1960`），写入 `1` 场、`2` 条报名、`2` 条成绩、`2` 匹马和 `4` 条别名；该样本不来自真实网络抓取，也不生成公开比赛页。英法美三地当前均为 `needs_more_spike`。正式规格已同步到 `openspec/specs/global-racing-data-import-readiness/spec.md`；后续如要正式导入英法美或真实 HKJC 网络适配，应另起 change。
 - `connect-real-global-racing-databases` 已创建并通过 OpenSpec 严格校验；目标按香港、英国、法国、美国顺序接入真实赛马数据库，每地抓最近 2 个月赛事和涉及马匹详情后停止。当前香港阶段已完成 HKJC 官方 HTML 单场真实 dry-run 和隔离 SQLite commit：`HK20260624HV01` 解析并写入 `1` 场、`12` 条报名、`12` 条成绩、`12` 条英文别名；并已完成 recent-days/date-range 小范围真实链路，`--recent-days 60 --end-date 2026-06-26 --limit-races 1 --limit-horses 1` dry-run 请求 `4` 次官方页面，返回 `completion.is_complete=false`、`meetings_found=28`，隔离 SQLite commit 写入 `1` 场、`12` 条报名、`12` 条成绩、`1` 匹马 profile 和 `12` 条别名，重复执行正式对象计数不增长。HKJC 追加 plan-only 批次预检：过滤 overseas `S*` racecourse 后，最近 60 天本地香港 `HV/ST` 比赛为 `144` 场，可按每批 `20` 场拆为 `8` 批；已通过 `--skip-races 20` 真实 smoke 证明日期范围后续批次可从第 21 场开始，并通过 `--race-ids HK20260624HV02,HK20260613ST04 --limit-horses 1` 真实 smoke 证明可按指定 race_id 精确批次只请求目标比赛和受限马匹详情。英法美已追加 `18` 次只读入口复核：英国 `Sporting Life + BHA` 可行性最高，美国 `Equibase` 入口更具体但 chart/PDF 仍需 fixture spike，法国 `France Galop` 仍未定位稳定结构化查询参数。下一步仍需部署后执行 HKJC 生产最近 2 个月全量 dry-run/commit，香港完成后再按顺序进入英国正式 parser/importer TDD。
 - 生产 HKJC 真实网络运行状态：`connect-real-global-racing-databases` 当前实现已部署到生产 `04c0444`，备份 `backups/db/pre-hkjc-real-network-20260626_202442.sql.gz` 通过校验，部署后 check/healthz/小样本 dry-run 通过，生产 plan-only 仍为 `144` 场、`8` 批；第 1 批 full dry-run 曾在马匹 profile 补抓阶段遇到 HKJC `ReadTimeout` / TLS handshake timeout 中断，该次未 commit、未写表，HKJC 锁为空且表计数仍为上次 fixture 样本 `1/2/2/2/4`。已按 TDD 补 transient timeout retry 并重新部署，随后将前 6 个 plan-only 批次拆成 24 个 5 场小批次 dry-run，均 `completion.is_complete=true`，累计覆盖 `120` 场、`1522` 条 entries、`1522` 条 results 和 `1522` 个 horse profile 请求，当前停在生产 commit 前确认点。

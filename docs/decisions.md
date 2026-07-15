@@ -1,5 +1,23 @@
 # 关键决策
 
+## 2026-07-15：项目协作切换为 Codex 原生规划、测试先行与独立子代理审核
+
+- 项目主流程固定为“探索 -> spec/design -> 方案审核 -> 测试先行 -> 子代理实现 -> reviewer 会话 `/review` -> 用户授权后发布”。新任务在 `docs/changes/<slug>/` 保留 `spec.md`、`design.md`、`test_cases.md`、`tasks.md` 和 `rollout.md` 五份 durable artifacts，不把聊天记录作为唯一项目记忆。
+- 探索使用 Codex 原生只读调研/规划；需求不清或高风险时可使用 `grill-me-codex`。进入方案审核阶段且缺少合适原生能力时自动使用 `plan-eng-review`，无需用户再次点名。
+- 自动化测试必须先于实现，并实际产生由缺失目标行为导致的 RED，再进入 GREEN/REFACTOR。仅不改变运行时行为的纯文档或纯配置整理可豁免；flags、队列/路由、权限、依赖、容器/部署顺序和数据行为配置必须测试先行。
+- 任何 subagent（实现、测试、审核、调研或其他用途）运行期间，直到全部 active subagent 结束，主代理只能继续派新 subagent 或等待/接收结果；不得读/改/测/调研、向其他任务发消息或处理无关工作。写密集任务默认串行，并行任务必须没有文件边界重叠。实现代理不提交、不发布，只返回摘要、路径、测试证据和风险。
+- 同一需求首次方案审核与首次代码审核各建立 reviewer 会话；首次代码 reviewer 必须未参与实现并实际调用内层只读 Codex 原生 review。后续方案复审和代码复审分别复用各自原 reviewer 的同一会话与上下文；只有会话不可恢复时才新建，并记录原因、上轮 findings 与已知问题交接。
+- 复审严格限于上轮具体漏洞、对应修复及直接触及路径。只有该漏洞的直接 P0/P1 回归可新增阻塞；其他新发现记录为后续建议后结束，禁止扩展为无关 P2/P3 加固或通用发布协议。completed/exit 0 仅表示原生 review 执行成功。
+- 发布授权只对当前任务有效，必须在最新成功 review 后由用户明确给出。成功 review 记录完整 fingerprint、approved parent 与 `content_manifest_sha256`；授权后 staging 前完整 fingerprint 必须不变。显式 stage 全部受审改动后允许 status/index 表示变化，但 HEAD 必须仍为 approved parent、无 unstaged/untracked/conflict，且 index content hash 必须等于受审值；漏 stage、夹带或内容变化均停止。不另引入 receipt 或 CAS 发布协议。
+- 部署后 evidence-only closure 的精确文件 allowlist 只有 current state、project status、deploy runbook、必要发布 decisions 和本任务 release report；仅追加已发生证据并复用同一需求既有代码 reviewer 会话审核。代码、测试、配置、迁移、spec、tasks、skills、agents 均禁入；超出集合或改变行为/治理时返回完整 review + 新授权。
+- 活跃 `grill-me-codex` 仅是一问一答的 Codex 原生只读探索 skill：先查仓库、每题给推荐答案与理由、用户可随时停止；不写 PLAN/spec/design，不启动其他模型或 nested review。原 Claude 双阶段版本完整归档，仅作恢复依据。
+- `openspec-explore`、`openspec-propose`、`openspec-apply-change`、`openspec-archive-change`、`openspec-sync-specs` 及 OpenSpec workflow-spine 停用。既有 OpenSpec artifacts 原地保留为历史/在途上下文，OpenSpec CLI、phase 和 journal 不再是新流程门禁。
+- `2026-07-15` 已在途任务先完成当前原子操作并停在安全检查点，再按“读取现存规格 -> 补齐/更新 test_cases -> 对尚未实现行为取得真实 RED -> subagent 实现 -> 复用同一需求既有 reviewer 会话（没有时首次建立）”迁移。不得伪造已经错过的历史 RED，也不得重做已完成生产动作；旧文档里的 OpenSpec “下一步”自此仅为历史记录，不再是现行指令。
+- 本迁移由用户直接要求立即建立规则；最早一批编辑发生时新流程及 `docs/changes/codex-native-workflow-migration/` 尚不存在，因此不追溯伪称前置 artifacts 已完成。目录建立后的 helper 强化必须保留真实 RED/GREEN 证据。
+- `codex-native-workflow-migration` 当前尚未发布；其他现有 worktree 不批量改写 tracked
+  治理文件，以免破坏在途工作，只在安全检查点通过 handoff/rebase/main 同步。base/commit
+  审核只接受 clean tree；未提交发布前改动统一走 `--uncommitted`。
+
 ## 2026-07-15：重型历史解析留在本地，详情匹配必须先消除距离歧义
 
 - France Galop 年度 PDF、逐场详情扫描及其他高内存解析只在本地固定镜像执行；生产 runner 只接收已缓存、已校验的轻量 artifact 做 verifier/apply。生产主机发生资源异常或 SSH 不可达时，不在未知状态下重启、重建或继续写入。
@@ -54,7 +72,7 @@
 - 扩容不能只修改一个命令行默认值。选择器、地区进度护栏、artifact 摘要、测试和运行手册必须使用同一口径；既有排除 snapshot、100 场地区领先护栏和待审 gap 记账规则继续有效，除非后续产品审核另行修改。
 - 后续历史批次使用独立 runner 容器，固定到已验收镜像 revision，显式挂载 runtime artifact，并设置资源限制。普通 web/worker/beat 部署不得重建、停止或接管 runner，也不得借此重建 DB、Redis 或共享网络。
 - runner 必须具有数据库级与应用级互斥锁、心跳、可恢复 checkpoint 和失联接管门禁；迁移前必须安全暂停。抓取阶段只允许 `network=true / write=false`，落库阶段只允许 `network=false / write=true`，任何阶段都不能同时获得两种权限。
-- 上述能力必须走 OpenSpec、工程评审、完整测试、实现和反复代码 review，并在部署验收通过后才允许启动 batch006。历史公开展示继续保持关闭。
+- 该能力在当时必须走 OpenSpec、工程评审、完整测试、实现和反复代码 review，并在部署验收通过后才允许启动 batch006；其中技术验收事实继续有效，但流程入口已由本文件顶部 `2026-07-15` 新流程取代。历史公开展示继续保持关闭。
 - 实现采用三张独立控制表、PostgreSQL 租约与 `fcntl` 双锁；过期租约不能被普通启动覆盖。接管必须同时证明旧容器不存在、`pg_stat_activity` 无对应 `application_name`、runtime/DB checkpoint 一致，并写入操作者与原因。
 - owner token 原文只能位于 artifact 外的 0600 文件；resume/takeover 也不得通过命令行传 token。crawl control role 对 event 表只允许 append，不能删除审计事件，更不能读取或写入赛事、新闻、术语等业务表。
 - 普通部署首次引入 `0031` 时只能显式设置一次 initial-install 门禁；后续迁移必须让 active runner 安全暂停。数据库、Redis 和共享网络只允许由独立 bootstrap 首次创建，普通 deploy/rollback 永远不隐式补建。
@@ -774,7 +792,7 @@ HKJC 官方英文概念和既有日语主术语如果拥有同一术语类型和
 - QQ 自动推送从全局范围配置扩展为群级配置，因为不同 QQ 群可能只想看不同地区或不同范围的新闻。
 - 外部数据库第一期正式实现 HKJC，因为香港官方数据集中、字段完整、中文用户价值高；美国 `Equibase`、英国 `Sporting Life + BHA`、法国 `France Galop` 先做小样本 spike，确认字段、入口和反爬/语言风险后再进入正式导入。
 
-该决策最初只对应 OpenSpec change `expand-international-racing-coverage` 的规划边界；`2026-06-25` 已在独立 worktree 开始本地实现。当前仍不表示国际化能力已经生产上线，后续部署需要完成完整测试、OpenSpec 校验和生产窗口确认。
+该决策最初只对应 OpenSpec change `expand-international-racing-coverage` 的规划边界；`2026-06-25` 已在独立 worktree 开始本地实现。当时后续部署要求完整测试、OpenSpec 校验和生产窗口确认；这是历史门禁记录，`2026-07-15` 后新变更以当前 Codex 工作流和任务专属发布授权为准。
 
 review 返修后补充实现边界：HKJC 外部数据导入必须参考 netkeiba 的单来源互斥锁语义，已有运行中导入时拒绝并发写入；在真实网络抓取实现前，`--commit` 不允许写入占位 payload，必须通过 `--payload-file` 提供真实小样本；payload 超过 `max_races / max_horses` 时直接失败，不静默截断或部分写入；`max_horses` 的统计口径必须覆盖顶层 `horses`、赛事 `entries` 和 `results` 中实际会写入缓存或别名的唯一马匹，避免 entries/results 绕过批量上限；多语言术语后处理和自动化评分必须按文章 `source_language` 隔离，避免英语、繁中、日语术语在翻译、改写、重点马和赛事优先级判断中串用。
 
@@ -849,7 +867,7 @@ review 返修后补充实现边界：HKJC 外部数据导入必须参考 netkeib
 - 英国 `Sporting Life + BHA`：Sporting Life racecards/results/profile 信号较好，优先级最高；BHA 官方搜索、监管和补字段入口仍需单独复验。
 - 法国 `France Galop`：英文站浅层页面可访问，但结构化赛程、报名、出马、赛果和马匹资料的稳定查询入口仍未确认；法语新闻正文仍不进入新闻审核、翻译、自动发布或 QQ 推送主链路。
 
-后续如要正式导入英法美数据库源，必须另起 OpenSpec change，先把每个地区的具体 URL 参数、字段映射、限速、失败恢复、正式表写入边界和回滚口径设计清楚。
+该决策当时要求正式导入英法美数据库源前另起 OpenSpec change，先把每个地区的具体 URL 参数、字段映射、限速、失败恢复、正式表写入边界和回滚口径设计清楚；`2026-07-15` 起等价工作改为新建 `docs/changes/<slug>/` spec/design，不再调用旧 OpenSpec skills。
 
 2026-06-26 `connect-real-global-racing-databases` 追加只读复核后，英法美仍不进入正式写库，但职责边界更清晰：
 
