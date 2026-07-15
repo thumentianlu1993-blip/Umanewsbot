@@ -20,6 +20,7 @@ ASSIGNMENT_RE = re.compile(
     r'^race\["(?P<group>starters|scratches)"\]\[(?P<index>\d+)\]'
     r'(?P<path>(?:\["[^"]+"\])+?)\s*=\s*(?P<value>.+);$'
 )
+RACE_DISTANCE_RE = re.compile(r'^race\["distance"\]\s*=\s*(?P<value>.+);$')
 
 
 def _js_value(raw: str):
@@ -49,8 +50,13 @@ def _horse_sort_key(row: dict) -> tuple[int, str]:
 
 def parse_equibase_yearbook(html: str, *, source_url: str) -> tuple[list[dict], list[dict], dict]:
     groups: dict[str, dict[int, dict]] = {"starters": {}, "scratches": {}}
+    distance_text = ""
     for raw_line in html.splitlines():
-        match = ASSIGNMENT_RE.match(raw_line.strip())
+        line = raw_line.strip()
+        distance_match = RACE_DISTANCE_RE.match(line)
+        if distance_match is not None:
+            distance_text = str(_js_value(distance_match.group("value"))).strip()
+        match = ASSIGNMENT_RE.match(line)
         if match is None:
             continue
         path = ".".join(re.findall(r'\["([^"]+)"\]', match.group("path")))
@@ -113,11 +119,14 @@ def parse_equibase_yearbook(html: str, *, source_url: str) -> tuple[list[dict], 
         row["finish_position"] = storage_position
     if not results:
         raise RuntimeError("Equibase yearbook page has no official results")
-    return runners, results, {
+    metadata = {
         "runner_count": len(runners),
         "result_count": len(results),
         "scratch_count": sum(row["running_status"] == "scratched" for row in runners),
     }
+    if distance_text:
+        metadata["distance_text"] = distance_text
+    return runners, results, metadata
 
 
 def _comma_person(value: str) -> str:
@@ -246,6 +255,8 @@ def prepare(*, event_paths: list[Path], manifest_path: Path) -> dict:
             else:
                 gaps.append({"slug": event["slug"], "reason": "unsupported_provider", "provider": provider})
                 continue
+            if not runners or not results:
+                raise RuntimeError(f"{provider} detail page has no complete rows: {source_url}")
         except Exception as exc:
             gaps.append({"slug": event["slug"], "reason": "parse_failed", "error": str(exc)})
             continue

@@ -1,0 +1,106 @@
+{
+  "schema_version": "2.0",
+  "stages": [
+    "discover",
+    "cache",
+    "parse",
+    "validate",
+    "package"
+  ],
+  "recipes": [
+    {
+      "id": "japan-v2",
+      "region": "japan",
+      "source_chain": [
+        "jra",
+        "netkeiba"
+      ],
+      "official_sources": [
+        "jra"
+      ],
+      "fallback_sources": [
+        "netkeiba"
+      ],
+      "discovery": {
+        "required": false,
+        "url_strategy": "approved_direct_or_catalog"
+      }
+    },
+    {
+      "id": "hong-kong-v2",
+      "region": "hong_kong",
+      "source_chain": [
+        "hkjc"
+      ],
+      "official_sources": [
+        "hkjc"
+      ],
+      "fallback_sources": [],
+      "discovery": {
+        "required": true,
+        "provider": "hkjc",
+        "url_strategy": "discovery_only"
+      }
+    },
+    {
+      "id": "united-kingdom-v2",
+      "region": "united_kingdom",
+      "source_chain": [
+        "racing_post",
+        "sporting_life",
+        "irishracing"
+      ],
+      "official_sources": [
+        "racing_post"
+      ],
+      "fallback_sources": [
+        "sporting_life",
+        "irishracing"
+      ],
+      "discovery": {
+        "required": false,
+        "url_strategy": "approved_direct_or_search"
+      }
+    },
+    {
+      "id": "france-v2",
+      "region": "france",
+      "source_chain": [
+        "france_galop",
+        "zeturf",
+        "irishracing"
+      ],
+      "official_sources": [
+        "france_galop"
+      ],
+      "fallback_sources": [
+        "zeturf",
+        "irishracing"
+      ],
+      "discovery": {
+        "required": false,
+        "url_strategy": "approved_direct_or_search"
+      }
+    },
+    {
+      "id": "united-states-v2",
+      "region": "united_states",
+      "source_chain": [
+        "equibase_chart",
+        "equibase_archive",
+        "horse_racing_nation"
+      ],
+      "official_sources": [
+        "equibase_chart",
+        "equibase_archive"
+      ],
+      "fallback_sources": [
+        "horse_racing_nation"
+      ],
+      "discovery": {
+        "required": false,
+        "url_strategy": "approved_direct_or_archive"
+      }
+    }
+  ]
+}

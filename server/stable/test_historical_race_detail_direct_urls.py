@@ -500,6 +500,18 @@ Owners: 8-CresRan,LLC;
 
         self.assertTrue(module._race_matches_event(event, "Grand Prix de Chantilly"))
 
+    def test_zeturf_event_match_expands_grand_prix_de_paris_catalog_name(self):
+        module = _load("prepare_france_zeturf_race_detail_candidates.py")
+        event = {
+            "slug": "france-paris-g-p-de-2024",
+            "original_name": "Paris (G.P. de)",
+            "source_refs": json.dumps(
+                {"calendar_discovery": {"race_name": "F GD PRIX PARIS"}}
+            ),
+        }
+
+        self.assertTrue(module._race_matches_event(event, "Grand Prix de Paris"))
+
     def test_zeturf_discovery_stops_scanning_when_date_is_complete(self):
         module = _load("prepare_france_zeturf_race_detail_candidates.py")
         events = [{

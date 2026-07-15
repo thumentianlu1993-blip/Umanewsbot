@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import argparse
+from datetime import date
 import hashlib
+from io import StringIO
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -29,8 +31,10 @@ from historical_race_calendar_common import (
     atomic_publish_directory,
     canonical_bytes,
     file_identity,
+    hkjc_coverage_policy,
     load_catalog,
     load_selection,
+    sha256_bytes,
     sha256_file,
     valid_timestamp,
 )
@@ -38,6 +42,57 @@ from historical_race_calendar_common import (
 
 class CalendarPrepareError(CalendarArtifactError):
     pass
+
+
+def _verified_request_manifest(
+    *,
+    request_manifest_path: Path | None,
+    selection_path: Path,
+    catalog_path: Path,
+    sources: list[dict],
+    hkjc_cutoff_date: date | None,
+) -> tuple[dict | None, dict | None, str | None]:
+    coverage_policy = hkjc_coverage_policy(
+        sources, hkjc_cutoff_date=hkjc_cutoff_date
+    )
+    coverage_policy_sha256 = (
+        sha256_bytes(canonical_bytes(coverage_policy)) if coverage_policy else None
+    )
+    if request_manifest_path is None:
+        if hkjc_cutoff_date is not None:
+            raise CalendarPrepareError(
+                "HKJC partial coverage requires the request manifest"
+            )
+        return None, coverage_policy, coverage_policy_sha256
+    if request_manifest_path.is_symlink() or not request_manifest_path.is_file():
+        raise CalendarPrepareError("request manifest is not a regular file")
+    try:
+        manifest = json.loads(request_manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CalendarPrepareError("request manifest is unreadable") from exc
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != "1.0":
+        raise CalendarPrepareError("request manifest schema is invalid")
+    if (
+        manifest.get("selection") != file_identity(selection_path)
+        or manifest.get("source_catalog") != file_identity(catalog_path)
+    ):
+        raise CalendarPrepareError("request manifest identity does not match inputs")
+    if coverage_policy is None:
+        if (
+            manifest.get("coverage_policy") is not None
+            or manifest.get("coverage_policy_sha256") is not None
+        ):
+            raise CalendarPrepareError("request manifest coverage policy identity drifted")
+    elif (
+        manifest.get("coverage_policy") != coverage_policy
+        or manifest.get("coverage_policy_sha256") != coverage_policy_sha256
+    ):
+        raise CalendarPrepareError("request manifest coverage policy identity drifted")
+    return (
+        file_identity(request_manifest_path),
+        coverage_policy,
+        coverage_policy_sha256,
+    )
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -207,10 +262,17 @@ def _source_text(source: dict, path: Path) -> str:
         try:
             with pdfplumber.open(path) as pdf:
                 preserve_layout = source["parser"] == "france_obstacle_summary"
-                text = "\n".join(
-                    (page.extract_text(layout=preserve_layout) or "")
-                    for page in pdf.pages
-                )
+                output = StringIO()
+                for page_number, page in enumerate(pdf.pages):
+                    if page_number:
+                        output.write("\n")
+                    try:
+                        output.write(
+                            page.extract_text(layout=preserve_layout) or ""
+                        )
+                    finally:
+                        page.close()
+                text = output.getvalue()
         except Exception as exc:
             raise CalendarPrepareError(f"calendar PDF is unreadable: {source['id']}") from exc
     else:
@@ -334,16 +396,20 @@ def prepare_calendar_inputs(
     source_cache_root: Path,
     source_cache_manifest_path: Path,
     request_ledger_path: Path,
+    request_manifest_path: Path | None = None,
     country_region: str,
     year: int,
     recorded_at: str,
     output_dir: Path,
+    hkjc_cutoff_date: date | None = None,
 ) -> dict:
     if not valid_timestamp(recorded_at):
         raise CalendarPrepareError("recorded_at must be a timezone-aware ISO timestamp")
     try:
         _selection, all_targets = load_selection(selection_path)
-        _catalog, all_sources = load_catalog(catalog_path)
+        _catalog, all_sources = load_catalog(
+            catalog_path, hkjc_cutoff_date=hkjc_cutoff_date
+        )
     except CalendarArtifactError as exc:
         raise CalendarPrepareError(str(exc)) from exc
     targets = [
@@ -356,8 +422,28 @@ def prepare_calendar_inputs(
         for source in all_sources
         if source["country_region"] == country_region and source["edition_year"] == year
     ]
+    scope_pairs = {
+        (target["country_region"], target["year"]) for target in all_targets
+    }
+    if hkjc_cutoff_date is not None and scope_pairs != {
+        ("hong_kong", hkjc_cutoff_date.year)
+    }:
+        raise CalendarPrepareError(
+            "HKJC partial coverage requires a single edition year selection"
+        )
     if not targets or not sources:
         raise CalendarPrepareError("calendar parser region/year scope is empty")
+    (
+        request_manifest_identity,
+        coverage_policy,
+        coverage_policy_sha256,
+    ) = _verified_request_manifest(
+        request_manifest_path=request_manifest_path,
+        selection_path=selection_path,
+        catalog_path=catalog_path,
+        sources=all_sources,
+        hkjc_cutoff_date=hkjc_cutoff_date,
+    )
     scope_ids = {target["target_id"] for target in targets}
     targets_by_identity = {
         (target["series_key"], target["year"]): target for target in targets
@@ -577,10 +663,14 @@ def prepare_calendar_inputs(
         "gap_count": len(gaps),
         "accounted_count": len(event_rows) + len(gaps),
         "provider_row_count": len(normalized_providers),
+        "date_match_count": len(event_rows),
         "accounted_rate": 1.0,
         "data_complete_rate": round(len(event_rows) / len(targets), 8),
         "recorded_at": recorded_at,
     }
+    if coverage_policy is not None:
+        summary["coverage_policy"] = coverage_policy
+        summary["coverage_policy_sha256"] = coverage_policy_sha256
     result = dict(summary)
 
     def write(temporary: Path) -> None:
@@ -592,12 +682,22 @@ def prepare_calendar_inputs(
         gaps_path.write_bytes(
             b"".join(canonical_bytes(row) for row in sorted(gaps, key=lambda row: row["target_id"]))
         )
+        date_matches_path = temporary / "date_matches.jsonl"
+        date_matches_path.write_bytes(
+            b"".join(
+                canonical_bytes(row)
+                for row in sorted(event_rows, key=lambda row: row["target_id"])
+            )
+        )
         event_files = write_calendar_event_inputs(event_rows, temporary)
         summary_path = temporary / "summary.json"
         summary_path.write_bytes(canonical_bytes(summary))
         artifacts = {
             "provider_rows": file_identity(providers_path, relative_to=temporary),
             "gaps": file_identity(gaps_path, relative_to=temporary),
+            "date_matches": file_identity(
+                date_matches_path, relative_to=temporary
+            ),
             "summary": file_identity(summary_path, relative_to=temporary),
         }
         for region, event_path in sorted(event_files.items()):
@@ -612,6 +712,11 @@ def prepare_calendar_inputs(
             "source_cache_manifest": file_identity(source_cache_manifest_path),
             "artifacts": artifacts,
         }
+        if request_manifest_identity is not None:
+            manifest["request_manifest"] = request_manifest_identity
+        if coverage_policy is not None:
+            manifest["coverage_policy"] = coverage_policy
+            manifest["coverage_policy_sha256"] = coverage_policy_sha256
         (temporary / "manifest.json").write_bytes(canonical_bytes(manifest))
 
     try:
@@ -631,10 +736,12 @@ def main() -> int:
     parser.add_argument("--source-cache-root", required=True, type=Path)
     parser.add_argument("--source-cache-manifest", required=True, type=Path)
     parser.add_argument("--request-ledger", required=True, type=Path)
+    parser.add_argument("--request-manifest", type=Path)
     parser.add_argument("--country-region", required=True)
     parser.add_argument("--year", required=True, type=int)
     parser.add_argument("--recorded-at", required=True)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--hkjc-cutoff-date", type=date.fromisoformat)
     args = parser.parse_args()
     try:
         result = prepare_calendar_inputs(
@@ -643,10 +750,12 @@ def main() -> int:
             source_cache_root=args.source_cache_root,
             source_cache_manifest_path=args.source_cache_manifest,
             request_ledger_path=args.request_ledger,
+            request_manifest_path=args.request_manifest,
             country_region=args.country_region,
             year=args.year,
             recorded_at=args.recorded_at,
             output_dir=args.output_dir,
+            hkjc_cutoff_date=args.hkjc_cutoff_date,
         )
     except (CalendarPrepareError, OSError, json.JSONDecodeError) as exc:
         parser.error(str(exc))

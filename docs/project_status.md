@@ -1,5 +1,24 @@
 # 项目状态文档
 
+## 2026-07-16 历史详情导入链路完成零问题复审
+
+- batch006 生产终态保持 `1061 accounted / 1042 complete / 19 gap`，不倒退、不重跑。新一轮本地产物已收敛为 `4930 = 4652 complete + 278 gap`，含 `51191 runners / 48413 results`；截至 2024 年拆为 18 个 chunk，2026 到期范围拆为 2 个 chunk。
+- source bundle、独立 receipt/迁移 `0032`、原子 chunk importer、租约 fencing、2026 descriptor 安全落库和逐 candidate verifier 已完成测试优先实现。聚焦回归 `148/148`、Django check、migration drift 通过；同一 reviewer 会话最终结论为 `NO ACTIONABLE FINDINGS / APPROVED`。
+- 新覆盖政策不删除既有总账：remaining `28126` targets 分为 `8857 historical hard / 18173 historical best-effort / 1096 new formal`。日本和香港继续 hard；英法美截至 2024 年 G1 hard，G2/G3 gap 单独报告但不阻断历史 hard 验收；2025 年以后五地区正式范围独立推进。
+- 当前仅完成本地代码与临时 full smoke，4652 场尚未写入生产。下一步是提交推送、生成正式不可变 bundle；取得当前发布授权后，才进行生产备份、`0032`、新镜像、逐 chunk dry-run/apply/verifier。历史公开开关继续关闭。
+
+## 2026-07-16 France runner v2 单目标 smoke 待重新生成 descriptor
+
+- 本地固定镜像与独立 run/host-lock 根已核验，但 France `48498` descriptor 的 mounts/outputs 仍绑定 plan root，和批准的 runtime 根不一致。
+- `discover` 在容器创建前 fail closed；请求、缓存、阶段产物和残留容器均为 0，后续四阶段未运行，生产与数据库未接触。
+- 下一步由计划生成侧提供绑定独立 runtime 根的新不可变 descriptor，再从 `discover` 重跑；不得绕过路径身份门禁。
+
+## 2026-07-16 日本 runner v2 单目标 smoke 待重新生成 descriptor
+
+- 本地固定镜像与独立 run/共享 host-lock 根已核验，但 Japan `50556` descriptor 的 mounts/outputs 仍绑定 plan root，和本次批准的 runtime 根不一致。
+- `discover` 在容器创建前 fail closed；请求、缓存、阶段产物和残留容器均为 `0`，后续四阶段未运行，生产与数据库未接触。
+- 下一步由计划生成侧提供绑定独立 runtime 根的新不可变 descriptor，或经明确审批改用 descriptor 原批准路径，再从 `discover` 重跑；不得绕过路径身份门禁。
+
 ## 2026-07-15 batch006 五地区详情抓取冲刺
 
 - 1061 场正式 selection 的年度日期已达到 `1050 complete + 11 evidence gap`，完整记账率 100%。零星日美缺口继续累计到最终审核，不中断地区或年代分片。
@@ -30,7 +49,7 @@
 - 生产 web/worker/beat 已统一到 revision `bdc0eeff78e111d7fa8a697cbb3557888f864fb8`、image `sha256:c975a4faf979a1f78cdb203b810d4f5726aca114175007fc01c176044f13841c`；最终任务、队列、翻译状态和数据库事务均为空，healthz 正常。
 - OpenSpec 相关 change 已归档且全量校验通过。历史 batch006 因生产可用磁盘约 `3.0 GiB < 5 GiB` 继续关闭，不属于新闻发布完成状态。
 
-最后更新时间：`2026-07-15`
+最后更新时间：`2026-07-16`
 当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP、公开首页资讯流、抓取新鲜度修复、后台快速术语创建与当前稿术语应用、外部马名索引识别链路、榜单重点 QQ 推送、公开文章 ID URL、国际赛马资讯扩展、多地区生产窗口、术语种子数据准备、赛事日历 MVP 和马匹详情页 MVP 均已部署生产）
 
 ## 2026-07-14 多地区归属 V3 首轮生产审计 no-go

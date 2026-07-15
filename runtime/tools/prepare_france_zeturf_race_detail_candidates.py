@@ -68,6 +68,7 @@ STOPWORDS = {
 
 ZETURF_SERIES_ALIASES = {
     "france-chantilly-g-p-de": ("Grand Prix de Chantilly",),
+    "france-paris-g-p-de": ("Grand Prix de Paris",),
 }
 
 

@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0",
+  "plan_id": "detail-crawl-1998-2026-v1",
+  "shard_id": "united_kingdom-2013-sporting-life-irishracing-01",
+  "region": "united_kingdom",
+  "complete_target_ids": [
+    "61000"
+  ],
+  "gap_target_ids": [
+    "61001",
+    "61002",
+    "61003",
+    "61004",
+    "61005",
+    "61006",
+    "61007",
+    "61008",
+    "61009",
+    "61010",
+    "61011",
+    "61012",
+    "61013",
+    "61014",
+    "61015",
+    "61016",
+    "61017",
+    "61018",
+    "61019",
+    "61020",
+    "61021",
+    "61022",
+    "61023",
+    "61024",
+    "61025",
+    "61026",
+    "61027",
+    "61028",
+    "61029",
+    "61030",
+    "61031",
+    "61032",
+    "61033",
+    "61034",
+    "61035",
+    "61036",
+    "61037",
+    "61038",
+    "61039"
+  ],
+  "gap_reason": "sporting_life_exhausted_in_v1",
+  "cache_entries": [
+    {
+      "url": "https://www.sportinglife.com/racing/results/2013-06-20/ascot/121996/norfolk-stakes-group-2",
+      "path": "cache/sporting_life/121996.html",
+      "size": 17,
+      "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "url": "https://www.irishracing.com/raceresults/Thu-20th-Jun-2013/Ascot/1545",
+      "path": "cache/irishracing/2013-06-20-ascot-1545.html",
+      "size": 19,
+      "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  ]
+}

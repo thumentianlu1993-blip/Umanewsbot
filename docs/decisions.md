@@ -1,5 +1,14 @@
 # 关键决策
 
+## 2026-07-16：历史覆盖分层与详情导入 receipt 成为正式门禁
+
+- 历史期定义为截至 2024 年；2025 年及以后属于新赛事正式范围。日本、中国香港继续沿用既有官方来源和正式总账 hard 标准；英国、法国、美国历史 G1 为 hard，历史 G2/G3 为 best-effort，已有数据继续保留和补充，显式 gap 单独报告但不阻断历史 hard 验收；2025 年及以后英法美 G1-G3 属于正式展示范围。
+- 已完成的 batch 和详情 package 一律复用，不因政策分层倒退或重跑。零星身份歧义、缺页和普通 G2/G3 缺口进入统一 gap/review ledger；hard 缺口只有权威取消、未举行或永久不可得证据才可记账通过。
+- 正式详情导入按 source bundle/chunk 执行。bundle 必须精确覆盖冻结 package scope，并把 source bytes、cache identity、request evidence、target identity、layer、cutoff、chunk 与 approval SHA 全部写入 manifest；只保存 identity 而不带来源对象字节的 bundle 不得进入生产。
+- 每个 chunk 使用独立 `HistoricalRaceDetailImportReceipt`。receipt 的 STARTED/COMPLETED/ABANDONED 三态及 supersedes 链不可覆写；业务写入和 COMPLETED 必须同事务，STARTED 只有证明零业务写后才能显式 abandon。runner owner token、全局数据库锁和 artifact/current-step/plan binding 共同构成 fencing，不能只凭 run ID 执行。
+- verifier 只核 receipt 固定的本次 APPLIED candidate，不以“event 下存在某个候选”代替精确写入证明。2026 当前到期 descriptor 必须按 target 身份 materialize，强制保持草稿和不完整状态，并在任何失败时整批回滚。
+- 历史公开继续关闭。代码通过最新零问题复审并生成正式不可变 artifact 后，仍须取得用户对当前固定发布内容的明确授权，才能执行生产备份、迁移、镜像切换和写入；授权后不得再改变发布内容。
+
 ## 2026-07-15：重型历史解析留在本地，详情匹配必须先消除距离歧义
 
 - France Galop 年度 PDF、逐场详情扫描及其他高内存解析只在本地固定镜像执行；生产 runner 只接收已缓存、已校验的轻量 artifact 做 verifier/apply。生产主机发生资源异常或 SSH 不可达时，不在未知状态下重启、重建或继续写入。

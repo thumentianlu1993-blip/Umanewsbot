@@ -1,5 +1,30 @@
 # 部署运行手册
 
+## 待授权：历史详情 source bundle 与 0032 串行导入
+
+1. 本阶段只接受正式 bundle 的不可变 manifest。范围必须严格为 39 个正式 package 的 `4930` 个目标，结果必须为 `4652 complete / 278 gap`、`51191 runners / 48413 results`；截至 2024 年 `4351/214/18 chunks`，2026 到期范围 `301/64/2 chunks`。任一计数、输入 SHA、source object 或 validation 漂移立即停止。
+2. 发布前必须使用最新 `main` 构建可复现 AMD64 镜像；部署迁移 `0032_historical_race_detail_import_receipt` 前生成新的 custom-format 数据库备份，记录路径、bytes、SHA-256 并用匹配 PostgreSQL 主版本执行 `pg_restore -l`。不得复用旧备份作为本次写前证据。
+3. 每个 chunk 先在持有 HistoricalBatchRun 全局租约的 runner 内执行 dry-run，再执行 apply。私有 owner token 只能通过受保护环境传递；子命令必须匹配 run/global lock、artifact root、current step 与 plan 输入，token 不得写入 CLI、日志、receipt 或报告。
+4. apply 对每个 chunk 使用唯一 receipt。STARTED receipt 禁止自动跨越；只有逐表证明零业务写时可显式 reconcile 为 ABANDONED，并用新审批、新 chunk 和 supersedes identity 重试。业务写入和 COMPLETED receipt 必须在同一最外层事务内提交。
+5. apply 后立即运行逐 receipt verifier，只核本次 receipt 固定的两个 APPLIED candidate ID、payload SHA、raw provenance、event 和模块集合；后来新增的其他 candidate 不影响结果，被删除、替换或篡改则失败。
+6. 2026 descriptor 路径必须逐 target 校验 ID/SHA/inventory，强制生成 `draft + incomplete + is_featured=false`，并确认全部 301 条属于 cutoff `2026-07-15` 的 due 清单。任何行、alias 或日志写入失败整批回滚。
+7. 全流程保持 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false` 和历史公开关闭。重型抓取/解析继续在本地 Docker；生产只接收紧凑、已校验 artifact。完成最新零问题 review 后仍须取得用户对本次固定代码与 artifact 的明确发布授权，授权前不得迁移或写库。
+
+## 2026-07-16 France runner v2 本地真实网络 smoke 阻断记录
+
+1. 计划执行单目标 `france / 48498` 的 `discover -> cache -> parse -> validate -> package`，仅授权本地 Docker；固定镜像为 `sha256:e55b8b08bcd5848625a8c1d0fa5abd710783ed3be6fddaf245860ccbc9e55fa8`，不得访问生产或数据库。
+2. 独立 run root 与共享 host lock 已创建在 `runtime/historical_detail_crawl_runs/detail-crawl-1998-2026-v2-smoke/`。现有 descriptor 的不可变 mounts/outputs 仍指向 `runtime/historical_plan_exports/detail-crawl-1998-2026-v2/smoke/`，因此 launcher 在创建容器前以 `mount contract mismatch for run` 拒绝。
+3. 本次安全终态：真实请求 `0`、缓存字节 `0`、stage artifact `0`，无 checkpoint、request log、package manifest 和残留容器；`cache / parse / validate / package` 均未启动。空 run root 与 host lock 保留，不执行清理删除。
+4. 恢复条件：由计划生成侧重新生成并审批绑定独立 run root 和共享 host lock 的 descriptor，保持相同 target、固定镜像、来源白名单和两次请求预算；不得使用软链接、手工改 descriptor 或切换到 plan root 运行目录。新 descriptor 就绪后从 `discover` 重新执行并逐阶段验收。
+
+## 2026-07-16 Japan runner v2 本地真实网络 smoke 阻断记录
+
+1. 计划执行单目标 `japan / 50556` 的 `discover -> cache -> parse -> validate -> package`，仅授权本地 Docker；固定镜像为 `sha256:e55b8b08bcd5848625a8c1d0fa5abd710783ed3be6fddaf245860ccbc9e55fa8`，不得访问生产或数据库。
+2. 独立 run root `runtime/historical_detail_crawl_runs/detail-crawl-1998-2026-v2-smoke/japan` 与同级共享 host lock 已创建。现有 descriptor 的不可变 mounts/outputs 仍指向 plan root 下的 `smoke/run/smoke-japan-50556` 与 `smoke/host-locks`，因此 launcher 在创建容器前以 `mount contract mismatch for run` 拒绝，退出码为 `2`。
+3. 本次安全终态：真实请求 `0`、缓存字节 `0`、stage artifact `0`，无 checkpoint、request log、package manifest 和残留容器；`cache / parse / validate / package` 均未启动。空 run root 与共享 host lock 保留。
+4. 恢复条件：由计划生成侧重新生成并审批绑定独立 run root 和共享 host lock 的 descriptor，或经明确审批改用 descriptor 原批准路径；不得手工修改 descriptor。新 descriptor 就绪后从 `discover` 重新执行并逐阶段验收。
+5. 本次没有生产变更、数据库写入或业务 artifact，因此无需生产回滚；重新运行前验证固定镜像 identity、descriptor SHA、空容器状态和授权路径。
+
 ## 阻断中：batch006 生产 runner 事故恢复
 
 1. 首次 France verify 在无网络、无赛事业务写入阶段执行重型 PDF 解析后，生产 SSH 持续出现 `Connection timed out during banner exchange`。在可信主机恢复前，不执行 retag、Compose、容器重启、runner resume、数据库备份或赛事 apply。

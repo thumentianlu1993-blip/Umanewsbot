@@ -44,6 +44,9 @@ RUNNER_MIN_FREE_DISK_BYTES = 5 * 1024 * 1024 * 1024
 RUNNER_REQUEST_INTERVAL_SECONDS = 1
 RUNNER_IMMUTABLE_TOOL_ROOT = Path("/app/runtime/tools").resolve()
 RUNNER_PRODUCTION_ARTIFACT_ROOT = Path("/app/historical-runtime").resolve()
+RUNNER_OWNER_TOKEN_ENV = "HISTORICAL_RUNNER_OWNER_TOKEN"
+RUNNER_PLAN_PATH_ENV = "HISTORICAL_RUNNER_PLAN_PATH"
+RUNNER_STEP_ID_ENV = "HISTORICAL_RUNNER_STEP_ID"
 _APPROVED_HISTORICAL_PYTHON_TOOLS = {
     "cache_historical_race_date_sources.py",
     "discover_historical_race_band_sources.py",
@@ -81,7 +84,10 @@ _WRITE_MANAGEMENT_COMMANDS = {
     "build_historical_race_date_discovery",
     "import_historical_race_event_candidates",
     "import_historical_race_event_field_candidates",
+    "import_race_events",
     "manage_historical_race_detail_sources",
+    "import_historical_race_detail_chunk",
+    "reconcile_historical_race_detail_receipt",
 }
 _JSONL_APPLY_COMMANDS = {
     "import_historical_race_event_candidates",
@@ -91,11 +97,15 @@ _ARTIFACT_APPLY_COMMANDS = {
     "build_historical_race_date_discovery",
     "manage_historical_race_detail_sources",
 }
+_DETAIL_CHUNK_APPLY_COMMANDS = {"import_historical_race_detail_chunk"}
+_DETAIL_RECEIPT_RECONCILE_COMMANDS = {"reconcile_historical_race_detail_receipt"}
+_CURRENT_YEAR_DESCRIPTOR_APPLY_COMMANDS = {"import_race_events"}
 _READ_MANAGEMENT_COMMANDS = {
     "build_historical_race_band_batch",
     "build_historical_race_date_discovery",
     "orchestrate_race_event_crawl",
     "manage_historical_race_detail_sources",
+    "verify_historical_race_detail_chunk",
 }
 
 
@@ -293,6 +303,120 @@ def _validate_apply_bindings(
 
     argv = step["argv"]
     expected_sha256 = step["expected_sha256"]
+    if command in _CURRENT_YEAR_DESCRIPTOR_APPLY_COMMANDS:
+        descriptor_path = str(
+            _ensure_within(
+                _option_value(argv, "--current-year-descriptor"),
+                artifact_root,
+                "current-year descriptor path",
+            )
+        )
+        command_approval = str(
+            _ensure_within(
+                _option_value(argv, "--current-year-approval"),
+                artifact_root,
+                "current-year approval path",
+            )
+        )
+        csv_path = str(
+            _ensure_within(_option_value(argv, "--csv"), artifact_root, "due CSV path")
+        )
+        cutoff = _option_value(argv, "--approved-cutoff-date")
+        if command_approval != approval_path:
+            raise RunnerPlanError(
+                f"apply step {step['id']} command approval does not match approved input"
+            )
+        if descriptor_path not in identities or csv_path not in identities:
+            raise RunnerPlanError(
+                f"apply step {step['id']} descriptor and due CSV must be declared inputs"
+            )
+        if approval_payload.get("cutoff_date") != cutoff:
+            raise RunnerPlanError(
+                f"apply step {step['id']} approval cutoff does not match command"
+            )
+        try:
+            descriptor_bytes = Path(descriptor_path).read_bytes()
+            descriptor = json.loads(descriptor_bytes)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RunnerPlanError(
+                f"apply step {step['id']} descriptor file is invalid"
+            ) from exc
+        if (
+            not isinstance(descriptor, dict)
+            or descriptor.get("artifact_kind") != "due_only"
+            or descriptor.get("cutoff_date") != cutoff
+            or approval_payload.get("descriptor_sha256")
+            != _sha256_bytes(descriptor_bytes)
+            or approval_payload.get("classified_manifest_sha256") != expected_sha256
+        ):
+            raise RunnerPlanError(
+                f"apply step {step['id']} descriptor or approval identity does not match"
+            )
+        manifest_identity = descriptor.get("classified_manifest")
+        apply_artifacts = descriptor.get("apply_artifacts")
+        if (
+            not isinstance(manifest_identity, dict)
+            or manifest_identity.get("sha256") != expected_sha256
+            or expected_sha256 not in identities.values()
+            or not isinstance(apply_artifacts, dict)
+            or identities.get(csv_path)
+            not in {
+                value.get("sha256")
+                for value in apply_artifacts.values()
+                if isinstance(value, dict)
+            }
+            or "--dry-run" in argv[3:]
+        ):
+            raise RunnerPlanError(
+                f"apply step {step['id']} due-only artifacts are not bound to expected SHA"
+            )
+        return
+    if command in _DETAIL_CHUNK_APPLY_COMMANDS:
+        bundle_dir = _ensure_within(
+            _option_value(argv, "--bundle-dir"), artifact_root, "detail chunk bundle dir"
+        )
+        bundle_manifest = str(bundle_dir / "manifest.json")
+        chunk_manifest = str(
+            _ensure_within(
+                _option_value(argv, "--chunk-manifest"),
+                artifact_root,
+                "detail chunk manifest",
+            )
+        )
+        command_approval = str(
+            _ensure_within(
+                _option_value(argv, "--approval"), artifact_root, "detail chunk approval"
+            )
+        )
+        if command_approval != approval_path:
+            raise RunnerPlanError(
+                f"apply step {step['id']} command approval does not match approved input"
+            )
+        if (
+            identities.get(bundle_manifest) != _option_value(argv, "--expected-bundle-sha256")
+            or identities.get(chunk_manifest) != _option_value(argv, "--expected-chunk-sha256")
+            or identities.get(command_approval) != _option_value(argv, "--expected-approval-sha256")
+            or expected_sha256 != identities.get(chunk_manifest)
+            or "--dry-run" in argv[3:]
+        ):
+            raise RunnerPlanError(
+                f"apply step {step['id']} detail chunk identities are not fully bound"
+            )
+        _option_value(argv, "--runner-run-id")
+        return
+    if command in _DETAIL_RECEIPT_RECONCILE_COMMANDS:
+        if expected_sha256 != approval["sha256"]:
+            raise RunnerPlanError(
+                f"apply step {step['id']} reconcile expected SHA must be the approval SHA"
+            )
+        if approval_payload.get("receipt_id") != _option_value(argv, "--receipt-id"):
+            raise RunnerPlanError(f"apply step {step['id']} reconcile receipt is not approved")
+        if approval_payload.get("approved_by") != _option_value(argv, "--approved-by"):
+            raise RunnerPlanError(f"apply step {step['id']} reconcile operator is not approved")
+        if approval_payload.get("reason") != _option_value(argv, "--reason"):
+            raise RunnerPlanError(f"apply step {step['id']} reconcile reason is not approved")
+        _option_value(argv, "--runner-run-id")
+        return
     if command in _JSONL_APPLY_COMMANDS:
         if approval_payload.get("expected_sha256") != expected_sha256:
             raise RunnerPlanError(f"apply step {step['id']} approval file does not approve expected SHA")
@@ -1418,6 +1542,12 @@ def execute_runner_plan(
         raise RunnerStateError(run.error_message)
     if run.phase == HistoricalBatchPhase.CRAWL:
         child_env = _crawl_step_environment(root)
+        for private_name in (
+            RUNNER_OWNER_TOKEN_ENV,
+            RUNNER_PLAN_PATH_ENV,
+            RUNNER_STEP_ID_ENV,
+        ):
+            child_env.pop(private_name, None)
     published_before = (
         set(
             RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED).values_list(
@@ -1485,10 +1615,34 @@ def execute_runner_plan(
                 tempfile.TemporaryFile(mode="w+b", dir=tempfile.gettempdir()) as stdout_stream,
                 tempfile.TemporaryFile(mode="w+b", dir=tempfile.gettempdir()) as stderr_stream,
             ):
+                step_env = child_env
+                try:
+                    step_command = _management_command(step["argv"])
+                except RunnerPlanError:
+                    step_command = ""
+                if step_command in {
+                    "import_historical_race_detail_chunk",
+                    "verify_historical_race_detail_chunk",
+                    "reconcile_historical_race_detail_receipt",
+                }:
+                    step_env = dict(child_env or os.environ.copy())
+                    for private_name in (
+                        RUNNER_OWNER_TOKEN_ENV,
+                        RUNNER_PLAN_PATH_ENV,
+                        RUNNER_STEP_ID_ENV,
+                    ):
+                        step_env.pop(private_name, None)
+                    step_env.update(
+                        {
+                            RUNNER_OWNER_TOKEN_ENV: owner_token,
+                            RUNNER_PLAN_PATH_ENV: str(plan_file.resolve()),
+                            RUNNER_STEP_ID_ENV: step["id"],
+                        }
+                    )
                 active_process = subprocess.Popen(
                     step["argv"],
                     cwd=str(Path(__file__).resolve().parents[2]),
-                    env=child_env,
+                    env=step_env,
                     stdout=stdout_stream,
                     stderr=stderr_stream,
                     shell=False,
@@ -1510,8 +1664,9 @@ def execute_runner_plan(
                 stdout = stdout_stream.read().decode("utf-8", errors="replace")
                 stderr = stderr_stream.read().decode("utf-8", errors="replace")
             active_process = None
-            stdout = redact_runner_text(stdout, secret_values)
-            stderr = redact_runner_text(stderr, secret_values)
+            redaction_values = (*secret_values, owner_token)
+            stdout = redact_runner_text(stdout, redaction_values)
+            stderr = redact_runner_text(stderr, redaction_values)
             _write_atomic_bytes(
                 logs_root / f"{step['id']}.stdout.log",
                 stdout.encode("utf-8"),

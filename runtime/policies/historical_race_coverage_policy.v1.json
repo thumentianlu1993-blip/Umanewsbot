@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0",
+  "policy_id": "historical-race-coverage-v1",
+  "historical_year_end": 2024,
+  "new_year_start": 2025,
+  "regions": [
+    "japan",
+    "hong_kong",
+    "united_kingdom",
+    "france",
+    "united_states"
+  ],
+  "historical_all_hard_regions": [
+    "japan",
+    "hong_kong"
+  ],
+  "historical_graded_regions": [
+    "united_kingdom",
+    "france",
+    "united_states"
+  ],
+  "barrier_not_applicable_race_types": [
+    "hurdle",
+    "steeplechase",
+    "chase",
+    "jumps",
+    "jump",
+    "national hunt"
+  ],
+  "trusted_sources": {
+    "jra": {
+      "hosts": ["jra.go.jp", "www.jra.go.jp"],
+      "regions": ["japan"],
+      "role": "official"
+    },
+    "jbis": {
+      "hosts": ["jbis.or.jp", "www.jbis.or.jp"],
+      "regions": ["japan"],
+      "role": "professional"
+    },
+    "netkeiba": {
+      "hosts": ["netkeiba.com", "db.netkeiba.com", "race.netkeiba.com"],
+      "regions": ["japan"],
+      "role": "professional"
+    },
+    "hkjc": {
+      "hosts": ["hkjc.com", "www.hkjc.com", "racing.hkjc.com"],
+      "regions": ["hong_kong"],
+      "role": "official"
+    },
+    "bha": {
+      "hosts": ["britishhorseracing.com", "www.britishhorseracing.com"],
+      "regions": ["united_kingdom"],
+      "role": "authority"
+    },
+    "racing_post": {
+      "hosts": ["racingpost.com", "www.racingpost.com"],
+      "regions": ["united_kingdom", "france"],
+      "role": "professional"
+    },
+    "sporting_life": {
+      "hosts": ["sportinglife.com", "www.sportinglife.com"],
+      "regions": ["united_kingdom"],
+      "role": "professional"
+    },
+    "france_galop": {
+      "hosts": ["france-galop.com", "www.france-galop.com"],
+      "regions": ["france"],
+      "role": "authority"
+    },
+    "pmu": {
+      "hosts": ["pmu.fr", "www.pmu.fr"],
+      "regions": ["france"],
+      "role": "professional"
+    },
+    "geny": {
+      "hosts": ["geny.com", "www.geny.com"],
+      "regions": ["france"],
+      "role": "professional"
+    },
+    "canalturf": {
+      "hosts": ["canalturf.com", "www.canalturf.com"],
+      "regions": ["france"],
+      "role": "professional"
+    },
+    "toba": {
+      "hosts": ["toba.org", "www.toba.org"],
+      "regions": ["united_states"],
+      "role": "authority"
+    },
+    "equibase": {
+      "hosts": ["equibase.com", "www.equibase.com"],
+      "regions": ["united_states"],
+      "role": "authority"
+    },
+    "horse_racing_nation": {
+      "hosts": ["horseracingnation.com", "www.horseracingnation.com"],
+      "regions": ["united_states"],
+      "role": "professional"
+    }
+  },
+  "whitelist_rules": [
+    {
+      "rule_id": "uk-grand-national-v1",
+      "country_region": "united_kingdom",
+      "series_key": "united-kingdom-grand-national-stp",
+      "reason": "英国全国大赛属于具有明确历史地位和产品价值的重要白名单赛事。"
+    }
+  ]
+}

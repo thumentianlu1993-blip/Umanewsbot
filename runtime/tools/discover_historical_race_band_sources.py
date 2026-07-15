@@ -378,6 +378,18 @@ CALENDAR_SERIES_ALIASES = {
         "FWD QEII Cup",
         "QEII Cup",
     ),
+    "hong-kong-international-cup-trial": (
+        "Jockey Club Cup",
+        "Cathay Pacific Jockey Club Cup",
+    ),
+    "hong-kong-international-mile-trial": (
+        "Jockey Club Mile",
+        "Cathay Pacific Jockey Club Mile",
+    ),
+    "hong-kong-international-sprint-trial": (
+        "Jockey Club Sprint",
+        "Cathay Pacific Jockey Club Sprint",
+    ),
     "france-alain-du-breil-course-de-haies-de-printemps-des-4-ans-hurdle": (
         "Alain du Breil",
     ),
@@ -685,18 +697,28 @@ def match_official_schedule_targets(targets: list[dict], schedule_rows: list[dic
             _calendar_key(str(match.get("race_name") or "")),
         )
         source_users[identity].append(int(match["target_id"]))
-    reused_target_ids = {
-        target_id
-        for target_ids in source_users.values()
-        if len(target_ids) > 1
-        for target_id in target_ids
-    }
+    reused_target_ids = set()
+    retained_target_ids = set()
+    matches_by_target_id = {int(match["target_id"]): match for match in matches}
+    for target_ids in source_users.values():
+        if len(target_ids) <= 1:
+            continue
+        ranked = sorted(
+            ((float(matches_by_target_id[target_id]["name_score"]), target_id) for target_id in target_ids),
+            reverse=True,
+        )
+        if ranked[0][0] >= 0.85 and (len(ranked) == 1 or ranked[0][0] > ranked[1][0]):
+            retained_target_ids.add(ranked[0][1])
+        reused_target_ids.update(target_ids)
+    reused_target_ids -= retained_target_ids
     if reused_target_ids:
         matches = [match for match in matches if int(match["target_id"]) not in reused_target_ids]
         for target_ids in source_users.values():
             if len(target_ids) <= 1:
                 continue
             for target_id in sorted(target_ids):
+                if target_id in retained_target_ids:
+                    continue
                 issues.append(
                     {
                         "target_id": target_id,
@@ -1684,12 +1706,13 @@ def _source_result(url: str, *, provider: str, authority: str) -> dict:
 def parse_jra_english_schedule(body: bytes, *, year: int) -> list[dict]:
     soup = BeautifulSoup(body.decode("utf-8", errors="replace"), "html.parser")
     rows = []
-    for heading in soup.find_all("th", colspan="7"):
+    course_names = set(JRA_COURSES.values())
+    for heading in soup.find_all("th", colspan=True):
         anchor = heading.find("a")
         date_node = heading.find("span")
         heading_row = heading.find_parent("tr")
         detail = heading_row.find_next_sibling("tr") if heading_row is not None else None
-        if anchor is None or date_node is None or detail is None:
+        if date_node is None or detail is None:
             continue
         result_anchor = next(
             (node for node in detail.find_all("a", href=True) if "doSubmit(" in node.get("href", "")),
@@ -1700,15 +1723,33 @@ def parse_jra_english_schedule(body: bytes, *, year: int) -> list[dict]:
         match = JRA_SUBMIT_RE.search(result_anchor["href"])
         if match is None or int(match.group("year")) != year:
             continue
+        race_name = _collapse(anchor.get_text(" ", strip=True)) if anchor is not None else _collapse(
+            heading.get_text(" ", strip=True).removeprefix(_collapse(date_node.get_text(" ", strip=True)))
+        )
+        if not race_name:
+            continue
         month_day = match.group("month_day")
         cells = detail.find_all(["td", "th"])
+        cell_texts = [_collapse(cell.get_text(" ", strip=True)) for cell in cells]
+        racecourse = next(
+            (value for value in cell_texts if value.upper() in course_names),
+            "",
+        )
+        distance = next(
+            (
+                value
+                for value in cell_texts
+                if re.search(r"(?:\d[\d,]*/(?:Turf|Dirt)|(?:T|D)\d{3,4}m|\d{3,4}m)", value, re.IGNORECASE)
+            ),
+            "",
+        )
         rows.append(
             {
-                "race_name": _collapse(anchor.get_text(" ", strip=True)),
-                "race_key": _normalize_name(anchor.get_text(" ", strip=True)),
+                "race_name": race_name,
+                "race_key": _normalize_name(race_name),
                 "local_date": f"{year}-{month_day[:2]}-{month_day[2:]}",
-                "racecourse": _collapse(cells[1].get_text(" ", strip=True)) if len(cells) > 1 else "",
-                "distance": _collapse(cells[2].get_text(" ", strip=True)) if len(cells) > 2 else "",
+                "racecourse": racecourse,
+                "distance": distance,
             }
         )
     return rows
@@ -1723,17 +1764,22 @@ def parse_jra_history_records(body: bytes, *, year: int) -> list[dict]:
         if not table_rows:
             continue
         headers = [_collapse(cell.get_text(" ", strip=True)) for cell in table_rows[0].find_all(["th", "td"])]
-        if not {"月日", "レース名", "競馬場", "結果"} <= set(headers):
+        date_header = next((value for value in ("月日", "月/日") if value in headers), "")
+        course_header = next((value for value in ("競馬場", "場") if value in headers), "")
+        if not date_header or not course_header or not {"レース名", "結果"} <= set(headers):
             continue
-        date_index = headers.index("月日")
+        date_index = headers.index(date_header)
         name_index = headers.index("レース名")
-        course_index = headers.index("競馬場")
+        course_index = headers.index(course_header)
         result_index = headers.index("結果")
         for tr in table_rows[1:]:
             cells = tr.find_all(["th", "td"])
             if len(cells) <= max(date_index, course_index, result_index):
                 continue
-            date_match = re.search(r"(\d{1,2})月(\d{1,2})日", cells[date_index].get_text(" ", strip=True))
+            date_text = cells[date_index].get_text(" ", strip=True)
+            date_match = re.search(r"(\d{1,2})月(\d{1,2})日", date_text) or re.search(
+                r"(\d{1,2})/(\d{1,2})", date_text
+            )
             result_link = cells[result_index].find("a", href=True)
             course = JRA_COURSES.get(_collapse(cells[course_index].get_text(" ", strip=True)), "")
             if date_match is None or result_link is None or not course:
@@ -1743,12 +1789,17 @@ def parse_jra_history_records(body: bytes, *, year: int) -> list[dict]:
                     "local_date": f"{year}-{int(date_match.group(1)):02d}-{int(date_match.group(2)):02d}",
                     "race_name": _collapse(cells[name_index].get_text(" ", strip=True)),
                     "racecourse": course,
-                    "result_url": urljoin(JRA_BASE_URL, result_link["href"]),
+                    "result_url": urljoin(
+                        f"{JRA_BASE_URL}/datafile/seiseki/replay/{year}/jyusyo.html",
+                        result_link["href"],
+                    ),
                 }
             )
-        if records:
-            break
-    return records
+    deduplicated = {
+        (row["local_date"], row["racecourse"], row["race_name"], row["result_url"]): row
+        for row in records
+    }
+    return list(deduplicated.values())
 
 
 def build_jra_provider_rows(
@@ -1866,7 +1917,7 @@ def parse_toba_schedule(body: str, *, year: int) -> list[dict]:
             query = parse_qs(urlparse(link["href"]).query)
             raw_date = (query.get("DT") or [""])[0]
             track = _collapse(cells[track_index].get_text(" ", strip=True)).upper()
-            race_number = (query.get("RACE") or [""])[0]
+            race_number = (query.get("RACE") or [""])[0].rstrip("=")
             if not raw_date or not track or not race_number.isdigit():
                 continue
             try:

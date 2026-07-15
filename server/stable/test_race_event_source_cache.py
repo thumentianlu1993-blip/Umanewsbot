@@ -433,6 +433,64 @@ class HistoricalRaceDateSourceCacheTests(SimpleTestCase):
                 {"content-type": "text/html"},
             )
 
+    def test_toba_yearbook_table_is_not_rejected_for_incapsula_script_reference(self):
+        self.module.validate_source_body(
+            "https://toba.org/graded-stakes/2024-races/",
+            (
+                b"<html><table><tr><th>Track</th><th>Date</th><th>Stake</th>"
+                b"<th>Winner</th></tr></table><script src='/_Incapsula_Resource'></script></html>"
+            ),
+            {"content-type": "text/html; charset=UTF-8"},
+        )
+
+    def test_toba_network_fetch_uses_browser_compatible_headers(self):
+        row = {
+            "adapter_key": "toba",
+            "target_id": 1,
+            "target_sha256": "1" * 64,
+            "series_key": "fixture",
+            "edition_year": 2024,
+            "urls": {
+                "calendar_source": {
+                    "url": "https://toba.org/graded-stakes/2024-races/"
+                }
+            },
+        }
+        body = (
+            b"<html><table><tr><th>Track</th><th>Date</th><th>Stake</th>"
+            b"<th>Winner</th></tr></table></html>"
+        )
+        response = {
+            "status": 200,
+            "final_url": row["urls"]["calendar_source"]["url"],
+            "redirect_chain": [],
+            "headers": {"content-type": "text/html"},
+        }
+        with TemporaryDirectory() as tmp, patch.object(
+            self.module, "before_network_request"
+        ), patch.object(
+            self.module, "fetch_https", return_value=(body, response)
+        ) as fetch, patch.object(
+            self.module,
+            "write_source_cache",
+            return_value={"path": "toba/body.html", "sha256": "a" * 64, "size": len(body)},
+        ):
+            result = self.module.cache_provider_rows([row], output_root=Path(tmp), timeout=10)
+
+        self.assertEqual(result["failure_count"], 0)
+        headers = fetch.call_args.kwargs["headers"]
+        self.assertIn("Mozilla/5.0", headers["User-Agent"])
+        self.assertIn("text/html", headers["Accept"])
+        self.assertEqual(headers["Accept-Language"], "en-US,en;q=0.9")
+
+    def test_toba_incapsula_page_without_yearbook_table_is_rejected(self):
+        with self.assertRaisesMessage(self.module.DateSourceCacheError, "anti-bot"):
+            self.module.validate_source_body(
+                "https://toba.org/graded-stakes/2024-races/",
+                b"<html><script src='/_Incapsula_Resource'></script></html>",
+                {"content-type": "text/html; charset=UTF-8"},
+            )
+
     def test_irishracing_http_200_unavailable_page_is_rejected(self):
         with self.assertRaisesMessage(self.module.DateSourceCacheError, "unavailable"):
             self.module.validate_source_body(

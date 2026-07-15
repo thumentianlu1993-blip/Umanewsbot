@@ -451,13 +451,17 @@ def _parse_detail_page(html: str, *, source_url: str) -> tuple[list[dict], list[
                 "source_refs": {**row["source_refs"], "official_finish_position": row["finish_position"]},
             }
         )
-    return runners, results, {
+    metadata = {
         "race_title": summary.get("name") or "",
         "race_id": (summary.get("race_summary_reference") or {}).get("id"),
         "race_stage": summary.get("race_stage") or "",
         "row_count": len(runners),
         "result_count": len(results),
     }
+    distance_text = str(summary.get("distance") or "").strip()
+    if distance_text:
+        metadata["distance_text"] = distance_text
+    return runners, results, metadata
 
 
 def prepare_candidates(args) -> dict:

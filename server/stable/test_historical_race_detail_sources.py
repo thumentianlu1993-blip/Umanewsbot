@@ -27,6 +27,7 @@ from stable.models import (
 )
 from stable.services.historical_race_batches import target_identity
 from stable.services.historical_race_detail_sources import (
+    apply_approved_detail_source,
     apply_detail_source_artifact,
     build_detail_source_artifact,
     check_detail_source_artifact,
@@ -356,8 +357,13 @@ class HistoricalRaceDetailSourceArtifactTests(TestCase):
             approval = self._approve(artifact)
             before = target_identity(self.target)["target_sha256"]
 
-            result = apply_detail_source_artifact(artifact_dir=artifact, approval_path=approval)
+            with patch(
+                "stable.services.historical_race_detail_sources.apply_approved_detail_source",
+                wraps=apply_approved_detail_source,
+            ) as primitive:
+                result = apply_detail_source_artifact(artifact_dir=artifact, approval_path=approval)
 
+        primitive.assert_called_once()
         self.target.refresh_from_db()
         discovery = self.target.source_refs["detail_discovery"]
         self.assertEqual(discovery["urls"]["result_url"]["url"], self.primary_url)

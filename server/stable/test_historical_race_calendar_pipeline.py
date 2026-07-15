@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+from datetime import date
 import hashlib
 import importlib.util
 import json
@@ -11,6 +12,7 @@ import time
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
@@ -516,10 +518,196 @@ class HistoricalRaceCalendarRequestTests(SimpleTestCase):
 
             self.assertFalse(output.exists())
 
+    def _hkjc_partial_source(
+        self,
+        *,
+        edition_year: int = 2026,
+        season_end_year: int = 2026,
+        coverage_start_date: str = "2025-09-01",
+        coverage_end_date: str = "2026-07-15",
+        authority: str = "official",
+    ) -> dict:
+        source = _source(
+            f"hkjc-pattern-{season_end_year}",
+            region="hong_kong",
+            year=edition_year,
+            adapter="hkjc",
+            url=(
+                "https://racing.hkjc.com/racing/english/international-racing/pdf/"
+                f"{season_end_year - 1}-{season_end_year}-Hong-Kong-Pattern-Book.pdf"
+            ),
+            parser="hkjc_pattern",
+            options={
+                "season_end_year": season_end_year,
+                "coverage_start_date": coverage_start_date,
+                "coverage_end_date": coverage_end_date,
+                "partial_coverage_reason": "next season official book not published at cutoff",
+            },
+        )
+        source["source_authority"] = authority
+        return source
+
+    def test_hkjc_current_year_single_season_cutoff_is_accepted_and_manifested(self):
+        target = _target(
+            1,
+            region="hong_kong",
+            year=2026,
+            name="January Cup",
+            course="Happy Valley",
+            distance="1800",
+        )
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            selection = root / "selection.json"
+            catalog = root / "catalog.json"
+            output = root / "requests"
+            _write_selection(selection, [target])
+            _write_catalog(catalog, [self._hkjc_partial_source()])
+
+            result = self.tool.build_calendar_requests(
+                selection_path=selection,
+                catalog_path=catalog,
+                output_dir=output,
+                hkjc_cutoff_date=date(2026, 7, 15),
+            )
+            manifest = json.loads((output / "manifest.json").read_text())
+
+        expected = {
+            "coverage_mode": "cutoff_bounded_partial_natural_year",
+            "cutoff_date": "2026-07-15",
+            "coverage_start_date": "2025-09-01",
+            "coverage_end_date": "2026-07-15",
+            "included_season_end_years": [2026],
+            "omitted_season_end_years": [2027],
+            "expected_full_season_end_years": [2026, 2027],
+            "partial_coverage_reason": "next season official book not published at cutoff",
+        }
+        self.assertEqual(result["coverage_policy"], expected)
+        self.assertEqual(manifest["coverage_policy"], expected)
+        self.assertRegex(manifest["coverage_policy_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_hkjc_partial_cutoff_rejects_invalid_coverage_boundaries(self):
+        cases = (
+            (date(2026, 7, 16), self._hkjc_partial_source(), "coverage"),
+            (date(2025, 7, 15), self._hkjc_partial_source(), "edition year"),
+            (
+                date(2026, 8, 1),
+                self._hkjc_partial_source(
+                    coverage_start_date="2026-09-01", coverage_end_date="2026-12-01"
+                ),
+                "coverage",
+            ),
+            (
+                date(2026, 7, 15),
+                self._hkjc_partial_source(
+                    coverage_start_date="2026-07-15", coverage_end_date="2026-07-15"
+                ),
+                "coverage",
+            ),
+            (
+                date(2026, 7, 15),
+                self._hkjc_partial_source(coverage_start_date="not-a-date"),
+                "coverage",
+            ),
+            (
+                date(2026, 7, 15),
+                self._hkjc_partial_source(
+                    coverage_start_date="2024-09-01", coverage_end_date="2026-07-15"
+                ),
+                "coverage",
+            ),
+            (
+                date(2026, 7, 15),
+                self._hkjc_partial_source(coverage_end_date="2027-01-01"),
+                "coverage",
+            ),
+        )
+        target = _target(
+            1,
+            region="hong_kong",
+            year=2026,
+            name="January Cup",
+            course="Happy Valley",
+            distance="1800",
+        )
+        for index, (cutoff, source, message) in enumerate(cases):
+            with self.subTest(index=index), TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                selection = root / "selection.json"
+                catalog = root / "catalog.json"
+                _write_selection(selection, [target])
+                _write_catalog(catalog, [source])
+                with self.assertRaisesRegex(self.tool.CalendarRequestError, message):
+                    self.tool.build_calendar_requests(
+                        selection_path=selection,
+                        catalog_path=catalog,
+                        output_dir=root / "requests",
+                        hkjc_cutoff_date=cutoff,
+                    )
+
+    def test_hkjc_partial_cutoff_rejects_missing_current_season_and_non_official_source(self):
+        target = _target(
+            1,
+            region="hong_kong",
+            year=2026,
+            name="January Cup",
+            course="Happy Valley",
+            distance="1800",
+        )
+        cases = (
+            self._hkjc_partial_source(season_end_year=2027),
+            self._hkjc_partial_source(authority="secondary"),
+        )
+        for index, source in enumerate(cases):
+            with self.subTest(index=index), TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                selection = root / "selection.json"
+                catalog = root / "catalog.json"
+                _write_selection(selection, [target])
+                _write_catalog(catalog, [source])
+                with self.assertRaises(self.tool.CalendarRequestError):
+                    self.tool.build_calendar_requests(
+                        selection_path=selection,
+                        catalog_path=catalog,
+                        output_dir=root / "requests",
+                        hkjc_cutoff_date=date(2026, 7, 15),
+                    )
+
+    def test_hkjc_partial_cutoff_rejects_mixed_edition_year_catalog_and_selection(self):
+        targets = [
+            _target(1, region="hong_kong", year=2026, name="January Cup", course="Happy Valley", distance="1800"),
+            _target(2, region="hong_kong", year=2025, name="January Cup", course="Happy Valley", distance="1800"),
+        ]
+        sources = [
+            self._hkjc_partial_source(),
+            self._hkjc_partial_source(
+                edition_year=2025,
+                season_end_year=2025,
+                coverage_start_date="2024-09-01",
+                coverage_end_date="2025-07-15",
+            ),
+        ]
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            selection = root / "selection.json"
+            catalog = root / "catalog.json"
+            _write_selection(selection, targets)
+            _write_catalog(catalog, sources)
+            with self.assertRaisesRegex(
+                self.tool.CalendarRequestError, "single edition year"
+            ):
+                self.tool.build_calendar_requests(
+                    selection_path=selection,
+                    catalog_path=catalog,
+                    output_dir=root / "requests",
+                    hkjc_cutoff_date=date(2026, 7, 15),
+                )
+
 
 class HistoricalRaceCalendarPrepareTests(SimpleTestCase):
     def setUp(self):
         self.tool = _load("prepare_historical_race_calendar_inputs.py")
+        self.request_tool = _load("build_historical_race_calendar_requests.py")
 
     def _prepare(self, root: Path, targets: list[dict], sources: list[dict], bodies: dict[str, bytes | None]):
         selection = root / "selection.json"
@@ -558,11 +746,19 @@ class HistoricalRaceCalendarPrepareTests(SimpleTestCase):
             result, output, _manifest = self._prepare(Path(tmp), [target], [source], {source["id"]: body})
             rows = list(csv.DictReader((output / "events_united_kingdom.csv").open(encoding="utf-8-sig")))
             providers = (output / "provider_rows.jsonl").read_text(encoding="utf-8")
+            date_matches = [
+                json.loads(line)
+                for line in (output / "date_matches.jsonl").read_text().splitlines()
+                if line.strip()
+            ]
 
         self.assertEqual(result["complete_count"], 1)
         self.assertEqual(result["gap_count"], 0)
         self.assertEqual(rows[0]["local_date"], "2024-06-15")
         self.assertEqual(providers, "")
+        self.assertEqual(len(date_matches), 1)
+        self.assertEqual(date_matches[0]["target_id"], target["target_id"])
+        self.assertEqual(date_matches[0]["local_date"], "2024-06-15")
 
     def test_global_ledger_supports_shared_url_across_year_shards(self):
         targets = [
@@ -984,6 +1180,197 @@ class HistoricalRaceCalendarPrepareTests(SimpleTestCase):
             },
         )
 
+    def _partial_hkjc_fixture(self, root: Path, *, body: bytes):
+        target = _target(
+            31,
+            region="hong_kong",
+            year=2026,
+            name="January Cup",
+            course="Happy Valley",
+            distance="1800",
+        )
+        source = _source(
+            "hkjc-pattern-2526",
+            region="hong_kong",
+            year=2026,
+            adapter="hkjc",
+            url="https://racing.hkjc.com/racing/english/international-racing/pdf/2025-2026-Hong-Kong-Pattern-Book.pdf",
+            parser="hkjc_pattern",
+            options={
+                "season_end_year": 2026,
+                "coverage_start_date": "2025-09-01",
+                "coverage_end_date": "2026-07-15",
+                "partial_coverage_reason": "next season official book not published at cutoff",
+            },
+        )
+        selection = root / "selection.json"
+        catalog = root / "catalog.json"
+        _write_selection(selection, [target])
+        _write_catalog(catalog, [source])
+        requests = root / "requests"
+        self.request_tool.build_calendar_requests(
+            selection_path=selection,
+            catalog_path=catalog,
+            output_dir=requests,
+            hkjc_cutoff_date=date(2026, 7, 15),
+        )
+        cache = root / "cache"
+        cache.mkdir()
+        cache_manifest, ledger = _write_cache_bundle(
+            cache, [source], {source["id"]: body}, [target]
+        )
+        return target, source, selection, catalog, requests, cache, cache_manifest, ledger
+
+    def test_hkjc_partial_prepare_requires_identical_request_coverage_policy(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (
+                _target_row,
+                _source_row,
+                selection,
+                catalog,
+                requests,
+                cache,
+                cache_manifest,
+                ledger,
+            ) = self._partial_hkjc_fixture(
+                root, body=b"WED 07/01/26 January Cup G3 3yo+ 1800\n"
+            )
+            with self.assertRaisesRegex(
+                self.tool.CalendarPrepareError, "coverage policy identity"
+            ):
+                self.tool.prepare_calendar_inputs(
+                    selection_path=selection,
+                    catalog_path=catalog,
+                    source_cache_root=cache,
+                    source_cache_manifest_path=cache_manifest,
+                    request_ledger_path=ledger,
+                    request_manifest_path=requests / "manifest.json",
+                    country_region="hong_kong",
+                    year=2026,
+                    recorded_at=RECORDED_AT,
+                    output_dir=root / "output",
+                    hkjc_cutoff_date=date(2026, 7, 14),
+                )
+
+    def test_hkjc_partial_prepare_rejects_tampered_request_coverage_identity(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (
+                _target_row,
+                _source_row,
+                selection,
+                catalog,
+                requests,
+                cache,
+                cache_manifest,
+                ledger,
+            ) = self._partial_hkjc_fixture(
+                root, body=b"WED 07/01/26 January Cup G3 3yo+ 1800\n"
+            )
+            request_manifest = requests / "manifest.json"
+            manifest = json.loads(request_manifest.read_text())
+            manifest["coverage_policy"]["cutoff_date"] = "2026-07-14"
+            request_manifest.write_bytes(_canonical(manifest))
+
+            with self.assertRaisesRegex(
+                self.tool.CalendarPrepareError, "coverage policy identity"
+            ):
+                self.tool.prepare_calendar_inputs(
+                    selection_path=selection,
+                    catalog_path=catalog,
+                    source_cache_root=cache,
+                    source_cache_manifest_path=cache_manifest,
+                    request_ledger_path=ledger,
+                    request_manifest_path=request_manifest,
+                    country_region="hong_kong",
+                    year=2026,
+                    recorded_at=RECORDED_AT,
+                    output_dir=root / "output",
+                    hkjc_cutoff_date=date(2026, 7, 15),
+                )
+
+    def test_hkjc_partial_prepare_records_policy_and_unmatched_target_remains_gap(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (
+                target,
+                _source_row,
+                selection,
+                catalog,
+                requests,
+                cache,
+                cache_manifest,
+                ledger,
+            ) = self._partial_hkjc_fixture(
+                root, body=b"SUN 18/01/26 Stewards Cup G1 3yo+ 1600\n"
+            )
+            output = root / "output"
+
+            result = self.tool.prepare_calendar_inputs(
+                selection_path=selection,
+                catalog_path=catalog,
+                source_cache_root=cache,
+                source_cache_manifest_path=cache_manifest,
+                request_ledger_path=ledger,
+                request_manifest_path=requests / "manifest.json",
+                country_region="hong_kong",
+                year=2026,
+                recorded_at=RECORDED_AT,
+                output_dir=output,
+                hkjc_cutoff_date=date(2026, 7, 15),
+            )
+            gap = json.loads((output / "gaps.jsonl").read_text())
+            manifest = json.loads((output / "manifest.json").read_text())
+
+        self.assertEqual(result["complete_count"], 0)
+        self.assertEqual(result["gap_count"], 1)
+        self.assertEqual(gap["target_id"], target["target_id"])
+        self.assertEqual(gap["reason_code"], "official_schedule_match_missing")
+        self.assertEqual(
+            manifest["coverage_policy"]["coverage_mode"],
+            "cutoff_bounded_partial_natural_year",
+        )
+        self.assertRegex(manifest["coverage_policy_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_hkjc_partial_prepare_rejects_catalog_identity_drift_from_request_manifest(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (
+                _target_row,
+                _source_row,
+                selection,
+                catalog,
+                requests,
+                cache,
+                cache_manifest,
+                ledger,
+            ) = self._partial_hkjc_fixture(
+                root, body=b"WED 07/01/26 January Cup G3 3yo+ 1800\n"
+            )
+            catalog_payload = json.loads(catalog.read_text())
+            catalog_payload["sources"][0]["options"]["partial_coverage_reason"] = (
+                "catalog changed after request build"
+            )
+            catalog.write_bytes(_canonical(catalog_payload))
+
+            with self.assertRaisesRegex(
+                self.tool.CalendarPrepareError, "request manifest identity"
+            ):
+                self.tool.prepare_calendar_inputs(
+                    selection_path=selection,
+                    catalog_path=catalog,
+                    source_cache_root=cache,
+                    source_cache_manifest_path=cache_manifest,
+                    request_ledger_path=ledger,
+                    request_manifest_path=requests / "manifest.json",
+                    country_region="hong_kong",
+                    year=2026,
+                    recorded_at=RECORDED_AT,
+                    output_dir=root / "output",
+                    hkjc_cutoff_date=date(2026, 7, 15),
+                )
+
     def test_toba_calendar_emits_real_result_provider_and_event(self):
         target = _target(
             3,
@@ -1183,6 +1570,116 @@ class HistoricalRaceCalendarPrepareTests(SimpleTestCase):
 class HistoricalRaceCalendarAdditionalTests(SimpleTestCase):
     def setUp(self):
         self.tool = _load("prepare_historical_race_calendar_inputs.py")
+
+    @staticmethod
+    def _pdf_source(*, parser="bha_flat") -> dict:
+        return {
+            "id": "bha-flat-2026",
+            "content_format": "pdf",
+            "parser": parser,
+        }
+
+    @staticmethod
+    def _pdf(pages):
+        class FakePdf:
+            def __init__(self, page_rows):
+                self.pages = page_rows
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, _exc_type, _exc, _traceback):
+                return False
+
+        return FakePdf(pages)
+
+    @staticmethod
+    def _page(text=None, *, extract_error=None, close_error=None):
+        class FakePage:
+            def __init__(self):
+                self.extract_calls = []
+                self.close_calls = 0
+
+            def extract_text(self, *, layout):
+                self.extract_calls.append(layout)
+                if extract_error is not None:
+                    raise extract_error
+                return text
+
+            def close(self):
+                self.close_calls += 1
+                if close_error is not None:
+                    raise close_error
+
+        return FakePage()
+
+    def test_pdf_source_text_closes_every_page_after_extracting(self):
+        pages = [self._page("Alpha"), self._page("Beta")]
+        with patch.object(
+            self.tool.pdfplumber, "open", return_value=self._pdf(pages)
+        ):
+            text = self.tool._source_text(self._pdf_source(), Path("unused.pdf"))
+
+        self.assertEqual(text, "Alpha\nBeta")
+        self.assertEqual([page.extract_calls for page in pages], [[False], [False]])
+        self.assertEqual([page.close_calls for page in pages], [1, 1])
+
+    def test_pdf_source_text_preserves_obstacle_summary_layout(self):
+        page = self._page("Obstacle schedule")
+        with patch.object(
+            self.tool.pdfplumber, "open", return_value=self._pdf([page])
+        ):
+            text = self.tool._source_text(
+                self._pdf_source(parser="france_obstacle_summary"),
+                Path("unused.pdf"),
+            )
+
+        self.assertEqual(text, "Obstacle schedule")
+        self.assertEqual(page.extract_calls, [True])
+        self.assertEqual(page.close_calls, 1)
+
+    def test_pdf_source_text_preserves_empty_page_segments_and_closes_pages(self):
+        pages = [self._page("A"), self._page(None), self._page("B")]
+        with patch.object(
+            self.tool.pdfplumber, "open", return_value=self._pdf(pages)
+        ):
+            text = self.tool._source_text(self._pdf_source(), Path("unused.pdf"))
+
+        self.assertEqual(text, "A\n\nB")
+        self.assertEqual([page.close_calls for page in pages], [1, 1, 1])
+
+    def test_pdf_extract_error_closes_current_page_and_stops_before_later_page(self):
+        failure = RuntimeError("extract failed")
+        current = self._page(extract_error=failure)
+        later = self._page("must not be read")
+        with patch.object(
+            self.tool.pdfplumber,
+            "open",
+            return_value=self._pdf([current, later]),
+        ):
+            with self.assertRaisesRegex(
+                self.tool.CalendarPrepareError, "bha-flat-2026"
+            ) as raised:
+                self.tool._source_text(self._pdf_source(), Path("unused.pdf"))
+
+        self.assertIs(raised.exception.__cause__, failure)
+        self.assertEqual(current.close_calls, 1)
+        self.assertEqual(later.extract_calls, [])
+        self.assertEqual(later.close_calls, 0)
+
+    def test_pdf_page_close_error_is_wrapped_with_source_id(self):
+        failure = RuntimeError("close failed")
+        page = self._page("Alpha", close_error=failure)
+        with patch.object(
+            self.tool.pdfplumber, "open", return_value=self._pdf([page])
+        ):
+            with self.assertRaisesRegex(
+                self.tool.CalendarPrepareError, "bha-flat-2026"
+            ) as raised:
+                self.tool._source_text(self._pdf_source(), Path("unused.pdf"))
+
+        self.assertIs(raised.exception.__cause__, failure)
+        self.assertEqual(page.close_calls, 1)
 
     @unittest.skipUnless(
         os.environ.get("RUN_HISTORICAL_PIPELINE_PERF") == "1",

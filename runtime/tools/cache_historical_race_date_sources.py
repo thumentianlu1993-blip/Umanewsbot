@@ -55,6 +55,22 @@ def _source_filename(adapter_key: str, url: str) -> str:
     return f"{adapter_key}/{stem}-{digest}{extension}"
 
 
+def request_headers(adapter_key: str) -> dict[str, str]:
+    if adapter_key == "toba":
+        return {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/126.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+    return {
+        "User-Agent": "UmaFansBot/1.0 (+https://umafans.run; historical race evidence)"
+    }
+
+
 def validate_source_body(url: str, body: bytes, headers: Mapping[str, str]) -> None:
     if not body:
         raise DateSourceCacheError("source response body is empty")
@@ -77,7 +93,14 @@ def validate_source_body(url: str, body: bytes, headers: Mapping[str, str]) -> N
         b"_incapsula_resource",
         b"to regain access",
     )
-    if any(marker in sample for marker in anti_bot_markers):
+    toba_sample = body[:2_000_000].lower()
+    toba_yearbook_table = (
+        urlparse(url).hostname in {"toba.org", "www.toba.org"}
+        and b"<table" in toba_sample
+        and b">stake</th>" in toba_sample
+        and b">winner</th>" in toba_sample
+    )
+    if any(marker in sample for marker in anti_bot_markers) and not toba_yearbook_table:
         raise DateSourceCacheError("source response is an anti-bot page")
     if b"information not available" in sample:
         raise DateSourceCacheError("source response is an unavailable page")
@@ -161,7 +184,7 @@ def cache_provider_rows(
                 url,
                 allowed_hosts=ADAPTER_ALLOWED_HOSTS[adapter_key],
                 timeout=timeout,
-                headers={"User-Agent": "UmaFansBot/1.0 (+https://umafans.run; historical race evidence)"},
+                headers=request_headers(adapter_key),
             )
             entry.update(
                 {

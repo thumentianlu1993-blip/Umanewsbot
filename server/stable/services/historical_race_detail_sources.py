@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -380,6 +381,126 @@ def _validate_current_targets(rows: list[dict[str, Any]], targets: dict[int, His
             raise InventoryValidationError(f"detail source target is no longer ready/materialized: {target.pk}")
 
 
+def _validate_approved_detail_source_row(
+    *,
+    target: HistoricalRaceEventTarget,
+    event: RaceEvent,
+    row: dict[str, Any],
+    artifact_root: str | Path,
+) -> None:
+    if target.event_id != event.pk:
+        raise InventoryValidationError("detail source target/event mismatch")
+    if target.resolution_status != HistoricalRaceResolutionStatus.READY or not target.event_id:
+        raise InventoryValidationError("detail source target is no longer ready/materialized")
+    if int(row.get("target_id") or 0) != target.pk:
+        raise InventoryValidationError("detail source row target identity mismatch")
+    if int(row.get("year") or 0) != target.year or str(row.get("slug") or "") != event.slug:
+        raise InventoryValidationError("detail source row event identity mismatch")
+    if target_identity(target)["target_sha256"] != row.get("expected_target_sha256"):
+        raise InventoryValidationError("detail source target changed after approval")
+    if target.artifact_sha256 != row.get("inventory_artifact_sha256"):
+        raise InventoryValidationError("detail source inventory changed after approval")
+
+    source_name = str(row.get("source_name") or "").strip()
+    provider = str(row.get("source_provider") or "").strip()
+    if not provider or SOURCE_NAME_TO_PROVIDER.get(source_name) != provider:
+        raise InventoryValidationError("detail source provider does not match source name")
+    if PROVIDER_REGIONS.get(provider) != target.country_region:
+        raise InventoryValidationError("detail source provider region mismatch")
+    authority = str(row.get("source_authority") or "").strip()
+    if PROVIDER_AUTHORITIES.get(provider) != authority:
+        raise InventoryValidationError("detail source authority mismatch")
+    source_url = str(row.get("source_url") or "").strip()
+    validate_direct_source_urls(
+        provider,
+        {
+            "result_url": {
+                "url": source_url,
+                "source_provider": provider,
+                "source_authority": authority,
+                "redirect_chain": row.get("redirect_chain") or [],
+            }
+        },
+    )
+
+    cache_identity = row.get("source_cache_identity")
+    if not isinstance(cache_identity, dict) or cache_identity.get("source_url") != source_url:
+        raise InventoryValidationError("detail source cache identity is invalid")
+    source = _artifact_path(Path(artifact_root), cache_identity.get("path"), label="detail source cache file")
+    if not source.is_file():
+        raise InventoryValidationError("detail source cache file is missing")
+    body = source.read_bytes()
+    try:
+        expected_size = int(cache_identity.get("size"))
+    except (TypeError, ValueError) as exc:
+        raise InventoryValidationError("detail source cache identity is invalid") from exc
+    if len(body) != expected_size or hashlib.sha256(body).hexdigest() != cache_identity.get("sha256"):
+        raise InventoryValidationError("detail source cache identity changed")
+
+
+def apply_approved_detail_source(
+    *,
+    target: HistoricalRaceEventTarget,
+    event: RaceEvent,
+    row: dict[str, Any],
+    artifact_root: str | Path,
+    artifact_manifest_sha256: str,
+    approved_by: str,
+    approved_at: str,
+) -> dict[str, Any]:
+    """Apply one already-locked target/event detail-source approval."""
+    if not re.fullmatch(r"[0-9a-f]{64}", str(artifact_manifest_sha256 or "")):
+        raise InventoryValidationError("detail source artifact manifest SHA is invalid")
+    if not str(approved_by or "").strip() or not str(approved_at or "").strip():
+        raise InventoryValidationError("detail source approval identity is incomplete")
+    _validate_approved_detail_source_row(
+        target=target,
+        event=event,
+        row=row,
+        artifact_root=artifact_root,
+    )
+
+    before = target_identity(target)["target_sha256"]
+    evidence = {
+        "url": row["source_url"],
+        "source_provider": row["source_provider"],
+        "source_authority": row["source_authority"],
+        "redirect_chain": row.get("redirect_chain") or [],
+        "source_cache_identity": row["source_cache_identity"],
+        "artifact_manifest_sha256": artifact_manifest_sha256,
+        "approved_by": approved_by,
+        "approved_at": approved_at,
+    }
+
+    refs = dict(target.source_refs or {})
+    discovery = dict(refs.get("detail_discovery") or {})
+    approved_sources = list(discovery.get("approved_detail_sources") or [])
+    approved_sources = [item for item in approved_sources if item.get("url") != row["source_url"]]
+    approved_sources.append(evidence)
+    discovery["approved_detail_sources"] = approved_sources
+    refs["detail_discovery"] = discovery
+
+    event_refs = dict(event.source_refs or {})
+    event_discovery = dict(event_refs.get("detail_discovery") or {})
+    event_sources = list(event_discovery.get("approved_detail_sources") or [])
+    event_sources = [item for item in event_sources if item.get("url") != row["source_url"]]
+    event_sources.append(dict(evidence))
+    event_discovery["approved_detail_sources"] = event_sources
+    event_refs["detail_discovery"] = event_discovery
+    event.source_refs = event_refs
+    event.save(update_fields={"source_refs"})
+
+    target.source_refs = refs
+    target.save(update_fields={"source_refs"})
+    target.refresh_from_db()
+    return {
+        "target_id": target.pk,
+        "before": before,
+        "after": target_identity(target)["target_sha256"],
+        "evidence": evidence,
+    }
+
+
 def check_detail_source_artifact(*, artifact_dir: str | Path, approval_path: str | Path) -> dict[str, Any]:
     root = Path(artifact_dir)
     _manifest, approval, rows = validate_detail_source_artifact(root, approval_path)
@@ -417,46 +538,17 @@ def apply_detail_source_artifact(*, artifact_dir: str | Path, approval_path: str
             raise InventoryValidationError("detail source event disappeared after approval")
         for row in rows:
             target = targets[int(row["target_id"])]
-            before = target_identity(target)["target_sha256"]
-            refs = dict(target.source_refs or {})
-            discovery = dict(refs.get("detail_discovery") or {})
-            approved_sources = list(discovery.get("approved_detail_sources") or [])
-            evidence = {
-                "url": row["source_url"],
-                "source_provider": row["source_provider"],
-                "source_authority": row["source_authority"],
-                "redirect_chain": row.get("redirect_chain") or [],
-                "source_cache_identity": row["source_cache_identity"],
-                "artifact_manifest_sha256": manifest_sha,
-                "approved_by": approval["approved_by"],
-                "approved_at": approval["approved_at"],
-            }
-            approved_sources = [item for item in approved_sources if item.get("url") != row["source_url"]]
-            approved_sources.append(evidence)
-            discovery["approved_detail_sources"] = approved_sources
-            refs["detail_discovery"] = discovery
-
             event = events[target.event_id]
-            event_refs = dict(event.source_refs or {})
-            event_discovery = dict(event_refs.get("detail_discovery") or {})
-            event_sources = list(event_discovery.get("approved_detail_sources") or [])
-            event_sources = [item for item in event_sources if item.get("url") != row["source_url"]]
-            event_sources.append(dict(evidence))
-            event_discovery["approved_detail_sources"] = event_sources
-            event_refs["detail_discovery"] = event_discovery
-            event.source_refs = event_refs
-            event.save(update_fields={"source_refs"})
-
-            target.source_refs = refs
-            target.save(update_fields={"source_refs"})
-            target.refresh_from_db()
-            changes.append(
-                {
-                    "target_id": target.pk,
-                    "before": before,
-                    "after": target_identity(target)["target_sha256"],
-                }
+            change = apply_approved_detail_source(
+                target=target,
+                event=event,
+                row=row,
+                artifact_root=root,
+                artifact_manifest_sha256=manifest_sha,
+                approved_by=approval["approved_by"],
+                approved_at=approval["approved_at"],
             )
+            changes.append({key: change[key] for key in ("target_id", "before", "after")})
         OperationLog.objects.create(
             admin=actor,
             action_type="historical_detail_sources_applied",

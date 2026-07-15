@@ -177,6 +177,63 @@ def _prevent_detail_regression(target: HistoricalRaceEventTarget, modules: dict[
             )
 
 
+def historical_basic_fields_complete(
+    target: HistoricalRaceEventTarget,
+    event: RaceEvent,
+) -> dict[str, Any]:
+    missing_fields: list[str] = []
+    policy_optional: list[str] = []
+
+    if target.event_id != event.pk:
+        missing_fields.append("mismatch.event")
+    if target.race_series_id != event.race_series_id:
+        missing_fields.append("mismatch.race_series")
+    if target.year != event.year:
+        missing_fields.append("mismatch.year")
+    if target.country_region != event.country_region:
+        missing_fields.append("mismatch.country_region")
+
+    required_fields = ("original_name", "racecourse", "local_date", "distance_text")
+    for owner_name, owner in (("target", target), ("event", event)):
+        for field in required_fields:
+            if getattr(owner, field) in (None, ""):
+                missing_fields.append(f"{owner_name}.{field}")
+        if not owner.source_refs:
+            missing_fields.append(f"{owner_name}.source_refs")
+
+    consistent_fields = (
+        "original_name",
+        "chinese_name",
+        "racecourse",
+        "grade_text",
+        "normalized_grade",
+        "surface",
+        "distance_text",
+        "local_date",
+    )
+    for field in consistent_fields:
+        if getattr(target, field) != getattr(event, field):
+            missing_fields.append(f"mismatch.{field}")
+
+    for field in ("grade_text", "surface"):
+        if getattr(target, field) in (None, "") and getattr(event, field) in (None, ""):
+            policy_optional.append(field)
+
+    return {
+        "complete": not missing_fields,
+        "missing_fields": missing_fields,
+        "policy_optional": policy_optional,
+    }
+
+
+def _basic_module_status(target: HistoricalRaceEventTarget) -> dict[str, Any]:
+    report = historical_basic_fields_complete(target, target.event)
+    status = {"basic": "complete" if report["complete"] else "incomplete"}
+    if report["missing_fields"]:
+        status["basic_missing_fields"] = report["missing_fields"]
+    return status
+
+
 def validate_historical_target_candidate(
     *,
     target_id: int,
@@ -254,7 +311,11 @@ def apply_historical_target_candidate(
             if modules:
                 raise InventoryValidationError("cancelled target must not import fabricated runners or results")
             target.resolution_status = HistoricalRaceResolutionStatus.IMPORTED
-            target.module_statuses = {"basic": "complete", "runners": "not_applicable", "results": "not_applicable"}
+            target.module_statuses = {
+                **_basic_module_status(target),
+                "runners": "not_applicable",
+                "results": "not_applicable",
+            }
             target.last_checked_at = timezone.now()
             target.save(update_fields={"resolution_status", "module_statuses", "last_checked_at"})
             return {"runners": 0, "results": 0, "history_winners": 0}
@@ -289,7 +350,7 @@ def apply_historical_target_candidate(
             )
         target.resolution_status = HistoricalRaceResolutionStatus.IMPORTED
         target.module_statuses = {
-            "basic": "complete",
+            **_basic_module_status(target),
             "runners": "complete",
             "results": "complete",
             "history_winners": "covered_by_results",

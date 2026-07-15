@@ -19,6 +19,75 @@ def load_tool():
 
 
 class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
+    def test_jra_schedule_accepts_legacy_plain_text_race_name(self):
+        body = b"""
+        <table>
+          <tr><th colspan="7"><div><span>Jan. 24</span> KYOTO HIMBA STAKES</div></th></tr>
+          <tr>
+            <td>G3</td><td>KYOTO</td><td>1,600/Turf</td><td>4yo&amp;up</td><td>40,000,000</td>
+            <td><a href="javascript:doSubmit('2015','0124','08','01','08','11','7')">Result</a></td>
+            <td></td>
+          </tr>
+        </table>
+        """
+
+        rows = self.tool.parse_jra_english_schedule(body, year=2015)
+
+        self.assertEqual(
+            rows,
+            [
+                {
+                    "race_name": "KYOTO HIMBA STAKES",
+                    "race_key": "KYOTOHIMBAS",
+                    "local_date": "2015-01-24",
+                    "racecourse": "KYOTO",
+                    "distance": "1,600/Turf",
+                }
+            ],
+        )
+
+    def test_jra_schedule_accepts_compact_legacy_column_layout(self):
+        body = b"""
+        <table>
+          <tr><th colspan="3"><div><span>Jan. 29</span> Negishi Stakes (GIII)</div></th></tr>
+          <tr>
+            <td>Tokyo</td><td>4yo &amp; up/D1400m</td>
+            <td><a href="javascript:doSubmit('2005','0129','05','01','01','11','7')">Result</a></td>
+          </tr>
+        </table>
+        """
+
+        rows = self.tool.parse_jra_english_schedule(body, year=2005)
+
+        self.assertEqual(rows[0]["race_name"], "Negishi Stakes (GIII)")
+        self.assertEqual(rows[0]["local_date"], "2005-01-29")
+        self.assertEqual(rows[0]["racecourse"], "Tokyo")
+        self.assertEqual(rows[0]["distance"], "4yo & up/D1400m")
+
+    def test_jra_history_accepts_legacy_headers_and_slash_date(self):
+        body = """
+        <table>
+          <tr><th>月/日</th><th>レース名</th><th>場</th><th>結果</th></tr>
+          <tr><td>1/24（土）</td><td>京都牝馬Ｓ</td><td>京都</td><td><a href="007.html">結果</a></td></tr>
+        </table>
+        <table>
+          <tr><th>月/日</th><th>レース名</th><th>場</th><th>結果</th></tr>
+          <tr><td>1/25（日）</td><td>アメリカＪＣＣ</td><td>中山</td><td><a href="008.html">結果</a></td></tr>
+        </table>
+        """.encode("cp932")
+
+        rows = self.tool.parse_jra_history_records(body, year=2015)
+
+        self.assertEqual(rows[0]["local_date"], "2015-01-24")
+        self.assertEqual(rows[0]["race_name"], "京都牝馬Ｓ")
+        self.assertEqual(rows[0]["racecourse"], "KYOTO")
+        self.assertEqual(
+            rows[0]["result_url"],
+            "https://www.jra.go.jp/datafile/seiseki/replay/2015/007.html",
+        )
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[1]["local_date"], "2015-01-25")
+
     def setUp(self):
         self.tool = load_tool()
 
@@ -271,6 +340,40 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
                 "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2025-12-13&rn=8&tk=DMR",
                 "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2025-02-08&rn=9&tk=OP",
             ],
+        )
+
+    def test_toba_accepts_legacy_race_number_with_trailing_equals(self):
+        body = """
+        <table>
+          <tr>
+            <th>Track</th><th>Date</th><th>Division</th><th>Stake</th><th>Gr</th>
+            <th>Age</th><th>Sex</th><th>Dis</th><th>Sur</th><th>Field</th>
+            <th>Total Purse</th><th>Winner</th>
+          </tr>
+          <tr>
+            <td>DMR</td><td>3-Sep</td><td>2YO</td>
+            <td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=9=&amp;BorP=P&amp;TID=DMR&amp;CTRY=USA&amp;DT=09/03/2018&amp;DAY=D&amp;STYLE=EQB">DEL MAR FUTURITY</a></td>
+            <td>1</td><td>2</td><td></td><td>7</td><td>D</td><td>6</td>
+            <td>$300,345</td><td>Game Winner</td>
+          </tr>
+        </table>
+        """
+        target = {
+            "series_key": "united-states-del-mar-futurity",
+            "year": 2018,
+            "country_region": "united_states",
+            "original_name": "Del Mar Futurity",
+            "racecourse": "Del Mar",
+            "distance_text": "7",
+        }
+
+        result = self.tool.build_toba_provider_rows(targets=[target], year=2018, body=body)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["rows"][0]["local_date"], "2018-09-03")
+        self.assertEqual(
+            result["rows"][0]["urls"]["result_url"]["url"],
+            "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2018-09-03&rn=9&tk=DMR",
         )
 
     def test_toba_ambiguous_or_missing_track_is_reported_without_guessing(self):
@@ -2095,6 +2198,46 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(
             [(issue["target_id"], issue["code"]) for issue in result["issues"]],
             [(13, "official_schedule_source_reused"), (14, "official_schedule_source_reused")],
+        )
+
+    def test_official_schedule_match_retains_unique_high_confidence_source_user(self):
+        targets = [
+            {
+                "target_id": 13,
+                "series_key": "hong-kong-national-day-cup",
+                "year": 2010,
+                "country_region": "hong_kong",
+                "original_name": "National Day Cup(H)",
+                "racecourse": "Sha Tin",
+                "distance_text": "1400",
+                "normalized_grade": "G3",
+            },
+            {
+                "target_id": 14,
+                "series_key": "hong-kong-stewards-cup",
+                "year": 2010,
+                "country_region": "hong_kong",
+                "original_name": "Stewards' Cup",
+                "racecourse": "Sha Tin",
+                "distance_text": "1600",
+                "normalized_grade": "G1",
+            },
+        ]
+        schedule = [{
+            "edition_year": 2010,
+            "local_date": "2010-10-01",
+            "racecourse": "Sha Tin",
+            "race_name": "National Day Cup",
+            "normalized_grade": "G3",
+            "distance_text": "1400m",
+        }]
+
+        result = self.tool.match_official_schedule_targets(targets, schedule)
+
+        self.assertEqual([match["target_id"] for match in result["matches"]], [13])
+        self.assertEqual(
+            [(issue["target_id"], issue["code"]) for issue in result["issues"]],
+            [(14, "official_schedule_source_reused")],
         )
 
     def test_manual_calendar_evidence_closes_only_its_exact_target(self):

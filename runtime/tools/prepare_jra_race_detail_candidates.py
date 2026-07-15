@@ -9,10 +9,10 @@ import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urljoin
-from urllib.request import Request, urlopen
 
-from race_event_request_budget import before_network_request
+from historical_race_detail_http import controlled_http_get
 from race_event_source_cache import write_source_cache
+from jra_legacy_replay_detail_parser import try_parse_jra_legacy_replay_detail
 
 from bs4 import BeautifulSoup
 
@@ -20,6 +20,10 @@ from bs4 import BeautifulSoup
 JRA_BASE_URL = "https://www.jra.go.jp"
 JRA_RESULT_RE = re.compile(r"/datafile/seiseki/(?:replay/2026/\d{3}|g1/[^\"']+/result/[^\"']+2026)\.html")
 WAKU_RE = re.compile(r"枠(\d+)")
+STRUCTURED_DISTANCE_RE = re.compile(
+    r"(?<!\d)(\d{1,2}(?:,\d{3})|\d{3,4})\s*(?:m|メートル)(?![A-Za-z])",
+    re.IGNORECASE,
+)
 
 
 def _text(node) -> str:
@@ -32,17 +36,73 @@ def _decode_jra_html(body: bytes) -> str:
     return body.decode("cp932", errors="replace")
 
 
-def _download(url: str, path: Path, *, allow_network: bool, timeout: int) -> bytes:
+def _canonical_structured_distance(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value or "")
+    match = STRUCTURED_DISTANCE_RE.search(normalized)
+    if match is None:
+        return ""
+    return f"{match.group(1).replace(',', '')}m"
+
+
+def _structured_distance_text(soup: BeautifulSoup) -> str:
+    for selector in (".raceKyoriTrack", ".cell.course"):
+        for node in soup.select(selector):
+            distance = _canonical_structured_distance(_text(node))
+            if distance:
+                return distance
+    for node in soup.select("td.gray12"):
+        normalized = unicodedata.normalize("NFKC", _text(node))
+        if re.fullmatch(r"\d{3,4}\s*m", normalized, re.IGNORECASE):
+            return _canonical_structured_distance(normalized)
+    return ""
+
+
+def _download(
+    url: str,
+    path: Path,
+    *,
+    allow_network: bool,
+    timeout: int,
+    request_context: dict | None = None,
+) -> bytes:
     if path.exists():
         return path.read_bytes()
     if not allow_network:
         raise RuntimeError(f"缺少缓存且未允许网络请求：{path}")
-    request = Request(url, headers={"User-Agent": "UmaFansBot/1.0"})
-    before_network_request(url)
-    with urlopen(request, timeout=timeout) as response:
-        body = response.read()
+    if not isinstance(request_context, dict):
+        raise RuntimeError("JRA 网络请求缺少 runner v2 受控请求上下文")
+    body = controlled_http_get(
+        url,
+        policy=request_context.get("request_policy"),
+        shard_id=request_context.get("shard_id"),
+        shard_state_path=request_context.get("shard_state_path"),
+        host_state_root=request_context.get("host_state_root"),
+        timeout=timeout,
+        headers={"User-Agent": "UmaFansBot/1.0"},
+    )
     write_source_cache(path, body, source_url=url)
     return body
+
+
+def _request_context_from_args(args) -> dict | None:
+    if not bool(getattr(args, "allow_network", False)):
+        return None
+    policy_path = str(getattr(args, "request_policy", "") or "")
+    shard_id = str(getattr(args, "request_shard_id", "") or "")
+    shard_state = str(getattr(args, "request_state", "") or "")
+    host_state_root = str(getattr(args, "host_state_root", "") or "")
+    if not all((policy_path, shard_id, shard_state, host_state_root)):
+        raise RuntimeError("JRA 网络模式必须提供 request policy、shard identity 与 host state")
+    try:
+        policy = json.loads(Path(policy_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("JRA request policy 无法读取") from exc
+    return {
+        "request_policy": policy,
+        "shard_id": shard_id,
+        "shard_state_path": shard_state,
+        "host_state_root": host_state_root,
+    }
 
 
 def _normalize_match_text(value: str) -> str:
@@ -240,10 +300,17 @@ def _parse_detail_page(body: bytes, *, source_url: str) -> tuple[list[dict], lis
     metadata = {
         "race_header": header,
         "race_title": race_title,
+        "distance_text": _structured_distance_text(soup),
         "row_count": len(rows),
         "result_count": len(results),
     }
-    return runners, results, metadata
+    if runners and results:
+        return runners, results, metadata
+
+    legacy = try_parse_jra_legacy_replay_detail(body, source_url=source_url)
+    if legacy is not None:
+        return legacy
+    raise RuntimeError(f"JRA result page has no complete rows: {source_url}")
 
 
 def prepare_candidates(args) -> dict:
@@ -253,6 +320,7 @@ def prepare_candidates(args) -> dict:
     if args.limit:
         finished_events = finished_events[: args.limit]
     result_links = _match_result_links(Path(args.source_html), finished_events)
+    request_context = _request_context_from_args(args)
 
     jsonl_path = output_dir / "jra_detail_candidates_2026.jsonl"
     review_csv_path = output_dir / "jra_detail_review_2026.csv"
@@ -273,7 +341,13 @@ def prepare_candidates(args) -> dict:
             source_url = result_links[index]
             source_path = source_dir / _source_filename(source_url)
             try:
-                body = _download(source_url, source_path, allow_network=args.allow_network, timeout=args.timeout_seconds)
+                body = _download(
+                    source_url,
+                    source_path,
+                    allow_network=args.allow_network,
+                    timeout=args.timeout_seconds,
+                    request_context=request_context,
+                )
                 runners, results, metadata = _parse_detail_page(body, source_url=source_url)
             except Exception as exc:
                 summary["errors"].append({"slug": event["slug"], "source_url": source_url, "error": str(exc)})
@@ -326,6 +400,10 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--timeout-seconds", type=int, default=30)
     parser.add_argument("--fail-fast", action="store_true")
+    parser.add_argument("--request-policy")
+    parser.add_argument("--request-shard-id")
+    parser.add_argument("--request-state")
+    parser.add_argument("--host-state-root")
     args = parser.parse_args()
     summary = prepare_candidates(args)
     print(json.dumps(summary, ensure_ascii=False, indent=2))

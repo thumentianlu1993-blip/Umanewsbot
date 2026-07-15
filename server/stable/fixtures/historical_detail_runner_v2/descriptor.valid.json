@@ -1,0 +1,129 @@
+{
+  "schema_version": "2.0",
+  "artifact_kind": "historical_race_detail_shard_descriptor",
+  "plan_id": "detail-crawl-1998-2026-v2",
+  "shard_id": "japan-2005-jra-01",
+  "region": "japan",
+  "image": {
+    "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "stages": [
+    "discover",
+    "cache",
+    "parse",
+    "validate",
+    "package"
+  ],
+  "permissions": {
+    "database": false,
+    "apply": false,
+    "shell": false,
+    "network_stages": [
+      "discover",
+      "cache"
+    ]
+  },
+  "mounts": [
+    {
+      "role": "repo",
+      "path": "${REPO_ROOT}",
+      "mode": "ro"
+    },
+    {
+      "role": "plan",
+      "path": "${PLAN_ROOT}",
+      "mode": "ro"
+    },
+    {
+      "role": "run",
+      "path": "${RUN_ROOT}",
+      "mode": "rw"
+    },
+    {
+      "role": "host_lock",
+      "path": "${HOST_LOCK_ROOT}",
+      "mode": "rw"
+    }
+  ],
+  "identities": [
+    {
+      "role": "plan",
+      "path": "${PLAN_FILE}",
+      "size": "${PLAN_SIZE}",
+      "sha256": "${PLAN_SHA256}"
+    },
+    {
+      "role": "events_csv",
+      "path": "${EVENTS_FILE}",
+      "size": "${EVENTS_SIZE}",
+      "sha256": "${EVENTS_SHA256}"
+    },
+    {
+      "role": "source_fragment",
+      "path": "${SOURCE_FILE}",
+      "size": "${SOURCE_SIZE}",
+      "sha256": "${SOURCE_SHA256}"
+    },
+    {
+      "role": "tool",
+      "path": "${TOOL_FILE}",
+      "size": "${TOOL_SIZE}",
+      "sha256": "${TOOL_SHA256}"
+    },
+    {
+      "role": "recipe",
+      "path": "${RECIPE_FILE}",
+      "size": "${RECIPE_SIZE}",
+      "sha256": "${RECIPE_SHA256}"
+    }
+  ],
+  "outputs": {
+    "cache_root": "${RUN_ROOT}/cache",
+    "parse_root": "${RUN_ROOT}/parse",
+    "package_root": "${RUN_ROOT}/package",
+    "checkpoint": "${RUN_ROOT}/checkpoint.json",
+    "request_log": "${RUN_ROOT}/request-log.jsonl",
+    "host_last_start": "${HOST_LOCK_ROOT}/www.jra.go.jp.last-start.json",
+    "host_append_log": "${HOST_LOCK_ROOT}/www.jra.go.jp.requests.jsonl"
+  },
+  "request_policy": {
+    "max_requests": 2,
+    "minimum_interval_seconds": 0.05,
+    "allowed_hosts": [
+      "www.jra.go.jp"
+    ],
+    "redirect_hosts": [
+      "www.jra.go.jp"
+    ],
+    "url_patterns": {
+      "www.jra.go.jp": [
+        "^/datafile/seiseki/replay/2005/[0-9]{2}\\.html$"
+      ]
+    }
+  },
+  "recipe": {
+    "id": "japan-v2",
+    "region": "japan",
+    "source_chain": [
+      "jra",
+      "netkeiba"
+    ],
+    "fallback_sources": [
+      "netkeiba"
+    ],
+    "discovery_required": false
+  },
+  "targets": [
+    {
+      "target_id": "50556",
+      "slug": "japan-daily-hai-nisai-2005",
+      "target_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "target_id": "50557",
+      "slug": "japan-fuchu-himba-2005",
+      "target_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+    }
+  ]
+}

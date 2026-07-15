@@ -1,5 +1,28 @@
 # 当前状态
 
+## 2026-07-16 历史详情正式导入能力完成本地验收，等待发布授权
+
+- batch006 已在生产完成且不得重跑：`1061 accounted / 1042 complete / 19 evidence-backed gaps`，累计 `11215 runners / 9931 results`，历史赛事仍为 `published=0`。
+- 后续本地详情抓取产物已固定为 `4930` 个目标：`4652 complete / 278 gap`，共 `51191 runners / 48413 results`。其中截至 2024 年为 `4351 complete / 214 gap`、18 个导入 chunk；2026 当前到期范围为 `301 complete / 64 gap`、2 个 chunk。301 条可导入记录全部在到期清单内，没有 `not_due` 或 `pending` 混入。
+- 新增正式 source bundle 打包器、迁移 `0032_historical_race_detail_import_receipt`、原子 chunk importer、receipt reconcile/verifier。打包器严格锁定 39 个正式 package 的 4930-target 并集；导入 receipt 固定 bundle/chunk/runner/target 身份，业务写入与 COMPLETED receipt 同事务提交，STARTED/ABANDONED 可审计且不可静默重用。
+- 2026 descriptor 导入现在逐 target 校验 ID/SHA/inventory，并强制 `draft + incomplete + is_featured=false`；任一行失败会连同 alias、操作日志和任务日志整批回滚。chunk 子命令必须同时匹配私有 owner token、run/global lock、有效租约、artifact root、current step 与 plan 输入，并只验 receipt 记录的本次 APPLIED candidate。
+- 覆盖政策按 `docs/historical_race_data_coverage_policy.md` 执行：日本、香港历史范围继续 hard；英法美截至 2024 年 G1 hard、G2/G3 best-effort；2025 年及以后五地区正式范围独立记账。remaining artifact 当前为 `28126` targets，其中 `8857 historical hard / 18173 historical best-effort / 1096 new formal`；existing complete/gap 继续复用，不倒退、不重跑。
+- 首次代码 review 的 7 项问题已修复并在同一 reviewer 会话复审为 `NO ACTIONABLE FINDINGS / APPROVED`。主会话聚焦回归 `148/148`、Django check 和 `makemigrations --check --dry-run` 通过。当前尚未提交、构建新生产镜像、应用 `0032` 或导入这 4652 场详情；正式不可变 bundle 生成后仍须取得当前任务的明确发布授权，再执行备份、迁移、dry-run、串行 apply 和逐目标 verifier。历史公开、常驻网络和常驻写入继续关闭。
+
+## 2026-07-16 France runner v2 单目标本地 smoke 在 preflight 安全停止
+
+- 本次仅使用本地 Docker，固定镜像 `sha256:e55b8b08bcd5848625a8c1d0fa5abd710783ed3be6fddaf245860ccbc9e55fa8`，OCI revision 为 `d6d6f58b2b5b90301d8fa633a650df28379c09e7`；未连接生产服务器或数据库。
+- 已创建独立 run root `runtime/historical_detail_crawl_runs/detail-crawl-1998-2026-v2-smoke/france` 和共享 host lock 根 `runtime/historical_detail_crawl_runs/detail-crawl-1998-2026-v2-smoke/host-locks`。France `48498` descriptor 仍把 `run`、`host_lock` 和全部 outputs 不可变绑定到 plan root 下的 `smoke/run/smoke-france-48498`、`smoke/host-locks`，与本次批准路径不一致。
+- `discover` 在 launcher 的宿主 preflight 以 `mount contract mismatch for run` fail closed，发生在 `docker run` 和真实网络请求之前。按失败即停规则未运行 `cache / parse / validate / package`；请求数、缓存字节和阶段产物均为 0，无 checkpoint、request log、package manifest 或残留容器。
+- 后续不得通过软链接、改写 descriptor 或改用 plan root 可写目录绕过门禁。须先由计划生成侧提供绑定上述独立 run root/共享 host lock 的新不可变 descriptor，再从 `discover` 重新开始。
+
+## 2026-07-16 日本 runner v2 单目标本地 smoke 在 preflight 安全停止
+
+- 本次仅使用本地 Docker，目标为 `japan / 50556`，固定镜像 `sha256:e55b8b08bcd5848625a8c1d0fa5abd710783ed3be6fddaf245860ccbc9e55fa8`，OCI revision 为 `d6d6f58b2b5b90301d8fa633a650df28379c09e7`；未连接生产服务器或数据库。
+- 已创建独立 run root `runtime/historical_detail_crawl_runs/detail-crawl-1998-2026-v2-smoke/japan`，并复用同级共享 host lock 根。Japan `50556` descriptor 仍把 `run`、`host_lock` 和全部 outputs 不可变绑定到 plan root 下的 `smoke/run/smoke-japan-50556`、`smoke/host-locks`，与本次批准路径不一致。
+- `discover` 在 launcher 的宿主 preflight 以 `mount contract mismatch for run` fail closed，退出码为 `2`，发生在 `docker run` 和真实网络请求之前。按失败即停规则未运行 `cache / parse / validate / package`；请求数、缓存字节和阶段产物均为 `0`，无 checkpoint、request log、package manifest 或残留容器。
+- 后续须由计划生成侧提供绑定上述独立 run root/共享 host lock 的新不可变 descriptor，或经明确审批改用当前 descriptor 原路径，再从 `discover` 重新开始；不得手工修改 descriptor 绕过身份门禁。
+
 ## 2026-07-15 batch006 本地详情冲刺进行中，生产写入暂停
 
 - batch006 年度赛历 1061 场已全部记账：`1050 complete / 11 gap`，accounted rate `100%`、data complete rate `98.96%`。两个日本 gap 为东京大赏典需要 NAR/Oi 来源；九个美国 gap 为障碍赛、同名冲突或未举办判断，全部进入最终统一审核，不阻断其他分片。

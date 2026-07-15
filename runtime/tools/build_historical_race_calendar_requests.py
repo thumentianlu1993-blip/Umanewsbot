@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import date
 import json
 from collections import Counter
 from pathlib import Path
@@ -11,8 +12,10 @@ from historical_race_calendar_common import (
     atomic_publish_directory,
     canonical_bytes,
     file_identity,
+    hkjc_coverage_policy,
     load_catalog,
     load_selection,
+    sha256_bytes,
     sha256_file,
 )
 
@@ -26,13 +29,28 @@ def build_calendar_requests(
     selection_path: Path,
     catalog_path: Path,
     output_dir: Path,
+    hkjc_cutoff_date: date | None = None,
 ) -> dict:
     try:
         _selection, targets = load_selection(selection_path)
-        _catalog, sources = load_catalog(catalog_path)
+        _catalog, sources = load_catalog(
+            catalog_path, hkjc_cutoff_date=hkjc_cutoff_date
+        )
     except CalendarArtifactError as exc:
         raise CalendarRequestError(str(exc)) from exc
     scope_pairs = {(target["country_region"], target["year"]) for target in targets}
+    if hkjc_cutoff_date is not None and scope_pairs != {
+        ("hong_kong", hkjc_cutoff_date.year)
+    }:
+        raise CalendarRequestError(
+            "HKJC partial coverage requires a single edition year selection"
+        )
+    coverage_policy = hkjc_coverage_policy(
+        sources, hkjc_cutoff_date=hkjc_cutoff_date
+    )
+    coverage_policy_sha256 = (
+        sha256_bytes(canonical_bytes(coverage_policy)) if coverage_policy else None
+    )
     source_pairs = {(source["country_region"], source["edition_year"]) for source in sources}
     if not sources or not source_pairs <= scope_pairs:
         raise CalendarRequestError("calendar catalog source is outside selection scope")
@@ -102,6 +120,9 @@ def build_calendar_requests(
             sorted(Counter(target["country_region"] for target in targets).items())
         ),
     }
+    if coverage_policy is not None:
+        summary["coverage_policy"] = coverage_policy
+        summary["coverage_policy_sha256"] = coverage_policy_sha256
     result = dict(summary)
 
     def write(temporary: Path) -> None:
@@ -118,6 +139,9 @@ def build_calendar_requests(
                 "summary": file_identity(summary_path, relative_to=temporary),
             },
         }
+        if coverage_policy is not None:
+            manifest["coverage_policy"] = coverage_policy
+            manifest["coverage_policy_sha256"] = coverage_policy_sha256
         (temporary / "manifest.json").write_bytes(canonical_bytes(manifest))
 
     try:
@@ -135,12 +159,14 @@ def main() -> int:
     parser.add_argument("--selection-snapshot", required=True, type=Path)
     parser.add_argument("--source-catalog", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--hkjc-cutoff-date", type=date.fromisoformat)
     args = parser.parse_args()
     try:
         result = build_calendar_requests(
             selection_path=args.selection_snapshot,
             catalog_path=args.source_catalog,
             output_dir=args.output_dir,
+            hkjc_cutoff_date=args.hkjc_cutoff_date,
         )
     except (CalendarRequestError, OSError, json.JSONDecodeError) as exc:
         parser.error(str(exc))

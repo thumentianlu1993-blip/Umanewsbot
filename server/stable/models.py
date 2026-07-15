@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Iterable
 
@@ -462,6 +463,17 @@ class HistoricalBatchRunStatus(models.TextChoices):
     COMPLETED = "completed", "已完成"
     FAILED = "failed", "失败"
     BLOCKED = "blocked", "已阻断"
+
+
+class HistoricalRaceDetailImportLayer(models.TextChoices):
+    HISTORICAL_THROUGH_2024 = "historical_through_2024", "截至2024年历史赛事"
+    CURRENT_YEAR_DUE = "current_year_due", "当前年度已到期赛事"
+
+
+class HistoricalRaceDetailImportReceiptStatus(models.TextChoices):
+    STARTED = "started", "已开始"
+    COMPLETED = "completed", "已完成"
+    ABANDONED = "abandoned", "已废弃"
 
 
 class RaceEventModule(models.TextChoices):
@@ -1125,6 +1137,229 @@ class HistoricalBatchRun(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.run_id} {self.batch_id} {self.phase}"
+
+
+class HistoricalRaceDetailImportReceipt(TimestampedModel):
+    receipt_id = models.CharField(max_length=64, unique=True)
+    runner = models.ForeignKey(
+        HistoricalBatchRun,
+        on_delete=models.PROTECT,
+        related_name="detail_import_receipts",
+    )
+    layer = models.CharField(max_length=32, choices=HistoricalRaceDetailImportLayer.choices)
+    bundle_sha256 = models.CharField(max_length=64)
+    chunk_sha256 = models.CharField(max_length=64)
+    status = models.CharField(
+        max_length=16,
+        choices=HistoricalRaceDetailImportReceiptStatus.choices,
+        default=HistoricalRaceDetailImportReceiptStatus.STARTED,
+    )
+    target_count = models.PositiveIntegerField()
+    initial_payload = models.JSONField(default=dict)
+    completion_payload = models.JSONField(default=dict, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    abandoned_at = models.DateTimeField(null=True, blank=True)
+    abandoned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="abandoned_historical_race_detail_import_receipts",
+    )
+    abandon_reason = models.TextField(blank=True)
+    reconcile_payload = models.JSONField(default=dict, blank=True)
+    supersedes_receipt = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="replacement_receipts",
+    )
+
+    IMMUTABLE_FIELDS = (
+        "receipt_id",
+        "runner_id",
+        "layer",
+        "bundle_sha256",
+        "chunk_sha256",
+        "target_count",
+        "initial_payload",
+        "supersedes_receipt_id",
+    )
+    TERMINAL_FIELDS = (
+        *IMMUTABLE_FIELDS,
+        "status",
+        "completion_payload",
+        "completed_at",
+        "abandoned_at",
+        "abandoned_by_id",
+        "abandon_reason",
+        "reconcile_payload",
+    )
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(fields=("bundle_sha256",), name="hist_rcpt_bundle_idx"),
+            models.Index(fields=("chunk_sha256",), name="hist_rcpt_chunk_idx"),
+            models.Index(fields=("runner", "status"), name="hist_rcpt_runner_status_idx"),
+            models.Index(fields=("layer", "status"), name="hist_rcpt_layer_status_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(target_count__gt=0),
+                name="hist_rcpt_target_count_gt_zero",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    layer__in=(
+                        HistoricalRaceDetailImportLayer.HISTORICAL_THROUGH_2024,
+                        HistoricalRaceDetailImportLayer.CURRENT_YEAR_DUE,
+                    )
+                ),
+                name="hist_rcpt_layer_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        status=HistoricalRaceDetailImportReceiptStatus.STARTED,
+                        completed_at__isnull=True,
+                        completion_payload={},
+                        abandoned_at__isnull=True,
+                        abandoned_by__isnull=True,
+                        abandon_reason="",
+                        reconcile_payload={},
+                    )
+                    | models.Q(
+                        status=HistoricalRaceDetailImportReceiptStatus.COMPLETED,
+                        completed_at__isnull=False,
+                        abandoned_at__isnull=True,
+                        abandoned_by__isnull=True,
+                        abandon_reason="",
+                        reconcile_payload={},
+                    )
+                    & ~models.Q(completion_payload={})
+                    | models.Q(
+                        status=HistoricalRaceDetailImportReceiptStatus.ABANDONED,
+                        completed_at__isnull=True,
+                        completion_payload={},
+                        abandoned_at__isnull=False,
+                        abandoned_by__isnull=False,
+                    )
+                    & ~models.Q(abandon_reason="")
+                    & ~models.Q(reconcile_payload={})
+                ),
+                name="hist_rcpt_state_consistent",
+            ),
+        ]
+
+    @staticmethod
+    def build_receipt_id(*, layer: str, chunk_sha256: str) -> str:
+        return hashlib.sha256(f"{layer}\0{chunk_sha256}".encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _is_sha256(value: str) -> bool:
+        return len(value) == 64 and all(character in "0123456789abcdef" for character in value)
+
+    def _target_ids(self) -> tuple[int, ...]:
+        target_ids = self.initial_payload.get("target_ids")
+        if not isinstance(target_ids, list) or not target_ids:
+            raise ValidationError({"initial_payload": "initial_payload 必须包含非空 target_ids 列表。"})
+        if any(
+            isinstance(target_id, bool) or not isinstance(target_id, int) or target_id <= 0
+            for target_id in target_ids
+        ):
+            raise ValidationError({"initial_payload": "target_ids 必须全部为正整数。"})
+        if len(set(target_ids)) != len(target_ids):
+            raise ValidationError({"initial_payload": "target_ids 不能重复。"})
+        if len(target_ids) != self.target_count:
+            raise ValidationError({"target_count": "target_count 必须等于 target_ids 数量。"})
+        return tuple(sorted(target_ids))
+
+    def _persisted(self):
+        if not self.pk:
+            return None
+        return type(self).objects.filter(pk=self.pk).first()
+
+    def _validate_persisted_state(self, persisted) -> None:
+        if persisted is None:
+            if self.status != HistoricalRaceDetailImportReceiptStatus.STARTED:
+                raise ValidationError({"status": "receipt 创建时必须为 STARTED。"})
+            return
+        changed_immutable = [
+            field_name
+            for field_name in self.IMMUTABLE_FIELDS
+            if getattr(self, field_name) != getattr(persisted, field_name)
+        ]
+        if changed_immutable:
+            raise ValidationError(
+                {field_name.removesuffix("_id"): "receipt 身份字段创建后不可修改。" for field_name in changed_immutable}
+            )
+        if persisted.status in (
+            HistoricalRaceDetailImportReceiptStatus.COMPLETED,
+            HistoricalRaceDetailImportReceiptStatus.ABANDONED,
+        ):
+            changed_terminal = [
+                field_name
+                for field_name in self.TERMINAL_FIELDS
+                if getattr(self, field_name) != getattr(persisted, field_name)
+            ]
+            if changed_terminal:
+                raise ValidationError({"status": "终态 receipt 不可修改。"})
+        elif self.status not in (
+            HistoricalRaceDetailImportReceiptStatus.STARTED,
+            HistoricalRaceDetailImportReceiptStatus.COMPLETED,
+            HistoricalRaceDetailImportReceiptStatus.ABANDONED,
+        ):
+            raise ValidationError({"status": "STARTED 只能转为 COMPLETED 或 ABANDONED。"})
+
+    def _validate_supersedes(self, target_ids: tuple[int, ...]) -> None:
+        if not self.supersedes_receipt_id:
+            return
+        if self.pk and self.supersedes_receipt_id == self.pk:
+            raise ValidationError({"supersedes_receipt": "receipt 不能替代自身。"})
+        superseded = self.supersedes_receipt
+        if superseded.status != HistoricalRaceDetailImportReceiptStatus.ABANDONED:
+            raise ValidationError({"supersedes_receipt": "只能替代 ABANDONED receipt。"})
+        if superseded.layer != self.layer:
+            raise ValidationError({"supersedes_receipt": "替代 receipt 必须属于同一 layer。"})
+        if superseded._target_ids() != target_ids:
+            raise ValidationError({"supersedes_receipt": "替代 receipt 的 target 集合必须一致。"})
+        if superseded.receipt_id == self.receipt_id:
+            raise ValidationError({"receipt_id": "替代 receipt 必须使用新的 receipt_id。"})
+        for key in ("chunk_payload", "approval_identity"):
+            if self.initial_payload.get(key) == superseded.initial_payload.get(key):
+                raise ValidationError({"initial_payload": f"替代 receipt 必须使用新的 {key}。"})
+        visited = {self.pk} if self.pk else set()
+        current = superseded
+        while current is not None:
+            if current.pk in visited:
+                raise ValidationError({"supersedes_receipt": "receipt 替代关系不能形成环。"})
+            visited.add(current.pk)
+            current = current.supersedes_receipt
+
+    def clean(self):
+        super().clean()
+        if not self._is_sha256(self.bundle_sha256):
+            raise ValidationError({"bundle_sha256": "bundle_sha256 必须为小写 SHA-256。"})
+        if not self._is_sha256(self.chunk_sha256):
+            raise ValidationError({"chunk_sha256": "chunk_sha256 必须为小写 SHA-256。"})
+        expected_receipt_id = self.build_receipt_id(
+            layer=self.layer,
+            chunk_sha256=self.chunk_sha256,
+        )
+        if self.receipt_id != expected_receipt_id:
+            raise ValidationError({"receipt_id": "receipt_id 与 layer/chunk_sha256 不匹配。"})
+        target_ids = self._target_ids()
+        self._validate_persisted_state(self._persisted())
+        self._validate_supersedes(target_ids)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.layer} {self.chunk_sha256} {self.status}"
 
 
 class HistoricalBatchLock(TimestampedModel):

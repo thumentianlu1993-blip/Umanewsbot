@@ -187,7 +187,99 @@ def load_selection(path: Path) -> tuple[dict, list[dict]]:
     return payload, sorted(normalized, key=lambda row: row["target_id"])
 
 
-def load_catalog(path: Path) -> tuple[dict, list[dict]]:
+def hkjc_coverage_policy(
+    sources: list[dict], *, hkjc_cutoff_date: date | None = None
+) -> dict | None:
+    hkjc_sources = [source for source in sources if source["parser"] == "hkjc_pattern"]
+    if hkjc_cutoff_date is None:
+        hkjc_seasons: dict[int, set[int]] = {}
+        for source in hkjc_sources:
+            hkjc_seasons.setdefault(source["edition_year"], set()).add(
+                source["options"]["season_end_year"]
+            )
+        for edition_year, season_end_years in sorted(hkjc_seasons.items()):
+            expected = {edition_year, edition_year + 1}
+            if season_end_years != expected:
+                raise CalendarArtifactError(
+                    "HKJC pattern sources must cover both seasons for natural year "
+                    f"{edition_year}: expected {sorted(expected)}"
+                )
+        return None
+
+    if not isinstance(hkjc_cutoff_date, date):
+        raise CalendarArtifactError("HKJC cutoff date is invalid")
+    if not sources or len(hkjc_sources) != len(sources):
+        raise CalendarArtifactError(
+            "HKJC partial coverage only supports official HKJC pattern sources"
+        )
+    if any(
+        source["adapter_key"] != "hkjc"
+        or source["source_authority"] != "official"
+        for source in sources
+    ):
+        raise CalendarArtifactError(
+            "HKJC partial coverage only supports official HKJC pattern sources"
+        )
+    edition_years = {source["edition_year"] for source in sources}
+    if len(edition_years) != 1:
+        raise CalendarArtifactError(
+            "HKJC partial coverage requires a single edition year catalog"
+        )
+    edition_year = next(iter(edition_years))
+    if hkjc_cutoff_date.year != edition_year:
+        raise CalendarArtifactError(
+            "HKJC cutoff date must match the catalog edition year"
+        )
+    included = {source["options"]["season_end_year"] for source in sources}
+    expected = {edition_year, edition_year + 1}
+    if included != {edition_year}:
+        raise CalendarArtifactError(
+            "HKJC partial coverage must include the current season and may only "
+            "omit the next season"
+        )
+
+    coverage_values = set()
+    for source in sources:
+        options = source["options"]
+        try:
+            coverage_start = date.fromisoformat(str(options["coverage_start_date"]))
+            coverage_end = date.fromisoformat(str(options["coverage_end_date"]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise CalendarArtifactError(
+                "HKJC partial coverage requires valid coverage date boundaries"
+            ) from exc
+        reason = str(options.get("partial_coverage_reason") or "").strip()
+        if (
+            coverage_start >= coverage_end
+            or not coverage_start <= hkjc_cutoff_date <= coverage_end
+            or coverage_start.year not in {edition_year - 1, edition_year}
+            or coverage_end.year != edition_year
+            or not reason
+        ):
+            raise CalendarArtifactError(
+                "HKJC partial coverage boundaries are invalid"
+            )
+        coverage_values.add((coverage_start, coverage_end, reason))
+    if len(coverage_values) != 1:
+        raise CalendarArtifactError(
+            "HKJC partial coverage boundaries must be identical across sources"
+        )
+    coverage_start, coverage_end, reason = next(iter(coverage_values))
+    return {
+        "coverage_mode": "cutoff_bounded_partial_natural_year",
+        "cutoff_date": hkjc_cutoff_date.isoformat(),
+        "coverage_start_date": coverage_start.isoformat(),
+        "coverage_end_date": coverage_end.isoformat(),
+        "included_season_end_years": sorted(included),
+        "omitted_season_end_years": sorted(expected - included),
+        "expected_full_season_end_years": sorted(expected),
+        "partial_coverage_reason": reason,
+    }
+
+
+def load_catalog(
+    path: Path, *, hkjc_cutoff_date: date | None = None
+) -> tuple[dict, list[dict]]:
     if path.is_symlink() or not path.is_file():
         raise CalendarArtifactError("calendar source catalog is not a regular file")
     try:
@@ -271,21 +363,9 @@ def load_catalog(path: Path) -> tuple[dict, list[dict]]:
                 "options": options,
             }
         )
-    hkjc_seasons: dict[int, set[int]] = {}
-    for source in normalized:
-        if source["parser"] != "hkjc_pattern":
-            continue
-        hkjc_seasons.setdefault(source["edition_year"], set()).add(
-            source["options"]["season_end_year"]
-        )
-    for edition_year, season_end_years in sorted(hkjc_seasons.items()):
-        expected = {edition_year, edition_year + 1}
-        if season_end_years != expected:
-            raise CalendarArtifactError(
-                "HKJC pattern sources must cover both seasons for natural year "
-                f"{edition_year}: expected {sorted(expected)}"
-            )
-    return payload, sorted(normalized, key=lambda row: row["id"])
+    normalized = sorted(normalized, key=lambda row: row["id"])
+    hkjc_coverage_policy(normalized, hkjc_cutoff_date=hkjc_cutoff_date)
+    return payload, normalized
 
 
 def _fsync_tree(root: Path) -> None:
