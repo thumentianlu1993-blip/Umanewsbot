@@ -1,18 +1,13 @@
 # 项目状态文档
 
-## 2026-07-15 Codex 原生工作流迁移待审核
+## 2026-07-15 Codex 原生工作流迁移已进入 `main`
 
-- durable change 为 `docs/changes/codex-native-workflow-migration/`；本地治理变更尚未发布。
-- 已建立 review fingerprint 与 workflow contract 验证：fingerprint `24/24`、transition/index `10/10`、workflow contract tests `26/26` 已通过；base/commit 只接受 clean tree，发布前未提交改动统一走 `--uncommitted`。
-- 新流程已在本地工作树补齐实际原生 review、既有在途任务安全检查点迁移、全 subagent 静默和有限发布收尾；尚未 commit、push、合并、部署或写生产。
-- 任意 subagent active 时主代理只能派新 subagent 或等待/接收结果。同一需求首次方案审核与首次代码审核各建立 reviewer 会话，后续复审复用各自原会话；仅会话不可恢复时新建并记录原因与交接。
-- 复审只核对上轮具体漏洞、对应修复和直接触及路径；仅该漏洞的直接 P0/P1 回归可新增阻塞，其他新发现记为后续建议后结束。CLI/subagent 原生 review 固定内层只读，completed/exit 0 不等于门禁通过。
-- 发布门只要求最新成功审核后取得本任务用户明确授权，且实际发布内容与受审内容一致；staging 前完整 fingerprint 必须不变，显式 stage 后只允许经 approved parent/clean/content hash 校验的 status/index 表示变化。本迁移仍未发布。
-- `.codex/agents/reviewer.toml` 已同步相同动态 freeze 规则，checker 有独立 mutation 防止其退回手工路径列举或部分 fingerprint。
-- 活跃 `grill-me-codex` 已改为 Codex 原生只读一问一答探索；旧 Claude/nested review 版本完整归档，不再主动调用。
-- 旧 OpenSpec “下一步”交接已由新流程取代；既有任务不伪造历史 RED、不重做已完成生产动作，只对安全检查点后的剩余行为按测试先行、subagent 实现和同一需求既有 reviewer 会话推进。
-- 新任务规格目录为 `docs/changes/<slug>/`；本迁移五份 durable artifacts 已补齐并记录 bootstrap 例外与真实 RED/GREEN。既有 OpenSpec artifacts 和本文后续旧流程叙述仅作历史/在途上下文，不再构成现行执行指令。
-- 本需求方案 reviewer 已按限定范围复审并返回 `APPROVED`；代码 reviewer 当前仍为 `REVISE`，三项 actionable finding 的候选修复待同一代码 reviewer 会话复审。不得声称代码 review 已通过；本迁移尚未发布。
+- durable change 位于 `docs/changes/codex-native-workflow-migration/`；方案审核与代码审核均为 `APPROVED`，用户在最新成功代码 review 后回复“确认上线”。
+- 受审 feature commit `55b6cebc14eef067c929b01ce3cea5515416c5ef` 已通过 [PR #10](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/10) 合并到远端 `main@96810fcc288f92b41971f4f825105732967798c2`。merge parents 为 `d6d6f58b...`、`55b6cebc...`，merge tree 与受审 feature tree 一致。
+- 本迁移五份 durable artifacts 已随 PR 合并；发布验证为 fingerprint `24/24`、transition/index `10/10`、workflow contract tests `26/26`，workflow checker 与 `git diff --check` 通过。
+- 本次仅发布仓库治理文档、skills/agents/scripts 和历史 skill 归档，不含 Django/runtime config/migration/生产数据变化；未构建或部署生产镜像，未重启、重建、迁移生产容器，线上业务运行态保持不变。
+- 本次验收以远端 `main` 合并完成为准，无需生产部署。发布证据和回滚方式记录在 `docs/changes/codex-native-workflow-migration/release_report.md`。
+- 原合并前记录中的“尚未发布”状态现已由上述 `main` 合并证据取代，不表示当前仍未发布。
 
 ## 2026-07-15 batch006 五地区详情抓取冲刺
 

@@ -1,16 +1,15 @@
 # 当前状态
 
-## 2026-07-15 Codex 项目工作流迁移已写入工作树，尚未发布
+## 2026-07-15 Codex 项目工作流迁移已合并主线（无需生产镜像部署）
 
-- 项目主流程已改为“探索 -> spec/design -> 方案审核 -> 测试先行 -> 子代理实现 -> reviewer 会话 `/review` -> 用户授权后发布”；细则写入 `AGENTS.md` 和 `docs/codex_workflow.md`。
-- 同一需求首次方案审核与首次代码审核各建立 reviewer 会话；后续复审分别复用原 reviewer 的同一会话与上下文。只有会话不可恢复时才新建，并记录原因、上轮 findings 与交接。复审只核对上轮具体漏洞、对应修复和直接触及路径；仅该漏洞的直接 P0/P1 回归可新增阻塞，其他新发现记为后续建议后结束。
-- CLI/subagent 审核强制内层 `sandbox_mode="read-only"`；fingerprint `24/24`、transition/index `10/10`、workflow contract tests `26/26` 已通过。成功 review 记录 approved parent/content hash，授权后 staging 前完整 fingerprint 必须不变；显式 stage 后只允许经校验的 status/index 表示变化。completed/exit 0 仍不等于审核门禁通过。
-- 新任务使用 Codex 原生只读调研与规划能力，规格落在 `docs/changes/<slug>/`；高风险或需求不清时可使用已重建的 Codex 原生只读 `grill-me-codex`（一问一答、先查仓库、不写 plan/spec、不启动 nested review），方案审核无通用原生 skill 时回退 `plan-eng-review`。旧 Claude 双阶段版本已完整归档。
-- 任意 subagent active 时主代理只能派新 subagent 或等待/接收结果。开发前须取得有效 RED；仅不改变运行时行为的纯文档/纯配置整理可豁免，flags、队列/路由、权限、依赖、容器/部署顺序和数据行为配置均不得豁免。
-- `openspec-explore/propose/apply-change/archive-change/sync-specs` 与 OpenSpec workflow-spine 已列为禁用。既有 OpenSpec artifacts 仅保留作历史/在途上下文，不再作为新流程门禁。
-- 既有在途任务在当前原子操作/安全检查点后切换：读取现存规格，补齐或更新 `test_cases.md`，只对尚未实现行为取得真实 RED，再由 subagent 实现并复用该需求既有代码 reviewer 会话审核；若尚无代码 reviewer 会话才首次建立；不伪造历史 RED、不重做已完成生产动作。
-- 本次迁移的五份 durable artifacts（含 `rollout.md`）已补入 `docs/changes/codex-native-workflow-migration/`；其中诚实记录最早编辑发生时新流程/目录尚不存在的 bootstrap 边界、helper/contract checker 真实 RED/GREEN 和各已知 task/worktree 的安全迁移方式。迁移仍只存在于本地工作树，尚未 commit、push、合并、创建 PR、部署或写入生产。
-- 本需求方案 reviewer 已按限定范围复审并返回 `APPROVED`。代码 reviewer 当前仍为 `REVISE`；三项 actionable finding 已形成候选修复，但必须回到同一代码 reviewer 会话复审后才可声称代码 review 通过。本迁移仍未发布，也没有有效发布授权。
+- Codex 原生工作流迁移已完成方案审核与代码审核，结论均为 `APPROVED`；用户在最新成功代码 review 后明确回复“确认上线”。
+- 受审 feature commit 为 `55b6cebc14eef067c929b01ce3cea5515416c5ef`；PR 为 [#10](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/10)。变更已提交、推送并合并到远端 `main@96810fcc288f92b41971f4f825105732967798c2`。
+- merge commit 的两个 parent 分别为原主线 `d6d6f58b...` 与受审 feature `55b6cebc...`；merge tree 与受审 feature tree 一致，实际进入 `main` 的内容未偏离审核范围。
+- 发布前验证通过：fingerprint `24/24`、transition/index `10/10`、workflow contract tests `26/26`，workflow checker 与 `git diff --check` 均通过。
+- 本次范围仅包括治理文档、Codex skills/agents/scripts 与历史 skill 归档；没有 Django 业务代码、runtime 配置、数据库 migration 或生产数据变化。
+- 本次“上线”以仓库主线合并为验收口径：未构建或部署生产镜像，未重启、重建或迁移生产容器，也未直接修改生产。线上业务运行态不因本变更改变，因此无需生产部署动作。
+- 原合并前记录中的“尚未发布”状态现已由上述 `main` 合并证据取代，不表示当前仍未发布。
+- 完整发布证据与回滚口径见 `docs/changes/codex-native-workflow-migration/release_report.md`。
 
 ## 2026-07-15 batch006 本地详情冲刺进行中，生产写入暂停
 
