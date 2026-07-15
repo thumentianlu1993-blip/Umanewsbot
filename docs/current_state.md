@@ -7,7 +7,8 @@
 - 新增正式 source bundle 打包器、迁移 `0032_historical_race_detail_import_receipt`、原子 chunk importer、receipt reconcile/verifier。打包器严格锁定 39 个正式 package 的 4930-target 并集；导入 receipt 固定 bundle/chunk/runner/target 身份，业务写入与 COMPLETED receipt 同事务提交，STARTED/ABANDONED 可审计且不可静默重用。
 - 2026 descriptor 导入现在逐 target 校验 ID/SHA/inventory，并强制 `draft + incomplete + is_featured=false`；任一行失败会连同 alias、操作日志和任务日志整批回滚。chunk 子命令必须同时匹配私有 owner token、run/global lock、有效租约、artifact root、current step 与 plan 输入，并只验 receipt 记录的本次 APPLIED candidate。
 - 覆盖政策按 `docs/historical_race_data_coverage_policy.md` 执行：日本、香港历史范围继续 hard；英法美截至 2024 年 G1 hard、G2/G3 best-effort；2025 年及以后五地区正式范围独立记账。remaining artifact 当前为 `28126` targets，其中 `8857 historical hard / 18173 historical best-effort / 1096 new formal`；existing complete/gap 继续复用，不倒退、不重跑。
-- 首次代码 review 的 7 项问题已修复并在同一 reviewer 会话复审为 `NO ACTIONABLE FINDINGS / APPROVED`。主会话聚焦回归 `148/148`、Django check 和 `makemigrations --check --dry-run` 通过。当前尚未提交、构建新生产镜像、应用 `0032` 或导入这 4652 场详情；正式不可变 bundle 生成后仍须取得当前任务的明确发布授权，再执行备份、迁移、dry-run、串行 apply 和逐目标 verifier。历史公开、常驻网络和常驻写入继续关闭。
+- 首次代码 review 的 7 项问题已修复并在同一 reviewer 会话复审为 `NO ACTIONABLE FINDINGS / APPROVED`。主会话聚焦回归 `148/148`、Django check 和 `makemigrations --check --dry-run` 通过；源码提交为 `6b1bcb6a`，已推送到 `origin/codex/fix-historical-exhausted-region-progress`。
+- 正式不可变 bundle 已生成在 `runtime/historical_plan_exports/detail-import-bundle-v1`，约 `608M`；顶层 `manifest.json` SHA-256 为 `dfb86ee85b103688fe1521b07f44ee8f36669d25e85ff3ac2b580a66b38e14d9`，source objects 为 `4652` 个、`525258402` bytes，全部 validations 为 true。当前尚未构建新生产镜像、应用 `0032` 或导入这 4652 场详情；仍须取得当前任务的明确发布授权，再执行备份、迁移、dry-run、串行 apply 和逐目标 verifier。历史公开、常驻网络和常驻写入继续关闭。
 
 ## 2026-07-16 France runner v2 单目标本地 smoke 在 preflight 安全停止
 

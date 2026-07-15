@@ -2,6 +2,8 @@
 
 ## 待授权：历史详情 source bundle 与 0032 串行导入
 
+正式输入固定为 `/opt/umanewsbot/runtime/historical_race_detail_import/detail-import-bundle-v1` 的待上传副本；本地原件为 `runtime/historical_plan_exports/detail-import-bundle-v1`，约 `608M`，顶层 `manifest.json` SHA-256 为 `dfb86ee85b103688fe1521b07f44ee8f36669d25e85ff3ac2b580a66b38e14d9`。上传后必须先逐文件复核 manifest 绑定的 size/SHA，不能只比较目录大小。
+
 1. 本阶段只接受正式 bundle 的不可变 manifest。范围必须严格为 39 个正式 package 的 `4930` 个目标，结果必须为 `4652 complete / 278 gap`、`51191 runners / 48413 results`；截至 2024 年 `4351/214/18 chunks`，2026 到期范围 `301/64/2 chunks`。任一计数、输入 SHA、source object 或 validation 漂移立即停止。
 2. 发布前必须使用最新 `main` 构建可复现 AMD64 镜像；部署迁移 `0032_historical_race_detail_import_receipt` 前生成新的 custom-format 数据库备份，记录路径、bytes、SHA-256 并用匹配 PostgreSQL 主版本执行 `pg_restore -l`。不得复用旧备份作为本次写前证据。
 3. 每个 chunk 先在持有 HistoricalBatchRun 全局租约的 runner 内执行 dry-run，再执行 apply。私有 owner token 只能通过受保护环境传递；子命令必须匹配 run/global lock、artifact root、current step 与 plan 输入，token 不得写入 CLI、日志、receipt 或报告。

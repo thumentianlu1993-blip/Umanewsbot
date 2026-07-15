@@ -5,7 +5,7 @@
 - batch006 生产终态保持 `1061 accounted / 1042 complete / 19 gap`，不倒退、不重跑。新一轮本地产物已收敛为 `4930 = 4652 complete + 278 gap`，含 `51191 runners / 48413 results`；截至 2024 年拆为 18 个 chunk，2026 到期范围拆为 2 个 chunk。
 - source bundle、独立 receipt/迁移 `0032`、原子 chunk importer、租约 fencing、2026 descriptor 安全落库和逐 candidate verifier 已完成测试优先实现。聚焦回归 `148/148`、Django check、migration drift 通过；同一 reviewer 会话最终结论为 `NO ACTIONABLE FINDINGS / APPROVED`。
 - 新覆盖政策不删除既有总账：remaining `28126` targets 分为 `8857 historical hard / 18173 historical best-effort / 1096 new formal`。日本和香港继续 hard；英法美截至 2024 年 G1 hard，G2/G3 gap 单独报告但不阻断历史 hard 验收；2025 年以后五地区正式范围独立推进。
-- 当前仅完成本地代码与临时 full smoke，4652 场尚未写入生产。下一步是提交推送、生成正式不可变 bundle；取得当前发布授权后，才进行生产备份、`0032`、新镜像、逐 chunk dry-run/apply/verifier。历史公开开关继续关闭。
+- 源码已提交为 `6b1bcb6a` 并推送；正式不可变 bundle 位于 `runtime/historical_plan_exports/detail-import-bundle-v1`，约 `608M`，顶层 manifest SHA-256 为 `dfb86ee85b103688fe1521b07f44ee8f36669d25e85ff3ac2b580a66b38e14d9`，全部 validations 为 true。4652 场仍尚未写入生产；取得当前发布授权后，才进行生产备份、`0032`、新镜像、逐 chunk dry-run/apply/verifier。历史公开开关继续关闭。
 
 ## 2026-07-16 France runner v2 单目标 smoke 待重新生成 descriptor
 
