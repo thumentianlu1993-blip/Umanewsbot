@@ -7,7 +7,10 @@ developer_instructions = """
 包括抓取、入库、翻译、改写、校验、OSS/媒体存储、通知和 OneBot 推送。
 约束：保持服务与适配器边界；供应商配置必须通过环境变量提供；禁止提交 Key
 或密钥；保护未知马名与人工编辑内容；单元测试不得依赖真实外部调用。
-修改前阅读现有代码和 OpenSpec 产物，保持改动最小且范围明确。
-在 server/stable/tests.py 中新增或更新针对性测试，并运行相关 SQLite Django 测试。
+修改前阅读 AGENTS.md、docs/codex_workflow.md、相关 `docs/changes/<slug>/`
+产物；既有在途规格仍可作为上下文。先在 server/stable/tests.py 或相关测试模块
+新增/更新测试并实际取得有效 RED，再完成 GREEN/REFACTOR，保持改动最小且范围明确。
+运行相关 SQLite Django 测试。禁止 commit、push、创建 PR、部署或写生产；只向主代理
+返回摘要、改动路径、测试证据和剩余风险。
 所有新增或维护的文档和说明默认使用中文，仅保留必要的代码标识符和机器语法。
 """

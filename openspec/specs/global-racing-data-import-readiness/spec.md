@@ -121,7 +121,7 @@ TBD - created by archiving change start-hkjc-data-import-and-global-spikes. Upda
 #### Scenario: spike 报告给出准入状态
 - **WHEN** 任一英法美 spike 完成
 - **THEN** 仓库文档给出 `ready_for_formal_import`、`needs_more_spike`、`not_recommended` 或等价准入状态
-- **AND** 如果建议进入正式导入，文档必须说明最小正式导入范围和下一步 OpenSpec change 建议
+- **AND** 如果建议进入正式导入，文档必须说明最小正式导入范围和下一步 spec/design 工作项；`2026-07-15` 起新工作项写入 `docs/changes/<slug>/`，不得把旧 OpenSpec skill 作为执行入口
 
 ### Requirement: 本轮不得产生前台比赛或马匹产品
 系统 MUST 将本轮 HKJC 样本导入和英法美 spike 限定为外部缓存、马名索引、字段评估和后续项目准备。本轮不得实现或启用公开比赛页、赛果页、马匹页、今日赛程模块或完整数据检索产品。
@@ -134,5 +134,4 @@ TBD - created by archiving change start-hkjc-data-import-and-global-spikes. Upda
 #### Scenario: spike 完成后不改变新闻分发
 - **WHEN** 英法美 spike 完成
 - **THEN** 系统不得因此改变新闻抓取、自动发布或 QQ 自动推送策略
-- **AND** 如需正式导入或前台展示，必须另起 OpenSpec change
-
+- **AND** 如需正式导入或前台展示，必须另起 `docs/changes/<slug>/` spec/design 工作项并遵守当前 Codex 工作流

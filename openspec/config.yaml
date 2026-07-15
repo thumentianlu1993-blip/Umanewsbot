@@ -1,3 +1,6 @@
+# Legacy compatibility only. New work follows AGENTS.md and docs/codex_workflow.md.
+# Existing OpenSpec artifacts remain readable, but OpenSpec skills, CLI phases,
+# journal and workflow-spine are not gates for new work.
 schema: spec-driven
 
 context: |
@@ -38,8 +41,9 @@ context: |
   - 除非已批准的规格明确要求，否则保留 Django 单体与 Docker Compose 架构，
     不做无关重构。
   - 生产结论必须区分仓库预期与服务器真实 commit、环境变量、容器配置和日志。
-  - 不手工修改生成的 `.codex/skills/openspec-*` 文件。
-  - Codex 新增或维护的仓库文档、OpenSpec 产物和代理说明默认使用中文；
+  - 本配置仅兼容既有 OpenSpec artifacts；新任务使用 `docs/changes/<slug>/`
+    与 `docs/codex_workflow.md`，不得调用 openspec 系列 skills。
+  - Codex 新增或维护的仓库文档、规格设计产物和代理说明默认使用中文；
     仅保留命令、代码标识符以及工具要求的机器语法。
 
   构建、运行与测试命令：
@@ -73,7 +77,8 @@ context: |
 rules:
   tasks:
     - "每项任务必须使用领域前缀：(application)、(integration) 或 (operations)。"
-    - "任务顺序必须先实施，后验证。"
+    - "任务顺序必须先编写并运行测试取得有效 RED，再实现至 GREEN/REFACTOR，最后完成验证。"
+    - "本配置仅兼容历史或在途 OpenSpec artifacts，不得把 OpenSpec CLI、phase、journal 或 workflow-spine 作为新任务门禁。"
     - "(application) 负责 server/app/、server/stable/models.py、migrations/、views.py、forms.py、urls.py、api_urls.py、templates/、static/、tasks.py、management/commands/ 和 server/stable/tests.py。"
     - "(integration) 负责 server/stable/adapters/ 和 server/stable/services/ 下的外部集成与领域服务工作。"
     - "(operations) 负责 Dockerfile、docker-compose*.yml、deploy*.sh、deploy/、.env.example 文档和 docs/ 下的部署运维文档。"
