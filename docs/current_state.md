@@ -24,6 +24,17 @@
 - `discover` 在 launcher 的宿主 preflight 以 `mount contract mismatch for run` fail closed，退出码为 `2`，发生在 `docker run` 和真实网络请求之前。按失败即停规则未运行 `cache / parse / validate / package`；请求数、缓存字节和阶段产物均为 `0`，无 checkpoint、request log、package manifest 或残留容器。
 - 后续须由计划生成侧提供绑定上述独立 run root/共享 host lock 的新不可变 descriptor，或经明确审批改用当前 descriptor 原路径，再从 `discover` 重新开始；不得手工修改 descriptor 绕过身份门禁。
 
+## 2026-07-15 Codex 项目工作流迁移已合并主线（无需生产镜像部署）
+
+- Codex 原生工作流迁移已完成方案审核与代码审核，结论均为 `APPROVED`；用户在最新成功代码 review 后明确回复“确认上线”。
+- 受审 feature commit 为 `55b6cebc14eef067c929b01ce3cea5515416c5ef`；PR 为 [#10](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/10)。变更已提交、推送并合并到远端 `main@96810fcc288f92b41971f4f825105732967798c2`。
+- merge commit 的两个 parent 分别为原主线 `d6d6f58b...` 与受审 feature `55b6cebc...`；merge tree 与受审 feature tree 一致，实际进入 `main` 的内容未偏离审核范围。
+- 发布前验证通过：fingerprint `24/24`、transition/index `10/10`、workflow contract tests `26/26`，workflow checker 与 `git diff --check` 均通过。
+- 本次范围仅包括治理文档、Codex skills/agents/scripts 与历史 skill 归档；没有 Django 业务代码、runtime 配置、数据库 migration 或生产数据变化。
+- 本次“上线”以仓库主线合并为验收口径：未构建或部署生产镜像，未重启、重建或迁移生产容器，也未直接修改生产。线上业务运行态不因本变更改变，因此无需生产部署动作。
+- 原合并前记录中的“尚未发布”状态现已由上述 `main` 合并证据取代，不表示当前仍未发布。
+- 完整发布证据与回滚口径见 `docs/changes/codex-native-workflow-migration/release_report.md`。
+
 ## 2026-07-15 batch006 本地详情冲刺进行中，生产写入暂停
 
 - batch006 年度赛历 1061 场已全部记账：`1050 complete / 11 gap`，accounted rate `100%`、data complete rate `98.96%`。两个日本 gap 为东京大赏典需要 NAR/Oi 来源；九个美国 gap 为障碍赛、同名冲突或未举办判断，全部进入最终统一审核，不阻断其他分片。
@@ -350,7 +361,7 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 
 `2026-07-10` 已将马匹详情页 MVP 最后一轮前台体验修复和两匹样本马资料上线到 UmaNews 生产服务器 `root@47.239.167.86:/opt/umanewsbot`，最终生产 `HEAD=65988b0`。本次只使用 UmaNews 服务器，未使用其他项目服务器。部署前备份 `.env.backup.horse-public-polish-20260710_010639` / `backups/db/pre-horse-public-polish-20260710_010639.sql.gz`，样本写入前备份 `backups/db/pre-horse-sample-profiles-20260710_011038.sql.gz`，移动样式修复前备份 `.env.backup.horse-mobile-polish-20260710_011811` / `backups/db/pre-horse-mobile-polish-20260710_011811.sql.gz`，均已 `gzip -t`。已发布 `春秋分` `/horses/13113/` 与 `北十字星` `/horses/3873/`，来源为用户指定 netkeiba 页面 `https://db.netkeiba.com/horse/2019105219/` 与 `https://db.netkeiba.com/horse/2022105102/`；两匹马均为 `published`、`complete_pedigree_2gen`，参赛履历分别为 `10` / `11` 条，相关新闻人工关联各 `5` 篇。浏览器验收覆盖：详情页二代血统、主胜鞍、参赛履历、相关新闻、新闻详情马匹 tag 点击、匿名关注/取消关注、关注页新闻流、`croix` / `EQUINOX` 大小写搜索、移动端一级导航和地区筛选布局；测试关注已清理，最终 `HorseFollow` 样本计数为 `0`。生产 `manage.py check`、本地和公网 `/healthz/` 均通过。
 
-`2026-07-10` 已为 P0 马资料补全专项新建独立 worktree `/Users/mentianlu/.codex/worktrees/p0-horse-info-completion/umanews`，分支 `codex/p0-horse-info-completion`，并从 `origin/main` 快进对齐旧线程最终提交 `d78fab0`（其中生产运行代码为 `65988b0`，`d78fab0` 为文档验收记录）。已创建并经 `/grill-me` 需求追问重写 OpenSpec change `complete-p0-horse-profile-data`：新版 P0 马范围为“当前 active 且有中文译名的 horse `TermEntry` + 日本/中国香港/英国/法国/美国全部历史与未来重点赛事参赛马”，重点赛事等级严格限定为 `G1/G2/G3/J-G1/J-G2/J-G3/JpnⅠ/JpnⅡ/JpnⅢ`；暂无中文译名的 P0 马允许进入补全、ready 和人工发布，翻译命中时必须保留原文而不做空中文替换。首批验收口径已改为五大地区各 10 匹完整资料马，完整资料硬门槛包含身份/P0 来源证据、基础事实字段、二代血统、完整赛事履历、主胜鞍、来源 URL、赛马生涯/同步状态和人工审核记录，`intro`、相关新闻和站内相关赛事链接不作为硬门槛。已重新执行 `plan-eng-review`（Full mode，session 2，2 个问题已修复），补充了退役/在役履历同步状态与 `docs/decisions.md` 回写任务；`.openspec.yaml` 当前 `phase=reviewed`。已通过 `openspec validate complete-p0-horse-profile-data --strict`；本 change 尚未进入代码实现或生产执行，下一步可运行 `/openspec-apply-change complete-p0-horse-profile-data` 按 tasks 从 P0 来源模型、无译名术语、范围同步、五地区 adapter、artifact/commit 门禁和后台筛选逐步实现。
+`2026-07-10` 已为 P0 马资料补全专项新建独立 worktree `/Users/mentianlu/.codex/worktrees/p0-horse-info-completion/umanews`，分支 `codex/p0-horse-info-completion`，并从 `origin/main` 快进对齐旧线程最终提交 `d78fab0`（其中生产运行代码为 `65988b0`，`d78fab0` 为文档验收记录）。已创建并经 `/grill-me` 需求追问重写 OpenSpec change `complete-p0-horse-profile-data`：新版 P0 马范围为“当前 active 且有中文译名的 horse `TermEntry` + 日本/中国香港/英国/法国/美国全部历史与未来重点赛事参赛马”，重点赛事等级严格限定为 `G1/G2/G3/J-G1/J-G2/J-G3/JpnⅠ/JpnⅡ/JpnⅢ`；暂无中文译名的 P0 马允许进入补全、ready 和人工发布，翻译命中时必须保留原文而不做空中文替换。首批验收口径已改为五大地区各 10 匹完整资料马，完整资料硬门槛包含身份/P0 来源证据、基础事实字段、二代血统、完整赛事履历、主胜鞍、来源 URL、赛马生涯/同步状态和人工审核记录，`intro`、相关新闻和站内相关赛事链接不作为硬门槛。已重新执行 `plan-eng-review`（Full mode，session 2，2 个问题已修复），补充了退役/在役履历同步状态与 `docs/decisions.md` 回写任务；`.openspec.yaml` 当前 `phase=reviewed`。已通过 `openspec validate complete-p0-horse-profile-data --strict`；本 change 尚未进入代码实现或生产执行。原“下一步运行 openspec apply skill”的交接已被 `2026-07-15` 新流程取代：在安全检查点读取现存规格，补齐/更新测试用例，对未实现行为取得真实 RED 后交给 subagent 实现，再由同一需求既有代码 reviewer 会话复审。
 
 `2026-07-10` 已按测试先行方式为 `complete-p0-horse-profile-data` 在 `server/stable/tests.py` 新增 RED 用例。覆盖暂无中文译名马名术语的识别/原文保留/校验阻断、五大地区重点赛事参赛马进入 P0 queue、非重点等级排除、完整资料硬门槛、在役马履历同步窗口、人工审核 artifact 幂等入库、完整后仍需人工首次发布、公开页不得触发 P0 同步/补全，以及无中文译名公开页使用原文并提示中文译名待补。本轮未实现产品代码，故未勾选 OpenSpec tasks；新增测试预期在实现前失败。当前本地仅完成 `python3 -m py_compile server/stable/tests.py` 与 `git diff --check`；Django 定向测试因当前可用 Python 环境缺少 `django` 依赖未能运行。
 
@@ -503,12 +514,11 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - 支持一致性校验、批量自动发布、自动化日志与通知日志
   - 后台候选池、详情页、编辑台、日志页已展示自动化状态与决策留痕
   - 前台展示优先级已调整为人工稿优先，其次改写稿，最后基准翻译稿
-- OpenSpec + Codex 工作流已完成仓库级配置：
-  - `openspec/config.yaml` 记录真实项目上下文、验证命令和任务域路由
-  - `.codex/skills/openspec-*` 提供提案、实现、同步与归档技能
-  - `.codex/skills/plan-eng-review` 提供实现前工程计划审查入口；`tdd` 与 `workflow-spine` 作为其配套审查约束与流程参考
-  - `.codex/agents/` 提供 `application / integration / operations` 领域代理与只读安全审查代理
-  - `AGENTS.md` 已补充规格驱动开发与子代理使用约定
+- Codex 原生工作流已完成仓库级规则配置：
+  - `AGENTS.md` 与 `docs/codex_workflow.md` 定义探索、持久 spec/design、测试先行、subagent 实现、独立 `/review` 和发布授权门禁
+  - 新任务持久产物写入 `docs/changes/<slug>/`；`.codex/skills/plan-eng-review` 仅在缺少通用原生方案审核能力时作为 fallback
+  - `.codex/agents/` 提供 `application / integration / operations` 实现代理，以及 `reviewer / security-scanner` 只读审核代理
+  - `openspec/config.yaml` 与既有 OpenSpec artifacts 只作 legacy 兼容；相关 skills、workflow-spine、CLI phase 和 journal 不再是新流程入口或门禁
 - 专有术语候选发现与待标注池已完成：
   - 支持马名、比赛名、骑手名和马主名发现
   - 支持候选去重、证据聚合、工作人员审核和安全写入正式术语
@@ -1299,12 +1309,12 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - `/grill-me` Q20 已确认选择 A：赛事日历增加年份筛选和赛事名称搜索，结果进入现有年度详情页；不新增系列页，也不要求按短窗口连续翻到 1984 年。
 - `/grill-me` Q21 已确认选择 A：哈希锁定 artifact 是审批与 apply 唯一凭证；后台增加按地区/年代/系列/状态/冲突查看的汇总入口，但不得绕过 artifact 直接批量写入。
 - `/grill-me` Q22 已确认选择 A：质量达标且 published 的历史年度赛事允许搜索引擎收录并进入分片 sitemap；draft、身份冲突、资料不足和 not_held 不收录。
-- 本轮 `/grill-me` 已完成关键产品分支确认，下一步进入 OpenSpec design、delta specs 和 tasks 编写。
-- `backfill-race-events-to-1984` 已完成两轮 Full `/plan-eng-review`，最终 APPROVED；随后已创建 `test_cases.md`，共 160 个唯一测试用例，覆盖范围、系列/迁移、年度状态机、来源权威、artifact、五地区 adapter、批次、导入、公开页面、运维和非目标回归。OpenSpec change strict、全量 22 项和 `git diff --check` 均通过。当前按用户流程进入 `/opsx:apply`，尚未上线、触网或写生产历史赛事。
+- 本轮 `/grill-me` 当时已完成关键产品分支确认，后续也已完成旧 OpenSpec design、delta specs 和 tasks 编写；这是一条历史进度记录，不是现行下一步。`2026-07-15` 起剩余工作按本文件顶部的新流程迁移。
+- `backfill-race-events-to-1984` 已完成两轮 Full `/plan-eng-review`，最终 APPROVED；随后已创建 `test_cases.md`，共 160 个唯一测试用例，覆盖范围、系列/迁移、年度状态机、来源权威、artifact、五地区 adapter、批次、导入、公开页面、运维和非目标回归。OpenSpec change strict、全量 22 项和 `git diff --check` 均通过。历史上曾按旧流程进入 apply 阶段；该交接已由 `2026-07-15` 新流程取代，后续从安全检查点读取现存规格并只对未实现行为补真实 RED，再由 subagent 实现并复用同一需求既有 reviewer 会话审核。此处不伪造既往 RED，也不重做已完成生产动作。
 
 ## 2026-07-12 历史赛事回填 apply 第一阶段
 
-- `backfill-race-events-to-1984` 已进入 `/opsx:apply`，当前仅完成本地模型、迁移和只读 inventory 基础能力；尚未部署、触网、提交历史总账或创建历史年度赛事。
+- `backfill-race-events-to-1984` 的旧 apply 阶段当时仅完成本地模型、迁移和只读 inventory 基础能力；尚未部署、触网、提交历史总账或创建历史年度赛事。后续执行以 `2026-07-15` 新流程为准，不再把旧命令作为可执行下一步。
 - 新增稳定系列、历史名称、系列关系和年度应到总账模型；`RaceEvent.race_series` 为 nullable，旧 `series_key` 和公开 slug 保持兼容。赛果新增独立 `official_finish_position`，迁移会优先读取旧 `source_refs` 官方名次并回退存储顺序，历史冠军唯一约束已支持并列冠军。
 - 新增离线 `build_historical_race_inventory`：默认只生成 series/target/conflict/gap/summary/manifest/approval artifact；commit 必须开启功能开关并验证批准人、时间、manifest SHA 和全部文件 SHA，且 commit 阶段不重新生成输入、不触网。
 - 已实现字段级来源权威合并、同级冲突阻断、人工锁保护、系列关系防环、名称模糊匹配只进待审、双状态转换、永久缺档独立双来源校验和 accounted/data-complete 分开统计。
