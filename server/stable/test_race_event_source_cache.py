@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -267,6 +268,39 @@ class RaceEventSourceCacheTests(SimpleTestCase):
 
         self.assertEqual(sum(outcomes), 10)
         self.assertEqual(state["request_count"], 10)
+
+    def test_separate_shard_budgets_share_one_host_request_interval(self):
+        budget = _load_budget_module()
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            common = {
+                "RACE_EVENT_CRAWL_MAX_REQUESTS": "10",
+                "RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS": "0.05",
+                "RACE_EVENT_CRAWL_HOST_INTERVAL_ARTIFACT": str(root / "host-interval.json"),
+            }
+            with patch.dict(
+                os.environ,
+                {**common, "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT": str(root / "shard-a.json")},
+                clear=False,
+            ):
+                budget.before_network_request("https://source.test/a")
+            started = time.monotonic()
+            with patch.dict(
+                os.environ,
+                {**common, "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT": str(root / "shard-b.json")},
+                clear=False,
+            ):
+                budget.before_network_request("https://source.test/b")
+            elapsed = time.monotonic() - started
+
+            host_state = json.loads((root / "host-interval.json").read_text(encoding="utf-8"))
+            shard_a = json.loads((root / "shard-a.json").read_text(encoding="utf-8"))
+            shard_b = json.loads((root / "shard-b.json").read_text(encoding="utf-8"))
+
+        self.assertGreaterEqual(elapsed, 0.04)
+        self.assertEqual(host_state["request_count"], 2)
+        self.assertEqual(shard_a["request_count"], 1)
+        self.assertEqual(shard_b["request_count"], 1)
 
 
 class RaceEventSafeHttpTests(SimpleTestCase):

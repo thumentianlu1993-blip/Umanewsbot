@@ -30,6 +30,11 @@ def _artifact_path() -> Path | None:
     return Path(value) if value else None
 
 
+def _host_interval_artifact_path() -> Path | None:
+    value = os.environ.get("RACE_EVENT_CRAWL_HOST_INTERVAL_ARTIFACT", "").strip()
+    return Path(value) if value else None
+
+
 def _read_state(path: Path | None) -> dict:
     if path is None or not path.exists():
         return {"request_count": 0, "requests": []}
@@ -63,10 +68,42 @@ def _budget_lock(path: Path | None):
         yield
 
 
+def _reserve_interval(path: Path, *, interval: float, url: str, method: str) -> float:
+    with _budget_lock(path):
+        state = _read_state(path)
+        last_started = float(state.get("last_request_started_at_epoch") or 0.0)
+        remaining = interval - (time.time() - last_started)
+        if remaining > 0:
+            time.sleep(remaining)
+        started_epoch = time.time()
+        request_count = int(state.get("request_count") or 0) + 1
+        requests = state.get("requests") if isinstance(state.get("requests"), list) else []
+        requests.append(
+            {
+                "sequence": request_count,
+                "method": method,
+                "url": url,
+                "started_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        state.update(
+            {
+                "status": "active",
+                "request_interval_seconds": interval,
+                "request_count": request_count,
+                "last_request_started_at_epoch": started_epoch,
+                "requests": requests[-200:],
+            }
+        )
+        _write_state(path, state)
+        return started_epoch
+
+
 def before_network_request(url: str, *, method: str = "GET") -> None:
     max_requests = _max_requests()
     interval = _request_interval()
     path = _artifact_path()
+    host_interval_path = _host_interval_artifact_path()
     with _budget_lock(path):
         state = _read_state(path)
         request_count = int(state.get("request_count") or 0)
@@ -84,12 +121,19 @@ def before_network_request(url: str, *, method: str = "GET") -> None:
                 f"race event crawl request budget exhausted: {request_count}/{max_requests}"
             )
 
-        last_started = float(state.get("last_request_started_at_epoch") or 0.0)
-        remaining = interval - (time.time() - last_started)
-        if remaining > 0:
-            time.sleep(remaining)
-
-        started_epoch = time.time()
+        if host_interval_path is not None and host_interval_path != path:
+            started_epoch = _reserve_interval(
+                host_interval_path,
+                interval=interval,
+                url=url,
+                method=method,
+            )
+        else:
+            last_started = float(state.get("last_request_started_at_epoch") or 0.0)
+            remaining = interval - (time.time() - last_started)
+            if remaining > 0:
+                time.sleep(remaining)
+            started_epoch = time.time()
         requests = state.get("requests") if isinstance(state.get("requests"), list) else []
         requests.append(
             {

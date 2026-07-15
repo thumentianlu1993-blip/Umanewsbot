@@ -5,8 +5,11 @@
 - batch006 年度赛历 1061 场已全部记账：`1050 complete / 11 gap`，accounted rate `100%`、data complete rate `98.96%`。两个日本 gap 为东京大赏典需要 NAR/Oi 来源；九个美国 gap 为障碍赛、同名冲突或未举办判断，全部进入最终统一审核，不阻断其他分片。
 - 日本详情已完成 `248/248`（`3704 runners / 3671 results`），美国 `241/241`（`2181 / 1885`），英国 `250/250`（`2570 / 2105`），香港 `61/61`（`660 / 645`），四地区详情均为零 parser gap。英国同名赛事先按距离筛选，香港同日赛事使用原始名与年度目录名共同匹配并按距离一对一解析；香港 61 场均有唯一官方 URL 和冠军。
 - 法国详情在本地按地区内单 host 1 秒限速续跑；本检查点前 5 个分片完成 `61` 场、`530 runners / 402 results`，零跳过、零错误。重型 PDF/详情解析只在本地运行，年度源只缓存一次；剩余分片继续使用 checkpoint 跳过已完成输出。
+- 多分片并发新增可选共享 host interval artifact：各 shard 保留独立请求额度，但共同文件锁保证跨容器请求启动至少间隔 1 秒；法国双 worker 实跑最近最小间隔 `1.006s`。正式 runner 显式清除此变量，避免继承宿主任意路径；当前共享限速只在共同挂载根内的本地抓取启用。
 - 首次生产 France verify 在无网络、无赛事业务写入阶段触发高内存后，生产 SSH 持续在 banner exchange 超时。当前禁止在生产重跑重型解析、启动新 runner 或执行赛事 apply；只在可信主机恢复后先清理/核对旧 runner、服务镜像、数据库租约、事务、队列和 healthz，再执行轻量 verifier 与串行写入。
-- 本轮 UK/HK 解析修复完成测试优先与零问题复审；来源/直连详情组合 `104/104`、完整 stable `1527/1527`（11 skip）、Python compile 和 diff check 通过。历史公开、常驻网络与常驻写入开关继续关闭。
+- 本轮 UK/HK 解析与共享 host 限速修复完成测试优先和零问题复审；请求/cache/runner 组合 `161/161`、来源/直连详情组合 `104/104`、最终完整 stable `1528/1528`（11 skip）、Python compile 和 diff check 通过。历史公开、常驻网络与常驻写入开关继续关闭。
+- `main@f9e76b88` 已构建本地 AMD64 候选 `sha256:f10982238ad75f53620f42897085888870cfb827b8fea67bb60fb3baf12406c3`，tree `ec3f9fbdb60c80ea63bb09b9939d56ce3eb20c64`、source archive SHA-256 `f78dae1071c5a006527d91821cec6f424035ffc0d336a82540936aece94d831a`；镜像内 Django check、迁移无漂移和赛事专项 `104/104` 通过。该镜像未传生产、未 retag、未重启服务。
+- 已生成正式详情包：日本 `248` 场 SHA-256 `936c6f9e25182c978121538c289175eb032d12bf6e01a75fb0a0d3842f762e28`、美国 `241` 场 `482fc83ebb1fd5aa28ffc25194749c13688eab6f43837cdfe5e0042b8ffd40c4`、香港 `61` 场 `c02d5d2f56c5fd04b3baf2da3fa69c3fee2d11b747d71c59f0342ed084336b31`，均 gap=0。英国 250 条 date fragment SHA-256 为 `aceaaba5a4170b0b2a6e3e21987a538b34ca7e5dd00bf2ff7a5af754b139a700`；按正式门禁须先 date apply、detail-source apply 并重导 target SHA 后再打包最终详情，不能绕过来源审批。
 
 ## 2026-07-15 batch006 年度赛历入口已部署，待生成正式分片
 

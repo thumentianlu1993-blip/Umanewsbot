@@ -1304,6 +1304,7 @@ def _crawl_step_environment(artifact_root: Path) -> dict[str, str]:
 
     root = artifact_root.resolve()
     child_env = os.environ.copy()
+    child_env.pop("RACE_EVENT_CRAWL_HOST_INTERVAL_ARTIFACT", None)
     child_env.update(
         {
             "RACE_EVENT_CRAWL_MAX_REQUESTS": str(request_budget),

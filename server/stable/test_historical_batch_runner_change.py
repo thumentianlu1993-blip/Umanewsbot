@@ -1099,6 +1099,7 @@ class HistoricalBatchRunnerExecutionTests(TestCase):
             "RACE_EVENT_CRAWL_MAX_REQUESTS",
             "RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS",
             "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT",
+            "RACE_EVENT_CRAWL_HOST_INTERVAL_ARTIFACT",
             "RACE_EVENT_CRAWL_MAX_SOURCE_CACHE_BYTES",
             "RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES",
             "RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT",
@@ -1202,6 +1203,7 @@ class HistoricalBatchRunnerExecutionTests(TestCase):
                 "RACE_EVENT_CRAWL_MAX_REQUESTS": "0",
                 "RACE_EVENT_CRAWL_REQUEST_INTERVAL_SECONDS": "0",
                 "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT": "/tmp/escaped-budget.json",
+                "RACE_EVENT_CRAWL_HOST_INTERVAL_ARTIFACT": "/tmp/escaped-host-interval.json",
                 "RACE_EVENT_CRAWL_MAX_SOURCE_CACHE_BYTES": str(9 * 1024 * 1024 * 1024),
                 "RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES": "1",
                 "RACE_EVENT_CRAWL_SOURCE_CACHE_ROOT": "/tmp/escaped-cache",
@@ -1228,6 +1230,7 @@ class HistoricalBatchRunnerExecutionTests(TestCase):
                 payload["RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT"],
                 str(artifact_root / "runner-request-budget.json"),
             )
+            self.assertIsNone(payload["RACE_EVENT_CRAWL_HOST_INTERVAL_ARTIFACT"])
             self.assertEqual(payload["RACE_EVENT_CRAWL_MAX_SOURCE_CACHE_BYTES"], "4096")
             self.assertEqual(
                 payload["RACE_EVENT_CRAWL_MIN_FREE_DISK_BYTES"],

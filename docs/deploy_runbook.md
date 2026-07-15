@@ -7,6 +7,7 @@
 3. 禁止在生产重跑 France Galop PDF 或逐场扫描。所有重解析在本地固定镜像完成并生成 cache manifest、summary、candidate SHA；生产只运行已验证 artifact 的 lightweight verifier。
 4. apply 仍逐阶段串行：日期 dry-run -> 独立 custom-format 备份并 `pg_restore -l` -> 日期 apply/verifier -> 重新导出 target identity -> 详情来源 dry-run/备份/apply/verifier -> 最终详情 dry-run/备份/apply/verifier。任一阶段不可与新闻维护或其他生产窗口并发。
 5. 历史公开、常驻网络和常驻写入保持关闭；只有全部 1998-2026 正式总账达到 complete 或 evidence gap 后，才进入最终统一人工审核与公开开关决策。
+6. 本地多 worker 抓取可显式设置同一个 `RACE_EVENT_CRAWL_HOST_INTERVAL_ARTIFACT`，同时让每个 shard 使用自己的 `RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT`；host 文件必须位于共同受控根。生产 runner 会清除 host interval 变量，除非后续通过独立设计把共享父挂载纳入 plan 身份与 checkpoint。
 
 ## 执行中：batch006 正式流水线部署与运行
 
