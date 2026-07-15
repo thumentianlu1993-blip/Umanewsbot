@@ -1,8 +1,16 @@
 # 部署运行手册
 
+## 阻断中：batch006 生产 runner 事故恢复
+
+1. 首次 France verify 在无网络、无赛事业务写入阶段执行重型 PDF 解析后，生产 SSH 持续出现 `Connection timed out during banner exchange`。在可信主机恢复前，不执行 retag、Compose、容器重启、runner resume、数据库备份或赛事 apply。
+2. 恢复后第一步只读检查并停止遗留 `umanews-historical-runner`：保留日志与 artifact，核对 `HistoricalBatchRun`、live lease、`pg_stat_activity`、idle transaction、Redis/Celery、web/worker/beat image identity、磁盘和内外 healthz。任一身份或数据库健康异常先回滚/修复，不继续批次。
+3. 禁止在生产重跑 France Galop PDF 或逐场扫描。所有重解析在本地固定镜像完成并生成 cache manifest、summary、candidate SHA；生产只运行已验证 artifact 的 lightweight verifier。
+4. apply 仍逐阶段串行：日期 dry-run -> 独立 custom-format 备份并 `pg_restore -l` -> 日期 apply/verifier -> 重新导出 target identity -> 详情来源 dry-run/备份/apply/verifier -> 最终详情 dry-run/备份/apply/verifier。任一阶段不可与新闻维护或其他生产窗口并发。
+5. 历史公开、常驻网络和常驻写入保持关闭；只有全部 1998-2026 正式总账达到 complete 或 evidence gap 后，才进入最终统一人工审核与公开开关决策。
+
 ## 执行中：batch006 正式流水线部署与运行
 
-生产部署阶段已完成：`main@ab95c6ef56873c73b548cd25da50a0e080816eed`、AMD64 image `sha256:8040b87e43c3e4587753be44cc205ca4879becd599040c4f556c716b7bfef9d8`、tree `d5715471723c21628d8c1c587e6e8bc9f96dcdf8`、source SHA-256 `604a8f254de2c86594fb2097f95d284aa401407a6140beb023535c8442374eb1`。写前备份 `pre-main-ab95c6ef-20260715_081056.dump` 为 `141447272` bytes、SHA-256 `924a3aed9d6d8c204c2fc0b0608444a6830c5f09bfd61d2b733e991b7145c127`，`pg_restore -l` 通过；回滚 tag 为 `umanewsbot:rollback-pre-ab95c6ef-20260715_081452`。四类 runner smoke 与最终空锁/空队列门禁通过，公开及常驻历史开关仍关闭。以下第 2-7 项继续作为 batch006 运行门禁。
+生产部署阶段已完成：`main@ccfee75fdff6fab7238b19484ba0489c2848dd50`、AMD64 image `sha256:e86c2339a6e690e801df2426a5edb408cbedf4c7eddd8cfd08011ed659ef773d`、tree `0c8fb1d65eea121a51366584a84749c7d2e3d88f`、source SHA-256 `635fa8a01b5c4685c66650355938af4930d8bebc90a9ece144fd76a2f1fa0d19`。写前备份 `pre-main-ccfee75f-20260715_122039.dump` 为 `141448192` bytes、SHA-256 `898c9a4ab3a06847023d189aed830553cbe733bf4c8e92a4ed636dd8231fa55f`，`pg_restore -l` 通过；回滚 tag 为 `umanewsbot:rollback-pre-ccfee75f-20260715_122039`。runner provisioning、crawl 最小权限、apply 无公网出口、两步暂停/恢复及最终空容器/空锁门禁通过，web/worker/beat 镜像一致，公开及常驻历史开关仍关闭。以下第 2-7 项继续作为 batch006 运行门禁。
 
 1. 已完成 `formalize-historical-batch-crawl-pipeline` 的完整 stable、真实 PostgreSQL READ ONLY、OpenSpec strict/all、迁移漂移、shell/diff、零问题 review、双构建和生产强化 smoke；后续若代码变化，必须重新执行同一门禁并生成新镜像身份。
 2. batch006 只接受现有冻结身份：1061 targets，法国/香港/日本/英国/美国 `250/61/250/250/250`；manifest `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`、selection `b9a3ad6556cfd03e9a57874bec763f75ad4c45e7642751140cb063f1d0553637`、approval `a119e3bcfd3bc8940cf8b792e246e462b405c292b77f2996739b435c9185d835`。任一字节漂移停止，不重新生成审批掩盖漂移。

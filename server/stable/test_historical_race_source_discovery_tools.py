@@ -43,6 +43,7 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
 
     def test_distance_matching_parses_compact_half_furlongs_without_tenfold_error(self):
         cases = {
+            "3m": 3 * 1760,
             "1m71/2f": 1760 + (7.5 * 220),
             "3m1/2f": (3 * 1760) + (0.5 * 220),
             "2m4f": (2 * 1760) + (4 * 220),
@@ -54,6 +55,11 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
                     self.tool._distance_measurement(raw, "united_kingdom"),
                     ("imperial", expected_yards),
                 )
+
+        self.assertEqual(
+            self.tool._distance_measurement("1600m", "united_states"),
+            ("metric", 1600.0),
+        )
 
     def test_jra_schedule_maps_english_name_to_official_static_result(self):
         schedule = b"""
@@ -751,6 +757,79 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
                 "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2024/09/22&Racecourse=ST&RaceNo=7",
                 "https://racing.hkjc.com/en-us/local/information/localresults?racedate=2024/10/01&Racecourse=ST&RaceNo=8",
             ],
+        )
+
+    def test_hkjc_result_url_resolver_uses_distance_before_name_and_original_alias(self):
+        matches = [
+            {
+                "target_id": 21,
+                "series_key": "hong-kong-chinese-club-challenge-cup",
+                "edition_year": 2017,
+                "local_date": "2017-01-01",
+                "racecourse": "Sha Tin",
+                "race_name": "Pocket Money HK 22 Apr 2007 Chinese Club Challenge Cup",
+                "race_names": [
+                    "Pocket Money HK 22 Apr 2007 Chinese Club Challenge Cup",
+                    "Chinese Club Challenge Cup (H)",
+                ],
+                "normalized_grade": "G3",
+                "distance_text": "1400m",
+            },
+            {
+                "target_id": 22,
+                "series_key": "hong-kong-jockey-club-cup",
+                "edition_year": 2017,
+                "local_date": "2017-11-19",
+                "racecourse": "Sha Tin",
+                "race_name": "BOCHK Jockey Club Cup",
+                "race_names": ["BOCHK Jockey Club Cup", "Jockey Club Cup [LONGINES]"],
+                "normalized_grade": "G2",
+                "distance_text": "2000m",
+            },
+            {
+                "target_id": 23,
+                "series_key": "hong-kong-jockey-club-sprint",
+                "edition_year": 2017,
+                "local_date": "2017-11-19",
+                "racecourse": "Sha Tin",
+                "race_name": "BOCHK Jockey Club Sprint",
+                "race_names": [
+                    "BOCHK Jockey Club Sprint",
+                    "Jockey Club Sprint [BOCHK Wealth Management]",
+                ],
+                "normalized_grade": "G2",
+                "distance_text": "1200m",
+            },
+        ]
+        result_pages = {
+            ("2017-01-01", "ST"): [{
+                "race_no": "8",
+                "race_name": "THE CHINESE CLUB CHALLENGE CUP (HANDICAP)",
+                "normalized_grade": "G3",
+                "distance_text": "1400m",
+            }],
+            ("2017-11-19", "ST"): [
+                {
+                    "race_no": "6",
+                    "race_name": "THE BOCHK JOCKEY CLUB CUP",
+                    "normalized_grade": "G2",
+                    "distance_text": "2000m",
+                },
+                {
+                    "race_no": "7",
+                    "race_name": "THE BOCHK WEALTH MANAGEMENT JOCKEY CLUB SPRINT",
+                    "normalized_grade": "G2",
+                    "distance_text": "1200m",
+                },
+            ],
+        }
+
+        result = self.tool.resolve_hkjc_result_urls(matches, result_pages)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(
+            [(row["target_id"], row["result_race_no"]) for row in result["matches"]],
+            [(21, "8"), (22, "6"), (23, "7")],
         )
 
     def test_bha_flat_book_uses_race_date_not_closing_date(self):

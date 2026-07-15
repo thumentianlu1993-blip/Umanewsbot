@@ -14,6 +14,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 from race_event_request_budget import before_network_request
 from race_event_safe_http import SafeHttpError, fetch_https, validate_https_url
 from race_event_source_cache import write_source_cache_text
+from discover_historical_race_band_sources import _distance_compatible
 
 from bs4 import BeautifulSoup
 
@@ -75,13 +76,27 @@ TOKEN_STOPWORDS = {
 
 SPORTING_LIFE_SERIES_ALIASES = {
     "GBR_AINTREE_BRIDLE_ROAD_HANDICAP_HURDLE": ("William Hill Top Price Guarantee Handicap Hurdle",),
-    "GBR_ASCOT_BETFAIR_EXCHANGE_TROPHY_HANDICAP_HURDLE": ("Ascot Rotary Club Festive Handicap Hurdle",),
+    "GBR_ASCOT_BETFAIR_EXCHANGE_TROPHY_HANDICAP_HURDLE": (
+        "Ascot Rotary Club Festive Handicap Hurdle",
+        "Ladbrokes Handicap Hurdle",
+    ),
     "GBR_ASCOT_HURST_PARK_HANDICAP_CHASE": ("Grundon Waste Management Handicap Chase",),
     "GBR_CHELTENHAM_COUNTDOWN_PODCAST_HANDICAP_CHASE": ("Betfair Exchange Handicap Chase",),
+    "GBR_CHELTENHAM_DECEMBER_3M2F_HANDICAP_CHASE": (
+        "Sonic The Hedgehog 3 Coming Soon Handicap Chase",
+    ),
     "GBR_CHELTENHAM_DECEMBER_GOLD_CUP": ("December Gold Cup Handicap Chase",),
-    "GBR_CHELTENHAM_NOVEMBER_LONG_DISTANCE_HANDICAP_CHASE": ("Oddschecker Handicap Chase",),
+    "GBR_CHELTENHAM_NOVEMBER_LONG_DISTANCE_HANDICAP_CHASE": (
+        "Oddschecker Handicap Chase",
+        "Holland Cooper Handicap Chase",
+    ),
+    "GBR_DONCASTER_GREAT_YORKSHIRE_CHASE": ("SBK Great Yorkshire Handicap Chase",),
+    "GBR_HAYDOCK_BETFAIR_STAYERS_HANDICAP_HURDLE": (
+        "Betfair Stayers Handicap Hurdle",
+    ),
+    "GBR_NEWBURY_WILLIAM_HILL_HURDLE": ("Betfair Hurdle",),
     "GBR_WINCANTON_BADGER_BEERS_HANDICAP_CHASE": ("64th Badger Beers Handicap Chase",),
-    "united-kingdom-1965-stp": ("Ladbrokes 1965 Chase",),
+    "united-kingdom-1965-stp": ("Ladbrokes 1965 Chase", "CopyBet 1965 Chase"),
     "united-kingdom-abernant": ("Abernant Stakes",),
     "united-kingdom-april-mares-novices-stp": ("Aston Martin Mares Novices Handicap Chase",),
     "united-kingdom-atalanta": ("Atalanta Stakes",),
@@ -91,6 +106,36 @@ SPORTING_LIFE_SERIES_ALIASES = {
         "Aintree Bowl Chase",
         "Bowl Chase",
     ),
+    "united-kingdom-county-hurdle": ("BetMGM County Handicap Hurdle",),
+    "united-kingdom-criterion": ("Plantation Stud Criterion Stakes",),
+    "united-kingdom-dahlia": ("William Hill Dahlia Stakes",),
+    "united-kingdom-darley": ("Space Blues Darley Stakes",),
+    "united-kingdom-e-b-f-betfair-national-hunt-novices-hurdle-final": (
+        "European Breeders Fund Betfair National Hunt Novices Handicap Hurdle Final",
+    ),
+    "united-kingdom-fillies-juvenile-hurdle": ("KTDA Fillies Juvenile Handicap Hurdle",),
+    "united-kingdom-fred-winter-juvenile-hurdle": ("Boodles Juvenile Handicap Hurdle",),
+    "united-kingdom-freebooter-stp": ("William Hill Handicap Chase Registered As The Freebooter Handicap Chase",),
+    "united-kingdom-gerry-feilden-intermediate-hurdle": (
+        "Coral Racing Club Intermediate Handicap Hurdle Registered As The Gerry Feilden",
+    ),
+    "united-kingdom-grand-national-stp": ("Randox Grand National Handicap Chase",),
+    "united-kingdom-grand-national-trial-stp": ("Virgin Bet Grand National Trial Handicap Chase",),
+    "united-kingdom-glorious": ("Coral Glorious Stakes",),
+    "united-kingdom-hackwood": ("Fidelity Energy Hackwood Stakes",),
+    "united-kingdom-lester-piggott": ("Betfred Nifty 50 Lester Piggott Fillies Stakes",),
+    "united-kingdom-maghull-novices-stp": ("My Pension Expert Maghull Novices Chase",),
+    "united-kingdom-melling-stp": ("My Pension Expert Melling Chase",),
+    "united-kingdom-mildmay-novices-stp": (
+        "Huyton Asphalt Franny Blennerhassett Memorial Mildmay Novices Chase",
+    ),
+    "united-kingdom-solario": ("BetMGM Solario Stakes",),
+    "united-kingdom-summer-mile": ("Cornish Orchards Summer Mile Stakes",),
+    "united-kingdom-swinley-stp": ("Betfair Swinley Handicap Chase",),
+    "united-kingdom-topham-stp": (
+        "Randox Supporting Prostate Cancer UK Topham Handicap Chase",
+    ),
+    "united-kingdom-zetland": ("Night Of Thunder Zetland Stakes",),
 }
 
 
@@ -268,6 +313,10 @@ def _find_race_summary(event: dict, races: list[dict]) -> dict | None:
         race
         for race in races
         if _course_match(event.get("racecourse") or "", race.get("course_name") or "")
+        and _distance_compatible(
+            {**event, "country_region": "united_kingdom"},
+            {"distance_text": race.get("distance") or ""},
+        )
     ]
     for race in candidates:
         race_key = _norm(race.get("name") or "")

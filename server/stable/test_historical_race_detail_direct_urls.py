@@ -290,6 +290,82 @@ Owners: 8-CresRan,LLC;
 
         self.assertEqual(matched["race_summary_reference"]["id"], 850965)
 
+    def test_sporting_life_summary_match_uses_distance_for_same_name_races(self):
+        module = _load("prepare_uk_sportinglife_race_detail_candidates.py")
+        event = {
+            "slug": "united_kingdom-GBR_AINTREE_BRIDLE_ROAD_HANDICAP_HURDLE-2024",
+            "original_name": "[Village Hotels] H. Hurdle",
+            "racecourse": "Aintree",
+            "normalized_grade": "G3",
+            "distance_text": "3m",
+            "source_refs": json.dumps(
+                {"calendar_discovery": {"race_name": "WILLIAM HILL HANDICAP"}}
+            ),
+        }
+        races = [
+            {
+                "course_name": "Aintree",
+                "name": "William Hill Handicap Hurdle (Premier Handicap) (GBB Race)",
+                "distance": "2m 4f",
+                "race_summary_reference": {"id": 789164},
+            },
+            {
+                "course_name": "Aintree",
+                "name": "William Hill Handicap Hurdle (Premier Handicap) (GBB Race)",
+                "distance": "3m 149y",
+                "race_summary_reference": {"id": 789171},
+            },
+        ]
+
+        matched = module._find_race_summary(event, races)
+
+        self.assertEqual(matched["race_summary_reference"]["id"], 789171)
+
+    def test_sporting_life_reviewed_aliases_cover_batch006_sponsor_names(self):
+        module = _load("prepare_uk_sportinglife_race_detail_candidates.py")
+        cases = [
+            (
+                "united_kingdom-GBR_DONCASTER_GREAT_YORKSHIRE_CHASE-2024",
+                "[Great Yorkshire] H. Stp",
+                "3m",
+                "SBK Great Yorkshire Handicap Chase (Premier Handicap) (GBB Race)",
+            ),
+            (
+                "united_kingdom-united-kingdom-darley-2024",
+                "Darley S. [Earthlight]",
+                "9f",
+                "Space Blues Darley Stakes (Group 3)",
+            ),
+            (
+                "united_kingdom-GBR_CHELTENHAM_DECEMBER_3M2F_HANDICAP_CHASE-2024",
+                "[The Favourite from The Sun] H. Stp",
+                "3m2f",
+                "Sonic The Hedgehog 3 Coming Soon Handicap Chase (Premier Handicap) (GBB Race)",
+            ),
+        ]
+        for index, (slug, original_name, distance, source_name) in enumerate(cases, start=1):
+            with self.subTest(slug=slug):
+                event = {
+                    "slug": slug,
+                    "original_name": original_name,
+                    "racecourse": "Cheltenham" if "CHELTENHAM" in slug else "Doncaster" if "DONCASTER" in slug else "Newmarket",
+                    "normalized_grade": "G3",
+                    "distance_text": distance,
+                    "source_refs": "{}",
+                }
+                races = [
+                    {
+                        "course_name": event["racecourse"],
+                        "name": source_name,
+                        "distance": distance,
+                        "race_summary_reference": {"id": index},
+                    }
+                ]
+
+                matched = module._find_race_summary(event, races)
+
+                self.assertEqual(matched["race_summary_reference"]["id"], index)
+
     def test_sporting_life_rejects_detail_url_reuse_across_targets(self):
         module = _load("prepare_uk_sportinglife_race_detail_candidates.py")
         claims = {}

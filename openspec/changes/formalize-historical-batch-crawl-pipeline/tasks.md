@@ -37,7 +37,7 @@
 - [x] 6.5 (integration) 为赛历解析器增加 typed recipe、地区+年份 scope binding、目录输入/输出身份和 runner 白名单；plan builder 向后兼容支持 crawl/verify descriptor，并强制 verify 无资源预算、无网络、无写入；runner 对 output directory 逐成员 checkpoint/恢复验真；请求生成器保持 plan 前工具，不进入 runner 白名单。
 - [x] 6.6 (operations) 更新 batch006 运行手册与状态文档，明确 request/cache/parse 分 stage、partial 口径、PDF 单位和 gap 统一审核路径。
 - [x] 6.7 (integration) 运行新增专项、历史组合、完整 stable、性能/OpenSpec/Django/migration/shell/diff 验证，并反复 code review 至一次零 actionable finding。
-- [ ] 6.8 (operations) 从最新 main 构建并部署可复现 AMD64 镜像，重新验收 runner 后再继续任务 7.2-7.4。
+- [x] 6.8 (operations) 从最新 main 构建并部署可复现 AMD64 镜像，重新验收 runner 后再继续任务 7.2-7.4。
 
 ## 7. batch006 生产应用
 

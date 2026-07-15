@@ -1,5 +1,11 @@
 # 关键决策
 
+## 2026-07-15：重型历史解析留在本地，详情匹配必须先消除距离歧义
+
+- France Galop 年度 PDF、逐场详情扫描及其他高内存解析只在本地固定镜像执行；生产 runner 只接收已缓存、已校验的轻量 artifact 做 verifier/apply。生产主机发生资源异常或 SSH 不可达时，不在未知状态下重启、重建或继续写入。
+- `m` 必须结合地区和值域解释：法港日以及 `>=100m` 为 metres；英美短值如 `3m` 为 miles。不能把英国 `3m` 当 3 metres，也不能把美国 `1600m` 当 1600 miles。详情匹配在名称评分前优先使用兼容距离缩小候选，并继续保留 URL 一对一和复用拒绝门禁。
+- 年度目录标题可能包含赞助名、注册名或历史胜马文本。详情解析应同时使用审核后的系列 alias、年度目录名和总账原始名，但只有日期、场地、距离及唯一来源 URL 共同通过时才接受；名称相似不能覆盖距离冲突。
+
 ## 2026-07-15：正式历史批次按冻结输入、证据 gap 和只读验收推进
 
 - batch006 及后续正式抓取必须由 tracked plan builder 生成结构化 runner plan；selection、approval、batch manifest、descriptor、image revision 和 tool SHA 均为不可变身份，typed recipe 必须从实际 CSV/JSONL 内容证明与 shard scope 精确一致，禁止手写任意 argv 或使用 `tmp/` 工具。

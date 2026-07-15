@@ -1,11 +1,18 @@
 # 项目状态文档
 
-## 2026-07-15 batch006 年度赛历流水线本地验收完成
+## 2026-07-15 batch006 五地区详情抓取冲刺
+
+- 1061 场正式 selection 的年度日期已达到 `1050 complete + 11 evidence gap`，完整记账率 100%。零星日美缺口继续累计到最终审核，不中断地区或年代分片。
+- 日本、美国、英国、香港详情分别完成 `248/248`、`241/241`、`250/250`、`61/61`；对应出马/赛果为 `3704/3671`、`2181/1885`、`2570/2105`、`660/645`。法国详情已启动 checkpoint 续跑，本检查点完成 61 场且无解析错误。
+- 英国距离单位歧义与香港同日同前缀赛事的一对一解析已修复，完整 stable `1527/1527`（11 skip）通过，最终 review 无 actionable finding。
+- 生产 SSH 因此前重型 France verify 后持续握手超时，赛事 apply 暂停；所有重解析留在本地。主机恢复后先做事故清理与健康核验，再按 dry-run、独立备份、apply、只读 verifier 串行推进。历史公开开关继续关闭。
+
+## 2026-07-15 batch006 年度赛历流水线已部署
 
 - 正式年度赛历 request/cache/parse 流水线已完成实现和零问题 review：支持全量或分片 ledger、共享 URL 去重、partial 终态、缓存身份复核、五地区 parser、complete/gap 分母及 runner 目录 checkpoint；完整 stable `1524/1524`（11 skip），专项 `118/118`（1 skip）、runner `70/70`、性能 `3/3`、OpenSpec `30/30`。
 - 法国真实官方来源已达到 2023 `120/120`、2024 `130/130`、issues=0；香港现有覆盖 `61/61`、日本 `248/250`、英国 `250/250`、美国 `241/250`，剩余日美缺口继续进入统一审核账本。
-- 生产仍运行旧的已验收流水线 `main@ab95c6ef` / image `sha256:8040b87e...9d8`；healthz、队列、锁、runner 和事务安静，历史常驻与公开开关关闭。新年度赛历代码尚未部署，batch006 未发出正式网络请求，也未写赛事业务表。
-- batch006 仍为 1061 场 approved selection，按 11 个地区×届次年 scope 执行：FR `120/130`、HK `35/26`、JP `88/138/24`、UK `196/54`、US `83/167`。下一步是提交/推送、可复现 AMD64 构建、安全部署，然后逐 scope 抓取并补齐日美 gap。
+- 生产 web/worker/beat 已统一到 `main@ccfee75f` / image `sha256:e86c2339...773d`；迁移、Django check、runner provisioning、crawl/apply 隔离、暂停/恢复和最终空锁验收均通过。写前备份 SHA-256 为 `898c9a4ab3a06847023d189aed830553cbe733bf4c8e92a4ed636dd8231fa55f`，历史常驻与公开开关继续关闭。
+- batch006 仍为 1061 场 approved selection，按 11 个地区×届次年 scope 执行：FR `120/130`、HK `35/26`、JP `88/138/24`、UK `196/54`、US `83/167`。正式网络请求与赛事业务表写入尚未开始；下一步生成不可变 descriptor/shards/runner plans 后逐 scope crawl，并把日美少量 gap 累计到最终统一审核。
 
 ## 2026-07-15 historical runner 新镜像已部署，batch006 待正式审批与分片 crawl
 

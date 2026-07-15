@@ -1,15 +1,24 @@
 # 当前状态
 
-## 2026-07-15 batch006 年度赛历入口本地验收完成，待重新部署
+## 2026-07-15 batch006 本地详情冲刺进行中，生产写入暂停
 
-- `formalize-historical-batch-crawl-pipeline` 的原正式流水线仍在线：生产代码为 `main@ab95c6ef56873c73b548cd25da50a0e080816eed`，web/worker 运行 AMD64 image `sha256:8040b87e43c3e4587753be44cc205ca4879becd599040c4f556c716b7bfef9d8`，beat 容器当前不存在。本次只读复核确认 healthz 正常、Redis 队列为 0、Celery active/reserved 为空、历史 running/held lock 为 0；可用磁盘 `7356400 KiB`，高于 5 GiB runner 门槛。新镜像切换时必须恢复并验收 beat。
+- batch006 年度赛历 1061 场已全部记账：`1050 complete / 11 gap`，accounted rate `100%`、data complete rate `98.96%`。两个日本 gap 为东京大赏典需要 NAR/Oi 来源；九个美国 gap 为障碍赛、同名冲突或未举办判断，全部进入最终统一审核，不阻断其他分片。
+- 日本详情已完成 `248/248`（`3704 runners / 3671 results`），美国 `241/241`（`2181 / 1885`），英国 `250/250`（`2570 / 2105`），香港 `61/61`（`660 / 645`），四地区详情均为零 parser gap。英国同名赛事先按距离筛选，香港同日赛事使用原始名与年度目录名共同匹配并按距离一对一解析；香港 61 场均有唯一官方 URL 和冠军。
+- 法国详情在本地按地区内单 host 1 秒限速续跑；本检查点前 5 个分片完成 `61` 场、`530 runners / 402 results`，零跳过、零错误。重型 PDF/详情解析只在本地运行，年度源只缓存一次；剩余分片继续使用 checkpoint 跳过已完成输出。
+- 首次生产 France verify 在无网络、无赛事业务写入阶段触发高内存后，生产 SSH 持续在 banner exchange 超时。当前禁止在生产重跑重型解析、启动新 runner 或执行赛事 apply；只在可信主机恢复后先清理/核对旧 runner、服务镜像、数据库租约、事务、队列和 healthz，再执行轻量 verifier 与串行写入。
+- 本轮 UK/HK 解析修复完成测试优先与零问题复审；来源/直连详情组合 `104/104`、完整 stable `1527/1527`（11 skip）、Python compile 和 diff check 通过。历史公开、常驻网络与常驻写入开关继续关闭。
+
+## 2026-07-15 batch006 年度赛历入口已部署，待生成正式分片
+
+- `formalize-historical-batch-crawl-pipeline` 已部署生产：代码为 `main@ccfee75fdff6fab7238b19484ba0489c2848dd50`，web/worker/beat 统一运行可复现 AMD64 image `sha256:e86c2339a6e690e801df2426a5edb408cbedf4c7eddd8cfd08011ed659ef773d`，Git tree `0c8fb1d65eea121a51366584a84749c7d2e3d88f`，source archive SHA-256 `635fa8a01b5c4685c66650355938af4930d8bebc90a9ece144fd76a2f1fa0d19`。两个正式域名的 HTTP healthz 正常，Celery active/reserved 与 Redis queue 均为 0。
 - 实跑 batch006 前补齐了正式年度赛历入口：tracked source catalog 展开、HTTPS/host allowlist、URL 去重、终态 partial ledger、缓存 path/size/SHA/source URL 复核、离线地区 parser、complete/gap 分母、typed recipe 与逐成员目录 checkpoint。请求与解析分 stage：crawl 仅联网不写库，verify 既不联网也不写库。
 - runner 新增全局输出路径互斥与普通文件 symlink 恢复拒绝；target/source identity 禁止布尔、分数和空字符串宽松转换。全量 ledger 可服务地区×年份解析分片；共享 URL 的 target references 必须精确等于 catalog 来源 scope 的并集。
 - batch006 固定身份仍为 1061 targets：manifest `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`、selection `b9a3ad6556cfd03e9a57874bec763f75ad4c45e7642751140cb063f1d0553637`、approval `a119e3bcfd3bc8940cf8b792e246e462b405c292b77f2996739b435c9185d835`。正式年度赛历按 11 个地区×届次年 scope 执行：FR `2023=120 / 2024=130`，HK `2016=35 / 2017=26`，JP `2022=88 / 2023=138 / 2024=24`，UK `2024=196 / 2025=54`，US `2024=83 / 2025=167`。
 - 法国官方来源真实 smoke 已完成：2023 `120/120`、2024 `130/130`，均 `issues=0`。France Galop 平地 programme、障碍详细赛程及固定列分组汇总均可解析；汇总只补详细赛程缺失目标，同等质量时详细记录优先，避免摘要笔误覆盖逐场日期。
 - 其他地区现有离线覆盖基线为：香港 `61/61`、日本 `248/250`、英国 `250/250`、美国 `241/250`。日本缺口为 2023/2024 东京大赏典的 Oi/NAR 日期来源；美国缺口集中在 NSA 障碍赛、2025 Remsen 同名冲突、Robert J. Frankel 未举办判断和 Tokyo City Cup 日期，继续记入统一 gap 审核，不中断其他 scope。
 - 最新验证：完整 stable `1524/1524`（11 skip）、年度赛历/来源专项 `118/118`（1 skip）、runner `70/70`、1250-target 性能 `3/3`、OpenSpec `30/30`；Django check、迁移漂移、Python compile 和 diff 检查均通过。新增实现完成 4 轮 review，最终一轮无 actionable finding。
-- 新年度赛历代码尚未部署，batch006 正式网络抓取和赛事业务表写入均未启动，历史公开/常驻网络/常驻写入继续关闭。下一步先提交、推送并从最新 main 构建可复现 AMD64 镜像，安全替换 web/worker/beat 后再按 11 个 scope 抓取、解析、补 gap、生成详情候选并分阶段 apply。
+- 写前 custom-format 备份为 `/opt/umanewsbot/backups/db/pre-main-ccfee75f-20260715_122039.dump`，`141448192` bytes，SHA-256 `898c9a4ab3a06847023d189aed830553cbe733bf4c8e92a4ed636dd8231fa55f`，`pg_restore -l` 通过；环境备份为 `.env.backup.pre-main-ccfee75f-20260715_122039`，旧镜像回滚标签为 `umanewsbot:rollback-pre-ccfee75f-20260715_122039`。
+- 新镜像 runner provisioning、crawl 最小权限、apply 无公网出口及两步暂停/恢复 smoke 均通过；恢复时第一步没有重复执行，最终无 runner 容器、running run 或 live lock。生产可用磁盘 `7088280 KiB`，高于 5 GiB 门槛。batch006 正式网络抓取和赛事业务表写入均未启动，历史公开/常驻网络/常驻写入继续关闭；下一步按 11 个 scope 生成不可变 descriptor/shard/plan 后启动 crawl。
 
 ## 2026-07-15 historical runner 工具根补丁部署与强化 smoke 完成
 

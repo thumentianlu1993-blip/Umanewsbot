@@ -503,7 +503,9 @@ def _distance_measurement(value: str, region: str) -> tuple[str, float] | None:
         return ("imperial", numeric * (220 if numeric >= 5 else 1760))
     metric = re.fullmatch(r"(?P<metres>\d+(?:\.\d+)?)\s*m", raw)
     if metric:
-        return ("metric", float(metric.group("metres")))
+        value = float(metric.group("metres"))
+        if region in {"france", "hong_kong", "japan"} or value >= 100:
+            return ("metric", value)
     furlongs = re.fullmatch(r"(?P<furlongs>\d+(?:\.\d+)?)\s*f", raw)
     if furlongs:
         return ("imperial", float(furlongs.group("furlongs")) * 220)
@@ -1037,9 +1039,28 @@ def resolve_hkjc_result_urls(matches: list[dict], result_pages: dict[tuple[str, 
     for match in matches:
         course_code = course_codes.get(_calendar_course_key(str(match.get("racecourse") or "")), "")
         page_rows = result_pages.get((str(match.get("local_date") or ""), course_code), [])
+        distance_rows = [
+            row
+            for row in page_rows
+            if _distance_compatible({**match, "country_region": "hong_kong"}, row)
+        ]
+        if distance_rows:
+            page_rows = distance_rows
+        race_names = [str(match.get("race_name") or "")]
+        race_names.extend(
+            str(name)
+            for name in match.get("race_names") or []
+            if isinstance(name, str) and name.strip()
+        )
         candidates = []
         for row in page_rows:
-            score = _calendar_name_score(str(match.get("race_name") or ""), str(row.get("race_name") or ""))
+            score = max(
+                (
+                    _calendar_name_score(name, str(row.get("race_name") or ""))
+                    for name in race_names
+                ),
+                default=0.0,
+            )
             if score < 0.5:
                 continue
             candidates.append((score, row))
@@ -1050,9 +1071,6 @@ def resolve_hkjc_result_urls(matches: list[dict], result_pages: dict[tuple[str, 
             grade_matches = [row for row in best if str(row.get("normalized_grade") or "").upper() == target_grade]
             if grade_matches:
                 best = grade_matches
-            distance_matches = [row for row in best if _distance_compatible({**match, "country_region": "hong_kong"}, row)]
-            if distance_matches:
-                best = distance_matches
         else:
             best = []
         if len(best) != 1 or not course_code:
