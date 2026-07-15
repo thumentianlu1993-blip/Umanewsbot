@@ -9,6 +9,7 @@ batch005 虽已完整导入五地区 250 场，但日期证据合并、详情候
 - 将 batch005 临时脚本中的通用校验提炼为正式实现，包括稳定身份唯一性、地区/年份分母、来源优先级冲突、距离单位、跨年届次、完整 runners/results、详情来源写后重打包和逐 target 阶段验收。
 - 支持稀疏人工证据覆盖，但覆盖必须使用结构化文件、绑定旧值/新值/来源 URL/理由和 SHA；不得在代码中写死 target ID，也不得静默覆盖冲突。
 - 将新工具加入 historical runner 显式白名单，保持 crawl、apply、verify 三阶段网络/写入权限隔离；生产公开及常驻历史网络/写入开关继续关闭。
+- 新增受控年度赛历入口：由冻结 selection 与版本化 source catalog 生成逐 target 来源请求，复用现有 source-cache 下载器，并把 JRA/TOBA、HKJC、BHA 与 France Galop 年度目录解析为 `events.csv`、直接详情来源和有证据 gap；不再依赖 batch005 写死年份的临时转换脚本。
 - batch006 先以已批准的 1061 场作为验收批次，完成后同一工具用于后续 1998-2026 标准批次。
 
 ## Capabilities
@@ -21,6 +22,6 @@ batch005 虽已完整导入五地区 250 场，但日期证据合并、详情候
 
 ## Impact
 
-- 主要影响 `runtime/tools/`、historical runner 计划校验/白名单、相关 Django 管理命令与 `server/stable` 测试。
+- 主要影响 `runtime/tools/`、historical runner 计划校验/白名单、相关 Django 管理命令与 `server/stable` 测试；不新增第三方依赖，PDF 文本提取复用镜像已有 `pdfplumber`。
 - 不新增模型或迁移，不改变公开页面、新闻链路、Celery 队列和常驻生产开关。
 - 运维文档将新增 batch006 分片、暂停/恢复、artifact 审批、备份、apply 和逐场验收步骤；旧 `tmp/` 脚本保留为历史证据但禁止用于新批次。

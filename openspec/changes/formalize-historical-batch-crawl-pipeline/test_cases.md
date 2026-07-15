@@ -63,6 +63,8 @@
 | TC-SHARD-020 | 详情 recipe 的非零 `limit` 小于 shard 目标数 | 生成 plan | 拒绝，禁止静默截断目标 | S/C |
 | TC-SHARD-021 | 法国 recipe 的日期范围排除任一 events CSV 目标 | 生成 plan | scope mismatch 拒绝 | S/C |
 | TC-SHARD-022 | fragment/gap 同时声明 target ID 与系列届次但两者冲突 | 生成 plan/merge | 拒绝，不任选其中一个身份 | S/C |
+| TC-SHARD-023 | 同一 catalog URL 覆盖两个届次年，parser 按年分片 | request/cache/parse | URL 只请求一次，ledger 引用为两届 scope 并集，每个 parser 只输出本届 target | S/C |
+| TC-PLAN-018 | target/source identity 为布尔值、分数或空字符串 | validate/build | 拒绝，不做整数或字符串宽松转换 | S/C |
 
 首批 typed recipe 必须各有成功和 scope mismatch 用例：
 
@@ -177,6 +179,8 @@
 | TC-ATOMIC-007 | source-cache/resource artifact 为 symlink | checkpoint/merge | 拒绝 | S/R |
 | TC-ATOMIC-008 | shard 完成后普通 web 部署 | runner 状态检查 | checkpoint/output 不受影响 | R/O |
 | TC-ATOMIC-009 | 最终目录 rename 成功后父目录 fsync 失败 | 发布 | 返回失败并删除最终目录，重跑不被半确认产物阻塞 | S/C |
+| TC-ATOMIC-010 | 两个 step 的输出文件/目录相同或互为父子 | validate | 创建 run 前拒绝全局路径重叠 | S/R |
+| TC-ATOMIC-011 | checkpoint 后普通输出文件替换为同内容 symlink | resume | 拒绝，不以相同 size/SHA 放行 | R |
 
 ## 9. 数据库阶段 verifier
 
@@ -224,7 +228,7 @@
 | TC-PROD-003 | 新镜像切换 | 验收 | 仅 web/worker/beat 替换，DB/Redis/runner/network 未重建 | O |
 | TC-PROD-004 | 新 runner smoke | crawl/apply/pause/resume/tool root | 全部通过，无残留容器/run | O |
 | TC-PROD-005 | batch006 artifact | 核对 | manifest `62aca6...`, selection `b9a3ad...`, approval `a119e3...`, 1061 targets | O |
-| TC-PROD-006 | 正式 stage descriptor | 生成 shards | 地区 `250/61/250/250/250`，全量零重叠零遗漏，每 shard <=250 请求 | O |
+| TC-PROD-006 | 正式 stage descriptor | 生成 shards | 11 个地区×届次年 scope：FR `120/130`、HK `35/26`、JP `88/138/24`、UK `196/54`、US `83/167`；全量零重叠零遗漏，每 shard <=250 targets/请求 | O |
 | TC-PROD-007 | 正式 crawl | 运行 | 每 shard 独立账本/cache/checkpoint，暂停恢复不重抓 | O |
 | TC-PROD-008 | 少量歧义 | crawl/merge | 写入 gap ledger 后继续其他 shard，不等待用户逐条确认 | O |
 | TC-PROD-009 | date/detail-source/final apply | 每阶段 | 写前独立备份，dry-run 通过，正式 verifier error=0 | O |
@@ -234,8 +238,62 @@
 
 ## 12. 执行顺序
 
-1. 先把 `TC-PLAN`、`TC-SHARD`、`TC-RECIPE`、`TC-RESOURCE`、`TC-DATE`、`TC-DETAIL`、`TC-EVIDENCE`、`TC-ATOMIC`、`TC-VERIFY` 和 `TC-PERF` 写入测试套件，并确认旧实现因缺少新能力而失败。
-2. 再实现 plan builder、typed policies、resource identity、merger、verifier 和白名单。
+1. 先把 `TC-PLAN`、`TC-SHARD`、`TC-RECIPE`、`TC-RESOURCE`、`TC-DATE`、`TC-DETAIL`、`TC-EVIDENCE`、`TC-ATOMIC`、`TC-VERIFY`、`TC-PERF` 和全部 `TC-CALENDAR` 写入测试套件，并确认旧实现因缺少新能力而失败。
+2. 再实现 plan builder、typed policies、resource identity、merger、verifier、年度赛历 request/cache/parse 和白名单。
 3. 跑聚焦与完整回归；任何失败先修复，再进入代码 review。
 4. 反复 review/修复/重新 review，直到一次无 actionable finding。
-5. 最后执行 `TC-PROD`；生产公开和常驻历史开关始终保持关闭。
+5. 最后执行 `TC-PROD`；先重新部署包含赛历能力的新固定镜像，再启动 batch006，生产公开和常驻历史开关始终保持关闭。
+
+## 13. 年度赛历请求与缓存
+
+| ID | 前置条件 | 操作 | 预期 | 层级 |
+| --- | --- | --- | --- | --- |
+| TC-CALENDAR-REQ-001 | selection 某地区年份有两份年度目录 | 展开 catalog | 每 target 绑定两份来源，共享 URL 在 cache 仅请求一次 | S |
+| TC-CALENDAR-REQ-002 | catalog 漏掉一个 target | 展开 | fail closed，最终输出目录不存在 | S |
+| TC-CALENDAR-REQ-003 | source 地区/年份跨 scope | 展开 | 拒绝并指出 source ID/target | S |
+| TC-CALENDAR-REQ-004 | 重复 source ID、未知 parser/adapter | 展开 | 拒绝 | S |
+| TC-CALENDAR-REQ-005 | URL 非 HTTPS、含凭据或 host 不在 adapter allowlist | 展开 | 拒绝 | S |
+| TC-CALENDAR-REQ-006 | selection/catalog 输入顺序变化 | 展开两次 | provider/summary/manifest 业务 SHA 一致 | S |
+| TC-CALENDAR-REQ-007 | 输出目录已存在或发布中注入异常 | 展开 | 拒绝覆盖；失败不留半套 artifact | S |
+| TC-CALENDAR-REQ-008 | 一条 URL 被多个年份 source 共用 | 展开/cache | 生成全量 target reference 并只请求一次，ledger 引用必须精确匹配来源 scope 并集 | S/R |
+| TC-CALENDAR-CACHE-001 | 全部唯一 URL 成功 | cache | ledger 每 URL 一条，target references 完整，summary success=all | S/R |
+| TC-CALENDAR-CACHE-002 | 一个 URL 失败，默认模式 | cache | 返回非零，ledger 保留失败与受影响 targets | S/R |
+| TC-CALENDAR-CACHE-003 | 一个 URL 失败，显式 allow-partial | cache | 所有请求均为终态后返回零；failure_count 与 affected_target_count 非零 | S/R |
+| TC-CALENDAR-CACHE-004 | partial 时请求未形成终态 | cache | 拒绝成功收口 | S/R |
+| TC-CALENDAR-CACHE-005 | provider 重复引用同一 URL | cache | 只消耗一次请求预算，references 去重确定排序 | S/R |
+
+## 14. 年度赛历离线解析
+
+| ID | 前置条件 | 操作 | 预期 | 层级 |
+| --- | --- | --- | --- | --- |
+| TC-CALENDAR-PARSE-001 | JRA schedule/history 缓存 | 解析 | 唯一目标生成 provider row 与 events_japan.csv | S |
+| TC-CALENDAR-PARSE-002 | TOBA 年鉴缓存 | 解析 | 同名赛事按场地/距离拆线并生成 Equibase 直接 URL | S |
+| TC-CALENDAR-PARSE-003 | BHA 平地+障碍 PDF 文本 | 解析 | 合并年度目录，英制距离原样保留，目标恰好一次 | S |
+| TC-CALENDAR-PARSE-004 | France Galop 平地+障碍 PDF 文本 | 解析 | 公制距离保留 `m`，场地/届次正确 | S |
+| TC-CALENDAR-PARSE-005 | HKJC 跨年赛季文本 | 解析 | edition year 与自然日期分别保留，单位为明确公制 | S |
+| TC-CALENDAR-PARSE-006 | PDF 无可提取文本 | 解析 | 受影响 targets 进入带 cache identity 的 gap，不猜格式 | S |
+| TC-CALENDAR-PARSE-007 | request ledger failed | 解析 | 受影响 targets 进入 source_request_failed gap，其他继续 | S |
+| TC-CALENDAR-PARSE-008 | 匹配缺失或多义 | 解析 | 对应 target 进入明确 gap，complete+gap=scope | S |
+| TC-CALENDAR-PARSE-009 | cache manifest path/size/SHA/source URL 漂移 | 解析 | fail closed，最终目录不存在 | S |
+| TC-CALENDAR-PARSE-010 | catalog/selection 地区或年份漂移 | 解析 | fail closed | S |
+| TC-CALENDAR-PARSE-011 | 未知 parser 或 parser options 类型错误 | 解析 | fail closed | S |
+| TC-CALENDAR-PARSE-012 | 同 target 被两份来源解析出冲突日期 | 解析 | conflict gap，保留双方身份 | S |
+| TC-CALENDAR-PARSE-013 | recorded_at 无时区或不固定 | 解析 | 拒绝 | S |
+| TC-CALENDAR-PARSE-014 | 输入顺序变化、同 recorded_at | 解析两次 | canonical 业务输出一致 | S |
+| TC-CALENDAR-PARSE-015 | 输出第二个文件时异常/目录已存在 | 解析 | 原子失败，不覆盖、不留半套 | S |
+| TC-CALENDAR-PARSE-016 | 1250 targets、10 个年度源 | 解析 | 30 秒/额外 RSS 256 MiB 内完成，不常驻 PDF body | S |
+| TC-CALENDAR-PARSE-017 | BHA/France/HK 目录只有年度赛历 URL | 解析 | events complete，但不生成伪 result provider row | S |
+| TC-CALENDAR-PARSE-018 | JRA/TOBA 有唯一直接赛果 URL | 解析 | events 与 provider row 同时生成，URL/provenance 一致 | S |
+| TC-CALENDAR-PARSE-019 | cache artifact 复制到新 shard 根 | 解析 | manifest 原 root 只作 provenance，按声明复制根和相对 path 复核成功 | S/C |
+| TC-CALENDAR-PARSE-020 | France Galop 固定列障碍分组汇总 PDF | 解析 | layout 模式保留列边界，补齐详细赛程未覆盖的赛事 | S |
+| TC-CALENDAR-PARSE-021 | 同目标详细赛程与汇总表日期冲突且同质量 | 解析 | 详细赛程优先，汇总表不覆盖；输出仍唯一完整 | S |
+| TC-CALENDAR-PLAN-001 | 新 parser recipe 声明地区+年份 | build plan | actual scope 精确等于 shard，cache 目录逐文件绑定 | S/C |
+| TC-CALENDAR-PLAN-002 | recipe 少地区/年份/recorded_at | build plan | 拒绝 | S/C |
+| TC-CALENDAR-PLAN-003 | recipe selection 实际含额外年份/地区 | build plan | 按显式地区+年份过滤；若仍与 shard 不等则拒绝 | S/C |
+| TC-CALENDAR-PLAN-004 | parser 工具不在白名单或 SHA 漂移 | validate/run | 创建 run 前拒绝 | S/R |
+| TC-CALENDAR-PLAN-005 | verify parse stage 声明 network=true/write=true，或 cache 尚未完成 | 生产门禁 | 拒绝启动 | R/O |
+| TC-CALENDAR-PLAN-006 | legacy descriptor 缺 phase | build plan | 继续按 crawl 生成，既有 batch 行为不变 | S/C |
+| TC-CALENDAR-PLAN-007 | verify descriptor 有 resource_limits 或非零 request budget | build plan | 拒绝 | S/C |
+| TC-CALENDAR-PLAN-008 | verify descriptor 合法且 parser tool 已批准 | build/run | plan 为 network=false/write=false，保留锁/心跳/checkpoint | S/R |
+| TC-CALENDAR-PLAN-009 | parser recipe 输出目录 | build/run | plan 使用 output_directories，checkpoint 绑定全部成员相对路径/size/SHA | S/R |
+| TC-CALENDAR-PLAN-010 | 完成后输出目录新增/删除/替换成员或 symlink | resume | checkpoint mismatch，拒绝跳过已完成 step | R |

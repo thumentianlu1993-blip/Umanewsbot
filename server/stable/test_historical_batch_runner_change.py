@@ -327,6 +327,43 @@ class HistoricalBatchRunnerPlanTests(SimpleTestCase):
             with self.assertRaisesMessage(RunnerPlanError, "input SHA"):
                 validate_runner_plan(plan)
 
+    def test_output_directories_are_distinct_from_file_outputs(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = self._plan(root, phase="verify")
+            output_directory = root / "artifacts" / "calendar-output"
+            plan["steps"][0]["outputs"] = []
+            plan["steps"][0]["output_directories"] = [str(output_directory)]
+            normalized = validate_runner_plan(plan)
+            self.assertEqual(
+                normalized["steps"][0]["output_directories"],
+                [{"path": str(output_directory.resolve())}],
+            )
+
+            plan["steps"][0]["output_directories"] = [str(root / "outside")]
+            with self.assertRaisesMessage(RunnerPlanError, "output directory"):
+                validate_runner_plan(plan)
+
+    def test_output_claims_cannot_overlap_across_steps(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            plan = self._plan(root, phase="verify")
+            output_directory = root / "artifacts" / "calendar-output"
+            plan["steps"][0]["outputs"] = []
+            plan["steps"][0]["output_directories"] = [str(output_directory)]
+            plan["steps"].append(
+                {
+                    "id": "nested-output",
+                    "kind": "python_tool",
+                    "argv": ["python", str(root / "tools" / "sample.py")],
+                    "inputs": [],
+                    "outputs": [str(output_directory / "events.csv")],
+                }
+            )
+
+            with self.assertRaisesMessage(RunnerPlanError, "output paths overlap"):
+                validate_runner_plan(plan)
+
     def test_apply_step_accepts_only_structured_approved_identity(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -570,6 +607,55 @@ class HistoricalBatchRunnerStateTests(SimpleTestCase):
             )})
             self.assertTrue(runner_checkpoint_matches(run))
             self.assertFalse(runner_checkpoint_matches(run, alternate))
+
+    def test_checkpoint_rejects_file_output_replaced_by_same_content_symlink(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "output.json"
+            replacement = root / "replacement.json"
+            output.write_text("{}\n", encoding="utf-8")
+            replacement.write_bytes(output.read_bytes())
+            state = {
+                "run_id": "symlink-output",
+                "batch_id": "batch",
+                "phase": "verify",
+                "image_id": "sha256:" + "1" * 64,
+                "image_revision": "a" * 40,
+                "plan_sha256": "b" * 64,
+                "completed_steps": [
+                    {
+                        "outputs": [
+                            {
+                                "path": str(output),
+                                "size": output.stat().st_size,
+                                "sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+                            }
+                        ],
+                        "output_directories": [],
+                    }
+                ],
+            }
+            write_runtime_state(root / "runner-state.json", state)
+            run = SimpleNamespace(
+                artifact_root=str(root),
+                checkpoint=state,
+                **{
+                    key: state[key]
+                    for key in (
+                        "run_id",
+                        "batch_id",
+                        "phase",
+                        "image_id",
+                        "image_revision",
+                        "plan_sha256",
+                    )
+                },
+            )
+            self.assertTrue(runner_checkpoint_matches(run))
+            output.unlink()
+            output.symlink_to(replacement)
+
+            self.assertFalse(runner_checkpoint_matches(run))
 
 
 class HistoricalBatchRunnerCommandTests(TestCase):
@@ -909,6 +995,92 @@ class HistoricalBatchRunnerLeaseTests(TestCase):
 
 
 class HistoricalBatchRunnerExecutionTests(TestCase):
+    def test_verify_checkpoint_tracks_each_output_directory_member(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            artifact_root = root / "artifacts"
+            tool_root = root / "tools"
+            output_directory = artifact_root / "calendar-output"
+            empty_output_directory = artifact_root / "empty-cache"
+            artifact_root.mkdir()
+            tool_root.mkdir()
+            tool_path = tool_root / "directory_writer.py"
+            tool_path.write_text(
+                "import sys\n"
+                "from pathlib import Path\n"
+                "root = Path(sys.argv[1])\n"
+                "root.mkdir()\n"
+                "(root / 'events.csv').write_text('target_id\\n1\\n', encoding='utf-8')\n"
+                "(root / 'manifest.json').write_text('{}\\n', encoding='utf-8')\n"
+                "Path(sys.argv[2]).mkdir()\n",
+                encoding="utf-8",
+            )
+            plan = {
+                "schema_version": "1.0",
+                "batch_id": "2016-2025-batch-006-directory-checkpoint",
+                "phase": "verify",
+                "network_enabled": False,
+                "write_enabled": False,
+                "image_id": "sha256:" + "1" * 64,
+                "image_revision": "a" * 40,
+                "artifact_root": str(artifact_root),
+                "tool_root": str(tool_root),
+                "tool_manifest": {
+                    tool_path.name: hashlib.sha256(tool_path.read_bytes()).hexdigest()
+                },
+                "steps": [
+                    {
+                        "id": "directory-writer",
+                        "kind": "python_tool",
+                        "argv": [
+                            "python",
+                            str(tool_path),
+                            str(output_directory),
+                            str(empty_output_directory),
+                        ],
+                        "inputs": [],
+                        "outputs": [],
+                        "output_directories": [
+                            str(output_directory),
+                            str(empty_output_directory),
+                        ],
+                    }
+                ],
+            }
+            plan_path = artifact_root / "runner-plan.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            run = create_runner_run(
+                batch_id=plan["batch_id"],
+                phase=plan["phase"],
+                artifact_root=str(artifact_root),
+                plan_sha256=hashlib.sha256(plan_path.read_bytes()).hexdigest(),
+                image_id=plan["image_id"],
+                image_revision=plan["image_revision"],
+            )
+            with self.settings(
+                HISTORICAL_RUNNER_TOOL_ROOT=str(tool_root),
+                HISTORICAL_RACE_BACKFILL_ENABLED=True,
+                HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=False,
+            ):
+                execute_runner_plan(
+                    run=run,
+                    plan_path=plan_path,
+                    owner_token="owner",
+                    lock_path=artifact_root / ".runner.lock",
+                )
+            run.refresh_from_db()
+            identities = run.checkpoint["completed_steps"][0]["output_directories"]
+            self.assertEqual(
+                [member["path"] for member in identities[0]["files"]],
+                ["events.csv", "manifest.json"],
+            )
+            self.assertEqual(identities[1]["files"], [])
+            self.assertTrue(runner_checkpoint_matches(run))
+            (output_directory / "events.csv").write_text(
+                "target_id\n2\n", encoding="utf-8"
+            )
+            self.assertFalse(runner_checkpoint_matches(run))
+
     def _environment_probe_run(self, root: Path) -> tuple[HistoricalBatchRun, Path, Path, Path]:
         artifact_root = root / "artifacts"
         tool_root = root / "tools"

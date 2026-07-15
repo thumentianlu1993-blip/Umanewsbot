@@ -82,6 +82,19 @@ class RaceEventSourceCacheTests(SimpleTestCase):
             self.assertEqual(manifest["total_bytes"], 6)
             self.assertEqual(len(manifest["files"]), 1)
 
+    def test_empty_source_cache_manifest_is_a_valid_terminal_artifact(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with self._environment(root):
+                manifest_path = self.module.ensure_source_cache_manifest(
+                    root / "outputs" / "cache" / ".calendar-cache"
+                )
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(manifest["root"], str(root.resolve()))
+        self.assertEqual(manifest["files"], {})
+        self.assertEqual(manifest["total_bytes"], 0)
+
     def test_disk_floor_fails_before_partial_cache_write(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -419,3 +432,66 @@ class HistoricalRaceDateSourceCacheTests(SimpleTestCase):
         self.assertEqual(failed["http_status"], 200)
         self.assertEqual(failed["final_url"], response["final_url"])
         self.assertEqual(failed["redirect_chain"], response["redirect_chain"])
+
+    def test_partial_cache_succeeds_only_after_all_requests_have_terminal_ledger_rows(self):
+        result = {
+            "request_count": 2,
+            "success_count": 1,
+            "failure_count": 1,
+            "request_ledger": [
+                {"status": "succeeded", "source_url": "https://www.jra.go.jp/a"},
+                {"status": "failed", "source_url": "https://www.jra.go.jp/b"},
+            ],
+        }
+        self.assertEqual(self.module.cache_command_exit_code(result, allow_partial=False), 2)
+        self.assertEqual(self.module.cache_command_exit_code(result, allow_partial=True), 0)
+
+        result["request_ledger"][1]["status"] = "started"
+        with self.assertRaisesMessage(self.module.DateSourceCacheError, "terminal"):
+            self.module.cache_command_exit_code(result, allow_partial=True)
+
+    def test_failure_summary_counts_unique_affected_targets(self):
+        rows = [
+            {
+                "adapter_key": "jra",
+                "target_id": target_id,
+                "target_sha256": str(target_id) * 64,
+                "series_key": f"race-{target_id}",
+                "edition_year": 2024,
+                "urls": {"calendar_source": {"url": "https://www.jra.go.jp/calendar.pdf"}},
+            }
+            for target_id in (1, 2)
+        ]
+        with TemporaryDirectory() as tmp, patch.object(
+            self.module, "before_network_request"
+        ), patch.object(
+            self.module, "fetch_https", side_effect=self.module.SafeHttpError("offline")
+        ):
+            result = self.module.cache_provider_rows(rows, output_root=Path(tmp), timeout=10)
+
+        self.assertEqual(result["failure_count"], 1)
+        self.assertEqual(result["failed_urls"], ["https://www.jra.go.jp/calendar.pdf"])
+        self.assertEqual(result["affected_target_count"], 2)
+        references = result["request_ledger"][0]["target_references"]
+        self.assertEqual([item["target_id"] for item in references], [1, 2])
+
+    def test_calendar_provider_rejects_invalid_target_identity_before_network(self):
+        row = {
+            "adapter_key": "jra",
+            "target_id": True,
+            "target_sha256": "a" * 64,
+            "series_key": "japan-race",
+            "edition_year": 2024,
+            "urls": {
+                "calendar_source": {
+                    "url": "https://www.jra.go.jp/calendar.html"
+                }
+            },
+        }
+        with TemporaryDirectory() as tmp, patch.object(
+            self.module, "before_network_request"
+        ) as budget, self.assertRaisesMessage(
+            self.module.DateSourceCacheError, "target identity"
+        ):
+            self.module.cache_provider_rows([row], output_root=Path(tmp), timeout=10)
+        budget.assert_not_called()

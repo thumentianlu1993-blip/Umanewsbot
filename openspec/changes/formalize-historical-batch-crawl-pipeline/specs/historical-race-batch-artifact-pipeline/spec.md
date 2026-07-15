@@ -96,3 +96,56 @@
 #### Scenario: 1250 target 性能契约
 - **WHEN** fixture 包含 1250 targets、10 shards 和每 target 20 条 runner/result
 - **THEN** 纯 artifact 编排在 30 秒和 256 MiB 额外 RSS 内完成，数据库 verifier 查询数不超过 20
+
+### Requirement: 年度赛历来源请求必须由冻结 catalog 展开
+系统 MUST 从 approved selection 和版本化 source catalog 生成逐 target 来源请求。catalog MUST 显式绑定来源 ID、地区、届次年份、adapter、HTTPS URL、parser 与来源级别；任一 target 没有来源映射或来源跨 scope 时不得生成请求 artifact。
+
+#### Scenario: 多份年度目录覆盖同一地区年份
+- **WHEN** 英国某届同时需要平地和障碍年度目录，且 catalog 两份来源都合法
+- **THEN** 系统为该 scope 的每个 target 绑定两份来源，并使 cache 对共享 URL 只请求一次而保留全部 target references
+
+#### Scenario: 同一 URL 跨届次年共享
+- **WHEN** 一个正式目录 URL 同时覆盖相邻两个届次年，request/ledger 使用全量 selection 与 catalog，而 parser 按地区+年份分片
+- **THEN** cache 只请求一次，ledger target references 精确等于两届来源 scope 的并集；每个 parser shard 仍只消费自己的 target scope
+
+#### Scenario: catalog 漏掉 target 或引用错误年份
+- **WHEN** 任一 target 没有匹配 source，或 source 的地区/届次年与 target 不一致
+- **THEN** 请求生成器 fail closed，不用空 URL 或人工默认值补齐
+
+### Requirement: 赛历缓存允许显式、完整记账的部分失败
+日期 source cache MUST 默认因任一请求失败返回非零；仅在操作者显式启用 partial 且全部唯一请求均已形成 succeeded/failed 终态账本时，才可继续下一阶段。失败请求 MUST 保留 URL、错误、受影响 target references 和请求身份，不得计入成功或数据完整率。
+
+#### Scenario: 一个年度 PDF 暂时不可得
+- **WHEN** 其余请求成功、该 PDF 请求失败且正式 recipe 显式允许 partial
+- **THEN** cache 完整写出 ledger/summary 并成功结束 stage，后续 parser 将受影响 target 转为 evidence-backed gap
+
+#### Scenario: 未显式允许 partial
+- **WHEN** 任一请求失败且 recipe 未声明 partial
+- **THEN** cache 返回非零，runner 停在该 step 的安全边界
+
+### Requirement: 缓存年度赛历必须离线解析为完整输入或证据缺口
+系统 MUST 使用 tracked runner 工具离线读取 selection、source catalog、request ledger、source-cache manifest 和缓存目录，复核每个缓存文件 path/size/SHA/source URL，再按显式 parser 生成可选直接 provider rows、地区 events CSV、gap ledger、summary 与 manifest。每个 scope target MUST 恰好属于 calendar-complete 或 gap；calendar-complete 必须有可信 local_date，但只有来源给出唯一直接赛果 URL 时才允许生成 provider row。
+
+#### Scenario: BHA 与 France Galop PDF 正常解析
+- **WHEN** 缓存身份一致、PDF 可提取文本且赛事唯一匹配
+- **THEN** 系统保留英国原始英制距离、法国公制距离和 source provenance，生成带 local_date 的 events CSV
+
+#### Scenario: 法国障碍汇总表仅作补充
+- **WHEN** 固定列分组汇总表可补齐详细赛程缺少的场地赛事，但同一目标的汇总日期与同质量详细赛程不同
+- **THEN** 系统使用布局保留解析补齐缺失目标，并让逐场详细赛程优先；汇总日期不得覆盖详细记录
+
+#### Scenario: HKJC 跨年赛季目录
+- **WHEN** HKJC 赛季来源包含上一自然年下半年和本自然年上半年
+- **THEN** 系统按 edition year 绑定目标并保留实际 local_date，不把跨年赛事改到错误届次
+
+#### Scenario: 缓存 SHA 漂移
+- **WHEN** manifest/ledger 声明的缓存文件与磁盘 size 或 SHA 不一致
+- **THEN** 解析器 fail closed，不生成 complete 或通用 gap
+
+#### Scenario: 来源已记账失败或匹配多义
+- **WHEN** cache ledger 为 failed，或解析后一个 target 无唯一匹配
+- **THEN** 解析器为该 target 生成带 catalog、ledger 和 source identity 的 gap，并继续其他 target
+
+#### Scenario: 年度目录只有日期而没有赛果 URL
+- **WHEN** BHA、France Galop 或 HKJC 年度目录唯一定位了赛事日期，但页面不是该场具体赛果
+- **THEN** 系统生成 event row 且不生成该 target 的 provider row；后续详情 preparer 必须找到真实赛果 URL 后才能进入 date fragment merger

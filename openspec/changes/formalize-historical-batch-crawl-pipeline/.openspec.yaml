@@ -3,6 +3,14 @@ created: 2026-07-14
 profile: feature
 phase: applying
 journal:
+  - event: plan-reviewed
+    date: "2026-07-15T08:40:09+08:00"
+    session: 2
+    mode: full
+    rounds: 4
+    issues_resolved: 10
+    artifacts_modified: [proposal.md, design.md, tasks.md, test_cases.md, engineering_review.md, specs/historical-race-batch-artifact-pipeline/spec.md, specs/race-event-data-crawl-orchestration/spec.md]
+    note: "Added the missing formal annual-calendar path: catalog request expansion, terminal partial cache accounting, offline parser output, portable cache identity, truthful result-URL semantics, crawl/verify phase separation, and output-directory checkpoints. Final review approved."
   - event: production-deployed
     date: "2026-07-15T08:26:00+08:00"
     session: 1
@@ -11,17 +19,18 @@ journal:
     backup: "pre-main-ab95c6ef-20260715_081056.dump sha256:924a3aed9d6d8c204c2fc0b0608444a6830c5f09bfd61d2b733e991b7145c127"
     note: "Only web/worker/beat were replaced. Crawl/apply isolation, pause/resume checkpointing and immutable tool-root rejection passed; persistent and public historical flags remained off."
   - event: implementation-verified
-    date: "2026-07-15T12:55:00+08:00"
-    session: 1
-    tests: "stable 1466/1466 (10 skips); historical combination 263/263 (3 skips); 1250-target performance 2/2; PostgreSQL 16 read-only injection 1/1; OpenSpec 30/30"
-    note: "Django check, migration drift, Python compile, runner shell syntax and diff checks also passed. Temporary PostgreSQL container and network were removed."
+    date: "2026-07-15T12:07:00+08:00"
+    session: 2
+    tests: "stable 1524/1524 (11 skips); annual-calendar/source 118/118 (1 skip); historical runner 70/70; 1250-target performance 3/3; OpenSpec 30/30"
+    note: "Django check, migration drift, Python compile and diff checks passed. France 2023 and 2024 official-source smoke completed 120/120 and 130/130 with zero issues."
   - event: code-review-approved
-    date: "2026-07-15T12:10:00+08:00"
-    session: 1
-    rounds: 19
+    date: "2026-07-15T12:07:00+08:00"
+    session: 2
+    rounds: 4
+    issues_resolved: 7
     final_findings: 0
-    tests: "pipeline+runner 107/107 passed, 3 environment skips"
-    note: "Repeated review/fix cycles closed identity agreement, evidence provenance, target-local evidence conflicts, semantic year/limit/date scope, atomic publication and runner/verifier hardening. The final full review found no actionable issue."
+    tests: "stable 1524/1524 passed, 11 environment skips"
+    note: "Closed full/scoped ledger and shared-URL identity, global output overlap, strict JSON integer identity across selection/catalog/ledger/fragments, file-symlink checkpoint and France detailed-source priority issues. The final full review found no actionable issue."
   - event: implementation-local
     date: "2026-07-15T08:25:00+08:00"
     session: 1

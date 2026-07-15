@@ -216,6 +216,119 @@ class HistoricalBatchPlanFixture:
 
 
 class HistoricalBatchPlanTests(SimpleTestCase, HistoricalBatchPlanFixture):
+    def test_calendar_parser_builds_verify_plan_without_network_write_or_resource_budget(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _descriptor_path, descriptor = self.make(root)
+            selection_path = Path(descriptor["selection"]["path"])
+            selection = json.loads(selection_path.read_text())
+            for target in selection["targets"]:
+                target["country_region"] = RacingRegion.UNITED_KINGDOM
+                target["year"] = 2024
+            selection_sha = _write_json(selection_path, selection)
+            manifest_path = Path(descriptor["batch_manifest"]["path"])
+            manifest = json.loads(manifest_path.read_text())
+            manifest["artifacts"]["selection_snapshot"].update(
+                sha256=selection_sha, size=selection_path.stat().st_size
+            )
+            manifest_sha = _write_json(manifest_path, manifest)
+            approval_path = Path(descriptor["approval"]["path"])
+            approval = json.loads(approval_path.read_text())
+            approval["manifest_identity"].update(
+                sha256=manifest_sha, size=manifest_path.stat().st_size
+            )
+            approval_sha = _write_json(approval_path, approval)
+
+            catalog = root / "bootstrap" / "catalog.json"
+            _write_json(catalog, {"schema_version": "1.0", "sources": []})
+            ledger = root / "bootstrap" / "ledger.jsonl"
+            _write_jsonl(ledger, [{"status": "succeeded"}])
+            cache = root / "bootstrap" / "cache"
+            cache.mkdir()
+            cache_manifest = root / "bootstrap" / "cache-manifest.json"
+            _write_json(cache_manifest, {"schema_version": "1.0", "files": {}})
+            tool_root = Path(__file__).resolve().parents[2] / "runtime" / "tools"
+            tool_name = "prepare_historical_race_calendar_inputs.py"
+            tool_path = tool_root / tool_name
+
+            descriptor.update(
+                phase="verify",
+                selection={"path": str(selection_path), "sha256": selection_sha},
+                batch_manifest={"path": str(manifest_path), "sha256": manifest_sha},
+                approval={"path": str(approval_path), "sha256": approval_sha},
+                tool_root=str(tool_root),
+                tool_manifest={tool_name: hashlib.sha256(tool_path.read_bytes()).hexdigest()},
+            )
+            descriptor.pop("resource_limits")
+            descriptor["shards"][0].update(
+                country_region=RacingRegion.UNITED_KINGDOM,
+                request_budget=0,
+                recipes=[
+                    {
+                        "tool": tool_name,
+                        "inputs": {
+                            "selection_snapshot": [str(selection_path)],
+                            "source_catalog": [str(catalog)],
+                            "source_cache_manifest": [str(cache_manifest)],
+                            "request_ledger": [str(ledger)],
+                            "source_cache_root": [str(cache)],
+                        },
+                        "outputs": {"output_dir": "outputs/calendar"},
+                        "options": {
+                            "country_region": RacingRegion.UNITED_KINGDOM,
+                            "year": 2024,
+                            "recorded_at": RECORDED_AT,
+                        },
+                    }
+                ],
+            )
+            path = root / "verify-descriptor.json"
+            _write_json(path, descriptor)
+            result = build_historical_batch_shard_plan(
+                descriptor_path=path,
+                shard_id="japan-01",
+                output_dir=root / "published",
+            )
+            plan = json.loads((root / "published" / "runner-plan.json").read_text())
+
+            self.assertEqual(result["target_count"], 2)
+            self.assertEqual(plan["phase"], "verify")
+            self.assertFalse(plan["network_enabled"])
+            self.assertFalse(plan["write_enabled"])
+            self.assertNotIn("resource_limits", plan)
+            self.assertEqual(plan["steps"][0]["outputs"], [])
+            self.assertEqual(
+                plan["steps"][0]["output_directories"],
+                [{"path": str((root / "published" / "outputs" / "calendar").resolve())}],
+            )
+
+            invalid = deepcopy(descriptor)
+            invalid["resource_limits"] = {
+                "request_budget": 1,
+                "max_source_cache_bytes": 1024,
+                "min_free_disk_bytes": 5 * 1024 * 1024 * 1024,
+                "request_interval_seconds": 1,
+            }
+            invalid_path = root / "invalid-verify-descriptor.json"
+            _write_json(invalid_path, invalid)
+            with self.assertRaises(HistoricalBatchPipelineError):
+                build_historical_batch_shard_plan(
+                    descriptor_path=invalid_path,
+                    shard_id="japan-01",
+                    output_dir=root / "invalid-published",
+                )
+
+            invalid_null = deepcopy(descriptor)
+            invalid_null["resource_limits"] = None
+            invalid_null_path = root / "invalid-null-verify-descriptor.json"
+            _write_json(invalid_null_path, invalid_null)
+            with self.assertRaises(HistoricalBatchPipelineError):
+                build_historical_batch_shard_plan(
+                    descriptor_path=invalid_null_path,
+                    shard_id="japan-01",
+                    output_dir=root / "invalid-null-published",
+                )
+
     def test_builds_canonical_plan_bound_to_selection_approval_tools_and_scope(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -282,14 +395,14 @@ class HistoricalBatchPlanTests(SimpleTestCase, HistoricalBatchPlanFixture):
                         output_dir=root / "published",
                     )
 
-    def test_selection_boolean_identity_values_are_rejected(self):
-        for field in ("target_id", "year"):
-            with self.subTest(field=field), tempfile.TemporaryDirectory() as tmp:
+    def test_selection_non_integer_identity_values_are_rejected(self):
+        for field, value in (("target_id", True), ("target_id", 1.5), ("year", True), ("year", 2024.5)):
+            with self.subTest(field=field, value=value), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 _descriptor_path, descriptor = self.make(root)
                 selection_path = Path(descriptor["selection"]["path"])
                 selection = json.loads(selection_path.read_text())
-                selection["targets"][0][field] = True
+                selection["targets"][0][field] = value
                 selection_sha = _write_json(selection_path, selection)
 
                 manifest_path = Path(descriptor["batch_manifest"]["path"])
@@ -856,8 +969,8 @@ class HistoricalBatchFormalResourceTests(TestCase, HistoricalBatchPlanFixture):
             selection_path = plan["batch_identity"]["selection"]["path"]
 
             overwritten = deepcopy(plan)
-            old_output = overwritten["steps"][0]["outputs"][0]["path"]
-            overwritten["steps"][0]["outputs"][0]["path"] = selection_path
+            old_output = overwritten["steps"][0]["output_directories"][0]["path"]
+            overwritten["steps"][0]["output_directories"][0]["path"] = selection_path
             overwritten["steps"][0]["argv"] = [
                 selection_path if value == old_output else value
                 for value in overwritten["steps"][0]["argv"]
@@ -1049,6 +1162,27 @@ class HistoricalBatchFragmentFixture:
 
 
 class HistoricalBatchFragmentMergeTests(SimpleTestCase, HistoricalBatchFragmentFixture):
+    def test_fractional_json_fragment_identity_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            selection, targets = self.make(root)
+            fragment = self.date_row(targets[0], local_date="2024-01-01")
+            fragment["target_id"] = float(targets[0]["target_id"]) + 0.5
+            fragments = root / "fragments.jsonl"
+            _write_jsonl(fragments, [fragment])
+            with self.assertRaisesMessage(
+                HistoricalBatchPipelineError, "fragment target is outside selection"
+            ):
+                merge_historical_race_fragments(
+                    mode="date",
+                    selection_path=selection,
+                    fragment_paths=[fragments],
+                    gap_paths=[],
+                    evidence_paths=[],
+                    output_dir=root / "output",
+                    recorded_at=RECORDED_AT,
+                )
+
     def test_rejects_impossible_dates_and_malformed_evidence_timestamps(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

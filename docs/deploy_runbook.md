@@ -4436,3 +4436,15 @@ python manage.py evaluate_multiregion_attribution_gold \
 5. 内部和公网 healthz 为 `ok`，公网首页和 `/races/` 为 `200`，近期 web/worker/beat 日志无 traceback/critical/integrityerror/exception。
 6. `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，多地区归属和相关查询开关也保持关闭；本次未执行历史写入。
 7. 切换完成后的旧预期曾为 `249 candidate / 1 gap`，后续已由 Hampton 移师证据修正为 `250 candidate / 0 gap` 并按独立 approval、备份、dry-run 与写后核验完成导入；旧 Hampton gap 不得恢复。
+
+# Batch006 年度赛历 11 分片运行手册（2026-07-15）
+
+1. 固定全批身份：1061 targets；manifest `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`、selection `b9a3ad6556cfd03e9a57874bec763f75ad4c45e7642751140cb063f1d0553637`、approval `a119e3bcfd3bc8940cf8b792e246e462b405c292b77f2996739b435c9185d835`。任何 SHA 漂移都停止，不从当前数据库重新生成替代审批。
+2. 按 11 个 scope 生成 selection/catalog 副本：FR `2023=120 / 2024=130`，HK `2016=35 / 2017=26`，JP `2022=88 / 2023=138 / 2024=24`，UK `2024=196 / 2025=54`，US `2024=83 / 2025=167`。核对全批 target 并集 1061、交集 0、每片不超过 250。
+3. 每个 scope 先运行 tracked request builder，核对 source catalog、HTTPS host、parser/adapter、target coverage 和 manifest。共享 URL 只请求一次；若 ledger 跨年份复用，其 target references 必须等于 catalog 来源 scope 的精确并集。
+4. cache stage 使用 historical runner `crawl` phase：`network=true/write=false`，按唯一 URL 计请求预算。默认任一请求失败即停；只有 descriptor 显式 `allow_partial` 且所有请求均形成 succeeded/failed 终态时才继续。不得把 failed 记为 complete。
+5. parse stage 使用 runner `verify` phase：`network=false/write=false`、request budget=0、无 resource_limits。复制并绑定已完成 cache 的 manifest/ledger/全部成员，离线生成 provider rows、events CSV、gaps、summary 和 manifest；逐成员 checkpoint 后禁止新增、删除、替换或 symlink。
+6. France Galop 解析同时消费平地 programme、障碍详细赛程和固定列分组汇总；汇总仅补缺，详细赛程优先。英国距离保留英制原文，法港日保留明确公制；不在编排层统一换算。
+7. 每个 scope 要求 `complete + gap = scope` 且二者无交集。gap 记录来源/ledger/cache/target identity 后继续其他 scope；汇总时分别报告 accounted rate 与 data complete rate，日美零星缺口留到全量正式总账完成后统一审核。
+8. 日期候选、详情来源、最终详情三阶段分别执行 dry-run；每次 commit 前独立创建并校验数据库备份，commit 使用 `network=false/write=true`，写后运行正式只读 verifier。任一 `error>0`、published>0、身份漂移或锁/事务异常即停止。
+9. 全批收口核对 1061 targets、五地区 events/runners/results、gap 清单、OperationLog、runner/checkpoint、Redis/Celery/事务和 healthz。常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`、`RACE_EVENT_HISTORICAL_PUBLIC_ENABLED=false`，直到用户统一审核并另行批准公开。

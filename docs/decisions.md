@@ -1377,3 +1377,10 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 低成本 Compose 的 PostgreSQL 主机名 `db` 只在容器网络内可解析，宿主机直接运行备份脚本可能在 `pg_dump` 阶段失败；脚本后续依赖或错误处理不完整时，仍可能打印看似成功的备份路径。部署门禁因此以命令退出码、文件非空、`gzip -t` 和 SHA-256 四项为准，缺一项都不能继续 retag 或重建生产容器。
 
 在备份脚本修复前，允许使用数据库容器内 `pg_dump`、宿主机只负责压缩落盘的回退路径。该路径仍必须生成独立的 `pre-<change>-<timestamp>.sql.gz`，完成完整性校验并记录 SHA-256；失败文件不得覆盖或冒充有效恢复点。
+
+# 2026-07-15：年度赛历按地区与届次年分片，汇总来源只作补充证据
+
+- batch006 的年度赛历 request/cache/parse 不按五个地区粗分，而按 11 个“地区+届次年”scope 执行；每片 target 数不超过 250，parser 的 edition year 和地区边界因此可被 typed recipe 精确证明。
+- 同一个年度目录 URL 可以服务多个届次年。网络 cache 对 URL 只请求一次，但 ledger 的 target references 必须精确等于 catalog 中所有引用该 URL 的来源 scope 并集；每个 parse shard 仍只输出本 scope targets。
+- France Galop 固定列障碍分组汇总表使用 layout-aware PDF 解析，只补齐逐场详细赛程未覆盖的赛事；同等来源质量下详细赛程优先，汇总摘要不得覆盖详细记录。
+- 完整 catalog/selection 与 scope 副本均可作为 stage 输入，但必须保留全量身份校验。少量匹配歧义、来源失败或确认事项进入 evidence-backed gap，并继续其他 scope；未知 parser、身份漂移或分母缺失仍 fail closed。

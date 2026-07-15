@@ -1,11 +1,11 @@
 # 项目状态文档
 
-## 2026-07-15 historical batch 正式流水线已部署
+## 2026-07-15 batch006 年度赛历流水线本地验收完成
 
-- `formalize-historical-batch-crawl-pipeline` 已完成方案、工程评审、完整实现、零问题 code review、完整回归和生产部署。最终门禁为 pipeline+runner `107/107`、完整 stable `1466/1466`、历史组合 `263/263`、性能 `2/2`、PostgreSQL READ ONLY `1/1`、OpenSpec `30/30`。
-- 生产现为 `main@ab95c6ef` / image `sha256:8040b87e...9d8`，写前备份 SHA-256 `924a3aed...5c127`；runner 四类强化 smoke 和最终空锁/空队列验收通过，历史常驻与公开开关关闭。
-- batch006 仍为 1061 场 approved selection，网络抓取、赛事写入和公开展示均未启动；当前进入正式 descriptor 与分片计划生成阶段。
-- batch006 正式身份：manifest `62aca6...6e3`、selection `b9a3ad...637`、approval `a119e3...835`；正式 descriptor 必须将五地区 `250/61/250/250/250` 精确覆盖且每 shard 不超过 250 个批准目标。
+- 正式年度赛历 request/cache/parse 流水线已完成实现和零问题 review：支持全量或分片 ledger、共享 URL 去重、partial 终态、缓存身份复核、五地区 parser、complete/gap 分母及 runner 目录 checkpoint；完整 stable `1524/1524`（11 skip），专项 `118/118`（1 skip）、runner `70/70`、性能 `3/3`、OpenSpec `30/30`。
+- 法国真实官方来源已达到 2023 `120/120`、2024 `130/130`、issues=0；香港现有覆盖 `61/61`、日本 `248/250`、英国 `250/250`、美国 `241/250`，剩余日美缺口继续进入统一审核账本。
+- 生产仍运行旧的已验收流水线 `main@ab95c6ef` / image `sha256:8040b87e...9d8`；healthz、队列、锁、runner 和事务安静，历史常驻与公开开关关闭。新年度赛历代码尚未部署，batch006 未发出正式网络请求，也未写赛事业务表。
+- batch006 仍为 1061 场 approved selection，按 11 个地区×届次年 scope 执行：FR `120/130`、HK `35/26`、JP `88/138/24`、UK `196/54`、US `83/167`。下一步是提交/推送、可复现 AMD64 构建、安全部署，然后逐 scope 抓取并补齐日美 gap。
 
 ## 2026-07-15 historical runner 新镜像已部署，batch006 待正式审批与分片 crawl
 

@@ -14,29 +14,18 @@ from urllib.parse import urlparse
 
 from race_event_request_budget import before_network_request
 from race_event_safe_http import SafeHttpError, fetch_https
-from race_event_source_cache import SourceCacheBudgetExceeded, write_source_cache
+from race_event_source_cache import (
+    SourceCacheBudgetExceeded,
+    ensure_source_cache_manifest,
+    write_source_cache,
+)
+from historical_race_calendar_common import (
+    ADAPTER_ALLOWED_HOSTS,
+    CalendarArtifactError,
+    SHA256_RE,
+    validate_source_url,
+)
 
-
-ADAPTER_ALLOWED_HOSTS = {
-    "jra": ("jra.go.jp",),
-    "netkeiba": ("netkeiba.com",),
-    "jbis": ("jbis.or.jp",),
-    "hkjc": ("hkjc.com",),
-    "uk_racingpost": ("racingpost.com",),
-    "uk_skysports": ("skysports.com",),
-    "uk_sportinglife": ("sportinglife.com",),
-    "uk_irishracing": ("irishracing.com",),
-    "uk_bha": ("britishhorseracing.com",),
-    "france_galop": ("france-galop.com",),
-    "pmu": ("pmu.fr",),
-    "france_irishracing": ("irishracing.com",),
-    "equibase": ("equibase.com",),
-    "brisnet": ("brisnet.com",),
-    "drf": ("drf.com",),
-    "bloodhorse": ("bloodhorse.com",),
-    "nsa": ("nationalsteeplechase.com",),
-    "us_hrn": ("horseracingnation.com",),
-}
 
 
 class DateSourceCacheError(RuntimeError):
@@ -105,16 +94,42 @@ def cache_provider_rows(
         adapter_key = str(row.get("adapter_key") or "").strip()
         if adapter_key not in ADAPTER_ALLOWED_HOSTS:
             raise DateSourceCacheError(f"unsupported date source adapter: {adapter_key}")
+        raw_target_id = row.get("target_id")
+        raw_year = row.get("edition_year")
+        if (
+            raw_target_id not in (None, "")
+            and (not isinstance(raw_target_id, int) or isinstance(raw_target_id, bool))
+        ) or (
+            raw_year not in (None, "")
+            and (not isinstance(raw_year, int) or isinstance(raw_year, bool))
+        ):
+            raise DateSourceCacheError("provider row target identity is invalid")
+        target_id = None if raw_target_id in (None, "") else raw_target_id
+        edition_year = None if raw_year in (None, "") else raw_year
+        target_sha = str(row.get("target_sha256") or "")
+        if (
+            (target_id is not None and target_id <= 0)
+            or (edition_year is not None and not 1800 <= edition_year <= 2200)
+            or (target_sha and not SHA256_RE.fullmatch(target_sha))
+        ):
+            raise DateSourceCacheError("provider row target identity is invalid")
         urls = row.get("urls")
         if not isinstance(urls, dict) or not urls:
             raise DateSourceCacheError("provider row has no source URLs")
         for role, evidence in urls.items():
             if not isinstance(evidence, dict) or not str(evidence.get("url") or "").strip():
                 raise DateSourceCacheError(f"provider row has invalid source URL: {role}")
+            source_url = str(evidence["url"]).strip()
+            try:
+                validate_source_url(source_url, adapter_key)
+            except CalendarArtifactError as exc:
+                raise DateSourceCacheError(str(exc)) from exc
             grouped[(adapter_key, str(evidence["url"]).strip())].append(
                 {
+                    "target_id": target_id,
+                    "target_sha256": target_sha,
                     "series_key": str(row.get("series_key") or ""),
-                    "edition_year": row.get("edition_year"),
+                    "edition_year": edition_year,
                     "role": role,
                 }
             )
@@ -127,7 +142,18 @@ def cache_provider_rows(
             "adapter_key": adapter_key,
             "requested_at": requested_at,
             "source_url": url,
-            "target_references": grouped[(adapter_key, url)],
+            "target_references": sorted(
+                {
+                    json.dumps(reference, ensure_ascii=False, sort_keys=True): reference
+                    for reference in grouped[(adapter_key, url)]
+                }.values(),
+                key=lambda reference: (
+                    int(reference.get("target_id") or 0),
+                    reference.get("series_key") or "",
+                    int(reference.get("edition_year") or 0),
+                    reference.get("role") or "",
+                ),
+            ),
         }
         try:
             before_network_request(url)
@@ -145,23 +171,51 @@ def cache_provider_rows(
                 }
             )
             validate_source_body(url, body, response.get("headers") or {})
-            identity = write_source_cache(output_root / _source_filename(adapter_key, url), body, source_url=url)
+            relative_cache_path = _source_filename(adapter_key, url)
+            identity = write_source_cache(
+                output_root / relative_cache_path, body, source_url=url
+            )
             entry.update(
                 {
                     "status": "succeeded",
                     "source_cache_identity": identity,
+                    "source_cache_relative_path": relative_cache_path,
                 }
             )
         except (OSError, SafeHttpError, SourceCacheBudgetExceeded, RuntimeError) as exc:
             failures += 1
             entry.update({"status": "failed", "error": str(exc)})
         ledger.append(entry)
+    failed_entries = [entry for entry in ledger if entry["status"] == "failed"]
+    affected_target_ids = {
+        int(reference["target_id"])
+        for entry in failed_entries
+        for reference in entry["target_references"]
+        if reference.get("target_id") not in (None, "")
+        and not isinstance(reference.get("target_id"), bool)
+    }
     return {
         "request_count": len(ledger),
         "success_count": len(ledger) - failures,
         "failure_count": failures,
+        "failed_urls": sorted(entry["source_url"] for entry in failed_entries),
+        "affected_target_count": len(affected_target_ids),
         "request_ledger": ledger,
     }
+
+
+def cache_command_exit_code(result: Mapping, *, allow_partial: bool) -> int:
+    ledger = result.get("request_ledger")
+    if not isinstance(ledger, list) or len(ledger) != result.get("request_count"):
+        raise DateSourceCacheError("date source request ledger is incomplete")
+    statuses = [entry.get("status") for entry in ledger if isinstance(entry, dict)]
+    if len(statuses) != len(ledger) or any(status not in {"succeeded", "failed"} for status in statuses):
+        raise DateSourceCacheError("date source request ledger is not terminal")
+    success_count = statuses.count("succeeded")
+    failure_count = statuses.count("failed")
+    if success_count != result.get("success_count") or failure_count != result.get("failure_count"):
+        raise DateSourceCacheError("date source request ledger counts are inconsistent")
+    return 0 if not failure_count or allow_partial else 2
 
 
 def _read_jsonl(paths: Iterable[Path]) -> list[dict]:
@@ -186,9 +240,12 @@ def main() -> int:
     parser.add_argument("--summary", required=True, type=Path)
     parser.add_argument("--timeout", type=int, default=30)
     parser.add_argument("--allow-network", action="store_true")
+    parser.add_argument("--allow-partial", action="store_true")
     args = parser.parse_args()
     try:
         require_network_gates(allow_network=args.allow_network, environ=os.environ)
+        args.output_root.mkdir(parents=True, exist_ok=True)
+        ensure_source_cache_manifest(args.output_root / ".calendar-cache")
         rows = _read_jsonl(args.provider_jsonl)
         result = cache_provider_rows(rows, output_root=args.output_root, timeout=args.timeout)
         args.request_ledger.parent.mkdir(parents=True, exist_ok=True)
@@ -200,7 +257,7 @@ def main() -> int:
         args.summary.parent.mkdir(parents=True, exist_ok=True)
         args.summary.write_text(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(json.dumps(summary, ensure_ascii=False, sort_keys=True))
-        return 0 if not result["failure_count"] else 2
+        return cache_command_exit_code(result, allow_partial=args.allow_partial)
     except (DateSourceCacheError, json.JSONDecodeError, OSError) as exc:
         parser.error(str(exc))
         return 2

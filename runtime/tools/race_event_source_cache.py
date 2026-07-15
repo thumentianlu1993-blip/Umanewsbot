@@ -77,6 +77,36 @@ def _write_manifest(path: Path, payload: dict) -> None:
     temporary.replace(path)
 
 
+def ensure_source_cache_manifest(destination: str | Path) -> Path:
+    path = Path(destination)
+    root = _cache_root(path)
+    manifest_path = _manifest_path(path)
+    if manifest_path.parent.resolve() != root:
+        raise SourceCacheBudgetExceeded(
+            "source cache manifest must be stored at the configured cache root"
+        )
+    lock_path = manifest_path.with_suffix(manifest_path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as lock_handle:
+        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+        manifest = _read_manifest(manifest_path)
+        if manifest_path.exists():
+            _manifest_root(manifest_path, manifest)
+        manifest.update(
+            {
+                "schema_version": "1.0",
+                "root": str(root),
+                "total_bytes": sum(
+                    int(item.get("size") or 0)
+                    for item in manifest["files"].values()
+                ),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        _write_manifest(manifest_path, manifest)
+    return manifest_path
+
+
 def write_source_cache(destination: str | Path, body: bytes, *, source_url: str) -> dict:
     path = Path(destination)
     path.parent.mkdir(parents=True, exist_ok=True)

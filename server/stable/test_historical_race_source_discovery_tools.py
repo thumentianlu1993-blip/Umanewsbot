@@ -179,6 +179,55 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
             {series_key: values[2] for series_key, values in expected.items()},
         )
 
+    def test_jra_official_aliases_cover_ledger_abbreviations_and_jump_names(self):
+        history = """
+        <table><tr><th>月日</th><th>レース名</th><th>競馬場</th><th>結果</th></tr>
+          <tr><td>6月24日 土曜</td><td>J・GⅢ 東京ジャンプS</td><td>東京</td><td><a href="/datafile/seiseki/replay/2023/057.html">result</a></td></tr>
+          <tr><td>8月20日 日曜</td><td>GⅢ 北九州記念</td><td>小倉</td><td><a href="/datafile/seiseki/replay/2023/072.html">result</a></td></tr>
+          <tr><td>8月26日 土曜</td><td>J・GⅢ 小倉サマージャンプ</td><td>小倉</td><td><a href="/datafile/seiseki/replay/2023/074.html">result</a></td></tr>
+          <tr><td>9月17日 日曜</td><td>GⅡ ローズS</td><td>阪神</td><td><a href="/datafile/seiseki/replay/2023/084.html">result</a></td></tr>
+          <tr><td>10月15日 日曜</td><td>J・GⅡ 東京ハイジャンプ</td><td>東京</td><td><a href="/datafile/seiseki/replay/2023/093.html">result</a></td></tr>
+          <tr><td>10月28日 土曜</td><td>GⅡ スワンS</td><td>京都</td><td><a href="/datafile/seiseki/replay/2023/096.html">result</a></td></tr>
+          <tr><td>11月11日 土曜</td><td>GⅡ デイリー杯2歳S</td><td>京都</td><td><a href="/datafile/seiseki/replay/2023/103.html">result</a></td></tr>
+          <tr><td>11月11日 土曜</td><td>J・GⅢ 京都ジャンプS</td><td>京都</td><td><a href="/datafile/seiseki/replay/2023/104.html">result</a></td></tr>
+        </table>
+        """
+        schedule = b"""
+        <table><tr><th colspan='7'><span>Nov. 11</span><a>DAILY HAI NISAI STAKES</a></th></tr>
+        <tr><td>G2</td><td>KYOTO</td><td>1600/Turf</td><td></td><td></td>
+        <td><a href="javascript:doSubmit('2023','1111','08','03','04','11','7')">o</a></td></tr></table>
+        """
+        expected = {
+            "japan-tokyo-jump": "Tokyo Jump S",
+            "japan-tv-nishi-nippon-corporation-sho-kitakyushu-kinen": "TV Nishinippon Corp. Sho Kitakyushu Kinen",
+            "japan-kokura-summer-jump": "Kokura Summer Jump",
+            "japan-kansai-television-co-ltd-sho-rose": "Kansai Television Co. Ltd. Sho Rose S",
+            "japan-tokyo-high-jump": "Tokyo High-Jump",
+            "japan-mbs-sho-swan": "MBS Sho Swan S",
+            "japan-daily-hai-nisai": "Daily Hai Nisai S",
+        }
+        targets = [
+            {
+                "series_key": series_key,
+                "year": 2023,
+                "country_region": "japan",
+                "original_name": original_name,
+                "racecourse": "",
+                "distance_text": "1600m",
+            }
+            for series_key, original_name in expected.items()
+        ]
+
+        result = self.tool.build_jra_provider_rows(
+            targets=targets,
+            year=2023,
+            english_schedule_body=schedule,
+            history_body=history.encode("cp932"),
+        )
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual({row["series_key"] for row in result["rows"]}, set(expected))
+
     def test_toba_same_name_is_disambiguated_by_track(self):
         body = """
         <table><tr><th>Stake</th><th>Gr</th><th>Track</th><th>Winner</th></tr>
@@ -291,6 +340,82 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(result["issues"], [])
         self.assertEqual(result["rows"][0]["local_date"], "2025-07-04")
 
+    def test_toba_does_not_treat_similar_wrong_track_name_as_unreviewed_relocation(self):
+        body = """
+        <table><tr><th>Stake</th><th>Track</th><th>Winner</th></tr>
+          <tr><td>WEST VIRGINIA DERBY</td><td>MNR</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=8&amp;TID=MNR&amp;DT=8/3/2025">Alpha</a></td></tr>
+        </table>
+        """
+        targets = [
+            {
+                "series_key": "united-states-virginia-derby",
+                "year": 2025,
+                "country_region": "united_states",
+                "original_name": "Virginia Derby",
+                "racecourse": "Colonial Downs",
+                "distance_text": "9",
+            },
+            {
+                "series_key": "united-states-west-virginia-derby",
+                "year": 2025,
+                "country_region": "united_states",
+                "original_name": "West Virginia Derby",
+                "racecourse": "Mountaineer Park",
+                "distance_text": "9",
+            },
+        ]
+
+        result = self.tool.build_toba_provider_rows(targets=targets, year=2025, body=body)
+
+        self.assertEqual(
+            [row["series_key"] for row in result["rows"]],
+            ["united-states-west-virginia-derby"],
+        )
+        self.assertEqual(
+            [(issue["series_key"], issue["code"]) for issue in result["issues"]],
+            [("united-states-virginia-derby", "source_match_not_unique")],
+        )
+
+    def test_toba_track_codes_cover_batch_006_flat_racecourses(self):
+        expected = {
+            "charles town": {"CT"},
+            "delaware park": {"DEL"},
+            "ellis park": {"ELP"},
+            "fair grounds": {"FG"},
+            "kentucky downs": {"KD"},
+            "laurel park": {"LRL"},
+            "lone star park": {"LS"},
+            "los alamitos": {"LRC"},
+            "monmouth park": {"MTH"},
+            "mountaineer park": {"MNR"},
+            "parx racing": {"PRX"},
+            "penn national": {"PEN"},
+            "pimlico": {"PIM"},
+            "prairie meadows": {"PRM"},
+            "presque isle downs": {"PID"},
+            "remington park": {"RP"},
+            "tampa bay downs": {"TAM"},
+            "thistledown": {"TDN"},
+        }
+
+        self.assertEqual(
+            {name: self.tool.TRACK_CODES.get(name) for name in expected},
+            expected,
+        )
+        self.assertNotIn("percy warner", self.tool.TRACK_CODES)
+        self.assertEqual(self.tool.TRACK_CODES["aqueduct"], {"AQU", "BAQ"})
+        self.assertEqual(self.tool.TRACK_CODES["belmont at aqueduct"], {"AQU", "BAQ"})
+        self.assertEqual(
+            self.tool.TOBA_REVIEWED_RELOCATIONS,
+            {
+                "united-states-belmont-derby-invitational",
+                "united-states-pennine-ridge",
+                "united-states-soaring-softly",
+                "united-states-victory-ride",
+                "united-states-wonder-again",
+            },
+        )
+
     def test_toba_core_name_qualifiers_disambiguate_breeders_cup_juvenile(self):
         body = """
         <table><tr><th>Stake</th><th>Track</th><th>Winner</th></tr>
@@ -375,6 +500,80 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(result["issues"], [])
         self.assertEqual(result["rows"][0]["series_key"], "united-states-alpha")
 
+    def test_toba_short_core_name_does_not_absorb_distinct_longer_race(self):
+        body = """
+        <table><tr><th>Stake</th><th>Track</th><th>Winner</th></tr>
+          <tr><td>AMERICAN PHAROAH S.</td><td>SA</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=1&amp;TID=SA&amp;DT=9/28/2024">A</a></td></tr>
+          <tr><td>BELMONT GOLD CUP S.</td><td>SAR</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=2&amp;TID=SAR&amp;DT=6/6/2024">B</a></td></tr>
+          <tr><td>TAMPA BAY DERBY</td><td>TAM</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=3&amp;TID=TAM&amp;DT=3/9/2024">C</a></td></tr>
+          <tr><td>IROQUOIS S.</td><td>CD</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=4&amp;TID=CD&amp;DT=9/14/2024">D</a></td></tr>
+        </table>
+        """
+        targets = [
+            {
+                "series_key": series_key,
+                "year": 2024,
+                "country_region": "united_states",
+                "original_name": original_name,
+                "racecourse": racecourse,
+                "distance_text": "8",
+            }
+            for series_key, original_name, racecourse in [
+                ("united-states-american", "American S", "Santa Anita Park"),
+                ("united-states-belmont", "Belmont S", "Saratoga"),
+                ("united-states-tampa-bay", "Tampa Bay S", "Tampa Bay Downs"),
+                ("united-states-calvin-houghland-iroquois-hurdle", "Calvin Houghland Iroquois Hurdle", "Churchill Downs"),
+            ]
+        ]
+
+        result = self.tool.build_toba_provider_rows(targets=targets, year=2024, body=body)
+
+        self.assertEqual(result["rows"], [])
+        self.assertEqual(
+            [issue["code"] for issue in result["issues"]],
+            ["source_match_not_unique"] * 4,
+        )
+
+    def test_toba_uses_official_former_names_and_ignores_changed_presenting_sponsor(self):
+        body = """
+        <table><tr><th>Stake</th><th>Track</th><th>Winner</th></tr>
+          <tr><td>CALIFORNIA CROWN S. PRESENTED BY SIRDAVIS AMERICAN WHISKY</td><td>SA</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=1&amp;TID=SA&amp;DT=9/28/2024">A</a></td></tr>
+          <tr><td>OAK LEAF S. PRESENTED BY OAK TREE (formerly CHANDELIER S.)</td><td>SA</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=2&amp;TID=SA&amp;DT=10/5/2024">B</a></td></tr>
+          <tr><td>MONROVIA S. PRESENTED BY DON JULIO</td><td>SA</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=3&amp;TID=SA&amp;DT=4/5/2024">C</a></td></tr>
+          <tr><td>PRINCESS ROONEY S.</td><td>GP</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=4&amp;TID=GP&amp;DT=9/20/2024">D</a></td></tr>
+          <tr><td>ELITE POWER S. (formerly RUNHAPPY S.)</td><td>BAQ</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=5&amp;TID=BAQ&amp;DT=12/6/2024">E</a></td></tr>
+          <tr><td>JOHN C. HARRIS S. (formerly UNZIP ME S.)</td><td>SA</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=6&amp;TID=SA&amp;DT=9/27/2024">F</a></td></tr>
+          <tr><td>OLD DOMINION DERBY (formerly VIRGINIA DERBY)</td><td>CNL</td><td><a href="http://www.equibase.com/premium/eqbPDFChartPlus.cfm?RACE=7&amp;TID=CNL&amp;DT=9/6/2024">G</a></td></tr>
+        </table>
+        """
+        targets = [
+            {
+                "series_key": series_key,
+                "year": 2024,
+                "country_region": "united_states",
+                "original_name": original_name,
+                "racecourse": racecourse,
+                "distance_text": "8",
+            }
+            for series_key, original_name, racecourse in [
+                ("united-states-awesome-again", "Awesome Again S", "Santa Anita Park"),
+                ("united-states-chandelier", "Chandelier S", "Santa Anita Park"),
+                ("united-states-monrovia-s-presented-by-ketel-one", "Monrovia S. Presented by Ketel One", "Santa Anita Park"),
+                ("united-states-princess-rooney-invitational", "Princess Rooney Invitational S", "Gulfstream Park"),
+                ("united-states-runhappy", "Runhappy S", "Belmont at Aqueduct"),
+                ("united-states-unzip-me", "Unzip Me S", "Santa Anita Park"),
+                ("united-states-virginia-derby", "Virginia Derby", "Colonial Downs"),
+            ]
+        ]
+
+        result = self.tool.build_toba_provider_rows(targets=targets, year=2024, body=body)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(
+            {row["series_key"] for row in result["rows"]},
+            {target["series_key"] for target in targets},
+        )
+
     def test_hkjc_pattern_book_schedule_preserves_cross_calendar_season_dates(self):
         text = """
         22/09/24 Celebration Cup G3 4,200,000 3yo+ 1400 26/08/24 16/09/24 N/A N/A 10
@@ -393,6 +592,52 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
             ],
         )
         self.assertEqual({row["edition_year"] for row in rows}, {2025})
+
+    def test_hkjc_2015_pattern_book_inherits_omitted_chronological_dates(self):
+        text = """
+        List of Group Races in 2015/2016
+        Date Race Name Group Prize Money Distance (Metres) Qualifications Weights Priority To Run
+        1 Jan 2016 Bauhinia Sprint Trophy HKG3 $3,000,000 1000 90+ Handicap Ratings
+        Chinese Club Challenge Cup HKG3 $3,000,000 1400 95+ Handicap Ratings
+        6 Jan 2016 January Cup HKG3 $3,000,000 1800 90+ Handicap Ratings
+        """
+
+        rows = self.tool.parse_hkjc_pattern_schedule_text(text, edition_year=2016)
+
+        self.assertEqual(
+            [(row["local_date"], row["race_name"], row["normalized_grade"], row["distance_text"]) for row in rows],
+            [
+                ("2016-01-01", "Bauhinia Sprint Trophy", "G3", "1000m"),
+                ("2016-01-01", "Chinese Club Challenge Cup", "G3", "1400m"),
+                ("2016-01-06", "January Cup", "G3", "1800m"),
+            ],
+        )
+        self.assertEqual(rows[-1]["racecourse"], "Happy Valley")
+
+    def test_hkjc_2016_pattern_book_inherits_course_and_distance_groups(self):
+        text = """
+        COURSE RECORDS
+        Distance Course - Surface Horse Trained Record Date Record Time Black Type Races for 2016/2017 Season Group Race Prize Money Ref. Page
+        1800 Sha Tin - TURF Helene Paragon HK 19 Jun 2016 1.45.83 Sa Sa Ladies’ Purse G3 06/11/16 3,000,000 14
+        Centenary Vase G3 05/02/17 3,000,000 27
+        Happy Valley - TURF Art Trader HK 01 Nov 2005 1.48.20 January Cup G3 04/01/17 3,000,000 23
+        2000 Sha Tin - TURF Jim And Tonic FR 18 Apr 1999 2.00.10 LONGINES Jockey Club Cup G2 20/11/16 4,000,000 15
+        Hong Kong Classic Cup 4yo 19/02/17 10,000,000 43
+        """
+
+        rows = self.tool.parse_hkjc_pattern_schedule_text(text, edition_year=2017)
+
+        self.assertEqual(
+            [(row["local_date"], row["racecourse"], row["race_name"], row["normalized_grade"], row["distance_text"]) for row in rows],
+            [
+                ("2016-11-06", "Sha Tin", "Sa Sa Ladies’ Purse", "G3", "1800m"),
+                ("2017-02-05", "Sha Tin", "Centenary Vase", "G3", "1800m"),
+                ("2017-01-04", "Happy Valley", "January Cup", "G3", "1800m"),
+                ("2016-11-20", "Sha Tin", "LONGINES Jockey Club Cup", "G2", "2000m"),
+                ("2017-02-19", "Sha Tin", "Hong Kong Classic Cup", "", "2000m"),
+            ],
+        )
+        self.assertEqual({row["edition_year"] for row in rows}, {2017})
 
     def test_hkjc_pattern_book_excludes_prior_season_history_rows(self):
         text = """
@@ -548,6 +793,40 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
             ],
         )
 
+    def test_bha_flat_book_accepts_spaced_multiword_course_names(self):
+        text = """
+        May 4 NEWMARKET QIPCO 2000 GUINEAS (P1.C.F.) 8F 3CF 46
+        ” 31 EPSOM DOWNS CORONATION CUP (P1.) 12F+ 4+ 67
+        ” 23 SANDOWN PARK RACEHORSE LOTTO BRIGADIER GERARD (P3.) 10F 4+ 61
+        Feb. 24 SOUTHWELL BETUK WINTER DERBY (P3.) 11F+ 4+ 30
+        """
+
+        rows = self.tool.parse_bha_flat_schedule_text(text, year=2024)
+
+        self.assertEqual(
+            [(row["local_date"], row["racecourse"], row["race_name"]) for row in rows],
+            [
+                ("2024-05-04", "Newmarket", "QIPCO 2000 GUINEAS"),
+                ("2024-05-31", "Epsom Downs", "CORONATION CUP"),
+                ("2024-05-23", "Sandown Park", "RACEHORSE LOTTO BRIGADIER GERARD"),
+                ("2024-02-24", "Southwell", "BETUK WINTER DERBY"),
+            ],
+        )
+
+    def test_bha_flat_book_prefers_explicit_race_date_over_derived_index_month(self):
+        text = """
+        June 12 NEWMARKET TATTERSALLS FALMOUTH (P1.F.) 8F 3+F 92
+        Mar. 5 NEWMARKET July 12 TATTERSALLS FALMOUTH (P1.F.) 8F 3 F 92
+        June 31 GOODWOOD JAEGER-LECOULTRE MOLECOMB (P3.) 5F 2 111
+        """
+
+        rows = self.tool.parse_bha_flat_schedule_text(text, year=2024)
+
+        self.assertEqual(
+            [(row["local_date"], row["race_name"]) for row in rows],
+            [("2024-07-12", "TATTERSALLS FALMOUTH")],
+        )
+
     def test_bha_flat_book_joins_wrapped_race_names(self):
         text = """
         ” 5 LINGFIELDPARK May 10 IRE-INCENTIVE,ITPAYSTOBUYIRISH
@@ -615,6 +894,52 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(rows[0]["local_date"], "2025-01-11")
         self.assertEqual(rows[0]["racecourse"], "Warwick")
 
+    def test_bha_jump_book_supports_batch_006_regional_courses(self):
+        rows = self.tool.parse_bha_jump_schedule_text(
+            "\n".join(
+                [
+                    "Apr.12 Ayr CoralScottishGrandNationalH'CapChase 4m Prem 200,000",
+                    "Dec.27 Chepstow CoralWelshGrandNationalH'CapChase 3m61/2f Prem 150,000",
+                    "Nov. 8 Exeter BetwayHaldonGoldCupH'CapChase 2m11/2f 2 100,000",
+                    "Feb.23 FontwellPark NationalSpiritHurdle 2m3f 2 60,000",
+                    "Jul.19 MarketRasen UnibetSummerPlateH'CapChase 2m53/4f Prem 100,000",
+                    "Mar.16 Uttoxeter MidlandsGrandNationalH'CapChase 4m2f Prem 150,000",
+                    "Aug.24 Windsor WeatherbysWinterHill 1m2f 3 80,000",
+                ]
+            ),
+            season_start_year=2024,
+        )
+
+        self.assertEqual(
+            [row["racecourse"] for row in rows],
+            ["Ayr", "Chepstow", "Exeter", "Fontwell", "Market Rasen", "Uttoxeter", "Windsor"],
+        )
+
+    def test_bha_jump_book_accepts_dotless_month_wrapped_name_and_plus_distance(self):
+        rows = self.tool.parse_bha_jump_schedule_text(
+            "\n".join(
+                [
+                    "July20 MarketRasen UnibetSummerPlateH’CapChase 2m51/2f Prem 100,000",
+                    "Feb.15 Ascot InjuredJockeysFundAmbassadorsProgramme",
+                    "SwinleyH’CapChase 3m Prem 100,000",
+                    "Nov.23 Ascot NirvanaSpa1965Chase 2m5f+ 2 80,000",
+                ]
+            ),
+            season_start_year=2024,
+        )
+
+        self.assertEqual(
+            [
+                (row["local_date"], row["racecourse"], row["race_name"], row["distance_text"])
+                for row in rows
+            ],
+            [
+                ("2024-07-20", "Market Rasen", "UNIBETSUMMERPLATEHANDICAPCHASE", "2m51/2f"),
+                ("2025-02-15", "Ascot", "INJUREDJOCKEYSFUNDAMBASSADORSPROGRAMMESWINLEYHANDICAPCHASE", "3m"),
+                ("2024-11-23", "Ascot", "NIRVANASPA1965CHASE", "2m5f+"),
+            ],
+        )
+
     def test_bha_jump_detail_distance_disambiguates_same_name(self):
         targets = [
             {
@@ -672,6 +997,41 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
             ],
         )
 
+    def test_france_galop_flat_program_extracts_only_aqps_index_rows(self):
+        text = """
+        Index
+        A.Q.P.S.
+        valeur ne el. 1 800 a
+        date hip. age sexe titre du prix Information - 1 800 + 2 200
+        totale Fr 2 200
+        1-09 Craon 37 000 3 ans R. DE GENNES 2 400
+        8-09 Moulins 37 000 3 ans F Y. D'ARMAILLE 2 400
+        Anglo-Arabes
+        1-09 Craon 42 000 3 ans P. ESSAI 2 200
+        """
+
+        rows = self.tool.parse_france_galop_flat_program_text(text, year=2024)
+
+        self.assertEqual(
+            rows,
+            [
+                {
+                    "local_date": "2024-09-01",
+                    "racecourse": "Craon",
+                    "race_name": "R. DE GENNES",
+                    "normalized_grade": "",
+                    "distance_text": "2400m",
+                },
+                {
+                    "local_date": "2024-09-08",
+                    "racecourse": "Moulins",
+                    "race_name": "Y. D'ARMAILLE",
+                    "normalized_grade": "",
+                    "distance_text": "2400m",
+                },
+            ],
+        )
+
     def test_france_galop_obstacle_index_extracts_group_races(self):
         text = """
         18-05 Auteuil 135 000 3 ans M H AGUADO Groupe III 3 500
@@ -713,6 +1073,148 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
             ],
         )
 
+    def test_france_galop_obstacle_cross_year_window_keeps_target_natural_year(self):
+        text = """
+        31-12 Auteuil 125 000 4 & + F LAST YEAR Groupe III 3 600
+        7-01 Cagnes-sur-Mer 154 000 5 & + THIS YEAR Groupe III 4 600
+        """
+
+        rows = self.tool.parse_france_galop_obstacle_schedule_text(
+            text,
+            year=2024,
+            date_start="2023-12-03",
+            date_end="2024-02-18",
+        )
+
+        self.assertEqual(
+            rows,
+            [
+                {
+                    "local_date": "2024-01-07",
+                    "racecourse": "Cagnes-sur-Mer",
+                    "race_name": "THIS YEAR",
+                    "normalized_grade": "G3",
+                    "distance_text": "4600m",
+                }
+            ],
+        )
+
+    def test_france_galop_obstacle_group_summary_preserves_column_identity(self):
+        text = """
+                             PROGRAMME  NATIONAL - GROUPES
+                              Haies                    Steeple-Chase
+                   3 ans      4 ans      5 et +      4 ans      5 et +
+                                                               GD PX DE NICE
+         Janvier                                               08/01 (Cagnes)
+                                                                [G3]4600 4
+                                                               GD PX DE PAU
+                                                                05/02 (Pau)
+                                                               [G3] 5300 24
+                            QUESTARABAD  LA BARKA               LES DRAGS
+         Juin              10/06 (Auteuil) 10/06 (Auteuil)    10/06 (Auteuil)
+                             [G3] 3900 6 [G2] 4300 9           [G2] 4400 46
+                                         TREDERN
+                                       17/06 (Auteuil)
+                                       [G3] [F] [4-5 ans]
+                                         3600 5
+        """
+
+        rows = self.tool.parse_france_galop_obstacle_group_summary_text(
+            text, year=2023
+        )
+
+        self.assertEqual(
+            [
+                row
+                for row in rows
+                if row["race_name"]
+                in {"GD PX DE NICE", "GD PX DE PAU", "LES DRAGS", "TREDERN"}
+            ],
+            [
+                {
+                    "local_date": "2023-01-08",
+                    "racecourse": "Cagnes",
+                    "race_name": "GD PX DE NICE",
+                    "normalized_grade": "G3",
+                    "distance_text": "4600m",
+                },
+                {
+                    "local_date": "2023-02-05",
+                    "racecourse": "Pau",
+                    "race_name": "GD PX DE PAU",
+                    "normalized_grade": "G3",
+                    "distance_text": "5300m",
+                },
+                {
+                    "local_date": "2023-06-10",
+                    "racecourse": "Auteuil",
+                    "race_name": "LES DRAGS",
+                    "normalized_grade": "G2",
+                    "distance_text": "4400m",
+                },
+                {
+                    "local_date": "2023-06-17",
+                    "racecourse": "Auteuil",
+                    "race_name": "TREDERN",
+                    "normalized_grade": "G3",
+                    "distance_text": "3600m",
+                },
+            ],
+        )
+
+        targets = [
+            {
+                "target_id": 61,
+                "series_key": "france-grand-prix-de-la-ville-de-nice-bernard-secly-stp",
+                "year": 2023,
+                "country_region": "france",
+                "original_name": "Grand Prix de la Ville de Nice (Bernard Secly) Stp",
+                "racecourse": "Cagnes-sur-Mer",
+                "distance_text": "4600",
+                "normalized_grade": "G3",
+            },
+            {
+                "target_id": 62,
+                "series_key": "france-grand-prix-de-pau-stp",
+                "year": 2023,
+                "country_region": "france",
+                "original_name": "Grand Prix de Pau Stp",
+                "racecourse": "Pau",
+                "distance_text": "5300",
+                "normalized_grade": "G3",
+            },
+            {
+                "target_id": 63,
+                "series_key": "france-drags-des-stp",
+                "year": 2023,
+                "country_region": "france",
+                "original_name": "Drags (des) Stp",
+                "racecourse": "Auteuil",
+                "distance_text": "4400",
+                "normalized_grade": "G2",
+            },
+            {
+                "target_id": 64,
+                "series_key": "france-christian-de-tredern-hurdle",
+                "year": 2023,
+                "country_region": "france",
+                "original_name": "Christian de Tredern Hurdle",
+                "racecourse": "Auteuil",
+                "distance_text": "3600",
+                "normalized_grade": "G3",
+            },
+        ]
+        result = self.tool.match_official_schedule_targets(
+            targets,
+            [{**row, "edition_year": 2023} for row in rows],
+        )
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(
+            {row["target_id"] for row in result["matches"]},
+            {61, 62, 63, 64},
+        )
+
     def test_official_schedule_match_uses_hong_kong_season_edition_year(self):
         targets = [{
             "target_id": 1,
@@ -737,6 +1239,52 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
         self.assertEqual(result["issues"], [])
         self.assertEqual(result["matches"][0]["local_date"], "2024-12-08")
         self.assertEqual(result["matches"][0]["target_id"], 1)
+
+    def test_official_schedule_match_prefers_detailed_source_over_equal_summary_match(self):
+        target = {
+            "target_id": 65,
+            "series_key": "france-alain-du-breil-hurdle",
+            "year": 2023,
+            "country_region": "france",
+            "original_name": "Alain du Breil Hurdle",
+            "racecourse": "Auteuil",
+            "distance_text": "3900",
+            "normalized_grade": "G1",
+        }
+        schedule = [
+            {
+                "edition_year": 2023,
+                "local_date": "2023-05-21",
+                "racecourse": "Auteuil",
+                "race_name": "ALAIN DU BREIL",
+                "normalized_grade": "G1",
+                "distance_text": "3900m",
+                "calendar_source_parser": "france_obstacle_summary",
+            },
+            {
+                "edition_year": 2023,
+                "local_date": "2023-05-21",
+                "racecourse": "Auteuil",
+                "race_name": "ALAIN DU BREIL",
+                "normalized_grade": "G1",
+                "distance_text": "3900m",
+                "calendar_source_parser": "france_obstacle",
+            },
+            {
+                "edition_year": 2023,
+                "local_date": "2023-05-22",
+                "racecourse": "Auteuil",
+                "race_name": "ALAIN DU BREIL",
+                "normalized_grade": "G1",
+                "distance_text": "3900m",
+                "calendar_source_parser": "france_obstacle_summary",
+            },
+        ]
+
+        result = self.tool.match_official_schedule_targets([target], schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["matches"][0]["local_date"], "2023-05-21")
 
     def test_official_schedule_match_deduplicates_apostrophe_variants(self):
         target = {
@@ -811,6 +1359,41 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
             {row["target_id"]: row["local_date"] for row in result["matches"]},
             {2: "2025-04-04", 3: "2025-04-05"},
         )
+
+    def test_official_schedule_match_prefers_compatible_distance_before_name_score(self):
+        target = {
+            "target_id": 8,
+            "series_key": "hong-kong-hong-kong-champions-chater-cup",
+            "year": 2016,
+            "country_region": "hong_kong",
+            "original_name": "Hong Kong Champions & Chater Cup [Standard Chartered]",
+            "racecourse": "Sha Tin",
+            "distance_text": "2400",
+            "normalized_grade": "G1",
+        }
+        schedule = [
+            {
+                "edition_year": 2016,
+                "local_date": "2016-02-21",
+                "racecourse": "Sha Tin",
+                "race_name": "Hong Kong Classic Cup",
+                "normalized_grade": "G1",
+                "distance_text": "1800m",
+            },
+            {
+                "edition_year": 2016,
+                "local_date": "2016-05-22",
+                "racecourse": "Sha Tin",
+                "race_name": "Standard Chartered Champions & Chater Cup",
+                "normalized_grade": "G1",
+                "distance_text": "2400m",
+            },
+        ]
+
+        result = self.tool.match_official_schedule_targets([target], schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["matches"][0]["local_date"], "2016-05-22")
 
     def test_official_schedule_match_accepts_bha_course_alias_but_not_name_only_guess(self):
         targets = [{
@@ -1181,6 +1764,229 @@ class HistoricalRaceSourceDiscoveryToolTests(SimpleTestCase):
 
         self.assertEqual(result["issues"], [])
         self.assertEqual({row["target_id"] for row in result["matches"]}, {16, 17, 18})
+
+    def test_official_schedule_match_uses_reviewed_uk_registered_names(self):
+        cases = [
+            (21, "GBR_BRISTOL_NOVICES_HURDLE", "Bristol Novices' Hurdle", "Cheltenham", "3", "G2", "ALBERT BARTLETT BRISTOL NOV. HURDLE", "2024-12-14"),
+            (22, "GBR_CHELTENHAM_DECEMBER_3M2F_HANDICAP_CHASE", "[Sponsor] H. Stp", "Cheltenham", "3.25", "G3", "SOUTHAM HANDICAP CHASE", "2024-12-13"),
+            (23, "GBR_CHELTENHAM_PADDY_POWER_GOLD_CUP", "[Sponsor] Gold Cup H. Stp", "Cheltenham", "2.5", "G3", "PADDY POWER GOLD CUP HANDICAP CHASE", "2024-11-16"),
+            (24, "united-kingdom-champion-s-british-champion-middle-distance", "Champion S.", "Ascot", "10", "G1", "QIPCO CHAMPION", "2024-10-19"),
+            (25, "united-kingdom-game-spirit-stp", "Game Spirit Stp.", "Newbury", "2", "G2", "BETFAIR EXCHANGE GAME SPIRIT CHASE", "2024-02-10"),
+            (26, "united-kingdom-fillies-juvenile-hurdle", "Fillies' Juvenile H. Hurdle", "Cheltenham", "2", "G3", "SAFRAN LANDING SYSTEMS JUVENILE HANDICAP HURDLE", "2024-04-18"),
+            (27, "united-kingdom-joel", "Joel S.", "Newmarket", "8", "G2", "AL BASTI EQUIWORLD, DUBAI JOEL", "2024-09-27"),
+            (28, "united-kingdom-july", "July S.", "Newmarket", "6", "G2", "KINGDOM OF BAHRAIN JULY", "2024-07-11"),
+            (29, "united-kingdom-silver-cup-stp", "Silver Cup H. Stp.", "Ascot", "3", "G3", "HOWDEN SILVER CUP HANDICAP CHASE", "2025-12-20"),
+            (30, "united-kingdom-swinley-stp", "Swinley H. Stp.", "Ascot", "3", "G3", "BETFAIR SWINLEY HANDICAP CHASE", "2025-02-15"),
+            (31, "united-kingdom-summer-plate-stp", "Summer Plate H. Stp.", "Market Rasen", "2.75", "G3", "UNIBET SUMMER PLATE HANDICAP CHASE", "2025-07-19"),
+            (32, "united-kingdom-1965-stp", "1965 Stp.", "Ascot", "2.5", "G2", "NIRVANA SPA 1965 CHASE", "2024-11-23"),
+            (33, "GBR_CHELTENHAM_NOVEMBER_LONG_DISTANCE_HANDICAP_CHASE", "[Jewson] H. Stp.", "Cheltenham", "3.5", "G3", "PRESTBURY HANDICAP CHASE", "2024-11-17"),
+        ]
+        targets = [
+            {
+                "target_id": target_id,
+                "series_key": series_key,
+                "year": int(local_date[:4]),
+                "country_region": "united_kingdom",
+                "original_name": original_name,
+                "racecourse": racecourse,
+                "distance_text": distance,
+                "normalized_grade": grade,
+            }
+            for target_id, series_key, original_name, racecourse, distance, grade, _source_name, local_date in cases
+        ]
+        schedule = [
+            {
+                "local_date": local_date,
+                "racecourse": racecourse,
+                "race_name": source_name,
+                "normalized_grade": grade,
+                "distance_text": distance,
+            }
+            for _target_id, _series_key, _original_name, racecourse, distance, grade, source_name, local_date in cases
+        ]
+
+        result = self.tool.match_official_schedule_targets(targets, schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(
+            {row["target_id"] for row in result["matches"]},
+            {case[0] for case in cases},
+        )
+
+    def test_official_schedule_match_uses_france_galop_registered_abbreviations(self):
+        cases = [
+            (41, "france-la-coupe", "La Coupe", "LA COUPE", "2024-06-09", "G3"),
+            (42, "france-la-coupe-de-maisons-laffitte", "La Coupe de Maisons-Laffitte", "LA COUPE DE M-L", "2024-09-08", "G3"),
+            (43, "france-paris-g-p-de", "Paris (G.P. de)", "F GD PRIX PARIS", "2024-07-13", "G1"),
+            (44, "france-vichy-g-p-de", "Vichy (G.P. de)", "GRAND PX VICHY", "2024-07-17", "G3"),
+            (45, "france-renaud-du-vivier-hurdle", "Renaud du Vivier Hurdle", "RENAUD DU VIVIER (GRANDE COURSE DE HAIES DES 4 ANS)", "2024-11-24", "G1"),
+        ]
+        targets = [
+            {
+                "target_id": target_id,
+                "series_key": series_key,
+                "year": 2024,
+                "country_region": "france",
+                "original_name": original_name,
+                "racecourse": "Auteuil" if target_id == 45 else ("Vichy" if target_id == 44 else "ParisLongchamp"),
+                "distance_text": "3900" if target_id == 45 else ("2400" if target_id == 43 else "2000"),
+                "normalized_grade": grade,
+            }
+            for target_id, series_key, original_name, _source_name, _date, grade in cases
+        ]
+        schedule = [
+            {
+                "edition_year": 2024,
+                "local_date": local_date,
+                "racecourse": "Auteuil" if target_id == 45 else ("Vichy" if target_id == 44 else "ParisLongchamp"),
+                "race_name": source_name,
+                "normalized_grade": grade,
+                "distance_text": "" if target_id == 45 else ("2400m" if target_id == 43 else "2000m"),
+            }
+            for target_id, _series_key, _original_name, source_name, local_date, grade in cases
+        ]
+
+        result = self.tool.match_official_schedule_targets(targets, schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(
+            {row["target_id"] for row in result["matches"]},
+            {case[0] for case in cases},
+        )
+
+    def test_official_schedule_match_uses_france_galop_sponsored_obstacle_names(self):
+        targets = [
+            {
+                "target_id": 46,
+                "series_key": "france-grand-prix-de-pau-stp",
+                "year": 2024,
+                "country_region": "france",
+                "original_name": "Grand Prix de Pau Stp",
+                "racecourse": "Pau",
+                "distance_text": "5300",
+                "normalized_grade": "G3",
+            },
+            {
+                "target_id": 47,
+                "series_key": "france-magalen-bryant-bournosienne-hurdle",
+                "year": 2024,
+                "country_region": "france",
+                "original_name": "Magalen Bryant (Bournosienne) Hurdle",
+                "racecourse": "Auteuil",
+                "distance_text": "3600",
+                "normalized_grade": "G2",
+            },
+        ]
+        schedule = [
+            {
+                "edition_year": 2024,
+                "local_date": "2024-02-04",
+                "racecourse": "Pau",
+                "race_name": "ANDRE LABARRERE",
+                "normalized_grade": "G3",
+                "distance_text": "5300m",
+            },
+            {
+                "edition_year": 2024,
+                "local_date": "2024-11-16",
+                "racecourse": "Auteuil",
+                "race_name": "HARAS D'ETREHAM MAGALEN BRYANT",
+                "normalized_grade": "G2",
+                "distance_text": "3600m",
+            },
+        ]
+
+        result = self.tool.match_official_schedule_targets(targets, schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(
+            {row["target_id"] for row in result["matches"]},
+            {46, 47},
+        )
+
+    def test_official_schedule_match_uses_france_galop_aqps_program_abbreviations(self):
+        cases = [
+            (48, "france-jacques-de-vienne", "Jacques de Vienne(R)", "J. DE VIENNE", "Fontainebleau", "2600"),
+            (49, "france-richard-de-gennes", "Richard de Gennes(R)", "R. DE GENNES", "Craon", "2400"),
+            (50, "france-yves-d-armaille", "Yves d'Armaille(R)", "Y. D'ARMAILLE", "Moulins", "2400"),
+            (51, "france-tremblay", "Tremblay(R)", "DU TREMBLAY", "Lyon-Parilly", "2400"),
+            (52, "france-craon", "Craon(R)", "DE CRAON", "ParisLongchamp", "2400"),
+            (53, "france-bourbonnais", "Bourbonnais(R)", "DU BOURBONNAIS", "Saint-Cloud", "2500"),
+        ]
+        targets = [
+            {
+                "target_id": target_id,
+                "series_key": series_key,
+                "year": 2024,
+                "country_region": "france",
+                "original_name": original_name,
+                "racecourse": course,
+                "distance_text": distance,
+            }
+            for target_id, series_key, original_name, _source_name, course, distance in cases
+        ]
+        schedule = [
+            {
+                "edition_year": 2024,
+                "local_date": f"2024-09-{target_id - 40:02d}",
+                "racecourse": "Fontainebleau Galop" if target_id == 48 else course,
+                "race_name": source_name,
+                "normalized_grade": "",
+                "distance_text": f"{distance}m",
+            }
+            for target_id, _series_key, _original_name, source_name, course, distance in cases
+        ]
+
+        result = self.tool.match_official_schedule_targets(targets, schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(
+            {row["target_id"] for row in result["matches"]},
+            {case[0] for case in cases},
+        )
+
+    def test_official_schedule_match_merges_duplicate_book_rows_and_keeps_distance(self):
+        targets = [{
+            "target_id": 19,
+            "series_key": "united-kingdom-brigadier-gerard",
+            "year": 2024,
+            "country_region": "united_kingdom",
+            "original_name": "Brigadier Gerard S. [Racehorse Lotto]",
+            "racecourse": "Sandown",
+            "distance_text": "10",
+            "normalized_grade": "G3",
+        }]
+        schedule = [
+            {
+                "edition_year": 2024,
+                "local_date": "2024-05-23",
+                "racecourse": "Sandown Park",
+                "race_name": "RACEHORSE LOTTO BRIGADIER GERARD",
+                "normalized_grade": "G3",
+                "distance_text": "",
+            },
+            {
+                "edition_year": 2024,
+                "local_date": "2024-05-23",
+                "racecourse": "Sandown Park",
+                "race_name": "RACEHORSE LOTTO BRIGADIER GERARD",
+                "normalized_grade": "G3",
+                "distance_text": "10f",
+            },
+            {
+                "edition_year": 2024,
+                "local_date": "2024-10-23",
+                "racecourse": "Sandown Park",
+                "race_name": "RACEHORSE LOTTO BRIGADIER GERARD",
+                "normalized_grade": "G3",
+                "distance_text": "",
+            },
+        ]
+
+        result = self.tool.match_official_schedule_targets(targets, schedule)
+
+        self.assertEqual(result["issues"], [])
+        self.assertEqual(result["matches"][0]["distance_text"], "10f")
 
     def test_official_schedule_match_rejects_reused_source_row(self):
         targets = [

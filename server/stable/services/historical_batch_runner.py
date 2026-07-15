@@ -52,6 +52,7 @@ _APPROVED_HISTORICAL_PYTHON_TOOLS = {
     "merge_historical_race_batch_fragments.py",
     "package_historical_race_detail_candidates.py",
     "prepare_cached_historical_race_details.py",
+    "prepare_historical_race_calendar_inputs.py",
     "prepare_france_wikipedia_history_winner_candidates.py",
     "prepare_france_zeturf_gap_candidates.py",
     "prepare_france_zeturf_race_detail_candidates.py",
@@ -380,7 +381,11 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
             or resource_limits["request_interval_seconds"] != RUNNER_REQUEST_INTERVAL_SECONDS
         ):
             raise RunnerPlanError("runner resource_limits are outside approved boundaries")
-    if "selection_identity" in plan and resource_limits is None:
+    if (
+        "selection_identity" in plan
+        and phase == HistoricalBatchPhase.CRAWL
+        and resource_limits is None
+    ):
         raise RunnerPlanError("formal historical crawl plan requires resource_limits")
 
     artifact_root = Path(str(plan["artifact_root"])).resolve()
@@ -441,12 +446,15 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
             selection_payload = json.loads(identity_paths["selection"].read_bytes())
             approval_payload = json.loads(identity_paths["approval"].read_bytes())
             manifest_payload = json.loads(identity_paths["batch_manifest"].read_bytes())
-            selection_ids = {
-                int(row["target_id"])
-                for row in selection_payload["targets"]
-                if isinstance(row, dict)
-                and not isinstance(row.get("target_id"), bool)
-            }
+            raw_selection_targets = selection_payload["targets"]
+            if not isinstance(raw_selection_targets, list) or any(
+                not isinstance(row, dict)
+                or not isinstance(row.get("target_id"), int)
+                or isinstance(row.get("target_id"), bool)
+                for row in raw_selection_targets
+            ):
+                raise ValueError
+            selection_ids = {row["target_id"] for row in raw_selection_targets}
             raw_approval_ids = approval_payload["approved_target_ids"]
             if any(
                 not isinstance(value, int) or isinstance(value, bool)
@@ -506,6 +514,7 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
             "production runner must use the immutable image tool root"
         )
     seen: set[str] = set()
+    claimed_output_paths: list[Path] = []
     normalized_steps: list[dict[str, Any]] = []
     formal_plan = "selection_identity" in plan
     for raw_step in plan["steps"]:
@@ -520,8 +529,14 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
         argv = step.get("argv")
         if not isinstance(argv, list) or not argv or not all(isinstance(value, str) and value for value in argv):
             raise RunnerPlanError(f"runner step {step_id} argv must be a string array")
-        if not isinstance(step.get("inputs", []), list) or not isinstance(step.get("outputs", []), list):
-            raise RunnerPlanError(f"runner step {step_id} inputs and outputs must be lists")
+        if (
+            not isinstance(step.get("inputs", []), list)
+            or not isinstance(step.get("outputs", []), list)
+            or not isinstance(step.get("output_directories", []), list)
+        ):
+            raise RunnerPlanError(
+                f"runner step {step_id} inputs, outputs and output_directories must be lists"
+            )
         declared_input_paths: list[Path] = []
         for value in step.get("inputs", []):
             if not isinstance(value, dict) or not re.fullmatch(r"[0-9a-f]{64}", str(value.get("sha256") or "")):
@@ -542,6 +557,43 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
                     f"formal runner step {step_id} output must stay under outputs/"
                 )
             declared_output_paths.append(output_path)
+        declared_output_directories: list[Path] = []
+        for value in step.get("output_directories", []):
+            output_directory = _ensure_within(
+                _declared_path(value, label="output directory"),
+                artifact_root,
+                "output directory",
+            )
+            if formal_plan and output_directory.relative_to(artifact_root).parts[:1] != (
+                "outputs",
+            ):
+                raise RunnerPlanError(
+                    f"formal runner step {step_id} output directory must stay under outputs/"
+                )
+            if output_directory.is_symlink() or (
+                output_directory.exists() and not output_directory.is_dir()
+            ):
+                raise RunnerPlanError(
+                    f"runner step {step_id} output directory is invalid"
+                )
+            declared_output_directories.append(output_directory)
+        output_claims = [*declared_output_paths, *declared_output_directories]
+        if len(set(output_claims)) != len(output_claims) or any(
+            left in right.parents or right in left.parents
+            for index, left in enumerate(output_claims)
+            for right in output_claims[index + 1 :]
+        ) or any(
+            current == claimed
+            or current in claimed.parents
+            or claimed in current.parents
+            for current in output_claims
+            for claimed in claimed_output_paths
+        ):
+            raise RunnerPlanError(f"runner step {step_id} output paths overlap")
+        claimed_output_paths.extend(output_claims)
+        step["output_directories"] = [
+            {"path": str(path)} for path in declared_output_directories
+        ]
         if formal_plan:
             input_root = artifact_root / "inputs"
             raw_input_directories = step.get("input_directories", [])
@@ -568,7 +620,7 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
                 directory_files = {
                     path.resolve() for path in directory_members if path.is_file()
                 }
-                if not directory_files or not directory_files <= set(declared_input_paths):
+                if not directory_files <= set(declared_input_paths):
                     raise RunnerPlanError(
                         f"formal runner step {step_id} input directory files are not declared"
                     )
@@ -591,7 +643,10 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
                             f"formal runner step {step_id} argv uses an undeclared input path"
                         )
                     continue
-                if artifact_argument not in declared_output_paths:
+                if (
+                    artifact_argument not in declared_output_paths
+                    and artifact_argument not in declared_output_directories
+                ):
                     raise RunnerPlanError(
                         f"formal runner step {step_id} argv uses an undeclared artifact path"
                     )
@@ -1002,9 +1057,43 @@ def takeover_runner_lease(
 
 
 def _file_identity(path: Path) -> dict[str, Any]:
-    if not path.is_file():
+    if path.is_symlink() or not path.is_file():
         raise RunnerStateError(f"runner expected output is missing: {path}")
     return {"path": str(path), "size": path.stat().st_size, "sha256": _sha256_file(path)}
+
+
+def _directory_identity(path: Path) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_dir():
+        raise RunnerStateError(f"runner expected output directory is missing: {path}")
+    files: list[dict[str, Any]] = []
+    for member in sorted(path.rglob("*")):
+        if member.is_symlink():
+            raise RunnerStateError(
+                f"runner output directory contains a symlink: {member}"
+            )
+        if member.is_dir():
+            continue
+        if not member.is_file():
+            raise RunnerStateError(
+                f"runner output directory contains a special entry: {member}"
+            )
+        files.append(
+            {
+                "path": member.relative_to(path).as_posix(),
+                "size": member.stat().st_size,
+                "sha256": _sha256_file(member),
+            }
+        )
+    return {"path": str(path), "files": files}
+
+
+def _directory_identity_matches(identity: Any) -> bool:
+    if not isinstance(identity, dict) or not isinstance(identity.get("path"), str):
+        return False
+    try:
+        return _directory_identity(Path(identity["path"])) == identity
+    except (OSError, RunnerStateError):
+        return False
 
 
 def _crawl_resource_paths(artifact_root: Path) -> tuple[Path, Path]:
@@ -1118,8 +1207,17 @@ def _checkpoint_matches(run: HistoricalBatchRun, state: dict[str, Any]) -> bool:
     for step in state.get("completed_steps", []):
         for output in step.get("outputs", []):
             path = Path(output["path"])
-            if not path.is_file() or _sha256_file(path) != output["sha256"]:
+            if (
+                path.is_symlink()
+                or not path.is_file()
+                or _sha256_file(path) != output["sha256"]
+            ):
                 return False
+        if not all(
+            _directory_identity_matches(identity)
+            for identity in step.get("output_directories", [])
+        ):
+            return False
     if "resource_artifacts" in state and not _crawl_resource_artifacts_match(
         Path(run.artifact_root), state["resource_artifacts"]
     ):
@@ -1429,6 +1527,12 @@ def execute_runner_plan(
                 _file_identity(Path(_declared_path(value, label="output")))
                 for value in step.get("outputs", [])
             ]
+            output_directories = [
+                _directory_identity(
+                    Path(_declared_path(value, label="output directory"))
+                )
+                for value in step.get("output_directories", [])
+            ]
             record = {
                 "id": step["id"],
                 "argv_sha256": _sha256_bytes(json.dumps(step["argv"]).encode("utf-8")),
@@ -1439,6 +1543,7 @@ def execute_runner_plan(
                 "stderr_summary": _tail_utf8(stderr, RUNNER_STREAM_SUMMARY_BYTES),
                 "inputs": input_identities,
                 "outputs": outputs,
+                "output_directories": output_directories,
             }
             completed.append(record)
             with transaction.atomic():

@@ -169,6 +169,12 @@ def _validated_identity(value: Any, *, label: str) -> tuple[Path, dict[str, Any]
     return path, actual
 
 
+def _strict_json_integer(value: Any, *, label: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise HistoricalBatchPipelineError(f"{label} must be a JSON integer")
+    return value
+
+
 def _load_selection(path: Path) -> tuple[dict[str, Any], dict[int, dict[str, Any]]]:
     payload, _raw = _read_json(path, label="selection snapshot")
     if payload.get("schema_version") != "1.0" or not isinstance(payload.get("targets"), list):
@@ -182,11 +188,11 @@ def _load_selection(path: Path) -> tuple[dict[str, Any], dict[int, dict[str, Any
         if not isinstance(row, dict):
             raise HistoricalBatchPipelineError("selection target must be an object")
         try:
-            if isinstance(row["target_id"], bool) or isinstance(row["year"], bool):
-                raise ValueError
-            target_id = int(row["target_id"])
-            year = int(row["year"])
-        except (KeyError, TypeError, ValueError) as exc:
+            target_id = _strict_json_integer(
+                row["target_id"], label="selection target_id"
+            )
+            year = _strict_json_integer(row["year"], label="selection year")
+        except (KeyError, HistoricalBatchPipelineError) as exc:
             raise HistoricalBatchPipelineError("selection target identity is invalid") from exc
         series_key = str(row.get("series_key") or "")
         region = str(row.get("country_region") or "")
@@ -305,13 +311,13 @@ def _package_candidate_target_ids(
     candidate_target_ids: set[int] = set()
     for row, _evidence in _read_jsonl(candidate_paths, label="package candidate JSONL"):
         try:
-            if (
-                isinstance(row.get("target_id"), bool)
-                or isinstance(row.get("year"), bool)
-            ):
-                raise ValueError
-            target_id = event_identities[(int(row["year"]), str(row["slug"]))]
-            if row.get("target_id") not in (None, "") and int(row["target_id"]) != target_id:
+            candidate_year = _strict_json_integer(
+                row["year"], label="package candidate year"
+            )
+            target_id = event_identities[(candidate_year, str(row["slug"]))]
+            if row.get("target_id") not in (None, "") and _strict_json_integer(
+                row["target_id"], label="package candidate target_id"
+            ) != target_id:
                 raise KeyError
             if target_id not in event_target_ids:
                 raise KeyError
@@ -333,13 +339,16 @@ def _gap_fragment_target_ids(
     target_ids: set[int] = set()
     for row, _evidence in _read_gap_fragments(paths):
         try:
-            if isinstance(row.get("target_id"), bool):
-                raise ValueError
             if row.get("target_id") not in (None, ""):
-                target_id = int(row["target_id"])
+                target_id = _strict_json_integer(
+                    row["target_id"], label="gap fragment target_id"
+                )
             else:
+                edition_year = _strict_json_integer(
+                    row["edition_year"], label="gap fragment edition_year"
+                )
                 target_id = targets_by_identity[
-                    (str(row["series_key"]), int(row["edition_year"]))
+                    (str(row["series_key"]), edition_year)
                 ]
         except (KeyError, TypeError, ValueError) as exc:
             raise HistoricalBatchPipelineError(
@@ -350,9 +359,10 @@ def _gap_fragment_target_ids(
             "",
         ):
             try:
-                identity_target_id = targets_by_identity[
-                    (str(row["series_key"]), int(row["edition_year"]))
-                ]
+                edition_year = _strict_json_integer(
+                    row["edition_year"], label="gap fragment edition_year"
+                )
+                identity_target_id = targets_by_identity[(str(row["series_key"]), edition_year)]
             except (KeyError, TypeError, ValueError) as exc:
                 raise HistoricalBatchPipelineError(
                     "gap fragment target identity is outside selection"
@@ -390,21 +400,27 @@ def _target_ids_from_jsonl(
     for row, _evidence in _read_jsonl(paths, label="recipe JSONL"):
         if row.get("target_id") not in (None, ""):
             try:
-                target_id = int(row["target_id"])
-            except (TypeError, ValueError) as exc:
+                target_id = _strict_json_integer(
+                    row["target_id"], label="recipe JSONL target_id"
+                )
+            except HistoricalBatchPipelineError as exc:
                 raise HistoricalBatchPipelineError("recipe JSONL target_id is invalid") from exc
         else:
             try:
-                identity = (str(row["series_key"]), int(row["edition_year"]))
+                edition_year = _strict_json_integer(
+                    row["edition_year"], label="recipe JSONL edition_year"
+                )
+                identity = (str(row["series_key"]), edition_year)
                 target_id = targets_by_identity[identity]
-            except (KeyError, TypeError, ValueError) as exc:
+            except (KeyError, HistoricalBatchPipelineError) as exc:
                 raise HistoricalBatchPipelineError("recipe JSONL target identity is outside selection") from exc
         if row.get("series_key") not in (None, "") or row.get("edition_year") not in (None, ""):
             try:
-                identity_target_id = targets_by_identity[
-                    (str(row["series_key"]), int(row["edition_year"]))
-                ]
-            except (KeyError, TypeError, ValueError) as exc:
+                edition_year = _strict_json_integer(
+                    row["edition_year"], label="recipe JSONL edition_year"
+                )
+                identity_target_id = targets_by_identity[(str(row["series_key"]), edition_year)]
+            except (KeyError, HistoricalBatchPipelineError) as exc:
                 raise HistoricalBatchPipelineError(
                     "recipe JSONL target identity is outside selection"
                 ) from exc
@@ -442,7 +458,32 @@ _RECIPE_POLICIES: dict[str, dict[str, Any]] = {
             "request_ledger": "--request-ledger",
             "summary": "--summary",
         },
-        "options": {"timeout": "--timeout", "allow_network": "--allow-network"},
+        "output_directories": {"output_root"},
+        "options": {
+            "timeout": "--timeout",
+            "allow_network": "--allow-network",
+            "allow_partial": "--allow-partial",
+        },
+    },
+    "prepare_historical_race_calendar_inputs.py": {
+        "phases": {"verify"},
+        "scope_key": "selection_snapshot",
+        "scope_kind": "selection",
+        "required_options": {"country_region", "year", "recorded_at"},
+        "inputs": {
+            "selection_snapshot": ("--selection-snapshot", "one"),
+            "source_catalog": ("--source-catalog", "one"),
+            "source_cache_manifest": ("--source-cache-manifest", "one"),
+            "request_ledger": ("--request-ledger", "one"),
+            "source_cache_root": ("--source-cache-root", "directory"),
+        },
+        "outputs": {"output_dir": "--output-dir"},
+        "output_directories": {"output_dir"},
+        "options": {
+            "country_region": "--country-region",
+            "year": "--year",
+            "recorded_at": "--recorded-at",
+        },
     },
     "prepare_jra_race_detail_candidates.py": {
         "regions": {RacingRegion.JAPAN},
@@ -453,6 +494,7 @@ _RECIPE_POLICIES: dict[str, dict[str, Any]] = {
             "source_html": ("--source-html", "one"),
         },
         "outputs": {"output_dir": "--output-dir"},
+        "output_directories": {"output_dir"},
         "options": {
             "allow_network": "--allow-network",
             "limit": "--limit",
@@ -466,6 +508,7 @@ _RECIPE_POLICIES: dict[str, dict[str, Any]] = {
         "scope_kind": "events",
         "inputs": {"events_csv": ("--events-csv", "one")},
         "outputs": {"output_dir": "--output-dir"},
+        "output_directories": {"output_dir"},
         "options": {
             "allow_network": "--allow-network",
             "limit": "--limit",
@@ -479,6 +522,7 @@ _RECIPE_POLICIES: dict[str, dict[str, Any]] = {
         "scope_kind": "events",
         "inputs": {"events_csv": ("--events-csv", "one")},
         "outputs": {"output_dir": "--output-dir"},
+        "output_directories": {"output_dir"},
         "options": {
             "allow_network": "--allow-network",
             "limit": "--limit",
@@ -493,6 +537,7 @@ _RECIPE_POLICIES: dict[str, dict[str, Any]] = {
         "scope_kind": "events",
         "inputs": {"events_csv": ("--events-csv", "one")},
         "outputs": {"output_dir": "--output-dir"},
+        "output_directories": {"output_dir"},
         "options": {
             "allow_network": "--allow-network",
             "limit": "--limit",
@@ -515,6 +560,7 @@ _RECIPE_POLICIES: dict[str, dict[str, Any]] = {
             "pdf_dir": ("--pdf-dir", "directory"),
         },
         "outputs": {"output_dir": "--output-dir"},
+        "output_directories": {"output_dir"},
         "options": {"fail_fast": "--fail-fast"},
     },
     "prepare_cached_historical_race_details.py": {
@@ -557,6 +603,7 @@ _RECIPE_POLICIES: dict[str, dict[str, Any]] = {
             "source_cache_manifest": ("--source-cache-manifest", "many_optional"),
         },
         "outputs": {"output_dir": "--output-dir"},
+        "output_directories": {"output_dir"},
         "options": {"mode": "--mode", "recorded_at": "--recorded-at"},
     },
 }
@@ -620,8 +667,6 @@ def _copy_input_directory(
         if copied_identity["sha256"] != source_identity["sha256"]:
             raise HistoricalBatchPipelineError(f"copied directory input SHA mismatch: {path}")
         identities.append(copied_identity)
-    if not identities:
-        raise HistoricalBatchPipelineError(f"artifact directory input is empty: {source}")
     return destination, identities
 
 
@@ -774,24 +819,33 @@ def build_historical_batch_shard_plan(
     tool_manifest = descriptor.get("tool_manifest")
     if not isinstance(tool_manifest, dict):
         raise HistoricalBatchPipelineError("tool_manifest must be an object")
+    phase = str(descriptor.get("phase") or "crawl")
+    if phase not in {"crawl", "verify"}:
+        raise HistoricalBatchPipelineError("stage descriptor phase must be crawl or verify")
     limits = descriptor.get("resource_limits")
-    if not isinstance(limits, dict):
-        raise HistoricalBatchPipelineError("resource_limits must be an object")
-    for key in ("max_source_cache_bytes", "min_free_disk_bytes"):
-        if (
-            not isinstance(limits.get(key), int)
-            or isinstance(limits.get(key), bool)
-            or limits[key] <= 0
+    if phase == "verify":
+        if "resource_limits" in descriptor:
+            raise HistoricalBatchPipelineError("verify stage cannot define resource_limits")
+    else:
+        if not isinstance(limits, dict):
+            raise HistoricalBatchPipelineError("crawl stage resource_limits must be an object")
+        for key in ("max_source_cache_bytes", "min_free_disk_bytes"):
+            if (
+                not isinstance(limits.get(key), int)
+                or isinstance(limits.get(key), bool)
+                or limits[key] <= 0
+            ):
+                raise HistoricalBatchPipelineError(f"resource limit is invalid: {key}")
+        if "request_budget" in limits and (
+            not isinstance(limits["request_budget"], int)
+            or isinstance(limits["request_budget"], bool)
+            or not 1 <= limits["request_budget"] <= RUNNER_MAX_CRAWL_REQUESTS
         ):
-            raise HistoricalBatchPipelineError(f"resource limit is invalid: {key}")
-    if "request_budget" in limits and (
-        not isinstance(limits["request_budget"], int)
-        or isinstance(limits["request_budget"], bool)
-        or not 1 <= limits["request_budget"] <= RUNNER_MAX_CRAWL_REQUESTS
-    ):
-        raise HistoricalBatchPipelineError("resource limit is invalid: request_budget")
-    if limits.get("request_interval_seconds") != RUNNER_REQUEST_INTERVAL_SECONDS:
-        raise HistoricalBatchPipelineError("request interval does not match the fixed runner contract")
+            raise HistoricalBatchPipelineError("resource limit is invalid: request_budget")
+        if limits.get("request_interval_seconds") != RUNNER_REQUEST_INTERVAL_SECONDS:
+            raise HistoricalBatchPipelineError(
+                "request interval does not match the fixed runner contract"
+            )
 
     shards = descriptor.get("shards")
     if not isinstance(shards, list) or not shards:
@@ -823,7 +877,11 @@ def build_historical_batch_shard_plan(
             or len(target_ids) > RUNNER_MAX_CRAWL_REQUESTS
             or not isinstance(budget, int)
             or isinstance(budget, bool)
-            or not 1 <= budget <= RUNNER_MAX_CRAWL_REQUESTS
+            or (
+                phase == "crawl"
+                and not 1 <= budget <= RUNNER_MAX_CRAWL_REQUESTS
+            )
+            or (phase == "verify" and budget != 0)
         ):
             raise HistoricalBatchPipelineError(f"shard limits are invalid: {current_id}")
         shard_scope = set(target_ids)
@@ -848,6 +906,10 @@ def build_historical_batch_shard_plan(
             policy = _RECIPE_POLICIES.get(tool_name)
             if policy is None:
                 raise HistoricalBatchPipelineError(f"tool has no typed recipe policy: {tool_name}")
+            if policy.get("phases") and phase not in policy["phases"]:
+                raise HistoricalBatchPipelineError(
+                    f"tool is not approved for stage phase: {tool_name}/{phase}"
+                )
             if policy.get("regions") and region not in policy["regions"]:
                 raise HistoricalBatchPipelineError(
                     f"tool does not support shard region: {tool_name}/{region}"
@@ -911,6 +973,27 @@ def build_historical_batch_shard_plan(
                         if target["year"] == year
                     )
                 actual_scope = discovery_scope
+            if tool_name == "prepare_historical_race_calendar_inputs.py":
+                option_region = str(raw_options.get("country_region") or "")
+                option_year = raw_options.get("year")
+                if (
+                    option_region != region
+                    or not isinstance(option_year, int)
+                    or isinstance(option_year, bool)
+                ):
+                    raise HistoricalBatchPipelineError(
+                        "calendar parser recipe region/year does not match the shard"
+                    )
+                calendar_scope: set[int] = set()
+                for path in original_inputs["selection_snapshot"]:
+                    _payload, calendar_targets = _load_selection(path)
+                    calendar_scope.update(
+                        target_id
+                        for target_id, target in calendar_targets.items()
+                        if target["country_region"] == option_region
+                        and target["year"] == option_year
+                    )
+                actual_scope = calendar_scope
             if "limit" in policy["options"] and "limit" in raw_options:
                 limit = raw_options["limit"]
                 if (
@@ -1006,12 +1089,13 @@ def build_historical_batch_shard_plan(
         )
     if selected_shard is None:
         raise HistoricalBatchPipelineError(f"requested shard does not exist: {shard_id}")
-    if "request_budget" in limits and limits["request_budget"] != selected_shard["request_budget"]:
+    if phase == "crawl" and "request_budget" in limits and limits["request_budget"] != selected_shard["request_budget"]:
         raise HistoricalBatchPipelineError("stage resource budget does not match selected shard")
-    plan_limits = {
-        **limits,
-        "request_budget": selected_shard["request_budget"],
-    }
+    plan_limits = (
+        {**limits, "request_budget": selected_shard["request_budget"]}
+        if phase == "crawl"
+        else None
+    )
 
     output_dir = Path(output_dir)
     result: dict[str, Any] = {}
@@ -1061,10 +1145,15 @@ def build_historical_batch_shard_plan(
                     argv.extend([flag, str(destination)])
                     declared_inputs.append(_identity(destination))
             output_paths = []
+            output_directories = []
             for key, flag in policy["outputs"].items():
                 output_path = temporary / outputs[key]
                 argv.extend([flag, str(output_path)])
-                output_paths.append({"path": str(output_path)})
+                declaration = {"path": str(output_path)}
+                if key in policy.get("output_directories", set()):
+                    output_directories.append(declaration)
+                else:
+                    output_paths.append(declaration)
             for key, value in sorted((recipe.get("options") or {}).items()):
                 _append_option(argv, policy["options"][key], value)
             steps.append(
@@ -1075,6 +1164,7 @@ def build_historical_batch_shard_plan(
                     "inputs": declared_inputs,
                     "input_directories": declared_input_directories,
                     "outputs": output_paths,
+                    "output_directories": output_directories,
                 }
             )
         scope = {
@@ -1091,15 +1181,14 @@ def build_historical_batch_shard_plan(
         plan = {
             "schema_version": "1.0",
             "batch_id": descriptor["batch_id"],
-            "phase": "crawl",
-            "network_enabled": True,
+            "phase": phase,
+            "network_enabled": phase == "crawl",
             "write_enabled": False,
             "image_id": descriptor["image_id"],
             "image_revision": descriptor["image_revision"],
             "artifact_root": str(temporary.resolve()),
             "tool_root": str(tool_root.resolve()),
             "tool_manifest": {name: tool_manifest[name] for name in sorted(tool_manifest)},
-            "resource_limits": deepcopy(plan_limits),
             "batch_identity": {
                 key: _identity(path) for key, path in copied_core.items()
             },
@@ -1109,6 +1198,8 @@ def build_historical_batch_shard_plan(
             },
             "steps": steps,
         }
+        if plan_limits is not None:
+            plan["resource_limits"] = deepcopy(plan_limits)
         normalized_plan = validate_runner_plan(plan)
         contract = deepcopy(normalized_plan)
         root_text = str(temporary.resolve())
@@ -1142,6 +1233,7 @@ def build_historical_batch_shard_plan(
             "batch_id": descriptor["batch_id"],
             "stage_id": descriptor["stage_id"],
             "shard_id": shard_id,
+            "phase": phase,
             "target_count": len(selected_shard["target_ids"]),
             "request_budget": selected_shard["request_budget"],
             "selection_sha256": selection_identity["sha256"],
@@ -1192,21 +1284,25 @@ def _target_for_row(
     allow_missing_hashes: bool = False,
 ) -> tuple[int, dict[str, Any]]:
     try:
-        if isinstance(row.get("target_id"), bool):
-            raise HistoricalBatchPipelineError("fragment target_id cannot be boolean")
         if row.get("target_id") not in (None, ""):
-            target_id = int(row["target_id"])
+            target_id = _strict_json_integer(
+                row["target_id"], label="fragment target_id"
+            )
         else:
-            target_id = identities[(str(row["series_key"]), int(row["edition_year"]))]
+            edition_year = _strict_json_integer(
+                row["edition_year"], label="fragment edition_year"
+            )
+            target_id = identities[(str(row["series_key"]), edition_year)]
         target = targets[target_id]
-    except (KeyError, TypeError, ValueError) as exc:
+    except (KeyError, HistoricalBatchPipelineError) as exc:
         raise HistoricalBatchPipelineError("fragment target is outside selection") from exc
     if row.get("series_key") not in (None, "") or row.get("edition_year") not in (None, ""):
         try:
-            identity_target_id = identities[
-                (str(row["series_key"]), int(row["edition_year"]))
-            ]
-        except (KeyError, TypeError, ValueError) as exc:
+            edition_year = _strict_json_integer(
+                row["edition_year"], label="fragment edition_year"
+            )
+            identity_target_id = identities[(str(row["series_key"]), edition_year)]
+        except (KeyError, HistoricalBatchPipelineError) as exc:
             raise HistoricalBatchPipelineError(
                 "fragment series/year identity is outside selection"
             ) from exc
@@ -1459,11 +1555,11 @@ def merge_historical_race_fragments(
     evidence_by_target: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for row, _identity_row in evidence:
         try:
-            if isinstance(row.get("target_id"), bool):
-                raise ValueError
-            target_id = int(row["target_id"])
+            target_id = _strict_json_integer(
+                row["target_id"], label="manual evidence target_id"
+            )
             targets[target_id]
-        except (KeyError, TypeError, ValueError) as exc:
+        except (KeyError, HistoricalBatchPipelineError) as exc:
             raise HistoricalBatchPipelineError("manual evidence target is outside selection") from exc
         evidence_by_target[target_id].append(row)
 
@@ -1518,23 +1614,25 @@ def merge_historical_race_fragments(
     explicit_gaps: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for row, source_identity in gaps:
         try:
-            if isinstance(row.get("target_id"), bool):
-                raise ValueError
             if row.get("target_id") not in (None, ""):
-                target_id = int(row["target_id"])
+                target_id = _strict_json_integer(
+                    row["target_id"], label="gap target_id"
+                )
             else:
-                target_id = identities[
-                    (str(row["series_key"]), int(row["edition_year"]))
-                ]
+                edition_year = _strict_json_integer(
+                    row["edition_year"], label="gap edition_year"
+                )
+                target_id = identities[(str(row["series_key"]), edition_year)]
             target = targets[target_id]
-        except (KeyError, TypeError, ValueError) as exc:
+        except (KeyError, HistoricalBatchPipelineError) as exc:
             raise HistoricalBatchPipelineError("gap target is outside selection") from exc
         if row.get("series_key") not in (None, "") or row.get("edition_year") not in (None, ""):
             try:
-                identity_target_id = identities[
-                    (str(row["series_key"]), int(row["edition_year"]))
-                ]
-            except (KeyError, TypeError, ValueError) as exc:
+                edition_year = _strict_json_integer(
+                    row["edition_year"], label="gap edition_year"
+                )
+                identity_target_id = identities[(str(row["series_key"]), edition_year)]
+            except (KeyError, HistoricalBatchPipelineError) as exc:
                 raise HistoricalBatchPipelineError(
                     "gap series/year identity is outside selection"
                 ) from exc

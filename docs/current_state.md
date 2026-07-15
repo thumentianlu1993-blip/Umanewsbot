@@ -1,16 +1,15 @@
 # 当前状态
 
-## 2026-07-15 historical batch 正式流水线已部署，batch006 待正式分片 crawl
+## 2026-07-15 batch006 年度赛历入口本地验收完成，待重新部署
 
-- OpenSpec change `formalize-historical-batch-crawl-pipeline` 已完成提案、完整测试用例和两轮工程评审，最终计划结论为 approved。代码已实现不可变 selection/approval/manifest/image/tool 身份、typed recipe 目标绑定、每 shard 最多 250 场、正式资源身份、目录原子发布、日期/详情碎片合并和三阶段数据库只读 verifier。
-- 首批 typed policy 覆盖 discovery、cache、JRA、HKJC、英国 Sporting Life、法国 ZEturf、美国 Equibase、cached parser、packager 和 tracked merger。正式 plan 不接受 descriptor 自带 argv、无 policy 工具、`tmp/` 脚本、artifact 内工具或跨 shard scope；runner 会在创建 run 和取锁前比较资源 settings，并交叉验证 shard target IDs 同时属于冻结 selection 与正式 approval。
-- merger 对 complete/gap 做精确分母，来源冲突和不完整碎片进入带输入 SHA 与绑定时间的 gap；人工补证必须绑定 target SHA、旧值、HTTPS 来源、审核人和合法时间。逐届距离保留来源原单位，不做跨地区猜测或强制换算。
-- verifier 在 PostgreSQL 事务开始时设置 `SET TRANSACTION READ ONLY`，一次预取 target/event/runners/results/applied candidates；检查日期、正式来源、模块、数量、provenance 和 draft visibility，拒绝 gap 已公开，并按 `applied_at/id` 核验每模块最新 APPLIED candidate、保留旧记录审计。1250 targets 性能合同已在本地通过：plan/merge 小于 1 秒级且 verifier 不超过 20 SQL。
-- pipeline+runner 联合回归 `107/107` 通过（3 个环境专项跳过），反复 code review 已在第 19 轮达到零 actionable finding。最终门禁通过：完整 stable `1466/1466`（10 skip）、历史组合 `263/263`（3 skip）、1250-target 性能 `2/2`、真实 PostgreSQL 16 READ ONLY 注入 `1/1`、OpenSpec `30/30`，Django check、迁移漂移、Python/shell/diff 均通过。
-- `main@ab95c6ef56873c73b548cd25da50a0e080816eed` 已部署到生产，web/worker/beat 统一绑定 AMD64 image `sha256:8040b87e43c3e4587753be44cc205ca4879becd599040c4f556c716b7bfef9d8`；Git tree `d5715471723c21628d8c1c587e6e8bc9f96dcdf8`，source archive SHA-256 `604a8f254de2c86594fb2097f95d284aa401407a6140beb023535c8442374eb1`。旧镜像保留为 `umanewsbot:rollback-pre-ab95c6ef-20260715_081452`。
-- 写前 custom-format 备份为 `/opt/umanewsbot/backups/db/pre-main-ab95c6ef-20260715_081056.dump`，`141447272` bytes、SHA-256 `924a3aed9d6d8c204c2fc0b0608444a6830c5f09bfd61d2b733e991b7145c127`，`pg_restore -l` 读出 802 条目录项；环境备份为 `.env.backup.pre-main-ab95c6ef-20260715_081056`。
-- 新镜像 provisioning、crawl 最小权限、apply 无公网、40 秒暂停/恢复不重复和伪工具根拒绝 smoke 全部通过。收口时 runner 容器不存在，preflight 为 `migration_safe`，Celery active/reserved/active_queues、Redis 队列、翻译/归属/历史 running、live lock 和数据库事务均为 0；web/worker 运行，beat 保持 `Created`，历史常驻/网络/公开均为 false，历史 published 为 0，可用磁盘 `7365392 KiB`。
-- batch006 固定身份仍为 1061 targets、地区 `250/61/250/250/250`；manifest `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`、selection `b9a3ad6556cfd03e9a57874bec763f75ad4c45e7642751140cb063f1d0553637`、approval `a119e3bcfd3bc8940cf8b792e246e462b405c292b77f2996739b435c9185d835`。尚未发出 batch006 正式网络请求或写入赛事业务表，下一步只生成并核验 descriptor/shards/runner plans。
+- `formalize-historical-batch-crawl-pipeline` 的原正式流水线仍在线：生产代码为 `main@ab95c6ef56873c73b548cd25da50a0e080816eed`，web/worker 运行 AMD64 image `sha256:8040b87e43c3e4587753be44cc205ca4879becd599040c4f556c716b7bfef9d8`，beat 容器当前不存在。本次只读复核确认 healthz 正常、Redis 队列为 0、Celery active/reserved 为空、历史 running/held lock 为 0；可用磁盘 `7356400 KiB`，高于 5 GiB runner 门槛。新镜像切换时必须恢复并验收 beat。
+- 实跑 batch006 前补齐了正式年度赛历入口：tracked source catalog 展开、HTTPS/host allowlist、URL 去重、终态 partial ledger、缓存 path/size/SHA/source URL 复核、离线地区 parser、complete/gap 分母、typed recipe 与逐成员目录 checkpoint。请求与解析分 stage：crawl 仅联网不写库，verify 既不联网也不写库。
+- runner 新增全局输出路径互斥与普通文件 symlink 恢复拒绝；target/source identity 禁止布尔、分数和空字符串宽松转换。全量 ledger 可服务地区×年份解析分片；共享 URL 的 target references 必须精确等于 catalog 来源 scope 的并集。
+- batch006 固定身份仍为 1061 targets：manifest `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`、selection `b9a3ad6556cfd03e9a57874bec763f75ad4c45e7642751140cb063f1d0553637`、approval `a119e3bcfd3bc8940cf8b792e246e462b405c292b77f2996739b435c9185d835`。正式年度赛历按 11 个地区×届次年 scope 执行：FR `2023=120 / 2024=130`，HK `2016=35 / 2017=26`，JP `2022=88 / 2023=138 / 2024=24`，UK `2024=196 / 2025=54`，US `2024=83 / 2025=167`。
+- 法国官方来源真实 smoke 已完成：2023 `120/120`、2024 `130/130`，均 `issues=0`。France Galop 平地 programme、障碍详细赛程及固定列分组汇总均可解析；汇总只补详细赛程缺失目标，同等质量时详细记录优先，避免摘要笔误覆盖逐场日期。
+- 其他地区现有离线覆盖基线为：香港 `61/61`、日本 `248/250`、英国 `250/250`、美国 `241/250`。日本缺口为 2023/2024 东京大赏典的 Oi/NAR 日期来源；美国缺口集中在 NSA 障碍赛、2025 Remsen 同名冲突、Robert J. Frankel 未举办判断和 Tokyo City Cup 日期，继续记入统一 gap 审核，不中断其他 scope。
+- 最新验证：完整 stable `1524/1524`（11 skip）、年度赛历/来源专项 `118/118`（1 skip）、runner `70/70`、1250-target 性能 `3/3`、OpenSpec `30/30`；Django check、迁移漂移、Python compile 和 diff 检查均通过。新增实现完成 4 轮 review，最终一轮无 actionable finding。
+- 新年度赛历代码尚未部署，batch006 正式网络抓取和赛事业务表写入均未启动，历史公开/常驻网络/常驻写入继续关闭。下一步先提交、推送并从最新 main 构建可复现 AMD64 镜像，安全替换 web/worker/beat 后再按 11 个 scope 抓取、解析、补 gap、生成详情候选并分阶段 apply。
 
 ## 2026-07-15 historical runner 工具根补丁部署与强化 smoke 完成
 

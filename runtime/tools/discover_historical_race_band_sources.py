@@ -33,28 +33,54 @@ JRA_COURSES = {
 }
 
 JRA_OFFICIAL_NAME_ALIASES = {
+    "japan-daily-hai-nisai": "デイリー杯2歳S",
     "japan-hanshin-jump": "阪神ジャンプS",
     "japan-hanshin-spring-jump": "阪神スプリングジャンプ",
+    "japan-kansai-television-co-ltd-sho-rose": "ローズS",
+    "japan-kansai-television-corporation-sho-rose": "ローズS",
     "japan-kokura-jump": "小倉ジャンプS",
+    "japan-kokura-summer-jump": "小倉サマージャンプ",
     "japan-kyoto-high-jump": "京都ハイジャンプ",
     "japan-kyoto-jump": "京都ジャンプS",
     "japan-laurel-racecourse-sho-nakayama-himba": "中山牝馬S",
+    "japan-mbs-sho-swan": "スワンS",
     "japan-niigata-jump": "新潟ジャンプS",
+    "japan-tokyo-high-jump": "東京ハイジャンプ",
+    "japan-tokyo-jump": "東京ジャンプS",
+    "japan-tv-nishi-nippon-corporation-sho-kitakyushu-kinen": "北九州記念",
 }
 
 TRACK_CODES = {
-    "aqueduct": {"AQU"},
-    "belmont at aqueduct": {"BAQ"},
-    "belmont at the big a": {"BAQ"},
+    "aqueduct": {"AQU", "BAQ"},
+    "belmont at aqueduct": {"AQU", "BAQ"},
+    "belmont at the big a": {"AQU", "BAQ"},
     "belmont park": {"BEL"},
     "churchill downs": {"CD"},
+    "charles town": {"CT"},
+    "delaware park": {"DEL"},
     "del mar": {"DMR"},
+    "ellis park": {"ELP"},
+    "fair grounds": {"FG"},
     "gulfstream park": {"GP"},
     "keeneland": {"KEE"},
+    "kentucky downs": {"KD"},
+    "laurel park": {"LRL"},
+    "lone star park": {"LS"},
+    "los alamitos": {"LRC"},
+    "monmouth park": {"MTH"},
+    "mountaineer park": {"MNR"},
     "oaklawn park": {"OP"},
+    "parx racing": {"PRX"},
+    "penn national": {"PEN"},
+    "pimlico": {"PIM"},
+    "prairie meadows": {"PRM"},
+    "presque isle downs": {"PID"},
+    "remington park": {"RP"},
     "santa anita": {"SA"},
     "santa anita park": {"SA"},
     "saratoga": {"SAR"},
+    "tampa bay downs": {"TAM"},
+    "thistledown": {"TDN"},
     "colonial downs": {"CNL"},
 }
 
@@ -64,9 +90,12 @@ MONTHS = {
     "mar": 3,
     "apr": 4,
     "may": 5,
+    "jun": 6,
     "june": 6,
+    "jul": 7,
     "july": 7,
     "aug": 8,
+    "sep": 9,
     "sept": 9,
     "oct": 10,
     "nov": 11,
@@ -91,22 +120,30 @@ FRENCH_MONTHS = {
 BHA_COURSES = {
     "AINTREE": "Aintree",
     "ASCOT": "Ascot",
+    "AYR": "Ayr",
     "CHESTER": "Chester",
     "CHELTENHAM": "Cheltenham",
+    "CHEPSTOW": "Chepstow",
     "DONCASTER": "Doncaster",
     "EPSOMDOWNS": "Epsom Downs",
+    "EXETER": "Exeter",
+    "FONTWELLPARK": "Fontwell",
     "GOODWOOD": "Goodwood",
     "HAYDOCKPARK": "Haydock Park",
     "KEMPTONPARK": "Kempton Park",
     "LINGFIELDPARK": "Lingfield",
+    "MARKETRASEN": "Market Rasen",
     "NEWBURY": "Newbury",
     "NEWMARKET": "Newmarket",
     "NEWCASTLE": "Newcastle",
     "SALISBURY": "Salisbury",
     "SANDOWNPARK": "Sandown Park",
+    "SOUTHWELL": "Southwell",
+    "UTTOXETER": "Uttoxeter",
     "WARWICK": "Warwick",
     "WETHERBY": "Wetherby",
     "WINCANTON": "Wincanton",
+    "WINDSOR": "Windsor",
     "YORK": "York",
 }
 
@@ -150,7 +187,71 @@ COMPACT_RACE_WORDS = (
 
 TOBA_CORE_NAME_QUALIFIERS = ("FILLIES", "TURF", "SPRINT")
 
+TOBA_SERIES_ALIASES = {
+    "united-states-awesome-again": ("California Crown Stakes",),
+    "united-states-chandelier": ("Oak Leaf Stakes",),
+    "united-states-princess-rooney-invitational": ("Princess Rooney Stakes",),
+    "united-states-runhappy": ("Elite Power Stakes",),
+    "united-states-unzip-me": ("John C. Harris Stakes",),
+    "united-states-virginia-derby": ("Old Dominion Derby",),
+}
+
+TOBA_REVIEWED_RELOCATIONS = {
+    "united-states-belmont-derby-invitational",
+    "united-states-pennine-ridge",
+    "united-states-soaring-softly",
+    "united-states-victory-ride",
+    "united-states-wonder-again",
+}
+
 CALENDAR_SERIES_ALIASES = {
+    "france-la-coupe": (
+        "La Coupe",
+    ),
+    "france-la-coupe-de-maisons-laffitte": (
+        "La Coupe de M-L",
+    ),
+    "france-jean-luc-lagardere-grand-criterium": (
+        "F J-L Lagardere",
+        "Jean-Luc Lagardere",
+    ),
+    "france-grand-prix-de-pau-stp": (
+        "Andre Labarrere",
+        "Grand Prix de Pau",
+        "GD PX DE PAU",
+    ),
+    "france-grand-prix-de-la-ville-de-nice-bernard-secly-stp": (
+        "Grand Prix de la Ville de Nice",
+        "GD PX DE NICE",
+    ),
+    "france-drags-des-stp": (
+        "Prix des Drags",
+        "Les Drags",
+    ),
+    "france-christian-de-tredern-hurdle": (
+        "Christian de Tredern",
+        "Tredern",
+    ),
+    "france-magalen-bryant-bournosienne-hurdle": (
+        "Haras d'Etreham Magalen Bryant",
+        "Magalen Bryant",
+        "Bournosienne",
+    ),
+    "france-paris-g-p-de": (
+        "F GD Prix Paris",
+        "Grand Prix de Paris",
+    ),
+    "france-renaud-du-vivier-hurdle": (
+        "Renaud du Vivier",
+    ),
+    "france-vichy-g-p-de": (
+        "Grand Px Vichy",
+        "Grand Prix de Vichy",
+    ),
+    "GBR_BRISTOL_NOVICES_HURDLE": (
+        "Albert Bartlett Bristol Novices Hurdle",
+        "Bristol Novices Hurdle",
+    ),
     "GBR_AINTREE_BRIDLE_ROAD_HANDICAP_HURDLE": (
         "William Hill Top Price Guarantee Handicap Hurdle",
         "William Hill Handicap Hurdle",
@@ -175,9 +276,17 @@ CALENDAR_SERIES_ALIASES = {
         "December Gold Cup Handicap Chase",
         "Nyetimber Gold Cup Handicap Chase",
     ),
+    "GBR_CHELTENHAM_DECEMBER_3M2F_HANDICAP_CHASE": (
+        "Southam Handicap Chase",
+    ),
     "GBR_CHELTENHAM_NOVEMBER_LONG_DISTANCE_HANDICAP_CHASE": (
         "Holland Cooper Handicap Chase",
         "Oddschecker Handicap Chase",
+        "Jewson Handicap Chase",
+        "Prestbury Handicap Chase",
+    ),
+    "GBR_CHELTENHAM_PADDY_POWER_GOLD_CUP": (
+        "Paddy Power Gold Cup Handicap Chase",
     ),
     "united-kingdom-acomb": (
         "Tattersalls Acomb",
@@ -198,7 +307,72 @@ CALENDAR_SERIES_ALIASES = {
     ),
     "united-kingdom-1965-stp": (
         "Copybet 1965 Chase",
+        "Nirvana Spa 1965 Chase",
+        "Chanelle Pharma 1965 Chase",
         "1965 Chase",
+    ),
+    "united-kingdom-british-champions-sprint": (
+        "QIPCO British Champions Sprint",
+        "British Champions Sprint",
+    ),
+    "united-kingdom-champion-s-british-champion-middle-distance": (
+        "QIPCO Champion",
+        "Champion Stakes",
+    ),
+    "united-kingdom-clarence-house-stp": (
+        "Clarence House Chase",
+    ),
+    "united-kingdom-cleeve-hurdle": (
+        "Cleeve Hurdle",
+    ),
+    "united-kingdom-denman-stp": (
+        "Betfair Denman Chase",
+        "Denman Chase",
+    ),
+    "united-kingdom-fillies-juvenile-hurdle": (
+        "Safran Landing Systems Juvenile Handicap Hurdle",
+    ),
+    "united-kingdom-fred-winter-juvenile-hurdle": (
+        "Boodles Fred Winter Juvenile Handicap Hurdle",
+    ),
+    "united-kingdom-game-spirit-stp": (
+        "Betfair Exchange Game Spirit Chase",
+        "Game Spirit Chase",
+    ),
+    "united-kingdom-hyde-novices-hurdle": (
+        "Albert Bartlett Hyde Novices Hurdle",
+        "Hyde Novices Hurdle",
+    ),
+    "united-kingdom-jockey-club": (
+        "Jockey Club Stakes",
+        "Jockey Club",
+    ),
+    "united-kingdom-joel": (
+        "Al Basti Equiworld Dubai Joel",
+        "Joel Stakes",
+    ),
+    "united-kingdom-july": (
+        "Kingdom of Bahrain July",
+        "July Stakes",
+    ),
+    "united-kingdom-kingwell-hurdle": (
+        "JenningsBet Kingwell Hurdle",
+        "Kingwell Hurdle",
+    ),
+    "united-kingdom-national-spirit-hurdle": (
+        "National Spirit Hurdle",
+    ),
+    "united-kingdom-silver-cup-stp": (
+        "Howden Silver Cup Handicap Chase",
+        "Silver Cup Handicap Chase",
+    ),
+    "united-kingdom-summer-plate-stp": (
+        "Unibet Summer Plate Handicap Chase",
+        "Summer Plate Handicap Chase",
+    ),
+    "united-kingdom-swinley-stp": (
+        "Betfair Swinley Handicap Chase",
+        "Swinley Handicap Chase",
     ),
     "hong-kong-queen-elizabeth-ii-cup": (
         "FWD QEII Cup",
@@ -237,7 +411,7 @@ def _collapse(value: str) -> str:
 
 
 def _iso_date(year: int, month: int, day: int) -> str:
-    return f"{year:04d}-{month:02d}-{day:02d}"
+    return datetime(year, month, day).date().isoformat()
 
 
 def _month_number(value: str) -> int:
@@ -298,7 +472,9 @@ def _calendar_name_score(target_name: str, source_name: str) -> float:
 def _calendar_course_key(value: str) -> str:
     key = _calendar_key(value)
     aliases = {
+        "CAGNES": "CAGNESSURMER",
         "EPSOMDOWNS": "EPSOM",
+        "FONTAINEBLEAUGALOP": "FONTAINEBLEAU",
         "HAYDOCKPARK": "HAYDOCK",
         "KEMPTONPARK": "KEMPTON",
         "SANDOWNPARK": "SANDOWN",
@@ -372,19 +548,47 @@ def _target_calendar_names(target: dict) -> list[str]:
 def match_official_schedule_targets(targets: list[dict], schedule_rows: list[dict]) -> dict:
     matches = []
     issues = []
-    deduped_sources = []
-    seen_sources = set()
+    event_date_counts = defaultdict(lambda: defaultdict(int))
     for source in schedule_rows:
+        event_identity = (
+            source.get("edition_year"),
+            _calendar_course_key(str(source.get("racecourse") or "")),
+            _calendar_key(str(source.get("race_name") or "")),
+        )
+        event_date_counts[event_identity][source.get("local_date")] += 1
+    majority_dates = {}
+    for event_identity, date_counts in event_date_counts.items():
+        maximum = max(date_counts.values(), default=0)
+        winners = [date for date, count in date_counts.items() if count == maximum]
+        if maximum >= 2 and len(winners) == 1:
+            majority_dates[event_identity] = winners[0]
+
+    sources_by_identity = {}
+    for source in schedule_rows:
+        event_identity = (
+            source.get("edition_year"),
+            _calendar_course_key(str(source.get("racecourse") or "")),
+            _calendar_key(str(source.get("race_name") or "")),
+        )
+        if (
+            event_identity in majority_dates
+            and source.get("local_date") != majority_dates[event_identity]
+        ):
+            continue
         identity = (
             source.get("edition_year"),
             source.get("local_date"),
             _calendar_course_key(str(source.get("racecourse") or "")),
             _calendar_key(str(source.get("race_name") or "")),
-            source.get("distance_text"),
         )
-        if identity not in seen_sources:
-            seen_sources.add(identity)
-            deduped_sources.append(source)
+        existing = sources_by_identity.get(identity)
+        if existing is None:
+            sources_by_identity[identity] = dict(source)
+            continue
+        for key, value in source.items():
+            if value and not existing.get(key):
+                existing[key] = value
+    deduped_sources = list(sources_by_identity.values())
     for target in targets:
         year = int(target.get("year") or 0)
         series_key = str(target.get("series_key") or "")
@@ -416,11 +620,32 @@ def match_official_schedule_targets(targets: list[dict], schedule_rows: list[dic
         ]
         if grade_candidates:
             candidates = grade_candidates
+        distance_candidates = [
+            (score, source)
+            for score, source in candidates
+            if _distance_compatible(target, source)
+        ]
+        if distance_candidates:
+            candidates = distance_candidates
+        detailed_candidates = [
+            (score, source)
+            for score, source in candidates
+            if source.get("calendar_source_parser") != "france_obstacle_summary"
+        ]
+        summary_candidates = [
+            (score, source)
+            for score, source in candidates
+            if source.get("calendar_source_parser") == "france_obstacle_summary"
+        ]
+        if (
+            detailed_candidates
+            and summary_candidates
+            and max(score for score, _source in detailed_candidates)
+            >= max(score for score, _source in summary_candidates)
+        ):
+            candidates = detailed_candidates
         best_score = max(score for score, _source in candidates)
         best = [source for score, source in candidates if abs(score - best_score) < 1e-9]
-        distance_matches = [source for source in best if _distance_compatible(target, source)]
-        if distance_matches:
-            best = distance_matches
         if len(best) != 1:
             issues.append(
                 {
@@ -616,11 +841,129 @@ def write_calendar_event_inputs(rows: list[dict], output_dir: Path) -> dict[str,
     return files
 
 
-def parse_hkjc_pattern_schedule_text(text: str, *, edition_year: int | None = None) -> list[dict]:
+def _hkjc_date_in_season(year: int, month: int, edition_year: int | None) -> bool:
+    return edition_year is None or (
+        (year == edition_year and month <= 6)
+        or (year == edition_year - 1 and month >= 7)
+    )
+
+
+def _parse_hkjc_chronological_group_table(
+    text: str, *, edition_year: int | None
+) -> list[dict]:
+    marker = "List of Group Races in"
+    if marker not in text:
+        return []
+    section = text.split(marker, 1)[1].split("List of Group Race Closing Dates", 1)[0]
+    pattern = re.compile(
+        r"^\s*(?:(?P<day>\d{1,2})\s+(?P<month>[A-Za-z]{3})\s+(?P<year>\d{4})\s+)?"
+        r"(?P<name>.+?)\s+(?P<status>HKG[123]|G[123])\s+\$[\d,]+\s+"
+        r"(?P<distance>\d{3,4})\b",
+        re.IGNORECASE,
+    )
+    month_numbers = {
+        "jan": 1,
+        "feb": 2,
+        "mar": 3,
+        "apr": 4,
+        "may": 5,
+        "jun": 6,
+        "jul": 7,
+        "aug": 8,
+        "sep": 9,
+        "oct": 10,
+        "nov": 11,
+        "dec": 12,
+    }
     rows = []
+    current_date: tuple[int, int, int] | None = None
+    for line in section.splitlines():
+        match = pattern.match(line)
+        if match is None:
+            continue
+        if match.group("day"):
+            month = month_numbers.get(match.group("month").casefold())
+            if month is None:
+                continue
+            current_date = (int(match.group("year")), month, int(match.group("day")))
+        if current_date is None:
+            continue
+        year, month, day = current_date
+        if not _hkjc_date_in_season(year, month, edition_year):
+            continue
+        race_name = _collapse(match.group("name"))
+        rows.append(
+            {
+                "local_date": _iso_date(year, month, day),
+                "edition_year": edition_year or year,
+                "racecourse": HKJC_PATTERN_RACECOURSES.get(
+                    _calendar_key(race_name), "Sha Tin"
+                ),
+                "race_name": race_name,
+                "normalized_grade": f"G{match.group('status')[-1]}",
+                "distance_text": f"{int(match.group('distance'))}m",
+            }
+        )
+    return rows
+
+
+def _parse_hkjc_course_records_table(
+    text: str, *, edition_year: int | None
+) -> list[dict]:
+    marker = "Black Type Races for"
+    if "COURSE RECORDS" not in text or marker not in text:
+        return []
+    section = text[text.index(marker) :]
+    course_header = re.compile(
+        r"^\s*(?:(?P<distance>\d{4})\s+)?(?P<course>Sha Tin|Happy Valley)\s+-\s+"
+        r"[A-Z]+\s+.+?\s+[A-Z]{2,3}\s+\d{2}\s+[A-Za-z]{3}\s+\d{4}\s+"
+        r"\d+\.\d+\.\d+\s+(?P<race>.+)$"
+    )
+    race_pattern = re.compile(
+        r"^(?P<name>.+?)\s+(?P<status>G[123]|4yo)\s+"
+        r"(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{2})\s+[\d,]+\s+\d+\s*$",
+        re.IGNORECASE,
+    )
+    rows = []
+    current_distance = 0
+    current_course = ""
+    for line in section.splitlines():
+        line = _collapse(line)
+        header_match = course_header.match(line)
+        if header_match is not None:
+            if header_match.group("distance"):
+                current_distance = int(header_match.group("distance"))
+            current_course = header_match.group("course")
+            line = header_match.group("race")
+        match = race_pattern.match(line)
+        if match is None or not current_distance or not current_course:
+            continue
+        year = 2000 + int(match.group("year"))
+        month = int(match.group("month"))
+        if not _hkjc_date_in_season(year, month, edition_year):
+            continue
+        status = match.group("status").upper()
+        rows.append(
+            {
+                "local_date": _iso_date(year, month, int(match.group("day"))),
+                "edition_year": edition_year or year,
+                "racecourse": current_course,
+                "race_name": _collapse(match.group("name")),
+                "normalized_grade": status if status.startswith("G") else "",
+                "distance_text": f"{current_distance}m",
+            }
+        )
+    return rows
+
+
+def parse_hkjc_pattern_schedule_text(text: str, *, edition_year: int | None = None) -> list[dict]:
+    rows = [
+        *_parse_hkjc_chronological_group_table(text, edition_year=edition_year),
+        *_parse_hkjc_course_records_table(text, edition_year=edition_year),
+    ]
     pattern = re.compile(
         r"^\s*(?:[A-Z]{3}\s+)?(?P<day>\d{2})/(?P<month>\d{2})/(?P<year>\d{2})\s+"
-        r"(?P<name>.+?)\s+G(?P<grade>[123])\s+.+?\b\dyo\+?\s+(?P<distance>\d{3,4})\b",
+        r"(?P<name>.+?)\s+G(?P<grade>[123])\s+.*?\b\dyo\+?\s+(?P<distance>\d{3,4})\b",
         re.IGNORECASE,
     )
     for line in text.splitlines():
@@ -629,10 +972,7 @@ def parse_hkjc_pattern_schedule_text(text: str, *, edition_year: int | None = No
             continue
         year = 2000 + int(match.group("year"))
         month = int(match.group("month"))
-        if edition_year is not None and not (
-            (year == edition_year and month <= 6)
-            or (year == edition_year - 1 and month >= 7)
-        ):
+        if not _hkjc_date_in_season(year, month, edition_year):
             continue
         race_name = _collapse(match.group("name"))
         rows.append(
@@ -645,7 +985,16 @@ def parse_hkjc_pattern_schedule_text(text: str, *, edition_year: int | None = No
                 "distance_text": f"{int(match.group('distance'))}m",
             }
         )
-    return rows
+    deduplicated = {
+        (
+            row["local_date"],
+            _calendar_key(row["race_name"]),
+            _calendar_course_key(row["racecourse"]),
+            row["distance_text"],
+        ): row
+        for row in rows
+    }
+    return list(deduplicated.values())
 
 
 def parse_hkjc_results_all_schedule(html: str) -> list[dict]:
@@ -752,12 +1101,22 @@ def resolve_hkjc_result_urls(matches: list[dict], result_pages: dict[tuple[str, 
 
 def parse_bha_flat_schedule_text(text: str, *, year: int) -> list[dict]:
     rows = []
-    course_pattern = "|".join(sorted(BHA_COURSES, key=len, reverse=True))
-    pattern = re.compile(
+    course_pattern = "|".join(
+        re.sub(r"(PARK|DOWNS|RASEN)$", r"\\s*\1", key)
+        for key in sorted(BHA_COURSES, key=len, reverse=True)
+    )
+    closing_date_pattern = re.compile(
         rf"^\s*(?:(?:[A-Z][a-z]{{2,3}}\.?)|[”\"])\s*\d{{1,2}}\s+"
         rf"(?P<course>{course_pattern})\s+"
         rf"(?P<month>[A-Z][a-z]{{2,3}})\.?\s*(?P<day>\d{{1,2}})\s+"
         rf"(?P<name>.+?)\(P(?P<grade>[123])(?:\.[A-Z])*\.\)",
+        re.IGNORECASE,
+    )
+    chronological_pattern = re.compile(
+        rf"^\s*(?P<month>[A-Z][a-z]{{2,3}}\.?|[”\"])\s*(?P<day>\d{{1,2}})\s+"
+        rf"(?P<course>{course_pattern})\s+"
+        rf"(?P<name>.+?)\(P(?P<grade>[123])(?:\.[A-Z])*\.\)",
+        re.IGNORECASE,
     )
     raw_lines = text.splitlines()
     logical_lines = []
@@ -771,39 +1130,94 @@ def parse_bha_flat_schedule_text(text: str, *, year: int) -> list[dict]:
                 if re.search(r"\(P[123]", combined):
                     break
         logical_lines.append(combined)
+    current_month = None
     for line in logical_lines:
-        match = pattern.search(line)
+        match = closing_date_pattern.search(line)
+        explicit_race_date = match is not None
+        if match is not None:
+            month = _month_number(match.group("month"))
+        else:
+            match = chronological_pattern.search(line)
+            if match is None:
+                continue
+            month_text = match.group("month")
+            if month_text in {'”', '"'}:
+                if current_month is None:
+                    continue
+                month = current_month
+            else:
+                month = _month_number(month_text)
+                current_month = month
         if match is None:
+            continue
+        try:
+            local_date = _iso_date(year, month, int(match.group("day")))
+        except ValueError:
             continue
         rows.append(
             {
-                "local_date": _iso_date(year, _month_number(match.group("month")), int(match.group("day"))),
-                "racecourse": BHA_COURSES[match.group("course")],
+                "local_date": local_date,
+                "racecourse": BHA_COURSES[re.sub(r"\s+", "", match.group("course")).upper()],
                 "race_name": _display_compact_race_name(match.group("name")),
                 "normalized_grade": f"G{match.group('grade')}",
                 "distance_text": "",
+                "_explicit_race_date": explicit_race_date,
             }
         )
-    return rows
+    authoritative = {
+        (
+            _calendar_course_key(row["racecourse"]),
+            _calendar_key(row["race_name"]),
+            row["normalized_grade"],
+        )
+        for row in rows
+        if row["_explicit_race_date"]
+    }
+    return [
+        {key: value for key, value in row.items() if key != "_explicit_race_date"}
+        for row in rows
+        if row["_explicit_race_date"]
+        or (
+            _calendar_course_key(row["racecourse"]),
+            _calendar_key(row["race_name"]),
+            row["normalized_grade"],
+        )
+        not in authoritative
+    ]
 
 
 def parse_bha_jump_schedule_text(text: str, *, season_start_year: int) -> list[dict]:
     rows = []
-    course_pattern = "|".join(sorted(BHA_COURSES, key=len, reverse=True))
+    course_pattern = "|".join(
+        re.sub(r"(PARK|DOWNS|RASEN)$", r"\\s*\1", key)
+        for key in sorted(BHA_COURSES, key=len, reverse=True)
+    )
     index_pattern = re.compile(
-        rf"^\s*(?P<month>[A-Z][a-z]{{2,3}})\.\s*(?P<day>\d{{1,2}})\s+"
+        rf"^\s*(?P<month>[A-Z][a-z]{{2,3}})\.?\s*(?P<day>\d{{1,2}})\s+"
         rf"(?P<course>{course_pattern})\s+(?P<name>.+?)\s+"
         rf"\d(?:\+|-\d)?(?:F)?\s+(?P<grade>Prem|Listed|[123])\s+\d+\s*$",
         re.IGNORECASE,
     )
     detail_pattern = re.compile(
-        rf"^\s*(?P<month>[A-Z][a-z]{{2,3}})\.\s*(?P<day>\d{{1,2}})\s+"
+        rf"^\s*(?P<month>[A-Z][a-z]{{2,3}})\.?\s*(?P<day>\d{{1,2}})\s+"
         rf"(?P<course>{course_pattern})\s+(?P<name>.+?)\s+"
-        rf"(?P<distance>\d+m(?:\d+(?:/\d+)?f)?|\d+(?:/\d+)?f)\s+"
+        rf"(?P<distance>(?:\d+m(?:\d+(?:/\d+)?f)?|\d+(?:/\d+)?f)\+?)\s+"
         rf"(?P<grade>Prem|Listed|[123])\s+[\d,]+\s*$",
         re.IGNORECASE,
     )
-    for line in text.splitlines():
+    raw_lines = text.splitlines()
+    logical_lines = []
+    for index, line in enumerate(raw_lines):
+        combined = line
+        if detail_pattern.search(combined) is None and index_pattern.search(combined) is None:
+            for continuation in raw_lines[index + 1 : index + 3]:
+                if re.match(r"^\s*[A-Z][a-z]{2,3}\.?\s*\d{1,2}\b", continuation):
+                    break
+                combined += continuation.strip()
+                if detail_pattern.search(combined) is not None or index_pattern.search(combined) is not None:
+                    break
+        logical_lines.append(combined)
+    for line in logical_lines:
         match = detail_pattern.search(line) or index_pattern.search(line)
         if match is None:
             continue
@@ -813,7 +1227,7 @@ def parse_bha_jump_schedule_text(text: str, *, season_start_year: int) -> list[d
         rows.append(
             {
                 "local_date": _iso_date(year, month, int(match.group("day"))),
-                "racecourse": BHA_COURSES[match.group("course").upper()],
+                "racecourse": BHA_COURSES[re.sub(r"\s+", "", match.group("course")).upper()],
                 "race_name": _display_compact_race_name(match.group("name")),
                 "normalized_grade": "G3" if grade == "PREM" else (f"G{grade}" if grade.isdigit() else grade),
                 "distance_text": match.groupdict().get("distance") or "",
@@ -856,8 +1270,80 @@ def parse_france_galop_flat_schedule_text(text: str, *, year: int) -> list[dict]
     return rows
 
 
-def parse_france_galop_obstacle_schedule_text(text: str, *, year: int) -> list[dict]:
+def parse_france_galop_flat_program_text(text: str, *, year: int) -> list[dict]:
     rows = []
+    in_aqps_index = False
+    section_end = re.compile(
+        r"^(?:Anglo-Arabes|Arabes Purs|Filiere obstacle|Filière obstacle)\s*$",
+        re.IGNORECASE,
+    )
+    row_pattern = re.compile(
+        r"^\s*(?P<day>\d{1,2})-(?P<month>\d{2})\s+"
+        r"(?P<course>.+?)\s+"
+        r"\d{1,3}(?:\s+\d{3})+\s+"
+        r"(?:\d+\s+ans|\d+\s*&\s*(?:\d+|\+)|\d+\s*,\s*\d+\s*&\s*\d+)\s+"
+        r"(?:(?:F|M|H)(?:\s+(?:F|M|H))?\s+)?"
+        r"(?:[•·]\s+)?"
+        r"(?P<name>.+?)\s+"
+        r"(?P<distance>\d(?:\s+\d{3})?)\s*$",
+        re.IGNORECASE,
+    )
+    for line in text.splitlines():
+        compact = _collapse(line)
+        if re.sub(r"[^A-Z]", "", compact.upper()) == "AQPS":
+            in_aqps_index = True
+            continue
+        if not in_aqps_index:
+            continue
+        if section_end.match(compact):
+            break
+        match = row_pattern.match(compact)
+        if match is None:
+            continue
+        rows.append(
+            {
+                "local_date": _iso_date(
+                    year,
+                    int(match.group("month")),
+                    int(match.group("day")),
+                ),
+                "racecourse": _collapse(match.group("course")).replace("'", "’"),
+                "race_name": _collapse(match.group("name")),
+                "normalized_grade": "",
+                "distance_text": f"{int(re.sub(r'\s+', '', match.group('distance')))}m",
+            }
+        )
+    return rows
+
+
+def parse_france_galop_obstacle_schedule_text(
+    text: str,
+    *,
+    year: int,
+    date_start: str = "",
+    date_end: str = "",
+) -> list[dict]:
+    rows = []
+    start = datetime.fromisoformat(date_start).date() if date_start else None
+    end = datetime.fromisoformat(date_end).date() if date_end else None
+    if (start is None) != (end is None) or (start is not None and start > end):
+        raise ValueError("France obstacle date window is invalid")
+
+    def source_date(month: int, day: int) -> str | None:
+        if start is None or end is None:
+            return _iso_date(year, month, day)
+        candidates = []
+        for candidate_year in range(start.year, end.year + 1):
+            try:
+                candidate = datetime(candidate_year, month, day).date()
+            except ValueError:
+                continue
+            if start <= candidate <= end:
+                candidates.append(candidate)
+        if len(candidates) != 1 or candidates[0].year != year:
+            return None
+        return candidates[0].isoformat()
+
     pattern = re.compile(
         r"^\s*(?P<day>\d{1,2})-(?P<month>\d{2})\s+"
         r"(?P<course>[A-Za-zÀ-ÿ’' -]+?)\s+"
@@ -876,9 +1362,12 @@ def parse_france_galop_obstacle_schedule_text(text: str, *, year: int) -> list[d
     for line in text.splitlines():
         match = pattern.match(line)
         if match is not None:
+            local_date = source_date(int(match.group("month")), int(match.group("day")))
+            if local_date is None:
+                continue
             rows.append(
                 {
-                    "local_date": _iso_date(year, int(match.group("month")), int(match.group("day"))),
+                    "local_date": local_date,
                     "racecourse": _collapse(match.group("course")).replace("'", "’"),
                     "race_name": _collapse(match.group("name")),
                     "normalized_grade": f"G{len(match.group('grade'))}",
@@ -892,15 +1381,143 @@ def parse_france_galop_obstacle_schedule_text(text: str, *, year: int) -> list[d
         month_key = _calendar_key(match.group("month")).lower()
         if month_key not in FRENCH_MONTHS:
             continue
+        local_date = source_date(FRENCH_MONTHS[month_key], int(match.group("day")))
+        if local_date is None:
+            continue
         rows.append(
             {
-                "local_date": _iso_date(year, FRENCH_MONTHS[month_key], int(match.group("day"))),
+                "local_date": local_date,
                 "racecourse": _collapse(match.group("course")).title().replace("'", "’"),
                 "race_name": _collapse(match.group("name")).rstrip("."),
                 "normalized_grade": "",
                 "distance_text": "",
             }
         )
+    return rows
+
+
+def parse_france_galop_obstacle_group_summary_text(
+    text: str,
+    *,
+    year: int,
+) -> list[dict]:
+    """Parse the fixed-width five-column France Galop obstacle group summary."""
+    header_pattern = re.compile(r"\b(?:3|4)\s+ans\b|\b5\s+et\s+\+", re.IGNORECASE)
+    date_pattern = re.compile(
+        r"(?P<day>\d{1,2})/(?P<month>\d{2})\s*\((?P<course>[^)]+)\)"
+    )
+    grade_pattern = re.compile(r"\[G(?P<grade>[123])\]", re.IGNORECASE)
+    distance_pattern = re.compile(r"(?<!\d)(?P<distance>[2-6]\s?\d{3})(?!\d)")
+    ignored_names = {"HAIES", "STEEPLECHASE", "PROGRAMMENATIONALGROUPES"}
+    french_month_names = {_calendar_key(name) for name in FRENCH_MONTHS}
+
+    column_starts: list[int] = []
+    states = [{} for _ in range(5)]
+    rows = []
+
+    def finish(column: int) -> None:
+        state = states[column]
+        required = {"name", "day", "month", "course", "grade", "distance"}
+        if not required.issubset(state):
+            return
+        rows.append(
+            {
+                "local_date": _iso_date(year, state["month"], state["day"]),
+                "racecourse": _collapse(state["course"]).title().replace("'", "’"),
+                "race_name": _collapse(state["name"]),
+                "normalized_grade": f"G{state['grade']}",
+                "distance_text": f"{state['distance']}m",
+            }
+        )
+        states[column] = {}
+
+    def nearest_column(position: int) -> int:
+        return min(
+            range(len(column_starts)),
+            key=lambda column: abs(column_starts[column] - position),
+        )
+
+    for line in text.splitlines():
+        headers = list(header_pattern.finditer(line))
+        if len(headers) == 5:
+            column_starts = [match.start() for match in headers]
+            states = [{} for _ in range(5)]
+            continue
+        if not column_starts:
+            continue
+
+        date_matches = list(date_pattern.finditer(line))
+        grade_matches = list(grade_pattern.finditer(line))
+        distance_matches = list(distance_pattern.finditer(line))
+        for date_match in date_matches:
+            column = nearest_column(date_match.start())
+            states[column].update(
+                {
+                    "day": int(date_match.group("day")),
+                    "month": int(date_match.group("month")),
+                    "course": date_match.group("course"),
+                }
+            )
+            finish(column)
+
+        for index, grade_match in enumerate(grade_matches):
+            column = nearest_column(grade_match.start())
+            states[column]["grade"] = int(grade_match.group("grade"))
+            segment_end = (
+                grade_matches[index + 1].start()
+                if index + 1 < len(grade_matches)
+                else len(line)
+            )
+            distance_match = distance_pattern.search(
+                line,
+                grade_match.end(),
+                segment_end,
+            )
+            if distance_match is not None:
+                states[column]["distance"] = int(
+                    re.sub(r"\s+", "", distance_match.group("distance"))
+                )
+            finish(column)
+
+        if not grade_matches:
+            for distance_match in distance_matches:
+                column = nearest_column(distance_match.start())
+                if "grade" not in states[column]:
+                    continue
+                states[column]["distance"] = int(
+                    re.sub(r"\s+", "", distance_match.group("distance"))
+                )
+                finish(column)
+
+        if not date_matches and not grade_matches and not distance_matches:
+            chunks = re.finditer(r"\S(?:.*?\S)?(?=\s{2,}|$)", line)
+            for chunk in chunks:
+                cell = _collapse(chunk.group())
+                if not cell:
+                    continue
+                column = nearest_column(chunk.start())
+                state = states[column]
+                name_key = _calendar_key(cell)
+                is_name = (
+                    any(char.isalpha() for char in cell)
+                    and cell == cell.upper()
+                    and name_key not in ignored_names
+                    and name_key not in french_month_names
+                    and not re.search(
+                        r"\b(?:ans|mois|semestre)\b",
+                        cell,
+                        re.IGNORECASE,
+                    )
+                )
+                if not is_name:
+                    continue
+                if state and state.get("name") != cell:
+                    states[column] = {"name": cell}
+                else:
+                    state["name"] = cell
+                finish(column)
+
+    rows.sort(key=lambda row: (row["local_date"], row["race_name"]))
     return rows
 
 
@@ -948,11 +1565,61 @@ def _toba_core_name_qualifiers(value: str) -> set[str]:
     return {qualifier for qualifier in TOBA_CORE_NAME_QUALIFIERS if qualifier in words}
 
 
+def _toba_target_names(target: dict) -> list[str]:
+    names = [str(target.get("original_name") or "")]
+    names.extend(re.split(r"[|,]", str(target.get("aliases") or "")))
+    names.extend(TOBA_SERIES_ALIASES.get(str(target.get("series_key") or ""), ()))
+    return [name for name in names if name]
+
+
+def _toba_target_keys(target: dict) -> set[str]:
+    keys = set()
+    for name in _toba_target_names(target):
+        keys.add(_normalize_name(name))
+        keys.add(_normalize_name(_toba_shape_key(name)))
+    return {key for key in keys if key}
+
+
 def _toba_core_name_compatible(target: dict, source: dict) -> bool:
-    target_names = [str(target.get("original_name") or "")]
-    target_names.extend(re.split(r"[|,]", str(target.get("aliases") or "")))
     source_qualifiers = _toba_core_name_qualifiers(str(source.get("race_name") or ""))
-    return any(_toba_core_name_qualifiers(name) == source_qualifiers for name in target_names)
+    return any(
+        _toba_core_name_qualifiers(name) == source_qualifiers
+        for name in _toba_target_names(target)
+    )
+
+
+def _toba_shape_key(value: str) -> str:
+    value = unicodedata.normalize("NFKC", SPONSOR_RE.sub("", value or "")).upper()
+    value = re.sub(r"\(\s*FORMERLY[^)]*\)", " ", value)
+    value = re.split(r"\b(?:PRESENTED|SPONSORED)\s+BY\b", value, maxsplit=1)[0]
+    value = re.sub(r"\b(?:STAKES|HANDICAP)\b", " ", value)
+    value = re.sub(r"\b[SH]\.?\s*(?=PRESENTED\b|SPONSORED\b|$)", " ", value)
+    value = re.sub(r"\bTHE\b", " ", value)
+    return re.sub(r"[^A-Z0-9]+", "", value)
+
+
+def _toba_name_shape_compatible(target: dict, source: dict) -> bool:
+    source_key = _toba_shape_key(str(source.get("race_name") or ""))
+    suffix_markers = ("PRESENTEDBY", "SPONSOREDBY", "INASSOCIATIONWITH")
+    for target_name in _toba_target_names(target):
+        target_key = _toba_shape_key(target_name)
+        if not target_key:
+            continue
+        if target_key == source_key:
+            return True
+        if target_key in source_key:
+            prefix, suffix = source_key.split(target_key, 1)
+            if prefix and not suffix:
+                return True
+            if suffix.startswith(suffix_markers):
+                return True
+        if source_key in target_key:
+            prefix, suffix = target_key.split(source_key, 1)
+            if prefix and not suffix:
+                return True
+            if suffix.startswith(suffix_markers):
+                return True
+    return False
 
 
 def _distance_with_unit(target: dict) -> str:
@@ -1100,7 +1767,10 @@ def build_jra_provider_rows(
             continue
         keys = _target_names(target)
         matches = _best_name_matches(keys, sources)
-        if not matches and target.get("series_key") in JRA_OFFICIAL_NAME_ALIASES:
+        if (
+            (len(matches) != 1 or not matches[0].get("result_url"))
+            and target.get("series_key") in JRA_OFFICIAL_NAME_ALIASES
+        ):
             official_key = _normalize_japanese_name(JRA_OFFICIAL_NAME_ALIASES[target["series_key"]])
             official_matches = [
                 source
@@ -1249,9 +1919,12 @@ def build_toba_provider_rows(*, targets: list[dict], year: int, body: str) -> di
     for target in targets:
         if target.get("country_region") != "united_states" or int(target.get("year") or 0) != year:
             continue
-        keys = _target_names(target)
+        keys = _toba_target_keys(target)
         compatible_sources = [
-            source for source in sources if _toba_core_name_compatible(target, source)
+            source
+            for source in sources
+            if _toba_core_name_compatible(target, source)
+            and _toba_name_shape_compatible(target, source)
         ]
         name_matches = _best_name_matches(keys, compatible_sources)
         expected_tracks = TRACK_CODES.get(str(target.get("racecourse") or "").casefold(), set())
@@ -1261,12 +1934,18 @@ def build_toba_provider_rows(*, targets: list[dict], year: int, body: str) -> di
         matches = _best_name_matches(keys, track_sources)
         # A unique annual-table name remains authoritative when a race was
         # temporarily moved, as happened during the Belmont reconstruction.
-        if not matches and len(name_matches) == 1:
+        if (
+            not matches
+            and len(name_matches) == 1
+            and str(target.get("series_key") or "") in TOBA_REVIEWED_RELOCATIONS
+        ):
             matches = name_matches
         not_run_track_sources = [
             source
             for source in not_run_sources
-            if source["track"] in expected_tracks and _toba_core_name_compatible(target, source)
+            if source["track"] in expected_tracks
+            and _toba_core_name_compatible(target, source)
+            and _toba_name_shape_compatible(target, source)
         ]
         not_run_matches = _best_name_matches(keys, not_run_track_sources)
         if len(matches) != 1 and len(not_run_matches) == 1:
