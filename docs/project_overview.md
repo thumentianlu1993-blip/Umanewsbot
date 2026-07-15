@@ -50,6 +50,8 @@
 
 长周期历史任务由独立原生 Docker runner 执行，不加入 Celery/Beat，也不属于普通 Compose project。crawl 与 apply 使用不同网络和数据库角色；runner 只按固定镜像和结构化 plan 执行，依靠数据库租约、runtime 文件锁、心跳和双 checkpoint 恢复。普通应用部署不得处理 runner、DB、Redis 或共享网络。
 
+正式 artifact 流水线已在生产镜像 `main@ab95c6ef` 部署并通过隔离、暂停恢复和工具根拒绝 smoke；batch006 正在按冻结的 1061 场 selection 生成分片计划，历史公开继续关闭。
+
 ## 技术栈主干
 
 - Web / 后台：`Django`

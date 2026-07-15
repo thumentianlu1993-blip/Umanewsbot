@@ -1,13 +1,16 @@
 # 当前状态
 
-## 2026-07-15 historical batch 正式流水线本地实现待最终验收
+## 2026-07-15 historical batch 正式流水线已部署，batch006 待正式分片 crawl
 
 - OpenSpec change `formalize-historical-batch-crawl-pipeline` 已完成提案、完整测试用例和两轮工程评审，最终计划结论为 approved。代码已实现不可变 selection/approval/manifest/image/tool 身份、typed recipe 目标绑定、每 shard 最多 250 场、正式资源身份、目录原子发布、日期/详情碎片合并和三阶段数据库只读 verifier。
 - 首批 typed policy 覆盖 discovery、cache、JRA、HKJC、英国 Sporting Life、法国 ZEturf、美国 Equibase、cached parser、packager 和 tracked merger。正式 plan 不接受 descriptor 自带 argv、无 policy 工具、`tmp/` 脚本、artifact 内工具或跨 shard scope；runner 会在创建 run 和取锁前比较资源 settings，并交叉验证 shard target IDs 同时属于冻结 selection 与正式 approval。
 - merger 对 complete/gap 做精确分母，来源冲突和不完整碎片进入带输入 SHA 与绑定时间的 gap；人工补证必须绑定 target SHA、旧值、HTTPS 来源、审核人和合法时间。逐届距离保留来源原单位，不做跨地区猜测或强制换算。
 - verifier 在 PostgreSQL 事务开始时设置 `SET TRANSACTION READ ONLY`，一次预取 target/event/runners/results/applied candidates；检查日期、正式来源、模块、数量、provenance 和 draft visibility，拒绝 gap 已公开，并按 `applied_at/id` 核验每模块最新 APPLIED candidate、保留旧记录审计。1250 targets 性能合同已在本地通过：plan/merge 小于 1 秒级且 verifier 不超过 20 SQL。
-- 当前本地 pipeline+runner 联合回归 `107/107` 通过（3 个环境专项跳过），反复 code review 已在第 19 轮达到零 actionable finding。最终门禁通过：完整 stable `1466/1466`（10 skip）、历史组合 `263/263`（3 skip）、1250-target 性能 `2/2`、真实 PostgreSQL 16 READ ONLY 注入 `1/1`、OpenSpec `30/30`，Django check、迁移漂移、Python/shell/diff 均通过；提交/镜像/生产部署仍待执行。生产仍为 `main@c4087e6c` / image `sha256:5eb6471c...22600`，batch006 没有发出正式网络请求或写入赛事业务表，公开与常驻历史开关继续关闭。
-- batch006 固定身份仍为 1061 targets、地区 `250/61/250/250/250`；manifest `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`、selection `b9a3ad6556cfd03e9a57874bec763f75ad4c45e7642751140cb063f1d0553637`、approval `a119e3bcfd3bc8940cf8b792e246e462b405c292b77f2996739b435c9185d835`。
+- pipeline+runner 联合回归 `107/107` 通过（3 个环境专项跳过），反复 code review 已在第 19 轮达到零 actionable finding。最终门禁通过：完整 stable `1466/1466`（10 skip）、历史组合 `263/263`（3 skip）、1250-target 性能 `2/2`、真实 PostgreSQL 16 READ ONLY 注入 `1/1`、OpenSpec `30/30`，Django check、迁移漂移、Python/shell/diff 均通过。
+- `main@ab95c6ef56873c73b548cd25da50a0e080816eed` 已部署到生产，web/worker/beat 统一绑定 AMD64 image `sha256:8040b87e43c3e4587753be44cc205ca4879becd599040c4f556c716b7bfef9d8`；Git tree `d5715471723c21628d8c1c587e6e8bc9f96dcdf8`，source archive SHA-256 `604a8f254de2c86594fb2097f95d284aa401407a6140beb023535c8442374eb1`。旧镜像保留为 `umanewsbot:rollback-pre-ab95c6ef-20260715_081452`。
+- 写前 custom-format 备份为 `/opt/umanewsbot/backups/db/pre-main-ab95c6ef-20260715_081056.dump`，`141447272` bytes、SHA-256 `924a3aed9d6d8c204c2fc0b0608444a6830c5f09bfd61d2b733e991b7145c127`，`pg_restore -l` 读出 802 条目录项；环境备份为 `.env.backup.pre-main-ab95c6ef-20260715_081056`。
+- 新镜像 provisioning、crawl 最小权限、apply 无公网、40 秒暂停/恢复不重复和伪工具根拒绝 smoke 全部通过。收口时 runner 容器不存在，preflight 为 `migration_safe`，Celery active/reserved/active_queues、Redis 队列、翻译/归属/历史 running、live lock 和数据库事务均为 0；web/worker 运行，beat 保持 `Created`，历史常驻/网络/公开均为 false，历史 published 为 0，可用磁盘 `7365392 KiB`。
+- batch006 固定身份仍为 1061 targets、地区 `250/61/250/250/250`；manifest `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`、selection `b9a3ad6556cfd03e9a57874bec763f75ad4c45e7642751140cb063f1d0553637`、approval `a119e3bcfd3bc8940cf8b792e246e462b405c292b77f2996739b435c9185d835`。尚未发出 batch006 正式网络请求或写入赛事业务表，下一步只生成并核验 descriptor/shards/runner plans。
 
 ## 2026-07-15 historical runner 工具根补丁部署与强化 smoke 完成
 

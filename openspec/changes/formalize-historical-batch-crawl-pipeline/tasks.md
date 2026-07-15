@@ -30,7 +30,7 @@
 
 ## 6. batch006 生产应用
 
-- [ ] 6.1 (operations) 从最新 main 双构建可复现 AMD64 镜像，完成写前备份、身份核对、只替换 web/worker/beat 和 runner 强化 smoke，保持公开及常驻开关关闭。
+- [x] 6.1 (operations) 从最新 main 双构建可复现 AMD64 镜像，完成写前备份、身份核对、只替换 web/worker/beat 和 runner 强化 smoke，保持公开及常驻开关关闭。
 - [ ] 6.2 (operations) 使用 approved 1061 场 selection 生成正式 stage descriptor、shards 和 runner plans，核对完整覆盖、请求预算、工具 SHA、磁盘与 approval 后启动 crawl。
 - [ ] 6.3 (operations) 对 complete targets 依次执行日期、详情来源和最终候选 dry-run；每次 apply 前独立备份，写后运行正式 verifier，gap 累计到统一审核账本。
 - [ ] 6.4 (operations) 完成 batch006 全批汇总、逐地区 events/runners/results、error=0、published=0 和无遗留 runner/队列/事务验收，再生成下一标准批次。

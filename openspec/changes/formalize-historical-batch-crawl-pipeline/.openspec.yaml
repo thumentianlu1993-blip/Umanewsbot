@@ -3,6 +3,13 @@ created: 2026-07-14
 profile: feature
 phase: applying
 journal:
+  - event: production-deployed
+    date: "2026-07-15T08:26:00+08:00"
+    session: 1
+    revision: "ab95c6ef56873c73b548cd25da50a0e080816eed"
+    image: "sha256:8040b87e43c3e4587753be44cc205ca4879becd599040c4f556c716b7bfef9d8"
+    backup: "pre-main-ab95c6ef-20260715_081056.dump sha256:924a3aed9d6d8c204c2fc0b0608444a6830c5f09bfd61d2b733e991b7145c127"
+    note: "Only web/worker/beat were replaced. Crawl/apply isolation, pause/resume checkpointing and immutable tool-root rejection passed; persistent and public historical flags remained off."
   - event: implementation-verified
     date: "2026-07-15T12:55:00+08:00"
     session: 1

@@ -1,8 +1,10 @@
 # 部署运行手册
 
-## 待执行：batch006 正式流水线部署与运行
+## 执行中：batch006 正式流水线部署与运行
 
-1. 先完成 `formalize-historical-batch-crawl-pipeline` 的完整 stable、真实 PostgreSQL READ ONLY、OpenSpec strict/all、迁移漂移、shell/diff 和零问题 review；不得用聚焦测试代替最终门禁。提交并 fast-forward 最新 main 后，从干净 source archive 双构建 AMD64，要求 image ID 完全一致且 revision/tree/source SHA 可追溯。
+生产部署阶段已完成：`main@ab95c6ef56873c73b548cd25da50a0e080816eed`、AMD64 image `sha256:8040b87e43c3e4587753be44cc205ca4879becd599040c4f556c716b7bfef9d8`、tree `d5715471723c21628d8c1c587e6e8bc9f96dcdf8`、source SHA-256 `604a8f254de2c86594fb2097f95d284aa401407a6140beb023535c8442374eb1`。写前备份 `pre-main-ab95c6ef-20260715_081056.dump` 为 `141447272` bytes、SHA-256 `924a3aed9d6d8c204c2fc0b0608444a6830c5f09bfd61d2b733e991b7145c127`，`pg_restore -l` 通过；回滚 tag 为 `umanewsbot:rollback-pre-ab95c6ef-20260715_081452`。四类 runner smoke 与最终空锁/空队列门禁通过，公开及常驻历史开关仍关闭。以下第 2-7 项继续作为 batch006 运行门禁。
+
+1. 已完成 `formalize-historical-batch-crawl-pipeline` 的完整 stable、真实 PostgreSQL READ ONLY、OpenSpec strict/all、迁移漂移、shell/diff、零问题 review、双构建和生产强化 smoke；后续若代码变化，必须重新执行同一门禁并生成新镜像身份。
 2. batch006 只接受现有冻结身份：1061 targets，法国/香港/日本/英国/美国 `250/61/250/250/250`；manifest `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`、selection `b9a3ad6556cfd03e9a57874bec763f75ad4c45e7642751140cb063f1d0553637`、approval `a119e3bcfd3bc8940cf8b792e246e462b405c292b77f2996739b435c9185d835`。任一字节漂移停止，不重新生成审批掩盖漂移。
 3. 使用 `build_historical_batch_crawl_plan --descriptor <tracked-artifact>/descriptor.json --shard-id <region-NN> --output-dir <new-empty-dir>` 为每个 shard 原子生成 `scope.json`、`runner-plan.json`、stage manifest 和 summary。每个 shard 只能包含一个地区、最多 250 targets/请求；runner plan 必须使用镜像内 `/app/runtime/tools`，不得指向 `tmp/`、artifact 子目录或宿主脚本。
 4. 每个 crawl shard 使用独立 artifact 根、请求账本、source-cache manifest、runner state 和 checkpoint。启动前执行资源 preflight，生产可用磁盘至少 5 GiB；网络阶段 `network=true/write=false`，写入阶段 `network=false/write=true`。暂停、失败或恢复时不得删除或缩小账本/cache 以重获额度。

@@ -1,9 +1,10 @@
 # 项目状态文档
 
-## 2026-07-15 historical batch 正式流水线实现进入完整回归
+## 2026-07-15 historical batch 正式流水线已部署
 
-- `formalize-historical-batch-crawl-pipeline` 已完成方案、工程评审、完整实现和零问题 code review。最终本地门禁通过：pipeline+runner `107/107`、完整 stable `1466/1466`、历史组合 `263/263`、1250 targets 性能 `2/2`、真实 PostgreSQL 16 READ ONLY 注入 `1/1`、OpenSpec `30/30`；生产部署与 batch006 正式运行待继续。
-- 本轮仍是本地实现状态：完整 stable、PostgreSQL 复验、零问题 review、提交/可复现 AMD64 镜像及生产部署尚未完成。生产 batch006 仍为 1061 场 approved selection，网络抓取、赛事写入和公开展示均未启动。
+- `formalize-historical-batch-crawl-pipeline` 已完成方案、工程评审、完整实现、零问题 code review、完整回归和生产部署。最终门禁为 pipeline+runner `107/107`、完整 stable `1466/1466`、历史组合 `263/263`、性能 `2/2`、PostgreSQL READ ONLY `1/1`、OpenSpec `30/30`。
+- 生产现为 `main@ab95c6ef` / image `sha256:8040b87e...9d8`，写前备份 SHA-256 `924a3aed...5c127`；runner 四类强化 smoke 和最终空锁/空队列验收通过，历史常驻与公开开关关闭。
+- batch006 仍为 1061 场 approved selection，网络抓取、赛事写入和公开展示均未启动；当前进入正式 descriptor 与分片计划生成阶段。
 - batch006 正式身份：manifest `62aca6...6e3`、selection `b9a3ad...637`、approval `a119e3...835`；正式 descriptor 必须将五地区 `250/61/250/250/250` 精确覆盖且每 shard 不超过 250 个批准目标。
 
 ## 2026-07-15 historical runner 新镜像已部署，batch006 待正式审批与分片 crawl
