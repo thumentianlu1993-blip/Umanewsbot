@@ -237,6 +237,32 @@ class HistoricalRaceDetailImportPrimitiveTests(TestCase):
         self.assertIn("event.source_refs", report["missing_fields"])
         self.assertIn("mismatch.racecourse", report["missing_fields"])
 
+    def test_basic_complete_report_uses_materialization_chinese_name_fallback(self):
+        cases = (
+            ("年度中文名", "系列中文名", "年度中文名", True),
+            ("年度中文名", "系列中文名", "系列中文名", False),
+            ("", "系列中文名", "系列中文名", True),
+            ("", "", self.target.original_name, True),
+        )
+
+        for target_name, series_name, event_name, expected_complete in cases:
+            with self.subTest(
+                target_name=target_name,
+                series_name=series_name,
+                event_name=event_name,
+            ):
+                self.target.chinese_name = target_name
+                self.series.chinese_name = series_name
+                self.event.chinese_name = event_name
+
+                report = historical_basic_fields_complete(self.target, self.event)
+
+                self.assertEqual(report["complete"], expected_complete)
+                self.assertEqual(
+                    "mismatch.chinese_name" in report["missing_fields"],
+                    not expected_complete,
+                )
+
     def test_detail_import_marks_basic_incomplete_without_blocking_imported_detail(self):
         self.target.distance_text = ""
         self.target.local_date = None

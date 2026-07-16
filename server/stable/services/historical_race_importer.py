@@ -201,9 +201,12 @@ def historical_basic_fields_complete(
         if not owner.source_refs:
             missing_fields.append(f"{owner_name}.source_refs")
 
+    effective_chinese_name = target.chinese_name or target.race_series.chinese_name or target.original_name
+    if effective_chinese_name != event.chinese_name:
+        missing_fields.append("mismatch.chinese_name")
+
     consistent_fields = (
         "original_name",
-        "chinese_name",
         "racecourse",
         "grade_text",
         "normalized_grade",
