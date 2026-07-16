@@ -104,6 +104,32 @@ class HistoricalRaceInventoryServiceTests(TestCase):
         self.assertFalse(result["blocked"])
         self.assertEqual(len(result["lower_authority_disagreements"]), 2)
 
+    def test_third_party_database_outranks_third_party_and_reference(self):
+        result = merge_authoritative_fields(
+            [
+                {
+                    "source_authority": "reference",
+                    "source_id": "reference",
+                    "fields": {"winner": "Reference Horse"},
+                },
+                {
+                    "source_authority": "third_party",
+                    "source_id": "third-party",
+                    "fields": {"winner": "Third Party Horse"},
+                },
+                {
+                    "source_authority": "third_party_database",
+                    "source_id": "database",
+                    "fields": {"winner": "Database Horse"},
+                },
+            ]
+        )
+
+        self.assertEqual(result["fields"]["winner"], "Database Horse")
+        self.assertEqual(result["field_provenance"]["winner"]["source_authority"], "third_party_database")
+        self.assertFalse(result["blocked"])
+        self.assertEqual(len(result["lower_authority_disagreements"]), 2)
+
     def test_lower_authority_fills_blank_field(self):
         result = merge_authoritative_fields(
             [{"source_authority": "reference", "source_id": "reference", "fields": {"racecourse": "Epsom"}}],

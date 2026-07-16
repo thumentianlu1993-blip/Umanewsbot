@@ -49,6 +49,7 @@ SUPPORTED_REGIONS = {
 SOURCE_AUTHORITY_RANKS = {
     "reference": 10,
     "third_party": 20,
+    "third_party_database": 30,
     "high_trust_database": 30,
     "third_party_high_access": 30,
     "official_archive": 40,
