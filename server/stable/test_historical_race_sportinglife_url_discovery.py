@@ -866,6 +866,126 @@ class SportingLifeHistoricalUrlDiscoveryTests(SimpleTestCase):
                         )
                 self.assertEqual(calls, [])
 
+    def test_accepts_great_britain_constituent_labels_but_rejects_other_regions(self):
+        event = {
+            "coverage_tier": "historical_hard",
+            "local_date": "2018-06-21",
+            "original_name": "Gold Cup",
+            "racecourse": "Ascot",
+            "slug": "united_kingdom-gold-cup-2018",
+            "target_id": 801,
+            "target_sha256": "8" * 64,
+            "year": 2018,
+        }
+        accepted_labels = ("ENG", "SCO", "WAL", "England", "Scotland", "Wales")
+        for country in accepted_labels:
+            with self.subTest(country=country):
+                meetings = [
+                    self._meeting(
+                        "2018-06-21",
+                        "Ascot",
+                        [
+                            self._race(
+                                910801,
+                                name="Gold Cup (Group 1)",
+                                course="Ascot",
+                                date="2018-06-21",
+                            )
+                        ],
+                        country=country,
+                    )
+                ]
+                result, gap = self.module._match_event(
+                    event,
+                    self.module._flatten_meetings(meetings),
+                    "a" * 64,
+                )
+                self.assertIsNone(gap)
+                self.assertEqual(result["discovery_status"], "url_discovered")
+                self.assertEqual(result["race_id"], 910801)
+
+        rejected_labels = ("IRE", "FR", "Ireland", "France")
+        for country in rejected_labels:
+            with self.subTest(country=country):
+                meetings = [
+                    self._meeting(
+                        "2018-06-21",
+                        "Ascot",
+                        [
+                            self._race(
+                                910801,
+                                name="Gold Cup (Group 1)",
+                                course="Ascot",
+                                date="2018-06-21",
+                            )
+                        ],
+                        country=country,
+                    )
+                ]
+                result, gap = self.module._match_event(
+                    event,
+                    self.module._flatten_meetings(meetings),
+                    "a" * 64,
+                )
+                self.assertIsNone(result)
+                self.assertEqual(gap["gap_reason"], "region_drift")
+
+    def test_matches_royal_ascot_only_through_an_explicit_course_alias(self):
+        event = {
+            "coverage_tier": "historical_hard",
+            "local_date": "2017-06-22",
+            "original_name": "Gold Cup",
+            "racecourse": "Ascot",
+            "slug": "united_kingdom-gold-cup-2017",
+            "target_id": 802,
+            "target_sha256": "8" * 64,
+            "year": 2017,
+        }
+
+        royal_ascot = self.module._flatten_meetings(
+            [
+                self._meeting(
+                    "2017-06-22",
+                    "Royal Ascot",
+                    [
+                        self._race(
+                            910802,
+                            name="Gold Cup (Group 1)",
+                            course="Royal Ascot",
+                            date="2017-06-22",
+                        )
+                    ],
+                )
+            ]
+        )
+        result, gap = self.module._match_event(event, royal_ascot, "a" * 64)
+        self.assertIsNone(gap)
+        self.assertEqual(result["race_id"], 910802)
+
+        unapproved_near_match = self.module._flatten_meetings(
+            [
+                self._meeting(
+                    "2017-06-22",
+                    "Ascot Heath",
+                    [
+                        self._race(
+                            910803,
+                            name="Gold Cup (Group 1)",
+                            course="Ascot Heath",
+                            date="2017-06-22",
+                        )
+                    ],
+                )
+            ]
+        )
+        result, gap = self.module._match_event(
+            event,
+            unapproved_near_match,
+            "a" * 64,
+        )
+        self.assertIsNone(result)
+        self.assertEqual(gap["gap_reason"], "no_match")
+
     def test_records_ambiguous_missing_nonterminal_and_drift_as_gaps(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

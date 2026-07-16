@@ -24,7 +24,19 @@ RESULT_PATH_RE = r"/racing/results/\d{4}-\d{2}-\d{2}/[a-z0-9-]+/\d+/[a-z0-9-]+"
 OFFICIAL_HOST = "www.sportinglife.com"
 SOURCE_AUTHORITY = "third_party_high_access"
 VALID_TIERS = {"historical_hard", "historical_best_effort", "new_formal"}
-UK_COUNTRY_NAMES = {"gb", "gbr", "uk", "united kingdom", "great britain"}
+UK_COUNTRY_NAMES = {
+    "eng",
+    "england",
+    "gb",
+    "gbr",
+    "great britain",
+    "sco",
+    "scotland",
+    "uk",
+    "united kingdom",
+    "wal",
+    "wales",
+}
 STAGED_EVENT_FIELDS = [
     "target_id",
     "target_sha256",
@@ -61,6 +73,7 @@ NAME_STOPWORDS = {
     "the",
 }
 COURSE_ALIASES = {
+    "royalascot": "ascot",
     "epsom": "epsomdowns",
     "epsomdowns": "epsomdowns",
     "haydock": "haydockpark",
