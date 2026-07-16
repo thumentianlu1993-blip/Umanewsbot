@@ -15,6 +15,7 @@ RUN pip install -r /app/requirements.txt
 
 COPY server /app/server
 COPY runtime/tools /app/runtime/tools
+COPY runtime/policies /app/runtime/policies
 COPY deploy /app/deploy
 COPY .env.example /app/.env.example
 

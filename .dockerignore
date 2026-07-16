@@ -8,6 +8,8 @@ __pycache__/
 runtime/*
 !runtime/tools/
 !runtime/tools/**
+!runtime/policies/
+!runtime/policies/**
 imports/
 backups/
 napcat/

@@ -19,6 +19,8 @@ TOOLS = ROOT / "runtime" / "tools"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "historical_detail_runner_v2"
 V2_MODULE = TOOLS / "historical_race_detail_runner_v2.py"
 V2_LAUNCHER = ROOT / "deploy" / "historical_race_detail_runner_v2.sh"
+DOCKERFILE = ROOT / "Dockerfile"
+DOCKERIGNORE = ROOT / ".dockerignore"
 STAGES = ["discover", "cache", "parse", "validate", "package"]
 TARGET_STATES = {
     "complete",
@@ -283,6 +285,36 @@ class HistoricalDetailRunnerV2FixtureTests(SimpleTestCase):
 
 
 class HistoricalDetailRunnerV2LauncherTests(SimpleTestCase):
+    def test_docker_image_copies_historical_coverage_policies(self):
+        dockerfile_exists = DOCKERFILE.is_file()
+        dockerignore_exists = DOCKERIGNORE.is_file()
+        if not dockerfile_exists and not dockerignore_exists:
+            self.skipTest(
+                "source-only Docker packaging contract: production image intentionally "
+                "omits Dockerfile and .dockerignore"
+            )
+        self.assertTrue(
+            dockerfile_exists and dockerignore_exists,
+            "incomplete source tree: Dockerfile and .dockerignore must either both exist "
+            "or both be absent from a production image",
+        )
+        copy_instructions = {
+            tuple(line.split())
+            for line in DOCKERFILE.read_text(encoding="utf-8").splitlines()
+            if line.strip().startswith("COPY ")
+        }
+        self.assertIn(
+            ("COPY", "runtime/policies", "/app/runtime/policies"),
+            copy_instructions,
+        )
+        dockerignore_rules = {
+            line.strip()
+            for line in DOCKERIGNORE.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        self.assertIn("!runtime/policies/", dockerignore_rules)
+        self.assertIn("!runtime/policies/**", dockerignore_rules)
+
     def test_tracked_launcher_is_shell_valid_and_mounts_only_approved_roots(self):
         self.assertTrue(V2_LAUNCHER.is_file(), f"missing tracked v2 launcher: {V2_LAUNCHER}")
         syntax = subprocess.run(
