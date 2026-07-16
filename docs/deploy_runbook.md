@@ -1,5 +1,29 @@
 # 部署运行手册
 
+## 已完成：第一期 1998–2026 历史赛事正式详情总账收口
+
+### 审批产物与生产写入证据
+
+1. 正式详情范围为 `8032 = 6534 complete + 1491 evidence gap + 7 not_due`，生产验收为 `6534 events / 70314 runners / 65227 results / 6534 winners`。日本、中国香港、法国 hard 范围完整；英国历史 hard 为 `708 complete + 45 evidence gap`；英国新正式为 `94 complete + 1 gap + 4 future`，美国新正式为 `195 complete + 1 future`。英国、美国历史 G2/G3 按已批准的 best-effort 政策收口。
+2. France 14 场 manifest 为 `7e8f29066bccae965ade8736e071189155cb8245e92309f07bf23bfa67f50eeb`，结果为 `132 runners / 122 results / 14 winners`；专用写前备份 `/opt/umanewsbot/backups/db/pre-france-zone-turf-7e8f2906-20260716_2204.dump`，SHA-256 `ed7e189796d2d8d87c27874ecbab796db99829322e5cf9cfb388db9b362b60a9`，replay/verifier 均为 `errors=0`。
+3. UK 6 场 bundle 为 `fd3438beaeabbf15ed365069707cea982221a444716161d66a30e74bc2a0a081`，结果为 `46 runners / 40 results / 6 winners`，状态为 `40 declared + 4 pulled_up + 2 withdrawn`。dry-run plan `490400342fe30e4fe291691d7cc61801d42f025663cb25245d4d5793c122560e`；apply2 plan/state `473495fbb70c22823d29471aa436d52a343596c23562043a42aff35c3dbdabbb` / `ca51bb347c4313a0bfeee645cc7fe9f33013da09713d2acbee02f69c0e688f0f`；replay plan/state `5e1b5895d217b2f265cc9455b35679e566ebd7f922dedae3caf80bdc349070b1` / `cc5d9d149fbfe20a3796a9b6bf62e75e233448939f4b1ce6799ac9fffbade6ba`。
+4. UK 场地修正 manifest `662be6d37e55fda7b3b2d620ddc61fe0ba2bc0291270d4bd7439ae8a4c0da903`，script SHA-256 `1ac34051d5c8a72294364b1f4d5b524c55d81e393c1188edcb12fbd0a508407c`；apply 与两次 verifier 均为 `4/4`。
+5. UK 6 场与 gap 裁决统一写前备份为 `/opt/umanewsbot/backups/db/pre-uk-six-gap-659b46ca-20260716_230344.dump`，`189338143` bytes，SHA-256 `c5006b15bee22dd17d0d6fb7913f7c376a0799eeb37f3d6dc42b9199444c1410`，权限 `0600`，mtime `2026-07-16 23:04:32 +0800`，`pg_restore -l` 通过。备份门禁：`pg_dump` 进程必须同步退出，文件 mtime/size 在复核窗口内稳定后，方可计算 SHA-256 并运行 `pg_restore -l`；不得把仍在写入的中间文件 identity 记为最终备份。
+6. gap/not_due resolution manifest 为 `d529126840a6d3c6ffb1abc0a426d3ac796d36f9df72a50dcc06b34e0af9c90f`；`1498` 条 resolution 已 apply，并经两次独立 verify，生产对应 `1498` 条唯一 `OperationLog`。原因分布为 `1467 source_unavailable + 31 identity_review_required`，最终按到期状态归入 `1491 gap + 7 not_due`；target `53349` 的日期为 `2026-09-05`，target `53418` 为 `2026-07-26`。
+7. 最终 v5 目录为 `runtime/race_event_crawl_runs/final-detail-coverage-ledger-v5-20260716`，manifest SHA-256 `692b089b0d18b08899571702cb57ff3dadbca144a2dce4c4e6b3d7c15e6584ea`，ledger SHA-256 `833995952fc444fd39c40934802cc7306cc7dd354c4f57db5bd725fc66a48fe9`，review 为 `approved`。global verifier 为 `8032 checked / errors=0`。
+
+### 生产运行态与验证
+
+1. `prod` tag、web、worker、beat 均运行 image `sha256:c8c49780ac9dca4799e4834b052f7e05ca75ff61945343b2c19bf0ef2ab561ab`，OCI revision 为 `6b596befa0eea9ef0ba45acbb5384195829cc144`。本次无迁移；Django check 通过，`umafans.run` 与 `www.umafans.run` 的 HTTP `/healthz/` 均为 `200`，worker ping 成功，收口日志无 error。
+2. formal 范围保持 `published=0 / featured=0`；`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，无 historical runner、无 running batch。第一期数据写入完成不构成公开授权，历史公开继续关闭。
+3. 已删除未使用的旧 `umanewsbot` tags，只保留当前镜像与即时 rollback；可用磁盘由 `2.6 GiB` 增至 `4.0 GiB`。该值仍低于 `5 GiB` crawl floor，服务器未来 crawl 为 no-go，不得降低门槛；重型抓取继续使用本地 Docker，生产只接收审核后的紧凑 artifact。
+
+### 回滚与回滚后验证
+
+1. 即时代码回滚标签为 `umanewsbot:rollback-pre-6b596bef-20260716_233842`，指向 `sha256:97b49b0226ce6de844de7e26ecbd51851c38fd2b0146c471f6f27767be397473`；切换前环境备份为 `/opt/umanewsbot/.env.backup.pre-6b596bef-20260716_233842`。回滚前先停止 beat，并等待 worker active/reserved 到达安全边界；不得强杀活动任务，也不得重建 DB/Redis。
+2. 将上述 rollback tag 重新绑定为 `prod` 后，仅以 `--no-deps` 重建 web/worker/beat。本次没有迁移，普通代码回滚不恢复数据库；只有确认本次详情或 resolution 写入造成数据损坏时，才使用 `/opt/umanewsbot/backups/db/pre-uk-six-gap-659b46ca-20260716_230344.dump` 进入单独数据库恢复窗口。恢复 `.env` 也只在确认环境文件漂移时执行，不覆盖当前凭据。
+3. 回滚后必须重新核对 web/worker/beat image ID 一致，运行 Django check，确认两个正式 HTTP 域名 `/healthz/` 均为 `200`、worker ping 成功、日志无 error；再次确认 formal `published=0 / featured=0`、历史 enabled/network 均为 false、无 runner/running batch。若数据库已恢复，还必须重跑 v5 global verifier 并取得 `8032 checked / errors=0` 后才能结束窗口。
+
 ## 已完成：英国 Sporting Life 增量详情包
 
 正式候选输入为 `/opt/umanewsbot/runtime/historical_race_detail_import/detail-import-bundle-uk-sportinglife-v8`；本地原件为 `runtime/historical_plan_exports/detail-import-bundle-uk-sportinglife-v8`。顶层 manifest SHA-256 为 `3c6a4d11106c2b490876d63f0719b71d6fde9d7c7bc9c8937736d26a0e28831c`，bundle identity 为 `2392a69c7cf1b03812422cf11b3c5ed73a181e719ca6309d79283812c735cb50`。

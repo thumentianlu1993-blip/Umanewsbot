@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-07-16 第一期历史赛事正式详情总账完成
+
+- `1998–2026` 正式详情范围已固定为 `8032`，最终 `6534 complete + 1491 evidence gap + 7 not_due`；生产共有 `6534 events / 70314 runners / 65227 results / 6534 winners`，global verifier 为 `8032 checked / 0 errors`。日本、中国香港、法国 hard 范围完整；英国历史 hard 为 `708 complete + 45 evidence gap`，英国新正式为 `94 complete + 1 gap + 4 future`，美国新正式为 `195 complete + 1 future`；英美历史 G2/G3 按批准的 best-effort 口径收口。
+- France 14 场和 UK 6 场补包已完成备份、dry-run/apply/replay/verifier；France manifest 为 `7e8f2906...eeb`，UK bundle 为 `fd3438be...081`。UK 6 场为 `46 runners / 40 results / 6 winners`，包含 `40 declared + 4 pulled_up + 2 withdrawn`；UK 场地修正 apply 与两次 verifier 均为 `4/4`。UK 6 场与 gap 裁决统一写前备份为 `189338143` bytes，SHA-256 `c5006b15bee22dd17d0d6fb7913f7c376a0799eeb37f3d6dc42b9199444c1410`，权限 `0600`，mtime `2026-07-16 23:04:32 +0800`，`pg_restore -l` 通过。
+- resolution manifest `d5291268...c90f` 的 `1498` 条记录已 apply 并通过两次独立 verify，对应 `1498` 条唯一 `OperationLog`；原因为 `1467 source_unavailable + 31 identity_review_required`，按日期最终归入 `1491 gap + 7 not_due`。target `53349=2026-09-05`、`53418=2026-07-26`。
+- 最终审核产物位于 `runtime/race_event_crawl_runs/final-detail-coverage-ledger-v5-20260716`，manifest `692b089b...584ea`、ledger `83399595...8fe9`，review 为 `approved`。生产 formal `published=0 / featured=0`，历史 enabled/network 均为 false，无 runner 或 running batch；历史公开仍关闭。
+- 生产已统一到 image `sha256:c8c49780ac9dca4799e4834b052f7e05ca75ff61945343b2c19bf0ef2ab561ab` / revision `6b596befa0eea9ef0ba45acbb5384195829cc144`，无迁移；Django check、两域 healthz 200、worker ping 与日志检查通过。即时回滚标签和 `.env` 备份已保留。删除未使用旧 tag 后磁盘从 `2.6 GiB` 回升至 `4.0 GiB`，仍低于 `5 GiB` 门槛，服务器后续 crawl 为 no-go，重型抓取继续放在本地 Docker。
+- 第一期正式详情总账的数据写入已完成，完成口径是“完整或证据化 gap/not_due”，不是“全部 complete”或“已经公开”。
+
 ## 2026-07-16 英国 Sporting Life 197 场增量详情已写入生产
 
 - 用户按 commit `2a7352c8` 与 manifest `3c6a4d11...831c` 授权后，已完成独立备份、全量 dry-run、两块串行 apply 和逐目标 replay verifier。写前备份 SHA-256 为 `a942e2dad092bdf0af9e0546030a73c75dfeebb1c89ee888d704e8244d7f0d6c`，两个 verifier 均 `error_count=0`。
