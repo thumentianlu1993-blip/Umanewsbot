@@ -1,16 +1,16 @@
 # 部署运行手册
 
-## 待授权：历史详情 source bundle 与 0032 串行导入
+## 已完成：历史详情 source bundle 正式导入
 
-正式输入固定为 `/opt/umanewsbot/runtime/historical_race_detail_import/detail-import-bundle-v1` 的待上传副本；本地原件为 `runtime/historical_plan_exports/detail-import-bundle-v1`，约 `608M`，顶层 `manifest.json` SHA-256 为 `dfb86ee85b103688fe1521b07f44ee8f36669d25e85ff3ac2b580a66b38e14d9`。上传后必须先逐文件复核 manifest 绑定的 size/SHA，不能只比较目录大小。
+正式输入为 `/opt/umanewsbot/runtime/historical_race_detail_import/detail-import-bundle-v1`；本地原件为 `runtime/historical_plan_exports/detail-import-bundle-v1`。顶层 `manifest.json` SHA-256 为 `dfb86ee85b103688fe1521b07f44ee8f36669d25e85ff3ac2b580a66b38e14d9`，范围为 39 个正式 package、`4930 = 4652 complete + 278 gap`，完整目标包含 `51191 runners / 48413 results`。
 
-1. 本阶段只接受正式 bundle 的不可变 manifest。范围必须严格为 39 个正式 package 的 `4930` 个目标，结果必须为 `4652 complete / 278 gap`、`51191 runners / 48413 results`；截至 2024 年 `4351/214/18 chunks`，2026 到期范围 `301/64/2 chunks`。任一计数、输入 SHA、source object 或 validation 漂移立即停止。
-2. 发布前必须使用最新 `main` 构建可复现 AMD64 镜像；部署迁移 `0032_historical_race_detail_import_receipt` 前生成新的 custom-format 数据库备份，记录路径、bytes、SHA-256 并用匹配 PostgreSQL 主版本执行 `pg_restore -l`。不得复用旧备份作为本次写前证据。
-3. 每个 chunk 先在持有 HistoricalBatchRun 全局租约的 runner 内执行 dry-run，再执行 apply。私有 owner token 只能通过受保护环境传递；子命令必须匹配 run/global lock、artifact root、current step 与 plan 输入，token 不得写入 CLI、日志、receipt 或报告。
-4. apply 对每个 chunk 使用唯一 receipt。STARTED receipt 禁止自动跨越；只有逐表证明零业务写时可显式 reconcile 为 ABANDONED，并用新审批、新 chunk 和 supersedes identity 重试。业务写入和 COMPLETED receipt 必须在同一最外层事务内提交。
-5. apply 后立即运行逐 receipt verifier，只核本次 receipt 固定的两个 APPLIED candidate ID、payload SHA、raw provenance、event 和模块集合；后来新增的其他 candidate 不影响结果，被删除、替换或篡改则失败。
-6. 2026 descriptor 路径必须逐 target 校验 ID/SHA/inventory，强制生成 `draft + incomplete + is_featured=false`，并确认全部 301 条属于 cutoff `2026-07-15` 的 due 清单。任何行、alias 或日志写入失败整批回滚。
-7. 全流程保持 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false` 和历史公开关闭。重型抓取/解析继续在本地 Docker；生产只接收紧凑、已校验 artifact。完成最新零问题 review 后仍须取得用户对本次固定代码与 artifact 的明确发布授权，授权前不得迁移或写库。
+1. 发布身份固定为 review fingerprint `943602458bd6975bff1a0bb6bb47ad8e3dde605796a10103461def91a723892a`、content `a353f2f8179432cb807601bf574039db578b265dda2bf3c9d5f9777e1c1b748f`、revision `700a2a961516464ecf93deb0f43a751718efaaca`。正式 AMD64 image ID 为 `sha256:97b49b0226ce6de844de7e26ecbd51851c38fd2b0146c471f6f27767be397473`，tree `0708ce3ef34f64549dd8483c9d7400302052c79e`，source archive SHA-256 `20ff51d1f2d6220fba3b0a01615e5366f57605de6e579b6ab222bc70eef597d3`；两次独立构建 image ID 一致。回滚标签 `umanewsbot:rollback-pre-700a2a96-20260716_1036` 指向切换前镜像。
+2. 本次部署显式把 `umanewsbot-web:latest`、`umanewsbot-worker:latest`、`umanewsbot-beat:latest` 绑定到批准 image ID，并使用 `docker compose ... --no-build`。此前一次普通 `docker compose up` 启动了服务器构建，发现后立即停止并清理，未产生数据库写入。
+3. 首次 run `detail-dryrun-700a2a96-dfb86ee8` 在第 13 个 chunk 因 `stable_raceevent_series_key_6e15e445` 物理 tuple overlap 失败，整个事务回滚且 receipt 为 0。修复前备份为 `/opt/umanewsbot/backups/db/pre-raceevent-index-reindex-700a2a96-20260716_104953.dump`，`151565133` bytes，SHA-256 `43cbfb4faec810a133805f7622f306a1cf44f143891e1235924ff7e85bd48947`，`pg_restore -l` 通过；随后执行两次 `REINDEX INDEX CONCURRENTLY stable_raceevent_series_key_6e15e445`。
+4. 索引修复后，本次没有续跑失败点，而是以新 plan 完整执行 `detail-dryrun2-700a2a96-dfb86ee8`，20/20 chunks、4652 targets、51191 runners、48413 results 全部通过且无业务写。正式 apply 前又生成 `/opt/umanewsbot/backups/db/pre-detail-apply-700a2a96-dfb86ee8-20260716_110915.dump`，`151570907` bytes，SHA-256 `6c7d8f326c4c6a10f685a7be1a0625027cf6732729bcbc6904eba3aa45964b54`，权限 `0600` 且 `pg_restore -l` 通过。
+5. `detail-apply-700a2a96-dfb86ee8` 已完成 20/20 receipts；`detail-replay-700a2a96-dfb86ee8` 随后完成 20/20 replay。最终逐目标 verifier：4652 events、51191 runners、48413 results、4652 winners，地区为 France `15`、Hong Kong `19`、Japan `1586`、United Kingdom `171`、United States `2861`；`module_errors=0`、`basic_errors=0`、`missing_sources=0`、`missing_dates=0`。
+6. 4652 场全部为 `draft + incomplete + is_featured=false`，published 为 0。basic/runners/results 模块已完整；事件级 `data_quality_status=incomplete` 和草稿状态原样保留，草稿 URL 返回 404。常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。
+7. 收口时 web/worker/beat image ID 一致，Celery active/reserved、Redis queue/unacked、historical runner 均为空，HTTP 首页与 healthz 为 200。web 更新后曾因 Nginx 保留旧容器 IP 出现 502，本次重启 Nginx 后恢复；DB/Redis 未重建。生产可用磁盘约 `4.5 GiB`，低于既有 historical crawl 的 5 GiB 门槛，本次没有启动新的生产 crawler。
 
 ## 2026-07-16 France runner v2 本地真实网络 smoke 阻断记录
 

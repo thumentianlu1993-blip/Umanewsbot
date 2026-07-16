@@ -1,14 +1,14 @@
 # 当前状态
 
-## 2026-07-16 历史详情正式导入能力完成本地验收，等待发布授权
+## 2026-07-16 历史详情 source bundle 已正式导入生产并完成逐目标验收
 
-- batch006 已在生产完成且不得重跑：`1061 accounted / 1042 complete / 19 evidence-backed gaps`，累计 `11215 runners / 9931 results`，历史赛事仍为 `published=0`。
-- 后续本地详情抓取产物已固定为 `4930` 个目标：`4652 complete / 278 gap`，共 `51191 runners / 48413 results`。其中截至 2024 年为 `4351 complete / 214 gap`、18 个导入 chunk；2026 当前到期范围为 `301 complete / 64 gap`、2 个 chunk。301 条可导入记录全部在到期清单内，没有 `not_due` 或 `pending` 混入。
-- 新增正式 source bundle 打包器、迁移 `0032_historical_race_detail_import_receipt`、原子 chunk importer、receipt reconcile/verifier。打包器严格锁定 39 个正式 package 的 4930-target 并集；导入 receipt 固定 bundle/chunk/runner/target 身份，业务写入与 COMPLETED receipt 同事务提交，STARTED/ABANDONED 可审计且不可静默重用。
-- 2026 descriptor 导入现在逐 target 校验 ID/SHA/inventory，并强制 `draft + incomplete + is_featured=false`；任一行失败会连同 alias、操作日志和任务日志整批回滚。chunk 子命令必须同时匹配私有 owner token、run/global lock、有效租约、artifact root、current step 与 plan 输入，并只验 receipt 记录的本次 APPLIED candidate。
-- 覆盖政策按 `docs/historical_race_data_coverage_policy.md` 执行：日本、香港历史范围继续 hard；英法美截至 2024 年 G1 hard、G2/G3 best-effort；2025 年及以后五地区正式范围独立记账。remaining artifact 当前为 `28126` targets，其中 `8857 historical hard / 18173 historical best-effort / 1096 new formal`；existing complete/gap 继续复用，不倒退、不重跑。
-- 首次代码 review 的 7 项问题已修复并在同一 reviewer 会话复审为 `NO ACTIONABLE FINDINGS / APPROVED`。主会话聚焦回归 `148/148`、Django check 和 `makemigrations --check --dry-run` 通过；源码提交为 `6b1bcb6a`，已推送到 `origin/codex/fix-historical-exhausted-region-progress`。
-- 正式不可变 bundle 已生成在 `runtime/historical_plan_exports/detail-import-bundle-v1`，约 `608M`；顶层 `manifest.json` SHA-256 为 `dfb86ee85b103688fe1521b07f44ee8f36669d25e85ff3ac2b580a66b38e14d9`，source objects 为 `4652` 个、`525258402` bytes，全部 validations 为 true。当前尚未构建新生产镜像、应用 `0032` 或导入这 4652 场详情；仍须取得当前任务的明确发布授权，再执行备份、迁移、dry-run、串行 apply 和逐目标 verifier。历史公开、常驻网络和常驻写入继续关闭。
+- 本次按用户授权的审核基线 `943602458bd6975bff1a0bb6bb47ad8e3dde605796a10103461def91a723892a`、content `a353f2f8179432cb807601bf574039db578b265dda2bf3c9d5f9777e1c1b748f`、commit `700a2a961516464ecf93deb0f43a751718efaaca` 和 manifest `dfb86ee85b103688fe1521b07f44ee8f36669d25e85ff3ac2b580a66b38e14d9` 执行。正式 AMD64 镜像为 `sha256:97b49b0226ce6de844de7e26ecbd51851c38fd2b0146c471f6f27767be397473`，两个独立构建 ID 一致；tree 为 `0708ce3ef34f64549dd8483c9d7400302052c79e`，source archive SHA-256 为 `20ff51d1f2d6220fba3b0a01615e5366f57605de6e579b6ab222bc70eef597d3`。镜像内聚焦回归 `30/30`、Django check 和迁移漂移检查通过，生产没有新增待应用迁移，`0032` 已处于 applied。
+- 正式 bundle 固定 `4930 = 4652 complete + 278 evidence-backed gaps`，其中完整目标含 `51191 runners / 48413 results / 4652 winners`；地区分布为法国 `15`、香港 `19`、日本 `1586`、英国 `171`、美国 `2861`。截至 2024 年导入 `4351` 场，2026 当前到期范围导入 `301` 场；278 个 gap 保留在统一 gap/review ledger，不阻断本次完整目标写入，也不视为已经消失。
+- 首次全量 dry-run 在第 13 个 chunk 发现 PostgreSQL 物理索引 `stable_raceevent_series_key_6e15e445` 的 tuple overlap 损坏，事务完整回滚且 receipt 为 0。先生成并校验修复前备份 `/opt/umanewsbot/backups/db/pre-raceevent-index-reindex-700a2a96-20260716_104953.dump`（`151565133` bytes，SHA-256 `43cbfb4faec810a133805f7622f306a1cf44f143891e1235924ff7e85bd48947`），再执行两次 `REINDEX INDEX CONCURRENTLY`，随后从头重跑 `detail-dryrun2-700a2a96-dfb86ee8`，20/20 chunks、4652 targets 全部通过。
+- 正式 apply 前重新生成独立 custom-format 备份 `/opt/umanewsbot/backups/db/pre-detail-apply-700a2a96-dfb86ee8-20260716_110915.dump`（`151570907` bytes，SHA-256 `6c7d8f326c4c6a10f685a7be1a0625027cf6732729bcbc6904eba3aa45964b54`），`pg_restore -l` 通过且权限为 `0600`。`detail-apply-700a2a96-dfb86ee8` 完成 20/20 receipts，`detail-replay-700a2a96-dfb86ee8` 随后逐 receipt replay 20/20，最终 verifier 为 `error_count=0`、缺来源 `0`、缺日期 `0`、模块错误 `0`。
+- 4652 场全部保持 `draft`、`published=0`、`is_featured=false`。其 basic/runners/results 历史模块已完整写入，但 `RaceEvent.data_quality_status` 继续为 `incomplete`，这是等待单独公开验收的产品门禁，不是导入失败；抽查草稿 URL 返回 404。常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，历史公开继续关闭。
+- 生产 web/worker/beat 已统一运行上述镜像，HTTP 首页和 `/healthz/` 为 200，Celery active/reserved、Redis queue/unacked、historical runner 均为空。本次切换显式绑定 service-specific image tags 并使用 `docker compose ... --no-build`；web 重建后 Nginx 曾保留旧 upstream IP 并短暂返回 502，重启 Nginx 后恢复。收口时生产可用磁盘约 `4.5 GiB`，低于既有重型历史 crawl 的 `5 GiB` 门槛，未启动新的生产 crawler。
+- batch006 及本次 4652 场均已完成，不倒退、不重跑。历史总目标尚未全部完成：remaining artifact 仍为 `28126` targets（`8857 historical hard / 18173 historical best-effort / 1096 new formal`）；下一步继续按五地区和覆盖分层推进，少量歧义与 278 个现有 gap 留到最终统一审核。
 
 ## 2026-07-16 France runner v2 单目标本地 smoke 在 preflight 安全停止
 

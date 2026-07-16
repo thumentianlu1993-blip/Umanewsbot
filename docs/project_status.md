@@ -1,11 +1,12 @@
 # 项目状态文档
 
-## 2026-07-16 历史详情导入链路完成零问题复审
+## 2026-07-16 4652 场历史详情已写入生产，公开门禁保持关闭
 
-- batch006 生产终态保持 `1061 accounted / 1042 complete / 19 gap`，不倒退、不重跑。新一轮本地产物已收敛为 `4930 = 4652 complete + 278 gap`，含 `51191 runners / 48413 results`；截至 2024 年拆为 18 个 chunk，2026 到期范围拆为 2 个 chunk。
-- source bundle、独立 receipt/迁移 `0032`、原子 chunk importer、租约 fencing、2026 descriptor 安全落库和逐 candidate verifier 已完成测试优先实现。聚焦回归 `148/148`、Django check、migration drift 通过；同一 reviewer 会话最终结论为 `NO ACTIONABLE FINDINGS / APPROVED`。
-- 新覆盖政策不删除既有总账：remaining `28126` targets 分为 `8857 historical hard / 18173 historical best-effort / 1096 new formal`。日本和香港继续 hard；英法美截至 2024 年 G1 hard，G2/G3 gap 单独报告但不阻断历史 hard 验收；2025 年以后五地区正式范围独立推进。
-- 源码已提交为 `6b1bcb6a` 并推送；正式不可变 bundle 位于 `runtime/historical_plan_exports/detail-import-bundle-v1`，约 `608M`，顶层 manifest SHA-256 为 `dfb86ee85b103688fe1521b07f44ee8f36669d25e85ff3ac2b580a66b38e14d9`，全部 validations 为 true。4652 场仍尚未写入生产；取得当前发布授权后，才进行生产备份、`0032`、新镜像、逐 chunk dry-run/apply/verifier。历史公开开关继续关闭。
+- 审核基线 `94360245...892a`、content `a353f2f8...748f`、commit `700a2a96` 与 manifest `dfb86ee8...14d9` 已按授权发布。生产 web/worker/beat 统一运行可复现 AMD64 镜像 `sha256:97b49b0226ce6de844de7e26ecbd51851c38fd2b0146c471f6f27767be397473`；镜像内测试 `30/30`、Django check、迁移状态和运行健康检查通过。
+- 正式 bundle 为 `4930 = 4652 complete + 278 gap`。4652 场已写入 `51191 runners / 48413 results / 4652 winners`，地区为法国 `15`、香港 `19`、日本 `1586`、英国 `171`、美国 `2861`；截至 2024 年 `4351` 场，2026 当前到期范围 `301` 场。
+- 首次 dry-run 发现 `stable_raceevent_series_key_6e15e445` 物理索引损坏，事务回滚且无 receipt；在独立备份后以 concurrent reindex 修复，再从头 full dry-run 20/20。正式写前备份 SHA-256 为 `6c7d8f326c4c6a10f685a7be1a0625027cf6732729bcbc6904eba3aa45964b54`，apply 20/20、replay verifier 20/20，最终错误、缺来源和缺日期均为 0。
+- 全部新事件仍为 `draft + incomplete`、`published=0`；历史模块完整表示详情已写入，事件级 `incomplete` 表示尚未通过独立公开验收。常驻历史写入、网络和公开能力均关闭，草稿 URL 返回 404，HTTP healthz 正常，队列和历史 runner 为空。
+- batch006 和本次 4652 场不再重跑。278 个 gap 继续保留在统一审核账本；remaining `28126` targets 仍按 `8857 historical hard / 18173 historical best-effort / 1096 new formal` 推进。收口时生产约 `4.5 GiB` 可用，低于既有重型 crawler 的 5 GiB 门槛，本次没有启动新的生产 crawler。
 
 ## 2026-07-16 France runner v2 单目标 smoke 待重新生成 descriptor
 
