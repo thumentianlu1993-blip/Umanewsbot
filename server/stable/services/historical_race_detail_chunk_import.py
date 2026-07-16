@@ -691,8 +691,8 @@ def _set_approved_basic_fields(target: HistoricalRaceEventTarget, row: dict[str,
     distance_text = validate_distance_text(row["distance_text"])
     if target.local_date and target.local_date != local_date:
         raise HistoricalRaceDetailChunkError(f"target {target.pk} local_date conflicts with approval")
-    if target.distance_text and target.distance_text != distance_text:
-        raise HistoricalRaceDetailChunkError(f"target {target.pk} distance conflicts with approval")
+    # _validate_pending_target has already bound the current expression to the
+    # approved pending-target SHA; the approved source text may promote it.
     target.local_date = local_date
     target.distance_text = distance_text
     target.source_refs = _merge_source_refs(target.source_refs or {}, row["source_refs"])

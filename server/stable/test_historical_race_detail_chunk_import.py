@@ -71,6 +71,7 @@ class ChunkArtifact:
         layer: str = "historical_through_2024",
         cutoff: str | None = None,
         invalid_last_result: bool = False,
+        distance_text: str = "1600m",
     ):
         self.root = root
         self.chunk_id = f"{layer}-0001"
@@ -154,11 +155,11 @@ class ChunkArtifact:
                             "calendar_source_url": source_url,
                         }
                     },
-                    "distance_text": "1600m",
+                    "distance_text": distance_text,
                     "distance_provenance": {
                         "source": "netkeiba_result_parser_v1",
                         "source_url": source_url,
-                        "original_text": "1600m",
+                        "original_text": distance_text,
                     },
                     "modules": modules,
                     "source": {
@@ -528,6 +529,78 @@ class HistoricalRaceDetailChunkImportTests(TestCase):
                 "receipts": HistoricalRaceDetailImportReceipt.objects.count(),
             },
         )
+
+    def test_dry_run_promotes_approved_distance_expression_and_rolls_back(self):
+        target = self._target(suffix="distance-promotion")
+        target.distance_text = "1600"
+        target.save(update_fields={"distance_text"})
+        before_sha = target_identity(target)["target_sha256"]
+
+        with TemporaryDirectory() as tmp:
+            artifact = ChunkArtifact(Path(tmp), [target], distance_text="1600ｍ")
+            self.assertEqual(
+                artifact.rows[0]["pending_target"]["target_sha256"],
+                before_sha,
+            )
+            result = import_historical_race_detail_chunk(
+                **artifact.kwargs(runner_run_id=self.run.run_id, dry_run=True)
+            )
+
+        target.refresh_from_db()
+        self.assertEqual(result["status"], "dry_run")
+        self.assertEqual(target.distance_text, "1600")
+        self.assertEqual(target_identity(target)["target_sha256"], before_sha)
+        self.assertEqual(target.resolution_status, HistoricalRaceResolutionStatus.PENDING)
+        self.assertIsNone(target.event_id)
+        self.assertEqual(HistoricalRaceDetailImportReceipt.objects.count(), 0)
+        self.assertEqual(RaceEvent.objects.count(), 0)
+        self.assertEqual(RaceEventDataCandidate.objects.count(), 0)
+
+    def test_distance_drift_after_packaging_still_fails_target_sha_gate(self):
+        target = self._target(suffix="distance-drift")
+        target.distance_text = "1600"
+        target.save(update_fields={"distance_text"})
+
+        with TemporaryDirectory() as tmp:
+            artifact = ChunkArtifact(Path(tmp), [target], distance_text="1600ｍ")
+            target.distance_text = "1800"
+            target.save(update_fields={"distance_text"})
+            with self.assertRaisesRegex(
+                HistoricalRaceDetailChunkError,
+                "changed after packaging",
+            ):
+                import_historical_race_detail_chunk(
+                    **artifact.kwargs(runner_run_id=self.run.run_id, dry_run=True)
+                )
+
+        target.refresh_from_db()
+        self.assertEqual(target.distance_text, "1800")
+        self.assertEqual(target.resolution_status, HistoricalRaceResolutionStatus.PENDING)
+        self.assertIsNone(target.event_id)
+        self.assertEqual(HistoricalRaceDetailImportReceipt.objects.count(), 0)
+        self.assertEqual(RaceEvent.objects.count(), 0)
+
+    def test_existing_local_date_conflict_still_fails_approval_gate(self):
+        target = self._target(suffix="date-conflict")
+        target.local_date = date(target.year, 1, 1)
+        target.save(update_fields={"local_date"})
+
+        with TemporaryDirectory() as tmp:
+            artifact = ChunkArtifact(Path(tmp), [target])
+            with self.assertRaisesRegex(
+                HistoricalRaceDetailChunkError,
+                "local_date conflicts with approval",
+            ):
+                import_historical_race_detail_chunk(
+                    **artifact.kwargs(runner_run_id=self.run.run_id, dry_run=True)
+                )
+
+        target.refresh_from_db()
+        self.assertEqual(target.local_date, date(target.year, 1, 1))
+        self.assertEqual(target.resolution_status, HistoricalRaceResolutionStatus.PENDING)
+        self.assertIsNone(target.event_id)
+        self.assertEqual(HistoricalRaceDetailImportReceipt.objects.count(), 0)
+        self.assertEqual(RaceEvent.objects.count(), 0)
 
     def test_late_failure_rolls_back_business_writes_but_keeps_started_receipt(self):
         targets = [self._target(suffix="first"), self._target(suffix="second")]
