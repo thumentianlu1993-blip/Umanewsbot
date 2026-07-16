@@ -32,6 +32,18 @@ from stable.services.operations import log_operation
 from stable.services.historical_race_inventory import sanitize_structured_row_evidence
 from stable.services.terms import source_term_matches_text
 
+# 赛事总账关联保持为独立领域服务；这里重导出兼容既有调用方和测试 API。
+from stable.services.race_event_reconciliation import (
+    adopt_existing_race_event_for_target,
+    apply_race_event_coverage_reconciliation,
+    build_layered_race_event_coverage_report,
+    classify_historical_race_event_targets,
+    export_race_event_coverage_reconciliation,
+    reconcile_historical_race_event_targets,
+    rollback_race_event_coverage_reconciliation,
+    verify_race_event_coverage_reconciliation,
+)
+
 
 User = get_user_model()
 

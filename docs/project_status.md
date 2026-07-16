@@ -1,5 +1,11 @@
 # 项目状态文档
 
+## 2026-07-17 赛事总账/公开赛程关联修复待发布
+
+- 已完成 `reconcile-race-event-coverage` 本地实现和零问题复审：允许 `not_due` 安全采用唯一既有赛程，新增历史/当前/赛果三层报告、不可变 artifact、approval 双 SHA、原子 apply/rollback 和 verifier。
+- 相关测试 `101/101`、Django check、迁移漂移和 diff check 通过；无模型或迁移变化。
+- 尚未发布或写生产。下一步在最新审核后取得明确发布授权，再提交推送、构建镜像、生产只读审计和按精确 manifest 审批的数据关联；历史公开保持关闭。
+
 ## 2026-07-16 第一期历史赛事正式详情总账完成
 
 - `1998–2026` 正式详情范围已固定为 `8032`，最终 `6534 complete + 1491 evidence gap + 7 not_due`；生产共有 `6534 events / 70314 runners / 65227 results / 6534 winners`，global verifier 为 `8032 checked / 0 errors`。日本、中国香港、法国 hard 范围完整；英国历史 hard 为 `708 complete + 45 evidence gap`，英国新正式为 `94 complete + 1 gap + 4 future`，美国新正式为 `195 complete + 1 future`；英美历史 G2/G3 按批准的 best-effort 口径收口。

@@ -197,6 +197,38 @@ class HistoricalRaceBatchTests(TestCase):
         self.assertIsNone(materialize_historical_event(target))
         self.assertFalse(RaceEvent.objects.exists())
 
+    def test_not_due_materializer_never_creates_event_but_accepts_reconciled_schedule(self):
+        series = self._series(RacingRegion.JAPAN, "not-due")
+        target = self._target(
+            series,
+            2026,
+            expectation=HistoricalRaceExpectationStatus.NOT_DUE,
+            resolution=HistoricalRaceResolutionStatus.SOURCE_UNAVAILABLE,
+            with_event=False,
+        )
+
+        self.assertIsNone(materialize_historical_event(target))
+        self.assertFalse(RaceEvent.objects.exists())
+
+        event = RaceEvent.objects.create(
+            year=2026,
+            slug="japan-not-due-2026",
+            race_series=series,
+            original_name=series.canonical_name_original,
+            chinese_name=series.chinese_name,
+            country_region=series.country_region,
+            racecourse="Test Course",
+            grade_text="G2",
+            surface=RaceEventSurface.TURF,
+            status=RaceEventStatus.SCHEDULED,
+            visibility_status=RaceEventVisibility.PUBLISHED,
+        )
+        target.event = event
+        target.save(update_fields={"event"})
+
+        self.assertEqual(materialize_historical_event(target).pk, event.pk)
+        self.assertEqual(RaceEvent.objects.count(), 1)
+
     def test_first_acceptance_selects_five_regions_three_series_and_three_eras(self):
         selected_series: dict[str, list[str]] = {}
         regions = [

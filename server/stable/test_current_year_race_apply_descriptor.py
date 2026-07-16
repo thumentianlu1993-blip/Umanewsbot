@@ -324,6 +324,67 @@ class CurrentYearRaceApplyDescriptorTests(TestCase):
         self.assertEqual(event.data_quality_status, RaceEventDataQuality.INCOMPLETE)
         self.assertFalse(event.is_featured)
         self.assertEqual(event.source_refs["historical_target_id"], target.pk)
+        log = TaskExecutionLog.objects.get(task_name="import_race_events")
+        self.assertEqual(log.payload["created"], 1)
+        self.assertEqual(log.payload["adopted"], 0)
+        self.assertIn("created=1 adopted=0", output.getvalue())
+
+    def test_descriptor_adopts_unique_existing_event_without_changing_publication_state(self):
+        target = self._target("existing-calendar-event")
+        existing = RaceEvent.objects.create(
+            race_series=target.race_series,
+            year=target.year,
+            slug="public-existing-calendar-event-2026",
+            original_name=target.race_series.canonical_name_original,
+            chinese_name=target.race_series.chinese_name,
+            country_region=target.country_region,
+            racecourse="Happy Valley",
+            grade_text="G3",
+            normalized_grade="G3",
+            surface=RaceEventSurface.TURF,
+            local_date=date(2026, 1, 7),
+            status=RaceEventStatus.FINISHED,
+            visibility_status=RaceEventVisibility.PUBLISHED,
+            data_quality_status=RaceEventDataQuality.COMPLETE,
+            is_featured=True,
+        )
+        manual_alias = RaceEventAlias.objects.create(
+            event=existing,
+            source_language="",
+            text="Manual Alias",
+            alias_type="manual-reviewed",
+            source="operator",
+            is_active=False,
+        )
+        with TemporaryDirectory() as temporary:
+            paths = self._fixture(Path(temporary), targets=[target])
+            rows = list(csv.DictReader(paths["due_csv"].open(encoding="utf-8-sig")))
+            fieldnames = [*rows[0].keys(), "aliases"]
+            rows[0]["aliases"] = "Manual Alias|New Alias"
+            with paths["due_csv"].open("w", encoding="utf-8-sig", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+            self._refresh_signed_chain(paths)
+            output = StringIO()
+            call_command("import_race_events", *self._argv(paths, dry_run=False), stdout=output)
+
+        target.refresh_from_db()
+        existing.refresh_from_db()
+        self.assertEqual(target.event_id, existing.pk)
+        self.assertEqual(existing.visibility_status, RaceEventVisibility.PUBLISHED)
+        self.assertEqual(existing.data_quality_status, RaceEventDataQuality.COMPLETE)
+        self.assertTrue(existing.is_featured)
+        manual_alias.refresh_from_db()
+        self.assertEqual(manual_alias.alias_type, "manual-reviewed")
+        self.assertEqual(manual_alias.source, "operator")
+        self.assertFalse(manual_alias.is_active)
+        self.assertTrue(RaceEventAlias.objects.filter(event=existing, text="New Alias", source="csv").exists())
+        log = TaskExecutionLog.objects.get(task_name="import_race_events")
+        self.assertEqual(log.payload["created"], 0)
+        self.assertEqual(log.payload["adopted"], 1)
+        self.assertEqual(log.payload["alias_count"], 1)
+        self.assertIn("created=0 adopted=1", output.getvalue())
 
     def test_descriptor_ignores_explicit_publication_fields(self):
         target = self._target("explicit-publication")

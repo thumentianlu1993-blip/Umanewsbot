@@ -1,5 +1,16 @@
 # 部署运行手册
 
+## 赛事正式目标与公开赛程关联发布门禁（2026-07-17）
+
+1. 以最新成功代码 review 后用户明确批准的 commit 构建 AMD64 镜像；切换前核对 revision、tree、source SHA 和两次构建 image ID，不复用旧分支镜像。
+2. 部署前停止 historical runner 并确认无 historical live lock/running batch；本变更无迁移，不需要为只读审计停止新闻 worker/beat。
+3. 先使用新命令生成一个不存在的生产 artifact 目录，默认只读。核对 `classification_counts`、三层分母、东海锦标 2026、全部冲突和 `review.html`，不得直接使用 pending approval 写库。
+4. artifact 目录拒绝覆盖；manifest 中四个文件路径与 SHA 必须精确匹配。审批文件必须独立填写 `status=approved / approved_by / approved_at / manifest_sha256`，并记录 approval 自身 SHA。
+5. apply 前生成 custom-format PostgreSQL 备份，核对非空、权限、SHA-256 和 `pg_restore -l`；随后再次运行 verifier，数据库 baseline 漂移即停止。
+6. apply 必须同时提供 expected manifest SHA 与 expected approval SHA。命令只串行采用 `exact_link`，整批单事务，先预检 rollback ledger；任一 identity、状态、artifact 或 ledger 失败时整批不写。
+7. 写后 verifier 必须证明 target/event/detail/visibility/status 数量守恒，所有 approved exact links 已关联，冲突未写入。保留 rollback ledger 和 SHA；若关联后发生生命周期或详情变化，禁止自动 rollback。
+8. 部署和数据 apply 全程保持 `RACE_EVENT_HISTORICAL_PUBLIC_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。
+
 ## 已完成：第一期 1998–2026 历史赛事正式详情总账收口
 
 ### 审批产物与生产写入证据

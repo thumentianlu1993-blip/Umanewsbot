@@ -34,6 +34,10 @@ from stable.services.historical_race_batches import (
     target_identity,
 )
 from stable.services.historical_race_inventory import InventoryValidationError
+from stable.services.race_event_reconciliation import (
+    RaceEventReconciliationError,
+    adopt_existing_race_event_for_target,
+)
 
 
 REQUIRED_FIELDS = {"year", "original_name", "chinese_name", "country_region", "racecourse", "grade_text", "surface"}
@@ -422,6 +426,7 @@ def _apply_current_year_descriptor_rows(
     dry_run: bool,
 ) -> tuple[int, int, int]:
     created = 0
+    adopted = 0
     alias_count = 0
     seen_target_ids: set[int] = set()
     try:
@@ -477,12 +482,15 @@ def _apply_current_year_descriptor_rows(
                     raise CommandError(
                         f"第 {line_number} 行 slug 与 target 不一致：{slug} != {expected_slug}"
                     )
-                if RaceEvent.objects.filter(year=year, slug=slug).exists():
-                    raise CommandError(f"第 {line_number} 行 slug conflict：{year}/{slug}")
-                if RaceEvent.objects.filter(
-                    race_series=target.race_series, year=year
+                existing_event = (
+                    RaceEvent.objects.select_related("race_series")
+                    .filter(race_series=target.race_series, year=year)
+                    .first()
+                )
+                if RaceEvent.objects.filter(year=year, slug=slug).exclude(
+                    pk=existing_event.pk if existing_event else None
                 ).exists():
-                    raise CommandError(f"第 {line_number} 行 existing event conflict")
+                    raise CommandError(f"第 {line_number} 行 slug conflict：{year}/{slug}")
 
                 target.original_name = defaults["original_name"]
                 target.chinese_name = defaults["chinese_name"]
@@ -516,43 +524,60 @@ def _apply_current_year_descriptor_rows(
                         "last_checked_at",
                     }
                 )
-                event = materialize_historical_event(target)
+                if existing_event is not None:
+                    try:
+                        adopt_existing_race_event_for_target(
+                            target_id=target.pk,
+                            expected_event_id=existing_event.pk,
+                        )
+                    except RaceEventReconciliationError as exc:
+                        raise CommandError(
+                            f"第 {line_number} 行 existing event 无法安全采用：{exc}"
+                        ) from exc
+                    target.refresh_from_db(fields={"event"})
+                    event = existing_event
+                    adopted += 1
+                else:
+                    event = materialize_historical_event(target)
+                    created += 1
                 if (
                     event is None
                     or event.race_series_id != target.race_series_id
                     or event.year != target.year
-                    or event.slug != expected_slug
+                    or (existing_event is None and event.slug != expected_slug)
                 ):
                     raise CommandError(f"第 {line_number} 行 materialized event 身份不一致")
-                event.visibility_status = RaceEventVisibility.DRAFT
-                event.data_quality_status = RaceEventDataQuality.INCOMPLETE
-                event.is_featured = False
-                event.save(
-                    update_fields={
-                        "visibility_status",
-                        "data_quality_status",
-                        "is_featured",
-                    }
-                )
-                for alias in aliases:
-                    RaceEventAlias.objects.update_or_create(
-                        event=event,
-                        source_language=alias_language,
-                        text=alias,
-                        defaults={
-                            "alias_type": "alias",
-                            "source": "csv",
-                            "is_active": True,
-                        },
+                if existing_event is None:
+                    event.visibility_status = RaceEventVisibility.DRAFT
+                    event.data_quality_status = RaceEventDataQuality.INCOMPLETE
+                    event.is_featured = False
+                    event.save(
+                        update_fields={
+                            "visibility_status",
+                            "data_quality_status",
+                            "is_featured",
+                        }
                     )
-                    alias_count += 1
-                created += 1
+                for alias in aliases:
+                    if not RaceEventAlias.objects.filter(
+                        event=event, source_language=alias_language, text=alias
+                    ).exists():
+                        RaceEventAlias.objects.create(
+                            event=event,
+                            source_language=alias_language,
+                            text=alias,
+                            alias_type="alias",
+                            source="csv",
+                            is_active=True,
+                        )
+                        alias_count += 1
             TaskExecutionLog.objects.create(
                 task_name="import_race_events",
                 status=TaskStatus.SUCCESS,
                 payload={
                     "csv": str(path),
                     "created": created,
+                    "adopted": adopted,
                     "updated": 0,
                     "alias_count": alias_count,
                     "descriptor_sha256": context.descriptor_sha256,
@@ -562,7 +587,7 @@ def _apply_current_year_descriptor_rows(
                 },
                 detail=(
                     "年度赛事 descriptor CSV 导入完成："
-                    f"created={created} updated=0 aliases={alias_count}"
+                    f"created={created} adopted={adopted} updated=0 aliases={alias_count}"
                 ),
                 started_at=timezone.now(),
                 finished_at=timezone.now(),
@@ -573,7 +598,7 @@ def _apply_current_year_descriptor_rows(
         raise CommandError("descriptor target 不存在") from exc
     except InventoryValidationError as exc:
         raise CommandError(f"descriptor materialization 失败：{exc}") from exc
-    return created, 0, alias_count
+    return created, adopted, alias_count
 
 
 class Command(BaseCommand):
@@ -601,6 +626,7 @@ class Command(BaseCommand):
             raise CommandError(f"CSV 文件不存在：{path}")
         created = 0
         updated = 0
+        adopted = 0
         alias_count = 0
         with path.open("r", encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
@@ -662,7 +688,7 @@ class Command(BaseCommand):
                 parsed[2]["visibility_status"] = RaceEventVisibility.DRAFT
                 parsed[2]["data_quality_status"] = RaceEventDataQuality.INCOMPLETE
                 parsed[2]["is_featured"] = False
-            created, updated, alias_count = _apply_current_year_descriptor_rows(
+            created, adopted, alias_count = _apply_current_year_descriptor_rows(
                 path=path,
                 rows=rows,
                 parsed_rows=parsed_rows,
@@ -677,7 +703,7 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.SUCCESS(
                     "年度赛事导入完成："
-                    f"created={created} updated={updated} aliases={alias_count}"
+                    f"created={created} adopted={adopted} updated=0 aliases={alias_count}"
                 )
             )
             return

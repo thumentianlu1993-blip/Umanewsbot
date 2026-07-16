@@ -16144,7 +16144,7 @@ class RaceEventPageMVPTests(TestCase):
             csv_path = Path(tmp) / "races.csv"
             csv_path.write_text(
                 "year,slug,original_name,chinese_name,aliases,country_region,racecourse,grade_text,normalized_grade,surface,local_date,priority,visibility_status\n"
-                "2026,hong-kong-cup,Hong Kong Cup,香港杯,Hong Kong Cup|HK Cup,hong_kong,沙田马场,G1,G1,turf,2026-12-13,P0,published\n",
+                "2025,hong-kong-cup,Hong Kong Cup,香港杯,Hong Kong Cup|HK Cup,hong_kong,沙田马场,G1,G1,turf,2025-12-13,P0,published\n",
                 encoding="utf-8",
             )
             call_command("import_race_events", "--csv", str(csv_path), stdout=StringIO())

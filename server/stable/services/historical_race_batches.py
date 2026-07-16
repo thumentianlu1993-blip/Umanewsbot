@@ -167,13 +167,22 @@ def _locked_historical_target(target_id: int):
 
 
 def materialize_historical_event(target: HistoricalRaceEventTarget, *, actor=None) -> RaceEvent | None:
-    if target.expectation_status in {
-        HistoricalRaceExpectationStatus.NOT_HELD,
-        HistoricalRaceExpectationStatus.NOT_DUE,
-    }:
+    if target.expectation_status == HistoricalRaceExpectationStatus.NOT_HELD:
         if target.event_id:
-            raise InventoryValidationError("not-held/not-due target must not have a RaceEvent")
+            raise InventoryValidationError("not-held target must not have a RaceEvent")
         return None
+    if target.expectation_status == HistoricalRaceExpectationStatus.NOT_DUE:
+        if not target.event_id:
+            return None
+        event = RaceEvent.objects.select_related("race_series").get(pk=target.event_id)
+        if (
+            event.race_series_id != target.race_series_id
+            or event.year != target.year
+            or event.country_region != target.country_region
+            or event.status not in {RaceEventStatus.SCHEDULED, RaceEventStatus.POSTPONED}
+        ):
+            raise InventoryValidationError("not-due target existing RaceEvent identity/status mismatch")
+        return event
     if target.race_series.review_status != RaceSeriesReviewStatus.APPROVED:
         raise InventoryValidationError("target series is not approved")
     if target.resolution_status not in {

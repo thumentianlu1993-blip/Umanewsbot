@@ -1,5 +1,12 @@
 # 当前状态
 
+## 2026-07-17 赛事正式总账与公开赛程关联修复已完成本地审核，待发布授权
+
+- 已确认此前“7 场未到期”只代表 `8032` 个历史详情验收目标中的 `not_due`，不代表生产全部未来赛程；生产在 `2026-07-18` 至 `2026-07-31` 另有 `44` 条公开 `scheduled RaceEvent`，多数尚未关联正式目标。
+- 新增只读 reconciliation、historical/current/result 三层覆盖报告、HTML/CSV 审核表、manifest+approval 双 SHA 门禁、整批原子 apply/rollback 和逐目标 verifier。 `not_due` 只允许采用同系列同年度的唯一既有 `scheduled/postponed` 赛事，不创建、删除或公开赛事，也不改变目标/赛事其他状态。
+- change 文档位于 `docs/changes/reconcile-race-event-coverage/`；真实 RED 后 focused `22/22`、相关组合 `101/101`、Django check、迁移漂移和 diff check 全部通过。首次代码 review 的 8 项事务、TOCTOU、artifact、快照、alias 和统计问题已修复，同一 reviewer 复审为 `APPROVED`。
+- 当前仅为独立 worktree 本地实现；尚未提交、推送、构建镜像、部署或连接生产生成 artifact。必须在最新审核后取得本次明确发布授权，随后才进入镜像切换、生产只读审计、精确 manifest 审批、备份、串行 apply 和 verifier；历史公开开关继续关闭。
+
 ## 2026-07-16 第一期 1998–2026 历史赛事正式详情总账已收口
 
 - 正式详情分母固定为 `8032`，最终为 `6534 complete + 1491 evidence gap + 7 not_due`；生产验收为 `6534 events / 70314 runners / 65227 results / 6534 winners`。日本、中国香港、法国 hard 范围完整；英国历史 hard 为 `708 complete + 45 evidence gap`；英国新正式范围为 `94 complete + 1 gap + 4 future`，美国新正式范围为 `195 complete + 1 future`。英国、美国历史 G2/G3 按已批准的 best-effort 政策收口，不把无可靠来源的目标伪造为完整。
