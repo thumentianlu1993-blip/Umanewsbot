@@ -366,11 +366,35 @@ def _odds(ride: dict) -> str:
 
 
 def _runner_status(ride: dict) -> str:
+    try:
+        if int(ride.get("finish_position")) > 0:
+            return "declared"
+    except (TypeError, ValueError):
+        pass
+
     status = str(ride.get("ride_status") or "").upper()
-    if status in {"NONRUNNER", "NON_RUNNER"}:
+    if status in {"NONRUNNER", "NON_RUNNER", "WITHDRAWN"}:
         return "withdrawn"
-    if status in {"RUNNER"}:
-        return "declared"
+
+    description = _collapse(str(ride.get("ride_description") or ""))
+    description = description.casefold().replace("-", " ")
+    if re.search(r"\bbrought\s+down\b", description):
+        return "brought_down"
+    if re.search(r"\b(?:unseated|lost)\s+(?:the\s+)?rider\b", description):
+        return "unseated_rider"
+    if re.search(r"\bpulled\s+up\b", description):
+        return "pulled_up"
+    if re.search(r"\b(?:fell|slipped\s+up)\b", description):
+        return "fell"
+    if re.search(r"\brefused\b", description):
+        return "refused"
+    if re.search(
+        r"\b(?:carried\s+out|ran\s+out|failed\s+to\s+complete|stopped)\b",
+        description,
+    ):
+        return "did_not_finish"
+    if re.search(r"\bdisqualified\b", description):
+        return "disqualified"
     return "unknown"
 
 

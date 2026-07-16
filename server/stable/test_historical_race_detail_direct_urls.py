@@ -58,6 +58,66 @@ class HistoricalRaceDetailDirectUrlTests(SimpleTestCase):
         event = self._event("uk_racingpost", "https://www.racingpost.com/results/fixture")
         self.assertEqual(module._approved_result_url(event, provider="uk_sportinglife"), "")
 
+    def test_sporting_life_runner_status_requires_explicit_finish_evidence(self):
+        module = _load("prepare_uk_sportinglife_race_detail_candidates.py")
+
+        self.assertEqual(
+            module._runner_status(
+                {
+                    "finish_position": 1,
+                    "ride_description": "pulled up",
+                    "ride_status": "RUNNER",
+                }
+            ),
+            "declared",
+        )
+
+        for ride_status in ("NONRUNNER", "NON_RUNNER", "WITHDRAWN"):
+            with self.subTest(ride_status=ride_status):
+                self.assertEqual(
+                    module._runner_status(
+                        {
+                            "finish_position": None,
+                            "ride_description": "",
+                            "ride_status": ride_status,
+                        }
+                    ),
+                    "withdrawn",
+                )
+
+        explicit_dnf_cases = (
+            ("pulled up before the last", "pulled_up"),
+            ("fell 3 out", "fell"),
+            ("unseated rider at the sixth", "unseated_rider"),
+            ("brought down 2 out", "brought_down"),
+            ("carried out after being hampered", "did_not_finish"),
+        )
+        for description, expected_status in explicit_dnf_cases:
+            with self.subTest(description=description):
+                self.assertEqual(
+                    module._runner_status(
+                        {
+                            "finish_position": None,
+                            "ride_description": description,
+                            "ride_status": "RUNNER",
+                        }
+                    ),
+                    expected_status,
+                )
+
+        for description in ("", "tailed off"):
+            with self.subTest(description=description):
+                self.assertEqual(
+                    module._runner_status(
+                        {
+                            "finish_position": None,
+                            "ride_description": description,
+                            "ride_status": "RUNNER",
+                        }
+                    ),
+                    "unknown",
+                )
+
     def test_irishracing_adapter_requires_region_specific_provider(self):
         module = _load("prepare_irishracing_race_detail_candidates.py")
         url = "https://www.irishracing.com/raceresults/Thu-22nd-Jun-2000/Ascot/1545"
