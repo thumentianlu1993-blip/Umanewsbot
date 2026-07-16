@@ -1,11 +1,16 @@
 # 当前状态
 
-## 2026-07-17 赛事正式总账与公开赛程关联修复已完成本地审核，待发布授权
+## 2026-07-17 赛事正式总账与公开赛程关联工具已发布，生产只读审计待身份审核
 
 - 已确认此前“7 场未到期”只代表 `8032` 个历史详情验收目标中的 `not_due`，不代表生产全部未来赛程；生产在 `2026-07-18` 至 `2026-07-31` 另有 `44` 条公开 `scheduled RaceEvent`，多数尚未关联正式目标。
 - 新增只读 reconciliation、historical/current/result 三层覆盖报告、HTML/CSV 审核表、manifest+approval 双 SHA 门禁、整批原子 apply/rollback 和逐目标 verifier。 `not_due` 只允许采用同系列同年度的唯一既有 `scheduled/postponed` 赛事，不创建、删除或公开赛事，也不改变目标/赛事其他状态。
 - change 文档位于 `docs/changes/reconcile-race-event-coverage/`；真实 RED 后 focused `22/22`、相关组合 `101/101`、Django check、迁移漂移和 diff check 全部通过。首次代码 review 的 8 项事务、TOCTOU、artifact、快照、alias 和统计问题已修复，同一 reviewer 复审为 `APPROVED`。
-- 当前仅为独立 worktree 本地实现；尚未提交、推送、构建镜像、部署或连接生产生成 artifact。必须在最新审核后取得本次明确发布授权，随后才进入镜像切换、生产只读审计、精确 manifest 审批、备份、串行 apply 和 verifier；历史公开开关继续关闭。
+- 用户已批准 commit `213a818c2845fd29a2afe742ea8d11f653269d9e`。该提交已推送并快进合入 `main`；两个独立 AMD64 构建得到相同 image ID `sha256:f3b2d4625322e7f96554288d4b710723ff9d01323dd3be654bcbc2ba0281a9d9`，tree `799f77db3f253e524f5f0095ed07a4fe9c8cd058`，source archive SHA-256 `c15bec6853266cd61c4852380ff1f6613cfe4bc9e1614ad3a5272d1edf9eb92a`。生产 web/worker/beat 与服务器 checkout 现均为该 revision；无迁移，HTTP healthz 和 `/races/` 正常。
+- 部署前 custom-format 备份为 `/opt/umanewsbot/backups/db/pre-race-reconcile-213a818c-20260717_015716.dump`，SHA-256 `7958873ff243f5a3c1bb85075f74fa0daec6a040f33688b31f63db71e1eb0e3b`，`pg_restore -l` 通过；环境备份为 `/opt/umanewsbot/.env.backup.pre-213a818c-20260717_015716`，回滚标签指向上一镜像 `sha256:c8c49780ac9dca4799e4834b052f7e05ca75ff61945343b2c19bf0ef2ab561ab`。
+- 有效生产只读 artifact 为 `/opt/umanewsbot/runtime/race_event_reconciliation/prod-213a818c-mounted-20260717_021203`，manifest SHA-256 `5caee7d0ed093605aede28c2834d3acf8a75f9f20e2d88679924c3670f3c6a51`，verifier `ok=true / error_count=0`。基线为 `30,917 targets / 9,867 events / 100,132 runners / 91,897 results / 5,725 history winners`；分类为 `8,875 already_linked / 46 identity_conflict / 21,537 missing_event / 459 status_conflict / 0 exact_link`。
+- 因该精确 manifest 没有可执行关联，approval 继续为 `pending`，没有签署、dry-run apply 或数据库关系写入。`not_held=459 / cancelled=15 / not_due=7` 是不同口径；2026 另有 `630 missing_event`，不得解释为未举办。严格赛果层因生产旧数据尚未写 `RaceEvent.result_confirmed_at` 而得到 `complete=0`，这是新显式确认字段缺口，不代表 `91,897` 条现有赛果消失。
+- 只读明细进一步得到 `46` 条同名系列冲突和 `221` 条 2025–2026 别名/跨语言候选；其中 target `53418 / Tokai S` 与 event `83 / 東海S / 东海锦标` 日期、级别、场地类型和距离一致，但属于两个 `RaceSeries`。46 条中另有英国 Sprint Cup 命中香港同名赛事、美国 Hanshin Cup 命中日本阪神杯等跨地区同名技术噪声，必须排除后再做系列合并决定。审核文件为本地 `outputs/race_event_reconciliation_20260717/生产赛事身份审核_213a818c_20260717.xlsx` 与同名 HTML；确认系列身份后重新生成非零 `exact_link` 的 manifest，才允许进入备份、apply 和 verifier。
+- 收口时无 historical one-off；常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，历史公开配置未开启。普通新闻 worker 有自然 crawl task 运行，Redis 主队列为 `0`；生产可用磁盘约 `3.6 GiB`，低于 `5 GiB` historical crawl 门槛，继续禁止在生产执行重型抓取。
 
 ## 2026-07-16 第一期 1998–2026 历史赛事正式详情总账已收口
 

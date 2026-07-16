@@ -1,10 +1,13 @@
 # 项目状态文档
 
-## 2026-07-17 赛事总账/公开赛程关联修复待发布
+## 2026-07-17 赛事总账/公开赛程关联工具已发布，关联写入待身份审核
 
 - 已完成 `reconcile-race-event-coverage` 本地实现和零问题复审：允许 `not_due` 安全采用唯一既有赛程，新增历史/当前/赛果三层报告、不可变 artifact、approval 双 SHA、原子 apply/rollback 和 verifier。
 - 相关测试 `101/101`、Django check、迁移漂移和 diff check 通过；无模型或迁移变化。
-- 尚未发布或写生产。下一步在最新审核后取得明确发布授权，再提交推送、构建镜像、生产只读审计和按精确 manifest 审批的数据关联；历史公开保持关闭。
+- commit `213a818c` 已合入 `main` 并部署；生产 web/worker/beat 统一运行 image `sha256:f3b2d4625322e7f96554288d4b710723ff9d01323dd3be654bcbc2ba0281a9d9`，无迁移，healthz 与赛事页正常。部署前数据库备份 SHA-256 为 `7958873ff243f5a3c1bb85075f74fa0daec6a040f33688b31f63db71e1eb0e3b`。
+- 有效生产只读 manifest 为 `5caee7d0ed093605aede28c2834d3acf8a75f9f20e2d88679924c3670f3c6a51`，verifier 无错误；`30,917` 个目标分为 `8,875 already_linked / 46 identity_conflict / 21,537 missing_event / 459 status_conflict / 0 exact_link`。因此 approval 保持 pending，本轮没有数据 apply。
+- `7` 是 not_due，不是未举办总数；全账本另有 `459 not_held / 15 cancelled`，2026 还有 `630 missing_event`。东海锦标等线上赛程与英文总账被拆为不同系列，另有跨地区同名误命中，需先完成系列身份审核。
+- 可读审核入口为 `outputs/race_event_reconciliation_20260717/生产赛事身份审核_213a818c_20260717.xlsx` 与 HTML，包含 46 条明确冲突、221 条别名/跨语言候选、冠军马、1号马、来源和线上页面。身份确认后重新生成具有明确动作的新 manifest，再执行备份、串行 apply 和逐目标 verifier；历史公开继续关闭。
 
 ## 2026-07-16 第一期历史赛事正式详情总账完成
 

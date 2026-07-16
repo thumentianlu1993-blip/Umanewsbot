@@ -11,6 +11,16 @@
 7. 写后 verifier 必须证明 target/event/detail/visibility/status 数量守恒，所有 approved exact links 已关联，冲突未写入。保留 rollback ledger 和 SHA；若关联后发生生命周期或详情变化，禁止自动 rollback。
 8. 部署和数据 apply 全程保持 `RACE_EVENT_HISTORICAL_PUBLIC_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。
 
+### 本次生产执行结果
+
+1. 用户批准的 revision 为 `213a818c2845fd29a2afe742ea8d11f653269d9e`；两个独立 AMD64 构建 image ID 均为 `sha256:f3b2d4625322e7f96554288d4b710723ff9d01323dd3be654bcbc2ba0281a9d9`，tree `799f77db3f253e524f5f0095ed07a4fe9c8cd058`，source archive SHA-256 `c15bec6853266cd61c4852380ff1f6613cfe4bc9e1614ad3a5272d1edf9eb92a`。生产 web/worker/beat 与服务器 checkout 已统一到该 revision。
+2. 生产 Compose 使用 service-specific image tag，且把宿主 `/opt/umanewsbot/server` bind mount 到 `/app/server`。只更新 `umanewsbot:prod` 或只替换镜像都不够；本次硬门禁分别发现容器仍使用旧 service tag、以及新镜像代码被旧宿主 checkout 覆盖，均在业务写入前停止。后续同类部署必须同时核对实际 service image ID、服务器 Git HEAD 和容器内管理命令可见性。
+3. 有效恢复点为 `/opt/umanewsbot/backups/db/pre-race-reconcile-213a818c-20260717_015716.dump`，SHA-256 `7958873ff243f5a3c1bb85075f74fa0daec6a040f33688b31f63db71e1eb0e3b`，custom-format 且 `pg_restore -l` 通过；环境备份为 `/opt/umanewsbot/.env.backup.pre-213a818c-20260717_015716`，上一镜像保留回滚标签。
+4. 只认显式挂载 `/opt/umanewsbot/runtime:/app/runtime` 后生成的 artifact：`runtime/race_event_reconciliation/prod-213a818c-mounted-20260717_021203`。manifest SHA-256 为 `5caee7d0ed093605aede28c2834d3acf8a75f9f20e2d88679924c3670f3c6a51`，verifier `ok=true / error_count=0`；此前未挂 runtime 的一次性容器产物不可见，已作废且没有写库。
+5. 本次分类为 `already_linked=8875 / identity_conflict=46 / missing_event=21537 / status_conflict=459 / exact_link=0`。approval SHA-256 为 `f22f5e0704fd1b30c19134d1450669fe09418cf93dbe955dc7a205160ab47938`，内容仍为 `status=pending`。由于没有 exact link，不得为了完成流程而签署或运行空 apply；先完成系列身份审核并重新生成 manifest。
+6. 审核输出位于 `outputs/race_event_reconciliation_20260717/`：Excel SHA-256 `834dd2dea4e2d8bac69c98ab580577bd7c7a8f8741d7949d310a0b586d0eb089`，HTML SHA-256 `0f9efbe80136597d20db701859daae1127b9124e96f1dddefe4192b76faeb7a3`，详细 JSON SHA-256 `aa0800963a01f7578c590d959d4423379d296e42f9e438c8693d02544073beed`。跨地区同名候选必须直接排除；同地区重复系列由产品审核确认合并、独立或沿革关系。
+7. 收口时无 historical one-off，历史 enabled/network 均为 false，历史公开未开启；HTTP healthz 正常。普通新闻 worker 正在处理自然 crawl，不属于本次历史任务；生产可用磁盘约 `3.6 GiB`，低于 `5 GiB` historical crawl 门槛，禁止在生产继续重型抓取。
+
 ## 已完成：第一期 1998–2026 历史赛事正式详情总账收口
 
 ### 审批产物与生产写入证据
