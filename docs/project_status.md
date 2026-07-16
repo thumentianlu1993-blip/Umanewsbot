@@ -1,5 +1,12 @@
 # 项目状态文档
 
+## 2026-07-16 英国 Sporting Life 197 场增量详情已写入生产
+
+- 用户按 commit `2a7352c8` 与 manifest `3c6a4d11...831c` 授权后，已完成独立备份、全量 dry-run、两块串行 apply 和逐目标 replay verifier。写前备份 SHA-256 为 `a942e2dad092bdf0af9e0546030a73c75dfeebb1c89ee888d704e8244d7f0d6c`，两个 verifier 均 `error_count=0`。
+- 本包范围为 `198 = 197 complete + 1 evidence gap`；新增 `197 events / 2027 runners / 1794 results / 197 first-place winners`。唯一 gap 为 target `57633`，未伪造为 complete。197 个完整目标均为 imported，basic/runners/results 全部 complete。
+- 全部新增赛事仍为 `draft + incomplete`、公开 0、featured 0。生产 web/worker/beat 已恢复并统一运行 `sha256:97b49b...397473` / revision `700a2a96`，HTTP 内外 healthz 正常，historical runner 为 `migration_safe`，常驻历史网络/写入和公开开关保持关闭。
+- 生产累计 historical imported target/event 当前为 `7182`，但一期 master ledger 尚未全部完成；后续继续处理剩余分片和统一 gap/review ledger，不重跑本包已验收目标。
+
 ## 2026-07-16 4652 场历史详情已写入生产，公开门禁保持关闭
 
 - 审核基线 `94360245...892a`、content `a353f2f8...748f`、commit `700a2a96` 与 manifest `dfb86ee8...14d9` 已按授权发布。生产 web/worker/beat 统一运行可复现 AMD64 镜像 `sha256:97b49b0226ce6de844de7e26ecbd51851c38fd2b0146c471f6f27767be397473`；镜像内测试 `30/30`、Django check、迁移状态和运行健康检查通过。

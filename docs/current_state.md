@@ -1,13 +1,16 @@
 # 当前状态
 
-## 2026-07-16 英国 Sporting Life 增量详情包已就绪，等待具体发布授权
+## 2026-07-16 英国 Sporting Life 增量详情包已正式导入生产
 
-- 第一阶段应到清单尚未全部写入。既有生产写入仍为 `4652 complete + 278 evidence-backed gaps`；本轮在本地 Docker、全程无数据库连接下补抓英国 Sporting Life 已发现目标 `198` 场，最终为 `197 complete + 1 parse gap`，包含 `2027 runners / 1794 results / 197 winners`。唯一缺口为 target `57633`（2015 Finale Juvenile Hurdle），来源页没有可解析 runner rows，已保留在统一 gap/review ledger。
+- 第一阶段应到清单尚未全部写入。本轮在本地 Docker、全程无数据库连接下补抓英国 Sporting Life 已发现目标 `198` 场，最终为 `197 complete + 1 parse gap`，包含 `2027 runners / 1794 results / 197 winners`。唯一缺口为 target `57633`（2015 Finale Juvenile Hurdle），来源页没有可解析 runner rows，已保留在统一 gap/review ledger；该缺口没有被伪造为 complete。
 - 解析器提交为 `2a7352c8abfbd3b22aca274a1eeb3fda07731eb8`，真实缓存 RED 后回归 `39/39`，独立代码审核结论为“未发现可修复问题”。结构化 casualty 现可保留 `NonRunner / UnseatedRider / PulledUp`；普通 `tailed off` 文案仍不会被武断映射为退赛。
 - 六个 2023 英国目标的旧总账距离丢失英里位，已按 Sporting Life 详情页结构化距离生成独立 correction ledger；原值、新值、来源 URL 和 fixture SHA 全部绑定。v8 plan manifest 为 `9f3042caf4a9bc27dbc5d9e1130b4a72a1e0f380ca2a3ef24dabca1322b729b0`，correction ledger 为 `ab17e79d823dff6e79d27b69a751aa10c8d700787e104a646229106e8c003350`。
 - 增量 source bundle 位于本地 `runtime/historical_plan_exports/detail-import-bundle-uk-sportinglife-v8`，已在生产隔离目录 `/opt/umanewsbot/runtime/historical_race_detail_import/detail-import-bundle-uk-sportinglife-v8` 逐字节复核。bundle manifest 为 `3c6a4d11106c2b490876d63f0719b71d6fde9d7c7bc9c8937736d26a0e28831c`，identity 为 `2392a69c7cf1b03812422cf11b3c5ed73a181e719ca6309d79283812c735cb50`；当前生产镜像在 `--network none` 下验证 `197` records、`197` source objects、`67302603` source bytes 全部通过。
-- 本轮尚未生成 approved chunk、未执行生产 dry-run、备份或 apply。两个待授权 chunk 分别为 historical `194` 场和 current-year-due `3` 场；必须取得用户针对上述 manifest 的明确授权后，才可签署 approval，并按“最新备份 -> 全量 dry-run -> 串行 apply -> 逐目标 verifier”执行。历史公开和常驻网络开关继续关闭。
-- 生产磁盘曾低于 5 GiB 门槛；已清理未被容器引用的旧工具镜像和 45 小时前候选镜像，保留当前 prod 与最近回滚。上传解压紧凑包后可用空间为 `5495132 KiB`，web/worker/beat、DB/Redis 和 `/healthz/` 均正常。
+- 用户按 commit `2a7352c8` 和 bundle manifest `3c6a4d11106c2b490876d63f0719b71d6fde9d7c7bc9c8937736d26a0e28831c` 明确授权。approval 于 `2026-07-16T09:33:54Z` 签署；historical approval SHA 为 `6a0240453cf19d681365a7add59ff2ea254fff5dfaee3ca6722495450ca87aec`，current-year-due approval SHA 为 `93bf1143460450015365f85fa7d2c3aae2a479180ccf69c953e9622d1fac06b1`。
+- 写前 custom-format 备份为 `/opt/umanewsbot/backups/db/pre-uk-sportinglife-v8-apply-700a2a96-3c6a4d11-20260716_093456.dump`，`175094189` bytes，SHA-256 `a942e2dad092bdf0af9e0546030a73c75dfeebb1c89ee888d704e8244d7f0d6c`，权限 `0600` 且 `pg_restore -l` 通过。`detail-dryrun-700a2a96-3c6a4d11` 对两个 chunk 全量通过，receipt 为 0；随后 `detail-apply2-700a2a96-3c6a4d11` 完成 2/2 receipts，`detail-replay-700a2a96-3c6a4d11` 逐目标检查 `194 + 3`，两块均 `error_count=0`。
+- 最终数据库验收精确为 `197 events / 2027 runners / 1794 results / 197 first-place winners`，197 个 target 均为 `imported`，basic/runners/results 均为 `complete`。197 场全部保持 `draft + incomplete + is_featured=false`，公开 0。生产累计 historical imported target/event 为 `7182`，但这不表示一期总账已经全部完成。
+- apply 首次尝试 `detail-apply-700a2a96-3c6a4d11` 因 dry-run 根 checkpoint 尚未归档而在业务步骤前 fail closed，错误为 `runtime/database checkpoint mismatch`，receipt 仍为 0。完成状态文件按 run 归档后使用新 run ID 从头执行，未删除 checkpoint、未续跑不明步骤；失败 run 保留为审计记录。
+- 收口时 historical runner 容器为空，preflight 为 `migration_safe`；web/worker/beat 统一运行镜像 `sha256:97b49b0226ce6de844de7e26ecbd51851c38fd2b0146c471f6f27767be397473`、revision `700a2a961516464ecf93deb0f43a751718efaaca`。HTTP 内外 `/healthz/` 正常，常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，历史公开继续关闭。worker/beat 恢复后已开始正常新闻窗口，因此 Celery 队列不要求保持空闲；生产可用空间约 `5.1 GiB`。
 
 ## 2026-07-16 历史详情 source bundle 已正式导入生产并完成逐目标验收
 
