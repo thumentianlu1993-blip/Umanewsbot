@@ -209,6 +209,69 @@ class HistoricalRaceDetailRunnerV2ValidationGapTests(SimpleTestCase):
         cls.runner = _load_v2()
         cls.adapters = _load_tool("historical_race_detail_adapters.py")
 
+    def test_uk_imperial_distance_rounding_keeps_event_text_and_provenance(self):
+        cases = (
+            ("2m4f", "2m 4f 0y"),
+            ("3m", "2m 7f 213y"),
+            ("2m4f", "2m 3f 200y"),
+            ("3m1/2f", "3m 97y"),
+            ("2m5f+", "2m 5f 26y"),
+            ("2m1f", "2m 179y"),
+            ("2m", "1m 7f 110y"),
+        )
+        source_url = "https://www.sportinglife.com/racing/results/fixture"
+        for event_distance, parsed_distance in cases:
+            with self.subTest(
+                event_distance=event_distance,
+                parsed_distance=parsed_distance,
+            ):
+                distance, provenance = self.runner._distance_for_validation(
+                    {
+                        "country_region": "united_kingdom",
+                        "distance_text": event_distance,
+                    },
+                    {
+                        "metadata": {"distance_text": parsed_distance},
+                        "source_url": source_url,
+                    },
+                )
+
+                self.assertEqual(distance, event_distance)
+                self.assertEqual(
+                    provenance,
+                    {
+                        "source": "event_csv.distance_text",
+                        "original_text": event_distance,
+                        "source_url": source_url,
+                    },
+                )
+
+    def test_uk_imperial_distance_semantic_conflicts_remain_rejected(self):
+        cases = (
+            ("2m", "2m 2f"),
+            ("5f", "2m 5f"),
+        )
+        for event_distance, parsed_distance in cases:
+            with self.subTest(
+                event_distance=event_distance,
+                parsed_distance=parsed_distance,
+            ), self.assertRaisesRegex(
+                self.runner.RunnerV2Error,
+                "event and parsed metadata distance conflict",
+            ):
+                self.runner._distance_for_validation(
+                    {
+                        "country_region": "united_kingdom",
+                        "distance_text": event_distance,
+                    },
+                    {
+                        "metadata": {"distance_text": parsed_distance},
+                        "source_url": (
+                            "https://www.sportinglife.com/racing/results/fixture"
+                        ),
+                    },
+                )
+
     def test_mixed_shard_yields_one_validated_candidate_and_one_validation_gap(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

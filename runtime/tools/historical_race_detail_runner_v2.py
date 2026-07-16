@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Iterable, Mapping
 from urllib.parse import parse_qsl, urlsplit
 
+from discover_historical_race_band_sources import _distance_measurement
+
 
 SCHEMA_VERSION = "2.0"
 STAGES = ("discover", "cache", "parse", "validate", "package")
@@ -1019,7 +1021,22 @@ def _distance_for_validation(event_row: dict, parsed: dict) -> tuple[str, dict]:
         event_comparison = " ".join(unicodedata.normalize("NFKC", event_distance).casefold().split())
         parsed_comparison = " ".join(unicodedata.normalize("NFKC", parsed_distance).casefold().split())
         if event_comparison != parsed_comparison:
-            raise RunnerV2Error("event and parsed metadata distance conflict")
+            region = str(event_row.get("country_region") or "")
+            event_measurement = _distance_measurement(
+                event_comparison.removesuffix("+").rstrip(),
+                region,
+            )
+            parsed_measurement = _distance_measurement(parsed_comparison, region)
+            compatible_uk_imperial = bool(
+                region == "united_kingdom"
+                and event_measurement is not None
+                and parsed_measurement is not None
+                and event_measurement[0] == "imperial"
+                and parsed_measurement[0] == "imperial"
+                and abs(event_measurement[1] - parsed_measurement[1]) <= 110
+            )
+            if not compatible_uk_imperial:
+                raise RunnerV2Error("event and parsed metadata distance conflict")
     distance = event_distance or parsed_distance
     source = "event_csv.distance_text" if event_distance else "parsed.metadata.distance_text"
     return distance, {
