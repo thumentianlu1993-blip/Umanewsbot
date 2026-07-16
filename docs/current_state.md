@@ -1,5 +1,14 @@
 # 当前状态
 
+## 2026-07-16 英国 Sporting Life 增量详情包已就绪，等待具体发布授权
+
+- 第一阶段应到清单尚未全部写入。既有生产写入仍为 `4652 complete + 278 evidence-backed gaps`；本轮在本地 Docker、全程无数据库连接下补抓英国 Sporting Life 已发现目标 `198` 场，最终为 `197 complete + 1 parse gap`，包含 `2027 runners / 1794 results / 197 winners`。唯一缺口为 target `57633`（2015 Finale Juvenile Hurdle），来源页没有可解析 runner rows，已保留在统一 gap/review ledger。
+- 解析器提交为 `2a7352c8abfbd3b22aca274a1eeb3fda07731eb8`，真实缓存 RED 后回归 `39/39`，独立代码审核结论为“未发现可修复问题”。结构化 casualty 现可保留 `NonRunner / UnseatedRider / PulledUp`；普通 `tailed off` 文案仍不会被武断映射为退赛。
+- 六个 2023 英国目标的旧总账距离丢失英里位，已按 Sporting Life 详情页结构化距离生成独立 correction ledger；原值、新值、来源 URL 和 fixture SHA 全部绑定。v8 plan manifest 为 `9f3042caf4a9bc27dbc5d9e1130b4a72a1e0f380ca2a3ef24dabca1322b729b0`，correction ledger 为 `ab17e79d823dff6e79d27b69a751aa10c8d700787e104a646229106e8c003350`。
+- 增量 source bundle 位于本地 `runtime/historical_plan_exports/detail-import-bundle-uk-sportinglife-v8`，已在生产隔离目录 `/opt/umanewsbot/runtime/historical_race_detail_import/detail-import-bundle-uk-sportinglife-v8` 逐字节复核。bundle manifest 为 `3c6a4d11106c2b490876d63f0719b71d6fde9d7c7bc9c8937736d26a0e28831c`，identity 为 `2392a69c7cf1b03812422cf11b3c5ed73a181e719ca6309d79283812c735cb50`；当前生产镜像在 `--network none` 下验证 `197` records、`197` source objects、`67302603` source bytes 全部通过。
+- 本轮尚未生成 approved chunk、未执行生产 dry-run、备份或 apply。两个待授权 chunk 分别为 historical `194` 场和 current-year-due `3` 场；必须取得用户针对上述 manifest 的明确授权后，才可签署 approval，并按“最新备份 -> 全量 dry-run -> 串行 apply -> 逐目标 verifier”执行。历史公开和常驻网络开关继续关闭。
+- 生产磁盘曾低于 5 GiB 门槛；已清理未被容器引用的旧工具镜像和 45 小时前候选镜像，保留当前 prod 与最近回滚。上传解压紧凑包后可用空间为 `5495132 KiB`，web/worker/beat、DB/Redis 和 `/healthz/` 均正常。
+
 ## 2026-07-16 历史详情 source bundle 已正式导入生产并完成逐目标验收
 
 - 本次按用户授权的审核基线 `943602458bd6975bff1a0bb6bb47ad8e3dde605796a10103461def91a723892a`、content `a353f2f8179432cb807601bf574039db578b265dda2bf3c9d5f9777e1c1b748f`、commit `700a2a961516464ecf93deb0f43a751718efaaca` 和 manifest `dfb86ee85b103688fe1521b07f44ee8f36669d25e85ff3ac2b580a66b38e14d9` 执行。正式 AMD64 镜像为 `sha256:97b49b0226ce6de844de7e26ecbd51851c38fd2b0146c471f6f27767be397473`，两个独立构建 ID 一致；tree 为 `0708ce3ef34f64549dd8483c9d7400302052c79e`，source archive SHA-256 为 `20ff51d1f2d6220fba3b0a01615e5366f57605de6e579b6ab222bc70eef597d3`。镜像内聚焦回归 `30/30`、Django check 和迁移漂移检查通过，生产没有新增待应用迁移，`0032` 已处于 applied。

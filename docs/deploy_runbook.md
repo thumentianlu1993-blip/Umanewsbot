@@ -1,5 +1,17 @@
 # 部署运行手册
 
+## 待授权：英国 Sporting Life 增量详情包
+
+正式候选输入为 `/opt/umanewsbot/runtime/historical_race_detail_import/detail-import-bundle-uk-sportinglife-v8`；本地原件为 `runtime/historical_plan_exports/detail-import-bundle-uk-sportinglife-v8`。顶层 manifest SHA-256 为 `3c6a4d11106c2b490876d63f0719b71d6fde9d7c7bc9c8937736d26a0e28831c`，bundle identity 为 `2392a69c7cf1b03812422cf11b3c5ed73a181e719ca6309d79283812c735cb50`。
+
+1. 固定范围为 `198 = 197 complete + 1 gap`，只含英国；完整记录为 `2027 runners / 1794 results / 197 winners`。historical chunk 为 `194` 场，chunk manifest `8fedabea94e348a3cbbdd960b2456ccb4864429fae7ce9588667fb82ad615543`；current-year-due chunk 为 `3` 场，chunk manifest `be156a8fd60f71f3f317d8bac6aa83c88067db30c4b653098b814c4f853d752d`。
+2. approval template 当前必须保持 `pending`。只有用户明确引用本节 bundle manifest 授权后，才能填入 `approved_by / approved_at / status=approved` 并记录 approval SHA；“继续抓取”“已上传”或旧 manifest 的授权均不能替代本包授权。
+3. 来源包已由当前生产镜像 `sha256:97b49b0226ce6de844de7e26ecbd51851c38fd2b0146c471f6f27767be397473` 在 `--network none` 下只读复核通过。上传归档 SHA-256 为 `dfd676f2ed3bc947f26bd81cdc8bbfff5f070de3971b3105c429a9177d0e085a`；解压后归档已删除，manifest/identity SHA 与本地一致。
+4. 获得授权后先确认 Celery active/reserved、Redis queue/unacked、TranslationRun、historical run/lock 和数据库事务为空，再生成新的 custom-format 数据库备份；备份必须记录 bytes/SHA、权限 `0600`，并使用临时 `postgres:16` 工具镜像执行 `pg_restore -l`。不得复用旧备份。
+5. approval 签署后先对两个 chunk 全量 dry-run；dry-run 必须绑定 bundle/chunk/approval 三重 SHA 和独立 runner run ID。任一 target SHA、inventory SHA、日期、来源、距离或结果完整性漂移即停止，不得修改 approval 掩盖漂移。
+6. dry-run 全部通过后才可串行 apply historical chunk 和 current-year chunk；每个 receipt 立即执行 verifier。最终必须精确得到 `197 events / 2027 runners / 1794 results / 197 winners`，`error_count=0`，且全部保持 `draft`、`published=0`、`is_featured=false`。
+7. 常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false` 和历史公开开关保持关闭。生产只处理该紧凑 artifact，不运行 Sporting Life 抓取或重型解析。
+
 ## 已完成：历史详情 source bundle 正式导入
 
 正式输入为 `/opt/umanewsbot/runtime/historical_race_detail_import/detail-import-bundle-v1`；本地原件为 `runtime/historical_plan_exports/detail-import-bundle-v1`。顶层 `manifest.json` SHA-256 为 `dfb86ee85b103688fe1521b07f44ee8f36669d25e85ff3ac2b580a66b38e14d9`，范围为 39 个正式 package、`4930 = 4652 complete + 278 gap`，完整目标包含 `51191 runners / 48413 results`。
