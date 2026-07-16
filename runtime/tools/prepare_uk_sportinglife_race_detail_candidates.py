@@ -21,6 +21,16 @@ from bs4 import BeautifulSoup
 
 SL_BASE_URL = "https://www.sportinglife.com"
 COUNTRY_SUFFIX_RE = re.compile(r"\s*[\(\（][A-Z]{2,3}[\)\）]\s*$")
+CASUALTY_STATUS_BY_REASON = {
+    "broughtdown": "brought_down",
+    "carriedout": "did_not_finish",
+    "fell": "fell",
+    "pulledup": "pulled_up",
+    "refused": "refused",
+    "refusedtorace": "refused",
+    "slippedup": "fell",
+    "unseatedrider": "unseated_rider",
+}
 
 
 def _text(node) -> str:
@@ -365,6 +375,14 @@ def _odds(ride: dict) -> str:
     return ""
 
 
+def _casualty_status(ride: dict) -> str:
+    casualty = ride.get("casualty")
+    if not isinstance(casualty, dict):
+        return ""
+    reason = re.sub(r"[^a-z0-9]", "", str(casualty.get("reason") or "").casefold())
+    return CASUALTY_STATUS_BY_REASON.get(reason, "")
+
+
 def _runner_status(ride: dict) -> str:
     try:
         if int(ride.get("finish_position")) > 0:
@@ -372,12 +390,18 @@ def _runner_status(ride: dict) -> str:
     except (TypeError, ValueError):
         pass
 
-    status = str(ride.get("ride_status") or "").upper()
-    if status in {"NONRUNNER", "NON_RUNNER", "WITHDRAWN"}:
+    casualty_status = _casualty_status(ride)
+    if casualty_status:
+        return casualty_status
+
+    status = re.sub(r"[^a-z0-9]", "", str(ride.get("ride_status") or "").casefold())
+    if status in {"nonrunner", "withdrawn"}:
         return "withdrawn"
 
     description = _collapse(str(ride.get("ride_description") or ""))
-    description = description.casefold().replace("-", " ")
+    description = description.casefold().replace("-", " ").replace("_", " ")
+    if re.search(r"\bnon\s*runner\b", description):
+        return "withdrawn"
     if re.search(r"\bbrought\s+down\b", description):
         return "brought_down"
     if re.search(r"\b(?:unseated|lost)\s+(?:the\s+)?rider\b", description):
@@ -421,6 +445,9 @@ def _parse_detail_page(html: str, *, source_url: str) -> tuple[list[dict], list[
             "horse_id": (horse.get("horse_reference") or {}).get("id"),
             "horse_slug": horse.get("slug") or "",
             "horse_name_raw": horse.get("name") or "",
+            "casualty_reason": (ride.get("casualty") or {}).get("reason", "")
+            if isinstance(ride.get("casualty"), dict)
+            else "",
             "ride_status": ride.get("ride_status") or "",
             "ride_description": ride.get("ride_description") or "",
         }

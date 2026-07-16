@@ -4,16 +4,40 @@ import importlib.util
 import csv
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
+from unittest import skipUnless
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
 
 TOOLS = Path(__file__).resolve().parents[2] / "runtime" / "tools"
+SPORTING_LIFE_REAL_CACHE_RUN_ROOT_VALUE = os.environ.get("SPORTING_LIFE_REAL_CACHE_RUN_ROOT", "")
+SPORTING_LIFE_REAL_CACHE_RUN_ROOT = (
+    Path(SPORTING_LIFE_REAL_CACHE_RUN_ROOT_VALUE) if SPORTING_LIFE_REAL_CACHE_RUN_ROOT_VALUE else None
+)
+
+
+def _sporting_life_real_cache(shard: str, filename: str) -> tuple[str, str]:
+    assert SPORTING_LIFE_REAL_CACHE_RUN_ROOT is not None
+    cache_root = (SPORTING_LIFE_REAL_CACHE_RUN_ROOT / shard / "source-cache").resolve()
+    manifest = json.loads((cache_root / "source_cache_manifest.json").read_text(encoding="utf-8"))
+    identities = [identity for identity in manifest["files"].values() if identity["path"] == filename]
+    if len(identities) != 1:
+        raise AssertionError(f"expected one cached source for {shard}/{filename}, got {len(identities)}")
+    identity = identities[0]
+    source_path = (cache_root / identity["path"]).resolve()
+    source_path.relative_to(cache_root)
+    body = source_path.read_bytes()
+    if len(body) != int(identity["size"]):
+        raise AssertionError(f"cache size mismatch: {source_path}")
+    if hashlib.sha256(body).hexdigest() != identity["sha256"]:
+        raise AssertionError(f"cache sha256 mismatch: {source_path}")
+    return identity["source_url"], body.decode("utf-8", errors="replace")
 
 
 def _load(name: str):
@@ -85,6 +109,36 @@ class HistoricalRaceDetailDirectUrlTests(SimpleTestCase):
                     "withdrawn",
                 )
 
+        self.assertEqual(
+            module._runner_status(
+                {
+                    "casualty": {},
+                    "finish_position": 0,
+                    "ride_description": "NonRunner",
+                    "ride_status": "DOUBTFUL",
+                }
+            ),
+            "withdrawn",
+        )
+
+        structured_casualty_cases = (
+            ("UnseatedRider", "unseated_rider"),
+            ("PulledUp", "pulled_up"),
+        )
+        for casualty_reason, expected_status in structured_casualty_cases:
+            with self.subTest(casualty_reason=casualty_reason):
+                self.assertEqual(
+                    module._runner_status(
+                        {
+                            "casualty": {"reason": casualty_reason},
+                            "finish_position": 0,
+                            "ride_description": "tailed off",
+                            "ride_status": "RUNNER",
+                        }
+                    ),
+                    expected_status,
+                )
+
         explicit_dnf_cases = (
             ("pulled up before the last", "pulled_up"),
             ("fell 3 out", "fell"),
@@ -97,6 +151,7 @@ class HistoricalRaceDetailDirectUrlTests(SimpleTestCase):
                 self.assertEqual(
                     module._runner_status(
                         {
+                            "casualty": {},
                             "finish_position": None,
                             "ride_description": description,
                             "ride_status": "RUNNER",
@@ -110,6 +165,7 @@ class HistoricalRaceDetailDirectUrlTests(SimpleTestCase):
                 self.assertEqual(
                     module._runner_status(
                         {
+                            "casualty": {},
                             "finish_position": None,
                             "ride_description": description,
                             "ride_status": "RUNNER",
@@ -117,6 +173,46 @@ class HistoricalRaceDetailDirectUrlTests(SimpleTestCase):
                     ),
                     "unknown",
                 )
+
+    @skipUnless(SPORTING_LIFE_REAL_CACHE_RUN_ROOT is not None, "Sporting Life real cache root not configured")
+    def test_sporting_life_real_cache_preserves_structured_non_finish_statuses(self):
+        module = _load("prepare_uk_sportinglife_race_detail_candidates.py")
+        cases = (
+            (
+                "united_kingdom-2018-sporting-life-irishracing-01",
+                "ea466a540417e785e831ecbac9a01781d3964b86af732dd1523d73da27a6401b.html",
+                460687,
+                {
+                    "Verdana Blue": ("withdrawn", ""),
+                    "My Tent Or Yours": ("withdrawn", ""),
+                },
+            ),
+            (
+                "united_kingdom-2020-sporting-life-irishracing-02",
+                "c41ae87f71d8042b9cd02e3cd34d9e6fa0497e155b6366f746479b7e268771a9.html",
+                559948,
+                {"Goshen": ("unseated_rider", "UnseatedRider")},
+            ),
+            (
+                "united_kingdom-2022-sporting-life-irishracing-01",
+                "bd3b263718aae7cd25155f4038ec493e40b1fb22ca0d754d6f441a7d3b50d69e.html",
+                715575,
+                {"Metier": ("pulled_up", "PulledUp")},
+            ),
+        )
+
+        for shard, filename, race_id, expected_horses in cases:
+            with self.subTest(shard=shard):
+                source_url, html = _sporting_life_real_cache(shard, filename)
+                runners, _results, metadata = module._parse_detail_page(html, source_url=source_url)
+                runners_by_name = {row["horse_name"]: row for row in runners}
+
+                self.assertEqual(metadata["race_id"], race_id)
+                for horse_name, (expected_status, casualty_reason) in expected_horses.items():
+                    with self.subTest(horse_name=horse_name):
+                        runner = runners_by_name[horse_name]
+                        self.assertEqual(runner["running_status"], expected_status)
+                        self.assertEqual(runner["source_refs"].get("casualty_reason", ""), casualty_reason)
 
     def test_irishracing_adapter_requires_region_specific_provider(self):
         module = _load("prepare_irishracing_race_detail_candidates.py")
