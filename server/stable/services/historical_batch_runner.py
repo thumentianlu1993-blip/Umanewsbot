@@ -397,7 +397,6 @@ def _validate_apply_bindings(
             or identities.get(chunk_manifest) != _option_value(argv, "--expected-chunk-sha256")
             or identities.get(command_approval) != _option_value(argv, "--expected-approval-sha256")
             or expected_sha256 != identities.get(chunk_manifest)
-            or "--dry-run" in argv[3:]
         ):
             raise RunnerPlanError(
                 f"apply step {step['id']} detail chunk identities are not fully bound"

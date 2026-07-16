@@ -43,6 +43,7 @@ from stable.services.historical_batch_runner import (
     _WRITE_MANAGEMENT_COMMANDS,
     _validate_apply_bindings,
     RunnerPlanError,
+    validate_runner_plan,
 )
 
 
@@ -939,3 +940,68 @@ class HistoricalRaceDetailChunkImportTests(TestCase):
                     command="import_historical_race_detail_chunk",
                     artifact_root=artifact.root.resolve(),
                 )
+
+    def test_apply_runner_plan_accepts_detail_chunk_dry_run_without_weakening_identity(self):
+        target = self._target(suffix="runner-dry-run")
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            artifact = ChunkArtifact(root / "artifacts", [target])
+            step = {
+                "id": "detail-chunk-dry-run",
+                "kind": "management",
+                "argv": [
+                    "python",
+                    "manage.py",
+                    "import_historical_race_detail_chunk",
+                    "--bundle-dir",
+                    str(artifact.root),
+                    "--chunk-manifest",
+                    str(artifact.chunk_manifest_path),
+                    "--approval",
+                    str(artifact.approval_path),
+                    "--expected-bundle-sha256",
+                    artifact.bundle_sha,
+                    "--expected-chunk-sha256",
+                    artifact.chunk_sha,
+                    "--expected-approval-sha256",
+                    artifact.approval_sha,
+                    "--runner-run-id",
+                    self.run.run_id,
+                    "--dry-run",
+                ],
+                "inputs": [
+                    {"path": str(artifact.bundle_manifest_path), "sha256": artifact.bundle_sha},
+                    {"path": str(artifact.chunk_manifest_path), "sha256": artifact.chunk_sha},
+                    {"path": str(artifact.approval_path), "sha256": artifact.approval_sha},
+                ],
+                "outputs": [],
+                "approval": {
+                    "status": "approved",
+                    "path": str(artifact.approval_path),
+                    "sha256": artifact.approval_sha,
+                },
+                "expected_sha256": artifact.chunk_sha,
+            }
+            plan = {
+                "schema_version": "1.0",
+                "batch_id": self.run.batch_id,
+                "phase": HistoricalBatchPhase.APPLY,
+                "network_enabled": False,
+                "write_enabled": True,
+                "image_id": "sha256:" + "1" * 64,
+                "image_revision": "a" * 40,
+                "artifact_root": str(artifact.root),
+                "tool_root": str(root / "tools"),
+                "tool_manifest": {},
+                "steps": [step],
+            }
+
+            self.assertEqual(validate_runner_plan(plan)["phase"], HistoricalBatchPhase.APPLY)
+
+            step["inputs"] = [
+                identity
+                for identity in step["inputs"]
+                if identity["path"] != str(artifact.chunk_manifest_path)
+            ]
+            with self.assertRaises(RunnerPlanError):
+                validate_runner_plan(plan)
