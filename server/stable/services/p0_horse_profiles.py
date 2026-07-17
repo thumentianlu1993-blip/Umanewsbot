@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import unicodedata
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import urlparse
 
@@ -35,6 +37,7 @@ from stable.models import (
     RaceEventResult,
     RaceEventRunner,
     RaceGrade,
+    RaceRunnerStatus,
     RacingRegion,
     SourceLanguage,
     TermEntry,
@@ -48,6 +51,7 @@ from stable.services.horse_race_records import (
     refresh_career_history_completeness,
     upsert_race_record,
 )
+from stable.services.term_maintenance import write_csv_artifact, write_json_artifact
 
 
 P0_REGIONS = {
@@ -91,6 +95,48 @@ MODULE_REVIEW_ALIASES = {
     HorseProfileModule.ALIASES: ("aliases",),
 }
 MIN_APPROVED_CONFIDENCE = 80
+P0_CANDIDATE_ARTIFACT_VERSION = "1.1"
+GENERIC_SOURCE_NAMESPACES = {
+    "database",
+    "media",
+    "news",
+    "official",
+    "source",
+    "unknown",
+    "web",
+}
+SOURCE_NAMESPACE_ALIASES = {
+    "equibase": "equibase",
+    "equibase_pdf_chart": "equibase",
+    "equibase_yearbook": "equibase",
+    "france_galop": "france_galop",
+    "geny": "geny",
+    "hkjc": "hkjc",
+    "hkjc_local_results": "hkjc",
+    "hkjc_official_result_page": "hkjc",
+    "horse_racing_nation": "horse_racing_nation",
+    "horse_racing_nation_track_day": "horse_racing_nation",
+    "irishracing": "irishracing",
+    "irishracing_historical_result": "irishracing",
+    "jbis": "jbis",
+    "jra": "jra",
+    "jra_official_result_page": "jra",
+    "keiba_go_jp": "keiba_go_jp",
+    "keiba_go_jp_deba_table": "keiba_go_jp",
+    "keiba_go_jp_race_mark_table": "keiba_go_jp",
+    "netkeiba": "netkeiba",
+    "netkeiba_result": "netkeiba",
+    "nsa": "nsa",
+    "nsa_official_result_pdf": "nsa",
+    "sporting_life": "sporting_life",
+    "sporting_life_result_detail": "sporting_life",
+    "zeturf": "zeturf",
+    "zeturf_race_detail": "zeturf",
+    "zone_turf": "zone_turf",
+    "zone_turf_historical_result": "zone_turf",
+    "zone_turf_horse_history": "zone_turf",
+    "zone_turf_race_detail": "zone_turf",
+}
 
 
 @dataclass
@@ -115,13 +161,41 @@ def _source_language_for_region(region: str) -> str:
 
 
 def _source_url_from_payload(*payloads: dict | None) -> str:
+    def first_http_url(value: Any) -> str:
+        if isinstance(value, str):
+            candidate = value.strip()
+            parsed = urlparse(candidate)
+            return candidate if parsed.scheme in {"http", "https"} and parsed.netloc else ""
+        if isinstance(value, dict):
+            for key in (
+                "primary",
+                "source_url",
+                "url",
+                "official",
+                "result",
+                "runner",
+                "profile",
+                "horse_profile_url",
+                "detail_url",
+            ):
+                candidate = first_http_url(value.get(key))
+                if candidate:
+                    return candidate
+            for nested in value.values():
+                candidate = first_http_url(nested)
+                if candidate:
+                    return candidate
+        if isinstance(value, (list, tuple)):
+            for nested in value:
+                candidate = first_http_url(nested)
+                if candidate:
+                    return candidate
+        return ""
+
     for payload in payloads:
-        if not isinstance(payload, dict):
-            continue
-        for key in ("official", "result", "runner", "source_url", "url"):
-            value = payload.get(key)
-            if value:
-                return str(value)
+        candidate = first_http_url(payload)
+        if candidate:
+            return candidate
     return ""
 
 
@@ -136,7 +210,14 @@ def _display_snapshot_from_term(term: TermEntry) -> dict[str, str]:
 
 
 def _normalized_regions(regions: Iterable[str] | None) -> list[str]:
-    return list(dict.fromkeys(regions or sorted(P0_REGIONS)))
+    region_list = list(dict.fromkeys(regions or sorted(P0_REGIONS)))
+    invalid_regions = sorted(set(region_list) - P0_REGIONS)
+    if invalid_regions:
+        raise ValueError(
+            f"P0 horse profiles only support these regions: {', '.join(sorted(P0_REGIONS))}; "
+            f"invalid: {', '.join(invalid_regions)}"
+        )
+    return region_list
 
 
 def _profile_identity_keys(profile: HorseProfile) -> set[str]:
@@ -163,21 +244,56 @@ def _matched_identity_profile_ids(identity_keys: set[str], identity_index: dict[
 
 
 def _source_namespace(*payloads: dict | None) -> str:
+    generic_fallback = ""
+
+    def find_namespace(value: Any) -> str:
+        nonlocal generic_fallback
+        if isinstance(value, dict):
+            for key in ("source_kind", "provider", "adapter", "source_name", "source"):
+                candidate = str(value.get(key) or "").strip().casefold()
+                if candidate in GENERIC_SOURCE_NAMESPACES:
+                    generic_fallback = generic_fallback or candidate
+                    continue
+                if candidate:
+                    return SOURCE_NAMESPACE_ALIASES.get(candidate, candidate)
+            for nested in value.values():
+                candidate = find_namespace(nested)
+                if candidate:
+                    return candidate
+        if isinstance(value, (list, tuple)):
+            for nested in value:
+                candidate = find_namespace(nested)
+                if candidate:
+                    return candidate
+        return ""
+
     for payload in payloads:
-        if not isinstance(payload, dict):
-            continue
-        for key in (
-            "source_key",
-            "source",
-            "source_name",
-            "provider",
-            "adapter",
-        ):
-            value = str(payload.get(key) or "").strip().casefold()
-            if value:
-                return value
+        namespace = find_namespace(payload)
+        if namespace:
+            return namespace
     source_url = _source_url_from_payload(*payloads)
-    return (urlparse(source_url).hostname or "").strip().casefold()
+    hostname = (urlparse(source_url).hostname or "").strip().casefold().removeprefix("www.")
+    domain_namespaces = {
+        "equibase.com": "equibase",
+        "france-galop.com": "france_galop",
+        "geny.com": "geny",
+        "hkjc.com": "hkjc",
+        "horseracingnation.com": "horse_racing_nation",
+        "irishracing.com": "irishracing",
+        "jbis.or.jp": "jbis",
+        "jra.go.jp": "jra",
+        "keiba.go.jp": "keiba_go_jp",
+        "nationalsteeplechase.com": "nsa",
+        "netkeiba.com": "netkeiba",
+        "racingpost.com": "racing_post",
+        "sportinglife.com": "sporting_life",
+        "zeturf.fr": "zeturf",
+        "zone-turf.fr": "zone_turf",
+    }
+    for domain, namespace in domain_namespaces.items():
+        if hostname == domain or hostname.endswith(f".{domain}"):
+            return namespace
+    return generic_fallback or hostname
 
 
 def _participant_identity_keys(*payloads: dict | None) -> set[str]:
@@ -187,6 +303,12 @@ def _participant_identity_keys(*payloads: dict | None) -> set[str]:
         if not isinstance(payload, dict):
             continue
         namespace = _source_namespace(payload) or fallback_namespace
+        if (
+            namespace in GENERIC_SOURCE_NAMESPACES
+            and fallback_namespace
+            and fallback_namespace not in GENERIC_SOURCE_NAMESPACES
+        ):
+            namespace = fallback_namespace
         if not namespace:
             continue
         for key in ("external_horse_id", "horse_id", "horseId", "id_horse"):
@@ -724,6 +846,85 @@ def _matching_name_profiles(horse_name: str, name_index: dict[str, set[int]]) ->
             | Q(display_name_zh__iexact=horse_name)
         ).order_by("id")
     )
+
+
+def _pedigree_profile_identity_index(
+    name_index: dict[str, set[int]],
+) -> dict[tuple[int, str], list[dict[str, Any]]]:
+    term_names: dict[int, set[str]] = {}
+    for normalized_name, term_ids in name_index.items():
+        for term_id in term_ids:
+            term_names.setdefault(term_id, set()).add(normalized_name)
+    index: dict[tuple[int, str], list[dict[str, Any]]] = {}
+    profiles = (
+        HorseProfile.objects.filter(birth_date__isnull=False)
+        .select_related("primary_term", "sire_term", "dam_term")
+        .only(
+            "id",
+            "birth_date",
+            "display_name_zh",
+            "original_name",
+            "english_name",
+            "japanese_name",
+            "primary_term_id",
+            "sire_text",
+            "sire_term_id",
+            "dam_text",
+            "dam_term_id",
+        )
+    )
+    for profile in profiles.iterator(chunk_size=500):
+        horse_names = {
+            _normalize_identity_name(value)
+            for value in (
+                profile.display_name_zh,
+                profile.original_name,
+                profile.english_name,
+                profile.japanese_name,
+            )
+            if _normalize_identity_name(value)
+        }
+        horse_names.update(term_names.get(profile.primary_term_id, set()))
+        sire_names = {
+            _normalize_identity_name(profile.sire_text)
+        } if _normalize_identity_name(profile.sire_text) else set()
+        dam_names = {
+            _normalize_identity_name(profile.dam_text)
+        } if _normalize_identity_name(profile.dam_text) else set()
+        if profile.sire_term_id:
+            sire_names.update(term_names.get(profile.sire_term_id, set()))
+        if profile.dam_term_id:
+            dam_names.update(term_names.get(profile.dam_term_id, set()))
+        row = {
+            "profile_id": profile.id,
+            "sire_names": sire_names,
+            "dam_names": dam_names,
+        }
+        for horse_name in horse_names:
+            index.setdefault((profile.birth_date.year, horse_name), []).append(row)
+    return index
+
+
+def _matched_pedigree_profile_ids_from_index(
+    *,
+    horse_name: str,
+    sire_name: str,
+    dam_name: str,
+    birth_year: int | None,
+    pedigree_index: dict[tuple[int, str], list[dict[str, Any]]],
+) -> set[int]:
+    if not all((horse_name, sire_name, dam_name, birth_year)):
+        return set()
+    normalized_sire = _normalize_identity_name(sire_name)
+    normalized_dam = _normalize_identity_name(dam_name)
+    return {
+        row["profile_id"]
+        for row in pedigree_index.get(
+            (int(birth_year), _normalize_identity_name(horse_name)),
+            [],
+        )
+        if normalized_sire in row["sire_names"] and normalized_dam in row["dam_names"]
+    }
 
 
 def _record_identity_conflict(
@@ -1332,6 +1533,639 @@ def _major_race_events(regions: Iterable[str] | None = None):
         "local_date",
         "id",
     )
+
+
+def _candidate_identity(
+    *,
+    event: RaceEvent,
+    participant: dict[str, Any],
+    identity_index: dict[str, set[int]],
+    pedigree_index: dict[tuple[int, str], list[dict[str, Any]]],
+) -> dict[str, Any]:
+    runner = participant["runner"]
+    result = participant["result"]
+    horse_name = participant["name"]
+    payloads = (
+        result.source_refs if result else None,
+        result.raw_payload if result else None,
+        runner.source_refs if runner else None,
+        runner.raw_payload if runner else None,
+        event.source_refs,
+    )
+    identity_keys = _participant_identity_keys(*payloads)
+    pedigree_identity = _participant_pedigree_identity(*payloads)
+    matched_profile_ids = _matched_identity_profile_ids(identity_keys, identity_index)
+    pedigree_profile_ids = _matched_pedigree_profile_ids_from_index(
+        horse_name=horse_name,
+        sire_name=pedigree_identity[0],
+        dam_name=pedigree_identity[1],
+        birth_year=pedigree_identity[2],
+        pedigree_index=pedigree_index,
+    )
+    profile_ids = matched_profile_ids | pedigree_profile_ids
+    pairing_conflict = participant.get("pairing_conflict") or {}
+    if pairing_conflict:
+        identity_status = "runner_result_pairing_conflict"
+        candidate_key = f"conflict:event:{event.id}:{participant['participant_key']}"
+    elif len(matched_profile_ids) > 1:
+        identity_status = "external_identity_conflict"
+        digest = hashlib.sha256("|".join(sorted(identity_keys)).encode("utf-8")).hexdigest()
+        candidate_key = f"conflict:external:{digest}"
+    elif len(pedigree_profile_ids) > 1:
+        identity_status = "pedigree_identity_conflict"
+        candidate_key = f"conflict:pedigree:{event.id}:{participant['participant_key']}"
+    elif (
+        matched_profile_ids
+        and pedigree_profile_ids
+        and matched_profile_ids != pedigree_profile_ids
+    ):
+        identity_status = "external_pedigree_identity_conflict"
+        candidate_key = f"conflict:evidence:{event.id}:{participant['participant_key']}"
+    elif len(profile_ids) == 1:
+        identity_status = (
+            "matched_existing_profile_multiple_evidence"
+            if matched_profile_ids and pedigree_profile_ids
+            else "matched_existing_profile_external"
+            if matched_profile_ids
+            else "matched_existing_profile_pedigree"
+        )
+        candidate_key = f"profile:{next(iter(profile_ids))}"
+    elif identity_keys:
+        identity_status = "strong_external_identity"
+        digest = hashlib.sha256("|".join(sorted(identity_keys)).encode("utf-8")).hexdigest()
+        candidate_key = f"external:{digest}"
+    elif all((horse_name, pedigree_identity[0], pedigree_identity[1], pedigree_identity[2])):
+        identity_status = "strong_pedigree_identity"
+        raw_key = "|".join(
+            (
+                _normalize_identity_name(horse_name),
+                _normalize_identity_name(pedigree_identity[0]),
+                _normalize_identity_name(pedigree_identity[1]),
+                str(pedigree_identity[2]),
+            )
+        )
+        candidate_key = f"pedigree:{hashlib.sha256(raw_key.encode('utf-8')).hexdigest()}"
+    else:
+        # A name is not a horse identity. Keep weak observations separate until
+        # a profile source supplies an external ID or full pedigree identity.
+        identity_status = "needs_identity_enrichment"
+        candidate_key = f"observation:event:{event.id}:{participant['participant_key']}"
+    pedigree_key = ""
+    if all((horse_name, pedigree_identity[0], pedigree_identity[1], pedigree_identity[2])):
+        pedigree_key = "|".join(
+            (
+                _normalize_identity_name(horse_name),
+                _normalize_identity_name(pedigree_identity[0]),
+                _normalize_identity_name(pedigree_identity[1]),
+                str(pedigree_identity[2]),
+            )
+        )
+    return {
+        "candidate_key": candidate_key,
+        "identity_status": identity_status,
+        "identity_keys": sorted(identity_keys),
+        "matched_profile_ids": sorted(profile_ids),
+        "sire_name": pedigree_identity[0],
+        "dam_name": pedigree_identity[1],
+        "birth_year": pedigree_identity[2],
+        "pedigree_key": pedigree_key,
+        "pairing_conflict": pairing_conflict,
+        "source_namespace": _source_namespace(*payloads),
+        "source_url": _source_url_from_payload(*payloads),
+    }
+
+
+def _canonicalize_candidate_identities(identities: list[dict[str, Any]]) -> None:
+    parents: dict[str, str] = {}
+
+    def find(token: str) -> str:
+        parents.setdefault(token, token)
+        if parents[token] != token:
+            parents[token] = find(parents[token])
+        return parents[token]
+
+    def union(left: str, right: str) -> None:
+        left_root = find(left)
+        right_root = find(right)
+        if left_root != right_root:
+            parents[max(left_root, right_root)] = min(left_root, right_root)
+
+    identity_tokens: list[list[str]] = []
+    for identity in identities:
+        identity["direct_identity_status"] = identity["identity_status"]
+        if identity["pairing_conflict"]:
+            identity_tokens.append([])
+            continue
+        tokens = [
+            *(f"external:{key}" for key in identity["identity_keys"]),
+            *(f"profile:{profile_id}" for profile_id in identity["matched_profile_ids"]),
+        ]
+        if identity["pedigree_key"]:
+            pedigree_digest = hashlib.sha256(
+                identity["pedigree_key"].encode("utf-8")
+            ).hexdigest()
+            tokens.append(f"pedigree:{pedigree_digest}")
+        identity_tokens.append(tokens)
+        for token in tokens:
+            find(token)
+        for token in tokens[1:]:
+            union(tokens[0], token)
+
+    components: dict[str, set[str]] = {}
+    for token in parents:
+        components.setdefault(find(token), set()).add(token)
+
+    for identity, tokens in zip(identities, identity_tokens):
+        if not tokens:
+            continue
+        component = components[find(tokens[0])]
+        external_keys = sorted(
+            token.removeprefix("external:")
+            for token in component
+            if token.startswith("external:")
+        )
+        profile_ids = sorted(
+            int(token.removeprefix("profile:"))
+            for token in component
+            if token.startswith("profile:")
+        )
+        pedigree_tokens = sorted(
+            token for token in component if token.startswith("pedigree:")
+        )
+        identity["identity_keys"] = external_keys
+        identity["matched_profile_ids"] = profile_ids
+        component_digest = hashlib.sha256(
+            "|".join(sorted(component)).encode("utf-8")
+        ).hexdigest()
+        if len(profile_ids) > 1 or len(pedigree_tokens) > 1:
+            identity["identity_status"] = (
+                identity["direct_identity_status"]
+                if "conflict" in identity["direct_identity_status"]
+                else "connected_identity_evidence_conflict"
+            )
+            identity["candidate_key"] = f"conflict:component:{component_digest}"
+        elif profile_ids:
+            profile_id = profile_ids[0]
+            if external_keys and pedigree_tokens:
+                identity["identity_status"] = "matched_existing_profile_multiple_evidence"
+            elif external_keys:
+                identity["identity_status"] = "matched_existing_profile_external"
+            else:
+                identity["identity_status"] = "matched_existing_profile_pedigree"
+            identity["candidate_key"] = f"profile:{profile_id}"
+        elif external_keys:
+            identity["identity_status"] = "strong_external_identity"
+            identity["candidate_key"] = f"external:{component_digest}"
+        else:
+            identity["identity_status"] = "strong_pedigree_identity"
+            identity["candidate_key"] = pedigree_tokens[0]
+
+
+def _identity_name_evidence_key(
+    value: str,
+    name_index: dict[str, set[int]],
+) -> tuple[str, tuple[int, ...] | str] | None:
+    normalized = _normalize_identity_name(value)
+    if not normalized:
+        return None
+    term_ids = tuple(sorted(name_index.get(normalized, set())))
+    return ("term", term_ids) if term_ids else ("text", normalized)
+
+
+def _participant_observation(
+    *,
+    event: RaceEvent,
+    participant: dict[str, Any],
+    identity: dict[str, Any],
+) -> dict[str, Any]:
+    runner = participant["runner"]
+    result = participant["result"]
+    runner_status = str(runner.running_status if runner else "")
+    result_status = str(result.running_status if result else "")
+    nonstarter_statuses = {RaceRunnerStatus.SCRATCHED, RaceRunnerStatus.WITHDRAWN}
+    if result_status in nonstarter_statuses or runner_status in nonstarter_statuses:
+        participation_status = "nonstarter"
+    elif (
+        result_status == RaceRunnerStatus.UNKNOWN
+        or runner_status == RaceRunnerStatus.UNKNOWN
+    ):
+        participation_status = "unconfirmed"
+    elif result is not None:
+        participation_status = "actual_start"
+    else:
+        participation_status = "declared_entry"
+    return {
+        "candidate_key": identity["candidate_key"],
+        "identity_status": identity["identity_status"],
+        "event_region": event.country_region,
+        "event_id": event.id,
+        "event_year": event.year,
+        "event_date": event.local_date.isoformat() if event.local_date else "",
+        "event_name": event.original_name,
+        "event_chinese_name": event.chinese_name,
+        "race_grade": event.normalized_grade,
+        "racecourse": event.racecourse,
+        "horse_name": participant["name"],
+        "horse_number": str(
+            (result.horse_number if result else "")
+            or (runner.horse_number if runner else "")
+            or ""
+        ),
+        "participant_key": participant["participant_key"],
+        "participation_status": participation_status,
+        "runner_id": runner.id if runner else None,
+        "result_id": result.id if result else None,
+        "finish_position": result.finish_position if result else None,
+        "runner_status": runner_status,
+        "source_namespace": identity["source_namespace"],
+        "source_url": identity["source_url"],
+        "identity_keys": identity["identity_keys"],
+        "matched_profile_ids": identity["matched_profile_ids"],
+        "sire_name": identity["sire_name"],
+        "dam_name": identity["dam_name"],
+        "birth_year": identity["birth_year"],
+        "pairing_conflict": identity["pairing_conflict"],
+    }
+
+
+def _finalize_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
+    source_urls = sorted(candidate.pop("_source_urls"))
+    source_namespaces = sorted(candidate.pop("_source_namespaces"))
+    identity_keys = sorted(candidate.pop("_identity_keys"))
+    matched_profile_ids = sorted(candidate.pop("_matched_profile_ids"))
+    aliases = sorted(candidate.pop("_names"))
+    event_regions = sorted(candidate.pop("_event_regions"))
+    event_ids = sorted(candidate.pop("_event_ids"))
+    grades = sorted(candidate.pop("_grades"))
+    name_counts = candidate.pop("_name_counts")
+    sire_evidence = candidate.pop("_sire_evidence")
+    dam_evidence = candidate.pop("_dam_evidence")
+    birth_year_evidence = candidate.pop("_birth_year_evidence")
+    horse_name = sorted(name_counts, key=lambda name: (-name_counts[name], name.casefold()))[0]
+    identity_statuses = candidate.pop("_identity_statuses")
+    if (
+        len(sire_evidence) > 1
+        or len(dam_evidence) > 1
+        or len(birth_year_evidence) > 1
+    ):
+        identity_statuses.add("pedigree_evidence_conflict")
+    conflict_statuses = sorted(status for status in identity_statuses if "conflict" in status)
+    if conflict_statuses:
+        identity_status = conflict_statuses[0]
+        review_status = "identity_conflict"
+    elif identity_statuses and all(
+        status.startswith("matched_existing_profile") for status in identity_statuses
+    ):
+        identity_status = (
+            next(iter(identity_statuses))
+            if len(identity_statuses) == 1
+            else "matched_existing_profile_multiple_evidence"
+        )
+        review_status = (
+            "ready_for_profile_resolution" if source_urls else "missing_source_url"
+        )
+    elif len(identity_statuses) == 1:
+        identity_status = next(iter(identity_statuses))
+        if not source_urls:
+            review_status = "missing_source_url"
+        elif identity_status == "needs_identity_enrichment":
+            review_status = "needs_identity_enrichment"
+        else:
+            review_status = "ready_for_profile_resolution"
+    else:
+        identity_status = "mixed_identity_evidence"
+        review_status = "identity_conflict"
+    return {
+        **candidate,
+        "horse_name": horse_name,
+        "aliases": aliases,
+        "event_regions": event_regions,
+        "event_ids": event_ids,
+        "race_grades": grades,
+        "source_urls": source_urls,
+        "source_namespace": source_namespaces[0] if len(source_namespaces) == 1 else "",
+        "source_namespaces": source_namespaces,
+        "identity_keys": identity_keys,
+        "matched_profile_ids": matched_profile_ids,
+        "sire_name": next(iter(sire_evidence.values()), ""),
+        "dam_name": next(iter(dam_evidence.values()), ""),
+        "birth_year": next(iter(birth_year_evidence), None),
+        "identity_status": identity_status,
+        "review_status": review_status,
+    }
+
+
+def build_p0_participant_candidate_artifact(
+    *,
+    regions: Iterable[str] | None = None,
+    sample_per_region: int = 10,
+) -> dict[str, Any]:
+    if sample_per_region <= 0:
+        raise ValueError("sample_per_region must be greater than zero")
+    region_list = _normalized_regions(regions)
+    identity_index = _identity_index()
+    name_index = _horse_name_identity_index()
+    pedigree_index = _pedigree_profile_identity_index(name_index)
+    observations: list[dict[str, Any]] = []
+    identities: list[dict[str, Any]] = []
+    candidate_map: dict[str, dict[str, Any]] = {}
+    event_counts: Counter[str] = Counter()
+    runner_counts: Counter[str] = Counter()
+    result_counts: Counter[str] = Counter()
+
+    events = _major_race_events(region_list).prefetch_related("runners", "results")
+    for event in events.iterator(chunk_size=100):
+        event_counts[event.country_region] += 1
+        runner_counts[event.country_region] += len(event.runners.all())
+        result_counts[event.country_region] += len(event.results.all())
+        for participant in _event_participants(event):
+            identity = _candidate_identity(
+                event=event,
+                participant=participant,
+                identity_index=identity_index,
+                pedigree_index=pedigree_index,
+            )
+            observation = _participant_observation(
+                event=event,
+                participant=participant,
+                identity=identity,
+            )
+            identities.append(identity)
+            observations.append(observation)
+
+    _canonicalize_candidate_identities(identities)
+    for observation, identity in zip(observations, identities):
+        observation["candidate_key"] = identity["candidate_key"]
+        observation["identity_status"] = identity["identity_status"]
+        observation["identity_keys"] = identity["identity_keys"]
+        observation["matched_profile_ids"] = identity["matched_profile_ids"]
+        candidate = candidate_map.setdefault(
+            identity["candidate_key"],
+            {
+                "candidate_key": identity["candidate_key"],
+                "evidence_count": 0,
+                "actual_start_evidence_count": 0,
+                "declared_entry_evidence_count": 0,
+                "nonstarter_evidence_count": 0,
+                "unconfirmed_evidence_count": 0,
+                "result_evidence_count": 0,
+                "first_event_date": "",
+                "last_event_date": "",
+                "latest_event_id": None,
+                "latest_event_name": "",
+                "latest_event_grade": "",
+                "_source_urls": set(),
+                "_source_namespaces": set(),
+                "_identity_keys": set(),
+                "_matched_profile_ids": set(),
+                "_names": set(),
+                "_event_regions": set(),
+                "_event_ids": set(),
+                "_grades": set(),
+                "_identity_statuses": set(),
+                "_name_counts": Counter(),
+                "_sire_evidence": {},
+                "_dam_evidence": {},
+                "_birth_year_evidence": set(),
+            },
+        )
+        candidate["evidence_count"] += 1
+        candidate[f"{observation['participation_status']}_evidence_count"] += 1
+        candidate["result_evidence_count"] += int(observation["result_id"] is not None)
+        candidate["_names"].add(observation["horse_name"])
+        candidate["_name_counts"][observation["horse_name"]] += 1
+        candidate["_event_regions"].add(observation["event_region"])
+        candidate["_event_ids"].add(observation["event_id"])
+        candidate["_grades"].add(observation["race_grade"])
+        candidate["_identity_statuses"].add(identity["identity_status"])
+        candidate["_identity_keys"].update(identity["identity_keys"])
+        candidate["_matched_profile_ids"].update(identity["matched_profile_ids"])
+        if identity["source_url"]:
+            candidate["_source_urls"].add(identity["source_url"])
+        if identity["source_namespace"]:
+            candidate["_source_namespaces"].add(identity["source_namespace"])
+        sire_key = _identity_name_evidence_key(identity["sire_name"], name_index)
+        dam_key = _identity_name_evidence_key(identity["dam_name"], name_index)
+        if sire_key:
+            candidate["_sire_evidence"].setdefault(sire_key, identity["sire_name"])
+        if dam_key:
+            candidate["_dam_evidence"].setdefault(dam_key, identity["dam_name"])
+        if identity["birth_year"]:
+            candidate["_birth_year_evidence"].add(identity["birth_year"])
+        event_date = observation["event_date"]
+        if event_date and (
+            not candidate["first_event_date"] or event_date < candidate["first_event_date"]
+        ):
+            candidate["first_event_date"] = event_date
+        if not candidate["last_event_date"] or event_date >= candidate["last_event_date"]:
+            candidate["last_event_date"] = event_date
+            candidate["latest_event_id"] = observation["event_id"]
+            candidate["latest_event_name"] = observation["event_name"]
+            candidate["latest_event_grade"] = observation["race_grade"]
+
+    candidates = sorted(
+        (_finalize_candidate(candidate) for candidate in candidate_map.values()),
+        key=lambda row: (row["event_regions"], row["horse_name"].casefold(), row["candidate_key"]),
+    )
+    sample_rows: list[dict[str, Any]] = []
+    status_priority = {
+        "ready_for_profile_resolution": 0,
+        "needs_identity_enrichment": 1,
+        "missing_source_url": 2,
+        "identity_conflict": 3,
+    }
+    selected_candidate_keys: set[str] = set()
+    for region in region_list:
+        region_candidates = [row for row in candidates if region in row["event_regions"]]
+        region_candidates.sort(
+            key=lambda row: (
+                status_priority.get(row["review_status"], 9),
+                -int(row["actual_start_evidence_count"] > 0),
+                -row["result_evidence_count"],
+                row["nonstarter_evidence_count"],
+                row["unconfirmed_evidence_count"],
+                -(
+                    date.fromisoformat(row["last_event_date"]).toordinal()
+                    if row["last_event_date"]
+                    else 0
+                ),
+                row["horse_name"].casefold(),
+                row["candidate_key"],
+            ),
+            reverse=False,
+        )
+        selected_region_candidates: list[dict[str, Any]] = []
+        selected_region_names: set[str] = set()
+        for candidate in region_candidates:
+            normalized_name = _normalize_identity_name(candidate["horse_name"])
+            if candidate["candidate_key"] in selected_candidate_keys:
+                continue
+            if (
+                candidate["review_status"] == "needs_identity_enrichment"
+                and normalized_name
+                and normalized_name in selected_region_names
+            ):
+                continue
+            selected_region_candidates.append(candidate)
+            selected_candidate_keys.add(candidate["candidate_key"])
+            if normalized_name:
+                selected_region_names.add(normalized_name)
+            if len(selected_region_candidates) >= sample_per_region:
+                break
+        for rank, candidate in enumerate(selected_region_candidates, start=1):
+            sample_rows.append(
+                {
+                    "sample_region": region,
+                    "sample_rank": rank,
+                    **candidate,
+                    "reviewed": False,
+                    "review_decision": "",
+                    "review_notes": "",
+                }
+            )
+
+    region_summaries = {}
+    for region in region_list:
+        region_candidates = [row for row in candidates if region in row["event_regions"]]
+        region_observations = [row for row in observations if row["event_region"] == region]
+        region_sample = [row for row in sample_rows if row["sample_region"] == region]
+        region_summaries[region] = {
+            "eligible_event_count": event_counts[region],
+            "runner_row_count": runner_counts[region],
+            "result_row_count": result_counts[region],
+            "participant_observation_count": len(region_observations),
+            "candidate_count": len(region_candidates),
+            "ready_for_profile_resolution_count": sum(
+                row["review_status"] == "ready_for_profile_resolution"
+                for row in region_candidates
+            ),
+            "needs_identity_enrichment_count": sum(
+                row["review_status"] == "needs_identity_enrichment"
+                for row in region_candidates
+            ),
+            "identity_conflict_count": sum(
+                row["review_status"] == "identity_conflict" for row in region_candidates
+            ),
+            "missing_source_url_count": sum(
+                row["review_status"] == "missing_source_url" for row in region_candidates
+            ),
+            "sample_count": len(region_sample),
+            "sample_ready_count": sum(
+                row["review_status"] == "ready_for_profile_resolution"
+                for row in region_sample
+            ),
+        }
+    return {
+        "artifact_type": "p0_horse_participant_candidates",
+        "schema_version": P0_CANDIDATE_ARTIFACT_VERSION,
+        "generated_at": timezone.now().isoformat(),
+        "read_only": True,
+        "regions": region_list,
+        "eligible_grades": sorted(P0_MAJOR_RACE_GRADES),
+        "sample_per_region": sample_per_region,
+        "selection_policy": {
+            "cross_event_merge": "existing profile, external source identity, or complete name+sire+dam+birth_year only",
+            "name_only_merge": False,
+            "sample_order": "identity readiness, actual-start evidence, result evidence, nonstarter count, stable name/key",
+            "sample_uniqueness": "candidate key is globally unique; duplicate normalized names are suppressed only for weak identity observations",
+        },
+        "summary": {
+            "eligible_event_count": sum(event_counts.values()),
+            "runner_row_count": sum(runner_counts.values()),
+            "result_row_count": sum(result_counts.values()),
+            "participant_observation_count": len(observations),
+            "candidate_count": len(candidates),
+            "sample_count": len(sample_rows),
+            "unique_sample_candidate_count": len(
+                {row["candidate_key"] for row in sample_rows}
+            ),
+            "regions": region_summaries,
+        },
+        "candidates": candidates,
+        "observations": observations,
+        "sample_rows": sample_rows,
+    }
+
+
+def write_p0_participant_candidate_artifacts(
+    artifact: dict[str, Any],
+    output_dir: str | Path,
+) -> dict[str, str]:
+    output = Path(output_dir)
+    if output.exists() and (not output.is_dir() or any(output.iterdir())):
+        raise ValueError(f"candidate artifact output directory is not empty: {output}")
+    write_json_artifact(output / "p0_participant_candidates.json", artifact)
+    write_json_artifact(output / "summary.json", artifact["summary"])
+    sample_fields = [
+        "sample_region",
+        "sample_rank",
+        "candidate_key",
+        "horse_name",
+        "aliases",
+        "identity_status",
+        "review_status",
+        "matched_profile_ids",
+        "identity_keys",
+        "source_namespace",
+        "source_namespaces",
+        "source_urls",
+        "event_regions",
+        "evidence_count",
+        "actual_start_evidence_count",
+        "declared_entry_evidence_count",
+        "nonstarter_evidence_count",
+        "unconfirmed_evidence_count",
+        "result_evidence_count",
+        "last_event_date",
+        "latest_event_id",
+        "latest_event_name",
+        "latest_event_grade",
+        "sire_name",
+        "dam_name",
+        "birth_year",
+        "reviewed",
+        "review_decision",
+        "review_notes",
+    ]
+    write_csv_artifact(
+        output / "p0_participant_sample_review.csv",
+        artifact["sample_rows"],
+        sample_fields,
+    )
+    observations_path = output / "p0_participant_observations.jsonl"
+    observations_path.parent.mkdir(parents=True, exist_ok=True)
+    observations_path.write_text(
+        "".join(
+            json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n"
+            for row in artifact["observations"]
+        ),
+        encoding="utf-8",
+    )
+    artifact_paths = {
+        "candidates": output / "p0_participant_candidates.json",
+        "summary": output / "summary.json",
+        "sample_review_csv": output / "p0_participant_sample_review.csv",
+        "observations_jsonl": observations_path,
+    }
+    manifest = {
+        "artifact_type": "p0_horse_participant_candidate_manifest",
+        "schema_version": P0_CANDIDATE_ARTIFACT_VERSION,
+        "generated_at": artifact["generated_at"],
+        "read_only": True,
+        "files": {
+            name: {
+                "path": path.name,
+                "size_bytes": path.stat().st_size,
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+            for name, path in artifact_paths.items()
+        },
+    }
+    manifest_path = write_json_artifact(output / "manifest.json", manifest)
+    return {
+        **{name: str(path) for name, path in artifact_paths.items()},
+        "manifest": str(manifest_path),
+    }
 
 
 def build_p0_completion_queue(

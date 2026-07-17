@@ -13,6 +13,15 @@
 - **THEN** 每匹参赛马 SHALL 产生 `major_race_participant` P0 来源
 - **AND** 来源 SHALL 记录赛事、等级、地区、参赛或赛果证据、source URL 和同步时间
 
+#### Scenario: 写入前只读提取参赛马候选
+
+- **WHEN** 操作者从已导入的重点赛事提取 P0 参赛马候选
+- **THEN** 系统 SHALL 输出完整参赛观察、按稳定身份归并的候选池、每地区人工样本、summary 和 SHA-256 manifest
+- **AND** 只有马名而没有来源内 external horse ID 或完整血统身份的跨赛事观察 SHALL 保持独立并标记待身份补强
+- **AND** 共享任一强身份键的观察 SHALL 归入同一候选，后续非空血统 SHALL 回填，连接多个既有 profile 或出现矛盾血统 SHALL 标记身份冲突
+- **AND** 拥有不同强身份的同名马 SHALL 保持为不同候选并可分别进入地区样本
+- **AND** 提取过程 SHALL NOT 创建或修改 `TermEntry`、`HorseProfile`、`HorseP0Source` 或 `HorseIdentityConflict`
+
 #### Scenario: 非重点等级不进入新版 P0
 - **WHEN** 赛事等级为 Listed、Open、`LOCAL_GRADE` 或其它非指定等级
 - **THEN** 该赛事的参赛马 SHALL NOT 仅因该赛事进入 P0 范围

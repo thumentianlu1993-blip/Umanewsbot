@@ -1,5 +1,14 @@
 # 部署运行手册
 
+## P0 马候选提取与完整生涯门禁
+
+1. 候选提取必须先以 `--extract-candidates` 运行到新目录，核对 `read_only=true`、五地区、九类等级、身份状态分布和 manifest SHA。
+2. 提取阶段禁止 `--commit`、资料网络请求以及创建 `TermEntry`、`HorseProfile`、`HorseP0Source` 或 `HorseIdentityConflict`；执行前后核对相关表计数。
+3. 日本、香港、美国缺 horse ID 时不得按同名自动合并；英国、法国 external ID 必须保留来源 namespace。
+4. 完整生涯必须按马采集，不得从重点赛事总账反推，也不得为普通比赛强行创建 `RaceEvent`。
+5. 资料 commit 仍需独立审核 artifact、写前备份和显式授权；本节不授权网络抓取、生产同步、履历写入或自动首次发布。
+6. 集成到最新主线时，P0 migrations 必须顺接主线 race-live migration leaf，不得恢复历史并行 `0032/0033` 图。
+
 ## 五地区准实时 Beta Gate 修复生产发布（2026-07-20）
 
 1. 发布身份：fingerprint

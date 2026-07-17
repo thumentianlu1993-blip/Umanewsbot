@@ -1,5 +1,12 @@
 # 当前状态
 
+## 2026-07-18 P0 重点赛事参赛马只读提取能力
+
+- 已实现从五地区重点赛事 `RaceEventRunner` / `RaceEventResult` 只读提取 P0 马候选、观察清单、每地区审核 CSV 和 SHA-256 manifest；只有马名的记录保持事件级独立并标记 `needs_identity_enrichment`。
+- 来源内 external horse ID 或完整“马名 + 父名 + 母名 + 出生年份”才可跨赛事归并；共享强身份键按连通关系聚合，身份冲突继续 fail closed。
+- 命令入口为 `p0_horse_profiles --extract-candidates`。提取阶段不创建术语、马匹、P0 来源或身份冲突，不启动马匹资料网络抓取。
+- 历史生产只读样本为五地区各 10 匹；该记录只说明候选提取完成，不构成生产资料写入或公开授权。
+
 ## 2026-07-20 五地区准实时 Beta Gate 修复已发布，法国重验安全降级
 
 - 用户授权的冻结 fingerprint

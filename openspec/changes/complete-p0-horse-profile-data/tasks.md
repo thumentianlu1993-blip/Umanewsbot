@@ -30,6 +30,7 @@
 - [x] 3.4 (integration) 实现 P0 补全队列生成服务，按地区、资料缺口、近期新闻、重点赛事证据、术语优先级、外部匹配信号、候选状态和人工标记输出排序原因。
 - [x] 3.5 (application) 扩展或新增管理命令，支持预览队列、按地区/profile id/limit 选择批次，并保证队列预览不写资料字段。
 - [x] 3.6 (integration) 实现两层马匹身份判定：同场先按马号/来源身份分组，来源内 external horse ID 直接匹配；跨来源对数据库已有马使用多语种马名、父名、母名、出生年份四元组唯一匹配，歧义写入可无 profile 的专用 `HorseIdentityConflict`。
+- [x] 3.7 (integration) 新增重点赛事参赛马只读候选提取，兼容历史导入的 `source_refs.primary/source_kind`，输出完整观察、保守去重候选池、五地区人工样本和 SHA-256 manifest；仅马名证据不得跨赛事合并。
 
 ## 4. 多地区来源候选与完整资料 artifact
 
@@ -65,3 +66,4 @@
 - [ ] 6.7 (operations) 每地区人工发布 1-2 匹完整资料马，验收公开索引、详情页、移动端、完整赛事履历、主胜鞍、关注入口、新闻 tag 和 no-network 边界。
 - [ ] 6.8 (operations) 将 dry-run/commit/公开验收结果、失败原因、下一批建议和是否扩大批次写回 `docs/current_state.md`、`docs/project_status.md`、`docs/decisions.md` 和 `docs/deploy_runbook.md`。
 - [x] 6.9 (integration) 为独立生涯完整度、异常结果实际出赛计数、跨来源/海外远征去重、多来源证据保留、未关联普通比赛、后续安全关联、跨单位距离和公开履历分页补充真实 Django 测试。
+- [x] 6.10 (integration) 为五地区真实赛事来源字段、共享强身份键连通去重、后续血统回填与冲突、不同强身份同名马保留、同名弱身份隔离、非 P0 等级/地区排除、只读命令和 artifact manifest 补充回归测试。
