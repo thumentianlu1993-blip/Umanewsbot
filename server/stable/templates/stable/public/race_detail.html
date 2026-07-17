@@ -71,7 +71,7 @@
         <div><strong>地区</strong><span>{{ event.get_country_region_display }}</span></div>
         <div><strong>等级</strong><span>{{ event.grade_text }}</span></div>
         <div><strong>Surface</strong><span>{{ event.get_surface_display }}</span></div>
-        {% if event.distance_text %}<div><strong>距离</strong><span>{{ event.distance_text }}</span></div>{% endif %}
+        {% if event.distance_text %}<div><strong>距离</strong><span>{{ event.display_distance_text }}</span></div>{% endif %}
         {% if event.eligibility_text %}<div><strong>参赛条件</strong><span>{{ event.eligibility_text }}</span></div>{% endif %}
       </div>
 

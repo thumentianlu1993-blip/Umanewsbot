@@ -110,7 +110,7 @@
                       {{ result.display_finish_position }}.{{ result.display_horse_name }}{% if result.margin %}({{ result.margin }}){% endif %}{% if not forloop.last %} / {% endif %}
                     {% endfor %}
                   {% else %}
-                    {{ event.distance_text|default:"赛前资料待补充" }}
+                    {{ event.display_distance_text|default:"赛前资料待补充" }}
                   {% endif %}
                 </td>
               </tr>

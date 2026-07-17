@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Iterable
 
 from django.conf import settings
@@ -1055,6 +1056,27 @@ class RaceEvent(TimestampedModel):
     @property
     def is_public(self) -> bool:
         return self.visibility_status == RaceEventVisibility.PUBLISHED
+
+    @property
+    def display_distance_text(self) -> str:
+        value = self.distance_text
+        if not re.fullmatch(r"\d+(?:\.\d+)?", value):
+            return value
+
+        normalized = value.rstrip("0").rstrip(".") if "." in value else value
+        if self.country_region in {
+            RacingRegion.JAPAN,
+            RacingRegion.HONG_KONG,
+            RacingRegion.FRANCE,
+        }:
+            unit = "米"
+        elif self.country_region == RacingRegion.UNITED_STATES:
+            unit = "f"
+        elif self.country_region == RacingRegion.UNITED_KINGDOM:
+            unit = "m" if self.surface == RaceEventSurface.JUMPS else "f"
+        else:
+            return value
+        return f"{normalized}{unit}"
 
     @property
     def public_path(self) -> str:
