@@ -16,6 +16,7 @@ RUN pip install -r /app/requirements.txt
 COPY server /app/server
 COPY runtime/tools /app/runtime/tools
 COPY runtime/policies /app/runtime/policies
+COPY docs/changes/realtime-race-results/source_registry_the_racing_api_free.json /app/runtime/policies/race_live/source_registry_the_racing_api_free.json
 COPY deploy /app/deploy
 COPY .env.example /app/.env.example
 

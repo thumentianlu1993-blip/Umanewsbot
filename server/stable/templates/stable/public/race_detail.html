@@ -44,6 +44,14 @@
           {% endfor %}
         </ol>
       {% endif %}
+      {% if live_result_status %}
+        <aside class="race-result-status race-result-status-{{ live_result_status.phase }}" role="status" aria-label="赛果发布状态">
+          <strong>{{ live_result_status.label }}</strong>
+          {% if live_result_status.detail %}<span>{{ live_result_status.detail }}</span>{% endif %}
+          <span>{{ live_result_status.source_label }} · {{ live_result_status.published_at|date:"m-d H:i" }}</span>
+          {% if live_result_status.is_stale %}<em>数据可能已过期</em>{% endif %}
+        </aside>
+      {% endif %}
     </section>
 
     <nav class="race-tabs race-detail-tabs" aria-label="赛事详情模块">
@@ -108,6 +116,13 @@
     {% if results %}
       <section class="race-panel" id="results">
         <h2>赛果</h2>
+        {% if live_result_status %}
+          <div class="race-result-status-summary" aria-label="本表赛果状态">
+            <strong>{{ live_result_status.label }}</strong>
+            {% if live_result_status.detail %}<span>{{ live_result_status.detail }}</span>{% endif %}
+            {% if live_result_status.is_stale %}<em>数据可能已过期</em>{% endif %}
+          </div>
+        {% endif %}
         <div class="race-table-wrap">
           <table class="race-table compact">
             <thead>

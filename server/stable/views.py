@@ -83,6 +83,7 @@ from .models import (
     RaceEventHistoryWinner,
     RaceEventPriority,
     RaceEventResult,
+    RaceRunnerStatus,
     RaceEventStatus,
     RaceEventVisibility,
     RacingRegion,
@@ -132,7 +133,14 @@ from .services.publishing_windows import select_publish_candidates
 from .services.pushing import enqueue_push_for_article
 from .services.qq_windows import select_qq_window_deliveries
 from .services.queueing import dispatch_task
-from .services.race_events import apply_data_candidate, associate_articles_for_event, confirm_article_link, remove_article_link
+from .services.race_events import (
+    apply_data_candidate,
+    associate_articles_for_event,
+    confirm_article_link,
+    remove_article_link,
+    resolve_race_live_public_read,
+    resolve_race_live_public_reads,
+)
 from .services.sources import sync_builtin_sources
 from .services.storage import current_media_provider
 from .services.term_admin import (
@@ -2543,8 +2551,17 @@ def _group_race_events_by_date(events):
     groups: list[dict] = []
     current_date = object()
     current_group = None
+    read_now = timezone.now()
+    live_public_reads = resolve_race_live_public_reads(
+        event_ids=[event.pk for event in events],
+        now=read_now,
+    )
     for event in events:
-        event.top_results = list(event.results.all()[:5])
+        live_public_read = live_public_reads[event.pk]
+        if live_public_read.revision_id is not None and not live_public_read.visible:
+            event.top_results = []
+        else:
+            event.top_results = list(event.results.all()[:5])
         _attach_result_display_positions(event.top_results)
         if event.local_date != current_date:
             current_date = event.local_date
@@ -2556,13 +2573,28 @@ def _group_race_events_by_date(events):
 
 
 def _attach_result_display_positions(results):
+    non_finish_statuses = {
+        RaceRunnerStatus.SCRATCHED,
+        RaceRunnerStatus.WITHDRAWN,
+        RaceRunnerStatus.NON_RUNNER,
+        RaceRunnerStatus.DISQUALIFIED,
+        RaceRunnerStatus.DID_NOT_FINISH,
+        RaceRunnerStatus.PULLED_UP,
+        RaceRunnerStatus.UNSEATED_RIDER,
+        RaceRunnerStatus.FELL,
+        RaceRunnerStatus.REFUSED,
+    }
+    status_labels = dict(RaceRunnerStatus.choices)
     for result in results:
         source_refs = result.source_refs or {}
-        result.display_finish_position = (
+        official_position = (
             result.official_finish_position
             or source_refs.get("official_finish_position")
-            or result.finish_position
         )
+        if official_position is None and result.running_status in non_finish_statuses:
+            result.display_finish_position = status_labels[result.running_status]
+        else:
+            result.display_finish_position = official_position or result.finish_position
     return results
 
 
@@ -2720,10 +2752,14 @@ def public_race_calendar(request: HttpRequest):
     )
 
 
-def _series_history_winners(event: RaceEvent):
+def _series_history_winners(
+    event: RaceEvent,
+    *,
+    exclude_result_event_id: int | None = None,
+):
     if not event.race_series_id:
         return list(event.history_winners.all())
-    result_winners = list(
+    result_winner_queryset = (
         RaceEventResult.objects.select_related("event")
         .filter(
             event__race_series_id=event.race_series_id,
@@ -2733,19 +2769,30 @@ def _series_history_winners(event: RaceEvent):
             Q(official_finish_position=1)
             | Q(official_finish_position__isnull=True, finish_position=1)
         )
-        .order_by("-event__year", "finish_position", "id")
+    )
+    if exclude_result_event_id is not None:
+        result_winner_queryset = result_winner_queryset.exclude(
+            event_id=exclude_result_event_id
+        )
+    result_winners = list(
+        result_winner_queryset.order_by("-event__year", "finish_position", "id")
     )
     covered_years = set()
     for winner in result_winners:
         winner.winner_year = winner.event.year
         covered_years.add(winner.event.year)
-    fallback_winners = list(
-        RaceEventHistoryWinner.objects.filter(
-            event__race_series_id=event.race_series_id,
-            event__visibility_status=RaceEventVisibility.PUBLISHED,
+    fallback_winner_queryset = RaceEventHistoryWinner.objects.filter(
+        event__race_series_id=event.race_series_id,
+        event__visibility_status=RaceEventVisibility.PUBLISHED,
+    )
+    if exclude_result_event_id is not None:
+        fallback_winner_queryset = fallback_winner_queryset.exclude(
+            event_id=exclude_result_event_id
         )
-        .exclude(winner_year__in=covered_years)
-        .order_by("-winner_year", "horse_name", "id")
+    fallback_winners = list(
+        fallback_winner_queryset.exclude(
+            winner_year__in=covered_years
+        ).order_by("-winner_year", "horse_name", "id")
     )
     return sorted(
         [*result_winners, *fallback_winners],
@@ -2755,7 +2802,12 @@ def _series_history_winners(event: RaceEvent):
 
 def public_race_detail(request: HttpRequest, year: int, slug: str):
     event = get_object_or_404(
-        RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED).prefetch_related(
+        RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED)
+        .select_related(
+            "projection_control__current_result_revision",
+            "live_tracking",
+        )
+        .prefetch_related(
             "runners",
             "results",
             "history_winners",
@@ -2764,6 +2816,46 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         year=year,
         slug=slug,
     )
+    live_result_status = None
+    projection_control = getattr(event, "projection_control", None)
+    current_result_revision = (
+        projection_control.current_result_revision if projection_control else None
+    )
+    read_now = timezone.now()
+    live_public_read = resolve_race_live_public_read(
+        event_id=event.pk,
+        now=read_now,
+    )
+    if current_result_revision and live_public_read.visible:
+        tracking = getattr(event, "live_tracking", None)
+        if current_result_revision.conflict_status == "pending":
+            status_label = "赛果待复核"
+            status_detail = "不同来源的赛果存在差异，正在复核"
+        else:
+            status_label, status_detail = {
+                "provisional": ("暂定赛果", "尚待官方来源复核"),
+                "official": ("正式赛果", ""),
+                "corrected": ("更正赛果", ""),
+            }.get(
+                current_result_revision.phase,
+                ("赛果更新", ""),
+            )
+        live_result_status = {
+            "label": status_label,
+            "detail": status_detail,
+            "phase": current_result_revision.phase,
+            "source_label": (
+                "官方来源"
+                if current_result_revision.source_authority == "official"
+                else "补充来源"
+            ),
+            "published_at": current_result_revision.published_at,
+            "is_stale": bool(
+                tracking
+                and tracking.stale_at is not None
+                and tracking.stale_at <= read_now
+            ),
+        }
     public_links = [
         link
         for link in event.article_links.all()
@@ -2777,8 +2869,17 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         "related": [link.article for link in public_links if link.link_type == ArticleRaceLinkType.RELATED],
     }
     runners = _sort_runners_for_display(list(event.runners.all()), event.country_region)
-    results = _attach_result_display_positions(list(event.results.all()))
-    history_winners = _series_history_winners(event)
+    has_current_live_revision = current_result_revision is not None
+    hide_live_results = has_current_live_revision and not live_public_read.visible
+    results = (
+        []
+        if hide_live_results
+        else _attach_result_display_positions(list(event.results.all()))
+    )
+    history_winners = _series_history_winners(
+        event,
+        exclude_result_event_id=event.pk if hide_live_results else None,
+    )
     _attach_race_term_display_names(
         [
             (event, runners),
@@ -2797,6 +2898,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "history_winners": history_winners,
             "top_results": top_results,
             "news_groups": news_groups,
+            "live_result_status": live_result_status,
         },
     )
 

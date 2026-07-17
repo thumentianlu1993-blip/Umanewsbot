@@ -462,6 +462,23 @@ NEWS_SOURCE_POLL_ALLOWED_SOURCES = env_list("NEWS_SOURCE_POLL_ALLOWED_SOURCES", 
 NEWS_SOURCE_POLL_RUNNING_TIMEOUT_MINUTES = int(env("NEWS_SOURCE_POLL_RUNNING_TIMEOUT_MINUTES", "60"))
 NEWS_SOURCE_POLL_RETRY_STALE_RUNNING = env_bool("NEWS_SOURCE_POLL_RETRY_STALE_RUNNING", False)
 
+RACE_LIVE_SCHEDULER_ENABLED = env_bool("RACE_LIVE_SCHEDULER_ENABLED", False)
+RACE_LIVE_SELECTOR_BATCH_SIZE = int(env("RACE_LIVE_SELECTOR_BATCH_SIZE", "20"))
+RACE_LIVE_CLAIM_TTL_SECONDS = int(env("RACE_LIVE_CLAIM_TTL_SECONDS", "120"))
+RACE_LIVE_RUNNER_MODE = (
+    env("RACE_LIVE_RUNNER_MODE", "disabled") or "disabled"
+).strip().lower()
+RACE_LIVE_OFFLINE_FIXTURE_ROOT = (env("RACE_LIVE_OFFLINE_FIXTURE_ROOT", "") or "").strip()
+RACE_LIVE_TRA_SECRET_ENV_FILE = (
+    env("RACE_LIVE_TRA_SECRET_ENV_FILE", "") or ""
+).strip()
+RACE_LIVE_TRA_REGISTRY_FILE = (
+    env("RACE_LIVE_TRA_REGISTRY_FILE", "") or ""
+).strip()
+RACE_LIVE_TRA_REGISTRY_SHA256 = (
+    env("RACE_LIVE_TRA_REGISTRY_SHA256", "") or ""
+).strip()
+
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -473,8 +490,21 @@ CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = int(env("CELERY_WORKER_PREFETCH_MULTIPLIER", "1"))
 CELERY_TASK_ACKS_LATE = env_bool("CELERY_TASK_ACKS_LATE", True)
 CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_ROUTES = {
+    "stable.tasks.poll_race_live_event_task": {"queue": "race_live"},
+}
+CELERY_TASK_ANNOTATIONS = {
+    "stable.tasks.poll_race_live_event_task": {
+        "soft_time_limit": 45,
+        "time_limit": 60,
+    },
+}
 
 CELERY_BEAT_SCHEDULE = {
+    "select-due-race-live-events": {
+        "task": "stable.tasks.select_due_race_live_events_task",
+        "schedule": crontab(minute="*"),
+    },
     "crawl-netkeiba-latest-hourly": {
         "task": "stable.tasks.crawl_netkeiba_latest",
         "schedule": crontab(minute=0),

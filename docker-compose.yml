@@ -15,12 +15,29 @@ services:
 
   worker:
     build: .
-    command: celery -A app worker -l info
+    command: /app/deploy/docker/start-worker.sh
     volumes:
       - ./server:/app/server
       - ./server/media:/app/server/media
     env_file:
       - .env
+    environment:
+      RACE_LIVE_SCHEDULER_ENABLED: ${RACE_LIVE_SCHEDULER_ENABLED:-false}
+    depends_on:
+      - db
+      - redis
+
+  race_live_worker:
+    build: .
+    command: /app/deploy/docker/start-race-live-worker.sh
+    volumes:
+      - ./server:/app/server
+      - ./server/media:/app/server/media
+      - ./runtime/secrets:/run/secrets:ro
+    env_file:
+      - .env
+    environment:
+      RACE_LIVE_SCHEDULER_ENABLED: ${RACE_LIVE_SCHEDULER_ENABLED:-false}
     depends_on:
       - db
       - redis
@@ -33,6 +50,8 @@ services:
       - ./server/media:/app/server/media
     env_file:
       - .env
+    environment:
+      RACE_LIVE_SCHEDULER_ENABLED: ${RACE_LIVE_SCHEDULER_ENABLED:-false}
     depends_on:
       - db
       - redis

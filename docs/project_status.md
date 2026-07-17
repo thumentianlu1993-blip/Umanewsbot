@@ -1,5 +1,12 @@
 # 项目状态文档
 
+## 2026-07-18 准实时赛果生产 shadow 初始化器已完成
+
+- 新增严格 manifest 驱动的 `initialize_race_live_events`：默认 dry-run、显式 apply、独立 verify、全事务和精确 replay；初始化范围仅为 shadow 的 control/tracking/source/participant/racecard/host budget/policy/allowlist/audit，不在 migration 隐式回填。
+- shadow runner 的 `shadow_only` 现在是成功 checkpoint，不再累计失败；仍保持公开物化、publication 和 official incident 为零。SQLite 聚焦 `13/13`、PostgreSQL 初始化并发及既有锁语义 `5/5`。
+- 首次成功原生完整 review 关闭既有 findings，另发现赛事日历 live read gate 的直接 P1：40 场页面为 `525` 次查询。真实 RED 后已改为固定批量读取，新增硬门禁 `<=12`；公开状态 `6/6`、准实时/来源 proof/初始化 SQLite `160/160`、临时 PostgreSQL `5/5` 通过。当前等待同一 reviewer 限定复审，尚无该 review 后发布授权；生产未迁移、未初始化、未启动 live worker、未公开。
+- 最终本地候选镜像 `sha256:4a281e426e32...5b099` 已通过镜像内 check、初始化器+TRA runner `13/13`、registry SHA 和无凭据检查；三份 Compose、worker shell、迁移漂移与 diff check 在完整源码树通过。部署契约测试依赖仓库根 Compose/源 registry，继续只在完整源码树运行，不为镜像自测复制非运行时文件。
+
 ## 2026-07-17 AI 赛事身份初审已形成生产候选
 
 - 已正式采用 AI 初审的 `267` 条决定：`228` 条合并并关联、`21` 条保持独立、`18` 条非同赛／忽略；John C. Harris Stakes 另有一条 `surface=turf` 修复。正向决定保留来源系列，负向决定写入双向禁止自动合并规则。
@@ -15,6 +22,18 @@
 - 有效生产只读 manifest 为 `5caee7d0ed093605aede28c2834d3acf8a75f9f20e2d88679924c3670f3c6a51`，verifier 无错误；`30,917` 个目标分为 `8,875 already_linked / 46 identity_conflict / 21,537 missing_event / 459 status_conflict / 0 exact_link`。因此 approval 保持 pending，本轮没有数据 apply。
 - `7` 是 not_due，不是未举办总数；全账本另有 `459 not_held / 15 cancelled`，2026 还有 `630 missing_event`。东海锦标等线上赛程与英文总账被拆为不同系列，另有跨地区同名误命中，需先完成系列身份审核。
 - 可读审核入口为 `outputs/race_event_reconciliation_20260717/生产赛事身份审核_213a818c_20260717.xlsx` 与 HTML，包含 46 条明确冲突、221 条别名/跨语言候选、冠军马、1号马、来源和线上页面。身份确认后重新生成具有明确动作的新 manifest，再执行备份、串行 apply 和逐目标 verifier；历史公开继续关闭。
+## 2026-07-17 准实时赛果来源路由产品口径修正
+
+- The Racing API 调整为覆盖范围内的暂定赛果公开主链：完整结果通过身份/字段门禁后可在官方二次复核前发布，并明确标注 provisional。
+- JRA/NAR/HKJC 等官方来源继续异步复核并决定 official/corrected；TRA 不获得 official authority，空结果、缺马、身份冲突、人工锁、条款和发布 mode 门禁不放宽。
+- 首轮方案复审提出的唯一 publication admission/read gate、TRA supplemental 数据库约束、racecard 全集完整性、不可变 official marker、异步 incident 闭环和 `0041` 迁移口径均已补齐；同一 reviewer 限定复审逐项关闭并给出 `APPROVED`。用户已授权进入测试先行、实现、shadow 与上线准备；实际生产发布仍须在最新成功代码 review 后取得一次新授权。当前没有本轮新增的网络 adapter、生产写入、部署或公开开关变化。
+
+## 2026-07-17 准实时赛果首个 TRA Free 来源 proof 已完成
+
+- 新增受控、脱敏、业务 DB 零写入的 The Racing API Free proof runner；仓库外 `0600` secret 已验证可用，不进入工作树/镜像/日志/artifact。
+- 首个成功窗口完成 3 个 Free 请求：regions 55、racecards 10、results 0，均 HTTP 200。reviewer P2 指出的 proof/长期 automation 许可耦合已用真实 RED 修复并通过限定复审；完成时间与 unknown 状态两个后续建议也已按 RED 修复，无效时钟和无 partial artifact 契约已补自动化。离线 proof + 准实时 `126/126`，合并 latest-main 相邻历史回归 `262/262`（1 skip）。
+- 当前只确认认证、端点与 schema；尚未取得已完赛样本或四赛日数据，覆盖、暂定/正式分类、p50/p95 和 Basic 升级门槛均未通过。无部署、生产写入、订阅采购或公开开关变化。
+- proof runner 与后续时钟/unknown 状态增量已完成复审。已启用本地 `tra-free-proof` 每日低频 automation 收集四个不同赛事日期；达到四日且至少一个非空 results 窗口后不再联网，等待主任务汇总。automation 不写 tracked 文件或业务 DB。
 
 ## 2026-07-16 第一期历史赛事正式详情总账完成
 
@@ -51,6 +70,28 @@
 - 本地固定镜像与独立 run/共享 host-lock 根已核验，但 Japan `50556` descriptor 的 mounts/outputs 仍绑定 plan root，和本次批准的 runtime 根不一致。
 - `discover` 在容器创建前 fail closed；请求、缓存、阶段产物和残留容器均为 `0`，后续四阶段未运行，生产与数据库未接触。
 - 下一步由计划生成侧提供绑定独立 runtime 根的新不可变 descriptor，或经明确审批改用 descriptor 原批准路径，再从 `discover` 重跑；不得绕过路径身份门禁。
+
+## 2026-07-16 准实时赛事赛果 latest-main 复审通过，进入离线测试先行
+
+- 独立专项初始 PLAN 基于 `9b617702`，离线 TDD 期间持续安全快进，当前 `HEAD == origin/main@283bacf2`；专项经 stash、`ff-only`、恢复后保留主线与专项双方文档事实并解决四份文档顶部冲突，代码仅有 `race_events.py` 的新增 re-export 与专项追加内容自动合并。五份 durable artifacts 位于 `docs/changes/realtime-race-results/`。
+- 目标是重点赛事完赛后数分钟展示明确标注的暂定赛果，再由官方来源确认/更正；不提供逐秒位置，不接管历史回填。
+- 已完成计划、latest-main 复用审计和第一批离线 TDD：发布 mode resolver 的 5 项目标测试与 3 项相邻赛事回归共 `8/8` 通过。首次原生代码 review 的 terms permission 缺失 fail-closed 和状态记录两项 P2 已修复，同一 reviewer 限定复审 `APPROVED`。The Racing API 仍采用 Free 先 proof，且历史 handoff 前不联网。
+- 第二个离线 TDD 切片已完成六态状态机纯函数 RED -> GREEN：只允许审核设计中的 7 条边，准实时模块与 3 项相邻赛事回归共 `10/10` 通过，同一代码 reviewer 完整只读复审 `APPROVED`；持久化 revision/ownership 尚未实现。
+- 第三个离线 TDD 切片已完成严格 JSON canonical SHA-256 RED -> GREEN；review P2 指出的等价数字 hash 抖动已按新增 RED 修复，五种 approved phase 均明确排除于内容 hash。准实时模块与 3 项相邻赛事回归共 `15/15` 通过，同一 reviewer 限定复审已关闭唯一 P2并 `APPROVED`；尚未接入 revision/CAS。
+- 第四个离线 TDD 切片已新增 ProjectionControl 基础一对一模型与 `0033` migration，不自动回填或接管既有赛事；完整 review 对本模型无 finding，既有 mode resolver 的 event allowlist P2 已按新增 RED 修复并由同一 reviewer 限定复审关闭。latest-main 上 SQLite 专项、相邻赛事及历史 chunk/receipt/import primitive 回归 `49/49`，check/migration drift 通过。revision pointer、owner transfer/CAS 和 importer 接入仍未实现。
+- reviewer 后续建议的 revision counter 0 风险也已按真实 RED 修复：模型与未发布 `0033` 增加两个 `>=1` 数据库约束；组合回归 `50/50`，等待限定复审。
+- 离线数据与调度骨架继续按真实 RED -> GREEN 推进：`0034` 至 `0038` 已覆盖 LiveTracking、身份、append-only revision/evidence、current/LKG pointers 和共享 HostBudget；owner transfer、revision allocator、source permission、时间窗、claim、host reservation、checkpoint 双 CAS 已实现。reviewer 的过期 claim P1 已分别补齐过期与缺失 expiry 的真实 RED 并修复，latest-main 组合回归 `105/105`；PostgreSQL 并发层仍待执行。未联网、启 worker、初始化 tracking、写生产、部署或购买订阅。
+- 新一批离线控制面已完成 due-selector、host circuit、默认关闭的 Beat selector、`race_live` poll route、The Racing API Free 合成 fixture contract和 append-only observation recorder；并按 reviewer finding 将损坏 claim lease 改为 fail closed、host outcome 改为 reservation version CAS。准实时 `85/85`、与 historical detail chunk/import receipt/import primitives 组合 `122/122`，check/migration drift/diff check 通过。poll runner 仍 fail closed，专用 worker/真实 HTTP/revision apply/PostgreSQL 并发未完成，等待同一 reviewer 限定复审；Compose 解析因 worktree 无 `.env` 未完成，未借用主工作区 secret。
+- 三份 Compose 的独立 `race_live` worker 也已按真实 RED -> GREEN 完成：普通/live queue 显式隔离，live 默认并发 1、prefetch 1、45/60 秒软硬时限，scheduler 默认关闭；准实时 `88/88`、与 historical detail chunk/import receipt/import primitives 组合 `125/125`，Compose 解析与脚本检查通过。尚未连接真实 broker/worker，poll runner 仍 fail closed。
+- 赛果 conflict policy、observation -> immutable revision/items/evidence、current/LKG pointer 与 shadow/public projection apply 已完成；official authority 已绑定持久且 approved 的 source identity，shadow 可通过唯一 publication audit 单向晋级。公开赛事页已区分 provisional/official/corrected/conflict/stale，shadow 不泄漏。SQLite 准实时 `103/103`、相邻历史组合 `140/140`。真实 PostgreSQL 16 identity/apply/并发直接路径 `15/15`，覆盖 `skip_locked`、host 串行预约、同 claim 单 revision/replay、deferred pointer/supersedes guards 与 shadow promotion；`0039`/`0040` 迁移往返通过。仍未连接真实 broker、HTTP 或生产。
+- 完全离线 TRA fixture runner 已完成受控文件 parse -> observation -> shadow revision -> checkpoint，使用实际文件 bytes SHA、失败 bounded retry、成功有限窗口/T+7d 停止，并强制 offline 永不公开。SQLite 准实时 `108/108`、相邻历史组合 `145/145`；仍未连接真实 Redis broker、HTTP 或生产。
+- 临时 PostgreSQL+Redis 的真实 broker smoke 已证明 selector -> live worker 端到端与普通队列隔离：1 observation、1 revision、成功 checkpoint、shadow result 0，普通 `celery` 消息未被消费；临时资源已全清。生产 broker、HTTP 和 shadow 仍未启用。
+- 后台已具备 live 模型只读观测面与赛事级 CAS kill switch；停用会立即失效在途 claim 并写审计，真实 Django admin POST 通过。manual correction 未开放。准实时 `113/113`、相邻历史组合 `150/150`。
+- latest-main 组合回归 `249/249`（1 skip）通过；完整 `stable` 的 `2 failures / 13 errors / 23 skipped` 已在干净 `origin/main@c40a8c2b` 精确复现为相同 15 项主线基线问题。Django check、migration drift、三份 Compose、脚本语法和 diff check 通过。
+- 最终 full review 的 2 项 P1、1 项 P2 已按真实 RED 修复：TRA non-finisher 状态保真，非完赛公开显示不再 fallback 内部顺序，两份生产 live worker 增加 0.25 CPU/384M 默认限制，并新增 `0041` choices migration。准实时 `116/116`、latest-main 组合 `252/252`（1 skip）和静态/迁移门禁通过，等待限定复审。
+- 计划采用共享写入所有权仲裁、稳定 participant、append-only racecard/result revision、现有当前投影、独立 `race_live` Celery queue/worker 和按 host 共享限速；网络任务使用短 claim、无锁联网、短 CAS/apply。
+- 原方案和用户修正范围均已 `APPROVED`；最新主线已把第一期历史详情正式分母收口为 `8032 = 6534 complete + 1491 gap + 7 not_due`，global verifier `errors=0`，历史 runner 为空且网络/功能开关关闭。来源 proof 的“历史先完成”条件已满足，但 proof 必须业务 DB 零写入；任何 shadow 仍需精确 event ownership allowlist、无 active lease/checkpoint、source registry digest 和共享 host/资源窗口的 SHA handoff。当前未联网、部署、购买、连接生产或开启公开展示。
+- The Racing API Free 暂定赛果核心链已完成：安全网络 runner -> append-only observation -> shadow revision -> 持久 admission -> 暂定赛果投影 -> 官方复核 incident；公开读取门、只读后台、独立 Celery queue、容器 secret 隔离和默认关闭配置均已落地。当前 registry digest 为 `1d801e95b2770c741503a75dbcba93aca407a6cd681f3471813f1e7d5586fa32`，专项回归 `149/149`。仍未生产迁移或初始化任何 event；最新成功代码 review 和其后的用户发布授权仍是硬门，官方结果自动复核不计入首轮完成范围。
 
 ## 2026-07-15 Codex 原生工作流迁移已进入 `main`
 
