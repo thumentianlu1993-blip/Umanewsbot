@@ -27,6 +27,8 @@ from stable.models import (
     OperationLog,
     RaceEvent,
     RaceEventDataQuality,
+    RaceEventResult,
+    RaceEventRunner,
     RaceEventStatus,
     RaceEventVisibility,
     RaceSeries,
@@ -35,6 +37,7 @@ from stable.models import (
     RaceSeriesReviewStatus,
     RacingRegion,
 )
+from stable.services.race_event_public_cache import invalidate_public_race_cache
 
 
 INVENTORY_SCHEMA_VERSION = "1.0"
@@ -69,6 +72,8 @@ REQUIRED_ARTIFACTS = {
     "summary",
 }
 MAPPING_REQUIRED_ARTIFACTS = {"mapping_candidates", "mapping_review", "mapping_conflicts", "summary"}
+HISTORICAL_PUBLICATION_MANIFEST_SCHEMA_VERSION = "historical-race-publication/v1"
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 UNSTABLE_SERIES_KEY_RE = re.compile(r"(?:^|[-_])(?:19|20)\d{2}(?:[-_]\d{1,2}(?:[-_]\d{1,2})?)?(?:$|[-_])")
 ALLOWED_RESOLUTION_TRANSITIONS = {
     HistoricalRaceResolutionStatus.PENDING: {
@@ -122,6 +127,10 @@ class InventoryValidationError(ValueError):
     pass
 
 
+class HistoricalPublicationBlockedError(InventoryValidationError):
+    pass
+
+
 @dataclass(frozen=True)
 class ArtifactIdentity:
     path: str
@@ -130,6 +139,21 @@ class ArtifactIdentity:
 
     def as_dict(self) -> dict[str, Any]:
         return {"path": self.path, "size": self.size, "sha256": self.sha256}
+
+
+@dataclass(frozen=True)
+class HistoricalPublicationManifest:
+    path: Path
+    sha256: str
+    target_ids: tuple[int, ...]
+    artifact_sha256_by_target: dict[int, str]
+
+
+@dataclass(frozen=True)
+class HistoricalPublicationFacts:
+    confirmed_result_event_ids: frozenset[int]
+    runner_event_ids: frozenset[int]
+    runner_provenance_missing_event_ids: frozenset[int]
 
 
 def canonical_json(value: Any) -> str:
@@ -1352,7 +1376,160 @@ def commit_existing_event_mapping(*, artifact_dir: str | Path, approval_path: st
     return {"series_created": series_created, "events_bound": events_bound}
 
 
-def historical_publication_blockers(target: HistoricalRaceEventTarget) -> list[str]:
+def load_historical_publication_manifest(
+    manifest_path: str | Path,
+    *,
+    expected_sha256: str,
+) -> HistoricalPublicationManifest:
+    path = Path(manifest_path)
+    expected_sha256 = str(expected_sha256 or "").strip().lower()
+    if not SHA256_RE.fullmatch(expected_sha256):
+        raise InventoryValidationError("expected manifest SHA-256 must be 64 lowercase hexadecimal characters")
+    actual_sha256 = file_identity(path).sha256
+    if actual_sha256 != expected_sha256:
+        raise InventoryValidationError(
+            f"manifest SHA-256 mismatch: expected {expected_sha256}, got {actual_sha256}"
+        )
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise InventoryValidationError(f"publication manifest is not valid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise InventoryValidationError("publication manifest root must be an object")
+    if payload.get("schema_version") != HISTORICAL_PUBLICATION_MANIFEST_SCHEMA_VERSION:
+        raise InventoryValidationError(
+            "publication manifest schema_version must be "
+            f"{HISTORICAL_PUBLICATION_MANIFEST_SCHEMA_VERSION}"
+        )
+    raw_target_ids = payload.get("target_ids")
+    if not isinstance(raw_target_ids, list) or not raw_target_ids:
+        raise InventoryValidationError("publication manifest target_ids must be a non-empty list")
+    if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0 for value in raw_target_ids):
+        raise InventoryValidationError("publication manifest target_ids must contain positive integers")
+    if len(raw_target_ids) != len(set(raw_target_ids)):
+        raise InventoryValidationError("publication manifest target_ids 包含重复目标")
+
+    artifact_by_target: dict[int, str] = {}
+    raw_targets = payload.get("targets")
+    if isinstance(raw_targets, list):
+        for row in raw_targets:
+            if not isinstance(row, dict):
+                raise InventoryValidationError("publication manifest targets rows must be objects")
+            target_id = row.get("target_id")
+            artifact_sha256 = str(row.get("artifact_sha256") or "").strip().lower()
+            if isinstance(target_id, bool) or not isinstance(target_id, int) or target_id <= 0:
+                raise InventoryValidationError("publication manifest target_id must be a positive integer")
+            if target_id in artifact_by_target:
+                raise InventoryValidationError(f"publication manifest targets 包含重复目标: {target_id}")
+            if not SHA256_RE.fullmatch(artifact_sha256):
+                raise InventoryValidationError(
+                    f"publication manifest artifact_sha256 is invalid for target {target_id}"
+                )
+            artifact_by_target[target_id] = artifact_sha256
+    else:
+        raw_mapping = payload.get("target_artifact_sha256")
+        if not isinstance(raw_mapping, dict):
+            raise InventoryValidationError(
+                "publication manifest must provide targets or target_artifact_sha256"
+            )
+        for raw_target_id, raw_artifact_sha256 in raw_mapping.items():
+            try:
+                target_id = int(raw_target_id)
+            except (TypeError, ValueError) as exc:
+                raise InventoryValidationError(
+                    f"publication manifest target id is invalid: {raw_target_id}"
+                ) from exc
+            artifact_sha256 = str(raw_artifact_sha256 or "").strip().lower()
+            if target_id <= 0 or not SHA256_RE.fullmatch(artifact_sha256):
+                raise InventoryValidationError(
+                    f"publication manifest artifact_sha256 is invalid for target {target_id}"
+                )
+            artifact_by_target[target_id] = artifact_sha256
+    if set(raw_target_ids) != set(artifact_by_target):
+        raise InventoryValidationError(
+            "publication manifest target_ids and artifact_sha256 rows must 完整对应"
+        )
+    return HistoricalPublicationManifest(
+        path=path,
+        sha256=actual_sha256,
+        target_ids=tuple(raw_target_ids),
+        artifact_sha256_by_target=artifact_by_target,
+    )
+
+
+def _load_historical_publication_targets(
+    manifest: HistoricalPublicationManifest,
+    *,
+    lock: bool,
+) -> list[HistoricalRaceEventTarget]:
+    queryset = HistoricalRaceEventTarget.objects.filter(pk__in=manifest.target_ids).select_related("race_series")
+    if lock:
+        queryset = queryset.select_for_update()
+    targets_by_id = {target.pk: target for target in queryset}
+    missing_ids = [target_id for target_id in manifest.target_ids if target_id not in targets_by_id]
+    if missing_ids:
+        raise InventoryValidationError(
+            "publication manifest targets do not exist: " + ", ".join(str(value) for value in missing_ids)
+        )
+    targets = [targets_by_id[target_id] for target_id in manifest.target_ids]
+    for target in targets:
+        expected_artifact_sha256 = manifest.artifact_sha256_by_target[target.pk]
+        if target.artifact_sha256 != expected_artifact_sha256:
+            raise InventoryValidationError(
+                "target artifact_sha256 changed after manifest: "
+                f"{target.pk} expected {expected_artifact_sha256}, got {target.artifact_sha256}"
+            )
+
+    event_ids = [target.event_id for target in targets if target.event_id]
+    event_queryset = RaceEvent.objects.filter(pk__in=event_ids)
+    if lock:
+        event_queryset = event_queryset.select_for_update()
+    events_by_id = {event.pk: event for event in event_queryset}
+    for target in targets:
+        if target.event_id:
+            target._state.fields_cache["event"] = events_by_id.get(target.event_id)
+    return targets
+
+
+def _historical_publication_facts(
+    event_ids: Iterable[int],
+    *,
+    lock: bool,
+) -> HistoricalPublicationFacts:
+    event_ids = tuple(sorted(set(event_ids)))
+    result_queryset = RaceEventResult.objects.filter(event_id__in=event_ids)
+    runner_queryset = RaceEventRunner.objects.filter(event_id__in=event_ids)
+    if lock:
+        result_queryset = result_queryset.select_for_update()
+        runner_queryset = runner_queryset.select_for_update()
+    confirmed_result_event_ids = {
+        event_id
+        for event_id, is_confirmed in result_queryset.values_list("event_id", "is_confirmed")
+        if is_confirmed
+    }
+    runner_event_ids: set[int] = set()
+    runner_provenance_missing_event_ids: set[int] = set()
+    for event_id, source_refs in runner_queryset.values_list("event_id", "source_refs"):
+        runner_event_ids.add(event_id)
+        source_refs = source_refs or {}
+        if not (
+            source_refs.get("derived_from_results")
+            or source_refs.get("racecard_url")
+            or source_refs.get("source_cache_identity")
+        ):
+            runner_provenance_missing_event_ids.add(event_id)
+    return HistoricalPublicationFacts(
+        confirmed_result_event_ids=frozenset(confirmed_result_event_ids),
+        runner_event_ids=frozenset(runner_event_ids),
+        runner_provenance_missing_event_ids=frozenset(runner_provenance_missing_event_ids),
+    )
+
+
+def historical_publication_blockers(
+    target: HistoricalRaceEventTarget,
+    *,
+    facts: HistoricalPublicationFacts | None = None,
+) -> list[str]:
     blockers: list[str] = []
     event = target.event
     if target.race_series.review_status != RaceSeriesReviewStatus.APPROVED:
@@ -1372,21 +1549,247 @@ def historical_publication_blockers(target: HistoricalRaceEventTarget) -> list[s
         return sorted(set(blockers))
     if event.status != RaceEventStatus.FINISHED:
         blockers.append("race_not_finished")
-    if not event.results.filter(is_confirmed=True).exists():
-        blockers.append("confirmed_results_missing")
-    runners = list(event.runners.all())
-    if not runners:
-        blockers.append("runners_missing")
-    elif any(
-        not (
-            (runner.source_refs or {}).get("derived_from_results")
-            or (runner.source_refs or {}).get("racecard_url")
-            or (runner.source_refs or {}).get("source_cache_identity")
-        )
-        for runner in runners
-    ):
-        blockers.append("runner_provenance_missing")
+    if facts is None:
+        if not event.results.filter(is_confirmed=True).exists():
+            blockers.append("confirmed_results_missing")
+        runners = list(event.runners.all())
+        if not runners:
+            blockers.append("runners_missing")
+        elif any(
+            not (
+                (runner.source_refs or {}).get("derived_from_results")
+                or (runner.source_refs or {}).get("racecard_url")
+                or (runner.source_refs or {}).get("source_cache_identity")
+            )
+            for runner in runners
+        ):
+            blockers.append("runner_provenance_missing")
+    else:
+        if event.pk not in facts.confirmed_result_event_ids:
+            blockers.append("confirmed_results_missing")
+        if event.pk not in facts.runner_event_ids:
+            blockers.append("runners_missing")
+        elif event.pk in facts.runner_provenance_missing_event_ids:
+            blockers.append("runner_provenance_missing")
     return sorted(set(blockers))
+
+
+def _historical_publication_report(
+    manifest: HistoricalPublicationManifest,
+    targets: list[HistoricalRaceEventTarget],
+    *,
+    facts: HistoricalPublicationFacts,
+) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = []
+    blocker_counts: Counter[str] = Counter()
+    eligible_count = 0
+    already_published_count = 0
+    for target in targets:
+        event = target.event
+        blockers = historical_publication_blockers(target, facts=facts)
+        blocker_counts.update(blockers)
+        already_published = bool(
+            not blockers
+            and event
+            and event.visibility_status == RaceEventVisibility.PUBLISHED
+            and event.data_quality_status == RaceEventDataQuality.COMPLETE
+        )
+        if blockers:
+            status = "blocked"
+        elif already_published:
+            status = "already_published"
+            eligible_count += 1
+            already_published_count += 1
+        else:
+            status = "eligible"
+            eligible_count += 1
+        rows.append(
+            {
+                "target_id": target.pk,
+                "event_id": target.event_id,
+                "artifact_sha256": manifest.artifact_sha256_by_target[target.pk],
+                "status": status,
+                "blockers": blockers,
+                "visibility_status": event.visibility_status if event else None,
+                "data_quality_status": event.data_quality_status if event else None,
+            }
+        )
+    return {
+        "mode": "dry_run",
+        "manifest_sha256": manifest.sha256,
+        "summary": {
+            "target_count": len(targets),
+            "eligible_count": eligible_count,
+            "blocked_count": len(targets) - eligible_count,
+            "already_published_count": already_published_count,
+            "blocker_counts": dict(sorted(blocker_counts.items())),
+        },
+        "targets": rows,
+    }
+
+
+def dry_run_historical_publication(
+    *,
+    manifest_path: str | Path,
+    expected_manifest_sha256: str,
+) -> dict[str, Any]:
+    manifest = load_historical_publication_manifest(
+        manifest_path,
+        expected_sha256=expected_manifest_sha256,
+    )
+    targets = _load_historical_publication_targets(manifest, lock=False)
+    facts = _historical_publication_facts(
+        (target.event_id for target in targets if target.event_id),
+        lock=False,
+    )
+    return _historical_publication_report(manifest, targets, facts=facts)
+
+
+def _historical_publication_verifier(
+    targets: list[HistoricalRaceEventTarget],
+) -> dict[str, Any]:
+    event_ids = [target.event_id for target in targets if target.event_id]
+    states = {
+        event_id: (visibility_status, data_quality_status)
+        for event_id, visibility_status, data_quality_status in RaceEvent.objects.filter(
+            pk__in=event_ids
+        ).values_list("pk", "visibility_status", "data_quality_status")
+    }
+    rows: list[dict[str, Any]] = []
+    error_count = 0
+    for target in targets:
+        state = states.get(target.event_id)
+        published = bool(state and state[0] == RaceEventVisibility.PUBLISHED)
+        complete = bool(state and state[1] == RaceEventDataQuality.COMPLETE)
+        errors = []
+        if not published:
+            errors.append("not_published")
+        if not complete:
+            errors.append("not_complete")
+        error_count += len(errors)
+        rows.append(
+            {
+                "target_id": target.pk,
+                "event_id": target.event_id,
+                "published": published,
+                "complete": complete,
+                "errors": errors,
+            }
+        )
+    return {
+        "ok": error_count == 0,
+        "checked_count": len(targets),
+        "error_count": error_count,
+        "targets": rows,
+    }
+
+
+def verify_historical_publication(
+    *,
+    manifest_path: str | Path,
+    expected_manifest_sha256: str,
+) -> dict[str, Any]:
+    manifest = load_historical_publication_manifest(
+        manifest_path,
+        expected_sha256=expected_manifest_sha256,
+    )
+    targets = _load_historical_publication_targets(manifest, lock=False)
+    return {
+        "mode": "verify",
+        "manifest_sha256": manifest.sha256,
+        "verifier": _historical_publication_verifier(targets),
+    }
+
+
+def apply_historical_publication(
+    *,
+    manifest_path: str | Path,
+    expected_manifest_sha256: str,
+    actor,
+) -> dict[str, Any]:
+    if not getattr(settings, "HISTORICAL_RACE_BACKFILL_ENABLED", False):
+        raise InventoryValidationError("HISTORICAL_RACE_BACKFILL_ENABLED must be true for publication apply")
+    if getattr(settings, "HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK", False):
+        raise InventoryValidationError("HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK must be false for publication apply")
+    if actor is None or not getattr(actor, "pk", None):
+        raise InventoryValidationError("publication apply requires an actor")
+    manifest = load_historical_publication_manifest(
+        manifest_path,
+        expected_sha256=expected_manifest_sha256,
+    )
+    published_count = 0
+    with transaction.atomic():
+        targets = _load_historical_publication_targets(manifest, lock=True)
+        facts = _historical_publication_facts(
+            (target.event_id for target in targets if target.event_id),
+            lock=True,
+        )
+        report = _historical_publication_report(manifest, targets, facts=facts)
+        if report["summary"]["blocked_count"]:
+            raise HistoricalPublicationBlockedError(
+                "历史赛事发布阻断: "
+                + canonical_json(
+                    {
+                        "blocked_count": report["summary"]["blocked_count"],
+                        "blocker_counts": report["summary"]["blocker_counts"],
+                    }
+                )
+            )
+        events_to_update: list[RaceEvent] = []
+        publication_logs: list[OperationLog] = []
+        event_ids = [target.event_id for target in targets if target.event_id]
+        existing_log_event_ids = set(
+            OperationLog.objects.filter(
+                action_type="historical_race_publication",
+                target_type="race_event",
+                target_id__in=[str(value) for value in event_ids],
+            ).values_list("target_id", flat=True)
+        )
+        for target, row in zip(targets, report["targets"], strict=True):
+            if row["status"] == "already_published":
+                continue
+            event = target.event
+            event.data_quality_status = RaceEventDataQuality.COMPLETE
+            event.visibility_status = RaceEventVisibility.PUBLISHED
+            events_to_update.append(event)
+            row["status"] = "published"
+            row["visibility_status"] = RaceEventVisibility.PUBLISHED
+            row["data_quality_status"] = RaceEventDataQuality.COMPLETE
+            published_count += 1
+            if str(event.pk) not in existing_log_event_ids:
+                publication_logs.append(
+                    OperationLog(
+                        admin=actor,
+                        action_type="historical_race_publication",
+                        target_type="race_event",
+                        target_id=str(event.pk),
+                        detail=canonical_json(
+                            {
+                                "target_id": target.pk,
+                                "artifact_sha256": manifest.artifact_sha256_by_target[target.pk],
+                                "manifest_sha256": manifest.sha256,
+                                "expectation_status": target.expectation_status,
+                            }
+                        ),
+                    )
+                )
+        if events_to_update:
+            RaceEvent.objects.bulk_update(
+                events_to_update,
+                ["data_quality_status", "visibility_status"],
+                batch_size=1000,
+            )
+        if publication_logs:
+            OperationLog.objects.bulk_create(publication_logs, batch_size=1000)
+        verifier = _historical_publication_verifier(targets)
+        if not verifier["ok"]:
+            raise InventoryValidationError("historical publication verifier failed inside transaction")
+        report["mode"] = "apply"
+        report["summary"]["published_count"] = published_count
+        report["verifier"] = verifier
+        if published_count:
+            transaction.on_commit(invalidate_public_race_cache)
+    return report
 
 
 def publish_historical_target(
