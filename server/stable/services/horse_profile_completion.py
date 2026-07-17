@@ -193,6 +193,38 @@ def _completion_status(pedigree_payload: dict[str, str], profile_payload: dict[s
     return HorseCompletionFailureReason.NO_EXTERNAL_MATCH, HorseCompletionFailureReason.NO_EXTERNAL_MATCH
 
 
+def _career_history_snapshot(profile: HorseProfile) -> dict[str, Any]:
+    return {
+        "status": profile.career_history_status,
+        "official_or_source_start_count": profile.official_or_source_start_count,
+        "collected_start_count": profile.collected_start_count,
+        "deduplicated_source_record_count": profile.deduplicated_source_record_count,
+        "gap_count": profile.career_history_gap_count,
+        "gap_reasons": profile.career_history_gap_reasons or [],
+        "linked_race_event_count": profile.linked_race_event_count,
+        "unlinked_race_record_count": profile.unlinked_race_record_count,
+        "overseas_start_count": profile.overseas_start_count,
+        "last_verified_at": (
+            profile.career_history_last_verified_at.isoformat()
+            if profile.career_history_last_verified_at
+            else ""
+        ),
+    }
+
+
+def _career_history_review_columns(snapshot: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "career_history_status": snapshot["status"],
+        "official_or_source_start_count": snapshot["official_or_source_start_count"],
+        "collected_start_count": snapshot["collected_start_count"],
+        "deduplicated_source_record_count": snapshot["deduplicated_source_record_count"],
+        "career_history_gap_count": snapshot["gap_count"],
+        "linked_race_event_count": snapshot["linked_race_event_count"],
+        "unlinked_race_record_count": snapshot["unlinked_race_record_count"],
+        "overseas_start_count": snapshot["overseas_start_count"],
+    }
+
+
 def plan_profile_completion(options: CompletionOptions | None = None) -> dict[str, Any]:
     options = options or CompletionOptions()
     queryset = HorseProfile.objects.select_related("primary_term").filter(primary_term__is_active=True)
@@ -236,6 +268,7 @@ def plan_profile_completion(options: CompletionOptions | None = None) -> dict[st
             summary["profile_only"] += 1
         else:
             summary["unmatched"] += 1
+        career_history = _career_history_snapshot(profile)
         row = {
             "profile_id": profile.pk,
             "display_name": profile.display_name,
@@ -255,6 +288,8 @@ def plan_profile_completion(options: CompletionOptions | None = None) -> dict[st
                 "horse_name_en": horse.horse_name_en,
                 "horse_name_zh_hant": horse.horse_name_zh_hant,
             },
+            "career_history": career_history,
+            **_career_history_review_columns(career_history),
             "reviewed": False,
         }
         rows.append(row)
@@ -275,6 +310,7 @@ def plan_profile_completion(options: CompletionOptions | None = None) -> dict[st
 
 
 def _row_for_failure(profile: HorseProfile, reason: str, message: str, *, matches: list[ExternalHorse] | None = None) -> dict[str, Any]:
+    career_history = _career_history_snapshot(profile)
     return {
         "profile_id": profile.pk,
         "display_name": profile.display_name,
@@ -292,6 +328,8 @@ def _row_for_failure(profile: HorseProfile, reason: str, message: str, *, matche
             "message": message,
             "matches": [{"source": item.source, "external_horse_id": item.horse_id, "horse_name": item.horse_name} for item in matches or []],
         },
+        "career_history": career_history,
+        **_career_history_review_columns(career_history),
         "reviewed": False,
     }
 
@@ -309,11 +347,35 @@ def _summary(rows: list[dict[str, Any]], region_summary: dict[str, dict[str, int
     for region, stats in region_summary.items():
         region_total = stats.get("total", 0)
         region_complete = stats.get("complete", 0)
+        region_rows = [row for row in rows if row.get("racing_region") == region]
         regions[region] = {
             **stats,
             "not_complete": region_total - region_complete,
             "complete_ratio": round(region_complete / region_total, 4) if region_total else 0,
             "not_complete_ratio": round((region_total - region_complete) / region_total, 4) if region_total else 0,
+            "career_history": {
+                "source_start_count_total": sum(
+                    int((row.get("career_history") or {}).get("official_or_source_start_count") or 0)
+                    for row in region_rows
+                ),
+                "source_start_count_unknown_profiles": sum(
+                    1
+                    for row in region_rows
+                    if (row.get("career_history") or {}).get("official_or_source_start_count") is None
+                ),
+                "collected_start_count_total": sum(
+                    int((row.get("career_history") or {}).get("collected_start_count") or 0)
+                    for row in region_rows
+                ),
+                "deduplicated_source_record_count_total": sum(
+                    int((row.get("career_history") or {}).get("deduplicated_source_record_count") or 0)
+                    for row in region_rows
+                ),
+                "gap_count_total": sum(
+                    int((row.get("career_history") or {}).get("gap_count") or 0)
+                    for row in region_rows
+                ),
+            },
         }
     return {
         "total": total,
@@ -323,6 +385,32 @@ def _summary(rows: list[dict[str, Any]], region_summary: dict[str, dict[str, int
         "complete_ratio": round(complete / total, 4) if total else 0,
         "not_complete_ratio": round((total - complete) / total, 4) if total else 0,
         "failure_distribution": failure_distribution,
+        "career_history": {
+            "source_start_count_total": sum(
+                int((row.get("career_history") or {}).get("official_or_source_start_count") or 0)
+                for row in rows
+            ),
+            "collected_start_count_total": sum(
+                int((row.get("career_history") or {}).get("collected_start_count") or 0)
+                for row in rows
+            ),
+            "source_start_count_unknown_profiles": sum(
+                1
+                for row in rows
+                if (row.get("career_history") or {}).get("official_or_source_start_count") is None
+            ),
+            "deduplicated_source_record_count_total": sum(
+                int((row.get("career_history") or {}).get("deduplicated_source_record_count") or 0)
+                for row in rows
+            ),
+            "gap_count_total": sum(
+                int((row.get("career_history") or {}).get("gap_count") or 0)
+                for row in rows
+            ),
+            "complete_profile_count": sum(
+                1 for row in rows if (row.get("career_history") or {}).get("status") == "complete"
+            ),
+        },
         "regions": regions,
     }
 
@@ -346,6 +434,14 @@ def write_completion_artifacts(plan: dict[str, Any], output_dir: str | Path) -> 
             "completion_status",
             "failure_reason",
             "missing_fields",
+            "career_history_status",
+            "official_or_source_start_count",
+            "collected_start_count",
+            "deduplicated_source_record_count",
+            "career_history_gap_count",
+            "linked_race_event_count",
+            "unlinked_race_record_count",
+            "overseas_start_count",
             "reviewed",
         ],
     )

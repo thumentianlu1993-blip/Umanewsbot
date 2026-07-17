@@ -103,6 +103,15 @@
       </select>
     </label>
     <label>
+      生涯完整度
+      <select name="career_status">
+        <option value="">全部</option>
+        {% for value,label in career_statuses %}
+          <option value="{{ value }}" {% if filters.career_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
       候选状态
       <select name="candidate_status">
         <option value="">全部</option>
@@ -140,6 +149,7 @@
               <td>
                 <span class="badge {% if profile.review_status == 'published' %}success{% elif profile.review_status == 'draft' %}warning{% endif %}">{{ profile.get_review_status_display }}</span>
                 <div class="muted">{{ profile.get_completeness_status_display }}</div>
+                <div class="muted">{{ profile.get_career_history_status_display }} · 已采集 {{ profile.collected_start_count }} / 来源 {{ profile.official_or_source_start_count|default:"待确认" }}</div>
                 <div class="muted">P0 来源 {{ profile.p0_source_count }} · 履历同步 {{ profile.records_synced_through|date:"Y-m-d"|default:"-" }}</div>
               </td>
               <td>

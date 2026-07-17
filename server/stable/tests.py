@@ -16990,6 +16990,9 @@ class P0HorseProfileDataCompletionTests(TestCase):
         return event
 
     def _complete_records(self, profile):
+        from stable.models import HorseRaceDatePrecision, HorseRaceStartStatus
+        from stable.services.horse_race_records import refresh_career_history_completeness
+
         HorseRaceRecord.objects.create(
             horse_profile=profile,
             race_name="Breeders' Cup Classic",
@@ -17002,6 +17005,8 @@ class P0HorseProfileDataCompletionTests(TestCase):
             surface=RaceEventSurface.DIRT,
             finish_position="1",
             result_status=HorseRaceResultStatus.WON,
+            start_status=HorseRaceStartStatus.STARTED,
+            race_date_precision=HorseRaceDatePrecision.EXACT,
             is_major_win=True,
             source_name="official",
             source_url="https://example.com/result",
@@ -17018,8 +17023,15 @@ class P0HorseProfileDataCompletionTests(TestCase):
             surface=RaceEventSurface.DIRT,
             finish_position="2",
             result_status=HorseRaceResultStatus.PLACED,
+            start_status=HorseRaceStartStatus.STARTED,
+            race_date_precision=HorseRaceDatePrecision.EXACT,
             source_name="official",
             source_url="https://example.com/saudi-cup",
+        )
+        refresh_career_history_completeness(
+            profile,
+            official_or_source_start_count=2,
+            verified_at=timezone.now(),
         )
 
     def test_major_race_participant_without_translation_enters_p0_queue(self):

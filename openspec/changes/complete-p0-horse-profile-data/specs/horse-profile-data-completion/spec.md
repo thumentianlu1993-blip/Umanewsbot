@@ -190,3 +190,54 @@
 - **WHEN** 批次完成
 - **THEN** 系统 SHALL 基于成功率、失败原因和队列剩余项输出下一批建议
 - **AND** 建议 SHALL 区分可扩大、需修 adapter、需人工处理和暂不处理
+
+### Requirement: P0 马完整生涯必须独立于赛事产品覆盖
+系统 SHALL 按马匹来源采集 P0 马的全部生涯实际出赛，不得从重点赛事或正式 `RaceEvent` 总账反推完整履历。新马、未胜利、普通条件、让磅、表列及各级分级赛均属于 `HorseRaceRecord` 范围。
+
+#### Scenario: 普通比赛没有正式赛事详情
+- **WHEN** 来源确认 P0 马参加了一场普通比赛，但系统没有可确认的 `RaceEvent`
+- **THEN** 系统 SHALL 保存一条 `event=NULL` 的 `HorseRaceRecord` 和比赛快照、结果及来源证据
+- **AND** 系统 MUST NOT 为满足履历展示强行创建 `RaceEvent`
+
+#### Scenario: 后续确认普通比赛身份
+- **WHEN** 未关联履历后来获得唯一可靠的 `RaceEvent` / `RaceEventResult` 身份
+- **THEN** 系统 SHALL 在原履历上回填关联
+- **AND** 不得生成第二条参赛事实或丢失原始来源证据
+
+### Requirement: 生涯完整度必须与资料和血统完整度分离
+系统 SHALL 为马匹独立记录 `career_history_status` 或等价状态。状态 MUST 以来源总实际出赛数、已采集实际出赛数、缺口数、关联/未关联赛事数、海外出赛数、逐场核心字段和最后核验时间为依据，不得用二代血统状态、重点胜利数或 `records_synced_through` 单独代替。
+
+#### Scenario: 来源总数与实际出赛一致
+- **WHEN** 可靠来源给出生涯实际出赛总数
+- **AND** 系统中去重后的实际出赛数与之相等、没有未解释缺口或待确认出赛记录
+- **THEN** 系统 MAY 将生涯履历标记为完整
+
+#### Scenario: 来源总数未知或计数不一致
+- **WHEN** 来源总数未知、采集数少于或多于来源总数，或存在待确认出赛状态
+- **THEN** 系统 MUST NOT 将生涯履历标记为完整
+- **AND** SHALL 保存可审核的阻断原因和缺口计数
+
+### Requirement: 异常结果必须采用实际出赛计数语义
+系统 SHALL 区分报名/退赛与实际出赛。`scratched` 和 `withdrawn` MUST NOT 计入生涯实际出赛数；`did_not_finish` 和 `disqualified` MUST 计入实际出赛数；来源无法确认是否实际出赛时 MUST 保持待确认。
+
+#### Scenario: 退赛不计入实际出赛
+- **WHEN** 一条履历状态为 `scratched` 或 `withdrawn`
+- **THEN** 该记录 SHALL 保留在履历中
+- **AND** `collected_start_count` MUST NOT 增加
+
+#### Scenario: 未完赛仍计入实际出赛
+- **WHEN** 一条履历状态为 `did_not_finish` 或 `disqualified`
+- **THEN** `collected_start_count` SHALL 计入该记录
+
+### Requirement: 跨来源履历必须安全去重并保留证据
+系统 SHALL 使用马匹稳定身份与精确赛事事实生成跨来源规范键。海外远征在母国来源和举办地区来源中重复出现时，只能形成一条参赛事实，但 MUST 保留全部来源引用。仅有模糊名称或年份时不得自动跨来源合并。
+
+#### Scenario: 两个来源描述同一场海外远征
+- **WHEN** 两个来源具有同一马匹、精确日期、场地和相同场次号，或具有一致的比赛名与距离证据
+- **THEN** 系统 SHALL 合并为一条 `HorseRaceRecord`
+- **AND** `source_refs` SHALL 同时保留两个来源 URL 和外部身份
+
+#### Scenario: 跨单位距离保留原文
+- **WHEN** 两个来源分别使用米、英里或化朗描述距离
+- **THEN** 系统 SHALL 保留各来源原始距离证据
+- **AND** 只有在赛事身份其它证据充分时才可合并，不得仅按未经规范化的距离数字判断同一赛事

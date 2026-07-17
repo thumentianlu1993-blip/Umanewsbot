@@ -17,6 +17,7 @@ from django.utils import timezone
 from stable.models import (
     HorseIdentityConflict,
     HorseIdentityConflictStatus,
+    HorseCareerHistoryStatus,
     HorseP0Source,
     HorseP0SourceStatus,
     HorseP0SourceType,
@@ -44,6 +45,7 @@ from stable.services.horse_profiles import PEDIGREE_TEXT_FIELDS, update_complete
 from stable.services.horse_race_records import (
     has_ambiguous_legacy_race_record,
     parse_record_date,
+    refresh_career_history_completeness,
     upsert_race_record,
 )
 
@@ -1501,6 +1503,15 @@ def evaluate_full_profile_completeness(
     ).exists():
         blocking_reasons.append("race_history.source_url")
 
+    if profile.career_history_status != HorseCareerHistoryStatus.COMPLETE:
+        blocking_reasons.append(f"race_history.career_status.{profile.career_history_status}")
+    if profile.official_or_source_start_count is None:
+        blocking_reasons.append("race_history.source_start_count")
+    elif profile.collected_start_count != profile.official_or_source_start_count:
+        blocking_reasons.append("race_history.start_count_mismatch")
+    if profile.career_history_gap_count:
+        blocking_reasons.append("race_history.gaps")
+
     if not race_records.filter(Q(result_status=HorseRaceResultStatus.WON) | Q(is_major_win=True)).exists():
         blocking_reasons.append("major_wins")
 
@@ -1864,6 +1875,21 @@ def apply_reviewed_completion_artifact(payload: dict, *, commit: bool = False) -
                     row=row,
                 )
                 row_changed |= bool(candidate_created or diff_payload.get("records") or changed_fields)
+
+            if HorseProfileModule.RACE_RECORD in approved_modules:
+                career_payload = row.get("career_history") or {}
+                refresh_kwargs: dict[str, Any] = {}
+                if "official_or_source_start_count" in career_payload:
+                    refresh_kwargs["official_or_source_start_count"] = career_payload.get(
+                        "official_or_source_start_count"
+                    )
+                if "gap_reasons" in career_payload:
+                    refresh_kwargs["gap_reasons"] = career_payload.get("gap_reasons") or []
+                if "source_refs" in career_payload:
+                    refresh_kwargs["source_refs"] = career_payload.get("source_refs") or {}
+                if career_payload:
+                    refresh_kwargs["verified_at"] = timezone.now()
+                refresh_career_history_completeness(profile, **refresh_kwargs)
 
             if source_url and approved_modules:
                 source_refs = dict(profile.source_refs or {})

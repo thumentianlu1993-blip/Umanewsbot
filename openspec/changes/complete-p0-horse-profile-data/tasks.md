@@ -12,6 +12,7 @@
 - [x] 1.3 (application) 新增或扩展 `HorseProfile` 完整资料状态、赛马生涯状态或等价同步标记，区分现有 `complete_pedigree_2gen`、退役马完整生涯履历和在役马截至最近同步时间的完整已知履历。
 - [x] 1.4 (application) 设计并新增 P0 补全 run / batch 记录模型或等价持久化结构，记录范围、参数、状态、artifact 路径、统计摘要、错误信息和操作者。
 - [x] 1.5 (application) 新增迁移，并确保 P0 来源、batch 记录、`HorseIdentityConflict`、候选记录、`HorseProfile` 和 `HorseRaceRecord` 可互相反查。
+- [x] 1.6 (application) 将生涯履历完整度从资料/二代血统完整度中拆分，新增来源总出赛数、已采集实际出赛数、缺口数、已关联/未关联赛事数、海外出赛数、独立状态和最后核验时间，并以安全迁移回填现有异常结果的实际出赛语义。
 
 ## 2. 术语识别、翻译保护和前台展示
 
@@ -39,6 +40,8 @@
 - [x] 4.5 (integration) 主胜鞍沿用既有 `HorseRaceRecord` 胜利最高等级 + 人工 `is_major_win` 覆盖规则，不因 P0 来源重点赛事定义而改变。
 - [ ] 4.6 (integration) 扩展 artifact 写出，确保 JSONL、CSV、summary、失败/冲突清单和 source evidence manifest 包含审核状态、模块 diff、来源 URL、失败原因样例和下一批建议。
 - [x] 4.7 (operations) 在 `.env.example` 和运行文档中补充 P0 补全请求开关、限速、缓存目录、批次大小、人工补录来源 URL 规则和生产默认保守值。
+- [x] 4.8 (integration) 扩展 `HorseRaceRecord` 普通比赛快照、日期精度、实际出赛状态和跨来源规范键；支持海外远征多来源去重、来源证据合并，以及未关联普通履历在确认身份后安全回填 `RaceEvent` / `RaceEventResult`。
+- [x] 4.9 (integration) 扩展履历完整度计算与 dry-run 指标，报告来源总出赛数、采集实际出赛数、跨来源去重数、缺口数、已关联/未关联赛事数、海外出赛数和逐马独立完整状态。
 
 ## 5. 审核应用、后台运营和发布预留
 
@@ -49,6 +52,7 @@
 - [x] 5.5 (application) 在后台详情或 ready/发布动作前展示资料质量提示，包含完整资料硬字段、缺失字段、候选冲突、人工锁定跳过、完整履历同步时间和中文名待补状态。
 - [x] 5.6 (application) 预留自动化状态和门禁字段，区分已发布马自动增量更新与未发布马自动首次公开；本阶段不启用自动首次公开。
 - [x] 5.7 (operations) 对未处理 `HorseIdentityConflict` 建立每日管理员通知，复用现有运营通知通道并提供 Django Admin 筛选 URL、处理人、处理时间和解决资料页。
+- [x] 5.8 (application) 将公开马匹详情页固定 20 条截断改为完整履历分页，支持日期正序/倒序；未关联普通比赛显示快照且不生成无效赛事链接。
 
 ## 6. 验证与生产试运行
 
@@ -60,3 +64,4 @@
 - [ ] 6.6 (operations) 对已审核五地区样本 artifact 执行生产 commit，抽检 `HorseProfile`、P0 来源、`HorseProfileDataCandidate`、`HorseRaceRecord`、无译名展示、翻译保护和后台质量提示。
 - [ ] 6.7 (operations) 每地区人工发布 1-2 匹完整资料马，验收公开索引、详情页、移动端、完整赛事履历、主胜鞍、关注入口、新闻 tag 和 no-network 边界。
 - [ ] 6.8 (operations) 将 dry-run/commit/公开验收结果、失败原因、下一批建议和是否扩大批次写回 `docs/current_state.md`、`docs/project_status.md`、`docs/decisions.md` 和 `docs/deploy_runbook.md`。
+- [x] 6.9 (integration) 为独立生涯完整度、异常结果实际出赛计数、跨来源/海外远征去重、多来源证据保留、未关联普通比赛、后续安全关联、跨单位距离和公开履历分页补充真实 Django 测试。

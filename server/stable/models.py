@@ -653,6 +653,13 @@ class HorseProfileCompleteness(models.TextChoices):
     COMPLETE_PROFILE_FULL = "complete_profile_full", "完整马匹资料"
 
 
+class HorseCareerHistoryStatus(models.TextChoices):
+    NOT_STARTED = "not_started", "尚未采集"
+    PARTIAL = "partial", "部分履历"
+    COMPLETE = "complete", "完整生涯"
+    NEEDS_REVIEW = "needs_review", "需要审核"
+
+
 class HorseProfileModule(models.TextChoices):
     PROFILE = "profile", "基础资料"
     PEDIGREE = "pedigree", "血统"
@@ -690,6 +697,19 @@ class HorseRaceResultStatus(models.TextChoices):
     WITHDRAWN = "withdrawn", "取消出走"
     DID_NOT_FINISH = "did_not_finish", "未完赛"
     DISQUALIFIED = "disqualified", "失格"
+    UNKNOWN = "unknown", "未知"
+
+
+class HorseRaceStartStatus(models.TextChoices):
+    STARTED = "started", "实际出赛"
+    DID_NOT_START = "did_not_start", "未实际出赛"
+    UNCONFIRMED = "unconfirmed", "是否出赛待确认"
+
+
+class HorseRaceDatePrecision(models.TextChoices):
+    EXACT = "exact", "完整日期"
+    MONTH = "month", "精确到月"
+    YEAR = "year", "精确到年"
     UNKNOWN = "unknown", "未知"
 
 
@@ -2754,6 +2774,21 @@ class HorseProfile(TimestampedModel):
         default=HorseRacingCareerStatus.UNKNOWN,
     )
     records_synced_through = models.DateField(null=True, blank=True)
+    career_history_status = models.CharField(
+        max_length=16,
+        choices=HorseCareerHistoryStatus.choices,
+        default=HorseCareerHistoryStatus.NOT_STARTED,
+    )
+    official_or_source_start_count = models.PositiveIntegerField(null=True, blank=True)
+    collected_start_count = models.PositiveIntegerField(default=0)
+    linked_race_event_count = models.PositiveIntegerField(default=0)
+    unlinked_race_record_count = models.PositiveIntegerField(default=0)
+    overseas_start_count = models.PositiveIntegerField(default=0)
+    deduplicated_source_record_count = models.PositiveIntegerField(default=0)
+    career_history_gap_count = models.PositiveIntegerField(default=0)
+    career_history_gap_reasons = models.JSONField(default=list, blank=True)
+    career_history_source_refs = models.JSONField(default=dict, blank=True)
+    career_history_last_verified_at = models.DateTimeField(null=True, blank=True)
     full_profile_reviewed_at = models.DateTimeField(null=True, blank=True)
     full_profile_reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -2793,6 +2828,7 @@ class HorseProfile(TimestampedModel):
             models.Index(fields=("completeness_status", "review_status"), name="horse_complete_status_idx"),
             models.Index(fields=("is_featured", "review_status"), name="horse_featured_status_idx"),
             models.Index(fields=("racing_region", "records_synced_through"), name="horse_region_sync_idx"),
+            models.Index(fields=("career_history_status", "racing_region"), name="horse_career_region_idx"),
         ]
 
     def __str__(self) -> str:
@@ -3056,18 +3092,41 @@ class HorseRaceRecord(TimestampedModel):
     race_name = models.CharField(max_length=255)
     race_year = models.PositiveSmallIntegerField(null=True, blank=True)
     race_date = models.DateField(null=True, blank=True)
+    race_date_precision = models.CharField(
+        max_length=16,
+        choices=HorseRaceDatePrecision.choices,
+        default=HorseRaceDatePrecision.UNKNOWN,
+    )
+    race_name_normalized = models.CharField(max_length=255, blank=True)
+    race_region = models.CharField(max_length=32, choices=RacingRegion.choices, blank=True)
+    race_number = models.CharField(max_length=32, blank=True)
     grade_text = models.CharField(max_length=128, blank=True)
     normalized_grade = models.CharField(max_length=32, choices=RaceGrade.choices, blank=True)
     racecourse = models.CharField(max_length=255, blank=True)
     distance_text = models.CharField(max_length=128, blank=True)
+    distance_meters = models.PositiveIntegerField(null=True, blank=True)
     surface = models.CharField(max_length=16, choices=RaceEventSurface.choices, blank=True)
+    race_type_text = models.CharField(max_length=128, blank=True)
+    horse_number = models.CharField(max_length=32, blank=True)
+    barrier = models.CharField(max_length=32, blank=True)
+    jockey_name = models.CharField(max_length=255, blank=True)
+    carried_weight = models.CharField(max_length=64, blank=True)
+    finish_time = models.CharField(max_length=64, blank=True)
+    prize_text = models.CharField(max_length=128, blank=True)
     finish_position = models.CharField(max_length=32, blank=True)
     result_status = models.CharField(max_length=16, choices=HorseRaceResultStatus.choices, default=HorseRaceResultStatus.UNKNOWN)
+    start_status = models.CharField(
+        max_length=16,
+        choices=HorseRaceStartStatus.choices,
+        default=HorseRaceStartStatus.UNCONFIRMED,
+    )
+    is_overseas = models.BooleanField(default=False)
     is_major_win = models.BooleanField(default=False)
     major_win_order = models.PositiveSmallIntegerField(default=0)
     source_name = models.CharField(max_length=128, blank=True)
     source_url = models.URLField(max_length=1000, blank=True)
     idempotency_key = models.CharField(max_length=255, blank=True)
+    canonical_race_key = models.CharField(max_length=64, blank=True)
     source_refs = models.JSONField(default=dict, blank=True)
     raw_payload = models.JSONField(default=dict, blank=True)
 
@@ -3078,13 +3137,20 @@ class HorseRaceRecord(TimestampedModel):
             models.Index(fields=("horse_profile", "is_major_win"), name="horse_record_major_idx"),
             models.Index(fields=("event", "result_status"), name="horse_record_event_idx"),
             models.Index(fields=("horse_profile", "idempotency_key"), name="horse_record_idem_idx"),
+            models.Index(fields=("horse_profile", "start_status"), name="horse_record_start_idx"),
+            models.Index(fields=("horse_profile", "canonical_race_key"), name="horse_record_canon_idx"),
         ]
         constraints = [
             models.UniqueConstraint(
                 fields=("horse_profile", "idempotency_key"),
                 condition=~models.Q(idempotency_key=""),
                 name="uq_horse_record_idempotency",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=("horse_profile", "canonical_race_key"),
+                condition=~models.Q(canonical_race_key=""),
+                name="uq_horse_record_canonical",
+            ),
         ]
 
     def __str__(self) -> str:
