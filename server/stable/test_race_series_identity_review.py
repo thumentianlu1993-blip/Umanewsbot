@@ -791,6 +791,138 @@ class RaceSeriesIdentityReviewTests(TestCase):
             self._service().is_identity_pair_do_not_merge(source, independent)
         )
 
+    def test_cross_region_ignore_false_match_preserves_existing_event_owner(self):
+        candidate_series = self._series(
+            "cross-region-candidate",
+            region=RacingRegion.UNITED_STATES,
+        )
+        event_series = self._series(
+            "cross-region-event",
+            region=RacingRegion.UNITED_KINGDOM,
+        )
+        candidate_target = self._target(series=candidate_series, year=2026)
+        owner_target = self._target(series=event_series, year=2026)
+        event = self._event(
+            series=event_series,
+            year=2026,
+            slug="cross-region-event-2026",
+        )
+        owner_target.event = event
+        owner_target.save(update_fields={"event"})
+        decision = self._decision(
+            sequence=1,
+            decision="ignore_false_match",
+            target=candidate_target,
+            event=event,
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            output, prepared = self._prepare(Path(temporary), [decision])
+            approval, approval_sha = self._approve(
+                output, prepared["manifest_sha256"]
+            )
+            applied = self._service().apply_race_series_identity_review(
+                artifact_dir=output,
+                expected_manifest_sha256=prepared["manifest_sha256"],
+                approval_path=approval,
+                expected_approval_sha256=approval_sha,
+                actor=self.actor,
+            )
+            verified = self._service().verify_race_series_identity_review(
+                artifact_dir=output,
+                expected_manifest_sha256=prepared["manifest_sha256"],
+                expected_state="applied",
+            )
+            self.assertTrue(verified["ok"])
+
+            candidate_target.refresh_from_db()
+            owner_target.refresh_from_db()
+            event.refresh_from_db()
+            candidate_series.refresh_from_db()
+            event_series.refresh_from_db()
+            self.assertIsNone(candidate_target.event_id)
+            self.assertEqual(owner_target.event_id, event.pk)
+            self.assertEqual(event.race_series_id, event_series.pk)
+            self.assertEqual(
+                event.country_region,
+                RacingRegion.UNITED_KINGDOM,
+            )
+            self.assertTrue(
+                self._service().is_identity_pair_do_not_merge(
+                    candidate_series, event_series
+                )
+            )
+            self.assertTrue(
+                self._service().is_identity_pair_do_not_merge(
+                    event_series, candidate_series
+                )
+            )
+
+            rolled_back = self._service().rollback_race_series_identity_review(
+                artifact_dir=output,
+                expected_manifest_sha256=prepared["manifest_sha256"],
+                approval_path=approval,
+                expected_approval_sha256=approval_sha,
+                rollback_path=applied["rollback_path"],
+                expected_rollback_sha256=applied["rollback_sha256"],
+                actor=self.actor,
+            )
+            self.assertTrue(rolled_back["verification"]["ok"])
+
+        candidate_target.refresh_from_db()
+        owner_target.refresh_from_db()
+        event.refresh_from_db()
+        candidate_series.refresh_from_db()
+        event_series.refresh_from_db()
+        self.assertIsNone(candidate_target.event_id)
+        self.assertEqual(owner_target.event_id, event.pk)
+        self.assertEqual(event.race_series_id, event_series.pk)
+        self.assertFalse(
+            self._service().is_identity_pair_do_not_merge(
+                candidate_series, event_series
+            )
+        )
+
+    def test_cross_region_owned_event_is_rejected_for_keep_or_merge(self):
+        for index, decision_value in enumerate(
+            ("keep_independent", "merge_and_link"),
+            start=1,
+        ):
+            with self.subTest(decision=decision_value):
+                candidate_series = self._series(
+                    f"cross-region-rejected-candidate-{index}",
+                    region=RacingRegion.UNITED_STATES,
+                )
+                event_series = self._series(
+                    f"cross-region-rejected-event-{index}",
+                    region=RacingRegion.UNITED_KINGDOM,
+                )
+                candidate_target = self._target(
+                    series=candidate_series,
+                    year=2026,
+                )
+                owner_target = self._target(series=event_series, year=2026)
+                event = self._event(
+                    series=event_series,
+                    year=2026,
+                    slug=f"cross-region-rejected-event-{index}-2026",
+                )
+                owner_target.event = event
+                owner_target.save(update_fields={"event"})
+                decision = self._decision(
+                    sequence=index,
+                    decision=decision_value,
+                    target=candidate_target,
+                    event=event,
+                )
+
+                with tempfile.TemporaryDirectory() as temporary:
+                    with self.assertRaisesRegex(
+                        self._service().RaceSeriesIdentityReviewError,
+                        "decision identity drift",
+                    ):
+                        self._prepare(Path(temporary), [decision])
+
     def test_negative_decision_rows_fail_closed_on_identity_or_detail_drift(self):
         mutations = (
             "target_series",

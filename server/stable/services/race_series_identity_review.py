@@ -428,15 +428,24 @@ def _validate_decision_identity(
     target: HistoricalRaceEventTarget,
     event: RaceEvent,
 ) -> None:
+    target_region = decision["country_region"]
     if (
-        target.race_series_id != decision["target_series_id"]
-        or event.race_series_id != decision["event_series_id"]
+        target.pk != decision["target_id"]
+        or target.race_series_id != decision["target_series_id"]
         or target.year != decision["year"]
+        or target.country_region != target_region
+        or target.race_series.country_region != target_region
+        or event.pk != decision["event_id"]
+        or event.race_series_id != decision["event_series_id"]
         or event.year != decision["year"]
-        or target.country_region != decision["country_region"]
-        or event.country_region != decision["country_region"]
-        or target.race_series.country_region != decision["country_region"]
-        or event.race_series.country_region != decision["country_region"]
+        or event.country_region != event.race_series.country_region
+        or (
+            decision["decision"] != DECISION_IGNORE_FALSE_MATCH
+            and (
+                event.country_region != target_region
+                or event.race_series.country_region != target_region
+            )
+        )
     ):
         raise RaceSeriesIdentityReviewError(
             f"decision identity drift: {decision['decision_id']}"
