@@ -1,5 +1,13 @@
 # 当前状态
 
+## 2026-07-17 AI 赛事身份初审已固化，生产写入待精确授权
+
+- 用户提供的 AI 初审工作簿为 `/Users/mentianlu/Downloads/生产赛事身份审核_213a818c_20260717_AI初审建议.xlsx`，SHA-256 为 `d93286e9e61ccf41770fe607740a972d025c8a00b2deb1d4a4f1890954852492`。正式输入共 `267` 条：`228` 条同意合并并关联、`21` 条保持独立、`18` 条非同赛／忽略；John C. Harris Stakes 另附 `surface: dirt -> turf` 的显式字段修复。
+- 身份执行工具已进入代码 commit `8b9b97552a6cb8b4b4690dc6f8b1a1d4233991e5`，tree `ab1f58af54381e72c7c277f03a59a29676618dae`。它只移动经批准年度赛事的系列归属、建立正式目标关联和 `MERGED_INTO` 沿革；不删除 `RaceSeries`，不改变公开状态、赛事状态、出马表或赛果。保持独立和误命中会写入双向禁止自动合并规则，字段修复独立执行。
+- 真实 RED 后 focused/相关组合测试最终 `50/50` 通过；Django check、迁移无漂移和 diff check 通过。同一 reviewer 连续复审了事务、锁、序列唯一性、正负决定冲突、跨地区误命中和 TOCTOU 修复，最终结论为 `APPROVED`，无剩余直接 P0/P1。
+- 生产只读 prepare 已在现有 `213a818c` 运行环境中加载上述精确代码完成，没有部署、重启或写库。有效 artifact 位于 `/opt/umanewsbot/runtime/race_series_identity_review/prepare-8b9b9755-20260717_205349/artifact`；manifest SHA-256 为 `cf5e220e9c0a0c7b2daeb7ef5030ed3243059ec9bd36ba5e6e2390c0d89a0147`，actions SHA-256 为 `9622460e82dc4d3449bf693bf2e7e107e43684c5b5dbf518bc700a4a24f53da1`，prepared verifier 为 `ok=true / error_count=0`。
+- `approval.json` 仍为 pending，尚未签署或执行生产 apply。下一门禁是用户对上述 commit、manifest 和 actions 的明确授权；授权后才可部署精确代码、生成并验证新数据库备份、再次 dry-run/verify、由 `admin` 串行 apply 并逐项验收。历史公开、常驻历史网络和写入开关继续关闭。
+
 ## 2026-07-17 赛事正式总账与公开赛程关联工具已发布，生产只读审计待身份审核
 
 - 已确认此前“7 场未到期”只代表 `8032` 个历史详情验收目标中的 `not_due`，不代表生产全部未来赛程；生产在 `2026-07-18` 至 `2026-07-31` 另有 `44` 条公开 `scheduled RaceEvent`，多数尚未关联正式目标。

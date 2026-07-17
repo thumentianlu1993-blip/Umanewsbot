@@ -1,5 +1,16 @@
 # 部署运行手册
 
+## AI 赛事身份决定生产执行门禁（2026-07-17）
+
+1. 唯一允许进入下一步的代码基线为 `8b9b97552a6cb8b4b4690dc6f8b1a1d4233991e5`，代码 tree 为 `ab1f58af54381e72c7c277f03a59a29676618dae`；工作簿 SHA-256 为 `d93286e9e61ccf41770fe607740a972d025c8a00b2deb1d4a4f1890954852492`。部署前重新核对主线只包含文档追加或该精确代码，不得夹带产品行为变化。
+2. 正式生产 artifact 为 `/opt/umanewsbot/runtime/race_series_identity_review/prepare-8b9b9755-20260717_205349/artifact`。manifest SHA-256 必须为 `cf5e220e9c0a0c7b2daeb7ef5030ed3243059ec9bd36ba5e6e2390c0d89a0147`，actions SHA-256 必须为 `9622460e82dc4d3449bf693bf2e7e107e43684c5b5dbf518bc700a4a24f53da1`；prepared verifier 必须保持 `ok=true / error_count=0`。
+3. 当前 `approval.json` 为 pending。取得用户对上述代码、manifest 和 actions 的明确发布授权后，才由生产用户 `admin` 填写 approved 状态、时间和 manifest SHA，并记录 approval 文件自身 SHA；不得沿用此前 reconciliation 的空动作 approval。
+4. 发布前确认 historical runner、live lock、running batch 和历史 one-off 均为空；构建并部署精确 AMD64 镜像，核对 web/worker/beat 的 image、revision、服务器 checkout 和容器内命令一致。本变更无迁移，仍需运行 Django check 和迁移漂移检查。
+5. apply 前创建新的 custom-format PostgreSQL 备份，核对文件非空、权限、SHA-256 和 `pg_restore -l`。随后以正式 artifact 运行 dry-run 和 verifier；任何数据库 baseline、artifact 或 approval SHA 漂移都停止。
+6. 只允许单个串行 apply。预期动作是 `228` 个正向身份关联、`24` 个唯一负向系列对和 `1` 个字段修复；工具内部整批事务、数据库锁和逐对象锁必须生效。不得删除系列，不得改变公开状态、赛事状态、runners 或 results。
+7. 写后 verifier 必须为 `ok=true / error_count=0`，并逐项证明目标关联、系列归属、`MERGED_INTO`、双向禁止合并规则和 John C. Harris 草地修复。保存 OperationLog、rollback ledger、最终 summary、manifest 和 approval SHA。
+8. 全程保持 `RACE_EVENT_HISTORICAL_PUBLIC_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。写后复核 healthz、队列、事务和错误日志，再单独决定是否继续原 reconciliation 关联。
+
 ## 赛事正式目标与公开赛程关联发布门禁（2026-07-17）
 
 1. 以最新成功代码 review 后用户明确批准的 commit 构建 AMD64 镜像；切换前核对 revision、tree、source SHA 和两次构建 image ID，不复用旧分支镜像。

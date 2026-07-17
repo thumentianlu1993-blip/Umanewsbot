@@ -1,5 +1,12 @@
 # 项目状态文档
 
+## 2026-07-17 AI 赛事身份初审已形成生产候选
+
+- 已正式采用 AI 初审的 `267` 条决定：`228` 条合并并关联、`21` 条保持独立、`18` 条非同赛／忽略；John C. Harris Stakes 另有一条 `surface=turf` 修复。正向决定保留来源系列，负向决定写入双向禁止自动合并规则。
+- 执行代码 commit 为 `8b9b9755`，最终相关测试 `50/50`、Django check、迁移和 diff 检查通过；同一 reviewer 最终批准，无剩余直接 P0/P1。
+- 生产只读 prepare 已完成：artifact 为 `/opt/umanewsbot/runtime/race_series_identity_review/prepare-8b9b9755-20260717_205349/artifact`，manifest `cf5e220e...a0147`、actions `9622460e...f53da1`，verifier 为 `ok=true / error_count=0`。对 228 个正向系列对的只读审计无同年目标冲突、既有关联冲突或第三方占用。
+- 当前仍是 pending approval，生产数据库没有执行本轮写入；生产运行镜像仍为 `213a818c`。待用户针对当前 commit+manifest+actions 明确授权后，执行精确部署、新备份、dry-run、串行 apply 和逐项 verifier；历史公开保持关闭。
+
 ## 2026-07-17 赛事总账/公开赛程关联工具已发布，关联写入待身份审核
 
 - 已完成 `reconcile-race-event-coverage` 本地实现和零问题复审：允许 `not_due` 安全采用唯一既有赛程，新增历史/当前/赛果三层报告、不可变 artifact、approval 双 SHA、原子 apply/rollback 和 verifier。
