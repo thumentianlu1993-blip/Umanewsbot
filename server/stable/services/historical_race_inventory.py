@@ -1385,14 +1385,18 @@ def load_historical_publication_manifest(
     expected_sha256 = str(expected_sha256 or "").strip().lower()
     if not SHA256_RE.fullmatch(expected_sha256):
         raise InventoryValidationError("expected manifest SHA-256 must be 64 lowercase hexadecimal characters")
-    actual_sha256 = file_identity(path).sha256
+    try:
+        manifest_bytes = path.read_bytes()
+    except OSError as exc:
+        raise InventoryValidationError(f"publication manifest cannot be read: {exc}") from exc
+    actual_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
     if actual_sha256 != expected_sha256:
         raise InventoryValidationError(
             f"manifest SHA-256 mismatch: expected {expected_sha256}, got {actual_sha256}"
         )
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        payload = json.loads(manifest_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise InventoryValidationError(f"publication manifest is not valid JSON: {exc}") from exc
     if not isinstance(payload, dict):
         raise InventoryValidationError("publication manifest root must be an object")

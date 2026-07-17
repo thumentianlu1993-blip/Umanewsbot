@@ -29,6 +29,7 @@ from stable.models import (
     RaceSeriesReviewStatus,
     RacingRegion,
 )
+from stable.services.historical_race_inventory import load_historical_publication_manifest
 
 
 class HistoricalRacePublicationCommandTests(TestCase):
@@ -191,6 +192,26 @@ class HistoricalRacePublicationCommandTests(TestCase):
             RaceEventVisibility.DRAFT,
         )
         self.assertFalse(OperationLog.objects.exists())
+
+    def test_manifest_sha_and_json_are_derived_from_the_same_single_read(self):
+        target = self._target(2021)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest, manifest_sha = self._manifest(root, [target])
+            manifest_bytes = manifest.read_bytes()
+            with patch.object(Path, "read_bytes", return_value=manifest_bytes) as read_bytes, patch.object(
+                Path,
+                "read_text",
+                side_effect=AssertionError("manifest must not be read a second time"),
+            ) as read_text:
+                loaded = load_historical_publication_manifest(
+                    manifest,
+                    expected_sha256=manifest_sha,
+                )
+
+        self.assertEqual(loaded.target_ids, (target.pk,))
+        read_bytes.assert_called_once_with()
+        read_text.assert_not_called()
 
     def test_manifest_rejects_duplicate_or_missing_target_artifact_rows(self):
         target = self._target(2004)
