@@ -15,6 +15,7 @@ services:
       MULTIREGION_ATTRIBUTION_GOLD_MIN_CROSS_REGION: ${MULTIREGION_ATTRIBUTION_GOLD_MIN_CROSS_REGION:-20}
       MULTIREGION_ATTRIBUTION_RELATED_RECALL_MIN: ${MULTIREGION_ATTRIBUTION_RELATED_RECALL_MIN:-0.50}
       TRANSLATION_AUTO_RETRY_ENABLED: ${TRANSLATION_AUTO_RETRY_ENABLED:-false}
+      RACE_LIVE_SCHEDULER_ENABLED: ${RACE_LIVE_SCHEDULER_ENABLED:-false}
     volumes:
       - static_data:/app/server/staticfiles
       - media_data:/app/server/media
@@ -39,6 +40,25 @@ services:
     volumes:
       - media_data:/app/server/media
       - app_logs:/app/logs
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
+
+  race_live_worker:
+    image: umanewsbot:prod
+    command: /app/deploy/docker/start-race-live-worker.sh
+    cpus: ${RACE_LIVE_WORKER_CPUS:-0.25}
+    mem_limit: ${RACE_LIVE_WORKER_MEMORY_LIMIT:-384M}
+    env_file:
+      - .env
+    environment: *safe_news_modes
+    volumes:
+      - media_data:/app/server/media
+      - app_logs:/app/logs
+      - ./runtime/secrets:/run/secrets:ro
     restart: unless-stopped
     depends_on:
       redis:

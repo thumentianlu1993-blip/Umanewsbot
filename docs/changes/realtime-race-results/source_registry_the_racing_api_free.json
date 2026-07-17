@@ -1,0 +1,30 @@
+{
+  "automation_allowed": true,
+  "endpoints": [
+    {
+      "name": "regions",
+      "path": "/v1/courses/regions"
+    },
+    {
+      "name": "racecards_today",
+      "path": "/v1/racecards/free?day=today&limit=500&skip=0"
+    },
+    {
+      "name": "results_today",
+      "path": "/v1/results/today/free?limit=50&skip=0"
+    }
+  ],
+  "evidence": {
+    "authorization_basis": "user_confirmed_automation_permission",
+    "documentation_url": "https://api.theracingapi.com/documentation",
+    "terms_url": "https://www.theracingapi.com/terms-of-service",
+    "verified_at": "2026-07-16T17:00:00+00:00"
+  },
+  "host": "api.theracingapi.com",
+  "max_requests": 3,
+  "proof_network_allowed": true,
+  "schema_version": 1,
+  "source_key": "the_racing_api",
+  "terms_status": "approved",
+  "valid_until": "2026-08-16T16:00:00+00:00"
+}

@@ -313,6 +313,38 @@ a {
   font-style: normal;
 }
 
+.race-result-status,
+.race-result-status-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 12px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid #cbd9e7;
+  border-radius: 8px;
+  background: #f5f9fd;
+  color: #455568;
+  font-size: 13px;
+}
+
+.race-result-status strong,
+.race-result-status-summary strong {
+  color: #153f68;
+  font-size: 15px;
+}
+
+.race-result-status em,
+.race-result-status-summary em {
+  color: #9b5118;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.race-result-status-summary {
+  margin: -2px 0 12px;
+}
+
 .race-panel,
 .race-related-box {
   padding: 14px;

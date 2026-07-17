@@ -21,6 +21,15 @@
 - 历史、当前和赛果使用三个独立分母：历史截至 2024，当前从 2025 开始，赛果只统计超过宽限期且实际举办的正式目标。展示扩展赛事不进入正式分母。
 - 完整赛果必须同时满足 `finished + imported + module_statuses.results=complete + result_confirmed_at + 全部结果 is_confirmed`；只有冠军或部分赛果不得计为完整。
 - 生产修复只建立已批准关联，不创建、删除或合并 `RaceEvent`，不改变可见性和详情；artifact、approval、apply、rollback 和 verifier 全部使用不可变身份与整批原子事务。
+## 2026-07-16：准实时赛果采用不可变修订、持久来源权限和独立 worker
+
+- 产品状态固定为 `scheduled -> racecard_ready -> awaiting_result -> provisional_result -> official_result -> corrected_result`，只允许审核设计中的显式边；当前不做比赛进行中的逐秒位置或沿途排名。
+- `RaceEventRunner` / `RaceEventResult` 继续作为当前投影，来源事实先写 append-only observation，再形成 immutable revision/items/evidence；current 与 last-known-good pointer 受 event/kind、owner generation 和 claim CAS 约束。shadow 不物化公开赛果，晋级公开必须留下唯一 publication audit。
+- official authority 只能来自持久、已审核的 source identity，调用方参数不能提权。The Racing API 只能作为 provisional/交叉验证来源，不能单独推进 official；公开只保留客观赛事事实，不复制评级、评论或第三方版权正文。
+- 用户在 `2026-07-17` 明确确认相信 The Racing API 商业接口的赛果准确性。对已完成覆盖 proof、赛事/参赛马身份绑定和完整性校验的目标赛事，TRA 改为暂定赛果公开主链：`provisional_public` 开启后可在官方二次复核前直接推到前台。JRA/NAR/HKJC/BHA/France Galop/Equibase 等官方来源仍必须异步复核并决定 official/corrected；这项决定不授予 TRA official authority，也不放宽空结果、缺马、身份冲突、人工锁或条款门禁。
+- 调度采用 Beat 轻量 due-selector + 独立 `race_live` queue/worker；普通 worker 固定只消费 `celery`。数据库 HostBudget 是正确性层，所有真实网络仍须通过 source permission、host 预算、有限轮询窗口和短 claim/checkpoint。
+- 历史一期收口只解除“先完成历史任务”顺序门禁，不自动移交任何赛事写入权。来源 proof 必须业务 DB 零写入；进入 shadow 前仍要用精确 event allowlist/owner generation 和 SHA handoff 明确无 active historical lease/checkpoint，并经最新代码 review 和用户发布授权。
+- 日本和香港正式范围按用户确认推进：香港 G1/G2/G3；日本 G1/G2/G3、JpnI/JpnII/JpnIII、JG1/JG2/JG3。JG1-3 只有在 90 天、必要时延长至 180 天的独立 proof 仍无法达标后，才可凭带 SHA、等级/赛事明细和复核日期的用户批准 artifact 暂时 deferred。
 
 ## 2026-07-16：历史覆盖分层与详情导入 receipt 成为正式门禁
 

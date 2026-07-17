@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
 from django.db.models import Count
 from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
@@ -38,8 +39,24 @@ from .models import (
     RaceEventAlias,
     RaceEventDataCandidate,
     RaceEventHistoryWinner,
+    RaceEventLiveTracking,
+    RaceEventParticipant,
+    RaceEventParticipantSourceIdentity,
+    RaceEventProjectionControl,
+    RaceEventRevision,
+    RaceEventRevisionEvidence,
+    RaceEventRevisionItem,
+    RaceEventRevisionPublication,
     RaceEventResult,
     RaceEventRunner,
+    RaceLiveEventPublicationAllowlist,
+    RaceLiveHostBudget,
+    RaceLiveOfficialMarkerContract,
+    RaceLiveOfficialMarkerEvidence,
+    RaceLiveOfficialVerificationIncident,
+    RaceLivePublicationPolicy,
+    RaceResultObservation,
+    RaceResultSourceIdentity,
     RaceSeries,
     RaceSeriesName,
     RaceSeriesRelation,
@@ -55,6 +72,7 @@ from .models import (
     WorkflowStatus,
 )
 from .services.operations import log_operation
+from .services.race_events import disable_race_event_live_tracking
 from .services.production_windows import update_major_race_boost_window
 from .services.pushing import enqueue_push_for_article
 from .services.queueing import dispatch_task
@@ -64,6 +82,363 @@ from .tasks import crawl_news_source_task, translate_article_task
 admin.site.register(TermCandidate)
 admin.site.register(TermCandidateEvidence)
 admin.site.register(TermAlias)
+
+
+class RaceLiveReadOnlyAdmin(admin.ModelAdmin):
+    """Shared observation-only surface for quasi-realtime race state."""
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(RaceEventProjectionControl)
+class RaceEventProjectionControlAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "event",
+        "write_owner",
+        "owner_generation",
+        "next_racecard_revision_no",
+        "next_result_revision_no",
+        "current_result_revision",
+        "updated_at",
+    )
+    list_filter = ("write_owner", "updated_at")
+    search_fields = ("event__chinese_name", "event__original_name", "owner_manifest_sha256")
+    raw_id_fields = (
+        "event",
+        "owner_changed_by",
+        "current_racecard_revision",
+        "last_known_good_racecard_revision",
+        "current_result_revision",
+        "last_known_good_result_revision",
+    )
+
+
+@admin.register(RaceLiveHostBudget)
+class RaceLiveHostBudgetAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "host",
+        "min_interval_ms",
+        "next_allowed_at",
+        "consecutive_failures",
+        "circuit_open_until",
+        "last_error_code",
+        "lock_version",
+    )
+    list_filter = ("last_error_code",)
+    search_fields = ("host", "last_error_code")
+
+
+@admin.register(RaceResultSourceIdentity)
+class RaceResultSourceIdentityAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "source_key",
+        "external_race_id",
+        "event",
+        "result_authority",
+        "review_status",
+        "terms_status",
+        "automation_allowed",
+        "valid_until",
+    )
+    list_filter = (
+        "source_key",
+        "result_authority",
+        "review_status",
+        "terms_status",
+        "automation_allowed",
+    )
+    search_fields = (
+        "source_key",
+        "external_race_id",
+        "event__chinese_name",
+        "event__original_name",
+        "canonical_url",
+    )
+    raw_id_fields = ("event", "reviewed_by")
+
+
+@admin.register(RaceEventParticipant)
+class RaceEventParticipantAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "stable_key",
+        "canonical_name",
+        "event",
+        "country_region",
+        "birth_year",
+        "review_status",
+    )
+    list_filter = ("country_region", "review_status")
+    search_fields = (
+        "stable_key",
+        "canonical_name",
+        "event__chinese_name",
+        "event__original_name",
+    )
+    raw_id_fields = ("event", "horse_profile", "term")
+
+
+@admin.register(RaceEventParticipantSourceIdentity)
+class RaceEventParticipantSourceIdentityAdmin(RaceLiveReadOnlyAdmin):
+    list_display = ("participant", "source_identity", "external_runner_id", "updated_at")
+    search_fields = (
+        "participant__stable_key",
+        "participant__canonical_name",
+        "source_identity__source_key",
+        "external_runner_id",
+    )
+    raw_id_fields = ("participant", "source_identity")
+
+
+@admin.register(RaceResultObservation)
+class RaceResultObservationAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "id",
+        "source_identity",
+        "result_phase",
+        "observed_at",
+        "source_updated_at",
+        "http_status",
+        "parser_version",
+        "error_code",
+        "retryable",
+    )
+    list_filter = ("result_phase", "source_identity__source_key", "error_code", "retryable")
+    search_fields = (
+        "source_identity__external_race_id",
+        "raw_sha256",
+        "normalized_sha256",
+        "parser_version",
+        "error_code",
+    )
+    raw_id_fields = ("source_identity",)
+
+
+@admin.register(RaceEventRevision)
+class RaceEventRevisionAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "event",
+        "kind",
+        "revision_no",
+        "phase",
+        "source_authority",
+        "conflict_status",
+        "published_at",
+        "official_confirmed_at",
+    )
+    list_filter = ("kind", "phase", "source_authority", "conflict_status")
+    search_fields = (
+        "event__chinese_name",
+        "event__original_name",
+        "content_sha256",
+        "decision_reason",
+    )
+    raw_id_fields = ("event", "primary_observation", "supersedes", "applied_by")
+
+
+@admin.register(RaceEventRevisionItem)
+class RaceEventRevisionItemAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "revision",
+        "internal_order",
+        "official_finish_position",
+        "participant",
+        "horse_number",
+        "status",
+        "finish_time",
+    )
+    list_filter = ("status", "revision__phase")
+    search_fields = (
+        "participant__canonical_name",
+        "participant__stable_key",
+        "horse_number",
+        "jockey_name",
+        "trainer_name",
+    )
+    raw_id_fields = ("revision", "participant")
+
+
+@admin.register(RaceEventRevisionEvidence)
+class RaceEventRevisionEvidenceAdmin(RaceLiveReadOnlyAdmin):
+    list_display = ("revision", "observation", "role", "created_at")
+    list_filter = ("role",)
+    search_fields = (
+        "revision__event__chinese_name",
+        "revision__event__original_name",
+        "observation__normalized_sha256",
+    )
+    raw_id_fields = ("revision", "observation")
+
+
+@admin.register(RaceEventRevisionPublication)
+class RaceEventRevisionPublicationAdmin(RaceLiveReadOnlyAdmin):
+    list_display = ("revision", "published_at", "reason", "created_at")
+    list_filter = ("reason", "published_at")
+    search_fields = (
+        "revision__event__chinese_name",
+        "revision__event__original_name",
+        "revision__content_sha256",
+    )
+    raw_id_fields = ("revision",)
+
+
+@admin.register(RaceLivePublicationPolicy)
+class RaceLivePublicationPolicyAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "scope_type",
+        "scope_key",
+        "mode",
+        "version",
+        "valid_until",
+        "updated_at",
+    )
+    list_filter = ("scope_type", "mode", "valid_until")
+    search_fields = ("scope_key", "registry_digest", "coverage_proof_digest")
+
+
+@admin.register(RaceLiveEventPublicationAllowlist)
+class RaceLiveEventPublicationAllowlistAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "event",
+        "source_key",
+        "max_mode",
+        "enabled",
+        "official_verification_route",
+        "official_verification_route_version",
+        "version",
+    )
+    list_filter = ("max_mode", "enabled", "event__country_region")
+    search_fields = (
+        "event__chinese_name",
+        "event__original_name",
+        "source_key",
+        "official_verification_route",
+        "official_verification_route_version",
+    )
+    raw_id_fields = ("event",)
+
+
+@admin.register(RaceLiveOfficialMarkerContract)
+class RaceLiveOfficialMarkerContractAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "country_region",
+        "source_key",
+        "parser_version",
+        "review_status",
+        "version",
+        "valid_until",
+    )
+    list_filter = ("country_region", "source_key", "review_status")
+    search_fields = ("source_key", "parser_version", "contract_digest")
+
+
+@admin.register(RaceLiveOfficialMarkerEvidence)
+class RaceLiveOfficialMarkerEvidenceAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "observation",
+        "contract",
+        "marker_type",
+        "parser_version",
+        "source_timestamp",
+        "created_at",
+    )
+    list_filter = ("marker_type", "contract__country_region", "contract__source_key")
+    search_fields = (
+        "marker_type",
+        "contract_digest",
+        "parser_version",
+        "raw_sha256",
+    )
+    raw_id_fields = ("observation", "contract")
+
+
+@admin.register(RaceLiveOfficialVerificationIncident)
+class RaceLiveOfficialVerificationIncidentAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "event",
+        "provisional_revision",
+        "official_route",
+        "official_route_version",
+        "status",
+        "deadline_at",
+        "next_probe_at",
+        "alert_sent_at",
+    )
+    list_filter = ("status", "official_route", "event__country_region")
+    search_fields = (
+        "event__chinese_name",
+        "event__original_name",
+        "official_route",
+        "official_route_version",
+    )
+    raw_id_fields = ("event", "provisional_revision")
+
+
+@admin.register(RaceEventLiveTracking)
+class RaceEventLiveTrackingAdmin(admin.ModelAdmin):
+    list_display = (
+        "event",
+        "state",
+        "tracking_enabled",
+        "next_poll_at",
+        "consecutive_failures",
+        "circuit_reason",
+        "claim_generation",
+        "lock_version",
+        "updated_at",
+    )
+    list_filter = ("tracking_enabled", "state", "circuit_reason")
+    search_fields = ("event__chinese_name", "event__original_name", "selection_reason")
+    raw_id_fields = ("event",)
+    readonly_fields = tuple(
+        field.name for field in RaceEventLiveTracking._meta.fields
+    )
+    actions = ("disable_selected_tracking",)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def save_model(self, request, obj, form, change):
+        raise PermissionDenied("准实时追踪仅允许通过停用操作变更。")
+
+    @admin.action(description="停用所选赛事的准实时追踪")
+    def disable_selected_tracking(self, request, queryset):
+        disabled = 0
+        already_disabled = 0
+        conflicted = 0
+        for event_id, lock_version in queryset.order_by("pk").values_list(
+            "event_id", "lock_version"
+        ):
+            decision = disable_race_event_live_tracking(
+                event_id=event_id,
+                expected_lock_version=lock_version,
+                now=timezone.now(),
+                disabled_by=request.user,
+            )
+            if decision.applied:
+                disabled += 1
+            elif decision.reason == "already_disabled":
+                already_disabled += 1
+            else:
+                conflicted += 1
+        level = messages.SUCCESS if conflicted == 0 else messages.WARNING
+        self.message_user(
+            request,
+            (
+                f"准实时追踪停用完成：已停用 {disabled}，"
+                f"此前已停用 {already_disabled}，冲突或跳过 {conflicted}。"
+            ),
+            level,
+        )
 
 
 class NewsImageInline(admin.TabularInline):

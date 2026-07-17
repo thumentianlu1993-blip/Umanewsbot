@@ -42,6 +42,67 @@
 5. 本次分类为 `already_linked=8875 / identity_conflict=46 / missing_event=21537 / status_conflict=459 / exact_link=0`。approval SHA-256 为 `f22f5e0704fd1b30c19134d1450669fe09418cf93dbe955dc7a205160ab47938`，内容仍为 `status=pending`。由于没有 exact link，不得为了完成流程而签署或运行空 apply；先完成系列身份审核并重新生成 manifest。
 6. 审核输出位于 `outputs/race_event_reconciliation_20260717/`：Excel SHA-256 `834dd2dea4e2d8bac69c98ab580577bd7c7a8f8741d7949d310a0b586d0eb089`，HTML SHA-256 `0f9efbe80136597d20db701859daae1127b9124e96f1dddefe4192b76faeb7a3`，详细 JSON SHA-256 `aa0800963a01f7578c590d959d4423379d296e42f9e438c8693d02544073beed`。跨地区同名候选必须直接排除；同地区重复系列由产品审核确认合并、独立或沿革关系。
 7. 收口时无 historical one-off，历史 enabled/network 均为 false，历史公开未开启；HTTP healthz 正常。普通新闻 worker 正在处理自然 crawl，不属于本次历史任务；生产可用磁盘约 `3.6 GiB`，低于 `5 GiB` historical crawl 门槛，禁止在生产继续重型抓取。
+## 准备中：准实时赛事赛果（当前禁止执行生产步骤）
+
+本节只固化候选发布顺序和回滚契约，不构成发布授权。首个真实来源 proof 已完成，TRA provisional 核心链已实现；最终代码 review 和用户在该 review 后的发布授权尚未完成，因此仍不得在生产运行 migration、启动 `race_live` worker、初始化 tracking、写入业务数据或打开公开模式。
+
+### 候选发布顺序
+
+1. 固定最新成功 review 的 parent、完整 fingerprint 和 content manifest；确认待发布 tree 与之逐字节一致。
+2. 生成精确 event allowlist/ownership handoff：逐 event 记录旧 owner/new owner、owner generation、无 active historical runner/lease/checkpoint、source registry digest、共享 host 预算和资源窗口。任何未知项停止。
+3. 先做数据库备份及恢复可读性验证，再应用当前已实现的 `stable.0033` 至 `stable.0045`；运行 `manage.py check`、`showmigrations stable` 和 migration drift 检查。候选镜像缺 `0045` 或最终受审 migration 上界时立即停止。migration 不自动创建 tracking/control/policy/allowlist 行，也不接管既有赛事。
+4. 在目标主机创建 `/opt/umanewsbot/runtime/secrets/`，把 TRA secret 放到 `the-racing-api-free.env`，目录只允许生产用户访问、文件必须为该用户所有的 regular file 且权限 `0600`。容器内只使用 `/run/secrets/the-racing-api-free.env`；registry 固定为 `/app/runtime/policies/race_live/source_registry_the_racing_api_free.json`，SHA-256 必须为 `1d801e95b2770c741503a75dbcba93aca407a6cd681f3471813f1e7d5586fa32`。任何 secret 内容不得出现在 shell trace、日志或文档。
+5. 首次部署 `.env` 保持 `RACE_LIVE_SCHEDULER_ENABLED=false`、`RACE_LIVE_RUNNER_MODE=disabled`；只填写容器内 secret/registry 路径和 registry SHA。先启动只消费 `race_live` 的独立 worker，确认普通 worker 只消费 `celery`。live worker 默认 concurrency 1、prefetch 1、soft/hard time limit 45/60 秒。
+6. 通过审核后的 dry-run manifest 显式初始化单地区 allowlist 的 control/tracking/source identity、获准 racecard revision、全部 participant identity、host budget 和 policy；先运行 selector dry-run 和后台只读检查，再把 runner 切为 `the_racing_api_free` 且 policy 保持 `shadow`。shadow revision 的 `published_at` 必须为空，`RaceEventResult` 和公开页面不得出现新赛果。
+7. 连续两个真实赛日满足 identity、字段、延迟、队列和资源门槛后，才可另行 review/授权精确赛事 `provisional_public`；`official_public` 必须再有官方来源 marker 和复核证据。任何扩大都使用精确 event allowlist，不使用随机百分比。当前单 event runner 尚无当天响应 cache，同 host 多赛事必须保持保守 batch cap，不得通过提高并发绕过 1 RPS。
+
+### 首次 shadow 初始化命令
+
+初始化 manifest 是生产运行 artifact，不放凭据、不通过聊天或 shell history传输实体数据。它必须是当前用户可读的 regular file，不能是 symlink；单次精确列出本批全部 event。顶层严格 schema v1 只允许：
+
+`schema_version / approved_commit / generated_at / registry_digest / coverage_proof_digest / terms_evidence_sha256 / source_key / host / policy_valid_until / official_verification_route / official_verification_route_version / official_verification_valid_until / events`
+
+每个 event 只允许：
+
+`event_id / expected_event_updated_at / year / slug / original_name / country_region / racecourse / grade_text / race_datetime / external_race_id / tracking_state / next_poll_at / participants`
+
+每个 participant 只允许：
+
+`stable_key / canonical_name / country_region / external_runner_id / horse_number / status`
+
+生成后先记录 manifest SHA-256，并由审核者核对 event 范围、racecard、identity、官方复核路由、有效期、历史 handoff、无 active historical runner/receipt/lease/checkpoint 及共享 host 资源窗口。`approved_commit` 必须等于本次最终受审并实际部署的 40 位 commit；先从固定 image ID 的 OCI `org.opencontainers.image.revision` 读取并逐字节比较，不能只相信人工输入。任何不一致立即停止。
+
+以下命令中的路径、SHA、commit 和 Compose 文件必须替换为本次受审值；默认第一条只 dry-run、零写：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml run --rm --no-deps \
+  -v /opt/umanewsbot/runtime/race_live_initialization/<run-id>/manifest.json:/run/race-live/manifest.json:ro \
+  web python manage.py initialize_race_live_events \
+  --manifest /run/race-live/manifest.json \
+  --expected-manifest-sha256 <manifest-sha256> \
+  --expected-approved-commit <release-commit>
+```
+
+备份和 dry-run 审核均通过后，才允许同一固定镜像、同一文件和同一参数追加：
+
+```bash
+--apply --confirm-apply
+```
+
+apply 成功后立即以同一输入改为：
+
+```bash
+--verify
+```
+
+verify 必须返回 `ok=true / error_count=0`；后台逐 event 核对 owner generation 1、无 active claim、policy 全为 shadow、allowlist cap 为 provisional、racecard revision 未发布，并确认 observation/result revision/publication/incident/`RaceEventResult` 全为零。apply 可精确重放但不得新增行或日志；未来/过期 manifest、event `updated_at` 漂移、人工 runners/results 锁、既有赛果或任一非精确初始化状态都会 fail closed。初始化完成后仍保持 scheduler false、runner disabled，直到单独 shadow 启动检查完成。
+
+### 验收与回滚
+
+1. 验收必须覆盖 `/healthz/`、web/news worker、`race_live` worker、Beat selector、普通/live queue 隔离、admin 只读面、赛事级 CAS kill switch、公开 badge、shadow 零泄漏、数据库锁等待和 host circuit；40 场赛事日历的公开读取门必须继续满足 `<=12` 查询自动化硬门禁，禁止退回逐 event resolver。
+2. 首选回滚为 mode 全局 `off`，再停 selector、停 `race_live` worker；不 purge Redis，不重建 DB/Redis，不触碰 historical runner/runtime/checkpoint。保留 observations/revisions/publication/OperationLog 审计。
+3. 错误投影只允许在 owner generation 和 current pointer CAS 下切回同 event/kind 的 last-known-good revision并重建；不得删除 revision 或 observation。结构异常才进入独立数据库恢复窗口。
+4. migration 回退只在尚未写入 live observation/revision/publication/incident 数据且已通过备份恢复门禁时使用；`0045 -> 0032` 的测试往返不能替代生产判断。admission/authority/marker/incident 表一旦存在审计数据，默认采用向前修复或整库备份恢复，不用反向迁移销毁证据。
 
 ## 已完成：第一期 1998–2026 历史赛事正式详情总账收口
 

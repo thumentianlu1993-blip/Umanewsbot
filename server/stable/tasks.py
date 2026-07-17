@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from celery import shared_task
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.utils import timezone
 
 from stable.adapters.jra import JRAAdapter
@@ -86,10 +87,107 @@ from stable.services.term_discovery import discover_and_aggregate_article
 from stable.services.translation import translate_article
 from stable.services.validation import apply_validation_outcome, validate_rewrite
 from stable.services.external_horse_data import ExternalHorseDataImporter, ImportOptions
+from stable.services.race_events import claim_due_race_event_live_tracking
 
 
 User = get_user_model()
 JRA_SKIPPABLE_DETAIL_ERRORS = (ValueError, AttributeError, IndexError, TypeError)
+
+
+@shared_task
+def select_due_race_live_events_task() -> dict:
+    if getattr(settings, "RACE_LIVE_SCHEDULER_ENABLED", False) is not True:
+        return {"enabled": False, "claimed": 0, "dispatched": 0}
+
+    claims = claim_due_race_event_live_tracking(
+        now=timezone.now(),
+        batch_size=settings.RACE_LIVE_SELECTOR_BATCH_SIZE,
+        ttl_seconds=settings.RACE_LIVE_CLAIM_TTL_SECONDS,
+    )
+    for claim in claims:
+        dispatch_kwargs = {
+            "event_id": claim.event_id,
+            "expected_owner_generation": claim.owner_generation,
+            "expected_claim_generation": claim.claim_generation,
+            "attempt_token": claim.attempt_token,
+        }
+        transaction.on_commit(
+            lambda kwargs=dispatch_kwargs: poll_race_live_event_task.apply_async(
+                kwargs=kwargs,
+                queue="race_live",
+            )
+        )
+    claimed = len(claims)
+    return {"enabled": True, "claimed": claimed, "dispatched": claimed}
+
+
+@shared_task
+def poll_race_live_event_task(
+    event_id: int,
+    expected_owner_generation: int,
+    expected_claim_generation: int,
+    attempt_token: str,
+) -> dict:
+    runner_mode = getattr(settings, "RACE_LIVE_RUNNER_MODE", "disabled")
+    if runner_mode == "disabled":
+        return {
+            "processed": False,
+            "reason": "runner_not_configured",
+            "event_id": event_id,
+        }
+
+    if runner_mode == "the_racing_api_free":
+        from stable.services.race_live_runner import (
+            run_race_live_the_racing_api_free,
+        )
+        from stable.services.race_live_source_proof import (
+            the_racing_api_transport,
+        )
+
+        return run_race_live_the_racing_api_free(
+            event_id=event_id,
+            expected_owner_generation=expected_owner_generation,
+            expected_claim_generation=expected_claim_generation,
+            attempt_token=attempt_token,
+            secret_env_file=getattr(
+                settings,
+                "RACE_LIVE_TRA_SECRET_ENV_FILE",
+                "",
+            ),
+            registry_file=getattr(
+                settings,
+                "RACE_LIVE_TRA_REGISTRY_FILE",
+                "",
+            ),
+            expected_registry_sha256=getattr(
+                settings,
+                "RACE_LIVE_TRA_REGISTRY_SHA256",
+                "",
+            ),
+            now=timezone.now(),
+            transport=the_racing_api_transport,
+            clock=timezone.now,
+        )
+
+    from stable.services.race_live_runner import run_race_live_offline_fixture
+
+    if runner_mode != "offline_fixture":
+        return run_race_live_offline_fixture(
+            event_id=event_id,
+            expected_owner_generation=expected_owner_generation,
+            expected_claim_generation=expected_claim_generation,
+            attempt_token=attempt_token,
+            fixture_root="",
+            configured_mode=runner_mode,
+        )
+    return run_race_live_offline_fixture(
+        event_id=event_id,
+        expected_owner_generation=expected_owner_generation,
+        expected_claim_generation=expected_claim_generation,
+        attempt_token=attempt_token,
+        fixture_root=getattr(settings, "RACE_LIVE_OFFLINE_FIXTURE_ROOT", ""),
+        configured_mode=runner_mode,
+    )
 
 
 @shared_task
