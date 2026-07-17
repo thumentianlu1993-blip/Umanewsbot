@@ -1,5 +1,17 @@
 # 当前状态
 
+## 2026-07-18 8,867 场已导入历史赛事已公开
+
+- 生产只读 eligibility 审计确认 `8,867 eligible / 0 blocked`，地区分布为日本 `2,239`、中国香港 `473`、英国 `2,144`、法国 `652`、美国 `3,359`。原始审计位于 `/opt/umanewsbot/runtime/historical_publication/eligibility-20260718_031331/publication-manifest.json`，SHA-256 为 `2768e9f66fcba74dad95ffe4505d8283ff11c1d6e2c3fb2c2bde3b2f213a110e`。
+- 正式不可变 scope 为 `/opt/umanewsbot/runtime/historical_publication/eligibility-20260718_031331/publication-scope-v1.json`，SHA-256 为 `c27491e4987a548a6c635c936b28211a1c0e2e1c8c0bd594b8467bfba539977a`；它固定 `8,867` 个 target ID 及逐目标 artifact SHA，不按线上动态查询扩张范围。
+- 写前 custom-format 备份为 `/opt/umanewsbot/backups/db/pre-historical-publication-8dec0076-20260718_041218.dump`，`195,414,204` bytes，SHA-256 为 `83a7524eb36bdb69e9cece8a749115022e9b94682b9dd37080df5756358a9d29`，`pg_restore -l` 通过；环境备份为 `/opt/umanewsbot/.env.backup.historical-publication-8dec0076-20260718_041218`。
+- dry-run、原子 apply 和独立 verifier 均为 `8,867 checked / 0 errors`。结果 SHA-256 依次为 `d830060cf33bd6ebb6ce6f5ed141799497e893fb74cdbaa79bbbfe5031dc0485`、`46f5a58eeefed4c35547308ede4cfcf7b83b1842d344cbd40e17a8ad9216853e`、`35cee37116bc0eeff4fa1bd940c01dc8f4ad8e8a9a908fd320d15a6417e04d2b`。
+- 生产现有 `9,867 RaceEvent / 9,820 published / 8,867 published+complete / 100,132 runners / 91,897 results`；`8,867` 个 imported 历史目标全部已关联到公开且完整的赛事。
+- 浏览器验收覆盖五区列表、赛事详情、历届、出马表、赛果和移动端。纯数字距离现按地区及赛事类型显示单位：日本、中国香港、法国为米；美国及英国平地为弗隆；英国障碍为英里。数据库原值、导入器、API 和 verifier 口径未改变。
+- 最终运行代码 revision 为 `4af5e20a3c65ddad81bcf054f7fd1cb1f8d0dfde`，tree 为 `32928369f7c20c74425902ba3d13932d7a0c0043`，web、worker、Beat、`race_live_worker` 和 `umanewsbot:prod` 统一使用 AMD64 image `sha256:111dbe46ba7a7024632ba2ca7c57c387b19ab39861f0147421a0245d08c38d7a`。公网 `/healthz/` 和赛事页为 200，Redis `celery/unacked/race_live` 队列均为 0。
+- 历史公开通过 `RaceEvent.visibility_status=published` 和 `data_quality_status=complete` 持久化，不依赖常驻抓取开关。生产仍保持 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`、`RACE_LIVE_SCHEDULER_ENABLED=false`、`RACE_LIVE_RUNNER_MODE=disabled`。
+- “已公开”不等于 `30,917` 条正式总账全部完成。总账当前另有 `20,544 pending / 1,467 source_unavailable / 31 identity_review_required / 8 ready`；后续抓取继续按这些缺口推进，不回退或重跑本次已公开的 `8,867` 场。
+
 ## 2026-07-18 准实时赛果安全基线已发布，shadow 因赛程时间缺口保持关闭
 
 - 最新成功 review 后的整合冻结版本已按用户授权发布：生产 `HEAD=4f11b2273fd167c69d54b338a4e627a77dd010c2`、tree `277cb10ad56aee9a3156fa2b1632dd73377054c8`，source archive SHA-256 为 `e957e748b82b4933eeaab2f5721185e42e6f4e58b9e552ee10cfabace11ca2d5`。web、普通 worker、Beat 与独立 `race_live_worker` 均运行 image `sha256:c2b9e15e037406808bef1edbbef888728a8f0d6ae40c47418c6cd4e414803966`，OCI revision 与生产 checkout 一致。

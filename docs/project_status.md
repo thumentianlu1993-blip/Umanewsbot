@@ -1,5 +1,12 @@
 # 项目状态文档
 
+## 2026-07-18 历史赛事公开状态
+
+- `8,867` 个已导入且完整的历史目标已全部公开，五区分布为日本 `2,239`、中国香港 `473`、英国 `2,144`、法国 `652`、美国 `3,359`；eligibility、dry-run、apply 和独立 verifier 均为零错误。
+- 生产当前为 `9,867 events / 9,820 published / 8,867 published+complete / 100,132 runners / 91,897 results`。五区浏览器验收、移动端、出马表顺序、赛果、历届、中文术语展示和距离单位展示通过。
+- 最终运行 revision 为 `4af5e20a`，四个 app 服务统一使用 image `sha256:111dbe46...8d7a`；公网 healthz、赛事列表和详情为 200，队列为空。历史常驻写门和网络门、准实时 scheduler/runner 继续关闭。
+- 正式总账仍为 `30,917` 条，其中另有 `20,544 pending / 1,467 source_unavailable / 31 identity_review_required / 8 ready`。这部分是后续抓取范围，不影响本轮 `8,867` 场已完成赛事的公开状态。
+
 ## 2026-07-18 准实时赛果生产安全基线已发布
 
 - 用户授权的最新整合冻结版本 `4f11b227` 已部署；生产 tree `277cb10a...54c8`，web/普通 worker/Beat/独立 `race_live_worker` 均运行 image `sha256:c2b9e15e...03966`，迁移已从 `stable.0032` 前进至 `stable.0045`。

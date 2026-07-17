@@ -1,5 +1,15 @@
 # 部署运行手册
 
+## 历史赛事批量公开与距离单位展示（2026-07-18）
+
+1. 批量公开入口为 `python manage.py publish_historical_race_targets`，必须提供固定 scope 路径及其完整 SHA-256；先执行默认 dry-run，再显式 `--apply`，最后独立 `--verify-only`。scope schema 固定逐目标 ID 和 artifact SHA，命令不得从当前数据库动态扩张范围。
+2. 写前必须生成 custom-format PostgreSQL 备份、计算 SHA-256 并通过 `pg_restore -l`。本轮基线为 `/opt/umanewsbot/backups/db/pre-historical-publication-8dec0076-20260718_041218.dump`，`195,414,204` bytes，SHA-256 `83a7524eb36bdb69e9cece8a749115022e9b94682b9dd37080df5756358a9d29`。
+3. 本轮 scope 为 `/opt/umanewsbot/runtime/historical_publication/eligibility-20260718_031331/publication-scope-v1.json`，SHA-256 `c27491e4987a548a6c635c936b28211a1c0e2e1c8c0bd594b8467bfba539977a`，共 `8,867` 个目标。dry-run、apply、独立 verifier 均为 `8,867 / 0 errors`。
+4. apply 只在单一进程中临时设置 `HISTORICAL_RACE_BACKFILL_ENABLED=true`，必须保持 `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`；成功后清理赛事列表和详情缓存。常驻环境不得为了展示已发布赛事而打开历史写门或网络门。
+5. 浏览器验收至少覆盖日本、中国香港、英国、法国、美国各一场，检查列表、详情、出马表、赛果、历届和移动端横向表格；纯数字距离必须显示地区正确单位，已带单位值不得被二次追加。
+6. 当前生产代码 revision `4af5e20a3c65ddad81bcf054f7fd1cb1f8d0dfde`、tree `32928369f7c20c74425902ba3d13932d7a0c0043`，四个 app 服务统一运行 image `sha256:111dbe46ba7a7024632ba2ca7c57c387b19ab39861f0147421a0245d08c38d7a`。回滚标签 `umanewsbot:rollback-pre-distance-display-20260718_0444` 保留上一历史公开镜像。
+7. 当前生产磁盘可用约 `1.6 GiB`，低于 historical runner 的 `5 GiB` 硬门槛。禁止在生产进行重型抓取、解析或镜像构建；后续抓取继续使用本地 Docker，生产只接收紧凑 artifact 的串行 apply。
+
 ## 准实时赛事赛果首次生产发布结果（2026-07-18）
 
 1. 已发布 revision `4f11b2273fd167c69d54b338a4e627a77dd010c2`、tree `277cb10ad56aee9a3156fa2b1632dd73377054c8`、source archive SHA-256 `e957e748b82b4933eeaab2f5721185e42e6f4e58b9e552ee10cfabace11ca2d5`。生产 app image 为 `sha256:c2b9e15e037406808bef1edbbef888728a8f0d6ae40c47418c6cd4e414803966`；web、普通 worker、Beat 和 `race_live_worker` 的 image/revision/checkout 一致。

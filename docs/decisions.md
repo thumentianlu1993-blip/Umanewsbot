@@ -1,5 +1,13 @@
 # 关键决策
 
+## 2026-07-18 历史公开状态与抓取权限门分离
+
+- 历史赛事是否对外展示，以逐赛事持久字段 `visibility_status=published` 且 `data_quality_status=complete` 为准；不新增一个会让未完成赛事误公开的全局展示布尔值。
+- 批量公开必须使用固定 target ID 和逐目标 artifact SHA 的不可变 scope，并依次执行最新备份、dry-run、整批原子 apply、事务内逐目标校验和独立 verifier。manifest 只读取一次，同一字节同时用于 SHA 校验和 JSON 解析，避免校验与执行之间的文件漂移。
+- `HISTORICAL_RACE_BACKFILL_ENABLED` 只允许在受控 apply 进程中临时为 true；网络门始终为 false。apply 完成后常驻写门、网络门和准实时 scheduler/runner 都保持关闭，已公开数据不受这些运行权限门影响。
+- 纯数字历史距离只在展示层补单位：日本、中国香港、法国为米，美国及英国平地为弗隆，英国障碍为英里；已带单位的字符串保持原样。原始数据库值、来源证据、导入和验收口径不做推断性重写。
+- `8,867` 个 imported 目标全部公开，只代表已完整导入层；`30,917` 条正式总账中仍有 pending、来源不可得、身份待审和 ready 目标，必须在进度报告中分开统计。
+
 ## 2026-07-18 PostgreSQL 身份写入只锁业务基表
 
 - 身份批次需要同时读取 `RaceEvent.race_series`，但该外键可空，PostgreSQL 不允许对 `select_related` 生成的 nullable `LEFT OUTER JOIN` 整体执行 `FOR UPDATE`。
