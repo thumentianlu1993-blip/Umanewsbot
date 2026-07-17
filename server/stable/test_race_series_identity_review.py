@@ -6,11 +6,12 @@ import json
 import tempfile
 from datetime import date
 from pathlib import Path
-from unittest import mock
+from unittest import mock, skipUnless
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db import connection
 from django.test import TestCase
 
 from stable.models import (
@@ -237,6 +238,43 @@ class RaceSeriesIdentityReviewTests(TestCase):
             is_confirmed=False,
         )
         return destination, source, target, event
+
+    def test_identity_lock_queries_lock_only_base_rows_while_prefetching_series(self):
+        _, _, target, event = self._positive_fixture()
+        service = self._service()
+
+        for model, row, expected_join in (
+            (HistoricalRaceEventTarget, target, "INNER JOIN"),
+            (RaceEvent, event, "LEFT OUTER JOIN"),
+        ):
+            with self.subTest(model=model.__name__):
+                queryset = service._identity_rows_for_update(model, {row.pk})
+                sql = str(queryset.query)
+                self.assertIn(expected_join, sql)
+                self.assertTrue(queryset.query.select_for_update)
+                self.assertEqual(queryset.query.select_for_update_of, ("self",))
+
+    @skipUnless(connection.vendor == "postgresql", "requires PostgreSQL")
+    def test_lock_action_rows_executes_with_nullable_series_join_on_postgresql(self):
+        destination, source, target, event = self._positive_fixture()
+
+        series, targets, events = self._service()._lock_action_rows(
+            {
+                "positive_actions": [
+                    {
+                        "source_series_id": source.pk,
+                        "destination_series_id": destination.pk,
+                        "target_id": target.pk,
+                        "event_id": event.pk,
+                    }
+                ],
+                "negative_actions": [],
+            }
+        )
+
+        self.assertEqual(set(series), {source.pk, destination.pk})
+        self.assertEqual(set(targets), {target.pk})
+        self.assertEqual(set(events), {event.pk})
 
     def test_default_command_is_read_only_and_artifact_is_non_overwriting(self):
         _, _, target, event = self._positive_fixture()

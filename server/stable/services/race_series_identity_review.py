@@ -914,6 +914,15 @@ def _require_actor_matches_approval(actor, approval: dict[str, Any]) -> str:
     return username
 
 
+def _identity_rows_for_update(model, ids: set[int]):
+    return (
+        model.objects.select_for_update(of=("self",))
+        .select_related("race_series")
+        .filter(pk__in=ids)
+        .order_by("pk")
+    )
+
+
 def _lock_action_rows(actions: dict[str, Any]) -> tuple[
     dict[int, RaceSeries],
     dict[int, HistoricalRaceEventTarget],
@@ -946,17 +955,17 @@ def _lock_action_rows(actions: dict[str, Any]) -> tuple[
     }
     targets = {
         row.pk: row
-        for row in HistoricalRaceEventTarget.objects.select_for_update()
-        .select_related("race_series")
-        .filter(pk__in=target_ids)
-        .order_by("pk")
+        for row in _identity_rows_for_update(
+            HistoricalRaceEventTarget,
+            target_ids,
+        )
     }
     events = {
         row.pk: row
-        for row in RaceEvent.objects.select_for_update()
-        .select_related("race_series")
-        .filter(pk__in=event_ids)
-        .order_by("pk")
+        for row in _identity_rows_for_update(
+            RaceEvent,
+            event_ids,
+        )
     }
     if (
         len(series) != len(series_ids)
