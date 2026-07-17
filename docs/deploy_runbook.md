@@ -1,5 +1,15 @@
 # 部署运行手册
 
+## 准实时赛事赛果首次生产发布结果（2026-07-18）
+
+1. 已发布 revision `4f11b2273fd167c69d54b338a4e627a77dd010c2`、tree `277cb10ad56aee9a3156fa2b1632dd73377054c8`、source archive SHA-256 `e957e748b82b4933eeaab2f5721185e42e6f4e58b9e552ee10cfabace11ca2d5`。生产 app image 为 `sha256:c2b9e15e037406808bef1edbbef888728a8f0d6ae40c47418c6cd4e414803966`；web、普通 worker、Beat 和 `race_live_worker` 的 image/revision/checkout 一致。
+2. 写前备份为 `/opt/umanewsbot/backups/db/pre-realtime-race-results-4f11b227-20260718_034437.dump`，`195,161,786` bytes、权限 `0600`、SHA-256 `f81a11ece1b75f5ff680e445b71b910ea453ee1fc26eeb24ac8df030daf72a01`，`pg_restore -l` 通过。环境备份为 `/opt/umanewsbot/.env.backup.pre-realtime-4f11b227-20260718_034437`；回滚标签 `umanewsbot:rollback-pre-realtime-4f11b227-20260718_034437` 指向 `sha256:63cdfc131ebb4152f4f56740fe6f94f806f33139b9496f15679b184457397329`。
+3. `stable.0033` 至 `stable.0045` 已应用；check、migration drift、镜像聚焦 `13/13`、registry digest 和无 secret 检查通过。迁移没有隐式创建 live 行，赛事/runner/result 总量保持 `9,867 / 100,132 / 91,897`。
+4. secret 已安装到 `/opt/umanewsbot/runtime/secrets/the-racing-api-free.env`，验收时为 `root:root 0600` regular file；`.env` 验收值为 `RACE_LIVE_SCHEDULER_ENABLED=false`、`RACE_LIVE_RUNNER_MODE=disabled`。
+5. 生产 proof `/opt/umanewsbot/runtime/race_live_source_proofs/production-proof-20260718_035358` 已对 3 个固定 Free 端点取得 HTTP 200；请求元数据 SHA-256 为 `421a3d7976fbaee0e5c2ed20caaf8fa7b7647895fed6e2666971248ecbb6fc59`。它只是只读来源证据，不是 shadow 初始化 artifact。
+6. 本次没有生成 shadow manifest：从 `2026-07-18` 起的 `428` 条 future event（英国 `72`）均无 `race_datetime`，而初始化器要求 aware 时间与既有 event 精确匹配；scheduler/runner 因此保持关闭，live 业务行保持为 `0`。
+7. web 容器重建后，Nginx 的静态 upstream 仍指向旧容器 IP并短暂返回 502；本次重启 Nginx 后重新解析 `web:8000`，内外 HTTP healthz 恢复 200。
+
 ## AI 赛事身份决定生产执行结果（2026-07-18）
 
 1. 用户批准的业务范围保持为 manifest `cf5e220e9c0a0c7b2daeb7ef5030ed3243059ec9bd36ba5e6e2390c0d89a0147`、actions `9622460e82dc4d3449bf693bf2e7e107e43684c5b5dbf518bc700a4a24f53da1`、approval `f02b0e4c11a605fe3d4f818856d699a8979c12b9884d04d93ed32adbb44b0584`。

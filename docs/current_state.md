@@ -1,5 +1,15 @@
 # 当前状态
 
+## 2026-07-18 准实时赛果安全基线已发布，shadow 因赛程时间缺口保持关闭
+
+- 最新成功 review 后的整合冻结版本已按用户授权发布：生产 `HEAD=4f11b2273fd167c69d54b338a4e627a77dd010c2`、tree `277cb10ad56aee9a3156fa2b1632dd73377054c8`，source archive SHA-256 为 `e957e748b82b4933eeaab2f5721185e42e6f4e58b9e552ee10cfabace11ca2d5`。web、普通 worker、Beat 与独立 `race_live_worker` 均运行 image `sha256:c2b9e15e037406808bef1edbbef888728a8f0d6ae40c47418c6cd4e414803966`，OCI revision 与生产 checkout 一致。
+- 写前 custom-format 备份为 `/opt/umanewsbot/backups/db/pre-realtime-race-results-4f11b227-20260718_034437.dump`，`195,161,786` bytes、权限 `0600`、SHA-256 `f81a11ece1b75f5ff680e445b71b910ea453ee1fc26eeb24ac8df030daf72a01`，`pg_restore -l` 通过。环境备份为 `/opt/umanewsbot/.env.backup.pre-realtime-4f11b227-20260718_034437`；即时回滚标签 `umanewsbot:rollback-pre-realtime-4f11b227-20260718_034437` 指向旧 image `sha256:63cdfc131ebb4152f4f56740fe6f94f806f33139b9496f15679b184457397329`。
+- 生产已应用 `stable.0033` 至 `stable.0045`；Django check、migration drift、镜像内初始化器与 TRA runner `13/13`、registry SHA 和无 secret 检查通过。迁移后 `9,867 events / 100,132 runners / 91,897 results` 保持不变，所有 live control/tracking/observation/revision/publication/incident 行均为 `0`。
+- TRA secret 仅存在于生产 `/opt/umanewsbot/runtime/secrets/the-racing-api-free.env`，为 `root:root 0600` regular file。生产配置保持 `RACE_LIVE_SCHEDULER_ENABLED=false`、`RACE_LIVE_RUNNER_MODE=disabled`；普通 worker 只消费 `celery`，独立 worker 只消费 `race_live`，后者队列为 `0`，没有发送 live 网络任务或公开写入。
+- 生产只读来源 proof 位于 `/opt/umanewsbot/runtime/race_live_source_proofs/production-proof-20260718_035358`：3 个固定 Free 端点均 HTTP 200，regions/racecards/results 分别为 `55 / 69 / 50`，请求元数据 SHA-256 为 `421a3d7976fbaee0e5c2ed20caaf8fa7b7647895fed6e2666971248ecbb6fc59`；未保存 raw payload，未连接业务写路径。
+- 首轮英国 shadow 没有生成或应用 manifest。生产从 `2026-07-18` 起共有 `428` 条 future `RaceEvent`，其中英国 `72` 条，但 `race_datetime` 非空均为 `0`；当天英国 Group 3 event `924` 同样缺少 `race_datetime/local_start_time` 且无 runners/results。冻结初始化器要求 aware `race_datetime` 并精确匹配既有赛事，仓库也没有已审核的赛前 racecard/开赛时间写入路径，因此当前必须 fail closed。不得手工猜时间或绕过初始化门禁；需要把赛前 racecard 与开赛时间同步作为后续受审增量。
+- web 重建后 Nginx 曾保留旧容器 IP 并短暂返回 502；重启 Nginx 重新解析 `web:8000` 后，本机和公网 HTTP `/healthz/` 均恢复 200。四个 app 服务 restart count 均为 `0`，近期 app 日志无 `Traceback/CRITICAL/ERROR/Exception`；公网 HTTPS 仍是既有未接入状态，不属于本变更验收。
+
 ## 2026-07-18 AI 赛事身份决定已完成生产写入
 
 - AI 初审的 `267` 条决定已经按原 manifest 完成生产执行：`228` 条合并并关联、`21` 条保持独立、`18` 条非同赛／忽略；实际写入汇总为 `228` 个正向动作、`24` 个去重后的负向系列对和 `1` 个 John C. Harris Stakes `surface: dirt -> turf` 修复。

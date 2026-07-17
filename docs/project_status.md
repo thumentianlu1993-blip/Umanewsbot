@@ -1,5 +1,12 @@
 # 项目状态文档
 
+## 2026-07-18 准实时赛果生产安全基线已发布
+
+- 用户授权的最新整合冻结版本 `4f11b227` 已部署；生产 tree `277cb10a...54c8`，web/普通 worker/Beat/独立 `race_live_worker` 均运行 image `sha256:c2b9e15e...03966`，迁移已从 `stable.0032` 前进至 `stable.0045`。
+- 写前数据库备份 SHA-256 为 `f81a11ec...2a01`，`pg_restore -l` 通过；旧 image `sha256:63cdfc13...7329`、环境备份和精确回滚标签已保留。Django check、migration drift、镜像聚焦 `13/13`、registry/no-secret 检查及 HTTP healthz 通过。
+- live scheduler 与 runner 分别保持 `false / disabled`，live 业务表和 `race_live` 队列均为 `0`；来源 proof 的 3 个固定端点均为 200，当前得到 `55 regions / 69 racecards / 50 results`，未保存 raw payload 或写业务 DB。
+- 首轮 shadow 因生产赛程时间缺口未启动：未来 `428` 条赛事、英国 `72` 条的 `race_datetime` 非空数均为 `0`。严格初始化器会拒绝无法精确匹配开赛时间的 manifest；下一步必须先以独立受审增量补齐赛前 racecard/开赛时间同步，不能手工猜时间或直接打开 runner。
+
 ## 2026-07-18 AI 赛事身份决定已生产完成
 
 - `267` 条 AI 初审决定已经受控落库：`228` 个正向关联、`24` 个去重负向系列对，另完成 John C. Harris Stakes 草地修正。业务 manifest `cf5e220e...a0147`、actions `9622460e...f53da1` 和 approval `f02b0e4c...0584` 保持不变。
