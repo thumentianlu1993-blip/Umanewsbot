@@ -1,5 +1,16 @@
 # 部署运行手册
 
+## AI 赛事身份决定生产执行结果（2026-07-18）
+
+1. 用户批准的业务范围保持为 manifest `cf5e220e9c0a0c7b2daeb7ef5030ed3243059ec9bd36ba5e6e2390c0d89a0147`、actions `9622460e82dc4d3449bf693bf2e7e107e43684c5b5dbf518bc700a4a24f53da1`、approval `f02b0e4c11a605fe3d4f818856d699a8979c12b9884d04d93ed32adbb44b0584`。
+2. 首次 apply 在 PostgreSQL 行锁阶段因 nullable outer join 被数据库拒绝。事务、prepared verifier、总量和 OperationLog 证明业务零写入；失败尝试没有 rollback ledger，空 result 文件只保留为失败时间证据。
+3. 锁查询技术修复进入 `main@f396d04837c7161a351b920737ac030911dec3e3`，tree `f9bef70b59f2ee0dfa0bbd2a78c5c2c316e45d45`，source archive SHA-256 `fd0c66acb2cef161746e2b2d851106ac12ba475abdab0b5107f2871a1e557d72`。两次构建 image ID 均为 `sha256:63cdfc131ebb4152f4f56740fe6f94f806f33139b9496f15679b184457397329`；镜像内 check、迁移漂移、生产 PostgreSQL 只读锁 smoke 和限定复审通过。
+4. 最终写前备份为 `/opt/umanewsbot/backups/db/pre-race-series-identity-f396d048-20260718_014337.dump`，`194,307,039` bytes、权限 `0600`、SHA-256 `640791685f14d82cd8a47a9c83ce2b6fb4a361e8edafa824c9c2e6338c892707`，`pg_restore -l` 通过。即时回滚标签为 `umanewsbot:rollback-pre-f396d048-20260718_014256`，环境备份为 `/opt/umanewsbot/.env.backup.pre-f396d048-20260718_014256`。
+5. 正式 apply result 位于 `runtime/race_series_identity_review/prepare-8b9b9755-20260717_205349/apply-result-f396d048-20260718_014604.json`，SHA-256 `20fb046276e633ba9c682fc62ec865dca41acff2ce6bccd5ad74256fb02b3365`。rollback ledger 同目录，SHA-256 `0a37af374fc06a2e19cb70360c1a512389f066d99f6927c079c76cc4389531e5`；独立 postapply verifier SHA-256 `dbc76f0ea5d6b5d3b1a3e7b6fc30290df440f47c4f48d10827394b55837a7a3b`。
+6. 写入结果为 `228 positive / 24 negative pairs`，John C. Harris event `507` 为 `turf`，OperationLog ID `96353`。`events/runners/results` 保持 `9,867 / 100,132 / 91,897`，linked targets 为 `9,103`，relations 为 `228`；事务内和独立 verifier 均无错误。
+7. web/worker/beat 已统一到新镜像，迁移无变化；内外 HTTP healthz、worker ping、active/reserved、Redis 队列和近期日志通过。`RACE_EVENT_HISTORICAL_PUBLIC_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。
+8. 若需要业务回滚，必须先停止 beat、排空 worker，并同时提供上述 manifest、approval、rollback ledger 及其精确 SHA；若任一相关 target/event/series 在 apply 后发生漂移，自动 rollback 会拒绝，必须先人工审计。
+
 ## AI 赛事身份决定生产执行门禁（2026-07-17）
 
 1. 唯一允许进入下一步的代码基线为 `8b9b97552a6cb8b4b4690dc6f8b1a1d4233991e5`，代码 tree 为 `ab1f58af54381e72c7c277f03a59a29676618dae`；工作簿 SHA-256 为 `d93286e9e61ccf41770fe607740a972d025c8a00b2deb1d4a4f1890954852492`。部署前重新核对主线只包含文档追加或该精确代码，不得夹带产品行为变化。

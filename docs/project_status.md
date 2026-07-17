@@ -1,5 +1,13 @@
 # 项目状态文档
 
+## 2026-07-18 AI 赛事身份决定已生产完成
+
+- `267` 条 AI 初审决定已经受控落库：`228` 个正向关联、`24` 个去重负向系列对，另完成 John C. Harris Stakes 草地修正。业务 manifest `cf5e220e...a0147`、actions `9622460e...f53da1` 和 approval `f02b0e4c...0584` 保持不变。
+- 首次 PostgreSQL apply 在任何业务写入前暴露 nullable outer join 锁错误；零写入核验后完成基表定向锁修复、真实 RED、相关 `52/52`、生产只读锁 smoke 和同一 reviewer 限定复审。最终 revision `f396d048`，生产三服务统一运行 image `sha256:63cdfc13...7329`，无迁移。
+- 最终写前备份 SHA-256 为 `640791685f14d82cd8a47a9c83ce2b6fb4a361e8edafa824c9c2e6338c892707`，`pg_restore -l` 通过；apply result `20fb0462...3365`、rollback ledger `0a37af37...31e5`、独立 verifier `ok=true / error_count=0`。
+- 写后为 `9,867 events / 100,132 runners / 91,897 results / 9,103 linked targets / 228 relations`；前三项完全守恒，OperationLog ID `96353`。John C. Harris event `507` 为 `turf`。
+- web/worker/beat、内外 HTTP healthz、worker ping、队列、事务和日志均正常；历史公开、常驻历史网络和写入开关继续关闭。生产磁盘清理后约剩 `3.07 GiB`。
+
 ## 2026-07-17 AI 赛事身份初审已形成生产候选
 
 - 已正式采用 AI 初审的 `267` 条决定：`228` 条合并并关联、`21` 条保持独立、`18` 条非同赛／忽略；John C. Harris Stakes 另有一条 `surface=turf` 修复。正向决定保留来源系列，负向决定写入双向禁止自动合并规则。

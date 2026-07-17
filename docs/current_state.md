@@ -1,5 +1,15 @@
 # 当前状态
 
+## 2026-07-18 AI 赛事身份决定已完成生产写入
+
+- AI 初审的 `267` 条决定已经按原 manifest 完成生产执行：`228` 条合并并关联、`21` 条保持独立、`18` 条非同赛／忽略；实际写入汇总为 `228` 个正向动作、`24` 个去重后的负向系列对和 `1` 个 John C. Harris Stakes `surface: dirt -> turf` 修复。
+- 正式 manifest 仍为 `cf5e220e9c0a0c7b2daeb7ef5030ed3243059ec9bd36ba5e6e2390c0d89a0147`，actions 为 `9622460e82dc4d3449bf693bf2e7e107e43684c5b5dbf518bc700a4a24f53da1`，用户签署 approval SHA-256 为 `f02b0e4c11a605fe3d4f818856d699a8979c12b9884d04d93ed32adbb44b0584`。未重算或替换任何审核决定。
+- 首次 apply 在 PostgreSQL 第一组锁查询被 `FOR UPDATE cannot be applied to the nullable side of an outer join` 拒绝，发生在业务写入前；prepared verifier、总量和 OperationLog 复核均证明零写入。技术修复改为只锁 target/event 基表、继续预取系列并独立锁定全部相关系列；本地相关测试 `52/52` 通过，PostgreSQL 专项在 SQLite 按设计跳过 1，同一原 reviewer 限定复审为 `APPROVED`。生产只读 smoke 成功锁定并回滚 `497 series / 267 targets / 261 events`。
+- 最终代码 revision 为 `f396d04837c7161a351b920737ac030911dec3e3`，tree `f9bef70b59f2ee0dfa0bbd2a78c5c2c316e45d45`，source archive SHA-256 `fd0c66acb2cef161746e2b2d851106ac12ba475abdab0b5107f2871a1e557d72`。两个独立归档上下文构建得到相同 AMD64 image `sha256:63cdfc131ebb4152f4f56740fe6f94f806f33139b9496f15679b184457397329`；生产 web/worker/beat 已统一运行该镜像。
+- 最终写前备份为 `/opt/umanewsbot/backups/db/pre-race-series-identity-f396d048-20260718_014337.dump`，`194,307,039` bytes、权限 `0600`、SHA-256 `640791685f14d82cd8a47a9c83ce2b6fb4a361e8edafa824c9c2e6338c892707`，`pg_restore -l` 通过。即时代码回滚标签为 `umanewsbot:rollback-pre-f396d048-20260718_014256`，环境备份为 `/opt/umanewsbot/.env.backup.pre-f396d048-20260718_014256`。
+- 正式 apply result SHA-256 为 `20fb046276e633ba9c682fc62ec865dca41acff2ce6bccd5ad74256fb02b3365`，rollback ledger SHA-256 为 `0a37af374fc06a2e19cb70360c1a512389f066d99f6927c079c76cc4389531e5`；事务内和独立写后 verifier 均为 `ok=true / error_count=0`，OperationLog ID 为 `96353`。
+- 写后总量严格守恒：`9,867 events / 100,132 runners / 91,897 results` 未变化；正式目标关联由 `8,875` 增至 `9,103`，系列关系由 `0` 增至 `228`，John C. Harris event `507` 已为 `turf`。historical runner、锁、started receipt、翻译和外部导入均为 0；历史公开、常驻历史写入和网络开关保持关闭。内外 HTTP healthz、worker ping、active/reserved、Redis 队列和近期错误日志均通过。
+
 ## 2026-07-17 AI 赛事身份初审已固化，生产写入待精确授权
 
 - 用户提供的 AI 初审工作簿为 `/Users/mentianlu/Downloads/生产赛事身份审核_213a818c_20260717_AI初审建议.xlsx`，SHA-256 为 `d93286e9e61ccf41770fe607740a972d025c8a00b2deb1d4a4f1890954852492`。正式输入共 `267` 条：`228` 条同意合并并关联、`21` 条保持独立、`18` 条非同赛／忽略；John C. Harris Stakes 另附 `surface: dirt -> turf` 的显式字段修复。

@@ -1,5 +1,11 @@
 # 关键决策
 
+## 2026-07-18 PostgreSQL 身份写入只锁业务基表
+
+- 身份批次需要同时读取 `RaceEvent.race_series`，但该外键可空，PostgreSQL 不允许对 `select_related` 生成的 nullable `LEFT OUTER JOIN` 整体执行 `FOR UPDATE`。
+- 正式锁顺序保持为：先按主键锁定全部相关 `RaceSeries`，再按主键锁定 `HistoricalRaceEventTarget` 和 `RaceEvent` 基表；后两者使用 `select_for_update(of=("self",))`，系列仍可预取但不通过外连接重复加锁。
+- 该调整不降低并发保护，也不改变审核动作、manifest 或数据语义。任何未来增加的 nullable 预取都必须保持“基表显式锁 + 关联对象独立锁”的 PostgreSQL 回归。
+
 ## 2026-07-17 AI 赛事身份初审的正式执行语义
 
 - 接受工作簿中的 `228` 条“同意合并并关联”、`21` 条“保持独立”和 `18` 条“非同赛／忽略”作为本轮正式产品输入，但生产执行仍受精确 manifest、独立 approval、备份、dry-run 和 verifier 门禁约束。
