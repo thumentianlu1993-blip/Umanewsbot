@@ -1,5 +1,23 @@
 # 项目状态文档
 
+## 2026-07-18 event 924 首个 TRA shadow 赛果到达
+
+- 已在 scheduler false、四层 policy shadow、tracking/allowlist 仅 `[924]` 的边界内完成
+  有界手动轮询。写前恢复点 `efa68a76…fd13b` 已通过 `pg_restore -l`。
+- generation 2–14 为 `13` 次无网络 `pre_off_wait`；generation 15–18 在预计开跑后按
+  3 分钟窗口返回 `result_not_found`；generation 19 的 task `9615a5f6…432b` 于
+  `14:14:42.301344Z` 获得首个 shadow result，距 `14:02:00Z` 预计开跑
+  `12` 分 `42.301` 秒，控制循环随即停止。
+- observation ID `1`、result revision ID `2` 已写入，7 匹均为 finished 且名次 1–7
+  完整，无 parse warning；tracking 为 `provisional_result / shadow_applied`。
+- publication、legacy result、official marker/incident 均为 0；公网仍无 participant 或
+  赛果标签，healthz 为 200，live queue/worker/one-off 为空。scheduler 仍为 false，
+  `14:24:42Z` 后续探针不会自动执行。
+- 上述“worker 为空”只表示 live worker 的 active/reserved task set 均为 0；
+  `race_live_worker` 节点本身仍在线并运行 `the_racing_api_free`。
+- 本轮授权已消费；下一步须先审核本次真实 observation，再对后续复核或 provisional public
+  灰度取得精确授权，不得扩展其他赛事。
+
 ## 2026-07-18 event 924 TRA shadow worker 启动检查通过
 
 - 已只为 `race_live_worker` 启用 `the_racing_api_free`，scheduler 继续 false；tracking 和

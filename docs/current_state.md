@@ -1,5 +1,50 @@
 # 当前状态
 
+## 2026-07-18 event 924 首个 TRA shadow 赛果已取得，有界窗口停止
+
+- 用户显式授权仅对 event `924` 按数据库 `next_poll_at` 手动 claim/dispatch，直到首个
+  shadow result 或明确截止；scheduler 必须保持 false，不扩展赛事、不公开。执行前
+  tracking/allowlist 精确全集均为 `[924]`，四层 policy 全为 shadow，赛果事实为 0。
+- 本轮写前恢复点为
+  `/opt/umanewsbot/backups/db/pre-race-live-window-924-ebab4aa8-20260718T111221Z.dump`，
+  `198,273,152` bytes、`root:root 0600`、SHA-256
+  `efa68a76f7236f7454fe9119df601ff4f1e4fae9d2b8040fc09aa9cf28efd13b`，
+  `pg_restore -l` 通过。
+- 临时控制循环只读取 event `924` 的持久 `next_poll_at`，逐次调用单赛事
+  `claim_race_event_live_tracking`，再只向 `race_live` 投递对应 claim。首次到期时控制
+  脚本误读返回对象字段 `applied`，在 task 投递前退出；generation 2 claim 已写入但未
+  重复领取，随后在 TTL 内读取同一 active claim 并于 `11:33:50Z` 精确投递 task
+  `a5e03b1a-6c7b-409b-ba16-096e575b63f4`，成功返回 `pre_off_wait`。脚本改用真实字段
+  `claimed` 后恢复，无悬挂 claim、无范围扩展。
+- 本窗口共完成 generation 2–19 的 `18` 次单赛事 task：generation 2–14 共 `13` 次
+  `pre_off_wait`，均未访问结果 API；generation 15–18 在 `14:02:09Z`、`14:05:17Z`、
+  `14:08:27Z`、`14:11:34Z` 各执行一次单请求并返回
+  `the_racing_api_result_not_found`。每次都由数据库 checkpoint 推进下一合法时间。
+- generation 19 于 `14:14:40.843702Z` claim，唯一 task
+  `9615a5f6-bc5c-4203-931d-32990b07432b` 返回
+  `SUCCESS / processed=true / reason=the_racing_api_shadow_applied /
+  revision_id=2`。上游 observation 时间为 `14:14:42.301344Z`，距预计开跑
+  `14:02:00Z` 为 `12` 分 `42.301` 秒；控制循环检测到首个 shadow result 后立即停止，
+  未执行数据库给出的下一次 `14:24:42.301344Z`。
+- observation ID `1` 为 `provisional / the_racing_api_free_v1 /
+  licensed_api_automation`，无 parse warning；normalized SHA-256 为
+  `4d2fa8c03ad3ae735700bd72291f822ea53e75449f90f3ad568392e2995dccc2`。
+  result revision ID `2` 为 revision no. `1`、`provisional`、supplemental authority、
+  `provisional_result_accepted`、conflict none，包含 `7` 个 finished item 和完整
+  `1–7` 名次，证据链接 `1` 条，`published_at` 为空。
+- tracking 已为 `provisional_result / shadow_applied`，current result pointer 为 revision
+  `2`，claim 已释放，连续失败为 0。HostBudget 为 failures `0`、error 为空、circuit
+  关闭、lock version `22`。
+- 停止后 tracking/allowlist 仍精确为 `[924]`，四层 policy 仍为 shadow；legacy result、
+  revision publication、official marker evidence、verification incident 全为 0。
+  `RACE_LIVE_SCHEDULER_ENABLED=false`，live queue、active/reserved 和 one-off 均为空。
+- 公网 event 详情及 `umafans.run`、`www.umafans.run` healthz 均为 HTTP 200；详情仍只
+  显示 `15:02`，不显示 7 匹 shadow participant 或暂定/正式/更正赛果标识。
+
+本授权已在首个 shadow result 到达时消费完毕。不得执行 `14:24:42Z` 后续探针、打开
+scheduler、扩展赛事或公开；后续来源结果复核、provisional public 灰度均须重新审核并取得
+精确授权。
+
 ## 2026-07-18 event 924 单赛事 TRA shadow runner 启动检查通过
 
 - 用户显式授权只启动 event `924` 的 The Racing API shadow runner 检查，要求

@@ -1,5 +1,42 @@
 # 部署运行手册
 
+## event 924 有界单赛事 shadow 轮询结果（2026-07-18）
+
+1. 授权范围只覆盖 event `924`，以数据库 `next_poll_at` 为唯一时钟，scheduler false、
+   四层 policy shadow、不得扩展赛事或公开。执行前 tracking/allowlist 均为 `[924]`，
+   observation/result/publication/incident 为 0。
+2. 本轮恢复点为
+   `/opt/umanewsbot/backups/db/pre-race-live-window-924-ebab4aa8-20260718T111221Z.dump`，
+   `198,273,152` bytes、`root:root 0600`、SHA-256
+   `efa68a76f7236f7454fe9119df601ff4f1e4fae9d2b8040fc09aa9cf28efd13b`；
+   `pg_restore -l` 通过。
+3. 临时控制循环不得调用全局 selector；每轮只查询 event `924`，到期后用 owner
+   generation 1、TTL 120 秒领取单赛事 claim，并只投递到 `race_live`。首轮脚本把
+   `RaceEventLiveClaimDecision.claimed` 误写成 `applied`，在 task 投递前失败；保留并复用
+   已写入的 generation 2 active claim，在 TTL 内于 `11:33:50Z` 投递
+   `a5e03b1a-6c7b-409b-ba16-096e575b63f4`。不得重新 claim；修正字段后继续。
+4. generation 2–14 共 `13` 次 task 均为 `SUCCESS / pre_off_wait`，没有结果 API 请求。
+   generation 15–18 分别在 `14:02:09Z`、`14:05:17Z`、`14:08:27Z`、`14:11:34Z`
+   发出一个受 HostBudget 约束的请求，均为 `SUCCESS /
+   the_racing_api_result_not_found`，checkpoint 按 3 分钟窗口推进。
+5. generation 19 于 `14:14:40.843702Z` claim，task
+   `9615a5f6-bc5c-4203-931d-32990b07432b` 在 observation 时间
+   `14:14:42.301344Z` 返回 `processed=true / the_racing_api_shadow_applied /
+   revision_id=2`。距预计开跑 `14:02:00Z` 为 `12` 分 `42.301` 秒。首个 shadow
+   result 到达后控制循环立即退出；不得执行 next poll `14:24:42.301344Z`。
+6. observation ID `1` 为 provisional、parser `the_racing_api_free_v1`、permission
+   `licensed_api_automation`、parse warning `0`，normalized SHA-256 为
+   `4d2fa8c03ad3ae735700bd72291f822ea53e75449f90f3ad568392e2995dccc2`。
+   revision ID `2` 为 result revision no. `1`，supplemental authority、conflict none，
+   `7/7` finished item 与 `1–7` 名次完整，evidence `1`，`published_at=null`。
+7. 停止后 tracking 为 `provisional_result / shadow_applied`，claim 为空、failures 0；
+   HostBudget failures 0、error 空、circuit 关闭。tracking/allowlist 仍只有 `[924]`，
+   四层 policy 仍为 shadow；legacy result/publication/marker evidence/incident 均为 0。
+8. `.env` 和 live worker 均为 `scheduler=false / runner=the_racing_api_free`；live queue、
+   active/reserved、one-off 为 0。公网赛事详情和两个正式域名 healthz 均为 200，页面没有
+   shadow participant 或赛果标识泄漏。本授权已消费，后续 probe、scheduler、其他赛事和
+   公开均须新授权。
+
 ## event 924 TRA shadow runner 启动检查（2026-07-18）
 
 1. 启动前确认 production tracking/allowlist 精确全集均为 event `924`，四层 policy 为

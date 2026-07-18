@@ -9,6 +9,10 @@
 > “单赛事 TRA shadow runner 启动检查（当前状态）”。下文 runner disabled 仅为早期历史
 > 快照；当前 live worker 已启用 TRA runner，但 scheduler 仍为 false。
 
+> 当前状态提示：runner 启动检查也已被后续获准的有界轮询取代；当前唯一权威状态与操作
+> 门禁见文末“event 924 有界 shadow 轮询（当前状态）”。首个 shadow result 已取得并停止，
+> scheduler 和公开模式仍未开启。
+
 冻结代码已部署生产，Group 后缀匹配能力进入运行镜像；scheduler、真实 runner 与公开门禁
 继续关闭。event `924` 的新受控 prepare 因 tomorrow GB 请求 HTTP 429 fail closed，没有
 manifest、initializer 或业务事实写入。
@@ -189,3 +193,38 @@ blocker artifact、启动 scheduler/runner 或公开。
 下一门禁是对 event `924` 的有界单赛事 shadow 轮询窗口取得单独授权。该轮询必须遵守每次
 数据库 `next_poll_at`、共享 HostBudget 和单请求上限，直到首次 shadow result 或明确截止；
 不得打开全局 selector、扩展其他赛事或公开。
+
+## event 924 有界 shadow 轮询（当前状态）
+
+> 状态更新：上一节要求的单独授权已经取得并消费。首个 shadow result 已到达，控制循环
+> 已停止；本节是当前唯一权威状态。
+
+- 用户授权边界为 event `924`、scheduler false、逐次遵守数据库 `next_poll_at`、直到首个
+  shadow result 或明确截止，不扩展赛事、不公开。
+- 写前备份
+  `/opt/umanewsbot/backups/db/pre-race-live-window-924-ebab4aa8-20260718T111221Z.dump`
+  为 `198,273,152` bytes、`0600`，SHA-256
+  `efa68a76f7236f7454fe9119df601ff4f1e4fae9d2b8040fc09aa9cf28efd13b`，
+  `pg_restore -l` 通过。
+- 临时循环只按 event `924` 执行单赛事 claim/dispatch。首轮误读 claim 返回对象字段，
+  在 task 投递前退出；已写入的 generation 2 claim 未重复领取，而是在 TTL 内原样投递
+  task `a5e03b1a-6c7b-409b-ba16-096e575b63f4`。改用真实 `claimed` 字段后恢复。
+- generation 2–14 共 `13` 次 `pre_off_wait`、零 API 请求；generation 15–18 在
+  `14:02:09Z` 至 `14:11:34Z` 的四次单请求均为 `result_not_found`。
+- generation 19 task `9615a5f6-bc5c-4203-931d-32990b07432b` 于
+  `14:14:42.301344Z` 返回 `processed=true /
+  the_racing_api_shadow_applied / revision_id=2`，距预计开跑 `12` 分 `42.301` 秒。
+  控制循环随即停止，未执行 next poll `14:24:42.301344Z`。
+- observation ID `1` 为 provisional、licensed API automation、parse warning 0；
+  normalized SHA-256
+  `4d2fa8c03ad3ae735700bd72291f822ea53e75449f90f3ad568392e2995dccc2`。
+  revision ID `2` 含 `7/7` finished item、完整 1–7 名次、evidence 1，且
+  `published_at=null`。
+- tracking 为 `provisional_result / shadow_applied`，claim 空、failures 0。tracking /
+  allowlist 仍为 `[924]`，四层 policy 仍为 shadow；legacy result、publication、official
+  marker/incident 全为 0。
+- scheduler 仍为 false；live queue、active/reserved、one-off 为空。公网详情和两个正式
+  healthz 为 200，页面无 shadow participant 或赛果标识。
+
+本授权已经完成并关闭。下一步只能是先审核这份真实 shadow evidence，再对后续复核或
+provisional public 灰度取得新的精确授权；不得直接执行后续探针、打开 scheduler 或扩展赛事。
