@@ -1,5 +1,31 @@
 # 部署运行手册
 
+## event 924 退避重试 prepare 结果（2026-07-18）
+
+1. 重试前 HostBudget 的 `next_allowed_at` 已过去，`consecutive_failures=1`、circuit 未开；
+   event `924` 仍为 `2026-07-18 / NEWBURY / G3 / scheduled`，四个 app service 仍运行
+   获准 image `sha256:4443a9c…55dc`，scheduler false、runner disabled、live queue 与
+   one-off 为 0。
+2. 用户授权范围内唯一有效联网 run 为
+   `/opt/umanewsbot/runtime/race_live_racecards/production-racecard-gb-924-grade-retry-20260718T093207Z`。
+   today GB 为 `200 / 215,646 bytes / 1,425 ms / SHA-256 4b4385a7…9b1d`；
+   tomorrow GB 为 `200 / 76,616 bytes / 1,184 ms / SHA-256 14364e39…6128`。
+3. run 为 `completed=true / request_count=2 / blockers=[]`。manifest/report/requests
+   SHA-256 依次为 `ee9d0d43…1432`、`96cb3acb…fdc2`、`cf45c566…d32`；目录 `0700`，
+   三文件 `0600`，manifest 内 companion hashes 与宿主重算一致。
+4. manifest 唯一事件为 event `924`、external race
+   `rac_13000002795`、`2026-07-18T15:02:00+01:00`、`7` 匹 declared participant；
+   审计无 raw、secret、credential、第三方 rating/comment 字段。
+5. prepare 只更新 HostBudget 成功结果，没有写 event 或 live 业务事实。执行后赛事、
+   runner、result 为 `9,867 / 100,132 / 91,897`，全部 live 事实表、policy/allowlist、
+   queue 和 one-off 仍为 0；HostBudget 为
+   `consecutive_failures=0 / last_error_code="" / circuit_open_until=null`，HTTP healthz
+   为 200。
+6. 成功 manifest 不是 initializer 授权。未取得对精确 manifest SHA
+   `ee9d0d43ac52c1678ddce61dbd7c4a6b0c0630eb02d2dd6fd8e43cfc5fcd1432`
+   的单独授权前，不得运行 initializer dry-run/apply/verify，不得启动 shadow、scheduler、
+   runner 或公开。
+
 ## 英国 Group 后缀修复生产发布结果（2026-07-18）
 
 1. 用户在最新成功 review 后授权的提交

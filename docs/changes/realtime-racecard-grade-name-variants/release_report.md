@@ -2,6 +2,9 @@
 
 ## 发布结论
 
+> 历史快照提示：本节记录首次 HTTP 429 run，不代表当前状态。退避重试已经成功生成
+> manifest；当前权威状态与唯一操作门禁见文末“退避重试最新结果（当前状态）”。
+
 冻结代码已部署生产，Group 后缀匹配能力进入运行镜像；scheduler、真实 runner 与公开门禁
 继续关闭。event `924` 的新受控 prepare 因 tomorrow GB 请求 HTTP 429 fail closed，没有
 manifest、initializer 或业务事实写入。
@@ -62,6 +65,49 @@ run：
 
 ## 下一门禁
 
+> 历史门禁提示：本节要求的联网重试授权已完成，不得据此再次发起 prepare。当前只允许在
+> 对文末精确 manifest SHA 单独授权后进入 initializer dry-run/apply/verify。
+
 本 blocker artifact 不得复用或手工补 manifest。退避后新 run 会再次产生最多两个真实请求，
 需要用户新的显式联网重试授权；若以后得到成功 manifest，仍须单独审核后才能决定
 initializer dry-run/apply/verify。
+
+## 退避重试最新结果（当前状态）
+
+用户已显式授权 event `924` 退避后重试。上述 HTTP 429 门禁是首次 run 的历史记录；有效
+联网 run `production-racecard-gb-924-grade-retry-20260718T093207Z` 已成功生成精确
+manifest，initializer、shadow 与公开门禁仍未执行。
+
+- 执行前 UTC `2026-07-18T09:29:51Z`，HostBudget 的
+  `next_allowed_at=2026-07-18T09:11:52.789191+00:00` 已过去，circuit 未打开。
+- 一次使用旧参数别名的命令在 argparse 阶段退出，没有发出网络请求，也没有创建对应
+  artifact；随后使用当前命令的正式参数名执行唯一一次有效联网重试。
+- 有效 run：
+  `/opt/umanewsbot/runtime/race_live_racecards/production-racecard-gb-924-grade-retry-20260718T093207Z`
+- today GB：HTTP 200，`215,646` bytes，`1,425 ms`，response SHA-256
+  `4b4385a77f6766160d70777c62110d438d37a9107c7578ad86026bf9cc859b1d`。
+- tomorrow GB：HTTP 200，`76,616` bytes，`1,184 ms`，response SHA-256
+  `14364e390bfebb033633d1b6b8b3fc8021ffbab52dffb0d18605fabdcfba6128`。
+- 结果：`completed=true / request_count=2 / blockers=[]`。
+- manifest SHA-256：
+  `ee9d0d43ac52c1678ddce61dbd7c4a6b0c0630eb02d2dd6fd8e43cfc5fcd1432`。
+- report SHA-256：
+  `96cb3acb3ef11c124dbd370226b3252ef31297e57ad4cb32da84443aa63fdc2d`。
+- requests SHA-256：
+  `cf45c566d9dc3bea64eaff27cf7a81a92942ebf834eae880a067b1066e35dd32`。
+- 目录 `0700`；`manifest.json/report.json/requests.jsonl` 均为 `0600`。
+- manifest companion hashes 与宿主重算一致；唯一事件为 event `924`、
+  external race `rac_13000002795`、开赛时间
+  `2026-07-18T15:02:00+01:00`、`7` 匹 declared participant，tracking state 为
+  `racecard_ready`。字段审计没有发现 raw、凭据、第三方 rating 或 comment。
+- 执行后 event `924` 仍为 `scheduled`，其 `race_datetime/local_start_time` 仍为空，
+  `updated_at` 未变化；`9,867 events / 100,132 runners / 91,897 results` 与全部 live
+  事实表守恒，policy/allowlist、live queue、one-off 仍为 0。
+- HostBudget 恢复为
+  `consecutive_failures=0 / last_error_code="" / circuit_open_until=null`；站内与公网
+  HTTP healthz 为 200。
+
+当前唯一门禁是对精确 manifest SHA
+`ee9d0d43ac52c1678ddce61dbd7c4a6b0c0630eb02d2dd6fd8e43cfc5fcd1432`
+取得单独授权，再执行 schema v2 initializer 的 dry-run/apply/verify。当前不得复用旧
+blocker artifact、启动 scheduler/runner 或公开。

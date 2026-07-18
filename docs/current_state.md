@@ -1,5 +1,36 @@
 # 当前状态
 
+## 2026-07-18 event 924 退避重试 prepare 成功，停在 initializer 门禁
+
+- 用户显式授权退避后仅重试 event `924`。执行前 UTC 为 `09:29:51`，已晚于
+  HostBudget 的 `next_allowed_at=09:11:52.789191+00:00`；circuit 未打开，event 仍为
+  `2026-07-18 / NEWBURY / G3 / scheduled`，scheduler false、runner disabled、
+  `race_live` 队列和 one-off 均为 0。
+- 有效 run 为
+  `/opt/umanewsbot/runtime/race_live_racecards/production-racecard-gb-924-grade-retry-20260718T093207Z`。
+  today/tomorrow 两个固定 GB 请求均为 HTTP 200，分别为
+  `215,646 bytes / 1,425 ms / 4b4385a77f6766160d70777c62110d438d37a9107c7578ad86026bf9cc859b1d`
+  与
+  `76,616 bytes / 1,184 ms / 14364e390bfebb033633d1b6b8b3fc8021ffbab52dffb0d18605fabdcfba6128`；
+  `completed=true / request_count=2 / blockers=[]`。
+- manifest SHA-256 为
+  `ee9d0d43ac52c1678ddce61dbd7c4a6b0c0630eb02d2dd6fd8e43cfc5fcd1432`，
+  report/request SHA-256 为
+  `96cb3acb3ef11c124dbd370226b3252ef31297e57ad4cb32da84443aa63fdc2d` /
+  `cf45c566d9dc3bea64eaff27cf7a81a92942ebf834eae880a067b1066e35dd32`。
+  目录/文件权限为 `0700/0600`，manifest companion hashes 与宿主重算一致。
+- manifest 唯一绑定 event `924` 与 `rac_13000002795`，开赛时间为
+  `2026-07-18T15:02:00+01:00`，共 `7` 匹 declared participant，目标 tracking state 为
+  `racecard_ready`；审计未发现 raw、凭据、第三方评级或评论字段。
+- prepare 后 event `924` 的 status、时间字段与 `updated_at` 未变化；生产仍为
+  `9,867 events / 100,132 runners / 91,897 results`，所有 live
+  control/tracking/source/participant/observation/revision/publication/incident 表仍为 0，
+  policy/allowlist、live queue 与 one-off 仍为 0。HostBudget 已恢复为
+  `consecutive_failures=0 / last_error_code=""`，站内与公网 HTTP healthz 为 200。
+- 本轮只生成并审计成功 manifest，未执行 initializer dry-run/apply/verify，未初始化
+  shadow、未开启调度或公开。下一步必须对该精确 manifest 取得单独授权后，才可运行
+  schema v2 initializer。
+
 ## 2026-07-18 英国 Group 后缀修复已发布，首轮新 prepare 因上游 429 安全停止
 
 - 最新成功原生 review 后，用户授权的冻结提交

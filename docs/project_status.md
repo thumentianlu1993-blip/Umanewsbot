@@ -1,5 +1,18 @@
 # 项目状态文档
 
+## 2026-07-18 event 924 已生成成功 racecard manifest，尚未初始化
+
+- 用户授权的单次退避重试已完成；有效 run
+  `production-racecard-gb-924-grade-retry-20260718T093207Z` 的 today/tomorrow GB
+  请求均为 200，`completed=true / request_count=2 / blockers=[]`。
+- manifest SHA-256 为 `ee9d0d43…1432`，精确绑定 event `924`、
+  `rac_13000002795`、伦敦时间 `15:02` 和 `7` 匹 declared participant；companion
+  hashes、`0700/0600` 权限和禁止字段检查通过。
+- prepare 没有修改 event 或 live 业务事实：`9,867 / 100,132 / 91,897` 守恒，全部 live
+  事实表、policy/allowlist、队列和 one-off 为 0；HostBudget 的 429 失败状态已清零。
+  initializer、shadow、scheduler、runner 和公开仍未执行或开启，下一步需对精确 manifest
+  单独授权。
+
 ## 2026-07-18 英国 Group 后缀修复已生产发布，prepare 被 429 阻断
 
 - 冻结提交 `ebab4aa8` 已快进 `main` 并部署，四个 app service 统一运行 AMD64 image
