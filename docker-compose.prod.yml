@@ -59,6 +59,7 @@ services:
       - media_data:/app/server/media
       - app_logs:/app/logs
       - ./runtime/secrets:/run/secrets:ro
+      - ./runtime/race_live_racecards:/run/race-live/racecards:rw
     restart: unless-stopped
     depends_on:
       redis:

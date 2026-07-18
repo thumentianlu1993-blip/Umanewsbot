@@ -2193,9 +2193,17 @@ class RaceLiveWorkerDeploymentContractTests(SimpleTestCase):
         repo_root = Path(__file__).resolve().parents[2]
         env_text = (repo_root / ".env.example").read_text()
         self.assertIn("RACE_LIVE_SCHEDULER_ENABLED=false", env_text)
+        self.assertIn(
+            "RACE_LIVE_RACECARD_ARTIFACT_ROOT=/run/race-live/racecards",
+            env_text,
+        )
         self.assertIn("CELERY_RACE_LIVE_WORKER_CONCURRENCY=1", env_text)
         self.assertIn("CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT=45", env_text)
         self.assertIn("CELERY_RACE_LIVE_WORKER_TIME_LIMIT=60", env_text)
+        self.assertEqual(
+            settings.RACE_LIVE_RACECARD_ARTIFACT_ROOT,
+            "/run/race-live/racecards",
+        )
 
     def test_live_worker_image_contains_registry_and_mounts_external_secret_read_only(self):
         repo_root = Path(__file__).resolve().parents[2]
@@ -2231,6 +2239,23 @@ class RaceLiveWorkerDeploymentContractTests(SimpleTestCase):
                     "./runtime/secrets:/run/secrets:ro",
                     live_worker,
                 )
+                self.assertIn(
+                    "./runtime/race_live_racecards:/run/race-live/racecards:rw",
+                    live_worker,
+                )
+
+                for service_name in ("web", "worker", "beat"):
+                    marker = f"  {service_name}:\n"
+                    self.assertIn(marker, compose_text)
+                    service_tail = compose_text.split(marker, 1)[1]
+                    service_lines = []
+                    for line in service_tail.splitlines():
+                        if line.startswith("  ") and not line.startswith("    "):
+                            break
+                        service_lines.append(line)
+                    service_text = "\n".join(service_lines)
+                    self.assertNotIn("/run/secrets", service_text)
+                    self.assertNotIn("/run/race-live/racecards", service_text)
 
 
 class RaceLiveOfflineFixtureRunnerTests(TestCase):
@@ -2683,6 +2708,14 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
                     "name": "results_today",
                     "path": "/v1/results/today/free?limit=50&skip=0",
                 },
+                {
+                    "name": "racecards_sync_today",
+                    "path": "/v1/racecards/free?day=today&region_codes=gb&limit=500&skip=0",
+                },
+                {
+                    "name": "racecards_sync_tomorrow",
+                    "path": "/v1/racecards/free?day=tomorrow&region_codes=gb&limit=500&skip=0",
+                },
             ],
             "evidence": {
                 "authorization_basis": "user_confirmed_automation_permission",
@@ -2992,6 +3025,112 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
         self.assertEqual(stable_models.RaceEventResult.objects.count(), 0)
         self.host_budget.refresh_from_db()
         self.assertEqual(self.host_budget.lock_version, 2)
+
+    def test_pre_off_claim_checkpoints_without_http_or_failure_increment(self):
+        off_time = self.NOW + timedelta(minutes=12)
+        stable_models.RaceEvent.objects.filter(pk=self.event.pk).update(
+            race_datetime=off_time,
+        )
+        stable_models.RaceEventLiveTracking.objects.filter(
+            pk=self.tracking.pk
+        ).update(
+            state=stable_models.RaceEventLiveState.RACECARD_READY,
+            consecutive_failures=4,
+        )
+        calls = []
+
+        with patch(
+            "stable.services.race_live_runner.read_the_racing_api_automation_registry",
+            return_value=({}, self.registry_digest),
+        ):
+            result = self._run(lambda **kwargs: calls.append(kwargs))
+
+        self.assertIs(result["processed"], False)
+        self.assertEqual(result["reason"], "pre_off_wait")
+        self.assertEqual(calls, [])
+        self.tracking.refresh_from_db()
+        self.assertEqual(
+            self.tracking.state,
+            stable_models.RaceEventLiveState.RACECARD_READY,
+        )
+        self.assertEqual(self.tracking.active_attempt_token, "")
+        self.assertIsNone(self.tracking.claim_expires_at)
+        self.assertEqual(self.tracking.consecutive_failures, 4)
+        self.assertEqual(self.tracking.checkpoint_payload["status"], "pre_off_wait")
+        self.assertGreater(self.tracking.next_poll_at, self.NOW)
+        self.assertLessEqual(self.tracking.next_poll_at, off_time)
+        self.host_budget.refresh_from_db()
+        self.assertEqual(self.host_budget.lock_version, 0)
+
+    def test_at_off_claim_is_promoted_before_the_first_results_request(self):
+        stable_models.RaceEvent.objects.filter(pk=self.event.pk).update(
+            race_datetime=self.NOW,
+        )
+        stable_models.RaceEventLiveTracking.objects.filter(
+            pk=self.tracking.pk
+        ).update(state=stable_models.RaceEventLiveState.RACECARD_READY)
+        state_seen_by_transport = []
+
+        def transport(**kwargs):
+            state_seen_by_transport.append(
+                stable_models.RaceEventLiveTracking.objects.values_list(
+                    "state", flat=True
+                ).get(pk=self.tracking.pk)
+            )
+            return self._response()
+
+        with patch(
+            "stable.services.race_live_runner.read_the_racing_api_automation_registry",
+            return_value=({}, self.registry_digest),
+        ):
+            result = self._run(transport)
+
+        self.assertEqual(
+            state_seen_by_transport,
+            [stable_models.RaceEventLiveState.AWAITING_RESULT],
+        )
+        self.assertIs(result["processed"], True)
+
+    def test_stale_owner_cannot_pre_off_checkpoint_promote_or_request(self):
+        off_time = self.NOW + timedelta(minutes=5)
+        stable_models.RaceEvent.objects.filter(pk=self.event.pk).update(
+            race_datetime=off_time,
+        )
+        stable_models.RaceEventProjectionControl.objects.filter(
+            pk=self.control.pk
+        ).update(owner_generation=5)
+        stable_models.RaceEventLiveTracking.objects.filter(
+            pk=self.tracking.pk
+        ).update(state=stable_models.RaceEventLiveState.RACECARD_READY)
+        before = stable_models.RaceEventLiveTracking.objects.values(
+            "state",
+            "active_attempt_token",
+            "claim_generation",
+            "claim_expires_at",
+            "next_poll_at",
+            "consecutive_failures",
+            "checkpoint_payload",
+        ).get(pk=self.tracking.pk)
+        calls = []
+
+        with patch(
+            "stable.services.race_live_runner.read_the_racing_api_automation_registry",
+            return_value=({}, self.registry_digest),
+        ):
+            result = self._run(lambda **kwargs: calls.append(kwargs))
+
+        self.assertIs(result["processed"], False)
+        self.assertEqual(calls, [])
+        after = stable_models.RaceEventLiveTracking.objects.values(
+            "state",
+            "active_attempt_token",
+            "claim_generation",
+            "claim_expires_at",
+            "next_poll_at",
+            "consecutive_failures",
+            "checkpoint_payload",
+        ).get(pk=self.tracking.pk)
+        self.assertEqual(after, before)
 
 
 class RaceLiveKillSwitchTests(TestCase):

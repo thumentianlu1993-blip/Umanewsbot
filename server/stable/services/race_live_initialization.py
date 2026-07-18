@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, time as datetime_time, timedelta
 import hashlib
 import json
 import os
@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import stat
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from django.db import transaction
 from django.utils import timezone
@@ -27,7 +28,7 @@ _SOURCE_KEY = "the_racing_api"
 _HOST = "api.theracingapi.com"
 _TERMS_URL = "https://www.theracingapi.com/terms-of-service"
 
-_TOP_LEVEL_KEYS = frozenset(
+_TOP_LEVEL_KEYS_V1 = frozenset(
     {
         "schema_version",
         "approved_commit",
@@ -44,7 +45,15 @@ _TOP_LEVEL_KEYS = frozenset(
         "events",
     }
 )
-_EVENT_KEYS = frozenset(
+_TOP_LEVEL_KEYS_V2 = _TOP_LEVEL_KEYS_V1 | frozenset(
+    {
+        "registry_valid_until",
+        "requests_sha256",
+        "report_sha256",
+        "official_verification_evidence_sha256",
+    }
+)
+_EVENT_KEYS_V1 = frozenset(
     {
         "event_id",
         "expected_event_updated_at",
@@ -61,7 +70,19 @@ _EVENT_KEYS = frozenset(
         "participants",
     }
 )
-_PARTICIPANT_KEYS = frozenset(
+_EVENT_KEYS_V2 = _EVENT_KEYS_V1 | frozenset(
+    {
+        "expected_race_datetime_before",
+        "expected_local_start_time_before",
+        "expected_status",
+        "expected_local_date",
+        "expected_timezone_name",
+        "local_date",
+        "source_off_dt",
+        "source_response_sha256",
+    }
+)
+_PARTICIPANT_KEYS_V1 = frozenset(
     {
         "stable_key",
         "canonical_name",
@@ -70,6 +91,9 @@ _PARTICIPANT_KEYS = frozenset(
         "horse_number",
         "status",
     }
+)
+_PARTICIPANT_KEYS_V2 = _PARTICIPANT_KEYS_V1 | frozenset(
+    {"barrier", "jockey_name", "jockey_id"}
 )
 _TRACKING_STATES = frozenset(
     {
@@ -171,28 +195,66 @@ def _aware_datetime(value: Any, label: str) -> datetime:
     return parsed
 
 
-def _read_regular_file(path: Path) -> bytes:
+def _optional_aware_datetime(value: Any, label: str) -> datetime | None:
+    if value is None:
+        return None
+    return _aware_datetime(value, label)
+
+
+def _iso_date(value: Any, label: str) -> date:
+    if not isinstance(value, str) or value != value.strip():
+        _fail(f"{label} 必须是 ISO date")
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise RaceLiveInitializationError(f"{label} 不是合法 ISO date") from exc
+
+
+def _optional_local_time(value: Any, label: str) -> datetime_time | None:
+    if value is None:
+        return None
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or "T" in value
+        or "+" in value
+        or value.endswith("Z")
+    ):
+        _fail(f"{label} 必须是严格本地 time 或 null")
+    try:
+        parsed = datetime_time.fromisoformat(value)
+    except ValueError as exc:
+        raise RaceLiveInitializationError(
+            f"{label} 不是合法本地 time"
+        ) from exc
+    if parsed.tzinfo is not None:
+        _fail(f"{label} 不能包含时区")
+    return parsed
+
+
+def _read_regular_file(path: Path, *, label: str = "manifest") -> bytes:
     try:
         before = path.lstat()
     except OSError as exc:
-        raise RaceLiveInitializationError(f"无法读取 manifest：{exc}") from exc
+        raise RaceLiveInitializationError(f"无法读取 {label}：{exc}") from exc
     if not stat.S_ISREG(before.st_mode):
-        _fail("manifest 必须是 regular file，不能是 symlink 或目录")
+        _fail(f"{label} 必须是 regular file，不能是 symlink 或目录")
     flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
     try:
         fd = os.open(path, flags)
     except OSError as exc:
-        raise RaceLiveInitializationError(f"无法安全打开 manifest：{exc}") from exc
+        raise RaceLiveInitializationError(f"无法安全打开 {label}：{exc}") from exc
     try:
         opened = os.fstat(fd)
         if not stat.S_ISREG(opened.st_mode):
-            _fail("manifest 必须是 regular file")
+            _fail(f"{label} 必须是 regular file")
         if (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
-            _fail("manifest 在打开期间发生替换")
+            _fail(f"{label} 在打开期间发生替换")
         if opened.st_size > _MAX_MANIFEST_BYTES:
-            _fail(f"manifest 超过 {_MAX_MANIFEST_BYTES} bytes")
+            _fail(f"{label} 超过 {_MAX_MANIFEST_BYTES} bytes")
         chunks: list[bytes] = []
         total = 0
         while True:
@@ -202,7 +264,7 @@ def _read_regular_file(path: Path) -> bytes:
             chunks.append(chunk)
             total += len(chunk)
             if total > _MAX_MANIFEST_BYTES:
-                _fail(f"manifest 超过 {_MAX_MANIFEST_BYTES} bytes")
+                _fail(f"{label} 超过 {_MAX_MANIFEST_BYTES} bytes")
         after = os.fstat(fd)
         if (
             opened.st_dev,
@@ -217,7 +279,7 @@ def _read_regular_file(path: Path) -> bytes:
             after.st_mtime_ns,
             after.st_ctime_ns,
         ):
-            _fail("manifest 在读取期间发生变化")
+            _fail(f"{label} 在读取期间发生变化")
         return b"".join(chunks)
     finally:
         os.close(fd)
@@ -252,13 +314,16 @@ def load_race_live_initialization_manifest(
         payload = json.loads(text, object_pairs_hook=_strict_object)
     except json.JSONDecodeError as exc:
         raise RaceLiveInitializationError(f"manifest JSON 无效：{exc}") from exc
-    payload = _exact_keys(payload, _TOP_LEVEL_KEYS, "manifest")
-
-    if (
-        isinstance(payload["schema_version"], bool)
-        or payload["schema_version"] != 1
-    ):
-        _fail("schema_version 必须精确为 1")
+    if not isinstance(payload, dict):
+        _fail("manifest 必须是 object")
+    schema_version = payload.get("schema_version")
+    if isinstance(schema_version, bool) or schema_version not in {1, 2}:
+        _fail("schema_version 必须精确为 1 或 2")
+    payload = _exact_keys(
+        payload,
+        _TOP_LEVEL_KEYS_V2 if schema_version == 2 else _TOP_LEVEL_KEYS_V1,
+        "manifest",
+    )
     approved_commit = _lower_commit(payload["approved_commit"], "approved_commit")
     if approved_commit != expected_commit:
         _fail(
@@ -281,6 +346,20 @@ def load_race_live_initialization_manifest(
     policy_valid_until = _aware_datetime(
         payload["policy_valid_until"], "policy_valid_until"
     )
+    registry_valid_until = None
+    if schema_version == 2:
+        registry_valid_until = _aware_datetime(
+            payload["registry_valid_until"],
+            "registry_valid_until",
+        )
+        if policy_valid_until > registry_valid_until:
+            _fail("policy_valid_until 不得晚于 registry_valid_until")
+        _lower_sha256(payload["requests_sha256"], "requests_sha256")
+        _lower_sha256(payload["report_sha256"], "report_sha256")
+        _lower_sha256(
+            payload["official_verification_evidence_sha256"],
+            "official_verification_evidence_sha256",
+        )
     official_valid_until = _aware_datetime(
         payload["official_verification_valid_until"],
         "official_verification_valid_until",
@@ -308,6 +387,25 @@ def load_race_live_initialization_manifest(
         _fail("policy_valid_until 必须晚于 generated_at")
     if official_valid_until <= generated_at:
         _fail("official_verification_valid_until 必须晚于 generated_at")
+    if registry_valid_until is not None and registry_valid_until <= effective_now:
+        _fail("registry_valid_until 已过期")
+
+    if schema_version == 2:
+        parent = path.parent
+        try:
+            parent_stat = parent.lstat()
+        except OSError as exc:
+            raise RaceLiveInitializationError(f"无法读取 artifact 目录：{exc}") from exc
+        if not stat.S_ISDIR(parent_stat.st_mode):
+            _fail("artifact parent 必须是目录且不能是 symlink")
+        for filename, digest_key in (
+            ("requests.jsonl", "requests_sha256"),
+            ("report.json", "report_sha256"),
+        ):
+            companion = parent / filename
+            companion_raw = _read_regular_file(companion, label=filename)
+            if hashlib.sha256(companion_raw).hexdigest() != payload[digest_key]:
+                _fail(f"{filename} SHA-256 不匹配")
 
     events = payload["events"]
     if not isinstance(events, list) or not events or len(events) > 500:
@@ -318,7 +416,11 @@ def load_race_live_initialization_manifest(
     allowed_regions = set(models.RacingRegion.values)
     for event_index, raw_event in enumerate(events):
         label = f"events[{event_index}]"
-        event = _exact_keys(raw_event, _EVENT_KEYS, label)
+        event = _exact_keys(
+            raw_event,
+            _EVENT_KEYS_V2 if schema_version == 2 else _EVENT_KEYS_V1,
+            label,
+        )
         event_id = _positive_int(event["event_id"], f"{label}.event_id")
         _aware_datetime(
             event["expected_event_updated_at"],
@@ -334,13 +436,20 @@ def load_race_live_initialization_manifest(
         )
         if region not in allowed_regions:
             _fail(f"{label}.country_region 不在允许范围")
+        if (
+            schema_version == 2
+            and region != models.RacingRegion.UNITED_KINGDOM
+        ):
+            _fail(f"{label}.country_region 必须是 united_kingdom")
         _nonempty_string(
             event["racecourse"], f"{label}.racecourse", max_length=255
         )
         _nonempty_string(
             event["grade_text"], f"{label}.grade_text", max_length=128
         )
-        _aware_datetime(event["race_datetime"], f"{label}.race_datetime")
+        race_datetime = _aware_datetime(
+            event["race_datetime"], f"{label}.race_datetime"
+        )
         external_race_id = _nonempty_string(
             event["external_race_id"],
             f"{label}.external_race_id",
@@ -349,6 +458,62 @@ def load_race_live_initialization_manifest(
         if event["tracking_state"] not in _TRACKING_STATES:
             _fail(f"{label}.tracking_state 不允许")
         _aware_datetime(event["next_poll_at"], f"{label}.next_poll_at")
+        if schema_version == 2:
+            _optional_aware_datetime(
+                event["expected_race_datetime_before"],
+                f"{label}.expected_race_datetime_before",
+            )
+            _optional_local_time(
+                event["expected_local_start_time_before"],
+                f"{label}.expected_local_start_time_before",
+            )
+            if event["expected_status"] != models.RaceEventStatus.SCHEDULED:
+                _fail(f"{label}.expected_status 必须是 scheduled")
+            expected_local_date = _iso_date(
+                event["expected_local_date"],
+                f"{label}.expected_local_date",
+            )
+            local_date = _iso_date(event["local_date"], f"{label}.local_date")
+            if expected_local_date != local_date:
+                _fail(f"{label}.local_date 与 expected_local_date 不一致")
+            if event["expected_timezone_name"] != "Europe/London":
+                _fail(f"{label}.expected_timezone_name 必须是 Europe/London")
+            source_off_dt = _aware_datetime(
+                event["source_off_dt"], f"{label}.source_off_dt"
+            )
+            if source_off_dt != race_datetime:
+                _fail(f"{label}.source_off_dt 与 race_datetime instant 不一致")
+            london_time = source_off_dt.astimezone(ZoneInfo("Europe/London"))
+            if london_time.date() != local_date:
+                _fail(f"{label}.source_off_dt 的伦敦日期不匹配")
+            _lower_sha256(
+                event["source_response_sha256"],
+                f"{label}.source_response_sha256",
+            )
+            expected_state = (
+                models.RaceEventLiveState.RACECARD_READY
+                if generated_at < source_off_dt
+                else models.RaceEventLiveState.AWAITING_RESULT
+            )
+            if event["tracking_state"] != expected_state:
+                _fail(f"{label}.tracking_state 与 generated_at/off time 不一致")
+            from stable.services.race_events import (
+                calculate_race_live_next_poll_at,
+            )
+
+            expected_next_poll = (
+                calculate_race_live_next_poll_at(
+                    off_time=source_off_dt,
+                    now=generated_at,
+                    state=expected_state,
+                )
+                if generated_at < source_off_dt
+                else generated_at
+            )
+            if _aware_datetime(
+                event["next_poll_at"], f"{label}.next_poll_at"
+            ) != expected_next_poll:
+                _fail(f"{label}.next_poll_at 与调度算法不一致")
         if event_id in seen_event_ids:
             _fail(f"{label}.event_id 重复")
         if (year, slug) in seen_event_keys:
@@ -372,7 +537,13 @@ def load_race_live_initialization_manifest(
         for participant_index, raw_participant in enumerate(participants):
             part_label = f"{label}.participants[{participant_index}]"
             participant = _exact_keys(
-                raw_participant, _PARTICIPANT_KEYS, part_label
+                raw_participant,
+                (
+                    _PARTICIPANT_KEYS_V2
+                    if schema_version == 2
+                    else _PARTICIPANT_KEYS_V1
+                ),
+                part_label,
             )
             stable_key = _nonempty_string(
                 participant["stable_key"],
@@ -384,13 +555,17 @@ def load_race_live_initialization_manifest(
                 f"{part_label}.canonical_name",
                 max_length=255,
             )
-            part_region = _nonempty_string(
-                participant["country_region"],
-                f"{part_label}.country_region",
-                max_length=32,
-            )
-            if part_region not in allowed_regions:
-                _fail(f"{part_label}.country_region 不在允许范围")
+            if schema_version == 2:
+                if participant["country_region"] != "":
+                    _fail(f"{part_label}.country_region 必须留空")
+            else:
+                part_region = _nonempty_string(
+                    participant["country_region"],
+                    f"{part_label}.country_region",
+                    max_length=32,
+                )
+                if part_region not in allowed_regions:
+                    _fail(f"{part_label}.country_region 不在允许范围")
             external_runner_id = _nonempty_string(
                 participant["external_runner_id"],
                 f"{part_label}.external_runner_id",
@@ -403,6 +578,30 @@ def load_race_live_initialization_manifest(
             )
             if participant["status"] not in _PARTICIPANT_STATUSES:
                 _fail(f"{part_label}.status 不允许")
+            if schema_version == 2:
+                expected_stable_key = "tra:" + hashlib.sha256(
+                    external_runner_id.encode("utf-8")
+                ).hexdigest()
+                if stable_key != expected_stable_key:
+                    _fail(f"{part_label}.stable_key 与 TRA runner ID 不一致")
+                if (
+                    participant["status"]
+                    != models.RaceEventRevisionItemStatus.DECLARED
+                ):
+                    _fail(f"{part_label}.status 必须是 declared")
+                for field, maximum in (
+                    ("barrier", 32),
+                    ("jockey_name", 255),
+                    ("jockey_id", 128),
+                ):
+                    value = participant[field]
+                    if (
+                        not isinstance(value, str)
+                        or value != value.strip()
+                        or "\x00" in value
+                        or len(value) > maximum
+                    ):
+                        _fail(f"{part_label}.{field} 类型或长度无效")
             if stable_key in stable_keys:
                 _fail(f"{part_label}.stable_key 重复")
             if external_runner_id in external_runner_ids:
@@ -434,7 +633,7 @@ def _canonical_sha256(value: Any) -> str:
 
 
 def _racecard_payload(event: dict[str, Any]) -> dict[str, Any]:
-    return {
+    payload = {
         "event_id": event["event_id"],
         "external_race_id": event["external_race_id"],
         "participants": [
@@ -449,6 +648,21 @@ def _racecard_payload(event: dict[str, Any]) -> dict[str, Any]:
             for participant in event["participants"]
         ],
     }
+    if "source_off_dt" in event:
+        payload["source_off_dt"] = event["source_off_dt"]
+        for row, participant in zip(
+            payload["participants"],
+            event["participants"],
+            strict=True,
+        ):
+            row.update(
+                {
+                    "barrier": participant["barrier"],
+                    "jockey_name": participant["jockey_name"],
+                    "jockey_id": participant["jockey_id"],
+                }
+            )
+    return payload
 
 
 def _policy_specs(
@@ -473,7 +687,7 @@ def _policy_specs(
     return result
 
 
-def _event_matches_manifest(row: models.RaceEvent, event: dict[str, Any]) -> bool:
+def _event_identity_matches(row: models.RaceEvent, event: dict[str, Any]) -> bool:
     return (
         row.pk == event["event_id"]
         and row.year == event["year"]
@@ -482,12 +696,58 @@ def _event_matches_manifest(row: models.RaceEvent, event: dict[str, Any]) -> boo
         and row.country_region == event["country_region"]
         and row.racecourse == event["racecourse"]
         and row.grade_text == event["grade_text"]
-        and row.race_datetime == _aware_datetime(
+    )
+
+
+def _event_matches_manifest(
+    row: models.RaceEvent,
+    event: dict[str, Any],
+    *,
+    schema_version: int,
+    replay: bool,
+) -> bool:
+    if not _event_identity_matches(row, event):
+        return False
+    if schema_version == 1:
+        return (
+            row.race_datetime == _aware_datetime(
             event["race_datetime"], "race_datetime"
+            )
+            and row.updated_at
+            == _aware_datetime(
+                event["expected_event_updated_at"], "expected_event_updated_at"
+            )
         )
+    source_off_dt = _aware_datetime(event["source_off_dt"], "source_off_dt")
+    expected_local_time = source_off_dt.astimezone(
+        ZoneInfo("Europe/London")
+    ).time().replace(tzinfo=None)
+    common = (
+        row.status == event["expected_status"]
+        and row.local_date == _iso_date(event["expected_local_date"], "local_date")
+        and row.timezone_name == event["expected_timezone_name"]
+    )
+    if replay:
+        return (
+            common
+            and row.race_datetime == source_off_dt
+            and row.local_start_time == expected_local_time
+        )
+    return (
+        common
         and row.updated_at
         == _aware_datetime(
             event["expected_event_updated_at"], "expected_event_updated_at"
+        )
+        and row.race_datetime
+        == _optional_aware_datetime(
+            event["expected_race_datetime_before"],
+            "expected_race_datetime_before",
+        )
+        and row.local_start_time
+        == _optional_local_time(
+            event["expected_local_start_time_before"],
+            "expected_local_start_time_before",
         )
     )
 
@@ -516,7 +776,12 @@ def _load_and_validate_events(
             models.RaceEventModule.RESULTS
         ):
             _fail(f"RaceEvent runners/results 已被人工锁定：event_id={row.pk}")
-        if not _event_matches_manifest(row, event):
+        if manifest.payload["schema_version"] == 1 and not _event_matches_manifest(
+            row,
+            event,
+            schema_version=1,
+            replay=False,
+        ):
             _fail(f"RaceEvent baseline 漂移：event_id={row.pk}")
     return rows
 
@@ -546,14 +811,20 @@ def _validate_shared_rows(
         if policy is not None and not _policy_matches(policy, manifest):
             _fail(f"publication policy 冲突：{scope_type}:{scope_key}")
     budget = models.RaceLiveHostBudget.objects.filter(host=_HOST).first()
-    if budget is not None and not (
+    budget_matches = budget is None or (
         budget.min_interval_ms == 1050
-        and budget.next_allowed_at is None
-        and budget.consecutive_failures == 0
-        and budget.circuit_open_until is None
-        and budget.last_error_code == ""
-        and budget.lock_version == 0
-    ):
+        and (
+            manifest.payload["schema_version"] == 2
+            or (
+                budget.next_allowed_at is None
+                and budget.consecutive_failures == 0
+                and budget.circuit_open_until is None
+                and budget.last_error_code == ""
+                and budget.lock_version == 0
+            )
+        )
+    )
+    if not budget_matches:
         _fail("The Racing API host budget 已存在且不精确匹配")
 
 
@@ -623,6 +894,14 @@ def _verify_event_exact(
 ) -> list[str]:
     errors: list[str] = []
     event_id = event["event_id"]
+    event_row = models.RaceEvent.objects.filter(pk=event_id).first()
+    if event_row is None or not _event_matches_manifest(
+        event_row,
+        event,
+        schema_version=manifest.payload["schema_version"],
+        replay=manifest.payload["schema_version"] == 2,
+    ):
+        errors.append("event_final_state_mismatch")
     control = models.RaceEventProjectionControl.objects.filter(
         event_id=event_id
     ).first()
@@ -807,6 +1086,15 @@ def _verify_event_exact(
                 break
             item = item_rows[index - 1]
             participant_row = participant_by_key.get(participant["stable_key"])
+            expected_barrier = participant.get("barrier", "")
+            expected_jockey_name = participant.get("jockey_name", "")
+            expected_field_provenance = {
+                "external_runner_id": participant["external_runner_id"],
+                "manifest_sha256": manifest.sha256,
+                "source_key": _SOURCE_KEY,
+            }
+            if manifest.payload["schema_version"] == 2:
+                expected_field_provenance["jockey_id"] = participant["jockey_id"]
             if participant_row is None or not (
                 item.participant_id == participant_row.pk
                 and item.source_order == index
@@ -817,16 +1105,11 @@ def _verify_event_exact(
                 and item.finish_time == ""
                 and item.margin == ""
                 and item.horse_number == participant["horse_number"]
-                and item.barrier == ""
-                and item.jockey_name == ""
+                and item.barrier == expected_barrier
+                and item.jockey_name == expected_jockey_name
                 and item.trainer_name == ""
                 and item.carried_weight == ""
-                and item.field_provenance
-                == {
-                    "external_runner_id": participant["external_runner_id"],
-                    "manifest_sha256": manifest.sha256,
-                    "source_key": _SOURCE_KEY,
-                }
+                and item.field_provenance == expected_field_provenance
             ):
                 errors.append(
                     f"racecard_item_mismatch:{participant['stable_key']}"
@@ -851,6 +1134,7 @@ def _verify_event_exact(
 
 def _inspect_initialization_state(
     manifest: LoadedRaceLiveInitializationManifest,
+    rows: dict[int, models.RaceEvent],
 ) -> tuple[list[int], list[int]]:
     fresh: list[int] = []
     replayed: list[int] = []
@@ -859,8 +1143,23 @@ def _inspect_initialization_state(
         if _event_has_forbidden_result_state(event_id):
             _fail(f"赛事已有赛果/observation/publication：event_id={event_id}")
         if not _event_has_any_initialization_rows(event_id):
+            if not _event_matches_manifest(
+                rows[event_id],
+                event,
+                schema_version=manifest.payload["schema_version"],
+                replay=False,
+            ):
+                _fail(f"RaceEvent baseline 漂移：event_id={event_id}")
             fresh.append(event_id)
             continue
+        control = models.RaceEventProjectionControl.objects.filter(
+            event_id=event_id
+        ).first()
+        if (
+            control is None
+            or control.owner_manifest_sha256 != manifest.sha256
+        ):
+            _fail(f"赛事已由不同 manifest 初始化：event_id={event_id}")
         errors = _verify_event_exact(manifest, event)
         if errors:
             _fail(
@@ -898,9 +1197,9 @@ def _summary(
 def dry_run_race_live_initialization(
     manifest: LoadedRaceLiveInitializationManifest,
 ) -> dict[str, Any]:
-    _load_and_validate_events(manifest, lock=False)
+    rows = _load_and_validate_events(manifest, lock=False)
     _validate_shared_rows(manifest)
-    _, replayed = _inspect_initialization_state(manifest)
+    _, replayed = _inspect_initialization_state(manifest, rows)
     return _summary(
         manifest,
         mode="dry_run",
@@ -938,11 +1237,16 @@ def _create_missing_shared_rows(
         )
     elif not (
         budget.min_interval_ms == 1050
-        and budget.next_allowed_at is None
-        and budget.consecutive_failures == 0
-        and budget.circuit_open_until is None
-        and budget.last_error_code == ""
-        and budget.lock_version == 0
+        and (
+            manifest.payload["schema_version"] == 2
+            or (
+                budget.next_allowed_at is None
+                and budget.consecutive_failures == 0
+                and budget.circuit_open_until is None
+                and budget.last_error_code == ""
+                and budget.lock_version == 0
+            )
+        )
     ):
         _fail("The Racing API host budget 已存在且不精确匹配")
 
@@ -1038,6 +1342,13 @@ def _create_event_rows(
         zip(event["participants"], participant_rows, strict=True),
         start=1,
     ):
+        field_provenance = {
+            "external_runner_id": participant["external_runner_id"],
+            "manifest_sha256": manifest.sha256,
+            "source_key": _SOURCE_KEY,
+        }
+        if manifest.payload["schema_version"] == 2:
+            field_provenance["jockey_id"] = participant["jockey_id"]
         models.RaceEventRevisionItem.objects.create(
             revision=revision,
             participant=participant_row,
@@ -1046,11 +1357,9 @@ def _create_event_rows(
             status=participant["status"],
             raw_status=participant["status"],
             horse_number=participant["horse_number"],
-            field_provenance={
-                "external_runner_id": participant["external_runner_id"],
-                "manifest_sha256": manifest.sha256,
-                "source_key": _SOURCE_KEY,
-            },
+            barrier=participant.get("barrier", ""),
+            jockey_name=participant.get("jockey_name", ""),
+            field_provenance=field_provenance,
         )
     control.current_racecard_revision = revision
     control.last_known_good_racecard_revision = revision
@@ -1075,7 +1384,13 @@ def apply_race_live_initialization(
     manifest: LoadedRaceLiveInitializationManifest,
 ) -> dict[str, Any]:
     with transaction.atomic():
-        _load_and_validate_events(manifest, lock=True)
+        rows = _load_and_validate_events(manifest, lock=True)
+        event_ids = [event["event_id"] for event in manifest.payload["events"]]
+        list(
+            models.RaceEventProjectionControl.objects.select_for_update().filter(
+                event_id__in=event_ids
+            )
+        )
         # Lock every existing shared row before deciding whether it is reusable.
         list(
             models.RaceLivePublicationPolicy.objects.select_for_update().filter(
@@ -1088,7 +1403,7 @@ def apply_race_live_initialization(
             models.RaceLiveHostBudget.objects.select_for_update().filter(host=_HOST)
         )
         _validate_shared_rows(manifest)
-        fresh, replayed = _inspect_initialization_state(manifest)
+        fresh, replayed = _inspect_initialization_state(manifest, rows)
         _create_missing_shared_rows(manifest)
         fresh_set = set(fresh)
         for event in manifest.payload["events"]:
@@ -1104,6 +1419,23 @@ def apply_race_live_initialization(
                     )
         for event in manifest.payload["events"]:
             if event["event_id"] in fresh_set:
+                if manifest.payload["schema_version"] == 2:
+                    row = rows[event["event_id"]]
+                    source_off_dt = _aware_datetime(
+                        event["source_off_dt"],
+                        "source_off_dt",
+                    )
+                    row.race_datetime = source_off_dt
+                    row.local_start_time = source_off_dt.astimezone(
+                        ZoneInfo("Europe/London")
+                    ).time().replace(tzinfo=None)
+                    row.save(
+                        update_fields=(
+                            "race_datetime",
+                            "local_start_time",
+                            "updated_at",
+                        )
+                    )
                 _create_event_rows(manifest, event)
         for event in manifest.payload["events"]:
             errors = _verify_event_exact(manifest, event)
@@ -1139,11 +1471,16 @@ def verify_race_live_initialization(
     budgets = list(models.RaceLiveHostBudget.objects.filter(host=_HOST))
     if len(budgets) != 1 or not (
         budgets[0].min_interval_ms == 1050
-        and budgets[0].next_allowed_at is None
-        and budgets[0].consecutive_failures == 0
-        and budgets[0].circuit_open_until is None
-        and budgets[0].last_error_code == ""
-        and budgets[0].lock_version == 0
+        and (
+            manifest.payload["schema_version"] == 2
+            or (
+                budgets[0].next_allowed_at is None
+                and budgets[0].consecutive_failures == 0
+                and budgets[0].circuit_open_until is None
+                and budgets[0].last_error_code == ""
+                and budgets[0].lock_version == 0
+            )
+        )
     ):
         errors.append("host_budget_mismatch")
     for event in manifest.payload["events"]:

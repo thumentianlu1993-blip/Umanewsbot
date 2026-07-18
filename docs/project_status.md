@@ -1,5 +1,19 @@
 # 项目状态文档
 
+## 2026-07-18 准实时赛前 racecard/off time 同步实现完成
+
+- 基于最新 `main@23435897` 的独立 change 已实现英国 TRA Free today/tomorrow racecard
+  prepare、精确赛事绑定、Europe/London 开赛时间、schema v2 原子初始化、动态
+  HostBudget、companion SHA 和 pre-off claim checkpoint；方案审核已 `APPROVED`。
+- SQLite 准实时/初始化/来源/相邻历史组合为 `203/203`，一次性本地 PostgreSQL 16 的
+  新旧初始化、竞争 manifest 与 runner 锁语义为 `6/6`；Django、迁移、Compose、语法和
+  registry SHA 门禁通过。新 registry digest 为 `60fcc081...ad402`，无模型或迁移变化。
+- 首次代码 review 的 artifact 并发误删与 event 占用 N+1 两个 P2 已用新 RED 修复：
+  发布失败只清理本调用拥有的 inode，40 场占用检查改为固定批量查询；限定复审待执行。
+- 本变更仍处于独立代码 review 前：未提交、未发布、未真实联网、未连接生产写入，也未
+  开启 scheduler、runner 或 provisional public。生产仍运行上一安全基线，首次英国
+  prepare 和 schema v2 初始化必须等最新 review 后的新用户授权。
+
 ## 2026-07-18 历史赛事公开状态
 
 - `8,867` 个已导入且完整的历史目标已全部公开，五区分布为日本 `2,239`、中国香港 `473`、英国 `2,144`、法国 `652`、美国 `3,359`；eligibility、dry-run、apply 和独立 verifier 均为零错误。

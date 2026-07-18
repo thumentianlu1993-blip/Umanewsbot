@@ -19,6 +19,7 @@ from stable.services.race_events import (
     admit_race_live_publication,
     apply_race_result_observation_revision,
     calculate_race_live_next_poll_at,
+    checkpoint_or_promote_race_event_live_pre_off,
     complete_race_event_live_checkpoint,
     record_race_result_observation,
     record_race_live_host_outcome,
@@ -395,6 +396,31 @@ def run_race_live_the_racing_api_free(
             "reason": "invalid_start_time",
             "event_id": event_id,
         }
+    tracking_state = (
+        RaceEventLiveTracking.objects.filter(event_id=event_id)
+        .values_list("state", flat=True)
+        .first()
+    )
+    if tracking_state == "racecard_ready":
+        pre_off = checkpoint_or_promote_race_event_live_pre_off(
+            event_id=event_id,
+            expected_owner_generation=expected_owner_generation,
+            expected_claim_generation=expected_claim_generation,
+            attempt_token=attempt_token,
+            now=now,
+        )
+        if not pre_off.applied:
+            return {
+                "processed": False,
+                "reason": f"pre_off_{pre_off.reason}",
+                "event_id": event_id,
+            }
+        if pre_off.reason == "pre_off_wait":
+            return {
+                "processed": False,
+                "reason": "pre_off_wait",
+                "event_id": event_id,
+            }
     try:
         _, registry_digest = read_the_racing_api_automation_registry(
             registry_file=registry_file,

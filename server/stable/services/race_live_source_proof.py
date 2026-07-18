@@ -21,11 +21,22 @@ from urllib.parse import urlsplit
 
 
 _HOST = "api.theracingapi.com"
-_ENDPOINTS = (
+_PROOF_ENDPOINTS = (
     ("regions", "/v1/courses/regions"),
     ("racecards_today", "/v1/racecards/free?day=today&limit=500&skip=0"),
     ("results_today", "/v1/results/today/free?limit=50&skip=0"),
 )
+_SYNC_ENDPOINTS = (
+    (
+        "racecards_sync_today",
+        "/v1/racecards/free?day=today&region_codes=gb&limit=500&skip=0",
+    ),
+    (
+        "racecards_sync_tomorrow",
+        "/v1/racecards/free?day=tomorrow&region_codes=gb&limit=500&skip=0",
+    ),
+)
+_ENDPOINTS = _PROOF_ENDPOINTS + _SYNC_ENDPOINTS
 _MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 
 
@@ -178,7 +189,7 @@ def _read_registry_contract(
         isinstance(registry_budget, bool)
         or not isinstance(registry_budget, int)
         or registry_budget < 1
-        or registry_budget > len(_ENDPOINTS)
+        or registry_budget > len(_PROOF_ENDPOINTS)
     ):
         raise ValueError("source registry max_requests must be between 1 and 3")
     expected_endpoints = [
@@ -207,7 +218,7 @@ def _read_registry(
         isinstance(max_requests, bool)
         or not isinstance(max_requests, int)
         or max_requests < 1
-        or max_requests > len(_ENDPOINTS)
+        or max_requests > len(_PROOF_ENDPOINTS)
     ):
         raise ValueError("max_requests must be between 1 and 3")
     if max_requests > registry["max_requests"]:
@@ -240,7 +251,16 @@ def _collection_metadata(endpoint_name: str, payload: Any) -> dict[str, Any]:
         top_level_fields: list[str] = []
         top_level_type = "list"
     else:
-        collection_key = "racecards" if endpoint_name == "racecards_today" else "results"
+        collection_key = (
+            "racecards"
+            if endpoint_name
+            in {
+                "racecards_today",
+                "racecards_sync_today",
+                "racecards_sync_tomorrow",
+            }
+            else "results"
+        )
         if not isinstance(payload, dict) or not isinstance(
             payload.get(collection_key), list
         ):
@@ -514,17 +534,17 @@ def the_racing_api_transport(
     max_response_bytes: int,
     allow_redirects: bool,
 ) -> RaceLiveProofHttpResponse:
-    del endpoint_name
     parsed = urlsplit(url)
-    allowed_paths = {path for _, path in _ENDPOINTS}
+    allowed_endpoints = dict(_ENDPOINTS)
     request_path = parsed.path + (f"?{parsed.query}" if parsed.query else "")
     if (
-        parsed.scheme != "https"
+        endpoint_name not in allowed_endpoints
+        or request_path != allowed_endpoints.get(endpoint_name)
+        or parsed.scheme != "https"
         or parsed.hostname != _HOST
         or parsed.port not in (None, 443)
         or parsed.username is not None
         or parsed.password is not None
-        or request_path not in allowed_paths
         or allow_redirects is not False
     ):
         raise PermissionError("transport target is outside the fixed allowlist")

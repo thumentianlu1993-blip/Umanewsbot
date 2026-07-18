@@ -469,6 +469,13 @@ RACE_LIVE_RUNNER_MODE = (
     env("RACE_LIVE_RUNNER_MODE", "disabled") or "disabled"
 ).strip().lower()
 RACE_LIVE_OFFLINE_FIXTURE_ROOT = (env("RACE_LIVE_OFFLINE_FIXTURE_ROOT", "") or "").strip()
+RACE_LIVE_RACECARD_ARTIFACT_ROOT = (
+    env(
+        "RACE_LIVE_RACECARD_ARTIFACT_ROOT",
+        "/run/race-live/racecards",
+    )
+    or "/run/race-live/racecards"
+).strip()
 RACE_LIVE_TRA_SECRET_ENV_FILE = (
     env("RACE_LIVE_TRA_SECRET_ENV_FILE", "") or ""
 ).strip()

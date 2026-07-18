@@ -1,5 +1,38 @@
 # 当前状态
 
+## 2026-07-18 准实时赛前 racecard/off time 同步已实现，待独立代码审核
+
+- 独立 worktree 为 `/Users/mentianlu/Code/umanews/.worktrees/realtime-racecard-sync`，
+  分支 `codex/realtime-racecard-sync`，基线为最新
+  `origin/main@234358979dea3620d04445bb569b30e4a5b2fe8a`。change artifacts 位于
+  `docs/changes/realtime-racecard-sync/`；同一方案 reviewer 已关闭全部 P0/P1 并给出
+  `APPROVED`。
+- 新增显式 event ID 驱动的英国 TRA Free racecard prepare：固定请求
+  `today/tomorrow + region_codes=gb`，经共享 HostBudget 1 RPS、最多一次且不超过 2 秒
+  等待、`Europe/London` instant 转换、赛场/赛事名精确匹配后，原子生成不含 raw 或专有
+  字段的 `manifest/report/requests`。零命中、多命中、baseline 漂移、条款/registry 或
+  路径异常均只形成 blocker，不产生可 apply manifest。
+- initializer 新增 schema v2：完整 run 目录只读加载并重算 companion SHA，锁内区分
+  fresh/replay，逐字段核对 status/local date/timezone/旧时间，在同一事务补齐
+  `race_datetime/local_start_time` 并初始化 participant/racecard/live shadow 行；不同
+  manifest、人工锁、身份冲突或后段失败全部 fail closed/回滚。schema v1 保持兼容。
+- `racecard_ready` 的有效赛前 claim 现在零 HTTP checkpoint：释放 claim、失败计数不增、
+  `next_poll_at` 推进且不晚于 off time；到达 off time 后才在 owner/claim CAS 下晋级
+  `awaiting_result` 并进入既有赛果请求。stale claim 或 owner 漂移保持零写入。
+- 真实 RED 已记录在 change 的 `test_cases.md`。主代理复跑的 GREEN 为 SQLite 组合
+  `203/203`、一次性本地 PostgreSQL 16 初始化/runner 并发与锁语义 `6/6`；Django check、
+  migration drift、三份 Compose、`py_compile`、registry SHA 与 `git diff --check` 通过。
+  新 registry SHA-256 为
+  `60fcc081a1e9f08b1fbe90633b5256bba05635199f34d2068aefea51d86ad402`。
+- 首次独立原生代码 review 找到两个 P2：同 run-id 并发异常清理可能删除赢家 artifact，
+  以及赛事占用检查在 40 场时产生 322 次查询。两项均先补真实 RED，再加入 root 级发布
+  锁/目录 inode 所有权校验和八类固定批量占用查询；修复后 racecard sync `13/13`、
+  准实时相关组合 `184/184`，等待复用同一 reviewer session 限定复审。
+- 当前只完成本地实现和验证：尚未 commit/push/deploy，未访问真实 TRA、未运行生产
+  prepare/initializer，未改变生产 HostBudget 或赛事业务数据，scheduler 仍为 false、
+  runner 仍为 disabled、公开 policy 未开启。下一门禁是独立代码 review；只有其成功后
+  才向用户请求本任务新的发布授权。
+
 ## 2026-07-18 8,867 场已导入历史赛事已公开
 
 - 生产只读 eligibility 审计确认 `8,867 eligible / 0 blocked`，地区分布为日本 `2,239`、中国香港 `473`、英国 `2,144`、法国 `652`、美国 `3,359`。原始审计位于 `/opt/umanewsbot/runtime/historical_publication/eligibility-20260718_031331/publication-manifest.json`，SHA-256 为 `2768e9f66fcba74dad95ffe4505d8283ff11c1d6e2c3fb2c2bde3b2f213a110e`。

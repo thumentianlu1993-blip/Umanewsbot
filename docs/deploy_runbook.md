@@ -64,41 +64,84 @@
 7. 收口时无 historical one-off，历史 enabled/network 均为 false，历史公开未开启；HTTP healthz 正常。普通新闻 worker 正在处理自然 crawl，不属于本次历史任务；生产可用磁盘约 `3.6 GiB`，低于 `5 GiB` historical crawl 门槛，禁止在生产继续重型抓取。
 ## 准备中：准实时赛事赛果（当前禁止执行生产步骤）
 
-本节只固化候选发布顺序和回滚契约，不构成发布授权。首个真实来源 proof 已完成，TRA provisional 核心链已实现；最终代码 review 和用户在该 review 后的发布授权尚未完成，因此仍不得在生产运行 migration、启动 `race_live` worker、初始化 tracking、写入业务数据或打开公开模式。
+本节只固化候选发布顺序和回滚契约，不构成发布授权。TRA provisional 核心链和赛前
+racecard/off time 增量已在本地实现；最终代码 review 和用户在该 review 后的发布授权
+尚未完成，因此仍不得部署本增量、运行生产 prepare/initializer、启动调度或打开公开模式。
 
 ### 候选发布顺序
 
 1. 固定最新成功 review 的 parent、完整 fingerprint 和 content manifest；确认待发布 tree 与之逐字节一致。
 2. 生成精确 event allowlist/ownership handoff：逐 event 记录旧 owner/new owner、owner generation、无 active historical runner/lease/checkpoint、source registry digest、共享 host 预算和资源窗口。任何未知项停止。
-3. 先做数据库备份及恢复可读性验证，再应用当前已实现的 `stable.0033` 至 `stable.0045`；运行 `manage.py check`、`showmigrations stable` 和 migration drift 检查。候选镜像缺 `0045` 或最终受审 migration 上界时立即停止。migration 不自动创建 tracking/control/policy/allowlist 行，也不接管既有赛事。
-4. 在目标主机创建 `/opt/umanewsbot/runtime/secrets/`，把 TRA secret 放到 `the-racing-api-free.env`，目录只允许生产用户访问、文件必须为该用户所有的 regular file 且权限 `0600`。容器内只使用 `/run/secrets/the-racing-api-free.env`；registry 固定为 `/app/runtime/policies/race_live/source_registry_the_racing_api_free.json`，SHA-256 必须为 `1d801e95b2770c741503a75dbcba93aca407a6cd681f3471813f1e7d5586fa32`。任何 secret 内容不得出现在 shell trace、日志或文档。
-5. 首次部署 `.env` 保持 `RACE_LIVE_SCHEDULER_ENABLED=false`、`RACE_LIVE_RUNNER_MODE=disabled`；只填写容器内 secret/registry 路径和 registry SHA。先启动只消费 `race_live` 的独立 worker，确认普通 worker 只消费 `celery`。live worker 默认 concurrency 1、prefetch 1、soft/hard time limit 45/60 秒。
-6. 通过审核后的 dry-run manifest 显式初始化单地区 allowlist 的 control/tracking/source identity、获准 racecard revision、全部 participant identity、host budget 和 policy；先运行 selector dry-run 和后台只读检查，再把 runner 切为 `the_racing_api_free` 且 policy 保持 `shadow`。shadow revision 的 `published_at` 必须为空，`RaceEventResult` 和公开页面不得出现新赛果。
+3. 先做数据库备份及恢复可读性验证，再部署最新受审镜像。本增量没有 migration；仍须运行
+   `manage.py check`、`showmigrations stable` 和 `makemigrations --check --dry-run`，确认
+   当前上界仍为 `stable.0045`。部署代码时保持 scheduler/runner/public policy 全关。
+4. TRA secret 继续只存在于 `/opt/umanewsbot/runtime/secrets/the-racing-api-free.env`，
+   宿主文件必须为生产用户所有的 `0600` regular file。候选镜像内 registry 固定为
+   `/app/runtime/policies/race_live/source_registry_the_racing_api_free.json`，SHA-256
+   必须更新为
+   `60fcc081a1e9f08b1fbe90633b5256bba05635199f34d2068aefea51d86ad402`；
+   旧 SHA `1d801e95...fa32` 不得用于新 prepare。
+5. 创建宿主 `/opt/umanewsbot/runtime/race_live_racecards`，要求 `root:root 0700` 且祖先
+   不含非系统 symlink。`.env` 新增
+   `RACE_LIVE_RACECARD_ARTIFACT_ROOT=/run/race-live/racecards`；三份 Compose 只让
+   `race_live_worker` 同时拥有 secret ro 与 artifact rw，web/普通 worker/Beat 均无永久
+   挂载。先用 `docker compose config` 和容器 mount inspection 验证，再重建服务。
+6. 对显式英国 event ID 运行受控 prepare。该步骤对 RaceEvent/runner/result/live
+   业务事实零写入，但会 bootstrap/更新 `RaceLiveHostBudget` reservation/outcome；最多
+   两个 TRA 请求。审核完整 run 目录及三文件 SHA 后，才可用 schema v2 默认 dry-run、
+   apply、verify 初始化单地区 shadow。
 7. 连续两个真实赛日满足 identity、字段、延迟、队列和资源门槛后，才可另行 review/授权精确赛事 `provisional_public`；`official_public` 必须再有官方来源 marker 和复核证据。任何扩大都使用精确 event allowlist，不使用随机百分比。当前单 event runner 尚无当天响应 cache，同 host 多赛事必须保持保守 batch cap，不得通过提高并发绕过 1 RPS。
 
-### 首次 shadow 初始化命令
+### racecard prepare 与 schema v2 初始化
 
-初始化 manifest 是生产运行 artifact，不放凭据、不通过聊天或 shell history传输实体数据。它必须是当前用户可读的 regular file，不能是 symlink；单次精确列出本批全部 event。顶层严格 schema v1 只允许：
+以下命令只在最新成功 review 后取得用户发布授权、完成代码部署与备份后执行。先核对容器
+OCI revision 等于受审 commit、镜像内 registry SHA 等于上述新值，并确认 scheduler false、
+runner disabled、historical runner/receipt/lease/checkpoint 和 live queue 全部为空。
 
-`schema_version / approved_commit / generated_at / registry_digest / coverage_proof_digest / terms_evidence_sha256 / source_key / host / policy_valid_until / official_verification_route / official_verification_route_version / official_verification_valid_until / events`
-
-每个 event 只允许：
-
-`event_id / expected_event_updated_at / year / slug / original_name / country_region / racecourse / grade_text / race_datetime / external_race_id / tracking_state / next_poll_at / participants`
-
-每个 participant 只允许：
-
-`stable_key / canonical_name / country_region / external_runner_id / horse_number / status`
-
-生成后先记录 manifest SHA-256，并由审核者核对 event 范围、racecard、identity、官方复核路由、有效期、历史 handoff、无 active historical runner/receipt/lease/checkpoint 及共享 host 资源窗口。`approved_commit` 必须等于本次最终受审并实际部署的 40 位 commit；先从固定 image ID 的 OCI `org.opencontainers.image.revision` 读取并逐字节比较，不能只相信人工输入。任何不一致立即停止。
-
-以下命令中的路径、SHA、commit 和 Compose 文件必须替换为本次受审值；默认第一条只 dry-run、零写：
+prepare 只能从 one-off `race_live_worker` 执行，必须显式列出本批英国 event ID。下面的
+coverage/terms/official evidence digest 与有效期必须替换为当次已审核值；policy
+`valid_until` 不得晚于 registry 的 `2026-08-16T16:00:00+00:00`：
 
 ```bash
 docker compose -f docker-compose.prod.lowcost.yml run --rm --no-deps \
-  -v /opt/umanewsbot/runtime/race_live_initialization/<run-id>/manifest.json:/run/race-live/manifest.json:ro \
+  race_live_worker python manage.py prepare_race_live_racecards \
+  --event-id <event-id> \
+  --region-code gb \
+  --run-id <run-id> \
+  --secret-env-file /run/secrets/the-racing-api-free.env \
+  --registry-file /app/runtime/policies/race_live/source_registry_the_racing_api_free.json \
+  --expected-registry-sha256 60fcc081a1e9f08b1fbe90633b5256bba05635199f34d2068aefea51d86ad402 \
+  --approved-commit <release-commit> \
+  --coverage-proof-digest <coverage-proof-sha256> \
+  --terms-evidence-sha256 <terms-evidence-sha256> \
+  --policy-valid-until <aware-datetime> \
+  --official-verification-route bha_manual_verification \
+  --official-verification-route-version bha-manual-v1 \
+  --official-verification-evidence-sha256 <official-evidence-sha256> \
+  --official-verification-valid-until <aware-datetime> \
+  --confirm-real-network
+```
+
+只接受输出目录
+`/opt/umanewsbot/runtime/race_live_racecards/<run-id>`；目录必须为 `0700`，其中
+`manifest.json/report.json/requests.jsonl` 必须为 `0600`。blocker run 没有 manifest，
+不得初始化。成功 run 逐项核对：两个固定 GB 路由、请求间隔、response SHA、赛事/赛场
+精确匹配、London 日期/时间、participant ID/number/draw/jockey、无 raw/secret/禁止字段，
+以及 manifest 内 companion SHA 与宿主重算值一致。
+
+schema v2 manifest 顶层新增
+`registry_valid_until/requests_sha256/report_sha256/official_verification_evidence_sha256`；
+event 新增旧时间、expected status/local date/timezone、source off time/response SHA；
+participant 新增 barrier/jockey。`approved_commit` 必须等于实际部署的 40 位 OCI revision。
+
+initializer 从 one-off web 执行，但只临时只读挂载获准的完整 run 目录，不挂 secret 或
+artifact root。默认命令为 dry-run：
+
+```bash
+docker compose -f docker-compose.prod.lowcost.yml run --rm --no-deps \
+  -v /opt/umanewsbot/runtime/race_live_racecards/<run-id>:/run/race-live/artifact:ro \
   web python manage.py initialize_race_live_events \
-  --manifest /run/race-live/manifest.json \
+  --manifest /run/race-live/artifact/manifest.json \
   --expected-manifest-sha256 <manifest-sha256> \
   --expected-approved-commit <release-commit>
 ```
@@ -115,7 +158,12 @@ apply 成功后立即以同一输入改为：
 --verify
 ```
 
-verify 必须返回 `ok=true / error_count=0`；后台逐 event 核对 owner generation 1、无 active claim、policy 全为 shadow、allowlist cap 为 provisional、racecard revision 未发布，并确认 observation/result revision/publication/incident/`RaceEventResult` 全为零。apply 可精确重放但不得新增行或日志；未来/过期 manifest、event `updated_at` 漂移、人工 runners/results 锁、既有赛果或任一非精确初始化状态都会 fail closed。初始化完成后仍保持 scheduler false、runner disabled，直到单独 shadow 启动检查完成。
+verify 必须返回 `ok=true / error_count=0`；后台逐 event 核对 London 时间、owner
+generation 1、无 active claim、policy 全为 shadow、allowlist cap 为 provisional、
+racecard revision 未发布，并确认 observation/result revision/publication/incident/
+`RaceEventResult` 全为零。apply 可精确重放但不得新增行或日志；不同 manifest、companion
+漂移、过期 policy/registry、event CAS 漂移、人工锁、既有赛果或 partial 初始化均 fail
+closed。初始化完成后仍保持 scheduler false、runner disabled，直到单独 shadow 启动检查。
 
 ### 验收与回滚
 

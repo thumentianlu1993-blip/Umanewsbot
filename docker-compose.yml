@@ -34,6 +34,7 @@ services:
       - ./server:/app/server
       - ./server/media:/app/server/media
       - ./runtime/secrets:/run/secrets:ro
+      - ./runtime/race_live_racecards:/run/race-live/racecards:rw
     env_file:
       - .env
     environment:

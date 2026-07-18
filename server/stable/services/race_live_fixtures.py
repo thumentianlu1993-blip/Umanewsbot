@@ -31,22 +31,43 @@ class TheRacingApiFixtureSnapshot:
     races: tuple[dict[str, Any], ...]
 
 
-def _required_nonempty_string(container: dict[str, Any], key: str) -> str:
+def _required_nonempty_string(
+    container: dict[str, Any],
+    key: str,
+    *,
+    max_length: int | None = None,
+) -> str:
     value = container.get(key)
-    if not isinstance(value, str) or not value or value.strip() != value:
+    if (
+        not isinstance(value, str)
+        or not value
+        or value.strip() != value
+        or "\x00" in value
+        or (max_length is not None and len(value) > max_length)
+    ):
         raise ValueError(f"{key} must be a non-empty string")
     return value
 
 
-def _optional_string(container: dict[str, Any], key: str) -> str:
+def _optional_string(
+    container: dict[str, Any],
+    key: str,
+    *,
+    max_length: int | None = None,
+) -> str:
     value = container.get(key, "")
-    if not isinstance(value, str):
+    if (
+        not isinstance(value, str)
+        or value != value.strip()
+        or "\x00" in value
+        or (max_length is not None and len(value) > max_length)
+    ):
         raise ValueError(f"{key} must be a string")
     return value
 
 
 def _aware_iso_datetime(container: dict[str, Any], key: str) -> str:
-    value = _required_nonempty_string(container, key)
+    value = _required_nonempty_string(container, key, max_length=64)
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as exc:
@@ -60,12 +81,22 @@ def _normalize_racecard_runner(runner: Any) -> dict[str, Any]:
     if not isinstance(runner, dict):
         raise ValueError("racecard runner must be an object")
     return {
-        "external_runner_id": _required_nonempty_string(runner, "horse_id"),
-        "horse_name": _required_nonempty_string(runner, "horse"),
-        "number": _required_nonempty_string(runner, "number"),
-        "draw": _optional_string(runner, "draw"),
-        "jockey_name": _optional_string(runner, "jockey"),
-        "jockey_id": _optional_string(runner, "jockey_id"),
+        "external_runner_id": _required_nonempty_string(
+            runner, "horse_id", max_length=128
+        ),
+        "horse_name": _required_nonempty_string(
+            runner, "horse", max_length=255
+        ),
+        "number": _required_nonempty_string(
+            runner, "number", max_length=32
+        ),
+        "draw": _optional_string(runner, "draw", max_length=32),
+        "jockey_name": _optional_string(
+            runner, "jockey", max_length=255
+        ),
+        "jockey_id": _optional_string(
+            runner, "jockey_id", max_length=128
+        ),
         "status": "declared",
     }
 
@@ -102,9 +133,15 @@ def _normalize_result_runner(runner: Any) -> dict[str, Any]:
             "REF": "refused",
         }.get(normalized_position, "unknown")
     return {
-        "external_runner_id": _required_nonempty_string(runner, "horse_id"),
-        "horse_name": _required_nonempty_string(runner, "horse"),
-        "number": _required_nonempty_string(runner, "number"),
+        "external_runner_id": _required_nonempty_string(
+            runner, "horse_id", max_length=128
+        ),
+        "horse_name": _required_nonempty_string(
+            runner, "horse", max_length=255
+        ),
+        "number": _required_nonempty_string(
+            runner, "number", max_length=32
+        ),
         "position_raw": position_raw,
         "official_finish_position": finish_position,
         "status": status,
@@ -126,12 +163,22 @@ def _normalize_race(race: Any, *, phase: str) -> dict[str, Any]:
         _normalize_racecard_runner if phase == "racecard" else _normalize_result_runner
     )
     return {
-        "external_race_id": _required_nonempty_string(race, "race_id"),
+        "external_race_id": _required_nonempty_string(
+            race, "race_id", max_length=128
+        ),
         "off_time": _aware_iso_datetime(race, "off_dt"),
-        "region": _required_nonempty_string(race, "region"),
-        "course": _required_nonempty_string(race, "course"),
-        "race_name": _required_nonempty_string(race, "race_name"),
-        "race_status": _optional_string(race, "race_status"),
+        "region": _required_nonempty_string(
+            race, "region", max_length=32
+        ),
+        "course": _required_nonempty_string(
+            race, "course", max_length=255
+        ),
+        "race_name": _required_nonempty_string(
+            race, "race_name", max_length=255
+        ),
+        "race_status": _optional_string(
+            race, "race_status", max_length=64
+        ),
         "participants": tuple(normalize_runner(runner) for runner in runners),
     }
 
@@ -224,4 +271,52 @@ def parse_the_racing_api_live_results_payload(
         races=tuple(
             _normalize_race(race, phase="provisional") for race in races
         ),
+    )
+
+
+def parse_the_racing_api_live_racecards_payload(
+    payload: Any,
+) -> TheRacingApiFixtureSnapshot:
+    """Validate and normalize one live TRA Free racecards response."""
+    if not isinstance(payload, dict):
+        raise ValueError("racecards payload must be an object")
+    races = payload.get("racecards")
+    if not isinstance(races, list):
+        raise ValueError("racecards must be a list")
+    if len(races) > _MAX_RACES:
+        raise ValueError("racecards payload exceeds race limit")
+    try:
+        payload_sha256 = build_race_live_canonical_sha256(
+            normalized_payload=payload
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError("payload is not strict JSON") from exc
+
+    normalized_races: list[dict[str, Any]] = []
+    race_ids: set[str] = set()
+    for race in races:
+        normalized = _normalize_race(race, phase="racecard")
+        external_race_id = normalized["external_race_id"]
+        if external_race_id in race_ids:
+            raise ValueError("duplicate race_id")
+        race_ids.add(external_race_id)
+        runner_ids: set[str] = set()
+        runner_numbers: set[str] = set()
+        for participant in normalized["participants"]:
+            external_runner_id = participant["external_runner_id"]
+            number = participant["number"]
+            if external_runner_id in runner_ids:
+                raise ValueError("duplicate horse_id")
+            if number in runner_numbers:
+                raise ValueError("duplicate runner number")
+            runner_ids.add(external_runner_id)
+            runner_numbers.add(number)
+        normalized_races.append(normalized)
+
+    return TheRacingApiFixtureSnapshot(
+        source_key=_SOURCE_KEY,
+        endpoint="/v1/racecards/free",
+        phase="racecard",
+        payload_sha256=payload_sha256,
+        races=tuple(normalized_races),
     )

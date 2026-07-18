@@ -12,6 +12,14 @@
     {
       "name": "results_today",
       "path": "/v1/results/today/free?limit=50&skip=0"
+    },
+    {
+      "name": "racecards_sync_today",
+      "path": "/v1/racecards/free?day=today&region_codes=gb&limit=500&skip=0"
+    },
+    {
+      "name": "racecards_sync_tomorrow",
+      "path": "/v1/racecards/free?day=tomorrow&region_codes=gb&limit=500&skip=0"
     }
   ],
   "evidence": {

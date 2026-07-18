@@ -68,6 +68,14 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
                     "name": "results_today",
                     "path": "/v1/results/today/free?limit=50&skip=0",
                 },
+                {
+                    "name": "racecards_sync_today",
+                    "path": "/v1/racecards/free?day=today&region_codes=gb&limit=500&skip=0",
+                },
+                {
+                    "name": "racecards_sync_tomorrow",
+                    "path": "/v1/racecards/free?day=tomorrow&region_codes=gb&limit=500&skip=0",
+                },
             ],
         }
         payload.update(overrides)
@@ -211,6 +219,8 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
                     "/v1/courses/regions",
                     "/v1/racecards/free?day=today&limit=500&skip=0",
                     "/v1/results/today/free?limit=50&skip=0",
+                    "/v1/racecards/free?day=today&region_codes=gb&limit=500&skip=0",
+                    "/v1/racecards/free?day=tomorrow&region_codes=gb&limit=500&skip=0",
                 ],
             )
             request_rows = [
@@ -564,3 +574,67 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
             get_commands(),
             "受控来源 proof 管理命令尚未注册",
         )
+
+    def test_sync_routes_are_exactly_allowlisted_without_expanding_proof_budget(self):
+        service = self._service()
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            registry, digest = self._registry(root)
+            payload, actual_digest = service.read_the_racing_api_automation_registry(
+                registry_file=registry,
+                expected_registry_sha256=digest,
+                now=self.NOW,
+            )
+            self.assertEqual(actual_digest, digest)
+            self.assertEqual(
+                payload["endpoints"][-2:],
+                [
+                    {
+                        "name": "racecards_sync_today",
+                        "path": "/v1/racecards/free?day=today&region_codes=gb&limit=500&skip=0",
+                    },
+                    {
+                        "name": "racecards_sync_tomorrow",
+                        "path": "/v1/racecards/free?day=tomorrow&region_codes=gb&limit=500&skip=0",
+                    },
+                ],
+            )
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "valid allowlist reached transport",
+            ):
+                with patch.object(
+                    service,
+                    "_resolve_public_addresses",
+                    side_effect=RuntimeError("valid allowlist reached transport"),
+                ):
+                    service.the_racing_api_transport(
+                        endpoint_name="racecards_sync_today",
+                        url=(
+                            "https://api.theracingapi.com/v1/racecards/free"
+                            "?day=today&region_codes=gb&limit=500&skip=0"
+                        ),
+                        username="user",
+                        password="password",
+                        timeout_seconds=15,
+                        max_response_bytes=2 * 1024 * 1024,
+                        allow_redirects=False,
+                    )
+
+            for unsafe_url in (
+                "https://api.theracingapi.com/v1/racecards/free?region_codes=gb&day=today&limit=500&skip=0",
+                "https://api.theracingapi.com/v1/racecards/free?day=today&region_codes=fr&limit=500&skip=0",
+                "https://api.theracingapi.com/v1/racecards/free?day=yesterday&region_codes=gb&limit=500&skip=0",
+            ):
+                with self.subTest(url=unsafe_url):
+                    with self.assertRaises(PermissionError):
+                        service.the_racing_api_transport(
+                            endpoint_name="racecards_sync_today",
+                            url=unsafe_url,
+                            username="user",
+                            password="password",
+                            timeout_seconds=15,
+                            max_response_bytes=2 * 1024 * 1024,
+                            allow_redirects=False,
+                        )

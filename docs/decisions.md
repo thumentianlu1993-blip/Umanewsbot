@@ -1,5 +1,26 @@
 # 关键决策
 
+## 2026-07-18：赛前开赛时间只通过受控 racecard manifest 初始化
+
+- 首期只处理调用方显式列出的英国 event ID，并只请求 TRA Free 的
+  `today/tomorrow + region_codes=gb` 两条固定路由。绑定必须同时精确满足英国地区、
+  `Europe/London` 当地日期、赛场名和已审核赛事名/有效别名；不使用 substring、编辑
+  距离、邻近时间或人工猜测自动绑定。
+- prepare 对赛事业务事实只读，但允许创建/更新共享 `RaceLiveHostBudget` 控制面以保证
+  1 RPS。真实网络不持有数据库锁；最多等待并重试一次，单次等待不超过 2 秒。产物只含
+  客观 racecard 字段、响应摘要和审计元数据，不保存 raw、赔率、form、评级、奖金、血统
+  或评论。
+- schema v2 manifest 必须与同目录 `requests.jsonl/report.json` 的 SHA 绑定。initializer
+  在锁内分类 fresh/replay，以 status、local date、timezone、旧时间、`updated_at` 和
+  owner manifest 做 CAS；fresh 在单事务补齐时间并建立 shadow 行，相同 manifest 精确
+  replay，任何不同 manifest 或 partial 状态拒绝。schema v1 继续兼容。
+- 赛前有效 claim 不调用 results API，也不把等待记为成功/失败 observation；它以专用
+  `pre_off_wait` checkpoint 清 claim、保持 failure counter、推进 next poll。只有到达
+  off time 才原子晋级 `awaiting_result` 后发请求，stale claim/owner mismatch 零写入。
+- secret 和 artifact 只永久挂载给独立 `race_live_worker`：secret 为 ro、artifact 为
+  rw。initializer 的 one-off web 只临时只读挂载获准的完整 run 目录，不读取 secret；
+  web、普通 worker 和 Beat 不得永久获得 secret 或 artifact root。
+
 ## 2026-07-18 历史公开状态与抓取权限门分离
 
 - 历史赛事是否对外展示，以逐赛事持久字段 `visibility_status=published` 且 `data_quality_status=complete` 为准；不新增一个会让未完成赛事误公开的全局展示布尔值。

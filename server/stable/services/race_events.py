@@ -213,6 +213,13 @@ class RaceEventLiveCheckpointDecision:
 
 
 @dataclass(frozen=True)
+class RaceEventLivePreOffDecision:
+    applied: bool
+    reason: str
+    promoted: bool = False
+
+
+@dataclass(frozen=True)
 class RaceEventLiveDisableDecision:
     applied: bool
     reason: str
@@ -723,6 +730,115 @@ def complete_race_event_live_checkpoint(
             update_fields.append("consecutive_failures")
         tracking.save(update_fields=update_fields)
         return RaceEventLiveCheckpointDecision(True, "checkpoint_applied")
+
+
+def checkpoint_or_promote_race_event_live_pre_off(
+    *,
+    event_id: int,
+    expected_owner_generation: int,
+    expected_claim_generation: int,
+    attempt_token: str,
+    now: datetime,
+) -> RaceEventLivePreOffDecision:
+    """Release a pre-off claim or promote it at off time under owner/claim CAS."""
+    if isinstance(event_id, bool) or not isinstance(event_id, int) or event_id <= 0:
+        return RaceEventLivePreOffDecision(False, "invalid_event")
+    if (
+        isinstance(expected_owner_generation, bool)
+        or not isinstance(expected_owner_generation, int)
+        or expected_owner_generation < 0
+    ):
+        return RaceEventLivePreOffDecision(False, "invalid_owner_generation")
+    if (
+        isinstance(expected_claim_generation, bool)
+        or not isinstance(expected_claim_generation, int)
+        or expected_claim_generation < 0
+    ):
+        return RaceEventLivePreOffDecision(False, "invalid_claim_generation")
+    if (
+        not isinstance(attempt_token, str)
+        or not attempt_token
+        or len(attempt_token) > 64
+    ):
+        return RaceEventLivePreOffDecision(False, "invalid_attempt_token")
+    if not isinstance(now, datetime) or timezone.is_naive(now):
+        return RaceEventLivePreOffDecision(False, "invalid_now")
+
+    with transaction.atomic():
+        try:
+            control = RaceEventProjectionControl.objects.select_for_update().get(
+                event_id=event_id
+            )
+            tracking = RaceEventLiveTracking.objects.select_for_update().get(
+                event_id=event_id
+            )
+            event = RaceEvent.objects.select_for_update().get(pk=event_id)
+        except RaceEventProjectionControl.DoesNotExist:
+            return RaceEventLivePreOffDecision(False, "control_missing")
+        except RaceEventLiveTracking.DoesNotExist:
+            return RaceEventLivePreOffDecision(False, "tracking_missing")
+        except RaceEvent.DoesNotExist:
+            return RaceEventLivePreOffDecision(False, "event_missing")
+
+        if (
+            control.write_owner != RaceEventProjectionWriteOwner.LIVE
+            or control.owner_generation != expected_owner_generation
+        ):
+            return RaceEventLivePreOffDecision(False, "owner_mismatch")
+        if (
+            tracking.active_attempt_token != attempt_token
+            or tracking.claim_generation != expected_claim_generation
+        ):
+            return RaceEventLivePreOffDecision(False, "claim_mismatch")
+        if tracking.claim_expires_at is None:
+            return RaceEventLivePreOffDecision(False, "claim_missing_expiry")
+        if tracking.claim_expires_at <= now:
+            return RaceEventLivePreOffDecision(False, "claim_expired")
+        if tracking.state == RaceEventLiveState.AWAITING_RESULT:
+            return RaceEventLivePreOffDecision(True, "already_awaiting", True)
+        if tracking.state != RaceEventLiveState.RACECARD_READY:
+            return RaceEventLivePreOffDecision(False, "state_mismatch")
+        if event.race_datetime is None or timezone.is_naive(event.race_datetime):
+            return RaceEventLivePreOffDecision(False, "race_datetime_missing")
+
+        if now >= event.race_datetime:
+            tracking.state = RaceEventLiveState.AWAITING_RESULT
+            tracking.next_poll_at = now
+            tracking.lock_version += 1
+            tracking.save(
+                update_fields=(
+                    "state",
+                    "next_poll_at",
+                    "lock_version",
+                    "updated_at",
+                )
+            )
+            return RaceEventLivePreOffDecision(True, "promoted", True)
+
+        next_poll_at = calculate_race_live_next_poll_at(
+            off_time=event.race_datetime,
+            now=now,
+            state=RaceEventLiveState.RACECARD_READY,
+        )
+        tracking.next_poll_at = min(
+            next_poll_at or event.race_datetime,
+            event.race_datetime,
+        )
+        tracking.checkpoint_payload = {"status": "pre_off_wait"}
+        tracking.active_attempt_token = ""
+        tracking.claim_expires_at = None
+        tracking.lock_version += 1
+        tracking.save(
+            update_fields=(
+                "next_poll_at",
+                "checkpoint_payload",
+                "active_attempt_token",
+                "claim_expires_at",
+                "lock_version",
+                "updated_at",
+            )
+        )
+        return RaceEventLivePreOffDecision(True, "pre_off_wait")
 
 
 def calculate_race_live_next_poll_at(
