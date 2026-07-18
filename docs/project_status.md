@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-07-18 event 924 TRA shadow worker 启动检查通过
+
+- 已只为 `race_live_worker` 启用 `the_racing_api_free`，scheduler 继续 false；tracking 和
+  allowlist 唯一 ID 均为 `924`。写前数据库备份 `bc06babe…6207` 与逐字节一致的 `.env`
+  备份已验证。
+- 在合法 due 点后，实际 Celery task `7ba0699c…7ff0` 通过 live queue 执行并返回
+  `SUCCESS / pre_off_wait`；claim 已释放，next poll 为 `11:33:04Z`，HostBudget 未变，
+  因而没有提前请求 API。
+- 赛果、observation、publication、incident 和公网 shadow 泄漏均为 0，队列/active/
+  reserved/one-off 为空，healthz 为 200。下一步需单独授权 event 924 的有界 shadow
+  轮询；scheduler 关闭期间不会自动执行 next poll。
+
 ## 2026-07-18 event 924 shadow baseline 初始化完成
 
 - 精确 manifest `ee9d0d43…1432` 的 initializer dry-run、单次 apply 和独立 verify 均为

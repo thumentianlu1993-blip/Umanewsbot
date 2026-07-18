@@ -1,5 +1,42 @@
 # 当前状态
 
+## 2026-07-18 event 924 单赛事 TRA shadow runner 启动检查通过
+
+- 用户显式授权只启动 event `924` 的 The Racing API shadow runner 检查，要求
+  scheduler false、公开不变且不扩展赛事。执行前 production tracking/allowlist ID 均只有
+  `[924]`，四层 policy 全为 shadow，event 为 `racecard_ready`、owner generation 1，
+  observation/result/publication/incident 全为 0。
+- shadow 启动前 custom-format 数据库备份为
+  `/opt/umanewsbot/backups/db/pre-race-live-shadow-924-ebab4aa8-20260718T102543Z.dump`，
+  `198,234,122` bytes、`root:root 0600`、SHA-256
+  `bc06babe341e25a45ba097aaed157c7530994e06edebc497f612642d30676207`，
+  `pg_restore -l` 通过。环境备份
+  `/opt/umanewsbot/.env.backup.pre-race-live-shadow-924-ebab4aa8-20260718T102543Z`
+  为 `root:root 0600`，与改动前 `.env` 逐字节一致。
+- 生产 `.env` 只把 `RACE_LIVE_RUNNER_MODE` 从 `disabled` 改为
+  `the_racing_api_free`，`RACE_LIVE_SCHEDULER_ENABLED=false` 未变；只重建
+  `race_live_worker`。新 worker 仍运行 image `sha256:4443a9c…55dc` /
+  revision `ebab4aa8…9992b`，registry SHA-256 `60fcc081…ad402`，实际 Celery 节点
+  `celery@81ec88d9e165` ready。首次定向 ping 发生在 worker 启动完成前而超时，随后 broad
+  ping、active/reserved 均正常。
+- 未绕过 `next_poll_at=2026-07-18T10:32:21.495909Z`。在
+  `10:33:03.874928Z` 精确 claim event `924`，owner generation 1、claim generation 1、
+  TTL 120 秒，并只投递 task
+  `7ba0699c-02f1-4b7d-864e-ed5cb7127ff0` 到 `race_live` 队列。Redis result backend
+  复核为 `SUCCESS / processed=false / reason=pre_off_wait`。
+- task 按设计在开赛前释放 claim，checkpoint 为 `pre_off_wait`，next poll 更新至
+  `2026-07-18T11:33:04.049149Z`。HostBudget 的
+  `next_allowed_at/consecutive_failures/last_error_code/lock_version` 完全未变，证明本次
+  没有提前请求结果 API。
+- 执行后 tracking/allowlist 仍只有 event `924`，claim 为空，racecard revision 仍为 1；
+  observation、result revision、legacy result、publication、marker evidence、incident
+  均为 0。live queue、active/reserved、one-off 均为 0。
+- 当前容器中只有 `race_live_worker` 的 runner 为 `the_racing_api_free`；
+  web/普通 worker/Beat 仍为 disabled，所有服务 scheduler false。公网详情和两个 HTTP
+  healthz 为 200，页面只显示 `15:02`，不显示 7 匹 shadow participant 或任何赛果标识。
+- scheduler false 意味着 `11:33:04Z` 不会自动投递。下一步须另行授权 event `924` 的
+  有界单赛事 shadow 轮询窗口；不得因此打开全局 selector、扩大赛事或公开。
+
 ## 2026-07-18 event 924 initializer 已完成，单赛事 shadow baseline 就绪
 
 - 用户已针对 manifest

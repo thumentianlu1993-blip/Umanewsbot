@@ -5,6 +5,10 @@
 > 历史快照提示：本节记录首次 HTTP 429 run，不代表当前状态。退避重试已经成功生成
 > manifest；当前权威状态与唯一操作门禁见文末“退避重试最新结果（当前状态）”。
 
+> 最新状态提示：上述权威状态指针也已被后续执行取代；当前唯一权威状态与操作门禁见文末
+> “单赛事 TRA shadow runner 启动检查（当前状态）”。下文 runner disabled 仅为早期历史
+> 快照；当前 live worker 已启用 TRA runner，但 scheduler 仍为 false。
+
 冻结代码已部署生产，Group 后缀匹配能力进入运行镜像；scheduler、真实 runner 与公开门禁
 继续关闭。event `924` 的新受控 prepare 因 tomorrow GB 请求 HTTP 429 fail closed，没有
 manifest、initializer 或业务事实写入。
@@ -148,3 +152,40 @@ blocker artifact、启动 scheduler/runner 或公开。
 
 下一门禁是另行授权 event `924` 的 The Racing API 单赛事 shadow runner 启动检查；该步骤
 仍不得扩大到公开模式或其他赛事。
+
+## 单赛事 TRA shadow runner 启动检查（当前状态）
+
+> 状态更新：上一节的 runner 启动检查授权已经完成。scheduler 仍关闭，尚未授权自动或有界
+> 后续轮询。
+
+- 用户授权边界：仅 event `924`、The Racing API shadow runner、scheduler false、公开
+  不变、不扩展赛事。
+- 启动前 tracking/allowlist ID 均只有 `[924]`，四层 policy 全为 shadow，赛果事实全为 0。
+- shadow 写前 backup：
+  `/opt/umanewsbot/backups/db/pre-race-live-shadow-924-ebab4aa8-20260718T102543Z.dump`，
+  `198,234,122` bytes、`root:root 0600`、SHA-256
+  `bc06babe341e25a45ba097aaed157c7530994e06edebc497f612642d30676207`，
+  `pg_restore -l` 通过。
+- `.env` backup：
+  `/opt/umanewsbot/.env.backup.pre-race-live-shadow-924-ebab4aa8-20260718T102543Z`，
+  `root:root 0600`，与改动前 `.env` 逐字节一致。
+- 只把 `RACE_LIVE_RUNNER_MODE` 改为 `the_racing_api_free`，保持
+  `RACE_LIVE_SCHEDULER_ENABLED=false` 并只重建 live worker；镜像 revision/tree 和
+  registry SHA 未变。
+- worker `celery@81ec88d9e165` ready。首次定向 ping 在启动完成前超时，随后 ping、
+  active/reserved 正常。
+- event `924` 只在合法 next poll 后 claim；claim time
+  `2026-07-18T10:33:03.874928Z`，owner generation 1、claim generation 1、TTL 120 秒。
+- 唯一 task `7ba0699c-02f1-4b7d-864e-ed5cb7127ff0` 经实际 `race_live` 队列执行，Redis
+  result backend 为 `SUCCESS / processed=false / reason=pre_off_wait`。
+- claim 已释放，checkpoint 为 `pre_off_wait`，next poll 为
+  `2026-07-18T11:33:04.049149Z`。HostBudget 未变，未发结果 API 请求。
+- observation/result revision/legacy result/publication/marker evidence/incident 全为 0；
+  queue、active/reserved、one-off 为 0。公网详情和 healthz 为 200，无 participant 或
+  result shadow 泄漏。
+- 当前只有 live worker runner enabled；web/普通 worker/Beat runner disabled，所有服务
+  scheduler false。
+
+下一门禁是对 event `924` 的有界单赛事 shadow 轮询窗口取得单独授权。该轮询必须遵守每次
+数据库 `next_poll_at`、共享 HostBudget 和单请求上限，直到首次 shadow result 或明确截止；
+不得打开全局 selector、扩展其他赛事或公开。

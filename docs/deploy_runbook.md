@@ -1,5 +1,33 @@
 # 部署运行手册
 
+## event 924 TRA shadow runner 启动检查（2026-07-18）
+
+1. 启动前确认 production tracking/allowlist 精确全集均为 event `924`，四层 policy 为
+   shadow，owner generation 1，result/observation/publication/incident 为 0；
+   `race_live` 队列和 worker active/reserved 为空。
+2. 数据库恢复点为
+   `/opt/umanewsbot/backups/db/pre-race-live-shadow-924-ebab4aa8-20260718T102543Z.dump`，
+   `198,234,122` bytes、`0600`、SHA-256
+   `bc06babe341e25a45ba097aaed157c7530994e06edebc497f612642d30676207`，
+   `pg_restore -l` 通过。对应 `.env` 备份
+   `/opt/umanewsbot/.env.backup.pre-race-live-shadow-924-ebab4aa8-20260718T102543Z`
+   为 `0600`，与变更前原文件逐字节一致。
+3. 运行配置只把 `RACE_LIVE_RUNNER_MODE` 设为 `the_racing_api_free`，保持
+   `RACE_LIVE_SCHEDULER_ENABLED=false`；只重建 `race_live_worker`，image/revision/tree、
+   secret ro、registry digest 与资源限制不变。首次定向 ping 在启动窗口内超时；容器无
+   restart，随后节点 `celery@81ec88d9e165` 的 ping、active/reserved 正常。
+4. 不得提前 claim。event `924` 在 `next_poll_at=10:32:21.495909Z` 后于
+   `10:33:03.874928Z` 被精确 claim；owner generation 1、claim generation 1、TTL 120 秒。
+   唯一 task `7ba0699c-02f1-4b7d-864e-ed5cb7127ff0` 只投递到 `race_live`，最终为
+   `SUCCESS / processed=false / pre_off_wait`。
+5. checkpoint 后 claim 释放，next poll 为 `11:33:04.049149Z`。HostBudget 四个关键字段
+   无变化，故本次没有网络请求；result/observation/publication/incident 仍为 0，live
+   queue、active/reserved 和 one-off 为空。
+6. 只有 live worker 的 runner mode 已启用；web/普通 worker/Beat 当前仍为 disabled，
+   所有服务 scheduler false。公网详情为 200 且没有 participant/result shadow 泄漏。
+   scheduler 关闭时 next poll 不会自动触发；后续有界 event 924 shadow 轮询需新授权，
+   不能借此打开全局 selector、扩大赛事或公开。
+
 ## event 924 initializer 生产结果（2026-07-18）
 
 1. 用户授权的唯一输入为 event `924` 与 manifest SHA-256
