@@ -1,5 +1,37 @@
 # 当前状态
 
+## 2026-07-18 英国 Group 级别后缀精确匹配已实现，待独立代码审核
+
+- 独立 worktree 为
+  `/Users/mentianlu/Code/umanews/.worktrees/realtime-racecard-identity-diagnosis`，
+  分支 `codex/realtime-racecard-identity-diagnosis`，基线为
+  `origin/main@12d76e61850f1f847aba13ac1c07004040191728`；change artifacts 位于
+  `docs/changes/realtime-racecard-grade-name-variants/`，方案 reviewer 的首次 finding
+  已全部关闭并在同一会话复审为 `VERDICT: APPROVED`。
+- 对生产 event `924` 执行了一次无 raw、无数据库写入、无 artifact 的受控来源诊断：
+  TRA today GB 返回 HTTP 200、47 场 racecard，Newbury 唯一同形候选为
+  `rac_13000002795`，赛事名
+  `Hallgarten And Novum Wines Hackwood Stakes (Group 3)`。这证明上一轮
+  `racecard_not_found` 是 event 获准基础名称与来源末尾 `(Group 3)` 的确定性格式差异，
+  不是来源覆盖缺口。
+- `_event_names()` 现在只对英国且 `normalized_grade=G1/G2/G3` 的已批准名称集合使用固定
+  `group 1/2/3` token：名称中零 Group token 才保留基础名并增加一个精确 suffix 变体；
+  恰好一个、位于末尾且同级的 token 保留一次；异级、非末尾或多个 token 整条排除。候选
+  仍由原有规范化后的 set membership
+  精确匹配；没有引入 substring、fuzzy、sponsor 删除、自由级别解析、数据库 alias 或其他
+  地区行为。
+- 真实 RED 先证明 event original + `(Group 3)` 返回
+  `('racecard_not_found',)`；首次实现后新增聚焦测试 `6/6`。原生代码 review 发现非末尾/
+  多 Group token 的 P2，并在修复前取得 3 个 subtest 的真实 RED；最小修复后聚焦
+  `7/7`、racecard sync 模块 `20/20`。主代理的 SQLite 准实时/初始化/来源/相邻历史组合为
+  `210/210`，一次性本地
+  PostgreSQL 16 初始化竞争与 HostBudget 锁组合为 `6/6`；Django check、migration drift、
+  `py_compile` 和 `git diff --check` 全部通过。无模型或 migration 变化。
+- 当前仅完成本地实现与验证，尚未 commit、push、deploy，也未运行新的生产 prepare 或
+  initializer。生产仍运行 `6646302b` 对应镜像；scheduler false、runner disabled、公开
+  policy off。下一门禁是复用同一独立代码 reviewer 会话限定复审 P2 修复；最新成功 review
+  后还需用户对精确冻结版本重新授权发布。
+
 ## 2026-07-18 准实时赛前 racecard/off time 增量已发布，首轮英国 prepare 安全停止
 
 - 用户在最新成功代码 review 后授权的冻结版本已发布。提交为

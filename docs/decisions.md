@@ -1,5 +1,18 @@
 # 关键决策
 
+## 2026-07-18：英国 Group 级别装饰只从审核级别派生精确名称变体
+
+- TRA 英国 G1-G3 racecard 赛事名可在基础名末尾携带 `(Group 1/2/3)`。首版只在英国且
+  `RaceEvent.normalized_grade` 明确为 G1、G2、G3 时，用固定映射生成规范化
+  `group 1/2/3` token；不从自由文本 `grade_text` 或来源字符串推断级别。
+- 派生输入继续限于原有获准 event、active 非中文 alias、series canonical、当年有效
+  series name 和 active 同年度 MajorRaceEvent 名称。名称中零 Group token 时才保留基础
+  名并增加唯一同级 suffix；恰好一个、位于末尾且同级的 token 只保留一次；异级、非末尾
+  或多个 token 时整条排除。非 G1-G3 与非英国赛事完全保留原有名称集合。
+- 来源候选仍须通过地区、Europe/London 日期、赛场和归一化赛事名 exact membership，并且
+  唯一命中。不得扩为 substring、编辑距离、任意括号删除、sponsor 删除、Roman numeral、
+  `G3` 文本解析或自动数据库 alias 写入；未观察到的新格式继续 fail closed。
+
 ## 2026-07-18：赛前开赛时间只通过受控 racecard manifest 初始化
 
 - 首期只处理调用方显式列出的英国 event ID，并只请求 TRA Free 的

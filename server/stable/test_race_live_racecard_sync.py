@@ -580,6 +580,412 @@ class RaceLiveRacecardPrepareTests(TestCase):
             (self.artifact_root / "substring-run" / "manifest.json").exists()
         )
 
+    def test_g3_event_original_name_matches_exact_source_group_suffix(self):
+        self.event.original_name = (
+            "Hallgarten And Novum Wines Hackwood Stakes"
+        )
+        self.event.racecourse = "Newbury"
+        self.event.grade_text = "G3"
+        self.event.normalized_grade = models.RaceGrade.G3
+        self.event.save(
+            update_fields=(
+                "original_name",
+                "racecourse",
+                "grade_text",
+                "normalized_grade",
+                "updated_at",
+            )
+        )
+        responses = iter(
+            (
+                self._response(
+                    {
+                        "racecards": [
+                            self._racecard(
+                                race_id="rac_13000002795",
+                                course="Newbury",
+                                race_name=(
+                                    "Hallgarten And Novum Wines "
+                                    "Hackwood Stakes (Group 3)"
+                                ),
+                            )
+                        ]
+                    }
+                ),
+                self._response({"racecards": []}),
+            )
+        )
+        current = [self.NOW]
+
+        result = self._run(
+            lambda **_kwargs: next(responses),
+            run_id="g3-original-suffix",
+            sleep=lambda seconds: current.__setitem__(
+                0, current[0] + timedelta(seconds=seconds)
+            ),
+            clock=lambda: current[0],
+        )
+
+        self.assertTrue(result.completed, result.blocker_codes)
+        self.assertEqual(result.blocker_codes, ())
+        manifest_path = (
+            self.artifact_root / "g3-original-suffix" / "manifest.json"
+        )
+        self.assertTrue(manifest_path.is_file())
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            manifest["events"][0]["external_race_id"],
+            "rac_13000002795",
+        )
+
+    def test_group_suffix_variants_are_grade_exact_and_fail_closed(self):
+        service = self._service()
+        approved_names = getattr(service, "_event_names", None)
+        self.assertTrue(callable(approved_names))
+
+        for grade, group_number in (
+            (models.RaceGrade.G1, 1),
+            (models.RaceGrade.G2, 2),
+            (models.RaceGrade.G3, 3),
+        ):
+            with self.subTest(grade=grade):
+                self.event.original_name = f"Exact Grade {grade} Stakes"
+                self.event.normalized_grade = grade
+                self.event.save(
+                    update_fields=(
+                        "original_name",
+                        "normalized_grade",
+                        "updated_at",
+                    )
+                )
+                names = approved_names(self.event)
+                self.assertIn(
+                    f"exact grade {grade.casefold()} stakes "
+                    f"group {group_number}",
+                    names,
+                )
+
+        self.event.original_name = "Already Decorated (Group 3)"
+        self.event.normalized_grade = models.RaceGrade.G3
+        self.event.save(
+            update_fields=(
+                "original_name",
+                "normalized_grade",
+                "updated_at",
+            )
+        )
+        names = approved_names(self.event)
+        self.assertIn("already decorated group 3", names)
+        self.assertNotIn("already decorated group 3 group 3", names)
+
+        self.event.original_name = "Wrong Grade (Group 2)"
+        self.event.save(update_fields=("original_name", "updated_at"))
+        names = approved_names(self.event)
+        self.assertNotIn("wrong grade group 2", names)
+        self.assertNotIn("wrong grade group 2 group 3", names)
+
+        self.event.original_name = "Boundary Stakes"
+        self.event.save(update_fields=("original_name", "updated_at"))
+        names = approved_names(self.event)
+        self.assertNotIn("boundary stakes group 3 sponsored", names)
+        self.assertNotIn("boundary stakes listed race", names)
+        self.assertNotIn("the boundary stakes group 3", names)
+
+        for grade in (
+            "",
+            models.RaceGrade.LISTED,
+            models.RaceGrade.OPEN,
+            models.RaceGrade.JPN3,
+            models.RaceGrade.JG3,
+        ):
+            with self.subTest(non_group_grade=grade):
+                self.event.normalized_grade = grade
+                self.event.save(
+                    update_fields=("normalized_grade", "updated_at")
+                )
+                names = approved_names(self.event)
+                self.assertEqual(names, {"boundary stakes"})
+
+    def test_group_tokens_outside_the_only_terminal_suffix_are_excluded(self):
+        service = self._service()
+        approved_names = getattr(service, "_event_names", None)
+        self.assertTrue(callable(approved_names))
+        self.event.normalized_grade = models.RaceGrade.G3
+
+        for original_name, normalized_name in (
+            ("Foo (Group 2) Stakes", "foo group 2 stakes"),
+            ("Foo (Group 2) (Group 3)", "foo group 2 group 3"),
+            ("Foo (Group 3) Stakes", "foo group 3 stakes"),
+        ):
+            with self.subTest(original_name=original_name):
+                self.event.original_name = original_name
+                self.event.save(
+                    update_fields=(
+                        "original_name",
+                        "normalized_grade",
+                        "updated_at",
+                    )
+                )
+
+                names = approved_names(self.event)
+
+                self.assertNotIn(normalized_name, names)
+                self.assertNotIn(f"{normalized_name} group 3", names)
+
+    def test_group_suffix_variants_cover_alias_and_series_name_paths(self):
+        service = self._service()
+        approved_names = getattr(service, "_event_names", None)
+        self.assertTrue(callable(approved_names))
+        series = models.RaceSeries.objects.create(
+            key="grade-variant-series",
+            country_region=models.RacingRegion.UNITED_KINGDOM,
+            canonical_name_original="Series Canonical Only",
+        )
+        self.event.original_name = "Event Original Only"
+        self.event.normalized_grade = models.RaceGrade.G3
+        self.event.race_series = series
+        self.event.save(
+            update_fields=(
+                "original_name",
+                "normalized_grade",
+                "race_series",
+                "series_key",
+                "updated_at",
+            )
+        )
+        models.RaceEventAlias.objects.create(
+            event=self.event,
+            text="Active Alias Only",
+            source_language="en",
+            is_active=True,
+        )
+        models.RaceEventAlias.objects.create(
+            event=self.event,
+            text="Inactive Alias Only",
+            source_language="en",
+            is_active=False,
+        )
+        models.RaceEventAlias.objects.create(
+            event=self.event,
+            text="含汉字 Alias Only",
+            source_language="en",
+            is_active=True,
+        )
+        models.RaceSeriesName.objects.create(
+            series=series,
+            text="Valid Series Name Only",
+            source_language="en",
+            valid_from_year=2026,
+            valid_to_year=2026,
+            is_active=True,
+        )
+        models.RaceSeriesName.objects.create(
+            series=series,
+            text="Expired Series Name Only",
+            source_language="en",
+            valid_from_year=2020,
+            valid_to_year=2025,
+            is_active=True,
+        )
+        models.RaceSeriesName.objects.create(
+            series=series,
+            text="Inactive Series Name Only",
+            source_language="en",
+            valid_from_year=2026,
+            valid_to_year=2026,
+            is_active=False,
+        )
+
+        names = approved_names(self.event)
+
+        for expected in (
+            "active alias only group 3",
+            "series canonical only group 3",
+            "valid series name only group 3",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, names)
+        for rejected in (
+            "inactive alias only group 3",
+            "含汉字 alias only group 3",
+            "expired series name only group 3",
+            "inactive series name only group 3",
+        ):
+            with self.subTest(rejected=rejected):
+                self.assertNotIn(rejected, names)
+
+    def test_group_suffix_variants_cover_major_event_names_and_gates(self):
+        service = self._service()
+        approved_names = getattr(service, "_event_names", None)
+        self.assertTrue(callable(approved_names))
+        major = models.MajorRaceEvent.objects.create(
+            name="Major Name Only",
+            normalized_name="Major Normalized Only",
+            year=2026,
+            racing_region=models.RacingRegion.UNITED_KINGDOM,
+            race_grade=models.RaceGrade.G3,
+            aliases=["Major Alias Only"],
+            timezone_name="Europe/London",
+            local_date=date(2026, 7, 18),
+            is_active=True,
+        )
+        self.event.original_name = "Event Original Only"
+        self.event.normalized_grade = models.RaceGrade.G3
+        self.event.major_race_event = major
+        self.event.save(
+            update_fields=(
+                "original_name",
+                "normalized_grade",
+                "major_race_event",
+                "updated_at",
+            )
+        )
+
+        names = approved_names(self.event)
+        for expected in (
+            "major name only group 3",
+            "major normalized only group 3",
+            "major alias only group 3",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, names)
+
+        major.is_active = False
+        major.save(update_fields=("is_active", "updated_at"))
+        names = approved_names(self.event)
+        self.assertNotIn("major name only group 3", names)
+        self.assertNotIn("major normalized only group 3", names)
+        self.assertNotIn("major alias only group 3", names)
+
+        major.is_active = True
+        major.year = 2025
+        major.save(update_fields=("is_active", "year", "updated_at"))
+        names = approved_names(self.event)
+        self.assertNotIn("major name only group 3", names)
+
+        major.year = 2026
+        major.name = "含汉字 Major Name"
+        major.normalized_name = "含汉字 Major Normalized"
+        major.aliases = ["含汉字 Major Alias"]
+        major.save(
+            update_fields=(
+                "year",
+                "name",
+                "normalized_name",
+                "aliases",
+                "updated_at",
+            )
+        )
+        names = approved_names(self.event)
+        self.assertNotIn("含汉字 major name group 3", names)
+        self.assertNotIn("含汉字 major normalized group 3", names)
+        self.assertNotIn("含汉字 major alias group 3", names)
+
+    def test_mismatched_group_tokens_from_all_approved_paths_are_excluded(self):
+        service = self._service()
+        approved_names = getattr(service, "_event_names", None)
+        self.assertTrue(callable(approved_names))
+        series = models.RaceSeries.objects.create(
+            key="wrong-grade-series",
+            country_region=models.RacingRegion.UNITED_KINGDOM,
+            canonical_name_original="Wrong Canonical (Group 2)",
+        )
+        models.RaceSeriesName.objects.create(
+            series=series,
+            text="Wrong Series Name (Group 2)",
+            source_language="en",
+            valid_from_year=2026,
+            valid_to_year=2026,
+            is_active=True,
+        )
+        major = models.MajorRaceEvent.objects.create(
+            name="Wrong Major Name (Group 2)",
+            normalized_name="Wrong Major Normalized (Group 2)",
+            year=2026,
+            racing_region=models.RacingRegion.UNITED_KINGDOM,
+            race_grade=models.RaceGrade.G3,
+            aliases=["Wrong Major Alias (Group 2)"],
+            timezone_name="Europe/London",
+            local_date=date(2026, 7, 18),
+            is_active=True,
+        )
+        self.event.original_name = "Wrong Original (Group 2)"
+        self.event.normalized_grade = models.RaceGrade.G3
+        self.event.race_series = series
+        self.event.major_race_event = major
+        self.event.save(
+            update_fields=(
+                "original_name",
+                "normalized_grade",
+                "race_series",
+                "series_key",
+                "major_race_event",
+                "updated_at",
+            )
+        )
+        models.RaceEventAlias.objects.create(
+            event=self.event,
+            text="Wrong Alias (Group 2)",
+            source_language="en",
+            is_active=True,
+        )
+
+        names = approved_names(self.event)
+
+        for base in (
+            "wrong original",
+            "wrong alias",
+            "wrong canonical",
+            "wrong series name",
+            "wrong major name",
+            "wrong major normalized",
+            "wrong major alias",
+        ):
+            with self.subTest(base=base):
+                self.assertNotIn(f"{base} group 2", names)
+                self.assertNotIn(f"{base} group 2 group 3", names)
+
+    def test_two_group_suffix_candidates_remain_ambiguous(self):
+        self.event.normalized_grade = models.RaceGrade.G3
+        self.event.save(
+            update_fields=("normalized_grade", "updated_at")
+        )
+        payload = {
+            "racecards": [
+                self._racecard(
+                    race_id="race-gb-group-1",
+                    race_name="King George Stakes (Group 3)",
+                ),
+                self._racecard(
+                    race_id="race-gb-group-2",
+                    race_name="King George Stakes (Group 3)",
+                ),
+            ]
+        }
+        responses = iter(
+            (self._response(payload), self._response({"racecards": []}))
+        )
+        current = [self.NOW]
+
+        result = self._run(
+            lambda **_kwargs: next(responses),
+            run_id="group-suffix-ambiguous",
+            sleep=lambda seconds: current.__setitem__(
+                0, current[0] + timedelta(seconds=seconds)
+            ),
+            clock=lambda: current[0],
+        )
+
+        self.assertFalse(result.completed)
+        self.assertIn("racecard_ambiguous", result.blocker_codes)
+        self.assertFalse(
+            (
+                self.artifact_root
+                / "group-suffix-ambiguous"
+                / "manifest.json"
+            ).exists()
+        )
+
     def test_ambiguous_match_outputs_report_only(self):
         payload = {
             "racecards": [

@@ -1,5 +1,19 @@
 # 项目状态文档
 
+## 2026-07-18 英国 Group 后缀精确匹配实现完成
+
+- 只读生产镜像诊断确认 event `924` 的 TRA 唯一候选存在，上一轮零命中的唯一身份格式差异
+  是来源赛事名末尾 `(Group 3)`，不是 API 覆盖缺口；诊断没有保存 raw、写数据库或生成
+  可 apply artifact。
+- 新增行为只覆盖英国 `normalized_grade=G1/G2/G3`：从既有获准名称精确派生
+  `group 1/2/3` suffix；零 token 才派生，唯一 terminal 同级 token 不重复，异级、非末尾
+  或多个 token 整条排除，非 G1-G3 和其他地区维持原语义。
+  精确匹配、日期、赛场、唯一性、HostBudget、artifact 和 initializer 门禁均未放宽。
+- 真实 RED 为 `racecard_not_found`；首次代码 review 的非末尾/多 Group token P2 也已先补
+  3 个失败 subtest 再修复。GREEN 后聚焦 `7/7`、完整受影响 SQLite `210/210`、临时
+  PostgreSQL 16 锁/竞争 `6/6`，Django、迁移、语法和 diff 门禁通过。当前待同一 reviewer
+  限定复审；未提交、未部署、未重跑生产 prepare，全部准实时与公开开关仍关闭。
+
 ## 2026-07-18 准实时 racecard 增量已生产发布，英国首轮 prepare fail closed
 
 - 冻结提交 `6646302b80c90cf406075516ab4812f2f4ebee18` 已进入 `main` 并部署生产，四个

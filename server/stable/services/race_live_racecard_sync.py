@@ -41,6 +41,12 @@ _MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 _SAFE_RUN_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 _COMMIT_RE = re.compile(r"[0-9a-f]{40}\Z")
+_GROUP_TOKEN_RE = re.compile(r"(?:^| )group ([123])(?= |\Z)")
+_GROUP_TOKEN_BY_GRADE = {
+    models.RaceGrade.G1: "group 1",
+    models.RaceGrade.G2: "group 2",
+    models.RaceGrade.G3: "group 3",
+}
 _SYNC_ENDPOINTS = (
     (
         "racecards_sync_today",
@@ -283,7 +289,28 @@ def _event_names(event: models.RaceEvent) -> set[str]:
                     and not _contains_han_text(alias)
                 ):
                     names.add(normalize_identity_text(alias))
-    return names
+    group_token = _GROUP_TOKEN_BY_GRADE.get(event.normalized_grade)
+    if (
+        event.country_region != models.RacingRegion.UNITED_KINGDOM
+        or group_token is None
+    ):
+        return names
+
+    approved_names: set[str] = set()
+    for name in names:
+        group_matches = list(_GROUP_TOKEN_RE.finditer(name))
+        if group_matches:
+            only_group = group_matches[0]
+            if (
+                len(group_matches) == 1
+                and only_group.end() == len(name)
+                and f"group {only_group.group(1)}" == group_token
+            ):
+                approved_names.add(name)
+            continue
+        approved_names.add(name)
+        approved_names.add(f"{name} {group_token}")
+    return approved_names
 
 
 def _load_target_events(
