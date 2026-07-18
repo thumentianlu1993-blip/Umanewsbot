@@ -1,5 +1,20 @@
 # 项目状态文档
 
+## 2026-07-18 准实时 racecard 增量已生产发布，英国首轮 prepare fail closed
+
+- 冻结提交 `6646302b80c90cf406075516ab4812f2f4ebee18` 已进入 `main` 并部署生产，四个
+  app service 统一运行 image
+  `sha256:7f188f8fc85979ad6df3504c49e42aed4e0c41696f64301b2a33c6c888722981`；新 registry
+  digest `60fcc081...ad402`、artifact/secret 挂载隔离、Django/migration/model drift、镜像
+  目标测试 `20/20`、Celery ping 与内外 healthz 均通过。
+- scheduler/runner/public policy 继续关闭。英国 event `924` 的受控 production prepare
+  请求 today/tomorrow GB racecards 均为 200，但严格身份匹配返回
+  `racecard_not_found`；blocker run 没有 manifest，因此没有运行 initializer，也没有写入
+  赛事时间、participant、racecard、tracking 或赛果。
+- 生产业务总量保持 `9,867 / 100,132 / 91,897`，全部 live 事实表仍为 0，仅 HostBudget
+  为 1。下一步是对 event 924 的来源覆盖或赛事别名做独立身份审核；修复后重新 prepare，
+  成功 manifest 仍需单独批准才可 initializer apply。
+
 ## 2026-07-18 准实时赛前 racecard/off time 同步实现完成
 
 - 基于最新 `main@23435897` 的独立 change 已实现英国 TRA Free today/tomorrow racecard

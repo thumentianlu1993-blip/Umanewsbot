@@ -68,6 +68,26 @@
 racecard/off time 增量已在本地实现；最终代码 review 和用户在该 review 后的发布授权
 尚未完成，因此仍不得部署本增量、运行生产 prepare/initializer、启动调度或打开公开模式。
 
+### 2026-07-18 本次生产执行结果
+
+1. 发布提交为 `6646302b80c90cf406075516ab4812f2f4ebee18`，四个 app service 的实际 image ID
+   均为 `sha256:7f188f8fc85979ad6df3504c49e42aed4e0c41696f64301b2a33c6c888722981`；
+   web/普通 worker/Beat 没有 secret 或 racecard artifact 挂载，只有
+   `race_live_worker` 拥有 `/run/secrets:ro` 和 `/run/race-live/racecards:rw`。
+2. 数据库恢复点为
+   `/opt/umanewsbot/backups/db/pre-racecard-6646302b-20260718_105233.dump`，SHA-256
+   `6bdda3152cb3ee6a92fc774989dde7fc94614149066e01e4bb746d85fb9f7882`，
+   `pg_restore -l` 通过。回滚 tag 为
+   `umanewsbot:rollback-pre-racecard-6646302b-20260718_105233`。
+3. production prepare run 为
+   `/opt/umanewsbot/runtime/race_live_racecards/production-racecard-gb-924-20260718T030337Z`；
+   目录 `0700`，`report.json/requests.jsonl` 均为 `0600`。两个固定 GB endpoint 均为
+   HTTP 200，但 event `924` 返回唯一 blocker `racecard_not_found`。
+4. blocker run 没有 `manifest.json`，因此本次未执行 initializer dry-run/apply/verify。
+   report SHA-256 为
+   `bd7a19f8867df38e21e88ae2db465f9b6c5be30ad3b520e6b7fa988c9f5ae46a`，request ledger
+   SHA-256 为 `78fef17cc843d8f83588a716dffc7fab0de56a740b88edc2a5510e0b99afcf2d`。
+
 ### 候选发布顺序
 
 1. 固定最新成功 review 的 parent、完整 fingerprint 和 content manifest；确认待发布 tree 与之逐字节一致。

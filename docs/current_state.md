@@ -1,5 +1,41 @@
 # 当前状态
 
+## 2026-07-18 准实时赛前 racecard/off time 增量已发布，首轮英国 prepare 安全停止
+
+- 用户在最新成功代码 review 后授权的冻结版本已发布。提交为
+  `6646302b80c90cf406075516ab4812f2f4ebee18`，生产 checkout、web、普通 worker、Beat
+  与独立 `race_live_worker` 均运行 AMD64 image
+  `sha256:7f188f8fc85979ad6df3504c49e42aed4e0c41696f64301b2a33c6c888722981`；镜像内
+  registry SHA-256 为
+  `60fcc081a1e9f08b1fbe90633b5256bba05635199f34d2068aefea51d86ad402`。
+- 写前数据库备份为
+  `/opt/umanewsbot/backups/db/pre-racecard-6646302b-20260718_105233.dump`，
+  `196,919,649` bytes、权限 `0600`、SHA-256
+  `6bdda3152cb3ee6a92fc774989dde7fc94614149066e01e4bb746d85fb9f7882`，
+  `pg_restore -l` 通过；环境备份为
+  `/opt/umanewsbot/.env.backup.pre-racecard-6646302b-20260718_105233`，回滚标签
+  `umanewsbot:rollback-pre-racecard-6646302b-20260718_105233` 指向旧 image
+  `sha256:111dbe46ba7a7024632ba2ca7c57c387b19ab39861f0147421a0245d08c38d7a`。
+- 部署后 Django check、migration check、model drift 和镜像内 racecard sync/initializer v2
+  `20/20` 通过；无 migration。web、两个 Celery 节点、Beat 和 Nginx 正常，内外 HTTP
+  `/healthz/` 为 200。只有 `race_live_worker` 挂载 `/run/secrets:ro` 和
+  `/run/race-live/racecards:rw`，web/普通 worker/Beat 均无这两类挂载。
+- 生产继续保持 `RACE_LIVE_SCHEDULER_ENABLED=false`、
+  `RACE_LIVE_RUNNER_MODE=disabled`。`race_live` 队列为 0；普通 worker 恢复 Beat 后正常
+  处理既有新闻抓取任务，不与 live worker 混用队列。
+- 首轮受控 prepare 只选择英国 event `924`，run 为
+  `/opt/umanewsbot/runtime/race_live_racecards/production-racecard-gb-924-20260718T030337Z`。
+  today/tomorrow 两个固定 GB 请求均为 HTTP 200，但严格赛场、日期、赛事名匹配得到
+  `racecard_not_found`，因此 `completed=false`、未生成 `manifest.json`，不得运行
+  initializer。report/request SHA-256 分别为
+  `bd7a19f8867df38e21e88ae2db465f9b6c5be30ad3b520e6b7fa988c9f5ae46a` /
+  `78fef17cc843d8f83588a716dffc7fab0de56a740b88edc2a5510e0b99afcf2d`。
+- prepare 后赛事总量仍为 `9,867 events / 100,132 runners / 91,897 results`；live
+  control/tracking/source/observation/revision/publication/incident 全为 0，仅按设计新增
+  `1` 条 `RaceLiveHostBudget` 控制面记录。下一步必须先审核 event 924 与 TRA racecard 的
+  身份/别名或覆盖缺口，再以受审数据修复和新 run-id 重跑；不得猜测开赛时间、放宽精确
+  匹配或对 blocker artifact 运行 initializer。
+
 ## 2026-07-18 准实时赛前 racecard/off time 同步已实现，待独立代码审核
 
 - 独立 worktree 为 `/Users/mentianlu/Code/umanews/.worktrees/realtime-racecard-sync`，
