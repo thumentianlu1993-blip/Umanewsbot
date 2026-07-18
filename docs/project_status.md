@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-07-18 event 924 shadow baseline 初始化完成
+
+- 精确 manifest `ee9d0d43…1432` 的 initializer dry-run、单次 apply 和独立 verify 均为
+  `ok=true / error_count=0 / 1 event / 7 participants / replayed=0`；新写前备份
+  `e57218e7…70fe` 为 custom-format、`0600` 且通过 `pg_restore -l`。
+- event `924` 已获得 London `15:02` 开赛时间、live owner generation 1、7 匹 approved
+  participant、1 个未发布 racecard revision 和四层 shadow policy；赛果、observation、
+  publication、official marker/incident 仍为 0。
+- 公网页面只新增客观开赛时间，不泄漏 shadow 出马表或赛果标识。scheduler false、runner
+  disabled、live queue/one-off 为 0；下一门禁是单独授权 event 924 的 TRA shadow
+  runner 启动检查，不得重复 initializer 或直接公开。
+
 ## 2026-07-18 event 924 已生成成功 racecard manifest，尚未初始化
 
 - 用户授权的单次退避重试已完成；有效 run

@@ -1,5 +1,35 @@
 # 当前状态
 
+## 2026-07-18 event 924 initializer 已完成，单赛事 shadow baseline 就绪
+
+- 用户已针对 manifest
+  `ee9d0d43ac52c1678ddce61dbd7c4a6b0c0630eb02d2dd6fd8e43cfc5fcd1432`
+  显式授权 event `924` initializer dry-run/apply/verify。执行前生产 checkout/OCI
+  revision 仍为 `ebab4aa8e4e855d644771584c010fa6b07b9992b`，manifest、companion
+  hashes、event baseline、空历史租约、空 live queue 和关闭开关均无漂移。
+- initializer 专属写前 custom-format 备份为
+  `/opt/umanewsbot/backups/db/pre-race-live-init-924-ebab4aa8-20260718T100040Z.dump`，
+  `198,147,827` bytes、`root:root 0600`、SHA-256
+  `e57218e77a1457c2aca7053d962d09b38942d4ad7cd9534185713236a61370fe`，
+  `pg_restore -l` 通过。
+- 同一只读 manifest、同一镜像和同一 expected commit 的 dry-run、单次 apply、独立 verify
+  均为 `ok=true / error_count=0 / event_count=1 / participant_count=7 /
+  replayed_event_count=0`。OperationLog 为 `105221`。
+- event `924` 保持 `scheduled`，已写入 `race_datetime=2026-07-18T14:02:00Z`、
+  London local time `15:02`；projection owner 为 `live / generation=1`，owner manifest
+  与获准 SHA 一致。tracking 为 `racecard_ready`，claim 为空。
+- 已创建 `1` 条 approved supplemental TRA source identity、`7` 条 approved
+  participant 与 `7` 条 participant identity、`1` 条未发布 racecard revision 和 `7` 条
+  declared revision item。四层 publication policy 均为 `shadow`；event allowlist 虽
+  `enabled=true / max_mode=provisional_public`，但有效模式仍被四层 shadow 上限约束。
+- `RaceEventResult`、result revision、observation/evidence、revision publication、
+  official marker/incident 均为 0；current result pointer 为空，racecard revision
+  `published_at` 为空。公网详情为 HTTP 200，只显示 `15:02`，不显示 7 匹 shadow
+  participant 或暂定/正式/更正赛果标识。
+- `RACE_LIVE_SCHEDULER_ENABLED=false`、`RACE_LIVE_RUNNER_MODE=disabled`，
+  live queue 和 one-off 为 0，站内及两个公网 HTTP healthz 为 200。initializer 授权已消费，
+  不得重复 apply；下一步须另行授权单赛事 TRA shadow runner 启动检查，不能直接开启公开。
+
 ## 2026-07-18 event 924 退避重试 prepare 成功，停在 initializer 门禁
 
 - 用户显式授权退避后仅重试 event `924`。执行前 UTC 为 `09:29:51`，已晚于

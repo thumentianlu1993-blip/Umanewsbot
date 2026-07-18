@@ -111,3 +111,40 @@ manifest，initializer、shadow 与公开门禁仍未执行。
 `ee9d0d43ac52c1678ddce61dbd7c4a6b0c0630eb02d2dd6fd8e43cfc5fcd1432`
 取得单独授权，再执行 schema v2 initializer 的 dry-run/apply/verify。当前不得复用旧
 blocker artifact、启动 scheduler/runner 或公开。
+
+## initializer 执行结果（当前状态）
+
+> 状态更新：上一节的 initializer 授权门禁已经完成并消费，不得重复 apply。当前仍未授权
+> runner、scheduler 或公开。
+
+- 用户授权的精确范围：event `924`、manifest SHA-256
+  `ee9d0d43ac52c1678ddce61dbd7c4a6b0c0630eb02d2dd6fd8e43cfc5fcd1432`。
+- 执行前 checkout/OCI revision 为
+  `ebab4aa8e4e855d644771584c010fa6b07b9992b`，image 为
+  `sha256:4443a9c418dd696c7faa4afec0ae34551bceec2e85d6c917fa27de706fe155dc`；
+  manifest、companion、event baseline、空历史租约、队列和关闭开关无漂移。
+- 写前 backup：
+  `/opt/umanewsbot/backups/db/pre-race-live-init-924-ebab4aa8-20260718T100040Z.dump`，
+  `198,147,827` bytes、`root:root 0600`、SHA-256
+  `e57218e77a1457c2aca7053d962d09b38942d4ad7cd9534185713236a61370fe`，
+  `pg_restore -l` 通过。
+- dry-run：`ok=true / error_count=0 / event_count=1 / participant_count=7 /
+  replayed_event_count=0`。
+- 单次 apply：`ok=true / error_count=0 / event_count=1 / participant_count=7 /
+  replayed_event_count=0`。
+- 独立 verify：`ok=true / error_count=0 / event_count=1 / participant_count=7 /
+  replayed_event_count=0`。
+- event `924` 写入 UTC `14:02` / London `15:02`，保持 `scheduled`；live owner 为
+  generation 1，tracking 为 `racecard_ready` 且 claim 为空。OperationLog ID 为
+  `105221`。
+- 写入 `1` 个 approved supplemental TRA source、`7` 个 approved participant、
+  `7` 个 participant identity、`1` 个未发布 racecard revision 和 `7` 个 declared item；
+  四层 policy 均为 shadow。
+- legacy result、result pointer/revision、observation/evidence、publication、official
+  marker/evidence/incident 均为 0。公网详情只显示 `15:02`，7 匹 shadow participant 与
+  暂定/正式/更正赛果标识均未泄漏。
+- scheduler false、runner disabled、live queue/one-off 为 0，站内和公网 HTTP healthz
+  为 200。
+
+下一门禁是另行授权 event `924` 的 The Racing API 单赛事 shadow runner 启动检查；该步骤
+仍不得扩大到公开模式或其他赛事。

@@ -1,5 +1,34 @@
 # 部署运行手册
 
+## event 924 initializer 生产结果（2026-07-18）
+
+1. 用户授权的唯一输入为 event `924` 与 manifest SHA-256
+   `ee9d0d43ac52c1678ddce61dbd7c4a6b0c0630eb02d2dd6fd8e43cfc5fcd1432`。
+   执行前 checkout/OCI revision 为 `ebab4aa8…9992b`，image 为
+   `sha256:4443a9c…55dc`；manifest/companion、event CAS、空历史租约、空 live queue 与
+   scheduler false/runner disabled 全部通过。
+2. 写前恢复点为
+   `/opt/umanewsbot/backups/db/pre-race-live-init-924-ebab4aa8-20260718T100040Z.dump`，
+   `198,147,827` bytes、`root:root 0600`、SHA-256
+   `e57218e77a1457c2aca7053d962d09b38942d4ad7cd9534185713236a61370fe`；
+   custom-format 且 `pg_restore -l` 通过。
+3. one-off web 只读挂载完整获准 run；dry-run、单次
+   `--apply --confirm-apply`、独立 `--verify` 均以同一 manifest/commit 执行，三次均返回
+   `ok=true / error_count=0 / event_count=1 / participant_count=7 /
+   replayed_event_count=0`。不得再次 apply；OperationLog ID 为 `105221`。
+4. event 写后为 `scheduled / 2026-07-18T14:02:00Z / Europe/London 15:02`；
+   projection control 为 `live / generation 1`，tracking 为 `racecard_ready` 且无 active
+   claim。TRA source 为 approved supplemental，automation allowed；7 个 participant 与
+   source identity、racecard revision 1 和 7 个 declared item 完整。
+5. global/source/region/event policy 均为 shadow；allowlist 为 enabled、上限
+   provisional public，但当前有效模式仍是 shadow。result pointer、legacy result、
+   observation/evidence、result revision、revision publication、official marker/evidence/
+   incident 全为 0，racecard revision 未发布。
+6. 公网赛事详情为 200，只显示客观 `15:02`，不显示 shadow participant 或任何 live
+   result badge。scheduler false、runner disabled、live queue/one-off 为 0，站内与公网
+   HTTP healthz 为 200。后续若启动 event 924 TRA shadow runner，必须另行授权并保持公开
+   模式不变；本次 initializer 授权不覆盖 runner、scheduler 或公开。
+
 ## event 924 退避重试 prepare 结果（2026-07-18）
 
 1. 重试前 HostBudget 的 `next_allowed_at` 已过去，`consecutive_failures=1`、circuit 未开；
