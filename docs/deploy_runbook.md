@@ -1,5 +1,33 @@
 # 部署运行手册
 
+## 英国 Group 后缀修复生产发布结果（2026-07-18）
+
+1. 用户在最新成功 review 后授权的提交
+   `ebab4aa8e4e855d644771584c010fa6b07b9992b` 已部署。tree 为
+   `f9a04eccc5bbda31a2619f3642e32c51275f0cc2`，source archive SHA-256 为
+   `75939622bb5a31b524fc7e339109c64565ef038f8ead1734d20905ece5a937b5`，生产 AMD64
+   image 为 `sha256:4443a9c418dd696c7faa4afec0ae34551bceec2e85d6c917fa27de706fe155dc`。
+2. 发布前 Beat 已停止，普通任务排空为 `active=0 / reserved=0 / confirm=0` 后才停止两个
+   worker。数据库恢复点为
+   `/opt/umanewsbot/backups/db/pre-racecard-grade-ebab4aa8-20260718T090735Z.dump`，
+   `198,033,727` bytes、`0600`、SHA-256
+   `17ba9ccbe0e28fe765f0f449c78452664f39f204011a1b8decb873240afd3db0`，
+   `pg_restore -l` 通过。旧 image 回滚标签为
+   `umanewsbot:rollback-pre-racecard-grade-ebab4aa8-20260718T090735Z`。
+3. 镜像内 registry digest 为 `60fcc081…ad402`；Django check、migration check、model
+   drift、racecard sync `20/20` 通过。部署后四个 app service 的 image/revision/tree
+   一致；web/普通 worker/Beat 无 secret 或 racecard artifact，只有 live worker 保留
+   `/run/secrets:ro` 与 `/run/race-live/racecards:rw`。内外 healthz 为 200。
+4. `RACE_LIVE_SCHEDULER_ENABLED=false`、`RACE_LIVE_RUNNER_MODE=disabled`，live queue、
+   publication policy 与 allowlist 均为 0；赛事、runner、result 和所有 live fact 表守恒。
+5. event `924` 的新 run 为
+   `/opt/umanewsbot/runtime/race_live_racecards/production-racecard-gb-924-grade-fix-20260718T091135Z`。
+   today GB 为 HTTP 200，tomorrow GB 为 HTTP 429，因此只生成 blocker report/request，
+   没有 manifest。report/request SHA-256 为 `3e37ecef…d91b` / `7c0ca959…d5d5`。
+6. 该 run 不得进入 initializer，也不得手工复用 today 响应构造 manifest。若需要新 run-id
+   退避重试，必须先取得显式联网重试授权；仍受每 run 最多两个请求、HostBudget 和完整
+   today/tomorrow 成功门禁约束。
+
 ## 历史赛事批量公开与距离单位展示（2026-07-18）
 
 1. 批量公开入口为 `python manage.py publish_historical_race_targets`，必须提供固定 scope 路径及其完整 SHA-256；先执行默认 dry-run，再显式 `--apply`，最后独立 `--verify-only`。scope schema 固定逐目标 ID 和 artifact SHA，命令不得从当前数据库动态扩张范围。

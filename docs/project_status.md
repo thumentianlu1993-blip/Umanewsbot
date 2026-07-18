@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-07-18 英国 Group 后缀修复已生产发布，prepare 被 429 阻断
+
+- 冻结提交 `ebab4aa8` 已快进 `main` 并部署，四个 app service 统一运行 AMD64 image
+  `sha256:4443a9c…55dc`；Django、迁移、镜像 racecard sync `20/20`、挂载隔离、内外
+  healthz 与 Celery ping 通过。写前备份 SHA-256 为 `17ba9ccb…db0`，`pg_restore -l`
+  通过，旧镜像与环境回滚点已保留。
+- scheduler false、runner disabled、公开 policy/allowlist 为 0、live queue 为 0。生产
+  `9,867 events / 100,132 runners / 91,897 results` 和全部 live fact 表均未改变。
+- event `924` 新 prepare 的 today GB 请求为 200，tomorrow GB 请求为 429，因此
+  `completed=false / blocker=http_429`。blocker artifact 无 manifest，未执行 initializer
+  或公开；下一次联网重试需要新授权，成功 manifest 仍进入单独审核。
+
 ## 2026-07-18 英国 Group 后缀精确匹配实现完成
 
 - 只读生产镜像诊断确认 event `924` 的 TRA 唯一候选存在，上一轮零命中的唯一身份格式差异
