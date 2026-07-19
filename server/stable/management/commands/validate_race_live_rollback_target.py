@@ -33,6 +33,16 @@ class Command(BaseCommand):
             provisional_revision_id = payload[
                 "expected_provisional_revision_id"
             ]
+            if (
+                "schema_version" in payload
+                and "expected_current_revision_id" not in payload
+            ):
+                raise ValueError(
+                    "generated manifest 缺少 current revision"
+                )
+            current_revision_id = payload.get(
+                "expected_current_revision_id"
+            )
             planned_policy_snapshot = payload["planned_policy_snapshot"]
             expected_allowlist_version = payload[
                 "expected_allowlist_version"
@@ -51,6 +61,10 @@ class Command(BaseCommand):
                 planned_policy_snapshot=planned_policy_snapshot,
                 expected_allowlist_version=expected_allowlist_version,
                 expected_publication_id=expected_publication_id,
+                expected_tracking_lock_version=payload.get(
+                    "expected_tracking_lock_version"
+                ),
+                expected_current_revision_id=current_revision_id,
             )
             if decision.allowed is not True:
                 raise CommandError(decision.reason)

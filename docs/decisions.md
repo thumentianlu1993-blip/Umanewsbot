@@ -1,5 +1,24 @@
 # 关键决策
 
+## 2026-07-19：coupled runner 身份与 rollback Gate D 修复边界
+
+- 来源中的参赛号码是客观展示字段，不是 live runner 唯一身份。合法 coupled entries
+  可以由不同非空 external runner ID 共享号码；系统不得改写为猜测的 `1A/1B`、合并
+  马匹或因页内无关 coupled race 拒绝整页。重复 external ID 仍必须 fail-closed。
+- legacy `RaceEventRunner` 的 live 身份改为 `event + nonempty external_runner_id`；
+  历史空身份行不做大表猜测回填。只有 external ID 唯一命中，或在无 external ID 时
+  号码/名称形成唯一匹配，才允许更新动态字段；歧义必须零写入并计数。
+- P0 身份按来源 `source_key + external_runner_id` 统一关联 runner/result；相同号码不
+  参与强身份归并，不同来源的相同外部 ID 也不得自动合并。legacy 新列与 source refs
+  同时非空却不一致时，在任何 racecard refresh/replay 写入前 fail-closed。
+- 后续准实时代码发布在切换镜像前必须生成受审、不可变、绑定完整候选 image ID 和
+  filtered env SHA 的 rollback manifest。四层 policy 先以单事务进入 maintenance，
+  再按 coarse restore、重新验证、event restore 的固定阶段恢复；缺 manifest、状态混合、
+  tracking/claim/settings 漂移或阶段乱序时不得切换镜像或扩大公开范围。
+- rollback manifest 同时冻结 current revision pointer；validator 和 policy restore
+  都要求 scheduler/monitor=false、enabled regions 为空，并在行锁内、任何恢复写入前
+  对 current pointer 做 CAS。pointer 漂移时保持当前恢复阶段不变，禁止重新开放 event。
+
 ## 2026-07-19：event 924 的 15 分钟 SLA 不追溯补证，下一场重新验收
 
 - event `924` 唯一 BHA 截图观察时间早于 promotion，receipt 的后续应用时间不能替代

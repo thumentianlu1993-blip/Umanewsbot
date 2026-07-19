@@ -2100,3 +2100,42 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   manifest 实际未生成，因此原发布门禁**未满足**，本次 release evidence closure
   仍不完整。任何后续补救必须作为独立受审、获准并验证的操作处理；当前只能继续保持
   全部新地区、scheduler 和 monitor 关闭。
+
+## 2026-07-19 准实时 Beta Gate 修复已完成本地实现，待代码审核
+
+- 法国真实 Free racecard 中合法 coupled entries 现按非空 `external_runner_id`
+  区分；不同 runner 可保留同一来源号码，重复 external ID、字段异常和超限仍
+  fail-closed。legacy `RaceEventRunner` 新增 external identity，并把唯一约束从
+  `event + horse_number` 改为 `event + nonempty external_runner_id`；历史空 identity
+  行保持兼容，动态字段在号码/名称歧义时零写入。
+- 新增 root-only rollback bundle 生成器和四层 publication policy 的单事务
+  maintenance CAS。bundle 严格绑定候选 image ID、filtered env SHA、approved commit、
+  event/revision/publication/allowlist、tracking lock version 和四层
+  maintenance/restore 快照；artifact 采用不可覆盖原子发布、root-owned
+  `0700/0600`、exact-key/duplicate-key/大小/secret 门禁。
+- generator、maintenance、validator 和 policy restore 均要求
+  `scheduler=false`、`monitor=false`、enabled regions 为空、tracking 全关且 claim
+  为空；恢复阶段只允许
+  `maintenance -> coarse-restored -> restored`，event-before-coarse 和任一漂移均拒绝。
+- 新增 migration
+  `stable.0048_raceeventrunner_external_runner_identity`。当前本地验证为目标/相邻
+  SQLite `42/42`、准实时组合 `206/206`（14 项 PostgreSQL 专用跳过）和临时
+  PostgreSQL 16 `25/25`；Django check、migration drift、compileall、三份 Compose
+  config 与 `git diff --check` 均通过。
+- 首次独立原生 code review 返回 3 个 P1、3 个 P2；已逐项取得真实 RED 并完成直接路径
+  GREEN：rollback 生成前复用真实 public-read admission；initializer 拒绝既有 legacy
+  runner 并精确验证 replay；P0 coupled identity 不再以同一号码覆盖；动态更新恢复唯一
+  名称兜底；unchanged replay 安全惰性迁移 external identity。主代理复跑准实时组合
+  SQLite `220/220`（22 项 PostgreSQL 专用跳过）和 remediation 主模块/专项在临时
+  PostgreSQL 16 `37/37` 通过。
+- 同一 reviewer 的首次限定复审又指出 2 个直接 P1 和 3 个直接 P2；已按新增 RED 修复：
+  P0 统一读取 runner/result external identity 并以 `source_key` 隔离命名空间；rollback
+  generated manifest 透传并行锁内 CAS current revision pointer；validator 要求
+  scheduler/monitor=false；普通 refresh/replay 在任一写入前拒绝 legacy 新列/source
+  refs 身份冲突。主代理最新复验为准实时相关 SQLite `432/432`（2 项环境跳过）和临时
+  PostgreSQL 16 `71/71`；Django check、migration drift、compileall、三份 Compose
+  config 与 `git diff --check` 均通过，临时数据库和容器已删除。
+- 当前状态是
+  `findings fixed / scoped re-review pending / not authorized / not deployed`。
+  生产仍运行 `85948707` 对应镜像；scheduler/monitor、新地区和 enabled regions
+  继续全关，法国 event 733–735 尚未重新联网 prepare，event 924 状态未改变。

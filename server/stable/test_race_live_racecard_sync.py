@@ -122,7 +122,7 @@ class TheRacingApiLiveRacecardPayloadTests(SimpleTestCase):
         )
         self.assertEqual(empty.races, ())
 
-    def test_rejects_naive_time_missing_identity_and_duplicate_ids_or_numbers(self):
+    def test_rejects_naive_time_missing_identity_and_duplicate_runner_ids(self):
         cases = []
         for missing in (
             "race_id",
@@ -148,16 +148,12 @@ class TheRacingApiLiveRacecardPayloadTests(SimpleTestCase):
                 {"racecards": [duplicate_race, self._race(course="Newbury")]},
             )
         )
-        for field in ("horse_id", "number"):
-            race = self._race()
-            duplicate = dict(race["runners"][0])
-            duplicate["horse"] = "Second Horse"
-            if field == "horse_id":
-                duplicate["number"] = "5"
-            else:
-                duplicate["horse_id"] = "horse-2"
-            race["runners"] = [race["runners"][0], duplicate]
-            cases.append((f"duplicate_{field}", {"racecards": [race]}))
+        race = self._race()
+        duplicate = dict(race["runners"][0])
+        duplicate["horse"] = "Second Horse"
+        duplicate["number"] = "5"
+        race["runners"] = [race["runners"][0], duplicate]
+        cases.append(("duplicate_horse_id", {"racecards": [race]}))
 
         for label, payload in cases:
             with self.subTest(case=label):

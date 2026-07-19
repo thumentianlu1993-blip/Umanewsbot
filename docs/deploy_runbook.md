@@ -5128,3 +5128,65 @@ python manage.py evaluate_multiregion_attribution_gold \
 - 当前只记录缺口并保持 scheduler/monitor false、enabled regions 为空；不得在
   evidence-only 通道把“发布前”改写成“promotion 前”。补救 manifest 的生成、SHA
   绑定和只读验证必须另走受审与授权流程。
+
+## 2026-07-19 准实时 Beta Gate 修复候选运行手册
+
+本节仅描述待审核候选；在成功代码 review、新 fingerprint 和该精确版本用户授权前，
+不得在生产执行。
+
+1. 候选镜像构建后、切换前，必须先确认 Beat/worker 已停、Celery active/reserved、
+   `celery`/`race_live` queue、全库 race-live claim 均为空，且
+   `RACE_LIVE_SCHEDULER_ENABLED=false`、
+   `RACE_LIVE_MONITOR_ENABLED=false`、
+   `RACE_LIVE_ENABLED_REGIONS=`。目标 event tracking 必须全关且
+   `next_poll_at/token/expiry` 为空。
+2. 对当前公开 provisional event 使用候选镜像生成 bundle：
+
+   ```bash
+   python manage.py prepare_race_live_rollback_bundle \
+     --event-id 924 \
+     --reviewed-release-image-id 'sha256:<64hex>' \
+     --filtered-env-sha256 '<64hex>' \
+     --approved-commit '<40hex>' \
+     --run-id '<release-run-id>' \
+     --output-root '/run/race-live/rollback'
+   ```
+
+   输出目录必须为 root-owned `0700`，且只含 root-owned `0600`
+   `manifest.json`、`report.json`、`sha256s.json`。记录 manifest SHA 后，用同一
+   approved commit 和完整 image ID 继续；禁止 mutable tag、复制后改写或覆盖同名
+   run。
+3. 先 dry-run，再用 manifest 内精确确认串进入 maintenance：
+
+   ```bash
+   python manage.py transition_race_live_rollback_maintenance \
+     --manifest '<absolute-manifest-path>' \
+     --expected-manifest-sha256 '<64hex>' \
+     --expected-approved-commit '<40hex>'
+
+   python manage.py transition_race_live_rollback_maintenance \
+     --manifest '<absolute-manifest-path>' \
+     --expected-manifest-sha256 '<64hex>' \
+     --expected-approved-commit '<40hex>' \
+     --apply \
+     --confirm 'ENTER_RACE_LIVE_ROLLBACK_MAINTENANCE_924'
+   ```
+
+   apply 后四层必须精确为 maintenance snapshot，event 924 无缓存 read gate 必须
+   隐藏；任一 scope、tracking、claim、settings、manifest 或 SHA 漂移即停止。
+4. 只允许按
+   `validate -> restore-policies-coarse -> validate -> restore-policy-event`
+   使用受审 one-shot。合法状态依次为四层 maintenance、三层 restore/event
+   maintenance、四层 restore；第二次 validate 失败时不得声称四层仍 off，也不得跳过
+   validator 直接恢复 event。generated manifest 必须包含
+   `expected_current_revision_id`；两个 validate 和两个 restore 阶段都必须保持
+   scheduler/monitor=false、enabled regions 为空，并在任何 policy 恢复写入前核对
+   current pointer。pointer 漂移时保持当前阶段原样并停止。
+5. 四层精确恢复、event 924 同一 provisional revision/7 条结果重新可见后，才允许
+   应用 `stable.0048` 并切换候选镜像。切换后继续保持全部新范围关闭，再对法国
+   event 733–735 做一次有界 prepare；仅消除 `racecard_schema_invalid`，不等于授权
+   initializer、shadow 扩大或公开 promotion。
+6. migration 删除 legacy runner 的号码唯一约束并增加非空 external ID 条件唯一约束。
+   旧镜像可读取 additive 列；若新版本已产生 coupled legacy rows，代码回滚时必须保持
+   对应 event/地区 tracking 关闭并禁止旧动态 updater，完全撤销只能使用切换前已验证
+   数据库备份。

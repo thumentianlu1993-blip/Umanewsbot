@@ -164,7 +164,13 @@ def _source_namespace(*payloads: dict | None) -> str:
     for payload in payloads:
         if not isinstance(payload, dict):
             continue
-        for key in ("source", "source_name", "provider", "adapter"):
+        for key in (
+            "source_key",
+            "source",
+            "source_name",
+            "provider",
+            "adapter",
+        ):
             value = str(payload.get(key) or "").strip().casefold()
             if value:
                 return value
@@ -188,6 +194,90 @@ def _participant_identity_keys(*payloads: dict | None) -> set[str]:
     return identity_keys
 
 
+def _runner_external_identity_key(
+    runner: RaceEventRunner | None,
+    event: RaceEvent,
+) -> str:
+    if runner is None:
+        return ""
+    external_runner_id = str(
+        runner.external_runner_id or ""
+    ).strip()
+    if not external_runner_id:
+        return ""
+    namespace = _source_namespace(
+        runner.source_refs,
+        runner.raw_payload,
+        event.source_refs,
+    )
+    if not namespace:
+        namespace = "race_event_runner"
+    return f"{namespace}:{external_runner_id}".casefold()
+
+
+def _external_runner_identity_keys(
+    *payloads: dict | None,
+) -> set[str]:
+    fallback_namespace = _source_namespace(*payloads)
+    identity_keys: set[str] = set()
+    for payload in payloads:
+        if not isinstance(payload, dict):
+            continue
+        namespace = _source_namespace(payload) or fallback_namespace
+        if not namespace:
+            continue
+        external_runner_id = str(
+            payload.get("external_runner_id") or ""
+        ).strip()
+        if external_runner_id:
+            identity_keys.add(
+                f"{namespace}:{external_runner_id}".casefold()
+            )
+    return identity_keys
+
+
+def _participant_external_runner_identity_keys(
+    *,
+    runner: RaceEventRunner | None,
+    result: RaceEventResult | None,
+    event: RaceEvent,
+) -> set[str]:
+    identity_keys = _external_runner_identity_keys(
+        result.source_refs if result else None,
+        result.raw_payload if result else None,
+        runner.source_refs if runner else None,
+        runner.raw_payload if runner else None,
+        event.source_refs,
+    )
+    runner_key = _runner_external_identity_key(runner, event)
+    if runner_key:
+        identity_keys.add(runner_key)
+    return identity_keys
+
+
+def _participant_record_identity_keys(
+    *,
+    runner: RaceEventRunner | None,
+    result: RaceEventResult | None,
+    event: RaceEvent,
+) -> set[str]:
+    identity_keys = _participant_identity_keys(
+        result.source_refs if result else None,
+        result.raw_payload if result else None,
+        runner.source_refs if runner else None,
+        runner.raw_payload if runner else None,
+        event.source_refs,
+    )
+    identity_keys.update(
+        _participant_external_runner_identity_keys(
+            runner=runner,
+            result=result,
+            event=event,
+        )
+    )
+    return identity_keys
+
+
 def _normalized_horse_number(value: Any) -> str:
     horse_number = str(value or "").strip()
     if horse_number:
@@ -196,7 +286,11 @@ def _normalized_horse_number(value: Any) -> str:
 
 
 def _record_identity_keys(record: RaceEventRunner | RaceEventResult, event: RaceEvent) -> set[str]:
-    return _participant_identity_keys(record.source_refs, record.raw_payload, event.source_refs)
+    return _participant_record_identity_keys(
+        runner=record if isinstance(record, RaceEventRunner) else None,
+        result=record if isinstance(record, RaceEventResult) else None,
+        event=event,
+    )
 
 
 def _participant_key(
@@ -206,6 +300,20 @@ def _participant_key(
     event: RaceEvent,
     name_is_unique: bool,
 ) -> str:
+    external_runner_identity_keys = (
+        _participant_external_runner_identity_keys(
+            runner=runner,
+            result=result,
+            event=event,
+        )
+    )
+    if external_runner_identity_keys:
+        digest = hashlib.sha256(
+            "|".join(
+                sorted(external_runner_identity_keys)
+            ).encode("utf-8")
+        ).hexdigest()
+        return f"identity:{digest}"
     horse_number = _normalized_horse_number(
         (result.horse_number if result else "") or (runner.horse_number if runner else "")
     )
@@ -298,12 +406,10 @@ def _event_participants(event: RaceEvent) -> list[dict[str, Any]]:
         if not horse_number:
             continue
         participant_numbers[index] = horse_number
-        identity_keys = _participant_identity_keys(
-            result.source_refs if result else None,
-            result.raw_payload if result else None,
-            runner.source_refs if runner else None,
-            runner.raw_payload if runner else None,
-            event.source_refs,
+        identity_keys = _participant_record_identity_keys(
+            runner=runner,
+            result=result,
+            event=event,
         )
         for identity_key in identity_keys:
             identity_members.setdefault(identity_key, []).append(index)
@@ -991,12 +1097,10 @@ def sync_p0_horse_sources(
                 pairing_conflict = participant.get("pairing_conflict") or {}
                 if not source_url:
                     source_url = next(iter(pairing_conflict.get("source_urls") or []), "")
-                identity_keys = _participant_identity_keys(
-                    result.source_refs if result else None,
-                    result.raw_payload if result else None,
-                    runner.source_refs if runner else None,
-                    runner.raw_payload if runner else None,
-                    event.source_refs,
+                identity_keys = _participant_record_identity_keys(
+                    runner=runner,
+                    result=result,
+                    event=event,
                 )
                 existing_sources = _matching_participant_sources(
                     event_sources,

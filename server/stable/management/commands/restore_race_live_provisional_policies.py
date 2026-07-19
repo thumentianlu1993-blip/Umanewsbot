@@ -33,6 +33,13 @@ class Command(BaseCommand):
             ):
                 raise ValueError("manifest SHA-256 漂移")
             payload = json.loads(manifest_bytes)
+            if (
+                "schema_version" in payload
+                and "expected_current_revision_id" not in payload
+            ):
+                raise ValueError(
+                    "generated manifest 缺少 current revision"
+                )
             decision = restore_race_live_provisional_policies(
                 event_id=payload["event_id"],
                 planned_policy_snapshot=payload[
@@ -52,6 +59,12 @@ class Command(BaseCommand):
                     "expected_manifest_sha256"
                 ],
                 now=timezone.now(),
+                expected_tracking_lock_version=payload.get(
+                    "expected_tracking_lock_version"
+                ),
+                expected_current_revision_id=payload.get(
+                    "expected_current_revision_id"
+                ),
             )
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise CommandError("rollback manifest 不合法") from exc

@@ -917,3 +917,18 @@
 - 原 Gate D 要求发布 artifact 已包含 rollback manifest；当前事实是该门禁未满足、
   release closure 不完整。新范围
   保持全部 off，后续只能通过独立受审和授权的补救操作关闭此缺口。
+
+## 2026-07-19 准实时 Beta Gate 修复候选
+
+- coupled-entry parser、legacy runner external identity、严格 rollback bundle 和
+  maintenance/restore 阶段机已完成本地实现；法国同号码不同马匹不再整页阻塞，号码
+  本身仍按来源事实展示。
+- 首次独立原生 review 的 3 个 P1、3 个 P2 及首次限定复审新增的 2 个 P1、3 个直接
+  P2 均已按真实 RED→GREEN 修复；新增关闭 result/runner coupled 配对、`source_key`
+  身份空间、current revision restore CAS、validator 后台开关和 racecard legacy 身份
+  冲突零写缺口。主代理最新复跑准实时 SQLite `432/432`（2 项环境跳过）和临时
+  PostgreSQL 16 `71/71`；Django、迁移、编译、三份 Compose 和 diff 门禁通过，当前
+  等待同一 reviewer 再次限定复审；尚无新 fingerprint 或发布授权。
+- 生产未随本地候选变化：仍只有 event 924 公开，scheduler/monitor 和 enabled regions
+  全关。新的 `0048` migration、rollback bundle、maintenance 演练及法国重验均未在
+  生产执行。

@@ -301,16 +301,11 @@ def parse_the_racing_api_live_racecards_payload(
             raise ValueError("duplicate race_id")
         race_ids.add(external_race_id)
         runner_ids: set[str] = set()
-        runner_numbers: set[str] = set()
         for participant in normalized["participants"]:
             external_runner_id = participant["external_runner_id"]
-            number = participant["number"]
             if external_runner_id in runner_ids:
                 raise ValueError("duplicate horse_id")
-            if number in runner_numbers:
-                raise ValueError("duplicate runner number")
             runner_ids.add(external_runner_id)
-            runner_numbers.add(number)
         normalized_races.append(normalized)
 
     return TheRacingApiFixtureSnapshot(

@@ -2523,6 +2523,7 @@ class RaceEventAlias(TimestampedModel):
 
 class RaceEventRunner(TimestampedModel):
     event = models.ForeignKey(RaceEvent, on_delete=models.CASCADE, related_name="runners")
+    external_runner_id = models.CharField(max_length=128, blank=True, default="")
     sort_order = models.PositiveSmallIntegerField(default=0)
     horse_number = models.CharField(max_length=32, blank=True)
     barrier = models.CharField(max_length=32, blank=True)
@@ -2546,9 +2547,9 @@ class RaceEventRunner(TimestampedModel):
         ordering = ("event", "sort_order", "horse_number", "id")
         constraints = [
             models.UniqueConstraint(
-                fields=("event", "horse_number"),
-                condition=~models.Q(horse_number=""),
-                name="uq_race_runner_event_no",
+                fields=("event", "external_runner_id"),
+                condition=~models.Q(external_runner_id=""),
+                name="uq_race_runner_event_external_id",
             )
         ]
         indexes = [

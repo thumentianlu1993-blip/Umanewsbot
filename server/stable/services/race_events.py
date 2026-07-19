@@ -82,6 +82,12 @@ from stable.services.race_event_reconciliation import (
     rollback_race_event_coverage_reconciliation,
     verify_race_event_coverage_reconciliation,
 )
+from stable.services.race_live_rollback import (
+    build_race_live_rollback_bundle,
+    load_race_live_rollback_manifest,
+    prepare_race_live_rollback_bundle,
+    transition_race_live_rollback_maintenance,
+)
 
 
 User = get_user_model()
@@ -2372,6 +2378,8 @@ def validate_race_live_provisional_rollback_target(
     planned_policy_snapshot: dict[str, dict[str, Any]] | None = None,
     expected_allowlist_version: int | None = None,
     expected_publication_id: int | None = None,
+    expected_tracking_lock_version: int | None = None,
+    expected_current_revision_id: int | None = None,
 ) -> RaceLiveProvisionalRollbackDecision:
     """Validate the dedicated provisional pointer against immutable audit rows."""
 
@@ -2384,6 +2392,22 @@ def validate_race_live_provisional_rollback_target(
         or event_id <= 0
         or not isinstance(now, datetime)
         or timezone.is_naive(now)
+        or getattr(
+            settings,
+            "RACE_LIVE_SCHEDULER_ENABLED",
+            False,
+        )
+        is not False
+        or getattr(
+            settings,
+            "RACE_LIVE_MONITOR_ENABLED",
+            False,
+        )
+        is not False
+        or tuple(
+            getattr(settings, "RACE_LIVE_ENABLED_REGIONS", ())
+        )
+        != ()
     ):
         return reject("invalid_input")
     control = (
@@ -2393,8 +2417,27 @@ def validate_race_live_provisional_rollback_target(
         .filter(event_id=event_id)
         .first()
     )
+    tracking = RaceEventLiveTracking.objects.filter(event_id=event_id).first()
+    if (
+        tracking is None
+        or tracking.tracking_enabled is not False
+        or tracking.next_poll_at is not None
+        or tracking.active_attempt_token != ""
+        or tracking.claim_expires_at is not None
+        or (
+            expected_tracking_lock_version is not None
+            and tracking.lock_version != expected_tracking_lock_version
+        )
+    ):
+        return reject("rollback_tracking_fence_invalid")
     if control is None or control.last_provisional_result_revision_id is None:
         return reject("provisional_pointer_missing")
+    if (
+        expected_current_revision_id is not None
+        and control.current_result_revision_id
+        != expected_current_revision_id
+    ):
+        return reject("current_result_pointer_changed")
     revision = control.last_provisional_result_revision
     if (
         expected_provisional_revision_id is not None
@@ -2584,6 +2627,8 @@ def restore_race_live_provisional_policies(
     expected_publication_id: int,
     expected_manifest_sha256: str,
     now: datetime,
+    expected_tracking_lock_version: int | None = None,
+    expected_current_revision_id: int | None = None,
 ) -> RaceLiveProvisionalRollbackDecision:
     """Restore reviewed rollback policies in coarse-then-event CAS stages."""
 
@@ -2594,6 +2639,10 @@ def restore_race_live_provisional_policies(
         )
         or getattr(settings, "RACE_LIVE_SCHEDULER_ENABLED", False) is not False
         or getattr(settings, "RACE_LIVE_MONITOR_ENABLED", False) is not False
+        or tuple(
+            getattr(settings, "RACE_LIVE_ENABLED_REGIONS", ())
+        )
+        != ()
     ):
         return RaceLiveProvisionalRollbackDecision(
             False, "rollback_policy_input_invalid"
@@ -2687,6 +2736,14 @@ def restore_race_live_provisional_policies(
             return RaceLiveProvisionalRollbackDecision(
                 False, "rollback_baseline_missing"
             )
+        if (
+            expected_current_revision_id is not None
+            and control.current_result_revision_id
+            != expected_current_revision_id
+        ):
+            return RaceLiveProvisionalRollbackDecision(
+                False, "current_result_pointer_changed"
+            )
         validation = validate_race_live_provisional_rollback_target(
             event_id=event_id,
             now=now,
@@ -2696,6 +2753,8 @@ def restore_race_live_provisional_policies(
             planned_policy_snapshot=planned_policy_snapshot,
             expected_allowlist_version=expected_allowlist_version,
             expected_publication_id=expected_publication_id,
+            expected_tracking_lock_version=expected_tracking_lock_version,
+            expected_current_revision_id=expected_current_revision_id,
         )
         if validation.allowed is not True:
             return validation
@@ -2887,6 +2946,10 @@ def restore_last_provisional_result(
     if (
         getattr(settings, "RACE_LIVE_SCHEDULER_ENABLED", False) is True
         or getattr(settings, "RACE_LIVE_MONITOR_ENABLED", False) is True
+        or tuple(
+            getattr(settings, "RACE_LIVE_ENABLED_REGIONS", ())
+        )
+        != ()
     ):
         return RaceLiveProvisionalRollbackDecision(
             False, "race_live_background_tasks_enabled"
@@ -4449,27 +4512,6 @@ def apply_race_live_racecard_refresh(
         "participants": [dict(row) if isinstance(row, dict) else row for row in incoming],
     }
 
-    observation_decision = record_race_result_observation(
-        source_identity_id=source.pk,
-        observed_at=now,
-        source_updated_at=None,
-        parser_version="the_racing_api_racecard_refresh_v2",
-        raw_sha256=raw_sha256,
-        result_phase=RaceResultPhase.RACECARD,
-        normalized_payload=observation_payload,
-        field_provenance={"source": "the_racing_api"},
-        parse_warnings=[],
-        permission_classification="licensed_api_automation",
-    )
-    if (
-        observation_decision.recorded is not True
-        or observation_decision.observation is None
-    ):
-        return RaceLiveRacecardRefreshDecision(
-            False, f"observation_{observation_decision.reason}"
-        )
-    observation = observation_decision.observation
-
     with transaction.atomic():
         try:
             event = RaceEvent.objects.select_for_update().get(pk=event_id)
@@ -4623,7 +4665,122 @@ def apply_race_live_racecard_refresh(
             phase=RaceResultPhase.RACECARD,
             content_sha256=content_sha256,
         ).first()
+
+        for row in merged_rows:
+            if row["external_runner_id"] in identity_by_external:
+                continue
+            horse_name = row.get("horse_name")
+            if (
+                not isinstance(horse_name, str)
+                or not horse_name
+                or horse_name != horse_name.strip()
+            ):
+                return RaceLiveRacecardRefreshDecision(
+                    False, "new_participant_name_missing"
+                )
+
+        legacy_runners = list(
+            RaceEventRunner.objects.select_for_update()
+            .filter(event_id=event_id)
+            .order_by("id")
+        )
+        for legacy_runner in legacy_runners:
+            external_runner_id = str(
+                legacy_runner.external_runner_id or ""
+            ).strip()
+            source_external_runner_id = (
+                str(
+                    legacy_runner.source_refs.get(
+                        "external_runner_id"
+                    )
+                    or ""
+                ).strip()
+                if isinstance(legacy_runner.source_refs, dict)
+                else ""
+            )
+            if (
+                external_runner_id
+                and source_external_runner_id
+                and external_runner_id
+                != source_external_runner_id
+            ):
+                return RaceLiveRacecardRefreshDecision(
+                    False, "legacy_runner_identity_conflict"
+                )
+        legacy_by_external: dict[str, RaceEventRunner | None] = {}
+        for row in merged_rows:
+            external_runner_id = row["external_runner_id"]
+            external_matches = [
+                runner
+                for runner in legacy_runners
+                if runner.external_runner_id == external_runner_id
+            ][:2]
+            if len(external_matches) > 1:
+                return RaceLiveRacecardRefreshDecision(
+                    False, "legacy_runner_identity_ambiguous"
+                )
+            legacy_matches = [
+                runner
+                for runner in legacy_runners
+                if not runner.external_runner_id
+                and isinstance(runner.source_refs, dict)
+                and str(
+                    runner.source_refs.get("external_runner_id") or ""
+                ).strip()
+                == external_runner_id
+            ][:2]
+            if len(legacy_matches) > 1:
+                return RaceLiveRacecardRefreshDecision(
+                    False, "legacy_runner_identity_ambiguous"
+                )
+            if external_matches and legacy_matches:
+                return RaceLiveRacecardRefreshDecision(
+                    False, "legacy_runner_identity_conflict"
+                )
+            legacy_by_external[external_runner_id] = (
+                external_matches[0]
+                if external_matches
+                else legacy_matches[0]
+                if legacy_matches
+                else None
+            )
+
+        observation_decision = record_race_result_observation(
+            source_identity_id=source.pk,
+            observed_at=now,
+            source_updated_at=None,
+            parser_version="the_racing_api_racecard_refresh_v2",
+            raw_sha256=raw_sha256,
+            result_phase=RaceResultPhase.RACECARD,
+            normalized_payload=observation_payload,
+            field_provenance={"source": "the_racing_api"},
+            parse_warnings=[],
+            permission_classification="licensed_api_automation",
+        )
+        if (
+            observation_decision.recorded is not True
+            or observation_decision.observation is None
+        ):
+            return RaceLiveRacecardRefreshDecision(
+                False, f"observation_{observation_decision.reason}"
+            )
+        observation = observation_decision.observation
+
         if existing_revision is not None:
+            for external_runner_id, legacy_runner in (
+                legacy_by_external.items()
+            ):
+                if (
+                    legacy_runner is not None
+                    and not legacy_runner.external_runner_id
+                ):
+                    legacy_runner.external_runner_id = external_runner_id
+                    legacy_runner.save(
+                        update_fields=(
+                            "external_runner_id",
+                            "updated_at",
+                        )
+                    )
             tracking.next_poll_at = calculate_race_live_next_poll_at(
                 off_time=event.race_datetime,
                 now=now,
@@ -4649,18 +4806,6 @@ def apply_race_live_racecard_refresh(
                 replayed=True,
             )
 
-        for row in merged_rows:
-            if row["external_runner_id"] in identity_by_external:
-                continue
-            horse_name = row.get("horse_name")
-            if (
-                not isinstance(horse_name, str)
-                or not horse_name
-                or horse_name != horse_name.strip()
-            ):
-                return RaceLiveRacecardRefreshDecision(
-                    False, "new_participant_name_missing"
-                )
         participants_by_external: dict[str, RaceEventParticipant] = {}
         for row in merged_rows:
             external_runner_id = row["external_runner_id"]
@@ -4742,10 +4887,12 @@ def apply_race_live_racecard_refresh(
             )
         )
         for index, row in enumerate(merged_rows, start=1):
+            external_runner_id = row["external_runner_id"]
             defaults = {
+                "external_runner_id": external_runner_id,
                 "sort_order": index,
                 "horse_name": participants_by_external[
-                    row["external_runner_id"]
+                    external_runner_id
                 ].canonical_name,
                 "barrier": str(row.get("draw", row.get("barrier", ""))),
                 "jockey_name": str(row.get("jockey_name", "")),
@@ -4755,14 +4902,11 @@ def apply_race_live_racecard_refresh(
                 "dynamic_updated_at": now,
                 "source_refs": {
                     "source_key": source.source_key,
-                    "external_runner_id": row["external_runner_id"],
+                    "external_runner_id": external_runner_id,
                 },
                 "raw_payload": {},
             }
-            legacy_runner = RaceEventRunner.objects.filter(
-                event_id=event_id,
-                source_refs__external_runner_id=row["external_runner_id"],
-            ).first()
+            legacy_runner = legacy_by_external[external_runner_id]
             if legacy_runner is None:
                 RaceEventRunner.objects.create(
                     event_id=event_id,
@@ -6360,18 +6504,77 @@ def apply_data_candidate(candidate: RaceEventDataCandidate, *, user: User | None
 def update_runner_dynamic_fields(event: RaceEvent, updates: Iterable[dict], *, source_name: str = "") -> dict:
     updated = 0
     skipped = 0
+    skipped_ambiguous = 0
     now = timezone.now()
     for item in updates:
+        external_runner_id = str(item.get("external_runner_id") or "").strip()
         horse_number = str(item.get("horse_number") or "")
         horse_name = _clean_race_horse_name(item.get("horse_name"))
         queryset = event.runners.all()
         runner = None
-        if horse_number:
-            runner = queryset.filter(horse_number=horse_number).first()
-        if runner is None and horse_name:
-            runner = queryset.filter(horse_name=horse_name).first()
+        ambiguous = False
+        if external_runner_id:
+            matches = list(
+                queryset.filter(
+                    external_runner_id=external_runner_id
+                )[:2]
+            )
+            if not matches:
+                matches = list(
+                    queryset.filter(
+                        external_runner_id="",
+                        source_refs__external_runner_id=external_runner_id,
+                    )[:2]
+                )
+            if len(matches) == 1:
+                runner = matches[0]
+            else:
+                ambiguous = len(matches) > 1
+        elif horse_number:
+            number_matches = list(
+                queryset.filter(horse_number=horse_number)
+            )
+            if len(number_matches) == 1:
+                runner = number_matches[0]
+            elif len(number_matches) > 1:
+                if horse_name:
+                    name_matches = [
+                        candidate
+                        for candidate in number_matches
+                        if _clean_race_horse_name(candidate.horse_name)
+                        == horse_name
+                    ]
+                    if len(name_matches) == 1:
+                        runner = name_matches[0]
+                    else:
+                        ambiguous = True
+                else:
+                    ambiguous = True
+            elif horse_name:
+                name_matches = [
+                    candidate
+                    for candidate in queryset
+                    if _clean_race_horse_name(candidate.horse_name)
+                    == horse_name
+                ][:2]
+                if len(name_matches) == 1:
+                    runner = name_matches[0]
+                else:
+                    ambiguous = len(name_matches) > 1
+        elif horse_name:
+            name_matches = [
+                candidate
+                for candidate in queryset
+                if _clean_race_horse_name(candidate.horse_name) == horse_name
+            ][:2]
+            if len(name_matches) == 1:
+                runner = name_matches[0]
+            else:
+                ambiguous = len(name_matches) > 1
         if runner is None:
             skipped += 1
+            if ambiguous:
+                skipped_ambiguous += 1
             continue
         changed_fields = []
         for field in DYNAMIC_RUNNER_FIELDS:
@@ -6385,10 +6588,23 @@ def update_runner_dynamic_fields(event: RaceEvent, updates: Iterable[dict], *, s
     _task_log(
         "race_event_dynamic_fields_refreshed",
         TaskStatus.SUCCESS,
-        payload={"event_id": event.pk, "source_name": source_name, "updated": updated, "skipped": skipped},
-        detail=f"赛事动态字段刷新完成：{event} updated={updated} skipped={skipped}",
+        payload={
+            "event_id": event.pk,
+            "source_name": source_name,
+            "updated": updated,
+            "skipped": skipped,
+            "skipped_ambiguous": skipped_ambiguous,
+        },
+        detail=(
+            f"赛事动态字段刷新完成：{event} updated={updated} "
+            f"skipped={skipped} ambiguous={skipped_ambiguous}"
+        ),
     )
-    return {"updated": updated, "skipped": skipped}
+    return {
+        "updated": updated,
+        "skipped": skipped,
+        "skipped_ambiguous": skipped_ambiguous,
+    }
 
 
 def record_dynamic_refresh_failure(event: RaceEvent, *, source_name: str, error: str) -> None:

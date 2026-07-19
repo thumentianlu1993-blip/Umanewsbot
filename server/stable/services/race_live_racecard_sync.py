@@ -140,6 +140,7 @@ def merge_race_live_racecard_participants(
                 not isinstance(external_runner_id, str)
                 or not external_runner_id
                 or external_runner_id != external_runner_id.strip()
+                or len(external_runner_id) > 128
             ):
                 raise ValueError(
                     f"{label} participant external_runner_id is invalid"

@@ -610,7 +610,6 @@ def load_race_live_initialization_manifest(
             _fail(f"{label}.participants 必须是 1-100 个元素的数组")
         stable_keys: set[str] = set()
         external_runner_ids: set[str] = set()
-        horse_numbers: set[str] = set()
         for participant_index, raw_participant in enumerate(participants):
             part_label = f"{label}.participants[{participant_index}]"
             participant = _exact_keys(
@@ -683,11 +682,8 @@ def load_race_live_initialization_manifest(
                 _fail(f"{part_label}.stable_key 重复")
             if external_runner_id in external_runner_ids:
                 _fail(f"{part_label}.external_runner_id 重复")
-            if horse_number in horse_numbers:
-                _fail(f"{part_label}.horse_number 重复")
             stable_keys.add(stable_key)
             external_runner_ids.add(external_runner_id)
-            horse_numbers.add(horse_number)
 
     return LoadedRaceLiveInitializationManifest(
         path=path,
@@ -979,6 +975,10 @@ def _event_has_any_initialization_rows(event_id: int) -> bool:
     )
 
 
+def _event_has_legacy_runners(event_id: int) -> bool:
+    return models.RaceEventRunner.objects.filter(event_id=event_id).exists()
+
+
 def _event_has_forbidden_result_state(event_id: int) -> bool:
     return any(
         (
@@ -1141,6 +1141,44 @@ def _verify_event_exact(
         errors.append("allowlist_mismatch")
 
     expected_participants = event["participants"]
+    legacy_runner_rows = list(
+        models.RaceEventRunner.objects.filter(event_id=event_id).order_by(
+            "sort_order",
+            "id",
+        )
+    )
+    if len(legacy_runner_rows) != len(expected_participants):
+        errors.append("legacy_runner_count_mismatch")
+    else:
+        for index, (legacy_runner, participant) in enumerate(
+            zip(
+                legacy_runner_rows,
+                expected_participants,
+                strict=True,
+            ),
+            start=1,
+        ):
+            if not (
+                legacy_runner.external_runner_id
+                == participant["external_runner_id"]
+                and legacy_runner.sort_order == index
+                and legacy_runner.horse_number
+                == participant["horse_number"]
+                and legacy_runner.horse_name
+                == participant["canonical_name"]
+                and legacy_runner.source_refs
+                == {
+                    "source_key": _SOURCE_KEY,
+                    "external_runner_id": participant[
+                        "external_runner_id"
+                    ],
+                }
+            ):
+                errors.append(
+                    "legacy_runner_mismatch:"
+                    f"{participant['external_runner_id']}"
+                )
+
     participant_rows = list(
         models.RaceEventParticipant.objects.filter(event_id=event_id).order_by(
             "stable_key"
@@ -1272,6 +1310,11 @@ def _inspect_initialization_state(
         if _event_has_forbidden_result_state(event_id):
             _fail(f"赛事已有赛果/observation/publication：event_id={event_id}")
         if not _event_has_any_initialization_rows(event_id):
+            if _event_has_legacy_runners(event_id):
+                _fail(
+                    "赛事已有 legacy_runner，拒绝 fresh 初始化："
+                    f"event_id={event_id}"
+                )
             if not _event_matches_manifest(
                 rows[event_id],
                 event,
@@ -1509,6 +1552,21 @@ def _create_event_rows(
             jockey_name=participant.get("jockey_name", ""),
             field_provenance=field_provenance,
         )
+        models.RaceEventRunner.objects.create(
+            event_id=event_id,
+            external_runner_id=participant["external_runner_id"],
+            sort_order=index,
+            horse_number=participant["horse_number"],
+            barrier=participant.get("barrier", ""),
+            horse_name=participant["canonical_name"],
+            jockey_name=participant.get("jockey_name", ""),
+            running_status=models.RaceRunnerStatus.DECLARED,
+            source_refs={
+                "source_key": _SOURCE_KEY,
+                "external_runner_id": participant["external_runner_id"],
+            },
+            raw_payload={},
+        )
     control.current_racecard_revision = revision
     control.last_known_good_racecard_revision = revision
     control.next_racecard_revision_no = 2
@@ -1536,6 +1594,11 @@ def apply_race_live_initialization(
         event_ids = [event["event_id"] for event in manifest.payload["events"]]
         list(
             models.RaceEventProjectionControl.objects.select_for_update().filter(
+                event_id__in=event_ids
+            )
+        )
+        list(
+            models.RaceEventRunner.objects.select_for_update().filter(
                 event_id__in=event_ids
             )
         )
