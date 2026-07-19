@@ -48,7 +48,7 @@ def backfill_career_history_semantics(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("stable", "0031_historical_batch_runner"),
+        ("stable", "0048_raceeventrunner_external_runner_identity"),
     ]
 
     operations = [

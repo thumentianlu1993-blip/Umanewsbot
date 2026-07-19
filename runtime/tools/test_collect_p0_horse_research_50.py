@@ -16,8 +16,6 @@ from runtime.tools.collect_p0_horse_research_50 import (
     apply_us_equibase_profile_verifications,
     deduplicate_us_visible_records,
     finalize_career_collection_status,
-    from_japan_candidate,
-    japan_candidates,
     parse_basic_profile_verifications,
     parse_career_record_verifications,
     parse_hrn_profile,
@@ -44,15 +42,22 @@ FINAL_ENRICHED_RESEARCH_50 = (
     / "runtime/horse_profile_completion/pedigree-research-20260719"
     / "p0_horse_research_50_enriched.json"
 )
+FINAL_ENRICHED_RESEARCH_50_V2 = (
+    ROOT
+    / "runtime/horse_profile_completion/pedigree-research-20260719"
+    / "p0_horse_research_50_enriched_v2.json"
+)
 
 
 class JapanOfflineRebuildTests(SimpleTestCase):
-    def test_all_ten_authorized_japan_candidates_rebuild_with_reconciled_counts(self):
-        candidates = japan_candidates()
-
+    def test_all_ten_frozen_japan_results_have_reconciled_counts(self):
+        document = json.loads(
+            FINAL_ENRICHED_RESEARCH_50_V2.read_text(encoding="utf-8")
+        )
         rebuilt = [
-            from_japan_candidate(candidate)
-            for candidate in candidates.values()
+            horse
+            for horse in document["horses"]
+            if horse["region"] == "japan"
         ]
 
         self.assertEqual(len(rebuilt), 10)

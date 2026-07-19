@@ -500,8 +500,8 @@ class P0HorseCareerHistoryTests(TestCase):
 
 
 class HorseCareerAuthorityMigrationTests(TransactionTestCase):
-    migrate_from = [("stable", "0033_merge_historical_detail_and_horse_career")]
-    migrate_to = [("stable", "0034_horse_career_source_authority")]
+    migrate_from = [("stable", "0049_horse_career_history")]
+    migrate_to = [("stable", "0050_horse_career_source_authority")]
 
     def setUp(self):
         super().setUp()

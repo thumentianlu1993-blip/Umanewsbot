@@ -252,7 +252,14 @@ def _source_namespace(*payloads: dict | None) -> str:
     def find_namespace(value: Any) -> str:
         nonlocal generic_fallback
         if isinstance(value, dict):
-            for key in ("source_kind", "provider", "adapter", "source_name", "source"):
+            for key in (
+                "source_key",
+                "source_kind",
+                "provider",
+                "adapter",
+                "source_name",
+                "source",
+            ):
                 candidate = str(value.get(key) or "").strip().casefold()
                 if candidate in GENERIC_SOURCE_NAMESPACES:
                     generic_fallback = generic_fallback or candidate

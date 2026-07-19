@@ -136,7 +136,7 @@
   Balko，必须保留在 v1 且不得进入 v2；正确父马是 Racing Post `595446` 的 2001 年 Balko，
   父母为 Pistolet Bleu / Ella Royale。自动 Netkeiba 父母候选 URL 只接受精确
   `https://en.netkeiba.com/db/horse/<id>/`，凭据、端口、query 或 fragment 任一存在均拒绝。
-- `0034_horse_career_source_authority` 在新增逐场权威状态后，会把旧
+- `0050_horse_career_source_authority` 在新增逐场权威状态后，会把旧
   `career_history_status=complete` 且权威性未核验的记录降为 `needs_review`；若整匹马状态原为
   `complete_profile_full`，同时降为 `complete_pedigree_2gen`，避免聚合状态继续对外显示未经
   证明的完整生涯。
@@ -331,7 +331,6 @@
   fixture/cache 协议或单份成功探针解释为已经补齐 50 匹资料。
 
 ## 2026-07-18 P0 重点赛事参赛马只读提取能力已完成本地实现
-## 2026-07-18 P0 重点赛事参赛马只读提取能力
 
 - 已实现从五地区重点赛事 `RaceEventRunner` / `RaceEventResult` 只读提取 P0 马候选、观察清单、每地区审核 CSV 和 SHA-256 manifest；只有马名的记录保持事件级独立并标记 `needs_identity_enrichment`。
 - 来源内 external horse ID 或完整“马名 + 父名 + 母名 + 出生年份”才可跨赛事归并；共享强身份键按连通关系聚合，身份冲突继续 fail closed。

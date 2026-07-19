@@ -20,7 +20,7 @@ def downgrade_unverified_complete_careers(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("stable", "0033_merge_historical_detail_and_horse_career"),
+        ("stable", "0049_horse_career_history"),
     ]
 
     operations = [
