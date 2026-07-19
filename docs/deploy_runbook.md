@@ -13,9 +13,9 @@
 3. 本地 PostgreSQL MigrationExecutor 必须从主线 `0048` 预置真实
    `HorseProfile/HorseRaceRecord` 后前进到唯一 leaf `0052`，验证回填、索引、约束、
    authority 字段和旧完整度降级，并完成 reverse/forward 重放。
-4. 当前修复仅完成代码与离线数据库验证，尚未执行二次 Phase A。再次部署前必须使用修复提交
-   重新构建镜像、核对生产仍停在 `0048`，并按既有备份、健康检查和 prepare-only 门禁重新执行；
-   不得沿用首次失败容器或把回滚视为 Phase A 已完成。
+4. 二次 Phase A 已使用修复提交 `1ddeb25f` 完成：生产迁移唯一 leaf 为 `0052`，
+   `check`、`makemigrations --check --dry-run`、静态资源和 HTTP `/healthz/` 均通过；
+   candidate artifact 仍未获得生产写入权限，须继续经过 Phase B trusted manifest 门禁。
 
 ## P0 美国组合来源批准后的生产门禁（2026-07-20）
 
@@ -49,15 +49,20 @@
    7. 停止会写 `HorseProfile`、`TermEntry`、`TermAlias` 的自动任务，或以运行日志和数据库会话
       明确确认 commit 窗口没有相关写入；
    8. 仅对已通过上述门禁的精确 artifact 执行 `--commit`。
-6. 当前 trusted allowlist 为空，Phase A production mapping/candidate artifact 与 formal dry-run 均
-   尚未执行。即使操作者自行制作 release manifest，命令也必须 fail closed；生产保持
-   **NO-GO / prepare-only**。
+6. Phase A 已在生产只读生成并复核精确产物：
+   mapping SHA `b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed`，
+   production snapshot SHA `20e57170ffdc033e3fee30f6cfbc9e57fe535c07e5f729c19b8ac826537c8c4f`，
+   candidate artifact SHA `ece013c36dc33f6514dbaaad5611db665d81c984343387eeec50eee98cb75f5a`。
+   独立 release manifest SHA
+   `92183a1a9eb9d3d918493fe8f52b809580f40bea976c8b4e5c0b33fba606999c`
+   是本次 Phase B 唯一 trusted 值；正式 dry-run 成功前仍为 **NO-GO**。
 
 ### P0 50 匹正式 mapping / artifact / apply 命令
 
 以下命令只描述新能力。Phase A 的 prepare 可消费已批准 mapping decisions 生成 candidate；
 `--dry-run/--commit` 都必须额外消费 independently approved release manifest，并且其文件 SHA
-必须已进入仓库 trusted allowlist。当前 allowlist 为空。
+必须已进入仓库 trusted allowlist。本批 allowlist 仅包含
+`92183a1a9eb9d3d918493fe8f52b809580f40bea976c8b4e5c0b33fba606999c`。
 
 mapping decisions 顶层必须为
 `p0-horse-profile-mapping-decisions.v1`、`review_status=approved`，并包含

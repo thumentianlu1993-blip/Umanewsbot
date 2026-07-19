@@ -1,0 +1,21 @@
+{
+  "artifact": {
+    "path": "reviewed_p0_horse_completion_artifact.json",
+    "sha256": "ece013c36dc33f6514dbaaad5611db665d81c984343387eeec50eee98cb75f5a"
+  },
+  "database_write_count": 0,
+  "release_status": "candidate_pending_independent_release",
+  "schema_version": "p0-horse-reviewed-completion-package.v1",
+  "summary": {
+    "actual_start_count": 1432,
+    "bind_existing_count": 25,
+    "create_new_count": 25,
+    "horse_count": 50,
+    "nonstarter_count": 7,
+    "p0_source_count": 50,
+    "race_record_count": 1439,
+    "required_module_count": 200,
+    "unconfirmed_count": 0
+  },
+  "trusted_release_manifest_required": true
+}

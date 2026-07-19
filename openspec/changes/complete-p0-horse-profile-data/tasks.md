@@ -76,11 +76,11 @@
 - [x] 6.2 (integration) 为五地区 adapter、artifact 输出、模块审核门禁、人工锁定跳过、完整赛事履历和 `HorseRaceRecord` 幂等写入补充测试。
 - [x] 6.3 (operations) 运行本地验证：`DB_ENGINE=sqlite python manage.py check`、目标 Django 测试、`makemigrations --check --dry-run`、`openspec validate complete-p0-horse-profile-data --strict`、`openspec validate --all` 和 `git diff --check`。
 - [x] 6.4 (operations) 已完成五地区各 10 匹离线研究批次 dry-run，并确认研究 artifact、完整率、冲突和地区 blocker；因当前研究输入缺真实 production profile/reviewer/module approval，正式 commit-compatible artifact 与 production dry-run 尚未完成，继续 fail closed。
-- [x] 6.4.1 (integration) 新增独立 `apply_reviewed_p0_horse_completion` prepare/dry-run/commit 链：显式消费 50 行 profile mapping decisions，绑定 v3/authority/mapping/production snapshot SHA，真实零写入模拟全部 schema 与 action，单事务锁定后幂等写入并整批回滚；能力与测试已完成，但真实生产 mapping artifact、正式生产 dry-run 和 commit 均未执行。
-- [x] 6.4.2 (integration) 将正式执行拆为 Phase A prepare-only 与 Phase B trusted release SHA 解锁：candidate 不可自签，JSON 单次冻结字节读取并拒绝 symlink，HORSE term 限定复用，completion run 仅关联 artifact 明确认领记录；加入脱敏 `58f00961` 生产快照/50 行 mapping fixture，并在本地隔离 PostgreSQL 16 容器通过 serializable/advisory lock、同 artifact 并发 identity create 和异常整批回滚测试。当前 trusted allowlist 仍为空。
-- [x] 6.4.3 (integration) PostgreSQL commit 在 snapshot 重扫和创建前以 `SHARE ROW EXCLUSIVE` 锁定 term/alias/profile 表并锁内重扫全部身份；测试证明非协作 term insert 等待锁释放、SQL 顺序正确、第一行完整业务写入后第二行异常全回滚，以及日志创建后异常连日志和业务一起回滚。dry-run 只报告锁计划，当前 trusted allowlist 仍为空。
-- [x] 6.4.4 (integration) table lock 前以事务局部 `lock_timeout` 固定 5 秒上限；PostgreSQL 测试通过独立观察连接按 writer backend PID 证明目标 relation lock 等待，并证明冲突锁超时后整批业务零写入、session advisory locks 释放。当前 trusted allowlist 仍为空。
-- [x] 6.4.5 (integration) 修复首次 Phase A PostgreSQL migration pending-trigger 回滚：将字段、回填、索引约束、authority 降级拆为原子 `0049-0052`，并以真实 MigrationExecutor fixture 验证 `0048` 到唯一 leaf 的 forward/reverse/forward、数据语义、索引和约束；二次 Phase A 尚未执行。
+- [x] 6.4.1 (integration) 新增独立 `apply_reviewed_p0_horse_completion` prepare/dry-run/commit 链：显式消费 50 行 profile mapping decisions，绑定 v3/authority/mapping/production snapshot SHA，真实零写入模拟全部 schema 与 action，单事务锁定后幂等写入并整批回滚；能力、测试和真实生产 Phase A prepare 已完成，formal dry-run 与 commit 待 Phase B。
+- [x] 6.4.2 (integration) 将正式执行拆为 Phase A prepare-only 与 Phase B trusted release SHA 解锁：candidate 不可自签，JSON 单次冻结字节读取并拒绝 symlink，HORSE term 限定复用，completion run 仅关联 artifact 明确认领记录；真实 Phase A mapping/candidate 已冻结，Phase B 仅信任 release manifest SHA `92183a1a9eb9d3d918493fe8f52b809580f40bea976c8b4e5c0b33fba606999c`。
+- [x] 6.4.3 (integration) PostgreSQL commit 在 snapshot 重扫和创建前以 `SHARE ROW EXCLUSIVE` 锁定 term/alias/profile 表并锁内重扫全部身份；测试证明非协作 term insert 等待锁释放、SQL 顺序正确、第一行完整业务写入后第二行异常全回滚，以及日志创建后异常连日志和业务一起回滚。dry-run 只报告锁计划。
+- [x] 6.4.4 (integration) table lock 前以事务局部 `lock_timeout` 固定 5 秒上限；PostgreSQL 测试通过独立观察连接按 writer backend PID 证明目标 relation lock 等待，并证明冲突锁超时后整批业务零写入、session advisory locks 释放。
+- [x] 6.4.5 (integration) 修复首次 Phase A PostgreSQL migration pending-trigger 回滚：将字段、回填、索引约束、authority 降级拆为原子 `0049-0052`，并以真实 MigrationExecutor fixture 验证 `0048` 到唯一 leaf 的 forward/reverse/forward、数据语义、索引和约束；二次 Phase A 已在生产完成。
 - [ ] 6.5 (operations) 部署前按运行手册确认 UmaNews 生产 `HEAD`、容器、`/healthz/`、外部导入运行数、导入锁、`.env` 备份和数据库备份。
 - [ ] 6.6 (operations) 对已审核五地区样本 artifact 执行生产 commit，抽检 `HorseProfile`、P0 来源、`HorseProfileDataCandidate`、`HorseRaceRecord`、无译名展示、翻译保护和后台质量提示。
 - [ ] 6.7 (operations) 每地区人工发布 1-2 匹完整资料马，验收公开索引、详情页、移动端、完整赛事履历、主胜鞍、关注入口、新闻 tag 和 no-network 边界。

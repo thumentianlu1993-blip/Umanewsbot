@@ -62,7 +62,9 @@ AUTHORITY_SCHEMA = "p0-horse-us-career-source-authority-review.v1"
 RELEASE_MANIFEST_SCHEMA = "p0_horse_production_release_manifest.v1"
 # Phase A is deliberately prepare-only. Phase B must add the exact independently
 # approved manifest byte SHA here in a reviewed repository change.
-TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256: tuple[str, ...] = ()
+TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256: tuple[str, ...] = (
+    "92183a1a9eb9d3d918493fe8f52b809580f40bea976c8b4e5c0b33fba606999c",
+)
 COMMIT_IDENTITY_TABLE_LOCK_MODE = "SHARE ROW EXCLUSIVE"
 COMMIT_IDENTITY_TABLE_LOCK_TIMEOUT_MS = 5_000
 COMMIT_IDENTITY_TABLE_LOCKS = (
