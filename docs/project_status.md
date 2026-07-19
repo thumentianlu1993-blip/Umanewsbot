@@ -1,5 +1,19 @@
 # 项目状态文档
 
+## 2026-07-19 event 924 暂定赛果单赛事公开灰度已上线，验收未收口
+
+- 冻结提交 `91cf50ad677a1b8c9b253528c9db98481fd1031a` 已进入生产，四个 app service
+  统一运行 image `sha256:700ea786…087ef`；`stable.0046`、健康检查和回滚点均已验证。
+- QQ SMTP 真实投递成功后，event `924` promotion dry-run/apply/verify 全部通过。
+  当前仅 event `924` allowlist 生效，四层 policy 为 `provisional_public v2`，
+  scheduler 仍为 false，tracking 已停止，不会扩展到其他赛事。
+- promotion 前 BHA 截图中的官方 1–7 名次与 TRA 暂定结果一致；其 receipt 在 promotion
+  后应用并把 incident 写为 resolved，但截图早于 promotion，不能证明“promotion 后
+  15 分钟内新浏览器探测”。该 SLA 验收仍未完成，页面继续明确标记“暂定赛果”。
+- 详情页和日历 HTTP 验收通过；disable kill-switch 只完成 dry-run，尚未实际隐藏、验证
+  和 restore，因此完整 kill-switch 验收与 evidence closure 未完成。灰度当前保持公开；
+  historical runner 仍为 `migration_safe`，常驻历史开关关闭，race-live queue 为空。
+
 ## 2026-07-19 event 924 代码 review finding 已修复，待限定复审
 
 - 候选变更基于当前 `origin/main@353464c7` 的独立 worktree，实现 event `924` 已存

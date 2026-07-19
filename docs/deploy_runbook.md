@@ -1,5 +1,45 @@
 # 部署运行手册
 
+## event 924 暂定赛果公开灰度生产实证（2026-07-19）
+
+1. 用户在最新成功 review 后授权精确冻结版本；release commit 为
+   `91cf50ad677a1b8c9b253528c9db98481fd1031a`，生产 image 为
+   `sha256:700ea78698fb67de602fb7e5447b997610e24e64de29df4591e4bb9e476087ef`。
+   `stable.0046` 已应用，四个 app service 的 OCI revision 均与 release commit 一致。
+2. 写前 custom-format 备份：
+   `/opt/umanewsbot/backups/db/pre-event924-provisional-public-20260719T040646Z.dump`，
+   `202,483,514` bytes、SHA-256
+   `a76c9d4788b36af08f64f4a9eddc90bc0a4ef4ecd239508bb5e40abffbe9e5be`；
+   `0600` 且 restore list 有效。旧镜像回滚 tag：
+   `umanewsbot:rollback-pre-event924-ebab4aa8-20260719T041339Z`。
+3. `RACE_LIVE_PUBLICATION_ARTIFACT_ROOT=/run/race-live/publications`，只有
+   race-live worker 持有 publication rw mount。QQ SMTP 使用 `smtp.qq.com:465 / SSL`，
+   报警目标 `754652181@qq.com`；promotion 前真实测试邮件返回 `sent=1`。
+4. BHA Results、event fixture/result 和 terms 均由 release operator 使用普通浏览器
+   人工确认；未调用页面后端 API、脚本抓取或批量下载。官方结果为 Newbury `3:02pm`
+   Hackwood Stakes，1–7 顺序与已存 provisional revision 一致。
+5. bundle：
+   `/opt/umanewsbot/runtime/race_live_publications/event924-public-91cf50ad-20260719T042103Z`。
+   promotion SHA 为 `2fedb9d3…ec3ba`，disable SHA 为 `d441e0a1…14949`，restore SHA
+   为 `cf96afb6…cf6c`；目录 `0700`、文件 `0600`、无 symlink。
+6. promotion dry-run/apply/verify 均 `ok=true`、event `[924]`、零网络请求；commit time
+   为 `2026-07-19T04:37:17.201536Z`。四层 policy 和 allowlist 已到 v2，revision `2`
+   published，legacy result `7`，tracking disabled，scheduler false。
+7. 首次 BHA receipt SHA 为 `955ac30b…23673`，私有截图 SHA 为
+   `77b77a03…5a480`；dry-run/apply/replay verify 均为 `comparison=match`。incident `1`
+   在 `04:40:32.495902Z` resolved，早于 `04:52:17.201536Z` due time，无告警邮件，
+   页面继续 provisional。但截图 observed at 为 `04:19:39Z`，早于 `04:37:17.201536Z`
+   promotion commit，故不能证明 promotion 后 15 分钟内的新浏览器 probe；该 SLA
+   验收未完成。
+8. HTTP 详情和日历均为 200，中文暂定标识、1–7 顺序、缺失字段和共同 read gate 通过。
+   disable dry-run 为 `ok=true`，但没有 apply、隐藏验证和 restore；kill-switch 完整
+   验收未完成，当前保持公开。
+9. 第一次等待 SMTP 配置期间恢复 Beat 时，Compose 因依赖配置重建了 db 容器；持久卷保持，
+   db 恢复 healthy，随后 promotion dry-run 再次通过，未执行数据恢复。最终 historical
+   preflight 为 `migration_safe`，历史 enabled/network false，tracking/allowlist universe
+   均为 `[924]`，race-live queue 为空，HostBudget 保持 failures 0、lock version 22。
+   本次发布已生效，但因第 7、8 项缺口，evidence closure 仍为未完成。
+
 ## event 924 暂定赛果公开候选（2026-07-19，尚未授权发布）
 
 本节是最新代码候选的发布前操作契约，不构成发布授权。只有未参与实现的 reviewer 完整

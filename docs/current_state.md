@@ -1,5 +1,56 @@
 # 当前状态
 
+## 2026-07-19 event 924 暂定赛果单赛事公开灰度已发布，验收尚未收口
+
+- 最新成功代码 review 的完整冻结基线已在授权后逐字节复核，受审提交
+  `91cf50ad677a1b8c9b253528c9db98481fd1031a` 已快进 `main` 并部署生产；web、worker、
+  race-live worker 和 Beat 均运行 image
+  `sha256:700ea78698fb67de602fb7e5447b997610e24e64de29df4591e4bb9e476087ef`，
+  OCI revision 与提交一致。`stable.0046` 已应用，`/healthz/` 正常。
+- 写前数据库备份为
+  `/opt/umanewsbot/backups/db/pre-event924-provisional-public-20260719T040646Z.dump`，
+  `202,483,514` bytes、SHA-256
+  `a76c9d4788b36af08f64f4a9eddc90bc0a4ef4ecd239508bb5e40abffbe9e5be`，
+  `root:root 0600` 且 `pg_restore -l` 通过。旧镜像已保留为
+  `umanewsbot:rollback-pre-event924-ebab4aa8-20260719T041339Z`。
+- QQ SMTP 已按 `smtp.qq.com:465 / SSL` 配置，报警目标为 `754652181@qq.com`；一次性新
+  容器真实投递返回 `sent=1`，随后四个常驻 app service 均确认 SMTP 密钥已加载。授权码
+  未写入 Git、日志或证据文档。
+- 生产 bundle
+  `event924-public-91cf50ad-20260719T042103Z` 以 `0700/0600` 生成且无 symlink；
+  promotion、disable、restore SHA-256 分别为
+  `2fedb9d381b275fb3dcc6e30c848a59c024da4dca0ec2227efb13925bceec3ba`、
+  `d441e0a1f134847abd4ebf3cf39c55c41be46d587723528e98958faa30014949`、
+  `cf96afb6363ed7621c7a153234b075e8708b544907956ca1745503739065cf6c`。
+- promotion 于 `2026-07-19T04:37:17.201536Z` 提交；dry-run、apply、独立 verify 均
+  `ok=true`、唯一 event `[924]`、零网络请求。当前四层 policy 为
+  `provisional_public v2`，allowlist 仅 event `924`、version 2；event 为 finished，
+  revision `2` 仍为 provisional，`result_confirmed_at=null`，publication `1`、
+  legacy result `7`。tracking 已停用、next poll 为空，claim generation 仍为 `19`，
+  provider attempt/success/hash/failure/stale 字段保持 shadow pre-state。
+- release operator 在 promotion 前通过正常浏览器核对 BHA Newbury `3:02pm`
+  Hackwood Stakes 官方 1–7 名次；私有截图 SHA-256 为
+  `77b77a03a7c8c640db69db7f4d84965aad91b01bba243613eaa49773bd55a480`。
+  截图 `observed_at=2026-07-19T04:19:39Z`，早于 promotion commit
+  `04:37:17.201536Z`，因此不能作为“promotion 后 15 分钟内新浏览器探测”的验收证据。
+  receipt SHA-256
+  `955ac30b6e345b5ec9226e0439b14df65bba515e39fd4cf29544402387823673`
+  的 dry-run/apply/replay verify 均为 `comparison=match`、零通知副作用。incident `1`
+  于 `04:40:32.495902Z` resolved，早于 `04:52:17.201536Z` 责任时限；新增 official
+  observation/marker evidence 各 `1`，页面仍保持 provisional，不误标正式赛果。但
+  `04:40:32Z` 是旧截图 receipt 的应用时间，不会把 promotion 前观察变成 promotion 后
+  探测；15 分钟 SLA 未被当前证据证明，BHA 首次探测 closure 尚未完成。
+- 公网 HTTP 详情与日历均为 200。详情显示“冠军 · 暂定”“暂定赛果”“尚待官方来源复核”
+  和 1–7 完整顺序；trainer/time/margin 缺失值为 `-`。日历共同 read gate 只对
+  event `924` 展示相同赛果摘要。disable manifest dry-run 为 `ok=true`，但未执行
+  disable apply、公开隐藏验证和 restore；kill-switch 完整验收尚未完成，当前灰度继续
+  公开。
+- 收口时 `RACE_LIVE_SCHEDULER_ENABLED=false`，tracking row universe 与 enabled
+  allowlist universe 均为 `[924]`，race-live queue 为空；HostBudget failures 为 0、
+  circuit 关闭、lock version `22`。historical runner preflight 为 `migration_safe`，
+  常驻历史 enabled/network 均为 false。Beat 已恢复，普通新闻任务可继续运行。发布本身
+  已生效，但 evidence closure 必须保持未完成，直到上述两个验收缺口得到单独处理。
+
 ## 2026-07-19 event 924 代码审核 finding 已修复，待同一 reviewer 限定复审
 
 - 独立 worktree 为
