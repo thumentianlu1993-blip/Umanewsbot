@@ -17,6 +17,7 @@ from stable.models import (
     NewsArticle,
     SourceLanguage,
 )
+from stable.services.internal_controls import external_ai_processing_allowed
 from stable.services.terms import (
     ArticleEntityResolution,
     apply_contextual_term_mappings,
@@ -274,6 +275,8 @@ class SiliconFlowRewriteProvider(OpenAICompatibleRewriteProvider):
 
 def get_rewrite_provider() -> RewriteProvider:
     provider = (getattr(settings, "REWRITE_PROVIDER", "") or settings.TRANSLATION_PROVIDER or "").lower()
+    if not external_ai_processing_allowed(provider):
+        raise RuntimeError("external_rewrite_disabled")
     if provider == "siliconflow" and settings.SILICONFLOW_API_KEY:
         return SiliconFlowRewriteProvider()
     if provider in {"openai", "openai-compatible"} and settings.OPENAI_API_KEY:

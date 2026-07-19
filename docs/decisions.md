@@ -1,5 +1,22 @@
 # 关键决策
 
+## 2026-07-20：来源技术准入以端到端抓取为准
+
+- technical access 只以透明、受限请求下的端到端结果判定：listing 可取得候选、detail 可
+  解析正文，并满足该来源的发布时间合同。listing HTTP `200` 本身不构成 accepted；
+  challenge、`403/429`、登录/付费墙、越界响应或缺失可用 `published_at` 均 fail closed
+  为 blocked，不通过更换 User-Agent、代理或扩大请求预算绕过。
+- `terms_risk` 只保留条款与再利用风险事实，不再代替技术探针给出 accepted/blocked，也不
+  表示来源方授权。每次 probe 仍必须透明、有界、可审计；本决策不构成法律结论。
+- source technical accepted 与单篇 freshness candidate 分开：来源端到端正文可用可以进入
+  internal-only 技术池，但样本时间 evidence unverified 时，该篇仍不得进入最近六小时候选。
+  HRI、Woodbine、ERA 因端到端 `missing_published_at` blocked；TDN 正文成功 accepted，但
+  本轮 unverified time 样本不计候选。
+- technical accepted 永远不自动设置 `enabled` 或 `production_approved`，也不扩大公开
+  权限。所有本批来源继续 `usage_scope=internal_only`、
+  `public_publish_allowed=false`；公开 queryset、详情、API、sitemap、QQ 和内容通知仍由
+  独立文章级 blocker fail closed。
+
 ## 2026-07-19：coupled runner 身份与 rollback Gate D 修复边界
 
 - 来源中的参赛号码是客观展示字段，不是 live runner 唯一身份。合法 coupled entries
@@ -18,6 +35,69 @@
 - rollback manifest 同时冻结 current revision pointer；validator 和 policy restore
   都要求 scheduler/monitor=false、enabled regions 为空，并在行锁内、任何恢复写入前
   对 current pointer 做 CAS。pointer 漂移时保持当前恢复阶段不变，禁止重新开放 event。
+
+## 2026-07-20：内部来源公开硬门、可信 TLS 与安全通知合同
+
+- 来源级 `usage_scope=internal_only` 或 `public_publish_allowed=false` 是独立于
+  `SITE_INTERNAL_ONLY_ENABLED` 的内容不公开合同。关闭全站登录墙只改变站点访问方式，不能
+  提升来源级稿件；公开 queryset、文章详情和 QQ eligibility 必须复用同一文章级 blocker，
+  任一来源级条件命中即 fail closed。
+- `DEBUG=false` 且内部模式开启时，`SESSION_COOKIE_SECURE` 与
+  `CSRF_COOKIE_SECURE` 都是启动硬门。传输层只能选择 direct
+  `SECURE_SSL_REDIRECT=true`，或显式
+  `SITE_INTERNAL_ONLY_TRUSTED_TLS_TERMINATION=true` 并配置完整、值为 HTTPS 的
+  `SECURE_PROXY_SSL_HEADER` 可信反代合同；只声明“有反代”但没有 proxy header、cookie
+  不安全或两条传输合同都不成立时拒绝启动。
+- 内部运维通知只允许任务标识、稳定错误分类、安全计数、时间和内部整数 ID；标题、正文、
+  译文、摘要及来源 URL 一律丢弃。翻译重试耗尽等文章级通知只传
+  `article_id`，不得在 payload、摘要或邮件正文恢复原站 URL。
+- 外部 AI 总门关闭时，translation retry selector 必须在 claim 前跳过；已经 preclaim 的
+  兼容调用必须释放文章与 `TranslationRun`，batch skipped 只计 processed、不计
+  translated。该合同用于避免门禁关闭后留下假运行态或虚高翻译成功数。
+
+## 2026-07-19：新闻网站转为内部使用，来源准入改为技术可达
+
+- 网站后续只向认证用户开放；匿名新闻、文章、赛事、马匹、API、sitemap 和 media 均不得
+  泄露内容，`/healthz/`、登录和静态资源为最小例外。QQ、旧 PushLog/OneBot 和包含新闻内容
+  的邮件/QQ 通知全部阻断；运维通知只保留任务名、错误分类、计数、时间和内部对象 ID。
+- 来源 registry 从单一 permission gate 改为 `technical_access`、`usage_scope=internal_only`、
+  `public_publish_allowed=false` 和 `terms_risk`。透明请求出现
+  `403/429/challenge/login/paywall/robots disallow` 或 host/大小/解析越界时技术 blocked；
+  其他技术 accepted 来源可进入内部候选，但不会自动设置
+  `enabled/production_approved`，也不表示来源方已授权。
+- 本批新增 RTÉ、IrishRacing、Canadian Thoroughbred、Assiniboia、Dubai Racing Club、
+  The National、SPA、Arab News、Just Horse Racing、The Straight、Racing NSW 和 Tasracing
+  十二个直接来源；Google News discovery 留待后续专项。
+- 所有外部 AI 内容处理统一由默认关闭的 `NEWS_EXTERNAL_AI_PROCESSING_ENABLED` 控制，
+  同时覆盖 translation 和 rewrite；本地/dummy 与真实外部 provider 分开报告。
+- 内部模式的生产启用以 HTTPS 或获准私网/VPN TLS、认证 media 链路和最新主线 migration
+  集成为前置条件；不能通过关闭 secure cookie、CSRF 或 SSL redirect 绕过。
+- 本决策覆盖下方同日较早的 canonical permission 网络阻断结论；下方记录保留为当时历史
+  证据和 `terms_risk`，不再是本轮可执行准入规则。
+
+## 2026-07-19：新五地区 date-only freshness 与 canonical permission 前置门禁
+
+- 只有发表日期、没有精确发表时刻的新闻，必须使用 evidence 声明的来源 IANA 时区；把
+  `published_at` 与本轮固定抓取时间分别转换为当地日期，绝对日差 `<=1` 进入候选，`>1`
+  记为历史。当地 12:00 只是 date-only 规范化值，不参与六小时计算；未来 1 天按相同差值
+  规则允许，未来超过 1 天拒绝。
+- evidence/draft verified 不为真、precision 缺失或未知、任一 datetime 为 naive、时间为空
+  或时区无效时统一 fail closed。Ireland/Canada 复用稿在 upsert 前用正式归属模块的共享
+  preview 判定 target；只有 target 稿应用该严格门禁，普通 UK/US 稿保持旧行为，正式
+  attribution 复用同一 preview，不维护第二套关键词。
+- permission 以 canonical source registry 为准，adapter 或地区 wrapper 不得放宽。
+  TDN canonical 家族、HRI、Woodbine、ERA 为 blocked；public/direct probe/crawl 在任何
+  adapter 网络调用前返回零请求阻断。JCSA/Racing Victoria 为 unknown，只有显式 research
+  mode、透明 UA 和按真实 HTTP hop 计数的 listing `1`/detail `2` 预算可做技术解析，不能
+  创建业务文章或翻译外部全文。
+- 未登记的变更前 legacy 国际来源暂保留既有自动轮询兼容路径并标记
+  `legacy_permission_unregistered`，不能显示为许可 approved/eligible，也不能进入本轮
+  content-scoped 新地区候选。自动 scheduled 的 managed-source enforcement 开关默认关闭；
+  public/direct 门禁始终生效。若要停止既有 TDN scheduled 生产路径，须先核对运行态并取得
+  针对该停抓变更的独立授权。
+- 没有 permission approved 的 freshness 候选时，如实报告真实外部翻译为 0；机械翻译链路
+  只用项目自有合成文本或最小 fixture，dummy 结果不得冒充中文新闻翻译。所有新增来源、
+  content-scoped candidate、生产抓取、发布和 QQ 开关继续默认关闭。
 
 ## 2026-07-19：event 924 的 15 分钟 SLA 不追溯补证，下一场重新验收
 
@@ -62,7 +142,33 @@
 - public admission/read 必须同时验证 route contract digest 和 terms evidence digest。
   allowlist/incident 保存同一版本化摘要，manual due 为 promotion commit + 15 分钟；
   event off + 2h 后仍 open 时 verify 明确报告 overdue。
+## 2026-07-19：新增新闻地区独立持久化并采用双关闭准入
 
+- 爱尔兰、加拿大、阿联酋、沙特和澳大利亚使用独立 region key；不存在
+  `middle_east` 数据值。阿联酋与沙特可在 UI 视觉分组，但来源、文章归属、许可、发布和 QQ
+  灰度都分别处理，避免与英国/美国或彼此混写。
+- 地区 choice 不等于所有业务执行能力范围。`0047` 扩展共享 `RacingRegion` 模型 choices，
+  但赛事与马匹 ModelForm、Django `RaceEventAdmin` 只提供旧五区加 `other`：这样既有
+  `other` 记录仍可修改无关字段，同时不开放新五区结构化录入。实际抓取任务、自动选择器、
+  公共 horse/race resolver 以及 historical、P0、race-live capability sets 继续显式锁定
+  旧五区。本 change 未提供新五区结构化数据抓取或生产能力。
+- 来源地区上下文的 ASCII 关键词必须使用现有语言边界匹配器，禁止裸子串匹配；例如 Ireland
+  缩写 `hri` 不得命中 `thrilling`。该约束只修正误归属，不改变来源 fallback 或跨地区关联
+  规则。
+- 全局 attribution mode 为 `off` 时，不自动改变文章主/关联地区。只有显式来源 allowlist
+  且 source-scoped candidate 开关开启时，才可保存 `review_candidate`；候选必须经人工确认
+  并解除 blocker 后才能另行发布或 QQ 推送。
+- 来源准入分为 `technical_status`、`automation_permission_status` 和
+  `effective_production_status` 三轴；只有技术 accepted 且许可 approved 才能成为
+  eligible。每个新来源默认 `enabled=false / production_approved=false`，候选开关与
+  allowlist 也默认关闭/空，禁止以入口 HTTP 200 代替解析或许可结论。
+- permission `blocked` 的 HRI、Woodbine、ERA 在获得新的书面同意前不得重新联网；
+  permission `unknown` 的 JCSA、Racing Victoria 仅能在预先声明的透明 User-Agent 和请求
+  预算内探测。预算用完后即使保存证据已支持离线修复，也不得补请求把 technical 状态“跑成”
+  accepted；必须等新的明确验证窗口。
+- 这是本地行为决策，不是发布事实。当前未 commit、push、deploy 或生产验证；临时
+  PostgreSQL、390px 与 Compose 门禁未完成，所有五来源仍 production blocked，生产状态
+  不变。
 ## 2026-07-18：英国 Group 级别装饰只从审核级别派生精确名称变体
 
 - TRA 英国 G1-G3 racecard 赛事名可在基础名末尾携带 `(Group 1/2/3)`。首版只在英国且

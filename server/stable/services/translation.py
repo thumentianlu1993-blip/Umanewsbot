@@ -11,6 +11,7 @@ from openai import OpenAI
 
 from stable.models import NewsArticle, SourceLanguage, TermType, TranslationRun
 
+from .internal_controls import external_ai_processing_allowed
 from .japanese_racing_translation import (
     build_japanese_format_plan,
     build_japanese_seed_term_plan,
@@ -869,9 +870,12 @@ class SiliconFlowTranslationProvider(OpenAICompatibleTranslationProvider):
 
 
 def get_translation_provider() -> TranslationProvider:
-    if settings.TRANSLATION_PROVIDER == "siliconflow" and settings.SILICONFLOW_API_KEY:
+    provider_name = str(settings.TRANSLATION_PROVIDER or "").strip().lower()
+    if not external_ai_processing_allowed(provider_name):
+        raise RuntimeError("external_translation_disabled")
+    if provider_name == "siliconflow" and settings.SILICONFLOW_API_KEY:
         return SiliconFlowTranslationProvider()
-    if settings.TRANSLATION_PROVIDER in {"openai", "openai-compatible"} and settings.OPENAI_API_KEY:
+    if provider_name in {"openai", "openai-compatible"} and settings.OPENAI_API_KEY:
         return OpenAICompatibleTranslationProvider(
             api_key=settings.OPENAI_API_KEY,
             base_url=(settings.OPENAI_BASE_URL or "").strip() or "https://api.openai.com/v1",

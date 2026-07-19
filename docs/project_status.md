@@ -17,6 +17,120 @@
   因此未生成 manifest 或初始化法国；五地区自动轮询和全面公开仍未开启。本次完成的是
   已授权 Gate 修复代码发布与安全降级验证，不是五地区来源覆盖全部验收通过。
 
+## 2026-07-20 新五地区第三轮 live evidence
+
+- 当前验收 worktree 为
+  `/Users/mentianlu/Code/umanews/.worktrees/add-new-region-news-sources-release-candidate`，
+  `HEAD=origin/main=a122ff6dde16ab4b53f34e446b0f959751ad7a77`，
+  `origin/main..HEAD=0`。
+- 已迁移 `/tmp` SQLite 上的透明 bounded live probe 使用每源 listing `1`、detail 最多
+  `2`，零生产读写。首次空库 `no such table` 只算环境问题，迁移后重跑结果为：
+  24-source registry `16 accepted / 8 blocked`；第三批 12 源 `8 accepted / 4 blocked`。
+- accepted 为 RTÉ、IrishRacing、Dubai Racing Club、JCSA、SPA、Racing Victoria、
+  Just Horse Racing、The Straight、Racing NSW、Tasracing、TDN、BloodHorse、
+  Horse Racing Nation、Sky Sports Racing、Sporting Life、BHA。blocked 为 HRI、
+  Woodbine、Canadian Thoroughbred、Assiniboia Downs、ERA、The National、Arab News、
+  Paulick Report。全部 internal-only/public-false；所有第三批来源仍
+  `enabled=false / production_approved=false`。
+- IrishRacing、SPA、Racing NSW、Tasracing 依据 live 结构 TDD 修复并复探 accepted；
+  Racing NSW 排除 tips/preview，generic `Latest News` 不覆盖 RSS 标题。HRI/Woodbine/ERA
+  虽 listing HTTP `200`，仍因 `missing_published_at` 端到端 blocked；TDN 正文成功
+  accepted，但当前样本时间 unverified，不进 freshness 候选。JCSA/Racing Victoria live
+  accepted。
+- 综合源 attribution 回归确认 Curragh/Irish Oaks -> Ireland、Woodbine/Canadian ->
+  Canada，无关键词保留原 US/UK region。Sporting Life technical accepted，但当前因
+  unverified time deferred。
+- 约 `2026-07-19T17:41Z` 的严格六小时候选只有 Ireland `2`：RTÉ
+  `Power Blue back to winning ways at the Curragh`（`15:09:15Z`，verified）和
+  IrishRacing `Tokyo Tower shows resolution to land Curragh finale`
+  （`16:51:00Z`，verified）。Canada/UAE/Saudi/Australia 均为 `0`。TDN 因 unverified、
+  JHR 因 `10:09:13Z` 超窗、其余来源因更早日期/时刻均不计；本轮未用 date-only 兜底。
+- 同一临时库使用真实 RTÉ 正文 `6616` 字符和 dummy provider，task 返回
+  `translated=true`，article 为 `translated`，`TranslationRun=success`，标题带
+  `[未配置真实翻译模型]`。本机 SiliconFlow/OpenAI key 均 absent，因此真实中文远程模型
+  未验证。
+- 最新 release-candidate 离线组合 `214/214 OK`、follow-up `10/10`；latest-main
+  release-gate `69 OK`（SQLite 跳过 PostgreSQL 专项 `15`），race-live
+  `37/37 + 63/63`。migration 无漂移、plan、临时 SQLite 空库 migrate 与唯一 leaf
+  `0050_merge_20260720_0017` 均通过；Django/diff/cached diff/`py_compile` 检查通过。来源
+  实现代理另报告 `202 + 1 skip`、translation recovery `22/22`。
+- 已完成 live probe、dummy translation orchestration 和最新 main 再集成；仍未完成最终
+  reviewer、真实远程翻译、PostgreSQL、生产 TLS/私有 media、用户新授权及
+  commit/push/PR/deploy。生产运行态不变。
+
+## 2026-07-20 新五地区内部使用与第三批多来源第二轮 main 候选（历史检查点）
+
+- 当前验收分支为 `codex/add-new-region-news-sources-final-integrated`，worktree 为
+  `/Users/mentianlu/Code/umanews/.worktrees/add-new-region-news-sources-final-integrated`。
+  集成时点 `origin/main=HEAD=58f00961f2cd9750d1285f7d6229494903e975a5`、
+  `origin/main..HEAD=0`；此前两个集成 worktree 仅作回退副本。
+- 独立方案审核已 `VERDICT: APPROVED`。首次独立代码审核为
+  `REVISE (2 P1 + 5 P2)`；七项 finding 取得 `7 failures / 0 errors` 的真实 RED并全部修复，
+  定向 `7/7`。同一 reviewer 对修复范围实质 `APPROVED`，但 main 漂移令完整性门禁
+  `BLOCKED`；最终 `58f00961…` 精确版本仍待复审，不能写成最终审核通过。
+- 修复后来源级 internal-only/public-false 独立于全局开关阻断公开 queryset、详情和 QQ。
+  `DEBUG=false` 内部模式要求 secure cookies，并且必须 direct HTTPS redirect，或显式
+  `SITE_INTERNAL_ONLY_TRUSTED_TLS_TERMINATION=true` 加合法
+  `SECURE_PROXY_SSL_HEADER` HTTPS 合同；其他组合启动 fail closed。
+- translation retry/preclaim/batch skip、通知 safe counts/IDs 且无 URL、TDN freshness
+  metrics、probe canonical normalize 均已闭环；旧 URL 通知测试改为安全
+  `article_id`-only。默认 `SITE_INTERNAL_ONLY_ENABLED=true`、
+  `NEWS_EXTERNAL_AI_PROCESSING_ENABLED=false` 不变。
+- migration 保留两个 `0047`。功能
+  `0048_merge_20260719_2242.py -> 0049_alter_newsarticle_source_site_and_more.py` 与 main
+  `0048_raceeventrunner_external_runner_identity.py` 最终汇入无操作
+  `0050_merge_20260720_0017.py`，后者是唯一 leaf；migration check/plan/测试库 migrate
+  通过。
+- 最新验证：findings `7/7`、重点功能 `175/175`、translation failure recovery `22/22`、
+  latest-main release-gate `69 OK`（SQLite 跳过 PostgreSQL 专项 `15`）、race-live
+  `37/37 + 63/63`；Django/migration checks、diff/cached diff 和相关 `py_compile` 通过。
+- 12 个第三批来源仍全部 `enabled=false / production_approved=false`；Google News 排除，
+  HRI/Woodbine/ERA technical blocked，JCSA/Racing Victoria unknown。当前仍未完成最终精确
+  版本复审、12 源受控 live probe/最近 6 小时汇总/真实翻译实跑、PostgreSQL 专项、生产 TLS/
+  私有 media、commit/push/PR/deploy。生产运行态不变，旧审核和旧授权无效。
+
+## 2026-07-19 新五地区第二批来源与候选规则
+
+- date-only 候选规则、Ireland/Canada pre-upsert 归属 preview、canonical permission
+  preflight、unknown 请求预算和窗口审计已完成 RED/GREEN。首次原生 code review 提出的
+  scheduled window、preview 副作用前门禁、detail failure 计数、ledger 保持与深不可变五项
+  finding 当前均已修复并有回归覆盖；补救 RED 为 `41 tests / 12 failures / 0 errors`。显式
+  scheduled `window_id` 现在在同步、抓取、task log、来源健康和窗口写入前验证
+  source/kind/RUNNING，无效绑定稳定返回 `invalid_scheduled_crawl_window` 且不修改窗口/来源。
+  该启动前验证测试因 runtime 先落地，只能记为 post-fix GREEN regression，未伪造 RED；当时
+  专用 `42/42`、指定组合共运行 `213` 项且 `OK (skipped=1)`。
+- 后续 F2 类型限定测试取得专用 `43 tests / 4 failures / 0 errors` 的真实 RED：
+  `Mock(spec=AttributionPreview)` 可伪造 `__class__` 绕过 shallow `isinstance`，并触发图片、
+  Article 和 Snapshot 副作用。当时 runtime 在任何副作用前用 exact type identity 拒绝 fake
+  preview，根任务复核专用 `43/43`、完整指定组合共运行 `214` 项且
+  `OK (skipped=1)`、bounded HTTP + request budget `11/11`；Django check、migration drift
+  与 `git diff --check` 均通过。
+- JCSA/Racing Victoria 最新受控 probe 均为 technical accepted：分别 `12` 条列表、`2/2`
+  详情与 `20` 条列表、`2/2` 详情；artifact 为 `75ecff06…eb5e24` 与
+  `58d1818b…ad3566`。最新稿仍是 `2026-03-22`、`2026-07-15`，permission unknown，
+  effective production blocked。
+- 爱尔兰、加拿大复用来源已补 `Irish Oaks/Woodbine Oaks` 强信号；Canadian Thoroughbred
+  date-only `2026-07-17` 样本按 2026-07-19 当地日差 `2` 归历史。TDN/HRI/Woodbine/ERA
+  等 blocked 来源本轮零请求。因此五目标地区最近 6 小时候选均为 `0`。
+- 没有 permission approved 的真实候选，外部 probe 业务写入与全文翻译均为 0。翻译任务只用
+  自有合成文本和 dummy provider 验证，结果 `translated/pending_edit`，published 与 QQ 均
+  为 0；不得解释为真实中文翻译成功。
+- 许可结论前的旧 TDN SQLite 已以 `0700/0600` 整库 quarantine，不再作为候选或翻译验收。
+- native same-session `019f79aa-be0a-71c0-8399-bff0c36ff038` 对 fingerprint
+  `13f7e095…6422`（HEAD `42a06f47`、content `60743f…78d0`）的只读限定复审 exit `0` 且
+  前后一致，但结论为 `VERDICT: REVISE`：F1/F3/F4/F5 `CLOSED`，唯一 P1/F2 是 ingestion
+  拒绝真实 Result、direct apply fake 可写。随后真实 RED 为
+  `45 tests / 9 failures / 0 errors`，两入口现统一 exact type
+  `{AttributionPreview, AttributionResult}` 并在任何相关副作用前拒绝 fake/`None`，不从
+  metadata 恢复。根任务最终复核专用 `45/45`、完整组合
+  `Ran 216 tests / OK (skipped=1)`、bounded `11/11`，Django check、migration
+  `No changes detected` 与 `git diff --check` 通过。
+- 同一 session 随后以 `codex exec resume -c 'sandbox_mode="read-only"' ...` 仅复审 F2
+  两入口 exact-type 修复；内层 read-only、exit `0`，审前审后 helper raw 一致，fingerprint
+  `30e7592a…ca1c`（HEAD `42a06f47`、content `a1dc620e…a636`）。actionable findings 为
+  `0`，F2 `CLOSED`；结合 F1/F3/F4/F5 已关闭，最终 `VERDICT: APPROVED`。native 未重跑
+  测试。代码、来源和开关仍未提交、推送、部署或启用；证据回写后仍待 docs-only fingerprint
+  复审与用户新授权，历史授权不可复用。
 ## 2026-07-19 event 924 kill-switch 演练完成
 
 - event `924` 的预生成 disable 和 restore manifest 均重新完成
@@ -66,6 +180,41 @@
   event `924` 已公开。
   当前未提交、未部署、未联网、未写生产；最新成功代码 review 和其后的精确发布授权仍是
   后续硬门禁。
+
+## 2026-07-19 新五地区新闻抓取源 worktree 代码复审历史检查点
+
+- `codex/add-new-region-news-sources-integrated` 已在独立 worktree 完成爱尔兰、加拿大、阿联酋、沙特和
+  澳大利亚五个独立新闻地区及五个默认关闭来源的本地候选；补救方案两轮复审已批准，真实
+  结构/许可/透明 UA/XML/结构化 HTTP 的 RED-GREEN 已完成。
+- 最新完整指纹的原生代码审查首轮为 `REVISE`：既有 `other` 赛事/马匹无法通过表单保存，
+  Ireland 来源关键词 `hri` 会误命中 `thrilling`。两项均先取得真实 RED，再以表单专用
+  旧五区加 `other` choices 和边界感知关键词匹配最小修复；没有扩大赛事、马匹或 race-live
+  执行地区。
+- 同一原生 session 对 fingerprint `def49ae…d9e` 的限定复审再次为 `REVISE`：Django
+  `RaceEventAdmin` 仍暴露五个 news-only 地区，测试文档顶部计数仍为旧值。Admin 缺口先用
+  真实 `ModelAdmin.get_form()` 取得 `1` 项内 `2` 个 failure，再复用受限地区集合修复；
+  文档摘要已同步。
+- 当前专用 `55/55`，新地区/归属/法国时间组合 `155` 个通过加 `1` 个既有 skip，相邻加
+  旧爱尔兰合同 `70/70`，event 924 最新邻接
+  `200` 个通过加 `2` 个 PostgreSQL-only skip。
+- 候选已同步最新 `origin/main@566a9b10`；本 change migration 因主线占用 `0046` 顺延为
+  `0047`。完整 `stable` 的剩余 `12 ERROR / 2 FAILURE` 已在干净主线精确复现，属于
+  current-year CSV、缺失 tmp helper 和既有 historical runner 基线问题，不是本 change
+  新增回归。
+- JCSA、Racing Victoria 的受控补救在线复测都仍为 technical `deferred`；已保存的 JCSA
+  当前详情可在修复后离线解析，RV 真实斜杠日期路径也已进入严格 fixture，但请求预算已用完，
+  不重复联网。HRI、Woodbine、ERA permission 为 `blocked`，JCSA/RV 为 `unknown`，当前
+  没有 `eligible` 来源。
+- 同一 reviewer/session 的第三次限定复审已通过：前后 fingerprint
+  `83675edc…b1353` 一致，`VERDICT: APPROVED`，无 P0/P1/P2 actionable finding。该冻结
+  版本仍未 commit、push、PR 或 deploy，后续必须取得用户针对本版本的新授权。
+- 这是本地候选，待用户决定后续，不是已上线。五来源仍
+  `enabled=false / production_approved=false`，全局归属和 source-scoped candidate 均默认
+  关闭；未 commit、push、deploy 或生产验证，生产状态未改变。
+- 临时 PostgreSQL、390px 和 Compose 尚未验证，不能宣称五区来源齐备或生产可用。
+- 正式候选只位于
+  `/Users/mentianlu/Code/umanews/.worktrees/add-new-region-news-sources-integrated`；旧同名
+  worktree 是错误全局 stash 的隔离现场，不参与后续 review 或发布。
 
 ## 2026-07-18 event 924 首个 TRA shadow 赛果到达
 

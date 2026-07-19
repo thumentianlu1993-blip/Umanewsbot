@@ -341,6 +341,7 @@ class RaceLivePublicationTransitionTests(TestCase):
         with self.assertRaises(RaceLivePublicationTransitionError):
             dry_run_race_live_publication_transition(manifest)
 
+    @override_settings(SITE_INTERNAL_ONLY_ENABLED=False)
     def test_promotion_uses_persisted_shadow_without_claim_network_or_provider_timing_mutation(self):
         bundle = self._bundle()
         manifest = self._loaded(bundle["promotion"])

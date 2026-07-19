@@ -20,6 +20,7 @@ from stable.services.historical_batch_runner import (
     RUNNER_REQUEST_INTERVAL_SECONDS,
     validate_runner_plan,
 )
+from stable.services.regions import RACE_DATA_REGIONS
 
 
 PIPELINE_SCHEMA_VERSION = "1.0"
@@ -28,7 +29,7 @@ _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 _IMAGE_RE = re.compile(r"sha256:[0-9a-f]{64}")
 _REVISION_RE = re.compile(r"[0-9a-f]{40}")
 _SAFE_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
-_VALID_REGIONS = {value for value, _label in RacingRegion.choices}
+_VALID_REGIONS = set(RACE_DATA_REGIONS)
 
 
 class HistoricalBatchPipelineError(ValueError):

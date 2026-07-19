@@ -84,6 +84,14 @@ a {
   color: #166a3a;
 }
 
+.region-tab-group {
+  align-self: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .race-tabs,
 .race-load-actions {
   display: flex;

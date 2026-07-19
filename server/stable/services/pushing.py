@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from stable.models import ArticleStatus, NewsArticle, PushLog, PushStatus, PushTarget
 
+from .internal_controls import external_news_distribution_blocker
 from .onebot import BotPusher
 
 
@@ -26,6 +27,8 @@ def build_push_message(article: NewsArticle) -> tuple[str, str | None]:
 
 
 def push_article_to_targets(article: NewsArticle, targets: list[PushTarget], user: User | None = None) -> list[PushLog]:
+    if external_news_distribution_blocker(article=article):
+        return []
     pusher = BotPusher()
     logs: list[PushLog] = []
     message, image_url = build_push_message(article)

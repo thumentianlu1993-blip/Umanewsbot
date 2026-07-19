@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Iterator
 
@@ -22,7 +23,12 @@ from stable.models import (
 )
 
 from .sources import find_builtin_source
-from .news_attribution import apply_article_attribution
+from .news_attribution import (
+    AttributionPreview,
+    AttributionResult,
+    apply_article_attribution,
+    content_scoped_candidate_source_enabled,
+)
 from .storage import download_image
 
 
@@ -69,8 +75,28 @@ def _draft_html(draft) -> str:
     return getattr(draft, "original_content_html", "") or draft.metadata.get("html", "")
 
 
+def _json_safe_metadata_value(value):
+    if isinstance(value, Mapping):
+        return {
+            key: _json_safe_metadata_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_metadata_value(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        return [
+            _json_safe_metadata_value(item)
+            for item in sorted(value, key=lambda item: repr(item))
+        ]
+    return value
+
+
 def _draft_metadata(draft) -> dict:
-    return {key: value for key, value in (draft.metadata or {}).items() if key != "html"}
+    return {
+        key: _json_safe_metadata_value(value)
+        for key, value in (draft.metadata or {}).items()
+        if key != "html"
+    }
 
 
 def _draft_article_source_site(draft):
@@ -105,15 +131,30 @@ def _should_update_primary_source(article: NewsArticle, draft, *, source_elevate
     return article.source_mode == draft.source_mode
 
 
-def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> ArticleUpsertResult:
-    now = timezone.now()
+def upsert_article_from_draft(
+    draft,
+    crawl_job: CrawlJob | None = None,
+    *,
+    attribution_preview: AttributionPreview | AttributionResult | None = None,
+) -> ArticleUpsertResult:
     source_config = find_builtin_source(draft.source_site, draft.source_mode)
+    article_source_site = _draft_article_source_site(draft)
+    content_scoped_source_enabled = content_scoped_candidate_source_enabled(
+        source_site=article_source_site,
+    )
+    if content_scoped_source_enabled:
+        if type(attribution_preview) not in (
+            AttributionPreview,
+            AttributionResult,
+        ):
+            raise ValueError("attribution_preview_required")
+
+    now = timezone.now()
     source_metadata = _source_metadata(draft, source_config)
     draft_metadata = _draft_metadata(draft)
     has_published_evidence = "published_at_verified" in draft_metadata
     draft_published_verified = draft_metadata.get("published_at_verified") if has_published_evidence else None
     draft_published_evidence = draft_metadata.get("published_at_evidence") or {}
-    article_source_site = _draft_article_source_site(draft)
     source_elevated = False
     with transaction.atomic():
         article, created = NewsArticle.objects.get_or_create(
@@ -205,5 +246,10 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
                 except Exception:
                     image.local_path = ""
             image.save()
-        apply_article_attribution(article, source_config=article.source_config, is_new_article=created)
+        apply_article_attribution(
+            article,
+            source_config=article.source_config,
+            is_new_article=created,
+            attribution_preview=attribution_preview,
+        )
     return ArticleUpsertResult(article=article, created=created, source_elevated=source_elevated)

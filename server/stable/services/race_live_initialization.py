@@ -19,6 +19,7 @@ from stable.services.race_live_target_eligibility import (
     MATRIX_VERSION,
     evaluate_race_live_target_eligibility,
 )
+from stable.services.regions import RACE_LIVE_SUPPORTED_REGIONS
 
 
 class RaceLiveInitializationError(ValueError):
@@ -432,7 +433,7 @@ def load_race_live_initialization_manifest(
     seen_event_ids: set[int] = set()
     seen_event_keys: set[tuple[int, str]] = set()
     seen_external_race_ids: set[str] = set()
-    allowed_regions = set(models.RacingRegion.values)
+    allowed_regions = set(RACE_LIVE_SUPPORTED_REGIONS)
     for event_index, raw_event in enumerate(events):
         label = f"events[{event_index}]"
         selected_event_keys = (

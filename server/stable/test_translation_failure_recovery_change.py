@@ -344,21 +344,65 @@ class ManualTranslationRetryTests(TestCase):
         TRANSLATION_FAILURE_NOTIFY_EMAILS=["754652181@qq.com"],
         SITE_URL="https://umafans.run",
     )
-    def test_exhausted_notification_is_sent_once_and_links_to_article(self):
+    def test_exhausted_notification_is_sent_once_with_safe_article_id_only(self):
         from stable.services.translation_recovery import notify_terminal_translation_failure
 
-        article = article_for_retry(translation_retry_exhausted_at=NOW, translation_next_retry_at=None)
+        article = article_for_retry(
+            translation_retry_exhausted_at=NOW,
+            translation_next_retry_at=None,
+            source_url="https://source.example.test/FORBIDDEN-SOURCE-URL",
+            title_ja="FORBIDDEN-TITLE-JA",
+            title_zh="FORBIDDEN-TITLE-ZH",
+            summary_zh="FORBIDDEN-SUMMARY-ZH",
+            body_ja_raw="FORBIDDEN-BODY-JA",
+            body_ja_normalized="FORBIDDEN-BODY-JA",
+            body_zh="FORBIDDEN-TRANSLATION-ZH",
+        )
 
         notify_terminal_translation_failure(article)
         notify_terminal_translation_failure(article)
 
         notifications = NotificationLog.objects.filter(payload_summary__contains=str(article.id))
         self.assertEqual(notifications.count(), 1)
-        self.assertEqual(notifications.get().status, "sent")
-        self.assertIn(f"/admin/stable/newsarticle/{article.id}/change/", notifications.get().payload_summary)
+        notification = notifications.get()
+        self.assertEqual(notification.status, "sent")
+        self.assertIn(f"article_id={article.id}", notification.payload_summary)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["754652181@qq.com"])
-        self.assertIn(f"/admin/stable/newsarticle/{article.id}/change/", mail.outbox[0].body)
+        self.assertIn(f"article_id: {article.id}", mail.outbox[0].body)
+
+        rendered_notification = "\n".join(
+            [
+                notification.payload_summary,
+                mail.outbox[0].subject,
+                mail.outbox[0].body,
+            ]
+        )
+        forbidden_values = (
+            "http://",
+            "https://",
+            "/admin/",
+            "title_ja",
+            "title_zh",
+            "body_ja_raw",
+            "body_ja_normalized",
+            "body_zh",
+            "summary_zh",
+            "source_url",
+            "标题:",
+            "正文:",
+            "译文:",
+            "摘要:",
+            "FORBIDDEN-TITLE-JA",
+            "FORBIDDEN-TITLE-ZH",
+            "FORBIDDEN-BODY-JA",
+            "FORBIDDEN-TRANSLATION-ZH",
+            "FORBIDDEN-SUMMARY-ZH",
+            "FORBIDDEN-SOURCE-URL",
+        )
+        for forbidden_value in forbidden_values:
+            with self.subTest(forbidden_value=forbidden_value):
+                self.assertNotIn(forbidden_value, rendered_notification)
 
     def test_non_staff_cannot_use_bulk_retry_admin_action(self):
         normal = get_user_model().objects.create_user(username="normal", password="password")

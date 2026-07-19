@@ -29,7 +29,10 @@ from stable.services.news_attribution import (
     region_label,
     related_region_queries_enabled,
 )
+from stable.services.regions import NEWS_PRODUCTION_REGIONS
+from stable.services.multiregion import region_review_publish_blocker
 
+from .internal_controls import external_news_distribution_blocker
 from .onebot import BotPusher
 
 
@@ -48,13 +51,7 @@ RANKED_NEWS_SOURCE_SITES = {
     SourceSite.HORSE_RACING_NATION,
 }
 AUTO_PUSH_SUMMARY_LIMIT = 160
-FIRST_PHASE_REGIONS = {
-    RacingRegion.JAPAN,
-    RacingRegion.HONG_KONG,
-    RacingRegion.UNITED_KINGDOM,
-    RacingRegion.FRANCE,
-    RacingRegion.UNITED_STATES,
-}
+FIRST_PHASE_REGIONS = set(NEWS_PRODUCTION_REGIONS)
 
 
 @dataclass(frozen=True)
@@ -157,6 +154,9 @@ def build_public_article_url(article: NewsArticle) -> str:
 
 
 def is_public_url_accessible(url: str) -> tuple[bool, str]:
+    blocker = external_news_distribution_blocker()
+    if blocker:
+        return False, blocker
     try:
         response = requests.get(
             url,
@@ -176,8 +176,13 @@ def should_push_news_to_qq(
     *,
     target: PushTarget | None = None,
 ) -> PushEligibility:
+    blocker = external_news_distribution_blocker(article=article)
+    if blocker:
+        return PushEligibility(False, blocker)
     if not is_article_public(article):
         return PushEligibility(False, "article_not_public")
+    if region_review_publish_blocker(article):
+        return PushEligibility(False, "region_review_required")
     if has_publish_blocker(article):
         return PushEligibility(False, "has_blocker")
     regions = article_regions(article, target=target)
@@ -257,6 +262,8 @@ def build_qq_auto_push_message(
 
 
 def ensure_qq_push_deliveries(article: NewsArticle, targets: list[PushTarget] | None = None) -> list[QQPushDelivery]:
+    if external_news_distribution_blocker(article=article):
+        return []
     max_attempts = max(1, int(getattr(settings, "QQ_PUSH_MAX_ATTEMPTS", 3)))
     deliveries: list[QQPushDelivery] = []
     resolved_targets = targets if targets is not None else get_auto_push_targets()
@@ -364,6 +371,11 @@ def _claim_delivery_attempt(delivery: QQPushDelivery, *, message: str, public_ur
 def process_qq_push_delivery(delivery: QQPushDelivery) -> QQPushDelivery:
     if delivery.status == QQPushDeliveryStatus.SENT:
         return delivery
+    blocker = external_news_distribution_blocker(article=delivery.article)
+    if blocker:
+        if delivery.status == QQPushDeliveryStatus.FAILED:
+            return delivery
+        return _set_delivery_not_eligible(delivery, reason=blocker)
     if delivery.status == QQPushDeliveryStatus.SENDING and not _is_stale_sending(delivery):
         return delivery
     if delivery.attempt_count >= delivery.max_attempts:
@@ -435,4 +447,10 @@ def enqueue_qq_auto_push_for_article(article_id: int) -> None:
         return
     from stable.tasks import qq_auto_push_article_task
 
-    transaction.on_commit(lambda: qq_auto_push_article_task.delay(article_id))
+    def enqueue_if_allowed() -> None:
+        article = NewsArticle.objects.filter(pk=article_id).first()
+        if article is None or external_news_distribution_blocker(article=article):
+            return
+        qq_auto_push_article_task.delay(article_id)
+
+    transaction.on_commit(enqueue_if_allowed)

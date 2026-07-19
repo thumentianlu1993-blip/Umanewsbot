@@ -8,6 +8,7 @@ from django.core.mail import send_mail
 from django.utils import timezone
 
 from stable.models import NotificationChannel, NotificationLog, NotificationStatus, NotificationType
+from stable.services.internal_controls import sanitize_internal_ops_notification
 from stable.services.onebot import BotPusher
 
 
@@ -17,9 +18,15 @@ def send_ops_notification(*, notification_type: str, title: str, payload: dict) 
         or getattr(settings, "MULTIREGION_ROLLBACK_DISABLE_OPS_NOTIFICATIONS", False)
     ):
         return []
+    safe_title = title
+    if getattr(settings, "SITE_INTERNAL_ONLY_ENABLED", True):
+        payload = sanitize_internal_ops_notification(payload)
+        if payload is None:
+            return []
+        safe_title = str(payload.get("task") or notification_type)
     cooldown_minutes = int(getattr(settings, "MULTIREGION_OPS_NOTIFICATION_COOLDOWN_MINUTES", 30))
     cooldown_since = timezone.now() - timedelta(minutes=cooldown_minutes)
-    signature = f"{notification_type}:{title}"
+    signature = f"{notification_type}:{safe_title}"
     if NotificationLog.objects.filter(
         type=notification_type,
         payload_summary__icontains=signature,
@@ -39,7 +46,7 @@ def send_ops_notification(*, notification_type: str, title: str, payload: dict) 
             payload_summary=summary,
         )
         try:
-            BotPusher().send_group_message(qq_group_id, f"{title}\n{summary}")
+            BotPusher().send_group_message(qq_group_id, f"{safe_title}\n{summary}")
             log.status = NotificationStatus.SENT
             log.sent_at = timezone.now()
         except Exception as exc:
@@ -58,7 +65,13 @@ def send_ops_notification(*, notification_type: str, title: str, payload: dict) 
             payload_summary=summary,
         )
         try:
-            send_mail(title, summary, settings.DEFAULT_FROM_EMAIL, emails, fail_silently=False)
+            send_mail(
+                safe_title,
+                summary,
+                settings.DEFAULT_FROM_EMAIL,
+                emails,
+                fail_silently=False,
+            )
             log.status = NotificationStatus.SENT
             log.sent_at = timezone.now()
         except Exception as exc:

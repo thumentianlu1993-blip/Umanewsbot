@@ -4,8 +4,8 @@ import json
 
 from django.core.management.base import BaseCommand, CommandError
 
-from stable.models import RacingRegion
 from stable.services import p0_horse_profiles
+from stable.services.regions import HORSE_PROFILE_REGIONS
 
 
 class Command(BaseCommand):
@@ -16,7 +16,7 @@ class Command(BaseCommand):
         parser.add_argument("--queue", action="store_true", help="预览 P0 补全队列；只读，不写资料字段。")
         parser.add_argument("--commit", action="store_true", help="配合 --sync-sources 写入 P0 来源；未指定时为 dry-run。")
         parser.add_argument("--full-reconcile", action="store_true", help="全地区完整对账并撤销已失效来源；必须配合 --sync-sources --commit。")
-        parser.add_argument("--region", action="append", choices=[choice[0] for choice in RacingRegion.choices])
+        parser.add_argument("--region", action="append", choices=list(HORSE_PROFILE_REGIONS))
         parser.add_argument("--profile-id", action="append", type=int, help="预览指定马资料；可重复指定。")
         parser.add_argument("--limit-per-region", type=int, default=10)
         parser.add_argument("--json", action="store_true", help="输出机器可读 JSON。")

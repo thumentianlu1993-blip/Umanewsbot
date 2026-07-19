@@ -34,6 +34,7 @@ from stable.models import (
     TermType,
     WorkflowStatus,
 )
+from stable.services.internal_controls import filter_news_for_current_site
 from stable.services.operations import log_operation
 from stable.services.horse_race_records import upsert_race_record
 from stable.services.terms import ArticleEntityResolution, resolve_article_entities, source_term_matches_text
@@ -671,6 +672,7 @@ def followed_articles(token_hash: str, *, limit: int = 20) -> list[dict[str, Any
     horse_ids = followed_horse_ids(token_hash, include_descendants=True)
     if not horse_ids:
         return []
+    article_queryset = filter_news_for_current_site(NewsArticle.objects.all())
     links = (
         ArticleHorseLink.objects.filter(
             horse_profile_id__in=horse_ids,
@@ -678,6 +680,7 @@ def followed_articles(token_hash: str, *, limit: int = 20) -> list[dict[str, Any
             status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL],
             article__workflow_status=WorkflowStatus.PUBLISHED,
             article__published_to_web_at__isnull=False,
+            article__in=article_queryset,
         )
         .select_related("article", "horse_profile")
         .order_by("-article__published_to_web_at", "-article_id")[:limit]

@@ -73,14 +73,14 @@ class RaceLiveOfficialPublicationSchemaTests(SimpleTestCase):
             models.RaceEventRevision,
         )
 
-    def test_migration_0047_exists_as_the_additive_schema_boundary(self):
+    def test_migration_0047_exists_in_parallel_schema_boundary(self):
         migrations = sorted(
             path.name
             for path in (REPO_ROOT / "server" / "stable" / "migrations").glob(
                 "0047_*.py"
             )
         )
-        self.assertEqual(len(migrations), 1)
+        self.assertIn("0047_race_live_public_beta_controls.py", migrations)
 
 
 class RaceLiveOfficialAuthorizationResolverContractTests(SimpleTestCase):

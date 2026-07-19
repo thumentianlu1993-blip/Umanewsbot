@@ -364,6 +364,392 @@ BUILTIN_SOURCE_DEFINITIONS = [
         "notes": "候选来源；上线前实测列表返回 403，暂不纳入第一版生产来源。",
         "priority": 20,
     },
+    {
+        "name": "Horse Racing Ireland 新闻",
+        "homepage_url": "https://www.hri.ie/news-and-media",
+        "feed_url": "https://www.hri.ie/news-and-media",
+        "source_type": SourceType.BUILTIN,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.IRELAND,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "hri_news",
+        "source_site": SourceSite.HRI_NEWS,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 360,
+        "notes": (
+            "爱尔兰官方新闻候选；technical_access=blocked（详情缺少"
+            "可验证发布时间）；保持关闭且未生产批准。"
+        ),
+        "priority": 40,
+    },
+    {
+        "name": "Woodbine 新闻",
+        "homepage_url": "https://woodbine.com/news/",
+        "feed_url": "https://woodbine.com/news/",
+        "source_type": SourceType.BUILTIN,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.CANADA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "woodbine_news",
+        "source_site": SourceSite.WOODBINE_NEWS,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 360,
+        "notes": (
+            "加拿大官方赛马场新闻候选；technical_access=blocked（详情缺少"
+            "可验证发布时间）；保持关闭且未生产批准。"
+        ),
+        "priority": 40,
+    },
+    {
+        "name": "Emirates Racing Authority 新闻",
+        "homepage_url": "https://emiratesracing.com/news/",
+        "feed_url": "https://emiratesracing.com/news/",
+        "source_type": SourceType.BUILTIN,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.UNITED_ARAB_EMIRATES,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "emirates_racing_authority",
+        "source_site": SourceSite.EMIRATES_RACING_AUTHORITY,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 360,
+        "notes": (
+            "阿联酋官方新闻候选；technical_access=blocked（详情缺少"
+            "可验证发布时间）；保持关闭且未生产批准。"
+        ),
+        "priority": 40,
+    },
+    {
+        "name": "Jockey Club of Saudi Arabia 新闻",
+        "homepage_url": "https://jcsa.sa/en/news/",
+        "feed_url": "https://jcsa.sa/api/news/en/0/12",
+        "source_type": SourceType.BUILTIN,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.SAUDI_ARABIA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "jcsa_news",
+        "source_site": SourceSite.JCSA_NEWS,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 360,
+        "notes": (
+            "沙特阿拉伯官方新闻候选；technical_access=accepted；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "保持关闭且未生产批准。"
+        ),
+        "priority": 40,
+    },
+    {
+        "name": "Racing Victoria 新闻",
+        "homepage_url": "https://www.racingvictoria.com.au/news",
+        "feed_url": "https://www.racingvictoria.com.au/sitemap.xml",
+        "source_type": SourceType.BUILTIN,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.AUSTRALIA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "racing_victoria_news",
+        "source_site": SourceSite.RACING_VICTORIA_NEWS,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 360,
+        "notes": (
+            "澳大利亚官方新闻候选；technical_access=accepted；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "保持关闭且未生产批准。"
+        ),
+        "priority": 40,
+    },
+    {
+        "name": "RTÉ Racing RSS",
+        "homepage_url": "https://www.rte.ie/sport/racing/",
+        "feed_url": "https://www.rte.ie/feeds/rss/?index=/sport/racing/",
+        "source_type": SourceType.RSS,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.IRELAND,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.MEDIA,
+        "adapter_key": "rte_racing",
+        "source_site": SourceSite.RTE_RACING,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 30,
+        "notes": (
+            "爱尔兰赛马 RSS；technical_access=accepted；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "保持关闭且未生产批准。"
+        ),
+        "priority": 39,
+    },
+    {
+        "name": "IrishRacing 新闻",
+        "homepage_url": "https://www.irishracing.com/news",
+        "feed_url": "https://www.irishracing.com/news",
+        "source_type": SourceType.HTML_LIST,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.IRELAND,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.MEDIA,
+        "adapter_key": "irishracing_news",
+        "source_site": SourceSite.IRISHRACING_NEWS,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 20,
+        "notes": (
+            "爱尔兰赛马行业新闻；technical_access=accepted；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "保持关闭且未生产批准。"
+        ),
+        "priority": 39,
+    },
+    {
+        "name": "Canadian Thoroughbred 新闻",
+        "homepage_url": "https://canadianthoroughbred.com/news/",
+        "feed_url": "https://canadianthoroughbred.com/news/",
+        "source_type": SourceType.HTML_LIST,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.CANADA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.MEDIA,
+        "adapter_key": "canadian_thoroughbred",
+        "source_site": SourceSite.CANADIAN_THOROUGHBRED,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 60,
+        "notes": (
+            "加拿大赛马行业新闻；technical_access=blocked（匿名登录/"
+            "CAPTCHA 挑战）；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "date-only 时间按来源当地日期日差判定；保持关闭。"
+        ),
+        "priority": 38,
+    },
+    {
+        "name": "Assiniboia Downs RSS",
+        "homepage_url": "https://asdowns.com/",
+        "feed_url": "https://asdowns.com/feed/",
+        "source_type": SourceType.RSS,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.CANADA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "assiniboia_downs_news",
+        "source_site": SourceSite.ASSINIBOIA_DOWNS_NEWS,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 120,
+        "notes": (
+            "加拿大马场官方 RSS；technical_access=blocked（匿名详情访问"
+            "挑战）；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "保持关闭且未生产批准。"
+        ),
+        "priority": 37,
+    },
+    {
+        "name": "Dubai Racing Club RSS",
+        "homepage_url": "https://dubairacingclub.com/press-releases/",
+        "feed_url": "https://dubairacingclub.com/feed/",
+        "source_type": SourceType.RSS,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.UNITED_ARAB_EMIRATES,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "dubai_racing_club",
+        "source_site": SourceSite.DUBAI_RACING_CLUB,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 120,
+        "notes": (
+            "迪拜官方赛马新闻 RSS；technical_access=accepted；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "默认不启用 WP 备用 listing；保持关闭。"
+        ),
+        "priority": 38,
+    },
+    {
+        "name": "The National Horse Racing",
+        "homepage_url": (
+            "https://www.thenationalnews.com/sport/horse-racing/"
+        ),
+        "feed_url": (
+            "https://www.thenationalnews.com/sport/horse-racing/"
+        ),
+        "source_type": SourceType.HTML_LIST,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.UNITED_ARAB_EMIRATES,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.MEDIA,
+        "adapter_key": "the_national_racing",
+        "source_site": SourceSite.THE_NATIONAL_RACING,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 60,
+        "notes": (
+            "阿联酋赛马媒体专区；technical_access=blocked（匿名登录/"
+            "CAPTCHA 挑战）；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "列表超过 2 MiB 时 fail closed；保持关闭。"
+        ),
+        "priority": 37,
+    },
+    {
+        "name": "Saudi Press Agency 赛马新闻",
+        "homepage_url": (
+            "https://www.spa.gov.sa/en/search?search=horse%20racing"
+        ),
+        "feed_url": (
+            "https://www.spa.gov.sa/en/search?search=horse%20racing"
+        ),
+        "source_type": SourceType.HTML_LIST,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.SAUDI_ARABIA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "spa_horse_racing",
+        "source_site": SourceSite.SPA_HORSE_RACING,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 120,
+        "notes": (
+            "沙特官方通讯社赛马主题入口；technical_access=accepted；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "排除 camel/show jumping；保持关闭。"
+        ),
+        "priority": 37,
+    },
+    {
+        "name": "Arab News Horse Racing",
+        "homepage_url": "https://www.arabnews.com/tags/horse-racing",
+        "feed_url": "https://www.arabnews.com/tags/horse-racing",
+        "source_type": SourceType.HTML_LIST,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.SAUDI_ARABIA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.MEDIA,
+        "adapter_key": "arab_news_racing",
+        "source_site": SourceSite.ARAB_NEWS_RACING,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 120,
+        "notes": (
+            "沙特赛马媒体标签页；technical_access=blocked（匿名请求"
+            " HTTP 403）；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "只接受 /node/<id>/sport；保持关闭。"
+        ),
+        "priority": 36,
+    },
+    {
+        "name": "Just Horse Racing RSS",
+        "homepage_url": (
+            "https://www.justhorseracing.com.au/category/news/"
+            "australian-racing"
+        ),
+        "feed_url": "https://www.justhorseracing.com.au/feed",
+        "source_type": SourceType.RSS,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.AUSTRALIA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.MEDIA,
+        "adapter_key": "just_horse_racing",
+        "source_site": SourceSite.JUST_HORSE_RACING,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 15,
+        "notes": (
+            "澳大利亚赛马 RSS；technical_access=accepted；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "排除 tips/odds/betting；保持关闭。"
+        ),
+        "priority": 38,
+    },
+    {
+        "name": "The Straight RSS",
+        "homepage_url": "https://thestraight.com.au/",
+        "feed_url": "https://thestraight.com.au/feed/",
+        "source_type": SourceType.RSS,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.AUSTRALIA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.MEDIA,
+        "adapter_key": "the_straight",
+        "source_site": SourceSite.THE_STRAIGHT,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 30,
+        "notes": (
+            "澳大利亚赛马行业 RSS；technical_access=accepted；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "排除 betting/prediction；保持关闭。"
+        ),
+        "priority": 37,
+    },
+    {
+        "name": "Racing NSW RSS",
+        "homepage_url": "https://www.racingnsw.com.au/news/",
+        "feed_url": "https://www.racingnsw.com.au/feed/",
+        "source_type": SourceType.RSS,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.AUSTRALIA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "racing_nsw_news",
+        "source_site": SourceSite.RACING_NSW_NEWS,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 15,
+        "notes": (
+            "新南威尔士官方赛马 RSS；technical_access=accepted；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "保持关闭且未生产批准。"
+        ),
+        "priority": 39,
+    },
+    {
+        "name": "Tasracing Thoroughbred RSS",
+        "homepage_url": "https://tasracing.com.au/news",
+        "feed_url": "https://tasracing.com.au/news/rss.xml",
+        "source_type": SourceType.RSS,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.AUSTRALIA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "tasracing_news",
+        "source_site": SourceSite.TASRACING_NEWS,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 60,
+        "notes": (
+            "塔斯马尼亚官方 RSS；technical_access=accepted；"
+            "usage_scope=internal_only；public_publish_allowed=false；"
+            "仅保留 thoroughbred，排除 harness/greyhound；保持关闭。"
+        ),
+        "priority": 38,
+    },
 ]
 
 

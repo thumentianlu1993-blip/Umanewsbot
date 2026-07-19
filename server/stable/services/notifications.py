@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from stable.models import NewsArticle, NotificationChannel, NotificationLog, NotificationStatus, NotificationType
 from stable.services.automation import is_high_value_article
+from stable.services.internal_controls import sanitize_internal_ops_notification
 from stable.services.validation import SEVERITY_BLOCKER, SEVERITY_WARNING, warning_signature
 
 
@@ -36,6 +37,10 @@ def _email_body(notification_type: str, payload: dict) -> str:
 
 
 def send_automation_notification(notification_type: str, payload: dict, channels: list[str] | None = None) -> list[NotificationLog]:
+    if getattr(settings, "SITE_INTERNAL_ONLY_ENABLED", True):
+        payload = sanitize_internal_ops_notification(payload)
+        if payload is None:
+            return []
     channels = channels or [NotificationChannel.EMAIL, NotificationChannel.SMS, NotificationChannel.QQ, NotificationChannel.WECHAT]
     logs: list[NotificationLog] = []
     summary = _payload_summary({"type": notification_type, **payload})
@@ -105,6 +110,12 @@ def send_high_value_warning_notification(article: NewsArticle) -> list[Notificat
     if not warnings or blockers or not is_high_value_article(article):
         return []
 
+    payload = _warning_payload(article, warnings)
+    if getattr(settings, "SITE_INTERNAL_ONLY_ENABLED", True):
+        payload = sanitize_internal_ops_notification(payload)
+        if payload is None:
+            return []
+
     signature = warning_signature(issues)
     dedup_hours = int(getattr(settings, "AUTOMATION_WARNING_EMAIL_DEDUP_HOURS", 24))
     now = timezone.now()
@@ -119,13 +130,12 @@ def send_high_value_warning_notification(article: NewsArticle) -> list[Notificat
                 channel=NotificationChannel.EMAIL,
                 target="",
                 status=NotificationStatus.SKIPPED,
-                payload_summary=_payload_summary(_warning_payload(article, warnings)),
+                payload_summary=_payload_summary(payload),
                 error_message="同一文章同一 warning 组合仍在去重窗口内",
             )
         ]
 
     recipients = list(getattr(settings, "AUTOMATION_WARNING_NOTIFY_EMAILS", []) or [])
-    payload = _warning_payload(article, warnings)
     target = ",".join(recipients)
     if not getattr(settings, "AUTOMATION_WARNING_EMAIL_ENABLED", True) or not recipients:
         return [

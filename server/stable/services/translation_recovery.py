@@ -26,6 +26,10 @@ from stable.models import (
     TranslationStatus,
     WorkflowStatus,
 )
+from stable.services.internal_controls import (
+    external_ai_processing_allowed,
+    sanitize_internal_ops_notification,
+)
 
 
 TRANSIENT_CATEGORIES = {
@@ -187,6 +191,12 @@ def dispatch_due_translation_retries(*, now: datetime | None = None) -> RetryDis
     now = now or timezone.now()
     if not getattr(settings, "TRANSLATION_AUTO_RETRY_ENABLED", False):
         return RetryDispatchResult(skipped_reason="disabled")
+    if not external_ai_processing_allowed(
+        getattr(settings, "TRANSLATION_PROVIDER", "")
+    ):
+        return RetryDispatchResult(
+            skipped_reason="external_translation_disabled"
+        )
     limit = int(getattr(settings, "TRANSLATION_AUTO_RETRY_BATCH_SIZE", 10))
     due_rows = list(
         NewsArticle.objects.filter(
@@ -209,6 +219,49 @@ def dispatch_due_translation_retries(*, now: datetime | None = None) -> RetryDis
         except Exception as exc:
             release_failed_translation_dispatch(article_id, claimed_at=now, error=exc)
     return RetryDispatchResult(dispatched_ids=dispatched_ids)
+
+
+def release_preclaimed_translation_retry_for_ai_gate(
+    article_id: int,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    now = now or timezone.now()
+    with transaction.atomic():
+        article = (
+            NewsArticle.objects.select_for_update()
+            .filter(
+                pk=article_id,
+                translation_status=ArticleTranslationStatus.TRANSLATING,
+            )
+            .first()
+        )
+        if article is None:
+            return False
+        article.translation_status = ArticleTranslationStatus.FAILED
+        article.workflow_status = WorkflowStatus.TRANSLATION_FAILED
+        article.automation_status = AutomationStatus.FAILED
+        article.translation_started_at = None
+        article.translation_next_retry_at = now
+        article.save(
+            update_fields=[
+                "translation_status",
+                "workflow_status",
+                "automation_status",
+                "translation_started_at",
+                "translation_next_retry_at",
+                "updated_at",
+            ]
+        )
+        TranslationRun.objects.filter(
+            article=article,
+            status=TranslationStatus.STARTED,
+        ).update(
+            status=TranslationStatus.FAILED,
+            error_message="external_translation_disabled",
+            updated_at=now,
+        )
+    return True
 
 
 def release_failed_translation_dispatch(
@@ -404,10 +457,28 @@ def notify_terminal_translation_failure(article: NewsArticle) -> None:
     article_path = f"/admin/stable/newsarticle/{article.id}/change/"
     article_url = f"{site_url}{article_path}" if site_url else article_path
     recipients = list(getattr(settings, "TRANSLATION_FAILURE_NOTIFY_EMAILS", []) or [])
-    summary = (
-        f"{signature} article_id={article.id} category={article.translation_error_category} "
-        f"retry_count={article.translation_retry_count} {article_url}"
-    )
+    internal_mode = getattr(settings, "SITE_INTERNAL_ONLY_ENABLED", True)
+    safe_payload = None
+    if internal_mode:
+        safe_payload = sanitize_internal_ops_notification(
+            {
+                "task": "translate_article",
+                "error_category": article.translation_error_category,
+                "count": article.translation_retry_count,
+                "occurred_at": timezone.now().isoformat(),
+                "article_id": article.id,
+            }
+        )
+        if safe_payload is None:
+            return
+        summary = " ".join(
+            [signature, *[f"{key}={value}" for key, value in safe_payload.items()]]
+        )
+    else:
+        summary = (
+            f"{signature} article_id={article.id} category={article.translation_error_category} "
+            f"retry_count={article.translation_retry_count} {article_url}"
+        )
     log = NotificationLog.objects.create(
         type=NotificationType.TRANSLATION_FAILED,
         channel=NotificationChannel.EMAIL,
@@ -420,20 +491,29 @@ def notify_terminal_translation_failure(article: NewsArticle) -> None:
         log.error_message = "翻译失败邮件未启用或未配置收件人"
         log.save(update_fields=["status", "error_message", "updated_at"])
         return
-    body = "\n".join(
-        [
-            "UmaFans 翻译任务已停止自动重试。",
-            "",
-            f"文章 ID: {article.id}",
-            f"标题: {article.effective_title}",
-            f"地区: {article.racing_region}",
-            f"来源: {article.source_site}:{article.source_mode}",
-            f"失败分类: {article.translation_error_category}",
-            f"重试次数: {article.translation_retry_count}",
-            f"最后错误: {article.translation_error_message}",
-            f"快速处理: {article_url}",
-        ]
-    )
+    if internal_mode:
+        body = "\n".join(
+            [
+                "UmaFans 内部运维通知。",
+                "",
+                *[f"{key}: {value}" for key, value in safe_payload.items()],
+            ]
+        )
+    else:
+        body = "\n".join(
+            [
+                "UmaFans 翻译任务已停止自动重试。",
+                "",
+                f"文章 ID: {article.id}",
+                f"标题: {article.effective_title}",
+                f"地区: {article.racing_region}",
+                f"来源: {article.source_site}:{article.source_mode}",
+                f"失败分类: {article.translation_error_category}",
+                f"重试次数: {article.translation_retry_count}",
+                f"最后错误: {article.translation_error_message}",
+                f"快速处理: {article_url}",
+            ]
+        )
     try:
         send_mail(
             "[UmaFans] 翻译任务失败，需要处理",

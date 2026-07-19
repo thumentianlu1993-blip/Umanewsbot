@@ -29,6 +29,23 @@ class SourceSite(models.TextChoices):
     AT_THE_RACES = "at_the_races", "At The Races"
     BLOODHORSE = "bloodhorse", "BloodHorse"
     PAULICK_REPORT = "paulick_report", "Paulick Report"
+    HRI_NEWS = "hri_news", "Horse Racing Ireland News"
+    WOODBINE_NEWS = "woodbine_news", "Woodbine News"
+    EMIRATES_RACING_AUTHORITY = "emirates_racing_authority", "Emirates Racing Authority"
+    JCSA_NEWS = "jcsa_news", "Jockey Club of Saudi Arabia News"
+    RACING_VICTORIA_NEWS = "racing_victoria_news", "Racing Victoria News"
+    RTE_RACING = "rte_racing", "RTÉ Racing"
+    IRISHRACING_NEWS = "irishracing_news", "IrishRacing News"
+    CANADIAN_THOROUGHBRED = "canadian_thoroughbred", "Canadian Thoroughbred"
+    ASSINIBOIA_DOWNS_NEWS = "assiniboia_downs_news", "Assiniboia Downs News"
+    DUBAI_RACING_CLUB = "dubai_racing_club", "Dubai Racing Club"
+    THE_NATIONAL_RACING = "the_national_racing", "The National Horse Racing"
+    SPA_HORSE_RACING = "spa_horse_racing", "Saudi Press Agency Horse Racing"
+    ARAB_NEWS_RACING = "arab_news_racing", "Arab News Horse Racing"
+    JUST_HORSE_RACING = "just_horse_racing", "Just Horse Racing"
+    THE_STRAIGHT = "the_straight", "The Straight"
+    RACING_NSW_NEWS = "racing_nsw_news", "Racing NSW News"
+    TASRACING_NEWS = "tasracing_news", "Tasracing News"
 
 
 class SourceMode(models.TextChoices):
@@ -59,6 +76,11 @@ class RacingRegion(models.TextChoices):
     UNITED_KINGDOM = "united_kingdom", "英国"
     FRANCE = "france", "法国"
     UNITED_STATES = "united_states", "美国"
+    IRELAND = "ireland", "爱尔兰"
+    CANADA = "canada", "加拿大"
+    UNITED_ARAB_EMIRATES = "united_arab_emirates", "阿联酋"
+    SAUDI_ARABIA = "saudi_arabia", "沙特阿拉伯"
+    AUSTRALIA = "australia", "澳大利亚"
     OTHER = "other", "其他"
 
 

@@ -344,18 +344,22 @@ class MultiRegionAttributionAndGateTests(TestCase):
         )
         self.assertEqual(result.reason, "source_region_with_ambiguous_context")
 
-    def test_ireland_content_is_temporarily_grouped_with_uk_and_tagged(self):
+    def test_irish_derby_is_attributed_to_ireland_without_legacy_tag(self):
         article = self._article(
             title_ja="Irish Derby result at the Curragh",
             body_ja_raw="Irish Derby result at the Curragh. " * 8,
             body_ja_normalized="Irish Derby result at the Curragh. " * 8,
         )
 
-        apply_article_attribution(article, force=True)
+        result = apply_article_attribution(article, force=True)
         article.refresh_from_db()
 
-        self.assertIn(RacingRegion.UNITED_KINGDOM, article_region_set(article))
-        self.assertIn("ireland", article.tags_json)
+        self.assertEqual(result.primary_region, RacingRegion.IRELAND)
+        self.assertEqual(
+            article_region_set(article),
+            {RacingRegion.IRELAND},
+        )
+        self.assertNotIn("ireland", article.tags_json)
 
     def test_english_term_gate_accepts_terms_from_related_regions(self):
         article = self._article(racing_region=RacingRegion.FRANCE)
@@ -4381,13 +4385,22 @@ class MultiRegionNewsProductionTests(TestCase):
             source_site=SourceSite.HKJC_NEWS,
             source_mode=SourceMode.OFFICIAL,
             enabled=True,
+            production_approved=True,
             priority=1,
             crawl_interval_minutes=1,
         )
         for index, source in enumerate([first, second]):
             source.enabled = True
+            source.production_approved = True
             source.last_crawl_at = timezone.now() - timedelta(hours=6 + index)
-            source.save(update_fields=["enabled", "last_crawl_at", "updated_at"])
+            source.save(
+                update_fields=[
+                    "enabled",
+                    "production_approved",
+                    "last_crawl_at",
+                    "updated_at",
+                ]
+            )
 
         selection = select_due_enabled_news_sources(max_sources=2)
 
@@ -4415,6 +4428,7 @@ class MultiRegionNewsProductionTests(TestCase):
             source_site=SourceSite.HKJC_NEWS,
             source_mode=SourceMode.LATEST,
             enabled=True,
+            production_approved=True,
             crawl_interval_minutes=1,
         )
         CrawlJob.objects.create(source=source, status=TaskStatus.STARTED, started_at=timezone.now() - timedelta(minutes=90))
@@ -13524,6 +13538,22 @@ class TranslationWorkflowTests(TestCase):
 
 
 class CrawlAutoTranslateTests(TestCase):
+    def _international_draft(self, *, source: NewsSource, stub) -> CanonicalNewsDraft:
+        return CanonicalNewsDraft(
+            source_site=source.source_site,
+            source_mode=source.source_mode,
+            source_article_id=stub.source_url.rsplit("/", 1)[-1],
+            source_url=stub.source_url,
+            title_ja="International fixture article",
+            body_ja_raw="International fixture body",
+            body_ja_normalized="International fixture body",
+            published_at=timezone.now(),
+            images=[],
+            racing_region=source.racing_region,
+            source_language=source.source_language,
+            source_kind=source.source_kind,
+        )
+
     @override_settings(AUTO_TRANSLATE_ON_INGEST=True, AUTO_TRANSLATE_SYNC=True)
     def test_new_article_is_translated_immediately_after_ingest(self):
         stub = type("Stub", (), {"source_article_id": "123"})()
@@ -13633,7 +13663,11 @@ class CrawlAutoTranslateTests(TestCase):
         self.assertEqual(source.last_crawl_status, TaskStatus.SUCCESS)
         self.assertEqual(source.last_crawl_message, "新增 0，重复 1")
 
-    @override_settings(AUTO_TRANSLATE_ON_INGEST=False, QQ_PUSH_ENABLED=True)
+    @override_settings(
+        AUTO_TRANSLATE_ON_INGEST=False,
+        QQ_PUSH_ENABLED=True,
+        SITE_INTERNAL_ONLY_ENABLED=False,
+    )
     def test_source_elevated_public_article_dispatches_qq_auto_push(self):
         sync_builtin_sources()
         source = NewsSource.objects.get(source_site=SourceSite.NETKEIBA, source_mode=SourceMode.ACCESS)
@@ -13735,11 +13769,18 @@ class CrawlAutoTranslateTests(TestCase):
             {"task_id": "ranked-revival-task-1"},
         )
 
-    @override_settings(AUTO_TRANSLATE_ON_INGEST=False, QQ_PUSH_ENABLED=True)
+    @override_settings(
+        AUTO_TRANSLATE_ON_INGEST=False,
+        QQ_PUSH_ENABLED=True,
+        SITE_INTERNAL_ONLY_ENABLED=False,
+    )
     def test_international_source_elevated_public_article_dispatches_qq_auto_push(self):
         sync_builtin_sources()
         source = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
+        source.production_approved = True
+        source.save(update_fields=["production_approved", "updated_at"])
         stub = type("Stub", (), {"source_url": "https://www.skysports.com/racing/news/sky-ranked-article"})()
+        draft = self._international_draft(source=source, stub=stub)
         article = NewsArticle.objects.create(
             source_site=SourceSite.SKY_SPORTS_RACING,
             source_mode=SourceMode.ACCESS,
@@ -13765,7 +13806,7 @@ class CrawlAutoTranslateTests(TestCase):
                 return object()
 
             def normalize_source_payload(self, stub, detail):
-                return object()
+                return draft
 
         with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {source.adapter_key: FakeInternationalAdapter}), patch(
             "stable.tasks.upsert_article_from_draft",
@@ -13781,7 +13822,10 @@ class CrawlAutoTranslateTests(TestCase):
     def test_international_source_elevated_unpublished_article_runs_ranked_revival_without_qq_push(self):
         sync_builtin_sources()
         source = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
+        source.production_approved = True
+        source.save(update_fields=["production_approved", "updated_at"])
         stub = type("Stub", (), {"source_url": "https://www.skysports.com/racing/news/sky-ranked-unpublished"})()
+        draft = self._international_draft(source=source, stub=stub)
         article = NewsArticle.objects.create(
             source_site=SourceSite.SKY_SPORTS_RACING,
             source_mode=SourceMode.ACCESS,
@@ -13806,7 +13850,7 @@ class CrawlAutoTranslateTests(TestCase):
                 return object()
 
             def normalize_source_payload(self, stub, detail):
-                return object()
+                return draft
 
         with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {source.adapter_key: FakeInternationalAdapter}), patch(
             "stable.tasks.upsert_article_from_draft",
@@ -13826,8 +13870,11 @@ class CrawlAutoTranslateTests(TestCase):
     def test_international_detail_parse_error_skips_article_and_continues(self):
         sync_builtin_sources()
         source = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
+        source.production_approved = True
+        source.save(update_fields=["production_approved", "updated_at"])
         bad_stub = type("Stub", (), {"source_url": "https://www.skysports.com/racing/news/bad-detail"})()
         good_stub = type("Stub", (), {"source_url": "https://www.skysports.com/racing/news/good-detail"})()
+        draft = self._international_draft(source=source, stub=good_stub)
         article = NewsArticle.objects.create(
             source_site=SourceSite.SKY_SPORTS_RACING,
             source_mode=SourceMode.ACCESS,
@@ -13852,7 +13899,7 @@ class CrawlAutoTranslateTests(TestCase):
                 return object()
 
             def normalize_source_payload(self, stub, detail):
-                return object()
+                return draft
 
         with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {source.adapter_key: FakeInternationalAdapter}), patch(
             "stable.tasks.upsert_article_from_draft", return_value=ArticleUpsertResult(article=article, created=True)
@@ -13872,6 +13919,8 @@ class CrawlAutoTranslateTests(TestCase):
     def test_international_listing_skips_are_recorded_without_marking_source_failed(self):
         sync_builtin_sources()
         source = NewsSource.objects.get(source_site=SourceSite.TDN_FRANCE, source_mode=SourceMode.ACCESS)
+        source.production_approved = True
+        source.save(update_fields=["production_approved", "updated_at"])
 
         class FakeInternationalAdapter:
             def __init__(self):
@@ -13906,6 +13955,8 @@ class CrawlAutoTranslateTests(TestCase):
     def test_international_all_detail_parse_errors_mark_source_failed(self):
         sync_builtin_sources()
         source = NewsSource.objects.get(source_site=SourceSite.SKY_SPORTS_RACING, source_mode=SourceMode.ACCESS)
+        source.production_approved = True
+        source.save(update_fields=["production_approved", "updated_at"])
         bad_stub = type("Stub", (), {"source_url": "https://www.skysports.com/racing/news/bad-detail"})()
 
         class FakeInternationalAdapter:

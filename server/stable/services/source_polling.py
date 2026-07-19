@@ -7,6 +7,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from stable.models import CrawlJob, NewsSource, SourceKind, SourceMode, SourceSite, TaskStatus
+from stable.services.source_permissions import permission_audit_reason_for_source
 
 
 FIXED_SCHEDULE_SOURCES = {
@@ -98,6 +99,9 @@ def select_due_enabled_news_sources(
         if is_fixed_schedule_source(source):
             skipped.append(SourcePollItem(source, "fixed_schedule"))
             continue
+        if source.production_approved is not True:
+            skipped.append(SourcePollItem(source, "production_not_approved"))
+            continue
         if allowed_regions and source.racing_region not in allowed_regions:
             skipped.append(SourcePollItem(source, "region_not_allowed"))
             continue
@@ -112,9 +116,15 @@ def select_due_enabled_news_sources(
         if completed_at is not None and completed_at > now - timedelta(minutes=source.crawl_interval_minutes):
             skipped.append(SourcePollItem(source, "not_due"))
             continue
-        due.append(SourcePollItem(source, "never_run" if completed_at is None else "due"))
+        due_reason = "never_run" if completed_at is None else "due"
+        permission_reason = permission_audit_reason_for_source(source)
+        due.append(
+            SourcePollItem(
+                source,
+                f"{due_reason};{permission_reason}",
+            )
+        )
 
     selected = due[:max_sources]
     deferred = due[max_sources:]
     return SourcePollSelection(selected=selected, skipped=skipped, deferred=deferred)
-

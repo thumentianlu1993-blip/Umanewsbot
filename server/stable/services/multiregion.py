@@ -28,14 +28,24 @@ from stable.models import (
     WorkflowStatus,
 )
 from stable.services.news_attribution import filter_articles_visible_in_region
+from stable.services.regions import NEWS_PRODUCTION_REGIONS
 
-PRODUCTION_REGIONS = [
-    RacingRegion.JAPAN,
-    RacingRegion.HONG_KONG,
-    RacingRegion.UNITED_KINGDOM,
-    RacingRegion.FRANCE,
-    RacingRegion.UNITED_STATES,
-]
+PRODUCTION_REGIONS = list(NEWS_PRODUCTION_REGIONS)
+
+
+def region_review_publish_blocker(article: NewsArticle) -> str:
+    """返回地区人工审核发布硬门原因；空字符串表示该门未阻断。"""
+
+    review_candidate = (article.attribution_summary or {}).get("review_candidate")
+    if review_candidate and not article.attribution_locked:
+        return "region_review_required"
+    if any(
+        str(issue.get("code", "")) == "region_review_required"
+        and str(issue.get("severity", "")) == "blocker"
+        for issue in (article.gate_issues or [])
+    ):
+        return "region_review_required"
+    return ""
 
 
 @dataclass(frozen=True)

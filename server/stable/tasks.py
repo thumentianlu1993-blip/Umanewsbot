@@ -37,6 +37,7 @@ from stable.models import (
     RacingRegion,
     ReviewMode,
     SourceMode,
+    SourceSite,
     TaskExecutionLog,
     TaskStatus,
     TranslationStatus,
@@ -54,9 +55,24 @@ from stable.services.automation import (
     score_article_for_automation,
 )
 from stable.services.ingestion import upsert_article_from_draft
+from stable.services.internal_controls import (
+    external_ai_processing_allowed,
+    external_news_distribution_blocker,
+)
 from stable.services.multiregion import auto_publish_count_today, auto_publish_policy_for_article
 from stable.services.multiregion import summarize_multiregion_news_production
-from stable.services.news_attribution import apply_article_attribution
+from stable.services.news_attribution import (
+    apply_article_attribution,
+    attribution_preview_payload,
+    preview_content_scoped_region,
+)
+from stable.services.news_candidate_freshness import (
+    DATE_ONLY_CANDIDATE,
+    DATE_ONLY_HISTORICAL,
+    FRESHNESS_UNRESOLVED,
+    PRECISE_TIME_NOT_APPLICABLE,
+    classify_candidate_freshness,
+)
 from stable.services.notifications import send_automation_notification, send_high_value_warning_notification
 from stable.services.operations import log_operation
 from stable.services.ops_notifications import send_ops_notification, send_production_summary_notification
@@ -85,6 +101,11 @@ from stable.services.queueing import dispatch_task
 from stable.services.rewriting import apply_rewrite_result, rewrite_article
 from stable.services.sources import find_builtin_source, sync_builtin_sources
 from stable.services.source_polling import select_due_enabled_news_sources
+from stable.services.source_permissions import (
+    THIRD_BATCH_DIRECT_SOURCE_SITES,
+    preflight_source_access,
+    resolve_source_permission,
+)
 from stable.services.term_discovery import discover_and_aggregate_article
 from stable.services.translation import translate_article
 from stable.services.validation import apply_validation_outcome, validate_rewrite
@@ -439,15 +460,49 @@ def _window_starts_to_run(*, kind: str, scope_key: str, now: datetime, minutes: 
 
 
 def _http_status_code_from_exception(exc: Exception) -> int | None:
+    status_code = getattr(exc, "status_code", None)
+    if status_code is not None:
+        try:
+            return int(status_code)
+        except (TypeError, ValueError):
+            pass
     response = getattr(exc, "response", None)
     status_code = getattr(response, "status_code", None)
-    return int(status_code) if status_code is not None else None
+    if status_code is None:
+        return None
+    try:
+        return int(status_code)
+    except (TypeError, ValueError):
+        return None
 
 
-def _finish_crawl_window(window_id: int | None, *, status: str, reason: str, payload: dict | None = None, error: str = "") -> None:
+def _final_url_from_exception(exc: Exception) -> str:
+    return str(getattr(exc, "final_url", "") or "")
+
+
+def _finish_crawl_window(
+    window_id: int | None,
+    *,
+    status: str,
+    reason: str,
+    payload: dict | None = None,
+    error: str = "",
+    source_id: int | None = None,
+    require_running: bool = False,
+) -> None:
     if not window_id:
         return
-    window = ProductionWindow.objects.filter(pk=window_id, kind=ProductionWindowKind.CRAWL).first()
+    window_query = ProductionWindow.objects.filter(
+        pk=window_id,
+        kind=ProductionWindowKind.CRAWL,
+    )
+    if source_id is not None:
+        window_query = window_query.filter(source_id=source_id)
+    if require_running:
+        window_query = window_query.filter(
+            status=ProductionWindowStatus.RUNNING,
+        )
+    window = window_query.first()
     if window is None:
         return
     window.status = status
@@ -608,28 +663,241 @@ def _crawl_jra_source(source: NewsSource | None = None) -> dict:
         raise
 
 
-def _crawl_international_source(source: NewsSource) -> dict:
+class InternationalCrawlError(RuntimeError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        source_summary: dict | None = None,
+        error_category: str = "",
+    ) -> None:
+        super().__init__(message)
+        self.source_summary = dict(source_summary or {})
+        self.error_category = error_category
+
+
+def _freshness_source_summary() -> dict:
+    return {
+        "new_articles": 0,
+        "duplicates": 0,
+        "historical_filtered": 0,
+        "candidate_date_within_one_day": 0,
+        "historical_date_outside_one_day": 0,
+        "precise_time_not_applicable": 0,
+        "published_at_missing": 0,
+        "invalid_published_timezone": 0,
+        "freshness_unresolved": 0,
+        "published_at_unverified": 0,
+        "query_failures": 0,
+        "detail_failures": 0,
+    }
+
+
+def _crawl_international_source_core(
+    source: NewsSource,
+    *,
+    crawled_at: datetime | None = None,
+    permission_preflight_enforced: bool,
+) -> dict:
     adapter_class = INTERNATIONAL_ADAPTERS.get(source.adapter_key)
     if adapter_class is None:
         raise NotImplementedError(f"未支持的国际新闻适配器：{source.adapter_key}")
     adapter = adapter_class()
+    adapter_canonical_source_site = str(
+        getattr(adapter, "canonical_source_site", "")
+        or getattr(adapter, "source_site", "")
+        or ""
+    )
+    strict_direct_adapter = (
+        adapter_canonical_source_site
+        in THIRD_BATCH_DIRECT_SOURCE_SITES
+    )
     job = _start_crawl_job(source)
+    fixed_crawled_at = crawled_at or timezone.now()
     new_count = 0
     seen_count = 0
     detail_errors: list[str] = []
+    freshness_skips: list[str] = []
     ranked_revival_results: list[dict] = []
     unverified_time_count = 0
+    successful_detail_count = 0
+    target_unresolved_count = 0
+    source_summary = _freshness_source_summary()
     try:
-        for stub in adapter.fetch_listing(source.source_mode, 1):
+        permission = (
+            preflight_source_access(adapter)
+            if permission_preflight_enforced
+            else resolve_source_permission(adapter)
+        )
+        source_summary["permission_status"] = str(
+            getattr(permission, "status", "") or ""
+        )
+        source_summary["permission_reason"] = str(
+            getattr(permission, "reason", "") or ""
+        )
+        if strict_direct_adapter and not (
+            getattr(permission, "allowed", False) is True
+            and str(getattr(permission, "status", "") or "")
+            == "accepted"
+            and str(getattr(permission, "reason", "") or "")
+            == "internal_only_technical_access"
+        ):
+            reason = str(
+                getattr(permission, "reason", "")
+                or "technical_access_required"
+            )
+            raise InternationalCrawlError(
+                reason,
+                source_summary=source_summary,
+                error_category=reason,
+            )
+        enforce_for_adapter = (
+            permission_preflight_enforced
+            or str(getattr(permission, "canonical_source_site", "") or "")
+            != SourceSite.TDN
+        )
+        if (
+            enforce_for_adapter
+            and getattr(permission, "allowed", False) is not True
+        ):
+            reason = str(
+                getattr(permission, "reason", "")
+                or "permission_blocked_preflight"
+            )
+            raise InternationalCrawlError(
+                reason,
+                source_summary=source_summary,
+                error_category=reason,
+            )
+        if strict_direct_adapter and source.enabled is not True:
+            raise InternationalCrawlError(
+                "source_not_enabled",
+                source_summary=source_summary,
+                error_category="source_not_enabled",
+            )
+        if source.production_approved is not True:
+            raise InternationalCrawlError(
+                "source_not_production_approved",
+                source_summary=source_summary,
+                error_category="source_not_production_approved",
+            )
+
+        stubs = list(adapter.fetch_listing(source.source_mode, 1))
+        listing_skips = list(getattr(adapter, "skipped_items", []) or [])
+        for listing_skip in listing_skips:
+            _prefix, separator, raw_reason = str(listing_skip).partition(": ")
+            reason = (
+                raw_reason if separator else str(listing_skip)
+            ).split(maxsplit=1)[0]
+            if reason == "stale_published_at":
+                source_summary["historical_filtered"] += 1
+            elif reason == "missing_published_at":
+                source_summary["published_at_missing"] += 1
+        if not stubs and not listing_skips:
+            error_message = "empty_listing: HTTP/listing response contained no parsable article links"
+            raise InternationalCrawlError(
+                error_message,
+                source_summary=source_summary,
+                error_category="empty_listing",
+            )
+        for stub in stubs:
             try:
                 detail = adapter.fetch_detail(stub.source_url)
                 draft = adapter.normalize_source_payload(stub, detail)
+                successful_detail_count += 1
                 if (getattr(draft, "metadata", {}) or {}).get("published_at_verified") is False:
                     unverified_time_count += 1
             except Exception as exc:
+                failure_reason = str(exc)
+                if strict_direct_adapter and failure_reason in {
+                    "missing_published_at",
+                    "invalid_published_timezone",
+                }:
+                    successful_detail_count += 1
+                    target_unresolved_count += 1
+                    if failure_reason == "invalid_published_timezone":
+                        source_summary["invalid_published_timezone"] += 1
+                        source_summary[FRESHNESS_UNRESOLVED] += 1
+                    else:
+                        source_summary["published_at_missing"] += 1
+                    freshness_skips.append(
+                        f"{stub.source_url}: "
+                        f"{FRESHNESS_UNRESOLVED}:{failure_reason}"
+                    )
+                    continue
                 detail_errors.append(f"{stub.source_url}: {exc}")
                 continue
-            upsert_result = upsert_article_from_draft(draft, crawl_job=job)
+
+            preview = preview_content_scoped_region(
+                title=draft.title_ja,
+                lead=(draft.body_ja_normalized or draft.body_ja_raw or "")[:400],
+                source_region=(
+                    getattr(draft, "racing_region", "")
+                    or source.racing_region
+                ),
+            )
+            draft.metadata = dict(getattr(draft, "metadata", {}) or {})
+            draft.metadata["content_scoped_region_preview"] = (
+                attribution_preview_payload(preview)
+            )
+            target_region = (
+                preview.primary_region
+                if preview.primary_region
+                in {RacingRegion.IRELAND, RacingRegion.CANADA}
+                and preview.status != "needs_review"
+                and preview.confidence >= 85
+                else ""
+            )
+            if target_region or strict_direct_adapter:
+                freshness = classify_candidate_freshness(
+                    published_at=draft.published_at,
+                    published_at_evidence=draft.metadata.get(
+                        "published_at_evidence"
+                    ),
+                    published_at_verified=draft.metadata.get(
+                        "published_at_verified"
+                    ),
+                    crawled_at=fixed_crawled_at,
+                )
+                freshness_metadata = freshness.as_metadata()
+                draft.metadata["candidate_freshness"] = freshness_metadata
+                if freshness.decision == DATE_ONLY_CANDIDATE:
+                    source_summary[DATE_ONLY_CANDIDATE] += 1
+                elif freshness.decision == DATE_ONLY_HISTORICAL:
+                    source_summary[DATE_ONLY_HISTORICAL] += 1
+                    source_summary["historical_filtered"] += 1
+                    freshness_skips.append(
+                        f"{stub.source_url}: {DATE_ONLY_HISTORICAL}"
+                    )
+                    continue
+                elif freshness.decision == PRECISE_TIME_NOT_APPLICABLE:
+                    source_summary[PRECISE_TIME_NOT_APPLICABLE] += 1
+                elif freshness.decision == FRESHNESS_UNRESOLVED:
+                    target_unresolved_count += 1
+                    reason = freshness.reason
+                    if reason == "invalid_published_timezone":
+                        source_summary["invalid_published_timezone"] += 1
+                        source_summary[FRESHNESS_UNRESOLVED] += 1
+                    elif reason in {
+                        "published_at_missing",
+                        "published_at_evidence_unverified",
+                        "published_at_unverified",
+                        "published_at_precision_missing",
+                        "naive_published_at",
+                    }:
+                        source_summary["published_at_missing"] += 1
+                    else:
+                        source_summary[FRESHNESS_UNRESOLVED] += 1
+                    freshness_skips.append(
+                        f"{stub.source_url}: {FRESHNESS_UNRESOLVED}:{reason}"
+                    )
+                    continue
+
+            upsert_result = upsert_article_from_draft(
+                draft,
+                crawl_job=job,
+                attribution_preview=preview,
+            )
             article, created = upsert_result
             if created:
                 new_count += 1
@@ -647,18 +915,42 @@ def _crawl_international_source(source: NewsSource) -> dict:
                     article,
                     source_elevated=bool(getattr(upsert_result, "source_elevated", False)),
                 )
-        listing_skips = list(getattr(adapter, "skipped_items", []) or [])
         query_errors = list(getattr(adapter, "last_listing_query_errors", []) or [])
-        skipped_errors = [*listing_skips, *detail_errors]
+        skipped_errors = [*listing_skips, *detail_errors, *freshness_skips]
+        source_summary.update(
+            {
+                "new_articles": new_count,
+                "duplicates": seen_count,
+                "published_at_unverified": unverified_time_count,
+                "query_failures": len(query_errors),
+                "detail_failures": len(detail_errors),
+            }
+        )
         message = ""
         if skipped_errors:
             message = f"新增 {new_count}，重复 {seen_count}；跳过 {len(skipped_errors)} 条：{skipped_errors[0][:120]}"
             if detail_errors:
                 message = f"新增 {new_count}，重复 {seen_count}；parse failed 跳过 {len(skipped_errors)} 条：{skipped_errors[0][:120]}"
-        if detail_errors and new_count == 0 and seen_count == 0:
-            error_message = message or "parse failed: no parsable article details"
-            _finish_crawl_job(job, success_count=new_count, fail_count=len(detail_errors), error_message=error_message)
-            raise RuntimeError(error_message)
+        if detail_errors and successful_detail_count == 0:
+            error_message = f"all_details_failed: {message or 'parse failed: no parsable article details'}"
+            raise InternationalCrawlError(
+                error_message,
+                source_summary=source_summary,
+                error_category="all_details_failed",
+            )
+        if (
+            successful_detail_count > 0
+            and target_unresolved_count == successful_detail_count
+            and source_summary[DATE_ONLY_HISTORICAL] == 0
+            and new_count == 0
+            and seen_count == 0
+        ):
+            source_summary[FRESHNESS_UNRESOLVED] = target_unresolved_count
+            raise InternationalCrawlError(
+                "all_candidates_unresolved",
+                source_summary=source_summary,
+                error_category="all_candidates_unresolved",
+            )
         _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, message=message)
         return {
             "new_count": new_count,
@@ -666,21 +958,39 @@ def _crawl_international_source(source: NewsSource) -> dict:
             "skipped_count": len(skipped_errors),
             "crawl_job_id": job.id,
             "ranked_revival_results": ranked_revival_results,
-            "source_summary": {
-                "new_articles": new_count,
-                "duplicates": seen_count,
-                "historical_filtered": sum("stale_published_at" in item for item in listing_skips),
-                "published_at_missing": sum("missing_published_at" in item for item in listing_skips),
-                "published_at_unverified": unverified_time_count,
-                "query_failures": len(query_errors),
-                "detail_failures": len(detail_errors),
-            },
+            "source_summary": source_summary,
         }
     except Exception as exc:
         job.refresh_from_db(fields=["status"])
         if job.status == TaskStatus.STARTED:
-            _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, error_message=str(exc))
+            error_category = str(
+                getattr(exc, "error_category", "") or ""
+            )
+            if error_category == "all_details_failed":
+                fail_count = len(detail_errors)
+            elif error_category == "all_candidates_unresolved":
+                fail_count = target_unresolved_count
+            else:
+                fail_count = seen_count
+            _finish_crawl_job(
+                job,
+                success_count=new_count,
+                fail_count=fail_count,
+                error_message=str(exc),
+            )
         raise
+
+
+def _crawl_international_source(
+    source: NewsSource,
+    *,
+    crawled_at: datetime | None = None,
+) -> dict:
+    return _crawl_international_source_core(
+        source,
+        crawled_at=crawled_at,
+        permission_preflight_enforced=True,
+    )
 
 
 @shared_task
@@ -751,7 +1061,10 @@ def crawl_news_source_task(source_id: int, window_id: int | None = None) -> dict
         elif source.adapter_key == "jra":
             result = _crawl_jra_source(source=source)
         elif source.adapter_key in INTERNATIONAL_ADAPTERS:
-            result = _crawl_international_source(source)
+            result = _crawl_international_source(
+                source,
+                crawled_at=timezone.now(),
+            )
         else:
             raise NotImplementedError("当前版本仅支持内置 netkeiba / JRA / 一期国际新闻来源")
         record_source_crawl_result(source, success=True)
@@ -759,23 +1072,145 @@ def crawl_news_source_task(source_id: int, window_id: int | None = None) -> dict
             window_id,
             status=ProductionWindowStatus.SUCCEEDED,
             reason="completed",
+            source_id=source.id,
+            require_running=True,
             payload={
                 "new_count": result.get("new_count", 0),
                 "seen_count": result.get("seen_count", 0),
                 "crawl_job_id": result.get("crawl_job_id"),
                 "ranked_revival_results": result.get("ranked_revival_results", []),
+                "source_summary": result.get("source_summary", {}),
             },
         )
         _log_success(log, f"source={source_id} new={result['new_count']} seen={result['seen_count']}")
         return result
     except Exception as exc:
-        error_category = classify_source_error(status_code=_http_status_code_from_exception(exc), message=str(exc))
+        http_status = _http_status_code_from_exception(exc)
+        final_url = _final_url_from_exception(exc)
+        error_category = str(getattr(exc, "error_category", "") or "")
+        if not error_category:
+            error_category = classify_source_error(
+                status_code=http_status,
+                message=str(exc),
+            )
         record_source_crawl_result(source, success=False, error_category=error_category)
         _finish_crawl_window(
             window_id,
             status=ProductionWindowStatus.FAILED,
             reason="crawl_failed",
-            payload={"error_category": error_category},
+            source_id=source.id,
+            require_running=True,
+            payload={
+                "error_category": error_category,
+                "http_status": http_status,
+                "final_url": final_url,
+                "source_summary": dict(
+                    getattr(exc, "source_summary", {}) or {}
+                ),
+            },
+            error=str(exc),
+        )
+        _log_failure(log, str(exc))
+        raise
+
+
+@shared_task
+def crawl_scheduled_news_source_task(
+    source_id: int,
+    window_id: int | None = None,
+) -> dict:
+    """Automatic polling entry with an internal, non-forgeable policy."""
+
+    if window_id is not None and not ProductionWindow.objects.filter(
+        pk=window_id,
+        source_id=source_id,
+        source__deleted_at__isnull=True,
+        kind=ProductionWindowKind.CRAWL,
+        status=ProductionWindowStatus.RUNNING,
+    ).exists():
+        raise InternationalCrawlError(
+            "invalid_scheduled_crawl_window",
+            error_category="invalid_scheduled_crawl_window",
+        )
+
+    sync_builtin_sources()
+    source = NewsSource.objects.get(pk=source_id, deleted_at__isnull=True)
+    log = _log_start(
+        "crawl_scheduled_news_source",
+        {"source_id": source_id, "window_id": window_id},
+    )
+    enforce_permission = bool(
+        getattr(
+            settings,
+            "NEWS_SOURCE_PERMISSION_PREFLIGHT_ENFORCEMENT_ENABLED",
+            False,
+        )
+    )
+    try:
+        if source.adapter_key == "netkeiba":
+            pages = 3 if source.source_mode == SourceMode.LATEST else 1
+            result = _crawl_netkeiba_mode(source.source_mode, pages, source=source)
+        elif source.adapter_key == "jra":
+            result = _crawl_jra_source(source=source)
+        elif source.adapter_key in INTERNATIONAL_ADAPTERS:
+            result = _crawl_international_source_core(
+                source,
+                crawled_at=timezone.now(),
+                permission_preflight_enforced=enforce_permission,
+            )
+        else:
+            raise NotImplementedError(
+                "当前版本仅支持内置 netkeiba / JRA / 一期国际新闻来源"
+            )
+        record_source_crawl_result(source, success=True)
+        _finish_crawl_window(
+            window_id,
+            status=ProductionWindowStatus.SUCCEEDED,
+            reason="completed",
+            source_id=source.id,
+            require_running=True,
+            payload={
+                "new_count": result.get("new_count", 0),
+                "seen_count": result.get("seen_count", 0),
+                "crawl_job_id": result.get("crawl_job_id"),
+                "ranked_revival_results": result.get(
+                    "ranked_revival_results",
+                    [],
+                ),
+                "source_summary": result.get("source_summary", {}),
+            },
+        )
+        _log_success(
+            log,
+            f"source={source_id} new={result['new_count']} seen={result['seen_count']}",
+        )
+        return result
+    except Exception as exc:
+        error_category = str(getattr(exc, "error_category", "") or "")
+        if not error_category:
+            error_category = classify_source_error(
+                status_code=_http_status_code_from_exception(exc),
+                message=str(exc),
+            )
+        record_source_crawl_result(
+            source,
+            success=False,
+            error_category=error_category,
+        )
+        _finish_crawl_window(
+            window_id,
+            status=ProductionWindowStatus.FAILED,
+            reason="crawl_failed",
+            source_id=source.id,
+            require_running=True,
+            payload={
+                "error_category": error_category,
+                "http_status": _http_status_code_from_exception(exc),
+                "final_url": _final_url_from_exception(exc),
+                "source_summary": dict(
+                    getattr(exc, "source_summary", {}) or {}
+                ),
+            },
             error=str(exc),
         )
         _log_failure(log, str(exc))
@@ -863,7 +1298,11 @@ def crawl_production_sources_window_task(now_iso: str | None = None) -> dict:
                 skipped.append({"id": source.id, "name": source.name, "window_id": window.id, "reason": claim.reason})
                 continue
             try:
-                dispatch_result = dispatch_task(crawl_news_source_task, source.id, window.id)
+                dispatch_result = dispatch_task(
+                    crawl_scheduled_news_source_task,
+                    source.id,
+                    claim.window.id,
+                )
                 window = claim.window
                 window.refresh_from_db()
                 if window.status == ProductionWindowStatus.RUNNING:
@@ -915,7 +1354,7 @@ def crawl_enabled_news_sources_task() -> dict:
     for item in selection.selected:
         source = item.source
         try:
-            dispatch_task(crawl_news_source_task, source.id)
+            dispatch_task(crawl_scheduled_news_source_task, source.id)
             triggered.append({"id": source.id, "name": source.name, "reason": item.reason})
         except Exception as exc:
             failed.append({"id": source.id, "name": source.name, "error": str(exc)})
@@ -968,6 +1407,24 @@ def translate_article_task(
     previous_automation_status = ""
     try:
         article = NewsArticle.objects.get(pk=article_id)
+        if not external_ai_processing_allowed(settings.TRANSLATION_PROVIDER):
+            reason = "external_translation_disabled"
+            if preclaimed_retry:
+                from stable.services.translation_recovery import (
+                    release_preclaimed_translation_retry_for_ai_gate,
+                )
+
+                release_preclaimed_translation_retry_for_ai_gate(
+                    article.id,
+                    now=timezone.now(),
+                )
+            _log_success(log, f"skipped article={article_id} reason={reason}")
+            return {
+                "article_id": article_id,
+                "translated": False,
+                "skipped": True,
+                "reason": reason,
+            }
         force_published = bool(force and article.workflow_status == WorkflowStatus.PUBLISHED)
         previous_automation_status = article.automation_status
         if not preclaimed_retry and article.translation_status == ArticleTranslationStatus.TRANSLATING:
@@ -1161,6 +1618,18 @@ def rewrite_article_task(article_id: int) -> dict:
     if article.review_mode != ReviewMode.AUTO:
         _log_success(log, "skipped non-auto article")
         return {"article_id": article.id, "skipped": True}
+    if not external_ai_processing_allowed(
+        getattr(settings, "REWRITE_PROVIDER", "")
+        or getattr(settings, "TRANSLATION_PROVIDER", "")
+    ):
+        reason = "external_rewrite_disabled"
+        _log_success(log, f"skipped article={article_id} reason={reason}")
+        return {
+            "article_id": article.id,
+            "rewritten": False,
+            "skipped": True,
+            "reason": reason,
+        }
     try:
         result = rewrite_article(article)
         apply_rewrite_result(article, result)
@@ -1548,8 +2017,9 @@ def batch_translate_articles_task(article_ids: list[int] | None = None, limit: i
     failed_count = 0
     for article_id in article_ids_to_process:
         try:
-            translate_article_task.run(article_id)
-            translated_count += 1
+            result = translate_article_task.run(article_id)
+            if result.get("translated") is True:
+                translated_count += 1
         except Exception:
             failed_count += 1
     detail = f"processed={len(article_ids_to_process)} translated={translated_count} failed={failed_count}"
@@ -1567,9 +2037,26 @@ def batch_translate_articles_task(article_ids: list[int] | None = None, limit: i
 
 @shared_task
 def push_article_task(article_id: int, target_ids: list[int], user_id: int | None = None) -> dict:
+    blocker = external_news_distribution_blocker()
+    if blocker:
+        return {
+            "article_id": article_id,
+            "target_count": 0,
+            "skipped": True,
+            "reason": blocker,
+        }
     log = _log_start("push_article", {"article_id": article_id, "target_ids": target_ids})
     try:
         article = NewsArticle.objects.get(pk=article_id)
+        blocker = external_news_distribution_blocker(article=article)
+        if blocker:
+            _log_success(log, f"skipped article={article_id} reason={blocker}")
+            return {
+                "article_id": article_id,
+                "target_count": 0,
+                "skipped": True,
+                "reason": blocker,
+            }
         targets = list(PushTarget.objects.filter(pk__in=target_ids, is_active=True))
         user = User.objects.filter(pk=user_id).first() if user_id else None
         push_article_to_targets(article, targets, user)
@@ -1582,6 +2069,14 @@ def push_article_task(article_id: int, target_ids: list[int], user_id: int | Non
 
 @shared_task
 def qq_region_window_task(region: str, now_iso: str | None = None) -> dict:
+    blocker = external_news_distribution_blocker()
+    if blocker:
+        return {
+            "region": region,
+            "skipped": True,
+            "reason": blocker,
+            "delivery_ids": [],
+        }
     log = _log_start("qq_region_window", {"region": region, "now_iso": now_iso})
     if (
         not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ENABLED", False)
@@ -1731,6 +2226,13 @@ def qq_region_window_task(region: str, now_iso: str | None = None) -> dict:
 
 @shared_task
 def qq_production_regions_window_task(now_iso: str | None = None) -> dict:
+    blocker = external_news_distribution_blocker()
+    if blocker:
+        return {
+            "skipped": True,
+            "reason": blocker,
+            "triggered_regions": [],
+        }
     log = _log_start("qq_production_regions_window", {"now_iso": now_iso})
     if (
         not getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_ENABLED", False)
@@ -1802,6 +2304,14 @@ def _qq_push_retry_countdown(attempt_count: int) -> int:
 @shared_task
 def qq_auto_push_article_task(article_id: int) -> dict:
     log = _log_start("qq_auto_push_article", {"article_id": article_id})
+    blocker = external_news_distribution_blocker()
+    if blocker:
+        _log_success(log, f"skipped: {blocker}")
+        return {
+            "article_id": article_id,
+            "skipped": True,
+            "reason": blocker,
+        }
     if not getattr(settings, "QQ_PUSH_ENABLED", False):
         _log_success(log, "qq push disabled")
         return {"article_id": article_id, "skipped": True, "reason": "disabled"}
@@ -1849,6 +2359,18 @@ def qq_push_delivery_task(self, delivery_id: int) -> dict:
     log = _log_start("qq_push_delivery", {"delivery_id": delivery_id})
     try:
         delivery = QQPushDelivery.objects.select_related("article", "target").get(pk=delivery_id)
+        blocker = external_news_distribution_blocker()
+        if blocker:
+            delivery = process_qq_push_delivery(delivery)
+            result = {
+                "delivery_id": delivery.id,
+                "status": delivery.status,
+                "attempt_count": delivery.attempt_count,
+                "last_error_type": delivery.last_error_type,
+                "reason": blocker,
+            }
+            _log_success(log, f"skipped: {blocker}")
+            return result
         throttle_delay = qq_push_next_attempt_delay(delivery)
         if throttle_delay > 0 and not getattr(settings, "CELERY_TASK_ALWAYS_EAGER", False):
             self.apply_async(args=(delivery_id,), countdown=throttle_delay)

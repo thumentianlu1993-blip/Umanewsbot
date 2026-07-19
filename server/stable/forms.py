@@ -24,6 +24,7 @@ from .models import (
 )
 from .services.term_admin import serialize_aliases, sync_term_source_aliases, validate_term_payload
 from .services.news_attribution import set_article_regions
+from .services.regions import HORSE_PROFILE_FORM_REGIONS, RACE_EVENT_FORM_REGIONS
 
 
 HORSE_PROFILE_LOCK_CHOICES = [
@@ -196,6 +197,9 @@ class RaceEventForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["normalized_grade"].choices = [("", "未设置"), *RaceGrade.choices]
+        self.fields["country_region"].choices = [
+            (value, RacingRegion(value).label) for value in RACE_EVENT_FORM_REGIONS
+        ]
         if self.instance.pk:
             self.fields["aliases_text"].initial = "\n".join(
                 self.instance.aliases.filter(is_active=True).order_by("source_language", "text").values_list("text", flat=True)
@@ -302,7 +306,9 @@ class HorseProfileForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["racing_region"].choices = RacingRegion.choices
+        self.fields["racing_region"].choices = [
+            (value, RacingRegion(value).label) for value in HORSE_PROFILE_FORM_REGIONS
+        ]
         parent_queryset = HorseProfile.objects.exclude(pk=self.instance.pk).order_by("racing_region", "display_name_zh", "original_name", "id")
         self.fields["sire_horse_profile"].queryset = parent_queryset
         self.fields["dam_horse_profile"].queryset = parent_queryset
@@ -490,6 +496,15 @@ class ArticleEditorForm(forms.ModelForm):
             content_category=instance.content_category,
             save=True,
         )
+        if instance.attribution_locked:
+            remaining_issues = [
+                issue
+                for issue in (instance.gate_issues or [])
+                if str(issue.get("code", "")) != "region_review_required"
+            ]
+            if remaining_issues != (instance.gate_issues or []):
+                instance.gate_issues = remaining_issues
+                instance.save(update_fields=["gate_issues", "updated_at"])
 
 
 class TermEntryForm(forms.ModelForm):

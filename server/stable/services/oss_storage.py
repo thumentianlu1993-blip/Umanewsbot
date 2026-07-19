@@ -35,6 +35,11 @@ def _build_public_base_url() -> str:
 @deconstructible
 class AliyunOSSStorage(Storage):
     def __init__(self) -> None:
+        from stable.services.internal_controls import (
+            validate_internal_media_configuration,
+        )
+
+        validate_internal_media_configuration()
         self.bucket_name = settings.OSS_BUCKET_NAME
         self.endpoint = _normalize_endpoint(settings.OSS_ENDPOINT)
         self.media_prefix = (getattr(settings, "OSS_MEDIA_PREFIX", "media") or "media").strip("/ ")
@@ -96,6 +101,15 @@ class AliyunOSSStorage(Storage):
 
     def url(self, name: str) -> str:
         normalized = str(name).lstrip("/")
+        if (
+            getattr(settings, "SITE_INTERNAL_ONLY_ENABLED", True)
+            and getattr(settings, "OSS_PRIVATE_MEDIA_ENABLED", False)
+        ):
+            return self.bucket.sign_url(
+                "GET",
+                self._full_key(normalized),
+                int(settings.OSS_PRIVATE_MEDIA_URL_TTL_SECONDS),
+            )
         return f"{self.public_base_url}/{self._full_key(normalized)}"
 
     def get_modified_time(self, name: str) -> datetime:

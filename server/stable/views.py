@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import math
+import mimetypes
 import re
 import unicodedata
 import uuid
 from datetime import datetime, time, timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from urllib.parse import quote, unquote
 
 from django.conf import settings
 from django.contrib import messages
@@ -18,7 +20,13 @@ from django.core.signing import BadSignature, SignatureExpired
 from django.db import transaction
 from django.db.models import Count, F, Q
 from django.db.models.functions import Lower
-from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse
+from django.http import (
+    FileResponse,
+    HttpRequest,
+    HttpResponse,
+    HttpResponseForbidden,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.html import format_html
@@ -118,8 +126,17 @@ from .services.horse_profiles import (
     update_completeness,
 )
 from .services.horse_race_records import upsert_race_record
+from .services.internal_controls import (
+    filter_news_for_current_site,
+    news_article_visible_on_current_site,
+)
 from .services.media_assets import localize_news_image, set_cover_asset
-from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
+from .services.multiregion import (
+    PRODUCTION_REGIONS,
+    region_production_rows,
+    region_review_publish_blocker,
+)
+from .services.regions import HORSE_PROFILE_REGIONS, RACE_DATA_REGIONS
 from .services.onebot import BotPusher
 from .services.operations import log_operation
 from .services.race_event_public_cache import (
@@ -175,14 +192,31 @@ RACE_CALENDAR_PAGE_SIZE = 40
 RACE_CALENDAR_WINDOW_DAYS = 30
 HORSE_PROFILE_PAGE_SIZE = 40
 PUBLIC_HORSE_PAGE_SIZE = 24
-PUBLIC_REGION_TABS = [
+PUBLIC_NEWS_REGION_TABS = [
     {"value": "", "label": "综合"},
     {"value": RacingRegion.JAPAN, "label": "日本"},
     {"value": RacingRegion.HONG_KONG, "label": "中国香港"},
     {"value": RacingRegion.UNITED_KINGDOM, "label": "英国"},
     {"value": RacingRegion.FRANCE, "label": "法国"},
     {"value": RacingRegion.UNITED_STATES, "label": "美国"},
+    {"value": RacingRegion.IRELAND, "label": "爱尔兰"},
+    {"value": RacingRegion.CANADA, "label": "加拿大"},
+    {"value": RacingRegion.AUSTRALIA, "label": "澳大利亚"},
+    {
+        "value": RacingRegion.UNITED_ARAB_EMIRATES,
+        "label": "阿联酋",
+        "group_label": "中东",
+    },
+    {"value": RacingRegion.SAUDI_ARABIA, "label": "沙特阿拉伯"},
 ]
+PUBLIC_HORSE_REGION_TABS = [
+    {"value": "", "label": "综合"},
+    *[
+        {"value": value, "label": RacingRegion(value).label}
+        for value in HORSE_PROFILE_REGIONS
+    ],
+]
+PUBLIC_REGION_TABS = PUBLIC_NEWS_REGION_TABS
 
 
 class BackendLoginView(LoginView):
@@ -196,6 +230,76 @@ class BackendLoginView(LoginView):
 
 class BackendLogoutView(LogoutView):
     next_page = settings.LOGOUT_REDIRECT_URL
+
+
+@require_GET
+def robots_txt(_request: HttpRequest):
+    if getattr(settings, "SITE_INTERNAL_ONLY_ENABLED", True):
+        body = "User-agent: *\nDisallow: /\n"
+    else:
+        body = "User-agent: *\nDisallow:\n"
+    return HttpResponse(body, content_type="text/plain")
+
+
+def _validated_local_media_path(relative_path: str) -> tuple[Path, str] | None:
+    decoded = unquote(str(relative_path or "")).replace("\\", "/")
+    pure_path = PurePosixPath(decoded)
+    if (
+        not decoded
+        or decoded.startswith("/")
+        or pure_path.is_absolute()
+        or any(part in {"", ".", ".."} for part in pure_path.parts)
+    ):
+        return None
+
+    try:
+        media_root = Path(settings.MEDIA_ROOT).resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+
+    current = media_root
+    for part in pure_path.parts:
+        current = current / part
+        try:
+            if current.is_symlink():
+                return None
+        except OSError:
+            return None
+
+    try:
+        candidate = current.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+    if not candidate.is_relative_to(media_root) or not candidate.is_file():
+        return None
+    return candidate, pure_path.as_posix()
+
+
+@require_GET
+def protected_local_media(request: HttpRequest, relative_path: str):
+    if str(getattr(settings, "MEDIA_STORAGE_BACKEND", "local")).lower() != "local":
+        return HttpResponse(status=404)
+    if (
+        getattr(settings, "SITE_INTERNAL_ONLY_ENABLED", True)
+        and not request.user.is_authenticated
+    ):
+        return redirect(settings.LOGIN_URL)
+
+    validated = _validated_local_media_path(relative_path)
+    if validated is None:
+        return HttpResponse(status=404)
+    candidate, safe_relative_path = validated
+    content_type = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
+    if not settings.DEBUG:
+        response = HttpResponse(content_type=content_type)
+        response["X-Accel-Redirect"] = (
+            f"/protected-media/{quote(safe_relative_path, safe='/')}"
+        )
+        response["Cache-Control"] = "private, no-store"
+        return response
+    response = FileResponse(candidate.open("rb"), content_type=content_type)
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 def _redirect_with_query(request: HttpRequest, target: str):
@@ -477,7 +581,7 @@ def race_event_list(request: HttpRequest):
             page_obj=page_obj,
             race_events=page_obj.object_list,
             years=years,
-            regions=RacingRegion.choices,
+            regions=[(value, RacingRegion(value).label) for value in RACE_DATA_REGIONS],
             priorities=RaceEventPriority.choices,
             statuses=RaceEventStatus.choices,
             visibilities=RaceEventVisibility.choices,
@@ -731,7 +835,7 @@ def horse_profile_list(request: HttpRequest):
             request,
             page_obj=page_obj,
             horse_profiles=page_obj.object_list,
-            regions=RacingRegion.choices,
+            regions=[(value, RacingRegion(value).label) for value in HORSE_PROFILE_REGIONS],
             statuses=HorseProfileStatus.choices,
             completenesses=HorseProfileCompleteness.choices,
             p0_source_types=HorseP0SourceType.choices,
@@ -2176,6 +2280,7 @@ def article_editor(request: HttpRequest, article_id: int):
         ),
         pk=article_id,
     )
+    persisted_region_publish_blocker = region_review_publish_blocker(article)
     article.ensure_editable_fields()
     if request.method == "POST":
         form = ArticleEditorForm(request.POST, instance=article)
@@ -2188,6 +2293,28 @@ def article_editor(request: HttpRequest, article_id: int):
             elif intent == "reject":
                 article.workflow_status = WorkflowStatus.REJECTED
             elif intent == "publish":
+                if (
+                    persisted_region_publish_blocker
+                    or region_review_publish_blocker(article)
+                ):
+                    messages.error(
+                        request,
+                        "地区归属尚未人工确认并锁定，或地区审核阻断仍未解除，不能发布。",
+                    )
+                    return render(
+                        request,
+                        "stable/console/article_editor.html",
+                        _console_context(
+                            request,
+                            form=form,
+                            article=article,
+                            allow_publish_without_cover=bool(
+                                request.POST.get("publish_without_cover")
+                            ),
+                            term_type_choices=TermType.choices,
+                            quick_term_followup=None,
+                        ),
+                    )
                 if not article.cover_media_asset and not request.POST.get("publish_without_cover"):
                     messages.warning(request, "当前没有封面图，如确认无封面发布，请再次点击“发布”并勾选无封面确认。")
                     return render(
@@ -2379,20 +2506,27 @@ def _public_published_articles(region: str = ""):
         .filter(workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at__isnull=False)
         .order_by("-published_to_web_at", "-id")
     )
+    queryset = filter_news_for_current_site(queryset)
     if region:
         queryset = filter_articles_visible_in_region(queryset, region)
     return queryset
 
 
-def _resolve_public_region(value: str) -> str:
+def _resolve_public_news_region(value: str) -> str:
     candidate = (value or "").strip()
-    valid_regions = {tab["value"] for tab in PUBLIC_REGION_TABS if tab["value"]}
+    valid_regions = {tab["value"] for tab in PUBLIC_NEWS_REGION_TABS if tab["value"]}
     return candidate if candidate in valid_regions else ""
 
 
-def _region_tab_context(active_region: str) -> list[dict]:
+def _resolve_public_horse_region(value: str) -> str:
+    candidate = (value or "").strip()
+    valid_regions = {tab["value"] for tab in PUBLIC_HORSE_REGION_TABS if tab["value"]}
+    return candidate if candidate in valid_regions else ""
+
+
+def _region_tab_context(active_region: str, *, tab_definitions: list[dict]) -> list[dict]:
     tabs: list[dict] = []
-    for tab in PUBLIC_REGION_TABS:
+    for tab in tab_definitions:
         value = tab["value"]
         tabs.append(
             {
@@ -2495,6 +2629,8 @@ def _race_calendar_queryset(request: HttpRequest):
     queryset = RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED)
     tab = request.GET.get("tab", "key").strip() or "key"
     region = request.GET.get("region", "").strip()
+    if region not in RACE_DATA_REGIONS:
+        region = ""
     direction = request.GET.get("direction", "").strip()
     cursor = request.GET.get("cursor", "").strip()
     year = request.GET.get("year", "").strip()
@@ -2722,9 +2858,8 @@ def public_race_calendar(request: HttpRequest):
         return f"?{params.urlencode()}" if params else "?"
 
     region_tabs = [{"value": "", "label": "全部", "is_active": filters["region"] == "", "url": filter_url(region="")}]
-    for value, label in RacingRegion.choices:
-        if value == RacingRegion.OTHER:
-            continue
+    for value in RACE_DATA_REGIONS:
+        label = RacingRegion(value).label
         region_tabs.append(
             {
                 "value": value,
@@ -2862,6 +2997,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         if link.status in {ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL}
         and link.article.workflow_status == WorkflowStatus.PUBLISHED
         and link.article.published_to_web_at is not None
+        and news_article_visible_on_current_site(link.article)
     ]
     news_groups = {
         "pre_race": [link.article for link in public_links if link.link_type == ArticleRaceLinkType.PRE_RACE],
@@ -2948,7 +3084,7 @@ def public_race_sitemap_shard(request: HttpRequest, shard: int):
 
 
 def public_news_feed(request: HttpRequest):
-    active_region = _resolve_public_region(request.GET.get("region", ""))
+    active_region = _resolve_public_news_region(request.GET.get("region", ""))
     queryset = _public_published_articles(active_region)
     headline_article = _select_headline_article(queryset)
     hot_articles = _build_hot_articles(queryset)
@@ -2966,7 +3102,10 @@ def public_news_feed(request: HttpRequest):
             "headline_article": headline_article,
             "feed_articles": feed_articles,
             "hot_articles": hot_articles,
-            "region_tabs": _region_tab_context(active_region),
+            "region_tabs": _region_tab_context(
+                active_region,
+                tab_definitions=PUBLIC_NEWS_REGION_TABS,
+            ),
             "active_region": active_region,
             "followed_entries": _public_followed_entries(request),
             "pagination_querystring": pagination_params.urlencode(),
@@ -2975,12 +3114,15 @@ def public_news_feed(request: HttpRequest):
 
 
 def public_article_detail(request: HttpRequest, article_id: int):
-    article = get_object_or_404(
+    queryset = filter_news_for_current_site(
         NewsArticle.objects.prefetch_related(
             "race_links__event",
             "horse_links__horse_profile",
             "related_region_links",
-        ),
+        )
+    )
+    article = get_object_or_404(
+        queryset,
         workflow_status=WorkflowStatus.PUBLISHED,
         published_to_web_at__isnull=False,
         pk=article_id,
@@ -3003,7 +3145,7 @@ def public_article_detail(request: HttpRequest, article_id: int):
 def public_horse_index(request: HttpRequest):
     queryset = _public_horse_queryset()
     query = request.GET.get("q", "").strip()
-    region = _resolve_public_region(request.GET.get("region", ""))
+    region = _resolve_public_horse_region(request.GET.get("region", ""))
     if query:
         queryset = queryset.filter(
             Q(display_name_zh__icontains=query)
@@ -3024,7 +3166,10 @@ def public_horse_index(request: HttpRequest):
         {
             "page_obj": page_obj,
             "horse_profiles": page_obj.object_list,
-            "region_tabs": _region_tab_context(region),
+            "region_tabs": _region_tab_context(
+                region,
+                tab_definitions=PUBLIC_HORSE_REGION_TABS,
+            ),
             "filters": {"q": query, "region": region},
             "pagination_querystring": pagination_params.urlencode(),
         },
@@ -3049,6 +3194,7 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
         if link.status in {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL}
         and link.article.workflow_status == WorkflowStatus.PUBLISHED
         and link.article.published_to_web_at is not None
+        and news_article_visible_on_current_site(link.article)
     ]
     public_race_links = [
         link
@@ -3113,8 +3259,9 @@ def public_horse_follows(request: HttpRequest):
 
 
 def legacy_public_article_detail(request: HttpRequest, slug: str):
+    queryset = filter_news_for_current_site(NewsArticle.objects.all())
     article = get_object_or_404(
-        NewsArticle,
+        queryset,
         workflow_status=WorkflowStatus.PUBLISHED,
         published_to_web_at__isnull=False,
         public_slug=slug,

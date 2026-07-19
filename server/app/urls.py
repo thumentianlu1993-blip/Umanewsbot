@@ -12,6 +12,12 @@ def healthcheck(_request):
 
 
 urlpatterns = [
+    path("robots.txt", stable_views.robots_txt, name="robots-txt"),
+    path(
+        "media/<path:relative_path>",
+        stable_views.protected_local_media,
+        name="protected-local-media",
+    ),
     path("", stable_views.public_news_feed, name="public-news-feed"),
     path("races/", stable_views.public_race_calendar, name="public-race-calendar"),
     path("sitemap.xml", stable_views.public_sitemap_index, name="public-sitemap-index"),
@@ -33,5 +39,9 @@ urlpatterns = [
     path("healthz/", healthcheck, name="healthcheck"),
 ]
 
-if settings.DEBUG and settings.MEDIA_STORAGE_BACKEND != "oss":
+if (
+    settings.DEBUG
+    and settings.MEDIA_STORAGE_BACKEND != "oss"
+    and not settings.SITE_INTERNAL_ONLY_ENABLED
+):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
