@@ -17,6 +17,7 @@ from django.utils import timezone
 from stable.models import (
     HorseP0Source,
     HorseProfile,
+    HorseProfileCompletionRun,
     HorseProfileDataCandidate,
     HorseRaceRecord,
     RaceEvent,
@@ -583,6 +584,16 @@ class P0HorseProductionApplyTests(TestCase):
                 [{"decision": "bind_existing", "profile": profile}],
             )
 
+    def test_prepare_rejects_candidate_region_that_conflicts_with_research(self):
+        horse = self._horse(0)
+        horse["candidate"]["sample_region"] = "hong_kong"
+
+        with self.assertRaisesRegex(
+            P0ReviewedArtifactError,
+            "candidate sample region conflicts with research region",
+        ):
+            self._prepare([horse], [{"decision": "create_new"}])
+
     def test_dry_run_performs_validation_and_writes_nothing(self):
         horse = self._horse(0)
         artifact_path, _ = self._prepare([horse], [{"decision": "create_new"}])
@@ -725,10 +736,50 @@ class P0HorseProductionApplyTests(TestCase):
         self.assertEqual(artifact["summary"]["nonstarter_count"], 7)
 
         first = self._commit(artifact_path)
+        completion_run = HorseProfileCompletionRun.objects.get()
+        source_to_repair = HorseP0Source.objects.get(
+            profile=resolutions[1]["profile"],
+        )
+        self.assertEqual(source_to_repair.racing_region, "hong_kong")
+        self.assertEqual(
+            completion_run.summary["database_write_count"],
+            first["database_write_count"],
+        )
+        source_to_repair.racing_region = "other"
+        source_to_repair.save(update_fields=["racing_region"])
+        repair_dry_run = self._dry_run(artifact_path)
+        self.assertEqual(
+            repair_dry_run["planned_metadata_reconciliations"],
+            1,
+        )
+
         second = self._commit(artifact_path)
+        source_to_repair.refresh_from_db()
+        completion_run.refresh_from_db()
         self.assertEqual(first["strict_complete_count"], 50)
         self.assertEqual(first["locked_identity_rescan_count"], 50)
         self.assertEqual(second["race_records_created"], 0)
+        self.assertEqual(second["metadata_reconciled_count"], 1)
+        self.assertEqual(second["database_write_count"], 1)
+        self.assertEqual(source_to_repair.racing_region, "hong_kong")
+        self.assertEqual(
+            completion_run.summary["database_write_count"],
+            first["database_write_count"],
+        )
+        self.assertEqual(
+            completion_run.summary["last_idempotent_verification"][
+                "metadata_reconciled_count"
+            ],
+            1,
+        )
+        third = self._commit(artifact_path)
+        completion_run.refresh_from_db()
+        self.assertEqual(third["metadata_reconciled_count"], 0)
+        self.assertEqual(third["database_write_count"], 0)
+        self.assertEqual(
+            completion_run.summary["database_write_count"],
+            first["database_write_count"],
+        )
         self.assertEqual(HorseProfile.objects.count(), 51)
         self.assertEqual(HorseRaceRecord.objects.count(), 1439)
         self.assertEqual(
@@ -761,8 +812,47 @@ class P0HorseProductionApplyTests(TestCase):
                 task_name="apply_reviewed_p0_horse_completion",
                 status="success",
             ).count(),
-            2,
+            3,
         )
+
+    def test_idempotent_repair_rejects_revoked_or_newer_source_review(self):
+        horse = self._horse(0)
+        artifact_path, _ = self._prepare(
+            [horse],
+            [{"decision": "create_new"}],
+        )
+        self._commit(artifact_path)
+        source = HorseP0Source.objects.get()
+        source.status = "revoked"
+        source.revoked_at = timezone.now()
+        source.revoked_reason = "reviewed revocation"
+        source.save(
+            update_fields=["status", "revoked_at", "revoked_reason"],
+        )
+
+        with self.assertRaisesRegex(P0ReviewedArtifactError, "was revoked"):
+            self._dry_run(artifact_path)
+
+        source.status = "active"
+        source.revoked_at = None
+        source.revoked_reason = ""
+        source.evidence_payload = {
+            **source.evidence_payload,
+            "artifact_sha256": "f" * 64,
+        }
+        source.save(
+            update_fields=[
+                "status",
+                "revoked_at",
+                "revoked_reason",
+                "evidence_payload",
+            ],
+        )
+        with self.assertRaisesRegex(
+            P0ReviewedArtifactError,
+            "belongs to a newer review",
+        ):
+            self._dry_run(artifact_path)
 
     def test_create_new_ignores_same_name_non_horse_term(self):
         horse = self._horse(0)

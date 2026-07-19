@@ -32,6 +32,7 @@ from stable.models import (
     HorseProfileDataCandidate,
     HorseRaceRecord,
     HorseRaceResultStatus,
+    RacingRegion,
     SourceLanguage,
     TaskExecutionLog,
     TaskStatus,
@@ -1004,6 +1005,12 @@ def _artifact_row(
         "authority_manifest_sha256": authority_manifest_sha256,
         "identity_key": deterministic_identity_key(identity),
     }
+    candidate_evidence = dict(horse.get("candidate") or {})
+    reviewed_region = horse.get("region")
+    candidate_region = candidate_evidence.get("sample_region")
+    if candidate_region and candidate_region != reviewed_region:
+        _fail(f"{identity['horse_name']} candidate sample region conflicts with research region")
+    candidate_evidence["sample_region"] = reviewed_region
     return {
         "identity": identity,
         "deterministic_identity_key": deterministic_identity_key(identity),
@@ -1022,7 +1029,7 @@ def _artifact_row(
             "research_v3_sha256": research_v3_sha256,
             "authority_manifest_sha256": authority_manifest_sha256,
             "mapping_decisions_sha256": mapping_decisions_sha256,
-            "candidate": horse.get("candidate") or {},
+            "candidate": candidate_evidence,
             "source": source,
             "source_evidence": horse.get("source_evidence") or [],
             "basic_profile_field_evidence": horse.get(
@@ -1545,6 +1552,7 @@ def _simulate(artifact: dict[str, Any], *, artifact_sha256: str, lock: bool = Fa
         "existing_race_records": 0,
         "planned_p0_source_upserts": 0,
         "planned_module_audits": 0,
+        "planned_metadata_reconciliations": 0,
         "already_applied_profiles": 0,
         "database_write_count": 0,
     }
@@ -1566,7 +1574,19 @@ def _simulate(artifact: dict[str, Any], *, artifact_sha256: str, lock: bool = Fa
             seen_profile_ids.add(profile.id)
         report["validated_horse_count"] += 1
         report["already_applied_profiles"] += int(already_applied)
-        if not already_applied:
+        if already_applied:
+            completion_run = _find_completion_run(artifact_sha256)
+            if completion_run is None:
+                _fail("applied profile is missing its completion run")
+            report["planned_metadata_reconciliations"] += int(
+                _p0_source_region_requires_reconcile(
+                    row=row,
+                    profile=profile,
+                    artifact_sha256=artifact_sha256,
+                    completion_run=completion_run,
+                )
+            )
+        else:
             report["planned_profile_creates"] += int(profile is None)
             report["planned_profile_updates"] += int(profile is not None)
             report["planned_p0_source_upserts"] += 1
@@ -1895,36 +1915,12 @@ def _apply_artifact_row(
     )
     profile.source_refs = source_refs
     profile.save(update_fields=["source_refs", "updated_at"])
-    source = HorseP0Source.objects.get(
+    _apply_p0_source_metadata(
+        row=row,
         profile=profile,
-        source_type=HorseP0SourceType.MANUAL,
-    )
-    source.completion_run = completion_run
-    source.evidence_summary = "Reviewed major-race P0 candidate batch completion"
-    source.evidence_payload = {
-        **row["evidence"],
-        "artifact_sha256": artifact_sha256,
-        "reviewer_id": reviewer_id,
-        "identity": row["identity"],
-        "deterministic_identity_key": identity_key,
-    }
-    source.metadata = {
-        "batch_kind": "reviewed_p0_horse_completion",
-        "authority_semantics": (
-            "US combined sources inherit only the frozen v3 approval; "
-            "they are not Equibase official per-race records."
-        ),
-    }
-    source.status = HorseP0SourceStatus.ACTIVE
-    source.save(
-        update_fields=[
-            "completion_run",
-            "evidence_summary",
-            "evidence_payload",
-            "metadata",
-            "status",
-            "updated_at",
-        ]
+        reviewer_id=reviewer_id,
+        artifact_sha256=artifact_sha256,
+        completion_run=completion_run,
     )
     HorseProfileDataCandidate.objects.filter(
         profile=profile,
@@ -1947,10 +1943,143 @@ def _apply_artifact_row(
     return summary
 
 
-def _completion_run(artifact_path: str | Path, artifact_sha256: str, reviewer_id: int) -> HorseProfileCompletionRun:
-    for run in HorseProfileCompletionRun.objects.select_for_update().order_by("id"):
+def _reviewed_source_region(row: dict[str, Any]) -> str:
+    candidate = (row.get("evidence") or {}).get("candidate") or {}
+    region = str(candidate.get("sample_region") or "").strip()
+    if region not in RacingRegion.values or region == RacingRegion.OTHER:
+        _fail(f"{row['identity']['horse_name']} reviewed sample region is invalid")
+    return region
+
+
+def _apply_p0_source_metadata(
+    *,
+    row: dict[str, Any],
+    profile: HorseProfile,
+    reviewer_id: int,
+    artifact_sha256: str,
+    completion_run: HorseProfileCompletionRun,
+) -> bool:
+    source = HorseP0Source.objects.get(
+        profile=profile,
+        source_type=HorseP0SourceType.MANUAL,
+    )
+    expected = {
+        "completion_run": completion_run,
+        "racing_region": _reviewed_source_region(row),
+        "evidence_summary": "Reviewed major-race P0 candidate batch completion",
+        "evidence_payload": {
+            **row["evidence"],
+            "artifact_sha256": artifact_sha256,
+            "reviewer_id": reviewer_id,
+            "identity": row["identity"],
+            "deterministic_identity_key": row["deterministic_identity_key"],
+        },
+        "metadata": {
+            "batch_kind": "reviewed_p0_horse_completion",
+            "authority_semantics": (
+                "US combined sources inherit only the frozen v3 approval; "
+                "they are not Equibase official per-race records."
+            ),
+        },
+        "status": HorseP0SourceStatus.ACTIVE,
+    }
+    changed_fields = [
+        field for field, value in expected.items() if getattr(source, field) != value
+    ]
+    if not changed_fields:
+        return False
+    for field, value in expected.items():
+        setattr(source, field, value)
+    source.save(update_fields=[*changed_fields, "updated_at"])
+    return True
+
+
+def _idempotent_p0_source(
+    *,
+    row: dict[str, Any],
+    profile: HorseProfile,
+    artifact_sha256: str,
+    completion_run: HorseProfileCompletionRun,
+) -> HorseP0Source:
+    source = HorseP0Source.objects.get(
+        profile=profile,
+        source_type=HorseP0SourceType.MANUAL,
+    )
+    if source.status != HorseP0SourceStatus.ACTIVE:
+        _fail(f"{row['identity']['horse_name']} P0 source was revoked after apply")
+    if (
+        source.completion_run_id != completion_run.id
+        or (source.evidence_payload or {}).get("artifact_sha256") != artifact_sha256
+    ):
+        _fail(f"{row['identity']['horse_name']} P0 source belongs to a newer review")
+    return source
+
+
+def _p0_source_region_requires_reconcile(
+    *,
+    row: dict[str, Any],
+    profile: HorseProfile,
+    artifact_sha256: str,
+    completion_run: HorseProfileCompletionRun,
+) -> bool:
+    source = _idempotent_p0_source(
+        row=row,
+        profile=profile,
+        artifact_sha256=artifact_sha256,
+        completion_run=completion_run,
+    )
+    return source.racing_region != _reviewed_source_region(row)
+
+
+def _reconcile_p0_source_region(
+    *,
+    row: dict[str, Any],
+    profile: HorseProfile,
+    artifact_sha256: str,
+    completion_run: HorseProfileCompletionRun,
+) -> bool:
+    source = _idempotent_p0_source(
+        row=row,
+        profile=profile,
+        artifact_sha256=artifact_sha256,
+        completion_run=completion_run,
+    )
+    expected_region = _reviewed_source_region(row)
+    if source.racing_region == expected_region:
+        return False
+    source.racing_region = expected_region
+    source.save(update_fields=["racing_region", "updated_at"])
+    return True
+
+
+def _previous_success_summary(artifact_sha256: str) -> dict[str, Any] | None:
+    logs = TaskExecutionLog.objects.filter(
+        task_name="apply_reviewed_p0_horse_completion",
+        status=TaskStatus.SUCCESS,
+    ).order_by("id")
+    for log in logs:
+        payload = log.payload or {}
+        summary = payload.get("summary")
+        if payload.get("artifact_sha256") == artifact_sha256 and isinstance(
+            summary, dict
+        ):
+            return summary
+    return None
+
+
+def _find_completion_run(artifact_sha256: str) -> HorseProfileCompletionRun | None:
+    for run in HorseProfileCompletionRun.objects.order_by("id"):
         if (run.parameters or {}).get("artifact_sha256") == artifact_sha256:
             return run
+    return None
+
+
+def _completion_run(artifact_path: str | Path, artifact_sha256: str, reviewer_id: int) -> HorseProfileCompletionRun:
+    existing = _find_completion_run(artifact_sha256)
+    if existing is not None:
+        return HorseProfileCompletionRun.objects.select_for_update().get(
+            pk=existing.pk
+        )
     return HorseProfileCompletionRun.objects.create(
         name=f"Reviewed P0 horse completion {artifact_sha256[:12]}",
         status=HorseCompletionRunStatus.RUNNING,
@@ -2001,12 +2130,16 @@ def commit_reviewed_p0_completion_artifact(
         simulation = _simulate(artifact, artifact_sha256=actual_sha, lock=True)
         _assert_expected_actions(artifact, simulation, phase="commit")
         completion_run = _completion_run(artifact_path, actual_sha, reviewer.id)
+        run_was_committed = (
+            completion_run.status == HorseCompletionRunStatus.COMMITTED
+        )
         aggregate = {
             "race_records_created": 0,
             "race_records_updated": 0,
             "race_records_existing": 0,
         }
         strict_complete_count = 0
+        metadata_reconciled_count = 0
         for row in artifact["rows"]:
             profile, already_applied = _resolve_current_profile(
                 row,
@@ -2017,6 +2150,14 @@ def commit_reviewed_p0_completion_artifact(
                 evaluation = evaluate_full_profile_completeness(profile)
                 if not evaluation.is_complete:
                     _fail(f"{row['identity']['horse_name']} idempotent profile is no longer strict complete")
+                metadata_reconciled_count += int(
+                    _reconcile_p0_source_region(
+                        row=row,
+                        profile=profile,
+                        artifact_sha256=actual_sha,
+                        completion_run=completion_run,
+                    )
+                )
                 strict_complete_count += 1
                 continue
             if profile is None:
@@ -2032,16 +2173,6 @@ def commit_reviewed_p0_completion_artifact(
             for key in aggregate:
                 aggregate[key] += int(row_summary.get(key) or 0)
             strict_complete_count += 1
-        completion_run.status = HorseCompletionRunStatus.COMMITTED
-        completion_run.summary = {
-            **simulation,
-            **aggregate,
-            "strict_complete_count": strict_complete_count,
-        }
-        completion_run.finished_at = timezone.now()
-        completion_run.save(
-            update_fields=["status", "summary", "finished_at", "updated_at"]
-        )
         result = {
             **simulation,
             **aggregate,
@@ -2049,6 +2180,7 @@ def commit_reviewed_p0_completion_artifact(
             "artifact_sha256": actual_sha,
             "release_manifest_sha256": release_input.sha256,
             "locked_identity_rescan_count": locked_identity_rescan_count,
+            "metadata_reconciled_count": metadata_reconciled_count,
             "commit_table_lock": {
                 "mode": COMMIT_IDENTITY_TABLE_LOCK_MODE,
                 "timeout_ms": COMMIT_IDENTITY_TABLE_LOCK_TIMEOUT_MS,
@@ -2061,8 +2193,28 @@ def commit_reviewed_p0_completion_artifact(
                 + aggregate["race_records_updated"]
                 + simulation["planned_p0_source_upserts"]
                 + simulation["planned_module_audits"]
+                + metadata_reconciled_count
             ),
         }
+        completed_at = timezone.now()
+        completion_run.status = HorseCompletionRunStatus.COMMITTED
+        if run_was_committed:
+            original_summary = _previous_success_summary(actual_sha)
+            if original_summary is None:
+                _fail("committed run is missing its successful task log")
+            completion_run.summary = {
+                **original_summary,
+                "last_idempotent_verification": {
+                    **result,
+                    "verified_at": completed_at.isoformat(),
+                },
+            }
+        else:
+            completion_run.summary = result
+        completion_run.finished_at = completed_at
+        completion_run.save(
+            update_fields=["status", "summary", "finished_at", "updated_at"]
+        )
         TaskExecutionLog.objects.create(
             task_name="apply_reviewed_p0_horse_completion",
             status=TaskStatus.SUCCESS,
