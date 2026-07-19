@@ -90,11 +90,20 @@ def latest_race_date(horse: dict[str, object]) -> date:
     return max(dates)
 
 
+def source_verified_date(horse: dict[str, object]) -> date:
+    career = horse["career"]
+    verified_at = str(career.get("official_start_count_verified_at") or "")
+    if verified_at:
+        return date.fromisoformat(verified_at[:10])
+    return latest_race_date(horse)
+
+
 def make_row(horse: dict[str, object]) -> dict[str, object]:
     identity = horse["identity"]
     horse_name = identity["horse_name"]
     snapshot = build_profile_mapping_snapshot(identity)
     latest_date = latest_race_date(horse)
+    synced_through = max(latest_date, source_verified_date(horse))
     profile_id = BIND_EXISTING_PROFILE_IDS.get(horse_name)
     decision = "bind_existing" if profile_id is not None else "create_new"
     row: dict[str, object] = {
@@ -115,7 +124,7 @@ def make_row(horse: dict[str, object]) -> dict[str, object]:
             "racing_career_status": (
                 "active" if latest_date >= ACTIVE_CUTOFF else "retired"
             ),
-            "records_synced_through": latest_date.isoformat(),
+            "records_synced_through": synced_through.isoformat(),
             **review_metadata(),
         },
         "database_mapping_snapshot": snapshot,

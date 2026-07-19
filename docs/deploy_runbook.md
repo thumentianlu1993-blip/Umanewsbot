@@ -50,11 +50,11 @@
       明确确认 commit 窗口没有相关写入；
    8. 仅对已通过上述门禁的精确 artifact 执行 `--commit`。
 6. Phase A 已在生产只读生成并复核精确产物：
-   mapping SHA `b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed`，
+   mapping SHA `68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764`，
    production snapshot SHA `20e57170ffdc033e3fee30f6cfbc9e57fe535c07e5f729c19b8ac826537c8c4f`，
-   candidate artifact SHA `ece013c36dc33f6514dbaaad5611db665d81c984343387eeec50eee98cb75f5a`。
+   candidate artifact SHA `884d2648ea8d573997dd48b8487605f5dd185e1fe2e5eaa8a03e83a9bcf9e046`。
    独立 release manifest SHA
-   `92183a1a9eb9d3d918493fe8f52b809580f40bea976c8b4e5c0b33fba606999c`
+   `f101bccff1a7269ef0cee38e546e9d56b430ede2f1dbd17521e59a690526d0e9`
    是本次 Phase B 唯一 trusted 值；正式 dry-run 成功前仍为 **NO-GO**。
 
 ### P0 50 匹正式 mapping / artifact / apply 命令
@@ -62,7 +62,7 @@
 以下命令只描述新能力。Phase A 的 prepare 可消费已批准 mapping decisions 生成 candidate；
 `--dry-run/--commit` 都必须额外消费 independently approved release manifest，并且其文件 SHA
 必须已进入仓库 trusted allowlist。本批 allowlist 仅包含
-`92183a1a9eb9d3d918493fe8f52b809580f40bea976c8b4e5c0b33fba606999c`。
+`f101bccff1a7269ef0cee38e546e9d56b430ede2f1dbd17521e59a690526d0e9`。
 
 mapping decisions 顶层必须为
 `p0-horse-profile-mapping-decisions.v1`、`review_status=approved`，并包含

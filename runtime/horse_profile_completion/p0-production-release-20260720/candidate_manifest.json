@@ -1,7 +1,7 @@
 {
   "artifact": {
     "path": "reviewed_p0_horse_completion_artifact.json",
-    "sha256": "ece013c36dc33f6514dbaaad5611db665d81c984343387eeec50eee98cb75f5a"
+    "sha256": "884d2648ea8d573997dd48b8487605f5dd185e1fe2e5eaa8a03e83a9bcf9e046"
   },
   "database_write_count": 0,
   "release_status": "candidate_pending_independent_release",

@@ -15,8 +15,8 @@
       "sha256": "29091d69573bab907cda2e9a081ae4684838b92d1f9b052a7601b6109a541077"
     },
     "profile_mapping_decisions": {
-      "path": "/tmp/p0-phase-a/approved-profile-mapping.json",
-      "sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed"
+      "path": "/tmp/p0-phase-c/approved-profile-mapping.json",
+      "sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764"
     },
     "research_v3": {
       "path": "/tmp/p0-phase-a/research-v3.json",
@@ -30,7 +30,7 @@
     "is_superuser": true,
     "username": "admin"
   },
-  "prepared_at": "2026-07-19T22:32:22.357584+00:00",
+  "prepared_at": "2026-07-19T22:50:25.990038+00:00",
   "prepared_by": "codex",
   "production_snapshot_sha256": "20e57170ffdc033e3fee30f6cfbc9e57fe535c07e5f729c19b8ac826537c8c4f",
   "release_status": "candidate_pending_independent_release",
@@ -151,7 +151,7 @@
             "https://www.zeturf.fr/fr/course-du-jour/2026-05-16/R1C6-auteuil-racing-tv-grande-course-de-haies-d-auteuil"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -427,7 +427,7 @@
         "owner_name": "Mme P Papot",
         "racing_career_status": "active",
         "racing_region": "france",
-        "records_synced_through": "2026-05-16",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "D Bressou"
       },
@@ -4088,7 +4088,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-05-16",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -4251,7 +4251,7 @@
             "https://www.zeturf.fr/fr/course-du-jour/2026-05-30/R1C4-auteuil-prix-des-drags"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -4457,7 +4457,7 @@
         "owner_name": "Jm Bazire",
         "racing_career_status": "active",
         "racing_region": "france",
-        "records_synced_through": "2026-05-30",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "A & F Pamart"
       },
@@ -9146,7 +9146,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-05-30",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -9303,7 +9303,7 @@
             "https://www.zeturf.fr/fr/course-du-jour/2026-07-14/R1C7-parislongchamp-maurice-de-nieuil"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -9580,7 +9580,7 @@
         "owner_name": "Wertheimer & Frere",
         "racing_career_status": "active",
         "racing_region": "france",
-        "records_synced_through": "2026-07-14",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "C Ferland"
       },
@@ -13533,7 +13533,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-14",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -13693,7 +13693,7 @@
             "https://www.zeturf.fr/fr/course-du-jour/2026-05-30/R1C4-auteuil-prix-des-drags"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -13942,7 +13942,7 @@
         "owner_name": "A Jathiere",
         "racing_career_status": "active",
         "racing_region": "france",
-        "records_synced_through": "2026-05-30",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "F Nicolle"
       },
@@ -17029,7 +17029,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-05-30",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -17190,7 +17190,7 @@
             "https://www.zeturf.fr/fr/course-du-jour/2026-05-17/R1C5-auteuil-grand-steeple-chase-de-paris"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -17391,7 +17391,7 @@
         "owner_name": "Ecurie Hub De Montmirail",
         "racing_career_status": "active",
         "racing_region": "france",
-        "records_synced_through": "2026-05-17",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "A & F Pamart"
       },
@@ -22964,7 +22964,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-05-17",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -23118,7 +23118,7 @@
             "https://www.zeturf.fr/fr/course-du-jour/2026-07-05/R1C5-saint-cloud-grand-prix-de-saint-cloud"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -23380,7 +23380,7 @@
         "original_name": "Aventure",
         "owner_name": "Wertheimer & Frere",
         "racing_career_status": "active",
-        "records_synced_through": "2026-07-05",
+        "records_synced_through": "2026-07-18",
         "sex": "f",
         "trainer_name": "C Ferland"
       },
@@ -25727,7 +25727,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-05",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -25953,7 +25953,7 @@
             "https://www.zeturf.fr/fr/course-du-jour/2025-10-26/R1C8-saint-cloud-royal-oak"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -26162,7 +26162,7 @@
         "owner_name": "Oti Management Pty Ltd",
         "racing_career_status": "active",
         "racing_region": "france",
-        "records_synced_through": "2025-10-26",
+        "records_synced_through": "2026-07-18",
         "sex": "c",
         "trainer_name": "A Fabre"
       },
@@ -29677,7 +29677,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2025-10-26",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -29827,7 +29827,7 @@
             "https://www.zeturf.fr/fr/course-du-jour/2026-04-26/R1C5-parislongchamp-prix-ganay"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -30068,7 +30068,7 @@
         "original_name": "First Look",
         "owner_name": "Wathnan Racing",
         "racing_career_status": "active",
-        "records_synced_through": "2026-04-26",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "A Fabre"
       },
@@ -32561,7 +32561,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-04-26",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -32785,7 +32785,7 @@
             "https://www.zeturf.fr/fr/course-du-jour/2026-03-15/R1C6-saint-cloud-prix-exbury"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -33061,7 +33061,7 @@
         "original_name": "Horizon Dore",
         "owner_name": "Gousserie Racing/ec Sud/c Becq",
         "racing_career_status": "active",
-        "records_synced_through": "2026-06-20",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "P Cottier"
       },
@@ -36868,7 +36868,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-06-20",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -37097,7 +37097,7 @@
             "https://www.zeturf.fr/fr/course-du-jour/2025-10-04/R1C6-parislongchamp-daniel-wildenstein-qatar"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -37346,7 +37346,7 @@
         "owner_name": "J Abdullah",
         "racing_career_status": "active",
         "racing_region": "france",
-        "records_synced_through": "2025-10-04",
+        "records_synced_through": "2026-07-18",
         "sex": "c",
         "trainer_name": "A Schutz"
       },
@@ -40861,7 +40861,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2025-10-04",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -41027,7 +41027,7 @@
             "https://racing.hkjc.com/racing/information/English/racing/LocalResults.aspx?RaceDate=2020/02/16&Racecourse=ST&RaceNo=5"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -41268,7 +41268,7 @@
         "original_name": "EAGLE WAY",
         "owner_name": "Siu Pak Kwan",
         "racing_career_status": "retired",
-        "records_synced_through": "2020-05-24",
+        "records_synced_through": "2026-07-18",
         "sex": "Gelding",
         "trainer_name": "J Moore"
       },
@@ -42989,7 +42989,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2020-05-24",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -43231,7 +43231,7 @@
             "https://racing.hkjc.com/racing/information/English/racing/LocalResults.aspx?RaceDate=2020/02/16&Racecourse=ST&RaceNo=5"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -43507,7 +43507,7 @@
         "original_name": "SOUTHERN LEGEND",
         "owner_name": "Boniface Ho Ka Kui",
         "racing_career_status": "retired",
-        "records_synced_through": "2021-11-21",
+        "records_synced_through": "2026-07-18",
         "sex": "Gelding",
         "trainer_name": "C Fownes"
       },
@@ -45678,7 +45678,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2021-11-21",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -45915,7 +45915,7 @@
             "https://racing.hkjc.com/racing/information/English/Racing/LocalResults.aspx?RaceDate=2020/04/26&Racecourse=ST&RaceNo=7"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -46254,7 +46254,7 @@
         "original_name": "BEAUTY GENERATION",
         "owner_name": "Patrick Kwok Ho Chuen",
         "racing_career_status": "retired",
-        "records_synced_through": "2020-12-13",
+        "records_synced_through": "2026-07-18",
         "sex": "Gelding",
         "trainer_name": "D A Hayes"
       },
@@ -47795,7 +47795,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2020-12-13",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -48034,7 +48034,7 @@
             "https://racing.hkjc.com/racing/information/English/racing/LocalResults.aspx?RaceDate=2020/02/16&Racecourse=ST&RaceNo=5"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -48296,7 +48296,7 @@
         "original_name": "TIME WARP",
         "owner_name": "Martin Siu Kim Sun",
         "racing_career_status": "retired",
-        "records_synced_through": "2021-06-20",
+        "records_synced_through": "2026-07-18",
         "sex": "Gelding",
         "trainer_name": "A S Cruz"
       },
@@ -50377,7 +50377,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2021-06-20",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -50611,7 +50611,7 @@
             "https://racing.hkjc.com/racing/information/English/racing/LocalResults.aspx?RaceDate=2020/02/16&Racecourse=ST&RaceNo=5"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -50901,7 +50901,7 @@
         "original_name": "EXULTANT",
         "owner_name": "Eddie Wong Ming Chak & Wong Leung Sau Hing",
         "racing_career_status": "retired",
-        "records_synced_through": "2021-05-23",
+        "records_synced_through": "2026-07-18",
         "sex": "Gelding",
         "trainer_name": "A S Cruz"
       },
@@ -52352,7 +52352,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2021-05-23",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -52585,7 +52585,7 @@
             "https://racing.hkjc.com/racing/information/English/Racing/LocalResults.aspx?RaceDate=2020/01/01&Racecourse=ST&RaceNo=7"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -52849,7 +52849,7 @@
         "original_name": "SEASONS BLOOM",
         "owner_name": "Paul Lo Chung Wai & Kathy Lo Ho Hsiu Lan",
         "racing_career_status": "retired",
-        "records_synced_through": "2020-01-01",
+        "records_synced_through": "2026-07-18",
         "sex": "Gelding",
         "trainer_name": "C S Shum"
       },
@@ -54165,7 +54165,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2020-01-01",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -54400,7 +54400,7 @@
             "https://racing.hkjc.com/racing/information/English/Racing/LocalResults.aspx?RaceDate=2019/06/23&Racecourse=ST&RaceNo=3"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -54658,7 +54658,7 @@
         "owner_name": "Peter Young Wai Po & Dr Arthur Leung Shing Tat",
         "racing_career_status": "retired",
         "racing_region": "hong_kong",
-        "records_synced_through": "2019-10-01",
+        "records_synced_through": "2026-07-18",
         "sex": "Gelding",
         "trainer_name": "A S Cruz"
       },
@@ -56379,7 +56379,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2019-10-01",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -56537,7 +56537,7 @@
             "https://racing.hkjc.com/racing/information/English/racing/LocalResults.aspx?RaceDate=2019/06/02&Racecourse=ST&RaceNo=9"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -56788,7 +56788,7 @@
         "owner_name": "Siu Pak Kwan",
         "racing_career_status": "retired",
         "racing_region": "hong_kong",
-        "records_synced_through": "2019-07-14",
+        "records_synced_through": "2026-07-18",
         "sex": "Gelding",
         "trainer_name": "J Size"
       },
@@ -58599,7 +58599,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2019-07-14",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -58754,7 +58754,7 @@
             "https://racing.hkjc.com/racing/info/meeting/results/English/Local/20180408/ST/8"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -59025,7 +59025,7 @@
         "original_name": "BEAUTY ONLY",
         "owner_name": "Eleanor Kwok Law Kwai Chun & Patrick Kwok Ho Chuen",
         "racing_career_status": "retired",
-        "records_synced_through": "2019-02-17",
+        "records_synced_through": "2026-07-18",
         "sex": "Gelding",
         "trainer_name": "A S Cruz"
       },
@@ -61151,7 +61151,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2019-02-17",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -61388,7 +61388,7 @@
             "https://racing.hkjc.com/racing/information/English/Racing/LocalResults.aspx?RaceDate=2019/11/17&Racecourse=ST&RaceNo=8"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -61640,7 +61640,7 @@
         "original_name": "PAKISTAN STAR",
         "owner_name": "Kerm Din",
         "racing_career_status": "retired",
-        "records_synced_through": "2019-11-17",
+        "records_synced_through": "2026-07-18",
         "sex": "Gelding",
         "trainer_name": "P O'Sullivan"
       },
@@ -62866,7 +62866,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2019-11-17",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -63059,7 +63059,7 @@
             "https://www.jra.go.jp/datafile/seiseki/replay/2026/062.html"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [],
         "research_v3_sha256": "98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e",
@@ -63178,7 +63178,7 @@
         "original_name": "アスクナイスショー",
         "owner_name": "廣崎 利洋",
         "racing_career_status": "active",
-        "records_synced_through": "2026-07-12",
+        "records_synced_through": "2026-07-18",
         "sex": "牡",
         "trainer_name": "中舘 英二 (美 浦)"
       },
@@ -63733,7 +63733,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-12",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -63924,7 +63924,7 @@
             "https://www.jra.go.jp/datafile/seiseki/replay/2026/062.html"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [],
         "research_v3_sha256": "98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e",
@@ -64029,7 +64029,7 @@
         "original_name": "オニャンコポン",
         "owner_name": "田原 邦男",
         "racing_career_status": "active",
-        "records_synced_through": "2026-07-12",
+        "records_synced_through": "2026-07-18",
         "sex": "セン",
         "trainer_name": "小島 茂之 (美 浦)"
       },
@@ -65128,7 +65128,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-12",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -65319,7 +65319,7 @@
             "https://www.jra.go.jp/datafile/seiseki/replay/2026/062.html"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [],
         "research_v3_sha256": "98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e",
@@ -65439,7 +65439,7 @@
         "owner_name": "有限会社シルク",
         "racing_career_status": "active",
         "racing_region": "japan",
-        "records_synced_through": "2026-07-12",
+        "records_synced_through": "2026-07-18",
         "sex": "牡",
         "trainer_name": "高野 友和 (栗 東)"
       },
@@ -65960,7 +65960,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-12",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -66074,7 +66074,7 @@
             "https://www.jra.go.jp/datafile/seiseki/replay/2026/062.html"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [],
         "research_v3_sha256": "98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e",
@@ -66193,7 +66193,7 @@
         "original_name": "オーロラエックス",
         "owner_name": "草間 庸文",
         "racing_career_status": "active",
-        "records_synced_through": "2026-07-12",
+        "records_synced_through": "2026-07-18",
         "sex": "牝",
         "trainer_name": "杉山 晴紀 (栗 東)"
       },
@@ -66714,7 +66714,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-12",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -66905,7 +66905,7 @@
             "https://www.jra.go.jp/datafile/seiseki/replay/2026/062.html"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [],
         "research_v3_sha256": "98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e",
@@ -67010,7 +67010,7 @@
         "original_name": "カラマティアノス",
         "owner_name": "(有) サンデーレーシング",
         "racing_career_status": "active",
-        "records_synced_through": "2026-07-12",
+        "records_synced_through": "2026-07-18",
         "sex": "牡",
         "trainer_name": "奥村 武 (美 浦)"
       },
@@ -67463,7 +67463,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-12",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -67654,7 +67654,7 @@
             "https://www.jra.go.jp/datafile/seiseki/replay/2026/062.html"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [],
         "research_v3_sha256": "98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e",
@@ -67759,7 +67759,7 @@
         "original_name": "クリスマスパレード",
         "owner_name": "(株) G１レーシング",
         "racing_career_status": "active",
-        "records_synced_through": "2026-07-12",
+        "records_synced_through": "2026-07-18",
         "sex": "牝",
         "trainer_name": "加藤 士津八 (美 浦)"
       },
@@ -68246,7 +68246,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-12",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -68437,7 +68437,7 @@
             "https://www.jra.go.jp/datafile/seiseki/replay/2026/062.html"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [],
         "research_v3_sha256": "98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e",
@@ -68549,7 +68549,7 @@
         "original_name": "コントラポスト",
         "owner_name": "ライオンレースホース (株)",
         "racing_career_status": "active",
-        "records_synced_through": "2026-07-12",
+        "records_synced_through": "2026-07-18",
         "sex": "セン",
         "trainer_name": "菊沢 隆徳 (美 浦)"
       },
@@ -69342,7 +69342,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-12",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -69533,7 +69533,7 @@
             "https://www.jra.go.jp/datafile/seiseki/replay/2026/062.html"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [],
         "research_v3_sha256": "98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e",
@@ -69645,7 +69645,7 @@
         "original_name": "サヴォーナ",
         "owner_name": "加藤 誠",
         "racing_career_status": "active",
-        "records_synced_through": "2026-07-12",
+        "records_synced_through": "2026-07-18",
         "sex": "牡",
         "trainer_name": "中竹 和也 (栗 東)"
       },
@@ -70302,7 +70302,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-12",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -70493,7 +70493,7 @@
             "https://www.jra.go.jp/datafile/seiseki/replay/2026/062.html"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [],
         "research_v3_sha256": "98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e",
@@ -70598,7 +70598,7 @@
         "original_name": "ショウナンマグマ",
         "owner_name": "国本 哲秀",
         "racing_career_status": "active",
-        "records_synced_through": "2026-07-12",
+        "records_synced_through": "2026-07-18",
         "sex": "セン",
         "trainer_name": "尾関 知人 (美 浦)"
       },
@@ -72003,7 +72003,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-12",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -72194,7 +72194,7 @@
             "https://www.jra.go.jp/datafile/seiseki/replay/2026/062.html"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [],
         "research_v3_sha256": "98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e",
@@ -72292,7 +72292,7 @@
         "original_name": "センツブラッド",
         "owner_name": "ゴドルフィン",
         "racing_career_status": "active",
-        "records_synced_through": "2026-07-12",
+        "records_synced_through": "2026-07-18",
         "sex": "牡",
         "trainer_name": "斉藤 崇史 (栗 東)"
       },
@@ -72711,7 +72711,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-12",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -72964,7 +72964,7 @@
             "https://www.sportinglife.com/racing/results/2026-04-25/sandown/913925/bet365-celebration-chase-grade-1-gbb-race#video-player"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -73268,7 +73268,7 @@
         "owner_name": "Mr John P McManus",
         "racing_career_status": "active",
         "racing_region": "united_kingdom",
-        "records_synced_through": "2026-03-12",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "N J Henderson"
       },
@@ -77367,7 +77367,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-03-12",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -77533,7 +77533,7 @@
             "https://www.sportinglife.com/racing/results/2026-04-25/sandown/913925/bet365-celebration-chase-grade-1-gbb-race#video-player"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -77783,7 +77783,7 @@
         "owner_name": "Robert Abrey & Ian Thurtle",
         "racing_career_status": "active",
         "racing_region": "united_kingdom",
-        "records_synced_through": "2026-04-25",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "A King"
       },
@@ -83926,7 +83926,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-04-25",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -84089,7 +84089,7 @@
             "https://www.sportinglife.com/racing/results/2023-12-26/kempton/775512/ladbrokes-christmas-hurdle-grade-1-gbb-race"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -84365,7 +84365,7 @@
         "owner_name": "Mr Simon Munir & Mr Isaac Souede",
         "racing_career_status": "retired",
         "racing_region": "united_kingdom",
-        "records_synced_through": "2023-12-26",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "A King"
       },
@@ -91676,7 +91676,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2023-12-26",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -91839,7 +91839,7 @@
             "https://www.sportinglife.com/racing/results/2021-10-16/ascot/640955/qipco-british-champions-sprint-stakes-group-1"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -92135,7 +92135,7 @@
         "original_name": "Brando",
         "owner_name": "Mrs Angie Bailey",
         "racing_career_status": "retired",
-        "records_synced_through": "2021-10-16",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "K A Ryan"
       },
@@ -99462,7 +99462,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2021-10-16",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -99697,7 +99697,7 @@
             "https://www.sportinglife.com/racing/results/2025-10-18/ascot/872905/qipco-british-champions-sprint-stakes-group-1#video-player"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -99942,7 +99942,7 @@
         "original_name": "Art Power",
         "owner_name": "King Power Racing Co Ltd",
         "racing_career_status": "active",
-        "records_synced_through": "2026-03-28",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "T D Easterby"
       },
@@ -106523,7 +106523,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-03-28",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -106757,7 +106757,7 @@
             "https://www.sportinglife.com/racing/results/2024-03-14/cheltenham/777274/paddy-power-stayers-hurdle-grade-1-gbb-race#video-player"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -106983,7 +106983,7 @@
         "owner_name": "Mr Andrew Gemmell",
         "racing_career_status": "retired",
         "racing_region": "united_kingdom",
-        "records_synced_through": "2024-03-14",
+        "records_synced_through": "2026-07-19",
         "sex": "g",
         "trainer_name": "Miss E C Lavelle"
       },
@@ -111889,7 +111889,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2024-03-14",
+          "records_synced_through": "2026-07-19",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -112049,7 +112049,7 @@
             "https://www.sportinglife.com/racing/results/2019-05-10/chester/520407/homeserve-huxley-stakes-group-2"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -112267,7 +112267,7 @@
         "owner_name": "Dr Marwan Koukash",
         "racing_career_status": "retired",
         "racing_region": "united_kingdom",
-        "records_synced_through": "2019-06-28",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "R A Fahey"
       },
@@ -119602,7 +119602,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2019-06-28",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -119761,7 +119761,7 @@
             "https://www.sportinglife.com/racing/results/2024-08-10/haydock/812777/betfred-rose-of-lancaster-stakes-group-3"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -120016,7 +120016,7 @@
         "original_name": "Regal Reality",
         "owner_name": "Mr Peter Done",
         "racing_career_status": "retired",
-        "records_synced_through": "2024-09-07",
+        "records_synced_through": "2026-07-18",
         "sex": "g",
         "trainer_name": "Sir Michael Stoute"
       },
@@ -125575,7 +125575,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2024-09-07",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -125809,7 +125809,7 @@
             "https://www.sportinglife.com/racing/results/2022-07-26/goodwood/690477/al-shaqab-goodwood-cup-stakes-group-1-british-champions-series"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -126164,7 +126164,7 @@
         "original_name": "Stradivarius",
         "owner_name": "Mr B E Nielsen",
         "racing_career_status": "retired",
-        "records_synced_through": "2022-07-26",
+        "records_synced_through": "2026-07-18",
         "sex": "h",
         "trainer_name": "J & T Gosden"
       },
@@ -131285,7 +131285,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2022-07-26",
+          "records_synced_through": "2026-07-18",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -131525,7 +131525,7 @@
             "https://www.sportinglife.com/racing/results/2018-12-15/cheltenham/502608/unibet-international-hurdle-grade-2"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -131841,7 +131841,7 @@
         "owner_name": "S Such & Cg Paletta",
         "racing_career_status": "retired",
         "racing_region": "united_kingdom",
-        "records_synced_through": "2018-12-15",
+        "records_synced_through": "2026-07-19",
         "sex": "g",
         "trainer_name": "N & W Twiston-Davies"
       },
@@ -137875,7 +137875,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "retired",
-          "records_synced_through": "2018-12-15",
+          "records_synced_through": "2026-07-19",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -137996,7 +137996,7 @@
             "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2026-07-11&rn=8&tk=PRM"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -138216,7 +138216,7 @@
         "owner_name": "By Talla Racing LLC, St. Elias Stables LLC, Three Chimneys Farm and West Point Thoroughbreds",
         "racing_career_status": "active",
         "racing_region": "united_states",
-        "records_synced_through": "2026-07-11",
+        "records_synced_through": "2026-07-19",
         "sex": "Colt",
         "trainer_name": "Michael W. McCarthy"
       },
@@ -138593,7 +138593,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-11",
+          "records_synced_through": "2026-07-19",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -138714,7 +138714,7 @@
             "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2026-07-11&rn=10&tk=SAR"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -138915,7 +138915,7 @@
         "owner_name": "West Point Thoroughbreds and Bouchey, Steven",
         "racing_career_status": "active",
         "racing_region": "united_states",
-        "records_synced_through": "2026-07-11",
+        "records_synced_through": "2026-07-19",
         "sex": "Horse",
         "trainer_name": "Miguel Clement"
       },
@@ -139484,7 +139484,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-11",
+          "records_synced_through": "2026-07-19",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -139605,7 +139605,7 @@
             "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2026-07-11&rn=8&tk=PRM"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -139860,7 +139860,7 @@
         "owner_name": "Joseph A. Schumer",
         "racing_career_status": "active",
         "racing_region": "united_states",
-        "records_synced_through": "2026-07-11",
+        "records_synced_through": "2026-07-19",
         "sex": "Gelding",
         "trainer_name": "Dan L. McFarlane"
       },
@@ -140815,7 +140815,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-11",
+          "records_synced_through": "2026-07-19",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -140936,7 +140936,7 @@
             "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2026-07-11&rn=10&tk=SAR"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -141130,7 +141130,7 @@
         "owner_name": "Bonnie Rye Stable and Stonelea Stable",
         "racing_career_status": "active",
         "racing_region": "united_states",
-        "records_synced_through": "2026-07-11",
+        "records_synced_through": "2026-07-19",
         "sex": "Gelding",
         "trainer_name": "Madison F. Meyers"
       },
@@ -141879,7 +141879,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-11",
+          "records_synced_through": "2026-07-19",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -142000,7 +142000,7 @@
             "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2026-07-11&rn=10&tk=SAR"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -142219,7 +142219,7 @@
         "original_name": "Fort George",
         "owner_name": "Mrs. Fitriani Hay",
         "racing_career_status": "active",
-        "records_synced_through": "2026-07-11",
+        "records_synced_through": "2026-07-19",
         "sex": "Gelding",
         "trainer_name": "Ed Walker"
       },
@@ -143537,7 +143537,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-11",
+          "records_synced_through": "2026-07-19",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -143730,7 +143730,7 @@
             "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2026-07-11&rn=8&tk=PRM"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -144020,7 +144020,7 @@
         "owner_name": "L and N Racing LLC and Brewster, Clark O.",
         "racing_career_status": "active",
         "racing_region": "united_states",
-        "records_synced_through": "2026-07-11",
+        "records_synced_through": "2026-07-19",
         "sex": "Horse",
         "trainer_name": "Steven M. Asmussen"
       },
@@ -145391,7 +145391,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-11",
+          "records_synced_through": "2026-07-19",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -145512,7 +145512,7 @@
             "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2026-07-11&rn=8&tk=PRM"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -145731,7 +145731,7 @@
         "owner_name": "Bennewith, Arnold, Wiest, Rick, Wiest, Clayton, Wiest, Lana, Tremblay, Norman, R 6 Stable and Regan, Sheila",
         "racing_career_status": "active",
         "racing_region": "united_states",
-        "records_synced_through": "2026-07-11",
+        "records_synced_through": "2026-07-19",
         "sex": "Horse",
         "trainer_name": "Robertino Diodoro"
       },
@@ -146876,7 +146876,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-11",
+          "records_synced_through": "2026-07-19",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -146997,7 +146997,7 @@
             "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2026-07-11&rn=5&tk=SAR"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -147238,7 +147238,7 @@
         "owner_name": "Resolute Racing and Miller Racing LLC",
         "racing_career_status": "active",
         "racing_region": "united_states",
-        "records_synced_through": "2026-07-11",
+        "records_synced_through": "2026-07-19",
         "sex": "Mare",
         "trainer_name": "Saffie A. Joseph, Jr."
       },
@@ -147952,7 +147952,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-11",
+          "records_synced_through": "2026-07-19",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -148073,7 +148073,7 @@
             "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2026-07-11&rn=10&tk=SAR"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -148250,7 +148250,7 @@
         "owner_name": "OXO Equine LLC",
         "racing_career_status": "active",
         "racing_region": "united_states",
-        "records_synced_through": "2026-07-11",
+        "records_synced_through": "2026-07-19",
         "sex": "Colt",
         "trainer_name": "William Walden"
       },
@@ -148523,7 +148523,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-11",
+          "records_synced_through": "2026-07-19",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {
@@ -148644,7 +148644,7 @@
             "https://www.equibase.com/yearbook/Result.cfm?cy=USA&de=D&rd=2026-07-11&rn=5&tk=SAR"
           ]
         },
-        "mapping_decisions_sha256": "b5109af9727d0b328555fdb7827f051907cad87bd0bfc298c0b67f01b1e5c6ed",
+        "mapping_decisions_sha256": "68f0e24e543cfcde3398b1f06a4c2e08b061e4bec4e6ae8d052274d259172764",
         "origin": "reviewed major-race P0 candidate batch",
         "pedigree_field_evidence": [
           {
@@ -148802,7 +148802,7 @@
         "owner_name": "Kenneth L. Ramsey",
         "racing_career_status": "active",
         "racing_region": "united_states",
-        "records_synced_through": "2026-07-11",
+        "records_synced_through": "2026-07-19",
         "sex": "Mare",
         "trainer_name": "Saffie A. Joseph, Jr."
       },
@@ -149553,7 +149553,7 @@
           "approved_at": "2026-07-20T06:35:00+08:00",
           "decision_source_reference": "codex-task:p0-horse-50-production-apply-20260720",
           "racing_career_status": "active",
-          "records_synced_through": "2026-07-11",
+          "records_synced_through": "2026-07-19",
           "reviewed_by": "project_owner"
         },
         "database_mapping_snapshot": {

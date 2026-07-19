@@ -11,6 +11,7 @@ from unittest import mock
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
+from django.utils import timezone
 
 from stable.models import (
     HorseP0Source,
@@ -247,8 +248,14 @@ class P0HorseProductionApplyTests(TestCase):
                     for module in ("profile", "pedigree", "race_record", "major_wins")
                 },
                 "completion_decision": {
-                    "racing_career_status": "retired",
-                    "records_synced_through": horse["career"]["records_synced_through"],
+                    "racing_career_status": resolution.get(
+                        "racing_career_status",
+                        "retired",
+                    ),
+                    "records_synced_through": resolution.get(
+                        "records_synced_through",
+                        horse["career"]["records_synced_through"],
+                    ),
                     "reviewed_by": "project_owner",
                     "approved_at": "2026-07-20T00:00:00Z",
                     "decision_source_reference": "codex-task:test-career-state",
@@ -792,6 +799,27 @@ class P0HorseProductionApplyTests(TestCase):
         unrelated.refresh_from_db()
         self.assertIsNotNone(claimed.completion_run_id)
         self.assertIsNone(unrelated.completion_run_id)
+
+    def test_active_profile_uses_source_sync_date_and_receives_review_metadata(self):
+        horse = self._horse(0)
+        artifact_path, _ = self._prepare(
+            [horse],
+            [
+                {
+                    "decision": "create_new",
+                    "racing_career_status": "active",
+                    "records_synced_through": timezone.localdate().isoformat(),
+                }
+            ],
+        )
+
+        self._commit(artifact_path)
+
+        profile = HorseProfile.objects.get()
+        self.assertEqual(profile.racing_career_status, "active")
+        self.assertEqual(profile.records_synced_through, timezone.localdate())
+        self.assertEqual(profile.full_profile_reviewed_by, self.reviewer)
+        self.assertIsNotNone(profile.full_profile_reviewed_at)
 
     def test_json_inputs_are_read_once_and_symlinks_are_rejected(self):
         horse = self._horse(0)
