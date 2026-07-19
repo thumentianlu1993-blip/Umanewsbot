@@ -1,5 +1,55 @@
 # 部署运行手册
 
+## 五地区准实时 Beta Gate 修复生产发布（2026-07-20）
+
+1. 发布身份：fingerprint
+   `231f8a68707f4b946daf1d355f5848cd107e13bbfa6c1ed856a0de2a31b22b4d`，
+   commit `58f00961f2cd9750d1285f7d6229494903e975a5`，tree
+   `de529e244a3ad21a1c6d72fc50b254d37e080e20`，source archive SHA-256
+   `1209353f4949c1fed7cbf58756e75e54f08c6bc0a8bdec996a7d1a2c78c43b08`。
+   正式 AMD64 image ID 为
+   `sha256:f9681a60f5072c39ae7cc66bad9881e719a7d24698050b4ae57858f94b310eef`。
+2. 恢复点：
+   `backups/db/pre-race-live-gate-58f00961-20260719T161644Z.dump`，
+   `205,411,102` bytes、SHA-256
+   `1aa9fc306a5a5039f835f873224f5c768be95265d8bd85674bba311f320404f1`，
+   `0600` 且 `pg_restore -l` 通过；环境备份为
+   `.env.backup.pre-race-live-gate-58f00961-20260719T161644Z`，SHA-256
+   `e24208729cfba44fd71d9b2ed343dd93d3437d3f6fb80f3f459759523158b566`。
+   旧 image tag 为
+   `umanewsbot:rollback-pre-race-live-gate-58f00961-20260719T161644Z`，指向
+   `sha256:4c40ae1946dd9ac85a368917fe3de64269e6cf848737e24253f0d0996403eda6`。
+3. filtered env 路径为
+   `/opt/umanewsbot/runtime/race_live_rollback/race-live-gate-58f00961-20260719T161644Z/rollback.filtered.env`，
+   SHA-256
+   `cda13ce08c6a6d03ffcb4812cf1e1bc1d56fa7eae2244d7cf72330869811062e`。
+   bundle manifest 位于同目录
+   `bundles/race-live-gate-58f00961-20260719T161644Z/manifest.json`，SHA-256
+   `e6e3e1ef848009903ab2a62ea77eba2a4e3d9289a8d93759eb9c9de7dd4609f5`；
+   根目录/最终目录为 `0700`，env、manifest、report 和 sha ledger 均为 root-owned
+   `0600`。
+4. Beat 先停止，普通新闻任务自然排空；随后普通 worker 和 race-live worker 停止，
+   `celery/race_live` queue 和 active claim 均为 0。maintenance dry-run/apply 后 event
+   `924` 隐藏；同一 immutable image/env/manifest 的 one-shot 顺序
+   `validate -> restore-policies-coarse -> validate -> restore-policy-event` 全部成功，
+   最终 validator 通过，event 恢复 revision `2`、7 条结果和公开暂定标识。
+5. `stable.0048_raceeventrunner_external_runner_identity` 已应用；web 健康后再重建普通
+   worker/race-live worker，最后重建 Beat。四个 app service 的 image/revision 均与第
+   1 项一致。scheduler/monitor=false、enabled regions 空、active claim/race-live queue
+   为 0；HTTP 本机与公网 healthz、首页、赛事日历和 event `924` 详情均为 200。
+6. 法国重验 run 为
+   `runtime/race_live_racecards/production-racecard-france-733-735-gate-fix-20260719T163001Z`。
+   成功 run 实际使用的 registry v2 digest 为
+   `7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a`；
+   使用旧手册值 `60fcc081…ad402` 的首次调用在网络前被拒绝。成功 run 请求
+   today/tomorrow 各一次，
+   `matched=1/3 / blocker=racecard_not_found`，没有
+   `racecard_schema_invalid`，也没有 manifest。report/requests SHA-256 分别为
+   `f81cf27666f8e026db4dd30d107f500205366d96ef3c45bf373879e68d22d517`、
+   `8c0a80775253b32ff6e3caa1d1e31244786c531116d5dad478d303977e197246`。
+   本次未对该 run 执行 initializer；法国 events `733–735` 的
+   tracking/control/allowlist 继续不存在。
+
 ## event 924 kill-switch 实际演练（2026-07-19）
 
 1. 用户确认 event `924` 已错过的 promotion 后 15 分钟 probe 不追溯补证，改由下一场

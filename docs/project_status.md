@@ -1,5 +1,22 @@
 # 项目状态文档
 
+## 2026-07-20 五地区准实时 Beta Gate 修复已上线
+
+- 冻结提交 `58f00961f2cd9750d1285f7d6229494903e975a5` 已进入生产；四个 app service
+  统一运行 AMD64 image
+  `sha256:f9681a60f5072c39ae7cc66bad9881e719a7d24698050b4ae57858f94b310eef`，
+  `stable.0048`、Django check、migration drift、静态文件和 HTTP healthz 均通过。
+- 写前数据库、环境和旧 image 恢复点已验证。新 root-only rollback manifest SHA-256
+  为 `e6e3e1ef…609f5`；四层 maintenance、两次 validator、coarse restore 和 event
+  restore 演练完整通过。event `924` 已恢复同一 provisional revision `2` 和 7 条赛果，
+  tracking 继续关闭。
+- scheduler/monitor=false、enabled regions 为空、active claim 和 race-live queue 均为
+  0。event `924` 详情继续公开“暂定赛果”；没有扩大其他赛事。
+- 法国 event `733–735` 的真实重验不再触发 coupled-entry
+  `racecard_schema_invalid`，但只匹配 1/3，整批以 `racecard_not_found` fail-closed。
+  因此未生成 manifest 或初始化法国；五地区自动轮询和全面公开仍未开启。本次完成的是
+  已授权 Gate 修复代码发布与安全降级验证，不是五地区来源覆盖全部验收通过。
+
 ## 2026-07-19 event 924 kill-switch 演练完成
 
 - event `924` 的预生成 disable 和 restore manifest 均重新完成

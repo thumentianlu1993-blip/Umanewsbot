@@ -1,5 +1,64 @@
 # 当前状态
 
+## 2026-07-20 五地区准实时 Beta Gate 修复已发布，法国重验安全降级
+
+- 用户授权的冻结 fingerprint
+  `231f8a68707f4b946daf1d355f5848cd107e13bbfa6c1ed856a0de2a31b22b4d`
+  在 staging 前重算一致；approved content hash 为
+  `90380f6bd31e9eb980242772fa77f565d297f7ed01a72a9c4f412c57b239773f`，
+  approved parent 为 `51fd07310d5287c535d01ce3c8af6ccd70a274cd`。受审内容提交为
+  `58f00961f2cd9750d1285f7d6229494903e975a5`，已快进远端 `main`；tree 为
+  `de529e244a3ad21a1c6d72fc50b254d37e080e20`，source archive SHA-256 为
+  `1209353f4949c1fed7cbf58756e75e54f08c6bc0a8bdec996a7d1a2c78c43b08`。
+- 生产候选 AMD64 image 为
+  `sha256:f9681a60f5072c39ae7cc66bad9881e719a7d24698050b4ae57858f94b310eef`；
+  镜像内 Django check、migration drift、两个新 command help 和 remediation
+  `32/32` 通过。web、普通 worker、race-live worker、Beat 已全部切换到该 image，
+  OCI revision/tree/source archive 与上项一致；`stable.0048` 已应用。
+- 写前 custom-format 备份为
+  `/opt/umanewsbot/backups/db/pre-race-live-gate-58f00961-20260719T161644Z.dump`，
+  `205,411,102` bytes、SHA-256
+  `1aa9fc306a5a5039f835f873224f5c768be95265d8bd85674bba311f320404f1`，
+  `root:root 0600` 且 `pg_restore -l` 通过；`.env` 备份 SHA-256 为
+  `e24208729cfba44fd71d9b2ed343dd93d3437d3f6fb80f3f459759523158b566`。
+  旧 image
+  `sha256:4c40ae1946dd9ac85a368917fe3de64269e6cf848737e24253f0d0996403eda6`
+  保留为
+  `umanewsbot:rollback-pre-race-live-gate-58f00961-20260719T161644Z`。
+- rollback filtered env SHA-256 为
+  `cda13ce08c6a6d03ffcb4812cf1e1bc1d56fa7eae2244d7cf72330869811062e`；
+  root-only bundle manifest 为
+  `/opt/umanewsbot/runtime/race_live_rollback/race-live-gate-58f00961-20260719T161644Z/bundles/race-live-gate-58f00961-20260719T161644Z/manifest.json`，
+  SHA-256
+  `e6e3e1ef848009903ab2a62ea77eba2a4e3d9289a8d93759eb9c9de7dd4609f5`。
+  它绑定 candidate image、commit、event `924`、current/provisional revision `2`
+  和 tracking lock version `39`。
+- maintenance dry-run/apply 成功，event `924` 临时
+  `visible=false / policy_off`；绑定同一 image/env/manifest 的 one-shot 按
+  `validate -> restore-policies-coarse -> validate -> restore-policy-event` 全部退出
+  0，最终 validator 再次通过。恢复后 event `924`
+  `visible=true / public_read_allowed`，current/provisional revision 均为 `2`、
+  legacy result `7`、tracking disabled、next poll null、token 为空、lock version
+  `39`。演练中两次末尾文本 `grep` 因远端引号形式返回非零，但都发生在成功事务和只读
+  结构化输出之后；后续 JSON 逐字段断言通过，没有留下中间 policy 状态。
+- 上线后 scheduler/monitor 均为 false、enabled regions 为空、active claim 为 0、
+  `race_live` queue 为 0；本机、公网和 `www` HTTP healthz、首页、赛事日历及 event
+  `924` 详情均为 200，近期 web/race-live worker/Beat 无 traceback、critical、
+  exception 或 integrity error。
+- 法国 event `733–735` 使用新镜像、Free 账户和 registry v2 真实重验。首次调用使用
+  旧 runbook registry SHA，被命令在网络前拒绝，零请求、零业务写入；改用镜像内真实
+  digest `7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a`
+  后，run
+  `production-racecard-france-733-735-gate-fix-20260719T163001Z` 完成 today/tomorrow
+  各一次请求。结果为 `request_count=2 / matched_event_count=1/3 /
+  blocker=racecard_not_found`，不再出现 `racecard_schema_invalid`；report 和 requests
+  SHA-256 分别为
+  `f81cf27666f8e026db4dd30d107f500205366d96ef3c45bf373879e68d22d517`、
+  `8c0a80775253b32ff6e3caa1d1e31244786c531116d5dad478d303977e197246`。
+  因整批不完整，没有 manifest、initializer、tracking/control/allowlist；法国和其他新
+  地区继续全关。当前公开范围仍只有 event `924` 的暂定赛果，不得表述为五地区已全面
+  自动运行。
+
 ## 2026-07-19 event 924 kill switch 实际演练完成，15 分钟 SLA 转入下一场验收
 
 - 用户确认 event `924` 不再补做无法追溯的 promotion 后 15 分钟 probe，改由下一场
