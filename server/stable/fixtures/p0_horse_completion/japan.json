@@ -1,0 +1,89 @@
+{
+  "schema_version": "p0-horse-source-cache.v2",
+  "adapter_key": "japan_jbis",
+  "region": "japan",
+  "source": {
+    "name": "jbis",
+    "url": "https://example.test/jbis/horse/jp-001",
+    "external_horse_id": "jp-001",
+    "fetched_at": "2026-07-18T00:00:00Z"
+  },
+  "identity": {
+    "horse_name": "FOREVER TEST",
+    "sire_name": "Japan Sire",
+    "dam_name": "Japan Dam",
+    "birth_year": 2021
+  },
+  "basic_profile": {
+    "country": "JP",
+    "sex": "male",
+    "color": "bay",
+    "birth_date": "2021-02-24",
+    "owner_name": "Japan Owner",
+    "trainer_name": "Japan Trainer",
+    "breeder_name": "Japan Breeder"
+  },
+  "pedigree": {
+    "sire": "Japan Sire",
+    "dam": "Japan Dam",
+    "sire_sire": "Japan Sire Sire",
+    "sire_dam": "Japan Sire Dam",
+    "dam_sire": "Japan Dam Sire",
+    "dam_dam": "Japan Dam Dam"
+  },
+  "aliases": [
+    {"name": "FOREVER TEST", "language": "en", "is_original": true},
+    {"name": "Forever Test", "language": "en"},
+    {"name": "フォーエバーテスト", "language": "ja"},
+    {"name": "青春測試", "language": "zh-Hant"}
+  ],
+  "career": {
+    "source_start_count": 3,
+    "official_start_count_source": "jbis",
+    "official_start_count_source_url": "https://example.test/jbis/horse/jp-001",
+    "official_start_count_verified_at": "2026-07-18T00:00:00Z",
+    "record_authority_status": "source_records_verified",
+    "records": [
+      {
+        "race_name": "Japan Maiden",
+        "race_date": "2023",
+        "racecourse": "Tokyo",
+        "race_number": "4",
+        "distance_text": "1600m",
+        "surface": "turf",
+        "finish": "1",
+        "source_url": "https://example.test/jbis/race/jp-race-1"
+      },
+      {
+        "race_name": "Japan Allowance",
+        "race_date": "2024-01-20",
+        "racecourse": "Kyoto",
+        "race_number": "8",
+        "distance_text": "1800m",
+        "surface": "turf",
+        "finish": "2",
+        "source_url": "https://example.test/jbis/race/jp-race-2"
+      },
+      {
+        "race_name": "Japan Grade Race",
+        "race_date": "2024-03-24",
+        "racecourse": "Hanshin",
+        "race_number": "11",
+        "distance_text": "2000m",
+        "surface": "turf",
+        "finish": "5",
+        "source_url": "https://example.test/jbis/race/jp-race-3"
+      },
+      {
+        "race_name": "Japan Withdrawn Entry",
+        "race_date": "2024-05-01",
+        "racecourse": "Tokyo",
+        "race_number": "10",
+        "distance_text": "1600m",
+        "surface": "turf",
+        "finish": "withdrawn",
+        "source_url": "https://example.test/jbis/race/jp-race-4"
+      }
+    ]
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": "p0-horse-source-cache.v2",
+  "adapter_key": "united_states_equibase",
+  "region": "united_states",
+  "source": {
+    "name": "equibase",
+    "url": "https://example.test/equibase/profiles/us-001",
+    "external_horse_id": "us-001",
+    "fetched_at": "2026-07-18T00:00:00Z"
+  },
+  "identity": {
+    "horse_name": "AMERICAN TEST",
+    "sire_name": "American Sire",
+    "dam_name": "American Dam",
+    "birth_year": 2020
+  },
+  "basic_profile": {
+    "country": "US",
+    "sex": "female",
+    "color": "dark bay",
+    "birth_date": "2020-02-02",
+    "owner_name": "US Owner",
+    "trainer_name": "US Trainer",
+    "breeder_name": "US Breeder"
+  },
+  "pedigree": {
+    "sire": "American Sire",
+    "dam": "American Dam",
+    "sire_sire": "American Sire Sire",
+    "sire_dam": "American Sire Dam",
+    "dam_sire": "American Dam Sire",
+    "dam_dam": "American Dam Dam"
+  },
+  "aliases": [
+    {"name": "AMERICAN TEST", "language": "en", "is_original": true}
+  ],
+  "career": {
+    "source_start_count": 1,
+    "official_start_count_source": "equibase",
+    "official_start_count_source_url": "https://example.test/equibase/profiles/us-001",
+    "official_start_count_verified_at": "2026-07-18T00:00:00Z",
+    "record_authority_status": "source_records_verified",
+    "records": [
+      {
+        "race_name": "Allowance Optional Claiming",
+        "race_date": "2025-08-30",
+        "racecourse": "Saratoga",
+        "race_number": "6",
+        "distance_text": "1 mile",
+        "surface": "dirt",
+        "finish": "5",
+        "source_url": "https://example.test/equibase/chart/us-race-1"
+      },
+      {
+        "race_name": "Scratched Stakes Entry",
+        "race_date": "2025-10-04",
+        "racecourse": "Keeneland",
+        "race_number": "8",
+        "distance_text": "8.5 furlongs",
+        "surface": "dirt",
+        "finish": "SCR",
+        "source_url": "https://example.test/equibase/chart/us-race-2"
+      }
+    ]
+  }
+}

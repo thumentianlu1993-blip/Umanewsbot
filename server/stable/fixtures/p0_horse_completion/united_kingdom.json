@@ -1,0 +1,76 @@
+{
+  "schema_version": "p0-horse-source-cache.v2",
+  "adapter_key": "united_kingdom_sporting_life",
+  "region": "united_kingdom",
+  "source": {
+    "name": "sporting_life",
+    "url": "https://example.test/sporting-life/horse/uk-001",
+    "external_horse_id": "uk-001",
+    "fetched_at": "2026-07-18T00:00:00Z"
+  },
+  "identity": {
+    "horse_name": "FORM TEST",
+    "sire_name": "Form Sire",
+    "dam_name": "Form Dam",
+    "birth_year": 2019
+  },
+  "basic_profile": {
+    "country": "GB",
+    "sex": "gelding",
+    "color": "chestnut",
+    "birth_date": "2019-04-12",
+    "owner_name": "UK Owner",
+    "trainer_name": "UK Trainer",
+    "breeder_name": "UK Breeder"
+  },
+  "pedigree": {
+    "sire": "Form Sire",
+    "dam": "Form Dam",
+    "sire_sire": "Form Sire Sire",
+    "sire_dam": "Form Sire Dam",
+    "dam_sire": "Form Dam Sire",
+    "dam_dam": "Form Dam Dam"
+  },
+  "aliases": [
+    {"name": "FORM TEST", "language": "en", "is_original": true}
+  ],
+  "career": {
+    "source_start_count": 2,
+    "official_start_count_source": "sporting_life",
+    "official_start_count_source_url": "https://example.test/sporting-life/horse/uk-001",
+    "official_start_count_verified_at": "2026-07-18T00:00:00Z",
+    "record_authority_status": "source_records_verified",
+    "records": [
+      {
+        "race_name": "Novices' Chase",
+        "race_date": "2025-11-15",
+        "racecourse": "Cheltenham",
+        "race_number": "3",
+        "distance_text": "2m4f",
+        "surface": "turf",
+        "finish": "UR",
+        "source_url": "https://example.test/sporting-life/race/uk-race-1"
+      },
+      {
+        "race_name": "Handicap Chase",
+        "race_date": "2025-12-26",
+        "racecourse": "Kempton",
+        "race_number": "5",
+        "distance_text": "3m",
+        "surface": "turf",
+        "finish": "DSQ",
+        "source_url": "https://example.test/sporting-life/race/uk-race-2"
+      },
+      {
+        "race_name": "Non Runner Chase",
+        "race_date": "2026-01-10",
+        "racecourse": "Warwick",
+        "race_number": "4",
+        "distance_text": "2m5f",
+        "surface": "turf",
+        "finish": "NR",
+        "source_url": "https://example.test/sporting-life/race/uk-race-3"
+      }
+    ]
+  }
+}

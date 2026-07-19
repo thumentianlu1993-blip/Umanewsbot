@@ -17031,6 +17031,12 @@ class P0HorseProfileDataCompletionTests(TestCase):
         refresh_career_history_completeness(
             profile,
             official_or_source_start_count=2,
+            official_start_count_source="official",
+            official_start_count_source_url=(
+                "https://example.com/official/horse/forever-young"
+            ),
+            official_start_count_verified_at=timezone.now(),
+            record_authority_status="source_records_verified",
             verified_at=timezone.now(),
         )
 
@@ -17114,6 +17120,68 @@ class P0HorseProfileDataCompletionTests(TestCase):
         self.assertNotIn("article_links", complete.blocking_reasons)
         self.assertFalse(missing_basic.is_complete)
         self.assertIn("basic_facts.breeder_name", missing_basic.blocking_reasons)
+
+    def test_ignored_new_suggestion_preserves_previous_applied_completeness(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import (
+            apply_reviewed_completion_artifact,
+            evaluate_full_profile_completeness,
+        )
+
+        profile = self._profile()
+        self._complete_records(profile)
+        HorseP0Source.objects.create(
+            profile=profile,
+            source_type="major_race_participant",
+            source_url="https://example.com/race",
+            observed_at=timezone.now(),
+            metadata={"race_grade": RaceGrade.G1},
+        )
+        self._approve_required_modules(profile)
+        self.assertTrue(
+            evaluate_full_profile_completeness(profile).is_complete
+        )
+        profile.completeness_status = (
+            HorseProfileCompleteness.COMPLETE_PROFILE_FULL
+        )
+        profile.save(update_fields=["completeness_status", "updated_at"])
+        row = self._reviewed_artifact_row(
+            profile,
+            profile_payload={"owner_name": "Ignored Owner"},
+        )
+        row["module_reviews"] = {
+            "profile": {
+                "status": "ignore",
+                "confidence": 100,
+                "reason": "new suggestion is not better",
+            }
+        }
+
+        summary = apply_reviewed_completion_artifact(
+            {
+                "reviewed": True,
+                "reviewer_id": self.user.id,
+                "rows": [row],
+            },
+            commit=True,
+        )
+        profile.refresh_from_db()
+
+        self.assertEqual(summary["ignored_modules"], 1)
+        self.assertTrue(
+            evaluate_full_profile_completeness(profile).is_complete
+        )
+        self.assertEqual(
+            profile.completeness_status,
+            HorseProfileCompleteness.COMPLETE_PROFILE_FULL,
+        )
+        self.assertTrue(
+            HorseProfileDataCandidate.objects.filter(
+                profile=profile,
+                module=HorseProfileModule.PROFILE,
+                status=HorseProfileCandidateStatus.IGNORED,
+            ).exists()
+        )
 
     def test_active_horse_history_must_record_sync_window_and_stale_state(self):
         from stable.models import HorseP0Source, HorseRacingCareerStatus
@@ -17585,6 +17653,32 @@ class P0HorseProfileDataCompletionTests(TestCase):
         self.assertFalse(evaluation.is_complete)
         self.assertIn("review.module.race_record", evaluation.blocking_reasons)
         self.assertNotEqual(profile.completeness_status, HorseProfileCompleteness.COMPLETE_PROFILE_FULL)
+
+    def test_complete_profile_rejects_historical_applied_module_with_invalid_url(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import evaluate_full_profile_completeness
+
+        profile = self._profile(
+            completeness_status=HorseProfileCompleteness.COMPLETE_PROFILE_FULL
+        )
+        self._complete_records(profile)
+        HorseP0Source.objects.create(
+            profile=profile,
+            source_type="manual",
+            source_url="https://example.com/profile",
+        )
+        self._approve_required_modules(profile)
+        profile.data_candidates.filter(module=HorseProfileModule.PEDIGREE).update(
+            source_url="https://bad host.example/pedigree"
+        )
+
+        evaluation = evaluate_full_profile_completeness(profile)
+
+        self.assertFalse(evaluation.is_complete)
+        self.assertIn(
+            "review.module.pedigree.source_url",
+            evaluation.blocking_reasons,
+        )
 
     def test_cross_region_participant_reuses_identity_without_changing_home_region(self):
         from stable.models import HorseP0Source

@@ -255,6 +255,10 @@ class HorseProfileForm(forms.ModelForm):
             "racing_career_status",
             "records_synced_through",
             "official_or_source_start_count",
+            "official_start_count_source",
+            "official_start_count_source_url",
+            "official_start_count_verified_at",
+            "career_record_authority_status",
             "career_history_last_verified_at",
             "intro",
             "sire_text",
@@ -272,7 +276,14 @@ class HorseProfileForm(forms.ModelForm):
         widgets = {
             "birth_date": forms.DateInput(attrs={"type": "date"}),
             "records_synced_through": forms.DateInput(attrs={"type": "date"}),
-            "career_history_last_verified_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "official_start_count_verified_at": forms.DateTimeInput(
+                format="%Y-%m-%dT%H:%M",
+                attrs={"type": "datetime-local"},
+            ),
+            "career_history_last_verified_at": forms.DateTimeInput(
+                format="%Y-%m-%dT%H:%M",
+                attrs={"type": "datetime-local"},
+            ),
             "intro": forms.Textarea(attrs={"rows": 4}),
             "review_notes": forms.Textarea(attrs={"rows": 3}),
         }
@@ -292,6 +303,10 @@ class HorseProfileForm(forms.ModelForm):
             "racing_career_status": "赛马生涯状态",
             "records_synced_through": "履历同步至",
             "official_or_source_start_count": "来源生涯实际出赛总数",
+            "official_start_count_source": "官方总出赛数来源",
+            "official_start_count_source_url": "官方总出赛数来源 URL",
+            "official_start_count_verified_at": "官方总出赛数核验时间",
+            "career_record_authority_status": "逐场履历权威状态",
             "career_history_last_verified_at": "生涯履历最后核验时间",
             "intro": "简介",
             "sire_text": "父",
@@ -314,6 +329,13 @@ class HorseProfileForm(forms.ModelForm):
         self.fields["dam_horse_profile"].queryset = parent_queryset
         self.fields["sire_horse_profile"].required = False
         self.fields["dam_horse_profile"].required = False
+        for field_name in (
+            "official_start_count_verified_at",
+            "career_history_last_verified_at",
+        ):
+            self.fields[field_name].input_formats = [
+                "%Y-%m-%dT%H:%M",
+            ]
         self.fields["locked_fields"].initial = sorted((self.instance.manual_lock_flags or {}).keys())
 
     def save(self, commit=True):

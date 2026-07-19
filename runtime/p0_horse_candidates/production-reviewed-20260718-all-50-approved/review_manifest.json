@@ -1,0 +1,31 @@
+{
+  "artifact_type": "p0_horse_candidate_review_manifest",
+  "decision": "confirm_batch_inclusion",
+  "files": {
+    "p0_participant_sample_review.reviewed.csv": {
+      "path": "p0_participant_sample_review.reviewed.csv",
+      "sha256": "f36d2f3f71fccc90a7f498f4d1c021e1a6d4275450122de599bc4b8767e240fa",
+      "size": 86763
+    },
+    "review_decisions.json": {
+      "path": "review_decisions.json",
+      "sha256": "f52ad9f8c499c2c37a168cd8a809d5cc77e8593e6306a83e82aed208a5624ace",
+      "size": 30734
+    },
+    "review_summary.json": {
+      "path": "review_summary.json",
+      "sha256": "414454487fe32cfb347cf9ac1537e2fcbf359ca52bf372ee0c205d00ad668fe6",
+      "size": 636
+    }
+  },
+  "generated_at": "2026-07-18T04:43:39.080573+08:00",
+  "reviewed_by": "project_owner",
+  "row_count": 50,
+  "source": {
+    "directory": "/Users/mentianlu/Code/umanews/.worktrees/p0-horse-info-completion/runtime/p0_horse_candidates/production-readonly-20260718-033432-review-copy",
+    "production_manifest_sha256": "ec9b7b9d0524a9e8f2dc1ef1b7019f22fbdcfcdac260391622119ba97bcf84d2",
+    "review_csv": "/Users/mentianlu/Code/umanews/.worktrees/p0-horse-info-completion/runtime/p0_horse_candidates/production-readonly-20260718-033432-review-copy/p0_participant_sample_review.csv",
+    "review_csv_sha256": "d1f5aecd1176230d7b2bb75c8315b4d235e27f7be043e72bb3004b70ebdec703",
+    "review_csv_size": 80413
+  }
+}

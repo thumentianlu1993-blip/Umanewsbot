@@ -1,0 +1,67 @@
+{
+  "schema_version": "p0-horse-source-cache.v2",
+  "adapter_key": "hong_kong_hkjc",
+  "region": "hong_kong",
+  "source": {
+    "name": "hkjc",
+    "url": "https://example.test/hkjc/horse/HK-001",
+    "external_horse_id": "HK-001",
+    "fetched_at": "2026-07-18T00:00:00Z"
+  },
+  "identity": {
+    "horse_name": "HARBOUR TEST",
+    "sire_name": "Harbour Sire",
+    "dam_name": "Harbour Dam",
+    "birth_year": 2020
+  },
+  "basic_profile": {
+    "country": "AUS",
+    "sex": "gelding",
+    "color": "brown",
+    "birth_date": "2020-09-14",
+    "owner_name": "Hong Kong Owner",
+    "trainer_name": "Hong Kong Trainer",
+    "breeder_name": "Hong Kong Breeder"
+  },
+  "pedigree": {
+    "sire": "Harbour Sire",
+    "dam": "Harbour Dam",
+    "sire_sire": "Harbour Sire Sire",
+    "sire_dam": "Harbour Sire Dam",
+    "dam_sire": "Harbour Dam Sire",
+    "dam_dam": "Harbour Dam Dam"
+  },
+  "aliases": [
+    {"name": "HARBOUR TEST", "language": "en", "is_original": true},
+    {"name": "港灣測試", "language": "zh-Hant"}
+  ],
+  "career": {
+    "source_start_count": 1,
+    "official_start_count_source": "hkjc",
+    "official_start_count_source_url": "https://example.test/hkjc/horse/HK-001",
+    "official_start_count_verified_at": "2026-07-18T00:00:00Z",
+    "record_authority_status": "source_records_verified",
+    "records": [
+      {
+        "race_name": "Class 2 Handicap",
+        "race_date": "2025-12-07",
+        "racecourse": "Sha Tin",
+        "race_number": "7",
+        "distance_text": "1400m",
+        "surface": "turf",
+        "finish": "PU",
+        "source_url": "https://example.test/hkjc/race/HK-20251207-7"
+      },
+      {
+        "race_name": "Withdrawn Handicap",
+        "race_date": "2026-01-04",
+        "racecourse": "Sha Tin",
+        "race_number": "9",
+        "distance_text": "1600m",
+        "surface": "turf",
+        "finish": "WV",
+        "source_url": "https://example.test/hkjc/race/HK-20260104-9"
+      }
+    ]
+  }
+}

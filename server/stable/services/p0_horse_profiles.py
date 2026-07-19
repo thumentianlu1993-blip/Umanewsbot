@@ -5,7 +5,7 @@ import json
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import urlparse
@@ -20,6 +20,7 @@ from stable.models import (
     HorseIdentityConflict,
     HorseIdentityConflictStatus,
     HorseCareerHistoryStatus,
+    HorseCareerRecordAuthorityStatus,
     HorseP0Source,
     HorseP0SourceStatus,
     HorseP0SourceType,
@@ -46,10 +47,12 @@ from stable.models import (
 )
 from stable.services.horse_profiles import PEDIGREE_TEXT_FIELDS, update_completeness
 from stable.services.horse_race_records import (
+    has_official_start_count_evidence,
     has_ambiguous_legacy_race_record,
     parse_record_date,
     refresh_career_history_completeness,
     upsert_race_record,
+    valid_http_url,
 )
 from stable.services.term_maintenance import write_csv_artifact, write_json_artifact
 
@@ -2343,8 +2346,18 @@ def evaluate_full_profile_completeness(
         blocking_reasons.append("race_history.source_start_count")
     elif profile.collected_start_count != profile.official_or_source_start_count:
         blocking_reasons.append("race_history.start_count_mismatch")
+    if not has_official_start_count_evidence(profile):
+        blocking_reasons.append("race_history.source_start_count_evidence")
     if profile.career_history_gap_count:
         blocking_reasons.append("race_history.gaps")
+    if (
+        profile.career_record_authority_status
+        != HorseCareerRecordAuthorityStatus.SOURCE_RECORDS_VERIFIED
+    ):
+        blocking_reasons.append(
+            "race_history.record_authority_status."
+            f"{profile.career_record_authority_status}"
+        )
 
     if not race_records.filter(Q(result_status=HorseRaceResultStatus.WON) | Q(is_major_win=True)).exists():
         blocking_reasons.append("major_wins")
@@ -2369,13 +2382,18 @@ def evaluate_full_profile_completeness(
         if not profile.full_profile_reviewed_at:
             blocking_reasons.append("review.reviewed_at")
         for module in REQUIRED_COMPLETION_MODULES:
-            latest_candidate = profile.data_candidates.filter(module=module).order_by("-fetched_at", "-id").first()
+            latest_candidate = (
+                profile.data_candidates.filter(module=module)
+                .exclude(status=HorseProfileCandidateStatus.IGNORED)
+                .order_by("-fetched_at", "-id")
+                .first()
+            )
             if not latest_candidate or latest_candidate.status != HorseProfileCandidateStatus.APPLIED:
                 blocking_reasons.append(f"review.module.{module}")
             elif (
                 getattr(settings, "HORSE_PROFILE_COMPLETION_REQUIRE_SOURCE_URL", True)
                 and module in {HorseProfileModule.PROFILE, HorseProfileModule.PEDIGREE}
-                and not (latest_candidate.source_url or "").strip()
+                and not valid_http_url(latest_candidate.source_url)
             ):
                 blocking_reasons.append(f"review.module.{module}.source_url")
 
@@ -2466,6 +2484,99 @@ def _module_payload(row: dict, module: str) -> Any:
     return row.get("aliases_payload") or []
 
 
+def _review_module_payload_error(module: str, payload: Any) -> str:
+    if module == HorseProfileModule.PROFILE:
+        if not isinstance(payload, dict):
+            return "invalid_profile_payload"
+        for field_name in (
+            "country",
+            "sex",
+            "color",
+            "owner_name",
+            "trainer_name",
+            "breeder_name",
+        ):
+            if field_name in payload and not isinstance(
+                payload[field_name], str
+            ):
+                return f"invalid_profile_field:{field_name}"
+        birth_date_value = payload.get("birth_date")
+        if (
+            birth_date_value not in ("", None)
+            and parse_record_date(birth_date_value) is None
+        ):
+            return "invalid_profile_field:birth_date"
+    elif module == HorseProfileModule.PEDIGREE:
+        if not isinstance(payload, dict):
+            return "invalid_pedigree_payload"
+        for field_name in PEDIGREE_TEXT_FIELDS:
+            if field_name in payload and not isinstance(
+                payload[field_name], str
+            ):
+                return f"invalid_pedigree_field:{field_name}"
+    elif module == HorseProfileModule.RACE_RECORD:
+        if not isinstance(payload, list):
+            return "invalid_race_records_payload"
+        for index, record in enumerate(payload):
+            if not isinstance(record, dict):
+                return f"invalid_race_record:{index}"
+            result_status = record.get("result_status")
+            if (
+                result_status not in ("", None)
+                and result_status not in HorseRaceResultStatus.values
+            ):
+                return f"invalid_race_result_status:{index}"
+    return ""
+
+
+def _career_count_evidence_group(
+    career_payload: dict[str, Any],
+) -> dict[str, Any]:
+    count = career_payload.get("official_or_source_start_count")
+    source = str(
+        career_payload.get("official_start_count_source") or ""
+    ).strip()
+    source_url = str(
+        career_payload.get("official_start_count_source_url") or ""
+    ).strip()
+    raw_verified_at = career_payload.get(
+        "official_start_count_verified_at"
+    )
+    if isinstance(raw_verified_at, datetime):
+        verified_at = raw_verified_at
+    elif isinstance(raw_verified_at, str):
+        try:
+            verified_at = datetime.fromisoformat(
+                raw_verified_at.replace("Z", "+00:00")
+            )
+        except ValueError:
+            verified_at = None
+    else:
+        verified_at = None
+    complete = (
+        isinstance(count, int)
+        and not isinstance(count, bool)
+        and count >= 0
+        and bool(source)
+        and valid_http_url(source_url)
+        and verified_at is not None
+        and timezone.is_aware(verified_at)
+    )
+    if not complete:
+        return {
+            "official_or_source_start_count": None,
+            "official_start_count_source": "",
+            "official_start_count_source_url": "",
+            "official_start_count_verified_at": None,
+        }
+    return {
+        "official_or_source_start_count": count,
+        "official_start_count_source": source,
+        "official_start_count_source_url": source_url,
+        "official_start_count_verified_at": verified_at,
+    }
+
+
 def _review_fingerprint(*, profile_id: int, module: str, payload: Any, source_url: str, review: dict) -> str:
     raw = json.dumps(
         {
@@ -2539,6 +2650,7 @@ def apply_reviewed_completion_artifact(payload: dict, *, commit: bool = False) -
         "skipped_unreviewed_modules": 0,
         "skipped_low_confidence_modules": 0,
         "skipped_conflict_modules": 0,
+        "ignored_modules": 0,
         "skipped_missing_source_url": 0,
         "skipped_missing_reviewer": 0,
     }
@@ -2573,6 +2685,24 @@ def apply_reviewed_completion_artifact(payload: dict, *, commit: bool = False) -
                 review_status = str(review.get("status") or "").strip().lower()
                 module_payload = _module_payload(row, module)
                 if module == HorseProfileModule.ALIASES and not review:
+                    continue
+                if review_status in {"ignore", "ignored"}:
+                    summary["ignored_modules"] += 1
+                    _save_module_audit(
+                        profile=profile,
+                        module=module,
+                        module_payload=module_payload,
+                        review=review,
+                        source_name=source_name,
+                        source_url=source_url,
+                        status=HorseProfileCandidateStatus.IGNORED,
+                        reviewer_id=reviewer.id,
+                        diff_payload={
+                            "ignored": True,
+                            "reason": str(review.get("reason") or "").strip(),
+                        },
+                        row=row,
+                    )
                     continue
                 if review_status != "approved":
                     summary["skipped_unreviewed_modules"] += 1
@@ -2612,16 +2742,35 @@ def apply_reviewed_completion_artifact(payload: dict, *, commit: bool = False) -
                     )
                     continue
                 if getattr(settings, "HORSE_PROFILE_COMPLETION_REQUIRE_SOURCE_URL", True):
-                    if module in {HorseProfileModule.PROFILE, HorseProfileModule.PEDIGREE} and not source_url.strip():
+                    if not valid_http_url(source_url):
                         summary["skipped_missing_source_url"] += 1
                         continue
                     if module == HorseProfileModule.RACE_RECORD and any(
                         not str(record.get("source_name") or "").strip()
-                        or not str(record.get("source_url") or "").strip()
+                        or not valid_http_url(record.get("source_url"))
                         for record in module_payload
                     ):
                         summary["skipped_missing_source_url"] += 1
                         continue
+                payload_error = _review_module_payload_error(
+                    module,
+                    module_payload,
+                )
+                if payload_error:
+                    summary["skipped_conflict_modules"] += 1
+                    row_changed |= _save_module_audit(
+                        profile=profile,
+                        module=module,
+                        module_payload=module_payload,
+                        review={**review, "conflict": payload_error},
+                        source_name=source_name,
+                        source_url=source_url,
+                        status=HorseProfileCandidateStatus.CONFLICT,
+                        reviewer_id=reviewer.id,
+                        diff_payload={"conflict": payload_error},
+                        row=row,
+                    )
+                    continue
                 if module == HorseProfileModule.RACE_RECORD and any(
                     has_ambiguous_legacy_race_record(profile, record) for record in module_payload
                 ):
@@ -2713,10 +2862,22 @@ def apply_reviewed_completion_artifact(payload: dict, *, commit: bool = False) -
             if HorseProfileModule.RACE_RECORD in approved_modules:
                 career_payload = row.get("career_history") or {}
                 refresh_kwargs: dict[str, Any] = {}
-                if "official_or_source_start_count" in career_payload:
-                    refresh_kwargs["official_or_source_start_count"] = career_payload.get(
-                        "official_or_source_start_count"
+                record_authority_status = career_payload.get(
+                    "record_authority_status"
+                )
+                if (
+                    record_authority_status
+                    not in HorseCareerRecordAuthorityStatus.values
+                ):
+                    record_authority_status = (
+                        HorseCareerRecordAuthorityStatus.UNKNOWN
                     )
+                refresh_kwargs["record_authority_status"] = (
+                    record_authority_status
+                )
+                refresh_kwargs.update(
+                    _career_count_evidence_group(career_payload)
+                )
                 if "gap_reasons" in career_payload:
                     refresh_kwargs["gap_reasons"] = career_payload.get("gap_reasons") or []
                 if "source_refs" in career_payload:
@@ -2725,7 +2886,7 @@ def apply_reviewed_completion_artifact(payload: dict, *, commit: bool = False) -
                     refresh_kwargs["verified_at"] = timezone.now()
                 refresh_career_history_completeness(profile, **refresh_kwargs)
 
-            if source_url and approved_modules:
+            if valid_http_url(source_url) and approved_modules:
                 source_refs = dict(profile.source_refs or {})
                 if source_refs.get("p0_completion") != source_url:
                     source_refs["p0_completion"] = source_url

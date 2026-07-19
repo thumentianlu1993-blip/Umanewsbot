@@ -1,5 +1,221 @@
 # 部署运行手册
 
+## P0 美国组合来源批准后的生产门禁（2026-07-20）
+
+1. 当前必须分层读取：冻结 v2 SHA-256
+   `a1184dbfb0257ecbe2a4ddbc4e729b0a74d73f911c8d52a20ab65854520325b7` 仍为原口径
+   `40/50`；独立批准 manifest
+   `29091d69573bab907cda2e9a081ae4684838b92d1f9b052a7601b6109a541077` 派生的 v3
+   `98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e` 在研究层为
+   `50/50`；生产数据库写入仍为 `0`。
+2. 美国批准口径只覆盖当前冻结批次：HRN 主记录，Fort George 补充 Sporting Life +
+   Racing Post，Equibase 用于官方总出赛数、身份和颜色对账。不得写成 Equibase 官方逐场
+   履历，不得全局放宽 HRN 或 `count_aligned_records_unverified`。
+3. 当前 production readiness report
+   `8cc36106091708827852401927a791a5575f2d6d490d1a306297e450612ed2c5` 只是
+   `static_schema_compatibility_check`；`safe_simulation_performed=false`、
+   `commit_artifact_compatible=false`、`decision=blocked`、`database_write_count=0`。
+   blockers 精确为 `not_horse_profile_completion_plan`、
+   `missing_production_profile_ids`、`missing_production_reviewer_id`、
+   `missing_commit_compatible_module_approvals`。
+4. prepare 只能保持 pending；apply 必须绑定固定 v2 SHA、可信 manifest SHA、调用方显式 SHA
+   与实际文件 SHA。记录、身份、来源、计数漂移或重复记录必须 fail closed。
+5. 下一步必须按顺序完成，任何一步失败即停止：
+   1. 读取生产数据，完成只读 profile mapping / preflight；
+   2. 生成 commit-compatible reviewed artifact；
+   3. 运行 formal `commit=False` 或生产备份副本模拟；
+   4. 核对生产 `HEAD`、容器、`/healthz/`、锁与备份；
+   5. 针对精确 artifact SHA 和准确集成版本重新取得生产授权。
+6. 正式 commit artifact 与 formal production dry-run 尚未生成或运行。本轮无网络、无数据库
+   写入、无部署发布，生产保持 **NO-GO / blocked**；用户本次“继续推进”不等于生产写入授权。
+
+## P0 马首批 50 匹生产提交前 NO-GO（2026-07-19）
+
+1. 当前五地区研究产物为 `50` 匹、`1439` 条履历记录，已复算为 `1432` 次实际出赛和 `7` 次
+   未出赛；法国、英国实际出赛未知赛果为 `0`，基础/三代血统硬字段和六项血统分别为
+   `650/650`、`300/300`。缺少实际出赛与多采待去重均为 `0`；Fort George 已由补充结果页
+   补齐为 `13/13` 次实际出赛。
+2. 这不等于 50 匹可提交生产 artifact。严格完整状态为 `40/50`：日本、法国、中国香港、
+   英国 `40/40` 达标；美国 `10/10` 仅完成 Equibase 官方总数与备用逐场数量对齐，逐场官方性
+   仍待授权来源或人工 Full Charts/Lifetime PP 核验。HRN 正式请求和缓存复放还必须携带并
+   命中马名、父名、母名、出生年份四字段身份；缺任一字段即 fail closed。
+3. 审核工作簿
+   `outputs/019f481e-4133-7f43-9844-e7a59b33ba9a/P0马五地区50匹完整解析与字段可用性审核-v2.xlsx`
+   含 `2050` 条逐字段证据，仅用于人工核验，不能传给 `complete_horse_profiles --commit`，
+   也不能替代模块级审核 CSV、diff、source evidence manifest 或冻结 SHA。
+4. 在 `50/50` 前不得执行 OpenSpec `6.5/6.6/6.7`，不得批量写生产 `HorseRaceRecord`、
+   创建普通比赛 `RaceEvent` 或公开马匹。补齐后先在最新集成版本重新生成正式 dry-run
+   artifact，并重新执行完整回归与独立代码审查。部署迁移时还必须抽检原
+   `career_history_status=complete` 且权威性未知的旧记录已降为 `needs_review`，原
+   `complete_profile_full` 已同步降为 `complete_pedigree_2gen`。
+5. 任何新生成或复放的 source cache 必须为 `p0-horse-source-cache.v2`，缓存自身马名/alias
+   必须命中请求马，来源总数必须具备来源名、URL 和带时区核验时间。网络 transport 必须关闭
+   自动重定向，仅允许实现登记的 JBIS、HKJC、Sporting Life、Geny、HRN HTTPS 主机；跨主机
+   跳转、带凭据 URL、非 443 端口或超预算均立即停止。跨 provider 补全还必须让候选四字段
+   身份与资料 payload 全部一致；数据库 evaluator、研究 JSON 和工作簿必须独立 fail closed，
+   不得只信 cache 入口。官方明确零出赛时允许空记录列表，其它空列表仍阻断。总数 URL 必须
+   通过 Django `URLValidator`；同 provider external ID 精确不一致也必须停止。
+6. 审核 `ignore` 只记录本次建议不采用，不得撤销此前 APPLIED 模块证据；部署验收需同时覆盖
+   “完整档案收到 ignore 后仍完整”和“conflict/pending 继续阻断”。日本重建必须跑授权离线
+   replay 的 10 匹真实样本并复算数量，不能只检查最终冻结 JSON。第 4 名及以后必须落为
+   `unplaced`；年份精度履历必须保持 partial；人工主来源、佐证来源和血统 URL 均须通过严格
+   HTTP(S) 校验。
+7. 自动补充来源合并前必须核对同源精确 external ID 或双方完整四字段身份。审核 apply 时总数、
+   来源名、URL、带时区核验时间必须整组写入或整组清空，不得借用旧记录；cache 非空硬字段还要
+   通过类型、出生年范围和 ISO 日期校验。研究摘要存在官方总数时必须以官方数对账。正式 dry-run
+   验收应包含非法行级 URL、模块 URL、逐场 URL 和 `source_refs` URL 的阻断样本。
+8. 父母实体查询中的唯一同名结果不得自动采用；external ID 必须按不透明原值比较。最终 v2
+   JSON / parent identity manifest / workbook SHA-256 分别为
+   `a1184dbfb0257ecbe2a4ddbc4e729b0a74d73f911c8d52a20ab65854520325b7` /
+   `b211d9040814b0b56ec30e8ef8930fdc10f4140a3a660cf491fcae12d0b6ab2b` /
+   `f67ad84408e68af69f14e2eef06e7135ca0b19cfc4fd18faf8925798acdbb1eb`。`116` 行审核证据解析为
+   `55` 个唯一父母来源身份；全部 `source_identity` 必须含马名、父名、母名和出生年。
+9. 父母出生年独立 approved artifact 的 SHA-256 为
+   `ed9f6419dccd41485b96884410ea9ab5976d8ab5ba2acfb97e03837a7a3deb54`，
+   `reviewed_by=codex_manual_source_review`，不得记成项目负责人逐字段审核 `55` 个出生年。
+   自动 Netkeiba 父母 URL 只允许精确 `https://en.netkeiba.com/db/horse/<id>/`，不得含凭据、
+   端口、query 或 fragment。Kentucky Wood 的父系必须使用 Racing Post `595446` 的 2001 年
+   Balko（Pistolet Bleu / Ella Royale）；Netkeiba `000a02bd3f` 是 1925 年同名马，只能留在 v1。
+10. 冻结 v1 JSON / workbook SHA-256 为
+    `55d80abed2b76a2d7fcf0cb97aadff800c3130c3815e84d8e6eb5b1c16b4befd` /
+    `4b68b87a076793eab0acc2357762afbd0c0fcaf2282fcf4122e3a2a855c2b696`，v2 生成不得修改其字节。
+    工作簿 builder 默认使用 v2 JSON、`-v2.xlsx` 和 `previews-v2`，环境变量覆盖配置；任何把
+    frozen v1 workbook 或 previews 作为输出目标的运行必须拒绝。历史 APPLIED
+    profile/pedigree 模块 URL 也要在最终完整度验收中通过严格校验。
+11. 只有正式 dry-run 全部模块审核通过后，才向用户申请该准确版本的生产授权；随后按本手册核对
+   生产 `HEAD`、容器、外部导入运行数与锁、环境备份、数据库备份和 `/healthz/`，任一失败即停止。
+
+## P0 马审核批次受控网络入口门禁（2026-07-18）
+
+1. 该入口只允许 `complete_horse_profiles --dry-run --p0-reviewed-candidates <csv>
+   --p0-review-manifest <review_manifest.json> --p0-review-manifest-sha256 <sha256>
+   --allow-network --region <region>`；`--commit`
+   或不带审核 CSV/审核 manifest 的 legacy dry-run 使用
+   `--allow-network` 必须拒绝。`HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true`、CLI flag 与
+   `HORSE_PROFILE_COMPLETION_REVIEW_MANIFEST_SHA256=<同一 sha256>` 缺一不可，direct service
+   调用同样检查两个 setting 和显式 expected SHA。
+2. 网络模式必须显式选择至少一个地区；未选地区只读既有 cache，cache 不存在则记录
+   `network_disabled_cache_missing`。不得默认扩大到五地区，也不得新建绕过现有 source client
+   的 HTTP 路径。
+3. 每个选中地区整批只创建一个 client，每区最多 10 匹；单马请求预算为日本 `3`、香港 `1`、
+   英国 `1`、法国 `2`、美国 `3`。单马失败只生成 blocker 并继续后续候选，不能放宽 source
+   validator、身份、硬字段、二代血统或完整履历要求。
+4. 每次运行使用冻结的 50 行审核 CSV、对应审核 manifest、外部批准的 manifest SHA 及全新空
+   output directory。解析 manifest 和创建 source client 前，必须先核对 CLI expected SHA、
+   服务端 setting 与实际文件字节 SHA 三方一致，再核对 `artifact_type/decision`、CSV
+   basename、SHA-256、大小和 50 行；
+   验收 manifest 必须包含 `network_allowed=true`、精确 `network_regions`、
+   `review_manifest_input`，总体与逐地区
+   `network_request_count/cache_hit_count/cache_miss_count`，并保持
+   `read_only=true/database_writes=0`。缓存发布继续使用现有 no-clobber 原子路径；整批
+   artifact 必须在同父目录 staging 中生成、校验并 `fsync` 后原子发布，失败不得留下半成品。
+5. 当前只完成本地代码验证：真实来源的可预期 `P0HorseSourceBlocked` 归入
+   `source_cache_or_adapter_error`，同时保留异常证据和实际请求数；其他异常仍归
+   `unexpected_adapter_error`。复用的底层 client 必须由逐候选代理隔离计数，不得要求底层
+   `last_request_count` 可写；fetch 前的 cache 错误必须为 `0`，fetch 后读取底层只读值。
+   每匹 fetch 重置请求预算计数，但不得清空同一 client 的最后真实请求时间；失败后的后续候选
+   也必须继续限速。JBIS 的 `**` 只有 `cells[12]` 规范文本精确为 `除外` 或 `取消` 时才映射
+   为 non-start；赛事名、缺列和未知状态不得触发。Docker `--network none` 下
+   transport 调用前必须记录请求尝试和 monotonic 时间，连接/TLS/读取异常仍计数并使下一候选
+   继续限速。source-client `48/48（0.450s）`、四模块 `102/102（1.040s）` 通过，Django check、
+   迁移无漂移、相关编译与 diff check 通过。
+   日本首批首次运行是 `9/10`；修复后受控重跑和无网络复放均为 `10/10`。该结果只能说明
+   日本样本完成，不得写成 `50` 匹完成。
+6. task 4.2 继续未完成；香港、英国、法国、美国字段缺口和法国 429 仍需独立方案。同一独立
+   reviewer 对本审计文字追加前的完整差异最终 `APPROVED`、无 actionable finding；approved
+   HEAD 为 `c2c30aeed73619767c1ca6dfb440b43c8f824d11`，fingerprint 为
+   `4dfaaaff01f38c5062a29a2225ac0f7fe8371d3ceccfd12e5182731cbaf99221`，reviewer stdout
+   SHA-256 为 `0780293905b1c1cdd953a02bd2386c25902021709c9144b2c466bf93ad062631`，helper raw
+   stdout SHA-256 为 `8a000524fd6228570e0ac2cb036d1d475e50701a3adb5806a5130cd91fbb632c`。
+   旧 fingerprint 不覆盖本段随后追加的审计文字；本段准确性以追加后的限定只读复核为准。
+   本节仍不授权新的真实批次、生产写库、commit、push、merge、部署或公开，后续每个真实地区
+   批次仍需针对精确输入和版本取得新授权。
+
+### 日本首批网络 dry-run、修复重跑与离线复放证据
+
+- run 目录：
+  `runtime/horse_profile_completion/p0-reviewed-japan-network-20260718-083707/`
+- batch manifest SHA-256：
+  `bf8dbda389e5ffc3b9efa1f361a8cbb7b8ad5392b2e1c11c86b25d8600db49e2`
+- 首次结果：`9/10 complete`、`30 requests`、`9 个新生成 cache`、`0 cache hits`、
+  `database_writes=0`。
+- 唯一 blocker 为コントラポスト：来源实际为 `22 actual starts + 1 除外`，旧解析把该除外行计入
+  实际出赛。
+- 修复重跑目录：
+  `runtime/horse_profile_completion/p0-reviewed-japan-network-rerun-20260718-091156/`；
+  batch manifest SHA-256：
+  `9682ceebddb53a796ff058bb79a3455e89a4ad03b01ddeed7beed947dd1106b5`。结果为日本
+  `10/10 complete`、`9 cache hits`、`1 cache miss`、`3 network requests`、
+  `database_writes=0`，其余四地区 `network_request_count=0`。コントラポスト保存
+  `23` 条履历，实际出赛计数为 `22/22`，缺口 `0`。
+- 无网络复放目录：
+  `runtime/horse_profile_completion/p0-reviewed-japan-offline-replay-20260718-0913/`；
+  batch manifest SHA-256：
+  `472785d50e5e6e7343d1ec0285cc68921a12ca7303556fa58dd21ffcc1af22c2`。Docker
+  `--network none` 下日本 `10/10 complete`、`10 cache hits`、`0 cache misses`、
+  `0 network requests`、`database_writes=0`；cache 目录正好 `10` 个 JSON，无临时文件。
+- 前述网络重跑和首次离线复放形成于审核 manifest 强绑定与整批原子发布修复之前，只作为来源
+  抓取和解析证据。加固后复放目录：
+  `runtime/horse_profile_completion/p0-reviewed-japan-hardened-offline-replay-20260718-094427/`；
+  batch manifest SHA-256：
+  `4834e9f9f47b67a57bb1c11ee7cdc0b8338673b7e96d575a56ef1e5164332ecb`。该次在 Docker
+  `--network none` 中启用网络门禁模式，审核 manifest SHA-256 为
+  `aa452fb27dcf77e7821782a6302504e7abe4cf600bd6da25e9c49e7f776213bf`，审核 CSV SHA-256
+  为 `f36d2f3f71fccc90a7f498f4d1c021e1a6d4275450122de599bc4b8767e240fa`；日本
+  `10/10 complete`、`10 cache hits`、`0 network requests`、`database_writes=0`，最终目录
+  `8` 个文件且无 staging 残留。该次形成于外部冻结 SHA 信任锚修复之前，只是中间验证。
+- 最终授权复放目录：
+  `runtime/horse_profile_completion/p0-reviewed-japan-authorized-offline-replay-20260718-100440/`；
+  batch manifest SHA-256：
+  `96ebef63ae74fa787ff786b262cebebc252f6e3c536c2aa89fc920c8d8e91210`。Docker
+  `--network none` 中 CLI `--p0-review-manifest-sha256`、服务端
+  `HORSE_PROFILE_COMPLETION_REVIEW_MANIFEST_SHA256` 与实际审核 manifest 字节 SHA 均为
+  `aa452fb27dcf77e7821782a6302504e7abe4cf600bd6da25e9c49e7f776213bf`，清单记录
+  `authorized_by_setting=true`；日本 `10/10 complete`、`10 cache hits`、`0 network requests`、
+  `database_writes=0`，最终目录 `8` 个文件且无 staging 残留。
+
+## P0 马真实页面兼容的发布前门禁（2026-07-18）
+
+- 当前仅允许离线验证，不得把保存快照解析成功升级为真实网络、生产缓存或 50 匹完成证据。
+  历史 `66/66` 是 scaffold；当前候选已在真正的 Docker `--network none` 中达到
+  source-client `20/20`（`Ran 20 tests in 0.057s`）和四模块 `74/74`
+  （`Ran 74 tests in 0.693s`）。Django check 无问题、`makemigrations --check --dry-run`
+  为 `No changes detected`，两个 service 最终使用
+  `PYTHONPYCACHEPREFIX=/tmp/pycache python -m py_compile ...` 退出 `0`，
+  `git diff --check` 退出 `0`。
+- 五地区首次真实探针基线为 `0/5`；修复后主会话执行的不落缓存、不写数据库新鲜探针为
+  `1/5`。JBIS オーロラエックス为 `15 starts / 15 records`；HKJC 缺
+  `birth_date/trainer_name/breeder_name`；Sporting Life 缺 `country/breeder_name`；
+  Geny HTTP 429；HRN 缺来源明确 `Starts`。后续重试或补充来源仍须保持低频、限量、可审计，
+  不得由单马探针直接扩大为 50 匹批量抓取。
+- HKJC 的 `Race Index` 只写 `external_race_id`，不得合成赛事名；Sporting Life 不得从
+  `sire/dam/damsire` 猜完整 pedigree；HRN 不得用年龄或表格行数猜出生年份/starts；法国
+  429 不得绕过。缺失字段继续 blocker，交给补充来源或人工审核。
+- cache 必须用同目录完整临时文件、`fsync`、`os.link(temp,target)` no-clobber；若目标已存在，
+  重新读取并严格校验 canonical cache，再 normalize/return。不得持有锁跨网络，不得覆盖赢家
+  cache，失败必须清理临时文件。
+- 任务 4.2 仍未完成；日本首批已为 `10/10`，其他地区仍需真实缓存与补充来源/人工字段。
+  在这些缺口与当前任务的新发布授权全部完成前，禁止 commit apply、生产写入或公开。当前实现已由同一独立
+  原生 reviewer 定向复审为 `APPROVED`，但这一项通过不能替代其余门禁。
+
+## P0 马已审核候选离线基线 dry-run
+
+1. 输入必须是已冻结审核 CSV，严格满足五地区各 10、候选键唯一、全部 `reviewed=True`、`review_decision=confirm_batch_inclusion`。当前输入为 `runtime/p0_horse_candidates/production-reviewed-20260718-all-50-approved/p0_participant_sample_review.reviewed.csv`，SHA-256 `f36d2f3f71fccc90a7f498f4d1c021e1a6d4275450122de599bc4b8767e240fa`。
+2. 只读基线命令必须在无网络容器运行，并显式提供审核 CSV、缓存和全新输出目录：
+
+   ```bash
+   python manage.py complete_horse_profiles \
+     --dry-run \
+     --p0-reviewed-candidates /app/runtime/p0_horse_candidates/production-reviewed-20260718-all-50-approved/p0_participant_sample_review.reviewed.csv \
+     --cache-dir /app/runtime/horse_profile_completion/cache-empty-20260718 \
+     --output-dir /app/runtime/horse_profile_completion/p0-reviewed-baseline-20260718-0500
+   ```
+
+3. 命令固定 `allow_network=false`，不得用它绕过地区来源客户端、限速、缓存或请求预算。输出目录非空时必须停止，不得覆盖已有 run。
+4. 当前基线为 `50 processed / 0 complete / 50 blocked / 0 network requests / 0 database writes`，batch manifest SHA-256 为 `2028e03a8e5edaa386e101cd159406559192844c02a9979d363e1dbece571110`；日本和美国共 20 匹还包含身份补强 blocker。只有后续受控来源缓存完成且重新 dry-run 通过，才能进入模块人工审核。
+5. 本节不授权生产 commit、自动首次公开或真实网络抓取。发布前仍需独立代码审核、最新用户授权、生产 HEAD/容器/health/锁/备份门禁和主线迁移冲突处理。
+
+## P0 马生产只读候选提取结果（2026-07-18）
 ## P0 马候选提取与完整生涯门禁
 
 1. 候选提取必须先以 `--extract-candidates` 运行到新目录，核对 `read_only=true`、五地区、九类等级、身份状态分布和 manifest SHA。
@@ -5096,6 +5312,26 @@ python manage.py evaluate_multiregion_attribution_gold \
 7. 每个 scope 要求 `complete + gap = scope` 且二者无交集。gap 记录来源/ledger/cache/target identity 后继续其他 scope；汇总时分别报告 accounted rate 与 data complete rate，日美零星缺口留到全量正式总账完成后统一审核。
 8. 日期候选、详情来源、最终详情三阶段分别执行 dry-run；每次 commit 前独立创建并校验数据库备份，commit 使用 `network=false/write=true`，写后运行正式只读 verifier。任一 `error>0`、published>0、身份漂移或锁/事务异常即停止。
 9. 全批收口核对 1061 targets、五地区 events/runners/results、gap 清单、OperationLog、runner/checkpoint、Redis/Celery/事务和 healthz。常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`、`RACE_EVENT_HISTORICAL_PUBLIC_ENABLED=false`，直到用户统一审核并另行批准公开。
+## P0 马人工补录 dry-run（2026-07-18）
+
+人工补录 CSV 必须使用 `server/stable/services/p0_horse_completion_source_clients.py` 中 `MANUAL_SUPPLEMENT_CSV_FIELDS` 的精确列顺序。只有 `approved` 行会参与；其他审核状态会被忽略。批准行的录入人与复核人必须不同，且禁止 `career` 字段组。
+
+```bash
+python manage.py complete_horse_profiles \
+  --dry-run \
+  --p0-reviewed-candidates /path/to/p0_participant_sample_review.reviewed.csv \
+  --p0-review-manifest /path/to/review_manifest.json \
+  --p0-review-manifest-sha256 <frozen-lowercase-sha256> \
+  --p0-manual-supplements /path/to/manual_supplements.reviewed.csv \
+  --allow-network \
+  --region united_kingdom \
+  --cache-dir /path/to/cache \
+  --output-dir /path/to/new-empty-output
+```
+
+运行前仍须同时开启服务端网络开关，并绑定相同的审核 manifest SHA。该命令只生成只读 dry-run artifact；不得因此执行 `--commit`。批次 manifest 必须出现 `manual_supplements_input`，并核对文件 SHA、`approved_field_count`、`candidate_count` 和 `outcome_summary`。canonical cache 不得包含任何人工 outcome、provenance、supplemental source 或 raw manual rows，并且 payload 必须是严格 JSON 类型；tuple/set、自定义容器子类、非字符串对象键、非有限浮点值、循环或超过最大深度均停止且不得留下目标 cache 或临时文件。形状检查必须先于复制，并通过 JSON round-trip 生成纯内置类型；独立 purity gate 与完整 validator 都必须在规范化后再次检查人工标记。自动多来源和人工补录合并 helper 也必须先规范化主 payload 与补充输入。磁盘 JSON 解码的深度异常必须归入 `source_cache_or_adapter_error` 并继续其他候选。读取失败不得删除、截断或改写原 cache，运行前后目录清单与逐文件字节应一致。人工内容只允许存在于本批工作副本。发布 staging 前必须证明每个批准字段恰有一个完整证据指纹一致且状态属于 `applied/already_applied/blocked/ignored` 的 outcome；缺失、重复、非法状态、证据漂移或无输入旧 outcome 均停止。
+
+当前不要对中国香港、英国、法国或美国执行 10 匹网络批次。先逐地区完成来源修复和单马完整度复验；法国 HTTP 429、美国身份缺口、中国香港生涯赛名缺口均为停止条件。
 
 ## 2026-07-19 五地区准实时公开 Beta 待发布运行约束
 

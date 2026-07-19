@@ -5,12 +5,15 @@ import json
 import re
 import unicodedata
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
+from django.core.exceptions import ValidationError
+from django.core.validators import URLValidator
 from django.utils import timezone
 
 from stable.models import (
+    HorseCareerRecordAuthorityStatus,
     HorseCareerHistoryStatus,
     HorseProfile,
     HorseRaceDatePrecision,
@@ -62,6 +65,7 @@ _NON_START_RESULTS = {
     HorseRaceResultStatus.SCRATCHED,
     HorseRaceResultStatus.WITHDRAWN,
 }
+_OFFICIAL_COUNT_URL_VALIDATOR = URLValidator(schemes=["http", "https"])
 
 
 def parse_record_date(value: Any) -> date | None:
@@ -385,21 +389,52 @@ def _race_record_values(payload: dict) -> dict[str, Any]:
     return values
 
 
+def valid_http_url(value: Any) -> bool:
+    try:
+        _OFFICIAL_COUNT_URL_VALIDATOR(str(value or "").strip())
+    except ValidationError:
+        return False
+    return True
+
+
 def _record_has_source_evidence(record: HorseRaceRecord) -> bool:
-    if record.source_name and record.source_url:
+    if record.source_name and valid_http_url(record.source_url):
         return True
     refs = record.source_refs if isinstance(record.source_refs, dict) else {}
     return any(
-        str(source.get("source_name") or "").strip() and str(source.get("source_url") or "").strip()
+        str(source.get("source_name") or "").strip()
+        and valid_http_url(source.get("source_url"))
         for source in refs.get("sources", [])
         if isinstance(source, dict)
     )
+
+
+def has_official_start_count_evidence(profile: HorseProfile) -> bool:
+    if not str(profile.official_start_count_source or "").strip():
+        return False
+    if not valid_http_url(
+        profile.official_start_count_source_url
+    ):
+        return False
+    verified_at = profile.official_start_count_verified_at
+    if isinstance(verified_at, str):
+        try:
+            verified_at = datetime.fromisoformat(
+                verified_at.replace("Z", "+00:00")
+            )
+        except ValueError:
+            return False
+    return isinstance(verified_at, datetime) and timezone.is_aware(verified_at)
 
 
 def refresh_career_history_completeness(
     profile: HorseProfile,
     *,
     official_or_source_start_count: int | None | object = _UNSET,
+    official_start_count_source: str | object = _UNSET,
+    official_start_count_source_url: str | object = _UNSET,
+    official_start_count_verified_at: Any = _UNSET,
+    record_authority_status: str | object = _UNSET,
     gap_reasons: list[str] | None = None,
     source_refs: dict | None = None,
     verified_at: Any = _UNSET,
@@ -407,6 +442,24 @@ def refresh_career_history_completeness(
 ) -> CareerHistoryEvaluation:
     if official_or_source_start_count is not _UNSET:
         profile.official_or_source_start_count = official_or_source_start_count
+    if official_start_count_source is not _UNSET:
+        profile.official_start_count_source = str(
+            official_start_count_source or ""
+        ).strip()
+    if official_start_count_source_url is not _UNSET:
+        profile.official_start_count_source_url = str(
+            official_start_count_source_url or ""
+        ).strip()
+    if official_start_count_verified_at is not _UNSET:
+        profile.official_start_count_verified_at = (
+            official_start_count_verified_at
+        )
+    if record_authority_status is not _UNSET:
+        if record_authority_status not in HorseCareerRecordAuthorityStatus.values:
+            raise ValueError(
+                f"unsupported career record authority status: {record_authority_status}"
+            )
+        profile.career_record_authority_status = record_authority_status
     if source_refs is not None:
         profile.career_history_source_refs = source_refs
     if verified_at is not _UNSET:
@@ -471,12 +524,65 @@ def refresh_career_history_completeness(
         extra_count = collected - source_total
         computed_reasons.append(f"source_start_count_exceeded:{extra_count}")
         computed_gap_count += extra_count
+    if source_total is not None:
+        if not str(profile.official_start_count_source or "").strip():
+            computed_reasons.append("official_start_count_source_missing")
+        if not valid_http_url(
+            profile.official_start_count_source_url
+        ):
+            computed_reasons.append("official_start_count_source_url_missing")
+        verified_at = profile.official_start_count_verified_at
+        if isinstance(verified_at, str):
+            try:
+                verified_at = datetime.fromisoformat(
+                    verified_at.replace("Z", "+00:00")
+                )
+            except ValueError:
+                verified_at = None
+        if not (
+            isinstance(verified_at, datetime)
+            and timezone.is_aware(verified_at)
+        ):
+            computed_reasons.append(
+                "official_start_count_verified_at_missing"
+            )
 
-    reasons = list(dict.fromkeys([*retained_reasons, *computed_reasons]))
+    authority_reasons: list[str] = []
+    if (
+        profile.career_record_authority_status
+        == HorseCareerRecordAuthorityStatus.COUNT_ALIGNED_RECORDS_UNVERIFIED
+    ):
+        authority_reasons.append(
+            "official_count_aligned_per_record_authority_pending:"
+            f"{profile.official_start_count_source or 'unknown'}"
+        )
+    elif (
+        profile.career_record_authority_status
+        == HorseCareerRecordAuthorityStatus.SOURCE_BLOCKED
+    ):
+        authority_reasons.append(
+            "official_per_record_source_blocked:"
+            f"{profile.official_start_count_source or 'unknown'}"
+        )
+    elif (
+        profile.career_record_authority_status
+        != HorseCareerRecordAuthorityStatus.SOURCE_RECORDS_VERIFIED
+    ):
+        authority_reasons.append("per_record_authority_unknown")
+    reasons = list(
+        dict.fromkeys(
+            [*retained_reasons, *computed_reasons, *authority_reasons]
+        )
+    )
     gap_count = len(retained_reasons) + computed_gap_count
     if not records and source_total is None:
         status = HorseCareerHistoryStatus.NOT_STARTED
-    elif source_total is not None and collected == source_total and gap_count == 0:
+    elif (
+        source_total is not None
+        and collected == source_total
+        and gap_count == 0
+        and not reasons
+    ):
         status = HorseCareerHistoryStatus.COMPLETE
     elif collected > (source_total if source_total is not None else collected) or unconfirmed_count:
         status = HorseCareerHistoryStatus.NEEDS_REVIEW
@@ -495,6 +601,10 @@ def refresh_career_history_completeness(
         profile.save(
             update_fields=[
                 "official_or_source_start_count",
+                "official_start_count_source",
+                "official_start_count_source_url",
+                "official_start_count_verified_at",
+                "career_record_authority_status",
                 "career_history_status",
                 "collected_start_count",
                 "linked_race_event_count",

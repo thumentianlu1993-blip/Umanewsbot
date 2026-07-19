@@ -1,0 +1,76 @@
+{
+  "eligible_event_count": 9867,
+  "runner_row_count": 100132,
+  "result_row_count": 91897,
+  "participant_observation_count": 100132,
+  "candidate_count": 82644,
+  "sample_count": 50,
+  "unique_sample_candidate_count": 50,
+  "regions": {
+    "france": {
+      "eligible_event_count": 827,
+      "runner_row_count": 6222,
+      "result_row_count": 4745,
+      "participant_observation_count": 6222,
+      "candidate_count": 2718,
+      "ready_for_profile_resolution_count": 2637,
+      "needs_identity_enrichment_count": 81,
+      "identity_conflict_count": 0,
+      "missing_source_url_count": 0,
+      "sample_count": 10,
+      "sample_ready_count": 10
+    },
+    "hong_kong": {
+      "eligible_event_count": 493,
+      "runner_row_count": 5067,
+      "result_row_count": 4969,
+      "participant_observation_count": 5067,
+      "candidate_count": 4322,
+      "ready_for_profile_resolution_count": 206,
+      "needs_identity_enrichment_count": 4116,
+      "identity_conflict_count": 0,
+      "missing_source_url_count": 0,
+      "sample_count": 10,
+      "sample_ready_count": 10
+    },
+    "japan": {
+      "eligible_event_count": 2425,
+      "runner_row_count": 34754,
+      "result_row_count": 34383,
+      "participant_observation_count": 34754,
+      "candidate_count": 34754,
+      "ready_for_profile_resolution_count": 0,
+      "needs_identity_enrichment_count": 34754,
+      "identity_conflict_count": 0,
+      "missing_source_url_count": 0,
+      "sample_count": 10,
+      "sample_ready_count": 0
+    },
+    "united_kingdom": {
+      "eligible_event_count": 2353,
+      "runner_row_count": 22427,
+      "result_row_count": 19487,
+      "participant_observation_count": 22427,
+      "candidate_count": 9188,
+      "ready_for_profile_resolution_count": 9168,
+      "needs_identity_enrichment_count": 20,
+      "identity_conflict_count": 0,
+      "missing_source_url_count": 0,
+      "sample_count": 10,
+      "sample_ready_count": 10
+    },
+    "united_states": {
+      "eligible_event_count": 3769,
+      "runner_row_count": 31662,
+      "result_row_count": 28313,
+      "participant_observation_count": 31662,
+      "candidate_count": 31662,
+      "ready_for_profile_resolution_count": 0,
+      "needs_identity_enrichment_count": 31662,
+      "identity_conflict_count": 0,
+      "missing_source_url_count": 0,
+      "sample_count": 10,
+      "sample_ready_count": 0
+    }
+  }
+}

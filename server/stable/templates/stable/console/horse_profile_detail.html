@@ -25,7 +25,7 @@
       {% if profile.published_at %}<span class="muted">发布 {{ profile.published_at|date:"Y-m-d H:i" }}</span>{% endif %}
     </div>
     <div class="muted" style="margin-top: 10px;">
-      P0 来源 {{ p0_sources|length }} 条 · 生涯状态 {{ profile.get_career_history_status_display }} · 来源出赛 {{ profile.official_or_source_start_count|default:"待确认" }} / 已采集 {{ profile.collected_start_count }} · 缺口 {{ profile.career_history_gap_count }} · 未关联赛事 {{ profile.unlinked_race_record_count }} · 履历同步 {{ profile.records_synced_through|date:"Y-m-d"|default:"-" }} · 完整资料审核 {{ profile.full_profile_reviewed_at|date:"Y-m-d H:i"|default:"-" }}
+      P0 来源 {{ p0_sources|length }} 条 · 生涯状态 {{ profile.get_career_history_status_display }} · 逐场权威性 {{ profile.get_career_record_authority_status_display }} · 来源出赛 {{ profile.official_or_source_start_count|default:"待确认" }} / 已采集 {{ profile.collected_start_count }} · 官方总数来源 {{ profile.official_start_count_source|default:"-" }} · 缺口 {{ profile.career_history_gap_count }} · 未关联赛事 {{ profile.unlinked_race_record_count }} · 履历同步 {{ profile.records_synced_through|date:"Y-m-d"|default:"-" }} · 完整资料审核 {{ profile.full_profile_reviewed_at|date:"Y-m-d H:i"|default:"-" }}
     </div>
     {% if p0_sources %}
       <div class="horse-chip-list" style="margin-top: 10px;">

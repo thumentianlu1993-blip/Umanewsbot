@@ -1,0 +1,67 @@
+{
+  "schema_version": "p0-horse-source-cache.v2",
+  "adapter_key": "france_geny",
+  "region": "france",
+  "source": {
+    "name": "geny",
+    "url": "https://example.test/geny/cheval/fr-001",
+    "external_horse_id": "fr-001",
+    "fetched_at": "2026-07-18T00:00:00Z"
+  },
+  "identity": {
+    "horse_name": "ESSAI PARISIEN",
+    "sire_name": "Paris Sire",
+    "dam_name": "Paris Dam",
+    "birth_year": 2021
+  },
+  "basic_profile": {
+    "country": "FR",
+    "sex": "female",
+    "color": "bay",
+    "birth_date": "2021-03-03",
+    "owner_name": "France Owner",
+    "trainer_name": "France Trainer",
+    "breeder_name": "France Breeder"
+  },
+  "pedigree": {
+    "sire": "Paris Sire",
+    "dam": "Paris Dam",
+    "sire_sire": "Paris Sire Sire",
+    "sire_dam": "Paris Sire Dam",
+    "dam_sire": "Paris Dam Sire",
+    "dam_dam": "Paris Dam Dam"
+  },
+  "aliases": [
+    {"name": "ESSAI PARISIEN", "language": "fr", "is_original": true},
+    {"name": "Essai Parisien", "language": "fr"}
+  ],
+  "career": {
+    "source_start_count": 2,
+    "official_start_count_source": "geny",
+    "official_start_count_source_url": "https://example.test/geny/cheval/fr-001",
+    "official_start_count_verified_at": "2026-07-18T00:00:00Z",
+    "record_authority_status": "source_records_verified",
+    "records": [
+      {
+        "race_name": "Prix de Test",
+        "race_date": "2025-05-11",
+        "racecourse": "Longchamp",
+        "race_number": "2",
+        "distance_text": "2000m",
+        "surface": "turf",
+        "finish": "1",
+        "source_url": "https://example.test/geny/course/fr-race-1"
+      },
+      {
+        "race_name": "Prix Sans Arrivee",
+        "race_date": "2025-06-08",
+        "racecourse": "Chantilly",
+        "race_number": "4",
+        "distance_text": "2100m",
+        "surface": "turf",
+        "finish": "DNF",
+        "source_url": "https://example.test/geny/course/fr-race-2"
+      }
+    ]
+  }
+}

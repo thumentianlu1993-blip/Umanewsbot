@@ -1,0 +1,25 @@
+{
+  "artifact_type": "p0_horse_candidate_review_summary",
+  "candidate_key_unique_count": 50,
+  "confirmed_for_batch": 50,
+  "identity_enrichment_still_required": 20,
+  "identity_status_counts": {
+    "needs_identity_enrichment": 20,
+    "strong_external_identity": 30
+  },
+  "region_counts": {
+    "france": 10,
+    "hong_kong": 10,
+    "japan": 10,
+    "united_kingdom": 10,
+    "united_states": 10
+  },
+  "review_status_counts": {
+    "needs_identity_enrichment": 20,
+    "ready_for_profile_resolution": 30
+  },
+  "reviewed": 50,
+  "reviewed_at": "2026-07-18T04:43:39.080573+08:00",
+  "reviewed_by": "project_owner",
+  "total": 50
+}

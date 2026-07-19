@@ -1,0 +1,196 @@
+{
+  "schema_version": "p0-horse-research-module-review.v1",
+  "mode": "research_read_only_module_review",
+  "module": "race_records",
+  "decision": "source_composition_approved",
+  "blockers": [],
+  "input_sha256": "a1184dbfb0257ecbe2a4ddbc4e729b0a74d73f911c8d52a20ab65854520325b7",
+  "review_artifact_sha256": "29091d69573bab907cda2e9a081ae4684838b92d1f9b052a7601b6109a541077",
+  "reviewed_horse_count": 10,
+  "approved_horse_count": 10,
+  "commit_artifact_compatible": false,
+  "production_application_authorized": false,
+  "rows": [
+    {
+      "identity": {
+        "horse_name": "Bullard",
+        "sire_name": "Gun Runner",
+        "dam_name": "Reve d'Amour",
+        "birth_year": 2022
+      },
+      "module": "race_records",
+      "decision": "approved",
+      "before_record_authority_status": "count_aligned_records_unverified",
+      "after_record_authority_status": "source_records_verified",
+      "record_count": 10,
+      "record_source_counts": {
+        "horseracingnation": 10
+      },
+      "record_set_sha256": "7edd42f34624354296468719eac2ef4b79ddca0f8a580db0cb7f2d6cc1c4cc31"
+    },
+    {
+      "identity": {
+        "horse_name": "Carson's Run",
+        "sire_name": "Cupid",
+        "dam_name": "Hot N Hectic",
+        "birth_year": 2021
+      },
+      "module": "race_records",
+      "decision": "approved",
+      "before_record_authority_status": "count_aligned_records_unverified",
+      "after_record_authority_status": "source_records_verified",
+      "record_count": 15,
+      "record_source_counts": {
+        "horseracingnation": 15
+      },
+      "record_set_sha256": "69abd5e929d0bc67d39287493acf10df687a89a7338c4c5ef4364da0e027064b"
+    },
+    {
+      "identity": {
+        "horse_name": "Cornishman",
+        "sire_name": "Curlin",
+        "dam_name": "Penwith",
+        "birth_year": 2021
+      },
+      "module": "race_records",
+      "decision": "approved",
+      "before_record_authority_status": "count_aligned_records_unverified",
+      "after_record_authority_status": "source_records_verified",
+      "record_count": 26,
+      "record_source_counts": {
+        "horseracingnation": 26
+      },
+      "record_set_sha256": "060f5652bdc54bf86eb79f2dfcf26098efdedcd22e903cd52141e2d451590d41"
+    },
+    {
+      "identity": {
+        "horse_name": "Desvio",
+        "sire_name": "Yoshida (JPN)",
+        "dam_name": "Fitzrovia",
+        "birth_year": 2021
+      },
+      "module": "race_records",
+      "decision": "approved",
+      "before_record_authority_status": "count_aligned_records_unverified",
+      "after_record_authority_status": "source_records_verified",
+      "record_count": 20,
+      "record_source_counts": {
+        "horseracingnation": 20
+      },
+      "record_set_sha256": "fbe13b25e1ed9375413fe26adf56a8c21597556cbf178fcd572f8b244d12bae1"
+    },
+    {
+      "identity": {
+        "horse_name": "Fort George",
+        "sire_name": "Territories (IRE)",
+        "dam_name": "Dusty Red (GB)",
+        "birth_year": 2022
+      },
+      "module": "race_records",
+      "decision": "approved",
+      "before_record_authority_status": "count_aligned_records_unverified",
+      "after_record_authority_status": "source_records_verified",
+      "record_count": 13,
+      "record_source_counts": {
+        "horseracingnation": 6,
+        "sporting_life": 6,
+        "racing_post": 1
+      },
+      "record_set_sha256": "7d53058711696ad141884167c6c3c53a436d1d23ed92499cad9f9c1ced81cc4c"
+    },
+    {
+      "identity": {
+        "horse_name": "Gigante",
+        "sire_name": "Not This Time",
+        "dam_name": "Summertime Green",
+        "birth_year": 2020
+      },
+      "module": "race_records",
+      "decision": "approved",
+      "before_record_authority_status": "count_aligned_records_unverified",
+      "after_record_authority_status": "source_records_verified",
+      "record_count": 37,
+      "record_source_counts": {
+        "horseracingnation": 37
+      },
+      "record_set_sha256": "774be10a5abac86c11c468dc423ac841724090de2a82769415fd7fc823ca46ae"
+    },
+    {
+      "identity": {
+        "horse_name": "Heroic Move",
+        "sire_name": "Quality Road",
+        "dam_name": "Family Tree",
+        "birth_year": 2020
+      },
+      "module": "race_records",
+      "decision": "approved",
+      "before_record_authority_status": "count_aligned_records_unverified",
+      "after_record_authority_status": "source_records_verified",
+      "record_count": 31,
+      "record_source_counts": {
+        "horseracingnation": 31
+      },
+      "record_set_sha256": "8010ff8d4add54e004975ee0efed010e200e8f0ab9de652ae6a25c4b80a81614"
+    },
+    {
+      "identity": {
+        "horse_name": "In Our Time",
+        "sire_name": "Not This Time",
+        "dam_name": "Laura's Pleasure",
+        "birth_year": 2021
+      },
+      "module": "race_records",
+      "decision": "approved",
+      "before_record_authority_status": "count_aligned_records_unverified",
+      "after_record_authority_status": "source_records_verified",
+      "record_count": 19,
+      "record_source_counts": {
+        "horseracingnation": 19
+      },
+      "record_set_sha256": "2e219632395a848efe3b9a5192c5b450f67a31895e8ee254ad0d7accd541f5d9"
+    },
+    {
+      "identity": {
+        "horse_name": "Minaret Station",
+        "sire_name": "Instilled Regard",
+        "dam_name": "Beau Recall (IRE)",
+        "birth_year": 2022
+      },
+      "module": "race_records",
+      "decision": "approved",
+      "before_record_authority_status": "count_aligned_records_unverified",
+      "after_record_authority_status": "source_records_verified",
+      "record_count": 7,
+      "record_source_counts": {
+        "horseracingnation": 7
+      },
+      "record_set_sha256": "c32e41f3efac369e435e1f55273393523f50d8d72ef1a97d3077043031c6131b"
+    },
+    {
+      "identity": {
+        "horse_name": "Movin' On Up",
+        "sire_name": "Accelerate",
+        "dam_name": "Stifle Yourself",
+        "birth_year": 2021
+      },
+      "module": "race_records",
+      "decision": "approved",
+      "before_record_authority_status": "count_aligned_records_unverified",
+      "after_record_authority_status": "source_records_verified",
+      "record_count": 20,
+      "record_source_counts": {
+        "horseracingnation": 20
+      },
+      "record_set_sha256": "39a0978972700b1ab61d5fd48b21adb6baa70fb621533efc46fbcc03a2b21402"
+    }
+  ],
+  "database_write_count": 0,
+  "derived_output": {
+    "path": "runtime/horse_profile_completion/pedigree-research-20260719/p0_horse_research_50_enriched_v3.json",
+    "sha256": "98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e"
+  },
+  "review_artifact": {
+    "path": "runtime/horse_profile_completion/pedigree-research-20260719/reviewed_us_career_source_authority_v1.json",
+    "sha256": "29091d69573bab907cda2e9a081ae4684838b92d1f9b052a7601b6109a541077"
+  }
+}

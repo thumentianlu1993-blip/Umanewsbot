@@ -660,6 +660,16 @@ class HorseCareerHistoryStatus(models.TextChoices):
     NEEDS_REVIEW = "needs_review", "需要审核"
 
 
+class HorseCareerRecordAuthorityStatus(models.TextChoices):
+    UNKNOWN = "unknown", "逐场权威性待确认"
+    SOURCE_RECORDS_VERIFIED = "source_records_verified", "逐场来源已核验"
+    COUNT_ALIGNED_RECORDS_UNVERIFIED = (
+        "count_aligned_records_unverified",
+        "数量已对齐、逐场官方性待确认",
+    )
+    SOURCE_BLOCKED = "source_blocked", "逐场权威来源受阻"
+
+
 class HorseProfileModule(models.TextChoices):
     PROFILE = "profile", "基础资料"
     PEDIGREE = "pedigree", "血统"
@@ -2780,6 +2790,14 @@ class HorseProfile(TimestampedModel):
         default=HorseCareerHistoryStatus.NOT_STARTED,
     )
     official_or_source_start_count = models.PositiveIntegerField(null=True, blank=True)
+    official_start_count_source = models.CharField(max_length=64, blank=True)
+    official_start_count_source_url = models.URLField(max_length=500, blank=True)
+    official_start_count_verified_at = models.DateTimeField(null=True, blank=True)
+    career_record_authority_status = models.CharField(
+        max_length=32,
+        choices=HorseCareerRecordAuthorityStatus.choices,
+        default=HorseCareerRecordAuthorityStatus.UNKNOWN,
+    )
     collected_start_count = models.PositiveIntegerField(default=0)
     linked_race_event_count = models.PositiveIntegerField(default=0)
     unlinked_race_record_count = models.PositiveIntegerField(default=0)

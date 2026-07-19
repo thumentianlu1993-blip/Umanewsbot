@@ -1,0 +1,28 @@
+{
+  "artifact_type": "p0_horse_participant_candidate_manifest",
+  "schema_version": "1.1",
+  "generated_at": "2026-07-17T19:36:02.844798+00:00",
+  "read_only": true,
+  "files": {
+    "candidates": {
+      "path": "p0_participant_candidates.json",
+      "size_bytes": 200466946,
+      "sha256": "6211519e2b8f5d88b339da0aef8000079e281eae96892f55f4a1de76aa11db8b"
+    },
+    "summary": {
+      "path": "summary.json",
+      "size_bytes": 2390,
+      "sha256": "86901fdd986b3a791bf57c250bd7fb210ca1b12467267309a0aad95af79b27ba"
+    },
+    "sample_review_csv": {
+      "path": "p0_participant_sample_review.csv",
+      "size_bytes": 80413,
+      "sha256": "d1f5aecd1176230d7b2bb75c8315b4d235e27f7be043e72bb3004b70ebdec703"
+    },
+    "observations_jsonl": {
+      "path": "p0_participant_observations.jsonl",
+      "size_bytes": 82632224,
+      "sha256": "8e6a7d284299b5647009d6bc817c3a157f814e9900ae6f468734856a2e58a27e"
+    }
+  }
+}

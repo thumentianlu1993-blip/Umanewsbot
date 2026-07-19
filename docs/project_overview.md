@@ -1,5 +1,20 @@
 # 项目总览
 
+## 2026-07-20 P0 马首批状态分层
+
+- 冻结数据层保持不变：v1 SHA-256
+  `55d80abed2b76a2d7fcf0cb97aadff800c3130c3815e84d8e6eb5b1c16b4befd`，v2 SHA-256
+  `a1184dbfb0257ecbe2a4ddbc4e729b0a74d73f911c8d52a20ab65854520325b7`；v2 仍按原口径记为
+  `40/50`。
+- 审核研究层通过当前批次限定的美国组合来源达到 `50/50`：HRN 为主记录，Fort George
+  由 Sporting Life 与 Racing Post 补充，Equibase 只用于官方总出赛数、身份和颜色对账。
+  v3 研究派生物 SHA-256 为
+  `98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e`。该结论不是
+  Equibase 官方逐场履历，也不全局放宽 HRN 或 `count_aligned_records_unverified`。
+- 生产层仍为零写入且 blocked：readiness 只完成静态 schema 兼容检查，没有 safe simulation，
+  也没有 commit-compatible artifact。正式生产 dry-run、运行态门禁和针对精确 artifact /
+  集成版本的新授权均未完成，生产保持 **NO-GO**。
+
 ## 产品目标
 
 构建一个面向中文用户的日本赛马新闻平台，将日文赛马资讯整理、翻译并发布为中文可读内容，兼顾后台运营、网页分发和后续社群推送能力。
@@ -73,6 +88,16 @@ P0 马范围由“active 且有中文译名的正式 horse term”与“五地�
 重点赛事参赛记录先进入只读候选层：同场 runner/result 按马号或来源身份配对，跨赛事只使用既有 profile、来源内 external horse ID 或完整“多语种马名+父名+母名+出生年份”归并。只有马名时保持独立并交由人工补强，避免同地区同名马误并。候选审核后才允许创建 P0 来源和资料补全队列。
 
 `HorseRaceRecord` 是单马参赛事实层，允许普通比赛不关联 `RaceEvent`；完整生涯页面按本地数据库分页展示全部履历。公开页面不请求第三方来源，资料抓取、审核写入和首次发布是三个独立门禁。
+
+马匹来源缓存必须由来源自身马名或 alias 绑定候选身份，并为总出赛数保留来源名、URL 和带时区核验时间。受控网络客户端仅访问各地区实现登记的 HTTPS 主机并逐跳校验重定向；缺少身份或计数证据时保持部分完成，不以请求值回填或猜测资料。
+
+同一 provider 可用其 external horse ID 绑定身份；跨 provider 必须完整命中马名、父名、母名和出生年份，不能只凭同名。生涯数据库、研究 JSON 和审核工作簿分别执行同一 fail-closed 完整度语义，只有逐场来源已核验才能显示完整。
+
+父母实体身份使用全局一致的 provider namespace 与不透明 external ID；v2 `source_identity`
+必须同时含马名、父名、母名和出生年。出生年证据是独立人工来源审核 artifact，不等同于项目
+负责人逐字段审核。自动 Netkeiba 父母候选只接受无凭据、端口、query、fragment 的精确 horse
+详情 URL；同名纠错必须在新版本显式留痕且不得改写冻结 v1。审核工作簿默认从 v2 JSON 生成到
+独立 v2 输出和预览目录，冻结 v1 工作簿与预览不得覆盖。
 
 ## 技术栈主干
 

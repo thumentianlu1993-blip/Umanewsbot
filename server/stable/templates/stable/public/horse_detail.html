@@ -80,7 +80,7 @@
           <a href="?records_order=asc"{% if records_order == "asc" %} aria-current="page"{% endif %}>最早优先</a>
         </nav>
         <p class="muted">
-          来源实际出赛 {{ profile.official_or_source_start_count|default:"待确认" }} 场 · 已采集 {{ profile.collected_start_count }} 场 · 未关联赛事 {{ profile.unlinked_race_record_count }} 条
+          来源实际出赛 {{ profile.official_or_source_start_count|default:"待确认" }} 场 · 已采集 {{ profile.collected_start_count }} 场 · {{ profile.get_career_record_authority_status_display }} · 未关联赛事 {{ profile.unlinked_race_record_count }} 条
         </p>
         <div class="horse-list">
           {% for record in race_records %}

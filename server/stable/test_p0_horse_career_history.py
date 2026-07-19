@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
-from django.test import TestCase
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
+from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from stable.forms import HorseProfileForm
 from stable.models import (
+    HorseCareerRecordAuthorityStatus,
     HorseCareerHistoryStatus,
     HorseP0Source,
     HorseP0SourceType,
@@ -80,6 +84,14 @@ class P0HorseCareerHistoryTests(TestCase):
         evaluation = refresh_career_history_completeness(
             self.profile,
             official_or_source_start_count=3,
+            official_start_count_source="official",
+            official_start_count_source_url=(
+                "https://example.com/official/horse/career-test"
+            ),
+            official_start_count_verified_at=timezone.now(),
+            record_authority_status=(
+                HorseCareerRecordAuthorityStatus.SOURCE_RECORDS_VERIFIED
+            ),
             verified_at=timezone.now(),
         )
 
@@ -111,6 +123,195 @@ class P0HorseCareerHistoryTests(TestCase):
         self.assertEqual(record.start_status, HorseRaceStartStatus.UNCONFIRMED)
         self.assertEqual(evaluation.status, HorseCareerHistoryStatus.NEEDS_REVIEW)
         self.assertIn(f"record:{record.id}:start_status_unconfirmed", evaluation.gap_reasons)
+
+    def test_equibase_count_alignment_does_not_claim_official_per_record_completeness(self):
+        for day in range(1, 3):
+            upsert_race_record(
+                self.profile,
+                self._payload(
+                    day=day,
+                    source_name="hrn",
+                    source_url=f"https://www.horseracingnation.com/horse/test/{day}",
+                ),
+            )
+        verified_at = timezone.now()
+
+        evaluation = refresh_career_history_completeness(
+            self.profile,
+            official_or_source_start_count=2,
+            official_start_count_source="equibase",
+            official_start_count_source_url=(
+                "https://www.equibase.com/profiles/Results.cfm"
+                "?type=Horse&refno=11138947&registry=T"
+            ),
+            official_start_count_verified_at=verified_at,
+            record_authority_status=(
+                HorseCareerRecordAuthorityStatus.COUNT_ALIGNED_RECORDS_UNVERIFIED
+            ),
+            verified_at=verified_at,
+        )
+
+        self.profile.refresh_from_db()
+        self.assertEqual(evaluation.gap_count, 0)
+        self.assertEqual(evaluation.collected_start_count, 2)
+        self.assertEqual(
+            evaluation.status,
+            HorseCareerHistoryStatus.PARTIAL,
+        )
+        self.assertEqual(
+            self.profile.official_start_count_source,
+            "equibase",
+        )
+        self.assertEqual(
+            self.profile.career_record_authority_status,
+            HorseCareerRecordAuthorityStatus.COUNT_ALIGNED_RECORDS_UNVERIFIED,
+        )
+        self.assertEqual(
+            self.profile.official_start_count_verified_at,
+            verified_at,
+        )
+        self.assertIn(
+            "official_count_aligned_per_record_authority_pending:equibase",
+            evaluation.gap_reasons,
+        )
+
+    def test_verified_authority_without_source_total_evidence_stays_partial(self):
+        upsert_race_record(
+            self.profile,
+            self._payload(result_status=HorseRaceResultStatus.WON),
+        )
+
+        evaluation = refresh_career_history_completeness(
+            self.profile,
+            official_or_source_start_count=1,
+            record_authority_status=(
+                HorseCareerRecordAuthorityStatus.SOURCE_RECORDS_VERIFIED
+            ),
+        )
+
+        self.assertEqual(
+            evaluation.status,
+            HorseCareerHistoryStatus.PARTIAL,
+        )
+        self.assertEqual(evaluation.gap_count, 0)
+        self.assertCountEqual(
+            evaluation.gap_reasons,
+            [
+                "official_start_count_source_missing",
+                "official_start_count_source_url_missing",
+                "official_start_count_verified_at_missing",
+            ],
+        )
+        self.profile.career_history_status = HorseCareerHistoryStatus.COMPLETE
+        self.profile.save(update_fields=["career_history_status"])
+        full = evaluate_full_profile_completeness(
+            self.profile,
+            require_review=False,
+        )
+        self.assertFalse(full.is_complete)
+        self.assertIn(
+            "race_history.source_start_count_evidence",
+            full.blocking_reasons,
+        )
+
+    def test_invalid_source_total_urls_cannot_complete(self):
+        upsert_race_record(
+            self.profile,
+            self._payload(result_status=HorseRaceResultStatus.WON),
+        )
+        for invalid_url in (
+            "https://bad host.example/horse",
+            "https://example.com:not-a-port/horse",
+        ):
+            with self.subTest(url=invalid_url):
+                evaluation = refresh_career_history_completeness(
+                    self.profile,
+                    official_or_source_start_count=1,
+                    official_start_count_source="official",
+                    official_start_count_source_url=invalid_url,
+                    official_start_count_verified_at=timezone.now(),
+                    record_authority_status=(
+                        HorseCareerRecordAuthorityStatus
+                        .SOURCE_RECORDS_VERIFIED
+                    ),
+                )
+
+                self.assertEqual(
+                    evaluation.status,
+                    HorseCareerHistoryStatus.PARTIAL,
+                )
+                self.assertIn(
+                    "official_start_count_source_url_missing",
+                    evaluation.gap_reasons,
+                )
+
+    def test_invalid_record_source_urls_do_not_count_as_evidence(self):
+        record = upsert_race_record(
+            self.profile,
+            self._payload(
+                result_status=HorseRaceResultStatus.WON,
+                source_url="https://bad host.example/race",
+            ),
+        ).record
+        record.source_refs = {
+            "sources": [
+                {
+                    "source_name": "secondary",
+                    "source_url": "https://example.com:not-a-port/race",
+                }
+            ]
+        }
+        record.save(update_fields=["source_refs"])
+
+        evaluation = refresh_career_history_completeness(
+            self.profile,
+            official_or_source_start_count=1,
+            official_start_count_source="official",
+            official_start_count_source_url=(
+                "https://example.com/horse"
+            ),
+            official_start_count_verified_at=timezone.now(),
+            record_authority_status=(
+                HorseCareerRecordAuthorityStatus.SOURCE_RECORDS_VERIFIED
+            ),
+        )
+
+        self.assertEqual(
+            evaluation.status,
+            HorseCareerHistoryStatus.PARTIAL,
+        )
+        self.assertIn(
+            f"record:{record.id}:source_evidence_missing",
+            evaluation.gap_reasons,
+        )
+
+    def test_unknown_record_authority_blocks_career_and_full_profile(self):
+        upsert_race_record(
+            self.profile,
+            self._payload(result_status=HorseRaceResultStatus.WON),
+        )
+        evaluation = refresh_career_history_completeness(
+            self.profile,
+            official_or_source_start_count=1,
+        )
+
+        self.profile.refresh_from_db()
+        self.assertEqual(evaluation.status, HorseCareerHistoryStatus.PARTIAL)
+        self.assertIn(
+            "per_record_authority_unknown",
+            evaluation.gap_reasons,
+        )
+        self.profile.career_history_status = HorseCareerHistoryStatus.COMPLETE
+        self.profile.save(update_fields=["career_history_status"])
+        full = evaluate_full_profile_completeness(
+            self.profile,
+            require_review=False,
+        )
+        self.assertFalse(full.is_complete)
+        self.assertIn(
+            "race_history.record_authority_status.unknown",
+            full.blocking_reasons,
+        )
 
     def test_cross_source_overseas_duplicate_merges_and_keeps_both_sources(self):
         first = upsert_race_record(
@@ -232,7 +433,18 @@ class P0HorseCareerHistoryTests(TestCase):
         )
 
         partial = evaluate_full_profile_completeness(self.profile, require_review=False)
-        refresh_career_history_completeness(self.profile, official_or_source_start_count=1)
+        refresh_career_history_completeness(
+            self.profile,
+            official_or_source_start_count=1,
+            official_start_count_source="official",
+            official_start_count_source_url=(
+                "https://example.com/official/horse/career-test"
+            ),
+            official_start_count_verified_at=timezone.now(),
+            record_authority_status=(
+                HorseCareerRecordAuthorityStatus.SOURCE_RECORDS_VERIFIED
+            ),
+        )
         complete = evaluate_full_profile_completeness(self.profile, require_review=False)
 
         self.assertFalse(partial.is_complete)
@@ -244,6 +456,9 @@ class P0HorseCareerHistoryTests(TestCase):
         refresh_career_history_completeness(
             self.profile,
             official_or_source_start_count=1,
+            record_authority_status=(
+                HorseCareerRecordAuthorityStatus.SOURCE_RECORDS_VERIFIED
+            ),
             verified_at=timezone.now(),
         )
 
@@ -256,6 +471,94 @@ class P0HorseCareerHistoryTests(TestCase):
         self.assertEqual(career["collected_start_count"], 1)
         self.assertEqual(career["gap_count"], 0)
         self.assertEqual(plan["summary"]["career_history"]["collected_start_count_total"], 1)
+
+    def test_horse_profile_datetime_local_fields_use_browser_format(self):
+        self.profile.official_start_count_verified_at = timezone.make_aware(
+            datetime(2026, 7, 19, 9, 2)
+        )
+        self.profile.career_history_last_verified_at = timezone.make_aware(
+            datetime(2026, 7, 19, 9, 3)
+        )
+        form = HorseProfileForm(instance=self.profile)
+
+        self.assertIn(
+            'value="2026-07-19T09:02"',
+            str(form["official_start_count_verified_at"]),
+        )
+        self.assertIn(
+            'value="2026-07-19T09:03"',
+            str(form["career_history_last_verified_at"]),
+        )
+        for field_name in (
+            "official_start_count_verified_at",
+            "career_history_last_verified_at",
+        ):
+            self.assertIn(
+                "%Y-%m-%dT%H:%M",
+                form.fields[field_name].input_formats,
+            )
+
+
+class HorseCareerAuthorityMigrationTests(TransactionTestCase):
+    migrate_from = [("stable", "0033_merge_historical_detail_and_horse_career")]
+    migrate_to = [("stable", "0034_horse_career_source_authority")]
+
+    def setUp(self):
+        super().setUp()
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_from)
+        old_apps = executor.loader.project_state(self.migrate_from).apps
+        TermEntry = old_apps.get_model("stable", "TermEntry")
+        HorseProfile = old_apps.get_model("stable", "HorseProfile")
+        complete_term = TermEntry.objects.create(
+            term_type="horse",
+            source_language="en",
+            source_ja="Migration Complete Horse",
+            target_zh="迁移完整马",
+            racing_region="united_kingdom",
+            is_active=True,
+        )
+        partial_term = TermEntry.objects.create(
+            term_type="horse",
+            source_language="en",
+            source_ja="Migration Partial Horse",
+            target_zh="迁移部分马",
+            racing_region="united_kingdom",
+            is_active=True,
+        )
+        self.complete_profile_id = HorseProfile.objects.create(
+            primary_term_id=complete_term.pk,
+            original_name="Migration Complete Horse",
+            completeness_status="complete_profile_full",
+            career_history_status="complete",
+        ).pk
+        self.partial_profile_id = HorseProfile.objects.create(
+            primary_term_id=partial_term.pk,
+            original_name="Migration Partial Horse",
+            career_history_status="partial",
+        ).pk
+
+        executor = MigrationExecutor(connection)
+        executor.migrate(self.migrate_to)
+        self.apps = executor.loader.project_state(self.migrate_to).apps
+
+    def tearDown(self):
+        MigrationExecutor(connection).migrate(self.migrate_to)
+        super().tearDown()
+
+    def test_complete_rows_fail_closed_when_authority_is_introduced(self):
+        HorseProfile = self.apps.get_model("stable", "HorseProfile")
+        complete = HorseProfile.objects.get(pk=self.complete_profile_id)
+        partial = HorseProfile.objects.get(pk=self.partial_profile_id)
+
+        self.assertEqual(complete.career_record_authority_status, "unknown")
+        self.assertEqual(complete.career_history_status, "needs_review")
+        self.assertEqual(
+            complete.completeness_status,
+            "complete_pedigree_2gen",
+        )
+        self.assertEqual(partial.career_record_authority_status, "unknown")
+        self.assertEqual(partial.career_history_status, "partial")
 
 
 class P0HorseCareerHistoryPageTests(TestCase):

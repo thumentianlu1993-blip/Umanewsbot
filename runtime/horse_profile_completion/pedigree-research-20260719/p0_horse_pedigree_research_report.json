@@ -1,0 +1,358 @@
+{
+  "schema_version": "p0-horse-pedigree-research.v1",
+  "source_name": "netkeiba_en",
+  "source_search_url": "https://en.netkeiba.com/db/horse/horse_list.html",
+  "verified_at": "2026-07-19T05:43:42.292864+00:00",
+  "horse_count": 50,
+  "filled_field_count": 89,
+  "evidence_count": 116,
+  "automatic_unresolved_query_count": 22,
+  "automatic_unresolved_queries": [
+    {
+      "horse_name": "LOSANGE BLEU",
+      "region": "france",
+      "identity_key": "Losange Bleu | Martaline | Sweet Valrose | 2019",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Sweet Valrose",
+      "expected_parent_sire": "Cadoudal",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "LE PHILOSOPHE",
+      "region": "france",
+      "identity_key": "Le Philosophe | Doctor Dino | Conceptuelle | 2019",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Conceptuelle",
+      "expected_parent_sire": "Stormy River",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "KENTUCKY WOOD",
+      "region": "france",
+      "identity_key": "Kentucky Wood | Balko | Carrieriste | 2020",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Carrieriste",
+      "expected_parent_sire": "Laveron",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "TOSCANA DU BERLAIS",
+      "region": "france",
+      "identity_key": "Toscana Du Berlais | Shantou | Katioucha | 2018",
+      "parent_role": "sire",
+      "target_fields": [
+        "sire_sire",
+        "sire_dam"
+      ],
+      "parent_name": "Shantou",
+      "expected_parent_sire": "",
+      "reason": "ambiguous_identity_matched_candidates",
+      "candidate_count": 2,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "TOSCANA DU BERLAIS",
+      "region": "france",
+      "identity_key": "Toscana Du Berlais | Shantou | Katioucha | 2018",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Katioucha",
+      "expected_parent_sire": "Mansonnien",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "SEVENNA'S KNIGHT",
+      "region": "france",
+      "identity_key": "Sevenna's Knight | Camelot | Sevenna | 2020",
+      "parent_role": "sire",
+      "target_fields": [
+        "sire_sire",
+        "sire_dam"
+      ],
+      "parent_name": "Camelot",
+      "expected_parent_sire": "",
+      "reason": "ambiguous_identity_matched_candidates",
+      "candidate_count": 2,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Jonbon",
+      "region": "united_kingdom",
+      "identity_key": "Jonbon | Walk In The Park | Star Face | 2016",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Star Face",
+      "expected_parent_sire": "Saint Des Saints",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 1,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Edwardstone",
+      "region": "united_kingdom",
+      "identity_key": "Edwardstone | Kayf Tara | Nothingtoloose | 2014",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Nothingtoloose",
+      "expected_parent_sire": "Luso",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Sceau Royal",
+      "region": "united_kingdom",
+      "identity_key": "Sceau Royal | Doctor Dino | Sandside | 2012",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Sandside",
+      "expected_parent_sire": "Marchand De Sable",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Art Power",
+      "region": "united_kingdom",
+      "identity_key": "Art Power | Dark Angel | Evening Time | 2017",
+      "parent_role": "sire",
+      "target_fields": [
+        "sire_sire",
+        "sire_dam"
+      ],
+      "parent_name": "Dark Angel",
+      "expected_parent_sire": "",
+      "reason": "ambiguous_identity_matched_candidates",
+      "candidate_count": 3,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Paisley Park",
+      "region": "united_kingdom",
+      "identity_key": "Paisley Park | Oscar | Presenting Shares | 2012",
+      "parent_role": "sire",
+      "target_fields": [
+        "sire_sire",
+        "sire_dam"
+      ],
+      "parent_name": "Oscar",
+      "expected_parent_sire": "",
+      "reason": "ambiguous_identity_matched_candidates",
+      "candidate_count": 4,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Paisley Park",
+      "region": "united_kingdom",
+      "identity_key": "Paisley Park | Oscar | Presenting Shares | 2012",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Presenting Shares",
+      "expected_parent_sire": "Presenting",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Gabrial",
+      "region": "united_kingdom",
+      "identity_key": "Gabrial | Dark Angel | Guajira | 2009",
+      "parent_role": "sire",
+      "target_fields": [
+        "sire_sire",
+        "sire_dam"
+      ],
+      "parent_name": "Dark Angel",
+      "expected_parent_sire": "",
+      "reason": "ambiguous_identity_matched_candidates",
+      "candidate_count": 3,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "The New One",
+      "region": "united_kingdom",
+      "identity_key": "The New One | King's Theatre | Thuringe | 2008",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Thuringe",
+      "expected_parent_sire": "Turgeon",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Carson's Run",
+      "region": "united_states",
+      "identity_key": "Carson's Run | Cupid | Hot N Hectic | 2021",
+      "parent_role": "sire",
+      "target_fields": [
+        "sire_sire",
+        "sire_dam"
+      ],
+      "parent_name": "Cupid",
+      "expected_parent_sire": "",
+      "reason": "ambiguous_identity_matched_candidates",
+      "candidate_count": 5,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Desvio",
+      "region": "united_states",
+      "identity_key": "Desvio | Yoshida (JPN) | Fitzrovia | 2021",
+      "parent_role": "sire",
+      "target_fields": [
+        "sire_sire",
+        "sire_dam"
+      ],
+      "parent_name": "Yoshida (JPN)",
+      "expected_parent_sire": "",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Fort George",
+      "region": "united_states",
+      "identity_key": "Fort George | Territories (IRE) | Dusty Red (GB) | 2022",
+      "parent_role": "sire",
+      "target_fields": [
+        "sire_sire",
+        "sire_dam"
+      ],
+      "parent_name": "Territories (IRE)",
+      "expected_parent_sire": "",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Fort George",
+      "region": "united_states",
+      "identity_key": "Fort George | Territories (IRE) | Dusty Red (GB) | 2022",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Dusty Red (GB)",
+      "expected_parent_sire": "Teofilo",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Heroic Move",
+      "region": "united_states",
+      "identity_key": "Heroic Move | Quality Road | Family Tree | 2020",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Family Tree",
+      "expected_parent_sire": "Smart Strike",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 1,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Minaret Station",
+      "region": "united_states",
+      "identity_key": "Minaret Station | Instilled Regard | Beau Recall (IRE) | 2022",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Beau Recall (IRE)",
+      "expected_parent_sire": "Sir Prancealot",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Movin' On Up",
+      "region": "united_states",
+      "identity_key": "Movin' On Up | Accelerate | Stifle Yourself | 2021",
+      "parent_role": "sire",
+      "target_fields": [
+        "sire_sire",
+        "sire_dam"
+      ],
+      "parent_name": "Accelerate",
+      "expected_parent_sire": "",
+      "reason": "ambiguous_identity_matched_candidates",
+      "candidate_count": 5,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    },
+    {
+      "horse_name": "Movin' On Up",
+      "region": "united_states",
+      "identity_key": "Movin' On Up | Accelerate | Stifle Yourself | 2021",
+      "parent_role": "dam",
+      "target_fields": [
+        "dam_dam"
+      ],
+      "parent_name": "Stifle Yourself",
+      "expected_parent_sire": "Cairo Prince",
+      "reason": "no_identity_matched_candidate",
+      "candidate_count": 0,
+      "final_missing_fields": [],
+      "final_disposition": "resolved_by_manual_evidence"
+    }
+  ],
+  "manual_evidence_row_count": 31,
+  "manual_filled_field_count": 31,
+  "total_filled_field_count": 120,
+  "remaining_missing_horse_count": 0,
+  "remaining_missing": [],
+  "unresolved_count": 0,
+  "unresolved": []
+}
