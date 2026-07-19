@@ -18,9 +18,10 @@ COPY runtime/tools /app/runtime/tools
 COPY runtime/policies /app/runtime/policies
 COPY docs/changes/realtime-race-results/source_registry_the_racing_api_free.json /app/runtime/policies/race_live/source_registry_the_racing_api_free.json
 COPY deploy /app/deploy
+COPY scripts /app/scripts
 COPY .env.example /app/.env.example
 
-RUN chmod +x /app/deploy/docker/*.sh \
+RUN chmod +x /app/deploy/docker/*.sh /app/scripts/*.py \
     && mkdir -p /app/logs /app/server/staticfiles \
     && ln -s /app/runtime /app/server/runtime
 

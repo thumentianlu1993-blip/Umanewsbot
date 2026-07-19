@@ -8,7 +8,9 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Iterable
+from zoneinfo import ZoneInfo
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models import F, Q
@@ -44,11 +46,16 @@ from stable.models import (
     RaceEventStatus,
     RaceEventParticipantSourceIdentity,
     RaceLiveEventPublicationAllowlist,
+    RaceLiveAlertIncident,
+    RaceLiveAlertIncidentStatus,
+    RaceLiveAlertType,
     RaceLiveOfficialMarkerEvidence,
+    RaceLiveOfficialPublicationAuthorization,
     RaceLiveOfficialVerificationIncident,
     RaceLiveOfficialVerificationIncidentStatus,
     RaceLivePublicationMode,
     RaceLivePublicationPolicy,
+    RaceLivePublicationScopeType,
     RaceResultObservation,
     RaceResultPhase,
     RaceResultSourceAuthority,
@@ -164,6 +171,52 @@ class RaceLivePublicationPolicyDecision:
     allowlist_version: int = 0
     registry_digest: str = ""
     coverage_proof_digest: str = ""
+
+
+@dataclass(frozen=True)
+class RaceLiveWorkerNetworkAdmissionDecision:
+    allowed: bool
+    reason: str
+    source_identity_id: int | None = None
+    effective_mode: str = RaceLivePublicationMode.OFF
+
+
+@dataclass(frozen=True)
+class RaceLiveOfficialAuthorizationDecision:
+    allowed: bool
+    reason: str
+    authorization_version: int = 0
+    route_registry_digest: str = ""
+    coverage_proof_digest: str = ""
+
+
+@dataclass(frozen=True)
+class RaceLiveProvisionalRollbackDecision:
+    allowed: bool
+    reason: str
+    revision_id: int | None = None
+
+
+@dataclass(frozen=True)
+class RaceLiveAlertDeliveryClaimDecision:
+    claimed: bool
+    reason: str
+    delivery_token: str = ""
+    incident_id: int | None = None
+
+
+@dataclass(frozen=True)
+class RaceLiveAlertDeliveryCompletionDecision:
+    applied: bool
+    reason: str
+
+
+@dataclass(frozen=True)
+class RaceLiveRacecardRefreshDecision:
+    applied: bool
+    reason: str
+    revision_id: int | None = None
+    replayed: bool = False
 
 
 @dataclass(frozen=True)
@@ -539,6 +592,7 @@ def claim_due_race_event_live_tracking(
     now: datetime,
     batch_size: int,
     ttl_seconds: int,
+    enabled_regions: Iterable[str] | None = None,
 ) -> tuple[RaceEventLiveBatchClaim, ...]:
     """Atomically claim a bounded batch of due live-tracking rows."""
     if not isinstance(now, datetime) or timezone.is_naive(now):
@@ -556,6 +610,26 @@ def claim_due_race_event_live_tracking(
         or ttl_seconds <= 0
     ):
         return ()
+    known_regions = {
+        choice for choice, _label in RaceEvent._meta.get_field(
+            "country_region"
+        ).choices
+    }
+    if enabled_regions is None:
+        region_ceiling = tuple(sorted(known_regions))
+    else:
+        if isinstance(enabled_regions, (str, bytes)):
+            return ()
+        try:
+            region_ceiling = tuple(enabled_regions)
+        except TypeError:
+            return ()
+        if (
+            not region_ceiling
+            or len(set(region_ceiling)) != len(region_ceiling)
+            or any(region not in known_regions for region in region_ceiling)
+        ):
+            return ()
 
     with transaction.atomic():
         due_rows = list(
@@ -566,6 +640,7 @@ def claim_due_race_event_live_tracking(
             .filter(
                 tracking_enabled=True,
                 next_poll_at__lte=now,
+                event__country_region__in=region_ceiling,
                 event__projection_control__write_owner=(
                     RaceEventProjectionWriteOwner.LIVE
                 ),
@@ -614,6 +689,535 @@ def claim_due_race_event_live_tracking(
                 )
             )
         return tuple(claims)
+
+
+def resolve_race_live_worker_network_admission(
+    *,
+    event_id: int,
+    expected_owner_generation: int,
+    expected_claim_generation: int,
+    attempt_token: str,
+    enabled_regions: Iterable[str],
+    now: datetime,
+) -> RaceLiveWorkerNetworkAdmissionDecision:
+    """Recheck source and publication gates immediately before any network I/O."""
+
+    if (
+        isinstance(event_id, bool)
+        or not isinstance(event_id, int)
+        or event_id <= 0
+        or not isinstance(now, datetime)
+        or timezone.is_naive(now)
+    ):
+        return RaceLiveWorkerNetworkAdmissionDecision(False, "invalid_input")
+    try:
+        region_ceiling = tuple(enabled_regions)
+    except (TypeError, ValueError):
+        return RaceLiveWorkerNetworkAdmissionDecision(
+            False, "invalid_enabled_regions"
+        )
+    known_regions = {
+        RacingRegion.UNITED_KINGDOM,
+        RacingRegion.FRANCE,
+        RacingRegion.HONG_KONG,
+        RacingRegion.JAPAN,
+        RacingRegion.UNITED_STATES,
+    }
+    if (
+        len(set(region_ceiling)) != len(region_ceiling)
+        or any(region not in known_regions for region in region_ceiling)
+    ):
+        return RaceLiveWorkerNetworkAdmissionDecision(
+            False, "invalid_enabled_regions"
+        )
+    if not region_ceiling:
+        return RaceLiveWorkerNetworkAdmissionDecision(
+            False, "region_not_enabled"
+        )
+    try:
+        event = RaceEvent.objects.get(pk=event_id)
+        control = RaceEventProjectionControl.objects.get(event_id=event_id)
+        tracking = RaceEventLiveTracking.objects.get(event_id=event_id)
+    except (
+        RaceEvent.DoesNotExist,
+        RaceEventProjectionControl.DoesNotExist,
+        RaceEventLiveTracking.DoesNotExist,
+    ):
+        return RaceLiveWorkerNetworkAdmissionDecision(False, "baseline_missing")
+    if event.country_region not in region_ceiling:
+        return RaceLiveWorkerNetworkAdmissionDecision(
+            False, "region_not_enabled"
+        )
+    if (
+        control.write_owner != RaceEventProjectionWriteOwner.LIVE
+        or control.owner_generation != expected_owner_generation
+    ):
+        return RaceLiveWorkerNetworkAdmissionDecision(False, "owner_mismatch")
+    if (
+        tracking.tracking_enabled is not True
+        or tracking.claim_generation != expected_claim_generation
+        or tracking.active_attempt_token != attempt_token
+        or tracking.claim_expires_at is None
+        or tracking.claim_expires_at <= now
+    ):
+        return RaceLiveWorkerNetworkAdmissionDecision(False, "claim_mismatch")
+    source = RaceResultSourceIdentity.objects.filter(
+        event_id=event_id,
+        source_key="the_racing_api",
+    ).first()
+    if source is None:
+        return RaceLiveWorkerNetworkAdmissionDecision(False, "source_missing")
+    policy = resolve_race_live_publication_policy(
+        event_id=event_id,
+        source_identity_id=source.pk,
+        now=now,
+    )
+    if policy.effective_mode == RaceLivePublicationMode.OFF:
+        return RaceLiveWorkerNetworkAdmissionDecision(
+            False,
+            policy.reason,
+            source_identity_id=source.pk,
+        )
+    return RaceLiveWorkerNetworkAdmissionDecision(
+        True,
+        "admitted",
+        source_identity_id=source.pk,
+        effective_mode=policy.effective_mode,
+    )
+
+
+def calculate_race_live_alert_retry_delay(
+    *,
+    attempt_number: int,
+) -> timedelta | None:
+    if isinstance(attempt_number, bool) or not isinstance(attempt_number, int):
+        raise TypeError("attempt_number must be an integer")
+    if attempt_number < 1:
+        raise ValueError("attempt_number must be positive")
+    seconds = {1: 60, 2: 300, 3: 900}.get(attempt_number)
+    return timedelta(seconds=seconds) if seconds is not None else None
+
+
+def stage_race_live_sla_alerts(
+    *,
+    now: datetime,
+    enabled_regions: Iterable[str],
+) -> tuple[int, ...]:
+    """Stage deduplicated SLA incidents; delivery is intentionally separate."""
+
+    if not isinstance(now, datetime) or timezone.is_naive(now):
+        return ()
+    try:
+        regions = tuple(enabled_regions)
+    except TypeError:
+        return ()
+    known_regions = {
+        choice
+        for choice, _label in RaceEvent._meta.get_field(
+            "country_region"
+        ).choices
+    }
+    if not regions or any(region not in known_regions for region in regions):
+        return ()
+
+    candidates: list[dict[str, Any]] = []
+    trackings = (
+        RaceEventLiveTracking.objects.select_related("event")
+        .filter(
+            tracking_enabled=True,
+            event__country_region__in=regions,
+        )
+        .order_by("event_id")
+    )[:100]
+    for tracking in trackings:
+        event = tracking.event
+        if (
+            event.race_datetime is not None
+            and tracking.state
+            in {
+                RaceEventLiveState.RACECARD_READY,
+                RaceEventLiveState.AWAITING_RESULT,
+            }
+            and event.race_datetime + timedelta(minutes=15) <= now
+        ):
+            candidates.append(
+                {
+                    "alert_type": RaceLiveAlertType.PROVISIONAL_OVERDUE,
+                    "scope_type": "event",
+                    "scope_key": str(event.pk),
+                    "reference_version": (
+                        f"off:{event.race_datetime.isoformat()}"
+                    ),
+                    "deadline_at": event.race_datetime
+                    + timedelta(minutes=15),
+                    "details": {
+                        "event_id": event.pk,
+                        "event_name": (
+                            event.chinese_name or event.original_name
+                        ),
+                        "region": event.country_region,
+                        "state": tracking.state,
+                    },
+                }
+            )
+        if tracking.consecutive_failures >= 3:
+            failure_episode_anchor = (
+                tracking.last_success_at
+                or event.race_datetime
+                or tracking.window_started_at
+            )
+            candidates.append(
+                {
+                    "alert_type": RaceLiveAlertType.SOURCE_FAILURES,
+                    "scope_type": "event",
+                    "scope_key": str(event.pk),
+                    "reference_version": (
+                        "failure:"
+                        + (
+                            failure_episode_anchor.isoformat()
+                            if failure_episode_anchor is not None
+                            else "initial"
+                        )
+                    ),
+                    "deadline_at": now,
+                    "details": {
+                        "event_id": event.pk,
+                        "event_name": (
+                            event.chinese_name or event.original_name
+                        ),
+                        "region": event.country_region,
+                        "consecutive_failures": tracking.consecutive_failures,
+                    },
+                }
+            )
+        claim_is_active = bool(
+            tracking.active_attempt_token
+            and tracking.claim_expires_at is not None
+            and tracking.claim_expires_at > now
+        )
+        if (
+            tracking.next_poll_at is not None
+            and tracking.next_poll_at + timedelta(minutes=3) <= now
+            and not claim_is_active
+        ):
+            candidates.append(
+                {
+                    "alert_type": RaceLiveAlertType.QUEUE_AGE,
+                    "scope_type": "event",
+                    "scope_key": str(event.pk),
+                    "reference_version": (
+                        f"poll:{tracking.next_poll_at.isoformat()}"
+                    ),
+                    "deadline_at": tracking.next_poll_at
+                    + timedelta(minutes=3),
+                    "details": {
+                        "event_id": event.pk,
+                        "event_name": (
+                            event.chinese_name or event.original_name
+                        ),
+                        "region": event.country_region,
+                    },
+                }
+            )
+        checkpoint = (
+            tracking.checkpoint_payload
+            if isinstance(tracking.checkpoint_payload, dict)
+            else {}
+        )
+        pagination = checkpoint.get("pagination")
+        pagination_category = (
+            pagination.get("category")
+            if isinstance(pagination, dict)
+            else None
+        )
+        if pagination_category in {
+            "deadline_exceeded",
+            "incomplete",
+            "metadata_drift",
+            "overflow",
+        }:
+            checkpoint_digest = hashlib.sha256(
+                json.dumps(
+                    checkpoint,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ).encode("utf-8")
+            ).hexdigest()
+            candidates.append(
+                {
+                    "alert_type": RaceLiveAlertType.PAGINATION_OVERFLOW,
+                    "scope_type": "event",
+                    "scope_key": str(event.pk),
+                    "reference_version": (
+                        f"checkpoint:{checkpoint_digest}"
+                    ),
+                    "deadline_at": now,
+                    "details": {
+                        "event_id": event.pk,
+                        "event_name": (
+                            event.chinese_name or event.original_name
+                        ),
+                        "region": event.country_region,
+                        "reason": str(checkpoint.get("reason", ""))[:128],
+                        "pagination_category": pagination_category,
+                    },
+                }
+            )
+
+    official_incidents = (
+        RaceLiveOfficialVerificationIncident.objects.select_related("event")
+        .filter(
+            status=RaceLiveOfficialVerificationIncidentStatus.OPEN,
+            deadline_at__lte=now,
+            event__country_region__in=regions,
+        )
+        .order_by("event_id", "pk")
+    )[:100]
+    for incident in official_incidents:
+        candidates.append(
+            {
+                "alert_type": RaceLiveAlertType.OFFICIAL_OVERDUE,
+                "scope_type": "event",
+                "scope_key": str(incident.event_id),
+                "reference_version": (
+                    f"official:{incident.pk}:"
+                    f"{incident.official_route_version}"
+                ),
+                "deadline_at": incident.deadline_at,
+                "details": {
+                    "event_id": incident.event_id,
+                    "event_name": (
+                        incident.event.chinese_name
+                        or incident.event.original_name
+                    ),
+                    "region": incident.event.country_region,
+                    "official_incident_id": incident.pk,
+                    "official_route": incident.official_route,
+                },
+            }
+        )
+
+    for budget in RaceLiveHostBudget.objects.filter(
+        circuit_open_until__gt=now
+    ).order_by("host")[:100]:
+        candidates.append(
+            {
+                "alert_type": RaceLiveAlertType.HOST_CIRCUIT,
+                "scope_type": "host",
+                "scope_key": budget.host,
+                "reference_version": (
+                    f"circuit:{budget.circuit_open_until.isoformat()}"
+                ),
+                "deadline_at": now,
+                "details": {
+                    "host": budget.host,
+                    "circuit_open_until": budget.circuit_open_until.isoformat(),
+                },
+            }
+        )
+
+    staged: list[int] = []
+    with transaction.atomic():
+        for candidate in candidates:
+            dedupe_key = hashlib.sha256(
+                json.dumps(
+                    {
+                        "alert_type": candidate["alert_type"],
+                        "scope_type": candidate["scope_type"],
+                        "scope_key": candidate["scope_key"],
+                        "reference_version": candidate["reference_version"],
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ).encode("utf-8")
+            ).hexdigest()
+            incident, created = RaceLiveAlertIncident.objects.get_or_create(
+                dedupe_key=dedupe_key,
+                defaults={
+                    **candidate,
+                    "status": RaceLiveAlertIncidentStatus.OPEN,
+                    "opened_at": now,
+                    "last_seen_at": now,
+                    "next_attempt_at": now,
+                },
+            )
+            if not created and incident.status not in {
+                RaceLiveAlertIncidentStatus.SENT,
+                RaceLiveAlertIncidentStatus.RESOLVED,
+            }:
+                incident.last_seen_at = now
+                incident.details = candidate["details"]
+                incident.save(
+                    update_fields=(
+                        "last_seen_at",
+                        "details",
+                        "updated_at",
+                    )
+                )
+            if incident.status not in {
+                RaceLiveAlertIncidentStatus.SENT,
+                RaceLiveAlertIncidentStatus.RESOLVED,
+            }:
+                staged.append(incident.pk)
+    return tuple(staged)
+
+
+def claim_race_live_alert_delivery(
+    *,
+    incident_id: int,
+    now: datetime,
+    lease_seconds: int = 300,
+) -> RaceLiveAlertDeliveryClaimDecision:
+    if (
+        isinstance(incident_id, bool)
+        or not isinstance(incident_id, int)
+        or incident_id <= 0
+        or not isinstance(now, datetime)
+        or timezone.is_naive(now)
+        or isinstance(lease_seconds, bool)
+        or not isinstance(lease_seconds, int)
+        or lease_seconds < 1
+        or lease_seconds > 900
+    ):
+        return RaceLiveAlertDeliveryClaimDecision(False, "invalid_input")
+    with transaction.atomic():
+        incident = (
+            RaceLiveAlertIncident.objects.select_for_update()
+            .filter(pk=incident_id)
+            .first()
+        )
+        if incident is None:
+            return RaceLiveAlertDeliveryClaimDecision(
+                False, "incident_missing"
+            )
+        if incident.status in {
+            RaceLiveAlertIncidentStatus.SENT,
+            RaceLiveAlertIncidentStatus.RESOLVED,
+        }:
+            return RaceLiveAlertDeliveryClaimDecision(
+                False, "incident_terminal"
+            )
+        if (
+            incident.status == RaceLiveAlertIncidentStatus.SENDING
+            and incident.delivery_lease_expires_at is not None
+            and incident.delivery_lease_expires_at > now
+        ):
+            return RaceLiveAlertDeliveryClaimDecision(
+                False, "delivery_lease_active"
+            )
+        if (
+            incident.next_attempt_at is not None
+            and incident.next_attempt_at > now
+        ):
+            return RaceLiveAlertDeliveryClaimDecision(
+                False, "delivery_not_due"
+            )
+        if incident.delivery_attempts >= 4:
+            return RaceLiveAlertDeliveryClaimDecision(
+                False, "delivery_attempts_exhausted"
+            )
+        token = uuid.uuid4().hex
+        incident.status = RaceLiveAlertIncidentStatus.SENDING
+        incident.delivery_attempts += 1
+        incident.delivery_token = token
+        incident.delivery_lease_expires_at = now + timedelta(
+            seconds=lease_seconds
+        )
+        incident.last_error_code = ""
+        incident.save(
+            update_fields=(
+                "status",
+                "delivery_attempts",
+                "delivery_token",
+                "delivery_lease_expires_at",
+                "last_error_code",
+                "updated_at",
+            )
+        )
+        return RaceLiveAlertDeliveryClaimDecision(
+            True,
+            "delivery_claimed",
+            delivery_token=token,
+            incident_id=incident.pk,
+        )
+
+
+def complete_race_live_alert_delivery(
+    *,
+    incident_id: int,
+    delivery_token: str,
+    now: datetime,
+    delivered: bool,
+    error_code: str = "",
+) -> RaceLiveAlertDeliveryCompletionDecision:
+    if (
+        isinstance(incident_id, bool)
+        or not isinstance(incident_id, int)
+        or incident_id <= 0
+        or not isinstance(delivery_token, str)
+        or not delivery_token
+        or delivery_token != delivery_token.strip()
+        or len(delivery_token) > 64
+        or not isinstance(now, datetime)
+        or timezone.is_naive(now)
+        or not isinstance(delivered, bool)
+        or not isinstance(error_code, str)
+        or len(error_code) > 64
+    ):
+        return RaceLiveAlertDeliveryCompletionDecision(False, "invalid_input")
+    with transaction.atomic():
+        incident = (
+            RaceLiveAlertIncident.objects.select_for_update()
+            .filter(pk=incident_id)
+            .first()
+        )
+        if incident is None:
+            return RaceLiveAlertDeliveryCompletionDecision(
+                False, "incident_missing"
+            )
+        if (
+            incident.status != RaceLiveAlertIncidentStatus.SENDING
+            or incident.delivery_token != delivery_token
+        ):
+            return RaceLiveAlertDeliveryCompletionDecision(
+                False, "delivery_token_mismatch"
+            )
+        incident.delivery_token = ""
+        incident.delivery_lease_expires_at = None
+        if delivered:
+            incident.status = RaceLiveAlertIncidentStatus.SENT
+            incident.alert_sent_at = now
+            incident.next_attempt_at = None
+            incident.last_error_code = ""
+            reason = "delivery_completed"
+        else:
+            incident.status = RaceLiveAlertIncidentStatus.FAILED
+            retry_delay = calculate_race_live_alert_retry_delay(
+                attempt_number=incident.delivery_attempts
+            )
+            incident.next_attempt_at = (
+                now + retry_delay if retry_delay is not None else None
+            )
+            incident.last_error_code = error_code or "delivery_failed"
+            reason = (
+                "delivery_retry_scheduled"
+                if retry_delay is not None
+                else "delivery_failed_terminal"
+            )
+        incident.save(
+            update_fields=(
+                "status",
+                "delivery_token",
+                "delivery_lease_expires_at",
+                "alert_sent_at",
+                "next_attempt_at",
+                "last_error_code",
+                "updated_at",
+            )
+        )
+        return RaceLiveAlertDeliveryCompletionDecision(True, reason)
 
 
 def complete_race_event_live_checkpoint(
@@ -1421,6 +2025,1137 @@ def resolve_race_live_publication_policy(
     )
 
 
+def _resolve_race_live_official_authorization_from_loaded_rows(
+    *,
+    event: RaceEvent | None,
+    observation: RaceResultObservation | None,
+    authorization: RaceLiveOfficialPublicationAuthorization | None,
+    tra_source: RaceResultSourceIdentity | None,
+    allowlist: RaceLiveEventPublicationAllowlist | None,
+    policy_by_scope: dict[
+        tuple[str, str],
+        RaceLivePublicationPolicy,
+    ],
+    phase: str,
+    now: datetime,
+) -> RaceLiveOfficialAuthorizationDecision:
+    def reject(reason: str) -> RaceLiveOfficialAuthorizationDecision:
+        return RaceLiveOfficialAuthorizationDecision(False, reason)
+
+    if event is None or observation is None or authorization is None:
+        return reject("official_authorization_baseline_missing")
+    event_id = event.pk
+    source = observation.source_identity
+    if source.event_id != event_id or observation.result_phase != phase:
+        return reject("official_observation_mismatch")
+    if (
+        source.result_authority != RaceResultSourceAuthority.OFFICIAL
+        or source.review_status != RaceLiveReviewStatus.APPROVED
+        or source.terms_status != RaceSourceTermsStatus.MANUAL
+        or source.automation_allowed is not False
+    ):
+        return reject("official_source_not_manual_approved")
+    if (
+        source.valid_until is None
+        or timezone.is_naive(source.valid_until)
+        or source.valid_until <= now
+    ):
+        return reject("official_source_expired")
+    if authorization.enabled is not True:
+        return reject("official_authorization_disabled")
+    if (
+        authorization.valid_until is None
+        or timezone.is_naive(authorization.valid_until)
+        or authorization.valid_until <= now
+    ):
+        return reject("official_authorization_expired")
+    if (
+        phase == RaceResultPhase.CORRECTED
+        and authorization.max_phase != RaceResultPhase.CORRECTED
+    ):
+        return reject("official_phase_not_authorized")
+    if authorization.max_phase not in {
+        RaceResultPhase.OFFICIAL,
+        RaceResultPhase.CORRECTED,
+    }:
+        return reject("official_phase_not_authorized")
+
+    if (
+        tra_source is None
+        or tra_source.review_status != RaceLiveReviewStatus.APPROVED
+        or tra_source.terms_status != RaceSourceTermsStatus.APPROVED
+        or tra_source.automation_allowed is not True
+        or allowlist is None
+        or allowlist.enabled is not True
+    ):
+        return reject("provisional_policy_baseline_missing")
+    if (
+        tra_source.valid_until is None
+        or timezone.is_naive(tra_source.valid_until)
+        or tra_source.valid_until <= now
+    ):
+        return reject("provisional_source_expired")
+    policy_lookups = (
+        (RaceLivePublicationScopeType.GLOBAL, "global"),
+        (RaceLivePublicationScopeType.REGION, event.country_region),
+        (RaceLivePublicationScopeType.SOURCE, "the_racing_api"),
+        (RaceLivePublicationScopeType.EVENT, str(event_id)),
+    )
+    policies = []
+    for scope_type, scope_key in policy_lookups:
+        policy = policy_by_scope.get((scope_type, scope_key))
+        if policy is None:
+            return reject("official_coarse_policy_missing")
+        if (
+            policy.valid_until is None
+            or timezone.is_naive(policy.valid_until)
+            or policy.valid_until <= now
+            or policy.registry_digest != tra_source.registry_digest
+            or policy.coverage_proof_digest
+            != allowlist.coverage_proof_digest
+        ):
+            return reject("official_coarse_policy_drift")
+        policies.append(policy)
+    for policy in policies:
+        required_mode = (
+            RaceLivePublicationMode.PROVISIONAL_PUBLIC
+            if policy.scope_type == RaceLivePublicationScopeType.SOURCE
+            else RaceLivePublicationMode.OFFICIAL_PUBLIC
+        )
+        if RACE_LIVE_MODE_RANK.get(policy.mode, -1) < RACE_LIVE_MODE_RANK[
+            required_mode
+        ]:
+            return reject("official_coarse_policy_mode")
+
+    if authorization.source_key != source.source_key:
+        return reject("official_source_key_mismatch")
+    if authorization.route != allowlist.official_verification_route:
+        return reject("official_route_mismatch")
+    if (
+        authorization.route_version
+        != allowlist.official_verification_route_version
+    ):
+        return reject("official_route_version_mismatch")
+    if authorization.route_registry_digest != source.registry_digest:
+        return reject("official_route_registry_mismatch")
+    if (
+        authorization.contract_digest
+        != allowlist.official_verification_contract_digest
+    ):
+        return reject("official_contract_mismatch")
+    if (
+        authorization.terms_evidence_digest
+        != allowlist.official_terms_evidence_digest
+        or source.evidence_sha256 != authorization.terms_evidence_digest
+    ):
+        return reject("official_terms_mismatch")
+    if (
+        authorization.coverage_proof_digest
+        != allowlist.coverage_proof_digest
+    ):
+        return reject("official_coverage_mismatch")
+    if (
+        allowlist.official_verification_valid_until is None
+        or timezone.is_naive(
+            allowlist.official_verification_valid_until
+        )
+        or allowlist.official_verification_valid_until <= now
+    ):
+        return reject("official_route_expired")
+
+    try:
+        marker = observation.official_marker_evidence
+    except RaceLiveOfficialMarkerEvidence.DoesNotExist:
+        return reject("official_marker_missing")
+    contract = marker.contract
+    if (
+        contract.country_region != event.country_region
+        or contract.source_key != source.source_key
+        or contract.review_status != RaceLiveReviewStatus.APPROVED
+        or contract.valid_until is None
+        or timezone.is_naive(contract.valid_until)
+        or contract.valid_until <= now
+        or marker.marker_type not in contract.allowed_marker_types
+        or marker.contract_digest != contract.contract_digest
+        or marker.contract_digest != authorization.contract_digest
+        or marker.parser_version != contract.parser_version
+        or marker.parser_version != observation.parser_version
+        or marker.raw_sha256 != observation.raw_sha256
+    ):
+        return reject("official_marker_contract_mismatch")
+    return RaceLiveOfficialAuthorizationDecision(
+        True,
+        "official_route_authorized",
+        authorization_version=authorization.version,
+        route_registry_digest=authorization.route_registry_digest,
+        coverage_proof_digest=authorization.coverage_proof_digest,
+    )
+
+
+def resolve_race_live_official_publication_authorization(
+    *,
+    event_id: int,
+    observation_id: int,
+    phase: str,
+    now: datetime,
+) -> RaceLiveOfficialAuthorizationDecision:
+    """Authorize an existing manual official observation without network access."""
+
+    if (
+        isinstance(event_id, bool)
+        or not isinstance(event_id, int)
+        or event_id <= 0
+        or isinstance(observation_id, bool)
+        or not isinstance(observation_id, int)
+        or observation_id <= 0
+        or phase not in {
+            RaceResultPhase.OFFICIAL,
+            RaceResultPhase.CORRECTED,
+        }
+        or not isinstance(now, datetime)
+        or timezone.is_naive(now)
+    ):
+        return RaceLiveOfficialAuthorizationDecision(False, "invalid_input")
+    event = RaceEvent.objects.filter(pk=event_id).first()
+    observation = (
+        RaceResultObservation.objects.select_related(
+            "source_identity",
+            "official_marker_evidence__contract",
+        )
+        .filter(pk=observation_id)
+        .first()
+    )
+    authorization = RaceLiveOfficialPublicationAuthorization.objects.filter(
+        event_id=event_id
+    ).first()
+    tra_source = RaceResultSourceIdentity.objects.filter(
+        event_id=event_id,
+        source_key="the_racing_api",
+    ).first()
+    allowlist = RaceLiveEventPublicationAllowlist.objects.filter(
+        event_id=event_id,
+        source_key="the_racing_api",
+    ).first()
+    policy_by_scope: dict[
+        tuple[str, str],
+        RaceLivePublicationPolicy,
+    ] = {}
+    if event is not None:
+        policy_by_scope = {
+            (policy.scope_type, policy.scope_key): policy
+            for policy in RaceLivePublicationPolicy.objects.filter(
+                Q(
+                    scope_type=RaceLivePublicationScopeType.GLOBAL,
+                    scope_key="global",
+                )
+                | Q(
+                    scope_type=RaceLivePublicationScopeType.REGION,
+                    scope_key=event.country_region,
+                )
+                | Q(
+                    scope_type=RaceLivePublicationScopeType.SOURCE,
+                    scope_key="the_racing_api",
+                )
+                | Q(
+                    scope_type=RaceLivePublicationScopeType.EVENT,
+                    scope_key=str(event_id),
+                )
+            )
+        }
+    return _resolve_race_live_official_authorization_from_loaded_rows(
+        event=event,
+        observation=observation,
+        authorization=authorization,
+        tra_source=tra_source,
+        allowlist=allowlist,
+        policy_by_scope=policy_by_scope,
+        phase=phase,
+        now=now,
+    )
+
+
+def resolve_race_live_official_coarse_policy(
+    *,
+    event_id: int,
+    now: datetime,
+) -> RaceLivePublicationPolicyDecision:
+    """Resolve official publication gates without granting TRA official authority."""
+
+    tra_source = RaceResultSourceIdentity.objects.filter(
+        event_id=event_id,
+        source_key="the_racing_api",
+    ).first()
+    if tra_source is None:
+        return RaceLivePublicationPolicyDecision(
+            False,
+            RaceLivePublicationMode.OFF,
+            "tra_source_missing",
+        )
+    base = resolve_race_live_publication_policy(
+        event_id=event_id,
+        source_identity_id=tra_source.pk,
+        now=now,
+    )
+    if base.allowed is not True:
+        return base
+    modes = {
+        scope_type: mode
+        for scope_type, mode in RaceLivePublicationPolicy.objects.filter(
+            Q(
+                scope_type=RaceLivePublicationScopeType.GLOBAL,
+                scope_key="global",
+            )
+            | Q(
+                scope_type=RaceLivePublicationScopeType.REGION,
+                scope_key=tra_source.event.country_region,
+            )
+            | Q(
+                scope_type=RaceLivePublicationScopeType.SOURCE,
+                scope_key=tra_source.source_key,
+            )
+            | Q(
+                scope_type=RaceLivePublicationScopeType.EVENT,
+                scope_key=str(event_id),
+            )
+        ).values_list("scope_type", "mode")
+    }
+    if set(modes) != {
+        RaceLivePublicationScopeType.GLOBAL,
+        RaceLivePublicationScopeType.REGION,
+        RaceLivePublicationScopeType.SOURCE,
+        RaceLivePublicationScopeType.EVENT,
+    }:
+        return RaceLivePublicationPolicyDecision(
+            False,
+            RaceLivePublicationMode.OFF,
+            "official_coarse_policy_missing",
+            policy_versions=base.policy_versions,
+            allowlist_version=base.allowlist_version,
+            registry_digest=base.registry_digest,
+            coverage_proof_digest=base.coverage_proof_digest,
+        )
+    if any(
+        modes[scope_type] != RaceLivePublicationMode.OFFICIAL_PUBLIC
+        for scope_type in (
+            RaceLivePublicationScopeType.GLOBAL,
+            RaceLivePublicationScopeType.REGION,
+            RaceLivePublicationScopeType.EVENT,
+        )
+    ) or RACE_LIVE_MODE_RANK.get(
+        modes[RaceLivePublicationScopeType.SOURCE], -1
+    ) < RACE_LIVE_MODE_RANK[RaceLivePublicationMode.PROVISIONAL_PUBLIC]:
+        return RaceLivePublicationPolicyDecision(
+            False,
+            base.effective_mode,
+            "official_coarse_policy_insufficient",
+            policy_versions=base.policy_versions,
+            allowlist_version=base.allowlist_version,
+            registry_digest=base.registry_digest,
+            coverage_proof_digest=base.coverage_proof_digest,
+        )
+    return RaceLivePublicationPolicyDecision(
+        True,
+        RaceLivePublicationMode.OFFICIAL_PUBLIC,
+        "official_coarse_policy_allowed",
+        policy_versions=base.policy_versions,
+        allowlist_version=base.allowlist_version,
+        registry_digest=base.registry_digest,
+        coverage_proof_digest=base.coverage_proof_digest,
+    )
+
+
+def validate_race_live_provisional_rollback_target(
+    *,
+    event_id: int,
+    now: datetime,
+    expected_provisional_revision_id: int | None = None,
+    planned_policy_snapshot: dict[str, dict[str, Any]] | None = None,
+    expected_allowlist_version: int | None = None,
+    expected_publication_id: int | None = None,
+) -> RaceLiveProvisionalRollbackDecision:
+    """Validate the dedicated provisional pointer against immutable audit rows."""
+
+    def reject(reason: str) -> RaceLiveProvisionalRollbackDecision:
+        return RaceLiveProvisionalRollbackDecision(False, reason)
+
+    if (
+        isinstance(event_id, bool)
+        or not isinstance(event_id, int)
+        or event_id <= 0
+        or not isinstance(now, datetime)
+        or timezone.is_naive(now)
+    ):
+        return reject("invalid_input")
+    control = (
+        RaceEventProjectionControl.objects.select_related(
+            "last_provisional_result_revision__primary_observation__source_identity"
+        )
+        .filter(event_id=event_id)
+        .first()
+    )
+    if control is None or control.last_provisional_result_revision_id is None:
+        return reject("provisional_pointer_missing")
+    revision = control.last_provisional_result_revision
+    if (
+        expected_provisional_revision_id is not None
+        and revision.pk != expected_provisional_revision_id
+    ):
+        return reject("provisional_pointer_changed")
+    if (
+        revision.event_id != event_id
+        or revision.kind != RaceEventRevisionKind.RESULT
+        or revision.phase != RaceResultPhase.PROVISIONAL
+        or revision.published_at is None
+        or timezone.is_naive(revision.published_at)
+    ):
+        return reject("provisional_pointer_invalid")
+    publication = RaceEventRevisionPublication.objects.filter(
+        revision_id=revision.pk
+    ).first()
+    if (
+        publication is None
+        or (
+            expected_publication_id is not None
+            and publication.pk != expected_publication_id
+        )
+        or publication.published_at != revision.published_at
+        or publication.authorization_kind != "provisional_policy"
+        or publication.official_authorization_version != 0
+    ):
+        return reject("provisional_publication_audit_invalid")
+    observation = revision.primary_observation
+    if observation is None or observation.result_phase != RaceResultPhase.PROVISIONAL:
+        return reject("provisional_observation_invalid")
+    source = observation.source_identity
+    if (
+        source.event_id != event_id
+        or source.source_key != "the_racing_api"
+        or source.result_authority != RaceResultSourceAuthority.SUPPLEMENTAL
+        or source.review_status != RaceLiveReviewStatus.APPROVED
+        or source.terms_status != RaceSourceTermsStatus.APPROVED
+        or source.automation_allowed is not True
+        or source.valid_until is None
+        or timezone.is_naive(source.valid_until)
+        or source.valid_until <= now
+    ):
+        return reject("provisional_source_invalid")
+    allowlist = RaceLiveEventPublicationAllowlist.objects.filter(
+        event_id=event_id,
+        source_key=source.source_key,
+        enabled=True,
+    ).first()
+    if (
+        allowlist is None
+        or (
+            expected_allowlist_version is not None
+            and allowlist.version != expected_allowlist_version
+        )
+        or allowlist.coverage_proof_digest
+        != publication.coverage_proof_digest
+        or source.registry_digest != publication.registry_digest
+        or allowlist.version != publication.allowlist_version
+    ):
+        return reject("provisional_allowlist_drift")
+    if planned_policy_snapshot is not None:
+        if not isinstance(planned_policy_snapshot, dict):
+            return reject("planned_policy_snapshot_invalid")
+        event = RaceEvent.objects.filter(pk=event_id).first()
+        if event is None:
+            return reject("event_missing")
+        expected_scopes = (
+            (RaceLivePublicationScopeType.GLOBAL, "global"),
+            (RaceLivePublicationScopeType.REGION, event.country_region),
+            (RaceLivePublicationScopeType.SOURCE, source.source_key),
+            (RaceLivePublicationScopeType.EVENT, str(event_id)),
+        )
+        if set(planned_policy_snapshot) != {
+            f"{scope_type}:{scope_key}"
+            for scope_type, scope_key in expected_scopes
+        }:
+            return reject("planned_policy_scope_mismatch")
+        actual_policy_states: list[str] = []
+        restored_modes: list[str] = []
+        for scope_type, scope_key in expected_scopes:
+            key = f"{scope_type}:{scope_key}"
+            expected = planned_policy_snapshot.get(key)
+            policy = RaceLivePublicationPolicy.objects.filter(
+                scope_type=scope_type,
+                scope_key=scope_key,
+            ).first()
+            if (
+                not isinstance(expected, dict)
+                or set(expected) != {"maintenance", "restore"}
+                or policy is None
+            ):
+                return reject("planned_policy_missing")
+            maintenance = expected.get("maintenance")
+            restore = expected.get("restore")
+            if (
+                not isinstance(maintenance, dict)
+                or not isinstance(restore, dict)
+                or set(maintenance)
+                != {
+                    "mode",
+                    "version",
+                    "registry_digest",
+                    "coverage_proof_digest",
+                    "valid_until",
+                }
+                or set(restore) != set(maintenance)
+                or maintenance["mode"] != RaceLivePublicationMode.OFF
+                or not isinstance(maintenance["version"], int)
+                or isinstance(maintenance["version"], bool)
+                or restore["version"] != maintenance["version"] + 1
+                or restore["registry_digest"] != source.registry_digest
+                or restore["coverage_proof_digest"]
+                != allowlist.coverage_proof_digest
+                or maintenance["registry_digest"]
+                != restore["registry_digest"]
+                or maintenance["coverage_proof_digest"]
+                != restore["coverage_proof_digest"]
+                or maintenance["valid_until"] != restore["valid_until"]
+            ):
+                return reject("planned_policy_snapshot_invalid")
+            try:
+                restore_valid_until = datetime.fromisoformat(
+                    restore["valid_until"]
+                )
+            except (TypeError, ValueError):
+                return reject("planned_policy_snapshot_invalid")
+            if (
+                timezone.is_naive(restore_valid_until)
+                or restore_valid_until <= now
+                or restore["mode"]
+                not in {
+                    RaceLivePublicationMode.PROVISIONAL_PUBLIC,
+                    RaceLivePublicationMode.OFFICIAL_PUBLIC,
+                }
+            ):
+                return reject("planned_policy_unusable")
+            if (
+                scope_type == RaceLivePublicationScopeType.SOURCE
+                and restore["mode"]
+                != RaceLivePublicationMode.PROVISIONAL_PUBLIC
+            ):
+                return reject("planned_source_policy_mode_invalid")
+            actual = {
+                "mode": policy.mode,
+                "version": policy.version,
+                "registry_digest": policy.registry_digest,
+                "coverage_proof_digest": policy.coverage_proof_digest,
+                "valid_until": (
+                    policy.valid_until.isoformat()
+                    if policy.valid_until is not None
+                    else None
+                ),
+            }
+            if actual == maintenance:
+                actual_policy_states.append("maintenance")
+            elif actual == restore:
+                actual_policy_states.append("restore")
+            else:
+                return reject("planned_policy_drift")
+            restored_modes.append(restore["mode"])
+        if actual_policy_states not in (
+            ["maintenance"] * 4,
+            ["restore", "restore", "restore", "maintenance"],
+            ["restore"] * 4,
+        ):
+            return reject("planned_policy_stage_invalid")
+        if min(
+            RACE_LIVE_MODE_RANK.get(mode, -1)
+            for mode in restored_modes
+        ) < RACE_LIVE_MODE_RANK[RaceLivePublicationMode.PROVISIONAL_PUBLIC]:
+            return reject("planned_policy_effective_mode_denied")
+    return RaceLiveProvisionalRollbackDecision(
+        True,
+        "provisional_rollback_target_valid",
+        revision_id=revision.pk,
+    )
+
+
+def restore_race_live_provisional_policies(
+    *,
+    event_id: int,
+    planned_policy_snapshot: dict[str, dict[str, Any]],
+    phase: str,
+    expected_provisional_revision_id: int,
+    expected_allowlist_version: int,
+    expected_publication_id: int,
+    expected_manifest_sha256: str,
+    now: datetime,
+) -> RaceLiveProvisionalRollbackDecision:
+    """Restore reviewed rollback policies in coarse-then-event CAS stages."""
+
+    if (
+        phase not in {"coarse", "event"}
+        or not RACE_PROJECTION_MANIFEST_SHA256_RE.fullmatch(
+            expected_manifest_sha256
+        )
+        or getattr(settings, "RACE_LIVE_SCHEDULER_ENABLED", False) is not False
+        or getattr(settings, "RACE_LIVE_MONITOR_ENABLED", False) is not False
+    ):
+        return RaceLiveProvisionalRollbackDecision(
+            False, "rollback_policy_input_invalid"
+        )
+    with transaction.atomic():
+        list(
+            RaceEventProjectionControl.objects.select_for_update()
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+        active_attempt_tokens = list(
+            RaceEventLiveTracking.objects.select_for_update()
+            .order_by("pk")
+            .values_list("active_attempt_token", flat=True)
+        )
+        if any(active_attempt_tokens):
+            return RaceLiveProvisionalRollbackDecision(
+                False, "active_claims_exist"
+            )
+        event = (
+            RaceEvent.objects.select_for_update()
+            .filter(pk=event_id)
+            .first()
+        )
+        if event is None:
+            return RaceLiveProvisionalRollbackDecision(
+                False, "event_missing"
+            )
+        control = (
+            RaceEventProjectionControl.objects.select_for_update()
+            .filter(event_id=event_id)
+            .first()
+        )
+        tracking = (
+            RaceEventLiveTracking.objects.select_for_update()
+            .filter(event_id=event_id)
+            .first()
+        )
+        revision = (
+            RaceEventRevision.objects.select_for_update()
+            .filter(
+                pk=expected_provisional_revision_id,
+                event_id=event_id,
+            )
+            .first()
+        )
+        observation = (
+            RaceResultObservation.objects.select_for_update()
+            .filter(
+                pk=(
+                    revision.primary_observation_id
+                    if revision is not None
+                    else None
+                )
+            )
+            .first()
+        )
+        source = (
+            RaceResultSourceIdentity.objects.select_for_update()
+            .filter(
+                pk=(
+                    observation.source_identity_id
+                    if observation is not None
+                    else None
+                )
+            )
+            .first()
+        )
+        allowlist = (
+            RaceLiveEventPublicationAllowlist.objects.select_for_update()
+            .filter(
+                event_id=event_id,
+                source_key="the_racing_api",
+            )
+            .first()
+        )
+        publication = (
+            RaceEventRevisionPublication.objects.select_for_update()
+            .filter(revision_id=expected_provisional_revision_id)
+            .first()
+        )
+        if (
+            control is None
+            or tracking is None
+            or revision is None
+            or observation is None
+            or source is None
+            or allowlist is None
+            or publication is None
+        ):
+            return RaceLiveProvisionalRollbackDecision(
+                False, "rollback_baseline_missing"
+            )
+        validation = validate_race_live_provisional_rollback_target(
+            event_id=event_id,
+            now=now,
+            expected_provisional_revision_id=(
+                expected_provisional_revision_id
+            ),
+            planned_policy_snapshot=planned_policy_snapshot,
+            expected_allowlist_version=expected_allowlist_version,
+            expected_publication_id=expected_publication_id,
+        )
+        if validation.allowed is not True:
+            return validation
+        expected_scopes = (
+            (RaceLivePublicationScopeType.GLOBAL, "global"),
+            (RaceLivePublicationScopeType.REGION, event.country_region),
+            (RaceLivePublicationScopeType.SOURCE, "the_racing_api"),
+            (RaceLivePublicationScopeType.EVENT, str(event_id)),
+        )
+        policies = list(
+            RaceLivePublicationPolicy.objects.select_for_update()
+            .filter(
+                Q(
+                    scope_type=RaceLivePublicationScopeType.GLOBAL,
+                    scope_key="global",
+                )
+                | Q(
+                    scope_type=RaceLivePublicationScopeType.REGION,
+                    scope_key=event.country_region,
+                )
+                | Q(
+                    scope_type=RaceLivePublicationScopeType.SOURCE,
+                    scope_key="the_racing_api",
+                )
+                | Q(
+                    scope_type=RaceLivePublicationScopeType.EVENT,
+                    scope_key=str(event_id),
+                )
+            )
+            .order_by("scope_type", "scope_key")
+        )
+        by_key = {
+            f"{policy.scope_type}:{policy.scope_key}": policy
+            for policy in policies
+        }
+        if set(by_key) != {
+            f"{scope_type}:{scope_key}"
+            for scope_type, scope_key in expected_scopes
+        }:
+            return RaceLiveProvisionalRollbackDecision(
+                False, "planned_policy_scope_mismatch"
+            )
+        target_scope_types = (
+            {
+                RaceLivePublicationScopeType.GLOBAL,
+                RaceLivePublicationScopeType.REGION,
+                RaceLivePublicationScopeType.SOURCE,
+            }
+            if phase == "coarse"
+            else {RaceLivePublicationScopeType.EVENT}
+        )
+        expected_pre_states = {
+            RaceLivePublicationScopeType.GLOBAL: (
+                "maintenance" if phase == "coarse" else "restore"
+            ),
+            RaceLivePublicationScopeType.REGION: (
+                "maintenance" if phase == "coarse" else "restore"
+            ),
+            RaceLivePublicationScopeType.SOURCE: (
+                "maintenance" if phase == "coarse" else "restore"
+            ),
+            RaceLivePublicationScopeType.EVENT: "maintenance",
+        }
+        planned_updates: list[
+            tuple[
+                RaceLivePublicationPolicy,
+                dict[str, Any],
+                datetime,
+                str,
+            ]
+        ] = []
+        for scope_type, scope_key in expected_scopes:
+            key = f"{scope_type}:{scope_key}"
+            policy = by_key[key]
+            snapshot = planned_policy_snapshot.get(key)
+            if (
+                not isinstance(snapshot, dict)
+                or set(snapshot) != {"maintenance", "restore"}
+            ):
+                return RaceLiveProvisionalRollbackDecision(
+                    False, "planned_policy_snapshot_invalid"
+                )
+            expected = snapshot[expected_pre_states[scope_type]]
+            actual = {
+                "mode": policy.mode,
+                "version": policy.version,
+                "registry_digest": policy.registry_digest,
+                "coverage_proof_digest": policy.coverage_proof_digest,
+                "valid_until": (
+                    policy.valid_until.isoformat()
+                    if policy.valid_until is not None
+                    else None
+                ),
+            }
+            restore = snapshot["restore"]
+            if actual == restore:
+                if scope_type in target_scope_types:
+                    continue
+                if expected_pre_states[scope_type] != "restore":
+                    return RaceLiveProvisionalRollbackDecision(
+                        False, "planned_policy_stage_invalid"
+                    )
+            elif actual != expected:
+                return RaceLiveProvisionalRollbackDecision(
+                    False, "planned_policy_drift"
+                )
+            if scope_type in target_scope_types and actual != restore:
+                try:
+                    restored_valid_until = datetime.fromisoformat(
+                        restore["valid_until"]
+                    )
+                except (KeyError, TypeError, ValueError):
+                    return RaceLiveProvisionalRollbackDecision(
+                        False, "planned_policy_snapshot_invalid"
+                    )
+                if (
+                    timezone.is_naive(restored_valid_until)
+                    or restored_valid_until <= now
+                ):
+                    return RaceLiveProvisionalRollbackDecision(
+                        False, "planned_policy_unusable"
+                    )
+                planned_updates.append(
+                    (policy, restore, restored_valid_until, key)
+                )
+        changed: list[str] = []
+        for policy, restore, restored_valid_until, key in planned_updates:
+            policy.mode = restore["mode"]
+            policy.version = restore["version"]
+            policy.registry_digest = restore["registry_digest"]
+            policy.coverage_proof_digest = restore[
+                "coverage_proof_digest"
+            ]
+            policy.valid_until = restored_valid_until
+            policy.save(
+                update_fields=(
+                    "mode",
+                    "version",
+                    "registry_digest",
+                    "coverage_proof_digest",
+                    "valid_until",
+                    "updated_at",
+                )
+            )
+            changed.append(key)
+        if changed:
+            log_operation(
+                action_type=(
+                    "race_live_emergency_provisional_policy_restore"
+                ),
+                target_type="race_event",
+                target_id=event_id,
+                detail=json.dumps(
+                    {
+                        "event_id": event_id,
+                        "phase": phase,
+                        "manifest_sha256": expected_manifest_sha256,
+                        "changed_scopes": changed,
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+            )
+        return RaceLiveProvisionalRollbackDecision(
+            True,
+            (
+                "provisional_policy_coarse_restored"
+                if phase == "coarse"
+                else "provisional_policy_event_restored"
+            ),
+        )
+
+
+def restore_last_provisional_result(
+    *,
+    event_id: int,
+    expected_current_revision_id: int,
+    expected_provisional_revision_id: int,
+    planned_policy_snapshot: dict[str, dict[str, Any]],
+    expected_allowlist_version: int,
+    expected_publication_id: int,
+    expected_tracking_lock_version: int,
+    expected_manifest_sha256: str,
+    now: datetime,
+) -> RaceLiveProvisionalRollbackDecision:
+    """Atomically restore the dedicated last-published provisional projection."""
+
+    if (
+        getattr(settings, "RACE_LIVE_SCHEDULER_ENABLED", False) is True
+        or getattr(settings, "RACE_LIVE_MONITOR_ENABLED", False) is True
+    ):
+        return RaceLiveProvisionalRollbackDecision(
+            False, "race_live_background_tasks_enabled"
+        )
+    if (
+        not RACE_PROJECTION_MANIFEST_SHA256_RE.fullmatch(
+            expected_manifest_sha256
+        )
+        or isinstance(expected_tracking_lock_version, bool)
+        or expected_tracking_lock_version < 0
+    ):
+        return RaceLiveProvisionalRollbackDecision(
+            False, "rollback_manifest_invalid"
+        )
+    with transaction.atomic():
+        list(
+            RaceEventProjectionControl.objects.select_for_update()
+            .order_by("pk")
+            .values_list("pk", flat=True)
+        )
+        active_attempt_tokens = list(
+            RaceEventLiveTracking.objects.select_for_update()
+            .order_by("pk")
+            .values_list("active_attempt_token", flat=True)
+        )
+        if any(active_attempt_tokens):
+            return RaceLiveProvisionalRollbackDecision(
+                False, "active_claims_exist"
+            )
+        try:
+            event = RaceEvent.objects.select_for_update().get(pk=event_id)
+            control = RaceEventProjectionControl.objects.select_for_update().get(
+                event_id=event_id
+            )
+            tracking = RaceEventLiveTracking.objects.select_for_update().get(
+                event_id=event_id
+            )
+        except (
+            RaceEvent.DoesNotExist,
+            RaceEventProjectionControl.DoesNotExist,
+            RaceEventLiveTracking.DoesNotExist,
+        ):
+            return RaceLiveProvisionalRollbackDecision(False, "baseline_missing")
+        if tracking.lock_version != expected_tracking_lock_version:
+            return RaceLiveProvisionalRollbackDecision(
+                False, "tracking_version_changed"
+            )
+        if control.current_result_revision_id != expected_current_revision_id:
+            return RaceLiveProvisionalRollbackDecision(
+                False, "current_revision_changed"
+            )
+        current_revision = (
+            RaceEventRevision.objects.select_for_update()
+            .filter(pk=expected_current_revision_id, event_id=event_id)
+            .first()
+        )
+        revision = (
+            RaceEventRevision.objects.select_for_update()
+            .select_related("primary_observation__source_identity")
+            .filter(pk=expected_provisional_revision_id, event_id=event_id)
+            .first()
+        )
+        if current_revision is None or revision is None:
+            return RaceLiveProvisionalRollbackDecision(
+                False, "revision_baseline_changed"
+            )
+        observation = (
+            RaceResultObservation.objects.select_for_update()
+            .filter(pk=revision.primary_observation_id)
+            .first()
+        )
+        source = (
+            RaceResultSourceIdentity.objects.select_for_update()
+            .filter(
+                pk=(
+                    observation.source_identity_id
+                    if observation is not None
+                    else None
+                )
+            )
+            .first()
+        )
+        allowlist = (
+            RaceLiveEventPublicationAllowlist.objects.select_for_update()
+            .filter(event_id=event_id, source_key="the_racing_api")
+            .first()
+        )
+        publication = (
+            RaceEventRevisionPublication.objects.select_for_update()
+            .filter(revision_id=expected_provisional_revision_id)
+            .first()
+        )
+        policies = list(
+            RaceLivePublicationPolicy.objects.select_for_update().filter(
+                Q(
+                    scope_type=RaceLivePublicationScopeType.GLOBAL,
+                    scope_key="global",
+                )
+                | Q(
+                    scope_type=RaceLivePublicationScopeType.REGION,
+                    scope_key=event.country_region,
+                )
+                | Q(
+                    scope_type=RaceLivePublicationScopeType.SOURCE,
+                    scope_key="the_racing_api",
+                )
+                | Q(
+                    scope_type=RaceLivePublicationScopeType.EVENT,
+                    scope_key=str(event_id),
+                )
+            )
+        )
+        if (
+            source is None
+            or allowlist is None
+            or publication is None
+            or len(policies) != 4
+        ):
+            return RaceLiveProvisionalRollbackDecision(
+                False, "rollback_baseline_missing"
+            )
+        if allowlist.version != expected_allowlist_version:
+            return RaceLiveProvisionalRollbackDecision(
+                False, "provisional_allowlist_version_changed"
+            )
+        if publication.pk != expected_publication_id:
+            return RaceLiveProvisionalRollbackDecision(
+                False, "provisional_publication_changed"
+            )
+        validation = validate_race_live_provisional_rollback_target(
+            event_id=event_id,
+            now=now,
+            expected_provisional_revision_id=(
+                expected_provisional_revision_id
+            ),
+            planned_policy_snapshot=planned_policy_snapshot,
+            expected_allowlist_version=expected_allowlist_version,
+            expected_publication_id=expected_publication_id,
+        )
+        if validation.allowed is not True:
+            return validation
+        for policy in policies:
+            snapshot = planned_policy_snapshot.get(
+                f"{policy.scope_type}:{policy.scope_key}",
+                {},
+            )
+            if not isinstance(snapshot, dict):
+                return RaceLiveProvisionalRollbackDecision(
+                    False, "planned_policy_snapshot_invalid"
+                )
+            if policy.mode != RaceLivePublicationMode.OFF:
+                return RaceLiveProvisionalRollbackDecision(
+                    False, "rollback_requires_maintenance_off"
+                )
+        items = list(
+            RaceEventRevisionItem.objects.select_for_update()
+            .filter(revision=revision)
+            .select_related("participant")
+            .order_by("internal_order", "pk")
+        )
+        if not items:
+            return RaceLiveProvisionalRollbackDecision(
+                False, "provisional_items_missing"
+            )
+        result_rows = []
+        for index, item in enumerate(items, start=1):
+            result_rows.append(
+                RaceEventResult(
+                    event_id=event_id,
+                    finish_position=index,
+                    official_finish_position=item.official_finish_position,
+                    horse_number=item.horse_number,
+                    horse_name=item.participant.canonical_name,
+                    jockey_name=item.jockey_name,
+                    trainer_name=item.trainer_name,
+                    finish_time=item.finish_time,
+                    margin=item.margin,
+                    barrier=item.barrier,
+                    carried_weight=item.carried_weight,
+                    running_status=item.status,
+                    is_confirmed=False,
+                    source_refs={
+                        "source_key": source.source_key,
+                        "external_race_id": source.external_race_id,
+                    },
+                    raw_payload={},
+                )
+            )
+        RaceEventResult.objects.filter(event_id=event_id).delete()
+        RaceEventResult.objects.bulk_create(result_rows)
+        control.current_result_revision = revision
+        control.last_known_good_result_revision = revision
+        control.save(
+            update_fields=(
+                "current_result_revision",
+                "last_known_good_result_revision",
+                "updated_at",
+            )
+        )
+        tracking.state = RaceEventLiveState.PROVISIONAL_RESULT
+        tracking.provisional_published_at = revision.published_at
+        tracking.official_published_at = None
+        tracking.corrected_at = None
+        tracking.save(
+            update_fields=(
+                "state",
+                "provisional_published_at",
+                "official_published_at",
+                "corrected_at",
+                "updated_at",
+            )
+        )
+        event.status = RaceEventStatus.FINISHED
+        event.result_confirmed_at = None
+        event.save(
+            update_fields=("status", "result_confirmed_at", "updated_at")
+        )
+        log_operation(
+            action_type="race_live_emergency_provisional_restore",
+            target_type="race_event",
+            target_id=event_id,
+            detail=json.dumps(
+                {
+                    "event_id": event_id,
+                    "from_revision_id": expected_current_revision_id,
+                    "restored_revision_id": revision.pk,
+                    "manifest_sha256": expected_manifest_sha256,
+                    "allowlist_version": expected_allowlist_version,
+                    "publication_id": expected_publication_id,
+                    "tracking_lock_version": (
+                        expected_tracking_lock_version
+                    ),
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        )
+        return RaceLiveProvisionalRollbackDecision(
+            True,
+            "provisional_result_restored",
+            revision_id=revision.pk,
+        )
+
+
+def _race_live_official_publication_audit_matches(
+    *,
+    publication: RaceEventRevisionPublication,
+    authorization: RaceLiveOfficialAuthorizationDecision,
+    coarse_policy: RaceLivePublicationPolicyDecision,
+) -> bool:
+    """Keep detail and bulk official-read audit semantics identical."""
+
+    return (
+        publication.authorization_kind == "official_route"
+        and publication.official_authorization_version >= 1
+        and publication.official_authorization_version
+        <= authorization.authorization_version
+        and publication.registry_digest
+        == authorization.route_registry_digest
+        and publication.coverage_proof_digest
+        == authorization.coverage_proof_digest
+        and publication.allowlist_version
+        == coarse_policy.allowlist_version
+        and publication.policy_versions
+        == [list(row) for row in coarse_policy.policy_versions]
+    )
+
+
 def resolve_race_live_public_read(
     *,
     event_id: int,
@@ -1564,6 +3299,56 @@ def resolve_race_live_public_read(
             phase=phase,
         )
 
+    if phase in {RaceResultPhase.OFFICIAL, RaceResultPhase.CORRECTED}:
+        coarse_policy = resolve_race_live_official_coarse_policy(
+            event_id=event_id,
+            now=now,
+        )
+        if coarse_policy.allowed is not True:
+            return reject(
+                f"policy_{coarse_policy.reason}",
+                revision_id=revision_id,
+                phase=phase,
+                effective_mode=coarse_policy.effective_mode,
+            )
+        official = resolve_race_live_official_publication_authorization(
+            event_id=event_id,
+            observation_id=observation.pk,
+            phase=phase,
+            now=now,
+        )
+        if official.allowed is not True:
+            return reject(
+                f"official_{official.reason}",
+                revision_id=revision_id,
+                phase=phase,
+            )
+        if not _race_live_official_publication_audit_matches(
+            publication=publication,
+            authorization=official,
+            coarse_policy=coarse_policy,
+        ):
+            return reject(
+                "official_publication_audit_mismatch",
+                revision_id=revision_id,
+                phase=phase,
+            )
+        return RaceLivePublicReadDecision(
+            visible=True,
+            reason="official_public_read_allowed",
+            revision_id=revision_id,
+            phase=phase,
+            effective_mode=RaceLivePublicationMode.OFFICIAL_PUBLIC,
+        )
+    if (
+        publication.authorization_kind != "provisional_policy"
+        or publication.official_authorization_version != 0
+    ):
+        return reject(
+            "provisional_publication_audit_mismatch",
+            revision_id=revision_id,
+            phase=phase,
+        )
     policy = resolve_race_live_publication_policy(
         event_id=event_id,
         source_identity_id=source.pk,
@@ -1856,6 +3641,95 @@ def _resolve_race_live_publication_policy_from_loaded_rows(
     )
 
 
+def _resolve_race_live_official_coarse_policy_from_loaded_rows(
+    *,
+    event: RaceEvent,
+    tra_source: RaceResultSourceIdentity | None,
+    now: datetime,
+    policy_by_scope: dict[tuple[str, str], RaceLivePublicationPolicy],
+    allowlist_by_event_source: dict[
+        tuple[int, str],
+        RaceLiveEventPublicationAllowlist,
+    ],
+) -> RaceLivePublicationPolicyDecision:
+    """Apply the official coarse gate without issuing per-event queries."""
+
+    if tra_source is None:
+        return RaceLivePublicationPolicyDecision(
+            False,
+            RaceLivePublicationMode.OFF,
+            "tra_source_missing",
+        )
+    base = _resolve_race_live_publication_policy_from_loaded_rows(
+        event=event,
+        source=tra_source,
+        now=now,
+        policy_by_scope=policy_by_scope,
+        allowlist_by_event_source=allowlist_by_event_source,
+    )
+    if base.allowed is not True:
+        return base
+    modes = {
+        scope_type: policy_by_scope[(scope_type, scope_key)].mode
+        for scope_type, scope_key in (
+            (RaceLivePublicationScopeType.GLOBAL, "global"),
+            (
+                RaceLivePublicationScopeType.REGION,
+                event.country_region,
+            ),
+            (
+                RaceLivePublicationScopeType.SOURCE,
+                tra_source.source_key,
+            ),
+            (RaceLivePublicationScopeType.EVENT, str(event.pk)),
+        )
+        if (scope_type, scope_key) in policy_by_scope
+    }
+    if set(modes) != {
+        RaceLivePublicationScopeType.GLOBAL,
+        RaceLivePublicationScopeType.REGION,
+        RaceLivePublicationScopeType.SOURCE,
+        RaceLivePublicationScopeType.EVENT,
+    }:
+        return RaceLivePublicationPolicyDecision(
+            False,
+            RaceLivePublicationMode.OFF,
+            "official_coarse_policy_missing",
+            policy_versions=base.policy_versions,
+            allowlist_version=base.allowlist_version,
+            registry_digest=base.registry_digest,
+            coverage_proof_digest=base.coverage_proof_digest,
+        )
+    if any(
+        modes[scope_type] != RaceLivePublicationMode.OFFICIAL_PUBLIC
+        for scope_type in (
+            RaceLivePublicationScopeType.GLOBAL,
+            RaceLivePublicationScopeType.REGION,
+            RaceLivePublicationScopeType.EVENT,
+        )
+    ) or RACE_LIVE_MODE_RANK.get(
+        modes[RaceLivePublicationScopeType.SOURCE], -1
+    ) < RACE_LIVE_MODE_RANK[RaceLivePublicationMode.PROVISIONAL_PUBLIC]:
+        return RaceLivePublicationPolicyDecision(
+            False,
+            base.effective_mode,
+            "official_coarse_policy_insufficient",
+            policy_versions=base.policy_versions,
+            allowlist_version=base.allowlist_version,
+            registry_digest=base.registry_digest,
+            coverage_proof_digest=base.coverage_proof_digest,
+        )
+    return RaceLivePublicationPolicyDecision(
+        True,
+        RaceLivePublicationMode.OFFICIAL_PUBLIC,
+        "official_coarse_policy_allowed",
+        policy_versions=base.policy_versions,
+        allowlist_version=base.allowlist_version,
+        registry_digest=base.registry_digest,
+        coverage_proof_digest=base.coverage_proof_digest,
+    )
+
+
 def resolve_race_live_public_reads(
     *,
     event_ids: Iterable[int],
@@ -1907,7 +3781,11 @@ def resolve_race_live_public_reads(
         for control in RaceEventProjectionControl.objects.filter(
             event_id__in=valid_ids
         ).select_related(
-            "current_result_revision__primary_observation__source_identity"
+            "current_result_revision__primary_observation__source_identity",
+            (
+                "current_result_revision__primary_observation__"
+                "official_marker_evidence__contract"
+            ),
         )
     }
     revision_ids = [
@@ -1929,6 +3807,7 @@ def resolve_race_live_public_reads(
         source = revision.primary_observation.source_identity
         if source is not None:
             source_keys.add(source.source_key)
+    source_keys.add("the_racing_api")
     region_keys = {
         event.country_region for event in event_by_id.values()
     }
@@ -1949,6 +3828,21 @@ def resolve_race_live_public_reads(
         (allowlist.event_id, allowlist.source_key): allowlist
         for allowlist in RaceLiveEventPublicationAllowlist.objects.filter(
             event_id__in=valid_ids
+        )
+    }
+    tra_source_by_event_id = {
+        source.event_id: source
+        for source in RaceResultSourceIdentity.objects.filter(
+            event_id__in=valid_ids,
+            source_key="the_racing_api",
+        )
+    }
+    authorization_by_event_id = {
+        authorization.event_id: authorization
+        for authorization in (
+            RaceLiveOfficialPublicationAuthorization.objects.filter(
+                event_id__in=valid_ids,
+            )
         )
     }
 
@@ -2073,6 +3967,75 @@ def resolve_race_live_public_reads(
         if required_mode is None:
             decisions[event_id] = reject(
                 "unsupported_result_phase",
+                revision_id=revision_id,
+                phase=phase,
+            )
+            continue
+        if phase in {RaceResultPhase.OFFICIAL, RaceResultPhase.CORRECTED}:
+            tra_source = tra_source_by_event_id.get(event_id)
+            coarse_policy = (
+                _resolve_race_live_official_coarse_policy_from_loaded_rows(
+                    event=event,
+                    tra_source=tra_source,
+                    now=now,
+                    policy_by_scope=policy_by_scope,
+                    allowlist_by_event_source=allowlist_by_event_source,
+                )
+            )
+            if coarse_policy.allowed is not True:
+                decisions[event_id] = reject(
+                    f"policy_{coarse_policy.reason}",
+                    revision_id=revision_id,
+                    phase=phase,
+                    effective_mode=coarse_policy.effective_mode,
+                )
+                continue
+            official = (
+                _resolve_race_live_official_authorization_from_loaded_rows(
+                    event=event,
+                    observation=observation,
+                    authorization=authorization_by_event_id.get(event_id),
+                    tra_source=tra_source,
+                    allowlist=allowlist_by_event_source.get(
+                        (event_id, "the_racing_api")
+                    ),
+                    policy_by_scope=policy_by_scope,
+                    phase=phase,
+                    now=now,
+                )
+            )
+            if official.allowed is not True:
+                decisions[event_id] = reject(
+                    f"official_{official.reason}",
+                    revision_id=revision_id,
+                    phase=phase,
+                )
+                continue
+            if not _race_live_official_publication_audit_matches(
+                publication=publication,
+                authorization=official,
+                coarse_policy=coarse_policy,
+            ):
+                decisions[event_id] = reject(
+                    "official_publication_audit_mismatch",
+                    revision_id=revision_id,
+                    phase=phase,
+                )
+                continue
+            decisions[event_id] = RaceLivePublicReadDecision(
+                visible=True,
+                reason="official_public_read_allowed",
+                revision_id=revision_id,
+                phase=phase,
+                effective_mode=RaceLivePublicationMode.OFFICIAL_PUBLIC,
+            )
+            continue
+        if (
+            publication.authorization_kind != "provisional_policy"
+            or publication.official_authorization_version != 0
+        ):
+            decisions[event_id] = reject(
+                "provisional_publication_audit_mismatch",
                 revision_id=revision_id,
                 phase=phase,
             )
@@ -2443,6 +4406,420 @@ def record_race_result_observation(
     )
 
 
+def apply_race_live_racecard_refresh(
+    *,
+    event_id: int,
+    expected_owner_generation: int,
+    expected_claim_generation: int,
+    attempt_token: str,
+    now: datetime,
+    normalized_racecard: dict[str, Any],
+    raw_sha256: str,
+    merge_participants,
+) -> RaceLiveRacecardRefreshDecision:
+    """Apply one already-fetched pre-off racecard under owner and claim CAS."""
+
+    if (
+        isinstance(event_id, bool)
+        or not isinstance(event_id, int)
+        or event_id <= 0
+        or not isinstance(now, datetime)
+        or timezone.is_naive(now)
+        or not isinstance(normalized_racecard, dict)
+        or not callable(merge_participants)
+        or not isinstance(raw_sha256, str)
+        or RACE_PROJECTION_MANIFEST_SHA256_RE.fullmatch(raw_sha256) is None
+    ):
+        return RaceLiveRacecardRefreshDecision(False, "invalid_input")
+    source = RaceResultSourceIdentity.objects.filter(
+        event_id=event_id,
+        source_key="the_racing_api",
+    ).first()
+    if source is None:
+        return RaceLiveRacecardRefreshDecision(False, "source_missing")
+    if normalized_racecard.get("external_race_id") != source.external_race_id:
+        return RaceLiveRacecardRefreshDecision(
+            False, "external_race_id_mismatch"
+        )
+    incoming = normalized_racecard.get("participants")
+    if not isinstance(incoming, (list, tuple)):
+        return RaceLiveRacecardRefreshDecision(False, "participants_invalid")
+    observation_payload = {
+        **normalized_racecard,
+        "participants": [dict(row) if isinstance(row, dict) else row for row in incoming],
+    }
+
+    observation_decision = record_race_result_observation(
+        source_identity_id=source.pk,
+        observed_at=now,
+        source_updated_at=None,
+        parser_version="the_racing_api_racecard_refresh_v2",
+        raw_sha256=raw_sha256,
+        result_phase=RaceResultPhase.RACECARD,
+        normalized_payload=observation_payload,
+        field_provenance={"source": "the_racing_api"},
+        parse_warnings=[],
+        permission_classification="licensed_api_automation",
+    )
+    if (
+        observation_decision.recorded is not True
+        or observation_decision.observation is None
+    ):
+        return RaceLiveRacecardRefreshDecision(
+            False, f"observation_{observation_decision.reason}"
+        )
+    observation = observation_decision.observation
+
+    with transaction.atomic():
+        try:
+            event = RaceEvent.objects.select_for_update().get(pk=event_id)
+            control = RaceEventProjectionControl.objects.select_for_update().get(
+                event_id=event_id
+            )
+            tracking = RaceEventLiveTracking.objects.select_for_update().get(
+                event_id=event_id
+            )
+        except (
+            RaceEvent.DoesNotExist,
+            RaceEventProjectionControl.DoesNotExist,
+            RaceEventLiveTracking.DoesNotExist,
+        ):
+            return RaceLiveRacecardRefreshDecision(False, "baseline_missing")
+        if (
+            control.write_owner != RaceEventProjectionWriteOwner.LIVE
+            or control.owner_generation != expected_owner_generation
+        ):
+            return RaceLiveRacecardRefreshDecision(False, "owner_mismatch")
+        if (
+            tracking.claim_generation != expected_claim_generation
+            or tracking.active_attempt_token != attempt_token
+            or tracking.claim_expires_at is None
+            or tracking.claim_expires_at <= now
+        ):
+            return RaceLiveRacecardRefreshDecision(False, "claim_mismatch")
+        if tracking.state not in {
+            RaceEventLiveState.SCHEDULED,
+            RaceEventLiveState.RACECARD_READY,
+        }:
+            return RaceLiveRacecardRefreshDecision(
+                False, "racecard_refresh_window_closed"
+            )
+        if event.race_datetime is not None and now >= event.race_datetime:
+            return RaceLiveRacecardRefreshDecision(
+                False, "racecard_refresh_window_closed"
+            )
+        locks = (
+            event.manual_lock_flags
+            if isinstance(event.manual_lock_flags, dict)
+            else {}
+        )
+        if (
+            locks.get(RaceEventModule.RUNNERS)
+            or locks.get(RaceEventModule.RESULTS)
+        ):
+            return RaceLiveRacecardRefreshDecision(
+                False, "event_manual_lock_conflict"
+            )
+        current = (
+            RaceEventRevision.objects.select_for_update()
+            .filter(
+                pk=control.current_racecard_revision_id,
+                event_id=event_id,
+                kind=RaceEventRevisionKind.RACECARD,
+                phase=RaceResultPhase.RACECARD,
+            )
+            .first()
+        )
+        if current is None:
+            return RaceLiveRacecardRefreshDecision(
+                False, "current_racecard_missing"
+            )
+        existing_identity_rows = list(
+            RaceEventParticipantSourceIdentity.objects.select_for_update()
+            .filter(
+                source_identity=source,
+                participant__event_id=event_id,
+            )
+            .select_related("participant")
+        )
+        identity_by_external = {
+            row.external_runner_id: row for row in existing_identity_rows
+        }
+        previous_items = {
+            item.participant_id: item
+            for item in current.items.select_related("participant").all()
+        }
+        previous = []
+        for identity in existing_identity_rows:
+            item = previous_items.get(identity.participant_id)
+            if item is None:
+                continue
+            previous.append(
+                {
+                    "external_runner_id": identity.external_runner_id,
+                    "horse_name": identity.participant.canonical_name,
+                    "number": item.horse_number,
+                    "draw": item.barrier,
+                    "jockey_name": item.jockey_name,
+                    "trainer_name": item.trainer_name,
+                    "carried_weight": item.carried_weight,
+                    "status": RaceEventRevisionItemStatus.DECLARED,
+                }
+            )
+        try:
+            merged = merge_participants(
+                previous=tuple(previous),
+                incoming=tuple(incoming),
+            )
+        except (TypeError, ValueError, PermissionError):
+            return RaceLiveRacecardRefreshDecision(
+                False, "participants_merge_rejected"
+            )
+        merged_rows = list(merged["participants"])
+        canonical_payload = {
+            **observation_payload,
+            "participants": merged_rows,
+            "missing_runner_source_gaps": list(
+                merged["missing_runner_source_gaps"]
+            ),
+        }
+        proposed_off_time = event.race_datetime
+        proposed_local_start_time = event.local_start_time
+        source_off_time = normalized_racecard.get("off_time")
+        if isinstance(source_off_time, str) and event.timezone_name:
+            try:
+                parsed_off = datetime.fromisoformat(
+                    source_off_time.replace("Z", "+00:00")
+                )
+                if timezone.is_naive(parsed_off):
+                    raise ValueError("source off time must be aware")
+                event_timezone = ZoneInfo(event.timezone_name)
+                local_off = parsed_off.astimezone(event_timezone)
+            except (TypeError, ValueError, KeyError):
+                return RaceLiveRacecardRefreshDecision(
+                    False, "off_time_change_rejected"
+                )
+            if (
+                local_off.date() != event.local_date
+                or (
+                    event.race_datetime is not None
+                    and abs(
+                        (parsed_off - event.race_datetime).total_seconds()
+                    )
+                    > 12 * 60 * 60
+                )
+            ):
+                return RaceLiveRacecardRefreshDecision(
+                    False, "off_time_change_rejected"
+                )
+            proposed_off_time = parsed_off
+            proposed_local_start_time = local_off.time().replace(tzinfo=None)
+        content_sha256 = build_race_live_canonical_sha256(
+            normalized_payload=canonical_payload
+        )
+        existing_revision = RaceEventRevision.objects.filter(
+            event_id=event_id,
+            kind=RaceEventRevisionKind.RACECARD,
+            phase=RaceResultPhase.RACECARD,
+            content_sha256=content_sha256,
+        ).first()
+        if existing_revision is not None:
+            tracking.next_poll_at = calculate_race_live_next_poll_at(
+                off_time=event.race_datetime,
+                now=now,
+                state=tracking.state,
+            )
+            tracking.last_success_at = now
+            tracking.last_observation_hash = observation.normalized_sha256
+            tracking.active_attempt_token = ""
+            tracking.claim_expires_at = None
+            tracking.checkpoint_payload = {
+                "status": "racecard_replayed",
+                "revision_id": existing_revision.pk,
+                "missing_runner_source_gaps": list(
+                    merged["missing_runner_source_gaps"]
+                ),
+            }
+            tracking.lock_version += 1
+            tracking.save()
+            return RaceLiveRacecardRefreshDecision(
+                True,
+                "racecard_replayed",
+                revision_id=existing_revision.pk,
+                replayed=True,
+            )
+
+        for row in merged_rows:
+            if row["external_runner_id"] in identity_by_external:
+                continue
+            horse_name = row.get("horse_name")
+            if (
+                not isinstance(horse_name, str)
+                or not horse_name
+                or horse_name != horse_name.strip()
+            ):
+                return RaceLiveRacecardRefreshDecision(
+                    False, "new_participant_name_missing"
+                )
+        participants_by_external: dict[str, RaceEventParticipant] = {}
+        for row in merged_rows:
+            external_runner_id = row["external_runner_id"]
+            identity = identity_by_external.get(external_runner_id)
+            if identity is None:
+                horse_name = row["horse_name"]
+                participant = RaceEventParticipant.objects.create(
+                    event_id=event_id,
+                    stable_key=(
+                        "tra:"
+                        + hashlib.sha256(
+                            external_runner_id.encode("utf-8")
+                        ).hexdigest()
+                    ),
+                    canonical_name=horse_name,
+                    country_region="",
+                    review_status=RaceLiveReviewStatus.APPROVED,
+                )
+                RaceEventParticipantSourceIdentity.objects.create(
+                    participant=participant,
+                    source_identity=source,
+                    external_runner_id=external_runner_id,
+                )
+            else:
+                participant = identity.participant
+            participants_by_external[external_runner_id] = participant
+
+        revision = RaceEventRevision.objects.create(
+            event_id=event_id,
+            kind=RaceEventRevisionKind.RACECARD,
+            revision_no=control.next_racecard_revision_no,
+            phase=RaceResultPhase.RACECARD,
+            content_sha256=content_sha256,
+            source_authority=RaceResultSourceAuthority.SUPPLEMENTAL,
+            decision_reason="pre-off source racecard refresh",
+            primary_observation=observation,
+            supersedes=current,
+        )
+        RaceEventRevisionItem.objects.bulk_create(
+            [
+                RaceEventRevisionItem(
+                    revision=revision,
+                    participant=participants_by_external[
+                        row["external_runner_id"]
+                    ],
+                    source_order=index,
+                    internal_order=index,
+                    status=RaceEventRevisionItemStatus.DECLARED,
+                    raw_status=str(
+                        row.get("status", RaceEventRevisionItemStatus.DECLARED)
+                    ),
+                    horse_number=str(row.get("number", "")),
+                    barrier=str(row.get("draw", row.get("barrier", ""))),
+                    jockey_name=str(row.get("jockey_name", "")),
+                    trainer_name=str(row.get("trainer_name", "")),
+                    carried_weight=str(row.get("carried_weight", "")),
+                    field_provenance={
+                        "source_key": source.source_key,
+                        "external_runner_id": row["external_runner_id"],
+                    },
+                )
+                for index, row in enumerate(merged_rows, start=1)
+            ]
+        )
+        RaceEventRevisionEvidence.objects.create(
+            revision=revision,
+            observation=observation,
+            role="primary",
+        )
+        control.current_racecard_revision = revision
+        control.last_known_good_racecard_revision = current
+        control.next_racecard_revision_no += 1
+        control.save(
+            update_fields=(
+                "current_racecard_revision",
+                "last_known_good_racecard_revision",
+                "next_racecard_revision_no",
+                "updated_at",
+            )
+        )
+        for index, row in enumerate(merged_rows, start=1):
+            defaults = {
+                "sort_order": index,
+                "horse_name": participants_by_external[
+                    row["external_runner_id"]
+                ].canonical_name,
+                "barrier": str(row.get("draw", row.get("barrier", ""))),
+                "jockey_name": str(row.get("jockey_name", "")),
+                "trainer_name": str(row.get("trainer_name", "")),
+                "carried_weight": str(row.get("carried_weight", "")),
+                "running_status": RaceRunnerStatus.DECLARED,
+                "dynamic_updated_at": now,
+                "source_refs": {
+                    "source_key": source.source_key,
+                    "external_runner_id": row["external_runner_id"],
+                },
+                "raw_payload": {},
+            }
+            legacy_runner = RaceEventRunner.objects.filter(
+                event_id=event_id,
+                source_refs__external_runner_id=row["external_runner_id"],
+            ).first()
+            if legacy_runner is None:
+                RaceEventRunner.objects.create(
+                    event_id=event_id,
+                    horse_number=str(row.get("number", "")),
+                    **defaults,
+                )
+            else:
+                legacy_locks = (
+                    legacy_runner.manual_lock_flags
+                    if isinstance(legacy_runner.manual_lock_flags, dict)
+                    else {}
+                )
+                for field_name, value in defaults.items():
+                    if legacy_locks.get(field_name) is not True:
+                        setattr(legacy_runner, field_name, value)
+                if legacy_locks.get("horse_number") is not True:
+                    legacy_runner.horse_number = str(row.get("number", ""))
+                legacy_runner.save()
+
+        if (
+            proposed_off_time != event.race_datetime
+            or proposed_local_start_time != event.local_start_time
+        ):
+            event.race_datetime = proposed_off_time
+            event.local_start_time = proposed_local_start_time
+            event.save(
+                update_fields=(
+                    "race_datetime",
+                    "local_start_time",
+                    "updated_at",
+                )
+            )
+        tracking.next_poll_at = calculate_race_live_next_poll_at(
+            off_time=event.race_datetime,
+            now=now,
+            state=tracking.state,
+        )
+        tracking.last_success_at = now
+        tracking.last_observation_hash = observation.normalized_sha256
+        tracking.active_attempt_token = ""
+        tracking.claim_expires_at = None
+        tracking.checkpoint_payload = {
+            "status": "racecard_refreshed",
+            "revision_id": revision.pk,
+            "missing_runner_source_gaps": list(
+                merged["missing_runner_source_gaps"]
+            ),
+        }
+        tracking.lock_version += 1
+        tracking.save()
+        return RaceLiveRacecardRefreshDecision(
+            True,
+            "racecard_refreshed",
+            revision_id=revision.pk,
+        )
+
+
 def _publish_race_result_revision(
     *,
     event_id: int,
@@ -2457,6 +4834,8 @@ def _publish_race_result_revision(
     allowlist_version: int = 1,
     registry_digest: str = "",
     coverage_proof_digest: str = "",
+    authorization_kind: str = "provisional_policy",
+    official_authorization_version: int = 0,
 ) -> None:
     """Audit and materialize one result revision inside the caller transaction."""
     if revision.published_at is None:
@@ -2470,6 +4849,8 @@ def _publish_race_result_revision(
             allowlist_version=allowlist_version,
             registry_digest=registry_digest,
             coverage_proof_digest=coverage_proof_digest,
+            authorization_kind=authorization_kind,
+            official_authorization_version=official_authorization_version,
         )
         revision.published_at = published_at
         revision.save(update_fields=("published_at", "updated_at"))
@@ -2483,6 +4864,10 @@ def _publish_race_result_revision(
                 "allowlist_version": allowlist_version,
                 "registry_digest": registry_digest,
                 "coverage_proof_digest": coverage_proof_digest,
+                "authorization_kind": authorization_kind,
+                "official_authorization_version": (
+                    official_authorization_version
+                ),
             },
         )
         if not created and publication.published_at != revision.published_at:
@@ -2601,6 +4986,18 @@ def _publish_race_result_revision(
         tracking.corrected_at = published_at
         tracking_fields.append("corrected_at")
     tracking.save(update_fields=tracking_fields)
+
+    if revision.phase == RaceResultPhase.PROVISIONAL:
+        control = RaceEventProjectionControl.objects.select_for_update().get(
+            event_id=event_id
+        )
+        control.last_provisional_result_revision = revision
+        control.save(
+            update_fields=(
+                "last_provisional_result_revision",
+                "updated_at",
+            )
+        )
 
     event.status = RaceEventStatus.FINISHED
     update_fields = ["status", "updated_at"]

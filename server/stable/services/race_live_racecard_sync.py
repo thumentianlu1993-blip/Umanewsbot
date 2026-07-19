@@ -30,7 +30,11 @@ from stable.services.race_live_fixtures import (
 from stable.services.race_live_source_proof import (
     RaceLiveProofHttpResponse,
     _read_secret,
+    build_the_racing_api_route_url,
     read_the_racing_api_automation_registry,
+)
+from stable.services.race_live_target_eligibility import (
+    evaluate_race_live_target_eligibility,
 )
 
 
@@ -46,6 +50,20 @@ _GROUP_TOKEN_BY_GRADE = {
     models.RaceGrade.G1: "group 1",
     models.RaceGrade.G2: "group 2",
     models.RaceGrade.G3: "group 3",
+}
+RACE_LIVE_REGION_TIMEZONES = {
+    models.RacingRegion.UNITED_KINGDOM: "Europe/London",
+    models.RacingRegion.FRANCE: "Europe/Paris",
+    models.RacingRegion.HONG_KONG: "Asia/Hong_Kong",
+    models.RacingRegion.JAPAN: "Asia/Tokyo",
+    models.RacingRegion.UNITED_STATES: None,
+}
+RACE_LIVE_REGION_CODES = {
+    models.RacingRegion.UNITED_KINGDOM: "gb",
+    models.RacingRegion.FRANCE: "fr",
+    models.RacingRegion.HONG_KONG: "hk",
+    models.RacingRegion.JAPAN: "jpn",
+    models.RacingRegion.UNITED_STATES: "usa",
 }
 _SYNC_ENDPOINTS = (
     (
@@ -65,6 +83,131 @@ class RaceLiveRacecardPrepareResult:
     request_count: int
     output_dir: Path
     blocker_codes: tuple[str, ...]
+
+
+def normalize_race_live_source_off_time(
+    *,
+    source_off_time: str | datetime,
+    event_timezone_name: str,
+    expected_local_date,
+) -> datetime:
+    if isinstance(source_off_time, str):
+        try:
+            parsed = datetime.fromisoformat(
+                source_off_time.replace("Z", "+00:00")
+            )
+        except ValueError as exc:
+            raise ValueError("source off time is invalid") from exc
+    elif isinstance(source_off_time, datetime):
+        parsed = source_off_time
+    else:
+        raise TypeError("source off time must be a datetime or ISO string")
+    if timezone.is_naive(parsed):
+        raise ValueError("source off time must be aware")
+    if (
+        not isinstance(event_timezone_name, str)
+        or not event_timezone_name
+        or expected_local_date is None
+    ):
+        raise ValueError("event timezone/local date is invalid")
+    try:
+        event_timezone = ZoneInfo(event_timezone_name)
+    except (KeyError, ValueError) as exc:
+        raise ValueError("event timezone is invalid") from exc
+    local = parsed.astimezone(event_timezone)
+    if local.date() != expected_local_date:
+        raise PermissionError("source off time crosses event local date")
+    return local
+
+
+def merge_race_live_racecard_participants(
+    *,
+    previous,
+    incoming,
+) -> dict[str, tuple[dict[str, Any], ...]]:
+    """Merge a provider racecard without interpreting omission as withdrawal."""
+
+    def validate_rows(rows, label: str) -> list[dict[str, Any]]:
+        if not isinstance(rows, (list, tuple)):
+            raise TypeError(f"{label} participants must be a list or tuple")
+        validated: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for row in rows:
+            if not isinstance(row, dict):
+                raise TypeError(f"{label} participant must be an object")
+            external_runner_id = row.get("external_runner_id")
+            if (
+                not isinstance(external_runner_id, str)
+                or not external_runner_id
+                or external_runner_id != external_runner_id.strip()
+            ):
+                raise ValueError(
+                    f"{label} participant external_runner_id is invalid"
+                )
+            if external_runner_id in seen:
+                raise ValueError(
+                    f"{label} participant external_runner_id is duplicated"
+                )
+            status = row.get("status", models.RaceEventRevisionItemStatus.DECLARED)
+            if status not in {
+                models.RaceEventRevisionItemStatus.DECLARED,
+                models.RaceEventRevisionItemStatus.REINSTATED,
+            }:
+                raise PermissionError(
+                    "racecard refresh only accepts explicit pre-off statuses"
+                )
+            normalized = dict(row)
+            normalized["external_runner_id"] = external_runner_id
+            normalized["status"] = status
+            validated.append(normalized)
+            seen.add(external_runner_id)
+        return validated
+
+    previous_rows = validate_rows(previous, "previous")
+    incoming_rows = validate_rows(incoming, "incoming")
+    incoming_by_id = {
+        row["external_runner_id"]: row for row in incoming_rows
+    }
+    merged: list[dict[str, Any]] = []
+    missing: list[str] = []
+    previous_ids: set[str] = set()
+    for row in previous_rows:
+        external_runner_id = row["external_runner_id"]
+        previous_ids.add(external_runner_id)
+        replacement = incoming_by_id.get(external_runner_id)
+        if replacement is None:
+            preserved = dict(row)
+            preserved["status"] = models.RaceEventRevisionItemStatus.DECLARED
+            merged.append(preserved)
+            missing.append(external_runner_id)
+        else:
+            merged.append(dict(replacement))
+    merged.extend(
+        dict(row)
+        for row in incoming_rows
+        if row["external_runner_id"] not in previous_ids
+    )
+    return {
+        "participants": tuple(merged),
+        "missing_runner_source_gaps": tuple(missing),
+    }
+
+
+def refresh_race_live_racecard(**kwargs):
+    """Apply a pre-off immutable racecard refresh through the shared event core.
+
+    The worker-facing implementation lives in ``race_events`` so result and
+    racecard writes share one owner/claim CAS boundary.  Keeping this small
+    adapter here makes the source-specific module the public capability entry
+    point without duplicating transactional behavior.
+    """
+
+    from stable.services.race_events import apply_race_live_racecard_refresh
+
+    return apply_race_live_racecard_refresh(
+        merge_participants=merge_race_live_racecard_participants,
+        **kwargs,
+    )
 
 
 def normalize_identity_text(value: Any) -> str:
@@ -138,6 +281,73 @@ def _validate_run_id(run_id: str) -> str:
     ):
         raise ValueError("run-id must be a safe basename")
     return run_id
+
+
+def read_race_live_eligibility_exception_file(
+    path_value: str | os.PathLike[str],
+) -> dict[str, Any]:
+    path = Path(path_value)
+    if not path.is_absolute():
+        raise ValueError("eligibility exception file must be absolute")
+    current = path.parent
+    while current != current.parent:
+        current_stat = current.lstat()
+        if stat.S_ISLNK(current_stat.st_mode):
+            macos_var_alias = (
+                current == Path("/var")
+                and current.resolve(strict=True) == Path("/private/var")
+            )
+            if not macos_var_alias:
+                raise PermissionError(
+                    "eligibility exception ancestors cannot be symlinks"
+                )
+        current = current.parent
+    descriptor = os.open(
+        path,
+        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+    )
+    try:
+        file_stat = os.fstat(descriptor)
+        if not stat.S_ISREG(file_stat.st_mode):
+            raise PermissionError(
+                "eligibility exception must be a regular file"
+            )
+        if stat.S_IMODE(file_stat.st_mode) & 0o077:
+            raise PermissionError(
+                "eligibility exception must not grant group/other access"
+            )
+        chunks: list[bytes] = []
+        remaining = _MAX_RESPONSE_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, min(65536, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        payload_bytes = b"".join(chunks)
+        if len(payload_bytes) > _MAX_RESPONSE_BYTES:
+            raise ValueError("eligibility exception file is too large")
+    finally:
+        os.close(descriptor)
+
+    def strict_object(pairs):
+        value = {}
+        for key, item in pairs:
+            if key in value:
+                raise ValueError("eligibility exception has duplicate keys")
+            value[key] = item
+        return value
+
+    payload = json.loads(
+        payload_bytes,
+        object_pairs_hook=strict_object,
+        parse_constant=lambda value: (_ for _ in ()).throw(
+            ValueError(f"invalid JSON constant: {value}")
+        ),
+    )
+    if not isinstance(payload, dict):
+        raise ValueError("eligibility exception must be an object")
+    return payload
 
 
 def _bootstrap_host_budget() -> None:
@@ -317,6 +527,9 @@ def _load_target_events(
     event_ids: list[int],
     *,
     generated_at: datetime,
+    requested_region: str | None = None,
+    exception_artifact: dict[str, Any] | None = None,
+    expected_approved_commit: str | None = None,
 ) -> tuple[list[models.RaceEvent], list[str]]:
     if (
         not isinstance(event_ids, list)
@@ -337,22 +550,57 @@ def _load_target_events(
     by_id = {event.pk: event for event in events}
     occupied_event_ids = _occupied_event_ids(event_ids)
     blockers: list[str] = []
-    london_today = generated_at.astimezone(
-        ZoneInfo("Europe/London")
-    ).date()
+    inferred_regions = {event.country_region for event in events}
+    selected_region = requested_region
+    if selected_region is None and len(inferred_regions) == 1:
+        selected_region = next(iter(inferred_regions))
+    if (
+        selected_region not in RACE_LIVE_REGION_CODES
+        or any(event.country_region != selected_region for event in events)
+    ):
+        blockers.append("mixed_or_invalid_region")
     for event_id in event_ids:
         event = by_id.get(event_id)
         if event is None:
             blockers.append("event_not_found")
             continue
         locks = event.manual_lock_flags
+        expected_timezone = RACE_LIVE_REGION_TIMEZONES.get(
+            event.country_region
+        )
+        timezone_valid = (
+            event.timezone_name == expected_timezone
+            if expected_timezone is not None
+            else (
+                event.country_region == models.RacingRegion.UNITED_STATES
+                and isinstance(event.timezone_name, str)
+                and event.timezone_name.startswith("America/")
+            )
+        )
+        try:
+            event_today = generated_at.astimezone(
+                ZoneInfo(event.timezone_name)
+            ).date()
+        except (KeyError, ValueError):
+            event_today = None
+        eligibility = evaluate_race_live_target_eligibility(
+            event_id=event.pk,
+            year=event.year,
+            region=event.country_region,
+            normalized_grade=event.normalized_grade,
+            exception_artifact=exception_artifact,
+            expected_approved_commit=expected_approved_commit,
+            now=generated_at,
+        )
         invalid = (
-            event.country_region != models.RacingRegion.UNITED_KINGDOM
+            event.country_region != selected_region
+            or eligibility.eligible is not True
             or event.status != models.RaceEventStatus.SCHEDULED
             or event.local_date is None
-            or event.local_date < london_today
-            or event.local_date > london_today + timedelta(days=1)
-            or event.timezone_name != "Europe/London"
+            or event_today is None
+            or event.local_date < event_today
+            or event.local_date > event_today + timedelta(days=1)
+            or not timezone_valid
             or not isinstance(locks, dict)
             or locks.get(models.RaceEventModule.RUNNERS)
             or locks.get(models.RaceEventModule.RESULTS)
@@ -368,12 +616,15 @@ def _match_events(
     events: list[models.RaceEvent],
     candidate_rows: list[tuple[dict[str, Any], str]],
     generated_at: datetime,
+    exception_artifact: dict[str, Any] | None,
+    expected_approved_commit: str,
 ) -> tuple[list[dict[str, Any]], list[str]]:
-    london = ZoneInfo("Europe/London")
     manifest_events: list[dict[str, Any]] = []
     blockers: list[str] = []
     used_external_ids: set[str] = set()
     for event in events:
+        event_timezone = ZoneInfo(event.timezone_name)
+        expected_region_code = RACE_LIVE_REGION_CODES[event.country_region]
         approved_names = _event_names(event)
         normalized_course = normalize_identity_text(event.racecourse)
         matches: list[tuple[dict[str, Any], str, datetime]] = []
@@ -382,9 +633,10 @@ def _match_events(
                 off_time = datetime.fromisoformat(
                     race["off_time"].replace("Z", "+00:00")
                 )
-                local = off_time.astimezone(london)
+                local = off_time.astimezone(event_timezone)
                 matching = (
-                    race["region"].upper() == "GB"
+                    race["region"].casefold()
+                    == expected_region_code.casefold()
                     and local.date() == event.local_date
                     and normalize_identity_text(race["course"]) == normalized_course
                     and normalize_identity_text(race["race_name"]) in approved_names
@@ -405,7 +657,7 @@ def _match_events(
             blockers.append("external_race_reused")
             continue
         used_external_ids.add(external_race_id)
-        local = off_time.astimezone(london)
+        local = off_time.astimezone(event_timezone)
         if (
             event.race_datetime is not None
             and event.race_datetime != off_time
@@ -430,6 +682,18 @@ def _match_events(
             if generated_at < off_time
             else generated_at
         )
+        eligibility = evaluate_race_live_target_eligibility(
+            event_id=event.pk,
+            year=event.year,
+            region=event.country_region,
+            normalized_grade=event.normalized_grade,
+            exception_artifact=exception_artifact,
+            expected_approved_commit=expected_approved_commit,
+            now=generated_at,
+        )
+        if eligibility.eligible is not True:
+            blockers.append("event_eligibility_rejected")
+            continue
         participants = []
         for runner in race["participants"]:
             runner_id = runner["external_runner_id"]
@@ -457,6 +721,7 @@ def _match_events(
                 "country_region": event.country_region,
                 "racecourse": event.racecourse,
                 "grade_text": event.grade_text,
+                "normalized_grade": event.normalized_grade,
                 "race_datetime": race["off_time"],
                 "external_race_id": external_race_id,
                 "tracking_state": tracking_state,
@@ -473,10 +738,19 @@ def _match_events(
                 ),
                 "expected_status": models.RaceEventStatus.SCHEDULED,
                 "expected_local_date": event.local_date.isoformat(),
-                "expected_timezone_name": "Europe/London",
+                "expected_timezone_name": event.timezone_name,
                 "local_date": local.date().isoformat(),
                 "source_off_dt": race["off_time"],
                 "source_response_sha256": response_sha,
+                "eligibility_matrix_version": eligibility.matrix_version,
+                "eligibility_exception_digest": (
+                    eligibility.exception_digest
+                ),
+                "eligibility_exception": (
+                    exception_artifact
+                    if eligibility.exception_digest
+                    else None
+                ),
                 "participants": participants,
             }
         )
@@ -592,6 +866,7 @@ def _write_artifact(
 def prepare_race_live_racecards(
     *,
     event_ids: list[int],
+    region: str | None = None,
     run_id: str,
     artifact_root: str | os.PathLike[str],
     secret_env_file: str | os.PathLike[str],
@@ -610,6 +885,7 @@ def prepare_race_live_racecards(
     sleep: Callable[[float], Any],
     clock: Callable[[], datetime],
     confirm_real_network: bool,
+    eligibility_exception_file: str | os.PathLike[str] | None = None,
 ) -> RaceLiveRacecardPrepareResult:
     if confirm_real_network is not True:
         raise PermissionError("real network confirmation is required")
@@ -661,16 +937,63 @@ def prepare_race_live_racecards(
     registry_valid_until = datetime.fromisoformat(registry["valid_until"])
     if policy_valid_until > registry_valid_until:
         raise PermissionError("policy outlives source registry")
-    endpoints_by_name = {
-        endpoint["name"]: endpoint["path"] for endpoint in registry["endpoints"]
-    }
-    if any(endpoints_by_name.get(name) != path for name, path in _SYNC_ENDPOINTS):
-        raise PermissionError("sync routes do not match the registry")
     username, password = _read_secret(secret_env_file)
+    exception_artifact = (
+        read_race_live_eligibility_exception_file(
+            eligibility_exception_file
+        )
+        if eligibility_exception_file is not None
+        else None
+    )
     events, baseline_blockers = _load_target_events(
         event_ids,
         generated_at=generated_at,
+        requested_region=region,
+        exception_artifact=exception_artifact,
+        expected_approved_commit=approved_commit,
     )
+    exception_event_ids = sorted(
+        event.pk
+        for event in events
+        if evaluate_race_live_target_eligibility(
+            event_id=event.pk,
+            year=event.year,
+            region=event.country_region,
+            normalized_grade=event.normalized_grade,
+            exception_artifact=exception_artifact,
+            expected_approved_commit=approved_commit,
+            now=generated_at,
+        ).reason
+        == "exception_approved"
+    )
+    if exception_artifact is not None and (
+        exception_artifact.get("event_ids") != exception_event_ids
+    ):
+        baseline_blockers.append("eligibility_exception_scope_mismatch")
+    selected_region = (
+        region
+        if region is not None
+        else (events[0].country_region if events else "")
+    )
+    if registry["schema_version"] == 1:
+        if selected_region != models.RacingRegion.UNITED_KINGDOM:
+            raise PermissionError("registry v1 only supports United Kingdom")
+        sync_endpoints = _SYNC_ENDPOINTS
+    else:
+        sync_endpoints = tuple(
+            (
+                f"racecards_sync_{day}",
+                build_the_racing_api_route_url(
+                    registry=registry,
+                    route_name="racecards_free",
+                    region=selected_region,
+                    day=day,
+                    limit=500,
+                    skip=0,
+                ).removeprefix(f"https://{_HOST}"),
+            )
+            for day in ("today", "tomorrow")
+        )
 
     request_rows: list[dict[str, Any]] = []
     candidates: list[tuple[dict[str, Any], str]] = []
@@ -678,7 +1001,7 @@ def prepare_race_live_racecards(
     if not blockers:
         _bootstrap_host_budget()
         for request_number, (endpoint_name, endpoint_path) in enumerate(
-            _SYNC_ENDPOINTS,
+            sync_endpoints,
             start=1,
         ):
             reservation_version, reservation_blocker = _reserve_with_bounded_wait(
@@ -751,6 +1074,8 @@ def prepare_race_live_racecards(
             events=events,
             candidate_rows=candidates,
             generated_at=generated_at,
+            exception_artifact=exception_artifact,
+            expected_approved_commit=approved_commit,
         )
         blockers.extend(match_blockers)
     blocker_codes = tuple(sorted(set(blockers)))

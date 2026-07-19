@@ -47,6 +47,7 @@ _TOP_LEVEL_KEYS = frozenset(
         "route_registry_digest",
         "route_contract_digest",
         "route_terms_digest",
+        "unrelated_scope_digest",
         "expected",
         "target",
     }
@@ -329,6 +330,200 @@ def read_bha_manual_route_registry(
     return payload, hashlib.sha256(data).hexdigest()
 
 
+def read_manual_official_route_registry(
+    *,
+    route: str,
+    now: datetime | None = None,
+) -> tuple[dict[str, Any], str]:
+    """Read one tracked manual route; retain the frozen BHA v1 compatibility."""
+
+    if route == "bha_manual_verification":
+        return read_bha_manual_route_registry(now=now)
+    path = (
+        Path(__file__).resolve().parents[3]
+        / "runtime"
+        / "policies"
+        / "race_live"
+        / "official_routes_manual_v1.json"
+    )
+    data = path.read_bytes()
+    payload = _parse_json(data, "manual official route registry")
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema_version") != 1
+        or not isinstance(payload.get("routes"), dict)
+    ):
+        _fail("manual official route registry schema 不匹配")
+    entry = payload["routes"].get(route)
+    if not isinstance(entry, dict):
+        _fail("manual official route 不在受审 registry")
+    expected_entry_keys = {
+        "country_region",
+        "source_key",
+        "access_mode",
+        "automation_allowed",
+        "allowed_hosts",
+        "allowed_path_prefixes",
+        "allowed_marker_types",
+        "parser_version",
+        "responsible_role",
+        "sla_minutes",
+        "permission_evidence",
+        "terms_evidence",
+        "contract_digest",
+    }
+    if (
+        set(entry) != expected_entry_keys
+        or entry.get("access_mode") != "manual_browser_only"
+        or entry.get("automation_allowed") is not False
+        or entry.get("country_region")
+        not in {
+            models.RacingRegion.UNITED_KINGDOM,
+            models.RacingRegion.FRANCE,
+            models.RacingRegion.HONG_KONG,
+            models.RacingRegion.JAPAN,
+            models.RacingRegion.UNITED_STATES,
+        }
+        or not isinstance(entry.get("allowed_hosts"), list)
+        or len(entry["allowed_hosts"]) != 1
+        or not isinstance(entry.get("allowed_path_prefixes"), list)
+        or len(entry["allowed_path_prefixes"]) != 1
+        or _SHA256_RE.fullmatch(str(entry.get("contract_digest"))) is None
+    ):
+        _fail("manual official route contract 不合法")
+    contract_payload = dict(entry)
+    contract_digest = contract_payload.pop("contract_digest")
+    if contract_digest != _sha256(contract_payload):
+        _fail("manual official route contract digest 不匹配")
+    effective_now = now or timezone.now()
+    valid_until = _aware_datetime(payload.get("valid_until"), "valid_until")
+    if timezone.is_naive(effective_now) or valid_until <= effective_now:
+        _fail("manual official route registry 已过期")
+    official_results_url = (
+        f"https://{entry['allowed_hosts'][0]}"
+        f"{entry['allowed_path_prefixes'][0]}"
+    )
+    permission = entry["permission_evidence"]
+    terms = entry["terms_evidence"]
+    if (
+        not isinstance(permission, dict)
+        or set(permission)
+        != {
+            "basis",
+            "authorized_at",
+            "valid_until",
+            "route",
+            "source_key",
+            "scope",
+            "manual_access_allowed",
+            "automation_allowed",
+            "sha256",
+        }
+        or permission["basis"]
+        != "user_source_use_authorization_2026-07-19"
+        or permission["route"] != route
+        or permission["source_key"] != entry["source_key"]
+        or permission["scope"] != "manual_official_facts_verification"
+        or permission["manual_access_allowed"] is not True
+        or permission["automation_allowed"] is not False
+    ):
+        _fail("manual official route permission evidence 不合法")
+    permission_payload = dict(permission)
+    permission_digest = permission_payload.pop("sha256")
+    if (
+        _SHA256_RE.fullmatch(str(permission_digest)) is None
+        or permission_digest != _sha256(permission_payload)
+        or _aware_datetime(
+            permission["authorized_at"],
+            "permission_evidence.authorized_at",
+        )
+        > effective_now
+        or _aware_datetime(
+            permission["valid_until"],
+            "permission_evidence.valid_until",
+        )
+        <= effective_now
+    ):
+        _fail("manual official route permission evidence 漂移或过期")
+    if (
+        not isinstance(terms, dict)
+        or set(terms)
+        != {
+            "basis",
+            "observed_at",
+            "valid_until",
+            "route",
+            "source_key",
+            "scope",
+            "manual_access_allowed",
+            "automation_allowed",
+            "sha256",
+        }
+        or terms["basis"]
+        != "user_source_use_authorization_2026-07-19"
+        or terms["route"] != route
+        or terms["source_key"] != entry["source_key"]
+        or terms["scope"] != "source_terms_use_authorization"
+        or terms["manual_access_allowed"] is not True
+        or terms["automation_allowed"] is not False
+    ):
+        _fail("manual official route terms evidence 不合法")
+    terms_payload = dict(terms)
+    terms_digest = terms_payload.pop("sha256")
+    if (
+        _SHA256_RE.fullmatch(str(terms_digest)) is None
+        or terms_digest != _sha256(terms_payload)
+        or terms_digest == contract_digest
+        or _aware_datetime(
+            terms["observed_at"],
+            "terms_evidence.observed_at",
+        )
+        > effective_now
+        or _aware_datetime(
+            terms["valid_until"],
+            "terms_evidence.valid_until",
+        )
+        <= effective_now
+    ):
+        _fail("manual official route terms evidence 漂移或过期")
+    normalized = {
+        "schema_version": 1,
+        "route": route,
+        "parser_version": entry["parser_version"],
+        "country_region": entry["country_region"],
+        "source_key": entry["source_key"],
+        "official_results_url": official_results_url,
+        "access_mode": entry["access_mode"],
+        "automation_allowed": False,
+        "responsible_role": entry["responsible_role"],
+        "sla_minutes": entry["sla_minutes"],
+        "allowed_marker_types": entry["allowed_marker_types"],
+        "allowed_hosts": tuple(entry["allowed_hosts"]),
+        "allowed_path_prefixes": tuple(entry["allowed_path_prefixes"]),
+        "terms_evidence": dict(terms),
+        "valid_until": min(
+            valid_until,
+            _aware_datetime(
+                permission["valid_until"],
+                "permission_evidence.valid_until",
+            ),
+            _aware_datetime(
+                terms["valid_until"],
+                "terms_evidence.valid_until",
+            ),
+        ).isoformat(),
+        "contract_digest": entry["contract_digest"],
+    }
+    route_registry_digest = _sha256(
+        {
+            "registry_version": payload.get("registry_version"),
+            "route": route,
+            "entry": entry,
+        }
+    )
+    return normalized, route_registry_digest
+
+
 def _policy_snapshot(event: models.RaceEvent, source_key: str) -> list[dict[str, Any]]:
     specs = (
         (models.RaceLivePublicationScopeType.GLOBAL, "global"),
@@ -582,6 +777,99 @@ def _current_snapshot(event_id: int, source_key: str) -> dict[str, Any]:
     }
 
 
+def _unrelated_scope_digest(*, event_id: int) -> str:
+    """Bind state that a single-event transition is forbidden to mutate."""
+
+    tracking = [
+        {
+            **row,
+            "next_poll_at": _dt(row["next_poll_at"]),
+            "claim_expires_at": _dt(row["claim_expires_at"]),
+        }
+        for row in models.RaceEventLiveTracking.objects.exclude(
+            event_id=event_id
+        )
+        .order_by("event_id")
+        .values(
+            "event_id",
+            "state",
+            "tracking_enabled",
+            "next_poll_at",
+            "claim_generation",
+            "active_attempt_token",
+            "claim_expires_at",
+            "lock_version",
+        )
+    ]
+    allowlists = [
+        {
+            **row,
+            "official_verification_valid_until": _dt(
+                row["official_verification_valid_until"]
+            ),
+        }
+        for row in models.RaceLiveEventPublicationAllowlist.objects.exclude(
+            event_id=event_id
+        )
+        .order_by("event_id", "source_key")
+        .values(
+            "event_id",
+            "source_key",
+            "enabled",
+            "max_mode",
+            "coverage_proof_digest",
+            "version",
+            "official_verification_route",
+            "official_verification_route_version",
+            "official_verification_contract_digest",
+            "official_terms_evidence_digest",
+            "official_verification_valid_until",
+        )
+    ]
+    policies = [
+        {
+            **row,
+            "valid_until": _dt(row["valid_until"]),
+        }
+        for row in models.RaceLivePublicationPolicy.objects.exclude(
+            scope_type=models.RaceLivePublicationScopeType.EVENT,
+            scope_key=str(event_id),
+        )
+        .order_by("scope_type", "scope_key")
+        .values(
+            "scope_type",
+            "scope_key",
+            "mode",
+            "version",
+            "registry_digest",
+            "coverage_proof_digest",
+            "valid_until",
+        )
+    ]
+    controls = list(
+        models.RaceEventProjectionControl.objects.exclude(
+            event_id=event_id
+        )
+        .order_by("event_id")
+        .values(
+            "event_id",
+            "write_owner",
+            "owner_generation",
+            "current_racecard_revision_id",
+            "current_result_revision_id",
+            "last_provisional_result_revision_id",
+        )
+    )
+    return _sha256(
+        {
+            "tracking": tracking,
+            "allowlists": allowlists,
+            "policies": policies,
+            "projection_controls": controls,
+        }
+    )
+
+
 def _predict_target(
     snapshot: dict[str, Any],
     *,
@@ -593,8 +881,8 @@ def _predict_target(
     policy_targets: list[dict[str, Any]] = []
     for policy in target["policies"]:
         changed = (
-            transition_name == "promote_shadow"
-            or policy["scope_type"] == models.RaceLivePublicationScopeType.EVENT
+            policy["scope_type"]
+            == models.RaceLivePublicationScopeType.EVENT
         )
         if changed:
             policy["version"] += 1
@@ -674,6 +962,9 @@ def _manifest_payload(
         "route_registry_digest": registry_digest,
         "route_contract_digest": registry["contract_digest"],
         "route_terms_digest": registry["terms_evidence"]["sha256"],
+        "unrelated_scope_digest": _unrelated_scope_digest(
+            event_id=event_id
+        ),
         "expected": expected,
         "target": _predict_target(
             expected,
@@ -696,8 +987,6 @@ def _build_race_live_publication_transition_bundle_snapshot(
         or event_id <= 0
     ):
         _fail("event_id 必须是正整数")
-    if event_id != 924:
-        _fail("本次 publication transition 只允许 event 924")
     if not isinstance(approved_commit, str) or _COMMIT_RE.fullmatch(
         approved_commit
     ) is None:
@@ -705,8 +994,19 @@ def _build_race_live_publication_transition_bundle_snapshot(
     now = generated_at or timezone.now()
     if timezone.is_naive(now):
         _fail("generated_at 必须包含时区")
-    registry, registry_digest = read_bha_manual_route_registry(now=now)
     source_key = "the_racing_api"
+    configured_route = (
+        models.RaceLiveEventPublicationAllowlist.objects.filter(
+            event_id=event_id,
+            source_key=source_key,
+        )
+        .values_list("official_verification_route", flat=True)
+        .first()
+    )
+    registry, registry_digest = read_manual_official_route_registry(
+        route=configured_route,
+        now=now,
+    )
     current = _with_participant_count(
         _current_snapshot(event_id, source_key),
         event_id,
@@ -737,16 +1037,28 @@ def _build_race_live_publication_transition_bundle_snapshot(
             participant_id__in=result_participant_ids,
         ).values_list("participant_id", "external_runner_id")
     )
-    if current["event_universes"] != {
-        "tracking_event_ids": [event_id],
-        "allowlist_event_ids": [event_id],
-    }:
-        _fail("tracking/allowlist universe 不是精确单赛事")
+    unrelated_scope_digest = _sha256(
+        {
+            "tracking_event_ids": [
+                value
+                for value in current["event_universes"][
+                    "tracking_event_ids"
+                ]
+                if value != event_id
+            ],
+            "allowlist_event_ids": [
+                value
+                for value in current["event_universes"][
+                    "allowlist_event_ids"
+                ]
+                if value != event_id
+            ],
+        }
+    )
     if (
         current["write_owner"]
         != models.RaceEventProjectionWriteOwner.LIVE
-        or current["event"]["country_region"]
-        != models.RacingRegion.UNITED_KINGDOM
+        or current["event"]["country_region"] != registry["country_region"]
         or current["event"]["race_datetime"] is None
         or current["event_status"]
         not in {
@@ -806,12 +1118,21 @@ def _build_race_live_publication_transition_bundle_snapshot(
         != result_participant_ids
         or any(not row[1] for row in participant_identity_rows)
         or any(
-            policy["mode"] != models.RaceLivePublicationMode.SHADOW
-            or policy["version"] != 1
+            policy["mode"]
+            != (
+                models.RaceLivePublicationMode.SHADOW
+                if policy["scope_type"]
+                == models.RaceLivePublicationScopeType.EVENT
+                else models.RaceLivePublicationMode.PROVISIONAL_PUBLIC
+            )
+            or policy["version"] < 1
             for policy in current["policies"]
         )
     ):
-        _fail("promotion baseline 不符合 event 924 shadow contract")
+        _fail(
+            "promotion baseline 不符合通用 shadow contract "
+            f"(unrelated_scope_digest={unrelated_scope_digest})"
+        )
     route_valid_until = current["allowlist"][
         "official_verification_valid_until"
     ]
@@ -834,8 +1155,18 @@ def _build_race_live_publication_transition_bundle_snapshot(
     predicted_promotion["policies"] = [
         {
             **policy,
-            "mode": models.RaceLivePublicationMode.PROVISIONAL_PUBLIC,
-            "version": policy["version"] + 1,
+            "mode": (
+                models.RaceLivePublicationMode.PROVISIONAL_PUBLIC
+                if policy["scope_type"]
+                == models.RaceLivePublicationScopeType.EVENT
+                else policy["mode"]
+            ),
+            "version": (
+                policy["version"] + 1
+                if policy["scope_type"]
+                == models.RaceLivePublicationScopeType.EVENT
+                else policy["version"]
+            ),
         }
         for policy in current["policies"]
     ]
@@ -923,15 +1254,16 @@ def _validate_manifest_schema(payload: dict[str, Any]) -> None:
     if (
         isinstance(payload["event_id"], bool)
         or not isinstance(payload["event_id"], int)
-        or payload["event_id"] != 924
+        or payload["event_id"] <= 0
     ):
-        _fail("event_id 只允许 924")
+        _fail("event_id 必须是正整数")
     if payload["source_key"] != "the_racing_api":
         _fail("source_key 不在本次范围")
     for key in (
         "route_registry_digest",
         "route_contract_digest",
         "route_terms_digest",
+        "unrelated_scope_digest",
     ):
         if _SHA256_RE.fullmatch(str(payload[key])) is None:
             _fail(f"{key} 不合法")
@@ -959,7 +1291,13 @@ def _validate_manifest_schema(payload: dict[str, Any]) -> None:
         or isinstance(expected["event"]["year"], bool)
         or not isinstance(expected["event"]["year"], int)
         or expected["event"]["country_region"]
-        != models.RacingRegion.UNITED_KINGDOM
+        not in {
+            models.RacingRegion.UNITED_KINGDOM,
+            models.RacingRegion.FRANCE,
+            models.RacingRegion.HONG_KONG,
+            models.RacingRegion.JAPAN,
+            models.RacingRegion.UNITED_STATES,
+        }
         or not isinstance(expected["event"]["race_datetime"], str)
         or not isinstance(expected["manual_locks"], dict)
         or set(expected["manual_locks"]) != {"results", "runners"}
@@ -1021,7 +1359,7 @@ def _validate_manifest_schema(payload: dict[str, Any]) -> None:
         (models.RaceLivePublicationScopeType.GLOBAL, "global"),
         (
             models.RaceLivePublicationScopeType.REGION,
-            models.RacingRegion.UNITED_KINGDOM,
+            expected["event"]["country_region"],
         ),
         (
             models.RaceLivePublicationScopeType.SOURCE,
@@ -1082,14 +1420,18 @@ def load_race_live_publication_transition_manifest(
     _validate_manifest_schema(payload)
     if payload["approved_commit"] != expected_approved_commit:
         _fail("approved commit 不匹配")
-    registry, registry_digest = read_bha_manual_route_registry()
+    registry, registry_digest = read_manual_official_route_registry(
+        route=payload["expected"]["allowlist"][
+            "official_verification_route"
+        ]
+    )
     if (
         payload["route_registry_digest"] != registry_digest
         or payload["route_contract_digest"] != registry["contract_digest"]
         or payload["route_terms_digest"]
         != registry["terms_evidence"]["sha256"]
     ):
-        _fail("BHA route registry 发生漂移")
+        _fail("manual official route registry 发生漂移")
     return LoadedRaceLivePublicationTransition(
         path=path,
         sha256=actual_sha,
@@ -1127,11 +1469,29 @@ def _validate_exact_pre(
     )
     if current != payload["expected"]:
         _fail("transition exact pre-state 漂移")
-    if current["event_universes"] != {
-        "tracking_event_ids": [payload["event_id"]],
-        "allowlist_event_ids": [payload["event_id"]],
-    }:
-        _fail("tracking/allowlist universe 漂移")
+    if (
+        _unrelated_scope_digest(event_id=payload["event_id"])
+        != payload["unrelated_scope_digest"]
+    ):
+        _fail("transition unrelated scope 漂移")
+    unrelated_scope_digest = _sha256(
+        {
+            "tracking_event_ids": [
+                value
+                for value in current["event_universes"][
+                    "tracking_event_ids"
+                ]
+                if value != payload["event_id"]
+            ],
+            "allowlist_event_ids": [
+                value
+                for value in current["event_universes"][
+                    "allowlist_event_ids"
+                ]
+                if value != payload["event_id"]
+            ],
+        }
+    )
     if payload["transition"] == "promote_shadow":
         effective_now = timezone.now()
         source_valid_until = current["source"]["valid_until"]
@@ -1164,9 +1524,7 @@ def _validate_exact_pre(
             ).values_list("participant_id", "external_runner_id")
         )
         if (
-            current["event"]["id"] != 924
-            or current["event"]["country_region"]
-            != models.RacingRegion.UNITED_KINGDOM
+            current["event"]["id"] != payload["event_id"]
             or current["event"]["race_datetime"] is None
             or current["event_status"]
             not in {
@@ -1223,11 +1581,15 @@ def _validate_exact_pre(
             != ""
             or current["allowlist"]["official_terms_evidence_digest"] != ""
             or current["allowlist"]["official_verification_route"]
-            != "bha_manual_verification"
+            != payload["expected"]["allowlist"][
+                "official_verification_route"
+            ]
             or current["allowlist"][
                 "official_verification_route_version"
             ]
-            != "bha-manual-v1"
+            != payload["expected"]["allowlist"][
+                "official_verification_route_version"
+            ]
             or allowlist_valid_until is None
             or _aware_datetime(
                 allowlist_valid_until,
@@ -1242,12 +1604,21 @@ def _validate_exact_pre(
             != result_participant_ids
             or any(not row[1] for row in participant_identity_rows)
             or any(
-                policy["mode"] != models.RaceLivePublicationMode.SHADOW
-                or policy["version"] != 1
+                policy["mode"]
+                != (
+                    models.RaceLivePublicationMode.SHADOW
+                    if policy["scope_type"]
+                    == models.RaceLivePublicationScopeType.EVENT
+                    else models.RaceLivePublicationMode.PROVISIONAL_PUBLIC
+                )
+                or policy["version"] < 1
                 for policy in current["policies"]
             )
         ):
-            _fail("promotion exact pre-state 不符合 shadow contract")
+            _fail(
+                "promotion exact pre-state 不符合 shadow contract "
+                f"(unrelated_scope_digest={unrelated_scope_digest})"
+            )
 
 
 def _expected_post_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
@@ -1315,11 +1686,11 @@ def _post_errors(
             errors.append(f"{label}_mismatch")
     if current != _expected_post_snapshot(payload):
         errors.append("exact_post_state_mismatch")
-    if current["event_universes"] != {
-        "tracking_event_ids": [payload["event_id"]],
-        "allowlist_event_ids": [payload["event_id"]],
-    }:
-        errors.append("event_universe_mismatch")
+    if (
+        _unrelated_scope_digest(event_id=payload["event_id"])
+        != payload["unrelated_scope_digest"]
+    ):
+        errors.append("unrelated_scope_mismatch")
     if target["counts"]["publication"] == 1:
         incident = models.RaceLiveOfficialVerificationIncident.objects.filter(
             event_id=payload["event_id"],

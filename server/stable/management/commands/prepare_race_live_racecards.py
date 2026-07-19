@@ -16,16 +16,27 @@ from stable.services.race_live_source_proof import the_racing_api_transport
 
 
 class Command(BaseCommand):
-    help = "为显式英国赛事准备受控、可审计的 TRA Free racecard 初始化 artifact"
+    help = "为显式五地区重点赛事准备受控、可审计的 TRA Free racecard artifact"
 
     def add_arguments(self, parser):
         parser.add_argument("--event-id", action="append", type=int, required=True)
-        parser.add_argument("--region-code", required=True)
+        parser.add_argument(
+            "--region",
+            choices=(
+                "united_kingdom",
+                "france",
+                "hong_kong",
+                "japan",
+                "united_states",
+            ),
+        )
+        parser.add_argument("--region-code")
         parser.add_argument("--run-id", required=True)
         parser.add_argument("--secret-env-file", required=True)
         parser.add_argument("--registry-file", required=True)
         parser.add_argument("--expected-registry-sha256", required=True)
         parser.add_argument("--approved-commit", required=True)
+        parser.add_argument("--eligibility-exception-file")
         parser.add_argument("--coverage-proof-digest", required=True)
         parser.add_argument("--terms-evidence-sha256", required=True)
         parser.add_argument("--policy-valid-until", required=True)
@@ -45,11 +56,27 @@ class Command(BaseCommand):
         parser.add_argument("--confirm-real-network", action="store_true")
 
     def handle(self, *args, **options):
-        if options["region_code"].lower() != "gb":
-            raise CommandError("--region-code 必须精确为 gb")
+        code_to_region = {
+            "gb": "united_kingdom",
+            "fr": "france",
+            "hk": "hong_kong",
+            "jpn": "japan",
+            "usa": "united_states",
+        }
+        region = options["region"]
+        if options["region_code"]:
+            legacy_region = code_to_region.get(options["region_code"].lower())
+            if legacy_region is None or (
+                region is not None and region != legacy_region
+            ):
+                raise CommandError("--region/--region-code 不匹配")
+            region = legacy_region
+        if region is None:
+            raise CommandError("--region 为必填")
         try:
             result = prepare_race_live_racecards(
                 event_ids=options["event_id"],
+                region=region,
                 run_id=options["run_id"],
                 artifact_root=settings.RACE_LIVE_RACECARD_ARTIFACT_ROOT,
                 secret_env_file=options["secret_env_file"],
@@ -83,6 +110,9 @@ class Command(BaseCommand):
                 sleep=time.sleep,
                 clock=timezone.now,
                 confirm_real_network=options["confirm_real_network"],
+                eligibility_exception_file=options[
+                    "eligibility_exception_file"
+                ],
             )
         except (
             OSError,

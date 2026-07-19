@@ -237,6 +237,7 @@ class RaceLiveRacecardPrepareTests(TestCase):
             "country_region": models.RacingRegion.UNITED_KINGDOM,
             "racecourse": "Ascot",
             "grade_text": "G1",
+            "normalized_grade": models.RaceGrade.G1,
             "surface": models.RaceEventSurface.TURF,
             "timezone_name": "Europe/London",
             "local_date": date(2026, 7, 18),
@@ -245,6 +246,30 @@ class RaceLiveRacecardPrepareTests(TestCase):
         }
         values.update(overrides)
         return models.RaceEvent.objects.create(**values)
+
+    def test_prepare_eligibility_never_infers_jpn_or_jg_from_grade_text(self):
+        service = self._service()
+        self.event.country_region = models.RacingRegion.HONG_KONG
+        self.event.timezone_name = "Asia/Hong_Kong"
+        self.event.grade_text = models.RaceGrade.JPN1
+        self.event.normalized_grade = ""
+        self.event.save(
+            update_fields=(
+                "country_region",
+                "timezone_name",
+                "grade_text",
+                "normalized_grade",
+                "updated_at",
+            )
+        )
+
+        _events, blockers = service._load_target_events(
+            [self.event.pk],
+            generated_at=self.NOW,
+            requested_region=models.RacingRegion.HONG_KONG,
+        )
+
+        self.assertIn("event_baseline_rejected", blockers)
 
     def _registry(self):
         payload = {
@@ -339,6 +364,36 @@ class RaceLiveRacecardPrepareTests(TestCase):
             redirect_url=None,
         )
 
+    def _exception_file(self, *, event_ids=None, name="exception.json"):
+        scoped = {
+            "schema_version": 1,
+            "approved_commit": self.APPROVED_COMMIT,
+            "event_ids": event_ids or [self.event.pk],
+            "reason": "用户批准精确赛事资格例外",
+            "approval_evidence_sha256": "f" * 64,
+            "generated_at": self.NOW.isoformat(),
+            "valid_until": (self.NOW + timedelta(days=7)).isoformat(),
+        }
+        payload = {
+            **scoped,
+            "scope_digest": hashlib.sha256(
+                json.dumps(
+                    scoped,
+                    ensure_ascii=False,
+                    allow_nan=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest(),
+        }
+        path = self.root / name
+        path.write_text(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True),
+            encoding="utf-8",
+        )
+        path.chmod(0o600)
+        return path, payload
+
     def _run(
         self,
         transport,
@@ -349,6 +404,7 @@ class RaceLiveRacecardPrepareTests(TestCase):
         confirm_real_network=True,
         expected_registry_sha256=None,
         policy_valid_until=None,
+        eligibility_exception_file=None,
     ):
         service = self._service()
         prepare = getattr(service, "prepare_race_live_racecards", None)
@@ -382,7 +438,98 @@ class RaceLiveRacecardPrepareTests(TestCase):
             sleep=sleep or (lambda _seconds: None),
             clock=clock or (lambda: self.NOW),
             confirm_real_network=confirm_real_network,
+            eligibility_exception_file=eligibility_exception_file,
         )
+
+    def test_exact_exception_is_embedded_and_reverified_by_initializer(self):
+        self.event.year = 2024
+        self.event.grade_text = models.RaceGrade.LISTED
+        self.event.normalized_grade = models.RaceGrade.LISTED
+        self.event.save(
+            update_fields=(
+                "year",
+                "grade_text",
+                "normalized_grade",
+                "updated_at",
+            )
+        )
+        exception_path, exception = self._exception_file()
+        responses = iter(
+            (
+                self._response({"racecards": [self._racecard()]}),
+                self._response({"racecards": []}),
+            )
+        )
+        current = [self.NOW]
+
+        result = self._run(
+            lambda **_kwargs: next(responses),
+            run_id="exact-exception",
+            sleep=lambda seconds: current.__setitem__(
+                0,
+                current[0] + timedelta(seconds=seconds),
+            ),
+            clock=lambda: current[0],
+            eligibility_exception_file=exception_path,
+        )
+
+        self.assertTrue(result.completed, result.blocker_codes)
+        manifest_path = result.output_dir / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        event = manifest["events"][0]
+        self.assertEqual(event["eligibility_exception"], exception)
+        self.assertTrue(event["eligibility_exception_digest"])
+        initialization = importlib.import_module(
+            "stable.services.race_live_initialization"
+        )
+        loaded = initialization.load_race_live_initialization_manifest(
+            manifest_path=manifest_path,
+            expected_manifest_sha256=hashlib.sha256(
+                manifest_path.read_bytes()
+            ).hexdigest(),
+            expected_approved_commit=self.APPROVED_COMMIT,
+            now=self.NOW,
+        )
+        self.assertEqual(
+            loaded.payload["events"][0]["eligibility_exception"],
+            exception,
+        )
+
+    def test_exception_scope_and_file_permissions_fail_before_network(self):
+        self.event.normalized_grade = models.RaceGrade.LISTED
+        self.event.save(
+            update_fields=("normalized_grade", "updated_at")
+        )
+        scoped_path, _payload = self._exception_file(
+            event_ids=[self.event.pk, self.event.pk + 1000],
+            name="over-broad-exception.json",
+        )
+        transport_calls = []
+
+        result = self._run(
+            lambda **kwargs: transport_calls.append(kwargs),
+            run_id="over-broad-exception",
+            eligibility_exception_file=scoped_path,
+        )
+
+        self.assertFalse(result.completed)
+        self.assertIn(
+            "eligibility_exception_scope_mismatch",
+            result.blocker_codes,
+        )
+        self.assertEqual(transport_calls, [])
+
+        wide_path, _payload = self._exception_file(
+            name="wide-exception.json",
+        )
+        wide_path.chmod(0o644)
+        with self.assertRaises(PermissionError):
+            self._run(
+                lambda **kwargs: transport_calls.append(kwargs),
+                run_id="wide-exception",
+                eligibility_exception_file=wide_path,
+            )
+        self.assertEqual(transport_calls, [])
 
     def test_exact_today_tomorrow_prepare_bootstraps_budget_and_writes_bound_artifact(self):
         calls = []
@@ -450,6 +597,10 @@ class RaceLiveRacecardPrepareTests(TestCase):
         )
         event = manifest["events"][0]
         self.assertEqual(event["event_id"], self.event.pk)
+        self.assertEqual(
+            event["normalized_grade"],
+            models.RaceGrade.G1,
+        )
         self.assertEqual(event["external_race_id"], "race-gb-1")
         self.assertEqual(event["expected_timezone_name"], "Europe/London")
         self.assertEqual(event["local_date"], "2026-07-18")
@@ -494,6 +645,21 @@ class RaceLiveRacecardPrepareTests(TestCase):
             self.assertNotIn(forbidden, requests_text)
         self.assertNotIn("form", json.dumps(manifest, sort_keys=True))
         self.assertNotIn("ofr", json.dumps(manifest, sort_keys=True))
+        initialization = importlib.import_module(
+            "stable.services.race_live_initialization"
+        )
+        loaded = initialization.load_race_live_initialization_manifest(
+            manifest_path=manifest_path,
+            expected_manifest_sha256=hashlib.sha256(
+                manifest_path.read_bytes()
+            ).hexdigest(),
+            expected_approved_commit=self.APPROVED_COMMIT,
+            now=self.NOW,
+        )
+        self.assertEqual(
+            loaded.payload["events"][0]["normalized_grade"],
+            models.RaceGrade.G1,
+        )
 
         budget = models.RaceLiveHostBudget.objects.get(
             host="api.theracingapi.com"

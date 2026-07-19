@@ -50,9 +50,11 @@ from .models import (
     RaceEventResult,
     RaceEventRunner,
     RaceLiveEventPublicationAllowlist,
+    RaceLiveAlertIncident,
     RaceLiveHostBudget,
     RaceLiveOfficialMarkerContract,
     RaceLiveOfficialMarkerEvidence,
+    RaceLiveOfficialPublicationAuthorization,
     RaceLiveOfficialVerificationIncident,
     RaceLivePublicationPolicy,
     RaceResultObservation,
@@ -117,6 +119,7 @@ class RaceEventProjectionControlAdmin(RaceLiveReadOnlyAdmin):
         "last_known_good_racecard_revision",
         "current_result_revision",
         "last_known_good_result_revision",
+        "last_provisional_result_revision",
     )
 
 
@@ -133,6 +136,52 @@ class RaceLiveHostBudgetAdmin(RaceLiveReadOnlyAdmin):
     )
     list_filter = ("last_error_code",)
     search_fields = ("host", "last_error_code")
+
+
+@admin.register(RaceLiveOfficialPublicationAuthorization)
+class RaceLiveOfficialPublicationAuthorizationAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "event",
+        "source_key",
+        "route",
+        "route_version",
+        "max_phase",
+        "enabled",
+        "version",
+        "valid_until",
+    )
+    list_filter = ("source_key", "max_phase", "enabled")
+    search_fields = (
+        "event__chinese_name",
+        "event__original_name",
+        "source_key",
+        "route",
+        "route_version",
+    )
+    raw_id_fields = ("event",)
+
+
+@admin.register(RaceLiveAlertIncident)
+class RaceLiveAlertIncidentAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "alert_type",
+        "scope_type",
+        "scope_key",
+        "status",
+        "deadline_at",
+        "next_attempt_at",
+        "delivery_attempts",
+        "alert_sent_at",
+        "last_error_code",
+    )
+    list_filter = ("alert_type", "status", "last_error_code")
+    search_fields = (
+        "scope_type",
+        "scope_key",
+        "reference_version",
+        "dedupe_key",
+        "last_error_code",
+    )
 
 
 @admin.register(RaceResultSourceIdentity)

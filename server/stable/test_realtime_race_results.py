@@ -2141,6 +2141,7 @@ class RaceLiveCeleryIsolationTests(TestCase):
 
     @override_settings(
         RACE_LIVE_SCHEDULER_ENABLED=True,
+        RACE_LIVE_ENABLED_REGIONS=(stable_models.RacingRegion.FRANCE,),
         RACE_LIVE_SELECTOR_BATCH_SIZE=20,
         RACE_LIVE_CLAIM_TTL_SECONDS=120,
     )
@@ -2170,6 +2171,7 @@ class RaceLiveCeleryIsolationTests(TestCase):
             now=self.NOW,
             batch_size=20,
             ttl_seconds=120,
+            enabled_regions=(stable_models.RacingRegion.FRANCE,),
         )
         apply_async.assert_called_once_with(
             kwargs={
@@ -2198,8 +2200,8 @@ class RaceLiveWorkerDeploymentContractTests(SimpleTestCase):
         self.assertIn('--queues="race_live"', live_script)
         self.assertIn('CELERY_RACE_LIVE_WORKER_CONCURRENCY:-1', live_script)
         self.assertIn('--prefetch-multiplier=1', live_script)
-        self.assertIn('CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT:-45', live_script)
-        self.assertIn('CELERY_RACE_LIVE_WORKER_TIME_LIMIT:-60', live_script)
+        self.assertIn('CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT:-180', live_script)
+        self.assertIn('CELERY_RACE_LIVE_WORKER_TIME_LIMIT:-210', live_script)
         self.assertNotIn('CELERY_WORKER_QUEUES', live_script)
 
     def test_all_compose_variants_define_a_dedicated_live_worker(self):
@@ -2244,8 +2246,18 @@ class RaceLiveWorkerDeploymentContractTests(SimpleTestCase):
         annotation = settings.CELERY_TASK_ANNOTATIONS[
             "stable.tasks.poll_race_live_event_task"
         ]
-        self.assertEqual(annotation["soft_time_limit"], 45)
-        self.assertEqual(annotation["time_limit"], 60)
+        self.assertEqual(
+            getattr(settings, "RACE_LIVE_RESULTS_FETCH_BUDGET_SECONDS", None),
+            165,
+        )
+        self.assertEqual(settings.RACE_LIVE_CLAIM_TTL_SECONDS, 240)
+        self.assertEqual(annotation["soft_time_limit"], 180)
+        self.assertEqual(annotation["time_limit"], 210)
+        self.assertLess(
+            settings.RACE_LIVE_RESULTS_FETCH_BUDGET_SECONDS,
+            annotation["soft_time_limit"],
+        )
+        self.assertLess(annotation["soft_time_limit"], annotation["time_limit"])
 
         repo_root = Path(__file__).resolve().parents[2]
         env_text = (repo_root / ".env.example").read_text()
@@ -2255,8 +2267,10 @@ class RaceLiveWorkerDeploymentContractTests(SimpleTestCase):
             env_text,
         )
         self.assertIn("CELERY_RACE_LIVE_WORKER_CONCURRENCY=1", env_text)
-        self.assertIn("CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT=45", env_text)
-        self.assertIn("CELERY_RACE_LIVE_WORKER_TIME_LIMIT=60", env_text)
+        self.assertIn("RACE_LIVE_RESULTS_FETCH_BUDGET_SECONDS=165", env_text)
+        self.assertIn("RACE_LIVE_CLAIM_TTL_SECONDS=240", env_text)
+        self.assertIn("CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT=180", env_text)
+        self.assertIn("CELERY_RACE_LIVE_WORKER_TIME_LIMIT=210", env_text)
         self.assertEqual(
             settings.RACE_LIVE_RACECARD_ARTIFACT_ROOT,
             "/run/race-live/racecards",
@@ -2490,13 +2504,23 @@ class RaceLiveOfflineFixtureRunnerTests(TestCase):
             RACE_LIVE_TRA_SECRET_ENV_FILE="/secure/tra.env",
             RACE_LIVE_TRA_REGISTRY_FILE="/app/source-registry.json",
             RACE_LIVE_TRA_REGISTRY_SHA256="a" * 64,
+            RACE_LIVE_ENABLED_REGIONS=(
+                stable_models.RacingRegion.UNITED_KINGDOM,
+            ),
         ), patch(
+            "stable.tasks.resolve_race_live_worker_network_admission",
+            return_value=race_events.RaceLiveWorkerNetworkAdmissionDecision(
+                True,
+                "admitted",
+            ),
+        ) as preflight, patch(
             "stable.services.race_live_runner.run_race_live_the_racing_api_free",
             return_value=expected,
         ) as runner:
             result = self._run()
 
         self.assertEqual(result, expected)
+        preflight.assert_called_once()
         kwargs = runner.call_args.kwargs
         self.assertEqual(kwargs["event_id"], self.event.pk)
         self.assertEqual(kwargs["expected_owner_generation"], 4)
@@ -2818,6 +2842,49 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
         )
         return hashlib.sha256(self.registry_path.read_bytes()).hexdigest()
 
+    def _write_registry_v2(self):
+        registry = {
+            "allowed_region_codes": {
+                "united_kingdom": "gb",
+                "france": "fr",
+                "hong_kong": "hk",
+                "japan": "jpn",
+                "united_states": "usa",
+            },
+            "automation_allowed": True,
+            "evidence": {
+                "authorization_basis": "user_confirmed_automation_permission",
+                "documentation_url": "https://api.theracingapi.com/documentation",
+                "terms_url": "https://www.theracingapi.com/terms-of-service",
+                "verified_at": (self.NOW - timedelta(days=1)).isoformat(),
+            },
+            "host": self.HOST,
+            "max_requests": 3,
+            "proof_network_allowed": False,
+            "route_contracts": {
+                "racecards_free": {
+                    "day": ["today", "tomorrow"],
+                    "limit": [500],
+                    "path": "/v1/racecards/free",
+                    "skip": [0],
+                },
+                "results_today_free": {
+                    "limit": [50],
+                    "path": "/v1/results/today/free",
+                    "skip": list(range(0, 500, 50)),
+                },
+            },
+            "schema_version": 2,
+            "source_key": "the_racing_api",
+            "terms_status": "approved",
+            "valid_until": (self.NOW + timedelta(days=20)).isoformat(),
+        }
+        self.registry_path.write_text(
+            json.dumps(registry, ensure_ascii=False, sort_keys=True),
+            encoding="utf-8",
+        )
+        return hashlib.sha256(self.registry_path.read_bytes()).hexdigest()
+
     def _response_payload(self, *, race_id="race-live-1"):
         return {
             "results": [
@@ -2867,7 +2934,33 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
         values.update(overrides)
         return response_type(**values)
 
-    def _run(self, transport, *, clock=None):
+    def _full_results_page(self, *, skip, count, include_target=False):
+        rows = []
+        for index in range(count):
+            rows.append(
+                self._response_payload(
+                    race_id=(
+                        "race-live-1"
+                        if include_target and index == 0
+                        else f"page-{skip}-race-{index}"
+                    )
+                )["results"][0]
+            )
+        return rows
+
+    def _configure_v2_results(self):
+        self.registry_digest = self._write_registry_v2()
+        stable_models.RaceResultSourceIdentity.objects.filter(
+            pk=self.source.pk
+        ).update(registry_digest=self.registry_digest)
+        stable_models.RaceLivePublicationPolicy.objects.update(
+            registry_digest=self.registry_digest
+        )
+        stable_models.RaceLiveHostBudget.objects.filter(
+            pk=self.host_budget.pk
+        ).update(min_interval_ms=1)
+
+    def _run(self, transport, *, clock=None, sleeper=None):
         module = importlib.import_module("stable.services.race_live_runner")
         service = getattr(
             module,
@@ -2891,6 +2984,8 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
         }
         if clock is not None:
             kwargs["clock"] = clock
+        if sleeper is not None:
+            kwargs["sleeper"] = sleeper
         return service(
             **kwargs,
         )
@@ -2941,6 +3036,512 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
         self.assertEqual(
             {path.name for path in self.root.iterdir()},
             {"the-racing-api.env", "registry.json"},
+        )
+
+    def test_v2_results_runner_fetches_all_pages_and_uses_region_route(self):
+        self.registry_digest = self._write_registry_v2()
+        stable_models.RaceResultSourceIdentity.objects.filter(
+            pk=self.source.pk
+        ).update(registry_digest=self.registry_digest)
+        stable_models.RaceLivePublicationPolicy.objects.update(
+            registry_digest=self.registry_digest
+        )
+        stable_models.RaceLiveHostBudget.objects.filter(
+            pk=self.host_budget.pk
+        ).update(min_interval_ms=1)
+        calls = []
+
+        def transport(**kwargs):
+            calls.append(kwargs)
+            skip = int(kwargs["url"].rsplit("skip=", 1)[1])
+            payload = {
+                "results": self._full_results_page(
+                    skip=skip,
+                    count=50 if skip == 0 else 1,
+                    include_target=skip == 0,
+                ),
+                "total": 51,
+                "limit": 50,
+                "skip": skip,
+            }
+            return self._response(payload=payload)
+
+        module = importlib.import_module("stable.services.race_live_runner")
+        clock_values = iter(
+            self.NOW + timedelta(milliseconds=offset)
+            for offset in (0, 10, 20, 30, 40)
+        )
+        result = module.run_race_live_the_racing_api_free(
+            event_id=self.event.pk,
+            expected_owner_generation=4,
+            expected_claim_generation=2,
+            attempt_token=self.TOKEN,
+            secret_env_file=str(self.secret_path),
+            registry_file=str(self.registry_path),
+            expected_registry_sha256=self.registry_digest,
+            now=self.NOW,
+            transport=transport,
+            clock=lambda: next(clock_values),
+        )
+
+        self.assertIs(result["processed"], True)
+        self.assertEqual(
+            [call["endpoint_name"] for call in calls],
+            ["results_today", "results_today"],
+        )
+        self.assertEqual(
+            [call["url"] for call in calls],
+            [
+                (
+                    "https://api.theracingapi.com/v1/results/today/free"
+                    "?limit=50&skip=0"
+                ),
+                (
+                    "https://api.theracingapi.com/v1/results/today/free"
+                    "?limit=50&skip=50"
+                ),
+            ],
+        )
+        observation = stable_models.RaceResultObservation.objects.get()
+        self.assertEqual(
+            observation.parser_version,
+            "the_racing_api_free_v2",
+        )
+
+    def _assert_truncated_results_page_fails_closed(self, *, truncated_skip):
+        self.registry_digest = self._write_registry_v2()
+        stable_models.RaceResultSourceIdentity.objects.filter(
+            pk=self.source.pk
+        ).update(registry_digest=self.registry_digest)
+        stable_models.RaceLivePublicationPolicy.objects.update(
+            registry_digest=self.registry_digest
+        )
+        stable_models.RaceLiveHostBudget.objects.filter(
+            pk=self.host_budget.pk
+        ).update(min_interval_ms=1)
+        cache_values = {}
+        cache_sets = []
+
+        class FakeCache:
+            def get(self, key):
+                return cache_values.get(key)
+
+            def set(self, key, value, timeout):
+                cache_sets.append((key, value, timeout))
+                cache_values[key] = value
+
+        def page_results(*, skip, total=101):
+            expected_count = min(50, total - skip)
+            actual_count = (
+                expected_count - 1
+                if skip == truncated_skip
+                else expected_count
+            )
+            rows = []
+            for index in range(actual_count):
+                payload = self._response_payload(
+                    race_id=(
+                        "race-live-1"
+                        if skip == 0 and index == 0
+                        else f"page-{skip}-race-{index}"
+                    )
+                )["results"][0]
+                rows.append(payload)
+            return rows
+
+        calls = []
+
+        def transport(**kwargs):
+            skip = int(kwargs["url"].rsplit("skip=", 1)[1])
+            calls.append(skip)
+            return self._response(
+                payload={
+                    "results": page_results(skip=skip),
+                    "total": 101,
+                    "limit": 50,
+                    "skip": skip,
+                }
+            )
+
+        tick = iter(range(100))
+        module = importlib.import_module("stable.services.race_live_runner")
+        with patch.object(module, "django_cache", FakeCache()):
+            result = self._run(
+                transport,
+                clock=lambda: self.NOW
+                + timedelta(milliseconds=10 * next(tick)),
+                sleeper=lambda _seconds: None,
+            )
+
+        self.assertFalse(result["processed"])
+        self.assertEqual(result["reason"], "results_pagination_incomplete")
+        self.assertEqual(
+            calls,
+            [skip for skip in (0, 50, 100) if skip <= truncated_skip],
+        )
+        self.assertEqual(cache_sets, [])
+        self.control.refresh_from_db()
+        self.assertIsNone(self.control.last_known_good_result_revision_id)
+        self.assertEqual(stable_models.RaceEventResult.objects.count(), 0)
+        self.tracking.refresh_from_db()
+        self.assertEqual(
+            self.tracking.checkpoint_payload["pagination"]["category"],
+            "incomplete",
+        )
+        staged = race_events.stage_race_live_sla_alerts(
+            now=self.NOW + timedelta(seconds=1),
+            enabled_regions=(
+                stable_models.RacingRegion.UNITED_KINGDOM,
+            ),
+        )
+        self.assertEqual(len(staged), 1)
+        incident = stable_models.RaceLiveAlertIncident.objects.get(
+            pk=staged[0]
+        )
+        self.assertEqual(
+            incident.alert_type,
+            stable_models.RaceLiveAlertType.PAGINATION_OVERFLOW,
+        )
+        self.assertEqual(
+            incident.details["pagination_category"],
+            "incomplete",
+        )
+
+    def test_v2_results_first_page_truncation_fails_closed(self):
+        self._assert_truncated_results_page_fails_closed(truncated_skip=0)
+
+    def test_v2_results_middle_page_truncation_fails_closed(self):
+        self._assert_truncated_results_page_fails_closed(truncated_skip=50)
+
+    def test_v2_results_last_page_truncation_fails_closed(self):
+        self._assert_truncated_results_page_fails_closed(truncated_skip=100)
+
+    def test_v2_results_overflow_checkpoint_stages_pagination_incident(self):
+        self._configure_v2_results()
+        tick = iter(range(20))
+
+        result = self._run(
+            lambda **_kwargs: self._response(
+                payload={
+                    "results": self._full_results_page(
+                        skip=0,
+                        count=50,
+                        include_target=True,
+                    ),
+                    "total": 501,
+                    "limit": 50,
+                    "skip": 0,
+                }
+            ),
+            clock=lambda: self.NOW
+            + timedelta(milliseconds=10 * next(tick)),
+        )
+
+        self.assertFalse(result["processed"])
+        self.assertEqual(result["reason"], "results_pagination_overflow")
+        self.tracking.refresh_from_db()
+        self.assertEqual(
+            self.tracking.checkpoint_payload["pagination"]["category"],
+            "overflow",
+        )
+        staged = race_events.stage_race_live_sla_alerts(
+            now=self.NOW + timedelta(seconds=1),
+            enabled_regions=(
+                stable_models.RacingRegion.UNITED_KINGDOM,
+            ),
+        )
+        self.assertEqual(len(staged), 1)
+        incident = stable_models.RaceLiveAlertIncident.objects.get(
+            pk=staged[0]
+        )
+        self.assertEqual(
+            incident.alert_type,
+            stable_models.RaceLiveAlertType.PAGINATION_OVERFLOW,
+        )
+        self.assertEqual(incident.details["pagination_category"], "overflow")
+
+    def test_v2_results_metadata_drift_checkpoint_stages_pagination_incident(self):
+        self._configure_v2_results()
+        calls = []
+
+        def transport(**kwargs):
+            skip = int(kwargs["url"].rsplit("skip=", 1)[1])
+            calls.append(skip)
+            total = 51 if skip == 0 else 52
+            count = min(50, total - skip)
+            return self._response(
+                payload={
+                    "results": self._full_results_page(
+                        skip=skip,
+                        count=count,
+                        include_target=skip == 0,
+                    ),
+                    "total": total,
+                    "limit": 50,
+                    "skip": skip,
+                }
+            )
+
+        tick = iter(range(30))
+        result = self._run(
+            transport,
+            clock=lambda: self.NOW
+            + timedelta(milliseconds=10 * next(tick)),
+        )
+
+        self.assertFalse(result["processed"])
+        self.assertEqual(
+            result["reason"],
+            "results_pagination_metadata_drift",
+        )
+        self.assertEqual(calls, [0, 50])
+        self.tracking.refresh_from_db()
+        self.assertEqual(
+            self.tracking.checkpoint_payload["pagination"]["category"],
+            "metadata_drift",
+        )
+        staged = race_events.stage_race_live_sla_alerts(
+            now=self.NOW + timedelta(seconds=1),
+            enabled_regions=(
+                stable_models.RacingRegion.UNITED_KINGDOM,
+            ),
+        )
+        self.assertEqual(len(staged), 1)
+        incident = stable_models.RaceLiveAlertIncident.objects.get(
+            pk=staged[0]
+        )
+        self.assertEqual(
+            incident.alert_type,
+            stable_models.RaceLiveAlertType.PAGINATION_OVERFLOW,
+        )
+        self.assertEqual(
+            incident.details["pagination_category"],
+            "metadata_drift",
+        )
+
+    def test_v2_ordinary_payload_error_does_not_stage_pagination_incident(self):
+        self._configure_v2_results()
+        tick = iter(range(20))
+
+        result = self._run(
+            lambda **_kwargs: self._response(
+                payload={
+                    "results": [{"race_id": "malformed"}],
+                    "total": 1,
+                    "limit": 50,
+                    "skip": 0,
+                }
+            ),
+            clock=lambda: self.NOW
+            + timedelta(milliseconds=10 * next(tick)),
+        )
+
+        self.assertEqual(result["reason"], "the_racing_api_payload_invalid")
+        self.tracking.refresh_from_db()
+        self.assertNotIn("pagination", self.tracking.checkpoint_payload)
+        race_events.stage_race_live_sla_alerts(
+            now=self.NOW + timedelta(seconds=1),
+            enabled_regions=(
+                stable_models.RacingRegion.UNITED_KINGDOM,
+            ),
+        )
+        self.assertFalse(
+            stable_models.RaceLiveAlertIncident.objects.filter(
+                alert_type=(
+                    stable_models.RaceLiveAlertType.PAGINATION_OVERFLOW
+                )
+            ).exists()
+        )
+
+    @override_settings(RACE_LIVE_RESULTS_FETCH_BUDGET_SECONDS=165)
+    def test_v2_ten_slow_pages_complete_inside_fetch_deadline(self):
+        self._configure_v2_results()
+        current = [self.NOW]
+        calls = []
+        cache_sets = []
+
+        class FakeCache:
+            def get(self, _key):
+                return None
+
+            def set(self, key, value, timeout):
+                cache_sets.append((key, value, timeout))
+
+        def transport(**kwargs):
+            skip = int(kwargs["url"].rsplit("skip=", 1)[1])
+            calls.append((skip, kwargs["timeout_seconds"]))
+            current[0] += timedelta(seconds=15)
+            return self._response(
+                payload={
+                    "results": self._full_results_page(
+                        skip=skip,
+                        count=50,
+                        include_target=skip == 0,
+                    ),
+                    "total": 500,
+                    "limit": 50,
+                    "skip": skip,
+                }
+            )
+
+        module = importlib.import_module("stable.services.race_live_runner")
+        with patch.object(module, "django_cache", FakeCache()):
+            result = self._run(
+                transport,
+                clock=lambda: current[0],
+                sleeper=lambda _seconds: None,
+            )
+
+        self.assertTrue(result["processed"], result["reason"])
+        self.assertEqual([skip for skip, _timeout in calls], list(range(0, 500, 50)))
+        self.assertTrue(all(timeout == 15 for _skip, timeout in calls))
+        self.assertEqual(len(cache_sets), 1)
+
+    @override_settings(RACE_LIVE_RESULTS_FETCH_BUDGET_SECONDS=165)
+    def test_v2_results_exceeding_deadline_fails_closed_with_remaining_timeout(self):
+        self._configure_v2_results()
+        current = [self.NOW]
+        calls = []
+        cache_sets = []
+
+        class FakeCache:
+            def get(self, _key):
+                return None
+
+            def set(self, key, value, timeout):
+                cache_sets.append((key, value, timeout))
+
+        def transport(**kwargs):
+            skip = int(kwargs["url"].rsplit("skip=", 1)[1])
+            calls.append((skip, kwargs["timeout_seconds"]))
+            current[0] += timedelta(seconds=17)
+            return self._response(
+                payload={
+                    "results": self._full_results_page(
+                        skip=skip,
+                        count=50,
+                        include_target=skip == 0,
+                    ),
+                    "total": 500,
+                    "limit": 50,
+                    "skip": skip,
+                }
+            )
+
+        module = importlib.import_module("stable.services.race_live_runner")
+        with patch.object(module, "django_cache", FakeCache()):
+            result = self._run(
+                transport,
+                clock=lambda: current[0],
+                sleeper=lambda _seconds: None,
+            )
+
+        self.assertFalse(result["processed"])
+        self.assertEqual(
+            result["reason"],
+            "results_pagination_deadline_exceeded",
+        )
+        self.assertEqual([skip for skip, _timeout in calls], list(range(0, 500, 50)))
+        self.assertLess(calls[-1][1], 15)
+        self.assertGreater(calls[-1][1], 0)
+        self.assertEqual(cache_sets, [])
+        self.control.refresh_from_db()
+        self.assertIsNone(self.control.last_known_good_result_revision_id)
+        self.assertEqual(
+            self.tracking.__class__.objects.get(
+                pk=self.tracking.pk
+            ).checkpoint_payload["pagination"]["category"],
+            "deadline_exceeded",
+        )
+
+    def test_v2_pre_off_runner_refreshes_racecard_through_region_snapshot(self):
+        self.registry_digest = self._write_registry_v2()
+        stable_models.RaceResultSourceIdentity.objects.filter(
+            pk=self.source.pk
+        ).update(registry_digest=self.registry_digest)
+        stable_models.RaceLivePublicationPolicy.objects.update(
+            registry_digest=self.registry_digest
+        )
+        stable_models.RaceEvent.objects.filter(pk=self.event.pk).update(
+            race_datetime=self.NOW + timedelta(hours=1),
+            timezone_name="Europe/London",
+            local_date=self.NOW.date(),
+        )
+        stable_models.RaceEventLiveTracking.objects.filter(
+            pk=self.tracking.pk
+        ).update(state=stable_models.RaceEventLiveState.RACECARD_READY)
+        calls = []
+
+        def transport(**kwargs):
+            calls.append(kwargs)
+            return self._response(
+                payload={
+                    "racecards": [
+                        {
+                            "race_id": "race-live-1",
+                            "off_dt": (
+                                self.NOW + timedelta(hours=1)
+                            ).isoformat(),
+                            "region": "GB",
+                            "course": "Ascot",
+                            "race_name": "TRA Free Live Runner Stakes",
+                            "race_status": "Racecard",
+                            "runners": [
+                                {
+                                    "horse_id": "runner-1",
+                                    "horse": "Alpha",
+                                    "number": "1",
+                                    "draw": "3",
+                                    "jockey": "New Jockey",
+                                },
+                                {
+                                    "horse_id": "runner-2",
+                                    "horse": "Beta",
+                                    "number": "2",
+                                    "draw": "5",
+                                    "jockey": "Second Jockey",
+                                },
+                            ],
+                        }
+                    ],
+                    "total": 1,
+                    "limit": 500,
+                    "skip": 0,
+                }
+            )
+
+        clock_values = iter(
+            (
+                self.NOW + timedelta(milliseconds=10),
+                self.NOW + timedelta(milliseconds=20),
+            )
+        )
+        module = importlib.import_module("stable.services.race_live_runner")
+        result = module.run_race_live_the_racing_api_free(
+            event_id=self.event.pk,
+            expected_owner_generation=4,
+            expected_claim_generation=2,
+            attempt_token=self.TOKEN,
+            secret_env_file=str(self.secret_path),
+            registry_file=str(self.registry_path),
+            expected_registry_sha256=self.registry_digest,
+            now=self.NOW,
+            transport=transport,
+            clock=lambda: next(clock_values),
+        )
+
+        self.assertTrue(result["processed"])
+        self.assertEqual(result["reason"], "racecard_refreshed")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(
+            calls[0]["endpoint_name"],
+            "racecards_sync_today",
+        )
+        self.assertIn("region_codes=gb", calls[0]["url"])
+        self.control.refresh_from_db()
+        self.assertEqual(
+            self.control.current_racecard_revision.revision_no,
+            2,
         )
 
     def test_shadow_result_is_checkpointed_without_publication_or_failure(self):
@@ -3390,10 +3991,15 @@ class RaceLivePublicStatusTests(TestCase):
                 if phase != "provisional"
                 else stable_models.RaceResultSourceAuthority.SUPPLEMENTAL
             ),
-            terms_status=stable_models.RaceSourceTermsStatus.APPROVED,
-            automation_allowed=True,
+            terms_status=(
+                stable_models.RaceSourceTermsStatus.MANUAL
+                if phase != "provisional"
+                else stable_models.RaceSourceTermsStatus.APPROVED
+            ),
+            automation_allowed=phase == "provisional",
             valid_until=self.NOW + timedelta(days=30),
-            registry_digest="a" * 64,
+            evidence_sha256="d" * 64 if phase != "provisional" else "f" * 64,
+            registry_digest="e" * 64 if phase != "provisional" else "a" * 64,
         )
         payload = {
             "external_race_id": source.external_race_id,
@@ -3416,6 +4022,27 @@ class RaceLivePublicStatusTests(TestCase):
             result_phase=phase,
             normalized_payload=payload,
         )
+        if phase != "provisional":
+            marker_contract = (
+                stable_models.RaceLiveOfficialMarkerContract.objects.create(
+                    country_region=event.country_region,
+                    source_key=source.source_key,
+                    parser_version="read-fixture-v1",
+                    allowed_marker_types=["official_result"],
+                    contract_digest="c" * 64,
+                    valid_until=self.NOW + timedelta(days=30),
+                    review_status=stable_models.RaceLiveReviewStatus.APPROVED,
+                )
+            )
+            stable_models.RaceLiveOfficialMarkerEvidence.objects.create(
+                observation=observation,
+                contract=marker_contract,
+                marker_type="official_result",
+                contract_digest="c" * 64,
+                parser_version="read-fixture-v1",
+                raw_sha256=observation.raw_sha256,
+                source_timestamp=self.NOW,
+            )
         revision = stable_models.RaceEventRevision.objects.create(
             event=event,
             kind=stable_models.RaceEventRevisionKind.RESULT,
@@ -3473,13 +4100,41 @@ class RaceLivePublicStatusTests(TestCase):
                     "valid_until": self.NOW + timedelta(days=30),
                 },
             )
-            source_policy = stable_models.RaceLivePublicationPolicy.objects.create(
+            policy_source = source
+            if phase != "provisional":
+                policy_source = (
+                    stable_models.RaceResultSourceIdentity.objects.create(
+                        event=event,
+                        source_key="the_racing_api",
+                        external_race_id=f"tra-{slug}",
+                        review_status=(
+                            stable_models.RaceLiveReviewStatus.APPROVED
+                        ),
+                        result_authority=(
+                            stable_models.RaceResultSourceAuthority.SUPPLEMENTAL
+                        ),
+                        terms_status=(
+                            stable_models.RaceSourceTermsStatus.APPROVED
+                        ),
+                        automation_allowed=True,
+                        valid_until=self.NOW + timedelta(days=30),
+                        evidence_sha256="f" * 64,
+                        registry_digest="a" * 64,
+                    )
+                )
+            source_policy, _ = stable_models.RaceLivePublicationPolicy.objects.get_or_create(
                 scope_type=stable_models.RaceLivePublicationScopeType.SOURCE,
-                scope_key=source.source_key,
-                mode=required_mode,
-                registry_digest="a" * 64,
-                coverage_proof_digest="b" * 64,
-                valid_until=self.NOW + timedelta(days=30),
+                scope_key=policy_source.source_key,
+                defaults={
+                    "mode": (
+                        required_mode
+                        if phase == "provisional"
+                        else stable_models.RaceLivePublicationMode.PROVISIONAL_PUBLIC
+                    ),
+                    "registry_digest": "a" * 64,
+                    "coverage_proof_digest": "b" * 64,
+                    "valid_until": self.NOW + timedelta(days=30),
+                },
             )
             event_policy = stable_models.RaceLivePublicationPolicy.objects.create(
                 scope_type=stable_models.RaceLivePublicationScopeType.EVENT,
@@ -3491,8 +4146,12 @@ class RaceLivePublicStatusTests(TestCase):
             )
             allowlist = stable_models.RaceLiveEventPublicationAllowlist.objects.create(
                 event=event,
-                source_key=source.source_key,
-                max_mode=required_mode,
+                source_key=policy_source.source_key,
+                max_mode=(
+                    required_mode
+                    if phase == "provisional"
+                    else stable_models.RaceLivePublicationMode.PROVISIONAL_PUBLIC
+                ),
                 coverage_proof_digest="b" * 64,
                 official_verification_route="read_fixture_verification",
                 official_verification_route_version="read-v1",
@@ -3501,6 +4160,24 @@ class RaceLivePublicStatusTests(TestCase):
                 official_verification_valid_until=self.NOW + timedelta(days=30),
                 enabled=True,
             )
+            if phase != "provisional":
+                stable_models.RaceLiveOfficialPublicationAuthorization.objects.create(
+                    event=event,
+                    source_key=source.source_key,
+                    route="read_fixture_verification",
+                    route_version="read-v1",
+                    route_registry_digest="e" * 64,
+                    contract_digest="c" * 64,
+                    terms_evidence_digest="d" * 64,
+                    coverage_proof_digest="b" * 64,
+                    max_phase=(
+                        stable_models.RaceResultPhase.CORRECTED
+                        if phase == "corrected"
+                        else stable_models.RaceResultPhase.OFFICIAL
+                    ),
+                    enabled=True,
+                    valid_until=self.NOW + timedelta(days=30),
+                )
             stable_models.RaceEventRevisionPublication.objects.create(
                 revision=revision,
                 published_at=self.NOW,
@@ -3515,8 +4192,18 @@ class RaceLivePublicStatusTests(TestCase):
                     )
                 ],
                 allowlist_version=allowlist.version,
-                registry_digest="a" * 64,
+                registry_digest=(
+                    "a" * 64 if phase == "provisional" else "e" * 64
+                ),
                 coverage_proof_digest="b" * 64,
+                authorization_kind=(
+                    "provisional_policy"
+                    if phase == "provisional"
+                    else "official_route"
+                ),
+                official_authorization_version=(
+                    0 if phase == "provisional" else 1
+                ),
             )
             stable_models.RaceEventResult.objects.create(
                 event=event,
@@ -3545,10 +4232,127 @@ class RaceLivePublicStatusTests(TestCase):
         stale = self._event_with_revision("s" * 8, "official", stale=True)
 
         self.assertContains(self.client.get(official.public_path), "正式赛果")
-        self.assertContains(self.client.get(corrected.public_path), "更正赛果")
+        self.assertContains(self.client.get(corrected.public_path), "赛果已更正")
         self.assertContains(self.client.get(conflict.public_path), "赛果待复核")
         with patch("stable.views.timezone.now", return_value=self.NOW):
             self.assertContains(self.client.get(stale.public_path), "数据可能已过期")
+
+    def test_safe_authorization_phase_extension_keeps_current_official_visible(self):
+        event = self._event_with_revision("a" * 8, "official")
+        authorization = (
+            stable_models.RaceLiveOfficialPublicationAuthorization.objects.get(
+                event=event
+            )
+        )
+        authorization.max_phase = stable_models.RaceResultPhase.CORRECTED
+        authorization.version = 2
+        authorization.save(
+            update_fields=("max_phase", "version", "updated_at")
+        )
+
+        decision = race_events.resolve_race_live_public_read(
+            event_id=event.pk,
+            now=self.NOW,
+        )
+        bulk_decision = race_events.resolve_race_live_public_reads(
+            event_ids=[event.pk],
+            now=self.NOW,
+        )[event.pk]
+
+        self.assertTrue(decision.visible, decision.reason)
+        self.assertEqual(decision.phase, stable_models.RaceResultPhase.OFFICIAL)
+        self.assertTrue(bulk_decision.visible, bulk_decision.reason)
+        self.assertEqual(bulk_decision, decision)
+
+    def test_official_policy_version_drift_hides_detail_and_bulk_reads(self):
+        event = self._event_with_revision("v" * 8, "official")
+        event_policy = stable_models.RaceLivePublicationPolicy.objects.get(
+            scope_type=stable_models.RaceLivePublicationScopeType.EVENT,
+            scope_key=str(event.pk),
+        )
+        event_policy.version += 1
+        event_policy.save(update_fields=("version", "updated_at"))
+
+        detail = race_events.resolve_race_live_public_read(
+            event_id=event.pk,
+            now=self.NOW,
+        )
+        bulk = race_events.resolve_race_live_public_reads(
+            event_ids=[event.pk],
+            now=self.NOW,
+        )[event.pk]
+
+        self.assertFalse(detail.visible)
+        self.assertFalse(bulk.visible)
+        self.assertEqual(detail.reason, "official_publication_audit_mismatch")
+        self.assertEqual(bulk, detail)
+
+    def test_official_policy_digest_drift_hides_detail_and_bulk_reads(self):
+        event = self._event_with_revision("i" * 8, "official")
+        event_policy = stable_models.RaceLivePublicationPolicy.objects.get(
+            scope_type=stable_models.RaceLivePublicationScopeType.EVENT,
+            scope_key=str(event.pk),
+        )
+        event_policy.registry_digest = "8" * 64
+        event_policy.save(update_fields=("registry_digest", "updated_at"))
+
+        detail = race_events.resolve_race_live_public_read(
+            event_id=event.pk,
+            now=self.NOW,
+        )
+        bulk = race_events.resolve_race_live_public_reads(
+            event_ids=[event.pk],
+            now=self.NOW,
+        )[event.pk]
+
+        self.assertFalse(detail.visible)
+        self.assertFalse(bulk.visible)
+        self.assertEqual(detail.reason, "policy_registry_digest_mismatch")
+        self.assertEqual(bulk, detail)
+
+    def test_official_allowlist_audit_drift_hides_detail_and_bulk_reads(self):
+        event = self._event_with_revision("w" * 8, "official")
+        allowlist = stable_models.RaceLiveEventPublicationAllowlist.objects.get(
+            event=event,
+        )
+        allowlist.version += 1
+        allowlist.save(update_fields=("version", "updated_at"))
+
+        detail = race_events.resolve_race_live_public_read(
+            event_id=event.pk,
+            now=self.NOW,
+        )
+        bulk = race_events.resolve_race_live_public_reads(
+            event_ids=[event.pk],
+            now=self.NOW,
+        )[event.pk]
+
+        self.assertFalse(detail.visible)
+        self.assertFalse(bulk.visible)
+        self.assertEqual(detail.reason, "official_publication_audit_mismatch")
+        self.assertEqual(bulk, detail)
+
+    def test_official_route_digest_drift_hides_detail_and_bulk_reads(self):
+        event = self._event_with_revision("d" * 8, "official")
+        publication = stable_models.RaceEventRevisionPublication.objects.get(
+            revision__event=event,
+        )
+        publication.registry_digest = "9" * 64
+        publication.save(update_fields=("registry_digest",))
+
+        detail = race_events.resolve_race_live_public_read(
+            event_id=event.pk,
+            now=self.NOW,
+        )
+        bulk = race_events.resolve_race_live_public_reads(
+            event_ids=[event.pk],
+            now=self.NOW,
+        )[event.pk]
+
+        self.assertFalse(detail.visible)
+        self.assertFalse(bulk.visible)
+        self.assertEqual(detail.reason, "official_publication_audit_mismatch")
+        self.assertEqual(bulk, detail)
 
     def test_shadow_revision_never_leaks_a_public_live_status_badge(self):
         event = self._event_with_revision("h" * 8, "provisional", published=False)
@@ -3661,6 +4465,32 @@ class RaceLivePublicStatusTests(TestCase):
             len(captured),
             12,
             f"赛事日历 live read gate 查询数不应随 40 场赛事线性增长，实际 {len(captured)}",
+        )
+
+    def test_calendar_official_read_gate_query_count_is_bounded_for_full_page(self):
+        events = [
+            self._event_with_revision(
+                f"calendar-official-query-{index:02d}",
+                "official" if index % 2 == 0 else "corrected",
+            )
+            for index in range(40)
+        ]
+
+        with patch("stable.views.timezone.now", return_value=self.NOW):
+            with CaptureQueriesContext(connection) as captured:
+                response = self.client.get(
+                    reverse("public-race-calendar"),
+                    {"tab": "all"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, events[0].chinese_name)
+        self.assertContains(response, events[-1].chinese_name)
+        self.assertLessEqual(
+            len(captured),
+            20,
+            "40 场 official/corrected 日历 read gate 必须保持有界查询，"
+            f"实际 {len(captured)}",
         )
 
 

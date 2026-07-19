@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
+from io import StringIO
+import json
 import os
 from pathlib import Path
 from threading import Barrier
 import tempfile
 from unittest import skipUnless
+from unittest.mock import patch
 
+from django.core.management import call_command
 from django.db import (
+    DatabaseError,
     close_old_connections,
     connection,
     connections,
@@ -43,6 +49,50 @@ class RaceLivePublicationTransitionPostgresTests(TransactionTestCase):
     _bundle = RaceLivePublicationTransitionTests._bundle
     _loaded = RaceLivePublicationTransitionTests._loaded
     _provider_snapshot = RaceLivePublicationTransitionTests._provider_snapshot
+
+    def test_rollback_validator_transaction_is_database_read_only(self):
+        payload = {
+            "event_id": self.event.pk,
+            "expected_provisional_revision_id": self.result_revision.pk,
+            "planned_policy_snapshot": {},
+            "expected_allowlist_version": self.allowlist.version,
+            "expected_publication_id": 1,
+        }
+        data = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "rollback-manifest.json"
+            path.write_bytes(data)
+            digest = hashlib.sha256(data).hexdigest()
+
+            def attempt_write(**_kwargs):
+                models.OperationLog.objects.create(
+                    action_type="validator_must_be_read_only",
+                    target_type="race_event",
+                    target_id=str(self.event.pk),
+                )
+
+            with patch(
+                "stable.management.commands.validate_race_live_rollback_target.validate_race_live_provisional_rollback_target",
+                side_effect=attempt_write,
+            ):
+                with self.assertRaises(DatabaseError):
+                    call_command(
+                        "validate_race_live_rollback_target",
+                        "--manifest",
+                        str(path),
+                        "--expected-manifest-sha256",
+                        digest,
+                        stdout=StringIO(),
+                    )
+        self.assertFalse(
+            models.OperationLog.objects.filter(
+                action_type="validator_must_be_read_only"
+            ).exists()
+        )
 
     def test_runner_claim_and_operator_promotion_share_lock_order_without_deadlock(self):
         manifest = self._loaded(self._bundle()["promotion"])

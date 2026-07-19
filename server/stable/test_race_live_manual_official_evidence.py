@@ -26,6 +26,7 @@ from django.db import (
 )
 from django.test import TransactionTestCase, override_settings
 from stable import models
+from stable.services import race_events
 from stable.services.race_live_manual_official_evidence import (
     RaceLiveManualOfficialEvidenceError,
     apply_race_live_manual_official_evidence,
@@ -320,7 +321,7 @@ class RaceLiveManualOfficialEvidenceTests(
         )
         return other_event, result, incident
 
-    def test_apply_rejects_other_event_even_with_complete_open_incident(self):
+    def test_apply_accepts_another_event_with_a_complete_matching_open_incident(self):
         self._promote()
         other_event, other_revision, other_incident = (
             self._create_other_event_open_incident()
@@ -349,12 +350,14 @@ class RaceLiveManualOfficialEvidenceTests(
             + b"\n"
         ).hexdigest()
 
-        with self.assertRaises(RaceLiveManualOfficialEvidenceError):
-            apply_race_live_manual_official_evidence(
-                receipt=receipt,
-                receipt_sha256=digest,
-                now=self.NOW.replace(minute=31),
-            )
+        result = apply_race_live_manual_official_evidence(
+            receipt=receipt,
+            receipt_sha256=digest,
+            now=self.NOW.replace(minute=31),
+        )
+
+        self.assertEqual(result["event_ids"], [other_event.pk])
+        self.assertEqual(result["outcome"], "unavailable")
 
     def test_match_creates_minimal_official_evidence_resolves_incident_and_keeps_page_provisional(self):
         _, incident = self._promote()
@@ -415,6 +418,99 @@ class RaceLiveManualOfficialEvidenceTests(
         )
         incident.refresh_from_db()
         self.assertEqual(incident.resolved_at, self.NOW.replace(minute=31))
+
+    def test_staged_official_revision_publishes_after_exact_authorization(self):
+        _, incident = self._promote()
+        temporary, _, receipt, digest = self._receipt(
+            self._submission(incident),
+            run_id="manual-staged-then-authorized",
+        )
+        self.addCleanup(temporary.cleanup)
+        first_result = apply_race_live_manual_official_evidence(
+            receipt=receipt,
+            receipt_sha256=digest,
+            now=self.NOW.replace(minute=31),
+        )
+        self.assertEqual(first_result["comparison"], "match")
+        staged = models.RaceEventRevision.objects.get(
+            event=self.event,
+            phase=models.RaceResultPhase.OFFICIAL,
+        )
+        self.assertIsNone(staged.published_at)
+        self.control.refresh_from_db()
+        self.assertEqual(
+            self.control.current_result_revision_id,
+            self.result_revision.pk,
+        )
+
+        for policy in models.RaceLivePublicationPolicy.objects.filter(
+            scope_type__in=(
+                models.RaceLivePublicationScopeType.GLOBAL,
+                models.RaceLivePublicationScopeType.REGION,
+                models.RaceLivePublicationScopeType.EVENT,
+            )
+        ):
+            policy.mode = models.RaceLivePublicationMode.OFFICIAL_PUBLIC
+            policy.version += 1
+            policy.save(update_fields=("mode", "version", "updated_at"))
+        self.allowlist.refresh_from_db()
+        call_command(
+            "authorize_race_live_official_publication",
+            "--event-id",
+            str(self.event.pk),
+            "--max-phase",
+            models.RaceResultPhase.OFFICIAL,
+            "--valid-until",
+            (self.NOW + timedelta(days=10)).isoformat(),
+            "--expected-version",
+            "0",
+            "--apply",
+            "--confirm",
+            f"AUTHORIZE_OFFICIAL_EVENT_{self.event.pk}",
+            stdout=StringIO(),
+        )
+        staged.refresh_from_db()
+        self.control.refresh_from_db()
+        self.tracking.refresh_from_db()
+        self.assertEqual(
+            self.control.current_result_revision_id,
+            staged.pk,
+        )
+        self.assertEqual(
+            self.tracking.state,
+            models.RaceEventLiveState.OFFICIAL_RESULT,
+        )
+        publication = models.RaceEventRevisionPublication.objects.get(
+            revision=staged
+        )
+        self.assertEqual(publication.authorization_kind, "official_route")
+        self.assertEqual(publication.official_authorization_version, 1)
+        self.assertEqual(
+            publication.allowlist_version,
+            self.allowlist.version,
+        )
+        self.assertEqual(
+            publication.policy_versions,
+            [
+                list(row)
+                for row in race_events.resolve_race_live_official_coarse_policy(
+                    event_id=self.event.pk,
+                    now=self.NOW.replace(minute=32),
+                ).policy_versions
+            ],
+        )
+        self.assertTrue(
+            race_events.resolve_race_live_public_read(
+                event_id=self.event.pk,
+                now=self.NOW.replace(minute=32),
+            ).visible
+        )
+        self.assertTrue(
+            models.RaceEventResult.objects.filter(
+                event=self.event,
+                is_confirmed=True,
+            ).exists()
+        )
 
     def test_replay_fails_closed_when_recorded_post_state_has_drifted(self):
         _, incident = self._promote()

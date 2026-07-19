@@ -38,6 +38,26 @@ _SYNC_ENDPOINTS = (
 )
 _ENDPOINTS = _PROOF_ENDPOINTS + _SYNC_ENDPOINTS
 _MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+_REGION_CODES = {
+    "united_kingdom": "gb",
+    "france": "fr",
+    "hong_kong": "hk",
+    "japan": "jpn",
+    "united_states": "usa",
+}
+_ROUTE_CONTRACTS = {
+    "racecards_free": {
+        "path": "/v1/racecards/free",
+        "day": ["today", "tomorrow"],
+        "limit": [500],
+        "skip": [0],
+    },
+    "results_today_free": {
+        "path": "/v1/results/today/free",
+        "limit": [50],
+        "skip": list(range(0, 500, 50)),
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -124,7 +144,7 @@ def _read_registry_contract(
         raise ValueError("source registry must be valid JSON") from exc
     if not isinstance(registry, dict):
         raise ValueError("source registry must be an object")
-    required = {
+    required_v1 = {
         "schema_version",
         "source_key",
         "host",
@@ -136,10 +156,20 @@ def _read_registry_contract(
         "evidence",
         "endpoints",
     }
-    if set(registry) != required:
+    required_v2 = (
+        required_v1
+        - {"endpoints"}
+        | {"allowed_region_codes", "route_contracts"}
+    )
+    schema_version = registry.get("schema_version")
+    if (
+        schema_version == 1
+        and set(registry) != required_v1
+    ) or (
+        schema_version == 2
+        and set(registry) != required_v2
+    ) or schema_version not in {1, 2}:
         raise ValueError("source registry keys do not match the proof contract")
-    if registry["schema_version"] != 1:
-        raise ValueError("unsupported source registry schema")
     if registry["source_key"] != "the_racing_api" or registry["host"] != _HOST:
         raise PermissionError("source registry identity is not approved")
     if registry["terms_status"] != "approved":
@@ -192,12 +222,68 @@ def _read_registry_contract(
         or registry_budget > len(_PROOF_ENDPOINTS)
     ):
         raise ValueError("source registry max_requests must be between 1 and 3")
-    expected_endpoints = [
-        {"name": name, "path": path} for name, path in _ENDPOINTS
-    ]
-    if registry["endpoints"] != expected_endpoints:
-        raise PermissionError("source registry endpoints do not match the allowlist")
+    if schema_version == 1:
+        expected_endpoints = [
+            {"name": name, "path": path} for name, path in _ENDPOINTS
+        ]
+        if registry["endpoints"] != expected_endpoints:
+            raise PermissionError(
+                "source registry endpoints do not match the allowlist"
+            )
+    else:
+        if registry["allowed_region_codes"] != _REGION_CODES:
+            raise PermissionError(
+                "source registry region codes do not match the allowlist"
+            )
+        if registry["route_contracts"] != _ROUTE_CONTRACTS:
+            raise PermissionError(
+                "source registry route contracts do not match the allowlist"
+            )
     return registry, digest
+
+
+def build_the_racing_api_route_url(
+    *,
+    registry: dict[str, Any],
+    route_name: str,
+    region: str,
+    limit: int,
+    skip: int,
+    day: str | None = None,
+) -> str:
+    """Build one canonical URL from the reviewed registry v2 contract."""
+    if (
+        not isinstance(registry, dict)
+        or registry.get("schema_version") != 2
+        or registry.get("source_key") != "the_racing_api"
+        or registry.get("host") != _HOST
+        or registry.get("allowed_region_codes") != _REGION_CODES
+        or registry.get("route_contracts") != _ROUTE_CONTRACTS
+    ):
+        raise PermissionError("source registry v2 contract is invalid")
+    region_code = _REGION_CODES.get(region)
+    contract = _ROUTE_CONTRACTS.get(route_name)
+    if region_code is None or contract is None:
+        raise ValueError("region or route is not allowed")
+    if (
+        isinstance(limit, bool)
+        or limit not in contract["limit"]
+        or isinstance(skip, bool)
+        or skip not in contract["skip"]
+    ):
+        raise ValueError("route pagination is outside the contract")
+    if route_name == "racecards_free":
+        if day not in contract["day"]:
+            raise ValueError("racecard day is outside the contract")
+        query = (
+            f"day={day}&region_codes={region_code}"
+            f"&limit={limit}&skip={skip}"
+        )
+    else:
+        if day is not None:
+            raise ValueError("results route does not accept day")
+        query = f"limit={limit}&skip={skip}"
+    return f"https://{_HOST}{contract['path']}?{query}"
 
 
 def _read_registry(
@@ -535,11 +621,29 @@ def the_racing_api_transport(
     allow_redirects: bool,
 ) -> RaceLiveProofHttpResponse:
     parsed = urlsplit(url)
-    allowed_endpoints = dict(_ENDPOINTS)
     request_path = parsed.path + (f"?{parsed.query}" if parsed.query else "")
+    allowed_requests = set(_ENDPOINTS)
+    for region_code in _REGION_CODES.values():
+        for day in ("today", "tomorrow"):
+            allowed_requests.add(
+                (
+                    f"racecards_sync_{day}",
+                    (
+                        "/v1/racecards/free"
+                        f"?day={day}&region_codes={region_code}"
+                        "&limit=500&skip=0"
+                    ),
+                )
+            )
+    for skip in range(0, 500, 50):
+        allowed_requests.add(
+            (
+                "results_today",
+                f"/v1/results/today/free?limit=50&skip={skip}",
+            )
+        )
     if (
-        endpoint_name not in allowed_endpoints
-        or request_path != allowed_endpoints.get(endpoint_name)
+        (endpoint_name, request_path) not in allowed_requests
         or parsed.scheme != "https"
         or parsed.hostname != _HOST
         or parsed.port not in (None, 443)

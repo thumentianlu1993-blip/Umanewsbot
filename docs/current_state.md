@@ -2007,3 +2007,35 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - `.env` 备份为 `.env.backup.main-3939992c-20260713_185140`。数据库备份为 `backups/db/pre-main-3939992c-20260713_185140.sql.gz`，大小 `125,782,755` bytes，SHA-256 `21903cf8d9494ef6053414a34c2e2f6ab01406b9ffebcf56ff3fd10eedfc0967`，`gzip -t` 通过；旧镜像回滚标签为 `umanewsbot:rollback-pre-3939992c-20260713_185140`。
 - 无待应用迁移；Django check、静态资源、worker ping、内外 healthz、首页、赛事页和近期错误日志均通过。常驻历史写入/网络、历史公开、多地区归属及相关地区查询开关继续关闭。
 - 该镜像切换步骤本身没有执行 batch003 写入；随后历史线程已按独立 approval、备份和门禁完成上方 250/250 正式导入。旧的 `249 candidate / 1 Hampton gap` 预期已经作废。
+
+## 2026-07-19 五地区准实时公开 Beta 首次 review findings 已修复，待限定复审
+
+- 独立 worktree 已形成五地区代码候选：TRA 自动链只负责合资格 event 的暂定赛果；英国、
+  法国、香港、日本 JRA/NAR、美国官方 route 只以 manual-browser receipt 做正式/改判
+  复核，`automation_allowed=false`。香港和日本资格矩阵均为
+  `G1/G2/G3 + JpnI/II/III + JG1/2/3`，未知/Listed/Open fail-closed。
+- 正式 receipt 可先形成 immutable staged revision；没有精确 event authorization 时，
+  current pointer 和前台继续保持 provisional。authorization 命令只有在 global/region/
+  event official coarse gate、TRA source provisional gate、allowlist、route、terms 和
+  marker evidence 全部一致时，才会把同一 staged revision 发布为 official/corrected，
+  并同步 publication audit、tracking、legacy projection 和 public read。
+- broad scope/official authorization 的 apply 均要求真实
+  `scheduler=false`、`monitor=false`、全库 active claim 为 0，并在写事务内重新检查。
+  rollback 候选新增 filtered PostgreSQL-only env、不可变 image ID、manifest/env SHA、
+  PostgreSQL read-only validator、maintenance-off provisional pointer restore 和
+  coarse-then-event policy CAS；任何漂移保持隐藏且零业务写入。
+- 首次独立代码 review 返回 `CHANGES_REQUIRED`；已按真实 RED 修复 official bulk read
+  N+1、原始分页截断、pagination checkpoint/monitor 分类和十页 fetch/Celery 时间预算。
+  当前完整准实时 SQLite 专项 `353 tests OK (14 skipped)`，一次性本地
+  PostgreSQL 16 专项 `25 tests OK`，测试数据库和容器已删除；Django check、migration
+  drift、compileall、三份 Compose、JSON 和 diff whitespace 均通过。此前候选镜像
+  `sha256:193c0d591da3fd55a11607ebe7ebfafccc949efd33c4efddb529ea2d91da6b60`
+  已因受审内容变化而作废；修复后的本地复审候选镜像为
+  `sha256:7764a332fba2991be4a4c2f70814d727ba910c68005f19de579e4900c962960c`，
+  容器内 Django check 与 `165/180/210/240` 秒 budget/soft/hard/claim TTL 契约通过，
+  但它仍不是最终发布镜像。全仓测试的历史 runner macOS 路径/命令环境失败已与未改动
+  `origin/main@566a9b10` 对照复现，不纳入本需求回归修复。当前等待同一 reviewer
+  限定复审；尚未取得成功 review、fingerprint 冻结或发布授权。
+- 本候选**未 commit、未 push、未部署、未迁移生产、未购买订阅、未开启 scheduler/
+  monitor/新增地区或公开范围，也未连接生产写入**。生产真实状态继续以上一条已发布
+  race-live 安全基线为准；本节只描述待审核预期。

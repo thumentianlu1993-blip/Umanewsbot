@@ -5037,3 +5037,30 @@ python manage.py evaluate_multiregion_attribution_gold \
 7. 每个 scope 要求 `complete + gap = scope` 且二者无交集。gap 记录来源/ledger/cache/target identity 后继续其他 scope；汇总时分别报告 accounted rate 与 data complete rate，日美零星缺口留到全量正式总账完成后统一审核。
 8. 日期候选、详情来源、最终详情三阶段分别执行 dry-run；每次 commit 前独立创建并校验数据库备份，commit 使用 `network=false/write=true`，写后运行正式只读 verifier。任一 `error>0`、published>0、身份漂移或锁/事务异常即停止。
 9. 全批收口核对 1061 targets、五地区 events/runners/results、gap 清单、OperationLog、runner/checkpoint、Redis/Celery/事务和 healthz。常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`、`RACE_EVENT_HISTORICAL_PUBLIC_ENABLED=false`，直到用户统一审核并另行批准公开。
+
+## 2026-07-19 五地区准实时公开 Beta 待发布运行约束
+
+本节是尚未发布候选的预期运行手册；在独立 review 和当前冻结版本授权前不得执行生产
+命令。完整 gate、manifest schema 和 Docker one-shot 模板以
+`docs/changes/five-region-race-live-public-beta/rollout.md` 为准。
+
+1. 初次部署必须保持 `RACE_LIVE_SCHEDULER_ENABLED=false`、
+   `RACE_LIVE_MONITOR_ENABLED=false`、`RACE_LIVE_ENABLED_REGIONS=`；部署代码不自动扩大
+   event allowlist 或公开范围。
+2. official authorization 和 broad scope apply 前停止读取这些设置的 Beat/worker，
+   排空 `race_live` queue，并确认数据库所有 `RaceEventLiveTracking.active_attempt_token`
+   为空；管理命令会在事务内再次 fail-closed 检查。
+3. manual official receipt 没有 authorization 时只保存 staged immutable revision，
+   provisional 页面不变；授权命令可在门禁齐备后发布该 staged revision，禁止重造 revision
+   或手工改 current pointer。
+4. release artifact 必须保存 reviewed release image 的完整本机 image ID、filtered env
+   SHA、rollback manifest SHA 和旧 image。one-shot 只允许
+   `/app/scripts/run_race_live_rollback_one_shot.py --command
+   validate|restore-result|restore-policies-coarse|restore-policy-event`，不得引用 mutable tag。
+5. rollback filtered env 只含 PostgreSQL 七项连接字段及受审固定安全值，精确包含
+   `DB_ENGINE=postgres` 和
+   `SECRET_KEY=fixed-race-live-rollback-validation-key`；env/manifest 均须 root `0600`
+   普通非 symlink 文件。validator 使用 PostgreSQL read-only transaction。
+6. emergency restore 全程保持四层 maintenance off：先恢复 dedicated provisional
+   pointer/legacy/tracking，再只恢复 global/region/source，第二次只读校验后最后恢复
+   event policy。失败时 event 继续隐藏。

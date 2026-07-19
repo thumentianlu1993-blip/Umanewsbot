@@ -541,6 +541,28 @@ class RaceLivePublicationScopeType(models.TextChoices):
     EVENT = "event", "赛事"
 
 
+class RaceLivePublicationAuthorizationKind(models.TextChoices):
+    PROVISIONAL_POLICY = "provisional_policy", "暂定赛果策略"
+    OFFICIAL_ROUTE = "official_route", "官方来源授权"
+
+
+class RaceLiveAlertType(models.TextChoices):
+    PROVISIONAL_OVERDUE = "provisional_overdue", "暂定赛果逾期"
+    OFFICIAL_OVERDUE = "official_overdue", "正式赛果逾期"
+    SOURCE_FAILURES = "source_failures", "来源连续失败"
+    PAGINATION_OVERFLOW = "pagination_overflow", "分页越界"
+    HOST_CIRCUIT = "host_circuit", "来源熔断"
+    QUEUE_AGE = "queue_age", "队列积压"
+
+
+class RaceLiveAlertIncidentStatus(models.TextChoices):
+    OPEN = "open", "待处理"
+    SENDING = "sending", "发送中"
+    SENT = "sent", "已发送"
+    FAILED = "failed", "发送失败"
+    RESOLVED = "resolved", "已解决"
+
+
 class RaceSourceTermsStatus(models.TextChoices):
     UNKNOWN = "unknown", "未知"
     APPROVED = "approved", "已批准"
@@ -1140,6 +1162,13 @@ class RaceEventProjectionControl(TimestampedModel):
         null=True,
         blank=True,
         related_name="last_known_good_result_projection_controls",
+    )
+    last_provisional_result_revision = models.ForeignKey(
+        "RaceEventRevision",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="last_provisional_result_projection_controls",
     )
 
     class Meta:
@@ -1744,12 +1773,134 @@ class RaceEventRevisionPublication(TimestampedModel):
     allowlist_version = models.PositiveBigIntegerField(default=1)
     registry_digest = models.CharField(max_length=64, blank=True, default="")
     coverage_proof_digest = models.CharField(max_length=64, blank=True, default="")
+    authorization_kind = models.CharField(
+        max_length=24,
+        choices=RaceLivePublicationAuthorizationKind.choices,
+        default=RaceLivePublicationAuthorizationKind.PROVISIONAL_POLICY,
+    )
+    official_authorization_version = models.PositiveBigIntegerField(default=0)
 
     class Meta:
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(allowlist_version__gte=1),
                 name="race_pub_allow_version_gte1",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    authorization_kind__in=(
+                        RaceLivePublicationAuthorizationKind.values
+                    )
+                ),
+                name="race_pub_auth_kind_valid",
+            ),
+        ]
+
+
+class RaceLiveOfficialPublicationAuthorization(TimestampedModel):
+    event = models.OneToOneField(
+        RaceEvent,
+        on_delete=models.CASCADE,
+        related_name="official_publication_authorization",
+    )
+    source_key = models.CharField(max_length=64)
+    route = models.CharField(max_length=255)
+    route_version = models.CharField(max_length=64)
+    route_registry_digest = models.CharField(max_length=64)
+    contract_digest = models.CharField(max_length=64)
+    terms_evidence_digest = models.CharField(max_length=64)
+    coverage_proof_digest = models.CharField(max_length=64)
+    max_phase = models.CharField(
+        max_length=16,
+        choices=(
+            (RaceResultPhase.OFFICIAL, "正式"),
+            (RaceResultPhase.CORRECTED, "改判"),
+        ),
+        default=RaceResultPhase.OFFICIAL,
+    )
+    enabled = models.BooleanField(default=False)
+    version = models.PositiveBigIntegerField(default=1)
+    valid_until = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(source_key=""),
+                name="race_official_auth_src_nonempty",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(route=""),
+                name="race_official_auth_route_nonempty",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    max_phase__in=(
+                        RaceResultPhase.OFFICIAL,
+                        RaceResultPhase.CORRECTED,
+                    )
+                ),
+                name="race_official_auth_phase_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(version__gte=1),
+                name="race_official_auth_version_gte1",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(route_registry_digest__regex=r"^[0-9a-f]{64}$")
+                    & models.Q(contract_digest__regex=r"^[0-9a-f]{64}$")
+                    & models.Q(terms_evidence_digest__regex=r"^[0-9a-f]{64}$")
+                    & models.Q(coverage_proof_digest__regex=r"^[0-9a-f]{64}$")
+                ),
+                name="race_official_auth_digests_valid",
+            ),
+        ]
+
+
+class RaceLiveAlertIncident(TimestampedModel):
+    alert_type = models.CharField(max_length=32, choices=RaceLiveAlertType.choices)
+    scope_type = models.CharField(max_length=32)
+    scope_key = models.CharField(max_length=255)
+    reference_version = models.CharField(max_length=128, blank=True)
+    dedupe_key = models.CharField(max_length=64, unique=True)
+    status = models.CharField(
+        max_length=16,
+        choices=RaceLiveAlertIncidentStatus.choices,
+        default=RaceLiveAlertIncidentStatus.OPEN,
+    )
+    deadline_at = models.DateTimeField(null=True, blank=True)
+    opened_at = models.DateTimeField(null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    next_attempt_at = models.DateTimeField(null=True, blank=True)
+    delivery_attempts = models.PositiveIntegerField(default=0)
+    delivery_token = models.CharField(max_length=64, blank=True)
+    delivery_lease_expires_at = models.DateTimeField(null=True, blank=True)
+    alert_sent_at = models.DateTimeField(null=True, blank=True)
+    last_error_code = models.CharField(max_length=64, blank=True)
+    details = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(alert_type__in=RaceLiveAlertType.values),
+                name="race_alert_type_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=RaceLiveAlertIncidentStatus.values
+                ),
+                name="race_alert_status_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("status", "next_attempt_at"),
+                name="race_alert_delivery_due_idx",
+            ),
+            models.Index(
+                fields=("alert_type", "scope_type", "scope_key"),
+                name="race_alert_scope_idx",
             ),
         ]
 

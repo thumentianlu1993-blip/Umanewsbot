@@ -101,7 +101,12 @@ class RaceLivePublicationTransitionTests(TestCase):
             models.RaceLivePublicationPolicy.objects.create(
                 scope_type=scope_type,
                 scope_key=scope_key,
-                mode=models.RaceLivePublicationMode.SHADOW,
+                mode=(
+                    models.RaceLivePublicationMode.SHADOW
+                    if scope_type
+                    == models.RaceLivePublicationScopeType.EVENT
+                    else models.RaceLivePublicationMode.PROVISIONAL_PUBLIC
+                ),
                 version=1,
                 registry_digest=self.REGISTRY_DIGEST,
                 coverage_proof_digest=self.COVERAGE_DIGEST,
@@ -251,6 +256,91 @@ class RaceLivePublicationTransitionTests(TestCase):
             "stale_at",
         ).get(pk=self.tracking.pk)
 
+    def _create_unrelated_live_event(self):
+        event = models.RaceEvent.objects.create(
+            id=925,
+            year=2026,
+            slug="unrelated-event-925",
+            original_name="Unrelated Event 925",
+            chinese_name="无关赛事 925",
+            country_region=models.RacingRegion.FRANCE,
+            racecourse="ParisLongchamp",
+            grade_text="G2",
+            surface=models.RaceEventSurface.TURF,
+            race_datetime=self.NOW + timedelta(days=1),
+        )
+        models.RaceEventProjectionControl.objects.create(event=event)
+        tracking = models.RaceEventLiveTracking.objects.create(
+            event=event,
+            state=models.RaceEventLiveState.RACECARD_READY,
+            tracking_enabled=True,
+            next_poll_at=self.NOW + timedelta(hours=1),
+        )
+        models.RaceLivePublicationPolicy.objects.create(
+            scope_type=models.RaceLivePublicationScopeType.EVENT,
+            scope_key=str(event.pk),
+            mode=models.RaceLivePublicationMode.SHADOW,
+            version=1,
+            registry_digest=self.REGISTRY_DIGEST,
+            coverage_proof_digest=self.COVERAGE_DIGEST,
+            valid_until=self.NOW + timedelta(days=20),
+        )
+        models.RaceLiveEventPublicationAllowlist.objects.create(
+            event=event,
+            source_key="the_racing_api",
+            max_mode=models.RaceLivePublicationMode.PROVISIONAL_PUBLIC,
+            coverage_proof_digest=self.COVERAGE_DIGEST,
+            official_verification_route="france_galop_manual_verification",
+            official_verification_route_version="france-galop-manual-v1",
+            official_verification_valid_until=self.NOW + timedelta(days=20),
+            enabled=True,
+        )
+        return event, tracking
+
+    def test_event_promotion_preserves_an_unrelated_live_event(self):
+        unrelated_event, unrelated_tracking = (
+            self._create_unrelated_live_event()
+        )
+        before = {
+            "tracking": models.RaceEventLiveTracking.objects.values().get(
+                pk=unrelated_tracking.pk
+            ),
+            "allowlist": models.RaceLiveEventPublicationAllowlist.objects.values().get(
+                event=unrelated_event
+            ),
+            "policy": models.RaceLivePublicationPolicy.objects.values().get(
+                scope_type=models.RaceLivePublicationScopeType.EVENT,
+                scope_key=str(unrelated_event.pk),
+            ),
+        }
+        manifest = self._loaded(self._bundle()["promotion"])
+
+        apply_race_live_publication_transition(manifest, now=self.NOW)
+
+        after = {
+            "tracking": models.RaceEventLiveTracking.objects.values().get(
+                pk=unrelated_tracking.pk
+            ),
+            "allowlist": models.RaceLiveEventPublicationAllowlist.objects.values().get(
+                event=unrelated_event
+            ),
+            "policy": models.RaceLivePublicationPolicy.objects.values().get(
+                scope_type=models.RaceLivePublicationScopeType.EVENT,
+                scope_key=str(unrelated_event.pk),
+            ),
+        }
+        self.assertEqual(after, before)
+
+    def test_unrelated_scope_drift_invalidates_prepared_event_manifest(self):
+        _, unrelated_tracking = self._create_unrelated_live_event()
+        manifest = self._loaded(self._bundle()["promotion"])
+        models.RaceEventLiveTracking.objects.filter(
+            pk=unrelated_tracking.pk
+        ).update(next_poll_at=self.NOW + timedelta(hours=2))
+
+        with self.assertRaises(RaceLivePublicationTransitionError):
+            dry_run_race_live_publication_transition(manifest)
+
     def test_promotion_uses_persisted_shadow_without_claim_network_or_provider_timing_mutation(self):
         bundle = self._bundle()
         manifest = self._loaded(bundle["promotion"])
@@ -275,19 +365,23 @@ class RaceLivePublicationTransitionTests(TestCase):
         self.assertIsNone(self.event.result_confirmed_at)
         self.result_revision.refresh_from_db()
         self.assertEqual(self.result_revision.published_at, self.NOW)
+        policy_states = {
+            row.scope_type: (row.mode, row.version)
+            for row in models.RaceLivePublicationPolicy.objects.all()
+        }
         self.assertEqual(
-            list(
-                models.RaceLivePublicationPolicy.objects.order_by(
-                    "scope_type"
-                ).values_list("mode", "version")
-            ),
-            [
-                (models.RaceLivePublicationMode.PROVISIONAL_PUBLIC, 2),
-                (models.RaceLivePublicationMode.PROVISIONAL_PUBLIC, 2),
-                (models.RaceLivePublicationMode.PROVISIONAL_PUBLIC, 2),
-                (models.RaceLivePublicationMode.PROVISIONAL_PUBLIC, 2),
-            ],
+            policy_states[models.RaceLivePublicationScopeType.EVENT],
+            (models.RaceLivePublicationMode.PROVISIONAL_PUBLIC, 2),
         )
+        for broad_scope in (
+            models.RaceLivePublicationScopeType.GLOBAL,
+            models.RaceLivePublicationScopeType.REGION,
+            models.RaceLivePublicationScopeType.SOURCE,
+        ):
+            self.assertEqual(
+                policy_states[broad_scope],
+                (models.RaceLivePublicationMode.PROVISIONAL_PUBLIC, 1),
+            )
         self.allowlist.refresh_from_db()
         self.assertEqual(self.allowlist.version, 2)
         self.assertRegex(
@@ -399,7 +493,10 @@ class RaceLivePublicationTransitionTests(TestCase):
                     "mode", flat=True
                 )
             ),
-            {models.RaceLivePublicationMode.SHADOW},
+            {
+                models.RaceLivePublicationMode.SHADOW,
+                models.RaceLivePublicationMode.PROVISIONAL_PUBLIC,
+            },
         )
         self.allowlist.refresh_from_db()
         self.assertEqual(self.allowlist.version, 1)

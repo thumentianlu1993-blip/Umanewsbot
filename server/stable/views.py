@@ -2835,7 +2835,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             status_label, status_detail = {
                 "provisional": ("暂定赛果", "尚待官方来源复核"),
                 "official": ("正式赛果", ""),
-                "corrected": ("更正赛果", ""),
+                "corrected": ("赛果已更正", ""),
             }.get(
                 current_result_revision.phase,
                 ("赛果更新", ""),

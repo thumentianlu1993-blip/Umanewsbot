@@ -9,7 +9,7 @@ exec celery -A app worker \
   --concurrency="${CELERY_RACE_LIVE_WORKER_CONCURRENCY:-1}" \
   --queues="race_live" \
   --prefetch-multiplier=1 \
-  --soft-time-limit="${CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT:-45}" \
-  --time-limit="${CELERY_RACE_LIVE_WORKER_TIME_LIMIT:-60}" \
+  --soft-time-limit="${CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT:-180}" \
+  --time-limit="${CELERY_RACE_LIVE_WORKER_TIME_LIMIT:-210}" \
   --without-gossip \
   --without-mingle

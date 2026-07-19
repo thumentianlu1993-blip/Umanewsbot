@@ -23,6 +23,10 @@ services:
       - .env
     environment:
       RACE_LIVE_SCHEDULER_ENABLED: ${RACE_LIVE_SCHEDULER_ENABLED:-false}
+      RACE_LIVE_MONITOR_ENABLED: ${RACE_LIVE_MONITOR_ENABLED:-false}
+      RACE_LIVE_ENABLED_REGIONS: ${RACE_LIVE_ENABLED_REGIONS:-}
+      RACE_LIVE_TRA_REGISTRY_FILE: ${RACE_LIVE_TRA_REGISTRY_FILE:-/app/runtime/policies/race_live/source_registry_the_racing_api_free.json}
+      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a}
     depends_on:
       - db
       - redis
@@ -40,6 +44,10 @@ services:
       - .env
     environment:
       RACE_LIVE_SCHEDULER_ENABLED: ${RACE_LIVE_SCHEDULER_ENABLED:-false}
+      RACE_LIVE_MONITOR_ENABLED: ${RACE_LIVE_MONITOR_ENABLED:-false}
+      RACE_LIVE_ENABLED_REGIONS: ${RACE_LIVE_ENABLED_REGIONS:-}
+      RACE_LIVE_TRA_REGISTRY_FILE: ${RACE_LIVE_TRA_REGISTRY_FILE:-/app/runtime/policies/race_live/source_registry_the_racing_api_free.json}
+      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a}
     depends_on:
       - db
       - redis
@@ -54,6 +62,10 @@ services:
       - .env
     environment:
       RACE_LIVE_SCHEDULER_ENABLED: ${RACE_LIVE_SCHEDULER_ENABLED:-false}
+      RACE_LIVE_MONITOR_ENABLED: ${RACE_LIVE_MONITOR_ENABLED:-false}
+      RACE_LIVE_ENABLED_REGIONS: ${RACE_LIVE_ENABLED_REGIONS:-}
+      RACE_LIVE_TRA_REGISTRY_FILE: ${RACE_LIVE_TRA_REGISTRY_FILE:-/app/runtime/policies/race_live/source_registry_the_racing_api_free.json}
+      RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a}
     depends_on:
       - db
       - redis

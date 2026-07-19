@@ -877,3 +877,20 @@
 - 第三标准批次首次只读快照为 249 场、`2,635 runners / 2,346 results`，曾把 Hampton 的 Warwick 原场次 `ABANDONED` 误作年度 gap；该快照已隔离，不得审批。
 - 用户提供 Windsor 正式结果后，batch003 已修正为 `250 candidate / 0 gap`、`2638 runners / 2349 results`，并完成 250/250 正式导入。NAR、Zone-Turf、ZEturf URL 身份和 surface 门禁修复继续有效。
 - batch003 来源门禁已合入 `main@3939992c` 并由可复现 AMD64 镜像 `sha256:87c435cf...e78ec` 执行；正式写入后的最终状态以上方“第三标准批次 250 场导入完成”为准，公开状态继续关闭。
+
+## 2026-07-19 五地区准实时赛果公开 Beta 候选状态
+
+- 五地区代码、配置、additive migration、SLA 告警、manual official evidence、正式授权、
+  前台 read gate 和 frozen-image rollback 控制面已进入 review 前候选。
+- 首次独立 review 的四项 finding 已按 RED→GREEN 修复；当前验证为 SQLite 相关
+  `353 tests OK (14 skipped)`、本地 PostgreSQL 16 `25 tests OK`，
+  测试数据库和容器已删除，Django、migration、compileall、Compose、JSON 与 diff
+  静态门禁均通过；本地复审候选镜像
+  `sha256:7764a332fba2991be4a4c2f70814d727ba910c68005f19de579e4900c962960c`
+  的容器内 check、时间参数和 registry/rollback 文件检查通过。
+  受审内容已变化，旧候选镜像与旧 review 结论均不能用于发布，当前等待同一 reviewer
+  限定复审。
+- 当前发布状态是
+  `code candidate / changes fixed / re-review pending / not authorized / not deployed`。
+  各地区真实 `racecard_seen/shadow_result_seen/public_eligible` 仍须按 event 取得证据；
+  代码完成不得写成五地区来源已经上线。

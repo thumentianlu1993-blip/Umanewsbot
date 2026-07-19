@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from celery import shared_task
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 
@@ -32,6 +33,7 @@ from stable.models import (
     QQPushDelivery,
     QQPushDeliveryStatus,
     PushTarget,
+    RaceLiveAlertIncident,
     RacingRegion,
     ReviewMode,
     SourceMode,
@@ -87,7 +89,14 @@ from stable.services.term_discovery import discover_and_aggregate_article
 from stable.services.translation import translate_article
 from stable.services.validation import apply_validation_outcome, validate_rewrite
 from stable.services.external_horse_data import ExternalHorseDataImporter, ImportOptions
-from stable.services.race_events import claim_due_race_event_live_tracking
+from stable.services.race_events import (
+    claim_due_race_event_live_tracking,
+    claim_race_live_alert_delivery,
+    complete_race_event_live_checkpoint,
+    complete_race_live_alert_delivery,
+    resolve_race_live_worker_network_admission,
+    stage_race_live_sla_alerts,
+)
 
 
 User = get_user_model()
@@ -98,11 +107,17 @@ JRA_SKIPPABLE_DETAIL_ERRORS = (ValueError, AttributeError, IndexError, TypeError
 def select_due_race_live_events_task() -> dict:
     if getattr(settings, "RACE_LIVE_SCHEDULER_ENABLED", False) is not True:
         return {"enabled": False, "claimed": 0, "dispatched": 0}
+    enabled_regions = tuple(
+        getattr(settings, "RACE_LIVE_ENABLED_REGIONS", ())
+    )
+    if not enabled_regions:
+        return {"enabled": False, "claimed": 0, "dispatched": 0}
 
     claims = claim_due_race_event_live_tracking(
         now=timezone.now(),
         batch_size=settings.RACE_LIVE_SELECTOR_BATCH_SIZE,
         ttl_seconds=settings.RACE_LIVE_CLAIM_TTL_SECONDS,
+        enabled_regions=enabled_regions,
     )
     for claim in claims:
         dispatch_kwargs = {
@@ -137,6 +152,38 @@ def poll_race_live_event_task(
         }
 
     if runner_mode == "the_racing_api_free":
+        enabled_regions = tuple(
+            getattr(settings, "RACE_LIVE_ENABLED_REGIONS", ())
+        )
+        admission_now = timezone.now()
+        admission = resolve_race_live_worker_network_admission(
+            event_id=event_id,
+            expected_owner_generation=expected_owner_generation,
+            expected_claim_generation=expected_claim_generation,
+            attempt_token=attempt_token,
+            enabled_regions=enabled_regions,
+            now=admission_now,
+        )
+        if admission.allowed is not True:
+            complete_race_event_live_checkpoint(
+                event_id=event_id,
+                expected_owner_generation=expected_owner_generation,
+                expected_claim_generation=expected_claim_generation,
+                attempt_token=attempt_token,
+                now=admission_now,
+                success=False,
+                next_poll_at=admission_now + timedelta(minutes=5),
+                checkpoint_payload={
+                    "status": "network_admission_rejected",
+                    "reason": admission.reason,
+                },
+                observation_sha256="",
+            )
+            return {
+                "processed": False,
+                "reason": f"network_admission_{admission.reason}",
+                "event_id": event_id,
+            }
         from stable.services.race_live_runner import (
             run_race_live_the_racing_api_free,
         )
@@ -188,6 +235,107 @@ def poll_race_live_event_task(
         fixture_root=getattr(settings, "RACE_LIVE_OFFLINE_FIXTURE_ROOT", ""),
         configured_mode=runner_mode,
     )
+
+
+@shared_task
+def monitor_race_live_sla_task() -> dict:
+    if getattr(settings, "RACE_LIVE_MONITOR_ENABLED", False) is not True:
+        return {"enabled": False, "staged": 0, "dispatched": 0}
+    enabled_regions = tuple(
+        getattr(settings, "RACE_LIVE_ENABLED_REGIONS", ())
+    )
+    if not enabled_regions:
+        return {"enabled": False, "staged": 0, "dispatched": 0}
+    incident_ids = stage_race_live_sla_alerts(
+        now=timezone.now(),
+        enabled_regions=enabled_regions,
+    )
+    for incident_id in incident_ids:
+        transaction.on_commit(
+            lambda value=incident_id: deliver_race_live_alert_task.apply_async(
+                kwargs={"incident_id": value},
+                queue="race_live",
+            )
+        )
+    return {
+        "enabled": True,
+        "staged": len(incident_ids),
+        "dispatched": len(incident_ids),
+    }
+
+
+@shared_task
+def deliver_race_live_alert_task(incident_id: int) -> dict:
+    now = timezone.now()
+    claim = claim_race_live_alert_delivery(
+        incident_id=incident_id,
+        now=now,
+        lease_seconds=300,
+    )
+    if not claim.claimed:
+        return {
+            "delivered": False,
+            "reason": claim.reason,
+            "incident_id": incident_id,
+        }
+    incident = RaceLiveAlertIncident.objects.filter(pk=incident_id).first()
+    recipients = list(
+        getattr(settings, "RACE_LIVE_ALERT_NOTIFY_EMAILS", ()) or ()
+    )
+    delivered = False
+    error_code = ""
+    if incident is None:
+        error_code = "incident_missing_after_claim"
+    elif not recipients:
+        error_code = "recipients_missing"
+    else:
+        details = (
+            incident.details if isinstance(incident.details, dict) else {}
+        )
+        region = str(details.get("region", "unknown"))
+        event_label = str(details.get("event_id", incident.scope_key))
+        event_name = str(details.get("event_name", event_label))
+        route = str(details.get("official_route", "the_racing_api"))
+        try:
+            delivered = (
+                send_mail(
+                    (
+                        f"[UmaFans] 准实时赛果告警 "
+                        f"{incident.alert_type} event {event_label} "
+                        f"{event_name}"
+                    ),
+                    "\n".join(
+                        (
+                            f"地区: {region}",
+                            f"event: {event_label}",
+                            f"赛事: {event_name}",
+                            f"告警: {incident.alert_type}",
+                            f"route: {route}",
+                            f"incident: {incident.pk}",
+                        )
+                    ),
+                    settings.DEFAULT_FROM_EMAIL,
+                    recipients,
+                    fail_silently=False,
+                )
+                == 1
+            )
+            if not delivered:
+                error_code = "smtp_zero_deliveries"
+        except Exception:
+            error_code = "smtp_delivery_failed"
+    completion = complete_race_live_alert_delivery(
+        incident_id=incident_id,
+        delivery_token=claim.delivery_token,
+        now=timezone.now(),
+        delivered=delivered,
+        error_code=error_code,
+    )
+    return {
+        "delivered": delivered and completion.applied,
+        "reason": completion.reason,
+        "incident_id": incident_id,
+    }
 
 
 @shared_task

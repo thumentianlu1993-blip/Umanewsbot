@@ -638,3 +638,52 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
                             max_response_bytes=2 * 1024 * 1024,
                             allow_redirects=False,
                         )
+
+    def test_results_pagination_uses_one_exact_allowlisted_endpoint_name(self):
+        service = self._service()
+        for skip in (0, 50, 450):
+            with self.subTest(skip=skip):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "valid results page reached transport",
+                ):
+                    with patch.object(
+                        service,
+                        "_resolve_public_addresses",
+                        side_effect=RuntimeError(
+                            "valid results page reached transport"
+                        ),
+                    ):
+                        service.the_racing_api_transport(
+                            endpoint_name="results_today",
+                            url=(
+                                "https://api.theracingapi.com"
+                                "/v1/results/today/free"
+                                f"?limit=50&skip={skip}"
+                            ),
+                            username="user",
+                            password="password",
+                            timeout_seconds=15,
+                            max_response_bytes=2 * 1024 * 1024,
+                            allow_redirects=False,
+                        )
+
+        for endpoint_name, skip in (
+            ("results_today_skip_50", 50),
+            ("results_today", 500),
+        ):
+            with self.subTest(endpoint_name=endpoint_name, skip=skip):
+                with self.assertRaises(PermissionError):
+                    service.the_racing_api_transport(
+                        endpoint_name=endpoint_name,
+                        url=(
+                            "https://api.theracingapi.com"
+                            "/v1/results/today/free"
+                            f"?limit=50&skip={skip}"
+                        ),
+                        username="user",
+                        password="password",
+                        timeout_seconds=15,
+                        max_response_bytes=2 * 1024 * 1024,
+                        allow_redirects=False,
+                    )

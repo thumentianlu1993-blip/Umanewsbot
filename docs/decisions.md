@@ -1535,3 +1535,19 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 同一个年度目录 URL 可以服务多个届次年。网络 cache 对 URL 只请求一次，但 ledger 的 target references 必须精确等于 catalog 中所有引用该 URL 的来源 scope 并集；每个 parse shard 仍只输出本 scope targets。
 - France Galop 固定列障碍分组汇总表使用 layout-aware PDF 解析，只补齐逐场详细赛程未覆盖的赛事；同等来源质量下详细赛程优先，汇总摘要不得覆盖详细记录。
 - 完整 catalog/selection 与 scope 副本均可作为 stage 输入，但必须保留全量身份校验。少量匹配歧义、来源失败或确认事项进入 evidence-backed gap，并继续其他 scope；未知 parser、身份漂移或分母缺失仍 fail closed。
+
+## 2026-07-19：五地区暂定赛果可先公开，正式赛果采用独立授权
+
+- TRA 商业 API 的合资格结果可以在完整性、身份、来源权限、event allowlist 和
+  provisional policy 通过后直接显示为“暂定赛果”，不等待官方二次复核。
+- 官方页面只用于客观赛果事实的 manual receipt；用户于 2026-07-19 确认可以使用这些
+  来源，但本期仍固定 `manual_browser_only`、`automation_allowed=false`。permission
+  evidence、terms evidence 和 route contract 使用三个独立 digest，不以 contract digest
+  冒充条款证据。
+- official/corrected receipt 与公开授权分离：receipt 可先保存 staged revision；只有精确
+  event authorization、global/region/event official coarse gate、TRA source
+  provisional gate 和当前 allowlist/audit 全部成立时才发布。缺少授权时 provisional
+  保持可见。
+- emergency rollback 不倒删 additive schema 或审计；页面先在 maintenance off 隐藏，
+  再以 dedicated provisional pointer 原子恢复投影，并按
+  global/region/source -> revalidate -> event 的顺序恢复 policy。

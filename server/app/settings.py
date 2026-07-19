@@ -470,8 +470,28 @@ NEWS_SOURCE_POLL_RUNNING_TIMEOUT_MINUTES = int(env("NEWS_SOURCE_POLL_RUNNING_TIM
 NEWS_SOURCE_POLL_RETRY_STALE_RUNNING = env_bool("NEWS_SOURCE_POLL_RETRY_STALE_RUNNING", False)
 
 RACE_LIVE_SCHEDULER_ENABLED = env_bool("RACE_LIVE_SCHEDULER_ENABLED", False)
+RACE_LIVE_MONITOR_ENABLED = env_bool("RACE_LIVE_MONITOR_ENABLED", False)
+_RACE_LIVE_ALLOWED_REGIONS = {
+    "united_kingdom",
+    "france",
+    "hong_kong",
+    "japan",
+    "united_states",
+}
+RACE_LIVE_ENABLED_REGIONS = tuple(
+    env_list("RACE_LIVE_ENABLED_REGIONS", "")
+)
+if (
+    len(set(RACE_LIVE_ENABLED_REGIONS))
+    != len(RACE_LIVE_ENABLED_REGIONS)
+    or any(
+        region not in _RACE_LIVE_ALLOWED_REGIONS
+        for region in RACE_LIVE_ENABLED_REGIONS
+    )
+):
+    raise ValueError("RACE_LIVE_ENABLED_REGIONS contains an invalid region")
 RACE_LIVE_SELECTOR_BATCH_SIZE = int(env("RACE_LIVE_SELECTOR_BATCH_SIZE", "20"))
-RACE_LIVE_CLAIM_TTL_SECONDS = int(env("RACE_LIVE_CLAIM_TTL_SECONDS", "120"))
+RACE_LIVE_CLAIM_TTL_SECONDS = int(env("RACE_LIVE_CLAIM_TTL_SECONDS", "240"))
 RACE_LIVE_RUNNER_MODE = (
     env("RACE_LIVE_RUNNER_MODE", "disabled") or "disabled"
 ).strip().lower()
@@ -499,6 +519,15 @@ RACE_LIVE_TRA_REGISTRY_FILE = (
 RACE_LIVE_TRA_REGISTRY_SHA256 = (
     env("RACE_LIVE_TRA_REGISTRY_SHA256", "") or ""
 ).strip()
+RACE_LIVE_RESULTS_FETCH_BUDGET_SECONDS = int(
+    env("RACE_LIVE_RESULTS_FETCH_BUDGET_SECONDS", "165")
+)
+CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT = int(
+    env("CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT", "180")
+)
+CELERY_RACE_LIVE_WORKER_TIME_LIMIT = int(
+    env("CELERY_RACE_LIVE_WORKER_TIME_LIMIT", "210")
+)
 
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
@@ -513,17 +542,22 @@ CELERY_TASK_ACKS_LATE = env_bool("CELERY_TASK_ACKS_LATE", True)
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_ROUTES = {
     "stable.tasks.poll_race_live_event_task": {"queue": "race_live"},
+    "stable.tasks.monitor_race_live_sla_task": {"queue": "race_live"},
 }
 CELERY_TASK_ANNOTATIONS = {
     "stable.tasks.poll_race_live_event_task": {
-        "soft_time_limit": 45,
-        "time_limit": 60,
+        "soft_time_limit": CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT,
+        "time_limit": CELERY_RACE_LIVE_WORKER_TIME_LIMIT,
     },
 }
 
 CELERY_BEAT_SCHEDULE = {
     "select-due-race-live-events": {
         "task": "stable.tasks.select_due_race_live_events_task",
+        "schedule": crontab(minute="*"),
+    },
+    "monitor-race-live-sla": {
+        "task": "stable.tasks.monitor_race_live_sla_task",
         "schedule": crontab(minute="*"),
     },
     "crawl-netkeiba-latest-hourly": {

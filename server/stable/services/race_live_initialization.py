@@ -15,6 +15,10 @@ from django.db import transaction
 from django.utils import timezone
 
 from stable import models
+from stable.services.race_live_target_eligibility import (
+    MATRIX_VERSION,
+    evaluate_race_live_target_eligibility,
+)
 
 
 class RaceLiveInitializationError(ValueError):
@@ -82,6 +86,21 @@ _EVENT_KEYS_V2 = _EVENT_KEYS_V1 | frozenset(
         "source_response_sha256",
     }
 )
+_EVENT_KEYS_V2_MULTIREGION = _EVENT_KEYS_V2 | frozenset(
+    {
+        "normalized_grade",
+        "eligibility_matrix_version",
+        "eligibility_exception_digest",
+        "eligibility_exception",
+    }
+)
+_REGION_TIMEZONES = {
+    models.RacingRegion.UNITED_KINGDOM: "Europe/London",
+    models.RacingRegion.FRANCE: "Europe/Paris",
+    models.RacingRegion.HONG_KONG: "Asia/Hong_Kong",
+    models.RacingRegion.JAPAN: "Asia/Tokyo",
+    models.RacingRegion.UNITED_STATES: None,
+}
 _PARTICIPANT_KEYS_V1 = frozenset(
     {
         "stable_key",
@@ -416,9 +435,22 @@ def load_race_live_initialization_manifest(
     allowed_regions = set(models.RacingRegion.values)
     for event_index, raw_event in enumerate(events):
         label = f"events[{event_index}]"
+        selected_event_keys = (
+            _EVENT_KEYS_V2_MULTIREGION
+            if (
+                schema_version == 2
+                and isinstance(raw_event, dict)
+                and set(raw_event) == _EVENT_KEYS_V2_MULTIREGION
+            )
+            else (
+                _EVENT_KEYS_V2
+                if schema_version == 2
+                else _EVENT_KEYS_V1
+            )
+        )
         event = _exact_keys(
             raw_event,
-            _EVENT_KEYS_V2 if schema_version == 2 else _EVENT_KEYS_V1,
+            selected_event_keys,
             label,
         )
         event_id = _positive_int(event["event_id"], f"{label}.event_id")
@@ -436,11 +468,6 @@ def load_race_live_initialization_manifest(
         )
         if region not in allowed_regions:
             _fail(f"{label}.country_region 不在允许范围")
-        if (
-            schema_version == 2
-            and region != models.RacingRegion.UNITED_KINGDOM
-        ):
-            _fail(f"{label}.country_region 必须是 united_kingdom")
         _nonempty_string(
             event["racecourse"], f"{label}.racecourse", max_length=255
         )
@@ -476,16 +503,66 @@ def load_race_live_initialization_manifest(
             local_date = _iso_date(event["local_date"], f"{label}.local_date")
             if expected_local_date != local_date:
                 _fail(f"{label}.local_date 与 expected_local_date 不一致")
-            if event["expected_timezone_name"] != "Europe/London":
-                _fail(f"{label}.expected_timezone_name 必须是 Europe/London")
+            expected_timezone = _REGION_TIMEZONES.get(region)
+            timezone_name = event["expected_timezone_name"]
+            if (
+                expected_timezone is not None
+                and timezone_name != expected_timezone
+            ) or (
+                expected_timezone is None
+                and (
+                    region != models.RacingRegion.UNITED_STATES
+                    or not isinstance(timezone_name, str)
+                    or not timezone_name.startswith("America/")
+                )
+            ):
+                _fail(f"{label}.expected_timezone_name 与地区不匹配")
             source_off_dt = _aware_datetime(
                 event["source_off_dt"], f"{label}.source_off_dt"
             )
             if source_off_dt != race_datetime:
                 _fail(f"{label}.source_off_dt 与 race_datetime instant 不一致")
-            london_time = source_off_dt.astimezone(ZoneInfo("Europe/London"))
-            if london_time.date() != local_date:
-                _fail(f"{label}.source_off_dt 的伦敦日期不匹配")
+            local_time = source_off_dt.astimezone(ZoneInfo(timezone_name))
+            if local_time.date() != local_date:
+                _fail(f"{label}.source_off_dt 的赛事当地日期不匹配")
+            if selected_event_keys == _EVENT_KEYS_V2_MULTIREGION:
+                normalized_grade = _nonempty_string(
+                    event["normalized_grade"],
+                    f"{label}.normalized_grade",
+                    max_length=16,
+                )
+                if normalized_grade not in models.RaceGrade.values:
+                    _fail(f"{label}.normalized_grade 不在允许范围")
+                if event["eligibility_matrix_version"] != MATRIX_VERSION:
+                    _fail(f"{label}.eligibility_matrix_version 漂移")
+                eligibility = evaluate_race_live_target_eligibility(
+                    event_id=event_id,
+                    year=year,
+                    region=region,
+                    normalized_grade=normalized_grade,
+                    exception_artifact=event["eligibility_exception"],
+                    expected_approved_commit=payload["approved_commit"],
+                    now=generated_at,
+                )
+                if (
+                    eligibility.eligible is not True
+                    or eligibility.exception_digest
+                    != event["eligibility_exception_digest"]
+                    or (
+                        eligibility.reason == "exception_approved"
+                        and not isinstance(
+                            event["eligibility_exception"],
+                            dict,
+                        )
+                    )
+                    or (
+                        eligibility.reason != "exception_approved"
+                        and event["eligibility_exception"] is not None
+                    )
+                ):
+                    _fail(f"{label}.eligibility 不通过")
+            elif region != models.RacingRegion.UNITED_KINGDOM:
+                _fail(f"{label} 非英国 event 必须绑定 eligibility")
             _lower_sha256(
                 event["source_response_sha256"],
                 f"{label}.source_response_sha256",
@@ -716,6 +793,10 @@ def _event_identity_matches(row: models.RaceEvent, event: dict[str, Any]) -> boo
         and row.country_region == event["country_region"]
         and row.racecourse == event["racecourse"]
         and row.grade_text == event["grade_text"]
+        and (
+            "normalized_grade" not in event
+            or row.normalized_grade == event["normalized_grade"]
+        )
     )
 
 
@@ -740,7 +821,7 @@ def _event_matches_manifest(
         )
     source_off_dt = _aware_datetime(event["source_off_dt"], "source_off_dt")
     expected_local_time = source_off_dt.astimezone(
-        ZoneInfo("Europe/London")
+        ZoneInfo(event["expected_timezone_name"])
     ).time().replace(tzinfo=None)
     common = (
         row.status == event["expected_status"]
@@ -1494,7 +1575,7 @@ def apply_race_live_initialization(
                     )
                     row.race_datetime = source_off_dt
                     row.local_start_time = source_off_dt.astimezone(
-                        ZoneInfo("Europe/London")
+                        ZoneInfo(event["expected_timezone_name"])
                     ).time().replace(tzinfo=None)
                     row.save(
                         update_fields=(

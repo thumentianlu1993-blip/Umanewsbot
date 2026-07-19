@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 from typing import Any
+from urllib.parse import urlsplit
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -15,7 +16,12 @@ from django.db.models import Q
 from django.utils import timezone
 
 from stable import models
-from stable.services.race_events import build_race_live_canonical_sha256
+from stable.services.race_events import (
+    _publish_race_result_revision,
+    build_race_live_canonical_sha256,
+    resolve_race_live_official_coarse_policy,
+    resolve_race_live_official_publication_authorization,
+)
 from stable.services.race_live_publication_transition import (
     LoadedRaceLivePublicationTransition,
     RaceLivePublicationTransitionError,
@@ -26,7 +32,7 @@ from stable.services.race_live_publication_transition import (
     _validate_output_root,
     apply_race_live_publication_transition,
     dry_run_race_live_publication_transition,
-    read_bha_manual_route_registry,
+    read_manual_official_route_registry,
 )
 
 
@@ -37,6 +43,14 @@ class RaceLiveManualOfficialEvidenceError(ValueError):
 _SHA256_RE = re.compile(r"[0-9a-f]{64}\Z")
 _COMMIT_RE = re.compile(r"[0-9a-f]{40}\Z")
 _RUN_ID_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+_ROUTE_SOURCE_KEYS = {
+    "bha_manual_verification": "bha_manual",
+    "france_galop_manual_verification": "france_galop",
+    "hkjc_manual_verification": "hkjc",
+    "jra_manual_verification": "jra",
+    "nar_manual_verification": "nar",
+    "us_official_manual_verification": "us_official",
+}
 _SUBMISSION_KEYS = frozenset(
     {
         "approved_commit",
@@ -130,15 +144,35 @@ def _validate_submission(
         value = submission[key]
         if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
             _fail(f"{key} 必须是正整数")
-    if submission["event_id"] != 924:
-        _fail("manual evidence 只允许 event 924")
     source_url = submission["source_url"]
-    if (
-        not isinstance(source_url, str)
-        or source_url != source_url.strip()
-        or source_url != registry["official_results_url"]
-    ):
-        _fail("source_url 必须精确匹配受审 BHA Results URL")
+    if not isinstance(source_url, str) or source_url != source_url.strip():
+        _fail("source_url 必须为受审官方 Results URL")
+    allowed_hosts = registry.get("allowed_hosts")
+    allowed_path_prefixes = registry.get("allowed_path_prefixes")
+    if allowed_hosts is None or allowed_path_prefixes is None:
+        if source_url != registry["official_results_url"]:
+            _fail("source_url 必须精确匹配受审 BHA Results URL")
+    else:
+        try:
+            parsed_url = urlsplit(source_url)
+            port = parsed_url.port
+        except ValueError as exc:
+            raise RaceLiveManualOfficialEvidenceError(
+                "source_url 不是合法 URL"
+            ) from exc
+        if (
+            parsed_url.scheme != "https"
+            or parsed_url.hostname not in allowed_hosts
+            or port not in {None, 443}
+            or parsed_url.username is not None
+            or parsed_url.password is not None
+            or parsed_url.fragment
+            or not any(
+                parsed_url.path.startswith(prefix)
+                for prefix in allowed_path_prefixes
+            )
+        ):
+            _fail("source_url 不在受审官方 host/path allowlist")
     observed_at = _aware_datetime(submission["observed_at"], "observed_at")
     if _SHA256_RE.fullmatch(str(submission["evidence_sha256"])) is None:
         _fail("evidence_sha256 不合法")
@@ -192,7 +226,17 @@ def prepare_race_live_manual_official_evidence(
 ) -> dict[str, Any]:
     if not isinstance(run_id, str) or _RUN_ID_RE.fullmatch(run_id) is None:
         _fail("run_id 不合法")
-    registry, registry_digest = read_bha_manual_route_registry()
+    route = (
+        models.RaceLiveEventPublicationAllowlist.objects.filter(
+            event_id=submission.get("event_id"),
+            source_key="the_racing_api",
+        )
+        .values_list("official_verification_route", flat=True)
+        .first()
+    )
+    registry, registry_digest = read_manual_official_route_registry(
+        route=route
+    )
     receipt = _validate_submission(
         submission,
         registry=registry,
@@ -245,7 +289,9 @@ def load_race_live_manual_official_evidence(
         raise RaceLiveManualOfficialEvidenceError(str(exc)) from exc
     if not isinstance(payload, dict) or set(payload) != _RECEIPT_KEYS:
         _fail("receipt schema 不匹配")
-    registry, registry_digest = read_bha_manual_route_registry()
+    registry, registry_digest = read_manual_official_route_registry(
+        route=payload["route"]
+    )
     submission = {key: payload[key] for key in _SUBMISSION_KEYS}
     normalized = _validate_submission(
         submission,
@@ -285,9 +331,9 @@ def _upsert_official_evidence(
         event=event,
         source_key=registry["source_key"],
         defaults={
-            "external_race_id": f"bha-manual:{event.pk}",
+            "external_race_id": f"{registry['source_key']}-manual:{event.pk}",
             "canonical_url": receipt["source_url"],
-            "host": "www.britishhorseracing.com",
+            "host": urlsplit(receipt["source_url"]).hostname or "",
             "identity_fields": {
                 "event_id": event.pk,
                 "route_contract_digest": receipt[
@@ -303,7 +349,7 @@ def _upsert_official_evidence(
             "terms_status": models.RaceSourceTermsStatus.MANUAL,
             "automation_allowed": False,
             "proof_network_allowed": False,
-            "evidence_url": registry["terms_evidence"]["url"],
+            "evidence_url": registry["terms_evidence"].get("url", ""),
             "evidence_sha256": registry["terms_evidence"]["sha256"],
             "valid_until": _aware_datetime(
                 registry["valid_until"],
@@ -313,12 +359,13 @@ def _upsert_official_evidence(
         },
     )
     if not created and (
-        source.external_race_id != f"bha-manual:{event.pk}"
+        source.external_race_id
+        != f"{registry['source_key']}-manual:{event.pk}"
         or source.result_authority != models.RaceResultSourceAuthority.OFFICIAL
         or source.automation_allowed is not False
         or source.registry_digest != registry_digest
     ):
-        _fail("既有 BHA manual source identity 漂移")
+        _fail("既有 manual official source identity 漂移")
 
     provisional_items = list(
         incident.provisional_revision.items.select_for_update().order_by(
@@ -341,7 +388,7 @@ def _upsert_official_evidence(
             )
         )
         if not identity_created and identity.external_runner_id != external_runner_id:
-            _fail("BHA manual participant identity 漂移")
+            _fail("manual official participant identity 漂移")
         normalized_participants.append(
             {
                 "external_runner_id": external_runner_id,
@@ -356,11 +403,25 @@ def _upsert_official_evidence(
     normalized_sha = build_race_live_canonical_sha256(
         normalized_payload=payload
     )
+    current_phase = (
+        models.RaceEventProjectionControl.objects.filter(event=event)
+        .values_list("current_result_revision__phase", flat=True)
+        .first()
+    )
+    result_phase = (
+        models.RaceResultPhase.CORRECTED
+        if current_phase
+        in {
+            models.RaceResultPhase.OFFICIAL,
+            models.RaceResultPhase.CORRECTED,
+        }
+        else models.RaceResultPhase.OFFICIAL
+    )
     observation, observation_created = (
         models.RaceResultObservation.objects.get_or_create(
             source_identity=source,
             normalized_sha256=normalized_sha,
-            result_phase=models.RaceResultPhase.OFFICIAL,
+            result_phase=result_phase,
             defaults={
                 "observed_at": _aware_datetime(
                     receipt["observed_at"],
@@ -385,7 +446,7 @@ def _upsert_official_evidence(
         or observation.parser_version != registry["parser_version"]
         or observation.normalized_payload != payload
     ):
-        _fail("既有 BHA manual observation 漂移")
+        _fail("既有 manual official observation 漂移")
     contract, contract_created = (
         models.RaceLiveOfficialMarkerContract.objects.get_or_create(
             country_region=event.country_region,
@@ -434,6 +495,282 @@ def _upsert_official_evidence(
     ):
         _fail("既有 marker evidence 漂移")
     return observation
+
+
+def _publish_official_revision_if_authorized(
+    *,
+    event: models.RaceEvent,
+    revision: models.RaceEventRevision,
+    observation: models.RaceResultObservation,
+    control: models.RaceEventProjectionControl,
+    tracking: models.RaceEventLiveTracking,
+    normalized_items: list[dict[str, Any]],
+    source_identities: dict[str, models.RaceEventParticipant],
+    now: datetime,
+) -> bool:
+    authorization = resolve_race_live_official_publication_authorization(
+        event_id=event.pk,
+        observation_id=observation.pk,
+        phase=revision.phase,
+        now=now,
+    )
+    coarse_policy = resolve_race_live_official_coarse_policy(
+        event_id=event.pk,
+        now=now,
+    )
+    if authorization.allowed is not True or coarse_policy.allowed is not True:
+        return False
+    control.current_result_revision = revision
+    control.last_known_good_result_revision = revision
+    control.save(
+        update_fields=(
+            "current_result_revision",
+            "last_known_good_result_revision",
+            "updated_at",
+        )
+    )
+    tracking.state = (
+        models.RaceEventLiveState.CORRECTED_RESULT
+        if revision.phase == models.RaceResultPhase.CORRECTED
+        else models.RaceEventLiveState.OFFICIAL_RESULT
+    )
+    tracking.save(update_fields=("state", "updated_at"))
+    _publish_race_result_revision(
+        event_id=event.pk,
+        revision=revision,
+        observation=observation,
+        normalized_items=normalized_items,
+        identities=source_identities,
+        tracking=tracking,
+        published_at=now,
+        publication_reason="manual_official_route",
+        policy_versions=[
+            list(row) for row in coarse_policy.policy_versions
+        ],
+        allowlist_version=coarse_policy.allowlist_version,
+        registry_digest=authorization.route_registry_digest,
+        coverage_proof_digest=authorization.coverage_proof_digest,
+        authorization_kind="official_route",
+        official_authorization_version=(
+            authorization.authorization_version
+        ),
+    )
+    return True
+
+
+def _stage_or_publish_official_revision(
+    *,
+    event: models.RaceEvent,
+    incident: models.RaceLiveOfficialVerificationIncident,
+    observation: models.RaceResultObservation,
+    now: datetime,
+) -> models.RaceEventRevision:
+    """Persist immutable official evidence, publishing only with an exact auth row."""
+
+    result_phase = observation.result_phase
+    control = models.RaceEventProjectionControl.objects.select_for_update().get(
+        event=event
+    )
+    tracking = models.RaceEventLiveTracking.objects.select_for_update().get(
+        event=event
+    )
+    existing = models.RaceEventRevision.objects.select_for_update().filter(
+        event=event,
+        kind=models.RaceEventRevisionKind.RESULT,
+        phase=result_phase,
+        content_sha256=observation.normalized_sha256,
+    ).first()
+    source_identities = {
+        identity.external_runner_id: identity.participant
+        for identity in models.RaceEventParticipantSourceIdentity.objects.select_for_update().filter(
+            source_identity=observation.source_identity,
+            participant__event=event,
+        ).select_related("participant")
+    }
+    normalized_items = []
+    for row in observation.normalized_payload.get("participants", []):
+        external_runner_id = row["external_runner_id"]
+        participant = source_identities.get(external_runner_id)
+        if participant is None:
+            _fail("official observation participant identity 缺失")
+        normalized_items.append(
+            {
+                "external_runner_id": external_runner_id,
+                "official_finish_position": row[
+                    "official_finish_position"
+                ],
+                "status": row["status"],
+                "raw_status": str(row["official_finish_position"]),
+                "finish_time": "",
+                "margin": "",
+                "number": "",
+                "barrier": "",
+                "jockey_name": "",
+                "trainer_name": "",
+                "carried_weight": "",
+                "field_provenance": {
+                    "source_key": observation.source_identity.source_key,
+                },
+            }
+        )
+    if not normalized_items:
+        _fail("official observation participant 全集为空")
+    if existing is None:
+        revision = models.RaceEventRevision.objects.create(
+            event=event,
+            kind=models.RaceEventRevisionKind.RESULT,
+            revision_no=control.next_result_revision_no,
+            phase=result_phase,
+            content_sha256=observation.normalized_sha256,
+            source_authority=models.RaceResultSourceAuthority.OFFICIAL,
+            decision_reason="manual official marker evidence",
+            primary_observation=observation,
+            supersedes=control.current_result_revision,
+            official_confirmed_at=now,
+        )
+        models.RaceEventRevisionItem.objects.bulk_create(
+            [
+                models.RaceEventRevisionItem(
+                    revision=revision,
+                    participant=source_identities[
+                        row["external_runner_id"]
+                    ],
+                    source_order=index,
+                    internal_order=index,
+                    official_finish_position=row[
+                        "official_finish_position"
+                    ],
+                    status=row["status"],
+                    raw_status=row["raw_status"],
+                    field_provenance=row["field_provenance"],
+                )
+                for index, row in enumerate(normalized_items, start=1)
+            ]
+        )
+        models.RaceEventRevisionEvidence.objects.create(
+            revision=revision,
+            observation=observation,
+            role="primary",
+        )
+        control.next_result_revision_no += 1
+        control.save(
+            update_fields=("next_result_revision_no", "updated_at")
+        )
+    else:
+        revision = existing
+    _publish_official_revision_if_authorized(
+        event=event,
+        revision=revision,
+        observation=observation,
+        control=control,
+        tracking=tracking,
+        normalized_items=normalized_items,
+        source_identities=source_identities,
+        now=now,
+    )
+    return revision
+
+
+def publish_authorized_staged_official_revision(
+    *,
+    event_id: int,
+    now: datetime,
+) -> models.RaceEventRevision:
+    """Publish the latest staged official/corrected revision after exact auth."""
+
+    if (
+        isinstance(event_id, bool)
+        or not isinstance(event_id, int)
+        or event_id <= 0
+        or not isinstance(now, datetime)
+        or timezone.is_naive(now)
+    ):
+        _fail("staged official publication 参数不合法")
+    with transaction.atomic():
+        event = models.RaceEvent.objects.select_for_update().get(pk=event_id)
+        control = (
+            models.RaceEventProjectionControl.objects.select_for_update().get(
+                event=event
+            )
+        )
+        tracking = models.RaceEventLiveTracking.objects.select_for_update().get(
+            event=event
+        )
+        revision = (
+            models.RaceEventRevision.objects.select_for_update()
+            .filter(
+                event=event,
+                kind=models.RaceEventRevisionKind.RESULT,
+                phase__in=(
+                    models.RaceResultPhase.OFFICIAL,
+                    models.RaceResultPhase.CORRECTED,
+                ),
+                published_at__isnull=True,
+            )
+            .select_related("primary_observation__source_identity")
+            .order_by("-revision_no", "-pk")
+            .first()
+        )
+        if revision is None or revision.primary_observation is None:
+            _fail("不存在待发布的 official/corrected revision")
+        observation = revision.primary_observation
+        identity_rows = list(
+            models.RaceEventParticipantSourceIdentity.objects.select_for_update()
+            .filter(
+                source_identity=observation.source_identity,
+                participant__event=event,
+            )
+            .select_related("participant")
+        )
+        source_identities = {
+            identity.external_runner_id: identity.participant
+            for identity in identity_rows
+        }
+        external_by_participant = {
+            identity.participant_id: identity.external_runner_id
+            for identity in identity_rows
+        }
+        normalized_items = []
+        for item in (
+            revision.items.select_for_update()
+            .select_related("participant")
+            .order_by("internal_order", "pk")
+        ):
+            external_runner_id = external_by_participant.get(
+                item.participant_id
+            )
+            if not external_runner_id:
+                _fail("staged revision participant identity 缺失")
+            normalized_items.append(
+                {
+                    "external_runner_id": external_runner_id,
+                    "official_finish_position": (
+                        item.official_finish_position
+                    ),
+                    "status": item.status,
+                    "raw_status": item.raw_status,
+                    "finish_time": item.finish_time,
+                    "margin": item.margin,
+                    "number": item.horse_number,
+                    "barrier": item.barrier,
+                    "jockey_name": item.jockey_name,
+                    "trainer_name": item.trainer_name,
+                    "carried_weight": item.carried_weight,
+                    "field_provenance": item.field_provenance,
+                }
+            )
+        if not _publish_official_revision_if_authorized(
+            event=event,
+            revision=revision,
+            observation=observation,
+            control=control,
+            tracking=tracking,
+            normalized_items=normalized_items,
+            source_identities=source_identities,
+            now=now,
+        ):
+            _fail("official authorization 或 coarse policy 不可用")
+        return revision
 
 
 def _compare_receipt_to_provisional(
@@ -496,7 +833,7 @@ def _manual_replay_errors(
             errors.append("unavailable_alert_mismatch")
         if models.RaceResultSourceIdentity.objects.filter(
             event=event,
-            source_key="bha_manual",
+            source_key=_ROUTE_SOURCE_KEYS.get(receipt["route"], ""),
         ).exists():
             errors.append("unavailable_source_present")
         return comparison, errors
@@ -507,7 +844,7 @@ def _manual_replay_errors(
     )
     source = models.RaceResultSourceIdentity.objects.filter(
         event=event,
-        source_key="bha_manual",
+        source_key=_ROUTE_SOURCE_KEYS.get(receipt["route"], ""),
     ).first()
     if (
         source is None
@@ -525,7 +862,10 @@ def _manual_replay_errors(
             source_identity=source,
             raw_sha256=receipt["evidence_sha256"],
             parser_version=receipt["route_version"],
-            result_phase=models.RaceResultPhase.OFFICIAL,
+            result_phase__in=(
+                models.RaceResultPhase.OFFICIAL,
+                models.RaceResultPhase.CORRECTED,
+            ),
         ).first()
     if observation is None:
         errors.append("official_observation_missing")
@@ -637,7 +977,7 @@ def _deliver_unavailable_alert_intent(
         try:
             incident = (
                 models.RaceLiveOfficialVerificationIncident.objects.select_for_update()
-                .get(pk=incident_id, event_id=924)
+                .get(pk=incident_id)
             )
             notification = models.NotificationLog.objects.select_for_update().get(
                 pk=notification_id,
@@ -673,10 +1013,16 @@ def _deliver_unavailable_alert_intent(
             if not recipients:
                 raise RuntimeError("race-live 告警未配置收件人")
             delivered = send_mail(
-                "[UmaFans] event 924 官方赛果人工复核暂不可用",
+                (
+                    f"[UmaFans] event {incident.event_id} "
+                    "官方赛果人工复核暂不可用"
+                ),
                 "\n".join(
                     [
-                        "event 924 的 BHA 人工官方赛果复核暂不可用。",
+                        (
+                            f"event {incident.event_id} 的 "
+                            f"{incident.official_route} 人工官方赛果复核暂不可用。"
+                        ),
                         "",
                         "暂定赛果继续显示，官方复核 incident 保持 open。",
                         f"incident ID: {incident.pk}",
@@ -722,8 +1068,9 @@ def _validate_manual_evidence_action_input(
         _fail("manual evidence action time 必须包含时区")
     if _SHA256_RE.fullmatch(str(receipt_sha256)) is None:
         _fail("receipt SHA-256 不合法")
-    registry, registry_digest = read_bha_manual_route_registry(
-        now=effective_now
+    registry, registry_digest = read_manual_official_route_registry(
+        route=receipt.get("route"),
+        now=effective_now,
     )
     if (
         not isinstance(receipt, dict)
@@ -1039,7 +1386,16 @@ def _build_manual_evidence_plan_locked(
     if any(
         policy.mode
         != models.RaceLivePublicationMode.PROVISIONAL_PUBLIC
-        or policy.version != 2
+        or (
+            policy.scope_type
+            == models.RaceLivePublicationScopeType.EVENT
+            and policy.version != 2
+        )
+        or (
+            policy.scope_type
+            != models.RaceLivePublicationScopeType.EVENT
+            and policy.version < 1
+        )
         or policy.registry_digest != source.registry_digest
         or policy.coverage_proof_digest != allowlist.coverage_proof_digest
         or policy.valid_until is None
@@ -1169,12 +1525,18 @@ def apply_race_live_manual_official_evidence(
                 )
                 comparison = "unavailable"
             else:
-                _upsert_official_evidence(
+                observation = _upsert_official_evidence(
                     receipt=receipt,
                     registry=registry,
                     registry_digest=registry_digest,
                     event=event,
                     incident=incident,
+                )
+                _stage_or_publish_official_revision(
+                    event=event,
+                    incident=incident,
+                    observation=observation,
+                    now=effective_now,
                 )
                 if comparison == "match":
                     incident.status = (
