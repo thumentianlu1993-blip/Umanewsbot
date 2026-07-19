@@ -1,5 +1,22 @@
 # 部署运行手册
 
+## P0 Phase A 首次迁移回滚与二次门禁（2026-07-20）
+
+1. 首次 Phase A 真实生产迁移在旧 `0049_horse_career_history` 内执行数据
+   `UPDATE` 后创建索引时，被 PostgreSQL 以
+   `cannot CREATE INDEX stable_horseracerecord because it has pending trigger events`
+   拒绝。该原子迁移已完整回滚，生产没有应用 `0049`；旧镜像和旧服务已恢复。
+2. 修复后的迁移链固定为：`0049` 只新增 career/profile/record 字段；`0050` 只执行
+   `backfill_career_history_semantics`；`0051` 只新增三个索引和
+   `uq_horse_record_canonical` 条件唯一约束；原 authority 迁移顺延为 `0052` 并依赖
+   `0051`。四个迁移均保持默认原子事务，禁止以 `atomic=False` 绕过失败。
+3. 本地 PostgreSQL MigrationExecutor 必须从主线 `0048` 预置真实
+   `HorseProfile/HorseRaceRecord` 后前进到唯一 leaf `0052`，验证回填、索引、约束、
+   authority 字段和旧完整度降级，并完成 reverse/forward 重放。
+4. 当前修复仅完成代码与离线数据库验证，尚未执行二次 Phase A。再次部署前必须使用修复提交
+   重新构建镜像、核对生产仍停在 `0048`，并按既有备份、健康检查和 prepare-only 门禁重新执行；
+   不得沿用首次失败容器或把回滚视为 Phase A 已完成。
+
 ## P0 美国组合来源批准后的生产门禁（2026-07-20）
 
 1. 当前必须分层读取：冻结 v2 SHA-256

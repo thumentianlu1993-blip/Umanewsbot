@@ -1,5 +1,13 @@
 # 关键决策
 
+## 2026-07-20 P0 PostgreSQL 迁移事务边界
+
+- 对会更新已有 `HorseRaceRecord` 的字段回填，不在同一原子迁移的后续 operation 创建该表
+  的索引或约束。迁移按 schema fields、data backfill、indexes/constraints、authority
+  顺序拆为 `0049-0052`，让前一事务的 trigger events 在后续 DDL 前结束。
+- 每个迁移继续使用 Django 默认原子事务；禁止用 `atomic=False` 留下可见的半 schema。
+  生产首次失败已完整回滚，二次 Phase A 必须从确认的 `0048` 状态重新开始。
+
 ## 2026-07-20 P0 美国组合来源批准与生产提交边界
 
 - 用户/项目负责人确认当前冻结批次采用以下美国组合来源可满足项目严格完整标准：HRN 为逐场

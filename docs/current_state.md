@@ -1,5 +1,14 @@
 # 当前状态
 
+## 2026-07-20 P0 Phase A 首次迁移已回滚，等待修复后二次执行
+
+- 首次真实生产迁移在旧原子 `0049` 的数据回填之后创建索引时触发 PostgreSQL
+  `pending trigger events` 错误；事务已完整回滚，生产未应用 `0049`，旧镜像和旧服务已恢复。
+- 修复将迁移拆为原子 `0049` 字段、`0050` 数据回填、`0051` 索引/条件唯一约束、
+  `0052` authority 字段及 fail-closed 降级，保持单一 leaf，不使用 `atomic=False`。
+- 当前仍是 **NO-GO / prepare-only**：二次 Phase A 尚未执行，production mapping、
+  candidate artifact、formal dry-run 和 commit 均未开始。
+
 ## 2026-07-20 P0 美国组合来源获批，生产准备仍 blocked
 
 - 用户/项目负责人已确认当前冻结批次的美国逐场组合来源满足项目严格标准：HRN 提供主记录；
@@ -136,7 +145,7 @@
   Balko，必须保留在 v1 且不得进入 v2；正确父马是 Racing Post `595446` 的 2001 年 Balko，
   父母为 Pistolet Bleu / Ella Royale。自动 Netkeiba 父母候选 URL 只接受精确
   `https://en.netkeiba.com/db/horse/<id>/`，凭据、端口、query 或 fragment 任一存在均拒绝。
-- `0050_horse_career_source_authority` 在新增逐场权威状态后，会把旧
+- `0052_horse_career_source_authority` 在新增逐场权威状态后，会把旧
   `career_history_status=complete` 且权威性未核验的记录降为 `needs_review`；若整匹马状态原为
   `complete_profile_full`，同时降为 `complete_pedigree_2gen`，避免聚合状态继续对外显示未经
   证明的完整生涯。

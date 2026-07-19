@@ -132,6 +132,11 @@ Sporting Life 可用于定位法国比赛和保留其展示值，但不得把 Cl
 
 HRN 默认只作为备用逐场来源。直接 slug、搜索结果、缓存复放和离线研究解析都必须让 HRN 页面马名、父名、母名、出生年份与已核验候选四字段全部存在且一致；缺项或冲突 fail closed。唯一窄例外是独立批准、精确绑定冻结输入与记录唯一性的组合来源审核：它可把该冻结研究派生物标为“组合来源逐场完整”，但不表示 HRN 或组合来源变成 Equibase 官方逐场履历，也不改变其它输入的默认状态。新增逐场权威性字段时，数据迁移把旧 `complete` 且权威性未核验的记录降为 `needs_review`，避免旧状态绕过新门禁。
 
+PostgreSQL 生涯迁移必须按事务边界拆分：`0049` 仅新增字段，`0050` 仅回填已有记录，
+`0051` 在前一回填事务结束后新增索引和条件唯一约束，`0052` 再新增 authority 字段并执行
+fail-closed 降级。不得在更新 `HorseRaceRecord` 后的同一原子迁移继续创建其索引或约束，
+也不得以 `atomic=False` 绕过 PostgreSQL pending trigger events 保护。
+
 所有地区缓存都必须使用缓存自身的马名或 alias 绑定请求马名，禁止以请求值回填缺失的来源身份。来源总数只有在来源名、来源 URL 和带时区核验时间齐备时才能参与 `complete` 判定。受控网络 client 只允许访问地区实现登记的 HTTPS 主机，transport 自动重定向必须关闭，并在每一跳发出请求前重新核验主机、凭据、端口和请求预算。迁移降级旧 `complete` 生涯时，原 `complete_profile_full` 聚合状态也同步撤销。
 
 同一 provider 只有在候选和 payload 均携带一致 external horse ID 时可直接绑定；显式来源 namespace 与 `external:<provider>:...` key 必须一致。候选 provider 与资料 provider 不同时，必须由候选提供完整马名、父名、母名、出生年份并与 payload 一致，只有同名或 alias 不足以放行。总数证据和逐场权威白名单同时在 cache、normalizer、数据库生涯 evaluator、整匹马 evaluator、研究 JSON 与工作簿层执行，避免任何旁路把未知 authority 提升为完整。官方明确总出赛数为零时，空逐场列表是合法数量对齐快照；总数大于零时仍必须有逐场记录。

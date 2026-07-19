@@ -352,6 +352,15 @@ prepare-only。
 - **AND** 系统 MUST NOT 在重新核验前继续展示完整生涯
 - **AND** 原 `complete_profile_full` 或等价聚合完整状态 SHALL 同步撤销
 
+#### Scenario: PostgreSQL 回填与索引 DDL 分属连续原子迁移
+- **WHEN** 系统从主线 `0048` 迁移到 P0 生涯履历最终 leaf
+- **THEN** 字段 DDL、既有记录回填、索引与条件唯一约束、authority 降级 MUST 按
+  `0049`、`0050`、`0051`、`0052` 顺序执行
+- **AND** 每个迁移 MUST 保持原子
+- **AND** 更新 `HorseRaceRecord` 的迁移 MUST NOT 在同一事务后续创建该表索引或约束
+- **AND** PostgreSQL MigrationExecutor MUST 能完成 forward、reverse、再次 forward，
+  且最终只有一个 stable migration leaf
+
 #### Scenario: 冻结批次组合逐场来源经人工审核
 - **WHEN** pending-only prepare 之外独立冻结的 approved 审核 manifest 精确匹配可信 v2 输入字节 SHA、美国 10 匹四字段身份、Equibase 官方总数证据、逐场记录全集与稳定摘要
 - **AND** 调用方显式提供的 approved manifest SHA 与代码信任锚和文件实际字节 SHA 完全一致
