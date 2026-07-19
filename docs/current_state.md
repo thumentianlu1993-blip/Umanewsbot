@@ -1,6 +1,31 @@
 # 当前状态
 
-## 2026-07-19 event 924 暂定赛果单赛事公开灰度已发布，验收尚未收口
+## 2026-07-19 event 924 kill switch 实际演练完成，15 分钟 SLA 转入下一场验收
+
+- 用户确认 event `924` 不再补做无法追溯的 promotion 后 15 分钟 probe，改由下一场
+  获准公开灰度赛事重新验收；这不把 promotion 前截图改写为合格证据，也不豁免下一场
+  的 15 分钟要求。
+- 用户另行授权 event `924` 完整 kill-switch 演练。原 bundle 的 disable manifest
+  `d441e0a1…14949` 重新 dry-run 后执行 apply 和独立 verify，三步均
+  `ok=true / event_ids=[924] / network_request_count=0`；OperationLog `105224`
+  记录于 `2026-07-19T05:14:25.394898Z`。event policy 从
+  `provisional_public v2` 收紧到 `shadow v3`。
+- disable 后公网 HTTP 详情和日历仍为 200；详情中的“冠军 · 暂定”“暂定赛果”“尚待
+  官方来源复核”全部消失，日历保留赛事本身但隐藏前五赛果摘要。revision `2`、
+  publication `1`、legacy result `7`、observation `2`、official marker evidence `1`
+  和 resolved incident `1` 均未删除。
+- 同一 bundle 的 restore manifest `cf96afb6…cf6c` 重新 dry-run 后执行 apply 和独立
+  verify，三步同样 `ok=true / event_ids=[924] / network_request_count=0`；
+  OperationLog `105225` 记录于 `2026-07-19T05:17:11.592720Z`。event policy 恢复为
+  `provisional_public v4`，shared global/UK/TRA policy 保持 v2，allowlist 仍只有
+  event `924`、version 2。
+- restore 后详情重新显示中文暂定标识和 1–7 赛果，日历重新显示前五摘要；不显示“赛果
+  已确认”，event 仍为 finished 且 `result_confirmed_at=null`。四个 app service 的
+  scheduler 均为 false，tracking disabled、next poll null、claim generation `19`，
+  `race_live` 与普通 `celery` 队列均为 0，live worker active/reserved 均为空，
+  `/healthz/` 为 200。演练未扩展其他赛事，event `924` 当前继续公开暂定赛果。
+
+## 2026-07-19 event 924 暂定赛果单赛事公开灰度首次发布记录
 
 - 最新成功代码 review 的完整冻结基线已在授权后逐字节复核，受审提交
   `91cf50ad677a1b8c9b253528c9db98481fd1031a` 已快进 `main` 并部署生产；web、worker、
@@ -40,16 +65,16 @@
   observation/marker evidence 各 `1`，页面仍保持 provisional，不误标正式赛果。但
   `04:40:32Z` 是旧截图 receipt 的应用时间，不会把 promotion 前观察变成 promotion 后
   探测；15 分钟 SLA 未被当前证据证明，BHA 首次探测 closure 尚未完成。
-- 公网 HTTP 详情与日历均为 200。详情显示“冠军 · 暂定”“暂定赛果”“尚待官方来源复核”
+- 首次发布收口点的公网 HTTP 详情与日历均为 200。详情显示“冠军 · 暂定”“暂定赛果”“尚待官方来源复核”
   和 1–7 完整顺序；trainer/time/margin 缺失值为 `-`。日历共同 read gate 只对
-  event `924` 展示相同赛果摘要。disable manifest dry-run 为 `ok=true`，但未执行
-  disable apply、公开隐藏验证和 restore；kill-switch 完整验收尚未完成，当前灰度继续
-  公开。
-- 收口时 `RACE_LIVE_SCHEDULER_ENABLED=false`，tracking row universe 与 enabled
+  event `924` 展示相同赛果摘要。当时 disable manifest 只完成 dry-run，未执行
+  disable apply、公开隐藏验证和 restore；后续实际演练结果见上方最新状态。
+- 首次发布收口时 `RACE_LIVE_SCHEDULER_ENABLED=false`，tracking row universe 与 enabled
   allowlist universe 均为 `[924]`，race-live queue 为空；HostBudget failures 为 0、
   circuit 关闭、lock version `22`。historical runner preflight 为 `migration_safe`，
-  常驻历史 enabled/network 均为 false。Beat 已恢复，普通新闻任务可继续运行。发布本身
-  已生效，但 evidence closure 必须保持未完成，直到上述两个验收缺口得到单独处理。
+  常驻历史 enabled/network 均为 false。Beat 已恢复，普通新闻任务可继续运行。当时
+  kill switch 与 15 分钟 SLA 两项尚未收口；前者现已完成，后者按用户决定转入下一场
+  赛事重新验收。
 
 ## 2026-07-19 event 924 代码审核 finding 已修复，待同一 reviewer 限定复审
 

@@ -1,6 +1,20 @@
 # 项目状态文档
 
-## 2026-07-19 event 924 暂定赛果单赛事公开灰度已上线，验收未收口
+## 2026-07-19 event 924 kill-switch 演练完成
+
+- event `924` 的预生成 disable 和 restore manifest 均重新完成
+  dry-run/apply/verify，所有步骤 `ok=true`、唯一 event `[924]`、零网络请求。
+- disable 后详情隐藏全部 live result 标识，日历保留赛事但隐藏赛果摘要；restore 后中文
+  暂定标识、1–7 详情和日历前五摘要恢复。两次切换均保留 revision、publication、legacy
+  result、observation、marker evidence 和 resolved incident。
+- 最终 event policy 为 `provisional_public v4`，allowlist 仍只有 event `924`；
+  scheduler false、tracking 停止、两个 Celery 队列为 0，live worker active/reserved
+  为空，健康检查 200。当前灰度继续公开，未扩展其他赛事。
+- event `924` 的 promotion 后 15 分钟新 probe 仍未发生，不能追溯补证。用户已决定由
+  下一场获准公开灰度赛事重新执行该 SLA 验收；下一场未通过前不得把本次记录解释为
+  15 分钟能力已验收。
+
+## 2026-07-19 event 924 暂定赛果单赛事公开灰度首次上线记录
 
 - 冻结提交 `91cf50ad677a1b8c9b253528c9db98481fd1031a` 已进入生产，四个 app service
   统一运行 image `sha256:700ea786…087ef`；`stable.0046`、健康检查和回滚点均已验证。
@@ -10,8 +24,8 @@
 - promotion 前 BHA 截图中的官方 1–7 名次与 TRA 暂定结果一致；其 receipt 在 promotion
   后应用并把 incident 写为 resolved，但截图早于 promotion，不能证明“promotion 后
   15 分钟内新浏览器探测”。该 SLA 验收仍未完成，页面继续明确标记“暂定赛果”。
-- 详情页和日历 HTTP 验收通过；disable kill-switch 只完成 dry-run，尚未实际隐藏、验证
-  和 restore，因此完整 kill-switch 验收与 evidence closure 未完成。灰度当前保持公开；
+- 首次上线收口点的详情页和日历 HTTP 验收通过；当时 disable kill-switch 只完成
+  dry-run，尚未实际隐藏、验证和 restore。后续完整演练现已完成，结果见上方最新状态；
   historical runner 仍为 `migration_safe`，常驻历史开关关闭，race-live queue 为空。
 
 ## 2026-07-19 event 924 代码 review finding 已修复，待限定复审

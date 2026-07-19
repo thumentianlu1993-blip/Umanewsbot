@@ -1,5 +1,34 @@
 # 部署运行手册
 
+## event 924 kill-switch 实际演练（2026-07-19）
+
+1. 用户确认 event `924` 已错过的 promotion 后 15 分钟 probe 不追溯补证，改由下一场
+   获准公开灰度赛事重新验收；本节不宣称该 SLA 已通过。用户另行明确授权 event `924`
+   disable、公开隐藏验证和 restore。
+2. 演练继续使用 bundle
+   `/opt/umanewsbot/runtime/race_live_publications/event924-public-91cf50ad-20260719T042103Z`；
+   宿主目录/文件仍为 `0700/0600`，disable SHA 为
+   `d441e0a1f134847abd4ebf3cf39c55c41be46d587723528e98958faa30014949`，
+   restore SHA 为
+   `cf96afb6363ed7621c7a153234b075e8708b544907956ca1745503739065cf6c`。
+3. disable 按 dry-run、`--apply --confirm-apply`、独立 `--verify` 顺序执行；三次均
+   `ok=true`、event `[924]`、零网络请求。OperationLog `105224` 创建于
+   `2026-07-19T05:14:25.394898Z`，event policy 从 `provisional_public v2` 变为
+   `shadow v3`。
+4. disable 后详情与日历 HTTP 均为 200。详情不再包含“冠军 · 暂定”“暂定赛果”“尚待
+   官方来源复核”或“赛果已确认”；日历保留赛事入口，但 live result 前五摘要消失。
+   数据库仍有 revision `2`、publication `1`、legacy result `7`、observation `2`、
+   marker evidence `1`、resolved incident `1`。
+5. restore 在 apply 前重新 dry-run，再执行 apply 和独立 verify；三次均
+   `ok=true`、event `[924]`、零网络请求。OperationLog `105225` 创建于
+   `2026-07-19T05:17:11.592720Z`，event policy 恢复为 `provisional_public v4`；
+   shared global/UK/TRA policy 保持 v2，allowlist 仍为 event `924`、enabled、
+   `provisional_public v2`。
+6. restore 后详情恢复中文暂定标识和 1–7 顺序，日历恢复前五摘要，仍不显示“赛果已
+   确认”。`/healthz/` 为 200；四个 app service scheduler 均为 false，tracking
+   disabled、next poll null，`race_live/celery` queue 均为 0，live worker
+   active/reserved 为空。演练没有触及其他赛事，最终保持 event `924` 暂定赛果公开。
+
 ## event 924 暂定赛果公开灰度生产实证（2026-07-19）
 
 1. 用户在最新成功 review 后授权精确冻结版本；release commit 为
@@ -31,14 +60,15 @@
    页面继续 provisional。但截图 observed at 为 `04:19:39Z`，早于 `04:37:17.201536Z`
    promotion commit，故不能证明 promotion 后 15 分钟内的新浏览器 probe；该 SLA
    验收未完成。
-8. HTTP 详情和日历均为 200，中文暂定标识、1–7 顺序、缺失字段和共同 read gate 通过。
-   disable dry-run 为 `ok=true`，但没有 apply、隐藏验证和 restore；kill-switch 完整
-   验收未完成，当前保持公开。
+8. 首次发布收口点的 HTTP 详情和日历均为 200，中文暂定标识、1–7 顺序、缺失字段和共同
+   read gate 通过。当时 disable 只完成 dry-run；后续实际 disable/隐藏/restore 演练
+   结果见上方专节。
 9. 第一次等待 SMTP 配置期间恢复 Beat 时，Compose 因依赖配置重建了 db 容器；持久卷保持，
    db 恢复 healthy，随后 promotion dry-run 再次通过，未执行数据恢复。最终 historical
    preflight 为 `migration_safe`，历史 enabled/network false，tracking/allowlist universe
    均为 `[924]`，race-live queue 为空，HostBudget 保持 failures 0、lock version 22。
-   本次发布已生效，但因第 7、8 项缺口，evidence closure 仍为未完成。
+   本次发布已生效。第 8 项 kill switch 后续已经完成；第 7 项 15 分钟 SLA 按用户决定
+   转入下一场获准公开灰度赛事重新验收。
 
 ## event 924 暂定赛果公开候选（2026-07-19，尚未授权发布）
 

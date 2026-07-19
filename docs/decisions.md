@@ -1,5 +1,16 @@
 # 关键决策
 
+## 2026-07-19：event 924 的 15 分钟 SLA 不追溯补证，下一场重新验收
+
+- event `924` 唯一 BHA 截图观察时间早于 promotion，receipt 的后续应用时间不能替代
+  promotion 后的新浏览器 probe；该场 15 分钟 SLA 继续明确记为未通过，不以数据库
+  incident 已 resolved 覆盖证据缺口。
+- 用户决定不为 event `924` 追溯补证，改由下一场获准公开灰度赛事在 promotion 后
+  15 分钟内重新执行官方来源 probe。该决定不豁免下一场 SLA，也不授权开启 scheduler、
+  扩大 allowlist 或增加其他公开赛事。
+- 用户同时明确授权 event `924` 实际 disable、公开隐藏验证和 restore；演练完成后恢复
+  该赛事的暂定赛果公开，客观赛果、publication、observation 和 incident 事实均保留。
+
 ## 2026-07-19：event 924 使用已存 shadow 的无网络 operator promotion
 
 - event `924` 的首个公开灰度不重新请求 TRA，也不伪造 runner claim/checkpoint。受审

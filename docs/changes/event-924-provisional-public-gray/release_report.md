@@ -2,8 +2,8 @@
 
 ## 1. 结论
 
-event `924` 已按最新成功 review 后取得的精确授权发布单赛事暂定赛果公开灰度，但生产
-验收和 evidence closure 尚未完成。
+event `924` 已按最新成功 review 后取得的精确授权发布单赛事暂定赛果公开灰度，并完成
+实际 disable、公开隐藏验证和 restore 演练。
 
 - 公开范围只有 event `924`；
 - `RACE_LIVE_SCHEDULER_ENABLED=false`；
@@ -11,7 +11,9 @@ event `924` 已按最新成功 review 后取得的精确授权发布单赛事暂
 - promotion 前 BHA 观察与暂定赛果得到 `match`，但缺少 promotion 后 15 分钟内的新
   浏览器探测证据；
 - 页面保持“暂定赛果”，未误标 `official_result`；
-- kill switch 只完成 disable dry-run，未实际隐藏、验证和 restore。
+- kill switch 已完成 disable dry-run/apply/verify、公开隐藏验证、restore
+  dry-run/apply/verify 和恢复公开验证；
+- 用户决定不追溯补做 event `924` 的 15 分钟证据，改由下一场获准公开灰度赛事重新验收。
 
 ## 2. 冻结版本
 
@@ -131,9 +133,24 @@ HTTP 详情与日历均返回 200。浏览器验收确认：
 - 不显示“赛果已确认”
 - 日历只对 event `924` 显示相同前五摘要
 
-disable manifest 默认 dry-run 返回 `ok=true / event_ids=[924] /
-network_request_count=0`。没有执行 disable apply、验证详情/日历隐藏或 restore，因此
-不能把 dry-run 记为完整 kill-switch 演练；该验收未完成，当前灰度继续公开。
+用户另行明确授权后，同一安全 bundle 完成完整演练：
+
+1. disable dry-run、apply、verify 均为
+   `ok=true / event_ids=[924] / network_request_count=0`；
+2. OperationLog `105224` 创建于 `2026-07-19T05:14:25.394898Z`，event policy 从
+   `provisional_public v2` 收紧为 `shadow v3`；
+3. disable 后详情仍为 200，但全部 live result 标识消失；日历仍保留赛事，前五赛果
+   摘要消失；
+4. restore 在 apply 前重新 dry-run，随后 apply、verify；三步同样
+   `ok=true / event_ids=[924] / network_request_count=0`；
+5. OperationLog `105225` 创建于 `2026-07-19T05:17:11.592720Z`，event policy 恢复为
+   `provisional_public v4`；
+6. restore 后详情恢复“冠军 · 暂定”“暂定赛果”“尚待官方来源复核”和 1–7 顺序，
+   日历恢复前五摘要，仍不显示“赛果已确认”。
+
+演练前后 revision `2`、publication `1`、legacy result `7`、observation `2`、official
+marker evidence `1` 和 resolved incident `1` 均保持。shared global/UK/TRA policy
+保持 `provisional_public v2`，allowlist 仍只有 event `924`、enabled、version 2。
 
 ## 9. 收口状态
 
@@ -149,6 +166,10 @@ network_request_count=0`。没有执行 disable apply、验证详情/日历隐�
 - 可用磁盘：约 `5.2 GiB`
 
 Beat 已恢复；普通新闻任务可以继续运行。当前没有待执行的 event 924 poll、claim、official
-promotion 或范围扩展操作。发布已经生效，但 BHA promotion 后 15 分钟探测证据与完整
-kill-switch 演练两项仍缺失，因此本报告只记录当前生产事实，不宣告 evidence closure
-完成。
+promotion 或范围扩展操作。完整 kill-switch 演练已经完成，最终 event `924` 继续公开
+暂定赛果；四个 app service scheduler 均为 false，`race_live` 与普通 `celery` 队列均为
+0，live worker active/reserved 为空，健康检查为 200。
+
+BHA promotion 后 15 分钟新探测仍未发生，不能追溯记为通过。用户已决定由下一场获准公开
+灰度赛事重新执行该项验收；在取得下一场真实证据前，不得把 event `924` 的发布记录解释为
+15 分钟能力已验收，也不得据此开启 scheduler 或扩大公开范围。
