@@ -592,6 +592,20 @@ class P0HorseProductionApplyTests(TestCase):
         self.assertEqual(report["planned_profile_creates"], 1)
         self.assertEqual(report["planned_race_record_creates"], 2)
         self.assertEqual(
+            report["commit_table_lock_plan"],
+            {
+                "database": "postgresql_only",
+                "mode": "SHARE ROW EXCLUSIVE",
+                "tables": [
+                    "stable_termentry",
+                    "stable_horseprofile",
+                    "stable_termalias",
+                ],
+                "blocks_writes": True,
+                "dry_run_lock_acquired": False,
+            },
+        )
+        self.assertEqual(
             before,
             {
                 "profiles": HorseProfile.objects.count(),
@@ -704,6 +718,7 @@ class P0HorseProductionApplyTests(TestCase):
         first = self._commit(artifact_path)
         second = self._commit(artifact_path)
         self.assertEqual(first["strict_complete_count"], 50)
+        self.assertEqual(first["locked_identity_rescan_count"], 50)
         self.assertEqual(second["race_records_created"], 0)
         self.assertEqual(HorseProfile.objects.count(), 51)
         self.assertEqual(HorseRaceRecord.objects.count(), 1439)

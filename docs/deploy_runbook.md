@@ -29,7 +29,9 @@
       **Phase B deploy**；
    5. 对同一 artifact 与 release manifest 运行 formal `--dry-run`，确认零写入和全部 action；
    6. 核对生产 `HEAD`、容器、`/healthz/`、锁，完成数据库备份及独立校验；
-   7. 仅对已通过上述门禁的精确 artifact 执行 `--commit`。
+   7. 停止会写 `HorseProfile`、`TermEntry`、`TermAlias` 的自动任务，或以运行日志和数据库会话
+      明确确认 commit 窗口没有相关写入；
+   8. 仅对已通过上述门禁的精确 artifact 执行 `--commit`。
 6. 当前 trusted allowlist 为空，Phase A production mapping/candidate artifact 与 formal dry-run 均
    尚未执行。即使操作者自行制作 release manifest，命令也必须 fail closed；生产保持
    **NO-GO / prepare-only**。
@@ -80,7 +82,8 @@ python manage.py apply_reviewed_p0_horse_completion \
 
 dry-run 对 artifact、release manifest、v3、authority、mapping 各只读取一次普通文件字节，
 同一字节同时用于 SHA 与 JSON 解析；symlink 和非普通文件直接拒绝。命令逐行复核 DB snapshot
-与计划 action；`database_write_count` 必须精确为 `0`。
+与计划 action；`database_write_count` 必须精确为 `0`。报告中的 `commit_table_lock_plan`
+仅说明 commit 将取得的锁，dry-run 自身不得执行阻塞式 table lock。
 
 ```bash
 python manage.py apply_reviewed_p0_horse_completion \
@@ -96,6 +99,13 @@ commit 使用首次读取后保留在内存中的 payload，不重新打开输�
 artifact/release manifest 的成功 dry-run 和备份后执行。该命令不访问网络、不创建普通比赛
 `RaceEvent`；任一 reviewer/profile/identity/record/source/action 漂移整批回滚。本批只将
 artifact 明确认领的履历（含 unchanged）关联 completion run，不接管其它旧 NULL 履历。
+
+PostgreSQL commit 在 `SERIALIZABLE` 事务开始后、任何 mapping snapshot 重扫或创建前，对
+`stable_termentry`、`stable_termalias`、`stable_horseprofile` 取得
+`SHARE ROW EXCLUSIVE` table lock，并在锁内重扫全部 50 匹四字段身份和 mapping snapshot。
+该锁允许普通 `SELECT`，但会让这些表的 `INSERT/UPDATE/DELETE` 等待到整批事务提交或回滚；
+因此会造成一次短时马档案/术语写入暂停。执行前必须停止相关自动补全、术语维护和后台批量写入，
+或确认没有并发写会话；如果无法获得安静窗口则停止 commit，不应依赖锁等待硬顶上线流量。
 
 ## P0 马首批 50 匹生产提交前 NO-GO（2026-07-19）
 

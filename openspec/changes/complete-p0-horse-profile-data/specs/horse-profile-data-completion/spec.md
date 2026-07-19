@@ -230,15 +230,31 @@ prepare-only。
 - **AND** 输出 SHALL 包含 profile create/update、record create/update/existing、P0 source 和
   module audit 数量
 - **AND** 数据库写入数 MUST 为零
+- **AND** 输出 SHALL 报告 commit 将使用的 table lock，但 dry-run MUST NOT 取得阻塞式 table lock
 
 #### Scenario: commit 在单事务中 fail closed
 - **WHEN** 操作者提供精确 artifact SHA 与 `--confirm-reviewed-artifact`
 - **THEN** 系统 MUST 在单事务中锁定 reviewer、已有 profile 和 deterministic identity create scope
+- **AND** PostgreSQL MUST 在任何 mapping snapshot 重扫和业务创建前，以
+  `SHARE ROW EXCLUSIVE` 锁定 `TermEntry`、`TermAlias`、`HorseProfile`
+- **AND** table lock 取得后 MUST 重扫全部 50 匹四字段身份和 mapping snapshot
 - **AND** 任一 identity、snapshot、manual lock、记录或来源漂移 MUST 使整批回滚
 - **AND** 重跑同一 artifact MUST 不重复创建 profile、term、P0 source、candidate 或 race record
 - **AND** 普通履历 event/result 可为空，系统 MUST NOT 为本批创建 `RaceEvent`
 - **AND** completion run 只 SHALL 关联本 artifact upsert 明确认领的 record ID（包括 unchanged），
   不得接管其它 `completion_run IS NULL` 的旧履历
+
+#### Scenario: 非协作马档案或术语写入不能穿透提交快照
+- **WHEN** 其它连接未使用本批 advisory lock 并尝试写入马档案、术语或 alias
+- **THEN** 该写入 MUST 在本批 commit table lock 释放前等待或按数据库超时失败
+- **AND** 普通读取 SHOULD 继续可用
+- **AND** 运行手册 MUST 要求 commit 前停止相关自动任务或确认无并发写入
+
+#### Scenario: 提交事务覆盖深层业务写入和审计日志
+- **WHEN** 第一行已真实创建 profile、term、race records、P0 source、module candidates 和
+  completion run 后，后续行失败
+- **THEN** 全部业务写入 MUST 回滚
+- **AND** `TaskExecutionLog` 创建后发生异常时，日志与全部业务写入也 MUST 在同一事务回滚
 
 #### Scenario: 美国组合来源保持窄批准语义
 - **WHEN** formal artifact 写入美国 10 匹的已审核履历

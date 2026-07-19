@@ -250,13 +250,21 @@ create/update/existing、P0 source 和 module audit 数；该路径不得创建 
 其它数据库记录。
 
 commit 在单事务中按 deterministic identity key 串行化 create resolution，并对已有行执行
-`select_for_update`。写前重跑 dry-run 验证和 snapshot 检查；任一行漂移、人工锁冲突或写后未达到
-strict complete 时整批回滚。`create_new` 可创建暂无中文名的 pending horse term 和
+`select_for_update`。PostgreSQL 先进入 `SERIALIZABLE`，再对 `TermEntry`、`TermAlias`、
+`HorseProfile` 取得 `SHARE ROW EXCLUSIVE` table lock；该锁允许读取但阻塞这些表的协作与
+非协作 INSERT/UPDATE/DELETE。锁取得后必须重扫全部 50 匹四字段身份和 mapping snapshot，
+之后才能验证 action 或创建任何业务行。写前重跑 dry-run 验证和 snapshot 检查；任一行漂移、
+人工锁冲突或写后未达到 strict complete 时整批回滚。`create_new` 可创建暂无中文名的 pending horse term 和
 `HorseProfile`；普通履历允许不关联 `RaceEvent`，不得为了本批创建赛事。重跑同一 artifact 只追加
 任务执行审计，不重复创建 term、profile、P0 source、module candidate 或 `HorseRaceRecord`。
 create resolution 只复用 `term_type=HORSE` 的 term/alias；同名其它术语类型忽略。completion run
 只关联 artifact 明确认领的 upsert record ID，包括 unchanged 记录，不接管该 profile 其它 NULL
 旧履历。
+
+table lock 只属于 commit；dry-run 只报告锁计划，不取得阻塞锁。部署运行手册必须要求 commit 前
+停止相关马档案/术语自动写入或确认无并发写会话，并提示短时写入暂停。事务测试必须证明第一行真实
+创建 profile、term、records、P0 source、module candidates、completion run 后第二行异常会全部
+回滚，也必须证明 `TaskExecutionLog` 创建后的异常会连同日志和业务数据一起回滚。
 
 ## Risks / Trade-offs
 

@@ -63,6 +63,12 @@ RELEASE_MANIFEST_SCHEMA = "p0_horse_production_release_manifest.v1"
 # Phase A is deliberately prepare-only. Phase B must add the exact independently
 # approved manifest byte SHA here in a reviewed repository change.
 TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256: tuple[str, ...] = ()
+COMMIT_IDENTITY_TABLE_LOCK_MODE = "SHARE ROW EXCLUSIVE"
+COMMIT_IDENTITY_TABLE_LOCKS = (
+    TermEntry._meta.db_table,
+    HorseProfile._meta.db_table,
+    TermAlias._meta.db_table,
+)
 MIN_FORMAL_CONFIDENCE = 90
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
 IDENTITY_FIELDS = ("horse_name", "sire_name", "dam_name", "birth_year")
@@ -1591,6 +1597,13 @@ def dry_run_reviewed_p0_completion_artifact(
             "artifact_sha256": actual_sha,
             "release_manifest_sha256": release_input.sha256,
             "dry_run": True,
+            "commit_table_lock_plan": {
+                "database": "postgresql_only",
+                "mode": COMMIT_IDENTITY_TABLE_LOCK_MODE,
+                "tables": list(COMMIT_IDENTITY_TABLE_LOCKS),
+                "blocks_writes": True,
+                "dry_run_lock_acquired": False,
+            },
         }
     )
     return report
@@ -1669,6 +1682,95 @@ def _begin_commit_isolation() -> None:
         return
     with connection.cursor() as cursor:
         cursor.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+
+
+def _lock_commit_identity_tables() -> None:
+    if connection.vendor != "postgresql":
+        return
+    quoted_tables = ", ".join(
+        connection.ops.quote_name(table_name)
+        for table_name in COMMIT_IDENTITY_TABLE_LOCKS
+    )
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"LOCK TABLE {quoted_tables} IN "
+            f"{COMMIT_IDENTITY_TABLE_LOCK_MODE} MODE"
+        )
+
+
+def _mapping_snapshot_matches_idempotent_apply(
+    expected: dict[str, Any],
+    current: dict[str, Any],
+    *,
+    profile_id: int,
+) -> bool:
+    if (
+        expected.get("schema_version") != current.get("schema_version")
+    ):
+        return False
+    expected_data = expected.get("data") or {}
+    current_data = current.get("data") or {}
+    list_fields = {"name_match_profiles", "strong_identity_profiles"}
+    if {
+        key: value for key, value in expected_data.items() if key not in list_fields
+    } != {
+        key: value for key, value in current_data.items() if key not in list_fields
+    }:
+        return False
+    for field in ("name_match_profiles", "strong_identity_profiles"):
+        expected_rows = {
+            item["profile_id"]: item
+            for item in expected_data.get(field, [])
+        }
+        current_rows = {
+            item["profile_id"]: item
+            for item in current_data.get(field, [])
+        }
+        expected_ids = set(expected_rows)
+        current_ids = set(current_rows)
+        if current_ids != expected_ids | {profile_id}:
+            return False
+        for other_id in expected_ids - {profile_id}:
+            if expected_rows[other_id] != current_rows.get(other_id):
+                return False
+    return True
+
+
+def _rescan_locked_identity_mapping_snapshots(
+    artifact: dict[str, Any],
+    *,
+    artifact_sha256: str,
+) -> int:
+    rows = artifact.get("rows")
+    if not isinstance(rows, list) or not rows:
+        _fail("reviewed artifact rows are required for locked identity rescan")
+    seen_keys: set[str] = set()
+    for row in rows:
+        identity = _identity(
+            row.get("identity"),
+            context="locked artifact identity rescan",
+        )
+        identity_key = deterministic_identity_key(identity)
+        if row.get("deterministic_identity_key") != identity_key:
+            _fail("locked artifact deterministic identity key drift")
+        if identity_key in seen_keys:
+            _fail("locked artifact contains duplicate four-field identity")
+        seen_keys.add(identity_key)
+        resolution = row.get("resolution")
+        if not isinstance(resolution, dict):
+            _fail("locked artifact mapping resolution is missing")
+        current_snapshot = build_profile_mapping_snapshot(identity)
+        if resolution.get("database_mapping_snapshot") != current_snapshot:
+            already_applied = _already_applied_profile(row, artifact_sha256)
+            if already_applied is None or not _mapping_snapshot_matches_idempotent_apply(
+                resolution["database_mapping_snapshot"],
+                current_snapshot,
+                profile_id=already_applied.id,
+            ):
+                _fail(
+                    f"{identity['horse_name']} locked database mapping snapshot drift"
+                )
+    return len(rows)
 
 
 def _select_or_create_term(row: dict[str, Any]) -> tuple[TermEntry, bool]:
@@ -1855,6 +1957,10 @@ def _completion_run(artifact_path: str | Path, artifact_sha256: str, reviewer_id
     )
 
 
+def _after_task_execution_log_created_for_test() -> None:
+    """Patch point for transaction rollback tests; never controlled at runtime."""
+
+
 def commit_reviewed_p0_completion_artifact(
     *,
     artifact_path: str | Path,
@@ -1875,6 +1981,11 @@ def commit_reviewed_p0_completion_artifact(
     reviewer = _validate_reviewer(artifact["reviewer_id"])
     with _identity_session_lock_scope(artifact["rows"]), transaction.atomic():
         _begin_commit_isolation()
+        _lock_commit_identity_tables()
+        locked_identity_rescan_count = _rescan_locked_identity_mapping_snapshots(
+            artifact,
+            artifact_sha256=actual_sha,
+        )
         reviewer = (
             get_user_model().objects.select_for_update().filter(pk=reviewer.id).first()
         )
@@ -1930,6 +2041,11 @@ def commit_reviewed_p0_completion_artifact(
             "strict_complete_count": strict_complete_count,
             "artifact_sha256": actual_sha,
             "release_manifest_sha256": release_input.sha256,
+            "locked_identity_rescan_count": locked_identity_rescan_count,
+            "commit_table_lock": {
+                "mode": COMMIT_IDENTITY_TABLE_LOCK_MODE,
+                "tables": list(COMMIT_IDENTITY_TABLE_LOCKS),
+            },
             "database_write_count": (
                 simulation["planned_profile_creates"]
                 + simulation["planned_profile_updates"]
@@ -1955,6 +2071,7 @@ def commit_reviewed_p0_completion_artifact(
             ),
             finished_at=timezone.now(),
         )
+        _after_task_execution_log_created_for_test()
         return result
 
 
