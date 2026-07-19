@@ -64,6 +64,7 @@ RELEASE_MANIFEST_SCHEMA = "p0_horse_production_release_manifest.v1"
 # approved manifest byte SHA here in a reviewed repository change.
 TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256: tuple[str, ...] = ()
 COMMIT_IDENTITY_TABLE_LOCK_MODE = "SHARE ROW EXCLUSIVE"
+COMMIT_IDENTITY_TABLE_LOCK_TIMEOUT_MS = 5_000
 COMMIT_IDENTITY_TABLE_LOCKS = (
     TermEntry._meta.db_table,
     HorseProfile._meta.db_table,
@@ -1600,6 +1601,7 @@ def dry_run_reviewed_p0_completion_artifact(
             "commit_table_lock_plan": {
                 "database": "postgresql_only",
                 "mode": COMMIT_IDENTITY_TABLE_LOCK_MODE,
+                "timeout_ms": COMMIT_IDENTITY_TABLE_LOCK_TIMEOUT_MS,
                 "tables": list(COMMIT_IDENTITY_TABLE_LOCKS),
                 "blocks_writes": True,
                 "dry_run_lock_acquired": False,
@@ -1692,6 +1694,9 @@ def _lock_commit_identity_tables() -> None:
         for table_name in COMMIT_IDENTITY_TABLE_LOCKS
     )
     with connection.cursor() as cursor:
+        cursor.execute(
+            f"SET LOCAL lock_timeout = '{COMMIT_IDENTITY_TABLE_LOCK_TIMEOUT_MS}ms'"
+        )
         cursor.execute(
             f"LOCK TABLE {quoted_tables} IN "
             f"{COMMIT_IDENTITY_TABLE_LOCK_MODE} MODE"
@@ -2044,6 +2049,7 @@ def commit_reviewed_p0_completion_artifact(
             "locked_identity_rescan_count": locked_identity_rescan_count,
             "commit_table_lock": {
                 "mode": COMMIT_IDENTITY_TABLE_LOCK_MODE,
+                "timeout_ms": COMMIT_IDENTITY_TABLE_LOCK_TIMEOUT_MS,
                 "tables": list(COMMIT_IDENTITY_TABLE_LOCKS),
             },
             "database_write_count": (

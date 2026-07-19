@@ -8,7 +8,12 @@ from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core.management.color import no_style
-from django.db import close_old_connections, connection, transaction
+from django.db import (
+    OperationalError,
+    close_old_connections,
+    connection,
+    transaction,
+)
 from django.test import TransactionTestCase, skipUnlessDBFeature
 
 from stable import test_p0_horse_production_apply as apply_test_helpers
@@ -122,6 +127,15 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
             for index, sql in enumerate(statements)
             if sql.startswith("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
         )
+        lock_timeout_index = next(
+            index
+            for index, sql in enumerate(statements)
+            if sql.startswith("SET LOCAL lock_timeout")
+        )
+        self.assertEqual(
+            statements[lock_timeout_index],
+            "SET LOCAL lock_timeout = '5000ms'",
+        )
         table_lock_index = next(
             index for index, sql in enumerate(statements) if sql.startswith("LOCK TABLE")
         )
@@ -142,7 +156,8 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
             for index, sql in enumerate(statements)
             if sql.startswith("INSERT INTO")
         )
-        self.assertLess(isolation_index, table_lock_index)
+        self.assertLess(isolation_index, lock_timeout_index)
+        self.assertLess(lock_timeout_index, table_lock_index)
         self.assertLess(table_lock_index, rescan_index)
         self.assertLess(rescan_index, first_insert_index)
 
@@ -152,6 +167,7 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
         writer_started = threading.Event()
         writer_finished = threading.Event()
         errors = []
+        writer_backend_pids = []
 
         def locker():
             close_old_connections()
@@ -170,6 +186,9 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
             close_old_connections()
             try:
                 lock_ready.wait(timeout=10)
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT pg_backend_pid()")
+                    writer_backend_pids.append(cursor.fetchone()[0])
                 writer_started.set()
                 TermEntry.objects.create(
                     term_type="horse",
@@ -191,7 +210,15 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
         writer_thread.start()
         self.assertTrue(lock_ready.wait(timeout=10))
         self.assertTrue(writer_started.wait(timeout=10))
-        time.sleep(0.25)
+        self.assertEqual(len(writer_backend_pids), 1)
+        blocked_lock = self._wait_for_relation_lock(
+            backend_pid=writer_backend_pids[0],
+            relation=TermEntry._meta.db_table,
+        )
+        self.assertEqual(blocked_lock["wait_event_type"], "Lock")
+        self.assertEqual(blocked_lock["relation"], TermEntry._meta.db_table)
+        self.assertEqual(blocked_lock["mode"], "RowExclusiveLock")
+        self.assertFalse(blocked_lock["granted"])
         self.assertFalse(writer_finished.is_set())
         release_lock.set()
         locker_thread.join(timeout=10)
@@ -201,6 +228,68 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
         self.assertTrue(
             TermEntry.objects.filter(source_ja="Non-cooperating writer").exists()
         )
+
+    def test_commit_table_lock_timeout_rolls_back_and_releases_session_locks(self):
+        horse = self.helper._horse(0)
+        artifact_path, artifact = self.helper._prepare(
+            [horse],
+            [{"decision": "create_new"}],
+        )
+        release_path, release_sha = self.helper._release(artifact_path, artifact)
+        lock_ready = threading.Event()
+        release_lock = threading.Event()
+        holder_errors = []
+
+        def conflicting_lock_holder():
+            close_old_connections()
+            try:
+                with transaction.atomic():
+                    with connection.cursor() as cursor:
+                        table_name = connection.ops.quote_name(TermEntry._meta.db_table)
+                        cursor.execute(
+                            f"LOCK TABLE {table_name} IN ROW EXCLUSIVE MODE"
+                        )
+                    lock_ready.set()
+                    release_lock.wait(timeout=7)
+            except Exception as exc:  # pragma: no cover - asserted after join
+                holder_errors.append(exc)
+            finally:
+                close_old_connections()
+
+        holder_thread = threading.Thread(target=conflicting_lock_holder)
+        holder_thread.start()
+        self.assertTrue(lock_ready.wait(timeout=10))
+        try:
+            with mock.patch(
+                "stable.services.p0_horse_production_apply."
+                "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
+                (release_sha,),
+            ), self.assertRaises(OperationalError):
+                commit_reviewed_p0_completion_artifact(
+                    artifact_path=artifact_path,
+                    artifact_sha256=sha256_file(artifact_path),
+                    release_manifest_path=release_path,
+                    release_manifest_sha256=release_sha,
+                    confirm_reviewed_artifact=True,
+                )
+        finally:
+            release_lock.set()
+            holder_thread.join(timeout=10)
+
+        self.assertFalse(holder_errors)
+        self.assertFalse(holder_thread.is_alive())
+        self._assert_all_apply_business_tables_empty()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT count(*)
+                FROM pg_locks
+                WHERE pid = pg_backend_pid()
+                  AND locktype = 'advisory'
+                  AND granted
+                """
+            )
+            self.assertEqual(cursor.fetchone()[0], 0)
 
     def test_concurrent_same_artifact_commit_creates_one_identity(self):
         horse = self.helper._horse(0)
@@ -366,3 +455,41 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
         self.assertEqual(HorseProfileDataCandidate.objects.count(), 0)
         self.assertEqual(HorseProfileCompletionRun.objects.count(), 0)
         self.assertEqual(TaskExecutionLog.objects.count(), 0)
+
+    def _wait_for_relation_lock(
+        self,
+        *,
+        backend_pid: int,
+        relation: str,
+        timeout: float = 5,
+    ):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT activity.wait_event_type, activity.wait_event,
+                           locks.mode, locks.granted, relation.relname
+                    FROM pg_stat_activity AS activity
+                    JOIN pg_locks AS locks ON locks.pid = activity.pid
+                    JOIN pg_class AS relation ON relation.oid = locks.relation
+                    WHERE activity.pid = %s
+                      AND locks.locktype = 'relation'
+                      AND relation.relname = %s
+                      AND NOT locks.granted
+                    """,
+                    [backend_pid, relation],
+                )
+                row = cursor.fetchone()
+            if row is not None and row[0] == "Lock":
+                return {
+                    "wait_event_type": row[0],
+                    "wait_event": row[1],
+                    "mode": row[2],
+                    "granted": row[3],
+                    "relation": row[4],
+                }
+            time.sleep(0.05)
+        self.fail(
+            f"backend {backend_pid} did not expose a blocked lock on {relation}"
+        )

@@ -237,6 +237,7 @@ prepare-only。
 - **THEN** 系统 MUST 在单事务中锁定 reviewer、已有 profile 和 deterministic identity create scope
 - **AND** PostgreSQL MUST 在任何 mapping snapshot 重扫和业务创建前，以
   `SHARE ROW EXCLUSIVE` 锁定 `TermEntry`、`TermAlias`、`HorseProfile`
+- **AND** 系统 MUST 在请求 table lock 前以事务局部设置将 `lock_timeout` 固定为 5 秒
 - **AND** table lock 取得后 MUST 重扫全部 50 匹四字段身份和 mapping snapshot
 - **AND** 任一 identity、snapshot、manual lock、记录或来源漂移 MUST 使整批回滚
 - **AND** 重跑同一 artifact MUST 不重复创建 profile、term、P0 source、candidate 或 race record
@@ -247,8 +248,16 @@ prepare-only。
 #### Scenario: 非协作马档案或术语写入不能穿透提交快照
 - **WHEN** 其它连接未使用本批 advisory lock 并尝试写入马档案、术语或 alias
 - **THEN** 该写入 MUST 在本批 commit table lock 释放前等待或按数据库超时失败
+- **AND** 独立观察连接 MUST 能按 writer backend PID 在目标 relation 上观测到
+  `wait_event_type=Lock` 和未授予的写入 relation lock
 - **AND** 普通读取 SHOULD 继续可用
 - **AND** 运行手册 MUST 要求 commit 前停止相关自动任务或确认无并发写入
+
+#### Scenario: table lock 等待超过固定上限
+- **WHEN** 其它连接持有冲突 relation lock 超过 5 秒
+- **THEN** 本批 commit MUST 以锁超时异常终止
+- **AND** 全部业务表 MUST 保持提交前状态
+- **AND** 本批 session advisory locks MUST 释放
 
 #### Scenario: 提交事务覆盖深层业务写入和审计日志
 - **WHEN** 第一行已真实创建 profile、term、race records、P0 source、module candidates 和

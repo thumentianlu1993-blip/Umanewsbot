@@ -103,6 +103,8 @@ artifact 明确认领的履历（含 unchanged）关联 completion run，不接�
 PostgreSQL commit 在 `SERIALIZABLE` 事务开始后、任何 mapping snapshot 重扫或创建前，对
 `stable_termentry`、`stable_termalias`、`stable_horseprofile` 取得
 `SHARE ROW EXCLUSIVE` table lock，并在锁内重扫全部 50 匹四字段身份和 mapping snapshot。
+取得 table lock 前，事务以 `SET LOCAL lock_timeout = '5000ms'` 将等待上限固定为 5 秒；
+超过上限即整批异常、业务零写入并释放本批 session advisory locks，不得自动放宽或盲目重试。
 该锁允许普通 `SELECT`，但会让这些表的 `INSERT/UPDATE/DELETE` 等待到整批事务提交或回滚；
 因此会造成一次短时马档案/术语写入暂停。执行前必须停止相关自动补全、术语维护和后台批量写入，
 或确认没有并发写会话；如果无法获得安静窗口则停止 commit，不应依赖锁等待硬顶上线流量。

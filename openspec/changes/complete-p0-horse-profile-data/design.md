@@ -252,7 +252,9 @@ create/update/existing、P0 source 和 module audit 数；该路径不得创建 
 commit 在单事务中按 deterministic identity key 串行化 create resolution，并对已有行执行
 `select_for_update`。PostgreSQL 先进入 `SERIALIZABLE`，再对 `TermEntry`、`TermAlias`、
 `HorseProfile` 取得 `SHARE ROW EXCLUSIVE` table lock；该锁允许读取但阻塞这些表的协作与
-非协作 INSERT/UPDATE/DELETE。锁取得后必须重扫全部 50 匹四字段身份和 mapping snapshot，
+非协作 INSERT/UPDATE/DELETE。取得 table lock 前必须在当前事务设置固定 5 秒
+`lock_timeout`；超时必须整批异常、业务零写入并释放 session advisory locks。锁取得后必须
+重扫全部 50 匹四字段身份和 mapping snapshot，
 之后才能验证 action 或创建任何业务行。写前重跑 dry-run 验证和 snapshot 检查；任一行漂移、
 人工锁冲突或写后未达到 strict complete 时整批回滚。`create_new` 可创建暂无中文名的 pending horse term 和
 `HorseProfile`；普通履历允许不关联 `RaceEvent`，不得为了本批创建赛事。重跑同一 artifact 只追加
@@ -262,7 +264,10 @@ create resolution 只复用 `term_type=HORSE` 的 term/alias；同名其它术�
 旧履历。
 
 table lock 只属于 commit；dry-run 只报告锁计划，不取得阻塞锁。部署运行手册必须要求 commit 前
-停止相关马档案/术语自动写入或确认无并发写会话，并提示短时写入暂停。事务测试必须证明第一行真实
+停止相关马档案/术语自动写入或确认无并发写会话，提示短时写入暂停和 5 秒锁等待上限。事务测试
+必须通过独立观察连接确认非协作 writer 的 backend PID 在目标 relation 上以
+`wait_event_type=Lock` 等待，并证明冲突锁超过上限时整批零写入且 session advisory locks
+释放。事务测试还必须证明第一行真实
 创建 profile、term、records、P0 source、module candidates、completion run 后第二行异常会全部
 回滚，也必须证明 `TaskExecutionLog` 创建后的异常会连同日志和业务数据一起回滚。
 

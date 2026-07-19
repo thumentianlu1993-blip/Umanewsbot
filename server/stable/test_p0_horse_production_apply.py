@@ -596,6 +596,7 @@ class P0HorseProductionApplyTests(TestCase):
             {
                 "database": "postgresql_only",
                 "mode": "SHARE ROW EXCLUSIVE",
+                "timeout_ms": 5000,
                 "tables": [
                     "stable_termentry",
                     "stable_horseprofile",
