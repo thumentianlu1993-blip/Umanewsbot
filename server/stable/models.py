@@ -1407,6 +1407,16 @@ class RaceLiveEventPublicationAllowlist(TimestampedModel):
         blank=True,
         default="",
     )
+    official_verification_contract_digest = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+    )
+    official_terms_evidence_digest = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+    )
     official_verification_valid_until = models.DateTimeField(null=True, blank=True)
     enabled = models.BooleanField(default=False)
     version = models.PositiveBigIntegerField(default=1)
@@ -1844,7 +1854,18 @@ class RaceLiveOfficialVerificationIncident(TimestampedModel):
     )
     official_route = models.CharField(max_length=255)
     official_route_version = models.CharField(max_length=64)
+    official_route_contract_digest = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+    )
+    official_terms_evidence_digest = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+    )
     deadline_at = models.DateTimeField()
+    manual_verification_due_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
         max_length=16,
         choices=RaceLiveOfficialVerificationIncidentStatus.choices,

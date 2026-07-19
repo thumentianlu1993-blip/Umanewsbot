@@ -1,5 +1,38 @@
 # 关键决策
 
+## 2026-07-19：event 924 使用已存 shadow 的无网络 operator promotion
+
+- event `924` 的首个公开灰度不重新请求 TRA，也不伪造 runner claim/checkpoint。受审
+  prepare 从数据库一致快照生成 promotion、disable、restore 三份独立 CAS manifest；
+  operator 路径按 `control -> tracking -> event -> source/observation/revision/items ->
+  policy/allowlist` 锁序，在同一事务内复用 runner 的唯一 admission core。
+- promotion 只修改 manifest 精确列出的四层 policy 和 event allowlist，物化既有
+  provisional revision，创建唯一 publication/incident，并停止该 event 的后续 tracking。
+  `claim_generation`、provider attempt/success/hash/failure 和 host budget 均保持不变；
+  scheduler 继续 false，tracking/allowlist universe 必须仍精确为 `[924]`。
+- shared global/region/source policy 可作为版本化 public cap 保留；每个 event policy
+  仍是强制层。resolver 的单条和批量读取在 event policy 缺失时都 fail closed；
+  initializer 可复用合法 shared v2+ cap，但新 event 只允许建立精确 `event:ID shadow
+  v1`，不能因 shared cap 或 allowlist 自动公开。
+
+## 2026-07-19：暂定公开与 BHA 人工官方复核解耦
+
+- TRA 继续固定为 supplemental authority；完整 TRA 结果可先以明确
+  `provisional_public` 展示。赛事粗状态随成功物化变为 finished，但
+  `result_confirmed_at` 保持空，页面只显示“冠军 · 暂定”“尚待官方来源复核”和“补充
+  来源”，绝不误标正式。
+- BHA 当前路线固定为版本化 `manual_browser_only` registry，禁止自动抓取、页面后端 API
+  或批量下载。registry 中的 terms evidence digest 是受审条款证据记录的摘要，不是
+  BHA HTTP response body 的摘要；发布前仍须 release operator 用普通浏览器确认入口、
+  条款和 route 有效。
+- 人工 receipt 只持久化客观 marker、participant/position 和私有截图/打印件 SHA，不保存
+  第三方页面 raw、评论、评级、赔率或逐马版权描述。服务自行比较 provisional 顺序：
+  match 只关闭 incident、不把页面升级为 official；conflict 同事务执行预生成 event
+  disable；unavailable 保持明确 provisional/open，记录一次告警和后续人工探针时间。
+- public admission/read 必须同时验证 route contract digest 和 terms evidence digest。
+  allowlist/incident 保存同一版本化摘要，manual due 为 promotion commit + 15 分钟；
+  event off + 2h 后仍 open 时 verify 明确报告 overdue。
+
 ## 2026-07-18：英国 Group 级别装饰只从审核级别派生精确名称变体
 
 - TRA 英国 G1-G3 racecard 赛事名可在基础名末尾携带 `(Group 1/2/3)`。首版只在英国且

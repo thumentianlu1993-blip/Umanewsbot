@@ -42,6 +42,20 @@
 - QQ 测试群通过 `PushTarget.multiregion_test_enabled` 单独灰度；该字段默认关闭，正式群在最终阶段前继续只按主地区判断。
 - 翻译自动重试耗尽或永久失败会记录终态并发送运营邮件，邮件包含后台快速处理入口；自动重试总开关仍默认关闭。
 
+## 准实时赛事赛果链路
+
+准实时赛果与新闻、历史回填分离。来源事实先保存为 append-only observation 和 immutable
+revision，再经四层 policy、逐赛事 allowlist、来源条款/authority、participant 完整性和
+owner/claim CAS 决定是否形成公开 projection。The Racing API 只提供快速
+`provisional_result`；官方来源的独立 evidence 才能支持后续 `official_result` 或
+`corrected_result`。
+
+首个公开候选只覆盖英国 event `924` 的已存 shadow revision，使用无网络、可哈希的
+promotion/disable/restore manifest。暂定赛果可以先公开，但页面必须清晰显示“暂定”与
+“尚待官方来源复核”；BHA 当前只采用人工浏览器复核和离线 evidence receipt，不自动抓取，
+也不复制第三方评级、评论、赔率或页面正文。scheduler 默认关闭，其他赛事和地区不会因
+部署代码自动进入公开范围。
+
 ## 历史赛事数据链路
 
 历史赛事与新闻常态任务分离，按“正式总账 -> selection artifact -> 网络抓取 artifact -> 离线打包/dry-run -> 受控落库 -> 逐场验收”推进。batch006 起标准批次为单地区最多 250 场，仍保留地区进度、排除 snapshot、来源身份、审批 SHA、写前备份和 draft 可见性门禁。

@@ -1,5 +1,27 @@
 # 项目状态文档
 
+## 2026-07-19 event 924 代码 review finding 已修复，待限定复审
+
+- 候选变更基于当前 `origin/main@353464c7` 的独立 worktree，实现 event `924` 已存
+  shadow result 的无网络 promotion、精确 disable/restore、页面“冠军 · 暂定”、客观
+  racecard fallback，以及 BHA manual official receipt 的 match/conflict/unavailable
+  闭环。
+- operator promotion 与 runner 复用同一 admission core，但不伪造 claim/checkpoint；
+  policy、allowlist、projection、incident 和 tracking stop 位于同一事务。scheduler
+  默认仍为 false，Compose 没有增加 worker 或扩大赛事范围。
+- 首次独立 code review 结论为 `REVISE`；2 项 P1、1 项 P2 已完成真实 RED/GREEN：
+  receipt 硬限 event 924、unavailable 真实邮件 SENT/FAILED/retry、manual dry-run/apply
+  共用 locked planner。随后两项直接 P1 也已用真实 RED/GREEN 修复：告警按 incident 跨
+  receipt 去重；probe/receipt operation/QUEUED intent 先原子 commit，SMTP 后置于独立
+  delivery transaction，主事务晚期写入或 commit 失败均零 SMTP。
+- SQLite 合并聚焦 `226` 项（`224` 通过、`2` 项 PostgreSQL-only 跳过）；PostgreSQL
+  durable intent/并发新增 `2/2`、既有锁/竞争 `22/22`；migration `0046` 往返、
+  Django/migration drift 和三份 Compose 校验均通过。
+- 这是“全部已知 finding 已修复、待同一 reviewer 限定复审”的状态，不是生产发布或
+  event `924` 已公开。
+  当前未提交、未部署、未联网、未写生产；最新成功代码 review 和其后的精确发布授权仍是
+  后续硬门禁。
+
 ## 2026-07-18 event 924 首个 TRA shadow 赛果到达
 
 - 已在 scheduler false、四层 policy shadow、tracking/allowlist 仅 `[924]` 的边界内完成

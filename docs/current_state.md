@@ -1,5 +1,50 @@
 # 当前状态
 
+## 2026-07-19 event 924 代码审核 finding 已修复，待同一 reviewer 限定复审
+
+- 独立 worktree 为
+  `/Users/mentianlu/Code/umanews/.worktrees/event-924-provisional-public-gray`，分支
+  `codex/event-924-provisional-public-gray`；`HEAD`、merge-base 和当前
+  `origin/main` 均为 `353464c76c63d1e43043ccbefe0ebc88274b0888`。没有复用历史抓取
+  worktree 或运行产物。
+- 已实现只针对“已持久化、未发布 shadow revision”的离线 operator transition：
+  prepare 一次生成 promotion/disable/restore 精确 CAS manifest；命令默认 dry-run，
+  apply 需要显式确认，verify 只读。promotion 不领取 provider claim、不调用网络或
+  checkpoint，不改 provider attempt/success/hash/failure 时间，只在同一事务内晋级
+  policy/allowlist、调用共享 admission core、物化 publication/legacy result/incident，
+  然后关闭 event tracking。
+- `0046` 只为 allowlist/incident 增加 BHA route contract、terms evidence digest 和人工
+  复核时限字段；旧 shadow 行允许为空，但 public admission/read 对缺失或非法 digest
+  fail closed。provisional materialization 会把 scheduled/running 推进为 finished，
+  保持 `result_confirmed_at=null`，只允许从 current racecard 补 `barrier/jockey_name`
+  并保存字段级 provenance。
+- BHA 仍是 `manual_browser_only` 官方复核路线，`automation_allowed=false`。离线 receipt
+  硬限 event `924`，只接受 source URL、时间、私有证据 SHA、marker 和客观名次；不保存
+  页面 raw、评论、评级或赔率，也不接受操作者自报 comparison。一致时 resolve incident，
+  冲突时同事务执行预生成 event disable。暂不可用时保持 provisional/open；主事务先原子
+  提交 probe、receipt OperationLog 和 `QUEUED NotificationLog` durable intent，提交成功
+  后才进入独立 delivery transaction 真实发邮件。delivery 终态为 `SENT/FAILED`，只有
+  SENT 设置 `alert_sent_at`，失败可重放重试；去重键稳定绑定 incident，不绑定 receipt，
+  因此新 receipt 会推进 probe/operation evidence，但不会重复发送同一 incident 告警。
+- manual 命令默认 dry-run 与 apply 共用同一个 locked planner，验证 current revision、
+  participant、incident、policy/allowlist CAS、时间和 conflict disable pre-state；dry-run
+  零写入、零邮件副作用，并显式输出 comparison/alert status。
+- 首次独立代码 review session `019f76c2-78bd-7ed3-9107-a7b1c2a7aa4e` 结论为
+  `REVISE`；首次 2 项 P1、1 项 P2 以及随后两项直接 P1 均按真实 RED -> GREEN 修复。
+  后两项明确覆盖跨 receipt incident 去重与“主事务成功 commit 前零 SMTP”，当前等待同一
+  reviewer 限定复审，不把此前 review 视为成功门禁。
+- 本地最终验证：合并聚焦 SQLite `226` 项，`224/224` 通过、PostgreSQL-only `2` 项跳过；
+  transition/manual 专项 `41` 项，`39/39` 通过、PostgreSQL-only `2` 项跳过；临时真实
+  PostgreSQL 16 新增 durable intent/并发专项 `2/2`，既有 transition、双 operator、
+  policy/allowlist CAS、runner 竞争和初始化锁回归 `22/22`；`0046` 正向、
+  反向、再正向通过；Django check、migration drift 和三份 Compose config 通过。
+  三份 Compose 都保持 `RACE_LIVE_SCHEDULER_ENABLED=false`，publication artifact rw
+  只挂给 `race_live_worker`。
+- 当前仍未 commit、未成功代码 review、未冻结、未发布、未连接或写入生产，也没有访问
+  BHA 或重新请求 TRA。生产继续运行 2026-07-18 的 shadow 基线：event `924` 未公开、
+  scheduler false、范围不扩展。下一门禁仍是同一 reviewer 的限定复审；只有成功后，才能
+  冻结精确 fingerprint 并向用户请求该冻结版本的新发布授权。
+
 ## 2026-07-18 event 924 首个 TRA shadow 赛果已取得，有界窗口停止
 
 - 用户显式授权仅对 event `924` 按数据库 `next_poll_at` 手动 claim/dispatch，直到首个

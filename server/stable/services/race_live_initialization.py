@@ -687,6 +687,26 @@ def _policy_specs(
     return result
 
 
+def _shared_policy_specs(
+    manifest: LoadedRaceLiveInitializationManifest,
+) -> list[tuple[str, str]]:
+    return [
+        spec
+        for spec in _policy_specs(manifest)
+        if spec[0] != models.RaceLivePublicationScopeType.EVENT
+    ]
+
+
+def _event_policy_specs(
+    manifest: LoadedRaceLiveInitializationManifest,
+) -> list[tuple[str, str]]:
+    return [
+        spec
+        for spec in _policy_specs(manifest)
+        if spec[0] == models.RaceLivePublicationScopeType.EVENT
+    ]
+
+
 def _event_identity_matches(row: models.RaceEvent, event: dict[str, Any]) -> bool:
     return (
         row.pk == event["event_id"]
@@ -786,12 +806,33 @@ def _load_and_validate_events(
     return rows
 
 
-def _policy_matches(
+def _shared_policy_matches(
     row: models.RaceLivePublicationPolicy,
     manifest: LoadedRaceLiveInitializationManifest,
 ) -> bool:
     return (
-        row.mode == models.RaceLivePublicationMode.SHADOW
+        row.scope_type != models.RaceLivePublicationScopeType.EVENT
+        and row.mode
+        in {
+            models.RaceLivePublicationMode.SHADOW,
+            models.RaceLivePublicationMode.PROVISIONAL_PUBLIC,
+            models.RaceLivePublicationMode.OFFICIAL_PUBLIC,
+        }
+        and row.version >= 1
+        and row.registry_digest == manifest.payload["registry_digest"]
+        and row.coverage_proof_digest
+        == manifest.payload["coverage_proof_digest"]
+        and row.valid_until == manifest.policy_valid_until
+    )
+
+
+def _event_policy_matches(
+    row: models.RaceLivePublicationPolicy,
+    manifest: LoadedRaceLiveInitializationManifest,
+) -> bool:
+    return (
+        row.scope_type == models.RaceLivePublicationScopeType.EVENT
+        and row.mode == models.RaceLivePublicationMode.SHADOW
         and row.version == 1
         and row.registry_digest == manifest.payload["registry_digest"]
         and row.coverage_proof_digest
@@ -803,12 +844,19 @@ def _policy_matches(
 def _validate_shared_rows(
     manifest: LoadedRaceLiveInitializationManifest,
 ) -> None:
-    for scope_type, scope_key in _policy_specs(manifest):
+    for scope_type, scope_key in _shared_policy_specs(manifest):
         policy = models.RaceLivePublicationPolicy.objects.filter(
             scope_type=scope_type,
             scope_key=scope_key,
         ).first()
-        if policy is not None and not _policy_matches(policy, manifest):
+        if policy is not None and not _shared_policy_matches(policy, manifest):
+            _fail(f"publication policy 冲突：{scope_type}:{scope_key}")
+    for scope_type, scope_key in _event_policy_specs(manifest):
+        policy = models.RaceLivePublicationPolicy.objects.filter(
+            scope_type=scope_type,
+            scope_key=scope_key,
+        ).first()
+        if policy is not None and not _event_policy_matches(policy, manifest):
             _fail(f"publication policy 冲突：{scope_type}:{scope_key}")
     budget = models.RaceLiveHostBudget.objects.filter(host=_HOST).first()
     budget_matches = budget is None or (
@@ -1210,7 +1258,7 @@ def dry_run_race_live_initialization(
 def _create_missing_shared_rows(
     manifest: LoadedRaceLiveInitializationManifest,
 ) -> None:
-    for scope_type, scope_key in _policy_specs(manifest):
+    for scope_type, scope_key in _shared_policy_specs(manifest):
         policy = models.RaceLivePublicationPolicy.objects.filter(
             scope_type=scope_type,
             scope_key=scope_key,
@@ -1227,7 +1275,26 @@ def _create_missing_shared_rows(
                 ],
                 valid_until=manifest.policy_valid_until,
             )
-        elif not _policy_matches(policy, manifest):
+        elif not _shared_policy_matches(policy, manifest):
+            _fail(f"publication policy 冲突：{scope_type}:{scope_key}")
+    for scope_type, scope_key in _event_policy_specs(manifest):
+        policy = models.RaceLivePublicationPolicy.objects.filter(
+            scope_type=scope_type,
+            scope_key=scope_key,
+        ).first()
+        if policy is None:
+            models.RaceLivePublicationPolicy.objects.create(
+                scope_type=scope_type,
+                scope_key=scope_key,
+                mode=models.RaceLivePublicationMode.SHADOW,
+                version=1,
+                registry_digest=manifest.payload["registry_digest"],
+                coverage_proof_digest=manifest.payload[
+                    "coverage_proof_digest"
+                ],
+                valid_until=manifest.policy_valid_until,
+            )
+        elif not _event_policy_matches(policy, manifest):
             _fail(f"publication policy 冲突：{scope_type}:{scope_key}")
     budget = models.RaceLiveHostBudget.objects.filter(host=_HOST).first()
     if budget is None:
@@ -1459,14 +1526,29 @@ def verify_race_live_initialization(
         _load_and_validate_events(manifest, lock=False)
     except RaceLiveInitializationError as exc:
         errors.append(str(exc))
-    for scope_type, scope_key in _policy_specs(manifest):
+    for scope_type, scope_key in _shared_policy_specs(manifest):
         policies = list(
             models.RaceLivePublicationPolicy.objects.filter(
                 scope_type=scope_type,
                 scope_key=scope_key,
             )
         )
-        if len(policies) != 1 or not _policy_matches(policies[0], manifest):
+        if len(policies) != 1 or not _shared_policy_matches(
+            policies[0],
+            manifest,
+        ):
+            errors.append(f"policy_mismatch:{scope_type}:{scope_key}")
+    for scope_type, scope_key in _event_policy_specs(manifest):
+        policies = list(
+            models.RaceLivePublicationPolicy.objects.filter(
+                scope_type=scope_type,
+                scope_key=scope_key,
+            )
+        )
+        if len(policies) != 1 or not _event_policy_matches(
+            policies[0],
+            manifest,
+        ):
             errors.append(f"policy_mismatch:{scope_type}:{scope_key}")
     budgets = list(models.RaceLiveHostBudget.objects.filter(host=_HOST))
     if len(budgets) != 1 or not (

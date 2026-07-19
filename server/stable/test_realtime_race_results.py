@@ -840,6 +840,8 @@ class RaceLivePublicationPolicyResolutionTests(TestCase):
             coverage_proof_digest=self.COVERAGE_DIGEST,
             official_verification_route="jra_result_verification",
             official_verification_route_version="jra-v1",
+            official_verification_contract_digest="c" * 64,
+            official_terms_evidence_digest="d" * 64,
             official_verification_valid_until=self.NOW + timedelta(days=30),
             enabled=True,
         )
@@ -864,6 +866,33 @@ class RaceLivePublicationPolicyResolutionTests(TestCase):
         self.assertEqual(decision.effective_mode, "off")
         self.assertEqual(decision.reason, "global_policy_missing")
 
+    def test_missing_event_policy_fails_closed_even_when_shared_caps_are_public(self):
+        for scope_type, scope_key in (
+            (stable_models.RaceLivePublicationScopeType.GLOBAL, "global"),
+            (
+                stable_models.RaceLivePublicationScopeType.REGION,
+                self.event.country_region,
+            ),
+            (
+                stable_models.RaceLivePublicationScopeType.SOURCE,
+                self.source.source_key,
+            ),
+        ):
+            stable_models.RaceLivePublicationPolicy.objects.create(
+                scope_type=scope_type,
+                scope_key=scope_key,
+                mode=stable_models.RaceLivePublicationMode.PROVISIONAL_PUBLIC,
+                registry_digest=self.REGISTRY_DIGEST,
+                coverage_proof_digest=self.COVERAGE_DIGEST,
+                valid_until=self.NOW + timedelta(days=30),
+            )
+
+        decision = self._resolve()
+
+        self.assertIs(decision.allowed, False)
+        self.assertEqual(decision.effective_mode, "off")
+        self.assertEqual(decision.reason, "event_policy_missing")
+
     def test_caps_terms_digests_allowlist_route_and_expiry_are_all_monotonic_gates(self):
         stable_models.RaceLivePublicationPolicy.objects.create(
             scope_type="global",
@@ -881,6 +910,18 @@ class RaceLivePublicationPolicyResolutionTests(TestCase):
             coverage_proof_digest=self.COVERAGE_DIGEST,
             valid_until=self.NOW + timedelta(days=30),
         )
+        for scope_type, scope_key in (
+            ("region", self.event.country_region),
+            ("event", str(self.event.pk)),
+        ):
+            stable_models.RaceLivePublicationPolicy.objects.create(
+                scope_type=scope_type,
+                scope_key=scope_key,
+                mode=stable_models.RaceLivePublicationMode.PROVISIONAL_PUBLIC,
+                registry_digest=self.REGISTRY_DIGEST,
+                coverage_proof_digest=self.COVERAGE_DIGEST,
+                valid_until=self.NOW + timedelta(days=30),
+            )
 
         self.assertEqual(self._resolve().reason, "policy_off")
 
@@ -1051,6 +1092,22 @@ class RaceLiveOfficialVerificationModelTests(TestCase):
                 deadline_at=self.NOW + timedelta(hours=2),
                 opened_at=self.NOW,
             )
+
+    def test_public_route_contract_and_manual_due_fields_are_persisted(self):
+        allowlist_fields = {
+            field.name
+            for field in stable_models.RaceLiveEventPublicationAllowlist._meta.get_fields()
+        }
+        incident_fields = {
+            field.name
+            for field in stable_models.RaceLiveOfficialVerificationIncident._meta.get_fields()
+        }
+
+        self.assertIn("official_verification_contract_digest", allowlist_fields)
+        self.assertIn("official_terms_evidence_digest", allowlist_fields)
+        self.assertIn("official_route_contract_digest", incident_fields)
+        self.assertIn("official_terms_evidence_digest", incident_fields)
+        self.assertIn("manual_verification_due_at", incident_fields)
 
 
 class RaceLiveRevisionModelTests(TestCase):
@@ -2680,6 +2737,28 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
             coverage_proof_digest="b" * 64,
             valid_until=self.NOW + timedelta(days=20),
         )
+        for scope_type, scope_key in (
+            (
+                stable_models.RaceLivePublicationScopeType.REGION,
+                self.event.country_region,
+            ),
+            (
+                stable_models.RaceLivePublicationScopeType.SOURCE,
+                self.source.source_key,
+            ),
+            (
+                stable_models.RaceLivePublicationScopeType.EVENT,
+                str(self.event.pk),
+            ),
+        ):
+            stable_models.RaceLivePublicationPolicy.objects.create(
+                scope_type=scope_type,
+                scope_key=scope_key,
+                mode=stable_models.RaceLivePublicationMode.PROVISIONAL_PUBLIC,
+                registry_digest=self.registry_digest,
+                coverage_proof_digest="b" * 64,
+                valid_until=self.NOW + timedelta(days=20),
+            )
         stable_models.RaceLiveEventPublicationAllowlist.objects.create(
             event=self.event,
             source_key=self.source.source_key,
@@ -2687,6 +2766,8 @@ class RaceLiveTheRacingApiFreeRunnerTests(TestCase):
             coverage_proof_digest="b" * 64,
             official_verification_route="bha_result_verification",
             official_verification_route_version="bha-v1",
+            official_verification_contract_digest="c" * 64,
+            official_terms_evidence_digest="d" * 64,
             official_verification_valid_until=self.NOW + timedelta(days=20),
             enabled=True,
         )
@@ -3415,6 +3496,8 @@ class RaceLivePublicStatusTests(TestCase):
                 coverage_proof_digest="b" * 64,
                 official_verification_route="read_fixture_verification",
                 official_verification_route_version="read-v1",
+                official_verification_contract_digest="c" * 64,
+                official_terms_evidence_digest="d" * 64,
                 official_verification_valid_until=self.NOW + timedelta(days=30),
                 enabled=True,
             )
@@ -3452,6 +3535,8 @@ class RaceLivePublicStatusTests(TestCase):
         self.assertContains(response, "尚待官方来源复核")
         self.assertContains(response, "补充来源")
         self.assertContains(response, "07-20 22:00")
+        self.assertContains(response, "冠军 · 暂定")
+        self.assertNotContains(response, "赛果已确认")
 
     def test_official_corrected_conflict_and_stale_labels_are_distinct(self):
         official = self._event_with_revision("o" * 8, "official")
@@ -3535,6 +3620,23 @@ class RaceLivePublicStatusTests(TestCase):
             hidden = self.client.get(calendar_url, {"tab": "all"})
         self.assertContains(hidden, event.chinese_name)
         self.assertNotContains(hidden, "Fixture Winner")
+
+    def test_missing_event_policy_hides_from_detail_and_bulk_calendar_reads(self):
+        event = self._event_with_revision("m" * 8, "provisional")
+        stable_models.RaceLivePublicationPolicy.objects.filter(
+            scope_type=stable_models.RaceLivePublicationScopeType.EVENT,
+            scope_key=str(event.pk),
+        ).delete()
+
+        with patch("stable.views.timezone.now", return_value=self.NOW):
+            detail = self.client.get(event.public_path)
+            calendar = self.client.get(
+                reverse("public-race-calendar"),
+                {"tab": "all"},
+            )
+
+        self.assertNotContains(detail, "Fixture Winner")
+        self.assertNotContains(calendar, "Fixture Winner")
 
     def test_calendar_live_read_gate_query_count_is_bounded_for_full_page(self):
         events = [
@@ -4261,6 +4363,28 @@ class RaceResultRevisionApplyTests(TestCase):
             coverage_proof_digest="b" * 64,
             valid_until=self.NOW + timedelta(days=30),
         )
+        for scope_type, scope_key in (
+            (
+                stable_models.RaceLivePublicationScopeType.REGION,
+                self.event.country_region,
+            ),
+            (
+                stable_models.RaceLivePublicationScopeType.SOURCE,
+                self.source.source_key,
+            ),
+            (
+                stable_models.RaceLivePublicationScopeType.EVENT,
+                str(self.event.pk),
+            ),
+        ):
+            stable_models.RaceLivePublicationPolicy.objects.create(
+                scope_type=scope_type,
+                scope_key=scope_key,
+                mode=stable_models.RaceLivePublicationMode.PROVISIONAL_PUBLIC,
+                registry_digest="a" * 64,
+                coverage_proof_digest="b" * 64,
+                valid_until=self.NOW + timedelta(days=30),
+            )
         stable_models.RaceLiveEventPublicationAllowlist.objects.create(
             event=self.event,
             source_key=self.source.source_key,
@@ -4268,6 +4392,8 @@ class RaceResultRevisionApplyTests(TestCase):
             coverage_proof_digest="b" * 64,
             official_verification_route="bha_result_verification",
             official_verification_route_version="bha-v1",
+            official_verification_contract_digest="c" * 64,
+            official_terms_evidence_digest="d" * 64,
             official_verification_valid_until=self.NOW + timedelta(days=30),
             enabled=True,
         )
@@ -4332,7 +4458,12 @@ class RaceResultRevisionApplyTests(TestCase):
         )
         self.assertEqual(
             publication.policy_versions,
-            [["global", "global", 1]],
+            [
+                ["global", "global", 1],
+                ["region", self.event.country_region, 1],
+                ["source", self.source.source_key, 1],
+                ["event", str(self.event.pk), 1],
+            ],
         )
         self.assertEqual(publication.allowlist_version, 1)
         self.assertEqual(publication.registry_digest, "a" * 64)
@@ -4351,6 +4482,12 @@ class RaceResultRevisionApplyTests(TestCase):
             stable_models.RaceEventResult.objects.filter(event=self.event).count(),
             2,
         )
+        self.event.refresh_from_db()
+        self.assertEqual(
+            self.event.status,
+            stable_models.RaceEventStatus.FINISHED,
+        )
+        self.assertIsNone(self.event.result_confirmed_at)
 
         import inspect
 

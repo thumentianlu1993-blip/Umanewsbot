@@ -1,0 +1,23 @@
+{
+  "access_mode": "manual_browser_only",
+  "allowed_marker_types": [
+    "weighed_in",
+    "official_result"
+  ],
+  "automation_allowed": false,
+  "contract_digest": "3e81fc6578f8787db8661eed3c48cf0bc2e5c732eb929ca59819e43ebcfe1b5c",
+  "country_region": "united_kingdom",
+  "official_results_url": "https://www.britishhorseracing.com/racing/results/",
+  "parser_version": "bha-manual-v1",
+  "responsible_role": "release_operator",
+  "route": "bha_manual_verification",
+  "schema_version": 1,
+  "sla_minutes": 15,
+  "source_key": "bha_manual",
+  "terms_evidence": {
+    "observed_at": "2026-07-18T17:48:00Z",
+    "sha256": "f86f1710b0584ca39c1ca78095aea42b55a67f94f6a6fbe00c185bae15cc6a6d",
+    "url": "https://www.britishhorseracing.com/terms-conditions/"
+  },
+  "valid_until": "2026-08-16T23:59:59Z"
+}

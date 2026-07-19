@@ -31,7 +31,7 @@
           <span>{% if event.local_date %}调整至 {{ event.local_date|date:"Y-m-d" }}{% else %}日期待定{% endif %}</span>
         {% elif event.status == 'finished' and top_results %}
           <strong>{{ top_results.0.display_horse_name }}</strong>
-          <span>冠军 · {% if top_results.0.margin %}{{ top_results.0.margin }}{% else %}赛果已确认{% endif %}</span>
+          <span>冠军 · {% if live_result_status.phase == "provisional" %}暂定{% elif top_results.0.margin %}{{ top_results.0.margin }}{% else %}赛果已确认{% endif %}</span>
         {% else %}
           <strong>{% if event.local_date %}{{ event.local_date|date:"Y-m-d" }}{% else %}日期待定{% endif %}</strong>
           <span>{% if event.local_start_time %}{{ event.local_start_time|time:"H:i" }}{% else %}时间待定{% endif %}</span>

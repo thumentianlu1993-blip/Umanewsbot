@@ -311,6 +311,7 @@ class RaceLiveEventPublicationAllowlistAdmin(RaceLiveReadOnlyAdmin):
         "enabled",
         "official_verification_route",
         "official_verification_route_version",
+        "official_verification_contract_digest",
         "version",
     )
     list_filter = ("max_mode", "enabled", "event__country_region")
@@ -320,6 +321,8 @@ class RaceLiveEventPublicationAllowlistAdmin(RaceLiveReadOnlyAdmin):
         "source_key",
         "official_verification_route",
         "official_verification_route_version",
+        "official_verification_contract_digest",
+        "official_terms_evidence_digest",
     )
     raw_id_fields = ("event",)
 
@@ -367,6 +370,7 @@ class RaceLiveOfficialVerificationIncidentAdmin(RaceLiveReadOnlyAdmin):
         "official_route_version",
         "status",
         "deadline_at",
+        "manual_verification_due_at",
         "next_probe_at",
         "alert_sent_at",
     )
@@ -376,6 +380,8 @@ class RaceLiveOfficialVerificationIncidentAdmin(RaceLiveReadOnlyAdmin):
         "event__original_name",
         "official_route",
         "official_route_version",
+        "official_route_contract_digest",
+        "official_terms_evidence_digest",
     )
     raw_id_fields = ("event", "provisional_revision")
 

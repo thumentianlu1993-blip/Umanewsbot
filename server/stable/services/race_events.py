@@ -41,6 +41,7 @@ from stable.models import (
     RaceEventRevisionPublication,
     RaceEventResult,
     RaceEventRunner,
+    RaceEventStatus,
     RaceEventParticipantSourceIdentity,
     RaceLiveEventPublicationAllowlist,
     RaceLiveOfficialMarkerEvidence,
@@ -1221,21 +1222,19 @@ def resolve_race_live_publication_policy(
         return reject("invalid_registry_digest")
 
     policy_lookups = (
-        ("global", "global", True),
-        ("region", event.country_region, False),
-        ("source", source.source_key, False),
-        ("event", str(event.pk), False),
+        ("global", "global", "global_policy_missing"),
+        ("region", event.country_region, "region_policy_missing"),
+        ("source", source.source_key, "source_policy_missing"),
+        ("event", str(event.pk), "event_policy_missing"),
     )
     policies: list[RaceLivePublicationPolicy] = []
-    for scope_type, scope_key, required in policy_lookups:
+    for scope_type, scope_key, missing_reason in policy_lookups:
         policy = RaceLivePublicationPolicy.objects.filter(
             scope_type=scope_type,
             scope_key=scope_key,
         ).first()
         if policy is None:
-            if required:
-                return reject("global_policy_missing")
-            continue
+            return reject(missing_reason)
         policies.append(policy)
 
     policy_versions = tuple(
@@ -1381,6 +1380,36 @@ def resolve_race_live_publication_policy(
         RaceLivePublicationMode.PROVISIONAL_PUBLIC,
         RaceLivePublicationMode.OFFICIAL_PUBLIC,
     }
+    if allowed:
+        if (
+            not isinstance(
+                allowlist.official_verification_contract_digest,
+                str,
+            )
+            or not RACE_PROJECTION_MANIFEST_SHA256_RE.fullmatch(
+                allowlist.official_verification_contract_digest
+            )
+        ):
+            return reject(
+                "official_route_contract_digest_invalid",
+                policy_versions=policy_versions,
+                allowlist_version=allowlist.version,
+                registry_digest=source.registry_digest,
+                coverage_proof_digest=allowlist.coverage_proof_digest,
+            )
+        if (
+            not isinstance(allowlist.official_terms_evidence_digest, str)
+            or not RACE_PROJECTION_MANIFEST_SHA256_RE.fullmatch(
+                allowlist.official_terms_evidence_digest
+            )
+        ):
+            return reject(
+                "official_terms_evidence_digest_invalid",
+                policy_versions=policy_versions,
+                allowlist_version=allowlist.version,
+                registry_digest=source.registry_digest,
+                coverage_proof_digest=allowlist.coverage_proof_digest,
+            )
     return RaceLivePublicationPolicyDecision(
         allowed=allowed,
         effective_mode=effective_mode,
@@ -1634,18 +1663,16 @@ def _resolve_race_live_publication_policy_from_loaded_rows(
         return reject("invalid_registry_digest")
 
     policy_lookups = (
-        ("global", "global", True),
-        ("region", event.country_region, False),
-        ("source", source.source_key, False),
-        ("event", str(event.pk), False),
+        ("global", "global", "global_policy_missing"),
+        ("region", event.country_region, "region_policy_missing"),
+        ("source", source.source_key, "source_policy_missing"),
+        ("event", str(event.pk), "event_policy_missing"),
     )
     policies: list[RaceLivePublicationPolicy] = []
-    for scope_type, scope_key, required in policy_lookups:
+    for scope_type, scope_key, missing_reason in policy_lookups:
         policy = policy_by_scope.get((scope_type, scope_key))
         if policy is None:
-            if required:
-                return reject("global_policy_missing")
-            continue
+            return reject(missing_reason)
         policies.append(policy)
 
     policy_versions = tuple(
@@ -1788,6 +1815,36 @@ def _resolve_race_live_publication_policy_from_loaded_rows(
         RaceLivePublicationMode.PROVISIONAL_PUBLIC,
         RaceLivePublicationMode.OFFICIAL_PUBLIC,
     }
+    if allowed:
+        if (
+            not isinstance(
+                allowlist.official_verification_contract_digest,
+                str,
+            )
+            or not RACE_PROJECTION_MANIFEST_SHA256_RE.fullmatch(
+                allowlist.official_verification_contract_digest
+            )
+        ):
+            return reject(
+                "official_route_contract_digest_invalid",
+                policy_versions=policy_versions,
+                allowlist_version=allowlist.version,
+                registry_digest=source.registry_digest,
+                coverage_proof_digest=allowlist.coverage_proof_digest,
+            )
+        if (
+            not isinstance(allowlist.official_terms_evidence_digest, str)
+            or not RACE_PROJECTION_MANIFEST_SHA256_RE.fullmatch(
+                allowlist.official_terms_evidence_digest
+            )
+        ):
+            return reject(
+                "official_terms_evidence_digest_invalid",
+                policy_versions=policy_versions,
+                allowlist_version=allowlist.version,
+                registry_digest=source.registry_digest,
+                coverage_proof_digest=allowlist.coverage_proof_digest,
+            )
     return RaceLivePublicationPolicyDecision(
         allowed=allowed,
         effective_mode=effective_mode,
@@ -2435,33 +2492,103 @@ def _publish_race_result_revision(
         RaceResultPhase.OFFICIAL,
         RaceResultPhase.CORRECTED,
     )
-    RaceEventResult.objects.filter(event_id=event_id).delete()
-    RaceEventResult.objects.bulk_create(
-        [
+    event = RaceEvent.objects.select_for_update().get(pk=event_id)
+    if event.status in {
+        RaceEventStatus.CANCELLED,
+        RaceEventStatus.POSTPONED,
+    }:
+        raise IntegrityError("cancelled or postponed race cannot publish a result")
+    if event.status not in {
+        RaceEventStatus.SCHEDULED,
+        RaceEventStatus.RUNNING,
+        RaceEventStatus.FINISHED,
+    }:
+        raise IntegrityError("race status cannot publish a result")
+    racecard_revision = (
+        RaceEventRevision.objects.filter(
+            pk=RaceEventProjectionControl.objects.filter(
+                event_id=event_id
+            ).values_list("current_racecard_revision_id", flat=True).first(),
+            event_id=event_id,
+            kind=RaceEventRevisionKind.RACECARD,
+            phase=RaceResultPhase.RACECARD,
+        )
+        .first()
+    )
+    racecard_items = (
+        {
+            item.participant_id: item
+            for item in racecard_revision.items.all()
+        }
+        if racecard_revision is not None
+        else {}
+    )
+
+    result_rows: list[RaceEventResult] = []
+    for index, item in enumerate(normalized_items, start=1):
+        participant = identities[item["external_runner_id"]]
+        source_refs: dict[str, Any] = {
+            "source_key": observation.source_identity.source_key,
+            "external_race_id": observation.source_identity.external_race_id,
+            "external_runner_id": item["external_runner_id"],
+        }
+        field_provenance: dict[str, Any] = {}
+        racecard_item = racecard_items.get(participant.pk)
+        barrier = item["barrier"]
+        jockey_name = item["jockey_name"]
+        if (
+            publication_reason == "shadow_promotion"
+            and observation.source_identity.source_key == "the_racing_api"
+            and racecard_item is not None
+        ):
+            for field_name in ("barrier", "jockey_name"):
+                current_value = (
+                    barrier if field_name == "barrier" else jockey_name
+                )
+                fallback_value = getattr(racecard_item, field_name)
+                if not current_value and fallback_value:
+                    if field_name == "barrier":
+                        barrier = racecard_item.barrier
+                    else:
+                        jockey_name = racecard_item.jockey_name
+                    racecard_source_key = (
+                        racecard_item.field_provenance.get("source_key")
+                        if isinstance(racecard_item.field_provenance, dict)
+                        else None
+                    )
+                    field_provenance[field_name] = {
+                        "racecard_revision_id": racecard_revision.pk,
+                        "racecard_revision_item_id": racecard_item.pk,
+                        "source_key": (
+                            racecard_source_key
+                            if isinstance(racecard_source_key, str)
+                            and racecard_source_key
+                            else observation.source_identity.source_key
+                        ),
+                    }
+        if field_provenance:
+            source_refs["field_provenance"] = field_provenance
+        result_rows.append(
             RaceEventResult(
                 event_id=event_id,
                 finish_position=index,
                 official_finish_position=item["official_finish_position"],
                 horse_number=item["number"],
-                horse_name=identities[item["external_runner_id"]].canonical_name,
-                jockey_name=item["jockey_name"],
+                horse_name=participant.canonical_name,
+                jockey_name=jockey_name,
                 trainer_name=item["trainer_name"],
                 finish_time=item["finish_time"],
                 margin=item["margin"],
-                barrier=item["barrier"],
+                barrier=barrier,
                 carried_weight=item["carried_weight"],
                 running_status=item["status"],
                 is_confirmed=is_confirmed,
-                source_refs={
-                    "source_key": observation.source_identity.source_key,
-                    "external_race_id": observation.source_identity.external_race_id,
-                    "external_runner_id": item["external_runner_id"],
-                },
+                source_refs=source_refs,
                 raw_payload={},
             )
-            for index, item in enumerate(normalized_items, start=1)
-        ]
-    )
+        )
+    RaceEventResult.objects.filter(event_id=event_id).delete()
+    RaceEventResult.objects.bulk_create(result_rows)
 
     tracking_fields = ["updated_at"]
     if revision.phase == RaceResultPhase.PROVISIONAL:
@@ -2475,8 +2602,12 @@ def _publish_race_result_revision(
         tracking_fields.append("corrected_at")
     tracking.save(update_fields=tracking_fields)
 
+    event.status = RaceEventStatus.FINISHED
+    update_fields = ["status", "updated_at"]
     if is_confirmed:
-        RaceEvent.objects.filter(pk=event_id).update(result_confirmed_at=published_at)
+        event.result_confirmed_at = published_at
+        update_fields.append("result_confirmed_at")
+    event.save(update_fields=update_fields)
 
 
 def apply_race_result_observation_revision(
@@ -2969,15 +3100,16 @@ def apply_race_result_observation_revision(
         return RaceResultRevisionApplyDecision(True, "apply", action.reason, revision)
 
 
-def admit_race_live_publication(
+def _admit_race_live_publication_locked(
     *,
     observation_id: int,
     expected_owner_generation: int,
-    expected_claim_generation: int,
-    attempt_token: str,
+    expected_claim_generation: int | None,
+    attempt_token: str | None,
     now: datetime,
+    operator_transition: bool,
 ) -> RaceResultRevisionApplyDecision:
-    """Promote one complete provisional shadow revision through persisted gates."""
+    """Single transactional admission core shared by poll and operator paths."""
     if (
         isinstance(observation_id, bool)
         or not isinstance(observation_id, int)
@@ -2986,28 +3118,46 @@ def admit_race_live_publication(
         return RaceResultRevisionApplyDecision(
             False, "reject", "invalid_observation"
         )
-    for value, reason in (
-        (expected_owner_generation, "invalid_owner_generation"),
-        (expected_claim_generation, "invalid_claim_generation"),
-    ):
+    for value, reason in ((expected_owner_generation, "invalid_owner_generation"),):
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             return RaceResultRevisionApplyDecision(False, "reject", reason)
-    if (
-        not isinstance(attempt_token, str)
-        or not attempt_token
-        or len(attempt_token) > 64
-        or attempt_token.strip() != attempt_token
-    ):
+    if not isinstance(operator_transition, bool):
         return RaceResultRevisionApplyDecision(
-            False, "reject", "invalid_attempt_token"
+            False, "reject", "invalid_operator_transition"
         )
+    if operator_transition:
+        if expected_claim_generation is not None or attempt_token is not None:
+            return RaceResultRevisionApplyDecision(
+                False, "reject", "operator_claim_forbidden"
+            )
+    else:
+        if (
+            isinstance(expected_claim_generation, bool)
+            or not isinstance(expected_claim_generation, int)
+            or expected_claim_generation < 0
+        ):
+            return RaceResultRevisionApplyDecision(
+                False, "reject", "invalid_claim_generation"
+            )
+        if (
+            not isinstance(attempt_token, str)
+            or not attempt_token
+            or len(attempt_token) > 64
+            or attempt_token.strip() != attempt_token
+        ):
+            return RaceResultRevisionApplyDecision(
+                False, "reject", "invalid_attempt_token"
+            )
     if not isinstance(now, datetime) or timezone.is_naive(now):
         return RaceResultRevisionApplyDecision(False, "reject", "invalid_now")
 
     with transaction.atomic():
         observation_hint = RaceResultObservation.objects.filter(
             pk=observation_id
-        ).values("source_identity__event_id").first()
+        ).values(
+            "source_identity__event_id",
+            "source_identity_id",
+        ).first()
         if observation_hint is None:
             return RaceResultRevisionApplyDecision(
                 False, "reject", "observation_missing"
@@ -3039,21 +3189,30 @@ def admit_race_live_publication(
             return RaceResultRevisionApplyDecision(
                 False, "reject", "tracking_missing"
             )
-        if (
-            tracking.claim_generation != expected_claim_generation
-            or tracking.active_attempt_token != attempt_token
-        ):
-            return RaceResultRevisionApplyDecision(
-                False, "reject", "claim_mismatch"
-            )
-        if tracking.claim_expires_at is None:
-            return RaceResultRevisionApplyDecision(
-                False, "reject", "claim_missing_expiry"
-            )
-        if tracking.claim_expires_at <= now:
-            return RaceResultRevisionApplyDecision(
-                False, "reject", "claim_expired"
-            )
+        if operator_transition:
+            if (
+                tracking.active_attempt_token != ""
+                or tracking.claim_expires_at is not None
+            ):
+                return RaceResultRevisionApplyDecision(
+                    False, "reject", "active_claim_present"
+                )
+        else:
+            if (
+                tracking.claim_generation != expected_claim_generation
+                or tracking.active_attempt_token != attempt_token
+            ):
+                return RaceResultRevisionApplyDecision(
+                    False, "reject", "claim_mismatch"
+                )
+            if tracking.claim_expires_at is None:
+                return RaceResultRevisionApplyDecision(
+                    False, "reject", "claim_missing_expiry"
+                )
+            if tracking.claim_expires_at <= now:
+                return RaceResultRevisionApplyDecision(
+                    False, "reject", "claim_expired"
+                )
         if tracking.state != RaceEventLiveState.PROVISIONAL_RESULT:
             return RaceResultRevisionApplyDecision(
                 False, "reject", "tracking_state_mismatch"
@@ -3061,13 +3220,13 @@ def admit_race_live_publication(
 
         try:
             event = RaceEvent.objects.select_for_update().get(pk=event_id)
-            observation = RaceResultObservation.objects.select_for_update().get(
-                pk=observation_id
-            )
             source_identity = (
                 RaceResultSourceIdentity.objects.select_for_update().get(
-                    pk=observation.source_identity_id
+                    pk=observation_hint["source_identity_id"]
                 )
+            )
+            observation = RaceResultObservation.objects.select_for_update().get(
+                pk=observation_id
             )
         except RaceEvent.DoesNotExist:
             return RaceResultRevisionApplyDecision(
@@ -3125,11 +3284,11 @@ def admit_race_live_publication(
                 False, "reject", "racecard_revision_missing"
             )
         try:
-            result_revision = RaceEventRevision.objects.select_for_update().get(
-                pk=result_revision_id
-            )
             racecard_revision = RaceEventRevision.objects.select_for_update().get(
                 pk=racecard_revision_id
+            )
+            result_revision = RaceEventRevision.objects.select_for_update().get(
+                pk=result_revision_id
             )
         except RaceEventRevision.DoesNotExist:
             return RaceResultRevisionApplyDecision(
@@ -3172,18 +3331,41 @@ def admit_race_live_publication(
                 False, "reject", "racecard_revision_inconsistent"
             )
 
-        racecard_participant_ids = set(
-            racecard_revision.items.values_list("participant_id", flat=True)
+        locked_revision_items = list(
+            RaceEventRevisionItem.objects.select_for_update()
+            .select_related("participant")
+            .filter(
+                revision_id__in=(
+                    racecard_revision_id,
+                    result_revision_id,
+                )
+            )
+            .order_by("revision_id", "internal_order", "pk")
         )
+        racecard_items = [
+            item
+            for item in locked_revision_items
+            if item.revision_id == racecard_revision_id
+        ]
+        result_items = [
+            item
+            for item in locked_revision_items
+            if item.revision_id == result_revision_id
+        ]
+        racecard_participant_ids = {
+            item.participant_id for item in racecard_items
+        }
         if not racecard_participant_ids:
             return RaceResultRevisionApplyDecision(
                 False, "reject", "participant_set_mismatch"
             )
         participants = list(
-            RaceEventParticipant.objects.select_for_update().filter(
+            RaceEventParticipant.objects.select_for_update()
+            .filter(
                 pk__in=racecard_participant_ids,
                 event_id=event.pk,
             )
+            .order_by("pk")
         )
         if {participant.pk for participant in participants} != racecard_participant_ids:
             return RaceResultRevisionApplyDecision(
@@ -3236,6 +3418,7 @@ def admit_race_live_publication(
                 external_runner_id__in=external_runner_ids,
                 participant__event_id=event.pk,
             )
+            .order_by("participant_id", "pk")
         )
         identities = {
             row.external_runner_id: row.participant for row in source_rows
@@ -3251,11 +3434,7 @@ def admit_race_live_publication(
                 False, "reject", "participant_set_mismatch"
             )
 
-        result_items = list(
-            result_revision.items.select_for_update()
-            .select_related("participant")
-            .order_by("internal_order")
-        )
+        result_items.sort(key=lambda item: (item.internal_order, item.pk))
         if (
             {item.participant_id for item in result_items}
             != racecard_participant_ids
@@ -3292,9 +3471,9 @@ def admit_race_live_publication(
             | Q(scope_type="event", scope_key=str(event.pk))
         )
         locked_policies = list(
-            RaceLivePublicationPolicy.objects.select_for_update().filter(
-                applicable_policy_filter
-            )
+            RaceLivePublicationPolicy.objects.select_for_update()
+            .filter(applicable_policy_filter)
+            .order_by("scope_type", "scope_key")
         )
         locked_allowlist = (
             RaceLiveEventPublicationAllowlist.objects.select_for_update()
@@ -3369,7 +3548,14 @@ def admit_race_live_publication(
         }
         incident_defaults = {
             "official_route": locked_allowlist.official_verification_route,
+            "official_route_contract_digest": (
+                locked_allowlist.official_verification_contract_digest
+            ),
+            "official_terms_evidence_digest": (
+                locked_allowlist.official_terms_evidence_digest
+            ),
             "deadline_at": official_deadline,
+            "manual_verification_due_at": now + timedelta(minutes=15),
             "status": RaceLiveOfficialVerificationIncidentStatus.OPEN,
             "next_probe_at": official_deadline,
             "opened_at": now,
@@ -3399,10 +3585,16 @@ def admit_race_live_publication(
             or incident.official_route != incident_defaults["official_route"]
             or incident.official_route_version
             != incident_lookup["official_route_version"]
+            or incident.official_route_contract_digest
+            != incident_defaults["official_route_contract_digest"]
+            or incident.official_terms_evidence_digest
+            != incident_defaults["official_terms_evidence_digest"]
             or incident.deadline_at != official_deadline
             or not isinstance(incident.opened_at, datetime)
             or timezone.is_naive(incident.opened_at)
             or incident.opened_at > now
+            or incident.manual_verification_due_at
+            != incident.opened_at + timedelta(minutes=15)
         ):
             return RaceResultRevisionApplyDecision(
                 False,
@@ -3442,6 +3634,42 @@ def admit_race_live_publication(
             "shadow_revision_promoted",
             result_revision,
         )
+
+
+def admit_race_live_publication(
+    *,
+    observation_id: int,
+    expected_owner_generation: int,
+    expected_claim_generation: int,
+    attempt_token: str,
+    now: datetime,
+) -> RaceResultRevisionApplyDecision:
+    """Poll/runner entrypoint; requires the existing live provider claim."""
+    return _admit_race_live_publication_locked(
+        observation_id=observation_id,
+        expected_owner_generation=expected_owner_generation,
+        expected_claim_generation=expected_claim_generation,
+        attempt_token=attempt_token,
+        now=now,
+        operator_transition=False,
+    )
+
+
+def admit_persisted_race_live_publication(
+    *,
+    observation_id: int,
+    expected_owner_generation: int,
+    now: datetime,
+) -> RaceResultRevisionApplyDecision:
+    """Operator entrypoint; requires an empty claim and never creates one."""
+    return _admit_race_live_publication_locked(
+        observation_id=observation_id,
+        expected_owner_generation=expected_owner_generation,
+        expected_claim_generation=None,
+        attempt_token=None,
+        now=now,
+        operator_transition=True,
+    )
 
 
 def _task_log(task_name: str, status: str, payload: dict | None = None, detail: str = "") -> TaskExecutionLog:

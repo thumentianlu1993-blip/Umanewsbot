@@ -1,5 +1,111 @@
 # 部署运行手册
 
+## event 924 暂定赛果公开候选（2026-07-19，尚未授权发布）
+
+本节是最新代码候选的发布前操作契约，不构成发布授权。只有未参与实现的 reviewer 完整
+review 成功、记录精确 fingerprint/approved parent/content manifest，并取得该冻结版本的
+新用户授权后，才可执行以下步骤。当前不得部署、生成生产 bundle、改 policy 或访问 BHA。
+
+1. 保持唯一范围为 event `924`，核对 tracking/allowlist universe 均为 `[924]`、四层
+   policy `shadow v1`、scheduler false、claim/queue/active/reserved/one-off 为空，
+   observation `1`、result revision `2`、publication/legacy result/incident 为 `0`。
+2. 停止 Beat 并排空相关 worker 后，创建 custom-format PostgreSQL 备份；验证 nonempty、
+   `0600`、SHA-256 和 `pg_restore -l`。部署精确受审 image，应用 `stable.0046`；迁移只
+   增加 nullable/default-empty 治理字段，不回填、不晋级。
+3. 宿主先创建
+   `/opt/umanewsbot/runtime/race_live_publications` 为 `root:root 0700`，设置
+   `RACE_LIVE_PUBLICATION_ARTIFACT_ROOT=/run/race-live/publications`。三份 Compose
+   只允许 `race_live_worker` 获得该目录 rw；web、普通 worker 和 Beat 不得获得永久挂载。
+   同时配置 `RACE_LIVE_ALERT_NOTIFY_EMAILS`；默认安全复用既有运营 warning/翻译失败
+   收件人，但生产必须显式核对非空目标，并在 promotion 前完成 SMTP 真实投递 preflight。
+4. release operator 用普通浏览器人工确认受审 BHA Results 入口可用、route registry/
+   terms 未过期。不得调用页面后端 API、脚本抓取或批量下载；官方结果尚未出现不阻止明确
+   标注的暂定首发，但入口或 contract 已不可执行时停止。
+5. 在 `race_live_worker` 内生成独占 bundle：
+
+   ```bash
+   python manage.py prepare_race_live_publication_transition \
+     --event-id 924 \
+     --approved-commit <release-commit> \
+     --run-id <unique-run-id>
+   ```
+
+   审核输出目录 `0700`，promotion/disable/restore/report/SHA ledger 全部 `0600`；记录
+   三份 manifest 的完整 SHA。实际命令前须确认管理命令帮助中的 artifact-root 参数与
+   受审版本一致，不使用聊天中的推测路径。
+6. promotion 必须按同一文件依次 dry-run、apply、verify：
+
+   ```bash
+   python manage.py transition_race_live_publication \
+     --manifest <absolute-promotion-manifest> \
+     --expected-manifest-sha256 <sha256> \
+     --expected-approved-commit <release-commit>
+
+   python manage.py transition_race_live_publication \
+     --manifest <absolute-promotion-manifest> \
+     --expected-manifest-sha256 <sha256> \
+     --expected-approved-commit <release-commit> \
+     --apply --confirm-apply
+
+   python manage.py transition_race_live_publication \
+     --manifest <absolute-promotion-manifest> \
+     --expected-manifest-sha256 <sha256> \
+     --expected-approved-commit <release-commit> \
+     --verify
+   ```
+
+   verify 必须 `ok=true`，并报告 incident `open/overdue`；页面仍是 provisional，
+   event finished、`result_confirmed_at=null`，1–7 顺序不变，tracking disabled，
+   provider timing/hash/failure 字段不变，scheduler 仍 false。
+7. 在同一维护窗口、promotion commit 后 15 分钟内，用普通浏览器读取 BHA 客观 marker/
+   名次，并在安全私有目录准备仅含许可字段的 submission JSON；先运行
+   `prepare_race_live_manual_official_evidence` 生成 `0600` receipt，再用
+   `apply_race_live_manual_official_evidence` 默认 dry-run 和显式
+   `--apply --confirm-apply`。命令必须提供 expected receipt SHA/approved commit；
+   conflict 还必须提供预生成 disable manifest 的精确路径/SHA。默认 dry-run 与 apply
+   共用 locked planner，必须返回预期 comparison/alert status 和
+   `notification_side_effect_count=0`；若 stale revision、closed/missing incident、
+   participant 或 policy/allowlist/disable CAS 漂移，禁止 apply。
+
+   ```bash
+   python manage.py prepare_race_live_manual_official_evidence \
+     --input <absolute-0600-submission-json> \
+     --run-id <unique-manual-run-id>
+
+   python manage.py apply_race_live_manual_official_evidence \
+     --receipt <absolute-receipt-json> \
+     --expected-receipt-sha256 <receipt-sha256> \
+     --expected-approved-commit <release-commit>
+
+   # conflict receipt 的 dry-run/apply 还必须在同一命令追加：
+   # --disable-manifest <absolute-disable-manifest>
+   # --expected-disable-manifest-sha256 <disable-sha256>
+   # 只在 dry-run、receipt 和可选 disable manifest 全部复核后：
+   # 在同一命令末尾追加 --apply --confirm-apply
+   ```
+
+8. match 应只 resolve incident，页面继续 provisional；conflict 必须在同一事务收紧
+   event policy 并立即隐藏；unavailable 不创建 official observation/marker，保持
+   open/provisional。apply 的第一阶段必须原子提交 probe、该 receipt 的 `OperationLog`
+   和 incident 级 `QUEUED NotificationLog` durable intent；只有第一阶段成功 commit 后，
+   第二阶段才允许真实发送运营邮件并将 intent 写为 `SENT/FAILED`。必须核对
+   `NotificationLog.status=SENT` 且 `alert_sent_at` 非空；若为 `FAILED`，
+   `alert_sent_at` 必须为空，修复 SMTP/收件人后用同一 receipt 重放，直到 SENT。若进程在
+   第一阶段 commit 后、delivery 前退出，重放必须复用已有 QUEUED intent 继续投递。
+   主事务晚期写入/commit 失败时必须零 SMTP 且不残留 intent/probe/operation 部分状态。
+   SENT 后，同 receipt 重放不得重复发信；具有新 observed/evidence 的另一 receipt 应继续
+   推进 probe 并写新的 OperationLog，但同一 incident 不得重复发信。禁止用“调用 apply 后
+   transaction rollback”模拟 dry-run。任何 mixed post-state、artifact/commit/registry/
+   event/revision/participant 漂移都停止，不人工补写。
+9. 无论 BHA 路线结果如何，都演练预生成 disable 的 dry-run；只有明确需要隐藏时才 apply。
+   disable/restore 每一步执行前都重新 dry-run，不删除 observation/revision/publication/
+   incident。结构性异常才考虑恢复发布前数据库备份。
+
+发布后浏览器验收详情页与日历的共同 read gate、中文暂定标签、缺失字段、无缓存即时隐藏；
+同时检查 `/healthz/`、容器 revision/image、Celery 队列、scheduler=false、资源和
+tracking/allowlist universe。生产事实只能在部署完成后按 evidence-only allowlist 追加，
+并复用本需求同一代码 reviewer 审核。
+
 ## event 924 有界单赛事 shadow 轮询结果（2026-07-18）
 
 1. 授权范围只覆盖 event `924`，以数据库 `next_poll_at` 为唯一时钟，scheduler false、

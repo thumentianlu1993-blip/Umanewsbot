@@ -477,3 +477,107 @@ class RaceLiveInitializationV2Tests(TestCase):
             },
             before,
         )
+
+    def test_public_shared_caps_are_reused_but_second_event_stays_explicit_shadow(self):
+        _, first_path, first_digest = self._write_artifact(self._manifest())
+        first = self._load(first_path, first_digest)
+        initialization.apply_race_live_initialization(first)
+        models.RaceLivePublicationPolicy.objects.exclude(
+            scope_type=models.RaceLivePublicationScopeType.EVENT
+        ).update(
+            mode=models.RaceLivePublicationMode.PROVISIONAL_PUBLIC,
+            version=2,
+        )
+        second_event = self._event(
+            "v2-race-live-second",
+            original_name="Second V2 Initialization Stakes",
+        )
+        second_manifest = self._manifest(
+            events=[
+                self._event_entry(
+                    second_event,
+                    suffix="2",
+                    generated_at=self.NOW,
+                )
+            ]
+        )
+        _, second_path, second_digest = self._write_artifact(
+            second_manifest,
+            dirname="second-artifact",
+        )
+        second = self._load(second_path, second_digest)
+
+        self.assertTrue(initialization.dry_run_race_live_initialization(second)["ok"])
+        applied = initialization.apply_race_live_initialization(second)
+
+        self.assertTrue(applied["ok"])
+        shared = models.RaceLivePublicationPolicy.objects.exclude(
+            scope_type=models.RaceLivePublicationScopeType.EVENT
+        )
+        self.assertEqual(
+            set(shared.values_list("mode", "version")),
+            {(models.RaceLivePublicationMode.PROVISIONAL_PUBLIC, 2)},
+        )
+        event_policy = models.RaceLivePublicationPolicy.objects.get(
+            scope_type=models.RaceLivePublicationScopeType.EVENT,
+            scope_key=str(second_event.pk),
+        )
+        self.assertEqual(event_policy.mode, models.RaceLivePublicationMode.SHADOW)
+        self.assertEqual(event_policy.version, 1)
+        source = models.RaceResultSourceIdentity.objects.get(event=second_event)
+        decision = race_events.resolve_race_live_publication_policy(
+            event_id=second_event.pk,
+            source_identity_id=source.pk,
+            now=self.NOW,
+        )
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reason, "shadow_only")
+
+    def test_existing_non_shadow_event_policy_blocks_fresh_initialization(self):
+        _, first_path, first_digest = self._write_artifact(self._manifest())
+        initialization.apply_race_live_initialization(
+            self._load(first_path, first_digest)
+        )
+        models.RaceLivePublicationPolicy.objects.exclude(
+            scope_type=models.RaceLivePublicationScopeType.EVENT
+        ).update(
+            mode=models.RaceLivePublicationMode.PROVISIONAL_PUBLIC,
+            version=2,
+        )
+        second_event = self._event(
+            "v2-race-live-conflicting-event-policy",
+            original_name="Conflicting Event Policy Stakes",
+        )
+        models.RaceLivePublicationPolicy.objects.create(
+            scope_type=models.RaceLivePublicationScopeType.EVENT,
+            scope_key=str(second_event.pk),
+            mode=models.RaceLivePublicationMode.PROVISIONAL_PUBLIC,
+            version=2,
+            registry_digest=self.REGISTRY_DIGEST,
+            coverage_proof_digest=self.COVERAGE_DIGEST,
+            valid_until=self.NOW + timedelta(days=20),
+        )
+        second_manifest = self._manifest(
+            events=[
+                self._event_entry(
+                    second_event,
+                    suffix="conflict",
+                    generated_at=self.NOW,
+                )
+            ]
+        )
+        _, second_path, second_digest = self._write_artifact(
+            second_manifest,
+            dirname="conflicting-event-policy-artifact",
+        )
+
+        with self.assertRaises(initialization.RaceLiveInitializationError):
+            initialization.dry_run_race_live_initialization(
+                self._load(second_path, second_digest)
+            )
+
+        self.assertFalse(
+            models.RaceEventProjectionControl.objects.filter(
+                event=second_event
+            ).exists()
+        )

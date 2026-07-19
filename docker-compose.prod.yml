@@ -60,6 +60,7 @@ services:
       - app_logs:/app/logs
       - ./runtime/secrets:/run/secrets:ro
       - ./runtime/race_live_racecards:/run/race-live/racecards:rw
+      - ./runtime/race_live_publications:/run/race-live/publications:rw
     restart: unless-stopped
     depends_on:
       redis:
