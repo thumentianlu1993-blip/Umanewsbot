@@ -33,6 +33,7 @@ from stable.services.p0_horse_production_apply import (
     sha256_file,
     validate_frozen_p0_research_inputs,
 )
+from stable.services.horse_race_records import upsert_race_record
 
 
 class P0HorseProductionApplyTests(TestCase):
@@ -164,6 +165,7 @@ class P0HorseProductionApplyTests(TestCase):
             "schema_version": "p0-horse-us-career-source-authority-review.v1",
             "review_status": "approved",
             "reviewed_by": "project_owner",
+            "reviewer_id": self.reviewer.id,
             "approved_at": "2026-07-20T00:00:00Z",
             "decision_source_reference": "codex-task:test-authority",
             "input": {
@@ -269,6 +271,7 @@ class P0HorseProductionApplyTests(TestCase):
             "schema_version": "p0-horse-profile-mapping-decisions.v1",
             "review_status": "approved",
             "reviewed_by": "project_owner",
+            "reviewer_id": self.reviewer.id,
             "approved_at": "2026-07-20T00:00:00Z",
             "decision_source_reference": "codex-task:test-profile-mapping",
             "research_v3_sha256": self.research_sha256,
@@ -326,6 +329,129 @@ class P0HorseProductionApplyTests(TestCase):
         )
         artifact_path = self._write_json("reviewed-artifact.json", artifact)
         return artifact_path, artifact
+
+    def _release(self, artifact_path: Path, artifact: dict | None = None) -> tuple[Path, str]:
+        artifact = artifact or json.loads(artifact_path.read_text(encoding="utf-8"))
+        release_manifest = {
+            "schema_version": "p0_horse_production_release_manifest.v1",
+            "bindings": {
+                "research_v3_sha256": artifact["inputs"]["research_v3"]["sha256"],
+                "authority_manifest_sha256": artifact["inputs"]["authority_manifest"]["sha256"],
+                "profile_mapping_decisions_sha256": artifact["inputs"][
+                    "profile_mapping_decisions"
+                ]["sha256"],
+                "production_snapshot_sha256": artifact["production_snapshot_sha256"],
+                "final_artifact_sha256": sha256_file(artifact_path),
+            },
+            "approved_by": "external_project_owner",
+            "approved_at": "2026-07-20T00:00:00Z",
+            "decision_reference": "codex-task:test-independent-production-release",
+            "executor_reviewer_id": self.reviewer.id,
+        }
+        release_path = self._write_json("release-manifest.json", release_manifest)
+        return release_path, sha256_file(release_path)
+
+    def _dry_run(self, artifact_path: Path) -> dict:
+        release_path, release_sha = self._release(artifact_path)
+        with mock.patch(
+            "stable.services.p0_horse_production_apply."
+            "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
+            (release_sha,),
+        ):
+            return dry_run_reviewed_p0_completion_artifact(
+                artifact_path=artifact_path,
+                artifact_sha256=sha256_file(artifact_path),
+                release_manifest_path=release_path,
+                release_manifest_sha256=release_sha,
+            )
+
+    def _commit(self, artifact_path: Path) -> dict:
+        release_path, release_sha = self._release(artifact_path)
+        with mock.patch(
+            "stable.services.p0_horse_production_apply."
+            "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
+            (release_sha,),
+        ):
+            return commit_reviewed_p0_completion_artifact(
+                artifact_path=artifact_path,
+                artifact_sha256=sha256_file(artifact_path),
+                release_manifest_path=release_path,
+                release_manifest_sha256=release_sha,
+                confirm_reviewed_artifact=True,
+            )
+
+    def test_release_gate_rejects_operator_made_manifest_when_trusted_allowlist_is_empty(self):
+        horse = self._horse(0)
+        artifact_path, artifact = self._prepare(
+            [horse],
+            [{"decision": "create_new"}],
+        )
+        release_manifest = {
+            "schema_version": "p0_horse_production_release_manifest.v1",
+            "bindings": {
+                "research_v3_sha256": artifact["inputs"]["research_v3"]["sha256"],
+                "authority_manifest_sha256": artifact["inputs"]["authority_manifest"]["sha256"],
+                "profile_mapping_decisions_sha256": artifact["inputs"][
+                    "profile_mapping_decisions"
+                ]["sha256"],
+                "production_snapshot_sha256": artifact["production_snapshot_sha256"],
+                "final_artifact_sha256": sha256_file(artifact_path),
+            },
+            "approved_by": "project_owner",
+            "approved_at": "2026-07-20T00:00:00Z",
+            "decision_reference": "codex-task:test-release-decision",
+            "executor_reviewer_id": self.reviewer.id,
+        }
+        release_path = self._write_json("release-manifest.json", release_manifest)
+
+        with self.assertRaisesRegex(P0ReviewedArtifactError, "trusted allowlist"):
+            dry_run_reviewed_p0_completion_artifact(
+                artifact_path=artifact_path,
+                artifact_sha256=sha256_file(artifact_path),
+                release_manifest_path=release_path,
+                release_manifest_sha256=sha256_file(release_path),
+            )
+
+    def test_release_gate_rejects_trusted_manifest_with_binding_or_role_drift(self):
+        horse = self._horse(0)
+        artifact_path, artifact = self._prepare(
+            [horse],
+            [{"decision": "create_new"}],
+        )
+        release_path, _ = self._release(artifact_path, artifact)
+        release = json.loads(release_path.read_text(encoding="utf-8"))
+        release["bindings"]["production_snapshot_sha256"] = "0" * 64
+        release_path = self._write_json("release-manifest.json", release)
+        release_sha = sha256_file(release_path)
+        with mock.patch(
+            "stable.services.p0_horse_production_apply."
+            "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
+            (release_sha,),
+        ), self.assertRaisesRegex(P0ReviewedArtifactError, "bindings"):
+            dry_run_reviewed_p0_completion_artifact(
+                artifact_path=artifact_path,
+                artifact_sha256=sha256_file(artifact_path),
+                release_manifest_path=release_path,
+                release_manifest_sha256=release_sha,
+            )
+
+        release["bindings"]["production_snapshot_sha256"] = artifact[
+            "production_snapshot_sha256"
+        ]
+        release["approved_by"] = self.reviewer.username
+        release_path = self._write_json("release-manifest.json", release)
+        release_sha = sha256_file(release_path)
+        with mock.patch(
+            "stable.services.p0_horse_production_apply."
+            "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
+            (release_sha,),
+        ), self.assertRaisesRegex(P0ReviewedArtifactError, "separate"):
+            dry_run_reviewed_p0_completion_artifact(
+                artifact_path=artifact_path,
+                artifact_sha256=sha256_file(artifact_path),
+                release_manifest_path=release_path,
+                release_manifest_sha256=release_sha,
+            )
 
     def test_prepare_requires_explicit_mapping_and_rejects_name_only_or_missing_reviewer(self):
         horse = self._horse(0)
@@ -460,10 +586,7 @@ class P0HorseProductionApplyTests(TestCase):
             "candidates": HorseProfileDataCandidate.objects.count(),
             "logs": TaskExecutionLog.objects.count(),
         }
-        report = dry_run_reviewed_p0_completion_artifact(
-            artifact_path=artifact_path,
-            artifact_sha256=sha256_file(artifact_path),
-        )
+        report = self._dry_run(artifact_path)
         self.assertEqual(report["database_write_count"], 0)
         self.assertEqual(report["validated_horse_count"], 1)
         self.assertEqual(report["planned_profile_creates"], 1)
@@ -484,10 +607,7 @@ class P0HorseProductionApplyTests(TestCase):
         unapproved["rows"][0]["module_reviews"]["profile"]["status"] = "pending"
         self._write_json("reviewed-artifact.json", unapproved)
         with self.assertRaisesRegex(P0ReviewedArtifactError, "formally approved"):
-            dry_run_reviewed_p0_completion_artifact(
-                artifact_path=artifact_path,
-                artifact_sha256=sha256_file(artifact_path),
-            )
+            self._dry_run(artifact_path)
 
         artifact_path, _ = self._prepare([horse], [{"decision": "create_new"}])
         horse["career"]["records"][1]["external_result_id"] = horse["career"]["records"][0][
@@ -497,10 +617,7 @@ class P0HorseProductionApplyTests(TestCase):
         artifact["rows"][0]["race_records_payload"] = horse["career"]["records"]
         self._write_json("reviewed-artifact.json", artifact)
         with self.assertRaisesRegex(P0ReviewedArtifactError, "duplicate race"):
-            dry_run_reviewed_p0_completion_artifact(
-                artifact_path=artifact_path,
-                artifact_sha256=sha256_file(artifact_path),
-            )
+            self._dry_run(artifact_path)
 
     def test_dry_run_rejects_profile_and_input_snapshot_drift_after_prepare(self):
         horse = self._horse(0)
@@ -512,20 +629,14 @@ class P0HorseProductionApplyTests(TestCase):
         profile.owner_name = "changed after prepare"
         profile.save(update_fields=["owner_name"])
         with self.assertRaisesRegex(P0ReviewedArtifactError, "snapshot drift"):
-            dry_run_reviewed_p0_completion_artifact(
-                artifact_path=artifact_path,
-                artifact_sha256=sha256_file(artifact_path),
-            )
+            self._dry_run(artifact_path)
 
         profile.owner_name = ""
         profile.save(update_fields=["owner_name"])
         mapping_path = self.root / "mapping.json"
         mapping_path.write_bytes(mapping_path.read_bytes() + b"\n")
         with self.assertRaisesRegex(P0ReviewedArtifactError, "profile_mapping_decisions.*SHA"):
-            dry_run_reviewed_p0_completion_artifact(
-                artifact_path=artifact_path,
-                artifact_sha256=sha256_file(artifact_path),
-            )
+            self._dry_run(artifact_path)
 
     def test_commit_rolls_back_on_mid_batch_exception(self):
         horses = [self._horse(0), self._horse(1)]
@@ -543,13 +654,8 @@ class P0HorseProductionApplyTests(TestCase):
         with mock.patch(
             "stable.services.p0_horse_production_apply._apply_artifact_row",
             side_effect=[None, RuntimeError("injected failure")],
-        ):
-            with self.assertRaisesRegex(RuntimeError, "injected failure"):
-                commit_reviewed_p0_completion_artifact(
-                    artifact_path=artifact_path,
-                    artifact_sha256=sha256_file(artifact_path),
-                    confirm_reviewed_artifact=True,
-                )
+        ), self.assertRaisesRegex(RuntimeError, "injected failure"):
+            self._commit(artifact_path)
         self.assertEqual(before["profiles"], HorseProfile.objects.count())
         self.assertEqual(before["terms"], TermEntry.objects.count())
         self.assertEqual(before["records"], HorseRaceRecord.objects.count())
@@ -595,16 +701,8 @@ class P0HorseProductionApplyTests(TestCase):
         self.assertEqual(artifact["summary"]["actual_start_count"], 1432)
         self.assertEqual(artifact["summary"]["nonstarter_count"], 7)
 
-        first = commit_reviewed_p0_completion_artifact(
-            artifact_path=artifact_path,
-            artifact_sha256=sha256_file(artifact_path),
-            confirm_reviewed_artifact=True,
-        )
-        second = commit_reviewed_p0_completion_artifact(
-            artifact_path=artifact_path,
-            artifact_sha256=sha256_file(artifact_path),
-            confirm_reviewed_artifact=True,
-        )
+        first = self._commit(artifact_path)
+        second = self._commit(artifact_path)
         self.assertEqual(first["strict_complete_count"], 50)
         self.assertEqual(second["race_records_created"], 0)
         self.assertEqual(HorseProfile.objects.count(), 51)
@@ -642,9 +740,88 @@ class P0HorseProductionApplyTests(TestCase):
             2,
         )
 
+    def test_create_new_ignores_same_name_non_horse_term(self):
+        horse = self._horse(0)
+        non_horse = TermEntry.objects.create(
+            term_type=TermType.JOCKEY,
+            source_language="en",
+            source_ja=horse["identity"]["horse_name"],
+            target_zh="",
+            translation_status=TermTranslationStatus.PENDING,
+            is_active=True,
+        )
+        artifact_path, _ = self._prepare([horse], [{"decision": "create_new"}])
+
+        self._commit(artifact_path)
+
+        profile = HorseProfile.objects.get()
+        self.assertNotEqual(profile.primary_term_id, non_horse.id)
+        self.assertEqual(profile.primary_term.term_type, TermType.HORSE)
+        self.assertEqual(TermEntry.objects.filter(term_type=TermType.JOCKEY).count(), 1)
+
+    def test_commit_claims_only_artifact_records_including_unchanged(self):
+        horse = self._horse(0)
+        profile = self._create_profile(horse["identity"])
+        claimed = upsert_race_record(profile, horse["career"]["records"][0]).record
+        unrelated_payload = self._record(0, -1, nonstarter=True)
+        unrelated = upsert_race_record(profile, unrelated_payload).record
+        artifact_path, _ = self._prepare(
+            [horse],
+            [{"decision": "bind_existing", "profile": profile}],
+        )
+
+        self._commit(artifact_path)
+
+        claimed.refresh_from_db()
+        unrelated.refresh_from_db()
+        self.assertIsNotNone(claimed.completion_run_id)
+        self.assertIsNone(unrelated.completion_run_id)
+
+    def test_json_inputs_are_read_once_and_symlinks_are_rejected(self):
+        horse = self._horse(0)
+        artifact_path, artifact = self._prepare([horse], [{"decision": "create_new"}])
+        release_path, release_sha = self._release(artifact_path, artifact)
+        artifact_sha = sha256_file(artifact_path)
+        original_reader = __import__(
+            "stable.services.p0_horse_production_apply",
+            fromlist=["_read_regular_file_once"],
+        )._read_regular_file_once
+        reads: dict[str, int] = {}
+
+        def counted_reader(path, *, label):
+            reads[str(path)] = reads.get(str(path), 0) + 1
+            return original_reader(path, label=label)
+
+        with mock.patch(
+            "stable.services.p0_horse_production_apply."
+            "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
+            (release_sha,),
+        ), mock.patch(
+            "stable.services.p0_horse_production_apply._read_regular_file_once",
+            side_effect=counted_reader,
+        ):
+            dry_run_reviewed_p0_completion_artifact(
+                artifact_path=artifact_path,
+                artifact_sha256=artifact_sha,
+                release_manifest_path=release_path,
+                release_manifest_sha256=release_sha,
+            )
+        self.assertEqual(set(reads.values()), {1})
+
+        symlink = self.root / "artifact-symlink.json"
+        symlink.symlink_to(artifact_path)
+        with self.assertRaisesRegex(P0ReviewedArtifactError, "symlink"):
+            dry_run_reviewed_p0_completion_artifact(
+                artifact_path=symlink,
+                artifact_sha256=artifact_sha,
+                release_manifest_path=release_path,
+                release_manifest_sha256=release_sha,
+            )
+
     def test_command_requires_exact_artifact_sha_and_confirmation(self):
         horse = self._horse(0)
-        artifact_path, _ = self._prepare([horse], [{"decision": "create_new"}])
+        artifact_path, artifact = self._prepare([horse], [{"decision": "create_new"}])
+        release_path, release_sha = self._release(artifact_path, artifact)
         with self.assertRaisesRegex(Exception, "SHA"):
             call_command(
                 "apply_reviewed_p0_horse_completion",
@@ -653,6 +830,10 @@ class P0HorseProductionApplyTests(TestCase):
                 str(artifact_path),
                 "--artifact-sha256",
                 "0" * 64,
+                "--release-manifest",
+                str(release_path),
+                "--release-manifest-sha256",
+                release_sha,
             )
         with self.assertRaisesRegex(Exception, "confirm-reviewed-artifact"):
             call_command(
@@ -662,6 +843,10 @@ class P0HorseProductionApplyTests(TestCase):
                 str(artifact_path),
                 "--artifact-sha256",
                 sha256_file(artifact_path),
+                "--release-manifest",
+                str(release_path),
+                "--release-manifest-sha256",
+                release_sha,
             )
 
     def test_prepare_command_writes_new_atomic_directory_and_refuses_overwrite(self):
@@ -736,3 +921,110 @@ class P0HorseProductionApplyTests(TestCase):
                 "nonstarter_count": 7,
             },
         )
+
+    def test_desensitized_production_snapshot_and_mapping_prepare_real_frozen_fifty(self):
+        repository_root = Path(__file__).resolve().parents[2]
+        fixture_root = (
+            repository_root
+            / "server"
+            / "stable"
+            / "fixtures"
+            / "p0_horse_production"
+        )
+        snapshot_path = fixture_root / "desensitized_profile_snapshot_58f00961.json"
+        mapping_fixture_path = (
+            fixture_root / "desensitized_mapping_decisions_58f00961.json"
+        )
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        mapping_fixture = json.loads(
+            mapping_fixture_path.read_text(encoding="utf-8")
+        )
+        self.assertEqual(snapshot["production_head"], "58f00961")
+        self.assertEqual(mapping_fixture["production_head"], "58f00961")
+        self.assertEqual(
+            mapping_fixture["production_snapshot_sha256"],
+            sha256_file(snapshot_path),
+        )
+        self.assertEqual(len(snapshot["rows"]), 50)
+        self.assertEqual(len(mapping_fixture["rows"]), 50)
+        self.assertEqual(
+            sum(row["decision"] == "bind_existing" for row in mapping_fixture["rows"]),
+            25,
+        )
+        self.assertEqual(
+            sum(row["decision"] == "create_new" for row in mapping_fixture["rows"]),
+            25,
+        )
+        strad = next(
+            row
+            for row in mapping_fixture["rows"]
+            if row["identity"]["horse_name"] == "Stradivarius"
+        )
+        self.assertEqual(strad["profile_id"], 19439)
+        self.assertEqual(strad["rejected_profile_ids"], [21276])
+        self.assertIn("official HKJC overseas term", strad["rejection_reason"])
+        self.assertIn("community term", strad["rejection_reason"])
+
+        artifact_root = (
+            repository_root
+            / "runtime"
+            / "horse_profile_completion"
+            / "pedigree-research-20260719"
+        )
+        research_path = artifact_root / "p0_horse_research_50_enriched_v3.json"
+        authority_path = artifact_root / "reviewed_us_career_source_authority_v1.json"
+        research = json.loads(research_path.read_text(encoding="utf-8"))
+        research_rows = {
+            row["identity"]["horse_name"]: row for row in research["horses"]
+        }
+        self.assertEqual(set(research_rows), {
+            row["identity"]["horse_name"] for row in mapping_fixture["rows"]
+        })
+        resolutions = []
+        ordered_horses = []
+        for fixture_row in mapping_fixture["rows"]:
+            horse = copy.deepcopy(research_rows[fixture_row["identity"]["horse_name"]])
+            horse["identity"] = fixture_row["identity"]
+            horse["career"]["records_synced_through"] = max(
+                record["race_date"] for record in horse["career"]["records"]
+            )
+            ordered_horses.append(horse)
+            if fixture_row["decision"] == "create_new":
+                resolutions.append({"decision": "create_new"})
+                continue
+            profile = self._create_profile(
+                fixture_row["identity"],
+                profile_id=fixture_row["profile_id"],
+            )
+            resolution = {
+                "decision": "bind_existing",
+                "profile": profile,
+            }
+            if fixture_row["identity"]["horse_name"] == "Stradivarius":
+                rejected = self._create_profile(
+                    fixture_row["identity"],
+                    profile_id=fixture_row["rejected_profile_ids"][0],
+                )
+                resolution.update(
+                    {
+                        "rejected_profile_ids": [rejected.id],
+                        "rejection_reason": fixture_row["rejection_reason"],
+                    }
+                )
+            resolutions.append(resolution)
+        self.research_sha256 = sha256_file(research_path)
+        mapping_path = self._mapping(ordered_horses, resolutions)
+        artifact = prepare_reviewed_p0_completion_artifact(
+            research_v3_path=research_path,
+            authority_manifest_path=authority_path,
+            authority_manifest_sha256=sha256_file(authority_path),
+            profile_mapping_decisions_path=mapping_path,
+            reviewer_id=self.reviewer.id,
+        )
+        self.assertEqual(artifact["inputs"]["research_v3"]["sha256"], snapshot["research_v3_sha256"])
+        self.assertEqual(artifact["summary"]["bind_existing_count"], 25)
+        self.assertEqual(artifact["summary"]["create_new_count"], 25)
+        self.assertEqual(artifact["summary"]["race_record_count"], 1439)
+        self.assertEqual(artifact["summary"]["actual_start_count"], 1432)
+        self.assertEqual(artifact["summary"]["nonstarter_count"], 7)
+        self.assertEqual(artifact["release_status"], "candidate_pending_independent_release")

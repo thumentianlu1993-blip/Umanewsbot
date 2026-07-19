@@ -189,17 +189,39 @@
 MUST 精确绑定冻结 v3、美国组合来源 authority manifest、独立 profile mapping decisions 的字节
 SHA，并逐匹保存四字段身份、deterministic identity key、模块批准和数据库 resolution snapshot。
 
+正式 dry-run 与 commit 还 MUST 消费独立
+`p0_horse_production_release_manifest.v1`。manifest MUST 绑定精确 v3、authority、mapping、
+production snapshot、final artifact SHA、项目负责人批准元数据和 executor reviewer ID，且
+manifest 自身精确字节 SHA MUST 位于仓库 trusted allowlist。allowlist 为空时系统 MUST 保持
+prepare-only。
+
 #### Scenario: prepare 消费全部显式 mapping decisions
 - **WHEN** 操作者执行正式 artifact prepare
 - **THEN** mapping decisions MUST 对全部 50 匹逐行给出 `bind_existing(profile_id)` 或 `create_new`
 - **AND** 仅名称命中、缺 profile ID、缺 production snapshot SHA 或缺 v3 SHA 绑定 MUST 阻断
 - **AND** `Stradivarius` 等多 profile 命中 MUST 显式保存选中 ID、全部 rejected ID 和理由
+- **AND** mapping reviewer MUST 是 active staff/superuser，且项目负责人 release approver 与
+  active superuser DB executor MUST 作为不同角色记录
+
+#### Scenario: candidate artifact 不能自签生产 release
+- **WHEN** 操作者完成 prepare 或自行制作 release manifest
+- **THEN** candidate artifact SHALL 保持 `candidate_pending_independent_release`
+- **AND** release manifest 精确 SHA 未进入仓库 trusted allowlist 时 dry-run 与 commit MUST 阻断
+- **AND** release manifest 任一输入 SHA、production snapshot、final artifact 或 executor 绑定
+  不一致 MUST 阻断
+
+#### Scenario: JSON 输入按冻结字节单次读取
+- **WHEN** prepare、dry-run 或 commit 消费 JSON 文件
+- **THEN** 每个文件 MUST 只读取一次普通文件字节，并以同一字节计算 SHA 和解析 JSON
+- **AND** symlink 或非普通文件 MUST 拒绝
+- **AND** commit MUST 使用已加载的内存 payload，不得重新打开 artifact 或其输入
 
 #### Scenario: create resolution 不得绕过强身份
 - **WHEN** mapping decision 选择 `create_new`
 - **THEN** 当前数据库 MUST 不存在名称、父、母、出生年四字段完整一致的 profile
 - **AND** commit SHALL 创建 pending horse `TermEntry` 与 `HorseProfile`
-- **AND** 已有唯一可复用且未绑定 profile 的正式 term/alias SHOULD 复用，不得重复创建中文术语
+- **AND** 已有唯一可复用且未绑定 profile 的 `term_type=HORSE` 正式 term/alias SHOULD 复用
+- **AND** 同名非 horse term MUST 完全忽略
 
 #### Scenario: dry-run 执行真实逐行模拟且零写入
 - **WHEN** 操作者为精确 artifact SHA 执行 `--dry-run`
@@ -215,6 +237,8 @@ SHA，并逐匹保存四字段身份、deterministic identity key、模块批准
 - **AND** 任一 identity、snapshot、manual lock、记录或来源漂移 MUST 使整批回滚
 - **AND** 重跑同一 artifact MUST 不重复创建 profile、term、P0 source、candidate 或 race record
 - **AND** 普通履历 event/result 可为空，系统 MUST NOT 为本批创建 `RaceEvent`
+- **AND** completion run 只 SHALL 关联本 artifact upsert 明确认领的 record ID（包括 unchanged），
+  不得接管其它 `completion_run IS NULL` 的旧履历
 
 #### Scenario: 美国组合来源保持窄批准语义
 - **WHEN** formal artifact 写入美国 10 匹的已审核履历

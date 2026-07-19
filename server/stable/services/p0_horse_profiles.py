@@ -2669,6 +2669,7 @@ def apply_reviewed_completion_artifact(payload: dict, *, commit: bool = False) -
         "race_records_adopted": 0,
         "race_records_updated": 0,
         "race_records_existing": 0,
+        "claimed_race_record_ids": [],
         "manual_lock_skipped": 0,
         "skipped_unreviewed": 0,
         "skipped_unreviewed_modules": 0,
@@ -2845,6 +2846,7 @@ def apply_reviewed_completion_artifact(payload: dict, *, commit: bool = False) -
                     record_diffs: list[dict[str, Any]] = []
                     for record_payload in module_payload:
                         upsert = upsert_race_record(profile, record_payload)
+                        summary["claimed_race_record_ids"].append(upsert.record.id)
                         summary_key = "race_records_existing" if upsert.action == "unchanged" else f"race_records_{upsert.action}"
                         summary[summary_key] += 1
                         if upsert.action != "unchanged":

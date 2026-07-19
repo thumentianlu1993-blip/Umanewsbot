@@ -20,19 +20,25 @@
    `missing_commit_compatible_module_approvals`。
 4. prepare 只能保持 pending；apply 必须绑定固定 v2 SHA、可信 manifest SHA、调用方显式 SHA
    与实际文件 SHA。记录、身份、来源、计数漂移或重复记录必须 fail closed。
-5. 下一步必须按顺序完成，任何一步失败即停止：
-   1. 读取生产数据，完成只读 profile mapping / preflight；
-   2. 生成 commit-compatible reviewed artifact；
-   3. 运行 formal `commit=False` 或生产备份副本模拟；
-   4. 核对生产 `HEAD`、容器、`/healthz/`、锁与备份；
-   5. 针对精确 artifact SHA 和准确集成版本重新取得生产授权。
-6. 正式 commit artifact 与 formal production dry-run 尚未生成或运行。本轮无网络、无数据库
-   写入、无部署发布，生产保持 **NO-GO / blocked**；用户本次“继续推进”不等于生产写入授权。
+5. 两阶段 release 顺序固定如下，任何一步失败即停止：
+   1. **Phase A deploy（prepare-only）**：仓库 trusted release manifest SHA allowlist 保持空；
+   2. 在生产只读查询 50 匹 profile snapshot，并生成 mapping decisions 与 candidate artifact；
+   3. 下载并独立审核 candidate artifact，生成绑定 v3、authority、mapping、production snapshot、
+      final artifact 和 executor reviewer 的 `p0_horse_production_release_manifest.v1`；
+   4. 将该 release manifest 的精确字节 SHA 作为代码变更加入 trusted allowlist，完成独立复核后
+      **Phase B deploy**；
+   5. 对同一 artifact 与 release manifest 运行 formal `--dry-run`，确认零写入和全部 action；
+   6. 核对生产 `HEAD`、容器、`/healthz/`、锁，完成数据库备份及独立校验；
+   7. 仅对已通过上述门禁的精确 artifact 执行 `--commit`。
+6. 当前 trusted allowlist 为空，Phase A production mapping/candidate artifact 与 formal dry-run 均
+   尚未执行。即使操作者自行制作 release manifest，命令也必须 fail closed；生产保持
+   **NO-GO / prepare-only**。
 
 ### P0 50 匹正式 mapping / artifact / apply 命令
 
-以下命令只描述新能力。未取得 independently approved 的 50 行 mapping decisions 前不得运行
-prepare；未完成生产只读 dry-run、备份和精确版本授权前不得运行 commit。
+以下命令只描述新能力。Phase A 的 prepare 可消费已批准 mapping decisions 生成 candidate；
+`--dry-run/--commit` 都必须额外消费 independently approved release manifest，并且其文件 SHA
+必须已进入仓库 trusted allowlist。当前 allowlist 为空。
 
 mapping decisions 顶层必须为
 `p0-horse-profile-mapping-decisions.v1`、`review_status=approved`，并包含
@@ -43,6 +49,9 @@ mapping decisions 顶层必须为
 `racing_career_status` / `records_synced_through` 的独立 `completion_decision`。bind 行还必须
 携带精确 `profile_snapshot` 与名称/alias evidence；多名称命中必须列出全部 rejected profile
 ID 和理由。
+mapping 的 `reviewer_id` 必须对应 active staff/superuser；它负责映射审核。candidate artifact
+中的 executor reviewer 必须是 active superuser。release manifest 的 `approved_by` 是项目负责人
+外部决策，不得冒充或混同 DB executor。
 
 ```bash
 python manage.py apply_reviewed_p0_horse_completion \
@@ -57,31 +66,36 @@ python manage.py apply_reviewed_p0_horse_completion \
 
 `--output` 必须不存在；成功后目录只包含
 `reviewed_p0_horse_completion_artifact.json` 与 `manifest.json`，并报告两者 SHA。prepare
-只读数据库且数据库写入为零。
+只读数据库且数据库写入为零；其 `release_status=candidate_pending_independent_release`，本身不
+授权执行。
 
 ```bash
 python manage.py apply_reviewed_p0_horse_completion \
   --dry-run \
   --artifact /absolute/path/reviewed_p0_horse_completion_artifact.json \
-  --artifact-sha256 '<exact-lowercase-sha256>'
+  --artifact-sha256 '<exact-lowercase-sha256>' \
+  --release-manifest /absolute/path/p0_horse_production_release_manifest.v1.json \
+  --release-manifest-sha256 '<trusted-exact-lowercase-sha256>'
 ```
 
-dry-run 会重新读取并核对 v3、authority、mapping 三份输入文件，逐行复核 DB snapshot 与计划
-action；`database_write_count` 必须精确为 `0`。只输出 `dry_run=True` 而没有逐项 action 数量
-不构成通过。
+dry-run 对 artifact、release manifest、v3、authority、mapping 各只读取一次普通文件字节，
+同一字节同时用于 SHA 与 JSON 解析；symlink 和非普通文件直接拒绝。命令逐行复核 DB snapshot
+与计划 action；`database_write_count` 必须精确为 `0`。
 
 ```bash
 python manage.py apply_reviewed_p0_horse_completion \
   --commit \
   --artifact /absolute/path/reviewed_p0_horse_completion_artifact.json \
   --artifact-sha256 '<same-exact-lowercase-sha256>' \
+  --release-manifest /absolute/path/p0_horse_production_release_manifest.v1.json \
+  --release-manifest-sha256 '<same-trusted-exact-lowercase-sha256>' \
   --confirm-reviewed-artifact
 ```
 
-commit 必须在完成部署前门禁、数据库备份、同一 artifact 的成功 dry-run 和针对精确集成版本的
-新授权后执行。该命令不访问网络、不创建普通比赛 `RaceEvent`；任一 reviewer/profile/identity/
-record/source/action 漂移整批回滚。美国来源审计仍必须写明 HRN/Sporting Life/Racing Post
-组合只继承冻结 v3 批准，不是 Equibase 官方逐场履历。
+commit 使用首次读取后保留在内存中的 payload，不重新打开输入。它必须在 Phase B、同一
+artifact/release manifest 的成功 dry-run 和备份后执行。该命令不访问网络、不创建普通比赛
+`RaceEvent`；任一 reviewer/profile/identity/record/source/action 漂移整批回滚。本批只将
+artifact 明确认领的履历（含 unchanged）关联 completion run，不接管其它旧 NULL 履历。
 
 ## P0 马首批 50 匹生产提交前 NO-GO（2026-07-19）
 

@@ -32,6 +32,8 @@ class Command(BaseCommand):
         parser.add_argument("--output")
         parser.add_argument("--artifact")
         parser.add_argument("--artifact-sha256")
+        parser.add_argument("--release-manifest")
+        parser.add_argument("--release-manifest-sha256")
         parser.add_argument("--confirm-reviewed-artifact", action="store_true")
 
     def handle(self, *args, **options):
@@ -64,9 +66,17 @@ class Command(BaseCommand):
                 self.stdout.write(json.dumps(package, ensure_ascii=False, sort_keys=True))
                 return
 
-            if not options.get("artifact") or not options.get("artifact_sha256"):
+            if any(
+                not options.get(name)
+                for name in (
+                    "artifact",
+                    "artifact_sha256",
+                    "release_manifest",
+                    "release_manifest_sha256",
+                )
+            ):
                 raise CommandError(
-                    "--dry-run/--commit 必须同时提供 --artifact 与 --artifact-sha256"
+                    "--dry-run/--commit 必须提供 artifact 与独立 release manifest 的精确 SHA"
                 )
             if options["dry_run"]:
                 if options.get("confirm_reviewed_artifact"):
@@ -74,6 +84,8 @@ class Command(BaseCommand):
                 report = dry_run_reviewed_p0_completion_artifact(
                     artifact_path=options["artifact"],
                     artifact_sha256=options["artifact_sha256"],
+                    release_manifest_path=options["release_manifest"],
+                    release_manifest_sha256=options["release_manifest_sha256"],
                 )
             else:
                 if not options.get("confirm_reviewed_artifact"):
@@ -81,6 +93,8 @@ class Command(BaseCommand):
                 report = commit_reviewed_p0_completion_artifact(
                     artifact_path=options["artifact"],
                     artifact_sha256=options["artifact_sha256"],
+                    release_manifest_path=options["release_manifest"],
+                    release_manifest_sha256=options["release_manifest_sha256"],
                     confirm_reviewed_artifact=True,
                 )
             self.stdout.write(json.dumps(report, ensure_ascii=False, sort_keys=True))

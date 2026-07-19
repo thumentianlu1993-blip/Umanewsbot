@@ -233,9 +233,18 @@ prepare 只读数据库并原子写入新目录。生成物必须为
 `p0-horse-reviewed-completion-artifact.v1`、`commit_artifact_compatible=true`，同时绑定 v3、
 美国 authority manifest、mapping decisions 三份文件的精确字节 SHA。四个 required module
 均须独立 approved、confidence 不低于 90，任何 URL、身份、记录唯一性、快照或 action 预期不一致
-即停止。
+即停止。该生成物仍只是 `candidate_pending_independent_release`，不能自行授权 dry-run/commit。
 
-dry-run 必须重新读取三份冻结输入、复算逐行 schema、review、identity、profile snapshot、记录
+正式 dry-run/commit 另须消费 `p0_horse_production_release_manifest.v1`。该独立 manifest 必须
+绑定精确 v3、authority、mapping、production snapshot、final artifact SHA、项目负责人
+`approved_by/approved_at/decision_reference` 与 DB executor reviewer ID；文件字节 SHA 还必须
+存在于仓库 trusted allowlist。Phase A allowlist 初始为空，因此任何操作者自制 manifest 都无法
+执行，Phase B 只能通过审查后的精确 SHA 代码变更解锁。mapping reviewer 必须是 active
+staff/superuser，release approver 与 active superuser executor 的职责和身份必须分离。
+
+每个 JSON 输入只允许读取一次普通文件字节；相同字节同时用于 SHA 和 JSON 解析，symlink/非普通
+文件拒绝。commit 使用内存 payload，不得在事务前后重新打开。dry-run 复算逐行 schema、review、
+identity、profile snapshot、记录
 稳定键/source-bound ID/同场规范键及计划 action，并报告 profile create/update、record
 create/update/existing、P0 source 和 module audit 数；该路径不得创建 run、候选、来源、日志或
 其它数据库记录。
@@ -245,6 +254,9 @@ commit 在单事务中按 deterministic identity key 串行化 create resolution
 strict complete 时整批回滚。`create_new` 可创建暂无中文名的 pending horse term 和
 `HorseProfile`；普通履历允许不关联 `RaceEvent`，不得为了本批创建赛事。重跑同一 artifact 只追加
 任务执行审计，不重复创建 term、profile、P0 source、module candidate 或 `HorseRaceRecord`。
+create resolution 只复用 `term_type=HORSE` 的 term/alias；同名其它术语类型忽略。completion run
+只关联 artifact 明确认领的 upsert record ID，包括 unchanged 记录，不接管该 profile 其它 NULL
+旧履历。
 
 ## Risks / Trade-offs
 

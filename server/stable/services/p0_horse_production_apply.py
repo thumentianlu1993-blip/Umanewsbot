@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
 import tempfile
 import unicodedata
 from copy import deepcopy
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -55,6 +59,10 @@ ARTIFACT_SCHEMA = "p0-horse-reviewed-completion-artifact.v1"
 MAPPING_SCHEMA = "p0-horse-profile-mapping-decisions.v1"
 RESEARCH_SCHEMA = "p0-horse-research.v3"
 AUTHORITY_SCHEMA = "p0-horse-us-career-source-authority-review.v1"
+RELEASE_MANIFEST_SCHEMA = "p0_horse_production_release_manifest.v1"
+# Phase A is deliberately prepare-only. Phase B must add the exact independently
+# approved manifest byte SHA here in a reviewed repository change.
+TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256: tuple[str, ...] = ()
 MIN_FORMAL_CONFIDENCE = 90
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
 IDENTITY_FIELDS = ("horse_name", "sire_name", "dam_name", "birth_year")
@@ -102,16 +110,51 @@ class P0ReviewedArtifactError(ValueError):
     pass
 
 
+@dataclass(frozen=True)
+class FrozenJsonInput:
+    path: str
+    sha256: str
+    payload: dict[str, Any]
+
+
 def _fail(message: str) -> None:
     raise P0ReviewedArtifactError(message)
 
 
 def sha256_file(path: str | Path) -> str:
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return hashlib.sha256(_read_regular_file_once(path, label="file")).hexdigest()
+
+
+def _read_regular_file_once(path: str | Path, *, label: str) -> bytes:
+    resolved = Path(path)
+    try:
+        metadata = resolved.lstat()
+    except OSError as exc:
+        _fail(f"{label} is not readable: {exc}")
+    if stat.S_ISLNK(metadata.st_mode):
+        _fail(f"{label} must not be a symlink")
+    if not stat.S_ISREG(metadata.st_mode):
+        _fail(f"{label} must be a regular file")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(resolved, flags)
+        try:
+            opened_metadata = os.fstat(descriptor)
+            if not stat.S_ISREG(opened_metadata.st_mode):
+                _fail(f"{label} must be a regular file")
+            if (
+                opened_metadata.st_dev != metadata.st_dev
+                or opened_metadata.st_ino != metadata.st_ino
+            ):
+                _fail(f"{label} changed before it could be read")
+            chunks = []
+            while chunk := os.read(descriptor, 1024 * 1024):
+                chunks.append(chunk)
+        finally:
+            os.close(descriptor)
+    except OSError as exc:
+        _fail(f"{label} is not readable: {exc}")
+    return b"".join(chunks)
 
 
 def _canonical_bytes(value: Any) -> bytes:
@@ -138,23 +181,29 @@ def _jsonable(value: Any) -> Any:
     return json.loads(json.dumps(value, default=_json_default))
 
 
-def _load_json(path: str | Path, *, label: str) -> dict[str, Any]:
+def _load_json_once(
+    path: str | Path,
+    *,
+    label: str,
+    expected_sha256: str | None = None,
+) -> FrozenJsonInput:
+    data = _read_regular_file_once(path, label=label)
+    actual_sha256 = hashlib.sha256(data).hexdigest()
+    if expected_sha256 is not None:
+        if not SHA256_RE.fullmatch(str(expected_sha256 or "")):
+            _fail(f"{label} SHA-256 must be lowercase hexadecimal")
+        if actual_sha256 != expected_sha256:
+            _fail(
+                f"{label} SHA-256 mismatch: expected {expected_sha256}, "
+                f"got {actual_sha256}"
+            )
     try:
-        payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        payload = json.loads(data)
+    except (UnicodeError, json.JSONDecodeError) as exc:
         _fail(f"{label} is not readable JSON: {exc}")
     if not isinstance(payload, dict):
         _fail(f"{label} must be a JSON object")
-    return payload
-
-
-def _verify_file_sha(path: str | Path, expected_sha256: str, *, label: str) -> str:
-    if not SHA256_RE.fullmatch(str(expected_sha256 or "")):
-        _fail(f"{label} SHA-256 must be lowercase hexadecimal")
-    actual = sha256_file(path)
-    if actual != expected_sha256:
-        _fail(f"{label} SHA-256 mismatch: expected {expected_sha256}, got {actual}")
-    return actual
+    return FrozenJsonInput(path=str(path), sha256=actual_sha256, payload=payload)
 
 
 def _normalized(value: Any) -> str:
@@ -187,7 +236,7 @@ def deterministic_identity_key(identity: dict[str, Any]) -> str:
     return hashlib.sha256("|".join(normalized).encode("utf-8")).hexdigest()
 
 
-def _valid_https_url(value: Any) -> bool:
+def _valid_https_url(value: Any, *, allow_fragment: bool = False) -> bool:
     text = str(value or "").strip()
     if not valid_http_url(text):
         return False
@@ -202,7 +251,7 @@ def _valid_https_url(value: Any) -> bool:
         and not parsed.username
         and not parsed.password
         and port is None
-        and not parsed.fragment
+        and (allow_fragment or not parsed.fragment)
     )
 
 
@@ -210,6 +259,15 @@ def _require_url(value: Any, *, context: str) -> str:
     text = str(value or "").strip()
     if not _valid_https_url(text):
         _fail(f"{context} URL must be a credential-free HTTPS URL without explicit port or fragment")
+    return text
+
+
+def _require_evidence_url(value: Any, *, context: str) -> str:
+    text = str(value or "").strip()
+    if not _valid_https_url(text, allow_fragment=True):
+        _fail(
+            f"{context} URL must be a credential-free HTTPS URL without explicit port"
+        )
     return text
 
 
@@ -224,12 +282,12 @@ def _validate_urls_recursive(value: Any, *, context: str) -> None:
         key_name = str(key).casefold()
         if key_name.endswith("_url") or key_name == "url":
             if item not in ("", None):
-                _require_url(item, context=f"{context}.{key}")
+                _require_evidence_url(item, context=f"{context}.{key}")
         elif key_name.endswith("_urls"):
             if not isinstance(item, list):
                 _fail(f"{context}.{key} URL collection must be a list")
             for index, url in enumerate(item):
-                _require_url(url, context=f"{context}.{key}[{index}]")
+                _require_evidence_url(url, context=f"{context}.{key}[{index}]")
         else:
             _validate_urls_recursive(item, context=f"{context}.{key}")
 
@@ -416,6 +474,19 @@ def _validate_reviewer(reviewer_id: Any):
     reviewer = get_user_model().objects.filter(pk=reviewer_id).first()
     if reviewer is None or not reviewer.is_active or not reviewer.is_superuser:
         _fail("reviewer must exist and be an active superuser")
+    return reviewer
+
+
+def _validate_mapping_reviewer(reviewer_id: Any):
+    if isinstance(reviewer_id, bool) or not isinstance(reviewer_id, int):
+        _fail("mapping reviewer_id is required")
+    reviewer = get_user_model().objects.filter(pk=reviewer_id).first()
+    if (
+        reviewer is None
+        or not reviewer.is_active
+        or not (reviewer.is_staff or reviewer.is_superuser)
+    ):
+        _fail("mapping reviewer must exist and be active staff or superuser")
     return reviewer
 
 
@@ -642,13 +713,25 @@ def validate_frozen_p0_research_inputs(
     authority_manifest_path: str | Path,
     authority_manifest_sha256: str,
 ) -> dict[str, int]:
-    research = _load_json(research_v3_path, label="research v3")
-    authority_sha = _verify_file_sha(
+    research_input = _load_json_once(research_v3_path, label="research v3")
+    authority_input = _load_json_once(
         authority_manifest_path,
-        authority_manifest_sha256,
         label="authority manifest",
+        expected_sha256=authority_manifest_sha256,
     )
-    authority = _load_json(authority_manifest_path, label="authority manifest")
+    return _validate_frozen_p0_research_payloads(
+        research_input.payload,
+        authority_input.payload,
+        authority_sha256=authority_input.sha256,
+    )
+
+
+def _validate_frozen_p0_research_payloads(
+    research: dict[str, Any],
+    authority: dict[str, Any],
+    *,
+    authority_sha256: str,
+) -> dict[str, int]:
     if research.get("schema_version") != RESEARCH_SCHEMA:
         _fail("research v3 schema is invalid")
     horses = research.get("horses")
@@ -657,7 +740,7 @@ def validate_frozen_p0_research_inputs(
     _validate_authority_chain(
         research,
         authority,
-        authority_sha256=authority_sha,
+        authority_sha256=authority_sha256,
     )
     identity_keys: set[str] = set()
     record_count = actual_start_count = nonstarter_count = 0
@@ -971,27 +1054,34 @@ def prepare_reviewed_p0_completion_artifact(
     if profile_mapping_decisions_path is None:
         _fail("profile mapping decisions artifact is required")
     reviewer = _validate_reviewer(reviewer_id)
-    research = _load_json(research_v3_path, label="research v3")
-    authority_sha = _verify_file_sha(
+    research_input = _load_json_once(research_v3_path, label="research v3")
+    authority_input = _load_json_once(
         authority_manifest_path,
-        authority_manifest_sha256,
         label="authority manifest",
+        expected_sha256=authority_manifest_sha256,
     )
-    authority = _load_json(authority_manifest_path, label="authority manifest")
-    validate_frozen_p0_research_inputs(
-        research_v3_path=research_v3_path,
-        authority_manifest_path=authority_manifest_path,
-        authority_manifest_sha256=authority_sha,
+    mapping_input = _load_json_once(
+        profile_mapping_decisions_path,
+        label="profile mapping decisions",
+    )
+    research = research_input.payload
+    authority = authority_input.payload
+    mapping = mapping_input.payload
+    _validate_frozen_p0_research_payloads(
+        research,
+        authority,
+        authority_sha256=authority_input.sha256,
     )
     horses = research["horses"]
-    research_sha = sha256_file(research_v3_path)
+    research_sha = research_input.sha256
+    authority_sha = authority_input.sha256
     _validate_authority_chain(research, authority, authority_sha256=authority_sha)
 
-    mapping = _load_json(profile_mapping_decisions_path, label="profile mapping decisions")
-    mapping_sha = sha256_file(profile_mapping_decisions_path)
+    mapping_sha = mapping_input.sha256
     if mapping.get("schema_version") != MAPPING_SCHEMA or mapping.get("review_status") != "approved":
         _fail("profile mapping decisions must be an independently approved mapping artifact")
     _review_metadata(mapping, context="profile mapping decisions")
+    mapping_reviewer = _validate_mapping_reviewer(mapping.get("reviewer_id"))
     if mapping.get("research_v3_sha256") != research_sha:
         _fail("profile mapping decisions research v3 SHA binding mismatch")
     mapping_rows = mapping.get("rows")
@@ -1056,6 +1146,7 @@ def prepare_reviewed_p0_completion_artifact(
         "schema_version": ARTIFACT_SCHEMA,
         "commit_artifact_compatible": True,
         "reviewed": True,
+        "release_status": "candidate_pending_independent_release",
         "reviewer_id": reviewer.id,
         "reviewer_snapshot": {
             "id": reviewer.id,
@@ -1063,8 +1154,16 @@ def prepare_reviewed_p0_completion_artifact(
             "is_active": reviewer.is_active,
             "is_superuser": reviewer.is_superuser,
         },
+        "mapping_reviewer_snapshot": {
+            "id": mapping_reviewer.id,
+            "username": mapping_reviewer.get_username(),
+            "is_active": mapping_reviewer.is_active,
+            "is_staff": mapping_reviewer.is_staff,
+            "is_superuser": mapping_reviewer.is_superuser,
+        },
         "prepared_by": str(prepared_by or "codex"),
         "prepared_at": timezone.now().isoformat(),
+        "production_snapshot_sha256": mapping["production_snapshot_sha256"],
         "inputs": {
             "research_v3": {"path": str(research_v3_path), "sha256": research_sha},
             "authority_manifest": {
@@ -1094,12 +1193,19 @@ def prepare_reviewed_p0_completion_artifact(
 
 
 def _load_artifact(path: str | Path, expected_sha256: str) -> tuple[dict[str, Any], str]:
-    actual_sha = _verify_file_sha(path, expected_sha256, label="reviewed artifact")
-    artifact = _load_json(path, label="reviewed artifact")
+    artifact_input = _load_json_once(
+        path,
+        label="reviewed artifact",
+        expected_sha256=expected_sha256,
+    )
+    actual_sha = artifact_input.sha256
+    artifact = artifact_input.payload
     if artifact.get("schema_version") != ARTIFACT_SCHEMA:
         _fail("reviewed artifact schema is invalid")
     if artifact.get("commit_artifact_compatible") is not True or artifact.get("reviewed") is not True:
         _fail("reviewed artifact is not commit compatible")
+    if artifact.get("release_status") != "candidate_pending_independent_release":
+        _fail("reviewed artifact is not a pending independent-release candidate")
     reviewer = _validate_reviewer(artifact.get("reviewer_id"))
     reviewer_snapshot = artifact.get("reviewer_snapshot")
     if reviewer_snapshot != {
@@ -1117,6 +1223,7 @@ def _load_artifact(path: str | Path, expected_sha256: str) -> tuple[dict[str, An
     inputs = artifact.get("inputs")
     if not isinstance(inputs, dict):
         _fail("reviewed artifact input bindings are missing")
+    loaded_inputs: dict[str, FrozenJsonInput] = {}
     for key in (
         "research_v3",
         "authority_manifest",
@@ -1125,17 +1232,89 @@ def _load_artifact(path: str | Path, expected_sha256: str) -> tuple[dict[str, An
         binding = inputs.get(key)
         if not isinstance(binding, dict):
             _fail(f"reviewed artifact {key} binding is missing")
-        _verify_file_sha(
+        loaded_inputs[key] = _load_json_once(
             binding.get("path"),
-            str(binding.get("sha256") or ""),
             label=f"reviewed artifact {key}",
+            expected_sha256=str(binding.get("sha256") or ""),
         )
-    validate_frozen_p0_research_inputs(
-        research_v3_path=inputs["research_v3"]["path"],
-        authority_manifest_path=inputs["authority_manifest"]["path"],
-        authority_manifest_sha256=inputs["authority_manifest"]["sha256"],
+    _validate_frozen_p0_research_payloads(
+        loaded_inputs["research_v3"].payload,
+        loaded_inputs["authority_manifest"].payload,
+        authority_sha256=loaded_inputs["authority_manifest"].sha256,
     )
+    mapping = loaded_inputs["profile_mapping_decisions"].payload
+    if mapping.get("schema_version") != MAPPING_SCHEMA:
+        _fail("reviewed artifact profile mapping decisions schema drift")
+    mapping_reviewer = _validate_mapping_reviewer(mapping.get("reviewer_id"))
+    if artifact.get("mapping_reviewer_snapshot") != {
+        "id": mapping_reviewer.id,
+        "username": mapping_reviewer.get_username(),
+        "is_active": mapping_reviewer.is_active,
+        "is_staff": mapping_reviewer.is_staff,
+        "is_superuser": mapping_reviewer.is_superuser,
+    }:
+        _fail("mapping reviewer snapshot drift")
+    if mapping.get("research_v3_sha256") != loaded_inputs["research_v3"].sha256:
+        _fail("reviewed artifact profile mapping decisions research SHA drift")
+    if mapping.get("production_snapshot_sha256") != artifact.get(
+        "production_snapshot_sha256"
+    ):
+        _fail("reviewed artifact production snapshot SHA drift")
     return artifact, actual_sha
+
+
+def _load_and_validate_release_manifest(
+    *,
+    release_manifest_path: str | Path,
+    release_manifest_sha256: str,
+    artifact: dict[str, Any],
+    artifact_sha256: str,
+) -> FrozenJsonInput:
+    release_input = _load_json_once(
+        release_manifest_path,
+        label="production release manifest",
+        expected_sha256=release_manifest_sha256,
+    )
+    if release_input.sha256 not in TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256:
+        _fail("production release manifest SHA is not in the repository trusted allowlist")
+    release = release_input.payload
+    if release.get("schema_version") != RELEASE_MANIFEST_SCHEMA:
+        _fail("production release manifest schema is invalid")
+    approved_by = str(release.get("approved_by") or "").strip()
+    approved_at = str(release.get("approved_at") or "").strip()
+    decision_reference = str(release.get("decision_reference") or "").strip()
+    if not all((approved_by, approved_at, decision_reference)):
+        _fail("production release manifest approval metadata is incomplete")
+    try:
+        parsed_approved_at = datetime.fromisoformat(
+            approved_at.replace("Z", "+00:00")
+        )
+    except ValueError:
+        _fail("production release manifest approved_at is invalid")
+    if parsed_approved_at.utcoffset() is None:
+        _fail("production release manifest approved_at must include timezone")
+    executor_reviewer_id = release.get("executor_reviewer_id")
+    reviewer = _validate_reviewer(executor_reviewer_id)
+    if executor_reviewer_id != artifact.get("reviewer_id"):
+        _fail("production release manifest executor reviewer mismatch")
+    if _normalized(approved_by) == _normalized(reviewer.get_username()):
+        _fail("production release approver must be separate from the DB executor")
+    bindings = release.get("bindings")
+    if not isinstance(bindings, dict):
+        _fail("production release manifest bindings are missing")
+    inputs = artifact["inputs"]
+    expected_bindings = {
+        "research_v3_sha256": inputs["research_v3"]["sha256"],
+        "authority_manifest_sha256": inputs["authority_manifest"]["sha256"],
+        "profile_mapping_decisions_sha256": inputs[
+            "profile_mapping_decisions"
+        ]["sha256"],
+        "production_snapshot_sha256": artifact["production_snapshot_sha256"],
+        "final_artifact_sha256": artifact_sha256,
+    }
+    if bindings != expected_bindings:
+        _fail("production release manifest bindings do not match the candidate artifact")
+    return release_input
 
 
 def _already_applied_profile(row: dict[str, Any], artifact_sha256: str) -> HorseProfile | None:
@@ -1394,14 +1573,23 @@ def dry_run_reviewed_p0_completion_artifact(
     *,
     artifact_path: str | Path,
     artifact_sha256: str,
+    release_manifest_path: str | Path,
+    release_manifest_sha256: str,
 ) -> dict[str, Any]:
     artifact, actual_sha = _load_artifact(artifact_path, artifact_sha256)
+    release_input = _load_and_validate_release_manifest(
+        release_manifest_path=release_manifest_path,
+        release_manifest_sha256=release_manifest_sha256,
+        artifact=artifact,
+        artifact_sha256=actual_sha,
+    )
     report = _simulate(artifact, artifact_sha256=actual_sha)
     _assert_expected_actions(artifact, report, phase="dry-run")
     report.update(
         {
             "schema_version": "p0-horse-reviewed-completion-dry-run.v1",
             "artifact_sha256": actual_sha,
+            "release_manifest_sha256": release_input.sha256,
             "dry_run": True,
         }
     )
@@ -1434,15 +1622,46 @@ def _assert_expected_actions(
 def _lock_identity_keys(rows: list[dict[str, Any]]) -> None:
     if connection.vendor != "postgresql":
         return
-    lock_ids = sorted(
+    lock_ids = _identity_lock_keys(rows)
+    with connection.cursor() as cursor:
+        for lock_id in lock_ids:
+            cursor.execute("SELECT pg_advisory_xact_lock(%s)", [lock_id])
+
+
+def _identity_lock_keys(rows: list[dict[str, Any]]) -> list[int]:
+    return sorted(
         {
             int(row["deterministic_identity_key"][:16], 16) - (1 << 63)
             for row in rows
         }
     )
+
+
+def _acquire_identity_session_locks(rows: list[dict[str, Any]]) -> list[int]:
+    if connection.vendor != "postgresql":
+        return []
+    lock_ids = _identity_lock_keys(rows)
     with connection.cursor() as cursor:
         for lock_id in lock_ids:
-            cursor.execute("SELECT pg_advisory_xact_lock(%s)", [lock_id])
+            cursor.execute("SELECT pg_advisory_lock(%s)", [lock_id])
+    return lock_ids
+
+
+def _release_identity_session_locks(lock_ids: list[int]) -> None:
+    if connection.vendor != "postgresql":
+        return
+    with connection.cursor() as cursor:
+        for lock_id in reversed(lock_ids):
+            cursor.execute("SELECT pg_advisory_unlock(%s)", [lock_id])
+
+
+@contextmanager
+def _identity_session_lock_scope(rows: list[dict[str, Any]]):
+    lock_ids = _acquire_identity_session_locks(rows)
+    try:
+        yield
+    finally:
+        _release_identity_session_locks(lock_ids)
 
 
 def _begin_commit_isolation() -> None:
@@ -1455,14 +1674,22 @@ def _begin_commit_isolation() -> None:
 def _select_or_create_term(row: dict[str, Any]) -> tuple[TermEntry, bool]:
     identity = row["identity"]
     horse_name = identity["horse_name"]
-    terms = list(
-        TermEntry.objects.select_for_update()
+    matching_term_ids = list(
+        TermEntry.objects
         .filter(
-            Q(source_ja__iexact=horse_name)
-            | Q(target_zh__iexact=horse_name)
-            | Q(source_aliases__text__iexact=horse_name)
+            Q(term_type=TermType.HORSE)
+            & (
+                Q(source_ja__iexact=horse_name)
+                | Q(target_zh__iexact=horse_name)
+                | Q(source_aliases__text__iexact=horse_name)
+            )
         )
         .distinct()
+        .values_list("id", flat=True)
+    )
+    terms = list(
+        TermEntry.objects.select_for_update()
+        .filter(id__in=matching_term_ids)
         .order_by("id")
     )
     available = [term for term in terms if not hasattr(term, "horse_profile")]
@@ -1596,8 +1823,10 @@ def _apply_artifact_row(
         status=HorseProfileCandidateStatus.APPLIED,
         completion_run__isnull=True,
     ).update(completion_run=completion_run)
+    claimed_record_ids = summary.get("claimed_race_record_ids") or []
     HorseRaceRecord.objects.filter(
         horse_profile=profile,
+        id__in=claimed_record_ids,
         completion_run__isnull=True,
     ).update(completion_run=completion_run)
     evaluation = evaluate_full_profile_completeness(profile)
@@ -1630,15 +1859,22 @@ def commit_reviewed_p0_completion_artifact(
     *,
     artifact_path: str | Path,
     artifact_sha256: str,
+    release_manifest_path: str | Path,
+    release_manifest_sha256: str,
     confirm_reviewed_artifact: bool,
 ) -> dict[str, Any]:
     if not confirm_reviewed_artifact:
         _fail("commit requires --confirm-reviewed-artifact")
     artifact, actual_sha = _load_artifact(artifact_path, artifact_sha256)
+    release_input = _load_and_validate_release_manifest(
+        release_manifest_path=release_manifest_path,
+        release_manifest_sha256=release_manifest_sha256,
+        artifact=artifact,
+        artifact_sha256=actual_sha,
+    )
     reviewer = _validate_reviewer(artifact["reviewer_id"])
-    with transaction.atomic():
+    with _identity_session_lock_scope(artifact["rows"]), transaction.atomic():
         _begin_commit_isolation()
-        _lock_identity_keys(artifact["rows"])
         reviewer = (
             get_user_model().objects.select_for_update().filter(pk=reviewer.id).first()
         )
@@ -1693,6 +1929,7 @@ def commit_reviewed_p0_completion_artifact(
             **aggregate,
             "strict_complete_count": strict_complete_count,
             "artifact_sha256": actual_sha,
+            "release_manifest_sha256": release_input.sha256,
             "database_write_count": (
                 simulation["planned_profile_creates"]
                 + simulation["planned_profile_updates"]
@@ -1708,6 +1945,7 @@ def commit_reviewed_p0_completion_artifact(
             payload={
                 "artifact_path": str(artifact_path),
                 "artifact_sha256": actual_sha,
+                "release_manifest_sha256": release_input.sha256,
                 "reviewer_id": reviewer.id,
                 "summary": result,
             },
@@ -1751,6 +1989,8 @@ def write_prepared_artifact_directory(
                 "sha256": artifact_sha,
             },
             "summary": artifact["summary"],
+            "release_status": artifact["release_status"],
+            "trusted_release_manifest_required": True,
             "database_write_count": 0,
         }
         manifest_path = temporary / "manifest.json"
