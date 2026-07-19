@@ -1,6 +1,43 @@
 # 当前状态
 
-## 2026-07-20 P0 Phase A 首次迁移已回滚，等待修复后二次执行
+## 2026-07-20 P0 首批五地区 50 匹已完成生产提交
+
+- 精确 artifact SHA-256
+  `1d7885bed20704b743465a94f3c431533c52d37fa506b96b9e11d4de6bfb922d`
+  已按 trusted release manifest SHA-256
+  `74be2ce42f425bbd24794fb9573ee8b71348f40b0ed6fc0af8599b167c575153`
+  提交生产。首次成功报告 SHA-256 为
+  `c12980dcfb8c397a12c3e8367ffad812768d33142164987bf0fc0e201ad566ff`：
+  `25` 个既有档案绑定、`25` 个新档案、`1439` 条履历、`50` 条 P0 来源和
+  `200` 条模块审核，业务写入计数 `1739`，严格完整 `50/50`。
+- 履历对账为 `1432` 次实际出赛、`7` 次未出赛、`4` 次海外出赛、
+  实际出赛未知结果 `0`。本批没有创建普通比赛 `RaceEvent`，全库
+  `RaceEvent=9867` 保持不变；`HorseRaceRecord` 全库为 `1460`，其中本批 `1439`。
+- 提交后审计发现既有档案地区不能代表本批审核地区。修复提交
+  `8863f37a679e9196e0bf45b5473c0e9f6657487f` 只允许同 artifact、同 run、仍 active
+  的来源修正地区；已撤销或属于新审核的来源 fail closed。生产幂等修复精确更新
+  `7` 条 `HorseP0Source.racing_region`，五地区现各 `10` 条；既有
+  `HorseProfile.racing_region` 未覆盖。首次 run 摘要继续保留 `1739`，本次
+  `7` 条修复只写入 `last_idempotent_verification`。
+- 修复前备份为
+  `/opt/umanewsbot/backups/p0-horse-postcommit-metadata-precommit-20260719T235117Z`；
+  custom-format dump 为 `209222446` bytes、SHA-256
+  `82cc39ef3e453d2ba3db716485f7fcf960379401e1eddb9d3acc210b74a972ac`，
+  `pg_restore -l` 为 `1017` 行。最终镜像为
+  `sha256:e54c82251e67d707d8b71c1d60c46089f95e572a372e797b0eb8f082109e89c1`，
+  revision `8863f37a`，内外 `/healthz/`、两个 Celery worker、队列和近期错误日志通过。
+- 最终幂等 dry-run SHA-256
+  `6872eaa8756d4ee75b26dd22b526755c35a0f6a8fc3923d00b7f136ca3463e40`
+  为 `50` 匹已应用、`1439` 条 existing、全部 planned write 为 `0`。
+  `25` 匹中文名已翻译、`25` 匹仍为待译且后台显示原始马名；本批 `published=0`、
+  `published_at=0`，没有自动首次发布。每地区人工发布 `1-2` 匹和公开页面验收仍是独立任务。
+- 本地最终验证为五地区/P0 组合 `182/182`、真实 PostgreSQL `7/7`、Django check、
+  migration drift、OpenSpec `30/30` 和 diff 检查通过；独立复审最终无 actionable finding。
+- 下一批建议继续采用“五地区各 10 匹”的可审计滚动批次，优先处理重点赛事新进入 P0 且尚无
+  完整档案的马；沿用本批严格来源、强身份、完整生涯和独立发布门禁。先完成 6.7 的首批公开
+  验收，再决定是否提高单批数量，不因本次落库成功自动扩大生产发布范围。
+
+## 2026-07-20 历史节点：P0 Phase A 首次迁移回滚
 
 - 首次真实生产迁移在旧原子 `0049` 的数据回填之后创建索引时触发 PostgreSQL
   `pending trigger events` 错误；事务已完整回滚，生产未应用 `0049`，旧镜像和旧服务已恢复。
@@ -9,7 +46,7 @@
 - 当前仍是 **NO-GO / prepare-only**：二次 Phase A 尚未执行，production mapping、
   candidate artifact、formal dry-run 和 commit 均未开始。
 
-## 2026-07-20 P0 美国组合来源获批，生产准备仍 blocked
+## 2026-07-20 历史节点：P0 美国组合来源获批
 
 - 用户/项目负责人已确认当前冻结批次的美国逐场组合来源满足项目严格标准：HRN 提供主记录；
   Fort George 由 Sporting Life 与 Racing Post 补充；Equibase 只用于官方总出赛数及身份、

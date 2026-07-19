@@ -81,10 +81,10 @@
 - [x] 6.4.3 (integration) PostgreSQL commit 在 snapshot 重扫和创建前以 `SHARE ROW EXCLUSIVE` 锁定 term/alias/profile 表并锁内重扫全部身份；测试证明非协作 term insert 等待锁释放、SQL 顺序正确、第一行完整业务写入后第二行异常全回滚，以及日志创建后异常连日志和业务一起回滚。dry-run 只报告锁计划。
 - [x] 6.4.4 (integration) table lock 前以事务局部 `lock_timeout` 固定 5 秒上限；PostgreSQL 测试通过独立观察连接按 writer backend PID 证明目标 relation lock 等待，并证明冲突锁超时后整批业务零写入、session advisory locks 释放。
 - [x] 6.4.5 (integration) 修复首次 Phase A PostgreSQL migration pending-trigger 回滚：将字段、回填、索引约束、authority 降级拆为原子 `0049-0052`，并以真实 MigrationExecutor fixture 验证 `0048` 到唯一 leaf 的 forward/reverse/forward、数据语义、索引和约束；二次 Phase A 已在生产完成。
-- [ ] 6.5 (operations) 部署前按运行手册确认 UmaNews 生产 `HEAD`、容器、`/healthz/`、外部导入运行数、导入锁、`.env` 备份和数据库备份。
-- [ ] 6.6 (operations) 对已审核五地区样本 artifact 执行生产 commit，抽检 `HorseProfile`、P0 来源、`HorseProfileDataCandidate`、`HorseRaceRecord`、无译名展示、翻译保护和后台质量提示。
+- [x] 6.5 (operations) 部署前按运行手册确认 UmaNews 生产 `HEAD`、容器、`/healthz/`、外部导入运行数、导入锁、`.env` 备份和数据库备份。
+- [x] 6.6 (operations) 对已审核五地区样本 artifact 执行生产 commit，抽检 `HorseProfile`、P0 来源、`HorseProfileDataCandidate`、`HorseRaceRecord`、无译名展示、翻译保护和后台质量提示。
 - [ ] 6.7 (operations) 每地区人工发布 1-2 匹完整资料马，验收公开索引、详情页、移动端、完整赛事履历、主胜鞍、关注入口、新闻 tag 和 no-network 边界。
-- [ ] 6.8 (operations) 将 dry-run/commit/公开验收结果、失败原因、下一批建议和是否扩大批次写回 `docs/current_state.md`、`docs/project_status.md`、`docs/decisions.md` 和 `docs/deploy_runbook.md`。
+- [x] 6.8 (operations) 将 dry-run/commit/公开验收结果、失败原因、下一批建议和是否扩大批次写回 `docs/current_state.md`、`docs/project_status.md`、`docs/decisions.md` 和 `docs/deploy_runbook.md`；公开验收未执行，继续由 6.7 单独跟踪。
 - [x] 6.9 (integration) 为独立生涯完整度、异常结果实际出赛计数、跨来源/海外远征去重、多来源证据保留、未关联普通比赛、后续安全关联、跨单位距离和公开履历分页补充真实 Django 测试。
 - [x] 6.10 (integration) 为五地区真实赛事来源字段、共享强身份键连通去重、后续血统回填与冲突、不同强身份同名马保留、同名弱身份隔离、非 P0 等级/地区排除、只读命令和 artifact manifest 补充回归测试。
 - [x] 6.11 (integration) 用真实 HKJC `Overseas` 页面形状、Sporting Life `casualty.reason`、法国 `N/A` 权威补证及 Equibase 总数对齐场景补回归测试，并重新生成五地区 50 匹审核产物。

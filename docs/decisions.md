@@ -1,5 +1,18 @@
 # 关键决策
 
+## 2026-07-20 P0 来源地区与幂等修复边界
+
+- `HorseProfile.racing_region` 是既有档案属性，不因本批样本归属自动覆盖；
+  `HorseP0Source.racing_region` 必须记录已审核候选的 `sample_region`。候选地区与研究顶层
+  地区冲突时，artifact 生成直接失败，不允许以旧档案地区替代本批审核事实。
+- 旧 artifact 的幂等重跑只允许修复仍属于同一 artifact、同一 completion run 且状态为
+  active 的确定性来源地区。来源已撤销、已转属新 run 或 evidence artifact SHA 不同，
+  均 fail closed；不得借幂等重跑覆盖后续人工决定、证据、状态或审计归属。
+- 首次成功 run 的 summary 固定保存首次写入结果；后续幂等核验写入独立
+  `last_idempotent_verification`，不得把首次 `database_write_count` 覆盖为 `0` 或修复数量。
+- P0 完整资料落库与首次公开继续分离。无中文译名马可以完整、待发布并在翻译中保护原文，
+  但本批不自动发布；每地区首批公开样本仍需单独人工动作和公开面验收。
+
 ## 2026-07-20 P0 PostgreSQL 迁移事务边界
 
 - 对会更新已有 `HorseRaceRecord` 的字段回填，不在同一原子迁移的后续 operation 创建该表

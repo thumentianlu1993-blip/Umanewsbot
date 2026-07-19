@@ -1,5 +1,52 @@
 # 部署运行手册
 
+## P0 首批 50 匹生产提交与最终验收（2026-07-20）
+
+1. 唯一生产输入为 artifact SHA-256
+   `1d7885bed20704b743465a94f3c431533c52d37fa506b96b9e11d4de6bfb922d`
+   和 trusted release manifest SHA-256
+   `74be2ce42f425bbd24794fb9573ee8b71348f40b0ed6fc0af8599b167c575153`。
+   首次成功报告保存在
+   `runtime/horse_profile_completion/p0-production-release-20260720/production_commit_report.v1.json`，
+   SHA-256
+   `c12980dcfb8c397a12c3e8367ffad812768d33142164987bf0fc0e201ad566ff`。
+2. 首次成功 commit 为：`25 create + 25 update` profile、`1439 create`
+   race records、`50` P0 source upsert、`200` module audits、业务写入计数
+   `1739`、严格完整 `50/50`。此前两次因在役同步窗口门禁失败的尝试均在同一事务内回滚；
+   不得把失败尝试计入业务写入。
+3. 首次成功前恢复点为
+   `/opt/umanewsbot/backups/p0-horse-authorized-precommit-20260719T232115Z`；
+   提交后元数据修复前恢复点为
+   `/opt/umanewsbot/backups/p0-horse-postcommit-metadata-precommit-20260719T235117Z`。
+   后者 dump 为 `209222446` bytes、SHA-256
+   `82cc39ef3e453d2ba3db716485f7fcf960379401e1eddb9d3acc210b74a972ac`，
+   `.env` SHA-256
+   `e24208729cfba44fd71d9b2ed343dd93d3437d3f6fb80f3f459759523158b566`，
+   权限均为 `0600`，`pg_restore -l` 为 `1017` 行。
+4. 提交后修复 revision
+   `8863f37a679e9196e0bf45b5473c0e9f6657487f` 的镜像 ID 为
+   `sha256:e54c82251e67d707d8b71c1d60c46089f95e572a372e797b0eb8f082109e89c1`，
+   source archive SHA-256
+   `31b286b2d3462fa5f6cb7883c8716f7cdee4eda26852cbb675b48228755f019d`。
+   旧镜像回滚标签为 `umanewsbot:rollback-pre-p0-audit-fix-20260720`。
+5. 元数据修复 dry-run、commit、修复后 dry-run 分别保存在同目录的
+   `idempotent_metadata_repair_dry_run.v1.json`、
+   `idempotent_metadata_repair_commit.v1.json`、
+   `post_repair_idempotent_dry_run.v1.json`，SHA-256 分别为
+   `d7835546b2e3df0b207e33959956fc4d674b9f9837a34b53ad371c543dd16903`、
+   `ac9e93cec2255b56aaf2af3e880b061e8714bc6ac525c81cbc849d7d2c3d372a`、
+   `6872eaa8756d4ee75b26dd22b526755c35a0f6a8fc3923d00b7f136ca3463e40`。
+   修复只更新 `7` 条同批 active `HorseP0Source.racing_region`；最终 dry-run
+   `planned_metadata_reconciliations=0` 且其它 planned write 全为 `0`。
+6. 最终数据库对账：`50` profiles、`1439` batch records、`1432` actual starts、
+   `7` non-starts、`4` overseas starts、`0` started unknown、`200` module audits；
+   P0 source 五地区各 `10`。全库 `RaceEvent=9867` 未变化。run summary 首次
+   `database_write_count=1739`，`last_idempotent_verification.database_write_count=7`。
+7. 最终运行验收：Django check、migration drift、内外 `/healthz/`、两个 worker
+   ping/active/reserved、近期 traceback/critical/integrity 日志均通过。后台抽检待译马
+   `Double Major` 显示原文、中文名待补和完整资料状态；其公开 URL 返回 `404`。
+   本批 `published=0`，后续公开必须走 OpenSpec 6.7 的人工发布与公开页面验收。
+
 ## P0 Phase A 首次迁移回滚与二次门禁（2026-07-20）
 
 1. 首次 Phase A 真实生产迁移在旧 `0049_horse_career_history` 内执行数据
