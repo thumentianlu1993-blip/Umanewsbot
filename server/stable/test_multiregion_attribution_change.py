@@ -941,8 +941,6 @@ class GoldSetQualityTests(TestCase):
 
 
 class AttributionRunLedgerTests(TransactionTestCase):
-    reset_sequences = True
-
     def test_lock_prevents_overlapping_runs_and_can_be_renewed(self):
         from stable.services.attribution_runs import acquire_attribution_lease, create_attribution_run, renew_attribution_lease
 
