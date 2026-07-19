@@ -217,6 +217,35 @@ production dry-run。readiness 只记录 `static_schema_compatibility_check`：�
 `safe_simulation_performed=false`；在正式 commit artifact 生成前不得伪造 apply 函数路径、
 零动作 summary 或任何 simulation 已执行声明。
 
+### 16. 正式生产映射与提交使用独立强审核链
+
+首批 50 匹不复用旧 `horse_profile_completion_plan` 的弱写入入口。独立命令
+`apply_reviewed_p0_horse_completion` 按 prepare、dry-run、commit 三个互斥阶段运行，并让三阶段
+消费同一套逐行验证器。
+
+profile mapping decisions 是独立批准输入，必须逐匹显式选择 `bind_existing(profile_id)` 或
+`create_new`。每行绑定 v3 SHA、四字段身份、名称/alias 证据、当前 profile snapshot、全库名称
+及强身份查询 snapshot、模块批准和生涯状态批准；整批另绑定 production snapshot SHA。名称命中
+只能作为证据，不能自动决定 profile。歧义名称必须记录选中 profile、全部 rejected profile ID
+和理由。地区不属于身份键，绑定既有 profile 时不得因样本地区覆盖其地区。
+
+prepare 只读数据库并原子写入新目录。生成物必须为
+`p0-horse-reviewed-completion-artifact.v1`、`commit_artifact_compatible=true`，同时绑定 v3、
+美国 authority manifest、mapping decisions 三份文件的精确字节 SHA。四个 required module
+均须独立 approved、confidence 不低于 90，任何 URL、身份、记录唯一性、快照或 action 预期不一致
+即停止。
+
+dry-run 必须重新读取三份冻结输入、复算逐行 schema、review、identity、profile snapshot、记录
+稳定键/source-bound ID/同场规范键及计划 action，并报告 profile create/update、record
+create/update/existing、P0 source 和 module audit 数；该路径不得创建 run、候选、来源、日志或
+其它数据库记录。
+
+commit 在单事务中按 deterministic identity key 串行化 create resolution，并对已有行执行
+`select_for_update`。写前重跑 dry-run 验证和 snapshot 检查；任一行漂移、人工锁冲突或写后未达到
+strict complete 时整批回滚。`create_new` 可创建暂无中文名的 pending horse term 和
+`HorseProfile`；普通履历允许不关联 `RaceEvent`，不得为了本批创建赛事。重跑同一 artifact 只追加
+任务执行审计，不重复创建 term、profile、P0 source、module candidate 或 `HorseRaceRecord`。
+
 ## Risks / Trade-offs
 
 - [P0 范围膨胀] -> 重点赛事等级严格限定为 9 类，P0 身份必须有结构化来源证据。

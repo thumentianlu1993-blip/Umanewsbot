@@ -76,6 +76,7 @@
 - [x] 6.2 (integration) 为五地区 adapter、artifact 输出、模块审核门禁、人工锁定跳过、完整赛事履历和 `HorseRaceRecord` 幂等写入补充测试。
 - [x] 6.3 (operations) 运行本地验证：`DB_ENGINE=sqlite python manage.py check`、目标 Django 测试、`makemigrations --check --dry-run`、`openspec validate complete-p0-horse-profile-data --strict`、`openspec validate --all` 和 `git diff --check`。
 - [x] 6.4 (operations) 已完成五地区各 10 匹离线研究批次 dry-run，并确认研究 artifact、完整率、冲突和地区 blocker；因当前研究输入缺真实 production profile/reviewer/module approval，正式 commit-compatible artifact 与 production dry-run 尚未完成，继续 fail closed。
+- [x] 6.4.1 (integration) 新增独立 `apply_reviewed_p0_horse_completion` prepare/dry-run/commit 链：显式消费 50 行 profile mapping decisions，绑定 v3/authority/mapping/production snapshot SHA，真实零写入模拟全部 schema 与 action，单事务锁定后幂等写入并整批回滚；能力与测试已完成，但真实生产 mapping artifact、正式生产 dry-run 和 commit 均未执行。
 - [ ] 6.5 (operations) 部署前按运行手册确认 UmaNews 生产 `HEAD`、容器、`/healthz/`、外部导入运行数、导入锁、`.env` 备份和数据库备份。
 - [ ] 6.6 (operations) 对已审核五地区样本 artifact 执行生产 commit，抽检 `HorseProfile`、P0 来源、`HorseProfileDataCandidate`、`HorseRaceRecord`、无译名展示、翻译保护和后台质量提示。
 - [ ] 6.7 (operations) 每地区人工发布 1-2 匹完整资料马，验收公开索引、详情页、移动端、完整赛事履历、主胜鞍、关注入口、新闻 tag 和 no-network 边界。

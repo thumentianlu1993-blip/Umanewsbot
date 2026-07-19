@@ -2613,6 +2613,17 @@ def _save_module_audit(
     diff_payload: dict,
     row: dict,
 ) -> bool:
+    def json_safe(value: Any) -> Any:
+        return json.loads(
+            json.dumps(
+                value,
+                ensure_ascii=False,
+                default=lambda item: item.isoformat()
+                if isinstance(item, (date, datetime))
+                else str(item),
+            )
+        )
+
     fingerprint = _review_fingerprint(
         profile_id=profile.id,
         module=module,
@@ -2635,9 +2646,15 @@ def _save_module_audit(
         source_url=source_url,
         status=status,
         confidence=int(review.get("confidence") or row.get("confidence") or 100),
-        candidate_payload={"review_fingerprint": fingerprint, "payload": module_payload, "review": review},
-        diff_payload=diff_payload,
-        raw_payload=row,
+        candidate_payload=json_safe(
+            {
+                "review_fingerprint": fingerprint,
+                "payload": module_payload,
+                "review": review,
+            }
+        ),
+        diff_payload=json_safe(diff_payload),
+        raw_payload=json_safe(row),
         applied_by_id=reviewer_id,
         applied_at=timezone.now(),
         result_summary=f"module_review={review.get('status') or 'unknown'}",

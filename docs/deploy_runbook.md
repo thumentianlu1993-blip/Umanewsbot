@@ -29,6 +29,60 @@
 6. 正式 commit artifact 与 formal production dry-run 尚未生成或运行。本轮无网络、无数据库
    写入、无部署发布，生产保持 **NO-GO / blocked**；用户本次“继续推进”不等于生产写入授权。
 
+### P0 50 匹正式 mapping / artifact / apply 命令
+
+以下命令只描述新能力。未取得 independently approved 的 50 行 mapping decisions 前不得运行
+prepare；未完成生产只读 dry-run、备份和精确版本授权前不得运行 commit。
+
+mapping decisions 顶层必须为
+`p0-horse-profile-mapping-decisions.v1`、`review_status=approved`，并包含
+`research_v3_sha256`、按全部逐行 `database_mapping_snapshot` 计算的
+`production_snapshot_sha256`、审核人/时间/decision reference。每行必须包含完整四字段
+`identity`、`bind_existing(profile_id)` 或 `create_new`、`decision_evidence`、
+`database_mapping_snapshot`、四个 required module 的 approved/confidence>=90 review，以及
+`racing_career_status` / `records_synced_through` 的独立 `completion_decision`。bind 行还必须
+携带精确 `profile_snapshot` 与名称/alias evidence；多名称命中必须列出全部 rejected profile
+ID 和理由。
+
+```bash
+python manage.py apply_reviewed_p0_horse_completion \
+  --prepare \
+  --research-v3 /absolute/path/p0_horse_research_50_enriched_v3.json \
+  --authority-manifest /absolute/path/reviewed_us_career_source_authority_v1.json \
+  --authority-manifest-sha256 29091d69573bab907cda2e9a081ae4684838b92d1f9b052a7601b6109a541077 \
+  --profile-mapping-decisions /absolute/path/approved_profile_mapping_decisions.json \
+  --reviewer-id 1 \
+  --output /absolute/path/to/new-formal-artifact-directory
+```
+
+`--output` 必须不存在；成功后目录只包含
+`reviewed_p0_horse_completion_artifact.json` 与 `manifest.json`，并报告两者 SHA。prepare
+只读数据库且数据库写入为零。
+
+```bash
+python manage.py apply_reviewed_p0_horse_completion \
+  --dry-run \
+  --artifact /absolute/path/reviewed_p0_horse_completion_artifact.json \
+  --artifact-sha256 '<exact-lowercase-sha256>'
+```
+
+dry-run 会重新读取并核对 v3、authority、mapping 三份输入文件，逐行复核 DB snapshot 与计划
+action；`database_write_count` 必须精确为 `0`。只输出 `dry_run=True` 而没有逐项 action 数量
+不构成通过。
+
+```bash
+python manage.py apply_reviewed_p0_horse_completion \
+  --commit \
+  --artifact /absolute/path/reviewed_p0_horse_completion_artifact.json \
+  --artifact-sha256 '<same-exact-lowercase-sha256>' \
+  --confirm-reviewed-artifact
+```
+
+commit 必须在完成部署前门禁、数据库备份、同一 artifact 的成功 dry-run 和针对精确集成版本的
+新授权后执行。该命令不访问网络、不创建普通比赛 `RaceEvent`；任一 reviewer/profile/identity/
+record/source/action 漂移整批回滚。美国来源审计仍必须写明 HRN/Sporting Life/Racing Post
+组合只继承冻结 v3 批准，不是 Equibase 官方逐场履历。
+
 ## P0 马首批 50 匹生产提交前 NO-GO（2026-07-19）
 
 1. 当前五地区研究产物为 `50` 匹、`1439` 条履历记录，已复算为 `1432` 次实际出赛和 `7` 次

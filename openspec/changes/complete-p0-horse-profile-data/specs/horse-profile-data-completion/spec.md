@@ -184,6 +184,43 @@
 - **THEN** 系统 SHALL 记录来源 URL、录入人、审核人和字段组
 - **AND** 不得将人工补录伪装为 adapter 自动抓取结果
 
+### Requirement: 首批五十匹正式提交必须绑定独立生产映射与数据库快照
+系统 MUST 使用独立、版本化、commit-compatible 的 reviewed artifact 提交首批 50 匹。artifact
+MUST 精确绑定冻结 v3、美国组合来源 authority manifest、独立 profile mapping decisions 的字节
+SHA，并逐匹保存四字段身份、deterministic identity key、模块批准和数据库 resolution snapshot。
+
+#### Scenario: prepare 消费全部显式 mapping decisions
+- **WHEN** 操作者执行正式 artifact prepare
+- **THEN** mapping decisions MUST 对全部 50 匹逐行给出 `bind_existing(profile_id)` 或 `create_new`
+- **AND** 仅名称命中、缺 profile ID、缺 production snapshot SHA 或缺 v3 SHA 绑定 MUST 阻断
+- **AND** `Stradivarius` 等多 profile 命中 MUST 显式保存选中 ID、全部 rejected ID 和理由
+
+#### Scenario: create resolution 不得绕过强身份
+- **WHEN** mapping decision 选择 `create_new`
+- **THEN** 当前数据库 MUST 不存在名称、父、母、出生年四字段完整一致的 profile
+- **AND** commit SHALL 创建 pending horse `TermEntry` 与 `HorseProfile`
+- **AND** 已有唯一可复用且未绑定 profile 的正式 term/alias SHOULD 复用，不得重复创建中文术语
+
+#### Scenario: dry-run 执行真实逐行模拟且零写入
+- **WHEN** 操作者为精确 artifact SHA 执行 `--dry-run`
+- **THEN** 系统 MUST 重新验证三份输入 SHA、reviewer、identity、profile snapshot、模块 payload、
+  URL、记录唯一性和 expected action
+- **AND** 输出 SHALL 包含 profile create/update、record create/update/existing、P0 source 和
+  module audit 数量
+- **AND** 数据库写入数 MUST 为零
+
+#### Scenario: commit 在单事务中 fail closed
+- **WHEN** 操作者提供精确 artifact SHA 与 `--confirm-reviewed-artifact`
+- **THEN** 系统 MUST 在单事务中锁定 reviewer、已有 profile 和 deterministic identity create scope
+- **AND** 任一 identity、snapshot、manual lock、记录或来源漂移 MUST 使整批回滚
+- **AND** 重跑同一 artifact MUST 不重复创建 profile、term、P0 source、candidate 或 race record
+- **AND** 普通履历 event/result 可为空，系统 MUST NOT 为本批创建 `RaceEvent`
+
+#### Scenario: 美国组合来源保持窄批准语义
+- **WHEN** formal artifact 写入美国 10 匹的已审核履历
+- **THEN** 系统 SHALL 继承冻结 v3 的 `source_records_verified` 状态
+- **AND** P0 source 审计 MUST 明确该状态不表示 Equibase 官方逐场履历
+
 ### Requirement: 补全专项报告必须给出下一批执行建议
 系统 SHALL 在每次 P0 补全 dry-run 和 commit 后输出专项报告。报告 MUST 包含全局和按地区统计、完整资料样本数、候选覆盖、完整赛事履历覆盖、失败原因、样例证据和下一批建议。
 
