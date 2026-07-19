@@ -63,7 +63,7 @@ RELEASE_MANIFEST_SCHEMA = "p0_horse_production_release_manifest.v1"
 # Phase A is deliberately prepare-only. Phase B must add the exact independently
 # approved manifest byte SHA here in a reviewed repository change.
 TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256: tuple[str, ...] = (
-    "f101bccff1a7269ef0cee38e546e9d56b430ede2f1dbd17521e59a690526d0e9",
+    "74be2ce42f425bbd24794fb9573ee8b71348f40b0ed6fc0af8599b167c575153",
 )
 COMMIT_IDENTITY_TABLE_LOCK_MODE = "SHARE ROW EXCLUSIVE"
 COMMIT_IDENTITY_TABLE_LOCK_TIMEOUT_MS = 5_000

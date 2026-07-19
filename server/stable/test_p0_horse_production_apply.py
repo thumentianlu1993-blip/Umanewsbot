@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import runpy
 import tempfile
 from datetime import date, timedelta
 from pathlib import Path
@@ -820,6 +821,27 @@ class P0HorseProductionApplyTests(TestCase):
         self.assertEqual(profile.records_synced_through, timezone.localdate())
         self.assertEqual(profile.full_profile_reviewed_by, self.reviewer)
         self.assertIsNotNone(profile.full_profile_reviewed_at)
+
+    def test_production_mapping_converts_utc_verification_to_project_date(self):
+        script = (
+            Path(__file__).resolve().parents[2]
+            / "runtime"
+            / "tools"
+            / "generate_reviewed_p0_production_mapping.py"
+        )
+        namespace = runpy.run_path(str(script))
+        horse = {
+            "identity": {"horse_name": "Timezone Test"},
+            "career": {
+                "official_start_count_verified_at": "2026-07-18T20:45:00Z",
+                "records": [{"race_date": "2026-05-16"}],
+            },
+        }
+
+        self.assertEqual(
+            namespace["source_verified_date"](horse),
+            date(2026, 7, 19),
+        )
 
     def test_json_inputs_are_read_once_and_symlinks_are_rejected(self):
         horse = self._horse(0)

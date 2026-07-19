@@ -8,6 +8,7 @@ import os
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.settings")
 sys.path.insert(0, str(Path.cwd()))
@@ -15,6 +16,8 @@ sys.path.insert(0, str(Path.cwd()))
 import django
 
 django.setup()
+
+from django.conf import settings
 
 from stable.models import HorseProfile
 from stable.services.p0_horse_production_apply import (
@@ -94,16 +97,31 @@ def source_verified_date(horse: dict[str, object]) -> date:
     career = horse["career"]
     verified_at = str(career.get("official_start_count_verified_at") or "")
     if verified_at:
-        return date.fromisoformat(verified_at[:10])
+        parsed = datetime.fromisoformat(verified_at.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(ZoneInfo(settings.TIME_ZONE)).date()
     return latest_race_date(horse)
 
 
-def make_row(horse: dict[str, object]) -> dict[str, object]:
+def make_row(
+    horse: dict[str, object],
+    *,
+    active_sync_verifications: dict[str, dict[str, object]],
+) -> dict[str, object]:
     identity = horse["identity"]
     horse_name = identity["horse_name"]
     snapshot = build_profile_mapping_snapshot(identity)
     latest_date = latest_race_date(horse)
     synced_through = max(latest_date, source_verified_date(horse))
+    sync_verification = active_sync_verifications.get(horse_name)
+    if sync_verification:
+        synced_through = max(
+            synced_through,
+            datetime.fromisoformat(
+                str(sync_verification["observed_at"])
+            ).date(),
+        )
     profile_id = BIND_EXISTING_PROFILE_IDS.get(horse_name)
     decision = "bind_existing" if profile_id is not None else "create_new"
     row: dict[str, object] = {
@@ -125,6 +143,7 @@ def make_row(horse: dict[str, object]) -> dict[str, object]:
                 "active" if latest_date >= ACTIVE_CUTOFF else "retired"
             ),
             "records_synced_through": synced_through.isoformat(),
+            "sync_verification": sync_verification or {},
             **review_metadata(),
         },
         "database_mapping_snapshot": snapshot,
@@ -154,13 +173,40 @@ def make_row(horse: dict[str, object]) -> dict[str, object]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--research-v3", required=True)
+    parser.add_argument("--active-sync-verification", required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
     research_path = Path(args.research_v3)
     research_bytes = research_path.read_bytes()
     research = json.loads(research_bytes)
-    rows = [make_row(horse) for horse in research["horses"]]
+    sync_path = Path(args.active_sync_verification)
+    sync_bytes = sync_path.read_bytes()
+    sync_payload = json.loads(sync_bytes)
+    if (
+        sync_payload.get("schema_version")
+        != "p0-horse-active-sync-verification.v1"
+        or sync_payload.get("review_status") != "approved"
+    ):
+        raise ValueError("active sync verification is not approved")
+    active_sync_verifications = {}
+    for item in sync_payload.get("rows") or []:
+        horse_name = item["horse_name"]
+        if item["observed_start_count"] != item["expected_start_count"]:
+            raise ValueError(f"{horse_name} active sync start count mismatch")
+        if len(str(item.get("response_sha256") or "")) != 64:
+            raise ValueError(f"{horse_name} active sync response SHA is invalid")
+        active_sync_verifications[horse_name] = {
+            **item,
+            "observed_at": sync_payload["observed_at"],
+        }
+    rows = [
+        make_row(
+            horse,
+            active_sync_verifications=active_sync_verifications,
+        )
+        for horse in research["horses"]
+    ]
     if len(rows) != 50:
         raise ValueError(f"expected 50 horses, got {len(rows)}")
     if sum(row["decision"] == "bind_existing" for row in rows) != 25:
@@ -184,6 +230,7 @@ def main() -> None:
         "approved_at": APPROVED_AT,
         "decision_source_reference": DECISION_REFERENCE,
         "research_v3_sha256": hashlib.sha256(research_bytes).hexdigest(),
+        "active_sync_verification_sha256": hashlib.sha256(sync_bytes).hexdigest(),
         "production_snapshot_sha256": hashlib.sha256(
             canonical_bytes(snapshot_payload)
         ).hexdigest(),
