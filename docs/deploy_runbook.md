@@ -5064,3 +5064,67 @@ python manage.py evaluate_multiregion_attribution_gold \
 6. emergency restore 全程保持四层 maintenance off：先恢复 dedicated provisional
    pointer/legacy/tracking，再只恢复 global/region/source，第二次只读校验后最后恢复
    event policy。失败时 event 继续隐藏。
+
+## 2026-07-19 五地区准实时公开 Beta 代码层发布记录
+
+1. 冻结 fingerprint
+   `17a1b34321ee25f13f783c1fe24278bbacdab288f3a30281a981e4986158e0fa`
+   对应 commit `85948707c7b2bf3c62a66b09b2ddb202adf2d1ee`。生产 reviewed
+   release image ID 为
+   `sha256:4c40ae1946dd9ac85a368917fe3de64269e6cf848737e24253f0d0996403eda6`；
+   旧 image ID 为
+   `sha256:700ea78698fb67de602fb7e5447b997610e24e64de29df4591e4bb9e476087ef`，
+   回滚标签为
+   `umanewsbot:rollback-pre-five-region-race-live-85948707-20260719T111505Z`。
+2. 发布前数据库 custom-format 备份路径为
+   `backups/db/pre-five-region-race-live-85948707-20260719T111505Z.dump`，
+   大小 `204,512,228` bytes，SHA-256
+   `98833a3d9dd5ebd74eb5c7d46ac44caa9b3d5d9ab6e310ec02137fe612e79c89`；
+   非空检查和 `pg_restore -l` 通过。`.env` 备份为
+   `.env.backup.pre-five-region-race-live-85948707-20260719T111505Z`、权限
+   `0600`。filtered rollback env SHA-256 为
+   `cda13ce08c6a6d03ffcb4812cf1e1bc1d56fa7eae2244d7cf72330869811062e`。
+3. 发布顺序为：历史 runner `migration_safe` 预检；停止 Beat；等待 Celery
+   `active=0 / reserved=0`；停止两个 worker；备份；retag reviewed image；一次性 web
+   容器执行 `migrate/check/makemigrations --check/collectstatic`；重建 web、普通 worker
+   与 race-live worker；健康后最后重建 Beat。
+4. `stable.0047_race_live_public_beta_controls` 成功应用。四个 app 容器 image/revision
+   一致；Django check、worker ping、内部和公网 healthz、event 924、五地区
+   `/races/?region=...` 页面和近期 traceback/critical/integrityerror 日志检查均通过。
+   event 924 当前 revision ID、content SHA、7 条结果和 provisional 页面未变化。
+5. 切换后必须继续保持
+   `RACE_LIVE_SCHEDULER_ENABLED=false`、
+   `RACE_LIVE_MONITOR_ENABLED=false`、
+   `RACE_LIVE_ENABLED_REGIONS=`，直到逐地区自然赛程 proof 通过。当前 selector
+   `claimed=0 / dispatched=0`，active claim、`celery` 和 `race_live` queue 均为 0。
+6. 本轮来源探针只保存去标识元数据：Free 端点 3 个请求均为 200；法国 event
+   733–735 因 coupled-entry 重复参赛编号触发 `racecard_schema_invalid`，日本
+   80/81/185 与美国 420 为 `racecard_not_found`。这些是 fail-closed blocker，
+   禁止据此开启对应地区或称其已公开上线。
+
+### 2026-07-19 发布证据与 rollback readiness 补充
+
+1. 来源 proof 目录：
+   `/opt/umanewsbot/runtime/race_live_racecards/source-proof-free-20260719T112200Z`。
+   `manifest.json` SHA-256 为
+   `26af97b56781803de44e418b8693ca13e1fff61f653f44a4acffb27b78ae3bfe`；
+   `requests.jsonl` SHA-256 为
+   `98e513464736082176bfa91b7579e45326d7228653ad6ac8090e92890d69127a`；
+   `summary.json` SHA-256 为
+   `1369c0c27af746891bbfdf932010601e3e6def82eba749452cf1522e4de9db79`。
+   三个文件均为 root-owned `0600` regular file；请求状态和集合计数必须以
+   `requests.jsonl` 为证据，不得只引用 summary。
+2. rollback artifact 目录
+   `/opt/umanewsbot/runtime/race_live_rollback/five-region-race-live-85948707-20260719T111505Z`
+   当前只有 `rollback.filtered.env` 和 `.sha256`，均为 root-owned `0600` regular
+   file；没有 `manifest.json`。因此数据库/旧 image/环境回滚可用，但 frozen release
+   image one-shot 的 result/policy business rollback 未就绪。
+
+### 2026-07-19 rollback 门禁更正记录
+
+- 冻结要求仍是 release artifact 在代码发布时保存 rollback manifest 路径和 SHA；
+  本次实际未生成 manifest，故 Gate D
+  未完整满足、release evidence closure 未完成。
+- 当前只记录缺口并保持 scheduler/monitor false、enabled regions 为空；不得在
+  evidence-only 通道把“发布前”改写成“promotion 前”。补救 manifest 的生成、SHA
+  绑定和只读验证必须另走受审与授权流程。

@@ -894,3 +894,26 @@
   `code candidate / changes fixed / re-review pending / not authorized / not deployed`。
   各地区真实 `racecard_seen/shadow_result_seen/public_eligible` 仍须按 event 取得证据；
   代码完成不得写成五地区来源已经上线。
+
+## 2026-07-19 五地区准实时公开 Beta 代码层已发布
+
+- 冻结 commit `85948707c7b2bf3c62a66b09b2ddb202adf2d1ee` 已部署，生产
+  `web / worker / race_live_worker / beat` 统一运行镜像
+  `sha256:4c40ae1946dd9ac85a368917fe3de64269e6cf848737e24253f0d0996403eda6`。
+  additive migration、备份、健康检查、worker、队列和 event 924 回归均通过。
+- 新范围仍为 fail-closed：scheduler/monitor 关闭、enabled regions 为空、claim 和
+  live queue 为 0。Free 有界 proof 成功，但法国真实 coupled-entry 编号揭示解析缺口；
+  日美当前 racecard 未命中，英港尚待自然赛程。当前准确状态是
+  `code deployed / five-region source proof incomplete / only existing event 924 remains public`。
+
+### 2026-07-19 回滚就绪度更正
+
+- 数据库、旧镜像和环境回滚锚点已验证；filtered rollback env 已冻结。
+- 专用 one-shot business rollback manifest 尚未生成，因此不得把本轮状态写成完整
+  frozen-image rollback ready。
+
+### 2026-07-19 发布门禁更正
+
+- 原 Gate D 要求发布 artifact 已包含 rollback manifest；当前事实是该门禁未满足、
+  release closure 不完整。新范围
+  保持全部 off，后续只能通过独立受审和授权的补救操作关闭此缺口。

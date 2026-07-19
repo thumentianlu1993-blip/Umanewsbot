@@ -2039,3 +2039,64 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 本候选**未 commit、未 push、未部署、未迁移生产、未购买订阅、未开启 scheduler/
   monitor/新增地区或公开范围，也未连接生产写入**。生产真实状态继续以上一条已发布
   race-live 安全基线为准；本节只描述待审核预期。
+
+## 2026-07-19 五地区准实时公开 Beta 代码层生产发布
+
+- 用户授权的冻结 fingerprint
+  `17a1b34321ee25f13f783c1fe24278bbacdab288f3a30281a981e4986158e0fa`
+  已按受审 content hash 精确提交为
+  `85948707c7b2bf3c62a66b09b2ddb202adf2d1ee` 并快进 `main`。生产运行 AMD64
+  镜像为
+  `sha256:4c40ae1946dd9ac85a368917fe3de64269e6cf848737e24253f0d0996403eda6`；
+  `web / worker / race_live_worker / beat` 均运行该 image ID 和 revision。
+- 切换前历史 runner 预检为 `migration_safe`，Celery
+  `active=0 / reserved=0`。数据库备份
+  `backups/db/pre-five-region-race-live-85948707-20260719T111505Z.dump`
+  为 `204,512,228` bytes，SHA-256
+  `98833a3d9dd5ebd74eb5c7d46ac44caa9b3d5d9ab6e310ec02137fe612e79c89`，
+  且 `pg_restore -l` 通过；旧镜像回滚标签指向
+  `sha256:700ea78698fb67de602fb7e5447b997610e24e64de29df4591e4bb9e476087ef`。
+  `.env` 备份权限为 `0600`；filtered rollback env SHA-256 为
+  `cda13ce08c6a6d03ffcb4812cf1e1bc1d56fa7eae2244d7cf72330869811062e`。
+- `stable.0047_race_live_public_beta_controls` 已应用；Django check、
+  migration drift、collectstatic、worker ping、内外 `/healthz/`、event 924 和五地区赛事
+  筛选页均通过。event 924 仍为同一 provisional revision `#2`、同一 content SHA、
+  7 条结果和“暂定赛果”页面；migration 只补齐专用 provisional pointer 和 publication
+  authorization audit。
+- 当前生产保持
+  `RACE_LIVE_SCHEDULER_ENABLED=false`、
+  `RACE_LIVE_MONITOR_ENABLED=false`、
+  `RACE_LIVE_ENABLED_REGIONS=[]`，selector 返回
+  `enabled=false / claimed=0 / dispatched=0`，active claim、`celery` 和
+  `race_live` queue 均为 0。代码部署不等于五地区来源已上线。
+- 部署后 Free 来源 proof 用 3 个有界请求取得 `200/200/200`：地区表 55 条、今日
+  racecard 43 场、今日 result 2 场，只保存去标识元数据，summary SHA-256 为
+  `1369c0c27af746891bbfdf932010601e3e6def82eba749452cf1522e4de9db79`。
+  法国 event 733–735 prepare 因真实 payload 中 coupled entries 的重复参赛编号触发
+  `racecard_schema_invalid`；日本 event 80/81/185 与美国 event 420 均为
+  `racecard_not_found`。这些地区继续 off，英国下一批和香港均尚未取得本轮来源 proof。
+
+### 2026-07-19 发布证据锚点补充
+
+- 来源 proof 目录为
+  `/opt/umanewsbot/runtime/race_live_racecards/source-proof-free-20260719T112200Z`；
+  其中 `manifest.json` SHA-256 为
+  `26af97b56781803de44e418b8693ca13e1fff61f653f44a4acffb27b78ae3bfe`，
+  `requests.jsonl` SHA-256 为
+  `98e513464736082176bfa91b7579e45326d7228653ad6ac8090e92890d69127a`，
+  `summary.json` SHA-256 为
+  `1369c0c27af746891bbfdf932010601e3e6def82eba749452cf1522e4de9db79`；
+  三个文件均为 root-owned `0600` regular file。`55/43/2` 与三次 HTTP 200 的明细
+  以 `requests.jsonl` 为准。
+- 当前 rollback artifact 目录只有 root-owned `0600`
+  `rollback.filtered.env` 及其 SHA 文件；尚无冻结的 `manifest.json`，因此 frozen-image
+  one-shot 的 business result/policy rollback **尚未达到可执行门槛**。当前可用恢复面
+  仅为已验证数据库备份、旧 image tag 和 `.env` 备份；缺失 manifest 时不得执行
+  one-shot 或开启新地区/public event。
+
+### 2026-07-19 rollback 门禁事实更正
+
+- 冻结 Gate D 原本要求在代码发布 artifact 中保存 rollback manifest 路径和 SHA。该
+  manifest 实际未生成，因此原发布门禁**未满足**，本次 release evidence closure
+  仍不完整。任何后续补救必须作为独立受审、获准并验证的操作处理；当前只能继续保持
+  全部新地区、scheduler 和 monitor 关闭。
