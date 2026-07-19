@@ -29,6 +29,8 @@ from stable.services.news_attribution import (
     region_label,
     related_region_queries_enabled,
 )
+from stable.services.regions import NEWS_PRODUCTION_REGIONS
+from stable.services.multiregion import region_review_publish_blocker
 
 from .onebot import BotPusher
 
@@ -48,13 +50,7 @@ RANKED_NEWS_SOURCE_SITES = {
     SourceSite.HORSE_RACING_NATION,
 }
 AUTO_PUSH_SUMMARY_LIMIT = 160
-FIRST_PHASE_REGIONS = {
-    RacingRegion.JAPAN,
-    RacingRegion.HONG_KONG,
-    RacingRegion.UNITED_KINGDOM,
-    RacingRegion.FRANCE,
-    RacingRegion.UNITED_STATES,
-}
+FIRST_PHASE_REGIONS = set(NEWS_PRODUCTION_REGIONS)
 
 
 @dataclass(frozen=True)
@@ -178,6 +174,8 @@ def should_push_news_to_qq(
 ) -> PushEligibility:
     if not is_article_public(article):
         return PushEligibility(False, "article_not_public")
+    if region_review_publish_blocker(article):
+        return PushEligibility(False, "region_review_required")
     if has_publish_blocker(article):
         return PushEligibility(False, "has_blocker")
     regions = article_regions(article, target=target)

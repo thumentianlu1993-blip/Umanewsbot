@@ -43,7 +43,33 @@
 - public admission/read 必须同时验证 route contract digest 和 terms evidence digest。
   allowlist/incident 保存同一版本化摘要，manual due 为 promotion commit + 15 分钟；
   event off + 2h 后仍 open 时 verify 明确报告 overdue。
+## 2026-07-19：新增新闻地区独立持久化并采用双关闭准入
 
+- 爱尔兰、加拿大、阿联酋、沙特和澳大利亚使用独立 region key；不存在
+  `middle_east` 数据值。阿联酋与沙特可在 UI 视觉分组，但来源、文章归属、许可、发布和 QQ
+  灰度都分别处理，避免与英国/美国或彼此混写。
+- 地区 choice 不等于所有业务执行能力范围。`0047` 扩展共享 `RacingRegion` 模型 choices，
+  但赛事与马匹 ModelForm、Django `RaceEventAdmin` 只提供旧五区加 `other`：这样既有
+  `other` 记录仍可修改无关字段，同时不开放新五区结构化录入。实际抓取任务、自动选择器、
+  公共 horse/race resolver 以及 historical、P0、race-live capability sets 继续显式锁定
+  旧五区。本 change 未提供新五区结构化数据抓取或生产能力。
+- 来源地区上下文的 ASCII 关键词必须使用现有语言边界匹配器，禁止裸子串匹配；例如 Ireland
+  缩写 `hri` 不得命中 `thrilling`。该约束只修正误归属，不改变来源 fallback 或跨地区关联
+  规则。
+- 全局 attribution mode 为 `off` 时，不自动改变文章主/关联地区。只有显式来源 allowlist
+  且 source-scoped candidate 开关开启时，才可保存 `review_candidate`；候选必须经人工确认
+  并解除 blocker 后才能另行发布或 QQ 推送。
+- 来源准入分为 `technical_status`、`automation_permission_status` 和
+  `effective_production_status` 三轴；只有技术 accepted 且许可 approved 才能成为
+  eligible。每个新来源默认 `enabled=false / production_approved=false`，候选开关与
+  allowlist 也默认关闭/空，禁止以入口 HTTP 200 代替解析或许可结论。
+- permission `blocked` 的 HRI、Woodbine、ERA 在获得新的书面同意前不得重新联网；
+  permission `unknown` 的 JCSA、Racing Victoria 仅能在预先声明的透明 User-Agent 和请求
+  预算内探测。预算用完后即使保存证据已支持离线修复，也不得补请求把 technical 状态“跑成”
+  accepted；必须等新的明确验证窗口。
+- 这是本地行为决策，不是发布事实。当前未 commit、push、deploy 或生产验证；临时
+  PostgreSQL、390px 与 Compose 门禁未完成，所有五来源仍 production blocked，生产状态
+  不变。
 ## 2026-07-18：英国 Group 级别装饰只从审核级别派生精确名称变体
 
 - TRA 英国 G1-G3 racecard 赛事名可在基础名末尾携带 `(Group 1/2/3)`。首版只在英国且

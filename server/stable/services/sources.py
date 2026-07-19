@@ -364,6 +364,111 @@ BUILTIN_SOURCE_DEFINITIONS = [
         "notes": "候选来源；上线前实测列表返回 403，暂不纳入第一版生产来源。",
         "priority": 20,
     },
+    {
+        "name": "Horse Racing Ireland 新闻",
+        "homepage_url": "https://www.hri.ie/news-and-media",
+        "feed_url": "https://www.hri.ie/news-and-media",
+        "source_type": SourceType.BUILTIN,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.IRELAND,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "hri_news",
+        "source_site": SourceSite.HRI_NEWS,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 360,
+        "notes": (
+            "爱尔兰官方新闻候选；automation_permission_status=blocked；"
+            "保持关闭且未生产批准。"
+        ),
+        "priority": 40,
+    },
+    {
+        "name": "Woodbine 新闻",
+        "homepage_url": "https://woodbine.com/news/",
+        "feed_url": "https://woodbine.com/news/",
+        "source_type": SourceType.BUILTIN,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.CANADA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "woodbine_news",
+        "source_site": SourceSite.WOODBINE_NEWS,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 360,
+        "notes": (
+            "加拿大官方赛马场新闻候选；automation_permission_status=blocked；"
+            "保持关闭且未生产批准。"
+        ),
+        "priority": 40,
+    },
+    {
+        "name": "Emirates Racing Authority 新闻",
+        "homepage_url": "https://emiratesracing.com/news/",
+        "feed_url": "https://emiratesracing.com/news/",
+        "source_type": SourceType.BUILTIN,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.UNITED_ARAB_EMIRATES,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "emirates_racing_authority",
+        "source_site": SourceSite.EMIRATES_RACING_AUTHORITY,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 360,
+        "notes": (
+            "阿联酋官方新闻候选；automation_permission_status=blocked；"
+            "保持关闭且未生产批准。"
+        ),
+        "priority": 40,
+    },
+    {
+        "name": "Jockey Club of Saudi Arabia 新闻",
+        "homepage_url": "https://jcsa.sa/en/news/",
+        "feed_url": "https://jcsa.sa/api/news/en/0/12",
+        "source_type": SourceType.BUILTIN,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.SAUDI_ARABIA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "jcsa_news",
+        "source_site": SourceSite.JCSA_NEWS,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 360,
+        "notes": (
+            "沙特阿拉伯官方新闻候选；automation_permission_status=unknown；"
+            "保持关闭且未生产批准。"
+        ),
+        "priority": 40,
+    },
+    {
+        "name": "Racing Victoria 新闻",
+        "homepage_url": "https://www.racingvictoria.com.au/news",
+        "feed_url": "https://www.racingvictoria.com.au/sitemap.xml",
+        "source_type": SourceType.BUILTIN,
+        "language": SourceLanguage.ENGLISH,
+        "racing_region": RacingRegion.AUSTRALIA,
+        "source_language": SourceLanguage.ENGLISH,
+        "source_kind": SourceKind.OFFICIAL,
+        "adapter_key": "racing_victoria_news",
+        "source_site": SourceSite.RACING_VICTORIA_NEWS,
+        "source_mode": SourceMode.OFFICIAL,
+        "enabled": False,
+        "production_approved": False,
+        "crawl_interval_minutes": 360,
+        "notes": (
+            "澳大利亚官方新闻候选；automation_permission_status=unknown；"
+            "保持关闭且未生产批准。"
+        ),
+        "priority": 40,
+    },
 ]
 
 

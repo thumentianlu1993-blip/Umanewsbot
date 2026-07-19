@@ -11,6 +11,7 @@
 
     <nav class="region-tabs" aria-label="地区频道">
       {% for tab in region_tabs %}
+        {% if tab.group_label %}<span class="region-tab-group" aria-label="{{ tab.group_label }}">{{ tab.group_label }}</span>{% endif %}
         <a class="{% if tab.is_active %}active{% endif %}" href="{{ tab.url }}">{{ tab.label }}</a>
       {% endfor %}
     </nav>

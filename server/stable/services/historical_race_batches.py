@@ -30,6 +30,7 @@ from stable.services.historical_race_inventory import (
     canonical_json,
     file_identity,
 )
+from stable.services.regions import RACE_DATA_REGIONS
 
 
 STANDARD_REGION_BATCH_LIMIT = 250
@@ -373,7 +374,7 @@ def select_first_acceptance_targets(
     fixed_ids = {int(value) for value in required_target_ids or []}
     if required_target_ids is not None and len(fixed_ids) != FIRST_ACCEPTANCE_TARGETS_PER_REGION * 5:
         raise InventoryValidationError("post-discovery acceptance must use the same target ids")
-    for region in sorted(region for region in RacingRegion.values if region not in {RacingRegion.OTHER}):
+    for region in sorted(RACE_DATA_REGIONS):
         series_keys = list(dict.fromkeys(series_keys_by_region.get(region) or []))
         if len(series_keys) != FIRST_ACCEPTANCE_SERIES_PER_REGION:
             raise InventoryValidationError(f"{region} first acceptance requires exactly 3 series")
@@ -447,7 +448,7 @@ def accounted_progress_by_region(
     *, year_start: int | None = None, year_end: int | None = None
 ) -> dict[str, int]:
     progress = dict.fromkeys(
-        [region for region in RacingRegion.values if region != RacingRegion.OTHER],
+        list(RACE_DATA_REGIONS),
         0,
     )
     rows = HistoricalRaceEventTarget.objects.filter(
@@ -492,7 +493,7 @@ def _validate_region_limit_and_progress(
     for region, count in counts.items():
         progress[region] = progress.get(region, 0) + count
     compared_regions = (
-        [region for region in RacingRegion.values if region != RacingRegion.OTHER]
+        list(RACE_DATA_REGIONS)
         if progress_regions is None
         else sorted(set(progress_regions))
     )
@@ -567,7 +568,7 @@ def select_historical_band_batch_targets(
     )
     eligible_counts = _counts_by_region(eligible)
     selected: list[HistoricalRaceEventTarget] = []
-    for region in sorted(region for region in RacingRegion.values if region != RacingRegion.OTHER):
+    for region in sorted(RACE_DATA_REGIONS):
         queryset = (
             eligible.select_related("race_series", "event")
             .filter(country_region=region)
@@ -727,7 +728,7 @@ def write_band_batch_artifact(
         "excluded_pending_by_region": dict(sorted(excluded_pending_counts.items())),
         "remaining_pending_by_region": {
             region: available_counts.get(region, 0) - selected_counts.get(region, 0)
-            for region in sorted(region for region in RacingRegion.values if region != RacingRegion.OTHER)
+            for region in sorted(RACE_DATA_REGIONS)
         },
         "progress_guard_regions": sorted(progress_guard_regions),
         "accounted_by_region": accounted_progress_by_region(year_start=year_start, year_end=year_end),

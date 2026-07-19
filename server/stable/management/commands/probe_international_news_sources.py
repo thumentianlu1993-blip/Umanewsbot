@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
 
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 
 from stable.models import NewsArticle, SourceMode
 from stable.services.production_windows import classify_source_error
@@ -14,8 +16,20 @@ from stable.adapters.international import (
 
 
 def _status_code_from_exception(exc: Exception) -> int | None:
+    status_code = getattr(exc, "status_code", None)
+    if status_code is not None:
+        try:
+            return int(status_code)
+        except (TypeError, ValueError):
+            pass
     response = getattr(exc, "response", None)
-    return getattr(response, "status_code", None)
+    status_code = getattr(response, "status_code", None)
+    if status_code is None:
+        return None
+    try:
+        return int(status_code)
+    except (TypeError, ValueError):
+        return None
 
 
 def _deferred_reason(*, error: str = "", status_code: int | None = None, list_count: int = 0, detail_body_length: int = 0) -> str:
@@ -82,6 +96,45 @@ def _apply_probe_adapter_metadata(source_result: dict, adapter) -> None:
     _apply_probe_query_errors(source_result, adapter)
 
 
+def _finalize_probe_contract(source_result: dict, adapter) -> None:
+    legacy_status = str(source_result.get("status") or "deferred")
+    if legacy_status == "accepted":
+        technical_status = "accepted"
+    elif source_result.get("deferred_reason") == "access_limited":
+        technical_status = "blocked"
+    else:
+        technical_status = "deferred"
+    permission = str(
+        getattr(adapter, "automation_permission_status", "unknown") or "unknown"
+    ).strip().lower()
+    if permission not in {"approved", "unknown", "blocked", "expired"}:
+        permission = "unknown"
+    source_result["source_key"] = source_result["source"]
+    source_result["technical_status"] = technical_status
+    source_result["automation_permission_status"] = permission
+    source_result["effective_production_status"] = (
+        "eligible"
+        if technical_status == "accepted" and permission == "approved"
+        else "production_blocked"
+    )
+    source_result["adapter_version"] = str(
+        getattr(adapter, "adapter_version", adapter.__class__.__name__) or adapter.__class__.__name__
+    )
+    source_result["parser_version"] = str(
+        getattr(adapter, "parser_version", source_result["adapter_version"])
+        or source_result["adapter_version"]
+    )
+    source_result["reviewed_at"] = timezone.now().isoformat()
+    canonical = json.dumps(
+        source_result,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+    source_result["artifact_sha256"] = hashlib.sha256(canonical).hexdigest()
+
+
 class Command(BaseCommand):
     help = "Dry-run probe international news adapters without writing articles."
 
@@ -101,7 +154,9 @@ class Command(BaseCommand):
         parser.add_argument("--json", action="store_true", help="以 JSON 输出探测结果。")
 
     def handle(self, *args, **options):
-        limit = max(1, options["limit"])
+        limit = int(options["limit"])
+        if limit < 1 or limit > 2:
+            raise CommandError("--limit 必须在 1-2 之间；每来源详情探测最多 2 篇。")
         requested_mode = options.get("mode")
         if options.get("source"):
             probe_targets = []
@@ -138,6 +193,8 @@ class Command(BaseCommand):
                     "detail_body_length": 0,
                     "duplicate_count": 0,
                     "duplicate_ratio": 0.0,
+                    "verified_time_count": 0,
+                    "missing_time_count": 0,
                 },
                 "articles": [],
                 "query_errors": [],
@@ -169,6 +226,10 @@ class Command(BaseCommand):
                     published_verified = (detail.metadata or {}).get("published_at_verified")
                     if published_verified is None:
                         published_verified = detail.published_at is not None
+                    if published_verified:
+                        source_result["parse_quality"]["verified_time_count"] += 1
+                    else:
+                        source_result["parse_quality"]["missing_time_count"] += 1
                     body_length = len(detail.body_ja_normalized or detail.body_ja_raw or "")
                     source_result["parse_quality"]["detail_sample_count"] += 1
                     source_result["parse_quality"]["detail_body_length"] = max(
@@ -205,6 +266,7 @@ class Command(BaseCommand):
                 if final_url:
                     source_result["final_url"] = final_url
                 source_result["deferred_reason"] = _deferred_reason(error=str(exc), status_code=status_code)
+            _finalize_probe_contract(source_result, adapter)
             results.append(source_result)
 
         if options["json"]:
@@ -214,6 +276,16 @@ class Command(BaseCommand):
         for item in results:
             self.stdout.write(
                 f"[{item['source']}] {item['region']} / {item['source_language']} / {item['source_mode']} / {item['listing_url']}"
+            )
+            self.stdout.write(
+                "  CONTRACT "
+                f"technical_status={item['technical_status']} "
+                f"automation_permission_status={item['automation_permission_status']} "
+                f"effective_production_status={item['effective_production_status']} "
+                f"adapter_version={item['adapter_version']} "
+                f"parser_version={item['parser_version']} "
+                f"reviewed_at={item['reviewed_at']} "
+                f"artifact_sha256={item['artifact_sha256']}"
             )
             if item["error"]:
                 self.stdout.write(f"  ERROR: {item['error']}")

@@ -484,13 +484,13 @@ class AttributionEvidenceHierarchyTests(TestCase):
 
     def test_supported_and_out_of_scope_partnership_keeps_source_and_related_other(self):
         article = article_with_text(
-            "York And Dubai Racing Club Announce International Partnership",
+            "Ascot And World's Best Racehorse Rankings Announce International Partnership",
             region=RacingRegion.UNITED_STATES,
         )
 
         result = infer_article_attribution(article)
 
-        self.assertResult(result, RacingRegion.UNITED_STATES, {RacingRegion.OTHER})
+        self.assertResult(result, RacingRegion.UNITED_KINGDOM, {RacingRegion.OTHER})
 
     def test_france_breeding_auction_and_institution_topics_are_primary_france(self):
         cases = [
@@ -640,14 +640,14 @@ class AttributionEvidenceHierarchyTests(TestCase):
     )
     def test_other_region_can_be_persisted_as_related_evidence(self):
         article = article_with_text(
-            "York And Dubai Racing Club Announce International Partnership",
+            "Ascot And World's Best Racehorse Rankings Announce International Partnership",
             region=RacingRegion.UNITED_STATES,
         )
 
         result = apply_article_attribution(article, save=True, is_new_article=True)
 
         article.refresh_from_db()
-        self.assertEqual(result.primary_region, RacingRegion.UNITED_STATES)
+        self.assertEqual(result.primary_region, RacingRegion.UNITED_KINGDOM)
         self.assertEqual(
             set(article.related_region_links.values_list("region", flat=True)),
             {RacingRegion.OTHER},

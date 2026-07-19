@@ -10,28 +10,24 @@ from django.conf import settings
 from django.db.models import Q, QuerySet
 
 from stable.models import (
+    AutomationStatus,
     AttributionStatus,
     ContentCategory,
     NewsArticle,
     NewsArticleRelatedRegion,
     NewsSource,
     RacingRegion,
+    ReviewMode,
     SourceLanguage,
     SourceSite,
     TermEntry,
     TermType,
 )
 from stable.services.terms import source_term_matches_text, source_terms_by_entry
+from stable.services.regions import NEWS_ATTRIBUTION_REGIONS
 
 
-SUPPORTED_REGIONS = {
-    RacingRegion.JAPAN,
-    RacingRegion.HONG_KONG,
-    RacingRegion.UNITED_KINGDOM,
-    RacingRegion.FRANCE,
-    RacingRegion.UNITED_STATES,
-    RacingRegion.OTHER,
-}
+SUPPORTED_REGIONS = set(NEWS_ATTRIBUTION_REGIONS)
 ENTITY_TERM_TYPES = {TermType.HORSE, TermType.JOCKEY, TermType.TRAINER, TermType.OWNER}
 EVENT_TERM_TYPES = {TermType.RACE, TermType.RACECOURSE}
 FRANCE_CONTEXT_TERM_TYPES = {TermType.FARM, TermType.ORG}
@@ -39,8 +35,13 @@ REGION_ORDER = [
     RacingRegion.JAPAN,
     RacingRegion.HONG_KONG,
     RacingRegion.UNITED_KINGDOM,
+    RacingRegion.IRELAND,
     RacingRegion.FRANCE,
     RacingRegion.UNITED_STATES,
+    RacingRegion.CANADA,
+    RacingRegion.UNITED_ARAB_EMIRATES,
+    RacingRegion.SAUDI_ARABIA,
+    RacingRegion.AUSTRALIA,
     RacingRegion.OTHER,
 ]
 REGION_KEYWORDS = {
@@ -106,6 +107,71 @@ REGION_KEYWORDS = {
         "del mar",
         "keeneland",
     ],
+    RacingRegion.IRELAND: [
+        "ireland",
+        "irish",
+        "horse racing ireland",
+        "hri",
+        "curragh",
+        "leopardstown",
+        "fairyhouse",
+        "naas",
+        "punchestown",
+        "galway",
+        "irish derby",
+        "irish champion stakes",
+    ],
+    RacingRegion.CANADA: [
+        "canada",
+        "canadian",
+        "woodbine",
+        "fort erie",
+        "king's plate",
+        "kings plate",
+        "woodbine mile",
+        "ontario racing",
+    ],
+    RacingRegion.UNITED_ARAB_EMIRATES: [
+        "united arab emirates",
+        "uae",
+        "dubai",
+        "meydan",
+        "dubai world cup",
+        "dubai racing club",
+        "emirates racing authority",
+        "jebel ali",
+        "abu dhabi",
+        "al ain",
+        "アラブ首長国連邦",
+        "ドバイ",
+        "ドバイワールドカップ",
+        "メイダン",
+    ],
+    RacingRegion.SAUDI_ARABIA: [
+        "saudi arabia",
+        "saudi",
+        "saudi cup",
+        "riyadh",
+        "king abdulaziz racecourse",
+        "jcsa",
+        "サウジアラビア",
+        "サウジカップ",
+        "リヤド",
+        "キングアブドゥルアジーズ競馬場",
+    ],
+    RacingRegion.AUSTRALIA: [
+        "australia",
+        "australian",
+        "racing victoria",
+        "flemington",
+        "randwick",
+        "rosehill",
+        "caulfield",
+        "moonee valley",
+        "melbourne cup",
+        "the everest",
+        "オーストラリア",
+    ],
 }
 EVENT_REGION_KEYWORDS = {
     RacingRegion.JAPAN: [
@@ -149,25 +215,58 @@ EVENT_REGION_KEYWORDS = {
         "del mar",
         "keeneland",
     ],
+    RacingRegion.IRELAND: [
+        "curragh",
+        "leopardstown",
+        "fairyhouse",
+        "naas",
+        "punchestown",
+        "galway",
+        "irish derby",
+        "irish champion stakes",
+    ],
+    RacingRegion.CANADA: [
+        "woodbine",
+        "fort erie",
+        "king's plate",
+        "kings plate",
+        "woodbine mile",
+    ],
+    RacingRegion.UNITED_ARAB_EMIRATES: [
+        "meydan",
+        "dubai world cup",
+        "dubai racing club",
+        "emirates racing authority",
+        "jebel ali",
+        "abu dhabi",
+        "al ain",
+        "ドバイワールドカップ",
+        "メイダン",
+    ],
+    RacingRegion.SAUDI_ARABIA: [
+        "saudi cup",
+        "riyadh",
+        "king abdulaziz racecourse",
+        "jcsa",
+        "サウジカップ",
+        "リヤド",
+        "キングアブドゥルアジーズ競馬場",
+    ],
+    RacingRegion.AUSTRALIA: [
+        "flemington",
+        "randwick",
+        "rosehill",
+        "caulfield",
+        "moonee valley",
+        "melbourne cup",
+        "the everest",
+    ],
 }
-IRELAND_KEYWORDS = ["ireland", "irish", "curragh", "leopardstown", "fairyhouse", "naas"]
 OUT_OF_SCOPE_TITLE_KEYWORDS = [
-    "australia",
-    "australian",
-    "canada",
-    "canadian",
-    "ontario",
-    "saudi arabia",
-    "saudi",
-    "dubai",
-    "uae",
-    "yulong",
-    "オーストラリア",
-    "サウジアラビア",
-    "ドバイ",
+    "world's best racehorse rankings",
 ]
 GLOBAL_SOURCE_SITES = {SourceSite.TDN, SourceSite.TDN_FRANCE}
-ATTRIBUTION_RULE_VERSION = "multiregion-v3"
+ATTRIBUTION_RULE_VERSION = "multiregion-v4-new-regions"
 ENFORCE_NEW_ARTICLES_STAGES = {
     "new_articles",
     "web_test_groups",
@@ -613,6 +712,11 @@ def _explicit_title_subject_region(title_text: str) -> str:
         RacingRegion.FRANCE: ("french trainer ", "team france "),
         RacingRegion.JAPAN: ("japanese trainer ", "team japan "),
         RacingRegion.UNITED_STATES: ("american trainer ", "team usa ", "team united states "),
+        RacingRegion.IRELAND: ("irish trainer ", "irish-trained ", "team ireland "),
+        RacingRegion.CANADA: ("canadian trainer ", "canadian runner ", "team canada "),
+        RacingRegion.UNITED_ARAB_EMIRATES: ("uae trainer ", "emirati trainer ", "team uae "),
+        RacingRegion.SAUDI_ARABIA: ("saudi trainer ", "saudi runner ", "team saudi "),
+        RacingRegion.AUSTRALIA: ("australian trainer ", "australian runner ", "team australia "),
     }
     return next((region for region, values in prefixes.items() if folded.startswith(values)), "")
 
@@ -717,8 +821,6 @@ def infer_article_attribution(
         ],
         exclude="",
     )
-    ireland_matched = [keyword for keyword in IRELAND_KEYWORDS if keyword in title_text.casefold()]
-
     france_theme_markers = [
         "france galop",
         "arqana",
@@ -736,6 +838,7 @@ def infer_article_attribution(
         allow_lazy_source_config=batch_context is None,
     )
     explicit_subject_region = _explicit_title_subject_region(title_text)
+    source_context_matches: list[str] = []
 
     if len(event_regions) > 1:
         title_event_candidates = [region for region in event_regions if region in title_context_regions]
@@ -857,8 +960,30 @@ def infer_article_attribution(
 
         if source_is_global and reason in {"event_region", "leading_subject_over_event"}:
             related.extend(credible_entity_regions)
-        if ireland_matched:
-            related.append(RacingRegion.UNITED_KINGDOM)
+        source_context_matches = [
+            keyword
+            for keyword in REGION_KEYWORDS.get(source_region, [])
+            if (
+                source_term_matches_text(lead_text, keyword, SourceLanguage.ENGLISH)
+                if keyword.isascii()
+                else keyword in lead_text
+            )
+        ]
+        if (
+            event_region
+            and primary == event_region
+            and source_region
+            and source_region != primary
+            and source_region in {
+                RacingRegion.IRELAND,
+                RacingRegion.CANADA,
+                RacingRegion.UNITED_ARAB_EMIRATES,
+                RacingRegion.SAUDI_ARABIA,
+                RacingRegion.AUSTRALIA,
+            }
+            and source_context_matches
+        ):
+            related.append(source_region)
         if out_of_scope_title_matches and primary != RacingRegion.OTHER:
             related.append(RacingRegion.OTHER)
         related = _dedupe_regions(related, exclude=primary)
@@ -884,7 +1009,7 @@ def infer_article_attribution(
         "event_keyword_matches": event_keyword_matches,
         "term_matches": term_matches,
         "title_term_matches": title_term_matches,
-        "ireland_keywords": ireland_matched,
+        "source_context_matches": source_context_matches,
         "out_of_scope_title_matches": out_of_scope_title_matches,
         "france_theme_matches": france_theme_matches,
         "positive": {
@@ -979,6 +1104,86 @@ def set_article_regions(
     return article
 
 
+def _source_scoped_new_region_candidate_enabled(
+    article: NewsArticle,
+    source_config: NewsSource | None,
+    *,
+    is_new_article: bool | None,
+) -> bool:
+    if is_new_article is not True:
+        return False
+    if not bool(getattr(settings, "NEW_REGION_NEWS_ATTRIBUTION_CANDIDATES_ENABLED", False)):
+        return False
+    configured = getattr(settings, "NEW_REGION_NEWS_ATTRIBUTION_CANDIDATE_SOURCES", [])
+    if isinstance(configured, str):
+        allowed = {item.strip() for item in configured.split(",") if item.strip()}
+    else:
+        allowed = {str(item).strip() for item in configured if str(item).strip()}
+    source_keys = {
+        str(article.source_site or "").strip(),
+        str(getattr(source_config, "adapter_key", "") or "").strip(),
+        str(getattr(source_config, "source_site", "") or "").strip(),
+    }
+    return bool(allowed.intersection(source_keys))
+
+
+def _save_source_scoped_review_candidate(
+    article: NewsArticle,
+    *,
+    source_config: NewsSource | None,
+    save: bool,
+) -> AttributionResult:
+    result = infer_article_attribution(article, source_config=source_config)
+    summary = dict(article.attribution_summary or {})
+    summary["review_candidate"] = {
+        "primary_region": result.primary_region,
+        "related_regions": result.related_regions,
+        "reason": result.reason,
+        "evidence": result.evidence,
+        "status": result.status,
+        "confidence": result.confidence,
+        "rule_version": result.rule_version,
+        "candidate_only": True,
+    }
+    issue = {
+        "code": "region_review_required",
+        "severity": "blocker",
+        "message": "新地区归属候选需人工确认并锁定后方可发布或推送。",
+    }
+    gate_issues = [
+        existing
+        for existing in (article.gate_issues or [])
+        if str(existing.get("code", "")) != issue["code"]
+    ]
+    gate_issues.append(issue)
+    article.attribution_summary = summary
+    article.attribution_status = result.status
+    article.attribution_confidence = result.confidence
+    article.attribution_rule_version = result.rule_version
+    article.attribution_locked = False
+    article.gate_issues = gate_issues
+    article.review_mode = ReviewMode.MANUAL
+    article.automation_status = AutomationStatus.MANUAL_REVIEW_REQUIRED
+    if not article.content_category:
+        article.content_category = result.content_category
+    if save:
+        article.save(
+            update_fields=[
+                "attribution_summary",
+                "attribution_status",
+                "attribution_confidence",
+                "attribution_rule_version",
+                "attribution_locked",
+                "gate_issues",
+                "review_mode",
+                "automation_status",
+                "content_category",
+                "updated_at",
+            ]
+        )
+    return result
+
+
 def apply_article_attribution(
     article: NewsArticle,
     *,
@@ -991,6 +1196,20 @@ def apply_article_attribution(
     rollout_stage = str(getattr(settings, "MULTIREGION_ATTRIBUTION_ROLLOUT_STAGE", "off") or "off").strip().lower()
     if not force and mode == "enforce" and rollout_stage in ENFORCE_NEW_ARTICLES_STAGES and is_new_article is not True:
         mode = "shadow"
+    if (
+        mode == "off"
+        and not article.attribution_locked
+        and _source_scoped_new_region_candidate_enabled(
+            article,
+            source_config,
+            is_new_article=is_new_article,
+        )
+    ):
+        return _save_source_scoped_review_candidate(
+            article,
+            source_config=source_config,
+            save=save,
+        )
     if mode == "off" or (article.attribution_locked and not force):
         content_category = article.content_category or classify_news_content(article)
         if save and not article.content_category:

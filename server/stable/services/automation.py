@@ -28,7 +28,10 @@ from stable.services.terms import (
     resolve_article_entities,
     resolve_terms_for_language,
 )
-from stable.services.multiregion import auto_publish_policy_for_article
+from stable.services.multiregion import (
+    auto_publish_policy_for_article,
+    region_review_publish_blocker,
+)
 from stable.services.news_attribution import classify_news_content
 from stable.services.race_grades import better_race_priority, normalize_race_grade, race_priority_for_grade
 
@@ -812,6 +815,8 @@ def mark_publish_ready(article: NewsArticle, *, reason: str = "改写稿通过�
 
 
 def is_ready_for_auto_publish(article: NewsArticle) -> bool:
+    if region_review_publish_blocker(article):
+        return False
     if article.review_mode != ReviewMode.AUTO:
         return False
     if article.automation_status != AutomationStatus.PUBLISH_READY:

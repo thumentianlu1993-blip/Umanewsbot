@@ -344,18 +344,22 @@ class MultiRegionAttributionAndGateTests(TestCase):
         )
         self.assertEqual(result.reason, "source_region_with_ambiguous_context")
 
-    def test_ireland_content_is_temporarily_grouped_with_uk_and_tagged(self):
+    def test_irish_derby_is_attributed_to_ireland_without_legacy_tag(self):
         article = self._article(
             title_ja="Irish Derby result at the Curragh",
             body_ja_raw="Irish Derby result at the Curragh. " * 8,
             body_ja_normalized="Irish Derby result at the Curragh. " * 8,
         )
 
-        apply_article_attribution(article, force=True)
+        result = apply_article_attribution(article, force=True)
         article.refresh_from_db()
 
-        self.assertIn(RacingRegion.UNITED_KINGDOM, article_region_set(article))
-        self.assertIn("ireland", article.tags_json)
+        self.assertEqual(result.primary_region, RacingRegion.IRELAND)
+        self.assertEqual(
+            article_region_set(article),
+            {RacingRegion.IRELAND},
+        )
+        self.assertNotIn("ireland", article.tags_json)
 
     def test_english_term_gate_accepts_terms_from_related_regions(self):
         article = self._article(racing_region=RacingRegion.FRANCE)

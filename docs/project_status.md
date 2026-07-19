@@ -50,6 +50,41 @@
   当前未提交、未部署、未联网、未写生产；最新成功代码 review 和其后的精确发布授权仍是
   后续硬门禁。
 
+## 2026-07-19 新五地区新闻抓取代码复审已通过，待用户授权
+
+- `codex/add-new-region-news-sources-integrated` 已在独立 worktree 完成爱尔兰、加拿大、阿联酋、沙特和
+  澳大利亚五个独立新闻地区及五个默认关闭来源的本地候选；补救方案两轮复审已批准，真实
+  结构/许可/透明 UA/XML/结构化 HTTP 的 RED-GREEN 已完成。
+- 最新完整指纹的原生代码审查首轮为 `REVISE`：既有 `other` 赛事/马匹无法通过表单保存，
+  Ireland 来源关键词 `hri` 会误命中 `thrilling`。两项均先取得真实 RED，再以表单专用
+  旧五区加 `other` choices 和边界感知关键词匹配最小修复；没有扩大赛事、马匹或 race-live
+  执行地区。
+- 同一原生 session 对 fingerprint `def49ae…d9e` 的限定复审再次为 `REVISE`：Django
+  `RaceEventAdmin` 仍暴露五个 news-only 地区，测试文档顶部计数仍为旧值。Admin 缺口先用
+  真实 `ModelAdmin.get_form()` 取得 `1` 项内 `2` 个 failure，再复用受限地区集合修复；
+  文档摘要已同步。
+- 当前专用 `55/55`，新地区/归属/法国时间组合 `155` 个通过加 `1` 个既有 skip，相邻加
+  旧爱尔兰合同 `70/70`，event 924 最新邻接
+  `200` 个通过加 `2` 个 PostgreSQL-only skip。
+- 候选已同步最新 `origin/main@566a9b10`；本 change migration 因主线占用 `0046` 顺延为
+  `0047`。完整 `stable` 的剩余 `12 ERROR / 2 FAILURE` 已在干净主线精确复现，属于
+  current-year CSV、缺失 tmp helper 和既有 historical runner 基线问题，不是本 change
+  新增回归。
+- JCSA、Racing Victoria 的受控补救在线复测都仍为 technical `deferred`；已保存的 JCSA
+  当前详情可在修复后离线解析，RV 真实斜杠日期路径也已进入严格 fixture，但请求预算已用完，
+  不重复联网。HRI、Woodbine、ERA permission 为 `blocked`，JCSA/RV 为 `unknown`，当前
+  没有 `eligible` 来源。
+- 同一 reviewer/session 的第三次限定复审已通过：前后 fingerprint
+  `83675edc…b1353` 一致，`VERDICT: APPROVED`，无 P0/P1/P2 actionable finding。该冻结
+  版本仍未 commit、push、PR 或 deploy，后续必须取得用户针对本版本的新授权。
+- 这是本地候选，待用户决定后续，不是已上线。五来源仍
+  `enabled=false / production_approved=false`，全局归属和 source-scoped candidate 均默认
+  关闭；未 commit、push、deploy 或生产验证，生产状态未改变。
+- 临时 PostgreSQL、390px 和 Compose 尚未验证，不能宣称五区来源齐备或生产可用。
+- 正式候选只位于
+  `/Users/mentianlu/Code/umanews/.worktrees/add-new-region-news-sources-integrated`；旧同名
+  worktree 是错误全局 stash 的隔离现场，不参与后续 review 或发布。
+
 ## 2026-07-18 event 924 首个 TRA shadow 赛果到达
 
 - 已在 scheduler false、四层 policy shadow、tracking/allowlist 仅 `[924]` 的边界内完成

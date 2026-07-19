@@ -121,6 +121,85 @@
   scheduler false、范围不扩展。下一门禁仍是同一 reviewer 的限定复审；只有成功后，才能
   冻结精确 fingerprint 并向用户请求该冻结版本的新发布授权。
 
+## 2026-07-19 新五地区新闻抓取代码复审已通过，待用户授权
+
+- 本地候选位于 worktree
+  `/Users/mentianlu/Code/umanews/.worktrees/add-new-region-news-sources-integrated`、分支
+  `codex/add-new-region-news-sources-integrated`。新闻地区使用五个独立持久键：
+  `ireland`、`canada`、`united_arab_emirates`、`saudi_arabia`、`australia`；首批来源分别为
+  `hri_news`、`woodbine_news`、`emirates_racing_authority`、`jcsa_news`、
+  `racing_victoria_news`。阿联酋和沙特只在界面视觉上归入“中东”，持久化、许可和灰度仍
+  分开。
+- 五个新来源全部默认 `enabled=false / production_approved=false`。全局 attribution mode
+  保持 `off`；仅供显式来源使用的 source-scoped candidate 开关默认关闭，allowlist 默认空。
+  新来源也已从默认 probe 外联矩阵移除，只能显式 `--source` opt-in；因此迁移或同步不会自动
+  抓取、改变主地区、发布或 QQ 推送。
+- 能力集合已按新闻、结构化赛事、马匹和 race-live 分开。新增 choice migration `0047`
+  扩展共享 `RacingRegion` 模型 choices；赛事/马匹 ModelForm 与 `RaceEventAdmin` 则只保留
+  旧五区加 `other`，既让旧 `other` 记录可继续编辑，也不开放新五区结构化录入。实际抓取
+  任务、自动选择器、公共 horse/race resolver 以及 historical、P0、race-live capability
+  sets 仍显式锁在旧五区，本任务未提供新五区结构化数据抓取或生产能力。
+- 首轮真实 probe 后完成两轮工程方案复审，五项 findings 全部关闭并
+  `VERDICT: APPROVED`。补救测试先行将专用范围扩充至 `51` 项：第一轮取得
+  `37` 个目标 failure、`0 ERROR`；修复五站真实入口、时间、正文、透明 User-Agent、
+  XML 请求隔离和 `403/429` 诊断后，纠正过时合成 fixture。随后又分别以真实 JCSA 日期
+  class、Racing Victoria `/news/YYYY/MM/DD/slug` 路径和内置来源 URL/许可 notes 取得
+  `5` 项、`12` 项干净 RED，均已最小修复。
+- 最新完整指纹的原生只读代码审查会话
+  `019f78e0-c31f-7c41-8885-7010617e379d` 首轮结论为 `VERDICT: REVISE`，提出两个 P2：
+  ModelForm 重建 choices 后无法保存既有 `other` 赛事/马匹，以及 Ireland 来源上下文中的
+  `hri` 会裸子串命中 `thrilling`。两项均先补测试取得 `3/3` failure，再做最小修复。
+- 结构化赛事、马匹和 race-live 的执行能力集合保持旧五区不变；只新增表单专用 choices，
+  允许旧五区加 `other` 的既有记录继续编辑，但不开放新五区结构化录入。Ireland 来源上下文
+  改为复用既有英文边界匹配器，不再以裸子串判定来源地区。
+- 同一 native session 对 fingerprint
+  `def49ae28389b8913ee5c86ee425094a0c136023921e7c6d2668fce766af5d9e`
+  的限定复审再次为 `VERDICT: REVISE`：Django `RaceEventAdmin` 仍从模型 choices 暴露
+  五个 news-only 地区，以及 `test_cases.md` 顶部保留旧计数。Admin 缺口先新增真实
+  `ModelAdmin.get_form()` 回归，旧实现得到 `1` 项测试内 `2` 个 failure；随后只在
+  `RaceEventAdmin.formfield_for_choice_field()` 复用 `RACE_EVENT_FORM_REGIONS`，并统一
+  durable 测试摘要。
+- 当前独立验证为：专用 `55/55`；新地区/归属/法国时间组合 `155` 个通过、`1` 个既有
+  live-network probe 跳过；既有来源/QQ/抓取/公共首页加爱尔兰旧合同纠偏 `70/70`；
+  最新 event 924 初始化/transition/manual 邻接 `200` 个通过、`2` 个 PostgreSQL-only
+  跳过；Django check、
+  migration drift 与 `git diff --check` 均通过。仓库外保存的当前 JCSA 详情 HTML
+  可离线解析出标题、`724` 字正文和 `2026-03-22T14:00:00Z`，时间证据 raw、Riyadh
+  时区与 minute precision 完整。
+- 受控补救在线复测没有产生 accepted 结论：JCSA 列表接口 HTTP `200`、`12` 条，但修复前
+  抽样详情被 fail-closed 为 `missing_published_at`，artifact
+  `0244333e5c84ea9da8d55e604cae6ea9a1c3c1fde79186da3615e0177ed753ca`；
+  Racing Victoria sitemap HTTP `200`，修复前因日期路径夹具偏差得到 `0` 条，artifact
+  `d35b541c698a94aba8e5b4979d8f0d3a64eba81c306b50c28bce5ce1fa304c9f`。两者已用保存
+  证据离线修复，但请求预算已用完，不重复联网，因此当前技术状态仍记 `deferred`，许可仍
+  `unknown`。HRI、Woodbine、ERA 因官方条款为 `blocked`，补救阶段未再次联网。
+- 同一 reviewer 和 native session
+  `019f78e0-c31f-7c41-8885-7010617e379d` 已完成第三次限定复审，命令 exit `0`，前后
+  fingerprint 均为
+  `83675edc20358bf813a73a1db4ccf49e7f3f34bc67cd0b3ac4d05f4a57fb1353`，结论
+  `VERDICT: APPROVED`，无 P0/P1/P2 actionable finding。该批准绑定本次纯审查结果文档
+  回写前的完整代码、测试与文档候选；本次回写只记录已发生事实，不改变运行行为。
+- 本候选已快进并叠加最新 `origin/main@566a9b1012aac7fe52ad7aec793ab0ff4b9eae18`；
+  主线占用 `stable.0046` 后，本 change 的 choice migration 顺延为 `0047`。自动合并曾暴露
+  `historical_batch_pipeline` 漏保留 `RacingRegion` import，已最小修复；“Irish Derby
+  临时归英国并打 tag”的旧测试已改为独立 Ireland 合同并直接 GREEN。
+- 从仓库根运行完整 `stable` 为 `2078` 项，其中 `12 ERROR / 2 FAILURE / 33 skipped`；
+  剩余 `14` 项在干净最新 `origin/main` detached worktree 中按同一精确测试集合全部复现，
+  涉及 current-year CSV approval、未跟踪 `tmp/` helper 和既有 historical runner contract，
+  不属于本 change。新地区、归属、来源、QQ、抓取、首页和 event 924 直接范围均 GREEN。
+- 旧 worktree `/Users/mentianlu/Code/umanews/.worktrees/add-new-region-news-sources` 曾因仓库级
+  stash 顶层被另一并行分支占用而恢复了错误 stash，现保留为隔离现场，不得作为候选、测试或
+  发布路径；正确候选只认本节所列 `-integrated` worktree/branch。
+- 当前没有 commit、push、PR、deploy、生产迁移或生产验证；生产当前运行态未因本任务改变。
+  临时 PostgreSQL migration smoke、390px 视觉 QA 和 Compose config 仍未验证。五来源
+  当前全部 `effective_production_status=production_blocked`，不能宣称来源 `eligible`、
+  五地区来源齐备、抓取可用或已经上线。
+- 新有界 HTTP helper 只为五个新 adapter 增加逐请求
+  `user_agent/accepted_content_types`；默认 header、`get_bytes()` 与旧 adapter 路径不变。
+  非 `200` 使用不含正文/请求头的结构化异常保留 `status_code/final_url`，probe/crawl
+  可精确分类 `403/429`，达到门槛时进入 `360` 分钟 blocked backoff，并把安全诊断写入失败
+  ProductionWindow/CrawlJob。
+
 ## 2026-07-18 event 924 首个 TRA shadow 赛果已取得，有界窗口停止
 
 - 用户显式授权仅对 event `924` 按数据库 `next_poll_at` 手动 claim/dispatch，直到首个

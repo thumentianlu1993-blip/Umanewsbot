@@ -21,7 +21,7 @@ class SourceArticleStub:
     source_article_id: str
     source_url: str
     title_ja: str
-    published_at: datetime
+    published_at: datetime | None
     rank: int | None = None
     comment_count: int | None = None
     attention_count: int | None = None

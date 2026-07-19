@@ -29,6 +29,11 @@ class SourceSite(models.TextChoices):
     AT_THE_RACES = "at_the_races", "At The Races"
     BLOODHORSE = "bloodhorse", "BloodHorse"
     PAULICK_REPORT = "paulick_report", "Paulick Report"
+    HRI_NEWS = "hri_news", "Horse Racing Ireland News"
+    WOODBINE_NEWS = "woodbine_news", "Woodbine News"
+    EMIRATES_RACING_AUTHORITY = "emirates_racing_authority", "Emirates Racing Authority"
+    JCSA_NEWS = "jcsa_news", "Jockey Club of Saudi Arabia News"
+    RACING_VICTORIA_NEWS = "racing_victoria_news", "Racing Victoria News"
 
 
 class SourceMode(models.TextChoices):
@@ -59,6 +64,11 @@ class RacingRegion(models.TextChoices):
     UNITED_KINGDOM = "united_kingdom", "英国"
     FRANCE = "france", "法国"
     UNITED_STATES = "united_states", "美国"
+    IRELAND = "ireland", "爱尔兰"
+    CANADA = "canada", "加拿大"
+    UNITED_ARAB_EMIRATES = "united_arab_emirates", "阿联酋"
+    SAUDI_ARABIA = "saudi_arabia", "沙特阿拉伯"
+    AUSTRALIA = "australia", "澳大利亚"
     OTHER = "other", "其他"
 
 

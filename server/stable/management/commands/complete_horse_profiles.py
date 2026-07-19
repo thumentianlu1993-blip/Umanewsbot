@@ -5,7 +5,6 @@ from pathlib import Path
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from stable.models import RacingRegion
 from stable.services.horse_profile_completion import (
     CompletionOptions,
     apply_completion_artifact,
@@ -13,6 +12,7 @@ from stable.services.horse_profile_completion import (
     plan_profile_completion,
     write_completion_artifacts,
 )
+from stable.services.regions import HORSE_PROFILE_REGIONS
 
 
 class Command(BaseCommand):
@@ -23,7 +23,7 @@ class Command(BaseCommand):
         parser.add_argument("--commit", action="store_true")
         parser.add_argument("--artifact", help="已审核 dry-run artifact JSON。commit 必填。")
         parser.add_argument("--confirm-reviewed-artifact", action="store_true", help="确认 artifact 已经人工审核。")
-        parser.add_argument("--region", action="append", choices=[choice[0] for choice in RacingRegion.choices])
+        parser.add_argument("--region", action="append", choices=list(HORSE_PROFILE_REGIONS))
         parser.add_argument("--limit", type=int)
         parser.add_argument("--request-interval-seconds", type=float, default=settings.HORSE_PROFILE_COMPLETION_REQUEST_INTERVAL_SECONDS)
         parser.add_argument("--cache-dir", default=settings.HORSE_PROFILE_COMPLETION_CACHE_DIR)

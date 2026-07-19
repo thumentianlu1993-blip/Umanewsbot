@@ -291,9 +291,24 @@ def _window_starts_to_run(*, kind: str, scope_key: str, now: datetime, minutes: 
 
 
 def _http_status_code_from_exception(exc: Exception) -> int | None:
+    status_code = getattr(exc, "status_code", None)
+    if status_code is not None:
+        try:
+            return int(status_code)
+        except (TypeError, ValueError):
+            pass
     response = getattr(exc, "response", None)
     status_code = getattr(response, "status_code", None)
-    return int(status_code) if status_code is not None else None
+    if status_code is None:
+        return None
+    try:
+        return int(status_code)
+    except (TypeError, ValueError):
+        return None
+
+
+def _final_url_from_exception(exc: Exception) -> str:
+    return str(getattr(exc, "final_url", "") or "")
 
 
 def _finish_crawl_window(window_id: int | None, *, status: str, reason: str, payload: dict | None = None, error: str = "") -> None:
@@ -472,7 +487,13 @@ def _crawl_international_source(source: NewsSource) -> dict:
     ranked_revival_results: list[dict] = []
     unverified_time_count = 0
     try:
-        for stub in adapter.fetch_listing(source.source_mode, 1):
+        stubs = list(adapter.fetch_listing(source.source_mode, 1))
+        listing_skips = list(getattr(adapter, "skipped_items", []) or [])
+        if not stubs and not listing_skips:
+            error_message = "empty_listing: HTTP/listing response contained no parsable article links"
+            _finish_crawl_job(job, success_count=0, fail_count=0, error_message=error_message)
+            raise RuntimeError(error_message)
+        for stub in stubs:
             try:
                 detail = adapter.fetch_detail(stub.source_url)
                 draft = adapter.normalize_source_payload(stub, detail)
@@ -499,7 +520,6 @@ def _crawl_international_source(source: NewsSource) -> dict:
                     article,
                     source_elevated=bool(getattr(upsert_result, "source_elevated", False)),
                 )
-        listing_skips = list(getattr(adapter, "skipped_items", []) or [])
         query_errors = list(getattr(adapter, "last_listing_query_errors", []) or [])
         skipped_errors = [*listing_skips, *detail_errors]
         message = ""
@@ -508,7 +528,7 @@ def _crawl_international_source(source: NewsSource) -> dict:
             if detail_errors:
                 message = f"新增 {new_count}，重复 {seen_count}；parse failed 跳过 {len(skipped_errors)} 条：{skipped_errors[0][:120]}"
         if detail_errors and new_count == 0 and seen_count == 0:
-            error_message = message or "parse failed: no parsable article details"
+            error_message = f"all_details_failed: {message or 'parse failed: no parsable article details'}"
             _finish_crawl_job(job, success_count=new_count, fail_count=len(detail_errors), error_message=error_message)
             raise RuntimeError(error_message)
         _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, message=message)
@@ -522,7 +542,9 @@ def _crawl_international_source(source: NewsSource) -> dict:
                 "new_articles": new_count,
                 "duplicates": seen_count,
                 "historical_filtered": sum("stale_published_at" in item for item in listing_skips),
-                "published_at_missing": sum("missing_published_at" in item for item in listing_skips),
+                "published_at_missing": sum(
+                    "missing_published_at" in item for item in [*listing_skips, *detail_errors]
+                ),
                 "published_at_unverified": unverified_time_count,
                 "query_failures": len(query_errors),
                 "detail_failures": len(detail_errors),
@@ -621,13 +643,22 @@ def crawl_news_source_task(source_id: int, window_id: int | None = None) -> dict
         _log_success(log, f"source={source_id} new={result['new_count']} seen={result['seen_count']}")
         return result
     except Exception as exc:
-        error_category = classify_source_error(status_code=_http_status_code_from_exception(exc), message=str(exc))
+        http_status = _http_status_code_from_exception(exc)
+        final_url = _final_url_from_exception(exc)
+        error_category = classify_source_error(
+            status_code=http_status,
+            message=str(exc),
+        )
         record_source_crawl_result(source, success=False, error_category=error_category)
         _finish_crawl_window(
             window_id,
             status=ProductionWindowStatus.FAILED,
             reason="crawl_failed",
-            payload={"error_category": error_category},
+            payload={
+                "error_category": error_category,
+                "http_status": http_status,
+                "final_url": final_url,
+            },
             error=str(exc),
         )
         _log_failure(log, str(exc))

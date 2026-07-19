@@ -76,6 +76,7 @@ from .services.race_events import disable_race_event_live_tracking
 from .services.production_windows import update_major_race_boost_window
 from .services.pushing import enqueue_push_for_article
 from .services.queueing import dispatch_task
+from .services.regions import RACE_EVENT_FORM_REGIONS
 from .tasks import crawl_news_source_task, translate_article_task
 
 
@@ -1060,6 +1061,14 @@ class RaceEventAdmin(admin.ModelAdmin):
         RaceEventDataCandidateInline,
         RaceEventArticleLinkInline,
     ]
+
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        if db_field.name == "country_region":
+            labels_by_value = dict(db_field.choices)
+            kwargs["choices"] = [
+                (value, labels_by_value[value]) for value in RACE_EVENT_FORM_REGIONS
+            ]
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
 
 
 @admin.register(RaceEventDataCandidate)
