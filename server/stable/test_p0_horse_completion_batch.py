@@ -534,3 +534,306 @@ class BatchRunStateTests(TestCase):
         loaded = BatchRunState.read(self.run_dir)
         self.assertEqual(loaded.stage, "abandoned")
         self.assertEqual(loaded.errors[-1]["error"], "批次构成有误，另起新批")
+
+
+class RequestBudgetToolTests(TestCase):
+    def setUp(self):
+        import tempfile
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.budget_dir = Path(self._tmp.name)
+
+    def test_check_request_budget_persists_count(self):
+        import json as jsonlib
+
+        from stable.services.p0_horse_completion_budget import load_race_event_request_budget_module
+
+        check_request_budget = load_race_event_request_budget_module().check_request_budget
+
+        artifact = self.budget_dir / "japan.json"
+        check_request_budget(
+            "https://www.jbis.or.jp/horse/0001/",
+            artifact_path=artifact,
+            max_requests=5,
+            interval=0,
+        )
+        check_request_budget(
+            "https://www.jbis.or.jp/horse/0002/",
+            artifact_path=artifact,
+            max_requests=5,
+            interval=0,
+        )
+        state = jsonlib.loads(artifact.read_text(encoding="utf-8"))
+        self.assertEqual(state["request_count"], 2)
+
+    def test_check_request_budget_limit_exceeded_fail_closed(self):
+        import json as jsonlib
+
+        from stable.services.p0_horse_completion_budget import (
+            load_race_event_request_budget_module,
+        )
+
+        _budget_module = load_race_event_request_budget_module()
+        RequestBudgetExceeded = _budget_module.RequestBudgetExceeded
+        check_request_budget = _budget_module.check_request_budget
+
+        artifact = self.budget_dir / "japan.json"
+        check_request_budget(
+            "https://www.jbis.or.jp/horse/0001/",
+            artifact_path=artifact,
+            max_requests=1,
+            interval=0,
+        )
+        with self.assertRaises(RequestBudgetExceeded):
+            check_request_budget(
+                "https://www.jbis.or.jp/horse/0002/",
+                artifact_path=artifact,
+                max_requests=1,
+                interval=0,
+            )
+        state = jsonlib.loads(artifact.read_text(encoding="utf-8"))
+        self.assertEqual(state["status"], "limit_exceeded")
+
+    def test_check_request_budget_corrupted_artifact_fail_closed(self):
+        from stable.services.p0_horse_completion_budget import (
+            load_race_event_request_budget_module,
+        )
+
+        _budget_module = load_race_event_request_budget_module()
+        RequestBudgetExceeded = _budget_module.RequestBudgetExceeded
+        check_request_budget = _budget_module.check_request_budget
+
+        artifact = self.budget_dir / "japan.json"
+        artifact.write_text("not-json", encoding="utf-8")
+        with self.assertRaises(RequestBudgetExceeded):
+            check_request_budget(
+                "https://www.jbis.or.jp/horse/0001/",
+                artifact_path=artifact,
+                max_requests=5,
+                interval=0,
+            )
+
+    def test_host_interval_dir_derives_per_host_artifact(self):
+        from stable.services.p0_horse_completion_budget import load_race_event_request_budget_module
+
+        check_request_budget = load_race_event_request_budget_module().check_request_budget
+
+        artifact = self.budget_dir / "japan.json"
+        host_dir = self.budget_dir / "host-interval"
+        check_request_budget(
+            "https://www.jbis.or.jp/horse/0001/",
+            artifact_path=artifact,
+            max_requests=5,
+            interval=0,
+            host_interval_dir=host_dir,
+        )
+        check_request_budget(
+            "https://db.netkeiba.com/horse/2010100001/",
+            artifact_path=artifact,
+            max_requests=5,
+            interval=0,
+            host_interval_dir=host_dir,
+        )
+        self.assertTrue((host_dir / "www.jbis.or.jp.json").exists())
+        self.assertTrue((host_dir / "db.netkeiba.com.json").exists())
+
+    def test_before_network_request_env_still_works(self):
+        import json as jsonlib
+        import os
+        from unittest import mock
+
+        from stable.services.p0_horse_completion_budget import (
+            load_race_event_request_budget_module,
+        )
+
+        before_network_request = load_race_event_request_budget_module().before_network_request
+
+        artifact = self.budget_dir / "race.json"
+        with mock.patch.dict(
+            os.environ,
+            {
+                "RACE_EVENT_CRAWL_MAX_REQUESTS": "3",
+                "RACE_EVENT_CRAWL_REQUEST_BUDGET_ARTIFACT": str(artifact),
+            },
+        ):
+            before_network_request("https://example.com/race/1")
+        state = jsonlib.loads(artifact.read_text(encoding="utf-8"))
+        self.assertEqual(state["request_count"], 1)
+
+
+class P0HorseSourceRetryTests(TestCase):
+    def _request(self, **overrides):
+        from stable.services.p0_horse_completion_adapters import (
+            P0HorseCompletionRequest,
+        )
+
+        defaults = {
+            "candidate_key": "profile:1",
+            "region": "japan",
+            "horse_name": "テスト馬",
+            "source_url": "https://www.jbis.or.jp/horse/0001234567/",
+            "request_budget": 3,
+            "batch_limit": 100,
+        }
+        defaults.update(overrides)
+        return P0HorseCompletionRequest(**defaults)
+
+    def _client(self, transport, **kwargs):
+        from stable.services.p0_horse_completion_source_clients import (
+            build_p0_horse_completion_source_client,
+        )
+
+        return build_p0_horse_completion_source_client(
+            "japan",
+            transport,
+            **kwargs,
+        )
+
+    @override_settings(
+        HORSE_PROFILE_COMPLETION_RETRY_MAX_ATTEMPTS=3,
+        HORSE_PROFILE_COMPLETION_RETRY_BACKOFF_BASE_SECONDS=0,
+    )
+    def test_429_retried_then_succeeds(self):
+        from unittest.mock import Mock
+
+        transport = Mock()
+        transport.get.side_effect = [
+            Mock(status_code=429, text="", url="", headers={"Retry-After": "0"}),
+            Mock(status_code=200, text="<html>ok</html>", url="", headers={}),
+        ]
+        ledger_calls = []
+        client = self._client(
+            transport,
+            budget_hook=lambda url: ledger_calls.append(url),
+        )
+        response = client._get(
+            "https://www.jbis.or.jp/horse/0001234567/",
+            self._request(),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(transport.get.call_count, 2)
+        self.assertEqual(len(ledger_calls), 2)
+
+    @override_settings(
+        HORSE_PROFILE_COMPLETION_RETRY_MAX_ATTEMPTS=3,
+        HORSE_PROFILE_COMPLETION_RETRY_BACKOFF_BASE_SECONDS=0,
+    )
+    def test_403_not_retried(self):
+        from unittest.mock import Mock
+
+        from stable.services.p0_horse_completion_source_clients import (
+            P0HorseSourceBlocked,
+        )
+
+        transport = Mock()
+        transport.get.return_value = Mock(
+            status_code=403, text="", url="", headers={}
+        )
+        client = self._client(transport)
+        with self.assertRaises(P0HorseSourceBlocked) as ctx:
+            client._get("https://www.jbis.or.jp/horse/0001234567/", self._request())
+        self.assertEqual(transport.get.call_count, 1)
+        self.assertFalse(ctx.exception.transient)
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    @override_settings(
+        HORSE_PROFILE_COMPLETION_RETRY_MAX_ATTEMPTS=2,
+        HORSE_PROFILE_COMPLETION_RETRY_BACKOFF_BASE_SECONDS=0,
+    )
+    def test_retry_exhaustion_raises_transient_error(self):
+        from unittest.mock import Mock
+
+        from stable.services.p0_horse_completion_source_clients import (
+            P0HorseSourceBlocked,
+        )
+
+        transport = Mock()
+        transport.get.side_effect = RuntimeError("connection reset")
+        client = self._client(transport)
+        with self.assertRaises(P0HorseSourceBlocked) as ctx:
+            client._get("https://www.jbis.or.jp/horse/0001234567/", self._request())
+        self.assertEqual(transport.get.call_count, 2)
+        self.assertTrue(ctx.exception.transient)
+
+    @override_settings(
+        HORSE_PROFILE_COMPLETION_RETRY_MAX_ATTEMPTS=3,
+        HORSE_PROFILE_COMPLETION_RETRY_BACKOFF_BASE_SECONDS=0,
+    )
+    def test_retry_does_not_consume_per_candidate_budget(self):
+        from unittest.mock import Mock
+
+        transport = Mock()
+        transport.get.side_effect = [
+            Mock(status_code=500, text="", url="", headers={}),
+            Mock(status_code=500, text="", url="", headers={}),
+            Mock(status_code=200, text="<html>ok</html>", url="", headers={}),
+        ]
+        client = self._client(transport)
+        request = self._request(request_budget=1)
+        response = client._get(
+            "https://www.jbis.or.jp/horse/0001234567/",
+            request,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(client._request_count, 1)
+
+
+class P0HorseBudgetLedgerTests(TestCase):
+    def setUp(self):
+        import tempfile
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.budget_dir = Path(self._tmp.name)
+
+    @override_settings(HORSE_PROFILE_COMPLETION_MAX_REQUESTS=10)
+    def test_region_ledger_and_host_interval(self):
+        import json as jsonlib
+
+        from stable.services.p0_horse_completion_budget import (
+            before_p0_horse_source_request,
+        )
+
+        before_p0_horse_source_request(
+            "https://www.jbis.or.jp/horse/0001/",
+            region="japan",
+            budget_dir=self.budget_dir,
+            interval=0,
+        )
+        before_p0_horse_source_request(
+            "https://www.jbis.or.jp/horse/0002/",
+            region="japan",
+            budget_dir=self.budget_dir,
+            interval=0,
+        )
+        ledger = jsonlib.loads(
+            (self.budget_dir / "japan.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(ledger["request_count"], 2)
+        self.assertTrue(
+            (self.budget_dir / "host-interval" / "www.jbis.or.jp.json").exists()
+        )
+
+    @override_settings(HORSE_PROFILE_COMPLETION_MAX_REQUESTS=1)
+    def test_region_ledger_limit_fail_closed(self):
+        from stable.services.p0_horse_completion_budget import (
+            before_p0_horse_source_request,
+            load_race_event_request_budget_module,
+        )
+
+        RequestBudgetExceeded = load_race_event_request_budget_module().RequestBudgetExceeded
+
+        before_p0_horse_source_request(
+            "https://www.jbis.or.jp/horse/0001/",
+            region="japan",
+            budget_dir=self.budget_dir,
+            interval=0,
+        )
+        with self.assertRaises(RequestBudgetExceeded):
+            before_p0_horse_source_request(
+                "https://www.jbis.or.jp/horse/0002/",
+                region="japan",
+                budget_dir=self.budget_dir,
+                interval=0,
+            )

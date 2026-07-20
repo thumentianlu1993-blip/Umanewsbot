@@ -2355,7 +2355,9 @@ def run_reviewed_p0_horse_completion_batch(
             allow_network=region_network_allowed,
             request_interval_seconds=request_interval_seconds,
             request_budget=REVIEWED_CANDIDATE_REQUEST_BUDGETS[region],
-            batch_limit=10,
+            batch_limit=int(
+                getattr(settings, "HORSE_PROFILE_COMPLETION_REGION_BATCH_LIMIT", 100)
+            ),
         )
         delegate_source_client = source_clients.get(region)
         source_client = (

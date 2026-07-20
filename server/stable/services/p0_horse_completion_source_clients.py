@@ -30,7 +30,25 @@ from stable.services.p0_horse_completion_adapters import (
 
 
 class P0HorseSourceBlocked(ValueError):
-    """A stable, fail-closed source retrieval or completeness failure."""
+    """A stable, fail-closed source retrieval or completeness failure.
+
+    ``status_code`` carries the HTTP status when applicable; ``transient``
+    marks failures eligible for bounded retry (timeout, connection errors,
+    HTTP 429 and 5xx); ``retry_after`` carries the Retry-After hint seconds.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        transient: bool = False,
+        retry_after: float | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.transient = transient
+        self.retry_after = retry_after
 
 
 MANUAL_SUPPLEMENT_CSV_FIELDS = (
@@ -1622,6 +1640,10 @@ class _BaseSourceClient:
         manual_supplements_by_candidate: (
             dict[str, list[dict[str, Any]]] | None
         ) = None,
+        budget_hook: Any = None,
+        retry_max_attempts: int | None = None,
+        retry_backoff_base_seconds: float | None = None,
+        sleep_func: Any = None,
     ):
         if transport is None or not callable(getattr(transport, "get", None)):
             raise P0HorseSourceBlocked("transport_required")
@@ -1629,10 +1651,41 @@ class _BaseSourceClient:
         self.manual_supplements_by_candidate = deepcopy(
             manual_supplements_by_candidate or {}
         )
+        self.budget_hook = budget_hook
+        self._retry_max_attempts = retry_max_attempts
+        self._retry_backoff_base_seconds = retry_backoff_base_seconds
+        self._sleep_func = sleep_func or time.sleep
         self._candidate_keys: set[str] = set()
         self._request_count = 0
+        self._budgeted_urls: set[str] = set()
         self._last_request_at: float | None = None
         self.last_request_count = 0
+
+    def _effective_retry_max_attempts(self) -> int:
+        if self._retry_max_attempts is not None:
+            return max(1, int(self._retry_max_attempts))
+        from django.conf import settings
+
+        return max(
+            1,
+            int(getattr(settings, "HORSE_PROFILE_COMPLETION_RETRY_MAX_ATTEMPTS", 3)),
+        )
+
+    def _effective_retry_backoff_base(self) -> float:
+        if self._retry_backoff_base_seconds is not None:
+            return max(0.0, float(self._retry_backoff_base_seconds))
+        from django.conf import settings
+
+        return max(
+            0.0,
+            float(
+                getattr(
+                    settings,
+                    "HORSE_PROFILE_COMPLETION_RETRY_BACKOFF_BASE_SECONDS",
+                    30.0,
+                )
+            ),
+        )
 
     def fetch(self, request: P0HorseCompletionRequest) -> dict[str, Any]:
         payload = self.fetch_source_payload(request)
@@ -1681,6 +1734,7 @@ class _BaseSourceClient:
             raise P0HorseSourceBlocked("batch_limit_exceeded")
         self._candidate_keys.add(candidate_key)
         self._request_count = 0
+        self._budgeted_urls = set()
         try:
             return self._fetch(request)
         finally:
@@ -1721,10 +1775,29 @@ class _BaseSourceClient:
         return source_url
 
     def _get(self, url: str, request: P0HorseCompletionRequest) -> Any:
+        max_attempts = self._effective_retry_max_attempts()
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                return self._get_once(url, request)
+            except P0HorseSourceBlocked as exc:
+                if not exc.transient or attempt >= max_attempts:
+                    raise
+                backoff = self._effective_retry_backoff_base() * (2 ** (attempt - 1))
+                if exc.retry_after is not None:
+                    backoff = max(backoff, float(exc.retry_after))
+                if backoff > 0:
+                    self._sleep_func(backoff)
+
+    def _get_once(self, url: str, request: P0HorseCompletionRequest) -> Any:
         current_url = self._validated_source_url(url)
         for _redirect_count in range(5):
-            if self._request_count >= request.request_budget:
-                raise P0HorseSourceBlocked("request_budget_exceeded")
+            if current_url not in self._budgeted_urls:
+                if self._request_count >= request.request_budget:
+                    raise P0HorseSourceBlocked("request_budget_exceeded")
+                self._request_count += 1
+                self._budgeted_urls.add(current_url)
             if (
                 self._last_request_at is not None
                 and request.request_interval_seconds > 0
@@ -1733,8 +1806,9 @@ class _BaseSourceClient:
                 delay = max(0.0, request.request_interval_seconds - elapsed)
                 if delay:
                     time.sleep(delay)
-            self._request_count += 1
             self._last_request_at = time.monotonic()
+            if self.budget_hook is not None:
+                self.budget_hook(current_url)
             try:
                 response = self.transport.get(
                     current_url,
@@ -1742,8 +1816,12 @@ class _BaseSourceClient:
                     headers={"User-Agent": self.user_agent},
                     allow_redirects=False,
                 )
+            except P0HorseSourceBlocked:
+                raise
             except Exception as exc:
-                raise P0HorseSourceBlocked(f"transport_error: {exc}") from exc
+                raise P0HorseSourceBlocked(
+                    f"transport_error: {exc}", transient=True
+                ) from exc
             response_url = _text(getattr(response, "url", "")) or current_url
             response_url = self._validated_source_url(response_url)
             status_code = int(getattr(response, "status_code", 0) or 0)
@@ -1753,16 +1831,33 @@ class _BaseSourceClient:
                 location = header_get("Location") if callable(header_get) else ""
                 if not location:
                     raise P0HorseSourceBlocked(
-                        f"http_error: HTTP {status_code} without Location"
+                        f"http_error: HTTP {status_code} without Location",
+                        status_code=status_code,
                     )
                 current_url = self._validated_source_url(
                     urljoin(response_url, _text(location))
                 )
                 continue
             if status_code == 429:
-                raise P0HorseSourceBlocked("rate_limited: HTTP 429")
+                headers = getattr(response, "headers", None)
+                header_get = getattr(headers, "get", None)
+                retry_after_text = header_get("Retry-After") if callable(header_get) else ""
+                try:
+                    retry_after = float(retry_after_text) if retry_after_text else None
+                except (TypeError, ValueError):
+                    retry_after = None
+                raise P0HorseSourceBlocked(
+                    "rate_limited: HTTP 429",
+                    status_code=429,
+                    transient=True,
+                    retry_after=retry_after,
+                )
             if status_code >= 400 or status_code == 0:
-                raise P0HorseSourceBlocked(f"http_error: HTTP {status_code}")
+                raise P0HorseSourceBlocked(
+                    f"http_error: HTTP {status_code}",
+                    status_code=status_code or None,
+                    transient=status_code >= 500 or status_code == 0,
+                )
             response_text = str(getattr(response, "text", "") or "")
             if re.search(
                 r"<(?:form|input)\b[^>]*(?:id=[\"']?login|name=[\"']password[\"']?)",
@@ -2974,6 +3069,7 @@ def build_p0_horse_completion_source_client(
     manual_supplements_by_candidate: (
         dict[str, list[dict[str, Any]]] | None
     ) = None,
+    **client_kwargs: Any,
 ) -> _BaseSourceClient:
     client_class = _CLIENTS.get(region)
     if client_class is None:
@@ -2981,4 +3077,5 @@ def build_p0_horse_completion_source_client(
     return client_class(
         transport,
         manual_supplements_by_candidate=manual_supplements_by_candidate,
+        **client_kwargs,
     )

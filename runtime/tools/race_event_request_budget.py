@@ -99,11 +99,39 @@ def _reserve_interval(path: Path, *, interval: float, url: str, method: str) -> 
         return started_epoch
 
 
-def before_network_request(url: str, *, method: str = "GET") -> None:
-    max_requests = _max_requests()
-    interval = _request_interval()
-    path = _artifact_path()
-    host_interval_path = _host_interval_artifact_path()
+def _host_artifact_for_url(host_interval_dir: Path, url: str) -> Path:
+    from urllib.parse import urlparse
+
+    host = (urlparse(url).hostname or "unknown").casefold()
+    safe_host = "".join(ch if ch.isalnum() or ch in ".-" else "_" for ch in host)
+    return host_interval_dir / f"{safe_host}.json"
+
+
+def check_request_budget(
+    url: str,
+    *,
+    method: str = "GET",
+    artifact_path: Path | str | None = None,
+    max_requests: int = 0,
+    interval: float = 0.0,
+    host_interval_path: Path | str | None = None,
+    host_interval_dir: Path | str | None = None,
+    budget_label: str = "request",
+) -> None:
+    """Explicit-config request budget check shared by race crawls and P0 batches.
+
+    Counts the request in the persistent artifact (flock-protected), enforces
+    ``max_requests`` (0 = unlimited), and applies the per-host interval via
+    either a single shared artifact or per-host artifacts derived from
+    ``host_interval_dir``. Corrupted artifacts and lock failures fail closed.
+    """
+    path = Path(artifact_path) if artifact_path else None
+    if host_interval_dir is not None:
+        resolved_host_path = _host_artifact_for_url(Path(host_interval_dir), url)
+    elif host_interval_path is not None:
+        resolved_host_path = Path(host_interval_path)
+    else:
+        resolved_host_path = None
     with _budget_lock(path):
         state = _read_state(path)
         request_count = int(state.get("request_count") or 0)
@@ -118,12 +146,12 @@ def before_network_request(url: str, *, method: str = "GET") -> None:
             )
             _write_state(path, state)
             raise RequestBudgetExceeded(
-                f"race event crawl request budget exhausted: {request_count}/{max_requests}"
+                f"{budget_label} budget exhausted: {request_count}/{max_requests}"
             )
 
-        if host_interval_path is not None and host_interval_path != path:
+        if resolved_host_path is not None and resolved_host_path != path:
             started_epoch = _reserve_interval(
-                host_interval_path,
+                resolved_host_path,
                 interval=interval,
                 url=url,
                 method=method,
@@ -154,3 +182,15 @@ def before_network_request(url: str, *, method: str = "GET") -> None:
             }
         )
         _write_state(path, state)
+
+
+def before_network_request(url: str, *, method: str = "GET") -> None:
+    check_request_budget(
+        url,
+        method=method,
+        artifact_path=_artifact_path(),
+        max_requests=_max_requests(),
+        interval=_request_interval(),
+        host_interval_path=_host_interval_artifact_path(),
+        budget_label="race event crawl request",
+    )
