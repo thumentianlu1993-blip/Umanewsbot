@@ -1,5 +1,9 @@
 # 项目状态文档
 
+P0 马信息补全专项的模型交接文档见
+`docs/p0_horse_information_completion_handoff.md`。后续接手应从该文档进入，并以
+`docs/current_state.md` 和生产实时核验校正可能漂移的运行数据。
+
 ## 2026-07-20 P0 首批五地区 50 匹生产数据已落地
 
 - 首批五地区各 `10` 匹已按精确审核 artifact 完成生产提交：`50` 个完整档案、
