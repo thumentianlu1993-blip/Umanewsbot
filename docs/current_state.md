@@ -23,9 +23,11 @@
   `/opt/umanewsbot/backups/p0-horse-postcommit-metadata-precommit-20260719T235117Z`；
   custom-format dump 为 `209222446` bytes、SHA-256
   `82cc39ef3e453d2ba3db716485f7fcf960379401e1eddb9d3acc210b74a972ac`，
-  `pg_restore -l` 为 `1017` 行。最终镜像为
-  `sha256:e54c82251e67d707d8b71c1d60c46089f95e572a372e797b0eb8f082109e89c1`，
-  revision `8863f37a`，内外 `/healthz/`、两个 Celery worker、队列和近期错误日志通过。
+  `pg_restore -l` 为 `1017` 行。元数据修复执行镜像为
+  `sha256:e54c82251e67d707d8b71c1d60c46089f95e572a372e797b0eb8f082109e89c1`
+  / revision `8863f37a`；证据归档后的当前运行镜像为
+  `sha256:af880cd208198c1e2ab960d8f39bd60539bdafa422cfb98890d0befbd90ff862`
+  / revision `7ad6adeb`。内外 `/healthz/`、两个 Celery worker、队列和近期错误日志通过。
 - 最终幂等 dry-run SHA-256
   `6872eaa8756d4ee75b26dd22b526755c35a0f6a8fc3923d00b7f136ca3463e40`
   为 `50` 匹已应用、`1439` 条 existing、全部 planned write 为 `0`。

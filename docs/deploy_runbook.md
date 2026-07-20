@@ -23,11 +23,16 @@
    `.env` SHA-256
    `e24208729cfba44fd71d9b2ed343dd93d3437d3f6fb80f3f459759523158b566`，
    权限均为 `0600`，`pg_restore -l` 为 `1017` 行。
-4. 提交后修复 revision
+4. 元数据修复执行 revision
    `8863f37a679e9196e0bf45b5473c0e9f6657487f` 的镜像 ID 为
    `sha256:e54c82251e67d707d8b71c1d60c46089f95e572a372e797b0eb8f082109e89c1`，
    source archive SHA-256
    `31b286b2d3462fa5f6cb7883c8716f7cdee4eda26852cbb675b48228755f019d`。
+   证据归档后当前运行 revision 为
+   `7ad6adebb366444aa03e6e766d66fe9a49a3e2f8`，镜像 ID
+   `sha256:af880cd208198c1e2ab960d8f39bd60539bdafa422cfb98890d0befbd90ff862`，
+   source archive SHA-256
+   `eef8d6fe5b0b757d570278afd811004bbb5e3dfc8deff0cd4e57af48b0ff0d85`。
    旧镜像回滚标签为 `umanewsbot:rollback-pre-p0-audit-fix-20260720`。
 5. 元数据修复 dry-run、commit、修复后 dry-run 分别保存在同目录的
    `idempotent_metadata_repair_dry_run.v1.json`、
