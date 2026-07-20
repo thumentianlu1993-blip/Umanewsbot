@@ -1215,3 +1215,13 @@
 - 生产未随本地候选变化：仍只有 event 924 公开，scheduler/monitor 和 enabled regions
   全关。新的 `0048` migration、rollback bundle、maintenance 演练及法国重验均未在
   生产执行。
+
+## 2026-07-20 P0 马生产范围同步
+
+- 五地区重点赛事参赛来源和全部已有中文名 active 马名术语已批量写入生产：
+  `56745` 条有效来源，对应 `46318` 匹唯一 P0 马；translated horse term 缺失来源为 `0`。
+- 详情完成度仍为独立维度：`50` 匹完整、`2` 匹具完整二代血统但生涯部分、`46266` 匹详情
+  尚未采集。当前准确状态是
+  `P0 scope committed / detail completion backlog created / identity conflicts fail closed`。
+- 首次全量单事务触发 OOM 但完整回滚；后续使用地区事务和固定批量安全完成。生产健康、
+  migration 和 Django check 均通过，后台 worker 已恢复。

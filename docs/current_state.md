@@ -2636,3 +2636,26 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   `findings fixed / scoped re-review pending / not authorized / not deployed`。
   生产仍运行 `85948707` 对应镜像；scheduler/monitor、新地区和 enabled regions
   继续全关，法国 event 733–735 尚未重新联网 prepare，event 924 状态未改变。
+
+## 2026-07-20 P0 马全范围来源已写入生产
+
+- 写入前备份位于
+  `/opt/umanewsbot/backups/p0-horse-full-scope-precommit-20260720T063831Z`；
+  数据库 dump SHA-256 为
+  `f773f5ec0a98974cc402b202cfe2f0eed91fc4f022e58a621f2c7b2b63b96378`，
+  restore list 为 `1017` 行。
+- 首次无地区单事务同步触发主机 OOM，Linux 杀死 Python 进程；事务完整回滚。重启后核对仍为
+  `50` 条有效 P0 来源、`21621` 匹资料和 `0` 个待处理身份冲突，没有半写状态。
+- 随后临时启用 `1 GiB` swap、停止空闲 worker，并按法国、香港、英国、美国、日本五个地区
+  分批提交；最后以每批 `500` 条的事务补齐 `other` 和空地区的已翻译 horse term 来源。
+  全部完成后已恢复 beat、worker 和 race-live worker，并删除临时 swap。
+- 当前生产有 `56745` 条有效 P0 来源、`46318` 匹唯一 P0 马：
+  `35097` 条重点赛事参赛来源、`21598` 条已有中文名 active 术语来源和 `50` 条人工来源。
+  已翻译 horse term 缺失 P0 来源数为 `0`。
+- 资料完整度必须与 P0 范围写入分开报告：当前 `50` 匹为
+  `complete_profile_full`，`2` 匹为 `complete_pedigree_2gen`，其余 `46266` 匹仍为
+  `empty`；完整生涯 `50` 匹、部分生涯 `2` 匹、尚未采集 `46266` 匹。
+- 当前有 `65042` 条待处理身份冲突证据。它们代表按赛事参与项保存的歧义，不等于同数量的唯一
+  马匹；在父名、母名、出生年份或稳定外部 ID 足以区分前，不得猜测合并或写入详细资料。
+- 生产 `manage.py check` 通过，migration 已应用至 `stable.0052`，`/healthz/` 返回
+  `{"status":"ok"}`。

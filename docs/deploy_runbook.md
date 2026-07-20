@@ -5641,3 +5641,25 @@ python manage.py complete_horse_profiles \
    旧镜像可读取 additive 列；若新版本已产生 coupled legacy rows，代码回滚时必须保持
    对应 event/地区 tracking 关闭并禁止旧动态 updater，完全撤销只能使用切换前已验证
    数据库备份。
+
+## 2026-07-20 P0 马全范围来源生产写入记录
+
+1. 写入前备份：
+   `/opt/umanewsbot/backups/p0-horse-full-scope-precommit-20260720T063831Z`。
+   dump SHA-256：
+   `f773f5ec0a98974cc402b202cfe2f0eed91fc4f022e58a621f2c7b2b63b96378`；
+   `.env` SHA-256：
+   `e24208729cfba44fd71d9b2ed343dd93d3437d3f6fb80f3f459759523158b566`。
+2. 禁止在当前 `2 vCPU / 4 GiB / no swap` 主机再次执行无地区
+   `p0_horse_profiles --sync-sources --commit` 单事务。该路径已实证达到约
+   `1.4 GiB` Python RSS 并触发整机 OOM。
+3. 本次成功路径为先停 beat、worker、race-live worker，临时启用 `1 GiB` swap，再分别执行
+   `--region france|hong_kong|united_kingdom|united_states|japan --commit`。
+   五批输出保存在生产 `runtime/p0-horse-source-sync-*-20260720.json`。
+4. 无五地区归属的 `7670` 条 translated horse term 仅调用与正式服务相同的
+   `_find_or_create_profile_for_term` / `_upsert_p0_source`，每 `500` 条独立事务提交；
+   不处理赛事、不修改身份门禁。
+5. 完成后必须恢复三个 worker、删除临时 swap，并检查：
+   `manage.py check`、migration 至 `stable.0052`、内外 `/healthz/`、有效来源分类总数、
+   translated term 缺失来源数和身份冲突数。本次最终为 `56745` 条有效来源、
+   `46318` 匹唯一 P0 马、translated term 缺失 `0`、待处理参与项冲突 `65042`。
