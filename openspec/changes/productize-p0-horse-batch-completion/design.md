@@ -103,6 +103,12 @@ mapping decision 的数据库快照在 prepare 和 commit（锁内 rescan）双�
 
 批次 manifest 逐匹保留队列排序原因（近期新闻、术语优先级、重点赛事证据、外部匹配信号、人工标记），人工批准批次构成时可解释“为什么是这批马”，也让后续批次去重和替补有据可查。
 
+### 15. 已记录取舍
+
+- rerun 会清除 `commit:{region}` artifact 键（下游失效的一部分），因此“已 commit 地区 + 再次重跑 prepare”的场景下同 SHA 重 commit 保护不复存在；此时既有 commit 链自身的 already-applied 幂等对账仍然兜底， planned write 为 0。
+- manifest 的 `batch_sha256` 为内容规范化 SHA（排除 `batch_id`/`batch_sha256` 字段），不是文件字节 SHA；操作者从 select/approve 命令输出取得该值，不需要自行 `shasum`。
+- 预算账本按 run（批次）维度隔离，host 限速证据跨 run 共享；`HORSE_PROFILE_COMPLETION_MAX_REQUESTS>0` 时作为 per-run 覆盖而非历史累计上限。
+
 ## Risks / Trade-offs
 
 - [预算账本与 per-candidate 常量双口径混淆] -> 账本记录每次请求的来源 URL 与候选键，summary 同时输出两种口径；账本只控 run/region 级，候选级仍走既有常量。

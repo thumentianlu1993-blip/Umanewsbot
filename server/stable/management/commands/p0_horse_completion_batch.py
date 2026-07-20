@@ -291,11 +291,20 @@ class Command(BaseCommand):
         from stable.services.p0_horse_completion_batch import (
             BatchRunState,
             abandon_batch_run,
+            load_batch_manifest,
             mark_batch_manifest_status,
         )
 
         manifest_path = Path(options["abandon"])
-        state = BatchRunState.read(manifest_path.parent)
+        state_file = manifest_path.parent / "state.json"
+        if state_file.exists():
+            state = BatchRunState.read(manifest_path.parent)
+        else:
+            manifest = load_batch_manifest(manifest_path)
+            state = BatchRunState.create(
+                batch_id=manifest["batch_id"],
+                run_dir=manifest_path.parent,
+            )
         abandon_batch_run(state, reason=options["note"])
         manifest = mark_batch_manifest_status(manifest_path, status="abandoned")
         result = {

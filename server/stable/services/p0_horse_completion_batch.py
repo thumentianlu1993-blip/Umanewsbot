@@ -471,10 +471,36 @@ def mark_batch_manifest_status(
 def append_blocker_pool_entries(
     batch_dir: str | Path,
     entries: Iterable[dict[str, Any]],
+    *,
+    replace_batch_id: str | None = None,
+    replace_reason: str | None = None,
 ) -> None:
-    """Append horses excluded from completion to the batch blocker pool."""
+    """Append horses excluded from completion to the batch blocker pool.
+
+    When ``replace_batch_id`` and ``replace_reason`` are given, existing
+    entries for that batch/reason are first dropped, keeping re-published
+    prepare results idempotent instead of duplicating rows.
+    """
     pool_path = Path(batch_dir) / P0_HORSE_BATCH_BLOCKER_POOL_FILENAME
-    with pool_path.open("a", encoding="utf-8") as handle:
+    existing: list[str] = []
+    if replace_batch_id is not None and pool_path.exists():
+        for line in pool_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                existing.append(line)
+                continue
+            if (
+                entry.get("batch_id") == replace_batch_id
+                and entry.get("reason") == replace_reason
+            ):
+                continue
+            existing.append(line)
+    with pool_path.open("w", encoding="utf-8") as handle:
+        for line in existing:
+            handle.write(line + "\n")
         for entry in entries:
             handle.write(json.dumps(entry, ensure_ascii=False, sort_keys=True) + "\n")
 
@@ -582,8 +608,7 @@ def candidate_input_fingerprint(candidate: dict[str, Any]) -> str:
         "expected_sire_name": candidate.get("expected_sire_name"),
         "expected_dam_name": candidate.get("expected_dam_name"),
         "expected_birth_year": candidate.get("expected_birth_year"),
-        "adapter_config": candidate.get("adapter_config_fingerprint")
-        or adapter_config_fingerprint(),
+        "adapter_config": adapter_config_fingerprint(),
     }
     return hashlib.sha256(_canonical_bytes(content)).hexdigest()
 

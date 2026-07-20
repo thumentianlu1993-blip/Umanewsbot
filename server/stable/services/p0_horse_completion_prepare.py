@@ -218,11 +218,10 @@ def _publish_batch_artifacts(
     combined_path = staging_dir / "combined_candidates.jsonl"
     review_path = staging_dir / "batch_review.csv"
     evidence_path = staging_dir / "source_evidence_manifest.jsonl"
-    csv_handle = review_path.open("w", encoding="utf-8", newline="")
-    writer: csv.DictWriter | None = None
     with combined_path.open("w", encoding="utf-8") as combined, evidence_path.open(
         "w", encoding="utf-8"
-    ) as evidence, csv_handle:
+    ) as evidence, review_path.open("w", encoding="utf-8", newline="") as csv_handle:
+        writer: csv.DictWriter | None = None
         for staging_path in staging_paths:
             try:
                 payload = json.loads(staging_path.read_text(encoding="utf-8"))
@@ -275,6 +274,8 @@ def _publish_batch_artifacts(
             network_requests += int(retrieval.get("network_request_count") or 0)
             cache_hits += int(bool(retrieval.get("cache_hit")))
             del payload
+        if writer is None:
+            csv.DictWriter(csv_handle, fieldnames=["candidate_key"]).writeheader()
 
     summary: dict[str, Any] = {
         "schema_version": "p0-horse-completion-batch-summary.v1",
@@ -311,7 +312,12 @@ def _publish_batch_artifacts(
             append_blocker_pool_entries,
         )
 
-        append_blocker_pool_entries(run_dir, blocked_entries)
+        append_blocker_pool_entries(
+            run_dir,
+            blocked_entries,
+            replace_batch_id=manifest["batch_id"],
+            replace_reason="blocked_at_prepare",
+        )
     return summary
 
 
@@ -458,12 +464,17 @@ def prepare_p0_horse_batch(
     staging_paths = [
         _staging_path(run_dir, candidate["candidate_key"]) for candidate in candidates
     ]
-    summary = _publish_batch_artifacts(
-        run_dir=run_dir,
-        manifest=manifest,
-        staging_paths=staging_paths,
-        generated_at=generated_at or _utcnow_iso(),
-    )
+    try:
+        summary = _publish_batch_artifacts(
+            run_dir=run_dir,
+            manifest=manifest,
+            staging_paths=staging_paths,
+            generated_at=generated_at or _utcnow_iso(),
+        )
+    except Exception:
+        state.stage = "prepare_failed"
+        state.write()
+        raise
     summary["resume"] = decision_counts
     for stage in ("prepare", "artifact"):
         if stage not in state.completed_stages:

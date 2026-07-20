@@ -11,6 +11,7 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import json
+import os
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -106,16 +107,19 @@ def commit_p0_horse_batch_region(
             reviewer_id=reviewer.id,
         )
         artifact_path = batch_dir / "approval" / f"commit_artifact_{region}.json"
-        artifact_sha = _write_canonical(artifact_path, artifact)
+        artifact_tmp_path = artifact_path.with_suffix(".json.pending")
+        artifact_sha = _write_canonical(artifact_tmp_path, artifact)
         if (
             isinstance(previous_commit, dict)
             and previous_commit.get("artifact_sha256")
             and previous_commit["artifact_sha256"] != artifact_sha
         ):
+            artifact_tmp_path.unlink(missing_ok=True)
             raise P0HorseBatchError(
                 f"region {region} was already committed with a different artifact; "
                 "content fixes must start a new batch"
             )
+        os.replace(artifact_tmp_path, artifact_path)
         release = build_region_release_manifest(
             artifact_path=artifact_path,
             artifact_sha256=artifact_sha,

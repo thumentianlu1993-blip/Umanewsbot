@@ -1640,3 +1640,47 @@ class P0HorseBatchCommandPipelineTests(P0HorseBatchPrepareTests):
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0]["horse_name"], "无缓存马")
         self.assertEqual(entries[0]["reason"], "blocked_at_prepare")
+
+    def test_abandon_without_prepare_works(self):
+        result = self._call(
+            "--abandon",
+            str(self.manifest_path),
+            "--note",
+            "选错批次",
+        )
+        self.assertEqual(result["status"], "abandoned")
+
+    def test_recommit_with_changed_artifact_rejected_and_preserves_evidence(self):
+        self.test_full_pipeline_via_command()
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            P0HorseBatchError,
+        )
+        from stable.services.p0_horse_completion_commit import (
+            commit_p0_horse_batch_region,
+        )
+
+        state = BatchRunState.read(self.manifest_path.parent)
+        recorded_sha = state.artifacts["commit:japan"]["artifact_sha256"]
+        artifact_path = (
+            self.manifest_path.parent / "approval" / "commit_artifact_japan.json"
+        )
+        original_bytes = artifact_path.read_bytes()
+        # simulate a tampered checkpoint recording a different committed SHA
+        state.artifacts["commit:japan"]["artifact_sha256"] = "0" * 64
+        state.write()
+        with self.assertRaises(P0HorseBatchError):
+            commit_p0_horse_batch_region(
+                self.manifest_path,
+                region="japan",
+                reviewer=self.reviewer,
+                approved_by="human-approver",
+                state_dir=self.state_dir,
+                confirm_reviewed_artifact=True,
+            )
+        self.assertEqual(artifact_path.read_bytes(), original_bytes)
+        state = BatchRunState.read(self.manifest_path.parent)
+        self.assertEqual(
+            state.artifacts["commit:japan"]["artifact_sha256"], "0" * 64
+        )
+        self.assertNotEqual(recorded_sha, "0" * 64)
