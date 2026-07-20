@@ -1279,6 +1279,44 @@ def _load_artifact(path: str | Path, expected_sha256: str) -> tuple[dict[str, An
     return artifact, actual_sha
 
 
+def _validate_rolling_release_ledger(release: dict[str, Any], release_sha256: str) -> None:
+    """Rolling-batch approval channel: append-only ledger binding.
+
+    The repository allowlist stays reserved for the first 50-horse batch.
+    Rolling batches instead bind the release manifest SHA to an entry in the
+    batch append-only approvals ledger recorded at approval time.
+    """
+    ledger_value = str(release.get("approvals_ledger_path") or "").strip()
+    if not ledger_value:
+        _fail(
+            "production release manifest SHA is not in the repository trusted "
+            "allowlist and no approvals ledger is declared"
+        )
+    ledger_path = Path(ledger_value)
+    if ledger_path.is_symlink() or not ledger_path.is_file():
+        _fail("production release approvals ledger is not a regular file")
+    try:
+        lines = ledger_path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        _fail(f"production release approvals ledger is unreadable: {exc}")
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if (
+            entry.get("event") == "release_approved"
+            and entry.get("release_manifest_sha256") == release_sha256
+        ):
+            return
+    _fail(
+        "production release manifest SHA has no release_approved entry in the "
+        "batch approvals ledger"
+    )
+
+
 def _load_and_validate_release_manifest(
     *,
     release_manifest_path: str | Path,
@@ -1292,7 +1330,10 @@ def _load_and_validate_release_manifest(
         expected_sha256=release_manifest_sha256,
     )
     if release_input.sha256 not in TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256:
-        _fail("production release manifest SHA is not in the repository trusted allowlist")
+        release_payload_for_ledger = release_input.payload
+        if not isinstance(release_payload_for_ledger, dict):
+            _fail("production release manifest schema is invalid")
+        _validate_rolling_release_ledger(release_payload_for_ledger, release_input.sha256)
     release = release_input.payload
     if release.get("schema_version") != RELEASE_MANIFEST_SCHEMA:
         _fail("production release manifest schema is invalid")

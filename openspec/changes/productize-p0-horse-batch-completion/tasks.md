@@ -20,10 +20,10 @@
 
 ## 3. 请求预算、限速与重试
 
-- [ ] 3.1 (integration) 抽象 `runtime/tools/race_event_request_budget.py` 的预算/限速为显式配置（artifact 路径、max requests、interval），保留环境变量默认值兼容赛事专项；host 级限速 artifact 从全局单文件扩展为按来源主机派生路径；两个专项共用同一实现。
-- [ ] 3.2 (integration) P0 source client 每次网络请求前过预算账本：按地区独立账本 `budget/<region>.json`（flock 跨进程安全），host 级限速 artifact 跨 run 共享；账本损坏、锁失败或超限 fail closed。
-- [ ] 3.3 (integration) 实现瞬时失败有限重试：引入结构化来源异常（携带 status_code 与 transient 标记，替代错误消息字符串匹配）；timeout/连接错误/429/5xx 指数退避（默认 3 次含首次、基数 30s、尊重 Retry-After 下限）；重试尝试不消耗 per-candidate 地区常量（该常量只计首次访问的不同 URL），但计入地区持久账本与 run 级上限；403/登录墙/解析失败/缓存身份错配不重试，直接 blocked payload。
-- [ ] 3.4 (application) settings 接线：新增 `HORSE_PROFILE_COMPLETION_MAX_REQUESTS`、`HORSE_PROFILE_COMPLETION_RETRY_MAX_ATTEMPTS`、`HORSE_PROFILE_COMPLETION_RETRY_BACKOFF_BASE_SECONDS`、`HORSE_PROFILE_COMPLETION_BUDGET_DIR`、`HORSE_PROFILE_COMPLETION_BATCH_STATE_DIR`、`HORSE_PROFILE_COMPLETION_REVIEW_OUTPUT_DIR`、`HORSE_PROFILE_COMPLETION_REGION_BATCH_LIMIT`（默认 100）与 `HORSE_PROFILE_COMPLETION_TOTAL_BATCH_LIMIT`（默认 500）；`HORSE_PROFILE_COMPLETION_BATCH_LIMIT` 重新定义为 source client 的 per-region 候选数上限真实消费方（替换 adapters 与 client 中硬编码 10）；`.env.example` 同步保守默认。
+- [x] 3.1 (integration) 抽象 `runtime/tools/race_event_request_budget.py` 的预算/限速为显式配置（artifact 路径、max requests、interval），保留环境变量默认值兼容赛事专项；host 级限速 artifact 从全局单文件扩展为按来源主机派生路径；两个专项共用同一实现。
+- [x] 3.2 (integration) P0 source client 每次网络请求前过预算账本：按地区独立账本 `budget/<region>.json`（flock 跨进程安全），host 级限速 artifact 跨 run 共享；账本损坏、锁失败或超限 fail closed。
+- [x] 3.3 (integration) 实现瞬时失败有限重试：引入结构化来源异常（携带 status_code 与 transient 标记，替代错误消息字符串匹配）；timeout/连接错误/429/5xx 指数退避（默认 3 次含首次、基数 30s、尊重 Retry-After 下限）；重试尝试不消耗 per-candidate 地区常量（该常量只计首次访问的不同 URL），但计入地区持久账本与 run 级上限；403/登录墙/解析失败/缓存身份错配不重试，直接 blocked payload。
+- [x] 3.4 (application) settings 接线：新增 `HORSE_PROFILE_COMPLETION_MAX_REQUESTS`、`HORSE_PROFILE_COMPLETION_RETRY_MAX_ATTEMPTS`、`HORSE_PROFILE_COMPLETION_RETRY_BACKOFF_BASE_SECONDS`、`HORSE_PROFILE_COMPLETION_BUDGET_DIR`、`HORSE_PROFILE_COMPLETION_BATCH_STATE_DIR`、`HORSE_PROFILE_COMPLETION_REVIEW_OUTPUT_DIR`、`HORSE_PROFILE_COMPLETION_REGION_BATCH_LIMIT`（默认 100）与 `HORSE_PROFILE_COMPLETION_TOTAL_BATCH_LIMIT`（默认 500）；source client 的 per-region 候选数上限改为消费 `HORSE_PROFILE_COMPLETION_REGION_BATCH_LIMIT`（替换 adapters 硬编码 10，旧 `HORSE_PROFILE_COMPLETION_BATCH_LIMIT` 不再作为该上限来源）；`.env.example` 同步保守默认。
 
 ## 4. 任意批次抓取、复审文件与滚动提交链
 
