@@ -1320,3 +1320,185 @@ class P0HorseBatchApprovalBundleTests(P0HorseBatchPrepareTests):
                 release_manifest_sha256=release["release_sha256"],
             )
         self.assertIn("ledger", str(ctx.exception))
+
+
+class P0HorseBatchReviewWorkbookTests(P0HorseBatchPrepareTests):
+    def test_workbook_sheets_and_exception_sampling(self):
+        from openpyxl import load_workbook
+
+        from stable.services.p0_horse_completion_batch import load_batch_manifest
+        from stable.services.p0_horse_completion_review import (
+            EXCEPTION_SHEET,
+            SUMMARY_SHEET,
+            build_batch_review_workbook,
+        )
+
+        self._prepare()
+        manifest = load_batch_manifest(self.manifest_path)
+        output = Path(self._tmp.name) / "review" / f"{manifest['batch_id']}.xlsx"
+        build_batch_review_workbook(
+            manifest=manifest,
+            artifact_dir=self.manifest_path.parent / "artifact",
+            output_path=output,
+        )
+        self.assertTrue(output.exists())
+        workbook = load_workbook(output)
+        self.assertIn(SUMMARY_SHEET, workbook.sheetnames)
+        self.assertIn("日本", workbook.sheetnames)
+        self.assertIn(EXCEPTION_SHEET, workbook.sheetnames)
+        japan_sheet = workbook["日本"]
+        self.assertEqual(japan_sheet.max_row, 2)
+        header = [cell.value for cell in japan_sheet[1]]
+        self.assertIn("马名", header)
+        self.assertIn("生涯缺口", header)
+        name_col = header.index("马名") + 1
+        self.assertEqual(japan_sheet.cell(row=2, column=name_col).value, "FOREVER TEST")
+
+    def test_workbook_lists_blocked_horse_in_exceptions(self):
+        from openpyxl import load_workbook
+
+        from stable.services.p0_horse_completion_batch import load_batch_manifest
+        from stable.services.p0_horse_completion_prepare import prepare_p0_horse_batch
+        from stable.services.p0_horse_completion_review import (
+            EXCEPTION_SHEET,
+            build_batch_review_workbook,
+        )
+
+        other = self._profile("无缓存马")
+        self._p0_source(other)
+        manifest = select_p0_horse_batch(regions=[RacingRegion.JAPAN])
+        manifest_path = write_batch_manifest(manifest, state_dir=self.state_dir / "batch-review")
+        approved = approve_batch_manifest(manifest_path, reviewer="reviewer-a")
+        prepare_p0_horse_batch(
+            manifest_path,
+            expected_sha256=approved["batch_sha256"],
+            allow_network=False,
+            cache_dir=self.cache_dir,
+        )
+        output = Path(self._tmp.name) / "review" / "blocked.xlsx"
+        build_batch_review_workbook(
+            manifest=load_batch_manifest(manifest_path),
+            artifact_dir=manifest_path.parent / "artifact",
+            output_path=output,
+        )
+        workbook = load_workbook(output)
+        sheet = workbook[EXCEPTION_SHEET]
+        names = [sheet.cell(row=row, column=5).value for row in range(2, sheet.max_row + 1)]
+        self.assertIn("无缓存马", names)
+        self.assertNotIn("FOREVER TEST", names)
+
+
+class P0HorseBatchCommandPipelineTests(P0HorseBatchPrepareTests):
+    def setUp(self):
+        super().setUp()
+        from django.contrib.auth import get_user_model
+
+        self.reviewer = get_user_model().objects.create_user(
+            username="p0-pipeline-reviewer",
+            password="unused",
+            is_superuser=True,
+            is_staff=True,
+        )
+
+    def _call(self, *command_args) -> dict:
+        from io import StringIO
+
+        from django.core.management import call_command
+
+        out = StringIO()
+        with override_settings(
+            HORSE_PROFILE_COMPLETION_BATCH_STATE_DIR=str(self.state_dir),
+            HORSE_PROFILE_COMPLETION_CACHE_DIR=str(self.cache_dir),
+            HORSE_PROFILE_COMPLETION_REVIEW_OUTPUT_DIR=str(
+                Path(self._tmp.name) / "review"
+            ),
+        ):
+            call_command("p0_horse_completion_batch", *command_args, "--json", stdout=out)
+        text = out.getvalue()
+        marker = text.rfind("\n{")
+        payload = text[marker + 1 :] if marker != -1 else text
+        return json.loads(payload)
+
+    def test_full_pipeline_via_command(self):
+        prepared = self._call(
+            "--prepare",
+            str(self.manifest_path),
+            "--expected-sha256",
+            self.approved["batch_sha256"],
+        )
+        self.assertEqual(prepared["totals"]["succeeded"], 1)
+        self.assertTrue(Path(prepared["review_workbook"]).exists())
+
+        bundled = self._call(
+            "--bundle",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        self.assertEqual(bundled["horse_count"], 1)
+
+        committed = self._call(
+            "--commit",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+            "--approved-by",
+            "human-approver",
+            "--confirm-reviewed-artifact",
+        )
+        self.assertTrue(committed["idempotent_verification"]["passed"])
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.owner_name, "Japan Owner")
+        self.assertEqual(self.profile.completeness_status, "complete_profile_full")
+
+        run = HorseProfileCompletionRun.objects.get(id=committed["completion_run_id"])
+        self.assertEqual(
+            run.parameters["p0_batch"]["profile_ids"], [self.profile.pk]
+        )
+        self.assertEqual(run.parameters["p0_batch"]["region"], "japan")
+        self.assertTrue(run.summary["idempotent_verification"]["passed"])
+
+    def test_commit_requires_confirm_flag(self):
+        from django.core.management.base import CommandError
+
+        self._call(
+            "--prepare",
+            str(self.manifest_path),
+            "--expected-sha256",
+            self.approved["batch_sha256"],
+        )
+        self._call(
+            "--bundle",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        with self.assertRaises(CommandError):
+            self._call(
+                "--commit",
+                str(self.manifest_path),
+                "--region",
+                "japan",
+                "--reviewer-id",
+                str(self.reviewer.id),
+                "--approved-by",
+                "human-approver",
+            )
+
+    def test_prepare_network_flag_requires_setting(self):
+        from django.core.management.base import CommandError
+
+        with self.assertRaises(CommandError):
+            self._call(
+                "--prepare",
+                str(self.manifest_path),
+                "--expected-sha256",
+                self.approved["batch_sha256"],
+                "--allow-network",
+            )
