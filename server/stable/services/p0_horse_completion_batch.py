@@ -2,10 +2,10 @@
 
 This module productizes the batch layer of P0 horse profile completion:
 queue-driven batch selection (replacing the fixed 50-row reviewed CSV),
-a SHA-256 bound batch manifest with a human approval gate, and an
-append-only approvals ledger. Network fetching, checkpoint/resume and the
-commit chain live in dedicated modules; selection and approval here never
-touch the network and never write profile data fields.
+a SHA-256 bound batch manifest with a human approval gate, an append-only
+approvals ledger, and the BatchRunState checkpoint/resume machine used by
+the fetch stage. Selection and approval here never touch the network and
+never write profile data fields.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import re
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -457,3 +458,235 @@ def validate_approved_batch_manifest(
             "batch approval ledger has no entry for the approved SHA-256"
         )
     return manifest
+
+
+# ---------------------------------------------------------------------------
+# BatchRunState checkpoint / resume
+# ---------------------------------------------------------------------------
+
+P0_HORSE_BATCH_STATE_FILENAME = "state.json"
+P0_HORSE_BATCH_DOWNSTREAM_STAGES = ("artifact", "review", "apply")
+
+
+def _file_identity(path: Path) -> dict[str, Any]:
+    data = path.read_bytes()
+    return {
+        "path": str(path),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size": len(data),
+    }
+
+
+def candidate_input_fingerprint(candidate: dict[str, Any]) -> str:
+    """Stable hash of everything that determines a candidate's fetch result."""
+    content = {
+        "candidate_key": candidate.get("candidate_key"),
+        "region": candidate.get("region") or candidate.get("sample_region"),
+        "horse_name": candidate.get("horse_name"),
+        "identity_keys": sorted(
+            str(key) for key in candidate.get("identity_keys") or []
+        ),
+        "source_namespace": candidate.get("source_namespace"),
+        "source_urls": list(candidate.get("source_urls") or []),
+        "expected_sire_name": candidate.get("expected_sire_name"),
+        "expected_dam_name": candidate.get("expected_dam_name"),
+        "expected_birth_year": candidate.get("expected_birth_year"),
+    }
+    return hashlib.sha256(_canonical_bytes(content)).hexdigest()
+
+
+@dataclass
+class BatchRunState:
+    batch_id: str
+    run_dir: Path
+    stage: str = "created"
+    completed_stages: list[str] = field(default_factory=list)
+    candidate_states: dict[str, dict[str, Any]] = field(default_factory=dict)
+    artifacts: dict[str, Any] = field(default_factory=dict)
+    resume_history: list[dict[str, Any]] = field(default_factory=list)
+    errors: list[dict[str, Any]] = field(default_factory=list)
+
+    @classmethod
+    def create(cls, *, batch_id: str, run_dir: str | Path) -> "BatchRunState":
+        state = cls(batch_id=batch_id, run_dir=Path(run_dir))
+        state.write()
+        return state
+
+    @classmethod
+    def read(cls, run_dir: str | Path) -> "BatchRunState":
+        path = Path(run_dir) / P0_HORSE_BATCH_STATE_FILENAME
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise P0HorseBatchError(f"batch run state is unreadable: {path}") from exc
+        return cls(
+            batch_id=data["batch_id"],
+            run_dir=Path(run_dir),
+            stage=data.get("stage", "created"),
+            completed_stages=list(data.get("completed_stages") or []),
+            candidate_states=dict(data.get("candidate_states") or {}),
+            artifacts=dict(data.get("artifacts") or {}),
+            resume_history=list(data.get("resume_history") or []),
+            errors=list(data.get("errors") or []),
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "batch_id": self.batch_id,
+            "stage": self.stage,
+            "completed_stages": self.completed_stages,
+            "candidate_states": self.candidate_states,
+            "artifacts": self.artifacts,
+            "resume_history": self.resume_history,
+            "errors": self.errors,
+        }
+
+    def write(self) -> None:
+        path = self.run_dir / P0_HORSE_BATCH_STATE_FILENAME
+        _write_json_atomically(path, self.to_dict())
+
+
+def record_candidate_success(
+    state: BatchRunState,
+    candidate: dict[str, Any],
+    *,
+    outputs: dict[str, str | Path],
+) -> None:
+    state.candidate_states[candidate["candidate_key"]] = {
+        "status": "succeeded",
+        "input_fingerprint": candidate_input_fingerprint(candidate),
+        "outputs": {
+            name: _file_identity(Path(output_path))
+            for name, output_path in outputs.items()
+        },
+        "updated_at": _utcnow_iso(),
+    }
+    state.write()
+
+
+def record_candidate_failure(
+    state: BatchRunState,
+    candidate: dict[str, Any],
+    *,
+    error: str,
+) -> None:
+    fingerprint = candidate_input_fingerprint(candidate)
+    previous = state.candidate_states.get(candidate["candidate_key"]) or {}
+    state.candidate_states[candidate["candidate_key"]] = {
+        "status": "failed",
+        "input_fingerprint": fingerprint,
+        "outputs": previous.get("outputs") or {},
+        "error": str(error),
+        "updated_at": _utcnow_iso(),
+    }
+    state.errors.append(
+        {
+            "stage": state.stage,
+            "candidate_key": candidate["candidate_key"],
+            "error": str(error),
+            "recorded_at": _utcnow_iso(),
+        }
+    )
+    state.write()
+
+
+def _previous_outputs_valid(
+    previous_outputs: dict[str, Any],
+) -> tuple[bool, str]:
+    for identity in (previous_outputs or {}).values():
+        if isinstance(identity, str):
+            identity = {"path": identity}
+        path = Path(str(identity.get("path") or ""))
+        if not path.exists():
+            return False, "rerun_output_missing"
+        recorded_sha = str(identity.get("sha256") or "")
+        if not recorded_sha:
+            return False, "rerun_output_unverified"
+        actual_sha = hashlib.sha256(path.read_bytes()).hexdigest()
+        if actual_sha != recorded_sha:
+            return False, "rerun_output_changed"
+    return True, ""
+
+
+def plan_candidate_resume(
+    state: BatchRunState,
+    candidates: Iterable[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Per-candidate resume decision matrix.
+
+    skipped_unchanged: same inputs, previous success, outputs still valid.
+    retry_failed: previous attempt failed or was interrupted.
+    rerun_input_changed: candidate identity/config drifted since last run.
+    rerun_output_missing / rerun_output_unverified / rerun_output_changed:
+    previous success but required outputs can no longer be trusted.
+    executed: no previous attempt.
+    """
+    decisions: dict[str, dict[str, Any]] = {}
+    for candidate in candidates:
+        key = candidate["candidate_key"]
+        fingerprint = candidate_input_fingerprint(candidate)
+        previous = state.candidate_states.get(key)
+        if previous is None:
+            decisions[key] = {"action": "executed", "input_fingerprint": fingerprint}
+            continue
+        outputs_valid, drift_action = _previous_outputs_valid(
+            previous.get("outputs") or {}
+        )
+        if previous.get("status") == "succeeded":
+            if previous.get("input_fingerprint") != fingerprint:
+                action = "rerun_input_changed"
+            elif not outputs_valid:
+                action = drift_action
+            else:
+                action = "skipped_unchanged"
+        elif previous.get("status") == "failed":
+            action = "retry_failed"
+        else:
+            action = "executed"
+        decisions[key] = {"action": action, "input_fingerprint": fingerprint}
+    return decisions
+
+
+def invalidate_downstream_stages(state: BatchRunState, *, reran: bool) -> None:
+    if not reran:
+        return
+    state.completed_stages = [
+        stage
+        for stage in state.completed_stages
+        if stage not in P0_HORSE_BATCH_DOWNSTREAM_STAGES
+    ]
+    state.write()
+
+
+def append_resume_history(
+    state: BatchRunState,
+    *,
+    from_stage: str,
+    decisions: dict[str, int],
+    status: str = "started",
+) -> None:
+    state.resume_history.append(
+        {
+            "started_at": _utcnow_iso(),
+            "from_stage": from_stage,
+            "status": status,
+            "decisions": dict(decisions),
+        }
+    )
+    state.write()
+
+
+def abandon_batch_run(state: BatchRunState, *, reason: str) -> None:
+    """Explicitly abandon a batch run; evidence is never silently removed."""
+    reason_text = str(reason or "").strip()
+    if not reason_text:
+        raise P0HorseBatchError("abandoning a batch run requires a reason")
+    state.stage = "abandoned"
+    state.errors.append(
+        {
+            "stage": "abandoned",
+            "error": reason_text,
+            "recorded_at": _utcnow_iso(),
+        }
+    )
+    state.write()

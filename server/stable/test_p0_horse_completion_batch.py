@@ -338,3 +338,199 @@ class P0HorseBatchCommandTests(P0HorseBatchTestBase):
         selected = self._call("--select", "--regions", "japan")
         with self.assertRaises(CommandError):
             self._call("--approve", selected["manifest_path"])
+
+
+class BatchRunStateTests(TestCase):
+    def setUp(self):
+        import tempfile
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.run_dir = Path(self._tmp.name) / "p0batch-abc123"
+
+    def _candidate(self, **overrides):
+        candidate = {
+            "candidate_key": "profile:1",
+            "region": "japan",
+            "horse_name": "テスト馬",
+            "identity_keys": ["jbis:0001"],
+            "source_namespace": "jbis",
+            "source_urls": ["https://www.jbis.or.jp/horse/0001/"],
+            "expected_sire_name": "父",
+            "expected_dam_name": "母",
+            "expected_birth_year": 2020,
+        }
+        candidate.update(overrides)
+        return candidate
+
+    def test_write_read_roundtrip(self):
+        from stable.services.p0_horse_completion_batch import BatchRunState
+
+        state = BatchRunState.create(batch_id="p0batch-abc123", run_dir=self.run_dir)
+        state.stage = "preparing"
+        state.write()
+        loaded = BatchRunState.read(self.run_dir)
+        self.assertEqual(loaded.batch_id, "p0batch-abc123")
+        self.assertEqual(loaded.stage, "preparing")
+        self.assertEqual(loaded.candidate_states, {})
+        self.assertEqual(loaded.resume_history, [])
+
+    def test_input_fingerprint_stability(self):
+        from stable.services.p0_horse_completion_batch import (
+            candidate_input_fingerprint,
+        )
+
+        base = candidate_input_fingerprint(self._candidate())
+        self.assertEqual(base, candidate_input_fingerprint(self._candidate()))
+        changed = candidate_input_fingerprint(self._candidate(expected_sire_name="别的父"))
+        self.assertNotEqual(base, changed)
+        reordered = candidate_input_fingerprint(
+            self._candidate(identity_keys=["jbis:0001", "netkeiba:2010"])
+        )
+        self.assertNotEqual(base, reordered)
+
+    def test_resume_decision_matrix(self):
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            candidate_input_fingerprint,
+            plan_candidate_resume,
+            record_candidate_success,
+        )
+
+        state = BatchRunState.create(batch_id="p0batch-abc123", run_dir=self.run_dir)
+        candidate = self._candidate()
+        output_file = self.run_dir / "staging" / "profile_1.json"
+        output_file.parent.mkdir(parents=True)
+        output_file.write_text('{"ok": true}', encoding="utf-8")
+        record_candidate_success(state, candidate, outputs={"payload": output_file})
+        decisions = plan_candidate_resume(state, [candidate])
+        self.assertEqual(decisions[candidate["candidate_key"]]["action"], "skipped_unchanged")
+
+        state.candidate_states[candidate["candidate_key"]]["status"] = "failed"
+        decisions = plan_candidate_resume(state, [candidate])
+        self.assertEqual(decisions[candidate["candidate_key"]]["action"], "retry_failed")
+
+        state.candidate_states[candidate["candidate_key"]]["status"] = "succeeded"
+        changed = self._candidate(expected_birth_year=2021)
+        decisions = plan_candidate_resume(state, [changed])
+        self.assertEqual(
+            decisions[changed["candidate_key"]]["action"], "rerun_input_changed"
+        )
+
+        decisions = plan_candidate_resume(state, [self._candidate(candidate_key="profile:2")])
+        self.assertEqual(decisions["profile:2"]["action"], "executed")
+
+    def test_resume_output_drift_codes(self):
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            candidate_input_fingerprint,
+            plan_candidate_resume,
+        )
+
+        state = BatchRunState.create(batch_id="p0batch-abc123", run_dir=self.run_dir)
+        candidate = self._candidate()
+        missing = self.run_dir / "staging" / "gone.json"
+        state.candidate_states[candidate["candidate_key"]] = {
+            "status": "succeeded",
+            "input_fingerprint": candidate_input_fingerprint(candidate),
+            "outputs": {"payload": str(missing)},
+        }
+        decisions = plan_candidate_resume(state, [candidate])
+        self.assertEqual(
+            decisions[candidate["candidate_key"]]["action"], "rerun_output_missing"
+        )
+
+        missing.parent.mkdir(parents=True, exist_ok=True)
+        missing.write_text('{"ok": true}', encoding="utf-8")
+        decisions = plan_candidate_resume(state, [candidate])
+        self.assertEqual(
+            decisions[candidate["candidate_key"]]["action"], "rerun_output_unverified"
+        )
+
+        from stable.services.p0_horse_completion_batch import record_candidate_success
+
+        record_candidate_success(state, candidate, outputs={"payload": missing})
+        missing.write_text('{"ok": false, "changed": true}', encoding="utf-8")
+        decisions = plan_candidate_resume(state, [candidate])
+        self.assertEqual(
+            decisions[candidate["candidate_key"]]["action"], "rerun_output_changed"
+        )
+
+    def test_record_success_and_failure(self):
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            candidate_input_fingerprint,
+            record_candidate_failure,
+            record_candidate_success,
+        )
+
+        state = BatchRunState.create(batch_id="p0batch-abc123", run_dir=self.run_dir)
+        candidate = self._candidate()
+        output_file = self.run_dir / "staging" / "profile_1.json"
+        output_file.parent.mkdir(parents=True)
+        output_file.write_text('{"ok": true}', encoding="utf-8")
+        record_candidate_success(state, candidate, outputs={"payload": output_file})
+        entry = state.candidate_states[candidate["candidate_key"]]
+        self.assertEqual(entry["status"], "succeeded")
+        self.assertEqual(
+            entry["input_fingerprint"], candidate_input_fingerprint(candidate)
+        )
+        self.assertEqual(len(entry["outputs"]["payload"]["sha256"]), 64)
+
+        record_candidate_failure(state, candidate, error="http_error: HTTP 500")
+        entry = state.candidate_states[candidate["candidate_key"]]
+        self.assertEqual(entry["status"], "failed")
+        self.assertEqual(entry["error"], "http_error: HTTP 500")
+
+    def test_downstream_stages_invalidated_on_rerun(self):
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            invalidate_downstream_stages,
+        )
+
+        state = BatchRunState.create(batch_id="p0batch-abc123", run_dir=self.run_dir)
+        state.completed_stages = ["prepare", "artifact", "review", "apply"]
+        invalidate_downstream_stages(state, reran=True)
+        self.assertEqual(state.completed_stages, ["prepare"])
+        invalidate_downstream_stages(state, reran=False)
+        self.assertEqual(state.completed_stages, ["prepare"])
+
+    def test_resume_history_appended(self):
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            append_resume_history,
+        )
+
+        state = BatchRunState.create(batch_id="p0batch-abc123", run_dir=self.run_dir)
+        append_resume_history(
+            state,
+            from_stage="preparing",
+            decisions={"skipped_unchanged": 3, "retry_failed": 1},
+        )
+        self.assertEqual(len(state.resume_history), 1)
+        entry = state.resume_history[0]
+        self.assertEqual(entry["from_stage"], "preparing")
+        self.assertEqual(entry["decisions"]["retry_failed"], 1)
+        self.assertTrue(entry["started_at"])
+        loaded = BatchRunState.read(self.run_dir)
+        self.assertEqual(len(loaded.resume_history), 1)
+
+    def test_abandon_requires_reason_and_preserves_evidence(self):
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            P0HorseBatchError,
+            abandon_batch_run,
+        )
+
+        state = BatchRunState.create(batch_id="p0batch-abc123", run_dir=self.run_dir)
+        staging = self.run_dir / "staging" / "profile_1.json"
+        staging.parent.mkdir(parents=True)
+        staging.write_text('{"ok": true}', encoding="utf-8")
+        with self.assertRaises(P0HorseBatchError):
+            abandon_batch_run(state, reason="")
+        abandon_batch_run(state, reason="批次构成有误，另起新批")
+        self.assertEqual(state.stage, "abandoned")
+        self.assertTrue(staging.exists())
+        loaded = BatchRunState.read(self.run_dir)
+        self.assertEqual(loaded.stage, "abandoned")
+        self.assertEqual(loaded.errors[-1]["error"], "批次构成有误，另起新批")
