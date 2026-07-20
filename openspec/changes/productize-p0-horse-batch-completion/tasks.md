@@ -42,7 +42,7 @@
 ## 6. 验证与文档
 
 - [x] 6.1 (integration) 目标测试：选批排除/覆盖规则与默认 100/500 阈值、队列项→候选形状转换（含无 source URL 行为）、manifest 批准绑定、checkpoint 决策矩阵全分支、预算账本超限/损坏/并发、结构化异常分类、重试记账（不计 per-candidate 常量、计地区账本）、永久失败不重试、地区交错调度、确定性转换器同字节复现、复审文件生成与抽样页内容、批准回写与排除马替补池、台账核对、滚动批准 fail closed、每地区独立 commit artifact 与既有断言兼容、重 commit 同 SHA 约束、幂等复验、无界执行拒绝；回归保护：首批 50 行 CSV 入口与首批白名单幂等复验路径保持可用。
-- [ ] 6.2 (operations) 本地验证：`DB_ENGINE=sqlite python manage.py check`、目标 Django 测试、完整 `stable` 回归、`makemigrations --check --dry-run`（本 change 无迁移，确认无漂移）、`openspec validate productize-p0-horse-batch-completion --strict`、`openspec validate --all`、`git diff --check`。
+- [x] 6.2 (operations) 本地验证：`DB_ENGINE=sqlite python manage.py check`、目标 Django 测试、完整 `stable` 回归、`makemigrations --check --dry-run`（本 change 无迁移，确认无漂移）、`openspec validate productize-p0-horse-batch-completion --strict`、`openspec validate --all`、`git diff --check`。
 - [x] 6.3 (integration) 离线 fixture 端到端：选批 → 批准 → prepare 模拟中断 → resume → artifact → dry-run → commit（sqlite）→ 幂等复验，全程零真实网络。
-- [ ] 6.4 (operations) 独立 code review 并修复全部 actionable finding；更新 `docs/current_state.md`、`docs/project_status.md`、`docs/deploy_runbook.md`（滚动批次操作手册）；将 `complete-p0-horse-profile-data` tasks.md 的 `4.2` 标记为由本 change 完成。
+- [x] 6.4 (operations) 独立 code review 并修复全部 actionable finding；更新 `docs/current_state.md`、`docs/project_status.md`、`docs/deploy_runbook.md`（滚动批次操作手册）；将 `complete-p0-horse-profile-data` tasks.md 的 `4.2` 标记为由本 change 完成。
 - [ ] 6.5 (operations) 生产部署按 runbook 执行（备份、容器健康、check/healthz smoke、含 openpyxl 的镜像构建验证）；本 change 部署不触网、不写马匹资料；首个生产滚动批次以单地区小批验证 checkpoint/resume/预算/复审文件/批准回写/地区独立 commit 证据后，再按默认 100/500 阈值滚动；串行提交窗口约束写入 deploy_runbook。
