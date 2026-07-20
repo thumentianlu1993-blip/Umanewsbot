@@ -49,11 +49,14 @@ def before_p0_horse_source_request(
     budget_dir: str | Path | None = None,
     interval: float | None = None,
     max_requests: int | None = None,
+    host_interval_dir: str | Path | None = None,
 ) -> None:
     """Fail-closed budget + throttle gate before every P0 source request.
 
     Every attempt (including retries) is counted in the persistent per-region
-    ledger and throttled by the per-host artifact shared across runs.
+    ledger and throttled by the per-host artifact shared across runs. The
+    ledger directory is run-scoped by the caller (per batch), so
+    ``max_requests`` always means per-run, never cumulative history.
     """
     budget = load_race_event_request_budget_module()
     root = Path(budget_dir) if budget_dir is not None else default_budget_dir()
@@ -74,6 +77,8 @@ def before_p0_horse_source_request(
         artifact_path=root / f"{region}.json",
         max_requests=effective_max,
         interval=effective_interval,
-        host_interval_dir=root / "host-interval",
+        host_interval_dir=Path(host_interval_dir)
+        if host_interval_dir is not None
+        else root / "host-interval",
         budget_label=f"P0 horse completion ({region})",
     )

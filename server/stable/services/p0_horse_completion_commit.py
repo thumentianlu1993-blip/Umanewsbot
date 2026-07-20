@@ -9,6 +9,8 @@ profile list into the completion run record.
 from __future__ import annotations
 
 import fcntl
+import hashlib
+import json
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -75,6 +77,26 @@ def commit_p0_horse_batch_region(
     if state.stage == "abandoned":
         raise P0HorseBatchError("batch run was abandoned; start a new batch")
     bundle = _region_bundle(state, region)
+    combined_path = batch_dir / "artifact" / "combined_candidates.jsonl"
+    try:
+        combined_sha = hashlib.sha256(combined_path.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise P0HorseBatchError(
+            f"batch combined candidates are unreadable: {combined_path}"
+        ) from exc
+    try:
+        research = json.loads(Path(bundle["research_path"]).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise P0HorseBatchError("bundle research v3 is unreadable") from exc
+    research_combined_sha = (
+        (research.get("generated_from") or {}).get("combined_candidates_sha256")
+    )
+    if research_combined_sha != combined_sha:
+        raise P0HorseBatchError(
+            f"bundle research was generated from a stale combined artifact for "
+            f"region {region}; re-run prepare and the approval bundle"
+        )
+    previous_commit = state.artifacts.get(f"commit:{region}")
     with _serial_window(Path(state_dir)):
         artifact = prepare_reviewed_p0_completion_artifact(
             research_v3_path=bundle["research_path"],
@@ -85,6 +107,15 @@ def commit_p0_horse_batch_region(
         )
         artifact_path = batch_dir / "approval" / f"commit_artifact_{region}.json"
         artifact_sha = _write_canonical(artifact_path, artifact)
+        if (
+            isinstance(previous_commit, dict)
+            and previous_commit.get("artifact_sha256")
+            and previous_commit["artifact_sha256"] != artifact_sha
+        ):
+            raise P0HorseBatchError(
+                f"region {region} was already committed with a different artifact; "
+                "content fixes must start a new batch"
+            )
         release = build_region_release_manifest(
             artifact_path=artifact_path,
             artifact_sha256=artifact_sha,
@@ -140,9 +171,11 @@ def commit_p0_horse_batch_region(
         .first()
     )
     if completion_run is not None:
-        from stable.services.p0_horse_completion_batch import load_batch_manifest
+        from stable.services.p0_horse_completion_batch import (
+            load_batch_manifest as _load_manifest_for_run,
+        )
 
-        manifest = load_batch_manifest(manifest_path)
+        manifest = _load_manifest_for_run(manifest_path)
         parameters = dict(completion_run.parameters or {})
         parameters["p0_batch"] = {
             "batch_id": manifest["batch_id"],
@@ -178,6 +211,20 @@ def commit_p0_horse_batch_region(
             f"idempotent re-verification failed for region {region}: "
             f"{planned_remaining}"
         )
+
+    from stable.services.p0_horse_completion_batch import (
+        load_batch_manifest,
+        mark_batch_manifest_status,
+    )
+
+    manifest = load_batch_manifest(manifest_path)
+    remaining_regions = [
+        manifest_region
+        for manifest_region in manifest.get("regions") or []
+        if f"commit:{manifest_region}" not in state.completed_stages
+    ]
+    if not remaining_regions:
+        mark_batch_manifest_status(manifest_path, status="committed")
     return {
         "region": region,
         "artifact_sha256": artifact_sha,

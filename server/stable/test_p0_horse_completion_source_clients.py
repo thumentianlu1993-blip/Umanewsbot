@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.conf import settings
 from django.test import SimpleTestCase, override_settings
 
 from stable.models import RacingRegion
@@ -2599,6 +2600,7 @@ class P0HorseCompletionSourceClientTests(SimpleTestCase):
                 client = source_clients.build_p0_horse_completion_source_client(
                     RacingRegion.FRANCE,
                     transport=ScriptedTransport(responses),
+                    retry_max_attempts=1,
                 )
                 with self.assertRaises(source_clients.P0HorseSourceBlocked) as caught:
                     client.fetch(
@@ -3593,6 +3595,7 @@ class P0HorseCompletionSourceClientTests(SimpleTestCase):
         client = source_clients.build_p0_horse_completion_source_client(
             RacingRegion.UNITED_KINGDOM,
             transport=transport,
+            retry_max_attempts=1,
         )
         first_request = _request(
             RacingRegion.UNITED_KINGDOM,
@@ -5144,7 +5147,17 @@ class P0HorseReviewedNetworkBatchContractTests(SimpleTestCase):
             with self.subTest(region=region):
                 self.assertEqual(len(client.calls), 10)
                 self.assertTrue(
-                    all(request.batch_limit == 10 for request in client.calls)
+                    all(
+                        request.batch_limit
+                        == int(
+                            getattr(
+                                settings,
+                                "HORSE_PROFILE_COMPLETION_REGION_BATCH_LIMIT",
+                                100,
+                            )
+                        )
+                        for request in client.calls
+                    )
                 )
                 self.assertTrue(
                     all(

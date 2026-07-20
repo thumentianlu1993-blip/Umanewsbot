@@ -1279,7 +1279,12 @@ def _load_artifact(path: str | Path, expected_sha256: str) -> tuple[dict[str, An
     return artifact, actual_sha
 
 
-def _validate_rolling_release_ledger(release: dict[str, Any], release_sha256: str) -> None:
+def _validate_rolling_release_ledger(
+    release: dict[str, Any],
+    release_sha256: str,
+    *,
+    release_manifest_path: str | Path,
+) -> None:
     """Rolling-batch approval channel: append-only ledger binding.
 
     The repository allowlist stays reserved for the first 50-horse batch.
@@ -1295,6 +1300,14 @@ def _validate_rolling_release_ledger(release: dict[str, Any], release_sha256: st
     ledger_path = Path(ledger_value)
     if ledger_path.is_symlink() or not ledger_path.is_file():
         _fail("production release approvals ledger is not a regular file")
+    if ledger_path.name != "approvals_ledger.jsonl":
+        _fail("production release approvals ledger filename is invalid")
+    release_dir = Path(release_manifest_path).resolve().parent
+    if ledger_path.resolve().parent != release_dir.parent:
+        _fail(
+            "production release approvals ledger must live in the batch state "
+            "directory of the release manifest"
+        )
     try:
         lines = ledger_path.read_text(encoding="utf-8").splitlines()
     except OSError as exc:
@@ -1333,7 +1346,11 @@ def _load_and_validate_release_manifest(
         release_payload_for_ledger = release_input.payload
         if not isinstance(release_payload_for_ledger, dict):
             _fail("production release manifest schema is invalid")
-        _validate_rolling_release_ledger(release_payload_for_ledger, release_input.sha256)
+        _validate_rolling_release_ledger(
+            release_payload_for_ledger,
+            release_input.sha256,
+            release_manifest_path=release_manifest_path,
+        )
     release = release_input.payload
     if release.get("schema_version") != RELEASE_MANIFEST_SCHEMA:
         _fail("production release manifest schema is invalid")

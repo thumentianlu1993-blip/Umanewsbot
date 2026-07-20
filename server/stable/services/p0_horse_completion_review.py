@@ -97,6 +97,13 @@ def _anomaly_flags(row: dict[str, Any]) -> list[str]:
     return flags
 
 
+def _excel_safe(value: Any) -> Any:
+    """Prefix formula-triggering text so Excel never evaluates cell content."""
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@"):
+        return "'" + value
+    return value
+
+
 def build_batch_review_workbook(
     *,
     manifest: dict[str, Any],
@@ -156,7 +163,7 @@ def build_batch_review_workbook(
     for region, rows in sorted(rows_by_region.items()):
         summary_rows.append((f"region:{region}", len(rows)))
     for label, value in summary_rows:
-        summary_sheet.append([label, value])
+        summary_sheet.append([_excel_safe(label), _excel_safe(value)])
 
     for region, sheet_name in REGION_SHEET_NAMES.items():
         rows = rows_by_region.get(region)
@@ -165,13 +172,13 @@ def build_batch_review_workbook(
         sheet = workbook.create_sheet(sheet_name)
         sheet.append([label for _, label in HORSE_COLUMNS])
         for row in rows:
-            sheet.append([row.get(field, "") for field, _ in HORSE_COLUMNS])
+            sheet.append([_excel_safe(row.get(field, "")) for field, _ in HORSE_COLUMNS])
 
     sheet = workbook.create_sheet(EXCEPTION_SHEET)
     exception_columns = ["region", "anomaly_flags"] + [field for field, _ in HORSE_COLUMNS]
     sheet.append(exception_columns)
     for row in exception_rows:
-        sheet.append([row.get(field, "") for field in exception_columns])
+        sheet.append([_excel_safe(row.get(field, "")) for field in exception_columns])
 
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -34,6 +34,7 @@ class Command(BaseCommand):
         stages.add_argument("--prepare", metavar="MANIFEST_PATH")
         stages.add_argument("--bundle", metavar="MANIFEST_PATH")
         stages.add_argument("--commit", metavar="MANIFEST_PATH")
+        stages.add_argument("--abandon", metavar="MANIFEST_PATH")
         parser.add_argument("--regions", default="")
         parser.add_argument("--profile-id", action="append", type=int, default=[])
         parser.add_argument("--limit-per-region", type=int, default=None)
@@ -64,8 +65,10 @@ class Command(BaseCommand):
                 result = self._prepare(options)
             elif options["bundle"]:
                 result = self._bundle(options)
-            else:
+            elif options["commit"]:
                 result = self._commit(options)
+            else:
+                result = self._abandon(options)
         except P0HorseBatchError as exc:
             raise CommandError(str(exc)) from exc
         if options["json"]:
@@ -282,4 +285,23 @@ class Command(BaseCommand):
             f"batch region {region} committed; idempotent verification "
             f"passed={result['idempotent_verification']['passed']}"
         )
+        return result
+
+    def _abandon(self, options) -> dict:
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            abandon_batch_run,
+            mark_batch_manifest_status,
+        )
+
+        manifest_path = Path(options["abandon"])
+        state = BatchRunState.read(manifest_path.parent)
+        abandon_batch_run(state, reason=options["note"])
+        manifest = mark_batch_manifest_status(manifest_path, status="abandoned")
+        result = {
+            "stage": "abandon",
+            "batch_id": manifest["batch_id"],
+            "status": manifest["status"],
+        }
+        self.stdout.write(f"batch {manifest['batch_id']} abandoned")
         return result

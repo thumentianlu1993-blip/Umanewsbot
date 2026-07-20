@@ -247,8 +247,41 @@ class P0HorseBatchManifestTests(P0HorseBatchTestBase):
         self.assertEqual(ledger_entries[0]["event"], "batch_approved")
         self.assertEqual(ledger_entries[0]["reviewer"], "reviewer-a")
         self.assertEqual(ledger_entries[0]["batch_sha256"], approved["batch_sha256"])
-        validated = validate_approved_batch_manifest(self.manifest_path)
+        validated = validate_approved_batch_manifest(
+            self.manifest_path,
+            expected_sha256=approved["batch_sha256"],
+        )
         self.assertEqual(validated["batch_sha256"], approved["batch_sha256"])
+
+    def test_validate_requires_explicit_expected_sha(self):
+        approve_batch_manifest(self.manifest_path, reviewer="reviewer-a")
+        with self.assertRaises(P0HorseBatchError):
+            validate_approved_batch_manifest(self.manifest_path)
+
+    def test_select_rejects_oversized_region_limit(self):
+        with self.assertRaises(P0HorseBatchError):
+            select_p0_horse_batch(
+                regions=[RacingRegion.JAPAN],
+                limit_per_region=101,
+            )
+
+    def test_approve_exclusion_writes_blocker_pool(self):
+        excluded_id = self.manifest_horse_profile_id()
+        approve_batch_manifest(
+            self.manifest_path,
+            reviewer="reviewer-a",
+            excluded_profile_ids=[excluded_id],
+            note="字段存疑",
+        )
+        pool_path = self.manifest_path.parent / "blocker_pool.jsonl"
+        entries = [
+            json.loads(line)
+            for line in pool_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["profile_id"], excluded_id)
+        self.assertEqual(entries[0]["reason"], "excluded_at_batch_approval")
 
     def test_validate_expected_sha_mismatch(self):
         approved = approve_batch_manifest(self.manifest_path, reviewer="reviewer-a")
@@ -489,9 +522,20 @@ class BatchRunStateTests(TestCase):
         )
 
         state = BatchRunState.create(batch_id="p0batch-abc123", run_dir=self.run_dir)
-        state.completed_stages = ["prepare", "artifact", "review", "apply"]
+        state.completed_stages = [
+            "prepare",
+            "artifact",
+            "review:japan",
+            "commit:japan",
+        ]
+        state.artifacts = {
+            "artifact_dir": "/tmp/x",
+            "bundle:japan": {"research_path": "/tmp/r.json"},
+            "commit:japan": {"artifact_sha256": "abc"},
+        }
         invalidate_downstream_stages(state, reran=True)
         self.assertEqual(state.completed_stages, ["prepare"])
+        self.assertEqual(state.artifacts, {"artifact_dir": "/tmp/x"})
         invalidate_downstream_stages(state, reran=False)
         self.assertEqual(state.completed_stages, ["prepare"])
 
@@ -913,7 +957,7 @@ class P0HorseBatchPrepareTests(P0HorseBatchTestBase):
         self.assertEqual(payload["candidate_key"], f"profile:{self.profile.pk}")
         self.assertTrue((artifact_dir / "batch_review.csv").exists())
         self.assertTrue((artifact_dir / "summary.json").exists())
-        self.assertTrue((artifact_dir / "source_evidence_manifest.json").exists())
+        self.assertTrue((artifact_dir / "source_evidence_manifest.jsonl").exists())
         from stable.services.p0_horse_completion_batch import BatchRunState
 
         state = BatchRunState.read(self.manifest_path.parent)
@@ -1502,3 +1546,97 @@ class P0HorseBatchCommandPipelineTests(P0HorseBatchPrepareTests):
                 self.approved["batch_sha256"],
                 "--allow-network",
             )
+
+    def test_commit_rejects_stale_bundle_after_rerun(self):
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            P0HorseBatchError,
+        )
+        from stable.services.p0_horse_completion_commit import (
+            commit_p0_horse_batch_region,
+        )
+
+        self._call(
+            "--prepare",
+            str(self.manifest_path),
+            "--expected-sha256",
+            self.approved["batch_sha256"],
+        )
+        self._call(
+            "--bundle",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        # simulate a rerun that republished the combined artifact (new bytes)
+        combined = self.manifest_path.parent / "artifact" / "combined_candidates.jsonl"
+        combined.write_text(combined.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+        with self.assertRaises(P0HorseBatchError) as ctx:
+            commit_p0_horse_batch_region(
+                self.manifest_path,
+                region="japan",
+                reviewer=self.reviewer,
+                approved_by="human-approver",
+                state_dir=self.state_dir,
+                confirm_reviewed_artifact=True,
+            )
+        self.assertIn("stale", str(ctx.exception))
+
+    def test_commit_marks_manifest_committed_and_leaves_inflight(self):
+        self.test_full_pipeline_via_command()
+        manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["status"], "committed")
+        selected = select_p0_horse_batch(regions=[RacingRegion.JAPAN])
+        names = {horse["horse_name"] for horse in selected["horses"]}
+        self.assertNotIn("FOREVER TEST", names)
+
+    def test_abandon_command_marks_manifest_abandoned(self):
+        self._call(
+            "--prepare",
+            str(self.manifest_path),
+            "--expected-sha256",
+            self.approved["batch_sha256"],
+        )
+        result = self._call(
+            "--abandon",
+            str(self.manifest_path),
+            "--note",
+            "批次构成有误",
+        )
+        self.assertEqual(result["status"], "abandoned")
+        from stable.services.p0_horse_completion_batch import P0HorseBatchError
+        from stable.services.p0_horse_completion_prepare import prepare_p0_horse_batch
+
+        with self.assertRaises(P0HorseBatchError):
+            prepare_p0_horse_batch(
+                self.manifest_path,
+                expected_sha256=self.approved["batch_sha256"],
+                allow_network=False,
+                cache_dir=self.cache_dir,
+            )
+
+    def test_prepare_blocked_payload_writes_blocker_pool(self):
+        other = self._profile("无缓存马")
+        self._p0_source(other)
+        manifest = select_p0_horse_batch(regions=[RacingRegion.JAPAN])
+        manifest_path = write_batch_manifest(manifest, state_dir=self.state_dir / "batch-pool")
+        approved = approve_batch_manifest(manifest_path, reviewer="reviewer-a")
+        from stable.services.p0_horse_completion_prepare import prepare_p0_horse_batch
+
+        prepare_p0_horse_batch(
+            manifest_path,
+            expected_sha256=approved["batch_sha256"],
+            allow_network=False,
+            cache_dir=self.cache_dir,
+        )
+        pool_path = manifest_path.parent / "blocker_pool.jsonl"
+        entries = [
+            json.loads(line)
+            for line in pool_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["horse_name"], "无缓存马")
+        self.assertEqual(entries[0]["reason"], "blocked_at_prepare")

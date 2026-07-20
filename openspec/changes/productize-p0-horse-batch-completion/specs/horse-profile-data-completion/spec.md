@@ -24,16 +24,21 @@
 
 ### Requirement: 批次触网前必须完成人工批准绑定
 
-系统 SHALL 要求批次 manifest 经人工批准后任何网络 prepare 才能执行。prepare MUST 校验显式传入的批准 SHA-256 与 manifest 文件字节 SHA-256 一致，且 manifest schema、reviewer、approved_at 字段完整，否则 fail closed。
+系统 SHALL 要求批次 manifest 经人工批准后任何网络 prepare 才能执行。prepare MUST 校验显式传入的批准 SHA-256 与 manifest 记录的 `batch_sha256`（内容规范化 SHA-256，select/approve 命令输出中提供）一致，且 manifest schema、reviewer、approved_at 字段完整，否则 fail closed。
 
 #### Scenario: 未批准批次不得触网
 
 - **WHEN** 操作者对状态为 `pending` 的批次 manifest 执行网络 prepare
 - **THEN** 系统 SHALL fail closed 且不发出任何网络请求
 
+#### Scenario: 未显式传入批准 SHA 被拒绝
+
+- **WHEN** 操作者执行 prepare 但未显式提供批准 SHA-256
+- **THEN** 系统 SHALL fail closed
+
 #### Scenario: 批准 SHA 漂移被拒绝
 
-- **WHEN** 显式传入的批准 SHA-256 与 manifest 文件实际字节 SHA-256 不一致
+- **WHEN** 显式传入的批准 SHA-256 与 manifest 记录的 `batch_sha256` 不一致
 - **THEN** 系统 SHALL fail closed 并记录漂移原因
 
 ### Requirement: 每批复审产物必须为面向抽样的单独文件
@@ -105,13 +110,18 @@
 
 ### Requirement: 滚动批次必须经确定性转换与批准回写进入既有提交链
 
-系统 SHALL 将批次 crawl artifact 通过确定性转换器生成每地区 research v3 JSON：同一输入字节 MUST 产生同一输出字节，转换器 MUST NOT 推断补值。操作者批准后，系统 SHALL 按地区生成 mapping decisions（逐马 bind/create、同名候选显式拒绝、四模块 module_reviews、数据库快照）、US authority manifest（批内含美国马时）和 release manifest，并复用既有 prepare/dry-run/commit 链提交。未通过复审的马 SHALL 整匹排除并记录到 blocker/替补池。
+系统 SHALL 将批次 crawl artifact 通过确定性转换器生成每地区 research v3 JSON：同一输入字节 MUST 产生同一输出字节，转换器 MUST NOT 推断补值。操作者批准后，系统 SHALL 按地区生成 mapping decisions（逐马 bind/create、同名候选显式拒绝、四模块 module_reviews、数据库快照）和 release manifest，并复用既有 prepare/dry-run/commit 链提交。批内含美国马时批准回写 SHALL fail closed：美国滚动批次必须取得独立批准的 authority manifest，首批冻结批次的美国组合来源批准 MUST NOT 外推到滚动批次。未通过复审的马 SHALL 整匹排除并记录到 blocker/替补池。
 
 #### Scenario: 转换器确定性
 
 - **WHEN** 对同一批次 crawl artifact 两次执行转换
 - **THEN** 两次输出的 research v3 字节和 SHA-256 SHALL 完全一致
 - **AND** 转换器无法确定的字段 SHALL 保持缺失并出现在复审文件异常页
+
+#### Scenario: 美国滚动批次 fail closed
+
+- **WHEN** 批准回写的输入包含美国地区马匹且没有独立批准的 authority manifest
+- **THEN** 系统 SHALL fail closed，不生成 approved authority manifest
 
 #### Scenario: 未通过复审的马整匹排除
 

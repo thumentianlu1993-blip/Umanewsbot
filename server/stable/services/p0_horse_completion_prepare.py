@@ -97,6 +97,8 @@ def _default_source_client_factory(
     region: str,
     *,
     budget_dir: str | Path | None,
+    host_interval_dir: str | Path | None,
+    max_requests: int | None,
 ):
     import requests
 
@@ -111,8 +113,19 @@ def _default_source_client_factory(
             url,
             region=region,
             budget_dir=budget_dir,
+            max_requests=max_requests,
+            host_interval_dir=host_interval_dir,
         ),
     )
+
+
+def _region_run_request_limit(region: str, horse_count: int) -> int:
+    """Derived per-run request cap: per-candidate budget x2 (retry allowance)."""
+    override = int(getattr(settings, "HORSE_PROFILE_COMPLETION_MAX_REQUESTS", 0))
+    if override > 0:
+        return override
+    per_candidate = REVIEWED_CANDIDATE_REQUEST_BUDGETS[region]
+    return max(1, horse_count) * per_candidate * 2
 
 
 def _request_from_candidate(
@@ -167,7 +180,7 @@ def _payload_summary_row(payload: dict[str, Any]) -> dict[str, Any]:
         "source_evidence_complete": bool(coverage.get("source_evidence", {}).get("complete")),
         "official_or_source_start_count": career.get("official_or_source_start_count", ""),
         "collected_start_count": career.get("collected_start_count", ""),
-        "career_history_gap_count": career.get("career_history_gap_count", ""),
+        "career_history_gap_count": career.get("gap_count", ""),
         "failure_reason": ";".join(payload.get("failure_reason") or []),
         "source_urls": ";".join(evidence),
     }
@@ -177,57 +190,91 @@ def _publish_batch_artifacts(
     *,
     run_dir: Path,
     manifest: dict[str, Any],
-    ordered_payloads: list[dict[str, Any]],
+    staging_paths: list[Path],
     generated_at: str,
 ) -> dict[str, Any]:
+    """Atomically publish the artifact set, streaming one payload at a time.
+
+    Peak memory is one candidate payload, never the whole batch — a hard
+    requirement on the 4 GiB production host.
+    """
     staging_dir = run_dir / "artifact.tmp"
     if staging_dir.exists():
         shutil.rmtree(staging_dir)
     staging_dir.mkdir(parents=True)
-
-    combined_path = staging_dir / "combined_candidates.jsonl"
-    with combined_path.open("w", encoding="utf-8") as handle:
-        for payload in ordered_payloads:
-            handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
-            handle.flush()
-
-    review_path = staging_dir / "batch_review.csv"
-    rows = [_payload_summary_row(payload) for payload in ordered_payloads]
-    with review_path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()) if rows else ["candidate_key"])
-        writer.writeheader()
-        writer.writerows(rows)
 
     failure_counts: dict[str, int] = {}
     region_counts: dict[str, dict[str, int]] = {}
     blocked = 0
     network_requests = 0
     cache_hits = 0
-    for payload in ordered_payloads:
-        region = str(payload.get("region") or "")
-        bucket = region_counts.setdefault(region, {"horses": 0, "blocked": 0})
-        bucket["horses"] += 1
-        reasons = payload.get("failure_reason") or []
-        if reasons:
-            blocked += 1
-            bucket["blocked"] += 1
-        for reason in reasons:
-            failure_counts[reason] = failure_counts.get(reason, 0) + 1
-        retrieval = payload.get("retrieval") if isinstance(payload.get("retrieval"), dict) else {}
-        network_requests += int(retrieval.get("network_request_count") or 0)
-        cache_hits += int(bool(retrieval.get("cache_hit")))
+    total = 0
+    blocked_entries: list[dict[str, Any]] = []
+    profile_id_by_key = {
+        horse["candidate_key"]: horse.get("profile_id")
+        for horse in manifest.get("horses") or []
+    }
 
-    evidence_entries = []
-    for payload in ordered_payloads:
-        evidence_entries.append(
-            {
-                "candidate_key": payload.get("candidate_key", ""),
-                "source_evidence": payload.get("source_evidence") or [],
-                "retrieval": payload.get("retrieval") or {},
-            }
-        )
-    evidence_path = staging_dir / "source_evidence_manifest.json"
-    _write_json_atomically(evidence_path, {"entries": evidence_entries})
+    combined_path = staging_dir / "combined_candidates.jsonl"
+    review_path = staging_dir / "batch_review.csv"
+    evidence_path = staging_dir / "source_evidence_manifest.jsonl"
+    csv_handle = review_path.open("w", encoding="utf-8", newline="")
+    writer: csv.DictWriter | None = None
+    with combined_path.open("w", encoding="utf-8") as combined, evidence_path.open(
+        "w", encoding="utf-8"
+    ) as evidence, csv_handle:
+        for staging_path in staging_paths:
+            try:
+                payload = json.loads(staging_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                raise P0HorseBatchError(
+                    f"candidate staging payload missing or unreadable: {staging_path}"
+                ) from exc
+            combined.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
+            combined.flush()
+            row = _payload_summary_row(payload)
+            if writer is None:
+                writer = csv.DictWriter(csv_handle, fieldnames=list(row.keys()))
+                writer.writeheader()
+            writer.writerow(row)
+            evidence.write(
+                json.dumps(
+                    {
+                        "candidate_key": payload.get("candidate_key", ""),
+                        "source_evidence": payload.get("source_evidence") or [],
+                        "retrieval": payload.get("retrieval") or {},
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+                + "\n"
+            )
+            total += 1
+            region = str(payload.get("region") or "")
+            bucket = region_counts.setdefault(region, {"horses": 0, "blocked": 0})
+            bucket["horses"] += 1
+            reasons = payload.get("failure_reason") or []
+            if reasons:
+                blocked += 1
+                bucket["blocked"] += 1
+                blocked_entries.append(
+                    {
+                        "profile_id": profile_id_by_key.get(payload.get("candidate_key")),
+                        "candidate_key": payload.get("candidate_key", ""),
+                        "horse_name": payload.get("horse_name", ""),
+                        "region": region,
+                        "reason": "blocked_at_prepare",
+                        "failure_reason": list(reasons),
+                        "batch_id": manifest["batch_id"],
+                        "recorded_at": generated_at,
+                    }
+                )
+            for reason in reasons:
+                failure_counts[reason] = failure_counts.get(reason, 0) + 1
+            retrieval = payload.get("retrieval") if isinstance(payload.get("retrieval"), dict) else {}
+            network_requests += int(retrieval.get("network_request_count") or 0)
+            cache_hits += int(bool(retrieval.get("cache_hit")))
+            del payload
 
     summary: dict[str, Any] = {
         "schema_version": "p0-horse-completion-batch-summary.v1",
@@ -235,8 +282,8 @@ def _publish_batch_artifacts(
         "batch_manifest_sha256": manifest["batch_sha256"],
         "generated_at": generated_at,
         "totals": {
-            "horses": len(ordered_payloads),
-            "succeeded": len(ordered_payloads) - blocked,
+            "horses": total,
+            "succeeded": total - blocked,
             "blocked": blocked,
         },
         "region_counts": region_counts,
@@ -248,10 +295,8 @@ def _publish_batch_artifacts(
         "artifacts": {},
     }
     summary_path = staging_dir / "summary.json"
-    _write_json_atomically(summary_path, summary)
-
     for artifact_path in sorted(staging_dir.iterdir()):
-        if artifact_path.is_file():
+        if artifact_path.is_file() and artifact_path.name != "summary.json":
             summary["artifacts"][artifact_path.name] = hashlib.sha256(
                 artifact_path.read_bytes()
             ).hexdigest()
@@ -261,6 +306,12 @@ def _publish_batch_artifacts(
     if artifact_dir.exists():
         shutil.rmtree(artifact_dir)
     os.replace(staging_dir, artifact_dir)
+    if blocked_entries:
+        from stable.services.p0_horse_completion_batch import (
+            append_blocker_pool_entries,
+        )
+
+        append_blocker_pool_entries(run_dir, blocked_entries)
     return summary
 
 
@@ -319,12 +370,34 @@ def prepare_p0_horse_batch(
     state.write()
 
     budget_error = load_race_event_request_budget_module().RequestBudgetExceeded
-    factory = source_client_factory
-    if factory is None:
+    budget_root = Path(
+        budget_dir
+        or getattr(
+            settings,
+            "HORSE_PROFILE_COMPLETION_BUDGET_DIR",
+            "runtime/horse_profile_completion/budget",
+        )
+    )
+    run_budget_dir = budget_root / "runs" / manifest["batch_id"]
+    host_interval_dir = budget_root / "host-interval"
+    region_horse_counts: dict[str, int] = {}
+    for candidate in candidates:
+        region_horse_counts[candidate["region"]] = (
+            region_horse_counts.get(candidate["region"], 0) + 1
+        )
+
+    if source_client_factory is None:
         factory = lambda region: _default_source_client_factory(  # noqa: E731
             region,
-            budget_dir=budget_dir,
+            budget_dir=run_budget_dir,
+            host_interval_dir=host_interval_dir,
+            max_requests=_region_run_request_limit(
+                region,
+                region_horse_counts.get(region, 0),
+            ),
         )
+    else:
+        factory = source_client_factory
     region_clients: dict[str, Any] = {}
     reran = False
     for candidate in _interleave_by_region(candidates):
@@ -382,24 +455,13 @@ def prepare_p0_horse_batch(
 
     invalidate_downstream_stages(state, reran=reran)
 
-    ordered_payloads: list[dict[str, Any]] = []
-    for candidate in candidates:
-        staging_path = _staging_path(run_dir, candidate["candidate_key"])
-        try:
-            ordered_payloads.append(
-                json.loads(staging_path.read_text(encoding="utf-8"))
-            )
-        except (OSError, ValueError) as exc:
-            state.stage = "prepare_failed"
-            state.write()
-            raise P0HorseBatchError(
-                f"candidate staging payload missing or unreadable: {staging_path}"
-            ) from exc
-
+    staging_paths = [
+        _staging_path(run_dir, candidate["candidate_key"]) for candidate in candidates
+    ]
     summary = _publish_batch_artifacts(
         run_dir=run_dir,
         manifest=manifest,
-        ordered_payloads=ordered_payloads,
+        staging_paths=staging_paths,
         generated_at=generated_at or _utcnow_iso(),
     )
     summary["resume"] = decision_counts

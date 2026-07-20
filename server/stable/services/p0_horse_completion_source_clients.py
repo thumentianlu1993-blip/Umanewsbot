@@ -51,6 +51,9 @@ class P0HorseSourceBlocked(ValueError):
         self.retry_after = retry_after
 
 
+RETRY_AFTER_CAP_SECONDS = 300.0
+
+
 MANUAL_SUPPLEMENT_CSV_FIELDS = (
     "candidate_key",
     "region",
@@ -1786,7 +1789,10 @@ class _BaseSourceClient:
                     raise
                 backoff = self._effective_retry_backoff_base() * (2 ** (attempt - 1))
                 if exc.retry_after is not None:
-                    backoff = max(backoff, float(exc.retry_after))
+                    backoff = max(
+                        backoff,
+                        min(float(exc.retry_after), RETRY_AFTER_CAP_SECONDS),
+                    )
                 if backoff > 0:
                     self._sleep_func(backoff)
 

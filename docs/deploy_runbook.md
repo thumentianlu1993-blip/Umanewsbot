@@ -37,6 +37,14 @@ prepared-uncommitted 状态（`serial-window.lock` 互斥）。
 artifact 字节。生产主机为 2 vCPU / 4 GiB / no swap：禁止无地区全量执行，
 禁止绕过批次上限。
 
+行为变化注明（对首批 50 匹链路）：source client 现在默认启用瞬时失败重试
+（`HORSE_PROFILE_COMPLETION_RETRY_MAX_ATTEMPTS=3`、退避基数 30s，Retry-After
+上限 300s），per-candidate 预算改为按去重 URL 计数（重试不再消耗），
+`run_reviewed_p0_horse_completion_batch` 的 client 批次上限由硬编码 10 改为
+`HORSE_PROFILE_COMPLETION_REGION_BATCH_LIMIT`（默认 100）。首批链路正确性不变，
+但瞬时失败候选的重跑会更慢；如需保持旧行为可在对应调用显式传
+`retry_max_attempts=1`。
+
 ## P0 首批 50 匹生产提交与最终验收（2026-07-20）
 
 1. 唯一生产输入为 artifact SHA-256

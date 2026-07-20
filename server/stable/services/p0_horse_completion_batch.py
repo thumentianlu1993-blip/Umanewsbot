@@ -259,6 +259,11 @@ def select_p0_horse_batch(
     effective_limit = limit_per_region if limit_per_region is not None else _region_batch_limit()
     if effective_limit <= 0:
         raise P0HorseBatchError("limit_per_region must be greater than zero")
+    if effective_limit > _region_batch_limit():
+        raise P0HorseBatchError(
+            f"limit_per_region exceeds the per-region slice cap "
+            f"{_region_batch_limit()}: split the batch instead of enlarging it"
+        )
     scope_regions = region_list or list(P0_HORSE_BATCH_REGIONS)
     if effective_limit * len(scope_regions) > _total_batch_limit():
         raise P0HorseBatchError(
@@ -310,6 +315,7 @@ def select_p0_horse_batch(
             "include_complete": include_complete,
             "allow_in_flight": allow_in_flight,
         },
+        "adapter_config_fingerprint": adapter_config_fingerprint(),
         "regions": [
             region for region in P0_HORSE_BATCH_REGIONS if region_counts.get(region)
         ],
@@ -383,6 +389,11 @@ def approve_batch_manifest(
         raise P0HorseBatchError(
             f"excluded profile ids not in batch: {unknown}"
         )
+    excluded_horses = [
+        horse
+        for horse in manifest["horses"]
+        if int(horse["profile_id"]) in excluded
+    ]
     if excluded:
         manifest["horses"] = [
             horse
@@ -419,7 +430,53 @@ def approve_batch_manifest(
             "excluded_profile_ids": excluded,
         },
     )
+    if excluded_horses:
+        append_blocker_pool_entries(
+            path.parent,
+            [
+                {
+                    "profile_id": horse["profile_id"],
+                    "candidate_key": horse["candidate_key"],
+                    "horse_name": horse["horse_name"],
+                    "region": horse["region"],
+                    "reason": "excluded_at_batch_approval",
+                    "note": str(note or "").strip(),
+                    "batch_id": manifest["batch_id"],
+                    "recorded_at": approved_at,
+                }
+                for horse in excluded_horses
+            ],
+        )
     return manifest
+
+
+P0_HORSE_BATCH_BLOCKER_POOL_FILENAME = "blocker_pool.jsonl"
+
+
+def mark_batch_manifest_status(
+    manifest_path: str | Path,
+    *,
+    status: str,
+) -> dict[str, Any]:
+    """Terminal status transitions so completed batches leave the in-flight set."""
+    if status not in ("committed", "abandoned"):
+        raise P0HorseBatchError(f"unsupported batch manifest status: {status}")
+    manifest = load_batch_manifest(manifest_path)
+    manifest["status"] = status
+    manifest["batch_sha256"] = _manifest_sha256(manifest)
+    _write_json_atomically(Path(manifest_path), manifest)
+    return manifest
+
+
+def append_blocker_pool_entries(
+    batch_dir: str | Path,
+    entries: Iterable[dict[str, Any]],
+) -> None:
+    """Append horses excluded from completion to the batch blocker pool."""
+    pool_path = Path(batch_dir) / P0_HORSE_BATCH_BLOCKER_POOL_FILENAME
+    with pool_path.open("a", encoding="utf-8") as handle:
+        for entry in entries:
+            handle.write(json.dumps(entry, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def validate_approved_batch_manifest(
@@ -436,7 +493,11 @@ def validate_approved_batch_manifest(
         raise P0HorseBatchError("batch approval is missing reviewer")
     if not str(approval.get("approved_at") or "").strip():
         raise P0HorseBatchError("batch approval is missing approved_at")
-    if expected_sha256 is not None and expected_sha256 != manifest["batch_sha256"]:
+    if expected_sha256 is None:
+        raise P0HorseBatchError(
+            "batch approval binding requires an explicit expected SHA-256"
+        )
+    if expected_sha256 != manifest["batch_sha256"]:
         raise P0HorseBatchError(
             "expected batch SHA-256 does not match the approved manifest"
         )
@@ -466,6 +527,8 @@ def validate_approved_batch_manifest(
 
 P0_HORSE_BATCH_STATE_FILENAME = "state.json"
 P0_HORSE_BATCH_DOWNSTREAM_STAGES = ("artifact", "review", "apply")
+P0_HORSE_BATCH_REGIONAL_STAGE_PREFIXES = ("review:", "commit:")
+P0_HORSE_BATCH_REGIONAL_ARTIFACT_PREFIXES = ("bundle:", "commit:")
 
 
 def _file_identity(path: Path) -> dict[str, Any]:
@@ -475,6 +538,34 @@ def _file_identity(path: Path) -> dict[str, Any]:
         "sha256": hashlib.sha256(data).hexdigest(),
         "size": len(data),
     }
+
+
+def adapter_config_fingerprint() -> str:
+    """Hash of adapter configuration that changes fetch results.
+
+    Mixed into batch manifests and per-candidate input fingerprints so code
+    or budget/config changes invalidate resume decisions instead of reusing
+    stale payloads.
+    """
+    from stable.services.p0_horse_completion_adapters import (
+        PAYLOAD_SCHEMA_VERSION,
+        REVIEWED_CANDIDATE_REQUEST_BUDGETS,
+    )
+
+    content = {
+        "payload_schema_version": PAYLOAD_SCHEMA_VERSION,
+        "region_adapters": {
+            region: sorted(adapter.source_names)
+            for region, adapter in sorted(REGION_ADAPTERS.items())
+        },
+        "candidate_request_budgets": dict(
+            sorted(REVIEWED_CANDIDATE_REQUEST_BUDGETS.items())
+        ),
+        "region_batch_limit": int(
+            getattr(settings, "HORSE_PROFILE_COMPLETION_REGION_BATCH_LIMIT", 100)
+        ),
+    }
+    return hashlib.sha256(_canonical_bytes(content)).hexdigest()
 
 
 def candidate_input_fingerprint(candidate: dict[str, Any]) -> str:
@@ -491,6 +582,8 @@ def candidate_input_fingerprint(candidate: dict[str, Any]) -> str:
         "expected_sire_name": candidate.get("expected_sire_name"),
         "expected_dam_name": candidate.get("expected_dam_name"),
         "expected_birth_year": candidate.get("expected_birth_year"),
+        "adapter_config": candidate.get("adapter_config_fingerprint")
+        or adapter_config_fingerprint(),
     }
     return hashlib.sha256(_canonical_bytes(content)).hexdigest()
 
@@ -654,7 +747,13 @@ def invalidate_downstream_stages(state: BatchRunState, *, reran: bool) -> None:
         stage
         for stage in state.completed_stages
         if stage not in P0_HORSE_BATCH_DOWNSTREAM_STAGES
+        and not stage.startswith(P0_HORSE_BATCH_REGIONAL_STAGE_PREFIXES)
     ]
+    state.artifacts = {
+        key: value
+        for key, value in state.artifacts.items()
+        if not key.startswith(P0_HORSE_BATCH_REGIONAL_ARTIFACT_PREFIXES)
+    }
     state.write()
 
 
