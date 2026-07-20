@@ -35,7 +35,7 @@
 ## 4. 多地区来源候选与完整资料 artifact
 
 - [x] 4.1 (integration) 定义统一补全候选 payload，覆盖 `basic_profile`、`pedigree`、`race_records`、`major_wins`、`aliases`、`source_evidence`、`raw_payload`、`confidence`、`failure_reason`。
-- [ ] 4.2 (integration) 为日本、中国香港、英国、法国、美国实现或扩展受控来源 adapter，支持请求间隔、缓存、单批上限、source URL、raw payload 和字段覆盖统计。
+- [x] 4.2 (integration) 为日本、中国香港、英国、法国、美国实现或扩展受控来源 adapter，支持请求间隔、缓存、单批上限、source URL、raw payload 和字段覆盖统计。（首批 50 匹已由受控 adapter 完成；长期滚动批次产品化由 `productize-p0-horse-batch-completion` 于 2026-07-21 实现：任意批次选择、checkpoint/resume、按地区持久预算、有限重试、复审文件与地区独立 commit）
 - [x] 4.3 (integration) 为完整赛事履历生成 `HorseRaceRecord` payload，覆盖退赛、取消出走、未完赛、失格等状态，并记录 `records_synced_through` 或等价同步时间。
 - [x] 4.4 (integration) 设计 `HorseRaceRecord` 幂等键，优先使用外部 race/result id；缺失时使用马匹、来源、日期/年份、比赛名、马场、source URL 组合。
 - [x] 4.5 (integration) 主胜鞍沿用既有 `HorseRaceRecord` 胜利最高等级 + 人工 `is_major_win` 覆盖规则，不因 P0 来源重点赛事定义而改变。

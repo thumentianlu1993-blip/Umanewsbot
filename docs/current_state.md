@@ -4,6 +4,32 @@
 字段口径、生产计数、关键产物、事故经验、未完成项和后续执行顺序；实时状态仍以本文和生产
 核验为准。
 
+## 2026-07-21 P0 滚动批次产品化已完成本地实现（未部署）
+
+- OpenSpec change `productize-p0-horse-batch-completion` 已完成 plan-eng-review
+  （2 P0 + 6 P1 + 5 P2 全部修复，phase=reviewed）和全部代码实现，覆盖
+  `complete-p0-horse-profile-data` 的 tasks `4.2` 长期版本。
+- 批次形态：队列选批（默认每地区 100、单批合计 500，无界执行 fail closed）、
+  批次 manifest 人工批准（SHA-256 绑定 + append-only 台账）、抓取 checkpoint/resume
+  （BatchRunState + 逐候选输入指纹 + 输出 SHA-256 决策矩阵）、按地区持久请求预算与
+  per-host 限速（复用赛事预算工具参数化实现）、瞬时失败有限重试（计入账本、不计
+  per-candidate 常量）、每批单独复审 xlsx（地区 sheet + 异常抽样页）。
+- 提交链产品化：确定性转换器（crawl artifact → 每地区 research v3，同字节复现）、
+  批准回写（mapping decisions + 空美国 authority manifest；美国滚动批次 fail closed）、
+  滚动 release manifest 走台账通道（首批仓库白名单仅留首批复验）、每地区独立 commit
+  artifact 复用既有 prepare/dry-run/commit 链、串行窗口互斥、commit 后自动幂等复验
+  planned write=0 并写入 run 记录。
+- 端到端 sqlite 证据：select → approve → prepare（fixture 缓存）→ bundle →
+  release → dry-run → commit → 幂等复验全通，`FOREVER TEST` 严格完整落库。
+- 本地验证：专项测试 `82/82`、既有 P0 adapter `45/45`、赛事编排 `66/66`、
+  Django check、迁移漂移（本 change 无迁移）、OpenSpec 严格/全量 `31/31`、
+  `git diff --check` 通过；完整 `stable` 回归与独立 code review 进行中。
+- 新增依赖 `openpyxl==3.1.5`（复审工作簿），部署需重建镜像验证。
+- 本 change 尚未部署生产、未触网、未写任何马匹资料；生产默认仍
+  `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`。首个生产滚动批次建议单地区小批验证后再按
+  100/500 阈值滚动；操作手册见 `docs/deploy_runbook.md` 顶部。
+- `6.7` 公开验收（每地区人工发布 1-2 匹）仍按计划在本 change 上线后立即单独执行。
+
 ## 2026-07-20 P0 首批五地区 50 匹已完成生产提交
 
 - 精确 artifact SHA-256

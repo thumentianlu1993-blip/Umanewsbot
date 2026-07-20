@@ -4,6 +4,21 @@ P0 马信息补全专项的模型交接文档见
 `docs/p0_horse_information_completion_handoff.md`。后续接手应从该文档进入，并以
 `docs/current_state.md` 和生产实时核验校正可能漂移的运行数据。
 
+## 2026-07-21 P0 滚动批次产品化已完成本地实现（未部署）
+
+- OpenSpec change `productize-p0-horse-batch-completion` 已完成 plan-eng-review 与全部
+  代码实现，覆盖 `complete-p0-horse-profile-data` 的 tasks `4.2` 长期版本：
+  队列选批（默认 100/地区、500/批、无界 fail closed）、批次 manifest 人工批准 +
+  append-only 台账、抓取 checkpoint/resume、按地区持久请求预算与 per-host 限速、
+  瞬时失败有限重试、每批单独复审 xlsx（openpyxl 新依赖）、确定性 research v3 转换器、
+  批准回写（美国滚动批次 fail closed）、滚动 release manifest 台账通道、
+  每地区独立 commit artifact + 串行窗口 + 自动幂等复验。
+- 端到端 sqlite 证据：select → approve → prepare → bundle → release → dry-run →
+  commit → 幂等复验全通；专项测试 `82/82`，既有 P0 adapter 与赛事编排回归通过。
+- 本 change 尚未部署生产、未触网、未写马匹资料；操作手册见 `docs/deploy_runbook.md`
+  顶部。`6.7` 公开验收在其上线后立即单独执行；`complete-p0-horse-profile-data`
+  仅剩 `6.7` 未完成。
+
 ## 2026-07-20 P0 首批五地区 50 匹生产数据已落地
 
 - 首批五地区各 `10` 匹已按精确审核 artifact 完成生产提交：`50` 个完整档案、

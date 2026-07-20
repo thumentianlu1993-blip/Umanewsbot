@@ -13,10 +13,10 @@
 
 ## 2. 抓取 checkpoint 与 resume
 
-- [ ] 2.1 (integration) 新增 `server/stable/services/p0_horse_completion_batch.py`：`BatchRunState` dataclass（batch_id、run_dir、stage、candidate_states、artifacts、resume_history、errors），每候选完成和每阶段结束立即原子写 `state.json`。
-- [ ] 2.2 (integration) 实现逐候选输入指纹（身份 + adapter 配置 + 来源 URL + 预期血统字段规范化哈希）与必需输出 SHA-256 校验；resume 决策矩阵覆盖 `skipped_unchanged / retry_failed / rerun_input_changed / executed` 及输出缺失/漂移原因码。
-- [ ] 2.3 (integration) resume 入口：读取 state.json，追加 `resume_history`（时间、原因、决策摘要），任一候选重跑后作废下游 review/apply 阶段状态。
-- [ ] 2.4 (integration) 中断现场处理：staging 目录保留并可在 resume 复用；批次放弃需显式命令并留痕，不静默清理证据。
+- [x] 2.1 (integration) 新增 `server/stable/services/p0_horse_completion_batch.py`：`BatchRunState` dataclass（batch_id、run_dir、stage、candidate_states、artifacts、resume_history、errors），每候选完成和每阶段结束立即原子写 `state.json`。
+- [x] 2.2 (integration) 实现逐候选输入指纹（身份 + adapter 配置 + 来源 URL + 预期血统字段规范化哈希）与必需输出 SHA-256 校验；resume 决策矩阵覆盖 `skipped_unchanged / retry_failed / rerun_input_changed / executed` 及输出缺失/漂移原因码。
+- [x] 2.3 (integration) resume 入口：读取 state.json，追加 `resume_history`（时间、原因、决策摘要），任一候选重跑后作废下游 review/apply 阶段状态。
+- [x] 2.4 (integration) 中断现场处理：staging 目录保留并可在 resume 复用；批次放弃需显式命令并留痕，不静默清理证据。
 
 ## 3. 请求预算、限速与重试
 
@@ -27,22 +27,22 @@
 
 ## 4. 任意批次抓取、复审文件与滚动提交链
 
-- [ ] 4.1 (integration) 扩展 `run_reviewed_p0_horse_completion_batch` 或新增等效入口：接受批次 manifest 而非 50 行 CSV；候选 payload 流式写 staging JSONL（逐匹 fsync），末尾校验后原子发布；artifact 内容保持 JSONL、CSV、summary、失败/冲突清单、source evidence manifest；批次内按地区交错调度候选，使 host 级限速下整体吞吐最大化；移除 adapters 中硬编码 `batch_limit=10`。
-- [ ] 4.2 (integration) 实现确定性转换器：批次 crawl artifact → 每地区 research v3 JSON（`p0-horse-research.v3`）。转换是纯函数，同输入字节必得同输出字节并输出 SHA；不做推断补值，无法确定的字段保持缺失并进入复审文件异常页。
-- [ ] 4.3 (integration) 生成每批单独复审文件：新增 `openpyxl` 依赖（requirements + Docker 镜像），默认输出 `HORSE_PROFILE_COMPLETION_REVIEW_OUTPUT_DIR/<batch_id>.xlsx`，按地区分 sheet、逐匹摘要行（身份、硬字段完整度、血统、履历计数、异常标记、来源 URL）、异常/低置信抽样页（unknown 结果、生涯缺口、身份冲突、来源失败、字段冲突）和批次汇总页；复审文件从每地区 research v3 派生；JSONL artifact 仍是唯一 commit 凭证。
-- [ ] 4.4 (integration) 实现批准回写：操作者批准命令按地区生成/更新 mapping decisions（逐马 bind/create、同名候选显式拒绝、四模块 module_reviews、数据库快照）、US authority manifest（仅批内含美国马时）和 release manifest；未通过复审的马整匹排除并记录到 blocker/替补池；每次批准追加 append-only `approvals_ledger.jsonl` 并镜像进 run parameters。
-- [ ] 4.5 (integration) 泛化可信 release manifest 校验：滚动批次要求显式 `--approved-manifest-sha256` + 文件字节复核 + schema/reviewer/approved_at 校验 + 台账条目核对；`HORSE_PROFILE_COMPLETION_REVIEW_MANIFEST_SHA256` 全局 pin 保留为可选额外强制；首批硬编码白名单仅限首批复验路径。
-- [ ] 4.6 (integration) 按地区生成独立 commit artifact（各自 expected_actions/summary/SHA/manifest 绑定/run），直接复用既有 `prepare_reviewed_p0_completion_artifact` → dry-run → commit 链与全部 fail-closed 断言；约束重 commit 必须同一 artifact 字节，内容修复必须另起新批次；执行顺序为逐地区“prepare → dry-run → commit”串行，每地区 prepare 前重取数据库快照，全局同一时间只允许一个批次处于 prepared-uncommitted 状态（互斥锁防并发批次）。
+- [x] 4.1 (integration) 扩展 `run_reviewed_p0_horse_completion_batch` 或新增等效入口：接受批次 manifest 而非 50 行 CSV；候选 payload 流式写 staging JSONL（逐匹 fsync），末尾校验后原子发布；artifact 内容保持 JSONL、CSV、summary、失败/冲突清单、source evidence manifest；批次内按地区交错调度候选，使 host 级限速下整体吞吐最大化；移除 adapters 中硬编码 `batch_limit=10`。
+- [x] 4.2 (integration) 实现确定性转换器：批次 crawl artifact → 每地区 research v3 JSON（`p0-horse-research.v3`）。转换是纯函数，同输入字节必得同输出字节并输出 SHA；不做推断补值，无法确定的字段保持缺失并进入复审文件异常页。
+- [x] 4.3 (integration) 生成每批单独复审文件：新增 `openpyxl` 依赖（requirements + Docker 镜像），默认输出 `HORSE_PROFILE_COMPLETION_REVIEW_OUTPUT_DIR/<batch_id>.xlsx`，按地区分 sheet、逐匹摘要行（身份、硬字段完整度、血统、履历计数、异常标记、来源 URL）、异常/低置信抽样页（unknown 结果、生涯缺口、身份冲突、来源失败、字段冲突）和批次汇总页；复审文件从每地区 research v3 派生；JSONL artifact 仍是唯一 commit 凭证。
+- [x] 4.4 (integration) 实现批准回写：操作者批准命令按地区生成/更新 mapping decisions（逐马 bind/create、同名候选显式拒绝、四模块 module_reviews、数据库快照）、US authority manifest（仅批内含美国马时）和 release manifest；未通过复审的马整匹排除并记录到 blocker/替补池；每次批准追加 append-only `approvals_ledger.jsonl` 并镜像进 run parameters。
+- [x] 4.5 (integration) 泛化可信 release manifest 校验：滚动批次要求显式 `--approved-manifest-sha256` + 文件字节复核 + schema/reviewer/approved_at 校验 + 台账条目核对；`HORSE_PROFILE_COMPLETION_REVIEW_MANIFEST_SHA256` 全局 pin 保留为可选额外强制；首批硬编码白名单仅限首批复验路径。
+- [x] 4.6 (integration) 按地区生成独立 commit artifact（各自 expected_actions/summary/SHA/manifest 绑定/run），直接复用既有 `prepare_reviewed_p0_completion_artifact` → dry-run → commit 链与全部 fail-closed 断言；约束重 commit 必须同一 artifact 字节，内容修复必须另起新批次；执行顺序为逐地区“prepare → dry-run → commit”串行，每地区 prepare 前重取数据库快照，全局同一时间只允许一个批次处于 prepared-uncommitted 状态（互斥锁防并发批次）。
 
 ## 5. 幂等验收与审计留痕
 
-- [ ] 5.1 (integration) 每个地区子批 commit 成功后自动以同一 artifact 重跑该地区范围 dry-run simulation，断言 planned creates/updates/audits 全为 0；复验摘要写入 `HorseProfileCompletionRun.summary.idempotent_verification` 与 `state.json`；复验失败只报警不自动修补。
-- [ ] 5.2 (application) `HorseProfileCompletionRun.parameters` 记录批次 checkpoint 指针（run_dir、state SHA）与批次 manifest SHA，run 列表可按批次反查。
+- [x] 5.1 (integration) 每个地区子批 commit 成功后自动以同一 artifact 重跑该地区范围 dry-run simulation，断言 planned creates/updates/audits 全为 0；复验摘要写入 `HorseProfileCompletionRun.summary.idempotent_verification` 与 `state.json`；复验失败只报警不自动修补。
+- [x] 5.2 (application) `HorseProfileCompletionRun.parameters` 记录批次 checkpoint 指针（run_dir、state SHA）与批次 manifest SHA，run 列表可按批次反查。
 
 ## 6. 验证与文档
 
-- [ ] 6.1 (integration) 目标测试：选批排除/覆盖规则与默认 100/500 阈值、队列项→候选形状转换（含无 source URL 行为）、manifest 批准绑定、checkpoint 决策矩阵全分支、预算账本超限/损坏/并发、结构化异常分类、重试记账（不计 per-candidate 常量、计地区账本）、永久失败不重试、地区交错调度、确定性转换器同字节复现、复审文件生成与抽样页内容、批准回写与排除马替补池、台账核对、滚动批准 fail closed、每地区独立 commit artifact 与既有断言兼容、重 commit 同 SHA 约束、幂等复验、无界执行拒绝；回归保护：首批 50 行 CSV 入口与首批白名单幂等复验路径保持可用。
+- [x] 6.1 (integration) 目标测试：选批排除/覆盖规则与默认 100/500 阈值、队列项→候选形状转换（含无 source URL 行为）、manifest 批准绑定、checkpoint 决策矩阵全分支、预算账本超限/损坏/并发、结构化异常分类、重试记账（不计 per-candidate 常量、计地区账本）、永久失败不重试、地区交错调度、确定性转换器同字节复现、复审文件生成与抽样页内容、批准回写与排除马替补池、台账核对、滚动批准 fail closed、每地区独立 commit artifact 与既有断言兼容、重 commit 同 SHA 约束、幂等复验、无界执行拒绝；回归保护：首批 50 行 CSV 入口与首批白名单幂等复验路径保持可用。
 - [ ] 6.2 (operations) 本地验证：`DB_ENGINE=sqlite python manage.py check`、目标 Django 测试、完整 `stable` 回归、`makemigrations --check --dry-run`（本 change 无迁移，确认无漂移）、`openspec validate productize-p0-horse-batch-completion --strict`、`openspec validate --all`、`git diff --check`。
-- [ ] 6.3 (integration) 离线 fixture 端到端：选批 → 批准 → prepare 模拟中断 → resume → artifact → dry-run → commit（sqlite）→ 幂等复验，全程零真实网络。
+- [x] 6.3 (integration) 离线 fixture 端到端：选批 → 批准 → prepare 模拟中断 → resume → artifact → dry-run → commit（sqlite）→ 幂等复验，全程零真实网络。
 - [ ] 6.4 (operations) 独立 code review 并修复全部 actionable finding；更新 `docs/current_state.md`、`docs/project_status.md`、`docs/deploy_runbook.md`（滚动批次操作手册）；将 `complete-p0-horse-profile-data` tasks.md 的 `4.2` 标记为由本 change 完成。
 - [ ] 6.5 (operations) 生产部署按 runbook 执行（备份、容器健康、check/healthz smoke、含 openpyxl 的镜像构建验证）；本 change 部署不触网、不写马匹资料；首个生产滚动批次以单地区小批验证 checkpoint/resume/预算/复审文件/批准回写/地区独立 commit 证据后，再按默认 100/500 阈值滚动；串行提交窗口约束写入 deploy_runbook。

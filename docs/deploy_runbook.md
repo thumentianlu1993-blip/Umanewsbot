@@ -1,5 +1,42 @@
 # 部署运行手册
 
+## P0 滚动批次补全操作手册（productize-p0-horse-batch-completion，2026-07-21）
+
+本节是滚动批次（每地区默认 100 匹、单批合计不超过 500 匹）的标准操作顺序。
+每批复审产物为 `HORSE_PROFILE_COMPLETION_REVIEW_OUTPUT_DIR/<batch_id>.xlsx`
+单独文件；JSONL artifact 是唯一 commit 凭证。全部写库动作按地区独立
+commit artifact 执行，全局同一时间只允许一个批次处于
+prepared-uncommitted 状态（`serial-window.lock` 互斥）。
+
+1. 选批（只读，不写任何资料字段）：
+   `python manage.py p0_horse_completion_batch --select --regions japan --json`
+   生成 pending 批次 manifest 于 `HORSE_PROFILE_COMPLETION_BATCH_STATE_DIR/p0batch-*/batch_manifest.json`。
+   无 `--regions`/`--profile-id` 且无显式 `--limit-per-region` 时命令 fail closed。
+2. 批准批次构成（人工）：核对 manifest 的逐马身份快照与队列排序原因后
+   `--approve <manifest> --reviewer <name>`；整匹排除用
+   `--exclude-profile-id`（四个模块一起排除，进入 blocker/替补池）。
+3. 抓取（可中断恢复）：`--prepare <manifest> --expected-sha256 <sha>`
+   默认 cache-only；触网需要 `--allow-network` 且生产
+   `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true`。中断或预算耗尽后重复同一命令即
+   resume（`skipped_unchanged/retry_failed/rerun_input_changed` 决策矩阵）。
+   请求经按地区持久账本 `budget/<region>.json` 与 per-host 限速；429/超时/5xx
+   有限重试（默认 3 次、基数 30s）计入账本但不计 per-candidate 常量。
+4. 人工复审：打开复审 xlsx（汇总/地区 sheet/异常抽样页），抽样核对重点字段。
+5. 批准回写：`--bundle <manifest> --region <region> --reviewer-id <id>`
+   （reviewer 必须是 active superuser），按地区生成 research v3、mapping
+   decisions、authority manifest 并追加台账。美国地区滚动批次 fail closed，
+   需独立批准 authority manifest（首批冻结批准不外推）。
+6. 提交：`--commit <manifest> --region <region> --reviewer-id <id>
+   --approved-by <name> --confirm-reviewed-artifact`。approved-by 必须与
+   reviewer 不是同一人。串行窗口内完成 prepare artifact → release manifest
+   （台账通道，不使用首批仓库白名单）→ dry-run → commit → 自动幂等复验
+   （planned write 必须为 0，否则命令失败报警，不自动修补）。
+7. 批次放弃：`abandon` 必须给出 reason；staging 与台账保留，禁止静默清理。
+
+内容修复（换马、改字段）必须另起新批次新 artifact；重 commit 必须使用同一
+artifact 字节。生产主机为 2 vCPU / 4 GiB / no swap：禁止无地区全量执行，
+禁止绕过批次上限。
+
 ## P0 首批 50 匹生产提交与最终验收（2026-07-20）
 
 1. 唯一生产输入为 artifact SHA-256
