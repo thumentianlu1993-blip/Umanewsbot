@@ -1,5 +1,31 @@
 # 关键决策
 
+## 2026-07-21：赛事中文名导入最终复审由 Claude Code 替代原 codex reviewer 会话
+
+- 背景：`docs/race_name_translation_handoff_20260720.md` 步骤 7 原要求复用 codex reviewer 外层会话 `019f7bfb-2543-7523-aebd-3d496bc96422` / 内层会话 `019f7e38-ab9f-74e1-8932-f42f9c364a48` 做最终只读复审。
+- 现实约束：该会话属于 codex CLI，当前任务由 Claude Code 接手，无法恢复 codex 会话上下文。
+- 用户于 2026-07-21 明确决定：最终复审改由 Claude Code 对最终精确候选做等价完整只读复审。复审必须覆盖交接文档步骤 7 点名的四类聚焦回归（全部 scope RaceSeries 完整行 CAS、非 allowlist 独立中文名不覆盖、supplemental seriesKey 门禁、SSH non-multiplexing 回归）外加全量常规审查，取得 APPROVED 且 actionable finding 清零后才进入用户授权门禁。
+- 不得以测试通过、普通 diff 或人工判断替代该复审；审核链替换事实同时记录于 `openspec/changes/import-reviewed-race-name-translations/design.md` 与交接文档。
+- 授权门禁不变：复审通过前的任何概括授权（包括此前的“授权任何操作”）均不替代用户对最新受审精确版本的重新发布授权。
+
+## 2026-07-20：赛事中文名不展示让赛标记
+
+- 用户明确要求所有赛事中文名均不展示让赛属性。原文中的 `(H)`、独立 `H`、`Handicap` 及其同义让赛标记只保留在原文或结构化赛事属性中，不进入最终中文展示名。
+- 该规则适用于日本、中国香港、美国、英国和法国五区，优先级高于各审核工作簿中任何关于保留或翻译“让赛”的旧说明。
+- 删除让赛标记不得用于合并 RaceSeries 身份；系列归属仍以 RaceSeries Key / ID、年份和来源证据单独判断。
+- 审核工作簿若仍残留让赛字样，统一 manifest 只删除明确的让赛字样和删除后形成的空括号，不擅自补写“锦标”“大赛”等新词；原工作簿保持锁定，并在报告中保存调整前后值。
+- 日本序号 64 `Keisei Hai Autumn H` 是用户逐项确认的显式例外，其最终中文展示名锁定为“京成杯秋季赛”；这里的“赛”是赛事名称自然结尾，不表示展示让赛属性，也不得再退回“京成杯秋季”。
+- 同系列已公开 2026 Event `96` 也必须使用“京成杯秋季赛”。它虽不在 2010–2025 审核表年度范围内，但已有独立中文旧名且直接对外展示；本批仅在事件 ID、年份、系列、地区、原文、旧中文名和目标中文名全部精确匹配时追加纠正。
+- 当一个 RaceSeries 在本批取得已审核中文名时，与该系列关联且 `RaceEvent.chinese_name == RaceEvent.original_name` 的范围外 Event 必须同步使用系列中文名，否则系列改名后会与历史完整性校验的期望展示名不一致。该扩展只适用于明确的原文回退值，并逐场执行地区、系列和 `chinese_name` 人工锁校验；已有独立中文名的范围外 Event 不自动覆盖。
+- 香港 `SURFACE Bauhinia Sprint Trophy(H)` 2012 行是本批唯一显式身份修正：RaceEvent 与其 HistoricalRaceEventTarget 必须在同一事务同步改绑系列 `5963`，Event 写中文名但保留来源污染的 `original_name`；污染系列 `6019` 本批不写系列中文名、不删除，也不把该例外推广为其他自动合并规则。
+- 生产 full-row 快照必须保留服务端 canonical JSON 的数字词法；`1.0` 不得经 JavaScript 变成 `1`。传输采用带序号和总数的完整分块，客户端先验证块集合与传输 SHA，再让落盘内容独立重算每行 `rowSha256` 和整体 `secondSha256`。
+- 完整 production-before、dry-run 和 rollback JSON 继续作为不可变审计证据并纳入 bundle index，但生产 apply/verifier 不同时展开这些大型对象。执行使用同 bundle 内受哈希绑定的紧凑 plan：写前以完整 before row SHA 做 CAS，写后/回滚以不可变字段 SHA、精确可变字段值、操作时间和整批聚合 SHA 验证；这样维持完整行保护，同时把 CLI+Django 入口峰值控制在 256 MiB 内。
+- 写后 verifier 不得只按 manifest 派生的稳定 batch ID 选择 OperationLog；还必须把日志中的 bundle-index、bundle content、apply/verifier、manifest、production-before、dry-run 和 rollback SHA 与当前受审 bundle 逐项比较。任一身份不一致即拒绝，避免旧候选日志被误用于验收新 bundle。
+- 生产事务不得把预演时的 Event 动作 ID 列表视为完整范围。执行计划必须冻结全部相关 RaceSeries 及其完整 Event 子集合；事务按“全部父系列 -> 全部子 Event”顺序加锁并比较精确集合、系列归属和非动作行完整 SHA。这样既阻止预演后新增/改绑子行，也保证仍以原文回退的 Event 不会在系列翻译后被遗漏。
+- “全部父系列”不仅是 ID 围栏；包括不发生中文名写入的身份修正源 Series `6019` 在内，每个 scope RaceSeries 都必须保存并校验完整 before-row SHA。apply、独立 verifier 和 rollback 任一阶段发现非动作父系列 key、地区或其他 concrete field 漂移都停止。
+- supplemental Event 只允许两类：当前 `chinese_name == original_name` 的同系列回退值，或精确 allowlist 的 Event `96`。其他独立中文名即使含让赛标记也只进入范围外报告，不得借“让赛不展示”规则覆盖；所有 supplemental 动作必须同时匹配 series ID、series key 和地区。
+- 生产快照的传输 SHA 只证明服务端 bytes 完整到达，不替代客户端对 lossless 重建结果的语义校验。生成器必须从保留数字词法的落地对象重算每行和整体 SHA，并在快照前后两次读取 checkout、image ID/tag、container started-at；任一变化使本次候选失效。
+
 ## 2026-07-18：英国 Group 级别装饰只从审核级别派生精确名称变体
 
 - TRA 英国 G1-G3 racecard 赛事名可在基础名末尾携带 `(Group 1/2/3)`。首版只在英国且

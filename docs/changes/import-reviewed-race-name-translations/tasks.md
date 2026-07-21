@@ -1,0 +1,31 @@
+# 已审核赛事中文名统一导入预演任务
+
+- [x] (application) 为 manifest 规范化、年份展开、严格校验和 dry-run 分类补充 RED 测试。
+- [x] (application) 实现五区工作簿解析、输入 SHA 锁定和原始 Markdown 身份列逐行对照。
+- [x] (application) 显式应用让赛不展示规则，保留审核原值、调整后值和规则说明。
+- [x] (application) 实现系列动作、年度赛事动作和香港唯一身份修正。
+- [x] (operations) 实现生产 Django 只读快照导出和全目标字段稳定摘要，不创建服务器文件、不执行写操作。
+- [x] (application) 生成 manifest、before/rollback、dry-run JSON 与用户审核 Excel。
+- [x] (application) 运行自动化测试、计数校验、公式错误扫描和所有工作表视觉验证。
+- [x] (operations) 核对生产查询前后计数/时间戳不漂移，并保存只读证据。
+- [x] (application) 更新 current state、project status 和必要的决策/运行手册。
+- [x] (application) 完成预演实现后的原生只读代码审核。
+- [x] (application) 修订日本序号 64 为“京成杯秋季赛”，重新锁定输入 SHA、manifest 和 Excel。
+- [x] (application) 生成日本修订前后机器语义 diff，并以负向用例证明任何额外业务差异都会阻断。
+- [x] (operations) 先补充 bundle 篡改、完整 concrete-field CAS、PostgreSQL 并发/唯一约束、审计失败、对象 rollback 和生产规模 RED 测试。
+- [x] (operations) 实现受审 bundle index、默认只读/显式 commit 的 CAS apply、独立 verifier、对象级 rollback 与固定 OperationLog 契约。
+- [x] (operations) 在 PostgreSQL 16 运行双连接并发及 1300/8883 规模测试，记录查询数、耗时和 RSS。
+- [x] (operations) 重跑生产 dry-run、表格 QA 和代码测试。
+- [x] (operations) 修复最终审核 P1：把香港关联 HistoricalRaceEventTarget 纳入快照、完整行 CAS、唯一性检查、同步改绑、rollback 和独立 verifier，并重跑 PostgreSQL 16 全量测试。
+- [x] (application) review 前把旧预演明确标记为失效，并锁定最终工作簿、bundle 和待发布内容。
+- [x] (application) 修复连续复审 P1：精确纳入已公开 2026 Event 96，并让生产快照分块传输、保留 JSON 数值词法，使全部行与整体哈希可独立重算。
+- [x] (operations) 修复最新复审 P1：commit 数量门改为 1300/8664，rollback verifier 只在 applied 模式执行让赛零残留检查，固定 Event 96 在已应用/漂移/缺失时均显式分类。
+- [x] (operations) 修复后续复审 P1/P2：以受哈希保护的紧凑 execution plan 把 CLI+Django 入口峰值降至 256 MiB 内，并整体删除直接包裹 Handicap 的中英文括号。
+- [x] (operations) 修复最新复审 P1：纳入 219 场同系列原文回退 Event，并让独立 verifier 按八项 artifact SHA 绑定精确 OperationLog。
+- [x] (operations) 修复连续复审 P1/P2：事务围栏 1301 个系列下完整 8885 场 Event，重算 lossless 逐行/整体 SHA，并复核 snapshot 前后运行时 metadata。
+- [x] (operations) 修复最新复审 P1/P2：对全部 scope 父 Series 做完整行 CAS，禁止覆盖非 allowlist 独立中文名，并为 supplemental Event 增加 seriesKey 门禁。
+- [ ] (operations) 在同一 reviewer 会话完成最新代码/归档只读复审。
+- [ ] (operations) 在最新成功 review 后取得明确授权，完成 staging transition、不可变提交并从该提交导出 bundle。
+- [ ] (operations) 由 lowcost `db` 容器创建 `.incomplete` custom-format 备份，原子改名并校验版本、权限、大小、SHA 和 `pg_restore -l`。
+- [ ] (operations) 运行 verify-only、原子 apply、独立 verifier、OperationLog/health/page 验收并清理临时文件。
+- [ ] (application) 仅在 evidence-only allowlist 回写最终生产证据，经 evidence review 后提交并推送；本任务不部署或重启服务。

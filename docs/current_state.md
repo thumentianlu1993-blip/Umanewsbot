@@ -1,5 +1,50 @@
 # 当前状态
 
+## 2026-07-21 五区赛事中文名最终复审第一轮完成，修复后新候选待复审第二轮
+
+- Claude Code 等价最终复审第一轮：四个聚焦门禁（全部 scope 系列完整行 CAS、非 allowlist 独立中文名不覆盖、supplemental seriesKey 门禁、SSH non-multiplexing 与快照 metadata 比对）直接验证通过；两个只读审查代理共报 11 项 finding，裁定 8 项行动项（supplemental 计数锚点、空原文误判、allowlist 未消费阻断、全簿值/公式 diff、共享字符串引用唯一性、打包器 contentSha/重复行/测试、布局负向测试、updated_at 断言）已全部修复并补负向测试；2 项驳回/观察（公式扫描不 gate 为有意设计、让赛前导空格删除符合规则）。
+- 修复后新候选 `unified-import-preview-20260720T220245Z`：`applyReady=true`、blocker 0、锚点计数 1300/8883/220/1/2/101 全一致、双快照稳定、metadata 一致、日本修订仅 C68、eventScope 1301/8885；`execution-plan.json` 与上一候选逐字节一致。测试：Node 20/20、布局 6/6、打包器 6/6、SQLite 20+4skip、PG16 24/24（31 queries / 3.093s / 90.9MB）、OpenSpec strict 31/31。bundle 重复打包逐字节一致：archive `bf28bb90…e6e4`、index `72706e95…333a`、content `014a43c2…80f4`。
+- 修订工具重跑真实基线精确复现锁定 SHA `e244a0fb…`；apply/verifier CLI 完成新 bundle 校验并到达预期数据库连接边界。仍未写生产、未提交、未备份；待复审第二轮（聚焦修复 diff）结论后进入用户授权门禁。
+
+## 2026-07-21 五区赛事中文名新候选已生成并通过全部本地验证，等待最终复审
+
+- 生产只读访问已恢复：`/opt/umanewsbot` HEAD `7ad6ade`，web 容器 image `sha256:af880cd2…`、started `2026-07-20T07:28:13Z`，`/healthz/` 200。四份原 `~/Downloads` 输入已由用户同字节复制到 `outputs/translate-race-names-20260719/`，六份输入 SHA 全部不变，生成器锁定路径已切换。
+- 生产快照脚本内存修复：第一轮快照 `content` 从不传输但此前与第二轮同时驻留，4 GiB 主机上被 OOM 杀死（exit 137，失败目录 `unified-import-preview-20260720T205208Z` 已 fail closed）。现第一轮摘要提取后显式 `del first` + `gc.collect()` 再取第二轮，输出语义不变；该修复进入最终复审范围。
+- 新候选 `unified-import-preview-20260720T205650Z`：`applyReady=true`、`blockerCount=0`、双轮快照稳定、snapshot 前后 metadata 一致；系列动作 `1300`、赛事动作 `8883`、身份修正 `1`、范围外仅报告 `2`、跨系列同译名 `101`；`eventScope.series=1301`（带 `beforeRowSha256`）、`eventScope.events=8885`；Event `96`、Event `16446`、Target `49052` 精确命中；日本修订仅 `C68` 一处业务差异、公式零差异。此前全部候选继续失效，不得 apply。
+- Excel QA 通过：8 张表齐全、公式错误 0、布局测试 2/2、概览阻断项 0；建议中文名无让赛残留。deterministic bundle 已重建于 `runtime/artifacts/race-name-translations/20260721/`，重复打包逐字节一致：archive SHA `3ac595c2…7eb7`、bundle-index 原始 SHA `2877af06…d111`、content SHA `6d188e9c…190a`，12 成员与 receipt 一致。
+- 全量测试通过：Node `16/16`、XLSX `2/2`、SQLite `20+4skip`、PostgreSQL 16 `24/24`（生产规模 `31 queries / 2.815s / 92,372,992 bytes`，预算内）、`openspec validate --all --strict` `31/31`、`git diff --check` 通过；apply/verifier CLI 均完成 bundle 校验并到达预期数据库连接边界；临时容器与临时文件已清理。
+- 最终复审方式变更（用户 2026-07-21 决定，见 `docs/decisions.md` 与交接文档）：原 codex reviewer 会话不可恢复，最终复审改由 Claude Code 对精确候选做等价完整只读复审。OpenSpec 薄层 change `openspec/changes/import-reviewed-race-name-translations/` 已建立并通过 strict 校验。仍未执行：staging/commit/push、生产备份、verify-only 连接生产、apply、任何生产写入。
+
+## 2026-07-20 五区赛事中文名继续返修，等待生产只读快照恢复
+
+- 本任务的跨模型完整交接入口已新增为 `docs/race_name_translation_handoff_20260720.md`，包含项目背景、用户决定、输入 SHA、已完成工作、失效候选、当前 SSH 阻塞、连续 reviewer 会话和严格续接顺序。后续模型应先读该文档，再从生产只读连接恢复开始，不得复用旧候选。
+
+- 四份未变地区输入和日本最终修订表已全部锁定；日本表 SHA-256 为 `e244a0fb…6eb1`，以原始 XLSX 包做单点修订，只有 `xl/sharedStrings.xml` 成员变化；机器语义 diff 只有 `翻译清单!C68` 从“京成杯秋季让赛”变为“京成杯秋季赛”，完整布局、其他业务值与公式零差异。
+- 生产权威入口仍为 `root@47.239.167.86:/opt/umanewsbot`。生成期间外部流程把 `umanewsbot-web-1` 重建到 checkout `8863f37a679e9196e0bf45b5473c0e9f6657487f`、image `sha256:e54c8225…e89c1`；首次读取因此中断，未复用旧结果。当前候选在新容器上重新执行 RaceSeries、RaceEvent 和 HistoricalRaceEventTarget 两次 PostgreSQL 全 concrete-field read-only 快照，稳定 SHA-256 仍为 `bc3af8f4…a8325`，没有生产写入。
+- 旧预演目录 `outputs/translate-race-names-20260719/unified-import-preview-20260719T201619Z/` 及其 manifest/dry-run/rollback SHA 已因用户最终译名更正而失效，只保留历史审计，不得用于正式 apply。
+- `unified-import-preview-20260719T212116Z` 至 `T020815Z` 的历次候选均因连续只读审查发现的关联目标、输入锁、回滚、范围、数值词法、内存、精确 bundle 身份、完整 Event/Series 范围围栏或运行时证据问题而失效，不得 apply。`T020815Z` 最后因 `eventScope` 未保存非动作源 Series `6019` 的完整行 SHA、非 allowlist 独立中文名含让赛标记时可能被覆盖、supplemental Event 未校验 `seriesKey` 而失效。三项代码与负向测试已修复，lossless 双层 SHA 和 snapshot 前后 runtime metadata 两项已由 reviewer 确认关闭。
+- 香港 `SURFACE Bauhinia Sprint Trophy(H)` 唯一命中 RaceEvent ID `16446` 与 HistoricalRaceEventTarget ID `49052`。候选在同一事务把两者从系列 `6019` 同步改绑到 `5963`，Event 同时更新 `series_key` 和中文名“洋紫荆短途锦标”；`original_name` 保持不变，目标系列 5963 在 2012 年不存在赛事或历史目标冲突。
+- 日本序号 64 的审核表范围为 2010–2025 共 `16` 场；另把同系列已公开 2026 Event `96` 从“京成杯秋季让赛”精确纠正为“京成杯秋季赛”。为避免系列中文名更新后 Event 继续回退英文，本批还纳入所有与目标系列关联且 `chinese_name == original_name` 的范围外 Event `219` 场；逐场执行地区、系列和中文名锁检查，任一漂移或锁定都会阻断。最终 Event 动作数为 `8663 + 1 + 219 = 8883`。剩余范围外提示仅 `2` 场，均已有独立中文名，不覆盖；跨系列同译名仍为 `101` 组。
+- 主生成器现从锁定的同一份工作簿 bytes 同时计算 SHA 与解析内容；日本修订前后逐值/逐公式验证仅 `翻译清单!C68` 一处变化，并独立校验工作表结构、样式、合并、行列尺寸、冻结窗格、筛选、数据验证等完整布局；Markdown 分组行集按原 PostgreSQL 排序重算得到 `c9c209e6…66d`；让赛规范化覆盖中英文 `让赛/Handicap/(H)/独立 H`，并通过 `H. Allen` 保留用例证明不误删姓名首字母。生产快照改为完整有序分块传输并保留 JSON 数值原始词法；客户端在生成 plan 前重新计算 `34,910` 个 full row 的 `rowSha256` 和整体 `secondSha256`。snapshot 前后还必须取得完全相同的 checkout、image ID/tag 和 container started-at，否则本次生成失败。
+- 执行计划的 `eventScope` 同时冻结 `1301` 个相关 RaceSeries 的完整行 SHA，以及其下完整 `8885` 场 Event 的 ID、系列和 before-row SHA。apply/rollback 事务先锁定并 CAS 全部 scope RaceSeries，再锁定其当前完整 Event 集；父行锁同时阻止并发插入或改绑，集合、系列或非动作行任一漂移均在业务写入前整批失败。独立 verifier 也重查完整父子集合，不再只核计划内 `1300/8883` 个动作。
+- 业务 manifest SHA-256 仍为 `3567eb18…9451`；返修 dry-run 为 `38619f0f…0e97`，rollback-before v3 为 `93b0edff…5bb3`。bundle-index 原始 SHA-256 为 `25d4e47d…e5a15`、内容 SHA 为 `040d6f02…9fa8c`；确定性归档为 `runtime/artifacts/race-name-translations/20260720/race-name-translation-bundle.tar.gz`，SHA-256 `faae9dc9…8e08`，重复打包逐字节一致。独立 verifier 逐项核对 OperationLog 中的 bundle-index、bundle content、apply/verifier、manifest、production-before、dry-run 和 rollback SHA，旧候选日志不能满足当前 bundle。
+- apply/verifier 只展开约 4.8 MB 的紧凑计划，完整大 JSON 继续留作审计。新候选从入口完成 bundle 全量哈希、Django 初始化并走到首次数据库连接失败点，apply/verifier 峰值分别为 `122,941,440` / `121,745,408` bytes，均低于 256 MiB。
+- 自动化测试：Node `16/16`、XLSX 布局 `2/2`、SQLite/Django `18/18`（4 项 PostgreSQL 专项跳过）、PostgreSQL 16 全量 `22/22`。最终 `1300/8883` 生产规模 fixture 实测 `31` 次查询、`2.629s`、RSS 增量 `100,294,656` bytes，低于 `40 / 60s / 256 MiB` 上界；OpenSpec 严格验证 `30/30`。
+- 最终 Excel SHA-256 为 `5ec98f1c…17c2`，已完成 8 张工作表关键范围渲染、重载和公式错误扫描，错误为 0；年度赛事动作中 Event `96`、香港 Event `16446` 和 `219` 场 fallback 动作均单独核对。日本输入说明页原有 2 个 `#NAME?` 兼容问题按“仅改单元格”约束原样保留，不进入最终预演。仍未执行数据库备份、正式 apply、术语库写入、公开状态修改、commit、push 或部署；当前门禁为同一 reviewer 最新只读 review，成功后重新取得发布授权。
+- 对指纹 `60fdee88…f1371b` 的原生只读 review 已于额度恢复后正常完成，审前/审后完整 stdout 逐字节一致；结论 `REVISE`，给出上述 1 个 P1 和 2 个 P2。当前返修代码本地 Node `16/16`、SQLite `20/20`（4 项 PostgreSQL 专项 skip）、PostgreSQL `24/24`，生产规模为 `31 queries / 2.918s / 101,470,208 bytes`。首次新候选生成在 snapshot 后 metadata SSH 阶段遇到连接断裂而 fail closed，第二次在首个 metadata SSH 阶段即超时；只留下空时间戳目录，未生成 artifact。当前生产主机 TCP/22 可连接但 SSH banner 不返回，HTTP health 也超时，禁止复用 `T020815Z` 旧快照冒充新候选。
+
+## 2026-07-19 已完整赛事暂无中文名只读盘点
+
+- 以生产 `HistoricalRaceEventTarget -> RaceEvent` 为准，只统计 `imported` 且 `basic/runners/results=complete` 的详情完整赛事，共 `8867` 个年度目标；本次未把 pending/gap、未来仅排期赛事或身份待审行混入分母。
+- 其中 `8663` 场没有独立中文名，当前 `RaceEvent.chinese_name` 只是原文回退；已有独立中文展示名 `204` 场。按 `RaceSeries + 完全一致展示名` 合并年份后为 `2023` 个待翻译分组，涉及 `1301` 个系列。
+- 地区分组/年度赛事数：日本 `176/2223`、中国香港 `91/473`、美国 `724/3273`、英国 `794/2042`、法国 `238/652`。
+- 完整清单见 `docs/collected_complete_race_names_missing_zh_20260719.md`。本次只读查询并生成审核文档，没有修改生产数据库、术语库或任何赛事名称。
+- 为便于人工编辑，已在 `outputs/translate-race-names-20260719/` 按日本、中国香港、美国、英国、法国拆成五个独立 `.xlsx`。每个文件包含“使用说明”和“翻译清单”，提供“建议中文名”“审核状态”“翻译备注”编辑列、状态下拉与颜色提示；导出后逐文件重载，行数、公式和十张工作表预览均已核验。
+- 日本、中国香港、美国、英国、法国五区翻译文件现已全部收齐并逐份验收，共 `2023/2023` 个展示名分组为 `已确认`。法国完成版为 `/Users/mentianlu/Downloads/法国_已完整赛事中文名翻译审核表_20260719_AI翻译完成.xlsx`，包含 `238` 行、`210` 个 RaceSeries、`652` 场年度赛事；来源为 HKJC `31`、WPStud `119`、AI 翻译 `88`，中文名/来源无空白，身份列与原模板完全一致，未发现公式错误、让赛字样或同一系列内译名不一致。
+- 五区文件仍属于审核输入，尚未生成统一写入 manifest，也未修改生产数据库或正式术语库。统一预演前必须先处理香港 `SURFACE Bauhinia Sprint Trophy(H)` 的采集头污染：2012 行应归入 RaceSeries ID `5963`，不得按独立 ID `6019` 写入；不同 RaceSeries 使用相同中文名的行只作为身份复核提示，不自动合并。
+- 全局展示规则已由用户明确锁定：赛事原文中的 `(H)`、`H` 或 `Handicap` 让赛标记不得进入建议中文名。日本和香港审核表说明页中的既有公式兼容问题应在统一导入包中改为静态汇总值，不影响已确认的明细数据。
+
+
 ## 2026-07-18 event 924 首个 TRA shadow 赛果已取得，有界窗口停止
 
 - 用户显式授权仅对 event `924` 按数据库 `next_poll_at` 手动 claim/dispatch，直到首个

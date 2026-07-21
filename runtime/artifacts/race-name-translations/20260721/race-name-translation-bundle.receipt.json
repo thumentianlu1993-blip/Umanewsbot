@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "race-name-translation-bundle-receipt.v1",
+  "archive": "race-name-translation-bundle.tar.gz",
+  "archiveSizeBytes": 17050222,
+  "archiveSha256": "bf28bb90dd9a3880a125d6193e73efe1821711189343430146a82c6cd491e6e4",
+  "bundleIndexSha256": "72706e95832a0595f0e7b7177e76fb1865e250f92e7b39e31142481fe8bc333a",
+  "bundleContentSha256": "014a43c2670f5504c12814a3fea92dde5bedf9f8dea741954a326216361780f4",
+  "memberCount": 12,
+  "members": [
+    "apply_race_name_translation_manifest.py",
+    "verify_race_name_translation_manifest.py",
+    "input-lock.json",
+    "normalized-input.json",
+    "manifest.json",
+    "production-before.json",
+    "dry-run.json",
+    "rollback-before.json",
+    "execution-metadata.json",
+    "execution-plan.json",
+    "artifact-index.json",
+    "bundle-index.json"
+  ]
+}

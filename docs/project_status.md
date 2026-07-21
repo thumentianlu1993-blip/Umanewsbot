@@ -1,5 +1,35 @@
 # 项目状态文档
 
+## 2026-07-21 五区赛事中文名最终复审第一轮完成，修复后候选待第二轮复审
+
+- Claude Code 等价复审第一轮：四聚焦门禁直接验证通过；8 项行动 finding 全部修复并补负向测试（supplemental 锚点、空原文、allowlist 阻断、全簿 diff、si 引用唯一、打包器加固、布局/updated_at 测试）。新候选 `unified-import-preview-20260720T220245Z` 全部锚点计数一致、`applyReady=true`；execution-plan 与上候选逐字节一致。测试 Node 20/20、布局 6/6、打包器 6/6、SQLite 20+4skip、PG16 24/24、OpenSpec strict 31/31；bundle archive `bf28bb90…` 逐字节可复现。仍未写生产/未提交；待复审第二轮后进入用户授权。
+
+## 2026-07-21 五区赛事中文名新候选已生成，等待 Claude Code 等价最终复审
+
+- 生产只读访问恢复（HEAD `7ad6ade`、web image `af880cd2`、healthz 200）；四份 `~/Downloads` 输入已由用户同字节复制入 worktree，六份输入 SHA 不变；快照脚本修复第一轮 content 驻留导致的容器 OOM（exit 137）后，新候选 `unified-import-preview-20260720T205650Z` 生成成功：`applyReady=true`、blocker 0、系列 `1300`、赛事 `8883`、身份修正 `1`、`eventScope` `1301/8885` 全覆盖，Event 96/16446/Target 49052 精确命中。
+- Excel QA 与 deterministic bundle 完成（archive `3ac595c2…7eb7`，重复打包逐字节一致）；全量测试通过：Node 16/16、XLSX 2/2、SQLite 20+4skip、PG16 24/24（31 queries / 2.815s / 92.4MB）、OpenSpec strict 31/31；apply/verifier CLI 到达预期数据库连接边界。
+- 最终复审改由 Claude Code 做等价完整只读复审（用户 2026-07-21 决定，`docs/decisions.md`）；OpenSpec 薄层 change `import-reviewed-race-name-translations` 已建立。仍未写生产、未提交、未备份；复审通过后须取得用户对精确版本的新授权才进入发布。
+
+## 2026-07-20 五区赛事中文名继续返修，等待生产只读快照恢复
+
+- 已新增 `docs/race_name_translation_handoff_20260720.md` 作为后续模型的完整续接入口；当前真实状态仍是“返修代码与测试完成、旧候选全部失效、等待生产 SSH 恢复后重生成”，没有生产写入。
+
+- 日本最终表 SHA `e244a0fb…6eb1`，仅序号 64 一个译名单元格改为“京成杯秋季赛”，完整 XLSX 布局校验一致；返修生产全字段快照 `bc3af8f4…a8325` 稳定。
+- 新 dry-run 为 `apply_ready=true / blocker=0`：计划更新 `1300` 个 RaceSeries、`8883` 个 RaceEvent，并把香港 Event `16446` 与 HistoricalRaceEventTarget `49052` 同步改绑到系列 `5963`；冲突/锁/缺失均为 0。除审核表 `8663` 场和 Event `96` 外，新增纳入 `219` 场同系列原文回退 Event；仅余 `2` 场已有独立中文名的范围外提示。
+- 输入锁终审风险已修复：日本单格修订由原 XLSX 包单点生成并由主生成器强制验证，工作簿 SHA 与解析共用同一份 bytes，完整布局 fail-closed 校验，Markdown 分组 SHA 实算，中英文让赛标记统一隐藏且保留合法姓名首字母。生产快照分块传输并保留 `1.0` 等 JSON 数值词法，`34,910` 个 full row 与整体哈希全部可从归档重算。apply、独立 verifier、after-CAS 对象 rollback 与审计已覆盖三个模型，回滚审计分别保留 artifact SHA 和回滚后聚合 SHA，并在写回前绑定原 apply 的三个关键 bundle SHA。
+- 连续复审进一步发现事务未围栏相关系列完整 Event 集、客户端未重算 lossless 快照双层 SHA、snapshot 后未复核容器元数据。三项均已修复：计划冻结 `1301` 个相关系列下 `8885` 场完整 Event 集，事务先锁父系列再锁全量子行，生成前重算 `34,910` 个 full row 与整体 SHA，并要求 snapshot 前后 checkout/image/container started-at 完全一致。
+- 原生只读 review 已恢复并完成，对 `T020815Z` 给出 1 个 P1 和 2 个 P2：非动作源 Series 6019 未做完整行 CAS、非 allowlist 独立中文名可能因让赛标记被覆盖、supplemental Event 未校验 seriesKey。三项已修复并补负向测试；lossless 双层 SHA 与 snapshot 前后 runtime metadata 已确认关闭。
+- 返修测试为 Node 16/16、SQLite 20/20（另 4 项 PostgreSQL 专项 skip）、PostgreSQL 24/24，规模测试 31 queries / 2.918s / 101,470,208 bytes。两次重新生成均因生产 SSH banner/metadata 连接超时 fail closed，未形成新 artifact；`T020815Z` 已失效且不得复用。当前未提交、未备份、未写生产，等待生产只读 SSH 恢复后重生成、QA 和复审。
+
+## 2026-07-19 已完整赛事中文名缺口已形成清单
+
+- 生产只读快照中，详情硬口径完整赛事为 `8867` 场；`8663` 场仍以原文回退为中文展示名，`204` 场已有独立中文展示名。
+- 按赛事系列和完全一致展示名合并跨年份后，共 `2023` 个待翻译分组；完整明细位于 `docs/collected_complete_race_names_missing_zh_20260719.md`。本次未写生产，下一步为人工确认翻译口径与批次。
+- 已按五个地区分别生成可编辑 Excel 审核表，均带状态下拉、编辑列和说明页；五个文件已完成导出重载、公式错误扫描和视觉检查。
+- 五区完成版已全部收齐并验收，`2023/2023` 行均为 `已确认`。法国完成版 `238` 行全部有中文名和来源，身份列与原模板一致，覆盖 `210` 个系列、`652` 场年度赛事；未发现公式错误、让赛字样或系列内译名不一致。
+- 当前仍停在人工审核输入层，尚未生成统一写入 manifest、dry-run 差异、回滚文件或执行任何生产写入。下一步先修正香港 `SURFACE Bauhinia Sprint Trophy(H)` 的 RaceSeries 身份归属，再统一生成可审阅的导入预演。
+
+
 ## 2026-07-18 event 924 首个 TRA shadow 赛果到达
 
 - 已在 scheduler false、四层 policy shadow、tracking/allowlist 仅 `[924]` 的边界内完成
