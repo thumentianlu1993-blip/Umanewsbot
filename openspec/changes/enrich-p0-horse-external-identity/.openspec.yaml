@@ -1,0 +1,13 @@
+schema: spec-driven
+created: 2026-07-21
+profile: feature
+phase: reviewed
+journal:
+  - event: plan-reviewed
+    date: "2026-07-21"
+    session: 1
+    mode: full
+    rounds: 1
+    issues_resolved: 11
+    artifacts_modified: [proposal.md, design.md, tasks.md, specs/horse-profile-data-completion/spec.md]
+    note: "Round 1 resolved 2 P0 + 4 P1 + 5 P2: P0-1 identity-key-only backfill cannot make JP/FR candidates committable — added four-field (sire/dam/birth_date) backfill from ExternalHorse with same uniqueness gate (user approved); P0-2 sync re-run would erase backfilled evidence — _upsert_p0_source now merges identity keys, order fixed as sync-then-backfill; P1-3 zeturf and geny ID spaces are not同源 — zeturf mapping dropped, evidence-only; P1-4 ExternalRaceEntry alignment key now requires race_name/venue plus pedigree cross-validation; P1-5 offline conflict deterministic fingerprint and resolved-skip; P1-6 transaction cap 500 profiles and OOM ops preconditions; P2 normalizer unified, casefold keys, unmapped-key neutrality, NAR coverage probe, full_clean on resolution write-back."
