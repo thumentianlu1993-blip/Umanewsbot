@@ -4,6 +4,27 @@
 字段口径、生产计数、关键产物、事故经验、未完成项和后续执行顺序；实时状态仍以本文和生产
 核验为准。
 
+## 2026-07-21 P0 滚动批次产品化已部署生产（未触网、未写马匹资料）
+
+- 生产已部署 `claude/p0-horse-batch-completion` 分支提交 `b3f44d86`，镜像
+  `umanewsbot:prod`（`680ed3a174eb`，新增 `openpyxl==3.1.5`），通过 git bundle
+  从 `7ad6adeb` 快进。部署前备份：`.env.backup.p0-rolling-batch-20260721_154508`、
+  `backups/db/pre-p0-rolling-batch-20260721.sql.gz`（`224757744` bytes，
+  `gzip -t` 通过，SHA-256
+  `93ebe2f3da940a4f2daea3d3ef559cbd97cc2d3e6f380d99a5c0e03d989cf3c5`）。
+- 部署后验证：`manage.py check` 通过、迁移无新增无漂移（仍 `0052`）、
+  镜像内 `openpyxl 3.1.5`、内外 `/healthz/`、首页、`/horses/`、`/races/`、
+  后台登录均 `200`；worker 近期无 error。web 重建后 nginx upstream 曾短暂 502，
+  重启 nginx 恢复（后续部署建议把 nginx 一并重启）。
+- 生产 smoke：`p0_horse_completion_batch --select --regions japan
+  --limit-per-region 1` 在真实队列上选出 `ベリングブルー`（无 identity keys，
+  按预期标记待身份补强），manifest 正常生成后已用 `--abandon` 清理，未写任何
+  马匹资料、未触网；`HORSE_PROFILE_COMPLETION_ALLOW_NETWORK` 生产仍为 `false`。
+- 下一步：首个生产滚动批次以单地区小批验证 checkpoint/resume/预算/复审文件/
+  批准回写/地区独立 commit 证据后，再按默认 100/500 阈值滚动；随后执行
+  `6.7` 公开验收（从已完成 50 匹中每地区人工发布 1-2 匹）。操作手册见
+  `docs/deploy_runbook.md` 顶部。本 change 未归档，待首个生产批次与 6.7 完成。
+
 ## 2026-07-21 P0 滚动批次产品化已完成本地实现（未部署）
 
 - OpenSpec change `productize-p0-horse-batch-completion` 已完成 plan-eng-review

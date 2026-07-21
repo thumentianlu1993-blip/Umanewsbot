@@ -1,5 +1,23 @@
 # 部署运行手册
 
+## P0 滚动批次产品化生产部署结果（2026-07-21）
+
+1. 部署前：容器全部健康，内外 `/healthz/` 200，磁盘 `37%`，无外部导入运行/锁。
+   备份 `.env.backup.p0-rolling-batch-20260721_154508` 与
+   `backups/db/pre-p0-rolling-batch-20260721.sql.gz`（224M，`gzip -t` 通过，
+   SHA-256 `93ebe2f3da940a4f2daea3d3ef559cbd97cc2d3e6f380d99a5c0e03d989cf3c5`）。
+   注意：手工 `pg_dump -U postgres` 在生产会产出 20 字节空 dump（role 不存在），
+   必须使用 `.env` 中 `POSTGRES_USER=horse_news` 并在 exec 时注入 `PGPASSWORD`。
+2. 部署：git bundle 从 `7ad6adeb` 快进到 `b3f44d86`；`docker compose -f
+   docker-compose.prod.lowcost.yml build web worker beat` 重建镜像
+   `680ed3a174eb`（含 openpyxl 3.1.5）并 `up -d`。
+3. 部署后：`manage.py check` 通过、无迁移漂移、镜像内 openpyxl 可用、内外
+   healthz/首页/horses/races/admin 均 200。**web 重建后 nginx upstream 短暂
+   502，重启 nginx 恢复；后续部署把 nginx 一并纳入重启清单。**
+4. smoke：批次命令 select/abandon 在真实队列验证通过（`ベリングブルー`，
+   无 identity keys 按预期待身份补强）；未触网、未写马匹资料，生产
+   `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false` 保持不变。
+
 ## P0 滚动批次补全操作手册（productize-p0-horse-batch-completion，2026-07-21）
 
 本节是滚动批次（每地区默认 100 匹、单批合计不超过 500 匹）的标准操作顺序。
