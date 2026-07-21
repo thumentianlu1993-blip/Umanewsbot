@@ -1,0 +1,6 @@
+{
+  "schema_version": "p0-horse-workbook-build-config.v1",
+  "input_path": "runtime/horse_profile_completion/pedigree-research-20260719/p0_horse_research_50_enriched_v2.json",
+  "output_path": "outputs/019f481e-4133-7f43-9844-e7a59b33ba9a/P0马五地区50匹完整解析与字段可用性审核-v2.xlsx",
+  "preview_dir": "outputs/019f481e-4133-7f43-9844-e7a59b33ba9a/previews-v2"
+}

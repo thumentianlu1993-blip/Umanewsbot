@@ -1,0 +1,43 @@
+{
+  "schema_version": "p0-horse-production-readiness-report.v1",
+  "mode": "production_readiness_report",
+  "decision": "blocked",
+  "blockers": [
+    "not_horse_profile_completion_plan",
+    "missing_production_profile_ids",
+    "missing_production_reviewer_id",
+    "missing_commit_compatible_module_approvals"
+  ],
+  "input_sha256": "a1184dbfb0257ecbe2a4ddbc4e729b0a74d73f911c8d52a20ab65854520325b7",
+  "review_artifact_sha256": "29091d69573bab907cda2e9a081ae4684838b92d1f9b052a7601b6109a541077",
+  "horse_count": 50,
+  "strict_complete_before": 40,
+  "strict_complete_after": 50,
+  "strict_complete_target": 50,
+  "us_authority_reviewed_count": 10,
+  "commit_artifact_compatible": false,
+  "commit_artifact_type": null,
+  "load_completion_artifact_compatible": false,
+  "safe_simulation_performed": false,
+  "assessment_type": "static_schema_compatibility_check",
+  "commit_validation": {
+    "loader": "stable.services.horse_profile_completion.load_completion_artifact",
+    "loader_preflight_result": "rejected_not_horse_profile_completion_plan",
+    "formal_simulation_status": "not_run_missing_commit_artifact"
+  },
+  "production_write_enabled": false,
+  "database_write_count": 0,
+  "ready_for_separate_production_commit_review": false,
+  "derived_output": {
+    "path": "runtime/horse_profile_completion/pedigree-research-20260719/p0_horse_research_50_enriched_v3.json",
+    "sha256": "98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e"
+  },
+  "review_artifact": {
+    "path": "runtime/horse_profile_completion/pedigree-research-20260719/reviewed_us_career_source_authority_v1.json",
+    "sha256": "29091d69573bab907cda2e9a081ae4684838b92d1f9b052a7601b6109a541077"
+  },
+  "research_module_review": {
+    "path": "runtime/horse_profile_completion/pedigree-research-20260719/p0_horse_research_50_enriched_v3_research_module_review.json",
+    "sha256": "1440550a3e4d203b604b9dba74b89b2f49ee7075bc168f35e756e54830f31db1"
+  }
+}

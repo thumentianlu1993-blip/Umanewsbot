@@ -1,0 +1,905 @@
+{
+  "schema_version": "p0-horse-basic-profile-evidence.v1",
+  "batch_id": "basic-profile-source-research-20260719",
+  "verified_at": "2026-07-19T09:14:00Z",
+  "verification_method": "manual_web_source_review",
+  "horses": [
+    {
+      "horse_name": "LOSANGE BLEU",
+      "region": "france",
+      "expected_external_horse_id": "1055320",
+      "expected_sire": "Martaline",
+      "expected_dam": "Sweet Valrose",
+      "expected_birth_year": 2019,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "FR",
+          "direct_raw_value": "FR",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-423022-losange_bleu.php",
+          "normalization_rule": "retain source country code",
+          "evidence_note": "France Sire identifies Losange Bleu as French-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Ecurie Madame Patrick Papot",
+          "direct_raw_value": "Ecurie Madame Patrick Papot",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-423022-losange_bleu.php",
+          "normalization_rule": "trim source text",
+          "evidence_note": "France Sire lists the breeder on the horse profile."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "LE PHILOSOPHE",
+      "region": "france",
+      "expected_external_horse_id": "1055312",
+      "expected_sire": "Doctor Dino",
+      "expected_dam": "Conceptuelle",
+      "expected_birth_year": 2019,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "FR",
+          "direct_raw_value": "FR",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-423013-le_philosophe.php",
+          "normalization_rule": "retain source country code",
+          "evidence_note": "France Sire identifies Le Philosophe as French-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Neustrian Associates",
+          "direct_raw_value": "Neustrian Associates",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-423013-le_philosophe.php",
+          "normalization_rule": "trim source text",
+          "evidence_note": "France Sire lists the breeder on the horse profile."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "DOUBLE MAJOR",
+      "region": "france",
+      "expected_external_horse_id": "1094515",
+      "expected_sire": "Daiwa Major",
+      "expected_dam": "Dancequest",
+      "expected_birth_year": 2020,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "IRE",
+          "direct_raw_value": "IRE",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-456362-double_major.php",
+          "normalization_rule": "retain source country code",
+          "evidence_note": "France Sire identifies Double Major as Irish-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Wertheimer & Frere",
+          "direct_raw_value": "Wertheimer & Frere",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-456362-double_major.php",
+          "normalization_rule": "trim source text",
+          "evidence_note": "France Sire lists the breeder on the horse profile."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "KENTUCKY WOOD",
+      "region": "france",
+      "expected_external_horse_id": "1137721",
+      "expected_sire": "Balko",
+      "expected_dam": "Carrieriste",
+      "expected_birth_year": 2020,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "FR",
+          "direct_raw_value": "FR",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-470857-kentucky_wood.php",
+          "normalization_rule": "retain source country code",
+          "evidence_note": "France Sire identifies Kentucky Wood as French-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "S.c.e.a. Bertwood Stables, Nicolas Lageneste",
+          "direct_raw_value": "S.c.e.a. Bertwood Stables, Nicolas Lageneste",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-470857-kentucky_wood.php",
+          "normalization_rule": "trim source text",
+          "evidence_note": "France Sire lists both breeder parties."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "TOSCANA DU BERLAIS",
+      "region": "france",
+      "expected_external_horse_id": "1059738",
+      "expected_sire": "Shantou",
+      "expected_dam": "Katioucha",
+      "expected_birth_year": 2018,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "FR",
+          "direct_raw_value": "FR",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-410189-toscana_du_berlais.php",
+          "normalization_rule": "retain source country code",
+          "evidence_note": "France Sire identifies Toscana Du Berlais as French-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Haras du Berlais, Catherine Pousin",
+          "direct_raw_value": "Haras du Berlais, Catherine Pousin",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-410189-toscana_du_berlais.php",
+          "normalization_rule": "trim source text",
+          "evidence_note": "France Sire lists both breeder parties."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "AVENTURE",
+      "region": "france",
+      "expected_external_horse_id": "1119373",
+      "expected_sire": "Sea The Stars",
+      "expected_dam": "Balladeuse",
+      "expected_birth_year": 2021,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "IRE",
+          "direct_raw_value": "IRE",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-472097-aventure.php",
+          "normalization_rule": "retain source country code",
+          "evidence_note": "France Sire identifies Aventure as Irish-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Wertheimer & Frere",
+          "direct_raw_value": "Wertheimer & Frere",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-472097-aventure.php",
+          "normalization_rule": "trim source text",
+          "evidence_note": "France Sire lists the breeder on the horse profile."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "SEVENNA'S KNIGHT",
+      "region": "france",
+      "expected_external_horse_id": "1079049",
+      "expected_sire": "Camelot",
+      "expected_dam": "Sevenna",
+      "expected_birth_year": 2020,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "IRE",
+          "direct_raw_value": "IRE",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-444455-sevenna_s_knight.php",
+          "normalization_rule": "retain source country code",
+          "evidence_note": "France Sire identifies Sevenna's Knight as Irish-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Gestut Ammerland",
+          "direct_raw_value": "Gestut Ammerland",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-444455-sevenna_s_knight.php",
+          "normalization_rule": "trim source text",
+          "evidence_note": "France Sire lists the breeder on the horse profile."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "FIRST LOOK",
+      "region": "france",
+      "expected_external_horse_id": "1124121",
+      "expected_sire": "Lope De Vega",
+      "expected_dam": "Bilissie",
+      "expected_birth_year": 2021,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "IRE",
+          "direct_raw_value": "First Look (IRE)",
+          "source_name": "france_galop",
+          "source_url": "https://www.france-galop.com/en/content/november-2023-maiden-winners",
+          "normalization_rule": "map horse-name suffix IRE to country code IRE",
+          "evidence_note": "France Galop identifies First Look with the IRE suffix."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Haras de la Perelle",
+          "direct_raw_value": "Haras de la Perelle",
+          "source_name": "france_galop",
+          "source_url": "https://www.france-galop.com/en/content/november-2023-maiden-winners",
+          "normalization_rule": "trim source text",
+          "evidence_note": "France Galop names Haras de la Perelle as breeder."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "HORIZON DORE",
+      "region": "france",
+      "expected_external_horse_id": "1077939",
+      "expected_sire": "Dabirsim",
+      "expected_dam": "Sweet Alabama",
+      "expected_birth_year": 2020,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "FR",
+          "direct_raw_value": "FR",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-397078-horizon_dore.php",
+          "normalization_rule": "retain source country code",
+          "evidence_note": "France Sire identifies Horizon Dore as French-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Chantal Becq",
+          "direct_raw_value": "Chantal Becq",
+          "source_name": "france_sire",
+          "source_url": "https://www.france-sire.com/cheval-397078-horizon_dore.php",
+          "normalization_rule": "trim source text",
+          "evidence_note": "France Sire lists the breeder on the horse profile."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "MARHABA YA SANAFI",
+      "region": "france",
+      "expected_external_horse_id": "1080265",
+      "expected_sire": "Muhaarar",
+      "expected_dam": "Danega",
+      "expected_birth_year": 2020,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "IRE",
+          "direct_raw_value": "Marhaba Ya Sanafi (IRE)",
+          "source_name": "france_galop",
+          "source_url": "https://www.france-galop.com/en/content/eu80000-longines-bertrand-du-breuil-gr3-marhaba-ya-sanafi-making-name-himself",
+          "normalization_rule": "map horse-name suffix IRE to country code IRE",
+          "evidence_note": "France Galop identifies Marhaba Ya Sanafi with the IRE suffix."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Rabbah Bloodstock Limited",
+          "direct_raw_value": "Rabbah Bloodstock Limited",
+          "source_name": "france_galop",
+          "source_url": "https://www.france-galop.com/fr/content/emirates-poule-des-poulains-le-bonjour-de-marhaba-ya-sanafi",
+          "normalization_rule": "trim source text",
+          "evidence_note": "France Galop names Rabbah Bloodstock Limited as breeder."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "Jonbon",
+      "region": "united_kingdom",
+      "expected_external_horse_id": "1014215",
+      "expected_sire": "Walk In The Park",
+      "expected_dam": "Star Face",
+      "expected_birth_year": 2016,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "FR",
+          "direct_raw_value": "Jonbon (FR)",
+          "source_name": "irishracing",
+          "source_url": "https://www.irishracing.com/horse/Jonbon-FR/607747",
+          "normalization_rule": "map horse-name suffix FR to country code FR",
+          "evidence_note": "Irish Racing identifies Jonbon with the FR suffix."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Mr Lotfi Kohli",
+          "direct_raw_value": "Mr Lotfi Kohli",
+          "source_name": "irishracing",
+          "source_url": "https://www.irishracing.com/horse/Jonbon-FR/607747",
+          "normalization_rule": "trim source text",
+          "evidence_note": "Irish Racing lists the breeder on the horse profile."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "Edwardstone",
+      "region": "united_kingdom",
+      "expected_external_horse_id": "912463",
+      "expected_sire": "Kayf Tara",
+      "expected_dam": "Nothingtoloose",
+      "expected_birth_year": 2014,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "GB",
+          "direct_raw_value": "Edwardstone (GB)",
+          "source_name": "irishracing",
+          "source_url": "https://www.irishracing.com/horse/Edwardstone-GB/580063",
+          "normalization_rule": "map horse-name suffix GB to country code GB",
+          "evidence_note": "Irish Racing identifies Edwardstone with the GB suffix."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Mr R. Abrey & Mr I. Thurtle",
+          "direct_raw_value": "Mr R. Abrey & Mr I. Thurtle",
+          "source_name": "irishracing",
+          "source_url": "https://www.irishracing.com/horse/Edwardstone-GB/580063",
+          "corroborating_source_urls": [
+            "https://greatbritishracinginternational.com/news/pensioned-kayf-taras-impact-still-felt-as-overbury-celebrates-edwardstone-grade-1"
+          ],
+          "normalization_rule": "trim source text",
+          "evidence_note": "Irish Racing lists both breeders; GBRI independently identifies the same breeding."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "Sceau Royal",
+      "region": "united_kingdom",
+      "expected_external_horse_id": "389715",
+      "expected_sire": "Doctor Dino",
+      "expected_dam": "Sandside",
+      "expected_birth_year": 2012,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "FR",
+          "direct_raw_value": "Sceau Royal (FR)",
+          "source_name": "racing_post",
+          "source_url": "https://www.racingpost.com/profile/horse/880918/sceau-royal",
+          "normalization_rule": "map horse-name suffix FR to country code FR",
+          "evidence_note": "Racing Post identifies Sceau Royal with the FR suffix."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Guy Vimont",
+          "direct_raw_value": "Guy Vimont",
+          "source_name": "racing_post",
+          "source_url": "https://www.racingpost.com/profile/horse/880918/sceau-royal",
+          "normalization_rule": "trim source text",
+          "evidence_note": "Racing Post lists the breeder on the horse profile."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "Brando",
+      "region": "united_kingdom",
+      "expected_external_horse_id": "316185",
+      "expected_sire": "Pivotal",
+      "expected_dam": "Argent Du Bois",
+      "expected_birth_year": 2012,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "GB",
+          "direct_raw_value": "Brando (GB)",
+          "source_name": "racing_post",
+          "source_url": "https://www.racingpost.com/bloodstock/news/international/a-new-top-level-winner-for-pivotal-as-brando-takes-centre-stage-aWcuh4G2BmkB/",
+          "normalization_rule": "map horse-name suffix GB to country code GB",
+          "evidence_note": "Racing Post identifies Brando as British-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Car Colston Hall Stud",
+          "direct_raw_value": "Car Colston Hall Stud",
+          "source_name": "racing_post",
+          "source_url": "https://www.racingpost.com/bloodstock/news/international/a-new-top-level-winner-for-pivotal-as-brando-takes-centre-stage-aWcuh4G2BmkB/",
+          "normalization_rule": "trim source text",
+          "evidence_note": "Racing Post names Car Colston Hall Stud as breeder."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "Art Power",
+      "region": "united_kingdom",
+      "expected_external_horse_id": "941963",
+      "expected_sire": "Dark Angel",
+      "expected_dam": "Evening Time",
+      "expected_birth_year": 2017,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "IRE",
+          "direct_raw_value": "Art Power (IRE)",
+          "source_name": "racing_post",
+          "source_url": "https://www.racingpost.com/bloodstock/news/royal-approval-given-as-breeders-celebrate-ascot-success-aIsWA5H7ubPu/",
+          "normalization_rule": "map horse-name suffix IRE to country code IRE",
+          "evidence_note": "Racing Post identifies Art Power as Irish-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "J F Tuthill",
+          "direct_raw_value": "J F Tuthill",
+          "source_name": "racing_post",
+          "source_url": "https://www.racingpost.com/bloodstock/news/royal-approval-given-as-breeders-celebrate-ascot-success-aIsWA5H7ubPu/",
+          "corroborating_source_urls": [
+            "https://www.racingpost.com/profile/horse/665261/evening-time"
+          ],
+          "normalization_rule": "trim source text",
+          "evidence_note": "Racing Post identifies John Tuthill as Art Power's breeder."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "Paisley Park",
+      "region": "united_kingdom",
+      "expected_external_horse_id": "23231",
+      "expected_sire": "Oscar",
+      "expected_dam": "Presenting Shares",
+      "expected_birth_year": 2012,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "IRE",
+          "direct_raw_value": "Paisley Park (IRE)",
+          "source_name": "irishracing",
+          "source_url": "https://www.irishracing.com/horse/Paisley-Park-IRE/542945",
+          "normalization_rule": "map horse-name suffix IRE to country code IRE",
+          "evidence_note": "Irish Racing identifies Paisley Park with the IRE suffix."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "M. Conaghan",
+          "direct_raw_value": "M. Conaghan",
+          "source_name": "irishracing",
+          "source_url": "https://www.irishracing.com/horse/Paisley-Park-IRE/542945",
+          "normalization_rule": "trim source text",
+          "evidence_note": "Irish Racing lists the breeder on the horse profile."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "Gabrial",
+      "region": "united_kingdom",
+      "expected_external_horse_id": "17774",
+      "expected_sire": "Dark Angel",
+      "expected_dam": "Guajira",
+      "expected_birth_year": 2009,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "IRE",
+          "direct_raw_value": "Gabrial (IRE)",
+          "source_name": "racing_post",
+          "source_url": "https://www.racingpost.com/results/2011-05-05",
+          "normalization_rule": "map horse-name suffix IRE to country code IRE",
+          "evidence_note": "Racing Post result data identifies Gabrial as Irish-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "B Kennedy",
+          "direct_raw_value": "B Kennedy",
+          "source_name": "racing_post",
+          "source_url": "https://www.racingpost.com/results/2011-05-05",
+          "normalization_rule": "trim source text",
+          "evidence_note": "Racing Post result data lists B Kennedy as breeder."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "Regal Reality",
+      "region": "united_kingdom",
+      "expected_external_horse_id": "867285",
+      "expected_sire": "Intello",
+      "expected_dam": "Regal Realm",
+      "expected_birth_year": 2015,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "GB",
+          "direct_raw_value": "Regal Reality (GB)",
+          "source_name": "irishracing",
+          "source_url": "https://www.irishracing.com/royal-ascot/raceresults/Sun-9th-Aug-2020/Salisbury/1525",
+          "normalization_rule": "map horse-name suffix GB to country code GB",
+          "evidence_note": "Irish Racing result data identifies Regal Reality as British-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Cheveley Park Stud Limited",
+          "direct_raw_value": "Cheveley Park Stud Limited",
+          "source_name": "irishracing",
+          "source_url": "https://www.irishracing.com/royal-ascot/raceresults/Sun-9th-Aug-2020/Salisbury/1525",
+          "normalization_rule": "trim source text",
+          "evidence_note": "Irish Racing result data lists Cheveley Park Stud Limited as breeder."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "Stradivarius",
+      "region": "united_kingdom",
+      "expected_external_horse_id": "421893",
+      "expected_sire": "Sea The Stars",
+      "expected_dam": "Private Life",
+      "expected_birth_year": 2014,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "IRE",
+          "direct_raw_value": "Stradivarius (IRE)",
+          "source_name": "france_galop",
+          "source_url": "https://www.france-galop.com/sites/default/files/200928qpat_2020_liste_riche_eng_lundi.pdf",
+          "normalization_rule": "map horse-name suffix IRE to country code IRE",
+          "evidence_note": "France Galop's Arc profile identifies Stradivarius as Irish-bred."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Bjorn Nielsen",
+          "direct_raw_value": "Bjorn Nielsen",
+          "source_name": "france_galop",
+          "source_url": "https://www.france-galop.com/sites/default/files/200928qpat_2020_liste_riche_eng_lundi.pdf",
+          "corroborating_source_urls": [
+            "https://www.racingpost.com/results/6/beverley/2017-04-19/671762"
+          ],
+          "normalization_rule": "trim source text",
+          "evidence_note": "France Galop and Racing Post identify Bjorn Nielsen as breeder."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "The New One",
+      "region": "united_kingdom",
+      "expected_external_horse_id": "9799",
+      "expected_sire": "King's Theatre",
+      "expected_dam": "Thuringe",
+      "expected_birth_year": 2008,
+      "fields": [
+        {
+          "field_name": "country",
+          "canonical_value": "IRE",
+          "direct_raw_value": "The New One (IRE)",
+          "source_name": "irishracing",
+          "source_url": "https://www.irishracing.com/horse/The-New-One-IRE/442085",
+          "normalization_rule": "map horse-name suffix IRE to country code IRE",
+          "evidence_note": "Irish Racing identifies The New One with the IRE suffix."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "R. Brown & Ballylinch Stud",
+          "direct_raw_value": "R. Brown & Ballylinch Stud",
+          "source_name": "irishracing",
+          "source_url": "https://www.irishracing.com/horse/The-New-One-IRE/442085",
+          "normalization_rule": "trim source text",
+          "evidence_note": "Irish Racing lists both breeder parties."
+        }
+      ],
+      "expected_source_name": "sporting_life"
+    },
+    {
+      "horse_name": "EAGLE WAY",
+      "region": "hong_kong",
+      "expected_external_horse_id": "hk_2016_a093",
+      "expected_sire": "More Than Ready",
+      "expected_dam": "Wedgetail Eagle",
+      "expected_birth_year": 2012,
+      "fields": [
+        {
+          "field_name": "birth_date",
+          "canonical_value": "2012-11-11",
+          "direct_raw_value": "11/11/2012",
+          "source_name": "australian_stud_book",
+          "source_url": "https://www.studbook.org.au/Horse.aspx?hid=1057656",
+          "normalization_rule": "parse Australian Stud Book date as YYYY-MM-DD",
+          "evidence_note": "Australian Stud Book profile for Eagle Way gives the exact foaling date."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Segenhoe Thoroughbreds Australia Pty Ltd, NSW",
+          "direct_raw_value": "Segenhoe Thoroughbreds Australia Pty Ltd, NSW",
+          "source_name": "australian_stud_book",
+          "source_url": "https://www.studbook.org.au/Horse.aspx?hid=1057656",
+          "normalization_rule": "trim source text",
+          "evidence_note": "Australian Stud Book lists the registered breeder."
+        }
+      ],
+      "expected_source_name": "hkjc"
+    },
+    {
+      "horse_name": "SOUTHERN LEGEND",
+      "region": "hong_kong",
+      "expected_external_horse_id": "hk_2016_a252",
+      "expected_sire": "Not A Single Doubt",
+      "expected_dam": "Donna's Appeal",
+      "expected_birth_year": 2012,
+      "fields": [
+        {
+          "field_name": "birth_date",
+          "canonical_value": "2012-10-26",
+          "direct_raw_value": "26 October 2012",
+          "source_name": "breednet",
+          "source_url": "https://www.breednet.com.au/horse/southern-legend",
+          "normalization_rule": "parse English source date as YYYY-MM-DD",
+          "evidence_note": "Breednet gives Southern Legend's exact foaling date."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Corumbene Stud",
+          "direct_raw_value": "Corumbene Stud",
+          "source_name": "arrowfield",
+          "source_url": "https://arrowfield.com.au/news/not-a-single-doubts-son-wins-the-kranji-mile/",
+          "normalization_rule": "trim source text",
+          "evidence_note": "Arrowfield identifies Southern Legend as bred by Corumbene Stud."
+        }
+      ],
+      "expected_source_name": "hkjc"
+    },
+    {
+      "horse_name": "BEAUTY GENERATION",
+      "region": "hong_kong",
+      "expected_external_horse_id": "hk_2015_v380",
+      "expected_sire": "Road To Rock",
+      "expected_dam": "Stylish Bel",
+      "expected_birth_year": 2012,
+      "fields": [
+        {
+          "field_name": "birth_date",
+          "canonical_value": "2012-09-27",
+          "direct_raw_value": "27 Sep 2012",
+          "source_name": "racing_and_sports",
+          "source_url": "https://www.racingandsports.com.au/thoroughbred/horse/beauty-generation/1023572",
+          "normalization_rule": "parse English source date as YYYY-MM-DD",
+          "evidence_note": "Racing and Sports gives Beauty Generation's exact foaling date."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Nearco Stud Limited",
+          "direct_raw_value": "Nearco Stud Limited",
+          "source_name": "breednet",
+          "source_url": "https://www.breednet.com.au/news/5909/beauty-generation-breeder-celebrates",
+          "normalization_rule": "trim source text",
+          "evidence_note": "Breednet's breeder feature identifies Nearco Stud Limited."
+        }
+      ],
+      "expected_source_name": "hkjc"
+    },
+    {
+      "horse_name": "TIME WARP",
+      "region": "hong_kong",
+      "expected_external_horse_id": "hk_2016_a066",
+      "expected_sire": "Archipenko",
+      "expected_dam": "Here To Eternity",
+      "expected_birth_year": 2013,
+      "fields": [
+        {
+          "field_name": "birth_date",
+          "canonical_value": "2013-01-28",
+          "direct_raw_value": "Jan 28, 2013",
+          "source_name": "equineline_tdn",
+          "source_url": "https://www.thoroughbreddailynews.com/wp-content/uploads/2020/02/TimeWarp.pdf",
+          "normalization_rule": "parse Equineline date as YYYY-MM-DD",
+          "evidence_note": "The Equineline pedigree distributed by TDN gives the exact foaling date."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Miss Kirsten Rausing",
+          "direct_raw_value": "Miss Kirsten Rausing",
+          "source_name": "thoroughbred_racing_commentary",
+          "source_url": "https://www.thoroughbredracing.com/articles/3348/british-breeding-produces-another-star-hong-kong/",
+          "normalization_rule": "trim source text",
+          "evidence_note": "The breeding feature identifies Kirsten Rausing as Time Warp's breeder."
+        }
+      ],
+      "expected_source_name": "hkjc"
+    },
+    {
+      "horse_name": "EXULTANT",
+      "region": "hong_kong",
+      "expected_external_horse_id": "hk_2017_b101",
+      "expected_sire": "Teofilo",
+      "expected_dam": "Contrary",
+      "expected_birth_year": 2014,
+      "fields": [
+        {
+          "field_name": "birth_date",
+          "canonical_value": "2014-03-24",
+          "direct_raw_value": "Mar 24, 2014",
+          "source_name": "equineline_tdn",
+          "source_url": "https://www.thoroughbreddailynews.com/wp-content/uploads/2020/04/Exultant.pdf",
+          "normalization_rule": "parse Equineline date as YYYY-MM-DD",
+          "evidence_note": "The Equineline pedigree distributed by TDN gives the exact foaling date."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Ballygallon Stud Ltd.",
+          "direct_raw_value": "Ballygallon Stud Ltd.",
+          "source_name": "turf_times",
+          "source_url": "https://www.turf-times.de/pferde/exultant-ire-2014",
+          "normalization_rule": "trim source text",
+          "evidence_note": "Turf-Times lists Ballygallon Stud Ltd. as breeder."
+        }
+      ],
+      "expected_source_name": "hkjc"
+    },
+    {
+      "horse_name": "SEASONS BLOOM",
+      "region": "hong_kong",
+      "expected_external_horse_id": "hk_2015_v410",
+      "expected_sire": "Captain Sonador",
+      "expected_dam": "Pyramisa's Lass",
+      "expected_birth_year": 2012,
+      "fields": [
+        {
+          "field_name": "birth_date",
+          "canonical_value": "2012-09-14",
+          "direct_raw_value": "Sep 14, 2012",
+          "source_name": "equineline_tdn",
+          "source_url": "https://www.thoroughbreddailynews.com/wp-content/uploads/2017/11/SeasonsBloom.pdf",
+          "normalization_rule": "parse Equineline date as YYYY-MM-DD",
+          "evidence_note": "The Equineline pedigree distributed by TDN gives the exact foaling date."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "B M Nolan",
+          "direct_raw_value": "B M NOLAN",
+          "source_name": "jra",
+          "source_url": "https://www.jra.go.jp/JRADB/pdf/2019/1022019020105_s.pdf",
+          "corroborating_source_urls": [
+            "https://world.jra-van.jp/db/horse/H0922/"
+          ],
+          "normalization_rule": "preserve initials and normalize capitalization",
+          "evidence_note": "JRA's official race sheet and JRA-VAN identify B M Nolan as breeder."
+        }
+      ],
+      "expected_source_name": "hkjc"
+    },
+    {
+      "horse_name": "WINNER'S WAY",
+      "region": "hong_kong",
+      "expected_external_horse_id": "hk_2016_a025",
+      "expected_sire": "Starcraft",
+      "expected_dam": "Sunday Service",
+      "expected_birth_year": 2012,
+      "fields": [
+        {
+          "field_name": "birth_date",
+          "canonical_value": "2012-10-24",
+          "direct_raw_value": "24 Oct 2012",
+          "source_name": "racing_and_sports",
+          "source_url": "https://www.racingandsports.co.uk/amp/thoroughbred/horse/winners-way/984148",
+          "normalization_rule": "parse English source date as YYYY-MM-DD",
+          "evidence_note": "Racing and Sports gives Winner's Way's exact foaling date."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Bruce Reid Racing",
+          "direct_raw_value": "Bruce Reid Racing",
+          "source_name": "racing_post",
+          "source_url": "https://www.racingpost.com/results/2017-04-12",
+          "corroborating_source_urls": [
+            "https://world.jra-van.jp/db/horse/H2014/"
+          ],
+          "normalization_rule": "trim source text",
+          "evidence_note": "Racing Post result data lists Bruce Reid Racing as breeder."
+        }
+      ],
+      "expected_source_name": "hkjc"
+    },
+    {
+      "horse_name": "DINOZZO",
+      "region": "hong_kong",
+      "expected_external_horse_id": "hk_2015_v246",
+      "expected_sire": "Lilbourne Lad",
+      "expected_dam": "Nisriyna",
+      "expected_birth_year": 2013,
+      "fields": [
+        {
+          "field_name": "birth_date",
+          "canonical_value": "2013-04-07",
+          "direct_raw_value": "07 APR 2013",
+          "source_name": "netkeiba",
+          "source_url": "https://en.netkeiba.com/db/horse/000a013ed0/",
+          "normalization_rule": "parse English source date as YYYY-MM-DD",
+          "evidence_note": "Netkeiba's international profile gives Dinozzo's exact foaling date."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Swordlestown Little",
+          "direct_raw_value": "B-Swordlestown Little",
+          "source_name": "thoroughbred_daily_news",
+          "source_url": "https://www.thoroughbreddailynews.com/pdf/tdn/2017/tdn170123e.pdf",
+          "corroborating_source_urls": [
+            "https://www.racingpost.com/results/2018-02-04"
+          ],
+          "normalization_rule": "remove breeder label prefix and trim source text",
+          "evidence_note": "TDN and Racing Post identify Swordlestown Little as breeder."
+        }
+      ],
+      "expected_source_name": "hkjc"
+    },
+    {
+      "horse_name": "BEAUTY ONLY",
+      "region": "hong_kong",
+      "expected_external_horse_id": "hk_2013_s411",
+      "expected_sire": "Holy Roman Emperor",
+      "expected_dam": "Goldendale",
+      "expected_birth_year": 2011,
+      "fields": [
+        {
+          "field_name": "birth_date",
+          "canonical_value": "2011-03-14",
+          "direct_raw_value": "14.03.2011",
+          "source_name": "turf_times",
+          "source_url": "https://www.turf-times.de/pferde/beauty-only-ire-2011",
+          "normalization_rule": "parse DD.MM.YYYY as YYYY-MM-DD",
+          "evidence_note": "Turf-Times gives Beauty Only's exact foaling date."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Massimo Parri",
+          "direct_raw_value": "Massimo Parri",
+          "source_name": "turf_times",
+          "source_url": "https://www.turf-times.de/pferde/beauty-only-ire-2011",
+          "corroborating_source_urls": [
+            "https://www.racingpost.com/bloodstock/news/international/emperor-could-rule-world-with-beauty-aQADI6I94wxs/"
+          ],
+          "normalization_rule": "trim source text",
+          "evidence_note": "Turf-Times and Racing Post identify Massimo Parri as breeder."
+        }
+      ],
+      "expected_source_name": "hkjc"
+    },
+    {
+      "horse_name": "PAKISTAN STAR",
+      "region": "hong_kong",
+      "expected_external_horse_id": "hk_2015_v325",
+      "expected_sire": "Shamardal",
+      "expected_dam": "Nina Celebre",
+      "expected_birth_year": 2013,
+      "fields": [
+        {
+          "field_name": "birth_date",
+          "canonical_value": "2013-03-02",
+          "direct_raw_value": "Mar 02, 2013",
+          "source_name": "equineline_tdn",
+          "source_url": "https://www.thoroughbreddailynews.com/wp-content/uploads/2018/05/PakistanStar.pdf",
+          "corroborating_source_urls": [
+            "https://www.gestuet-wittekindshof.de/zucht/en_mares_details.php?ID=9"
+          ],
+          "normalization_rule": "parse Equineline date as YYYY-MM-DD",
+          "evidence_note": "Equineline and the breeder's mare record agree on 2 March 2013."
+        },
+        {
+          "field_name": "breeder_name",
+          "canonical_value": "Gestüt Wittekindshof",
+          "direct_raw_value": "Gestut Wittekindshof",
+          "source_name": "darley",
+          "source_url": "https://www.darley.com.au/news/blog/pakistan-star",
+          "corroborating_source_urls": [
+            "https://www.gestuet-wittekindshof.de/news/en_news_details.php?ID=149"
+          ],
+          "normalization_rule": "restore breeder's official German spelling",
+          "evidence_note": "Darley and Gestüt Wittekindshof identify the German breeder."
+        }
+      ],
+      "expected_source_name": "hkjc"
+    }
+  ]
+}

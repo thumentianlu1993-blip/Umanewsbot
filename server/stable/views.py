@@ -51,6 +51,7 @@ from .models import (
     ArticleTranslationStatus,
     CrawlJob,
     HistoricalRaceResolutionStatus,
+    HorseCareerHistoryStatus,
     HorseFollow,
     HorseP0SourceStatus,
     HorseP0SourceType,
@@ -117,7 +118,7 @@ from .services.horse_profiles import (
     unfollow_horse,
     update_completeness,
 )
-from .services.horse_race_records import upsert_race_record
+from .services.horse_race_records import refresh_career_history_completeness, upsert_race_record
 from .services.media_assets import localize_news_image, set_cover_asset
 from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
 from .services.onebot import BotPusher
@@ -175,6 +176,7 @@ RACE_CALENDAR_PAGE_SIZE = 40
 RACE_CALENDAR_WINDOW_DAYS = 30
 HORSE_PROFILE_PAGE_SIZE = 40
 PUBLIC_HORSE_PAGE_SIZE = 24
+PUBLIC_HORSE_RACE_RECORD_PAGE_SIZE = 20
 PUBLIC_REGION_TABS = [
     {"value": "", "label": "综合"},
     {"value": RacingRegion.JAPAN, "label": "日本"},
@@ -653,6 +655,7 @@ def _horse_profile_filters(queryset, request: HttpRequest):
     p0_source = request.GET.get("p0_source", "").strip()
     name_status = request.GET.get("name_status", "").strip()
     sync_status = request.GET.get("sync_status", "").strip()
+    career_status = request.GET.get("career_status", "").strip()
     candidate_status = request.GET.get("candidate_status", "").strip()
     if query:
         queryset = queryset.filter(
@@ -698,6 +701,8 @@ def _horse_profile_filters(queryset, request: HttpRequest):
         )
     elif sync_status == "fresh":
         queryset = queryset.exclude(records_synced_through__isnull=True)
+    if career_status in HorseCareerHistoryStatus.values:
+        queryset = queryset.filter(career_history_status=career_status)
     if candidate_status in HorseProfileCandidateStatus.values:
         queryset = queryset.filter(data_candidates__status=candidate_status).distinct()
     return queryset
@@ -734,6 +739,7 @@ def horse_profile_list(request: HttpRequest):
             regions=RacingRegion.choices,
             statuses=HorseProfileStatus.choices,
             completenesses=HorseProfileCompleteness.choices,
+            career_statuses=HorseCareerHistoryStatus.choices,
             p0_source_types=HorseP0SourceType.choices,
             candidate_statuses=HorseProfileCandidateStatus.choices,
             filters={
@@ -748,6 +754,7 @@ def horse_profile_list(request: HttpRequest):
                 "p0_source": request.GET.get("p0_source", ""),
                 "name_status": request.GET.get("name_status", ""),
                 "sync_status": request.GET.get("sync_status", ""),
+                "career_status": request.GET.get("career_status", ""),
                 "candidate_status": request.GET.get("candidate_status", ""),
             },
             pagination_querystring=pagination_params.urlencode(),
@@ -769,6 +776,7 @@ def horse_profile_detail(request: HttpRequest, profile_id: int):
         form = HorseProfileForm(request.POST, instance=profile)
         if form.is_valid():
             profile = form.save()
+            refresh_career_history_completeness(profile)
             update_completeness(profile)
             log_operation(
                 action_type="horse_profile_saved",
@@ -946,13 +954,27 @@ def _horse_race_record_payload(form: HorseRaceRecordForm) -> dict:
         "race_name": cleaned.get("race_name") or "",
         "race_year": cleaned.get("race_year"),
         "race_date": race_date.isoformat() if race_date else "",
+        "race_date_precision": cleaned.get("race_date_precision") or "",
+        "race_name_normalized": cleaned.get("race_name_normalized") or "",
+        "race_region": cleaned.get("race_region") or "",
+        "race_number": cleaned.get("race_number") or "",
         "grade_text": cleaned.get("grade_text") or "",
         "normalized_grade": cleaned.get("normalized_grade") or "",
         "racecourse": cleaned.get("racecourse") or "",
         "distance_text": cleaned.get("distance_text") or "",
+        "distance_meters": cleaned.get("distance_meters"),
         "surface": cleaned.get("surface") or "",
+        "race_type_text": cleaned.get("race_type_text") or "",
+        "horse_number": cleaned.get("horse_number") or "",
+        "barrier": cleaned.get("barrier") or "",
+        "jockey_name": cleaned.get("jockey_name") or "",
+        "carried_weight": cleaned.get("carried_weight") or "",
+        "finish_time": cleaned.get("finish_time") or "",
+        "prize_text": cleaned.get("prize_text") or "",
         "finish_position": cleaned.get("finish_position") or "",
         "result_status": cleaned.get("result_status") or HorseRaceResultStatus.UNKNOWN,
+        "start_status": cleaned.get("start_status") or "",
+        "is_overseas": bool(cleaned.get("is_overseas")),
         "is_major_win": bool(cleaned.get("is_major_win")),
         "major_win_order": cleaned.get("major_win_order") or 0,
         "source_name": cleaned.get("source_name") or "manual",
@@ -968,8 +990,10 @@ def horse_profile_delete_race_record(request: HttpRequest, record_id: int):
     if denied:
         return denied
     record = get_object_or_404(HorseRaceRecord.objects.select_related("horse_profile"), pk=record_id)
+    profile = record.horse_profile
     profile_id = record.horse_profile_id
     record.delete()
+    refresh_career_history_completeness(profile)
     messages.success(request, "参赛履历已删除。")
     return redirect("console-horse-profile-detail", profile_id=profile_id)
 
@@ -3037,7 +3061,6 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
         .prefetch_related(
             "article_links__article",
             "race_links__event",
-            "race_records__event",
             "sire_children",
             "dam_children",
         ),
@@ -3056,7 +3079,28 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
         if link.status in {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL}
         and link.event.visibility_status == RaceEventVisibility.PUBLISHED
     ]
-    race_records = list(profile.race_records.all()[:20])
+    records_order = request.GET.get("records_order", "desc").strip().lower()
+    if records_order not in {"asc", "desc"}:
+        records_order = "desc"
+    race_record_queryset = profile.race_records.select_related("event")
+    if records_order == "asc":
+        race_record_queryset = race_record_queryset.order_by(
+            F("race_date").asc(nulls_last=True),
+            F("race_year").asc(nulls_last=True),
+            "id",
+        )
+    else:
+        race_record_queryset = race_record_queryset.order_by(
+            F("race_date").desc(nulls_last=True),
+            F("race_year").desc(nulls_last=True),
+            "id",
+        )
+    race_records_page = Paginator(
+        race_record_queryset,
+        PUBLIC_HORSE_RACE_RECORD_PAGE_SIZE,
+    ).get_page(request.GET.get("records_page"))
+    records_pagination_params = request.GET.copy()
+    records_pagination_params.pop("records_page", None)
     token_hash = _follow_token_hash_from_request(request)
     is_following = bool(token_hash and HorseFollow.objects.filter(token_hash=token_hash, horse_profile=profile).exists())
     descendants = (
@@ -3071,7 +3115,10 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
             "major_wins": major_win_records(profile),
             "article_links": public_article_links[:12],
             "race_links": public_race_links[:12],
-            "race_records": race_records,
+            "race_records": race_records_page.object_list,
+            "race_records_page": race_records_page,
+            "records_order": records_order,
+            "records_pagination_querystring": records_pagination_params.urlencode(),
             "descendants": descendants,
             "is_following": is_following,
         },

@@ -1,11 +1,206 @@
 # 关键决策
 
+## 2026-07-22 P0 身份回填写入门禁加固
+
+- 离线冲突 fingerprint 为裸 SHA-256 hexdigest（64 字符），"offline" 作用域编进被哈希
+  内容而不是字符串前缀；任何指纹格式必须满足 `HorseIdentityConflict.fingerprint`
+  `max_length=64`，禁止再以 SQLite 不校验长度为由放行超长值。
+- 批准后的 manifest 在 commit 时必须重算哈希并与存储值、操作者提供值双重比对；只比
+  存储值等于把批准后的 manifest 篡改视为可信。artifact 文件 SHA 另独立校验。
+- commit 是第二道 fail-closed 防线：dry-run 之后 profile 发生漂移（同 namespace 出现
+  其他 key、四字段与证据矛盾）时整个候选丢弃并记冲突，不写部分身份；identity key
+  一律 casefold 写入（含 HKJC 字母数字 ID），原始大小写只留在 `identity_evidence`。
+- 证据判级按行来源 namespace 核验：可识别为其他 provider 的 `horse_id` 不得贴上本
+  地区预期 provider 的标签（如 UK 行上的 racing_post ID 不得写成 sporting_life key）；
+  无法识别来源的行保持既有行为并留待后续治理。
+
 ## 2026-07-21：赛事展示名让赛处理以原文括号形式为准，京成杯为例外
 
 - 用户明确修订让赛清理规则：原文名（RaceEvent.original_name / RaceSeries.canonical_name_original / TermEntry.source_ja）中 handicap/让赛 被括号圈住时，视为赛事补充说明，中文展示名删除该标记；未被括号圈住时，视为赛事名组成部分，保留。所有案例按此规则判定，不再设"条件描述型豁免"的独立逻辑。
 - 京成杯是唯一例外：凡展示名为"京成杯秋季让赛"的对象（日本 RaceSeries 285、术语 1972/15215）一律改为用户此前逐字锁定的"京成杯秋季赛"，与 2026-07-21 已写入生产的系列 6125、Event 96 和 2010–2025 共 16 场历史赛事保持一致；该例外不与"Keisei Hai Autumn H 原文 H 无括号"的新规则冲突处理，而是显式锁定值。
 - 删除机制沿用"只删不补"：仅删除四种中文让赛标记及直接包裹该标记的中英文括号，不补写"锦标""大赛"等新词；删除后无中文字符、同地区重名等校验失败的对象只报告、不写入。
 - 本规则取代 2026-07-20"让赛不展示一律删除"的口径；范围仍限定赛事日历对象与 race 术语 target_zh，不回填历史文章、不新增术语。
+
+## 2026-07-20 P0 来源地区与幂等修复边界
+
+- `HorseProfile.racing_region` 是既有档案属性，不因本批样本归属自动覆盖；
+  `HorseP0Source.racing_region` 必须记录已审核候选的 `sample_region`。候选地区与研究顶层
+  地区冲突时，artifact 生成直接失败，不允许以旧档案地区替代本批审核事实。
+- 旧 artifact 的幂等重跑只允许修复仍属于同一 artifact、同一 completion run 且状态为
+  active 的确定性来源地区。来源已撤销、已转属新 run 或 evidence artifact SHA 不同，
+  均 fail closed；不得借幂等重跑覆盖后续人工决定、证据、状态或审计归属。
+- 首次成功 run 的 summary 固定保存首次写入结果；后续幂等核验写入独立
+  `last_idempotent_verification`，不得把首次 `database_write_count` 覆盖为 `0` 或修复数量。
+- P0 完整资料落库与首次公开继续分离。无中文译名马可以完整、待发布并在翻译中保护原文，
+  但本批不自动发布；每地区首批公开样本仍需单独人工动作和公开面验收。
+
+## 2026-07-20 P0 PostgreSQL 迁移事务边界
+
+- 对会更新已有 `HorseRaceRecord` 的字段回填，不在同一原子迁移的后续 operation 创建该表
+  的索引或约束。迁移按 schema fields、data backfill、indexes/constraints、authority
+  顺序拆为 `0049-0052`，让前一事务的 trigger events 在后续 DDL 前结束。
+- 每个迁移继续使用 Django 默认原子事务；禁止用 `atomic=False` 留下可见的半 schema。
+  生产首次失败已完整回滚，二次 Phase A 必须从确认的 `0048` 状态重新开始。
+
+## 2026-07-20 P0 美国组合来源批准与生产提交边界
+
+- 用户/项目负责人确认当前冻结批次采用以下美国组合来源可满足项目严格完整标准：HRN 为逐场
+  主记录；Fort George 由 Sporting Life 与 Racing Post 补齐；Equibase 只承担官方总出赛数、
+  身份和颜色对账。该批准是批次限定、经独立批准的组合来源完整，不得表述为 Equibase 官方
+  逐场履历，不得全局放宽 HRN 或 `count_aligned_records_unverified`。
+- 冻结 v1/v2 JSON 字节保持不变：v1 SHA-256
+  `55d80abed2b76a2d7fcf0cb97aadff800c3130c3815e84d8e6eb5b1c16b4befd`；v2 SHA-256
+  `a1184dbfb0257ecbe2a4ddbc4e729b0a74d73f911c8d52a20ab65854520325b7`，并继续保留原口径
+  `40/50`。独立批准 manifest SHA-256 为
+  `29091d69573bab907cda2e9a081ae4684838b92d1f9b052a7601b6109a541077`；由此生成的 v3
+  研究派生物 SHA-256 为
+  `98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e`，只在研究层达到
+  `50/50`，不能反向改写冻结 v2。
+- prepare 只能生成 pending 准备稿；当前 pending SHA-256 为
+  `8aba561b856ffbdcd03c2a59228b166315174b539f20aef4ae6412bfe03b1b61`。apply 必须同时绑定
+  固定 v2 SHA、可信 manifest SHA、调用方显式 SHA 和实际文件 SHA；记录、身份、来源、计数
+  漂移或重复记录必须 fail closed。
+- research module review SHA-256
+  `1440550a3e4d203b604b9dba74b89b2f49ee7075bc168f35e756e54830f31db1` 的独立 reviewer
+  第三轮结论为 `APPROVED`，只批准研究模块及该批次来源组合，不替代生产 artifact、formal
+  dry-run 或准确集成版本的生产授权。
+- production readiness report SHA-256
+  `8cc36106091708827852401927a791a5575f2d6d490d1a306297e450612ed2c5` 仅为
+  `static_schema_compatibility_check`，明确
+  `safe_simulation_performed=false`、`commit_artifact_compatible=false`、
+  `decision=blocked`、`database_write_count=0`。用户本次“继续推进”不构成生产写入授权；
+  正式 commit artifact 与 formal production dry-run 完成后仍须重新申请精确授权。
+
+## 2026-07-19 P0 父母出生年、全局来源身份与 v2 冻结规则
+
+- `116` 条已审核血统证据必须解析为 `55` 个唯一父母来源身份；每条 v2 `source_identity`
+  必须同时含 `horse_name`、`sire_name`、`dam_name`、`birth_year`，不得保留 name-only 或
+  name + known sire legacy method。
+- 父母出生年使用独立 approved artifact
+  `runtime/horse_profile_completion/pedigree-research-20260719/reviewed_parent_birth_year_evidence.json`，
+  SHA-256 为 `ed9f6419dccd41485b96884410ea9ab5976d8ab5ba2acfb97e03837a7a3deb54`，
+  `reviewed_by=codex_manual_source_review`。这 `55` 个出生年不记为项目负责人逐字段提供或审核；
+  parent identity manifest 只绑定该独立证据及既有审核上下文。
+- provider namespace 可以规范化，external horse ID 必须在搜索候选、出生年证据、逐行 manifest、
+  v2 JSON 和工作簿全链路按不透明原值精确一致；同 provider 不允许大小写、标点删除或其它
+  近似匹配改变 ID。
+- 自动 Netkeiba 父母候选只接受精确
+  `https://en.netkeiba.com/db/horse/<id>/`。URL 含凭据、显式端口、query 或 fragment 时必须
+  fail closed，即使主机名和路径前缀看似正确也不能进入 v2。
+- Kentucky Wood 的父系 Balko 必须保留显式纠错审计：Netkeiba `000a02bd3f` 是 1925 年同名马，
+  只留在冻结 v1；v2 使用 Racing Post `595446`、出生年 2001、父 Pistolet Bleu、母
+  Ella Royale。纠错不得回写或重造 v1。
+- 冻结 v1 JSON / workbook SHA-256 分别为
+  `55d80abed2b76a2d7fcf0cb97aadff800c3130c3815e84d8e6eb5b1c16b4befd` /
+  `4b68b87a076793eab0acc2357762afbd0c0fcaf2282fcf4122e3a2a855c2b696`；最终 v2 JSON /
+  parent identity manifest / workbook SHA-256 分别为
+  `a1184dbfb0257ecbe2a4ddbc4e729b0a74d73f911c8d52a20ab65854520325b7` /
+  `b211d9040814b0b56ec30e8ef8930fdc10f4140a3a660cf491fcae12d0b6ab2b` /
+  `f67ad84408e68af69f14e2eef06e7135ca0b19cfc4fd18faf8925798acdbb1eb`。
+- 工作簿 builder 默认读取 v2 JSON、输出 `-v2.xlsx` 和 `previews-v2`，环境变量优先于配置；
+  冻结 v1 workbook 与 previews 目录是拒绝写入目标。本决定只固定只读审核产物和生成边界，
+  不授权生产写入、部署、发布或网络 career crawl。
+
+## 2026-07-19 P0 来源缓存必须自证身份、计数证据和安全出站目标
+
+- `p0-horse-source-cache.v2` 不得用当前请求的马名补齐缓存身份。所有地区复放前必须由缓存
+  `identity.horse_name` 或缓存 alias 命中请求马名；美国或提供了预期血统的候选还必须完整命中
+  父名、母名和出生年份。
+- 来源总出赛数只有在同时保存非空来源名、HTTP(S) 来源 URL 和带时区核验时间后才可参与
+  `complete` 判定。数量相等但三项证据任一缺失时保留 `partial`，不虚增数量缺口。
+- 受控来源 client 采用登记 HTTPS 主机白名单、禁止凭据 URL 和非 443 端口、关闭 transport
+  自动重定向并逐跳校验 `Location`；重定向请求继续消耗同一单马预算。当前登记主机仅为
+  JBIS、HKJC、Sporting Life、Geny 和 HRN 的实现目标。
+- 引入逐场权威状态时，旧的未核验 `complete` 不仅降级生涯状态；若聚合状态为
+  `complete_profile_full`，也必须降为 `complete_pedigree_2gen`。跨来源正式赛果覆盖旧
+  `unknown` 时保留旧直接展示值，标准原始值和归一化值改用正式来源证据。
+- 候选来源与资料 payload 来源不同时，来源内 external ID 不能互证；候选必须提供完整四字段
+  身份并与 payload 一致，或以后使用显式人工审核的跨来源绑定。只有同名/alias 时 fail closed。
+  同 provider 也只有在候选和 payload 都携带一致 external ID 时可直接绑定；显式来源 namespace
+  与 `external:<provider>:...` key 冲突时必须拒绝。
+- 总数证据门禁必须同时存在于 cache validator、履历 normalizer、数据库生涯 evaluator 和
+  整匹马聚合 evaluator，不能假设所有调用都经过同一入口。研究 JSON 与工作簿只有
+  `source_records_verified` 可显示完整，其它或非法 authority 均保持受阻/待审。
+- `source_start_count=0` 是合法官方事实；此时空逐场列表可通过数量对齐校验。总数大于零时，
+  空列表仍是完整履历缺口。
+- 同 provider 比较对 provider namespace 做 NFKC/大小写归一，但 external horse ID 按来源
+  原值精确比较；名称大小写不能绕过 ID 冲突。总数 URL 使用 Django `URLValidator`，不以
+  scheme/netloc 粗判替代合法 URL。
+- `IGNORED` 表达“本次建议不采用”，不是撤销既有已应用证据。模块完整度读取最近一条非
+  ignored 审核状态；若不存在此前 APPLIED，或最近非 ignored 状态为 conflict/pending，仍阻断。
+- 一次性研究转换必须在函数内部从实际逐场记录复算数量，真实离线 replay 样本纳入测试；不能
+  依赖调用环境残留变量或仅测试冻结最终 JSON。
+- 逐场结果状态必须使用 `HorseRaceResultStatus` 的正式枚举；第 4 名及以后和来源 `finished` /
+  `unplaced` 统一归一为 `unplaced`。只有 `race_date_precision=exact` 的记录可满足逐场核心
+  证据门禁；年份精度记录照常保存，但不能在 dry-run 中先宣称完整。
+- 所有人工字段证据 URL，包括主来源、佐证来源、血统证据、逐场结果和官方总数，都必须通过
+  Django `URLValidator` 的 HTTP(S) 严格校验；仅检查 scheme/netloc 或 `https://` 前缀不足以
+  进入冻结审核产物。
+- 自动补充来源与主来源的合并也必须做强身份检查。同 provider 只有双方 external ID 完整且
+  精确一致时可直接补空；其它情况要求双方各自完整匹配马名、父名、母名、出生年份，不能因
+  地区相同或马名相同放行。
+- 来源总数、来源名、来源 URL 和带时区核验时间按一个原子证据组更新。新审核候选缺任一项时
+  整组清空，禁止与数据库旧字段拼接。研究摘要有官方总数时优先采用官方总数，否则才采用
+  备用来源总数。
+- source cache 的“非空”不等于“有效”：硬字段必须是预期类型，出生年份在合理范围，精确日期
+  必须为合法 ISO 日期。审核行、模块、逐场记录与数据库 `source_refs` 均执行相同 HTTP(S)
+  URL 门禁。
+- 父母实体反查不能把“搜索只有一个同名结果”当作强身份。自动采用只允许预期 external ID
+  精确一致，或已知父名与候选完整来源身份共同命中；provider 名可规范化，external ID 是
+  opaque string，只去首尾空格并精确比较。
+- 已审核的历史 name-only 血统字段不直接改写旧产物。必须用 manifest 逐行绑定旧输入 SHA、
+  目标马强身份、父母实体 external ID、字段值、既有审核上下文和独立出生年证据，再生成
+  新版本；任一漂移即拒绝。独立出生年证据的 `reviewed_by` 不得被改写为项目负责人逐字段
+  审核。历史 APPLIED profile/pedigree 模块的 URL 由最终 evaluator 再次严格校验。
+
+## 2026-07-19 P0 马人工字段补证与美国履历数量对齐口径
+
+- 人工字段证据保留地区元数据，但身份匹配优先使用“来源 namespace + 来源马 ID”；来源身份
+  不可用时才回退到“马名 + 父名 + 母名 + 出生年份”。出生年份缺失必须拒绝，同一字段重复、
+  身份不匹配或与既有非空值冲突时整项拒绝。马名归一化须跨地区生效，地区不得进入唯一身份键。
+- 基础字段人工补证必须保留直接原始值、归一化值、转换规则、来源 URL、核验时间和证据说明。
+  应用前缺口快照是冻结审核输入，重复执行不得覆盖或把补后状态伪装成补前状态。
+- Fort George 缺失的 7 条逐场履历可由 Sporting Life/Racing Post 结果页补齐数量，但
+  Equibase 只核验了 Career Starts 总数。因此美国样本在 `13/13` 或其它数量对齐后仍必须保持
+  `count_aligned_records_unverified` / `count_aligned_per_record_officiality_pending`，不得升级为
+  官方逐场完整。
+- HRN 备用逐场履历只能在 HRN 页面与已核验候选的马名、父名、母名、出生年份四项全部存在且
+  一致时接收；直接 slug、搜索结果和缓存复放遵守同一门禁。任何缺项、同名不同年份或父母冲突
+  均阻断。来源证据没有 external horse ID 时，去重键必须携带完整四字段身份，不能只按赛事 ID
+  跨马去重。
+- 新增逐场权威性字段时，既有 `complete` 履历不能沿用旧结论；迁移必须把权威状态非
+  `source_records_verified` 的旧完整记录降为 `needs_review`。同场的 `unknown` 可由正式结果
+  补齐，但两个互相矛盾的正式结果不得自动合并。
+- 本决定只适用于只读研究产物、审核工作簿和后续安全应用能力，不授权生产批量写入、网络抓取、
+  自动发布、部署或为普通比赛强建 `RaceEvent`。
+
+## 2026-07-18 P0 马网络批次必须绑定冻结审核 manifest
+
+- `--allow-network` 不能只信任审核 CSV 内自报的 `reviewed/decision`，也不能只依赖 CSV 与
+  manifest 彼此自洽；必须同时显式提供冻结的 `review_manifest.json` 和预先批准的 SHA-256。
+  CLI expected SHA、服务端 `HORSE_PROFILE_COMPLETION_REVIEW_MANIFEST_SHA256` 与实际 manifest
+  字节 SHA 必须三方一致，随后再核对 artifact 类型、确认决定、CSV basename、SHA-256、大小和
+  50 行分母。所有校验在解析 manifest 和创建任何 source client 前完成。
+- transport 调用一旦开始，无论返回 HTTP 响应还是在连接、TLS、读取阶段抛异常，都计为一次
+  请求尝试并更新跨候选限速时间；manifest 不得把已尝试的失败请求记为 0。
+- reviewed batch 的业务文件和两层 manifest 必须先在同父目录 staging 中完整生成、逐文件
+  校验并 `fsync`，再原子发布最终目录；失败清理 staging，不允许留下无法安全重跑的半批 artifact。
+- 该加固只提高审核输入、请求审计和 artifact 发布可靠性，不授权新的网络地区、生产写入、
+  自动发布、Git 合并或部署，也不改变 P0 范围和五地区资料完整门槛。
+
+## 2026-07-18 P0 马首批 50 匹全部纳入
+
+- 项目负责人确认生产只读样本中的法国、中国香港、日本、英国、美国各 10 匹全部纳入首批 P0 马资料补全。
+- “确认纳入”只决定批次成员，不代表身份已确认或资料已完整；`needs_identity_enrichment`、同名歧义、完整生涯和硬字段门禁继续生效。
+- 真实资料写入前继续采用离线 artifact、模块人工审核和显式 commit 门禁；本决定不授权自动首次发布或生产写入。
+
+## 2026-07-18 P0 参赛马必须先只读提取，马名本身不构成跨赛事唯一身份
+## 2026-07-18：P0 参赛马先只读提取，马名不构成跨赛事唯一身份
+
+- 赛事详情完成后，先生成只读观察、候选和五地区人工样本，再决定是否同步 P0 来源。
+- 来源内 external horse ID 可跨赛事归并；跨来源归并必须完整命中马名、父名、母名和出生年份。只有马名时不得自动视为同一匹马。
+- 同一观察可携带多个强身份键并按连通关系聚合；连通后指向多个 profile 或出现血统冲突时必须转人工审核。
+- 预样本只验证来源和 adapter；只有人工确认并完成全部硬字段后，才能计入每地区 10 匹完整资料验收。
 
 ## 2026-07-19：coupled runner 身份与 rollback Gate D 修复边界
 
@@ -1562,6 +1757,69 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - France Galop 固定列障碍分组汇总表使用 layout-aware PDF 解析，只补齐逐场详细赛程未覆盖的赛事；同等来源质量下详细赛程优先，汇总摘要不得覆盖详细记录。
 - 完整 catalog/selection 与 scope 副本均可作为 stage 输入，但必须保留全量身份校验。少量匹配歧义、来源失败或确认事项进入 evidence-backed gap，并继续其他 scope；未知 parser、身份漂移或分母缺失仍 fail closed。
 
+## 2026-07-18 P0 马真实来源字段统一 fail closed
+
+- provider external horse ID 与完整 `horse_name + sire_name + dam_name + birth_year` 四元身份至少
+  有一项，才允许统一 payload 通过身份 validator；候选来源 ID 不得借给另一 provider。
+- Sporting Life 缺 breeder/完整二代血统、HKJC 缺明确赛事名或硬字段、HRN 缺明确出生/场数、
+  JBIS 搜索与 profile 身份不一致、Geny 429/登录墙/部分履历时一律 blocker，不猜测或合成。
+- `Race Index`、年龄、赛绩行数、`sire/dam/damsire` 和地区常识不能代替缺失的赛事名、出生年份、
+  starts 或完整 pedigree。JBIS 日本区域只有在页面明确给出 `産地` 时才可把 country 设为日本。
+- 并发网络结果只允许第一个完整临时文件通过 `os.link` 发布；所有竞争调用重读并严格校验同一
+  canonical cache 后再返回，失败清理临时文件，不持锁跨网络。
+## 2026-07-18 P0 马人工补录与多来源合并门禁
+
+- 自动补充来源只允许补齐主来源的空字段，不得覆盖不同的非空值；发生冲突时整匹候选 fail closed，进入人工处理。
+- 人工补录采用逐字段审核记录，只允许身份、基础资料和二代血统白名单字段。每条批准记录必须有直接 `http/https` 证据 URL、真实来源名、录入人、不同的复核人和 UTC 复核时间。
+- 人工补录在 artifact 中必须标为 `entry_method=manual_review`、`evidence_role=manual_supplement`，adapter key 留空；不得把人工查证包装成自动抓取。
+- canonical source cache 只能保存纯自动来源快照；读、写两侧都必须递归拒绝人工 outcome、人工 provenance、人工 supplemental source 和 raw manual rows。canonical payload 的容器只接受精确内置 `dict/list` 和字符串对象键，拒绝 tuple/set、自定义容器子类、非有限浮点值等会在序列化时变形或产生非标准 JSON 的值；迭代检查必须在任何复制之前检测当前活动容器中的循环并限制最大深度，随后用 JSON round-trip 生成纯内置类型副本，不调用不可信 `__deepcopy__`，并在规范化副本上再次检查人工标记，防止欺骗型字符串值或键在转换后变成真实标记。独立 canonical purity gate、完整 source validator 和 cache 写入边界都必须遵守该双检查。磁盘 JSON 解码阶段的深度异常也必须包装为来源错误，统一产生领域 blocker，不泄漏 `RecursionError` 或对象自定义复制异常。自动多来源与人工补录两个合并入口也必须先规范化主 payload 和全部补充行，再执行任何合并。历史污染 cache 或自定义 client 混合 payload 不得进入当前批次，人工补录只作用于本批内存工作副本。
+- 原子发布 staging 前必须把冻结人工 CSV 的每个批准字段与唯一 outcome 按候选、字段和完整证据指纹一一对账。只允许 `applied/already_applied/blocked/ignored`；缺失、重复、未知状态、证据漂移或无批准输入的旧 outcome 一律整批阻断。
+- 完整生涯不能通过人工字段补录通道写入，也不能由重点赛事列表推导。生涯记录仍必须来自可证明来源总出赛数和全部逐场核心证据的主来源。
+- 某地区单马探测已知不完整时，不批量跑该地区 10 匹；先修来源或身份，再用同一匹复验。当前只有日本允许保持已完成结论。
+
+## 2026-07-19 P0 马逐场证据与权威性决策
+
+- 逐场字段证据固定分为 `direct_raw`、`canonical_raw`、`normalized` 三层，每层分别保留值、状态、
+  来源、URL、时间和转换规则。Sporting Life 对法国赛事的英式展示只属于直接原始值；没有
+  France Galop/IFCE SIRE 证据时，不得把 Class/Grade 映射为 Groupe，也不得由舍入英制距离反推
+  官方米制。
+- Sporting Life 的法国 `N/A` 不统一解释为缺失。只有法国权威来源能决定其是正式名次、未完赛、
+  低名次/未映射结果或仍待补；直接 `N/A` 与权威标准结果必须同时保留。
+- 生涯数量完整度与逐场权威性是两个独立维度。官方总数与备用来源行数相等时可记录 `gap=0`，
+  但逐场状态仍为 `count_aligned_records_unverified`；只有逐场来源也通过权威核验后才能提升。
+- HKJC 首列纯文本 `Overseas` 是有效海外履历，不要求 Race Index 包含数字；主表和页面下方重复
+  海外表按稳定记录键去重并保留来源。`F/UR/BD` 等正式异常结果属于实际出赛，`WV/SCR/withdrawn`
+  属于未出赛，两类计数不得混合。
+- Equibase 受 Incapsula 和许可条款限制，禁止将浏览器绕过做成生产爬虫。短期仅允许人工核验
+  `Career Starts` 并保存来源与时间；长期使用 Equibase/Equineline/TrackMaster 授权数据或人工
+  Full Charts/Lifetime PP。
+
+## 2026-07-19 P0 马祖父母字段的父母实体反查规则
+
+- 当目标马来源只有父、母、母父而缺父父、父母、母母时，允许查询父马和母马各自的父母并回填
+  目标马祖父母；每个字段必须保存来源 URL、核验时间、方法和证据等级。
+- 父马反查只接受唯一精确同名候选；出现多个同名候选时不自动选择。母马反查除精确同名外，必须
+  与目标马已有母父一致；不允许仅以马名、地区或搜索排序合并。
+- 自动来源没有唯一安全候选时，允许人工查看目标马完整血统页、父母资料页、官方/拍卖目录或可靠
+  血统页补证。人工补证只填空，不覆盖已有不同非空值；身份条件不符或值冲突时 fail closed。
+- netkeiba、France-Sire、Tattersalls、媒体血统页和种公马资料页可作为本批字段级二级证据，但不
+  自动提升为官方 Stud Book 值。法国长期以 IFCE SIRE/France Galop、英国及英爱马以 Weatherbys、
+  香港进口马以原产地 Stud Book、美国以 Equineline/授权数据复核。
+- 祖父母字段齐全只表示“本批血统字段已有可审计值”，不代表整匹马资料或生涯完成；基础字段缺口、
+  结果状态待补、官方总出赛数未知和逐场权威性仍按独立维度判断。
+
+## 2026-07-19 P0 马来源可见行与实际出赛必须分离
+
+- 马匹来源页的一行不自动等于一次实际出赛。最终出赛名单未包含的早期报名行、取消赛事中的报名行
+  可以保留为可审计履历证据，但 `start_status=did_not_start`，不得计入实际出赛总数或未知赛果数。
+- `result_status` 与 `start_status` 独立：实际出赛的正式名次、`F/UR/BD/arr` 等必须有非
+  `unknown` 结果；已证实未出赛但无法证明具体退赛原因时，结果可保持 `unknown`，不能猜成
+  `scratched` 或 `withdrawn`。
+- 人工赛果证据必须完整绑定原始马名、来源马 ID、父、母、出生年份、日期、外部赛事 ID、外部结果
+  ID 和规范化赛事名，并且只能精确命中一条记录。身份或比赛不一致、重复命中、实际出赛仍为未知
+  结果、来源 URL 或核验时间缺失时整条证据 fail closed。
+- 来源可见行数、实际出赛数、未出赛数和权威/来源声明总数分别保存。只有人工最终出赛名单与公开
+  生涯总数对账一致时，才可标记 `source_reconciled`；该状态不改变逐场来源本身的权威等级。
 ## 2026-07-19：五地区暂定赛果可先公开，正式赛果采用独立授权
 
 - TRA 商业 API 的合资格结果可以在完整性、身份、来源权限、event allowlist 和
@@ -1577,3 +1835,14 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - emergency rollback 不倒删 additive schema 或审计；页面先在 maintenance off 隐藏，
   再以 dedicated provisional pointer 原子恢复投影，并按
   global/region/source -> revalidate -> event 的顺序恢复 policy。
+
+## 2026-07-20 P0 范围批量写入与详细资料边界
+
+- P0 来源同步允许按地区拆分事务，并把无五地区归属的既有中文马名术语另行按固定批量提交；
+  该拆分只改变事务大小，不改变 P0 定义、身份规则或来源证据。
+- 一次大事务因 OOM 被杀时必须先确认数据库完整回滚、恢复健康并核验备份，再继续较小批次；
+  不得把进程中断前的内存进度当成已提交数据。
+- “已进入 P0 生产范围”不等于“详细资料已经补完”。基础资料、二代血统、完整生涯和逐场权威性
+  仍按独立完整度与字段证据门禁写入；身份冲突继续 fail closed，不因批量范围写入而放宽。
+- 本次用户授权覆盖 P0 范围批量生产写入，但不授权猜值、跨身份合并、绕过来源许可或把未审核
+  详情 artifact 标成已审核。

@@ -1,0 +1,38 @@
+{
+  "artifact_type": "p0_horse_production_readonly_extraction_receipt",
+  "schema_version": "1.0",
+  "run_id": "production-readonly-20260718-033432",
+  "remote_artifact_dir": "/opt/umanewsbot/runtime/p0_horse_candidates/production-readonly-20260718-033432",
+  "source_archive": {
+    "path": "/opt/umanewsbot-builds/p0-candidate-readonly-20260718-033432.tar.gz",
+    "size_bytes": 1056704,
+    "sha256": "82ec45656e63ccc4257edf75addc9bc43dc09156e6aae29b7a7f690157c85618"
+  },
+  "manifest_sha256": "ec9b7b9d0524a9e8f2dc1ef1b7019f22fbdcfcdac260391622119ba97bcf84d2",
+  "database_read_only": true,
+  "database_counts_before_and_after": {
+    "race_events": 9867,
+    "runners": 100132,
+    "results": 91897,
+    "terms": 27437,
+    "profiles": 21596,
+    "p0_sources": 0,
+    "identity_conflicts": 0
+  },
+  "candidate_count": 82644,
+  "sample_count": 50,
+  "sample_region_counts": {
+    "france": 10,
+    "hong_kong": 10,
+    "japan": 10,
+    "united_kingdom": 10,
+    "united_states": 10
+  },
+  "sample_review_status_counts": {
+    "ready_for_profile_resolution": 30,
+    "needs_identity_enrichment": 20
+  },
+  "sample_duplicate_candidate_key_count": 0,
+  "network_horse_profile_crawl_started": false,
+  "production_p0_write_started": false
+}

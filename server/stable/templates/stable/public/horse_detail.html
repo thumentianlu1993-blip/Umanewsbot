@@ -13,6 +13,7 @@
           <div class="article-meta">
             <span>{{ profile.get_racing_region_display }}</span>
             <span>{{ profile.get_completeness_status_display }}</span>
+            <span>{{ profile.get_career_history_status_display }}</span>
             {% if not profile.display_name_zh and not profile.primary_term.target_zh %}<span>中文译名待补</span>{% endif %}
             {% if profile.is_featured %}<span>推荐</span>{% endif %}
           </div>
@@ -73,17 +74,35 @@
       </section>
 
       <section class="horse-panel">
-        <h2>参赛履历</h2>
+        <h2>参赛履历（{{ race_records_page.paginator.count }}）</h2>
+        <nav class="article-actions" aria-label="履历排序">
+          <a href="?records_order=desc"{% if records_order == "desc" %} aria-current="page"{% endif %}>最新优先</a>
+          <a href="?records_order=asc"{% if records_order == "asc" %} aria-current="page"{% endif %}>最早优先</a>
+        </nav>
+        <p class="muted">
+          来源实际出赛 {{ profile.official_or_source_start_count|default:"待确认" }} 场 · 已采集 {{ profile.collected_start_count }} 场 · {{ profile.get_career_record_authority_status_display }} · 未关联赛事 {{ profile.unlinked_race_record_count }} 条
+        </p>
         <div class="horse-list">
           {% for record in race_records %}
             <div class="horse-list-item">
-              <strong>{{ record.race_name }}</strong>
-              <span>{{ record.race_date|date:"Y-m-d"|default:record.race_year }} · {{ record.get_result_status_display }} · {{ record.finish_position|default:"-" }}</span>
+              <strong>
+                {% if record.event and record.event.visibility_status == "published" %}<a href="{{ record.event.public_path }}">{% endif %}
+                {{ record.race_name_normalized|default:record.race_name }}
+                {% if record.event and record.event.visibility_status == "published" %}</a>{% endif %}
+              </strong>
+              <span>{{ record.race_date|date:"Y-m-d"|default:record.race_year }} · {{ record.racecourse|default:"场地待补" }}{% if record.distance_text %} · {{ record.distance_text }}{% endif %} · {{ record.get_result_status_display }} · {{ record.finish_position|default:"-" }}</span>
             </div>
           {% empty %}
             <p class="muted">暂无参赛履历。</p>
           {% endfor %}
         </div>
+        {% if race_records_page.paginator.num_pages > 1 %}
+          <nav class="pagination" aria-label="参赛履历分页">
+            {% if race_records_page.has_previous %}<a href="?{% if records_pagination_querystring %}{{ records_pagination_querystring }}&amp;{% endif %}records_page={{ race_records_page.previous_page_number }}">上一页</a>{% endif %}
+            <span>第 {{ race_records_page.number }} / {{ race_records_page.paginator.num_pages }} 页</span>
+            {% if race_records_page.has_next %}<a href="?{% if records_pagination_querystring %}{{ records_pagination_querystring }}&amp;{% endif %}records_page={{ race_records_page.next_page_number }}">下一页</a>{% endif %}
+          </nav>
+        {% endif %}
       </section>
 
       <section class="horse-panel">

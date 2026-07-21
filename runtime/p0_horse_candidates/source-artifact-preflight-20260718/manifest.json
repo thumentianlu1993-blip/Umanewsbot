@@ -1,0 +1,230 @@
+{
+  "artifact_type": "p0_horse_source_artifact_preflight_manifest",
+  "schema_version": "1.1",
+  "generated_at": "2026-07-17T18:38:26.707Z",
+  "read_only": true,
+  "production_db_verified": false,
+  "source_root": "/Users/mentianlu/Code/umanews/runtime/historical_plan_exports/detail-crawl-1998-2026-v6/run",
+  "selection_parameters": {
+    "regions": [
+      "japan",
+      "hong_kong",
+      "united_kingdom",
+      "france",
+      "united_states"
+    ],
+    "sample_per_region": 10,
+    "result_rows_only": true,
+    "normalized_display_name_unique_per_region": true,
+    "eligible_grade_and_database_identity_verification": "pending"
+  },
+  "input_files": [
+    {
+      "path": "france-2026-zeturf-irishracing-01/validated-candidates.jsonl",
+      "size_bytes": 198195,
+      "sha256": "efaa13f9ad8ba144006a784962e38fd052257e488cbcc80eec49085a999e47f7"
+    },
+    {
+      "path": "hong_kong-2026-hkjc-01/validated-candidates.jsonl",
+      "size_bytes": 521810,
+      "sha256": "a56d75eeb5e44594d96cc139cd9964a6d6ce25f75eba0986be06354d4a5c6f3d"
+    },
+    {
+      "path": "japan-2005-jra-01/validated-candidates.jsonl",
+      "size_bytes": 115895,
+      "sha256": "afe97bb884e309f5950121565d583df35fc2b0ff0902312c6c305b13595e6db4"
+    },
+    {
+      "path": "japan-2006-jra-01/validated-candidates.jsonl",
+      "size_bytes": 414868,
+      "sha256": "99506b85ccef919279460186b4488d28a8aceaf8e0743ef91b62029bc6793709"
+    },
+    {
+      "path": "japan-2007-jra-01/validated-candidates.jsonl",
+      "size_bytes": 64053,
+      "sha256": "4ec3d179834cb2468167a2beda447795693349ca7f82874b5598c879b65a2b71"
+    },
+    {
+      "path": "japan-2008-jra-01/validated-candidates.jsonl",
+      "size_bytes": 50943,
+      "sha256": "3b4d799737dd06e2e208ebf8a9e1c1519961cd98bd99835e4b9de31ebdfaff03"
+    },
+    {
+      "path": "japan-2009-jra-01/validated-candidates.jsonl",
+      "size_bytes": 101833,
+      "sha256": "c9023aefd31a60242eab52ac3ee2b30448c20ed18abf46798b46c1d7475488df"
+    },
+    {
+      "path": "japan-2010-jra-01/validated-candidates.jsonl",
+      "size_bytes": 3418721,
+      "sha256": "cec6d4ddf7b4e6fc1342cb39594b9b1db0b085cfe4eb42b66ae65275a0df7097"
+    },
+    {
+      "path": "japan-2011-jra-01/validated-candidates.jsonl",
+      "size_bytes": 2753659,
+      "sha256": "8859d7561eca912b29a8be0c561cc40086253e6b45a52313d4b27aafe9dd75e2"
+    },
+    {
+      "path": "japan-2012-jra-01/validated-candidates.jsonl",
+      "size_bytes": 3176235,
+      "sha256": "0d419e96bd2b3ef02eb3ef0499f56c2588e92c2a75e43d486ed149830ad6c006"
+    },
+    {
+      "path": "japan-2013-jra-01/validated-candidates.jsonl",
+      "size_bytes": 3225083,
+      "sha256": "92d0f00f369d451502af3caaa70f1d8a3e5596db90de7194b7c3baf302563f3b"
+    },
+    {
+      "path": "japan-2014-jra-01/validated-candidates.jsonl",
+      "size_bytes": 3311738,
+      "sha256": "ff370ddb7231ece7abcb8699ea23d51211ceb9698df54a17e1a270936602b7b1"
+    },
+    {
+      "path": "japan-2015-jra-01/validated-candidates.jsonl",
+      "size_bytes": 3422793,
+      "sha256": "17137add467a6df179d7611ab108cbb3bc31d3bc53421994011411853c16a5ad"
+    },
+    {
+      "path": "japan-2016-jra-01/validated-candidates.jsonl",
+      "size_bytes": 3444556,
+      "sha256": "5d1ab07663a6772589be59063d89d05aa2f16be2cb78c621713e1f04e8ec14bf"
+    },
+    {
+      "path": "japan-2017-jra-01/validated-candidates.jsonl",
+      "size_bytes": 3288983,
+      "sha256": "0b1f27f6def3a32cb727ad2c7d017a2bf075faafc2afa254f3e5df292db04766"
+    },
+    {
+      "path": "japan-2018-jra-01/validated-candidates.jsonl",
+      "size_bytes": 3239556,
+      "sha256": "df6b702df58cb30df1a0fd03207279ab8723636dc9926dfe4700b4c7eff51b35"
+    },
+    {
+      "path": "japan-2019-jra-01/validated-candidates.jsonl",
+      "size_bytes": 3433192,
+      "sha256": "f98b6bfc0d677b96a727237344f3356651873f6672c356dc0ab80fd82f8b59f9"
+    },
+    {
+      "path": "japan-2020-jra-01/validated-candidates.jsonl",
+      "size_bytes": 3533560,
+      "sha256": "b87a1fe581315003a44209522bf9a142101d99685537c0798c36e2d9da2b5433"
+    },
+    {
+      "path": "japan-2021-jra-01/validated-candidates.jsonl",
+      "size_bytes": 3559671,
+      "sha256": "c4cb0e0eecfad027041cac99dc12cd52c6a60ddb3be8a3626af8273074ad5086"
+    },
+    {
+      "path": "japan-2022-jra-01/validated-candidates.jsonl",
+      "size_bytes": 1375989,
+      "sha256": "3eefa881706cb0d931cd6e091f191f2f485592e11685c8bb4e8373028deb9664"
+    },
+    {
+      "path": "japan-2026-jra-01/validated-candidates.jsonl",
+      "size_bytes": 2007464,
+      "sha256": "11b4148b6c8e9ce25a5f0cf95d01636c27b7b76692a329f77405177626601f65"
+    },
+    {
+      "path": "united_kingdom-2013-sporting-life-irishracing-01/validated-candidates.jsonl",
+      "size_bytes": 3965907,
+      "sha256": "d8a815af61cda3fdcf9d5ed8b646d556d4cfe09c7f585de5240e89fb845c79d0"
+    },
+    {
+      "path": "united_kingdom-2014-sporting-life-irishracing-01/validated-candidates.jsonl",
+      "size_bytes": 951700,
+      "sha256": "a48812e395a669d5fe520359f9565ade0172954ff7d67e9c90c8de4cd576c668"
+    },
+    {
+      "path": "united_kingdom-2026-sporting-life-irishracing-01/validated-candidates.jsonl",
+      "size_bytes": 42092,
+      "sha256": "4b32e8c9c0531b6d063ae9295b3bf9bcb41f8a230f5d55af580749ea66c3221e"
+    },
+    {
+      "path": "united_states-2018-hrn-equibase-archive-chart-01/validated-candidates.jsonl",
+      "size_bytes": 4111133,
+      "sha256": "6cc583314a1410a200a84d254669ee555b177f878869d5fbc18806d61c1f5cc7"
+    },
+    {
+      "path": "united_states-2018-hrn-equibase-archive-chart-02/validated-candidates.jsonl",
+      "size_bytes": 2427955,
+      "sha256": "0279ccf37a34b59616305f324ab60ad94c0d337b820ed45778b7e94485d3f04a"
+    },
+    {
+      "path": "united_states-2019-hrn-equibase-archive-chart-01/validated-candidates.jsonl",
+      "size_bytes": 4093282,
+      "sha256": "606323e62be07a68049f467dad06ce4c72b4b32f346533ce6cb2563abce481e4"
+    },
+    {
+      "path": "united_states-2019-hrn-equibase-archive-chart-02/validated-candidates.jsonl",
+      "size_bytes": 2430857,
+      "sha256": "23b47f0bc62487a4be1ca3c6228c625ee6caf104fbc1c1b6f55dcb3c5e77fa16"
+    },
+    {
+      "path": "united_states-2020-hrn-equibase-archive-chart-01/validated-candidates.jsonl",
+      "size_bytes": 4084608,
+      "sha256": "9d63bf70a5238662c1ecce4483330e63942bcc1344653604baa2fc8ec369fe0e"
+    },
+    {
+      "path": "united_states-2020-hrn-equibase-archive-chart-02/validated-candidates.jsonl",
+      "size_bytes": 1493157,
+      "sha256": "85d5bf8675d31792b1c254427e6a3a55b6f8f3307d3804a53e1de956d77c389e"
+    },
+    {
+      "path": "united_states-2021-hrn-equibase-archive-chart-01/validated-candidates.jsonl",
+      "size_bytes": 3859832,
+      "sha256": "6b03d39735b9881bd101af729b64827bd546f3adacc1d0433c352d2ea0b03d1e"
+    },
+    {
+      "path": "united_states-2021-hrn-equibase-archive-chart-02/validated-candidates.jsonl",
+      "size_bytes": 2170077,
+      "sha256": "4ce1419f46a7feb9c28d29ae33887363b446cb60afb3650a5aa3531406d7d27d"
+    },
+    {
+      "path": "united_states-2022-hrn-equibase-archive-chart-01/validated-candidates.jsonl",
+      "size_bytes": 3991053,
+      "sha256": "39e5aac84a2651a9ac3366f1b3751eabe93b50be4aa78db7be60b45b93656018"
+    },
+    {
+      "path": "united_states-2022-hrn-equibase-archive-chart-02/validated-candidates.jsonl",
+      "size_bytes": 2104422,
+      "sha256": "27bc50bc4d4ebdb250d3a732efa17dfcf8ff829e6c668229e0a46c7854e2e547"
+    },
+    {
+      "path": "united_states-2023-hrn-equibase-archive-chart-01/validated-candidates.jsonl",
+      "size_bytes": 3997749,
+      "sha256": "dcbc68ffaab26e05b06666b2aba3e594309fc18c190489096e53e4c40d6c3728"
+    },
+    {
+      "path": "united_states-2023-hrn-equibase-archive-chart-02/validated-candidates.jsonl",
+      "size_bytes": 2563736,
+      "sha256": "5092d856d1c58e4bbf3a83e6b2959d633325d93bb9b0267f73a42cc258bb73a2"
+    },
+    {
+      "path": "united_states-2024-hrn-equibase-archive-chart-01/validated-candidates.jsonl",
+      "size_bytes": 4090448,
+      "sha256": "45d338251caa7c7391db223be20eef35fa2012bc2dd4014d54d0b1c377a4291e"
+    },
+    {
+      "path": "united_states-2024-hrn-equibase-archive-chart-02/validated-candidates.jsonl",
+      "size_bytes": 1274829,
+      "sha256": "944b832b833eec8c0b72af98772d25e847ca8e29603245e6dc7628222a237a1b"
+    },
+    {
+      "path": "united_states-2026-hrn-equibase-archive-chart-01/validated-candidates.jsonl",
+      "size_bytes": 3052174,
+      "sha256": "67dadc0816536ac348245e33881ce2f91bd259564bdf654e2c8e95d897de5f75"
+    }
+  ],
+  "files": {
+    "preflight_sample_json": {
+      "path": "preflight_sample.json",
+      "size_bytes": 41082,
+      "sha256": "9f8b92c3df9c610787842954767f316520dafa542bd2983552ec5afae24cc88a"
+    },
+    "preflight_sample_review_csv": {
+      "path": "preflight_sample_review.csv",
+      "size_bytes": 17119,
+      "sha256": "c0d2993522d7404cd2611f4e16316ed15d203ceabb003ecd3b221d1d30e98877"
+    }
+  }
+}

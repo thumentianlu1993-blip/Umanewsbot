@@ -1,0 +1,31 @@
+schema: spec-driven
+created: 2026-07-21
+profile: feature
+phase: reviewed
+journal:
+  - event: plan-reviewed
+    date: "2026-07-21"
+    session: 1
+    mode: full
+    rounds: 1
+    issues_resolved: 11
+    artifacts_modified: [proposal.md, design.md, tasks.md, specs/horse-profile-data-completion/spec.md]
+    note: "Round 1 resolved 2 P0 + 4 P1 + 5 P2: P0-1 identity-key-only backfill cannot make JP/FR candidates committable — added four-field (sire/dam/birth_date) backfill from ExternalHorse with same uniqueness gate (user approved); P0-2 sync re-run would erase backfilled evidence — _upsert_p0_source now merges identity keys, order fixed as sync-then-backfill; P1-3 zeturf and geny ID spaces are not同源 — zeturf mapping dropped, evidence-only; P1-4 ExternalRaceEntry alignment key now requires race_name/venue plus pedigree cross-validation; P1-5 offline conflict deterministic fingerprint and resolved-skip; P1-6 transaction cap 500 profiles and OOM ops preconditions; P2 normalizer unified, casefold keys, unmapped-key neutrality, NAR coverage probe, full_clean on resolution write-back."
+  - event: implemented
+    date: "2026-07-22"
+    session: 2
+    mode: full
+    artifacts_modified: [server/stable/services/p0_horse_identity_enrichment.py, server/stable/services/p0_horse_profiles.py, server/stable/services/horse_identity_html_parse.py, server/stable/management/commands/enrich_p0_horse_identities.py, runtime/tools/reparse_horse_identity_html_cache.py, server/stable/test_p0_horse_identity_enrichment.py, docs/current_state.md, docs/project_status.md, docs/decisions.md, docs/deploy_runbook.md]
+    note: "tasks 0.1-6.3 complete: four offline evidence sources, fail-closed uniqueness gates, horse_url/slug ID extraction, dry-run/approve/chunked-commit, conflict aggregation + approved resolution write-back via full_clean, region metrics before/after. Target tests 57/57; full stable suite zero new failures vs stash baseline (14 failures identical, errors 71->70); check/makemigrations-check/openspec validate --all 30/30/git diff --check all pass. NAR probe on local caches: 0 parseable pages, NAR source disabled this phase."
+  - event: code-reviewed
+    date: "2026-07-22"
+    session: 2
+    mode: full
+    rounds: 1
+    issues_resolved: 11
+    note: "Independent review round 1 resolved 1 P0 + 5 P1 + 5 P2: P0-1 offline fingerprint 72 chars exceeded model max_length=64 (PG crash) — bare hexdigest now, scope hashed into content; P1-2 commit recomputes approved manifest hash (tamper detection); P1-3 alias path pedigree cross-check, commit-time four-field drift fails closed for the whole candidate; P1-4 race-entry/UK paths check keys held by other profiles; P1-5 HKJC keys casefolded at write (no dual forms); P1-6 runner-name query via join instead of unbounded IN; P2 aggregation uses post-backfill alignment, per-row namespace verification, schema confusion guarded, reparse tool memory capped. Regression tests added for each finding."
+  - event: production-executed
+    date: "2026-07-22"
+    session: 2
+    mode: full
+    note: "tasks 6.5 complete with stepwise user authorization (access / deploy / write). Production fast-forwarded 88d25de0->349c822f, images rebuilt, backup dump sha256 23818ce0... NAR probe 0.02% coverage -> source disabled; HKJC cache reparse 1036 evidence rows. User-approved commits: japan 2462 netkeiba keys (coverage 0%->21.1%), hong_kong 327 hkjc keys (385 total, 7.9%), france 1773 zeturf evidence rows into 4097 sources (no keys by design), UK/US none. Idempotent re-commit applied=0; hong_kong sync re-run preserved all evidence; rolling-batch sample japan top-100 now 100/100 with keys (was 0/10). Production ExternalHorse has no sire/dam/birth_date — four-field backfill impossible this phase, deferred to a data-source follow-up. Aggregation baseline: 65042 pending / 15446 groups, all needs_admin_review."

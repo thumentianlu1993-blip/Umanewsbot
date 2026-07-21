@@ -1,5 +1,514 @@
 # 当前状态
 
+专项交接入口：`docs/p0_horse_information_completion_handoff.md`。该文档汇总 P0 定义、完整
+字段口径、生产计数、关键产物、事故经验、未完成项和后续执行顺序；实时状态仍以本文和生产
+核验为准。
+
+## 2026-07-22 P0 身份回填专项：本地实现 + 生产执行完成
+
+- OpenSpec change `enrich-p0-horse-external-identity` 完成全部实现（tasks `0.1-6.5`
+  勾选）：四个离线证据源（netkeiba `ExternalHorse/Alias`、`ExternalRaceEntry/Result`
+  回推、UK/FR `RaceEventRunner/Result.source_refs`、HKJC/NAR 本地 HTML 缓存重解析）
+  统一产出 identity 候选，唯一强匹配 + 双向唯一 + 四字段不矛盾才写入，歧义一律
+  fail closed 进 `HorseIdentityConflict`；`_participant_identity_keys` 新增
+  `horse_url`/`horse_slug` 同源 ID 提取（netkeiba/jbis/nar/hkjc/sporting_life/
+  equibase，zeturf 与 HRN 永不生成 key）；回填写入走 dry-run artifact → 人工批准
+  manifest SHA → 按地区分批 commit（单事务 ≤500）；冲突聚合输出分组统计 +
+  SHA-256 manifest，批量裁决建议经批准后过 `full_clean()` 走既有 resolved 通道；
+  批次视角 `metrics_before/after` 按地区报告可采信比例变化。
+- 独立 code review 修复 1 个 P0 + 5 个 P1 + 5 个 P2：离线冲突 fingerprint 改为裸
+  64 字符 hexdigest（原 72 字符超模型 `max_length`，生产 PG 必崩）；commit 重算
+  批准后 manifest 哈希防篡改；alias 路径补四字段矛盾检查；race-entry/UK 路径补
+  "key 已被其他 profile 持有"检查；HKJC key casefold 写入消除双形态；participant
+  名称查询改 join 避免 IN 超 bind 上限；commit 增加漂移复检（四字段矛盾或同
+  namespace 异 key 整个候选丢弃）；聚合统计纳入回填后对齐证据。
+- 本地验证：专项测试 `57/57`，批次/adapter/基础套件 `753/757`（4 个失败为
+  `RaceEventPageMVPTests` 既有基线失败，stash 基线对照完全一致，与赛事历史
+  专项在途改动相关，非本 change 引入）；完整 `stable` 套件失败数与基线相同
+  （14 failures + 70 errors，基线 14 + 71，零新增）；`manage.py check`、
+  `makemigrations --check --dry-run`、`openspec validate --all`（30/30）、
+  `git diff --check` 全部通过。
+- 生产执行（tasks `6.5`，用户逐步授权访问/部署/写入后完成）：生产 fast-forward 至
+  `349c822f` 并重建镜像；备份 dump SHA-256 `23818ce0…`。NAR 探针覆盖率 0.02%
+  本期不启用；HKJC 缓存重解析 1,036 条证据。经 dry-run 用户审核批准后写入：
+  日本 2,462 个 netkeiba key（覆盖率 0%→21.1%）、香港 327 个 hkjc key（385 匹
+  合计 7.9%）、法国 1,773 条 zeturf 证据合并进 4,097 条来源（不生成 key）、
+  英美无新增。重复 commit 幂等 applied=0；香港地区 sync 重跑后证据完好；
+  滚动批次抽样日本前 100 匹 100/100 带 key（回填前首批 0/10）。详细执行记录见
+  `docs/deploy_runbook.md` 顶部。
+- 已知边界：生产 ExternalHorse 的 netkeiba 记录父母/出生日期全为空，本期未回填
+  四字段，日本候选仍不能过批次四字段锁（需后续数据源专项）；冲突聚合基线
+  65,042 条 pending / 15,446 组全部 `needs_admin_review`；identity key 仅改善
+  治理，不改变批次既有四字段锁与来源复核。
+
+## 2026-07-21 6.7 公开验收：每地区 2 匹已发布，全部可验证项通过
+
+- 已从 50 匹严格完整资料马中每地区人工发布 2 匹（`published_at/published_by`
+  留痕，操作 admin，备注"6.7 公开验收"）：日本 曙光将来(4023)/欢快舞步(4330)、
+  香港 美丽传承(1368)/时时精彩(11320)、英国 先睹风采(8338)/乔治堡(8367)、
+  法国 游历万里(3857)/美艺力量(7669)、美国 Gigante(21619)/In Our Time(21621)。
+- 验收结果：公开索引 `/horses/` 10 匹可见；详情页 ×10 全部 `200`，基础资料、
+  二代血统、主胜鞍、来源证据区块正常；完整履历分页正常（美丽传承/Gigante 有
+  `records_page=2`）；匿名关注 POST `302`、关注流显示已关注马；美国无中文名马
+  显示原名 + "中文名待补"提示；公开页面零第三方域名引用（no-network 边界）。
+- 新闻 tag：`scan_article_horse_links --article-id 7117 --commit` 创建
+  `欢快舞步 ↔ article 7117` 关联并人工确认（status=manual），`/news/7117/`
+  已渲染 `/horses/4330/` tag。宽范围 dry-run（article 7000+、2000 篇）显示另有
+  `327` 条潜在关联（`candidate` 状态），未 commit，留待后续单独批次处理。
+- 移动端：本会话 Chrome headless 与 MCP 均不可用，未截图；页面模板与
+  `2026-07-08` 移动验收通过版本一致。用户将自行安排生产端复核。
+- 两个 change（`complete-p0-horse-profile-data`、
+  `productize-p0-horse-batch-completion`）暂不归档：待用户生产复核移动端、
+  以及身份补强专项方向确定后分别处理。
+
+## 2026-07-21 首个生产滚动批次：门禁验证通过，0/10 可提交
+
+- 批次 `p0batch-ef7d482c4401`（日本队列前 10 匹，用户批准后触网）完整跑通
+  select → approve → network prepare 链路：checkpoint 状态完整、run 维度预算账本
+  `22` 请求、host 限速 artifact、复审 xlsx、blocker 池 `10` 条、地区交错
+  （单地区 trivially）。JBIS 马名精确检索结果：`ambiguous_identity=3`、
+  `identity_mismatch=2`、`identity_incomplete=4`、`partial_career=1`，全部按
+  fail-closed 设计阻断，没有伪造任何完整性。
+- 重要产品发现：整个日本 P0 队列 `source_refs` 无 external identity keys
+  （赛事导入的出走/赛果行未带外部马 ID），裸马名检索难以唯一解析，
+  滚动补全需要先解决身份补强（另起专项）。
+- 部署修复：compose 新增 `./runtime/horse_profile_completion` 挂载（web/worker），
+  解决容器重建丢批次证据问题，已提交 `88d25de0` 并部署；`.env` 网络开关已恢复
+  `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`。
+- 用户决定：先做 `6.7` 公开验收（每地区人工发布 1-2 匹），身份补强另起专项。
+
+## 2026-07-21 P0 滚动批次产品化已部署生产（未触网、未写马匹资料）
+
+- 生产已部署 `claude/p0-horse-batch-completion` 分支提交 `b3f44d86`，镜像
+  `umanewsbot:prod`（`680ed3a174eb`，新增 `openpyxl==3.1.5`），通过 git bundle
+  从 `7ad6adeb` 快进。部署前备份：`.env.backup.p0-rolling-batch-20260721_154508`、
+  `backups/db/pre-p0-rolling-batch-20260721.sql.gz`（`224757744` bytes，
+  `gzip -t` 通过，SHA-256
+  `93ebe2f3da940a4f2daea3d3ef559cbd97cc2d3e6f380d99a5c0e03d989cf3c5`）。
+- 部署后验证：`manage.py check` 通过、迁移无新增无漂移（仍 `0052`）、
+  镜像内 `openpyxl 3.1.5`、内外 `/healthz/`、首页、`/horses/`、`/races/`、
+  后台登录均 `200`；worker 近期无 error。web 重建后 nginx upstream 曾短暂 502，
+  重启 nginx 恢复（后续部署建议把 nginx 一并重启）。
+- 生产 smoke：`p0_horse_completion_batch --select --regions japan
+  --limit-per-region 1` 在真实队列上选出 `ベリングブルー`（无 identity keys，
+  按预期标记待身份补强），manifest 正常生成后已用 `--abandon` 清理，未写任何
+  马匹资料、未触网；`HORSE_PROFILE_COMPLETION_ALLOW_NETWORK` 生产仍为 `false`。
+- 下一步：首个生产滚动批次以单地区小批验证 checkpoint/resume/预算/复审文件/
+  批准回写/地区独立 commit 证据后，再按默认 100/500 阈值滚动；随后执行
+  `6.7` 公开验收（从已完成 50 匹中每地区人工发布 1-2 匹）。操作手册见
+  `docs/deploy_runbook.md` 顶部。本 change 未归档，待首个生产批次与 6.7 完成。
+
+## 2026-07-21 P0 滚动批次产品化已完成本地实现（未部署）
+
+- OpenSpec change `productize-p0-horse-batch-completion` 已完成 plan-eng-review
+  （2 P0 + 6 P1 + 5 P2 全部修复，phase=reviewed）和全部代码实现，覆盖
+  `complete-p0-horse-profile-data` 的 tasks `4.2` 长期版本。
+- 批次形态：队列选批（默认每地区 100、单批合计 500，无界执行 fail closed）、
+  批次 manifest 人工批准（SHA-256 绑定 + append-only 台账）、抓取 checkpoint/resume
+  （BatchRunState + 逐候选输入指纹 + 输出 SHA-256 决策矩阵）、按地区持久请求预算与
+  per-host 限速（复用赛事预算工具参数化实现）、瞬时失败有限重试（计入账本、不计
+  per-candidate 常量）、每批单独复审 xlsx（地区 sheet + 异常抽样页）。
+- 提交链产品化：确定性转换器（crawl artifact → 每地区 research v3，同字节复现）、
+  批准回写（mapping decisions + 空美国 authority manifest；美国滚动批次 fail closed）、
+  滚动 release manifest 走台账通道（首批仓库白名单仅留首批复验）、每地区独立 commit
+  artifact 复用既有 prepare/dry-run/commit 链、串行窗口互斥、commit 后自动幂等复验
+  planned write=0 并写入 run 记录。
+- 端到端 sqlite 证据：select → approve → prepare（fixture 缓存）→ bundle →
+  release → dry-run → commit → 幂等复验全通，`FOREVER TEST` 严格完整落库。
+- 本地验证：专项测试 `82/82`、既有 P0 adapter `45/45`、赛事编排 `66/66`、
+  Django check、迁移漂移（本 change 无迁移）、OpenSpec 严格/全量 `31/31`、
+  `git diff --check` 通过；完整 `stable` 回归与独立 code review 进行中。
+- 新增依赖 `openpyxl==3.1.5`（复审工作簿），部署需重建镜像验证。
+- 本 change 尚未部署生产、未触网、未写任何马匹资料；生产默认仍
+  `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`。首个生产滚动批次建议单地区小批验证后再按
+  100/500 阈值滚动；操作手册见 `docs/deploy_runbook.md` 顶部。
+- `6.7` 公开验收（每地区人工发布 1-2 匹）仍按计划在本 change 上线后立即单独执行。
+
+## 2026-07-20 P0 首批五地区 50 匹已完成生产提交
+
+- 精确 artifact SHA-256
+  `1d7885bed20704b743465a94f3c431533c52d37fa506b96b9e11d4de6bfb922d`
+  已按 trusted release manifest SHA-256
+  `74be2ce42f425bbd24794fb9573ee8b71348f40b0ed6fc0af8599b167c575153`
+  提交生产。首次成功报告 SHA-256 为
+  `c12980dcfb8c397a12c3e8367ffad812768d33142164987bf0fc0e201ad566ff`：
+  `25` 个既有档案绑定、`25` 个新档案、`1439` 条履历、`50` 条 P0 来源和
+  `200` 条模块审核，业务写入计数 `1739`，严格完整 `50/50`。
+- 履历对账为 `1432` 次实际出赛、`7` 次未出赛、`4` 次海外出赛、
+  实际出赛未知结果 `0`。本批没有创建普通比赛 `RaceEvent`，全库
+  `RaceEvent=9867` 保持不变；`HorseRaceRecord` 全库为 `1460`，其中本批 `1439`。
+- 提交后审计发现既有档案地区不能代表本批审核地区。修复提交
+  `8863f37a679e9196e0bf45b5473c0e9f6657487f` 只允许同 artifact、同 run、仍 active
+  的来源修正地区；已撤销或属于新审核的来源 fail closed。生产幂等修复精确更新
+  `7` 条 `HorseP0Source.racing_region`，五地区现各 `10` 条；既有
+  `HorseProfile.racing_region` 未覆盖。首次 run 摘要继续保留 `1739`，本次
+  `7` 条修复只写入 `last_idempotent_verification`。
+- 修复前备份为
+  `/opt/umanewsbot/backups/p0-horse-postcommit-metadata-precommit-20260719T235117Z`；
+  custom-format dump 为 `209222446` bytes、SHA-256
+  `82cc39ef3e453d2ba3db716485f7fcf960379401e1eddb9d3acc210b74a972ac`，
+  `pg_restore -l` 为 `1017` 行。元数据修复执行镜像为
+  `sha256:e54c82251e67d707d8b71c1d60c46089f95e572a372e797b0eb8f082109e89c1`
+  / revision `8863f37a`；证据归档后的当前运行镜像为
+  `sha256:af880cd208198c1e2ab960d8f39bd60539bdafa422cfb98890d0befbd90ff862`
+  / revision `7ad6adeb`。内外 `/healthz/`、两个 Celery worker、队列和近期错误日志通过。
+- 最终幂等 dry-run SHA-256
+  `6872eaa8756d4ee75b26dd22b526755c35a0f6a8fc3923d00b7f136ca3463e40`
+  为 `50` 匹已应用、`1439` 条 existing、全部 planned write 为 `0`。
+  `25` 匹中文名已翻译、`25` 匹仍为待译且后台显示原始马名；本批 `published=0`、
+  `published_at=0`，没有自动首次发布。每地区人工发布 `1-2` 匹和公开页面验收仍是独立任务。
+- 本地最终验证为五地区/P0 组合 `182/182`、真实 PostgreSQL `7/7`、Django check、
+  migration drift、OpenSpec `30/30` 和 diff 检查通过；独立复审最终无 actionable finding。
+- 下一批建议继续采用“五地区各 10 匹”的可审计滚动批次，优先处理重点赛事新进入 P0 且尚无
+  完整档案的马；沿用本批严格来源、强身份、完整生涯和独立发布门禁。先完成 6.7 的首批公开
+  验收，再决定是否提高单批数量，不因本次落库成功自动扩大生产发布范围。
+
+## 2026-07-20 历史节点：P0 Phase A 首次迁移回滚
+
+- 首次真实生产迁移在旧原子 `0049` 的数据回填之后创建索引时触发 PostgreSQL
+  `pending trigger events` 错误；事务已完整回滚，生产未应用 `0049`，旧镜像和旧服务已恢复。
+- 修复将迁移拆为原子 `0049` 字段、`0050` 数据回填、`0051` 索引/条件唯一约束、
+  `0052` authority 字段及 fail-closed 降级，保持单一 leaf，不使用 `atomic=False`。
+- 当前仍是 **NO-GO / prepare-only**：二次 Phase A 尚未执行，production mapping、
+  candidate artifact、formal dry-run 和 commit 均未开始。
+
+## 2026-07-20 历史节点：P0 美国组合来源获批
+
+- 用户/项目负责人已确认当前冻结批次的美国逐场组合来源满足项目严格标准：HRN 提供主记录；
+  Fort George 由 Sporting Life 与 Racing Post 补充；Equibase 只用于官方总出赛数及身份、
+  颜色对账。这是针对当前冻结批次的“经独立批准的组合来源完整”，不是 Equibase 官方逐场
+  履历，也不全局放宽 HRN 或 `count_aligned_records_unverified`。
+- 当前状态严格分为三层：
+  - 冻结输入层：v1 SHA-256
+    `55d80abed2b76a2d7fcf0cb97aadff800c3130c3815e84d8e6eb5b1c16b4befd`，v2 SHA-256
+    `a1184dbfb0257ecbe2a4ddbc4e729b0a74d73f911c8d52a20ab65854520325b7`；两者字节均未修改，
+    v2 继续保留原口径严格完整 `40/50`。
+  - 审核研究层：pending 准备稿 SHA-256
+    `8aba561b856ffbdcd03c2a59228b166315174b539f20aef4ae6412bfe03b1b61`，独立批准 manifest
+    SHA-256 `29091d69573bab907cda2e9a081ae4684838b92d1f9b052a7601b6109a541077`，v3 研究派生物
+    SHA-256 `98a7019a400f10a4bf961d869f38f770e9e98afab76b557a3c784d4eff6e470e`。该层严格完整
+    `50/50`；美国共 `198` 条逐场，Fort George 精确为 HRN `6` + Sporting Life `6` +
+    Racing Post `1`，其余美国 `9` 匹均为 HRN-only。research module review SHA-256 为
+    `1440550a3e4d203b604b9dba74b89b2f49ee7075bc168f35e756e54830f31db1`。
+  - 生产层：production readiness report SHA-256
+    `8cc36106091708827852401927a791a5575f2d6d490d1a306297e450612ed2c5` 仅执行
+    `static_schema_compatibility_check`，`safe_simulation_performed=false`、
+    `commit_artifact_compatible=false`、`decision=blocked`、`database_write_count=0`。
+- 精确生产 blockers 为 `not_horse_profile_completion_plan`、
+  `missing_production_profile_ids`、`missing_production_reviewer_id`、
+  `missing_commit_compatible_module_approvals`。正式 commit artifact 尚未生成，formal
+  production dry-run 尚未运行；本轮无网络、无数据库写入、无部署或发布，生产仍为
+  **NO-GO / blocked**。
+- prepare 只能产出 pending；apply 必须同时绑定固定 v2 SHA、可信 manifest SHA、调用方显式
+  SHA 与实际文件 SHA。记录、身份、来源、计数发生漂移或出现重复记录时一律 fail closed。
+  用户本次“继续推进”不构成生产写入授权。
+- 本轮验证为工具与转换器 `48/48`、相关 Django `223/223`、Node `2/2`、OpenSpec
+  `30/30`；Django check、migration drift 与 `git diff --check` clean，独立 reviewer
+  第三轮 `APPROVED`。文档中的历史 `282/282` 继续保留，但不是本轮新运行结果。
+
+## 2026-07-20 P0 工作簿地区结论、来源调研与批次文案完成动态化
+
+- 来源调研页改由 `buildSourceResearchRows(horses)` 从当前 horses 输入动态计算法国、英国、
+  美国与 Fort George 结论；日本、香港“本批无缺口”也按当前 `field_status` 与 career
+  数据生成。无对应地区或具名马样本时不制造结论。
+- 标题、范围、总表 sheet 名及美国字段字典中的固定 `50`、`各 10`、`美国 10` 改由
+  `workbookBatchMetadata(horses)` 生成；默认输出文件名仍绑定冻结 50 匹 artifact，不改变。
+- 地区汇总改由 `regionSummaryConclusion` 按当前硬字段、血统、missing/excess/unknown 与
+  career completeness 动态生成；无样本明确显示“当前输入无样本”，美国另附逐场官方性说明。
+  `japanBatchConclusion` 的空样本不再产生 `0/0` 成功结论。
+- `regionSourcePolicy` 与 `regionNextRoute` 只描述通用来源能力和入口；字段矩阵不再固定
+  Fort George/JBIS 本批覆盖说明或样本 URL，无样本也不再因 `0=0` 显示可正常获取。
+- 两轮 RED 均因缺少新 helper 导出而使 summary test `exit 1`；GREEN 后 summary/path tests
+  均 `exit 0`，builder/summary Node `--check` 通过。
+- 地区汇总与字段矩阵回归的 RED 因缺少 `regionNextRoute` 导出失败；GREEN 后 summary/path
+  tests 与 builder/summary Node `--check` 均通过。视觉检查后仅将 summary `A5:M9` 行高由
+  `42` 调至 `72`、matrix data rows 由 `34` 调至 `56`。
+- reviewer 最后一条 P2 指出 `pedigreeCompletionStatement([])` 会把 0 匹误判为全部补齐。
+  RED 已复现旧错误；GREEN 后 `pedigreeCompletionStatement([])` 与
+  `regionPedigreeStatement([])` 均返回“当前输入无样本”，非空输入行为不变。summary/path
+  tests、Node `--check` 与 `git diff --check` 通过。
+- v2 workbook 已重建为 50 horses / 2050 field evidence / 1439 career records /
+  2679 record evidence / 9 previews / formula errors 0，SHA-256 为
+  `f67ad84408e68af69f14e2eef06e7135ca0b19cfc4fd18faf8925798acdbb1eb`。可见内容与前次
+  一致，SHA 变化只来自二进制生成元数据；此后不再重建。生产仍为 **NO-GO**，未执行生产
+  写入、部署或发布。
+
+## 2026-07-19 P0 马五地区 50 匹字段与履历数量缺口已清零
+
+- 本轮继续保持只读研究边界：没有写生产 `HorseProfile`、`HorseP0Source` 或
+  `HorseRaceRecord`，没有创建 `RaceEvent`，也没有部署或发布。
+- 富化后的结构化结果为
+  `runtime/horse_profile_completion/pedigree-research-20260719/p0_horse_research_50_enriched_v2.json`。
+  最终 SHA-256 为 `a1184dbfb0257ecbe2a4ddbc4e729b0a74d73f911c8d52a20ab65854520325b7`；
+  冻结 v1
+  `runtime/horse_profile_completion/pedigree-research-20260719/p0_horse_research_50_enriched.json`
+  的 SHA-256 为 `55d80abed2b76a2d7fcf0cb97aadff800c3130c3815e84d8e6eb5b1c16b4befd`，
+  v2 生成未修改其字节。
+  五地区各 `10` 匹的 13 项基础/三代血统硬字段均为 `130/130`，父、母、父父、父母、母父、
+  母母总体为 `300/300`，基础字段和血统字段缺口均为零。
+- 原 `120` 个祖父母缺口中，`89` 个由父母实体安全反查补齐，`31` 个歧义或未命中字段由逐项
+  人工证据补齐。法国和英国的产地、育马者，以及中国香港的精确出生日期、育马者共 `60` 个
+  基础字段也已按“来源马 ID + 父 + 母 + 出生年”身份锁补证；所有应用只允许填空，冲突即拒绝。
+  `basic_profile_gap_snapshot.json` 冻结了首次应用前 `60/60` 个缺口；v5 应用清单同时绑定父输入
+  SHA、当前输入快照、应用后快照及追加式历史，重复执行不得覆盖首次快照。
+- 五地区现有履历共 `1439` 条，来源总数与已采集实际出赛的“缺少实际出赛”和“多采/待去重”
+  均为 `0`，不再用无方向的绝对差值冒充缺口。Fort George
+  原缺的 `7` 场已从 Sporting Life/Racing Post 结果页逐场补入，现为 `13/13`；这些记录不是
+  Equibase 官方逐场数据，因此美国 `10/10` 匹仍保持
+  `count_aligned_per_record_officiality_pending`，不得宣称逐场官方性完整。
+- 按本批结构化完整规则，日本、法国、中国香港、英国为 `40/40` 完整；美国 `10` 匹仅达到
+  官方总数对齐，严格整匹马完整门禁为 `40/50`。美国长期仍需授权
+  Equibase/Equineline/TrackMaster 数据，或人工 Full Charts/Lifetime PP 核验。
+- 美国 HRN 正式来源 client、缓存复放和 50 匹研究解析现均强制使用“马名 + 父名 + 母名 +
+  出生年份”四字段锁；任一字段缺失或不一致均阻断，不能再由同名 slug 导入履历。跨来源同场
+  合并只允许正式结果覆盖 `unknown`，并保留旧来源直接展示值、采用新来源标准值和归一化值；
+  人工赛果证据去重键始终包含来源身份或完整四字段身份。
+- source cache 已升级为 `p0-horse-source-cache.v2`。所有地区在复放前都必须用缓存自身马名或
+  alias 命中请求马名，禁止用请求值回填缺失身份；来源总出赛数必须同时具备来源名、HTTP(S)
+  URL 和带时区核验时间。受控网络 client 只允许访问 JBIS、HKJC、Sporting Life、Geny、HRN
+  的登记 HTTPS 主机，关闭自动重定向并逐跳复核目标主机、端口和请求预算。
+- 候选来源与资料来源不同时，必须由候选提供完整“马名 + 父名 + 母名 + 出生年份”并与资料
+  payload 一致；不同 provider 的 external ID 和同名 alias 不能代替四字段锁。数据库生涯
+  evaluator 与整匹马聚合 evaluator 也会独立复核总数来源名、URL 和带时区核验时间，后台或
+  其它服务不能绕过 cache 直接写出完整。同 provider 只有在候选和 payload 都具备一致 external
+  ID 时才走直接身份；显式来源名与 `external:<provider>:...` key 冲突时立即拒绝。
+- 研究 JSON 和 Excel 现均只允许 `source_records_verified` 进入“完整”；`source_blocked`、
+  `unknown` 和非法 authority 全部 fail closed。官方明确 `source_start_count=0` 时允许空
+  `records` 作为数量对齐快照，非零总数仍必须具备逐场记录。
+- 日本 10 匹授权离线重放现逐匹真实调用 `from_japan_candidate` 重建，并从逐场记录复算实际
+  出赛、未出赛、异常状态和双向数量差异，不再引用外部未定义计数变量。同 provider 判断会
+  规范化 provider 大小写，但 external ID 必须精确一致。
+- 数据库总数 URL 改用 Django `URLValidator`，带空格主机、非法端口等不可用值不能进入完整。
+  新建议标为 `IGNORED` 只追加审核历史，完整度仍取最近一条非 ignored 的有效状态，不会撤销
+  此前已应用证据；后续 conflict/pending 仍会正常阻断。
+- 逐场第 4 名及以后统一归一为模型合法状态 `unplaced`，不再写入不存在的 `finished`；真实审核
+  apply 回归已确认落库值合法。只有年份的履历继续保留 `race_date_precision=year`，但 adapter
+  和数据库 evaluator 都保持 `partial`。基础资料、血统、逐场赛果、官方总数及所有佐证 URL
+  均使用严格 HTTP(S) URL 校验，空格主机和非法端口不能进入冻结证据。
+- 自动补充来源现不能只凭同名合并：同 provider 必须 external ID 精确一致，否则主来源与
+  补充来源各自都要具备并一致命中马名、父名、母名、出生年份。审核 apply、source client 和
+  数据库 evaluator 均使用同一严格 URL 规则；总数、来源名、URL、带时区核验时间按原子证据组
+  更新，缺一项即清空整组，不能与数据库旧值拼接。cache 的硬字段会验证类型、出生年范围和
+  ISO 日期；研究摘要优先使用官方总数计算缺口，不再被相等的备用来源总数掩盖。
+- 父母实体反查也不再把“搜索中只有一个同名结果”当成强身份。自动采用必须匹配预期
+  provider-bound external ID，或同时具备已知父名和完整来源身份；provider namespace 可
+  规范化，但 external ID 在全链路只去首尾空格并按不透明原值精确比较。同 provider 的候选、
+  出生年证据、逐行 manifest 和 v2 `source_identity` 必须保持同一 ID。
+- 旧 JSON 中 `62` 条 name-only 父系证据和 `54` 条 name + known sire 母系证据已升级为
+  `116` 行审核 manifest，归并为 `55` 个唯一父母来源身份。所有 `116` 个 `source_identity`
+  现均具备 `horse_name + sire_name + dam_name + birth_year`，两种旧 legacy method 计数均为
+  `0`。manifest 路径为
+  `runtime/horse_profile_completion/pedigree-research-20260719/reviewed_parent_identity_evidence.json`，
+  SHA-256 为 `b211d9040814b0b56ec30e8ef8930fdc10f4140a3a660cf491fcae12d0b6ab2b`。
+  父母出生年不是项目负责人逐字段提供或审核：它来自独立 approved artifact
+  `reviewed_parent_birth_year_evidence.json`，`reviewed_by=codex_manual_source_review`，
+  SHA-256 为 `ed9f6419dccd41485b96884410ea9ab5976d8ab5ba2acfb97e03837a7a3deb54`；
+  parent identity manifest 只绑定该独立证据及既有审核上下文。
+- Kentucky Wood 的父系同名纠错已显式留痕：旧 Netkeiba `000a02bd3f` 是 1925 年同名
+  Balko，必须保留在 v1 且不得进入 v2；正确父马是 Racing Post `595446` 的 2001 年 Balko，
+  父母为 Pistolet Bleu / Ella Royale。自动 Netkeiba 父母候选 URL 只接受精确
+  `https://en.netkeiba.com/db/horse/<id>/`，凭据、端口、query 或 fragment 任一存在均拒绝。
+- `0052_horse_career_source_authority` 在新增逐场权威状态后，会把旧
+  `career_history_status=complete` 且权威性未核验的记录降为 `needs_review`；若整匹马状态原为
+  `complete_profile_full`，同时降为 `complete_pedigree_2gen`，避免聚合状态继续对外显示未经
+  证明的完整生涯。
+- 审核工作簿已用富化结果重建：
+  `outputs/019f481e-4133-7f43-9844-e7a59b33ba9a/P0马五地区50匹完整解析与字段可用性审核-v2.xlsx`，
+  最终 SHA-256 为 `f67ad84408e68af69f14e2eef06e7135ca0b19cfc4fd18faf8925798acdbb1eb`；
+  冻结 v1 工作簿 SHA-256 为
+  `4b68b87a076793eab0acc2357762afbd0c0fcaf2282fcf4122e3a2a855c2b696`，
+  人工证据应用 ID 为 `3d5ab289cc5590e3cc405a4f28e532b98c86466f1b8da656e01183ca1fb2508c`。
+  工作簿包含 `2050` 条逐字段证据、`1439` 条逐场履历、`2679` 条逐场三层证据；非冲突证据
+  不再误显示为“冲突候选值”。公式错误扫描为零，`9` 张预览已覆盖全部工作表并完成视觉核验。
+- 工作簿 builder 默认读取 v2 JSON，默认输出 `-v2.xlsx` 和 `previews-v2`；环境变量覆盖配置文件。
+  指向冻结 v1 工作簿或 v1 previews 目录的输出会被拒绝，避免覆盖审计基线。
+- reviewer 最后一条意见指出工作簿结论数字被硬编码；现由 `careerConclusionRows(horses)` 从当前
+  horses 输入动态生成法国、中国香港、英国和美国结论，具名马不存在时不制造对应结论。合成
+  输入 Node 回归已覆盖该边界；重建后仍为 `50` 匹、`2050` 条字段证据、`1439` 条履历、
+  `2679` 条履历字段证据、`9` 张预览、公式错误 `0`，首页预览人工检查无溢出或遮挡。
+- 来源解析、适配器、候选提取、生涯模型、50 匹产物最终化、基础资料与血统补证离线组合回归
+  已从上一轮 `277/277` 增至最终 `282/282` 通过；Node 工作簿 summary 与 path 测试通过，
+  测试分母已包含既有
+  `stable.tests.P0HorseProfileDataCompletionTests` 整类。Django check、迁移漂移检查、
+  OpenSpec change strict 通过、all strict `30/30`、Python `compileall`、工作簿公式错误扫描、
+  `9` 张预览和 `git diff --check` 均通过。
+  生产仍为 `NO-GO`：没有生产写入、部署、发布或网络 career crawl。
+
+## 2026-07-18 P0 马五地区 50 匹字段与履历研究包已完成
+
+- 已对审核确认的法国、中国香港、日本、英国、美国各 `10` 匹、共 `50` 匹执行一次性只读
+  研究解析；全部 `50/50` 生成结果且无解析异常。当时结构化结果路径为
+  `runtime/horse_profile_completion/research-50-parsed-20260718/p0_horse_research_50.json`，
+  审计记录曾登记 SHA-256
+  `1c15b3c3338cdb9e8fe853d66a6a88c277c2f7afccd1b106349bab8ed640e5ba`。该路径后来被后续
+  研究步骤覆盖，旧字节未保留、现已不可复验；当前路径字节 SHA-256 为
+  `7a02bbe0f66177fd813626aa03ea98a190c2b11e227a96aab056ad17c3bb2f6c`，不得冒充 7 月 18 日
+  原产物。当前可复验的最终冻结 JSON 以本文件上一节的富化路径和 SHA 为准。
+  本轮没有创建或修改生产 `HorseProfile`、`HorseP0Source`、`HorseRaceRecord` 或
+  `RaceEvent`，也没有发布马匹页。
+- 人工审核工作簿为
+  `outputs/019f481e-4133-7f43-9844-e7a59b33ba9a/P0马五地区50匹完整解析与字段可用性审核.xlsx`，
+  当时审计记录曾登记 SHA-256
+  `584e7493d9c53726616fc18ad03144262dfa418b6940c4fba23aa67c7a09044b`；该同名路径后来由
+  7 月 19 日最终工作簿原子替换，旧字节未保留、现已不可复验。当前路径 SHA-256 为
+  `4b68b87a076793eab0acc2357762afbd0c0fcaf2282fcf4122e3a2a855c2b696`，其内容和统计以
+  本文件上一节为准。
+  工作簿包含地区字段矩阵、50 匹全部资料、`1550` 条逐字段证据、`1434` 条逐场履历、
+  来源调研和字段字典；公式错误扫描为零，并已逐 sheet 渲染验收。
+- 13 个基础/二代血统硬字段按“已获取格数/地区总格数”统计为：日本 `130/130`、美国
+  `90/130`、法国 `80/130`、中国香港 `80/130`、英国 `80/130`。日本是唯一全部
+  `13/13` 字段均达到 `10/10` 的地区。法国和英国缺产地、育马者及父父/父母/母母；
+  中国香港缺完整出生日期、育马者及父父/父母/母母；美国缺毛色及父父/父母/母母。
+- 履历研究结果必须按语义分层：日本有 `200` 条记录，其中 `199` 次实际出赛、`1` 次退赛，
+  来源总数无缺口；法国来源声明 `250` 次实际出赛且已采集 `250` 条，但有 `12` 场旧记录
+  结果状态待补；英国来源声明并采集 `412` 次实际出赛，但有 `18` 场旧记录结果状态待补；
+  中国香港已采集 `372` 次实际出赛和 `3` 条未出赛记录，按来源总数仍有 `4` 场缺口；
+  美国 HRN 可见履历共 `197` 条，但没有取得 Equibase 权威总出赛数，因此缺口仍为未知。
+- 法国 Geny 本次继续返回 HTTP `429`，研究包改用已逐马确认身份的 Sporting Life
+  `Full Form`；长期硬字段方案为 IFCE SIRE / France Galop Stud Book。美国先从 Equibase
+  官方赛事载荷取得 refno、父母和完整出生日期，再用 NYRA 官方赛事页补产地/育马者；
+  HRN 只在父、母和出生年份一致后提供可见履历。该校验已修正 Cornishman、Gigante 和
+  Movin' On Up 三个同名马错误 profile，禁止只按马名或 HRN slug 合并。
+- 本轮完成的是“字段可用性研究和人工审核包”，不是五地区正式资料批次闭环。严格完整门禁仍为
+  `10/50`：法国、英国需要补结果状态和剩余硬字段；中国香港需要补硬字段及 `4` 场履历；
+  美国需要 Equibase 官方总出赛数、完整履历和剩余硬字段。后续生产 apply 仍需新的冻结
+  artifact、逐马人工审核、写前备份和针对精确版本的明确授权。
+
+## 2026-07-18 P0 马日本首批已达 10/10，并通过无网络复放
+
+- `complete_horse_profiles` 已支持仅在 `--dry-run + --p0-reviewed-candidates +
+  --p0-review-manifest + --p0-review-manifest-sha256` 组合中使用 `--allow-network`；
+  CLI 冻结 SHA、服务端 `HORSE_PROFILE_COMPLETION_REVIEW_MANIFEST_SHA256` 和实际 manifest
+  字节 SHA 必须三方一致，manifest 还必须与 CSV basename、SHA-256、大小和 50 行分母完全
+  一致；全部校验在解析 manifest 和创建任何 source client 前完成。命令参数和
+  `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK` 必须同时开启，service 入口也会独立复核设置。
+  网络模式必须显式选择至少一个地区，未选择地区仍只走现有离线 cache/cache-miss blocker。
+- 五地区分别固定单马请求预算为日本 `3`、香港 `1`、英国 `1`、法国 `2`、美国 `3`，每区
+  最多 `10` 匹且整批复用一个受控 source client。网络结果继续经过统一 source validator、
+  adapter 和原子 cache；单马失败不会中断后续候选。成功补出 provider ID 或完整
+  “马名+父名+母名+出生年份”后，候选不再被旧的 `needs_identity_enrichment` 永久阻断。
+- batch manifest 现在记录 `network_allowed`、`network_regions`、`review_manifest_input`，
+  summary 总体和逐地区记录
+  `network_request_count/cache_hit_count/cache_miss_count`；仍固定
+  `read_only=true/database_writes=0`，50 行审核 CSV、输入 SHA、空输出目录、五地区各 10 匹、
+  身份与完整度门禁均未放宽。整批 artifact 在同父目录 staging 中生成，逐文件校验并
+  `fsync` 后再原子发布；失败会清理 staging，不在最终目录留下半成品。
+- 测试先行的 8 个批次入口合同最初全部 RED；随后新增的真实来源 blocker 分类合同也先取得
+  RED，并修正为 `P0HorseSourceBlocked -> source_cache_or_adapter_error`，保留原始异常和请求数，
+  其他编程异常仍归 `unexpected_adapter_error`。复用的地区 client 外包一层逐候选代理，
+  不要求底层 `last_request_count` 可写；cache 在 fetch 前失败时记录 `0`，实际 fetch
+  成功或失败后读取底层只读计数，底层无该属性时保守记 `1`。底层 client 的请求预算逐马
+  重置，但最后真实请求时间跨同地区候选保留，后续候选继续遵守请求间隔。
+  JBIS `.data-6-5` 中只有 finish 精确为 `**`、列数至少 13 且 `cells[12]` 规范文本精确为
+  `除外` 或 `取消` 时，才分别映射为 `withdrawn` 或 `scratched`；赛事名不能代替状态列，
+  列不足或未知 `**` 继续阻断。后续 reviewer 发现 transport 异常未计数的问题也已按测试先行
+  修复：真实 transport 调用前即记录一次请求尝试和 monotonic 时间，连接/TLS/读取异常仍计入
+  request budget，下一候选继续遵守剩余间隔。Docker `--network none` 下 source-client
+  `48/48`（`Ran 48 tests in 0.450s`）与四模块 `102/102`
+  （`Ran 102 tests in 1.040s`）均为 `OK`。Django check 无问题，迁移检查为
+  `No changes detected`，两个 service 与管理命令 `py_compile`、`git diff --check` 均通过。
+- 日本 10 匹首个受控网络批次已运行，目录为
+  `runtime/horse_profile_completion/p0-reviewed-japan-network-20260718-083707/`，batch
+  manifest SHA-256 为 `bf8dbda389e5ffc3b9efa1f361a8cbb7b8ad5392b2e1c11c86b25d8600db49e2`。
+  该次历史结果为 `9/10 complete / 30 requests / 9 个新生成 cache / 0 cache hits / 0 database writes`；
+  コントラポスト的真实履历为 `22 actual starts + 1 除外`，旧解析将 `**` 误算实际出赛而阻断。
+  修复后使用新目录
+  `runtime/horse_profile_completion/p0-reviewed-japan-network-rerun-20260718-091156/`
+  完成受控重跑，batch manifest SHA-256 为
+  `9682ceebddb53a796ff058bb79a3455e89a4ad03b01ddeed7beed947dd1106b5`。重跑结果为
+  日本 `10/10 complete / 9 cache hits / 1 cache miss / 3 network requests / 0 database writes`；
+  其余四地区均未触网。コントラポスト保留 `23` 条履历，其中 `22` 次实际出赛和 `1` 条
+  `除外`，生涯计数为 `22/22`、缺口为 `0`。
+- 随后在 Docker `--network none` 中使用同一 10 份 canonical cache 复放，目录为
+  `runtime/horse_profile_completion/p0-reviewed-japan-offline-replay-20260718-0913/`，
+  batch manifest SHA-256 为
+  `472785d50e5e6e7343d1ec0285cc68921a12ca7303556fa58dd21ffcc1af22c2`。日本结果为
+  `10/10 complete / 10 cache hits / 0 cache misses / 0 network requests / 0 database writes`；
+  cache 目录正好 `10` 个 JSON，且无临时文件残留。
+- 前述两次日本重跑形成于审核 manifest 强绑定和整批原子发布修复之前，因此保留为来源抓取与
+  解析证据，不冒充新门禁证据。加固后又在 Docker `--network none` 中以
+  `network_allowed=true + network_regions=["japan"]` 完成全缓存复放，目录为
+  `runtime/horse_profile_completion/p0-reviewed-japan-hardened-offline-replay-20260718-094427/`，
+  batch manifest SHA-256 为
+  `4834e9f9f47b67a57bb1c11ee7cdc0b8338673b7e96d575a56ef1e5164332ecb`。该清单绑定审核
+  manifest SHA-256 `aa452fb27dcf77e7821782a6302504e7abe4cf600bd6da25e9c49e7f776213bf`
+  和审核 CSV SHA-256 `f36d2f3f71fccc90a7f498f4d1c021e1a6d4275450122de599bc4b8767e240fa`；
+  日本 `10/10 complete / 10 cache hits / 0 network requests / 0 database writes`，最终目录
+  `8` 个文件、无 staging 残留。该次形成于外部冻结 SHA 信任锚修复之前，只是中间验证。
+- 最终授权复放目录为
+  `runtime/horse_profile_completion/p0-reviewed-japan-authorized-offline-replay-20260718-100440/`，
+  batch manifest SHA-256 为
+  `96ebef63ae74fa787ff786b262cebebc252f6e3c536c2aa89fc920c8d8e91210`。Docker
+  `--network none` 中同时设置 CLI 和服务端冻结 SHA
+  `aa452fb27dcf77e7821782a6302504e7abe4cf600bd6da25e9c49e7f776213bf`，实际 manifest
+  SHA 与之相同，batch manifest 记录 `authorized_by_setting=true`；审核 CSV 仍为
+  `f36d2f3f71fccc90a7f498f4d1c021e1a6d4275450122de599bc4b8767e240fa`。日本
+  `10/10 complete / 10 cache hits / 0 network requests / 0 database writes`，最终目录
+  `8` 个文件、无 staging 残留。
+- HK/UK/FR/US 的真实字段缺口仍未闭环，法国 429 仍是 blocker；任务 4.2 保持未完成。
+  当前总体只能记为首批 `10/50` 达到来源完整状态；没有执行生产资料写入、发布、Git
+  commit/push/merge 或部署。同一独立 reviewer 对本审计段落追加前的完整差异结论为
+  `APPROVED`、无 actionable finding；approved HEAD 为
+  `c2c30aeed73619767c1ca6dfb440b43c8f824d11`，审前/审后 fingerprint 均为
+  `4dfaaaff01f38c5062a29a2225ac0f7fe8371d3ceccfd12e5182731cbaf99221`，reviewer stdout
+  SHA-256 为 `0780293905b1c1cdd953a02bd2386c25902021709c9144b2c466bf93ad062631`，helper raw
+  stdout SHA-256 为 `8a000524fd6228570e0ac2cb036d1d475e50701a3adb5806a5130cd91fbb632c`。
+  上述旧 fingerprint 不覆盖这段随后追加的审计文字；该文字的准确性以追加后的限定只读复核
+  结果为准，避免把复核自身的 fingerprint 再写回并形成无限自指。
+
+## 2026-07-18 P0 马真实页面兼容已通过单马受控探针
+
+- 五地区 source client 已补入保存快照所示的真实页面 shape：Sporting Life 同时兼容旧
+  `pageProps.horse/full_form` 与 `pageProps.profile/previous_results/stats.total`；HKJC
+  支持 nested `table.horseProfile`、`title_text` 和 `bigborder` Form Records；JBIS 使用
+  `/horse/result/?keyword=<name>&match=exact` 并支持真实 profile/record grid；HRN 先按严格
+  slug 直达并从同页 `horse-stats`、`horse-table` 解析。并发 cache 发布改为
+  `os.link` no-clobber，竞争者统一重读并校验 canonical cache。
+- 这仍是离线页面兼容，不是五地区真实资料完成。此前 `66/66` 只证明合成 fixture scaffold；
+  原“真实客户端最终 GREEN”、实现者 reviewer `APPROVED` 和 fingerprint 完成声明已经撤销。
+- 当前候选已由主会话在真正的 Docker `--network none` 中完成最终复验：source-client
+  `20/20`（`Ran 20 tests in 0.057s`）与四模块 `74/74`
+  （`Ran 74 tests in 0.693s`）均为 `OK`；Django check 无问题、迁移无漂移，
+  `PYTHONPYCACHEPREFIX=/tmp/pycache` 下两个 service `py_compile` 与 `git diff --check`
+  均退出 `0`。
+- 首次真实探针曾为 `0/5`，其中日本因旧 JBIS 入口失败。修复后主会话再次执行五地区各 1 匹、
+  不落缓存且不写数据库的受控探针，当前为 `1/5`：日本オーロラエックス通过真实 JBIS
+  search/profile/record 三页解析，来源总出赛数与履历均为 `15/15`；香港 EAGLE WAY
+  精确阻断于缺 `birth_date/trainer_name/breeder_name`；英国 Jonbon 精确阻断于缺
+  `country/breeder_name`；法国 LOSANGE BLEU 仍为 HTTP `429`；美国 Bullard 精确阻断于
+  `missing_source_start_count`。这只证明单马来源兼容，不代表首批资料已缓存或补全。
+- HKJC、Sporting Life、HRN 仍需补充来源或人工字段；法国需在 429 解除后重新低频探针。
+  任务 4.2 保持未完成；日本首批后续已重跑并达到 `10/10`，但严禁扩大解释为
+  “50 匹已补全”。
+- 同一独立原生 reviewer session `019f71f9-bb0c-7c92-8e12-83837a2a6c11` 已对前轮四项
+  finding、严格身份 validator 和 legacy cache 边界完成代码定向复审，结论为
+  `APPROVED`、无剩余 actionable finding。审前审后 fingerprint 均为
+  `85f9adbfc574b6ffb5a261ae27d48aeefff97a62fd314c6397d30f0b469b4351`，review stdout
+  SHA-256 为 `78582a4a05140a44d9c49a1c0c353a8124fa1477e095c3410d32d6ecf0ea08fd`。
+  该指纹产生于本段状态文档更新之前，只清零代码审查问题，不代表任务 4.2、真实资料批次
+  或随后新增的文档已获批准。
+
+## 2026-07-18 P0 马首批审核与完整资料离线 dry-run scaffold 已完成本地实现
+
+- 项目负责人确认生产只读候选中的五地区各 `10` 匹、共 `50` 匹全部纳入首批资料补全。机器可读审核 artifact 位于 `runtime/p0_horse_candidates/production-reviewed-20260718-all-50-approved/`，审核 manifest SHA-256 为 `aa452fb27dcf77e7821782a6302504e7abe4cf600bd6da25e9c49e7f776213bf`。该决定只确认批次范围，不豁免身份、完整资料或完整生涯门禁。
+- 新增统一 `p0-horse-completion.v1` payload、五地区 adapter 协议、完整履历状态映射、年精度日期、未关联普通比赛、跨来源保守去重、模块 apply/ignore/conflict 审计，以及绑定审核输入和逐文件 SHA-256 的离线批次 artifact。`complete_horse_profiles --dry-run --p0-reviewed-candidates ...` 固定 `allow_network=false`，单匹缓存缺失或解析失败转 blocker，不中断整批。
+- 持久化基线 dry-run 位于 `runtime/horse_profile_completion/p0-reviewed-baseline-20260718-0500/`，batch manifest SHA-256 为 `2028e03a8e5edaa386e101cd159406559192844c02a9979d363e1dbece571110`。输入审核 CSV SHA-256 为 `f36d2f3f71fccc90a7f498f4d1c021e1a6d4275450122de599bc4b8767e240fa`；处理 `50` 匹、五地区各 `10`，网络请求 `0`、数据库写入 `0`。当时空缓存下 `50/50` 为 `network_disabled_cache_missing`，日本和美国共 `20/50` 另外保留 `identity_enrichment_required + missing_identity`，因此该离线基线为 `0/50`；此数已被后续日本网络批次和离线复放更新为当前 `10/50`，不能再作为当前完成数。
+- 该离线基线形成时，本地验证由 `17` 项中的 `14` 项 RED 和批次新增 `5` 项 RED 推进到
+  focused `22/22`、P0 相关组合 `51/51` 通过；当时尚未执行真实资料网络抓取。后续日本受控
+  抓取与加固验证见本页顶部；截至当前仍未执行生产 commit、自动发布、Git
+  commit/push/merge 或部署。
+- 该历史段落记录的旧 reviewer approval 只覆盖当时受审代码和既有 findings，不覆盖后续网络
+  证据、加固实现或当前全部未提交差异。下一步是为香港、英国、美国确定补充来源/人工字段方案，
+  并为法国 429 制定低频重试窗口；在这些方案形成新的受控缓存批次前，不得把
+  fixture/cache 协议或单份成功探针解释为已经补齐 50 匹资料。
+
+## 2026-07-18 P0 重点赛事参赛马只读提取能力已完成本地实现
+
+- 已实现从五地区重点赛事 `RaceEventRunner` / `RaceEventResult` 只读提取 P0 马候选、观察清单、每地区审核 CSV 和 SHA-256 manifest；只有马名的记录保持事件级独立并标记 `needs_identity_enrichment`。
+- 来源内 external horse ID 或完整“马名 + 父名 + 母名 + 出生年份”才可跨赛事归并；共享强身份键按连通关系聚合，身份冲突继续 fail closed。
+- 命令入口为 `p0_horse_profiles --extract-candidates`。提取阶段不创建术语、马匹、P0 来源或身份冲突，不启动马匹资料网络抓取。
+- 历史生产只读样本为五地区各 10 匹；该记录只说明候选提取完成，不构成生产资料写入或公开授权。
+
 ## 2026-07-20 五地区准实时 Beta Gate 修复已发布，法国重验安全降级
 
 - 用户授权的冻结 fingerprint
@@ -2066,6 +2575,59 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - `.env` 备份为 `.env.backup.main-3939992c-20260713_185140`。数据库备份为 `backups/db/pre-main-3939992c-20260713_185140.sql.gz`，大小 `125,782,755` bytes，SHA-256 `21903cf8d9494ef6053414a34c2e2f6ab01406b9ffebcf56ff3fd10eedfc0967`，`gzip -t` 通过；旧镜像回滚标签为 `umanewsbot:rollback-pre-3939992c-20260713_185140`。
 - 无待应用迁移；Django check、静态资源、worker ping、内外 healthz、首页、赛事页和近期错误日志均通过。常驻历史写入/网络、历史公开、多地区归属及相关地区查询开关继续关闭。
 - 该镜像切换步骤本身没有执行 batch003 写入；随后历史线程已按独立 approval、备份和门禁完成上方 250/250 正式导入。旧的 `249 candidate / 1 Hampton gap` 预期已经作废。
+## 2026-07-18 P0 马详细资料首批来源审计与人工补录入口
+
+- 五地区各 10 匹身份审核仍为全批纳入；当前只有日本 `10/10` 已由完整缓存和离线回放证明资料、二代血统及完整生涯均可生成。其他四地区不得因为 adapter 代码存在而视为真实可用。
+- 受控单马探测结论：中国香港 HKJC 可访问，但缺精确出生日期、繁育者、部分二代血统及逐场正式比赛名；英国 Sporting Life 可返回完整表单，但样本缺出生国和繁育者；法国 Geny 返回 HTTP 429，Canalturf 仅能作为部分资料证据；美国候选缺 provider horse ID，Equibase 被防护页阻断，HRN 样本可访问但精确出生日期存在跨来源冲突。
+- 新增保守多来源合并和人工补录入口。自动第二来源只能填空，既有非空值不同即阻断；人工补录只允许 `identity/basic_profile/pedigree` 白名单字段，必须记录直接证据 URL、录入人、不同的复核人、审核时间和字段组，禁止补写 `career`，并在证据中明确标为 `manual_supplement`，不得伪装为 adapter。
+- `complete_horse_profiles` 新增 `--p0-manual-supplements`，只允许与已授权审核候选网络 dry-run 同时使用。批次 manifest 记录人工补录文件路径、大小、SHA-256、批准字段数和候选数；只有 `review_status=approved` 的行参与合并。
+- 已生成审核工作簿 `outputs/p0-horse-info-completion-20260718/P0马详细信息补全_字段审核工作簿_20260718.xlsx`，包含 50 匹队列、四地区真实阻断、70 个中港英待审核字段和完整字段字典。工作簿不构成抓取、写库、发布或生产授权。
+- 独立 reviewer 首轮指出候选 CSV 与人工 CSV 的哈希快照竞态，以及美国 HRN 三请求回退超过两请求预算。现已改为直接解析首次捕获并用于 SHA 的同一字节快照，美国预算提高为 `3`；并新增未选地区人工行、自定义 source client、已非空目标字段三项前置阻断。第二轮补齐 cache hit 人工合并、冲突和幂等复放；第三轮把纯自动 canonical cache 与本批人工工作副本拆开，并增加逐字段 `applied/already_applied/blocked/ignored` 结果及总体、地区和 manifest 汇总。第四轮进一步要求 canonical cache 读写严格拒绝所有人工标记，并在 staging 前按完整证据指纹核对每个批准字段与唯一 outcome；污染 cache、混合来源、缺失/重复/非法状态/证据漂移和无输入旧 outcome 均 fail closed。第五轮把 canonical payload 限制为严格 JSON 类型，tuple/set、非字符串对象键及非有限浮点值不得在序列化前绕过纯净检查。第六轮把该检查改为带活动容器集合和最大深度的迭代遍历，循环和过深结构稳定转为领域 blocker；真实审核批次证明 7 个非法候选被隔离、3 个合法候选继续且 cache 无临时残留。第七轮把严格形状检查提前到 `deepcopy` 之前，并把磁盘 JSON 解码的 `RecursionError` 包装为来源错误；1200 层内存与 cache 输入都稳定阻断且批次继续。第八轮仅允许精确内置 `dict/list` 容器，校验后通过 JSON round-trip 生成纯内置类型副本；异常/篡改型容器子类不触发复制钩子，深层坏 cache 批次前后目录与逐文件字节完全不变。第九轮在 JSON 规范化副本上再次检查人工标记，并让自动多来源与人工补录两个直接合并入口先规范化全部输入；欺骗型字符串值/键和异常/篡改型 helper 输入均 fail closed。第十轮把独立 canonical purity gate 也改为检查规范化副本，直接 helper 与实际 adapter + cache 路径都能阻断欺骗型人工标记且不落 cache。source-client `68/68`、四模块 `123/123` 均在 Docker `--network none` 下通过。
+- 第十一轮同一独立 reviewer 最终返回 `VERDICT: APPROVED`，无 actionable findings；审前/审后 fingerprint 均为 `9d2a7a276236306d3468e7a302df46e448ecfee257c64763db4700197edc8303`，reviewer stdout SHA-256 为 `b124808e0a93c4662687790b11f87dd192f29d9dff53692ff9383d96edb8ed8a`。该批准只覆盖当前只读能力、模型/展示/测试与人工审核通道，不授权四地区 10 匹网络批次、生产 `HorseRaceRecord` 写入、赛事创建、公开发布、Git 合并或部署。
+- 当前真实完成度仍为 `10/50`。任务 4.2 保持未完成；下一步先解决四地区主源/身份/字段缺口，再逐地区单马复验，只有单马达到完整资料和完整生涯双门槛后才允许扩到该地区 10 匹。
+
+## 2026-07-19 P0 马五地区 50 匹人工审核返修与履历证据分层
+
+- 本轮只在 P0 worktree 修复能力、模型/迁移、展示、测试和只读审核产物；没有启动新的历史履历
+  网络抓取，没有批量写生产 `HorseRaceRecord`，没有为普通比赛强建 `RaceEvent`，也没有发布或
+  部署。
+- 履历来源模型现将官方/主来源实际出赛总数与逐场权威性分开。新增总数来源、来源 URL、核验时间
+  和逐场权威状态；数量相等但逐场来自备用来源时只能标记
+  `count_aligned_records_unverified`，不得宣称逐场官方履历完整。
+- Sporting Life 逐场字段证据现按 `direct_raw/canonical_raw/normalized` 三层保存，各自保留状态、
+  来源 URL、时间和转换规则。法国 Class/Grade 与舍入英制距离在缺少 France Galop/IFCE SIRE
+  权威证据时保持阻断，不反推 Groupe 或官方米制。
+- 法国 `12` 条 Sporting Life `N/A` 已全部由 France Galop 官方公报补证为正式名次或
+  `arr/tbé/t.j`；Kentucky Wood `2026-05-30` 的 `arr` 按实际出赛未完成比赛计数。法国当前
+  `250 actual / 11 official abnormal / 0 unknown / gap 0`。
+- HKJC parser 已识别首列纯文本 `Overseas`，设置 `is_overseas=true`、生成稳定记录键，并对主表与
+  下方 `Overseas Horse Form Records` 去重。香港当前
+  `379 records = 376 actual + 3 non-start`，其中 `4` 次海外；SOUTHERN LEGEND、
+  BEAUTY ONLY、TIME WARP 均与 HKJC 总数对齐，缺口为 `0`。
+- Sporting Life parser 已读取 `casualty.reason`。Edwardstone 的五场 `F/F/UR/BD/UR` 均保留原始
+  reason、正式码和归一化状态，`finish_position` 可空但计入实际出赛。另 `8` 条旧 `N/A`
+  已核验为 `5` 条正式名次和 `3` 条未实际出赛；结果状态与实际出赛状态独立保存。英国当前
+  `412 records = 409 actual + 3 non-start / 10 official abnormal / 0 unknown / gap 0`。
+- 法国/英国的产地与育马者、中国香港的精确出生日期与育马者共 `60` 个基础字段已按来源马 ID、
+  父、母和出生年身份锁完成字段级补证；五地区 13 项基础/三代血统硬字段均为 `130/130`。
+- 美国 `10/10` 匹 Equibase `Career Starts` 和毛色均已作为人工核验证据保存。HRN 原始 `197`
+  行合并 `6` 条同场重复后为 `191` 次已采集实际出赛；Fort George 原缺 `7` 场已由 Sporting
+  Life/Racing Post 结果页补齐，现全批 `198/198` 数量对齐、已知数量缺口为 `0`。由于逐场来源
+  不是 Equibase 官方数据，美国 `10/10` 匹仍保持逐场官方性待确认。生产实现不得绕过
+  Incapsula 或违反 Equibase 条款，长期改用授权数据或人工 Full Charts/Lifetime PP。
+- 50 匹离线审核产出 `50` 匹资料、`2050` 条逐字段证据、`1439` 条逐场履历和 `2679` 条逐场
+  三层字段证据。严格完整资料门禁为日本、法国、中国香港、英国 `40/40`，总体 `40/50`；美国
+  不因数量对齐而升级为逐场权威完整。
+- 当前工作簿位于
+  `outputs/019f481e-4133-7f43-9844-e7a59b33ba9a/P0马五地区50匹完整解析与字段可用性审核-v2.xlsx`，
+  最终 SHA-256 为 `f67ad84408e68af69f14e2eef06e7135ca0b19cfc4fd18faf8925798acdbb1eb`，人工证据应用 ID 为
+  `3d5ab289cc5590e3cc405a4f28e532b98c86466f1b8da656e01183ca1fb2508c`；
+  9 个工作表已完成公式错误扫描和逐表视觉核验。
+- 真实 HKJC 页面形状、Sporting Life casualty、法国 N/A 补证、官方总数/逐场权威性、模型与完整
+  履历分页、人工赛果证据身份/比赛绑定相关回归在该历史轮次为 `277/277`；第十四轮最终增至
+  `282/282`。Django check、迁移无漂移、OpenSpec、工作簿摘要测试和公式错误扫描通过。
+  task `4.2` 继续未完成；美国逐场官方性等剩余语义按
+  `missing/partial/source_blocked/parser_gap` 保留。
 
 ## 2026-07-19 五地区准实时公开 Beta 首次 review findings 已修复，待限定复审
 
@@ -2198,3 +2760,26 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   `findings fixed / scoped re-review pending / not authorized / not deployed`。
   生产仍运行 `85948707` 对应镜像；scheduler/monitor、新地区和 enabled regions
   继续全关，法国 event 733–735 尚未重新联网 prepare，event 924 状态未改变。
+
+## 2026-07-20 P0 马全范围来源已写入生产
+
+- 写入前备份位于
+  `/opt/umanewsbot/backups/p0-horse-full-scope-precommit-20260720T063831Z`；
+  数据库 dump SHA-256 为
+  `f773f5ec0a98974cc402b202cfe2f0eed91fc4f022e58a621f2c7b2b63b96378`，
+  restore list 为 `1017` 行。
+- 首次无地区单事务同步触发主机 OOM，Linux 杀死 Python 进程；事务完整回滚。重启后核对仍为
+  `50` 条有效 P0 来源、`21621` 匹资料和 `0` 个待处理身份冲突，没有半写状态。
+- 随后临时启用 `1 GiB` swap、停止空闲 worker，并按法国、香港、英国、美国、日本五个地区
+  分批提交；最后以每批 `500` 条的事务补齐 `other` 和空地区的已翻译 horse term 来源。
+  全部完成后已恢复 beat、worker 和 race-live worker，并删除临时 swap。
+- 当前生产有 `56745` 条有效 P0 来源、`46318` 匹唯一 P0 马：
+  `35097` 条重点赛事参赛来源、`21598` 条已有中文名 active 术语来源和 `50` 条人工来源。
+  已翻译 horse term 缺失 P0 来源数为 `0`。
+- 资料完整度必须与 P0 范围写入分开报告：当前 `50` 匹为
+  `complete_profile_full`，`2` 匹为 `complete_pedigree_2gen`，其余 `46266` 匹仍为
+  `empty`；完整生涯 `50` 匹、部分生涯 `2` 匹、尚未采集 `46266` 匹。
+- 当前有 `65042` 条待处理身份冲突证据。它们代表按赛事参与项保存的歧义，不等于同数量的唯一
+  马匹；在父名、母名、出生年份或稳定外部 ID 足以区分前，不得猜测合并或写入详细资料。
+- 生产 `manage.py check` 通过，migration 已应用至 `stable.0052`，`/healthz/` 返回
+  `{"status":"ok"}`。
