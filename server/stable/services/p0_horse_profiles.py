@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -246,6 +247,76 @@ def _matched_identity_profile_ids(identity_keys: set[str], identity_index: dict[
     return matched_profile_ids
 
 
+SOURCE_DOMAIN_NAMESPACES = {
+    "equibase.com": "equibase",
+    "france-galop.com": "france_galop",
+    "geny.com": "geny",
+    "hkjc.com": "hkjc",
+    "horseracingnation.com": "horse_racing_nation",
+    "irishracing.com": "irishracing",
+    "jbis.or.jp": "jbis",
+    "jra.go.jp": "jra",
+    "keiba.go.jp": "keiba_go_jp",
+    "nationalsteeplechase.com": "nsa",
+    "netkeiba.com": "netkeiba",
+    "racingpost.com": "racing_post",
+    "sportinglife.com": "sporting_life",
+    "zeturf.fr": "zeturf",
+    "zone-turf.fr": "zone_turf",
+}
+# Numeric ``horse_slug`` values are only trustworthy as same-origin IDs for
+# providers whose slugs really are the horse ID. HRN slugs are name slugs and
+# HKJC IDs are alphanumeric, so neither is eligible.
+_NUMERIC_SLUG_ID_NAMESPACES = {"equibase", "jbis", "netkeiba", "sporting_life"}
+
+
+def _source_namespace_from_url(source_url: str) -> str:
+    hostname = (urlparse(source_url).hostname or "").strip().casefold().removeprefix("www.")
+    for domain, namespace in SOURCE_DOMAIN_NAMESPACES.items():
+        if hostname == domain or hostname.endswith(f".{domain}"):
+            return namespace
+    return ""
+
+
+def _identity_key_from_horse_url(horse_url: str) -> str:
+    """Extract a same-origin identity key from a horse profile URL.
+
+    Only URL shapes that embed the provider's own horse ID are mapped, and
+    only to the rolling-batch recognized namespace set. ZEturf and HRN URLs
+    never yield a key (their IDs/slugs are not same-origin horse IDs).
+    """
+    parsed = urlparse(str(horse_url or "").strip())
+    if not parsed.hostname:
+        return ""
+    namespace = _source_namespace_from_url(horse_url)
+    path = parsed.path or ""
+    query = parse_qs(parsed.query or "")
+    if namespace == "netkeiba":
+        match = re.search(r"/horse/(?:[a-z]+/)*(\d{5,})(?:/|$)", path)
+        return f"netkeiba:{match.group(1)}" if match else ""
+    if namespace == "jbis":
+        match = re.search(r"/horse/(\d{5,})(?:/|$)", path)
+        return f"jbis:{match.group(1)}" if match else ""
+    if namespace == "keiba_go_jp":
+        for key in ("k_lineageLoginCode", "k_lineagelogincode"):
+            value = (query.get(key) or [""])[0].strip()
+            if value.isdigit():
+                return f"nar:{value}"
+        return ""
+    if namespace == "hkjc":
+        for key, values in query.items():
+            if key.casefold() == "horseid" and values and values[0].strip():
+                return f"hkjc:{values[0].strip()}"
+        return ""
+    if namespace == "sporting_life":
+        match = re.search(r"/profiles/horse/(\d+)(?:/|$)", path)
+        return f"sporting_life:{match.group(1)}" if match else ""
+    if namespace == "equibase":
+        value = (query.get("refno") or [""])[0].strip()
+        return f"equibase:{value}" if value.isdigit() else ""
+    return ""
+
+
 def _source_namespace(*payloads: dict | None) -> str:
     generic_fallback = ""
 
@@ -283,24 +354,7 @@ def _source_namespace(*payloads: dict | None) -> str:
             return namespace
     source_url = _source_url_from_payload(*payloads)
     hostname = (urlparse(source_url).hostname or "").strip().casefold().removeprefix("www.")
-    domain_namespaces = {
-        "equibase.com": "equibase",
-        "france-galop.com": "france_galop",
-        "geny.com": "geny",
-        "hkjc.com": "hkjc",
-        "horseracingnation.com": "horse_racing_nation",
-        "irishracing.com": "irishracing",
-        "jbis.or.jp": "jbis",
-        "jra.go.jp": "jra",
-        "keiba.go.jp": "keiba_go_jp",
-        "nationalsteeplechase.com": "nsa",
-        "netkeiba.com": "netkeiba",
-        "racingpost.com": "racing_post",
-        "sportinglife.com": "sporting_life",
-        "zeturf.fr": "zeturf",
-        "zone-turf.fr": "zone_turf",
-    }
-    for domain, namespace in domain_namespaces.items():
+    for domain, namespace in SOURCE_DOMAIN_NAMESPACES.items():
         if hostname == domain or hostname.endswith(f".{domain}"):
             return namespace
     return generic_fallback or hostname
@@ -325,6 +379,12 @@ def _participant_identity_keys(*payloads: dict | None) -> set[str]:
             value = str(payload.get(key) or "").strip()
             if value:
                 identity_keys.add(f"{namespace}:{value}".casefold())
+        url_key = _identity_key_from_horse_url(str(payload.get("horse_url") or ""))
+        if url_key:
+            identity_keys.add(url_key.casefold())
+        slug = str(payload.get("horse_slug") or "").strip()
+        if slug.isdigit() and namespace in _NUMERIC_SLUG_ID_NAMESPACES:
+            identity_keys.add(f"{namespace}:{slug}".casefold())
     return identity_keys
 
 
@@ -1116,6 +1176,40 @@ def _find_or_create_profile_for_term(term: TermEntry) -> tuple[HorseProfile, boo
         return profile, True
 
 
+def _merge_preserved_identity_evidence(
+    new_payload: dict | None,
+    existing_payload: dict | None,
+) -> dict:
+    """Preserve backfilled identity evidence across source upserts.
+
+    Sync recomputes ``evidence_payload`` from race rows and would otherwise
+    erase identity keys/evidence written by the offline enrichment flow.
+    """
+    merged = dict(new_payload or {})
+    existing = existing_payload or {}
+    old_keys = existing.get("horse_identity_keys") or []
+    if old_keys:
+        combined = list(dict.fromkeys([*(merged.get("horse_identity_keys") or []), *old_keys]))
+        merged["horse_identity_keys"] = combined
+    old_evidence = existing.get("identity_evidence") or []
+    if old_evidence:
+        combined_list = list(merged.get("identity_evidence") or [])
+        seen = {
+            (item.get("original_namespace"), str(item.get("original_id")))
+            for item in combined_list
+            if isinstance(item, dict)
+        }
+        for item in old_evidence:
+            if not isinstance(item, dict):
+                continue
+            marker = (item.get("original_namespace"), str(item.get("original_id")))
+            if marker not in seen:
+                seen.add(marker)
+                combined_list.append(item)
+        merged["identity_evidence"] = combined_list
+    return merged
+
+
 def _upsert_p0_source(
     *,
     profile: HorseProfile,
@@ -1147,6 +1241,16 @@ def _upsert_p0_source(
         "revoked_reason": "",
     }
     if source_type == HorseP0SourceType.TERM_ACTIVE_WITH_ZH:
+        existing_source = HorseP0Source.objects.filter(
+            profile=profile,
+            source_type=source_type,
+            term=term,
+        ).first()
+        if existing_source is not None:
+            defaults["evidence_payload"] = _merge_preserved_identity_evidence(
+                defaults["evidence_payload"],
+                existing_source.evidence_payload,
+            )
         source, created = HorseP0Source.objects.update_or_create(
             profile=profile,
             source_type=source_type,
@@ -1154,6 +1258,15 @@ def _upsert_p0_source(
             defaults=defaults,
         )
     elif source_type == HorseP0SourceType.MANUAL:
+        existing_source = HorseP0Source.objects.filter(
+            profile=profile,
+            source_type=source_type,
+        ).first()
+        if existing_source is not None:
+            defaults["evidence_payload"] = _merge_preserved_identity_evidence(
+                defaults["evidence_payload"],
+                existing_source.evidence_payload,
+            )
         source, created = HorseP0Source.objects.update_or_create(
             profile=profile,
             source_type=source_type,
@@ -1187,6 +1300,11 @@ def _upsert_p0_source(
             active_source.revoked_at = timezone.now()
             active_source.revoked_reason = "participant identity was corrected to another horse profile"
             active_source.save(update_fields=["status", "revoked_at", "revoked_reason", "updated_at"])
+        if active_source is not None and active_source.profile_id == profile.id:
+            defaults["evidence_payload"] = _merge_preserved_identity_evidence(
+                defaults["evidence_payload"],
+                active_source.evidence_payload,
+            )
         source, created = HorseP0Source.objects.update_or_create(
             source_type=source_type,
             race_event=race_event,

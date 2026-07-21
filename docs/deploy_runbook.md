@@ -1,5 +1,40 @@
 # 部署运行手册
 
+## P0 身份回填操作手册（enrich-p0-horse-external-identity，2026-07-22）
+
+本节是离线身份回填（identity keys + 四字段）与冲突治理的标准操作顺序。全流程
+零网络请求；命令为 `enrich_p0_horse_identities`，运行账号需能读取生产数据库与
+artifact 目录。前置运维边界沿用既有先例：先备份、临时 swap、停 beat/worker，
+串行执行，结束后恢复。
+
+1. HTML 缓存重解析（可选证据源，离线）：
+   `python runtime/tools/reparse_horse_identity_html_cache.py --namespace hkjc
+   --cache-root <本地缓存目录> --output evidence_hkjc.jsonl --summary summary_hkjc.json`；
+   NAR 必须先跑 `--probe` 只读覆盖探针，`files_with_matches=0` 或 `named_ids=0`
+   时 NAR 证据源本期不启用（2026-07-22 本地缓存探针实测 0 命中，NAR 未启用）。
+   缓存缺失时 summary 如实记录 `cache_missing_or_empty`，不得触网补抓。
+2. 按地区 dry-run（默认不落库）：
+   `python manage.py enrich_p0_horse_identities --dry-run --regions japan
+   --output-dir runtime/horse_profile_completion/identity-enrichment-<date>-japan
+   [--cache-evidence evidence_hkjc.jsonl --nar-probe nar_probe.json] --json`。
+   artifact 含候选、冲突增量、证据源统计、`metrics_before` 与 SHA-256 manifest。
+3. 人工批准：核对候选与冲突后
+   `--approve <manifest> --reviewer <name>`，记录 `approved_sha256`。
+4. 分批 commit：`--commit <manifest> --approved-sha256 <sha>`，按地区分批、
+   单事务 ≤500 profile；commit 复检 manifest 重算哈希、artifact SHA、四字段
+   漂移与同 namespace 矛盾，任何一项不满足即 fail closed。报告含
+   applied/skipped/conflicts 与 `metrics_after`。
+5. 重跑地区 P0 来源同步（先 sync 后回填的执行顺序固化为 sync → 回填 → 增量
+   对账；`_upsert_p0_source` 会合并保留已回填的 identity 证据，不会抹除）。
+6. 冲突治理（只读先行）：`--aggregate [--output-dir <dir>]` 输出分组统计与
+   SHA-256 manifest；`--suggest-resolutions --output-dir <dir>` 生成裁决建议
+   artifact；人工批准后 `--commit-resolutions <manifest> --approved-sha256
+   <sha> --reviewer-id <用户ID>` 经既有 resolved 通道写回（`full_clean()`
+   校验，只触碰 pending 记录，reopen 保护不变）。
+7. 完成复核：重复 dry-run 应显示候选为 0、already_present 上升；
+   `metrics_before/after` 对比按地区可采信比例变化；抽样核对滚动批次
+   select 能选出带 identity keys 与四字段的候选。
+
 ## P0 滚动批次产品化生产部署结果（2026-07-21）
 
 1. 部署前：容器全部健康，内外 `/healthz/` 200，磁盘 `37%`，无外部导入运行/锁。

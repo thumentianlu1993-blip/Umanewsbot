@@ -4,6 +4,35 @@
 字段口径、生产计数、关键产物、事故经验、未完成项和后续执行顺序；实时状态仍以本文和生产
 核验为准。
 
+## 2026-07-22 P0 身份回填专项本地实现完成（未部署、未写生产）
+
+- OpenSpec change `enrich-p0-horse-external-identity` 完成全部实现（tasks `0.1-6.3`
+  勾选）：四个离线证据源（netkeiba `ExternalHorse/Alias`、`ExternalRaceEntry/Result`
+  回推、UK/FR `RaceEventRunner/Result.source_refs`、HKJC/NAR 本地 HTML 缓存重解析）
+  统一产出 identity 候选，唯一强匹配 + 双向唯一 + 四字段不矛盾才写入，歧义一律
+  fail closed 进 `HorseIdentityConflict`；`_participant_identity_keys` 新增
+  `horse_url`/`horse_slug` 同源 ID 提取（netkeiba/jbis/nar/hkjc/sporting_life/
+  equibase，zeturf 与 HRN 永不生成 key）；回填写入走 dry-run artifact → 人工批准
+  manifest SHA → 按地区分批 commit（单事务 ≤500）；冲突聚合输出分组统计 +
+  SHA-256 manifest，批量裁决建议经批准后过 `full_clean()` 走既有 resolved 通道；
+  批次视角 `metrics_before/after` 按地区报告可采信比例变化。
+- 独立 code review 修复 1 个 P0 + 5 个 P1 + 5 个 P2：离线冲突 fingerprint 改为裸
+  64 字符 hexdigest（原 72 字符超模型 `max_length`，生产 PG 必崩）；commit 重算
+  批准后 manifest 哈希防篡改；alias 路径补四字段矛盾检查；race-entry/UK 路径补
+  "key 已被其他 profile 持有"检查；HKJC key casefold 写入消除双形态；participant
+  名称查询改 join 避免 IN 超 bind 上限；commit 增加漂移复检（四字段矛盾或同
+  namespace 异 key 整个候选丢弃）；聚合统计纳入回填后对齐证据。
+- 验证：专项测试 `57/57`，批次/adapter/基础套件 `753/757`（4 个失败为
+  `RaceEventPageMVPTests` 既有基线失败，stash 基线对照完全一致，与赛事历史
+  专项在途改动相关，非本 change 引入）；完整 `stable` 套件失败数与基线相同
+  （14 failures + 70 errors，基线 14 + 71，零新增）；`manage.py check`、
+  `makemigrations --check --dry-run`、`openspec validate --all`（30/30）、
+  `git diff --check` 全部通过。
+- NAR/HKJC 覆盖探针实测：本地缓存 NAR 2 个 HTML 0 命中、HKJC 0 个 HTML（仅
+  PDF），NAR 证据源本期不启用，HKJC 需先在生产缓存目录跑 reparse 再评估。
+- 本 change 尚未部署生产、未写任何生产数据；生产执行顺序见
+  `docs/deploy_runbook.md` 顶部"身份回填操作手册"，对应 tasks `6.5`。
+
 ## 2026-07-21 6.7 公开验收：每地区 2 匹已发布，全部可验证项通过
 
 - 已从 50 匹严格完整资料马中每地区人工发布 2 匹（`published_at/published_by`

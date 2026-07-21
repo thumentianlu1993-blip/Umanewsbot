@@ -1660,15 +1660,23 @@ class P0HorseBatchCommandPipelineTests(P0HorseBatchPrepareTests):
             commit_p0_horse_batch_region,
         )
 
-        state = BatchRunState.read(self.manifest_path.parent)
-        recorded_sha = state.artifacts["commit:japan"]["artifact_sha256"]
         artifact_path = (
             self.manifest_path.parent / "approval" / "commit_artifact_japan.json"
         )
         original_bytes = artifact_path.read_bytes()
-        # simulate a tampered checkpoint recording a different committed SHA
-        state.artifacts["commit:japan"]["artifact_sha256"] = "0" * 64
-        state.write()
+        # re-bundle after the commit: snapshots recomputed for the current
+        # (already-completed) profile, so prepare stays valid but produces a
+        # different artifact SHA than the recorded committed one.
+        self._call(
+            "--bundle",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        state = BatchRunState.read(self.manifest_path.parent)
+        recorded_sha = state.artifacts["commit:japan"]["artifact_sha256"]
         with self.assertRaises(P0HorseBatchError):
             commit_p0_horse_batch_region(
                 self.manifest_path,
@@ -1681,6 +1689,5 @@ class P0HorseBatchCommandPipelineTests(P0HorseBatchPrepareTests):
         self.assertEqual(artifact_path.read_bytes(), original_bytes)
         state = BatchRunState.read(self.manifest_path.parent)
         self.assertEqual(
-            state.artifacts["commit:japan"]["artifact_sha256"], "0" * 64
+            state.artifacts["commit:japan"]["artifact_sha256"], recorded_sha
         )
-        self.assertNotEqual(recorded_sha, "0" * 64)

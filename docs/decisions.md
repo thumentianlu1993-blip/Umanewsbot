@@ -1,5 +1,19 @@
 # 关键决策
 
+## 2026-07-22 P0 身份回填写入门禁加固
+
+- 离线冲突 fingerprint 为裸 SHA-256 hexdigest（64 字符），"offline" 作用域编进被哈希
+  内容而不是字符串前缀；任何指纹格式必须满足 `HorseIdentityConflict.fingerprint`
+  `max_length=64`，禁止再以 SQLite 不校验长度为由放行超长值。
+- 批准后的 manifest 在 commit 时必须重算哈希并与存储值、操作者提供值双重比对；只比
+  存储值等于把批准后的 manifest 篡改视为可信。artifact 文件 SHA 另独立校验。
+- commit 是第二道 fail-closed 防线：dry-run 之后 profile 发生漂移（同 namespace 出现
+  其他 key、四字段与证据矛盾）时整个候选丢弃并记冲突，不写部分身份；identity key
+  一律 casefold 写入（含 HKJC 字母数字 ID），原始大小写只留在 `identity_evidence`。
+- 证据判级按行来源 namespace 核验：可识别为其他 provider 的 `horse_id` 不得贴上本
+  地区预期 provider 的标签（如 UK 行上的 racing_post ID 不得写成 sporting_life key）；
+  无法识别来源的行保持既有行为并留待后续治理。
+
 ## 2026-07-20 P0 来源地区与幂等修复边界
 
 - `HorseProfile.racing_region` 是既有档案属性，不因本批样本归属自动覆盖；
