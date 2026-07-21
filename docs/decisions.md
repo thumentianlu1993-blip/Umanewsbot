@@ -1,5 +1,11 @@
 # 关键决策
 
+## 2026-07-22：去让赛混合标记对象一律进 review；最终复审沿用 Claude Code 等价复审
+
+- 代码复审 P1：term 5087（`THE KWANGTUNG HANDICAP CUP (HANDICAP)` / `广东让赛杯(让赛)`）原文同时含未括号 handicap（赛事名组成部分）与括号 (HANDICAP)（补充说明），既有兜底删除会错改为「广东杯」。决策：凡原文去除括号标记后仍含 handicap 完整词或四种中文让赛标记的对象，一律进 review 桶保持原值，不写入；京成杯锁定例外（`京成杯秋季让赛`→`京成杯秋季赛`）显式豁免该守卫。term 5087 与 5570 留待人工决定展示名，另走受控流程。
+- 本任务最终复审沿用 2026-07-21 先例：codex CLI 不可用、原 codex reviewer 会话无法恢复，由 Claude Code 对精确候选做等价完整只读复审（首轮 REVISE → 修复 → 同一 reviewer 限定复审 APPROVED，P0/P1/P2 清零，审前/审后 fingerprint `2889f4b2…` 一致）；不以测试通过或普通 diff 替代复审。
+- 发布授权：用户 2026-07-22 针对精确版本（提交 `5b491561` + artifact SHA `30d85d1a…`，168/1550/2/0）回复「发布吧」；发布报告见 `docs/changes/remove-handicap-markers-from-race-names/release_report.md`。
+
 ## 2026-07-22 P0 身份回填写入门禁加固
 
 - 离线冲突 fingerprint 为裸 SHA-256 hexdigest（64 字符），"offline" 作用域编进被哈希

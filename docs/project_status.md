@@ -4,6 +4,13 @@ P0 马信息补全专项的模型交接文档见
 `docs/p0_horse_information_completion_handoff.md`。后续接手应从该文档进入，并以
 `docs/current_state.md` 和生产实时核验校正可能漂移的运行数据。
 
+## 2026-07-22 赛事去让赛清理已发布并验收
+
+- 提交 `5b491561` 随 `cce280a7` 部署：168 条去让赛清理单事务写入生产（19 赛历 +
+  149 术语），kept 1550 / review 2 零改动，verify 与前台抽检通过。审核链：首轮复审
+  REVISE（term 5087 混合标记 P1）→ 守卫修复 → 同一 reviewer 限定复审 APPROVED。
+- 发布报告：`docs/changes/remove-handicap-markers-from-race-names/release_report.md`。
+
 ## 2026-07-22 P0 身份回填专项已完成本地实现与生产执行
 
 - OpenSpec change `enrich-p0-horse-external-identity` tasks `0.1-6.5` 全部完成：四离线

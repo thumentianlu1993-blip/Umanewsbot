@@ -4,6 +4,17 @@
 字段口径、生产计数、关键产物、事故经验、未完成项和后续执行顺序；实时状态仍以本文和生产
 核验为准。
 
+## 2026-07-22 赛事去让赛清理已写入生产并验收
+
+- 发布提交 `5b491561`（随 `cce280a7` 合并部署）：赛历对象与 race 术语去让赛清理
+  **168 条**单事务写入（19 赛历 `chinese_name` + 149 术语 `target_zh`），kept 1550、
+  review 2（term 5087/5570 保持原值）零改动，`--verify` 通过，前台抽检无「让赛」残留，
+  京成杯系列/术语统一为「京成杯秋季赛」。
+- artifact `runtime/artifacts/race-name-handicap-cleanup/20260721T154923Z/dry-run.json`
+  （SHA `30d85d1a…`）；写前备份 `pre-handicap-cleanup-20260722_023308.dump`（`pg_restore -l`
+  通过）；OperationLog 审计 batchId `23eddf04…`。
+- 审核链与完整证据：`docs/changes/remove-handicap-markers-from-race-names/release_report.md`。
+
 ## 2026-07-22 P0 身份回填专项：本地实现 + 生产执行完成
 
 - OpenSpec change `enrich-p0-horse-external-identity` 完成全部实现（tasks `0.1-6.5`

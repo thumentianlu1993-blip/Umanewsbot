@@ -1,5 +1,14 @@
 # 部署运行手册
 
+## 赛事去让赛清理生产写入结果（2026-07-22）
+
+1. 生产检出原为并行任务分支 `claude/p0-horse-batch-completion`（`88d25de0`，未推送）；待 P0 合并后 main 为 `cce280a7`（含两任务），生产 `git checkout main && git pull --ff-only origin main` 快进 37 个提交。注意：ff 检出会重置脚本执行位，需先 `chmod +x deploy_lowcost.sh deploy/*.sh deploy/docker/*.sh` 再部署（exit 126 Permission denied 即为该原因）。
+2. `bash ./deploy_lowcost.sh`：无迁移，web/worker/beat 重建，`/healthz/` 200。
+3. 写前备份 `backups/db/pre-handicap-cleanup-20260722_023308.dump`（228136448 bytes，SHA-256 `23fc73ee8277e2dfc936df1f1d217e7b85235409d70e85d5abf6a489e2a5176b`，`pg_restore -l` 1017 项通过）。
+4. artifact 随 main 进入生产仓库（`runtime/artifacts/race-name-handicap-cleanup/20260721T154923Z/dry-run.json`，SHA `30d85d1a…`），`docker cp` 进 web 容器后执行 `clean_race_name_handicap_markers --commit`（artifact/备份 SHA + 授权信息）：`written=168`，batchId `23eddf04…`；`--verify` 返回 `ok=true`（168/1550/2）。
+5. 前台抽检：赛历各视图与详情页无「让赛」残留；精英杯详情 `/races/2026/hkjc-2026-0621-18/` 200；首页与金杯详情 200。容器 `/tmp` 临时文件已清理。
+6. 完整审核链与证据：`docs/changes/remove-handicap-markers-from-race-names/release_report.md`。
+
 ## P0 身份回填生产执行结果（2026-07-22）
 
 1. 部署前：容器全健康、`manage.py check` 通过、无导入锁、内外 healthz 200、磁盘 38%。
