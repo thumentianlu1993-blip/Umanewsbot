@@ -45,4 +45,4 @@
 - [x] 6.2 (operations) 本地验证：`DB_ENGINE=sqlite python manage.py check`、目标 Django 测试、完整 `stable` 回归、`makemigrations --check --dry-run`（本 change 无迁移，确认无漂移）、`openspec validate productize-p0-horse-batch-completion --strict`、`openspec validate --all`、`git diff --check`。
 - [x] 6.3 (integration) 离线 fixture 端到端：选批 → 批准 → prepare 模拟中断 → resume → artifact → dry-run → commit（sqlite）→ 幂等复验，全程零真实网络。
 - [x] 6.4 (operations) 独立 code review 并修复全部 actionable finding；更新 `docs/current_state.md`、`docs/project_status.md`、`docs/deploy_runbook.md`（滚动批次操作手册）；将 `complete-p0-horse-profile-data` tasks.md 的 `4.2` 标记为由本 change 完成。
-- [ ] 6.5 (operations) 生产部署按 runbook 执行（备份、容器健康、check/healthz smoke、含 openpyxl 的镜像构建验证）；本 change 部署不触网、不写马匹资料；首个生产滚动批次以单地区小批验证 checkpoint/resume/预算/复审文件/批准回写/地区独立 commit 证据后，再按默认 100/500 阈值滚动；串行提交窗口约束写入 deploy_runbook。
+- [x] 6.5 (operations) 生产部署按 runbook 执行（备份、容器健康、check/healthz smoke、含 openpyxl 的镜像构建验证）；本 change 部署不触网、不写马匹资料；首个生产滚动批次以单地区小批验证 checkpoint/resume/预算/复审文件/批准回写/地区独立 commit 证据后，再按默认 100/500 阈值滚动；串行提交窗口约束写入 deploy_runbook。
