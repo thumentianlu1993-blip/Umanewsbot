@@ -1,5 +1,9 @@
 # 项目状态文档
 
+## 2026-07-21 五区赛事中文名已正式写入生产并验收通过
+
+- 用户授权“发布吧”后按门禁完成发布：提交 `8e9dba57`、备份 `51a0f8ae…`（pg_restore -l 通过）、verify-only 全绿、单事务 apply `1300/8883/1/1`、独立 verifier `ok=true`（OperationLog `105230`）、页面与健康抽检通过。范围外让赛残留（2026 香港赛历 9 Event/9 系列、日本系列 285）属既有独立中文名、非本批回归，后续独立任务待用户决策。详见 `docs/changes/import-reviewed-race-name-translations/release_report.md`。
+
 ## 2026-07-21 五区赛事中文名最终复审第一轮完成，修复后候选待第二轮复审
 
 - Claude Code 等价复审第一轮：四聚焦门禁直接验证通过；8 项行动 finding 全部修复并补负向测试（supplemental 锚点、空原文、allowlist 阻断、全簿 diff、si 引用唯一、打包器加固、布局/updated_at 测试）。新候选 `unified-import-preview-20260720T220245Z` 全部锚点计数一致、`applyReady=true`；execution-plan 与上候选逐字节一致。测试 Node 20/20、布局 6/6、打包器 6/6、SQLite 20+4skip、PG16 24/24、OpenSpec strict 31/31；bundle archive `bf28bb90…` 逐字节可复现。仍未写生产/未提交；待复审第二轮后进入用户授权。

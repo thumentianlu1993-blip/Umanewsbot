@@ -1,5 +1,12 @@
 # 当前状态
 
+## 2026-07-21 五区赛事中文名已正式写入生产并验收通过
+
+- 用户在 Claude Code 两轮等价复审 APPROVED 后针对精确候选 `unified-import-preview-20260720T220245Z` 授权“发布吧”。发布链路：staging `INDEX_TRANSITION_OK` → 不可变提交 `8e9dba57`（`COMMIT_TRANSITION_OK`）→ 提交导出 bundle 与 receipt 一致 → 生产 custom-format 备份 `pre-race-name-translation-20260721T080706Z.dump`（`225591170` bytes、SHA `51a0f8ae…d1388`、`pg_restore -l` 通过）→ 宿主/容器复算 12 成员一致 → verify-only 全绿 → `--commit` 单事务写入 `1300/8883/1/1` → 独立 verifier `ok=true`（OperationLog `105230`）。
+- 写后抽检：Event `96` = 京成杯秋季赛；香港 Event `16446` 与 Target `49052` 已同步改绑 `5963`、中文名洋紫荆短途锦标、`original_name` 保留；`/healthz/` 本地+公网 200，`/races/` 与三页抽检（jra-2026-0905-01、hong_kong 2012、keisei 2010）均显示新名且无让赛残留。服务器与容器临时文件已清理，备份保留。
+- 范围外残留（非本批回归，后续独立任务待用户决策）：9 个 2026 香港赛历 Event 与 9 个对应系列、日本系列 `285` 的中文名仍含让赛字样，均有独立中文名、按规则未覆盖。
+- 发布证据见 `docs/changes/import-reviewed-race-name-translations/release_report.md`。
+
 ## 2026-07-21 五区赛事中文名最终复审第一轮完成，修复后新候选待复审第二轮
 
 - Claude Code 等价最终复审第一轮：四个聚焦门禁（全部 scope 系列完整行 CAS、非 allowlist 独立中文名不覆盖、supplemental seriesKey 门禁、SSH non-multiplexing 与快照 metadata 比对）直接验证通过；两个只读审查代理共报 11 项 finding，裁定 8 项行动项（supplemental 计数锚点、空原文误判、allowlist 未消费阻断、全簿值/公式 diff、共享字符串引用唯一性、打包器 contentSha/重复行/测试、布局负向测试、updated_at 断言）已全部修复并补负向测试；2 项驳回/观察（公式扫描不 gate 为有意设计、让赛前导空格删除符合规则）。
