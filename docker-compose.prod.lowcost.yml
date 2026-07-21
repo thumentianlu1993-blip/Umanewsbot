@@ -27,6 +27,7 @@ services:
       - static_data:/app/server/staticfiles
       - media_data:/app/server/media
       - app_logs:/app/logs
+      - ./runtime/horse_profile_completion:/app/runtime/horse_profile_completion:rw
     restart: unless-stopped
     depends_on:
       db:
@@ -64,6 +65,7 @@ services:
     volumes:
       - media_data:/app/server/media
       - app_logs:/app/logs
+      - ./runtime/horse_profile_completion:/app/runtime/horse_profile_completion:rw
     restart: unless-stopped
     depends_on:
       db:
