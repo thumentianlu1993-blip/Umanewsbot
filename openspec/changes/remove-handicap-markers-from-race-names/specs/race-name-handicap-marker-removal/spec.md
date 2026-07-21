@@ -4,7 +4,7 @@
 
 ### Requirement: 原文括号判定规则
 
-清理判定 SHALL 以原文名的括号形式为准：原文（`RaceEvent.original_name` / `RaceSeries.canonical_name_original` / `TermEntry.source_ja`）中 `handicap/H/让赛/讓賽` 被中英文括号圈住时，中文展示名 SHALL 删除让赛标记；未被括号圈住时，对象 MUST 保留原值并列入 `kept` 桶。唯一例外：展示名为 `京成杯秋季让赛` 的对象 MUST 改为用户逐字锁定的 `京成杯秋季赛`。
+清理判定 SHALL 以原文名的括号形式为准：原文（`RaceEvent.original_name` / `RaceSeries.canonical_name_original` / `TermEntry.source_ja`）中 `handicap/H/让赛/讓賽` 被中英文括号圈住时，中文展示名 SHALL 删除让赛标记；未被括号圈住时，对象 MUST 保留原值并列入 `kept` 桶。原文同时含括号与未括号 handicap/让赛 标记的对象 MUST 一律进入 `review` 桶并保持原值。唯一例外：展示名为 `京成杯秋季让赛` 的对象 MUST 改为用户逐字锁定的 `京成杯秋季赛`。
 
 #### Scenario: 括号标记者清理
 

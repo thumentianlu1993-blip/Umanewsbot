@@ -43,6 +43,17 @@ class BracketRuleTests(TestCase):
         self.assertFalse(cleanup.has_bracketed_marker_in_original("CANMAKE TOKYO"))
         self.assertFalse(cleanup.has_bracketed_marker_in_original("H. Allen Memorial"))
 
+    def test_unbracketed_marker_guard(self):
+        self.assertTrue(
+            cleanup.has_unbracketed_marker_in_original(
+                "THE KWANGTUNG HANDICAP CUP (HANDICAP)"
+            )
+        )
+        self.assertFalse(cleanup.has_unbracketed_marker_in_original("Premier Cup (H)"))
+        self.assertTrue(cleanup.has_unbracketed_marker_in_original("2yo Handicap"))
+        self.assertFalse(cleanup.has_unbracketed_marker_in_original("京成杯オータムH"))
+        self.assertFalse(cleanup.has_unbracketed_marker_in_original("CANMAKE TOKYO"))
+
     def test_should_clean_only_bracketed_or_keisei_exception(self):
         self.assertTrue(cleanup.should_clean("Premier Cup (H)", "精英杯 (让赛)"))
         self.assertTrue(cleanup.should_clean("京成杯オータムH", "京成杯秋季让赛"))
@@ -89,6 +100,23 @@ class ClassifyObjectTests(TestCase):
         self.assertEqual(
             cleanup.classify_object("Premier Cup (H)", "精英杯 (让赛)", seen, "hong_kong"),
             "review",
+        )
+
+    def test_mixed_bracketed_and_unbracketed_original_goes_to_review(self):
+        self.assertEqual(
+            cleanup.classify_object(
+                "THE KWANGTUNG HANDICAP CUP (HANDICAP)",
+                "广东让赛杯(让赛)",
+                set(),
+                "hong_kong",
+            ),
+            "review",
+        )
+
+    def test_keisei_exception_bypasses_unbracketed_guard(self):
+        self.assertEqual(
+            cleanup.classify_object("京成杯オータムH", "京成杯秋季让赛", set(), "japan"),
+            "auto_clean",
         )
 
 
@@ -195,6 +223,43 @@ class DryRunTests(HandicapCleanupDbMixin, TestCase):
         self.assertNotIn(("term", self.term_clean.id), by_key)
         self.assertEqual(report["counts"]["autoClean"], len(actions))
         self.assertTrue(report["contentSha256"])
+
+    def test_mixed_term_goes_to_review_not_actions(self):
+        term_mixed = TermEntry.objects.create(
+            term_type="race",
+            source_language="en",
+            racing_region="hong_kong",
+            source_ja="THE KWANGTUNG HANDICAP CUP (HANDICAP)",
+            target_zh="广东让赛杯(让赛)",
+        )
+        report = cleanup.build_dry_run()
+        action_ids = {(a["kind"], a["id"]) for a in report["actions"]}
+        self.assertNotIn(("term", term_mixed.id), action_ids)
+        review_by_id = {(r["kind"], r["id"]): r for r in report["review"]}
+        entry = review_by_id[("term", term_mixed.id)]
+        self.assertEqual(
+            entry["reason"], "original also contains unbracketed handicap marker"
+        )
+        self.assertEqual(entry["before"]["targetZh"], "广东让赛杯(让赛)")
+        self.assertEqual(entry["after"]["targetZh"], "广东杯")
+
+    def test_mixed_series_goes_to_review_not_actions(self):
+        series_mixed = RaceSeries.objects.create(
+            key="hong-kong-kwangtung-handicap-cup",
+            canonical_name_original="THE KWANGTUNG HANDICAP CUP (HANDICAP)",
+            chinese_name="广东让赛杯(让赛)",
+            country_region="hong_kong",
+        )
+        report = cleanup.build_dry_run()
+        action_ids = {(a["kind"], a["id"]) for a in report["actions"]}
+        self.assertNotIn(("series", series_mixed.id), action_ids)
+        review_by_id = {(r["kind"], r["id"]): r for r in report["review"]}
+        entry = review_by_id[("series", series_mixed.id)]
+        self.assertEqual(
+            entry["reason"], "original also contains unbracketed handicap marker"
+        )
+        self.assertEqual(entry["before"]["chineseName"], "广东让赛杯(让赛)")
+        self.assertEqual(entry["after"]["chineseName"], "广东杯")
 
 
 class CommitTests(HandicapCleanupDbMixin, TransactionTestCase):

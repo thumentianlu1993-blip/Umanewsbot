@@ -2,7 +2,7 @@
 
 ## 规则（用户 2026-07-21 锁定）
 
-1. **判定以原文括号为准**：原文名（`RaceEvent.original_name` / `RaceSeries.canonical_name_original` / `TermEntry.source_ja`）中 `handicap/H/让赛/讓賽` 被中英文括号圈住 → 补充说明，清理中文展示名中的标记；未被括号圈住 → 赛事名组成部分，保留。
+1. **判定以原文括号为准**：原文名（`RaceEvent.original_name` / `RaceSeries.canonical_name_original` / `TermEntry.source_ja`）中 `handicap/H/让赛/讓賽` 被中英文括号圈住 → 补充说明，清理中文展示名中的标记；未被括号圈住 → 赛事名组成部分，保留。原文同时含括号与未括号 handicap/让赛 标记的对象（如 `THE KWANGTUNG HANDICAP CUP (HANDICAP)`）一律进 `review` 桶保持原值。
 2. **京成杯唯一例外**：展示名为 `京成杯秋季让赛` 的对象（日本 RaceSeries `285`、术语 `1972`/`15215`）一律改为用户逐字锁定的 `京成杯秋季赛`，与已上线的系列 `6125`、Event `96` 和 16 场历史赛事一致。
 3. **删除机制只删不补**：仅删除四种中文标记 `让赛 / 讓賽 / 让步赛 / 讓步賽` 及直接包裹该标记的中英文括号；括号前只有一个分隔空格时一并删除该空格。不补写任何新词，不折叠其他空格，不删除无关标点。
 4. 不再设"条件描述型豁免"独立逻辑：`2yo Handicap → 两岁马让赛`、`ALBATROSS HANDICAP → 信天翁让赛` 等原文无括号标记的对象一律自然落入 `kept` 桶保留。

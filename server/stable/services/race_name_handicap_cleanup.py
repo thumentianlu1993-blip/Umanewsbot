@@ -3,7 +3,10 @@
 规则（用户 2026-07-21 锁定）：以原文名的括号形式为准——
 - 原文中 handicap/让赛 被括号圈住：视为赛事补充说明，中文展示名删除该标记；
 - 原文中 handicap/让赛 未被括号圈住：视为赛事名组成部分，保留；
-- 唯一例外：京成杯秋季让赛 一律改为用户逐字锁定的 京成杯秋季赛。
+- 原文同时含括号与未括号标记（如 `THE KWANGTUNG HANDICAP CUP (HANDICAP)`）：
+  无法判定名内标记是否为赛事名组成部分，一律进 review 桶保持原值；
+- 唯一例外：京成杯秋季让赛 一律改为用户逐字锁定的 京成杯秋季赛（锁定例外优先，
+  不受未括号守卫影响）。
 
 删除机制只删不补：仅删除四种中文标记及直接包裹该标记的中英文括号。
 """
@@ -31,6 +34,7 @@ _BRACKETED_ORIGINAL_MARKER_RE = re.compile(
     r"[（(]\s*(?:handicap|h|让赛|讓賽|让步赛|讓步賽)\s*[）)]",
     re.IGNORECASE,
 )
+_UNBRACKETED_HANDICAP_WORD_RE = re.compile(r"\bhandicap\b", re.IGNORECASE)
 _CJK_RE = re.compile(r"[一-鿿]")
 
 
@@ -63,6 +67,18 @@ def has_bracketed_marker_in_original(original: str) -> bool:
     return bool(_BRACKETED_ORIGINAL_MARKER_RE.search(original or ""))
 
 
+def has_unbracketed_marker_in_original(original: str) -> bool:
+    """去除括号标记后，原文剩余文本是否仍含 handicap 词或中文让赛标记。
+
+    只匹配完整词 handicap（IGNORECASE）与四种中文标记；不匹配裸字母 H/h，
+    避免误伤「京成杯オータムH」类名称。
+    """
+    remainder = _BRACKETED_ORIGINAL_MARKER_RE.sub("", original or "")
+    if _UNBRACKETED_HANDICAP_WORD_RE.search(remainder):
+        return True
+    return contains_marker(remainder)
+
+
 def should_clean(original: str, display_name: str) -> bool:
     """是否应清理该展示名：原文括号标记，或京成杯锁定例外。"""
     if (display_name or "") in LOCKED_NAME_OVERRIDES:
@@ -79,6 +95,8 @@ def classify_object(
     """分桶：auto_clean / review / kept。"""
     if not should_clean(original, display_name):
         return "kept"
+    if _hits_unbracketed_guard(original, display_name):
+        return "review"
     cleaned = clean_display_name(display_name)
     if (
         not cleaned
@@ -88,6 +106,13 @@ def classify_object(
     ):
         return "review"
     return "auto_clean"
+
+
+def _hits_unbracketed_guard(original: str, display_name: str) -> bool:
+    """未括号守卫：京成杯锁定例外优先；其余原文含未括号标记者进 review。"""
+    if (display_name or "") in LOCKED_NAME_OVERRIDES:
+        return False
+    return has_unbracketed_marker_in_original(original)
 
 
 def _has_cjk(value: str) -> bool:
@@ -142,6 +167,17 @@ def build_dry_run() -> dict[str, Any]:
             )
             continue
         after_value = clean_display_name(before_value)
+        if _hits_unbracketed_guard(original, before_value):
+            review.append(
+                {
+                    "kind": kind,
+                    "id": instance.id,
+                    "before": {"chineseName": before_value},
+                    "after": {"chineseName": after_value},
+                    "reason": "original also contains unbracketed handicap marker",
+                }
+            )
+            continue
         if not after_value or not _has_cjk(after_value) or contains_marker(after_value):
             review.append(
                 {
@@ -188,6 +224,19 @@ def build_dry_run() -> dict[str, Any]:
             )
             continue
         cleaned = clean_display_name(term.target_zh)
+        if _hits_unbracketed_guard(term.source_ja, term.target_zh):
+            review.append(
+                {
+                    "kind": "term",
+                    "id": term.id,
+                    "region": term.racing_region,
+                    "source": term.source_ja,
+                    "before": {"targetZh": term.target_zh},
+                    "after": {"targetZh": cleaned},
+                    "reason": "original also contains unbracketed handicap marker",
+                }
+            )
+            continue
         if not cleaned or not _has_cjk(cleaned) or contains_marker(cleaned):
             review.append(
                 {
