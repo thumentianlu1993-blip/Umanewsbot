@@ -1,5 +1,33 @@
 # 部署运行手册
 
+## P0 身份回填生产执行结果（2026-07-22）
+
+1. 部署前：容器全健康、`manage.py check` 通过、无导入锁、内外 healthz 200、磁盘 38%。
+   备份 `.env.backup.p0-identity-enrichment-20260721T163603Z` 与
+   `backups/db/pre-p0-identity-enrichment-20260721T163603Z.sql.gz`（226MB，`gzip -t`
+   通过，SHA-256 `23818ce02edd9ac07d53a3da8dd08398aa437fde4722ce8fd7c65a23a1d8c897`）。
+2. 部署：git bundle 从 `88d25de0` 快进到 `349c822f`；重建
+   `web/worker/beat/race_live_worker` 镜像（`umanewsbot:prod`）并 `up -d`，nginx
+   一并重启；部署后 check 通过、51 迁移零漂移、内外 healthz 与 `/horses/` 200。
+3. 缓存探针（生产 `/opt/umanewsbot/runtime`，17,022 个 HTML）：NAR 仅 4 页可解析
+   （16 ID，覆盖率 0.02%）→ NAR 本期不启用；HKJC 重解析得 1,036 条唯一马 ID 证据。
+4. dry-run → 用户批准 → commit：
+   - 日本：2,462 applied / 0 skipped / 0 冲突；identity key 覆盖率 0% → 21.1%。
+   - 中国香港：327 applied（58 → 385 匹带 hkjc key，覆盖率 7.9%）。
+   - 法国：1,773 条 zeturf 证据合并进 4,097 条来源 `identity_evidence`（不生成
+     key；commit 报告计为 skipped 因为 profile 字段无变化，属口径说明而非失败）。
+   - 英国 6,342 匹已有 key 无新增；美国 0（HRN 仅 slug，按设计不回填）。
+   - 生产 ExternalHorse 12,405 条 netkeiba 记录父母/出生日期全为空，本期无法
+     回填四字段，日本候选仍不能过批次四字段锁；四字段需后续数据源专项。
+5. 验证：重复 commit japan applied=0 幂等；重复 dry-run 候选 0、already_present
+   2,462；`p0_horse_profiles --sync-sources --commit --region hong_kong` 后
+   385 匹 key 与 4,097 条 zeturf 证据完好（合并保留修复生产实证）；滚动批次
+   抽样 select（`p0batch-a4d8262eadc2`，已 abandon）日本前 100 匹 100/100 带
+   netkeiba key（回填前首批 0/10）；最终容器全健康、公网 healthz 200。
+6. artifact 目录：`runtime/horse_profile_completion/identity-enrichment-20260722/`
+   （dry-run-japan / dry-run-hong_kong / dry-run-uk-fr-us / conflict-aggregation /
+   nar_probe.json / evidence_hkjc.jsonl / verify-jp-hk）。
+
 ## P0 身份回填操作手册（enrich-p0-horse-external-identity，2026-07-22）
 
 本节是离线身份回填（identity keys + 四字段）与冲突治理的标准操作顺序。全流程

@@ -4,17 +4,20 @@ P0 马信息补全专项的模型交接文档见
 `docs/p0_horse_information_completion_handoff.md`。后续接手应从该文档进入，并以
 `docs/current_state.md` 和生产实时核验校正可能漂移的运行数据。
 
-## 2026-07-22 P0 身份回填专项完成本地实现（未部署）
+## 2026-07-22 P0 身份回填专项已完成本地实现与生产执行
 
-- OpenSpec change `enrich-p0-horse-external-identity` 完成 tasks `0.1-6.3`：四离线
+- OpenSpec change `enrich-p0-horse-external-identity` tasks `0.1-6.5` 全部完成：四离线
   证据源统一候选、唯一强匹配 fail-closed 写入门禁、dry-run → 批准 → 分批 commit、
   冲突聚合与批量裁决建议通道、批次视角前后对比度量；`_participant_identity_keys`
-  支持 `horse_url`/`horse_slug` 同源 ID 提取。
-- 独立 code review 的 1 P0（fingerprint 超长在 PG 必崩）+ 5 P1 已全部修复并回归；
-  专项测试 `57/57`，完整套件零新增失败（基线对照：14 failures 一致，errors 71→70）。
-- 剩余：`6.5` 生产执行（备份 → 停 beat/worker → 按地区 dry-run → 批准 → 分批
-  commit → 重跑 sync → 对比统计），操作手册见 `docs/deploy_runbook.md` 顶部；
-  NAR 证据源因本地缓存探针 0 命中本期不启用。完成后更新状态并评估归档。
+  支持 `horse_url`/`horse_slug` 同源 ID 提取。独立 code review 的 1 P0 + 5 P1 已
+  全部修复；专项测试 `57/57`，完整套件零新增失败。
+- 生产已部署 `349c822f` 并经用户批准后写入：日本 2,462 netkeiba key（覆盖率
+  0%→21.1%）、香港 327 hkjc key（385 匹 7.9%）、法国 1,773 条 zeturf 证据
+  （4,097 条来源）、英美无新增；幂等与 sync 证据保留均生产实证；滚动批次日本
+  前 100 匹抽样 100/100 带 key。执行记录见 `docs/deploy_runbook.md` 顶部。
+- 后续方向：四字段数据源专项（生产 netkeiba ExternalHorse 无父母/出生日期，日本
+  候选尚不能过批次四字段锁）；15,446 组 `needs_admin_review` 冲突的管理员治理；
+  美国来源（HRN 仅 slug，需明确授权来源）。本 change 可评估归档。
 
 ## 2026-07-21 P0 滚动批次产品化已完成本地实现（未部署）
 

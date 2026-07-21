@@ -4,9 +4,9 @@
 字段口径、生产计数、关键产物、事故经验、未完成项和后续执行顺序；实时状态仍以本文和生产
 核验为准。
 
-## 2026-07-22 P0 身份回填专项本地实现完成（未部署、未写生产）
+## 2026-07-22 P0 身份回填专项：本地实现 + 生产执行完成
 
-- OpenSpec change `enrich-p0-horse-external-identity` 完成全部实现（tasks `0.1-6.3`
+- OpenSpec change `enrich-p0-horse-external-identity` 完成全部实现（tasks `0.1-6.5`
   勾选）：四个离线证据源（netkeiba `ExternalHorse/Alias`、`ExternalRaceEntry/Result`
   回推、UK/FR `RaceEventRunner/Result.source_refs`、HKJC/NAR 本地 HTML 缓存重解析）
   统一产出 identity 候选，唯一强匹配 + 双向唯一 + 四字段不矛盾才写入，歧义一律
@@ -22,16 +22,24 @@
   "key 已被其他 profile 持有"检查；HKJC key casefold 写入消除双形态；participant
   名称查询改 join 避免 IN 超 bind 上限；commit 增加漂移复检（四字段矛盾或同
   namespace 异 key 整个候选丢弃）；聚合统计纳入回填后对齐证据。
-- 验证：专项测试 `57/57`，批次/adapter/基础套件 `753/757`（4 个失败为
+- 本地验证：专项测试 `57/57`，批次/adapter/基础套件 `753/757`（4 个失败为
   `RaceEventPageMVPTests` 既有基线失败，stash 基线对照完全一致，与赛事历史
   专项在途改动相关，非本 change 引入）；完整 `stable` 套件失败数与基线相同
   （14 failures + 70 errors，基线 14 + 71，零新增）；`manage.py check`、
   `makemigrations --check --dry-run`、`openspec validate --all`（30/30）、
   `git diff --check` 全部通过。
-- NAR/HKJC 覆盖探针实测：本地缓存 NAR 2 个 HTML 0 命中、HKJC 0 个 HTML（仅
-  PDF），NAR 证据源本期不启用，HKJC 需先在生产缓存目录跑 reparse 再评估。
-- 本 change 尚未部署生产、未写任何生产数据；生产执行顺序见
-  `docs/deploy_runbook.md` 顶部"身份回填操作手册"，对应 tasks `6.5`。
+- 生产执行（tasks `6.5`，用户逐步授权访问/部署/写入后完成）：生产 fast-forward 至
+  `349c822f` 并重建镜像；备份 dump SHA-256 `23818ce0…`。NAR 探针覆盖率 0.02%
+  本期不启用；HKJC 缓存重解析 1,036 条证据。经 dry-run 用户审核批准后写入：
+  日本 2,462 个 netkeiba key（覆盖率 0%→21.1%）、香港 327 个 hkjc key（385 匹
+  合计 7.9%）、法国 1,773 条 zeturf 证据合并进 4,097 条来源（不生成 key）、
+  英美无新增。重复 commit 幂等 applied=0；香港地区 sync 重跑后证据完好；
+  滚动批次抽样日本前 100 匹 100/100 带 key（回填前首批 0/10）。详细执行记录见
+  `docs/deploy_runbook.md` 顶部。
+- 已知边界：生产 ExternalHorse 的 netkeiba 记录父母/出生日期全为空，本期未回填
+  四字段，日本候选仍不能过批次四字段锁（需后续数据源专项）；冲突聚合基线
+  65,042 条 pending / 15,446 组全部 `needs_admin_review`；identity key 仅改善
+  治理，不改变批次既有四字段锁与来源复核。
 
 ## 2026-07-21 6.7 公开验收：每地区 2 匹已发布，全部可验证项通过
 

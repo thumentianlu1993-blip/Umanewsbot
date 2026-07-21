@@ -42,4 +42,4 @@
 - [x] 6.2 (operations) 本地验证：`DB_ENGINE=sqlite python manage.py check`、目标测试、完整 `stable` 回归、`makemigrations --check --dry-run`、`openspec validate enrich-p0-horse-external-identity --strict`、`openspec validate --all`、`git diff --check`。
 - [x] 6.3 (integration) 离线 fixture 端到端：候选 → 歧义冲突 → 批准 → commit → 同步 → 批次可采信对比，全程零网络。
 - [x] 6.4 (operations) 独立 code review 并修复全部 actionable finding；更新 `docs/current_state.md`、`docs/project_status.md`、`docs/deploy_runbook.md`、`docs/decisions.md`。
-- [ ] 6.5 (operations) 生产执行：备份 → 停 beat/worker（OOM 先例前置）→ 按地区 dry-run artifact → 人工批准 → 分批 commit（单事务 ≤500）→ 重跑地区同步 → 对比统计 → 抽样验证滚动批次可选出带身份与四字段候选。
+- [x] 6.5 (operations) 生产执行：备份 → 停 beat/worker（OOM 先例前置）→ 按地区 dry-run artifact → 人工批准 → 分批 commit（单事务 ≤500）→ 重跑地区同步 → 对比统计 → 抽样验证滚动批次可选出带身份与四字段候选。
