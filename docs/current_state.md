@@ -4,6 +4,42 @@
 字段口径、生产计数、关键产物、事故经验、未完成项和后续执行顺序；实时状态仍以本文和生产
 核验为准。
 
+## 2026-07-21 6.7 公开验收：每地区 2 匹已发布，全部可验证项通过
+
+- 已从 50 匹严格完整资料马中每地区人工发布 2 匹（`published_at/published_by`
+  留痕，操作 admin，备注"6.7 公开验收"）：日本 曙光将来(4023)/欢快舞步(4330)、
+  香港 美丽传承(1368)/时时精彩(11320)、英国 先睹风采(8338)/乔治堡(8367)、
+  法国 游历万里(3857)/美艺力量(7669)、美国 Gigante(21619)/In Our Time(21621)。
+- 验收结果：公开索引 `/horses/` 10 匹可见；详情页 ×10 全部 `200`，基础资料、
+  二代血统、主胜鞍、来源证据区块正常；完整履历分页正常（美丽传承/Gigante 有
+  `records_page=2`）；匿名关注 POST `302`、关注流显示已关注马；美国无中文名马
+  显示原名 + "中文名待补"提示；公开页面零第三方域名引用（no-network 边界）。
+- 新闻 tag：`scan_article_horse_links --article-id 7117 --commit` 创建
+  `欢快舞步 ↔ article 7117` 关联并人工确认（status=manual），`/news/7117/`
+  已渲染 `/horses/4330/` tag。宽范围 dry-run（article 7000+、2000 篇）显示另有
+  `327` 条潜在关联（`candidate` 状态），未 commit，留待后续单独批次处理。
+- 移动端：本会话 Chrome headless 与 MCP 均不可用，未截图；页面模板与
+  `2026-07-08` 移动验收通过版本一致。用户将自行安排生产端复核。
+- 两个 change（`complete-p0-horse-profile-data`、
+  `productize-p0-horse-batch-completion`）暂不归档：待用户生产复核移动端、
+  以及身份补强专项方向确定后分别处理。
+
+## 2026-07-21 首个生产滚动批次：门禁验证通过，0/10 可提交
+
+- 批次 `p0batch-ef7d482c4401`（日本队列前 10 匹，用户批准后触网）完整跑通
+  select → approve → network prepare 链路：checkpoint 状态完整、run 维度预算账本
+  `22` 请求、host 限速 artifact、复审 xlsx、blocker 池 `10` 条、地区交错
+  （单地区 trivially）。JBIS 马名精确检索结果：`ambiguous_identity=3`、
+  `identity_mismatch=2`、`identity_incomplete=4`、`partial_career=1`，全部按
+  fail-closed 设计阻断，没有伪造任何完整性。
+- 重要产品发现：整个日本 P0 队列 `source_refs` 无 external identity keys
+  （赛事导入的出走/赛果行未带外部马 ID），裸马名检索难以唯一解析，
+  滚动补全需要先解决身份补强（另起专项）。
+- 部署修复：compose 新增 `./runtime/horse_profile_completion` 挂载（web/worker），
+  解决容器重建丢批次证据问题，已提交 `88d25de0` 并部署；`.env` 网络开关已恢复
+  `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`。
+- 用户决定：先做 `6.7` 公开验收（每地区人工发布 1-2 匹），身份补强另起专项。
+
 ## 2026-07-21 P0 滚动批次产品化已部署生产（未触网、未写马匹资料）
 
 - 生产已部署 `claude/p0-horse-batch-completion` 分支提交 `b3f44d86`，镜像
