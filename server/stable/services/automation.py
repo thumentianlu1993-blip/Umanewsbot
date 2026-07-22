@@ -30,6 +30,7 @@ from stable.services.terms import (
 )
 from stable.services.multiregion import auto_publish_policy_for_article
 from stable.services.news_attribution import classify_news_content
+from stable.services.publish_readiness import transition_to_publish_ready
 from stable.services.race_grades import better_race_priority, normalize_race_grade, race_priority_for_grade
 
 
@@ -793,22 +794,33 @@ def mark_automation_failed(article: NewsArticle, *, phase: str, error: Exception
     )
 
 
-def mark_publish_ready(article: NewsArticle, *, reason: str = "改写稿通过一致性校验") -> None:
-    article.automation_status = AutomationStatus.PUBLISH_READY
+def mark_publish_ready(
+    article: NewsArticle,
+    *,
+    reason: str = "改写稿通过一致性校验",
+    ready_at=None,
+    refresh_ready_at: bool = False,
+) -> None:
+    ready_at_changed = transition_to_publish_ready(
+        article,
+        ready_at=ready_at,
+        refresh_ready_at=refresh_ready_at,
+    )
     article.review_mode = ReviewMode.AUTO
     article.risk_level = RiskLevel.LOW
     article.decision_summary = reason
     article.automation_error_message = ""
-    article.save(
-        update_fields=[
-            "automation_status",
-            "review_mode",
-            "risk_level",
-            "decision_summary",
-            "automation_error_message",
-            "updated_at",
-        ]
-    )
+    update_fields = [
+        "automation_status",
+        "review_mode",
+        "risk_level",
+        "decision_summary",
+        "automation_error_message",
+        "updated_at",
+    ]
+    if ready_at_changed:
+        update_fields.append("publish_ready_at")
+    article.save(update_fields=update_fields)
 
 
 def is_ready_for_auto_publish(article: NewsArticle) -> bool:

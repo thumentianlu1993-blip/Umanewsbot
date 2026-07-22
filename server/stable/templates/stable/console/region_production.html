@@ -87,6 +87,7 @@
             <th>待翻译</th>
             <th>翻译失败</th>
             <th>待审核</th>
+            <th>可发布积压年龄</th>
             <th>自动发布</th>
             <th>人工发布</th>
             <th>公开</th>
@@ -114,6 +115,15 @@
               <td>{{ row.pending_translation }}</td>
               <td>{{ row.translation_failed }}</td>
               <td>{{ row.pending_review }}</td>
+              <td>
+                0–24h {{ row.publish_ready_age.auto_0_24h }} /
+                24–72h {{ row.publish_ready_age.review_24_72h }} /
+                &gt;72h {{ row.publish_ready_age.expired_over_72h }} /
+                无时间 {{ row.publish_ready_age.legacy_missing }}
+                {% if row.publish_ready_age.oldest_age_minutes != None %}
+                  <div class="muted">最老 {{ row.publish_ready_age.oldest_age_minutes }} 分钟</div>
+                {% endif %}
+              </td>
               <td>{{ row.auto_published }}</td>
               <td>{{ row.manual_published }}</td>
               <td>{{ row.public }}</td>
@@ -138,7 +148,7 @@
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="16" class="muted">没有符合筛选条件的地区。</td></tr>
+            <tr><td colspan="17" class="muted">没有符合筛选条件的地区。</td></tr>
           {% endfor %}
         </tbody>
       </table>

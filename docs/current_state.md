@@ -1,5 +1,32 @@
 # 当前状态
 
+## 2026-07-22 publish_ready 积压治理（本地实现完成，未部署）
+
+- OpenSpec change `recover-publish-ready-backlog` 已完成代码主体：`NewsArticle` 新增 nullable
+  `publish_ready_at` 和 `region/status/time` 组合索引，迁移不回填历史值。新稿仅在
+  “非 ready → publish_ready”时写入资格时间；重复校验、普通保存和历史 NULL 均不自动刷新，
+  只有显式榜单重处理或审核 manifest 恢复可刷新。
+- 发布候选拆为两个独立有界通道：实时通道继续读取最近 3 小时首次入库/榜单唤醒；积压通道只读
+  主地区、0–24 小时内的 `publish_ready_at`。每通道默认最多 200 条，按文章 ID 合并，统一经过
+  主地区、硬门禁、内容指纹、分数、软填充和配额；同分时先消费更早 ready 的稿。积压总开关
+  默认关闭，且必须另填地区 allowlist。
+- 24–72 小时稿只进入人工复核指标，>72 小时稿进入过期处置指标，历史 NULL 单列；三者均不得
+  自动公开。地区生产后台展示四层计数和最老年龄；异常任务按
+  `stale_publish_ready_review` 独立冷却告警，不在选择窗口暗改文章工作流。
+- 新命令 `reconcile_publish_ready_backlog` 支持不可覆盖 dry-run manifest、独立 decisions 文件封印
+  reviewer 和新 SHA、以及显式 `--confirm-apply`。apply 逐篇锁行并核对状态、更新时间、内容和
+  门禁指纹；默认动作 `keep_manual` 零业务写入，只有审核为
+  `revalidate_refresh_ready` 且完整重校验通过的文章才刷新资格时间。命令不设置
+  `published_to_web_at`、不创建 QQ delivery，文章仍等待正常窗口。
+- 当前验证：专项 19/19；真实 PostgreSQL 16 的 1,000 条 ready 积压测试加载上限 200、候选 SQL
+  2 条、测试主体 0.456 秒；相关/相邻 118 项通过。完整套件候选为
+  `2635 tests / 14 failures / 67 errors / 57 skipped`，同一 `origin/main@26eb03e3` 基线为
+  `2616 / 14 / 67 / 57`，新增 19 项且新增失败/错误/跳过均为 0；现有失败集中在历史 runner
+  macOS 临时路径、准实时赛果时钟和既有环境契约。迁移 apply/rollback/reapply、Django check、
+  三份 Compose、OpenSpec strict/all、compileall 和 diff check 均通过。
+  当前代码尚未 commit/push/deploy，生产仍运行上一阶段镜像
+  `sha256:712a5da8b408…`，生产 21 条历史候选尚未生成新 manifest、未处置、未公开。
+
 ## 2026-07-22 新闻生产完整性修复（实施中）
 
 - 生产 `public.stable_newsarticle_public_slug_46694cb6` 普通 B-tree 索引已完成备份、停写窗口内受控 `REINDEX INDEX`、事务回滚写入探针、临时 `amcheck bt_index_check` 和真实抓取验证。备份为 `backups/db/pre-news-index-repair-20260722_135849.dump`，大小 `229947588` 字节，SHA-256 `07d2ebd67f1a3c5ec1fb9ddaf93f554639980425dde87c4b19d0cc54a9ae2fb1`。

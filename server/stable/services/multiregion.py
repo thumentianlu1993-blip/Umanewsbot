@@ -29,6 +29,7 @@ from stable.models import (
 )
 from stable.services.news_attribution import filter_articles_visible_in_region
 from stable.services.news_production_integrity import region_source_health_summary
+from stable.services.publish_readiness import publish_ready_age_summary
 
 PRODUCTION_REGIONS = [
     RacingRegion.JAPAN,
@@ -311,6 +312,7 @@ def summarize_multiregion_news_production(*, now=None, regions_filter: list[str]
                 "gate_blocker_examples": [
                     example for example in gate_issues["examples"] if example.get("severity") == "blocker"
                 ],
+                "publish_ready_age": publish_ready_age_summary(primary_articles, now=now),
             },
             "qq_delivery": _count_by(qq_recent, "status"),
             "production_windows": _window_rows(region),
@@ -335,6 +337,12 @@ def summarize_multiregion_news_production(*, now=None, regions_filter: list[str]
             "multiregion_qq_windows_enabled": bool(getattr(settings, "MULTIREGION_PRODUCTION_WINDOWS_QQ_ENABLED", False)),
             "multiregion_auto_publish_allowed_regions": sorted(_setting_list("MULTIREGION_AUTO_PUBLISH_ALLOWED_REGIONS")),
             "multiregion_auto_publish_allowed_sources": sorted(_setting_list("MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES")),
+            "multiregion_publish_backlog_enabled": bool(
+                getattr(settings, "MULTIREGION_PUBLISH_BACKLOG_ENABLED", False)
+            ),
+            "multiregion_publish_backlog_allowed_regions": sorted(
+                _setting_list("MULTIREGION_PUBLISH_BACKLOG_ALLOWED_REGIONS")
+            ),
         },
         "quota_exhausted": _quota_rows(recent_start=recent_start),
     }
@@ -371,6 +379,7 @@ def region_production_rows(*, selected_region: str = "", now=None) -> list[dict[
                 "pending_translation": articles["workflow"].get(WorkflowStatus.PENDING_TRANSLATION, 0),
                 "translation_failed": articles["translation"].get(ArticleTranslationStatus.FAILED, 0),
                 "pending_review": articles["workflow"].get(WorkflowStatus.PENDING_REVIEW, 0),
+                "publish_ready_age": articles["publish_ready_age"],
                 "auto_published": articles["today_auto_published"],
                 "manual_published": articles["today_manual_published"],
                 "public": articles["today_public"],

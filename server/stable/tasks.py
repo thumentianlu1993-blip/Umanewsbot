@@ -75,6 +75,7 @@ from stable.services.production_windows import (
     select_production_sources,
 )
 from stable.services.publishing_windows import select_publish_candidates
+from stable.services.publish_readiness import publish_ready_age_summary
 from stable.services.pushing import push_article_to_targets
 from stable.services.qq_auto_push import (
     ensure_qq_push_deliveries,
@@ -1338,6 +1339,7 @@ def publish_region_window_task(region: str, now_iso: str | None = None) -> dict:
                 "failed_article_ids": window_failed_ids,
                 "zero_reasons": selection.zero_reasons,
                 "mode": mode,
+                "candidate_pool": selection.pool,
             }
             window.save(update_fields=["status", "finished_at", "reason_summary", "result_payload", "updated_at"])
         except Exception as exc:
@@ -1411,8 +1413,15 @@ def auto_publish_batch_task(limit: int | None = None) -> dict:
         _log_success(log, "automation disabled")
         return {"published_count": 0, "skipped": True}
     batch_limit = _resolve_auto_publish_batch_limit(limit)
+    publish_now = timezone.now()
     queryset = (
-        NewsArticle.objects.filter(review_mode=ReviewMode.AUTO, automation_status=AutomationStatus.PUBLISH_READY)
+        NewsArticle.objects.filter(
+            review_mode=ReviewMode.AUTO,
+            automation_status=AutomationStatus.PUBLISH_READY,
+            publish_ready_at__gte=publish_now
+            - timedelta(hours=max(1, int(getattr(settings, "MULTIREGION_PUBLISH_BACKLOG_AUTO_HOURS", 24)))),
+            publish_ready_at__lte=publish_now,
+        )
         .exclude(workflow_status__in=[WorkflowStatus.PUBLISHED, WorkflowStatus.WITHDRAWN, WorkflowStatus.IGNORED, WorkflowStatus.DUPLICATE])
         .order_by("-score_total", "-published_at", "-id")
     )
@@ -1579,6 +1588,27 @@ def detect_automation_anomalies_task() -> dict:
     backlog_count = NewsArticle.objects.filter(automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED).count()
     if backlog_count >= 50 and not _recent_notification_exists(NotificationType.BACKLOG):
         send_notification_task.run(NotificationType.BACKLOG, {"manual_review_count": backlog_count})
+        sent.append(NotificationType.BACKLOG)
+
+    ready_age = publish_ready_age_summary(NewsArticle.objects.all(), now=now)
+    stale_ready_count = (
+        ready_age["review_24_72h"] + ready_age["expired_over_72h"] + ready_age["legacy_missing"]
+    )
+    if stale_ready_count and not _recent_notification_exists(
+        NotificationType.BACKLOG,
+        hours=max(1, int(getattr(settings, "MULTIREGION_PUBLISH_BACKLOG_ALERT_COOLDOWN_HOURS", 6))),
+        summary_contains="stale_publish_ready_review",
+    ):
+        send_notification_task.run(
+            NotificationType.BACKLOG,
+            {
+                "reason": "stale_publish_ready_review",
+                "review_24_72h": ready_age["review_24_72h"],
+                "expired_over_72h": ready_age["expired_over_72h"],
+                "legacy_missing": ready_age["legacy_missing"],
+                "oldest_age_minutes": ready_age["oldest_age_minutes"],
+            },
+        )
         sent.append(NotificationType.BACKLOG)
 
     last_day_auto = NewsArticle.objects.filter(auto_publish_at__gte=now - timedelta(hours=24)).exists()

@@ -247,6 +247,8 @@ class MultiRegionAttributionAndGateTests(TestCase):
             "quality_score": 90,
         }
         payload.update(overrides)
+        if payload.get("automation_status") == AutomationStatus.PUBLISH_READY and "publish_ready_at" not in overrides:
+            payload["publish_ready_at"] = timezone.now()
         return NewsArticle.objects.create(**payload)
 
     @override_settings(MULTIREGION_ATTRIBUTION_ENABLED=False)
@@ -3723,6 +3725,7 @@ class PublishWindowServiceTests(TestCase):
             "source_url": overrides.pop("source_url", f"https://example.com/{NewsArticle.objects.count()}"),
             "review_mode": ReviewMode.AUTO,
             "automation_status": AutomationStatus.PUBLISH_READY,
+            "publish_ready_at": overrides.pop("publish_ready_at", timezone.now()),
             "score_total": overrides.pop("score_total", 80),
             "quality_score": 80,
             "rewrite_confidence": 80,
@@ -4332,6 +4335,8 @@ class MultiRegionNewsProductionTests(TestCase):
             "source_url": "https://example.com/mr-article",
         }
         payload.update(overrides)
+        if payload.get("automation_status") == AutomationStatus.PUBLISH_READY and "publish_ready_at" not in overrides:
+            payload["publish_ready_at"] = timezone.now()
         return NewsArticle.objects.create(**payload)
 
     @override_settings(NEWS_SOURCE_POLL_ENABLED=False)

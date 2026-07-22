@@ -3378,6 +3378,7 @@ class NewsArticle(TimestampedModel):
         choices=AutomationStatus.choices,
         default=AutomationStatus.PENDING,
     )
+    publish_ready_at = models.DateTimeField(null=True, blank=True)
     decision_reason = models.JSONField(default=dict, blank=True)
     decision_summary = models.TextField(blank=True)
     gate_issues = models.JSONField(default=list, blank=True)
@@ -3463,6 +3464,10 @@ class NewsArticle(TimestampedModel):
         indexes = [
             models.Index(fields=("racing_region", "workflow_status", "-first_seen_at"), name="news_region_workflow_idx"),
             models.Index(fields=("racing_region", "automation_status", "-auto_publish_at"), name="news_region_auto_idx"),
+            models.Index(
+                fields=("racing_region", "automation_status", "publish_ready_at"),
+                name="news_region_ready_at_idx",
+            ),
             models.Index(fields=("racing_region", "-published_to_web_at"), name="news_region_public_idx"),
             models.Index(fields=("racing_region", "translation_status"), name="news_region_trans_idx"),
         ]

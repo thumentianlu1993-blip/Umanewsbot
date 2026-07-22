@@ -1,5 +1,93 @@
 # 部署运行手册
 
+## publish_ready 积压治理部署与灰度（2026-07-22，尚未执行）
+
+### 1. 部署前和迁移
+
+1. 核对生产 Git HEAD、四应用容器 image ID、迁移末端和所有相关开关；停止 beat、排空
+   active/reserved，备份 `.env` 和 PostgreSQL custom dump，并验证 SHA-256 与
+   `pg_restore -l`。
+2. 部署 `0053_newsarticle_publish_ready_at`。该迁移只增加 nullable 字段和组合索引，不回填
+   历史文章。部署后先保持：
+
+```dotenv
+MULTIREGION_PUBLISH_BACKLOG_ENABLED=false
+MULTIREGION_PUBLISH_BACKLOG_ALLOWED_REGIONS=
+MULTIREGION_PUBLISH_BACKLOG_AUTO_HOURS=24
+MULTIREGION_PUBLISH_BACKLOG_REVIEW_HOURS=72
+MULTIREGION_PUBLISH_REALTIME_SCAN_LIMIT=200
+MULTIREGION_PUBLISH_BACKLOG_SCAN_LIMIT=200
+```
+
+3. 运行 Django check、migration drift、Celery ping、`/healthz/`、首页和五地区页；确认最近自然
+   抓取产生的新 ready 文章具有 `publish_ready_at`，历史 NULL 数没有被迁移改变。
+
+### 2. 只读预览和单地区四窗口
+
+候选预览只调用 `build_candidate_pool`，不创建窗口决定和配额：
+
+```bash
+$COMPOSE exec -T web python manage.py shell -c '
+from django.utils import timezone
+from stable.services.publishing_windows import build_candidate_pool
+p=build_candidate_pool("hong_kong", now=timezone.now())
+print(p.summary); print([(a.id,p.channels[a.id]) for a in p.articles[:20]])
+'
+```
+
+预览无异常后只开启一个地区，例如中国香港：
+
+```dotenv
+MULTIREGION_PUBLISH_BACKLOG_ENABLED=true
+MULTIREGION_PUBLISH_BACKLOG_ALLOWED_REGIONS=hong_kong
+```
+
+重建 web/worker/beat 后连续观察 4 个发布窗口。逐窗口核对
+`ProductionWindow.result_payload.candidate_pool`、`WindowCandidateDecision.payload` 中通道/年龄/截断，
+以及地区窗口上限 5、全站小时配额、公开页和 QQ；任何过期稿被选中、查询无界、配额变化或错误
+上升时立即把总开关改回 false 并重建相关容器。
+
+四窗口通过后可把 allowlist 扩到五地区，但不得修改既有发布配额。随后连续观察 24 小时。
+
+### 3. 历史候选审核 manifest
+
+生成命令零数据库写入且拒绝覆盖文件：
+
+```bash
+TS=$(date +%Y%m%d_%H%M%S)
+PENDING="/app/runtime/news_integrity/publish-ready-pending-${TS}.json"
+$COMPOSE exec -T web python manage.py reconcile_publish_ready_backlog --output "$PENDING" --limit 100
+```
+
+审核决定另存为 JSON 对象，键为 article ID，值只能是 `keep_manual` 或
+`revalidate_refresh_ready`。默认省略的文章全部 `keep_manual`。封印 reviewer 和新 SHA：
+
+```bash
+REVIEWED="/app/runtime/news_integrity/publish-ready-reviewed-${TS}.json"
+$COMPOSE exec -T web python manage.py reconcile_publish_ready_backlog \
+  --seal-review "$PENDING" --decisions /app/runtime/news_integrity/decisions.json \
+  --reviewer '<审核人>' --output "$REVIEWED"
+```
+
+只有用户确认逐篇决定和封印 SHA 后才可 apply：
+
+```bash
+$COMPOSE exec -T web python manage.py reconcile_publish_ready_backlog \
+  --apply-manifest "$REVIEWED" --expected-sha256 '<64位SHA>' --confirm-apply --limit 100
+```
+
+apply 后必须独立核对：刷新数、漂移/阻断数、`published_to_web_at` 新增 0、QQ delivery 新增 0；
+刷新稿只进入正常发布窗口。当前 21 条历史候选默认不恢复、不公开。
+
+### 4. 回滚
+
+- 首选止损：`MULTIREGION_PUBLISH_BACKLOG_ENABLED=false` 并重建 web/worker/beat；实时 3 小时通道
+  和原配额继续运行。
+- `0053` 是 additive schema，代码回滚时保留字段和索引最安全；不得为回滚清空
+  `publish_ready_at`。只有恢复旧数据库备份时才整体回退迁移。
+- manifest apply 只刷新资格时间。若某批准文章需撤销，必须以逐篇人工工作流处置；不得批量删除
+  新闻、公开记录或 QQ 账本。
+
 ## 新闻索引和遗留 CrawlJob 操作手册（2026-07-22）
 
 ### 已执行的索引修复

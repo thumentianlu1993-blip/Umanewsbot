@@ -39,6 +39,7 @@ from stable.services.terms import (
     source_terms_by_entry,
 )
 from stable.services.news_attribution import article_region_set
+from stable.services.publish_readiness import transition_to_publish_ready
 
 
 _NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
@@ -1292,13 +1293,23 @@ def warning_signature(issues: list[dict]) -> str:
     return hashlib.sha256("|".join(sorted(warning_codes)).encode("utf-8")).hexdigest() if warning_codes else ""
 
 
-def apply_validation_outcome(article: NewsArticle, outcome: ValidationOutcome) -> None:
+def apply_validation_outcome(
+    article: NewsArticle,
+    outcome: ValidationOutcome,
+    *,
+    ready_at=None,
+    refresh_ready_at: bool = False,
+) -> None:
     duplicate_issue = next((issue for issue in outcome.blockers if issue.get("route") == ROUTE_DUPLICATE), None)
     manual_duplicate_issue = next((issue for issue in outcome.blockers if issue.get("code") == "possible_duplicate_content"), None)
     warning_sig = warning_signature(outcome.issues)
     duplicate_payload = (duplicate_issue or manual_duplicate_issue or {}).get("payload") or {}
     if outcome.passed:
-        article.automation_status = AutomationStatus.PUBLISH_READY
+        ready_at_changed = transition_to_publish_ready(
+            article,
+            ready_at=ready_at,
+            refresh_ready_at=refresh_ready_at,
+        )
         article.review_mode = ReviewMode.AUTO
         article.risk_level = RiskLevel.LOW
         if article.workflow_status in {WorkflowStatus.DUPLICATE, WorkflowStatus.PENDING_REVIEW}:
@@ -1314,6 +1325,8 @@ def apply_validation_outcome(article: NewsArticle, outcome: ValidationOutcome) -
             "automation_error_message",
             "updated_at",
         ]
+        if ready_at_changed:
+            update_fields.append("publish_ready_at")
     else:
         article.automation_status = AutomationStatus.MANUAL_REVIEW_REQUIRED
         article.review_mode = ReviewMode.MANUAL
