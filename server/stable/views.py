@@ -121,6 +121,7 @@ from .services.horse_profiles import (
 from .services.horse_race_records import refresh_career_history_completeness, upsert_race_record
 from .services.media_assets import localize_news_image, set_cover_asset
 from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
+from .services.news_production_integrity import source_health_snapshot
 from .services.onebot import BotPusher
 from .services.operations import log_operation
 from .services.race_event_public_cache import (
@@ -364,7 +365,14 @@ def _source_health(source: NewsSource, *, now=None) -> dict:
     now = now or timezone.now()
     latest_job = source.crawl_jobs.order_by("-started_at", "-id").first()
     latest_completed_job = source.crawl_jobs.exclude(status=TaskStatus.STARTED).order_by("-started_at", "-id").first()
-    running_timeout_minutes = 60
+    running_timeout_minutes = max(1, int(getattr(settings, "CRAWL_JOB_STALE_MINUTES", 60)))
+    rolling = source_health_snapshot(
+        source,
+        now=now,
+        stale_minutes=running_timeout_minutes,
+        short_window_hours=getattr(settings, "NEWS_SOURCE_HEALTH_SHORT_WINDOW_HOURS", 2),
+        long_window_hours=getattr(settings, "NEWS_SOURCE_HEALTH_LONG_WINDOW_HOURS", 24),
+    )
     stale_minutes = max(source.crawl_interval_minutes * 3, 180)
     completed_at = (latest_completed_job.finished_at if latest_completed_job else None) or source.last_crawl_at
     freshness_reference_at = completed_at or source.created_at
@@ -373,7 +381,15 @@ def _source_health(source: NewsSource, *, now=None) -> dict:
     new_count = latest_completed_job.success_count if latest_completed_job else None
     duplicate_count = latest_completed_job.fail_count if latest_completed_job else None
     error_summary = ((latest_completed_job.error_message if latest_completed_job else "") or source.last_crawl_message).strip()
-    if latest_job and latest_job.status == TaskStatus.STARTED:
+    if rolling["index_error"]["active"]:
+        label = "P0 索引错误"
+        tone = "danger"
+        index_name = rolling["index_error"]["index_name"] or "未知索引"
+        summary = (
+            f"{index_name} 近 24 小时物理错误 {rolling['index_error']['count']} 次；"
+            f"最近成功仍保留，近 2 小时失败 {rolling['failures_2h']} 次"
+        )
+    elif latest_job and latest_job.status == TaskStatus.STARTED:
         running_minutes = int((now - latest_job.started_at).total_seconds() // 60)
         started_at = timezone.localtime(latest_job.started_at).strftime("%m-%d %H:%M")
         if running_minutes > running_timeout_minutes:
@@ -387,7 +403,17 @@ def _source_health(source: NewsSource, *, now=None) -> dict:
     elif status == TaskStatus.FAILED:
         label = "失败"
         tone = "danger"
-        summary = error_summary or "抓取失败"
+        summary = (
+            f"{error_summary or '抓取失败'}；"
+            f"近 2 小时失败 {rolling['failures_2h']} 次，24 小时失败 {rolling['failures_24h']} 次"
+        )
+    elif rolling["failures_2h"]:
+        label = "近期有失败"
+        tone = "warning"
+        summary = (
+            f"近 2 小时失败 {rolling['failures_2h']} 次，24 小时失败 {rolling['failures_24h']} 次；"
+            f"最后完成状态 {rolling['last_completed_status'] or '-'}"
+        )
     elif is_stale:
         label = "长时间未运行"
         tone = "warning"
@@ -414,6 +440,14 @@ def _source_health(source: NewsSource, *, now=None) -> dict:
         "latest_job": latest_job,
         "latest_completed_job": latest_completed_job,
         "is_stale": is_stale,
+        "current_running_count": rolling["current_running_count"],
+        "timed_out_started_count": rolling["timed_out_started_count"],
+        "failures_2h": rolling["failures_2h"],
+        "failures_24h": rolling["failures_24h"],
+        "last_success_at": rolling["last_success_at"],
+        "failure_categories": rolling["failure_categories"],
+        "index_error": rolling["index_error"],
+        "index_error_24h": rolling["index_error_24h"],
     }
 
 

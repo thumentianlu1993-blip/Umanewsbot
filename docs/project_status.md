@@ -1,5 +1,10 @@
 # 项目状态文档
 
+## 2026-07-22 新闻生产完整性修复进展
+
+- 生产新闻 `public_slug` B-tree 索引已完成受控 REINDEX 和三层验证；因并行 P0 马匹部署导致一次 Nginx 旧上游 `502`，已恢复并从约 `14:23` 重新计时 60 分钟。当前生产 `HEAD=a59536a9d60708556a1c1a1c3b0a46811ab36b72`，应用容器镜像一致，HTTP healthz/首页/五地区页正常。
+- 条件终态、SHA manifest 遗留任务收敛、只读索引审计、滚动来源健康和 P0 告警已在 `codex/repair-news-production-integrity` 实现。专项/相关 `99` 项全绿，完整 `stable` 与同一基线均为 `14 failures / 72 errors / 57 skipped`。当前代码尚未部署，历史 `32` 条 stale CrawlJob 尚未 apply；正式处置必须以部署后新 manifest 和 SHA 为准。
+
 P0 马信息补全专项的模型交接文档见
 `docs/p0_horse_information_completion_handoff.md`。后续接手应从该文档进入，并以
 `docs/current_state.md` 和生产实时核验校正可能漂移的运行数据。

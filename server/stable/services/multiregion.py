@@ -28,6 +28,7 @@ from stable.models import (
     WorkflowStatus,
 )
 from stable.services.news_attribution import filter_articles_visible_in_region
+from stable.services.news_production_integrity import region_source_health_summary
 
 PRODUCTION_REGIONS = [
     RacingRegion.JAPAN,
@@ -259,6 +260,13 @@ def summarize_multiregion_news_production(*, now=None, regions_filter: list[str]
         )
         external_aliases = ExternalHorseAlias.objects.filter(racing_region=region)
         gate_issues = _gate_issue_summary(recent_articles)
+        rolling_health = region_source_health_summary(
+            sources,
+            now=now,
+            stale_minutes=max(1, int(getattr(settings, "CRAWL_JOB_STALE_MINUTES", 60))),
+            short_window_hours=getattr(settings, "NEWS_SOURCE_HEALTH_SHORT_WINDOW_HOURS", 2),
+            long_window_hours=getattr(settings, "NEWS_SOURCE_HEALTH_LONG_WINDOW_HOURS", 24),
+        )
         regions[region] = {
             "label": region_label(region),
             "sources": {
@@ -272,6 +280,7 @@ def summarize_multiregion_news_production(*, now=None, regions_filter: list[str]
                 "success_no_new": sources.filter(last_crawl_status=TaskStatus.SUCCESS, last_crawl_message__icontains="新增 0").count(),
                 "failed": sources.filter(last_crawl_status=TaskStatus.FAILED).count(),
                 "parse_failed_source_ids": _parse_failed_source_ids(sources),
+                "rolling_health": rolling_health,
             },
             "articles": {
                 "total": articles.count(),
@@ -353,6 +362,11 @@ def region_production_rows(*, selected_region: str = "", now=None) -> list[dict[
                 "production_approved_sources": item["sources"]["production_approved"],
                 "paused_sources": item["sources"]["paused"],
                 "backoff_sources": item["sources"]["backoff_active"],
+                "crawl_running": item["sources"]["rolling_health"]["current_running_count"],
+                "crawl_timed_out": item["sources"]["rolling_health"]["timed_out_started_count"],
+                "crawl_failures_2h": item["sources"]["rolling_health"]["failures_2h"],
+                "crawl_failures_24h": item["sources"]["rolling_health"]["failures_24h"],
+                "crawl_index_error": item["sources"]["rolling_health"]["index_error"],
                 "today_new": articles["today_new"],
                 "pending_translation": articles["workflow"].get(WorkflowStatus.PENDING_TRANSLATION, 0),
                 "translation_failed": articles["translation"].get(ArticleTranslationStatus.FAILED, 0),

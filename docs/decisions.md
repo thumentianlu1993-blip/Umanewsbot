@@ -1,5 +1,11 @@
 # 关键决策
 
+## 2026-07-22 遗留 CrawlJob 使用 SHA manifest 和条件终态
+
+- `CrawlJob(status=started)` 超过 60 分钟不等于执行已死亡。dry-run 必须记录 Celery active/reserved 和有效生产窗口租约；Celery 无回应、任务无法映射来源或租约未过期时 fail closed。
+- apply 必须绑定不可覆盖的 manifest 和 SHA-256，逐行加锁复核 status/started_at/source 未漂移，并使用有界批次。历史审计数 `32` 只作基线，不是直接写入清单。
+- 抓取执行只能以 started→success/failed 条件更新抢占终态。未抢到终态的迟到任务只记录 `terminal_state_already_claimed`，不得覆盖 CrawlJob 或 `NewsSource.last_crawl_*`。
+
 ## 2026-07-22 P0 BASIC 层公开发布门禁与自动首发
 
 - 公开展示最低门槛为 BASIC 层：名称 + 五地区地区 +（`horse_identity_verified_keys`

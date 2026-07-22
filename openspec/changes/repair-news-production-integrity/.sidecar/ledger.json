@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "entries": [
+    {
+      "source": "plan-eng-review",
+      "round": 1,
+      "session": 1,
+      "timestamp": "2026-07-22T13:42:30+08:00",
+      "last_updated": "2026-07-22T13:42:30+08:00",
+      "mode": "full",
+      "artifacts_modified": [],
+      "rounds_total_for_session": 1,
+      "issues_resolved": 0,
+      "findings": []
+    },
+    {
+      "source": "plan-eng-review",
+      "round": 1,
+      "session": 2,
+      "timestamp": "2026-07-22T13:46:03+08:00",
+      "last_updated": "2026-07-22T13:46:03+08:00",
+      "mode": "full",
+      "artifacts_modified": ["design.md", "tasks.md"],
+      "rounds_total_for_session": 1,
+      "issues_resolved": 1,
+      "findings": [
+        {
+          "id": "F-001",
+          "severity": "critical",
+          "category": "scope",
+          "summary": "持续发生的索引物理错误被排在后续应用代码实现之后会延迟 P0 止血",
+          "resolution": "维护窗口批准后先独立完成备份和 REINDEX，再实现终态保护并最后收敛遗留任务",
+          "status": "resolved",
+          "round_found": 1,
+          "round_resolved": 1
+        }
+      ]
+    }
+  ]
+}

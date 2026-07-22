@@ -3539,6 +3539,7 @@ class ProductionWindowServiceTests(TestCase):
         response = Mock(status_code=429)
         error = requests.HTTPError("rate limited")
         error.response = response
+        error._crawl_terminal_state_claimed = True
 
         with patch("stable.tasks._crawl_international_source", side_effect=error):
             with self.assertRaises(requests.HTTPError):

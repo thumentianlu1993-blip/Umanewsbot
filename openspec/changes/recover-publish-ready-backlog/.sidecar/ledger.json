@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "entries": [
+    {
+      "source": "plan-eng-review",
+      "round": 2,
+      "session": 1,
+      "timestamp": "2026-07-22T13:42:39+08:00",
+      "last_updated": "2026-07-22T13:42:39+08:00",
+      "mode": "full",
+      "artifacts_modified": ["design.md", "specs/multiregion-news-production/spec.md", "tasks.md"],
+      "rounds_total_for_session": 2,
+      "issues_resolved": 1,
+      "findings": [
+        {
+          "id": "F-001",
+          "severity": "critical",
+          "category": "architecture",
+          "summary": "已就绪文章的重复校验可能持续刷新 publish_ready_at 并绕过过期策略",
+          "resolution": "默认只在非 ready 到 ready 转换时设置，只有榜单唤醒、人工批准或审核 manifest 可显式刷新",
+          "status": "resolved",
+          "round_found": 1,
+          "round_resolved": 1
+        }
+      ]
+    }
+  ]
+}

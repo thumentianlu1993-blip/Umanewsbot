@@ -1,5 +1,47 @@
 # 部署运行手册
 
+## 新闻索引和遗留 CrawlJob 操作手册（2026-07-22）
+
+### 已执行的索引修复
+
+- 目标：`public.stable_newsarticle_public_slug_46694cb6`，普通非唯一、非约束 B-tree。执行前 HEAD `559cec7aca35d7eb49b463aa52e49c93d8af9a52`，PostgreSQL `16.14`。
+- 备份：`.env.backup.news-index-repair-20260722_135849`；`backups/db/pre-news-index-repair-20260722_135849.dump`（`229947588` 字节，mode `600`，SHA-256 `07d2ebd67f1a3c5ec1fb9ddaf93f554639980425dde87c4b19d0cc54a9ae2fb1`，`pg_restore -l` `1017` 行）。
+- 停 beat，等 worker 无 active/reserved 后停 worker，确认无活动写入；以 `lock_timeout=30s`、`statement_timeout=5min` 执行 `REINDEX INDEX public.stable_newsarticle_public_slug_46694cb6`。不得 drop index、改 slug 或删文章。
+- 写后验收：`indisvalid/indisready/indislive=true`；事务回滚写入探针通过；事务内临时安装 `amcheck`、`bt_index_check(..., true)` 通过后 rollback；netkeiba latest 真实抓取 task `5dc8dac8-8b46-49bc-8122-d2e6c21bec49` 成功。
+- 并行 P0 马匹部署重建 db/web 后曾因 Nginx 旧上游出现 `502`。恢复时未回退对方提交，而是恢复 worker/beat/race_live_worker、reload Nginx，并核对 web/worker/beat/race_live_worker 均为镜像 `sha256:f48f6523525e…`。任何后续 web 重建都必须同步 reload/recreate Nginx 并验收 HTTP。
+- 从约 `14:23` 重新计时 60 分钟；`14:29` 快照为 CrawlJob `32 success / 0 failed / 0 started`、索引错误 `0`、公网 HTTP healthz/首页/五地区入口均 `200`。
+
+### 代码部署后的只读审计与遗留收敛
+
+1. 只读审计：
+
+```bash
+docker compose exec -T web python manage.py audit_news_production_integrity --hours 24
+```
+
+2. 生成 dry-run manifest（拒绝覆盖已有文件，不写 CrawlJob 或 NewsSource）：
+
+```bash
+TS=$(date +%Y%m%d_%H%M%S)
+MANIFEST="/app/runtime/news_integrity/stale-crawl-${TS}.json"
+docker compose exec -T web python manage.py reconcile_stale_crawl_jobs \
+  --stale-minutes 60 \
+  --output "${MANIFEST}"
+```
+
+3. 审核 `jobs[]`、`activity_evidence`、`recommended_action` 和 stdout 的 `manifest_sha256`。Celery inspect 无回应、有无法映射的抓取任务、或生产窗口租约有效时必须停止，不能把“没回应”当成“没任务”。
+4. 仅对审核过的同一 SHA 文件有界 apply：
+
+```bash
+docker compose exec -T web python manage.py reconcile_stale_crawl_jobs \
+  --apply-manifest "${MANIFEST}" \
+  --expected-sha256 "<64 位 SHA-256>" \
+  --confirm-apply \
+  --limit 100
+```
+
+apply 会逐行加锁，只处理仍为 started、started_at/source 未漂移且无活动证据的记录。禁止绕过 manifest 手工批量 UPDATE。代码回滚时保留已修复索引和已收敛终态，不得把 failed 批量改回 started；索引物理错误复发时立即停写并使用备份在隔离库恢复验证。
+
 ## P0 BASIC 层自动首发操作手册（publish-p0-horses-basic-tier，2026-07-22）
 
 本节是批次自动首发与存量批量发布的标准操作顺序。公开门槛：名称 + 五地区 +

@@ -56,6 +56,10 @@ from stable.services.automation import (
 from stable.services.ingestion import upsert_article_from_draft
 from stable.services.multiregion import auto_publish_count_today, auto_publish_policy_for_article
 from stable.services.multiregion import summarize_multiregion_news_production
+from stable.services.news_production_integrity import (
+    region_source_health_summary,
+    task_execution_index_error_snapshot,
+)
 from stable.services.news_attribution import apply_article_attribution
 from stable.services.notifications import send_automation_notification, send_high_value_warning_notification
 from stable.services.operations import log_operation
@@ -380,18 +384,44 @@ def _finish_crawl_job(
     fail_count: int = 0,
     error_message: str = "",
     message: str = "",
-) -> None:
-    job.status = TaskStatus.FAILED if error_message else TaskStatus.SUCCESS
-    job.success_count = success_count
-    job.fail_count = fail_count
-    job.error_message = error_message or message
-    job.finished_at = timezone.now()
-    job.save()
-    if job.source:
-        job.source.last_crawl_at = job.finished_at
-        job.source.last_crawl_status = job.status
-        job.source.last_crawl_message = error_message or message or f"新增 {success_count}，重复 {fail_count}"
-        job.source.save(update_fields=["last_crawl_at", "last_crawl_status", "last_crawl_message", "updated_at"])
+) -> bool:
+    finished_at = timezone.now()
+    terminal_status = TaskStatus.FAILED if error_message else TaskStatus.SUCCESS
+    terminal_message = error_message or message
+    with transaction.atomic():
+        claimed = bool(
+            CrawlJob.objects.filter(pk=job.pk, status=TaskStatus.STARTED).update(
+                status=terminal_status,
+                success_count=success_count,
+                fail_count=fail_count,
+                error_message=terminal_message,
+                finished_at=finished_at,
+                updated_at=finished_at,
+            )
+        )
+        if not claimed:
+            TaskExecutionLog.objects.create(
+                task_name="crawl_job_terminal_state",
+                status=TaskStatus.SUCCESS,
+                payload={"crawl_job_id": job.pk, "source_id": job.source_id},
+                detail="terminal_state_already_claimed",
+                started_at=finished_at,
+                finished_at=finished_at,
+            )
+            return False
+        if job.source_id:
+            NewsSource.objects.filter(pk=job.source_id).update(
+                last_crawl_at=finished_at,
+                last_crawl_status=terminal_status,
+                last_crawl_message=terminal_message or f"新增 {success_count}，重复 {fail_count}",
+                updated_at=finished_at,
+            )
+        job.status = terminal_status
+        job.success_count = success_count
+        job.fail_count = fail_count
+        job.error_message = terminal_message
+        job.finished_at = finished_at
+    return True
 
 
 def _parse_task_now(now_iso: str | None = None) -> datetime:
@@ -554,15 +584,22 @@ def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None
                     )
             if mode in {SourceMode.ACCESS, SourceMode.ATTENTION}:
                 break
-        _finish_crawl_job(job, success_count=new_count, fail_count=seen_count)
+        terminal_state_claimed = _finish_crawl_job(job, success_count=new_count, fail_count=seen_count)
         return {
             "new_count": new_count,
             "seen_count": seen_count,
             "crawl_job_id": job.id,
             "ranked_revival_results": ranked_revival_results,
+            "terminal_state_claimed": terminal_state_claimed,
         }
     except Exception as exc:
-        _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, error_message=str(exc))
+        terminal_state_claimed = _finish_crawl_job(
+            job,
+            success_count=new_count,
+            fail_count=seen_count,
+            error_message=str(exc),
+        )
+        setattr(exc, "_crawl_terminal_state_claimed", terminal_state_claimed)
         raise
 
 
@@ -596,15 +633,22 @@ def _crawl_jra_source(source: NewsSource | None = None) -> dict:
         message = ""
         if skipped_errors:
             message = f"新增 {new_count}，重复 {seen_count}；跳过 {len(skipped_errors)} 条：{skipped_errors[0][:120]}"
-        _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, message=message)
+        terminal_state_claimed = _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, message=message)
         return {
             "new_count": new_count,
             "seen_count": seen_count,
             "skipped_count": len(skipped_errors),
             "crawl_job_id": job.id,
+            "terminal_state_claimed": terminal_state_claimed,
         }
     except Exception as exc:
-        _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, error_message=str(exc))
+        terminal_state_claimed = _finish_crawl_job(
+            job,
+            success_count=new_count,
+            fail_count=seen_count,
+            error_message=str(exc),
+        )
+        setattr(exc, "_crawl_terminal_state_claimed", terminal_state_claimed)
         raise
 
 
@@ -657,15 +701,23 @@ def _crawl_international_source(source: NewsSource) -> dict:
                 message = f"新增 {new_count}，重复 {seen_count}；parse failed 跳过 {len(skipped_errors)} 条：{skipped_errors[0][:120]}"
         if detail_errors and new_count == 0 and seen_count == 0:
             error_message = message or "parse failed: no parsable article details"
-            _finish_crawl_job(job, success_count=new_count, fail_count=len(detail_errors), error_message=error_message)
-            raise RuntimeError(error_message)
-        _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, message=message)
+            terminal_state_claimed = _finish_crawl_job(
+                job,
+                success_count=new_count,
+                fail_count=len(detail_errors),
+                error_message=error_message,
+            )
+            failure = RuntimeError(error_message)
+            setattr(failure, "_crawl_terminal_state_claimed", terminal_state_claimed)
+            raise failure
+        terminal_state_claimed = _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, message=message)
         return {
             "new_count": new_count,
             "seen_count": seen_count,
             "skipped_count": len(skipped_errors),
             "crawl_job_id": job.id,
             "ranked_revival_results": ranked_revival_results,
+            "terminal_state_claimed": terminal_state_claimed,
             "source_summary": {
                 "new_articles": new_count,
                 "duplicates": seen_count,
@@ -679,7 +731,13 @@ def _crawl_international_source(source: NewsSource) -> dict:
     except Exception as exc:
         job.refresh_from_db(fields=["status"])
         if job.status == TaskStatus.STARTED:
-            _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, error_message=str(exc))
+            terminal_state_claimed = _finish_crawl_job(
+                job,
+                success_count=new_count,
+                fail_count=seen_count,
+                error_message=str(exc),
+            )
+            setattr(exc, "_crawl_terminal_state_claimed", terminal_state_claimed)
         raise
 
 
@@ -754,7 +812,8 @@ def crawl_news_source_task(source_id: int, window_id: int | None = None) -> dict
             result = _crawl_international_source(source)
         else:
             raise NotImplementedError("当前版本仅支持内置 netkeiba / JRA / 一期国际新闻来源")
-        record_source_crawl_result(source, success=True)
+        if result.get("terminal_state_claimed"):
+            record_source_crawl_result(source, success=True)
         _finish_crawl_window(
             window_id,
             status=ProductionWindowStatus.SUCCEEDED,
@@ -770,7 +829,8 @@ def crawl_news_source_task(source_id: int, window_id: int | None = None) -> dict
         return result
     except Exception as exc:
         error_category = classify_source_error(status_code=_http_status_code_from_exception(exc), message=str(exc))
-        record_source_crawl_result(source, success=False, error_category=error_category)
+        if getattr(exc, "_crawl_terminal_state_claimed", False):
+            record_source_crawl_result(source, success=False, error_category=error_category)
         _finish_crawl_window(
             window_id,
             status=ProductionWindowStatus.FAILED,
@@ -1441,9 +1501,17 @@ def auto_publish_batch_task(limit: int | None = None) -> dict:
     }
 
 
-def _recent_notification_exists(notification_type: str, hours: int = 6) -> bool:
+def _recent_notification_exists(
+    notification_type: str,
+    hours: int = 6,
+    *,
+    summary_contains: str = "",
+) -> bool:
     since = timezone.now() - timedelta(hours=hours)
-    return NotificationLog.objects.filter(type=notification_type, created_at__gte=since).exists()
+    queryset = NotificationLog.objects.filter(type=notification_type, created_at__gte=since)
+    if summary_contains:
+        queryset = queryset.filter(payload_summary__icontains=summary_contains)
+    return queryset.exists()
 
 
 @shared_task
@@ -1455,11 +1523,48 @@ def send_notification_task(notification_type: str, payload: dict) -> dict:
 @shared_task
 def detect_automation_anomalies_task() -> dict:
     log = _log_start("detect_automation_anomalies")
-    if not getattr(settings, "AUTOMATION_ENABLED", False):
-        _log_success(log, "automation disabled")
-        return {"skipped": True}
     sent: list[str] = []
     now = timezone.now()
+    rolling_source_health = region_source_health_summary(
+        NewsSource.objects.filter(deleted_at__isnull=True),
+        now=now,
+        stale_minutes=max(1, int(getattr(settings, "CRAWL_JOB_STALE_MINUTES", 60))),
+        short_window_hours=getattr(settings, "NEWS_SOURCE_HEALTH_SHORT_WINDOW_HOURS", 2),
+        long_window_hours=getattr(settings, "NEWS_SOURCE_HEALTH_LONG_WINDOW_HOURS", 24),
+    )
+    index_error = rolling_source_health["index_error"]
+    if not index_error["active"]:
+        index_error = task_execution_index_error_snapshot(
+            now=now,
+            window_hours=getattr(settings, "NEWS_SOURCE_HEALTH_SHORT_WINDOW_HOURS", 2),
+        )
+    if index_error["active"] and not _recent_notification_exists(
+        NotificationType.OPS_ANOMALY,
+        hours=max(1, int(getattr(settings, "NEWS_INDEX_P0_COOLDOWN_HOURS", 6))),
+        summary_contains="news_index_physical_error",
+    ):
+        send_notification_task.run(
+            NotificationType.OPS_ANOMALY,
+            {
+                "severity": "p0",
+                "reason": "news_index_physical_error",
+                "index_name": index_error["index_name"]
+                or getattr(
+                    settings,
+                    "NEWS_PRODUCTION_INDEX_NAME",
+                    "stable_newsarticle_public_slug_46694cb6",
+                ),
+                "count": index_error["count"],
+                "first_at": index_error["first_at"].isoformat() if index_error["first_at"] else "",
+                "last_at": index_error["last_at"].isoformat() if index_error["last_at"] else "",
+            },
+        )
+        sent.append(NotificationType.OPS_ANOMALY)
+
+    if not getattr(settings, "AUTOMATION_ENABLED", False):
+        _log_success(log, f"automation disabled; notifications={len(sent)}")
+        return {"skipped": True, "notifications": sent}
+
     stale_sources = []
     for source in NewsSource.objects.filter(enabled=True, deleted_at__isnull=True):
         if not source.last_crawl_at:

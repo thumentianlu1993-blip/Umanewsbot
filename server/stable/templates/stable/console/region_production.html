@@ -82,6 +82,7 @@
             <th>启用来源</th>
             <th>生产批准</th>
             <th>暂停/backoff</th>
+            <th>抓取滚动健康</th>
             <th>今日新增</th>
             <th>待翻译</th>
             <th>翻译失败</th>
@@ -102,6 +103,13 @@
               <td>{{ row.enabled_sources }}</td>
               <td>{{ row.production_approved_sources }}</td>
               <td>{{ row.paused_sources }} / {{ row.backoff_sources }}</td>
+              <td>
+                {% if row.crawl_index_error.active %}
+                  <span class="badge danger">P0 索引错误 {{ row.crawl_index_error.count }}</span>
+                {% else %}
+                  运行 {{ row.crawl_running }} / 超时 {{ row.crawl_timed_out }} / 失败 2h {{ row.crawl_failures_2h }} / 24h {{ row.crawl_failures_24h }}
+                {% endif %}
+              </td>
               <td>{{ row.today_new }}</td>
               <td>{{ row.pending_translation }}</td>
               <td>{{ row.translation_failed }}</td>
@@ -130,7 +138,7 @@
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="15" class="muted">没有符合筛选条件的地区。</td></tr>
+            <tr><td colspan="16" class="muted">没有符合筛选条件的地区。</td></tr>
           {% endfor %}
         </tbody>
       </table>

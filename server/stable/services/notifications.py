@@ -20,6 +20,8 @@ def _payload_summary(payload: dict) -> str:
         parts.append(str(payload["decision_summary"]))
     if payload.get("error"):
         parts.append(str(payload["error"]))
+    if payload.get("reason"):
+        parts.append(f"reason={payload['reason']}")
     return " | ".join(parts)[:1000]
 
 
