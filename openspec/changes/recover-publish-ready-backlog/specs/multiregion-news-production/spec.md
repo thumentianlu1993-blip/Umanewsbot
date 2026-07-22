@@ -73,6 +73,13 @@
 - **THEN** 系统 SHALL 运行完整门禁并仅在通过时刷新 `publish_ready_at`
 - **AND** 文章 SHALL 等待正常发布窗口、去重和配额
 
+#### Scenario: 审核后明确舍弃历史候选
+- **WHEN** 已审核 manifest 批准舍弃某文章且文章未漂移
+- **THEN** 系统 SHALL 将其工作流、审核和自动化状态统一标记为 `ignored` 并记录忽略时间
+- **AND** 系统 SHALL 记录 reviewer、manifest SHA 和批准动作
+- **AND** 系统 MUST NOT 公开文章或创建 QQ delivery
+- **AND** 对同一 manifest 的重复 apply SHALL 幂等且不得重复改变文章
+
 ### Requirement: 积压候选查询必须有界 <!-- id: req-backlog-query-bounded -->
 系统 MUST 为实时和积压候选设置独立扫描上限并使用索引友好条件；不得在每个发布窗口加载全部历史 `publish_ready` 文章。
 

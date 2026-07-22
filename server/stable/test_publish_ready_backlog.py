@@ -423,6 +423,46 @@ class PublishCandidateLaneTests(TestCase):
         self.assertTrue(result["outcomes"][0]["reason"].startswith("drift:"))
         self.assertIsNone(article.publish_ready_at)
 
+    def test_reviewed_manifest_discard_is_audited_and_idempotent(self):
+        now = timezone.now()
+        article = self._article(now=now, publish_ready_at=None)
+        with self._settings():
+            pending = build_publish_ready_backlog_manifest(now=now)
+            reviewed = seal_publish_ready_backlog_review(
+                pending,
+                decisions={str(article.id): "discard_ignored"},
+                reviewer="test-reviewer",
+                now=now,
+            )
+            first = apply_publish_ready_backlog_manifest(
+                reviewed,
+                expected_sha256=reviewed["manifest_sha256"],
+                now=now,
+            )
+            second = apply_publish_ready_backlog_manifest(
+                reviewed,
+                expected_sha256=reviewed["manifest_sha256"],
+                now=now,
+            )
+
+        article.refresh_from_db()
+        recovery = article.decision_reason["publish_ready_recovery"]
+        self.assertEqual(first["discarded_count"], 1)
+        self.assertEqual(second["already_applied_count"], 1)
+        self.assertEqual(article.workflow_status, WorkflowStatus.IGNORED)
+        self.assertEqual(article.review_mode, ReviewMode.IGNORED)
+        self.assertEqual(article.automation_status, AutomationStatus.IGNORED)
+        self.assertEqual(article.ignored_at, now)
+        self.assertEqual(recovery["manifest_sha256"], reviewed["manifest_sha256"])
+        self.assertEqual(recovery["reviewer"], "test-reviewer")
+        self.assertEqual(recovery["action"], "discard_ignored")
+        self.assertIsNone(article.published_to_web_at)
+        self.assertEqual(article.qq_push_deliveries.count(), 0)
+
+        with self._settings():
+            followup = build_publish_ready_backlog_manifest(now=now)
+        self.assertEqual(followup["articles"], [])
+
     def test_reviewed_revalidation_only_refreshes_ready_time_and_is_idempotent(self):
         now = timezone.now()
         article = self._article(now=now, publish_ready_at=now - timedelta(hours=80))
