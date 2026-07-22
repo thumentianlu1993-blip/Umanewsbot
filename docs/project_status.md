@@ -2,8 +2,8 @@
 
 ## 2026-07-22 新闻生产完整性修复进展
 
-- 生产新闻 `public_slug` B-tree 索引已完成受控 REINDEX、三层验证和满 60 分钟生产观察：`77` 次抓取全部成功，同类索引错误 `0`，真实新增 `2` 篇、正常公开 `1` 篇，healthz/首页/五地区页全部 `200`。当前生产 `HEAD=a59536a9d60708556a1c1a1c3b0a46811ab36b72`，索引修复门禁正式 PASS。
-- 条件终态、SHA manifest 遗留任务收敛、只读索引审计、滚动来源健康和 P0 告警已在 `codex/repair-news-production-integrity` 实现并以提交 `75cbedf1` 推送。专项/相关 `99` 项全绿，完整 `stable` 与同一基线均为 `14 failures / 72 errors / 57 skipped`。当前代码尚未部署，历史 `32` 条 stale CrawlJob 尚未 apply；正式处置必须以部署后新 manifest 和 SHA 为准。
+- 生产新闻 `public_slug` B-tree 索引已完成受控 REINDEX、三层验证和满 60 分钟生产观察：`77` 次抓取全部成功，同类索引错误 `0`，真实新增 `2` 篇、正常公开 `1` 篇，索引修复门禁正式 PASS。
+- 条件终态、SHA manifest 收敛、滚动来源健康和 P0 告警已部署到生产 `HEAD=7ff968c0`，四个应用容器统一为镜像 `sha256:712a5da8…`。执行时 manifest `c4cc4f49…` 的 `32` 条全部安全收敛，stale started `32→0`；文章、公开、QQ 和来源最近状态前后不变，幂等重放更新 `0`，新 dry-run 为 `0`。部署后 60 分钟内 `61` 次抓取全部成功、新稿 `1`、新 stale/迟到覆盖/索引错误/异常日志均为 `0`；P0 信号和 6h 冷却生产实证通过。本 change 全部门禁 PASS，下一步进入 publish_ready 积压修复。
 
 P0 马信息补全专项的模型交接文档见
 `docs/p0_horse_information_completion_handoff.md`。后续接手应从该文档进入，并以

@@ -13,10 +13,16 @@
 
 ### 代码部署后的只读审计与遗留收敛
 
+生产操作必须显式使用 low-cost Compose 文件；裸 `docker compose` 会读取默认文件，可能把 `race_live_worker` 重建为旧的独立镜像：
+
+```bash
+COMPOSE="./deploy/docker/compose-wrapper.sh -f docker-compose.prod.lowcost.yml"
+```
+
 1. 只读审计：
 
 ```bash
-docker compose exec -T web python manage.py audit_news_production_integrity --hours 24
+$COMPOSE exec -T web python manage.py audit_news_production_integrity --hours 24
 ```
 
 2. 生成 dry-run manifest（拒绝覆盖已有文件，不写 CrawlJob 或 NewsSource）：
@@ -24,7 +30,7 @@ docker compose exec -T web python manage.py audit_news_production_integrity --ho
 ```bash
 TS=$(date +%Y%m%d_%H%M%S)
 MANIFEST="/app/runtime/news_integrity/stale-crawl-${TS}.json"
-docker compose exec -T web python manage.py reconcile_stale_crawl_jobs \
+$COMPOSE exec -T web python manage.py reconcile_stale_crawl_jobs \
   --stale-minutes 60 \
   --output "${MANIFEST}"
 ```
@@ -33,7 +39,7 @@ docker compose exec -T web python manage.py reconcile_stale_crawl_jobs \
 4. 仅对审核过的同一 SHA 文件有界 apply：
 
 ```bash
-docker compose exec -T web python manage.py reconcile_stale_crawl_jobs \
+$COMPOSE exec -T web python manage.py reconcile_stale_crawl_jobs \
   --apply-manifest "${MANIFEST}" \
   --expected-sha256 "<64 位 SHA-256>" \
   --confirm-apply \
@@ -41,6 +47,14 @@ docker compose exec -T web python manage.py reconcile_stale_crawl_jobs \
 ```
 
 apply 会逐行加锁，只处理仍为 started、started_at/source 未漂移且无活动证据的记录。禁止绕过 manifest 手工批量 UPDATE。代码回滚时保留已修复索引和已收敛终态，不得把 failed 批量改回 started；索引物理错误复发时立即停写并使用备份在隔离库恢复验证。
+
+### 本次代码部署与遗留收敛结果
+
+- 部署前恢复点：`.env.backup.news-integrity-deploy-20260722_152904`（`8193` 字节、mode `600`、SHA-256 `7af509d60ca60f2cf232959d2e779388917a688c3a3210bbb5d70445bda668de`）；`backups/db/pre-news-integrity-deploy-20260722_152904.dump`（`230252800` 字节、mode `600`、SHA-256 `810b07829c36c551722168b0a76ab1efc65b7bbd367ddcab6f0741c6b7b5807a`、容器内 `pg_restore -l` `1017` 项）。
+- 生产 fast-forward 到 `7ff968c0557300c1240f13a3d6feae3a8df3085d`，镜像 `sha256:712a5da8b408…`。部署后 Django check、无迁移漂移、Celery 两节点和 HTTP 七入口通过。
+- 验收时发现一次裸 `docker compose up race_live_worker` 读取默认文件，使该容器短暂使用旧镜像 `sha256:111dbe46…`；在宣告通过前用 `$COMPOSE up -d --no-deps --force-recreate race_live_worker` 纠正，最终四应用容器镜像一致，期间公开页面持续 `200`。后续禁止对生产服务使用裸 Compose。
+- 清单 `/app/runtime/news_integrity/stale-crawl-20260722_153609.json`，SHA-256 `c4cc4f4975a6246131cd91bf2772aaaeb36d85344fbb02fc6223467567230ea0`；`32/32` 条活动证据完整且建议收敛，apply 后 stale started `32→0`。文章 `9547→9547`、公开 `1640→1640`、QQ delivery `629→629`，来源最近状态 SHA-256 均为 `8dca4a423a80b84f4dca456f95cc9a225a8d21632d2c90146b6847285fb86bb8`；幂等重放 updated `0`，随后 dry-run `0` 条。
+- 代码上线后满 60 分钟最终快照：`61 success / 0 failed / 0 started`，新稿 `1`、stale started `0`、迟到终态标记 `0`、新索引错误 `0`、应用/数据库异常日志 `0`；修复前错误仍在 24h 历史而已退出 2h 当前窗口。新闻索引 P0 只在 `15:33` 留下同一次 `4` 渠道记录，后续半小时调度未重复，6h 冷却生效。四应用容器统一 `sha256:712a5da8b408…`，Celery 两节点与 HTTP 七入口通过；生产验收 PASS。
 
 ## P0 BASIC 层自动首发操作手册（publish-p0-horses-basic-tier，2026-07-22）
 
