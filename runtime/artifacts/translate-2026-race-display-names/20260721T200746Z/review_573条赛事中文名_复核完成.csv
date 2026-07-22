@@ -1,0 +1,574 @@
+﻿id,region,original_name,before,level,matched_on,suggested_name,confidence,rationale,final_name,decision
+164,japan,ブルーバードカップ,ブルーバードカップ,needs_translation,,蓝鸟杯,medium,ブルーバード意译为蓝鸟，カップ按惯例译杯；复核通过。,蓝鸟杯,通过
+184,japan,スパーキングレディーカップ （ホクトベガメモリアル）,スパーキングレディーカップ （ホクトベガメモリアル）,needs_translation,,闪耀女士杯（北斗织姬纪念）,medium,スパーキング译闪耀、レディーカップ按レディス→女士惯例译女士杯，括号内ホクトベガ沿用马名惯译北斗织姬，メモリアル→纪念；复核通过。,闪耀女士杯（北斗织姬纪念）,通过
+186,japan,クラスターカップ,クラスターカップ,needs_translation,,克拉斯特杯,low,クラスター含义（星团/群集）不确定，暂音译为克拉斯特，カップ→杯；复核通过。,克拉斯特杯,通过
+188,japan,ブリーダーズゴールドカップ,ブリーダーズゴールドカップ,needs_translation,,育马者金杯,high,ブリーダーズ沿用育马者杯惯例译育马者，ゴールド→金，カップ→杯；复核通过。,育马者金杯,通过
+190,japan,サマーチャンピオン,サマーチャンピオン,needs_translation,,夏季冠军,high,サマー意译夏季，チャンピオン按冠军杯惯例核心词译冠军；复核后修正；补足赛事名称中的“赛”，避免仅呈现头衔名词。,夏季冠军赛,已修正
+192,japan,オーバルスプリント,オーバルスプリント,needs_translation,,椭圆短途赛,medium,オーバル意译椭圆（指椭圆形赛道），スプリント按短途锦标惯例译短途；复核后修正；采用现有中文赛马会话中的“椭圆短途锦标”结构。,椭圆短途锦标,已修正
+194,japan,マリーンカップ,マリーンカップ,needs_translation,,海洋杯,high,マリーン意译海洋，カップ→杯；复核通过。,海洋杯,通过
+195,japan,レディスプレリュード,レディスプレリュード,needs_translation,,女士序曲,medium,レディス按惯例译女士，プレリュード意译序曲（前奏赛）；复核通过。,女士序曲,通过
+210,united_states,ROBERT J. FRANKEL S.,ROBERT J. FRANKEL S.,history,Robert J. Frankel S,罗伯特·J·弗兰克尔锦标,high,历史赛事已上线译名（Robert J. Frankel S）；复核通过。,罗伯特·J·弗兰克尔锦标,通过
+211,united_states,SAN VICENTE S.,SAN VICENTE S.,history,San Vicente S,圣维森特锦标,high,历史赛事已上线译名（San Vicente S）；复核通过。,圣维森特锦标,通过
+212,united_states,LAS CIENEGAS S.,LAS CIENEGAS S.,history,Las Cienegas S,拉斯谢内加斯锦标,high,历史赛事已上线译名（Las Cienegas S）；复核通过。,拉斯谢内加斯锦标,通过
+213,united_states,LAS FLORES S.,LAS FLORES S.,history,Las Flores S,拉斯弗洛雷斯锦标,high,历史赛事已上线译名（Las Flores S）；复核通过。,拉斯弗洛雷斯锦标,通过
+214,united_states,LOUISIANA S. PRESENTED BY HAGYARD,LOUISIANA S. PRESENTED BY HAGYARD,history,Louisiana S,路易斯安那锦标,high,历史赛事已上线译名（Louisiana S）；复核通过。,路易斯安那锦标,通过
+215,united_states,LECOMTE S.,LECOMTE S.,history,LeComte S; Lecomte S,勒孔特锦标,high,历史赛事已上线译名（LeComte S; Lecomte S）；复核通过。,勒孔特锦标,通过
+216,united_states,LA CANADA S.,LA CANADA S.,history,La Canada S,拉加拿大锦标,high,历史赛事已上线译名（La Canada S）；复核通过。,拉加拿大锦标,通过
+217,united_states,CHRISTOPHE CLEMENT S. PRESENTED BY DON JULIO TEQUILA,CHRISTOPHE CLEMENT S. PRESENTED BY DON JULIO TEQUILA,needs_translation,,克里斯托夫·克莱芒锦标,medium,人名 Christophe Clement（法裔练马师）音译，S.→锦标，冠名 Don Julio 已正确剥离；复核通过。,克里斯托夫·克莱芒锦标,通过
+218,united_states,PEGASUS WORLD CUP FILLY AND MARE TURF INVITATIONAL S. PRESENTED BY THOROUGHBRED AFTERCARE ALLIANCE,PEGASUS WORLD CUP FILLY AND MARE TURF INVITATIONAL S. PRESENTED BY THOROUGHBRED AFTERCARE ALLIANCE,needs_translation,,飞马世界杯雌马草地锦标,medium,沿用飞马世界杯既有译名，Filly and Mare Turf 按例译出，Invitational 依飞马世界杯例省去；复核通过。,飞马世界杯雌马草地锦标,通过
+219,united_states,HOUSTON LADIES CLASSIC S.,HOUSTON LADIES CLASSIC S.,needs_translation,,休斯顿女士经典锦标,medium,Houston 音译休斯顿，Ladies Classic 意译女士经典，S.→锦标；复核后修正；Houston采用中国大陆通行地名“休斯敦”。,休斯敦女士经典锦标,已修正
+220,united_states,INSIDE INFORMATION S. PRESENTED BY MYRACEHORSE,INSIDE INFORMATION S. PRESENTED BY MYRACEHORSE,history,Inside Information S. Presented by MyRacehorse,内幕消息锦标,high,历史赛事已上线译名（Inside Information S. Presented by MyRacehorse）；复核通过。,内幕消息锦标,通过
+221,united_states,PEGASUS WORLD CUP INVITATIONAL S.,PEGASUS WORLD CUP INVITATIONAL S.,history,Pegasus World Cup Invitational S,飞马世界杯,high,历史赛事已上线译名（Pegasus World Cup Invitational S）；复核通过。,飞马世界杯,通过
+222,united_states,FRED W. HOOPER S. PRESENTED BY VISIT LAUDERDALE,FRED W. HOOPER S. PRESENTED BY VISIT LAUDERDALE,history,Fred W. Hooper S,弗雷德·W·胡珀锦标,high,历史赛事已上线译名（Fred W. Hooper S）；复核通过。,弗雷德·W·胡珀锦标,通过
+223,united_states,WILLIAM L. MCKNIGHT S. PRESENTED BY WOODFORD RESERVE BOURBON,WILLIAM L. MCKNIGHT S. PRESENTED BY WOODFORD RESERVE BOURBON,history,William. L. McKnight S,威廉·L·麦克奈特锦标,high,历史赛事已上线译名（William. L. McKnight S）；复核通过。,威廉·L·麦克奈特锦标,通过
+224,united_states,PEGASUS WORLD CUP TURF INVITATIONAL S.,PEGASUS WORLD CUP TURF INVITATIONAL S.,history,Pegasus World Cup Turf Invitational S,飞马世界杯草地锦标,high,历史赛事已上线译名（Pegasus World Cup Turf Invitational S）；复核通过。,飞马世界杯草地锦标,通过
+225,united_states,MEGAHERTZ S.,MEGAHERTZ S.,history,Megahertz S,兆赫锦标,high,历史赛事已上线译名（Megahertz S）；复核通过。,兆赫锦标,通过
+226,united_states,ENDEAVOUR S.,ENDEAVOUR S.,history,Endeavour S,奋进锦标,high,历史赛事已上线译名（Endeavour S）；复核通过。,奋进锦标,通过
+227,united_states,SAN PASQUAL S.,SAN PASQUAL S.,history,San Pasqual S,圣帕斯夸尔锦标,high,历史赛事已上线译名（San Pasqual S）；复核通过。,圣帕斯夸尔锦标,通过
+228,united_states,TAMPA BAY S.,TAMPA BAY S.,history,Tampa Bay S,坦帕湾锦标,high,历史赛事已上线译名（Tampa Bay S）；复核通过。,坦帕湾锦标,通过
+229,united_states,FORWARD GAL S.,FORWARD GAL S.,history,Forward Gal S,前进少女锦标,high,历史赛事已上线译名（Forward Gal S）；复核通过。,前进少女锦标,通过
+230,united_states,HOLY BULL S.,HOLY BULL S.,history,Holy Bull S,圣牛锦标,high,历史赛事已上线译名（Holy Bull S）；复核通过。,圣牛锦标,通过
+231,united_states,SOUTHWEST S.,SOUTHWEST S.,history,Southwest S,西南锦标,high,历史赛事已上线译名（Southwest S）；复核通过。,西南锦标,通过
+232,united_states,BAYAKOA S.,BAYAKOA S.,manual,Bayakoa S,,low,需人工定夺：ambiguous history translations；复核后修正；Bayakoa采用社区稳定马名译法“巴亚科亚”；同名的两条美国赛事系列可依赛场和RaceSeries区分。,巴亚科亚锦标,人工裁决
+233,united_states,D. WAYNE LUKAS S. (formerly SANTA MONICA S.),D. WAYNE LUKAS S. (formerly SANTA MONICA S.),needs_translation,,D·韦恩·卢卡斯锦标,medium,人名 D. Wayne Lukas 音译并保留首字母缩写；括号内原名 Santa Monica S.（圣莫尼卡锦标）不进中文名；历史旧名复核修正：当前赛事名为D. Wayne Lukas Stakes；Santa Monica Stakes仅为括号内旧名。,D·韦恩·卢卡斯锦标,已修正
+234,united_states,THUNDER ROAD S.,THUNDER ROAD S.,history,Thunder Road S,雷霆大道锦标,high,历史赛事已上线译名（Thunder Road S）；复核通过。,雷霆大道锦标,通过
+235,united_states,ROBERT B. LEWIS S.,ROBERT B. LEWIS S.,history,Robert B. Lewis S,罗伯特·B·刘易斯锦标,high,历史赛事已上线译名（Robert B. Lewis S）；复核通过。,罗伯特·B·刘易斯锦标,通过
+236,united_states,ROYAL DELTA S.,ROYAL DELTA S.,history,Royal Delta S,御皇三角锦标,high,历史赛事已上线译名（Royal Delta S）；复核通过。,御皇三角锦标,通过
+237,united_states,MINESHAFT S. PRESENTED BY HAGYARD,MINESHAFT S. PRESENTED BY HAGYARD,history,Mineshaft S,矿井锦标,high,历史赛事已上线译名（Mineshaft S）；复核通过。,矿井锦标,通过
+238,united_states,SAN MARCOS S.,SAN MARCOS S.,history,San Marcos S,圣马科斯锦标,high,历史赛事已上线译名（San Marcos S）；复核通过。,圣马科斯锦标,通过
+239,united_states,FAIR GROUNDS S. PRESENTED BY HORSE RACING NATION,FAIR GROUNDS S. PRESENTED BY HORSE RACING NATION,history,Fair Grounds S. Presented by Horse Racing Nation,费尔园锦标,high,历史赛事已上线译名（Fair Grounds S. Presented by Horse Racing Nation）；复核通过。,费尔园锦标,通过
+240,united_states,FASIG-TIPTON RACHEL ALEXANDRA S.,FASIG-TIPTON RACHEL ALEXANDRA S.,needs_translation,,蕾切尔·亚历山德拉锦标,low,base 剥离有误：Fasig-Tipton 为冠名应剔除；Rachel Alexandra 为名驹音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,历山小姐锦标,已修正
+241,united_states,FASIG-TIPTON RISEN STAR S.,FASIG-TIPTON RISEN STAR S.,needs_translation,,新星锦标,low,base 剥离有误：Fasig-Tipton 为冠名应剔除；Risen Star 意译新星；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,高星锦标,已修正
+242,united_states,THE VERY ONE S. PRESENTED BY DRF EN ESPANOL,THE VERY ONE S. PRESENTED BY DRF EN ESPANOL,history,The Very One S,独一无二锦标,high,历史赛事已上线译名（The Very One S）；复核通过。,独一无二锦标,通过
+243,united_states,HONEY FOX S. PRESENTED BY MY RACEHORSE,HONEY FOX S. PRESENTED BY MY RACEHORSE,history,Honey Fox S,蜂蜜狐狸锦标,high,历史赛事已上线译名（Honey Fox S）；复核通过。,蜂蜜狐狸锦标,通过
+244,united_states,BUENA VISTA S.,BUENA VISTA S.,history,Buena Vista S,布埃纳维斯塔锦标,high,历史赛事已上线译名（Buena Vista S）；复核通过。,布埃纳维斯塔锦标,通过
+245,united_states,GULFSTREAM PARK MILE S. PRESENTED BY FIERCENESS,GULFSTREAM PARK MILE S. PRESENTED BY FIERCENESS,history,Gulfstream Park Mile S,湾流园一哩锦标,high,历史赛事已上线译名（Gulfstream Park Mile S）；复核通过。,湾流园一哩锦标,通过
+246,united_states,RAZORBACK H.,RAZORBACK H.,history,Razorback H,剃刀背锦标,high,历史赛事已上线译名（Razorback H）；复核通过。,剃刀背锦标,通过
+247,united_states,MAC DIARMIDA S. PRESENTED BY FANDUEL TV,MAC DIARMIDA S. PRESENTED BY FANDUEL TV,history,Mac Diarmida S,麦克迪阿米达锦标,high,历史赛事已上线译名（Mac Diarmida S）；复核通过。,麦克迪阿米达锦标,通过
+248,united_states,CANADIAN TURF S.,CANADIAN TURF S.,history,Canadian Turf S,加拿大草地锦标,high,历史赛事已上线译名（Canadian Turf S）；复核通过。,加拿大草地锦标,通过
+249,united_states,TOM FOOL S.,TOM FOOL S.,history,Tom Fool S,汤姆·福尔锦标,high,历史赛事已上线译名（Tom Fool S）；复核通过。,汤姆·福尔锦标,通过
+250,united_states,DAVONA DALE S. PRESENTED BY INGLIS DIGITAL USA,DAVONA DALE S. PRESENTED BY INGLIS DIGITAL USA,history,Davona Dale S,Davona Dale锦标,high,历史赛事已上线译名（Davona Dale S）；复核后修正；Davona Dale采用赛马社区中可确认的马名音译。,达沃娜戴尔锦标,已修正
+251,united_states,HERECOMESTHEBRIDE S.,HERECOMESTHEBRIDE S.,history,Herecomesthebride S,新娘来了锦标,high,历史赛事已上线译名（Herecomesthebride S）；复核通过。,新娘来了锦标,通过
+252,united_states,GOTHAM S.,GOTHAM S.,history,Gotham S,葛咸锦标,high,历史赛事已上线译名（Gotham S）；复核通过。,葛咸锦标,通过
+253,united_states,COOLMORE FOUNTAIN OF YOUTH S.,COOLMORE FOUNTAIN OF YOUTH S.,needs_translation,,青春之泉锦标,low,base 剥离有误：Coolmore 为冠名应剔除；Fountain of Youth 从通行译法青春之泉；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,青春无限锦标,已修正
+254,united_states,HONEYBEE S.,HONEYBEE S.,history,Honeybee S,蜜蜂锦标,high,历史赛事已上线译名（Honeybee S）；复核通过。,蜜蜂锦标,通过
+255,united_states,REBEL S.,REBEL S.,history,Rebel S,反叛锦标,high,历史赛事已上线译名（Rebel S）；复核通过。,反叛锦标,通过
+256,united_states,B. WAYNE HUGHES BEHOLDER MILE S.,B. WAYNE HUGHES BEHOLDER MILE S.,history,B. Wayne Hughes Beholder Mile S,B·韦恩·休斯观览一哩锦标,high,历史赛事已上线译名（B. Wayne Hughes Beholder Mile S）；复核通过。,B·韦恩·休斯观览一哩锦标,通过
+257,united_states,HILLSBOROUGH S.,HILLSBOROUGH S.,history,Hillsborough S,希尔斯伯勒锦标,high,历史赛事已上线译名（Hillsborough S）；复核通过。,希尔斯伯勒锦标,通过
+258,united_states,AZERI S.,AZERI S.,history,Azeri S,阿塞莉锦标,high,历史赛事已上线译名（Azeri S）；复核通过。,阿塞莉锦标,通过
+259,united_states,HURRICANE BERTIE S.,HURRICANE BERTIE S.,history,Hurricane Bertie S,飓风伯蒂锦标,high,历史赛事已上线译名（Hurricane Bertie S）；复核通过。,飓风伯蒂锦标,通过
+260,united_states,SANTA ANITA H. PRESENTED BY YAAMAVA' RESORT & CASINO AT SAN MIGUEL,SANTA ANITA H. PRESENTED BY YAAMAVA' RESORT & CASINO AT SAN MIGUEL,history,Santa Anita H,圣雅尼塔锦标,high,历史赛事已上线译名（Santa Anita H）；复核通过。,圣雅尼塔锦标,通过
+261,united_states,MICHELOB ULTRA CHALLENGER S.,MICHELOB ULTRA CHALLENGER S.,needs_translation,,挑战者锦标,low,base 剥离有误：Michelob Ultra 为冠名应剔除；Challenger 意译挑战者；低置信度复核通过：冠名/补充说明已正确剥离。,挑战者锦标,通过
+262,united_states,FRANK E. KILROE MILE S.,FRANK E. KILROE MILE S.,history,Frank E. Kilroe Mile S,弗兰克·E·基尔罗一哩锦标,high,历史赛事已上线译名（Frank E. Kilroe Mile S）；复核通过。,弗兰克·E·基尔罗一哩锦标,通过
+263,united_states,FLORIDA OAKS,FLORIDA OAKS,history,Florida Oaks,佛罗里达橡树大赛,high,历史赛事已上线译名（Florida Oaks）；复核通过。,佛罗里达橡树大赛,通过
+264,united_states,SAN FELIPE S. PRESENTED BY DK HORSE,SAN FELIPE S. PRESENTED BY DK HORSE,history,San Felipe S,圣费利佩锦标,high,历史赛事已上线译名（San Felipe S）；复核通过。,圣费利佩锦标,通过
+265,united_states,ESMARK TAMPA BAY DERBY,ESMARK TAMPA BAY DERBY,needs_translation,,坦帕湾德比,low,base 剥离有误：Esmark 为冠名应剔除；Tampa Bay Derby 按地名+德比译出；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,坦帕湾打吡,已修正
+266,united_states,SANTA YSABEL S.,SANTA YSABEL S.,history,Santa Ysabel S,圣伊莎贝尔锦标,high,历史赛事已上线译名（Santa Ysabel S）；复核通过。,圣伊莎贝尔锦标,通过
+267,united_states,WHITMORE S.,WHITMORE S.,history,Whitmore S,惠特莫尔锦标,high,历史赛事已上线译名（Whitmore S）；复核通过。,惠特莫尔锦标,通过
+268,united_states,SAN SIMEON S.,SAN SIMEON S.,history,San Simeon S,圣西蒙锦标,high,历史赛事已上线译名（San Simeon S）；复核后修正；San Simeon按加州地名译作“圣西米恩”，与英国St Simon赛事区分。,圣西米恩锦标,重名已处理
+269,united_states,SANTA ANA S.,SANTA ANA S.,history,Santa Ana S,圣安娜锦标,high,历史赛事已上线译名（Santa Ana S）；复核通过。,圣安娜锦标,通过
+270,united_states,NEW ORLEANS CLASSIC S. PRESENTED BY HAGYARD,NEW ORLEANS CLASSIC S. PRESENTED BY HAGYARD,history,New Orleans Classic S,新奥尔良经典锦标,high,历史赛事已上线译名（New Orleans Classic S）；复核通过。,新奥尔良经典锦标,通过
+271,united_states,ESSEX H.,ESSEX H.,history,Essex H,埃塞克斯锦标,high,历史赛事已上线译名（Essex H）；复核通过。,埃塞克斯锦标,通过
+272,united_states,SAN LUIS REY S.,SAN LUIS REY S.,history,San Luis Rey S,圣路易斯雷伊锦标,high,历史赛事已上线译名（San Luis Rey S）；复核通过。,圣路易斯雷伊锦标,通过
+273,united_states,MUNIZ MEMORIAL CLASSIC S. PRESENTED BY HORSE RACING NATION,MUNIZ MEMORIAL CLASSIC S. PRESENTED BY HORSE RACING NATION,history,Muniz Memorial Classic S,穆尼斯纪念经典锦标,high,历史赛事已上线译名（Muniz Memorial Classic S）；复核通过。,穆尼斯纪念经典锦标,通过
+274,united_states,TWINSPIRES KENTUCKY CUP CLASSIC S.,TWINSPIRES KENTUCKY CUP CLASSIC S.,needs_translation,,肯塔基杯经典锦标,low,base 剥离有误：TwinSpires 为冠名应剔除；Cup→杯，Classic→经典；低置信度复核通过：冠名/补充说明已正确剥离。,肯塔基杯经典锦标,通过
+275,united_states,FASIG-TIPTON FAIR GROUNDS OAKS,FASIG-TIPTON FAIR GROUNDS OAKS,needs_translation,,费尔园橡树,low,base 剥离有误：Fasig-Tipton 为冠名应剔除；Fair Grounds 为赛场名试译费尔园，Oaks 从橡树译法；低置信度复核：冠名/补充说明剥离及主体译名已修正；Oaks统一采用“橡树大赛”。,费尔园橡树大赛,已修正
+276,united_states,TWINSPIRES.COM LOUISIANA DERBY,TWINSPIRES.COM LOUISIANA DERBY,needs_translation,,路易斯安那德比,low,base 剥离有误：TwinSpires.com 为冠名应剔除；沿用路易斯安那译名，Derby→德比；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,路易斯安那打吡,已修正
+278,united_states,FANTASY S.,FANTASY S.,history,Fantasy S,梦幻锦标,high,历史赛事已上线译名（Fantasy S）；复核通过。,梦幻锦标,通过
+279,united_states,ORCHID S.,ORCHID S.,history,Orchid S,兰花锦标,high,历史赛事已上线译名（Orchid S）；复核通过。,兰花锦标,通过
+280,united_states,WILSHIRE S.,WILSHIRE S.,history,Wilshire S,威尔希尔锦标,high,历史赛事已上线译名（Wilshire S）；复核通过。,威尔希尔锦标,通过
+281,united_states,GHOSTZAPPER S. PRESENTED BY FANDUEL TV,GHOSTZAPPER S. PRESENTED BY FANDUEL TV,history,Ghostzapper S,驱魔客锦标,high,历史赛事已上线译名（Ghostzapper S）；复核通过。,驱魔客锦标,通过
+282,united_states,OAKLAWN MILE S.,OAKLAWN MILE S.,history,Oaklawn Mile S,奥克朗一哩锦标,high,历史赛事已上线译名（Oaklawn Mile S）；复核通过。,奥克朗一哩锦标,通过
+283,united_states,PAN AMERICAN S. PRESENTED BY ROOD & RIDDLE,PAN AMERICAN S. PRESENTED BY ROOD & RIDDLE,history,Pan American S,泛美锦标,high,历史赛事已上线译名（Pan American S）；复核通过。,泛美锦标,通过
+284,united_states,GULFSTREAM PARK OAKS PRESENTED BY CITY NATIONAL BANK,GULFSTREAM PARK OAKS PRESENTED BY CITY NATIONAL BANK,history,Gulfstream Park Oaks,湾流园橡树大赛,high,历史赛事已上线译名（Gulfstream Park Oaks）；复核通过。,湾流园橡树大赛,通过
+285,united_states,CURLIN FLORIDA DERBY PRESENTED BY HILL 'N' DALE FARMS AT XALAPA,CURLIN FLORIDA DERBY PRESENTED BY HILL 'N' DALE FARMS AT XALAPA,needs_translation,,柯林佛罗里达德比,medium,剥离正确（Hill 'n' Dale 已剔除）；Curlin 为名驹名留于正式赛名，音译柯林；Florida Derby→佛罗里达德比；复核后修正；按HKJC既有译名统一。,佛罗里达打吡大赛,已修正
+286,united_states,ARKANSAS DERBY,ARKANSAS DERBY,term,Arkansas Derby,阿肯色州打吡,high,术语库已有译名（Arkansas Derby）；复核后修正；按HKJC既有译名统一。,阿肯色打吡,已修正
+287,united_states,SAN CARLOS S.,SAN CARLOS S.,history,San Carlos S,圣卡洛斯锦标,high,历史赛事已上线译名（San Carlos S）；复核通过。,圣卡洛斯锦标,通过
+288,united_states,CENTRAL BANK ASHLAND S.,CENTRAL BANK ASHLAND S.,needs_translation,,阿什兰锦标,low,base 剥离有误：Central Bank 为冠名应剔除；Ashland 音译阿什兰；低置信度复核通过：冠名/补充说明已正确剥离。,阿什兰锦标,通过
+289,united_states,MIDDLEGROUND CAPITAL BEAUMONT S.,MIDDLEGROUND CAPITAL BEAUMONT S.,needs_translation,,博蒙特锦标,low,base 剥离有误：Middleground Capital 为冠名应剔除；Beaumont 音译博蒙特；低置信度复核通过：冠名/补充说明已正确剥离。,博蒙特锦标,通过
+290,united_states,UK HEALTHCARE TRANSYLVANIA S.,UK HEALTHCARE TRANSYLVANIA S.,needs_translation,,特兰西瓦尼亚锦标,low,base 剥离有误：UK HealthCare 为冠名应剔除；Transylvania 通行译名特兰西瓦尼亚；低置信度复核通过：冠名/补充说明已正确剥离。,特兰西瓦尼亚锦标,通过
+291,united_states,DISTAFF S.,DISTAFF S.,history,Distaff S,雌马锦标,high,历史赛事已上线译名（Distaff S）；复核通过。,雌马锦标,通过
+292,united_states,MONROVIA S. PRESENTED BY DON JULIO,MONROVIA S. PRESENTED BY DON JULIO,history,Monrovia S,蒙罗维亚锦标,high,历史赛事已上线译名（Monrovia S）；复核通过。,蒙罗维亚锦标,通过
+293,united_states,CARTER S. PRESENTED BY NYRA BETS,CARTER S. PRESENTED BY NYRA BETS,history,Carter S,卡特锦标,high,历史赛事已上线译名（Carter S）；复核通过。,卡特锦标,通过
+294,united_states,GAZELLE S.,GAZELLE S.,history,Gazelle S,瞪羚锦标,high,历史赛事已上线译名（Gazelle S）；复核通过。,瞪羚锦标,通过
+295,united_states,SANTA ANITA OAKS PRESENTED BY SURFSIDE,SANTA ANITA OAKS PRESENTED BY SURFSIDE,term,Santa Anita Oaks,圣雅尼塔橡树大赛,high,术语库已有译名（Santa Anita Oaks）；复核通过。,圣雅尼塔橡树大赛,通过
+296,united_states,WOOD MEMORIAL S. PRESENTED BY RESORTS WORLD CASINO,WOOD MEMORIAL S. PRESENTED BY RESORTS WORLD CASINO,history,Wood Memorial S,活特纪念锦标,high,历史赛事已上线译名（Wood Memorial S）；复核通过。,活特纪念锦标,通过
+297,united_states,SANTA ANITA DERBY,SANTA ANITA DERBY,term,Santa Anita Derby,圣雅尼塔打吡,high,术语库已有译名（Santa Anita Derby）；复核通过。,圣雅尼塔打吡,通过
+298,united_states,RESOLUTE RACING MADISON S.,RESOLUTE RACING MADISON S.,needs_translation,,麦迪逊锦标,low,base 剥离有误：Resolute Racing 为冠名应剔除；Madison 音译麦迪逊；低置信度复核通过：冠名/补充说明已正确剥离。,麦迪逊锦标,通过
+299,united_states,COMMONWEALTH S.,COMMONWEALTH S.,history,Commonwealth S,英联邦锦标,high,历史赛事已上线译名（Commonwealth S）；复核通过。,英联邦锦标,通过
+300,united_states,VALVOLINE GLOBAL SHAKERTOWN S.,VALVOLINE GLOBAL SHAKERTOWN S.,needs_translation,,谢克敦锦标,low,base 剥离有误：Valvoline Global 为冠名应剔除；Shakertown 音译谢克敦；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,沙克镇锦标,已修正
+301,united_states,APPALACHIAN S. PRESENTED BY JAPAN RACING ASSOCIATION,APPALACHIAN S. PRESENTED BY JAPAN RACING ASSOCIATION,history,Appalachian S,阿巴拉契亚锦标,high,历史赛事已上线译名（Appalachian S）；复核通过。,阿巴拉契亚锦标,通过
+302,united_states,TOYOTA BLUE GRASS S.,TOYOTA BLUE GRASS S.,needs_translation,,蓝草锦标,low,base 剥离有误：Toyota 为冠名应剔除；Blue Grass 从通行译法蓝草；低置信度复核通过：冠名/补充说明已正确剥离。,蓝草锦标,通过
+303,united_states,MAKER'S MARK MILE S.,MAKER'S MARK MILE S.,history,Maker's Mark Mile S,一哩锦标,high,历史赛事已上线译名（Maker's Mark Mile S）；复核通过。,一哩锦标,通过
+304,united_states,FANDUEL LIMESTONE S.,FANDUEL LIMESTONE S.,needs_translation,,莱姆斯通锦标,low,base 剥离有误：FanDuel 为冠名应剔除；Limestone 音译莱姆斯通；低置信度复核：冠名/补充说明剥离及主体译名已修正；Limestone采用语义译名“石灰岩”。,石灰岩锦标,已修正
+305,united_states,APPLE BLOSSOM H.,APPLE BLOSSOM H.,history,Apple Blossom H,苹果花锦标,high,历史赛事已上线译名（Apple Blossom H）；复核通过。,苹果花锦标,通过
+306,united_states,COUNT FLEET SPRINT H.,COUNT FLEET SPRINT H.,history,Count Fleet Sprint H,舰队伯爵短途锦标,high,历史赛事已上线译名（Count Fleet Sprint H）；复核通过。,舰队伯爵短途锦标,通过
+307,united_states,JENNY WILEY S.,JENNY WILEY S.,history,Jenny Wiley S,珍妮·威利锦标,high,历史赛事已上线译名（Jenny Wiley S）；复核通过。,珍妮·威利锦标,通过
+308,united_states,STONESTREET LEXINGTON S.,STONESTREET LEXINGTON S.,needs_translation,,列克星敦锦标,low,base 剥离有误：Stonestreet 为冠名应剔除；Lexington 通行译名列克星敦；低置信度复核通过：冠名/补充说明已正确剥离。,列克星敦锦标,通过
+309,united_states,GIANT'S CAUSEWAY S. PRESENTED BY KEENELAND SELECT,GIANT'S CAUSEWAY S. PRESENTED BY KEENELAND SELECT,history,Giant's Causeway S,巨人长堤锦标,high,历史赛事已上线译名（Giant's Causeway S）；复核通过。,巨人长堤锦标,通过
+310,united_states,BAIRD DOUBLEDOGDARE S.,BAIRD DOUBLEDOGDARE S.,needs_translation,,双重挑战锦标,low,base 剥离有误：Baird 为冠名应剔除；Doubledogdare 为口语(double dog dare)试意译双重挑战，无把握；低置信度复核通过：冠名/补充说明已正确剥离。,双重挑战锦标,通过
+311,united_states,OAKLAWN H.,OAKLAWN H.,history,Oaklawn H,奥克朗锦标,high,历史赛事已上线译名（Oaklawn H）；复核通过。,奥克朗锦标,通过
+312,united_states,AMERICAN S.,AMERICAN S.,history,American S,美国锦标,high,历史赛事已上线译名（American S）；复核通过。,美国锦标,通过
+313,united_states,BEN ALI S.,BEN ALI S.,history,Ben Ali S,本·阿里锦标,high,历史赛事已上线译名（Ben Ali S）；复核通过。,本·阿里锦标,通过
+314,united_states,VISITLEX ELKHORN S.,VISITLEX ELKHORN S.,needs_translation,,埃尔克霍恩锦标,low,base 剥离有误：VisitLex 为冠名应剔除；Elkhorn 音译埃尔克霍恩；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,鹿角锦标,已修正
+315,united_states,SANTA MARIA S.,SANTA MARIA S.,history,Santa Maria S,圣玛丽亚锦标,high,历史赛事已上线译名（Santa Maria S）；复核通过。,圣玛丽亚锦标,通过
+316,united_states,BEWITCH S. PRESENTED BY KEENELAND SALES,BEWITCH S. PRESENTED BY KEENELAND SALES,history,Bewitch S,毕域治锦标,high,历史赛事已上线译名（Bewitch S）；复核通过。,毕域治锦标,通过
+317,united_states,ROYAL HEROINE S.,ROYAL HEROINE S.,history,Royal Heroine S,皇家女英雄锦标,high,历史赛事已上线译名（Royal Heroine S）；复核通过。,皇家女英雄锦标,通过
+318,united_states,MAMZELLE S. PRESENTED BY KENTUCKY PROUD,MAMZELLE S. PRESENTED BY KENTUCKY PROUD,history,Mamzelle S,曼泽尔锦标,high,历史赛事已上线译名（Mamzelle S）；复核通过。,曼泽尔锦标,通过
+319,united_states,LONGINES KENTUCKY OAKS,LONGINES KENTUCKY OAKS,needs_translation,,肯塔基橡树,low,base 剥离有误：Longines 为冠名应剔除；Kentucky Oaks 从既有经典译法肯塔基橡树；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,肯塔基橡树大赛,已修正
+320,united_states,SHEEPSHEAD BAY S.,SHEEPSHEAD BAY S.,history,Sheepshead Bay S,希普斯黑德湾锦标,high,历史赛事已上线译名（Sheepshead Bay S）；复核通过。,希普斯黑德湾锦标,通过
+321,united_states,FASIG-TIPTON LA TROIENNE S.,FASIG-TIPTON LA TROIENNE S.,needs_translation,,拉·特罗伊恩锦标,low,base 剥离有误：Fasig-Tipton 为冠名应剔除；La Troienne 为名牝音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；采用该历史牝马/赛事的稳定音译。,拉特罗耶纳锦标,已修正
+322,united_states,MODESTY S. PRESENTED BY VERITAS PRIME,MODESTY S. PRESENTED BY VERITAS PRIME,history,Modesty S,谦逊锦标,high,历史赛事已上线译名（Modesty S）；复核通过。,谦逊锦标,通过
+323,united_states,UNBRIDLED SIDNEY S. PRESENTED BY TWINSPIRES,UNBRIDLED SIDNEY S. PRESENTED BY TWINSPIRES,history,Unbridled Sidney S,无缰悉尼锦标,high,历史赛事已上线译名（Unbridled Sidney S）；复核通过。,无缰悉尼锦标,通过
+324,united_states,ALYSHEBA S. PRESENTED BY U.S. ARMY,ALYSHEBA S. PRESENTED BY U.S. ARMY,history,Alysheba S,阿利希巴锦标,high,历史赛事已上线译名（Alysheba S）；复核通过。,阿利希巴锦标,通过
+325,united_states,EDGEWOOD S. PRESENTED BY ACCENTURE,EDGEWOOD S. PRESENTED BY ACCENTURE,history,Edgewood S,埃奇伍德锦标,high,历史赛事已上线译名（Edgewood S）；复核通过。,埃奇伍德锦标,通过
+326,united_states,EIGHT BELLES S. PRESENTED BY SYSCO,EIGHT BELLES S. PRESENTED BY SYSCO,history,Eight Belles S,八美铃锦标,high,历史赛事已上线译名（Eight Belles S）；复核通过。,八美铃锦标,通过
+327,united_states,CHARLES WHITTINGHAM S. PRESENTED BY FANDUEL TV,CHARLES WHITTINGHAM S. PRESENTED BY FANDUEL TV,history,Charles Whittingham S,查尔斯·惠廷厄姆锦标,high,历史赛事已上线译名（Charles Whittingham S）；复核通过。,查尔斯·惠廷厄姆锦标,通过
+328,united_states,KENTUCKY DERBY PRESENTED BY WOODFORD RESERVE,KENTUCKY DERBY PRESENTED BY WOODFORD RESERVE,term,Kentucky Derby,肯塔基打吡,high,术语库已有译名（Kentucky Derby）；复核后修正；按HKJC既有译名统一。,肯塔基打吡大赛,已修正
+329,united_states,FORT MARCY S.,FORT MARCY S.,history,Fort Marcy S,马西堡锦标,high,历史赛事已上线译名（Fort Marcy S）；复核通过。,马西堡锦标,通过
+330,united_states,LONGINES CHURCHILL DISTAFF TURF MILE S.,LONGINES CHURCHILL DISTAFF TURF MILE S.,needs_translation,,丘吉尔雌马草地一哩锦标,low,base 剥离有误：Longines 为冠名应剔除；Churchill→丘吉尔，Distaff→雌马，Turf Mile→草地一哩；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,邱吉尔园雌马草地一哩锦标,已修正
+331,united_states,DERBY CITY DISTAFF S. PRESENTED BY FORD,DERBY CITY DISTAFF S. PRESENTED BY FORD,history,Derby City Distaff S,打吡城雌马锦标,high,历史赛事已上线译名（Derby City Distaff S）；复核通过。,打吡城雌马锦标,通过
+332,united_states,OLD FORESTER BOURBON TURF CLASSIC S.,OLD FORESTER BOURBON TURF CLASSIC S.,needs_translation,,波本草地经典锦标,low,base 剥离有误：Old Forester 为冠名应剔除；Bourbon 疑与冠名关联但保留于赛名，译波本；Turf Classic→草地经典；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,草地经典锦标,已修正
+333,united_states,CHURCHILL DOWNS S. PRESENTED BY FORD,CHURCHILL DOWNS S. PRESENTED BY FORD,history,Churchill Downs S,邱吉尔园锦标,high,历史赛事已上线译名（Churchill Downs S）；复核通过。,邱吉尔园锦标,通过
+334,united_states,TWIN SPIRES TURF SPRINT S. PRESENTED BY ACCENTURE,TWIN SPIRES TURF SPRINT S. PRESENTED BY ACCENTURE,needs_translation,,双塔草地短途锦标,medium,剥离正确（Accenture 已剔除）；Twin Spires 为丘吉尔园标志建筑译双塔，Turf Sprint→草地短途；复核后修正；按WPStud既有译名统一。,双子塔草地短途锦标,已修正
+335,united_states,PAT DAY MILE S. PRESENTED BY SAP,PAT DAY MILE S. PRESENTED BY SAP,history,Pat Day Mile S,帕特·戴一哩锦标,high,历史赛事已上线译名（Pat Day Mile S）；复核通过。,帕特·戴一哩锦标,通过
+336,united_states,AMERICAN TURF S.,AMERICAN TURF S.,history,American Turf S,美国草地锦标,high,历史赛事已上线译名（American Turf S）；复核通过。,美国草地锦标,通过
+337,united_states,BEAUGAY S.,BEAUGAY S.,history,Beaugay S,博盖锦标,high,历史赛事已上线译名（Beaugay S）；复核通过。,博盖锦标,通过
+338,united_states,VAGRANCY S.,VAGRANCY S.,history,Vagrancy S,流浪者锦标,high,历史赛事已上线译名（Vagrancy S）；复核通过。,流浪者锦标,通过
+339,united_states,WESTCHESTER S.,WESTCHESTER S.,history,Westchester S,威彻斯特锦标,high,历史赛事已上线译名（Westchester S）；复核通过。,威彻斯特锦标,通过
+340,united_states,SENORITA S.,SENORITA S.,history,Senorita S,少女锦标,high,历史赛事已上线译名（Senorita S）；复核通过。,少女锦标,通过
+341,united_states,RUFFIAN S.,RUFFIAN S.,history,Ruffian S,鲁菲安锦标,high,历史赛事已上线译名（Ruffian S）；复核通过。,鲁菲安锦标,通过
+342,united_states,JOHN A. NERUD S.,JOHN A. NERUD S.,history,John A. Nerud S,约翰·A·内鲁德锦标,high,历史赛事已上线译名（John A. Nerud S）；复核通过。,约翰·A·内鲁德锦标,通过
+344,united_states,GEORGE E. MITCHELL BLACK-EYED SUSAN S.,GEORGE E. MITCHELL BLACK-EYED SUSAN S.,history,George E. Mitchell Black-Eyed Susan S,黑眼苏珊锦标,high,历史赛事已上线译名（George E. Mitchell Black-Eyed Susan S）；复核通过。,黑眼苏珊锦标,通过
+345,united_states,PIMLICO SPECIAL S.,PIMLICO SPECIAL S.,history,Pimlico Special S,宾利高特别锦标,high,历史赛事已上线译名（Pimlico Special S）；复核通过。,宾利高特别锦标,通过
+346,united_states,MISS PREAKNESS S.,MISS PREAKNESS S.,history,Miss Preakness S,必利是小姐锦标,high,历史赛事已上线译名（Miss Preakness S）；复核通过。,必利是小姐锦标,通过
+347,united_states,GALLORETTE S.,GALLORETTE S.,history,Gallorette S,加洛雷特锦标,high,历史赛事已上线译名（Gallorette S）；复核通过。,加洛雷特锦标,通过
+348,united_states,PREAKNESS S.,PREAKNESS S.,history,Preakness S,必利是锦标,high,历史赛事已上线译名（Preakness S）；复核通过。,必利是锦标,通过
+349,united_states,LOUISVILLE S.,LOUISVILLE S.,history,Louisville S,Louisville锦标,high,历史赛事已上线译名（Louisville S）；复核后修正；Louisville采用通行地名译法“路易维尔”。,路易维尔锦标,已修正
+350,united_states,DINNER PARTY S.,DINNER PARTY S.,history,Dinner Party S,晚宴锦标,high,历史赛事已上线译名（Dinner Party S）；复核通过。,晚宴锦标,通过
+351,united_states,MARYLAND SPRINT S.,MARYLAND SPRINT S.,history,Maryland Sprint S,马里兰短途锦标,high,历史赛事已上线译名（Maryland Sprint S）；复核通过。,马里兰短途锦标,通过
+352,united_states,GAMELY S.,GAMELY S.,history,Gamely S,敢励锦标,high,历史赛事已上线译名（Gamely S）；复核通过。,敢励锦标,通过
+353,united_states,HOLLYWOOD GOLD CUP S.,HOLLYWOOD GOLD CUP S.,history,Hollywood Gold Cup S,荷里活金杯,high,历史赛事已上线译名（Hollywood Gold Cup S）；复核通过。,荷里活金杯,通过
+354,united_states,SHOEMAKER MILE S.,SHOEMAKER MILE S.,history,Shoemaker Mile S,舒密加一哩锦标,high,历史赛事已上线译名（Shoemaker Mile S）；复核通过。,舒密加一哩锦标,通过
+355,united_states,WINNING COLORS S.,WINNING COLORS S.,history,Winning Colors S,胜利色彩锦标,high,历史赛事已上线译名（Winning Colors S）；复核通过。,胜利色彩锦标,通过
+356,united_states,STEVE SEXTON MILE S.,STEVE SEXTON MILE S.,history,Steve Sexton Mile S,史蒂夫·塞克斯顿一哩锦标,high,历史赛事已上线译名（Steve Sexton Mile S）；复核通过。,史蒂夫·塞克斯顿一哩锦标,通过
+357,united_states,PENN MILE S.,PENN MILE S.,history,Penn Mile S,宾州一哩锦标,high,历史赛事已上线译名（Penn Mile S）；复核通过。,宾州一哩锦标,通过
+358,united_states,SANTA MARGARITA S.,SANTA MARGARITA S.,history,Santa Margarita S,圣玛格丽塔锦标,high,历史赛事已上线译名（Santa Margarita S）；复核通过。,圣玛格丽塔锦标,通过
+359,united_states,SHAWNEE S.,SHAWNEE S.,history,Shawnee S,肖尼锦标,high,历史赛事已上线译名（Shawnee S）；复核通过。,肖尼锦标,通过
+360,united_states,OLD FORESTER MINT JULEP S.,OLD FORESTER MINT JULEP S.,needs_translation,,薄荷茱莉普锦标,low,base 剥离有误：Old Forester 为冠名应剔除；Mint Julep 为饮品名通行音译薄荷茱莉普；低置信度复核：冠名/补充说明剥离及主体译名已修正；Mint Julep采用鸡尾酒通行译名“薄荷朱利普”。,薄荷朱利普锦标,已修正
+361,united_states,BLAME S.,BLAME S.,history,Blame S,怪罪锦标,high,历史赛事已上线译名（Blame S）；复核通过。,怪罪锦标,通过
+362,united_states,ARLINGTON S.,ARLINGTON S.,history,Arlington S,雅灵顿锦标,high,历史赛事已上线译名（Arlington S）；复核通过。,雅灵顿锦标,通过
+363,united_states,ARISTIDES S.,ARISTIDES S.,history,Aristides S,阿里斯泰迪斯锦标,high,历史赛事已上线译名（Aristides S）；复核通过。,阿里斯泰迪斯锦标,通过
+364,united_states,REGRET S.,REGRET S.,history,Regret S,遗憾锦标,high,历史赛事已上线译名（Regret S）；复核通过。,遗憾锦标,通过
+365,united_states,TRIPLE BEND S.,TRIPLE BEND S.,history,Triple Bend S,三湾锦标,high,历史赛事已上线译名（Triple Bend S）；复核通过。,三湾锦标,通过
+366,united_states,INTERCONTINENTAL S.,INTERCONTINENTAL S.,history,Intercontinental S,洲际锦标,high,历史赛事已上线译名（Intercontinental S）；复核通过。,洲际锦标,通过
+367,united_states,BELMONT GOLD CUP S.,BELMONT GOLD CUP S.,history,Belmont Gold Cup S,贝蒙金杯,high,历史赛事已上线译名（Belmont Gold Cup S）；复核通过。,贝蒙金杯,通过
+368,united_states,PENNINE RIDGE S.,PENNINE RIDGE S.,history,Pennine Ridge S,奔宁岭锦标,high,历史赛事已上线译名（Pennine Ridge S）；复核通过。,奔宁岭锦标,通过
+369,united_states,OGDEN PHIPPS S. PRESENTED BY FORD,OGDEN PHIPPS S. PRESENTED BY FORD,history,Ogden Phipps S,奥格登·菲普斯锦标,high,历史赛事已上线译名（Ogden Phipps S）；复核通过。,奥格登·菲普斯锦标,通过
+370,united_states,NEW YORK S.,NEW YORK S.,history,New York S,纽约锦标,high,历史赛事已上线译名（New York S）；复核通过。,纽约锦标,通过
+371,united_states,BED O' ROSES S. PRESENTED BY BOLDYN NETWORKS,BED O' ROSES S. PRESENTED BY BOLDYN NETWORKS,history,Bed o' Roses S,玫瑰花坛锦标,high,历史赛事已上线译名（Bed o' Roses S）；复核通过。,玫瑰花坛锦标,通过
+372,united_states,DRAFTKINGS ACORN S.,DRAFTKINGS ACORN S.,needs_translation,,橡子锦标,low,base 剥离有误：DraftKings 为冠名应剔除；Acorn 意译橡子；低置信度复核通过：冠名/补充说明已正确剥离。,橡子锦标,通过
+373,united_states,WONDER AGAIN S. PRESENTED BY SHIFT4,WONDER AGAIN S. PRESENTED BY SHIFT4,history,Wonder Again S,再度惊奇锦标,high,历史赛事已上线译名（Wonder Again S）；复核通过。,再度惊奇锦标,通过
+374,united_states,BELMONT S. PRESENTED BY NYRABETS,BELMONT S. PRESENTED BY NYRABETS,history,Belmont S,贝蒙锦标,high,历史赛事已上线译名（Belmont S）；复核通过。,贝蒙锦标,通过
+375,united_states,JUST A GAME S. PRESENTED BY RESOLUTE RACING,JUST A GAME S. PRESENTED BY RESOLUTE RACING,history,Just a Game S,只是一场游戏锦标,high,历史赛事已上线译名（Just a Game S）；复核通过。,只是一场游戏锦标,通过
+376,united_states,HILL 'N' DALE METROPOLITAN H.,HILL 'N' DALE METROPOLITAN H.,manual,,,low,原文含未括号让赛缩写（H'Cap / 尾部 H.），按让赛规则转人工：请定夺——保留「让赛」字（与去让赛 kept 先例一致，如两岁马让赛）或使用无让赛译名，手填 final_name；复核后修正；删除HILL 'N' DALE冠名；尾部H.为Handicap补充说明，按既定规则不写入中文名。,大都会锦标,人工裁决
+377,united_states,RESORTS WORLD CASINO MANHATTAN S.,RESORTS WORLD CASINO MANHATTAN S.,needs_translation,,曼哈顿锦标,low,base 剥离有误：Resorts World Casino 为冠名应剔除；Manhattan 通行译名曼哈顿；低置信度复核通过：冠名/补充说明已正确剥离。,曼哈顿锦标,通过
+378,united_states,TRUE NORTH S.,TRUE NORTH S.,history,True North S,真北锦标,high,历史赛事已上线译名（True North S）；复核通过。,真北锦标,通过
+379,united_states,JAIPUR S.,JAIPUR S.,history,Jaipur S,捷布锦标,high,历史赛事已上线译名（Jaipur S）；复核通过。,捷布锦标,通过
+380,united_states,WOODY STEPHENS S. PRESENTED BY MOHEGAN SUN,WOODY STEPHENS S. PRESENTED BY MOHEGAN SUN,history,Woody Stephens S,伍迪·史蒂文斯锦标,high,历史赛事已上线译名（Woody Stephens S）；复核通过。,伍迪·史蒂文斯锦标,通过
+381,united_states,POKER S.,POKER S.,history,Poker S,扑克锦标,high,历史赛事已上线译名（Poker S）；复核通过。,扑克锦标,通过
+382,united_states,SOARING SOFTLY S.,SOARING SOFTLY S.,history,Soaring Softly S,轻柔翱翔锦标,high,历史赛事已上线译名（Soaring Softly S）；复核通过。,轻柔翱翔锦标,通过
+383,united_states,MATT WINN S.,MATT WINN S.,history,Matt Winn S,马特·温锦标,high,历史赛事已上线译名（Matt Winn S）；复核通过。,马特·温锦标,通过
+384,united_states,DAYTONA S.,DAYTONA S.,history,Daytona S,代托纳锦标,high,历史赛事已上线译名（Daytona S）；复核通过。,代托纳锦标,通过
+385,united_states,SUMMERTIME OAKS,SUMMERTIME OAKS,history,Summertime Oaks,盛夏橡树大赛,high,历史赛事已上线译名（Summertime Oaks）；复核通过。,盛夏橡树大赛,通过
+386,united_states,EATONTOWN S.,EATONTOWN S.,history,Eatontown S,伊顿镇锦标,high,历史赛事已上线译名（Eatontown S）；复核通过。,伊顿镇锦标,通过
+387,united_states,SALVATOR MILE S.,SALVATOR MILE S.,history,Salvator Mile S,萨尔瓦托一哩锦标,high,历史赛事已上线译名（Salvator Mile S）；复核通过。,萨尔瓦托一哩锦标,通过
+388,united_states,DELAWARE OAKS,DELAWARE OAKS,history,Delaware Oaks,特拉华橡树大赛,high,历史赛事已上线译名（Delaware Oaks）；复核通过。,特拉华橡树大赛,通过
+389,united_states,ROBERT G. DICK MEMORIAL S.,ROBERT G. DICK MEMORIAL S.,history,Robert G. Dick Memorial S,罗伯特·G·迪克纪念锦标,high,历史赛事已上线译名（Robert G. Dick Memorial S）；复核通过。,罗伯特·G·迪克纪念锦标,通过
+390,united_states,SAN JUAN CAPISTRANO S.,SAN JUAN CAPISTRANO S.,history,San Juan Capistrano S,圣胡安卡皮斯特拉诺锦标,high,历史赛事已上线译名（San Juan Capistrano S）；复核通过。,圣胡安卡皮斯特拉诺锦标,通过
+391,united_states,CHICAGO S.,CHICAGO S.,history,Chicago S,芝加哥锦标,high,历史赛事已上线译名（Chicago S）；复核通过。,芝加哥锦标,通过
+392,united_states,OHIO DERBY,OHIO DERBY,term,Ohio Derby,俄亥俄打吡,high,术语库已有译名（Ohio Derby）；复核通过。,俄亥俄打吡,通过
+393,united_states,STEPHEN FOSTER S.,STEPHEN FOSTER S.,history,Stephen Foster S,史提芬·科士打锦标,high,历史赛事已上线译名（Stephen Foster S）；复核通过。,史提芬·科士打锦标,通过
+394,united_states,FASIG-TIPTON FLEUR DE LIS S.,FASIG-TIPTON FLEUR DE LIS S.,needs_translation,,百合花锦标,low,base 剥离有误：Fasig-Tipton 为冠名应剔除；Fleur de Lis 意译百合花；低置信度复核：冠名/补充说明剥离及主体译名已修正；Fleur de Lis采用通行意译“鸢尾花”。,鸢尾花锦标,已修正
+395,united_states,WISE DAN S.,WISE DAN S.,history,Wise Dan S,聪明丹锦标,high,历史赛事已上线译名（Wise Dan S）；复核通过。,聪明丹锦标,通过
+396,united_states,BANGO S. (formerly KELLY'S LANDING S.),BANGO S. (formerly KELLY'S LANDING S.),needs_translation,,班戈锦标,low,Bango 性质不明（疑为冠名或马名）暂音译班戈；括号内原名 Kelly's Landing S. 不进中文名；低置信度复核通过：冠名/补充说明已正确剥离。,班戈锦标,通过
+397,united_states,HANSHIN S. PRESENTED BY JRA,HANSHIN S. PRESENTED BY JRA,needs_translation,,阪神锦标,medium,剥离正确（Presented by JRA 已剔除）；Hanshin 为日文地名通行译名阪神，但赛名本身与 JRA 冠名关联密切故存疑；复核通过。,阪神锦标,通过
+398,united_states,MAXFIELD S.,MAXFIELD S.,needs_translation,,麦克斯菲尔德锦标,medium,Maxfield 为名驹音译，S.→锦标；复核通过。,麦克斯菲尔德锦标,通过
+399,united_states,SANFORD S.,SANFORD S.,history,Sanford S,桑福德锦标,high,历史赛事已上线译名（Sanford S）；复核通过。,桑福德锦标,通过
+400,united_states,SUBURBAN S.,SUBURBAN S.,history,Suburban S,郊区锦标,high,历史赛事已上线译名（Suburban S）；复核通过。,郊区锦标,通过
+401,united_states,BELMONT OAKS,BELMONT OAKS,needs_translation,,贝尔蒙特橡树,high,Belmont 通行译名贝尔蒙特，Oaks 从橡树译法；复核后修正；按HKJC既有译名统一。,贝蒙橡树大赛,已修正
+402,united_states,BELMONT DERBY,BELMONT DERBY,needs_translation,,贝尔蒙特德比,high,Belmont 通行译名贝尔蒙特，Derby→德比；复核后修正；按HKJC既有译名统一。,贝蒙打吡,已修正
+403,united_states,GREAT LADY M S.,GREAT LADY M S.,history,Great Lady M S,伟大M女士锦标,high,历史赛事已上线译名（Great Lady M S）；复核通过。,伟大M女士锦标,通过
+404,united_states,KELSO S.,KELSO S.,history,Kelso S,Kelso锦标（Saratoga）,high,历史赛事已上线译名（Kelso S）；复核后修正；Kelso采用名马音译；删除数据库内部用于区分的Saratoga括注。,凯尔索锦标,已修正
+405,united_states,VICTORY RIDE S.,VICTORY RIDE S.,history,Victory Ride S,胜利骑行锦标,high,历史赛事已上线译名（Victory Ride S）；复核通过。,胜利骑行锦标,通过
+408,united_states,PRAIRIE MEADOWS CORNHUSKER H.,PRAIRIE MEADOWS CORNHUSKER H.,history,Prairie Meadows Cornhusker H,草原牧场玉米农锦标,high,历史赛事已上线译名（Prairie Meadows Cornhusker H）；复核通过。,草原牧场玉米农锦标,通过
+409,united_states,CARESS S.,CARESS S.,history,Caress S,爱抚锦标,high,历史赛事已上线译名（Caress S）；复核通过。,爱抚锦标,通过
+410,united_states,BOWLING GREEN S.,BOWLING GREEN S.,history,Bowling Green S,鲍灵格林锦标,high,历史赛事已上线译名（Bowling Green S）；复核通过。,鲍灵格林锦标,通过
+411,united_states,WINSTAR MATCHMAKER S.,WINSTAR MATCHMAKER S.,needs_translation,,媒人锦标,low,base 剥离有误：WinStar 为冠名应剔除；Matchmaker 意译媒人；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,作媒锦标,已修正
+415,united_states,NYRA BETS HASKELL S.,NYRA BETS HASKELL S.,needs_translation,,赫斯基锦标,low,base 剥离有误：NYRA Bets 为冠名应剔除；Haskell 音译赫斯基；低置信度复核通过：冠名/补充说明已正确剥离。,赫斯基锦标,通过
+418,united_states,DUNKIN' DIANA S.,DUNKIN' DIANA S.,needs_translation,,戴安娜锦标,low,base 剥离有误：Dunkin' 为冠名应剔除；Diana 通行译名戴安娜；低置信度复核通过：冠名/补充说明已正确剥离。,戴安娜锦标,通过
+420,united_states,QUICK CALL S.,QUICK CALL S.,history,Quick Call S,快速召唤锦标,high,历史赛事已上线译名（Quick Call S）；复核通过。,快速召唤锦标,通过
+425,united_states,COACHING CLUB AMERICAN OAKS INVITATIONAL S.,COACHING CLUB AMERICAN OAKS INVITATIONAL S.,needs_translation,,教练俱乐部美国橡树锦标,medium,Coaching Club 为历史赛名组成部分非冠名，直译教练俱乐部；Invitational 按例省去；复核后修正；按HKJC既有译名统一。,美国橡树大赛,已修正
+427,united_states,HONORABLE MISS S.,HONORABLE MISS S.,needs_translation,,尊贵小姐锦标,medium,Honorable Miss 意译尊贵小姐，S.→锦标；复核通过。,尊贵小姐锦标,通过
+432,united_states,LAKE GEORGE S.,LAKE GEORGE S.,history,Lake George S,乔治湖锦标,high,历史赛事已上线译名（Lake George S）；复核通过。,乔治湖锦标,通过
+433,united_states,JIM DANDY S.,JIM DANDY S.,history,Jim Dandy S,吉姆·丹迪锦标,high,历史赛事已上线译名（Jim Dandy S）；复核通过。,吉姆·丹迪锦标,通过
+438,united_states,FASIG-TIPTON SARATOGA OAKS,FASIG-TIPTON SARATOGA OAKS,needs_translation,,萨拉托加橡树,low,base 剥离有误：Fasig-Tipton 为冠名应剔除；Saratoga 通行音译萨拉托加，Oaks→橡树；低置信度复核：冠名/补充说明剥离及主体译名已修正；Oaks统一采用“橡树大赛”。,沙拉托加橡树大赛,已修正
+444,united_states,TEST S.,TEST S.,history,Test S,考验锦标,high,历史赛事已上线译名（Test S）；复核通过。,考验锦标,通过
+445,united_states,SARATOGA DERBY,SARATOGA DERBY,needs_translation,,萨拉托加德比,high,Saratoga 通行音译萨拉托加，Derby→德比；复核后修正；Derby按既定赛事术语译为“打吡”。,沙拉托加打吡,已修正
+450,united_states,CHRISTOPHE CLEMENT TURF S. (formerly SWORD DANCER S.),CHRISTOPHE CLEMENT TURF S. (formerly SWORD DANCER S.),needs_translation,,克里斯托夫·克莱芒草地锦标,medium,人名音译同 id 217，Turf→草地；括号内原名 Sword Dancer S. 不进中文名；历史旧名复核修正：当前赛事名为Christophe Clement Turf Stakes；Sword Dancer Stakes仅为括号内旧名。,克里斯托夫·克莱芒草地锦标,已修正
+457,united_states,BALLSTON SPA S.,BALLSTON SPA S.,history,Ballston Spa S,巴尔斯顿温泉锦标,high,历史赛事已上线译名（Ballston Spa S）；复核通过。,巴尔斯顿温泉锦标,通过
+458,united_states,ALABAMA S.,ALABAMA S.,history,Alabama S,阿拉巴马锦标,high,历史赛事已上线译名（Alabama S）；复核通过。,阿拉巴马锦标,通过
+459,united_states,CAESARDS SPORTSBOOK DEL MAR DERBY,CAESARDS SPORTSBOOK DEL MAR DERBY,needs_translation,,德尔玛德比,low,base 剥离有误：Caesars Sportsbook（原文疑拼写有误作 Caesards）为冠名应剔除；Del Mar 音译德尔玛，Derby→德比；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,德尔马打吡,已修正
+466,united_states,RESORTS WORLD CASINO BALLERINA S.,RESORTS WORLD CASINO BALLERINA S.,needs_translation,,芭蕾舞者锦标,low,base 剥离有误：Resorts World Casino 为冠名应剔除；Ballerina 意译芭蕾舞者；低置信度复核通过：冠名/补充说明已正确剥离。,芭蕾舞者锦标,通过
+469,united_states,DRAFTKINGS TRAVERS S.,DRAFTKINGS TRAVERS S.,needs_translation,,特拉弗斯锦标,low,base 剥离有误：DraftKings 为冠名应剔除；Travers 音译特拉弗斯；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,卓华斯锦标,已修正
+478,united_states,KENTUCKY TURF CUP INVITATIONAL S.,KENTUCKY TURF CUP INVITATIONAL S.,needs_translation,,肯塔基草地杯,medium,Kentucky Turf Cup 按 Cup→杯译肯塔基草地杯，Invitational 依飞马世界杯例省去；复核通过。,肯塔基草地杯,通过
+479,united_states,KENTUCKY TURF SPRINT S.,KENTUCKY TURF SPRINT S.,needs_translation,,肯塔基草地短途锦标,high,Kentucky→肯塔基，Turf Sprint→草地短途，S.→锦标；复核通过。,肯塔基草地短途锦标,通过
+483,united_states,SPENDTHRIFT HOPEFUL S.,SPENDTHRIFT HOPEFUL S.,needs_translation,,希望锦标,low,base 剥离有误：Spendthrift 为冠名应剔除；Hopeful 意译希望；低置信度复核通过：冠名/补充说明已正确剥离。,希望锦标,通过
+485,united_states,LADIES MARATHON INVITATIONAL S.,LADIES MARATHON INVITATIONAL S.,needs_translation,,女士马拉松锦标,medium,Ladies→女士，Marathon 音译马拉松，Invitational 按例省去；复核通过。,女士马拉松锦标,通过
+487,united_states,MINT MILLIONS INVITATIONAL S.,MINT MILLIONS INVITATIONAL S.,needs_translation,,薄荷百万锦标,low,Mint 疑与冠名关联（Mint 博彩品牌）但无法确认剥离边界，暂整体意译薄荷百万；低置信度复核通过：冠名/补充说明已正确剥离。,薄荷百万锦标,通过
+489,united_states,OLD DOMINION DERBY,OLD DOMINION DERBY,needs_translation,,老自治领德比,medium,Old Dominion 为弗吉尼亚州别称通行译名老自治领，Derby→德比；复核后修正；Derby按既定赛事术语译为“打吡”。,老自治领打吡,已修正
+503,united_states,GOODWOOD S.,GOODWOOD S.,needs_translation,,古德伍德锦标,medium,Goodwood 音译古德伍德（借英国赛场通行译名），S.→锦标；复核通过。,古德伍德锦标,通过
+507,united_states,JOHN C. HARRIS S.,JOHN C. HARRIS S.,needs_translation,,约翰·C·哈里斯锦标,high,人名音译含中间名缩写（·C·），S.→锦标；复核通过。,约翰·C·哈里斯锦标,通过
+513,united_states,DARLEY ALCIBIADES S.,DARLEY ALCIBIADES S.,needs_translation,,亚西比德锦标,low,base 剥离有误：Darley 为冠名应剔除；Alcibiades 从古希腊人名通行译法亚西比德；低置信度复核：冠名/补充说明剥离及主体译名已修正；补足Alcibiades音译。,阿尔西比亚德斯锦标,已修正
+515,united_states,STOLL KEENON OGDEN PHOENIX S.,STOLL KEENON OGDEN PHOENIX S.,needs_translation,,凤凰锦标,low,base 剥离有误：Stoll Keenon Ogden（律所）为冠名应剔除；Phoenix 通行译名凤凰；低置信度复核通过：冠名/补充说明已正确剥离。,凤凰锦标,通过
+519,united_states,MATRON S.,MATRON S.,series,Matron Stakes,Matron锦标（NYRA）,high,系列已有中文名，继承；复核后修正；Matron按赛事语义译为“主母”，删除NYRA内部区分括注。,主母锦标,已修正
+526,united_states,CLAIBORNE BREEDERS' FUTURITY,CLAIBORNE BREEDERS' FUTURITY,needs_translation,,育马者未来锦标,low,base 剥离有误：Claiborne 为冠名应剔除；Breeders' Futurity 从育马者杯系列译法译育马者未来锦标；低置信度复核通过：冠名/补充说明已正确剥离。,育马者未来锦标,通过
+527,united_states,FIRST LADY S.,FIRST LADY S.,series,First Lady Stakes,First Lady锦标（Keeneland）,high,系列已有中文名，继承；复核后修正；First Lady采用通行直译，删除Keeneland内部区分括注。,第一夫人锦标,已修正
+529,united_states,COOLMORE TURF MILE S.,COOLMORE TURF MILE S.,needs_translation,,草地一哩锦标,low,base 剥离有误：Coolmore 为冠名应剔除；Turf Mile→草地一哩；低置信度复核通过：冠名/补充说明已正确剥离。,草地一哩锦标,通过
+533,united_states,CASTLE & KEY BOURBON S.,CASTLE & KEY BOURBON S.,needs_translation,,波本锦标,low,base 剥离有误：Castle & Key（酒厂）为冠名应剔除；Bourbon 疑与冠名关联但保留于赛名，译波本；低置信度复核通过：冠名/补充说明已正确剥离。,波本锦标,通过
+534,united_states,INDIAN SUMMER S.,INDIAN SUMMER S.,needs_translation,,印第安之夏锦标,medium,Indian Summer 直译印第安之夏，S.→锦标；复核通过。,印第安之夏锦标,通过
+535,united_states,JUDDMONTE SPINSTER S.,JUDDMONTE SPINSTER S.,needs_translation,,斯宾斯特锦标,low,base 剥离有误：Juddmonte 为冠名应剔除；Spinster 意译欠雅故音译斯宾斯特；低置信度复核通过：冠名/补充说明已正确剥离。,斯宾斯特锦标,通过
+540,united_states,LEXUS RAVEN RUN S.,LEXUS RAVEN RUN S.,needs_translation,,渡鸦疾驰锦标,low,base 剥离有误：Lexus 为冠名应剔除；Raven Run 试意译渡鸦疾驰，无把握；低置信度复核通过：冠名/补充说明已正确剥离。,渡鸦疾驰锦标,通过
+542,united_states,ROOD & RIDDLE DOWAGER S.,ROOD & RIDDLE DOWAGER S.,needs_translation,,道瓦格锦标,low,base 剥离有误：Rood & Riddle 为冠名应剔除；Dowager 意译欠妥故音译道瓦格；低置信度复核：冠名/补充说明剥离及主体译名已修正；Dowager按赛事语义译为“贵妇”。,贵妇锦标,已修正
+544,united_states,BANK OF AMERICA VALLEY VIEW S.,BANK OF AMERICA VALLEY VIEW S.,needs_translation,,谷景锦标,low,base 剥离有误：Bank of America 为冠名应剔除；Valley View 意译谷景；低置信度复核：冠名/补充说明剥离及主体译名已修正；Valley View采用完整语义翻译。,山谷景观锦标,已修正
+554,united_states,LONGINES BREEDERS' CUP DISTAFF,LONGINES BREEDERS' CUP DISTAFF,needs_translation,,育马者杯雌马大赛,low,base 剥离有误：Longines 为冠名应剔除；Breeders' Cup 从通行译法育马者杯，Distaff→雌马；低置信度复核通过：冠名/补充说明已正确剥离。,育马者杯雌马大赛,通过
+557,united_states,LONGINES BREEDERS' CUP CLASSIC,LONGINES BREEDERS' CUP CLASSIC,needs_translation,,育马者杯经典大赛,low,base 剥离有误：Longines 为冠名应剔除；Breeders' Cup Classic 从通行译法育马者杯经典大赛；低置信度复核通过：冠名/补充说明已正确剥离。,育马者杯经典大赛,通过
+559,united_states,LONGINES BREEDERS' CUP TURF,LONGINES BREEDERS' CUP TURF,needs_translation,,育马者杯草地大赛,low,base 剥离有误：Longines 为冠名应剔除；Breeders' Cup Turf→育马者杯草地大赛；低置信度复核通过：冠名/补充说明已正确剥离。,育马者杯草地大赛,通过
+560,united_states,FANDUEL BREEDERS' CUP MILE,FANDUEL BREEDERS' CUP MILE,needs_translation,,育马者杯一哩大赛,low,base 剥离有误：FanDuel 为冠名应剔除；Breeders' Cup Mile→育马者杯一哩大赛；低置信度复核通过：冠名/补充说明已正确剥离。,育马者杯一哩大赛,通过
+561,united_states,CYGAMES BREEDERS' CUP SPRINT,CYGAMES BREEDERS' CUP SPRINT,needs_translation,,育马者杯短途大赛,low,base 剥离有误：Cygames 为冠名应剔除；Breeders' Cup Sprint→育马者杯短途大赛；低置信度复核通过：冠名/补充说明已正确剥离。,育马者杯短途大赛,通过
+570,united_states,MAN O' WAR S.,MAN O' WAR S.,history,Man o' War S; Man o’ War S,斗士锦标,high,历史赛事已上线译名（Man o' War S; Man o’ War S）；复核通过。,斗士锦标,通过
+572,united_states,JOCKEY CLUB OAKS INVITATIONAL S.,JOCKEY CLUB OAKS INVITATIONAL S.,history,Jockey Club Oaks Invitational S,赛马会橡树大赛,high,历史赛事已上线译名（Jockey Club Oaks Invitational S）；复核通过。,赛马会橡树大赛,通过
+577,united_states,ELITE POWER S.,ELITE POWER S.,needs_translation,,精英力量锦标,medium,Elite Power 为名驹名意译精英力量，S.→锦标；复核通过。,精英力量锦标,通过
+621,united_kingdom,Dornan Engineering Relkeel Hurdle,Dornan Engineering Relkeel Hurdle,needs_translation,,雷尔基尔跨栏锦标,medium,Relkeel 为马名，音译雷尔基尔，Hurdle 按例译跨栏锦标；复核通过。,雷尔基尔跨栏锦标,通过
+622,united_kingdom,Coral Silviniaco Conti Chase,Coral Silviniaco Conti Chase,needs_translation,,西尔维尼亚科孔蒂障碍锦标,medium,Silviniaco Conti 为马名音译，Chase 译障碍锦标；复核通过。,西尔维尼亚科孔蒂障碍锦标,通过
+623,united_kingdom,Trustatrader Hampton Nov. Chase,Trustatrader Hampton Nov. Chase,needs_translation,,汉普顿新手障碍锦标,high,Hampton 音译，Nov. Chase 按例译新手障碍锦标；复核通过。,汉普顿新手障碍锦标,通过
+624,united_kingdom,Lightning Nov. Chase,Lightning Nov. Chase,needs_translation,,闪电新手障碍锦标,high,Lightning 意译闪电，Nov. Chase 译新手障碍锦标；复核通过。,闪电新手障碍锦标,通过
+625,united_kingdom,Betmgm Clarence House Chase,Betmgm Clarence House Chase,needs_translation,,克拉伦斯宫障碍锦标,high,沿用已上线 Clarence House 译名克拉伦斯宫；复核通过。,克拉伦斯宫障碍锦标,通过
+626,united_kingdom,Betmgm Warfield Hurdle,Betmgm Warfield Hurdle,needs_translation,,沃菲尔德跨栏锦标,medium,Warfield 音译，Hurdle 译跨栏锦标；复核通过。,沃菲尔德跨栏锦标,通过
+627,united_kingdom,Sky Bet Supreme Trial Rossington Main Nov. Hurdle,Sky Bet Supreme Trial Rossington Main Nov. Hurdle,needs_translation,,至尊预赛罗辛顿梅恩新手跨栏锦标,medium,Supreme Trial 译至尊预赛，Rossington Main 音译，Nov. 译新手；复核后修正；Sky Bet Supreme Trial为冠名/预赛标签，RaceSeries主体为Rossington Main Novices' Hurdle。,罗辛顿梅因新手跨栏锦标,已修正
+628,united_kingdom,Betfair Cotswold Chase,Betfair Cotswold Chase,needs_translation,,科茨沃尔德障碍锦标,high,Cotswold 常见音译科茨沃尔德，Chase 译障碍锦标；复核通过。,科茨沃尔德障碍锦标,通过
+629,united_kingdom,Unibet International Hurdle,Unibet International Hurdle,needs_translation,,国际跨栏锦标,high,International 意译国际，Hurdle 译跨栏锦标；复核通过。,国际跨栏锦标,通过
+630,united_kingdom,AIS Nov. Hurdle,AIS Nov. Hurdle,needs_translation,,新手跨栏锦标,low,AIS 剥离后 base 仅剩条件描述，无赛事本名，疑似剥离过度；低置信度复核通过：冠名/补充说明已正确剥离。,新手跨栏锦标,通过
+631,united_kingdom,JCB Triumph Trial Finesse Juvenile Hurdle,JCB Triumph Trial Finesse Juvenile Hurdle,needs_translation,,凯旋预赛菲内斯幼龄跨栏锦标,medium,Triumph Trial 译凯旋预赛，Finesse 音译菲内斯，Juvenile 译幼龄；复核后修正；JCB Triumph Trial为冠名及预赛标签，主体为Finesse Juvenile Hurdle。,技巧幼龄跨栏锦标,已修正
+632,united_kingdom,Betfair Cleeve Hurdle,Betfair Cleeve Hurdle,history,Cleeve Hurdle,克利夫跨栏锦标,high,历史赛事已上线译名（Cleeve Hurdle）；复核通过。,克利夫跨栏锦标,通过
+633,united_kingdom,River Don Nov. Hurdle,River Don Nov. Hurdle,needs_translation,,唐河新手跨栏锦标,medium,River Don 为英格兰河流唐河，Nov. Hurdle 译新手跨栏锦标；复核通过。,唐河新手跨栏锦标,通过
+634,united_kingdom,Virgin Bet Yorkshire Rose Hurdle,Virgin Bet Yorkshire Rose Hurdle,needs_translation,,约克郡玫瑰跨栏锦标,high,Yorkshire Rose 意译约克郡玫瑰，Hurdle 译跨栏锦标；复核通过。,约克郡玫瑰跨栏锦标,通过
+635,united_kingdom,Virgin Bet Scilly Isles Nov. Chase,Virgin Bet Scilly Isles Nov. Chase,needs_translation,,锡利群岛新手障碍锦标,medium,Scilly Isles 意译锡利群岛，Nov. Chase 译新手障碍锦标；复核通过。,锡利群岛新手障碍锦标,通过
+636,united_kingdom,Jane Seymour Nov. Hurdle,Jane Seymour Nov. Hurdle,needs_translation,,简·西摩新手跨栏锦标,medium,Jane Seymour 为人名常见译法，Nov. Hurdle 译新手跨栏锦标；复核通过。,简·西摩新手跨栏锦标,通过
+637,united_kingdom,William Hill Bet10 Get10 On Racing Denman Chase,William Hill Bet10 Get10 On Racing Denman Chase,needs_translation,,丹曼障碍锦标,low,base 残留 William Hill 推广语冠名，按已上线 Denman 译名丹曼；低置信度复核通过：冠名/补充说明已正确剥离。,丹曼障碍锦标,通过
+638,united_kingdom,William Hill Best Odds Guaranteed Game Spirit Chase,William Hill Best Odds Guaranteed Game Spirit Chase,needs_translation,,游戏精神障碍锦标,low,base 残留 Best Odds Guaranteed 推广语，Game Spirit 意译游戏精神；低置信度复核：冠名/补充说明剥离及主体译名已修正；Game Spirit采用更自然且与既有术语一致的译名“竞技精神”。,竞技精神障碍锦标,已修正
+639,united_kingdom,Unibet Kingmaker Nov. Chase,Unibet Kingmaker Nov. Chase,needs_translation,,拥王者新手障碍锦标,medium,Kingmaker 意译拥王者，Nov. Chase 译新手障碍锦标；复核后修正；Kingmaker意译为“王者缔造者”。,王者缔造者新手障碍锦标,已修正
+640,united_kingdom,Betfair Ascot Chase,Betfair Ascot Chase,needs_translation,,阿斯科特障碍锦标,high,Ascot 常见音译阿斯科特，Chase 译障碍锦标；复核通过。,阿斯科特障碍锦标,通过
+641,united_kingdom,Ebony Horse Club Reynoldstown Nov. Chase,Ebony Horse Club Reynoldstown Nov. Chase,needs_translation,,雷诺兹敦新手障碍锦标,low,base 残留冠名 Ebony Horse Club，Reynoldstown 音译；低置信度复核通过：冠名/补充说明已正确剥离。,雷诺兹敦新手障碍锦标,通过
+642,united_kingdom,Albert Bartlett Prestige Nov. Hurdle,Albert Bartlett Prestige Nov. Hurdle,needs_translation,,威望新手跨栏锦标,low,Albert Bartlett 为冠名残留，Prestige 意译威望；低置信度复核通过：冠名/补充说明已正确剥离；保留Prestige Novices' Hurdle主体，删除Albert Bartlett冠名。,威望新手跨栏锦标,通过
+643,united_kingdom,Rendlesham Hurdle,Rendlesham Hurdle,history,Rendlesham Hurdle,伦德尔舍姆跨栏锦标,high,历史赛事已上线译名（Rendlesham Hurdle）；复核通过。,伦德尔舍姆跨栏锦标,通过
+644,united_kingdom,Kingwell Hurdle,Kingwell Hurdle,history,Kingwell Hurdle,金威尔跨栏锦标,high,历史赛事已上线译名（Kingwell Hurdle）；复核通过。,金威尔跨栏锦标,通过
+645,united_kingdom,Ladbrokes Dovecote Nov. Hurdle,Ladbrokes Dovecote Nov. Hurdle,needs_translation,,多夫科特新手跨栏锦标,low,base 残留冠名 Ladbrokes，Dovecote 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；Dovecote按语义译为“鸽舍”。,鸽舍新手跨栏锦标,已修正
+646,united_kingdom,Ladbrokes Adonis Juvenile Hurdle,Ladbrokes Adonis Juvenile Hurdle,needs_translation,,阿多尼斯幼龄跨栏锦标,low,base 残留冠名 Ladbrokes，Adonis 常见音译阿多尼斯；低置信度复核通过：冠名/补充说明已正确剥离。,阿多尼斯幼龄跨栏锦标,通过
+647,united_kingdom,Ladbrokes Pendil Nov. Chase,Ladbrokes Pendil Nov. Chase,needs_translation,,彭迪尔新手障碍锦标,low,base 残留冠名 Ladbrokes，Pendil 音译；低置信度复核通过：冠名/补充说明已正确剥离。,彭迪尔新手障碍锦标,通过
+648,united_kingdom,Star Sports National Spirit Hurdle,Star Sports National Spirit Hurdle,needs_translation,,民族精神跨栏锦标,low,base 残留冠名 Star Sports，National Spirit 意译民族精神；低置信度复核通过：冠名/补充说明已正确剥离。,民族精神跨栏锦标,通过
+649,united_kingdom,Bet365 Premier Nov. Hurdle,Bet365 Premier Nov. Hurdle,needs_translation,,顶级新手跨栏锦标,low,base 残留冠名 Bet365，Premier 意译顶级；低置信度复核：冠名/补充说明剥离及主体译名已修正；Premier译为“首席”，与Top Nov. Hurdle的“顶级”区分。,首席新手跨栏锦标,重名已处理
+650,united_kingdom,Unibet Champion Hurdle Challenge Trophy Hurdle,Unibet Champion Hurdle Challenge Trophy Hurdle,needs_translation,,冠军跨栏锦标,medium,赛事通称 Champion Hurdle（Challenge Trophy 为奖杯名），译冠军跨栏锦标；复核后修正；完整保留Champion Hurdle Challenge Trophy主体。,冠军跨栏挑战杯,已修正
+651,united_kingdom,Arkle Challenge Trophy Nov. Chase,Arkle Challenge Trophy Nov. Chase,needs_translation,,阿克尔挑战杯新手障碍锦标,medium,Arkle 为名马音译阿克尔，Challenge Trophy 译挑战杯；复核通过。,阿克尔挑战杯新手障碍锦标,通过
+652,united_kingdom,Skybet Supreme Nov. Hurdle,Skybet Supreme Nov. Hurdle,needs_translation,,至尊新手跨栏锦标,low,base 残留冠名 Skybet，Supreme Novices' Hurdle 通译至尊新手跨栏；低置信度复核通过：冠名/补充说明已正确剥离。,至尊新手跨栏锦标,通过
+653,united_kingdom,Close Brothers David Nicholson Hurdle,Close Brothers David Nicholson Hurdle,needs_translation,,大卫·尼科尔森跨栏锦标,low,base 残留冠名 Close Brothers，David Nicholson 人名音译；低置信度复核通过：冠名/补充说明已正确剥离。,大卫·尼科尔森跨栏锦标,通过
+654,united_kingdom,Betmgm Queen Mother Champion Chase,Betmgm Queen Mother Champion Chase,needs_translation,,王太后冠军障碍锦标,medium,Queen Mother 译王太后，Champion Chase 译冠军障碍锦标；复核后修正；Queen Mother采用“皇太后”，而非“王太后”。,皇太后冠军障碍锦标,已修正
+655,united_kingdom,Broadway Nov. Chase,Broadway Nov. Chase,needs_translation,,百老汇新手障碍锦标,medium,Broadway 常见译名百老汇，Nov. Chase 译新手障碍锦标；复核通过。,百老汇新手障碍锦标,通过
+656,united_kingdom,Baring Bingham Nov. Hurdle,Baring Bingham Nov. Hurdle,needs_translation,,巴林宾厄姆新手跨栏锦标,medium,Baring Bingham 为人名音译，Nov. Hurdle 译新手跨栏锦标；复核通过。,巴林宾厄姆新手跨栏锦标,通过
+657,united_kingdom,Weatherbys Champion Bumper N.H.F. Race,Weatherbys Champion Bumper N.H.F. Race,needs_translation,,冠军邦珀全国狩猎平地赛,low,base 残留冠名 Weatherbys，Champion Bumper N.H.F. Race 按全国狩猎平地赛译；低置信度复核：冠名/补充说明剥离及主体译名已修正；Bumper是NHF赛事俗称，不在中文名中重复音译。,冠军国家狩猎平地赛,已修正
+658,united_kingdom,Ryanair Festival Trophy Chase,Ryanair Festival Trophy Chase,needs_translation,,节日杯障碍锦标,low,base 残留冠名 Ryanair，Festival Trophy 译节日杯；低置信度复核：冠名/补充说明剥离及主体译名已修正；Festival Trophy采用“节庆杯”，删除Ryanair冠名。,节庆杯障碍锦标,已修正
+659,united_kingdom,Paddy Power Stayers’ Hurdle,Paddy Power Stayers’ Hurdle,needs_translation,,长途跨栏锦标,low,base 残留冠名 Paddy Power，Stayers' 译长途；低置信度复核通过：冠名/补充说明已正确剥离。,长途跨栏锦标,通过
+660,united_kingdom,Ryanair Dawn Run Nov. Hurdle,Ryanair Dawn Run Nov. Hurdle,needs_translation,,晨奔新手跨栏锦标,low,base 残留冠名 Ryanair，Dawn Run 为名马意译晨奔；低置信度复核：冠名/补充说明剥离及主体译名已修正；Dawn Run采用语义译名，删除Ryanair冠名。,曙光奔跑新手跨栏锦标,已修正
+661,united_kingdom,Jack Richards Golden Miller Nov. H’Cap Chase,Jack Richards Golden Miller Nov. H’Cap Chase,manual,,,low,原文含未括号让赛缩写（H'Cap / 尾部 H.），按让赛规则转人工：请定夺——保留「让赛」字（与去让赛 kept 先例一致，如两岁马让赛）或使用无让赛译名，手填 final_name；复核后修正；删除Jack Richards冠名及H’Cap说明，保留Golden Miller、Nov.和Chase赛事主体。,金米勒新手障碍锦标,人工裁决
+662,united_kingdom,Boodles Cheltenham Gold Cup Chase,Boodles Cheltenham Gold Cup Chase,needs_translation,,切尔滕纳姆金杯障碍锦标,low,base 残留冠名 Boodles，Cheltenham Gold Cup 通译切尔滕纳姆金杯；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,卓定咸金杯,已修正
+663,united_kingdom,JCB Triumph Juvenile Hurdle,JCB Triumph Juvenile Hurdle,needs_translation,,凯旋幼龄跨栏锦标,medium,Triumph Juvenile Hurdle 通译凯旋幼龄跨栏；复核通过。,凯旋幼龄跨栏锦标,通过
+664,united_kingdom,Albert Bartlett Spa Nov. Hurdle,Albert Bartlett Spa Nov. Hurdle,needs_translation,,斯帕新手跨栏锦标,low,Albert Bartlett 为冠名残留，Spa 音译斯帕；低置信度复核：冠名/补充说明剥离及主体译名已修正；Spa采用语义译名“温泉”。,温泉新手跨栏锦标,已修正
+665,united_kingdom,Mrs Paddy Power Liberthine Chase,Mrs Paddy Power Liberthine Chase,needs_translation,,利伯珊障碍锦标,low,base 残留冠名 Mrs Paddy Power，Liberthine 为马名音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；删除Mrs Paddy Power冠名；Liberthine采用音译。,利伯廷障碍锦标,已修正
+666,united_kingdom,Betvictor EBF Nov. H’Cap Hurdle,Betvictor EBF Nov. H’Cap Hurdle,manual,,,low,原文含未括号让赛缩写（H'Cap / 尾部 H.），按让赛规则转人工：请定夺——保留「让赛」字（与去让赛 kept 先例一致，如两岁马让赛）或使用无让赛译名，手填 final_name；复核后修正；删除BetVictor与EBF冠名/机构前缀及H’Cap说明，保留Nov. Hurdle主体；最终裁决补充：该赛事去除BetVictor与EBF后仅剩通用名，若再删除H’Cap会与另一项新手跨栏赛撞名，故保留“让赛”作为实质身份区分。,新手让赛跨栏锦标,人工裁决
+667,united_kingdom,Aintree Bowl Chase,Aintree Bowl Chase,needs_translation,,安特里碗杯障碍锦标,medium,Aintree 沿用安特里，Bowl 译碗杯；复核后修正；避免“碗杯”重复，保留Aintree Bowl Chase主体。,安特里碗赛障碍锦标,已修正
+668,united_kingdom,William Hill Aintree Hurdle,William Hill Aintree Hurdle,history,Aintree Hurdle,安特里跨栏锦标,high,历史赛事已上线译名（Aintree Hurdle）；复核通过。,安特里跨栏锦标,通过
+669,united_kingdom,Manifesto Nov. Chase,Manifesto Nov. Chase,needs_translation,,宣言新手障碍锦标,medium,Manifesto 意译宣言，Nov. Chase 译新手障碍锦标；复核通过。,宣言新手障碍锦标,通过
+670,united_kingdom,Anniversary 4-Y-O Juvenile Hurdle,Anniversary 4-Y-O Juvenile Hurdle,history,Anniversary 4YO Juvenile Hurdle,纪念四岁马幼龄跨栏锦标,high,历史赛事已上线译名（Anniversary 4YO Juvenile Hurdle）；复核通过。,纪念四岁马幼龄跨栏锦标,通过
+671,united_kingdom,Standard Open Nickel Coin Mares’ N.H.F. Race,Standard Open Nickel Coin Mares’ N.H.F. Race,needs_translation,,镍币雌马标准公开全国狩猎平地赛,low,Nickel Coin 意译镍币，Standard Open N.H.F. 为官方赛种译标准公开全国狩猎平地赛；低置信度复核：冠名/补充说明剥离及主体译名已修正；Nickel Coin为赛事专名；Standard Open和Mares为条件说明，不写入最终名称。,镍币国家狩猎平地赛,已修正
+672,united_kingdom,Melling Chase,Melling Chase,needs_translation,,梅林障碍锦标,medium,Melling 音译梅林，Chase 译障碍锦标；复核通过。,梅林障碍锦标,通过
+673,united_kingdom,Mildmay Nov. Chase,Mildmay Nov. Chase,needs_translation,,迈尔德梅新手障碍锦标,medium,Mildmay 音译，Nov. Chase 译新手障碍锦标；复核通过。,迈尔德梅新手障碍锦标,通过
+674,united_kingdom,Sefton Nov. Hurdle,Sefton Nov. Hurdle,needs_translation,,塞夫顿新手跨栏锦标,medium,Sefton 音译，Nov. Hurdle 译新手跨栏锦标；复核通过。,塞夫顿新手跨栏锦标,通过
+675,united_kingdom,Top Nov. Hurdle,Top Nov. Hurdle,needs_translation,,顶级新手跨栏锦标,medium,Top 意译顶级，Nov. Hurdle 译新手跨栏锦标；复核通过；Top译为“顶级”，与Premier Nov. Hurdle区分。,顶级新手跨栏锦标,重名已处理
+676,united_kingdom,Liverpool Hurdle,Liverpool Hurdle,history,Liverpool Hurdle,利物浦跨栏锦标,high,历史赛事已上线译名（Liverpool Hurdle）；复核通过。,利物浦跨栏锦标,通过
+677,united_kingdom,Maghull Nov. Chase,Maghull Nov. Chase,needs_translation,,马格哈尔新手障碍锦标,medium,Maghull 为地名音译，Nov. Chase 译新手障碍锦标；复核通过。,马格哈尔新手障碍锦标,通过
+678,united_kingdom,Mersey Nov. Hurdle,Mersey Nov. Hurdle,needs_translation,,默西新手跨栏锦标,medium,Mersey 为河流名常见音译默西，Nov. Hurdle 译新手跨栏锦标；复核通过。,默西新手跨栏锦标,通过
+679,united_kingdom,Weatherbys Nhstallions.Co.Uk Standard Open N.H.F. Race,Weatherbys Nhstallions.Co.Uk Standard Open N.H.F. Race,needs_translation,,标准公开全国狩猎平地赛,low,base 残留冠名 Weatherbys Nhstallions.Co.Uk，按官方赛种译；低置信度复核：冠名/补充说明剥离及主体译名已修正；删除Weatherbys冠名及Standard Open条件说明。,国家狩猎平地赛,已修正
+680,united_kingdom,Matt Hampson Foundation Silver Trophy H’Cap Chase,Matt Hampson Foundation Silver Trophy H’Cap Chase,manual,,,low,原文含未括号让赛缩写（H'Cap / 尾部 H.），按让赛规则转人工：请定夺——保留「让赛」字（与去让赛 kept 先例一致，如两岁马让赛）或使用无让赛译名，手填 final_name；复核后修正；删除Matt Hampson Foundation冠名及H’Cap说明，保留Silver Trophy Chase主体。,银杯障碍锦标,人工裁决
+681,united_kingdom,Coral Scottish Champion H’Cap Hurdle,Coral Scottish Champion H’Cap Hurdle,manual,,,low,原文含未括号让赛缩写（H'Cap / 尾部 H.），按让赛规则转人工：请定夺——保留「让赛」字（与去让赛 kept 先例一致，如两岁马让赛）或使用无让赛译名，手填 final_name；复核后修正；删除Coral冠名及H’Cap说明，保留Scottish Champion Hurdle主体。,苏格兰冠军跨栏锦标,人工裁决
+682,united_kingdom,Bet365 Celebration Chase,Bet365 Celebration Chase,needs_translation,,庆典障碍锦标,low,base 残留冠名 Bet365，Celebration 意译庆典；低置信度复核通过：冠名/补充说明已正确剥离。,庆典障碍锦标,通过
+683,united_kingdom,Bet365 Oaksey Chase,Bet365 Oaksey Chase,needs_translation,,奥克西障碍锦标,low,base 残留冠名 Bet365，Oaksey 音译；低置信度复核通过：冠名/补充说明已正确剥离。,奥克西障碍锦标,通过
+684,united_kingdom,Bet365 Select Hurdle,Bet365 Select Hurdle,needs_translation,,精选跨栏锦标,low,base 残留冠名 Bet365，Select 意译精选；低置信度复核通过：冠名/补充说明已正确剥离。,精选跨栏锦标,通过
+858,united_kingdom,MIDNITE WINTER DERBY STAKES,MIDNITE WINTER DERBY STAKES,needs_translation,,冬季德比锦标,low,base 残留冠名 MIDNITE，Winter Derby 译冬季德比；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,冬季打吡,已修正
+859,united_kingdom,bet365 EARL OF SEFTON STAKES,bet365 EARL OF SEFTON STAKES,needs_translation,,塞夫顿伯爵锦标,low,base 残留冠名 bet365，Earl of Sefton 译塞夫顿伯爵；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,薛夫顿伯爵锦标,已修正
+860,united_kingdom,bet365 CRAVEN STAKES,bet365 CRAVEN STAKES,needs_translation,,克雷文锦标,low,base 残留冠名 bet365，Craven 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,卡拉芬锦标,已修正
+861,united_kingdom,BLANDFORD BLOODSTOCK ABERNANT STAKES,BLANDFORD BLOODSTOCK ABERNANT STAKES,needs_translation,,阿伯南特锦标,low,base 残留冠名 BLANDFORD BLOODSTOCK，Abernant 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,爱百灵锦标,已修正
+862,united_kingdom,DUBAI DUTY FREE FINEST SURPRISE STAKES,DUBAI DUTY FREE FINEST SURPRISE STAKES,needs_translation,,至臻惊喜锦标,low,base 残留冠名 DUBAI DUTY FREE，Finest Surprise 意译；低置信度复核：冠名/补充说明剥离及主体译名已修正；Dubai Duty Free Finest Surprise是John Porter Stakes的冠名展示名，按非冠名注册名翻译。,约翰布特锦标,已修正
+863,united_kingdom,bet365 MILE,bet365 MILE,needs_translation,,一英里锦标,low,base 残留冠名 bet365，Mile 译一英里；低置信度复核：冠名/补充说明剥离及主体译名已修正；bet365 Mile对应Sandown Mile，删除bet365冠名并恢复赛场专名。,沙丘园一哩锦标,已修正
+864,united_kingdom,bet365 CLASSIC TRIAL,bet365 CLASSIC TRIAL,needs_translation,,经典预赛锦标,low,base 残留冠名 bet365，Classic Trial 译经典预赛；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,经典预赛,已修正
+865,united_kingdom,LONGINES SAGARO STAKES,LONGINES SAGARO STAKES,needs_translation,,萨加罗锦标,low,base 残留冠名 LONGINES，Sagaro 为马名音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,萨嘉罗锦标,已修正
+866,united_kingdom,EVENTMASTERS.CO.UK COMMONWEALTH CUP TRIAL STAKES,EVENTMASTERS.CO.UK COMMONWEALTH CUP TRIAL STAKES,needs_translation,,英联邦杯预赛锦标,low,base 残留冠名 EVENTMASTERS.CO.UK，Commonwealth Cup Trial 译英联邦杯预赛；低置信度复核：冠名/补充说明剥离及主体译名已修正；保留Trial身份，不误并为英联邦杯正赛。,英联邦杯预赛,已修正
+867,united_kingdom,BETFRED JOCKEY CLUB STAKES,BETFRED JOCKEY CLUB STAKES,needs_translation,,赛马会锦标,low,base 残留冠名 BETFRED，Jockey Club 译赛马会；低置信度复核通过：冠名/补充说明已正确剥离。,赛马会锦标,通过
+868,united_kingdom,BETFRED 2000 GUINEAS STAKES,BETFRED 2000 GUINEAS STAKES,needs_translation,,二千坚尼锦标,low,base 残留冠名 BETFRED，2000 Guineas 通译二千坚尼；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,英国二千坚尼,已修正
+869,united_kingdom,HONG KONG JOCKEY CLUB WORLD POOL PALACE HOUSE STAKES,HONG KONG JOCKEY CLUB WORLD POOL PALACE HOUSE STAKES,needs_translation,,皇宫府锦标,low,base 残留冠名 HONG KONG JOCKEY CLUB WORLD POOL，Palace House 意译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,皇宫锦标,已修正
+870,united_kingdom,BETFRED 1000 GUINEAS STAKES,BETFRED 1000 GUINEAS STAKES,needs_translation,,一千坚尼锦标,low,base 残留冠名 BETFRED，1000 Guineas 通译一千坚尼；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,英国一千坚尼,已修正
+871,united_kingdom,BETFRED DAHLIA STAKES,BETFRED DAHLIA STAKES,needs_translation,,大丽花锦标,low,base 残留冠名 BETFRED，Dahlia 意译大丽花；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,达利亚锦标,已修正
+872,united_kingdom,BOODLES CHESTER VASE STAKES,BOODLES CHESTER VASE STAKES,needs_translation,,切斯特花瓶锦标,low,base 残留冠名 BOODLES，Chester Vase 直译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,车士达银瓶,已修正
+873,united_kingdom,LADBROKES BIG-VALUE YOU CAN BET ON ORMONDE STAKES,LADBROKES BIG-VALUE YOU CAN BET ON ORMONDE STAKES,needs_translation,,奥蒙德锦标,low,base 残留冠名 LADBROKES 及推广语，Ormonde 音译奥蒙德；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,奥蒙特锦标,已修正
+874,united_kingdom,"IRE-INCENTIVE, IT PAYS TO BUY IRISH HUXLEY STAKES","IRE-INCENTIVE, IT PAYS TO BUY IRISH HUXLEY STAKES",needs_translation,,赫胥黎锦标,low,base 残留冠名 IRE-INCENTIVE 推广语，Huxley 音译赫胥黎；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,克斯利锦标,已修正
+875,united_kingdom,WILLIAM HILL CHARTWELL FILLIES' STAKES,WILLIAM HILL CHARTWELL FILLIES' STAKES,term,Chartwell Fillies' Stakes,卓威尔雌马锦标,high,术语库已有译名（Chartwell Fillies' Stakes）；复核通过。,卓威尔雌马锦标,通过
+876,united_kingdom,GO LOCAL STORES MINSTER STAKES,GO LOCAL STORES MINSTER STAKES,needs_translation,,敏斯特锦标,low,base 残留冠名 GO LOCAL STORES，Minster 音译；低置信度复核通过：冠名/补充说明已正确剥离。,敏斯特锦标,通过
+877,united_kingdom,TATTERSALLS MUSIDORA STAKES,TATTERSALLS MUSIDORA STAKES,needs_translation,,穆西多拉锦标,low,base 残留冠名 TATTERSALLS，Musidora 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,慕丝多拉锦标,已修正
+878,united_kingdom,AL BASTI EQUIWORLD DUBAI DANTE STAKES,AL BASTI EQUIWORLD DUBAI DANTE STAKES,needs_translation,,但丁锦标,low,base 残留冠名 AL BASTI EQUIWORLD DUBAI，Dante 通译但丁；低置信度复核通过：冠名/补充说明已正确剥离。,但丁锦标,通过
+879,united_kingdom,AL BASTI EQUIWORLD DUBAI MIDDLETON FILLIES' STAKES,AL BASTI EQUIWORLD DUBAI MIDDLETON FILLIES' STAKES,needs_translation,,米德尔顿雌马锦标,low,base 残留冠名 AL BASTI EQUIWORLD DUBAI，Middleton 音译，Fillies' 译雌马；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,米德尔顿锦标,已修正
+880,united_kingdom,BOYLE SPORTS LOCKINGE STAKES,BOYLE SPORTS LOCKINGE STAKES,needs_translation,,洛金格锦标,low,base 残留冠名 BOYLE SPORTS，Lockinge 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,乐景杰锦标,已修正
+881,united_kingdom,SKY SPORTS RACING ASTON PARK STAKES,SKY SPORTS RACING ASTON PARK STAKES,needs_translation,,阿斯顿公园锦标,low,base 残留冠名 SKY SPORTS RACING，Aston Park 直译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,阿斯顿园锦标,已修正
+884,united_kingdom,WILLIAM HILL BRONTË CUP FILLIES' STAKES,WILLIAM HILL BRONTË CUP FILLIES' STAKES,needs_translation,,勃朗特杯雌马锦标,high,Brontë 通译勃朗特，Fillies' 译雌马；复核后修正；Fillies为参赛条件说明，不写入最终名称。,勃朗特杯,已修正
+885,united_kingdom,STAR SPORTS HENRY II STAKES,STAR SPORTS HENRY II STAKES,needs_translation,,亨利二世锦标,low,base 残留冠名 STAR SPORTS，Henry II 译亨利二世；低置信度复核通过：冠名/补充说明已正确剥离。,亨利二世锦标,通过
+886,united_kingdom,STAR SPORTS BRIGADIER GERARD STAKES,STAR SPORTS BRIGADIER GERARD STAKES,needs_translation,,杰拉德准将锦标,low,base 残留冠名 STAR SPORTS，Brigadier Gerard 为名马意译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,格烈准将锦标,已修正
+887,united_kingdom,LESTER PIGGOTT FILLIES' STAKES,LESTER PIGGOTT FILLIES' STAKES,term,Lester Piggott Fillies' Stakes,柏葛锦标,high,术语库已有译名（Lester Piggott Fillies' Stakes）；复核通过。,柏葛锦标,通过
+888,united_kingdom,BETFRED OAKS,BETFRED OAKS,needs_translation,,橡树锦标,low,base 残留冠名 BETFRED，Oaks 通译橡树；低置信度复核：冠名/补充说明剥离及主体译名已修正；英国Oaks采用HKJC通行译名，并与法国Prix des Chênes区分。,英国橡树大赛,重名已处理
+889,united_kingdom,BETFRED DIOMED STAKES,BETFRED DIOMED STAKES,needs_translation,,迪奥米德锦标,low,base 残留冠名 BETFRED，Diomed 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,大奥密锦标,已修正
+890,united_kingdom,BETFRED DERBY,BETFRED DERBY,needs_translation,,德比锦标,low,base 残留冠名 BETFRED，Derby 通译德比；低置信度复核：冠名/补充说明剥离及主体译名已修正；Derby采用英国经典赛通行译名。,英国打吡,已修正
+891,united_kingdom,COOLMORE CORONATION CUP,COOLMORE CORONATION CUP,needs_translation,,加冕杯锦标,low,base 残留冠名 COOLMORE，Coronation Cup 译加冕杯；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,加冕锦标,已修正
+892,united_kingdom,BETFRED TATTENHAM CORNER STAKES,BETFRED TATTENHAM CORNER STAKES,needs_translation,,塔特纳姆角锦标,low,base 残留冠名 BETFRED，Tattenham Corner 直译；低置信度复核通过：冠名/补充说明已正确剥离。,塔特纳姆角锦标,通过
+911,united_kingdom,JENNINGSBET IN DELVES HOPPINGS FILLIES' STAKES,JENNINGSBET IN DELVES HOPPINGS FILLIES' STAKES,needs_translation,,霍平斯雌马锦标,low,base 残留冠名 JENNINGSBET IN DELVES，Hoppings 音译，Fillies' 译雌马；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,霍平斯锦标,已修正
+912,united_kingdom,JENNINGSBET CHIPCHASE STAKES,JENNINGSBET CHIPCHASE STAKES,needs_translation,,奇普蔡斯锦标,low,base 残留冠名 JENNINGSBET，Chipchase 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,卓普斯锦标,已修正
+913,united_kingdom,AL BASTI EQUIWORLD DUBAI CRITERION STAKES,AL BASTI EQUIWORLD DUBAI CRITERION STAKES,needs_translation,,准则锦标,low,base 残留冠名 AL BASTI EQUIWORLD DUBAI，Criterion 意译准则；低置信度复核通过：冠名/补充说明已正确剥离。,准则锦标,通过
+915,united_kingdom,CORAL-ECLIPSE,CORAL-ECLIPSE,needs_translation,,日蚀锦标,low,base 残留冠名 CORAL，Eclipse 通译日蚀；低置信度复核：冠名/补充说明剥离及主体译名已修正；英国Coral-Eclipse采用HKJC通行译名“日蚀大赛”。,日蚀大赛,重名已处理
+916,united_kingdom,CORAL CHARGE,CORAL CHARGE,needs_translation,,冲锋锦标,low,Coral 剥离后 base 仅剩 Charge，可能误伤注册本名（注册名 Sprint Stakes）；低置信度复核：冠名/补充说明剥离及主体译名已修正；Coral Charge是Sprint Stakes的冠名展示，删除Coral冠名及Charge营销标题。,短途锦标,已修正
+919,united_kingdom,TATTERSALLS FALMOUTH STAKES,TATTERSALLS FALMOUTH STAKES,needs_translation,,法尔茅斯锦标,low,base 残留冠名 TATTERSALLS，Falmouth 音译法尔茅斯；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,法尔曼斯锦标,已修正
+921,united_kingdom,WILLIAM HILL SUMMER STAKES,WILLIAM HILL SUMMER STAKES,term,Summer Stakes,夏季锦标 夏日锦标,high,术语库已有译名（Summer Stakes）；复核后修正；按WPStud既有译名统一。,夏季锦标,已修正
+922,united_kingdom,CORNISH ORCHARDS SUMMER MILE STAKES,CORNISH ORCHARDS SUMMER MILE STAKES,needs_translation,,夏季一英里锦标,low,base 残留冠名 CORNISH ORCHARDS，Summer Mile 直译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,夏日一哩锦标,已修正
+924,united_kingdom,HALLGARTEN AND NOVUM WINES HACKWOOD STAKES,HALLGARTEN AND NOVUM WINES HACKWOOD STAKES,needs_translation,,哈克伍德锦标,low,base 残留冠名 HALLGARTEN AND NOVUM WINES，Hackwood 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,夏活锦标,已修正
+926,united_kingdom,LONGINES VALIANT STAKES,LONGINES VALIANT STAKES,needs_translation,,英勇锦标,low,base 残留冠名 LONGINES，Valiant 意译英勇；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,威勇锦标,已修正
+927,united_kingdom,SODEXO LIVE! PRINCESS MARGARET STAKES,SODEXO LIVE! PRINCESS MARGARET STAKES,needs_translation,,玛格丽特公主锦标,low,base 残留冠名 SODEXO LIVE!，Princess Margaret 通译玛格丽特公主；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,玛嘉烈公主锦标,已修正
+928,united_kingdom,SKY BET YORK STAKES,SKY BET YORK STAKES,term,York Stakes,约克锦标,high,术语库已有译名（York Stakes）；复核通过。,约克锦标,通过
+929,united_kingdom,AL SHAQAB GOODWOOD CUP STAKES,AL SHAQAB GOODWOOD CUP STAKES,needs_translation,,古德伍德杯锦标,low,base 残留冠名 AL SHAQAB，Goodwood Cup 通译古德伍德杯；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,古活杯,已修正
+930,united_kingdom,HKJC WORLD POOL LENNOX STAKES,HKJC WORLD POOL LENNOX STAKES,term,HKJC World Pool Lennox Stakes,香港赛马会全球汇合彩池里诺斯锦标,high,术语库已有译名（HKJC World Pool Lennox Stakes）；复核通过；最终残留扫描修正：删除HKJC World Pool冠名，仅保留Lennox Stakes主体。,里诺斯锦标,已修正
+931,united_kingdom,CORAL VINTAGE STAKES,CORAL VINTAGE STAKES,term,Vintage Stakes,葡萄酒锦标,high,术语库已有译名（Vintage Stakes）；复核通过。,葡萄酒锦标,通过
+932,united_kingdom,VISIT QATAR SUSSEX STAKES,VISIT QATAR SUSSEX STAKES,needs_translation,,萨塞克斯锦标,low,base 残留冠名 VISIT QATAR，Sussex 通译萨塞克斯；低置信度复核通过：冠名/补充说明已正确剥离。,萨塞克斯锦标,通过
+933,united_kingdom,HKJC WORLD POOL OAK TREE STAKES,HKJC WORLD POOL OAK TREE STAKES,term,HKJC World Pool Oak Tree Stakes,香港赛马会全球汇合彩池橡树锦标,high,术语库已有译名（HKJC World Pool Oak Tree Stakes）；复核通过；最终残留扫描修正：删除HKJC World Pool冠名；因与法国Prix des Chênes均译作“橡树锦标”，加英国括注区分。,橡树锦标（英国）,已修正
+934,united_kingdom,HKJC WORLD POOL MOLECOMB STAKES,HKJC WORLD POOL MOLECOMB STAKES,term,HKJC World Pool Molecomb Stakes,香港赛马会全球汇合彩池摩金锦标,high,术语库已有译名（HKJC World Pool Molecomb Stakes）；复核通过；最终残留扫描修正：删除HKJC World Pool冠名，仅保留Molecomb Stakes主体。,摩金锦标,已修正
+935,united_kingdom,QATAR NASSAU STAKES,QATAR NASSAU STAKES,needs_translation,,拿骚锦标,low,base 残留冠名 QATAR，Nassau 通译拿骚；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,兰秀锦标,已修正
+936,united_kingdom,HKJC WORLD POOL GORDON STAKES,HKJC WORLD POOL GORDON STAKES,term,HKJC World Pool Gordon Stakes,香港赛马会全球汇合彩池哥顿锦标,high,术语库已有译名（HKJC World Pool Gordon Stakes）；复核通过；最终残留扫描修正：删除HKJC World Pool冠名，仅保留Gordon Stakes主体。,哥顿锦标,已修正
+937,united_kingdom,MARKEL RICHMOND STAKES,MARKEL RICHMOND STAKES,needs_translation,,里士满锦标,low,base 残留冠名 MARKEL，Richmond 通译里士满；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,利治蒙锦标,已修正
+938,united_kingdom,KING GEORGE QATAR STAKES,KING GEORGE QATAR STAKES,needs_translation,,乔治国王锦标,low,base 残留冠名 QATAR，King George 译乔治国王；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,英皇佐治锦标,已修正
+939,united_kingdom,BONHAMS THOROUGHBRED STAKES,BONHAMS THOROUGHBRED STAKES,needs_translation,,纯血马锦标,low,base 残留冠名 BONHAMS，Thoroughbred 译纯血马；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,纯种马锦标,已修正
+940,united_kingdom,QATAR LILLIE LANGTRY STAKES,QATAR LILLIE LANGTRY STAKES,needs_translation,,莉莉·兰特里锦标,low,base 残留冠名 QATAR，Lillie Langtry 人名音译；低置信度复核通过：冠名/补充说明已正确剥离。,莉莉·兰特里锦标,通过
+941,united_kingdom,CORAL GLORIOUS STAKES,CORAL GLORIOUS STAKES,term,Glorious Stakes,光荣锦标,high,术语库已有译名（Glorious Stakes）；复核通过。,光荣锦标,通过
+943,united_kingdom,NEWSELLS PARK STUD SWEET SOLERA STAKES,NEWSELLS PARK STUD SWEET SOLERA STAKES,needs_translation,,甜蜜索莱拉锦标,low,base 残留冠名 NEWSELLS PARK STUD，Sweet Solera 意译加音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,甜索利那锦标,已修正
+944,united_kingdom,VISIT MALTA HUNGERFORD STAKES,VISIT MALTA HUNGERFORD STAKES,needs_translation,,亨格福德锦标,low,base 残留冠名 VISIT MALTA，Hungerford 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,肯格福锦标,已修正
+945,united_kingdom,HIGHCLERE THOROUGHBRED RACING GEOFFREY FREER STAKES,HIGHCLERE THOROUGHBRED RACING GEOFFREY FREER STAKES,needs_translation,,杰弗里·弗里尔锦标,low,base 残留冠名 HIGHCLERE THOROUGHBRED RACING，Geoffrey Freer 人名音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,杰菲弗里尔锦标,已修正
+946,united_kingdom,JUDDMONTE INTERNATIONAL STAKES,JUDDMONTE INTERNATIONAL STAKES,needs_translation,,国际锦标,low,base 残留冠名 JUDDMONTE，International 译国际；低置信度复核通过：冠名/补充说明已正确剥离。,国际锦标,通过
+947,united_kingdom,SKY BET GREAT VOLTIGEUR STAKES,SKY BET GREAT VOLTIGEUR STAKES,term,Great Voltigeur Stakes,获狄嘉锦标,high,术语库已有译名（Great Voltigeur Stakes）；复核通过。,获狄嘉锦标,通过
+948,united_kingdom,PERTEMPS NETWORK YORKSHIRE OAKS,PERTEMPS NETWORK YORKSHIRE OAKS,needs_translation,,约克郡橡树锦标,low,base 残留冠名 PERTEMPS NETWORK，Yorkshire Oaks 通译约克郡橡树；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,约克郡橡树大赛,已修正
+949,united_kingdom,SKY BET LOWTHER STAKES,SKY BET LOWTHER STAKES,term,Lowther Stakes,雷凡锦标,high,术语库已有译名（Lowther Stakes）；复核通过。,雷凡锦标,通过
+950,united_kingdom,COOLMORE CITY OF TROY NUNTHORPE STAKES,COOLMORE CITY OF TROY NUNTHORPE STAKES,needs_translation,,楠索普锦标,low,base 残留冠名 COOLMORE CITY OF TROY，Nunthorpe 音译；低置信度复核通过：冠名/补充说明已正确剥离。,楠索普锦标,通过
+951,united_kingdom,WEATHERBYS LONSDALE CUP STAKES,WEATHERBYS LONSDALE CUP STAKES,needs_translation,,朗斯代尔杯锦标,low,base 残留冠名 WEATHERBYS，Lonsdale Cup 音译加杯；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,伦斯度杯,已修正
+952,united_kingdom,AL BASTI EQUIWORLD DUBAI GIMCRACK STAKES,AL BASTI EQUIWORLD DUBAI GIMCRACK STAKES,needs_translation,,吉姆克拉克锦标,low,base 残留冠名 AL BASTI EQUIWORLD DUBAI，Gimcrack 为马名音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,小玩意锦标,已修正
+953,united_kingdom,SKY BET CITY OF YORK STAKES,SKY BET CITY OF YORK STAKES,term,City of York Stakes,约克市锦标,high,术语库已有译名（City of York Stakes）；复核通过。,约克市锦标,通过
+954,united_kingdom,BETMGM ATALANTA STAKES,BETMGM ATALANTA STAKES,term,Atalanta Stakes,爱特兰塔锦标,high,术语库已有译名（Atalanta Stakes）；复核通过。,爱特兰塔锦标,通过
+955,united_kingdom,BETMGM SOLARIO STAKES,BETMGM SOLARIO STAKES,term,Solario Stakes,苏拿里奥锦标,high,术语库已有译名（Solario Stakes）；复核通过。,苏拿里奥锦标,通过
+956,united_kingdom,VIRGIN BET PRESTIGE FILLIES' STAKES,VIRGIN BET PRESTIGE FILLIES' STAKES,term,Prestige Fillies' Stakes,威望雌马锦标,high,术语库已有译名（Prestige Fillies' Stakes）；复核后修正；Fillies为参赛条件说明，不写入最终名称。,威望锦标,已修正
+957,united_kingdom,IRISH THOROUGHBRED MARKETING DICK POOLE FILLIES' STAKES,IRISH THOROUGHBRED MARKETING DICK POOLE FILLIES' STAKES,needs_translation,,迪克·普尔雌马锦标,low,base 残留冠名 IRISH THOROUGHBRED MARKETING，Dick Poole 人名音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,迪克·普尔锦标,已修正
+958,united_kingdom,BEST ODDS ON THE BETFAIR EXCHANGE SUPERIOR MILE STAKES,BEST ODDS ON THE BETFAIR EXCHANGE SUPERIOR MILE STAKES,needs_translation,,超级一英里锦标,low,base 残留冠名 BEST ODDS ON THE BETFAIR EXCHANGE，Superior Mile 直译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,卓越一哩锦标,已修正
+959,united_kingdom,UNIBET SEPTEMBER STAKES,UNIBET SEPTEMBER STAKES,term,September Stakes,九月锦标,high,术语库已有译名（September Stakes）；复核通过。,九月锦标,通过
+960,united_kingdom,UNIBET SIRENIA STAKES,UNIBET SIRENIA STAKES,term,Sirenia Stakes,亚西尼亚锦标,high,术语库已有译名（Sirenia Stakes）；复核通过。,亚西尼亚锦标,通过
+961,united_kingdom,WEATHERBYS GLOBAL STALLIONS APP WINTER HILL STAKES,WEATHERBYS GLOBAL STALLIONS APP WINTER HILL STAKES,needs_translation,,冬山锦标,low,base 残留冠名 WEATHERBYS GLOBAL STALLIONS APP，Winter Hill 直译；低置信度复核通过：冠名/补充说明已正确剥离。,冬山锦标,通过
+962,united_kingdom,BETFRED PARK HILL FILLIES' STAKES,BETFRED PARK HILL FILLIES' STAKES,needs_translation,,公园山雌马锦标,low,base 残留冠名 BETFRED，Park Hill 直译，Fillies' 译雌马；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,帕克山锦标,已修正
+963,united_kingdom,BETFRED MAY HILL STAKES,BETFRED MAY HILL STAKES,needs_translation,,五月山锦标,low,base 残留冠名 BETFRED，May Hill 直译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,梅希尔锦标,已修正
+964,united_kingdom,BETFRED HOWARD WRIGHT DONCASTER CUP STAKES,BETFRED HOWARD WRIGHT DONCASTER CUP STAKES,needs_translation,,唐卡斯特杯锦标,low,base 残留冠名 BETFRED HOWARD WRIGHT，Doncaster Cup 通译唐卡斯特杯；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,唐加士达杯,已修正
+965,united_kingdom,CARLSBERG DANISH PILSNER FLYING CHILDERS STAKES,CARLSBERG DANISH PILSNER FLYING CHILDERS STAKES,needs_translation,,飞童锦标,low,base 残留冠名 CARLSBERG DANISH PILSNER，Flying Childers 为名马意译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,飞彻特斯锦标,已修正
+966,united_kingdom,BETFRED ST LEGER STAKES,BETFRED ST LEGER STAKES,needs_translation,,圣莱杰锦标,low,base 残留冠名 BETFRED，St Leger 通译圣莱杰；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,英国圣烈治锦标,已修正
+967,united_kingdom,BETFRED PARK STAKES,BETFRED PARK STAKES,needs_translation,,公园锦标,low,base 残留冠名 BETFRED，Park 意译公园；低置信度复核通过：冠名/补充说明已正确剥离。,公园锦标,通过
+968,united_kingdom,BETFRED CHAMPAGNE STAKES,BETFRED CHAMPAGNE STAKES,needs_translation,,香槟锦标,low,base 残留冠名 BETFRED，Champagne 通译香槟；低置信度复核通过：冠名/补充说明已正确剥离。,香槟锦标,通过
+969,united_kingdom,LADBROKES 'GET REWARDED WITH LADBUCKS' FIRTH OF CLYDE,LADBROKES 'GET REWARDED WITH LADBUCKS' FIRTH OF CLYDE,needs_translation,,克莱德湾锦标,low,base 残留冠名 LADBROKES 及推广语，Firth of Clyde 译克莱德湾；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,克莱德河湾锦标,已修正
+970,united_kingdom,DUBAI INTERNATIONAL AIRPORT WORLD TROPHY STAKES,DUBAI INTERNATIONAL AIRPORT WORLD TROPHY STAKES,needs_translation,,世界奖杯锦标,low,base 残留冠名 DUBAI INTERNATIONAL AIRPORT，World Trophy 直译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,世界锦标赛,已修正
+971,united_kingdom,TATTERSALLS STAKES,TATTERSALLS STAKES,needs_translation,,塔特索斯锦标,low,Tattersalls 既为注册名主体又属冠名性质，音译塔特索斯；低置信度复核：冠名/补充说明剥离及主体译名已修正；Tattersalls Stakes对应Somerville Tattersall Stakes，Tattersalls不作为最终赛事主体。,萨默维尔锦标,已修正
+972,united_kingdom,BOYLE SPORTS HOME OF EARLY PAYOUT ROCKFEL STAKES,BOYLE SPORTS HOME OF EARLY PAYOUT ROCKFEL STAKES,needs_translation,,罗克菲尔锦标,low,base 残留冠名 BOYLE SPORTS 及推广语，Rockfel 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,洛克菲尔锦标,已修正
+973,united_kingdom,BOYLE SPORTS DAILY RACING REWARDS JOEL STAKES,BOYLE SPORTS DAILY RACING REWARDS JOEL STAKES,needs_translation,,乔尔锦标,low,base 残留冠名 BOYLE SPORTS DAILY RACING REWARDS，Joel 音译乔尔；低置信度复核通过：冠名/补充说明已正确剥离。,乔尔锦标,通过
+975,united_kingdom,TATTERSALLS MIDDLE PARK STAKES,TATTERSALLS MIDDLE PARK STAKES,needs_translation,,米德尔公园锦标,low,base 残留冠名 TATTERSALLS，Middle Park 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,中央公园锦标,已修正
+976,united_kingdom,TATTERSALLS SCEPTRE SESSIONS CHEVELEY PARK STAKES,TATTERSALLS SCEPTRE SESSIONS CHEVELEY PARK STAKES,needs_translation,,切夫利公园锦标,low,base 残留冠名 TATTERSALLS SCEPTRE SESSIONS，Cheveley Park 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,卓维利园锦标,已修正
+977,united_kingdom,BetMGM CUMBERLAND LODGE STAKES,BetMGM CUMBERLAND LODGE STAKES,term,Cumberland Lodge Stakes,金柏兰舍锦标,high,术语库已有译名（Cumberland Lodge Stakes）；复核通过。,金柏兰舍锦标,通过
+978,united_kingdom,JOHN GUEST RACING BENGOUGH STAKES,JOHN GUEST RACING BENGOUGH STAKES,needs_translation,,本戈锦标,low,base 残留冠名 JOHN GUEST RACING，Bengough 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,班高锦标,已修正
+979,united_kingdom,BetMGM SUN CHARIOT STAKES,BetMGM SUN CHARIOT STAKES,term,Sun Chariot Stakes,太阳战车锦标,high,术语库已有译名（Sun Chariot Stakes）；复核通过。,太阳战车锦标,通过
+980,united_kingdom,bet365 FILLIES' MILE,bet365 FILLIES' MILE,needs_translation,,雌马一英里锦标,low,base 残留冠名 bet365，Fillies' Mile 直译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,雌马一哩赛,已修正
+981,united_kingdom,THOROUGHBRED INDUSTRY EMPLOYEE AWARDS CHALLENGE STAKES,THOROUGHBRED INDUSTRY EMPLOYEE AWARDS CHALLENGE STAKES,needs_translation,,挑战锦标,low,base 残留冠名 THOROUGHBRED INDUSTRY EMPLOYEE AWARDS，Challenge 译挑战；低置信度复核通过：冠名/补充说明已正确剥离；Thoroughbred Industry Employee Awards为冠名，赛事主体是Challenge Stakes。,挑战锦标,通过
+982,united_kingdom,NEWMARKET PONY ACADEMY PRIDE STAKES,NEWMARKET PONY ACADEMY PRIDE STAKES,needs_translation,,骄傲锦标,low,base 残留冠名 NEWMARKET PONY ACADEMY，Pride 意译骄傲；低置信度复核通过：冠名/补充说明已正确剥离。,骄傲锦标,通过
+983,united_kingdom,GODOLPHIN LIFETIME CARE OH SO SHARP STAKES,GODOLPHIN LIFETIME CARE OH SO SHARP STAKES,needs_translation,,奥索夏普锦标,low,base 残留冠名 GODOLPHIN LIFETIME CARE，Oh So Sharp 为名马音译；低置信度复核通过：冠名/补充说明已正确剥离。,奥索夏普锦标,通过
+984,united_kingdom,NEWMARKET ACADEMY GODOLPHIN BEACON PROJECT CORNWALLIS STAKES,NEWMARKET ACADEMY GODOLPHIN BEACON PROJECT CORNWALLIS STAKES,needs_translation,,康沃利斯锦标,low,base 残留冠名 NEWMARKET ACADEMY GODOLPHIN BEACON PROJECT，Cornwallis 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,干威利锦标,已修正
+985,united_kingdom,DARLEY DEWHURST STAKES,DARLEY DEWHURST STAKES,needs_translation,,杜赫斯特锦标,low,base 残留冠名 DARLEY，Dewhurst 音译杜赫斯特；低置信度复核：冠名/补充说明剥离及主体译名已修正；按HKJC既有译名统一。,杜何斯特锦标,已修正
+986,united_kingdom,TOO DARN HOT DARLEY STAKES,TOO DARN HOT DARLEY STAKES,needs_translation,,达利锦标,low,base 残留冠名 TOO DARN HOT，Darley 音译达利（Darley 本身亦具冠名性质）；低置信度复核通过：冠名/补充说明已正确剥离。,达利锦标,通过
+987,united_kingdom,NIGHT OF THUNDER ZETLAND STAKES,NIGHT OF THUNDER ZETLAND STAKES,needs_translation,,泽特兰锦标,low,base 残留冠名 NIGHT OF THUNDER，Zetland 音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,思兰锦标,已修正
+988,united_kingdom,EMIRATES AUTUMN STAKES,EMIRATES AUTUMN STAKES,needs_translation,,秋季锦标,low,base 残留冠名 EMIRATES，Autumn 意译秋季；低置信度复核通过：冠名/补充说明已正确剥离。,秋季锦标,通过
+989,united_kingdom,QIPCO CHAMPION STAKES,QIPCO CHAMPION STAKES,needs_translation,,冠军锦标,low,base 残留冠名 QIPCO，Champion 译冠军；低置信度复核：冠名/补充说明剥离及主体译名已修正；采用HKJC通行译名，并与其他地区Champion Stakes区分。,英国冠军锦标,已修正
+993,united_kingdom,WILLIAM HILL FUTURITY TROPHY STAKES,WILLIAM HILL FUTURITY TROPHY STAKES,needs_translation,,未来杯锦标,medium,Futurity Trophy 译未来杯，冠名已正确剥离；复核后修正；按WPStud既有译名统一。,英国未来锦标,已修正
+994,united_kingdom,BetVictor ST SIMON STAKES,BetVictor ST SIMON STAKES,needs_translation,,圣西蒙锦标,low,base 残留冠名 BetVictor，St Simon 通译圣西蒙；低置信度复核通过：冠名/补充说明已正确剥离；St Simon沿用名马/赛事通行译名“圣西蒙”。,圣西蒙锦标,重名已处理
+995,united_kingdom,BetVictor HORRIS HILL STAKES,BetVictor HORRIS HILL STAKES,needs_translation,,霍里斯山锦标,low,base 残留冠名 BetVictor，Horris Hill 音译；低置信度复核通过：冠名/补充说明已正确剥离。,霍里斯山锦标,通过
+685,france,PRIX EXBURY,PRIX EXBURY,term,Prix Exbury,埃克斯百里锦标,high,术语库已有译名（Prix Exbury）；复核通过。,埃克斯百里锦标,通过
+686,france,PRIX EDMOND BLANC,PRIX EDMOND BLANC,term,Prix Edmond Blanc,艾蒙巴克大赛,high,术语库已有译名（Prix Edmond Blanc）；复核通过。,艾蒙巴克大赛,通过
+687,france,PRIX LA FORCE,PRIX LA FORCE,term,Prix la Force,力量锦标,high,术语库已有译名（Prix la Force）；复核通过。,力量锦标,通过
+688,france,AL SHIRA’AA RACING PRIX VANTEAUX,AL SHIRA’AA RACING PRIX VANTEAUX,needs_translation,,万图锦标,medium,Prix Vanteaux 去掉 Al Shira'aa Racing 冠名，Vanteaux 音译；该词实为地名/旧庄名，译法未定型；复核后修正；按WPStud既有译名统一。,旺图锦标,已修正
+689,france,PRIX D’HARCOURT,PRIX D’HARCOURT,term,Prix d'Harcourt,夏葛特锦标,high,术语库已有译名（Prix d'Harcourt）；复核通过。,夏葛特锦标,通过
+690,france,PRIX DJEBEL,PRIX DJEBEL,term,Prix Djebel,高山锦标,high,术语库已有译名（Prix Djebel）；复核通过。,高山锦标,通过
+691,france,PRIX IMPRUDENCE,PRIX IMPRUDENCE,term,Prix Imprudence,不羁名驹大赛,high,术语库已有译名（Prix Imprudence）；复核通过。,不羁名驹大赛,通过
+692,france,PRIX DE FONTAINEBLEAU,PRIX DE FONTAINEBLEAU,term,Prix de Fontainebleau,枫丹白露大赛 方亭巴鲁大赛,high,术语库已有译名（Prix de Fontainebleau）；复核后修正；删除同一名称的重复候选“方亭巴鲁大赛”。,枫丹白露大赛,已修正
+693,france,PRIX DE LA GROTTE,PRIX DE LA GROTTE,term,Prix De La Grotte,具路都锦标,high,术语库已有译名（Prix De La Grotte）；复核通过。,具路都锦标,通过
+694,france,PRIX NOAILLES,PRIX NOAILLES,term,Prix Noailles,鲁力斯大赛,high,术语库已有译名（Prix Noailles）；复核通过。,鲁力斯大赛,通过
+695,france,PRIX SIGY,PRIX SIGY,term,Prix Sigy,先捷锦标,high,术语库已有译名（Prix Sigy）；复核通过。,先捷锦标,通过
+696,france,HENRI MATISSE COOLMORE PRIX CLEOPATRE,HENRI MATISSE COOLMORE PRIX CLEOPATRE,needs_translation,,克娄巴特拉锦标,medium,Prix Cléopâtre 去掉 Henri Matisse Coolmore 冠名，Cléopâtre 意译为埃及艳后克娄巴特拉；复核后修正；按WPStud既有译名统一。,埃及女王锦标,已修正
+697,france,PRIX DE BARBEVILLE,PRIX DE BARBEVILLE,term,Prix de Barbeville,巴比维尔锦标,high,术语库已有译名（Prix de Barbeville）；复核通过。,巴比维尔锦标,通过
+698,france,PRIX GANAY,PRIX GANAY,term,Prix Ganay,根利锦标,high,术语库已有译名（Prix Ganay）；复核通过。,根利锦标,通过
+699,france,PRIX DU MUGUET,PRIX DU MUGUET,term,Prix du Muguet,山谷百合锦标,high,术语库已有译名（Prix du Muguet）；复核通过。,山谷百合锦标,通过
+700,france,PRIX ALLEZ FRANCE,PRIX ALLEZ FRANCE,term,Prix Allez France,遨游法国锦标,high,术语库已有译名（Prix Allez France）；复核通过。,遨游法国锦标,通过
+701,france,PRIX D’HEDOUVILLE,PRIX D’HEDOUVILLE,term,Prix d'Hedouville,希度华大赛,high,术语库已有译名（Prix d'Hedouville）；复核通过。,希度华大赛,通过
+702,france,PRIX DE GUICHE,PRIX DE GUICHE,term,Prix de Guiche,杰时锦标,high,术语库已有译名（Prix de Guiche）；复核通过。,杰时锦标,通过
+703,france,PRIX GREFFULHE,PRIX GREFFULHE,term,Prix Greffulhe,国富大赛,high,术语库已有译名（Prix Greffulhe）；复核通过。,国富大赛,通过
+704,france,EMIRATES POULE D’ESSAI DES POULAINS,EMIRATES POULE D’ESSAI DES POULAINS,needs_translation,,法国二千坚尼,high,Poule d'Essai des Poulains 去掉 Emirates 冠名，通行译名为法国二千坚尼；复核通过。,法国二千坚尼,通过
+705,france,EMIRATES POULE D’ESSAI DES POULICHES,EMIRATES POULE D’ESSAI DES POULICHES,needs_translation,,法国一千坚尼,high,Poule d'Essai des Pouliches 去掉 Emirates 冠名，通行译名为法国一千坚尼；复核通过。,法国一千坚尼,通过
+706,france,CAMILLE PISSARRO COOLMORE PRIX SAINT -ALARY,CAMILLE PISSARRO COOLMORE PRIX SAINT -ALARY,needs_translation,,圣阿拉里锦标,medium,Prix Saint-Alary 去掉 Camille Pissarro Coolmore 冠名，Saint-Alary 为人名音译，base 中 'SAINT -ALARY' 有空格疑为原始数据问题；复核后修正；按WPStud既有译名统一。,圣安利尔大赛,已修正
+707,france,PRIX DE SAINT -GEORGES,PRIX DE SAINT -GEORGES,term,Prix de Saint-Georges,圣佐治锦标,high,术语库已有译名（Prix de Saint-Georges）；复核通过。,圣佐治锦标,通过
+708,france,PRIX TEXANITA,PRIX TEXANITA,needs_translation,,特克萨妮塔锦标,low,Prix Texanita 以名牝 Texanita 命名，音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,特萨妮塔锦标,已修正
+709,france,PRIX DU PALAIS-ROYAL,PRIX DU PALAIS-ROYAL,term,Prix du Palais-Royal,皇家宫殿锦标,high,术语库已有译名（Prix du Palais-Royal）；复核通过。,皇家宫殿锦标,通过
+710,france,PRIX D’ISPAHAN,PRIX D’ISPAHAN,term,Prix d'Ispahan,伊斯巴翰锦标,high,术语库已有译名（Prix d'Ispahan）；复核通过。,伊斯巴翰锦标,通过
+711,france,PRIX VICOMTESSE VIGIER,PRIX VICOMTESSE VIGIER,term,Prix Vicomtesse Vigier,韦杰亚女子爵锦标,high,术语库已有译名（Prix Vicomtesse Vigier）；复核通过。,韦杰亚女子爵锦标,通过
+712,france,PRIX CORRIDA,PRIX CORRIDA,term,Prix Corrida,斗牛锦标,high,术语库已有译名（Prix Corrida）；复核通过。,斗牛锦标,通过
+713,france,PRIX HOCQUART,PRIX HOCQUART,term,Prix Hocquart,奥卡尔锦标,high,术语库已有译名（Prix Hocquart）；复核通过。,奥卡尔锦标,通过
+714,france,PRIX DE ROYAUMONT,PRIX DE ROYAUMONT,needs_translation,,罗亚蒙锦标,medium,Prix de Royaumont，Royaumont 为罗亚蒙修道院地名；复核后修正；按WPStud既有译名统一。,鲁瓦约蒙锦标,已修正
+715,france,PRIX DE SANDRINGHAM,PRIX DE SANDRINGHAM,term,Prix de Sandringham,沙特利咸大赛,high,术语库已有译名（Prix de Sandringham）；复核通过。,沙特利咸大赛,通过
+716,france,QATAR PRIX DU JOCKEY CLUB,QATAR PRIX DU JOCKEY CLUB,needs_translation,,法国打吡,high,Prix du Jockey Club 去掉 Qatar 冠名，通行译名为法国打吡；复核后修正；按HKJC既有译名统一。,法国打吡大赛,已修正
+717,france,GRAND PRIX DE CHANTILL Y,GRAND PRIX DE CHANTILL Y,term,Grand Prix de Chantilly,尚蒂伊大赛,high,术语库已有译名（Grand Prix de Chantilly）；复核通过。,尚蒂伊大赛,通过
+718,france,PRIX DU GROS-CHENE,PRIX DU GROS-CHENE,term,Prix du Gros-Chene,橡树大赛,high,术语库已有译名（Prix du Gros-Chene）；复核通过。,橡树大赛,通过
+719,france,PRIX PAUL DE MOUSSAC,PRIX PAUL DE MOUSSAC,needs_translation,,保罗·德·穆萨克锦标,medium,Prix Paul de Moussac 人名音译；复核后修正；按WPStud既有译名统一。,保罗穆莎锦标,已修正
+720,france,KRA LA COUPE,KRA LA COUPE,needs_translation,,赛马杯,low,La Coupe 去掉 KRA 冠名，La Coupe 意即'杯赛'，中文无定型译名；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,杯赛,已修正
+721,france,PRIX DU L YS LONGINES,PRIX DU L YS LONGINES,needs_translation,,百合锦标,medium,Prix du Lys 去掉尾部 Longines 冠名（base 未剥离，且 'L YS' 疑为 LYS 断字），Lys 意为百合；复核通过。,百合锦标,通过
+722,france,PRIX DE DIANE LONGINES,PRIX DE DIANE LONGINES,needs_translation,,法国橡树大赛,high,Prix de Diane 去掉尾部 Longines 冠名（base 未剥离），通行译名为法国橡树大赛（戴安娜锦标）；复核通过。,法国橡树大赛,通过
+723,france,PRIX BERTRAND DU BREUIL LONGINES,PRIX BERTRAND DU BREUIL LONGINES,needs_translation,,贝特朗·杜·布勒伊锦标,medium,Prix Bertrand du Breuil 去掉尾部 Longines 冠名（base 未剥离），人名音译；复核后修正；按WPStud既有译名统一。,贝特朗·迪布勒伊锦标,已修正
+724,france,PRIX DE LA PORTE MAILLOT,PRIX DE LA PORTE MAILLOT,term,Prix de la Porte Maillot,万乐宝锦标,high,术语库已有译名（Prix de la Porte Maillot）；复核通过。,万乐宝锦标,通过
+725,france,PRIX DU BOIS,PRIX DU BOIS,term,Prix du Bois,木头锦标,high,术语库已有译名（Prix du Bois）；复核通过。,木头锦标,通过
+726,france,PRIX EUGENE ADAM,PRIX EUGENE ADAM,term,Prix Eugene Adam,尤金亚当锦标,high,术语库已有译名（Prix Eugene Adam）；复核通过。,尤金亚当锦标,通过
+727,france,PRIX DE RIS-ORANGIS,PRIX DE RIS-ORANGIS,term,Prix de Ris-Orangis,奥兰杰斯锦标,high,术语库已有译名（Prix de Ris-Orangis）；复核通过。,奥兰杰斯锦标,通过
+728,france,GRAND PRIX DE SAINT -CLOUD,GRAND PRIX DE SAINT -CLOUD,term,Grand Prix de Saint-Cloud,圣格卢大赛,high,术语库已有译名（Grand Prix de Saint-Cloud）；复核通过。,圣格卢大赛,通过
+729,france,PRIX JEAN PRAT,PRIX JEAN PRAT,term,Prix Jean Prat,庄柏德大赛,high,术语库已有译名（Prix Jean Prat）；复核通过。,庄柏德大赛,通过
+730,france,CYGAMES PRIX DE MALLERET,CYGAMES PRIX DE MALLERET,needs_translation,,马勒雷锦标,medium,Prix de Malleret 去掉 Cygames 冠名，Malleret 为地名音译；复核后修正；按WPStud既有译名统一。,马拉威特大赛,已修正
+731,france,CYGAMES GRAND PRIX DE PARIS,CYGAMES GRAND PRIX DE PARIS,needs_translation,,巴黎大赛,high,Grand Prix de Paris 去掉 Cygames 冠名，Grand Prix 译大赛；复核通过。,巴黎大赛,通过
+732,france,PRIX MAURICE DE NIEUIL,PRIX MAURICE DE NIEUIL,term,Prix Maurice de Nieuil,尼雅大赛,high,术语库已有译名（Prix Maurice de Nieuil）；复核通过。,尼雅大赛,通过
+733,france,GOFFS PRIX ROBERT PAPIN,GOFFS PRIX ROBERT PAPIN,needs_translation,,罗贝尔·帕潘锦标,medium,Prix Robert Papin 去掉 Goffs 冠名，人名音译；复核后修正；按WPStud既有译名统一。,毕罗拔大赛,已修正
+734,france,DARLEY PRIX CHLOE,DARLEY PRIX CHLOE,needs_translation,,克洛伊锦标,medium,Prix Chloé 去掉 Darley 冠名，Chloé 为常用人名译法；复核通过。,克洛伊锦标,通过
+735,france,PRIX MESSIDOR,PRIX MESSIDOR,term,Prix Messidor,莫诗度锦标,high,术语库已有译名（Prix Messidor）；复核通过。,莫诗度锦标,通过
+736,france,GRAND PRIX DE VICHY,GRAND PRIX DE VICHY,term,Grand Prix De Vichy,维希大赛,high,术语库已有译名（Grand Prix De Vichy）；复核通过。,维希大赛,通过
+737,france,PRIX DE CABOURG - FONDS EUROPEEN DE L ’ELEVAGE,PRIX DE CABOURG - FONDS EUROPEEN DE L ’ELEVAGE,needs_translation,,卡布尔锦标,medium,Prix de Cabourg 去掉 '- Fonds Européen de l'Élevage' 冠名后缀（base 未剥离），Cabourg 为海滨城镇卡布尔；复核后修正；按WPStud既有译名统一。,卡堡锦标,已修正
+738,france,SKY SPORTS RACING PRIX SIX PERFECTIONS - FONDS EUROPEEN DE L ’ELEVAGE,SKY SPORTS RACING PRIX SIX PERFECTIONS - FONDS EUROPEEN DE L ’ELEVAGE,needs_translation,,尽善尽美锦标,low,Prix Six Perfections 去掉 Sky Sports Racing 冠名及 Fonds Européen 后缀（base 均未剥离），以名牝 Six Perfections 命名，意译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,六星完美锦标,已修正
+739,france,SKY SPORTS RACING PRIX DE PSYCHE - FONDS EUROPEEN DE L ’ELEVAGE,SKY SPORTS RACING PRIX DE PSYCHE - FONDS EUROPEEN DE L ’ELEVAGE,needs_translation,,普绪喀锦标,medium,Prix de Psyché 去掉 Sky Sports Racing 冠名及 Fonds Européen 后缀（base 均未剥离），Psyché 为神话人物普绪喀；复核后修正；按WPStud既有译名统一。,普赛克锦标,已修正
+740,france,PRIX ROTHSCHILD - FONDS EUROPEEN DE L ’ELEVAGE,PRIX ROTHSCHILD - FONDS EUROPEEN DE L ’ELEVAGE,needs_translation,,罗斯柴尔德锦标,medium,Prix Rothschild 去掉 Fonds Européen 后缀（base 未剥离），Rothschild 通行译名罗斯柴尔德；复核后修正；按HKJC既有译名统一。,罗斯齐尔德大赛,已修正
+741,france,PRIX DE REUX,PRIX DE REUX,term,Prix de Reux,罗鲁锦标,high,术语库已有译名（Prix de Reux）；复核通过。,罗鲁锦标,通过
+742,france,PRIX DAPHNIS,PRIX DAPHNIS,term,Prix Daphnis,戴芙莉锦标,high,术语库已有译名（Prix Daphnis）；复核通过。,戴芙莉锦标,通过
+743,france,ARC PRIX MAURICE DE GHEEST - FONDS EUROPEEN DE L ’ELEVAGE,ARC PRIX MAURICE DE GHEEST - FONDS EUROPEEN DE L ’ELEVAGE,needs_translation,,纪尔斯大赛,high,Prix Maurice de Gheest 去掉 ARC 冠名及 Fonds Européen 后缀（base 均未剥离），采用既有译名纪尔斯大赛；复核通过。,纪尔斯大赛,通过
+744,france,PRIX ALEC HEAD (PRIX DE POMONE),PRIX ALEC HEAD (PRIX DE POMONE),needs_translation,,亚历克·海德锦标,medium,Prix Alec Head 人名音译；base 括号内 Prix de Pomone 为该赛事旧名，未一并译出；历史旧名复核修正：当前赛事名为Prix Alec Head；Prix de Pomone仅为括号内旧名。,亚历克·海德锦标,已修正
+745,france,DARLEY PRIX DE LIEUREY,DARLEY PRIX DE LIEUREY,needs_translation,,利厄雷锦标,low,Prix de Lieurey 去掉 Darley 冠名，Lieurey 为厄尔省小镇，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,里维锦标,已修正
+747,france,PRIX GONTAUT -BIRON HONG KONG JOCKEY CLUB,PRIX GONTAUT -BIRON HONG KONG JOCKEY CLUB,term,Prix Gontaut-Biron Hong Kong Jockey Club,香港赛马会拜伦锦标,high,术语库已有译名（Prix Gontaut-Biron Hong Kong Jockey Club）；复核通过。,香港赛马会拜伦锦标,通过
+748,france,THE AGA KHAN STUDS PRIX FRANCOIS BOUTIN,THE AGA KHAN STUDS PRIX FRANCOIS BOUTIN,needs_translation,,弗朗索瓦·布坦锦标,medium,Prix François Boutin 去掉 The Aga Khan Studs 冠名（base 未剥离），人名音译（练马师布坦）；复核通过。,弗朗索瓦·布坦锦标,通过
+749,france,THE AGA KHAN STUDS PRIX LADY O’REILL Y (PRIX MINERVE),THE AGA KHAN STUDS PRIX LADY O’REILL Y (PRIX MINERVE),needs_translation,,弥涅瓦锦标,low,以括号内旧名 Prix Minerve 译出（Minerve 即智慧女神弥涅瓦），去掉 Aga Khan 冠名；Lady O'Reilly 疑为冠名马主名；低置信度复核：冠名/补充说明剥离及主体译名已修正；Lady O’Reilly是当前赛事主体；括号内Prix Minerve为旧名，不写入最终名称。,奥赖利夫人锦标,已修正
+750,france,THE AGA KHAN STUDS PRIX JACQUES LE MAROIS,THE AGA KHAN STUDS PRIX JACQUES LE MAROIS,needs_translation,,杰克莫华大赛,high,Prix Jacques Le Marois 去掉 The Aga Khan Studs 冠名（base 未剥离），采用既有译名杰克莫华大赛；复核通过。,杰克莫华大赛,通过
+751,france,SUMBE PRIX DU CALVADOS,SUMBE PRIX DU CALVADOS,needs_translation,,卡尔瓦多斯锦标,medium,Prix du Calvados 去掉 Sumbe 冠名，Calvados 为法国省份通行译名；复核后修正；按WPStud既有译名统一。,卡尔瓦多斯大赛,已修正
+752,france,SUMBE PRIX MORNY,SUMBE PRIX MORNY,needs_translation,,莫尼大赛,high,Prix Morny 去掉 Sumbe 冠名，采用既有译名莫尼大赛；复核通过。,莫尼大赛,通过
+753,france,SUMBE PRIX KERGORLAY,SUMBE PRIX KERGORLAY,needs_translation,,凯尔戈莱锦标,low,Prix Kergorlay 去掉 Sumbe 冠名，Kergorlay 为布列塔尼姓氏/地名，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,贾嘉利大赛,已修正
+754,france,SUMBE PRIX JEAN ROMANET,SUMBE PRIX JEAN ROMANET,needs_translation,,让·罗马内锦标,medium,Prix Jean Romanet 去掉 Sumbe 冠名，人名音译；或沿用既有译名尚罗万尼大赛；复核后修正；按HKJC既有译名统一。,尚罗万尼锦标,已修正
+755,france,BARRIERE PRIX DE MEAUTRY,BARRIERE PRIX DE MEAUTRY,needs_translation,,莫特里锦标,medium,Prix de Meautry 去掉 Barrière 冠名，Meautry 为诺曼底庄名，译法未定型；复核后修正；按WPStud既有译名统一。,莫特尔锦标,已修正
+756,france,BARRIERE PRIX QUINCEY,BARRIERE PRIX QUINCEY,needs_translation,,坎西锦标,low,Prix Quincey 去掉 Barrière 冠名，Quincey 为地名，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,昆西大赛,已修正
+757,france,LUCIEN BARRIERE GRAND PRIX DE DEAUVILLE,LUCIEN BARRIERE GRAND PRIX DE DEAUVILLE,needs_translation,,多维尔大赛,medium,Grand Prix de Deauville 去掉 Lucien Barrière 冠名，Deauville 通行译名多维尔；复核通过。,多维尔大赛,通过
+758,france,PRIX D’ARENBERG,PRIX D’ARENBERG,term,Prix d'Arenberg,雅兰堡大赛,high,术语库已有译名（Prix d'Arenberg）；复核通过。,雅兰堡大赛,通过
+760,france,QATAR PRIX NIEL,QATAR PRIX NIEL,needs_translation,,尼尔锦标,high,Prix Niel 去掉 Qatar 冠名，采用既有译名尼尔锦标；复核通过。,尼尔锦标,通过
+761,france,QATAR PRIX DU MOULIN DE LONGCHAMP,QATAR PRIX DU MOULIN DE LONGCHAMP,needs_translation,,隆尚磨坊大赛,high,Prix du Moulin de Longchamp 去掉 Qatar 冠名，采用既有译名隆尚磨坊大赛；复核通过。,隆尚磨坊大赛,通过
+762,france,QATAR PRIX VERMEILLE,QATAR PRIX VERMEILLE,needs_translation,,红宝锦标,high,Prix Vermeille 去掉 Qatar 冠名，采用既有译名红宝锦标；复核通过。,红宝锦标,通过
+763,france,QATAR PRIX FOY,QATAR PRIX FOY,needs_translation,,福伊锦标,high,Prix Foy 去掉 Qatar 冠名，采用既有译名福伊锦标；复核通过。,福伊锦标,通过
+764,france,QATAR PRIX D’AUMALE,QATAR PRIX D’AUMALE,needs_translation,,奥马勒锦标,medium,Prix d'Aumale 去掉 Qatar 冠名，Aumale 为贵族封号（奥马勒公爵），译法未定型；复核后修正；按WPStud既有译名统一。,爱曼大赛,已修正
+765,france,QATAR PRIX LA ROCHETTE,QATAR PRIX LA ROCHETTE,needs_translation,,拉罗谢特锦标,medium,Prix La Rochette 去掉 Qatar 冠名，地名/庄名音译，译法未定型；复核后修正；按WPStud既有译名统一。,诺卓亭大赛,已修正
+766,france,PRIX GLADIATEUR,PRIX GLADIATEUR,term,Prix Gladiateur,战士锦标,high,术语库已有译名（Prix Gladiateur）；复核通过。,战士锦标,通过
+767,france,PRIX DU PRINCE D’ORANGE,PRIX DU PRINCE D’ORANGE,term,Prix du Prince d'Orange,奥兰治太子锦标,high,术语库已有译名（Prix du Prince d'Orange）；复核通过。,奥兰治太子锦标,通过
+768,france,PRIX DU PIN,PRIX DU PIN,term,Prix du Pin,松树大赛,high,术语库已有译名（Prix du Pin）；复核通过。,松树大赛,通过
+769,france,PRIX DU PETIT COUVERT,PRIX DU PETIT COUVERT,term,Prix du Petit Couvert,小盖锦标,high,术语库已有译名（Prix du Petit Couvert）；复核通过。,小盖锦标,通过
+770,france,PRIX ECLIPSE - FONDS EUROPEEN DE L ’ELEVAGE,PRIX ECLIPSE - FONDS EUROPEEN DE L ’ELEVAGE,needs_translation,,日蚀锦标,medium,Prix Eclipse 去掉 Fonds Européen 后缀（base 未剥离），以名驹 Eclipse（日蚀）命名；复核通过；法国Prix Eclipse保留“日蚀锦标”，与英国日蚀大赛区分。,日蚀锦标,重名已处理
+771,france,PRIX DES CHENES - FONDS EUROPEEN DE L ’ELEVAGE,PRIX DES CHENES - FONDS EUROPEEN DE L ’ELEVAGE,needs_translation,,橡树锦标,medium,Prix des Chênes 去掉 Fonds Européen 后缀（base 未剥离），Chênes 意为橡树；复核通过；Prix des Chênes按法国赛事主体译作“橡树锦标”，不与英国Oaks合并。,橡树锦标,重名已处理
+772,france,PRIX BERTRAND DE TARRAGON - FONDS EUROPEEN DE L ’ELEVAGE,PRIX BERTRAND DE TARRAGON - FONDS EUROPEEN DE L ’ELEVAGE,needs_translation,,贝特朗·德·塔拉贡锦标,low,Prix Bertrand de Tarragon 去掉 Fonds Européen 后缀（base 未剥离），人名音译，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；统一法语人名连接词写法。,贝特朗·德塔拉贡锦标,已修正
+773,france,PRIX DE CONDE,PRIX DE CONDE,term,Prix de Conde,康特锦标,high,术语库已有译名（Prix de Conde）；复核通过。,康特锦标,通过
+774,france,QATAR PRIX CHAUDENAY,QATAR PRIX CHAUDENAY,needs_translation,,绍德奈锦标,medium,Prix Chaudenay 去掉 Qatar 冠名，Chaudenay 为地名音译；复核通过。,绍德奈锦标,通过
+775,france,QATAR PRIX DANIEL WILDENSTEIN,QATAR PRIX DANIEL WILDENSTEIN,needs_translation,,丹尼尔·维尔登斯坦锦标,medium,Prix Daniel Wildenstein 去掉 Qatar 冠名，马主家族姓氏音译；复核后修正；按WPStud既有译名统一。,维尔登斯坦锦标,已修正
+776,france,QATAR PRIX DOLLAR,QATAR PRIX DOLLAR,needs_translation,,多拉锦标,low,Prix Dollar 去掉 Qatar 冠名，以名驹 Dollar 命名，音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,多拉尔锦标,已修正
+777,france,QATAR PRIX DE ROYALLIEU,QATAR PRIX DE ROYALLIEU,needs_translation,,罗亚利厄锦标,low,Prix de Royallieu 去掉 Qatar 冠名，Royallieu 为贡比涅森林地名，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,皇家地锦标,已修正
+778,france,QATAR PRIX DU CADRAN,QATAR PRIX DU CADRAN,needs_translation,,嘉登大赛,high,Prix du Cadran 去掉 Qatar 冠名，采用既有译名嘉登大赛；复核通过。,嘉登大赛,通过
+779,france,QATAR PRIX JEAN-LUC LAGARDERE,QATAR PRIX JEAN-LUC LAGARDERE,needs_translation,,尚卢利加迪大赛,medium,Prix Jean-Luc Lagardère 去掉 Qatar 冠名，采用既有译名尚卢利加迪大赛（让-吕克·拉加代尔）；复核通过。,尚卢利加迪大赛,通过
+781,france,PRIX DE L ’ABBAYE DE LONGCHAMP LONGINES,PRIX DE L ’ABBAYE DE LONGCHAMP LONGINES,needs_translation,,隆尚教堂大赛,high,Prix de l'Abbaye de Longchamp 去掉尾部 Longines 冠名（base 未剥离），沿用上线译名；复核通过。,隆尚教堂大赛,通过
+782,france,PRIX DE L ’OPERA LONGINES,PRIX DE L ’OPERA LONGINES,needs_translation,,歌剧锦标,high,Prix de l'Opéra 去掉尾部 Longines 冠名（base 未剥离），采用既有译名歌剧锦标；复核通过。,歌剧锦标,通过
+783,france,QATAR PRIX DE LA FORET,QATAR PRIX DE LA FORET,needs_translation,,森林大赛,high,Prix de la Forêt 去掉 Qatar 冠名，采用既有译名森林大赛；复核通过。,森林大赛,通过
+784,france,QATAR PRIX DE L ’ARC DE TRIOMPHE,QATAR PRIX DE L ’ARC DE TRIOMPHE,needs_translation,,凯旋门大赛,high,Prix de l'Arc de Triomphe 去掉 Qatar 冠名，沿用上线译名凯旋门大赛；复核通过。,凯旋门大赛,通过
+786,france,PRIX DU CONSEIL DE PARIS,PRIX DU CONSEIL DE PARIS,term,Prix du Conseil de Paris,巴黎市议会大赛,high,术语库已有译名（Prix du Conseil de Paris）；复核通过。,巴黎市议会大赛,通过
+789,france,PRIX PERTH,PRIX PERTH,term,Prix Perth,柏斯锦标,high,术语库已有译名（Prix Perth）；复核通过。,柏斯锦标,通过
+790,france,PRIX DE FLORE,PRIX DE FLORE,term,Prix de Flore,花拉锦标,high,术语库已有译名（Prix de Flore）；复核通过。,花拉锦标,通过
+791,france,PRIX BELLE DE NUIT,PRIX BELLE DE NUIT,term,Prix Belle de Nuit,迷人夜色锦标,high,术语库已有译名（Prix Belle de Nuit）；复核通过。,迷人夜色锦标,通过
+792,france,PRIX ROYAL-OAK,PRIX ROYAL-OAK,term,Prix Royal-Oak,皇家橡树锦标 (法国圣烈治大赛),high,术语库已有译名（Prix Royal-Oak）；复核通过。,皇家橡树锦标 (法国圣烈治大赛),通过
+793,france,DARLEY PRIX DES RESERVOIRS,DARLEY PRIX DES RESERVOIRS,needs_translation,,蓄水池锦标,low,Prix des Réservoirs 去掉 Darley 冠名，Réservoirs 为多维尔附近地名/林地，意译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；按WPStud既有译名统一。,水塘锦标,已修正
+794,france,PRIX DE SEINE-ET -OISE,PRIX DE SEINE-ET -OISE,term,Prix de Seine-et-Oise,瓦兹省塞纳河锦标,high,术语库已有译名（Prix de Seine-et-Oise）；复核通过。,瓦兹省塞纳河锦标,通过
+796,france,PRIX THOMAS BRYON,PRIX THOMAS BRYON,term,Prix Thomas Bryon,拜伦锦标,high,术语库已有译名（Prix Thomas Bryon）；复核通过。,拜伦锦标,通过
+797,france,PRIX MIESQUE,PRIX MIESQUE,needs_translation,,美酒皇后锦标,medium,Prix Miesque 以名牝 Miesque（中文马名美酒皇后）命名；复核通过；Miesque采用既有名马中文译名“美酒皇后”。,美酒皇后锦标,通过
+798,france,GSC MASTERS - PRIX ROBERT DE CLERMONT - TONNERRE,GSC MASTERS - PRIX ROBERT DE CLERMONT - TONNERRE,needs_translation,,克莱蒙-托内尔锦标,low,Prix Robert de Clermont-Tonnerre 去掉 GSC Masters 系列冠名（base 未剥离），人名音译，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；补全纪念人物姓名。,罗伯特·德克莱蒙－托内尔锦标,已修正
+799,france,PRIX JUIGNE,PRIX JUIGNE,needs_translation,,朱尼耶锦标,low,Prix Juigné 人名/地名音译，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,居涅跨栏锦标,已修正
+800,france,PRIX D’INDY,PRIX D’INDY,needs_translation,,印地锦标,low,Prix d'Indy 名称音译，来源（马名/地名）不明；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,丹第跨栏锦标,已修正
+801,france,PRIX DUC D’ANJOU,PRIX DUC D’ANJOU,needs_translation,,安茹公爵锦标,medium,Prix Duc d'Anjou，Duc d'Anjou 意译为安茹公爵；复核后修正；该赛事为障碍赛，补回赛事类型。,安茹公爵障碍锦标,已修正
+802,france,GRAND STEEPLE-CHASE MASTERS - PRIX TROYTOWN,GRAND STEEPLE-CHASE MASTERS - PRIX TROYTOWN,needs_translation,,特洛伊城锦标,low,Prix Troytown 去掉 Grand Steeple-Chase Masters 系列冠名（base 未剥离），Troytown 为爱尔兰地名/马名，意译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；Grand Steeple-Chase Masters为系列冠名/标签，Troytown为赛事主体。,特洛伊镇障碍锦标,已修正
+803,france,PRIX DE PEPINVAST,PRIX DE PEPINVAST,needs_translation,,佩潘瓦锦标,low,Prix de Pépinvast 地名音译，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,佩潘瓦跨栏锦标,已修正
+804,france,PRIX LA BARKA,PRIX LA BARKA,needs_translation,,拉巴卡锦标,low,Prix La Barka 以名牝 La Barka 命名，音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,拉巴尔卡跨栏锦标,已修正
+805,france,PRIX FLEURET,PRIX FLEURET,needs_translation,,花剑锦标,low,Prix Fleuret，Fleuret 意为花剑，疑以马名命名，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,花剑障碍锦标,已修正
+806,france,GRAND STEEPLE-CHASE MASTERS - PRIX MURAT,GRAND STEEPLE-CHASE MASTERS - PRIX MURAT,needs_translation,,缪拉锦标,medium,Prix Murat 去掉 Grand Steeple-Chase Masters 系列冠名（base 未剥离），Murat 为人名（元帅缪拉）；复核后修正；Grand Steeple-Chase Masters为系列标签，Murat为赛事主体。,缪拉障碍锦标,已修正
+807,france,PRIX JOURNALISTE,PRIX JOURNALISTE,needs_translation,,记者锦标,low,Prix Journaliste，Journaliste 意为记者，疑以马名命名，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,记者障碍锦标,已修正
+808,france,PRIX WILLIAM ET ALEC HEAD,PRIX WILLIAM ET ALEC HEAD,needs_translation,,威廉与亚历克·海德锦标,low,Prix William et Alec Head 人名音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,威廉与亚历克·海德障碍锦标,已修正
+810,france,PRIX AMADOU,PRIX AMADOU,needs_translation,,阿马杜锦标,low,Prix Amadou，Amadou 意为火绒（疑为马名），音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,阿马杜跨栏锦标,已修正
+811,france,PRIX LEON RAMBAUD,PRIX LEON RAMBAUD,needs_translation,,莱昂·朗博锦标,low,Prix Léon Rambaud 人名音译，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,莱昂·朗博跨栏锦标,已修正
+812,france,PRIX JEAN STERN,PRIX JEAN STERN,needs_translation,,让·斯特恩锦标,low,Prix Jean Stern 人名音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,让·斯特恩障碍锦标,已修正
+813,france,PRIX HOPPER,PRIX HOPPER,needs_translation,,霍珀锦标,low,Prix Hopper 疑以马名命名，音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,霍珀障碍锦标,已修正
+815,france,GRAND STEEPLE-CHASE MASTERS - PRIX INGRE,GRAND STEEPLE-CHASE MASTERS - PRIX INGRE,needs_translation,,安格雷锦标,low,Prix Ingré 去掉 Grand Steeple-Chase Masters 系列冠名（base 未剥离），Ingré 为奥尔良附近城镇；低置信度复核：冠名/补充说明剥离及主体译名已修正；Grand Steeple-Chase Masters为系列标签，Ingré为赛事主体。,安格尔障碍锦标,已修正
+816,france,PRIX ROMATI,PRIX ROMATI,needs_translation,,罗马蒂锦标,low,Prix Romati 疑以马名命名，音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,罗马蒂障碍锦标,已修正
+817,france,PRIX SAGAN,PRIX SAGAN,needs_translation,,萨冈锦标,low,Prix Sagan 名称音译（疑以马名命名），译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,萨冈跨栏锦标,已修正
+818,france,RACING TV GRANDE COURSE DE HAIES D’AUTEUIL,RACING TV GRANDE COURSE DE HAIES D’AUTEUIL,needs_translation,,奥特伊大跨栏赛,medium,Grande Course de Haies d'Auteuil 去掉 Racing TV 冠名（base 未剥离），Haies 为跨栏、Auteuil 译奥特伊，译法未定型；复核通过。,奥特伊大跨栏赛,通过
+819,france,PRIX AGUADO,PRIX AGUADO,needs_translation,,阿瓜多锦标,low,Prix Aguado 人名/马名音译，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,阿瓜多跨栏锦标,已修正
+820,france,PRIX ALAIN DU BREIL - COURSE DE HAIES DE PRINTEMPS DES QUATRE ANS,PRIX ALAIN DU BREIL - COURSE DE HAIES DE PRINTEMPS DES QUATRE ANS,needs_translation,,阿兰·杜·布勒伊春季跨栏大赛,low,全名为 Prix Alain du Breil - Course de Haies de Printemps des Quatre Ans（四岁马春季跨栏赛），人名音译加意译；低置信度复核：冠名/补充说明剥离及主体译名已修正；保留赛事专名和四岁马春季跨栏身份。,阿兰·迪布雷伊四岁马春季跨栏锦标,已修正
+821,france,PRIX FERDINAND DUFAURE,PRIX FERDINAND DUFAURE,needs_translation,,费迪南·迪福尔锦标,low,Prix Ferdinand Dufaure 人名音译，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,费迪南·迪福尔障碍锦标,已修正
+822,france,GRAND STEEPLE-CHASE DE PARIS,GRAND STEEPLE-CHASE DE PARIS,history,Grand Steeple-Chase de Paris,巴黎大障碍赛,high,历史赛事已上线译名（Grand Steeple-Chase de Paris）；复核通过。,巴黎大障碍赛,通过
+824,france,PRIX QUESTARABAD,PRIX QUESTARABAD,needs_translation,,奎斯塔拉巴德锦标,low,Prix Questarabad 以马名命名，音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,凯斯塔拉巴德跨栏锦标,已修正
+825,france,PRIX HYPOTHESE,PRIX HYPOTHESE,needs_translation,,假设锦标,low,Prix Hypothèse，Hypothèse 意为假设（疑以马名命名），意译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,假设跨栏锦标,已修正
+826,france,PRIX LA PERICHOLE,PRIX LA PERICHOLE,needs_translation,,佩里绍勒锦标,low,Prix La Périchole 源自奥芬巴赫歌剧名，音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,拉佩里绍勒障碍锦标,已修正
+827,france,PRIX DES DRAGS,PRIX DES DRAGS,needs_translation,,德拉格锦标,low,Prix des Drags，Drags 含义（猎车/狩猎）不明，取音译，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,德拉格斯障碍锦标,已修正
+829,france,PRIX DE CHAMBL Y,PRIX DE CHAMBL Y,needs_translation,,尚布利锦标,medium,Prix de Chambly，Chambly 为瓦兹省城镇（base 中 'CHAMBL Y' 疑为断字）；复核后修正；该赛事为跨栏赛，补回赛事类型。,尚布利跨栏锦标,已修正
+830,france,PRIX DE COMPIEGNE,PRIX DE COMPIEGNE,needs_translation,,贡比涅锦标,medium,Prix de Compiègne，Compiègne 通行译名贡比涅；复核后修正；该赛事为跨栏赛，补回赛事类型。,贡比涅跨栏锦标,已修正
+833,france,PRIX DE MAISONS-LAFFITTE,PRIX DE MAISONS-LAFFITTE,needs_translation,,迈松拉菲特锦标,medium,Prix de Maisons-Laffitte，Maisons-Laffitte 通行译名迈松拉菲特；复核后修正；该赛事为跨栏赛，补回赛事类型。,迈松拉菲特跨栏锦标,已修正
+834,france,PRIX DE LA GASCOGNE,PRIX DE LA GASCOGNE,needs_translation,,加斯科涅锦标,medium,Prix de la Gascogne，Gascogne 通行译名加斯科涅；复核后修正；该赛事为障碍赛，补回赛事类型。,加斯科涅障碍锦标,已修正
+835,france,PRIX MONTGOMERY,PRIX MONTGOMERY,needs_translation,,蒙哥马利锦标,medium,Prix Montgomery，Montgomery 通行译名蒙哥马利；复核后修正；该赛事为障碍赛；尾部H为让赛说明，不写入名称。,蒙哥马利障碍锦标,已修正
+836,france,PRIX MAGNE,PRIX MAGNE,needs_translation,,马涅锦标,low,Prix Magne 人名/马名音译，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,马涅跨栏锦标,已修正
+838,france,PRIX CARMARTHEN,PRIX CARMARTHEN,needs_translation,,卡马森锦标,low,Prix Carmarthen，Carmarthen 为威尔士城镇卡马森；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,卡马森跨栏锦标,已修正
+840,france,PRIX ORCADA,PRIX ORCADA,needs_translation,,奥尔卡达锦标,low,Prix Orcada 疑以马名命名，音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,奥尔卡达障碍锦标,已修正
+841,france,PRIX HEROS XII,PRIX HEROS XII,needs_translation,,英雄十二世锦标,low,Prix Héros XII 以名驹 Héros XII（英雄十二世）命名，意译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,英雄十二障碍锦标,已修正
+844,france,PRIX SERGE LANDON - GRAND PRIX D’AUTOMNE,PRIX SERGE LANDON - GRAND PRIX D’AUTOMNE,needs_translation,,秋季大赛,medium,正式名为 Grand Prix d'Automne（秋季大赛），Prix Serge Landon 为冠名部分，人名不入译名；复核后修正；Serge Landon为纪念附名；Grand Prix d’Automne为赛事核心名称。,秋季大跨栏赛,已修正
+845,france,PRIX CONGRESS,PRIX CONGRESS,needs_translation,,康格雷斯锦标,low,Prix Congress 疑以马名命名，取音译，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,国会障碍锦标,已修正
+846,france,PRIX CAMBACERES - GRANDE COURSE DE HAIES DES 3 ANS,PRIX CAMBACERES - GRANDE COURSE DE HAIES DES 3 ANS,needs_translation,,康巴塞雷斯三岁跨栏大赛,low,全名为 Prix Cambacérès - Grande Course de Haies des 3 Ans（三岁马跨栏大赛），Cambacérès 人名音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；完整保留三岁马大跨栏赛事身份。,康巴塞雷斯三岁马跨栏大赛,已修正
+847,france,PRIX RENAUD DU VIVIER - GRANDE COURSE DE HAIES DES 4 ANS,PRIX RENAUD DU VIVIER - GRANDE COURSE DE HAIES DES 4 ANS,needs_translation,,雷诺·迪维维耶四岁跨栏大赛,low,全名为 Prix Renaud du Vivier - Grande Course de Haies des 4 Ans（四岁马跨栏大赛），人名音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；完整保留四岁马大跨栏赛事身份。,雷诺·迪维维耶四岁马跨栏大赛,已修正
+848,france,PRIX MAURICE GILLOIS - GRAND STEEPLE-CHASE DES 4 ANS,PRIX MAURICE GILLOIS - GRAND STEEPLE-CHASE DES 4 ANS,needs_translation,,莫里斯·吉卢瓦四岁大障碍赛,low,全名为 Prix Maurice Gillois - Grand Steeple-Chase des 4 Ans（四岁马大障碍赛），人名音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；完整保留四岁马大障碍赛事身份。,莫里斯·吉卢瓦四岁马大障碍赛,已修正
+849,france,PRIX FONDEUR,PRIX FONDEUR,needs_translation,,丰德尔锦标,low,Prix Fondeur，Fondeur 意为熔炼工（疑为马名），取音译，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；Fondeur按语义译为“铸造者”，并补回障碍类型。,铸造者障碍锦标,已修正
+852,france,PRIX LEOPOLD D’ORSETTI - GRANDE COURSE DE HAIES DE COMPIEGNE,PRIX LEOPOLD D’ORSETTI - GRANDE COURSE DE HAIES DE COMPIEGNE,needs_translation,,莱奥波德·多尔塞蒂贡比涅跨栏大赛,low,全名为 Prix Léopold d'Orsetti - Grande Course de Haies de Compiègne（贡比涅跨栏大赛），人名音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；Leopold d’Orsetti为纪念附名；Grande Course de Haies de Compiègne为赛事核心。,贡比涅大跨栏赛,已修正
+853,france,PRIX SYTAJ,PRIX SYTAJ,needs_translation,,西塔吉锦标,low,Prix Sytaj 以马名命名，音译未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,西塔伊障碍锦标,已修正
+854,france,PRIX ANDRE MICHEL,PRIX ANDRE MICHEL,needs_translation,,安德烈·米歇尔锦标,low,Prix André Michel 人名音译；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为跨栏赛，补回赛事类型。,安德烈·米歇尔跨栏锦标,已修正
+856,france,PRIX MORGEX,PRIX MORGEX,needs_translation,,莫尔热锦标,low,Prix Morgex，Morgex 为意大利奥斯塔山谷小镇，译法未定型；低置信度复核：冠名/补充说明剥离及主体译名已修正；该赛事为障碍赛，补回赛事类型。,莫尔热障碍锦标,已修正
