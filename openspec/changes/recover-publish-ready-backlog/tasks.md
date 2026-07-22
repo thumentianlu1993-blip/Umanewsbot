@@ -35,7 +35,7 @@
 
 ## 5. 生产灰度与历史处置
 
-- [ ] 5.1 (operations) 部署前备份并核对生产 HEAD/环境/容器/迁移，部署后保持积压通道关闭并执行只读候选预览 (req: req-candidate-backlog-fill)
-- [ ] 5.2 (operations) 先开启一个地区并观察 4 个窗口，再扩到五地区；验证每窗口和全站配额未变化 (req: req-candidate-backlog-fill)
+- [x] 5.1 (operations) 部署前备份并核对生产 HEAD/环境/容器/迁移，部署后保持积压通道关闭并执行只读候选预览 (req: req-candidate-backlog-fill)
+- [x] 5.2 (operations) 先开启一个地区并观察 4 个窗口，再扩到五地区；验证每窗口和全站配额未变化 (req: req-candidate-backlog-fill)
 - [ ] 5.3 (operations) 对当前历史候选生成新 manifest，按“默认不自动公开”提交用户审核后再执行批准动作 (req: req-backlog-recovery-manifest)
 - [ ] 5.4 (operations) 观察 24 小时候选消费、过期队列、窗口决策、公开页和 QQ，异常时关闭积压通道 (req: req-stale-ready-review)

@@ -1,6 +1,38 @@
 # 部署运行手册
 
-## publish_ready 积压治理部署与灰度（2026-07-22，尚未执行）
+## publish_ready 积压治理部署与灰度（2026-07-22，五地区 24 小时观察中）
+
+### 0. 本次实际执行证据
+
+- 代码：生产 `HEAD=8bbf7a2551296177da6556029e325db57bd369cc`；web/worker/beat/race_live_worker
+  统一使用 `sha256:251706abb947b7292b36e2ac24285f9d75661031c2cbdcba3259539792b5b0cb`。
+- 恢复点：`.env.backup.publish-ready-20260722_172001`（SHA-256 `7af509d6…`）；
+  `backups/db/pre-publish-ready-20260722_172001.dump`（`230492618` 字节、SHA-256
+  `4aac6117…`、`pg_restore -l` `1017` 项）；旧镜像标签
+  `umanewsbot:rollback-pre-publish-ready-26eb03e3-20260722_172001`。
+- 迁移：`0053_newsarticle_publish_ready_at` 已应用；nullable 列与
+  `news_region_ready_at_idx` 存在；21 条历史 ready 均未回填。`makemigrations --check`、
+  Django check、Celery 两节点、容器内和公网 HTTP `/healthz/` 通过。
+- 关闭态只读预览：日本实时 8、英国实时 2、其他 0；五区积压加载均 0；
+  `WindowCandidateDecision 25937→25937`、`QuotaLedger 440→440`。
+- 香港直开：实际进程读取
+  `MULTIREGION_PUBLISH_BACKLOG_ENABLED=true`、allowlist `hong_kong`、limit `200`。
+  `17:45 / 18:00 / 18:15 / 18:30` 窗口 `50846 / 50881 / 50905 / 50931` 均为
+  `succeeded / realtime=0 / backlog=0 / published=0`，四窗口候选决策和地区配额写入均 0；
+  公网 healthz、抓取/stale、队列、资源与关键异常日志验收通过。
+- 四窗口通过后已将 allowlist 扩为
+  `japan,hong_kong,united_kingdom,france,united_states`，Web/Worker 实际读取一致。
+  扩区后只读预览为日本实时 9、英国实时 1、其他 0，五区积压均 0，零决策/配额写入。
+  `18:45` 首个五区自然窗口五条记录均 `succeeded`，日本 9/英国 1 条实时候选
+  全部 `hard_gate_blocked`，selected 0、积压决策 0、地区窗口配额账本 0、全站小时配额
+  `1/60`；Celery 两节点和公网 healthz 正常。继续 24 小时观察；未完成前不标记
+  change 生产收口。
+- 历史 dry-run：主机持久化文件
+  `runtime/news_integrity/publish-ready-legacy-20260722_173639.json`，内部 manifest SHA-256
+  `b72ddc927a3f334762a69a4384755aff40704a71aa4877ca4aa5ecbdfa52faac`，文件 SHA-256
+  `a125647ac6a751c269bf52ad24e6d33443a542d87eb2b0d3ecaddec1ab28534c`；21 条全部建议
+  `keep_manual`，数据库写入 0，尚未 seal/apply。web 容器未挂载通用 runtime，因此使用
+  `/tmp` 生成后立即 `docker cp` 到主机受控目录，不得只留在可重建容器内。
 
 ### 1. 部署前和迁移
 

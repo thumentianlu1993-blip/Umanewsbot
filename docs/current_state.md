@@ -1,6 +1,6 @@
 # 当前状态
 
-## 2026-07-22 publish_ready 积压治理（本地实现完成，未部署）
+## 2026-07-22 publish_ready 积压治理（已部署，五地区 24 小时观察中）
 
 - OpenSpec change `recover-publish-ready-backlog` 已完成代码主体：`NewsArticle` 新增 nullable
   `publish_ready_at` 和 `region/status/time` 组合索引，迁移不回填历史值。新稿仅在
@@ -24,8 +24,33 @@
   `2616 / 14 / 67 / 57`，新增 19 项且新增失败/错误/跳过均为 0；现有失败集中在历史 runner
   macOS 临时路径、准实时赛果时钟和既有环境契约。迁移 apply/rollback/reapply、Django check、
   三份 Compose、OpenSpec strict/all、compileall 和 diff check 均通过。
-  当前代码尚未 commit/push/deploy，生产仍运行上一阶段镜像
-  `sha256:712a5da8b408…`，生产 21 条历史候选尚未生成新 manifest、未处置、未公开。
+- 生产已 fast-forward 到 `8bbf7a2551296177da6556029e325db57bd369cc`，四个应用容器统一使用
+  `sha256:251706abb947…`。部署前恢复点为
+  `.env.backup.publish-ready-20260722_172001`（SHA-256 `7af509d6…`）和
+  `backups/db/pre-publish-ready-20260722_172001.dump`（`230492618` 字节、SHA-256
+  `4aac6117…`、`pg_restore -l` `1017` 项）；回滚镜像标签为
+  `umanewsbot:rollback-pre-publish-ready-26eb03e3-20260722_172001`。
+- `0053_newsarticle_publish_ready_at` 已应用，列与 `news_region_ready_at_idx` 存在，历史
+  21 条 ready 仍全部为 NULL。部署后先保持通道关闭：五区只读预览加载日本实时
+  8 条、英国 2 条、其他 0，候选决策和配额账本前后均不变。
+- 香港单区真实生产观察已完成：`17:45 / 18:00 / 18:15 / 18:30` 四个独立窗口
+  `50846 / 50881 / 50905 / 50931` 均 `succeeded`，每窗口均为实时 0、积压 0、公开 0；
+  候选决策 0、地区窗口配额写入 0、历史 ready 仍 21、stale CrawlJob 0。期间公网
+  HTTP `/healthz/` 持续 `200`，应用/数据库关键异常日志 0，Web/Worker/DB 最终快照约
+  `328/492/185 MiB`，队列无持续增长。
+- 四窗口通过后已直接扩到五地区，Web 和主 Worker 实际读取为
+  `enabled=true / allowed_regions=[japan,hong_kong,united_kingdom,france,united_states] / scan_limit=200`。
+  扩区后只读预览为日本实时 9、英国实时 1、其他 0，五区积压均 0，决策/配额前后不变。
+  `18:45` 首个五区自然窗口也已通过：五条 window 均 `succeeded`且均记录
+  `backlog_enabled=true`；日本 9 和英国 1 条实时候选全部保持 `hard_gate_blocked`，
+  selected 0、积压通道决策 0、地区窗口配额账本 0、全站小时配额 `1/60`。
+  Celery 两节点空闲、HTTP healthz 正常，Web/Worker/DB 内存约 `305/431/183 MiB`。
+  现进入五区 24 小时持续观察，未完成前 change 不归档。
+- 当前历史审核清单为
+  `runtime/news_integrity/publish-ready-legacy-20260722_173639.json`，内部 manifest SHA-256
+  `b72ddc927a3f334762a69a4384755aff40704a71aa4877ca4aa5ecbdfa52faac`，文件 SHA-256
+  `a125647ac6a751c269bf52ad24e6d33443a542d87eb2b0d3ecaddec1ab28534c`。21 条全部建议
+  `keep_manual`，dry-run 业务写入 0；未经逐条审核不 seal、不 apply。
 
 ## 2026-07-22 新闻生产完整性修复（实施中）
 
