@@ -95,8 +95,11 @@ PENDING="/app/runtime/news_integrity/publish-ready-pending-${TS}.json"
 $COMPOSE exec -T web python manage.py reconcile_publish_ready_backlog --output "$PENDING" --limit 100
 ```
 
-审核决定另存为 JSON 对象，键为 article ID，值只能是 `keep_manual` 或
-`revalidate_refresh_ready`。默认省略的文章全部 `keep_manual`。封印 reviewer 和新 SHA：
+审核决定另存为 JSON 对象，键为 article ID，值只能是 `keep_manual`、
+`revalidate_refresh_ready` 或 `discard_ignored`。默认省略的文章全部 `keep_manual`。
+`discard_ignored` 沿用后台忽略语义，同时设置 workflow/review/automation 三层 `ignored` 和
+`ignored_at`，并在 `decision_reason.publish_ready_recovery` 记录 reviewer、manifest SHA、动作和
+执行时间；它不会删除文章。封印 reviewer 和新 SHA：
 
 ```bash
 REVIEWED="/app/runtime/news_integrity/publish-ready-reviewed-${TS}.json"
@@ -112,8 +115,10 @@ $COMPOSE exec -T web python manage.py reconcile_publish_ready_backlog \
   --apply-manifest "$REVIEWED" --expected-sha256 '<64位SHA>' --confirm-apply --limit 100
 ```
 
-apply 后必须独立核对：刷新数、漂移/阻断数、`published_to_web_at` 新增 0、QQ delivery 新增 0；
-刷新稿只进入正常发布窗口。当前 21 条历史候选默认不恢复、不公开。
+apply 后必须独立核对：刷新/舍弃数、漂移/阻断数、`published_to_web_at` 新增 0、QQ delivery
+新增 0；刷新稿只进入正常发布窗口，舍弃稿不再进入候选池。同一 manifest 应重放一次验证
+`already_applied` 幂等结果。当前 21 条历史候选已由用户明确确认全部舍弃，仍须以原清单快照
+零漂移为前提执行。
 
 ### 4. 回滚
 

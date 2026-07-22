@@ -53,12 +53,12 @@
 
 ### Decision 4: 当前旧候选通过 SHA manifest 逐篇处置 <!-- adr: adr-004-legacy-manifest -->
 
-**Choice：** 管理命令按固定 ID/状态/内容指纹/门禁快照输出 21 篇 manifest，分类为“仍具时效可重新校验”“保留人工发布”“驳回/归档”。apply 仅接受已审核 manifest，逐篇锁行、拒绝漂移，并调用完整校验；通过者设置新的 `publish_ready_at`，但仍等待正常发布窗口。
+**Choice：** 管理命令按固定 ID/状态/内容指纹/门禁快照输出 21 篇 manifest，分类为“仍具时效可重新校验”“保留人工发布”“舍弃并标记忽略”。apply 仅接受已审核 manifest，逐篇锁行并拒绝漂移。重新校验者只有通过完整门禁才设置新的 `publish_ready_at`，并继续等待正常发布窗口；明确舍弃者沿用后台“忽略候选新闻”语义，将 workflow/review/automation 三层状态统一改为 `ignored` 并记录 `ignored_at`。两种写操作都必须记录 reviewer、manifest SHA 和动作，且不得公开或创建 QQ delivery。
 
 **Alternatives considered：**
 
 - 一次性把 21 篇 `ranked_revived_at=now` — 会绕过内容时效审核并制造集中发布。
-- 全部归档 — 可能丢失仍具长期价值或赛事资料价值的文章。
+- 全部归档且不记录逐篇授权 — 缺少可追溯的用户决定；本次只有绑定精确 manifest 的逐篇舍弃动作被允许。
 
 ## Risks / Trade-offs
 

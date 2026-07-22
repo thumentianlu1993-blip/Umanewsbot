@@ -26,6 +26,11 @@
 - 当前历史候选一律先生成 SHA manifest，默认 `keep_manual`。逐篇恢复必须由独立 decisions
   文件、reviewer、封印后的精确 SHA 和 apply 确认共同授权；内容、状态、门禁或更新时间漂移即
   跳过。恢复只刷新通过完整重校验文章的 `publish_ready_at`，不直接公开也不创建 QQ delivery。
+- 用户已确认 2026-07-22 manifest 中的精确 21 篇全部舍弃。舍弃使用新增
+  `discard_ignored` 审核动作，沿用后台“忽略候选新闻”语义，将 workflow/review/automation
+  三层状态统一改为 `ignored` 并记录 `ignored_at`；不物理删除文章。该动作仍受 reviewer、原始
+  快照、新 manifest SHA、逐行锁和漂移拒绝约束，并记录在
+  `decision_reason.publish_ready_recovery`；重复 apply 必须幂等，公开和 QQ 账本不得变化。
 - 生产灰度顺序仍是“部署且开关关闭 → 只读预览 → 单地区 4 个窗口 → 五地区 → 24 小时观察”；
   这不是 shadow，但开关和地区 allowlist 仍是即时止损面。
 

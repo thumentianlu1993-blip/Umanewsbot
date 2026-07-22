@@ -10,12 +10,12 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from stable.models import AutomationStatus, NewsArticle, QQPushDelivery, WorkflowStatus
+from stable.models import AutomationStatus, NewsArticle, QQPushDelivery, ReviewMode, WorkflowStatus
 from stable.services.validation import apply_validation_outcome, validate_rewrite
 
 
 SCHEMA_VERSION = "publish-ready-backlog-v1"
-REVIEW_ACTIONS = {"keep_manual", "revalidate_refresh_ready"}
+REVIEW_ACTIONS = {"discard_ignored", "keep_manual", "revalidate_refresh_ready"}
 
 
 def _canonical_sha(payload: dict) -> str:
@@ -216,7 +216,7 @@ def apply_publish_ready_backlog_manifest(
                 outcomes.append({"article_id": article_id, "status": "skipped", "reason": "missing"})
                 continue
             previous_recovery = (article.decision_reason or {}).get("publish_ready_recovery") or {}
-            if action == "revalidate_refresh_ready" and previous_recovery.get("manifest_sha256") == manifest_sha:
+            if action != "keep_manual" and previous_recovery.get("manifest_sha256") == manifest_sha:
                 outcomes.append({"article_id": article_id, "status": "already_applied"})
                 continue
             drift = _snapshot_drift(article, row.get("snapshot") or {})
@@ -226,10 +226,6 @@ def apply_publish_ready_backlog_manifest(
             if action == "keep_manual":
                 outcomes.append({"article_id": article_id, "status": "kept_manual"})
                 continue
-            validation = validate_rewrite(article)
-            if not validation.passed:
-                outcomes.append({"article_id": article_id, "status": "blocked", "reason": validation.reason})
-                continue
             public_before = article.published_to_web_at
             qq_before = QQPushDelivery.objects.filter(article=article).count()
             article.decision_reason = {
@@ -237,15 +233,38 @@ def apply_publish_ready_backlog_manifest(
                 "publish_ready_recovery": {
                     "manifest_sha256": manifest_sha,
                     "reviewer": review["reviewer"],
+                    "action": action,
                     "applied_at": apply_now.isoformat(),
                 },
             }
-            apply_validation_outcome(
-                article,
-                validation,
-                ready_at=apply_now,
-                refresh_ready_at=True,
-            )
+            if action == "discard_ignored":
+                article.workflow_status = WorkflowStatus.IGNORED
+                article.review_mode = ReviewMode.IGNORED
+                article.automation_status = AutomationStatus.IGNORED
+                article.ignored_at = article.ignored_at or apply_now
+                article.save(
+                    update_fields=[
+                        "workflow_status",
+                        "review_mode",
+                        "automation_status",
+                        "ignored_at",
+                        "decision_reason",
+                        "updated_at",
+                    ]
+                )
+                outcome_status = "discarded"
+            else:
+                validation = validate_rewrite(article)
+                if not validation.passed:
+                    outcomes.append({"article_id": article_id, "status": "blocked", "reason": validation.reason})
+                    continue
+                apply_validation_outcome(
+                    article,
+                    validation,
+                    ready_at=apply_now,
+                    refresh_ready_at=True,
+                )
+                outcome_status = "refreshed"
             article.refresh_from_db()
             if (
                 article.published_to_web_at != public_before
@@ -253,13 +272,15 @@ def apply_publish_ready_backlog_manifest(
                 or QQPushDelivery.objects.filter(article=article).count() != qq_before
             ):
                 raise RuntimeError("恢复命令越权改变了公开状态或 QQ delivery")
-            outcomes.append({"article_id": article_id, "status": "refreshed"})
+            outcomes.append({"article_id": article_id, "status": outcome_status})
 
     return {
         "manifest_sha256": manifest_sha,
         "reviewer": review["reviewer"],
         "outcomes": outcomes,
         "refreshed_count": sum(item["status"] == "refreshed" for item in outcomes),
+        "discarded_count": sum(item["status"] == "discarded" for item in outcomes),
         "kept_manual_count": sum(item["status"] == "kept_manual" for item in outcomes),
+        "already_applied_count": sum(item["status"] == "already_applied" for item in outcomes),
         "skipped_count": sum(item["status"] in {"skipped", "blocked"} for item in outcomes),
     }
