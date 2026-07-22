@@ -1,10 +1,25 @@
 # 部署运行手册
 
-## publish_ready 积压治理部署与灰度（2026-07-22，五地区 24 小时观察中）
+## publish_ready 积压治理部署与灰度（2026-07-23，历史清单已收敛，新 24 小时观察中）
 
 ### 0. 本次实际执行证据
 
-- 代码：生产 `HEAD=8bbf7a2551296177da6556029e325db57bd369cc`；web/worker/beat/race_live_worker
+- 2026-07-23 舍弃动作部署：生产从 `3d573583` fast-forward 到
+  `HEAD=7a6f30d8708c0560ba2120c44fd640ff35a7ea3e`；web/worker/beat/race_live_worker 统一为
+  `sha256:fa2fdf9bb952…`。恢复点为 `.env.backup.publish-ready-discard-20260723_001049`
+  （SHA-256 `467b6398…`）和 `backups/db/pre-publish-ready-discard-20260723_001049.dump`
+  （SHA-256 `d6f6e342…`、`pg_restore -l` `1018` 项）。Django check、迁移、镜像一致和 healthz 通过。
+- 21 篇 decisions 与 pending manifest ID 集合精确相等；pending 快照漂移 0。批准文件为
+  `runtime/news_integrity/publish-ready-legacy-discard-approved-20260723_001547.json`，manifest SHA
+  `860fbec26c8982515f11ab888637a915e1a0b9fbdbd113475ced48e616932bb9`、文件 SHA
+  `83e396a8ffc2…`。首次 apply `discarded=21 / skipped=0 / refreshed=0`，重放
+  `already_applied=21`；最终 21/21 三层 ignored 且审计匹配，公开 0、QQ 0。
+- 部署后先停 beat 消化到期任务，celery/race_live 队列清零且 active/reserved 排空；备份
+  `.env.backup.publish-ready-observation-20260723_002152` 后重新启用五地区。运行进程实际读取
+  `enabled=true`、五地区 allowlist、24h、limit 200；开启时英国实时 1、美国实时 5、其他实时 0、
+  五区 backlog 0、healthz 200。新观察期为 `2026-07-23 00:22:19` 至
+  `2026-07-24 00:22:19 Asia/Shanghai`，heartbeat 为 `publish-ready-24-restart`。
+- 初次部署代码：生产 `HEAD=8bbf7a2551296177da6556029e325db57bd369cc`；web/worker/beat/race_live_worker
   统一使用 `sha256:251706abb947b7292b36e2ac24285f9d75661031c2cbdcba3259539792b5b0cb`。
 - 恢复点：`.env.backup.publish-ready-20260722_172001`（SHA-256 `7af509d6…`）；
   `backups/db/pre-publish-ready-20260722_172001.dump`（`230492618` 字节、SHA-256
@@ -25,18 +40,18 @@
   扩区后只读预览为日本实时 9、英国实时 1、其他 0，五区积压均 0，零决策/配额写入。
   `18:45` 首个五区自然窗口五条记录均 `succeeded`，日本 9/英国 1 条实时候选
   全部 `hard_gate_blocked`，selected 0、积压决策 0、地区窗口配额账本 0、全站小时配额
-  `1/60`；Celery 两节点和公网 healthz 正常。继续 24 小时观察；未完成前不标记
-  change 生产收口。
-- 24 小时观察由绑定当前 Codex 任务的每小时心跳 `publish-ready-24` 继续，终点为
-  `2026-07-23 18:45 Asia/Shanghai`。心跳不得 seal/apply 历史 manifest，不得手工补跑未来窗口；
-  命中过期/legacy 稿误选或公开、窗口失败、配额超限、持续队列/资源增长或 healthz 失败时，
-  按本节回滚顺序关闭 `MULTIREGION_PUBLISH_BACKLOG_ENABLED`并保留证据。
+  `1/60`；Celery 两节点和公网 healthz 正常。当时进入首轮 24 小时观察，未完成前不标记
+  change 生产收口；该轮后续被并行部署打断，见下一条。
+- 首轮 24 小时观察从 `2026-07-22 18:45` 开始，期间 13 篇新鲜候选正常公开，最大 selected
+  ready 年龄 `0.625h`，无过期/legacy 稿误选或公开；约 `23:00` 被并行 P0 容器重建打断。
+  本任务已按批准顺序关闭积压开关并恢复运行态，旧 heartbeat 已删除；该段只能作为增量证据，
+  不计为连续 24 小时通过。
 - 历史 dry-run：主机持久化文件
   `runtime/news_integrity/publish-ready-legacy-20260722_173639.json`，内部 manifest SHA-256
   `b72ddc927a3f334762a69a4384755aff40704a71aa4877ca4aa5ecbdfa52faac`，文件 SHA-256
-  `a125647ac6a751c269bf52ad24e6d33443a542d87eb2b0d3ecaddec1ab28534c`；21 条全部建议
-  `keep_manual`，数据库写入 0，尚未 seal/apply。web 容器未挂载通用 runtime，因此使用
-  `/tmp` 生成后立即 `docker cp` 到主机受控目录，不得只留在可重建容器内。
+  `a125647ac6a751c269bf52ad24e6d33443a542d87eb2b0d3ecaddec1ab28534c`；原 dry-run 数据库写入 0。
+  这 21 条现已按上方 approved manifest 全部 `discard_ignored`。web 容器未挂载通用 runtime，
+  因此审核文件均通过 `/tmp` 处理后立即 `docker cp` 到主机受控目录，不得只留在可重建容器内。
 
 ### 1. 部署前和迁移
 
@@ -126,8 +141,8 @@ apply 后必须独立核对：刷新/舍弃数、漂移/阻断数、`published_t
   和原配额继续运行。
 - `0053` 是 additive schema，代码回滚时保留字段和索引最安全；不得为回滚清空
   `publish_ready_at`。只有恢复旧数据库备份时才整体回退迁移。
-- manifest apply 只刷新资格时间。若某批准文章需撤销，必须以逐篇人工工作流处置；不得批量删除
-  新闻、公开记录或 QQ 账本。
+- manifest apply 可以刷新资格时间或按明确授权标记 ignored。若某批准动作需撤销，必须以逐篇
+  人工工作流重新审核；不得批量删除新闻、公开记录或 QQ 账本。
 
 ## 新闻索引和遗留 CrawlJob 操作手册（2026-07-22）
 
