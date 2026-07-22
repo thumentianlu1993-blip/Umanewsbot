@@ -1,23 +1,17 @@
 {% if headline_article %}
-  <section class="headline-section" aria-label="头条">
-    <article class="headline-card">
-      {% if headline_article.cover_image_url %}
-        <a class="headline-image" href="{{ headline_article.public_path }}">
-          <img src="{{ headline_article.cover_image_url }}" alt="">
-        </a>
-      {% endif %}
-      <div class="headline-body">
-        <div class="article-meta">
-          <span>{{ headline_article.published_to_web_at|date:"Y-m-d H:i" }}</span>
-          <span>{{ headline_article.region_display_text }}</span>
-          <span>{{ headline_article.source_note|default:headline_article.get_source_site_display }}</span>
-          <span>{{ headline_article.get_source_language_display }}</span>
-        </div>
-        <h2><a href="{{ headline_article.public_path }}">{{ headline_article.effective_title }}</a></h2>
-        {% if headline_article.effective_summary %}
-          <p>{{ headline_article.effective_summary|truncatechars:120 }}</p>
-        {% endif %}
-      </div>
-    </article>
-  </section>
+  <a class="hero-headline{% if headline_article.cover_image_url %} has-cover{% endif %}" href="{{ headline_article.public_path }}">
+    {% if headline_article.cover_image_url %}
+      <img class="hero-cover" src="{{ headline_article.cover_image_url }}" alt="">
+    {% endif %}
+    <span class="hero-kicker"><span class="dot" style="background: {{ headline_article.region_color }}"></span>头条 · {{ headline_article.get_racing_region_display }}</span>
+    <h1 class="hero-title">{{ headline_article.effective_title }}</h1>
+    {% if headline_article.effective_summary %}
+      <p class="hero-summary">{{ headline_article.effective_summary|truncatechars:120 }}</p>
+    {% endif %}
+    <div class="hero-meta">
+      <span>{{ headline_article.source_note|default:headline_article.get_source_site_display }}</span>
+      <span class="tabular">{{ headline_article.published_to_web_at|date:"Y-m-d H:i" }}</span>
+      <span class="hero-cta">阅读全文 →</span>
+    </div>
+  </a>
 {% endif %}

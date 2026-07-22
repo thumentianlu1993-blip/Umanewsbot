@@ -1,0 +1,8 @@
+{% if flash_race %}
+  <a class="flash-card" href="{{ flash_race.event.public_path }}">
+    <div class="flash-kicker">赛事快讯 · {{ flash_race.event.grade_badge_label }} · {{ flash_race.event.get_country_region_display }}</div>
+    <h3 class="flash-title">{{ flash_race.event.chinese_name }}</h3>
+    <p class="flash-result">冠军 <b>{{ flash_race.winner }}</b></p>
+    <span class="flash-link">查看完整赛果 →</span>
+  </a>
+{% endif %}

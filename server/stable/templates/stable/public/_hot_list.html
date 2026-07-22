@@ -1,15 +1,42 @@
-{% if hot_articles %}
-  <aside class="hot-panel" aria-label="原站热度">
-    <h2>原站热度</h2>
-    <ol>
-      {% for entry in hot_articles %}
-        <li>
-          <a href="{{ entry.article.public_path }}">{{ entry.article.effective_title }}</a>
-          {% if entry.snapshot.rank %}
-            <span>原站排行 {{ entry.snapshot.rank }}</span>
-          {% endif %}
-        </li>
+<aside class="rail">
+  {% if hot_articles %}
+    <section class="rail-card" aria-label="热门榜">
+      <h2 class="rail-title">热门榜 <span class="rail-more">原站热度</span></h2>
+      <ol class="hot-list">
+        {% for entry in hot_articles %}
+          <li>
+            <span class="hot-num tabular">{{ forloop.counter|stringformat:"02d" }}</span>
+            <a href="{{ entry.article.public_path }}">{{ entry.article.effective_title }}</a>
+          </li>
+        {% endfor %}
+      </ol>
+    </section>
+  {% endif %}
+
+  <section class="rail-card" aria-label="我的关注">
+    <h2 class="rail-title">我的关注 <a class="rail-more" href="{% url 'public-horse-follows' %}">管理 →</a></h2>
+    {% if followed_entries %}
+      {% for entry in followed_entries %}
+        <div class="follow-item">
+          <span class="star">★</span>
+          <a href="{{ entry.article.public_path }}">{{ entry.article.effective_title|truncatechars:18 }}</a>
+          <span class="follow-meta">{{ entry.horse_profile.display_name }}</span>
+        </div>
       {% endfor %}
-    </ol>
-  </aside>
-{% endif %}
+    {% else %}
+      <p class="follow-empty">关注马匹，第一时间收到它和子孙代的最新新闻。<a href="{% url 'public-horse-index' %}">去马匹档案看看 →</a></p>
+    {% endif %}
+  </section>
+
+  {% if next_key_race %}
+    <section class="rail-card" aria-label="即将开赛">
+      <h2 class="rail-title">即将开赛</h2>
+      <p class="countdown-race">{{ next_key_race.chinese_name }}{% if next_key_race.grade_badge_label %} · {{ next_key_race.grade_badge_label }}{% endif %}</p>
+      <p class="countdown-meta">{{ next_key_race.get_country_region_display }} · {{ next_key_race.racecourse }}{% if next_key_race.distance_text %} · {{ next_key_race.distance_text }}{% endif %}</p>
+      <div class="countdown-digits tabular">
+        {{ next_key_race.local_date|date:"n月j日" }}{% if next_key_race.local_start_time %} {{ next_key_race.local_start_time|time:"H:i" }}{% endif %}
+        <small>{% if next_key_race.status == "finished" %}已完赛{% else %}开跑{% endif %}</small>
+      </div>
+    </section>
+  {% endif %}
+</aside>

@@ -1,37 +1,45 @@
 {% extends "stable/public/base.html" %}
 
-{% block title %}马匹资料{% endblock %}
+{% block title %}马匹档案{% endblock %}
 
 {% block content %}
   <main class="horse-page">
-    <section class="home-lead">
+    <section class="horse-search-hero">
       <span class="section-kicker">Horse Profiles</span>
-      <h1>马匹资料</h1>
+      <h1>马匹档案</h1>
+      <form class="horse-search-bar" method="get">
+        <input type="search" name="q" value="{{ filters.q }}" placeholder="搜索中文名、原名、英文名或国家" aria-label="搜索马匹">
+        {% if filters.region %}<input type="hidden" name="region" value="{{ filters.region }}">{% endif %}
+        <button type="submit">搜索</button>
+      </form>
     </section>
 
-    <form class="public-filter-bar" method="get">
-      <input type="search" name="q" value="{{ filters.q }}" placeholder="搜索马名、英文名或国家">
-      {% if filters.region %}<input type="hidden" name="region" value="{{ filters.region }}">{% endif %}
-      <button type="submit">搜索</button>
-    </form>
-
-    <nav class="region-tabs" aria-label="地区筛选">
+    <nav class="region-tabs horse-region-tabs" aria-label="地区筛选">
       {% for tab in region_tabs %}
-        <a class="{% if tab.is_active %}active{% endif %}" href="{% url 'public-horse-index' %}{% if tab.value %}?region={{ tab.value }}{% endif %}">{{ tab.label }}</a>
+        <a class="{% if tab.is_active %}active{% endif %}" style="--region-color: {{ tab.color }}" href="{% url 'public-horse-index' %}{% if tab.value %}?region={{ tab.value }}{% endif %}">{{ tab.label }}</a>
       {% endfor %}
     </nav>
 
-    <section class="horse-grid">
+    <section class="horse-grid" aria-label="马匹列表">
       {% for profile in horse_profiles %}
-        <a class="horse-card" href="{{ profile.public_path }}">
-          <strong>{{ profile.display_name }}</strong>
-          <span>{{ profile.original_name|default:profile.english_name|default:"-" }}</span>
-          <div class="horse-card-meta">
-            <span>{{ profile.get_racing_region_display }}</span>
-            <span>{{ profile.public_completeness_badge }}</span>
-            {% if not profile.display_name_zh and not profile.primary_term.target_zh %}<span>中文译名待补</span>{% endif %}
+        <article class="horse-card" style="--region-color: {{ profile.public_region_color }}">
+          <form method="post" action="{% url 'public-horse-follow' profile.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            {% if profile.is_following %}
+              <button class="follow-btn active" type="submit" name="intent" value="unfollow" aria-label="取消关注 {{ profile.display_name }}">★ 已关注</button>
+            {% else %}
+              <input type="hidden" name="include_descendants" value="1">
+              <button class="follow-btn" type="submit" aria-label="关注 {{ profile.display_name }}">☆ 关注</button>
+            {% endif %}
+          </form>
+          <div class="horse-card-top"><span class="region-mark"></span><span class="region-label">{{ profile.get_racing_region_display }}</span></div>
+          <h2 class="horse-card-name"><a href="{{ profile.public_path }}">{{ profile.display_name }}</a></h2>
+          <p class="horse-card-original">{{ profile.original_name|default:profile.english_name|default:"资料整理中" }}</p>
+          <div class="horse-record" aria-label="战绩">
+            <span>{{ profile.starts_count }} 战</span><b>{{ profile.wins_count }} 冠</b><span>{{ profile.seconds_count }} 亚</span><span>{{ profile.thirds_count }} 季</span>
           </div>
-        </a>
+        </article>
       {% empty %}
         {% include "stable/public/_empty_state.html" with empty_state_text="目前还没有已发布马匹资料。" %}
       {% endfor %}

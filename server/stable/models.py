@@ -1141,6 +1141,21 @@ class RaceEvent(TimestampedModel):
     def is_key_race(self) -> bool:
         return self.priority in {RaceEventPriority.P0, RaceEventPriority.P1} or self.is_featured
 
+    @property
+    def grade_badge_class(self) -> str:
+        grade = (self.normalized_grade or "").upper()
+        if grade in {"G1", "JG1", "JPN1"}:
+            return "g1"
+        if grade in {"G2", "JG2", "JPN2"}:
+            return "g2"
+        if grade in {"G3", "JG3", "JPN3"}:
+            return "g3"
+        return "g-other"
+
+    @property
+    def grade_badge_label(self) -> str:
+        return (self.normalized_grade or self.grade_text or "").strip()[:4]
+
 
 class RaceEventProjectionControl(TimestampedModel):
     event = models.OneToOneField(
@@ -3534,6 +3549,16 @@ class NewsArticle(TimestampedModel):
         if not self.pk:
             return ""
         return f"/news/{self.pk}/"
+
+    @property
+    def region_color(self) -> str:
+        return {
+            RacingRegion.JAPAN: "#B51E2E",
+            RacingRegion.HONG_KONG: "#6B2D8E",
+            RacingRegion.UNITED_KINGDOM: "#1D4E9E",
+            RacingRegion.FRANCE: "#2A7FBF",
+            RacingRegion.UNITED_STATES: "#3E5C3A",
+        }.get(self.racing_region, "#0E5A38")
 
     @property
     def region_display_text(self) -> str:

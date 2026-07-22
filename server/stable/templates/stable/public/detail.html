@@ -1,47 +1,40 @@
 {% extends "stable/public/base.html" %}
 
-{% block title %}{{ article.effective_title }}{% endblock %}
+{% block title %}{{ article.effective_title }} · UmaFans{% endblock %}
 
 {% block content %}
-  <main class="article-page">
+  <main class="article-wrap" style="--region-color: {{ article.region_color }}">
     <article class="article-detail" data-public-detail>
       <nav class="article-actions" aria-label="文章操作">
-        <a href="/">返回首页</a>
-        <a href="{{ article.source_url }}" target="_blank" rel="noreferrer">查看原文</a>
+        <a href="/">← 返回首页</a>
+        <a href="{{ article.source_url }}" target="_blank" rel="noreferrer">查看原文 ↗</a>
       </nav>
+      <span class="article-kicker">{{ article.get_racing_region_display }} · {{ article.source_note|default:article.get_source_site_display }}</span>
+      <h1 class="article-title">{{ article.effective_title }}</h1>
       <div class="article-meta">
-        <span>{{ article.published_to_web_at|date:"Y-m-d H:i" }}</span>
-        <span>{{ article.region_display_text }}</span>
-        <span>{{ article.source_note|default:article.get_source_site_display }}</span>
+        <span class="tabular">{{ article.published_to_web_at|date:"Y-m-d H:i" }} 发布</span>
+        <span>来源：{{ article.source_note|default:article.get_source_site_display }}</span>
         <span>{{ article.get_source_language_display }}</span>
       </div>
-      <h1>{{ article.effective_title }}</h1>
-      {% if article.effective_summary %}
-        <p class="article-summary">{{ article.effective_summary }}</p>
+      <hr class="article-rule">
+
+      {% if horse_links or race_links %}
+        <div class="mention-ribbon" aria-label="关联赛事与马匹">
+          <span class="mention-label">本文提及</span>
+          {% for link in horse_links %}
+            <a class="entity-chip" href="{{ link.horse_profile.public_path }}">🐎 {{ link.horse_profile.display_name }}</a>
+          {% endfor %}
+          {% for link in race_links %}
+            <a class="entity-chip race" href="{{ link.event.public_path }}">🏆 {{ link.event.chinese_name }} {{ link.event.year }}</a>
+          {% endfor %}
+        </div>
       {% endif %}
-      <div class="tag-list">
-        {% for tag in article.tags_json %}
-          <span>{{ tag }}</span>
-        {% empty %}
-          <span>新闻</span>
-        {% endfor %}
-        {% for link in horse_links %}
-          <a href="{{ link.horse_profile.public_path }}">{{ link.horse_profile.display_name }}</a>
-        {% endfor %}
-      </div>
+
+      {% if article.effective_summary %}
+        <p class="article-lede">{{ article.effective_summary }}</p>
+      {% endif %}
       {% if article.cover_image_url %}
         <img class="article-cover" src="{{ article.cover_image_url }}" alt="">
-      {% endif %}
-      {% if race_links %}
-        <section class="race-related-box">
-          <h2>关联赛事</h2>
-          {% for link in race_links %}
-            <a href="{{ link.event.public_path }}">
-              <strong>{{ link.event.chinese_name }} {{ link.event.year }}</strong>
-              <span>{{ link.get_link_type_display }} · {{ link.event.racecourse }}</span>
-            </a>
-          {% endfor %}
-        </section>
       {% endif %}
       <div class="article-body">{{ article.effective_body|linebreaks }}</div>
       <section class="source-box">
@@ -54,5 +47,47 @@
         <p><strong>原文链接：</strong><a href="{{ article.source_url }}" target="_blank" rel="noreferrer">{{ article.source_url }}</a></p>
       </section>
     </article>
+
+    {% if teaser_event %}
+      <a class="race-teaser" href="{{ teaser_event.public_path }}">
+        <span class="grade-badge {{ teaser_event.grade_badge_class }}">{{ teaser_event.grade_badge_label }}</span>
+        <span class="race-teaser-main">
+          <span class="race-teaser-kicker">赛事预告</span>
+          <h3 class="race-teaser-name">{{ teaser_event.chinese_name }}</h3>
+          <p class="race-teaser-meta">
+            {{ teaser_event.get_country_region_display }} · {{ teaser_event.racecourse }}
+            {% if teaser_event.distance_text %} · {{ teaser_event.distance_text }}{% endif %}
+            {% if teaser_event.local_date %} · {{ teaser_event.local_date|date:"n月j日" }}{% endif %}
+          </p>
+        </span>
+        <span class="flash-link">查看赛事 →</span>
+      </a>
+    {% endif %}
+
+    {% if prev_article or next_article %}
+      <nav class="article-pager" aria-label="上下篇">
+        {% if prev_article %}
+          <a class="pager-card" href="{{ prev_article.public_path }}">
+            <span class="pager-dir">← 上一篇</span>
+            <div class="pager-title">{{ prev_article.effective_title }}</div>
+          </a>
+        {% endif %}
+        {% if next_article %}
+          <a class="pager-card next" href="{{ next_article.public_path }}">
+            <span class="pager-dir">下一篇 →</span>
+            <div class="pager-title">{{ next_article.effective_title }}</div>
+          </a>
+        {% endif %}
+      </nav>
+    {% endif %}
+
+    {% if related_articles %}
+      <h2 class="related-head">相关新闻</h2>
+      <div class="related-grid">
+        {% for article in related_articles %}
+          {% include "stable/public/_article_card.html" %}
+        {% endfor %}
+      </div>
+    {% endif %}
   </main>
 {% endblock %}

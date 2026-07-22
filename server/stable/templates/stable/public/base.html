@@ -4,18 +4,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}赛马新闻{% endblock %}</title>
+  <title>{% block title %}UmaFans 赛马新闻{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'stable/public.css' %}">
 </head>
 <body class="public-site">
   <header class="site-header">
-    <a class="site-brand" href="/">UmaFans</a>
-    <nav class="site-nav" aria-label="公开站点导航">
-      <a href="/">首页</a>
-      <a href="{% url 'public-race-calendar' %}">赛事日历</a>
-      <a href="{% url 'public-horse-index' %}">马匹</a>
-      <a href="{% url 'public-horse-follows' %}">我的关注</a>
-    </nav>
+    <div class="wrap">
+      <a class="brand" href="/">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a9 9 0 0 0-9 9c0 3.4 1.7 6.2 3.4 7.9l1.7-1.7C6.4 16 5.5 14 5.5 11.5a6.5 6.5 0 0 1 13 0c0 2.5-.9 4.5-2.6 6.2l1.7 1.7c1.7-1.7 3.4-4.5 3.4-7.9a9 9 0 0 0-9-9z" fill="#C9A227"/><circle cx="6" cy="12" r=".9" fill="#0B3D27"/><circle cx="9" cy="7" r=".9" fill="#0B3D27"/><circle cx="15" cy="7" r=".9" fill="#0B3D27"/><circle cx="18" cy="12" r=".9" fill="#0B3D27"/></svg>
+        <span class="brand-name">Uma<em>Fans</em></span>
+        <span class="brand-sub">赛马新闻门户</span>
+      </a>
+      <nav class="site-nav" aria-label="公开站点导航">
+        <a class="{% if request.resolver_match.url_name == 'public-news-feed' %}active{% endif %}" href="/">首页</a>
+        <a class="{% if request.resolver_match.url_name == 'public-race-calendar' or request.resolver_match.url_name == 'public-race-detail' %}active{% endif %}" href="{% url 'public-race-calendar' %}">赛事日历</a>
+        <a class="{% if request.resolver_match.url_name == 'public-horse-index' or request.resolver_match.url_name == 'public-horse-detail' %}active{% endif %}" href="{% url 'public-horse-index' %}">马匹</a>
+        <a class="{% if request.resolver_match.url_name == 'public-horse-follows' %}active{% endif %}" href="{% url 'public-horse-follows' %}">我的关注</a>
+      </nav>
+    </div>
   </header>
   {% if messages %}
     <div class="public-flash-stack">
@@ -25,5 +31,53 @@
     </div>
   {% endif %}
   {% block content %}{% endblock %}
+  <footer class="site-footer">
+    <div class="wrap">
+      <div>
+        <div class="footer-brand">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a9 9 0 0 0-9 9c0 3.4 1.7 6.2 3.4 7.9l1.7-1.7C6.4 16 5.5 14 5.5 11.5a6.5 6.5 0 0 1 13 0c0 2.5-.9 4.5-2.6 6.2l1.7 1.7c1.7-1.7 3.4-4.5 3.4-7.9a9 9 0 0 0-9-9z" fill="#C9A227"/></svg>
+          <span>UmaFans</span>
+        </div>
+        <p class="footer-desc">面向中文读者的全球赛马新闻门户：聚合日本、中国香港、英国、法国、美国赛马资讯，提供赛事日历、赛果数据与马匹档案。</p>
+      </div>
+      <div class="footer-col">
+        <h3>频道</h3>
+        <ul>
+          <li><a href="/?region=japan">日本赛马</a></li>
+          <li><a href="/?region=hong_kong">中国香港</a></li>
+          <li><a href="/?region=united_kingdom">英国</a> / <a href="/?region=france">法国</a></li>
+          <li><a href="/?region=united_states">美国</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h3>数据</h3>
+        <ul>
+          <li><a href="{% url 'public-race-calendar' %}">赛事日历</a></li>
+          <li><a href="{% url 'public-horse-index' %}">马匹档案</a></li>
+          <li><a href="{% url 'public-horse-follows' %}">我的关注</a></li>
+          <li><a href="/sitemap.xml">网站地图</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">© 2026 UmaFans · 内容来源：netkeiba / JRA / HKJC 等公开来源，仅供资讯阅读</div>
+  </footer>
+  <nav class="mobile-tabbar" aria-label="移动端导航">
+    <a class="{% if request.resolver_match.url_name == 'public-news-feed' %}active{% endif %}" href="/">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>
+      首页
+    </a>
+    <a class="{% if request.resolver_match.url_name == 'public-race-calendar' or request.resolver_match.url_name == 'public-race-detail' %}active{% endif %}" href="{% url 'public-race-calendar' %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+      赛事
+    </a>
+    <a class="{% if request.resolver_match.url_name == 'public-horse-index' or request.resolver_match.url_name == 'public-horse-detail' %}active{% endif %}" href="{% url 'public-horse-index' %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.5a9 9 0 0 0-9 9c0 3.4 1.7 6.2 3.4 7.9l1.7-1.7C6.4 16 5.5 14 5.5 11.5a6.5 6.5 0 0 1 13 0c0 2.5-.9 4.5-2.6 6.2l1.7 1.7c1.7-1.7 3.4-4.5 3.4-7.9a9 9 0 0 0-9-9z"/></svg>
+      马匹
+    </a>
+    <a class="{% if request.resolver_match.url_name == 'public-horse-follows' %}active{% endif %}" href="{% url 'public-horse-follows' %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z"/></svg>
+      关注
+    </a>
+  </nav>
 </body>
 </html>

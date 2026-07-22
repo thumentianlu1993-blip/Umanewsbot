@@ -1,48 +1,64 @@
 {% extends "stable/public/base.html" %}
 
-{% block title %}赛马新闻{% endblock %}
+{% block title %}UmaFans 赛马新闻{% endblock %}
 
 {% block content %}
-  <main class="home-page">
-    <section class="home-lead">
-      <span class="section-kicker">全球赛马</span>
-      <h1>赛马新闻</h1>
-    </section>
+  <main class="wrap home-page">
 
-    <nav class="region-tabs" aria-label="地区频道">
-      {% for tab in region_tabs %}
-        <a class="{% if tab.is_active %}active{% endif %}" href="{{ tab.url }}">{{ tab.label }}</a>
-      {% endfor %}
-    </nav>
-
-    {% include "stable/public/_headline.html" %}
-
-    {% if followed_entries %}
-      <section class="follow-news-panel" aria-label="我的关注">
-        <div class="section-head">
-          <div>
-            <h2>我的关注</h2>
-          </div>
-          <a href="{% url 'public-horse-follows' %}">管理</a>
-        </div>
-        <div class="follow-news-list">
-          {% for entry in followed_entries %}
-            <a class="follow-news-item" href="{{ entry.article.public_path }}">
-              <strong>{{ entry.article.effective_title }}</strong>
-              <span>{{ entry.horse_profile.display_name }} · {{ entry.article.published_to_web_at|date:"m-d H:i" }}</span>
-            </a>
-          {% endfor %}
-        </div>
+    {% if headline_article or today_races %}
+      <section class="hero">
+        {% if headline_article %}
+          {% include "stable/public/_headline.html" %}
+        {% endif %}
+        {% if today_races %}
+          <aside class="hero-races" aria-label="今日赛事">
+            <div class="panel-head">
+              <span class="gold-dot"></span>
+              <h2>{% if today_races_is_fallback %}近期赛事{% else %}今日赛事{% endif %}</h2>
+              <a class="panel-more" href="{% url 'public-race-calendar' %}">完整日历 →</a>
+            </div>
+            {% for entry in today_races %}
+              <a class="race-row" href="{{ entry.event.public_path }}">
+                <span class="grade-badge {{ entry.event.grade_badge_class }}">{{ entry.event.grade_badge_label }}</span>
+                <span class="race-row-main">
+                  <span class="race-row-name">{{ entry.event.chinese_name }}</span>
+                  <span class="race-row-meta">{{ entry.event.get_country_region_display }} · {{ entry.event.racecourse }}{% if entry.event.distance_text %} · {{ entry.event.distance_text }}{% endif %}</span>
+                </span>
+                <span class="race-row-status">
+                  {% if entry.event.status == "finished" %}
+                    <span class="status-chip done">已完赛</span>
+                    {% if entry.winner %}<div class="race-row-winner">冠军 <b>{{ entry.winner }}</b></div>{% endif %}
+                  {% else %}
+                    <span class="status-chip soon">{{ entry.date_label }}</span>
+                    <div class="race-row-winner tabular">{% if entry.event.local_start_time %}{{ entry.event.local_start_time|time:"H:i" }} 发走{% else %}时刻待定{% endif %}</div>
+                  {% endif %}
+                </span>
+              </a>
+            {% endfor %}
+          </aside>
+        {% endif %}
       </section>
     {% endif %}
 
-    <div class="home-layout">
-      <section class="news-list" aria-label="最新新闻">
+    <nav class="region-tabs" aria-label="地区频道">
+      {% for tab in region_tabs %}
+        <a class="region-tab{% if tab.is_active %} active{% endif %}" style="--tab-color: {{ tab.color }}" href="{{ tab.url }}">{{ tab.label }}</a>
+      {% endfor %}
+    </nav>
+
+    <div class="home-grid">
+      <section class="feed" aria-label="最新新闻">
         {% for article in feed_articles %}
           {% include "stable/public/_article_card.html" %}
+          {% if flash_race and forloop.counter == 3 %}
+            {% include "stable/public/_flash_race.html" %}
+          {% endif %}
         {% empty %}
           {% include "stable/public/_empty_state.html" %}
         {% endfor %}
+        {% if flash_race and feed_articles|length < 3 %}
+          {% include "stable/public/_flash_race.html" %}
+        {% endif %}
 
         {% include "stable/public/_pagination.html" %}
       </section>

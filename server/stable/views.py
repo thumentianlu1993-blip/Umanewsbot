@@ -16,13 +16,14 @@ from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.core.signing import BadSignature, SignatureExpired
 from django.db import transaction
-from django.db.models import Count, F, Q
+from django.db.models import BooleanField, Count, Exists, F, OuterRef, Prefetch, Q, Value
 from django.db.models.functions import Lower
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from .forms import (
@@ -77,6 +78,7 @@ from .models import (
     PushTarget,
     QuotaLedger,
     QuotaLedgerKind,
+    RaceGrade,
     RaceEvent,
     RaceEventCandidateStatus,
     RaceEventDataCandidate,
@@ -87,6 +89,7 @@ from .models import (
     RaceRunnerStatus,
     RaceEventStatus,
     RaceEventVisibility,
+    RaceSeriesReviewStatus,
     RacingRegion,
     ReviewMode,
     SourceLanguage,
@@ -108,6 +111,7 @@ from .services.horse_profiles import (
     apply_data_candidate as apply_horse_data_candidate,
     follow_horse,
     followed_articles,
+    get_descendant_horse_ids,
     major_win_records,
     scan_article_horse_links,
     set_follow_cookie,
@@ -179,12 +183,12 @@ HORSE_PROFILE_PAGE_SIZE = 40
 PUBLIC_HORSE_PAGE_SIZE = 24
 PUBLIC_HORSE_RACE_RECORD_PAGE_SIZE = 20
 PUBLIC_REGION_TABS = [
-    {"value": "", "label": "综合"},
-    {"value": RacingRegion.JAPAN, "label": "日本"},
-    {"value": RacingRegion.HONG_KONG, "label": "中国香港"},
-    {"value": RacingRegion.UNITED_KINGDOM, "label": "英国"},
-    {"value": RacingRegion.FRANCE, "label": "法国"},
-    {"value": RacingRegion.UNITED_STATES, "label": "美国"},
+    {"value": "", "label": "综合", "color": "#14181F"},
+    {"value": RacingRegion.JAPAN, "label": "日本", "color": "#B51E2E"},
+    {"value": RacingRegion.HONG_KONG, "label": "中国香港", "color": "#6B2D8E"},
+    {"value": RacingRegion.UNITED_KINGDOM, "label": "英国", "color": "#1D4E9E"},
+    {"value": RacingRegion.FRANCE, "label": "法国", "color": "#2A7FBF"},
+    {"value": RacingRegion.UNITED_STATES, "label": "美国", "color": "#3E5C3A"},
 ]
 
 
@@ -2431,9 +2435,30 @@ def operation_log_list(request: HttpRequest):
 
 
 def _public_published_articles(region: str = ""):
+    confirmed_race_links = (
+        ArticleRaceLink.objects.filter(
+            status__in=[ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL],
+            event__visibility_status=RaceEventVisibility.PUBLISHED,
+        )
+        .select_related("event")
+        .order_by("id")
+    )
+    confirmed_horse_links = (
+        ArticleHorseLink.objects.filter(
+            status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL],
+            horse_profile__review_status=HorseProfileStatus.PUBLISHED,
+        )
+        .select_related("horse_profile")
+        .order_by("id")
+    )
     queryset = (
         NewsArticle.objects.select_related("cover_media_asset")
-        .prefetch_related("images", "related_region_links")
+        .prefetch_related(
+            "images",
+            "related_region_links",
+            Prefetch("race_links", queryset=confirmed_race_links, to_attr="public_race_links"),
+            Prefetch("horse_links", queryset=confirmed_horse_links, to_attr="public_horse_links"),
+        )
         .filter(workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at__isnull=False)
         .order_by("-published_to_web_at", "-id")
     )
@@ -2462,12 +2487,83 @@ def _region_tab_context(active_region: str) -> list[dict]:
     return tabs
 
 
-def _public_horse_queryset():
-    return (
+def _public_horse_queryset(*, token_hash: str = ""):
+    queryset = (
         HorseProfile.objects.filter(review_status=HorseProfileStatus.PUBLISHED)
         .select_related("primary_term", "sire_horse_profile", "dam_horse_profile")
+        .annotate(
+            starts_count=Count("race_records", filter=~Q(race_records__result_status=HorseRaceResultStatus.SCRATCHED)),
+            wins_count=Count(
+                "race_records",
+                filter=Q(race_records__result_status=HorseRaceResultStatus.WON) | Q(race_records__finish_position__startswith="1"),
+            ),
+            seconds_count=Count("race_records", filter=Q(race_records__finish_position__startswith="2")),
+            thirds_count=Count("race_records", filter=Q(race_records__finish_position__startswith="3")),
+        )
         .order_by("-is_featured", "racing_region", "display_name_zh", "original_name", "id")
     )
+    if token_hash:
+        return queryset.annotate(
+            is_following=Exists(HorseFollow.objects.filter(token_hash=token_hash, horse_profile_id=OuterRef("pk")))
+        )
+    return queryset.annotate(is_following=Value(False, output_field=BooleanField()))
+
+
+def _horse_stats(profile: HorseProfile) -> dict[str, int]:
+    starts = profile.starts_count or 0
+    wins = profile.wins_count or 0
+    return {
+        "starts": starts,
+        "wins": wins,
+        "seconds": profile.seconds_count or 0,
+        "thirds": profile.thirds_count or 0,
+        "win_rate": round((wins / starts) * 100) if starts else 0,
+    }
+
+
+def _horse_record_position(record: HorseRaceRecord) -> str:
+    match = re.match(r"^\s*([123])(?:\D|$)", record.finish_position or "")
+    if match:
+        return match.group(1)
+    if record.result_status == HorseRaceResultStatus.WON:
+        return "1"
+    return (record.finish_position or "-").strip() or "-"
+
+
+def _public_horse_article_entries(profile: HorseProfile, *, limit: int = 12) -> list[dict]:
+    descendant_ids = get_descendant_horse_ids(profile, depth=2, public_only=True)
+    horse_ids = {profile.pk, *descendant_ids}
+    links = list(
+        ArticleHorseLink.objects.filter(
+            horse_profile_id__in=horse_ids,
+            horse_profile__review_status=HorseProfileStatus.PUBLISHED,
+            status__in=[ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL],
+            article__workflow_status=WorkflowStatus.PUBLISHED,
+            article__published_to_web_at__isnull=False,
+        )
+        .select_related("horse_profile")
+        .order_by("-article__published_to_web_at", "-article_id", "horse_profile_id")
+    )
+    source_by_article: dict[int, ArticleHorseLink] = {}
+    ordered_ids: list[int] = []
+    for link in links:
+        existing = source_by_article.get(link.article_id)
+        if existing is None:
+            source_by_article[link.article_id] = link
+            ordered_ids.append(link.article_id)
+        elif link.horse_profile_id == profile.pk and existing.horse_profile_id != profile.pk:
+            source_by_article[link.article_id] = link
+    ordered_ids = ordered_ids[:limit]
+    articles = {article.pk: article for article in _public_published_articles().filter(pk__in=ordered_ids)}
+    return [
+        {
+            "article": articles[article_id],
+            "source_horse_profile": source_by_article[article_id].horse_profile,
+            "is_descendant": source_by_article[article_id].horse_profile_id != profile.pk,
+        }
+        for article_id in ordered_ids
+        if article_id in articles
+    ]
 
 
 def _follow_token_hash_from_request(request: HttpRequest) -> str:
@@ -2549,6 +2645,119 @@ def _build_hot_articles(queryset) -> list[dict]:
     return sorted(entries, key=_hot_article_sort_key, reverse=True)[:PUBLIC_HOT_DISPLAY_LIMIT]
 
 
+PUBLIC_TODAY_RACE_LIMIT = 4
+
+PUBLIC_RACE_GRADE_FILTERS = {
+    "g1": [RaceGrade.G1, RaceGrade.JG1, RaceGrade.JPN1],
+    "g2": [RaceGrade.G2, RaceGrade.JG2, RaceGrade.JPN2],
+    "g3": [RaceGrade.G3, RaceGrade.JG3, RaceGrade.JPN3],
+}
+PUBLIC_RACE_WHEN_FILTERS = {
+    "upcoming": [RaceEventStatus.SCHEDULED, RaceEventStatus.RUNNING, RaceEventStatus.POSTPONED],
+    "finished": [RaceEventStatus.FINISHED],
+}
+
+
+def _race_date_label(event: RaceEvent, today) -> str:
+    if event.local_date == today:
+        return "今天"
+    if event.local_date == today + timedelta(days=1):
+        return "明天"
+    if event.local_date:
+        return f"{event.local_date.month}月{event.local_date.day}日"
+    return "日期待定"
+
+
+def _confirmed_race_results(event: RaceEvent) -> list[RaceEventResult]:
+    return [result for result in event.results.all() if result.is_confirmed]
+
+
+def _confirmed_race_winner(results: list[RaceEventResult]):
+    return next((result for result in results if result.official_finish_position == 1), None) or next(
+        (
+            result
+            for result in results
+            if result.official_finish_position is None and result.finish_position == 1
+        ),
+        None,
+    )
+
+
+def _public_race_status_label(event: RaceEvent, today, winner=None) -> str:
+    if event.status == RaceEventStatus.FINISHED:
+        return "已完赛" if winner else "赛果待确认"
+    if event.status == RaceEventStatus.RUNNING:
+        return "进行中"
+    if event.status == RaceEventStatus.POSTPONED:
+        return "延期"
+    if event.status == RaceEventStatus.CANCELLED:
+        return "取消"
+    if event.local_date is None:
+        return "日期待定"
+    days = (event.local_date - today).days
+    if days == 0:
+        return "今天"
+    if days == 1:
+        return "明天"
+    if days > 1:
+        return f"{days}天后"
+    return event.get_status_display()
+
+
+def _public_today_races(region: str = "") -> tuple[list[dict], bool]:
+    """首页"今日赛事"面板：当日与次日公开赛事，空窗时回退到最近的重点赛事。"""
+    today = timezone.localdate()
+    base = RaceEvent.objects.filter(
+        visibility_status=RaceEventVisibility.PUBLISHED,
+        local_date__isnull=False,
+    )
+    if region:
+        base = base.filter(country_region=region)
+    events = list(
+        base.filter(local_date__gte=today, local_date__lte=today + timedelta(days=1)).order_by(
+            "local_date", "local_start_time", "id"
+        )[:PUBLIC_TODAY_RACE_LIMIT]
+    )
+    is_fallback = False
+    if not events:
+        is_fallback = True
+        events = list(
+            base.filter(local_date__gt=today + timedelta(days=1))
+            .filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
+            .order_by("local_date", "local_start_time", "id")[:PUBLIC_TODAY_RACE_LIMIT]
+        )
+    winners: dict[int, str] = {}
+    finished_ids = [event.pk for event in events if event.status == RaceEventStatus.FINISHED]
+    if finished_ids:
+        for result in RaceEventResult.objects.filter(
+            event_id__in=finished_ids,
+            is_confirmed=True,
+        ).filter(Q(official_finish_position=1) | Q(official_finish_position__isnull=True, finish_position=1)):
+            winners[result.event_id] = result.horse_name
+    entries = [
+        {
+            "event": event,
+            "winner": winners.get(event.pk, ""),
+            "date_label": _race_date_label(event, today),
+        }
+        for event in events
+    ]
+    return entries, is_fallback
+
+
+def _public_next_key_race(region: str = ""):
+    """右栏"即将开赛"模块：最近一场公开重点赛事。"""
+    today = timezone.localdate()
+    queryset = RaceEvent.objects.filter(
+        visibility_status=RaceEventVisibility.PUBLISHED,
+        local_date__isnull=False,
+        local_date__gte=today,
+    ).filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
+    if region:
+        queryset = queryset.filter(country_region=region)
+    return queryset.order_by("local_date", "local_start_time", "id").first()
+
+
 def _race_calendar_queryset(request: HttpRequest):
     queryset = RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED)
     tab = request.GET.get("tab", "key").strip() or "key"
@@ -2557,11 +2766,21 @@ def _race_calendar_queryset(request: HttpRequest):
     cursor = request.GET.get("cursor", "").strip()
     year = request.GET.get("year", "").strip()
     query = request.GET.get("q", "").strip()
+    grade = request.GET.get("grade", "").strip().lower()
+    when = request.GET.get("when", "").strip().lower()
+    if grade not in PUBLIC_RACE_GRADE_FILTERS:
+        grade = ""
+    if when not in PUBLIC_RACE_WHEN_FILTERS:
+        when = ""
     today = timezone.localdate()
     if tab == "key":
         queryset = queryset.filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
     if region:
         queryset = queryset.filter(country_region=region)
+    if grade:
+        queryset = queryset.filter(normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS[grade])
+    if when:
+        queryset = queryset.filter(status__in=PUBLIC_RACE_WHEN_FILTERS[when])
     if year.isdigit():
         queryset = queryset.filter(year=int(year))
     if query:
@@ -2602,6 +2821,8 @@ def _race_calendar_queryset(request: HttpRequest):
         "cursor": cursor,
         "year": year,
         "q": query,
+        "grade": grade,
+        "when": when,
     }
 
 
@@ -2621,13 +2842,49 @@ def _group_race_events_by_date(events):
         else:
             event.top_results = list(event.results.all()[:5])
         _attach_result_display_positions(event.top_results)
+        winner = _confirmed_race_winner(event.top_results) if event.status == RaceEventStatus.FINISHED else None
+        event.public_winner_result = winner
+        event.public_winner_name = winner.horse_name if winner else ""
+        event.public_status_label = _public_race_status_label(event, timezone.localdate(), winner)
         if event.local_date != current_date:
             current_date = event.local_date
-            current_group = {"date": event.local_date, "events": []}
+            current_group = {
+                "date": event.local_date,
+                "events": [],
+                "anchor_id": f"race-date-{event.local_date.isoformat()}" if event.local_date else "race-date-undated",
+                "is_today": event.local_date == timezone.localdate(),
+            }
             groups.append(current_group)
         current_group["events"].append(event)
     _attach_race_term_display_names([(event, event.top_results) for event in events])
+    for event in events:
+        if event.public_winner_result:
+            event.public_winner_name = event.public_winner_result.display_horse_name
     return groups
+
+
+def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | None = None) -> list[RaceEvent]:
+    today = timezone.localdate()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+    if events is not None:
+        return [
+            event
+            for event in events
+            if event.local_date
+            and week_start <= event.local_date <= week_end
+            and event.normalized_grade in PUBLIC_RACE_GRADE_FILTERS["g1"]
+            and (not region or event.country_region == region)
+        ][:3]
+    queryset = RaceEvent.objects.filter(
+        visibility_status=RaceEventVisibility.PUBLISHED,
+        local_date__gte=week_start,
+        local_date__lte=week_end,
+        normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS["g1"],
+    )
+    if region:
+        queryset = queryset.filter(country_region=region)
+    return list(queryset.order_by("local_date", "local_start_time", "id")[:3])
 
 
 def _attach_result_display_positions(results):
@@ -2793,14 +3050,30 @@ def public_race_calendar(request: HttpRequest):
         )
     previous_cursor = events[0].local_date.isoformat() if events and events[0].local_date else ""
     next_cursor = events[-1].local_date.isoformat() if events and events[-1].local_date else ""
+    grade_tabs = [
+        {"value": "", "label": "全部等级", "is_active": filters["grade"] == "", "url": filter_url(grade="")},
+        *[
+            {"value": value, "label": value.upper(), "is_active": filters["grade"] == value, "url": filter_url(grade=value)}
+            for value in PUBLIC_RACE_GRADE_FILTERS
+        ],
+    ]
+    when_tabs = [
+        {"value": "upcoming", "label": "即将开赛", "is_active": filters["when"] == "upcoming", "url": filter_url(when="upcoming")},
+        {"value": "", "label": "全部时间", "is_active": filters["when"] == "", "url": filter_url(when="")},
+        {"value": "finished", "label": "已完赛", "is_active": filters["when"] == "finished", "url": filter_url(when="finished")},
+    ]
     return render(
         request,
         "stable/public/race_calendar.html",
         {
             "groups": groups,
             "filters": filters,
+            "focus_events": _public_weekly_focus_events(filters["region"], events=events),
+            "date_axis": [group for group in groups if group["date"]],
             "years": public_race_calendar_years(),
             "region_tabs": region_tabs,
+            "grade_tabs": grade_tabs,
+            "when_tabs": when_tabs,
             "all_tab_url": filter_url(tab="all"),
             "key_tab_url": filter_url(tab="key"),
             "clear_search_url": filter_url(year="", q=""),
@@ -2822,6 +3095,7 @@ def _series_history_winners(
         .filter(
             event__race_series_id=event.race_series_id,
             event__visibility_status=RaceEventVisibility.PUBLISHED,
+            is_confirmed=True,
         )
         .filter(
             Q(official_finish_position=1)
@@ -2862,6 +3136,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
     event = get_object_or_404(
         RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED)
         .select_related(
+            "race_series",
             "projection_control__current_result_revision",
             "live_tracking",
         )
@@ -2921,10 +3196,19 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         and link.article.workflow_status == WorkflowStatus.PUBLISHED
         and link.article.published_to_web_at is not None
     ]
+    article_ids = [link.article_id for link in public_links]
+    public_articles = {article.pk: article for article in _public_published_articles().filter(pk__in=article_ids)}
     news_groups = {
-        "pre_race": [link.article for link in public_links if link.link_type == ArticleRaceLinkType.PRE_RACE],
-        "post_race": [link.article for link in public_links if link.link_type == ArticleRaceLinkType.POST_RACE],
-        "related": [link.article for link in public_links if link.link_type == ArticleRaceLinkType.RELATED],
+        link_type: [
+            public_articles[link.article_id]
+            for link in public_links
+            if link.link_type == link_type and link.article_id in public_articles
+        ]
+        for link_type in (
+            ArticleRaceLinkType.PRE_RACE,
+            ArticleRaceLinkType.POST_RACE,
+            ArticleRaceLinkType.RELATED,
+        )
     }
     runners = _sort_runners_for_display(list(event.runners.all()), event.country_region)
     has_current_live_revision = current_result_revision is not None
@@ -2945,7 +3229,19 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             (event, history_winners),
         ]
     )
+    winner = _confirmed_race_winner(results) if event.status == RaceEventStatus.FINISHED else None
     top_results = results[:5]
+    series_events = []
+    if event.race_series_id and event.race_series.review_status == RaceSeriesReviewStatus.APPROVED:
+        candidates = list(
+            RaceEvent.objects.filter(
+                race_series_id=event.race_series_id,
+                visibility_status=RaceEventVisibility.PUBLISHED,
+            ).order_by("-year", "id")
+        )
+        if len(candidates) > 1:
+            series_events = candidates
+    has_news = any(news_groups.values())
     return render(
         request,
         "stable/public/race_detail.html",
@@ -2954,9 +3250,15 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "runners": runners,
             "results": results,
             "history_winners": history_winners,
+            "history_primary": history_winners[:10],
+            "history_extra": history_winners[10:],
             "top_results": top_results,
+            "winner": winner,
+            "series_events": series_events,
             "news_groups": news_groups,
             "live_result_status": live_result_status,
+            "has_news": has_news,
+            "status_label": _public_race_status_label(event, timezone.localdate(), winner),
         },
     )
 
@@ -3015,6 +3317,9 @@ def public_news_feed(request: HttpRequest):
     feed_articles = [article for article in page_obj if not headline_article or article.pk != headline_article.pk]
     pagination_params = request.GET.copy()
     pagination_params.pop("page", None)
+    today_races, today_races_is_fallback = _public_today_races(active_region)
+    next_key_race = _public_next_key_race(active_region)
+    flash_race = next((entry for entry in today_races if entry["winner"]), None)
     return render(
         request,
         "stable/public/feed.html",
@@ -3026,7 +3331,11 @@ def public_news_feed(request: HttpRequest):
             "hot_articles": hot_articles,
             "region_tabs": _region_tab_context(active_region),
             "active_region": active_region,
-            "followed_entries": _public_followed_entries(request),
+            "followed_entries": _public_followed_entries(request, limit=4),
+            "today_races": today_races,
+            "today_races_is_fallback": today_races_is_fallback,
+            "next_key_race": next_key_race,
+            "flash_race": flash_race,
             "pagination_querystring": pagination_params.urlencode(),
         },
     )
@@ -3055,11 +3364,56 @@ def public_article_detail(request: HttpRequest, article_id: int):
         if link.status in {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL}
         and link.horse_profile.review_status == HorseProfileStatus.PUBLISHED
     ]
-    return render(request, "stable/public/detail.html", {"article": article, "race_links": race_links, "horse_links": horse_links})
+    published_neighbors = NewsArticle.objects.filter(
+        workflow_status=WorkflowStatus.PUBLISHED,
+        published_to_web_at__isnull=False,
+    )
+    prev_article = (
+        published_neighbors.filter(
+            Q(published_to_web_at__lt=article.published_to_web_at)
+            | Q(published_to_web_at=article.published_to_web_at, id__lt=article.id)
+        )
+        .order_by("-published_to_web_at", "-id")
+        .first()
+    )
+    next_article = (
+        published_neighbors.filter(
+            Q(published_to_web_at__gt=article.published_to_web_at)
+            | Q(published_to_web_at=article.published_to_web_at, id__gt=article.id)
+        )
+        .order_by("published_to_web_at", "id")
+        .first()
+    )
+    related_articles = list(
+        published_neighbors.filter(racing_region=article.racing_region)
+        .exclude(pk=article.pk)
+        .order_by("-published_to_web_at", "-id")[:4]
+    )
+    today = timezone.localdate()
+    teaser_event = None
+    for link in race_links:
+        event = link.event
+        if event.status == RaceEventStatus.SCHEDULED and (event.local_date is None or event.local_date >= today):
+            teaser_event = event
+            break
+    return render(
+        request,
+        "stable/public/detail.html",
+        {
+            "article": article,
+            "race_links": race_links,
+            "horse_links": horse_links,
+            "prev_article": prev_article,
+            "next_article": next_article,
+            "related_articles": related_articles,
+            "teaser_event": teaser_event,
+        },
+    )
 
 
 def public_horse_index(request: HttpRequest):
-    queryset = _public_horse_queryset()
+    token_hash = _follow_token_hash_from_request(request)
+    queryset = _public_horse_queryset(token_hash=token_hash)
     query = request.GET.get("q", "").strip()
     region = _resolve_public_region(request.GET.get("region", ""))
     if query:
@@ -3074,6 +3428,9 @@ def public_horse_index(request: HttpRequest):
         queryset = queryset.filter(racing_region=region)
     paginator = Paginator(queryset, PUBLIC_HORSE_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
+    region_colors = {tab["value"]: tab["color"] for tab in PUBLIC_REGION_TABS}
+    for profile in page_obj.object_list:
+        profile.public_region_color = region_colors.get(profile.racing_region, "#0E5A38")
     pagination_params = request.GET.copy()
     pagination_params.pop("page", None)
     return render(
@@ -3091,22 +3448,14 @@ def public_horse_index(request: HttpRequest):
 
 def public_horse_detail(request: HttpRequest, profile_id: int):
     profile = get_object_or_404(
-        _public_horse_queryset()
+        _public_horse_queryset(token_hash=_follow_token_hash_from_request(request))
         .prefetch_related(
-            "article_links__article",
             "race_links__event",
             "sire_children",
             "dam_children",
         ),
         pk=profile_id,
     )
-    public_article_links = [
-        link
-        for link in profile.article_links.all()
-        if link.status in {ArticleHorseLinkStatus.AUTO, ArticleHorseLinkStatus.MANUAL}
-        and link.article.workflow_status == WorkflowStatus.PUBLISHED
-        and link.article.published_to_web_at is not None
-    ]
     public_race_links = [
         link
         for link in profile.race_links.all()
@@ -3116,7 +3465,7 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
     records_order = request.GET.get("records_order", "desc").strip().lower()
     if records_order not in {"asc", "desc"}:
         records_order = "desc"
-    race_record_queryset = profile.race_records.select_related("event")
+    race_record_queryset = profile.race_records.select_related("event", "result")
     if records_order == "asc":
         race_record_queryset = race_record_queryset.order_by(
             F("race_date").asc(nulls_last=True),
@@ -3135,6 +3484,19 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
     ).get_page(request.GET.get("records_page"))
     records_pagination_params = request.GET.copy()
     records_pagination_params.pop("records_page", None)
+    for record in race_records_page.object_list:
+        record.public_position = _horse_record_position(record)
+        record.podium_class = f"p{record.public_position}" if record.public_position in {"1", "2", "3"} else ""
+        record.public_event_path = (
+            record.event.public_path
+            if record.event and record.event.visibility_status == RaceEventVisibility.PUBLISHED
+            else ""
+        )
+        record.public_finish_time = (
+            record.result.finish_time
+            if record.result and record.result.is_confirmed and record.result.finish_time
+            else ""
+        )
     token_hash = _follow_token_hash_from_request(request)
     is_following = bool(token_hash and HorseFollow.objects.filter(token_hash=token_hash, horse_profile=profile).exists())
     descendants = (
@@ -3146,8 +3508,9 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
         "stable/public/horse_detail.html",
         {
             "profile": profile,
+            "horse_stats": _horse_stats(profile),
             "major_wins": major_win_records(profile),
-            "article_links": public_article_links[:12],
+            "article_entries": _public_horse_article_entries(profile),
             "race_links": public_race_links[:12],
             "race_records": race_records_page.object_list,
             "race_records_page": race_records_page,
@@ -3174,7 +3537,13 @@ def public_horse_follow(request: HttpRequest, profile_id: int):
     else:
         follow_horse(token_hash, profile, include_descendants=include_descendants)
         messages.success(request, "已关注这匹马。")
-    response = redirect(profile.public_path)
+    next_url = request.POST.get("next", "").strip()
+    if not (
+        next_url.startswith("/horses/")
+        and url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure())
+    ):
+        next_url = profile.public_path
+    response = redirect(next_url)
     set_follow_cookie(response, signed_token)
     return response
 
@@ -3184,12 +3553,25 @@ def public_horse_follows(request: HttpRequest):
     follows = []
     entries = []
     if token_hash:
-        follows = (
+        follows = list(
             HorseFollow.objects.filter(token_hash=token_hash, horse_profile__review_status=HorseProfileStatus.PUBLISHED)
             .select_related("horse_profile")
             .order_by("-followed_at", "-id")
         )
         entries = followed_articles(token_hash, limit=40)
+        direct_ids = {follow.horse_profile_id for follow in follows}
+        article_ids = [entry["article"].pk for entry in entries]
+        public_articles = {article.pk: article for article in _public_published_articles().filter(pk__in=article_ids)}
+        entries = [
+            {
+                **entry,
+                "article": public_articles[entry["article"].pk],
+                "source_horse_profile": entry["horse_profile"],
+                "is_descendant": entry["horse_profile"].pk not in direct_ids,
+            }
+            for entry in entries
+            if entry["article"].pk in public_articles
+        ]
     return render(request, "stable/public/horse_follows.html", {"follows": follows, "followed_entries": entries})
 
 

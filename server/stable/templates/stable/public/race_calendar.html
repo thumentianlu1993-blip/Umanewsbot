@@ -9,6 +9,20 @@
       <h1>赛事日历</h1>
     </section>
 
+    {% if focus_events %}
+      <section class="focus-strip" aria-label="本周焦点">
+        <span class="focus-strip-kicker">本周焦点 · G1</span>
+        <div class="focus-strip-races">
+          {% for event in focus_events %}
+            <a class="focus-strip-race" href="{{ event.public_path }}">
+              <b>{{ event.chinese_name }}</b>
+              <span>{{ event.local_date|date:"m月d日" }} · {{ event.racecourse }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+
     <nav class="race-tabs" aria-label="赛事范围">
       <a class="{% if filters.tab == 'all' %}active{% endif %}" href="{{ all_tab_url }}">全部</a>
       <a class="{% if filters.tab != 'all' %}active{% endif %}" href="{{ key_tab_url }}">重点</a>
@@ -20,9 +34,36 @@
       {% endfor %}
     </nav>
 
+    <div class="race-filter-row">
+      <nav class="grade-filter" aria-label="等级筛选">
+        {% for tab in grade_tabs %}
+          <a class="{% if tab.is_active %}active{% endif %}" href="{{ tab.url }}">{{ tab.label }}</a>
+        {% endfor %}
+      </nav>
+      <nav class="grade-filter when-filter" aria-label="时间筛选">
+        {% for tab in when_tabs %}
+          <a class="{% if tab.is_active %}active{% endif %}" href="{{ tab.url }}">{{ tab.label }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+
+    {% if date_axis %}
+      <nav class="date-axis" aria-label="当前赛事日期">
+        {% for group in date_axis %}
+          <a class="{% if group.is_today %}today{% endif %}" href="#{{ group.anchor_id }}">
+            <b>{{ group.date|date:"d" }}</b>
+            <span>{{ group.date|date:"D" }}{% if group.is_today %} · 今天{% endif %}</span>
+            <span class="race-dot" aria-label="有赛事"></span>
+          </a>
+        {% endfor %}
+      </nav>
+    {% endif %}
+
     <form class="public-filter-bar race-calendar-filters" method="get">
       <input type="hidden" name="tab" value="{{ filters.tab }}">
       {% if filters.region %}<input type="hidden" name="region" value="{{ filters.region }}">{% endif %}
+      {% if filters.grade %}<input type="hidden" name="grade" value="{{ filters.grade }}">{% endif %}
+      {% if filters.when %}<input type="hidden" name="when" value="{{ filters.when }}">{% endif %}
       <label>
         <span>年份</span>
         <select name="year">
@@ -45,81 +86,40 @@
       {% if next_url %}<a href="{{ next_url }}">加载未来赛事</a>{% endif %}
     </div>
 
-    <section class="race-calendar-mobile" aria-label="赛事卡片">
+    <section class="race-timeline agenda" aria-label="赛事时间线">
       {% for group in groups %}
-        <div class="race-date-group">
-          <h2>{% if group.date %}{{ group.date|date:"Y-m-d D" }}{% else %}日期待定{% endif %}</h2>
-          {% for event in group.events %}
-            <a class="race-card" href="{{ event.public_path }}">
-              <div class="race-card-main">
-                <div>
-                  <strong>{{ event.chinese_name }}</strong>
-                  <span>{{ event.original_name }}</span>
-                </div>
-                <span class="race-status">{{ event.get_status_display }}</span>
-              </div>
-              <div class="race-card-meta">
-                <span>{{ event.racecourse }}</span>
-                {% if event.local_start_time %}<span>{{ event.local_start_time|time:"H:i" }}</span>{% endif %}
-                <span>{{ event.grade_text }}</span>
-                <span>{{ event.get_surface_display }}</span>
-              </div>
-              {% if event.status == 'finished' and event.top_results %}
-                <ol class="race-top-results">
-                  {% for result in event.top_results %}
-                    <li>{{ result.display_finish_position }}. {{ result.display_horse_name }}{% if result.margin %}<span>{{ result.margin }}</span>{% endif %}</li>
-                  {% endfor %}
-                </ol>
-              {% endif %}
-            </a>
-          {% endfor %}
-        </div>
+        <section class="agenda-day {% if group.is_today %}today{% endif %}" id="{{ group.anchor_id }}">
+          <header class="agenda-date {% if group.is_today %}today{% endif %}">
+            {% if group.date %}
+              <div class="d">{{ group.date|date:"d" }}</div>
+              <div class="w">{{ group.date|date:"D" }}{% if group.is_today %} · 今天{% endif %}</div>
+            {% else %}
+              <div class="d">—</div><div class="w">日期待定</div>
+            {% endif %}
+          </header>
+          <div class="agenda-races">
+            {% for event in group.events %}
+              <a class="cal-card" href="{{ event.public_path }}">
+                <span class="grade-badge {{ event.grade_badge_class }}">{{ event.grade_badge_label }}</span>
+                <span class="cal-card-main">
+                  <span class="cal-card-name">{{ event.chinese_name }}{% if event.original_name and event.original_name != event.chinese_name %}<small>{{ event.original_name }}</small>{% endif %}</span>
+                  <span class="cal-card-meta">
+                    <span>{{ event.get_country_region_display }} · {{ event.racecourse }}</span>
+                    {% if event.distance_text %}<span>{{ event.distance_text }}</span>{% elif event.surface %}<span>{{ event.get_surface_display }}</span>{% endif %}
+                    {% if event.eligibility_text %}<span>{{ event.eligibility_text }}</span>{% endif %}
+                  </span>
+                </span>
+                <span class="cal-card-status">
+                  <strong>{{ event.public_status_label }}</strong>
+                  {% if event.public_winner_name %}<small>冠军 {{ event.public_winner_name }}</small>{% elif event.local_start_time and event.status == 'scheduled' %}<small>{{ event.local_start_time|time:"H:i" }} 发走</small>{% endif %}
+                </span>
+              </a>
+            {% endfor %}
+          </div>
+        </section>
       {% empty %}
         <p class="empty-state">暂无符合条件的赛事。</p>
       {% endfor %}
-    </section>
-
-    <section class="race-calendar-desktop" aria-label="赛事表格">
-      <table class="race-table">
-        <thead>
-          <tr>
-            <th>日期</th>
-            <th>时间</th>
-            <th>状态</th>
-            <th>赛事</th>
-            <th>地区 / 马场</th>
-            <th>等级</th>
-            <th>Surface</th>
-            <th>摘要</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for group in groups %}
-            {% for event in group.events %}
-              <tr>
-                <td>{% if event.local_date %}{{ event.local_date|date:"Y-m-d" }}{% else %}待定{% endif %}</td>
-                <td>{% if event.local_start_time %}{{ event.local_start_time|time:"H:i" }}{% else %}-{% endif %}</td>
-                <td><span class="race-status">{{ event.get_status_display }}</span></td>
-                <td><a href="{{ event.public_path }}"><strong>{{ event.chinese_name }}</strong><span>{{ event.original_name }}</span></a></td>
-                <td>{{ event.get_country_region_display }}<span>{{ event.racecourse }}</span></td>
-                <td>{{ event.grade_text }}</td>
-                <td>{{ event.get_surface_display }}</td>
-                <td>
-                  {% if event.status == 'finished' and event.top_results %}
-                    {% for result in event.top_results %}
-                      {{ result.display_finish_position }}.{{ result.display_horse_name }}{% if result.margin %}({{ result.margin }}){% endif %}{% if not forloop.last %} / {% endif %}
-                    {% endfor %}
-                  {% else %}
-                    {{ event.display_distance_text|default:"赛前资料待补充" }}
-                  {% endif %}
-                </td>
-              </tr>
-            {% endfor %}
-          {% empty %}
-            <tr><td colspan="8">暂无符合条件的赛事。</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
     </section>
   </main>
 {% endblock %}

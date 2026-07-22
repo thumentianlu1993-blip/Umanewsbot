@@ -1,26 +1,23 @@
-{% with cover_url=article.cover_image_url %}
-  <article class="news-card{% if not cover_url %} no-image{% endif %}">
-    <div class="news-card-body">
-      <div class="article-meta">
-        <span>{{ article.published_to_web_at|date:"Y-m-d H:i" }}</span>
-        <span>{{ article.region_display_text }}</span>
-        <span>{{ article.source_note|default:article.get_source_site_display }}</span>
-        <span>{{ article.get_source_language_display }}</span>
-      </div>
-      <h2><a href="{{ article.public_path }}">{{ article.effective_title }}</a></h2>
-      {% if article.effective_summary %}
-        <p>{{ article.effective_summary|truncatechars:92 }}</p>
-      {% endif %}
-      <div class="tag-list">
-        {% for tag in article.tags_json %}
-          <span>{{ tag }}</span>
-        {% endfor %}
-      </div>
+<article class="feed-card" style="--region-color: {{ article.region_color }}">
+  <div class="feed-card-top">
+    <span class="region-mark"></span>
+    <span class="region-label">{{ article.get_racing_region_display }}</span>
+    <span class="feed-card-source">{{ article.source_note|default:article.get_source_site_display }}</span>
+    {% if follow_entry %}<span class="follow-source-tag">{% if follow_entry.is_descendant %}子代相关 · {% else %}来自：{% endif %}{{ follow_entry.source_horse_profile.display_name }}</span>{% endif %}
+    <span class="feed-card-time tabular">{{ article.published_to_web_at|date:"m-d H:i" }}</span>
+  </div>
+  <h3 class="feed-card-title"><a href="{{ article.public_path }}">{{ article.effective_title }}</a></h3>
+  {% if article.effective_summary %}
+    <p class="feed-card-summary">{{ article.effective_summary|truncatechars:92 }}</p>
+  {% endif %}
+  {% if article.public_horse_links or article.public_race_links %}
+    <div class="feed-card-foot">
+      {% for link in article.public_horse_links|slice:":2" %}
+        <a class="entity-chip" href="{{ link.horse_profile.public_path }}">🐎 {{ link.horse_profile.display_name }}</a>
+      {% endfor %}
+      {% for link in article.public_race_links|slice:":2" %}
+        <a class="entity-chip race" href="{{ link.event.public_path }}">🏆 {{ link.event.chinese_name }}</a>
+      {% endfor %}
     </div>
-    {% if cover_url %}
-      <a class="news-thumb" href="{{ article.public_path }}">
-        <img src="{{ cover_url }}" alt="">
-      </a>
-    {% endif %}
-  </article>
-{% endwith %}
+  {% endif %}
+</article>
