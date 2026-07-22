@@ -52,6 +52,7 @@ class P0HorseSourceBlocked(ValueError):
 
 
 RETRY_AFTER_CAP_SECONDS = 300.0
+NETKEIBA_PARSER_VERSION = "netkeiba-parser.v2"
 
 
 MANUAL_SUPPLEMENT_CSV_FIELDS = (
@@ -2318,7 +2319,7 @@ class _NetkeibaClient(_BaseSourceClient):
             BeautifulSoup(_netkeiba_page_text(result), "html.parser"),
             result_url=result_url,
         )
-        return self._payload(
+        payload = self._payload(
             request=request,
             source_url=getattr(profile, "url", profile_url),
             external_horse_id=horse_id,
@@ -2352,6 +2353,8 @@ class _NetkeibaClient(_BaseSourceClient):
                 ),
             ],
         )
+        payload["source"]["parser_version"] = NETKEIBA_PARSER_VERSION
+        return payload
 
     def _parse_title(self, soup) -> tuple[str, str, str, str]:
         title = soup.select_one(".horse_title")
@@ -2363,19 +2366,22 @@ class _NetkeibaClient(_BaseSourceClient):
         heading_text = _text(heading.get_text(" ", strip=True)) if heading else ""
         remainder = line[len(heading_text):].strip(" 　") if heading_text else line
         color_alternation = "|".join(_NETKEIBA_COLORS)
-        match = re.match(
-            rf"(?P<en>.*?)(?:現役|引退|繁殖|登録抹消)\s*(?P<sex>セン|牡|牝|セ)(?:\d+歳)?\s*(?P<color>{color_alternation})$",
-            remainder,
+        color_match = re.search(rf"(?P<color>{color_alternation})$", remainder)
+        if not color_match:
+            raise P0HorseSourceBlocked("netkeiba_profile_structure: title_color")
+        color = color_match.group("color")
+        before_color = remainder[: color_match.start()].strip(" 　")
+        sex_match = re.search(r"(?P<sex>セン|牡|牝|セ)(?:\d+歳)?$", before_color)
+        if not sex_match:
+            raise P0HorseSourceBlocked("netkeiba_profile_structure: title_sex")
+        sex = sex_match.group("sex")
+        before_sex = before_color[: sex_match.start()].strip(" 　")
+        status_match = re.search(
+            r"(?P<status>登録抹消|現役|引退|繁殖|抹消)$", before_sex
         )
-        if not match:
-            # no guessing: an unrecognized title shape (missing/unknown color
-            # or sex) blocks the candidate instead of emitting wrong fields
-            raise P0HorseSourceBlocked(
-                "netkeiba_profile_structure: title_sex_color"
-            )
-        english_name = match.group("en").strip(" 　")
-        sex = match.group("sex") or ""
-        color = match.group("color") or ""
+        if not status_match:
+            raise P0HorseSourceBlocked("netkeiba_profile_structure: title_status")
+        english_name = before_sex[: status_match.start()].strip(" 　")
         return name, english_name, sex, color
 
     def _parse_profile_table(self, soup) -> dict[str, str]:

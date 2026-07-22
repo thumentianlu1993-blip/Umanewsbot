@@ -22,6 +22,7 @@ from typing import Any, Callable, Iterable
 from django.conf import settings
 
 from stable.services.p0_horse_completion_adapters import (
+    P0HorseCompletionSourceError,
     P0HorseCompletionRequest,
     REVIEWED_CANDIDATE_REQUEST_BUDGETS,
     _blocked_candidate_payload,
@@ -439,7 +440,10 @@ def prepare_p0_horse_batch(
                 P0HorseSourceBlocked,
             )
 
-            if isinstance(exc, P0HorseSourceBlocked):
+            identity_source_error = isinstance(
+                exc, P0HorseCompletionSourceError
+            ) and str(exc).startswith(("identity_incomplete:", "identity_mismatch:"))
+            if isinstance(exc, P0HorseSourceBlocked) or identity_source_error:
                 failure_reason = "source_cache_or_adapter_error"
             elif exc.__class__.__name__ == "P0HorseCompletionNetworkDisabled":
                 failure_reason = "network_disabled_cache_missing"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import fcntl
 import hashlib
 import io
 import json
@@ -966,9 +967,20 @@ def _require_expected_identity_matches_payload(
     if not must_lock_identity:
         return
     if any(expected[field] in ("", None) for field in expected):
+        missing_expected_fields = [
+            {
+                "horse_name": "expected_horse_name",
+                "sire_name": "expected_sire_name",
+                "dam_name": "expected_dam_name",
+                "birth_year": "expected_birth_year",
+            }[field]
+            for field in expected
+            if expected[field] in ("", None)
+        ]
         raise P0HorseCompletionSourceError(
-            "identity_incomplete: expected horse_name, sire_name, dam_name, "
-            "and birth_year"
+            "identity_incomplete: expected horse_name, sire_name, dam_name, and "
+            "birth_year; candidate expected fields missing: "
+            + ", ".join(missing_expected_fields)
         )
     for field in ("sire_name", "dam_name", "birth_year"):
         expected_value = expected[field]
@@ -1387,7 +1399,12 @@ def _read_cache(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _write_source_cache_atomically(path: Path, payload: dict[str, Any]) -> None:
+def _write_source_cache_atomically(
+    path: Path,
+    payload: dict[str, Any],
+    *,
+    replace_stale_netkeiba: bool = False,
+) -> None:
     payload = _validate_source_cache_payload(
         payload,
         context="canonical cache write",
@@ -1406,10 +1423,40 @@ def _write_source_cache_atomically(path: Path, payload: dict[str, Any]) -> None:
             temporary.write(_canonical_json_bytes(payload))
             temporary.flush()
             os.fsync(temporary.fileno())
-        try:
-            os.link(temporary_path, path)
-        except FileExistsError:
-            pass
+        if replace_stale_netkeiba:
+            from stable.services.p0_horse_completion_source_clients import (
+                NETKEIBA_PARSER_VERSION,
+            )
+
+            lock_path = path.with_name(f".{path.name}.netkeiba-replace.lock")
+            lock_flags = os.O_CREAT | os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+            lock_fd = os.open(lock_path, lock_flags, 0o600)
+            with os.fdopen(lock_fd, "rb+") as lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                current_payload = _read_cache(path) if path.is_file() else None
+                current_source = (
+                    current_payload.get("source")
+                    if isinstance(current_payload, dict)
+                    and isinstance(current_payload.get("source"), dict)
+                    else {}
+                )
+                current_is_netkeiba = (
+                    _normalized_text(current_source.get("name")) == "netkeiba"
+                )
+                current_parser_version = str(
+                    current_source.get("parser_version") or ""
+                )
+                if current_payload is None or (
+                    current_is_netkeiba
+                    and current_parser_version != NETKEIBA_PARSER_VERSION
+                ):
+                    os.replace(temporary_path, path)
+                    temporary_path = None
+        else:
+            try:
+                os.link(temporary_path, path)
+            except FileExistsError:
+                pass
     except OSError as exc:
         raise P0HorseCompletionSourceError(
             f"P0 horse source cache write failed: {path}"
@@ -1849,6 +1896,7 @@ def run_p0_horse_completion_adapter(
         request,
     )
     use_cache = False
+    parser_version_blocked = False
     if cache_path and cache_path.is_file():
         cached_payload = _read_cache(cache_path)
         # Cache is keyed per candidate, not per provider: for japan (where a
@@ -1865,7 +1913,23 @@ def run_p0_horse_completion_adapter(
             and cached_source
             and candidate_source != cached_source
         )
-        if not cross_source_blocked:
+        if (
+            request.region == RacingRegion.JAPAN
+            and candidate_source == "netkeiba"
+            and cached_source == "netkeiba"
+        ):
+            from stable.services.p0_horse_completion_source_clients import (
+                NETKEIBA_PARSER_VERSION,
+            )
+
+            parser_version_blocked = (
+                str(
+                    (cached_payload.get("source") or {}).get("parser_version")
+                    or ""
+                )
+                != NETKEIBA_PARSER_VERSION
+            )
+        if not cross_source_blocked and not parser_version_blocked:
             use_cache = True
             source_payload = cached_payload
     if use_cache:
@@ -1929,6 +1993,7 @@ def run_p0_horse_completion_adapter(
             _write_source_cache_atomically(
                 cache_path,
                 canonical_source_payload,
+                replace_stale_netkeiba=parser_version_blocked,
             )
             canonical_source_payload = _read_cache(cache_path)
             canonical_source_payload = _validate_source_cache_payload(

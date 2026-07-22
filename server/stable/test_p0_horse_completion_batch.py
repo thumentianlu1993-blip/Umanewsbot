@@ -424,6 +424,29 @@ class BatchRunStateTests(TestCase):
         )
         self.assertNotEqual(base, reordered)
 
+    def test_netkeiba_parser_version_changes_adapter_and_candidate_fingerprints(self):
+        from unittest.mock import patch
+
+        from stable.services.p0_horse_completion_batch import (
+            adapter_config_fingerprint,
+            candidate_input_fingerprint,
+        )
+
+        candidate = self._candidate(
+            identity_keys=["netkeiba:2022110137"],
+            source_namespace="netkeiba",
+        )
+        base_adapter = adapter_config_fingerprint()
+        base_candidate = candidate_input_fingerprint(candidate)
+        self.assertEqual(base_adapter, adapter_config_fingerprint())
+        self.assertEqual(base_candidate, candidate_input_fingerprint(candidate))
+        with patch(
+            "stable.services.p0_horse_completion_source_clients.NETKEIBA_PARSER_VERSION",
+            "netkeiba-parser.test-next",
+        ):
+            self.assertNotEqual(base_adapter, adapter_config_fingerprint())
+            self.assertNotEqual(base_candidate, candidate_input_fingerprint(candidate))
+
     def test_resume_decision_matrix(self):
         from stable.services.p0_horse_completion_batch import (
             BatchRunState,
@@ -944,6 +967,48 @@ class P0HorseBatchPrepareTests(P0HorseBatchTestBase):
         }
         defaults.update(overrides)
         return prepare_p0_horse_batch(self.manifest_path, **defaults)
+
+    def test_identity_source_error_is_explainable_prepare_blocker(self):
+        import shutil
+
+        if type(self) is not P0HorseBatchPrepareTests:
+            return
+
+        from stable.services.p0_horse_completion_adapters import (
+            P0HorseCompletionSourceError,
+        )
+
+        class PartialExpectedIdentityClient:
+            last_request_count = 0
+
+            def fetch_source_payload(self, request):
+                raise P0HorseCompletionSourceError(
+                    "identity_incomplete: expected horse_name, sire_name, dam_name, and "
+                    "birth_year; candidate expected fields missing: "
+                    "expected_dam_name, expected_birth_year"
+                )
+
+        shutil.rmtree(self.cache_dir)
+        summary = self._prepare(
+            allow_network=True,
+            source_client_factory=lambda region: PartialExpectedIdentityClient(),
+        )
+        self.assertEqual(
+            summary["failure_reason_counts"]["source_cache_or_adapter_error"],
+            1,
+        )
+        self.assertNotIn(
+            "unexpected_adapter_error", summary["failure_reason_counts"]
+        )
+        staging_path = next((self.manifest_path.parent / "staging").iterdir())
+        payload = json.loads(staging_path.read_text(encoding="utf-8"))
+        self.assertNotIn("unexpected_adapter_error", payload["failure_reason"])
+        self.assertEqual(
+            payload["retrieval"]["error_message"],
+            "identity_incomplete: expected horse_name, sire_name, dam_name, and "
+            "birth_year; candidate expected fields missing: "
+            "expected_dam_name, expected_birth_year",
+        )
 
     def test_prepare_cache_only_success(self):
         summary = self._prepare()

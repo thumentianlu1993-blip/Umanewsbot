@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -116,6 +119,11 @@ class NetkeibaCacheGuardTests(SimpleTestCase):
         payload["source"]["name"] = source_name
         return payload
 
+    def _current_netkeiba_cache_payload(self) -> dict:
+        payload = self._cache_payload("netkeiba")
+        payload["source"]["parser_version"] = source_clients.NETKEIBA_PARSER_VERSION
+        return payload
+
     def test_cross_source_cache_treated_as_miss(self):
         import tempfile
 
@@ -141,7 +149,7 @@ class NetkeibaCacheGuardTests(SimpleTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             cache_path = Path(tmp) / "cache.json"
             cache_path.write_text(
-                json.dumps(self._cache_payload("netkeiba"), ensure_ascii=False),
+                json.dumps(self._current_netkeiba_cache_payload(), ensure_ascii=False),
                 encoding="utf-8",
             )
             result = completion.run_p0_horse_completion_adapter(
@@ -150,6 +158,157 @@ class NetkeibaCacheGuardTests(SimpleTestCase):
             )
             self.assertTrue(result["retrieval"]["cache_hit"])
 
+    def test_legacy_or_wrong_netkeiba_parser_version_is_cache_miss(self):
+        import tempfile
+
+        for parser_version in (None, "netkeiba-parser.invalid"):
+            with (
+                self.subTest(parser_version=parser_version),
+                tempfile.TemporaryDirectory() as tmp,
+            ):
+                payload = self._cache_payload("netkeiba")
+                if parser_version is None:
+                    payload["source"].pop("parser_version", None)
+                else:
+                    payload["source"]["parser_version"] = parser_version
+                cache_path = Path(tmp) / "cache.json"
+                cache_path.write_text(
+                    json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+                )
+                with self.assertRaises(completion.P0HorseCompletionNetworkDisabled):
+                    completion.run_p0_horse_completion_adapter(
+                        _request(cache_path=str(cache_path), allow_network=False),
+                        source_client=None,
+                    )
+
+    def test_stale_cache_is_atomically_replaced_by_current_network_payload(self):
+        import tempfile
+
+        stale_payload = self._cache_payload("netkeiba")
+        stale_payload["source"]["parser_version"] = "netkeiba-parser.old"
+        stale_payload["basic_profile"]["owner_name"] = "旧缓存马主"
+        current_payload = self._current_netkeiba_cache_payload()
+        current_payload["basic_profile"]["owner_name"] = "新抓取马主"
+
+        class CurrentPayloadClient:
+            last_request_count = 3
+
+            def fetch_source_payload(self, request):
+                return deepcopy(current_payload)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_path = Path(tmp) / "cache.json"
+            cache_path.write_text(
+                json.dumps(stale_payload, ensure_ascii=False), encoding="utf-8"
+            )
+            result = completion.run_p0_horse_completion_adapter(
+                _request(cache_path=str(cache_path), allow_network=True),
+                source_client=CurrentPayloadClient(),
+            )
+            persisted = json.loads(cache_path.read_text(encoding="utf-8"))
+            temporary_files = list(Path(tmp).glob(".*.tmp"))
+
+        self.assertFalse(result["retrieval"]["cache_hit"])
+        self.assertEqual(result["basic_profile"]["owner_name"], "新抓取马主")
+        self.assertEqual(persisted["basic_profile"]["owner_name"], "新抓取马主")
+        self.assertEqual(
+            persisted["source"]["parser_version"],
+            source_clients.NETKEIBA_PARSER_VERSION,
+        )
+        self.assertEqual(temporary_files, [])
+
+    def test_concurrent_stale_replacement_returns_one_current_canonical_payload(self):
+        import tempfile
+
+        stale_payload = self._cache_payload("netkeiba")
+        stale_payload["source"]["parser_version"] = "netkeiba-parser.old"
+        payloads = []
+        for owner in ("并发马主 A", "并发马主 B"):
+            payload = self._current_netkeiba_cache_payload()
+            payload["basic_profile"]["owner_name"] = owner
+            payloads.append(payload)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_path = Path(tmp) / "cache.json"
+            cache_path.write_text(
+                json.dumps(stale_payload, ensure_ascii=False), encoding="utf-8"
+            )
+            barrier = threading.Barrier(2)
+
+            class BarrierPayloadClient:
+                last_request_count = 3
+
+                def __init__(self, payload):
+                    self.payload = payload
+
+                def fetch_source_payload(self, request):
+                    barrier.wait(timeout=10)
+                    return deepcopy(self.payload)
+
+            request = _request(cache_path=str(cache_path), allow_network=True)
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                futures = [
+                    executor.submit(
+                        completion.run_p0_horse_completion_adapter,
+                        request,
+                        source_client=BarrierPayloadClient(payload),
+                    )
+                    for payload in payloads
+                ]
+                results = [future.result(timeout=10) for future in futures]
+            persisted = json.loads(cache_path.read_text(encoding="utf-8"))
+            temporary_files = list(Path(tmp).glob(".*.tmp"))
+
+        persisted_owner = persisted["basic_profile"]["owner_name"]
+        self.assertEqual(
+            [result["basic_profile"]["owner_name"] for result in results],
+            [persisted_owner, persisted_owner],
+        )
+        self.assertEqual(
+            persisted["source"]["parser_version"],
+            source_clients.NETKEIBA_PARSER_VERSION,
+        )
+        self.assertEqual(temporary_files, [])
+
+    def test_parser_guard_does_not_change_jbis_or_other_region_cache(self):
+        import tempfile
+
+        payloads = [
+            self._cache_payload("jbis"),
+            json.loads(
+                (FIXTURE_ROOT / "united_kingdom.json").read_text(encoding="utf-8")
+            ),
+        ]
+        for payload in payloads:
+            source = payload["source"]
+            identity = payload["identity"]
+            request = _request(
+                region=payload["region"],
+                candidate_source_name=source["name"],
+                external_horse_id=source["external_horse_id"],
+                horse_name=identity["horse_name"],
+                expected_sire_name=identity["sire_name"],
+                expected_dam_name=identity["dam_name"],
+                expected_birth_year=identity["birth_year"],
+            )
+            with (
+                self.subTest(region=request.region),
+                tempfile.TemporaryDirectory() as tmp,
+            ):
+                cache_path = Path(tmp) / "cache.json"
+                cache_path.write_text(json.dumps(payload), encoding="utf-8")
+                result = completion.run_p0_horse_completion_adapter(
+                    completion.P0HorseCompletionRequest(
+                        **{
+                            **request.__dict__,
+                            "cache_path": str(cache_path),
+                            "allow_network": False,
+                        }
+                    ),
+                    source_client=None,
+                )
+                self.assertTrue(result["retrieval"]["cache_hit"])
+
 
 class NetkeibaClientHappyPathTests(SimpleTestCase):
     def test_full_payload_validates(self):
@@ -157,6 +316,10 @@ class NetkeibaClientHappyPathTests(SimpleTestCase):
         validated = source_clients.validate_p0_horse_source_cache(payload)
         self.assertEqual(validated["source"]["name"], "netkeiba")
         self.assertEqual(validated["source"]["external_horse_id"], "2022110137")
+        self.assertEqual(
+            validated["source"]["parser_version"],
+            source_clients.NETKEIBA_PARSER_VERSION,
+        )
         self.assertEqual(
             validated["identity"],
             {
@@ -301,6 +464,61 @@ class NetkeibaRecordSemanticsTests(SimpleTestCase):
             [record["result_status"] for record in records[-4:]],
             ["scratched", "withdrawn", "did_not_finish", "disqualified"],
         )
+
+    def test_deleted_title_status_is_parsed_independently(self):
+        profile = HORSE_HTML.replace("現役　牡4歳　芦毛", "抹消　牡　黒鹿毛")
+        payload = _fetch(FixtureTransport(profile=profile))
+        self.assertEqual(payload["basic_profile"]["sex"], "牡")
+        self.assertEqual(payload["basic_profile"]["color"], "黒鹿毛")
+
+    def test_unknown_title_status_still_blocks(self):
+        profile = HORSE_HTML.replace("現役　牡4歳　芦毛", "不明　牡　黒鹿毛")
+        with self.assertRaisesRegex(
+            source_clients.P0HorseSourceBlocked, "title_status"
+        ):
+            _fetch(FixtureTransport(profile=profile))
+
+    def test_uncertain_mizusawa_row_remains_partial_career_blocker(self):
+        import tempfile
+
+        row = self._record_row("水沢", "").replace(
+            "2026/04/15", "2025/03/17"
+        ).replace("テスト戦", "C1")
+        result_html = RESULT_HTML.replace("</table>", row + "</table>", 1)
+        payload = _fetch(FixtureTransport(result=result_html))
+        record = payload["career"]["records"][-1]
+        self.assertEqual(record["race_date"], "2025-03-17")
+        self.assertEqual(record["racecourse"], "水沢")
+        self.assertEqual(record["race_name"], "C1")
+        self.assertEqual(record["finish"], "")
+        self.assertEqual(record["result_status"], "")
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_path = Path(tmp) / "cache.json"
+            cache_path.write_text(
+                json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(
+                completion.P0HorseCompletionSourceError,
+                "partial_career: record 14 lacks core evidence",
+            ):
+                completion.run_p0_horse_completion_adapter(
+                    _request(cache_path=str(cache_path), allow_network=False),
+                    source_client=None,
+                )
+
+    def test_partial_expected_identity_lists_each_missing_candidate_field(self):
+        payload = _fetch()
+        with self.assertRaises(completion.P0HorseCompletionSourceError) as raised:
+            completion._require_expected_identity_matches_payload(
+                _request(expected_sire_name="Frosted"),
+                payload["identity"],
+                payload["aliases"],
+                payload["source"]["name"],
+                payload["source"]["external_horse_id"],
+            )
+        message = str(raised.exception)
+        self.assertIn("expected_dam_name", message)
+        self.assertIn("expected_birth_year", message)
 
     def test_year_only_birth_date_blocked(self):
         profile = HORSE_HTML.replace("2022年3月26日", "2022年")

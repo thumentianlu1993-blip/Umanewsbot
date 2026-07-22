@@ -45,6 +45,22 @@ P0 马信息补全专项的模型交接文档见
 `docs/p0_horse_information_completion_handoff.md`。后续接手应从该文档进入，并以
 `docs/current_state.md` 和生产实时核验校正可能漂移的运行数据。
 
+## 2026-07-23 netkeiba 第二轮返修进入代码验证
+
+- 首个日本 netkeiba 批次现已 prepare 完成，但结果为 `27/100` 完整、`73/100` 阻断；
+  未 bundle、未 commit、未自动首发。主要缺陷是 62 个已注销马标题使用 `抹消`；另有
+  10 个部分 expected identity 预期阻断和 1 个证据不足履历行。
+- 生产网络开关已实际恢复 false，web/Nginx/worker 与公开健康页通过；已公开仍为
+  `2,797` 匹。旧批只保留证据，返修部署后 abandon 并重新 select/approve。
+- 本地已实现 `抹消` 精确解析、字段级身份 blocker、parser version fingerprint/cache
+  guard；首次独立 review 发现的 stale cache 无法覆盖 P1 已用 sidecar lock + 原子替换修复。
+  同一 reviewer 连续复审已清零 actionable finding。修复随后重放到最新
+  `origin/main@0dcdbdab`；集成候选的精确提交与内容身份由最终 base review 报告固定，
+  不在提交正文中记录会因 amend 自失效的 SHA。P0 聚焦 `285/285`、OpenSpec `37/37`
+  通过，完整 `stable 2741` 与主线基线 `2726` 的失败计数均为
+  `21 failures + 70 errors + 57 skipped`。旧审核指纹与部署授权因主线集成失效，尚待集成
+  版本复审和重新授权；未部署返修、未触网、未写生产数据。
+
 ## 2026-07-22 netkeiba 马匹客户端专项完成本地实现（未部署）
 
 - OpenSpec change `add-netkeiba-horse-client` 完成 tasks `0.1-4.2`：`_NetkeibaClient`

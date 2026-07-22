@@ -54,6 +54,18 @@
 - **EUC-JP 解码**：netkeiba 响应 `Content-Type: text/html` 无 charset，requests 按 ISO-8859-1 解码得到乱码（生产首轮 61/100 因此阻断）。客户端一律用 `_netkeiba_page_text` 对原始 bytes 按 EUC-JP 解码后再解析。
 - **跨源缓存守卫**：候选级缓存只按 candidate_key 寻址，不区分来源；日本 dispatcher 引入双来源后，JBIS 时代缓存会让 netkeiba 候选的 provider-bound 失效并永久卡死四字段锁（生产首轮 39/100 因此阻断）。`run_p0_horse_completion_adapter` 对日本地区校验缓存 payload 的 `source.name` 与候选 `candidate_source_name` 一致才允许命中；其他地区（美国 equibase/HRN 互补流）保持既有跨来源缓存语义。
 
+### 7. 第二轮生产发现与恢复设计（2026-07-23）
+
+批次 `p0batch-e5cee174ba05` 后续已在相同相关代码下完成 prepare，说明早先 `7/100` 无声退出更符合 detached exec/进程会话中断，而非第 8 个候选的稳定 Python 异常。该批最终为 `27/100` 完整、`73/100` 阻断、`300` 次请求：`62` 个 `title_sex_color`、`10` 个四字段身份不完整、`1` 个履历核心证据不足。普通解析异常均被现有 prepare 转为 blocker staging，因此没有错误数据写库。
+
+- **标题状态**：真实已注销页面使用 `抹消　牡　黒鹿毛`，既有正则只接受 `登録抹消` 等状态。解析应把状态、性别、毛色分开验证，精确加入 `抹消`，未知 token 继续 fail closed；不得把整行改成任意前缀的宽松匹配。
+- **部分期望字段诊断**：受控复现已确认样本页面实际四字段齐全；10 个 `identity_incomplete` 来自候选仅携带部分 `expected_sire_name/expected_dam_name/expected_birth_year`，触发既有完整期望锁。该锁不得放宽；错误必须列出候选缺少的期望字段并归类为可解释的 source/identity blocker，而不是 `unexpected_adapter_error`。
+- **异常履历行 characterization**：单个 `partial_career` 的第 15 行为 `2025-03-17 水沢 C1`，页面行有骑师/距离/马号但头数与着顺为空，马体重为 `計不`；这些事实不足以证明实际出赛或取消。先写 characterization 测试保存该不确定性；只有官方页面/结果证据能证明合法状态时，才另写期望映射与计数语义的 RED 测试后实现，否则保持 blocker。
+- **解析器版本与 cache 绑定**：`adapter_config_fingerprint()` 当前只覆盖 schema、来源集合、预算和批次上限，代码改动不会使已成功 staging 失效。新增显式 `NETKEIBA_PARSER_VERSION`（机器稳定常量）并纳入 fingerprint，同时写入 netkeiba canonical source payload；日本同来源 cache 缺失或不匹配当前版本时强制 cache miss。网络刷新成功后必须在 sidecar 文件锁内原子替换 stale cache，并让并发调用复用同一份当前版本 payload；普通 cache 首写仍保持 no-clobber，其他来源/地区不变。任何会改变 canonical payload 的 netkeiba 解析规则都必须递增版本并用测试锁定。
+- **批次处置**：blocked payload 也按候选级 `succeeded` 保存，故修复后不得直接重跑当前 prepared 批次或手改 checkpoint。当前批只保留证据、不 bundle/commit；新版本部署后 abandon，再重新 select/approve。旧 netkeiba canonical cache 因缺少当前 parser version 不再复用，新批在预算内重新抓取。
+- **验收阈值**：不要求来源天然缺失的候选达到 `100/100`，但要求 `unexpected_adapter_error=0`、已支持结构造成的系统性 blocker=0；剩余 blocker 必须字段级可解释。仅完整且经 xlsx 人工复审的子集可以 bundle/commit，并核验自动首发与审计。
+- **运行态恢复**：每个触网窗口结束都必须把 `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false` 注入实际执行容器并验证，不能只改 `.env`。2026-07-23 已恢复 false，web/Nginx 与公开健康检查通过。
+
 ## Risks / Trade-offs
 
 - [页面结构脆弱] -> 解析器按表格标签语义定位而非绝对位置；结构不识别即 fail closed，配 fixture 回归。
@@ -66,7 +78,9 @@
 1. 实现 client + 解析 + adapter 注册，fixture 测试（正常页、同名马、缺表、改版、总数不符、海外行）。
 2. 本地 sqlite 端到端：select → prepare（缓存模拟）→ bundle → commit → 自动首发。
 3. 独立 code review 后合并 main。
-4. 生产执行（分步授权）：部署 → 首个日本批次全链路（含 xlsx 人工复审）→ 核验自动首发 → `publish-p0-horses-basic-tier` tasks 7.2 闭环。
+4. 第二轮生产 fixture 先写 RED：`抹消` 标题、字段级 identity blocker、异常履历行、parser version fingerprint；再最小实现至 GREEN。
+5. 独立方案复审、代码复审与本地验证通过后，重新取得精确代码版本的部署/触网授权；部署后保留并 abandon 旧批次，新建日本批次只执行到 prepare 与 xlsx；prepare 成功或异常后立即在 finally 路径恢复并验证 `ALLOW_NETWORK=false` 和 worker，不等待人工复审。
+6. 用户人工复审 xlsx 后冻结 bundle/hash；再取得绑定该 bundle/hash、完整子集与自动公开首发范围的精确 commit 授权，最后执行 commit、首发验收与网络开关恢复。
 
 ## Resolved Questions
 

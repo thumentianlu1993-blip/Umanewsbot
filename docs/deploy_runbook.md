@@ -224,14 +224,68 @@ apply 会逐行加锁，只处理仍为 started、started_at/source 未漂移且
 - 验收时发现一次裸 `docker compose up race_live_worker` 读取默认文件，使该容器短暂使用旧镜像 `sha256:111dbe46…`；在宣告通过前用 `$COMPOSE up -d --no-deps --force-recreate race_live_worker` 纠正，最终四应用容器镜像一致，期间公开页面持续 `200`。后续禁止对生产服务使用裸 Compose。
 - 清单 `/app/runtime/news_integrity/stale-crawl-20260722_153609.json`，SHA-256 `c4cc4f4975a6246131cd91bf2772aaaeb36d85344fbb02fc6223467567230ea0`；`32/32` 条活动证据完整且建议收敛，apply 后 stale started `32→0`。文章 `9547→9547`、公开 `1640→1640`、QQ delivery `629→629`，来源最近状态 SHA-256 均为 `8dca4a423a80b84f4dca456f95cc9a225a8d21632d2c90146b6847285fb86bb8`；幂等重放 updated `0`，随后 dry-run `0` 条。
 - 代码上线后满 60 分钟最终快照：`61 success / 0 failed / 0 started`，新稿 `1`、stale started `0`、迟到终态标记 `0`、新索引错误 `0`、应用/数据库异常日志 `0`；修复前错误仍在 24h 历史而已退出 2h 当前窗口。新闻索引 P0 只在 `15:33` 留下同一次 `4` 渠道记录，后续半小时调度未重复，6h 冷却生效。四应用容器统一 `sha256:712a5da8b408…`，Celery 两节点与 HTTP 七入口通过；生产验收 PASS。
+## 2026-07-23 netkeiba 第二轮返修与首批重开门禁
 
-## netkeiba 客户端日本批次操作补充（add-netkeiba-horse-client，2026-07-22）
+旧批 `p0batch-e5cee174ba05` 已完整 prepare，但只 `27/100` 完整、`73/100` 阻断；该批
+只作证据，**不得 bundle/commit，不得手改 state.json，也不得在解析器修复后直接重跑同一
+approved manifest**。blocked staging 也记为候选成功，且旧解析器未进入 canonical cache
+版本，直接 resume 会跳过旧结果。
+
+本轮生产发现与处置：
+
+- `62` 个 `抹消` 标题为解析器缺陷；修复后状态/性别/毛色仍须分别精确验证。
+- `10` 个部分 expected identity 为既有完整期望锁的预期阻断，须字段级报告，不得放宽锁。
+- Haru Aube 的水沢空着顺行没有足够官方证据判为出赛或取消，继续
+  `partial_career` blocker。
+- `NETKEIBA_PARSER_VERSION` 同时进入 adapter/candidate fingerprint 与 netkeiba
+  canonical payload。日本 netkeiba cache 缺版本或版本不符必须视为 miss；JBIS 和其他
+  地区 cache 语义不变。
+
+后续生产必须拆成独立门禁：
+
+1. 最新 code review 通过并冻结精确版本后，重新取得部署/触网授权。先备份并部署；保持
+   `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`，只验 HEAD、镜像、Django check、
+   容器、Nginx、日志和 healthz，不触网、不写马匹资料。
+2. 取得该版本触网授权后进入串行窗口：停相关 worker，开启并在执行容器确认网络开关；
+   abandon 旧批，再重新 select/approve 日本批次并 prepare 到 xlsx。要求
+   `unexpected_adapter_error=0`、已支持结构系统性 blocker=0；剩余失败字段级报告。
+3. prepare 成功或异常后立即以 finally 语义恢复 `.env` 与执行容器内
+   `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`，启动 worker/beat/race_live_worker，
+   验证日志、healthz；不得把网络窗口跨到人工 xlsx 复审。
+4. 用户人工复审 xlsx 后才生成完整子集 bundle，冻结 bundle/release manifest SHA、预计
+   写入和自动首发清单；此步不写库、不公开。
+5. 用户针对精确 bundle/hash、完整子集与自动首发范围重新授权后，才执行 commit
+   `--confirm-reviewed-artifact`；核验幂等复验、auto_first_publish、OperationLog、
+   `/horses/?region=japan` 与徽章。失败只走 `--retry-publish`。
+6. commit 后重复终验网络开关为 false、全部 worker、日志、healthz 与 `/horses/` 200。
+
+2026-07-23 已完成一次安全恢复：备份 `.env.backup.p0-network-disable-
+20260722T180903Z`，重建 web 使容器设置为 false，重启 Nginx；web healthy，内外 healthz、
+`/horses/` 均为 200。该恢复不代表返修代码已经部署。
+
+最新主线集成返修验证基线：修复重放到 `origin/main@0dcdbdab`；集成候选的精确提交、
+content hash 与 fingerprint 以最终 base review 报告为准，不在提交正文中写入会因 amend
+自失效的 SHA。P0 聚焦
+`285/285`，Django check、`makemigrations --check --dry-run`、OpenSpec strict/all `37/37`、
+`git diff --check` 均通过。完整 `stable` 为 `2741` 项、`21 failures + 70 errors + 57 skipped`；
+临时干净工作树中的同一 `origin/main` 基线为 `2726` 项且失败/错误/跳过计数完全相同，差异
+仅为本专项新增 15 项测试。首次
+全量运行多出的 2 个错误文本兼容失败已通过保留旧错误前缀并追加字段明细修复，之后聚焦与
+全量均已复跑。首次独立 review 发现的 stale cache 覆盖 P1 已增加 sidecar lock、原子替换
+与并发回归。旧审核指纹和部署授权因主线集成失效，集成版本必须由同一 reviewer 复审并在
+冻结新指纹后重新取得部署授权；上述证据不代表生产授权。
+## netkeiba 客户端日本批次历史补充（2026-07-22；触网步骤已由上节替代）
 
 在「P0 BASIC 层自动首发操作手册」基础上，首个日本批次重跑时按本节执行：
 
+以下只保留解析与审核口径；凡涉及网络开关、服务暂停/恢复和 prepare 顺序，均以上一节
+“第二轮返修与首批重开门禁”为准，不得沿用本历史段落的旧窗口假设。
+
 1. 部署含 netkeiba 客户端的构建后，日本候选有 netkeiba key（2,462 匹）走 ID 直取
    （马匹页 + 战绩页 + 血统页 3 页，每候选预算 4），无 key 候选保持 JBIS 检索；
-   无需改任何配置，`HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true` 与 8s 限速沿用。
+   8s 限速保持不变，但 `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true` 只能在另行授权的
+   prepare 短窗口内启用，并须在 prepare 成功或异常后立即恢复、验证为 false，不能跨到
+   人工审核阶段。
 2. prepare 重跑同一 select 会生成新批次（原 `p0batch-37fad126d645` 已 abandon）；
    复核 xlsx 时关注：netkeiba 候选 `candidate_source_name=netkeiba`、外部 ID 与
    key 一致、四字段来自页面；`ambiguous_identity` 应基本消失，残余失败按
@@ -249,8 +303,9 @@ apply 会逐行加锁，只处理仍为 started、started_at/source 未漂移且
 `manual_lock_flags` 写入 `"auto_publish_blocked": true`（shell 逐匹设置，设置后
 任何自动/批量通道都不会发布该马，解除时删除该键）。
 
-1. 前置：备份；停 beat/worker（OOM 先例窗口）；首个触网批次需
-   `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true` 并重启执行进程。
+1. 前置：备份；停 beat/worker（OOM 先例窗口）；首个触网批次只在另行授权的 prepare
+   短窗口内设置 `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true` 并重启执行进程；prepare
+   成功或异常后立即恢复并验证 false，再启动 worker，不得等待人工复审。
 2. 首个日本滚动批次：select → approve → validate → prepare `--allow-network`
    （可断点续跑）→ 人工复审 xlsx → bundle → commit `--confirm-reviewed-artifact`。
    commit 复验通过后自动首发本地区马（含批次新建马），输出 `auto_first_publish`

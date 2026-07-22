@@ -88,6 +88,39 @@
 字段口径、生产计数、关键产物、事故经验、未完成项和后续执行顺序；实时状态仍以本文和生产
 核验为准。
 
+## 2026-07-23 netkeiba 首批第二轮生产发现与本地返修
+
+- 生产实时只读核验推翻了旧交接断点：`p0batch-e5cee174ba05` 已在相同相关代码下完成
+  prepare，状态为 `prepared`，`100` 个 checkpoint/staging、artifact 与 xlsx 均已生成；
+  因此早先 `7/100` 无声退出更符合 detached exec/进程会话中断，不能再按“第 8 匹稳定
+  崩溃”直接重跑。
+- 该批真实结果为 `27/100` 完整、`73/100` 阻断、`300` 次网络请求：`62` 个已注销马
+  标题 `抹消` 未被旧正则识别；`10` 个候选仅携带部分 expected identity 字段，按既有
+  完整期望锁阻断；`1` 个 Haru Aube 履历行（2025-03-17 水沢 C1）头数/着顺为空，
+  证据不足。三类均 fail closed，没有 bundle、commit 或自动首发；旧批保留证据，禁止
+  手改 state 或提交其中 27 匹。
+- 生产运行态已于 2026-07-23 恢复：备份 `.env.backup.p0-network-disable-
+  20260722T180903Z` 后将 `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false` 注入重建的 web，
+  重启 Nginx；web healthy，worker/beat/race_live_worker 运行，内外 healthz 与
+  `/horses/` 200。生产 HEAD 为 `6167b6c0`，公开马仍为 `2,797`（日本 `2,463`）。
+- `add-netkeiba-horse-client` 第二次 Full 方案审核修复 `1 P0 + 3 P1 + 2 P2` 后进入
+  implementing。tasks `4.3-4.5` 已本地实现：精确支持 `抹消`；部分 expected identity
+  输出字段级可解释 blocker；`NETKEIBA_PARSER_VERSION` 同时绑定批次 fingerprint 与
+  日本 netkeiba canonical cache；旧/错版本 cache 强制 miss，JBIS/其他地区不变；
+  Haru Aube 不确定行继续阻断，不猜状态。
+- 当前修复已重放到最新 `origin/main@0dcdbdab`；集成候选的精确提交与内容身份由最终
+  base review 报告在仓库外固定，避免在提交正文中自引用过期 SHA。运行手册冲突按
+  “保留主线新发布记录并追加本专项段落”解决，代码无冲突。P0 聚焦回归 `285/285` 通过；
+  Django check、迁移漂移、OpenSpec strict/all `37/37` 与 diff check 通过。完整 `stable`
+  回归为 `2741` 项、`21 failures + 70 errors + 57 skipped`；同一环境下 `origin/main` 基线为
+  `2726` 项且失败/错误/跳过计数完全相同，本轮新增 15 项测试，没有新增失败。首次全量运行暴露的 2 个本轮
+  错误文本兼容失败已修复并完成聚焦及全量复跑。首次独立原生 code review 另发现旧版
+  netkeiba cache 虽 miss、但新抓取结果无法替换已有文件的 P1；现已用 sidecar 文件锁与
+  `os.replace` 原子替换，并新增单线程/并发回归；同一 reviewer 连续复审已清零 actionable
+  finding。因最新主线集成改变了父版本与仓库内容，旧审核指纹和用户部署授权已失效；当前
+  等待同一 reviewer 对集成版本复审。未部署修复、未触网、未写生产数据库；集成版本冻结后
+  必须重新取得绑定该精确版本的部署授权，触网 prepare 仍是下一独立授权。
+
 ## 2026-07-22 netkeiba 马匹客户端专项：本地实现完成（未部署）
 
 - OpenSpec change `add-netkeiba-horse-client` 完成 plan-eng-review 与全部本地实现

@@ -6,10 +6,11 @@
 
 ## What Changes
 
-- 新增 netkeiba 马匹客户端：按候选 `netkeiba:{id}` 直接抓取马匹页与战绩页，不做名称检索；提取基础资料、父母、出生日期、生涯逐场与生涯总数；仅抽取客观比赛事实，遵守既有每地区预算与 per-host 限速（当前 8s 间隔）。
+- 新增 netkeiba 马匹客户端：按候选 `netkeiba:{id}` 直接抓取马匹页、战绩页与血统页，不做名称检索；提取基础资料、父母、出生日期、生涯逐场与生涯总数；仅抽取客观比赛事实，遵守既有每地区预算与 per-host 限速（当前 8s 间隔）。
 - 身份判据：payload 的 netkeiba ID 必须与候选 key 完全一致（provider-bound identity）；页面马名与候选名规范化不一致时 fail closed 进冲突，不猜测。
 - adapter 接入：日本地区候选有 netkeiba key 时走 netkeiba 客户端；无 key 的候选保持 JBIS 检索路径（行为不变）。
 - 解析层容错：页面结构变化（缺表、改版）一律 fail closed 记录不可解析，不猜字段；距离/日期等单位保留原文与规范化值两层。
+- 生产兼容返修：支持 netkeiba 已注销马标题中的精确状态词 `抹消`；部分候选期望身份字段失败改为字段级诊断；解析器语义版本同时绑定批次输入指纹与 netkeiba canonical cache，禁止解析规则变化后静默复用旧 staging/cache。
 - 批次集成后重跑首个日本滚动批次，验证 `publish-p0-horses-basic-tier` 的自动首发链路（该 change tasks 7.2 的前置）。
 
 ## Capabilities
@@ -27,5 +28,7 @@
 - 代码：`server/stable/services/p0_horse_completion_source_clients.py` 新增 netkeiba client；`p0_horse_completion_adapters.py` 注册日本 netkeiba adapter；新增解析与集成测试（含同名马、缺页、结构变化 fail closed）。
 - 数据：无模型变更、无迁移；批次抓取继续走既有缓存/checkpoint/预算通道。
 - 运维：批次执行沿用既有门禁（ALLOW_NETWORK、限速、串行窗口、xlsx 人工复审）。
+- 恢复：2026-07-23 生产批次 `p0batch-e5cee174ba05` 已完成 prepare，但仅 `27/100` 完整、`73/100` 阻断；该批保留为证据且不 commit，修复部署后 abandon 并重新 select/approve，避免旧 checkpoint 掩盖解析器变化。
+- 发布门禁：部署/触网授权绑定受审代码版本；prepare 与 xlsx 复审后再冻结 bundle/hash，并针对精确完整子集与自动首发范围重新取得 commit 授权。
 - 合规：netkeiba 访问延续既有保守限速（8s）；实际批量前复核访问条款与公开展示边界（KeibaScraper 调研已提示负载注意）。
 - 明确不做：不改 JBIS 客户端既有行为；不做 netkeiba 全站爬取；不把页面专有预测/评论类内容入库；不在本 change 修复 ExternalHorse 存量空四字段（仅随批次自然覆盖，批量修复另立专项）。

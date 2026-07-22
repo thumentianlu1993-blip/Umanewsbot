@@ -1,5 +1,21 @@
 # 关键决策
 
+## 2026-07-23 netkeiba 解析版本、旧批处置与生产授权拆分
+
+- 会改变 canonical payload 的 netkeiba 解析规则必须递增显式 parser version；版本同时
+  绑定批次输入 fingerprint 与日本 netkeiba canonical cache。只失效 checkpoint 而继续
+  命中旧 cache 仍会绕过新解析器，因此不接受。
+- stale netkeiba cache 在网络刷新成功后必须通过独立 sidecar 文件锁与 `os.replace` 原子
+  替换；竞争调用若已发布当前版本则复用该 payload。普通 cache 首写仍使用 no-clobber，
+  JBIS 和其他地区不进入替换路径。
+- prepared 批次中的 blocker payload 也按候选成功落 checkpoint。解析器变化后不手改
+  state、不直接 resume 旧 approved manifest；旧批保留证据并 abandon，重新 select/approve。
+- 页面事实不足时继续阻断：Haru Aube 的空着顺水沢行不因存在马号/骑师就推断为实际出赛
+  或取消；部分 expected identity 继续要求完整四字段，不因来源页面本身完整而放宽候选锁。
+- 生产授权按不可变对象拆分：受审代码版本绑定部署/触网授权；prepare 与人工 xlsx 复审后
+  再冻结 bundle/hash；生产 commit 与自动首发必须取得绑定精确 bundle/hash、完整子集和
+  公开范围的新授权。触网窗口在 prepare 成功或异常后立即恢复 false，不跨人工审核。
+
 ## 2026-07-22 日本滚动补全来源：netkeiba ID 直取优先，JBIS 检索兜底
 
 - 日本候选持有 netkeiba key 时，select 阶段 `source_namespace` 直接取 netkeiba 并走

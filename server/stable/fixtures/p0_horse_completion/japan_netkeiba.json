@@ -277,6 +277,7 @@
     "external_horse_id": "2022110137",
     "fetched_at": "2026-07-22T00:00:00Z",
     "name": "netkeiba",
+    "parser_version": "netkeiba-parser.v2",
     "url": "https://db.netkeiba.com/horse/2022110137/"
   }
 }

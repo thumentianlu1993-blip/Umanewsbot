@@ -586,9 +586,13 @@ def adapter_config_fingerprint() -> str:
         PAYLOAD_SCHEMA_VERSION,
         REVIEWED_CANDIDATE_REQUEST_BUDGETS,
     )
+    from stable.services.p0_horse_completion_source_clients import (
+        NETKEIBA_PARSER_VERSION,
+    )
 
     content = {
         "payload_schema_version": PAYLOAD_SCHEMA_VERSION,
+        "netkeiba_parser_version": NETKEIBA_PARSER_VERSION,
         "region_adapters": {
             region: sorted(adapter.source_names)
             for region, adapter in sorted(REGION_ADAPTERS.items())
