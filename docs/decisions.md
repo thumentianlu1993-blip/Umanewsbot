@@ -1930,6 +1930,16 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 本次用户授权覆盖 P0 范围批量生产写入，但不授权猜值、跨身份合并、绕过来源许可或把未审核
   详情 artifact 标成已审核。
 
+## 2026-07-23 netkeiba 标题省略状态与错误分类规则
+
+- netkeiba `.horse_title .txt_01` 合法只含“性别年龄 + 毛色”时，允许状态字段为空；仅接受
+  空值或既有明确枚举，出现未知非空状态仍以 `netkeiba_profile_structure: title_status`
+  fail closed。英文名必须独立读取 `.eng_name`，不得再从整段标题位置推断。
+- `partial_career:` 是已知的证据完整度 blocker，应保留原记录序号和错误文本并归类为
+  `source_cache_or_adapter_error`；不得标成 `unexpected_adapter_error`，也不得据此猜测空着顺。
+- 上述标题解析会改变 canonical payload，因此 parser version 从 v2 递增到 v3；所有 v2
+  Netkeiba cache 与 checkpoint 必须按既有版本门禁失效，不能为节省请求绕过刷新。
+
 ## 2026-07-23 公开门户 P1–P3 采用一次性整合发布
 
 - P1、P2、P3 作为同一公开门户版本发布，避免生产出现字体、组件、赛事上下文和关注页模板

@@ -297,6 +297,31 @@ task 5.1 生产部署证据（2026-07-23）：
   Celery worker 响应，近期日志无 error。公开马保持 `2797`、日本 `2463`。本步没有执行
   prepare、没有触网、没有马匹资料写入；task 5.2 仍需新的独立授权。
 
+task 5.2 首次触网执行证据（2026-07-23；**验收失败，禁止进入 5.3**）：
+
+- 前置恢复点：`.env.backup.pre-p0-task52-20260722T193712Z`（`8,554` bytes、mode
+  `0600`、SHA-256 `fd647e0970c5139f1f82ab70fe02f0c02bb2919be5b2ae7d48bf8b4a5e9b5b35`）；
+  `backups/db/pre-p0-task52-20260722T193712Z.dump`（`232,970,028` bytes、mode
+  `0600`、SHA-256 `8aecbce162f56f4938078eeb3d94ef7660048b78bc8e42e8db37208827f0c4a2`、
+  `pg_restore -l` `1,018` 项）。
+- 生产必须显式配置以下持久化容器路径，禁止依赖 `/app/server` 工作目录的相对默认值：
+  `HORSE_PROFILE_COMPLETION_BATCH_STATE_DIR=/app/runtime/horse_profile_completion/batches`、
+  `REVIEW_OUTPUT_DIR=/app/runtime/horse_profile_completion/review`、
+  `CACHE_DIR=/app/runtime/horse_profile_completion/cache`、
+  `BUDGET_DIR=/app/runtime/horse_profile_completion/budget`。
+- 正式批 `p0batch-5802d72da799` 批准 SHA
+  `204fa275e618fa59eba491c8ce786f9f8c1e73f9ca02d3e5d92c8b35aa9125b8`；prepare 为
+  `45 complete / 55 blocked / 300 requests / 0 cache hits`。xlsx SHA-256 为
+  `34e849ebd7850a6969d59a0070c881630d467e85857b2816b86edcdbe6f908f9`。该批已
+  abandon 留证，不得 bundle/commit。
+- 验收失败分层：`20 title_status`（真实页面省略状态）、`32` 个 expected identity
+  三字段缺失、`2 partial_career` 分类错误、`1 incomplete_career_history`。parser v3
+  返修已在修正真实 validator 包装路径 P1 后通过独立 review；仍须冻结精确版本并取得新
+  部署/触网授权，不得在 v2 批次上 resume。
+- finally 已验证：宿主、四应用容器和 Django setting network=false；worker/beat/
+  race_live_worker 恢复，web healthy、Celery 两节点响应、Django check、HTTP healthz 与
+  日本马匹页通过，公开计数不变。后续人工 xlsx 复审和 task 5.3 均不得基于此失败批启动。
+
 ## netkeiba 客户端日本批次历史补充（2026-07-22；触网步骤已由上节替代）
 
 在「P0 BASIC 层自动首发操作手册」基础上，首个日本批次重跑时按本节执行：

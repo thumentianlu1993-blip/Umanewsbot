@@ -440,10 +440,27 @@ def prepare_p0_horse_batch(
                 P0HorseSourceBlocked,
             )
 
-            identity_source_error = isinstance(
+            explainable_identity_error = isinstance(
                 exc, P0HorseCompletionSourceError
-            ) and str(exc).startswith(("identity_incomplete:", "identity_mismatch:"))
-            if isinstance(exc, P0HorseSourceBlocked) or identity_source_error:
+            ) and str(exc).startswith(
+                ("identity_incomplete:", "identity_mismatch:")
+            )
+            current_error: BaseException | None = exc
+            seen_errors: set[int] = set()
+            explainable_partial_career = False
+            while current_error is not None and id(current_error) not in seen_errors:
+                seen_errors.add(id(current_error))
+                if isinstance(current_error, P0HorseSourceBlocked) and str(
+                    current_error
+                ).startswith("partial_career:"):
+                    explainable_partial_career = True
+                    break
+                current_error = current_error.__cause__
+            if (
+                isinstance(exc, P0HorseSourceBlocked)
+                or explainable_identity_error
+                or explainable_partial_career
+            ):
                 failure_reason = "source_cache_or_adapter_error"
             elif exc.__class__.__name__ == "P0HorseCompletionNetworkDisabled":
                 failure_reason = "network_disabled_cache_missing"

@@ -129,6 +129,42 @@
   healthz 均为 200，近期应用日志无 error。公开马仍为 `2,797`（日本 `2,463`），本步未
   触网、未运行 prepare、未写马匹资料。触网 prepare 继续等待 task 5.2 的单独授权。
 
+## 2026-07-23 task 5.2 首次触网未通过验收，已关网返修
+
+- 用户授权后执行独立恢复点：`.env.backup.pre-p0-task52-20260722T193712Z` 为 `8,554`
+  bytes、mode `0600`、SHA-256 `fd647e09…5b35`；数据库 dump 为 `232,970,028`
+  bytes、mode `0600`、SHA-256 `8aecbce1…c4a2`，`pg_restore -l` 为 `1,018` 项。
+  beat 先停，两个 Celery 节点 drain 到 active/reserved 均为 0，再停 worker 与
+  race_live_worker。
+- 生产默认相对路径会把新 select 写到 `/app/server/runtime`。两个仅 pending、未抓取的
+  预检批次 `p0batch-97888727f9f8`、`p0batch-cbd8ed561515` 已正式 abandon 留证；`.env`
+  已把 batch/review/cache/budget 四个目录显式设为 `/app/runtime/horse_profile_completion/*`
+  并通过 Django setting 验证，避免重建 web 后丢失批次与 xlsx。
+- 旧批 `p0batch-e5cee174ba05` 已正式 abandon。正式新批
+  `p0batch-5802d72da799` 为日本 `100/100`、全部持有唯一 `netkeiba:{数字 ID}`，由
+  `mentianlu` approve；批准 SHA 为 `204fa275…9125b8`，validate 通过。prepare 使用
+  `300` 次网络请求、缓存命中 `0`，生成 xlsx
+  `runtime/horse_profile_completion/review/p0batch-5802d72da799.xlsx`（SHA-256
+  `34e849eb…08f9`），未 bundle、未 commit、未自动公开。
+- 本轮结果为 `45/100` 完整、`55/100` blocker，未通过 task 5.2 验收：`20` 条
+  `netkeiba_profile_structure: title_status`、`32` 条 expected identity 三字段缺失、
+  `2` 条 `partial_career` 被误归类为 `unexpected_adapter_error`、另 `1` 条仅
+  `incomplete_career_history`。失败批已正式 abandon 并保留 artifact/xlsx。
+- prepare 结束后立即恢复网络关闭；`.env`、web、worker、beat、race_live_worker 与
+  Django setting 均为 false。四服务恢复，web healthy，Celery 两节点响应，Django check、
+  应用日志、按 Host 的 HTTP healthz 与日本马匹页通过；总马匹 `46,318`，公开仍为
+  `2,797/日本 2,463`，证明本步没有马匹资料写入。
+- 源页面复核确认上述 `20` 条不是未知状态，而是 `.txt_01` 合法省略状态、只显示
+  “性别年龄 + 毛色”。本地返修改为独立读取 `.eng_name` 与 `.txt_01`，只允许状态为空或
+  既有枚举，未知状态仍 fail closed；已知 `partial_career:` 改为可解释 source blocker。
+  canonical 解析规则变化使 parser version 必须递增为 `netkeiba-parser.v3`。
+- 本地验证：四套件 `292/292`，Django check、迁移漂移、OpenSpec strict/all `37/37`、
+  diff check 通过；完整 `stable` 为 `2,748` 项，干净 HEAD 基线为 `2,741` 项，两边均为
+  `21 failures + 65 errors + 57 skipped`，零新增失败。独立 review 首轮发现真实 validator
+  包装路径未覆盖的 `partial_career` P1；改为沿 cause 链精确识别底层 blocker、测试改走真实
+  canonical validation 后，同一 reviewer 最终 `APPROVED`、0 actionable findings。返修尚未
+  部署；task 5.2 保持未完成，下一步是冻结受审精确版本并重新取得部署/触网授权。
+
 ## 2026-07-22 netkeiba 马匹客户端专项：本地实现完成（未部署）
 
 - OpenSpec change `add-netkeiba-horse-client` 完成 plan-eng-review 与全部本地实现

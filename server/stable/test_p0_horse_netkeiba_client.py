@@ -471,6 +471,14 @@ class NetkeibaRecordSemanticsTests(SimpleTestCase):
         self.assertEqual(payload["basic_profile"]["sex"], "牡")
         self.assertEqual(payload["basic_profile"]["color"], "黒鹿毛")
 
+    def test_absent_title_status_is_allowed(self):
+        profile = HORSE_HTML.replace("現役　牡4歳　芦毛", "　牡4歳　芦毛")
+        payload = _fetch(FixtureTransport(profile=profile))
+        self.assertEqual(payload["identity"]["horse_name"], "ドラゴンウェルズ")
+        self.assertEqual(payload["aliases"][1]["name"], "Dragon Welds")
+        self.assertEqual(payload["basic_profile"]["sex"], "牡")
+        self.assertEqual(payload["basic_profile"]["color"], "芦毛")
+
     def test_unknown_title_status_still_blocks(self):
         profile = HORSE_HTML.replace("現役　牡4歳　芦毛", "不明　牡　黒鹿毛")
         with self.assertRaisesRegex(

@@ -64,6 +64,17 @@ P0 马信息补全专项的模型交接文档见
   HTTP 验收通过，公开马计数仍为 `2,797/日本2,463`；本步未触网、未写马匹数据。下一步
   触网 prepare 仍需单独授权。
 
+## 2026-07-23 netkeiba task 5.2 首次触网结果
+
+- 首次受控 prepare 已完成并立即关网：正式批 `p0batch-5802d72da799` 使用 `300` 次请求，
+  产出 xlsx，但只有 `45/100` 完整；`20` 条页面合法省略状态触发 `title_status`，另有
+  `2` 条已知 `partial_career` 被误归为 unexpected，因此未通过验收并已 abandon。
+- 未 bundle、未 commit、未自动公开；公开马仍为 `2,797/日本 2,463`。网络开关在宿主、
+  四应用容器和 Django setting 均恢复 false，全部 worker、healthz 和日本马匹页正常。
+- 本地已形成 parser v3 返修并通过四套件 `292/292`、OpenSpec `37/37` 和完整基线逐数
+  对照；独立 review 修正 1 个真实 validator 包装路径 P1 后最终 `APPROVED`、0 actionable
+  findings。尚未部署；task 5.2 仍未完成，下一次生产操作必须绑定新的受审精确版本。
+
 ## 2026-07-22 netkeiba 马匹客户端专项完成本地实现（未部署）
 
 - OpenSpec change `add-netkeiba-horse-client` 完成 tasks `0.1-4.2`：`_NetkeibaClient`

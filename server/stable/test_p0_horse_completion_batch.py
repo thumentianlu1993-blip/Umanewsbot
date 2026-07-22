@@ -1010,6 +1010,50 @@ class P0HorseBatchPrepareTests(P0HorseBatchTestBase):
             "expected_dam_name, expected_birth_year",
         )
 
+    def test_partial_career_source_error_is_explainable_prepare_blocker(self):
+        import shutil
+
+        if type(self) is not P0HorseBatchPrepareTests:
+            return
+
+        fixture = (
+            Path(__file__).resolve().parent
+            / "fixtures"
+            / "p0_horse_completion"
+            / "japan.json"
+        )
+        fixture_payload = json.loads(fixture.read_text(encoding="utf-8"))
+        for record in fixture_payload["career"]["records"]:
+            record.setdefault("source_name", "jbis")
+        fixture_payload["career"]["records"][0]["finish"] = ""
+        fixture_payload["career"]["records"][0]["result_status"] = ""
+
+        class PartialCareerClient:
+            last_request_count = 3
+
+            def fetch_source_payload(self, request):
+                return fixture_payload
+
+        shutil.rmtree(self.cache_dir)
+        summary = self._prepare(
+            allow_network=True,
+            source_client_factory=lambda region: PartialCareerClient(),
+        )
+        self.assertEqual(
+            summary["failure_reason_counts"]["source_cache_or_adapter_error"],
+            1,
+        )
+        self.assertNotIn(
+            "unexpected_adapter_error", summary["failure_reason_counts"]
+        )
+        staging_path = next((self.manifest_path.parent / "staging").iterdir())
+        payload = json.loads(staging_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            payload["retrieval"]["error_message"],
+            "network working copy source payload failed validation: "
+            "partial_career: record 1 lacks core evidence",
+        )
+
     def test_prepare_cache_only_success(self):
         summary = self._prepare()
         self.assertEqual(summary["totals"]["horses"], 1)

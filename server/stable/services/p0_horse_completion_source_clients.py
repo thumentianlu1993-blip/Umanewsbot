@@ -52,7 +52,7 @@ class P0HorseSourceBlocked(ValueError):
 
 
 RETRY_AFTER_CAP_SECONDS = 300.0
-NETKEIBA_PARSER_VERSION = "netkeiba-parser.v2"
+NETKEIBA_PARSER_VERSION = "netkeiba-parser.v3"
 
 
 MANUAL_SUPPLEMENT_CSV_FIELDS = (
@@ -2361,10 +2361,17 @@ class _NetkeibaClient(_BaseSourceClient):
         if title is None:
             return "", "", "", ""
         heading = title.select_one("h1")
-        name = re.sub(r"[（(][^）)]*[）)]", "", _text(heading.get_text() if heading else "")).strip()
-        line = _text(title.get_text(" ", strip=True))
-        heading_text = _text(heading.get_text(" ", strip=True)) if heading else ""
-        remainder = line[len(heading_text):].strip(" 　") if heading_text else line
+        name = re.sub(
+            r"[（(][^）)]*[）)]",
+            "",
+            _text(heading.get_text() if heading else ""),
+        ).strip()
+        english = title.select_one(".eng_name")
+        english_name = _text(english.get_text(" ", strip=True)) if english else ""
+        title_meta = title.select_one(".txt_01")
+        remainder = _text(
+            title_meta.get_text(" ", strip=True) if title_meta else ""
+        )
         color_alternation = "|".join(_NETKEIBA_COLORS)
         color_match = re.search(rf"(?P<color>{color_alternation})$", remainder)
         if not color_match:
@@ -2376,12 +2383,14 @@ class _NetkeibaClient(_BaseSourceClient):
             raise P0HorseSourceBlocked("netkeiba_profile_structure: title_sex")
         sex = sex_match.group("sex")
         before_sex = before_color[: sex_match.start()].strip(" 　")
-        status_match = re.search(
-            r"(?P<status>登録抹消|現役|引退|繁殖|抹消)$", before_sex
-        )
-        if not status_match:
+        if before_sex and before_sex not in {
+            "登録抹消",
+            "現役",
+            "引退",
+            "繁殖",
+            "抹消",
+        }:
             raise P0HorseSourceBlocked("netkeiba_profile_structure: title_status")
-        english_name = before_sex[: status_match.start()].strip(" 　")
         return name, english_name, sex, color
 
     def _parse_profile_table(self, soup) -> dict[str, str]:

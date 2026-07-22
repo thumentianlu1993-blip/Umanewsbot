@@ -38,7 +38,7 @@
 
 ## 5. 生产执行（分步用户授权）
 
-- [ ] 5.1 (operations) 取得受审精确版本授权后执行备份与部署，只验证代码 HEAD、镜像、Django check、容器/Nginx/healthz；默认保持 `ALLOW_NETWORK=false`，本步不触网、不写马匹资料。
+- [x] 5.1 (operations) 取得受审精确版本授权后执行备份与部署，只验证代码 HEAD、镜像、Django check、容器/Nginx/healthz；默认保持 `ALLOW_NETWORK=false`，本步不触网、不写马匹资料。
 - [ ] 5.2 (operations) 取得该版本触网授权后进入串行窗口：停相关 worker、开启并验证 `ALLOW_NETWORK=true`、保留并 abandon `p0batch-e5cee174ba05`、重新 select/approve 日本批次并 prepare 到 xlsx；验收 `unexpected_adapter_error=0`、已支持结构系统性 blocker=0，剩余失败字段级报告。本步不 bundle、不 commit、不自动公开；prepare 成功或异常后都必须立即在 finally 路径恢复并验证 `ALLOW_NETWORK=false`、启动 worker/beat/race_live_worker、检查容器 env/日志/healthz，不等待人工 xlsx 复审。
 - [ ] 5.3 (operations) 用户人工复审 xlsx 后生成仅含通过完整子集的 bundle，冻结 bundle/release manifest SHA 与预计写入/自动首发清单；本步不写生产数据库、不公开。
 - [ ] 5.4 (operations) 用户针对 5.3 的精确 bundle/hash、完整子集和自动首发范围重新授权后，执行 commit `--confirm-reviewed-artifact`，核验幂等复验、auto_first_publish、OperationLog、`/horses/?region=japan` 新马与徽章（闭环 `publish-p0-horses-basic-tier` task 7.2）。
