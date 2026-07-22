@@ -43,7 +43,7 @@
 
 ## 7. 生产执行（分步用户授权）
 
-- [ ] 7.1 (operations) 备份 → 停 beat/worker → `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true` 并重启进程。
-- [ ] 7.2 (operations) 首个日本滚动批次全链路：select → approve → validate → prepare `--allow-network` → 人工复审 xlsx → bundle → commit `--confirm-reviewed-artifact` → 核验 auto_first_publish 计数、OperationLog、`/horses/?region=japan` 新马与「资料补全中」徽章。
-- [ ] 7.3 (operations) provenance 回填与存量发布：先对生产重跑已批准的三个身份回填 manifest 的 commit（幂等，为 2026-07-22 已写入的 2,789 个 key 补写 `horse_identity_verified_keys`）→ `publish_p0_horse_profiles --dry-run --regions japan,hong_kong` → 人工审 artifact → approve → 按地区 commit → metrics 对比。
+- [x] 7.1 (operations) 备份 → 停 beat/worker → `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true` 并重启进程。
+- [ ] 7.2 (operations) 首个日本滚动批次全链路【2026-07-22 已尝试：JBIS 名称检索同名歧义 100/100 fail closed，批次已 abandon 留证；待 netkeiba 客户端 change 后重跑】：select → approve → validate → prepare `--allow-network` → 人工复审 xlsx → bundle → commit `--confirm-reviewed-artifact` → 核验 auto_first_publish 计数、OperationLog、`/horses/?region=japan` 新马与「资料补全中」徽章。
+- [x] 7.3 (operations) provenance 回填与存量发布：先对生产重跑已批准的三个身份回填 manifest 的 commit（幂等，为 2026-07-22 已写入的 2,789 个 key 补写 `horse_identity_verified_keys`）→ `publish_p0_horse_profiles --dry-run --regions japan,hong_kong` → 人工审 artifact → approve → 按地区 commit → metrics 对比。
 - [ ] 7.4 (operations) 恢复 worker；healthz + `/horses/` 200；更新状态文档；同步主规格（含 Purpose 段措辞）并评估归档。

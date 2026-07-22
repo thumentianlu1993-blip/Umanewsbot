@@ -40,6 +40,27 @@
 字段口径、生产计数、关键产物、事故经验、未完成项和后续执行顺序；实时状态仍以本文和生产
 核验为准。
 
+## 2026-07-22 P0 BASIC 层自动首发：存量 2,785 匹已发布；首个滚动批次因 JBIS 同名歧义阻断
+
+- 生产已部署 `a59536a9`（备份 dump SHA-256 `77b12edd…`）。provenance 回填完成：重跑
+  三个已批准身份回填 manifest 的 commit（幂等），`horse_identity_verified_keys`
+  日本 2,462 + 香港 327。
+- **存量发布已执行**：`publish-20260722` manifest 经用户批准后 commit，日本 2,459 +
+  香港 326 = **2,785 匹发布**，零错误零阻断；审计 OperationLog 2,785 条，
+  `published_by=admin`。公开 `/horses/` 现为 103 页（日本区），响应 0.02-0.06s，
+  未完整马显示「资料补全中」徽章，抽样详情页 200。全库已发布合计 2,797 匹。
+- **首个日本滚动批次被身份锁正确阻断**：`p0batch-37fad126d645`（100 匹）prepare
+  触网完成但 100/100 `ambiguous_identity` fail closed——JBIS 名称检索对近年活跃马
+  普遍返回 2-4 个同名结果（实测 ドラゴンウェルズ/ディーズメンフィス 各 2、
+  コンプリート 4），候选四字段为空无法消歧。身份回填解决了选批但解决不了抓取时
+  身份锁（设计已预判）。批次已 abandon 留证。用户决定：先完成存量发布（已做），
+  再新开 OpenSpec change 做 **netkeiba 马匹客户端**（候选 ID 与 netkeiba key 同源，
+  URL 直取无检索歧义，页面含父母/出生日期/生涯，同时解开身份锁与四字段两个堵点）。
+- 运维状态：ALLOW_NETWORK 已恢复 false，beat/worker/race_live_worker 已重启，
+  公网 healthz 200，数据核验 2,797 匹发布完好。
+- 本 change 剩余：tasks `7.2`（批次自动首发生产验证，待 netkeiba 客户端）、`7.4`
+  （规格同步与归档，随 7.2 一并处理）。
+
 ## 2026-07-22 P0 BASIC 层自动首发专项：本地实现完成（未部署）
 
 - OpenSpec change `publish-p0-horses-basic-tier` 完成 plan-eng-review 与全部本地实现
