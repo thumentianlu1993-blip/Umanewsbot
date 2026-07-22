@@ -180,6 +180,22 @@ apply 会逐行加锁，只处理仍为 started、started_at/source 未漂移且
 - 清单 `/app/runtime/news_integrity/stale-crawl-20260722_153609.json`，SHA-256 `c4cc4f4975a6246131cd91bf2772aaaeb36d85344fbb02fc6223467567230ea0`；`32/32` 条活动证据完整且建议收敛，apply 后 stale started `32→0`。文章 `9547→9547`、公开 `1640→1640`、QQ delivery `629→629`，来源最近状态 SHA-256 均为 `8dca4a423a80b84f4dca456f95cc9a225a8d21632d2c90146b6847285fb86bb8`；幂等重放 updated `0`，随后 dry-run `0` 条。
 - 代码上线后满 60 分钟最终快照：`61 success / 0 failed / 0 started`，新稿 `1`、stale started `0`、迟到终态标记 `0`、新索引错误 `0`、应用/数据库异常日志 `0`；修复前错误仍在 24h 历史而已退出 2h 当前窗口。新闻索引 P0 只在 `15:33` 留下同一次 `4` 渠道记录，后续半小时调度未重复，6h 冷却生效。四应用容器统一 `sha256:712a5da8b408…`，Celery 两节点与 HTTP 七入口通过；生产验收 PASS。
 
+## netkeiba 客户端日本批次操作补充（add-netkeiba-horse-client，2026-07-22）
+
+在「P0 BASIC 层自动首发操作手册」基础上，首个日本批次重跑时按本节执行：
+
+1. 部署含 netkeiba 客户端的构建后，日本候选有 netkeiba key（2,462 匹）走 ID 直取
+   （马匹页 + 战绩页 + 血统页 3 页，每候选预算 4），无 key 候选保持 JBIS 检索；
+   无需改任何配置，`HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true` 与 8s 限速沿用。
+2. prepare 重跑同一 select 会生成新批次（原 `p0batch-37fad126d645` 已 abandon）；
+   复核 xlsx 时关注：netkeiba 候选 `candidate_source_name=netkeiba`、外部 ID 与
+   key 一致、四字段来自页面；`ambiguous_identity` 应基本消失，残余失败按
+   `partial expected fields`（候选带部分四字段期望值导致锁收紧）单独如实计数。
+3. 页面解析失败（`netkeiba_profile_structure` 等）属预期 fail closed，进 blocker
+   池等结构适配，不得在运维侧手改 payload。
+4. 其余阶段（approve → validate → prepare → xlsx 复审 → bundle → commit → 核验
+   自动首发 → `--retry-publish` 恢复路径）与首发手册一致。
+
 ## P0 BASIC 层自动首发操作手册（publish-p0-horses-basic-tier，2026-07-22）
 
 本节是批次自动首发与存量批量发布的标准操作顺序。公开门槛：名称 + 五地区 +

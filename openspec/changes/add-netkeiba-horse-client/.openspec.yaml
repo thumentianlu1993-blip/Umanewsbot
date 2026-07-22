@@ -1,5 +1,26 @@
 schema: spec-driven
 created: 2026-07-22
 profile: feature
-phase: proposed
-journal: []
+phase: reviewed
+journal:
+  - event: plan-reviewed
+    date: "2026-07-22"
+    session: 1
+    mode: full
+    rounds: 1
+    issues_resolved: 11
+    artifacts_modified: [design.md, tasks.md]
+    note: "Round 1 resolved 1 P0 + 6 P1 + 4 P2: P0-1 client-selection layer does not exist (RegionAdapter has no client_factory; prepare builds one client per region) — selection moved to select-stage namespace preference for netkeiba plus a composed dispatcher client at _CLIENTS[japan]; P1-1 comparator is adapters' _normalized_text and client strips the parenthesized country suffix before identity.horse_name (aliases carry raw + romanized names); P1-2 year-only birth date cannot pass the payload validator — outcome is fail-closed candidate block, not precision retention; P1-3 career total (通算成績) is on the profile page, not the result page — parsed there and used as source_url; P1-4 status mapping enumerated (取消→scratched, 除外→withdrawn nonstart, 中止→did_not_finish, 失格→disqualified); P1-5 basic_profile sourcing mapped to the real page (country from 産地 abbreviation, sex/color from title line, trainer suffix, pedigree from blood_table two generations six fields, romanized-only aliases); P1-6 fixture/test plan expanded (provider-bound adapter fixture, mismatch/suffix/missing-table/count-mismatch/overseas/status/year-only/障害 cases); P2 budget is 3 pages + 1 redirect so japan per-candidate budget raised 3→4 with no mid-candidate fallback; overseas detection rule specified; partial-expected-fields trap recorded; date-format blockers noted. Real fixtures captured from production: netkeiba_{horse,result,ped}_2022110137.html."
+  - event: implemented
+    date: "2026-07-22"
+    session: 1
+    mode: full
+    artifacts_modified: [server/stable/services/p0_horse_completion_source_clients.py, server/stable/services/p0_horse_completion_batch.py, server/stable/services/p0_horse_completion_adapters.py, server/stable/test_p0_horse_netkeiba_client.py, server/stable/test_p0_horse_completion_batch.py, server/stable/test_p0_horse_completion_source_clients.py, server/stable/fixtures/p0_horse_completion/]
+    note: "tasks 0.1-3.2 complete: _NetkeibaClient (3-page ID-direct fetch), _JapanDispatcherClient, select netkeiba preference, japan budget 3->4. End-to-end sqlite pipeline passes with auto first publish (profile complete_profile_full, four fields from page, verified key, published)."
+  - event: code-reviewed
+    date: "2026-07-22"
+    session: 1
+    mode: full
+    rounds: 1
+    issues_resolved: 8
+    note: "Independent review round 1 resolved 2 P1 + 6 P2: P1-1 namespace iteration over frozenset source_names was nondeterministic across hash seeds for multi-key candidates (all regions) — reverted to deterministic identity_keys-order scan with netkeiba pre-pass for japan only; P1-2 title regex backtracking accepted '4歳' as color — color whitelist enforced, unknown shapes fail closed; P2 removed dead career_count_mismatch marker (adapter recomputes the gap), unknown single-char 産地 marks fail closed instead of silent 日本, NAR venue numeric prefixes (2大井8) handled, dispatcher batch_limit doc corrected (dispatcher enforces 1x), 4 missing scenario tests added (year-only birth, 障害 distance, adapter name-mismatch, suffixed-page pass), select determinism regression test added."

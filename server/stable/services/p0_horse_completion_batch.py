@@ -198,11 +198,20 @@ def _candidate_from_queue_item(
 
     region_namespaces = REGION_ADAPTERS[item.region].source_names
     source_namespace = ""
-    for key in identity_keys:
-        namespace = key.split(":", 1)[0].strip()
-        if namespace and namespace in region_namespaces:
-            source_namespace = namespace
-            break
+    # Japan: prefer netkeiba when the candidate holds a netkeiba key — the
+    # netkeiba client fetches by ID (provider-bound identity), while the JBIS
+    # name search fails closed on same-name horses (review P0-1). All other
+    # cases keep the deterministic identity_keys-order scan.
+    if item.region == RacingRegion.JAPAN and any(
+        key.split(":", 1)[0].strip() == "netkeiba" for key in identity_keys
+    ):
+        source_namespace = "netkeiba"
+    else:
+        for key in identity_keys:
+            namespace = key.split(":", 1)[0].strip()
+            if namespace and namespace in region_namespaces:
+                source_namespace = namespace
+                break
 
     source_urls = [
         url

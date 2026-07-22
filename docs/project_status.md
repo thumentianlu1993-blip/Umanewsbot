@@ -30,6 +30,17 @@ P0 马信息补全专项的模型交接文档见
 `docs/p0_horse_information_completion_handoff.md`。后续接手应从该文档进入，并以
 `docs/current_state.md` 和生产实时核验校正可能漂移的运行数据。
 
+## 2026-07-22 netkeiba 马匹客户端专项完成本地实现（未部署）
+
+- OpenSpec change `add-netkeiba-horse-client` 完成 tasks `0.1-4.2`：`_NetkeibaClient`
+  ID 直取（3 页/马，provider-bound 身份 + 四字段 + 完整生涯）、日本 dispatcher、
+  select netkeiba 偏好、预算 3→4；解析全 fail closed。
+- plan-eng-review 1 P0 与独立 code review 2 P1 全部修复；专项 25/25、补全套件
+  266/266、完整回归与基线逐数一致；sqlite 端到端含自动首发全通。
+- 剩余：tasks `5.1-5.2` 生产执行（分步用户授权）——部署后重跑首个日本滚动批次
+  （触网 + xlsx 人工复审），核验批次自动首发，闭环 `publish-p0-horses-basic-tier`
+  tasks 7.2；随后两 change 一并评估归档。
+
 ## 2026-07-22 P0 BASIC 层自动首发专项完成本地实现（未部署）
 
 - OpenSpec change `publish-p0-horses-basic-tier` 完成 tasks `0.1-6.2`：BASIC 发布门禁

@@ -68,6 +68,31 @@
 字段口径、生产计数、关键产物、事故经验、未完成项和后续执行顺序；实时状态仍以本文和生产
 核验为准。
 
+## 2026-07-22 netkeiba 马匹客户端专项：本地实现完成（未部署）
+
+- OpenSpec change `add-netkeiba-horse-client` 完成 plan-eng-review 与全部本地实现
+  （tasks `0.1-4.2`），解开 2026-07-22 首个日本批次 100/100 JBIS 同名歧义阻断。
+- 核心实现：`_NetkeibaClient`（按候选 `netkeiba:{id}` 直取马匹页 + 战绩页 + 血统页
+  3 页，provider-bound 身份，页面提取四字段与完整生涯）；`_JapanDispatcherClient`
+  （netkeiba key 候选走 netkeiba、其余保持 JBIS）；select 阶段日本候选 netkeiba
+  namespace 偏好（其余保持 identity_keys 顺序，确定性）；日本每候选预算 3→4。
+  解析全 fail closed：结构不识别/年份生日/未知毛色/未知单字产地一律阻断不猜值；
+  异常状态四档映射（取消/除外不计出赛、中止/失格计出赛）；海外行按 JRA/NAR
+  场地名单判定；通算成績与逐场对账由 adapter 既有 gap 逻辑处理。
+- plan-eng-review 修复 1 P0 + 6 P1：选择层位置（select 偏好 + dispatcher 而非
+  adapter client_factory）；生涯总数在马匹页非战绩页；年份生日只能阻断；
+  状态映射枚举；页面字段口径对照真实页面。
+- 独立 code review 修复 2 P1 + 6 P2：frozenset 迭代非确定性回退为 identity_keys
+  顺序；毛色白名单防「4歳」被当毛色；未知单字产地 fail closed；NAR 数字前缀
+  场地（2大井8）正确判非海外；移除死代码计数标记；补 4 个场景测试。
+- 验证：netkeiba 专项 25/25、补全四套件 266/266、完整 `stable` 2,595 项与基线
+  逐数一致（14F+70E，零新增）；sqlite 端到端 select → prepare（缓存）→ bundle
+  → commit → **自动首发**全通（四字段写入、verified key 标记、published）。
+  真实 fixture 捕获自生产：`netkeiba_{horse,result,ped}_2022110137.html`。
+- 本 change 尚未部署生产；生产执行（tasks `5.1-5.2`）需分步用户授权：部署 →
+  首个日本滚动批次全链路（触网 prepare + xlsx 人工复审）→ 核验批次自动首发
+  （即 `publish-p0-horses-basic-tier` tasks 7.2 闭环）。
+
 ## 2026-07-22 P0 BASIC 层自动首发：存量 2,785 匹已发布；首个滚动批次因 JBIS 同名歧义阻断
 
 - 生产已部署 `a59536a9`（备份 dump SHA-256 `77b12edd…`）。provenance 回填完成：重跑

@@ -18,30 +18,36 @@
 
 ## Decisions
 
-### 1. netkeiba 客户端结构
+### 1. netkeiba 客户端结构与抓取序列
 
-新增 `_NetkeibaClient(_BaseSourceClient)`：`provider_name = "netkeiba"`、`allowed_hosts = frozenset({"db.netkeiba.com"})`、`record_authority_status = "source_records_verified"`（netkeiba 战绩页生涯总数与逐场记录一致时）。抓取序列：马匹页 `/horse/{id}/`（基础资料 + 父母 + 出生日期）→ 战绩页 `/horse/result/{id}/`（生涯逐场 + 总数校验）。仅当候选携带 `netkeiba:{id}` key 时可用；无 key 候选不构造 URL（回退 JBIS 路径）。
+新增 `_NetkeibaClient(_BaseSourceClient)`：`provider_name = "netkeiba"`、`allowed_hosts = frozenset({"db.netkeiba.com"})`、`record_authority_status = "source_records_verified"`。抓取序列 **3 页/马**（实测页面结构）：马匹页 `/horse/{id}/`（基础资料表 `db_prof_table` + **通算成績总数** + 标题行性别/毛色）→ 战绩页 `/horse/result/{id}/`（`db_h_race_results` 逐场）→ 血统页 `/horse/ped/{id}/`（`blood_table` 两代六字段）。生涯总数在**马匹页**（`通算成績 13戦6勝`），不在战绩页；`source_url` 用马匹页 URL 使 `official_start_count_source_url` 指向携带总数的页面。日本每候选预算 3→**4**（3 页 + 1 次 redirect 余量，redirect 计入预算；JBIS 路径仍只用 3）；**不做 netkeiba 失败中途回退 JBIS**（2+3 超预算且必然 fail closed）。
 
-### 2. 身份判据
+### 2. 客户端选择层（review P0-1 修正）
+
+`_CLIENTS` 每地区只有一个客户端类，且 prepare 每地区只实例化一次（per-client `batch_limit` 计数）。选择层实现为：
+
+1. **select 阶段 namespace 偏好**：日本候选持有 netkeiba key 时 `source_namespace` 直接取 netkeiba；其余情况保持既有 identity_keys 顺序扫描（确定性，不引入 frozenset 迭代——独立 review P1-1 修正）。
+2. **dispatcher 客户端**：`_CLIENTS[japan]` 注册组合 dispatcher，按 `request.candidate_source_name == "netkeiba"` 分发 `_NetkeibaClient`，否则 `_JBISClient`（HKJC 的候选守卫为先例）；`last_request_count` 与 `_request_count` 在 finally 中双向代理（异常下也正确）；`batch_limit` 由 dispatcher 自身统一执行（地区上限 1×，子客户端上限不可达——独立 review P2-3 修正文档口径）。
+
+### 3. 身份判据
 
 - payload external ID = URL 中的数字 ID，必须与候选 key ID 完全一致（provider-bound）。
-- 页面马名（含括号国别后缀的原文）与候选名按 `_normalize_identity_name` 语义比对；不一致 fail closed 记身份冲突，不猜测合并。
-- 页面列出英文/中文别名时进 aliases；原名以日文表记为准。
+- 客户端先把 netkeiba 页面马名的**括号国别后缀**（如 `(USA)`）剥除再写 `identity.horse_name`；比较器是 adapter 的 `_normalized_text`（NFKC + casefold + 空白折叠），不是 `_normalize_identity_name`。原始页面名与罗马字英文名进 `aliases`（身份锁会查 aliases）。净keiba 页面只有罗马字英文名，无中文别名。
+- **部分期望字段陷阱**（如实记录）：候选只要带任一非空 sire/dam/birth_year 期望值，provider-bound 放宽即失效，全部期望字段必须命中——回填四字段只填了一部分的候选仍会 fail closed，重跑预期成功率口径应排除这类候选。
 
-### 3. 解析与字段口径
+### 4. 解析与字段口径
 
-- 基础资料：性别、毛色、出生日期、马主、练马师、生产牧场；只有年份时保留日期精度，不虚构月日。
-- 生涯：逐场日期、场地、比赛名、跑道/距离（保留原文单位）、名次/异常状态（`取消`/`除外`/`中止` 等按既有结果状态语义映射，不折叠 unknown）、骑师、马号、负磅、时间、奖金；战绩页生涯总数写 `official_or_source_start_count` 并与逐场数对账，不一致进缺口而非放行。
-- 海外远征行保留并在统计中计 overseas。
-- 任何预期表缺失/结构改版：`source_payload_unavailable` 式 fail closed，记录不可解析。
+- 基础资料：`country` 由 `db_prof_table` 的 `産地` 判定——单字缩写按映射表（`米`→美国等）；多字值为国内产地（北海道等）→ `日本`；**未识别的单字标记 fail closed**（不得误标日本）；缺失 fail closed（独立 review P2-4 修正）。`sex`/`color` 来自标题行（`現役　牡4歳　芦毛`），毛色必须命中白名单（鹿毛/黒鹿毛/青鹿毛/青毛/芦毛/栗毛/栃栗毛/尾花栗毛/白毛），不命中即 fail closed 不猜字段（独立 review P1-2 修正）；`trainer` 剥 `（栗東）` 类后缀；`馬主` 单元格前置 `<img>` 忽略；生产牧场取 `生産者`。
+- 血统：`blood_table` 两代六字段（父 = row0 cell0、父父 = row0 cell1、父母 = row8 cell0、母 = row16 cell0、母父 = row16 cell1、母母 = row24 cell0）；名称剥 `(米)` 国别标记、年份、毛色、`[血統][産駒]` 标记。payload 校验要求**六字段全非空 + birth_date 为完整 ISO 日期**——**只有年份的出生日期 = 该候选 fail closed 阻断**（不虚构月日，也不存在精度保留路径）；任一血统字段缺失同理阻断。
+- 生涯逐场：`db_h_race_results` 行：日期（`YYYY/MM/DD`）、開催（`大井` 或 `2中山8` 格式）、レース名（含 `(JpnI`/`(OP)` 等级标记保留原文）、着順、騎手、馬番、斤量、距離（`ダ1200` 原文保留、单位统一为米但原文必须保留）、タイム。
+- 异常状态映射（客户端层翻译，与 JBIS 先例一致并补齐）：`取消→scratched`、`除外→withdrawn`（两者不计出赛）、`中止→did_not_finish`、`失格→disqualified`（两者计出赛）；未映射状态不得折叠 unknown 放行（会变成 `unconfirmed_start_status` 阻断，这是既有行为，保持）。
+- 海外行判定：開催不符合 JRA `回場日` 格式且不在 NAR 场地名单 → `is_overseas=True`，场地与比赛名保留原文。
+- `source_start_count` 只计实际出赛（排除 scratched/withdrawn），与通算成績（中央+地方合计）对账，不一致进缺口。
+- 逐场日期非精确（如老年份 2 位年）会产生 `race_record_core_evidence_missing` 阻断（既有行为，保持并如实记录）。
 
-### 4. adapter 接入
+### 5. 规格与合规
 
-`p0_horse_completion_adapters.py` 日本 adapter 增加 netkeiba 来源：`REGION_ADAPTERS[japan].client_factory` 按候选是否有 netkeiba key 选择 `_NetkeibaClient` 或 `_JBISClient`；`source_names` 已含 netkeiba。identity key 合并沿用既有 `_participant_identity_keys`（netkeiba URL 提取已实现）。
-
-### 5. 限速与合规
-
-沿用 `_default_source_client_factory` 的每地区预算账本与 per-host 限速（8s）；不重试 4xx；429/5xx 有限重试。批量执行前复核 netkeiba 访问条款。
+沿用 `_default_source_client_factory` 的每地区预算账本与 per-host 限速（8s）；429/5xx 有限重试、4xx 不重试（既有基类行为）。payload 复用 `_BaseSourceClient._payload`（形状与 JBIS 相同，`adapter_key` 自动为 `japan_jbis`——地区键非来源键，如实记录）。批量执行前复核 netkeiba 访问条款。
 
 ## Risks / Trade-offs
 

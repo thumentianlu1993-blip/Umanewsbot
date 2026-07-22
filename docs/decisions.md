@@ -1,5 +1,20 @@
 # 关键决策
 
+## 2026-07-22 日本滚动补全来源：netkeiba ID 直取优先，JBIS 检索兜底
+
+- 日本候选持有 netkeiba key 时，select 阶段 `source_namespace` 直接取 netkeiba 并走
+  `_NetkeibaClient`（马匹页 + 战绩页 + 血统页 3 页直取，provider-bound 身份）；无 key
+  候选保持 `_JBISClient` 名称检索。其余多 key 场景保持 identity_keys 顺序扫描（不用
+  frozenset 迭代，保证跨进程确定性）。
+- netkeiba 与 JBIS 身份空间不同源：netkeiba key 不代表 JBIS ID；不做 netkeiba 失败
+  中途回退 JBIS（预算与身份语义都不允许）。日本每候选请求预算 3→4（3 页 + 1 次
+  redirect 余量）。
+- netkeiba 页面解析不猜值：结构不识别、年份生日、未白名单毛色、未知单字产地一律
+  fail closed 阻断候选；生涯总数取马匹页「通算成績」并与逐场对账（不一致由既有
+  adapter gap 逻辑处理）；异常状态 `取消/除外` 不计出赛、`中止/失格` 计出赛。
+- ExternalHorse 存量空四字段（12,405 条）不在本 change 批量修复，仅随批次自然覆盖；
+  批量修复如需进行另立专项。
+
 ## 2026-07-22 发布资格时间、积压时效和历史恢复
 
 - `first_seen_at` 表示“系统何时看见新闻”，不能代表“新闻何时通过全部发布门禁”。新增

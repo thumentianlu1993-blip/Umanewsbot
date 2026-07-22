@@ -35,7 +35,9 @@ REVIEWED_CANDIDATE_REGIONS = (
     RacingRegion.UNITED_STATES,
 )
 REVIEWED_CANDIDATE_REQUEST_BUDGETS = {
-    RacingRegion.JAPAN: 3,
+    # japan: netkeiba path fetches profile+result+pedigree (3 pages) plus one
+    # redirect of headroom; JBIS path uses 3 (search+profile+record).
+    RacingRegion.JAPAN: 4,
     RacingRegion.HONG_KONG: 1,
     RacingRegion.UNITED_KINGDOM: 1,
     RacingRegion.FRANCE: 2,
