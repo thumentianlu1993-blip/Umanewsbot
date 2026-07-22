@@ -185,7 +185,8 @@ def _complete_source_payload(region: str) -> dict[str, Any]:
 
 
 REGION_REQUEST_BUDGETS = {
-    RacingRegion.JAPAN: 3,
+    # netkeiba path: profile + result + pedigree pages plus redirect headroom
+    RacingRegion.JAPAN: 4,
     RacingRegion.HONG_KONG: 1,
     RacingRegion.UNITED_KINGDOM: 1,
     RacingRegion.FRANCE: 2,
@@ -2047,7 +2048,7 @@ class P0HorseCompletionSourceClientTests(SimpleTestCase):
     def test_factory_routes_all_regions_and_network_is_disabled_by_default(self):
         source_clients = _source_module()
         expected_providers = {
-            RacingRegion.JAPAN: "jbis",
+            RacingRegion.JAPAN: "japan_dispatch",
             RacingRegion.HONG_KONG: "hkjc",
             RacingRegion.UNITED_KINGDOM: "sporting_life",
             RacingRegion.FRANCE: "geny",
@@ -5170,7 +5171,7 @@ class P0HorseReviewedNetworkBatchContractTests(SimpleTestCase):
                 row["retrieval"]["network_request_count"]
                 for row in payloads
             ),
-            100,
+            110,
         )
 
     @override_settings(HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=True)
@@ -5271,11 +5272,11 @@ class P0HorseReviewedNetworkBatchContractTests(SimpleTestCase):
             reviewed_sha256,
         )
         self.assertEqual(manifest["summary"]["processed_count"], 50)
-        self.assertEqual(manifest["summary"]["network_request_count"], 100)
+        self.assertEqual(manifest["summary"]["network_request_count"], 110)
         self.assertEqual(manifest["summary"]["cache_hit_count"], 0)
         self.assertEqual(manifest["summary"]["cache_miss_count"], 50)
         for region, request_count in {
-            RacingRegion.JAPAN: 30,
+            RacingRegion.JAPAN: 40,
             RacingRegion.HONG_KONG: 10,
             RacingRegion.UNITED_KINGDOM: 10,
             RacingRegion.FRANCE: 20,

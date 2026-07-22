@@ -157,7 +157,9 @@ class P0HorseBatchSelectionTests(P0HorseBatchTestBase):
         self.assertEqual(identified_row["candidate_key"], f"profile:{identified.pk}")
         self.assertIn("jbis:0001234567", identified_row["identity_keys"])
         self.assertIn("netkeiba:2010100001", identified_row["identity_keys"])
-        self.assertEqual(identified_row["source_namespace"], "jbis")
+        # japan candidates prefer netkeiba when both keys exist (ID-direct
+        # fetch path; JBIS name search fails closed on same-name horses)
+        self.assertEqual(identified_row["source_namespace"], "netkeiba")
         self.assertNotIn("identity_status", identified_row)
         for url in identified_row["source_urls"]:
             self.assertNotIn("example.test/race", url)
@@ -1691,6 +1693,129 @@ class P0HorseBatchCommandPipelineTests(P0HorseBatchPrepareTests):
         self.assertEqual(
             state.artifacts["commit:japan"]["artifact_sha256"], recorded_sha
         )
+
+
+class P0HorseBatchNetkeibaPipelineTests(P0HorseBatchTestBase):
+    """End-to-end: netkeiba ID-direct path through the rolling batch pipeline
+    (add-netkeiba-horse-client). The candidate has a netkeiba identity key
+    and no four-field data — provider-bound identity must carry it through.
+    """
+
+    def setUp(self):
+        import shutil
+        import tempfile
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        root = Path(self._tmp.name)
+        self.state_dir = root / "batches"
+        self.cache_dir = root / "cache"
+        from django.contrib.auth import get_user_model
+
+        self.reviewer = get_user_model().objects.create_user(
+            username="p0-netkeiba-reviewer",
+            password="unused",
+            is_superuser=True,
+            is_staff=True,
+        )
+        self.profile = self._profile(
+            "ドラゴンウェルズ",
+            source_refs={
+                "horse_identity_keys": ["netkeiba:2022110137"],
+                "horse_source_urls": ["https://db.netkeiba.com/horse/2022110137/"],
+            },
+        )
+        self._p0_source(self.profile)
+        from stable.services.p0_horse_completion_batch import (
+            approve_batch_manifest,
+            select_p0_horse_batch,
+            write_batch_manifest,
+        )
+
+        manifest = select_p0_horse_batch(regions=[RacingRegion.JAPAN])
+        horses = manifest.get("horses") or []
+        self.assertEqual(len(horses), 1)
+        self.assertEqual(horses[0]["source_namespace"], "netkeiba")
+        self.manifest_path = write_batch_manifest(manifest, state_dir=self.state_dir)
+        self.approved = approve_batch_manifest(self.manifest_path, reviewer="reviewer-a")
+        from stable.services.p0_horse_completion_adapters import (
+            p0_horse_completion_cache_path,
+        )
+
+        fixture = (
+            Path(__file__).resolve().parent
+            / "fixtures"
+            / "p0_horse_completion"
+            / "japan_netkeiba.json"
+        )
+        cache_path = p0_horse_completion_cache_path(
+            self.cache_dir, f"profile:{self.profile.pk}"
+        )
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(fixture, cache_path)
+
+    def _call(self, *command_args) -> dict:
+        from io import StringIO
+
+        from django.core.management import call_command
+        from django.test import override_settings
+
+        out = StringIO()
+        with override_settings(
+            HORSE_PROFILE_COMPLETION_BATCH_STATE_DIR=str(self.state_dir),
+            HORSE_PROFILE_COMPLETION_CACHE_DIR=str(self.cache_dir),
+            HORSE_PROFILE_COMPLETION_REVIEW_OUTPUT_DIR=str(
+                Path(self._tmp.name) / "review"
+            ),
+        ):
+            call_command("p0_horse_completion_batch", *command_args, "--json", stdout=out)
+        text = out.getvalue()
+        marker = text.rfind("\n{")
+        payload = text[marker + 1 :] if marker != -1 else text
+        return json.loads(payload)
+
+    def test_netkeiba_full_pipeline_with_auto_publish(self):
+        prepared = self._call(
+            "--prepare",
+            str(self.manifest_path),
+            "--expected-sha256",
+            self.approved["batch_sha256"],
+        )
+        self.assertEqual(prepared["totals"]["succeeded"], 1)
+        bundled = self._call(
+            "--bundle",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        self.assertEqual(bundled["horse_count"], 1)
+        committed = self._call(
+            "--commit",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+            "--approved-by",
+            "human-approver",
+            "--confirm-reviewed-artifact",
+        )
+        self.assertTrue(committed["idempotent_verification"]["passed"])
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.sire_text, "Frosted")
+        self.assertEqual(self.profile.dam_text, "Little Dipper")
+        self.assertEqual(str(self.profile.birth_date), "2022-03-26")
+        self.assertEqual(self.profile.completeness_status, "complete_profile_full")
+        # netkeiba key marked verified by the reviewed batch commit
+        self.assertEqual(
+            self.profile.source_refs.get("horse_identity_verified_keys"),
+            ["netkeiba:2022110137"],
+        )
+        # auto first publish fired through the BASIC gate
+        self.assertEqual(committed["auto_first_publish"]["published"], 1)
+        self.assertEqual(self.profile.review_status, "published")
 
 
 class P0HorseBatchAutoPublishTests(P0HorseBatchCommandPipelineTests):

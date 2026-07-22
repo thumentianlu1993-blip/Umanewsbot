@@ -2205,6 +2205,308 @@ class _JBISClient(_BaseSourceClient):
         )
 
 
+_NETKEIBA_COUNTRY_BY_MARK = {
+    "米": "美国",
+    "英": "英国",
+    "愛": "爱尔兰",
+    "仏": "法国",
+    "豪": "澳大利亚",
+    "新": "新西兰",
+    "独": "德国",
+    "加": "加拿大",
+    "伊": "意大利",
+    "韓": "韩国",
+    "日": "日本",
+}
+_NETKEIBA_STATUS_MAP = {
+    "取消": "scratched",
+    "取": "scratched",
+    "除外": "withdrawn",
+    "除": "withdrawn",
+    "中止": "did_not_finish",
+    "中": "did_not_finish",
+    "失格": "disqualified",
+    "失": "disqualified",
+}
+_NETKEIBA_NONSTART_STATUSES = {"scratched", "withdrawn"}
+_NETKEIBA_COLORS = (
+    "黒鹿毛", "青鹿毛", "栃栗毛", "尾花栗毛",
+    "鹿毛", "青毛", "芦毛", "栗毛", "白毛",
+)
+_NETKEIBA_JRA_VENUE_RE = re.compile(
+    r"^\d*(?:東京|中山|京都|阪神|新潟|中京|札幌|函館|福島|小倉)\d*$"
+)
+_NETKEIBA_NAR_VENUE_RE = re.compile(
+    r"^\d*(?:大井|川崎|船橋|浦和|盛岡|水沢|金沢|笠松|名古屋|園田|姫路|高知|佐賀|帯広|門別)\d*$"
+)
+_NETKEIBA_PEDIGREE_CELLS = {
+    "sire": (0, 0),
+    "sire_sire": (0, 1),
+    "sire_dam": (8, 0),
+    "dam": (16, 0),
+    "dam_sire": (16, 1),
+    "dam_dam": (24, 0),
+}
+
+
+def _netkeiba_pedigree_name(value: Any) -> str:
+    """Strip country marks, year, color and [血統]/[産駒] markers."""
+    text = _text(value)
+    text = re.split(r"[\[（(]|\d{4}", text, maxsplit=1)[0]
+    return text.strip(" 　")
+
+
+def _netkeiba_japanese_date(value: Any) -> str:
+    text = _text(value)
+    match = re.search(r"(\d{4})年(\d{1,2})月(\d{1,2})日", text)
+    if not match:
+        return _iso_date(text)
+    year, month, day = (int(part) for part in match.groups())
+    try:
+        return date(year, month, day).isoformat()
+    except ValueError:
+        return ""
+
+
+class _NetkeibaClient(_BaseSourceClient):
+    """Fetch horses by netkeiba ID directly — no name search, no ambiguity."""
+
+    region = RacingRegion.JAPAN
+    provider_name = "netkeiba"
+    record_authority_status = "source_records_verified"
+    allowed_hosts = frozenset({"db.netkeiba.com"})
+    base_url = "https://db.netkeiba.com"
+
+    def _fetch(self, request: P0HorseCompletionRequest) -> dict[str, Any]:
+        if (
+            _normalized(request.candidate_source_name) != "netkeiba"
+            or not _text(request.external_horse_id)
+        ):
+            raise P0HorseSourceBlocked("provider_bound_identity_required: netkeiba")
+        horse_id = _text(request.external_horse_id)
+        if not horse_id.isdigit():
+            raise P0HorseSourceBlocked("provider_bound_identity_required: netkeiba")
+        profile_url = f"{self.base_url}/horse/{horse_id}/"
+        result_url = f"{self.base_url}/horse/result/{horse_id}/"
+        pedigree_url = f"{self.base_url}/horse/ped/{horse_id}/"
+        profile = self._get(profile_url, request)
+        result = self._get(result_url, request)
+        pedigree_page = self._get(pedigree_url, request)
+
+        profile_soup = BeautifulSoup(profile.text, "html.parser")
+        name, english_name, sex, color = self._parse_title(profile_soup)
+        if not name:
+            raise P0HorseSourceBlocked("netkeiba_profile_structure: title")
+        values = self._parse_profile_table(profile_soup)
+        birth_date = _netkeiba_japanese_date(values.get("生年月日"))
+        if not birth_date:
+            raise P0HorseSourceBlocked("netkeiba_profile_structure: birth_date")
+        source_start_count = self._parse_career_total(values.get("通算成績"))
+        pedigree = self._parse_pedigree(
+            BeautifulSoup(pedigree_page.text, "html.parser")
+        )
+        records = self._parse_records(
+            BeautifulSoup(result.text, "html.parser"), result_url=result_url
+        )
+        return self._payload(
+            request=request,
+            source_url=getattr(profile, "url", profile_url),
+            external_horse_id=horse_id,
+            horse_name=name,
+            identity={"birth_year": _year(birth_date)},
+            basic_profile={
+                "country": self._parse_country(values.get("産地")),
+                "sex": sex,
+                "color": color,
+                "birth_date": birth_date,
+                "owner_name": _text(values.get("馬主")),
+                "trainer_name": re.sub(
+                    r"[（(][^）)]*[）)]", "", _text(values.get("調教師"))
+                ).strip(),
+                "breeder_name": _text(values.get("生産者")),
+            },
+            pedigree=pedigree,
+            records=records,
+            source_start_count=source_start_count,
+            raw_payload={
+                "profile_html": profile.text,
+                "result_html": result.text,
+                "pedigree_html": pedigree_page.text,
+            },
+            aliases=[
+                {"name": name, "language": "ja", "is_original": True},
+                *(
+                    [{"name": english_name, "language": "en", "is_original": False}]
+                    if english_name
+                    else []
+                ),
+            ],
+        )
+
+    def _parse_title(self, soup) -> tuple[str, str, str, str]:
+        title = soup.select_one(".horse_title")
+        if title is None:
+            return "", "", "", ""
+        heading = title.select_one("h1")
+        name = re.sub(r"[（(][^）)]*[）)]", "", _text(heading.get_text() if heading else "")).strip()
+        line = _text(title.get_text(" ", strip=True))
+        heading_text = _text(heading.get_text(" ", strip=True)) if heading else ""
+        remainder = line[len(heading_text):].strip(" 　") if heading_text else line
+        color_alternation = "|".join(_NETKEIBA_COLORS)
+        match = re.match(
+            rf"(?P<en>.*?)(?:現役|引退|繁殖|登録抹消)\s*(?P<sex>セン|牡|牝|セ)(?:\d+歳)?\s*(?P<color>{color_alternation})$",
+            remainder,
+        )
+        if not match:
+            # no guessing: an unrecognized title shape (missing/unknown color
+            # or sex) blocks the candidate instead of emitting wrong fields
+            raise P0HorseSourceBlocked(
+                "netkeiba_profile_structure: title_sex_color"
+            )
+        english_name = match.group("en").strip(" 　")
+        sex = match.group("sex") or ""
+        color = match.group("color") or ""
+        return name, english_name, sex, color
+
+    def _parse_profile_table(self, soup) -> dict[str, str]:
+        table = soup.select_one("table.db_prof_table")
+        if table is None:
+            raise P0HorseSourceBlocked("netkeiba_profile_structure: db_prof_table")
+        values: dict[str, str] = {}
+        for row in table.select("tr"):
+            cells = row.find_all(["th", "td"])
+            if len(cells) >= 2:
+                values[_text(cells[0].get_text(" ", strip=True))] = _text(
+                    cells[1].get_text(" ", strip=True)
+                )
+        return values
+
+    def _parse_country(self, mark: Any) -> str:
+        text = _text(mark)
+        if not text:
+            raise P0HorseSourceBlocked("netkeiba_profile_structure: country")
+        mapped = _NETKEIBA_COUNTRY_BY_MARK.get(text)
+        if mapped:
+            return mapped
+        # multi-character values are domestic prefectures/regions (e.g. 北海道);
+        # an unknown single-character country mark must fail closed, not be
+        # silently mislabeled 日本
+        if len(text) == 1:
+            raise P0HorseSourceBlocked(
+                f"netkeiba_profile_structure: unknown country mark {text}"
+            )
+        return "日本"
+
+    def _parse_career_total(self, value: Any) -> int:
+        match = re.search(r"(\d+)\s*戦", _text(value))
+        if not match:
+            raise P0HorseSourceBlocked("missing_source_start_count")
+        return int(match.group(1))
+
+    def _parse_pedigree(self, soup) -> dict[str, str]:
+        table = soup.select_one("table.blood_table")
+        if table is None:
+            raise P0HorseSourceBlocked("netkeiba_pedigree_structure: blood_table")
+        rows = table.select("tr")
+        pedigree: dict[str, str] = {}
+        for field, (row_index, cell_index) in _NETKEIBA_PEDIGREE_CELLS.items():
+            if row_index >= len(rows):
+                raise P0HorseSourceBlocked(
+                    f"netkeiba_pedigree_structure: row {row_index}"
+                )
+            cells = rows[row_index].find_all(["th", "td"])
+            if cell_index >= len(cells):
+                raise P0HorseSourceBlocked(
+                    f"netkeiba_pedigree_structure: cell {row_index}/{cell_index}"
+                )
+            pedigree[field] = _netkeiba_pedigree_name(
+                cells[cell_index].get_text(" ", strip=True)
+            )
+        return pedigree
+
+    def _parse_records(self, soup, *, result_url: str) -> list[dict[str, Any]]:
+        table = soup.select_one("table.db_h_race_results")
+        if table is None:
+            raise P0HorseSourceBlocked("netkeiba_result_structure: db_h_race_results")
+        records: list[dict[str, Any]] = []
+        for row in table.select("tr"):
+            cells = row.find_all("td")
+            if len(cells) < 19:
+                continue
+            race_date = _iso_date(cells[0].get_text(" ", strip=True))
+            venue = _text(cells[1].get_text(" ", strip=True))
+            race_name = _text(cells[4].get_text(" ", strip=True))
+            finish_raw = _text(cells[11].get_text(" ", strip=True))
+            result_status = _NETKEIBA_STATUS_MAP.get(finish_raw, "")
+            overseas = not (
+                _NETKEIBA_JRA_VENUE_RE.match(venue)
+                or _NETKEIBA_NAR_VENUE_RE.match(venue)
+            )
+            link = cells[4].find("a", href=True)
+            records.append(
+                {
+                    "external_race_id": "",
+                    "external_result_id": "",
+                    "race_date": race_date,
+                    "racecourse": venue,
+                    "race_name": race_name,
+                    "finish": result_status or finish_raw,
+                    "result_status": result_status,
+                    "distance_text": _text(cells[14].get_text(" ", strip=True)),
+                    "horse_number": _text(cells[8].get_text(" ", strip=True)),
+                    "jockey_name": _text(cells[12].get_text(" ", strip=True)),
+                    "carried_weight": _text(cells[13].get_text(" ", strip=True)),
+                    "going": _text(cells[16].get_text(" ", strip=True)),
+                    "finish_time": _text(cells[18].get_text(" ", strip=True)),
+                    "is_overseas": overseas,
+                    "source_url": (
+                        urljoin(result_url, link["href"]) if link else result_url
+                    ),
+                }
+            )
+        return records
+
+
+class _JapanDispatcherClient(_BaseSourceClient):
+    """Dispatch japan candidates: netkeiba ID fetch when the candidate carries
+    a netkeiba identity, JBIS name search otherwise. The dispatcher's own
+    fetch_source_payload enforces the region batch_limit once per run, so the
+    region cap stays 1x total; sub-client caps are unreachable in practice.
+    """
+
+    region = RacingRegion.JAPAN
+    provider_name = "japan_dispatch"
+    allowed_hosts = frozenset({"www.jbis.or.jp", "db.netkeiba.com"})
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._netkeiba = _NetkeibaClient(*args, **kwargs)
+        self._jbis = _JBISClient(*args, **kwargs)
+        self._active: _BaseSourceClient = self._jbis
+
+    def has_manual_supplements(self, request: P0HorseCompletionRequest) -> bool:
+        if _normalized(request.candidate_source_name) == "netkeiba":
+            return self._netkeiba.has_manual_supplements(request)
+        return self._jbis.has_manual_supplements(request)
+
+    def apply_manual_supplements(self, payload, request):
+        return self._active.apply_manual_supplements(payload, request)
+
+    def _fetch(self, request: P0HorseCompletionRequest) -> dict[str, Any]:
+        self._active = (
+            self._netkeiba
+            if _normalized(request.candidate_source_name) == "netkeiba"
+            else self._jbis
+        )
+        try:
+            return self._active.fetch_source_payload(request)
+        finally:
+            # the base wrapper overwrites last_request_count from
+            # self._request_count after _fetch returns, so mirror both
+            self._request_count = self._active._request_count
+            self.last_request_count = self._active.last_request_count
+
+
 class _HKJCClient(_BaseSourceClient):
     region = RacingRegion.HONG_KONG
     provider_name = "hkjc"
@@ -3060,7 +3362,7 @@ class _HRNClient(_BaseSourceClient):
 
 
 _CLIENTS = {
-    RacingRegion.JAPAN: _JBISClient,
+    RacingRegion.JAPAN: _JapanDispatcherClient,
     RacingRegion.HONG_KONG: _HKJCClient,
     RacingRegion.UNITED_KINGDOM: _SportingLifeClient,
     RacingRegion.FRANCE: _GenyClient,

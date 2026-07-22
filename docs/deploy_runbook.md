@@ -1,5 +1,21 @@
 # 部署运行手册
 
+## netkeiba 客户端日本批次操作补充（add-netkeiba-horse-client，2026-07-22）
+
+在「P0 BASIC 层自动首发操作手册」基础上，首个日本批次重跑时按本节执行：
+
+1. 部署含 netkeiba 客户端的构建后，日本候选有 netkeiba key（2,462 匹）走 ID 直取
+   （马匹页 + 战绩页 + 血统页 3 页，每候选预算 4），无 key 候选保持 JBIS 检索；
+   无需改任何配置，`HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true` 与 8s 限速沿用。
+2. prepare 重跑同一 select 会生成新批次（原 `p0batch-37fad126d645` 已 abandon）；
+   复核 xlsx 时关注：netkeiba 候选 `candidate_source_name=netkeiba`、外部 ID 与
+   key 一致、四字段来自页面；`ambiguous_identity` 应基本消失，残余失败按
+   `partial expected fields`（候选带部分四字段期望值导致锁收紧）单独如实计数。
+3. 页面解析失败（`netkeiba_profile_structure` 等）属预期 fail closed，进 blocker
+   池等结构适配，不得在运维侧手改 payload。
+4. 其余阶段（approve → validate → prepare → xlsx 复审 → bundle → commit → 核验
+   自动首发 → `--retry-publish` 恢复路径）与首发手册一致。
+
 ## P0 BASIC 层自动首发操作手册（publish-p0-horses-basic-tier，2026-07-22）
 
 本节是批次自动首发与存量批量发布的标准操作顺序。公开门槛：名称 + 五地区 +
