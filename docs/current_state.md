@@ -4,6 +4,35 @@
 字段口径、生产计数、关键产物、事故经验、未完成项和后续执行顺序；实时状态仍以本文和生产
 核验为准。
 
+## 2026-07-22 P0 BASIC 层自动首发专项：本地实现完成（未部署）
+
+- OpenSpec change `publish-p0-horses-basic-tier` 完成 plan-eng-review 与全部本地实现
+  （tasks `0.1-6.2`）：目标是把公开 `/horses/` 从 12 匹推向全部 46,318 匹 P0。
+  用户已确认三项产品决策：BASIC 层公开门槛（名称 + 五地区 + verified 身份或三字段
+  齐全）、批次审核后自动首次发布、日本先行滚动补全。
+- 核心实现：新服务 `horse_profile_publish.py`（BASIC 门禁只信
+  `horse_identity_verified_keys` —— 由身份回填 commit 或人工批准批次 commit 写入，
+  sync 名称归属 key 不计；hidden/曾 hidden/`auto_publish_blocked` 锁定一律阻断）；
+  批次地区 commit 复验通过后自动首发（含 create_new 反查，published_by=批次审核人，
+  四通道审计）；发布失败阻断 committed 终态并走 `--retry-publish` 专用恢复阶段
+  （retry 必须核验复验通过；同 artifact 全量重 commit 的快照漂移 fail closed 为
+  既有行为，未改动）；存量命令 `publish_p0_horse_profiles`（dry-run → 批准 →
+  按地区 ≤500/事务 commit，逐匹错误非零退出）；前台「资料补全中」徽章
+  （完整档保留正面标签，内部措辞不上公开页）。
+- plan-eng-review 修复 2 P0 + 3 P1 + 3 P2：身份信任引入 verified provenance（sync
+  归属 key 不满足门禁，存量池精确为回填核验的 2,789 匹）；delta 规格改为 MODIFIED
+  两条真实存在的要求；hidden_at 阻断；create_new 覆盖；发布失败阻断终态。
+- 独立 code review 修复 3 P1 + 6 P2：retry 必须核验 `idempotent_verification.passed`；
+  多地区 committed 需要每地区完整 publish stage；provenance 生产回填步骤（重跑已批准
+  回填 manifest，幂等）写入 runbook；门禁要求 key 带非空 ID；发布 save+OperationLog
+  同事务；重试合并累计发布清单；存量命令逐匹错误非零退出。
+- 验证：专项测试 `test_horse_profile_publish` 23/23、批次套件 116/116（含自动首发
+  钩子 11 项）、完整 `stable` 2,569 项与基线逐数一致（14F+70E，零新增）；
+  `manage.py check`、`makemigrations --check --dry-run`（无迁移）、
+  `openspec validate --strict`、`git diff --check` 全部通过。
+- 本 change 尚未部署生产、未写任何生产数据；生产执行（tasks `7.1-7.4`）见
+  `docs/deploy_runbook.md` 顶部操作手册，需分步用户授权。
+
 ## 2026-07-22 赛事去让赛清理已写入生产并验收
 
 - 发布提交 `5b491561`（随 `cce280a7` 合并部署）：赛历对象与 race 术语去让赛清理

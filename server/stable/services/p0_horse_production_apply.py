@@ -1962,6 +1962,16 @@ def _apply_artifact_row(
     source_refs = dict(profile.source_refs or {})
     batches = dict(source_refs.get("p0_reviewed_batches") or {})
     batches[identity_key] = artifact_sha256
+    # A profile that passed a human-reviewed batch commit earns verified
+    # identity provenance: all of its current identity keys may satisfy the
+    # BASIC publish gate (see services/horse_profile_publish.py).
+    existing_keys = [str(key) for key in source_refs.get("horse_identity_keys") or []]
+    verified_keys = list(source_refs.get("horse_identity_verified_keys") or [])
+    verified_folded = {str(key).casefold() for key in verified_keys}
+    for key in existing_keys:
+        if key.casefold() not in verified_folded:
+            verified_keys.append(key.casefold())
+            verified_folded.add(key.casefold())
     source_refs.update(
         {
             "p0_reviewed_identity": {
@@ -1971,6 +1981,8 @@ def _apply_artifact_row(
             "p0_reviewed_batches": batches,
         }
     )
+    if verified_keys:
+        source_refs["horse_identity_verified_keys"] = verified_keys
     profile.source_refs = source_refs
     profile.save(update_fields=["source_refs", "updated_at"])
     _apply_p0_source_metadata(

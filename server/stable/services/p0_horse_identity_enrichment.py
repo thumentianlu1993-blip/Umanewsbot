@@ -1199,6 +1199,15 @@ def commit_approved_artifact(
                             keys.append(key)
                             refs["horse_identity_keys"] = keys
                             changed = True
+                        # Fail-closed enrichment writes verified provenance;
+                        # only verified keys may satisfy the publish gate.
+                        # Idempotent: re-running an approved commit backfills
+                        # provenance for keys written before provenance existed.
+                        verified = list(refs.get("horse_identity_verified_keys") or [])
+                        if key not in {str(item).casefold() for item in verified}:
+                            verified.append(key)
+                            refs["horse_identity_verified_keys"] = verified
+                            changed = True
                         if candidate["source_url"]:
                             urls = list(refs.get("horse_source_urls") or [])
                             if candidate["source_url"] not in urls:

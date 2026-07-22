@@ -1691,3 +1691,380 @@ class P0HorseBatchCommandPipelineTests(P0HorseBatchPrepareTests):
         self.assertEqual(
             state.artifacts["commit:japan"]["artifact_sha256"], recorded_sha
         )
+
+
+class P0HorseBatchAutoPublishTests(P0HorseBatchCommandPipelineTests):
+    """Auto first publish hook after a region commit's verification passes."""
+
+    def _commit_args(self):
+        return (
+            "--commit",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+            "--approved-by",
+            "human-approver",
+            "--confirm-reviewed-artifact",
+        )
+
+    def _run_pipeline(self):
+        self._call(
+            "--prepare",
+            str(self.manifest_path),
+            "--expected-sha256",
+            self.approved["batch_sha256"],
+        )
+        self._call(
+            "--bundle",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        return self._call(*self._commit_args())
+
+    def test_auto_first_publish_after_verified_commit(self):
+        from stable.models import HorseProfileCompletionRun, OperationLog
+        from stable.services.p0_horse_completion_batch import BatchRunState
+
+        committed = self._run_pipeline()
+        publish = committed["auto_first_publish"]
+        self.assertEqual(publish["published"], 1)
+        self.assertEqual(publish["errors"], [])
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.review_status, "published")
+        self.assertEqual(self.profile.published_by, self.reviewer)
+        self.assertIsNotNone(self.profile.published_at)
+        self.assertTrue(
+            OperationLog.objects.filter(
+                action_type="horse_profile_status_changed",
+                target_id=str(self.profile.pk),
+            ).exists()
+        )
+        ledger = (self.manifest_path.parent / "approvals_ledger.jsonl").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"auto_first_publish"', ledger)
+        state = BatchRunState.read(self.manifest_path.parent)
+        self.assertIn("publish:japan", state.artifacts)
+        self.assertIn("publish:japan", state.completed_stages)
+        run = HorseProfileCompletionRun.objects.get(id=committed["completion_run_id"])
+        self.assertEqual(run.summary["auto_first_publish"]["published"], 1)
+
+    def test_batch_apply_marks_identity_keys_verified(self):
+        self._run_pipeline()
+        self.profile.refresh_from_db()
+        verified = self.profile.source_refs.get("horse_identity_verified_keys") or []
+        flat = self.profile.source_refs.get("horse_identity_keys") or []
+        self.assertTrue(flat)
+        self.assertEqual(sorted(verified), sorted(flat))
+
+    def test_retry_publish_recovers_from_publish_error(self):
+        from unittest import mock
+
+        from stable.services import horse_profile_publish
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            P0HorseBatchError,
+        )
+        from stable.services.p0_horse_completion_commit import (
+            commit_p0_horse_batch_region,
+        )
+
+        real_publish = horse_profile_publish.auto_publish_profiles
+        calls = {"count": 0}
+
+        def flaky_publish(profiles, *, user, note):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                return {
+                    "published": 0,
+                    "skipped_already_published": 0,
+                    "blocked": 0,
+                    "blocked_reasons": {},
+                    "published_profile_ids": [],
+                    "errors": [{"profile_id": self.profile.pk, "error": "boom"}],
+                }
+            return real_publish(profiles, user=user, note=note)
+
+        self._call(
+            "--prepare",
+            str(self.manifest_path),
+            "--expected-sha256",
+            self.approved["batch_sha256"],
+        )
+        self._call(
+            "--bundle",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        with mock.patch.object(
+            horse_profile_publish,
+            "auto_publish_profiles",
+            side_effect=flaky_publish,
+        ):
+            with self.assertRaises(P0HorseBatchError):
+                commit_p0_horse_batch_region(
+                    self.manifest_path,
+                    region="japan",
+                    reviewer=self.reviewer,
+                    approved_by="human-approver",
+                    state_dir=self.state_dir,
+                    confirm_reviewed_artifact=True,
+                )
+        state = BatchRunState.read(self.manifest_path.parent)
+        self.assertIn("publish:japan", state.artifacts)
+        self.assertNotIn("publish:japan", state.completed_stages)
+        self.assertTrue(
+            any(entry.get("stage") == "publish:japan" for entry in state.errors)
+        )
+        self.profile.refresh_from_db()
+        self.assertNotEqual(self.profile.review_status, "published")
+        # manifest must not reach committed terminal state
+        import json as jsonlib
+
+        manifest = jsonlib.loads(self.manifest_path.read_text(encoding="utf-8"))
+        self.assertNotEqual(manifest.get("status"), "committed")
+
+        retried = self._call(
+            "--retry-publish",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        publish = retried["auto_first_publish"]
+        self.assertEqual(publish["published"], 1)
+        self.assertEqual(publish["errors"], [])
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.review_status, "published")
+        state = BatchRunState.read(self.manifest_path.parent)
+        self.assertIn("publish:japan", state.completed_stages)
+        self.assertFalse(
+            any(entry.get("stage") == "publish:japan" for entry in state.errors)
+        )
+        manifest = jsonlib.loads(self.manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(manifest.get("status"), "committed")
+
+    def test_retry_publish_after_success_fails_closed(self):
+        from stable.services.p0_horse_completion_batch import P0HorseBatchError
+        from stable.services.p0_horse_completion_commit import retry_region_publish
+
+        self._run_pipeline()
+        with self.assertRaises(P0HorseBatchError):
+            retry_region_publish(
+                self.manifest_path,
+                region="japan",
+                reviewer=self.reviewer,
+            )
+
+    def test_hidden_profile_not_auto_published(self):
+        from django.utils import timezone
+
+        self.profile.review_status = "hidden"
+        self.profile.hidden_at = timezone.now()
+        self.profile.save(update_fields=["review_status", "hidden_at"])
+        committed = self._run_pipeline()
+        publish = committed["auto_first_publish"]
+        self.assertEqual(publish["published"], 0)
+        self.assertEqual(publish["blocked"], 1)
+        self.assertEqual(publish["blocked_reasons"], {"state.hidden": 1})
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.review_status, "hidden")
+
+    def test_failed_verification_blocks_publish(self):
+        from unittest import mock
+
+        from stable.services import p0_horse_completion_commit as commit_module
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            P0HorseBatchError,
+        )
+        from stable.services.p0_horse_completion_commit import (
+            commit_p0_horse_batch_region,
+        )
+
+        self._call(
+            "--prepare",
+            str(self.manifest_path),
+            "--expected-sha256",
+            self.approved["batch_sha256"],
+        )
+        self._call(
+            "--bundle",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        real_dry_run = commit_module.dry_run_reviewed_p0_completion_artifact
+        calls = {"count": 0}
+
+        def fake_dry_run(**kwargs):
+            calls["count"] += 1
+            report = real_dry_run(**kwargs)
+            if calls["count"] >= 2:
+                report = {**report, "planned_profile_updates": 1}
+            return report
+
+        with mock.patch.object(
+            commit_module,
+            "dry_run_reviewed_p0_completion_artifact",
+            side_effect=fake_dry_run,
+        ):
+            with self.assertRaises(P0HorseBatchError):
+                commit_p0_horse_batch_region(
+                    self.manifest_path,
+                    region="japan",
+                    reviewer=self.reviewer,
+                    approved_by="human-approver",
+                    state_dir=self.state_dir,
+                    confirm_reviewed_artifact=True,
+                )
+        self.profile.refresh_from_db()
+        # apply promotes draft -> ready, but nothing may be published
+        self.assertNotEqual(self.profile.review_status, "published")
+        state = BatchRunState.read(self.manifest_path.parent)
+        self.assertNotIn("publish:japan", state.artifacts)
+        # retry-publish must also refuse: verification never passed
+        from stable.services.p0_horse_completion_commit import retry_region_publish
+
+        with self.assertRaises(P0HorseBatchError):
+            retry_region_publish(
+                self.manifest_path,
+                region="japan",
+                reviewer=self.reviewer,
+            )
+
+    def test_publish_error_retry_also_covers_run_created_profiles(self):
+        """create_new profiles (not in the manifest) are published via the
+        completion-run reverse lookup (design P1-2)."""
+        from unittest import mock
+
+        from stable.models import (
+            HorseP0Source,
+            HorseP0SourceStatus,
+            HorseP0SourceType,
+            HorseProfileCompletionRun,
+        )
+        from stable.services import horse_profile_publish
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            P0HorseBatchError,
+        )
+        from stable.services.p0_horse_completion_commit import (
+            commit_p0_horse_batch_region,
+        )
+
+        real_publish = horse_profile_publish.auto_publish_profiles
+        calls = {"count": 0}
+
+        def flaky_publish(profiles, *, user, note):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                return {
+                    "published": 0,
+                    "skipped_already_published": 0,
+                    "blocked": 0,
+                    "blocked_reasons": {},
+                    "published_profile_ids": [],
+                    "errors": [{"profile_id": self.profile.pk, "error": "boom"}],
+                }
+            return real_publish(profiles, user=user, note=note)
+
+        created = self._profile(
+            "新建马",
+            source_refs={"horse_identity_verified_keys": ["netkeiba:2020100001"]},
+        )
+        self._call(
+            "--prepare",
+            str(self.manifest_path),
+            "--expected-sha256",
+            self.approved["batch_sha256"],
+        )
+        self._call(
+            "--bundle",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        with mock.patch.object(
+            horse_profile_publish,
+            "auto_publish_profiles",
+            side_effect=flaky_publish,
+        ):
+            with self.assertRaises(P0HorseBatchError):
+                commit_p0_horse_batch_region(
+                    self.manifest_path,
+                    region="japan",
+                    reviewer=self.reviewer,
+                    approved_by="human-approver",
+                    state_dir=self.state_dir,
+                    confirm_reviewed_artifact=True,
+                )
+        run = HorseProfileCompletionRun.objects.order_by("-id").first()
+        self.assertIsNotNone(run)
+        HorseP0Source.objects.create(
+            profile=created,
+            source_type=HorseP0SourceType.MAJOR_RACE_PARTICIPANT,
+            status=HorseP0SourceStatus.ACTIVE,
+            racing_region="japan",
+            horse_name=created.original_name,
+            participant_key=f"test-created:{created.pk}",
+            source_url="https://example.test/race/created",
+            completion_run=run,
+        )
+        retried = self._call(
+            "--retry-publish",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        publish = retried["auto_first_publish"]
+        self.assertEqual(publish["published"], 2)
+        self.assertEqual(publish["errors"], [])
+        created.refresh_from_db()
+        self.assertEqual(created.review_status, "published")
+
+    def test_locked_profile_not_auto_published(self):
+        self.profile.manual_lock_flags = {"auto_publish_blocked": True}
+        self.profile.save(update_fields=["manual_lock_flags"])
+        committed = self._run_pipeline()
+        publish = committed["auto_first_publish"]
+        self.assertEqual(publish["published"], 0)
+        self.assertEqual(publish["blocked"], 1)
+        self.assertEqual(publish["blocked_reasons"], {"state.locked": 1})
+        self.profile.refresh_from_db()
+        self.assertNotEqual(self.profile.review_status, "published")
+
+    def test_regions_pending_commit_or_publish_helper(self):
+        from stable.services.p0_horse_completion_batch import BatchRunState
+        from stable.services.p0_horse_completion_commit import (
+            _regions_pending_commit_or_publish,
+        )
+
+        state = BatchRunState(
+            batch_id="test-batch",
+            run_dir=self.state_dir,
+            stage="commit",
+            completed_stages=["commit:japan", "publish:japan", "commit:hong_kong"],
+            artifacts={},
+        )
+        manifest = {"regions": ["japan", "hong_kong"]}
+        self.assertEqual(
+            _regions_pending_commit_or_publish(manifest, state), ["hong_kong"]
+        )
+        state.completed_stages.append("publish:hong_kong")
+        self.assertEqual(_regions_pending_commit_or_publish(manifest, state), [])

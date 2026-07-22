@@ -1,5 +1,26 @@
 # 关键决策
 
+## 2026-07-22 P0 BASIC 层公开发布门禁与自动首发
+
+- 公开展示最低门槛为 BASIC 层：名称 + 五地区地区 +（`horse_identity_verified_keys`
+  含 netkeiba/nar/hkjc/sporting_life 认可 namespace 的 key，或父/母/出生日期三字段
+  齐全）。verified 身份只由 fail-closed 身份回填 commit 或人工批准批次 commit 写入；
+  sync 按名称归属写入的扁平 `horse_identity_keys` 不产生公开信任。
+- 滚动批次地区 commit 通过幂等复验后自动首次发布本地区马（含批次 create_new 新建马，
+  经 completion run 反查）；`published_by` = 批次 commit 审核人，不设系统用户；
+  `auto_first_publish_enabled` 死字段保持预留不启用，opt-out 用
+  `manual_lock_flags.auto_publish_blocked`。
+- hidden 或曾 hidden（`hidden_at` 非空）的马任何自动/批量通道都不得发布，必须人工
+  重新发布；这是隔离 `mark_profile_completion_ready` 把 hidden 复活为 ready 的既有行为。
+- 发布失败不得进入批次 committed 终态；同 artifact 全量重 commit 会被快照漂移检查
+  fail closed（既有行为），发布失败恢复走 `--retry-publish` 专用阶段，且 retry 必须核验
+  commit artifact 的 `idempotent_verification.passed`。
+- 主规格 `horse-profile-pages`"只有管理员审核发布后才进入前台"按三种发布路径（人工 /
+  批次审核后自动首发 / 批准的存量批量发布）修订，全部经同一 `transition_review_status`
+  审计通道；首批验收（2026-07-21 已完成）前仍只允许人工发布。
+- 未完整公开马统一显示「资料补全中」徽章；`空壳/仅基础资料/部分血统` 等内部措辞不出现在
+  公开页，`completeness_status` 仍是唯一事实源。
+
 ## 2026-07-22：去让赛混合标记对象一律进 review；最终复审沿用 Claude Code 等价复审
 
 - 代码复审 P1：term 5087（`THE KWANGTUNG HANDICAP CUP (HANDICAP)` / `广东让赛杯(让赛)`）原文同时含未括号 handicap（赛事名组成部分）与括号 (HANDICAP)（补充说明），既有兜底删除会错改为「广东杯」。决策：凡原文去除括号标记后仍含 handicap 完整词或四种中文让赛标记的对象，一律进 review 桶保持原值，不写入；京成杯锁定例外（`京成杯秋季让赛`→`京成杯秋季赛`）显式豁免该守卫。term 5087 与 5570 留待人工决定展示名，另走受控流程。

@@ -2861,6 +2861,18 @@ class HorseProfile(TimestampedModel):
         return self.review_status == HorseProfileStatus.PUBLISHED
 
     @property
+    def public_completeness_badge(self) -> str:
+        """Public-facing completeness label: positive tiers keep their labels,
+        everything below shows the honest in-progress badge (internal wording
+        like 空壳 never appears on public pages)."""
+        if self.completeness_status in {
+            HorseProfileCompleteness.COMPLETE_PEDIGREE_2GEN,
+            HorseProfileCompleteness.COMPLETE_PROFILE_FULL,
+        }:
+            return self.get_completeness_status_display()
+        return "资料补全中"
+
+    @property
     def public_path(self) -> str:
         if not self.pk:
             return ""
