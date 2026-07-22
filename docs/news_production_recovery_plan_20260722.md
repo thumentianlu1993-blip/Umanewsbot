@@ -2,7 +2,7 @@
 
 ## 1. 目的与当前基线
 
-本计划用于处理 `2026-07-22` 再核查确认的五地区新闻生产问题。规划与验收均以生产运行态为准，不以本地代码预期替代生产证据。用户已确认第 1–5 项按建议实施，第 6 项改为每地区初始最多 2 个 accepted 来源并行生产直开。P0 索引已完成备份、受控 REINDEX 和三层验证，当前从约 `14:23` 重新计时连续 60 分钟生产观察；CrawlJob 安全收敛代码已在独立工作树实现并通过目标测试，尚未部署或 apply 历史记录。其他阶段尚未开始生产执行。
+本计划用于处理 `2026-07-22` 再核查确认的五地区新闻生产问题。规划与验收均以生产运行态为准，不以本地代码预期替代生产证据。用户已确认第 1–5 项按建议实施，第 6 项改为每地区初始最多 2 个 accepted 来源并行生产直开。P0 索引已完成备份、受控 REINDEX、三层验证和满 60 分钟生产观察，`77` 次抓取全成功、同类错误为 `0`、真实新增 `2` 篇，索引修复门禁 PASS；CrawlJob 安全收敛代码已在独立工作树实现并通过目标测试，尚未部署或 apply 历史记录。其他阶段尚未开始生产执行。
 
 生产核查基线：
 
@@ -146,8 +146,8 @@
 - `repair-news-production-integrity`：已完成 full 工程审查；审查修正了 P0 顺序，明确索引修复不等待代码部署。
 - `recover-publish-ready-backlog`：已完成 full 工程审查；审查修正了 ready 时间被重复校验不断刷新的风险。
 - `harden-news-translation-recovery`：已完成 full 工程审查；审查补齐了 legacy 错误码迁移与低置信投影边界。
-- `improve-low-yield-regional-news-sources`：已完成 full 工程审查；审查收紧了真实 fixture 的最小化与敏感信息边界。
-- 四个新 change 均通过 `openspec validate <change> --strict`；全库严格校验通过。既有英文门禁 change 继续复用，不重复提案。
+- `improve-low-yield-regional-news-sources`：原 shadow 方案曾完成 full 工程审查；用户改为“每地区最多 2 个 accepted 来源并行生产直开”后，scope 已修订并退回 `proposed`。第 6 阶段实施前必须按新 scope 重新完成工程审查，不能复用旧结论。
+- 四个新 change 均通过 `openspec validate <change> --strict`；全库严格校验通过。严格校验只证明文档结构有效，不替代上述新 scope 的工程复审。既有英文门禁 change 继续复用，不重复提案。
 
 ## 7. 用户已确认的决策
 

@@ -9,7 +9,7 @@
 - 停 beat，等 worker 无 active/reserved 后停 worker，确认无活动写入；以 `lock_timeout=30s`、`statement_timeout=5min` 执行 `REINDEX INDEX public.stable_newsarticle_public_slug_46694cb6`。不得 drop index、改 slug 或删文章。
 - 写后验收：`indisvalid/indisready/indislive=true`；事务回滚写入探针通过；事务内临时安装 `amcheck`、`bt_index_check(..., true)` 通过后 rollback；netkeiba latest 真实抓取 task `5dc8dac8-8b46-49bc-8122-d2e6c21bec49` 成功。
 - 并行 P0 马匹部署重建 db/web 后曾因 Nginx 旧上游出现 `502`。恢复时未回退对方提交，而是恢复 worker/beat/race_live_worker、reload Nginx，并核对 web/worker/beat/race_live_worker 均为镜像 `sha256:f48f6523525e…`。任何后续 web 重建都必须同步 reload/recreate Nginx 并验收 HTTP。
-- 从约 `14:23` 重新计时 60 分钟；`14:29` 快照为 CrawlJob `32 success / 0 failed / 0 started`、索引错误 `0`、公网 HTTP healthz/首页/五地区入口均 `200`。
+- 从约 `14:23` 重新计时 60 分钟；`15:23` 最终快照为 CrawlJob `77 success / 0 failed / 0 started`，CrawlJob、TaskExecutionLog、db/worker 日志同类索引错误均为 `0`；真实新增文章 `2` 篇，其中日本稿 `9572` 正常公开，英国稿 `9573` 进入人工复核；索引 valid/ready/live，公网 HTTP healthz/首页/五地区入口均 `200`。历史 stale started 仍为 `32`，索引修复门禁 PASS。
 
 ### 代码部署后的只读审计与遗留收敛
 

@@ -1,6 +1,6 @@
 ## 0. Pre-declared hypotheses
 
-- [ ] 0.1 (operations) 索引修复 PASS：维护后 60 分钟同类 B-tree 错误为 0，事务写入探针和至少一轮真实抓取成功；任一同类错误或写入失败为 BLOCKER
+- [x] 0.1 (operations) 索引修复 PASS：维护后 60 分钟同类 B-tree 错误为 0，事务写入探针和至少一轮真实抓取成功；任一同类错误或写入失败为 BLOCKER
 - [ ] 0.2 (application) 任务收敛 PASS：dry-run 对业务表零写入，apply 只更新 manifest 中仍为 started 且无活动证据的记录，迟到任务零终态覆盖；任一误收敛或覆盖为 BLOCKER
 - [ ] 0.3 (application) 可观测性 PASS：最近成功与 2h/24h 滚动失败、超时任务可同时展示，任一索引物理错误产生 P0 信号；被成功状态掩盖为 BLOCKER
 
@@ -9,7 +9,7 @@
 - [x] 1.1 (operations) 取得维护窗口确认，记录生产 HEAD/数据库版本/索引身份/磁盘/活动写入，生成并验证数据库与 `.env` 备份 (req: req-index-repair-preflight)
 - [x] 1.2 (operations) 暂停 beat/worker 和后台文章编辑，按锁定索引执行受控 `REINDEX INDEX`，禁止 drop index 或删除文章 (req: req-controlled-reindex) (adr: adr-001-reindex-window)
 - [x] 1.3 (operations) 完成 pg_index、可用时 amcheck、事务回滚写入探针和真实抓取验证后恢复服务 (req: req-index-repair-verify) (adr: adr-002-three-layer-check)
-- [ ] 1.4 (operations) 连续观察 60 分钟索引错误、新稿入库、CrawlJob、`/healthz/`、首页和五地区页，BLOCKER 立即停止扩大 (req: req-index-repair-verify) (req: req-index-error-alert)
+- [x] 1.4 (operations) 连续观察 60 分钟索引错误、新稿入库、CrawlJob、`/healthz/`、首页和五地区页，BLOCKER 立即停止扩大 (req: req-index-repair-verify) (req: req-index-error-alert)
 
 ## 2. 抓取终态与遗留任务收敛
 

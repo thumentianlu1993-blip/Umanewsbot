@@ -4,8 +4,8 @@
 
 - 生产 `public.stable_newsarticle_public_slug_46694cb6` 普通 B-tree 索引已完成备份、停写窗口内受控 `REINDEX INDEX`、事务回滚写入探针、临时 `amcheck bt_index_check` 和真实抓取验证。备份为 `backups/db/pre-news-index-repair-20260722_135849.dump`，大小 `229947588` 字节，SHA-256 `07d2ebd67f1a3c5ec1fb9ddaf93f554639980425dde87c4b19d0cc54a9ae2fb1`。
 - 首次观察被并行 P0 马匹部署中断：该部署将生产前移到 `a59536a9d60708556a1c1a1c3b0a46811ab36b72`，重建 db/web 后 Nginx 仍指向旧 web IP，曾短暂返回 `502`。本轮未回退对方功能；恢复必需容器、reload Nginx 并确认四个应用容器均为镜像 `sha256:f48f6523525e…` 后，从约 `14:23` 重新计时 60 分钟。
-- `14:29` 中途快照：重建后 CrawlJob `32 success / 0 failed / 0 started`、同类索引错误 `0`、新稿 `0`、历史 stale started `32`；HTTP `/healthz/`、首页和五地区入口均为 `200`。连续 60 分钟未完成前不宣告索引最终 PASS。
-- 本分支已实现 CrawlJob 条件终态、SHA manifest 遗留任务收敛、只读索引审计、2h/24h 滚动健康和 P0 告警。专项/相关测试 `99` 项全绿；完整 `stable` 为 `2616` 项，其 `14 failures / 72 errors / 57 skipped` 与同一 `a59536a9` 基线 `2595` 项的 `14 / 72 / 57` 逐数一致，未新增回归红灯。历史 `32` 条只是基线，代码部署后必须重新生成 manifest 才能 apply。当前这批新闻代码尚未部署，遗留记录尚未处置。
+- `15:23` 满 60 分钟最终快照：重建后 CrawlJob `77 success / 0 failed / 0 started`，CrawlJob、TaskExecutionLog、db 与 worker 日志中的同类索引错误均为 `0`；真实新增文章 `2` 篇，其中日本稿 `9572` 已由正常窗口公开，英国稿 `9573` 进入人工复核。索引仍为 valid/ready/live，HTTP `/healthz/`、首页和五地区入口全部 `200`，应用与数据库资源平稳。历史 stale started 仍为 `32` 且未被索引操作改写。索引修复门禁正式 PASS。
+- 本分支已实现 CrawlJob 条件终态、SHA manifest 遗留任务收敛、只读索引审计、2h/24h 滚动健康和 P0 告警，提交 `75cbedf1` 已推送到 `origin/codex/repair-news-production-integrity`。专项/相关测试 `99` 项全绿；完整 `stable` 为 `2616` 项，其 `14 failures / 72 errors / 57 skipped` 与同一 `a59536a9` 基线 `2595` 项的 `14 / 72 / 57` 逐数一致，未新增回归红灯。历史 `32` 条只是基线，代码部署后必须重新生成 manifest 才能 apply。当前这批新闻代码尚未部署，遗留记录尚未处置。
 
 专项交接入口：`docs/p0_horse_information_completion_handoff.md`。该文档汇总 P0 定义、完整
 字段口径、生产计数、关键产物、事故经验、未完成项和后续执行顺序；实时状态仍以本文和生产
