@@ -1,5 +1,30 @@
 # 部署运行手册
 
+## 2026 赛历赛事中文名补齐生产执行记录（2026-07-23）
+
+1. 生产当时快进到 `6167b6c0` 并执行 `deploy_lowcost.sh`；无迁移，HTTP `/healthz/`
+   返回 200。这是已发生的发布记录，不是本轮重新部署。
+2. 定稿 CSV 进入生产后，基于生产实时 before 构建 manifest，与定稿零漂移。写前备份
+   `backups/db/pre-translate-2026-race-names-20260723_012307.dump` 大小为 232,399,205 bytes，
+   SHA-256 为 `cdcc751ed852019830721ddea0894afe04c0fcf7f7c5223921ca947c66edd04c`，
+   `pg_restore -l` 得到 1018 项。
+3. 同一 manifest（SHA-256
+   `b9f1e8b73e84da9df141a78081a1da2ba29d727539f12ce2fb708a95df4375c8`）单事务写入
+   `written=573`；OperationLog batchId 为
+   `d2e2b203d9c3e67f683650c397ed6af038c17123d9c54cf71bdb302b784ce673`；
+   `--verify` 返回 `{"ok": true, "written": 573, "veto": 0}`。
+4. 发布时保留的核验包括 DB 全量复扫、五地区赛历卡片和 4 场详情页。spec 要求
+   详情页跨地区抽查至少 5 场，因此现存证据少 1 场，不能把该数量项记为通过。本轮只做
+   HTTP 公网抽检：`/healthz/` JSON 正常，2026 赛历抽样标题为中文；这不是发布时的第 5 场。
+   HTTPS 在本地代理链路握手失败，本轮未验证 HTTPS。
+5. web 容器内的定稿与 manifest 临时文件已清理；本地
+   `/tmp/translate2026-manifest-production.json` 当前也不存在。保留的是上述 SHA、执行结果、
+   OperationLog batchId 和发布报告，不得将临时 manifest 文件本体记为现存。
+6. 治理证据缺口：历史 Claude Code「等价复审」不是现行规则要求的 Codex 原生只读
+   review；用户授权的 `bd03b100` 与最终部署的 `6167b6c0` 不同，缺少集成版本的
+   合格复审及其后新授权证据。生产结果虽然成功，但不能因此追认该治理门禁。
+7. 详细记录：`docs/changes/translate-2026-race-display-names/release_report.md`。
+
 ## publish_ready 积压治理部署与灰度（2026-07-23，历史清单已收敛，新 24 小时观察中）
 
 ### 0. 本次实际执行证据

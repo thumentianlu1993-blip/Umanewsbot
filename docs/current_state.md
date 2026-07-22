@@ -1,5 +1,22 @@
 # 当前状态
 
+## 2026-07-23 2026 赛历赛事中文名补齐已写入生产
+
+- 根据发布时保存的执行证据，573 场 2026 年已发布赛事已完成单事务写入：
+  `written=573`、`veto=0`，`--verify` 返回 `ok=true`。生产写入绑定
+  manifest SHA-256 `b9f1e8b73e84da9df141a78081a1da2ba29d727539f12ce2fb708a95df4375c8`
+  和 OperationLog batchId `d2e2b203d9c3e67f683650c397ed6af038c17123d9c54cf71bdb302b784ce673`。
+- 发布时保留的核验记录为：已发布赛事空中文名 0、非 CJK 回退 0；五地区赛历卡片
+  非 CJK 标题 0；4 场详情页返回 200 并渲染中文名。spec 要求跨地区详情页抽查
+  至少 5 场，因此现存证据少 1 场，该数量验收项未满足；本轮也未重做全量验收。
+- 历史记录中的 Claude Code「等价复审」不是现行工作流要求的 Codex 原生只读 review；
+  且被授权的 `bd03b100` 与最终部署的集成版本 `6167b6c0` 不同，没有现存证据证明
+  集成版本获得合格原生复审和其后的新授权。生产结果成功是事实，但不能补证这一治理门禁。
+- 本轮只做公网 HTTP 抽检：`/healthz/` 返回 `{"status":"ok"}`，2026 赛历页抽样标题为中文。
+  HTTPS 在本地代理链路上握手失败，本轮未将 HTTPS 记为已验证。
+- 详细发布记录见 `docs/changes/translate-2026-race-display-names/release_report.md`；写前备份为
+  `backups/db/pre-translate-2026-race-names-20260723_012307.dump`。
+
 ## 2026-07-23 publish_ready 积压治理（21 篇历史稿已舍弃，五地区新 24 小时观察中）
 
 - OpenSpec change `recover-publish-ready-backlog` 已完成代码主体：`NewsArticle` 新增 nullable
