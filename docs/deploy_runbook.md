@@ -6069,3 +6069,26 @@ python manage.py complete_horse_profiles \
    `manage.py check`、migration 至 `stable.0052`、内外 `/healthz/`、有效来源分类总数、
    translated term 缺失来源数和身份冲突数。本次最终为 `56745` 条有效来源、
    `46318` 匹唯一 P0 马、translated term 缺失 `0`、待处理参与项冲突 `65042`。
+
+## 2026-07-23 公开门户 P1–P3 生产发布记录
+
+1. 发布提交：`bc7e2df047a20a997de1620688f1c7de4a5c52c4`；生产目录：
+   `/opt/umanewsbot`；编排文件：`docker-compose.prod.lowcost.yml`。
+2. 切换前确认生产 HEAD 为 `f0d3fbd6e71374b425e3bbae2041d47758270546`、Django check 和
+   `/healthz/` 正常、运行中的 `ExternalDataImportRun(status=started)` 为 `0`。
+3. 数据库恢复点：
+   `backups/db/pre-portal-redesign-20260723_024424.sql.gz`，大小 `232004041` bytes，
+   SHA-256 `9bdb7a53cde72c1302c86886415b5d59f4a088a5ae93e0325d34c8b0261fb6b2`；
+   `gzip -t` 已通过。环境恢复点：`.env.backup.portal-redesign-20260723_024424`。
+4. 使用 `bash ./deploy_lowcost.sh` 部署后，必须额外核对 `race_live_worker` image ID；该脚本本次
+   没有重建此服务，已执行：
+
+   ```bash
+   docker compose -f docker-compose.prod.lowcost.yml \
+     up -d --no-deps --force-recreate race_live_worker
+   ```
+
+5. 最终四个应用服务统一镜像：
+   `sha256:69ed2bd9f3f7ecc581c2caba4704bd7b1764fc02af6a2663b78f599217b23696`。
+   回滚时将代码恢复到上一个提交 `f0d3fbd6e71374b425e3bbae2041d47758270546` 并用同一低成本
+   Compose 重建全部四个应用服务；本次无迁移，只有确认数据受损时才恢复数据库备份。

@@ -2953,3 +2953,21 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   马匹；在父名、母名、出生年份或稳定外部 ID 足以区分前，不得猜测合并或写入详细资料。
 - 生产 `manage.py check` 通过，migration 已应用至 `stable.0052`，`/healthz/` 返回
   `{"status":"ok"}`。
+
+## 2026-07-23 公开门户 P1–P3 已整体上线
+
+- 公开门户视觉改版 P1、赛事体验 P2、马匹与关注体验 P3 已作为同一发布提交
+  `bc7e2df047a20a997de1620688f1c7de4a5c52c4` 快进 `main` 并部署到生产。
+- 本次没有数据库迁移；生产 `manage.py check`、migration plan、collectstatic、内外
+  `/healthz/` 均通过，首页、赛事日历、马匹列表、关注页和 sitemap 均返回 HTTP 200。
+- `web / worker / beat / race_live_worker` 已统一运行镜像
+  `sha256:69ed2bd9f3f7ecc581c2caba4704bd7b1764fc02af6a2663b78f599217b23696`。
+  部署脚本未自动重建 `race_live_worker`，本次已使用低成本 Compose 精确重建该服务并复核
+  四个应用容器 image ID 一致。
+- 生产浏览器验收覆盖 1440px 和 390px：首页、赛事日历、赛事详情、马匹列表、马匹详情、
+  我的关注均无横向溢出；桌面/移动导航断点正常，Noto Serif SC 700/900 字体加载成功，
+  浏览器控制台无错误。
+- 发布前数据库备份为
+  `backups/db/pre-portal-redesign-20260723_024424.sql.gz`，大小 `232004041` bytes，
+  SHA-256 为 `9bdb7a53cde72c1302c86886415b5d59f4a088a5ae93e0325d34c8b0261fb6b2`，
+  `gzip -t` 通过；环境备份为 `.env.backup.portal-redesign-20260723_024424`，权限 `0600`。
