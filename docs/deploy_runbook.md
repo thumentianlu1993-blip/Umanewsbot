@@ -27,6 +27,10 @@
   全部 `hard_gate_blocked`，selected 0、积压决策 0、地区窗口配额账本 0、全站小时配额
   `1/60`；Celery 两节点和公网 healthz 正常。继续 24 小时观察；未完成前不标记
   change 生产收口。
+- 24 小时观察由绑定当前 Codex 任务的每小时心跳 `publish-ready-24` 继续，终点为
+  `2026-07-23 18:45 Asia/Shanghai`。心跳不得 seal/apply 历史 manifest，不得手工补跑未来窗口；
+  命中过期/legacy 稿误选或公开、窗口失败、配额超限、持续队列/资源增长或 healthz 失败时，
+  按本节回滚顺序关闭 `MULTIREGION_PUBLISH_BACKLOG_ENABLED`并保留证据。
 - 历史 dry-run：主机持久化文件
   `runtime/news_integrity/publish-ready-legacy-20260722_173639.json`，内部 manifest SHA-256
   `b72ddc927a3f334762a69a4384755aff40704a71aa4877ca4aa5ecbdfa52faac`，文件 SHA-256

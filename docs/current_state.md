@@ -46,6 +46,9 @@
   selected 0、积压通道决策 0、地区窗口配额账本 0、全站小时配额 `1/60`。
   Celery 两节点空闲、HTTP healthz 正常，Web/Worker/DB 内存约 `305/431/183 MiB`。
   现进入五区 24 小时持续观察，未完成前 change 不归档。
+  Codex 当前任务已绑定每小时心跳 `publish-ready-24`，以 `2026-07-23 18:45`
+  为 24 小时终点；心跳只读观察并在预定 BLOCKER 下关闭积压总开关，不处理历史
+  manifest、不提前进入英文门禁或翻译阶段。
 - 当前历史审核清单为
   `runtime/news_integrity/publish-ready-legacy-20260722_173639.json`，内部 manifest SHA-256
   `b72ddc927a3f334762a69a4384755aff40704a71aa4877ca4aa5ecbdfa52faac`，文件 SHA-256
