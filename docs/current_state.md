@@ -117,9 +117,17 @@
   错误文本兼容失败已修复并完成聚焦及全量复跑。首次独立原生 code review 另发现旧版
   netkeiba cache 虽 miss、但新抓取结果无法替换已有文件的 P1；现已用 sidecar 文件锁与
   `os.replace` 原子替换，并新增单线程/并发回归；同一 reviewer 连续复审已清零 actionable
-  finding。因最新主线集成改变了父版本与仓库内容，旧审核指纹和用户部署授权已失效；当前
-  等待同一 reviewer 对集成版本复审。未部署修复、未触网、未写生产数据库；集成版本冻结后
-  必须重新取得绑定该精确版本的部署授权，触网 prepare 仍是下一独立授权。
+  finding。最新主线集成最终 base review 以 `0dcdbdab` 为 base、`15645b05` 为 HEAD，
+  content hash `d3a26c24…342c7`、fingerprint `43313e31…2441`，0 actionable findings；
+  用户随后明确授权部署该精确版本并保持网络关闭。
+- task 5.1 已完成生产部署：远端 main/生产 HEAD 均为 `15645b05`，四个应用容器统一镜像
+  `sha256:07f46301e77eb64cdd4899fee8a1b66d4b3ad5c79b5f5847e15a9ac985f176ef`；无迁移，
+  Django check 通过，宿主源码与容器 adapter SHA 均为
+  `444c62a709454f576cdd818e858fc07c3d24df1884ebc3de72794a05adfe744e`。
+  `.env`、web、worker、beat、race_live_worker 与 Django setting 均验证 network=false，
+  parser version 为 `netkeiba-parser.v2`；内外 healthz、`/horses/?region=japan` 与 www
+  healthz 均为 200，近期应用日志无 error。公开马仍为 `2,797`（日本 `2,463`），本步未
+  触网、未运行 prepare、未写马匹资料。触网 prepare 继续等待 task 5.2 的单独授权。
 
 ## 2026-07-22 netkeiba 马匹客户端专项：本地实现完成（未部署）
 

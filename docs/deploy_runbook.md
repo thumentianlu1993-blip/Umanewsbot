@@ -272,8 +272,31 @@ content hash 与 fingerprint 以最终 base review 报告为准，不在提交�
 仅为本专项新增 15 项测试。首次
 全量运行多出的 2 个错误文本兼容失败已通过保留旧错误前缀并追加字段明细修复，之后聚焦与
 全量均已复跑。首次独立 review 发现的 stale cache 覆盖 P1 已增加 sidecar lock、原子替换
-与并发回归。旧审核指纹和部署授权因主线集成失效，集成版本必须由同一 reviewer 复审并在
-冻结新指纹后重新取得部署授权；上述证据不代表生产授权。
+与并发回归。集成版本最终 base review 以 base `0dcdbdab`、HEAD `15645b05`、content hash
+`d3a26c24db0f80afc2acb023d88cc9829fc6a9338022f08e7605f67a399342c7`、fingerprint
+`43313e311d5e2ccf87da9d2829c7d6cacfe6f96fd962821be1db35d981822441` 通过，随后取得绑定
+该精确版本且明确保持网络关闭的部署授权。
+
+task 5.1 生产部署证据（2026-07-23）：
+
+- 部署前 `.env` 备份 `.env.backup.pre-netkeiba-repair-20260722T192208Z` 为 `8554` bytes、
+  mode `0600`、SHA-256 `fd647e0970c5139f1f82ab70fe02f0c02bb2919be5b2ae7d48bf8b4a5e9b5b35`。
+  数据库恢复点 `backups/db/pre-netkeiba-repair-20260722T192208Z.dump` 为 `232930440`
+  bytes、mode `0600`、SHA-256
+  `af96e506b1315bae23e63ce42ecf70c89d1c5fb14179e1eebe383e2d73f4c0b6`，`pg_restore -l`
+  为 `1018` 项。回滚标签 `umanewsbot:rollback-pre-netkeiba-repair-20260722T192208Z`
+  指向旧镜像 `sha256:69ed2bd9f3f7ecc581c2caba4704bd7b1764fc02af6a2663b78f599217b23696`。
+- 生产 fast-forward 到 `15645b054ff1c4057b1463d3382892cbe4c68106`；构建新镜像
+  `sha256:07f46301e77eb64cdd4899fee8a1b66d4b3ad5c79b5f5847e15a9ac985f176ef`。先停 beat，
+  Celery 两节点 drain 到 `active=0/reserved=0` 后切换；web、worker、beat、
+  race_live_worker 最终全部运行该镜像。无迁移，collectstatic 完成，Django check 无问题。
+- `.env` 及四个应用容器的 `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK` 均为 `false`，Django
+  setting 为 `False`，parser version 为 `netkeiba-parser.v2`。宿主与容器 adapter SHA-256
+  均为 `444c62a709454f576cdd818e858fc07c3d24df1884ebc3de72794a05adfe744e`。
+  内部 healthz/日本马匹页、公开域名 healthz/日本马匹页及 www healthz 均为 200；两个
+  Celery worker 响应，近期日志无 error。公开马保持 `2797`、日本 `2463`。本步没有执行
+  prepare、没有触网、没有马匹资料写入；task 5.2 仍需新的独立授权。
+
 ## netkeiba 客户端日本批次历史补充（2026-07-22；触网步骤已由上节替代）
 
 在「P0 BASIC 层自动首发操作手册」基础上，首个日本批次重跑时按本节执行：

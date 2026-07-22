@@ -58,8 +58,11 @@ P0 马信息补全专项的模型交接文档见
   `origin/main@0dcdbdab`；集成候选的精确提交与内容身份由最终 base review 报告固定，
   不在提交正文中记录会因 amend 自失效的 SHA。P0 聚焦 `285/285`、OpenSpec `37/37`
   通过，完整 `stable 2741` 与主线基线 `2726` 的失败计数均为
-  `21 failures + 70 errors + 57 skipped`。旧审核指纹与部署授权因主线集成失效，尚待集成
-  版本复审和重新授权；未部署返修、未触网、未写生产数据。
+  `21 failures + 70 errors + 57 skipped`。集成版本最终 review 以 HEAD `15645b05`、
+  fingerprint `43313e31…2441` 通过并取得精确部署授权；生产已切换为该 HEAD 和统一应用
+  镜像 `sha256:07f46301…176ef`。网络在 `.env`、四应用容器与 Django setting 均为 false，
+  HTTP 验收通过，公开马计数仍为 `2,797/日本2,463`；本步未触网、未写马匹数据。下一步
+  触网 prepare 仍需单独授权。
 
 ## 2026-07-22 netkeiba 马匹客户端专项完成本地实现（未部署）
 
