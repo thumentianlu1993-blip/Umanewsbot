@@ -2268,6 +2268,15 @@ def _netkeiba_japanese_date(value: Any) -> str:
         return ""
 
 
+def _netkeiba_page_text(response: Any) -> str:
+    """netkeiba serves EUC-JP without a charset header; requests defaults to
+    ISO-8859-1, so ``.text`` is mojibake. Decode the raw bytes explicitly."""
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray)):
+        return content.decode("euc-jp", errors="replace")
+    return str(getattr(response, "text", "") or "")
+
+
 class _NetkeibaClient(_BaseSourceClient):
     """Fetch horses by netkeiba ID directly — no name search, no ambiguity."""
 
@@ -2293,7 +2302,7 @@ class _NetkeibaClient(_BaseSourceClient):
         result = self._get(result_url, request)
         pedigree_page = self._get(pedigree_url, request)
 
-        profile_soup = BeautifulSoup(profile.text, "html.parser")
+        profile_soup = BeautifulSoup(_netkeiba_page_text(profile), "html.parser")
         name, english_name, sex, color = self._parse_title(profile_soup)
         if not name:
             raise P0HorseSourceBlocked("netkeiba_profile_structure: title")
@@ -2303,10 +2312,11 @@ class _NetkeibaClient(_BaseSourceClient):
             raise P0HorseSourceBlocked("netkeiba_profile_structure: birth_date")
         source_start_count = self._parse_career_total(values.get("通算成績"))
         pedigree = self._parse_pedigree(
-            BeautifulSoup(pedigree_page.text, "html.parser")
+            BeautifulSoup(_netkeiba_page_text(pedigree_page), "html.parser")
         )
         records = self._parse_records(
-            BeautifulSoup(result.text, "html.parser"), result_url=result_url
+            BeautifulSoup(_netkeiba_page_text(result), "html.parser"),
+            result_url=result_url,
         )
         return self._payload(
             request=request,
@@ -2329,9 +2339,9 @@ class _NetkeibaClient(_BaseSourceClient):
             records=records,
             source_start_count=source_start_count,
             raw_payload={
-                "profile_html": profile.text,
-                "result_html": result.text,
-                "pedigree_html": pedigree_page.text,
+                "profile_html": _netkeiba_page_text(profile),
+                "result_html": _netkeiba_page_text(result),
+                "pedigree_html": _netkeiba_page_text(pedigree_page),
             },
             aliases=[
                 {"name": name, "language": "ja", "is_original": True},

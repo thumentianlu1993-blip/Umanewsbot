@@ -70,6 +70,87 @@ def _fetch(transport=None, **overrides):
     return client.fetch_source_payload(_request(**overrides))
 
 
+class NetkeibaEncodingTests(SimpleTestCase):
+    def test_euc_jp_content_decoded_when_charset_missing(self):
+        """netkeiba serves EUC-JP without charset; .text would be mojibake."""
+
+        @dataclass(frozen=True)
+        class ByteResponse:
+            content: bytes
+            text: str
+            status_code: int = 200
+            url: str = ""
+            headers: dict = field(default_factory=dict)
+
+        class ByteTransport:
+            def get(self, url, **kwargs):
+                if "/horse/result/" in url:
+                    return ByteResponse(
+                        content=RESULT_HTML.encode("euc-jp"),
+                        text=RESULT_HTML.encode("euc-jp").decode("latin-1"),
+                        url=url,
+                    )
+                if "/horse/ped/" in url:
+                    return ByteResponse(
+                        content=PED_HTML.encode("euc-jp"),
+                        text=PED_HTML.encode("euc-jp").decode("latin-1"),
+                        url=url,
+                    )
+                return ByteResponse(
+                    content=HORSE_HTML.encode("euc-jp"),
+                    text=HORSE_HTML.encode("euc-jp").decode("latin-1"),
+                    url=url,
+                )
+
+        payload = _fetch(ByteTransport())
+        self.assertEqual(payload["identity"]["horse_name"], "ドラゴンウェルズ")
+        self.assertEqual(payload["basic_profile"]["color"], "芦毛")
+        self.assertEqual(len(payload["career"]["records"]), 13)
+
+
+class NetkeibaCacheGuardTests(SimpleTestCase):
+    def _cache_payload(self, source_name: str) -> dict:
+        payload = json.loads(
+            (FIXTURE_ROOT / "japan_netkeiba.json").read_text(encoding="utf-8")
+        )
+        payload["source"]["name"] = source_name
+        return payload
+
+    def test_cross_source_cache_treated_as_miss(self):
+        import tempfile
+
+        from stable.services import p0_horse_completion_adapters as adapters
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_path = Path(tmp) / "cache.json"
+            cache_path.write_text(
+                json.dumps(self._cache_payload("jbis"), ensure_ascii=False),
+                encoding="utf-8",
+            )
+            with self.assertRaises(completion.P0HorseCompletionNetworkDisabled):
+                completion.run_p0_horse_completion_adapter(
+                    _request(cache_path=str(cache_path), allow_network=False),
+                    source_client=None,
+                )
+
+    def test_matching_source_cache_served(self):
+        import tempfile
+
+        from stable.services import p0_horse_completion_adapters as adapters
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_path = Path(tmp) / "cache.json"
+            cache_path.write_text(
+                json.dumps(self._cache_payload("netkeiba"), ensure_ascii=False),
+                encoding="utf-8",
+            )
+            result = completion.run_p0_horse_completion_adapter(
+                _request(cache_path=str(cache_path), allow_network=False),
+                source_client=None,
+            )
+            self.assertTrue(result["retrieval"]["cache_hit"])
+
+
 class NetkeibaClientHappyPathTests(SimpleTestCase):
     def test_full_payload_validates(self):
         payload = _fetch()

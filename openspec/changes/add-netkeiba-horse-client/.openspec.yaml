@@ -24,3 +24,10 @@ journal:
     rounds: 1
     issues_resolved: 8
     note: "Independent review round 1 resolved 2 P1 + 6 P2: P1-1 namespace iteration over frozenset source_names was nondeterministic across hash seeds for multi-key candidates (all regions) — reverted to deterministic identity_keys-order scan with netkeiba pre-pass for japan only; P1-2 title regex backtracking accepted '4歳' as color — color whitelist enforced, unknown shapes fail closed; P2 removed dead career_count_mismatch marker (adapter recomputes the gap), unknown single-char 産地 marks fail closed instead of silent 日本, NAR venue numeric prefixes (2大井8) handled, dispatcher batch_limit doc corrected (dispatcher enforces 1x), 4 missing scenario tests added (year-only birth, 障害 distance, adapter name-mismatch, suffixed-page pass), select determinism regression test added."
+  - event: production-repair
+    date: "2026-07-22"
+    session: 1
+    mode: full
+    rounds: 1
+    issues_resolved: 2
+    note: "First production prepare (batch p0batch-4635b087fbbd) blocked 100/100 on two real defects: 61/100 netkeiba_profile_structure:title_sex_color — netkeiba serves EUC-JP without charset so requests decoded mojibake (fixtures were saved with explicit EUC-JP, hiding this); fixed with _netkeiba_page_text decoding raw bytes. 39/100 identity_incomplete — stale JBIS-era per-candidate cache served under netkeiba-keyed candidates, breaking provider-bound identity permanently; fixed with a japan-scoped cross-source cache guard in run_p0_horse_completion_adapter (US cross-provider complement flow unchanged). Regression tests: EUC-JP byte responses, cross-source cache miss, matching-source cache hit. Completion suites 270/270 green."

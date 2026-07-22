@@ -1848,8 +1848,27 @@ def run_p0_horse_completion_adapter(
         source_client,
         request,
     )
+    use_cache = False
     if cache_path and cache_path.is_file():
-        source_payload = _read_cache(cache_path)
+        cached_payload = _read_cache(cache_path)
+        # Cache is keyed per candidate, not per provider: for japan (where a
+        # dispatcher routes candidates between netkeiba and JBIS), a payload
+        # cached by the other source must be treated as a miss, or the
+        # identity lock sees a foreign provider and fails closed. Other
+        # regions intentionally allow cross-provider caches (e.g. the US
+        # equibase/HRN complement flow).
+        candidate_source = _normalized_text(_candidate_source_name(request))
+        cached_source = _normalized_text((cached_payload.get("source") or {}).get("name"))
+        cross_source_blocked = (
+            request.region == RacingRegion.JAPAN
+            and candidate_source
+            and cached_source
+            and candidate_source != cached_source
+        )
+        if not cross_source_blocked:
+            use_cache = True
+            source_payload = cached_payload
+    if use_cache:
         source_payload = _validate_legacy_existing_source_cache_payload(
             source_payload,
         )

@@ -49,6 +49,11 @@
 
 沿用 `_default_source_client_factory` 的每地区预算账本与 per-host 限速（8s）；429/5xx 有限重试、4xx 不重试（既有基类行为）。payload 复用 `_BaseSourceClient._payload`（形状与 JBIS 相同，`adapter_key` 自动为 `japan_jbis`——地区键非来源键，如实记录）。批量执行前复核 netkeiba 访问条款。
 
+### 6. 编码与缓存（生产首轮返修，2026-07-22）
+
+- **EUC-JP 解码**：netkeiba 响应 `Content-Type: text/html` 无 charset，requests 按 ISO-8859-1 解码得到乱码（生产首轮 61/100 因此阻断）。客户端一律用 `_netkeiba_page_text` 对原始 bytes 按 EUC-JP 解码后再解析。
+- **跨源缓存守卫**：候选级缓存只按 candidate_key 寻址，不区分来源；日本 dispatcher 引入双来源后，JBIS 时代缓存会让 netkeiba 候选的 provider-bound 失效并永久卡死四字段锁（生产首轮 39/100 因此阻断）。`run_p0_horse_completion_adapter` 对日本地区校验缓存 payload 的 `source.name` 与候选 `candidate_source_name` 一致才允许命中；其他地区（美国 equibase/HRN 互补流）保持既有跨来源缓存语义。
+
 ## Risks / Trade-offs
 
 - [页面结构脆弱] -> 解析器按表格标签语义定位而非绝对位置；结构不识别即 fail closed，配 fixture 回归。
