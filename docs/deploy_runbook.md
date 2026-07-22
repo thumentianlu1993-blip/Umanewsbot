@@ -1,5 +1,35 @@
 # 部署运行手册
 
+## P0 BASIC 层自动首发操作手册（publish-p0-horses-basic-tier，2026-07-22）
+
+本节是批次自动首发与存量批量发布的标准操作顺序。公开门槛：名称 + 五地区 +
+（verified identity key 认可 namespace，或父/母/出生日期三字段齐全）；verified
+身份只来自身份回填 commit 或人工批准批次 commit。人工 opt-out：在 profile 的
+`manual_lock_flags` 写入 `"auto_publish_blocked": true`（shell 逐匹设置，设置后
+任何自动/批量通道都不会发布该马，解除时删除该键）。
+
+1. 前置：备份；停 beat/worker（OOM 先例窗口）；首个触网批次需
+   `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true` 并重启执行进程。
+2. 首个日本滚动批次：select → approve → validate → prepare `--allow-network`
+   （可断点续跑）→ 人工复审 xlsx → bundle → commit `--confirm-reviewed-artifact`。
+   commit 复验通过后自动首发本地区马（含批次新建马），输出 `auto_first_publish`
+   计数。核验：OperationLog 有逐匹记录、台账有 `auto_first_publish` 条目、
+   `/horses/?region=japan` 出现新马并显示「资料补全中」徽章、抽样详情页 200。
+3. 发布失败恢复：commit 报 auto first publish failed 时批次不会进入 committed
+   终态；排查原因后用 `--retry-publish <manifest> --region <地区> --reviewer-id
+   <id>` 只重跑发布步骤（要求复验已通过），成功后自动清理 state.errors 并推进
+   终态。**不要用全量重 commit 恢复发布失败**（快照漂移检查会 fail closed）。
+4. provenance 回填（一次性，本 change 部署后）：重跑 2026-07-22 已批准的三个
+   身份回填 manifest 的 commit（`enrich_p0_horse_identities --commit <manifest>
+   --approved-sha256 <sha>`，幂等），为已写入的 2,789 个 key 补写
+   `horse_identity_verified_keys`；不重跑则存量 dry-run 候选为 0。
+5. 存量发布：`publish_p0_horse_profiles --dry-run --regions japan,hong_kong
+   --output-dir runtime/horse_profile_completion/publish-<date>` → 人工审候选
+   与阻断直方图 → `--approve <manifest> --reviewer <name>` → `--commit
+   <manifest> --approved-sha256 <sha> --reviewer-id <id>`（按地区 ≤500/事务，
+   有逐匹错误时命令非零退出）→ metrics 前后对比。
+6. 回滚：下线 = 后台逐匹转 hidden，不设批量下线；代码回滚不影响已发布状态。
+
 ## P0 身份回填生产执行结果（2026-07-22）
 
 1. 部署前：容器全健康、`manage.py check` 通过、无导入锁、内外 healthz 200、磁盘 38%。

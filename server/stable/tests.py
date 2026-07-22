@@ -18774,3 +18774,65 @@ class P0HorseProfileDataCompletionTests(TestCase):
 
         self.assertContains(response, "Forever Young")
         self.assertContains(response, "中文译名待补")
+
+    def test_public_index_shows_in_progress_badge_for_incomplete_profiles(self):
+        self._profile(
+            completeness_status="empty",
+            review_status=HorseProfileStatus.PUBLISHED,
+        )
+
+        response = self.client.get(reverse("public-horse-index"))
+
+        self.assertContains(response, "资料补全中")
+        self.assertNotContains(response, "空壳")
+
+    def test_public_index_keeps_positive_label_for_complete_profiles(self):
+        self._profile(
+            completeness_status="complete_profile_full",
+            review_status=HorseProfileStatus.PUBLISHED,
+        )
+
+        response = self.client.get(reverse("public-horse-index"))
+
+        self.assertContains(response, "完整马匹资料")
+        self.assertNotContains(response, "资料补全中")
+
+    def test_public_detail_basic_tier_renders_with_in_progress_badge(self):
+        profile = self._profile(
+            completeness_status="empty",
+            review_status=HorseProfileStatus.PUBLISHED,
+        )
+
+        response = self.client.get(reverse("public-horse-detail", args=[profile.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "资料补全中")
+        self.assertNotContains(response, "空壳")
+
+    def test_public_index_pagination_composes_with_region_filter(self):
+        for index in range(26):
+            self._profile(
+                primary_term=self._term(source=f"Japan Horse {index}", region=RacingRegion.JAPAN),
+                completeness_status="empty",
+                review_status=HorseProfileStatus.PUBLISHED,
+            )
+        self._profile(
+            primary_term=self._term(source="HK Horse", target="香港马", region=RacingRegion.HONG_KONG),
+            racing_region=RacingRegion.HONG_KONG,
+            completeness_status="empty",
+            review_status=HorseProfileStatus.PUBLISHED,
+        )
+
+        first = self.client.get(reverse("public-horse-index"), {"region": "japan"})
+        second = self.client.get(
+            reverse("public-horse-index"), {"region": "japan", "page": 2}
+        )
+        hong_kong = self.client.get(
+            reverse("public-horse-index"), {"region": "hong_kong"}
+        )
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(len(first.context["page_obj"]), 24)
+        self.assertEqual(len(second.context["page_obj"]), 2)
+        self.assertContains(hong_kong, "香港马")

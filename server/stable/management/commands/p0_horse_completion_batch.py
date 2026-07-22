@@ -34,6 +34,7 @@ class Command(BaseCommand):
         stages.add_argument("--prepare", metavar="MANIFEST_PATH")
         stages.add_argument("--bundle", metavar="MANIFEST_PATH")
         stages.add_argument("--commit", metavar="MANIFEST_PATH")
+        stages.add_argument("--retry-publish", metavar="MANIFEST_PATH")
         stages.add_argument("--abandon", metavar="MANIFEST_PATH")
         parser.add_argument("--regions", default="")
         parser.add_argument("--profile-id", action="append", type=int, default=[])
@@ -67,6 +68,8 @@ class Command(BaseCommand):
                 result = self._bundle(options)
             elif options["commit"]:
                 result = self._commit(options)
+            elif options["retry_publish"]:
+                result = self._retry_publish(options)
             else:
                 result = self._abandon(options)
         except P0HorseBatchError as exc:
@@ -284,6 +287,33 @@ class Command(BaseCommand):
         self.stdout.write(
             f"batch region {region} committed; idempotent verification "
             f"passed={result['idempotent_verification']['passed']}"
+        )
+        return result
+
+    def _retry_publish(self, options) -> dict:
+        from django.contrib.auth import get_user_model
+
+        from stable.services.p0_horse_completion_commit import retry_region_publish
+
+        region = str(options["region"] or "").strip()
+        if not region:
+            raise CommandError("--retry-publish requires --region")
+        reviewer_id = options["reviewer_id"]
+        if reviewer_id is None:
+            raise CommandError("--retry-publish requires --reviewer-id")
+        reviewer = get_user_model().objects.filter(pk=reviewer_id).first()
+        if reviewer is None or not reviewer.is_active or not reviewer.is_superuser:
+            raise CommandError("reviewer must be an active superuser")
+        result = retry_region_publish(
+            options["retry_publish"],
+            region=region,
+            reviewer=reviewer,
+        )
+        result["stage"] = "retry-publish"
+        self.stdout.write(
+            f"batch region {region} publish retried: "
+            f"published={result['auto_first_publish']['published']} "
+            f"skipped={result['auto_first_publish']['skipped_already_published']}"
         )
         return result
 

@@ -4,6 +4,18 @@ P0 马信息补全专项的模型交接文档见
 `docs/p0_horse_information_completion_handoff.md`。后续接手应从该文档进入，并以
 `docs/current_state.md` 和生产实时核验校正可能漂移的运行数据。
 
+## 2026-07-22 P0 BASIC 层自动首发专项完成本地实现（未部署）
+
+- OpenSpec change `publish-p0-horses-basic-tier` 完成 tasks `0.1-6.2`：BASIC 发布门禁
+  （只信 verified provenance）、批次 commit 复验后自动首发（含 create_new、四通道
+  审计、发布失败阻断 committed 终态 + `--retry-publish` 恢复）、存量发布命令
+  （dry-run → 批准 → 分批 commit）、前台「资料补全中」徽章。
+- plan-eng-review 2 P0 与独立 code review 3 P1 全部修复并回归；目标测试全绿，
+  完整套件与分支基线逐数一致（14F+70E，零新增）。
+- 剩余：tasks `7.1-7.4` 生产执行（分步用户授权）：部署 → 重跑已批准回填 manifest
+  补 provenance → 首个日本滚动批次（触网 prepare）→ 存量发布 japan/hong_kong →
+  恢复服务并归档评估。操作手册见 `docs/deploy_runbook.md` 顶部。
+
 ## 2026-07-22 P0 身份回填专项已完成本地实现与生产执行
 
 - OpenSpec change `enrich-p0-horse-external-identity` tasks `0.1-6.5` 全部完成：四离线
