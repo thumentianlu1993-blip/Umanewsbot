@@ -45,6 +45,45 @@
   独立核对 SHA，六 sheet 实际渲染和公式错误扫描通过。本阶段只运行导出模式，未生成 decisions、
   未运行 prepare/apply/commit，未写生产业务数据；下一门禁是人工审核并定稿工作簿。
 
+## 2026-07-24 HRN 新闻正文边界已集成最新 main，待同会话复审
+
+- 独立干净 worktree 位于
+  `/Users/mentianlu/.codex/worktrees/fix-news-body-extraction-boundaries/umanews`，分支为
+  `codex/fix-news-body-extraction-boundaries`，基线是已核对远端的
+  `origin/main@45ded0834e6517a544ad2acd600503e127bd59ef`；主工作区的其他未提交修改未被触碰。
+- 只读复现确认公开文章 `9623` 与同源 `9519` 都含 HRN ticker、登录入口和相关推荐等页面框架。
+  根因位于 `HorseRacingNationAdapter.body_selector = "article, main"`：当前 HRN 页面没有语义
+  `<article>`，真实正文位于 `.article-body`，解析器因而选中整个 `<main>`。污染随后写入
+  `body_ja_raw/body_ja_normalized`，继续进入翻译、改写与 `effective_body`；公开模板本身没有拼接来源框架。
+- 仓库已有可信正文选择、通用清理、`original_content_html` 留存、边界 fixture 和显式 ID 离线 repair
+  命令，可用于最小来源级修复；仓库没有 `9623` 的 HRN 新闻 fixture，但生产文章按模型约定应保留原始 HTML。
+- durable artifacts 已写入 `docs/changes/fix-news-body-extraction-boundaries/`。建议方案是将 HRN 收紧为
+  `.article-body` 且选择器漂移 fail-closed，并扩展只读、有界、分批的历史候选识别；不使用中文词黑名单、
+  文章 ID 特判或模板隐藏。
+- 独立方案 reviewer 首轮提出三项 finding：upsert 前阻断、历史 manifest/哈希原子绑定、Gate A 不得用既有
+  文章重复抓取验收。规格修正后由同一 reviewer 会话限定复审，三项均关闭，结论 `VERDICT: APPROVED`。
+- 审核后静态校验发现 `.codex/scripts/check_workflow_contract.py` 仍硬编码旧七阶段 marker；当前没有修改该脚本
+  或配套测试，已把测试先行同步列入待实现范围。补充 reviewer 的两项 P1（T16 GREEN 门禁与固定 `26/26`
+  inventory 策略）已修正并由同一会话复审通过，最终仍为 `VERDICT: APPROVED`。
+- 用户明确“开始实现”后，测试 subagent 先取得目标 RED；实现 subagent 已将 HRN selector 收紧至
+  `.article-body`，在国际详情 upsert 前 fail-closed，并完成只读历史扫描、manifest/hash 原子 repair 与八阶段
+  workflow checker。没有模板隐藏、中文词黑名单或文章 ID 特判。
+- 主代理整体验证：正文边界 `43/43`、抓取相邻回归 `13/13`、workflow contract `26/26`，Django check、
+  compileall 和 `git diff --check` 均通过。
+- 未参与实现的 reviewer 已实际执行原生只读 uncommitted review；内层只读、退出码 0、审前审后 fingerprint
+  逐字节一致。首轮四项 P2 涉及扫描分类/风险字段、CrawlJob 详情失败计数和旧 runbook commit 流程。
+- 测试 subagent 先为 findings 取得目标 RED；实现/operations subagent 已修复并重新取得正文 `43/43`、抓取
+  `13/13`、workflow `26/26`、Django/static 全绿。runbook 现从 dry-run 推导唯一来源并绑定精确 ID manifest/SHA。
+- 第一次限定复审关闭两项，另指出 `fail_count` 不得改变既有 duplicate 语义，以及 explicit dry-run 尚未提供
+  runbook 所列人工审查证据。第二轮 RED/修复后，详情失败改由持久 `detail_failures=N` token 记录；dry-run 直接
+  输出同一 ID 的首尾短摘要、长度/哈希、状态、有效层、人工/改写、发布时间和 QQ 数，完整回归再次全绿。
+- 旧审核版本曾获得发布授权，但发布前完整 fingerprint 因 `origin/main` 前进而漂移，门禁在 staging 前停止。
+  最新 main 集成 review 又发现 manifest 未绑定全部持久化输出这一项 P2；测试 subagent 取得有效 RED 后，
+  manifest 已升级为 v2，同时绑定标题、原始正文、标准化正文和解析元数据，legacy v1、缺字段或任一输出漂移
+  均整批拒绝。当前正文边界与相邻抓取回归 `58/58`、workflow `26/26`、Django check、compileall 和 diff check
+  全部通过。必须由同一 reviewer 会话完成限定复审，并在成功后重新取得
+  当前集成版本的发布授权。未执行生产历史扫描或生产重处理，未 commit、push、建 PR、部署或写生产。
+
 ## 2026-07-23 2026 赛历赛事中文名补齐已写入生产
 
 - 根据发布时保存的执行证据，573 场 2026 年已发布赛事已完成单事务写入：

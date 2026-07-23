@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import timedelta
 from io import StringIO
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.core.management import call_command
@@ -11,10 +13,19 @@ from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from stable.adapters.international import SponichiAdapter, SportingLifeAdapter, TDNAdapter
+from stable.adapters.base import CanonicalNewsDraft, SourceArticleDetail, SourceArticleStub
+from stable.adapters.international import (
+    HorseRacingNationAdapter,
+    SponichiAdapter,
+    SportingLifeAdapter,
+    TDNAdapter,
+)
 from stable.models import (
     ArticleTranslationStatus,
+    CrawlJob,
     NewsArticle,
+    NewsSnapshot,
+    NewsSource,
     OperationLog,
     PublishedByMode,
     PushTarget,
@@ -24,10 +35,12 @@ from stable.models import (
     SourceLanguage,
     SourceMode,
     SourceSite,
+    TaskStatus,
     WorkflowStatus,
 )
+from stable.services.sources import sync_builtin_sources
 from stable.services.translation import OpenAICompatibleTranslationProvider
-from stable.tasks import translate_article_task
+from stable.tasks import _crawl_international_source, translate_article_task
 
 
 FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "news_content_boundaries"
@@ -38,6 +51,109 @@ def fixture_html(name: str) -> str:
 
 
 class InternationalNewsContentBoundaryTests(TestCase):
+    def test_hrn_9623_extracts_only_trusted_article_body(self):
+        detail = HorseRacingNationAdapter().parse_detail_html(
+            fixture_html("hrn_9623.html"),
+            url=(
+                "https://www.horseracingnation.com/news/"
+                "Sire_profile_Pavel_is_a_surprising_summer_success_story_123"
+            ),
+        )
+
+        self.assertEqual(detail.metadata["body_parse_status"], "ok")
+        self.assertEqual(detail.metadata["body_selector"], ".article-body")
+        self.assertTrue(detail.body_ja_raw.startswith("Pavel's first runners"))
+        self.assertTrue(detail.body_ja_raw.endswith("autumn racing begins."))
+        for framework_text in (
+            "Trending",
+            "CCA Oaks analysis",
+            "Head to head",
+            "Log in",
+            "Sign up for free",
+            "By Horse Racing Nation staff",
+            "Related Pages",
+            "Top Stories",
+        ):
+            self.assertNotIn(framework_text, detail.body_ja_raw)
+
+    def test_hrn_preserves_legitimate_structure_and_same_word_facts_in_dom_order(self):
+        detail = HorseRacingNationAdapter().parse_detail_html(
+            fixture_html("hrn_9623.html"),
+            url="https://www.horseracingnation.com/news/example_123",
+        )
+        ordered_text = (
+            "Pavel's first runners",
+            "A patient route to stud",
+            "The young horses have shown speed",
+            "Three juveniles won on dirt",
+            "Two more placed on turf",
+            "Runner",
+            "Summer Promise",
+            "First",
+            "Fair odds were available before the race",
+            "owners can sign up for the yearling inspection",
+            "The next crop will be watched closely",
+        )
+
+        positions = [detail.body_ja_raw.index(text) for text in ordered_text]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_hrn_missing_trusted_container_fails_closed_without_main_fallback(self):
+        detail = HorseRacingNationAdapter().parse_detail_html(
+            """
+            <html><head><meta property="og:title" content="Layout drift"></head><body>
+              <main><div class="ticker">Trending</div><a href="/login">Log in</a></main>
+            </body></html>
+            """,
+            url="https://www.horseracingnation.com/news/layout_drift_123",
+        )
+
+        self.assertEqual(detail.body_ja_raw, "")
+        self.assertEqual(detail.body_ja_normalized, "")
+        self.assertEqual(detail.metadata["body_parse_status"], "selector_not_found")
+        self.assertEqual(detail.metadata["body_selector"], "")
+
+    def test_hrn_normal_article_counterexample_keeps_complete_first_and_last_blocks(self):
+        detail = HorseRacingNationAdapter().parse_detail_html(
+            fixture_html("hrn_normal_article.html"),
+            url="https://www.horseracingnation.com/news/autumn_campaign_123",
+        )
+
+        self.assertTrue(detail.body_ja_raw.startswith("The trainer opened the season"))
+        self.assertIn("The next target", detail.body_ja_raw)
+        self.assertIn("We will let the horse tell us", detail.body_ja_raw)
+        self.assertIn("A quiet week at the farm", detail.body_ja_raw)
+        self.assertIn("One final breeze before entry day", detail.body_ja_raw)
+        self.assertTrue(detail.body_ja_raw.endswith("full campaign remains intact."))
+
+    def test_hrn_clean_body_is_the_translation_prompt_source(self):
+        detail = HorseRacingNationAdapter().parse_detail_html(
+            fixture_html("hrn_9623.html"),
+            url="https://www.horseracingnation.com/news/example_123",
+        )
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.HORSE_RACING_NATION,
+            source_mode=SourceMode.LATEST,
+            source_article_id="hrn-translation-input",
+            racing_region=RacingRegion.UNITED_STATES,
+            source_language=SourceLanguage.ENGLISH,
+            title_ja=detail.title_ja,
+            body_ja_raw=detail.body_ja_raw,
+            body_ja_normalized=detail.body_ja_normalized,
+            original_content_html=detail.original_content_html,
+            published_at=timezone.now(),
+            source_url="https://www.horseracingnation.com/news/example_123",
+        )
+        prompt = OpenAICompatibleTranslationProvider(
+            api_key="test",
+            base_url="https://example.com/v1",
+        )._build_prompt(article, [], [])
+
+        self.assertIn("Pavel's first runners", prompt)
+        self.assertIn("The next crop will be watched closely", prompt)
+        self.assertNotIn("Related Pages", prompt)
+        self.assertNotIn("Sign up for free", prompt)
+
     def test_sponichi_extracts_component_title_and_body_without_page_shell(self):
         detail = SponichiAdapter().parse_detail_html(
             """
@@ -324,8 +440,172 @@ class InternationalNewsContentBoundaryTests(TestCase):
         self.assertIsInstance(detail.metadata["body_cleaning"]["removed_rules"], dict)
 
 
+@override_settings(AUTO_TRANSLATE_ON_INGEST=True, AUTO_TRANSLATE_SYNC=True, TERM_DISCOVERY_ENABLED=True)
+class InternationalNewsBodyParseGateTests(TestCase):
+    def setUp(self):
+        sync_builtin_sources()
+        self.source = NewsSource.objects.get(
+            source_site=SourceSite.HORSE_RACING_NATION,
+            source_mode=SourceMode.LATEST,
+        )
+
+    def _stub(self, suffix: str) -> SourceArticleStub:
+        return SourceArticleStub(
+            source_site=SourceSite.HORSE_RACING_NATION,
+            source_mode=SourceMode.LATEST,
+            source_article_id=f"hrn-{suffix}",
+            source_url=f"https://www.horseracingnation.com/news/{suffix}_123",
+            title_ja=f"HRN {suffix}",
+            published_at=timezone.now(),
+        )
+
+    def _draft(self, stub: SourceArticleStub, *, status: str, body: str) -> CanonicalNewsDraft:
+        return CanonicalNewsDraft(
+            source_site=SourceSite.HORSE_RACING_NATION,
+            source_mode=SourceMode.LATEST,
+            source_article_id=stub.source_article_id,
+            source_url=stub.source_url,
+            title_ja=stub.title_ja,
+            body_ja_raw=body,
+            body_ja_normalized=body,
+            published_at=stub.published_at,
+            images=[],
+            racing_region=RacingRegion.UNITED_STATES,
+            source_language=SourceLanguage.ENGLISH,
+            original_content_html=f"<main>{stub.source_article_id}</main>",
+            metadata={"body_parse_status": status, "body_selector": ".article-body" if status == "ok" else ""},
+        )
+
+    def test_invalid_detail_bodies_are_rejected_before_upsert_and_other_articles_continue(self):
+        selector_stub = self._stub("selector-missing")
+        empty_stub = self._stub("empty-after-cleaning")
+        good_stub = self._stub("good-body")
+        drafts = {
+            selector_stub.source_url: self._draft(selector_stub, status="selector_not_found", body=""),
+            empty_stub.source_url: self._draft(empty_stub, status="empty_after_cleaning", body=""),
+            good_stub.source_url: self._draft(good_stub, status="ok", body="A complete article body."),
+        }
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.HORSE_RACING_NATION,
+            source_mode=SourceMode.LATEST,
+            source_article_id="upsert-result",
+            racing_region=RacingRegion.UNITED_STATES,
+            source_language=SourceLanguage.ENGLISH,
+            title_ja="Good article",
+            body_ja_raw="A complete article body.",
+            body_ja_normalized="A complete article body.",
+            published_at=timezone.now(),
+            source_url=good_stub.source_url,
+        )
+
+        class FakeAdapter:
+            skipped_items = []
+            last_listing_query_errors = []
+
+            def fetch_listing(self, mode, page):
+                return [selector_stub, empty_stub, good_stub]
+
+            def fetch_detail(self, source_url):
+                draft = drafts[source_url]
+                return SourceArticleDetail(
+                    title_ja=draft.title_ja,
+                    body_ja_raw=draft.body_ja_raw,
+                    body_ja_normalized=draft.body_ja_normalized,
+                    published_at=draft.published_at,
+                    images=[],
+                    original_content_html=draft.original_content_html,
+                    metadata=draft.metadata,
+                )
+
+            def normalize_source_payload(self, stub, detail):
+                return drafts[stub.source_url]
+
+        with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {self.source.adapter_key: FakeAdapter}), patch(
+            "stable.tasks.upsert_article_from_draft", return_value=(article, True)
+        ) as upsert, patch("stable.tasks._discover_terms_after_ingest") as discover, patch(
+            "stable.tasks._auto_translate_article_after_ingest"
+        ) as translate:
+            result = _crawl_international_source(self.source)
+
+        self.assertEqual(upsert.call_count, 1)
+        self.assertEqual(discover.call_count, 1)
+        self.assertEqual(translate.call_count, 1)
+        self.assertEqual(result["new_count"], 1)
+        self.assertEqual(result["skipped_count"], 2)
+        self.assertEqual(result["source_summary"]["detail_failures"], 2)
+        job = CrawlJob.objects.get(pk=result["crawl_job_id"])
+        self.assertEqual(job.status, TaskStatus.SUCCESS)
+        self.assertEqual(
+            (job.fail_count, "detail_failures=2" in job.error_message),
+            (0, True),
+        )
+        self.assertIn("parse failed", job.error_message)
+
+    def test_invalid_repeat_detail_does_not_update_existing_article_html_metadata_or_snapshot(self):
+        bad_stub = self._stub("existing-bad")
+        good_stub = self._stub("new-good")
+        article = NewsArticle.objects.create(
+            source_site=SourceSite.HORSE_RACING_NATION,
+            source_mode=SourceMode.LATEST,
+            source_article_id=bad_stub.source_article_id,
+            racing_region=RacingRegion.UNITED_STATES,
+            source_language=SourceLanguage.ENGLISH,
+            title_ja="Original title",
+            body_ja_raw="Original clean body.",
+            body_ja_normalized="Original clean body.",
+            original_content_html="<div class='article-body'>Original clean body.</div>",
+            translation_metadata={"existing": "metadata"},
+            published_at=timezone.now(),
+            source_url=bad_stub.source_url,
+        )
+        bad_draft = self._draft(bad_stub, status="selector_not_found", body="")
+        bad_draft.original_content_html = "<main>Changed shell only</main>"
+        bad_draft.metadata["layout"] = "drifted"
+        good_draft = self._draft(good_stub, status="ok", body="New complete body.")
+        drafts = {bad_stub.source_url: bad_draft, good_stub.source_url: good_draft}
+
+        class FakeAdapter:
+            skipped_items = []
+            last_listing_query_errors = []
+
+            def fetch_listing(self, mode, page):
+                return [bad_stub, good_stub]
+
+            def fetch_detail(self, source_url):
+                draft = drafts[source_url]
+                return SourceArticleDetail(
+                    title_ja=draft.title_ja,
+                    body_ja_raw=draft.body_ja_raw,
+                    body_ja_normalized=draft.body_ja_normalized,
+                    published_at=draft.published_at,
+                    images=[],
+                    original_content_html=draft.original_content_html,
+                    metadata=draft.metadata,
+                )
+
+            def normalize_source_payload(self, stub, detail):
+                return drafts[stub.source_url]
+
+        with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {self.source.adapter_key: FakeAdapter}), patch(
+            "stable.tasks._discover_terms_after_ingest"
+        ), patch("stable.tasks._auto_translate_article_after_ingest"):
+            result = _crawl_international_source(self.source)
+
+        article.refresh_from_db()
+        self.assertEqual(article.title_ja, "Original title")
+        self.assertEqual(article.body_ja_raw, "Original clean body.")
+        self.assertEqual(article.original_content_html, "<div class='article-body'>Original clean body.</div>")
+        self.assertEqual(article.translation_metadata, {"existing": "metadata"})
+        self.assertFalse(NewsSnapshot.objects.filter(article=article).exists())
+        self.assertEqual(result["new_count"], 1)
+        self.assertEqual(result["seen_count"], 0)
+        self.assertEqual(result["skipped_count"], 1)
+
+
 class RepairArticleContentBoundariesCommandTests(TestCase):
     def setUp(self):
+        self.temp_dir = TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
         self.article = NewsArticle.objects.create(
             source_site=SourceSite.TDN,
             source_mode=SourceMode.LATEST,
@@ -348,6 +628,55 @@ class RepairArticleContentBoundariesCommandTests(TestCase):
             published_by_mode=PublishedByMode.AUTO,
         )
 
+    @staticmethod
+    def _parse_metadata_sha256(detail: SourceArticleDetail) -> str:
+        persisted_metadata = {
+            "body_parse_status": detail.metadata.get("body_parse_status", ""),
+            "body_selector": detail.metadata.get("body_selector", ""),
+            "body_cleaning": detail.metadata.get("body_cleaning", {}),
+        }
+        canonical = json.dumps(
+            persisted_metadata,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def _manifest_args(self, *articles: NewsArticle) -> tuple[str, str]:
+        rows = []
+        for article in articles:
+            article.refresh_from_db()
+            detail = TDNAdapter().parse_detail_html(article.original_content_html, url=article.source_url)
+            if article.source_site == SourceSite.SPONICHI:
+                detail = SponichiAdapter().parse_detail_html(article.original_content_html, url=article.source_url)
+            rows.append(
+                {
+                    "article_id": article.id,
+                    "decision": "repair_source_body",
+                    "updated_at": article.updated_at.isoformat(),
+                    "original_content_html_sha256": hashlib.sha256(
+                        article.original_content_html.encode("utf-8")
+                    ).hexdigest(),
+                    "before_body_sha256": hashlib.sha256(article.body_ja_raw.encode("utf-8")).hexdigest(),
+                    "after_body_sha256": hashlib.sha256(detail.body_ja_raw.encode("utf-8")).hexdigest(),
+                    "after_title_sha256": hashlib.sha256(detail.title_ja.encode("utf-8")).hexdigest(),
+                    "after_body_normalized_sha256": hashlib.sha256(
+                        detail.body_ja_normalized.encode("utf-8")
+                    ).hexdigest(),
+                    "after_parse_metadata_sha256": self._parse_metadata_sha256(detail),
+                }
+            )
+        payload = {
+            "schema_version": 2,
+            "source_site": articles[0].source_site,
+            "articles": rows,
+        }
+        path = Path(self.temp_dir.name) / "approved-manifest.json"
+        raw = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        path.write_bytes(raw)
+        return str(path), hashlib.sha256(raw).hexdigest()
+
     def test_command_requires_explicit_article_ids(self):
         with self.assertRaises(CommandError):
             call_command("repair_article_content_boundaries")
@@ -355,15 +684,64 @@ class RepairArticleContentBoundariesCommandTests(TestCase):
     def test_dry_run_reports_hashes_without_writing(self):
         before_body = self.article.body_ja_raw
         before_metadata = dict(self.article.translation_metadata)
+        expected_detail = TDNAdapter().parse_detail_html(
+            self.article.original_content_html,
+            url=self.article.source_url,
+        )
+        expected_updated_at = self.article.updated_at.isoformat()
+        expected_html_sha256 = hashlib.sha256(self.article.original_content_html.encode("utf-8")).hexdigest()
+        expected_before_body_sha256 = hashlib.sha256(before_body.encode("utf-8")).hexdigest()
+        expected_after_body_sha256 = hashlib.sha256(expected_detail.body_ja_raw.encode("utf-8")).hexdigest()
+        expected_after_title_sha256 = hashlib.sha256(expected_detail.title_ja.encode("utf-8")).hexdigest()
+        expected_after_body_normalized_sha256 = hashlib.sha256(
+            expected_detail.body_ja_normalized.encode("utf-8")
+        ).hexdigest()
+        expected_after_parse_metadata_sha256 = self._parse_metadata_sha256(expected_detail)
+        expected_effective_body_sha256 = hashlib.sha256(self.article.effective_body.encode("utf-8")).hexdigest()
+        expected_status_fields = {
+            "workflow_status": self.article.workflow_status,
+            "translation_status": self.article.translation_status,
+            "automation_status": self.article.automation_status,
+            "effective_body_layer": "manual_body_zh",
+            "effective_body_sha256": expected_effective_body_sha256,
+            "manually_edited_fields": ["title_zh", "body_zh"],
+            "has_rewrite_body": False,
+            "qq_delivery_count": 0,
+            "published_to_web_at": self.article.published_to_web_at.isoformat(),
+            "before_body_start_excerpt": before_body[:160],
+            "before_body_end_excerpt": before_body[-160:],
+            "after_body_start_excerpt": expected_detail.body_ja_raw[:160],
+            "after_body_end_excerpt": expected_detail.body_ja_raw[-160:],
+        }
+        self.assertFalse(QQPushDelivery.objects.filter(article=self.article).exists())
         out = StringIO()
 
         call_command("repair_article_content_boundaries", "--article-id", str(self.article.id), stdout=out)
 
         payload = json.loads(out.getvalue())
         self.assertEqual(payload["mode"], "dry_run")
-        self.assertEqual(payload["articles"][0]["article_id"], self.article.id)
-        self.assertEqual(payload["articles"][0]["body_parse_status"], "ok")
-        self.assertNotEqual(payload["articles"][0]["before_sha256"], payload["articles"][0]["after_sha256"])
+        row = payload["articles"][0]
+        self.assertEqual(row["article_id"], self.article.id)
+        self.assertEqual(row["body_parse_status"], "ok")
+        self.assertIn("updated_at", row)
+        self.assertEqual(row["updated_at"], expected_updated_at)
+        self.assertEqual(row["original_content_html_sha256"], expected_html_sha256)
+        self.assertEqual(row["before_body_sha256"], expected_before_body_sha256)
+        self.assertEqual(row["after_body_sha256"], expected_after_body_sha256)
+        self.assertEqual(row["after_title_sha256"], expected_after_title_sha256)
+        self.assertIn("after_body_normalized_sha256", row)
+        self.assertEqual(row["after_body_normalized_sha256"], expected_after_body_normalized_sha256)
+        self.assertIn("after_parse_metadata_sha256", row)
+        self.assertEqual(row["after_parse_metadata_sha256"], expected_after_parse_metadata_sha256)
+        self.assertNotEqual(row["before_body_sha256"], row["after_body_sha256"])
+        self.assertIn("length_delta", row)
+        self.assertEqual(row["length_delta"], row["after_length"] - row["before_length"])
+        self.assertTrue(
+            set(expected_status_fields).issubset(row),
+            f"missing dry-run audit fields: {sorted(set(expected_status_fields) - set(row))}",
+        )
+        for field_name, expected_value in expected_status_fields.items():
+            self.assertEqual(row[field_name], expected_value, field_name)
         self.article.refresh_from_db()
         self.assertEqual(self.article.body_ja_raw, before_body)
         self.assertEqual(self.article.translation_metadata, before_metadata)
@@ -375,10 +753,15 @@ class RepairArticleContentBoundariesCommandTests(TestCase):
         before_title_zh = self.article.title_zh
         before_body_zh = self.article.body_zh
 
+        manifest_path, manifest_sha256 = self._manifest_args(self.article)
         call_command(
             "repair_article_content_boundaries",
             "--article-id",
             str(self.article.id),
+            "--manifest",
+            manifest_path,
+            "--manifest-sha256",
+            manifest_sha256,
             "--commit",
             stdout=StringIO(),
         )
@@ -404,6 +787,7 @@ class RepairArticleContentBoundariesCommandTests(TestCase):
         self.assertFalse(QQPushDelivery.objects.filter(article=self.article).exists())
 
     def test_commit_rejects_selector_failure_without_partial_write(self):
+        manifest_path, manifest_sha256 = self._manifest_args(self.article)
         self.article.original_content_html = "<html><body><nav>TDN shell</nav></body></html>"
         self.article.save(update_fields=["original_content_html", "updated_at"])
         before_body = self.article.body_ja_raw
@@ -413,6 +797,10 @@ class RepairArticleContentBoundariesCommandTests(TestCase):
                 "repair_article_content_boundaries",
                 "--article-id",
                 str(self.article.id),
+                "--manifest",
+                manifest_path,
+                "--manifest-sha256",
+                manifest_sha256,
                 "--commit",
                 stdout=StringIO(),
             )
@@ -451,10 +839,15 @@ class RepairArticleContentBoundariesCommandTests(TestCase):
         )
 
         out = StringIO()
+        manifest_path, manifest_sha256 = self._manifest_args(article)
         call_command(
             "repair_article_content_boundaries",
             "--article-id",
             str(article.id),
+            "--manifest",
+            manifest_path,
+            "--manifest-sha256",
+            manifest_sha256,
             "--commit",
             stdout=out,
         )
@@ -471,6 +864,397 @@ class RepairArticleContentBoundariesCommandTests(TestCase):
             article.translation_metadata["content_boundary_repair"]["after_title"],
             "本当の見出し",
         )
+
+    def test_commit_requires_exact_manifest_file_sha_before_any_write(self):
+        manifest_path, manifest_sha256 = self._manifest_args(self.article)
+        before_body = self.article.body_ja_raw
+
+        with self.assertRaises(CommandError):
+            call_command(
+                "repair_article_content_boundaries",
+                "--article-id",
+                str(self.article.id),
+                "--manifest",
+                manifest_path,
+                "--manifest-sha256",
+                "0" * len(manifest_sha256),
+                "--commit",
+                stdout=StringIO(),
+            )
+
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.body_ja_raw, before_body)
+        self.assertFalse(OperationLog.objects.filter(action_type="article_content_boundary_repaired").exists())
+
+    def test_commit_rejects_legacy_manifest_without_all_persisted_output_hashes(self):
+        manifest_path, _manifest_sha256 = self._manifest_args(self.article)
+        path = Path(manifest_path)
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest["schema_version"] = 1
+        for row in manifest["articles"]:
+            row.pop("after_title_sha256")
+            row.pop("after_body_normalized_sha256")
+            row.pop("after_parse_metadata_sha256")
+        raw = json.dumps(manifest, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        path.write_bytes(raw)
+        legacy_sha256 = hashlib.sha256(raw).hexdigest()
+        before = (
+            self.article.title_ja,
+            self.article.body_ja_raw,
+            self.article.body_ja_normalized,
+            dict(self.article.translation_metadata),
+        )
+
+        with self.assertRaises(CommandError):
+            call_command(
+                "repair_article_content_boundaries",
+                "--article-id",
+                str(self.article.id),
+                "--manifest",
+                str(path),
+                "--manifest-sha256",
+                legacy_sha256,
+                "--commit",
+                stdout=StringIO(),
+            )
+
+        self.article.refresh_from_db()
+        self.assertEqual(
+            (
+                self.article.title_ja,
+                self.article.body_ja_raw,
+                self.article.body_ja_normalized,
+                self.article.translation_metadata,
+            ),
+            before,
+        )
+        self.assertFalse(OperationLog.objects.filter(action_type="article_content_boundary_repaired").exists())
+
+    def test_manifest_rejects_drift_in_each_persisted_parser_output(self):
+        manifest_path, manifest_sha256 = self._manifest_args(self.article)
+        before = (
+            self.article.title_ja,
+            self.article.body_ja_raw,
+            self.article.body_ja_normalized,
+            dict(self.article.translation_metadata),
+        )
+
+        def mutate_title(detail):
+            detail.title_ja = f"{detail.title_ja} changed after approval"
+
+        def mutate_normalized_body(detail):
+            detail.body_ja_normalized = f"{detail.body_ja_normalized}\nnormalized drift"
+
+        def mutate_parse_metadata(detail):
+            detail.metadata = {
+                **detail.metadata,
+                "body_selector": "span[data-review-drift='true']",
+            }
+
+        for label, mutator in (
+            ("title", mutate_title),
+            ("normalized_body", mutate_normalized_body),
+            ("parse_metadata", mutate_parse_metadata),
+        ):
+            with self.subTest(output=label):
+                class DriftedTDNAdapter:
+                    def parse_detail_html(self, html, *, url):
+                        detail = TDNAdapter().parse_detail_html(html, url=url)
+                        mutator(detail)
+                        return detail
+
+                with patch(
+                    "stable.management.commands.repair_article_content_boundaries.INTERNATIONAL_ADAPTERS",
+                    {SourceSite.TDN: DriftedTDNAdapter},
+                ), self.assertRaises(CommandError):
+                    call_command(
+                        "repair_article_content_boundaries",
+                        "--article-id",
+                        str(self.article.id),
+                        "--manifest",
+                        manifest_path,
+                        "--manifest-sha256",
+                        manifest_sha256,
+                        "--commit",
+                        stdout=StringIO(),
+                    )
+
+                self.article.refresh_from_db()
+                self.assertEqual(
+                    (
+                        self.article.title_ja,
+                        self.article.body_ja_raw,
+                        self.article.body_ja_normalized,
+                        self.article.translation_metadata,
+                    ),
+                    before,
+                )
+                self.assertFalse(
+                    OperationLog.objects.filter(action_type="article_content_boundary_repaired").exists()
+                )
+
+    def test_manifest_input_drift_rolls_back_entire_approved_batch(self):
+        second = NewsArticle.objects.create(
+            source_site=SourceSite.TDN,
+            source_mode=SourceMode.LATEST,
+            source_article_id="production-8316-second",
+            racing_region=RacingRegion.UNITED_STATES,
+            source_language=SourceLanguage.ENGLISH,
+            title_ja="Second approved article",
+            body_ja_raw="Second old body with Read Today's Paper.",
+            body_ja_normalized="Second old body with Read Today's Paper.",
+            original_content_html=fixture_html("tdn_8316.html"),
+            published_at=timezone.now(),
+            source_url="https://www.thoroughbreddailynews.com/charity-event-second/",
+        )
+        manifest_path, manifest_sha256 = self._manifest_args(self.article, second)
+        first_before = self.article.body_ja_raw
+        second.body_ja_raw = "Drift after approval."
+        second.body_ja_normalized = second.body_ja_raw
+        second.save(update_fields=["body_ja_raw", "body_ja_normalized", "updated_at"])
+
+        with self.assertRaises(CommandError):
+            call_command(
+                "repair_article_content_boundaries",
+                "--article-id",
+                str(self.article.id),
+                "--article-id",
+                str(second.id),
+                "--manifest",
+                manifest_path,
+                "--manifest-sha256",
+                manifest_sha256,
+                "--commit",
+                stdout=StringIO(),
+            )
+
+        self.article.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(self.article.body_ja_raw, first_before)
+        self.assertEqual(second.body_ja_raw, "Drift after approval.")
+        self.assertFalse(OperationLog.objects.filter(action_type="article_content_boundary_repaired").exists())
+
+
+class HorseRacingNationHistoricalBoundaryScanTests(TestCase):
+    def _article(
+        self,
+        suffix: str,
+        *,
+        html: str,
+        body: str,
+        body_zh: str = "",
+        rewrite_body_zh: str = "",
+        manually_edited_fields: list[str] | None = None,
+    ) -> NewsArticle:
+        return NewsArticle.objects.create(
+            source_site=SourceSite.HORSE_RACING_NATION,
+            source_mode=SourceMode.LATEST,
+            source_article_id=f"historical-{suffix}",
+            racing_region=RacingRegion.UNITED_STATES,
+            source_language=SourceLanguage.ENGLISH,
+            title_ja=f"Historical {suffix}",
+            body_ja_raw=body,
+            body_ja_normalized=body,
+            original_content_html=html,
+            body_zh=body_zh,
+            rewrite_body_zh=rewrite_body_zh,
+            manually_edited_fields=manually_edited_fields or [],
+            published_at=timezone.now(),
+            source_url=f"https://www.horseracingnation.com/news/historical_{suffix}_123",
+        )
+
+    def _scan(self, *, after_id: int = 0, max_id: int, limit: int = 100) -> dict:
+        out = StringIO()
+        call_command(
+            "repair_article_content_boundaries",
+            "--source-site",
+            SourceSite.HORSE_RACING_NATION,
+            "--after-id",
+            str(after_id),
+            "--max-id",
+            str(max_id),
+            "--limit",
+            str(limit),
+            stdout=out,
+        )
+        return json.loads(out.getvalue())
+
+    def test_read_only_scan_is_stably_bounded_and_reports_hashes_without_side_effects(self):
+        first = self._article("first", html=fixture_html("hrn_9623.html"), body="Polluted old body")
+        second = self._article("second", html=fixture_html("hrn_normal_article.html"), body="Another old body")
+        frozen_max_id = second.id
+        later = self._article("later", html=fixture_html("hrn_9623.html"), body="Must stay outside scope")
+        target = PushTarget.objects.create(name="Historical scan audit", group_id="hrn-scan-audit")
+        QQPushDelivery.objects.create(
+            article=first,
+            target=target,
+            status=QQPushDeliveryStatus.SENT,
+            message_id="existing-hrn-delivery",
+            sent_at=timezone.now(),
+        )
+        before = {
+            article.id: (article.updated_at, article.body_ja_raw, article.translation_metadata)
+            for article in (first, second, later)
+        }
+
+        payload = self._scan(max_id=frozen_max_id, limit=10)
+
+        self.assertEqual(payload["mode"], "scan")
+        self.assertEqual(payload["scope"]["source_site"], SourceSite.HORSE_RACING_NATION)
+        self.assertEqual(payload["scope"]["after_id"], 0)
+        self.assertEqual(payload["scope"]["max_id"], frozen_max_id)
+        self.assertEqual(payload["scope"]["limit"], 10)
+        self.assertEqual([row["article_id"] for row in payload["articles"]], [first.id, second.id])
+        rows = {row["article_id"]: row for row in payload["articles"]}
+        for row in payload["articles"]:
+            required_status_fields = {
+                "workflow_status",
+                "translation_status",
+                "automation_status",
+                "qq_delivery_count",
+                "before_length",
+                "after_length",
+                "length_delta",
+            }
+            self.assertTrue(
+                required_status_fields.issubset(row),
+                f"missing scan status fields: {sorted(required_status_fields - set(row))}",
+            )
+            self.assertRegex(row["original_content_html_sha256"], r"^[0-9a-f]{64}$")
+            self.assertRegex(row["before_body_sha256"], r"^[0-9a-f]{64}$")
+            self.assertRegex(row["after_body_sha256"], r"^[0-9a-f]{64}$")
+            self.assertRegex(row["effective_body_sha256"], r"^[0-9a-f]{64}$")
+            article = first if row["article_id"] == first.id else second
+            detail = HorseRacingNationAdapter().parse_detail_html(
+                article.original_content_html,
+                url=article.source_url,
+            )
+            self.assertEqual(row["before_length"], len(article.body_ja_raw))
+            self.assertEqual(row["after_length"], len(detail.body_ja_raw))
+            self.assertEqual(row["length_delta"], len(detail.body_ja_raw) - len(article.body_ja_raw))
+            self.assertEqual(row["workflow_status"], article.workflow_status)
+            self.assertEqual(row["translation_status"], article.translation_status)
+            self.assertEqual(row["automation_status"], article.automation_status)
+            self.assertNotIn("original_content_html", row)
+            self.assertNotIn("body_ja_raw", row)
+        self.assertEqual(rows[first.id]["qq_delivery_count"], 1)
+        self.assertEqual(rows[second.id]["qq_delivery_count"], 0)
+        for article in (first, second, later):
+            article.refresh_from_db()
+            self.assertEqual(
+                (article.updated_at, article.body_ja_raw, article.translation_metadata),
+                before[article.id],
+            )
+        self.assertFalse(OperationLog.objects.exists())
+        self.assertEqual(QQPushDelivery.objects.filter(article=first).count(), 1)
+        self.assertFalse(QQPushDelivery.objects.filter(article=second).exists())
+
+    def test_scan_accounts_for_missing_selector_changed_and_unchanged_without_dropping_scope(self):
+        missing = self._article("missing", html="", body="Old body")
+        selector_failure = self._article("selector", html="<main>Navigation only</main>", body="Old shell body")
+        empty_after_cleaning = self._article(
+            "empty",
+            html="<div class='article-body'><nav>Structured navigation only</nav></div>",
+            body="Old shell body",
+        )
+        changed = self._article("changed", html=fixture_html("hrn_9623.html"), body="Polluted old body")
+        parsed = HorseRacingNationAdapter().parse_detail_html(
+            fixture_html("hrn_normal_article.html"),
+            url="https://www.horseracingnation.com/news/historical_unchanged_123",
+        )
+        unchanged = self._article(
+            "unchanged",
+            html=fixture_html("hrn_normal_article.html"),
+            body=parsed.body_ja_raw,
+        )
+
+        payload = self._scan(max_id=unchanged.id)
+
+        self.assertEqual(
+            [row["article_id"] for row in payload["articles"]],
+            [missing.id, selector_failure.id, empty_after_cleaning.id, changed.id, unchanged.id],
+        )
+        rows = {row["article_id"]: row for row in payload["articles"]}
+        self.assertEqual(payload["counts"]["missing_original_html"], 1)
+        self.assertEqual(payload["counts"]["selector_not_found"], 1)
+        self.assertIn("empty_after_cleaning", payload["counts"])
+        self.assertEqual(payload["counts"]["empty_after_cleaning"], 1)
+        self.assertEqual(payload["counts"]["changed"], 1)
+        self.assertEqual(payload["counts"]["unchanged"], 1)
+        self.assertEqual(rows[empty_after_cleaning.id]["body_parse_status"], "empty_after_cleaning")
+        self.assertEqual(rows[empty_after_cleaning.id]["status"], "empty_after_cleaning")
+
+    def test_scan_rejects_unsupported_source_invalid_limit_and_commit_combination(self):
+        article = self._article("bounds", html=fixture_html("hrn_9623.html"), body="Old body")
+        invalid_calls = (
+            ("--source-site", SourceSite.TDN, "--after-id", "0", "--max-id", str(article.id), "--limit", "10"),
+            (
+                "--source-site",
+                SourceSite.HORSE_RACING_NATION,
+                "--after-id",
+                "0",
+                "--max-id",
+                str(article.id),
+                "--limit",
+                "0",
+            ),
+            (
+                "--source-site",
+                SourceSite.HORSE_RACING_NATION,
+                "--after-id",
+                "0",
+                "--max-id",
+                str(article.id),
+                "--limit",
+                "501",
+            ),
+            (
+                "--source-site",
+                SourceSite.HORSE_RACING_NATION,
+                "--after-id",
+                "0",
+                "--max-id",
+                str(article.id),
+                "--limit",
+                "10",
+                "--commit",
+            ),
+        )
+        for command_args in invalid_calls:
+            with self.subTest(command_args=command_args), self.assertRaises(CommandError):
+                call_command("repair_article_content_boundaries", *command_args, stdout=StringIO())
+
+        article.refresh_from_db()
+        self.assertEqual(article.body_ja_raw, "Old body")
+        self.assertFalse(OperationLog.objects.exists())
+
+    def test_scan_reports_manual_and_rewrite_effective_layers_without_overwriting_them(self):
+        manual = self._article(
+            "manual",
+            html=fixture_html("hrn_9623.html"),
+            body="Old body",
+            body_zh="人工正文",
+            manually_edited_fields=["body_zh"],
+        )
+        rewrite = self._article(
+            "rewrite",
+            html=fixture_html("hrn_9623.html"),
+            body="Old body",
+            body_zh="机器翻译",
+            rewrite_body_zh="机器改写正文",
+        )
+
+        payload = self._scan(max_id=rewrite.id)
+        rows = {row["article_id"]: row for row in payload["articles"]}
+
+        self.assertEqual(rows[manual.id]["effective_body_layer"], "manual_body_zh")
+        self.assertEqual(rows[manual.id]["manually_edited_fields"], ["body_zh"])
+        self.assertEqual(rows[rewrite.id]["effective_body_layer"], "rewrite_body_zh")
+        self.assertTrue(rows[rewrite.id]["has_rewrite_body"])
+        manual.refresh_from_db()
+        rewrite.refresh_from_db()
+        self.assertEqual(manual.body_zh, "人工正文")
+        self.assertEqual(rewrite.rewrite_body_zh, "机器改写正文")
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, AUTOMATION_ENABLED=False)

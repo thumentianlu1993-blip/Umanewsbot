@@ -77,8 +77,28 @@ class WorkflowContractTests(unittest.TestCase):
         path.write_text(path.read_text(encoding="utf-8") + value, encoding="utf-8")
 
     def test_current_contract_passes(self) -> None:
+        canonical_stages = (
+            "探索 -> spec/design -> 方案审核 -> 用户确认实现 -> 测试先行 -> "
+            "子代理实现 -> 独立 reviewer 会话 /review -> 用户授权后发布"
+        )
+        governed_workflow_files = (
+            "AGENTS.md",
+            "docs/codex_workflow.md",
+            "docs/session_bootstrap.md",
+        )
+        for relative in governed_workflow_files:
+            value = (self.repo / relative).read_text(encoding="utf-8")
+            self.assertIn(canonical_stages, value)
+
         result = self.check(success=True)
         self.assertIn("WORKFLOW_CONTRACT_OK", result.stdout)
+
+        stages_without_confirmation = canonical_stages.replace("用户确认实现 -> ", "", 1)
+        for relative in governed_workflow_files:
+            self.replace(relative, canonical_stages, stages_without_confirmation)
+            result = self.check(success=False)
+            self.assertIn("workflow", result.stderr.lower())
+            self.replace(relative, stages_without_confirmation, canonical_stages)
 
     def test_release_staging_contract_is_present(self) -> None:
         workflow = (self.repo / "docs/codex_workflow.md").read_text(encoding="utf-8")
