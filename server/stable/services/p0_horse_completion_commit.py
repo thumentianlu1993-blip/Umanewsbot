@@ -315,13 +315,35 @@ def prepare_p0_horse_batch_release_candidate(
     reviewer,
     state_dir: str | Path,
 ) -> dict[str, Any]:
+    """Serialize release preparation against commit and abandon."""
+    batch_dir = Path(manifest_path).parent
+    with batch_execution_window(batch_dir):
+        return _prepare_p0_horse_batch_release_candidate_locked(
+            manifest_path,
+            region=region,
+            reviewer=reviewer,
+            state_dir=state_dir,
+        )
+
+
+def _prepare_p0_horse_batch_release_candidate_locked(
+    manifest_path: str | Path,
+    *,
+    region: str,
+    reviewer,
+    state_dir: str | Path,
+) -> dict[str, Any]:
     """Freeze the reviewed commit plan without approval or business writes."""
     batch_dir = Path(manifest_path).parent
     combined_path = batch_dir / "artifact" / "combined_candidates.jsonl"
     with _serial_window(Path(state_dir)):
         manifest = load_batch_manifest(manifest_path)
         state = BatchRunState.read(batch_dir)
-        if state.stage == "abandoned":
+        if manifest.get("status") == "committed":
+            raise P0HorseBatchError(
+                "batch run is already committed; release preparation is forbidden"
+            )
+        if manifest.get("status") == "abandoned" or state.stage == "abandoned":
             raise P0HorseBatchError("batch run was abandoned; start a new batch")
         bundle = _region_bundle(state, region)
         combined_sha = _sha256_file(combined_path)

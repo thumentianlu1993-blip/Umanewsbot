@@ -266,3 +266,10 @@ candidate SHA，并生成反向绑定该 SHA 的正式 release manifest；candid
 - **AND** 只有唯一且精确匹配 batch、region、artifact、发布计数、published IDs 与冻结排除集合的 v2 `auto_first_publish` 成功事件存在时，系统 SHALL 返回冻结 commit/publish 结果
 - **AND** 该重放 SHALL 对 completion run、source、audit、task log、业务表、state 与 ledger 零写入
 - **AND** 证据缺失、重复或不匹配时系统 MUST fail closed 并要求人工审计，不得尝试修补 checkpoint 或重跑 apply/publish
+
+#### Scenario: direct prepare-release 与 commit 或 abandon 并发
+
+- **WHEN** direct service caller 在同 batch commit 的数据库执行窗口或 abandon execution window 尚未退出时调用 `prepare-release`
+- **THEN** prepare-release service SHALL 先取得同 batch execution lock，再按 `execution -> state` 顺序取得 serial lock
+- **AND** 获锁后系统 SHALL 重新读取 state 与 manifest，不得使用等待前的终态判断
+- **AND** commit 已完成或 batch 已 abandoned 时系统 MUST 在生成 candidate、更新 state 或追加 ledger 前 fail closed

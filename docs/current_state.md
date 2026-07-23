@@ -1,5 +1,16 @@
 # 当前状态
 
+## 2026-07-24 第二轮 fresh review P2 已完成本地返修（待复审）
+
+- prepare-release 的 public service 入口现直接取得同 batch execution lock，再进入既有 state serial
+  lock；direct service caller 不再能绕过 command 并发边界。
+- 获锁后重新读取 manifest/state；commit 已完成或 batch 已 abandoned 时，在 candidate/state/ledger
+  写入前 fail closed。双线程覆盖 commit DB window 与 abandon window，均验证等待完整退出和零额外
+  证据写入。
+- 两项线程测试在继承集合共执行 4 项，P0 三模块 SQLite 禁网回归 `270/270` 通过。
+- 当前仍是本地未提交差异，未触网、未 push、未部署，也未执行生产 task 5.3/5.4；需再次
+  fresh read-only review。
+
 ## 2026-07-24 fresh review P1/P2 已完成本地返修（待复审）
 
 - `prepare` 现与同批正式 commit 共享 execution lock，锁顺序保持 `execution -> state`；commit

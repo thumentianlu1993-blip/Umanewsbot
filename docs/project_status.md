@@ -1,5 +1,13 @@
 # 项目状态文档
 
+## 2026-07-24 P0 prepare-release service 并发边界返修完成
+
+- prepare-release service 已补齐 `execution -> state` 锁顺序，锁内复读 manifest/state；direct caller
+  与 command caller 现在共享同一 commit/abandon 串行边界。
+- commit 或 abandon 完成后，等待中的 prepare-release 零写拒绝。新增 commit DB window 与
+  abandon window 两项线程时序测试；P0 三模块 `270/270` 通过。
+- 变更尚未提交、推送或部署，生产授权范围未扩大，仍需 fresh read-only review。
+
 ## 2026-07-24 P0 completed 重放证据链返修完成
 
 - prepare/commit 同批竞态已由共享 execution lock 关闭；completed commit 重放改为在任何

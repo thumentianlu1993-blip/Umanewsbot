@@ -533,3 +533,24 @@ GREEN：
 - focused 3 项通过；SQLite/Celery eager 禁网的
   `stable.test_horse_profile_publish + stable.test_p0_horse_production_apply +
   stable.test_p0_horse_completion_batch` 为 `266/266`，未访问生产。
+
+## 第二轮 fresh review 返修证据（task 4.10l）
+
+RED：
+
+- `prepare-release` 的 command 入口没有 execution lock，public service 也只取得 state serial
+  lock。direct service caller 可在同 batch commit 的 DB 窗口内进入 candidate 生成路径。
+- abandon 已更新 state/manifest、但仍持 execution lock 时，direct prepare-release 会提前读取终态
+  并返回，而不是等待完整 execution window 退出。
+
+GREEN：
+
+- public `prepare_p0_horse_batch_release_candidate` 先取得同 batch execution lock，再调用 locked
+  helper 进入既有 state serial lock；command 和 direct caller 使用同一边界。
+- helper 在两层锁内重新加载 manifest/state；manifest committed 或 manifest/state abandoned 时，
+  在 candidate/state/ledger 写入前 fail closed。
+- commit DB-window 与 abandon post-body 双线程测试均确认 prepare-release 等待 A 完整退出；随后
+  分别以 committed/abandoned 拒绝，candidate 文件、A 完成后的 state 与 ledger bytes 不变。
+- 两项线程测试在 pipeline 基类及 auto-publish 子类继承集合共执行 4 项，全部通过；SQLite/Celery
+  eager 禁网的 P0 三模块为 `270/270`。Django、迁移、OpenSpec 与 diff 门禁见本轮验证记录；
+  未访问生产。

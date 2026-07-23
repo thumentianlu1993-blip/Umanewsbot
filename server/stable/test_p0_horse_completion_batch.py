@@ -3444,6 +3444,341 @@ class P0HorseBatchCommandPipelineTests(P0HorseBatchPrepareTests):
                 second.result(timeout=5)
         self.assertEqual(order, ["a" * 64, "b" * 64])
 
+    def test_prepare_release_waits_for_commit_db_window_then_rejects_committed(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from contextlib import contextmanager
+        from threading import Event, get_ident
+        from unittest import mock
+
+        from stable.services import p0_horse_completion_commit as commit_module
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            P0HorseBatchError,
+        )
+
+        self._call(
+            "--prepare",
+            str(self.manifest_path),
+            "--expected-sha256",
+            self.approved["batch_sha256"],
+        )
+        self._call(
+            "--bundle",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        candidate = self._prepare_release_candidate()
+        batch_dir = self.manifest_path.parent
+        ledger_path = batch_dir / "approvals_ledger.jsonl"
+        candidate_state = BatchRunState.read(batch_dir)
+        candidate_history = candidate_state.artifacts[
+            "release_candidate:japan:"
+            + candidate["release_candidate_sha256"]
+        ]
+        frozen_artifact = json.loads(
+            Path(candidate_history["artifact_path"]).read_text(
+                encoding="utf-8"
+            )
+        )
+        frozen_publish_scope = json.loads(
+            Path(candidate["release_candidate_path"]).read_text(
+                encoding="utf-8"
+            )
+        )["auto_first_publish_scope"]
+        db_window_entered = Event()
+        release_db_window = Event()
+        commit_body_finished = Event()
+        release_execution_window = Event()
+        prepare_started = Event()
+        prepare_reached_bundle = Event()
+        prepare_finished = Event()
+        commit_thread_id = {"value": None}
+        real_execution_window = commit_module.batch_execution_window
+
+        @contextmanager
+        def controlled_execution_window(path):
+            with real_execution_window(path):
+                try:
+                    yield
+                finally:
+                    if (
+                        get_ident() == commit_thread_id["value"]
+                        and db_window_entered.is_set()
+                    ):
+                        commit_body_finished.set()
+                        self.assertTrue(
+                            release_execution_window.wait(timeout=5)
+                        )
+
+        zero_report = {
+            "planned_profile_creates": 0,
+            "planned_profile_updates": 0,
+            "planned_race_record_creates": 0,
+            "planned_race_record_updates": 0,
+            "planned_module_audits": 0,
+        }
+
+        def controlled_db_commit(**_kwargs):
+            db_window_entered.set()
+            self.assertTrue(release_db_window.wait(timeout=5))
+            return {"status": "committed"}
+
+        def controlled_publish(
+            _manifest,
+            *,
+            batch_dir,
+            state_dir,
+            region,
+            **_kwargs,
+        ):
+            report = {
+                "published": 0,
+                "skipped_already_published": 0,
+                "blocked": 0,
+                "blocked_reasons": {},
+                "published_profile_ids": [],
+                "errors": [],
+                "profile_ids": [],
+                "frozen_exclusions": [],
+                "frozen_exclusion_counts": {},
+            }
+            with commit_module._serial_window(state_dir):
+                state = BatchRunState.read(batch_dir)
+                stage = f"publish:{region}"
+                state.artifacts[stage] = report
+                if stage not in state.completed_stages:
+                    state.completed_stages.append(stage)
+                state.write()
+            return report
+
+        def reject_if_prepare_crosses_execution_boundary(state, region):
+            prepare_reached_bundle.set()
+            raise P0HorseBatchError(
+                "prepare-release entered before commit execution exited"
+            )
+
+        def run_commit():
+            commit_thread_id["value"] = get_ident()
+            return commit_module.commit_p0_horse_batch_region(
+                self.manifest_path,
+                region="japan",
+                reviewer=self.reviewer,
+                approved_by="human-approver",
+                release_candidate_sha256=candidate[
+                    "release_candidate_sha256"
+                ],
+                state_dir=self.state_dir,
+                confirm_reviewed_artifact=True,
+            )
+
+        def run_prepare_release():
+            prepare_started.set()
+            try:
+                return commit_module.prepare_p0_horse_batch_release_candidate(
+                    self.manifest_path,
+                    region="japan",
+                    reviewer=self.reviewer,
+                    state_dir=self.state_dir,
+                )
+            finally:
+                prepare_finished.set()
+
+        completion_runs = mock.Mock()
+        completion_runs.order_by.return_value.first.return_value = None
+        with mock.patch.object(
+            commit_module,
+            "batch_execution_window",
+            side_effect=controlled_execution_window,
+        ), mock.patch.object(
+            commit_module,
+            "prepare_reviewed_p0_completion_artifact",
+            return_value=frozen_artifact,
+        ), mock.patch.object(
+            commit_module,
+            "_build_auto_first_publish_scope",
+            return_value=frozen_publish_scope,
+        ), mock.patch.object(
+            commit_module,
+            "_artifact_was_committed",
+            return_value=False,
+        ), mock.patch.object(
+            commit_module,
+            "dry_run_reviewed_p0_completion_artifact",
+            return_value=zero_report,
+        ), mock.patch.object(
+            commit_module,
+            "commit_reviewed_p0_completion_artifact",
+            side_effect=controlled_db_commit,
+        ), mock.patch.object(
+            commit_module,
+            "_run_region_publish",
+            side_effect=controlled_publish,
+        ), mock.patch.object(
+            commit_module,
+            "_region_bundle",
+            side_effect=reject_if_prepare_crosses_execution_boundary,
+        ), mock.patch(
+            "stable.models.HorseProfileCompletionRun.objects.filter",
+            return_value=completion_runs,
+        ):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                committing = executor.submit(run_commit)
+                if not db_window_entered.wait(timeout=5):
+                    release_execution_window.set()
+                    committing.result(timeout=5)
+                    self.fail("commit did not reach database window")
+                preparing = executor.submit(run_prepare_release)
+                self.assertTrue(prepare_started.wait(timeout=5))
+                crossed_during_db = prepare_reached_bundle.wait(timeout=0.2)
+                release_db_window.set()
+                self.assertTrue(commit_body_finished.wait(timeout=5))
+                finished_before_commit_exit = prepare_finished.is_set()
+                state_after_commit = (batch_dir / "state.json").read_bytes()
+                ledger_after_commit = ledger_path.read_bytes()
+                candidate_after_commit = {
+                    path.name: path.read_bytes()
+                    for path in (batch_dir / "approval").glob(
+                        "release_candidate_japan_*.json"
+                    )
+                }
+                release_execution_window.set()
+                committing.result(timeout=5)
+                with self.assertRaisesRegex(P0HorseBatchError, "committed"):
+                    preparing.result(timeout=5)
+
+        self.assertFalse(crossed_during_db)
+        self.assertFalse(finished_before_commit_exit)
+        self.assertEqual((batch_dir / "state.json").read_bytes(), state_after_commit)
+        self.assertEqual(ledger_path.read_bytes(), ledger_after_commit)
+        self.assertEqual(
+            {
+                path.name: path.read_bytes()
+                for path in (batch_dir / "approval").glob(
+                    "release_candidate_japan_*.json"
+                )
+            },
+            candidate_after_commit,
+        )
+
+    def test_prepare_release_waits_for_abandon_exit_then_rejects_without_mutation(
+        self,
+    ):
+        from concurrent.futures import ThreadPoolExecutor
+        from contextlib import contextmanager
+        from threading import Event, get_ident
+        from unittest import mock
+
+        from stable.services import (
+            p0_horse_completion_batch as batch_module,
+            p0_horse_completion_commit as commit_module,
+        )
+        from stable.services.p0_horse_completion_batch import P0HorseBatchError
+
+        self._call(
+            "--prepare",
+            str(self.manifest_path),
+            "--expected-sha256",
+            self.approved["batch_sha256"],
+        )
+        self._call(
+            "--bundle",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        self._prepare_release_candidate()
+        batch_dir = self.manifest_path.parent
+        ledger_path = batch_dir / "approvals_ledger.jsonl"
+        abandon_body_finished = Event()
+        release_abandon_execution = Event()
+        prepare_started = Event()
+        prepare_finished = Event()
+        abandon_thread_id = {"value": None}
+        real_execution_window = batch_module.batch_execution_window
+
+        @contextmanager
+        def controlled_abandon_execution(path):
+            with real_execution_window(path):
+                try:
+                    yield
+                finally:
+                    if get_ident() == abandon_thread_id["value"]:
+                        abandon_body_finished.set()
+                        self.assertTrue(
+                            release_abandon_execution.wait(timeout=5)
+                        )
+
+        def run_abandon():
+            abandon_thread_id["value"] = get_ident()
+            return self._call(
+                "--abandon",
+                str(self.manifest_path),
+                "--note",
+                "prepare-release 并发终止测试",
+            )
+
+        def run_prepare_release():
+            prepare_started.set()
+            try:
+                return commit_module.prepare_p0_horse_batch_release_candidate(
+                    self.manifest_path,
+                    region="japan",
+                    reviewer=self.reviewer,
+                    state_dir=self.state_dir,
+                )
+            finally:
+                prepare_finished.set()
+
+        with mock.patch.object(
+            batch_module,
+            "batch_execution_window",
+            side_effect=controlled_abandon_execution,
+        ), mock.patch.object(
+            batch_module,
+            "ensure_batch_can_be_abandoned",
+            return_value=None,
+        ):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                abandoning = executor.submit(run_abandon)
+                self.assertTrue(abandon_body_finished.wait(timeout=5))
+                state_after_abandon = (batch_dir / "state.json").read_bytes()
+                manifest_after_abandon = self.manifest_path.read_bytes()
+                ledger_after_abandon = ledger_path.read_bytes()
+                candidate_after_abandon = {
+                    path.name: path.read_bytes()
+                    for path in (batch_dir / "approval").glob(
+                        "release_candidate_japan_*.json"
+                    )
+                }
+                preparing = executor.submit(run_prepare_release)
+                self.assertTrue(prepare_started.wait(timeout=5))
+                finished_before_abandon_exit = prepare_finished.wait(
+                    timeout=0.2
+                )
+                release_abandon_execution.set()
+                abandoning.result(timeout=5)
+                with self.assertRaisesRegex(P0HorseBatchError, "abandoned"):
+                    preparing.result(timeout=5)
+
+        self.assertFalse(finished_before_abandon_exit)
+        self.assertEqual((batch_dir / "state.json").read_bytes(), state_after_abandon)
+        self.assertEqual(self.manifest_path.read_bytes(), manifest_after_abandon)
+        self.assertEqual(ledger_path.read_bytes(), ledger_after_abandon)
+        self.assertEqual(
+            {
+                path.name: path.read_bytes()
+                for path in (batch_dir / "approval").glob(
+                    "release_candidate_japan_*.json"
+                )
+            },
+            candidate_after_abandon,
+        )
+
     def test_abandon_waits_for_execution_window_then_stops_batch(self):
         from concurrent.futures import ThreadPoolExecutor
         from threading import Event

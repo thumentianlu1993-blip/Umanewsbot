@@ -1,5 +1,14 @@
 # 部署运行手册
 
+## P0 prepare-release 并发排障补充
+
+- `prepare-release` 无论从 command 还是 public service 调用，都必须先取得 batch execution lock，
+  再取得 state serial lock。不得以 direct service、临时 shell 或脚本绕过此顺序。
+- 若同 batch commit 或 abandon 正在执行，prepare-release 会等待完整 execution window 退出，并在
+  获锁后复读 manifest/state。终态为 committed 或 abandoned 时应零写拒绝。
+- 排障时保留 lock 文件、candidate 目录、state 和 ledger；不得删除 lock、并行重跑或手工修改
+  终态证据。异常拒绝后应核对 candidate 文件集合及 state/ledger bytes 未被该调用改变。
+
 ## P0 completed commit 重放核验补充
 
 - task 5.4 成功后如需普通重复 commit，必须确认 candidate、artifact、release、commit/publish

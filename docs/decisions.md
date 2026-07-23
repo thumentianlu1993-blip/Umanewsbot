@@ -27,6 +27,9 @@
   发布恢复入口。
 - `prepare` 也属于同 batch execution window；锁顺序固定为 `execution -> state`，不得让 commit
   在 prepare 的 artifact、workbook 或 checkpoint 更新中途读取证据。
+- prepare-release 的锁合同必须位于 public service，而不能只依赖 management command。所有 direct
+  caller 先取得同 batch execution lock，再进入 state serial lock；等待后必须复读 manifest/state。
+  committed 或 abandoned 终态只允许零写拒绝，不得生成新 candidate 或补写 state/ledger。
 - completed 重放不是仅凭 state checkpoint 的快捷返回。它必须在任何 dry-run/DB apply/publish 前
   复验冻结 candidate、artifact/release、commit/publish checkpoint、committed completion run，
   并要求唯一精确匹配的 v2 `auto_first_publish` 成功账本事件。证据缺失、重复或报告计数/ID/
