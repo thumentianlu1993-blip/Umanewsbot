@@ -59,7 +59,7 @@
 
 - [x] 5.1 (operations) 取得受审精确版本授权后执行备份与部署，只验证代码 HEAD、镜像、Django check、容器/Nginx/healthz；默认保持 `ALLOW_NETWORK=false`，本步不触网、不写马匹资料。
 - [x] 5.2 (operations) 取得该版本触网授权后，以 revision label 固定的精确一次性镜像重新 select/approve 日本批次并 prepare 到 xlsx；生产 `.env` 与在线四应用保持 `ALLOW_NETWORK=false`，仅一次性 prepare 容器覆盖 true，退出即撤销。验收 `unexpected_adapter_error=0`、已支持结构系统性 blocker=0，剩余失败字段级报告；不 bundle、不 commit、不自动公开，并核验容器退出、在线 env/日志/healthz 与马匹计数不变。
-- [ ] 5.3 (operations) 用户人工复审 xlsx 后生成仅含通过完整子集的 bundle 与 release candidate，冻结 candidate SHA、全部 bundle/artifact bindings、预计写入与自动首发范围；本步不写生产数据库、不公开、不产生 `release_approved`。
+- [x] 5.3 (operations) 用户人工复审 xlsx 后生成仅含通过完整子集的 bundle 与 release candidate，冻结 candidate SHA、全部 bundle/artifact bindings、预计写入与自动首发范围；本步不写生产数据库、不公开、不产生 `release_approved`。
 - [ ] 5.4 (operations) 用户针对 5.3 的精确 release-candidate SHA、完整子集、预计写入和自动首发范围重新授权后，执行带 `--release-candidate-sha256` 的 commit `--confirm-reviewed-artifact`；正式 release manifest 反向绑定 candidate SHA，核验幂等复验、auto_first_publish、OperationLog、`/horses/?region=japan` 新马与徽章（闭环 `publish-p0-horses-basic-tier` task 7.2）。
 - [ ] 5.5 (operations) commit/自动首发成功或中止后重复终验安全态：确认 `ALLOW_NETWORK=false`、worker/beat/race_live_worker 正常，容器 env、日志、healthz 与 `/horses/` 200。
 - [ ] 5.6 (operations) 复核 netkeiba 访问条款与限速合规记录；状态文档更新、主规格同步与两个 change 的归档评估。

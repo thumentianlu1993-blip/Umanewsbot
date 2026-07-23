@@ -1,5 +1,25 @@
 # 部署运行手册
 
+## task 5.3 生产执行记录（2026-07-24）
+
+- 精确版本：`4972a6b2eb35167d5783f5c37908b8b3d190160d`；部署镜像：
+  `sha256:eed9a3d3b4116644488e85929f475fa06a1072c30f40502b96b62a644fff8ea8`。
+  `deploy_lowcost.sh` 不会自动重建 `race_live_worker`，本次按既有要求额外执行
+  `docker compose -f docker-compose.prod.lowcost.yml up -d --no-deps --force-recreate
+  race_live_worker`，最终四应用镜像一致。
+- 恢复点：`.env.backup.pre-p0-task53-20260723T201151Z`；
+  `backups/db/pre-p0-task53-20260723T201151Z.dump`（238,713,659 bytes，SHA-256
+  `341210bceff05064c1828914338aa82dc166773a605a3154cc54547f7f2522d8`）；
+  `umanewsbot:rollback-pre-p0-task53-20260723T201151Z`。
+- 持久化批次必须使用容器绝对路径
+  `/app/runtime/horse_profile_completion/batches/p0batch-20b59bda0608/batch_manifest.json`。
+  `/app/server/runtime` 在当前镜像中不是该宿主挂载点；相对 `runtime/...` 会在任何写入前报
+  combined candidates unreadable，不得以复制文件绕过，应改用上述已绑定的绝对路径。
+- bundle 为 61 匹；candidate/artifact SHA 分别为
+  `8ef0f718803f7772db5b498925a71651e5c68cb331aeafa50f03dc831f8848fe` /
+  `1abbf475927c1e4391ab1ce851b3cd28958da2ec65641c28ec4f49e9608c4894`。
+  重复 prepare-release SHA 不变且账本不增长。当前不得执行 commit；task 5.4 需新授权。
+
 ## P0 prepare-release 并发排障补充
 
 - `prepare-release` 无论从 command 还是 public service 调用，都必须先取得 batch execution lock，

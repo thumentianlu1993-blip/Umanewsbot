@@ -1,5 +1,37 @@
 # 当前状态
 
+## 2026-07-24 task 5.3 已在生产无写入完成，停在精确候选授权门禁
+
+- 最终集成版本 `4972a6b2eb35167d5783f5c37908b8b3d190160d` 经原生只读 full review
+  `APPROVED`（P0/P1/P2=`0/0/0`，session
+  `019f9095-2025-7a80-96be-b50800b18d82`）后推送并部署。生产四个应用服务统一运行镜像
+  `sha256:eed9a3d3b4116644488e85929f475fa06a1072c30f40502b96b62a644fff8ea8`，
+  宿主与四容器 `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`；Django check、迁移、HTTP
+  healthz、首页和马匹列表通过。
+- 部署前恢复点为 `.env.backup.pre-p0-task53-20260723T201151Z`（SHA-256
+  `dee182cb5b35194c3f3661e94119c36e63dc684d9fff992517d872fc50167d0a`）和
+  `backups/db/pre-p0-task53-20260723T201151Z.dump`（238,713,659 bytes、SHA-256
+  `341210bceff05064c1828914338aa82dc166773a605a3154cc54547f7f2522d8`，容器内
+  `pg_restore -l` 通过）；回滚镜像标签为
+  `umanewsbot:rollback-pre-p0-task53-20260723T201151Z`。
+- `p0batch-20b59bda0608` 的 bundle 精确包含 61 匹，research/mapping/authority SHA 分别为
+  `1afce80f871cc703e0527113bc4f33db06766770029ebf380444b77108fb115b`、
+  `e96c8aa9a2fa965f9cc18b0b5931bc47af48f882d8c3833ef9b35a2fe414e826`、
+  `759ac2dcdcbff1c22f62424f7c6167c417ae99d9d669c14a0ef0fa38ab1f7bdb`。
+  39 个 blocker 与 artifact 交集为 0。
+- release candidate SHA 为
+  `8ef0f718803f7772db5b498925a71651e5c68cb331aeafa50f03dc831f8848fe`，commit artifact
+  SHA 为 `1abbf475927c1e4391ab1ce851b3cd28958da2ec65641c28ec4f49e9608c4894`。
+  预计动作是 61 profile updates、1,490 race record creates、61 P0 source upserts、244
+  module audits；不创建 profile。61 匹当前均已 published，因此冻结 scope 为
+  `61 skip_already_published / 0 attempt_publish / 0 create_new`。
+- 重复 prepare-release 的 candidate 文件字节与 SHA 不变，账本行数保持 3，
+  `release_candidate_prepared=1`、`release_approved=0`，未生成 v2 release manifest。
+  HorseProfile `46318`、Japan `11642`、published `2797`、Japan published `2463`、
+  HorseP0Source `57332`、HorseRaceRecord `1460`、HorseProfileCompletionRun `1`、
+  OperationLog `59362` 均未变化。task 5.3 已完成并立即停步；task 5.4 必须由用户针对上述
+  candidate SHA、预计写入和零新增公开范围重新明确授权。
+
 ## 2026-07-24 第二轮 fresh review P2 已完成本地返修（待复审）
 
 - prepare-release 的 public service 入口现直接取得同 batch execution lock，再进入既有 state serial

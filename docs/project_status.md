@@ -1,5 +1,16 @@
 # 项目状态文档
 
+## 2026-07-24 P0 task 5.3 生产候选已冻结
+
+- `main@4972a6b2` 已部署，四个应用服务同镜像且马匹网络开关全部为 false。
+- 已审核的 61 匹生成 release candidate
+  `8ef0f718803f7772db5b498925a71651e5c68cb331aeafa50f03dc831f8848fe`；
+  39 个 blocker 零命中。预计更新 61 份 profile、创建 1,490 条履历、upsert 61 条 P0 source、
+  写 244 条 module audit。
+- 61 匹当前均已公开，冻结自动首发范围为 0。重复 prepare-release SHA 不变、账本不重复；
+  马匹业务表、OperationLog 和公开计数不变，未产生批准或正式 release manifest。
+- 当前停在 task 5.4 前。任何数据库 commit 都必须取得针对该 candidate SHA 的新授权。
+
 ## 2026-07-24 P0 prepare-release service 并发边界返修完成
 
 - prepare-release service 已补齐 `execution -> state` 锁顺序，锁内复读 manifest/state；direct caller
