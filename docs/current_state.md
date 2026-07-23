@@ -1,5 +1,40 @@
 # 当前状态
 
+## 2026-07-23 task 5.2 精确版本 v3 触网 prepare 已通过解析验收
+
+- 用户授权的不可变版本为 `5eec316f073a3107d2887f724e95762f76f27ae2`。执行前发现生产
+  `main/HEAD=17d7757aec764755394339400eb2523eae896fa5` 已包含另一条并行发布分支，和目标提交
+  同源于 `d64c6926` 但互不为祖先。为避免回退已上线功能或用 merge commit 冒充精确版本，
+  本轮不移动生产 HEAD、不重建在线服务；服务器从目标 Git tree
+  `28a46542768fd8441dbfbd3a29ab0f67ccbd43d5` 构建一次性镜像
+  `sha256:e543065ce08033b9d1b871478a85141c8b728334ec662bf6ea17fd2dcb1323f9`，镜像 revision
+  label 固定为完整目标提交。select/approve/validate/prepare 均由该镜像执行。
+- 本轮恢复点为 `.env.backup.pre-p0-v3-task52-20260723T024436Z`（SHA-256
+  `dee182cb5b35194c3f3661e94119c36e63dc684d9fff992517d872fc50167d0a`）和
+  `backups/db/pre-p0-v3-task52-20260723T024436Z.dump`（`234645581` bytes、SHA-256
+  `d43de53684a430da403c1d5b5d224dd21c8194e0ef9ad95f03f8f0ca0077dce0`、
+  `pg_restore -l` 1018 项）；回滚镜像标签为
+  `umanewsbot:rollback-pre-p0-v3-task52-20260723T024436Z`。
+- 新批 `p0batch-20b59bda0608` 为 Japan 100/100；profile ID、candidate key 均 100 个唯一值，
+  100/100 各有且仅有一个数字型 `netkeiba:{id}` 和一致的 Netkeiba URL。`mentianlu` 审核批准后
+  manifest SHA-256 为 `51ac349ebd45848abb89c9f29545e695a760d245e09e72fcecc0de4bfaefa44f`，
+  validate 通过。
+- prepare 由精确镜像中的 `netkeiba-parser.v3` 执行，100 个 checkpoint/staging 均成功，
+  300 次网络请求、缓存命中 0、8 秒 host interval。最终 61/100 完整、39/100 blocker：
+  32 个候选缺 `expected_sire_name/expected_dam_name/expected_birth_year`，6 个来源履历行缺核心证据
+  而以 `partial_career` fail closed，1 个为官方 51 场、采集 50 场的生涯缺口。
+  `unexpected_adapter_error=0`；`netkeiba_profile_structure`、`title_status`、`title_sex`、
+  `title_color` 均为 0，说明 v3 针对合法省略状态的系统性误判已消除。
+- 审核工作簿为
+  `runtime/horse_profile_completion/review/p0batch-20b59bda0608.xlsx`（18379 bytes、SHA-256
+  `bee158e6d70c099c550102df6f9221b2d6bbb5fb75697d50a06d6d87b61cbc9f`）。本轮未运行 bundle、
+  commit 或自动首发，马匹数据库计数保持总计 46318、日本 11642、公开 2797、日本公开 2463。
+- prepare 结束后一次性联网容器已自动删除；宿主 `.env` 及 web/worker/beat/race_live_worker
+  均仍为 `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`，HTTP healthz 通过。在线生产保持
+  `HEAD=17d7757a`、parser v2；web/worker/beat 使用镜像 `sha256:5a3dd28b...`，
+  `race_live_worker` 仍使用先前镜像 `sha256:07f46301...`。该镜像差异早于且独立于本次一次性
+  task 5.2 执行，本轮未擅自重建并行发布服务，需由对应发布线单独核对。
+
 ## 2026-07-23 2026 赛历赛事中文名补齐已写入生产
 
 - 根据发布时保存的执行证据，573 场 2026 年已发布赛事已完成单事务写入：

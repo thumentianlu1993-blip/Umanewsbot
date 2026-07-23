@@ -1,5 +1,15 @@
 # 关键决策
 
+## 2026-07-23 task 5.2 分叉生产线执行决定
+
+- 本次已批准 task 提交与生产 HEAD 从共同父提交分叉：切换会回退并行已上线功能，合并会产生
+  未获本次精确授权的新 SHA。为同时保住生产运行态和授权对象，本次只把目标 Git tree 构建为带
+  完整 revision label 的一次性任务镜像，未替换在线 web/worker/beat/race_live_worker。
+- 本次网络权限缩到一次性 prepare 容器：生产 `.env` 和在线应用保持 false，仅该容器覆盖 true。
+  容器退出后确认其已不存在、四应用 false，生产 HEAD、马匹计数和 healthz 均未变化。
+- 本次一次性执行仅完成 task 5.2 的 prepare/xlsx，不是公网应用版本切换，也没有扩大数据写入
+  授权；未执行 bundle、commit 或自动首发。后续动作仍受既有精确 artifact/hash 授权边界约束。
+
 ## 2026-07-23 netkeiba 解析版本、旧批处置与生产授权拆分
 
 - 会改变 canonical payload 的 netkeiba 解析规则必须递增显式 parser version；版本同时

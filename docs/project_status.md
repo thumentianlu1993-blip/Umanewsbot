@@ -1,5 +1,22 @@
 # 项目状态文档
 
+## 2026-07-23 task 5.2 v3 精确触网验收完成
+
+- 受审提交 `5eec316f073a3107d2887f724e95762f76f27ae2` 与当前生产
+  `17d7757aec764755394339400eb2523eae896fa5` 已分叉。本轮以 revision label 固定的独立镜像
+  `sha256:e543065ce08033b9d1b871478a85141c8b728334ec662bf6ea17fd2dcb1323f9` 执行批任务，
+  未切换生产 HEAD、未重建在线服务。
+- `p0batch-20b59bda0608` 通过 Japan 100/100 Netkeiba 唯一身份审核，批准 SHA 为
+  `51ac349ebd45848abb89c9f29545e695a760d245e09e72fcecc0de4bfaefa44f`。prepare 发出 300 次
+  8 秒节流请求，结果 61 完整、39 blocker：32 个候选身份期望字段不全、6 个来源履历证据不足、
+  1 个生涯场次缺口。
+- v3 核心验收通过：`unexpected_adapter_error=0`，旧误判
+  `netkeiba_profile_structure/title_status/title_sex/title_color=0`。xlsx SHA-256 为
+  `bee158e6d70c099c550102df6f9221b2d6bbb5fb75697d50a06d6d87b61cbc9f`。
+- 未 bundle、未 commit、未自动发布，公开马保持 2797（日本 2463）。一次性联网容器已删除，
+  宿主和四个在线应用的网络开关均为 false，healthz 通过。后续仍需人工审核 xlsx；任何 bundle、
+  数据库 commit 或自动首发都必须绑定新 artifact/hash 再单独授权。
+
 ## 2026-07-23 2026 赛历赛事中文名补齐已发布
 
 - 发布时执行证据记录：573 场 2026 年已发布赛事的中文名已单事务写入，

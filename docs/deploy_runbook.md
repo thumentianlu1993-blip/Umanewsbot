@@ -1,5 +1,26 @@
 # 部署运行手册
 
+## task 5.2 精确提交一次性联网执行记录（2026-07-23）
+
+- 本次执行前，受审目标 `5eec316f...` 与生产 HEAD 已从共同父提交分叉。强制切换会回退并行
+  已上线功能，合并则会产生不同于授权对象的新 SHA，因此本次没有改动生产分支。服务器通过
+  `git archive <target>` 导出精确 tree，构建了带
+  `org.opencontainers.image.revision=<完整目标 SHA>` 的专用镜像；在线服务保持生产 HEAD 和
+  既有镜像不动。
+- 本次专用容器加入生产 Compose network、复用 `.env`，仅覆盖
+  `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true`，并把宿主
+  `runtime/horse_profile_completion` 挂载到 `/app/runtime/horse_profile_completion:rw`。
+  宿主 `.env` 全程保持 false，该镜像未用于重建 web/worker/beat/race_live_worker。
+- 本次依次执行 select、100/100 地区与唯一 provider identity 检查、approve、批准后 SHA validate
+  和 `prepare --allow-network`；只生成 cache/checkpoint/artifact/xlsx，未继续 bundle、commit 或
+  自动首发。
+- 本次证据：镜像 `sha256:e543065c...`、批次 `p0batch-20b59bda0608`、批准 SHA
+  `51ac349e...`、300 请求/0 cache hit、61/100 完整；xlsx SHA `bee158e6...`。执行后确认专用
+  容器不存在，宿主及四应用 network=false，生产 HEAD 未变，马匹和公开计数未变，healthz 通过。
+- 本次回滚面为停止一次性容器；容器正常退出并删除后，其联网能力随即撤销。由于在线镜像和
+  `.env` 均未替换，本次没有为关窗重建公网服务。执行前 `.env`、数据库 dump 和在线镜像 tag
+  均已保留；发现的在线应用既有镜像差异只记录证据，本次 P0 批任务未改动。
+
 ## 2026 赛历赛事中文名补齐生产执行记录（2026-07-23）
 
 1. 生产当时快进到 `6167b6c0` 并执行 `deploy_lowcost.sh`；无迁移，HTTP `/healthz/`
