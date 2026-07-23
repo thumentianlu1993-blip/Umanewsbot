@@ -70,7 +70,30 @@ closed，重新 prepare-release 并重新授权；不得手工改 state/ledger �
 - 本次回滚面为停止一次性容器；容器正常退出并删除后，其联网能力随即撤销。由于在线镜像和
   `.env` 均未替换，本次没有为关窗重建公网服务。执行前 `.env`、数据库 dump 和在线镜像 tag
   均已保留；发现的在线应用既有镜像差异只记录证据，本次 P0 批任务未改动。
+## 2026 赛事系列身份只读审核工具与正式审核包（2026-07-23）
 
+1. 用户在最终原生只读 review 通过后授权提交、推送、部署只读工具并生成正式生产审核包。
+   审核内容经 index transition 锁定后提交为
+   `17d7757aec764755394339400eb2523eae896fa5`，任务分支和 `main` 均已推送。
+2. 生产从 `15645b05` fast-forward 到 `17d7757a`，运行 `deploy_lowcost.sh`。无 migration；
+   Django check 和命令 help 通过，web/worker 镜像均为
+   `sha256:5a3dd28b846954837ade517e5d85aa2bba3b4651d322876f950f0cdfcda45e44`，HTTP
+   `/healthz/` 返回 `{"status": "ok"}`。
+3. 以生产 HEAD 作为不可变参数运行 `review_2026_race_series_identities` 导出模式。正式快照时间
+   `2026-07-23T02:44:23.655795+00:00`，计数为 1,085 total、684 已关联、226 唯一名称匹配、
+   11 同名多候选、162 无名称匹配、2 未举办；五分类计数与探索基线一致，异常 0，
+   `blocks_decisions=false`。当前未记录 identity-set digest，不能据此排除集合等量替换。
+4. 主机持久化目录为
+   `runtime/race_series_identity_review/formal-20260723T104700+0800/`。web 的 `/app/runtime` 未挂载，
+   因此导出后立即用 `docker cp` 把同一目录复制到主机；禁止只保留在可重建容器内。
+5. 文件 SHA-256：manifest `9d0df5da1e942f77bbabe9df7c84a921ea9325564ce821ab5f17ebf2f13eee47`；
+   review.csv `afa06b10cb1d3a7ade13e95f6d18385379a2813458fe61f34ce98440770be1cf`；
+   review.json `951ef701c21f994de1f584530b8cca2eec9ae7b1a3f3858aaf5ddc59d447b0aa`；
+   review.xlsx `c4e09f8bc0d5a5dc912d6b57efb79173d69f9fb70ce057a9d9f6a1526d30c80b`；
+   snapshot.json `1073fa0bbaf6a2b3e3dfa1217fe1afe0b01a80796e47552a182524b0d27ae98a`。
+6. 五文件已复制到本地审核目录并逐文件复核相同 SHA；六张工作表均实际导入、渲染，公式错误
+   扫描为 0。本阶段未运行 build-decisions、prepare、apply 或 commit 模式，没有生产业务数据写入。
+   人工定稿工作簿不等于数据 apply 授权；后续仍需精确 decisions/manifest 复审和新的写入授权。
 ## 2026 赛历赛事中文名补齐生产执行记录（2026-07-23）
 
 1. 生产当时快进到 `6167b6c0` 并执行 `deploy_lowcost.sh`；无迁移，HTTP `/healthz/`
@@ -1719,7 +1742,138 @@ closed。初始化完成后仍保持 scheduler false、runner disabled，直到�
 2. 正式镜像 `umanewsbot:main-514af8a2-amd64-20260714-050736`，image ID `sha256:954673cc74049d4b882e492ec29b072aba01aeb1a3ae440cc85415209c8a2f8a`。切换前 worker active/reserved、外部导入 run/lock 均为空；候选镜像 Django check、迁移漂移和正文边界 27 项测试通过。
 3. 最终切换前备份 `.env.backup.pre-main-514af8a2-20260714-051127`；数据库 `backups/db/pre-main-514af8a2-20260714-051127.sql.gz` 为 `158552943` bytes，SHA-256 `9fc72efba29ee8d32c9709665809d259ca49e47a217c43626c99b084d99d4b0a`，`gzip -t` 通过。旧镜像回滚 tag 为 `umanewsbot:rollback-pre-514af8a2-20260714-051127`，image ID `sha256:5d7c09bd25fbb45999f2e8109995736f93f4d3011e37299033cae4773e4968c1`。
 4. 将候选 retag 为 `umanewsbot:prod` 后，依次执行 migrate、Django check、`makemigrations --check --dry-run` 和 collectstatic，再只重建 web/worker；四篇目标文及五篇抽检文回归完成、worker 清空后，以同一镜像重建 beat。最终 web/worker/beat 镜像 ID 和 revision 一致。
-5. 文章修复必须先运行 `python manage.py repair_article_content_boundaries --article-id <ID>...` 查看 SHA/长度/规则计数，再追加 `--commit`；随后用 `python manage.py translate_news --article-id <ID>... --sync --force` 重译。每批都要比对 `workflow_status`、`published_to_web_at` 和 `QQPushDelivery`，禁止重复公开或群发。
+5. 旧版“dry-run 后直接追加 `--commit`”流程已失效。历史文章源正文修复必须先取得针对精确文章集合和动作的单独授权，并在已验证备份和安全窗口后按以下 fail-closed 流程执行；本文档只定义操作步骤，**不自动批准任何历史重处理**。
+
+   先用显式 ID 保存 dry-run JSON；变量名不得复用系统 `HOME`，目录已存在时必须停止：
+
+   ```sh
+   set -o errexit -o nounset -o pipefail -o noclobber
+   umask 077
+
+   ARTICLE_IDS=(8086 8267 8316 8318)  # 本章已记录的精确目标全集
+   RUN_TS="$(date -u +%Y%m%dT%H%M%SZ)"
+   ARTIFACT_DIR="/app/runtime/news_integrity/article-content-boundary-${RUN_TS}"
+   DRY_RUN_JSON="${ARTIFACT_DIR}/dry-run.json"
+   APPROVED_MANIFEST="${ARTIFACT_DIR}/approved-manifest-v2.json"
+   MANIFEST_SHA_FILE="${APPROVED_MANIFEST}.sha256"
+   COMMIT_JSON="${ARTIFACT_DIR}/commit.json"
+   ARTICLE_ARGS=()
+   for ARTICLE_ID in "${ARTICLE_IDS[@]}"; do
+     ARTICLE_ARGS+=(--article-id "${ARTICLE_ID}")
+   done
+
+   mkdir "${ARTIFACT_DIR}"
+   python manage.py repair_article_content_boundaries "${ARTICLE_ARGS[@]}" \
+     > "${DRY_RUN_JSON}"
+   jq -e '.mode == "dry_run" and (.articles | length > 0)' "${DRY_RUN_JSON}" >/dev/null
+   SOURCE_SITE="$(jq -er '
+     ([.articles[].source_site] | unique) as $sources
+     | if (($sources | length) == 1)
+          and (($sources[0] | type) == "string")
+          and (($sources[0] | length) > 0)
+       then $sources[0]
+       else error("dry-run 必须精确只包含一个 source_site；混合来源必须分批")
+       end
+   ' "${DRY_RUN_JSON}")"
+   ```
+
+   到此必须停止并人工审查同一份 `dry-run.json`。每个 `articles[]` 行直接与该 `article_id` 绑定提供：
+
+   - `before_body_start_excerpt` / `before_body_end_excerpt` 与 `after_body_start_excerpt` / `after_body_end_excerpt`：修复前后正文的首尾短摘要，**不是完整正文**；
+   - `before_length` / `after_length` / `length_delta`、正文前后 SHA-256、`original_content_html_sha256`、解析选择器和清理计数；
+   - `workflow_status` / `translation_status` / `automation_status`、`effective_body_layer` / `effective_body_sha256`；
+   - `manually_edited_fields`、`has_rewrite_body`、`published_to_web_at`、`qq_delivery_count`。
+
+   人工审查以这些已绑定同一 ID 精确集合的字段为准，逐篇核对来源、修复前后首尾、长度/哈希、当前有效正文层、人工/改写标记、状态、公开时间和 QQ delivery；不再依赖另一个未定义查询。未明确决定为 `repair_source_body` 的文章不得进入 manifest。审查通过后，从该 dry-run 的每行只提取固定 schema v2 字段，并在生成前核对精确来源与 ID 集合。v2 除 raw 正文外，还必须绑定 commit 将持久化的标题、normalized 正文和 parse metadata；旧 schema v1 不得继续使用：
+
+   ```sh
+   REQUESTED_IDS_JSON="$(printf '%s\n' "${ARTICLE_IDS[@]}" | \
+     jq -Rsc 'split("\n") | map(select(length > 0) | tonumber) | sort')"
+   EXPECTED_COUNT="${#ARTICLE_IDS[@]}"
+
+   jq -e --arg source_site "${SOURCE_SITE}" \
+     --argjson requested_ids "${REQUESTED_IDS_JSON}" \
+     --argjson expected_count "${EXPECTED_COUNT}" '
+       (.mode == "dry_run") and
+       (.articles | length == $expected_count) and
+       (($requested_ids | unique | length) == $expected_count) and
+       (([.articles[].article_id] | sort) == $requested_ids) and
+       (all(.articles[];
+         .source_site == $source_site and
+         .body_parse_status == "ok" and
+         (.updated_at | type == "string" and length > 0) and
+         (.original_content_html_sha256 | test("^[0-9a-f]{64}$")) and
+         (.before_body_sha256 | test("^[0-9a-f]{64}$")) and
+         (.after_body_sha256 | test("^[0-9a-f]{64}$")) and
+         (.after_title_sha256 | test("^[0-9a-f]{64}$")) and
+         (.after_body_normalized_sha256 | test("^[0-9a-f]{64}$")) and
+         (.after_parse_metadata_sha256 | test("^[0-9a-f]{64}$"))))
+     ' "${DRY_RUN_JSON}" >/dev/null
+
+   jq -S --arg source_site "${SOURCE_SITE}" '
+     {
+       schema_version: 2,
+       source_site: $source_site,
+       articles: (
+         .articles
+         | map({
+             article_id,
+             decision: "repair_source_body",
+             updated_at,
+             original_content_html_sha256,
+             before_body_sha256,
+             after_body_sha256,
+             after_title_sha256,
+             after_body_normalized_sha256,
+             after_parse_metadata_sha256
+           })
+         | sort_by(.article_id)
+       )
+     }
+   ' "${DRY_RUN_JSON}" > "${APPROVED_MANIFEST}"
+
+   jq -e --arg source_site "${SOURCE_SITE}" \
+     --argjson requested_ids "${REQUESTED_IDS_JSON}" '
+     .schema_version == 2 and
+     .source_site == $source_site and
+     (([.articles[].article_id] | sort) == $requested_ids) and
+     (all(.articles[];
+       .decision == "repair_source_body" and
+       (.after_title_sha256 | test("^[0-9a-f]{64}$")) and
+       (.after_body_sha256 | test("^[0-9a-f]{64}$")) and
+       (.after_body_normalized_sha256 | test("^[0-9a-f]{64}$")) and
+       (.after_parse_metadata_sha256 | test("^[0-9a-f]{64}$"))))
+   ' "${APPROVED_MANIFEST}" >/dev/null
+
+   MANIFEST_SHA256="$(sha256sum "${APPROVED_MANIFEST}" | awk '{print $1}')"
+   printf '%s  %s\n' "${MANIFEST_SHA256}" "${APPROVED_MANIFEST}" \
+     > "${MANIFEST_SHA_FILE}"
+   sha256sum --check "${MANIFEST_SHA_FILE}"
+   ```
+
+   `after_parse_metadata_sha256` 的算法固定为：只取将写入 `translation_metadata` 的
+   `body_parse_status/body_selector/body_cleaning`，使用 UTF-8
+   `json.dumps(..., ensure_ascii=False, sort_keys=True, separators=(",", ":"))` canonical JSON 后计算
+   SHA-256。不得改用默认 JSON 空格、ASCII escape 或包含其他临时字段的摘要。
+
+   必须先保存并人工审核 `dry-run.json`、`approved-manifest-v2.json`、`.sha256` 和实际 SHA 值，确认 manifest 中的 ID 精确等于授权全集后，才可执行写入。commit 必须同时传入 manifest 文件和已审核 SHA：
+
+   ```sh
+   sha256sum --check "${MANIFEST_SHA_FILE}"
+   python manage.py repair_article_content_boundaries "${ARTICLE_ARGS[@]}" \
+     --commit \
+     --manifest "${APPROVED_MANIFEST}" \
+     --manifest-sha256 "${MANIFEST_SHA256}" \
+     > "${COMMIT_JSON}"
+   jq -e '.mode == "commit"' "${COMMIT_JSON}" >/dev/null
+   ```
+
+   命令会在单一事务中锁定全部 ID，重新解析并校验 `source_site`、`updated_at`、
+   `original_content_html_sha256`、`before_body_sha256`、`after_body_sha256`、`after_title_sha256`、
+   `after_body_normalized_sha256` 和 `after_parse_metadata_sha256`；文件 SHA、schema、ID 集合、缺字段或任一
+   逐篇输入/输出漂移时命令必须失败，整批零写入、零 OperationLog。原文层 commit 不会自动批准翻译、改写、
+   重新公开或 QQ 发送；后续层须根据人工正文/机器改写情况另行审核和授权。每批仍要比对
+   `workflow_status`、`published_to_web_at` 和 `QQPushDelivery`，禁止重复公开或群发。
 6. 本次目标 `8086/8267/8316/8318` 均保持已发布和原发布时间，QQ delivery 为 0；随机样本 `8306/8311/8326/8331/8336` 最终保存正文与当前重解析逐字一致，状态 `ok`、无博彩/链接/编辑注/页脚噪声。已发布 `8326` 保持 `2026-07-13T17:47:04.152562Z`，QQ delivery 为 0。
 7. 回归通过内外 `/healthz/`、首页、后台登录、`/news/8086/`、`/news/8267/`、`/news/8316/`、`/news/8318/`、`/news/8326/` 和近 200 行 web/worker 日志；Celery active/reserved 为空。若回滚，先停 beat 并排空 worker，将 `umanewsbot:rollback-pre-514af8a2-20260714-051127` retag 为 `prod` 后重建 web/worker/beat；本次无迁移，只有确认数据损坏时才恢复数据库备份。
 
@@ -6275,3 +6429,22 @@ python manage.py complete_horse_profiles \
    `sha256:69ed2bd9f3f7ecc581c2caba4704bd7b1764fc02af6a2663b78f599217b23696`。
    回滚时将代码恢复到上一个提交 `f0d3fbd6e71374b425e3bbae2041d47758270546` 并用同一低成本
    Compose 重建全部四个应用服务；本次无迁移，只有确认数据受损时才恢复数据库备份。
+
+## 2026-07-24 HRN 新闻正文边界发布记录
+
+1. PR `#12` 的任务提交为 `9fded052`，合并后的生产 revision 为 `0e4a3520`。发布前数据库恢复点为
+   `backups/db/pre-news-body-boundary-20260724T015733+0800.sql.gz`，大小 `237423530` bytes，
+   SHA-256 为 `250e81de23816d00c7c15d9fd354867d28521f56edca980786f7f557c4a4330d`；
+   `.env` 恢复点为 `.env.backup.news-body-boundary-20260724T015733+0800`。
+2. 发布前停止 beat，等待两个采集任务及下游术语/自动化任务自然完成；`active/reserved=0` 后停止
+   普通 worker 与 race-live worker。外部导入运行数为 0。本次无 migration。
+3. 首次 `deploy_lowcost.sh` 在新 web 已启动后，外层 `collectstatic` 与 web 启动脚本并发处理共享
+   static volume，出现瞬时文件不存在。确认新 web 自身 collectstatic 成功且 healthy、migration 未变化后，
+   单进程重跑 collectstatic 成功，再显式重建 `worker / beat / race_live_worker`。
+4. 最终 `web / worker / beat / race_live_worker` 统一镜像为
+   `sha256:36b9a75b854f9be0ccfb7beca164a69e9a5f79bab77b4bcd2f4cbb9f50356733`。
+   Django check、migration drift、worker ping、内外 healthz、首页及新闻详情 HTTP 通过；队列为空，
+   近 10 分钟四服务无严重错误。
+5. 生产镜像只读解析 `9623` 的真实来源页得到 `.article-body / ok`，正文 9,355 字符，已知框架文本
+   命中 0。自然 HRN job `27503 / 27504` 均成功但没有全新文章，因此 Gate A 的新稿翻译/公开验收
+   尚未完成。重复抓取已清理 `9623` 原文层，但历史中文 `effective_body` 仍含污染；未运行历史 repair。

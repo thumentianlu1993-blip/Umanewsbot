@@ -37,7 +37,57 @@
 - 未 bundle、未 commit、未自动发布，公开马保持 2797（日本 2463）。一次性联网容器已删除，
   宿主和四个在线应用的网络开关均为 false，healthz 通过。后续仍需人工审核 xlsx；任何 bundle、
   数据库 commit 或自动首发都必须绑定新 artifact/hash 再单独授权。
+## 2026-07-24 HRN 新采集正文边界已部署
 
+- 生产已运行 `main@0e4a3520`，四个应用服务同镜像；Django、migration drift、队列、日志和内外
+  healthz 验收通过。
+- `9623` 的真实来源页在生产镜像中只读解析为 `.article-body`，已知框架文本命中 0。部署后两个
+  HRN 自然抓取窗口成功，但没有全新文章，Gate A 的新稿翻译/公开验收仍待自然样本。
+- 自然重复抓取只更新了旧文章原文层；`9623` 的历史中文公开正文仍含污染，本次未重译或重处理。
+  历史识别和历史修复继续是独立授权门禁。
+- 发布证据：
+  `docs/changes/fix-news-body-extraction-boundaries/release_report.md`。
+
+## 2026-07-23 2026 赛事系列双卡片治理只读审核包已生成（待人工定稿）
+
+- 已确认问题来自 2026 临时系列与历史系列身份断开，不是赛事中文名缺失。生产只读探索发现
+  401 条 2026 target 尚未关联，其中 226 条为唯一名称匹配、11 条歧义、162 条无匹配、2 条未举办。
+- 方案确定完整导出全部未关联总账，但首批只处理人工批准、证据完整且兼容既有引擎的唯一匹配项；
+  其余保留为只读审核总账，不为清零放宽条件。
+- 方案评审通过后已完成测试先行和本地实现：新增只读审核包生成/安全回读命令，复用既有身份归并
+  写入引擎，不增加 migration、配置、调度或第二套 commit 路径。
+- SQLite、真实 PostgreSQL 16 并发、等价规模、工作簿视觉、Compose 和完整套件主线增量验证均完成；
+  独立原生只读代码 review 已通过。
+- 提交 `17d7757a` 已推送并部署到生产，只读导出的五分类计数与探索基线一致：1,085 条
+  target 中 684 已关联、226 唯一名称匹配、11 歧义、162 无匹配、2 未举办，异常 0。正式
+  manifest SHA-256 为 `9d0df5da1e942f77bbabe9df7c84a921ea9325564ce821ab5f17ebf2f13eee47`。
+  由于没有 identity-set digest，该计数证据不能排除集合等量替换。当前没有生成或应用任何归并
+  decisions，也没有生产业务数据写入；下一门禁是人工审核工作簿。
+
+## 2026-07-24 HRN 新闻正文边界已迁移至最新 main，等待复审
+
+- 公开文章 `9623` 与 `9519` 已只读确认存在同源页面框架污染；根因是 HRN 适配器在页面没有
+  `<article>` 时选择整个 `<main>`，而真实正文容器为 `.article-body`。污染发生在翻译前的详情解析层，
+  不是公开模板拼接。
+- 已从核对过的 `origin/main@d64c692` 建立独立 `codex/fix-news-body-extraction-boundaries` worktree，现已因
+  上游前进而迁移至 `origin/main@45ded083`，
+  完成探索和 `docs/changes/fix-news-body-extraction-boundaries/` 五份规格。计划复用现有正文清理、原始 HTML
+  和离线 repair 能力，新增 HRN 来源级可信容器与只读历史候选识别。
+- 独立方案 reviewer 首轮 findings 已在规格中修正，并由同一会话限定复审通过；审核后发现的 workflow checker
+  直接路径也完成补充复审，T16 GREEN 与 `26/26` inventory 两项 P1 已关闭（最终 `VERDICT: APPROVED`）。
+- 用户确认实现后已按测试先行和 subagent 文件边界完成代码：HRN `.article-body`、upsert 前失败阻断、只读历史
+  scope、批准 manifest/hash 原子 repair 与八阶段 checker。正文边界 `43/43`、相邻抓取 `13/13`、workflow
+  `26/26` 及 Django/static 检查通过。
+- 独立原生 code review 首轮四项 P2 已按测试 RED 修复：扫描独立记账、风险状态/QQ 数、CrawlJob 详情失败数、
+  manifest/SHA runbook。修复后全部本地验证继续通过，等待同一 reviewer 会话限定复审。
+- 第一次限定复审确认两项关闭，并纠正 `CrawlJob.fail_count` 既有 duplicate 语义与 dry-run 审核证据缺口；第二轮
+  RED/修复现使用 `detail_failures=N` 持久 token，并由同一 dry-run artifact 提供首尾摘要及全部审核状态。完整
+  本地验证再次通过。
+- 发布前 fingerprint 正确阻止了旧审核版本 staging；当前无生产变更。最新集成 review 发现 manifest 未绑定
+  全部持久化输出这一项 P2，现已按有效 RED 升级为绑定标题、原始正文、标准化正文和解析元数据的 v2 契约。
+  正文边界与相邻抓取回归 `58/58`、workflow `26/26`、Django check、compileall 和 diff check 已通过；
+  仍须复用原 reviewer 会话复审，
+  之后再取得当前精确版本的新发布授权。历史识别、历史重处理和代码部署仍是三个独立门禁。
 ## 2026-07-23 2026 赛历赛事中文名补齐已发布
 
 - 发布时执行证据记录：573 场 2026 年已发布赛事的中文名已单事务写入，

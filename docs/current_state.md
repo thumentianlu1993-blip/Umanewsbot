@@ -70,7 +70,103 @@
   `HEAD=17d7757a`、parser v2；web/worker/beat 使用镜像 `sha256:5a3dd28b...`，
   `race_live_worker` 仍使用先前镜像 `sha256:07f46301...`。该镜像差异早于且独立于本次一次性
   task 5.2 执行，本轮未擅自重建并行发布服务，需由对应发布线单独核对。
+## 2026-07-24 HRN 新闻正文边界已部署，历史中文稿未重处理
 
+- PR `#12` 已合并，生产运行 `main@0e4a3520`；四个应用服务统一使用镜像
+  `sha256:36b9a75b854f9be0ccfb7beca164a69e9a5f79bab77b4bcd2f4cbb9f50356733`。
+  无新增 migration，Django check、worker ping、内外 healthz、首页和文章详情 HTTP 验收通过。
+- 生产镜像只读解析文章 `9623` 的真实 HRN 来源页得到 `.article-body / ok`，正文 9,355 字符，
+  已知页面框架文本命中 0，首尾均为文章正文。
+- 部署后的自然 HRN job `27503 / 27504` 均成功，但只有重复文章，尚无此前从未入库的新 HRN 稿件；
+  Gate A 的新稿翻译和公开验收必须等待真实新样本，不能由重复抓取替代。
+- 自然重复抓取已把 `9623` 原文层更新为干净正文；旧中文译文和公开 `effective_body` 仍保留历史污染。
+  本次未重译、改写、重新发布、发送 QQ，也未执行历史扫描或 manifest commit；Gate B/C 仍需独立授权。
+- 恢复点、部署过程和 `collectstatic` 并发插曲详见
+  `docs/changes/fix-news-body-extraction-boundaries/release_report.md`。
+
+## 2026-07-23 2026 赛事系列身份归并：只读审核工具已部署，正式审核包待人工定稿
+
+- 新建 `docs/changes/reconcile-2026-race-series-identities/` 五份规划文档，目标是完整盘点正式快照中
+  全部 2026 历史目标，同时仅把人工批准且兼容既有引擎的唯一匹配候选纳入首批写入。
+- 2026-07-23 生产只读探索基线为 1,085 条 target：684 已关联、226 唯一名称匹配但系列不同、
+  11 同名多候选、162 无名称匹配、2 未举办；226 条中当前 215 条满足既有引擎严格条件。正式
+  导出必须重新锁定快照，任何漂移都需显式确认。
+- 独立方案评审首轮提出 3 项 P1、2 项 P2；修订后限定复审再发现 1 项 P1、1 项 P2，现已全部
+  关闭并得到 `VERDICT: APPROVED`。关键门禁为：原始 manifest 是独立信任根；只有唯一匹配表
+  可产生动作；首批单一 manifest/单事务；穷尽分类并阻塞异常；审核包严格字段白名单。
+- 已新增只读审核适配服务和管理命令：在 repeatable-read 快照内穷尽分类，生成
+  JSON/CSV/六 sheet XLSX/manifest；定稿回读绑定原始 manifest，只有唯一匹配表可产生既有引擎
+  decisions，命令不提供 commit 模式。工作簿已完成实际渲染返修，操作列前置并带动作下拉。
+- RED 阶段为目标模块缺失导致 1 项失败、12 项安全跳过；GREEN 及代码审核返修后，新增/既有身份
+  专项 SQLite 48 项通过（3 项 PostgreSQL-only 跳过）。真实 PostgreSQL 16 的 repeatable-read MVCC、行锁和
+  双事务竞争同一 target/destination 均通过，竞争结果严格一胜一败且败者零部分写入。
+- 1,085 targets / 1,500 event identities 等价规模两次构建 0.121 秒。完整 `stable` 对测试基线
+  `origin/main@15645b05` 对照（后续 `d64c6926` 仅为 netkeiba 发布证据文档）：主线
+  `2741 / 21F / 70E / 57S`，本分支
+  `2769 / 21F / 70E / 59S`，新增 28 项且失败/错误增量为 0；新增 2 项跳过均为 PostgreSQL-only。
+  Django check、无迁移、compile、三份 Compose config 和 diff check 通过。
+- 独立原生代码 review 首轮发现 1 项 P1、1 项 P2；首次限定复审确认原问题关闭后发现 1 项直接
+  P1（审核后新增 do-not-merge veto），下一轮又发现同边界 P1（source/destination series 身份未
+  锁定）；现均已修复为四对象 identity SHA + 当前 veto 双重门禁并通过目标回归。行为代码最终
+  原生只读 review 已 `APPROVED`：parent
+  `d64c69264df8bf16389e99514fb4ab553ca3f37b`、content manifest
+  `943431514ffa8b814fc2076eb40ad96ddc5d25a6b1896cd81b1e9a7504bacdd2`、fingerprint
+  `db9d0f9b00cad1f1fbfcc784837fc54210e78bc7e7a292b0b720cd85f23c1c85`。随后只修改状态文档，
+  文档增量限定 review 以同一 parent 得到 content manifest
+  `d513dd8cd61031013d3e365b23c2af655d6b3a802ae20bf48c0c793104855d53`、fingerprint
+  `2062b52e452fdecafacb10ae572dd27a26cddf751a56145532323b50a542f4c6`，并作为发布前最终冻结基线。
+  三项 P2 与一项探索 identity-set digest 建议已记入非阻塞后续。
+- 用户在最终 review 后明确授权提交、推送、部署只读工具和生成正式生产审核包。审核内容以
+  `INDEX_TRANSITION_OK` 锁定后提交为 `17d7757aec764755394339400eb2523eae896fa5`，任务分支和
+  `main` 均已推送；生产从 `15645b05` fast-forward 到该提交并运行 `deploy_lowcost.sh`。无迁移，
+  Django check、命令 help、web/worker 同镜像和 HTTP `/healthz/` 均通过；镜像为
+  `sha256:5a3dd28b846954837ade517e5d85aa2bba3b4651d322876f950f0cdfcda45e44`。
+- 正式 repeatable-read 导出时间为 `2026-07-23T02:44:23.655795+00:00`，生产五分类计数与探索
+  基线一致：`1085 = 684 + 226 + 11 + 162 + 2`，异常 0、`blocks_decisions=false`。当前没有
+  identity-set digest，因此该证据不能排除 target/candidate 集合发生等量替换。审核包保存在
+  `runtime/race_series_identity_review/formal-20260723T104700+0800/`，manifest SHA-256 为
+  `9d0df5da1e942f77bbabe9df7c84a921ea9325564ce821ab5f17ebf2f13eee47`；五文件已复制到本地并
+  独立核对 SHA，六 sheet 实际渲染和公式错误扫描通过。本阶段只运行导出模式，未生成 decisions、
+  未运行 prepare/apply/commit，未写生产业务数据；下一门禁是人工审核并定稿工作簿。
+
+## 2026-07-24 HRN 新闻正文边界已集成最新 main，待同会话复审
+
+- 独立干净 worktree 位于
+  `/Users/mentianlu/.codex/worktrees/fix-news-body-extraction-boundaries/umanews`，分支为
+  `codex/fix-news-body-extraction-boundaries`，基线是已核对远端的
+  `origin/main@45ded0834e6517a544ad2acd600503e127bd59ef`；主工作区的其他未提交修改未被触碰。
+- 只读复现确认公开文章 `9623` 与同源 `9519` 都含 HRN ticker、登录入口和相关推荐等页面框架。
+  根因位于 `HorseRacingNationAdapter.body_selector = "article, main"`：当前 HRN 页面没有语义
+  `<article>`，真实正文位于 `.article-body`，解析器因而选中整个 `<main>`。污染随后写入
+  `body_ja_raw/body_ja_normalized`，继续进入翻译、改写与 `effective_body`；公开模板本身没有拼接来源框架。
+- 仓库已有可信正文选择、通用清理、`original_content_html` 留存、边界 fixture 和显式 ID 离线 repair
+  命令，可用于最小来源级修复；仓库没有 `9623` 的 HRN 新闻 fixture，但生产文章按模型约定应保留原始 HTML。
+- durable artifacts 已写入 `docs/changes/fix-news-body-extraction-boundaries/`。建议方案是将 HRN 收紧为
+  `.article-body` 且选择器漂移 fail-closed，并扩展只读、有界、分批的历史候选识别；不使用中文词黑名单、
+  文章 ID 特判或模板隐藏。
+- 独立方案 reviewer 首轮提出三项 finding：upsert 前阻断、历史 manifest/哈希原子绑定、Gate A 不得用既有
+  文章重复抓取验收。规格修正后由同一 reviewer 会话限定复审，三项均关闭，结论 `VERDICT: APPROVED`。
+- 审核后静态校验发现 `.codex/scripts/check_workflow_contract.py` 仍硬编码旧七阶段 marker；当前没有修改该脚本
+  或配套测试，已把测试先行同步列入待实现范围。补充 reviewer 的两项 P1（T16 GREEN 门禁与固定 `26/26`
+  inventory 策略）已修正并由同一会话复审通过，最终仍为 `VERDICT: APPROVED`。
+- 用户明确“开始实现”后，测试 subagent 先取得目标 RED；实现 subagent 已将 HRN selector 收紧至
+  `.article-body`，在国际详情 upsert 前 fail-closed，并完成只读历史扫描、manifest/hash 原子 repair 与八阶段
+  workflow checker。没有模板隐藏、中文词黑名单或文章 ID 特判。
+- 主代理整体验证：正文边界 `43/43`、抓取相邻回归 `13/13`、workflow contract `26/26`，Django check、
+  compileall 和 `git diff --check` 均通过。
+- 未参与实现的 reviewer 已实际执行原生只读 uncommitted review；内层只读、退出码 0、审前审后 fingerprint
+  逐字节一致。首轮四项 P2 涉及扫描分类/风险字段、CrawlJob 详情失败计数和旧 runbook commit 流程。
+- 测试 subagent 先为 findings 取得目标 RED；实现/operations subagent 已修复并重新取得正文 `43/43`、抓取
+  `13/13`、workflow `26/26`、Django/static 全绿。runbook 现从 dry-run 推导唯一来源并绑定精确 ID manifest/SHA。
+- 第一次限定复审关闭两项，另指出 `fail_count` 不得改变既有 duplicate 语义，以及 explicit dry-run 尚未提供
+  runbook 所列人工审查证据。第二轮 RED/修复后，详情失败改由持久 `detail_failures=N` token 记录；dry-run 直接
+  输出同一 ID 的首尾短摘要、长度/哈希、状态、有效层、人工/改写、发布时间和 QQ 数，完整回归再次全绿。
+- 旧审核版本曾获得发布授权，但发布前完整 fingerprint 因 `origin/main` 前进而漂移，门禁在 staging 前停止。
+  最新 main 集成 review 又发现 manifest 未绑定全部持久化输出这一项 P2；测试 subagent 取得有效 RED 后，
+  manifest 已升级为 v2，同时绑定标题、原始正文、标准化正文和解析元数据，legacy v1、缺字段或任一输出漂移
+  均整批拒绝。当前正文边界与相邻抓取回归 `58/58`、workflow `26/26`、Django check、compileall 和 diff check
+  全部通过。必须由同一 reviewer 会话完成限定复审，并在成功后重新取得
+  当前集成版本的发布授权。未执行生产历史扫描或生产重处理，未 commit、push、建 PR、部署或写生产。
 ## 2026-07-23 2026 赛历赛事中文名补齐已写入生产
 
 - 根据发布时保存的执行证据，573 场 2026 年已发布赛事已完成单事务写入：

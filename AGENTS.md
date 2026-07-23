@@ -42,15 +42,16 @@
 本项目从 `2026-07-15` 起统一使用以下主流程；完整说明见
 [`docs/codex_workflow.md`](docs/codex_workflow.md)：
 
-`探索 -> spec/design -> 方案审核 -> 测试先行 -> 子代理实现 -> reviewer 会话 /review -> 用户授权后发布`
+`探索 -> spec/design -> 方案审核 -> 用户确认实现 -> 测试先行 -> 子代理实现 -> 独立 reviewer 会话 /review -> 用户授权后发布`
 
 - 探索阶段使用 Codex 原生只读调研与规划能力。需求不清、决策分支多或风险较高时，可以使用 `grill-me-codex` 逐项确认；禁止使用 `openspec-explore`。
 - spec/design 阶段优先使用 Codex 原生规划能力。新任务的持久产物放在 `docs/changes/<slug>/`，至少包含 `spec.md`、`design.md`、`test_cases.md`、`tasks.md`、`rollout.md` 五份 durable artifacts；`tasks.md` 使用 `(application)`、`(integration)` 或 `(operations)` 域前缀，并按“测试 -> 实现 -> 验证”排列。
 - 方案审核优先使用可用的 Codex 原生方案审核能力；工作流进入“方案审核”阶段且当前没有合适的 Codex 原生方案审核能力时，自动使用 `plan-eng-review`，无需用户再次点名。首次方案审核建立 reviewer 会话；同一需求的方案复审复用该 reviewer 的同一会话与上下文，仅在会话不可恢复时新建并交接。复审只核对上轮具体 findings、对应修复和直接触及路径；仅直接 P0/P1 回归可新增阻塞，其他新发现记为后续建议并结束。审核结论未通过前不得进入开发。
+- 方案审核通过后必须向用户提交根因、最终范围、测试与 RED 方案、历史数据边界、风险/非目标/回滚和 reviewer 结论，并停在“用户确认实现”门禁。只有用户针对当前版本明确回复“确认实现”“开始实现”“继续实现”或同义授权后，才可编写/修改自动化测试、修改应用代码/配置/迁移、启动实现 subagent 或执行历史数据重处理；最初任务描述和探索/规划授权不得视为实现授权。
 - 开发前必须补足 `test_cases.md` 和对应自动化测试，并实际看到新增/变更测试因目标能力尚未实现而失败（RED）；再逐项完成 GREEN 和 REFACTOR。只有不改变任何运行时行为的纯文档或纯配置整理，才可以在 `test_cases.md` 中写明 RED 不适用原因，并给出、执行相应验证。feature flag、队列/路由、权限、依赖、容器或部署顺序、数据行为等配置变化不得豁免测试先行。
 - 任何 subagent（实现、测试、审核、调研或其他用途）启动后，直到全部 active subagent 结束，主代理只能继续派出新的 subagent，或等待/接收结果；不得读/改文件、跑测试、继续调研、向其他任务发消息、处理用户追加的无关工作或执行其他工具调用。写密集任务默认串行；并行时必须保证文件边界不重叠。
 - 实现 subagent 不得 commit、push、部署或写生产；返回内容必须包含摘要、改动路径、测试证据和剩余风险。主代理仅在所有实现 subagent 结束后检查、整合和验证结果。
-- 代码首次审核必须派出一个未参与本轮实现的 reviewer subagent，并实际调用 Codex 原生 review。同一需求后续复审必须复用该 reviewer 的同一会话与上下文；只有 reviewer 明确确认会话不可恢复时才能新建，并记录原因、上轮 findings 与已知问题交接。复审范围只包括上轮具体 actionable findings（漏洞/阻塞项）、对应修复和修复直接触及路径的回归；仅当前漏洞的直接 P0/P1 回归可新增阻塞，其他新发现记录为后续建议后结束本需求审核。具体命令、fingerprint 与 fail-closed 规则见 `docs/codex_workflow.md` 第 6 节。
+- 代码首次审核必须派出一个未参与本轮实现的 reviewer subagent，并实际调用 Codex 原生 review。同一需求后续复审必须复用该 reviewer 的同一会话与上下文；只有 reviewer 明确确认会话不可恢复时才能新建，并记录原因、上轮 findings 与已知问题交接。复审范围只包括上轮具体 actionable findings（漏洞/阻塞项）、对应修复和修复直接触及路径的回归；仅当前漏洞的直接 P0/P1 回归可新增阻塞，其他新发现记录为后续建议后结束本需求审核。具体命令、fingerprint 与 fail-closed 规则见 `docs/codex_workflow.md` 第 7 节。
 
 <!-- WORKFLOW_CONTRACT:REVIEW_COMMANDS:START -->
 - `codex review -c 'sandbox_mode="read-only"' --uncommitted`

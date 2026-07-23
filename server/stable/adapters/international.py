@@ -751,7 +751,7 @@ class HorseRacingNationAdapter(SimpleInternationalNewsAdapter):
     source_language = SourceLanguage.ENGLISH
     link_path_keywords = ("/news/",)
     title_selector = "h1"
-    body_selector = "article, main"
+    body_selector = ".article-body"
 
     def parse_listing_html(self, html: str, *, url: str, mode: SourceMode | str | None = None) -> list[SourceArticleStub]:
         soup = BeautifulSoup(html, "lxml")
