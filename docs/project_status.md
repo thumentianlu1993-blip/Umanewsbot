@@ -1,5 +1,26 @@
 # 项目状态文档
 
+## 2026-07-23 task 5.3 发布候选门禁本地完成（待授权提交与部署）
+
+- 用户已确认 `p0batch-20b59bda0608` 的 61 个完整对象可以继续，39 个 blocker 保持排除。
+  本地新增 `--prepare-release`，可在零业务写、零公开、零正式批准事件下冻结 deterministic
+  commit artifact、expected actions、publish scope 与精确 candidate SHA。
+- 正式 rolling release 升级为 v2 并强制加载真实 candidate；通用 apply、batch commit、retry 与
+  abandon 共享 supersede/abandoned/ledger/锁门禁。自动首发只处理 artifact 已复审且冻结为
+  attempt 的对象，不再把整个 Japan 100 匹 manifest 当发布范围。
+- 第十轮 full-diff review 的 2 个 P1 已完成 RED→GREEN：standalone v2 validation 到数据库事务
+  全程持有可重入 execution lock；未落库时复验 current batch/combined SHA，只有精确
+  artifact path+SHA 的 committed-run 可跳过 current 漂移并从不可变 snapshot 恢复。
+- 相关 `260/260` 通过；完整 stable 相对 `21610ae8` 新增 88 项，最终对照为
+  `2836 tests / 21 failures / 67 errors / 57 skipped`，failure/error/skipped 增量均为 0。
+  Django check、迁移、OpenSpec `37/37`、diff check 通过。第十一轮 native full-diff review
+  `APPROVED`，P0/P1/P2 为 0，session
+  `019f901d-7b9f-77e3-96e0-792546d3eb4f`，审查前后 fingerprint
+  `60cf62da1514f00fce451c89aa39b46146d20a4ef5245bdc84651a037559e164` 一致。
+- 当前仍未 commit/push/deploy，生产网络 false，未运行 bundle/prepare-release，马匹数据与公开
+  计数未变化。下一步先取得最终精确集成版本的提交/推送/部署授权；获批部署后仅执行无写入
+  task 5.3，展示 candidate SHA 与清单并再次停下等待 task 5.4 授权。
+
 ## 2026-07-23 task 5.2 v3 精确触网验收完成
 
 - 受审提交 `5eec316f073a3107d2887f724e95762f76f27ae2` 与当前生产

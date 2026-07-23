@@ -1,5 +1,55 @@
 # 部署运行手册
 
+## task 5.3 无写入发布候选操作手册（待取得精确版本部署授权）
+
+前提：
+
+1. 只部署经过最终原生 review 的精确集成提交；生产 `.env` 与所有在线应用继续保持
+   `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`。本步不需要网络，不得覆盖为 true。
+2. 使用已人工确认的 `p0batch-20b59bda0608`，仅纳入 61 个无 `failure_reason` 的完整对象；39 个
+   blocker 必须保持排除。先核对原 xlsx SHA 仍为
+   `bee158e6d70c099c550102df6f9221b2d6bbb5fb75697d50a06d6d87b61cbc9f`。
+3. 执行前后记录 `HorseProfile`、`HorseP0Source`、`HorseRaceRecord`、
+   `HorseProfileCompletionRun`、`OperationLog`、`TaskExecutionLog`、`TermEntry`、`TermAlias`
+   计数，以及日本公开马计数；task 5.3 要求全部不变。
+
+执行顺序：
+
+```bash
+python manage.py p0_horse_completion_batch \
+  --bundle <p0_horse_completion_batch_manifest.json> \
+  --region japan \
+  --reviewer-id <active-superuser-id>
+
+python manage.py p0_horse_completion_batch \
+  --prepare-release <p0_horse_completion_batch_manifest.json> \
+  --region japan \
+  --reviewer-id <active-superuser-id>
+```
+
+验收并停步：
+
+- 保存并展示 release-candidate 文件路径与 SHA、commit artifact SHA、batch/combined/research/
+  mapping/authority/production snapshot 全部 bindings、expected actions、existing/create-new
+  publish scope 和 frozen exclusions。
+- `approvals_ledger.jsonl` 只允许新增幂等 `release_candidate_prepared`，不得出现本 candidate 的
+  `release_approved`；不得生成 v2 release manifest。
+- 核对 61 个 reviewed 对象与 candidate scope 精确一致，39 个 blocker 为 0 命中；重复
+  `prepare-release` 必须字节一致、SHA 不变。
+- 至此立即停止。不得传 `--approved-by`，不得执行 `--commit` 或 `--retry-publish`。将精确
+  candidate SHA、预计写入和自动首发清单交给用户；task 5.4 必须取得针对该 SHA 的新授权。
+
+task 5.4（本轮不执行）的入口必须同时包含：
+
+```bash
+--release-candidate-sha256 <用户批准的精确 SHA> \
+--approved-by <独立批准人> \
+--confirm-reviewed-artifact
+```
+
+任何 bundle、mapping、生产 profile 状态、candidate、artifact、账本或 manifest 漂移均 fail
+closed，重新 prepare-release 并重新授权；不得手工改 state/ledger 绕过。
+
 ## task 5.2 精确提交一次性联网执行记录（2026-07-23）
 
 - 本次执行前，受审目标 `5eec316f...` 与生产 HEAD 已从共同父提交分叉。强制切换会回退并行
@@ -273,11 +323,16 @@ approved manifest**。blocked staging 也记为候选成功，且旧解析器未
 3. prepare 成功或异常后立即以 finally 语义恢复 `.env` 与执行容器内
    `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`，启动 worker/beat/race_live_worker，
    验证日志、healthz；不得把网络窗口跨到人工 xlsx 复审。
-4. 用户人工复审 xlsx 后才生成完整子集 bundle，冻结 bundle/release manifest SHA、预计
-   写入和自动首发清单；此步不写库、不公开。
-5. 用户针对精确 bundle/hash、完整子集与自动首发范围重新授权后，才执行 commit
-   `--confirm-reviewed-artifact`；核验幂等复验、auto_first_publish、OperationLog、
-   `/horses/?region=japan` 与徽章。失败只走 `--retry-publish`。
+4. 用户人工复审 xlsx 后才生成完整子集 bundle，再执行无写入 `--prepare-release`，冻结
+   candidate SHA、commit artifact、预计写入和自动首发清单；此步不写库、不公开，也不生成
+   `release_approved`。
+5. 用户针对精确 release-candidate SHA、完整子集、预计写入与自动首发范围重新授权后，才执行
+   带 `--release-candidate-sha256 <sha> --approved-by <name>
+   --confirm-reviewed-artifact` 的 commit；核验 v2 release 反向绑定、幂等复验、
+   auto_first_publish、OperationLog、`/horses/?region=japan` 与徽章。失败只允许在同一冻结 scope
+   上走 `--retry-publish`。禁止绕过 batch wrapper 直接并发调用 standalone v2；即使使用
+   standalone dry-run/commit，也必须由代码自动进入同一可重入 execution lock，并在未落库时
+   复验 current batch manifest/combined 的真实 SHA。
 6. commit 后重复终验网络开关为 false、全部 worker、日志、healthz 与 `/horses/` 200。
 
 2026-07-23 已完成一次安全恢复：备份 `.env.backup.p0-network-disable-
@@ -489,9 +544,9 @@ artifact 目录。前置运维边界沿用既有先例：先备份、临时 swap
 
 本节是滚动批次（每地区默认 100 匹、单批合计不超过 500 匹）的标准操作顺序。
 每批复审产物为 `HORSE_PROFILE_COMPLETION_REVIEW_OUTPUT_DIR/<batch_id>.xlsx`
-单独文件；JSONL artifact 是唯一 commit 凭证。全部写库动作按地区独立
-commit artifact 执行，全局同一时间只允许一个批次处于
-prepared-uncommitted 状态（`serial-window.lock` 互斥）。
+单独文件；正式 commit 凭证是人工批准的精确 release-candidate SHA，candidate 反向绑定
+不可变 JSONL/JSON artifact、预计动作与发布范围。全部写库动作按地区独立执行；state 文件窗口由
+`serial-window.lock` 保护，正式批准到 DB/publish 全窗由 `execution-window.lock` 串行化。
 
 1. 选批（只读，不写任何资料字段）：
    `python manage.py p0_horse_completion_batch --select --regions japan --json`
@@ -511,12 +566,16 @@ prepared-uncommitted 状态（`serial-window.lock` 互斥）。
    （reviewer 必须是 active superuser），按地区生成 research v3、mapping
    decisions、authority manifest 并追加台账。美国地区滚动批次 fail closed，
    需独立批准 authority manifest（首批冻结批准不外推）。
-6. 提交：`--commit <manifest> --region <region> --reviewer-id <id>
-   --approved-by <name> --confirm-reviewed-artifact`。approved-by 必须与
-   reviewer 不是同一人。串行窗口内完成 prepare artifact → release manifest
-   （台账通道，不使用首批仓库白名单）→ dry-run → commit → 自动幂等复验
+6. 准备发布候选（零业务写）：`--prepare-release <manifest> --region <region>
+   --reviewer-id <id>`。记录 candidate/artifact SHA、expected actions、publish scope；重复执行必须
+   SHA 不变。此处停止并取得针对精确 candidate SHA 的独立授权。
+7. 提交：`--commit <manifest> --region <region> --reviewer-id <id>
+   --release-candidate-sha256 <sha> --approved-by <name>
+   --confirm-reviewed-artifact`。approved-by 必须与 reviewer 不是同一人。execution window 内复验
+   真实 candidate/当前输入/ledger，生成 v2 release manifest，再 dry-run → commit → 自动幂等复验
    （planned write 必须为 0，否则命令失败报警，不自动修补）。
-7. 批次放弃：`abandon` 必须给出 reason；staging 与台账保留，禁止静默清理。
+8. 批次放弃：`abandon` 必须给出 reason；staging 与台账保留，禁止静默清理；已有 committed
+   run/checkpoint/manifest 的批次不得 abandon。
 
 内容修复（换马、改字段）必须另起新批次新 artifact；重 commit 必须使用同一
 artifact 字节。生产主机为 2 vCPU / 4 GiB / no swap：禁止无地区全量执行，

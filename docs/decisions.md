@@ -1,5 +1,27 @@
 # 关键决策
 
+## 2026-07-23 P0 正式提交拆分为无批准候选与独立批准
+
+- 人工 xlsx 内容复审不等于生产写入批准。bundle 之后先执行 `prepare-release`，冻结完整子集、
+  commit artifact、预计数据库动作与自动首发范围到精确 candidate SHA；candidate 不含
+  `approved_by`，不写 `release_approved`，不写业务表或公开状态。
+- 新 rolling release 只生成 `p0_horse_production_release_manifest.v2`，并反向绑定真实 candidate
+  SHA；v1 仅用于历史证据的只读复验，不再允许 builder 新建 v1 批准。正式 commit 和 standalone
+  apply 都必须验证 candidate 普通文件、完整 SHA、batch/state、准备事件与有序批准账本；
+  superseded 或 abandoned candidate 永久 fail closed。
+- 自动首发授权集合来自已复审 artifact，而不是地区 batch manifest。只有冻结 disposition 为
+  `attempt_publish_after_commit` 的对象可进入 live gate；hidden、manual lock、already published
+  以及未进 artifact 的 blocker 只进入排除审计，后续状态放宽不能扩大原批准。
+- 文件证据采用按 SHA 命名的不可变快照；账本严格解析 malformed/partial 行并在 append 后
+  flush/fsync。候选替换顺序固定为“写新 manifest（未批准）→ supersede 旧批准 → approve 新
+  manifest”，防止崩溃时新旧同时 active。
+- batch state lock 保护产物与 checkpoint 的短事务，execution lock 串行化正式批准、DB apply、
+  publish/retry 与 abandon。abandon 只允许尚未落库批次；已 committed 的数据库事实不能通过改
+  state 伪装撤回。execution lock 必须按同线程同 batch 可重入实现，锁顺序固定为
+  execution -> state；standalone v2 同样从 validation 持锁到数据库事务退出。artifact 尚未
+  committed 时必须复验 current batch manifest/combined SHA；只有精确 artifact path+SHA 的
+  committed completion run 可改用不可变 snapshot 恢复。
+
 ## 2026-07-23 task 5.2 分叉生产线执行决定
 
 - 本次已批准 task 提交与生产 HEAD 从共同父提交分叉：切换会回退并行已上线功能，合并会产生

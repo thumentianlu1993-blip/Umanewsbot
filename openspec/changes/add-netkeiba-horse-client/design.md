@@ -66,6 +66,144 @@
 - **验收阈值**：不要求来源天然缺失的候选达到 `100/100`，但要求 `unexpected_adapter_error=0`、已支持结构造成的系统性 blocker=0；剩余 blocker 必须字段级可解释。仅完整且经 xlsx 人工复审的子集可以 bundle/commit，并核验自动首发与审计。
 - **运行态恢复**：每个触网窗口结束都必须把 `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false` 注入实际执行容器并验证，不能只改 `.env`。2026-07-23 已恢复 false，web/Nginx 与公开健康检查通过。
 
+### 8. 发布候选与正式批准拆分（task 5.3 门禁修复）
+
+现有 `--bundle` 只生成 research/mapping/authority，而 `--commit` 才生成 commit artifact 与
+release manifest，随后在同一调用内 dry-run、真实写库和自动首发。这样无法在写库前把最终
+artifact SHA、预计动作与自动首发范围交给用户做精确授权；提前调用
+`build_region_release_manifest` 又会把 `approved_by` 和 `release_approved` 写入可信账本，错误地把
+内容复审冒充生产发布批准。
+
+最小改动是在既有 batch command 增加 `--prepare-release` 阶段，并复用
+`prepare_reviewed_p0_completion_artifact`：
+
+1. `--bundle` 仍生成并冻结 research/mapping/authority，仅纳入无 `failure_reason` 的完整子集。
+2. `--prepare-release` 重算并规范写出 `commit_artifact_{region}.json`，从 artifact 自带的
+   `expected_actions` 读取预计 profile/race/source/audit 动作。commit artifact 现有
+   `prepared_at=now()` 会导致同一输入得到不同 SHA，因此本阶段为准备函数增加可选的确定性
+   `prepared_at`：batch 路径固定使用已冻结 mapping 的人工审核时间，旧入口不传参时保持原行为。
+   正式 commit 重算时复用 candidate 绑定的同一时间值。
+3. 自动首发范围必须从 commit artifact 的已复审行推导，不能复用当前
+   `_run_region_publish` 的“整个地区 batch manifest”集合。后者会把 39 个 blocker 也列为发布
+   目标，是本门禁必须一并封闭的越界。对 artifact 中 `update_existing` 记录精确 profile ID；
+   对 `create_new` 记录确定性 identity key，并在 commit 后只加入本次 completion run 实际创建的
+   profile。对既有 profile 另记录当前
+   `review_status`、hidden/manual-lock 状态和预计 disposition
+   （`attempt_publish_after_commit` / `skip_already_published` / `block_hidden` /
+   `block_manual_lock`）。未进入 artifact 的 blocker 不得出现在 candidate 或自动首发目标中。
+4. 生成 `p0_horse_production_release_candidate.v1`，状态固定
+   `pending_independent_release_approval`，绑定 batch manifest SHA、combined artifact SHA、
+   三个 bundle SHA、commit artifact SHA、production snapshot SHA、预计动作与自动首发范围。
+   candidate 不含 `approved_by`，只写 `release_candidate_prepared` 证据事件，不写
+   `release_approved`。
+5. commit artifact、candidate 与正式 v2 release manifest 均按完整 SHA 使用候选专属不可变路径，
+   不复用会被下一候选覆盖的地区固定文件名。batch state 的 `release_candidate:{region}` 只作为当前
+   待批准候选指针，同时保留按 SHA 索引的历史记录。重复 prepare 若输入和生产快照未变，
+   应产生字节一致的 candidate。为保证确定性，candidate 不写易变生成时间；人工审核时间沿用已冻结
+   mapping。candidate 文件原子替换、state 写入、账本查重与
+   `release_candidate_prepared` 追加必须全部位于现有 batch serial/file lock 内；查重在持锁后执行，
+   因而相同 candidate SHA 的重复或并发 prepare 都只产生一条证据事件。
+6. `--commit` 新增必填 `--release-candidate-sha256`。提交前重新加载 candidate、重算 artifact、
+   预计动作和自动首发范围并逐项比较；任何差异均在正式 release manifest 和数据库事务前阻断。
+7. 用户授权后才生成正式 manifest。既有
+   `p0_horse_production_release_manifest.v1` 继续只服务历史 trusted/rolling release 的复验，
+   validator 保持其原五项 bindings 合同；新 rolling release 使用
+   `p0_horse_production_release_manifest.v2`，其 bindings 在原五项之外强制新增
+   `release_candidate_sha256`。builder 不再生成新 v1，validator 按 schema 分支校验，防止破坏旧发布
+   回放。
+8. 同一 candidate 只能对应一个正式 release manifest。首次批准在 batch serial/file lock 内写入
+   `approved_by` 与唯一 `approved_at`，原子发布 manifest，幂等追加 `release_approved` 后写 state；
+   重复 commit 必须复用相同 manifest/SHA。若进程在 manifest 或账本写入后、state 写入前崩溃，
+   恢复逻辑应从同目录 manifest 与账本验证 candidate SHA、approver 和 executor 后复用，不得生成
+   新批准。相同 candidate 以不同 approver 重试时 fail closed。数据库 commit 后崩溃继续依赖既有
+   artifact 幂等语义，publish retry 始终使用 candidate 冻结的 reviewed scope。
+9. 若旧 candidate 已批准但尚无 `HorseProfileCompletionRun(COMMITTED)` 或等价 artifact 落库证据，
+   新一轮 `prepare-release` 与针对新 SHA 的明确授权可以推进到新的候选专属 v2 manifest；系统保留
+   旧 manifest/ledger，并幂等追加 `release_superseded` 关联旧、新 candidate/release SHA。若旧
+   artifact 已落库，则严禁换候选，必须按旧 candidate 做幂等恢复，防止一批多次提交。
+10. 正式 manifest 已存在但数据库尚未落库时，每次 commit 重试仍必须重新生成 artifact、预计动作和
+   当前自动首发范围，与已批准 candidate 逐项比较。`hidden_at`、`review_status`、manual lock 等任何
+   发布资格漂移都在 DB 写入前阻断并要求新 candidate/new SHA 授权；只有确认 artifact 已完整落库后，
+   才可跳过“提交前当前状态”比较进入幂等复验与 candidate 冻结范围的 publish recovery。
+11. 后续 dry-run、commit、幂等复验和自动首发保持既有顺序；任何失败均不得把 scope 回退为地区
+   batch manifest 全集。旧 commit state 若没有 `publish_scope`，`retry-publish` 必须明确
+   fail closed 并要求走人工审计恢复，不能用空集合调用发布服务后误标成功。
+12. candidate bindings 中 research/mapping/authority SHA 以刚生成 commit artifact 的
+   `inputs.*.sha256` 为事实来源，并在任何 artifact/candidate/state/ledger 落盘前与 bundle state
+   声明逐项核对；bundle 文件被一致替换但 state 未同步时直接拒绝 prepare，不生成“可展示但不可提交”
+   的 candidate。
+13. `prepare-release` 校验当前 bundle 后，把 research/mapping/authority 原始字节复制到按 SHA 命名
+    的候选不可变输入路径，并让 commit artifact 的 `inputs.*.path` 指向这些快照。DB 前重试与
+    DB 后幂等恢复都只从 candidate 历史记录和不可变输入复验，不依赖可能被后续 `--bundle` 覆盖的
+    region-current 文件；因此已落库 A 在重做 bundle 后仍能按 A 恢复 publish，而新 B 仍因 A 已
+    落库被拒绝。
+14. commit 不得在取得 batch serial/file lock 前读取 combined、state 或 current bundle 决定候选
+    有效性。所有校验移入锁内；未落库候选至少再次核对当前 combined SHA，已落库恢复使用 candidate
+    冻结的不可变输入和 SHA，避免锁等待期间读取旧值的 TOCTOU。
+15. v1 release manifest 兼容仅限 validator 读取和复验已有证据；rolling release builder 不再接受
+    空 candidate SHA，也不得新建 ledger-backed v1 批准。测试历史兼容时使用已冻结 fixture，而非
+    调用生产 builder 生成新 v1。
+16. 自动首发执行范围必须同时满足“位于 candidate”与冻结
+    `disposition=attempt_publish_after_commit`。`block_hidden`、`block_manual_lock`、
+    `skip_already_published` 只进入排除审计，不得因 commit 后/重试前 live 状态放宽而被发布；live
+    gate 只可在冻结尝试集合上进一步收紧。
+17. batch serial/file lock 下沉为 batch 服务共享合同；会重写 combined 或 region-current
+    research/mapping/authority/state 的 `--prepare`、`--bundle`，以及 `--prepare-release`、
+    `--commit` 必须从文件生成到 state 写入全程使用同一把锁，避免 read-modify-write 丢更新。
+    不可变 snapshot 同时要求目标为普通文件、拒绝 symlink，并以独占/原子发布方式避免非合作覆盖。
+18. 数据库事务成功后若需要暂时释放锁，写 completion-run 元数据、`commit:{region}` checkpoint、
+    publish state/ledger 前必须重新取得同一 batch lock、重新读取最新 state 并合并；publish 的
+    state 更新保持在该锁内。DB commit 与二次加锁之间进入的 bundle/prepare-release 必须依据 DB
+    artifact 落库证据安全拒绝或完成，其 state 更新不得被旧内存 state 覆盖。
+19. rolling release builder 除精确 SHA 外必须接收并加载真实 candidate path，验证普通文件、
+    字节 SHA、schema/status、batch/region/executor、artifact SHA、五项输入 bindings、
+    expected actions 与冻结 publish scope 均和待签发 release 上下文一致。builder 自身是正式批准
+    边界，不能依赖上层 commit 已做过校验；任意伪造 64 位 hex 或错 candidate 文件均不得生成
+    manifest/ledger。
+20. 新增独立 `batch-execution` lock，正式 commit 从旧候选失效、新候选批准、DB apply/复验到
+    checkpoint/inline publish 全程持有；共享 state lock 只在短文件/state 窗口内嵌套，所有路径统一
+    按 execution -> state 顺序取锁。`--abandon` 同样先取 execution 再取 state，因此不会在 DB gap
+    插入终止；取得锁后若 state 已 abandoned，commit 在批准/DB/publish 前后检查并 fail closed。
+21. supersede/approve 账本顺序固定为：原子写新 manifest（尚未批准）-> 幂等追加旧 candidate 的
+    `release_superseded` -> 追加新 manifest 的 `release_approved`。这样任一崩溃点最多导致暂时没有
+    active 新批准，不会出现旧、新同时可提交；同批 execution lock 防止旧 candidate 在转换中执行。
+22. release manifest 崩溃恢复只接受非 symlink 普通文件，且文件名内 SHA 必须等于当前完整字节
+    SHA；payload key 集、approved_by/approved_at/decision_reference/executor/region/ledger path/
+    bindings 必须全量符合原签发合同。任何改字节导致文件名不匹配时不得补写 `release_approved`。
+23. `auto_publish_profiles` 在 PostgreSQL 下必须在每匹马的 `transaction.atomic()` 内按 ID
+    `select_for_update()` 后再评估 live gate 与状态迁移；调用方不得在事务外求值带
+    `select_for_update()` 的 QuerySet。SQLite/TestCase 绿色不能替代这一事务边界回归。
+24. 通用 production apply 的 v2 validator 必须从 release manifest 目录按 region+candidate SHA
+    推导并加载真实 candidate，复验普通文件/SHA/schema/status/metadata/artifact bindings/actions，
+    以及 state history 和 `release_candidate_prepared`。它必须严格按 ledger 顺序计算 active
+    approval：找到 release_approved 后若存在指向该 release/candidate 的后续
+    `release_superseded`，所有 direct dry-run/commit 入口都拒绝旧 A。
+25. ledger parser 统一严格模式：任何非空 malformed/partial 行均转为业务层 fail-closed 错误，不能
+    静默跳过潜在 supersede；append 前先严格验证现有文件，使用单条完整写、flush 与 fsync。尾部破损
+    只允许人工审计修复，不由正式 apply/builder 猜测截断。
+26. abandon 仅适用于尚未落库的批次。在 execution lock 内同时检查 manifest/state 的 commit/publish
+    checkpoint 与 candidate 专属 artifact 的 committed completion-run 证据；任一存在即拒绝
+    abandoned 终态，不伪装成已撤回生产写入。
+27. 自动发布报告仅在每匹 `transaction.atomic()` 成功退出后增加 published/ID，避免 deferred
+    commit failure 同时计为成功和 error；多次 retry 的累计基线优先使用此前
+    `cumulative_published_profile_ids`，再合并本次结果。
+28. 通用 v2 validator 读取 candidate state 时必须把 `state.stage=abandoned` 或 batch manifest
+    `status=abandoned` 视为永久拒绝，复验 manifest schema/internal SHA；因此已批准但 DB 前停止的
+    batch 不能再被 standalone direct apply 复活。
+29. strict ledger 按事件 schema/version 验证。新 `auto_first_publish` 事件显式标记 v2 并强制
+    frozen exclusion 字段；升级前无版本的 legacy 事件允许缺少这些新字段，读取时仅在内存归一为空
+    集合，原始 JSONL 不修改。malformed JSON 和已声明 v2 却缺字段仍 fail closed。
+30. `batch_execution_window` 对同线程同 batch 可重入。通用 v2 dry-run/commit 必须从 candidate
+    validation 到 DB transaction 完整持有该 execution lock；batch wrapper 的嵌套调用复用同一
+    lease。这样 A 校验后，B 不能在 A 落库前追加 supersede；锁后若 A 已失效则 DB 零写。
+31. 通用 v2 validator 对尚未 committed 的 artifact 复验 candidate 绑定与当前 batch manifest
+    实际内部 SHA、当前 combined 文件完整 SHA；manifest 或 combined 重生成后 stale candidate 的
+    direct dry-run/commit 均拒绝。只有以 committed completion-run + 精确 artifact path/SHA 确认
+    已完整落库时，幂等恢复才改用 candidate 不可变 snapshot，不依赖 region-current 输入。
+
+release candidate 是“待批准的精确施工方案”，不是 release manifest，也不进入现有可信发布批准
+校验。正式 commit 仍只接受带独立批准账本事件的 release manifest，因此该拆分不降低既有写入门禁。
+
 ## Risks / Trade-offs
 
 - [页面结构脆弱] -> 解析器按表格标签语义定位而非绝对位置；结构不识别即 fail closed，配 fixture 回归。
@@ -81,6 +219,9 @@
 4. 第二轮生产 fixture 先写 RED：`抹消` 标题、字段级 identity blocker、异常履历行、parser version fingerprint；再最小实现至 GREEN。
 5. 独立方案复审、代码复审与本地验证通过后，重新取得精确代码版本的部署/触网授权；部署后保留并 abandon 旧批次，新建日本批次只执行到 prepare 与 xlsx；prepare 成功或异常后立即在 finally 路径恢复并验证 `ALLOW_NETWORK=false` 和 worker，不等待人工复审。
 6. 用户人工复审 xlsx 后冻结 bundle/hash；再取得绑定该 bundle/hash、完整子集与自动公开首发范围的精确 commit 授权，最后执行 commit、首发验收与网络开关恢复。
+7. task 5.3 先执行 `--bundle` 与 `--prepare-release`，向用户展示 release-candidate SHA、全部
+   bindings、预计写入和自动首发范围；取得该精确 candidate SHA 授权后，task 5.4 才生成正式
+   release manifest 并执行 commit。
 
 ## Resolved Questions
 

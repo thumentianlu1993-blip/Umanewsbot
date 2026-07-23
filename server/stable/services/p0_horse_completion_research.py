@@ -16,12 +16,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import re
+import stat
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from stable.services.p0_horse_completion_batch import (
+    BatchRunState,
+    P0_HORSE_BATCH_MANIFEST_FILENAME,
     P0HorseBatchError,
+    _append_approvals_ledger,
     _utcnow_iso,
+    load_batch_manifest,
+    read_approvals_ledger,
 )
 from stable.services.p0_horse_profiles import REQUIRED_COMPLETION_MODULES
 from stable.services.p0_horse_production_apply import (
@@ -368,7 +377,6 @@ def build_region_approval_bundle(
     mapping_path = out_dir / f"mapping_decisions_{region}.json"
     mapping_sha = _write_canonical(mapping_path, mapping)
 
-    ledger_path = Path(batch_dir) / "approvals_ledger.jsonl"
     ledger_entry = {
         "event": "region_modules_approved",
         "region": region,
@@ -379,8 +387,7 @@ def build_region_approval_bundle(
         "approved_at": approved_at,
         "horse_count": len(rows),
     }
-    with ledger_path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(ledger_entry, ensure_ascii=False, sort_keys=True) + "\n")
+    _append_approvals_ledger(Path(batch_dir), ledger_entry)
 
     return {
         "research_path": research_file,
@@ -396,6 +403,7 @@ def build_region_approval_bundle(
 
 
 RELEASE_MANIFEST_SCHEMA = "p0_horse_production_release_manifest.v1"
+RELEASE_MANIFEST_SCHEMA_V2 = "p0_horse_production_release_manifest.v2"
 
 
 def build_region_release_manifest(
@@ -408,6 +416,10 @@ def build_region_release_manifest(
     batch_dir: str | Path,
     region: str,
     decision_reference: str = "p0-horse-completion-batch",
+    release_candidate_path: str | Path | None = None,
+    release_candidate_sha256: str | None = None,
+    expected_publish_scope: dict[str, Any] | None = None,
+    superseded_releases: list[dict[str, Any]] | None = None,
     now=None,
 ) -> dict[str, Any]:
     """Create the rolling-batch release manifest after artifact preparation.
@@ -417,6 +429,40 @@ def build_region_release_manifest(
     (the rolling-batch replacement for the repository trusted allowlist).
     ``approved_by`` must be a different person than the DB executor reviewer.
     """
+    candidate_sha = str(release_candidate_sha256 or "").strip()
+    if not re.fullmatch(r"[0-9a-f]{64}", candidate_sha):
+        raise P0HorseBatchError(
+            "rolling release manifest requires an exact release candidate SHA-256"
+        )
+    batch_root = Path(batch_dir)
+    approval_dir = batch_root / "approval"
+    candidate_file = Path(str(release_candidate_path or ""))
+    expected_candidate_path = (
+        approval_dir / f"release_candidate_{region}_{candidate_sha}.json"
+    )
+    try:
+        candidate_mode = candidate_file.lstat().st_mode
+    except OSError as exc:
+        raise P0HorseBatchError("release candidate file is unreadable") from exc
+    if (
+        candidate_file.is_symlink()
+        or not stat.S_ISREG(candidate_mode)
+        or candidate_file.absolute() != expected_candidate_path.absolute()
+    ):
+        raise P0HorseBatchError(
+            "release candidate must be the immutable regular file for this batch"
+        )
+    try:
+        candidate_bytes = candidate_file.read_bytes()
+        candidate = json.loads(candidate_bytes)
+    except (OSError, ValueError) as exc:
+        raise P0HorseBatchError("release candidate file is unreadable") from exc
+    if (
+        not isinstance(candidate, dict)
+        or _sha256_bytes(candidate_bytes) != candidate_sha
+    ):
+        raise P0HorseBatchError("release candidate SHA-256 mismatch")
+
     artifact_file = Path(artifact_path)
     try:
         artifact_bytes = artifact_file.read_bytes()
@@ -426,6 +472,9 @@ def build_region_release_manifest(
     actual_sha = _sha256_bytes(artifact_bytes)
     if actual_sha != artifact_sha256:
         raise P0HorseBatchError("commit artifact SHA-256 mismatch")
+    manifest = load_batch_manifest(
+        batch_root / P0_HORSE_BATCH_MANIFEST_FILENAME
+    )
     approved_by_text = str(approved_by or "").strip()
     if not approved_by_text:
         raise P0HorseBatchError("release manifest requires approved_by")
@@ -452,35 +501,249 @@ def build_region_release_manifest(
     if bindings["profile_mapping_decisions_sha256"] != bundle["mapping_sha256"]:
         raise P0HorseBatchError("release binding mapping SHA does not match the approval bundle")
 
-    approved_at = _utcnow_iso(now)
-    ledger_path = Path(batch_dir) / "approvals_ledger.jsonl"
-    release = {
-        "schema_version": RELEASE_MANIFEST_SCHEMA,
+    research = {}
+    try:
+        research = json.loads(Path(bundle["research_path"]).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise P0HorseBatchError("release candidate research is unreadable") from exc
+    combined_sha = (
+        (research.get("generated_from") or {}).get(
+            "combined_candidates_sha256"
+        )
+    )
+    candidate_bindings = candidate.get("bindings") or {}
+    expected_candidate_bindings = {
+        "batch_manifest_sha256": candidate_bindings.get(
+            "batch_manifest_sha256"
+        ),
+        "combined_candidates_sha256": combined_sha,
+        **bindings,
+    }
+    state = BatchRunState.read(batch_root)
+    history = state.artifacts.get(
+        f"release_candidate:{region}:{candidate_sha}"
+    )
+    ledger_path = batch_root / "approvals_ledger.jsonl"
+    ledger_entries = read_approvals_ledger(batch_root)
+    prepared_event_matches = any(
+        event.get("event") == "release_candidate_prepared"
+        and event.get("batch_id") == manifest["batch_id"]
+        and event.get("region") == region
+        and event.get("release_candidate_sha256") == candidate_sha
+        and event.get("artifact_sha256") == artifact_sha256
+        for event in ledger_entries
+    )
+    if (
+        not isinstance(history, dict)
+        or history.get("path") != str(candidate_file)
+        or history.get("sha256") != candidate_sha
+        or history.get("artifact_path") != str(artifact_file)
+        or history.get("artifact_sha256") != artifact_sha256
+        or history.get("publish_scope") != expected_publish_scope
+        or not prepared_event_matches
+    ):
+        raise P0HorseBatchError(
+            "release candidate has no matching frozen batch evidence"
+        )
+    if (
+        candidate.get("schema_version")
+        != "p0_horse_production_release_candidate.v1"
+        or candidate.get("status")
+        != "pending_independent_release_approval"
+        or candidate.get("batch_id") != manifest["batch_id"]
+        or candidate.get("region") != region
+        or candidate.get("executor_reviewer_id") != reviewer.id
+        or candidate.get("artifact_prepared_at") != artifact.get("prepared_at")
+        or candidate_bindings != expected_candidate_bindings
+        or candidate.get("expected_actions") != artifact.get("expected_actions")
+        or candidate.get("auto_first_publish_scope")
+        != expected_publish_scope
+    ):
+        raise P0HorseBatchError(
+            "release candidate does not match the release context"
+        )
+    current_batch_sha = manifest.get("batch_sha256")
+    if (
+        manifest.get("status") != "committed"
+        and candidate_bindings.get("batch_manifest_sha256")
+        != current_batch_sha
+    ):
+        raise P0HorseBatchError(
+            "release candidate batch manifest binding drifted"
+        )
+
+    bindings["release_candidate_sha256"] = candidate_sha
+    schema_version = RELEASE_MANIFEST_SCHEMA_V2
+    history_key = f"release_candidate:{region}:{candidate_sha}"
+    pending_release = history.get("pending_release")
+    recorded_release_path = history.get("release_path")
+    if isinstance(pending_release, dict):
+        release_path = Path(str(pending_release.get("path") or ""))
+        release_sha = str(pending_release.get("sha256") or "")
+        release = pending_release.get("release")
+    elif recorded_release_path:
+        release_path = Path(str(recorded_release_path))
+        release_sha = str(history.get("release_sha256") or "")
+        release = None
+    else:
+        approved_at = _utcnow_iso(now)
+        release = {
+            "schema_version": schema_version,
+            "approved_by": approved_by_text,
+            "approved_at": approved_at,
+            "decision_reference": str(decision_reference),
+            "executor_reviewer_id": reviewer.id,
+            "region": region,
+            "approvals_ledger_path": str(ledger_path),
+            "bindings": bindings,
+        }
+        release_bytes = _canonical_bytes(release) + b"\n"
+        release_sha = _sha256_bytes(release_bytes)
+        release_path = approval_dir / (
+            f"release_manifest_{region}_{release_sha}.json"
+        )
+        history = {
+            **history,
+            "pending_release": {
+                "path": str(release_path),
+                "sha256": release_sha,
+                "release": release,
+            },
+        }
+        state.artifacts[history_key] = history
+        state.write()
+
+    expected_release_keys = {
+        "schema_version",
+        "approved_by",
+        "approved_at",
+        "decision_reference",
+        "executor_reviewer_id",
+        "region",
+        "approvals_ledger_path",
+        "bindings",
+    }
+    if release is None:
+        try:
+            release = json.loads(release_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise P0HorseBatchError(
+                "existing release manifest is unreadable"
+            ) from exc
+    try:
+        approved_at_value = datetime.fromisoformat(
+            str(release.get("approved_at") or "").replace("Z", "+00:00")
+        )
+    except ValueError as exc:
+        raise P0HorseBatchError(
+            "existing release manifest approval time is invalid"
+        ) from exc
+    expected_release = {
+        "schema_version": schema_version,
         "approved_by": approved_by_text,
-        "approved_at": approved_at,
+        "approved_at": release.get("approved_at"),
         "decision_reference": str(decision_reference),
         "executor_reviewer_id": reviewer.id,
         "region": region,
         "approvals_ledger_path": str(ledger_path),
         "bindings": bindings,
     }
-    release_path = Path(batch_dir) / "approval" / f"release_manifest_{region}.json"
-    release_sha = _write_canonical(release_path, release)
-    with ledger_path.open("a", encoding="utf-8") as handle:
-        handle.write(
-            json.dumps(
-                {
-                    "event": "release_approved",
-                    "region": region,
-                    "release_manifest_sha256": release_sha,
-                    "approved_by": approved_by_text,
-                    "approved_at": approved_at,
-                    "decision_reference": str(decision_reference),
-                },
-                ensure_ascii=False,
-                sort_keys=True,
+    if (
+        set(release) != expected_release_keys
+        or approved_at_value.tzinfo is None
+        or approved_at_value.utcoffset() is None
+        or release != expected_release
+    ):
+        raise P0HorseBatchError(
+            "existing release manifest does not match the signing contract"
+        )
+    expected_release_path = approval_dir / (
+        f"release_manifest_{region}_{release_sha}.json"
+    )
+    if release_path.absolute() != expected_release_path.absolute():
+        raise P0HorseBatchError("release manifest path does not match its SHA")
+
+    if os.path.lexists(release_path):
+        try:
+            release_mode = release_path.lstat().st_mode
+            release_bytes = release_path.read_bytes()
+        except OSError as exc:
+            raise P0HorseBatchError(
+                "existing release manifest is unreadable"
+            ) from exc
+        if release_path.is_symlink() or not stat.S_ISREG(release_mode):
+            raise P0HorseBatchError(
+                "existing release manifest must be a regular file"
             )
-            + "\n"
+        if (
+            _sha256_bytes(release_bytes) != release_sha
+            or release_bytes != _canonical_bytes(release) + b"\n"
+        ):
+            raise P0HorseBatchError(
+                "existing release manifest filename SHA does not match bytes"
+            )
+    else:
+        pending_path = approval_dir / (
+            f".release_manifest_{region}_{candidate_sha}.pending"
+        )
+        written_sha = _write_canonical(pending_path, release)
+        if written_sha != release_sha:
+            pending_path.unlink(missing_ok=True)
+            raise P0HorseBatchError("release manifest signing bytes drifted")
+        os.replace(pending_path, release_path)
+
+    superseded_releases = superseded_releases or []
+    for old_release in superseded_releases:
+        if old_release.get("candidate_sha256") == candidate_sha:
+            continue
+        old_release_sha = str(old_release.get("sha256") or "")
+        supersede_event = {
+            "event": "release_superseded",
+            "region": region,
+            "old_release_candidate_sha256": old_release[
+                "candidate_sha256"
+            ],
+            "old_release_manifest_sha256": old_release_sha,
+            "new_release_candidate_sha256": candidate_sha,
+            "new_release_manifest_sha256": release_sha,
+        }
+        if not any(
+            entry.get("event") == "release_superseded"
+            and entry.get("old_release_manifest_sha256")
+            == old_release_sha
+            for entry in read_approvals_ledger(batch_root)
+        ):
+            _append_approvals_ledger(batch_root, supersede_event)
+
+    ledger_entries = read_approvals_ledger(batch_root)
+    matching_approvals = [
+        entry
+        for entry in ledger_entries
+        if entry.get("event") == "release_approved"
+        and entry.get("release_manifest_sha256") == release_sha
+    ]
+    for entry in matching_approvals:
+        if (
+            entry.get("region") != region
+            or entry.get("approved_by") != approved_by_text
+            or entry.get("approved_at") != release["approved_at"]
+            or entry.get("decision_reference")
+            != str(decision_reference)
+        ):
+            raise P0HorseBatchError(
+                "release approval ledger does not match the signed manifest"
+            )
+    if not matching_approvals:
+        _append_approvals_ledger(
+            batch_root,
+            {
+                "event": "release_approved",
+                "region": region,
+                "release_manifest_sha256": release_sha,
+                "approved_by": approved_by_text,
+                "approved_at": release["approved_at"],
+                "decision_reference": str(decision_reference),
+            },
         )
     return {
         "release_path": release_path,

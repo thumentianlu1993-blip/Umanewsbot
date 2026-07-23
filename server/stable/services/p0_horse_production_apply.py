@@ -61,6 +61,7 @@ MAPPING_SCHEMA = "p0-horse-profile-mapping-decisions.v1"
 RESEARCH_SCHEMA = "p0-horse-research.v3"
 AUTHORITY_SCHEMA = "p0-horse-us-career-source-authority-review.v1"
 RELEASE_MANIFEST_SCHEMA = "p0_horse_production_release_manifest.v1"
+RELEASE_MANIFEST_SCHEMA_V2 = "p0_horse_production_release_manifest.v2"
 # Phase A is deliberately prepare-only. Phase B must add the exact independently
 # approved manifest byte SHA here in a reviewed repository change.
 TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256: tuple[str, ...] = (
@@ -214,6 +215,28 @@ def _load_json_once(
     if not isinstance(payload, dict):
         _fail(f"{label} must be a JSON object")
     return FrozenJsonInput(path=str(path), sha256=actual_sha256, payload=payload)
+
+
+@contextmanager
+def _production_release_execution_window(
+    *,
+    release_manifest_path: str | Path,
+    release_manifest_sha256: str,
+):
+    """Route rolling v2 validation and apply through its batch execution lock."""
+    release_input = _load_json_once(
+        release_manifest_path,
+        label="production release manifest",
+        expected_sha256=release_manifest_sha256,
+    )
+    if release_input.payload.get("schema_version") != RELEASE_MANIFEST_SCHEMA_V2:
+        yield release_input
+        return
+    from stable.services.p0_horse_completion_batch import batch_execution_window
+
+    batch_dir = Path(release_manifest_path).resolve().parent.parent
+    with batch_execution_window(batch_dir):
+        yield release_input
 
 
 def _normalized(value: Any) -> str:
@@ -1066,6 +1089,7 @@ def prepare_reviewed_p0_completion_artifact(
     profile_mapping_decisions_path: str | Path | None,
     reviewer_id: int,
     prepared_by: str = "codex",
+    prepared_at: str | None = None,
 ) -> dict[str, Any]:
     if profile_mapping_decisions_path is None:
         _fail("profile mapping decisions artifact is required")
@@ -1178,7 +1202,7 @@ def prepare_reviewed_p0_completion_artifact(
             "is_superuser": mapping_reviewer.is_superuser,
         },
         "prepared_by": str(prepared_by or "codex"),
-        "prepared_at": timezone.now().isoformat(),
+        "prepared_at": str(prepared_at or timezone.now().isoformat()),
         "production_snapshot_sha256": mapping["production_snapshot_sha256"],
         "inputs": {
             "research_v3": {"path": str(research_v3_path), "sha256": research_sha},
@@ -1284,6 +1308,9 @@ def _validate_rolling_release_ledger(
     release_sha256: str,
     *,
     release_manifest_path: str | Path,
+    candidate: dict[str, Any] | None = None,
+    candidate_sha256: str = "",
+    artifact_sha256: str = "",
 ) -> None:
     """Rolling-batch approval channel: append-only ledger binding.
 
@@ -1308,26 +1335,260 @@ def _validate_rolling_release_ledger(
             "production release approvals ledger must live in the batch state "
             "directory of the release manifest"
         )
+    from stable.services.p0_horse_completion_batch import (
+        P0HorseBatchError,
+        read_approvals_ledger,
+    )
+
     try:
-        lines = ledger_path.read_text(encoding="utf-8").splitlines()
-    except OSError as exc:
-        _fail(f"production release approvals ledger is unreadable: {exc}")
-    for line in lines:
-        if not line.strip():
-            continue
-        try:
-            entry = json.loads(line)
-        except ValueError:
-            continue
+        entries = read_approvals_ledger(ledger_path.parent)
+    except P0HorseBatchError as exc:
+        _fail(f"production release approvals ledger is invalid: {exc}")
+    approval_index = None
+    for index, entry in enumerate(entries):
         if (
             entry.get("event") == "release_approved"
             and entry.get("release_manifest_sha256") == release_sha256
         ):
-            return
-    _fail(
-        "production release manifest SHA has no release_approved entry in the "
-        "batch approvals ledger"
+            approval_index = index
+            break
+    if approval_index is None:
+        _fail(
+            "production release manifest SHA has no release_approved entry in the "
+            "batch approvals ledger"
+        )
+    if candidate is None:
+        return
+    prepared_index = next(
+        (
+            index
+            for index, entry in enumerate(entries[:approval_index])
+            if entry.get("event") == "release_candidate_prepared"
+            and entry.get("batch_id") == candidate.get("batch_id")
+            and entry.get("region") == candidate.get("region")
+            and entry.get("release_candidate_sha256") == candidate_sha256
+            and entry.get("artifact_sha256") == artifact_sha256
+        ),
+        None,
     )
+    if prepared_index is None:
+        _fail(
+            "production release candidate has no preceding "
+            "release_candidate_prepared evidence"
+        )
+    for entry in entries[approval_index + 1 :]:
+        if entry.get("event") != "release_superseded":
+            continue
+        if (
+            entry.get("old_release_manifest_sha256") == release_sha256
+            or entry.get("old_release_candidate_sha256")
+            == candidate_sha256
+        ):
+            _fail("production release manifest was superseded")
+
+
+def _validate_release_candidate_scope(scope: Any) -> None:
+    if not isinstance(scope, dict) or set(scope) != {
+        "existing_profiles",
+        "create_new_identities",
+    }:
+        _fail("production release candidate publish scope structure is invalid")
+    existing = scope["existing_profiles"]
+    create_new = scope["create_new_identities"]
+    if not isinstance(existing, list) or not isinstance(create_new, list):
+        _fail("production release candidate publish scope collections are invalid")
+    existing_dispositions = {
+        "attempt_publish_after_commit",
+        "skip_already_published",
+        "block_hidden",
+        "block_manual_lock",
+    }
+    for item in existing:
+        if (
+            not isinstance(item, dict)
+            or set(item)
+            != {
+                "profile_id",
+                "review_status",
+                "hidden",
+                "manual_lock",
+                "disposition",
+            }
+            or isinstance(item["profile_id"], bool)
+            or not isinstance(item["profile_id"], int)
+            or not isinstance(item["hidden"], bool)
+            or not isinstance(item["manual_lock"], bool)
+            or item["disposition"] not in existing_dispositions
+        ):
+            _fail("production release candidate existing-profile scope is invalid")
+    for item in create_new:
+        if (
+            not isinstance(item, dict)
+            or set(item)
+            != {"deterministic_identity_key", "horse_name", "disposition"}
+            or not str(item["deterministic_identity_key"] or "").strip()
+            or not str(item["horse_name"] or "").strip()
+            or item["disposition"] != "attempt_publish_after_commit"
+        ):
+            _fail("production release candidate new-identity scope is invalid")
+
+
+def _artifact_has_exact_committed_run(
+    artifact_path: str | Path,
+    artifact_sha256: str,
+) -> bool:
+    runs = HorseProfileCompletionRun.objects.filter(
+        status=HorseCompletionRunStatus.COMMITTED,
+        artifact_path=str(artifact_path),
+    ).only("parameters")
+    return any(
+        (run.parameters or {}).get("artifact_sha256") == artifact_sha256
+        for run in runs
+    )
+
+
+def _load_and_validate_release_candidate(
+    *,
+    release: dict[str, Any],
+    release_manifest_path: str | Path,
+    candidate_sha256: str,
+    artifact: dict[str, Any],
+    artifact_path: str | Path,
+    artifact_sha256: str,
+    expected_release_bindings: dict[str, str],
+) -> dict[str, Any]:
+    from stable.services.p0_horse_completion_batch import (
+        BatchRunState,
+        P0_HORSE_BATCH_SCHEMA_VERSION,
+        P0HorseBatchError,
+        _manifest_sha256,
+    )
+
+    release_dir = Path(release_manifest_path).resolve().parent
+    region = str(release.get("region") or "").strip()
+    if not region:
+        _fail("production release manifest region is missing")
+    candidate_path = release_dir / (
+        f"release_candidate_{region}_{candidate_sha256}.json"
+    )
+    candidate_input = _load_json_once(
+        candidate_path,
+        label="production release candidate",
+        expected_sha256=candidate_sha256,
+    )
+    candidate = candidate_input.payload
+    batch_dir = release_dir.parent
+    batch_manifest = _load_json_once(
+        batch_dir / "batch_manifest.json",
+        label="production release batch manifest",
+    ).payload
+    if (
+        batch_manifest.get("schema_version")
+        != P0_HORSE_BATCH_SCHEMA_VERSION
+        or batch_manifest.get("batch_sha256")
+        != _manifest_sha256(batch_manifest)
+    ):
+        _fail("production release batch manifest schema or internal SHA is invalid")
+    batch_status = batch_manifest.get("status")
+    if batch_status == "abandoned":
+        _fail("production release batch manifest is abandoned")
+    if batch_status not in {"approved", "committed"}:
+        _fail("production release batch manifest status is invalid")
+    candidate_bindings = candidate.get("bindings")
+    expected_candidate_binding_keys = {
+        "batch_manifest_sha256",
+        "combined_candidates_sha256",
+        *expected_release_bindings,
+    }
+    if (
+        not isinstance(candidate_bindings, dict)
+        or set(candidate_bindings) != expected_candidate_binding_keys
+        or any(
+            candidate_bindings.get(key) != value
+            for key, value in expected_release_bindings.items()
+        )
+        or not SHA256_RE.fullmatch(
+            str(candidate_bindings.get("batch_manifest_sha256") or "")
+        )
+        or not SHA256_RE.fullmatch(
+            str(candidate_bindings.get("combined_candidates_sha256") or "")
+        )
+    ):
+        _fail("production release candidate bindings do not match the artifact")
+    _validate_release_candidate_scope(
+        candidate.get("auto_first_publish_scope")
+    )
+    if (
+        candidate.get("schema_version")
+        != "p0_horse_production_release_candidate.v1"
+        or candidate.get("status")
+        != "pending_independent_release_approval"
+        or candidate.get("batch_id") != batch_manifest.get("batch_id")
+        or candidate.get("region") != region
+        or candidate.get("executor_reviewer_id")
+        != release.get("executor_reviewer_id")
+        or candidate.get("executor_reviewer_id") != artifact.get("reviewer_id")
+        or candidate.get("artifact_prepared_at") != artifact.get("prepared_at")
+        or candidate.get("expected_actions") != artifact.get("expected_actions")
+    ):
+        _fail("production release candidate metadata does not match the artifact")
+    try:
+        state = BatchRunState.read(batch_dir)
+    except P0HorseBatchError as exc:
+        _fail(f"production release candidate state is invalid: {exc}")
+    if state.batch_id != batch_manifest.get("batch_id"):
+        _fail("production release candidate state batch does not match")
+    if state.stage == "abandoned":
+        _fail("production release candidate state is abandoned")
+    history = state.artifacts.get(
+        f"release_candidate:{region}:{candidate_sha256}"
+    )
+    frozen_artifact_path = Path(
+        str((history or {}).get("artifact_path") or "")
+    )
+    if not isinstance(history, dict):
+        _fail("production release candidate has no matching frozen state history")
+    if (
+        Path(str(history.get("path") or "")).resolve()
+        != candidate_path.resolve()
+        or history.get("sha256") != candidate_sha256
+    ):
+        _fail(
+            "production release candidate state path or SHA does not match"
+        )
+    if (
+        not str(history.get("artifact_path") or "").strip()
+        or str(artifact_path) != str(history.get("artifact_path"))
+        or history.get("artifact_sha256") != artifact_sha256
+    ):
+        _fail("production release candidate artifact state does not match")
+    if history.get("publish_scope") != candidate.get(
+        "auto_first_publish_scope"
+    ):
+        _fail("production release candidate publish scope state does not match")
+    _load_json_once(
+        frozen_artifact_path,
+        label="production release candidate artifact",
+        expected_sha256=artifact_sha256,
+    )
+    if not _artifact_has_exact_committed_run(
+        frozen_artifact_path,
+        artifact_sha256,
+    ):
+        if (
+            batch_manifest.get("batch_sha256")
+            != candidate_bindings["batch_manifest_sha256"]
+        ):
+            _fail("production release batch manifest binding drift")
+        combined_sha256 = hashlib.sha256(
+            _read_regular_file_once(
+                batch_dir / "artifact" / "combined_candidates.jsonl",
+                label="production release combined candidates",
+            )
+        ).hexdigest()
+        if combined_sha256 != candidate_bindings["combined_candidates_sha256"]:
+            _fail("production release combined candidates binding drift")
+    return candidate
 
 
 def _load_and_validate_release_manifest(
@@ -1335,24 +1596,19 @@ def _load_and_validate_release_manifest(
     release_manifest_path: str | Path,
     release_manifest_sha256: str,
     artifact: dict[str, Any],
+    artifact_path: str | Path,
     artifact_sha256: str,
+    release_input: FrozenJsonInput | None = None,
 ) -> FrozenJsonInput:
-    release_input = _load_json_once(
-        release_manifest_path,
-        label="production release manifest",
-        expected_sha256=release_manifest_sha256,
-    )
-    if release_input.sha256 not in TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256:
-        release_payload_for_ledger = release_input.payload
-        if not isinstance(release_payload_for_ledger, dict):
-            _fail("production release manifest schema is invalid")
-        _validate_rolling_release_ledger(
-            release_payload_for_ledger,
-            release_input.sha256,
-            release_manifest_path=release_manifest_path,
+    if release_input is None:
+        release_input = _load_json_once(
+            release_manifest_path,
+            label="production release manifest",
+            expected_sha256=release_manifest_sha256,
         )
     release = release_input.payload
-    if release.get("schema_version") != RELEASE_MANIFEST_SCHEMA:
+    release_schema = release.get("schema_version")
+    if release_schema not in {RELEASE_MANIFEST_SCHEMA, RELEASE_MANIFEST_SCHEMA_V2}:
         _fail("production release manifest schema is invalid")
     approved_by = str(release.get("approved_by") or "").strip()
     approved_at = str(release.get("approved_at") or "").strip()
@@ -1386,8 +1642,47 @@ def _load_and_validate_release_manifest(
         "production_snapshot_sha256": artifact["production_snapshot_sha256"],
         "final_artifact_sha256": artifact_sha256,
     }
+    if release_schema == RELEASE_MANIFEST_SCHEMA_V2:
+        release_candidate_sha256 = str(
+            bindings.get("release_candidate_sha256") or ""
+        ).strip()
+        if not release_candidate_sha256:
+            _fail("production release manifest candidate binding is missing")
+        expected_bindings["release_candidate_sha256"] = release_candidate_sha256
     if bindings != expected_bindings:
         _fail("production release manifest bindings do not match the candidate artifact")
+    candidate = None
+    if release_schema == RELEASE_MANIFEST_SCHEMA_V2:
+        candidate = _load_and_validate_release_candidate(
+            release=release,
+            release_manifest_path=release_manifest_path,
+            candidate_sha256=release_candidate_sha256,
+            artifact=artifact,
+            artifact_path=artifact_path,
+            artifact_sha256=artifact_sha256,
+            expected_release_bindings={
+                key: value
+                for key, value in expected_bindings.items()
+                if key != "release_candidate_sha256"
+            },
+        )
+    if (
+        release_schema == RELEASE_MANIFEST_SCHEMA_V2
+        or release_input.sha256
+        not in TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256
+    ):
+        _validate_rolling_release_ledger(
+            release,
+            release_input.sha256,
+            release_manifest_path=release_manifest_path,
+            candidate=candidate,
+            candidate_sha256=(
+                release_candidate_sha256
+                if release_schema == RELEASE_MANIFEST_SCHEMA_V2
+                else ""
+            ),
+            artifact_sha256=artifact_sha256,
+        )
     return release_input
 
 
@@ -1663,12 +1958,35 @@ def dry_run_reviewed_p0_completion_artifact(
     release_manifest_path: str | Path,
     release_manifest_sha256: str,
 ) -> dict[str, Any]:
+    with _production_release_execution_window(
+        release_manifest_path=release_manifest_path,
+        release_manifest_sha256=release_manifest_sha256,
+    ) as release_input:
+        return _dry_run_reviewed_p0_completion_artifact_locked(
+            artifact_path=artifact_path,
+            artifact_sha256=artifact_sha256,
+            release_manifest_path=release_manifest_path,
+            release_manifest_sha256=release_manifest_sha256,
+            release_input=release_input,
+        )
+
+
+def _dry_run_reviewed_p0_completion_artifact_locked(
+    *,
+    artifact_path: str | Path,
+    artifact_sha256: str,
+    release_manifest_path: str | Path,
+    release_manifest_sha256: str,
+    release_input: FrozenJsonInput,
+) -> dict[str, Any]:
     artifact, actual_sha = _load_artifact(artifact_path, artifact_sha256)
     release_input = _load_and_validate_release_manifest(
         release_manifest_path=release_manifest_path,
         release_manifest_sha256=release_manifest_sha256,
         artifact=artifact,
+        artifact_path=artifact_path,
         artifact_sha256=actual_sha,
+        release_input=release_input,
     )
     report = _simulate(artifact, artifact_sha256=actual_sha)
     _assert_expected_actions(artifact, report, phase="dry-run")
@@ -2167,13 +2485,14 @@ def _after_task_execution_log_created_for_test() -> None:
     """Patch point for transaction rollback tests; never controlled at runtime."""
 
 
-def commit_reviewed_p0_completion_artifact(
+def _commit_reviewed_p0_completion_artifact_locked(
     *,
     artifact_path: str | Path,
     artifact_sha256: str,
     release_manifest_path: str | Path,
     release_manifest_sha256: str,
     confirm_reviewed_artifact: bool,
+    release_input: FrozenJsonInput,
 ) -> dict[str, Any]:
     if not confirm_reviewed_artifact:
         _fail("commit requires --confirm-reviewed-artifact")
@@ -2182,7 +2501,9 @@ def commit_reviewed_p0_completion_artifact(
         release_manifest_path=release_manifest_path,
         release_manifest_sha256=release_manifest_sha256,
         artifact=artifact,
+        artifact_path=artifact_path,
         artifact_sha256=actual_sha,
+        release_input=release_input,
     )
     reviewer = _validate_reviewer(artifact["reviewer_id"])
     with _identity_session_lock_scope(artifact["rows"]), transaction.atomic():
@@ -2303,6 +2624,28 @@ def commit_reviewed_p0_completion_artifact(
         )
         _after_task_execution_log_created_for_test()
         return result
+
+
+def commit_reviewed_p0_completion_artifact(
+    *,
+    artifact_path: str | Path,
+    artifact_sha256: str,
+    release_manifest_path: str | Path,
+    release_manifest_sha256: str,
+    confirm_reviewed_artifact: bool,
+) -> dict[str, Any]:
+    with _production_release_execution_window(
+        release_manifest_path=release_manifest_path,
+        release_manifest_sha256=release_manifest_sha256,
+    ) as release_input:
+        return _commit_reviewed_p0_completion_artifact_locked(
+            artifact_path=artifact_path,
+            artifact_sha256=artifact_sha256,
+            release_manifest_path=release_manifest_path,
+            release_manifest_sha256=release_manifest_sha256,
+            confirm_reviewed_artifact=confirm_reviewed_artifact,
+            release_input=release_input,
+        )
 
 
 def write_prepared_artifact_directory(

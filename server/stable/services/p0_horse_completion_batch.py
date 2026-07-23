@@ -10,10 +10,14 @@ never write profile data fields.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
 import re
+import stat
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,6 +40,8 @@ P0_HORSE_BATCH_SCHEMA_VERSION = "p0-horse-completion-batch.v1"
 P0_HORSE_BATCH_REGIONS: tuple[str, ...] = tuple(REGION_ADAPTERS.keys())
 P0_HORSE_BATCH_MANIFEST_FILENAME = "batch_manifest.json"
 P0_HORSE_BATCH_LEDGER_FILENAME = "approvals_ledger.jsonl"
+P0_HORSE_BATCH_SERIAL_LOCK_FILENAME = "serial-window.lock"
+P0_HORSE_BATCH_EXECUTION_LOCK_FILENAME = "execution-window.lock"
 
 _IN_FLIGHT_RUN_STATUSES = (
     HorseCompletionRunStatus.PLANNED,
@@ -44,10 +50,121 @@ _IN_FLIGHT_RUN_STATUSES = (
 )
 _IN_FLIGHT_MANIFEST_STATUSES = ("pending", "approved")
 _HTTP_URL_RE = re.compile(r"^https?://[^\s]+$", re.IGNORECASE)
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+_LEDGER_EVENT_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
+    "batch_approved": (
+        "batch_id",
+        "batch_sha256",
+        "reviewer",
+        "approved_at",
+        "excluded_profile_ids",
+    ),
+    "release_candidate_prepared": (
+        "batch_id",
+        "region",
+        "release_candidate_sha256",
+        "artifact_sha256",
+    ),
+    "region_modules_approved": (
+        "region",
+        "research_sha256",
+        "mapping_sha256",
+        "authority_sha256",
+        "reviewer",
+        "approved_at",
+        "horse_count",
+    ),
+    "release_approved": (
+        "region",
+        "release_manifest_sha256",
+        "approved_by",
+        "approved_at",
+        "decision_reference",
+    ),
+    "release_superseded": (
+        "region",
+        "old_release_candidate_sha256",
+        "old_release_manifest_sha256",
+        "new_release_candidate_sha256",
+        "new_release_manifest_sha256",
+    ),
+    "auto_first_publish": (
+        "batch_id",
+        "region",
+        "artifact_sha256",
+        "published",
+        "skipped_already_published",
+        "blocked",
+        "published_profile_ids",
+        "at",
+    ),
+}
+AUTO_FIRST_PUBLISH_LEDGER_SCHEMA_V2 = "p0_horse_auto_first_publish.v2"
+_LEDGER_SHA_FIELDS = {
+    "batch_sha256",
+    "release_candidate_sha256",
+    "artifact_sha256",
+    "release_manifest_sha256",
+    "old_release_candidate_sha256",
+    "old_release_manifest_sha256",
+    "new_release_candidate_sha256",
+    "new_release_manifest_sha256",
+}
 
 
 class P0HorseBatchError(Exception):
     """Raised when a rolling batch operation must fail closed."""
+
+
+_BATCH_EXECUTION_LOCK_STATE = threading.local()
+
+
+@contextmanager
+def batch_serial_window(state_dir: str | Path):
+    """Serialize every batch artifact/state read-modify-write window."""
+    lock_dir = Path(state_dir)
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / P0_HORSE_BATCH_SERIAL_LOCK_FILENAME
+    with lock_path.open("a+b") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            raise P0HorseBatchError(
+                "another batch is inside the serial prepare-commit window"
+            ) from exc
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+@contextmanager
+def batch_execution_window(batch_dir: str | Path):
+    """Serialize one batch's approval-to-publish execution and abandonment."""
+    lock_dir = Path(batch_dir)
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = (lock_dir / P0_HORSE_BATCH_EXECUTION_LOCK_FILENAME).resolve()
+    leases = getattr(_BATCH_EXECUTION_LOCK_STATE, "leases", None)
+    if leases is None:
+        leases = {}
+        _BATCH_EXECUTION_LOCK_STATE.leases = leases
+    lease_depth = leases.get(str(lock_path), 0)
+    if lease_depth:
+        leases[str(lock_path)] = lease_depth + 1
+        try:
+            yield
+        finally:
+            leases[str(lock_path)] -= 1
+        return
+    with lock_path.open("a+b") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        leases[str(lock_path)] = 1
+        try:
+            yield
+        finally:
+            leases.pop(str(lock_path), None)
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _region_batch_limit() -> int:
@@ -368,11 +485,137 @@ def load_batch_manifest(manifest_path: str | Path) -> dict[str, Any]:
     return data
 
 
+def _validate_approvals_ledger_entry(
+    entry: Any,
+    *,
+    line_number: int,
+) -> dict[str, Any]:
+    if not isinstance(entry, dict):
+        raise P0HorseBatchError(
+            f"approvals ledger line {line_number} must contain an object"
+        )
+    event = entry.get("event")
+    required_fields = _LEDGER_EVENT_REQUIRED_FIELDS.get(event)
+    if required_fields is None:
+        raise P0HorseBatchError(
+            f"approvals ledger line {line_number} has an unsupported event"
+        )
+    missing = [
+        field
+        for field in required_fields
+        if field not in entry or entry[field] is None or entry[field] == ""
+    ]
+    if missing:
+        raise P0HorseBatchError(
+            f"approvals ledger line {line_number} is partial: "
+            f"missing {', '.join(missing)}"
+        )
+    for field in {
+        key
+        for key in entry
+        if key in _LEDGER_SHA_FIELDS or key.endswith("_sha256")
+    }:
+        if not _SHA256_RE.fullmatch(str(entry[field])):
+            raise P0HorseBatchError(
+                f"approvals ledger line {line_number} has invalid {field}"
+            )
+    if event == "batch_approved" and not isinstance(
+        entry["excluded_profile_ids"], list
+    ):
+        raise P0HorseBatchError(
+            f"approvals ledger line {line_number} has invalid excluded_profile_ids"
+        )
+    if event == "auto_first_publish" and (
+        not isinstance(entry["published_profile_ids"], list)
+    ):
+        raise P0HorseBatchError(
+            f"approvals ledger line {line_number} has invalid publish collections"
+        )
+    if event == "auto_first_publish":
+        event_schema = entry.get("event_schema")
+        if event_schema is None:
+            normalized = dict(entry)
+            normalized.setdefault("frozen_exclusions", [])
+            normalized.setdefault("frozen_exclusion_counts", {})
+            if (
+                not isinstance(normalized["frozen_exclusions"], list)
+                or not isinstance(
+                    normalized["frozen_exclusion_counts"], dict
+                )
+            ):
+                raise P0HorseBatchError(
+                    f"approvals ledger line {line_number} has invalid "
+                    "publish collections"
+                )
+            return normalized
+        if event_schema != AUTO_FIRST_PUBLISH_LEDGER_SCHEMA_V2:
+            raise P0HorseBatchError(
+                f"approvals ledger line {line_number} has unsupported "
+                "auto publish schema"
+            )
+        missing_v2 = [
+            field
+            for field in ("frozen_exclusions", "frozen_exclusion_counts")
+            if field not in entry or entry[field] is None
+        ]
+        if missing_v2:
+            raise P0HorseBatchError(
+                f"approvals ledger line {line_number} is partial: "
+                f"missing {', '.join(missing_v2)}"
+            )
+        if (
+            not isinstance(entry["frozen_exclusions"], list)
+            or not isinstance(entry["frozen_exclusion_counts"], dict)
+        ):
+            raise P0HorseBatchError(
+                f"approvals ledger line {line_number} has invalid "
+                "publish collections"
+            )
+    return entry
+
+
+def read_approvals_ledger(batch_dir: str | Path) -> list[dict[str, Any]]:
+    """Read the append-only approvals ledger without skipping damaged evidence."""
+    ledger_path = Path(batch_dir) / P0_HORSE_BATCH_LEDGER_FILENAME
+    if not ledger_path.exists():
+        return []
+    try:
+        metadata = ledger_path.lstat()
+        if ledger_path.is_symlink() or not stat.S_ISREG(metadata.st_mode):
+            raise P0HorseBatchError(
+                "approvals ledger must be a regular file"
+            )
+        lines = ledger_path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise P0HorseBatchError("approvals ledger is unreadable") from exc
+    entries: list[dict[str, Any]] = []
+    for line_number, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError as exc:
+            raise P0HorseBatchError(
+                f"approvals ledger line {line_number} is malformed"
+            ) from exc
+        entries.append(
+            _validate_approvals_ledger_entry(
+                entry,
+                line_number=line_number,
+            )
+        )
+    return entries
+
+
 def _append_approvals_ledger(batch_dir: Path, entry: dict[str, Any]) -> None:
+    read_approvals_ledger(batch_dir)
+    _validate_approvals_ledger_entry(entry, line_number=1)
     ledger_path = batch_dir / P0_HORSE_BATCH_LEDGER_FILENAME
     line = json.dumps(entry, ensure_ascii=False, sort_keys=True)
     with ledger_path.open("a", encoding="utf-8") as handle:
         handle.write(line + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
 
 
 def approve_batch_manifest(
@@ -536,19 +779,11 @@ def validate_approved_batch_manifest(
         raise P0HorseBatchError(
             "expected batch SHA-256 does not match the approved manifest"
         )
-    ledger_path = Path(manifest_path).parent / P0_HORSE_BATCH_LEDGER_FILENAME
-    ledger_match = False
-    if ledger_path.exists():
-        for line in ledger_path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            try:
-                entry = json.loads(line)
-            except ValueError:
-                continue
-            if entry.get("batch_sha256") == manifest["batch_sha256"]:
-                ledger_match = True
-                break
+    ledger_match = any(
+        entry.get("event") == "batch_approved"
+        and entry.get("batch_sha256") == manifest["batch_sha256"]
+        for entry in read_approvals_ledger(Path(manifest_path).parent)
+    )
     if not ledger_match:
         raise P0HorseBatchError(
             "batch approval ledger has no entry for the approved SHA-256"
@@ -827,3 +1062,53 @@ def abandon_batch_run(state: BatchRunState, *, reason: str) -> None:
         }
     )
     state.write()
+
+
+def ensure_batch_can_be_abandoned(
+    manifest: dict[str, Any],
+    state: BatchRunState,
+) -> None:
+    """Reject an abandoned label once any production commit evidence exists."""
+    if manifest.get("status") == "committed":
+        raise P0HorseBatchError(
+            "committed batch manifest cannot be abandoned"
+        )
+    checkpoint_keys = {
+        key
+        for key in state.artifacts
+        if key.startswith(("commit:", "publish:"))
+    }
+    checkpoint_stages = {
+        stage
+        for stage in state.completed_stages
+        if stage.startswith(("commit:", "publish:"))
+    }
+    if checkpoint_keys or checkpoint_stages:
+        raise P0HorseBatchError(
+            "batch with commit or publish checkpoint cannot be abandoned"
+        )
+    candidate_artifacts = {
+        (
+            str(history.get("artifact_path") or ""),
+            str(history.get("artifact_sha256") or ""),
+        )
+        for key, history in state.artifacts.items()
+        if key.count(":") == 2
+        and key.startswith("release_candidate:")
+        and isinstance(history, dict)
+    }
+    for artifact_path, artifact_sha256 in candidate_artifacts:
+        if not artifact_path or not _SHA256_RE.fullmatch(artifact_sha256):
+            continue
+        runs = HorseProfileCompletionRun.objects.filter(
+            status=HorseCompletionRunStatus.COMMITTED,
+            artifact_path=artifact_path,
+        ).only("summary")
+        if any(
+            (run.summary or {}).get("artifact_sha256")
+            == artifact_sha256
+            for run in runs
+        ):
+            raise P0HorseBatchError(
+                "batch candidate artifact was already committed and cannot be abandoned"
+            )

@@ -1,5 +1,41 @@
 # 当前状态
 
+## 2026-07-23 task 5.3 发布候选门禁已完成本地实现（未提交、未部署）
+
+- 用户已确认 `p0batch-20b59bda0608` 工作簿中 61 匹完整资料可以向下推进；39 个 blocker 继续
+  排除，不得进入 bundle、commit artifact 或自动首发范围。原工作簿和 SHA 保持不变。
+- 现有 `--commit` 会在同一调用内生成正式 release manifest、写批准账本、写数据库和自动首发，
+  无法在写库前展示最终 artifact SHA、预计动作与公开范围。本轮新增
+  `--prepare-release`：只生成无批准语义的
+  `p0_horse_production_release_candidate.v1`、确定性 commit artifact、预计数据库动作和冻结
+  publish scope；不写马匹业务表、不公开、不产生 `release_approved`。
+- candidate 使用 SHA 专属不可变 research/mapping/authority、artifact、candidate 和 v2 release
+  路径；正式 commit 必须接收用户批准的精确 candidate SHA，通用 production apply 也会复验真实
+  candidate、state、batch manifest 与有序 ledger，拒绝 superseded/abandoned/stale 证据。
+  自动首发只处理 candidate 中冻结为 `attempt_publish_after_commit` 的已复审对象，不再使用整个
+  Japan 100 匹 manifest；39 个 blocker 不会被同地区范围误带入。
+- prepare、bundle、prepare-release、commit/checkpoint/publish/abandon 现使用共享 state lock 与
+  独立 execution lock；支持崩溃恢复、候选替换与幂等 retry，并保持 v1 历史 release/legacy
+  publish ledger 的只读兼容。PostgreSQL 自动发布改为每匹在独立事务内锁行、重验 gate、写状态与
+  OperationLog。第十轮 full-diff review 后，execution lock 已改为同线程同 batch 可重入；
+  standalone v2 dry-run/commit 从 validation 到数据库事务退出全程持锁。未落库 artifact 还会
+  比较 current batch manifest/combined 的真实 SHA；只有精确 artifact path+SHA 的 committed-run
+  才允许从不可变 snapshot 幂等恢复。
+- TDD 与复验：相关
+  `stable.test_horse_profile_publish + stable.test_p0_horse_completion_batch +
+  stable.test_p0_horse_production_apply` 为 `260/260`；Django check、迁移漂移、OpenSpec
+  strict/all `37/37`、diff check 通过。完整 stable：基线
+  `21610ae8` 为 `2748 tests / 21F / 67E / 57 skipped`，本分支新增 88 项后为
+  `2836 / 21F / 67E / 57 skipped`，失败/错误/跳过增量均为 0；既有失败集中在历史 runner 的
+  macOS 临时路径、实时赛果时钟和旧页面/环境契约。
+- 独立原生只读 code review 第十一轮已对最终完整差异给出 `APPROVED`，P0/P1/P2 actionable
+  finding 均为 0；session `019f901d-7b9f-77e3-96e0-792546d3eb4f`，审查前后 fingerprint
+  `60cf62da1514f00fce451c89aa39b46146d20a4ef5245bdc84651a037559e164` 一致。当前仍是未提交
+  工作区，尚未部署、未执行生产
+  bundle/prepare-release，生产网络开关保持 false，马匹数据库与公开状态未变化。下一步必须先取得
+  对最终精确集成提交的 commit/push/deploy 授权；部署后 task 5.3 也只运行 bundle +
+  prepare-release 并停在 candidate SHA 复审，不写马匹数据。
+
 ## 2026-07-23 task 5.2 精确版本 v3 触网 prepare 已通过解析验收
 
 - 用户授权的不可变版本为 `5eec316f073a3107d2887f724e95762f76f27ae2`。执行前发现生产
