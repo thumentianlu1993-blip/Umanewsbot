@@ -25,6 +25,12 @@
   重复 commit 必须返回冻结 publish checkpoint/report，不得因人工降级、解除 manual lock 或其他
   gate 放宽再次调用发布。publish 未完成或失败只允许显式 `--retry-publish`；普通 commit 不兼任
   发布恢复入口。
+- `prepare` 也属于同 batch execution window；锁顺序固定为 `execution -> state`，不得让 commit
+  在 prepare 的 artifact、workbook 或 checkpoint 更新中途读取证据。
+- completed 重放不是仅凭 state checkpoint 的快捷返回。它必须在任何 dry-run/DB apply/publish 前
+  复验冻结 candidate、artifact/release、commit/publish checkpoint、committed completion run，
+  并要求唯一精确匹配的 v2 `auto_first_publish` 成功账本事件。证据缺失、重复或报告计数/ID/
+  frozen exclusions 不匹配时只允许人工审计，禁止自动补账本、重算 checkpoint 或写数据库。
 
 ## 2026-07-23 task 5.2 分叉生产线执行决定
 

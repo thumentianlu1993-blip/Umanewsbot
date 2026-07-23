@@ -507,3 +507,29 @@ GREEN：
   state/ledger 不变且发布 mock 零调用。
 - focused 3 项与完整 `P0HorseBatchAutoPublishTests` 72 项通过；P0 相关三模块最终为
   `263/263`。全程使用 SQLite/Celery eager 禁网测试环境，未访问生产。
+
+## fresh review 返修证据（task 4.10k）
+
+RED：
+
+- `prepare` 只持有 state serial lock，正式 commit 可在 prepare service 尚未退出时取得 execution
+  lock 并读取同批次半更新证据；双线程测试确认 commit 提前进入。
+- completed commit 普通重放仍调用两次 production dry-run；虽然 apply 幂等，completion run、
+  source、audit、task log 与业务表的零写合同未由入口结构保证。
+- 删除或篡改该 batch/region/artifact 的 v2 `auto_first_publish` 成功账本事件后，旧实现仍复用
+  publish checkpoint，不能证明冻结报告来自成功发布。
+
+GREEN：
+
+- `prepare` 的完整 service、manifest reload、review workbook 与 summary 窗口先取得同 batch
+  execution lock，再取得 state serial lock；双线程时 commit 在 prepare 退出前保持阻塞。
+- completed 重放在 execution -> state lock 内、任何 dry-run/DB apply/publish 前，复验普通文件与
+  SHA、candidate/commit/publish/release bindings、零 remaining verification、精确 committed
+  completion run，以及唯一匹配的 prepared/approved/v2 auto publish ledger。
+- 重放成功直接返回冻结 commit/publish 结果；测试断言 production dry-run、apply、publish 零调用，
+  completion run/source/audit/task log/业务表计数、run/source 内容、state 与 ledger bytes 全部不变。
+- 缺失 publish ledger 或发布计数不匹配均要求 manual audit，且 state、ledger、数据库与上述调用
+  全部零写。
+- focused 3 项通过；SQLite/Celery eager 禁网的
+  `stable.test_horse_profile_publish + stable.test_p0_horse_production_apply +
+  stable.test_p0_horse_completion_batch` 为 `266/266`，未访问生产。

@@ -51,6 +51,7 @@
 - [x] 4.10h (integration) 审查修复测试先行：通用 v2 validator 同时拒绝 state/manifest abandoned，standalone direct apply 不得复活；strict ledger 为新 auto-first-publish 事件加版本并强制冻结排除字段，无版本 legacy 事件只读兼容并内存归一。
 - [x] 4.10i (integration) 最终 full-diff 审查修复测试先行：通用 v2 dry-run/commit 从 validation 到 DB 全程进入可重入 batch execution lock，阻断 validation 后 supersede 竞态；未落库 direct v2 复验当前 batch manifest 与 combined 实际 SHA，已落库恢复使用不可变快照。
 - [x] 4.10j (integration) 最新主线集成审查修复测试先行：相同 candidate 的普通重复 commit 在 publish stage 已完成时复用冻结 checkpoint/report，禁止因人工降级或 gate 放宽再次调用发布；publish 未完成或失败时普通 commit 必须 fail closed 并仅指向显式 `--retry-publish`。
+- [x] 4.10k (integration) fresh review 修复测试先行：prepare 与同批 commit 共享 execution lock；completed 重放在 dry-run/DB apply 前完整复验冻结 candidate、commit/publish checkpoint 与精确 v2 publish ledger，缺失或不匹配时零写 fail closed 并要求人工审计。
 - [x] 4.11 (operations) 验证缺失/错误/篡改/stale candidate、生产快照漂移与重复 prepare/commit；运行专项、Django check、迁移漂移、完整 stable 基线、OpenSpec strict/all、diff check；更新四份状态/决策/运行手册并完成独立 code review。
 
 ## 5. 生产执行（分步用户授权）

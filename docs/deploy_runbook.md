@@ -1,5 +1,17 @@
 # 部署运行手册
 
+## P0 completed commit 重放核验补充
+
+- task 5.4 成功后如需普通重复 commit，必须确认 candidate、artifact、release、commit/publish
+  checkpoint 与 committed completion run 均完整，且账本中恰有一个精确匹配 batch、region、
+  artifact、发布计数/IDs 和 frozen exclusions 的 v2 `auto_first_publish` 成功事件。
+- 合法重放只返回冻结结果，不执行 production dry-run、DB apply 或 publish，也不修改 state、
+  ledger、completion run/source/audit/task log 与业务表。
+- publish 账本缺失、重复或不匹配时命令会提示 manual audit。此时停止操作，保全 batch 目录、
+  state、ledger、数据库计数和日志证据；不得手工补写 ledger/checkpoint，也不得用普通 commit
+  代替 `--retry-publish`。publish 未完成或失败仍只走显式 retry 门禁。
+- `prepare` 与 commit 对同 batch 共享 execution lock；生产排障不得删除 lock 文件或并行绕过。
+
 ## task 5.3 无写入发布候选操作手册（待取得精确版本部署授权）
 
 前提：

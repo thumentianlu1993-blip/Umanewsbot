@@ -2981,6 +2981,74 @@ class P0HorseBatchCommandPipelineTests(P0HorseBatchPrepareTests):
                 str(self.reviewer.id),
             )
 
+    def test_prepare_execution_window_blocks_same_batch_commit(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from unittest import mock
+
+        from django.core.management.base import CommandError
+
+        from stable.services import (
+            p0_horse_completion_commit as commit_module,
+            p0_horse_completion_prepare as prepare_module,
+        )
+        from stable.services.p0_horse_completion_batch import P0HorseBatchError
+
+        prepare_entered = Event()
+        release_prepare = Event()
+        commit_started = Event()
+        commit_entered = Event()
+
+        def controlled_prepare(*_args, **_kwargs):
+            prepare_entered.set()
+            self.assertTrue(release_prepare.wait(timeout=5))
+            raise P0HorseBatchError("stop controlled prepare")
+
+        def controlled_commit(*_args, **_kwargs):
+            commit_entered.set()
+            return {"status": "commit-entered-after-prepare"}
+
+        def run_commit():
+            commit_started.set()
+            return commit_module.commit_p0_horse_batch_region(
+                self.manifest_path,
+                region="japan",
+                reviewer=self.reviewer,
+                approved_by="human-approver",
+                release_candidate_sha256="a" * 64,
+                state_dir=self.state_dir,
+                confirm_reviewed_artifact=True,
+            )
+
+        with mock.patch.object(
+            prepare_module,
+            "prepare_p0_horse_batch",
+            side_effect=controlled_prepare,
+        ), mock.patch.object(
+            commit_module,
+            "_commit_p0_horse_batch_region_locked",
+            side_effect=controlled_commit,
+        ):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                preparing = executor.submit(
+                    self._call,
+                    "--prepare",
+                    str(self.manifest_path),
+                    "--expected-sha256",
+                    self.approved["batch_sha256"],
+                )
+                self.assertTrue(prepare_entered.wait(timeout=5))
+                committing = executor.submit(run_commit)
+                self.assertTrue(commit_started.wait(timeout=5))
+                self.assertFalse(commit_entered.wait(timeout=0.2))
+                release_prepare.set()
+                with self.assertRaisesRegex(CommandError, "controlled prepare"):
+                    preparing.result(timeout=5)
+                self.assertEqual(
+                    committing.result(timeout=5)["status"],
+                    "commit-entered-after-prepare",
+                )
+
     def test_prepare_release_rejects_symlink_and_non_regular_snapshot_targets(self):
         from django.core.management.base import CommandError
 
@@ -4325,11 +4393,19 @@ class P0HorseBatchAutoPublishTests(P0HorseBatchCommandPipelineTests):
     def test_repeated_commit_reuses_completed_publish_after_manual_downgrade(self):
         from unittest import mock
 
-        from stable.services import horse_profile_publish
-        from stable.services.p0_horse_completion_batch import BatchRunState
-        from stable.services.p0_horse_completion_commit import (
-            commit_p0_horse_batch_region,
+        from stable.models import (
+            HorseP0Source,
+            HorseProfileCompletionRun,
+            HorseProfileDataCandidate,
+            HorseRaceRecord,
+            OperationLog,
+            TaskExecutionLog,
         )
+        from stable.services import (
+            horse_profile_publish,
+            p0_horse_completion_commit as commit_module,
+        )
+        from stable.services.p0_horse_completion_batch import BatchRunState
 
         self._run_pipeline()
         batch_dir = self.manifest_path.parent
@@ -4350,6 +4426,31 @@ class P0HorseBatchAutoPublishTests(P0HorseBatchCommandPipelineTests):
                 "published_by",
             ]
         )
+        counted_models = (
+            HorseProfile,
+            HorseP0Source,
+            HorseRaceRecord,
+            HorseProfileDataCandidate,
+            HorseProfileCompletionRun,
+            OperationLog,
+            TaskExecutionLog,
+        )
+        database_counts_before = {
+            model: model.objects.count() for model in counted_models
+        }
+        completion_runs_before = list(
+            HorseProfileCompletionRun.objects.order_by("id").values(
+                "id",
+                "status",
+                "parameters",
+                "summary",
+                "artifact_path",
+                "updated_at",
+            )
+        )
+        sources_before = list(
+            HorseP0Source.objects.order_by("id").values()
+        )
         with mock.patch.object(
             horse_profile_publish,
             "auto_publish_profiles",
@@ -4361,8 +4462,20 @@ class P0HorseBatchAutoPublishTests(P0HorseBatchCommandPipelineTests):
                 "published_profile_ids": [],
                 "errors": [],
             },
-        ) as publish_mock:
-            repeated = commit_p0_horse_batch_region(
+        ) as publish_mock, mock.patch.object(
+            commit_module,
+            "dry_run_reviewed_p0_completion_artifact",
+            wraps=commit_module.dry_run_reviewed_p0_completion_artifact,
+        ) as dry_run_mock, mock.patch.object(
+            commit_module,
+            "commit_reviewed_p0_completion_artifact",
+            wraps=commit_module.commit_reviewed_p0_completion_artifact,
+        ) as database_apply_mock, mock.patch.object(
+            commit_module,
+            "_run_region_publish",
+            wraps=commit_module._run_region_publish,
+        ) as region_publish_mock:
+            repeated = commit_module.commit_p0_horse_batch_region(
                 self.manifest_path,
                 region="japan",
                 reviewer=self.reviewer,
@@ -4374,6 +4487,9 @@ class P0HorseBatchAutoPublishTests(P0HorseBatchCommandPipelineTests):
                 confirm_reviewed_artifact=True,
             )
         publish_mock.assert_not_called()
+        dry_run_mock.assert_not_called()
+        database_apply_mock.assert_not_called()
+        region_publish_mock.assert_not_called()
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.review_status, "ready")
         state_after = BatchRunState.read(batch_dir)
@@ -4387,6 +4503,159 @@ class P0HorseBatchAutoPublishTests(P0HorseBatchCommandPipelineTests):
         )
         self.assertEqual(ledger_path.read_bytes(), ledger_before)
         self.assertEqual(repeated["auto_first_publish"], publish_before)
+        self.assertEqual(
+            {model: model.objects.count() for model in counted_models},
+            database_counts_before,
+        )
+        self.assertEqual(
+            list(
+                HorseProfileCompletionRun.objects.order_by("id").values(
+                    "id",
+                    "status",
+                    "parameters",
+                    "summary",
+                    "artifact_path",
+                    "updated_at",
+                )
+            ),
+            completion_runs_before,
+        )
+        self.assertEqual(
+            list(HorseP0Source.objects.order_by("id").values()),
+            sources_before,
+        )
+
+    def test_completed_replay_requires_exact_v2_publish_ledger_evidence(self):
+        from unittest import mock
+
+        from stable.models import (
+            HorseP0Source,
+            HorseProfileCompletionRun,
+            HorseProfileDataCandidate,
+            HorseRaceRecord,
+            OperationLog,
+            TaskExecutionLog,
+        )
+        from stable.services import p0_horse_completion_commit as commit_module
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            P0HorseBatchError,
+        )
+
+        self._run_pipeline()
+        batch_dir = self.manifest_path.parent
+        state_before = BatchRunState.read(batch_dir).to_dict()
+        ledger_path = batch_dir / "approvals_ledger.jsonl"
+        original_entries = [
+            json.loads(line)
+            for line in ledger_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        publish_index = next(
+            index
+            for index, entry in enumerate(original_entries)
+            if entry.get("event") == "auto_first_publish"
+        )
+        counted_models = (
+            HorseProfile,
+            HorseP0Source,
+            HorseRaceRecord,
+            HorseProfileDataCandidate,
+            HorseProfileCompletionRun,
+            OperationLog,
+            TaskExecutionLog,
+        )
+
+        crash_shapes = {
+            "missing": [
+                entry
+                for index, entry in enumerate(original_entries)
+                if index != publish_index
+            ],
+            "mismatched_count": [
+                (
+                    {
+                        **entry,
+                        "published": int(entry["published"]) + 1,
+                    }
+                    if index == publish_index
+                    else entry
+                )
+                for index, entry in enumerate(original_entries)
+            ],
+        }
+        for name, entries in crash_shapes.items():
+            with self.subTest(crash_shape=name):
+                ledger_path.write_text(
+                    "".join(
+                        json.dumps(
+                            entry,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        )
+                        + "\n"
+                        for entry in entries
+                    ),
+                    encoding="utf-8",
+                )
+                ledger_before = ledger_path.read_bytes()
+                database_counts_before = {
+                    model: model.objects.count() for model in counted_models
+                }
+                with mock.patch.object(
+                    commit_module,
+                    "dry_run_reviewed_p0_completion_artifact",
+                    wraps=commit_module.dry_run_reviewed_p0_completion_artifact,
+                ) as dry_run_mock, mock.patch.object(
+                    commit_module,
+                    "commit_reviewed_p0_completion_artifact",
+                    wraps=commit_module.commit_reviewed_p0_completion_artifact,
+                ) as database_apply_mock, mock.patch.object(
+                    commit_module,
+                    "_run_region_publish",
+                    wraps=commit_module._run_region_publish,
+                ) as publish_mock:
+                    with self.assertRaisesRegex(
+                        P0HorseBatchError,
+                        "manual audit",
+                    ):
+                        commit_module.commit_p0_horse_batch_region(
+                            self.manifest_path,
+                            region="japan",
+                            reviewer=self.reviewer,
+                            approved_by="human-approver",
+                            release_candidate_sha256=self.release_candidate[
+                                "release_candidate_sha256"
+                            ],
+                            state_dir=self.state_dir,
+                            confirm_reviewed_artifact=True,
+                        )
+                dry_run_mock.assert_not_called()
+                database_apply_mock.assert_not_called()
+                publish_mock.assert_not_called()
+                self.assertEqual(
+                    BatchRunState.read(batch_dir).to_dict(),
+                    state_before,
+                )
+                self.assertEqual(ledger_path.read_bytes(), ledger_before)
+                self.assertEqual(
+                    {model: model.objects.count() for model in counted_models},
+                    database_counts_before,
+                )
+        ledger_path.write_text(
+            "".join(
+                json.dumps(
+                    entry,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n"
+                for entry in original_entries
+            ),
+            encoding="utf-8",
+        )
 
     def test_repeated_commit_does_not_expand_completed_frozen_exclusion(self):
         from unittest import mock

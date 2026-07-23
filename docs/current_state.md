@@ -1,5 +1,17 @@
 # 当前状态
 
+## 2026-07-24 fresh review P1/P2 已完成本地返修（待复审）
+
+- `prepare` 现与同批正式 commit 共享 execution lock，锁顺序保持 `execution -> state`；commit
+  不会在 prepare service、manifest/workbook/checkpoint 窗口尚未结束时读取半更新证据。
+- completed commit 普通重放在任何 production dry-run、数据库 apply 或 publish 前，完整复验
+  冻结 candidate、artifact/release、commit/publish checkpoint、committed completion run 与唯一
+  精确匹配的 v2 auto-publish ledger。证据缺失或计数不匹配时要求人工审计并零写 fail closed。
+- 新增 3 项 RED→GREEN；成功重放断言 completion run/source/audit/task log/业务表、state、ledger
+  全部零写。P0 三模块 SQLite 禁网回归 `266/266` 通过。
+- 当前仍是本地未提交差异，未触网、未 push、未部署、未执行生产 task 5.3/5.4；上一轮 review
+  不覆盖本补丁，必须 fresh read-only review。
+
 ## 2026-07-24 最新主线集成 publish 幂等 P1 已修复（待 fresh review）
 
 - 最新集成 review 的唯一 P1 已完成 RED→GREEN：相同 candidate 的普通重复 commit 在

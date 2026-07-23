@@ -16,6 +16,7 @@ from django.core.management.base import BaseCommand, CommandError
 from stable.services.p0_horse_completion_batch import (
     P0HorseBatchError,
     approve_batch_manifest,
+    batch_execution_window,
     batch_serial_window,
     default_batch_state_dir,
     select_p0_horse_batch,
@@ -172,26 +173,30 @@ class Command(BaseCommand):
             raise CommandError(
                 "network prepare requires HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true"
             )
-        with batch_serial_window(default_batch_state_dir()):
-            summary = prepare_p0_horse_batch(
-                options["prepare"],
-                expected_sha256=options["expected_sha256"],
-                allow_network=allow_network,
-            )
-            manifest = load_batch_manifest(options["prepare"])
-            review_output_dir = getattr(
-                settings,
-                "HORSE_PROFILE_COMPLETION_REVIEW_OUTPUT_DIR",
-                "runtime/horse_profile_completion/review",
-            )
-            workbook_path = build_batch_review_workbook(
-                manifest=manifest,
-                artifact_dir=Path(options["prepare"]).parent / "artifact",
-                output_path=Path(review_output_dir) / f"{manifest['batch_id']}.xlsx",
-            )
-            summary["stage"] = "prepare"
-            summary["review_workbook"] = str(workbook_path)
-            summary["allow_network"] = allow_network
+        batch_dir = Path(options["prepare"]).parent
+        with batch_execution_window(batch_dir):
+            with batch_serial_window(default_batch_state_dir()):
+                summary = prepare_p0_horse_batch(
+                    options["prepare"],
+                    expected_sha256=options["expected_sha256"],
+                    allow_network=allow_network,
+                )
+                manifest = load_batch_manifest(options["prepare"])
+                review_output_dir = getattr(
+                    settings,
+                    "HORSE_PROFILE_COMPLETION_REVIEW_OUTPUT_DIR",
+                    "runtime/horse_profile_completion/review",
+                )
+                workbook_path = build_batch_review_workbook(
+                    manifest=manifest,
+                    artifact_dir=batch_dir / "artifact",
+                    output_path=(
+                        Path(review_output_dir) / f"{manifest['batch_id']}.xlsx"
+                    ),
+                )
+                summary["stage"] = "prepare"
+                summary["review_workbook"] = str(workbook_path)
+                summary["allow_network"] = allow_network
         self.stdout.write(
             f"batch {manifest['batch_id']} prepared: "
             f"{summary['totals']['succeeded']}/{summary['totals']['horses']} horses, "

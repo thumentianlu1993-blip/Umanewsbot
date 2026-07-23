@@ -252,3 +252,17 @@ candidate SHA，并生成反向绑定该 SHA 的正式 release manifest；candid
 - **WHEN** candidate 批准后、artifact 尚未落库，当前 batch manifest 或 combined artifact 被合法重生成并产生新 SHA
 - **THEN** standalone dry-run/commit SHALL 比较当前真实 bytes 与 candidate bindings 并 fail closed
 - **AND** 已有 committed-run 精确证据的幂等恢复 SHALL 使用 candidate 不可变快照，不因 current 文件后续变化失效
+
+#### Scenario: prepare 与同批正式提交并发
+
+- **WHEN** `prepare` 正在更新同一 batch 的 artifact、workbook 或 checkpoint，正式 commit 同时到达
+- **THEN** 两者 SHALL 先取得同一 batch execution lock，并保持 `execution -> state` 锁顺序
+- **AND** commit SHALL 等待 prepare 完整退出后再读取 candidate、state 与账本
+
+#### Scenario: completed commit 的只读重放证据
+
+- **WHEN** 相同 candidate 的 commit 与 publish stage 均已完成，操作者普通重复 commit
+- **THEN** 系统 SHALL 在任何 dry-run、数据库 apply 或 publish 调用前，完整复验 candidate、artifact、release、commit/publish checkpoint、committed completion run 与账本
+- **AND** 只有唯一且精确匹配 batch、region、artifact、发布计数、published IDs 与冻结排除集合的 v2 `auto_first_publish` 成功事件存在时，系统 SHALL 返回冻结 commit/publish 结果
+- **AND** 该重放 SHALL 对 completion run、source、audit、task log、业务表、state 与 ledger 零写入
+- **AND** 证据缺失、重复或不匹配时系统 MUST fail closed 并要求人工审计，不得尝试修补 checkpoint 或重跑 apply/publish

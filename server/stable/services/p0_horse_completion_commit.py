@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from stable.services.p0_horse_completion_batch import (
+    AUTO_FIRST_PUBLISH_LEDGER_SCHEMA_V2,
     BatchRunState,
     P0HorseBatchError,
     _append_approvals_ledger,
@@ -58,6 +59,22 @@ def _sha256_file(path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest()
     except OSError as exc:
         raise P0HorseBatchError(f"release input is unreadable: {path}") from exc
+
+
+def _validate_immutable_file(
+    path: Path,
+    *,
+    label: str,
+    expected_sha256: str,
+) -> None:
+    try:
+        mode = path.lstat().st_mode
+    except OSError as exc:
+        raise P0HorseBatchError(f"{label} is unreadable") from exc
+    if path.is_symlink() or not stat.S_ISREG(mode):
+        raise P0HorseBatchError(f"{label} must be an immutable regular file")
+    if _sha256_file(path) != expected_sha256:
+        raise P0HorseBatchError(f"{label} SHA-256 mismatch")
 
 
 def _read_json(path: str | Path, *, label: str) -> dict[str, Any]:
@@ -516,6 +533,308 @@ def _regions_pending_commit_or_publish(
     ]
 
 
+def _completed_region_replay_result(
+    *,
+    state: BatchRunState,
+    manifest: dict[str, Any],
+    batch_dir: Path,
+    region: str,
+    reviewer,
+    approved_by: str,
+    release_candidate_sha256: str,
+    candidate: dict[str, Any],
+    candidate_record: dict[str, Any],
+    artifact_path: Path,
+    artifact_sha: str,
+) -> dict[str, Any]:
+    """Validate frozen commit/publish evidence and return without any DB write."""
+    from stable.models import (
+        HorseCompletionRunStatus,
+        HorseP0Source,
+        HorseProfileCompletionRun,
+    )
+
+    commit_stage = f"commit:{region}"
+    publish_stage = f"publish:{region}"
+    if publish_stage not in state.completed_stages:
+        raise P0HorseBatchError(
+            f"region {region} commit already completed but publish did not; "
+            "ordinary commit cannot recover publish state, use --retry-publish"
+        )
+    commit_report = state.artifacts.get(commit_stage)
+    publish_report = state.artifacts.get(publish_stage)
+    required_publish_report_fields = {
+        "published",
+        "skipped_already_published",
+        "blocked",
+        "published_profile_ids",
+        "errors",
+        "profile_ids",
+        "frozen_exclusions",
+        "frozen_exclusion_counts",
+    }
+    if (
+        not isinstance(commit_report, dict)
+        or not isinstance(publish_report, dict)
+        or not required_publish_report_fields.issubset(publish_report)
+        or publish_report.get("errors") != []
+    ):
+        raise P0HorseBatchError(
+            f"region {region} completed commit/publish checkpoint is missing "
+            "or invalid; manual audit recovery is required"
+        )
+    verification = commit_report.get("idempotent_verification")
+    planned_remaining = (
+        verification.get("planned_remaining")
+        if isinstance(verification, dict)
+        else None
+    )
+    expected_planned_keys = {
+        "planned_profile_creates",
+        "planned_profile_updates",
+        "planned_race_record_creates",
+        "planned_race_record_updates",
+        "planned_module_audits",
+    }
+    candidate_scope = candidate.get("auto_first_publish_scope")
+    publish_counts = (
+        publish_report.get("published"),
+        publish_report.get("skipped_already_published"),
+        publish_report.get("blocked"),
+    )
+    release_path = Path(str(commit_report.get("release_path") or ""))
+    release_sha = str(commit_report.get("release_sha256") or "")
+    expected_commit_fields = {
+        "artifact_path": str(artifact_path),
+        "artifact_sha256": artifact_sha,
+        "release_path": str(candidate_record.get("release_path") or ""),
+        "release_sha256": str(candidate_record.get("release_sha256") or ""),
+        "release_candidate_sha256": release_candidate_sha256,
+        "publish_scope": candidate_scope,
+    }
+    if (
+        state.batch_id != manifest.get("batch_id")
+        or candidate.get("batch_id") != manifest.get("batch_id")
+        or (candidate.get("bindings") or {}).get("final_artifact_sha256")
+        != artifact_sha
+        or candidate_record.get("artifact_path") != str(artifact_path)
+        or candidate_record.get("artifact_sha256") != artifact_sha
+        or candidate_record.get("publish_scope") != candidate_scope
+        or not isinstance(candidate_scope, dict)
+        or not all(
+            isinstance(value, int) and not isinstance(value, bool)
+            for value in publish_counts
+        )
+        or not isinstance(publish_report.get("published_profile_ids"), list)
+        or not isinstance(publish_report.get("profile_ids"), list)
+        or not isinstance(publish_report.get("frozen_exclusions"), list)
+        or not isinstance(publish_report.get("frozen_exclusion_counts"), dict)
+        or any(
+            commit_report.get(field) != expected
+            for field, expected in expected_commit_fields.items()
+        )
+        or not isinstance(verification, dict)
+        or verification.get("passed") is not True
+        or verification.get("artifact_sha256") != artifact_sha
+        or not isinstance(planned_remaining, dict)
+        or set(planned_remaining) != expected_planned_keys
+        or not all(
+            isinstance(value, int) and not isinstance(value, bool)
+            for value in planned_remaining.values()
+        )
+        or any(planned_remaining.values())
+    ):
+        raise P0HorseBatchError(
+            f"region {region} frozen commit checkpoint is invalid; "
+            "manual audit recovery is required"
+        )
+    _validate_immutable_file(
+        artifact_path,
+        label="completed commit artifact",
+        expected_sha256=artifact_sha,
+    )
+    _validate_immutable_file(
+        release_path,
+        label="completed release filename SHA",
+        expected_sha256=release_sha,
+    )
+    if release_path.name != f"release_manifest_{region}_{release_sha}.json":
+        raise P0HorseBatchError(
+            f"region {region} frozen release filename is invalid; "
+            "manual audit recovery is required"
+        )
+    release = _read_json(release_path, label="completed release manifest")
+    release_bindings = release.get("bindings") or {}
+    if (
+        release.get("schema_version")
+        != "p0_horse_production_release_manifest.v2"
+        or release.get("region") != region
+        or release.get("executor_reviewer_id") != reviewer.id
+        or release.get("approved_by") != str(approved_by or "").strip()
+        or release_bindings.get("release_candidate_sha256")
+        != release_candidate_sha256
+        or release_bindings.get("final_artifact_sha256") != artifact_sha
+    ):
+        raise P0HorseBatchError(
+            f"region {region} frozen release manifest is invalid; "
+            "manual audit recovery is required"
+        )
+
+    ledger = read_approvals_ledger(batch_dir)
+    prepared_events = [
+        entry
+        for entry in ledger
+        if entry.get("event") == "release_candidate_prepared"
+        and entry.get("batch_id") == manifest["batch_id"]
+        and entry.get("region") == region
+        and entry.get("release_candidate_sha256")
+        == release_candidate_sha256
+    ]
+    approved_events = [
+        entry
+        for entry in ledger
+        if entry.get("event") == "release_approved"
+        and entry.get("region") == region
+        and entry.get("release_manifest_sha256") == release_sha
+    ]
+    publish_events = [
+        entry
+        for entry in ledger
+        if entry.get("event") == "auto_first_publish"
+        and entry.get("batch_id") == manifest["batch_id"]
+        and entry.get("region") == region
+        and entry.get("artifact_sha256") == artifact_sha
+    ]
+    expected_publish_event = {
+        "event_schema": AUTO_FIRST_PUBLISH_LEDGER_SCHEMA_V2,
+        "published": publish_report["published"],
+        "skipped_already_published": publish_report[
+            "skipped_already_published"
+        ],
+        "blocked": publish_report["blocked"],
+        "published_profile_ids": publish_report["published_profile_ids"],
+        "frozen_exclusions": publish_report["frozen_exclusions"],
+        "frozen_exclusion_counts": publish_report[
+            "frozen_exclusion_counts"
+        ],
+    }
+    if (
+        len(prepared_events) != 1
+        or prepared_events[0].get("artifact_sha256") != artifact_sha
+        or len(approved_events) != 1
+        or len(publish_events) != 1
+        or any(
+            publish_events[0].get(field) != expected
+            for field, expected in expected_publish_event.items()
+        )
+    ):
+        raise P0HorseBatchError(
+            f"region {region} frozen publish ledger evidence is missing or "
+            "does not match; manual audit recovery is required"
+        )
+    completion_run = next(
+        (
+            run
+            for run in HorseProfileCompletionRun.objects.filter(
+                status=HorseCompletionRunStatus.COMMITTED,
+                artifact_path=str(artifact_path),
+            ).order_by("-id")
+            if (run.summary or {}).get("artifact_sha256") == artifact_sha
+        ),
+        None,
+    )
+    if completion_run is None:
+        raise P0HorseBatchError(
+            f"region {region} committed completion run is missing; "
+            "manual audit recovery is required"
+        )
+    existing_scope = candidate_scope.get("existing_profiles") or []
+    create_scope = candidate_scope.get("create_new_identities") or []
+    expected_profile_ids = {
+        int(item["profile_id"])
+        for item in existing_scope
+        if item.get("disposition") == "attempt_publish_after_commit"
+    }
+    wanted_keys = {
+        item["deterministic_identity_key"]
+        for item in create_scope
+        if item.get("disposition") == "attempt_publish_after_commit"
+    }
+    for source in HorseP0Source.objects.filter(
+        completion_run=completion_run,
+    ).select_related("profile"):
+        batches = (source.profile.source_refs or {}).get(
+            "p0_reviewed_batches"
+        ) or {}
+        if any(batches.get(key) == artifact_sha for key in wanted_keys):
+            expected_profile_ids.add(source.profile_id)
+    expected_frozen_exclusions = [
+        {
+            "target_type": "existing_profile",
+            "profile_id": int(item["profile_id"]),
+            "disposition": item.get("disposition"),
+        }
+        for item in existing_scope
+        if item.get("disposition") != "attempt_publish_after_commit"
+    ]
+    expected_frozen_exclusions.extend(
+        {
+            "target_type": "create_new_identity",
+            "deterministic_identity_key": item.get(
+                "deterministic_identity_key"
+            ),
+            "disposition": item.get("disposition"),
+        }
+        for item in create_scope
+        if item.get("disposition") != "attempt_publish_after_commit"
+    )
+    expected_frozen_counts = {
+        disposition: sum(
+            item["disposition"] == disposition
+            for item in expected_frozen_exclusions
+        )
+        for disposition in sorted(
+            {
+                item["disposition"]
+                for item in expected_frozen_exclusions
+                if item.get("disposition")
+            }
+        )
+    }
+    if (
+        publish_report["profile_ids"] != sorted(expected_profile_ids)
+        or publish_report["frozen_exclusions"]
+        != expected_frozen_exclusions
+        or publish_report["frozen_exclusion_counts"]
+        != expected_frozen_counts
+        or publish_report["published"]
+        != len(publish_report["published_profile_ids"])
+        or (
+            publish_report["published"]
+            + publish_report["skipped_already_published"]
+            + publish_report["blocked"]
+        )
+        != len(expected_profile_ids)
+        or not set(publish_report["published_profile_ids"]).issubset(
+            expected_profile_ids
+        )
+    ):
+        raise P0HorseBatchError(
+            f"region {region} frozen publish checkpoint does not match "
+            "candidate scope; manual audit recovery is required"
+        )
+    return {
+        "region": region,
+        "artifact_sha256": artifact_sha,
+        "release_sha256": release_sha,
+        "dry_run": dict(planned_remaining),
+        "commit_report": {"status": "committed"},
+        "idempotent_verification": verification,
+        "auto_first_publish": json.loads(json.dumps(publish_report)),
+        "completion_run_id": completion_run.id,
+    }
+
+
 def commit_p0_horse_batch_region(
     manifest_path: str | Path,
     *,
@@ -561,7 +880,6 @@ def _commit_p0_horse_batch_region_locked(
         raise P0HorseBatchError("region commit requires a release candidate SHA-256")
     batch_dir = Path(manifest_path).parent
     combined_path = batch_dir / "artifact" / "combined_candidates.jsonl"
-    completed_publish_report: dict[str, Any] | None = None
     with _serial_window(Path(state_dir)):
         state = BatchRunState.read(batch_dir)
         if state.stage == "abandoned":
@@ -571,12 +889,13 @@ def _commit_p0_horse_batch_region_locked(
             _candidate_history_key(region, release_candidate_sha256)
         ) or {}
         candidate_path = Path(str(candidate_record.get("path") or ""))
-        if (
-            not candidate_path.is_file()
-            or _sha256_file(candidate_path) != release_candidate_sha256
-            or candidate_record.get("sha256") != release_candidate_sha256
-        ):
+        if candidate_record.get("sha256") != release_candidate_sha256:
             raise P0HorseBatchError("release candidate SHA-256 mismatch")
+        _validate_immutable_file(
+            candidate_path,
+            label="release candidate",
+            expected_sha256=release_candidate_sha256,
+        )
         candidate = _read_json(candidate_path, label="release candidate")
         if (
             candidate.get("schema_version") != RELEASE_CANDIDATE_SCHEMA
@@ -595,45 +914,12 @@ def _commit_p0_horse_batch_region_locked(
                 "release candidate was superseded by a newer authorization"
             )
         commit_stage = f"commit:{region}"
-        publish_stage = f"publish:{region}"
         repeated_completed_commit = (
             commit_stage in state.completed_stages
             and isinstance(previous_commit, dict)
             and previous_commit.get("release_candidate_sha256")
             == release_candidate_sha256
         )
-        if repeated_completed_commit:
-            if publish_stage not in state.completed_stages:
-                raise P0HorseBatchError(
-                    f"region {region} commit already completed but publish did "
-                    "not; ordinary commit cannot recover publish state, use "
-                    "--retry-publish"
-                )
-            frozen_publish_report = state.artifacts.get(publish_stage)
-            required_publish_report_fields = {
-                "published",
-                "skipped_already_published",
-                "blocked",
-                "published_profile_ids",
-                "errors",
-                "profile_ids",
-                "frozen_exclusions",
-                "frozen_exclusion_counts",
-            }
-            if (
-                not isinstance(frozen_publish_report, dict)
-                or not required_publish_report_fields.issubset(
-                    frozen_publish_report
-                )
-                or frozen_publish_report.get("errors") != []
-            ):
-                raise P0HorseBatchError(
-                    f"region {region} completed publish checkpoint is missing "
-                    "or invalid; manual audit recovery is required"
-                )
-            completed_publish_report = json.loads(
-                json.dumps(frozen_publish_report)
-            )
         artifact_sha = str(
             (candidate.get("bindings") or {}).get("final_artifact_sha256") or ""
         )
@@ -648,6 +934,20 @@ def _commit_p0_horse_batch_region_locked(
             )
         )
         manifest = load_batch_manifest(manifest_path)
+        if repeated_completed_commit:
+            return _completed_region_replay_result(
+                state=state,
+                manifest=manifest,
+                batch_dir=batch_dir,
+                region=region,
+                reviewer=reviewer,
+                approved_by=approved_by,
+                release_candidate_sha256=release_candidate_sha256,
+                candidate=candidate,
+                candidate_record=candidate_record,
+                artifact_path=artifact_path,
+                artifact_sha=artifact_sha,
+            )
         releases = _release_manifests_for_region(batch_dir, region)
         artifact_committed = _artifact_was_committed(artifact_path, artifact_sha)
         snapshot_bundle = candidate_record.get("snapshot_bundle")
@@ -918,19 +1218,16 @@ def _commit_p0_horse_batch_region_locked(
     )
 
     manifest = load_batch_manifest(manifest_path)
-    if completed_publish_report is None:
-        publish_report = _run_region_publish(
-            manifest,
-            batch_dir=batch_dir,
-            state_dir=Path(state_dir),
-            region=region,
-            artifact_sha=artifact_sha,
-            reviewer=reviewer,
-            completion_run=completion_run,
-            publish_scope=candidate["auto_first_publish_scope"],
-        )
-    else:
-        publish_report = completed_publish_report
+    publish_report = _run_region_publish(
+        manifest,
+        batch_dir=batch_dir,
+        state_dir=Path(state_dir),
+        region=region,
+        artifact_sha=artifact_sha,
+        reviewer=reviewer,
+        completion_run=completion_run,
+        publish_scope=candidate["auto_first_publish_scope"],
+    )
 
     with _serial_window(Path(state_dir)):
         state = BatchRunState.read(batch_dir)
@@ -973,10 +1270,6 @@ def _run_region_publish(
     from stable.models import HorseP0Source, HorseProfile
     from stable.services.horse_profile_publish import auto_publish_profiles
     from stable.services.p0_horse_completion_batch import _append_approvals_ledger
-    from stable.services.p0_horse_completion_batch import (
-        AUTO_FIRST_PUBLISH_LEDGER_SCHEMA_V2,
-    )
-
     with _serial_window(state_dir):
         boundary_state = BatchRunState.read(batch_dir)
         if boundary_state.stage == "abandoned":

@@ -1,5 +1,13 @@
 # 项目状态文档
 
+## 2026-07-24 P0 completed 重放证据链返修完成
+
+- prepare/commit 同批竞态已由共享 execution lock 关闭；completed commit 重放改为在任何
+  dry-run/DB apply/publish 前验证完整冻结证据和精确 v2 publish ledger。
+- 成功重放为严格零写；账本缺失或计数不匹配时要求人工审计并保持 state/ledger/数据库不变。
+  新增 3 项测试，P0 三模块 `266/266` 通过。
+- 变更尚未提交、推送或部署，生产 task 5.3/5.4 边界不变，仍需 fresh read-only review。
+
 ## 2026-07-24 P0 重复 commit 发布幂等 P1 已本地修复
 
 - completed publish 的相同 candidate 普通重放只返回冻结报告，不重新发布；publish 失败或未完成
