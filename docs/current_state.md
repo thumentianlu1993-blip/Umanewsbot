@@ -1,5 +1,23 @@
 # 当前状态
 
+## 2026-07-24 task 5.3 门禁已集成最新主线，等待精确提交复审
+
+- 用户已授权提交、同步主线、复审、部署并执行无写入 task 5.3；task 5.4 的数据库写入和自动首发
+  仍须针对最终 release-candidate SHA 重新授权。
+- 最终未提交受审差异 fingerprint
+  `15f8c3b80b0ddd0a6715dfbee0c17ba8a0ede59bac8ad6b22c8bdb540f1fbbbe`
+  已提交为 `ffa12214`。随后获取并显式合并
+  `origin/main@97dd2350a193c74d5063bf7432a283e4d47f6d0a`，集成提交为
+  `8e3716bc`；四份追加式状态文档冲突均保留双方完整记录，代码无冲突。
+- 集成后 P0 相关 `260/260` 通过，主线新闻边界/赛事系列身份相邻回归
+  `90/90`（1 skip）通过；Django check、迁移漂移、OpenSpec strict/all `37/37` 和 diff check
+  通过。相同禁网 SQLite/Celery eager 环境下，最新主线完整基线为
+  `2784 tests / 21F / 67E / 59 skipped`，集成提交为
+  `2879 / 21F / 67E / 59 skipped`；新增 95 项，failure/error/skipped 增量均为 0。
+- 当前集成提交尚未完成新的原生只读 review，尚未 push 或部署，也未运行生产
+  bundle/prepare-release。生产网络 false、马匹数据和公开状态沿用上一条已核验证据；下一道门禁
+  是对精确集成提交进行只读复审，成功后才可推送和部署。
+
 ## 2026-07-23 task 5.3 发布候选门禁已完成本地实现（未提交、未部署）
 
 - 用户已确认 `p0batch-20b59bda0608` 工作簿中 61 匹完整资料可以向下推进；39 个 blocker 继续

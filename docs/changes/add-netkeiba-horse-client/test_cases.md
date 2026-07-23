@@ -460,3 +460,19 @@ GREEN：
   最终完整差异执行原生只读 review，结论 `APPROVED`，无 P0/P1/P2 actionable finding；session
   `019f901d-7b9f-77e3-96e0-792546d3eb4f`，审查前后 fingerprint
   `60cf62da1514f00fce451c89aa39b46146d20a4ef5245bdc84651a037559e164` 一致。
+
+## 2026-07-24 最新主线集成验证
+
+- 受审未提交差异 fingerprint
+  `15f8c3b80b0ddd0a6715dfbee0c17ba8a0ede59bac8ad6b22c8bdb540f1fbbbe`
+  提交为 `ffa12214`，再合并 `origin/main@97dd2350a193c74d5063bf7432a283e4d47f6d0a`，
+  形成集成提交 `8e3716bc`。
+- 集成后 P0 相关三模块 `260/260`；主线新闻正文边界与赛事系列身份相邻模块
+  `90/90`（1 skip）。
+- Django check 无问题，`makemigrations --check --dry-run` 无漂移，OpenSpec strict/all
+  `37/37`，`git diff --check` 通过。
+- 使用相同 SQLite、Celery eager/memory backend、禁网环境完整运行 stable：
+  - `origin/main@97dd2350`：`2784 tests / 21 failures / 67 errors / 59 skipped`；
+  - 集成提交：`2879 tests / 21 failures / 67 errors / 59 skipped`。
+- 集成相对最新主线新增 95 项测试，failure/error/skipped 增量均为 0。临时 detached baseline
+  worktree 已移除并 prune。
