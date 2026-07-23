@@ -1,6 +1,6 @@
 # 当前状态
 
-## 2026-07-23 2026 赛事系列身份归并：本地实现与代码审核完成，待发布授权
+## 2026-07-23 2026 赛事系列身份归并：只读审核工具已部署，正式审核包待人工定稿
 
 - 新建 `docs/changes/reconcile-2026-race-series-identities/` 五份规划文档，目标是完整盘点正式快照中
   全部 2026 历史目标，同时仅把人工批准且兼容既有引擎的唯一匹配候选纳入首批写入。
@@ -23,13 +23,27 @@
   Django check、无迁移、compile、三份 Compose config 和 diff check 通过。
 - 独立原生代码 review 首轮发现 1 项 P1、1 项 P2；首次限定复审确认原问题关闭后发现 1 项直接
   P1（审核后新增 do-not-merge veto），下一轮又发现同边界 P1（source/destination series 身份未
-  锁定）；现均已修复为四对象 identity SHA + 当前 veto 双重门禁并通过目标回归。最终原生只读
-  review 已 `APPROVED`：parent
+  锁定）；现均已修复为四对象 identity SHA + 当前 veto 双重门禁并通过目标回归。行为代码最终
+  原生只读 review 已 `APPROVED`：parent
   `d64c69264df8bf16389e99514fb4ab553ca3f37b`、content manifest
   `943431514ffa8b814fc2076eb40ad96ddc5d25a6b1896cd81b1e9a7504bacdd2`、fingerprint
-  `db9d0f9b00cad1f1fbfcc784837fc54210e78bc7e7a292b0b720cd85f23c1c85`。
-  三项 P2 与一项探索 identity-set digest 建议已记入非阻塞后续。尚未生成正式生产审核包、未部署、
-  未写生产数据库；历史发布授权不适用于本任务。
+  `db9d0f9b00cad1f1fbfcc784837fc54210e78bc7e7a292b0b720cd85f23c1c85`。随后只修改状态文档，
+  文档增量限定 review 以同一 parent 得到 content manifest
+  `d513dd8cd61031013d3e365b23c2af655d6b3a802ae20bf48c0c793104855d53`、fingerprint
+  `2062b52e452fdecafacb10ae572dd27a26cddf751a56145532323b50a542f4c6`，并作为发布前最终冻结基线。
+  三项 P2 与一项探索 identity-set digest 建议已记入非阻塞后续。
+- 用户在最终 review 后明确授权提交、推送、部署只读工具和生成正式生产审核包。审核内容以
+  `INDEX_TRANSITION_OK` 锁定后提交为 `17d7757aec764755394339400eb2523eae896fa5`，任务分支和
+  `main` 均已推送；生产从 `15645b05` fast-forward 到该提交并运行 `deploy_lowcost.sh`。无迁移，
+  Django check、命令 help、web/worker 同镜像和 HTTP `/healthz/` 均通过；镜像为
+  `sha256:5a3dd28b846954837ade517e5d85aa2bba3b4651d322876f950f0cdfcda45e44`。
+- 正式 repeatable-read 导出时间为 `2026-07-23T02:44:23.655795+00:00`，生产五分类计数与探索
+  基线一致：`1085 = 684 + 226 + 11 + 162 + 2`，异常 0、`blocks_decisions=false`。当前没有
+  identity-set digest，因此该证据不能排除 target/candidate 集合发生等量替换。审核包保存在
+  `runtime/race_series_identity_review/formal-20260723T104700+0800/`，manifest SHA-256 为
+  `9d0df5da1e942f77bbabe9df7c84a921ea9325564ce821ab5f17ebf2f13eee47`；五文件已复制到本地并
+  独立核对 SHA，六 sheet 实际渲染和公式错误扫描通过。本阶段只运行导出模式，未生成 decisions、
+  未运行 prepare/apply/commit，未写生产业务数据；下一门禁是人工审核并定稿工作簿。
 
 ## 2026-07-23 2026 赛历赛事中文名补齐已写入生产
 

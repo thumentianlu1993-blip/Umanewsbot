@@ -1,5 +1,30 @@
 # 部署运行手册
 
+## 2026 赛事系列身份只读审核工具与正式审核包（2026-07-23）
+
+1. 用户在最终原生只读 review 通过后授权提交、推送、部署只读工具并生成正式生产审核包。
+   审核内容经 index transition 锁定后提交为
+   `17d7757aec764755394339400eb2523eae896fa5`，任务分支和 `main` 均已推送。
+2. 生产从 `15645b05` fast-forward 到 `17d7757a`，运行 `deploy_lowcost.sh`。无 migration；
+   Django check 和命令 help 通过，web/worker 镜像均为
+   `sha256:5a3dd28b846954837ade517e5d85aa2bba3b4651d322876f950f0cdfcda45e44`，HTTP
+   `/healthz/` 返回 `{"status": "ok"}`。
+3. 以生产 HEAD 作为不可变参数运行 `review_2026_race_series_identities` 导出模式。正式快照时间
+   `2026-07-23T02:44:23.655795+00:00`，计数为 1,085 total、684 已关联、226 唯一名称匹配、
+   11 同名多候选、162 无名称匹配、2 未举办；五分类计数与探索基线一致，异常 0，
+   `blocks_decisions=false`。当前未记录 identity-set digest，不能据此排除集合等量替换。
+4. 主机持久化目录为
+   `runtime/race_series_identity_review/formal-20260723T104700+0800/`。web 的 `/app/runtime` 未挂载，
+   因此导出后立即用 `docker cp` 把同一目录复制到主机；禁止只保留在可重建容器内。
+5. 文件 SHA-256：manifest `9d0df5da1e942f77bbabe9df7c84a921ea9325564ce821ab5f17ebf2f13eee47`；
+   review.csv `afa06b10cb1d3a7ade13e95f6d18385379a2813458fe61f34ce98440770be1cf`；
+   review.json `951ef701c21f994de1f584530b8cca2eec9ae7b1a3f3858aaf5ddc59d447b0aa`；
+   review.xlsx `c4e09f8bc0d5a5dc912d6b57efb79173d69f9fb70ce057a9d9f6a1526d30c80b`；
+   snapshot.json `1073fa0bbaf6a2b3e3dfa1217fe1afe0b01a80796e47552a182524b0d27ae98a`。
+6. 五文件已复制到本地审核目录并逐文件复核相同 SHA；六张工作表均实际导入、渲染，公式错误
+   扫描为 0。本阶段未运行 build-decisions、prepare、apply 或 commit 模式，没有生产业务数据写入。
+   人工定稿工作簿不等于数据 apply 授权；后续仍需精确 decisions/manifest 复审和新的写入授权。
+
 ## 2026 赛历赛事中文名补齐生产执行记录（2026-07-23）
 
 1. 生产当时快进到 `6167b6c0` 并执行 `deploy_lowcost.sh`；无迁移，HTTP `/healthz/`
