@@ -56,3 +56,15 @@
 当前停在 task 5.4 前。正式写入必须取得针对 release candidate
 `8ef0f718803f7772db5b498925a71651e5c68cb331aeafa50f03dc831f8848fe`
 的新授权。
+
+## task 5.4 首次正式写入结果
+
+- 用户已授权上述 candidate，批准人 `mentianlu`；生成的 v2 release manifest SHA-256 为
+  `5320c33c44d387b14e827b109353ffe5068d997bd9c62d9df903cb5de91e0c90`。
+- 数据库 apply 在 `イエローマジック` 的 strict-complete 复验处 fail closed，原因是该马真实
+  无胜场，而当前完整度逻辑不能区分“major-wins 未审核”和“已审核确认暂无胜绩”。
+- 61 行中有 10 匹真实无胜场；不得为通过门禁而虚构胜场。
+- PostgreSQL 事务整批回滚；马匹业务表、completion run、OperationLog 和公开计数均零变化，
+  自动首发未运行，网络保持 false。
+- task 5.4 未完成。建议通过新测试锁定“approved empty major-wins”语义，实施窄修并独立复审；
+  部署后重新生成 candidate，任何新 SHA 都必须重新授权。

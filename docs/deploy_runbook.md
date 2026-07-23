@@ -1,5 +1,23 @@
 # 部署运行手册
 
+## task 5.4 首次 commit fail-closed 记录（2026-07-24）
+
+- 命令绑定 candidate
+  `8ef0f718803f7772db5b498925a71651e5c68cb331aeafa50f03dc831f8848fe`、
+  reviewer ID `1`、`approved_by=mentianlu` 与 `--confirm-reviewed-artifact`。
+- 写前备份：
+  `backups/db/pre-p0-task54-20260723T203347Z.dump`（238,795,564 bytes、SHA-256
+  `082e91d5e9d01ef5e04e8d7d3e16118eab8ae09ad2548b13378d49f23254c2ec`）和
+  `.env.backup.pre-p0-task54-20260723T203347Z`。
+- 正式 manifest/批准账本已生成，release SHA 为
+  `5320c33c44d387b14e827b109353ffe5068d997bd9c62d9df903cb5de91e0c90`；DB apply 在
+  `イエローマジック is not strict complete after apply:
+  ['major_wins', 'review.reviewer', 'review.reviewed_at']` 处失败。
+- 事务回滚后马匹业务表、completion run、OperationLog 与公开计数全部不变，state 无
+  commit/publish stage。不要手改 artifact、添加虚假胜场、删除 release/ledger 或用 retry-publish。
+  同 candidate 只有在代码语义未变且完整门禁可满足时才允许幂等重试；若修复完整度语义，应部署
+  新受审版本、重新 prepare-release 并取得新 candidate SHA 授权。
+
 ## task 5.3 生产执行记录（2026-07-24）
 
 - 精确版本：`4972a6b2eb35167d5783f5c37908b8b3d190160d`；部署镜像：

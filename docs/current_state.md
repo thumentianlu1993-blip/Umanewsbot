@@ -1,5 +1,29 @@
 # 当前状态
 
+## 2026-07-24 task 5.4 首次正式写入被 strict-complete 门禁整批回滚
+
+- 用户已针对 candidate
+  `8ef0f718803f7772db5b498925a71651e5c68cb331aeafa50f03dc831f8848fe`
+  授权正式写入，`approved_by=mentianlu`。写前候选、账本、网络开关、空闲队列和数据库计数均
+  无漂移；新增写前恢复点
+  `backups/db/pre-p0-task54-20260723T203347Z.dump`（238,795,564 bytes、SHA-256
+  `082e91d5e9d01ef5e04e8d7d3e16118eab8ae09ad2548b13378d49f23254c2ec`，
+  `pg_restore -l` 通过）及 `.env.backup.pre-p0-task54-20260723T203347Z`。
+- v2 release manifest 已按授权生成，SHA-256 为
+  `5320c33c44d387b14e827b109353ffe5068d997bd9c62d9df903cb5de91e0c90`，
+  `release_approved` 唯一写入账本。随后数据库事务在首个无胜场对象
+  `イエローマジック` 的 strict-complete 复验处 fail closed：
+  `major_wins / review.reviewer / review.reviewed_at`。
+- PostgreSQL 事务整批回滚。HorseProfile `46318`、Japan `11642`、published `2797`、
+  Japan published `2463`、HorseP0Source `57332`、HorseRaceRecord `1460`、
+  HorseProfileCompletionRun `1`、OperationLog `59362` 均与写前一致；未执行自动首发，
+  batch 仍为 prepared，commit/publish stage 均未完成，网络开关仍为 false。
+- 只读检查确认 61 行中有 10 匹真实无胜场；这些行的 `major_wins` 模块已由 reviewer 批准为空，
+  但全局完整度当前把“没有任何胜场”直接判为 `major_wins` 缺失，导致已审核的“暂无胜绩”无法
+  表达。不得伪造胜场或绕过 strict-complete。建议另行授权窄修：只有存在 applied/approved
+  major-wins 审核证据时才允许空列表表示“已核实无胜场”，并补 RED/GREEN、完整回归、独立复审、
+  部署和新 candidate SHA 授权。task 5.4 仍未完成。
+
 ## 2026-07-24 task 5.3 已在生产无写入完成，停在精确候选授权门禁
 
 - 最终集成版本 `4972a6b2eb35167d5783f5c37908b8b3d190160d` 经原生只读 full review
