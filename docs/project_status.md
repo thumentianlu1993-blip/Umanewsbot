@@ -1,13 +1,20 @@
 # 项目状态文档
 
+## 2026-07-24 P0 重复 commit 发布幂等 P1 已本地修复
+
+- completed publish 的相同 candidate 普通重放只返回冻结报告，不重新发布；publish 失败或未完成
+  时普通重放拒绝并指向 `--retry-publish`。人工降级和 gate 放宽不会把一次授权变成再次公开。
+- focused 3 项、auto-publish `72/72`、P0 三模块 `263/263` 通过；当前补丁未提交、未部署，仍须
+  fresh read-only review。生产 task 5.3/5.4 授权边界未扩大。
+
 ## 2026-07-24 P0 task 5.3 已形成最新主线集成提交（待复审）
 
 - 已把受审实现提交为 `ffa12214`，并显式合并
   `origin/main@97dd2350a193c74d5063bf7432a283e4d47f6d0a`，当前集成提交为 `8e3716bc`。
   合并仅在四份追加式文档发生冲突，双方状态记录全部保留，行为代码无冲突。
-- P0 `260/260`、主线相邻 `90/90`（1 skip）、Django、迁移、OpenSpec `37/37` 和 diff check
+- P0 `263/263`、主线相邻 `90/90`（1 skip）、Django、迁移、OpenSpec `37/37` 和 diff check
   通过。完整 stable 对照为主线 `2784 / 21F / 67E / 59S`、集成
-  `2879 / 21F / 67E / 59S`，新增 95 项且失败/错误/跳过增量均为 0。
+  `2882 / 21F / 67E / 59S`，新增 98 项且失败/错误/跳过增量均为 0。
 - 用户已授权继续到无写入 task 5.3；当前仍未 push/deploy/bundle/prepare-release。必须先完成
   精确集成提交的原生只读复审；成功后部署保持网络 false，生成 candidate 后再次停下等待
   task 5.4 授权。

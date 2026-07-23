@@ -21,6 +21,10 @@
   execution -> state；standalone v2 同样从 validation 持锁到数据库事务退出。artifact 尚未
   committed 时必须复验 current batch manifest/combined SHA；只有精确 artifact path+SHA 的
   committed completion run 可改用不可变 snapshot 恢复。
+- publish completed 是一次性终态证据，不是“可重新计算”的当前 gate。相同 candidate 的普通
+  重复 commit 必须返回冻结 publish checkpoint/report，不得因人工降级、解除 manual lock 或其他
+  gate 放宽再次调用发布。publish 未完成或失败只允许显式 `--retry-publish`；普通 commit 不兼任
+  发布恢复入口。
 
 ## 2026-07-23 task 5.2 分叉生产线执行决定
 

@@ -1,5 +1,16 @@
 # 当前状态
 
+## 2026-07-24 最新主线集成 publish 幂等 P1 已修复（待 fresh review）
+
+- 最新集成 review 的唯一 P1 已完成 RED→GREEN：相同 candidate 的普通重复 commit 在
+  `publish:<region>` 已 completed 时只复用冻结 checkpoint/report，不因后续人工降级或 gate 放宽
+  再次调用发布。publish 未完成或失败时普通 commit 在 DB/publish 重跑前 fail closed，只允许显式
+  `--retry-publish` 恢复。
+- 新增 3 项定向测试；auto-publish 类 `72/72`、P0 相关三模块 `263/263` 通过。Django check、
+  迁移漂移、OpenSpec strict/all 与 diff check 见本轮最终验证记录。
+- 当前仍是本地未提交差异；先前针对 `41086464` 的 review 结论不覆盖本补丁。未触网、未 push、
+  未部署，也未执行生产 bundle/prepare-release/commit；下一步必须 fresh read-only review。
+
 ## 2026-07-24 task 5.3 门禁已集成最新主线，等待精确提交复审
 
 - 用户已授权提交、同步主线、复审、部署并执行无写入 task 5.3；task 5.4 的数据库写入和自动首发
@@ -9,11 +20,11 @@
   已提交为 `ffa12214`。随后获取并显式合并
   `origin/main@97dd2350a193c74d5063bf7432a283e4d47f6d0a`，集成提交为
   `8e3716bc`；四份追加式状态文档冲突均保留双方完整记录，代码无冲突。
-- 集成后 P0 相关 `260/260` 通过，主线新闻边界/赛事系列身份相邻回归
+- 集成及 4.10j 返修后 P0 相关 `263/263` 通过，主线新闻边界/赛事系列身份相邻回归
   `90/90`（1 skip）通过；Django check、迁移漂移、OpenSpec strict/all `37/37` 和 diff check
   通过。相同禁网 SQLite/Celery eager 环境下，最新主线完整基线为
   `2784 tests / 21F / 67E / 59 skipped`，集成提交为
-  `2879 / 21F / 67E / 59 skipped`；新增 95 项，failure/error/skipped 增量均为 0。
+  `2882 / 21F / 67E / 59 skipped`；新增 98 项，failure/error/skipped 增量均为 0。
 - 当前集成提交尚未完成新的原生只读 review，尚未 push 或部署，也未运行生产
   bundle/prepare-release。生产网络 false、马匹数据和公开状态沿用上一条已核验证据；下一道门禁
   是对精确集成提交进行只读复审，成功后才可推送和部署。

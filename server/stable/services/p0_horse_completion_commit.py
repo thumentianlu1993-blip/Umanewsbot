@@ -561,6 +561,7 @@ def _commit_p0_horse_batch_region_locked(
         raise P0HorseBatchError("region commit requires a release candidate SHA-256")
     batch_dir = Path(manifest_path).parent
     combined_path = batch_dir / "artifact" / "combined_candidates.jsonl"
+    completed_publish_report: dict[str, Any] | None = None
     with _serial_window(Path(state_dir)):
         state = BatchRunState.read(batch_dir)
         if state.stage == "abandoned":
@@ -592,6 +593,46 @@ def _commit_p0_horse_batch_region_locked(
         ):
             raise P0HorseBatchError(
                 "release candidate was superseded by a newer authorization"
+            )
+        commit_stage = f"commit:{region}"
+        publish_stage = f"publish:{region}"
+        repeated_completed_commit = (
+            commit_stage in state.completed_stages
+            and isinstance(previous_commit, dict)
+            and previous_commit.get("release_candidate_sha256")
+            == release_candidate_sha256
+        )
+        if repeated_completed_commit:
+            if publish_stage not in state.completed_stages:
+                raise P0HorseBatchError(
+                    f"region {region} commit already completed but publish did "
+                    "not; ordinary commit cannot recover publish state, use "
+                    "--retry-publish"
+                )
+            frozen_publish_report = state.artifacts.get(publish_stage)
+            required_publish_report_fields = {
+                "published",
+                "skipped_already_published",
+                "blocked",
+                "published_profile_ids",
+                "errors",
+                "profile_ids",
+                "frozen_exclusions",
+                "frozen_exclusion_counts",
+            }
+            if (
+                not isinstance(frozen_publish_report, dict)
+                or not required_publish_report_fields.issubset(
+                    frozen_publish_report
+                )
+                or frozen_publish_report.get("errors") != []
+            ):
+                raise P0HorseBatchError(
+                    f"region {region} completed publish checkpoint is missing "
+                    "or invalid; manual audit recovery is required"
+                )
+            completed_publish_report = json.loads(
+                json.dumps(frozen_publish_report)
             )
         artifact_sha = str(
             (candidate.get("bindings") or {}).get("final_artifact_sha256") or ""
@@ -877,16 +918,19 @@ def _commit_p0_horse_batch_region_locked(
     )
 
     manifest = load_batch_manifest(manifest_path)
-    publish_report = _run_region_publish(
-        manifest,
-        batch_dir=batch_dir,
-        state_dir=Path(state_dir),
-        region=region,
-        artifact_sha=artifact_sha,
-        reviewer=reviewer,
-        completion_run=completion_run,
-        publish_scope=candidate["auto_first_publish_scope"],
-    )
+    if completed_publish_report is None:
+        publish_report = _run_region_publish(
+            manifest,
+            batch_dir=batch_dir,
+            state_dir=Path(state_dir),
+            region=region,
+            artifact_sha=artifact_sha,
+            reviewer=reviewer,
+            completion_run=completion_run,
+            publish_scope=candidate["auto_first_publish_scope"],
+        )
+    else:
+        publish_report = completed_publish_report
 
     with _serial_window(Path(state_dir)):
         state = BatchRunState.read(batch_dir)

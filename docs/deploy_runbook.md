@@ -358,6 +358,11 @@ approved manifest**。blocked staging 也记为候选成功，且旧解析器未
    复验 current batch manifest/combined 的真实 SHA。
 6. commit 后重复终验网络开关为 false、全部 worker、日志、healthz 与 `/horses/` 200。
 
+重复执行同一 candidate 的普通 `--commit` 只允许做数据库幂等复验：若 publish stage 已
+completed，返回首次冻结的 publish checkpoint/report，禁止重新调用发布；若 publish stage 缺失、
+未完成或含 errors，普通 commit 必须拒绝，唯一恢复入口是显式 `--retry-publish`。不得通过重复
+commit 利用后续人工降级或 gate 放宽重新公开对象。
+
 2026-07-23 已完成一次安全恢复：备份 `.env.backup.p0-network-disable-
 20260722T180903Z`，重建 web 使容器设置为 false，重启 Nginx；web healthy，内外 healthz、
 `/horses/` 均为 200。该恢复不代表返修代码已经部署。

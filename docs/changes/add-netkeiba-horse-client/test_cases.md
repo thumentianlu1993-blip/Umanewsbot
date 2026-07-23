@@ -121,6 +121,11 @@
 38. candidate artifact 已完整 COMMITTED 后，重建 current batch/combined 并删除 commit
     checkpoint；standalone v2 幂等 dry-run/commit 仍从不可变 snapshot 与 committed-run 证据恢复，
     planned writes 为 0。
+39. 首次 commit + publish completed 后，分别人工把已发布对象降回可发布状态、清除首次冻结的
+    manual-lock gate，再以相同 candidate 普通重复 commit；两者都必须复用冻结 publish
+    checkpoint/report，不调用发布服务、不改变当前公开状态、不新增 ledger 或 state publish
+    证据。首次 publish 失败或 commit 后尚未 publish 时，普通重复 commit 必须在 DB/publish 重跑前
+    fail closed 并提示显式 `--retry-publish`。
 
 ## GREEN 与回归门禁
 
@@ -467,12 +472,38 @@ GREEN：
   `15f8c3b80b0ddd0a6715dfbee0c17ba8a0ede59bac8ad6b22c8bdb540f1fbbbe`
   提交为 `ffa12214`，再合并 `origin/main@97dd2350a193c74d5063bf7432a283e4d47f6d0a`，
   形成集成提交 `8e3716bc`。
-- 集成后 P0 相关三模块 `260/260`；主线新闻正文边界与赛事系列身份相邻模块
+- 集成及 4.10j 返修后 P0 相关三模块 `263/263`；主线新闻正文边界与赛事系列身份相邻模块
   `90/90`（1 skip）。
 - Django check 无问题，`makemigrations --check --dry-run` 无漂移，OpenSpec strict/all
   `37/37`，`git diff --check` 通过。
 - 使用相同 SQLite、Celery eager/memory backend、禁网环境完整运行 stable：
   - `origin/main@97dd2350`：`2784 tests / 21 failures / 67 errors / 59 skipped`；
-  - 集成提交：`2879 tests / 21 failures / 67 errors / 59 skipped`。
-- 集成相对最新主线新增 95 项测试，failure/error/skipped 增量均为 0。临时 detached baseline
+  - 集成返修工作区：`2882 tests / 21 failures / 67 errors / 59 skipped`。
+- 集成相对最新主线新增 98 项测试，failure/error/skipped 增量均为 0。临时 detached baseline
   worktree 已移除并 prune。
+
+## 最新主线集成审查返修证据（task 4.10j）
+
+RED：
+
+- 相同 candidate 在 `publish:<region>` 已进入 completed stages 后，普通重复 commit 仍无条件调用
+  `_run_region_publish`。人工把首次发布对象降回 ready 后会再次进入发布；首次冻结为
+  `block_manual_lock` 的对象在清除 lock 后虽不扩大冻结 scope，但仍重复调用发布服务并重写
+  publish checkpoint/ledger。
+- 首次 publish 记录 errors、commit stage 已完成时，普通重复 commit 会再次运行 DB 幂等 apply 和
+  publish；显式 `--retry-publish` 不再是唯一恢复入口。
+- 新增 3 项测试在旧实现上为 2 error + 1 failure，明确观测到发布 mock 被调用及失败 publish 被
+  普通 commit 恢复。
+
+GREEN：
+
+- 同 candidate 且 commit stage 已完成时，普通 commit 在 execution -> state lock 内读取 publish
+  stage。已 completed 必须存在字段完整、`errors=[]` 的冻结 checkpoint，后续 DB 幂等复验完成后
+  直接返回该 report，完全跳过 `_run_region_publish`。
+- publish stage 缺失、未 completed 或失败时，普通重复 commit 在 artifact/DB/publish 重跑前以
+  领域错误拒绝并明确提示 `--retry-publish`；显式 retry 入口及既有成功后拒绝 retry 的合同不变。
+- 人工降级与 manual-lock 放宽测试均断言发布 mock 零调用、profile 当前 review status 不变、
+  `publish:japan` report 不变、completed stage 唯一、ledger bytes 不变。失败 publish 测试断言
+  state/ledger 不变且发布 mock 零调用。
+- focused 3 项与完整 `P0HorseBatchAutoPublishTests` 72 项通过；P0 相关三模块最终为
+  `263/263`。全程使用 SQLite/Celery eager 禁网测试环境，未访问生产。

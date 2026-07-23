@@ -4322,6 +4322,233 @@ class P0HorseBatchAutoPublishTests(P0HorseBatchCommandPipelineTests):
         run = HorseProfileCompletionRun.objects.get(id=committed["completion_run_id"])
         self.assertEqual(run.summary["auto_first_publish"]["published"], 1)
 
+    def test_repeated_commit_reuses_completed_publish_after_manual_downgrade(self):
+        from unittest import mock
+
+        from stable.services import horse_profile_publish
+        from stable.services.p0_horse_completion_batch import BatchRunState
+        from stable.services.p0_horse_completion_commit import (
+            commit_p0_horse_batch_region,
+        )
+
+        self._run_pipeline()
+        batch_dir = self.manifest_path.parent
+        state_before = BatchRunState.read(batch_dir)
+        publish_before = json.loads(
+            json.dumps(state_before.artifacts["publish:japan"])
+        )
+        ledger_path = batch_dir / "approvals_ledger.jsonl"
+        ledger_before = ledger_path.read_bytes()
+
+        self.profile.review_status = "ready"
+        self.profile.published_at = None
+        self.profile.published_by = None
+        self.profile.save(
+            update_fields=[
+                "review_status",
+                "published_at",
+                "published_by",
+            ]
+        )
+        with mock.patch.object(
+            horse_profile_publish,
+            "auto_publish_profiles",
+            return_value={
+                "published": 0,
+                "skipped_already_published": 1,
+                "blocked": 0,
+                "blocked_reasons": {},
+                "published_profile_ids": [],
+                "errors": [],
+            },
+        ) as publish_mock:
+            repeated = commit_p0_horse_batch_region(
+                self.manifest_path,
+                region="japan",
+                reviewer=self.reviewer,
+                approved_by="human-approver",
+                release_candidate_sha256=self.release_candidate[
+                    "release_candidate_sha256"
+                ],
+                state_dir=self.state_dir,
+                confirm_reviewed_artifact=True,
+            )
+        publish_mock.assert_not_called()
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.review_status, "ready")
+        state_after = BatchRunState.read(batch_dir)
+        self.assertEqual(
+            state_after.artifacts["publish:japan"],
+            publish_before,
+        )
+        self.assertEqual(
+            state_after.completed_stages.count("publish:japan"),
+            1,
+        )
+        self.assertEqual(ledger_path.read_bytes(), ledger_before)
+        self.assertEqual(repeated["auto_first_publish"], publish_before)
+
+    def test_repeated_commit_does_not_expand_completed_frozen_exclusion(self):
+        from unittest import mock
+
+        from stable.services import horse_profile_publish
+        from stable.services.p0_horse_completion_batch import BatchRunState
+        from stable.services.p0_horse_completion_commit import (
+            commit_p0_horse_batch_region,
+        )
+
+        self.profile.manual_lock_flags = {"auto_publish_blocked": True}
+        self.profile.save(update_fields=["manual_lock_flags"])
+        committed = self._run_pipeline()
+        self.assertEqual(
+            committed["auto_first_publish"]["frozen_exclusion_counts"],
+            {"block_manual_lock": 1},
+        )
+        batch_dir = self.manifest_path.parent
+        state_before = BatchRunState.read(batch_dir)
+        publish_before = json.loads(
+            json.dumps(state_before.artifacts["publish:japan"])
+        )
+        ledger_path = batch_dir / "approvals_ledger.jsonl"
+        ledger_before = ledger_path.read_bytes()
+
+        self.profile.manual_lock_flags = {}
+        self.profile.save(update_fields=["manual_lock_flags"])
+        with mock.patch.object(
+            horse_profile_publish,
+            "auto_publish_profiles",
+            return_value={
+                "published": 0,
+                "skipped_already_published": 0,
+                "blocked": 0,
+                "blocked_reasons": {},
+                "published_profile_ids": [],
+                "errors": [],
+            },
+        ) as publish_mock:
+            repeated = commit_p0_horse_batch_region(
+                self.manifest_path,
+                region="japan",
+                reviewer=self.reviewer,
+                approved_by="human-approver",
+                release_candidate_sha256=self.release_candidate[
+                    "release_candidate_sha256"
+                ],
+                state_dir=self.state_dir,
+                confirm_reviewed_artifact=True,
+            )
+        publish_mock.assert_not_called()
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.review_status, "ready")
+        state_after = BatchRunState.read(batch_dir)
+        self.assertEqual(
+            state_after.artifacts["publish:japan"],
+            publish_before,
+        )
+        self.assertEqual(
+            state_after.completed_stages.count("publish:japan"),
+            1,
+        )
+        self.assertEqual(ledger_path.read_bytes(), ledger_before)
+        self.assertEqual(repeated["auto_first_publish"], publish_before)
+
+    def test_repeated_commit_rejects_incomplete_publish_and_requires_retry(self):
+        from unittest import mock
+
+        from stable.services import horse_profile_publish
+        from stable.services.p0_horse_completion_batch import (
+            BatchRunState,
+            P0HorseBatchError,
+        )
+        from stable.services.p0_horse_completion_commit import (
+            commit_p0_horse_batch_region,
+        )
+
+        self._call(
+            "--prepare",
+            str(self.manifest_path),
+            "--expected-sha256",
+            self.approved["batch_sha256"],
+        )
+        self._call(
+            "--bundle",
+            str(self.manifest_path),
+            "--region",
+            "japan",
+            "--reviewer-id",
+            str(self.reviewer.id),
+        )
+        self.release_candidate = self._prepare_release_candidate()
+        failed_report = {
+            "published": 0,
+            "skipped_already_published": 0,
+            "blocked": 0,
+            "blocked_reasons": {},
+            "published_profile_ids": [],
+            "errors": [{"profile_id": self.profile.pk, "error": "boom"}],
+        }
+        with mock.patch.object(
+            horse_profile_publish,
+            "auto_publish_profiles",
+            return_value=failed_report,
+        ):
+            with self.assertRaises(P0HorseBatchError):
+                commit_p0_horse_batch_region(
+                    self.manifest_path,
+                    region="japan",
+                    reviewer=self.reviewer,
+                    approved_by="human-approver",
+                    release_candidate_sha256=self.release_candidate[
+                        "release_candidate_sha256"
+                    ],
+                    state_dir=self.state_dir,
+                    confirm_reviewed_artifact=True,
+                )
+
+        batch_dir = self.manifest_path.parent
+        state_before = BatchRunState.read(batch_dir)
+        publish_before = json.loads(
+            json.dumps(state_before.artifacts["publish:japan"])
+        )
+        ledger_path = batch_dir / "approvals_ledger.jsonl"
+        ledger_before = ledger_path.read_bytes()
+        successful_report = {
+            "published": 1,
+            "skipped_already_published": 0,
+            "blocked": 0,
+            "blocked_reasons": {},
+            "published_profile_ids": [self.profile.pk],
+            "errors": [],
+        }
+        with mock.patch.object(
+            horse_profile_publish,
+            "auto_publish_profiles",
+            return_value=successful_report,
+        ) as publish_mock:
+            with self.assertRaisesRegex(
+                P0HorseBatchError,
+                "--retry-publish",
+            ):
+                commit_p0_horse_batch_region(
+                    self.manifest_path,
+                    region="japan",
+                    reviewer=self.reviewer,
+                    approved_by="human-approver",
+                    release_candidate_sha256=self.release_candidate[
+                        "release_candidate_sha256"
+                    ],
+                    state_dir=self.state_dir,
+                    confirm_reviewed_artifact=True,
+                )
+        publish_mock.assert_not_called()
+        state_after = BatchRunState.read(batch_dir)
+        self.assertEqual(
+            state_after.artifacts["publish:japan"],
+            publish_before,
+        )
+        self.assertNotIn("publish:japan", state_after.completed_stages)
+        self.assertEqual(ledger_path.read_bytes(), ledger_before)
+
     def test_third_publish_attempt_preserves_all_cumulative_ids(self):
         from unittest import mock
 
