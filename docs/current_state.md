@@ -1,5 +1,19 @@
 # 当前状态
 
+## 2026-07-24 HRN 新闻正文边界已部署，历史中文稿未重处理
+
+- PR `#12` 已合并，生产运行 `main@0e4a3520`；四个应用服务统一使用镜像
+  `sha256:36b9a75b854f9be0ccfb7beca164a69e9a5f79bab77b4bcd2f4cbb9f50356733`。
+  无新增 migration，Django check、worker ping、内外 healthz、首页和文章详情 HTTP 验收通过。
+- 生产镜像只读解析文章 `9623` 的真实 HRN 来源页得到 `.article-body / ok`，正文 9,355 字符，
+  已知页面框架文本命中 0，首尾均为文章正文。
+- 部署后的自然 HRN job `27503 / 27504` 均成功，但只有重复文章，尚无此前从未入库的新 HRN 稿件；
+  Gate A 的新稿翻译和公开验收必须等待真实新样本，不能由重复抓取替代。
+- 自然重复抓取已把 `9623` 原文层更新为干净正文；旧中文译文和公开 `effective_body` 仍保留历史污染。
+  本次未重译、改写、重新发布、发送 QQ，也未执行历史扫描或 manifest commit；Gate B/C 仍需独立授权。
+- 恢复点、部署过程和 `collectstatic` 并发插曲详见
+  `docs/changes/fix-news-body-extraction-boundaries/release_report.md`。
+
 ## 2026-07-23 2026 赛事系列身份归并：只读审核工具已部署，正式审核包待人工定稿
 
 - 新建 `docs/changes/reconcile-2026-race-series-identities/` 五份规划文档，目标是完整盘点正式快照中

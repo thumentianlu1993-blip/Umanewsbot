@@ -6326,3 +6326,22 @@ python manage.py complete_horse_profiles \
    `sha256:69ed2bd9f3f7ecc581c2caba4704bd7b1764fc02af6a2663b78f599217b23696`。
    回滚时将代码恢复到上一个提交 `f0d3fbd6e71374b425e3bbae2041d47758270546` 并用同一低成本
    Compose 重建全部四个应用服务；本次无迁移，只有确认数据受损时才恢复数据库备份。
+
+## 2026-07-24 HRN 新闻正文边界发布记录
+
+1. PR `#12` 的任务提交为 `9fded052`，合并后的生产 revision 为 `0e4a3520`。发布前数据库恢复点为
+   `backups/db/pre-news-body-boundary-20260724T015733+0800.sql.gz`，大小 `237423530` bytes，
+   SHA-256 为 `250e81de23816d00c7c15d9fd354867d28521f56edca980786f7f557c4a4330d`；
+   `.env` 恢复点为 `.env.backup.news-body-boundary-20260724T015733+0800`。
+2. 发布前停止 beat，等待两个采集任务及下游术语/自动化任务自然完成；`active/reserved=0` 后停止
+   普通 worker 与 race-live worker。外部导入运行数为 0。本次无 migration。
+3. 首次 `deploy_lowcost.sh` 在新 web 已启动后，外层 `collectstatic` 与 web 启动脚本并发处理共享
+   static volume，出现瞬时文件不存在。确认新 web 自身 collectstatic 成功且 healthy、migration 未变化后，
+   单进程重跑 collectstatic 成功，再显式重建 `worker / beat / race_live_worker`。
+4. 最终 `web / worker / beat / race_live_worker` 统一镜像为
+   `sha256:36b9a75b854f9be0ccfb7beca164a69e9a5f79bab77b4bcd2f4cbb9f50356733`。
+   Django check、migration drift、worker ping、内外 healthz、首页及新闻详情 HTTP 通过；队列为空，
+   近 10 分钟四服务无严重错误。
+5. 生产镜像只读解析 `9623` 的真实来源页得到 `.article-body / ok`，正文 9,355 字符，已知框架文本
+   命中 0。自然 HRN job `27503 / 27504` 均成功但没有全新文章，因此 Gate A 的新稿翻译/公开验收
+   尚未完成。重复抓取已清理 `9623` 原文层，但历史中文 `effective_body` 仍含污染；未运行历史 repair。
