@@ -30,6 +30,8 @@ from stable.models import (
     RaceSeriesReviewStatus,
     RacingRegion,
 )
+from stable.services.race_event_reconciliation import event_identity, target_identity
+from stable.services.race_series_identity_review import race_series_identity
 
 
 class RaceSeriesIdentityReviewTests(TestCase):
@@ -370,6 +372,188 @@ class RaceSeriesIdentityReviewTests(TestCase):
                 )
             target.refresh_from_db()
             self.assertIsNone(target.event_id)
+
+    def test_optional_review_identity_sha_is_strictly_validated(self):
+        _, _, target, event = self._positive_fixture()
+        decision = self._decision(
+            sequence=1,
+            decision="merge_and_link",
+            target=target,
+            event=event,
+        )
+        decision["target_identity_sha256"] = "not-a-sha"
+        with tempfile.TemporaryDirectory() as temporary:
+            decisions_path, repairs_path = self._write_inputs(
+                Path(temporary), [decision]
+            )
+            with self.assertRaisesRegex(
+                self._service().RaceSeriesIdentityReviewError,
+                "invalid target_identity_sha256",
+            ):
+                self._service().prepare_race_series_identity_review(
+                    decisions_path=decisions_path,
+                    field_repairs_path=repairs_path,
+                    output_dir=Path(temporary) / "artifact",
+                )
+
+    def test_optional_review_series_identity_sha_is_strictly_validated(self):
+        _, _, target, event = self._positive_fixture()
+        decision = self._decision(
+            sequence=1,
+            decision="merge_and_link",
+            target=target,
+            event=event,
+        )
+        decision["source_series_identity_sha256"] = "A" * 64
+        with tempfile.TemporaryDirectory() as temporary:
+            decisions_path, repairs_path = self._write_inputs(
+                Path(temporary), [decision]
+            )
+            with self.assertRaisesRegex(
+                self._service().RaceSeriesIdentityReviewError,
+                "invalid source_series_identity_sha256",
+            ):
+                self._service().prepare_race_series_identity_review(
+                    decisions_path=decisions_path,
+                    field_repairs_path=repairs_path,
+                    output_dir=Path(temporary) / "artifact",
+                )
+
+    def test_review_identity_sha_rejects_semantic_drift_before_new_baseline(self):
+        _, _, target, event = self._positive_fixture()
+        original_target_name = target.original_name
+        original_event_refs = event.source_refs
+        decision = self._decision(
+            sequence=1,
+            decision="merge_and_link",
+            target=target,
+            event=event,
+        )
+        decision["target_identity_sha256"] = target_identity(target)["sha256"]
+        decision["event_identity_sha256"] = event_identity(event)["sha256"]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            decisions_path, repairs_path = self._write_inputs(root, [decision])
+
+            target.original_name = "Name changed after workbook review"
+            target.save(update_fields={"original_name"})
+            with self.assertRaisesRegex(
+                self._service().RaceSeriesIdentityReviewError,
+                "review target identity drift",
+            ):
+                self._service().prepare_race_series_identity_review(
+                    decisions_path=decisions_path,
+                    field_repairs_path=repairs_path,
+                    output_dir=root / "target-drift-artifact",
+                )
+
+            target.original_name = original_target_name
+            target.save(update_fields={"original_name"})
+            event.source_refs = {**original_event_refs, "official": "https://drift.example.test"}
+            event.save(update_fields={"source_refs"})
+            with self.assertRaisesRegex(
+                self._service().RaceSeriesIdentityReviewError,
+                "review event identity drift",
+            ):
+                self._service().prepare_race_series_identity_review(
+                    decisions_path=decisions_path,
+                    field_repairs_path=repairs_path,
+                    output_dir=root / "event-drift-artifact",
+                )
+
+    def test_merge_prepare_rejects_do_not_merge_veto_added_after_review(self):
+        destination, source, target, event = self._positive_fixture()
+        decision = self._decision(
+            sequence=1,
+            decision="merge_and_link",
+            target=target,
+            event=event,
+        )
+        decision["target_identity_sha256"] = target_identity(target)["sha256"]
+        decision["event_identity_sha256"] = event_identity(event)["sha256"]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            decisions_path, repairs_path = self._write_inputs(root, [decision])
+            for locked_series, other_series, label in (
+                (destination, source, "destination"),
+                (source, destination, "source"),
+            ):
+                with self.subTest(locked_side=label):
+                    destination.manual_lock_flags = {}
+                    destination.save(update_fields={"manual_lock_flags"})
+                    source.manual_lock_flags = {}
+                    source.save(update_fields={"manual_lock_flags"})
+                    locked_series.manual_lock_flags = {
+                        "identity_do_not_merge": {
+                            str(other_series.pk): {
+                                "decision": "keep_independent",
+                                "other_series_id": other_series.pk,
+                                "evidence": [],
+                            }
+                        }
+                    }
+                    locked_series.save(update_fields={"manual_lock_flags"})
+                    output = root / f"{label}-veto-artifact"
+                    with self.assertRaisesRegex(
+                        self._service().RaceSeriesIdentityReviewError,
+                        "do_not_merge veto",
+                    ):
+                        self._service().prepare_race_series_identity_review(
+                            decisions_path=decisions_path,
+                            field_repairs_path=repairs_path,
+                            output_dir=output,
+                        )
+                    self.assertFalse(output.exists())
+
+    def test_review_series_identity_sha_rejects_visible_name_drift(self):
+        destination, source, target, event = self._positive_fixture()
+        decision = self._decision(
+            sequence=1,
+            decision="merge_and_link",
+            target=target,
+            event=event,
+        )
+        decision.update(
+            {
+                "target_identity_sha256": target_identity(target)["sha256"],
+                "event_identity_sha256": event_identity(event)["sha256"],
+                "source_series_identity_sha256": race_series_identity(source)[
+                    "sha256"
+                ],
+                "destination_series_identity_sha256": race_series_identity(
+                    destination
+                )["sha256"],
+            }
+        )
+        original_names = {
+            source.pk: source.canonical_name_original,
+            destination.pk: destination.canonical_name_original,
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            decisions_path, repairs_path = self._write_inputs(root, [decision])
+            for series, label in (
+                (source, "source"),
+                (destination, "destination"),
+            ):
+                with self.subTest(series_side=label):
+                    series.canonical_name_original = (
+                        original_names[series.pk] + " Changed"
+                    )
+                    series.save(update_fields={"canonical_name_original"})
+                    output = root / f"{label}-series-drift-artifact"
+                    with self.assertRaisesRegex(
+                        self._service().RaceSeriesIdentityReviewError,
+                        f"review {label} series identity drift",
+                    ):
+                        self._service().prepare_race_series_identity_review(
+                            decisions_path=decisions_path,
+                            field_repairs_path=repairs_path,
+                            output_dir=output,
+                        )
+                    self.assertFalse(output.exists())
+                    series.canonical_name_original = original_names[series.pk]
+                    series.save(update_fields={"canonical_name_original"})
 
     def test_positive_merge_links_target_creates_relation_and_preserves_details(self):
         destination, source, target, event = self._positive_fixture()

@@ -1,5 +1,36 @@
 # 当前状态
 
+## 2026-07-23 2026 赛事系列身份归并：本地实现与代码审核完成，待发布授权
+
+- 新建 `docs/changes/reconcile-2026-race-series-identities/` 五份规划文档，目标是完整盘点正式快照中
+  全部 2026 历史目标，同时仅把人工批准且兼容既有引擎的唯一匹配候选纳入首批写入。
+- 2026-07-23 生产只读探索基线为 1,085 条 target：684 已关联、226 唯一名称匹配但系列不同、
+  11 同名多候选、162 无名称匹配、2 未举办；226 条中当前 215 条满足既有引擎严格条件。正式
+  导出必须重新锁定快照，任何漂移都需显式确认。
+- 独立方案评审首轮提出 3 项 P1、2 项 P2；修订后限定复审再发现 1 项 P1、1 项 P2，现已全部
+  关闭并得到 `VERDICT: APPROVED`。关键门禁为：原始 manifest 是独立信任根；只有唯一匹配表
+  可产生动作；首批单一 manifest/单事务；穷尽分类并阻塞异常；审核包严格字段白名单。
+- 已新增只读审核适配服务和管理命令：在 repeatable-read 快照内穷尽分类，生成
+  JSON/CSV/六 sheet XLSX/manifest；定稿回读绑定原始 manifest，只有唯一匹配表可产生既有引擎
+  decisions，命令不提供 commit 模式。工作簿已完成实际渲染返修，操作列前置并带动作下拉。
+- RED 阶段为目标模块缺失导致 1 项失败、12 项安全跳过；GREEN 及代码审核返修后，新增/既有身份
+  专项 SQLite 48 项通过（3 项 PostgreSQL-only 跳过）。真实 PostgreSQL 16 的 repeatable-read MVCC、行锁和
+  双事务竞争同一 target/destination 均通过，竞争结果严格一胜一败且败者零部分写入。
+- 1,085 targets / 1,500 event identities 等价规模两次构建 0.121 秒。完整 `stable` 对测试基线
+  `origin/main@15645b05` 对照（后续 `d64c6926` 仅为 netkeiba 发布证据文档）：主线
+  `2741 / 21F / 70E / 57S`，本分支
+  `2769 / 21F / 70E / 59S`，新增 28 项且失败/错误增量为 0；新增 2 项跳过均为 PostgreSQL-only。
+  Django check、无迁移、compile、三份 Compose config 和 diff check 通过。
+- 独立原生代码 review 首轮发现 1 项 P1、1 项 P2；首次限定复审确认原问题关闭后发现 1 项直接
+  P1（审核后新增 do-not-merge veto），下一轮又发现同边界 P1（source/destination series 身份未
+  锁定）；现均已修复为四对象 identity SHA + 当前 veto 双重门禁并通过目标回归。最终原生只读
+  review 已 `APPROVED`：parent
+  `d64c69264df8bf16389e99514fb4ab553ca3f37b`、content manifest
+  `943431514ffa8b814fc2076eb40ad96ddc5d25a6b1896cd81b1e9a7504bacdd2`、fingerprint
+  `db9d0f9b00cad1f1fbfcc784837fc54210e78bc7e7a292b0b720cd85f23c1c85`。
+  三项 P2 与一项探索 identity-set digest 建议已记入非阻塞后续。尚未生成正式生产审核包、未部署、
+  未写生产数据库；历史发布授权不适用于本任务。
+
 ## 2026-07-23 2026 赛历赛事中文名补齐已写入生产
 
 - 根据发布时保存的执行证据，573 场 2026 年已发布赛事已完成单事务写入：

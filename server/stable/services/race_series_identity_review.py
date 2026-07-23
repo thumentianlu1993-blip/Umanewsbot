@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import tempfile
 from collections import Counter, defaultdict
@@ -34,6 +35,8 @@ from stable.services.race_event_reconciliation import (
     _read_regular_file_bytes,
     _set_repeatable_read_snapshot,
     _sha256_bytes,
+    event_identity as reconciliation_event_identity,
+    target_identity as reconciliation_target_identity,
 )
 
 
@@ -105,6 +108,11 @@ def _model_identity(instance) -> dict[str, Any]:
     return _identity(_model_payload(instance))
 
 
+def race_series_identity(series: RaceSeries) -> dict[str, Any]:
+    """Return the full concrete-field identity used by identity-review CAS."""
+    return _model_identity(series)
+
+
 def _event_detail_identity(event: RaceEvent) -> dict[str, Any]:
     rows: dict[str, list[dict[str, Any]]] = {}
     for relation_name in DETAIL_RELATIONS:
@@ -137,6 +145,17 @@ def _required_positive_int(payload: dict[str, Any], key: str, *, label: str) -> 
     if parsed <= 0:
         raise RaceSeriesIdentityReviewError(f"{label} has invalid {key}")
     return parsed
+
+
+def _optional_identity_sha256(
+    payload: dict[str, Any], key: str, *, label: str
+) -> str | None:
+    if key not in payload:
+        return None
+    value = payload[key]
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise RaceSeriesIdentityReviewError(f"{label} has invalid {key}")
+    return value
 
 
 def _normalize_evidence(value: Any, *, label: str) -> dict[str, Any]:
@@ -185,6 +204,18 @@ def _normalize_decisions(payload: dict[str, Any]) -> list[dict[str, Any]]:
             )
         decision_ids.add(decision_id)
         sheet_sequences.add(sheet_sequence)
+        target_identity_sha256 = _optional_identity_sha256(
+            row, "target_identity_sha256", label=label
+        )
+        event_identity_sha256 = _optional_identity_sha256(
+            row, "event_identity_sha256", label=label
+        )
+        source_series_identity_sha256 = _optional_identity_sha256(
+            row, "source_series_identity_sha256", label=label
+        )
+        destination_series_identity_sha256 = _optional_identity_sha256(
+            row, "destination_series_identity_sha256", label=label
+        )
         normalized.append(
             {
                 "decision_id": decision_id,
@@ -203,6 +234,32 @@ def _normalize_decisions(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 "country_region": _required_text(row, "country_region", label=label),
                 "confidence": _required_text(row, "confidence", label=label),
                 "evidence": _normalize_evidence(row.get("evidence"), label=label),
+                **(
+                    {"target_identity_sha256": target_identity_sha256}
+                    if target_identity_sha256 is not None
+                    else {}
+                ),
+                **(
+                    {"event_identity_sha256": event_identity_sha256}
+                    if event_identity_sha256 is not None
+                    else {}
+                ),
+                **(
+                    {
+                        "source_series_identity_sha256": source_series_identity_sha256
+                    }
+                    if source_series_identity_sha256 is not None
+                    else {}
+                ),
+                **(
+                    {
+                        "destination_series_identity_sha256": (
+                            destination_series_identity_sha256
+                        )
+                    }
+                    if destination_series_identity_sha256 is not None
+                    else {}
+                ),
             }
         )
     return sorted(
@@ -476,11 +533,62 @@ def _build_actions(
     if len(targets) != len(target_ids) or len(events) != len(event_ids):
         raise RaceSeriesIdentityReviewError("decision target or event does not exist")
     for decision in decisions:
+        target = targets[decision["target_id"]]
+        event = events[decision["event_id"]]
+        expected_target_sha256 = decision.get("target_identity_sha256")
+        expected_event_sha256 = decision.get("event_identity_sha256")
+        expected_source_series_sha256 = decision.get(
+            "source_series_identity_sha256"
+        )
+        expected_destination_series_sha256 = decision.get(
+            "destination_series_identity_sha256"
+        )
+        if (
+            expected_target_sha256 is not None
+            and reconciliation_target_identity(target)["sha256"]
+            != expected_target_sha256
+        ):
+            raise RaceSeriesIdentityReviewError(
+                f"review target identity drift: {decision['decision_id']}"
+            )
+        if (
+            expected_event_sha256 is not None
+            and reconciliation_event_identity(event)["sha256"]
+            != expected_event_sha256
+        ):
+            raise RaceSeriesIdentityReviewError(
+                f"review event identity drift: {decision['decision_id']}"
+            )
+        if (
+            expected_source_series_sha256 is not None
+            and race_series_identity(event.race_series)["sha256"]
+            != expected_source_series_sha256
+        ):
+            raise RaceSeriesIdentityReviewError(
+                f"review source series identity drift: {decision['decision_id']}"
+            )
+        if (
+            expected_destination_series_sha256 is not None
+            and race_series_identity(target.race_series)["sha256"]
+            != expected_destination_series_sha256
+        ):
+            raise RaceSeriesIdentityReviewError(
+                f"review destination series identity drift: {decision['decision_id']}"
+            )
         _validate_decision_identity(
             decision,
-            target=targets[decision["target_id"]],
-            event=events[decision["event_id"]],
+            target=target,
+            event=event,
         )
+        if (
+            decision["decision"] == DECISION_MERGE_AND_LINK
+            and is_identity_pair_do_not_merge(
+                target.race_series, event.race_series
+            )
+        ):
+            raise RaceSeriesIdentityReviewError(
+                f"identity pair has do_not_merge veto: {decision['decision_id']}"
+            )
 
     repairs_by_event: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for repair in repairs:
