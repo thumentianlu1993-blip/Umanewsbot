@@ -91,6 +91,7 @@ from stable.services.rewriting import apply_rewrite_result, rewrite_article
 from stable.services.sources import find_builtin_source, sync_builtin_sources
 from stable.services.source_polling import select_due_enabled_news_sources
 from stable.services.term_discovery import discover_and_aggregate_article
+from stable.services.text import normalize_whitespace
 from stable.services.translation import translate_article
 from stable.services.validation import apply_validation_outcome, validate_rewrite
 from stable.services.external_horse_data import ExternalHorseDataImporter, ImportOptions
@@ -669,7 +670,17 @@ def _crawl_international_source(source: NewsSource) -> dict:
             try:
                 detail = adapter.fetch_detail(stub.source_url)
                 draft = adapter.normalize_source_payload(stub, detail)
-                if (getattr(draft, "metadata", {}) or {}).get("published_at_verified") is False:
+                draft_metadata = getattr(draft, "metadata", {}) or {}
+                body_parse_status = draft_metadata.get("body_parse_status")
+                body_raw = normalize_whitespace(getattr(draft, "body_ja_raw", "") or "")
+                body_normalized = normalize_whitespace(getattr(draft, "body_ja_normalized", "") or "")
+                if body_parse_status != "ok" or not body_raw or not body_normalized:
+                    raise ValueError(
+                        "article body parse failed before upsert: "
+                        f"status={body_parse_status or 'missing'}, "
+                        f"body_raw_empty={not body_raw}, body_normalized_empty={not body_normalized}"
+                    )
+                if draft_metadata.get("published_at_verified") is False:
                     unverified_time_count += 1
             except Exception as exc:
                 detail_errors.append(f"{stub.source_url}: {exc}")
@@ -699,7 +710,10 @@ def _crawl_international_source(source: NewsSource) -> dict:
         if skipped_errors:
             message = f"新增 {new_count}，重复 {seen_count}；跳过 {len(skipped_errors)} 条：{skipped_errors[0][:120]}"
             if detail_errors:
-                message = f"新增 {new_count}，重复 {seen_count}；parse failed 跳过 {len(skipped_errors)} 条：{skipped_errors[0][:120]}"
+                message = (
+                    f"新增 {new_count}，重复 {seen_count}；parse failed 跳过 {len(skipped_errors)} 条；"
+                    f"detail_failures={len(detail_errors)}：{skipped_errors[0][:120]}"
+                )
         if detail_errors and new_count == 0 and seen_count == 0:
             error_message = message or "parse failed: no parsable article details"
             terminal_state_claimed = _finish_crawl_job(
@@ -711,7 +725,12 @@ def _crawl_international_source(source: NewsSource) -> dict:
             failure = RuntimeError(error_message)
             setattr(failure, "_crawl_terminal_state_claimed", terminal_state_claimed)
             raise failure
-        terminal_state_claimed = _finish_crawl_job(job, success_count=new_count, fail_count=seen_count, message=message)
+        terminal_state_claimed = _finish_crawl_job(
+            job,
+            success_count=new_count,
+            fail_count=seen_count,
+            message=message,
+        )
         return {
             "new_count": new_count,
             "seen_count": seen_count,

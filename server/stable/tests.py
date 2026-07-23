@@ -13530,6 +13530,23 @@ class TranslationWorkflowTests(TestCase):
 
 
 class CrawlAutoTranslateTests(TestCase):
+    def _valid_international_draft(self, article: NewsArticle) -> CanonicalNewsDraft:
+        return CanonicalNewsDraft(
+            source_site=article.source_site,
+            source_mode=article.source_mode,
+            source_article_id=article.source_article_id,
+            source_url=article.source_url,
+            title_ja=article.title_ja,
+            body_ja_raw=article.body_ja_raw,
+            body_ja_normalized=article.body_ja_normalized,
+            published_at=article.published_at,
+            images=[],
+            racing_region=article.racing_region,
+            source_language=article.source_language,
+            original_content_html="<div class='article-body'><p>Body</p></div>",
+            metadata={"body_parse_status": "ok", "body_selector": ".article-body"},
+        )
+
     @override_settings(AUTO_TRANSLATE_ON_INGEST=True, AUTO_TRANSLATE_SYNC=True)
     def test_new_article_is_translated_immediately_after_ingest(self):
         stub = type("Stub", (), {"source_article_id": "123"})()
@@ -13762,6 +13779,7 @@ class CrawlAutoTranslateTests(TestCase):
             workflow_status=WorkflowStatus.PUBLISHED,
             published_to_web_at=timezone.now(),
         )
+        valid_draft = self._valid_international_draft(article)
 
         class FakeInternationalAdapter:
             def fetch_listing(self, mode, page):
@@ -13771,7 +13789,7 @@ class CrawlAutoTranslateTests(TestCase):
                 return object()
 
             def normalize_source_payload(self, stub, detail):
-                return object()
+                return valid_draft
 
         with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {source.adapter_key: FakeInternationalAdapter}), patch(
             "stable.tasks.upsert_article_from_draft",
@@ -13803,6 +13821,7 @@ class CrawlAutoTranslateTests(TestCase):
             automation_status=AutomationStatus.MANUAL_REVIEW_REQUIRED,
             review_mode=ReviewMode.MANUAL,
         )
+        valid_draft = self._valid_international_draft(article)
 
         class FakeInternationalAdapter:
             def fetch_listing(self, mode, page):
@@ -13812,7 +13831,7 @@ class CrawlAutoTranslateTests(TestCase):
                 return object()
 
             def normalize_source_payload(self, stub, detail):
-                return object()
+                return valid_draft
 
         with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {source.adapter_key: FakeInternationalAdapter}), patch(
             "stable.tasks.upsert_article_from_draft",
@@ -13847,6 +13866,7 @@ class CrawlAutoTranslateTests(TestCase):
             source_url=good_stub.source_url,
             workflow_status=WorkflowStatus.PENDING_TRANSLATION,
         )
+        valid_draft = self._valid_international_draft(article)
 
         class FakeInternationalAdapter:
             def fetch_listing(self, mode, page):
@@ -13858,7 +13878,7 @@ class CrawlAutoTranslateTests(TestCase):
                 return object()
 
             def normalize_source_payload(self, stub, detail):
-                return object()
+                return valid_draft
 
         with patch("stable.tasks.INTERNATIONAL_ADAPTERS", {source.adapter_key: FakeInternationalAdapter}), patch(
             "stable.tasks.upsert_article_from_draft", return_value=ArticleUpsertResult(article=article, created=True)

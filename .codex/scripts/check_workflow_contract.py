@@ -377,7 +377,10 @@ def check_reviewer_continuity(root: Path) -> None:
 
 
 def check_documents(root: Path) -> None:
-    stages = "探索 -> spec/design -> 方案审核 -> 测试先行 -> 子代理实现 -> reviewer 会话 /review -> 用户授权后发布"
+    stages = (
+        "探索 -> spec/design -> 方案审核 -> 用户确认实现 -> 测试先行 -> "
+        "子代理实现 -> 独立 reviewer 会话 /review -> 用户授权后发布"
+    )
     agents = read_text(root, "AGENTS.md")
     workflow = read_text(root, "docs/codex_workflow.md")
     for label, value in (("AGENTS.md", agents), ("workflow", workflow)):
@@ -481,7 +484,11 @@ def check_documents(root: Path) -> None:
         "docs/changes/codex-native-workflow-migration/test_cases.md",
     ):
         value = read_text(root, relative)
-        require("四份" not in value and "16/16" not in value, f"{relative} outdated count claim")
+        require(
+            not re.search(r"四份\s+(?:durable\s+)?artifacts", value)
+            and "16/16" not in value,
+            f"{relative} outdated count claim",
+        )
     require(
         "五份 durable artifacts" in read_text(root, "docs/project_status.md"),
         "docs/project_status.md outdated count: five durable artifacts missing",
