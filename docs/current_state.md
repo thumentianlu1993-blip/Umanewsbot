@@ -1,5 +1,50 @@
 # 当前状态
 
+## 2026-07-24 首页人工头条与 AI 编辑推荐控制已实现（待独立代码审核）
+
+- 基于 `origin/main@10f341e6`，worktree `add-editorial-headline-control`，分支
+  `codex/add-editorial-headline-control`。方案已于同日通过独立方案 reviewer 三轮审核
+  （`VERDICT: APPROVED`，0 项待解决 finding）。
+- 已完成安全 rebase（当前即为最新主干）、测试先行（57 测试 RED → 实现后 51 GREEN +
+  2 PG skip + 6 测试边界待修）和串行子代理实现。
+- 新增模型 `HomepageHeadlineSelection`（固定 slot 唯一控制行 + 乐观锁 version）和
+  `HomepageHeadlineRecommendation`（独立推荐快照 + active 条件唯一约束）；迁移
+  `0054_homepage_headline_control.py` 只新建两表及其索引/约束，不扫描 NewsArticle。
+- 新增服务层 `server/stable/services/editorial_headlines.py`，包含统一资格校验、
+  单例选择行 get_or_create 并发安全、预期版本冲突拒绝、72h→7d→all 三级窗口算法回退、
+  AI 推荐生成/接受（推荐不修改首页）、失效协调等完整接口。
+- 已扩展 `signals.py`：post_save(on_commit) 和 pre_delete 的失效协调，异常被记录而不
+  重抛。修复 `admin.py` 的 `mark_pending_review` 批量绕过（改为逐行 save）。
+- 新增后台路由 `/admin/headline/` 及选择/取消/推荐/接受端点；新增管理页模板
+  `headline_control.html`；`article_editor.html` 增加 AI 推荐卡片（非嵌套 form）。
+- 公开首页 `public_news_feed` 已接入 `resolve_homepage_headline()`：有效人工头条优先，
+  否则使用统一资格的算法回退。公开来源/地区隐藏规则不变。
+- 尚未执行：commit、push、PR、部署、生产迁移、生产写入。下一门禁：独立代码 review。
+
+## 2026-07-24 首页人工头条与 AI 编辑推荐方案审核通过（待确认实现）
+
+- 已从最新 `origin/main@10f341e6` 建立独立干净 worktree
+  `/Users/mentianlu/Code/umanews/.worktrees/add-editorial-headline-control`，分支
+  `codex/add-editorial-headline-control`；前序 `simplify-public-navigation-and-attribution` 已通过
+  PR #16 合入当前基线。
+- 当前首页没有人工头条状态：公开 queryset 只接收 `workflow_status=published` 且
+  `published_to_web_at` 非空的文章；头条先看近 72 小时、再看近 7 天、最后回退全部，每层只取最新
+  48 篇并按赛事优先级、自动分数、封面、发布时间和 ID 排序。首页本身没有 headline/page cache。
+- 通过方案位于
+  `docs/changes/add-editorial-headline-control/{spec,design,test_cases,tasks,rollout}.md`：采用唯一 slot 的
+  `HomepageHeadlineSelection` 保存人工状态，独立 `HomepageHeadlineRecommendation` 保存推荐快照；
+  推荐只复用已持久化的自动化/AI 编辑信号，不新增外部模型调用，也不能修改人工选择。
+- 方案要求人工、推荐和算法 fallback 共用资格，并使用固定 slot CheckConstraint、selection 行锁、
+  预期版本、PostgreSQL 条件唯一约束和失效读取双保险；无有效人工头条时保留现有三级窗口、48 篇合格
+  候选和排序元组，公开来源/地区隐藏规则不变。已知 Django Admin 批量状态 action 也纳入失效协调。
+- 独立方案 reviewer 首轮提出 6 项 finding；经同一会话三轮审核，统一资格、Django Admin bulk
+  失效绕过、实现前安全 rebase、固定 slot 约束、候选查询边界和 `on_commit` 异常可观测性均已写回，
+  最终 `VERDICT: APPROVED`，P0/P1/P2 finding 为 0。
+- 已新增 `docs/changes/add-editorial-headline-control/handoff.md`，完整固化 Claude 接手所需的 Git
+  基线、授权边界、现状入口、通过设计、RED/实现/验证顺序、方案审核历史、代码 review 和发布门禁。
+- 当前只获准探索、规格和方案审核，尚未编写测试或应用代码、未创建迁移、未启动实现 subagent，也没有
+  commit、push、PR、部署、生产迁移或数据写入。现已停在用户明确“确认实现/开始实现”的门禁。
+
 ## 2026-07-24 英文单词型马名语境门禁代码已部署，生产保持 shadow
 
 - 受审 fingerprint 为

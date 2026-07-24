@@ -1,0 +1,140 @@
+{% extends "stable/console/base.html" %}
+{% load static %}
+
+{% block title %}首页头条管理{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-6">
+  <h1 class="text-2xl font-bold mb-6">首页头条管理</h1>
+
+  {# Current Headline Status #}
+  <section class="mb-8 bg-white rounded-lg shadow p-6">
+    <h2 class="text-lg font-semibold mb-3">当前头条状态</h2>
+    {% if state.is_manual_active and state.manual_article %}
+      <div class="flex items-center gap-3 mb-2">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">人工选择</span>
+        <span class="text-sm text-gray-500">版本 {{ state.selection.version }}</span>
+      </div>
+      <div class="flex items-start justify-between">
+        <div>
+          <a href="{% url 'console-article-editor' state.manual_article.pk %}" class="text-blue-600 hover:underline font-medium">
+            #{{ state.manual_article.pk }} {{ state.manual_article.effective_title }}
+          </a>
+          <p class="text-sm text-gray-400 mt-1">
+            由 {{ state.selection.selected_by|default:"—" }} 于 {{ state.selection.selected_at|date:"Y-m-d H:i" }} 设置
+          </p>
+        </div>
+        <form method="post" action="{% url 'console-headline-cancel' %}">
+          {% csrf_token %}
+          <input type="hidden" name="expected_version" value="{{ state.selection.version }}">
+          <button type="submit" class="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50">
+            取消人工头条
+          </button>
+        </form>
+      </div>
+    {% else %}
+      <p class="text-gray-500">当前使用<strong>算法自动回退</strong>，没有人工设置的头条。</p>
+    {% endif %}
+  </section>
+
+  {# AI Recommendation #}
+  <section class="mb-8 bg-white rounded-lg shadow p-6">
+    <h2 class="text-lg font-semibold mb-3">AI 编辑推荐</h2>
+    {% if recommendation and recommendation.article %}
+      <div class="mb-3">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ recommendation.get_status_display }}</span>
+        <span class="text-xs text-gray-400 ml-2">{{ recommendation.engine_version }}</span>
+      </div>
+      <div class="mb-2">
+        <a href="{% url 'console-article-editor' recommendation.article.pk %}" class="text-blue-600 hover:underline">
+          #{{ recommendation.article.pk }} {{ recommendation.article.effective_title }}
+        </a>
+      </div>
+      <p class="text-sm text-gray-600 mb-3">{{ recommendation.reason }}</p>
+      {% if recommendation.status == "active" %}
+        <form method="post" action="{% url 'console-headline-accept-recommendation' recommendation.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="expected_version" value="{{ state.selection.version|default:0 }}">
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
+            {% if state.is_manual_active %}替换当前头条{% else %}接受此推荐{% endif %}
+          </button>
+        </form>
+      {% endif %}
+    {% else %}
+      <p class="text-gray-500 mb-3">暂无推荐。</p>
+    {% endif %}
+    <form method="post" action="{% url 'console-headline-recommend' %}">
+      {% csrf_token %}
+      <button type="submit" class="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
+        刷新推荐
+      </button>
+    </form>
+  </section>
+
+  {# Eligible Articles #}
+  <section class="mb-8 bg-white rounded-lg shadow p-6">
+    <h2 class="text-lg font-semibold mb-3">合格文章（最多48篇）</h2>
+    {% if eligible_articles %}
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="border-b">
+            <tr>
+              <th class="text-left py-2 px-2">ID</th>
+              <th class="text-left py-2 px-2">标题</th>
+              <th class="text-left py-2 px-2">网页发布时间</th>
+              <th class="text-left py-2 px-2">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for article in eligible_articles %}
+              <tr class="border-b hover:bg-gray-50 {% if state.manual_article and state.manual_article.pk == article.pk %}bg-green-50{% endif %}">
+                <td class="py-2 px-2">{{ article.pk }}</td>
+                <td class="py-2 px-2">
+                  <a href="{% url 'console-article-editor' article.pk %}" class="text-blue-600 hover:underline">
+                    {{ article.effective_title }}
+                  </a>
+                  {% if state.manual_article and state.manual_article.pk == article.pk %}
+                    <span class="text-green-600 text-xs ml-1">← 当前头条</span>
+                  {% endif %}
+                </td>
+                <td class="py-2 px-2 text-gray-500">{{ article.published_to_web_at|date:"Y-m-d H:i" }}</td>
+                <td class="py-2 px-2">
+                  <form method="post" action="{% url 'console-headline-select' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="article_id" value="{{ article.pk }}">
+                    <input type="hidden" name="expected_version" value="{{ state.selection.version|default:0 }}">
+                    <button type="submit" class="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100">
+                      {% if state.manual_article and state.manual_article.pk == article.pk %}重新设置{% else %}设为头条{% endif %}
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-gray-500">当前没有合格文章。</p>
+    {% endif %}
+  </section>
+
+  {# Recent Audit Logs #}
+  <section class="bg-white rounded-lg shadow p-6">
+    <h2 class="text-lg font-semibold mb-3">最近操作记录</h2>
+    {% if recent_logs %}
+      <div class="space-y-2 text-sm">
+        {% for log in recent_logs %}
+          <div class="flex items-start gap-3 py-1.5 border-b border-gray-100 last:border-0">
+            <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 flex-shrink-0">{{ log.action_type }}</span>
+            <span class="text-gray-700">{{ log.detail }}</span>
+            <span class="text-gray-400 text-xs flex-shrink-0">{{ log.created_at|date:"m-d H:i" }}</span>
+            <span class="text-gray-400 text-xs flex-shrink-0">{{ log.admin|default:"系统" }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-gray-400 text-sm">暂无操作记录。</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -63,4 +63,9 @@ urlpatterns = [
     path("term-candidates/<int:candidate_id>/ignore/", views.term_candidate_ignore, name="console-term-candidate-ignore"),
     path("published/", views.published_list, name="console-published-list"),
     path("logs/", views.operation_log_list, name="console-log-list"),
+    path("headline/", views.headline_control, name="console-headline-control"),
+    path("headline/select/", views.headline_select, name="console-headline-select"),
+    path("headline/cancel/", views.headline_cancel, name="console-headline-cancel"),
+    path("headline/recommend/", views.headline_recommend, name="console-headline-recommend"),
+    path("headline/recommend/<int:recommendation_id>/accept/", views.headline_accept_recommendation, name="console-headline-accept-recommendation"),
 ]

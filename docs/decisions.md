@@ -1,5 +1,30 @@
 # 关键决策
 
+## 2026-07-24 首页人工头条实现完成（代码就位，待审核与发布）
+
+- 已按审核通过的方案实现 HomepageHeadlineSelection / HomepageHeadlineRecommendation
+  模型、服务层、signals 协调、admin 修复、路由、视图和模板。
+- 具体实现与 `docs/changes/add-editorial-headline-control/design.md` 的通过版本一致。
+- 未实际发布，不授权部署或生产写入。
+
+## 2026-07-24 首页人工头条采用唯一控制行，AI 推荐保持独立记录
+
+- 规划中的首页人工头条不在 `NewsArticle` 增加 `is_headline` 布尔字段。全站唯一头条是跨文章不变量，
+  用多文章布尔字段会把替换、并发和残余状态分散到多行，也容易让 Django Admin 绕过资格与审计。
+- 方案采用固定 `homepage_primary` slot 的 `HomepageHeadlineSelection` 单例控制行；所有设置、替换、
+  取消、接受推荐和失效协调锁同一行，并用 `version` 拒绝陈旧页面。数据库以固定 slot
+  CheckConstraint 和 `UNIQUE(slot)` 保证当前版本全库只有一个合法控制位。
+- AI 编辑推荐使用独立 `HomepageHeadlineRecommendation` 快照和 active 条件唯一约束。推荐生成只读取
+  已保存的赛事优先级、自动分数、封面和发布时间信号，不新增第二套 LLM 调用；生成推荐永不写 selection，
+  只有有权限用户明确接受后才可切换人工头条。
+- 头条统一资格要求文章当前已发布、网页公开时间不在未来、有效标题/摘要/正文非空；不强制封面。
+  人工选择、AI 推荐和算法 fallback 共用该资格；选择失效时清除人工状态并记录审计，保留原有三级时间
+  窗口、48 篇合格候选和排序元组，避免无效文章被算法立即选回。
+- 首页当前没有页面级或 headline cache，本变更不为头条新增缓存；实时性通过数据库读取和连续请求验证。
+  若后续需要 cache，必须另行补 key、TTL、事务提交后失效和故障回退设计。
+- 本决策已由同一独立方案 reviewer 三轮收敛并获得 `VERDICT: APPROVED`；最终字段和文件范围以
+  `docs/changes/add-editorial-headline-control/` 的通过版本为准。当前只完成规划，尚未授权实现或发布。
+
 ## 2026-07-24 已审核空胜绩采用显式证据语义并版本化发布候选
 
 - “没有胜绩记录”不再等同于“胜绩资料缺失”。有实际胜绩沿用原判定；没有实际胜绩时，只有最新

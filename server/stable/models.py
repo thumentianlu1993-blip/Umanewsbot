@@ -4666,3 +4666,82 @@ class MultiregionAttributionLock(TimestampedModel):
 
     class Meta:
         ordering = ("key",)
+
+
+class HomepageHeadlineSelection(models.Model):
+    SLOT_HOMEPAGE_PRIMARY = "homepage_primary"
+
+    slot = models.CharField(max_length=32, unique=True, default=SLOT_HOMEPAGE_PRIMARY)
+    article = models.ForeignKey(
+        "NewsArticle", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+"
+    )
+    selected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+"
+    )
+    selected_at = models.DateTimeField(null=True, blank=True)
+    version = models.PositiveBigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(slot="homepage_primary"),
+                name="headline_selection_slot_check",
+            ),
+        ]
+        indexes = []
+
+
+class HomepageHeadlineRecommendation(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "活跃"
+        ACCEPTED = "accepted", "已接受"
+        SUPERSEDED = "superseded", "已替换"
+        INVALIDATED = "invalidated", "已失效"
+
+    SLOT_HOMEPAGE_PRIMARY = "homepage_primary"
+
+    slot = models.CharField(max_length=32, default=SLOT_HOMEPAGE_PRIMARY)
+    article = models.ForeignKey(
+        "NewsArticle", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+"
+    )
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.ACTIVE
+    )
+    reason = models.TextField(blank=True)
+    evidence = models.JSONField(default=dict)
+    engine_version = models.CharField(max_length=64)
+    generated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL,
+        related_name="+"
+    )
+    accepted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+"
+    )
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(slot="homepage_primary"),
+                name="headline_recommendation_slot_check",
+            ),
+            models.UniqueConstraint(
+                fields=("slot",),
+                condition=models.Q(status="active"),
+                name="headline_recommendation_unique_active",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("slot", "status", "-created_at"),
+                name="headline_rec_slot_status_idx",
+            ),
+        ]

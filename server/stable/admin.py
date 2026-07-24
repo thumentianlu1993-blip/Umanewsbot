@@ -698,8 +698,12 @@ class NewsArticleAdmin(admin.ModelAdmin):
 
     @admin.action(description="标记为待审核")
     def mark_pending_review(self, request, queryset):
-        count = queryset.update(workflow_status=WorkflowStatus.PENDING_REVIEW)
-        self.message_user(request, f"已将 {count} 篇文章标记为待审核。", messages.SUCCESS)
+        count = 0
+        for article in queryset:
+            article.workflow_status = WorkflowStatus.PENDING_REVIEW
+            article.save(update_fields=["workflow_status", "updated_at"])
+            count += 1
+        self.message_user(request, f"已将 {count} 篇文章标记为待审核。", messages.SUCCESS, fail_silently=True)
 
     @admin.action(description="标记为可推送")
     def mark_published_ready(self, request, queryset):
