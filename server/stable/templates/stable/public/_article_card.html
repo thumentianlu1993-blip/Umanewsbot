@@ -1,8 +1,5 @@
-<article class="feed-card" style="--region-color: {{ article.region_color }}">
+<article class="feed-card">
   <div class="feed-card-top">
-    <span class="region-mark"></span>
-    <span class="region-label">{{ article.get_racing_region_display }}</span>
-    <span class="feed-card-source">{{ article.source_note|default:article.get_source_site_display }}</span>
     {% if follow_entry %}<span class="follow-source-tag">{% if follow_entry.is_descendant %}子代相关 · {% else %}来自：{% endif %}{{ follow_entry.source_horse_profile.display_name }}</span>{% endif %}
     <span class="feed-card-time tabular">{{ article.published_to_web_at|date:"m-d H:i" }}</span>
   </div>

@@ -3,18 +3,14 @@
 {% block title %}{{ article.effective_title }} · UmaFans{% endblock %}
 
 {% block content %}
-  <main class="article-wrap" style="--region-color: {{ article.region_color }}">
+  <main class="article-wrap">
     <article class="article-detail" data-public-detail>
       <nav class="article-actions" aria-label="文章操作">
         <a href="/">← 返回首页</a>
-        <a href="{{ article.source_url }}" target="_blank" rel="noreferrer">查看原文 ↗</a>
       </nav>
-      <span class="article-kicker">{{ article.get_racing_region_display }} · {{ article.source_note|default:article.get_source_site_display }}</span>
       <h1 class="article-title">{{ article.effective_title }}</h1>
       <div class="article-meta">
         <span class="tabular">{{ article.published_to_web_at|date:"Y-m-d H:i" }} 发布</span>
-        <span>来源：{{ article.source_note|default:article.get_source_site_display }}</span>
-        <span>{{ article.get_source_language_display }}</span>
       </div>
       <hr class="article-rule">
 
@@ -37,15 +33,6 @@
         <img class="article-cover" src="{{ article.cover_image_url }}" alt="">
       {% endif %}
       <div class="article-body">{{ article.effective_body|linebreaks }}</div>
-      <section class="source-box">
-        <p><strong>来源说明：</strong>{{ article.source_note|default:article.get_source_site_display }}</p>
-        <p><strong>主地区：</strong>{{ article.get_racing_region_display }}</p>
-        {% if article.related_region_display_text %}
-          <p><strong>关联地区：</strong>{{ article.related_region_display_text }}</p>
-        {% endif %}
-        <p><strong>原文语言：</strong>{{ article.get_source_language_display }}</p>
-        <p><strong>原文链接：</strong><a href="{{ article.source_url }}" target="_blank" rel="noreferrer">{{ article.source_url }}</a></p>
-      </section>
     </article>
 
     {% if teaser_event %}

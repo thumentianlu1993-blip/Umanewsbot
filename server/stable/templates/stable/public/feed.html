@@ -40,12 +40,6 @@
       </section>
     {% endif %}
 
-    <nav class="region-tabs" aria-label="地区频道">
-      {% for tab in region_tabs %}
-        <a class="region-tab{% if tab.is_active %} active{% endif %}" style="--tab-color: {{ tab.color }}" href="{{ tab.url }}">{{ tab.label }}</a>
-      {% endfor %}
-    </nav>
-
     <div class="home-grid">
       <section class="feed" aria-label="最新新闻">
         {% for article in feed_articles %}

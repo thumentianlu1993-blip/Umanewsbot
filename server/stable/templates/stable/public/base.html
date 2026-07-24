@@ -38,15 +38,14 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5a9 9 0 0 0-9 9c0 3.4 1.7 6.2 3.4 7.9l1.7-1.7C6.4 16 5.5 14 5.5 11.5a6.5 6.5 0 0 1 13 0c0 2.5-.9 4.5-2.6 6.2l1.7 1.7c1.7-1.7 3.4-4.5 3.4-7.9a9 9 0 0 0-9-9z" fill="#C9A227"/></svg>
           <span>UmaFans</span>
         </div>
-        <p class="footer-desc">面向中文读者的全球赛马新闻门户：聚合日本、中国香港、英国、法国、美国赛马资讯，提供赛事日历、赛果数据与马匹档案。</p>
+        <p class="footer-desc">面向中文读者的全球赛马新闻门户，提供赛事日历、赛果数据与马匹档案。</p>
       </div>
       <div class="footer-col">
         <h3>频道</h3>
         <ul>
-          <li><a href="/?region=japan">日本赛马</a></li>
-          <li><a href="/?region=hong_kong">中国香港</a></li>
-          <li><a href="/?region=united_kingdom">英国</a> / <a href="/?region=france">法国</a></li>
-          <li><a href="/?region=united_states">美国</a></li>
+          <li><a href="/">全部新闻</a></li>
+          <li><a href="{% url 'public-race-calendar' %}">赛事日历</a></li>
+          <li><a href="{% url 'public-horse-index' %}">马匹档案</a></li>
         </ul>
       </div>
       <div class="footer-col">
@@ -59,7 +58,7 @@
         </ul>
       </div>
     </div>
-    <div class="footer-bottom">© 2026 UmaFans · 内容来源：netkeiba / JRA / HKJC 等公开来源，仅供资讯阅读</div>
+    <div class="footer-bottom">© 2026 UmaFans</div>
   </footer>
   <nav class="mobile-tabbar" aria-label="移动端导航">
     <a class="{% if request.resolver_match.url_name == 'public-news-feed' %}active{% endif %}" href="/">

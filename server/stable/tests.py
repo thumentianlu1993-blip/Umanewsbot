@@ -10793,17 +10793,17 @@ class PublicHomeInfoFeedTests(TestCase):
 
     def test_public_home_region_tabs_filter_published_articles(self):
         now = timezone.now()
-        self.make_article("jp-region", "日本新闻", published_to_web_at=now - timedelta(minutes=2))
+        self.make_article("jp-region", "测试新闻A", published_to_web_at=now - timedelta(minutes=2))
         hk_article = self.make_article(
             "hk-region",
-            "香港新闻",
+            "测试新闻B",
             racing_region=RacingRegion.HONG_KONG,
             source_language=SourceLanguage.ENGLISH,
             published_to_web_at=now,
         )
         self.make_article(
             "uk-draft",
-            "英国草稿",
+            "草稿新闻",
             racing_region=RacingRegion.UNITED_KINGDOM,
             source_language=SourceLanguage.ENGLISH,
             workflow_status=WorkflowStatus.PENDING_EDIT,
@@ -10813,38 +10813,48 @@ class PublicHomeInfoFeedTests(TestCase):
         aggregate = self.client.get("/")
         hk = self.client.get("/", {"region": RacingRegion.HONG_KONG})
 
-        self.assertContains(aggregate, "综合")
-        self.assertContains(aggregate, "日本")
-        self.assertContains(aggregate, "中国香港")
-        self.assertContains(aggregate, "英国")
-        self.assertContains(aggregate, "法国")
-        self.assertContains(aggregate, "美国")
-        self.assertEqual([article.effective_title for article in aggregate.context["latest_articles"]], ["香港新闻", "日本新闻"])
-        self.assertEqual([article.effective_title for article in hk.context["latest_articles"]], ["香港新闻"])
-        self.assertEqual(hk.context["headline_article"], hk_article)
-        self.assertNotContains(hk, "日本新闻")
-        self.assertNotContains(hk, "英国草稿")
+        # NEW BEHAVIOR: No region tabs in the aggregate response
+        self.assertNotContains(aggregate, "综合")
+        self.assertNotContains(aggregate, "日本")
+        self.assertNotContains(aggregate, "中国香港")
+
+        # NEW BEHAVIOR: region param causes permanent redirect to /
+        self.assertEqual(hk.status_code, 301)
+
+        # NEW BEHAVIOR: Aggregate shows ALL published articles regardless of region
+        self.assertEqual(
+            [article.effective_title for article in aggregate.context["latest_articles"]],
+            ["测试新闻B", "测试新闻A"],
+        )
+
+        # NEW BEHAVIOR: Draft articles still not visible
+        self.assertNotContains(aggregate, "草稿新闻")
 
     def test_public_home_pagination_preserves_region_filter(self):
         now = timezone.now()
         for index in range(14):
             self.make_article(
                 f"hk-page-{index}",
-                f"香港分页新闻 {index}",
+                f"分页测试新闻 {index}",
                 racing_region=RacingRegion.HONG_KONG,
                 source_language=SourceLanguage.ENGLISH,
                 published_to_web_at=now - timedelta(minutes=index),
             )
 
         response = self.client.get("/", {"region": RacingRegion.HONG_KONG})
+        paged = self.client.get("/", {"region": RacingRegion.HONG_KONG, "page": 2})
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "?region=hong_kong&amp;page=2")
+        # NEW BEHAVIOR: region param causes permanent redirect to /
+        self.assertEqual(response.status_code, 301)
+        # NEW BEHAVIOR: region param with page redirects to / without region
+        self.assertEqual(paged.status_code, 301)
+        self.assertIn("page=2", paged["Location"])
+        self.assertNotIn("region", paged["Location"])
 
     def test_public_detail_shows_region_source_and_source_language(self):
         article = self.make_article(
             "us-detail",
-            "美国详情",
+            "测试详情",
             racing_region=RacingRegion.UNITED_STATES,
             source_language=SourceLanguage.ENGLISH,
             source_mode=SourceMode.LATEST,
@@ -10852,9 +10862,16 @@ class PublicHomeInfoFeedTests(TestCase):
 
         response = self.client.get(article.public_path)
 
-        self.assertContains(response, "美国")
-        self.assertContains(response, "英文")
-        self.assertContains(response, "netkeiba")
+        # NEW BEHAVIOR: Detail page does NOT show region, source language, or source note
+        self.assertNotContains(response, "美国")
+        self.assertNotContains(response, "英文")
+        self.assertNotContains(response, "netkeiba")
+        # NEW BEHAVIOR: Detail page does NOT contain a link to source_url
+        self.assertNotContains(response, article.source_url)
+        # NEW BEHAVIOR: Detail page still shows title, body, publish time
+        self.assertContains(response, "测试详情")
+        self.assertContains(response, "测试详情 正文")
+        self.assertContains(response, "测试详情 摘要")
 
     def test_public_home_selects_recent_high_value_cover_article_as_headline(self):
         now = timezone.now()
@@ -10983,7 +11000,7 @@ class PublicHomeInfoFeedTests(TestCase):
 
         response = self.client.get("/")
 
-        self.assertContains(response, "原站热度")
+        self.assertNotContains(response, "原站热度")
         self.assertNotContains(response, "本站评论")
         self.assertNotContains(response, "本站浏览")
 
@@ -11013,8 +11030,11 @@ class PublicHomeInfoFeedTests(TestCase):
         self.assertContains(response, "改写标题")
         self.assertContains(response, "改写摘要")
         self.assertContains(response, "改写正文第一段")
-        self.assertContains(response, "netkeiba")
-        self.assertContains(response, article.source_url)
+        # NEW BEHAVIOR: source_note and source_url are not shown in public HTML
+        self.assertNotContains(response, "netkeiba")
+        self.assertNotContains(response, article.source_url)
+        # NEW BEHAVIOR: No source-box section exists in the response
+        self.assertNotContains(response, "source-box")
 
     def test_public_detail_requires_web_publish_time(self):
         article = self.make_article("detail-without-web-time", "无发布时间", published_to_web_at=None)
@@ -18835,7 +18855,7 @@ class P0HorseProfileDataCompletionTests(TestCase):
         self.assertContains(response, "资料补全中")
         self.assertNotContains(response, "空壳")
 
-    def test_public_index_pagination_composes_with_region_filter(self):
+    def test_public_index_pagination_uses_unified_list_after_legacy_region_redirect(self):
         for index in range(26):
             self._profile(
                 primary_term=self._term(source=f"Japan Horse {index}", region=RacingRegion.JAPAN),
@@ -18849,16 +18869,25 @@ class P0HorseProfileDataCompletionTests(TestCase):
             review_status=HorseProfileStatus.PUBLISHED,
         )
 
-        first = self.client.get(reverse("public-horse-index"), {"region": "japan"})
-        second = self.client.get(
+        # Legacy ?region= param causes permanent redirect — region stripped, page preserved.
+        redirect_first = self.client.get(reverse("public-horse-index"), {"region": "japan"})
+        redirect_second = self.client.get(
             reverse("public-horse-index"), {"region": "japan", "page": 2}
         )
-        hong_kong = self.client.get(
-            reverse("public-horse-index"), {"region": "hong_kong"}
-        )
+
+        self.assertEqual(redirect_first.status_code, 301)
+        self.assertEqual(redirect_second.status_code, 301)
+        self.assertEqual(redirect_second["Location"], "/horses/?page=2")
+
+        # Unified list (no region param) shows all regions together with pagination.
+        first = self.client.get(reverse("public-horse-index"))
+        second = self.client.get(reverse("public-horse-index"), {"page": 2})
 
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 200)
         self.assertEqual(len(first.context["page_obj"]), 24)
-        self.assertEqual(len(second.context["page_obj"]), 2)
-        self.assertContains(hong_kong, "香港马")
+        self.assertEqual(len(second.context["page_obj"]), 3)
+        # Under unified ordering, the HK horse sorts after the 26 Japan horses;
+        # it lands on page 2.
+        self.assertNotContains(first, "香港马")
+        self.assertContains(second, "香港马")

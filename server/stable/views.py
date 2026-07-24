@@ -190,6 +190,14 @@ PUBLIC_REGION_TABS = [
     {"value": RacingRegion.FRANCE, "label": "法国", "color": "#2A7FBF"},
     {"value": RacingRegion.UNITED_STATES, "label": "美国", "color": "#3E5C3A"},
 ]
+PUBLIC_REGION_COLORS = {
+    "": "#14181F",
+    RacingRegion.JAPAN: "#B51E2E",
+    RacingRegion.HONG_KONG: "#6B2D8E",
+    RacingRegion.UNITED_KINGDOM: "#1D4E9E",
+    RacingRegion.FRANCE: "#2A7FBF",
+    RacingRegion.UNITED_STATES: "#3E5C3A",
+}
 
 
 class BackendLoginView(LoginView):
@@ -2434,7 +2442,22 @@ def operation_log_list(request: HttpRequest):
     )
 
 
-def _public_published_articles(region: str = ""):
+def _redirect_legacy_region(request):
+    """If the request carries a legacy ?region= parameter, permanently redirect
+    to the same path with region stripped, preserving all other query params."""
+    if "region" not in request.GET:
+        return None
+    params = request.GET.copy()
+    # `pop` on a QueryDict only removes the last value; iterate to drop all.
+    while "region" in params:
+        params.pop("region")
+    target = request.path
+    if params:
+        target = f"{target}?{params.urlencode()}"
+    return redirect(target, permanent=True)
+
+
+def _public_published_articles():
     confirmed_race_links = (
         ArticleRaceLink.objects.filter(
             status__in=[ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL],
@@ -2462,8 +2485,6 @@ def _public_published_articles(region: str = ""):
         .filter(workflow_status=WorkflowStatus.PUBLISHED, published_to_web_at__isnull=False)
         .order_by("-published_to_web_at", "-id")
     )
-    if region:
-        queryset = filter_articles_visible_in_region(queryset, region)
     return queryset
 
 
@@ -2500,7 +2521,7 @@ def _public_horse_queryset(*, token_hash: str = ""):
             seconds_count=Count("race_records", filter=Q(race_records__finish_position__startswith="2")),
             thirds_count=Count("race_records", filter=Q(race_records__finish_position__startswith="3")),
         )
-        .order_by("-is_featured", "racing_region", "display_name_zh", "original_name", "id")
+        .order_by("-is_featured", "display_name_zh", "original_name", "id")
     )
     if token_hash:
         return queryset.annotate(
@@ -2704,15 +2725,13 @@ def _public_race_status_label(event: RaceEvent, today, winner=None) -> str:
     return event.get_status_display()
 
 
-def _public_today_races(region: str = "") -> tuple[list[dict], bool]:
+def _public_today_races() -> tuple[list[dict], bool]:
     """首页"今日赛事"面板：当日与次日公开赛事，空窗时回退到最近的重点赛事。"""
     today = timezone.localdate()
     base = RaceEvent.objects.filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
         local_date__isnull=False,
     )
-    if region:
-        base = base.filter(country_region=region)
     events = list(
         base.filter(local_date__gte=today, local_date__lte=today + timedelta(days=1)).order_by(
             "local_date", "local_start_time", "id"
@@ -2745,7 +2764,7 @@ def _public_today_races(region: str = "") -> tuple[list[dict], bool]:
     return entries, is_fallback
 
 
-def _public_next_key_race(region: str = ""):
+def _public_next_key_race():
     """右栏"即将开赛"模块：最近一场公开重点赛事。"""
     today = timezone.localdate()
     queryset = RaceEvent.objects.filter(
@@ -2753,8 +2772,6 @@ def _public_next_key_race(region: str = ""):
         local_date__isnull=False,
         local_date__gte=today,
     ).filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
-    if region:
-        queryset = queryset.filter(country_region=region)
     return queryset.order_by("local_date", "local_start_time", "id").first()
 
 
@@ -3308,8 +3325,10 @@ def public_race_sitemap_shard(request: HttpRequest, shard: int):
 
 
 def public_news_feed(request: HttpRequest):
-    active_region = _resolve_public_region(request.GET.get("region", ""))
-    queryset = _public_published_articles(active_region)
+    redirect_response = _redirect_legacy_region(request)
+    if redirect_response:
+        return redirect_response
+    queryset = _public_published_articles()
     headline_article = _select_headline_article(queryset)
     hot_articles = _build_hot_articles(queryset)
     paginator = Paginator(queryset, PUBLIC_FEED_PAGE_SIZE)
@@ -3317,8 +3336,8 @@ def public_news_feed(request: HttpRequest):
     feed_articles = [article for article in page_obj if not headline_article or article.pk != headline_article.pk]
     pagination_params = request.GET.copy()
     pagination_params.pop("page", None)
-    today_races, today_races_is_fallback = _public_today_races(active_region)
-    next_key_race = _public_next_key_race(active_region)
+    today_races, today_races_is_fallback = _public_today_races()
+    next_key_race = _public_next_key_race()
     flash_race = next((entry for entry in today_races if entry["winner"]), None)
     return render(
         request,
@@ -3329,8 +3348,6 @@ def public_news_feed(request: HttpRequest):
             "headline_article": headline_article,
             "feed_articles": feed_articles,
             "hot_articles": hot_articles,
-            "region_tabs": _region_tab_context(active_region),
-            "active_region": active_region,
             "followed_entries": _public_followed_entries(request, limit=4),
             "today_races": today_races,
             "today_races_is_fallback": today_races_is_fallback,
@@ -3412,10 +3429,12 @@ def public_article_detail(request: HttpRequest, article_id: int):
 
 
 def public_horse_index(request: HttpRequest):
+    redirect_response = _redirect_legacy_region(request)
+    if redirect_response:
+        return redirect_response
     token_hash = _follow_token_hash_from_request(request)
     queryset = _public_horse_queryset(token_hash=token_hash)
     query = request.GET.get("q", "").strip()
-    region = _resolve_public_region(request.GET.get("region", ""))
     if query:
         queryset = queryset.filter(
             Q(display_name_zh__icontains=query)
@@ -3424,13 +3443,10 @@ def public_horse_index(request: HttpRequest):
             | Q(japanese_name__icontains=query)
             | Q(country__icontains=query)
         )
-    if region:
-        queryset = queryset.filter(racing_region=region)
     paginator = Paginator(queryset, PUBLIC_HORSE_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
-    region_colors = {tab["value"]: tab["color"] for tab in PUBLIC_REGION_TABS}
     for profile in page_obj.object_list:
-        profile.public_region_color = region_colors.get(profile.racing_region, "#0E5A38")
+        profile.public_region_color = PUBLIC_REGION_COLORS.get(profile.racing_region, "#0E5A38")
     pagination_params = request.GET.copy()
     pagination_params.pop("page", None)
     return render(
@@ -3439,8 +3455,7 @@ def public_horse_index(request: HttpRequest):
         {
             "page_obj": page_obj,
             "horse_profiles": page_obj.object_list,
-            "region_tabs": _region_tab_context(region),
-            "filters": {"q": query, "region": region},
+            "filters": {"q": query},
             "pagination_querystring": pagination_params.urlencode(),
         },
     )
