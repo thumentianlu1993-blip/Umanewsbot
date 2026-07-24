@@ -1,5 +1,18 @@
 # 项目状态文档
 
+## 2026-07-24 英文单词型马名语境分类已部署为 shadow
+
+- CORE review 已基于 fingerprint `7ff685325de9…` 通过；PR
+  [#14](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/14) 合并为
+  `main@2a3c249f`，生产四应用统一运行镜像 `sha256:316e4563…`，无 migration。
+- Django、migration drift、四类 HTTP 入口、Celery 两节点、容器镜像、外部导入锁和磁盘
+  验收通过。article `9595` 的只读进程内 enforce dry-run 未产生 horse alert，正式译名
+  `Logician` 保留，`Africa/East` 保持普通词；没有保存、重处理、通知或生产数据写入。
+- 生产仍为 `ENGLISH_TERM_CONTEXT_MODE=shadow`，实际发布门禁尚未切换。启用
+  `enforce` 需独立明确授权；deferred P2 继续由后续 change 处理。
+- 完整发布证据见
+  `docs/changes/fix-external-english-horse-context-gate/release_report.md`。
+
 ## 2026-07-24 P0 task 5.4 已完成
 
 - 空胜绩窄修以 `044f3d57` 部署，正式 candidate `6dc853a2…`、artifact `b1e123fa…`、
