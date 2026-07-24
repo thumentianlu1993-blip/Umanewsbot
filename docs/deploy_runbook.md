@@ -6590,3 +6590,52 @@ python manage.py complete_horse_profiles \
    回滚期间及回滚后保持 `ENGLISH_TERM_CONTEXT_MODE=shadow`。
 7. `shadow -> enforce` 是独立生产变更，必须重新明确授权并执行切换前后验证；deferred P2
    `fix-term-discovery-visible-occurrence-aggregation` 不在本次发布或回滚范围。
+
+## 2026-07-24 赛事日历月份与移动端等级徽标发布记录
+
+1. Git 与范围：
+   - PR `#17` merge/生产 HEAD：
+     `3772256e606e3f62081eecec162fecedbd1aa23d`。
+   - 生产从 `438ab6a14f9665fd77318d8c12f8bc5a3ca63690` 快进；本次无 migration，
+     不执行赛事、新闻或历史数据写入。
+2. 发布前门禁：
+   - Celery 两节点 active/reserved 均为空，外部导入 `started=0`、外部锁 `=0`；
+     historical runner preflight 返回 `migration_safe`，宿主磁盘可用 `54G`。
+   - 数据库备份：
+     `backups/db/pre-race-calendar-responsive-20260724T173452+0800.sql.gz`，
+     `242013429` bytes，SHA-256
+     `2ed8f391b4b37e3590e22ad558ce6237a53ded073f6a5920aafacad8d8f4ce7f`，
+     `gzip -t` 通过、权限 `0600`。
+   - 环境备份：
+     `.env.backup.race-calendar-responsive-20260724T173452+0800`，权限 `0600`。
+3. 部署过程：
+   - 首次 `deploy_lowcost.sh` 在构建前停止，因为旧 Compose 创建的 web 容器没有新版
+     historical preflight 要求的 Docker health metadata，实际状态为
+     `running / health=none`；当时内外 healthz、PostgreSQL `pg_isready`、Redis `PING`
+     和 historical runner `migration_safe` 均已独立验证。
+   - 按脚本第 19–28 行执行等价低成本 Compose 序列。新镜像构建成功后，drain 脚本因
+     worker 已在备份阶段安全停止而无节点响应；使用部署前两次空 active/reserved 证据，
+     从保持 worker 停止的下一安全步骤继续。
+   - 强制重建 `web / worker / beat / race_live_worker`；无待应用迁移，collectstatic
+     输出 `131 unmodified / 360 post-processed`。
+4. 生产结果：
+   - 四个应用服务统一镜像：
+     `sha256:90c98db7eb048949507bbc3d335ed7b989dc9ce6dab1d3576a5242c2c4d10e49`；
+     web healthy，两节点 Celery ping 正常，reserved 为空，beat 恢复后仅有自然新闻任务。
+   - Django check `0 issues`，`makemigrations --check --dry-run` 为 `No changes detected`；
+     外部导入/锁仍为 `0/0`，historical runner 仍为 `migration_safe`，近 10 分钟四服务
+     无 traceback、critical、IntegrityError、exception 或 error。
+   - `umafans.run`、`www.umafans.run` healthz、首页、`/races/`、`/admin/login/`
+     均返回 HTTP 200；生产静态资源为 `public.e7932bf85b07.css`。
+5. 真实浏览器验收：
+   - 1440px：日期轴直接显示 `6月24日 / 6月28日 / 7月1日`，G1、G2、JPN1 均为
+     `42×42px`，无横向溢出。
+   - 390px：长赛事名换行且徽标保持 `flex: 0 0 42px`、水平垂直居中，页面无横向溢出，
+     today 状态仍存在，浏览器控制台无错误。
+   - 320px：抽检 G1、G2、JPN1 仍为 `42×42px`，页面 `scrollWidth=clientWidth=320`。
+6. 回滚锚点：
+   - 代码回滚父提交为 `438ab6a14f9665fd77318d8c12f8bc5a3ca63690`。
+   - 旧 web/worker 镜像分别保留为
+     `umanewsbot:rollback-pre-calendar-web-20260724T173452` 与
+     `umanewsbot:rollback-pre-calendar-worker-20260724T173452`。
+   - 本次无 migration 和业务数据写入；仅当确认数据损坏时才恢复数据库备份。
