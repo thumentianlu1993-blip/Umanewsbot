@@ -1,5 +1,35 @@
 # 当前状态
 
+## 2026-07-24 task 5.4 已正式写入并完成生产回归
+
+- 修复提交 `044f3d57f4f3bb75eac31f0567917132e5ae5cff` 已推送 `main` 并部署；四应用统一
+  镜像 `sha256:01f0fd3466873b0a1c44bb7ad4ab5d64d4a8f0e2e9d8a5a6df84a27dfad8861d`，
+  宿主及 `web/worker/beat/race_live_worker` 的
+  `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`。
+- 新 candidate 为
+  `6dc853a2b5581de3af241fca81fb76d0f48bcea600abcb7c231206d229a69f9b`，artifact 为
+  `b1e123fa77387505a1380b6ae932712117c68aa8aef502deb66b149d25838863`，正式 release 为
+  `8c6f2dc8d88abce2d432b3e3d174611dedbba2f5a04f174e17d1376365c1511d`。冻结集合仍为
+  `61 complete / 39 blocker`，artifact 与 blocker 交集为 0；公开范围仍为
+  `61 skip_already_published / 0 attempt / 0 create`。
+- 正式写入成功，内置和普通重复 commit 幂等复验均为 passed，剩余 profile/record/audit 动作
+  全为 0。61 匹全部 strict complete，含 10 匹真实无胜场；61 个公开详情页均返回 200。
+- 写前后：HorseProfile `46318 -> 46318`、Japan `11642 -> 11642`、published
+  `2797 -> 2797`、Japan published `2463 -> 2463`、HorseRaceRecord `1460 -> 2950`
+  （`+1490`）、HorseProfileDataCandidate `200 -> 444`（`+244`）、
+  HorseProfileCompletionRun `1 -> 2`（`+1`）、HorseP0Source `57332 -> 57393`
+  （`+61`）、OperationLog `59362 -> 59362`。此前把 61 次 source upsert 估为净增 0 不准确；
+  candidate 只冻结 upsert 动作数，实际 61 条均为新来源行。
+- 恢复点：部署前
+  `backups/db/pre-p0-task54-fix-20260724T025733Z.dump`
+  （SHA-256 `94530cd15dbbcff316bfed6eb6325fe36ea348b8c52d648935c98fdaef6bc055`）；
+  正式写入前
+  `backups/db/pre-p0-task54-write-20260724T030415Z.dump`
+  （SHA-256 `3f0c71122e62f6fc6940d4c142ea542653b4a7980c63723b953a87f5807fea6e`）。
+  两者均为 custom-format 且通过 `pg_restore -l`；对应 `.env` 备份已保存。beat 在写入前暂停并
+  等待 active/reserved/队列归零，回归后已恢复。Django check、迁移、容器、HTTP healthz、
+  日本马匹列表及公网 HTTP 均正常，近 15 分钟应用日志无 error/traceback。
+
 ## 2026-07-24 task 5.4 已审核空胜绩语义完成本地修复（待独立复审）
 
 - 用户已授权开始修复。测试先行确认两层旧行为：已 applied 的空 `major_wins` 仍被判

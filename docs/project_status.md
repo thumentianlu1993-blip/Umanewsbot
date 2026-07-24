@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-07-24 P0 task 5.4 已完成
+
+- 空胜绩窄修以 `044f3d57` 部署，正式 candidate `6dc853a2…`、artifact `b1e123fa…`、
+  release `8c6f2dc8…` 已成功写入生产；61 匹全部严格完整，39 个 blocker 未进入。
+- 实际新增 1,490 条履历、244 条模块审计、1 条 completion run、61 条 P0 source；profile、
+  公开马和 OperationLog 净增均为 0。61 匹原本均已公开，因此新增公开为 0。
+- 幂等重放剩余动作全 0；61 个公开详情页、healthz、日本马匹列表、四应用统一镜像和网络 false
+  均通过。task 5.4 不再处于待写入状态。
+
 ## 2026-07-24 P0 task 5.4 空胜绩门禁已本地修复
 
 - 只有 applied、approved、payload 精确为空且具有执行人/时间的 `major_wins` 证据可表达

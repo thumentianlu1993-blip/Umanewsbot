@@ -1,5 +1,26 @@
 # 部署运行手册
 
+## task 5.4 最终生产执行记录（2026-07-24）
+
+- 精确提交 `044f3d57f4f3bb75eac31f0567917132e5ae5cff`，生产镜像
+  `sha256:01f0fd3466873b0a1c44bb7ad4ab5d64d4a8f0e2e9d8a5a6df84a27dfad8861d`。
+  `web/worker/beat/race_live_worker` 均使用该镜像且马匹网络为 false。
+- candidate/artifact/release SHA 分别为 `6dc853a2b5581de3af241fca81fb76d0f48bcea600abcb7c231206d229a69f9b`、
+  `b1e123fa77387505a1380b6ae932712117c68aa8aef502deb66b149d25838863`、
+  `8c6f2dc8d88abce2d432b3e3d174611dedbba2f5a04f174e17d1376365c1511d`。
+- 写入前先停止 beat，并通过既有 drain 等待 active/reserved、`celery` 和 `race_live` 队列归零。
+  正式恢复点为
+  `backups/db/pre-p0-task54-write-20260724T030415Z.dump`，大小 `239995794` bytes，
+  SHA-256 `3f0c71122e62f6fc6940d4c142ea542653b4a7980c63723b953a87f5807fea6e`，
+  `pg_restore -l` 通过；环境备份为
+  `.env.backup.pre-p0-task54-write-20260724T030415Z`。
+- commit 成功并写入 1,490 records、244 audits、61 P0 source、1 completion run；61 profiles
+  只更新不新建，61 个已公开对象进入 frozen exclusion，发布 0。重复相同 commit 返回冻结结果，
+  planned remaining 全 0，所有相关表计数不变。
+- 回归结果：61 匹 strict complete、61 个公开详情页 200、healthz 与日本马匹列表 200、四应用
+  network false；确认后已恢复 beat。该批次已完成 `commit:japan` 与 `publish:japan`；
+  本次执行没有再 prepare 新 candidate，也没有用 retry-publish 扩大公开范围。
+
 ## task 5.4 空胜绩修复后的恢复顺序（待 review 后发布授权）
 
 1. 只部署通过独立 review 的精确修复提交；保持宿主及

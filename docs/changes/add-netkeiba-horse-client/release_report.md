@@ -89,3 +89,19 @@
   commit 在写库前拒绝；无胜绩手工审核继续写空列表证据。
 - 当前等待同一独立 review 会话确认。仓库门禁要求在最新成功 review 后重新取得当前任务发布
   授权；review 前的持续授权不替代该门禁。范围漂移仍必须停步。
+
+## task 5.4 最终发布结果
+
+- 最终 review：`APPROVED / no findings`；指纹
+  `257b68c30e8c4ce304826edd0551adb768f4c8cd7d11d17eb244a9a651601d59`。
+- 提交/镜像：`044f3d57f4f3bb75eac31f0567917132e5ae5cff` /
+  `sha256:01f0fd3466873b0a1c44bb7ad4ab5d64d4a8f0e2e9d8a5a6df84a27dfad8861d`。
+- candidate/artifact/release：
+  `6dc853a2b5581de3af241fca81fb76d0f48bcea600abcb7c231206d229a69f9b` /
+  `b1e123fa77387505a1380b6ae932712117c68aa8aef502deb66b149d25838863` /
+  `8c6f2dc8d88abce2d432b3e3d174611dedbba2f5a04f174e17d1376365c1511d`。
+- 实际结果：61 profile updates、1,490 record creates、244 module audits、61 P0 source creates、
+  1 completion run、0 profile creates、0 publish。61 匹均 strict complete；10 匹无记录胜绩
+  由 approved empty 证据满足门禁。
+- 相同 candidate 普通重放 planned remaining 全 0，数据库计数不变；61 个公开详情页、HTTP
+  healthz、日本马匹列表与四应用 network false 通过。
