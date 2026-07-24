@@ -3042,6 +3042,7 @@ def public_race_calendar(request: HttpRequest):
     if filters["direction"] == "past":
         events = list(reversed(events))
     groups = _group_race_events_by_date(events)
+    date_axis_spans_years = len({group["date"].year for group in groups if group["date"]}) > 1
     def filter_url(**changes):
         params = request.GET.copy()
         params.pop("cursor", None)
@@ -3087,6 +3088,7 @@ def public_race_calendar(request: HttpRequest):
             "filters": filters,
             "focus_events": _public_weekly_focus_events(filters["region"], events=events),
             "date_axis": [group for group in groups if group["date"]],
+            "date_axis_spans_years": date_axis_spans_years,
             "years": public_race_calendar_years(),
             "region_tabs": region_tabs,
             "grade_tabs": grade_tabs,
