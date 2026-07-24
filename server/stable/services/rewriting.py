@@ -19,8 +19,10 @@ from stable.models import (
 )
 from stable.services.terms import (
     ArticleEntityResolution,
-    apply_contextual_term_mappings,
+    apply_contextual_horse_placeholders,
+    apply_generated_text_contextual_mappings,
     resolve_article_entities,
+    resolve_article_entities_for_article,
 )
 
 
@@ -128,9 +130,9 @@ class FallbackRewriteProvider(RewriteProvider):
             else 55
         )
         return RewriteResult(
-            title_zh=apply_contextual_term_mappings(title.strip(), resolution),
-            summary_zh=apply_contextual_term_mappings(summary.strip(), resolution),
-            body_zh=apply_contextual_term_mappings(body.strip(), resolution),
+            title_zh=apply_generated_text_contextual_mappings(title.strip(), resolution),
+            summary_zh=apply_generated_text_contextual_mappings(summary.strip(), resolution),
+            body_zh=apply_generated_text_contextual_mappings(body.strip(), resolution),
             confidence=confidence,
             metadata={"provider": self.name, "model": "fallback", "category": article.content_category},
         )
@@ -148,7 +150,10 @@ class OpenAICompatibleRewriteProvider(RewriteProvider):
         names = {
             item.matched_text
             for item in resolution.entities
-            if item.entity_type == "unknown_horse" and item.needs_preserve and item.matched_text
+            if item.entity_type in {"horse", "unknown_horse"}
+            and item.needs_preserve
+            and item.classification in {"", "confirmed_horse"}
+            and item.matched_text
         }
         return {
             f"__UMA_KEEP_{index}__": name
@@ -185,10 +190,22 @@ class OpenAICompatibleRewriteProvider(RewriteProvider):
         )
         terms = resolution.accepted_terms[: settings.TRANSLATION_TERM_LIMIT]
         placeholders = placeholders if placeholders is not None else self._unknown_horse_placeholders(resolution)
-        protected_title = self._apply_placeholders(article.title_ja, placeholders)
-        protected_source_text = self._apply_placeholders(source_text, placeholders)
-        protected_base_title = self._apply_placeholders(article.translated_title_zh or article.title_zh, placeholders)
-        protected_base_body = self._apply_placeholders(base_body, placeholders)
+        protected_title = apply_contextual_horse_placeholders(
+            article.title_ja,
+            resolution,
+            placeholders,
+            field_name="title",
+        )
+        protected_source_text = apply_contextual_horse_placeholders(
+            source_text,
+            resolution,
+            placeholders,
+            field_name="body",
+        )
+        # Generated/base Chinese fields do not share source coordinates.
+        # They must not inherit source occurrence ordinals or global replaces.
+        protected_base_title = article.translated_title_zh or article.title_zh
+        protected_base_body = base_body
         glossary_lines = [
             f"- [{term.term_type}] {term.matched_text or term.source_ja} => {term.target_zh}"
             + (f"（备注：{term.notes}）" if term.notes else "")
@@ -248,9 +265,9 @@ class OpenAICompatibleRewriteProvider(RewriteProvider):
         if not title or not body:
             raise ValueError("Rewrite response missing required fields")
         return RewriteResult(
-            title_zh=apply_contextual_term_mappings(title, resolution),
-            summary_zh=apply_contextual_term_mappings(summary or _first_sentence(body), resolution),
-            body_zh=apply_contextual_term_mappings(body, resolution),
+            title_zh=apply_generated_text_contextual_mappings(title, resolution),
+            summary_zh=apply_generated_text_contextual_mappings(summary or _first_sentence(body), resolution),
+            body_zh=apply_generated_text_contextual_mappings(body, resolution),
             confidence=max(0, min(100, confidence)),
             metadata={
                 "provider": self.name,
@@ -286,11 +303,7 @@ def get_rewrite_provider() -> RewriteProvider:
 
 def rewrite_article(article: NewsArticle) -> RewriteResult:
     provider = get_rewrite_provider()
-    resolution = resolve_article_entities(
-        article.title_ja,
-        article.body_ja_normalized or article.body_ja_raw,
-        source_language=article.source_language or SourceLanguage.JAPANESE,
-    )
+    resolution = resolve_article_entities_for_article(article)
     if "entity_resolution" in inspect.signature(provider.rewrite).parameters:
         return provider.rewrite(article, entity_resolution=resolution)
     return provider.rewrite(article)

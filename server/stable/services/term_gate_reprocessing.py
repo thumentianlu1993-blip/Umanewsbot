@@ -16,15 +16,20 @@ from typing import Any, Callable
 from django.conf import settings
 from django.db import connection, transaction
 from django.db.models import Q, prefetch_related_objects
+from django.test.utils import override_settings
 from django.utils import timezone
 
 from stable.models import (
     ArticleHorseLink,
     ArticleHorseLinkStatus,
+    ArticleRaceLink,
     ArticleRaceLinkStatus,
     AutomationStatus,
+    ExternalHorseAlias,
     NewsArticle,
+    NewsArticleRelatedRegion,
     ReviewMode,
+    RaceEvent,
     RaceEventResult,
     RaceEventRunner,
     SourceLanguage,
@@ -37,14 +42,20 @@ from stable.models import (
     TermType,
     WorkflowStatus,
 )
-from stable.services.terms import _comparable_horse_name, recognize_horse_names_batch, resolve_article_entities_batch
+from stable.services.terms import (
+    _entity_candidate_keys,
+    normalize_horse_entity_key,
+    recognized_horses_from_resolution,
+    resolve_article_entities_for_articles,
+    visible_source_parts,
+)
 from stable.services.news_attribution import article_region_set
 from stable.services.validation import (
     ValidationBatchContext,
     apply_validation_outcome,
     validate_rewrite,
     _content_source,
-    _visible_source_parts,
+    warning_signature,
 )
 
 
@@ -115,6 +126,40 @@ def _lock_term_snapshot_tables() -> None:
     alias_table = connection.ops.quote_name(TermAlias._meta.db_table)
     with connection.cursor() as cursor:
         cursor.execute(f"LOCK TABLE {term_table}, {alias_table} IN SHARE MODE")
+
+
+def _lock_published_audit_article_table() -> None:
+    """Prevent article writes/phantoms before acquiring any dependent lock."""
+    if connection.vendor != "postgresql":
+        return
+    article_table = connection.ops.quote_name(NewsArticle._meta.db_table)
+    with connection.cursor() as cursor:
+        cursor.execute(f"LOCK TABLE {article_table} IN EXCLUSIVE MODE")
+
+
+def _lock_published_audit_evidence_tables() -> None:
+    """Block evidence-table writes until the surrounding transaction ends."""
+    if connection.vendor != "postgresql":
+        return
+    quote_name = getattr(
+        getattr(connection, "ops", None),
+        "quote_name",
+        lambda value: f'"{value}"',
+    )
+    table_names = [
+        ExternalHorseAlias._meta.db_table,
+        ArticleHorseLink._meta.db_table,
+        ArticleRaceLink._meta.db_table,
+        NewsArticleRelatedRegion._meta.db_table,
+        RaceEvent._meta.db_table,
+        RaceEventRunner._meta.db_table,
+        RaceEventResult._meta.db_table,
+    ]
+    quoted_tables = ", ".join(quote_name(name) for name in table_names)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"LOCK TABLE {quoted_tables} IN SHARE ROW EXCLUSIVE MODE"
+        )
 
 
 def encode_reprocess_cursor(
@@ -201,21 +246,41 @@ def build_term_snapshot_sha256(
     return snapshot
 
 
+def build_settings_payload() -> dict:
+    return {
+        "ENGLISH_TERM_CONTEXT_MODE": getattr(
+            settings, "ENGLISH_TERM_CONTEXT_MODE", "off"
+        ),
+        "MULTIREGION_TERM_GATE_COMMON_ENGLISH_TERMS": getattr(
+            settings, "MULTIREGION_TERM_GATE_COMMON_ENGLISH_TERMS", []
+        ),
+        "MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS": getattr(
+            settings, "MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS", []
+        ),
+        "MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS": getattr(
+            settings, "MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS", []
+        ),
+        "AUTO_DUPLICATE_HIGH_THRESHOLD": getattr(
+            settings, "AUTO_DUPLICATE_HIGH_THRESHOLD", 0.86
+        ),
+        "AUTO_DUPLICATE_REVIEW_THRESHOLD": getattr(
+            settings, "AUTO_DUPLICATE_REVIEW_THRESHOLD", 0.72
+        ),
+        "AUTO_DUPLICATE_LOOKBACK_DAYS": getattr(
+            settings, "AUTO_DUPLICATE_LOOKBACK_DAYS", 7
+        ),
+        "AUTO_REWRITE_ENABLED": getattr(settings, "AUTO_REWRITE_ENABLED", False),
+        "AUTO_PUBLISH_CONTENT_SOURCE": getattr(
+            settings, "AUTO_PUBLISH_CONTENT_SOURCE", "base_translation"
+        ),
+        "REWRITE_CONFIDENCE_MIN": getattr(
+            settings, "REWRITE_CONFIDENCE_MIN", 60
+        ),
+    }
+
+
 def build_settings_sha256() -> str:
-    return _canonical_sha(
-        {
-            "mode": getattr(settings, "ENGLISH_TERM_CONTEXT_MODE", "off"),
-            "common": getattr(settings, "MULTIREGION_TERM_GATE_COMMON_ENGLISH_TERMS", []),
-            "ambiguous": getattr(settings, "MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS", []),
-            "ignored": getattr(settings, "MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS", []),
-            "duplicate_high": getattr(settings, "AUTO_DUPLICATE_HIGH_THRESHOLD", 0.86),
-            "duplicate_review": getattr(settings, "AUTO_DUPLICATE_REVIEW_THRESHOLD", 0.72),
-            "duplicate_lookback_days": getattr(settings, "AUTO_DUPLICATE_LOOKBACK_DAYS", 7),
-            "auto_rewrite_enabled": getattr(settings, "AUTO_REWRITE_ENABLED", False),
-            "publish_content_source": getattr(settings, "AUTO_PUBLISH_CONTENT_SOURCE", "base_translation"),
-            "rewrite_confidence_min": getattr(settings, "REWRITE_CONFIDENCE_MIN", 60),
-        }
-    )
+    return _canonical_sha(build_settings_payload())
 
 
 def article_input_fingerprint(article: NewsArticle) -> str:
@@ -357,6 +422,21 @@ def build_validation_batch_context(
     }
     if progress_callback:
         progress_callback()
+    entity_index_languages = {
+        language
+        for article in articles
+        for language in [
+            article.source_language or SourceLanguage.JAPANESE
+        ]
+        if _entity_candidate_keys(
+            "\n".join(
+                part
+                for part in visible_source_parts(article)
+                if part
+            ),
+            language,
+        )
+    }
     entry_queryset = TermEntry.objects.filter(
         is_active=True,
         term_type__in=[TermType.HORSE, TermType.RACE, TermType.JOCKEY, TermType.TRAINER],
@@ -394,16 +474,6 @@ def build_validation_batch_context(
             values.extend(aliases_by_term_language.get((entry.id, language), []))
             mapping[entry.id] = list(dict.fromkeys(value.strip() for value in values if value and value.strip()))
         terms_by_language[language] = mapping
-    known_horse_terms_by_language = {
-        language: {
-            _comparable_horse_name(value, language)
-            for entry in entries
-            if entry.term_type == TermType.HORSE
-            for value in terms_by_language[language].get(entry.id, [])
-            if _comparable_horse_name(value, language)
-        }
-        for language in languages
-    }
     compiled_by_language: dict[str, dict[str, list[tuple[int, re.Pattern]]]] = {}
     for language, mapping in terms_by_language.items():
         compiled: dict[str, list[tuple[int, re.Pattern]]] = {}
@@ -424,7 +494,7 @@ def build_validation_batch_context(
         if progress_callback and article_index % 10 == 1:
             progress_callback()
         language = article.source_language or SourceLanguage.JAPANESE
-        title, body = _visible_source_parts(article)
+        title, body = visible_source_parts(article)
         source = unicodedata.normalize("NFKC", f"{title}\n{body}")
         buckets = compiled_by_language.get(language, {})
         candidate_patterns = list(buckets.get(_FALLBACK_BUCKET, []))
@@ -444,40 +514,49 @@ def build_validation_batch_context(
                 matched_ids.add(term_id)
         term_entry_ids_by_article[article.id] = matched_ids
     article_ids = [article.id for article in articles]
+    english_article_ids = [
+        article.id
+        for article in articles
+        if (article.source_language or SourceLanguage.JAPANESE) == SourceLanguage.ENGLISH
+    ]
     structured_entities_by_article: dict[int, dict[str, list[str]]] = {article_id: {} for article_id in article_ids}
     effective_links = Q(
         event__article_links__status__in=[ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL],
         event__article_links__removed_at__isnull=True,
     )
-    runner_rows = _evaluate_queryset_with_count(
-        RaceEventRunner.objects.filter(
-            effective_links,
-            event__article_links__article_id__in=article_ids,
-        ).values(
-            "id", "event_id", "event__article_links__article_id", "horse_name", "jockey_name", "trainer_name"
-        ).distinct(),
-        "race_entity_prefetch_count",
-        query_counts,
-    )
-    result_rows = _evaluate_queryset_with_count(
-        RaceEventResult.objects.filter(
-            effective_links,
-            event__article_links__article_id__in=article_ids,
-        ).values(
-            "id", "event_id", "event__article_links__article_id", "horse_name", "jockey_name", "trainer_name"
-        ).distinct(),
-        "race_entity_prefetch_count",
-        query_counts,
-    )
+    runner_rows = []
+    result_rows = []
+    if english_article_ids:
+        runner_rows = _evaluate_queryset_with_count(
+            RaceEventRunner.objects.filter(
+                effective_links,
+                event__article_links__article_id__in=english_article_ids,
+            ).values(
+                "id", "event_id", "event__article_links__article_id", "horse_name"
+            ).distinct(),
+            "race_entity_prefetch_count",
+            query_counts,
+        )
+        result_rows = _evaluate_queryset_with_count(
+            RaceEventResult.objects.filter(
+                effective_links,
+                event__article_links__article_id__in=english_article_ids,
+            ).values(
+                "id", "event_id", "event__article_links__article_id", "horse_name"
+            ).distinct(),
+            "race_entity_prefetch_count",
+            query_counts,
+        )
     if progress_callback:
         progress_callback()
     for kind, rows in (("runner", runner_rows), ("result", result_rows)):
         for row in rows:
             names = structured_entities_by_article.setdefault(row["event__article_links__article_id"], {})
-            for field in ("horse_name", "jockey_name", "trainer_name"):
-                if row.get(field):
-                    key = unicodedata.normalize("NFKC", row[field]).casefold()
-                    names.setdefault(key, []).append(f"race_{kind}:{row['id']}:event:{row['event_id']}:{field}")
+            if row.get("horse_name"):
+                key = normalize_horse_entity_key(row["horse_name"])
+                names.setdefault(key, []).append(
+                    f"race_{kind}:{row['id']}:event:{row['event_id']}:horse_name"
+                )
     earliest = min((article.published_at or timezone.now() for article in articles), default=timezone.now()) - timedelta(
         days=int(getattr(settings, "AUTO_DUPLICATE_LOOKBACK_DAYS", 7))
     )
@@ -510,18 +589,25 @@ def build_validation_batch_context(
     )
     if progress_callback:
         progress_callback()
-    def count_query(category: str, amount: int) -> None:
-        query_counts[category] = query_counts.get(category, 0) + amount
-
-    recognized_horses = recognize_horse_names_batch(
+    entity_resolutions = resolve_article_entities_for_articles(
         articles,
-        progress_callback=progress_callback,
-        known_horse_terms_by_language=known_horse_terms_by_language,
-        query_count_callback=count_query,
+        structured_entities_by_article=structured_entities_by_article,
     )
-    if progress_callback:
-        progress_callback()
-    entity_resolutions = resolve_article_entities_batch(articles)
+    recognized_horses = {
+        article_id: recognized_horses_from_resolution(resolution)
+        for article_id, resolution in entity_resolutions.items()
+    }
+    # The unified entity index performs one alias query plus one TermAlias and
+    # one TermEntry query for each source-language bucket with candidate keys.
+    # This is the same no-query build plan consumed by
+    # ``_build_article_entity_index`` and therefore remains batch-size
+    # independent without SQL inspection.
+    query_counts["horse_alias_prefetch_count"] = len(
+        entity_index_languages
+    )
+    query_counts["horse_term_prefetch_count"] = (
+        2 * len(entity_index_languages)
+    )
     accepted_term_ids_by_article = {
         article_id: resolution.accepted_term_ids
         for article_id, resolution in entity_resolutions.items()
@@ -1077,4 +1163,567 @@ def commit_reprocess_run(*, dry_run_id: int, manifest_sha256: str) -> dict:
         "restored_candidate_ids": restored,
         "skipped_article_ids": skipped,
         "skipped_reasons": skipped_reasons,
+    }
+
+
+def _published_audit_issue_counts(issues: list[dict]) -> dict[str, int]:
+    return {
+        severity: sum(issue.get("severity") == severity for issue in issues)
+        for severity in ("blocker", "warning", "info")
+    }
+
+
+def _normalize_published_audit_identity(value: str, *, label: str) -> str:
+    normalized = " ".join(str(value or "").split())
+    if not normalized:
+        raise ValueError(f"published audit requires explicit {label} identity")
+    return normalized
+
+
+def _external_horse_alias_snapshot_sha256() -> str:
+    """Bind the audit to the complete English external-alias decision input."""
+    rows = list(
+        ExternalHorseAlias.objects.filter(
+            source_language=SourceLanguage.ENGLISH
+        )
+        .order_by("id")
+        .values(
+            "id",
+            "source",
+            "racing_region",
+            "source_language",
+            "horse_id",
+            "external_horse_id",
+            "name_ja",
+            "name_en",
+            "name_zh_hant",
+            "normalized_name",
+            "confidence",
+            "alias_source",
+            "first_seen_at",
+            "last_seen_at",
+            "created_at",
+            "updated_at",
+        )
+    )
+    return _canonical_sha(rows)
+
+
+def _structured_horse_evidence_snapshot_sha256(article_ids: list[int]) -> str:
+    """Bind active article race links and the runner/result evidence they expose."""
+    links = list(
+        ArticleRaceLink.objects.filter(
+            article_id__in=article_ids,
+            status__in=[
+                ArticleRaceLinkStatus.AUTO,
+                ArticleRaceLinkStatus.MANUAL,
+            ],
+            removed_at__isnull=True,
+        )
+        .order_by("article_id", "event_id", "id")
+        .values(
+            "id",
+            "article_id",
+            "event_id",
+            "status",
+            "link_type",
+            "source",
+            "confidence",
+            "matched_text",
+            "match_reason",
+            "metadata",
+            "confirmed_by_id",
+            "confirmed_at",
+            "created_at",
+            "updated_at",
+        )
+    )
+    event_ids = sorted({row["event_id"] for row in links})
+    runners = (
+        list(
+            RaceEventRunner.objects.filter(event_id__in=event_ids)
+            .order_by("event_id", "id")
+            .values(
+                "id",
+                "event_id",
+                "external_runner_id",
+                "sort_order",
+                "horse_number",
+                "barrier",
+                "horse_name",
+                "jockey_name",
+                "trainer_name",
+                "running_status",
+                "created_at",
+                "updated_at",
+            )
+        )
+        if event_ids
+        else []
+    )
+    results = (
+        list(
+            RaceEventResult.objects.filter(event_id__in=event_ids)
+            .order_by("event_id", "id")
+            .values(
+                "id",
+                "event_id",
+                "finish_position",
+                "official_finish_position",
+                "horse_number",
+                "horse_name",
+                "jockey_name",
+                "trainer_name",
+                "running_status",
+                "is_confirmed",
+                "created_at",
+                "updated_at",
+            )
+        )
+        if event_ids
+        else []
+    )
+    return _canonical_sha(
+        {"article_ids": article_ids, "links": links, "runners": runners, "results": results}
+    )
+
+
+def _article_horse_link_snapshot_sha256(article_ids: list[int]) -> str:
+    rows = list(
+        ArticleHorseLink.objects.filter(article_id__in=article_ids)
+        .order_by("article_id", "horse_profile_id", "id")
+        .values(
+            "id",
+            "article_id",
+            "horse_profile_id",
+            "status",
+            "source",
+            "confidence",
+            "matched_text",
+            "match_reason",
+            "metadata",
+            "confirmed_by_id",
+            "confirmed_at",
+            "removed_by_id",
+            "removed_at",
+            "created_at",
+            "updated_at",
+        )
+    )
+    return _canonical_sha({"article_ids": article_ids, "links": rows})
+
+
+def _related_region_snapshot_sha256(article_ids: list[int]) -> str:
+    rows = list(
+        NewsArticleRelatedRegion.objects.filter(article_id__in=article_ids)
+        .order_by("article_id", "region", "id")
+        .values(
+            "id",
+            "article_id",
+            "region",
+            "source",
+            "reason",
+            "confidence",
+            "is_manual",
+            "evidence",
+            "created_at",
+            "updated_at",
+        )
+    )
+    return _canonical_sha({"article_ids": article_ids, "regions": rows})
+
+
+def _duplicate_corpus_snapshot_sha256(
+    articles: list[NewsArticle],
+) -> str:
+    earliest = min(
+        (article.published_at or article.created_at for article in articles)
+    ) - timedelta(
+        days=int(getattr(settings, "AUTO_DUPLICATE_LOOKBACK_DAYS", 7))
+    )
+    rows = list(
+        NewsArticle.objects.filter(
+            Q(workflow_status=WorkflowStatus.PUBLISHED)
+            | Q(
+                review_mode=ReviewMode.AUTO,
+                automation_status=AutomationStatus.PUBLISH_READY,
+            ),
+            published_at__gte=earliest,
+        )
+        .order_by("-published_at", "-id")
+        .values(
+            "id",
+            "workflow_status",
+            "review_mode",
+            "automation_status",
+            "published_at",
+            "title_ja",
+            "title_zh",
+            "translated_title_zh",
+            "summary_zh",
+            "translated_summary_zh",
+            "push_summary_zh",
+            "body_zh",
+            "translated_body_zh",
+            "rewrite_title_zh",
+            "manually_edited_fields",
+            "source_url",
+            "created_at",
+            "updated_at",
+        )[:500]
+    )
+    return _canonical_sha({"earliest": earliest, "articles": rows})
+
+
+def run_published_term_gate_audit_dry_run(
+    *,
+    article_ids: list[int],
+    owner_token: str,
+    operator_identity: str,
+    reviewer_identity: str,
+) -> dict:
+    """Prepare an exact-ID, audit-only manifest for already published articles."""
+    ids = list(dict.fromkeys(int(article_id) for article_id in article_ids))
+    if not ids or len(ids) != len(article_ids) or not owner_token:
+        raise ValueError("published audit requires exact article IDs and owner token")
+    operator = _normalize_published_audit_identity(
+        operator_identity, label="operator"
+    )
+    reviewer = _normalize_published_audit_identity(
+        reviewer_identity, label="reviewer"
+    )
+    articles_by_id = {
+        article.id: article
+        for article in NewsArticle.objects.filter(id__in=ids).prefetch_related("related_region_links")
+    }
+    if set(articles_by_id) != set(ids):
+        raise ValueError("published audit article ID not found")
+    articles = [articles_by_id[article_id] for article_id in ids]
+    if any(article.workflow_status != WorkflowStatus.PUBLISHED for article in articles):
+        raise ValueError("published audit accepts published articles only")
+    configured_settings = build_settings_payload()
+    configured_rule_mode = configured_settings["ENGLISH_TERM_CONTEXT_MODE"]
+    settings_sha = _canonical_sha(configured_settings)
+    with override_settings(ENGLISH_TERM_CONTEXT_MODE="enforce"):
+        effective_settings = build_settings_payload()
+        effective_settings_sha = _canonical_sha(effective_settings)
+        external_alias_snapshot_sha = _external_horse_alias_snapshot_sha256()
+        structured_evidence_snapshot_sha = (
+            _structured_horse_evidence_snapshot_sha256(ids)
+        )
+        article_horse_link_snapshot_sha = (
+            _article_horse_link_snapshot_sha256(ids)
+        )
+        related_region_snapshot_sha = _related_region_snapshot_sha256(ids)
+        duplicate_corpus_snapshot_sha = (
+            _duplicate_corpus_snapshot_sha256(articles)
+        )
+        context = build_validation_batch_context(articles)
+        outcomes = []
+        candidates = []
+        for article in articles:
+            outcome = validate_rewrite(article, batch_context=context)
+            outcome_payload = {
+                "article_id": article.id,
+                "issues": outcome.issues,
+                "issue_counts": _published_audit_issue_counts(outcome.issues),
+                "warning_signature": warning_signature(outcome.issues),
+            }
+            outcomes.append(outcome_payload)
+            candidates.append(
+                {
+                    "article_id": article.id,
+                    "input_sha256": article_input_fingerprint(article),
+                    "outcome_sha256": _canonical_sha(outcome_payload),
+                }
+            )
+    manifest = {
+        "kind": "published_audit_only",
+        "article_ids": ids,
+        "rule_version": RULE_VERSION,
+        "settings_sha256": settings_sha,
+        "configured_rule_mode": configured_rule_mode,
+        "effective_rule_mode": "enforce",
+        "effective_settings": effective_settings,
+        "effective_settings_sha256": effective_settings_sha,
+        "term_snapshot_sha256": context.term_snapshot_sha256,
+        "external_horse_alias_snapshot_sha256": external_alias_snapshot_sha,
+        "structured_horse_evidence_snapshot_sha256": structured_evidence_snapshot_sha,
+        "article_horse_link_snapshot_sha256": article_horse_link_snapshot_sha,
+        "related_region_snapshot_sha256": related_region_snapshot_sha,
+        "duplicate_corpus_snapshot_sha256": duplicate_corpus_snapshot_sha,
+        "operator_identity": operator,
+        "reviewer_identity": reviewer,
+        "candidate_payload": candidates,
+        "outcomes": outcomes,
+    }
+    manifest_sha = _canonical_sha(manifest)
+    run = TermGateReprocessRun.objects.create(
+        mode="dry_run",
+        selectors={
+            "kind": "published_audit_only",
+            "article_ids": ids,
+            "owner_token": owner_token,
+            "operator_identity": operator,
+            "reviewer_identity": reviewer,
+            "configured_rule_mode": configured_rule_mode,
+            "effective_rule_mode": "enforce",
+            "effective_settings_sha256": effective_settings_sha,
+        },
+        status=TermGateReprocessStatus.SUCCEEDED,
+        rule_version=RULE_VERSION,
+        settings_sha256=settings_sha,
+        term_snapshot_sha256=context.term_snapshot_sha256,
+        candidate_payload=candidates,
+        result_payload={
+            "operator_identity": operator,
+            "reviewer_identity": reviewer,
+            "configured_rule_mode": configured_rule_mode,
+            "effective_rule_mode": "enforce",
+            "effective_settings": effective_settings,
+            "effective_settings_sha256": effective_settings_sha,
+            "external_horse_alias_snapshot_sha256": external_alias_snapshot_sha,
+            "structured_horse_evidence_snapshot_sha256": structured_evidence_snapshot_sha,
+            "article_horse_link_snapshot_sha256": article_horse_link_snapshot_sha,
+            "related_region_snapshot_sha256": related_region_snapshot_sha,
+            "duplicate_corpus_snapshot_sha256": duplicate_corpus_snapshot_sha,
+            "outcomes": outcomes,
+            "manifest": manifest,
+        },
+        manifest_sha256=manifest_sha,
+        finished_at=timezone.now(),
+    )
+    return {
+        "run_id": run.id,
+        "manifest_sha256": manifest_sha,
+        "article_ids": ids,
+        "operator_identity": operator,
+        "reviewer_identity": reviewer,
+        "configured_rule_mode": configured_rule_mode,
+        "effective_rule_mode": "enforce",
+        "effective_settings_sha256": effective_settings_sha,
+        "external_horse_alias_snapshot_sha256": external_alias_snapshot_sha,
+        "structured_horse_evidence_snapshot_sha256": structured_evidence_snapshot_sha,
+        "article_horse_link_snapshot_sha256": article_horse_link_snapshot_sha,
+        "related_region_snapshot_sha256": related_region_snapshot_sha,
+        "duplicate_corpus_snapshot_sha256": duplicate_corpus_snapshot_sha,
+        "outcomes": outcomes,
+    }
+
+
+def apply_published_term_gate_audit_run(
+    *,
+    dry_run_id: int,
+    manifest_sha256: str,
+    article_ids: list[int],
+    confirm: bool,
+    operator_identity: str,
+    reviewer_identity: str | None = None,
+) -> dict:
+    """Apply only gate audit fields; publication workflow is deliberately untouched."""
+    ids = list(dict.fromkeys(int(article_id) for article_id in article_ids))
+    if not confirm or not ids or len(ids) != len(article_ids):
+        raise ValueError("published audit apply requires confirmation and exact IDs")
+    operator = _normalize_published_audit_identity(
+        operator_identity, label="operator"
+    )
+    with transaction.atomic():
+        run = TermGateReprocessRun.objects.select_for_update().get(pk=dry_run_id, mode="dry_run")
+        expected_ids = list(run.selectors.get("article_ids") or [])
+        if run.status == TermGateReprocessStatus.COMMITTED:
+            if ids != expected_ids or manifest_sha256 != run.manifest_sha256:
+                raise ValueError("published audit committed receipt selector drift")
+            if operator != run.selectors.get("operator_identity"):
+                raise ValueError(
+                    "published audit committed receipt operator identity mismatch"
+                )
+            prepared_reviewer = _normalize_published_audit_identity(
+                run.selectors.get("reviewer_identity"),
+                label="prepared reviewer",
+            )
+            receipt_reviewer = _normalize_published_audit_identity(
+                run.result_payload.get("reviewer_identity"),
+                label="committed receipt reviewer",
+            )
+            if receipt_reviewer != prepared_reviewer:
+                raise ValueError(
+                    "published audit committed receipt reviewer identity binding mismatch"
+                )
+            if reviewer_identity is not None:
+                supplied_reviewer = _normalize_published_audit_identity(
+                    reviewer_identity,
+                    label="reviewer",
+                )
+                if supplied_reviewer != prepared_reviewer:
+                    raise ValueError(
+                        "published audit committed receipt reviewer identity mismatch"
+                    )
+            return {
+                "status": "already_committed",
+                "run_id": run.id,
+                "manifest_sha256": run.manifest_sha256,
+                "article_ids": expected_ids,
+                "operator_identity": run.selectors.get(
+                    "operator_identity", ""
+                ),
+                "reviewer_identity": receipt_reviewer,
+                "updated_article_ids": list(
+                    run.result_payload.get("updated_article_ids") or []
+                ),
+            }
+        if run.status != TermGateReprocessStatus.SUCCEEDED:
+            raise ValueError(
+                "published audit first apply requires succeeded prepared status"
+            )
+        if run.selectors.get("kind") != "published_audit_only" or ids != expected_ids:
+            raise ValueError("published audit selector drift")
+        if operator != run.selectors.get("operator_identity"):
+            raise ValueError("published audit operator identity does not match prepared run")
+        reviewer = _normalize_published_audit_identity(
+            run.selectors.get("reviewer_identity"), label="prepared reviewer"
+        )
+        if reviewer_identity is not None:
+            supplied_reviewer = _normalize_published_audit_identity(
+                reviewer_identity, label="reviewer"
+            )
+            if supplied_reviewer != reviewer:
+                raise ValueError(
+                    "published audit reviewer identity does not match prepared run"
+                )
+        if run.manifest_sha256 != manifest_sha256:
+            raise ValueError("published audit manifest drift")
+        configured_settings = build_settings_payload()
+        configured_rule_mode = configured_settings["ENGLISH_TERM_CONTEXT_MODE"]
+        if (
+            run.rule_version != RULE_VERSION
+            or run.settings_sha256 != _canonical_sha(configured_settings)
+            or run.selectors.get("configured_rule_mode") != configured_rule_mode
+            or run.selectors.get("effective_rule_mode") != "enforce"
+        ):
+            raise ValueError("published audit settings snapshot drift")
+        # Acquire the article table first so we never wait on its EXCLUSIVE lock
+        # while already holding evidence or term locks.  The table lock also
+        # freezes duplicate-corpus membership before final snapshot validation.
+        _lock_published_audit_article_table()
+        _lock_published_audit_evidence_tables()
+        _lock_term_snapshot_tables()
+        articles = list(
+            NewsArticle.objects.select_for_update()
+            .filter(id__in=ids)
+            .prefetch_related("related_region_links")
+        )
+        by_id = {article.id: article for article in articles}
+        if set(by_id) != set(ids):
+            raise ValueError("published audit article snapshot drift")
+        expected_candidates = {
+            item["article_id"]: item for item in run.candidate_payload
+        }
+        expected_outcomes = {
+            item["article_id"]: item
+            for item in run.result_payload.get("outcomes", [])
+        }
+        prepared_payloads = []
+        with override_settings(ENGLISH_TERM_CONTEXT_MODE="enforce"):
+            effective_settings = build_settings_payload()
+            effective_settings_sha = _canonical_sha(effective_settings)
+            if (
+                run.result_payload.get("effective_rule_mode") != "enforce"
+                or run.result_payload.get("effective_settings_sha256")
+                != effective_settings_sha
+                or run.selectors.get("effective_settings_sha256")
+                != effective_settings_sha
+            ):
+                raise ValueError("published audit effective settings snapshot drift")
+            context = build_validation_batch_context(articles, lock_terms=True)
+            if context.term_snapshot_sha256 != run.term_snapshot_sha256:
+                raise ValueError("published audit term snapshot drift")
+            snapshot_checks = (
+                (
+                    "external_horse_alias_snapshot_sha256",
+                    _external_horse_alias_snapshot_sha256(),
+                    "external alias",
+                ),
+                (
+                    "structured_horse_evidence_snapshot_sha256",
+                    _structured_horse_evidence_snapshot_sha256(ids),
+                    "structured evidence",
+                ),
+                (
+                    "article_horse_link_snapshot_sha256",
+                    _article_horse_link_snapshot_sha256(ids),
+                    "article horse link dependency",
+                ),
+                (
+                    "related_region_snapshot_sha256",
+                    _related_region_snapshot_sha256(ids),
+                    "related region dependency",
+                ),
+                (
+                    "duplicate_corpus_snapshot_sha256",
+                    _duplicate_corpus_snapshot_sha256(articles),
+                    "duplicate corpus dependency",
+                ),
+            )
+            for key, current_snapshot, label in snapshot_checks:
+                if (
+                    not run.result_payload.get(key)
+                    or run.result_payload.get(key) != current_snapshot
+                ):
+                    raise ValueError(
+                        f"published audit {label} snapshot drift"
+                    )
+            for article_id in ids:
+                article = by_id[article_id]
+                if article.workflow_status != WorkflowStatus.PUBLISHED:
+                    raise ValueError("published audit workflow snapshot drift")
+                if (
+                    article_input_fingerprint(article)
+                    != expected_candidates[article_id]["input_sha256"]
+                ):
+                    raise ValueError("published audit input fingerprint drift")
+                outcome = validate_rewrite(article, batch_context=context)
+                payload = {
+                    "article_id": article.id,
+                    "issues": outcome.issues,
+                    "issue_counts": _published_audit_issue_counts(
+                        outcome.issues
+                    ),
+                    "warning_signature": warning_signature(outcome.issues),
+                }
+                if (
+                    _canonical_sha(payload)
+                    != expected_candidates[article_id]["outcome_sha256"]
+                ):
+                    raise ValueError("published audit outcome snapshot drift")
+                if payload != expected_outcomes.get(article_id):
+                    raise ValueError("published audit manifest outcome drift")
+                prepared_payloads.append((article, payload))
+        updated = []
+        for article, payload in prepared_payloads:
+            decision_reason = {
+                **(article.decision_reason or {}),
+                "gate_issues": payload["issues"],
+                "gate_issue_counts": payload["issue_counts"],
+            }
+            NewsArticle.objects.filter(pk=article.id).update(
+                gate_issues=payload["issues"],
+                decision_reason=decision_reason,
+                automation_warning_email_signature=payload["warning_signature"],
+                updated_at=timezone.now(),
+            )
+            updated.append(article.id)
+        run.status = TermGateReprocessStatus.COMMITTED
+        run.result_payload = {
+            **run.result_payload,
+            "applied_by_operator_identity": operator,
+            "reviewer_identity": reviewer,
+            "updated_article_ids": updated,
+        }
+        run.finished_at = timezone.now()
+        run.save(update_fields=["status", "result_payload", "finished_at", "updated_at"])
+    return {
+        "status": "committed",
+        "operator_identity": operator,
+        "reviewer_identity": reviewer,
+        "updated_article_ids": updated,
     }
