@@ -779,6 +779,52 @@ class TermCandidateStatus(models.TextChoices):
     MERGED = "merged", "已合并"
 
 
+class NormalizedRaceResultStatus(models.TextChoices):
+    FINISHED = "finished", "完赛"
+    DEAD_HEAT = "dead_heat", "同着"
+    DID_NOT_FINISH = "did_not_finish", "未完赛"
+    PULLED_UP = "pulled_up", "拉停"
+    BROUGHT_DOWN = "brought_down", "拉停(被带倒)"
+    UNSEATED_RIDER = "unseated_rider", "落马"
+    FELL = "fell", "堕马"
+    DISQUALIFIED = "disqualified", "失格"
+    SCRATCHED = "scratched", "退赛"
+    NON_RUNNER = "non_runner", "未出赛"
+    WITHDRAWN = "withdrawn", "退出"
+    UNKNOWN = "unknown", "未知"
+
+
+class DistancePrecision(models.TextChoices):
+    OFFICIAL_METRIC = "official_metric", "官方公制"
+    EXACT_CONVERSION = "exact_conversion", "精确换算"
+    APPROXIMATE_CONVERSION = "approximate_conversion", "近似换算"
+    UNKNOWN = "unknown", "未知"
+
+
+class NormalizedSurface(models.TextChoices):
+    TURF = "turf", "草地"
+    DIRT = "dirt", "泥地"
+    SYNTHETIC = "synthetic", "合成"
+    UNKNOWN = "unknown", "未知"
+
+
+class NormalizedRaceType(models.TextChoices):
+    FLAT = "flat", "平地"
+    HURDLE = "hurdle", "障碍"
+    STEEPLECHASE = "steeplechase", "越野障碍"
+    OTHER = "other", "其他"
+    UNKNOWN = "unknown", "未知"
+
+
+class RaceSexRestriction(models.TextChoices):
+    OPEN = "open", "不限"
+    FEMALE = "female", "牝马"
+    MALE = "male", "牡马"
+    MALE_OR_FEMALE = "male_or_female", "牡/牝"
+    OTHER = "other", "其他"
+    UNKNOWN = "unknown", "未知"
+
+
 class TimestampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1066,6 +1112,35 @@ class RaceEvent(TimestampedModel):
         related_name="race_events",
     )
     notes = models.TextField(blank=True)
+    # Normalized fields
+    distance_meters_normalized = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="规范距离(米)"
+    )
+    distance_precision = models.CharField(
+        max_length=32, choices=DistancePrecision.choices, blank=True, default="", verbose_name="距离精度"
+    )
+    normalized_surface = models.CharField(
+        max_length=32, choices=NormalizedSurface.choices, blank=True, default="", verbose_name="规范场地"
+    )
+    normalized_race_type = models.CharField(
+        max_length=32, choices=NormalizedRaceType.choices, blank=True, default="", verbose_name="规范赛种"
+    )
+    course_layout_text = models.CharField(max_length=128, blank=True, default="", verbose_name="路线")
+    going_text = models.CharField(max_length=128, blank=True, default="", verbose_name="场地状况")
+    minimum_age = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="最低年龄")
+    maximum_age = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="最高年龄")
+    age_open_ended = models.BooleanField(default=False, verbose_name="年龄无上限")
+    sex_restriction = models.CharField(
+        max_length=32, choices=RaceSexRestriction.choices, blank=True, default="", verbose_name="性别限制"
+    )
+    eligibility_constraints = models.JSONField(default=dict, blank=True, verbose_name="资格约束")
+    racecourse_term = models.ForeignKey(
+        "TermEntry", null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="马场术语"
+    )
+    normalization_version = models.CharField(max_length=64, blank=True, default="", verbose_name="规范化版本")
+    normalization_input_sha256 = models.CharField(max_length=64, blank=True, default="", verbose_name="规范化输入摘要")
+    normalization_issues = models.JSONField(default=list, blank=True, verbose_name="规范化问题")
+    normalized_at = models.DateTimeField(null=True, blank=True, verbose_name="规范化时间")
 
     class Meta:
         ordering = ("local_date", "local_start_time", "country_region", "chinese_name")
@@ -3174,6 +3249,43 @@ class HorseRaceRecord(TimestampedModel):
     canonical_race_key = models.CharField(max_length=64, blank=True)
     source_refs = models.JSONField(default=dict, blank=True)
     raw_payload = models.JSONField(default=dict, blank=True)
+    # Normalized fields
+    normalized_finish_position = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="规范名次")
+    normalized_result_status = models.CharField(
+        max_length=32, choices=NormalizedRaceResultStatus.choices, blank=True, default="", verbose_name="规范结果状态"
+    )
+    normalization_version = models.CharField(max_length=64, blank=True, default="", verbose_name="规范化版本")
+    normalization_input_sha256 = models.CharField(max_length=64, blank=True, default="", verbose_name="规范化输入摘要")
+    normalization_issues = models.JSONField(default=list, blank=True, verbose_name="规范化问题")
+    normalized_at = models.DateTimeField(null=True, blank=True, verbose_name="规范化时间")
+    distance_meters_normalized = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="规范距离(米)"
+    )
+    distance_precision = models.CharField(
+        max_length=32, choices=DistancePrecision.choices, blank=True, default="", verbose_name="距离精度"
+    )
+    normalized_surface = models.CharField(
+        max_length=32, choices=NormalizedSurface.choices, blank=True, default="", verbose_name="规范场地"
+    )
+    normalized_race_type = models.CharField(
+        max_length=32, choices=NormalizedRaceType.choices, blank=True, default="", verbose_name="规范赛种"
+    )
+    course_layout_text = models.CharField(max_length=128, blank=True, default="", verbose_name="路线")
+    going_text = models.CharField(max_length=128, blank=True, default="", verbose_name="场地状况")
+    race_term = models.ForeignKey(
+        "TermEntry", null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="赛事术语"
+    )
+    racecourse_term = models.ForeignKey(
+        "TermEntry", null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="马场术语"
+    )
+    eligibility_text = models.CharField(max_length=255, blank=True, default="", verbose_name="参赛资格原文")
+    minimum_age = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="最低年龄")
+    maximum_age = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="最高年龄")
+    age_open_ended = models.BooleanField(default=False, verbose_name="年龄无上限")
+    sex_restriction = models.CharField(
+        max_length=32, choices=RaceSexRestriction.choices, blank=True, default="", verbose_name="性别限制"
+    )
+    eligibility_constraints = models.JSONField(default=dict, blank=True, verbose_name="资格约束")
 
     class Meta:
         ordering = ("horse_profile", "-race_date", "-race_year", "major_win_order", "id")
@@ -3184,6 +3296,7 @@ class HorseRaceRecord(TimestampedModel):
             models.Index(fields=("horse_profile", "idempotency_key"), name="horse_record_idem_idx"),
             models.Index(fields=("horse_profile", "start_status"), name="horse_record_start_idx"),
             models.Index(fields=("horse_profile", "canonical_race_key"), name="horse_record_canon_idx"),
+            models.Index(fields=("horse_profile", "normalized_finish_position"), name="horse_record_norm_finish_idx"),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -4745,3 +4858,52 @@ class HomepageHeadlineRecommendation(models.Model):
                 name="headline_rec_slot_status_idx",
             ),
         ]
+
+class RaceFieldNormalizationRun(TimestampedModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "待执行"
+        RUNNING = "running", "执行中"
+        COMPLETED = "completed", "已完成"
+        FAILED = "failed", "失败"
+
+    status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
+    model_scope = models.CharField(max_length=64)
+    manifest_sha256 = models.CharField(max_length=64, blank=True, default="")
+    normalizer_version = models.CharField(max_length=64)
+    term_snapshot_digest = models.CharField(max_length=64, blank=True, default="")
+    checkpoint_data = models.JSONField(default=dict, blank=True)
+    planned_count = models.PositiveIntegerField(default=0)
+    actual_count = models.PositiveIntegerField(default=0)
+    skipped_count = models.PositiveIntegerField(default=0)
+    conflict_count = models.PositiveIntegerField(default=0)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class RaceFieldNormalizationReceipt(models.Model):
+    run = models.ForeignKey(RaceFieldNormalizationRun, on_delete=models.CASCADE, related_name="receipts")
+    batch_number = models.PositiveIntegerField(default=0)
+    model_label = models.CharField(max_length=64)
+    object_pk = models.PositiveIntegerField()
+    before_snapshot = models.JSONField(default=dict)
+    after_snapshot = models.JSONField(default=dict)
+    input_sha256 = models.CharField(max_length=64, blank=True, default="")
+    race_term_id = models.PositiveIntegerField(null=True, blank=True)
+    racecourse_term_id = models.PositiveIntegerField(null=True, blank=True)
+    normalizer_version = models.CharField(max_length=64)
+    committed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["run", "model_label", "object_pk"],
+                name="unique_normalization_receipt_per_object",
+            )
+        ]
+        ordering = ["run", "batch_number", "pk"]

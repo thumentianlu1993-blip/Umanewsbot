@@ -3476,3 +3476,15 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   `2ed8f391b4b37e3590e22ad558ce6237a53ded073f6a5920aafacad8d8f4ce7f`；
   `gzip -t` 通过。环境恢复点为
   `.env.backup.race-calendar-responsive-20260724T173452+0800`，两者权限均为 `0600`。
+
+## 2026-07-24 跨地区赛事与马匹履历字段归一化方案完成交接
+
+- change `normalize-race-and-career-fields` 已完成探索、规格、设计、测试用例、任务拆分和
+  rollout 设计；独立方案 reviewer 经三轮复审后给出 `VERDICT: APPROVED`。
+- 自包含交接入口为
+  `docs/changes/normalize-race-and-career-fields/HANDOFF.md`，其中冻结了生产只读基线、
+  字段与映射合同、迁移链、backfill/receipt 合同、功能开关、TDD/subagent 顺序、验证矩阵、
+  并行 change overlap、发布与回滚边界。
+- 当前准确状态为
+  `plan approved / handoff complete / implementation not authorized / no code or production write`。
+  本轮没有新增测试、应用代码、迁移或配置，没有 commit、push、PR、部署或生产写入。

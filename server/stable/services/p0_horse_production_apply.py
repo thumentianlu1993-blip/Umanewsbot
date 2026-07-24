@@ -45,6 +45,7 @@ from stable.services.horse_race_records import (
     canonical_race_key,
     record_idempotency_key,
     valid_http_url,
+    _normalize_race_record,
 )
 from stable.services.p0_horse_completion_adapters import (
     normalize_p0_horse_race_records,
@@ -2334,6 +2335,11 @@ def _apply_artifact_row(
         id__in=claimed_record_ids,
         completion_run__isnull=True,
     ).update(completion_run=completion_run)
+    # Re-normalize race records to ensure normalized fields are populated
+    # (normalization_version, normalized_finish_position, etc.)
+    for record_id in claimed_record_ids:
+        record = HorseRaceRecord.objects.get(pk=record_id)
+        _normalize_race_record(record)
     evaluation = evaluate_full_profile_completeness(profile)
     if not evaluation.is_complete:
         _fail(

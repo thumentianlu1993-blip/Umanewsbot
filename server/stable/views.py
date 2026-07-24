@@ -66,6 +66,7 @@ from .models import (
     HorseRaceLink,
     HorseRaceRecord,
     HorseRaceResultStatus,
+    HorseRaceStartStatus,
     MediaAsset,
     NewsArticle,
     NewsImage,
@@ -163,6 +164,7 @@ from .services.term_admin import (
     validate_term_payload,
 )
 from .services.term_candidate_review import accept_candidate, merge_candidate, set_candidate_status
+from .services.race_term_display import RaceTermResolver
 from .services.terms import apply_created_term_to_article
 from .services.editorial_headlines import (
     accept_headline_recommendation,
@@ -2690,17 +2692,46 @@ def _region_tab_context(active_region: str) -> list[dict]:
 
 
 def _public_horse_queryset(*, token_hash: str = ""):
+    stats_enabled = getattr(settings, "RACE_FIELD_NORMALIZED_STATS_ENABLED", False)
+    if stats_enabled:
+        starts_count = Count(
+            "race_records",
+            filter=~Q(race_records__start_status__in=[
+                HorseRaceStartStatus.DID_NOT_START,
+            ]) & ~Q(race_records__result_status__in=[
+                HorseRaceResultStatus.SCRATCHED,
+                HorseRaceResultStatus.WITHDRAWN,
+                HorseRaceResultStatus.UNKNOWN,
+            ]),
+        )
+        wins_count = Count("race_records", filter=Q(race_records__normalized_finish_position=1))
+        seconds_count = Count("race_records", filter=Q(race_records__normalized_finish_position=2))
+        thirds_count = Count("race_records", filter=Q(race_records__normalized_finish_position=3))
+    else:
+        starts_count = Count(
+            "race_records",
+            filter=~Q(race_records__result_status__in=[
+                HorseRaceResultStatus.SCRATCHED,
+                HorseRaceResultStatus.WITHDRAWN,
+                HorseRaceResultStatus.UNKNOWN,
+            ]),
+        )
+        wins_count = Count(
+            "race_records",
+            filter=Q(race_records__result_status=HorseRaceResultStatus.WON)
+            | Q(race_records__finish_position__in=["1", "01"]),
+        )
+        seconds_count = Count("race_records", filter=Q(race_records__finish_position__in=["2", "02"]))
+        thirds_count = Count("race_records", filter=Q(race_records__finish_position__in=["3", "03"]))
+
     queryset = (
         HorseProfile.objects.filter(review_status=HorseProfileStatus.PUBLISHED)
         .select_related("primary_term", "sire_horse_profile", "dam_horse_profile")
         .annotate(
-            starts_count=Count("race_records", filter=~Q(race_records__result_status=HorseRaceResultStatus.SCRATCHED)),
-            wins_count=Count(
-                "race_records",
-                filter=Q(race_records__result_status=HorseRaceResultStatus.WON) | Q(race_records__finish_position__startswith="1"),
-            ),
-            seconds_count=Count("race_records", filter=Q(race_records__finish_position__startswith="2")),
-            thirds_count=Count("race_records", filter=Q(race_records__finish_position__startswith="3")),
+            starts_count=starts_count,
+            wins_count=wins_count,
+            seconds_count=seconds_count,
+            thirds_count=thirds_count,
         )
         .order_by("-is_featured", "display_name_zh", "original_name", "id")
     )
@@ -2724,12 +2755,71 @@ def _horse_stats(profile: HorseProfile) -> dict[str, int]:
 
 
 def _horse_record_position(record: HorseRaceRecord) -> str:
-    match = re.match(r"^\s*([123])(?:\D|$)", record.finish_position or "")
+    display_enabled = getattr(settings, "RACE_FIELD_NORMALIZED_DISPLAY_ENABLED", False)
+
+    if display_enabled:
+        if record.normalized_finish_position is not None:
+            if record.normalized_result_status == "dead_heat":
+                return f"{record.normalized_finish_position} (同着)"
+            return str(record.normalized_finish_position)
+        if record.normalized_result_status and record.normalized_result_status != "unknown":
+            status_labels = {
+                "finished": "完赛",
+                "dead_heat": "同着",
+                "did_not_finish": "未完赛",
+                "pulled_up": "拉停",
+                "brought_down": "拉停(被带倒)",
+                "unseated_rider": "落马",
+                "fell": "堕马",
+                "disqualified": "失格",
+                "scratched": "退赛",
+                "non_runner": "未出赛",
+                "withdrawn": "退出",
+            }
+            label = status_labels.get(record.normalized_result_status)
+            if label:
+                return label
+
+    # Fallback: fixed old logic
+    pos_raw = (record.finish_position or "").strip()
+
+    # Known abbreviation codes for non-finish status
+    abbreviation_labels = {
+        "PU": "拉停",
+        "DNF": "未完赛",
+        "SCR": "退赛",
+    }
+    upper_pos = pos_raw.upper()
+    if upper_pos in abbreviation_labels:
+        return abbreviation_labels[upper_pos]
+
+    # Empty position: try result_status for a descriptive label
+    if not pos_raw or pos_raw == "-":
+        status_labels_raw = {
+            HorseRaceResultStatus.DID_NOT_FINISH: "未完赛",
+            HorseRaceResultStatus.SCRATCHED: "退赛",
+            HorseRaceResultStatus.WITHDRAWN: "取消出走",
+            HorseRaceResultStatus.DISQUALIFIED: "失格",
+        }
+        label = status_labels_raw.get(record.result_status)
+        if label:
+            return label
+        # WON with no position data
+        if record.result_status == HorseRaceResultStatus.WON:
+            return "1"
+        return "-"
+
+    # Numeric position: strip leading zeros ("01" -> "1", "10" -> "10")
+    if pos_raw.isdigit():
+        return str(int(pos_raw))
+
+    # Original regex for e.g. "1", "2", "3" followed by non-digit
+    match = re.match(r"^\s*([123])(?:\D|$)", pos_raw)
     if match:
         return match.group(1)
     if record.result_status == HorseRaceResultStatus.WON:
         return "1"
-    return (record.finish_position or "-").strip() or "-"
+    return pos_raw
 
 
 def _public_horse_article_entries(profile: HorseProfile, *, limit: int = 12) -> list[dict]:
@@ -3682,6 +3772,73 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
     ).get_page(request.GET.get("records_page"))
     records_pagination_params = request.GET.copy()
     records_pagination_params.pop("records_page", None)
+
+    # Batch resolve race and racecourse display names from term entries.
+    # When the display flag is enabled, resolve formal Chinese names via the
+    # term database.  When disabled, fall back to the original names so the
+    # template never encounters a missing attribute.
+    display_enabled = getattr(settings, "RACE_FIELD_NORMALIZED_DISPLAY_ENABLED", False)
+    major_wins_list = list(major_win_records(profile))
+
+    if display_enabled:
+        from stable.services.race_field_normalization import PROVIDER_LANGUAGE_MAP
+
+        term_resolver = RaceTermResolver()
+        def _record_region(rec) -> str:
+            """Use race_region; fall back to linked event's country_region."""
+            r = getattr(rec, "race_region", "") or ""
+            if not r and getattr(rec, "event", None):
+                r = getattr(rec.event, "country_region", "") or ""
+            return r
+
+        for record in race_records_page.object_list:
+            region = _record_region(record)
+            lang = PROVIDER_LANGUAGE_MAP.get(
+                (getattr(record, "source_name", "") or "").strip(), ""
+            )
+            term_resolver.add_race_name(
+                record.race_name, region=region, source_language=lang
+            )
+            term_resolver.add_racecourse_name(
+                record.racecourse, region=region, source_language=lang
+            )
+        for record in major_wins_list:
+            region = _record_region(record)
+            lang = PROVIDER_LANGUAGE_MAP.get(
+                (getattr(record, "source_name", "") or "").strip(), ""
+            )
+            term_resolver.add_race_name(
+                record.race_name, region=region, source_language=lang
+            )
+        term_resolver.resolve()
+
+        for record in race_records_page.object_list:
+            region = _record_region(record)
+            lang = PROVIDER_LANGUAGE_MAP.get(
+                (getattr(record, "source_name", "") or "").strip(), ""
+            )
+            record.display_race_name = term_resolver.display_race_name(
+                record.race_name, region=region, source_language=lang
+            )
+            record.display_racecourse = term_resolver.display_racecourse_name(
+                record.racecourse, region=region, source_language=lang
+            )
+        for record in major_wins_list:
+            region = _record_region(record)
+            lang = PROVIDER_LANGUAGE_MAP.get(
+                (getattr(record, "source_name", "") or "").strip(), ""
+            )
+            record.display_race_name = term_resolver.display_race_name(
+                record.race_name, region=region, source_language=lang
+            )
+    else:
+        # Display flag off: use original names so template attributes are always populated
+        for record in race_records_page.object_list:
+            record.display_race_name = record.race_name or ""
+            record.display_racecourse = record.racecourse or ""
+        for record in major_wins_list:
+            record.display_race_name = record.race_name or ""
+
     for record in race_records_page.object_list:
         record.public_position = _horse_record_position(record)
         record.podium_class = f"p{record.public_position}" if record.public_position in {"1", "2", "3"} else ""
@@ -3707,7 +3864,7 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
         {
             "profile": profile,
             "horse_stats": _horse_stats(profile),
-            "major_wins": major_win_records(profile),
+            "major_wins": major_wins_list,
             "article_entries": _public_horse_article_entries(profile),
             "race_links": public_race_links[:12],
             "race_records": race_records_page.object_list,
