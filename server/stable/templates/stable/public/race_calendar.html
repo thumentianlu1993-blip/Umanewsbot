@@ -50,8 +50,8 @@
     {% if date_axis %}
       <nav class="date-axis" aria-label="当前赛事日期">
         {% for group in date_axis %}
-          <a class="{% if group.is_today %}today{% endif %}" href="#{{ group.anchor_id }}">
-            <b>{{ group.date|date:"d" }}</b>
+          <a class="{% if group.is_today %}today{% endif %}" {% if group.is_today %}aria-current="date"{% endif %} href="#{{ group.anchor_id }}">
+            <b>{% if date_axis_spans_years %}<span class="date-year">{{ group.date|date:"Y年" }}</span>{% endif %}{{ group.date|date:"n月j日" }}</b>
             <span>{{ group.date|date:"D" }}{% if group.is_today %} · 今天{% endif %}</span>
             <span class="race-dot" aria-label="有赛事"></span>
           </a>
@@ -89,9 +89,11 @@
     <section class="race-timeline agenda" aria-label="赛事时间线">
       {% for group in groups %}
         <section class="agenda-day {% if group.is_today %}today{% endif %}" id="{{ group.anchor_id }}">
-          <header class="agenda-date {% if group.is_today %}today{% endif %}">
+          <header class="agenda-date {% if group.is_today %}today{% endif %}" {% if group.date %}aria-label="{{ group.date|date:'Y年n月j日' }}"{% endif %}>
             {% if group.date %}
-              <div class="d">{{ group.date|date:"d" }}</div>
+              {% if date_axis_spans_years %}<div class="date-year">{{ group.date|date:"Y年" }}</div>{% endif %}
+              <div class="m">{{ group.date|date:"n月" }}</div>
+              <div class="d">{{ group.date|date:"j日" }}</div>
               <div class="w">{{ group.date|date:"D" }}{% if group.is_today %} · 今天{% endif %}</div>
             {% else %}
               <div class="d">—</div><div class="w">日期待定</div>
