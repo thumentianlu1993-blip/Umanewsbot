@@ -1,5 +1,21 @@
 # 项目状态文档
 
+- 2026-07-24: 首页人工头条与 AI 编辑推荐控制代码实现完成，待独立代码 review 和发布授权。
+
+## 2026-07-24 首页编辑控制方案审核通过，待确认实现
+
+- `add-editorial-headline-control` 已在最新 `origin/main@10f341e6` 的独立 worktree 完成只读探索和
+  `spec/design/test_cases/tasks/rollout`。
+- 现状仍为算法化单头条；规划方案把人工唯一选择与 AI 编辑推荐分开持久化，人工有效时优先，否则保留现有
+  72 小时/7 天/全部文章窗口与排序，并统一排除未来网页时间或空有效内容。推荐不会自动发布或覆盖人工选择。
+- 前序公开导航/来源隐藏 change 已合入；本任务预计不改公开 headline partial 和 `public.css`，实现前仍须
+  通过可恢复 stash 门禁 rebase 最新主干，并重新检查 `admin.py`、`views.py`、模板和测试重叠。
+- 同一独立方案 reviewer 三轮收敛，首轮 6 项 finding 已全部关闭，最终
+  `VERDICT: APPROVED`，无剩余 P0/P1/P2 finding。
+- 已提供自包含 `docs/changes/add-editorial-headline-control/handoff.md`，后续 Claude 可从该文件恢复
+  需求、设计、Git 基线、测试先行、subagent、review 和发布授权门禁。
+- 当前未实现、未迁移、未发布；已停下等待用户明确确认实现。
+
 ## 2026-07-24 英文单词型马名语境分类已部署为 shadow
 
 - CORE review 已基于 fingerprint `7ff685325de9…` 通过；PR

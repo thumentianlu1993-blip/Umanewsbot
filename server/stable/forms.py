@@ -832,3 +832,20 @@ class TermCandidateMergeForm(forms.Form):
 
 class TermCandidateReviewForm(forms.Form):
     review_notes = forms.CharField(label="审核备注", required=False, widget=forms.Textarea(attrs={"rows": 3}))
+
+
+class HeadlineControlForm(forms.Form):
+    article_id = forms.IntegerField(required=True, min_value=1)
+    expected_version = forms.IntegerField(required=True, min_value=0)
+
+    def clean_article_id(self):
+        article_id = self.cleaned_data["article_id"]
+        from stable.models import NewsArticle
+        try:
+            article = NewsArticle.objects.get(pk=article_id)
+        except NewsArticle.DoesNotExist:
+            raise forms.ValidationError("文章不存在。")
+        from stable.services.editorial_headlines import is_headline_eligible
+        if not is_headline_eligible(article):
+            raise forms.ValidationError("该文章不满足头条资格。")
+        return article_id

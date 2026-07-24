@@ -30,6 +30,7 @@ from .forms import (
     ArticleEditorForm,
     ArticleQuickTermForm,
     BackendAuthenticationForm,
+    HeadlineControlForm,
     HorseArticleLinkForm,
     HorseProfileForm,
     HorseRaceRecordForm,
@@ -52,6 +53,7 @@ from .models import (
     ArticleTranslationStatus,
     CrawlJob,
     HistoricalRaceResolutionStatus,
+    HomepageHeadlineRecommendation,
     HorseCareerHistoryStatus,
     HorseFollow,
     HorseP0SourceStatus,
@@ -162,6 +164,16 @@ from .services.term_admin import (
 )
 from .services.term_candidate_review import accept_candidate, merge_candidate, set_candidate_status
 from .services.terms import apply_created_term_to_article
+from .services.editorial_headlines import (
+    accept_headline_recommendation,
+    cancel_manual_headline,
+    generate_headline_recommendation,
+    get_headline_state,
+    headline_candidate_queryset,
+    is_headline_eligible,
+    resolve_homepage_headline,
+    set_manual_headline,
+)
 from .tasks import (
     batch_translate_articles_task,
     crawl_news_source_task,
@@ -2246,6 +2258,10 @@ def article_editor(request: HttpRequest, article_id: int):
         ),
         pk=article_id,
     )
+    active_rec = HomepageHeadlineRecommendation.objects.select_related("article").filter(
+        slot="homepage_primary", status="active"
+    ).first()
+    can_manage_headline = request.user.has_perm("stable.change_homepageheadlineselection")
     article.ensure_editable_fields()
     if request.method == "POST":
         form = ArticleEditorForm(request.POST, instance=article)
@@ -2270,6 +2286,8 @@ def article_editor(request: HttpRequest, article_id: int):
                             allow_publish_without_cover=True,
                             term_type_choices=TermType.choices,
                             quick_term_followup=None,
+                            active_headline_recommendation=active_rec,
+                            can_manage_headline=can_manage_headline,
                         ),
                     )
                 article.workflow_status = WorkflowStatus.PUBLISHED
@@ -2322,6 +2340,8 @@ def article_editor(request: HttpRequest, article_id: int):
             allow_publish_without_cover=False,
             term_type_choices=TermType.choices,
             quick_term_followup=_pop_quick_term_followup(request, article, "editor"),
+            active_headline_recommendation=active_rec,
+            can_manage_headline=can_manage_headline,
         ),
     )
 
@@ -2333,6 +2353,167 @@ def article_preview(request: HttpRequest, article_id: int):
         return denied
     article = get_object_or_404(NewsArticle, pk=article_id)
     return render(request, "stable/console/article_preview.html", _console_context(request, article=article))
+
+
+@login_required
+def headline_control(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    if not request.user.has_perm("stable.change_homepageheadlineselection"):
+        return HttpResponseForbidden("无首页头条管理权限。")
+
+    state = get_headline_state()
+    # Apply exact Python eligibility to the database superset so that
+    # articles with empty effective_summary / effective_body (which may
+    # have non-empty fallback fields) are not shown as selectable.
+    qs = headline_candidate_queryset()
+    eligible_articles = []
+    for article in qs[:192]:
+        if is_headline_eligible(article):
+            eligible_articles.append(article)
+            if len(eligible_articles) >= 48:
+                break
+
+    active_rec = state.get("active_recommendation")
+    recommendation = None
+    if active_rec:
+        try:
+            recommendation = HomepageHeadlineRecommendation.objects.select_related(
+                "article", "generated_by"
+            ).get(pk=active_rec.pk)
+        except HomepageHeadlineRecommendation.DoesNotExist:
+            pass
+
+    recent_logs = OperationLog.objects.select_related("admin").filter(
+        action_type__in=[
+            "headline_set", "headline_replaced", "headline_cancelled",
+            "headline_invalidated", "headline_recommendation_generated",
+            "headline_recommendation_superseded",
+            "headline_recommendation_accepted",
+            "headline_recommendation_invalidated",
+        ]
+    ).order_by("-created_at")[:20]
+
+    return render(
+        request,
+        "stable/console/headline_control.html",
+        _console_context(
+            request,
+            state=state,
+            eligible_articles=eligible_articles,
+            recommendation=recommendation,
+            recent_logs=recent_logs,
+        ),
+    )
+
+
+@login_required
+@require_POST
+def headline_select(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    if not request.user.has_perm("stable.change_homepageheadlineselection"):
+        return HttpResponseForbidden("无首页头条管理权限。")
+
+    form = HeadlineControlForm(request.POST)
+    if not form.is_valid():
+        for error in form.errors.get("article_id", []):
+            messages.error(request, f"选择失败：{error}")
+        return redirect("console-headline-control")
+
+    article_id = form.cleaned_data["article_id"]
+    expected_version = form.cleaned_data["expected_version"]
+    try:
+        result = set_manual_headline(article_id, user=request.user, expected_version=expected_version)
+        if result.get("success"):
+            messages.success(request, "已设置首页头条。")
+        else:
+            messages.error(request, f"设置失败：{result.get('reason', '未知错误')}")
+    except (PermissionError, ValueError) as exc:
+        messages.error(request, f"设置失败：{exc}")
+    return redirect("console-headline-control")
+
+
+@login_required
+@require_POST
+def headline_cancel(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    if not request.user.has_perm("stable.change_homepageheadlineselection"):
+        return HttpResponseForbidden("无首页头条管理权限。")
+
+    try:
+        expected_version = int(request.POST.get("expected_version", -1))
+    except (TypeError, ValueError):
+        messages.error(request, "版本号格式不正确。")
+        return redirect("console-headline-control")
+    if expected_version < 0:
+        messages.error(request, "缺少版本号。")
+        return redirect("console-headline-control")
+
+    try:
+        result = cancel_manual_headline(user=request.user, expected_version=expected_version)
+        if result.get("success"):
+            messages.success(request, "已取消人工头条，首页将使用算法回退。")
+        else:
+            messages.error(request, f"取消失败：{result.get('reason', '未知错误')}")
+    except (PermissionError, ValueError) as exc:
+        messages.error(request, f"取消失败：{exc}")
+    return redirect("console-headline-control")
+
+
+@login_required
+@require_POST
+def headline_recommend(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    if not request.user.has_perm("stable.change_homepageheadlineselection"):
+        return HttpResponseForbidden("无首页头条管理权限。")
+
+    try:
+        result = generate_headline_recommendation(user=request.user)
+        if result is None:
+            messages.warning(request, "当前没有合格的候选文章可供推荐。")
+        else:
+            messages.success(request, "已生成新的 AI 编辑推荐。")
+    except (PermissionError, ValueError) as exc:
+        messages.error(request, f"推荐生成失败：{exc}")
+    return redirect("console-headline-control")
+
+
+@login_required
+@require_POST
+def headline_accept_recommendation(request: HttpRequest, recommendation_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    if not request.user.has_perm("stable.change_homepageheadlineselection"):
+        return HttpResponseForbidden("无首页头条管理权限。")
+
+    try:
+        expected_version = int(request.POST.get("expected_version", -1))
+    except (TypeError, ValueError):
+        messages.error(request, "版本号格式不正确。")
+        return redirect("console-headline-control")
+    if expected_version < 0:
+        messages.error(request, "缺少版本号。")
+        return redirect("console-headline-control")
+
+    try:
+        result = accept_headline_recommendation(
+            recommendation_id, user=request.user, expected_selection_version=expected_version
+        )
+        if result.get("success"):
+            messages.success(request, "已接受推荐并更新首页头条。")
+        else:
+            messages.error(request, f"接受失败：{result.get('reason', '未知错误')}")
+    except (PermissionError, ValueError) as exc:
+        messages.error(request, f"接受失败：{exc}")
+    return redirect("console-headline-control")
 
 
 @login_required
@@ -3331,7 +3512,7 @@ def public_news_feed(request: HttpRequest):
     if redirect_response:
         return redirect_response
     queryset = _public_published_articles()
-    headline_article = _select_headline_article(queryset)
+    headline_article = resolve_homepage_headline(queryset)
     hot_articles = _build_hot_articles(queryset)
     paginator = Paginator(queryset, PUBLIC_FEED_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
