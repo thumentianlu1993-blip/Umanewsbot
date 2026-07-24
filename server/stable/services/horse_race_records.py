@@ -22,6 +22,20 @@ from stable.models import (
     HorseRaceStartStatus,
     RaceEventResult,
 )
+from stable.services.race_field_normalization import (
+    RACE_FIELD_NORMALIZATION_VERSION,
+    DistancePrecision,
+    NormalizedRaceResultStatus,
+    NormalizedSurface,
+    NormalizedRaceType,
+    PROVIDER_LANGUAGE_MAP,
+    RaceSexRestriction,
+    compute_input_sha256,
+    normalize_distance,
+    normalize_eligibility,
+    normalize_finish_position,
+    normalize_surface_race_type_layout_going,
+)
 
 
 class AmbiguousLegacyRaceRecordError(ValueError):
@@ -666,6 +680,137 @@ def _apply_record_values(
     return diff
 
 
+def _normalize_race_record(record: HorseRaceRecord) -> HorseRaceRecord:
+    """Normalize race record fields using the shared normalization service.
+
+    Operates on an already-persisted record. Does not block the write on
+    failure. Normalization exceptions are recorded in ``normalization_issues``.
+    """
+    try:
+        # --- Extract context ---
+        source_name = str(record.source_name or "").strip()
+        source_language = PROVIDER_LANGUAGE_MAP.get(source_name, "")
+        source_region = record.race_region
+
+        # Build input_sha for audit trail
+        normalization_input_sha256 = compute_input_sha256(
+            finish_position=record.finish_position,
+            distance_text=record.distance_text,
+            distance_meters=record.distance_meters,
+            surface=record.surface,
+            race_type_text=record.race_type_text,
+            eligibility_text=record.eligibility_text,
+        )
+
+        issues: list[str] = []
+
+        # --- Finish position / result status ---
+        finish_result = normalize_finish_position(
+            record.finish_position,
+            source_kind=source_name,
+        )
+        normalized_finish_position = finish_result.position
+        normalized_result_status = finish_result.status
+
+        # --- Distance ---
+        distance_result = normalize_distance(
+            record.distance_text,
+            source_language=source_language or None,
+            source_region=source_region or None,
+            official_metric_meters=record.distance_meters,
+        )
+        distance_meters_normalized = distance_result.meters
+        distance_precision = distance_result.precision
+
+        # --- Surface / race type ---
+        surface_result = normalize_surface_race_type_layout_going(
+            record.surface,
+            source_language=source_language or None,
+            source_region=source_region or None,
+        )
+        normalized_surface = surface_result.surface
+        normalized_race_type = surface_result.race_type
+        # If race_type_text has content, use it to refine race type
+        race_type_text = (record.race_type_text or "").strip()
+        if race_type_text:
+            race_type_result = normalize_surface_race_type_layout_going(
+                race_type_text,
+                source_language=source_language or None,
+                source_region=source_region or None,
+            )
+            if race_type_result.race_type != NormalizedRaceType.UNKNOWN:
+                normalized_race_type = race_type_result.race_type
+
+        # --- Eligibility ---
+        eligibility_result = normalize_eligibility(
+            record.eligibility_text,
+            source_language=source_language or None,
+            source_region=source_region or None,
+        )
+
+        # --- Collect issues ---
+        for tag, result in (
+            ("finish", finish_result),
+            ("distance", distance_result),
+            ("surface", surface_result),
+            ("eligibility", eligibility_result),
+        ):
+            if result.reason.status not in ("normalized",):
+                issues.append(f"{tag}:{result.reason.status}:{result.reason.reason_code}")
+
+        # --- Update record ---
+        record.normalized_finish_position = normalized_finish_position
+        record.normalized_result_status = normalized_result_status
+        record.distance_meters_normalized = distance_meters_normalized
+        record.distance_precision = distance_precision
+        record.normalized_surface = normalized_surface
+        record.normalized_race_type = normalized_race_type
+        record.course_layout_text = surface_result.course_layout
+        record.going_text = surface_result.going_text
+        record.minimum_age = eligibility_result.min_age
+        record.maximum_age = eligibility_result.max_age
+        record.age_open_ended = eligibility_result.age_open_ended
+        record.sex_restriction = eligibility_result.sex
+        record.eligibility_constraints = eligibility_result.extra_constraints
+        record.normalization_version = RACE_FIELD_NORMALIZATION_VERSION
+        record.normalization_input_sha256 = normalization_input_sha256
+        record.normalization_issues = issues
+        record.normalized_at = timezone.now()
+
+        record.save(update_fields=[
+            "normalized_finish_position",
+            "normalized_result_status",
+            "distance_meters_normalized",
+            "distance_precision",
+            "normalized_surface",
+            "normalized_race_type",
+            "course_layout_text",
+            "going_text",
+            "minimum_age",
+            "maximum_age",
+            "age_open_ended",
+            "sex_restriction",
+            "eligibility_constraints",
+            "normalization_version",
+            "normalization_input_sha256",
+            "normalization_issues",
+            "normalized_at",
+            "updated_at",
+        ])
+    except Exception as exc:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning("Normalization failed for HorseRaceRecord %s: %s", record.pk, exc)
+        issues = list(record.normalization_issues or [])
+        issues.append(f"error:{exc}")
+        try:
+            record.normalization_issues = issues
+            record.save(update_fields=["normalization_issues", "updated_at"])
+        except Exception as persist_exc:
+            logger.exception("Failed to persist normalization issues for record %s", record.pk)
+    return record
+
+
 def upsert_race_record(
     profile: HorseProfile,
     payload: dict,
@@ -725,6 +870,7 @@ def upsert_race_record(
         diff.update(_apply_record_values(record, values, cross_source=False))
         if diff:
             record.save()
+        _normalize_race_record(record)
         refresh_career_history_completeness(profile)
         return RaceRecordUpsertResult(record=record, action="updated" if diff else "unchanged", diff=diff)
 
@@ -779,6 +925,7 @@ def upsert_race_record(
                 idempotency_key=key,
                 **values,
             )
+            _normalize_race_record(record)
             refresh_career_history_completeness(profile)
             return RaceRecordUpsertResult(record=record, action="created", diff={})
 
@@ -792,5 +939,6 @@ def upsert_race_record(
         record.save()
         if action != "adopted":
             action = "updated"
+    _normalize_race_record(record)
     refresh_career_history_completeness(profile)
     return RaceRecordUpsertResult(record=record, action=action, diff=diff)

@@ -13,7 +13,7 @@
           <p class="horse-hero-original">{{ profile.original_name|default:profile.english_name }}{% if profile.birth_date %} · {{ profile.birth_date|date:"Y" }} 年生{% endif %}{% if profile.color %} · {{ profile.color }}{% endif %}{% if profile.sex %} · {{ profile.sex }}{% endif %}</p>
           <div class="horse-hero-meta">
             {% if profile.trainer_name %}<span>练马师：{{ profile.trainer_name }}</span>{% endif %}
-            {% if major_wins %}<span>主胜鞍：{% for record in major_wins|slice:":3" %}{{ record.race_name }}{% if not forloop.last %} / {% endif %}{% endfor %}</span>{% endif %}
+            {% if major_wins %}<span>主胜鞍：{% for record in major_wins|slice:":3" %}{{ record.display_race_name }}{% if not forloop.last %} / {% endif %}{% endfor %}</span>{% endif %}
           </div>
         </div>
         <form method="post" action="{% url 'public-horse-follow' profile.id %}">
@@ -43,7 +43,7 @@
     <section class="panel"><h2>参赛履历</h2>
       {% if race_records %}<div class="record-list">{% for record in race_records %}<div class="record-row">
         <span class="record-pos {{ record.podium_class }}">{{ record.public_position }}</span><span class="record-date tabular">{{ record.race_date|date:"Y-m-d"|default:record.race_year|default:"日期待定" }}</span>
-        <span class="record-race">{% if record.public_event_path %}<a href="{{ record.public_event_path }}">{{ record.race_name }}</a>{% else %}<b>{{ record.race_name }}</b>{% endif %}<span>{% if record.racecourse %}{{ record.racecourse }}{% endif %}{% if record.distance_text %} · {{ record.distance_text }}{% endif %}{% if record.grade_text %} · {{ record.grade_text }}{% endif %}</span></span>
+        <span class="record-race">{% if record.public_event_path %}<a href="{{ record.public_event_path }}">{% if record.display_race_name != record.race_name %}{{ record.display_race_name }}{% else %}{{ record.race_name }}{% endif %}</a>{% else %}<b>{% if record.display_race_name != record.race_name %}{{ record.display_race_name }}{% else %}{{ record.race_name }}{% endif %}</b>{% endif %}{% if record.display_race_name != record.race_name %}<small>{{ record.race_name }}</small>{% endif %}<span>{% if record.display_racecourse != record.racecourse %}{{ record.display_racecourse }}<small>{{ record.racecourse }}</small>{% elif record.racecourse %}{{ record.racecourse }}{% endif %}{% if record.distance_text %} · {{ record.distance_text }}{% endif %}{% if record.grade_text %} · {{ record.grade_text }}{% endif %}</span></span>
         <span class="record-time tabular">{{ record.public_finish_time }}</span>
       </div>{% endfor %}</div>{% else %}<p class="muted">暂无参赛履历。</p>{% endif %}
     </section>

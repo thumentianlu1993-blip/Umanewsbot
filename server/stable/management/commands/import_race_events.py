@@ -38,6 +38,7 @@ from stable.services.race_event_reconciliation import (
     RaceEventReconciliationError,
     adopt_existing_race_event_for_target,
 )
+from stable.services.race_events import apply_race_event_normalization
 
 
 REQUIRED_FIELDS = {"year", "original_name", "chinese_name", "country_region", "racecourse", "grade_text", "surface"}
@@ -558,6 +559,7 @@ def _apply_current_year_descriptor_rows(
                             "is_featured",
                         }
                     )
+                apply_race_event_normalization(event)
                 for alias in aliases:
                     if not RaceEventAlias.objects.filter(
                         event=event, source_language=alias_language, text=alias
@@ -715,6 +717,7 @@ class Command(BaseCommand):
                 event, was_created = RaceEvent.objects.update_or_create(
                     year=year, slug=slug, defaults=defaults
                 )
+                apply_race_event_normalization(event)
                 for alias in aliases:
                     RaceEventAlias.objects.update_or_create(
                         event=event,

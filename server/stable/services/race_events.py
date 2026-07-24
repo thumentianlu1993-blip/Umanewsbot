@@ -70,6 +70,13 @@ from stable.models import (
 from stable.services.operations import log_operation
 from stable.services.historical_race_inventory import sanitize_structured_row_evidence
 from stable.services.terms import source_term_matches_text
+from stable.services.race_field_normalization import (
+    RACE_FIELD_NORMALIZATION_VERSION,
+    compute_input_sha256,
+    normalize_distance,
+    normalize_eligibility,
+    normalize_surface_race_type_layout_going,
+)
 
 # 赛事总账关联保持为独立领域服务；这里重导出兼容既有调用方和测试 API。
 from stable.services.race_event_reconciliation import (
@@ -6460,6 +6467,88 @@ def _candidate_items(payload: dict | list) -> list[dict]:
     return [item for item in payload.get("items", []) if isinstance(item, dict)]
 
 
+def apply_race_event_normalization(event: RaceEvent) -> None:
+    """Apply field normalization to a RaceEvent and persist normalized fields.
+
+    This is a non-blocking operation: normalization failures are recorded in
+    ``normalization_issues`` without aborting the write path.  The normalizer
+    reads ``surface``, ``distance_text`` and ``eligibility_text`` from the
+    event and writes the computed normalized fields back to the database.
+    """
+    issues: list[dict[str, str]] = []
+    now = timezone.now()
+    input_parts: dict[str, str] = {}
+
+    # --- Surface / race-type / layout / going ---
+    try:
+        surface_result = normalize_surface_race_type_layout_going(
+            raw_value=event.surface,
+            going_text=None,
+        )
+        event.normalized_surface = surface_result.surface.value
+        event.normalized_race_type = surface_result.race_type.value
+        event.course_layout_text = surface_result.course_layout
+        event.going_text = surface_result.going_text
+        input_parts["surface"] = event.surface
+    except Exception as exc:
+        issues.append({"field": "surface", "error": str(exc)})
+
+    # --- Distance ---
+    try:
+        distance_result = normalize_distance(
+            raw_value=event.distance_text,
+            official_metric_meters=None,
+        )
+        if distance_result.meters is not None:
+            event.distance_meters_normalized = float(distance_result.meters) if distance_result.meters is not None else None
+        event.distance_precision = distance_result.precision.value
+        input_parts["distance_text"] = event.distance_text
+    except Exception as exc:
+        issues.append({"field": "distance", "error": str(exc)})
+
+    # --- Eligibility (age / sex restriction) ---
+    try:
+        eligibility_result = normalize_eligibility(
+            raw_value=event.eligibility_text,
+        )
+        event.minimum_age = eligibility_result.min_age
+        event.maximum_age = eligibility_result.max_age
+        event.age_open_ended = eligibility_result.age_open_ended
+        event.sex_restriction = eligibility_result.sex.value
+        event.eligibility_constraints = eligibility_result.extra_constraints
+        input_parts["eligibility_text"] = event.eligibility_text
+    except Exception as exc:
+        issues.append({"field": "eligibility", "error": str(exc)})
+
+    # --- Normalization metadata ---
+    event.normalization_version = RACE_FIELD_NORMALIZATION_VERSION
+    event.normalization_input_sha256 = compute_input_sha256(**input_parts)
+    event.normalization_issues = issues
+    event.normalized_at = now
+
+    # Persist only normalization-related fields
+    event.save(
+        update_fields=[
+            "normalized_surface",
+            "normalized_race_type",
+            "course_layout_text",
+            "going_text",
+            "distance_meters_normalized",
+            "distance_precision",
+            "minimum_age",
+            "maximum_age",
+            "age_open_ended",
+            "sex_restriction",
+            "eligibility_constraints",
+            "normalization_version",
+            "normalization_input_sha256",
+            "normalization_issues",
+            "normalized_at",
+            "updated_at",
+        ]
+    )
+
+
 def apply_data_candidate(candidate: RaceEventDataCandidate, *, user: User | None = None) -> dict:
     event = candidate.event
     payload = candidate.candidate_payload or {}
@@ -6470,6 +6559,7 @@ def apply_data_candidate(candidate: RaceEventDataCandidate, *, user: User | None
             updated_fields = _set_unlocked_event_fields(event, payload)
             if updated_fields:
                 event.save(update_fields=[*updated_fields, "updated_at"])
+            apply_race_event_normalization(event)
             summary["updated_fields"] = updated_fields
         elif module == RaceEventModule.RUNNERS:
             summary["created_count"] = _replace_runners(event, _candidate_items(payload))

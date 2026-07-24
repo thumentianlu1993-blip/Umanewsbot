@@ -1575,3 +1575,10 @@ P0 马信息补全专项的模型交接文档见
 - 日期导航现明确显示月份；移动端 G1、G2、JPN1 等级徽标保持 `42×42px`，长赛事名由标题区域换行。
 - 四个应用服务统一运行镜像 `sha256:90c98db7...0e49`；Django、迁移、健康检查、主要 HTTP
   路由和 1440px/390px/320px 浏览器验收通过。本次没有迁移或业务数据写入。
+
+## 2026-07-24 跨地区赛事与履历字段归一化待实现
+
+- change `normalize-race-and-career-fields` 的规格、设计、测试矩阵、任务和 rollout 已经独立方案
+  review 通过；完整接手入口为 `docs/changes/normalize-race-and-career-fields/HANDOFF.md`。
+- 当前仅完成方案与 Claude 交接，没有实现、迁移、发布或生产数据写入；必须等待用户新的明确
+  “确认实现/开始实现/继续实现”，再按测试先行和 subagent 流程推进。
