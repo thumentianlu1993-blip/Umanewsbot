@@ -3414,3 +3414,20 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   `backups/db/pre-portal-redesign-20260723_024424.sql.gz`，大小 `232004041` bytes，
   SHA-256 为 `9bdb7a53cde72c1302c86886415b5d59f4a088a5ae93e0325d34c8b0261fb6b2`，
   `gzip -t` 通过；环境备份为 `.env.backup.portal-redesign-20260723_024424`，权限 `0600`。
+
+## 2026-07-24 赛事日历月份与移动端等级徽标修复上线
+
+- PR `#17` 已合并并部署到生产，生产 HEAD 为
+  `3772256e606e3f62081eecec162fecedbd1aa23d`；本次无新增迁移、无赛事或新闻业务数据写入。
+- `web / worker / beat / race_live_worker` 已统一运行镜像
+  `sha256:90c98db7eb048949507bbc3d335ed7b989dc9ce6dab1d3576a5242c2c4d10e49`。
+  Django check、migration drift、内外 healthz、首页、赛事日历和后台登录入口均通过。
+- 生产 1440px、390px 和 320px 验收确认：日期轴直接显示月份，跨月的
+  `6月28日 / 7月1日` 无歧义；G1、G2、JPN1 在长赛事名下均保持 `42×42px`，
+  390px/320px 页面无横向溢出，浏览器控制台无错误。
+- 部署前数据库恢复点为
+  `backups/db/pre-race-calendar-responsive-20260724T173452+0800.sql.gz`，
+  大小 `242013429` bytes，SHA-256
+  `2ed8f391b4b37e3590e22ad558ce6237a53ded073f6a5920aafacad8d8f4ce7f`；
+  `gzip -t` 通过。环境恢复点为
+  `.env.backup.race-calendar-responsive-20260724T173452+0800`，两者权限均为 `0600`。
