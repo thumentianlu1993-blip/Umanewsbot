@@ -1,5 +1,24 @@
 # 项目状态文档
 
+## 2026-07-24 P0 task 5.4 空胜绩门禁已本地修复
+
+- 只有 applied、approved、payload 精确为空且具有执行人/时间的 `major_wins` 证据可表达
+  “确认无胜绩”；未审核、非空 payload 或 conflict 仍 fail closed。
+- artifact/candidate 新增完整度策略版本绑定，旧 candidate `8ef0f718...` 在新代码下不可复用，
+  必须重新生成 SHA 并重新授权。
+- 本地关键测试已转绿；312 项组合中 308 通过，4 个失败与修复前基线完全一致；排除基线失败后
+  最终 P0 相关集合 `247/247`，Django、迁移、OpenSpec `37/37` 与 diff check 通过。尚未独立
+  review、push、部署或触碰生产。
+- 冻结输入下预估净增：0 匹新马、1,490 条履历、244 条模块审计、1 条 completion run、0 条新
+  P0 source、0 匹新增公开；61 个 profile 和 61 条既有 source 将更新/upsert。
+- 两项审查 P1 已修复：不再接受 applied 的非空 payload 作为“无胜绩”，也不再让新 v2 策略
+  破坏历史 v1 artifact 的只读复验；当前策略只在 v2 发布链路强制。
+- 后续直接路径复审补齐 v1 只读边界和手工审核稳定性：v1 commit 在写库前拒绝；无胜绩马的
+  手工 ready 审计继续保存空列表，后续完整度不会反转。生产链路 246 项与三项新增测试共
+  `249/249` 通过。
+- 用户表达了持续确认新 SHA 的意愿，但仓库发布门禁要求授权必须发生在最新成功 review 之后；
+  review 成功后仍须请求当前任务发布授权。candidate 对象、动作或公开范围漂移则停止。
+
 ## 2026-07-24 P0 task 5.4 因“已审核无胜场”语义缺口安全回滚
 
 - 精确 candidate 已生成唯一 v2 正式批准，但数据库事务在首个无胜场对象的 strict-complete

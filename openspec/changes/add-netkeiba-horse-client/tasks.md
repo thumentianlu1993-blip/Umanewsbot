@@ -53,6 +53,7 @@
 - [x] 4.10j (integration) 最新主线集成审查修复测试先行：相同 candidate 的普通重复 commit 在 publish stage 已完成时复用冻结 checkpoint/report，禁止因人工降级或 gate 放宽再次调用发布；publish 未完成或失败时普通 commit 必须 fail closed 并仅指向显式 `--retry-publish`。
 - [x] 4.10k (integration) fresh review 修复测试先行：prepare 与同批 commit 共享 execution lock；completed 重放在 dry-run/DB apply 前完整复验冻结 candidate、commit/publish checkpoint 与精确 v2 publish ledger，缺失或不匹配时零写 fail closed 并要求人工审计。
 - [x] 4.10l (integration) 第二轮 fresh review 修复测试先行：prepare-release 的 service 入口直接取得同 batch execution lock，再进入 state serial lock；锁内复读 state/manifest，commit 或 abandon 已完成时零写 fail closed，禁止 direct service caller 绕过 command 并发边界。
+- [x] 4.10m (integration) task 5.4 首次整批回滚修复测试先行：已审核 applied 的空 `major_wins` 表示“确认无胜绩”并可通过严格完整度；无审核或最新 conflict 仍阻断；artifact/candidate 绑定完整度策略版本，旧候选在 DB 前 fail closed 并要求新 SHA、新授权。
 - [x] 4.11 (operations) 验证缺失/错误/篡改/stale candidate、生产快照漂移与重复 prepare/commit；运行专项、Django check、迁移漂移、完整 stable 基线、OpenSpec strict/all、diff check；更新四份状态/决策/运行手册并完成独立 code review。
 
 ## 5. 生产执行（分步用户授权）

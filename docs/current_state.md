@@ -1,5 +1,35 @@
 # 当前状态
 
+## 2026-07-24 task 5.4 已审核空胜绩语义完成本地修复（待独立复审）
+
+- 用户已授权开始修复。测试先行确认两层旧行为：已 applied 的空 `major_wins` 仍被判
+  `major_wins` 缺失，正式 artifact 因而不能写入 `full_profile_reviewed_by/at`。
+- 本地窄修现只在最新非 ignored 的 `major_wins` 候选为 `applied`、审核结论为 `approved`、
+  候选 payload 精确为空列表，且具有 `applied_by`、`applied_at` 时，把无胜绩解释为“已审核
+  确认无胜绩”；无审核、非空 payload 或最新 conflict 仍阻断。
+- 新 commit artifact 与 release candidate 均绑定完整度策略
+  `p0-horse-full-profile-completeness.v2`。旧 artifact/candidate 会在数据库写入前 fail closed，
+  因此已批准 candidate `8ef0f718...` 不会被静默复用；必须部署受审精确版本后重新
+  prepare-release，得到新 artifact/candidate SHA。当前预授权不能替代最新成功 review 后的
+  发布授权；review 成功后仍须请求当前任务发布授权。若对象、预计动作或公开范围漂移则
+  fail closed。
+- 关键 RED→GREEN 3 项通过；P0/完整度相关组合共运行 312 项，其中 308 项通过，4 项公开页面
+  文案测试失败；同 4 项已在修复前基线 `04c89e35` 全部复现，确认不是本补丁回归。当前未触网、
+  未连接或写入生产、未部署、未生成新 candidate。
+- 排除上述已确认基线失败后，最终 P0 写入链路 246 项与三项新增完整度测试合计 `249/249`
+  通过；Django
+  check、迁移漂移、OpenSpec strict/all `37/37` 与 diff check 全部通过。
+- 独立审查发现并修复两项 P1：空胜绩证据曾误接受非空 applied payload；策略版本曾误阻断
+  历史 v1 artifact 的只读复验。当前仅 v2 正式发布链路强制当前策略，历史 v1 仍只读兼容；
+  两项均有先失败后通过的回归测试。
+- 后续复审又发现并修复：历史 v1 release 曾仍可进入 commit，现已在数据库写入前明确拒绝；
+  手工 ready 曾用非空 payload 覆盖无胜绩证据，现会继续保存空列表。两项也均完成 RED→GREEN，
+  正等待同一审查会话最终确认。
+- 冻结业务输入未变时，预计线上净增仍为：HorseProfile `+0`（更新 61）、HorseRaceRecord
+  `+1490`、HorseProfileDataCandidate/module audits `+244`、HorseProfileCompletionRun `+1`；
+  HorseP0Source 预计净增 `+0`（upsert 61 条既有来源），新增公开 `+0`。最终数字必须以新版本在
+  生产重算出的 candidate 为准，若漂移即停步重新汇报。
+
 ## 2026-07-24 task 5.4 首次正式写入被 strict-complete 门禁整批回滚
 
 - 用户已针对 candidate

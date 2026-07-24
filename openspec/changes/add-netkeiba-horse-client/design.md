@@ -204,6 +204,26 @@ artifact SHA、预计动作与自动首发范围交给用户做精确授权；�
 release candidate 是“待批准的精确施工方案”，不是 release manifest，也不进入现有可信发布批准
 校验。正式 commit 仍只接受带独立批准账本事件的 release manifest，因此该拆分不降低既有写入门禁。
 
+### 9. 已审核空胜绩与完整度策略版本（task 5.4 返修）
+
+task 5.4 首次正式写入在 PostgreSQL 事务内 fail closed：61 匹中的 10 匹没有胜绩记录，虽然
+`major_wins` 模块已人工批准为空列表，旧完整度判断仍把“没有胜绩记录”解释为“胜绩资料缺失”，
+导致首匹无胜绩马严格验收失败并整批回滚。
+
+修复采用窄语义：
+
+1. 有实际获胜或重大胜绩记录时，沿用既有完整判定；
+2. 没有胜绩记录时，只有最新非 ignored 的 `major_wins` 候选为 `applied`、审核为
+   `approved`、payload 精确为空列表，并有 `applied_by`、`applied_at` 时，才表示“已审核确认
+   无胜绩”并满足资料完整度；
+3. 没有审核记录，或最新记录为 pending/conflict/rejected 时仍阻断；ignored 新建议继续沿用此前
+   已 applied 的有效审核，不放宽未审核资料；
+4. 新生成 commit artifact 与 release candidate 都写入
+   `p0-horse-full-profile-completeness.v2`。candidate 与正式 v2 release 必须精确匹配当前策略
+   版本。历史 v1 artifact 仅允许可信 v1 release 的只读 dry-run 复验，commit 明确拒绝；
+5. 手工 ready 复审无胜绩马时，新 `major_wins` 审计继续保存空列表，不能用
+   `{"manual_review": true}` 覆盖并自我推翻完整度。
+
 ## Risks / Trade-offs
 
 - [页面结构脆弱] -> 解析器按表格标签语义定位而非绝对位置；结构不识别即 fail closed，配 fixture 回归。
@@ -222,6 +242,8 @@ release candidate 是“待批准的精确施工方案”，不是 release manif
 7. task 5.3 先执行 `--bundle` 与 `--prepare-release`，向用户展示 release-candidate SHA、全部
    bindings、预计写入和自动首发范围；取得该精确 candidate SHA 授权后，task 5.4 才生成正式
    release manifest 并执行 commit。
+8. task 5.4 首次写入整批回滚后，先修复已审核空胜绩语义并绑定完整度策略版本；本地验证与独立
+   review 通过后部署精确版本，再从冻结 bundle 重新生成 candidate 并取得新的精确写入授权。
 
 ## Resolved Questions
 

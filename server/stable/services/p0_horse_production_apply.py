@@ -50,6 +50,7 @@ from stable.services.p0_horse_completion_adapters import (
     normalize_p0_horse_race_records,
 )
 from stable.services.p0_horse_profiles import (
+    FULL_PROFILE_COMPLETENESS_POLICY_VERSION,
     REQUIRED_COMPLETION_MODULES,
     apply_reviewed_completion_artifact,
     evaluate_full_profile_completeness,
@@ -1184,6 +1185,7 @@ def prepare_reviewed_p0_completion_artifact(
     summary = _summary(reviewed_rows)
     artifact = {
         "schema_version": ARTIFACT_SCHEMA,
+        "completion_policy_version": FULL_PROFILE_COMPLETENESS_POLICY_VERSION,
         "commit_artifact_compatible": True,
         "reviewed": True,
         "release_status": "candidate_pending_independent_release",
@@ -1521,6 +1523,10 @@ def _load_and_validate_release_candidate(
     if (
         candidate.get("schema_version")
         != "p0_horse_production_release_candidate.v1"
+        or candidate.get("completion_policy_version")
+        != FULL_PROFILE_COMPLETENESS_POLICY_VERSION
+        or candidate.get("completion_policy_version")
+        != artifact.get("completion_policy_version")
         or candidate.get("status")
         != "pending_independent_release_approval"
         or candidate.get("batch_id") != batch_manifest.get("batch_id")
@@ -1610,6 +1616,12 @@ def _load_and_validate_release_manifest(
     release_schema = release.get("schema_version")
     if release_schema not in {RELEASE_MANIFEST_SCHEMA, RELEASE_MANIFEST_SCHEMA_V2}:
         _fail("production release manifest schema is invalid")
+    if (
+        release_schema == RELEASE_MANIFEST_SCHEMA_V2
+        and artifact.get("completion_policy_version")
+        != FULL_PROFILE_COMPLETENESS_POLICY_VERSION
+    ):
+        _fail("reviewed artifact completion policy version is stale")
     approved_by = str(release.get("approved_by") or "").strip()
     approved_at = str(release.get("approved_at") or "").strip()
     decision_reference = str(release.get("decision_reference") or "").strip()
@@ -2496,6 +2508,8 @@ def _commit_reviewed_p0_completion_artifact_locked(
 ) -> dict[str, Any]:
     if not confirm_reviewed_artifact:
         _fail("commit requires --confirm-reviewed-artifact")
+    if release_input.payload.get("schema_version") != RELEASE_MANIFEST_SCHEMA_V2:
+        _fail("legacy v1 release is read-only and cannot be committed")
     artifact, actual_sha = _load_artifact(artifact_path, artifact_sha256)
     release_input = _load_and_validate_release_manifest(
         release_manifest_path=release_manifest_path,

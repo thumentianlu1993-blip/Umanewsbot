@@ -1,5 +1,21 @@
 # 关键决策
 
+## 2026-07-24 已审核空胜绩采用显式证据语义并版本化发布候选
+
+- “没有胜绩记录”不再等同于“胜绩资料缺失”。有实际胜绩沿用原判定；没有实际胜绩时，只有最新
+  非 ignored 的 `major_wins` 候选为 `applied`、审核结论为 `approved`、payload 精确为空列表，
+  且记录执行人、执行时间，才表示“已审核确认无胜绩”。未审核、非空 payload、pending、
+  conflict、rejected 均继续阻断，不伪造胜场、不绕过严格完整度。
+- 完整度语义会改变同一审核输入能否提交，因此属于发布候选的安全属性。新 artifact 和 candidate
+  统一绑定 `p0-horse-full-profile-completeness.v2`，所有 candidate/v2 release 加载与重算路径
+  必须精确校验；历史 v1 artifact 继续可信 v1 dry-run 验证兼容，任何 v1 commit 明确拒绝。
+- 手工 ready 复审无胜绩马时，新的 `major_wins` 审计必须继续保存空列表，不能写入较新的非空
+  手工标记而使档案立即重新不完整。
+- 旧 candidate 即使已有正式批准，只要尚未完整落库，就不能跨策略版本恢复。保留旧
+  candidate/release/ledger 作为审计证据；部署新受审版本后从冻结 bundle 重做 prepare-release。
+  发布授权必须在最新成功 review 后取得，review 前的持续授权或预授权不替代该门禁；对象、动作
+  或公开范围漂移必须 fail closed。
+
 ## 2026-07-23 P0 正式提交拆分为无批准候选与独立批准
 
 - 人工 xlsx 内容复审不等于生产写入批准。bundle 之后先执行 `prepare-release`，冻结完整子集、

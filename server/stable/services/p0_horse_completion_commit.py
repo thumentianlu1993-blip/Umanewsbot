@@ -31,6 +31,9 @@ from stable.services.p0_horse_completion_research import (
     _write_canonical,
     build_region_release_manifest,
 )
+from stable.services.p0_horse_profiles import (
+    FULL_PROFILE_COMPLETENESS_POLICY_VERSION,
+)
 from stable.services.p0_horse_production_apply import (
     P0ReviewedArtifactError,
     commit_reviewed_p0_completion_artifact,
@@ -463,6 +466,9 @@ def _prepare_p0_horse_batch_release_candidate_locked(
         }
         candidate = {
             "schema_version": RELEASE_CANDIDATE_SCHEMA,
+            "completion_policy_version": (
+                FULL_PROFILE_COMPLETENESS_POLICY_VERSION
+            ),
             "status": "pending_independent_release_approval",
             "batch_id": manifest["batch_id"],
             "region": region,
@@ -921,6 +927,8 @@ def _commit_p0_horse_batch_region_locked(
         candidate = _read_json(candidate_path, label="release candidate")
         if (
             candidate.get("schema_version") != RELEASE_CANDIDATE_SCHEMA
+            or candidate.get("completion_policy_version")
+            != FULL_PROFILE_COMPLETENESS_POLICY_VERSION
             or candidate.get("status") != "pending_independent_release_approval"
             or candidate.get("region") != region
             or candidate.get("executor_reviewer_id") != reviewer.id
@@ -1067,6 +1075,9 @@ def _commit_p0_horse_batch_region_locked(
             artifact_sha = _write_canonical(artifact_tmp_path, artifact)
         expected_candidate = {
             "schema_version": RELEASE_CANDIDATE_SCHEMA,
+            "completion_policy_version": (
+                FULL_PROFILE_COMPLETENESS_POLICY_VERSION
+            ),
             "status": "pending_independent_release_approval",
             "batch_id": manifest["batch_id"],
             "region": region,

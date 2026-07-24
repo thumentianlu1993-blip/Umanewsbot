@@ -1,5 +1,25 @@
 # 部署运行手册
 
+## task 5.4 空胜绩修复后的恢复顺序（待 review 后发布授权）
+
+1. 只部署通过独立 review 的精确修复提交；保持宿主及
+   `web/worker/beat/race_live_worker` 的
+   `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`。本修复不需要触网。
+2. 保留旧 candidate `8ef0f718...`、release `5320c33c...`、artifact 和 ledger，不删除、不覆盖、
+   不手工改状态。新代码只在 v2 发布链路因缺少当前完整度策略版本而拒绝旧候选；历史 v1
+   artifact 继续兼容可信 v1 dry-run，但任何 v1 commit 都在数据库写入前拒绝。
+3. 使用原冻结 bundle 执行新的 `--prepare-release`，核对 artifact/candidate 都包含
+   `completion_policy_version=p0-horse-full-profile-completeness.v2`，并重新记录完整 SHA、
+   bindings、expected actions 和 publish scope。
+4. 最新独立 review 成功且指纹不变后，请求当前任务发布授权。review 前的持续授权或预授权
+   不替代该门禁。
+5. 获得 review 后发布授权，再部署精确提交并重新 prepare-release。若预计动作仍为
+   61 profile updates、1,490 record creates、61 source upserts、244 audits，且公开范围仍为
+   61 already-published / 0 attempt，才可生成正式批准；任一对象、数字或公开范围扩大都停止。
+6. 另做写前数据库/.env 恢复点，再运行带新 candidate SHA 的 commit。成功后核验
+   completion run `+1`、records `+1490`、audits `+244`、profiles/sources/公开净增与 candidate
+   一致，并重复网络 false、容器、healthz、马匹页和幂等复验。
+
 ## task 5.4 首次 commit fail-closed 记录（2026-07-24）
 
 - 命令绑定 candidate

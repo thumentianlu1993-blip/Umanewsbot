@@ -32,7 +32,10 @@ from stable.services.p0_horse_completion_batch import (
     load_batch_manifest,
     read_approvals_ledger,
 )
-from stable.services.p0_horse_profiles import REQUIRED_COMPLETION_MODULES
+from stable.services.p0_horse_profiles import (
+    FULL_PROFILE_COMPLETENESS_POLICY_VERSION,
+    REQUIRED_COMPLETION_MODULES,
+)
 from stable.services.p0_horse_production_apply import (
     MIN_FORMAL_CONFIDENCE,
     build_profile_mapping_snapshot,
@@ -548,6 +551,10 @@ def build_region_release_manifest(
     if (
         candidate.get("schema_version")
         != "p0_horse_production_release_candidate.v1"
+        or candidate.get("completion_policy_version")
+        != FULL_PROFILE_COMPLETENESS_POLICY_VERSION
+        or candidate.get("completion_policy_version")
+        != artifact.get("completion_policy_version")
         or candidate.get("status")
         != "pending_independent_release_approval"
         or candidate.get("batch_id") != manifest["batch_id"]

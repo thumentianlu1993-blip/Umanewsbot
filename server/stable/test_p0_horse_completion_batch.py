@@ -1304,6 +1304,9 @@ class P0HorseBatchApprovalBundleTests(P0HorseBatchPrepareTests):
         scope = _build_auto_first_publish_scope(artifact)
         candidate = {
             "schema_version": "p0_horse_production_release_candidate.v1",
+            "completion_policy_version": (
+                "p0-horse-full-profile-completeness.v2"
+            ),
             "status": "pending_independent_release_approval",
             "batch_id": manifest["batch_id"],
             "region": RacingRegion.JAPAN,
@@ -1882,6 +1885,14 @@ class P0HorseBatchCommandPipelineTests(P0HorseBatchPrepareTests):
         self.assertEqual(
             candidate["schema_version"],
             "p0_horse_production_release_candidate.v1",
+        )
+        self.assertEqual(
+            candidate["completion_policy_version"],
+            "p0-horse-full-profile-completeness.v2",
+        )
+        self.assertEqual(
+            artifact["completion_policy_version"],
+            candidate["completion_policy_version"],
         )
         self.assertEqual(candidate["status"], "pending_independent_release_approval")
         self.assertNotIn("approved_by", candidate)

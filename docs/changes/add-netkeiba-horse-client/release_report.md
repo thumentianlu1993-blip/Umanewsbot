@@ -68,3 +68,24 @@
   自动首发未运行，网络保持 false。
 - task 5.4 未完成。建议通过新测试锁定“approved empty major-wins”语义，实施窄修并独立复审；
   部署后重新生成 candidate，任何新 SHA 都必须重新授权。
+
+## task 5.4 空胜绩门禁本地修复
+
+- 用户已授权开始修复；生产仍保持网络 false，且本轮没有连接、读取或写入生产。
+- 修复后只有最新非 ignored 的 `major_wins` 候选为 applied、审核为 approved、payload 精确为空
+  且带执行人/执行时间，才表示“已审核确认无胜绩”；无审核、非空 payload 或最新 conflict
+  仍保留 blocker。
+- artifact 与 candidate 新增
+  `completion_policy_version=p0-horse-full-profile-completeness.v2`，旧 candidate
+  `8ef0f718...` 会在 DB 前拒绝，不能复用旧批准。
+- 关键 RED→GREEN 3 项通过。P0/完整度组合 312 项中 308 项通过；4 项旧公开页面文案失败已在
+  修复前 `04c89e35` 基线全部复现，增量失败为 0。
+- 排除已确认基线失败后，P0 production apply/batch 246 项与三项新增完整度回归合计 `249/249`
+  通过；
+  Django check、迁移检查、OpenSpec strict/all `37/37`、diff check 均通过。
+- 独立审查提出的两项 P1 已修复并补回归：非空 applied payload 不得作为无胜绩证据；新策略
+  只在 v2 发布链路强制，历史 v1 artifact 保留只读复验能力。
+- 后续直接路径复审发现的 v1 commit 和手工 ready 问题也已 RED→GREEN：可信 v1 只能 dry-run，
+  commit 在写库前拒绝；无胜绩手工审核继续写空列表证据。
+- 当前等待同一独立 review 会话确认。仓库门禁要求在最新成功 review 后重新取得当前任务发布
+  授权；review 前的持续授权不替代该门禁。范围漂移仍必须停步。

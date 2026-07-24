@@ -6,6 +6,15 @@
 `openspec/changes/add-netkeiba-horse-client/` 为准；本轮只修复“人工复审后、生产提交前”缺失的
 精确授权门禁，不扩大来源抓取或马匹资料模型。
 
+task 5.4 空胜绩修复追加两项不可回退合同：
+
+1. 只有 applied、approved、payload 精确为空且带 applied 人/时间的 `major_wins` 证据可让真实
+   无胜场对象通过完整度；非空 payload、未审核和 conflict 必须阻断。
+2. 当前完整度策略必须在 v2 release/candidate 链路强制；缺少新策略字段的历史 v1 artifact
+   仍可在可信 v1 release 下只读 dry-run 验证，但 v1 commit 必须在数据库写入前拒绝。
+3. 无胜绩档案执行手工 ready 后，最新 `major_wins` 审计的 payload 仍必须精确为空列表，完整度
+   复验不得反转。
+
 ## 必须先出现的 RED
 
 实现前先在现有 batch command 与 production apply 测试中加入以下用例，并保留因
@@ -554,3 +563,30 @@ GREEN：
 - 两项线程测试在 pipeline 基类及 auto-publish 子类继承集合共执行 4 项，全部通过；SQLite/Celery
   eager 禁网的 P0 三模块为 `270/270`。Django、迁移、OpenSpec 与 diff 门禁见本轮验证记录；
   未访问生产。
+
+## task 5.4 已审核空胜绩门禁返修
+
+RED：
+
+- 有完整履历但没有胜绩的 profile，即使已有 applied `major_wins` 空审核，旧完整度仍返回
+  `major_wins` blocker。
+- 正式 reviewed artifact 对同类马应用后，因 data evaluation 不完整而不会设置
+  `full_profile_reviewed_by/at`，随后 strict-complete 失败并触发事务回滚。
+- 新生成 candidate/artifact 不包含完整度策略版本，旧批准可在代码语义变化后被误复用。
+
+GREEN：
+
+- applied 且带 `applied_by/applied_at` 的最新非 ignored `major_wins` 审核满足无胜绩完整度；
+  没有审核和最新 conflict 两种情况继续阻断。
+- 正式 artifact 能为经审核无胜绩马写入完整复审元数据并通过严格完整度。
+- artifact/candidate 同时绑定 `p0-horse-full-profile-completeness.v2`；stale artifact 在
+  production dry-run 的数据库路径前拒绝。
+- 3 项关键测试通过。组合运行
+  `P0HorseProfileDataCompletionTests + stable.test_p0_horse_production_apply +
+  stable.test_p0_horse_completion_batch` 共 312 项，308 项通过；4 项公开页面文案失败在修复前
+  `04c89e35` 基线 4/4 同样失败，因此本轮增量失败为 0。全程 SQLite/Celery eager、未触网、
+  未访问生产。
+- 排除上述基线失败后单独运行两项新增完整度回归与
+  `stable.test_p0_horse_production_apply + stable.test_p0_horse_completion_batch`，
+  `247/247` 通过。Django check 无问题，迁移无漂移，OpenSpec strict/all `37/37`，diff check
+  通过。

@@ -17147,6 +17147,194 @@ class P0HorseProfileDataCompletionTests(TestCase):
         self.assertFalse(missing_basic.is_complete)
         self.assertIn("basic_facts.breeder_name", missing_basic.blocking_reasons)
 
+    def test_reviewed_empty_major_wins_is_complete_but_unreviewed_or_conflicted_is_blocked(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import evaluate_full_profile_completeness
+
+        profile = self._profile()
+        self._complete_records(profile)
+        profile.race_records.filter(result_status=HorseRaceResultStatus.WON).update(
+            result_status=HorseRaceResultStatus.PLACED,
+            is_major_win=False,
+        )
+        HorseP0Source.objects.create(
+            profile=profile,
+            source_type="major_race_participant",
+            source_url="https://example.com/race",
+            observed_at=timezone.now(),
+            metadata={"race_grade": RaceGrade.G1},
+        )
+
+        unreviewed = evaluate_full_profile_completeness(
+            profile,
+            require_review=False,
+        )
+        HorseProfileDataCandidate.objects.create(
+            profile=profile,
+            module=HorseProfileModule.MAJOR_WINS,
+            source_name="test_manual_review",
+            source_url="https://example.com/review",
+            status=HorseProfileCandidateStatus.APPLIED,
+            confidence=100,
+            candidate_payload={
+                "payload": [],
+                "review": {"status": "approved", "confidence": 100},
+            },
+            applied_by=self.user,
+            applied_at=timezone.now(),
+        )
+        reviewed_empty = evaluate_full_profile_completeness(
+            profile,
+            require_review=False,
+        )
+        HorseProfileDataCandidate.objects.create(
+            profile=profile,
+            module=HorseProfileModule.MAJOR_WINS,
+            source_name="test_conflict",
+            source_url="https://example.com/conflict",
+            status=HorseProfileCandidateStatus.CONFLICT,
+            confidence=100,
+            candidate_payload=[],
+        )
+        conflicted = evaluate_full_profile_completeness(
+            profile,
+            require_review=False,
+        )
+        HorseProfileDataCandidate.objects.create(
+            profile=profile,
+            module=HorseProfileModule.MAJOR_WINS,
+            source_name="test_nonempty_review_without_records",
+            source_url="https://example.com/nonempty-review",
+            status=HorseProfileCandidateStatus.APPLIED,
+            confidence=100,
+            candidate_payload={
+                "payload": [{"race_name": "Missing Win"}],
+                "review": {"status": "approved", "confidence": 100},
+            },
+            applied_by=self.user,
+            applied_at=timezone.now(),
+        )
+        nonempty_without_record = evaluate_full_profile_completeness(
+            profile,
+            require_review=False,
+        )
+
+        self.assertIn("major_wins", unreviewed.blocking_reasons)
+        self.assertTrue(reviewed_empty.is_complete)
+        self.assertNotIn("major_wins", reviewed_empty.blocking_reasons)
+        self.assertIn("major_wins", conflicted.blocking_reasons)
+        self.assertIn(
+            "major_wins",
+            nonempty_without_record.blocking_reasons,
+        )
+
+    def test_reviewed_artifact_can_complete_a_horse_with_verified_empty_major_wins(self):
+        from stable.models import (
+            HorseCareerRecordAuthorityStatus,
+            HorseP0Source,
+        )
+        from stable.services.p0_horse_profiles import (
+            apply_reviewed_completion_artifact,
+            evaluate_full_profile_completeness,
+        )
+
+        profile = self._profile()
+        self._complete_records(profile)
+        profile.race_records.filter(result_status=HorseRaceResultStatus.WON).update(
+            result_status=HorseRaceResultStatus.PLACED,
+            is_major_win=False,
+        )
+        HorseP0Source.objects.create(
+            profile=profile,
+            source_type="major_race_participant",
+            source_url="https://example.com/race",
+            observed_at=timezone.now(),
+            metadata={"race_grade": RaceGrade.G1},
+        )
+
+        row = self._reviewed_artifact_row(profile)
+        row["career_history"] = {
+            "record_authority_status": (
+                HorseCareerRecordAuthorityStatus.SOURCE_RECORDS_VERIFIED
+            ),
+            "official_or_source_start_count": 2,
+            "official_start_count_source": "official",
+            "official_start_count_source_url": (
+                "https://example.com/official/horse/forever-young"
+            ),
+            "official_start_count_verified_at": timezone.now().isoformat(),
+            "gap_reasons": [],
+            "source_refs": {
+                "official": (
+                    "https://example.com/official/horse/forever-young"
+                )
+            },
+        }
+        summary = apply_reviewed_completion_artifact(
+            {
+                "reviewed": True,
+                "reviewer_id": self.user.id,
+                "rows": [row],
+            },
+            commit=True,
+        )
+        profile.refresh_from_db()
+
+        self.assertEqual(summary["applied_profiles"], 1)
+        self.assertEqual(profile.full_profile_reviewed_by, self.user)
+        self.assertIsNotNone(profile.full_profile_reviewed_at)
+        self.assertTrue(evaluate_full_profile_completeness(profile).is_complete)
+
+    def test_manual_ready_preserves_verified_empty_major_wins_evidence(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import (
+            evaluate_full_profile_completeness,
+            mark_profile_completion_ready,
+        )
+
+        profile = self._profile()
+        self._complete_records(profile)
+        profile.race_records.filter(result_status=HorseRaceResultStatus.WON).update(
+            result_status=HorseRaceResultStatus.PLACED,
+            is_major_win=False,
+        )
+        profile.source_refs = {
+            "p0_completion": "https://example.com/horse-profile"
+        }
+        profile.save(update_fields=["source_refs", "updated_at"])
+        HorseP0Source.objects.create(
+            profile=profile,
+            source_type="major_race_participant",
+            source_url="https://example.com/race",
+            observed_at=timezone.now(),
+            metadata={"race_grade": RaceGrade.G1},
+        )
+        HorseProfileDataCandidate.objects.create(
+            profile=profile,
+            module=HorseProfileModule.MAJOR_WINS,
+            source_name="test_manual_review",
+            source_url="https://example.com/review",
+            status=HorseProfileCandidateStatus.APPLIED,
+            confidence=100,
+            candidate_payload={
+                "payload": [],
+                "review": {"status": "approved", "confidence": 100},
+            },
+            applied_by=self.user,
+            applied_at=timezone.now(),
+        )
+
+        result = mark_profile_completion_ready(profile, reviewer=self.user)
+        profile.refresh_from_db()
+        evaluation = evaluate_full_profile_completeness(profile)
+        latest_major_wins = profile.data_candidates.filter(
+            module=HorseProfileModule.MAJOR_WINS,
+        ).order_by("-fetched_at", "-id").first()
+
+        self.assertEqual(result["status"], "ready_for_manual_publish")
+        self.assertEqual(latest_major_wins.candidate_payload["payload"], [])
+        self.assertTrue(evaluation.is_complete)
+
     def test_ignored_new_suggestion_preserves_previous_applied_completeness(self):
         from stable.models import HorseP0Source
         from stable.services.p0_horse_profiles import (

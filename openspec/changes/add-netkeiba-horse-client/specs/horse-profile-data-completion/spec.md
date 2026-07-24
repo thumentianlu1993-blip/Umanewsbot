@@ -273,3 +273,40 @@ candidate SHA，并生成反向绑定该 SHA 的正式 release manifest；candid
 - **THEN** prepare-release service SHALL 先取得同 batch execution lock，再按 `execution -> state` 顺序取得 serial lock
 - **AND** 获锁后系统 SHALL 重新读取 state 与 manifest，不得使用等待前的终态判断
 - **AND** commit 已完成或 batch 已 abandoned 时系统 MUST 在生成 candidate、更新 state 或追加 ledger 前 fail closed
+
+### Requirement: 已审核为空的重大胜绩模块必须有明确完整度语义
+
+系统 SHALL 区分“尚无重大胜绩资料”和“人工已审核确认没有重大胜绩”。没有实际胜绩记录时，
+仅最新非 ignored 的 `major_wins` 候选为 `applied`、审核为 `approved`、payload 精确为空列表
+且具有执行人和执行时间，才能满足重大胜绩完整度；未审核、非空或冲突证据 MUST 继续阻断。
+
+#### Scenario: 人工确认没有胜绩
+
+- **WHEN** 马匹有完整生涯记录但没有任何获胜或重大胜绩记录，且 `major_wins` 模块以空列表通过人工审核并 applied
+- **THEN** 完整度判断 SHALL 将其解释为“已确认无胜绩”，不得添加 `major_wins` blocker
+- **AND** 正式 artifact apply SHALL 能设置完整复审人和复审时间并通过严格完整度验收
+- **AND** 后续手工 ready 复审 SHALL 继续保存空列表证据，不得写入较新的非空 payload 使档案重新不完整
+
+#### Scenario: 无胜绩且没有有效审核
+
+- **WHEN** 马匹没有获胜记录，且没有 applied 审核，或最新非 ignored 审核为 conflict/pending/rejected
+- **THEN** 系统 SHALL 保留 `major_wins` blocker，MUST NOT 标记完整
+
+### Requirement: 发布候选必须绑定完整度策略版本
+
+新生成的 commit artifact 与 release candidate SHALL 同时携带当前完整度策略版本。candidate
+与正式 v2 release 的所有加载和重算路径 MUST 精确校验该版本，防止旧批准在完整度
+语义变化后继续生效。
+
+#### Scenario: 完整度策略变化后重做候选
+
+- **WHEN** 已批准 candidate 使用旧完整度策略，而代码已切换到新策略
+- **THEN** 系统 MUST 在数据库写入前拒绝旧 artifact/candidate
+- **AND** 操作者 SHALL 从冻结审核输入重新 prepare-release，产生新的 artifact SHA 与 candidate SHA
+- **AND** 新 candidate MUST 重新取得绑定其精确 SHA、预计动作和发布范围的用户授权
+
+#### Scenario: 历史 v1 仅允许只读复验
+
+- **WHEN** 操作者使用可信的历史 v1 release 与缺少当前策略版本的 v1 artifact
+- **THEN** dry-run SHALL 继续允许只读复验
+- **AND** commit MUST 在任何数据库写入前拒绝该 v1 release
