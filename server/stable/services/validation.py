@@ -10,7 +10,6 @@ from typing import Callable
 from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
-from django.utils.html import strip_tags
 
 from stable.models import (
     ArticleHorseLink,
@@ -30,13 +29,17 @@ from stable.models import (
 from stable.services.terms import (
     ArticleEntityResolution,
     ENGLISH_COMMON_WORD_TERM_SEEDS,
+    _recognize_non_japanese_external_aliases,
+    english_horse_name_has_confirmed_occurrence,
     _find_source_term_match,
     recognize_horse_names,
     recognized_horses_from_resolution,
     resolve_article_entities,
+    resolve_article_entities_for_article,
     serialize_recognized_horse_names,
     source_term_matches_text,
     source_terms_by_entry,
+    visible_source_parts as _visible_source_parts,
 )
 from stable.services.news_attribution import article_region_set
 from stable.services.publish_readiness import transition_to_publish_ready
@@ -161,22 +164,6 @@ def _source_text(article: NewsArticle) -> str:
     return "\n".join([title, body]).strip()
 
 
-def _clean_visible_source_text(text: str) -> str:
-    cleaned = text or ""
-    for tag in ("script", "style", "nav", "aside"):
-        cleaned = re.sub(rf"<{tag}\b[^>]*>.*?</{tag}>", " ", cleaned, flags=re.IGNORECASE | re.DOTALL)
-    cleaned = strip_tags(cleaned)
-    cleaned = re.sub(r"\s+", " ", cleaned)
-    return cleaned.strip()
-
-
-def _visible_source_parts(article: NewsArticle) -> tuple[str, str]:
-    return (
-        _clean_visible_source_text(article.title_ja or ""),
-        _clean_visible_source_text(article.body_ja_normalized or article.body_ja_raw or ""),
-    )
-
-
 def _content_source() -> str:
     if not getattr(settings, "AUTO_REWRITE_ENABLED", False):
         return "base_translation"
@@ -287,6 +274,34 @@ def _term_preserved(
 def _pending_horse_original_preserved(publish_text: str, source_terms: list[str]) -> bool:
     normalized_publish = _normalize_term_text(publish_text)
     return any(term and _normalize_term_text(term) in normalized_publish for term in source_terms)
+
+
+def _formal_chinese_horse_target_exactly_mentioned(
+    publish_text: str,
+    candidates: list[str],
+) -> bool:
+    """Accept an unambiguous formal Chinese name mention after source confirmation.
+
+    Short Chinese translations such as ``辉煌`` remain context-classified because
+    they are commonly used as ordinary predicates.  Longer formal names can be
+    preserved by an exact terminal match without requiring a result-card phrase.
+    """
+    normalized_publish = unicodedata.normalize("NFKC", publish_text or "")
+    for candidate in candidates:
+        normalized_candidate = unicodedata.normalize(
+            "NFKC", candidate or ""
+        ).strip()
+        if not normalized_candidate:
+            continue
+        han_characters = re.findall(r"[\u3400-\u9fff]", normalized_candidate)
+        if len(han_characters) < 3:
+            continue
+        if re.search(
+            rf"{re.escape(normalized_candidate)}(?![0-9A-Za-z_\u3400-\u9fff])",
+            normalized_publish,
+        ):
+            return True
+    return False
 
 
 def _source_term_hit(text: str, source_terms: list[str], source_language: str | None) -> bool:
@@ -655,7 +670,12 @@ def _classify_english_term_context(
         return EnglishTermSemanticDecision("proper_noun", 0.95, f"{entry.term_type}_term_type", match)
     if has_common_seed:
         if _english_match_looks_like_entity_context(entry, match):
-            return EnglishTermSemanticDecision("uncertain", 0.45, "common_seed_entity_context", match)
+            return EnglishTermSemanticDecision(
+                "proper_noun",
+                0.95,
+                "common_seed_entity_context",
+                match,
+            )
         if _english_match_looks_like_common_word_context(entry, match):
             return EnglishTermSemanticDecision("common_word", 0.9, "ordinary_english_context", match)
         return EnglishTermSemanticDecision("common_word", 0.85, "ordinary_english_seed_default", match)
@@ -849,20 +869,147 @@ def validate_rewrite(
 
     preserve_limit = 12
     article_source_language = article.source_language or SourceLanguage.JAPANESE
-    entity_resolution = (
+    occurrence_resolution = (
         (batch_context.entity_resolutions_by_article or {}).get(article.id)
         if batch_context is not None
         else None
     )
-    if entity_resolution is None:
-        entity_resolution = resolve_article_entities(
-            article.title_ja,
-            article.body_ja_normalized or article.body_ja_raw,
+    if occurrence_resolution is None:
+        occurrence_resolution = resolve_article_entities_for_article(
+            article, title_text=visible_title, body_text=visible_body
+        )
+    # Off/shadow must remain behaviorally identical to the legacy gate.  Keep
+    # the occurrence resolver solely as audit/shadow detail in those modes and
+    # independently resolve the raw legacy source for all behavioral inputs.
+    behavior_resolution = occurrence_resolution
+    if (
+        article_source_language == SourceLanguage.ENGLISH
+        and context_mode in {"off", "shadow"}
+    ):
+        behavior_resolution = resolve_article_entities(
+            legacy_title,
+            legacy_body,
             source_language=article_source_language,
         )
-    recognized_horses = recognized_horses_from_resolution(entity_resolution)
-    details["article_entities"] = [item.as_dict() for item in entity_resolution.entities]
-    details["accepted_term_ids"] = sorted(entity_resolution.accepted_term_ids)
+    behavior_accepted_term_ids = set(behavior_resolution.accepted_term_ids)
+    if (
+        behavior_accepted_term_ids
+        and article_source_language == SourceLanguage.ENGLISH
+        and context_mode in {"off", "shadow"}
+    ):
+        legacy_accepted_entries = list(
+            TermEntry.objects.filter(id__in=behavior_accepted_term_ids)
+        )
+        legacy_terms_by_entry = source_terms_by_entry(
+            legacy_accepted_entries,
+            article_source_language,
+        )
+        legacy_duplicate_winners: dict[
+            tuple[str, str, str, str, str], TermEntry
+        ] = {}
+        for legacy_entry in legacy_accepted_entries:
+            duplicate_key = (
+                legacy_entry.term_type,
+                legacy_entry.source_language,
+                legacy_entry.racing_region or GLOBAL_RACING_REGION,
+                (legacy_entry.source_ja or "").casefold(),
+                (legacy_entry.target_zh or "").casefold(),
+            )
+            winner = legacy_duplicate_winners.get(duplicate_key)
+            if winner is None or (
+                legacy_entry.priority,
+                legacy_entry.id,
+            ) > (
+                winner.priority,
+                winner.id,
+            ):
+                legacy_duplicate_winners[duplicate_key] = legacy_entry
+            if legacy_entry.term_type != TermType.HORSE:
+                continue
+            legacy_source_terms = legacy_terms_by_entry.get(
+                legacy_entry.id, []
+            )
+            legacy_is_core = _is_core_term(
+                legacy_entry,
+                source,
+                legacy_title,
+                legacy_body[:500],
+                article_source_language,
+                legacy_source_terms,
+            )
+            legacy_semantic = _classify_english_term_context(
+                legacy_entry,
+                source,
+                legacy_title,
+                legacy_body[:500],
+                legacy_source_terms,
+                is_core=legacy_is_core,
+            )
+            if (
+                legacy_semantic
+                and legacy_semantic.classification == "common_word"
+                and legacy_semantic.confidence >= 0.8
+            ):
+                behavior_accepted_term_ids.discard(legacy_entry.id)
+        duplicate_winner_ids = {
+            entry.id for entry in legacy_duplicate_winners.values()
+        }
+        behavior_accepted_term_ids.intersection_update(
+            duplicate_winner_ids
+        )
+    recognized_horses = (
+        _recognize_non_japanese_external_aliases(source, article_source_language, None)
+        if article_source_language == SourceLanguage.ENGLISH and context_mode in {"off", "shadow"}
+        else recognized_horses_from_resolution(behavior_resolution)
+    )
+    details["article_entities"] = [
+        item.as_dict() for item in occurrence_resolution.entities
+    ]
+    details["accepted_term_ids"] = sorted(behavior_accepted_term_ids)
+    if article_source_language == SourceLanguage.ENGLISH:
+        details["english_term_classifications"].extend(
+            {
+                "term_id": occurrence.term_id,
+                "source_ja": occurrence.canonical_text,
+                "term_type": occurrence.term_type,
+                "term_semantic_classification": (
+                    "proper_noun" if occurrence.classification == "confirmed_horse" else occurrence.classification
+                ),
+                "classification": occurrence.classification,
+                "confidence": occurrence.confidence / 100,
+                "classification_reason": occurrence.reason,
+                "matched_text": occurrence.matched_text,
+                "matched_context": occurrence.matched_context,
+                "matched_span": [occurrence.start, occurrence.end],
+                "match_position": occurrence.field_name,
+                "position": "core" if occurrence.field_name == "title" or occurrence.start < 500 else "background",
+                "entity_evidence": [
+                    item
+                    for item in (occurrence.entity_evidence or occurrence.evidence)
+                    if item.startswith("race_")
+                ],
+                "external_horse_ids": list(occurrence.external_horse_ids or []),
+                "needs_preserve": occurrence.needs_preserve,
+            }
+            for occurrence in occurrence_resolution.entities
+            if occurrence.term_type == TermType.HORSE or occurrence.external_horse_ids
+        )
+    for occurrence in occurrence_resolution.entities:
+        if (
+            context_mode == "enforce"
+            and
+            occurrence.classification == "uncertain"
+            and occurrence.external_horse_ids
+            and not occurrence.term_id
+        ):
+            issues.append(
+                _issue(
+                    "external_horse_occurrence_uncertain",
+                    SEVERITY_INFO,
+                    "外部马名索引命中缺少充分语境，仅保留审计：" + occurrence.matched_text,
+                    payload=occurrence.as_dict(),
+                )
+            )
     if progress_callback:
         progress_callback()
     details["recognized_horse_names"] = serialize_recognized_horse_names(recognized_horses)
@@ -872,7 +1019,16 @@ def validate_rewrite(
     external_horses = [item for item in preservable_horses if item.source == "external_alias"]
     details["external_horse_names"] = [item.matched_text or item.name_ja for item in external_horses]
     missing_external_horses = [
-        item for item in external_horses if (item.matched_text or item.name_ja) and (item.matched_text or item.name_ja) not in publish_text
+        item
+        for item in external_horses
+        if (item.matched_text or item.name_ja)
+        and (
+            not english_horse_name_has_confirmed_occurrence(
+                publish_text, [item.matched_text or item.name_ja]
+            )
+            if article_source_language == SourceLanguage.ENGLISH and context_mode == "enforce"
+            else (item.matched_text or item.name_ja) not in publish_text
+        )
     ]
     if missing_external_horses:
         issues.append(
@@ -917,15 +1073,22 @@ def validate_rewrite(
     rejected_horse_candidates = [
         *[
             item
-            for item in entity_resolution.entities
-            if item.entity_type == "common_word" and item.term_type == TermType.HORSE
+            for item in behavior_resolution.entities
+            if item.classification == "common_word"
+            and item.term_type == TermType.HORSE
         ],
         *[
             item
-            for item in entity_resolution.suppressed_candidates
+            for item in behavior_resolution.suppressed_candidates
             if item.term_type == TermType.HORSE
             and any(
-                flag in {"inside_person_span", "inside_longer_entity", "inside_common_word_span"}
+                flag
+                in {
+                    "inside_person_span",
+                    "inside_longer_person_span",
+                    "inside_longer_entity",
+                    "inside_common_word_span",
+                }
                 for flag in item.conflict_flags
             )
         ],
@@ -937,7 +1100,7 @@ def validate_rewrite(
     }
     accepted_horse_targets = {
         item.target_zh
-        for item in entity_resolution.entities
+        for item in behavior_resolution.entities
         if item.entity_type == "horse" and item.target_zh
     }
     rejected_horse_targets -= accepted_horse_targets
@@ -949,7 +1112,7 @@ def validate_rewrite(
     }
     accepted_horse_term_ids = {
         item.term_id
-        for item in entity_resolution.entities
+        for item in behavior_resolution.entities
         if item.entity_type == "horse" and item.term_id
     }
     rejected_horse_term_ids -= accepted_horse_term_ids
@@ -981,13 +1144,20 @@ def validate_rewrite(
     missing_terms: list[str] = []
     first_block = gate_body[:500]
     accepted_term_ids = (
-        (batch_context.accepted_term_ids_by_article or {}).get(article.id, entity_resolution.accepted_term_ids)
+        (
+            behavior_accepted_term_ids
+            if article_source_language == SourceLanguage.ENGLISH
+            and context_mode in {"off", "shadow"}
+            else (batch_context.accepted_term_ids_by_article or {}).get(
+                article.id, behavior_accepted_term_ids
+            )
+        )
         if batch_context is not None
-        else entity_resolution.accepted_term_ids
+        else behavior_accepted_term_ids
     )
     context_suppressed_term_ids = {
         item.term_id
-        for item in entity_resolution.suppressed_candidates
+        for item in behavior_resolution.suppressed_candidates
         if item.term_id
         and any(
             flag in {"inside_person_span", "inside_longer_entity", "inside_common_word_span"}
@@ -1012,14 +1182,27 @@ def validate_rewrite(
         if progress_callback and index % 25 == 1:
             progress_callback()
         source_terms = terms_by_entry.get(entry.pk, [])
+        english_horse_occurrences = [
+            item
+            for item in behavior_resolution.entities
+            if article_source_language == SourceLanguage.ENGLISH
+            and entry.term_type == TermType.HORSE
+            and item.term_id == entry.id
+        ]
         v2_matches = (
             _all_source_term_match_contexts(visible_title, visible_body, source_terms)
-            if article_source_language == SourceLanguage.ENGLISH and context_mode in {"shadow", "enforce"}
+            if article_source_language == SourceLanguage.ENGLISH
+            and (
+                context_mode == "shadow"
+                or (context_mode == "enforce" and not english_horse_occurrences)
+            )
+            and context_mode in {"shadow", "enforce"}
             else []
         )
         source_hit = (
-            bool(v2_matches)
-            if context_mode == "enforce" and article_source_language == SourceLanguage.ENGLISH
+            bool(v2_matches) if context_mode == "enforce"
+            and article_source_language == SourceLanguage.ENGLISH
+            and not english_horse_occurrences
             else _source_term_hit(source, source_terms, article_source_language)
         )
         if not source_hit:
@@ -1074,11 +1257,78 @@ def validate_rewrite(
                 )
             )
             continue
-        preserved = (
-            _pending_horse_original_preserved(publish_text, source_terms)
-            if entry.is_pending_horse_translation
-            else _term_preserved(entry, publish_text, article_source_language, source_terms)
+        if context_mode == "enforce" and english_horse_occurrences and not any(
+            item.classification == "confirmed_horse" for item in english_horse_occurrences
+        ):
+            uncertain_occurrences = [
+                item for item in english_horse_occurrences if item.classification == "uncertain"
+            ]
+            for occurrence in uncertain_occurrences:
+                payload = occurrence.as_dict()
+                payload.update(
+                    {
+                        "source_ja": entry.source_ja,
+                        "source_language": entry.source_language,
+                        "term_type": entry.term_type,
+                    }
+                )
+                issues.append(
+                    _issue(
+                        "english_horse_occurrence_uncertain",
+                        SEVERITY_INFO,
+                        "英文马名索引命中缺少充分语境，仅保留审计：" + occurrence.matched_text,
+                        payload=payload,
+                    )
+                )
+            # Common-word occurrences are already retained in article_entities;
+            # neither class participates in horse preservation or term warnings.
+            continue
+        confirmed_english_horse_source = bool(
+            entry.term_type == TermType.HORSE
+            and article_source_language == SourceLanguage.ENGLISH
+            and context_mode == "enforce"
+            and any(
+                item.classification == "confirmed_horse"
+                for item in english_horse_occurrences
+            )
         )
+        if confirmed_english_horse_source:
+            original_preserved_in_horse_context = (
+                english_horse_name_has_confirmed_occurrence(
+                    publish_text, source_terms
+                )
+            )
+            if entry.is_pending_horse_translation:
+                preserved = original_preserved_in_horse_context
+            else:
+                translated_candidates = [entry.target_zh, *(entry.aliases_zh or [])]
+                preserved = (
+                    original_preserved_in_horse_context
+                    or english_horse_name_has_confirmed_occurrence(
+                        publish_text,
+                        [
+                            candidate
+                            for candidate in translated_candidates
+                            if candidate
+                        ],
+                    )
+                    or _formal_chinese_horse_target_exactly_mentioned(
+                        publish_text,
+                        [
+                            candidate
+                            for candidate in translated_candidates
+                            if candidate
+                        ],
+                    )
+                )
+        else:
+            preserved = (
+                _pending_horse_original_preserved(publish_text, source_terms)
+                if entry.is_pending_horse_translation
+                else _term_preserved(
+                    entry, publish_text, article_source_language, source_terms
+                )
+            )
         if not preserved:
             missing_terms.append(entry.source_ja)
             classification_payloads: list[dict] = []
@@ -1127,6 +1377,11 @@ def validate_rewrite(
                 )
             is_core = _is_core_term(entry, source, title, first_block, article_source_language, source_terms)
             if entry.is_pending_horse_translation:
+                confirmed_occurrences = [
+                    item.as_dict()
+                    for item in english_horse_occurrences
+                    if item.classification == "confirmed_horse"
+                ]
                 issues.append(
                     _issue(
                         "pending_horse_original_missing",
@@ -1140,6 +1395,8 @@ def validate_rewrite(
                             "term_type": entry.term_type,
                             "priority": entry.priority,
                             "position": "core" if is_core else "background",
+                            "classification": "confirmed_horse",
+                            "occurrences": confirmed_occurrences,
                         },
                     )
                 )
@@ -1177,9 +1434,47 @@ def validate_rewrite(
             semantic_decision = (
                 _classify_english_term_context(entry, source, title, first_block, source_terms, is_core=is_core)
                 if article_source_language == SourceLanguage.ENGLISH
+                and (
+                    entry.term_type != TermType.HORSE
+                    or context_mode in {"off", "shadow"}
+                )
                 else None
             )
             semantic_payload = _english_term_semantic_payload(semantic_decision) if semantic_decision else {}
+            if (
+                semantic_decision
+                and entry.term_type == TermType.HORSE
+                and context_mode in {"off", "shadow"}
+            ):
+                semantic_payload["classification"] = (
+                    "confirmed_horse"
+                    if semantic_decision.classification == "proper_noun"
+                    else semantic_decision.classification
+                )
+            if english_horse_occurrences and context_mode == "enforce":
+                occurrence = next(
+                    (
+                        item
+                        for item in english_horse_occurrences
+                        if item.classification == "confirmed_horse"
+                    ),
+                    english_horse_occurrences[0],
+                )
+                semantic_payload = {
+                    "classification": occurrence.classification,
+                    "term_semantic_classification": (
+                        "proper_noun"
+                        if occurrence.classification == "confirmed_horse"
+                        else occurrence.classification
+                    ),
+                    "confidence": occurrence.confidence / 100,
+                    "classification_reason": occurrence.reason,
+                    "matched_text": occurrence.matched_text,
+                    "matched_context": occurrence.matched_context,
+                    "matched_span": [occurrence.start, occurrence.end],
+                    "entity_evidence": list(occurrence.entity_evidence or occurrence.evidence),
+                    "external_horse_ids": list(occurrence.external_horse_ids or []),
+                }
             if semantic_decision:
                 classification_payload = {
                     "term_id": entry.id,

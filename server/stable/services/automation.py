@@ -26,6 +26,7 @@ from stable.models import (
 from stable.services.terms import (
     ArticleEntityResolution,
     resolve_article_entities,
+    resolve_article_entities_for_article,
     resolve_terms_for_language,
 )
 from stable.services.multiregion import auto_publish_policy_for_article
@@ -588,11 +589,7 @@ def _hard_rule_decision(
 def score_article_for_automation(article: NewsArticle) -> AutomationDecision:
     text = _source_text(article)
     category = classify_content_category(article)
-    entity_resolution = resolve_article_entities(
-        article.title_ja,
-        article.body_ja_normalized or article.body_ja_raw,
-        source_language=article.source_language or SourceLanguage.JAPANESE,
-    )
+    entity_resolution = resolve_article_entities_for_article(article)
     hard_mode, hard_risk, hard_reasons, checks = _hard_rule_decision(
         article,
         category,

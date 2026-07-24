@@ -16,7 +16,7 @@ from stable.models import (
     TermEntry,
     TermType,
 )
-from stable.services.terms import recognize_horse_names, source_terms_by_entry
+from stable.services.terms import recognized_horses_from_resolution, resolve_article_entities_for_article, source_terms_by_entry
 
 
 SUPPORTED_TERM_TYPES = {TermType.HORSE, TermType.RACE, TermType.JOCKEY, TermType.OWNER}
@@ -33,6 +33,9 @@ class TermDiscoveryFinding:
     reason: str
     source_field: str
     context: str
+    matched_span: tuple[int, int] = ()
+    classification: str = ""
+    external_horse_ids: tuple[str, ...] = ()
 
 
 def normalize_japanese_term(value: str) -> str:
@@ -110,17 +113,59 @@ def discover_term_findings(article: NewsArticle) -> list[TermDiscoveryFinding]:
     title = article.title_ja or ""
     body = article.body_ja_normalized or article.body_ja_raw or ""
     source_language = article.source_language or SourceLanguage.JAPANESE
-    for horse in recognize_horse_names(title, body, limit=None, source_language=source_language):
+    resolution = resolve_article_entities_for_article(article)
+    for horse in recognized_horses_from_resolution(resolution):
         if not horse.needs_preserve:
             continue
         matched_text = horse.matched_text or horse.name_ja
-        field, text = ("title_ja", title) if matched_text in title else ("body_ja_normalized", body)
+        field = (
+            "title_ja"
+            if horse.source_field == "title"
+            else (
+                "body_ja_normalized"
+                if article.body_ja_normalized
+                else "body_ja_raw"
+            )
+        )
+        source_text = (
+            title
+            if field == "title_ja"
+            else (
+                article.body_ja_normalized
+                if field == "body_ja_normalized"
+                else article.body_ja_raw
+            )
+        ) or ""
+        context = horse.matched_context
+        if not context:
+            start, end = horse.matched_span or (0, 0)
+            if 0 <= start < end <= len(source_text):
+                context = source_text[
+                    max(0, start - CONTEXT_RADIUS) :
+                    min(len(source_text), end + CONTEXT_RADIUS)
+                ].strip()
+            else:
+                context = _context(source_text, matched_text)
         detector = "external_horse_alias" if horse.source == "external_alias" else "unknown_horse"
-        reason = "本地外部马名索引命中且缺少中文译名" if horse.source == "external_alias" else "疑似未知马名"
-        confidence = max(85, horse.confidence) if horse.source == "external_alias" else horse.confidence
-        finding = _finding(TermType.HORSE, matched_text, confidence, detector, reason, field, text)
-        if finding:
-            results.append(finding)
+        reason = horse.reason or (
+            "本地外部马名索引命中且缺少中文译名"
+            if horse.source == "external_alias"
+            else "疑似未知马名"
+        )
+        results.append(
+            TermDiscoveryFinding(
+                term_type=TermType.HORSE,
+                source_ja=matched_text,
+                confidence=horse.confidence,
+                detector=detector,
+                reason=reason,
+                source_field=field,
+                context=context,
+                matched_span=horse.matched_span,
+                classification=horse.classification,
+                external_horse_ids=tuple(horse.external_horse_ids),
+            )
+        )
     for field, text in fields:
         if source_language == SourceLanguage.JAPANESE:
             results.extend(_regex_findings(text, field))

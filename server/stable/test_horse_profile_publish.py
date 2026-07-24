@@ -189,6 +189,105 @@ class AutoPublishProfilesTests(PublishTestBase):
         self.assertEqual(report["blocked"], 1)
         self.assertEqual(report["blocked_reasons"], {"gate.identity": 1})
 
+    def test_locking_read_and_gate_run_inside_per_profile_atomic(self):
+        from contextlib import contextmanager
+        from unittest import mock
+
+        from stable.services import horse_profile_publish as publish_module
+
+        profile = self._verified_profile()
+        reviewer = self._reviewer()
+        depth = {"value": 0}
+        events = []
+
+        @contextmanager
+        def controlled_atomic(*args, **kwargs):
+            events.append("atomic_enter")
+            depth["value"] += 1
+            try:
+                yield
+            finally:
+                depth["value"] -= 1
+                events.append("atomic_exit")
+
+        locked = mock.Mock()
+
+        def locked_get(*, pk):
+            self.assertGreater(depth["value"], 0)
+            events.append("locked_get")
+            self.assertEqual(pk, profile.pk)
+            profile.refresh_from_db()
+            return profile
+
+        locked.get.side_effect = locked_get
+        with mock.patch.object(
+            publish_module.transaction,
+            "atomic",
+            side_effect=controlled_atomic,
+        ), mock.patch.object(
+            publish_module.HorseProfile.objects,
+            "select_for_update",
+            return_value=locked,
+        ), mock.patch.object(
+            publish_module,
+            "evaluate_basic_publish_gate",
+            wraps=publish_module.evaluate_basic_publish_gate,
+        ) as gate:
+            report = auto_publish_profiles(
+                [profile.pk],
+                user=reviewer,
+                note="postgres transaction boundary",
+            )
+        self.assertEqual(report["published"], 1)
+        self.assertLess(events.index("atomic_enter"), events.index("locked_get"))
+        self.assertLess(events.index("locked_get"), events.index("atomic_exit"))
+        gate.assert_called_once_with(profile)
+
+    def test_rejects_locking_queryset_before_external_evaluation(self):
+        from stable.services.horse_profile_publish import P0HorsePublishError
+
+        profile = self._verified_profile()
+        locking_queryset = HorseProfile.objects.select_for_update().filter(
+            pk=profile.pk
+        )
+        with self.assertRaisesRegex(P0HorsePublishError, "non-locking"):
+            auto_publish_profiles(
+                locking_queryset,
+                user=self._reviewer(),
+                note="must not evaluate outside atomic",
+            )
+        self.assertIsNone(locking_queryset._result_cache)
+
+    def test_atomic_exit_failure_is_counted_only_as_error(self):
+        from contextlib import contextmanager
+        from unittest import mock
+
+        from stable.services import horse_profile_publish as publish_module
+
+        profile = self._verified_profile()
+
+        @contextmanager
+        def deferred_commit_failure(*args, **kwargs):
+            yield
+            raise RuntimeError("deferred commit failed")
+
+        with mock.patch.object(
+            publish_module.transaction,
+            "atomic",
+            side_effect=deferred_commit_failure,
+        ):
+            report = auto_publish_profiles(
+                [profile.pk],
+                user=self._reviewer(),
+                note="deferred commit failure",
+            )
+        self.assertEqual(report["published"], 0)
+        self.assertEqual(report["published_profile_ids"], [])
+        self.assertEqual(
+            report["errors"],
+            [{"profile_id": profile.pk, "error": "deferred commit failed"}],
+        )
+
 
 class StockPublishChannelTests(PublishTestBase):
     def setUp(self):

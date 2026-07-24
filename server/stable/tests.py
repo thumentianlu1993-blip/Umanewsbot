@@ -11370,20 +11370,20 @@ class AutomationFlowTests(TestCase):
         )
         japanese_article = self._translated_article(
             source_article_id="ja-language-term-isolation",
-            title_ja="Derby preview for International Star",
-            translated_title_zh="Derby preview for International Star",
-            body_ja_raw="Derby preview for International Star.",
-            body_ja_normalized="Derby preview for International Star.",
-            translated_body_zh="Derby preview for International Star.",
+            title_ja="Derby preview after International Star won",
+            translated_title_zh="Derby preview after International Star won",
+            body_ja_raw="International Star won before the Derby preview.",
+            body_ja_normalized="International Star won before the Derby preview.",
+            translated_body_zh="International Star won before the Derby preview.",
         )
         english_article = self._translated_article(
             source_article_id="en-language-term-isolation",
             source_language=SourceLanguage.ENGLISH,
-            title_ja="Derby preview for International Star",
-            translated_title_zh="Derby preview for International Star",
-            body_ja_raw="Derby preview for International Star.",
-            body_ja_normalized="Derby preview for International Star.",
-            translated_body_zh="Derby preview for International Star.",
+            title_ja="Derby preview after International Star won",
+            translated_title_zh="Derby preview after International Star won",
+            body_ja_raw="International Star won before the Derby preview.",
+            body_ja_normalized="International Star won before the Derby preview.",
+            translated_body_zh="International Star won before the Derby preview.",
         )
 
         japanese_decision = score_article_for_automation(japanese_article)
@@ -11702,8 +11702,11 @@ class AutomationFlowTests(TestCase):
         self.assertEqual([issue["payload"]["source_ja"] for issue in blockers], ["Cody"])
         self.assertFalse(any(issue["code"] == "ambiguous_term_downgraded" for issue in outcome.issues))
 
-    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=["class", "content", "agent"])
-    def test_english_high_ambiguity_common_word_is_downgraded_from_blocker(self):
+    @override_settings(
+        ENGLISH_TERM_CONTEXT_MODE="enforce",
+        MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=["class", "content", "agent"],
+    )
+    def test_english_high_ambiguity_horse_match_is_audited_without_blocker(self):
         TermEntry.objects.create(
             term_type="horse",
             source_language=SourceLanguage.ENGLISH,
@@ -11730,13 +11733,24 @@ class AutomationFlowTests(TestCase):
 
         self.assertTrue(outcome.passed)
         self.assertFalse(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
-        downgraded = [issue for issue in outcome.issues if issue["code"] == "ambiguous_term_downgraded"]
-        self.assertTrue(downgraded)
-        self.assertIn(downgraded[0]["severity"], {"warning", "info"})
-        self.assertEqual(downgraded[0]["payload"]["source_ja"], "Class")
-        self.assertIn("high_ambiguity", downgraded[0]["payload"]["reason"])
+        classifications = [
+            item for item in outcome.details["english_term_classifications"]
+            if item.get("source_ja") == "Class"
+        ]
+        self.assertTrue(classifications)
+        self.assertTrue(all(item["classification"] == "uncertain" for item in classifications), classifications)
+        audits = [
+            issue for issue in outcome.issues
+            if issue["code"] == "english_horse_occurrence_uncertain"
+        ]
+        self.assertTrue(audits)
+        self.assertTrue(all(issue["severity"] == "info" for issue in audits))
+        self.assertFalse(any(issue["severity"] == "warning" for issue in outcome.issues))
 
-    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    @override_settings(
+        ENGLISH_TERM_CONTEXT_MODE="enforce",
+        MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[],
+    )
     def test_english_common_word_context_downgrades_review_seed_terms(self):
         for source_ja, target_zh in [
             ("Contact", "接触"),
@@ -11782,16 +11796,20 @@ class AutomationFlowTests(TestCase):
 
         self.assertTrue(outcome.passed)
         self.assertFalse(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
-        downgraded = [issue for issue in outcome.issues if issue["code"] == "english_term_common_word_downgraded"]
-        self.assertEqual({issue["payload"]["source_ja"] for issue in downgraded}, {"Contact", "Number", "Live", "Were", "AGENDA", "Tuesday"})
-        for issue in downgraded:
-            self.assertIn(issue["severity"], {"warning", "info"})
-            self.assertEqual(issue["payload"]["term_semantic_classification"], "common_word")
-            self.assertGreaterEqual(issue["payload"]["confidence"], 0.8)
-            self.assertTrue(issue["payload"]["classification_reason"])
-            self.assertTrue(issue["payload"]["matched_context"])
+        classifications = outcome.details["english_term_classifications"]
+        expected = {"Contact", "Number", "Live", "Were", "AGENDA", "Tuesday"}
+        self.assertEqual({item["source_ja"] for item in classifications}, expected)
+        for item in classifications:
+            self.assertEqual(item["classification"], "common_word")
+            self.assertGreaterEqual(item["confidence"], 0.8)
+            self.assertTrue(item["classification_reason"])
+            self.assertTrue(item["matched_context"])
+        self.assertFalse(any(issue["severity"] == "warning" for issue in outcome.issues))
 
-    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    @override_settings(
+        ENGLISH_TERM_CONTEXT_MODE="enforce",
+        MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[],
+    )
     def test_english_common_seed_with_race_marker_defaults_to_common_word_without_entity_context(self):
         TermEntry.objects.create(
             term_type="horse",
@@ -11819,13 +11837,18 @@ class AutomationFlowTests(TestCase):
 
         self.assertTrue(outcome.passed)
         self.assertFalse(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
-        downgraded = [issue for issue in outcome.issues if issue["code"] == "english_term_common_word_downgraded"]
-        self.assertEqual(len(downgraded), 1)
-        self.assertEqual(downgraded[0]["payload"]["source_ja"], "Classic")
-        self.assertEqual(downgraded[0]["payload"]["term_semantic_classification"], "common_word")
-        self.assertEqual(downgraded[0]["payload"]["classification_reason"], "ordinary_english_seed_default")
+        classifications = [
+            item for item in outcome.details["english_term_classifications"]
+            if item.get("source_ja") == "Classic"
+        ]
+        self.assertTrue(classifications)
+        self.assertTrue(all(item["classification"] == "common_word" for item in classifications))
+        self.assertFalse(any(issue["severity"] == "warning" for issue in outcome.issues))
 
-    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    @override_settings(
+        ENGLISH_TERM_CONTEXT_MODE="enforce",
+        MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[],
+    )
     def test_english_common_word_weak_racing_title_context_still_downgrades(self):
         for source_ja, target_zh in [
             ("Contact", "常联系"),
@@ -11865,9 +11888,13 @@ class AutomationFlowTests(TestCase):
 
         self.assertTrue(outcome.passed)
         self.assertFalse(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
-        downgraded = [issue for issue in outcome.issues if issue["code"] == "english_term_common_word_downgraded"]
-        self.assertEqual({issue["payload"]["source_ja"] for issue in downgraded}, {"Contact", "Live"})
-        self.assertEqual({issue["payload"]["term_semantic_classification"] for issue in downgraded}, {"common_word"})
+        classifications = [
+            item for item in outcome.details["english_term_classifications"]
+            if item.get("source_ja") in {"Contact", "Live"}
+        ]
+        self.assertEqual({item["source_ja"] for item in classifications}, {"Contact", "Live"})
+        self.assertEqual({item["classification"] for item in classifications}, {"common_word"})
+        self.assertFalse(any(issue["severity"] == "warning" for issue in outcome.issues))
 
     @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
     def test_english_common_word_seeds_stay_blocked_in_entity_context(self):
@@ -11913,11 +11940,9 @@ class AutomationFlowTests(TestCase):
         self.assertEqual({issue["payload"]["source_ja"] for issue in blockers}, {"Contact", "Live", "Action"})
         self.assertFalse(any(issue["code"] == "english_term_common_word_downgraded" for issue in outcome.issues))
         for issue in blockers:
-            self.assertEqual(issue["payload"]["term_semantic_classification"], "uncertain")
-            self.assertIn(
-                issue["payload"]["classification_reason"],
-                {"common_seed_entity_context", "common_seed_context_uncertain"},
-            )
+            self.assertEqual(issue["payload"]["term_semantic_classification"], "proper_noun")
+            self.assertEqual(issue["payload"]["classification"], "confirmed_horse")
+            self.assertTrue(issue["payload"]["classification_reason"])
 
     @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
     def test_english_proper_race_terms_still_block_with_semantic_payload(self):
@@ -11993,7 +12018,8 @@ class AutomationFlowTests(TestCase):
         self.assertFalse(outcome.passed)
         self.assertEqual({issue["payload"]["source_ja"] for issue in blockers}, {"Tuesday", "GOOD JOB", "Fast Track"})
         for issue in blockers:
-            self.assertEqual(issue["payload"]["term_semantic_classification"], "uncertain")
+            self.assertEqual(issue["payload"]["term_semantic_classification"], "proper_noun")
+            self.assertEqual(issue["payload"]["classification"], "confirmed_horse")
             self.assertTrue(issue["payload"]["classification_reason"])
 
     @override_settings(MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS=["google play", "トレセン"])
@@ -12220,7 +12246,10 @@ class AutomationFlowTests(TestCase):
         self.assertIn(rejected.id, payload["skipped"]["manual_terminal_state"])
         self.assertEqual(recent.automation_status, AutomationStatus.MANUAL_REVIEW_REQUIRED)
 
-    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    @override_settings(
+        ENGLISH_TERM_CONTEXT_MODE="enforce",
+        MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[],
+    )
     def test_reprocess_term_gate_blocked_articles_reports_common_word_downgrades_and_region_summary(self):
         TermEntry.objects.create(
             term_type="horse",
@@ -12262,7 +12291,7 @@ class AutomationFlowTests(TestCase):
         article.refresh_from_db()
         self.assertEqual(payload["candidate_ids"], [article.id])
         self.assertEqual(payload["revalidated_to_publish_ready_ids"], [article.id])
-        self.assertEqual(payload["summary"]["common_word_downgraded_count"], 1)
+        self.assertEqual(payload["summary"]["common_word_downgraded_count"], 9)
         self.assertEqual(payload["summary"]["proper_term_blocker_count"], 0)
         self.assertEqual(payload["summary_by_region"][RacingRegion.UNITED_KINGDOM]["revalidated_to_publish_ready_count"], 1)
         outcome = payload["outcomes"][0]
@@ -17166,6 +17195,194 @@ class P0HorseProfileDataCompletionTests(TestCase):
         self.assertNotIn("article_links", complete.blocking_reasons)
         self.assertFalse(missing_basic.is_complete)
         self.assertIn("basic_facts.breeder_name", missing_basic.blocking_reasons)
+
+    def test_reviewed_empty_major_wins_is_complete_but_unreviewed_or_conflicted_is_blocked(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import evaluate_full_profile_completeness
+
+        profile = self._profile()
+        self._complete_records(profile)
+        profile.race_records.filter(result_status=HorseRaceResultStatus.WON).update(
+            result_status=HorseRaceResultStatus.PLACED,
+            is_major_win=False,
+        )
+        HorseP0Source.objects.create(
+            profile=profile,
+            source_type="major_race_participant",
+            source_url="https://example.com/race",
+            observed_at=timezone.now(),
+            metadata={"race_grade": RaceGrade.G1},
+        )
+
+        unreviewed = evaluate_full_profile_completeness(
+            profile,
+            require_review=False,
+        )
+        HorseProfileDataCandidate.objects.create(
+            profile=profile,
+            module=HorseProfileModule.MAJOR_WINS,
+            source_name="test_manual_review",
+            source_url="https://example.com/review",
+            status=HorseProfileCandidateStatus.APPLIED,
+            confidence=100,
+            candidate_payload={
+                "payload": [],
+                "review": {"status": "approved", "confidence": 100},
+            },
+            applied_by=self.user,
+            applied_at=timezone.now(),
+        )
+        reviewed_empty = evaluate_full_profile_completeness(
+            profile,
+            require_review=False,
+        )
+        HorseProfileDataCandidate.objects.create(
+            profile=profile,
+            module=HorseProfileModule.MAJOR_WINS,
+            source_name="test_conflict",
+            source_url="https://example.com/conflict",
+            status=HorseProfileCandidateStatus.CONFLICT,
+            confidence=100,
+            candidate_payload=[],
+        )
+        conflicted = evaluate_full_profile_completeness(
+            profile,
+            require_review=False,
+        )
+        HorseProfileDataCandidate.objects.create(
+            profile=profile,
+            module=HorseProfileModule.MAJOR_WINS,
+            source_name="test_nonempty_review_without_records",
+            source_url="https://example.com/nonempty-review",
+            status=HorseProfileCandidateStatus.APPLIED,
+            confidence=100,
+            candidate_payload={
+                "payload": [{"race_name": "Missing Win"}],
+                "review": {"status": "approved", "confidence": 100},
+            },
+            applied_by=self.user,
+            applied_at=timezone.now(),
+        )
+        nonempty_without_record = evaluate_full_profile_completeness(
+            profile,
+            require_review=False,
+        )
+
+        self.assertIn("major_wins", unreviewed.blocking_reasons)
+        self.assertTrue(reviewed_empty.is_complete)
+        self.assertNotIn("major_wins", reviewed_empty.blocking_reasons)
+        self.assertIn("major_wins", conflicted.blocking_reasons)
+        self.assertIn(
+            "major_wins",
+            nonempty_without_record.blocking_reasons,
+        )
+
+    def test_reviewed_artifact_can_complete_a_horse_with_verified_empty_major_wins(self):
+        from stable.models import (
+            HorseCareerRecordAuthorityStatus,
+            HorseP0Source,
+        )
+        from stable.services.p0_horse_profiles import (
+            apply_reviewed_completion_artifact,
+            evaluate_full_profile_completeness,
+        )
+
+        profile = self._profile()
+        self._complete_records(profile)
+        profile.race_records.filter(result_status=HorseRaceResultStatus.WON).update(
+            result_status=HorseRaceResultStatus.PLACED,
+            is_major_win=False,
+        )
+        HorseP0Source.objects.create(
+            profile=profile,
+            source_type="major_race_participant",
+            source_url="https://example.com/race",
+            observed_at=timezone.now(),
+            metadata={"race_grade": RaceGrade.G1},
+        )
+
+        row = self._reviewed_artifact_row(profile)
+        row["career_history"] = {
+            "record_authority_status": (
+                HorseCareerRecordAuthorityStatus.SOURCE_RECORDS_VERIFIED
+            ),
+            "official_or_source_start_count": 2,
+            "official_start_count_source": "official",
+            "official_start_count_source_url": (
+                "https://example.com/official/horse/forever-young"
+            ),
+            "official_start_count_verified_at": timezone.now().isoformat(),
+            "gap_reasons": [],
+            "source_refs": {
+                "official": (
+                    "https://example.com/official/horse/forever-young"
+                )
+            },
+        }
+        summary = apply_reviewed_completion_artifact(
+            {
+                "reviewed": True,
+                "reviewer_id": self.user.id,
+                "rows": [row],
+            },
+            commit=True,
+        )
+        profile.refresh_from_db()
+
+        self.assertEqual(summary["applied_profiles"], 1)
+        self.assertEqual(profile.full_profile_reviewed_by, self.user)
+        self.assertIsNotNone(profile.full_profile_reviewed_at)
+        self.assertTrue(evaluate_full_profile_completeness(profile).is_complete)
+
+    def test_manual_ready_preserves_verified_empty_major_wins_evidence(self):
+        from stable.models import HorseP0Source
+        from stable.services.p0_horse_profiles import (
+            evaluate_full_profile_completeness,
+            mark_profile_completion_ready,
+        )
+
+        profile = self._profile()
+        self._complete_records(profile)
+        profile.race_records.filter(result_status=HorseRaceResultStatus.WON).update(
+            result_status=HorseRaceResultStatus.PLACED,
+            is_major_win=False,
+        )
+        profile.source_refs = {
+            "p0_completion": "https://example.com/horse-profile"
+        }
+        profile.save(update_fields=["source_refs", "updated_at"])
+        HorseP0Source.objects.create(
+            profile=profile,
+            source_type="major_race_participant",
+            source_url="https://example.com/race",
+            observed_at=timezone.now(),
+            metadata={"race_grade": RaceGrade.G1},
+        )
+        HorseProfileDataCandidate.objects.create(
+            profile=profile,
+            module=HorseProfileModule.MAJOR_WINS,
+            source_name="test_manual_review",
+            source_url="https://example.com/review",
+            status=HorseProfileCandidateStatus.APPLIED,
+            confidence=100,
+            candidate_payload={
+                "payload": [],
+                "review": {"status": "approved", "confidence": 100},
+            },
+            applied_by=self.user,
+            applied_at=timezone.now(),
+        )
+
+        result = mark_profile_completion_ready(profile, reviewer=self.user)
+        profile.refresh_from_db()
+        evaluation = evaluate_full_profile_completeness(profile)
+        latest_major_wins = profile.data_candidates.filter(
+            module=HorseProfileModule.MAJOR_WINS,
+        ).order_by("-fetched_at", "-id").first()
+
+        self.assertEqual(result["status"], "ready_for_manual_publish")
+        self.assertEqual(latest_major_wins.candidate_payload["payload"], [])
+        self.assertTrue(evaluation.is_complete)
 
     def test_ignored_new_suggestion_preserves_previous_applied_completeness(self):
         from stable.models import HorseP0Source

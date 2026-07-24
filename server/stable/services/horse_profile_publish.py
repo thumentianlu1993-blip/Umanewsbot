@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from django.db import transaction
+from django.db.models import QuerySet
 
 from stable.models import HorseProfile, HorseProfileStatus
 from stable.services.horse_profiles import transition_review_status
@@ -108,7 +109,7 @@ def evaluate_basic_publish_gate(profile: HorseProfile) -> PublishGateResult:
 
 
 def auto_publish_profiles(
-    profiles: Iterable[HorseProfile],
+    profiles: Iterable[HorseProfile | int],
     *,
     user: Any,
     note: str,
@@ -127,32 +128,52 @@ def auto_publish_profiles(
         "published_profile_ids": [],
         "errors": [],
     }
-    for profile in profiles:
+    if isinstance(profiles, QuerySet) and profiles.query.select_for_update:
+        raise P0HorsePublishError(
+            "auto publish accepts IDs or a non-locking queryset only"
+        )
+    profile_ids = [
+        int(profile.pk if isinstance(profile, HorseProfile) else profile)
+        for profile in profiles
+    ]
+    for profile_id in profile_ids:
         try:
-            if profile.review_status == HorseProfileStatus.PUBLISHED:
+            outcome: tuple[str, Any]
+            # PostgreSQL requires the locking read to be evaluated inside the
+            # transaction. Re-read and re-check the gate under that row lock.
+            with transaction.atomic():
+                profile = HorseProfile.objects.select_for_update().get(
+                    pk=profile_id
+                )
+                if profile.review_status == HorseProfileStatus.PUBLISHED:
+                    outcome = ("skipped", None)
+                else:
+                    gate = evaluate_basic_publish_gate(profile)
+                    if not gate.eligible:
+                        outcome = ("blocked", gate.blocking_reasons)
+                    else:
+                        transition_review_status(
+                            profile,
+                            HorseProfileStatus.PUBLISHED,
+                            user=user,
+                            note=note,
+                        )
+                        outcome = ("published", profile.pk)
+            if outcome[0] == "skipped":
                 report["skipped_already_published"] += 1
-                continue
-            gate = evaluate_basic_publish_gate(profile)
-            if not gate.eligible:
+            elif outcome[0] == "blocked":
                 report["blocked"] += 1
-                for reason in gate.blocking_reasons:
+                for reason in outcome[1]:
                     report["blocked_reasons"][reason] = (
                         report["blocked_reasons"].get(reason, 0) + 1
                     )
-                continue
-            # save + OperationLog must commit together: a published profile
-            # without its audit entry must never be left behind.
-            with transaction.atomic():
-                transition_review_status(
-                    profile,
-                    HorseProfileStatus.PUBLISHED,
-                    user=user,
-                    note=note,
-                )
-            report["published"] += 1
-            report["published_profile_ids"].append(profile.pk)
+            else:
+                report["published"] += 1
+                report["published_profile_ids"].append(outcome[1])
         except Exception as exc:  # noqa: BLE001 - per-profile isolation
-            report["errors"].append({"profile_id": profile.pk, "error": str(exc)})
+            report["errors"].append(
+                {"profile_id": profile_id, "error": str(exc)}
+            )
     return report
 
 
@@ -335,11 +356,11 @@ def commit_approved_publish_manifest(
         errors: list[dict[str, Any]] = []
         for start in range(0, len(region_candidates), PUBLISH_COMMIT_CHUNK_SIZE):
             chunk = region_candidates[start : start + PUBLISH_COMMIT_CHUNK_SIZE]
-            with transaction.atomic():
-                profiles = HorseProfile.objects.select_for_update().filter(
-                    pk__in=[c["profile_id"] for c in chunk]
-                )
-                chunk_report = auto_publish_profiles(profiles, user=reviewer, note=note)
+            chunk_report = auto_publish_profiles(
+                [c["profile_id"] for c in chunk],
+                user=reviewer,
+                note=note,
+            )
             published += chunk_report["published"]
             skipped += chunk_report["skipped_already_published"]
             blocked += chunk_report["blocked"]

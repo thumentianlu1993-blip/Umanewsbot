@@ -16,6 +16,8 @@ from django.core.management.base import BaseCommand, CommandError
 from stable.services.p0_horse_completion_batch import (
     P0HorseBatchError,
     approve_batch_manifest,
+    batch_execution_window,
+    batch_serial_window,
     default_batch_state_dir,
     select_p0_horse_batch,
     validate_approved_batch_manifest,
@@ -33,6 +35,7 @@ class Command(BaseCommand):
         stages.add_argument("--validate", metavar="MANIFEST_PATH")
         stages.add_argument("--prepare", metavar="MANIFEST_PATH")
         stages.add_argument("--bundle", metavar="MANIFEST_PATH")
+        stages.add_argument("--prepare-release", metavar="MANIFEST_PATH")
         stages.add_argument("--commit", metavar="MANIFEST_PATH")
         stages.add_argument("--retry-publish", metavar="MANIFEST_PATH")
         stages.add_argument("--abandon", metavar="MANIFEST_PATH")
@@ -49,6 +52,7 @@ class Command(BaseCommand):
         parser.add_argument("--region", default="")
         parser.add_argument("--reviewer-id", type=int, default=None)
         parser.add_argument("--approved-by", default="")
+        parser.add_argument("--release-candidate-sha256", default="")
         parser.add_argument("--racing-career-status", default="active")
         parser.add_argument("--allow-network", action="store_true")
         parser.add_argument("--confirm-reviewed-artifact", action="store_true")
@@ -66,6 +70,8 @@ class Command(BaseCommand):
                 result = self._prepare(options)
             elif options["bundle"]:
                 result = self._bundle(options)
+            elif options["prepare_release"]:
+                result = self._prepare_release(options)
             elif options["commit"]:
                 result = self._commit(options)
             elif options["retry_publish"]:
@@ -167,25 +173,30 @@ class Command(BaseCommand):
             raise CommandError(
                 "network prepare requires HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true"
             )
-        summary = prepare_p0_horse_batch(
-            options["prepare"],
-            expected_sha256=options["expected_sha256"],
-            allow_network=allow_network,
-        )
-        manifest = load_batch_manifest(options["prepare"])
-        review_output_dir = getattr(
-            settings,
-            "HORSE_PROFILE_COMPLETION_REVIEW_OUTPUT_DIR",
-            "runtime/horse_profile_completion/review",
-        )
-        workbook_path = build_batch_review_workbook(
-            manifest=manifest,
-            artifact_dir=Path(options["prepare"]).parent / "artifact",
-            output_path=Path(review_output_dir) / f"{manifest['batch_id']}.xlsx",
-        )
-        summary["stage"] = "prepare"
-        summary["review_workbook"] = str(workbook_path)
-        summary["allow_network"] = allow_network
+        batch_dir = Path(options["prepare"]).parent
+        with batch_execution_window(batch_dir):
+            with batch_serial_window(default_batch_state_dir()):
+                summary = prepare_p0_horse_batch(
+                    options["prepare"],
+                    expected_sha256=options["expected_sha256"],
+                    allow_network=allow_network,
+                )
+                manifest = load_batch_manifest(options["prepare"])
+                review_output_dir = getattr(
+                    settings,
+                    "HORSE_PROFILE_COMPLETION_REVIEW_OUTPUT_DIR",
+                    "runtime/horse_profile_completion/review",
+                )
+                workbook_path = build_batch_review_workbook(
+                    manifest=manifest,
+                    artifact_dir=batch_dir / "artifact",
+                    output_path=(
+                        Path(review_output_dir) / f"{manifest['batch_id']}.xlsx"
+                    ),
+                )
+                summary["stage"] = "prepare"
+                summary["review_workbook"] = str(workbook_path)
+                summary["allow_network"] = allow_network
         self.stdout.write(
             f"batch {manifest['batch_id']} prepared: "
             f"{summary['totals']['succeeded']}/{summary['totals']['horses']} horses, "
@@ -213,36 +224,37 @@ class Command(BaseCommand):
         if reviewer is None or not reviewer.is_active or not reviewer.is_superuser:
             raise CommandError("reviewer must be an active superuser")
         batch_dir = Path(options["bundle"]).parent
-        research = build_region_research_v3(
-            batch_dir / "artifact",
-            region=region,
-        )
-        research_path, _ = write_region_research(
-            research,
-            output_dir=batch_dir / "approval",
-            region=region,
-        )
-        bundle = build_region_approval_bundle(
-            research_path=research_path,
-            region=region,
-            reviewer=reviewer,
-            output_dir=batch_dir / "approval",
-            batch_dir=batch_dir,
-            racing_career_status=options["racing_career_status"],
-        )
-        state = BatchRunState.read(batch_dir)
-        state.artifacts[f"bundle:{region}"] = {
-            "research_path": str(bundle["research_path"]),
-            "research_sha256": bundle["research_sha256"],
-            "mapping_path": str(bundle["mapping_path"]),
-            "mapping_sha256": bundle["mapping_sha256"],
-            "authority_path": str(bundle["authority_path"]),
-            "authority_sha256": bundle["authority_sha256"],
-        }
-        stage_name = f"review:{region}"
-        if stage_name not in state.completed_stages:
-            state.completed_stages.append(stage_name)
-        state.write()
+        with batch_serial_window(default_batch_state_dir()):
+            research = build_region_research_v3(
+                batch_dir / "artifact",
+                region=region,
+            )
+            research_path, _ = write_region_research(
+                research,
+                output_dir=batch_dir / "approval",
+                region=region,
+            )
+            bundle = build_region_approval_bundle(
+                research_path=research_path,
+                region=region,
+                reviewer=reviewer,
+                output_dir=batch_dir / "approval",
+                batch_dir=batch_dir,
+                racing_career_status=options["racing_career_status"],
+            )
+            state = BatchRunState.read(batch_dir)
+            state.artifacts[f"bundle:{region}"] = {
+                "research_path": str(bundle["research_path"]),
+                "research_sha256": bundle["research_sha256"],
+                "mapping_path": str(bundle["mapping_path"]),
+                "mapping_sha256": bundle["mapping_sha256"],
+                "authority_path": str(bundle["authority_path"]),
+                "authority_sha256": bundle["authority_sha256"],
+            }
+            stage_name = f"review:{region}"
+            if stage_name not in state.completed_stages:
+                state.completed_stages.append(stage_name)
+            state.write()
         result = {
             "stage": "bundle",
             "region": region,
@@ -275,11 +287,17 @@ class Command(BaseCommand):
         approved_by = str(options["approved_by"] or "").strip()
         if not approved_by:
             raise CommandError("--commit requires --approved-by")
+        release_candidate_sha256 = str(
+            options["release_candidate_sha256"] or ""
+        ).strip()
+        if not release_candidate_sha256:
+            raise CommandError("--commit requires --release-candidate-sha256")
         result = commit_p0_horse_batch_region(
             options["commit"],
             region=region,
             reviewer=reviewer,
             approved_by=approved_by,
+            release_candidate_sha256=release_candidate_sha256,
             state_dir=default_batch_state_dir(),
             confirm_reviewed_artifact=options["confirm_reviewed_artifact"],
         )
@@ -287,6 +305,35 @@ class Command(BaseCommand):
         self.stdout.write(
             f"batch region {region} committed; idempotent verification "
             f"passed={result['idempotent_verification']['passed']}"
+        )
+        return result
+
+    def _prepare_release(self, options) -> dict:
+        from django.contrib.auth import get_user_model
+
+        from stable.services.p0_horse_completion_commit import (
+            prepare_p0_horse_batch_release_candidate,
+        )
+
+        region = str(options["region"] or "").strip()
+        if not region:
+            raise CommandError("--prepare-release requires --region")
+        reviewer_id = options["reviewer_id"]
+        if reviewer_id is None:
+            raise CommandError("--prepare-release requires --reviewer-id")
+        reviewer = get_user_model().objects.filter(pk=reviewer_id).first()
+        if reviewer is None or not reviewer.is_active or not reviewer.is_superuser:
+            raise CommandError("reviewer must be an active superuser")
+        result = prepare_p0_horse_batch_release_candidate(
+            options["prepare_release"],
+            region=region,
+            reviewer=reviewer,
+            state_dir=default_batch_state_dir(),
+        )
+        result["stage"] = "prepare-release"
+        self.stdout.write(
+            f"batch region {region} release candidate prepared: "
+            f"{result['release_candidate_sha256']}"
         )
         return result
 
@@ -321,22 +368,33 @@ class Command(BaseCommand):
         from stable.services.p0_horse_completion_batch import (
             BatchRunState,
             abandon_batch_run,
+            batch_execution_window,
+            ensure_batch_can_be_abandoned,
             load_batch_manifest,
             mark_batch_manifest_status,
         )
 
         manifest_path = Path(options["abandon"])
-        state_file = manifest_path.parent / "state.json"
-        if state_file.exists():
-            state = BatchRunState.read(manifest_path.parent)
-        else:
-            manifest = load_batch_manifest(manifest_path)
-            state = BatchRunState.create(
-                batch_id=manifest["batch_id"],
-                run_dir=manifest_path.parent,
-            )
-        abandon_batch_run(state, reason=options["note"])
-        manifest = mark_batch_manifest_status(manifest_path, status="abandoned")
+        with batch_execution_window(manifest_path.parent):
+            with batch_serial_window(default_batch_state_dir()):
+                manifest = load_batch_manifest(manifest_path)
+                if manifest.get("status") == "committed":
+                    raise P0HorseBatchError(
+                        "committed batch manifest cannot be abandoned"
+                    )
+                state_file = manifest_path.parent / "state.json"
+                if state_file.exists():
+                    state = BatchRunState.read(manifest_path.parent)
+                else:
+                    state = BatchRunState.create(
+                        batch_id=manifest["batch_id"],
+                        run_dir=manifest_path.parent,
+                    )
+                ensure_batch_can_be_abandoned(manifest, state)
+                abandon_batch_run(state, reason=options["note"])
+                manifest = mark_batch_manifest_status(
+                    manifest_path, status="abandoned"
+                )
         result = {
             "stage": "abandon",
             "batch_id": manifest["batch_id"],

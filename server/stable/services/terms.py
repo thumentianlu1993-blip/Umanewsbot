@@ -10,8 +10,19 @@ from typing import Callable
 from django.db import connection
 from django.db.models import Q
 from django.db.models.functions import Lower
+from django.utils.html import strip_tags
 
-from stable.models import ExternalHorseAlias, NewsArticle, SourceLanguage, TermAlias, TermEntry, TermType
+from stable.models import (
+    ArticleRaceLinkStatus,
+    ExternalHorseAlias,
+    NewsArticle,
+    RaceEventResult,
+    RaceEventRunner,
+    SourceLanguage,
+    TermAlias,
+    TermEntry,
+    TermType,
+)
 
 
 @dataclass
@@ -45,6 +56,11 @@ class RecognizedHorseName:
     first_position: int
     detection_reason: str
     conflict_flags: list[str]
+    source_field: str = ""
+    matched_span: tuple[int, int] = ()
+    matched_context: str = ""
+    classification: str = ""
+    reason: str = ""
 
 
 @dataclass
@@ -64,10 +80,17 @@ class ArticleEntity:
     external_horse_ids: list[str] | None = None
     priority: int = 0
     term_type: str = ""
+    classification: str = ""
+    reason: str = ""
+    matched_context: str = ""
+    entity_evidence: list[str] | None = None
 
     def as_dict(self) -> dict:
         payload = asdict(self)
         payload["external_horse_ids"] = list(self.external_horse_ids or [])
+        payload["entity_evidence"] = list(self.entity_evidence or self.evidence)
+        payload["matched_span"] = [self.start, self.end]
+        payload["primary_external_horse_id"] = (self.external_horse_ids or [""])[0]
         return payload
 
 
@@ -81,7 +104,11 @@ class ArticleEntityResolution:
 
     @property
     def accepted_term_ids(self) -> set[int]:
-        return {item.term_id for item in self.entities if item.term_id and item.entity_type != "common_word"}
+        return {
+            item.term_id
+            for item in self.entities
+            if item.term_id and item.entity_type not in {"common_word", "ambiguous"}
+        }
 
     def as_dict(self) -> dict:
         return {
@@ -112,6 +139,31 @@ def _dedupe_source_terms(values: Iterable[str]) -> list[str]:
         seen.add(term)
         terms.append(term)
     return terms
+
+
+def clean_visible_source_text(text: str) -> str:
+    """Return the existing publish-gate visible-text representation."""
+    cleaned = text or ""
+    for tag in ("script", "style", "nav", "aside"):
+        cleaned = re.sub(
+            rf"<{tag}\b[^>]*>.*?</{tag}>",
+            " ",
+            cleaned,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+    cleaned = strip_tags(cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def visible_source_parts(article: NewsArticle) -> tuple[str, str]:
+    title = article.title_ja or ""
+    body = article.body_ja_normalized or article.body_ja_raw or ""
+    if (article.source_language or SourceLanguage.JAPANESE) != SourceLanguage.ENGLISH:
+        return title, body
+    return (
+        clean_visible_source_text(title),
+        clean_visible_source_text(body),
+    )
 
 
 def _alias_texts_by_term(source_language: str | None = None, term_ids: Iterable[int] | None = None) -> dict[int, list[str]]:
@@ -145,9 +197,15 @@ def _entry_source_terms(
     return _dedupe_source_terms(values)
 
 
-def _normalized_term_candidate(value: str) -> str:
+def normalize_horse_entity_key(value: str) -> str:
+    """Return the shared deterministic key for horse names and evidence."""
     normalized = unicodedata.normalize("NFKC", value or "").replace("’", "'").replace("‘", "'")
     return " ".join(normalized.casefold().split())
+
+
+# Compatibility for private callers while all cross-service code imports the
+# public helper above.
+_normalized_term_candidate = normalize_horse_entity_key
 
 
 def _term_query_key_variants(value: str) -> set[str]:
@@ -267,14 +325,16 @@ _ENGLISH_PERSON_ROLE_RE = re.compile(
     re.IGNORECASE,
 )
 _ENGLISH_STRONG_HORSE_AFTER_RE = re.compile(
-    r"^\s*(?:\([A-Z]{2,3}\)|,?\s*(?:colt|filly|gelding|mare|horse)\b|"
-    r"(?:wins?|won|finished|runs?|ran|returns?|heads?|targets?|entered|defeated|is\s+trained|was\s+ridden|"
-    r"will\s+(?:run|target|race|start)|is\s+entered)\b)",
+    r"^\s*(?:\([A-Z]{2,3}\)|,?\s*(?:colt|filly|gelding|mare|horse|stallion|broodmare)\b|"
+    r"(?:wins?|won|finished|runs?|ran|returns?|heads?|targets?|aims?|entered|defeated|is\s+trained|was\s+ridden|"
+    r"will\s+(?:run|target|race|start)|is\s+entered|"
+    r"(?:is|was)\s+too\s+strong\s+in\s+the\s+(?:closing|final)\s+stages)\b|"
+    r",\s*(?:ridden|trained)\s+by\b)",
     re.IGNORECASE,
 )
 _ENGLISH_STRONG_HORSE_BEFORE_RE = re.compile(
-    r"(?:(?:^|\b)(?:stall|draw|odds|sire|dam|runner|horse|filly|colt|gelding|mare)\s*(?:[:#-]|\s)\s*|"
-    r"(?:^|\n)\s*\d+\s+|\binner\s+)$",
+    r"(?:(?:^|\b)(?:stall|draw|odds|sire|dam|runner|horse|filly|colt|gelding|mare|stallion|broodmare)\s*(?:[:#-]|\s)\s*|"
+    r"(?:^|\n)\s*\d+\s+|\binner\s+|\bwinner(?:-turned)?-(?:stallion|mare)\s+)$",
     re.IGNORECASE,
 )
 
@@ -286,6 +346,8 @@ def _entity_candidate_keys(text: str, source_language: str) -> set[str]:
             unicodedata.normalize("NFKC", text or ""),
         )
         keys: set[str] = set()
+        for word in words:
+            keys.update(part.casefold() for part in re.split(r"[-.]", word) if part)
         for start in range(len(words)):
             for end in range(start + 1, min(len(words), start + 6) + 1):
                 keys.add(" ".join(words[start:end]).casefold())
@@ -435,29 +497,170 @@ def _english_strong_horse_context(text: str, start: int, end: int) -> bool:
     return False
 
 
-def _english_title_proper_horse_context(field_name: str, matched_text: str) -> bool:
-    if field_name != "title":
-        return False
-    words = re.findall(r"[A-Za-z][A-Za-z'’.-]*", matched_text or "")
-    return (
-        len(words) >= 2
-        and all(word[:1].isupper() for word in words)
-        and _normalized_term_candidate(matched_text) not in ENGLISH_COMMON_WORD_TERM_SEEDS
+@dataclass(frozen=True)
+class EnglishHorseOccurrenceDecision:
+    classification: str
+    reason: str
+    confidence: int
+    evidence: tuple[str, ...] = ()
+
+
+def _english_ordinary_context(text: str, start: int, end: int) -> str:
+    """Return a grammatical reason for an ordinary-use occurrence, if proven.
+
+    These are syntax/phrase-shape rules rather than a horse-name stop list.  They
+    intentionally inspect only the current occurrence's sentence-sized window.
+    """
+    before = text[max(0, start - 48) : start]
+    after = text[end : min(len(text), end + 64)]
+    matched = text[start:end]
+    local = f"{before[-32:]}<{matched}>{after[:40]}"
+    rules = (
+        (r"\b(?:include[ds]?|including|across|throughout)\s+(?:the\s+)?[^<>]{0,30}<[^>]+>(?:\s*,|\s+and\b)", "geographic_or_business_enumeration"),
+        (r"\b(?:a|an|the)\s+(?:fair|large|small|considerable|significant|substantial|certain|particular)\s+<[^>]+>\s+of\b", "ordinary_quantity_noun"),
+        (r"\b(?:a|an|the)\s+(?:particular|special|strong|renewed)?\s*<[^>]+>\s+on\b", "ordinary_prepositional_noun"),
+        (r"\b(?:a|an|the|his|her|their)\s+<[^>]+>\s+to\s+[a-z]", "ordinary_purpose_noun"),
+        (r"\b(?:beer|tax|customs?|import|export)\s+<[^>]+>(?:\s|$)", "ordinary_policy_noun"),
+        (r"\b(?:and|to|will|would|can|could|should|must)\s+<[^>]+>\s+(?:with|to|the|a|an)\b", "ordinary_verb_context"),
+        (r"\b(?:has|have|had|was|were|is|are)\s+<[^>]+>\s+(?:a|an|the|to|into|across|for|at|after|before)\b", "ordinary_predicate_context"),
+        (r"\b(?:role|remit|scope|business|company|organisation|organization|team|plan|work)\s+[^<>]{0,12}<[^>]+>\s+(?:to|into|across|for)\b", "ordinary_business_description"),
+        (r"\b(?:a|an|the)\s+<[^>]+>\s+(?:performance|effort|job|idea|plan|change|review|update)\b", "ordinary_adjective_context"),
+        (r"\b(?:a|an|the)\s+<[^>]+>\s+(?:filly|colt|mare|gelding|horse|crowd|season|meeting)\b", "ordinary_adjective_context"),
+        (r"\b(?:as|too|very|quite|rather|so)\s+<[^>]+>(?:\s+to\b|\s+after\b|[,.])", "ordinary_predicate_adjective"),
+        (r"\b(?:with|posed?|seeking|another|huge|great|serious|major)\s+(?:a|an|the|another)?\s*<[^>]+>(?:\s|[,.])", "ordinary_abstract_noun"),
+        (r"\b(?:has|have|had)\s+<[^>]+>\s+to\b", "ordinary_adverb_context"),
+        (r"(?:^|[.!?]\s*)<[^>]+>\s+(?:went|goes|seems|appears|happened)\b", "ordinary_clause_subject"),
+        (r"\b\d+(?:\s+\d+/\d+)?\s+<[^>]+>(?:\s|$)", "ordinary_measurement_unit"),
+        (r"<[^>]+>\s+(?:work|job|effort|performance|idea|plan|change)\b", "ordinary_adjective_phrase"),
+        (r"<[^>]+>\s*-\s*(?:class|level|quality|flight)\b", "ordinary_compound_modifier"),
+        (r"\b(?:done|doing|do|did|good|great|important|valuable|hard|their|his|her|our)\s+(?:\w+\s+){0,2}<[^>]+>(?:\s+(?:already|currently|together|underway|on|for)\b|[,.])", "ordinary_work_noun"),
+        (r"<[^>]+>\s+(?:already\s+)?(?:underway|together|continues?|begins?|starts?)\b", "ordinary_subject_noun"),
+        (r"\bto\s+<[^>]+>\b[^.!?]{0,36}\bup\b", "ordinary_phrasal_verb"),
     )
+    for pattern, reason in rules:
+        if re.search(pattern, local, re.IGNORECASE):
+            return reason
+    return ""
 
 
-def _english_candidate_strong_horse_context(
+def classify_english_horse_occurrence(
     text: str,
     field_name: str,
     start: int,
     end: int,
-    matched_text: str,
-) -> bool:
-    if _normalized_term_candidate(matched_text) == "nyra":
-        return False
-    return _english_strong_horse_context(text, start, end) or _english_title_proper_horse_context(
-        field_name, matched_text
+    *,
+    structured_evidence: Iterable[str] = (),
+    structured_identity_is_unique: bool = True,
+) -> EnglishHorseOccurrenceDecision:
+    evidence = tuple(structured_evidence)
+    matched_text = text[start:end]
+    matched_key = _normalized_term_candidate(text[start:end])
+    after = text[end : min(len(text), end + 64)]
+    ordinary_reason = _english_ordinary_context(text, start, end)
+    copular_repeat = re.match(
+        rf"\s+was\s+({re.escape(text[start:end])})\b", after, re.IGNORECASE
     )
+    if (
+        copular_repeat
+        and re.search(
+            r"\b(?:the|this) horse\s+(?:wins?|won|finished|runs?|ran|returns?)\b",
+            text[
+                end + copular_repeat.end() : min(
+                    len(text), end + copular_repeat.end() + 96
+                )
+            ],
+            re.IGNORECASE,
+        )
+    ):
+        return EnglishHorseOccurrenceDecision(
+            "confirmed_horse",
+            "proper_name_copular_adjective_contrast",
+            92,
+            ("proper_name_copular_adjective_contrast",),
+        )
+    if (
+        ordinary_reason == "ordinary_adjective_context"
+        and matched_text[:1].islower()
+    ):
+        return EnglishHorseOccurrenceDecision(
+            "common_word",
+            ordinary_reason,
+            95,
+            (ordinary_reason,),
+        )
+    if re.match(
+        r"\s+(?:filly|colt|mare|gelding|horse|stallion|broodmare)\s+"
+        r"(?:wins?|won|finished|runs?|ran|returns?|heads?|targets?|aims?|entered|defeated|starts?|"
+        r"(?:is|was)\s+(?:trained|ridden)\s+by)\b",
+        after,
+        re.IGNORECASE,
+    ) or re.match(
+        r"\s+(?:filly|colt|mare|gelding|horse|stallion|broodmare)\s*,\s*"
+        r"(?:trained|ridden)\s+by\b",
+        after,
+        re.IGNORECASE,
+    ) or re.match(
+        r"\s+(?:is|was)\s+(?:(?:a|an|the)\s+)?(?:[a-z][a-z'’-]*\s+){0,2}"
+        r"(?:filly|colt|mare|gelding|horse|stallion|broodmare)"
+        r"(?:\s*,?\s*(?:who|that|which|and)\s+|\s*,\s*)"
+        r"(?:wins?|won|finished|runs?|ran|returns?|heads?|targets?|aims?|entered|defeated|starts?|"
+        r"(?:is|was)\s+(?:trained|ridden)\s+by)\b",
+        after,
+        re.IGNORECASE,
+    ) or re.match(
+        r"\s*,\s*(?:(?:a|an|the)\s+)?(?:[a-z][a-z'’-]*\s+){0,2}"
+        r"(?:filly|colt|mare|gelding|horse|stallion|broodmare)\s*,\s*"
+        r"(?:wins?|won|finished|runs?|ran|returns?|heads?|targets?|aims?|entered|defeated|starts?|"
+        r"(?:is|was)\s+(?:trained|ridden)\s+by)\b",
+        after,
+        re.IGNORECASE,
+    ):
+        return EnglishHorseOccurrenceDecision(
+            "confirmed_horse",
+            "horse_entity_noun_race_relation",
+            97,
+            ("horse_entity_noun", "strong_horse_context"),
+        )
+    if (
+        matched_text[:1].isupper()
+        and re.match(
+            r"\s+(?:runner|colt|filly|mare|gelding|horse|stallion|broodmare)\b",
+            after,
+            re.IGNORECASE,
+        )
+    ):
+        return EnglishHorseOccurrenceDecision(
+            "confirmed_horse",
+            "horse_entity_noun_context",
+            95,
+            ("horse_entity_noun",),
+        )
+    if evidence and re.match(
+        (
+            r"\s+to\s+(?:win|contest|run\s+in|race\s+in|target)\s+"
+            r"(?:the\s+)?(?:race|racecard|field|meeting|derby|classic)\b"
+        ),
+        after,
+        re.IGNORECASE,
+    ):
+        return EnglishHorseOccurrenceDecision(
+            "confirmed_horse",
+            "structured_entity_local_race_relation",
+            100,
+            (*evidence, "local_race_relation"),
+        )
+    if ordinary_reason:
+        return EnglishHorseOccurrenceDecision("common_word", ordinary_reason, 95, (ordinary_reason,))
+    if evidence and structured_identity_is_unique:
+        return EnglishHorseOccurrenceDecision("confirmed_horse", "structured_race_entity", 100, evidence)
+    if _english_strong_horse_context(text, start, end):
+        if matched_key == "nyra":
+            return EnglishHorseOccurrenceDecision("common_word", "organization_acronym", 99, ("organization_acronym",))
+        return EnglishHorseOccurrenceDecision("confirmed_horse", "strong_horse_context", 96, ("strong_horse_context",))
+    seed_key = re.sub(r"^(?:the|a|an)\s+", "", matched_key)
+    if matched_key in ENGLISH_COMMON_WORD_TERM_SEEDS or seed_key in ENGLISH_COMMON_WORD_TERM_SEEDS:
+        return EnglishHorseOccurrenceDecision("common_word", "reviewed_common_word_context", 90, ("reviewed_common_word_context",))
+    return EnglishHorseOccurrenceDecision("uncertain", "lexical_horse_index_only", 45, ("lexical_horse_index",))
 
 
 def _person_term_lookup(entries: list[TermEntry]) -> dict[str, TermEntry]:
@@ -483,6 +686,10 @@ def _make_entity(
     needs_preserve: bool = False,
     term: TermEntry | None = None,
     external_horse_ids: Iterable[str] = (),
+    classification: str = "",
+    reason: str = "",
+    matched_context: str = "",
+    entity_evidence: Iterable[str] = (),
 ) -> ArticleEntity:
     return ArticleEntity(
         entity_type=entity_type,
@@ -500,6 +707,10 @@ def _make_entity(
         external_horse_ids=list(external_horse_ids),
         priority=term.priority if term else 0,
         term_type=term.term_type if term else "",
+        classification=classification,
+        reason=reason,
+        matched_context=matched_context,
+        entity_evidence=list(entity_evidence),
     )
 
 
@@ -510,11 +721,57 @@ def _resolve_english_entities(
     entries: list[TermEntry],
     terms_by_entry: dict[int, list[str]],
     external_aliases: list[ExternalHorseAlias],
+    structured_entities: dict[str, list[str]] | None = None,
 ) -> tuple[list[ArticleEntity], list[ArticleEntity]]:
     fields = (("title", title), ("body", body))
     entities: list[ArticleEntity] = []
     suppressed: list[ArticleEntity] = []
     person_terms = _person_term_lookup(entries)
+    structured_entities = structured_entities or {}
+    structured_occurrence_counts = {
+        key: sum(
+            1
+            for _, candidate_text in fields
+            for _ in _iter_candidate_matches(
+                candidate_text,
+                key,
+                SourceLanguage.ENGLISH,
+            )
+        )
+        for key in structured_entities
+    }
+
+    def decision_for(text: str, field_name: str, match) -> EnglishHorseOccurrenceDecision:
+        key = normalize_horse_entity_key(match.group(0))
+        structured_evidence = tuple(structured_entities.get(key, ()))
+        decision = classify_english_horse_occurrence(
+            text,
+            field_name,
+            match.start(),
+            match.end(),
+            structured_evidence=structured_evidence,
+            structured_identity_is_unique=(
+                structured_occurrence_counts.get(key, 0) <= 1
+            ),
+        )
+        if (
+            structured_evidence
+            and decision.classification == "confirmed_horse"
+        ):
+            return EnglishHorseOccurrenceDecision(
+                decision.classification,
+                decision.reason,
+                max(decision.confidence, 100),
+                tuple(
+                    dict.fromkeys(
+                        (*decision.evidence, *structured_evidence)
+                    )
+                ),
+            )
+        return decision
+
+    def context_for(text: str, start: int, end: int) -> str:
+        return text[max(0, start - 60) : min(len(text), end + 60)].strip()
 
     for field_name, text in fields:
         for entry in entries:
@@ -668,22 +925,27 @@ def _resolve_english_entities(
                         )
                         continue
                     if entry.term_type == TermType.HORSE:
-                        strong = _english_candidate_strong_horse_context(
-                            text, field_name, match.start(), match.end(), match.group(0)
-                        )
+                        decision = decision_for(text, field_name, match)
                         entities.append(
                             _make_entity(
-                                "horse" if strong else "common_word",
+                                "horse" if decision.classification == "confirmed_horse" else (
+                                    "common_word" if decision.classification == "common_word" else "ambiguous"
+                                ),
                                 match.group(0),
                                 field_name,
                                 match.start(),
                                 match.end(),
                                 canonical_text=entry.source_ja,
                                 target_zh=entry.target_zh,
-                                confidence=95 if strong else 90,
-                                evidence=["strong_horse_context" if strong else "ordinary_english_context"],
-                                conflict_flags=[] if strong else ["horse_term_without_strong_context"],
+                                confidence=decision.confidence,
+                                evidence=list(decision.evidence),
+                                conflict_flags=[] if decision.classification == "confirmed_horse" else ["horse_term_without_strong_context"],
+                                needs_preserve=decision.classification == "confirmed_horse" and not entry.has_translation,
                                 term=entry,
+                                classification=decision.classification,
+                                reason=decision.reason,
+                                matched_context=context_for(text, match.start(), match.end()),
+                                entity_evidence=decision.evidence,
                             )
                         )
                     else:
@@ -721,31 +983,113 @@ def _resolve_english_entities(
                         )
                     )
                     continue
-                if any(
-                    item.field_name == field_name
-                    and item.start == match.start()
-                    and item.end == match.end()
-                    for item in entities
-                ):
+                existing = next((
+                    item for item in entities
+                    if item.field_name == field_name and item.start == match.start() and item.end == match.end()
+                ), None)
+                if existing:
+                    existing.external_horse_ids = list(dict.fromkeys([
+                        *(existing.external_horse_ids or []), alias.external_horse_id
+                    ]))
+                    if "external_horse_alias" not in existing.evidence:
+                        existing.evidence.append("external_horse_alias")
                     continue
-                strong = _english_candidate_strong_horse_context(
-                    text, field_name, match.start(), match.end(), match.group(0)
-                )
+                decision = decision_for(text, field_name, match)
                 entities.append(
                     _make_entity(
-                        "horse" if strong else "common_word",
+                        "unknown_horse" if decision.classification == "confirmed_horse" else (
+                            "common_word" if decision.classification == "common_word" else "ambiguous"
+                        ),
                         match.group(0),
                         field_name,
                         match.start(),
                         match.end(),
                         canonical_text=alias_text,
-                        confidence=alias.confidence if strong else 85,
-                        evidence=["external_horse_alias", "strong_horse_context" if strong else "ordinary_english_context"],
-                        conflict_flags=[] if strong else ["horse_alias_without_strong_context"],
-                        needs_preserve=strong,
+                        confidence=max(decision.confidence, alias.confidence if decision.classification == "confirmed_horse" else 0),
+                        evidence=["external_horse_alias", *decision.evidence],
+                        conflict_flags=[] if decision.classification == "confirmed_horse" else ["horse_alias_without_strong_context"],
+                        needs_preserve=decision.classification == "confirmed_horse",
                         external_horse_ids=[alias.external_horse_id],
+                        classification=decision.classification,
+                        reason=decision.reason,
+                        matched_context=context_for(text, match.start(), match.end()),
+                        entity_evidence=decision.evidence,
                     )
                 )
+    formal_horses_by_span: dict[
+        tuple[str, int, int], list[ArticleEntity]
+    ] = {}
+    for entity in entities:
+        if entity.term_id and entity.term_type == TermType.HORSE:
+            formal_horses_by_span.setdefault(
+                (entity.field_name, entity.start, entity.end), []
+            ).append(entity)
+    ambiguous_members: set[int] = set()
+    merged_ambiguous: list[ArticleEntity] = []
+    for group in formal_horses_by_span.values():
+        targets = {
+            (entity.target_zh or "").strip()
+            for entity in group
+        }
+        if len(group) < 2 or len(targets) < 2:
+            continue
+        primary = group[0]
+        term_ids = sorted(
+            entity.term_id for entity in group if entity.term_id is not None
+        )
+        target_values = sorted(targets)
+        primary.term_id = None
+        primary.target_zh = ""
+        primary.canonical_text = primary.matched_text
+        primary.needs_preserve = (
+            primary.classification == "confirmed_horse"
+        )
+        primary.priority = max(entity.priority for entity in group)
+        primary.external_horse_ids = list(
+            dict.fromkeys(
+                external_id
+                for entity in group
+                for external_id in (entity.external_horse_ids or [])
+            )
+        )
+        primary.evidence = list(
+            dict.fromkeys(
+                [
+                    *(item for entity in group for item in entity.evidence),
+                    "ambiguous_formal_horse_name",
+                    *(f"formal_term_id:{term_id}" for term_id in term_ids),
+                    *(
+                        f"formal_target_zh:{target}"
+                        for target in target_values
+                    ),
+                ]
+            )
+        )
+        primary.entity_evidence = list(primary.evidence)
+        primary.conflict_flags = list(
+            dict.fromkeys(
+                [
+                    *(
+                        item
+                        for entity in group
+                        for item in entity.conflict_flags
+                    ),
+                    "ambiguous_formal_horse_name",
+                    "conflicting_formal_term_ids",
+                    "conflicting_formal_targets",
+                ]
+            )
+        )
+        primary.reason = "ambiguous_formal_horse_name"
+        ambiguous_members.update(id(entity) for entity in group)
+        merged_ambiguous.append(primary)
+    if ambiguous_members:
+        entities = [
+            entity
+            for entity in entities
+            if id(entity) not in ambiguous_members
+        ]
+        entities.extend(merged_ambiguous)
     return entities, suppressed
 
 
@@ -1122,6 +1466,7 @@ def resolve_article_entities(
     *,
     source_language: str = SourceLanguage.JAPANESE,
     preloaded_index: ArticleEntityIndex | None = None,
+    structured_entities: dict[str, list[str]] | None = None,
 ) -> ArticleEntityResolution:
     title = title_text or ""
     body = body_text or ""
@@ -1137,7 +1482,7 @@ def resolve_article_entities(
         )
     elif source_language == SourceLanguage.ENGLISH:
         entities, suppressed = _resolve_english_entities(
-            title, body, source_language, entries, terms_by_entry, external_aliases
+            title, body, source_language, entries, terms_by_entry, external_aliases, structured_entities
         )
     else:
         entities, suppressed = _resolve_formal_entities(
@@ -1159,48 +1504,435 @@ def resolve_article_entities(
 def resolve_article_entities_batch(
     articles: Iterable[NewsArticle],
 ) -> dict[int, ArticleEntityResolution]:
+    return resolve_article_entities_for_articles(articles)
+
+
+def _structured_horse_entities_for_articles(
+    articles: Iterable[NewsArticle],
+) -> dict[int, dict[str, list[str]]]:
+    article_list = [
+        article
+        for article in articles
+        if (article.source_language or SourceLanguage.JAPANESE) == SourceLanguage.ENGLISH
+    ]
+    article_ids = [article.id for article in article_list if article.id]
+    result: dict[int, dict[str, list[str]]] = {article_id: {} for article_id in article_ids}
+    if not article_ids:
+        return result
+    link_filter = Q(
+        event__article_links__article_id__in=article_ids,
+        event__article_links__status__in=[ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL],
+        event__article_links__removed_at__isnull=True,
+    )
+    for kind, queryset in (
+        ("runner", RaceEventRunner.objects.filter(link_filter)),
+        ("result", RaceEventResult.objects.filter(link_filter)),
+    ):
+        rows = queryset.values(
+            "id", "event_id", "event__article_links__article_id", "horse_name"
+        ).distinct()
+        for row in rows:
+            name = normalize_horse_entity_key(row["horse_name"])
+            if not name:
+                continue
+            result[row["event__article_links__article_id"]].setdefault(name, []).append(
+                f"race_{kind}:{row['id']}:event:{row['event_id']}:horse_name"
+            )
+    return result
+
+
+def resolve_article_entities_for_articles(
+    articles: Iterable[NewsArticle],
+    *,
+    structured_entities_by_article: dict[int, dict[str, list[str]]] | None = None,
+) -> dict[int, ArticleEntityResolution]:
     article_list = list(articles)
     rows = []
+    visible_parts_by_article: dict[int, tuple[str, str]] = {}
     for article in article_list:
         language = article.source_language or SourceLanguage.JAPANESE
-        text = "\n".join(
-            part for part in (article.title_ja or "", article.body_ja_normalized or article.body_ja_raw or "") if part
-        )
+        visible_parts_by_article[article.id] = visible_source_parts(article)
+        text = "\n".join(part for part in visible_parts_by_article[article.id] if part)
         rows.append((language, text))
     index = _build_article_entity_index(rows)
+    english_articles = [
+        article
+        for article in article_list
+        if (article.source_language or SourceLanguage.JAPANESE) == SourceLanguage.ENGLISH
+    ]
+    structured_by_article = (
+        structured_entities_by_article
+        if structured_entities_by_article is not None
+        else _structured_horse_entities_for_articles(english_articles)
+    )
     return {
         article.id: resolve_article_entities(
-            article.title_ja,
-            article.body_ja_normalized or article.body_ja_raw,
+            visible_parts_by_article[article.id][0],
+            visible_parts_by_article[article.id][1],
             source_language=article.source_language or SourceLanguage.JAPANESE,
             preloaded_index=index,
+            structured_entities=structured_by_article.get(article.id, {}),
         )
         for article in article_list
     }
 
 
+def resolve_article_entities_for_article(
+    article: NewsArticle,
+    *,
+    title_text: str | None = None,
+    body_text: str | None = None,
+) -> ArticleEntityResolution:
+    if title_text is None and body_text is None:
+        return resolve_article_entities_for_articles([article])[article.id]
+    title = article.title_ja if title_text is None else title_text
+    body = (article.body_ja_normalized or article.body_ja_raw) if body_text is None else body_text
+    language = article.source_language or SourceLanguage.JAPANESE
+    index = _build_article_entity_index([(language, "\n".join(part for part in (title, body) if part))])
+    structured = _structured_horse_entities_for_articles([article]).get(article.id, {})
+    return resolve_article_entities(
+        title,
+        body,
+        source_language=language,
+        preloaded_index=index,
+        structured_entities=structured,
+    )
+
+
 def apply_contextual_term_mappings(
     text: str,
     resolution: ArticleEntityResolution,
+    *,
+    field_name: str | None = None,
+    span_offset: int = 0,
 ) -> str:
+    if resolution.source_language == SourceLanguage.ENGLISH:
+        replacements: list[tuple[int, int, str]] = []
+        for entity in resolution.entities:
+            if field_name and entity.field_name != field_name:
+                continue
+            if not entity.term_id or not entity.target_zh:
+                continue
+            if entity.entity_type in {"common_word", "ambiguous", "unknown_horse"}:
+                continue
+            if entity.term_type == TermType.HORSE and entity.classification != "confirmed_horse":
+                continue
+            raw_span = _raw_span_for_visible_entity(text, resolution, entity)
+            if raw_span is None:
+                continue
+            start = raw_span[0] - span_offset
+            end = raw_span[1] - span_offset
+            if start < 0 or end > len(text) or start >= end:
+                continue
+            if _normalized_term_candidate(text[start:end]) != _normalized_term_candidate(entity.matched_text):
+                continue
+            replacements.append((start, end, entity.target_zh))
+        mapped = text or ""
+        accepted_end = len(mapped) + 1
+        for start, end, target in sorted(replacements, key=lambda item: (item[0], item[1]), reverse=True):
+            if end > accepted_end:
+                continue
+            mapped = mapped[:start] + target + mapped[end:]
+            accepted_end = start
+        entity_term_pairs = {
+            (_normalized_term_candidate(entity.matched_text), entity.target_zh)
+            for entity in resolution.entities
+            if entity.term_id and entity.target_zh
+        }
+        # Compatibility for explicitly supplied non-horse ResolvedTerm objects
+        # that predate occurrence entities. Production resolver terms always
+        # have entities and therefore stay on the span-safe path above.
+        for term in resolution.accepted_terms:
+            pair = (_normalized_term_candidate(term.matched_text), term.target_zh)
+            if term.term_type == TermType.HORSE or pair in entity_term_pairs:
+                continue
+            mapped = _replace_source_term(mapped, term.matched_text, term.target_zh, resolution.source_language)
+        return mapped
     mapped = text or ""
     for term in sorted(resolution.accepted_terms, key=lambda item: len(item.matched_text), reverse=True):
         mapped = _replace_source_term(mapped, term.matched_text, term.target_zh, resolution.source_language)
     return mapped
 
 
+def _raw_span_for_visible_entity(
+    text: str,
+    resolution: ArticleEntityResolution,
+    entity: ArticleEntity,
+) -> tuple[int, int] | None:
+    """Map a visible-text occurrence back to raw text without reviving hidden HTML."""
+    if (
+        0 <= entity.start < entity.end <= len(text)
+        and _normalized_term_candidate(text[entity.start : entity.end])
+        == _normalized_term_candidate(entity.matched_text)
+    ):
+        return entity.start, entity.end
+    peers = [
+        item
+        for item in resolution.entities
+        if item.field_name == entity.field_name
+        and _normalized_term_candidate(item.matched_text)
+        == _normalized_term_candidate(entity.matched_text)
+    ]
+    peers.sort(key=lambda item: (item.start, item.end))
+    try:
+        ordinal = peers.index(entity)
+    except ValueError:
+        return None
+    visible_raw_spans: list[tuple[int, int]] = []
+    marker = "__UMA_VISIBLE_OCCURRENCE_MARKER__"
+    for match in _iter_candidate_matches(text, entity.matched_text, SourceLanguage.ENGLISH):
+        marked = text[: match.start()] + marker + text[match.end() :]
+        if marker in clean_visible_source_text(marked):
+            visible_raw_spans.append((match.start(), match.end()))
+    return visible_raw_spans[ordinal] if ordinal < len(visible_raw_spans) else None
+
+
+def apply_contextual_horse_placeholders(
+    text: str,
+    resolution: ArticleEntityResolution,
+    placeholders: dict[str, str],
+    *,
+    field_name: str,
+) -> str:
+    """Protect only confirmed horse occurrence spans for English source text."""
+    if resolution.source_language != SourceLanguage.ENGLISH:
+        protected = text or ""
+        for placeholder, name in placeholders.items():
+            protected = protected.replace(name, placeholder)
+        return protected
+    placeholder_by_name = {
+        _normalized_term_candidate(name): placeholder
+        for placeholder, name in placeholders.items()
+    }
+    candidates: list[tuple[int, int, str]] = []
+    globally_selected: list[tuple[str, int, int, str]] = []
+    for entity in resolution.entities:
+        if not entity.needs_preserve:
+            continue
+        if entity.classification not in {"", "confirmed_horse"}:
+            continue
+        placeholder = placeholder_by_name.get(_normalized_term_candidate(entity.matched_text))
+        if not placeholder:
+            continue
+        globally_selected.append(
+            (entity.field_name, entity.start, entity.end, placeholder)
+        )
+        if entity.field_name != field_name:
+            continue
+        raw_span = _raw_span_for_visible_entity(text, resolution, entity)
+        if raw_span is None:
+            continue
+        candidates.append((raw_span[0], raw_span[1], placeholder))
+
+    selected_global: list[tuple[str, int, int, str]] = []
+    occupied_by_field: dict[str, list[tuple[int, int]]] = {}
+    for candidate in sorted(
+        globally_selected,
+        key=lambda item: (-(item[2] - item[1]), item[0], item[1], item[2], item[3]),
+    ):
+        candidate_field, start, end, _ = candidate
+        occupied = occupied_by_field.setdefault(candidate_field, [])
+        if any(start < other_end and other_start < end for other_start, other_end in occupied):
+            continue
+        occupied.append((start, end))
+        selected_global.append(candidate)
+
+    selected_placeholders = {item[3] for item in selected_global}
+    for placeholder in list(placeholders):
+        if placeholder not in selected_placeholders:
+            placeholders.pop(placeholder, None)
+
+    replacements: list[tuple[int, int, str]] = []
+    occupied: list[tuple[int, int]] = []
+    for candidate in sorted(
+        candidates,
+        key=lambda item: (-(item[1] - item[0]), item[0], item[1], item[2]),
+    ):
+        start, end, _ = candidate
+        if any(start < other_end and other_start < end for other_start, other_end in occupied):
+            continue
+        occupied.append((start, end))
+        replacements.append(candidate)
+
+    protected = text or ""
+    for start, end, placeholder in sorted(replacements, key=lambda item: (item[0], item[1]), reverse=True):
+        protected = protected[:start] + placeholder + protected[end:]
+    return protected
+
+
+def classify_generated_horse_occurrence(
+    text: str,
+    start: int,
+    end: int,
+) -> EnglishHorseOccurrenceDecision:
+    """Classify one generated occurrence for both mapping and validation."""
+    decision = classify_english_horse_occurrence(
+        text or "", "generated", start, end
+    )
+    if decision.classification == "confirmed_horse":
+        return decision
+    generated_before = (text or "")[max(0, start - 24) : start]
+    generated_after = (text or "")[end : min(len(text or ""), end + 32)]
+    if re.match(
+        (
+            r"^\s*(?:(?:将|已|即将|再次)?(?:"
+            r"赢得(?:了)?(?:比赛|赛事|冠军)|"
+            r"取胜|获胜|夺冠|出赛|参赛|复出|领衔|"
+            r"获得(?:了)?(?:冠军|亚军|季军)|"
+            r"(?:名列|跑获)(?:第)?(?:\d+|[一二三四五六七八九十]+)(?:名|位)?|"
+            r"由.{0,8}(?:策骑|训练)|"
+            r"(?:在|于)[^，。！？\n]{1,12}(?:取胜|获胜|夺冠|出赛|参赛|复出)"
+            r"))"
+        ),
+        generated_after,
+    ):
+        return EnglishHorseOccurrenceDecision(
+            "confirmed_horse",
+            "generated_chinese_horse_relation",
+            96,
+            ("generated_chinese_horse_relation",),
+        )
+    if (
+        re.search(
+            r"(?:^|[\s，。！？；：])(?:本场)?(?:冠军|亚军|季军)是\s*$",
+            generated_before,
+        )
+        and re.match(r"^(?:\s|[，。！？；：,.!?;:]|$)", generated_after)
+    ):
+        return EnglishHorseOccurrenceDecision(
+            "confirmed_horse",
+            "generated_chinese_result_identity",
+            96,
+            ("generated_chinese_result_identity",),
+        )
+    return decision
+
+
+def english_horse_name_has_confirmed_occurrence(text: str, names: Iterable[str]) -> bool:
+    for name in names:
+        for match in _iter_candidate_matches(text or "", name, SourceLanguage.ENGLISH):
+            decision = classify_generated_horse_occurrence(
+                text or "", match.start(), match.end()
+            )
+            if decision.classification == "confirmed_horse":
+                return True
+    return False
+
+
+def apply_generated_text_contextual_mappings(
+    text: str,
+    resolution: ArticleEntityResolution,
+) -> str:
+    """Map generated English occurrences only when their own context proves the entity."""
+    if resolution.source_language != SourceLanguage.ENGLISH:
+        return apply_contextual_term_mappings(text, resolution)
+    candidates: dict[tuple[str, str, int], tuple[str, str, int, int]] = {}
+    for entity in resolution.entities:
+        if (
+            entity.term_id
+            and entity.target_zh
+            and entity.entity_type == "horse"
+            and entity.classification == "confirmed_horse"
+        ):
+            key = (
+                normalize_horse_entity_key(entity.matched_text),
+                entity.target_zh,
+                entity.term_id,
+            )
+            candidates.setdefault(
+                key,
+                (
+                    entity.matched_text,
+                    entity.target_zh,
+                    entity.priority,
+                    entity.term_id,
+                ),
+            )
+    replacement_candidates: list[
+        tuple[int, int, str, int, int]
+    ] = []
+    for source, target, priority, term_id in candidates.values():
+        for match in _iter_candidate_matches(text or "", source, SourceLanguage.ENGLISH):
+            decision = classify_generated_horse_occurrence(
+                text or "", match.start(), match.end()
+            )
+            if decision.classification == "confirmed_horse":
+                replacement_candidates.append(
+                    (
+                        match.start(),
+                        match.end(),
+                        target,
+                        priority,
+                        term_id,
+                    )
+                )
+    replacements: list[tuple[int, int, str]] = []
+    occupied: list[tuple[int, int]] = []
+    for start, end, target, priority, term_id in sorted(
+        replacement_candidates,
+        key=lambda item: (
+            -(item[1] - item[0]),
+            -item[3],
+            item[4],
+            item[0],
+            item[1],
+            item[2],
+        ),
+    ):
+        if any(start < occupied_end and occupied_start < end for occupied_start, occupied_end in occupied):
+            continue
+        occupied.append((start, end))
+        replacements.append((start, end, target))
+    mapped = text or ""
+    for start, end, target in sorted(replacements, key=lambda item: (item[0], item[1]), reverse=True):
+        mapped = mapped[:start] + target + mapped[end:]
+    for term in resolution.accepted_terms:
+        if term.term_type != TermType.HORSE:
+            mapped = _replace_source_term(mapped, term.matched_text, term.target_zh, resolution.source_language)
+    return mapped
+
+
 def recognized_horses_from_resolution(resolution: ArticleEntityResolution) -> list[RecognizedHorseName]:
     recognized: list[RecognizedHorseName] = []
     seen: set[tuple[str, str]] = set()
+    formal_span_counts: dict[tuple[str, int, int], int] = {}
+    for entity in resolution.entities:
+        if entity.term_id and entity.term_type == TermType.HORSE:
+            span_key = (entity.field_name, entity.start, entity.end)
+            formal_span_counts[span_key] = formal_span_counts.get(span_key, 0) + 1
     for item in resolution.entities:
         if item.entity_type not in {"horse", "unknown_horse"}:
             continue
-        key = (item.field_name, item.matched_text)
+        key = (item.canonical_text.casefold(), item.target_zh.casefold())
         if key in seen:
             continue
         seen.add(key)
-        source = "external_alias" if item.external_horse_ids else (
-            "formal_term" if item.entity_type == "horse" and item.term_id else "heuristic"
+        ambiguous_formal = bool(
+            "ambiguous_formal_horse_name" in item.conflict_flags
+            or (
+                item.term_id
+                and formal_span_counts.get(
+                    (item.field_name, item.start, item.end), 0
+                )
+                > 1
+            )
+        )
+        source = (
+            "formal_ambiguous_term"
+            if ambiguous_formal
+            else (
+                "formal_term"
+                if item.term_id and item.target_zh
+                else (
+                    "formal_pending_term"
+                    if item.term_id
+                    else (
+                        "external_alias"
+                        if item.external_horse_ids
+                        else "heuristic"
+                    )
+                )
+            )
         )
         recognized.append(
             RecognizedHorseName(
@@ -1210,11 +1942,19 @@ def recognized_horses_from_resolution(resolution: ArticleEntityResolution) -> li
                 confidence=item.confidence,
                 external_horse_ids=list(item.external_horse_ids or []),
                 primary_external_horse_id=(item.external_horse_ids or [""])[0],
-                needs_preserve=item.needs_preserve,
-                has_translation=bool(item.target_zh),
+                needs_preserve=ambiguous_formal or item.needs_preserve,
+                has_translation=bool(item.target_zh) and not ambiguous_formal,
                 first_position=item.start,
                 detection_reason=item.evidence[0] if item.evidence else "article_entity_resolution",
-                conflict_flags=list(item.conflict_flags),
+                conflict_flags=[
+                    *item.conflict_flags,
+                    *(["ambiguous_formal_horse_name"] if ambiguous_formal else []),
+                ],
+                source_field=item.field_name,
+                matched_span=(item.start, item.end),
+                matched_context=item.matched_context,
+                classification=item.classification,
+                reason=item.reason,
             )
         )
     return recognized
@@ -1703,6 +2443,17 @@ def recognize_horse_names_batch(
     query_count_callback: Callable[[str, int], None] | None = None,
 ) -> dict[int, list[RecognizedHorseName]]:
     article_list = list(articles)
+    if article_list and all(
+        (article.source_language or SourceLanguage.JAPANESE) == SourceLanguage.ENGLISH
+        for article in article_list
+    ):
+        resolutions = resolve_article_entities_for_articles(article_list)
+        return {
+            article.id: recognized_horses_from_resolution(resolutions[article.id])[:limit]
+            if limit is not None
+            else recognized_horses_from_resolution(resolutions[article.id])
+            for article in article_list
+        }
     recognized: dict[int, list[RecognizedHorseName]] = {}
     grouped: dict[str, list[tuple[NewsArticle, str]]] = {}
     for article in article_list:
@@ -1772,6 +2523,11 @@ def recognize_horse_names(
     full_text = "\n".join(part for part in [title, body] if part)
     if not full_text:
         return []
+    if source_language == SourceLanguage.ENGLISH:
+        recognized = recognized_horses_from_resolution(
+            resolve_article_entities(title, body, source_language=source_language)
+        )
+        return recognized[:limit] if limit is not None else recognized
     if source_language != SourceLanguage.JAPANESE:
         return _recognize_non_japanese_external_aliases(full_text, source_language, limit)
 

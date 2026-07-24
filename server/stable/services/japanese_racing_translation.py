@@ -29,7 +29,7 @@ _WORKOUT_RE = re.compile(
     r"[―ー\-–—](?P<last_whole>\d+)秒(?P<last_tenth>\d+)"
 )
 _INTERVIEW_RE = re.compile(
-    r"(?m)(?P<prefix>^[ \t　]*)"
+    r"(?m)(?:^|(?<=>))(?P<prefix>[ \t　]*)"
     r"(?P<jockey>[一-龥々〆ヵヶぁ-んァ-ヴーA-Za-z・･ \t　]{2,40}?)騎手"
     r"[（(](?P<horse>[^=＝()（）\r\n]{1,80}?)[=＝](?P<finish>\d+着)[）)]"
 )

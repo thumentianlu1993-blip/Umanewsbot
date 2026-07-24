@@ -36,11 +36,31 @@
 - [x] 4.6 (operations) 验证：netkeiba 专项、P0 completion 套件、Django check、完整 stable 基线对照、迁移漂移、OpenSpec strict/all、diff check；更新状态与运行手册，记录 `27/100` 旧批证据、abandon/new batch 恢复规则与网络开关实测恢复。
 - [x] 4.7 (operations) 独立 code review 清零 actionable finding并冻结受审代码版本；随后再取得绑定该精确版本的生产部署与触网 prepare 授权。
 
+## 4B. 发布候选门禁修复（task 5.3 前置）
+
+- [x] 4.8 (integration) 测试先行：`prepare-release` 只纳入完整子集并生成确定性 release candidate；断言全部相关业务表和公开状态零写、无 `release_approved`；参数化覆盖每项 binding 漂移；覆盖既有/新建 profile、已发布、hidden、manual lock 的自动首发范围与 disposition，并证明同批 blocker 永不进入 candidate 或发布目标。
+- [x] 4.9 (integration) 实现 release candidate schema、规范写入与 batch state/checkpoint：绑定 batch/combined/bundle/artifact/production snapshot SHA、预计数据库动作和自动首发范围；batch 路径以冻结 mapping 审核时间生成确定性 commit artifact，candidate 不含易变时间字段；candidate/state/ledger 在 batch serial/file lock 内原子协调，相同输入重复或并发 prepare 字节一致且准备账本事件唯一。
+- [x] 4.10 (integration) `p0_horse_completion_batch --prepare-release` 生成 candidate；`--commit` 强制接收 `--release-candidate-sha256`，以同一确定性时间重算 artifact/预计动作/自动首发范围并 fail closed 比对；历史 release manifest v1 保持兼容，新 release manifest v2 强制反向绑定 candidate SHA；同 candidate 重复 commit 或批准后崩溃恢复必须复用唯一 manifest/SHA 且 `release_approved` 只记录一次；修正 `_run_region_publish`，只发布 artifact 已复审既有 profile 与本次 run 实际新建 profile，不再使用整个地区 batch manifest。
+- [x] 4.10a (integration) 审查修复测试先行：候选/commit artifact/v2 manifest 改为 SHA 专属不可变路径；旧 candidate 已批准但未落库时，新 SHA 授权可保留旧证据并以 `release_superseded` 推进，旧 artifact 已落库时拒绝替换；正式 manifest 已存在但 DB 前重试仍重算并校验 hidden/review/manual-lock 发布范围漂移。
+- [x] 4.10b (integration) 审查修复测试先行：旧 commit state 缺 `publish_scope` 的 retry 必须 fail closed 且不得空跑标成功；`prepare-release` 从 artifact 实际 inputs 绑定 SHA，并在任何候选证据落盘前拒绝 bundle 声明与 research/mapping/authority 实际 SHA 不一致。
+- [x] 4.10c (integration) 审查修复测试先行：`prepare-release` 为 research/mapping/authority 建 SHA 专属不可变输入快照并让 artifact/state 指向快照；已落库候选在 region-current bundle 重建后仍可幂等恢复，且新候选仍被拒；commit 的 combined/state/bundle 候选校验全部移入 serial/file lock，覆盖锁等待期间 combined 漂移。
+- [x] 4.10d (integration) 审查修复测试先行：rolling release builder 强制 candidate SHA，v1 仅保留历史读取兼容；自动首发只调用 candidate 中冻结为 `attempt_publish_after_commit` 的既有/新建对象并审计 block/skip；把共享 batch lock 覆盖到 prepare、bundle、prepare-release、commit 的文件与 state 全窗口，并拒绝 symlink/非普通 snapshot。
+- [x] 4.10e (integration) 审查修复测试先行：DB commit 后的 completion-run/checkpoint/publish state 在二次共享锁内重新加载并合并，覆盖并发 bundle/state writer；rolling release builder 强制加载真实 candidate path 并复验 SHA、元数据、artifact/bindings/actions/scope，拒绝任意 hex 或错 candidate 绕过。
+- [x] 4.10f (integration) 审查修复测试先行：新增 batch execution lock 串行化 supersede/approval/DB/checkpoint/publish 与 abandon；账本按 manifest -> supersede old -> approve new 安全顺序恢复；release 恢复强制普通文件、文件名 SHA 与完整元数据；自动发布改为 PostgreSQL 每 profile atomic 内锁行。
+- [x] 4.10g (integration) 审查修复测试先行：通用 production apply v2 validator 加载真实 candidate/state/prepared evidence 并按 ledger 顺序拒绝 superseded release；abandon 拒绝任何 DB committed/checkpoint 批次；ledger malformed/partial 全路径 fail closed 且 append fsync；发布计数事务后更新并保留多轮累计 IDs。
+- [x] 4.10h (integration) 审查修复测试先行：通用 v2 validator 同时拒绝 state/manifest abandoned，standalone direct apply 不得复活；strict ledger 为新 auto-first-publish 事件加版本并强制冻结排除字段，无版本 legacy 事件只读兼容并内存归一。
+- [x] 4.10i (integration) 最终 full-diff 审查修复测试先行：通用 v2 dry-run/commit 从 validation 到 DB 全程进入可重入 batch execution lock，阻断 validation 后 supersede 竞态；未落库 direct v2 复验当前 batch manifest 与 combined 实际 SHA，已落库恢复使用不可变快照。
+- [x] 4.10j (integration) 最新主线集成审查修复测试先行：相同 candidate 的普通重复 commit 在 publish stage 已完成时复用冻结 checkpoint/report，禁止因人工降级或 gate 放宽再次调用发布；publish 未完成或失败时普通 commit 必须 fail closed 并仅指向显式 `--retry-publish`。
+- [x] 4.10k (integration) fresh review 修复测试先行：prepare 与同批 commit 共享 execution lock；completed 重放在 dry-run/DB apply 前完整复验冻结 candidate、commit/publish checkpoint 与精确 v2 publish ledger，缺失或不匹配时零写 fail closed 并要求人工审计。
+- [x] 4.10l (integration) 第二轮 fresh review 修复测试先行：prepare-release 的 service 入口直接取得同 batch execution lock，再进入 state serial lock；锁内复读 state/manifest，commit 或 abandon 已完成时零写 fail closed，禁止 direct service caller 绕过 command 并发边界。
+- [x] 4.10m (integration) task 5.4 首次整批回滚修复测试先行：已审核 applied 的空 `major_wins` 表示“确认无胜绩”并可通过严格完整度；无审核或最新 conflict 仍阻断；artifact/candidate 绑定完整度策略版本，旧候选在 DB 前 fail closed 并要求新 SHA、新授权。
+- [x] 4.11 (operations) 验证缺失/错误/篡改/stale candidate、生产快照漂移与重复 prepare/commit；运行专项、Django check、迁移漂移、完整 stable 基线、OpenSpec strict/all、diff check；更新四份状态/决策/运行手册并完成独立 code review。
+
 ## 5. 生产执行（分步用户授权）
 
-- [ ] 5.1 (operations) 取得受审精确版本授权后执行备份与部署，只验证代码 HEAD、镜像、Django check、容器/Nginx/healthz；默认保持 `ALLOW_NETWORK=false`，本步不触网、不写马匹资料。
-- [ ] 5.2 (operations) 取得该版本触网授权后进入串行窗口：停相关 worker、开启并验证 `ALLOW_NETWORK=true`、保留并 abandon `p0batch-e5cee174ba05`、重新 select/approve 日本批次并 prepare 到 xlsx；验收 `unexpected_adapter_error=0`、已支持结构系统性 blocker=0，剩余失败字段级报告。本步不 bundle、不 commit、不自动公开；prepare 成功或异常后都必须立即在 finally 路径恢复并验证 `ALLOW_NETWORK=false`、启动 worker/beat/race_live_worker、检查容器 env/日志/healthz，不等待人工 xlsx 复审。
-- [ ] 5.3 (operations) 用户人工复审 xlsx 后生成仅含通过完整子集的 bundle，冻结 bundle/release manifest SHA 与预计写入/自动首发清单；本步不写生产数据库、不公开。
-- [ ] 5.4 (operations) 用户针对 5.3 的精确 bundle/hash、完整子集和自动首发范围重新授权后，执行 commit `--confirm-reviewed-artifact`，核验幂等复验、auto_first_publish、OperationLog、`/horses/?region=japan` 新马与徽章（闭环 `publish-p0-horses-basic-tier` task 7.2）。
+- [x] 5.1 (operations) 取得受审精确版本授权后执行备份与部署，只验证代码 HEAD、镜像、Django check、容器/Nginx/healthz；默认保持 `ALLOW_NETWORK=false`，本步不触网、不写马匹资料。
+- [x] 5.2 (operations) 取得该版本触网授权后，以 revision label 固定的精确一次性镜像重新 select/approve 日本批次并 prepare 到 xlsx；生产 `.env` 与在线四应用保持 `ALLOW_NETWORK=false`，仅一次性 prepare 容器覆盖 true，退出即撤销。验收 `unexpected_adapter_error=0`、已支持结构系统性 blocker=0，剩余失败字段级报告；不 bundle、不 commit、不自动公开，并核验容器退出、在线 env/日志/healthz 与马匹计数不变。
+- [x] 5.3 (operations) 用户人工复审 xlsx 后生成仅含通过完整子集的 bundle 与 release candidate，冻结 candidate SHA、全部 bundle/artifact bindings、预计写入与自动首发范围；本步不写生产数据库、不公开、不产生 `release_approved`。
+- [ ] 5.4 (operations) 用户针对 5.3 的精确 release-candidate SHA、完整子集、预计写入和自动首发范围重新授权后，执行带 `--release-candidate-sha256` 的 commit `--confirm-reviewed-artifact`；正式 release manifest 反向绑定 candidate SHA，核验幂等复验、auto_first_publish、OperationLog、`/horses/?region=japan` 新马与徽章（闭环 `publish-p0-horses-basic-tier` task 7.2）。
 - [ ] 5.5 (operations) commit/自动首发成功或中止后重复终验安全态：确认 `ALLOW_NETWORK=false`、worker/beat/race_live_worker 正常，容器 env、日志、healthz 与 `/horses/` 200。
 - [ ] 5.6 (operations) 复核 netkeiba 访问条款与限速合规记录；状态文档更新、主规格同步与两个 change 的归档评估。

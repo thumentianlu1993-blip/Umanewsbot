@@ -1,0 +1,154 @@
+# 任务清单
+
+## 测试（用户确认实现后）
+
+- [ ] (application) 新增 article 9595 等价正文回归，先取得由 13 条 pending horse warning 导致的真实 RED。
+- [ ] (application) 新增 pending `TermEntry` 与 alias-only 的五类强语境、Logician、同文双角色和 payload 完整性 RED。
+- [ ] (integration) 新增 uncertain 只审计不告警、warning signature/高价值通知不受污染的 RED。
+- [ ] (integration) 新增实时/批量/term discovery 一致性和 structured entity evidence 状态 RED。
+- [ ] (integration) 新增多词 Title Case alias-only uncertain 与相同 surface 强赛马关系 confirmed 的对照 RED。
+- [ ] (operations) 新增 published exact-ID audit-only apply allowlist、drift 和全状态/QQ/NotificationLog 不变 RED。
+- [ ] (integration) 新增查询数与 10/20/100 篇批处理性能边界断言，确认失败不是环境或 fixture 错误。
+
+## 实现（全部委派给实现 subagent）
+
+- [ ] (application) 在英文实体解析层实现唯一 occurrence classifier 与可解释序列化字段。
+- [ ] (application) 实现 article-aware 单篇/批量 resolver 与共享 structured evidence loader，并接入 translation、automation、rewriting、validation 和 discovery 入口。
+- [ ] (application) 让正式 pending horse 和 ExternalHorseAlias 按 confirmed/uncertain/common_word 映射 entity 与 `needs_preserve`。
+- [ ] (integration) 修改发布校验只对 confirmed occurrences 生成马名缺失 issue；uncertain 进入 info/audit，common 不生成 horse warning。
+- [ ] (integration) 让 translation/automation/term discovery/recognize compatibility 入口消费统一 resolution，删除或绕过旧 lexical alias 自动保护分叉。
+- [ ] (integration) 让 batch context 从统一 entity resolutions 派生 recognized horses，并统一实时/批量 structured evidence；禁止新增逐条查询。
+- [ ] (operations) 实现显式 exact-ID/issue 历史 dry-run selector 与独立 published audit-only apply；写字段严格 allowlist，禁止复用候选恢复 apply 分支。
+
+## 验证
+
+- [ ] (application) 运行专用测试取得 GREEN，并复核 13 个词无马名 warning、Logician 与强语境马名仍受保护。
+- [ ] (integration) 运行英文术语、外部马名、自动发布门禁、通知、term discovery 与批量重处理回归。
+- [ ] (integration) 运行查询数/批处理性能验证：10/20 篇均 `<=8` 且相同，100 篇完整 dry-run `<=35`，runner/result 各 1 次，无 N+1。
+- [ ] (operations) 仅做本地/隔离环境历史 dry-run；保存 article 9595 输入 hash、分类、issues 和状态不变证据，不写生产。
+- [x] (application) 运行 `DB_ENGINE=sqlite python manage.py check` 与 `git diff --check`。
+- [ ] (operations) 由未参与实现的 reviewer subagent 按 `docs/codex_workflow.md` 运行 Codex 原生只读 `/review`/CLI review 和 fingerprint 门禁；actionable findings 清零后停止。
+- [ ] (operations) 最新成功代码 review 后等待用户对精确 fingerprint 的发布授权；授权前不得 commit、push、PR、部署、迁移、重启或生产写入。
+
+## Reviewer findings 测试先行（2026-07-23）
+
+- [x] (application) 为 `The Brilliant filly won ...` 的 pending/formal 与 alias-only 强实体名词语境新增回归，并取得 ordinary 先于 strong 导致的真实 RED。
+- [x] (integration) 为实时 validation 与批量 reprocessing 共用现有可见文本表示新增回归，并取得隐藏 `nav/aside` alias 仅污染批量路径的真实 RED。
+- [x] (application) 锁定 `The Brilliant filly is trained by...`、`Brilliant mare, trained by...` 与普通 adjective 的优先级，并取得 pending/alias 实体名词关系误判 RED。
+- [x] (integration) 锁定 batch structured map 仅允许 horse_name 提供马名证据，并取得 jockey/trainer 同名 alias 污染 RED。
+- [x] (application) 锁定 linked runner structured evidence 的 occurrence 局部性，并取得同形普通 adjective 被全文广播升级的 RED。
+- [x] (integration) 锁定非英文 article-aware resolver 不调用 runner/result structured loader、英文仍正常调用，并取得 Mock 调用范围 RED。
+- [x] (application) 恢复并锁定 `off=legacy`、`shadow=legacy+would-change`、`enforce=occurrence` 三态门禁，取得 off/shadow 错误 suppress legacy blocker 的 RED。
+- [x] (integration) 锁定 pending 与 alias-only unknown horse placeholder 只保护 confirmed span，取得同形普通 occurrence 被全局 placeholder 替换的 RED。
+- [x] (application) 锁定已译正式 horse mapping 只替换 confirmed span，取得同形普通 occurrence 被全局中文映射的 RED。
+- [x] (application) 为 5 个明确验证 occurrence 语义的 `AutomationFlowTests` 增加方法级 enforce 配置，保持默认 off/legacy 测试契约，并取得默认套件 GREEN。
+- [x] (integration) 锁定 validation 必须验证 confirmed occurrence 本身被保留，取得 ordinary 同形词掩盖真实马名缺失的 RED。
+- [x] (integration) 锁定 HTML raw source 与 visible resolver span 对齐下的 placeholder/mapping 行为，取得 confirmed 可见马名 no-op 的 RED。
+- [x] (application) 锁定 rewrite 生成文本的可证明 occurrence 映射与普通同形词保留，取得错误复用 source span 导致 no-op 的 RED。
+- [x] (integration) 锁定 pending 与 alias-only confirmed horse 在“赢得/获胜/参赛/复出/由...策骑或训练”等合法中文译文 occurrence 中应视为已保留，并取得“赢得了比赛”误报 RED。
+- [x] (integration) 锁定 target 只保留普通 `Brilliant表现` 不得掩盖 source confirmed occurrence 缺失，并取得纯全文 contains 回退 RED。
+- [x] (operations) 锁定 published-audit dry-run 必须显式、规范化并绑定 operator/reviewer identity，apply 必须匹配 prepared operator，并取得 service/command 身份参数缺失 RED。
+- [x] (integration) 独立复跑第五轮新增 7 项取得 GREEN，确认中文紧邻关系保留与 ordinary occurrence 防冒充。
+- [x] (operations) 独立复核 published-audit identity 在 selectors/result/manifest 的绑定、command 转发及 apply fail-closed，取得 GREEN。
+- [x] (application) 独立运行专用模块 33 项及英文语境/重处理/resolver/自动化门禁最小矩阵 118 项，全部 GREEN。
+- [x] (integration) 锁定 TranslationWorkflow/provider generated output 必须按目标 occurrence 自身语境映射，取得 source ordinal 将 ordinary `Brilliant performance` 错映射为“辉煌”的 RED，并保留 confirmed/placeholder 安全对照。
+- [x] (integration) 锁定正式马名 validation 不得以 target ordinary 同形词冒充 confirmed preservation，取得纯 surface contains 导致 issues 为空的 RED。
+- [x] (integration) 直接捕获 reprocessing runner/result SQL，锁定 mixed batch 两查询均只含 English IDs、pure non-English 零查询，取得 result 分支查询日文 IDs 的 RED。
+- [x] (integration) 独立复跑第六轮 6 项取得 GREEN，确认 generated translation 自身语境、ordinary 防错映射/防冒充与 pending placeholder 安全。
+- [x] (integration) 独立复核 mixed/pure non-English reprocessing runner/result SQL 查询边界取得 GREEN，并运行专用 39 项及相关最小矩阵 132 项全部通过。
+- [x] (application) 锁定 pending/formal/ExternalHorseAlias 在 `Enough was enough.` / `Work was work.` 中不得由重复 copula 升级为马名，并保留 `Work won at Ascot.` 强语境对照，取得 RED。
+- [x] (operations) 锁定 published-audit manifest/result/prepared 必须绑定 external alias 与 structured horse evidence SHA-256，并在 apply 前复核，取得缺失字段 RED。
+- [x] (operations) 以 outcome 不变 fixture 锁定 alias 新增及 active link/runner/result 修改均须 fail closed 且不更新文章，取得 apply 错误继续提交 RED；dry-run 查询预算保持 `<=35`。
+- [x] (application) 独立复跑第七轮 6 项取得 GREEN，并补充合法 coreference 对照，确认 ordinary copula 降级而 strong/coreference 仍 confirmed。
+- [x] (operations) 独立复核 alias/structured snapshot 的 prepared/result/manifest 绑定、无漂移成功、漂移 fail-closed 与文章零更新，查询预算 `<=35`；专用 45 项及相关 118 项全部 GREEN。
+- [x] (integration) 锁定 generated 中文赛马关系 mapping 与 validation 使用同一公开 occurrence decision，取得 7 类已认可关系全部未映射及 shared helper 缺失 RED；ordinary 对照不映射。
+- [x] (operations) 用 fake PostgreSQL connection/cursor 锁定 published-audit evidence `LOCK TABLE` 精确五表集及 SQLite no-op 兼容，取得 lock helper 缺失 RED。
+- [x] (operations) 锁定 evidence lock、final alias/structured snapshots、article update 的同一 atomic 顺序，并验证 lock failure 零更新 fail-closed，取得 RED；既有 dry-run `<=35` 查询预算继续 GREEN。
+- [x] (integration) 修正 Django `TestCase` 外层 atomic fixture，改以 atomic depth 锁定 apply 内层事务与返回后深度恢复；第八轮 5 项精确测试全部 GREEN。
+- [x] (operations) 锁定 published-audit 在 global off/shadow 下固定使用并审计 effective enforce mode，取得 9595 等价正文恢复 legacy blockers 与 mode metadata 缺失 RED。
+- [x] (operations) 锁定 configured/effective settings 在 prepared/result/manifest 的绑定及 apply drift 复核，禁止 legacy issues 被提交。
+- [x] (integration) 锁定 ArticleHorseLink、NewsArticleRelatedRegion 与 duplicate candidate corpus 三类 validation dependency snapshot，取得 outcome 不变时 apply 错误继续提交 RED。
+- [x] (operations) 扩展 fake PostgreSQL 精确锁表与 atomic 顺序契约到 horse link、region through、NewsArticle corpus，取得 snapshot helper/lock table 缺失 RED；dry-run `<=35` 预算继续通过。
+- [x] (operations) 独立复跑第九轮 8 项取得 GREEN，确认 off/shadow effective enforce、configured/effective settings 漂移复核与 9595 普通词告警清零。
+- [x] (integration) 独立复核三类新 dependency snapshots、8 表锁、五类 final snapshot 顺序、漂移零更新与 `<=35` 查询预算；专用 55 项及相关 118 项全部 GREEN。
+- [x] (application) 锁定 active English horse formal 同 source/different target 必须合并为无 target ambiguous entity，不进入 accepted/mapping candidates，取得双 confirmed entities RED；单一 formal 映射对照 GREEN。
+- [x] (integration) 锁定 pending formal + ExternalAlias 同 span 由 formal missing 告警优先、external ID 仅作 evidence，取得 external warning + pending blocker 双告警 RED；alias-only external warning 对照 GREEN。
+- [x] (application) 独立复跑第十轮 4 项取得 GREEN，确认 ambiguous formal 单实体保留不映射与 single formal 正常映射。
+- [x] (integration) 独立复核 formal+external 单正式告警、external evidence 保留及 alias-only 对照；专用 59 项及相关最小矩阵 130 项全部 GREEN。
+- [x] (integration) 锁定弯/直撇号 `King’s Gambit` / `King's Gambit` 在 live wrapper、batch resolver、term-gate reprocessing 中必须共享结构化 horse evidence key、分类与 preserve payload，取得路径分叉 RED。
+- [x] (integration) 锁定 `terms.normalize_horse_entity_key` 公开唯一 helper 及 reprocessing 同一函数对象/实际调用契约，取得 helper 缺失 RED。
+- [x] (application) 锁定 `International Star` / `Star` 生成映射必须选择 longest、priority-independent 的不重叠 span，并保留独立 `Star` 映射，取得长词结果被短词二次破坏的 RED。
+- [x] (integration) 独立复跑第十一轮 4 项取得 GREEN，确认公开 normalizer 同一函数对象/实际调用及弯直撇号三路径 payload 一致。
+- [x] (application) 独立复核 nested longest non-overlap、反向顺序/不同 priority 与独立 `Star` 映射；专用 63 项及相关最小矩阵 132 项全部 GREEN。
+- [x] (application) 锁定 linked/structured `Campaign` 仅在当前 occurrence 具有 `to win the race` 局部关系时覆盖 ordinary purpose 句形，同时同文 performance/business occurrence 保持 common，取得 RED。
+- [x] (integration) 锁定中文赛果 `获得亚军/冠军/季军` 与 `冠军是<马名>` 的 mapper/validation 共享判定，并保留 `名列/跑获` 对照及普通“获得支持/冠军是表现”负例，取得 RED。
+- [x] (integration) 锁定 pending formal + ExternalHorseAlias 在新增中文赛果表达中视为已保留、普通表达仍触发缺失门禁，取得 RED。
+- [x] (application) 独立复跑第十二轮 3 项取得 GREEN，确认 structured + local race relation 优先但不向同文普通 occurrence 广播，三条 resolver 路径 payload 一致。
+- [x] (integration) 独立复核中文名次正负边界、mapper/validation 共用 helper 与 pending+alias preservation；专用 66 项及相关最小矩阵 132 项全部 GREEN。
+- [x] (application) 锁定 off/shadow legacy `_classify_english_term_context` 必须包含已译 horse entries 的内置/configured common-word downgrade，enforce 继续 occurrence 三类，取得 RED/GREEN 对照。
+- [x] (integration) 锁定 shadow 记录 horse occurrence would-change/classifications 但不改变 legacy gate outcome，取得错误 core blockers RED。
+- [x] (operations) 锁定 published-audit 同 run/manifest/identity 二次 apply 返回 `already_committed` 且 article/run 时间戳、result、QQ、NotificationLog 零写入，取得重放进入 snapshot drift 的 RED。
+- [x] (operations) 锁定 published-audit run 行 `select_for_update` 与仅 `succeeded` 可首次 apply 的状态机，取得 `running` 状态仍错误提交的 RED。
+- [x] (application) 独立复跑第十三轮 5 项取得 GREEN，确认 off/shadow legacy horse downgrade、enforce occurrence 三类与 published-audit 状态机/幂等零写。
+- [x] (application) 扩大回归发现并修复强实体语境 common seed/dual-use horse 被降为 uncertain；独立复跑 AutomationFlow 37 项、专用 71 项及相关最小矩阵 132 项全部 GREEN。
+- [x] (application) 锁定 OpenAI-compatible rewrite actual prompt 中 pending formal/alias-only 仅 confirmed source occurrence 占位，ordinary title/body 不占位，取得 pending 零占位与 alias 全局替换 RED。
+- [x] (integration) 锁定 rewrite provider 重排 token 后只恢复 confirmed occurrence，summary/title ordinary 同形词不被全局恢复或 mapping，取得实际 messages/client 路径 RED。
+- [x] (integration) 锁定已译 horse target/`aliases_zh` 必须通过 shared generated occurrence helper 判断 preservation；普通“团队表现辉煌/璀璨”不得掩盖 missing，合法获胜/亚军/冠军关系继续通过，取得 substring 冒充 RED。
+- [x] (application) 独立复跑第十四轮 4 项取得 GREEN，确认 rewrite actual path 的 pending/alias confirmed-only KEEP、字段 span 与重排/summary 安全。
+- [x] (integration) 独立复核 translated target/aliases generated-context preservation 正负边界；专用 75 项及相关最小矩阵 132 项全部 GREEN。
+- [x] (application) 锁定 pending/formal/alias `Work is strong...` 不得作为马名证据、`Work won...` 继续 confirmed，取得 bare strong 误判 RED。
+- [x] (operations) 锁定既有 PostgreSQL term snapshot helper 精确锁 `TermEntry + TermAlias` 的 SHARE mode 与 SQLite no-op，取得 helper 本身 GREEN。
+- [x] (operations) 锁定 published-audit apply 同一 atomic 固定 `8表 evidence lock -> term table lock -> final term context/snapshot -> article update`，取得 term lock 未接入 RED。
+- [x] (operations) 锁定 term table lock failure 时 article/gate/run result 零更新，并继续保持单篇 dry-run `<=35` 查询预算，取得错误继续提交 RED。
+- [x] (application) 独立复跑第十五轮 5 项取得 GREEN，确认 bare strong 收窄、合法 win 对照、term lock SQL/顺序与失败零更新。
+- [x] (integration) 独立复核运行专用 80 项及相关最小矩阵 132 项全部 GREEN，单篇 published-audit dry-run 查询预算继续 `<=35`。
+- [x] (integration) 锁定 uncertain horse occurrence + AUTO/CANDIDATE machine link 只产生 info audit、不产生 mismatch；common-word 仍 mismatch、confirmed 正常，取得 rejected set 包含 ambiguous 的 RED。
+- [x] (operations) 锁定 NewsArticle 从八表 SRX helper 移出，剩余七 evidence 表；新增 NewsArticle EXCLUSIVE table-first helper 与 SQLite no-op，取得 helper 缺失/旧表集 RED。
+- [x] (operations) 锁定同一 atomic 的 `NewsArticle EXCLUSIVE -> 7 evidence SRX -> term SHARE -> target rows -> final context -> update` 固定顺序，取得 RED。
+- [x] (operations) 锁定最先 article table lock failure 与后续 term lock failure均零更新，且 EXCLUSIVE 模式阻止 duplicate corpus phantom 写入而允许普通读，取得 RED。
+- [x] (integration) 修正 evidence-lock 测试的 NewsArticle/related-region 表名前缀误判，改为解析完整 quoted identifiers 并精确比较七表集合；第十六轮 6 项全部 GREEN。
+- [x] (operations) 独立复核 uncertain info-only、common/confirmed 对照、NewsArticle table-first EXCLUSIVE 锁序和前后锁失败零更新；专用 85 项及相关最小矩阵 132 项全部 GREEN。
+- [x] (integration) 扩大 verification 复现旧 contextual person-span suppression 回归，并新增 Grace Hamilton/Hamilton stale tag fixture，取得 suppressed candidate 存在但 mismatch 缺失 RED。
+- [x] (integration) 锁定结构性 suppressed candidate 继续作为明确 rejected machine candidate，同时普通 uncertain + AUTO/CANDIDATE link 保持 info-only，取得 RED/GREEN 对照。
+- [x] (integration) 独立复跑旧 contextual 回归、新增 Grace Hamilton fixture 与 uncertain 安全对照 3 项全部 GREEN。
+- [x] (integration) 独立复核 contextual 52 项、专用 86 项及相关最小矩阵 132 项全部 GREEN，确认结构性 suppression 恢复且一般 uncertain 未回退。
+- [x] (application) 第十七轮测试先行：锁定 off/shadow 在 resolver 将弱英文 horse occurrence 判为 uncertain 时仍保持完整 legacy outcome/gate/issues/accepted IDs/machine mismatch，取得 blocker 被错误绕过的 RED；enforce 三类判定对照 GREEN。
+- [x] (integration) 第十七轮测试先行：锁定 article-aware single/batch 仅 English 使用 visible-clean，Japanese/Traditional Chinese 使用实际 raw translation source 坐标，并锁定 Japanese format/seed placeholder 精确 span，取得非英文 clean/remap 错位 RED。
+- [x] (application) 实现 off/shadow 完整 legacy behavior projection；shadow 仅记录 would-change，enforce 使用 occurrence 三类；published exact-ID audit 继续局部 effective enforce。
+- [x] (integration) 实现按语言选择 article resolver source representation，修复 Japanese/Traditional Chinese raw span 与 Japanese format/seed consumption，且不得修改提取/清洗规则。
+- [x] (integration) 独立复跑第十七轮目标集、published effective-enforce 对照、专用模块及相关回归取得 GREEN，并执行 Django check、性能边界与 `git diff --check`。
+- [x] (integration) Reviewer finding 测试先行：锁定 nested confirmed `International Star` / `Star` placeholder 必须 longest-overlap-first，取得短 alias 仍进入 placeholder metadata 的 RED。
+- [x] (integration) Reviewer finding 测试先行：锁定 discovery 使用 confirmed occurrence 的正文 field/span/context/classification，取得 `matched_text in title` 错归标题的 RED。
+- [x] (application) 修复 confirmed horse placeholder 的全字段 longest non-overlap 选择，并让 discovery finding 直接保留 occurrence metadata；未修改 extraction、cleaning rules 或 source adapters。
+- [x] (integration) 未参与实现的测试所有者复跑两项目标、当前去重 325 项完整矩阵、77 项语言回归及 5 项批量/查询边界，全部 GREEN；Django check、相关 py_compile、`git diff --check` 通过。
+- [ ] (operations) 复用同一独立 reviewer 会话对最新 fingerprint 重新执行只读 review；actionable findings 清零前继续冻结发布。
+- [ ] (operations) Review 成功后停止并取得用户针对当前 fingerprint 的明确发布授权；授权前禁止 commit、push、PR、merge、部署、历史重处理及生产写入。
+- [x] (integration) Reviewer P1 测试先行：同文 strong `Brilliant won...` 与 lexical-only `Brilliant Result Announced...` 共享 runner/result surface evidence 时必须 occurrence-level 分类，取得第二处被文章级 evidence 错误升级为 confirmed/preserve 的 RED。
+- [x] (application) 将 structured identity 的独立确认限制为 surface 全文唯一；多 occurrence 时由各自 strong/local 语境确认并仅向 confirmed occurrence 附加 evidence。
+- [x] (integration) 未参与实现的测试所有者复跑 P1 目标、去重 326 项完整矩阵、77 项语言专项及 8 项一致性/query-budget 回归全部 GREEN；Django check、相关 py_compile、`git diff --check` 通过。
+- [ ] (operations) 复用同一 reviewer 会话审核 occurrence-local structured evidence 修复后的最新 fingerprint，取得明确 `APPROVED` 前保持发布冻结。
+- [ ] (operations) Reviewer `APPROVED` 后仍须取得用户对该新 fingerprint 的明确发布授权；授权前继续禁止 commit、push、PR、merge、部署、历史重处理和生产写入。
+- [x] (operations) Reviewer P2 测试先行：锁定 committed published-audit replay 的 explicit reviewer identity 必须匹配 prepared/receipt binding，同 reviewer保持幂等，取得不同 reviewer 未被拒绝的 RED。
+- [x] (integration) Reviewer P2 测试先行：锁定 mixed-language batch telemetry 必须反映每 language bucket 的 ExternalHorseAlias/TermAlias/TermEntry 实际查询，并保持 2/20 篇 query count 恒定，取得 alias 固定上报 1 的 RED。
+- [x] (operations) 修复 committed receipt 的 prepared/receipt/supplied reviewer binding 校验；same reviewer replay 继续 `already_committed`，mismatch fail closed。
+- [x] (integration) telemetry 改为按实际非空 entity-index language buckets 计数；校准 100 篇旧测试的 horse-term `0→2`、entity `3→5`，总 SQL `<=35` 预算未放宽。
+- [x] (integration) 未参与实现的测试所有者复跑两项目标、100 篇预算、去重 328 项完整矩阵、77 项语言专项及 8 项 identity/security/N+1 回归全部 GREEN；Django check、相关 py_compile、`git diff --check` 通过。
+- [ ] (operations) 复用同一 reviewer 会话审核两项 P2 与 telemetry 契约更新后的最新 fingerprint，明确 `APPROVED` 前保持发布冻结。
+- [ ] (operations) Reviewer `APPROVED` 后仍须用户针对最新 fingerprint 重新授权；授权前禁止 commit、push、PR、merge、部署、历史重处理和生产写入。
+- [x] (application) 最新 P1 测试先行：锁定专名式 `The Brilliant filly/horse ...` 的明确 horse entity noun 必须优先于普通 adjective downgrade，并以小写 `versatile filly` 防止过度升级；取得 2 tests / 3 scenarios 的真实 RED。
+- [x] (integration) 最新 P2 测试先行：锁定非英文 discovery 在 entity context 为空时从 resolved field/span 补齐上下文且保持 raw translation source 坐标；取得 context 为空的真实 RED。
+- [x] (application) 实现 proper-name horse noun 优先级与大小写收窄，并实现 discovery field/span context fallback；未修改提取、清洗或来源适配器。
+- [x] (integration) 未参与实现的测试所有者复跑两项目标、article 9595/strong/common、发现与三路径一致性、query budgets、published audit security、去重 330 项完整矩阵及 77 项语言专项，全部 GREEN；Django check、相关 py_compile、`git diff --check` 通过。
+- [ ] (operations) `origin/main` 已前移且最新修复改变 fingerprint；复用同一独立 reviewer 会话基于当前 worktree/base 状态重新只读 review，取得明确 `APPROVED` 前保持发布冻结。
+- [ ] (operations) 最新 reviewer `APPROVED` 后仍须用户针对该精确 fingerprint 重新授权；授权前继续禁止 commit、push、PR、merge、部署、历史重处理与生产写入。
+- [x] (operations) 独立 `REVIEW 1/2 CORE` 已返回 `APPROVED`，actionable core findings `A=0`；本任务核心验收不再新增实现范围。
+- [x] (integration) 将两个非核心 B/P2 finding 明确 deferred 到后续 change slug `fix-term-discovery-visible-occurrence-aggregation`：raw HTML literal membership 可能遗漏 visible-text confirmed 候选；raw `text.count` 可能放大同形但非 confirmed occurrence 的计数。本任务不实现，也不创建该后续 change 的完整规格。
+- [ ] (operations) 当前仅剩 `REVIEW 2/2`；完成前保持发布冻结，之后仍须用户针对最终 fingerprint 明确授权。
+- [x] (application) 最终核心 P1 测试先行：锁定 `a brilliant filly won...` 的小写普通形容词不得被 horse noun + race relation 升级，并保留 `Brilliant won...`、`The Brilliant filly won...` 强语境；取得真实 RED。
+- [x] (integration) 最终核心 P1 测试先行：锁定 confirmed English source horse 的正式中文长名精确提及满足 preservation，target substring 不得掩盖 missing；取得真实 RED。
+- [x] (application) 最小修复小写 adjective/horse-noun 优先级，并为 confirmed source 增加保守的正式中文长名精确提及判定；未修改 extraction、cleaning、source adapter 或 deferred discovery aggregation。
+- [x] (integration) 复跑新增 3 项、translated target/alias 正负边界 5 项及专用模块 101 项，全部 GREEN；Django system check 无问题。
+- [x] (operations) 使用 `git rebase --autostash origin/main` 无冲突快进到 `origin/main=97a38cf5e2a692b7336c8518a4cdd6dfcc511d2a`，并恢复本 change 的未提交修改。
+- [x] (integration) 在新基线复跑完整去重矩阵 333 项与语言专项 77 项，全部 GREEN；Django check、`makemigrations --check --dry-run`（`No changes detected`）及 `git diff --check` 通过。
+- [ ] (operations) 对 rebase 后的新 fingerprint 执行一轮独立只读代码 review；在明确 review 成功前不得声称通过或进入发布。
+- [ ] (operations) 独立 review 成功后，取得用户针对该精确 fingerprint 的新发布确认；确认前继续禁止 commit、push、PR、merge、部署、历史重处理和生产写入。

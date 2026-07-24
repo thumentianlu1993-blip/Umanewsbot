@@ -1,5 +1,138 @@
 # 项目状态文档
 
+## 2026-07-24 英文单词型马名语境分类已部署为 shadow
+
+- CORE review 已基于 fingerprint `7ff685325de9…` 通过；PR
+  [#14](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/14) 合并为
+  `main@2a3c249f`，生产四应用统一运行镜像 `sha256:316e4563…`，无 migration。
+- Django、migration drift、四类 HTTP 入口、Celery 两节点、容器镜像、外部导入锁和磁盘
+  验收通过。article `9595` 的只读进程内 enforce dry-run 未产生 horse alert，正式译名
+  `Logician` 保留，`Africa/East` 保持普通词；没有保存、重处理、通知或生产数据写入。
+- 生产仍为 `ENGLISH_TERM_CONTEXT_MODE=shadow`，实际发布门禁尚未切换。启用
+  `enforce` 需独立明确授权；deferred P2 继续由后续 change 处理。
+- 完整发布证据见
+  `docs/changes/fix-external-english-horse-context-gate/release_report.md`。
+
+## 2026-07-24 P0 task 5.4 已完成
+
+- 空胜绩窄修以 `044f3d57` 部署，正式 candidate `6dc853a2…`、artifact `b1e123fa…`、
+  release `8c6f2dc8…` 已成功写入生产；61 匹全部严格完整，39 个 blocker 未进入。
+- 实际新增 1,490 条履历、244 条模块审计、1 条 completion run、61 条 P0 source；profile、
+  公开马和 OperationLog 净增均为 0。61 匹原本均已公开，因此新增公开为 0。
+- 幂等重放剩余动作全 0；61 个公开详情页、healthz、日本马匹列表、四应用统一镜像和网络 false
+  均通过。task 5.4 不再处于待写入状态。
+
+## 2026-07-24 P0 task 5.4 空胜绩门禁已本地修复
+
+- 只有 applied、approved、payload 精确为空且具有执行人/时间的 `major_wins` 证据可表达
+  “确认无胜绩”；未审核、非空 payload 或 conflict 仍 fail closed。
+- artifact/candidate 新增完整度策略版本绑定，旧 candidate `8ef0f718...` 在新代码下不可复用，
+  必须重新生成 SHA 并重新授权。
+- 本地关键测试已转绿；312 项组合中 308 通过，4 个失败与修复前基线完全一致；排除基线失败后
+  最终 P0 相关集合 `247/247`，Django、迁移、OpenSpec `37/37` 与 diff check 通过。尚未独立
+  review、push、部署或触碰生产。
+- 冻结输入下预估净增：0 匹新马、1,490 条履历、244 条模块审计、1 条 completion run、0 条新
+  P0 source、0 匹新增公开；61 个 profile 和 61 条既有 source 将更新/upsert。
+- 两项审查 P1 已修复：不再接受 applied 的非空 payload 作为“无胜绩”，也不再让新 v2 策略
+  破坏历史 v1 artifact 的只读复验；当前策略只在 v2 发布链路强制。
+- 后续直接路径复审补齐 v1 只读边界和手工审核稳定性：v1 commit 在写库前拒绝；无胜绩马的
+  手工 ready 审计继续保存空列表，后续完整度不会反转。生产链路 246 项与三项新增测试共
+  `249/249` 通过。
+- 用户表达了持续确认新 SHA 的意愿，但仓库发布门禁要求授权必须发生在最新成功 review 之后；
+  review 成功后仍须请求当前任务发布授权。candidate 对象、动作或公开范围漂移则停止。
+
+## 2026-07-24 P0 task 5.4 因“已审核无胜场”语义缺口安全回滚
+
+- 精确 candidate 已生成唯一 v2 正式批准，但数据库事务在首个无胜场对象的 strict-complete
+  复验处失败；61 行中共有 10 匹真实无胜场。
+- 数据库整批零写、自动首发未运行、网络保持 false。正式 release SHA 为
+  `5320c33c44d387b14e827b109353ffe5068d997bd9c62d9df903cb5de91e0c90`。
+- 当前不能伪造胜场或跳过门禁。下一步需确认是否实施“approved empty major-wins 表示已核实
+  暂无胜绩”的窄修；修复后必须重新 review、部署、prepare-release，并针对新 SHA 再授权。
+
+## 2026-07-24 P0 task 5.3 生产候选已冻结
+
+- `main@4972a6b2` 已部署，四个应用服务同镜像且马匹网络开关全部为 false。
+- 已审核的 61 匹生成 release candidate
+  `8ef0f718803f7772db5b498925a71651e5c68cb331aeafa50f03dc831f8848fe`；
+  39 个 blocker 零命中。预计更新 61 份 profile、创建 1,490 条履历、upsert 61 条 P0 source、
+  写 244 条 module audit。
+- 61 匹当前均已公开，冻结自动首发范围为 0。重复 prepare-release SHA 不变、账本不重复；
+  马匹业务表、OperationLog 和公开计数不变，未产生批准或正式 release manifest。
+- 当前停在 task 5.4 前。任何数据库 commit 都必须取得针对该 candidate SHA 的新授权。
+
+## 2026-07-24 P0 prepare-release service 并发边界返修完成
+
+- prepare-release service 已补齐 `execution -> state` 锁顺序，锁内复读 manifest/state；direct caller
+  与 command caller 现在共享同一 commit/abandon 串行边界。
+- commit 或 abandon 完成后，等待中的 prepare-release 零写拒绝。新增 commit DB window 与
+  abandon window 两项线程时序测试；P0 三模块 `270/270` 通过。
+- 变更尚未提交、推送或部署，生产授权范围未扩大，仍需 fresh read-only review。
+
+## 2026-07-24 P0 completed 重放证据链返修完成
+
+- prepare/commit 同批竞态已由共享 execution lock 关闭；completed commit 重放改为在任何
+  dry-run/DB apply/publish 前验证完整冻结证据和精确 v2 publish ledger。
+- 成功重放为严格零写；账本缺失或计数不匹配时要求人工审计并保持 state/ledger/数据库不变。
+  新增 3 项测试，P0 三模块 `266/266` 通过。
+- 变更尚未提交、推送或部署，生产 task 5.3/5.4 边界不变，仍需 fresh read-only review。
+
+## 2026-07-24 P0 重复 commit 发布幂等 P1 已本地修复
+
+- completed publish 的相同 candidate 普通重放只返回冻结报告，不重新发布；publish 失败或未完成
+  时普通重放拒绝并指向 `--retry-publish`。人工降级和 gate 放宽不会把一次授权变成再次公开。
+- focused 3 项、auto-publish `72/72`、P0 三模块 `263/263` 通过；当前补丁未提交、未部署，仍须
+  fresh read-only review。生产 task 5.3/5.4 授权边界未扩大。
+
+## 2026-07-24 P0 task 5.3 已形成最新主线集成提交（待复审）
+
+- 已把受审实现提交为 `ffa12214`，并显式合并
+  `origin/main@97dd2350a193c74d5063bf7432a283e4d47f6d0a`，当前集成提交为 `8e3716bc`。
+  合并仅在四份追加式文档发生冲突，双方状态记录全部保留，行为代码无冲突。
+- P0 `263/263`、主线相邻 `90/90`（1 skip）、Django、迁移、OpenSpec `37/37` 和 diff check
+  通过。完整 stable 对照为主线 `2784 / 21F / 67E / 59S`、集成
+  `2882 / 21F / 67E / 59S`，新增 98 项且失败/错误/跳过增量均为 0。
+- 用户已授权继续到无写入 task 5.3；当前仍未 push/deploy/bundle/prepare-release。必须先完成
+  精确集成提交的原生只读复审；成功后部署保持网络 false，生成 candidate 后再次停下等待
+  task 5.4 授权。
+
+## 2026-07-23 task 5.3 发布候选门禁本地完成（待授权提交与部署）
+
+- 用户已确认 `p0batch-20b59bda0608` 的 61 个完整对象可以继续，39 个 blocker 保持排除。
+  本地新增 `--prepare-release`，可在零业务写、零公开、零正式批准事件下冻结 deterministic
+  commit artifact、expected actions、publish scope 与精确 candidate SHA。
+- 正式 rolling release 升级为 v2 并强制加载真实 candidate；通用 apply、batch commit、retry 与
+  abandon 共享 supersede/abandoned/ledger/锁门禁。自动首发只处理 artifact 已复审且冻结为
+  attempt 的对象，不再把整个 Japan 100 匹 manifest 当发布范围。
+- 第十轮 full-diff review 的 2 个 P1 已完成 RED→GREEN：standalone v2 validation 到数据库事务
+  全程持有可重入 execution lock；未落库时复验 current batch/combined SHA，只有精确
+  artifact path+SHA 的 committed-run 可跳过 current 漂移并从不可变 snapshot 恢复。
+- 相关 `260/260` 通过；完整 stable 相对 `21610ae8` 新增 88 项，最终对照为
+  `2836 tests / 21 failures / 67 errors / 57 skipped`，failure/error/skipped 增量均为 0。
+  Django check、迁移、OpenSpec `37/37`、diff check 通过。第十一轮 native full-diff review
+  `APPROVED`，P0/P1/P2 为 0，session
+  `019f901d-7b9f-77e3-96e0-792546d3eb4f`，审查前后 fingerprint
+  `60cf62da1514f00fce451c89aa39b46146d20a4ef5245bdc84651a037559e164` 一致。
+- 当前仍未 commit/push/deploy，生产网络 false，未运行 bundle/prepare-release，马匹数据与公开
+  计数未变化。下一步先取得最终精确集成版本的提交/推送/部署授权；获批部署后仅执行无写入
+  task 5.3，展示 candidate SHA 与清单并再次停下等待 task 5.4 授权。
+
+## 2026-07-23 task 5.2 v3 精确触网验收完成
+
+- 受审提交 `5eec316f073a3107d2887f724e95762f76f27ae2` 与当前生产
+  `17d7757aec764755394339400eb2523eae896fa5` 已分叉。本轮以 revision label 固定的独立镜像
+  `sha256:e543065ce08033b9d1b871478a85141c8b728334ec662bf6ea17fd2dcb1323f9` 执行批任务，
+  未切换生产 HEAD、未重建在线服务。
+- `p0batch-20b59bda0608` 通过 Japan 100/100 Netkeiba 唯一身份审核，批准 SHA 为
+  `51ac349ebd45848abb89c9f29545e695a760d245e09e72fcecc0de4bfaefa44f`。prepare 发出 300 次
+  8 秒节流请求，结果 61 完整、39 blocker：32 个候选身份期望字段不全、6 个来源履历证据不足、
+  1 个生涯场次缺口。
+- v3 核心验收通过：`unexpected_adapter_error=0`，旧误判
+  `netkeiba_profile_structure/title_status/title_sex/title_color=0`。xlsx SHA-256 为
+  `bee158e6d70c099c550102df6f9221b2d6bbb5fb75697d50a06d6d87b61cbc9f`。
+- 未 bundle、未 commit、未自动发布，公开马保持 2797（日本 2463）。一次性联网容器已删除，
+  宿主和四个在线应用的网络开关均为 false，healthz 通过。后续仍需人工审核 xlsx；任何 bundle、
+  数据库 commit 或自动首发都必须绑定新 artifact/hash 再单独授权。
 ## 2026-07-24 HRN 新采集正文边界已部署
 
 - 生产已运行 `main@0e4a3520`，四个应用服务同镜像；Django、migration drift、队列、日志和内外
@@ -51,7 +184,6 @@
   正文边界与相邻抓取回归 `58/58`、workflow `26/26`、Django check、compileall 和 diff check 已通过；
   仍须复用原 reviewer 会话复审，
   之后再取得当前精确版本的新发布授权。历史识别、历史重处理和代码部署仍是三个独立门禁。
-
 ## 2026-07-23 2026 赛历赛事中文名补齐已发布
 
 - 发布时执行证据记录：573 场 2026 年已发布赛事的中文名已单事务写入，
@@ -115,6 +247,17 @@ P0 马信息补全专项的模型交接文档见
   镜像 `sha256:07f46301…176ef`。网络在 `.env`、四应用容器与 Django setting 均为 false，
   HTTP 验收通过，公开马计数仍为 `2,797/日本2,463`；本步未触网、未写马匹数据。下一步
   触网 prepare 仍需单独授权。
+
+## 2026-07-23 netkeiba task 5.2 首次触网结果
+
+- 首次受控 prepare 已完成并立即关网：正式批 `p0batch-5802d72da799` 使用 `300` 次请求，
+  产出 xlsx，但只有 `45/100` 完整；`20` 条页面合法省略状态触发 `title_status`，另有
+  `2` 条已知 `partial_career` 被误归为 unexpected，因此未通过验收并已 abandon。
+- 未 bundle、未 commit、未自动公开；公开马仍为 `2,797/日本 2,463`。网络开关在宿主、
+  四应用容器和 Django setting 均恢复 false，全部 worker、healthz 和日本马匹页正常。
+- 本地已形成 parser v3 返修并通过四套件 `292/292`、OpenSpec `37/37` 和完整基线逐数
+  对照；独立 review 修正 1 个真实 validator 包装路径 P1 后最终 `APPROVED`、0 actionable
+  findings。尚未部署；task 5.2 仍未完成，下一次生产操作必须绑定新的受审精确版本。
 
 ## 2026-07-22 netkeiba 马匹客户端专项完成本地实现（未部署）
 

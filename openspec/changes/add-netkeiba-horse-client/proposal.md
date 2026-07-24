@@ -30,5 +30,9 @@
 - 运维：批次执行沿用既有门禁（ALLOW_NETWORK、限速、串行窗口、xlsx 人工复审）。
 - 恢复：2026-07-23 生产批次 `p0batch-e5cee174ba05` 已完成 prepare，但仅 `27/100` 完整、`73/100` 阻断；该批保留为证据且不 commit，修复部署后 abandon 并重新 select/approve，避免旧 checkpoint 掩盖解析器变化。
 - 发布门禁：部署/触网授权绑定受审代码版本；prepare 与 xlsx 复审后再冻结 bundle/hash，并针对精确完整子集与自动首发范围重新取得 commit 授权。
+- 发布候选门禁：xlsx 人工复审后新增不带发布批准语义的 `prepare-release` 阶段，冻结
+  research/mapping/authority、commit artifact、预计数据库动作与自动首发范围到精确
+  release-candidate SHA；正式 release manifest 只能在用户针对该 SHA 授权后生成，并必须反向绑定
+  candidate SHA。`prepare-release` 不写马匹数据库、不公开，也不产生 `release_approved` 账本事件。
 - 合规：netkeiba 访问延续既有保守限速（8s）；实际批量前复核访问条款与公开展示边界（KeibaScraper 调研已提示负载注意）。
 - 明确不做：不改 JBIS 客户端既有行为；不做 netkeiba 全站爬取；不把页面专有预测/评论类内容入库；不在本 change 修复 ExternalHorse 存量空四字段（仅随批次自然覆盖，批量修复另立专项）。

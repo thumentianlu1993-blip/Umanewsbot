@@ -91,6 +91,9 @@ REQUIRED_COMPLETION_MODULES = (
     HorseProfileModule.RACE_RECORD,
     HorseProfileModule.MAJOR_WINS,
 )
+FULL_PROFILE_COMPLETENESS_POLICY_VERSION = (
+    "p0-horse-full-profile-completeness.v2"
+)
 MODULE_REVIEW_ALIASES = {
     HorseProfileModule.PROFILE: ("profile", "basic_profile"),
     HorseProfileModule.PEDIGREE: ("pedigree",),
@@ -2484,8 +2487,41 @@ def evaluate_full_profile_completeness(
             f"{profile.career_record_authority_status}"
         )
 
-    if not race_records.filter(Q(result_status=HorseRaceResultStatus.WON) | Q(is_major_win=True)).exists():
-        blocking_reasons.append("major_wins")
+    has_recorded_win = race_records.filter(
+        Q(result_status=HorseRaceResultStatus.WON) | Q(is_major_win=True)
+    ).exists()
+    if not has_recorded_win:
+        latest_major_wins_review = (
+            profile.data_candidates.filter(
+                module=HorseProfileModule.MAJOR_WINS
+            )
+            .exclude(status=HorseProfileCandidateStatus.IGNORED)
+            .order_by("-fetched_at", "-id")
+            .first()
+        )
+        review_evidence = (
+            latest_major_wins_review.candidate_payload
+            if latest_major_wins_review
+            and isinstance(latest_major_wins_review.candidate_payload, dict)
+            else {}
+        )
+        review_metadata = (
+            review_evidence.get("review")
+            if isinstance(review_evidence.get("review"), dict)
+            else {}
+        )
+        has_applied_empty_major_wins_review = bool(
+            latest_major_wins_review
+            and latest_major_wins_review.status
+            == HorseProfileCandidateStatus.APPLIED
+            and latest_major_wins_review.applied_by_id
+            and latest_major_wins_review.applied_at
+            and review_evidence.get("payload") == []
+            and str(review_metadata.get("status") or "").strip().lower()
+            == "approved"
+        )
+        if not has_applied_empty_major_wins_review:
+            blocking_reasons.append("major_wins")
 
     if profile.racing_career_status == HorseRacingCareerStatus.UNKNOWN:
         blocking_reasons.append("racing_career_status.unknown")
@@ -3087,11 +3123,20 @@ def mark_profile_completion_ready(profile: HorseProfile, *, reviewer=None) -> di
     source_url = str((profile.source_refs or {}).get("p0_completion") or "")
     if not source_url:
         return {"status": "blocked", "blocking_reasons": ["review.source_url"]}
+    has_recorded_win = profile.race_records.filter(
+        Q(result_status=HorseRaceResultStatus.WON) | Q(is_major_win=True)
+    ).exists()
     for module in REQUIRED_COMPLETION_MODULES:
+        module_payload = (
+            []
+            if module == HorseProfileModule.MAJOR_WINS
+            and not has_recorded_win
+            else {"manual_review": True}
+        )
         _save_module_audit(
             profile=profile,
             module=module,
-            module_payload={"manual_review": True},
+            module_payload=module_payload,
             review={"status": "approved", "confidence": 100},
             source_name="manual_profile_review",
             source_url=source_url,

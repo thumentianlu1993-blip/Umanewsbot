@@ -21,9 +21,11 @@ from .japanese_racing_translation import (
 )
 from .terms import (
     ArticleEntityResolution,
-    apply_contextual_term_mappings,
+    apply_contextual_horse_placeholders,
+    apply_generated_text_contextual_mappings,
     recognized_horses_from_resolution,
     resolve_article_entities,
+    resolve_article_entities_for_article,
     serialize_recognized_horse_names,
     serialize_terms,
 )
@@ -84,8 +86,12 @@ class DummyTranslationProvider(TranslationProvider):
         )
         format_plan = build_japanese_format_plan(article.title_ja, body, resolution)
         seed_term_plan = build_japanese_seed_term_plan(article.title_ja, body, resolution, format_plan)
-        mapped_title = apply_contextual_term_mappings(seed_term_plan.protected_title, resolution)
-        mapped_body = apply_contextual_term_mappings(seed_term_plan.protected_body, resolution)
+        mapped_title = apply_generated_text_contextual_mappings(
+            seed_term_plan.protected_title, resolution
+        )
+        mapped_body = apply_generated_text_contextual_mappings(
+            seed_term_plan.protected_body, resolution
+        )
         mapped_title = restore_japanese_seed_term_placeholders(mapped_title, seed_term_plan, field_name="title")
         mapped_body = restore_japanese_seed_term_placeholders(mapped_body, seed_term_plan, field_name="body")
         mapped_title = restore_japanese_format_placeholders(mapped_title, format_plan, field_name="title")
@@ -439,10 +445,16 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         parts: list[str] = []
         cursor = 0
         for match in cls._ALL_PLACEHOLDER_RE.finditer(value):
-            parts.append(apply_contextual_term_mappings(value[cursor : match.start()], resolution))
+            parts.append(
+                apply_generated_text_contextual_mappings(
+                    value[cursor : match.start()], resolution
+                )
+            )
             parts.append(match.group(0))
             cursor = match.end()
-        parts.append(apply_contextual_term_mappings(value[cursor:], resolution))
+        parts.append(
+            apply_generated_text_contextual_mappings(value[cursor:], resolution)
+        )
         return "".join(parts)
 
     @classmethod
@@ -612,8 +624,18 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             )
         )[:unknown_horse_limit]
         _, horse_placeholders = self._protect_unknown_horse_names("", unknown_horse_names)
-        protected_title = self._protect_with_placeholders(seed_term_plan.protected_title, horse_placeholders)
-        protected_body = self._protect_with_placeholders(seed_term_plan.protected_body, horse_placeholders)
+        protected_title = apply_contextual_horse_placeholders(
+            seed_term_plan.protected_title,
+            resolution,
+            horse_placeholders,
+            field_name="title",
+        )
+        protected_body = apply_contextual_horse_placeholders(
+            seed_term_plan.protected_body,
+            resolution,
+            horse_placeholders,
+            field_name="body",
+        )
         protected_title = self._protect_with_placeholders(protected_title, person_source_placeholders)
         protected_body = self._protect_with_placeholders(protected_body, person_source_placeholders)
         unknown_horse_lines = [
@@ -882,11 +904,7 @@ def get_translation_provider() -> TranslationProvider:
 def translate_article(article: NewsArticle) -> TranslationResult:
     provider = get_translation_provider()
     source_text = article.body_ja_normalized or article.body_ja_raw
-    resolution = resolve_article_entities(
-        article.title_ja,
-        source_text,
-        source_language=article.source_language or SourceLanguage.JAPANESE,
-    )
+    resolution = resolve_article_entities_for_article(article)
     terms = _translation_terms(resolution)
     run = article.translation_runs.filter(status="started").order_by("-created_at", "-id").first()
     if run is None:

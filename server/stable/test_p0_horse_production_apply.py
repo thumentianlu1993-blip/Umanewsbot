@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import runpy
+import shutil
 import tempfile
 from datetime import date, timedelta
 from pathlib import Path
@@ -27,6 +28,7 @@ from stable.models import (
     TermType,
 )
 from stable.services.p0_horse_production_apply import (
+    FrozenJsonInput,
     P0ReviewedArtifactError,
     build_profile_mapping_snapshot,
     build_profile_snapshot,
@@ -376,17 +378,71 @@ class P0HorseProductionApplyTests(TestCase):
 
     def _commit(self, artifact_path: Path) -> dict:
         release_path, release_sha = self._release(artifact_path)
+        validated_release = FrozenJsonInput(
+            path=str(release_path),
+            sha256=release_sha,
+            payload={
+                "schema_version": "p0_horse_production_release_manifest.v2"
+            },
+        )
         with mock.patch(
             "stable.services.p0_horse_production_apply."
             "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
             (release_sha,),
+        ), mock.patch(
+            "stable.services.p0_horse_production_apply."
+            "_production_release_execution_window",
+        ) as execution_window, mock.patch(
+            "stable.services.p0_horse_production_apply."
+            "_load_and_validate_release_manifest",
+            return_value=validated_release,
         ):
+            execution_window.return_value.__enter__.return_value = validated_release
             return commit_reviewed_p0_completion_artifact(
                 artifact_path=artifact_path,
                 artifact_sha256=sha256_file(artifact_path),
                 release_manifest_path=release_path,
                 release_manifest_sha256=release_sha,
                 confirm_reviewed_artifact=True,
+            )
+
+    def test_release_gate_rejects_v2_without_real_candidate_and_missing_binding(self):
+        horse = self._horse(0)
+        artifact_path, artifact = self._prepare(
+            [horse],
+            [{"decision": "create_new"}],
+        )
+        release_path, _ = self._release(artifact_path, artifact)
+        release = json.loads(release_path.read_text(encoding="utf-8"))
+        release["schema_version"] = "p0_horse_production_release_manifest.v2"
+        release["bindings"]["release_candidate_sha256"] = "a" * 64
+        release_path = self._write_json("release-manifest-v2.json", release)
+        release_sha = sha256_file(release_path)
+        with mock.patch(
+            "stable.services.p0_horse_production_apply."
+            "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
+            (release_sha,),
+        ), self.assertRaisesRegex(P0ReviewedArtifactError, "region is missing"):
+            dry_run_reviewed_p0_completion_artifact(
+                artifact_path=artifact_path,
+                artifact_sha256=sha256_file(artifact_path),
+                release_manifest_path=release_path,
+                release_manifest_sha256=release_sha,
+            )
+
+        del release["bindings"]["release_candidate_sha256"]
+        release_path = self._write_json("release-manifest-v2-missing.json", release)
+        release_sha = sha256_file(release_path)
+        with mock.patch(
+            "stable.services.p0_horse_production_apply."
+            "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
+            (release_sha,),
+        ), self.assertRaisesRegex(P0ReviewedArtifactError, "candidate binding"):
+            dry_run_reviewed_p0_completion_artifact(
+                artifact_path=artifact_path,
+                artifact_sha256=sha256_file(artifact_path),
+                release_manifest_path=release_path,
+                release_manifest_sha256=release_sha,
             )
 
     def test_release_gate_rejects_operator_made_manifest_when_trusted_allowlist_is_empty(self):
@@ -461,6 +517,76 @@ class P0HorseProductionApplyTests(TestCase):
                 release_manifest_path=release_path,
                 release_manifest_sha256=release_sha,
             )
+
+    def test_rolling_v1_accepts_legacy_auto_publish_fixture(self):
+        from stable.services.p0_horse_completion_batch import (
+            _append_approvals_ledger,
+        )
+
+        horse = self._horse(0)
+        artifact_path, artifact = self._prepare(
+            [horse],
+            [{"decision": "create_new"}],
+        )
+        artifact.pop("completion_policy_version")
+        artifact_path = self._write_json("reviewed-artifact.json", artifact)
+        batch_dir = self.root / "legacy-rolling-batch"
+        approval_dir = batch_dir / "approval"
+        approval_dir.mkdir(parents=True)
+        ledger_path = batch_dir / "approvals_ledger.jsonl"
+        fixture = (
+            Path(__file__).resolve().parent
+            / "fixtures"
+            / "p0_horse_completion"
+            / "approvals_ledger_legacy_auto_first_publish.jsonl"
+        )
+        shutil.copyfile(fixture, ledger_path)
+        release = {
+            "schema_version": "p0_horse_production_release_manifest.v1",
+            "bindings": {
+                "research_v3_sha256": artifact["inputs"]["research_v3"]["sha256"],
+                "authority_manifest_sha256": artifact["inputs"][
+                    "authority_manifest"
+                ]["sha256"],
+                "profile_mapping_decisions_sha256": artifact["inputs"][
+                    "profile_mapping_decisions"
+                ]["sha256"],
+                "production_snapshot_sha256": artifact[
+                    "production_snapshot_sha256"
+                ],
+                "final_artifact_sha256": sha256_file(artifact_path),
+            },
+            "approved_by": "external_project_owner",
+            "approved_at": "2026-07-20T00:00:00Z",
+            "decision_reference": "codex-task:test-legacy-rolling-v1",
+            "executor_reviewer_id": self.reviewer.id,
+            "approvals_ledger_path": str(ledger_path),
+        }
+        release_path = approval_dir / "release-manifest-v1.json"
+        release_path.write_text(
+            json.dumps(release, ensure_ascii=False, sort_keys=True, indent=2)
+            + "\n",
+            encoding="utf-8",
+        )
+        release_sha = sha256_file(release_path)
+        _append_approvals_ledger(
+            batch_dir,
+            {
+                "event": "release_approved",
+                "region": "japan",
+                "release_manifest_sha256": release_sha,
+                "approved_by": release["approved_by"],
+                "approved_at": release["approved_at"],
+                "decision_reference": release["decision_reference"],
+            },
+        )
+        report = dry_run_reviewed_p0_completion_artifact(
+            artifact_path=artifact_path,
+            artifact_sha256=sha256_file(artifact_path),
+            release_manifest_path=release_path,
+            release_manifest_sha256=release_sha,
+        )
+        self.assertEqual(report["planned_profile_creates"], 1)
 
     def test_prepare_requires_explicit_mapping_and_rejects_name_only_or_missing_reviewer(self):
         horse = self._horse(0)
@@ -652,6 +778,72 @@ class P0HorseProductionApplyTests(TestCase):
         self._write_json("reviewed-artifact.json", artifact)
         with self.assertRaisesRegex(P0ReviewedArtifactError, "duplicate race"):
             self._dry_run(artifact_path)
+
+    def test_dry_run_rejects_stale_completion_policy_artifact(self):
+        horse = self._horse(0)
+        artifact_path, artifact = self._prepare(
+            [horse],
+            [{"decision": "create_new"}],
+        )
+        artifact["completion_policy_version"] = (
+            "p0-horse-full-profile-completeness.v1"
+        )
+        artifact_path = self._write_json("reviewed-artifact.json", artifact)
+        release_path, _ = self._release(artifact_path, artifact)
+        release = json.loads(release_path.read_text(encoding="utf-8"))
+        release["schema_version"] = "p0_horse_production_release_manifest.v2"
+        release["region"] = "japan"
+        release["bindings"]["release_candidate_sha256"] = "a" * 64
+        release_path = self._write_json("release-manifest-v2.json", release)
+        release_sha = sha256_file(release_path)
+
+        with self.assertRaisesRegex(
+            P0ReviewedArtifactError,
+            "completion policy version is stale",
+        ):
+            dry_run_reviewed_p0_completion_artifact(
+                artifact_path=artifact_path,
+                artifact_sha256=sha256_file(artifact_path),
+                release_manifest_path=release_path,
+                release_manifest_sha256=release_sha,
+            )
+
+    def test_commit_rejects_legacy_v1_release_without_database_writes(self):
+        horse = self._horse(0)
+        artifact_path, artifact = self._prepare(
+            [horse],
+            [{"decision": "create_new"}],
+        )
+        artifact.pop("completion_policy_version")
+        artifact_path = self._write_json("reviewed-artifact.json", artifact)
+        release_path, release_sha = self._release(artifact_path, artifact)
+        before = {
+            "profiles": HorseProfile.objects.count(),
+            "records": HorseRaceRecord.objects.count(),
+            "sources": HorseP0Source.objects.count(),
+            "runs": HorseProfileCompletionRun.objects.count(),
+        }
+
+        with mock.patch(
+            "stable.services.p0_horse_production_apply."
+            "TRUSTED_P0_HORSE_PRODUCTION_RELEASE_MANIFEST_SHA256",
+            (release_sha,),
+        ), self.assertRaisesRegex(
+            P0ReviewedArtifactError,
+            "legacy v1 release is read-only",
+        ):
+            commit_reviewed_p0_completion_artifact(
+                artifact_path=artifact_path,
+                artifact_sha256=sha256_file(artifact_path),
+                release_manifest_path=release_path,
+                release_manifest_sha256=release_sha,
+                confirm_reviewed_artifact=True,
+            )
+
+        self.assertEqual(before["profiles"], HorseProfile.objects.count())
+        self.assertEqual(before["records"], HorseRaceRecord.objects.count())
+        self.assertEqual(before["sources"], HorseP0Source.objects.count())
+        self.assertEqual(before["runs"], HorseProfileCompletionRun.objects.count())
 
     def test_dry_run_rejects_profile_and_input_snapshot_drift_after_prepare(self):
         horse = self._horse(0)

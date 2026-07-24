@@ -1,5 +1,65 @@
 # 关键决策
 
+## 2026-07-24 已审核空胜绩采用显式证据语义并版本化发布候选
+
+- “没有胜绩记录”不再等同于“胜绩资料缺失”。有实际胜绩沿用原判定；没有实际胜绩时，只有最新
+  非 ignored 的 `major_wins` 候选为 `applied`、审核结论为 `approved`、payload 精确为空列表，
+  且记录执行人、执行时间，才表示“已审核确认无胜绩”。未审核、非空 payload、pending、
+  conflict、rejected 均继续阻断，不伪造胜场、不绕过严格完整度。
+- 完整度语义会改变同一审核输入能否提交，因此属于发布候选的安全属性。新 artifact 和 candidate
+  统一绑定 `p0-horse-full-profile-completeness.v2`，所有 candidate/v2 release 加载与重算路径
+  必须精确校验；历史 v1 artifact 继续可信 v1 dry-run 验证兼容，任何 v1 commit 明确拒绝。
+- 手工 ready 复审无胜绩马时，新的 `major_wins` 审计必须继续保存空列表，不能写入较新的非空
+  手工标记而使档案立即重新不完整。
+- 旧 candidate 即使已有正式批准，只要尚未完整落库，就不能跨策略版本恢复。保留旧
+  candidate/release/ledger 作为审计证据；部署新受审版本后从冻结 bundle 重做 prepare-release。
+  发布授权必须在最新成功 review 后取得，review 前的持续授权或预授权不替代该门禁；对象、动作
+  或公开范围漂移必须 fail closed。
+
+## 2026-07-23 P0 正式提交拆分为无批准候选与独立批准
+
+- 人工 xlsx 内容复审不等于生产写入批准。bundle 之后先执行 `prepare-release`，冻结完整子集、
+  commit artifact、预计数据库动作与自动首发范围到精确 candidate SHA；candidate 不含
+  `approved_by`，不写 `release_approved`，不写业务表或公开状态。
+- 新 rolling release 只生成 `p0_horse_production_release_manifest.v2`，并反向绑定真实 candidate
+  SHA；v1 仅用于历史证据的只读复验，不再允许 builder 新建 v1 批准。正式 commit 和 standalone
+  apply 都必须验证 candidate 普通文件、完整 SHA、batch/state、准备事件与有序批准账本；
+  superseded 或 abandoned candidate 永久 fail closed。
+- 自动首发授权集合来自已复审 artifact，而不是地区 batch manifest。只有冻结 disposition 为
+  `attempt_publish_after_commit` 的对象可进入 live gate；hidden、manual lock、already published
+  以及未进 artifact 的 blocker 只进入排除审计，后续状态放宽不能扩大原批准。
+- 文件证据采用按 SHA 命名的不可变快照；账本严格解析 malformed/partial 行并在 append 后
+  flush/fsync。候选替换顺序固定为“写新 manifest（未批准）→ supersede 旧批准 → approve 新
+  manifest”，防止崩溃时新旧同时 active。
+- batch state lock 保护产物与 checkpoint 的短事务，execution lock 串行化正式批准、DB apply、
+  publish/retry 与 abandon。abandon 只允许尚未落库批次；已 committed 的数据库事实不能通过改
+  state 伪装撤回。execution lock 必须按同线程同 batch 可重入实现，锁顺序固定为
+  execution -> state；standalone v2 同样从 validation 持锁到数据库事务退出。artifact 尚未
+  committed 时必须复验 current batch manifest/combined SHA；只有精确 artifact path+SHA 的
+  committed completion run 可改用不可变 snapshot 恢复。
+- publish completed 是一次性终态证据，不是“可重新计算”的当前 gate。相同 candidate 的普通
+  重复 commit 必须返回冻结 publish checkpoint/report，不得因人工降级、解除 manual lock 或其他
+  gate 放宽再次调用发布。publish 未完成或失败只允许显式 `--retry-publish`；普通 commit 不兼任
+  发布恢复入口。
+- `prepare` 也属于同 batch execution window；锁顺序固定为 `execution -> state`，不得让 commit
+  在 prepare 的 artifact、workbook 或 checkpoint 更新中途读取证据。
+- prepare-release 的锁合同必须位于 public service，而不能只依赖 management command。所有 direct
+  caller 先取得同 batch execution lock，再进入 state serial lock；等待后必须复读 manifest/state。
+  committed 或 abandoned 终态只允许零写拒绝，不得生成新 candidate 或补写 state/ledger。
+- completed 重放不是仅凭 state checkpoint 的快捷返回。它必须在任何 dry-run/DB apply/publish 前
+  复验冻结 candidate、artifact/release、commit/publish checkpoint、committed completion run，
+  并要求唯一精确匹配的 v2 `auto_first_publish` 成功账本事件。证据缺失、重复或报告计数/ID/
+  frozen exclusions 不匹配时只允许人工审计，禁止自动补账本、重算 checkpoint 或写数据库。
+
+## 2026-07-23 task 5.2 分叉生产线执行决定
+
+- 本次已批准 task 提交与生产 HEAD 从共同父提交分叉：切换会回退并行已上线功能，合并会产生
+  未获本次精确授权的新 SHA。为同时保住生产运行态和授权对象，本次只把目标 Git tree 构建为带
+  完整 revision label 的一次性任务镜像，未替换在线 web/worker/beat/race_live_worker。
+- 本次网络权限缩到一次性 prepare 容器：生产 `.env` 和在线应用保持 false，仅该容器覆盖 true。
+  容器退出后确认其已不存在、四应用 false，生产 HEAD、马匹计数和 healthz 均未变化。
+- 本次一次性执行仅完成 task 5.2 的 prepare/xlsx，不是公网应用版本切换，也没有扩大数据写入
+  授权；未执行 bundle、commit 或自动首发。后续动作仍受既有精确 artifact/hash 授权边界约束。
 ## 2026-07-23 Codex 原生流程增加“用户确认实现”，HRN 正文按来源可信容器修复
 
 - 项目主流程更新为“探索 -> spec/design -> 方案审核 -> 用户确认实现 -> 测试先行 -> 子代理实现 ->
@@ -11,7 +71,6 @@
 - 新采集修复、历史候选识别、历史文章重处理和生产部署是独立门禁。历史识别只读、分批并输出哈希；
   部署前已存在的 HRN 文章一律留在历史 scope。历史写入必须绑定精确批准 manifest 及 file SHA，在事务锁行后
   复核全集与逐篇输入/输出哈希，任一漂移整批零写入；备份和另一次明确授权仍是前置条件，人工正文默认不自动覆盖。
-
 ## 2026-07-23 netkeiba 解析版本、旧批处置与生产授权拆分
 
 - 会改变 canonical payload 的 netkeiba 解析规则必须递增显式 parser version；版本同时
@@ -1941,6 +2000,16 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   仍按独立完整度与字段证据门禁写入；身份冲突继续 fail closed，不因批量范围写入而放宽。
 - 本次用户授权覆盖 P0 范围批量生产写入，但不授权猜值、跨身份合并、绕过来源许可或把未审核
   详情 artifact 标成已审核。
+
+## 2026-07-23 netkeiba 标题省略状态与错误分类规则
+
+- netkeiba `.horse_title .txt_01` 合法只含“性别年龄 + 毛色”时，允许状态字段为空；仅接受
+  空值或既有明确枚举，出现未知非空状态仍以 `netkeiba_profile_structure: title_status`
+  fail closed。英文名必须独立读取 `.eng_name`，不得再从整段标题位置推断。
+- `partial_career:` 是已知的证据完整度 blocker，应保留原记录序号和错误文本并归类为
+  `source_cache_or_adapter_error`；不得标成 `unexpected_adapter_error`，也不得据此猜测空着顺。
+- 上述标题解析会改变 canonical payload，因此 parser version 从 v2 递增到 v3；所有 v2
+  Netkeiba cache 与 checkpoint 必须按既有版本门禁失效，不能为节省请求绕过刷新。
 
 ## 2026-07-23 公开门户 P1–P3 采用一次性整合发布
 

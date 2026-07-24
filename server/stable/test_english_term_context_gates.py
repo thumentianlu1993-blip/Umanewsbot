@@ -216,10 +216,17 @@ class EnglishTermContextGateTests(TestCase):
         classifications = self._classifications(outcome, "Brilliant")
         self.assertEqual(classifications[0]["term_semantic_classification"], "uncertain")
         self.assertEqual(classifications[0]["match_position"], "title")
-        blocker = self._core_blockers(outcome, "Brilliant")[0]
-        self.assertEqual(blocker["payload"]["term_semantic_classification"], "uncertain")
+        self.assertFalse(self._core_blockers(outcome, "Brilliant"))
+        audit = next(
+            issue
+            for issue in outcome.issues
+            if issue.get("code") == "english_horse_occurrence_uncertain"
+            and (issue.get("payload") or {}).get("term_id") == classifications[0]["term_id"]
+        )
+        self.assertEqual(audit["severity"], "info")
+        self.assertEqual(audit["payload"]["classification"], "uncertain")
 
-    def test_uncertain_background_match_warns_without_blocking(self):
+    def test_uncertain_background_match_is_audited_without_warning_or_blocker(self):
         self._term("Brilliant", target="辉煌", priority=10)
         lead = "The report reviewed the meeting, runners and conditions in detail. " * 12
         article = self._article(
@@ -230,16 +237,23 @@ class EnglishTermContextGateTests(TestCase):
         outcome = validate_rewrite(article)
 
         self.assertFalse(self._core_blockers(outcome, "Brilliant"))
-        warning = next(
+        audit = next(
             issue
             for issue in outcome.issues
-            if issue.get("code") == "background_term_missing"
+            if issue.get("code") == "english_horse_occurrence_uncertain"
             and (issue.get("payload") or {}).get("source_ja") == "Brilliant"
         )
-        self.assertEqual(warning["severity"], "warning")
-        self.assertEqual(warning["payload"]["term_semantic_classification"], "uncertain")
+        self.assertEqual(audit["severity"], "info")
+        self.assertEqual(audit["payload"]["classification"], "uncertain")
+        self.assertFalse(
+            any(
+                issue.get("severity") == "warning"
+                and (issue.get("payload") or {}).get("source_ja") == "Brilliant"
+                for issue in outcome.issues
+            )
+        )
 
-    def test_high_priority_uncertain_background_match_still_only_warns(self):
+    def test_high_priority_uncertain_background_match_still_only_audits(self):
         self._term("Brilliant", target="辉煌", priority=100)
         lead = "The report reviewed the meeting, runners and conditions in detail. " * 12
         article = self._article(
@@ -250,13 +264,20 @@ class EnglishTermContextGateTests(TestCase):
         outcome = validate_rewrite(article)
 
         self.assertFalse(self._core_blockers(outcome, "Brilliant"))
-        warning = next(
+        audit = next(
             issue
             for issue in outcome.issues
-            if issue.get("code") == "background_term_missing"
+            if issue.get("code") == "english_horse_occurrence_uncertain"
             and (issue.get("payload") or {}).get("source_ja") == "Brilliant"
         )
-        self.assertEqual(warning["severity"], "warning")
+        self.assertEqual(audit["severity"], "info")
+        self.assertFalse(
+            any(
+                issue.get("severity") == "warning"
+                and (issue.get("payload") or {}).get("source_ja") == "Brilliant"
+                for issue in outcome.issues
+            )
+        )
 
     def test_preserved_alias_short_circuits_uncertain_classification(self):
         entry = self._term("Brilliant", target="辉煌")
@@ -462,6 +483,16 @@ class EnglishTermContextModeTests(TestCase):
             outcome = validate_rewrite(article)
 
         self.assertFalse(self._core_blockers(outcome, "Brilliant"))
-        self.assertTrue(
-            any(issue["code"] == "english_term_common_word_downgraded" for issue in outcome.issues)
+        classification = next(
+            item
+            for item in outcome.details["english_term_classifications"]
+            if item.get("source_ja") == "Brilliant"
+        )
+        self.assertEqual(classification["classification"], "common_word")
+        self.assertFalse(
+            any(
+                issue.get("severity") == "warning"
+                and (issue.get("payload") or {}).get("source_ja") == "Brilliant"
+                for issue in outcome.issues
+            )
         )

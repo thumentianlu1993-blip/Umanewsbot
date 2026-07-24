@@ -1,5 +1,24 @@
 # 项目总览
 
+## P0 马资料生产批准链路
+
+P0 滚动批次的内容审核与生产批准现在是两层门禁：
+
+`触网 prepare/xlsx -> 人工确认完整子集 -> bundle -> 无写入 prepare-release candidate ->
+用户按 candidate SHA 独立批准 -> commit -> 幂等复验 -> 仅按冻结范围自动首发`
+
+`prepare-release` 只把不可变输入、预计数据库动作和发布范围封进 SHA，不代表批准，也不写业务
+数据。正式提交只接受真实、active、未 supersede/abandon 的 candidate；自动首发范围来自人工通过的
+artifact 行，不能因为同属一个地区 batch 就把未完成对象带入。历史 v1 release 只保留验证兼容，
+新发布统一使用绑定 candidate 的 v2。
+
+完整度语义也属于候选绑定的一部分。没有实际胜绩时，只有最新 `major_wins` 候选已 applied、
+审核为 approved、payload 精确为空且带执行人/时间，系统才解释为“已确认无胜绩”；无审核、
+非空 payload 或冲突仍阻断。artifact 与 candidate 携带显式完整度策略版本，策略变化会强制
+产生新 SHA，旧批准不能跨版本复用；历史 v1 artifact 仅保留只读验证兼容。
+历史 v1 release 只允许 dry-run，不能 commit。手工 ready 复审无胜绩档案时继续保存空列表证据，
+避免复审动作自身使档案重新不完整。
+
 ## 新闻发布资格与积压链路
 
 新闻的“抓到时间”和“通过发布门禁时间”是两个独立事实。`first_seen_at/ranked_revived_at` 负责
