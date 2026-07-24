@@ -1,5 +1,36 @@
 # 当前状态
 
+## 2026-07-24 英文单词型马名语境门禁代码已部署，生产保持 shadow
+
+- 受审 fingerprint 为
+  `7ff685325de93578f0131a73746a50f23d627f5cd1dbb266f2afee372eb9aabd`，
+  content hash 为
+  `53d957ed41e6e0e5e0e68f4331cf9d0078a563129fbb9a995c845895f381a2cb`；
+  独立只读 review 会话 `019f9252-e50c-7d30-8e49-d6765919a51d` 的 CORE 结论为
+  `APPROVED`。本地完整矩阵 `333/333`、语言专项 `77/77`，Django check、migration
+  drift 与 diff check 均通过。
+- 本地 release commit 为 `1c34a00715aa3a0ac49153553622360afa10e049`，经
+  [PR #14](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/14) 合并；生产
+  `/opt/umanewsbot` 从 `97a38cf5` 快进到 merge commit
+  `2a3c249f4ffce2e97a2133f9a932234f74ec1e1e`。使用 `bash ./deploy_lowcost.sh`
+  部署，无 migration；`web/worker/beat` 重建后另行 force-recreate
+  `race_live_worker`。
+- `web/worker/beat/race_live_worker` 统一运行镜像
+  `sha256:316e4563b306ca70bde8e55a78c79d48de1ac8ca09d7259a8a7d0b4f5044c364`，
+  web healthy。Django check、`makemigrations --check --dry-run`、内网/公网及
+  `www` healthz、首页和 admin login 均通过或返回 HTTP 200；Celery 两节点 ping
+  正常。部署前 active/reserved 为空，部署后仅自然 netkeiba crawl 为 active，
+  reserved 为空；外部导入 `started=0`、locks `=0`，磁盘可用 `54G`。
+- 生产 `ENGLISH_TERM_CONTEXT_MODE=shadow`：新分类代码已部署，但尚未改变实际发布门禁。
+  切换 `enforce` 必须另行取得明确授权，本次不执行。
+- 对 article `9595` 仅做进程内 override `enforce` dry-run：
+  `workflow=published`、`automation=auto_published`、`horse_alert_codes=[]`；
+  `Logician` 为 `confirmed_horse` 且因已有正式译名 `needs_preserve=false`，
+  `Africa/East` 为 `common_word` 且均 `needs_preserve=false`。未保存、未重处理、
+  未发通知、未修改生产数据。
+- 两项 discovery aggregation P2 继续 deferred 到后续 change
+  `fix-term-discovery-visible-occurrence-aggregation`，本次发布不扩大范围。
+
 ## 2026-07-24 task 5.4 已正式写入并完成生产回归
 
 - 修复提交 `044f3d57f4f3bb75eac31f0567917132e5ae5cff` 已推送 `main` 并部署；四应用统一

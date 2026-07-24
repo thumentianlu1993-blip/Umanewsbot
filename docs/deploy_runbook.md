@@ -6553,3 +6553,40 @@ python manage.py complete_horse_profiles \
 5. 生产镜像只读解析 `9623` 的真实来源页得到 `.article-body / ok`，正文 9,355 字符，已知框架文本
    命中 0。自然 HRN job `27503 / 27504` 均成功但没有全新文章，因此 Gate A 的新稿翻译/公开验收
    尚未完成。重复抓取已清理 `9623` 原文层，但历史中文 `effective_body` 仍含污染；未运行历史 repair。
+
+## 2026-07-24 英文单词型马名语境门禁 shadow 发布记录
+
+1. 发布证据：受审 fingerprint
+   `7ff685325de93578f0131a73746a50f23d627f5cd1dbb266f2afee372eb9aabd`，
+   content hash
+   `53d957ed41e6e0e5e0e68f4331cf9d0078a563129fbb9a995c845895f381a2cb`；
+   review session `019f9252-e50c-7d30-8e49-d6765919a51d` 的 CORE 结论为
+   `APPROVED`。本地完整矩阵 `333/333`、语言专项 `77/77`，Django、migration
+   与 diff 检查通过。
+2. Git 链路：release commit
+   `1c34a00715aa3a0ac49153553622360afa10e049`，PR
+   [#14](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/14)，merge/生产
+   HEAD `2a3c249f4ffce2e97a2133f9a932234f74ec1e1e`。生产目录
+   `/opt/umanewsbot` 从 `97a38cf5` 快进，执行 `bash ./deploy_lowcost.sh`；本次无
+   migration。脚本重建 `web/worker/beat` 后，另行执行低成本 Compose 的
+   `up -d --no-deps --force-recreate race_live_worker`。
+3. 最终 `web/worker/beat/race_live_worker` 统一镜像为
+   `sha256:316e4563b306ca70bde8e55a78c79d48de1ac8ca09d7259a8a7d0b4f5044c364`，
+   web healthy。部署前 Celery active/reserved 为空；部署后两节点 ping 正常，仅自然
+   netkeiba crawl 为 active，reserved 为空。外部导入 `started=0`、locks `=0`，宿主磁盘
+   可用 `54G`。
+4. 验证通过：Django check、`makemigrations --check --dry-run`、容器内 healthz、公网
+   `umafans.run` 与 `www.umafans.run` healthz、首页和 admin login，HTTP 入口均为 200。
+   生产配置仍为 `ENGLISH_TERM_CONTEXT_MODE=shadow`，因此部署只增加 shadow 分类与审计，
+   不改变实际门禁。
+5. article `9595` 只读验收使用进程内 override `enforce` dry-run：
+   `workflow=published`、`automation=auto_published`、`horse_alert_codes=[]`；
+   `Logician` 为 `confirmed_horse / needs_preserve=false`，`Africa/East` 为
+   `common_word / needs_preserve=false`。该操作没有保存、重处理、通知或生产数据写入。
+6. 回滚边界：若代码发布引发异常，须先取得独立回滚授权，再将生产代码恢复到
+   `97a38cf5`，使用同一低成本 Compose 重建 `web/worker/beat/race_live_worker`，并复核
+   四应用镜像一致、web healthy、Django check、migration drift、Celery ping 与内外 HTTP。
+   本次无 migration、无历史 apply、无业务数据写入，正常代码回滚不恢复数据库。
+   回滚期间及回滚后保持 `ENGLISH_TERM_CONTEXT_MODE=shadow`。
+7. `shadow -> enforce` 是独立生产变更，必须重新明确授权并执行切换前后验证；deferred P2
+   `fix-term-discovery-visible-occurrence-aggregation` 不在本次发布或回滚范围。
