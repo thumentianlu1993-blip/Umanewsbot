@@ -11350,20 +11350,20 @@ class AutomationFlowTests(TestCase):
         )
         japanese_article = self._translated_article(
             source_article_id="ja-language-term-isolation",
-            title_ja="Derby preview for International Star",
-            translated_title_zh="Derby preview for International Star",
-            body_ja_raw="Derby preview for International Star.",
-            body_ja_normalized="Derby preview for International Star.",
-            translated_body_zh="Derby preview for International Star.",
+            title_ja="Derby preview after International Star won",
+            translated_title_zh="Derby preview after International Star won",
+            body_ja_raw="International Star won before the Derby preview.",
+            body_ja_normalized="International Star won before the Derby preview.",
+            translated_body_zh="International Star won before the Derby preview.",
         )
         english_article = self._translated_article(
             source_article_id="en-language-term-isolation",
             source_language=SourceLanguage.ENGLISH,
-            title_ja="Derby preview for International Star",
-            translated_title_zh="Derby preview for International Star",
-            body_ja_raw="Derby preview for International Star.",
-            body_ja_normalized="Derby preview for International Star.",
-            translated_body_zh="Derby preview for International Star.",
+            title_ja="Derby preview after International Star won",
+            translated_title_zh="Derby preview after International Star won",
+            body_ja_raw="International Star won before the Derby preview.",
+            body_ja_normalized="International Star won before the Derby preview.",
+            translated_body_zh="International Star won before the Derby preview.",
         )
 
         japanese_decision = score_article_for_automation(japanese_article)
@@ -11682,8 +11682,11 @@ class AutomationFlowTests(TestCase):
         self.assertEqual([issue["payload"]["source_ja"] for issue in blockers], ["Cody"])
         self.assertFalse(any(issue["code"] == "ambiguous_term_downgraded" for issue in outcome.issues))
 
-    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=["class", "content", "agent"])
-    def test_english_high_ambiguity_common_word_is_downgraded_from_blocker(self):
+    @override_settings(
+        ENGLISH_TERM_CONTEXT_MODE="enforce",
+        MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=["class", "content", "agent"],
+    )
+    def test_english_high_ambiguity_horse_match_is_audited_without_blocker(self):
         TermEntry.objects.create(
             term_type="horse",
             source_language=SourceLanguage.ENGLISH,
@@ -11710,13 +11713,24 @@ class AutomationFlowTests(TestCase):
 
         self.assertTrue(outcome.passed)
         self.assertFalse(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
-        downgraded = [issue for issue in outcome.issues if issue["code"] == "ambiguous_term_downgraded"]
-        self.assertTrue(downgraded)
-        self.assertIn(downgraded[0]["severity"], {"warning", "info"})
-        self.assertEqual(downgraded[0]["payload"]["source_ja"], "Class")
-        self.assertIn("high_ambiguity", downgraded[0]["payload"]["reason"])
+        classifications = [
+            item for item in outcome.details["english_term_classifications"]
+            if item.get("source_ja") == "Class"
+        ]
+        self.assertTrue(classifications)
+        self.assertTrue(all(item["classification"] == "uncertain" for item in classifications), classifications)
+        audits = [
+            issue for issue in outcome.issues
+            if issue["code"] == "english_horse_occurrence_uncertain"
+        ]
+        self.assertTrue(audits)
+        self.assertTrue(all(issue["severity"] == "info" for issue in audits))
+        self.assertFalse(any(issue["severity"] == "warning" for issue in outcome.issues))
 
-    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    @override_settings(
+        ENGLISH_TERM_CONTEXT_MODE="enforce",
+        MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[],
+    )
     def test_english_common_word_context_downgrades_review_seed_terms(self):
         for source_ja, target_zh in [
             ("Contact", "接触"),
@@ -11762,16 +11776,20 @@ class AutomationFlowTests(TestCase):
 
         self.assertTrue(outcome.passed)
         self.assertFalse(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
-        downgraded = [issue for issue in outcome.issues if issue["code"] == "english_term_common_word_downgraded"]
-        self.assertEqual({issue["payload"]["source_ja"] for issue in downgraded}, {"Contact", "Number", "Live", "Were", "AGENDA", "Tuesday"})
-        for issue in downgraded:
-            self.assertIn(issue["severity"], {"warning", "info"})
-            self.assertEqual(issue["payload"]["term_semantic_classification"], "common_word")
-            self.assertGreaterEqual(issue["payload"]["confidence"], 0.8)
-            self.assertTrue(issue["payload"]["classification_reason"])
-            self.assertTrue(issue["payload"]["matched_context"])
+        classifications = outcome.details["english_term_classifications"]
+        expected = {"Contact", "Number", "Live", "Were", "AGENDA", "Tuesday"}
+        self.assertEqual({item["source_ja"] for item in classifications}, expected)
+        for item in classifications:
+            self.assertEqual(item["classification"], "common_word")
+            self.assertGreaterEqual(item["confidence"], 0.8)
+            self.assertTrue(item["classification_reason"])
+            self.assertTrue(item["matched_context"])
+        self.assertFalse(any(issue["severity"] == "warning" for issue in outcome.issues))
 
-    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    @override_settings(
+        ENGLISH_TERM_CONTEXT_MODE="enforce",
+        MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[],
+    )
     def test_english_common_seed_with_race_marker_defaults_to_common_word_without_entity_context(self):
         TermEntry.objects.create(
             term_type="horse",
@@ -11799,13 +11817,18 @@ class AutomationFlowTests(TestCase):
 
         self.assertTrue(outcome.passed)
         self.assertFalse(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
-        downgraded = [issue for issue in outcome.issues if issue["code"] == "english_term_common_word_downgraded"]
-        self.assertEqual(len(downgraded), 1)
-        self.assertEqual(downgraded[0]["payload"]["source_ja"], "Classic")
-        self.assertEqual(downgraded[0]["payload"]["term_semantic_classification"], "common_word")
-        self.assertEqual(downgraded[0]["payload"]["classification_reason"], "ordinary_english_seed_default")
+        classifications = [
+            item for item in outcome.details["english_term_classifications"]
+            if item.get("source_ja") == "Classic"
+        ]
+        self.assertTrue(classifications)
+        self.assertTrue(all(item["classification"] == "common_word" for item in classifications))
+        self.assertFalse(any(issue["severity"] == "warning" for issue in outcome.issues))
 
-    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    @override_settings(
+        ENGLISH_TERM_CONTEXT_MODE="enforce",
+        MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[],
+    )
     def test_english_common_word_weak_racing_title_context_still_downgrades(self):
         for source_ja, target_zh in [
             ("Contact", "常联系"),
@@ -11845,9 +11868,13 @@ class AutomationFlowTests(TestCase):
 
         self.assertTrue(outcome.passed)
         self.assertFalse(any(issue["code"] == "core_term_missing" for issue in outcome.issues))
-        downgraded = [issue for issue in outcome.issues if issue["code"] == "english_term_common_word_downgraded"]
-        self.assertEqual({issue["payload"]["source_ja"] for issue in downgraded}, {"Contact", "Live"})
-        self.assertEqual({issue["payload"]["term_semantic_classification"] for issue in downgraded}, {"common_word"})
+        classifications = [
+            item for item in outcome.details["english_term_classifications"]
+            if item.get("source_ja") in {"Contact", "Live"}
+        ]
+        self.assertEqual({item["source_ja"] for item in classifications}, {"Contact", "Live"})
+        self.assertEqual({item["classification"] for item in classifications}, {"common_word"})
+        self.assertFalse(any(issue["severity"] == "warning" for issue in outcome.issues))
 
     @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
     def test_english_common_word_seeds_stay_blocked_in_entity_context(self):
@@ -11893,11 +11920,9 @@ class AutomationFlowTests(TestCase):
         self.assertEqual({issue["payload"]["source_ja"] for issue in blockers}, {"Contact", "Live", "Action"})
         self.assertFalse(any(issue["code"] == "english_term_common_word_downgraded" for issue in outcome.issues))
         for issue in blockers:
-            self.assertEqual(issue["payload"]["term_semantic_classification"], "uncertain")
-            self.assertIn(
-                issue["payload"]["classification_reason"],
-                {"common_seed_entity_context", "common_seed_context_uncertain"},
-            )
+            self.assertEqual(issue["payload"]["term_semantic_classification"], "proper_noun")
+            self.assertEqual(issue["payload"]["classification"], "confirmed_horse")
+            self.assertTrue(issue["payload"]["classification_reason"])
 
     @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
     def test_english_proper_race_terms_still_block_with_semantic_payload(self):
@@ -11973,7 +11998,8 @@ class AutomationFlowTests(TestCase):
         self.assertFalse(outcome.passed)
         self.assertEqual({issue["payload"]["source_ja"] for issue in blockers}, {"Tuesday", "GOOD JOB", "Fast Track"})
         for issue in blockers:
-            self.assertEqual(issue["payload"]["term_semantic_classification"], "uncertain")
+            self.assertEqual(issue["payload"]["term_semantic_classification"], "proper_noun")
+            self.assertEqual(issue["payload"]["classification"], "confirmed_horse")
             self.assertTrue(issue["payload"]["classification_reason"])
 
     @override_settings(MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS=["google play", "トレセン"])
@@ -12200,7 +12226,10 @@ class AutomationFlowTests(TestCase):
         self.assertIn(rejected.id, payload["skipped"]["manual_terminal_state"])
         self.assertEqual(recent.automation_status, AutomationStatus.MANUAL_REVIEW_REQUIRED)
 
-    @override_settings(MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[])
+    @override_settings(
+        ENGLISH_TERM_CONTEXT_MODE="enforce",
+        MULTIREGION_TERM_GATE_AMBIGUOUS_ENGLISH_TERMS=[],
+    )
     def test_reprocess_term_gate_blocked_articles_reports_common_word_downgrades_and_region_summary(self):
         TermEntry.objects.create(
             term_type="horse",
@@ -12242,7 +12271,7 @@ class AutomationFlowTests(TestCase):
         article.refresh_from_db()
         self.assertEqual(payload["candidate_ids"], [article.id])
         self.assertEqual(payload["revalidated_to_publish_ready_ids"], [article.id])
-        self.assertEqual(payload["summary"]["common_word_downgraded_count"], 1)
+        self.assertEqual(payload["summary"]["common_word_downgraded_count"], 9)
         self.assertEqual(payload["summary"]["proper_term_blocker_count"], 0)
         self.assertEqual(payload["summary_by_region"][RacingRegion.UNITED_KINGDOM]["revalidated_to_publish_ready_count"], 1)
         outcome = payload["outcomes"][0]

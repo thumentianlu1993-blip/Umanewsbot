@@ -9,7 +9,9 @@ from django.core.management.base import BaseCommand, CommandError
 from stable.models import RacingRegion
 from stable.services.term_gate_reprocessing import (
     ReprocessLeaseActive,
+    apply_published_term_gate_audit_run,
     commit_reprocess_run,
+    run_published_term_gate_audit_dry_run,
     run_reprocess_dry_run,
 )
 
@@ -29,10 +31,53 @@ class Command(BaseCommand):
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument("--commit", action="store_true")
         parser.add_argument("--json", action="store_true")
+        parser.add_argument("--published-audit", action="store_true")
+        parser.add_argument("--article-id", action="append", type=int, dest="article_ids")
+        parser.add_argument("--confirm", action="store_true")
+        parser.add_argument("--operator", default="")
+        parser.add_argument("--reviewer", default="")
 
     def handle(self, *args, **options):
         if options["dry_run"] == options["commit"]:
             raise CommandError("必须且只能指定 --dry-run 或 --commit")
+        if options.get("published_audit"):
+            article_ids = options.get("article_ids") or []
+            if not article_ids:
+                raise CommandError("published audit 必须至少指定一个 --article-id")
+            operator_identity = " ".join((options.get("operator") or "").split())
+            reviewer_identity = " ".join((options.get("reviewer") or "").split())
+            if not operator_identity or not reviewer_identity:
+                raise CommandError(
+                    "published audit 必须显式指定 --operator 和 --reviewer identity"
+                )
+            try:
+                if options["commit"]:
+                    if not options.get("run_id") or not options.get("manifest_sha256") or not options.get("confirm"):
+                        raise CommandError(
+                            "published audit commit 必须指定 --run-id、--manifest-sha256 和 --confirm"
+                        )
+                    payload = apply_published_term_gate_audit_run(
+                        dry_run_id=options["run_id"],
+                        manifest_sha256=options["manifest_sha256"],
+                        article_ids=article_ids,
+                        confirm=True,
+                        operator_identity=operator_identity,
+                        reviewer_identity=reviewer_identity,
+                    )
+                else:
+                    payload = run_published_term_gate_audit_dry_run(
+                        article_ids=article_ids,
+                        owner_token=f"published-audit:{operator_identity}:{reviewer_identity}",
+                        operator_identity=operator_identity,
+                        reviewer_identity=reviewer_identity,
+                    )
+            except ValueError as exc:
+                raise CommandError(str(exc)) from exc
+            rendered = json.dumps(payload, ensure_ascii=False, default=str, sort_keys=True)
+            self.stdout.write(
+                rendered if options["json"] else json.dumps(payload, ensure_ascii=False, indent=2, default=str)
+            )
+            return
         if options["commit"]:
             if not options.get("run_id") or not options.get("manifest_sha256"):
                 raise CommandError("commit 必须指定 --run-id 和 --manifest-sha256")
