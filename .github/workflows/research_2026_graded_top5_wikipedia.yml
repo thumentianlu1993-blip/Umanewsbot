@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: research-2026-graded-top5-wikipedia
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   collect:
