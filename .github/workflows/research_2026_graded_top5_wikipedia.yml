@@ -7,6 +7,12 @@ on:
     paths:
       - runtime/research/collect_2026_graded_top5_wikipedia.py
       - .github/workflows/research_2026_graded_top5_wikipedia.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - runtime/research/collect_2026_graded_top5_wikipedia.py
+      - .github/workflows/research_2026_graded_top5_wikipedia.yml
   workflow_dispatch:
 
 permissions:
