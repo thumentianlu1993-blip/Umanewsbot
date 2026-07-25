@@ -1582,3 +1582,11 @@ P0 马信息补全专项的模型交接文档见
   review 通过；完整接手入口为 `docs/changes/normalize-race-and-career-fields/HANDOFF.md`。
 - 当前仅完成方案与 Claude 交接，没有实现、迁移、发布或生产数据写入；必须等待用户新的明确
   “确认实现/开始实现/继续实现”，再按测试先行和 subagent 流程推进。
+
+## 2026-07-25 HRN 剩余正文污染修复候选待代码审核
+
+- HRN 正文内 `role="dialog"` 视频控件残留与美国 `The Jockey Club` 被套用英国机构译名的
+  修复已按真实 RED 完成本地实现。
+- 受影响回归 `290/290`、Django check、migration drift 和 diff 检查通过，无 migration。
+- 当前未 commit、未发布、未写生产，也未重新处理剩余 36 篇；必须先完成独立原生只读 code
+  review，再取得针对该精确版本的新发布授权。
