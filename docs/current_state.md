@@ -3488,3 +3488,19 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 当前准确状态为
   `plan approved / handoff complete / implementation not authorized / no code or production write`。
   本轮没有新增测试、应用代码、迁移或配置，没有 commit、push、PR、部署或生产写入。
+
+## 2026-07-25 HRN dialog 残留与美国机构译名修复完成本地实现，待代码审核
+
+- Gate 6 历史正文处理后的只读复核发现：HRN `.article-body` 内嵌的
+  `role="dialog"` 视频 modal 会把 `Race Video ×` 带入正文；生产已有英国同名机构词条
+  又会把 HRN 美国文章中的 `The Jockey Club` 映射为“英国赛马会”。
+- 当前候选只在 HRN 来源内删除 dialog 结构，并通过 provider 共用的确定性 TERM 计划把完整
+  英文边界 `The Jockey Club` 恢复为“美国赛马会”。英国非 HRN 来源、普通正文同词、
+  `The Jockey Clubhouse` 和其他术语行为保持原状。
+- 测试先行证据为聚焦 `10` 项中 `7` 项真实 RED；实现后主代理复跑两组受影响矩阵
+  `120/120 + 170/170 = 290/290`。Django check、migration drift 和 diff 检查通过；
+  本轮没有 migration。
+- 当前精确状态是
+  `implementation GREEN / code review pending / not authorized for release / no production write`。
+  尚未 commit、push、创建 PR、部署或重新 prepare Gate 6 剩余 36 篇；历史重处理继续等待
+  最新成功 code review 后的当前版本发布授权。

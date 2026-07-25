@@ -54,6 +54,10 @@ _SPONICHI_STRUCTURED_NOISE_SELECTORS = (
     "#login_article_more_area",
 )
 
+_HRN_STRUCTURED_NOISE_SELECTORS = (
+    "[role='dialog']",
+)
+
 _SPONICHI_PROMOTION_RE = re.compile(
     r"(?:スポニチ予想.*(?:販売中|プリントサービス)|e-printservice\.net)",
     re.IGNORECASE,
@@ -117,6 +121,14 @@ def _remove_structured_noise(node: Tag, removed: Counter[str]) -> None:
 
 
 def _remove_source_structured_noise(node: Tag, source: str, removed: Counter[str]) -> None:
+    if source == SourceSite.HORSE_RACING_NATION:
+        for selector in _HRN_STRUCTURED_NOISE_SELECTORS:
+            matches = list(node.select(selector))
+            for match in matches:
+                match.decompose()
+            if matches:
+                removed["hrn_structured_noise"] += len(matches)
+        return
     if source != SourceSite.SPONICHI:
         return
     for selector in _SPONICHI_STRUCTURED_NOISE_SELECTORS:

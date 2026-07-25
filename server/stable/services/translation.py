@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from django.conf import settings
 from openai import OpenAI
 
-from stable.models import NewsArticle, SourceLanguage, TermType, TranslationRun
+from stable.models import NewsArticle, SourceLanguage, SourceSite, TermType, TranslationRun
 
 from .japanese_racing_translation import (
     build_japanese_format_plan,
@@ -57,6 +57,148 @@ class TranslationProvider:
         raise NotImplementedError
 
 
+_HRN_JOCKEY_CLUB_RE = re.compile(
+    r"(?<![A-Za-z0-9])The\s+Jockey\s+Club(?![A-Za-z0-9])",
+    re.IGNORECASE,
+)
+
+
+@dataclass(frozen=True)
+class DeterministicTermSpec:
+    source: str
+    target: str
+    kind: str
+    source_site: str = ""
+    pattern: re.Pattern[str] | None = None
+
+
+@dataclass(frozen=True)
+class DeterministicTermPlaceholderPlan:
+    protected_title: str
+    protected_body: str
+    target_placeholders: dict[str, str]
+    person_source_placeholders: dict[str, str]
+    person_target_placeholders: dict[str, str]
+    source_term_placeholders: dict[str, dict]
+    excluded_source_keys: frozenset[str]
+
+
+def _normalized_source_key(value: str) -> str:
+    return re.sub(r"\s+", " ", value or "").strip().casefold()
+
+
+def _source_value(value) -> str:
+    return value.value if hasattr(value, "value") else str(value or "")
+
+
+def _build_deterministic_term_plan(
+    article: NewsArticle,
+    terms: list,
+    source_title: str,
+    source_body: str,
+) -> DeterministicTermPlaceholderPlan:
+    source_specs: dict[str, DeterministicTermSpec] = {}
+    if (
+        _source_value(article.source_site) == SourceSite.HORSE_RACING_NATION
+        and _source_value(article.source_language) == SourceLanguage.ENGLISH
+        and (
+            _HRN_JOCKEY_CLUB_RE.search(source_title or "")
+            or _HRN_JOCKEY_CLUB_RE.search(source_body or "")
+        )
+    ):
+        spec = DeterministicTermSpec(
+            source="The Jockey Club",
+            target="美国赛马会",
+            kind="source",
+            source_site=SourceSite.HORSE_RACING_NATION,
+            pattern=_HRN_JOCKEY_CLUB_RE,
+        )
+        source_specs[_normalized_source_key(spec.source)] = spec
+
+    person_specs: dict[str, DeterministicTermSpec] = {}
+    person_conflicts: set[str] = set()
+    for term in terms:
+        if term.term_type not in {TermType.JOCKEY, TermType.TRAINER, TermType.OWNER}:
+            continue
+        source = (term.matched_text or term.source_ja or "").strip()
+        target = (term.target_zh or "").strip()
+        key = _normalized_source_key(source)
+        if not key or not target or key in source_specs:
+            continue
+        previous = person_specs.get(key)
+        if previous and previous.target != target:
+            person_conflicts.add(key)
+            continue
+        person_specs[key] = DeterministicTermSpec(
+            source=source,
+            target=target,
+            kind="person",
+        )
+    for key in person_conflicts:
+        person_specs.pop(key, None)
+
+    specs = sorted(
+        [*source_specs.values(), *person_specs.values()],
+        key=lambda item: (-len(item.source), item.source.casefold(), item.target),
+    )
+    protected_title = source_title or ""
+    protected_body = source_body or ""
+    target_placeholders: dict[str, str] = {}
+    person_source_placeholders: dict[str, str] = {}
+    person_target_placeholders: dict[str, str] = {}
+    source_term_placeholders: dict[str, dict] = {}
+    for index, spec in enumerate(specs, start=1):
+        placeholder = f"__UMA_TERM_{index}__"
+        target_placeholders[placeholder] = spec.target
+        if spec.kind == "source":
+            pattern = spec.pattern or re.compile(re.escape(spec.source))
+            title_count = len(pattern.findall(protected_title))
+            body_count = len(pattern.findall(protected_body))
+            protected_title = pattern.sub(placeholder, protected_title)
+            protected_body = pattern.sub(placeholder, protected_body)
+            source_term_placeholders[placeholder] = {
+                "source_site": spec.source_site,
+                "source": spec.source,
+                "target": spec.target,
+                "field_counts": {"title": title_count, "body": body_count},
+            }
+        else:
+            protected_title = protected_title.replace(spec.source, placeholder)
+            protected_body = protected_body.replace(spec.source, placeholder)
+            person_source_placeholders[placeholder] = spec.source
+            person_target_placeholders[placeholder] = spec.target
+
+    return DeterministicTermPlaceholderPlan(
+        protected_title=protected_title,
+        protected_body=protected_body,
+        target_placeholders=target_placeholders,
+        person_source_placeholders=person_source_placeholders,
+        person_target_placeholders=person_target_placeholders,
+        source_term_placeholders=source_term_placeholders,
+        excluded_source_keys=frozenset(source_specs),
+    )
+
+
+def _resolution_without_source_term_conflicts(
+    resolution: ArticleEntityResolution,
+    excluded_source_keys: frozenset[str],
+) -> ArticleEntityResolution:
+    if not excluded_source_keys:
+        return resolution
+    return ArticleEntityResolution(
+        source_language=resolution.source_language,
+        entities=resolution.entities,
+        suppressed_candidates=resolution.suppressed_candidates,
+        accepted_terms=[
+            term
+            for term in resolution.accepted_terms
+            if _normalized_source_key(term.matched_text or term.source_ja or "")
+            not in excluded_source_keys
+        ],
+        machine_horse_tags=resolution.machine_horse_tags,
+    )
+
+
 def _translation_terms(resolution: ArticleEntityResolution) -> list:
     limit = max(0, int(settings.TRANSLATION_TERM_LIMIT))
     selected = list(resolution.accepted_terms[:limit])
@@ -86,30 +228,56 @@ class DummyTranslationProvider(TranslationProvider):
         )
         format_plan = build_japanese_format_plan(article.title_ja, body, resolution)
         seed_term_plan = build_japanese_seed_term_plan(article.title_ja, body, resolution, format_plan)
+        terms = _translation_terms(resolution)
+        deterministic_term_plan = _build_deterministic_term_plan(
+            article,
+            terms,
+            seed_term_plan.protected_title,
+            seed_term_plan.protected_body,
+        )
+        mapping_resolution = _resolution_without_source_term_conflicts(
+            resolution,
+            deterministic_term_plan.excluded_source_keys,
+        )
         mapped_title = apply_generated_text_contextual_mappings(
-            seed_term_plan.protected_title, resolution
+            deterministic_term_plan.protected_title, mapping_resolution
         )
         mapped_body = apply_generated_text_contextual_mappings(
-            seed_term_plan.protected_body, resolution
+            deterministic_term_plan.protected_body, mapping_resolution
+        )
+        mapped_title = OpenAICompatibleTranslationProvider._restore_unknown_horse_placeholders(
+            mapped_title,
+            deterministic_term_plan.target_placeholders,
+        )
+        mapped_body = OpenAICompatibleTranslationProvider._restore_unknown_horse_placeholders(
+            mapped_body,
+            deterministic_term_plan.target_placeholders,
         )
         mapped_title = restore_japanese_seed_term_placeholders(mapped_title, seed_term_plan, field_name="title")
         mapped_body = restore_japanese_seed_term_placeholders(mapped_body, seed_term_plan, field_name="body")
         mapped_title = restore_japanese_format_placeholders(mapped_title, format_plan, field_name="title")
         mapped_body = restore_japanese_format_placeholders(mapped_body, format_plan, field_name="body")
+        metadata = {
+            "provider": self.name,
+            "model": "dummy",
+            "terms": serialize_terms(resolution.accepted_terms),
+            "entities": [item.as_dict() for item in resolution.entities],
+            "suppressed_entities": [item.as_dict() for item in resolution.suppressed_candidates],
+            "machine_horse_tags": resolution.machine_horse_tags,
+            "japanese_format_normalizations": format_plan.as_dicts(),
+            "japanese_seed_term_normalizations": seed_term_plan.as_dicts(),
+            "person_term_placeholders": {
+                placeholder: {"source": source, "target": deterministic_term_plan.person_target_placeholders[placeholder]}
+                for placeholder, source in deterministic_term_plan.person_source_placeholders.items()
+            },
+        }
+        if deterministic_term_plan.source_term_placeholders:
+            metadata["source_term_placeholders"] = deterministic_term_plan.source_term_placeholders
         return TranslationResult(
             title_zh=f"[未配置真实翻译模型] {mapped_title}",
             body_zh=mapped_body,
             push_summary_zh=mapped_body[:140],
-            metadata={
-                "provider": self.name,
-                "model": "dummy",
-                "terms": serialize_terms(resolution.accepted_terms),
-                "entities": [item.as_dict() for item in resolution.entities],
-                "suppressed_entities": [item.as_dict() for item in resolution.suppressed_candidates],
-                "machine_horse_tags": resolution.machine_horse_tags,
-                "japanese_format_normalizations": format_plan.as_dicts(),
-                "japanese_seed_term_normalizations": seed_term_plan.as_dicts(),
-            },
+            metadata=metadata,
         )
 
 
@@ -159,7 +327,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             "如果识别到马名但术语表没有提供中文译名，必须保留该马名的原始写法，不得音译、意译或自行猜译。"
             "未被术语表或占位符保护的普通片假名是正文词汇，必须按上下文译成中文，不得保留原文。"
             "若原文中出现 __UMA_KEEP_数字__ 形式的占位符，请在译文中原样复制该占位符，不要翻译或删除。"
-            "若原文中出现 __UMA_TERM_数字__ 形式的人名占位符，也必须在译文中原样复制，系统会按术语表还原。"
+            "若原文中出现 __UMA_TERM_数字__ 形式的确定性术语占位符，也必须在译文中原样复制，系统会按指定译法还原。"
             "若原文中出现 __UMA_FORMAT_数字__ 形式的固定格式占位符，也必须在对应标题或正文中原样复制，系统会还原为规范格式。"
             "若原文中出现 __UMA_SEED_数字__ 形式的种子术语占位符，也必须在对应标题或正文中原样复制，系统会还原为指定译法。"
             "只可复制原文中实际出现的占位符，不得新造占位符、改变数字或混用 KEEP、TERM、FORMAT、SEED 命名空间。"
@@ -286,34 +454,6 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         for placeholder, name in placeholders.items():
             restored = restored.replace(placeholder, name)
         return restored
-
-    @staticmethod
-    def _person_term_placeholders(terms: list) -> tuple[dict[str, str], dict[str, str]]:
-        mappings: dict[str, str] = {}
-        conflicts: set[str] = set()
-        for term in terms:
-            if term.term_type not in {TermType.JOCKEY, TermType.TRAINER, TermType.OWNER}:
-                continue
-            source = (term.matched_text or term.source_ja or "").strip()
-            target = (term.target_zh or "").strip()
-            if not source or not target:
-                continue
-            if source in mappings and mappings[source] != target:
-                conflicts.add(source)
-                continue
-            mappings[source] = target
-        for source in conflicts:
-            mappings.pop(source, None)
-        source_placeholders: dict[str, str] = {}
-        target_placeholders: dict[str, str] = {}
-        for index, (source, target) in enumerate(
-            sorted(mappings.items(), key=lambda item: (-len(item[0]), item[0], item[1])),
-            start=1,
-        ):
-            placeholder = f"__UMA_TERM_{index}__"
-            source_placeholders[placeholder] = source
-            target_placeholders[placeholder] = target
-        return source_placeholders, target_placeholders
 
     @staticmethod
     def _usage_to_dict(usage) -> dict:
@@ -593,23 +733,6 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
         format_plan = build_japanese_format_plan(article.title_ja, source_text, resolution)
         seed_term_plan = build_japanese_seed_term_plan(article.title_ja, source_text, resolution, format_plan)
         terms = _translation_terms(resolution)
-        person_source_placeholders, person_target_placeholders = self._person_term_placeholders(terms)
-        person_placeholder_by_source = {
-            source: placeholder for placeholder, source in person_source_placeholders.items()
-        }
-        glossary_lines = [
-            f"- [{term.term_type}] "
-            f"{person_placeholder_by_source.get((term.matched_text or term.source_ja or '').strip(), term.matched_text or term.source_ja)}"
-            f" => {term.target_zh}"
-            + (f"（备注：{term.notes}）" if term.notes else "")
-            for term in terms
-            if (term.target_zh or "").strip()
-        ]
-        glossary_lines.extend(
-            f"- [seed-placeholder] {item.placeholder} => {item.target_text}"
-            f"（源词：{item.source_text}；译文中必须原样复制占位符，系统会恢复精确中文）"
-            for item in seed_term_plan.items
-        )
         unknown_horse_limit = max(1, int(settings.TRANSLATION_UNKNOWN_HORSE_LIMIT))
         recognized_horses = recognized_horses_from_resolution(resolution)
         consumed_entity_keys = format_plan.consumed_entity_keys | seed_term_plan.consumed_entity_keys
@@ -624,20 +747,50 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             )
         )[:unknown_horse_limit]
         _, horse_placeholders = self._protect_unknown_horse_names("", unknown_horse_names)
-        protected_title = apply_contextual_horse_placeholders(
+        horse_protected_title = apply_contextual_horse_placeholders(
             seed_term_plan.protected_title,
             resolution,
             horse_placeholders,
             field_name="title",
         )
-        protected_body = apply_contextual_horse_placeholders(
+        horse_protected_body = apply_contextual_horse_placeholders(
             seed_term_plan.protected_body,
             resolution,
             horse_placeholders,
             field_name="body",
         )
-        protected_title = self._protect_with_placeholders(protected_title, person_source_placeholders)
-        protected_body = self._protect_with_placeholders(protected_body, person_source_placeholders)
+        deterministic_term_plan = _build_deterministic_term_plan(
+            article,
+            terms,
+            horse_protected_title,
+            horse_protected_body,
+        )
+        person_source_placeholders = deterministic_term_plan.person_source_placeholders
+        person_target_placeholders = deterministic_term_plan.person_target_placeholders
+        person_placeholder_by_source = {
+            source: placeholder for placeholder, source in person_source_placeholders.items()
+        }
+        glossary_lines = [
+            f"- [{term.term_type}] "
+            f"{person_placeholder_by_source.get((term.matched_text or term.source_ja or '').strip(), term.matched_text or term.source_ja)}"
+            f" => {term.target_zh}"
+            + (f"（备注：{term.notes}）" if term.notes else "")
+            for term in terms
+            if (term.target_zh or "").strip()
+            and _normalized_source_key(term.matched_text or term.source_ja or "")
+            not in deterministic_term_plan.excluded_source_keys
+        ]
+        glossary_lines.extend(
+            f"- [seed-placeholder] {item.placeholder} => {item.target_text}"
+            f"（源词：{item.source_text}；译文中必须原样复制占位符，系统会恢复精确中文）"
+            for item in seed_term_plan.items
+        )
+        protected_title = deterministic_term_plan.protected_title
+        protected_body = deterministic_term_plan.protected_body
+        mapping_resolution = _resolution_without_source_term_conflicts(
+            resolution,
+            deterministic_term_plan.excluded_source_keys,
+        )
         unknown_horse_lines = [
             f"- {placeholder} => {name}（译文中先原样复制占位符，系统会还原为日文马名）"
             for placeholder, name in horse_placeholders.items()
@@ -702,6 +855,10 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                 "attempt": attempt,
                 "max_attempts": max_attempts,
             }
+            if deterministic_term_plan.source_term_placeholders:
+                last_metadata["source_term_placeholders"] = (
+                    deterministic_term_plan.source_term_placeholders
+                )
 
             format_violations = japanese_format_placeholder_violations(
                 raw_title,
@@ -750,7 +907,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
             if preserved_placeholder_violations:
                 last_metadata["preserved_placeholder_violations"] = preserved_placeholder_violations
                 retry_hint += self._placeholder_retry_instruction(
-                    label="马名或人物",
+                    label="马名或确定性术语",
                     namespace="__UMA_KEEP_数字__ 或 __UMA_TERM_数字__ 占位符",
                     violations=preserved_placeholder_violations,
                     source_title=protected_title,
@@ -793,7 +950,7 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                     for item in preserved_placeholder_violations
                 ):
                     raise TranslationResponseError(
-                        "Translation response changed required person terms",
+                        "Translation response changed required deterministic term placeholder",
                         metadata=last_metadata,
                     )
                 raise TranslationResponseError(
@@ -805,16 +962,25 @@ class OpenAICompatibleTranslationProvider(TranslationProvider):
                     metadata=last_metadata,
                 )
 
-            mapped_title = self._apply_contextual_mappings_outside_placeholders(raw_title, resolution)
-            mapped_body = self._apply_contextual_mappings_outside_placeholders(raw_body, resolution)
-            mapped_summary = self._apply_contextual_mappings_outside_placeholders(raw_summary, resolution)
+            mapped_title = self._apply_contextual_mappings_outside_placeholders(raw_title, mapping_resolution)
+            mapped_body = self._apply_contextual_mappings_outside_placeholders(raw_body, mapping_resolution)
+            mapped_summary = self._apply_contextual_mappings_outside_placeholders(raw_summary, mapping_resolution)
 
             title_zh = self._restore_unknown_horse_placeholders(mapped_title, horse_placeholders)
             body_zh = self._restore_unknown_horse_placeholders(mapped_body, horse_placeholders)
             push_summary_zh = self._restore_unknown_horse_placeholders(mapped_summary, horse_placeholders)
-            title_zh = self._restore_unknown_horse_placeholders(title_zh, person_target_placeholders)
-            body_zh = self._restore_unknown_horse_placeholders(body_zh, person_target_placeholders)
-            push_summary_zh = self._restore_unknown_horse_placeholders(push_summary_zh, person_target_placeholders)
+            title_zh = self._restore_unknown_horse_placeholders(
+                title_zh,
+                deterministic_term_plan.target_placeholders,
+            )
+            body_zh = self._restore_unknown_horse_placeholders(
+                body_zh,
+                deterministic_term_plan.target_placeholders,
+            )
+            push_summary_zh = self._restore_unknown_horse_placeholders(
+                push_summary_zh,
+                deterministic_term_plan.target_placeholders,
+            )
             title_zh = restore_japanese_seed_term_placeholders(title_zh, seed_term_plan, field_name="title")
             body_zh = restore_japanese_seed_term_placeholders(body_zh, seed_term_plan, field_name="body")
             push_summary_zh = restore_japanese_seed_term_placeholders(push_summary_zh, seed_term_plan)
