@@ -41,6 +41,19 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install requests beautifulsoup4 urllib3
 
+      - name: Apply current public status-label compatibility
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("runtime/research/collect_2026_graded_top5_wikipedia.py")
+          text = path.read_text(encoding="utf-8")
+          old = 'if status != "已完赛":'
+          new = 'if status not in {"已结束", "已完赛"}:'
+          if old not in text:
+              raise SystemExit("expected status-label guard not found")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+
       - name: Compile collector
         run: python -m py_compile runtime/research/collect_2026_graded_top5_wikipedia.py
 
