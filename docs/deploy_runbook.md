@@ -6639,3 +6639,78 @@ python manage.py complete_horse_profiles \
      `umanewsbot:rollback-pre-calendar-web-20260724T173452` 与
      `umanewsbot:rollback-pre-calendar-worker-20260724T173452`。
    - 本次无 migration 和业务数据写入；仅当确认数据损坏时才恢复数据库备份。
+
+## 2026-07-26 HRN dialog 残留与机构译名发布、历史重处理记录
+
+1. 发布身份：
+   - PR `#22`，生产 revision
+     `8cbee3e70bb1044248a18ed5521a1273d629d404`。
+   - `web / worker / beat` 镜像：
+     `sha256:02a83fbde219827ce5a49c633086057eb7d2957abb1e19c7b386205fc914c60e`。
+   - 当前低成本运行态未包含 `race_live_worker` 容器，本次未启动或重建该服务。
+2. 发布前恢复点：
+   - `.env.backup.pre-hrn-residual-20260725T162001Z`，SHA-256
+     `baef570546106ba5ec54f781b1c2f8e70ce14699b339d64a12d06cd7611632a3`。
+   - `backups/db/pre-hrn-residual-20260725T162001Z.dump`，
+     `250941179` bytes、mode `0600`、SHA-256
+     `0ebd22ebdf419e8819545bb31ee97658ab43dc56ce82f95ca88fbd9fbd415296`，
+     `pg_restore -l` `1062` 行。
+   - 旧镜像标签：
+     `umanewsbot:rollback-pre-hrn-residual-20260725T162001Z`。
+3. 发布过程：
+   - historical runner preflight 为 `migration_safe`，外部导入 `started=0`；
+     正常抓取任务自然结束后 active/reserved 为空。
+   - 生产从 `9b58bfd` 快进到 `8cbee3e7`，执行 `bash ./deploy_lowcost.sh`；
+     无待应用 migration，collectstatic 成功。
+4. 历史写入：
+   - 每批 apply 前停止 beat，并由 drain 脚本取得 worker active/reserved 双快照为 0；
+     apply 后立即独立 verify，再恢复 beat。
+   - 冻结 36 篇结果：`12 applied / 18 translation_failed / 6 review_rejected`。
+   - post-deploy inventory 另发现 8 篇旧正文只多 `Race Video / ×`，以独立 cohort
+     `f70b56c3...e137` 处理并 `8/8 verified`。
+   - 5 个批次均位于
+     `/opt/umanewsbot/runtime/horse_profile_completion/news_body_history/hrn-residual-20260725/`；
+     各目录内依次记录
+     `candidate_manifest.json / approved_manifest.json / rollback/receipt.json /
+     rollback/rollback_manifest.json` 的完整 SHA-256：
+     - `apply-b3-01/`：
+       `adc962890a5fcbdc415ec4fbcf6d2349a911c00eb0b801abfb5ac049428776c7 /
+       6e9ef52957cc91245da8d9949d9f8a66f5d89f41d824b929a1880246efd453fa /
+       6bb060584d90bddf0b69d9d990cb3ec40458f70c9e8f073375675d0583f96e2a /
+       1388a8cb6aa65eae94b56c3564a6a93110e2a8c2a10fb117614986489bc6704a`。
+     - `apply-b3-02/`：
+       `09bac09c7b3b6f9455d607709da736dc011ef0156bc0c8d35a664fa0b2350019 /
+       bca594b70d1d33e491375aeda12276d48610b8f8a0ed352e99f87bde6eb49e22 /
+       23b01b5bca9dd86d9590be6d29e3352196be505e3fe4e14fa3e3c6e6c646daa0 /
+       067c73e5fe6f149f4fb2924e392c8d0ba52d1d64d2dce5bcd71d062193d3e4ce`。
+     - `apply-b3-03/`：
+       `5df4d8468753b4e8975d341e3a6fe49c48e6c04ee4dbbf63095e673b996f0332 /
+       4525089e4886f554acb29d84fe681b5776f9fb80d36433f2ca01ae473350a21a /
+       6bae78c3dc3d9e93caf3fe114a4b710996b7fcc30df817aeec0b8b88cdae19ca /
+       b69f23be9dd5a1854f7b51b8df4567044daa16fab97056cfddc5ec2d5812e6d3`。
+     - `apply-term-retry-01/`：
+       `c711e0caac96f737b29a51a3586fde68d9375394497974ef90110cf6e20dab7a /
+       39f204d9dd10b192eed7c7626a5be9756f322e587ddfde968286ab5abf892130 /
+       94d2657cbedb5e085389942175e3f9ac345c560ac24834e163e4816890f2adca /
+       12dd25563f4612b4cb0ecf7de85e28044dc7b78d889888b77f51a82317295d15`。
+     - `apply-discovered-dialog-01/`：
+       `a049dc6eda61f31d71c4f5263952cc63768edc0e44b73d8fa0b1aa584cbeb794 /
+       7520ee9bd9ee785253c0813fd8146377dffbb01f81c388232e9645a25e387b34 /
+       73c5b5fac249563cdcf91fa5c46188658817e77a040ea0fd1094b7c9be19a95e /
+       02a40848d33a9f265bd7c23198e29129a61deac4f824af309c8f950b4e52e062`。
+5. 终验：
+   - 282 篇 cohort SHA `3b297aaa...c0d` 未漂移；
+     `source_clean 171 -> 183`、`source_changed 111 -> 99`、`source_blocked=0`。
+   - 24 个证据文件递归 SHA 校验和 5 个 batch verifier 全部 `status=ok`。
+   - 20 篇正文与当前解析器逐字一致；13 篇公开详情、首页及两个正式域名 healthz 均为
+     HTTP 200；Celery active/reserved 为空。
+   - 20 篇 QQ delivery、workflow 和公开时间写前/写后零漂移，不重发 QQ。
+6. 总体 closure：
+   `/opt/umanewsbot/runtime/horse_profile_completion/news_body_history/hrn-residual-20260725/hrn-residual-20260725-overall-closure.json`，
+   SHA-256
+   `ab0d93035afc593ccb5822323c2e27ffa1f48b53ec8c53030023cbcd21d33328`。
+7. 回滚：
+   - 单批业务回滚必须使用该批 rollback manifest + receipt SHA 做 CAS；
+     当前数据库已被外部编辑时 fail closed。
+   - 代码回滚使用上述旧镜像标签；本次无 migration，正常代码回滚不恢复数据库。
+   - 仅确认本轮造成数据库级损坏时，才进入整库恢复窗口。

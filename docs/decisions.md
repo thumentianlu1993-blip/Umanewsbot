@@ -2065,3 +2065,15 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   计划内排除。
 - 生产中既有英国词条不修改，非 HRN 来源继续使用原术语解析。未来出现不同来源、缩写或新 DOM
   结构时必须用真实样本另行审核，不扩成全局字符串替换。
+
+## 2026-07-26 本次部署后新发现的同结构污染使用独立 cohort
+
+- 本次发布后使用新解析器重跑了完整权威 cohort，因此没有仅以冻结目标的 apply 数量推算
+  `source_clean` 增量。
+- 新解析器使 8 篇旧 `source_clean` 文章变为 `source_changed`。逐篇 diff 证明它们属于同一
+  已审核 DOM 结构后，本次为其建立了独立 ID-set SHA、candidate、批准、receipt 和
+  rollback；冻结 36 篇的 completion 保持不变。
+- 本次新发现 8 篇均只移除 HRN dialog 的 `Race Video / ×`，独立 cohort SHA 为
+  `f70b56c3aaa4d988c827f28aee076c43199312132be9774c1ccd010a4e51e137`。
+- 其中已公开且已有 sent delivery 的文章 `9783` 仅按批准正文更新了数据库与网页，没有重发
+  QQ；写前/写后逐篇比对确认 delivery 与公开状态未漂移。

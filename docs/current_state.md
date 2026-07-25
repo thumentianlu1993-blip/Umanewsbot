@@ -3504,3 +3504,23 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   `implementation GREEN / code review pending / not authorized for release / no production write`。
   尚未 commit、push、创建 PR、部署或重新 prepare Gate 6 剩余 36 篇；历史重处理继续等待
   最新成功 code review 后的当前版本发布授权。
+
+## 2026-07-26 HRN dialog 残留与机构译名修复已发布，历史重处理完成
+
+- 独立 reviewer session `019f98b4-e9b2-7520-9b08-f04a3e01b2ec` 返回 `APPROVED`；
+  PR `#22` 已合并，生产 revision 为 `8cbee3e70bb1044248a18ed5521a1273d629d404`。
+- 生产 `web / worker / beat` 统一运行镜像
+  `sha256:02a83fbde219827ce5a49c633086057eb7d2957abb1e19c7b386205fc914c60e`；
+  本次无 migration，Django check、migration drift、Celery、内外 healthz 和公开新闻页通过。
+- 冻结 36 篇最终为 `12 applied / 18 translation_failed / 6 review_rejected`。部署后完整
+  inventory 另发现 8 篇同结构 `Race Video ×` dialog 污染，作为独立 cohort 逐篇审查后
+  `8/8 applied + verified`。
+- 本轮合计审查 44 篇、写入并验证 20 篇。282 篇权威 cohort 未漂移，
+  `source_clean 171 -> 183`、`source_changed 111 -> 99`、`source_blocked=0`。
+- 20 篇写前/写后 QQ delivery、workflow 和公开时间逐项零漂移；已发 QQ 的文章没有重发。
+- 总体 closure：
+  `/opt/umanewsbot/runtime/horse_profile_completion/news_body_history/hrn-residual-20260725/hrn-residual-20260725-overall-closure.json`，
+  SHA-256
+  `ab0d93035afc593ccb5822323c2e27ffa1f48b53ec8c53030023cbcd21d33328`。
+- 详细发布、失败/拒绝清单、5 组 receipt/rollback 和恢复点见
+  `docs/changes/fix-hrn-residual-boundaries-and-jockey-club-term/release_report.md`。
