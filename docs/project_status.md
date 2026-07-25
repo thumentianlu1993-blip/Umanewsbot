@@ -1590,3 +1590,15 @@ P0 马信息补全专项的模型交接文档见
 - 受影响回归 `290/290`、Django check、migration drift 和 diff 检查通过，无 migration。
 - 当前未 commit、未发布、未写生产，也未重新处理剩余 36 篇；必须先完成独立原生只读 code
   review，再取得针对该精确版本的新发布授权。
+
+## 2026-07-26 HRN 剩余正文污染修复已生产收口
+
+- PR `#22` 已部署到生产 revision `8cbee3e7`；HRN dialog 结构清洗和来源级“美国赛马会”
+  确定性译名已生效，本次无 migration。
+- 冻结 36 篇为 `12 applied / 18 translation_failed / 6 review_rejected`；部署后另发现并
+  修复同结构污染 8 篇，总计 `20 applied + verified`。
+- 282 篇 HRN cohort 的 ID-set 不变，最终 `183 source_clean / 99 source_changed /
+  0 source_blocked`。所有写入均有 candidate、approved manifest、receipt、rollback 和 SHA；
+  失败或内容截断文章未写库。
+- 20 篇 QQ delivery 与公开状态零漂移；已发送 QQ 未重发。完整证据见
+  `docs/changes/fix-hrn-residual-boundaries-and-jockey-club-term/release_report.md`。
