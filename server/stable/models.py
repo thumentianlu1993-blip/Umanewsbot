@@ -3006,6 +3006,27 @@ class HorseProfileCompletionRun(TimestampedModel):
         return self.name or f"P0 horse completion run #{self.pk}"
 
 
+class HorseIdentityEvidenceCommitReceipt(TimestampedModel):
+    approved_sha256 = models.CharField(max_length=64, unique=True)
+    artifact_sha256 = models.CharField(max_length=64)
+    approved_by = models.CharField(max_length=255)
+    approved_profile_ids = models.JSONField(default=list)
+    before_after = models.JSONField(default=dict)
+    evidence_summary = models.JSONField(default=dict)
+    result_payload = models.JSONField(default=dict)
+    operation_log = models.OneToOneField(
+        "OperationLog",
+        on_delete=models.PROTECT,
+        related_name="horse_identity_evidence_receipt",
+    )
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:
+        return f"P0 horse identity receipt {self.approved_sha256[:12]}"
+
+
 class HorseP0Source(TimestampedModel):
     profile = models.ForeignKey(HorseProfile, on_delete=models.CASCADE, related_name="p0_sources")
     term = models.ForeignKey("TermEntry", on_delete=models.SET_NULL, null=True, blank=True, related_name="p0_sources")

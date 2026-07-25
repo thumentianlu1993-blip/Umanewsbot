@@ -1,5 +1,76 @@
 # 当前状态
 
+## 2026-07-25 日本重赏 P0 身份补证进入本地实现（未部署、未触网）
+
+- task 1.1 已在生产 `9b58bfd437f58dede0de5d11d64537e2e68e214e` 上完成只读盘点：
+  7,228 个日本地区潜在 profile 中，直接 JRA/NAR 马匹锚点为 0，7,164 个只有官方赛事
+  上下文；1,353 个有唯一 Netkeiba ID，60 个身份底稿已完整。可尝试“赛事上下文解析锚点 +
+  双源补证”的底稿缺失上界为 1,283 个。
+- 现有库没有结构化日本训练确认，7,228 个对象全部只能视为训练范围未确认；其中 5,875 个没有
+  Netkeiba key，不能把 profile 行数直接解释为已跨赛事去重的真实马匹数。原设计“从已有官方
+  马匹锚点选 PoC”无法执行，须先修订为第二层赛事上下文解析 PoC。
+- 只读聚合前后 `RaceEvent/Runner/Result/HorseP0Source/HorseProfile` 计数完全一致，未访问
+  JRA/NAR/Netkeiba。摘要 SHA 为
+  `66d6415941810436ce9e657621f45c6f710ddf39e142a5e56cc67cf270ce086c`。
+- `docs/changes/bootstrap-p0-horse-identity-evidence/` 已取消 JAIRS，核心链路改为
+  `重赏赛事 → JRA/NAR 官方马匹锚点 → Netkeiba/JRA/NAR 四字段共识`；JRA-VAN 仅作为后续
+  Windows 离线补证来源。
+- 一期范围扩大为 1998–2026 年日本训练马参加的 G1/G2/G3、J-G1/J-G2/J-G3、
+  JpnⅠ/JpnⅡ/JpnⅢ，以及资格与训练证据完整的海外 G1/G2/G3。赛事等级只决定处理优先级，
+  不改变身份锁或证据等级。
+- 候选从 `RaceEventRunner`、`RaceEventResult`、`HorseP0Source` 反向生成并按 profile
+  去重；只有 JRA/NAR 所属或经审核的等价证据才能确认日本训练，只有赛事在日本或
+  `racing_region=Japan` 不足以通过。
+- 项目按个人非商用学习用途处理，不把另行申请商业数据授权设为实现前置；真实访问仍须一次性
+  人工触发、双重网络开关、分 host 限速、请求预算、缓存，且不公开源页面副本。
+- 修订方案已通过当时的规格严格校验（38/38）和两轮聚焦工程复审，`VERDICT: APPROVED`。
+  复审补齐三项门禁：外国出生/转籍只作 `sampling_clue`，不冒充训练证据；第二层完整官方
+  赛事上下文进入稳定排序；单匹总预算为 6 URL/18 次传输，其中 JRA/NAR 官方链最多
+  3 URL/6 次传输。
+- 当前任务清单进度为 `26/38`：任务 1.1–1.5、2.1–2.11、3.1–3.6、4.1–4.3 与 4.5 已完成。
+  当前本地链路已经覆盖
+  候选池、稳定排序、JRA/NAR 确定性锚点、三套独立 provider、Netkeiba/JRA/NAR 四字段
+  A/A+ 共识、6 URL/18 次传输与官方 3 URL/6 次传输持久预算、缓存/断点恢复、拒绝即停、
+  provider-neutral artifact、请求账本、逐马审核 xlsx、不可变审核事件、唯一 commit receipt
+  及严格 replay verifier。`commit/verify` 必须显式提供 `--confirm-approved-artifact`；
+  approve、commit 与 replay 都会复核资格、官方锚点、来源 URL/ID/内容 SHA、结果和
+  OperationLog，任一漂移即阻断。真实 prepare 候选会携带 commit 复验所需的完整冻结选择字段；
+  approve 会要求内嵌 candidate/blocker 与已哈希 JSONL sidecar 逐字节一致。旧 JAIRS/JBIS
+  新命令路径和旧测试均已移除；审查修复后身份补证测试 `46/46` 通过。
+- JRA-VAN 本轮只增加 Windows 离线交换 schema 与 Linux 校验器，要求 UM、血统登记编号、
+  数据规格版本、带时区 snapshot、逐记录 SHA、输入/输出清单 SHA；拒绝夹带原始 UM record，
+  未实现常驻 Windows 采集服务。
+- 分支已无冲突同步最新 `origin/main@9b58bfd4`；新迁移顺延为
+  `stable.0058_horse_identity_evidence_commit_receipt` 并依赖合并叶 `0057_merge_20260725_0448`，
+  测试数据库已完整迁移到 `0058`。Django check、迁移漂移检查、两份生产 Compose 配置和
+  `git diff --check` 的完整复验将在本轮修复后重跑。公开马匹履历模板已
+  补上每页 20 条的上一页/下一页导航并保留排序参数；身份补证 `46/46`，分页、旧 P0 批次及
+  P0/Netkeiba/补源/回填/发布门禁组合回归 `551/551` 均通过，新命令和服务
+  未引用 JBIS/JAIRS。旧 `stable.tests.P0HorseProfileDataCompletionTests` 的 4 个公开内部状态
+  文案断言与既有“公开页隐藏内部元数据”决策冲突，且最新主线已将该模块转为
+  `tests_legacy.py`；不将它们解释为本变更回归。
+- 第三次独立只读代码审查已返回 6 项 finding：迁移主线冲突、approve 未从来源身份重算共识、
+  URL 未强制 HTTPS、直连官方锚点可缺来源 ID、请求无连接/读取超时，以及新 change 误放
+  OpenSpec 目录。当前已同步主线并改为 `0058`，approve 会重算四字段共识，来源请求逐跳强制
+  HTTPS 且使用 `5s/20s` 超时，JRA/NAR 锚点要求非空 `CNAME/k_lineageLoginCode`，durable
+  artifacts 已迁至 `docs/changes/bootstrap-p0-horse-identity-evidence/` 并补齐
+  `test_cases.md/rollout.md`；随后原生完整范围 review 又发现两项 P1：真实 prepare 候选缺少
+  commit 冻结字段、approve 未把内嵌候选绑定到已审核 sidecar。两项均已补测试并修复：
+  prepare 复制完整冻结选择字段，approve 对 candidate/blocker JSONL 做规范字节一致性校验。
+  身份模块 `46/46`、相关主链 `551/551` 均通过。
+  Django check、migration drift、`0057 → 0058 → 0057 → 0058` 往返迁移、两份生产 Compose
+  config、durable artifact 五件套和 `git diff --check` 通过。原生 reviewer 会话
+  `019f99c5-9fa6-7022-a0a6-c999e1dbd68d` 已复审确认两项 P1 均关闭、无直接相关
+  actionable finding；受审指纹为
+  `a8e8f7f18d0e37095ebc30789a103e046955213825dcac8390188b6ab25cb19b`。
+- 2026-07-26 发布前发现 `origin/main` 已新增 HRN 正文边界修复及其发布证据；本分支未 staging、
+  未提交，先后安全快进并恢复本任务改动，当前无冲突同步
+  `origin/main@0aeb0ed7660746bdcdcbad0343aad771b1324918`。合并后身份模块 `46/46`、相关主链
+  `551/551`、Django check、migration drift、两份 Compose config 和 diff check 再次通过；
+  由于 approved parent 已变化，旧指纹和发布授权不再用于提交，当前等待同一原生 reviewer
+  会话对最新组合版本复审。
+  当前仍未部署、未执行生产迁移、未真实访问 JRA/NAR/Netkeiba、未写生产马匹数据。
+
 ## 2026-07-24 首页人工头条与 AI 编辑推荐控制已实现（待独立代码审核）
 
 - 基于 `origin/main@10f341e6`，worktree `add-editorial-headline-control`，分支

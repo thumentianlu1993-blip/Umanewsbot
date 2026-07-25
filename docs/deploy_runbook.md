@@ -1,5 +1,49 @@
 # 部署运行手册
 
+## 日本重赏 P0 身份补证的未来生产边界（2026-07-25 方案）
+
+- 2026-07-25 task 1.1 只读盘点使用生产 HEAD `9b58bfd437f58dede0de5d11d64537e2e68e214e`
+  的现有 web 容器执行 ORM 聚合；没有外部来源请求。写前/写后计数均为
+  `RaceEvent=9867 / Runner=100132 / Result=91904 / HorseP0Source=57393 /
+  HorseProfile=46318`。
+- 聚合 artifact 位于
+  `docs/changes/bootstrap-p0-horse-identity-evidence/artifacts/production-readonly-20260725/`；
+  `summary.json` SHA-256 为
+  `66d6415941810436ce9e657621f45c6f710ddf39e142a5e56cc67cf270ce086c`，
+  `report.md` SHA-256 为
+  `c3fe77fcfa83389fd5ed7897f178ec565a84496aea97cee90b89e2e31928dcc3`。
+- 当前任务清单进度为 `26/38`，候选池、JRA/NAR 上下文解析、三套 provider、网络预算/
+  缓存/恢复、A/A+ 共识、完整 prepare artifact、请求账本、审核 xlsx、不可变 approve event、
+  唯一 receipt 和严格 replay verifier 已完成；真实 prepare 候选保存完整 commit 冻结选择字段，
+  approve 要求内嵌 candidate/blocker 与已哈希 JSONL sidecar 规范字节一致。旧 JBIS/JAIRS
+  新命令路径已移除，身份补证 `46/46` 通过。分支已同步 `origin/main@9b58bfd4`，receipt
+  迁移为 `0058` 并依赖当前
+  合并叶 `0057`；`0057 → 0058 → 0057 → 0058` 往返迁移、Django、迁移漂移、两份 Compose
+  config、durable artifact 五件套和 diff check 均通过。
+- 正式 commit/verify 命令必须带精确批准 SHA、独立批准人及
+  `--confirm-approved-artifact`。身份补证 `46/46`，公开履历分页、旧 P0 批次及其余相关主链
+  组合回归 `551/551` 已通过；新命令与服务无 JBIS/JAIRS 引用。
+  首轮明确代码 review 的 6 项 finding 已修复；完整范围原生 review 新发现的两项 P1 也已修复，
+  原生 reviewer 会话已确认两项 P1 关闭且无直接相关 actionable finding。2026-07-26 发布前
+  `origin/main` 新增 HRN 修复及其发布证据，本分支在未 staging/commit 状态下安全同步到
+  `0aeb0ed7`；合并后身份模块 `46/46`、相关主链 `551/551`、Django、migration drift、
+  Compose 和 diff check 通过，须对该最新组合版本完成同会话复审并重新取得发布授权后才能提交。
+  当前未迁移生产、未触网、未写生产。
+- 部署后常驻 `web/worker/beat/race_live_worker` 的马匹网络开关仍保持 false。真实 PoC 只在
+  另获当次触网授权后，由一次性容器按显式 20 匹清单运行；JRA、NAR、Netkeiba 分 host 限速，
+  429、访问拒绝或异常访问提示立即停止，结束后立即恢复网络 false。
+- 首次 PoC 不写数据库，必须 20/20 产生 pass/partial/稳定 blocker、未知异常为 0、至少 1 匹
+  pass，且请求账本闭合。通过后才能另行授权首批最多 100 匹 prepare。
+- 第二层每匹最多访问赛事索引、赛事详情、马匹档案各一个 JRA/NAR URL；每 URL 最多三次尝试，
+  单匹总计最多 6 个不同 URL/18 次传输，官方链最多 3 个不同 URL/6 次传输，同 provider
+  重定向也计入预算。外国出生或转籍抽样线索不得写入 `training_evidence`，必须由官方档案
+  另行确认日本训练身份。
+- prepare 仍只生成 qualification、candidate、blocker、source evidence、请求账本和 xlsx。
+  正式写入必须先备份并绑定精确批准 SHA；commit 只填三个仍为空且未锁定的身份字段，任一漂移
+  整批回滚，公开状态与履历不变。
+- 未来 JRA-VAN 通过 Windows 节点离线导出 `horse_identity.jsonl` 与 manifest；生产 Linux
+  只做无网络 SHA/版本/清单校验，不为 Windows 节点开放数据库直连。
+
 ## task 5.4 最终生产执行记录（2026-07-24）
 
 - 精确提交 `044f3d57f4f3bb75eac31f0567917132e5ae5cff`，生产镜像

@@ -1,5 +1,38 @@
 # 关键决策
 
+## 2026-07-25 日本重赏 P0 一期采用 Netkeiba + JRA/NAR 身份共识
+
+- JAIRS 完全退出自动化与人工主链。JRA 中央马档案和 NAR 地方马档案分别作为正式 provider；
+  有直接官方马匹 ID/URL 时优先使用，没有锚点时只允许带赛事日期、马号和官方来源的有界上下文
+  检索，只有 Netkeiba 的对象继续阻断。
+- 一期范围包含 G1/G2/G3、J-G1/J-G2/J-G3、JpnⅠ/JpnⅡ/JpnⅢ及证据完整的日本训练马
+  海外 G1/G2/G3。等级只决定 `G1 → G2 → G3` 的批次顺序；G3 的完整双源证据可以通过，
+  G1 的单一 Netkeiba 证据仍必须阻断。
+- 自动候选只接受马名、父、母和完整出生日期一致：Netkeiba+JRA 或 Netkeiba+NAR 为 A，
+  三源一致为 A+；任何冲突、年份级日期、字段缺失或候选不唯一均不提交。
+- “日本训练”使用独立证据门禁：JRA 的美浦/栗东等所属、NAR 地方所属，或绑定来源与赛事日期的
+  已审核等价证据；比赛地点、日文名、日本产地和 profile 地区均不能单独证明。
+- 项目所有者确认网站是个人非商用学习项目，不另设商业授权申请前置。访问合同仍保持最小化、
+  低频、缓存、请求预算、拒绝即停且不公开复制源页面；用途改变时重新评估来源合同。
+- JRA-VAN DataLab 只定义 Windows 清单导出与 Linux 离线校验接口：交换包必须绑定 UM record
+  type、血统登记编号、数据规格版本、带时区 snapshot、逐记录 SHA、输入清单与输出清单 SHA；
+  校验器拒绝夹带原始 UM record。普通 DataLab 原始记录不直接复制到公开产品，本期网页 PoC
+  不依赖 Windows 节点，也不实现常驻采集服务。
+- 2026-07-25 只读盘点确认直接官方马匹锚点为 0 后，首个 PoC 固定从第二层开始：只消费冻结的
+  官方赛事 URL、日期、场地、马号和精确马名；索引页最多跟随一个唯一详情链接，参赛行和同源
+  马匹链接都必须唯一，禁止站内开放式马名搜索。外国出生/转籍线索只决定抽样覆盖，不证明
+  日本训练身份。单匹总计最多 6 个不同 URL/18 次传输，JRA/NAR 上下文链最多 3 URL/6 次传输。
+- 审核批准与正式写入继续分离：approve 生成包含 reviewer、获批 profile 集合、时间、prepare
+  artifact SHA 的不可变审核事件；commit/verify 除精确批准 SHA 外还必须显式确认该 artifact。
+  approve 还必须从冻结的 Netkeiba 与 JRA/NAR 原始身份字段重新计算共识，不能信任候选中的
+  `fields` 自述或只靠伴随文件 SHA；真实 prepare 候选必须携带 commit 复验所需的完整冻结选择
+  字段，approve 必须要求内嵌 candidate/blocker 与已哈希 JSONL sidecar 规范字节一致。
+  所有来源 URL 与重定向逐跳限定为 allowlist HTTPS，
+  JRA/NAR 直连锚点必须携带非空来源 ID，每次传输使用显式连接/读取超时。
+  首次事务以唯一批准 SHA 写入 receipt 与 OperationLog；重复执行只有在 before/after、资格、
+  官方来源证据摘要、结果 payload 和审计日志全部与 receipt 一致时才返回零写 replay，不能仅凭
+  当前字段值相同推断历史写入成功。
+
 ## 2026-07-24 首页人工头条实现完成（代码就位，待审核与发布）
 
 - 已按审核通过的方案实现 HomepageHeadlineSelection / HomepageHeadlineRecommendation
