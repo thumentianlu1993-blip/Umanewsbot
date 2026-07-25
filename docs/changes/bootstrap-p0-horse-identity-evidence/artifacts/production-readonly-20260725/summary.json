@@ -1,0 +1,104 @@
+{
+  "schema_version": "p0-horse-official-anchor-inventory.v1",
+  "generated_at": "2026-07-24T21:37:56.918327+00:00",
+  "production_git_head": "9b58bfd437f58dede0de5d11d64537e2e68e214e",
+  "database_vendor": "postgresql",
+  "read_only": true,
+  "external_source_network_requests": 0,
+  "scope": {
+    "years": [
+      1998,
+      2026
+    ],
+    "grades": [
+      "G1",
+      "G2",
+      "G3",
+      "JG1",
+      "JG2",
+      "JG3",
+      "JPN1",
+      "JPN2",
+      "JPN3"
+    ],
+    "profile_region": "japan",
+    "source_type": "major_race_participant",
+    "source_status": "active",
+    "training_policy": "profile region and Japan race location are provisional only; confirmed_japan requires explicit reviewed training evidence"
+  },
+  "database_counts_before_and_after": {
+    "before": {
+      "race_events": 9867,
+      "runners": 100132,
+      "results": 91904,
+      "p0_sources": 57393,
+      "profiles": 46318
+    },
+    "after": {
+      "race_events": 9867,
+      "runners": 100132,
+      "results": 91904,
+      "p0_sources": 57393,
+      "profiles": 46318
+    }
+  },
+  "summary": {
+    "source_row_count": 7228,
+    "unique_profile_count": 7228,
+    "highest_grade_profile_counts": {
+      "G1": 623,
+      "G2": 1732,
+      "G3": 4750,
+      "JG1": 1,
+      "JG2": 5,
+      "JG3": 5,
+      "JPN1": 20,
+      "JPN2": 26,
+      "JPN3": 66
+    },
+    "official_anchor_provider_counts": {},
+    "official_context_provider_counts": {
+      "jra": 7044,
+      "nar": 120
+    },
+    "inventory_category_counts": {
+      "missing_or_nonunique_netkeiba": 53,
+      "official_context_only": 7164,
+      "only_netkeiba": 11
+    },
+    "netkeiba_key_count_distribution": {
+      "0": 5875,
+      "1": 1353
+    },
+    "identity_baseline_counts": {
+      "complete": 60,
+      "incomplete": 7168
+    },
+    "public_counts": {
+      "not_public": 5875,
+      "public": 1353
+    },
+    "training_scope_status_counts": {
+      "unresolved": 7228
+    },
+    "route_matrix": {
+      "missing_or_nonunique_netkeiba|missing_netkeiba|incomplete|unresolved": 53,
+      "official_context_only|missing_netkeiba|incomplete|unresolved": 5822,
+      "official_context_only|unique_netkeiba|complete|unresolved": 59,
+      "official_context_only|unique_netkeiba|incomplete|unresolved": 1283,
+      "only_netkeiba|unique_netkeiba|complete|unresolved": 1,
+      "only_netkeiba|unique_netkeiba|incomplete|unresolved": 10
+    },
+    "highest_grade_actionable_context_incomplete_counts": {
+      "G1": 108,
+      "G2": 349,
+      "G3": 789,
+      "JG1": 1,
+      "JG2": 5,
+      "JG3": 5,
+      "JPN1": 2,
+      "JPN2": 6,
+      "JPN3": 18
+    }
+  }
+}

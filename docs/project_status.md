@@ -300,6 +300,26 @@
   59 行/50 组只读 inventory 通过；有界联网 prepare 因 recovery plan 的
   `expected_target_empty` 实现缺口在 transport 前阻断，请求数为 0，尚无候选或赛果写入。
 - 2026-07-26: 赛事新闻质量治理代码实现完成，待独立代码 review 和发布授权。
+- 2026-07-25: 日本重赏 P0 身份补证方案已取消 JAIRS，改为 Netkeiba+JRA/NAR；一期覆盖
+  G1/G2/G3、J-G1/J-G2/J-G3、JpnⅠ/JpnⅡ/JpnⅢ及合格海外重赏。规格严格校验 38/38
+  严格校验与工程复审通过。task 1.1 生产只读盘点已完成：7,228 个潜在日本 profile 中直接
+  官方马匹锚点为 0，只有赛事上下文为 7,164；唯一 Netkeiba ID 且底稿不完整的第二层候选上界
+  为 1,283。PoC 已修订为第二层确定性上下文解析；任务清单当前完成 `26/38`，本地候选池、
+  三套 provider、网络预算/缓存/恢复、JRA/NAR 锚点解析、A/A+ 四字段比较、完整审核 artifact/
+  xlsx、JRA-VAN 离线交换校验器、不可变 approve event、唯一 receipt 和严格 replay verifier
+  已实现，旧 JAIRS/JBIS 新命令路径已移除。履历分页 `16/16`、身份补证 `41/41`、旧 P0 批次
+  `222/222`、其余相关主链 `313/313` 已有通过基线。第三次只读 review 返回 6 项 finding；
+  当前已同步 `origin/main@9b58bfd4`，迁移顺延为依赖 `0057` 的 `0058`，approve 重算来源共识，
+  请求逐跳强制 HTTPS 并使用 `5s/20s` 超时，官方锚点要求非空来源 ID，方案产物已迁入
+  `docs/changes/` 并补齐五件套。原生完整范围 review 随后发现真实 prepare 候选缺少 commit
+  冻结字段、approve 未绑定内嵌候选与审核 sidecar 两项 P1；现已补测试并修复。身份模块
+  `46/46`、分页/P0/Netkeiba/补源/
+  回填/发布门禁组合 `551/551`、Django、migration drift、`0058` 往返迁移、Compose 和 diff
+  check 均通过；原生 reviewer 会话已确认两项 P1 关闭且无直接相关 actionable finding。
+  2026-07-26 发布前因 `origin/main` 新增 HRN 修复及发布证据，本分支未提交并安全同步至
+  `0aeb0ed7`；合并后身份模块 `46/46`、相关主链 `551/551`、Django、migration drift、
+  Compose 和 diff check 再次通过，当前等待同一 reviewer 对最新组合版本复审。未部署、
+  未触网或写生产。
 - 2026-07-24: 首页人工头条与 AI 编辑推荐控制代码实现完成，待独立代码 review 和发布授权。
 
 ## 2026-07-27 赛果缺口恢复方案

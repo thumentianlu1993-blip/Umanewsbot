@@ -46,6 +46,13 @@
         <span class="record-race">{% if record.public_event_path %}<a href="{{ record.public_event_path }}">{% if record.display_race_name != record.race_name %}{{ record.display_race_name }}{% else %}{{ record.race_name }}{% endif %}</a>{% else %}<b>{% if record.display_race_name != record.race_name %}{{ record.display_race_name }}{% else %}{{ record.race_name }}{% endif %}</b>{% endif %}{% if record.display_race_name != record.race_name %}<small>{{ record.race_name }}</small>{% endif %}<span>{% if record.display_racecourse != record.racecourse %}{{ record.display_racecourse }}<small>{{ record.racecourse }}</small>{% elif record.racecourse %}{{ record.racecourse }}{% endif %}{% if record.distance_text %} · {{ record.distance_text }}{% endif %}{% if record.grade_text %} · {{ record.grade_text }}{% endif %}</span></span>
         <span class="record-time tabular">{{ record.public_finish_time }}</span>
       </div>{% endfor %}</div>{% else %}<p class="muted">暂无参赛履历。</p>{% endif %}
+      {% if race_records_page.has_other_pages %}
+        <nav class="pagination" aria-label="参赛履历分页">
+          {% if race_records_page.has_previous %}<a href="?{% if records_pagination_querystring %}{{ records_pagination_querystring }}&amp;{% endif %}records_page={{ race_records_page.previous_page_number }}">上一页</a>{% endif %}
+          <span>第 {{ race_records_page.number }} / {{ race_records_page.paginator.num_pages }} 页</span>
+          {% if race_records_page.has_next %}<a href="?{% if records_pagination_querystring %}{{ records_pagination_querystring }}&amp;{% endif %}records_page={{ race_records_page.next_page_number }}">下一页</a>{% endif %}
+        </nav>
+      {% endif %}
     </section>
 
     {% if article_entries %}<section class="panel"><h2>相关新闻</h2><div class="related-grid">{% for entry in article_entries %}{% include "stable/public/_article_card.html" with article=entry.article follow_entry=entry %}{% endfor %}</div></section>{% endif %}
