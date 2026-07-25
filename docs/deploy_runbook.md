@@ -1,5 +1,30 @@
 # 部署运行手册
 
+## normalize-race-and-career-fields 生产执行记录（2026-07-25）
+
+- 精确提交 `9b58bfd4`（PR #21 squash-merge），生产镜像
+  `sha256:b1f125342388`（`umanewsbot:prod`）。
+  `web/worker/beat` 均使用该镜像。
+- Migration 0054（schema）、0055（index）、0056（BROUGHT_DOWN enum）、0057（merge main）
+  全部成功应用；部署前生产 HEAD 为 `f8e09c3b`。
+- 生产 dry-run：12,817 行（RaceEvent 9,867 + HorseRaceRecord 2,950），
+  normalized=538 / preserved=12,265 / unknown=14 / conflicts=0。
+  Manifest SHA-256：`2e0149176e7303db2cf10f3ffb797a394c6e77a4f8b7a138789beaab2b4a8ec1`。
+- 回填 apply：Run #1 completed（12,817 planned/actual，0 skipped，12,817 receipts）；
+  Run #2 幂等复验 completed（1,197 planned/actual，checkpoint 恢复批次 26+，1,197 receipts）；
+  第三次 apply 零新增写入，幂等性确认。
+- 数据质量验证：
+  - `"01"` → position=1：80/80 全部修正。
+  - `"10"` → position=10：不再被 `startswith("1")` 误计为冠军。
+  - DINOZZO（profile 21607）胜场：9（旧，含误计）→ 5（新，正确）。
+  - Art Power（profile 7669）胜场：17（旧，含误计）→ 10（新，正确）。
+  - 页面名次前导零已消除（`"06"` → `6`），非完赛状态显示中文标签。
+- 功能开关：`RACE_FIELD_NORMALIZED_DISPLAY_ENABLED=true`、
+  `RACE_FIELD_NORMALIZED_STATS_ENABLED=true`（覆盖率 100% 后启用）。
+- 页面验收：`/healthz/`、`/horses/21607/`、`/horses/7669/`、`/races/`、`/horses/`
+  全部返回 200；容器 web/worker/beat/db/redis/nginx/onebot 全部 Up。
+- 详细发布报告：`docs/changes/normalize-race-and-career-fields/release_report.md`。
+
 ## task 5.4 最终生产执行记录（2026-07-24）
 
 - 精确提交 `044f3d57f4f3bb75eac31f0567917132e5ae5cff`，生产镜像
