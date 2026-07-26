@@ -1,12 +1,6 @@
 name: Research 2026 graded top-five Wikipedia mapping
 
 on:
-  push:
-    branches:
-      - research/2026-graded-top5-wikipedia
-    paths:
-      - runtime/research/collect_2026_graded_top5_wikipedia.py
-      - .github/workflows/research_2026_graded_top5_wikipedia.yml
   pull_request:
     branches:
       - main
@@ -19,8 +13,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: research-2026-graded-top5-wikipedia
-  cancel-in-progress: true
+  group: research-2026-graded-top5-wikipedia-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   collect:
