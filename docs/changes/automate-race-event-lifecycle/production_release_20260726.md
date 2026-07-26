@@ -79,8 +79,21 @@
 ## 6. 下一门禁
 
 - 当前可以进入 dry-run 结果人工审核和 shadow manifest 准备，不能直接启用 shadow。
+- 7 个 transition 候选均为旧日期、`scheduled` 且无 `race_datetime`：
+  美国 4 场、英国 2 场、法国 1 场，统一命中 `local_next_day_midnight -> finished`。
+- 生产五地区共有 523 场已发布、未取消的 P0/P1/featured 赛事，当前
+  `race_datetime` 非空数为 `0`。因此小范围 enforce 所要求的“至少一场有明确出走时间”
+  暂时无法满足。
+- 当前窗口没有日本或香港赛事；日本下一场重点赛事为 2026-08-16 札幌纪念，香港下一场为
+  2026-12-13 香港杯，二者也都缺少 `race_datetime`。
+- The Racing API registry 当前为 schema v2，静态许可记录允许 proof network、最多 3 个请求，
+  有效期至 `2026-08-16T16:00:00+00:00`；但
+  `run_the_racing_api_free_proof()` 仍读取 v1 `registry["endpoints"]`，会在 transport 前失败。
+  本轮没有调用 API，也不能据此声明 provider 可用、覆盖率或延迟。
 - shadow 前必须：
-  1. 修复并 review 双重 migration 执行入口；
-  2. 明确日本、香港在观察窗口无样本时的补样策略；
-  3. 冻结逐场 enrollment/baseline manifest 及 SHA-256；
-  4. 取得针对精确 manifest、赛事集合和观察窗口的独立用户授权。
+  1. 修复并 review The Racing API schema v2 proof runner，再执行最多 3 请求的独立只读 proof；
+  2. 修复并 review 双重 migration 执行入口；
+  3. 明确日本、香港在观察窗口无样本时的补样策略；
+  4. 取得至少一场可信 `race_datetime`，或明确保持 enforce 门禁关闭；
+  5. 冻结逐场 enrollment/baseline manifest 及 SHA-256；
+  6. 取得针对精确 manifest、赛事集合和观察窗口的独立用户授权。
