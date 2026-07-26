@@ -564,6 +564,19 @@ CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT = int(
 CELERY_RACE_LIVE_WORKER_TIME_LIMIT = int(
     env("CELERY_RACE_LIVE_WORKER_TIME_LIMIT", "210")
 )
+# ── Race Event Lifecycle (Phase A) ──
+RACE_EVENT_LIFECYCLE_ENABLED = env_bool("RACE_EVENT_LIFECYCLE_ENABLED", False)
+RACE_EVENT_LIFECYCLE_MODE = env("RACE_EVENT_LIFECYCLE_MODE", "off")
+RACE_EVENT_LIFECYCLE_BATCH_SIZE = int(env("RACE_EVENT_LIFECYCLE_BATCH_SIZE", "100"))
+RACE_EVENT_LIFECYCLE_CLAIM_TTL_SECONDS = int(
+    env("RACE_EVENT_LIFECYCLE_CLAIM_TTL_SECONDS", "240")
+)
+RACE_EVENT_LIFECYCLE_SOFT_TIME_LIMIT = int(
+    env("RACE_EVENT_LIFECYCLE_SOFT_TIME_LIMIT", "120")
+)
+RACE_EVENT_LIFECYCLE_TIME_LIMIT = int(
+    env("RACE_EVENT_LIFECYCLE_TIME_LIMIT", "150")
+)
 
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
@@ -579,11 +592,20 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_ROUTES = {
     "stable.tasks.poll_race_live_event_task": {"queue": "race_live"},
     "stable.tasks.monitor_race_live_sla_task": {"queue": "race_live"},
+    "stable.tasks.advance_race_event_lifecycle_task": {"queue": "default"},
 }
 CELERY_TASK_ANNOTATIONS = {
     "stable.tasks.poll_race_live_event_task": {
         "soft_time_limit": CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT,
         "time_limit": CELERY_RACE_LIVE_WORKER_TIME_LIMIT,
+    },
+    "stable.tasks.advance_race_event_lifecycle_task": {
+        "soft_time_limit": RACE_EVENT_LIFECYCLE_SOFT_TIME_LIMIT,
+        "time_limit": RACE_EVENT_LIFECYCLE_TIME_LIMIT,
+    },
+    "stable.tasks.scan_due_race_event_lifecycle_task": {
+        "soft_time_limit": RACE_EVENT_LIFECYCLE_SOFT_TIME_LIMIT,
+        "time_limit": RACE_EVENT_LIFECYCLE_TIME_LIMIT,
     },
 }
 
@@ -653,6 +675,10 @@ CELERY_BEAT_SCHEDULE = {
     "detect-automation-anomalies": {
         "task": "stable.tasks.detect_automation_anomalies_task",
         "schedule": crontab(minute="*/30"),
+    },
+    "scan-due-race-lifecycle": {
+        "task": "stable.tasks.scan_due_race_event_lifecycle_task",
+        "schedule": crontab(minute="*/5"),
     },
     "production-summary-daily": {
         "task": "stable.tasks.production_summary_task",

@@ -2077,3 +2077,21 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   `f70b56c3aaa4d988c827f28aee076c43199312132be9774c1ccd010a4e51e137`。
 - 其中已公开且已有 sent delivery 的文章 `9783` 仅按批准正文更新了数据库与网页，没有重发
   QQ；写前/写后逐篇比对确认 delivery 与公开状态未漂移。
+
+## 2026-07-26 赛事生命周期设计决策（阶段 A 已实现）
+
+- 状态推进与赛果权威分离；时间规则按 IANA 时区执行；cancelled/postponed/finished 为终态。
+- 时区合同：日本→Asia/Tokyo、香港→Asia/Hong_Kong、英国→Europe/London、法国→Europe/Paris、
+  美国→manifest 逐场审核 America/*；其他 region fail closed。
+- 默认 mode=off，所有配置关闭；不接入 provider、不改新闻门禁、不 dispatch race-live。
+
+## 2026-07-26 The Racing API schema v2 proof 路由必须显式绑定地区
+
+- schema v2 proof 禁止隐式默认英国；调用者必须显式给出 registry 中已审核的 region。
+- 单次 proof 固定顺序为该地区 `racecards today`、`racecards tomorrow`、无地区过滤的
+  `results today skip=0`，最多 3 请求；所有 URL 均由 registry v2 route contract builder
+  构建，并继续受 HTTPS host、请求参数、15 秒超时、2 MiB、无 redirect/retry 和 1.05 秒间隔约束。
+- v2 artifact 只记录本次实际尝试的请求 path，不把未执行路由写成已执行证据；v1 proof
+  行为保持兼容。
+- runner 修复、独立 review 与真实联网 proof 是三个独立授权点。本地测试通过不构成联网许可，
+  当前仍禁止读取生产 secret 或发出请求。

@@ -2054,3 +2054,96 @@ def publish_article(article: NewsArticle, user) -> None:
         detail=f"发布文章《{article.effective_title}》",
         admin=user,
     )
+
+
+# ── Race Event Lifecycle (Phase A) ────────────────────────────────────
+
+@shared_task
+def scan_due_race_event_lifecycle_task() -> dict:
+    """Celery Beat task: claim due lifecycle controls and dispatch per-event tasks.
+
+    Runs every 5 minutes. Does NOT dispatch race-live polling.
+    """
+    if not getattr(settings, "RACE_EVENT_LIFECYCLE_ENABLED", False):
+        return {"enabled": False, "claimed": 0, "dispatched": 0}
+
+    from stable.services.race_event_lifecycle import claim_due_lifecycle_controls
+
+    now = timezone.now()
+    claims = claim_due_lifecycle_controls(
+        now=now,
+        batch_size=getattr(settings, "RACE_EVENT_LIFECYCLE_BATCH_SIZE", 100),
+        ttl_seconds=getattr(settings, "RACE_EVENT_LIFECYCLE_CLAIM_TTL_SECONDS", 240),
+    )
+
+    for claim in claims:
+        dispatch_kwargs = {
+            "event_id": claim.event_id,
+            "expected_generation": claim.schedule_generation,
+            "attempt_token": claim.attempt_token,
+            "expected_claim_generation": claim.claim_generation,
+        }
+        transaction.on_commit(
+            lambda kwargs=dispatch_kwargs: advance_race_event_lifecycle_task.apply_async(
+                kwargs=kwargs,
+            )
+        )
+
+    count = len(claims)
+    return {"enabled": True, "claimed": count, "dispatched": count}
+
+
+@shared_task
+def advance_race_event_lifecycle_task(
+    event_id: int,
+    expected_generation: int,
+    attempt_token: str,
+    expected_claim_generation: int = 0,
+) -> dict:
+    """Advance a single event's lifecycle based on time rules only.
+
+    No network, no provider calls, no race-live dispatch.
+    Must be called inside transaction.atomic() because the underlying
+    service uses select_for_update().
+    """
+    from stable.services.race_event_lifecycle import apply_race_lifecycle_decision
+
+    from stable.models import RaceEventLifecycleControl
+
+    now = timezone.now()
+    with transaction.atomic():
+        # Re-check both ENABLED and MODE inside the transaction to prevent
+        # stale queued tasks from writing after the feature is disabled.
+        if not getattr(settings, "RACE_EVENT_LIFECYCLE_ENABLED", False):
+            return {"processed": False, "reason": "lifecycle_disabled_mid_flight", "event_id": event_id}
+        lifecycle_mode = getattr(settings, "RACE_EVENT_LIFECYCLE_MODE", "off")
+        if lifecycle_mode not in ("shadow", "enforce"):
+            return {"processed": False, "reason": "lifecycle_disabled_mid_flight", "event_id": event_id}
+
+        # Read per-event US zone allowlist from control manifest
+        allowed_us_zones = None
+        try:
+            ctrl = RaceEventLifecycleControl.objects.only("manifest_data").get(event_id=event_id)
+            zones = ctrl.manifest_data.get("allowed_us_zones")
+            if zones:
+                allowed_us_zones = frozenset(zones)
+        except RaceEventLifecycleControl.DoesNotExist:
+            pass
+
+        result = apply_race_lifecycle_decision(
+            event_id=event_id,
+            expected_generation=expected_generation,
+            now=now,
+            mode=lifecycle_mode,
+            attempt_token=attempt_token,
+            expected_claim_generation=expected_claim_generation,
+            allowed_us_zones=allowed_us_zones,
+        )
+
+    return {
+        "processed": True,
+        "event_id": event_id,
+        "action": result.action,
+        "error": result.error,
+        "transition_id": result.transition_id,
+    }

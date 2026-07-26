@@ -1602,3 +1602,15 @@ P0 马信息补全专项的模型交接文档见
   失败或内容截断文章未写库。
 - 20 篇 QQ delivery 与公开状态零漂移；已发送 QQ 未重发。完整证据见
   `docs/changes/fix-hrn-residual-boundaries-and-jockey-club-term/release_report.md`。
+
+# 2026-07-26 赛事生命周期阶段 A 已实现（代码审查中）
+
+- 阶段 A（纯时间推进）新增 4 模型、2 migration、服务/task/admin/管理命令、56 项测试。
+- 当前：代码审查进行中；未部署、未写生产。
+
+## 2026-07-26 TRA schema v2 proof runner 本地修复审核通过
+
+- schema v2 proof 已改为显式 region 和固定三路由，v1 兼容；测试先行 RED 已转 GREEN。
+- 主线程相关回归 55/55，通过 Django、迁移和静态检查。
+- 独立 reviewer 已给出 `APPROVED`，无开放 P0/P1/P2。当前没有联网、提交、发布或生产写入；
+  最多 3 次只读 API 请求仍需针对最终 fingerprint 的单独授权。
