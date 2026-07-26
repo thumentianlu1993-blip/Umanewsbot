@@ -81,6 +81,7 @@ _SHELL_FLAGS = {"-c", "-lc"}
 _PYTHON_PROGRAMS = {"python", "python3"}
 _WRITE_ARGUMENTS = {"--apply", "--commit", "apply", "commit"}
 _WRITE_MANAGEMENT_COMMANDS = {
+    "apply_race_result_recovery",
     "build_historical_race_date_discovery",
     "import_historical_race_event_candidates",
     "import_historical_race_event_field_candidates",
@@ -88,6 +89,12 @@ _WRITE_MANAGEMENT_COMMANDS = {
     "manage_historical_race_detail_sources",
     "import_historical_race_detail_chunk",
     "reconcile_historical_race_detail_receipt",
+}
+_RACE_RESULT_RECOVERY_APPLY_COMMANDS = {"apply_race_result_recovery"}
+_RACE_RESULT_RECOVERY_PHASES = {
+    "apply_race_result_recovery": HistoricalBatchPhase.APPLY,
+    "build_race_result_recovery_inventory": HistoricalBatchPhase.VERIFY,
+    "verify_race_result_recovery": HistoricalBatchPhase.VERIFY,
 }
 _JSONL_APPLY_COMMANDS = {
     "import_historical_race_event_candidates",
@@ -101,11 +108,13 @@ _DETAIL_CHUNK_APPLY_COMMANDS = {"import_historical_race_detail_chunk"}
 _DETAIL_RECEIPT_RECONCILE_COMMANDS = {"reconcile_historical_race_detail_receipt"}
 _CURRENT_YEAR_DESCRIPTOR_APPLY_COMMANDS = {"import_race_events"}
 _READ_MANAGEMENT_COMMANDS = {
+    "build_race_result_recovery_inventory",
     "build_historical_race_band_batch",
     "build_historical_race_date_discovery",
     "orchestrate_race_event_crawl",
     "manage_historical_race_detail_sources",
     "verify_historical_race_detail_chunk",
+    "verify_race_result_recovery",
 }
 
 
@@ -303,6 +312,57 @@ def _validate_apply_bindings(
 
     argv = step["argv"]
     expected_sha256 = step["expected_sha256"]
+    if command in _RACE_RESULT_RECOVERY_APPLY_COMMANDS:
+        manifest_path = str(
+            _ensure_within(
+                _option_value(argv, "--manifest"),
+                artifact_root,
+                "recovery manifest path",
+            )
+        )
+        command_approval = str(
+            _ensure_within(
+                _option_value(argv, "--approval"),
+                artifact_root,
+                "recovery approval path",
+            )
+        )
+        manifest_sha256 = _option_value(argv, "--manifest-sha256")
+        approval_sha256 = _option_value(argv, "--approval-sha256")
+        ledger_root = _ensure_within(
+            _option_value(argv, "--ledger-root"),
+            artifact_root,
+            "recovery ledger root",
+        )
+        try:
+            applied_by_id = int(_option_value(argv, "--applied-by-id"))
+        except ValueError as exc:
+            raise RunnerPlanError(
+                f"apply step {step['id']} applied-by-id must be a positive integer"
+            ) from exc
+        if (
+            applied_by_id <= 0
+            or command_approval != approval_path
+            or identities.get(manifest_path) != manifest_sha256
+            or identities.get(command_approval) != approval_sha256
+            or approval_sha256 != approval["sha256"]
+            or manifest_sha256 != expected_sha256
+            or ledger_root == artifact_root
+            or argv[3:].count("--confirm-apply") != 1
+        ):
+            raise RunnerPlanError(
+                f"apply step {step['id']} recovery manifest/approval binding is invalid"
+            )
+        approved_manifest_sha = str(
+            approval_payload.get("manifest_sha256")
+            or approval_payload.get("approved_manifest_sha256")
+            or ""
+        )
+        if approved_manifest_sha != manifest_sha256:
+            raise RunnerPlanError(
+                f"apply step {step['id']} approval does not bind the recovery manifest"
+            )
+        return
     if command in _CURRENT_YEAR_DESCRIPTOR_APPLY_COMMANDS:
         descriptor_path = str(
             _ensure_within(
@@ -798,6 +858,12 @@ def validate_runner_plan(plan: dict[str, Any]) -> dict[str, Any]:
             allowed = _WRITE_MANAGEMENT_COMMANDS if phase == HistoricalBatchPhase.APPLY else _READ_MANAGEMENT_COMMANDS
             if command not in allowed:
                 raise RunnerPlanError(f"management command is not allowed in {phase}: {command}")
+            recovery_phase = _RACE_RESULT_RECOVERY_PHASES.get(command)
+            if recovery_phase is not None and phase != recovery_phase:
+                raise RunnerPlanError(
+                    f"recovery management command {command} is only allowed in "
+                    f"{recovery_phase}"
+                )
             if phase != HistoricalBatchPhase.APPLY and any(
                 value.casefold() in _WRITE_ARGUMENTS
                 or value.casefold().startswith("--action=apply")

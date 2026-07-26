@@ -213,3 +213,13 @@ revision 表达。来源失败不会使赛事永久停留赛前，也不会被�
 赛前资料和赛果允许采购商业 API，但订阅价格与来源权威分开判断。低成本聚合 API 可做
 supplemental/provisional，只有逐地区、逐字段、逐结果阶段的官方合同或 rights-holder 证明才能
 取得 official authority；合同、proof、registry 和生产启用分别授权。
+
+# 历史赛果缺口恢复链路
+
+赛果缺口恢复与 race-live 分流：先冻结 event/race-group 双层 inventory，再按地区生成
+results-only 候选，由官方 route receipt 和 participant identity 审批后逐场原子投影。
+重复赛事通过显式 canonical link 在公开入口去重，旧详情 URL 保留。historical owner
+不得把第三方候选直接提升为 confirmed，也不得接管 live owner 的暂定赛果。
+
+实现、部署、联网 candidate prepare、人工 official 审批和生产 apply 分别授权；默认状态下
+不会联网或写业务数据库。

@@ -1,6 +1,17 @@
 # 项目状态文档
 
+- 2026-07-27: `2026-07-08..2026-07-27` 赛果缺口生产只读盘点完成；恢复方案与工程审核已通过，
+  当前停在实施确认门禁，尚未抓取来源候选或写入生产。
 - 2026-07-24: 首页人工头条与 AI 编辑推荐控制代码实现完成，待独立代码 review 和发布授权。
+
+## 2026-07-27 赛果缺口恢复方案
+
+- 生产窗口内 59 条公开 event row 初步对应约 50 场真实赛事；9 组为跨系列重复实体，event 924
+  仅有未确认 TRA 结果，重点赛事中 26 条过期且零结果。
+- 方案采用双层 inventory、结果专用编排、人工官方路由、projection owner/revision arbitration、
+  `RaceEventProductCanonicalLink`、精确 SHA apply/rollback 和 `blocker=0` 完成定义。
+- OpenSpec strict 与同一 reviewer 复审通过；下一步需用户确认实施。代码实现、部署、网络 prepare
+  和生产写入仍是独立门禁。
 
 ## 2026-07-24 首页编辑控制方案审核通过，待确认实现
 
@@ -1614,3 +1625,22 @@ P0 马信息补全专项的模型交接文档见
 - 主线程相关回归 55/55，通过 Django、迁移和静态检查。
 - 独立 reviewer 已给出 `APPROVED`，无开放 P0/P1/P2。当前没有联网、提交、发布或生产写入；
   最多 3 次只读 API 请求仍需针对最终 fingerprint 的单独授权。
+
+## 2026-07-27 赛果缺口已有逐场来源图
+
+- 7 月 8 日至 27 日按真实赛事去重后缺 `40` 场赛果：日本 6、英国 11、法国 4、美国 19。
+- 日本可直接使用 JRA/NAR 官方结果；英国以 Sporting Life 预采、BHA 人工确认；法国以
+  ZEturf 预采、France Galop 人工确认；美国 12 场已有 TOBA→Equibase 精确 chart，
+  其余 7 场以 Sporting Life 预采、Equibase 人工确认。
+- 本阶段只完成来源与可用性调研，未采集候选、未写库。逐场映射见 change 内
+  `source_research_20260727.md`。
+
+## 2026-07-27 赛果缺口恢复本地候选已实现
+
+- 已完成 inventory、地区化结果候选、官方 receipt、canonical 去重、逐场原子 apply /
+  rollback / verify 和历史批处理 allowlist；冻结范围仍为 40 场真实缺口、9 组重复赛事及
+  单独保留 live owner 的 event 924。
+- 恢复专属 SQLite `45/45` 与 PostgreSQL `2/2` 测试通过；完整候选相对同环境干净主线没有新增红项，
+  且修复一个既有日历查询数失败。OpenSpec、Django、迁移、Compose、编译和 diff 门禁通过。
+- 首次独立原生只读审核的 6 项 finding 已修复，正在由同一 reviewer 限定复审。当前仍是
+  未提交本地实现；尚未部署、联网生成 candidate、人工批准 official receipt 或写生产库。

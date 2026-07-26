@@ -1,5 +1,22 @@
 # 当前状态
 
+## 2026-07-27 赛事赛果缺口恢复方案已通过工程审核（待确认实施）
+
+- 生产只读盘点确认 `2026-07-08..2026-07-27` 有 59 条公开 `RaceEvent`，初步对应约 50 场真实赛事；
+  其中 9 组赛果落在跨 `RaceSeries` 的另一条实体，event `924` 有 7 条未确认 TRA 结果，重点口径有
+  26 条已过期赛事仍为 `scheduled + results=0`。公网 `/races/?when=finished` 实际最晚只展示
+  `2026-07-05`。
+- 已从 `origin/main@a59956b3` 建立独立 worktree `recover-race-results-through-20260727`，
+  OpenSpec change 同名，proposal/design/四份 delta spec/tasks 均通过 strict 校验；另补
+  `test_cases.md` 与 `rollout.md`。
+- 首轮工程审核发现 direct `RaceEventResult` 写入会绕过 owner/revision arbitration、canonical
+  映射未持久化、blocker 被误算完成以及缺测试/rollout 四项问题；现已改为 owner-aware official
+  revision 投影、新增最小 `RaceEventProductCanonicalLink`、完成条件 `blocker=0`，同一 reviewer
+  复审为 `VERDICT: APPROVED`。
+- 本轮只执行生产数据库只读查询与公网页面核验；尚未实现代码、运行赛事来源网络 prepare、部署、迁移或
+  写入生产。下一门禁是用户确认实施；实现完成后仍须分别取得 release、network prepare 和精确
+  candidate/approval SHA 的生产写入授权。
+
 ## 2026-07-24 首页人工头条与 AI 编辑推荐控制已实现（待独立代码审核）
 
 - 基于 `origin/main@10f341e6`，worktree `add-editorial-headline-control`，分支
@@ -3543,3 +3560,38 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 本轮只使用 fake transport，没有读取生产凭据或联网。Django check、migration drift、
   py_compile、`git diff --check` 通过；独立 reviewer 最终结论为 `APPROVED`，无开放
   P0/P1/P2。当前未 commit、push、PR、部署，真实联网仍等待独立用户授权。
+
+## 2026-07-27 赛事赛果缺口来源调研完成
+
+- 生产 `2026-07-08..2026-07-27` 的 `49` 个零赛果事件中有 `9` 个重复赛事已在另一历史实体
+  上保存确认赛果；真实待采集为 `40` 场：日本 `6`、英国 `11`、法国 `4`、美国 `19`。
+- 日本 6 场均已定位到 JRA replay 或 NAR `RaceMarkTable` 官方页；英国 11 场已在
+  Sporting Life 日期结果页逐场命中；法国 4 场已定位 ZEturf 精确 `R/C` 页面；美国前
+  12 场已从 TOBA 定位精确 Equibase chart，后 7 场已在 Sporting Life 日期页命中但 TOBA
+  尚无 chart link。
+- 官方确认继续按地区走 JRA/NAR、BHA、France Galop、Equibase。BHA/France Galop/
+  Equibase 当前只能人工浏览确认；HRN 旧日期入口已重定向首页，不再作为本批可靠入口。
+- `RaceEvent#924` Hackwood Stakes 另有 7 条未确认赛果，不计入 40 场，继续由 race-live
+  owner 链补 official receipt。
+- 逐场来源表见
+  `openspec/changes/recover-race-results-through-20260727/source_research_20260727.md`。
+  本轮仅只读调研，没有生成候选、写生产库、发布或提升 official 状态。
+
+## 2026-07-27 赛果缺口恢复已完成本地实现，待独立代码审核
+
+- 隔离分支 `codex/recover-race-results-through-20260727` 基于
+  `origin/main@a59956b327157d29630fab1f1c98ba9c9cacfed0`，已实现双层 inventory、
+  结果专用受限编排、官方 receipt、participant 精确绑定、逐场原子投影、write-ahead
+  rollback ledger、独立 verifier 和公开 canonical 去重；新增迁移 `0060`。
+- 冻结守恒仍为
+  `59 event rows = 40 missing + 9 duplicate-zero + 9 duplicate-confirmed + 1 provisional`，
+  对应 `50 race groups`。event `924` 继续由既有 live owner 处理，不进入 historical apply。
+- SQLite 恢复专属测试 `45/45` 通过（另有 2 个 PostgreSQL-only skip），PostgreSQL 16
+  并发测试 `2/2` 通过；受影响回归除干净主线已存在的“暂定页面栏目标题”断言外无新增失败。
+  完整候选 `3433` 项为 `24 failures / 39 errors / 68 skipped`，同环境干净主线 `3393`
+  项为 `25 failures / 39 errors / 66 skipped`；候选无新增红项，并修复主线一个日历查询数失败。
+- Django check、迁移漂移、OpenSpec `38/38` strict/all、三份 Compose config、`py_compile`
+  和 `git diff --check` 均通过。首次独立原生只读审核提出 6 项 actionable finding；
+  当前已补齐完整写前身份 CAS、来源合同实时重验、ledger 故障回滚、verifier 深校验、
+  canonical link apply 和已批准 participant fallback，等待同一 reviewer 限定复审。
+  尚未 commit、push、PR、部署、联网收集候选或写生产数据。
