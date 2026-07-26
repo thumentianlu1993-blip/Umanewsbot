@@ -88,6 +88,7 @@ from .models import (
     RaceEventDataQuality,
     RaceEventHistoryWinner,
     RaceEventPriority,
+    RaceEventProductCanonicalLink,
     RaceEventResult,
     RaceRunnerStatus,
     RaceEventStatus,
@@ -3002,7 +3003,7 @@ def _public_today_races() -> tuple[list[dict], bool]:
     base = RaceEvent.objects.filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
         local_date__isnull=False,
-    )
+    ).exclude(canonical_product_links__is_active=True)
     events = list(
         base.filter(local_date__gte=today, local_date__lte=today + timedelta(days=1)).order_by(
             "local_date", "local_start_time", "id"
@@ -3042,12 +3043,22 @@ def _public_next_key_race():
         visibility_status=RaceEventVisibility.PUBLISHED,
         local_date__isnull=False,
         local_date__gte=today,
-    ).filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
+    ).exclude(canonical_product_links__is_active=True).filter(
+        Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1])
+        | Q(is_featured=True)
+    )
     return queryset.order_by("local_date", "local_start_time", "id").first()
 
 
 def _race_calendar_queryset(request: HttpRequest):
-    queryset = RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED)
+    queryset = RaceEvent.objects.filter(
+        visibility_status=RaceEventVisibility.PUBLISHED
+    ).exclude(canonical_product_links__is_active=True).annotate(
+        public_current_result_revision_id=F(
+            "projection_control__current_result_revision_id"
+        ),
+        public_projection_write_owner=F("projection_control__write_owner"),
+    )
     tab = request.GET.get("tab", "key").strip() or "key"
     region = request.GET.get("region", "").strip()
     direction = request.GET.get("direction", "").strip()
@@ -3119,13 +3130,28 @@ def _group_race_events_by_date(events):
     current_date = object()
     current_group = None
     read_now = timezone.now()
-    live_public_reads = resolve_race_live_public_reads(
-        event_ids=[event.pk for event in events],
-        now=read_now,
+    live_revision_event_ids = [
+        event.pk
+        for event in events
+        if getattr(event, "public_current_result_revision_id", None) is not None
+        and getattr(event, "public_projection_write_owner", None)
+        != "historical"
+    ]
+    live_public_reads = (
+        resolve_race_live_public_reads(
+            event_ids=live_revision_event_ids,
+            now=read_now,
+        )
+        if live_revision_event_ids
+        else {}
     )
     for event in events:
-        live_public_read = live_public_reads[event.pk]
-        if live_public_read.revision_id is not None and not live_public_read.visible:
+        live_public_read = live_public_reads.get(event.pk)
+        if (
+            live_public_read is not None
+            and live_public_read.revision_id is not None
+            and not live_public_read.visible
+        ):
             event.top_results = []
         else:
             event.top_results = list(event.results.all()[:5])
@@ -3169,7 +3195,7 @@ def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | N
         local_date__gte=week_start,
         local_date__lte=week_end,
         normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS["g1"],
-    )
+    ).exclude(canonical_product_links__is_active=True)
     if region:
         queryset = queryset.filter(country_region=region)
     return list(queryset.order_by("local_date", "local_start_time", "id")[:3])
@@ -3440,6 +3466,11 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         slug=slug,
     )
     live_result_status = None
+    canonical_product_link = (
+        RaceEventProductCanonicalLink.objects.select_related("canonical_event")
+        .filter(duplicate_event=event, is_active=True)
+        .first()
+    )
     projection_control = getattr(event, "projection_control", None)
     current_result_revision = (
         projection_control.current_result_revision if projection_control else None
@@ -3547,6 +3578,11 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "series_events": series_events,
             "news_groups": news_groups,
             "live_result_status": live_result_status,
+            "canonical_product_event": (
+                canonical_product_link.canonical_event
+                if canonical_product_link
+                else None
+            ),
             "has_news": has_news,
             "status_label": _public_race_status_label(event, timezone.localdate(), winner),
         },
@@ -3559,6 +3595,7 @@ def _race_sitemap_queryset():
             visibility_status=RaceEventVisibility.PUBLISHED,
             data_quality_status=RaceEventDataQuality.COMPLETE,
         )
+        .exclude(canonical_product_links__is_active=True)
         .filter(
             Q(historical_target__isnull=True)
             | Q(historical_target__resolution_status=HistoricalRaceResolutionStatus.IMPORTED)

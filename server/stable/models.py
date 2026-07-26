@@ -1232,6 +1232,68 @@ class RaceEvent(TimestampedModel):
         return (self.normalized_grade or self.grade_text or "").strip()[:4]
 
 
+class RaceEventProductCanonicalLink(TimestampedModel):
+    """Audited product-display choice for two records of the same race."""
+
+    duplicate_event = models.ForeignKey(
+        RaceEvent,
+        on_delete=models.PROTECT,
+        related_name="canonical_product_links",
+    )
+    canonical_event = models.ForeignKey(
+        RaceEvent,
+        on_delete=models.PROTECT,
+        related_name="canonical_product_sources",
+    )
+    identity_sha256 = models.CharField(max_length=64)
+    manifest_sha256 = models.CharField(max_length=64)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="approved_race_event_canonical_links",
+    )
+    approved_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    deactivated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="deactivated_race_event_canonical_links",
+    )
+    deactivated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("duplicate_event",),
+                condition=models.Q(is_active=True),
+                name="uq_race_canon_duplicate_active",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(duplicate_event=models.F("canonical_event")),
+                name="race_canon_not_self",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(identity_sha256__regex=r"^[0-9a-f]{64}$"),
+                name="race_canon_identity_sha256",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(manifest_sha256__regex=r"^[0-9a-f]{64}$"),
+                name="race_canon_manifest_sha256",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("canonical_event", "is_active"),
+                name="race_canon_event_active_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.duplicate_event} -> {self.canonical_event}"
+
+
 class RaceEventProjectionControl(TimestampedModel):
     event = models.OneToOneField(
         RaceEvent,

@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import shlex
 import sys
 import shutil
@@ -48,6 +49,23 @@ TARGET_MODULES = [
 ]
 SOURCE_AUTHORITY_LEVELS = {"official", "third_party_high_access", "third_party", "reference"}
 REPO_ROOT = Path(__file__).resolve().parents[3]
+RECOVERY_PURPOSE = "race_result_recovery"
+RECOVERY_SOURCE_MAP_VERSION = "2026-07-27"
+RECOVERY_EVENT_IDS_BY_SOURCE = {
+    (RacingRegion.JAPAN.value, "jra"): {80, 81, 82, 83},
+    (RacingRegion.JAPAN.value, "nar"): {184, 185},
+    (RacingRegion.UNITED_KINGDOM.value, "sporting_life"): {
+        917, 918, 919, 920, 921, 922, 923, 925, 926, 927, 928,
+    },
+    (RacingRegion.FRANCE.value, "zeturf"): {733, 734, 735, 736},
+    (RacingRegion.UNITED_STATES.value, "toba"): {
+        406, 407, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420,
+    },
+    (RacingRegion.UNITED_STATES.value, "sporting_life"): {
+        421, 422, 423, 424, 425, 426, 427,
+    },
+}
+RECOVERY_EVENT_IDS = set().union(*RECOVERY_EVENT_IDS_BY_SOURCE.values())
 
 
 @lru_cache(maxsize=1)
@@ -356,6 +374,16 @@ DEFAULT_ADAPTER_MANIFESTS.update(
 )
 DEFAULT_ADAPTER_MANIFESTS["uk_sporting_life_results"] = DEFAULT_ADAPTER_MANIFESTS["uk_sporting_life_detail"]
 DEFAULT_ADAPTER_MANIFESTS["uk_sporting_life_history"] = DEFAULT_ADAPTER_MANIFESTS["uk_sporting_life_history_winners"]
+DEFAULT_ADAPTER_MANIFESTS["us_toba_chart_discovery"] = {
+    **DEFAULT_ADAPTER_MANIFESTS["us_toba_history_winners"],
+    "key": "us_toba_chart_discovery",
+    "modules": [RaceEventModule.RESULTS],
+}
+DEFAULT_ADAPTER_MANIFESTS["us_sporting_life_results"] = {
+    **DEFAULT_ADAPTER_MANIFESTS["uk_sporting_life_detail"],
+    "key": "us_sporting_life_results",
+    "region": RacingRegion.UNITED_STATES,
+}
 
 
 class PlanValidationError(ValueError):
@@ -422,6 +450,7 @@ class AdapterManifest:
     requires_network: bool = False
     working_dir: str = ""
     supports_year_range: bool = False
+    access_mode: str = "automated"
 
     @classmethod
     def from_dict(cls, payload: dict[str, Any]) -> "AdapterManifest":
@@ -458,6 +487,7 @@ class AdapterManifest:
             requires_network=bool(payload.get("requires_network", False)),
             working_dir=str(payload.get("working_dir") or ""),
             supports_year_range=bool(payload.get("supports_year_range", False)),
+            access_mode=str(payload.get("access_mode") or "automated"),
         )
 
 
@@ -494,6 +524,11 @@ class AdapterRunner:
         allow_network: bool = False,
         execution_policy: dict[str, Any] | None = None,
     ) -> AdapterResult:
+        if self.manifest.access_mode == "manual_browser_only":
+            raise PlanValidationError(
+                f"adapter {self.manifest.key} is manual_browser_only; "
+                "manual-only official routes cannot be transported"
+            )
         if self.manifest.requires_network and not allow_network:
             raise AdapterDependencyError(f"adapter {self.manifest.key} requires network authorization")
 
@@ -896,8 +931,14 @@ def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(regions, list) or not regions:
         raise PlanValidationError("plan must include regions")
     historical = bool(plan.get("historical_inventory_sha256"))
+    recovery = plan.get("purpose") == RECOVERY_PURPOSE
     for region_plan in regions:
-        _validate_region_plan(region_plan, batch_size=batch_size, historical=historical)
+        _validate_region_plan(
+            region_plan,
+            batch_size=batch_size,
+            historical=historical,
+            recovery=recovery,
+        )
     adapters = plan.get("adapters") or []
     if not isinstance(adapters, list):
         raise PlanValidationError("adapters must be a list")
@@ -912,7 +953,62 @@ def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
         validate_first_acceptance_plan(plan)
     if plan.get("historical_inventory_sha256"):
         validate_historical_plan_budgets(plan)
+    if recovery:
+        _validate_recovery_source_map(plan)
     return plan
+
+
+def _validate_recovery_source_map(plan: dict[str, Any]) -> None:
+    manifest_sha = str(plan.get("inventory_manifest_sha256") or "")
+    if re.fullmatch(r"[0-9a-f]{64}", manifest_sha) is None:
+        raise PlanValidationError(
+            "race_result_recovery requires an inventory manifest SHA"
+        )
+    if str(plan.get("source_map_version") or "") not in {
+        "",
+        RECOVERY_SOURCE_MAP_VERSION,
+    }:
+        raise PlanValidationError("recovery source map version is not approved")
+    observed: dict[tuple[str, str], set[int]] = {}
+    all_event_ids: list[int] = []
+    for region_plan in plan.get("regions") or []:
+        region = str(region_plan.get("region") or "")
+        source = str(region_plan.get("source") or "")
+        event_ids = region_plan.get("event_ids")
+        if (
+            not isinstance(event_ids, list)
+            or not event_ids
+            or any(
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value <= 0
+                for value in event_ids
+            )
+        ):
+            raise PlanValidationError(
+                "recovery frozen event scope must contain positive event IDs"
+            )
+        if len(event_ids) != len(set(event_ids)):
+            raise PlanValidationError(
+                "recovery frozen event scope contains duplicate event IDs"
+            )
+        observed.setdefault((region, source), set()).update(event_ids)
+        all_event_ids.extend(event_ids)
+    if len(all_event_ids) != len(set(all_event_ids)):
+        raise PlanValidationError(
+            "recovery source map assigns an event more than once"
+        )
+    enforce_frozen_map = (
+        str(plan.get("source_map_version") or "")
+        == RECOVERY_SOURCE_MAP_VERSION
+    )
+    if enforce_frozen_map and (
+        observed != RECOVERY_EVENT_IDS_BY_SOURCE
+        or set(all_event_ids) != RECOVERY_EVENT_IDS
+    ):
+        raise PlanValidationError(
+            "recovery source map does not match the frozen event scope"
+        )
 
 
 def validate_historical_plan_budgets(
@@ -950,7 +1046,13 @@ def validate_historical_plan_budgets(
     }
 
 
-def _validate_region_plan(region_plan: dict[str, Any], *, batch_size: int, historical: bool = False) -> None:
+def _validate_region_plan(
+    region_plan: dict[str, Any],
+    *,
+    batch_size: int,
+    historical: bool = False,
+    recovery: bool = False,
+) -> None:
     region = region_plan.get("region")
     if region not in TARGET_REGIONS:
         raise PlanValidationError(f"unsupported region: {region}")
@@ -960,6 +1062,21 @@ def _validate_region_plan(region_plan: dict[str, Any], *, batch_size: int, histo
     modules = region_plan.get("modules")
     if not isinstance(modules, dict):
         raise PlanValidationError(f"{region} modules must be an object")
+    if recovery:
+        if set(modules) != {RaceEventModule.RESULTS}:
+            raise PlanValidationError(
+                "race_result_recovery only permits the results module"
+            )
+        event_ids = region_plan.get("event_ids")
+        if not isinstance(event_ids, list) or not event_ids:
+            raise PlanValidationError(
+                f"{region} recovery plan must include frozen event IDs"
+            )
+        if len(event_ids) > batch_size:
+            raise PlanValidationError(
+                f"{region} event count {len(event_ids)} exceeds batch_size {batch_size}"
+            )
+        return
     missing = [module for module in TARGET_MODULES if module not in modules]
     if missing:
         raise PlanValidationError(f"missing required modules: {', '.join(missing)}")
@@ -1531,17 +1648,41 @@ def prepare_adapters(plan: dict[str, Any], state: RunState, *, resume: bool = Fa
         state.completed_stages.append("prepare")
     state.stage = "prepare"
     state.artifacts["adapter_results"] = results
-    combined = aggregate_candidate_artifacts(results=results, run_dir=state.run_dir)
+    approved_modules = sorted(
+        {
+            module
+            for region_plan in plan.get("regions") or []
+            for module in (region_plan.get("modules") or {})
+        }
+    )
+    combined = aggregate_candidate_artifacts(
+        results=results,
+        run_dir=state.run_dir,
+        purpose=str(plan.get("purpose") or ""),
+        approved_modules=approved_modules,
+    )
     state.artifacts["combined_candidates"] = combined["path"]
     state.artifacts["combined_candidates_identity"] = combined["identity"]
     state.write()
     return results
 
 
-def aggregate_candidate_artifacts(*, results: list[dict[str, Any]], run_dir: str | Path) -> dict[str, Any]:
+def aggregate_candidate_artifacts(
+    *,
+    results: list[dict[str, Any]],
+    run_dir: str | Path,
+    purpose: str = "",
+    approved_modules: list[str] | tuple[str, ...] | None = None,
+) -> dict[str, Any]:
     records: list[dict[str, Any]] = []
     source_paths: list[str] = []
     seen_paths: set[str] = set()
+    recovery = purpose == RECOVERY_PURPOSE
+    approved = set(approved_modules or TARGET_MODULES)
+    if recovery and approved != {RaceEventModule.RESULTS}:
+        raise PlanValidationError(
+            "race_result_recovery aggregate only permits results"
+        )
     for result in results:
         artifacts = result.get("artifacts") if isinstance(result.get("artifacts"), dict) else {}
         artifact = artifacts.get("candidate_jsonl") if isinstance(artifacts.get("candidate_jsonl"), dict) else {}
@@ -1555,15 +1696,60 @@ def aggregate_candidate_artifacts(*, results: list[dict[str, Any]], run_dir: str
         source_paths.append(str(path.resolve()))
         for record in _read_jsonl(path):
             record.pop("_line_number", None)
+            source = str(
+                record.get("source_name")
+                or record.get("source_provider")
+                or result.get("source")
+                or ""
+            ).strip()
+            authority = str(
+                record.get("source_authority")
+                or result.get("source_authority")
+                or (DEFAULT_SOURCE_AUTHORITY_MATRIX.get(source) or {}).get(
+                    "authority"
+                )
+                or ""
+            ).strip()
             modules = record.get("modules") if isinstance(record.get("modules"), dict) else None
             if modules is not None:
+                if (
+                    recovery
+                    and source == "toba"
+                    and RaceEventModule.RESULTS not in modules
+                    and RaceEventModule.HISTORY_WINNERS in modules
+                ):
+                    history_items = _payload_items(
+                        modules[RaceEventModule.HISTORY_WINNERS]
+                    )
+                    modules[RaceEventModule.RESULTS] = {
+                        "items": [
+                            {
+                                "finish_position": None,
+                                "horse_name": str(
+                                    item.get("horse_name") or ""
+                                ),
+                                "source_refs": dict(
+                                    item.get("source_refs") or {}
+                                ),
+                                "discovery_only": True,
+                            }
+                            for item in history_items
+                        ]
+                    }
                 record["modules"] = {
                     module: payload
                     for module, payload in modules.items()
+                    if not recovery or module in approved
                     if not _is_explicitly_empty_module_payload(payload)
                 }
                 if not record["modules"]:
                     continue
+            if recovery:
+                _normalize_recovery_candidate_record(
+                    record,
+                    source=source,
+                    authority=authority,
+                )
             records.append(record)
     output_path = Path(run_dir) / "candidates" / "combined_candidates.jsonl"
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1577,6 +1763,96 @@ def aggregate_candidate_artifacts(*, results: list[dict[str, Any]], run_dir: str
         "record_count": len(records),
         "source_paths": source_paths,
     }
+
+
+def _normalize_recovery_candidate_record(
+    record: dict[str, Any],
+    *,
+    source: str,
+    authority: str,
+) -> None:
+    if authority not in SOURCE_AUTHORITY_LEVELS:
+        raise PlanValidationError(
+            f"unsupported recovery candidate authority: {authority or '<empty>'}"
+        )
+    if source == "toba":
+        phase = "chart_discovery_candidate"
+    elif authority == "official":
+        phase = "official_candidate"
+    else:
+        phase = "provisional_candidate"
+    record["source_name"] = source
+    record["source_provider"] = source
+    record["source_authority"] = authority
+    record["result_phase"] = phase
+    record["confirmation_eligible"] = False
+    modules = record.get("modules")
+    if not isinstance(modules, dict):
+        return
+    payload = modules.get(RaceEventModule.RESULTS)
+    if isinstance(payload, list):
+        items = payload
+        payload = {"items": items}
+        modules[RaceEventModule.RESULTS] = payload
+    elif isinstance(payload, dict):
+        items = payload.get("items")
+    else:
+        return
+    if not isinstance(items, list):
+        return
+    normalized_items: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            raise PlanValidationError("recovery result item must be an object")
+        raw = dict(item)
+        source_refs = (
+            item.get("source_refs")
+            if isinstance(item.get("source_refs"), dict)
+            else {}
+        )
+        source_url = str(
+            source_refs.get("primary")
+            or source_refs.get("chart_url")
+            or record.get("source_url")
+            or ""
+        ).strip()
+        source_kind = str(
+            source_refs.get("source_kind") or source or ""
+        ).strip()
+        normalized = {
+            key: item.get(key)
+            for key in (
+                "finish_position",
+                "official_finish_position",
+                "horse_number",
+                "horse_name",
+                "jockey_name",
+                "trainer_name",
+                "finish_time",
+                "margin",
+                "running_status",
+            )
+            if key in item
+        }
+        display_zh = dict(normalized)
+        normalized_items.append(
+            {
+                **item,
+                "is_confirmed": False,
+                "values": {
+                    "raw": raw,
+                    "normalized": normalized,
+                    "display_zh": display_zh,
+                },
+                "provenance": {
+                    "source_url": source_url,
+                    "source_kind": source_kind,
+                    "source_authority": authority,
+                    "candidate_phase": phase,
+                },
+            }
+        )
+    payload["items"] = normalized_items
 
 
 def _is_explicitly_empty_module_payload(payload: Any) -> bool:
@@ -1683,6 +1959,12 @@ def audit_coverage(
 ) -> dict[str, Any]:
     plan = load_plan(plan_path)
     validate_plan(plan)
+    if plan.get("purpose") == RECOVERY_PURPOSE:
+        return _audit_recovery_coverage(
+            plan=plan,
+            candidate_jsonl=candidate_jsonl,
+            run_dir=run_dir,
+        )
     records = _read_jsonl(Path(candidate_jsonl))
     mapping = _read_json(Path(series_mapping_path))
     run_path = Path(run_dir)
@@ -1967,6 +2249,123 @@ def audit_coverage(
         "artifacts": artifacts,
     }
     artifacts["coverage_json"] = {"path": str(_write_json(run_path / "coverage_audit.json", result))}
+    return result
+
+
+def _audit_recovery_coverage(
+    *,
+    plan: dict[str, Any],
+    candidate_jsonl: str | Path,
+    run_dir: str | Path,
+) -> dict[str, Any]:
+    records = _read_jsonl(Path(candidate_jsonl))
+    run_path = Path(run_dir)
+    run_path.mkdir(parents=True, exist_ok=True)
+    expected: dict[int, dict[str, Any]] = {}
+    for region_plan in plan.get("regions") or []:
+        for event_id in region_plan.get("event_ids") or []:
+            expected[int(event_id)] = {
+                "event_id": int(event_id),
+                "region": str(region_plan.get("region") or ""),
+                "source": str(region_plan.get("source") or ""),
+            }
+    grouped: dict[int, list[dict[str, Any]]] = {}
+    invalid_records: list[dict[str, Any]] = []
+    for record in records:
+        try:
+            event_id = int(record.get("event_id"))
+        except (TypeError, ValueError):
+            invalid_records.append(record)
+            continue
+        grouped.setdefault(event_id, []).append(record)
+
+    blockers: list[dict[str, Any]] = []
+    for _record in invalid_records:
+        blockers.append({"code": "candidate_event_id_missing"})
+    complete_count = 0
+    review_rows: list[dict[str, Any]] = []
+    for event_id, target in sorted(expected.items()):
+        candidates = grouped.get(event_id, [])
+        event_codes: list[str] = []
+        result_payloads: list[Any] = []
+        for record in candidates:
+            modules = (
+                record.get("modules")
+                if isinstance(record.get("modules"), dict)
+                else {}
+            )
+            unexpected = sorted(
+                set(modules) - {RaceEventModule.RESULTS}
+            )
+            if unexpected:
+                event_codes.append("unexpected_module")
+                blockers.append(
+                    {
+                        "code": "unexpected_module",
+                        "event_id": event_id,
+                        "modules": unexpected,
+                    }
+                )
+            payload = modules.get(RaceEventModule.RESULTS)
+            if _payload_items(payload):
+                result_payloads.append(payload)
+        if not result_payloads:
+            event_codes.append("missing_event_candidate")
+            blockers.append(
+                {
+                    "code": "missing_event_candidate",
+                    "event_id": event_id,
+                    "region": target["region"],
+                    "source": target["source"],
+                    "module": RaceEventModule.RESULTS,
+                }
+            )
+        if len(result_payloads) > 1:
+            event_codes.append("duplicate_candidate")
+            blockers.append(
+                {"code": "duplicate_candidate", "event_id": event_id}
+            )
+        if not event_codes:
+            complete_count += 1
+        review_rows.append(
+            {
+                "event_id": event_id,
+                "region": target["region"],
+                "source": target["source"],
+                "status": "blocked" if event_codes else "complete",
+                "codes": "|".join(sorted(set(event_codes))),
+            }
+        )
+    for event_id in sorted(set(grouped) - set(expected)):
+        blockers.append(
+            {"code": "unexpected_candidate", "event_id": event_id}
+        )
+
+    blocker_codes = _unique_codes(blockers)
+    review_path = _write_review_csv(
+        run_path / "review" / "coverage_audit.csv", review_rows
+    )
+    result = {
+        "status": "passed" if not blockers else "blocked",
+        "purpose": RECOVERY_PURPOSE,
+        "expected_target_count": len(expected),
+        "actual_target_count": len(set(grouped) & set(expected)),
+        "complete_count": complete_count,
+        "candidate_jsonl": str(candidate_jsonl),
+        "candidate_identity": file_identity(candidate_jsonl),
+        "inventory_manifest_sha256": plan["inventory_manifest_sha256"],
+        "approved_modules": [RaceEventModule.RESULTS],
+        "blockers": blockers,
+        "warnings": [],
+        "blocker_codes": blocker_codes,
+        "warning_codes": [],
+        "artifacts": {"review_csv": {"path": str(review_path)}},
+    }
+    result["artifacts"]["coverage_json"] = {
+        "path": str(
+            _write_json(run_path / "coverage_audit.json", result)
+        )
+    }
     return result
 
 

@@ -6728,3 +6728,17 @@ python manage.py complete_horse_profiles \
   本地或生产执行 `--confirm-network-proof`，不得读取/复制/输出 production secret。
 - 获得联网授权后仍必须使用唯一 output 目录、精确 registry SHA、`--max-requests <= 3`，
   先核对 registry 有效期和 evidence 新鲜度；失败 artifact 也必须保留，禁止原目录重跑覆盖。
+
+## 2026-07-27 赛果缺口恢复发布前门禁
+
+- 当前仅完成本地实现，禁止直接运行生产 inventory、联网 candidate prepare 或 apply。
+- 发布前必须先完成独立原生只读代码审核，再针对精确 fingerprint 取得 release 授权；部署时
+  保持恢复 apply、网络自动化、TRA public、scheduler 和 publication 开关关闭。
+- 部署后先运行只读 inventory，冻结
+  `59 event rows / 50 race groups / 40 missing / 9 duplicate groups / event 924 provisional`
+  守恒。任何 ID 或计数漂移都停止，不通过调整分母继续。
+- 联网 prepare 需要对精确 source map 的新授权，并受 `<=75` 请求、单请求 `<=30s`、
+  cache `<=512 MiB` 约束；manual-only 官方 route 请求必须为 0。
+- 生产 apply 需要 candidate/approval 双 SHA、逐场预计写入、canonical 映射、blocker=0、
+  队列排空、备份和写前快照的再次授权。执行后逐地区立即 verify 与幂等重放；任一 CAS、
+  ledger 或数据库身份不一致即停止。
