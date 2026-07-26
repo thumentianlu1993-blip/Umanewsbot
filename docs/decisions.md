@@ -2084,3 +2084,15 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 时区合同：日本→Asia/Tokyo、香港→Asia/Hong_Kong、英国→Europe/London、法国→Europe/Paris、
   美国→manifest 逐场审核 America/*；其他 region fail closed。
 - 默认 mode=off，所有配置关闭；不接入 provider、不改新闻门禁、不 dispatch race-live。
+
+## 2026-07-26 lifecycle schema、dry-run 与启用授权继续分离
+
+- 阶段 A 先以 `false/off` 部署 schema/code；schema 已存在和 dry-run 成功均不构成 shadow、
+  enforce、赛事纳管、provider 调用或业务数据写入授权。
+- 生产 dry-run 只使用 rollout 日期窗口冻结的精确 event IDs，不使用当前不限制日期的
+  `--auto-discover`。
+- 当前窗口没有日本或香港重点赛事，决策为保留该覆盖缺口，不用窗口外历史赛事替代生产观察。
+- 生产发现 web 启动脚本和部署脚本会并发执行 migration；后续 migration 发布必须先改为
+  单一 migration 执行入口，并将该修复作为独立代码变更 review。
+- `race_live_worker` 和 `race_live` 积压继续作为独立运维问题处理，不在 lifecycle dry-run
+  或后续 shadow 操作中顺带启动、清空或重放。

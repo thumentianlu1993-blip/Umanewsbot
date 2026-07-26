@@ -3530,3 +3530,16 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - worktree `.worktrees/automate-race-event-lifecycle`，分支 `codex/automate-race-event-lifecycle`，
   rebase 到 `origin/main@0aeb0ed7`。新增模型/迁移/服务/task/admin/管理命令，SQLite 56 项测试。
 - 当前：代码审查进行中；未 commit / push / PR / 部署 / 生产写入。
+
+## 2026-07-26 赛事生命周期阶段 A 已关闭部署并完成生产 dry-run
+
+- PR `#25` 已部署到生产 revision
+  `ef54a1836dd1fe1840f2d4765ebb73a1d130c645`；迁移 `stable.0058/0059` 已应用。
+- 生产显式保持 `RACE_EVENT_LIFECYCLE_ENABLED=false`、
+  `RACE_EVENT_LIFECYCLE_MODE=off`；四类 lifecycle 表记录数均为 `0`。
+- 过去 7 天至未来 14 天共有 35 场符合范围的重点赛事；只读 dry-run 得到
+  `7 transition / 28 noop / 0 error`，前后赛事摘要和四表计数完全一致。
+- 当前窗口覆盖英国、法国、美国纽约/洛杉矶，没有日本或香港样本；不得将本轮结果描述为
+  五地区完整验收。
+- 发布、恢复点、迁移竞态和证据 SHA 见
+  `docs/changes/automate-race-event-lifecycle/production_release_20260726.md`。

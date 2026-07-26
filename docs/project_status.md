@@ -1607,3 +1607,11 @@ P0 马信息补全专项的模型交接文档见
 
 - 阶段 A（纯时间推进）新增 4 模型、2 migration、服务/task/admin/管理命令、56 项测试。
 - 当前：代码审查进行中；未部署、未写生产。
+
+## 2026-07-26 赛事生命周期阶段 A 已关闭上线并完成 dry-run
+
+- 阶段 A schema/code 已部署，生产开关仍为 `false/off`，没有 lifecycle 业务记录或赛事状态写入。
+- 生产日期窗口内 35 场重点赛事的 dry-run 为
+  `7 transition / 28 noop / 0 error`；覆盖英国、法国和美国两个时区，日本、香港在窗口内无样本。
+- web、worker、beat、Django、Celery、数据库锁和内外 HTTP 健康检查通过。
+  进入 shadow 前仍需冻结 manifest、补齐区域观察策略并取得新的精确授权。
