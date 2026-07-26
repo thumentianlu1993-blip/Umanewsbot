@@ -6719,3 +6719,12 @@ python manage.py complete_horse_profiles \
 
 精确方案见 `docs/changes/automate-race-event-lifecycle/rollout.md`。阶段 A 已实现，
 56 项测试通过；当前代码审查进行中，未部署、未写生产。
+
+## The Racing API schema v2 proof runner 候选操作边界
+
+- 当前候选新增 `run_race_live_source_proof --region <region>`；schema v2 缺失或非法 region
+  必须在 transport 前失败。
+- 在当前候选完成独立 review、冻结 fingerprint 并取得最多 3 请求的独立用户授权前，不得在
+  本地或生产执行 `--confirm-network-proof`，不得读取/复制/输出 production secret。
+- 获得联网授权后仍必须使用唯一 output 目录、精确 registry SHA、`--max-requests <= 3`，
+  先核对 registry 有效期和 evidence 新鲜度；失败 artifact 也必须保留，禁止原目录重跑覆盖。

@@ -448,6 +448,7 @@ def run_the_racing_api_free_proof(
     transport: Callable[..., RaceLiveProofHttpResponse],
     sleep: Callable[[float], Any],
     max_requests: int,
+    region: str | None = None,
     clock: Callable[[], datetime] | None = None,
 ) -> RaceLiveSourceProofResult:
     output = Path(output_dir)
@@ -462,7 +463,43 @@ def run_the_racing_api_free_proof(
     )
     request_rows: list[dict[str, Any]] = []
     completed = True
-    endpoints = registry["endpoints"][:max_requests]
+    schema_version = registry["schema_version"]
+    if schema_version == 1:
+        endpoints = [
+            {
+                "name": endpoint["name"],
+                "url": f"https://{_HOST}{endpoint['path']}",
+                "path": endpoint["path"],
+            }
+            for endpoint in registry["endpoints"][:max_requests]
+        ]
+    else:
+        endpoints = []
+        route_specs = (
+            ("racecards_sync_today", "racecards_free", "today", 500),
+            ("racecards_sync_tomorrow", "racecards_free", "tomorrow", 500),
+            ("results_today", "results_today_free", None, 50),
+        )
+        for endpoint_name, route_name, day, limit in route_specs[:max_requests]:
+            endpoints.append(
+                {
+                    "name": endpoint_name,
+                    "url": build_the_racing_api_route_url(
+                        registry=registry,
+                        route_name=route_name,
+                        region=region,
+                        day=day,
+                        limit=limit,
+                        skip=0,
+                    ),
+                }
+            )
+        for endpoint in endpoints:
+            parsed_url = urlsplit(endpoint["url"])
+            endpoint["path"] = parsed_url.path + (
+                f"?{parsed_url.query}" if parsed_url.query else ""
+            )
+    requested_paths: list[str] = []
     for index, endpoint in enumerate(endpoints):
         if index:
             sleep(1.05)
@@ -471,9 +508,10 @@ def run_the_racing_api_free_proof(
             "request_number": index + 1,
         }
         try:
+            requested_paths.append(endpoint["path"])
             response = transport(
                 endpoint_name=endpoint["name"],
-                url=f"https://{_HOST}{endpoint['path']}",
+                url=endpoint["url"],
                 username=username,
                 password=password,
                 timeout_seconds=15,
@@ -547,7 +585,11 @@ def run_the_racing_api_free_proof(
             started_at=now,
             finished_at=finished_at,
             request_budget=max_requests,
-            endpoints=[endpoint["path"] for endpoint in registry["endpoints"]],
+            endpoints=(
+                [endpoint["path"] for endpoint in registry["endpoints"]]
+                if schema_version == 1
+                else requested_paths
+            ),
             terms_status=registry["terms_status"],
             evidence_verified_at=registry["evidence"]["verified_at"],
             completed=completed,
