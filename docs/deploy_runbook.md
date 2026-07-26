@@ -6719,3 +6719,15 @@ python manage.py complete_horse_profiles \
 
 精确方案见 `docs/changes/automate-race-event-lifecycle/rollout.md`。阶段 A 已实现，
 56 项测试通过；当前代码审查进行中，未部署、未写生产。
+
+## 2026-07-26 lifecycle 关闭部署与 dry-run
+
+- 生产 revision 为 `ef54a1836dd1fe1840f2d4765ebb73a1d130c645`，
+  `RACE_EVENT_LIFECYCLE_ENABLED=false`、`RACE_EVENT_LIFECYCLE_MODE=off`。
+- `stable.0058/0059` 已应用，四类 lifecycle 表保持零记录；dry-run 证据和恢复点见
+  `docs/changes/automate-race-event-lifecycle/production_release_20260726.md`。
+- 当前部署入口有双重 migration 竞态：`start-web.sh` 和 `deploy_lowcost.sh` 都会运行
+  `migrate --noinput`。后续含迁移发布必须使用单一 migration 执行者，不得依赖容器重启恢复。
+- rollout 日期窗口必须用精确 event IDs；当前 `--auto-discover` 不限制日期，不能作为该门禁
+  的生产命令。
+- shadow 前不得沿用本轮 dry-run 作为五地区证明：当前窗口没有日本、香港样本。
