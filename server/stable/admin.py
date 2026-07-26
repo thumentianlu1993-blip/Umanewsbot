@@ -49,6 +49,10 @@ from .models import (
     RaceEventRevisionPublication,
     RaceEventResult,
     RaceEventRunner,
+    RaceEventFieldAuthority,
+    RaceEventFieldChange,
+    RaceEventLifecycleControl,
+    RaceEventLifecycleTransition,
     RaceLiveEventPublicationAllowlist,
     RaceLiveAlertIncident,
     RaceLiveHostBudget,
@@ -1113,13 +1117,69 @@ class RaceEventAdmin(admin.ModelAdmin):
         RaceEventDataCandidateInline,
         RaceEventArticleLinkInline,
     ]
+    readonly_fields = ("created_at", "updated_at", "_lifecycle_info")
 
+    @admin.display(description="生命周期状态")
+    def _lifecycle_info(self, obj):
+        try:
+            ctrl = obj.lifecycle_control
+        except Exception:
+            return "—"
+        lines = [
+            f"模式: {ctrl.get_mode_display()}",
+            f"下次刷新: {ctrl.next_refresh_at or '—'}",
+            f"世代: {ctrl.schedule_generation}",
+            f"最后尝试: {ctrl.last_attempt_at or '—'}",
+            f"最后结果: {ctrl.last_result_code or '—'}",
+            f"连续失败: {ctrl.consecutive_failures}",
+        ]
+        return " | ".join(lines)
+
+
+# ── Lifecycle admin (read-only) ───────────────────────────────────────
 
 @admin.register(RaceEventDataCandidate)
 class RaceEventDataCandidateAdmin(admin.ModelAdmin):
-    list_display = ("event", "module", "source_name", "status", "confidence", "fetched_at", "applied_by", "applied_at")
+    list_display = ("event", "module", "source_name", "status", "confidence",
+                    "fetched_at", "applied_by", "applied_at")
     list_filter = ("module", "status", "source_name", "fetched_at")
-    search_fields = ("event__chinese_name", "event__original_name", "source_name", "source_url", "error_message")
+    search_fields = ("event__chinese_name", "event__original_name", "source_name",
+                     "source_url", "error_message")
+    readonly_fields = ("created_at", "updated_at")
+
+@admin.register(RaceEventLifecycleControl)
+class RaceEventLifecycleControlAdmin(RaceLiveReadOnlyAdmin):
+    list_display = ("event", "mode", "next_refresh_at", "schedule_generation",
+                    "last_attempt_at", "last_result_code", "consecutive_failures")
+    list_filter = ("mode",)
+    search_fields = ("event__chinese_name", "event__original_name", "event__slug")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(RaceEventLifecycleTransition)
+class RaceEventLifecycleTransitionAdmin(RaceLiveReadOnlyAdmin):
+    list_display = ("event", "from_status", "to_status", "record_kind",
+                    "reason_code", "effective_at", "schedule_generation")
+    list_filter = ("record_kind", "from_status", "to_status")
+    search_fields = ("event__chinese_name", "dedupe_key")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(RaceEventFieldAuthority)
+class RaceEventFieldAuthorityAdmin(RaceLiveReadOnlyAdmin):
+    list_display = ("event", "subject_type", "subject_key", "field_name",
+                    "authority_level", "manual_lock")
+    list_filter = ("subject_type", "authority_level", "manual_lock")
+    search_fields = ("event__chinese_name", "subject_key", "field_name")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(RaceEventFieldChange)
+class RaceEventFieldChangeAdmin(RaceLiveReadOnlyAdmin):
+    list_display = ("event", "subject_type", "subject_key", "field_name",
+                    "authority_level", "applied", "created_at")
+    list_filter = ("subject_type", "applied", "field_name")
+    search_fields = ("event__chinese_name", "subject_key", "field_name")
     readonly_fields = ("created_at", "updated_at")
 
 

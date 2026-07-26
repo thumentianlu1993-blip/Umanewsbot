@@ -4907,3 +4907,247 @@ class RaceFieldNormalizationReceipt(models.Model):
             )
         ]
         ordering = ["run", "batch_number", "pk"]
+
+
+# ── Race Event Lifecycle (Phase A) ────────────────────────────────────
+
+
+class RaceEventLifecycleMode(models.TextChoices):
+    OFF = "off", "关闭"
+    SHADOW = "shadow", "影子"
+    ENFORCE = "enforce", "执行"
+
+
+class RaceEventLifecycleTransitionKind(models.TextChoices):
+    PROPOSAL = "proposal", "提案"
+    APPLIED = "applied", "已应用"
+
+
+class RaceEventFieldSubjectType(models.TextChoices):
+    EVENT = "event", "赛事"
+    PARTICIPANT = "participant", "参赛马"
+
+
+class RaceEventLifecycleControl(TimestampedModel):
+    """Per-event lifecycle operational control (one-to-one with RaceEvent)."""
+
+    event = models.OneToOneField(
+        "RaceEvent",
+        on_delete=models.CASCADE,
+        related_name="lifecycle_control",
+    )
+    mode = models.CharField(
+        max_length=16,
+        choices=RaceEventLifecycleMode.choices,
+        default=RaceEventLifecycleMode.OFF,
+    )
+    next_refresh_at = models.DateTimeField(null=True, blank=True)
+    schedule_generation = models.PositiveBigIntegerField(default=0)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
+    last_result_code = models.CharField(max_length=64, blank=True)
+    last_error = models.TextField(blank=True)
+    last_source_key = models.CharField(max_length=128, blank=True)
+    refresh_profile = models.CharField(max_length=8, blank=True, default="")  # e.g. P0, P1
+    consecutive_failures = models.PositiveIntegerField(default=0)
+    claim_token = models.CharField(max_length=64, blank=True)
+    claim_generation = models.PositiveBigIntegerField(default=0)
+    claim_expires_at = models.DateTimeField(null=True, blank=True)
+    manual_pause_reason = models.TextField(blank=True)
+    enrollment_manifest_sha256 = models.CharField(max_length=64, blank=True)
+    manifest_data = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=("mode", "next_refresh_at"),
+                name="lifecycle_ctrl_m_refresh_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.event} mode={self.mode} gen={self.schedule_generation}"
+
+
+class RaceEventLifecycleTransition(TimestampedModel):
+    """Append-only audit log of lifecycle state transitions."""
+
+    event = models.ForeignKey(
+        "RaceEvent",
+        on_delete=models.CASCADE,
+        related_name="lifecycle_transitions",
+    )
+    from_status = models.CharField(max_length=16, choices=RaceEventStatus.choices)
+    to_status = models.CharField(max_length=16, choices=RaceEventStatus.choices)
+    reason_code = models.CharField(max_length=64)
+    effective_at = models.DateTimeField()
+    source_authority = models.CharField(max_length=32, blank=True)
+    source_key = models.CharField(max_length=128, blank=True)
+    source_url = models.CharField(max_length=1000, blank=True)
+    trigger_task = models.CharField(max_length=128, blank=True)
+    run_id = models.CharField(max_length=64, blank=True)
+    schedule_generation = models.PositiveBigIntegerField(default=0)
+    record_kind = models.CharField(
+        max_length=16,
+        choices=RaceEventLifecycleTransitionKind.choices,
+    )
+    dedupe_key = models.CharField(max_length=255)
+    based_on_proposal = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="applied_transitions",
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("dedupe_key",),
+                name="uq_lifecycle_transition_dedupe_key",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("event", "record_kind"),
+                name="lifecycle_trans_event_kind_idx",
+            ),
+            models.Index(
+                fields=("event", "schedule_generation"),
+                name="lifecycle_trans_event_gen_idx",
+            ),
+        ]
+        ordering = ("event", "effective_at", "id")
+
+    def __str__(self) -> str:
+        return f"{self.event} {self.from_status}→{self.to_status} [{self.record_kind}]"
+
+
+class RaceEventFieldAuthority(TimestampedModel):
+    """Tracks the current authority level and source for each field of each subject."""
+
+    event = models.ForeignKey(
+        "RaceEvent",
+        on_delete=models.CASCADE,
+        related_name="field_authorities",
+    )
+    subject_type = models.CharField(
+        max_length=16,
+        choices=RaceEventFieldSubjectType.choices,
+    )
+    subject_key = models.CharField(max_length=255)
+    field_name = models.CharField(max_length=64)
+    authority_level = models.PositiveSmallIntegerField(default=0)
+    source_key = models.CharField(max_length=128, blank=True)
+    source_url = models.CharField(max_length=1000, blank=True)
+    external_id = models.CharField(max_length=255, blank=True)
+    confidence = models.PositiveSmallIntegerField(default=0)
+    observed_at = models.DateTimeField(null=True, blank=True)
+    article = models.ForeignKey(
+        "NewsArticle",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    candidate = models.ForeignKey(
+        "RaceEventDataCandidate",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    revision = models.ForeignKey(
+        "RaceEventRevision",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    value_sha256 = models.CharField(max_length=64, blank=True)
+    manual_lock = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("event", "subject_type", "subject_key", "field_name"),
+                name="uq_field_authority_subject_field",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("event", "subject_type", "subject_key"),
+                name="field_auth_event_subject_idx",
+            ),
+        ]
+        verbose_name_plural = "race event field authorities"
+
+    def __str__(self) -> str:
+        return f"{self.event} {self.subject_type}:{self.subject_key}.{self.field_name} lv={self.authority_level}"
+
+
+class RaceEventFieldChange(TimestampedModel):
+    """Append-only log of each field value change with provenance."""
+
+    event = models.ForeignKey(
+        "RaceEvent",
+        on_delete=models.CASCADE,
+        related_name="field_changes",
+    )
+    subject_type = models.CharField(
+        max_length=16,
+        choices=RaceEventFieldSubjectType.choices,
+    )
+    subject_key = models.CharField(max_length=255)
+    field_name = models.CharField(max_length=64)
+    old_value = models.JSONField(null=True, blank=True)
+    new_value = models.JSONField(null=True, blank=True)
+    source_key = models.CharField(max_length=128, blank=True)
+    source_url = models.CharField(max_length=1000, blank=True)
+    external_id = models.CharField(max_length=255, blank=True)
+    confidence = models.PositiveSmallIntegerField(default=0)
+    authority_level = models.PositiveSmallIntegerField(default=0)
+    trigger_task = models.CharField(max_length=128, blank=True)
+    run_id = models.CharField(max_length=64, blank=True)
+    article = models.ForeignKey(
+        "NewsArticle",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    candidate = models.ForeignKey(
+        "RaceEventDataCandidate",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    revision = models.ForeignKey(
+        "RaceEventRevision",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    schedule_generation = models.PositiveBigIntegerField(default=0)
+    operation_mode = models.CharField(max_length=16, blank=True)
+    applied = models.BooleanField(default=True)
+    rejection_reason = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=("event", "subject_type", "subject_key"),
+                name="field_change_event_subject_idx",
+            ),
+            models.Index(
+                fields=("event", "field_name"),
+                name="field_change_event_field_idx",
+            ),
+        ]
+        ordering = ("event", "created_at", "id")
+
+    def __str__(self) -> str:
+        return f"{self.event} {self.subject_type}:{self.subject_key}.{self.field_name}"
