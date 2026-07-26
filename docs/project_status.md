@@ -1602,3 +1602,8 @@ P0 马信息补全专项的模型交接文档见
   失败或内容截断文章未写库。
 - 20 篇 QQ delivery 与公开状态零漂移；已发送 QQ 未重发。完整证据见
   `docs/changes/fix-hrn-residual-boundaries-and-jockey-club-term/release_report.md`。
+
+# 2026-07-26 赛事生命周期阶段 A 已实现（代码审查中）
+
+- 阶段 A（纯时间推进）新增 4 模型、2 migration、服务/task/admin/管理命令、56 项测试。
+- 当前：代码审查进行中；未部署、未写生产。

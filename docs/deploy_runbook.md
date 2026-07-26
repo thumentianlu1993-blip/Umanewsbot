@@ -6714,3 +6714,8 @@ python manage.py complete_horse_profiles \
      当前数据库已被外部编辑时 fail closed。
    - 代码回滚使用上述旧镜像标签；本次无 migration，正常代码回滚不恢复数据库。
    - 仅确认本轮造成数据库级损坏时，才进入整库恢复窗口。
+
+# 赛事生命周期自动更新发布入口（规划中，阶段 A 代码审查进行中）
+
+精确方案见 `docs/changes/automate-race-event-lifecycle/rollout.md`。阶段 A 已实现，
+56 项测试通过；当前代码审查进行中，未部署、未写生产。

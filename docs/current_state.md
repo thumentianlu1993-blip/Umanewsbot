@@ -3524,3 +3524,9 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   `ab0d93035afc593ccb5822323c2e27ffa1f48b53ec8c53030023cbcd21d33328`。
 - 详细发布、失败/拒绝清单、5 组 receipt/rollback 和恢复点见
   `docs/changes/fix-hrn-residual-boundaries-and-jockey-club-term/release_report.md`。
+
+# 2026-07-26 赛事生命周期阶段 A 已实现（代码审查中）
+
+- worktree `.worktrees/automate-race-event-lifecycle`，分支 `codex/automate-race-event-lifecycle`，
+  rebase 到 `origin/main@0aeb0ed7`。新增模型/迁移/服务/task/admin/管理命令，SQLite 56 项测试。
+- 当前：代码审查进行中；未 commit / push / PR / 部署 / 生产写入。

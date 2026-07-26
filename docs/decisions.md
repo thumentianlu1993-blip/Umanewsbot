@@ -2077,3 +2077,10 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   `f70b56c3aaa4d988c827f28aee076c43199312132be9774c1ccd010a4e51e137`。
 - 其中已公开且已有 sent delivery 的文章 `9783` 仅按批准正文更新了数据库与网页，没有重发
   QQ；写前/写后逐篇比对确认 delivery 与公开状态未漂移。
+
+## 2026-07-26 赛事生命周期设计决策（阶段 A 已实现）
+
+- 状态推进与赛果权威分离；时间规则按 IANA 时区执行；cancelled/postponed/finished 为终态。
+- 时区合同：日本→Asia/Tokyo、香港→Asia/Hong_Kong、英国→Europe/London、法国→Europe/Paris、
+  美国→manifest 逐场审核 America/*；其他 region fail closed。
+- 默认 mode=off，所有配置关闭；不接入 provider、不改新闻门禁、不 dispatch race-live。
