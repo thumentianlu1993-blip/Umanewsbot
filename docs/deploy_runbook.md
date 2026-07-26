@@ -6742,3 +6742,53 @@ python manage.py complete_horse_profiles \
 - 生产 apply 需要 candidate/approval 双 SHA、逐场预计写入、canonical 映射、blocker=0、
   队列排空、备份和写前快照的再次授权。执行后逐地区立即 verify 与幂等重放；任一 CAS、
   ledger 或数据库身份不一致即停止。
+
+## 2026-07-27 赛果缺口恢复关闭态部署与联网阻断记录
+
+1. Git 与镜像：
+   - PR `#28` release commit：
+     `88cc4eafe4a7b5263aa2a6c30cd7d70978323989`。
+   - merge/生产 HEAD：
+     `dfbd24e10f5910580945f29fe19219b7d838730c`。
+   - `web/worker/beat` 应用镜像：
+     `sha256:35a53589e051c39806397fe8aec1e00f0bcbd1df9d0a9ffec29a72f35dc4d751`。
+     race-live worker 已重建为同一镜像但保持 Created/停止。
+2. 恢复点：
+   - PostgreSQL custom dump：
+     `backups/db/pre-race-result-recovery-20260726T200011Z.dump`，
+     `257629113` bytes，SHA-256
+     `682848bdb63edc43b809056fa3a5b1331ebca7f2f6e2cfae806208fa105c9efc`，
+     mode `0600`，`pg_restore -l` 通过。
+   - `.env.backup.pre-race-result-recovery-20260726T200011Z`，mode `0600`。
+3. 关闭态：
+   - `RACE_LIVE_SCHEDULER_ENABLED=false`
+   - `RACE_LIVE_MONITOR_ENABLED=false`
+   - `RACE_LIVE_ENABLED_REGIONS=`
+   - `RACE_LIVE_RUNNER_MODE=disabled`
+   - `RACE_EVENT_LIFECYCLE_ENABLED=false`
+   - `RACE_EVENT_LIFECYCLE_MODE=off`
+   - `HISTORICAL_RACE_BACKFILL_ENABLED=false`
+   - `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`
+   - 4 条 race-live publication policy 为 off，enabled allowlist 为 0。
+4. 迁移与验收：
+   - `stable.0060_raceeventproductcanonicallink` 成功，表记录为 0。
+   - Django check 通过；公网 HTTP `healthz` 与 `/races/` 最终为 200。
+   - Compose `create race_live_worker` 曾连带把 db 容器重建为 Created；PostgreSQL volume
+     未删除。启动 db 并等待 healthy 后重启 web/worker/beat，`RaceEvent=9867`，页面恢复。
+     后续禁止用未加 `--no-deps` 的 `compose create` 维护停止态 worker。
+5. 只读 inventory：
+   - 文件：
+     `runtime/race_result_recovery/inventory-20260726T200544Z.json`。
+   - 文件 SHA-256：
+     `a4380f2b4bb5fafe96f7990e2bc0ef9e032a7d84e17718ebd0b091d5b60b267a`。
+   - manifest SHA-256：
+     `f3a4cb7f26bfac5db4312af3f3af46d9fe11f9e50d2241ef54d4606403dbed1b`。
+   - 守恒：
+     `59 rows / 50 groups / 40 missing / 9 duplicate-zero /
+     9 duplicate-confirmed / 1 provisional(event 924)`。
+6. 联网 prepare：
+   - 在网络保持关闭的生产只读调用中，plan 校验 40 个冻结 ID 后，
+     `expected_targets_from_plan()` 报 `expected_target_empty`。
+   - transport 请求 `0`、manual-only 请求 `0`、candidate/source cache `0`、赛果业务写入 `0`。
+   - 禁止绕过 runner。先修 recovery event-ID snapshot 和 JRA 受控请求输入，完成新一轮测试、
+     独立 review、发布和联网授权后再执行。

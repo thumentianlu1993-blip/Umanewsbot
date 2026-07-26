@@ -1,5 +1,18 @@
 # 关键决策
 
+## 2026-07-27 赛果候选联网在 expected-target 构造缺口处保持零请求阻断
+
+- `race_result_recovery` 的 40 个 event ID source map 校验通过，不代表运行时 expected-target
+  snapshot 已可生成。生产只读调用实证 `expected_targets_from_plan()` 返回
+  `expected_target_empty`；此时不得手工伪造 snapshot、改用普通三模块 plan、直接运行 adapter
+  或跳过 historical runner。
+- 本次联网权限没有被解释为绕过编排权限：自动请求、manual-only 请求、candidate 和 source
+  cache 均为 0。修复必须先为 recovery event ID 构造并绑定精确 `RaceEvent` identity，
+  同时补齐 JRA list/source 与受控请求上下文，再按测试、独立 review、精确 release、部署和
+  新联网授权顺序推进。
+- 关闭态部署允许修改控制面开关，但不授权正式赛果投影。既有 race-live publication policies
+  和 allowlist 已关闭；event 924 暂定结果保留，正式结果、canonical link 和新闻/QQ 均不改。
+
 ## 2026-07-27 赛果恢复必须服从 projection owner 并以 blocker=0 才算完成
 
 - 指定窗口的赛果恢复不得直接按名称/日期复制数据，也不得直接写 `RaceEventResult`。所有正式结果先形成

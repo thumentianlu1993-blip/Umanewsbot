@@ -1,5 +1,40 @@
 # 当前状态
 
+## 2026-07-27 赛果缺口恢复已关闭态部署，inventory 通过，联网 prepare 在零请求处阻断
+
+- PR `#28` 已合并，release commit `88cc4eafe4a7b5263aa2a6c30cd7d70978323989`，
+  merge/生产 HEAD `dfbd24e10f5910580945f29fe19219b7d838730c`。生产应用镜像为
+  `sha256:35a53589e051c39806397fe8aec1e00f0bcbd1df9d0a9ffec29a72f35dc4d751`；
+  `stable.0060_raceeventproductcanonicallink` 已成功应用，新增表保持 `0` 行。
+- 部署恢复点为
+  `backups/db/pre-race-result-recovery-20260726T200011Z.dump`，大小
+  `257629113` bytes，SHA-256
+  `682848bdb63edc43b809056fa3a5b1331ebca7f2f6e2cfae806208fa105c9efc`，
+  mode `0600` 且 `pg_restore -l` 通过；环境恢复点为
+  `.env.backup.pre-race-result-recovery-20260726T200011Z`，mode `0600`。
+- 生产运行时保持关闭：race-live scheduler/monitor=false、enabled regions 为空、
+  runner mode=disabled、lifecycle=false/off、historical backfill/network=false；
+  4 条既有 race-live publication policy 已切到 off，1 条 allowlist 已 disabled。
+  event `924` 的 7 条暂定结果未删除，未创建正式赛果或 canonical link。
+- 只读 inventory 位于
+  `runtime/race_result_recovery/inventory-20260726T200544Z.json`，文件 SHA-256
+  `a4380f2b4bb5fafe96f7990e2bc0ef9e032a7d84e17718ebd0b091d5b60b267a`，
+  manifest SHA-256
+  `f3a4cb7f26bfac5db4312af3f3af46d9fe11f9e50d2241ef54d4606403dbed1b`。
+  守恒精确为 `59 event rows / 50 race groups / 40 missing / 9 duplicate-zero /
+  9 duplicate-confirmed / 1 provisional(event 924)`，并生成 9 组 pending identity review。
+- 为保持 race-live worker 停止而执行 Compose `create` 时，Compose 意外连带重建 db
+  容器但未删除 PostgreSQL 持久卷；db 一度处于 Created，`/races/` 瞬时返回 500。
+  已启动原数据卷上的 db、等待 healthy 并重启 web/worker/beat，最终
+  `RaceEvent=9867`、公网 HTTP healthz 与 `/races/` 均恢复 200；race-live worker
+  使用新镜像但保持 Created/未运行。
+- 有界联网 prepare 在 transport 前 fail closed：`race_result_recovery` plan 已正确验证
+  40 个冻结 event ID，但 `expected_targets_from_plan()` 仍只处理普通 `series` 或历史
+  `targets`，生产只读调用报 `expected_target_empty`。本次网络请求 `0`、manual-only
+  请求 `0`、candidate/source cache `0`，未写赛果业务表。不得绕过 approved runner；
+  需先补 recovery event-ID snapshot 路径并解决 JRA 受控请求输入，再重新测试、独立 review、
+  发布和取得新的联网执行授权。
+
 ## 2026-07-27 赛事赛果缺口恢复方案已通过工程审核（待确认实施）
 
 - 生产只读盘点确认 `2026-07-08..2026-07-27` 有 59 条公开 `RaceEvent`，初步对应约 50 场真实赛事；
