@@ -3530,3 +3530,16 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - worktree `.worktrees/automate-race-event-lifecycle`，分支 `codex/automate-race-event-lifecycle`，
   rebase 到 `origin/main@0aeb0ed7`。新增模型/迁移/服务/task/admin/管理命令，SQLite 56 项测试。
 - 当前：代码审查进行中；未 commit / push / PR / 部署 / 生产写入。
+
+## 2026-07-26 The Racing API schema v2 proof runner 已完成本地修复
+
+- 分支 `codex/fix-tra-schema-v2-proof-runner` 从
+  `origin/main@ef54a1836dd1fe1840f2d4765ebb73a1d130c645` 创建。
+- 测试先行新增 4 项真实 RED：runner 不接受 region、命令无 `--region`、schema v2 仍读取
+  v1 `registry["endpoints"]`。实现后新增 4 项、完整 proof 16 项，以及 proof /
+  multiregion pipeline / racecard sync 合计 55 项均 GREEN。
+- schema v2 现在要求显式 region，按该地区固定构建 today racecard、tomorrow racecard、
+  results today 三条已审核 route，最多执行 registry 允许的 3 个请求；schema v1 行为保持兼容。
+- 本轮只使用 fake transport，没有读取生产凭据或联网。Django check、migration drift、
+  py_compile、`git diff --check` 通过；独立 reviewer 最终结论为 `APPROVED`，无开放
+  P0/P1/P2。当前未 commit、push、PR、部署，真实联网仍等待独立用户授权。
