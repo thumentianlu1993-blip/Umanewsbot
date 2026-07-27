@@ -1104,7 +1104,10 @@ def run_scheduled_prepare(*, schedule_slot: datetime | None = None) -> dict[str,
                 schedule_slot=item["schedule_slot"],
                 defaults={
                     "status": item["terminal_state"],
-                    "terminal_summary": item,
+                    "terminal_summary": {
+                        **item,
+                        "schedule_slot": item["schedule_slot"].isoformat(),
+                    },
                     "finished_at": now,
                 },
             )
