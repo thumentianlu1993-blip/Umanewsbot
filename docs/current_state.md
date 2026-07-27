@@ -1,5 +1,29 @@
 # 当前状态
 
+## 2026-07-27 2026 重赏前五名 Wikipedia 研究流水线已完成本地改造与代码审核
+
+- 草稿 PR #24 的原始单体 workflow 已证实两次在约 `700/1540` 匹马的 Wikidata 搜索阶段达到
+  180 分钟上限；此前已有 456 场赛事、2231 条前五名记录和 1540 个马匹种子的有效设计成果，
+  但进程取消时没有 checkpoint，最新两次长运行均没有 artifact。
+- 已在隔离 worktree 的本地分支 `codex/resumable-2026-graded-top5-wikipedia` 完成可续跑改造：
+  races、profiles、Wikidata search、entities、horse scoring、finalize 均可独立执行，使用原子
+  checkpoint、稳定分片、精确上游 SHA/manifest/tool/input 绑定、结构化错误和实际请求计数。
+- GitHub workflow 已改为 11-job artifact DAG。PR 默认只运行离线 synthetic safe-stop/resume
+  smoke；完整公网任务必须手动 `workflow_dispatch full_network=true`，并使用精确
+  `source_run_id + source_attempt` 恢复。安全停止码 `75` 会保留 checkpoint、令 job 失败并
+  阻断下游，恢复成功返回 0 后才继续。
+- 测试先行证据：初始 `14` 项为 `3 failures + 10 errors`；首轮 review 返修扩展到 `26` 项时
+  为 `2 failures + 4 errors`；最终 `27/27` 通过。synthetic CLI 实际覆盖退出 75、续跑、
+  fan-in、纯离线 finalize、字节等价、结构化错误和请求数聚合；`py_compile`、11-job YAML
+  解析和 `git diff --check` 通过。
+- 独立代码 reviewer 经过首次 `REVISE` 和两轮限定返修后最终 `VERDICT: APPROVED`，无剩余
+  P0/P1/P2 finding。
+- 当前精确状态：实现 diff 尚未 commit；为在 RED 前对齐 `origin/main@a59956b3`，本地分支已有
+  未推送的 merge commit `7423d490`。其余状态为 `implementation reviewed / not pushed /
+  PR #24 unchanged / GitHub smoke not run / full network not run / not deployed / no production write`。
+  下一门禁是在最新 review 后取得针对当前 fingerprint 的发布授权，才可 commit、push 并更新
+  草稿 PR；完整公网研究运行仍需另行明确授权。
+
 ## 2026-07-24 首页人工头条与 AI 编辑推荐控制已实现（待独立代码审核）
 
 - 基于 `origin/main@10f341e6`，worktree `add-editorial-headline-control`，分支

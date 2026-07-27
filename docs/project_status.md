@@ -1,5 +1,9 @@
 # 项目状态文档
 
+- 2026-07-27: PR #24 的 2026 重赏前五名 Wikipedia 研究工具已完成本地阶段化、checkpoint、
+  精确 attempt 恢复和 11-job artifact DAG 改造；27 项离线/synthetic 测试及独立代码 review
+  通过。实现 diff 尚未 commit；仅有对齐主干的本地 merge commit `7423d490`，尚未 push，
+  PR 未更新、GitHub smoke/完整公网任务未运行、未部署且未写生产。
 - 2026-07-24: 首页人工头条与 AI 编辑推荐控制代码实现完成，待独立代码 review 和发布授权。
 
 ## 2026-07-24 首页编辑控制方案审核通过，待确认实现

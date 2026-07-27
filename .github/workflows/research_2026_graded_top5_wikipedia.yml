@@ -2,74 +2,379 @@ name: Research 2026 graded top-five Wikipedia mapping
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [main]
     paths:
       - runtime/research/collect_2026_graded_top5_wikipedia.py
+      - runtime/research/test_collect_2026_graded_top5_wikipedia.py
       - .github/workflows/research_2026_graded_top5_wikipedia.yml
   workflow_dispatch:
+    inputs:
+      full_network:
+        description: Run the explicitly authorized staged public-network collection
+        required: true
+        type: boolean
+        default: false
+      source_run_id:
+        description: Exact prior workflow run ID to resume; blank starts a fresh run
+        required: false
+        type: string
+        default: ""
+      source_attempt:
+        description: Exact prior run attempt paired with source_run_id
+        required: false
+        type: string
+        default: ""
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
-  group: research-2026-graded-top5-wikipedia-pr-${{ github.event.pull_request.number || github.ref }}
+  group: research-2026-graded-top5-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
-jobs:
-  collect:
-    runs-on: ubuntu-latest
-    timeout-minutes: 180
-    steps:
-      - name: Checkout research branch
-        uses: actions/checkout@v4
+env:
+  OUTPUT_DIR: runtime/research/output/2026-graded-top5-wikipedia
+  SMOKE_DIR: runtime/research/output/2026-graded-top5-wikipedia-smoke
+  PYTHONUNBUFFERED: "1"
+  SAFE_STOP_CODE: "75"
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
-
-      - name: Install research dependencies
+      - run: python -m pip install requests beautifulsoup4 urllib3
+      - name: Offline contracts
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install requests beautifulsoup4 urllib3
-
-      - name: Apply current public status-label compatibility
+          python -m py_compile runtime/research/collect_2026_graded_top5_wikipedia.py
+          python -m unittest runtime.research.test_collect_2026_graded_top5_wikipedia -v
+      - name: Synthetic safe stop, resume, fan-in and finalize
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path("runtime/research/collect_2026_graded_top5_wikipedia.py")
-          text = path.read_text(encoding="utf-8")
-          old = 'if status != "已完赛":'
-          new = 'if status not in {"已结束", "已完赛"}:'
-          if old not in text:
-              raise SystemExit("expected status-label guard not found")
-          path.write_text(text.replace(old, new, 1), encoding="utf-8")
-          PY
-
-      - name: Compile collector
-        run: python -m py_compile runtime/research/collect_2026_graded_top5_wikipedia.py
-
-      - name: Collect top-five finishers and Wikipedia mapping
-        run: |
+          set +e
           python runtime/research/collect_2026_graded_top5_wikipedia.py \
-            --base-url https://umafans.run \
-            --cutoff 2026-07-26 \
-            --delay 0.12 \
-            --output-dir runtime/research/output/2026-graded-top5-wikipedia
-
-      - name: Show summary
-        if: always()
-        run: |
-          test -f runtime/research/output/2026-graded-top5-wikipedia/summary.json && cat runtime/research/output/2026-graded-top5-wikipedia/summary.json || true
-          test -f runtime/research/output/2026-graded-top5-wikipedia/errors.json && cat runtime/research/output/2026-graded-top5-wikipedia/errors.json || true
-
-      - name: Upload research artifact
-        if: always()
+            --stage synthetic_smoke --limit 1 --output-dir "$SMOKE_DIR"
+          code=$?
+          set -e
+          test "$code" -eq "$SAFE_STOP_CODE"
+          python runtime/research/collect_2026_graded_top5_wikipedia.py \
+            --stage synthetic_smoke --resume --output-dir "$SMOKE_DIR"
+          test -f "$SMOKE_DIR/safe_stop.json"
+          test -f "$SMOKE_DIR/synthetic_smoke_report.json"
+          test -f "$SMOKE_DIR/final/summary.json"
+      - name: Upload real synthetic checkpoint evidence
         uses: actions/upload-artifact@v4
         with:
-          name: 2026-graded-top5-wikipedia
-          path: runtime/research/output/2026-graded-top5-wikipedia/
-          if-no-files-found: error
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-synthetic-checkpoint-0
+          path: |
+            ${{ env.SMOKE_DIR }}/run_manifest.json
+            ${{ env.SMOKE_DIR }}/safe_stop.json
+            ${{ env.SMOKE_DIR }}/synthetic_smoke_report.json
+            ${{ env.SMOKE_DIR }}/stages/
+            ${{ env.SMOKE_DIR }}/final/
           retention-days: 14
+
+  races:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install requests beautifulsoup4 urllib3
+      - name: Validate exact source attempt selector
+        if: (inputs.source_run_id == '') != (inputs.source_attempt == '')
+        run: |
+          echo "source_run_id and source_attempt must be provided together"
+          exit 1
+      - name: Restore one exact compatible source attempt
+        if: inputs.source_run_id != '' && inputs.source_attempt != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-races-0
+          path: ${{ env.OUTPUT_DIR }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - name: Race checkpoint
+        run: |
+          python runtime/research/collect_2026_graded_top5_wikipedia.py \
+            --stage races --resume --checkpoint-every 20 --time-budget-seconds 3600 \
+            --base-url https://umafans.run --cutoff 2026-07-26 --output-dir "$OUTPUT_DIR"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-races-0
+          path: ${{ env.OUTPUT_DIR }}
+          retention-days: 14
+
+  profiles:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network
+    needs: races
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install requests beautifulsoup4 urllib3
+      - name: Restore this shard from one exact source attempt
+        if: inputs.source_run_id != '' && inputs.source_attempt != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-profiles-${{ matrix.shard }}
+          path: ${{ env.OUTPUT_DIR }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - name: Restore current-attempt race input after optional shard restore
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-races-0
+          path: ${{ env.OUTPUT_DIR }}
+      - run: |
+          python runtime/research/collect_2026_graded_top5_wikipedia.py \
+            --stage profiles --resume --shard-index ${{ matrix.shard }} --shard-count 4 \
+            --checkpoint-every 25 --time-budget-seconds 3600 --output-dir "$OUTPUT_DIR"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-profiles-${{ matrix.shard }}
+          path: ${{ env.OUTPUT_DIR }}
+
+  merge_profiles:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network
+    needs: profiles
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install requests beautifulsoup4 urllib3
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-profiles-0", path: "${{ env.OUTPUT_DIR }}"}
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-profiles-1", path: "${{ env.OUTPUT_DIR }}"}
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-profiles-2", path: "${{ env.OUTPUT_DIR }}"}
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-profiles-3", path: "${{ env.OUTPUT_DIR }}"}
+      - run: python runtime/research/collect_2026_graded_top5_wikipedia.py --stage merge_profiles --shard-count 4 --output-dir "$OUTPUT_DIR"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-merge_profiles-0
+          path: ${{ env.OUTPUT_DIR }}
+
+  wikidata_search:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network
+    needs: merge_profiles
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install requests beautifulsoup4 urllib3
+      - name: Restore this shard from one exact source attempt
+        if: inputs.source_run_id != '' && inputs.source_attempt != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-wikidata_search-${{ matrix.shard }}
+          path: ${{ env.OUTPUT_DIR }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - name: Restore current-attempt merged profiles after optional shard restore
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-merge_profiles-0
+          path: ${{ env.OUTPUT_DIR }}
+      - run: |
+          python runtime/research/collect_2026_graded_top5_wikipedia.py \
+            --stage wikidata_search --resume --shard-index ${{ matrix.shard }} --shard-count 4 \
+            --checkpoint-every 25 --time-budget-seconds 4500 --output-dir "$OUTPUT_DIR"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-wikidata_search-${{ matrix.shard }}
+          path: ${{ env.OUTPUT_DIR }}
+
+  merge_search:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network
+    needs: wikidata_search
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install requests beautifulsoup4 urllib3
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-wikidata_search-0", path: "${{ env.OUTPUT_DIR }}"}
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-wikidata_search-1", path: "${{ env.OUTPUT_DIR }}"}
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-wikidata_search-2", path: "${{ env.OUTPUT_DIR }}"}
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-wikidata_search-3", path: "${{ env.OUTPUT_DIR }}"}
+      - run: python runtime/research/collect_2026_graded_top5_wikipedia.py --stage merge_search --shard-count 4 --output-dir "$OUTPUT_DIR"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-merge_search-0
+          path: ${{ env.OUTPUT_DIR }}
+
+  wikidata_entities:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network
+    needs: merge_search
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install requests beautifulsoup4 urllib3
+      - name: Restore this shard from one exact source attempt
+        if: inputs.source_run_id != '' && inputs.source_attempt != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-wikidata_entities-${{ matrix.shard }}
+          path: ${{ env.OUTPUT_DIR }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - name: Restore current-attempt merged search after optional shard restore
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-merge_search-0
+          path: ${{ env.OUTPUT_DIR }}
+      - run: |
+          python runtime/research/collect_2026_graded_top5_wikipedia.py \
+            --stage wikidata_entities --resume --shard-index ${{ matrix.shard }} --shard-count 4 \
+            --checkpoint-every 25 --time-budget-seconds 3600 --output-dir "$OUTPUT_DIR"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-wikidata_entities-${{ matrix.shard }}
+          path: ${{ env.OUTPUT_DIR }}
+
+  merge_entities:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network
+    needs: wikidata_entities
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install requests beautifulsoup4 urllib3
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-wikidata_entities-0", path: "${{ env.OUTPUT_DIR }}"}
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-wikidata_entities-1", path: "${{ env.OUTPUT_DIR }}"}
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-wikidata_entities-2", path: "${{ env.OUTPUT_DIR }}"}
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-wikidata_entities-3", path: "${{ env.OUTPUT_DIR }}"}
+      - run: python runtime/research/collect_2026_graded_top5_wikipedia.py --stage merge_entities --shard-count 4 --output-dir "$OUTPUT_DIR"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-merge_entities-0
+          path: ${{ env.OUTPUT_DIR }}
+
+  score_horses:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network
+    needs: merge_entities
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install requests beautifulsoup4 urllib3
+      - name: Restore this shard from one exact source attempt
+        if: inputs.source_run_id != '' && inputs.source_attempt != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-score_horses-${{ matrix.shard }}
+          path: ${{ env.OUTPUT_DIR }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - name: Restore current-attempt merged entities after optional shard restore
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-merge_entities-0
+          path: ${{ env.OUTPUT_DIR }}
+      - run: |
+          python runtime/research/collect_2026_graded_top5_wikipedia.py \
+            --stage score_horses --resume --shard-index ${{ matrix.shard }} --shard-count 4 \
+            --checkpoint-every 25 --time-budget-seconds 900 --output-dir "$OUTPUT_DIR"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-score_horses-${{ matrix.shard }}
+          path: ${{ env.OUTPUT_DIR }}
+
+  merge_scores:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network
+    needs: score_horses
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install requests beautifulsoup4 urllib3
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-score_horses-0", path: "${{ env.OUTPUT_DIR }}"}
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-score_horses-1", path: "${{ env.OUTPUT_DIR }}"}
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-score_horses-2", path: "${{ env.OUTPUT_DIR }}"}
+      - uses: actions/download-artifact@v4
+        with: {name: "${{ github.run_id }}-${{ github.run_attempt }}-score_horses-3", path: "${{ env.OUTPUT_DIR }}"}
+      - run: python runtime/research/collect_2026_graded_top5_wikipedia.py --stage merge_scores --shard-count 4 --output-dir "$OUTPUT_DIR"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-merge_scores-0
+          path: ${{ env.OUTPUT_DIR }}
+
+  finalize:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network
+    needs: merge_scores
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: python -m pip install requests beautifulsoup4 urllib3
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-merge_scores-0
+          path: ${{ env.OUTPUT_DIR }}
+      - name: Pure offline finalize
+        run: python runtime/research/collect_2026_graded_top5_wikipedia.py --stage finalize --output-dir "$OUTPUT_DIR"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-finalize-0
+          path: ${{ env.OUTPUT_DIR }}/final
