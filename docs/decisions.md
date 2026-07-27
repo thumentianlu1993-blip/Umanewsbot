@@ -1,5 +1,15 @@
 # 关键决策
 
+## 2026-07-27 明确非完赛状态计入完整性，但不得成为名次
+
+- 官方 `SCR/DNF/DSQ/中止` 等受控状态表示该参赛者已被官方交代，但没有数值完赛名次；
+  adapter 必须同时保留来源原文与规范化状态，不得把表格行号或后续顺序写成名次。
+- JRA `中止` 采用现有模型语义 `pulled_up`。恢复聚合只允许明确列入受控集合的退赛/非完赛
+  状态退出数值名次分母；`unknown`、`declared`、`Also Ran`、`N/A` 等不确定或无顺序状态
+  继续产生 `incomplete_result_order` blocker。
+- 完整名次是所有实际完赛马的连续、唯一数值顺序；“非完赛状态已交代”和“完整排名”是两个
+  并存事实。该决定不放宽官方 evidence、participant identity、receipt 或生产 apply 门禁。
+
 ## 2026-07-27 recovery adapter 不得以成功空跑替代 scheduled 目标处理
 
 - inventory 中 `scheduled + result_due=true` 是本次历史赛果恢复的合法冻结状态；显式

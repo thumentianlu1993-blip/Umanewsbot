@@ -216,7 +216,7 @@ def _runner_status_from_finish_position(value: str) -> str:
     if value == "除外":
         return "scratched"
     if value == "中止":
-        return "unknown"
+        return "pulled_up"
     return "declared"
 
 

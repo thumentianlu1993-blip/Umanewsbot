@@ -1,5 +1,26 @@
 # 当前状态
 
+## 2026-07-27 正式 gap-v2 prepare 为 39/40，JRA 中止语义已本地修复
+
+- 生产只读联网 prepare
+  `formal-gap-v2-20260727T114705Z/outputs/prepare-20260727T114705Z`
+  对冻结 40 场生成 40 个 candidate、319 条数值名次；实际请求 `56/75`，
+  manual-only 请求为 `0`，未写 `RaceEventResult` 或 `RaceEventDataCandidate`。
+- 39 场完整。唯一 blocker 为 event `80`（小仓纪念）：JRA 官方页完整列出第 1–17 名，
+  #5 `エヒト` 的官方状态为 `中止`。旧 adapter 保留了原始文字，但错误规范化为
+  `unknown`，聚合层因此报告 `runner_missing_from_result_order`；该马没有、也不应获得
+  数值名次。
+- 独立工作树 `codex/fix-jra-nonfinish-result-status` 基于
+  `origin/main@a079c93c70086298e4ea68c9b9b37023ed587103` 完成测试先行窄修：
+  JRA `中止 -> pulled_up`，恢复完整性只豁免受控退赛/非完赛状态；
+  `unknown/declared/Also Ran` 仍然阻断，且不会按页面顺序补造名次。
+- 新增真实 RED 精确失败于 `unknown != pulled_up`；修复后赛果恢复模块
+  `40/40` 通过，另有 JRA 中止、Also Ran 和普通缺马三项定点回归 `3/3` 通过。
+  扩大组合测试中的缺 fixture/子进程导入路径问题均位于未修改代码路径，不能计为本修复
+  GREEN，也未据此扩大修改范围。
+- 本修复尚未提交、推送、建 PR、独立发布复审或部署；生产仍运行旧解析语义，正式 prepare
+  artifact 未被覆盖，4.4/4.5 仍未完成，更未取得生产赛果写入授权。
+
 ## 2026-07-27 P0 URL 开关已恢复并完成一次补跑
 
 - 后续生产部署曾在 `2026-07-27 15:33 +08:00` 将

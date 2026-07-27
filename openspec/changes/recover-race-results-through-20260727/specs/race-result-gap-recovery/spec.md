@@ -22,6 +22,10 @@
 - **WHEN** 来源仅给出前若干名，并把其余完赛马统一标为 `Also Ran`、`N/A` 或其他无顺序状态
 - **THEN** adapter 不得按页面顺序补造后续名次，candidate 必须标记 `result_order_complete=false`，coverage 以 `incomplete_result_order` 阻断该场
 
+#### Scenario: 官方结果包含明确非完赛状态
+- **WHEN** 官方来源以 `SCR/DNF/DSQ/中止` 等受支持状态明确交代某匹参赛马且其余完赛马具有完整连续名次
+- **THEN** adapter 必须保留原始状态及规范化状态，不得为该马补造数值名次；完整性校验应将其计为已交代，未知或无顺序状态仍必须阻断
+
 #### Scenario: 任一恢复来源无法证明完整排名
 - **WHEN** candidate 缺少 target `event_id`、完整参赛名单、任一非退赛马的结果、连续唯一的内部名次，或仅包含 discovery-only winner
 - **THEN** candidate 不得进入可写入状态；系统必须保留精确缺项，并以 coverage blocker 阻断该场

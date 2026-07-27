@@ -79,10 +79,13 @@ inventory 同时保存：
 显式 recovery mode；普通历史详情模式继续只接受 `finished`。来源仅给前若干名并把其余完赛马
 标为 `Also Ran/N/A` 时，adapter 保留已知事实但写入 `result_order_complete=false`，coverage
 必须产生 `incomplete_result_order` blocker，禁止按页面排列补造名次。
+官方页面明确给出的非完赛状态属于已交代结果而不是名次：例如 JRA `中止` 规范化为
+`pulled_up`，保留原始文字并从连续数值名次分母中排除；只有受控非完赛状态可获得该豁免，
+`unknown/declared/Also Ran` 仍保持 blocker。
 聚合层对所有恢复来源再次独立核对：candidate 必须携带冻结 `event_id`，参赛名单中除
-`withdrawn/scratched` 外的每匹马都必须恰好进入结果，内部 `finish_position` 必须为从 1
-开始的连续唯一序列。缺参赛名单、缺马、重复身份、无效名次和 TOBA discovery-only winner
-一律标记 `result_order_complete=false`，不能因 adapter 命令成功而放行。
+受控退赛/非完赛状态外的每匹马都必须恰好进入结果，内部 `finish_position` 必须为从 1
+开始的连续唯一序列。缺参赛名单、缺马、重复身份、未知状态、无效名次和 TOBA
+discovery-only winner 一律标记 `result_order_complete=false`，不能因 adapter 命令成功而放行。
 UK 与 US Sporting Life 虽复用同一 parser，但在单次 run 中使用互不相同的
 candidate/review/summary 标准路径。coverage 只读取并验证当前 state 记录的标准 combined
 artifact identity，拒绝 `--candidate-jsonl` 替换；随后逐场比较聚合层强制写入的
