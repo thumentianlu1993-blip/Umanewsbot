@@ -6783,3 +6783,119 @@ python manage.py complete_horse_profiles \
   `/opt/umanewsbot/runtime/upcoming_racecard_urls/`，保持功能开关 false 部署并完成 flag-off
   smoke；随后才可按精确 route 做单次生产验证并启用开关。任何代码/registry 变化都会使 proof、
   review 和授权失效。
+## 2026-07-27 赛果缺口恢复发布前门禁
+
+- 当前仅完成本地实现，禁止直接运行生产 inventory、联网 candidate prepare 或 apply。
+- 发布前必须先完成独立原生只读代码审核，再针对精确 fingerprint 取得 release 授权；部署时
+  保持恢复 apply、网络自动化、TRA public、scheduler 和 publication 开关关闭。
+- 部署后先运行只读 inventory，冻结
+  `59 event rows / 50 race groups / 40 missing / 9 duplicate groups / event 924 provisional`
+  守恒。任何 ID 或计数漂移都停止，不通过调整分母继续。
+- 联网 prepare 需要对精确 source map 的新授权，并受 `<=75` 请求、单请求 `<=30s`、
+  cache `<=512 MiB` 约束；manual-only 官方 route 请求必须为 0。
+- 生产 apply 需要 candidate/approval 双 SHA、逐场预计写入、canonical 映射、blocker=0、
+  队列排空、备份和写前快照的再次授权。执行后逐地区立即 verify 与幂等重放；任一 CAS、
+  ledger 或数据库身份不一致即停止。
+
+## 2026-07-27 赛果缺口恢复关闭态部署与联网阻断记录
+
+1. Git 与镜像：
+   - PR `#28` release commit：
+     `88cc4eafe4a7b5263aa2a6c30cd7d70978323989`。
+   - merge/生产 HEAD：
+     `dfbd24e10f5910580945f29fe19219b7d838730c`。
+   - `web/worker/beat` 应用镜像：
+     `sha256:35a53589e051c39806397fe8aec1e00f0bcbd1df9d0a9ffec29a72f35dc4d751`。
+     race-live worker 已重建为同一镜像但保持 Created/停止。
+2. 恢复点：
+   - PostgreSQL custom dump：
+     `backups/db/pre-race-result-recovery-20260726T200011Z.dump`，
+     `257629113` bytes，SHA-256
+     `682848bdb63edc43b809056fa3a5b1331ebca7f2f6e2cfae806208fa105c9efc`，
+     mode `0600`，`pg_restore -l` 通过。
+   - `.env.backup.pre-race-result-recovery-20260726T200011Z`，mode `0600`。
+3. 关闭态：
+   - `RACE_LIVE_SCHEDULER_ENABLED=false`
+   - `RACE_LIVE_MONITOR_ENABLED=false`
+   - `RACE_LIVE_ENABLED_REGIONS=`
+   - `RACE_LIVE_RUNNER_MODE=disabled`
+   - `RACE_EVENT_LIFECYCLE_ENABLED=false`
+   - `RACE_EVENT_LIFECYCLE_MODE=off`
+   - `HISTORICAL_RACE_BACKFILL_ENABLED=false`
+   - `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`
+   - 4 条 race-live publication policy 为 off，enabled allowlist 为 0。
+4. 迁移与验收：
+   - `stable.0060_raceeventproductcanonicallink` 成功，表记录为 0。
+   - Django check 通过；公网 HTTP `healthz` 与 `/races/` 最终为 200。
+   - Compose `create race_live_worker` 曾连带把 db 容器重建为 Created；PostgreSQL volume
+     未删除。启动 db 并等待 healthy 后重启 web/worker/beat，`RaceEvent=9867`，页面恢复。
+     后续禁止用未加 `--no-deps` 的 `compose create` 维护停止态 worker。
+5. 只读 inventory：
+   - 文件：
+     `runtime/race_result_recovery/inventory-20260726T200544Z.json`。
+   - 文件 SHA-256：
+     `a4380f2b4bb5fafe96f7990e2bc0ef9e032a7d84e17718ebd0b091d5b60b267a`。
+   - manifest SHA-256：
+     `f3a4cb7f26bfac5db4312af3f3af46d9fe11f9e50d2241ef54d4606403dbed1b`。
+   - 守恒：
+     `59 rows / 50 groups / 40 missing / 9 duplicate-zero /
+     9 duplicate-confirmed / 1 provisional(event 924)`。
+6. 联网 prepare：
+   - 在网络保持关闭的生产只读调用中，plan 校验 40 个冻结 ID 后，
+     `expected_targets_from_plan()` 报 `expected_target_empty`。
+   - transport 请求 `0`、manual-only 请求 `0`、candidate/source cache `0`、赛果业务写入 `0`。
+   - 禁止绕过 runner。先修 recovery event-ID snapshot 和 JRA 受控请求输入，完成新一轮测试、
+     独立 review、发布和联网授权后再执行。
+# 2026-07-27 赛果恢复联网 prepare 阻断修复发布前门禁
+
+- PR `#29` 已合并为 `main@e7dc1b20aa36b311ade2497b96a62b15451942d2`；当前修复分支为
+  `codex/fix-race-result-recovery-prepare`，未发布、未部署、未触网。
+- 修复版部署前必须取得最新独立代码审核和精确 release 授权。部署继续保持 race-live、
+  lifecycle、historical network/apply、scheduler 和 publication 全关闭。
+- 部署后不得沿用此前已消耗的联网授权。应先在网络关闭状态用冻结 plan 重新生成 40 条
+  expected-target snapshot；plan 必须绑定 inventory 文件路径、文件 SHA 和内部 manifest SHA，
+  同时必须携带当前批准的 `source_map_version` 并精确匹配 40 场 source map，再通过数据库
+  drift verifier。随后核对 JRA/NAR 与 TOBA/Sporting Life 的 source-scoped CSV，
+  审批 snapshot 后再取得新的有界联网授权。
+- JRA 执行时必须同时出现共享 `request_budget.json` 和
+  `control/jra_detail.request-state.json`/host-state 证据；总请求仍 `<=75`、单请求
+  `<=30s`、间隔 `>=1s`、source cache `<=512 MiB`，每个 redirect 分别计数，manual-only
+  请求数必须为 0。JRA scheduled 目标仅可通过 plan 注入的显式 recovery mode 读取。
+- 任一 event 消失、地区/adapter input 漂移、request policy 摘要变化、来源交叉分片或预算账本
+  缺失都停止，不得手工构造 snapshot、复用旧 approval 或直接运行 adapter。
+
+# 2026-07-27 赛果恢复联网 prepare 阻断修复关闭态部署记录
+
+1. Git 与镜像：
+   - 修复提交 `00979dc443979ef0d982ae7776c3ff7dfb3d0572` 经 PR `#30` 合并为
+     `main@e2ae3efe2349623dd60745bfef498af31d7d8d84`。
+   - 生产 `web/worker/beat/race_live_worker` 统一镜像为
+     `sha256:e0a2d3d6612841df64f2ab1b8ca8ff6a749f4b14c8f4e3173317a394250e61a3`；
+     `race_live_worker` 通过 `up --no-start --no-deps --force-recreate` 更新后保持
+     `Created`，未启动、未消费 race-live 队列。
+2. 恢复点：
+   - `backups/db/pre-race-result-prepare-fix-20260727T045500Z.dump` 为
+     `259584695` bytes，SHA-256
+     `3a2d1b91ac1610e42c272957a3055067b1a326b2f11c71a81c3ce099b97cbf5c`，
+     mode `0600`，`pg_restore -l` 为 1127 项。
+   - `.env.backup.pre-race-result-prepare-fix-20260727T045500Z` 为 mode `0600`。
+3. 关闭态：
+   - 四个应用容器均为 `RACE_LIVE_SCHEDULER_ENABLED=false`、
+     `RACE_LIVE_MONITOR_ENABLED=false`、`RACE_LIVE_ENABLED_REGIONS=`、
+     `RACE_LIVE_RUNNER_MODE=disabled`、`RACE_EVENT_LIFECYCLE_ENABLED=false`、
+     `RACE_EVENT_LIFECYCLE_MODE=off`、`HISTORICAL_RACE_BACKFILL_ENABLED=false`、
+     `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。
+   - 4 条 publication policy 均为 off。event 924 保留 1 条
+     `max_mode=provisional_public` 的既有 allowlist；它在总 policy off 且 race-live worker
+     停止时不生效，本次未改写历史授权记录。
+4. 验收：
+   - Celery 切换前 drain 为 `active=0/reserved=0`；无迁移，`0060` 保持已应用，
+     `RaceEventProductCanonicalLink=0`，Django check 通过。
+   - 公网 HTTP `/healthz/` 与 `/races/` 均为 200；HTTPS 仍拒绝连接，符合当前项目尚未完成
+     HTTPS 接入的既有状态。近 15 分钟应用日志未发现
+     traceback、critical、exception 或 error。
+   - 本次未运行联网 prepare，`runtime/race_result_recovery` 没有部署窗口内新增文件，
+     未生成 candidate/source cache，未执行赛果 apply 或其他赛果业务写入。
+5. 下一门禁：
+   - 先在网络关闭状态重建并审核精确 40 条 expected-target snapshot 与 source-scoped
+     adapter 输入；之后必须取得新的有界联网 prepare 授权，旧授权不得复用。

@@ -1,6 +1,27 @@
 # 项目状态文档
 
+- 2026-07-27: 联网 prepare 阻断修复已由 PR `#30` 合并并关闭态部署到
+  `main@e2ae3efe`、镜像 `sha256:e0a2d3d6…61a3`。联网 prepare 的
+  recovery expected-target、source-scoped adapter input 和 JRA list/受控请求上下文已在独立
+  分支完成测试先行修复；两轮复审的 4 个 P1 已修复，包括强制当前
+  `source_map_version` 与精确 40 场映射，受影响范围
+  `100 passed / 3 skipped`；同一原生只读 reviewer 已对 fingerprint `db0e38b2…5135`
+  给出 `VERDICT: APPROVED`。四个应用容器统一镜像，race-live worker 停止，网络、scheduler、
+  monitor、lifecycle、historical backfill 与 publication policy 全关闭；本次未运行 prepare，
+  candidate/source cache 和赛果业务写入仍为 0。
+- 2026-07-27: 赛果恢复 PR `#28` 已关闭态部署到生产 `dfbd24e1`，迁移 `0060` 与
+  59 行/50 组只读 inventory 通过；有界联网 prepare 因 recovery plan 的
+  `expected_target_empty` 实现缺口在 transport 前阻断，请求数为 0，尚无候选或赛果写入。
 - 2026-07-24: 首页人工头条与 AI 编辑推荐控制代码实现完成，待独立代码 review 和发布授权。
+
+## 2026-07-27 赛果缺口恢复方案
+
+- 生产 inventory 已精确确认 59 条 event row 对应 50 个 race group；分类为 40 missing、
+  9 duplicate-zero、9 duplicate-confirmed 和 event 924 一条 provisional。
+- 方案采用双层 inventory、结果专用编排、人工官方路由、projection owner/revision arbitration、
+  `RaceEventProductCanonicalLink`、精确 SHA apply/rollback 和 `blocker=0` 完成定义。
+- 代码与空表迁移已部署，全部相关运行开关关闭，未写赛果。下一步不是绕过 runner 抓取，而是修复
+  recovery event-ID snapshot/JRA 受控输入，重新 review 和发布后再取得新的精确联网授权。
 
 ## 2026-07-24 首页编辑控制方案审核通过，待确认实现
 
@@ -1653,3 +1674,21 @@ P0 马信息补全专项的模型交接文档见
   `APPROVED`；三个新 P2 仅列后续建议。
 - 总功能开关仍为 false，尚未部署或启用 06:30/18:30 调度；当前只等待审核事实文档的限定
   复审和其后的精确发布授权。
+## 2026-07-27 赛果缺口已有逐场来源图
+
+- 7 月 8 日至 27 日按真实赛事去重后缺 `40` 场赛果：日本 6、英国 11、法国 4、美国 19。
+- 日本可直接使用 JRA/NAR 官方结果；英国以 Sporting Life 预采、BHA 人工确认；法国以
+  ZEturf 预采、France Galop 人工确认；美国 12 场已有 TOBA→Equibase 精确 chart，
+  其余 7 场以 Sporting Life 预采、Equibase 人工确认。
+- 本阶段只完成来源与可用性调研，未采集候选、未写库。逐场映射见 change 内
+  `source_research_20260727.md`。
+
+## 2026-07-27 赛果缺口恢复本地候选已实现
+
+- 已完成 inventory、地区化结果候选、官方 receipt、canonical 去重、逐场原子 apply /
+  rollback / verify 和历史批处理 allowlist；冻结范围仍为 40 场真实缺口、9 组重复赛事及
+  单独保留 live owner 的 event 924。
+- 恢复专属 SQLite `45/45` 与 PostgreSQL `2/2` 测试通过；完整候选相对同环境干净主线没有新增红项，
+  且修复一个既有日历查询数失败。OpenSpec、Django、迁移、Compose、编译和 diff 门禁通过。
+- 首次独立原生只读审核的 6 项 finding 已修复，正在由同一 reviewer 限定复审。当前仍是
+  未提交本地实现；尚未部署、联网生成 candidate、人工批准 official receipt 或写生产库。

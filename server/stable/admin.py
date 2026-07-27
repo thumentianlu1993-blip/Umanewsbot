@@ -42,6 +42,7 @@ from .models import (
     RaceEventLiveTracking,
     RaceEventParticipant,
     RaceEventParticipantSourceIdentity,
+    RaceEventProductCanonicalLink,
     RaceEventProjectionControl,
     RaceEventRevision,
     RaceEventRevisionEvidence,
@@ -101,6 +102,33 @@ class RaceLiveReadOnlyAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(RaceEventProductCanonicalLink)
+class RaceEventProductCanonicalLinkAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "duplicate_event",
+        "canonical_event",
+        "is_active",
+        "approved_by",
+        "approved_at",
+        "deactivated_at",
+    )
+    list_filter = ("is_active", "approved_at", "deactivated_at")
+    search_fields = (
+        "duplicate_event__chinese_name",
+        "duplicate_event__original_name",
+        "canonical_event__chinese_name",
+        "canonical_event__original_name",
+        "identity_sha256",
+        "manifest_sha256",
+    )
+    raw_id_fields = (
+        "duplicate_event",
+        "canonical_event",
+        "approved_by",
+        "deactivated_by",
+    )
 
 
 @admin.register(RaceEventProjectionControl)

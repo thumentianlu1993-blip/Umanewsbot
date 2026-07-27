@@ -4,7 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase
 
@@ -35,6 +35,36 @@ def _policy(*, max_requests: int = 2, max_requests_per_host: int = 1) -> dict:
 
 
 class HistoricalRaceDetailHTTPBudgetTests(SimpleTestCase):
+    def test_redirect_reserves_the_shared_budget_before_controlled_transport(self):
+        module = _load_tool("historical_race_detail_http.py")
+        session = Mock()
+        shared_budget = Mock()
+        redirect_url = (
+            "https://www.jra.go.jp/datafile/seiseki/replay/2006/27.html"
+        )
+        handler = module._ControlledRedirectHandler(
+            session,
+            before_request=shared_budget,
+        )
+
+        with patch.object(
+            module.HTTPRedirectHandler,
+            "redirect_request",
+            return_value="redirect-request",
+        ):
+            result = handler.redirect_request(
+                Mock(),
+                None,
+                302,
+                "Found",
+                {},
+                redirect_url,
+            )
+
+        self.assertEqual(result, "redirect-request")
+        shared_budget.assert_called_once_with(redirect_url)
+        session.reserve_redirect.assert_called_once_with(redirect_url)
+
     def test_host_budget_is_per_descriptor_while_shared_state_still_limits_and_audits(self):
         module = _load_tool("historical_race_detail_http.py")
         first_url = "https://www.jra.go.jp/datafile/seiseki/replay/2005/99.html"

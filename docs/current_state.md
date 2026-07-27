@@ -1,5 +1,97 @@
 # 当前状态
 
+## 2026-07-27 PR #30 已合并，联网 prepare 阻断修复已关闭态部署
+
+- 修复提交 `00979dc443979ef0d982ae7776c3ff7dfb3d0572` 经 PR `#30` 合并为
+  `main@e2ae3efe2349623dd60745bfef498af31d7d8d84`，生产已快进并构建统一应用镜像
+  `sha256:e0a2d3d6612841df64f2ab1b8ca8ff6a749f4b14c8f4e3173317a394250e61a3`。
+- 已用测试复现并修复 `expected_target_empty`：recovery plan 现在同时绑定 inventory 文件路径、
+  文件 SHA 和内部 manifest SHA，调用既有 verifier 重算当前数据库身份后，再按冻结顺序批量加载
+  40 个 event ID 和 active aliases。状态、可见性、日期、名称、系列、source facts、赛果数量/
+  内容、event 消失、地区漂移或重复 ID 均 fail closed；既有 snapshot 恢复时也重新验证。
+- adapter CSV 从仅按地区改为按 `region + source` 精确分片，避免日本 JRA/NAR 与美国
+  TOBA/Sporting Life 互相取得对方目标；40 场 snapshot 与输入物化均固定为 2 条 SQL。
+- JRA adapter 现在由 runner 物化年度列表缓存路径、精确 host/path request policy、
+  shard/request-state/host-state，并在缺少缓存时先受控抓取年度列表。每个 JRA 请求同时进入
+  全批次共享请求预算和 runner v2 host/path/间隔账本，每个 redirect 也单独占用共享预算；
+  只有显式 recovery mode 才允许冻结目标保持 `scheduled` 时进入候选，旧模式仍只接收
+  `finished`。manual-only 路由未改变。
+- 首轮独立复审提出 inventory 未重验、scheduled 被过滤和 redirect 预算低报 3 个 P1；第二轮
+  复审进一步发现可省略 `source_map_version` 绕过精确 40 场映射，现均已补 RED 并修复。
+  recovery plan 必须携带当前批准的 source-map 版本且始终精确匹配冻结范围。受影响范围测试为
+  `100 passed / 3 skipped`，HTTP 预算 `3/3`、runner-v2
+  contract `29/29`；Django check、迁移漂移、OpenSpec strict、
+  `py_compile` 与 `git diff --check` 通过。现有本地测试镜像的完整 `stable` 因缺
+  `openpyxl`、无 Redis 及既有无关失败只能如实记录为 `2003 tests / 19 failures /
+  91 errors / 5 skipped`，不能作为本修复 GREEN 证据。
+- 同一原生只读 reviewer 已对精确 fingerprint
+  `db0e38b26bacb1c6bc798303d756e6fcf1a80e4203fb1778cd6a324d552c5135`
+  给出 `VERDICT: APPROVED`，前后 fingerprint 一致且未修改文件。
+- 部署恢复点为
+  `backups/db/pre-race-result-prepare-fix-20260727T045500Z.dump`，大小
+  `259584695` bytes、SHA-256
+  `3a2d1b91ac1610e42c272957a3055067b1a326b2f11c71a81c3ce099b97cbf5c`、
+  mode `0600`，`pg_restore -l` 为 1127 项；对应 `.env` 备份同为 `0600`。
+- `web/worker/beat` 运行新镜像，`race_live_worker` 使用同镜像但保持 `Created`。四个应用容器中
+  scheduler、monitor、runner、lifecycle、historical backfill/network 八项值全部关闭；4 条
+  publication policy 为 off。event 924 的既有 `provisional_public` allowlist 保留，但在 policy
+  off 且 worker 停止时不生效。迁移无变化，Django check、公网 HTTP healthz 与 `/races/`
+  均通过，近 15 分钟应用日志无 traceback/critical/exception/error。
+- 本次部署没有运行 prepare，没有新增 candidate/source cache，也没有赛果业务写入。下一门禁仍是
+  对精确 40 场 snapshot/adapter 输入完成关闭态复核后取得新的有界联网 prepare 授权。
+
+## 2026-07-27 赛果缺口恢复已关闭态部署，inventory 通过，联网 prepare 在零请求处阻断
+
+- PR `#28` 已合并，release commit `88cc4eafe4a7b5263aa2a6c30cd7d70978323989`，
+  merge/生产 HEAD `dfbd24e10f5910580945f29fe19219b7d838730c`。生产应用镜像为
+  `sha256:35a53589e051c39806397fe8aec1e00f0bcbd1df9d0a9ffec29a72f35dc4d751`；
+  `stable.0060_raceeventproductcanonicallink` 已成功应用，新增表保持 `0` 行。
+- 部署恢复点为
+  `backups/db/pre-race-result-recovery-20260726T200011Z.dump`，大小
+  `257629113` bytes，SHA-256
+  `682848bdb63edc43b809056fa3a5b1331ebca7f2f6e2cfae806208fa105c9efc`，
+  mode `0600` 且 `pg_restore -l` 通过；环境恢复点为
+  `.env.backup.pre-race-result-recovery-20260726T200011Z`，mode `0600`。
+- 生产运行时保持关闭：race-live scheduler/monitor=false、enabled regions 为空、
+  runner mode=disabled、lifecycle=false/off、historical backfill/network=false；
+  4 条既有 race-live publication policy 已切到 off，1 条 allowlist 已 disabled。
+  event `924` 的 7 条暂定结果未删除，未创建正式赛果或 canonical link。
+- 只读 inventory 位于
+  `runtime/race_result_recovery/inventory-20260726T200544Z.json`，文件 SHA-256
+  `a4380f2b4bb5fafe96f7990e2bc0ef9e032a7d84e17718ebd0b091d5b60b267a`，
+  manifest SHA-256
+  `f3a4cb7f26bfac5db4312af3f3af46d9fe11f9e50d2241ef54d4606403dbed1b`。
+  守恒精确为 `59 event rows / 50 race groups / 40 missing / 9 duplicate-zero /
+  9 duplicate-confirmed / 1 provisional(event 924)`，并生成 9 组 pending identity review。
+- 为保持 race-live worker 停止而执行 Compose `create` 时，Compose 意外连带重建 db
+  容器但未删除 PostgreSQL 持久卷；db 一度处于 Created，`/races/` 瞬时返回 500。
+  已启动原数据卷上的 db、等待 healthy 并重启 web/worker/beat，最终
+  `RaceEvent=9867`、公网 HTTP healthz 与 `/races/` 均恢复 200；race-live worker
+  使用新镜像但保持 Created/未运行。
+- 有界联网 prepare 在 transport 前 fail closed：`race_result_recovery` plan 已正确验证
+  40 个冻结 event ID，但 `expected_targets_from_plan()` 仍只处理普通 `series` 或历史
+  `targets`，生产只读调用报 `expected_target_empty`。本次网络请求 `0`、manual-only
+  请求 `0`、candidate/source cache `0`，未写赛果业务表。不得绕过 approved runner；
+  需先补 recovery event-ID snapshot 路径并解决 JRA 受控请求输入，再重新测试、独立 review、
+  发布和取得新的联网执行授权。
+
+## 2026-07-27 赛事赛果缺口恢复方案已通过工程审核（待确认实施）
+
+- 生产只读盘点确认 `2026-07-08..2026-07-27` 有 59 条公开 `RaceEvent`，初步对应约 50 场真实赛事；
+  其中 9 组赛果落在跨 `RaceSeries` 的另一条实体，event `924` 有 7 条未确认 TRA 结果，重点口径有
+  26 条已过期赛事仍为 `scheduled + results=0`。公网 `/races/?when=finished` 实际最晚只展示
+  `2026-07-05`。
+- 已从 `origin/main@a59956b3` 建立独立 worktree `recover-race-results-through-20260727`，
+  OpenSpec change 同名，proposal/design/四份 delta spec/tasks 均通过 strict 校验；另补
+  `test_cases.md` 与 `rollout.md`。
+- 首轮工程审核发现 direct `RaceEventResult` 写入会绕过 owner/revision arbitration、canonical
+  映射未持久化、blocker 被误算完成以及缺测试/rollout 四项问题；现已改为 owner-aware official
+  revision 投影、新增最小 `RaceEventProductCanonicalLink`、完成条件 `blocker=0`，同一 reviewer
+  复审为 `VERDICT: APPROVED`。
+- 本轮只执行生产数据库只读查询与公网页面核验；尚未实现代码、运行赛事来源网络 prepare、部署、迁移或
+  写入生产。下一门禁是用户确认实施；实现完成后仍须分别取得 release、network prepare 和精确
+  candidate/approval SHA 的生产写入授权。
+
 ## 2026-07-24 首页人工头条与 AI 编辑推荐控制已实现（待独立代码审核）
 
 - 基于 `origin/main@10f341e6`，worktree `add-editorial-headline-control`，分支
@@ -3633,3 +3725,37 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   限定复审与随后用户对精确版本的发布授权。
 - 当前仍未 commit、push、PR、部署、创建生产宿主目录或启用定时任务；总功能开关保持默认
   false。审核事实文档复审通过后，仍必须重新取得针对最终 fingerprint 的发布授权。
+## 2026-07-27 赛事赛果缺口来源调研完成
+
+- 生产 `2026-07-08..2026-07-27` 的 `49` 个零赛果事件中有 `9` 个重复赛事已在另一历史实体
+  上保存确认赛果；真实待采集为 `40` 场：日本 `6`、英国 `11`、法国 `4`、美国 `19`。
+- 日本 6 场均已定位到 JRA replay 或 NAR `RaceMarkTable` 官方页；英国 11 场已在
+  Sporting Life 日期结果页逐场命中；法国 4 场已定位 ZEturf 精确 `R/C` 页面；美国前
+  12 场已从 TOBA 定位精确 Equibase chart，后 7 场已在 Sporting Life 日期页命中但 TOBA
+  尚无 chart link。
+- 官方确认继续按地区走 JRA/NAR、BHA、France Galop、Equibase。BHA/France Galop/
+  Equibase 当前只能人工浏览确认；HRN 旧日期入口已重定向首页，不再作为本批可靠入口。
+- `RaceEvent#924` Hackwood Stakes 另有 7 条未确认赛果，不计入 40 场，继续由 race-live
+  owner 链补 official receipt。
+- 逐场来源表见
+  `openspec/changes/recover-race-results-through-20260727/source_research_20260727.md`。
+  本轮仅只读调研，没有生成候选、写生产库、发布或提升 official 状态。
+
+## 2026-07-27 赛果缺口恢复已完成本地实现，待独立代码审核
+
+- 隔离分支 `codex/recover-race-results-through-20260727` 基于
+  `origin/main@a59956b327157d29630fab1f1c98ba9c9cacfed0`，已实现双层 inventory、
+  结果专用受限编排、官方 receipt、participant 精确绑定、逐场原子投影、write-ahead
+  rollback ledger、独立 verifier 和公开 canonical 去重；新增迁移 `0060`。
+- 冻结守恒仍为
+  `59 event rows = 40 missing + 9 duplicate-zero + 9 duplicate-confirmed + 1 provisional`，
+  对应 `50 race groups`。event `924` 继续由既有 live owner 处理，不进入 historical apply。
+- SQLite 恢复专属测试 `45/45` 通过（另有 2 个 PostgreSQL-only skip），PostgreSQL 16
+  并发测试 `2/2` 通过；受影响回归除干净主线已存在的“暂定页面栏目标题”断言外无新增失败。
+  完整候选 `3433` 项为 `24 failures / 39 errors / 68 skipped`，同环境干净主线 `3393`
+  项为 `25 failures / 39 errors / 66 skipped`；候选无新增红项，并修复主线一个日历查询数失败。
+- Django check、迁移漂移、OpenSpec `38/38` strict/all、三份 Compose config、`py_compile`
+  和 `git diff --check` 均通过。首次独立原生只读审核提出 6 项 actionable finding；
+  当前已补齐完整写前身份 CAS、来源合同实时重验、ledger 故障回滚、verifier 深校验、
+  canonical link apply 和已批准 participant fallback，等待同一 reviewer 限定复审。
+  尚未 commit、push、PR、部署、联网收集候选或写生产数据。

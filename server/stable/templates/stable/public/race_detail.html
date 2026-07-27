@@ -9,6 +9,13 @@
       <a href="/">返回首页</a>
     </nav>
 
+    {% if canonical_product_event %}
+      <aside class="panel" role="note" aria-label="赛事正式展示入口">
+        此为保留的旧赛事入口。当前正式展示赛事：
+        <a href="{{ canonical_product_event.public_path }}">{{ canonical_product_event.chinese_name }}</a>
+      </aside>
+    {% endif %}
+
     <section class="race-hero state-{{ event.status }}">
       <div class="race-hero-top">
         <span class="grade-badge {{ event.grade_badge_class }}">{{ event.grade_badge_label }}</span>
