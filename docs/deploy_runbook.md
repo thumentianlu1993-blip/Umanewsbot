@@ -6846,6 +6846,24 @@ python manage.py complete_horse_profiles \
    - 两次运行范围内 `RaceEvent/RaceEventRunner/RaceEventResult/ExternalRaceEntry/
      ExternalRaceResult` 更新数均为 `0`；
    - 未启用 race-live、lifecycle、历史抓取、公开发布或 QQ。
+
+### 2026-07-27 开关恢复与补跑事实
+
+- 后续部署将 P0 开关恢复为 `false`，当日 `18:30` 调度未执行。用户授权后确认生产
+  `5fed1a96` 的 P0 实现相对原发布版无差异、registry SHA-256 仍为
+  `c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876`。
+- beat 暂停期间默认队列 `29 -> 0`，Celery drain 为
+  `active=0 / reserved=0 / active_confirm=0`。`.env` 备份
+  `.env.backup.pre-p0-reenable-20260727T114553Z` 为 `0600`，随后只恢复 P0 开关。
+- worker 重建连带重建 db/web；业务表总数保持不变且健康检查通过后执行补跑。补跑成功，
+  `TaskExecutionLog 2 -> 3`，generation 更新为
+  `19679c03583afb492a873c3ff5dfbdc6495ed69cb8af5e9c99b9c91b5dcc8612`。
+- 补跑统计为 `future_expected=6 / orphans=5 / listing_reachable=3 / found=0 /
+  not_available=8 / blocked=6 / errors=2`；五张赛事业务表的运行窗口更新数均为 `0`。
+- worker/beat 最终开关均为 true，调度保持 `Asia/Shanghai` 的 `30 6,18 * * *`；
+  Django check、generation verifier 和内外 healthz 通过。beat 恢复后的默认队列快照为
+  `37`，均为其他既有周期任务；未清理队列或追加 P0 运行。
+
 ## 2026-07-27 赛果缺口恢复发布前门禁
 
 - 当前仅完成本地实现，禁止直接运行生产 inventory、联网 candidate prepare 或 apply。

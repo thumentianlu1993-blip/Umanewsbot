@@ -91,3 +91,23 @@ generation：
 - beat 重启补投了其他既有周期任务；验收快照默认队列为 `19`，未删除这些任务。
 - 剩余风险为 Equibase 生产网络超时，以及审核记录的三个非阻塞 P2；后续修复需要新任务、
   测试、review 和发布授权。
+
+## 2026-07-27 开关恢复与立即补跑
+
+- 后续部署在 `15:33 +08:00` 将 P0 开关恢复为 `false`，所以 `18:30` 自然调度没有生成
+  第三条日志。用户随后明确授权“不修改代码，打开开关，然后立即补跑一次任务”。
+- 操作基线为生产 `5fed1a964d099281f59ad6d39b13196ecffd2cbe`。P0 任务实现与原发布版
+  `cfba7151` 无差异，registry SHA-256 仍为
+  `c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876`。
+- 恢复点 `.env.backup.pre-p0-reenable-20260727T114553Z` 为 `0600`。beat 暂停后默认队列
+  `29 -> 0`，Celery drain 为 `active=0 / reserved=0 / active_confirm=0`，随后只把 P0
+  开关从 false 改为 true。
+- Compose 重建 worker 时连带重建了 db/web；未改镜像或数据卷，五张业务表总数保持一致，
+  db/web healthy 且回环 healthz 为 `200` 后才继续。
+- 补跑成功，task id 为 `daac29fa-62e9-43e7-aae3-165b0d1ce35f`，
+  `TaskExecutionLog 2 -> 3`，运行统计仍为 `6 / 5 / 3 / 0 / 8 / 6 / 2`。新 generation
+  `19679c03583afb492a873c3ff5dfbdc6495ed69cb8af5e9c99b9c91b5dcc8612` 已成为
+  `current`，verifier 通过。
+- 本次窗口内五张赛事业务表更新数均为 `0`。worker/beat 最终均为 true，调度保持
+  `30 6,18 * * *`；Django check 与内外 healthz 通过。beat 恢复后其他既有任务队列快照
+  为 `37`，未删除或改写。
