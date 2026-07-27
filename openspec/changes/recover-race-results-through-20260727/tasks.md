@@ -40,6 +40,7 @@
 - [x] 3.3 (application) 运行完整 `stable` 回归、Django check、`makemigrations --check --dry-run`、OpenSpec strict/all、Compose config、`py_compile` 和 `git diff --check`。
 - [x] 3.3a (integration) 对生产零请求暴露的 recovery expected-target、source-scoped adapter 输入和 JRA list/request-context 缺口补有效 RED，并完成最小修复与受影响回归。
 - [x] 3.3b (integration) 对生产首次 prepare 暴露的 NAR/Sporting Life/ZEturf `scheduled` 静默过滤、candidate 丢失 target `event_id` 与 `Also Ran` 无顺序缺口补有效 RED；仅在 recovery mode 放宽输入，并在聚合层对所有来源以 `incomplete_result_order` 阻断缺参赛名单、缺马、重复身份、无效名次或 discovery-only 的不完整 finish order。
+- [x] 3.3c (integration) 修复独立复审发现的 UK/US Sporting Life 标准输出覆盖及 recovery audit 外部 JSONL/跨来源绕过；补同 run 双来源产物、identity 绑定和 source/region mismatch RED。
 - [ ] 3.4 (operations) 对精确实现 fingerprint 运行独立只读代码审核；修复 finding 后重新执行受影响测试并复审至无 actionable finding。
 
 ## 4. 生产只读盘点与候选收集

@@ -10,6 +10,12 @@
 - source-scoped CSV 必须携带冻结生产 `event_id` 并由 candidate 回传。聚合层对所有来源独立
   校验完整参赛名单、所有非 `withdrawn/scratched` 马的结果覆盖、连续唯一内部名次及
   discovery-only 标记；缺一项即 `incomplete_result_order`，`Also Ran` 页面顺序不得成为名次。
+- 同一 run 内不同地区 adapter 的 `standard_name` 必须唯一；UK/US Sporting Life 即使复用
+  parser，也必须分别保存 candidate/review/summary，禁止后执行来源覆盖先执行来源。
+- recovery coverage 只接受当前 run `state.json` 绑定的标准
+  `candidates/combined_candidates.jsonl`，并复核其 SHA-256/size；CLI 显式外部 JSONL、
+  identity 漂移或缺 state 一律拒绝。逐场 candidate 的 `source_provider/racing_region`
+  还必须与 plan target 完全一致，不能靠自报 `result_order_complete=true` 跨 shard 放行。
 - 本轮不通过手改 CSV status、直接运行 adapter 或手工拼接 combined candidate 绕过 runner。
   非 JRA adapter 的恢复状态过滤需按测试、独立 review、release、关闭态部署后再重新联网；
   已取得的网页赛果只能作为人工审核线索，未进入 receipt 前不得授权生产 apply。

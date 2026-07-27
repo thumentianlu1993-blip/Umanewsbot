@@ -1,6 +1,6 @@
 # 当前状态
 
-## 2026-07-27 非 JRA recovery mode 与完整名次门禁已本地修复，尚未发布
+## 2026-07-27 PR #33 完整名次门禁进入独立复审修复轮，尚未合并或部署
 
 - 生产首轮 prepare 暴露的 NAR/Sporting Life/ZEturf `scheduled` 静默过滤已补有效 RED。
   runner 现在仅在 `purpose=race_result_recovery` 时向四类详情 adapter 传入
@@ -12,12 +12,18 @@
 - source-scoped adapter CSV 现携带生产 `event_id`，JRA、NAR、Sporting Life、ZEturf 与
   TOBA candidate 会原样回传，coverage 可以唯一绑定目标，不再把合法结果误列为
   `candidate_event_id_missing`。
-- 新增门禁 RED→GREEN 已通过；adapter/orchestration 相关回归为 `138 tests / 137 passed /
-  1 skipped`，Django check、无迁移漂移、`py_compile`、OpenSpec strict 与 `git diff --check`
-  均通过。Eddie Read 已由 Racing Post 完整结果与 DRF 赛后文字交叉确认第 5–8 名依次为
+- PR `#33` 以 `main@cfba7151` 为 base、首轮受审 head `1b11f985`。独立只读复审返回
+  `REVISE`：UK/US Sporting Life 共用标准输出路径会覆盖英国候选；coverage 可接受外部
+  JSONL 自报完整性并缺少 target 来源核对。两项 P1 已补 RED 并在同一分支修复：英美输出
+  路径完全分离，recovery audit 只接受 state 中绑定 SHA/size 的标准 combined artifact，
+  同时逐场核对 `source_provider/racing_region`。
+- finding 修复后相关回归为 `142 tests / 141 passed / 1 skipped`；Django check、无迁移漂移、
+  `py_compile`、OpenSpec strict/all（`38/38`）与 `git diff --check` 均通过。Eddie Read
+  已由 Racing Post 完整结果与 DRF 赛后文字交叉确认第 5–8 名依次为
   Seal Team、Almendares、Mondego、Mi Hermano Ramon；该结论仍是第三方候选，Del Mar 官方
   chart 当次复核尚不可用，不能提升为 confirmed。
-- 修复位于 `codex/fix-race-result-recovery-completeness`，尚未提交、推送、创建 PR、合并或部署；
+- 修复位于 `codex/fix-race-result-recovery-completeness` 并已提交、推送至草稿 PR `#33`；
+  当前复审 finding 修复尚待新 head 推送与同一 reviewer 复审。尚未合并或部署；
   生产仍运行 `main@e2ae3efe` 对应应用镜像，现有 candidate 与常驻关闭开关未改变。
 
 ## 2026-07-27 event 426 时间修正后已执行一次性联网 prepare，4/40 形成候选

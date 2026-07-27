@@ -648,6 +648,69 @@ class RaceResultRecoveryAdapterModeTests(SimpleTestCase):
                 self.assertEqual(inputs["recovery_flag"], "--recovery-mode")
                 self.assertIn("{recovery_flag}", manifest.command)
 
+    def test_uk_and_us_sporting_life_use_disjoint_standard_outputs(self):
+        uk = orchestration.adapter_manifest_for_key(
+            "uk_sporting_life_detail"
+        )
+        us = orchestration.adapter_manifest_for_key(
+            "us_sporting_life_results"
+        )
+
+        uk_outputs = {
+            str(output["key"]): str(output.get("standard_name") or "")
+            for output in uk.outputs
+        }
+        us_outputs = {
+            str(output["key"]): str(output.get("standard_name") or "")
+            for output in us.outputs
+        }
+
+        self.assertEqual(set(uk_outputs), set(us_outputs))
+        for key in uk_outputs:
+            with self.subTest(output=key):
+                self.assertNotEqual(uk_outputs[key], us_outputs[key])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            collected = {}
+            for manifest, marker in ((uk, "uk"), (us, "us")):
+                adapter_dir = root / "adapter_runs" / manifest.key
+                for output in manifest.outputs:
+                    output_path = adapter_dir / str(output["path"])
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    if output_path.suffix == ".jsonl":
+                        output_path.write_text(
+                            json.dumps({"marker": marker}) + "\n",
+                            encoding="utf-8",
+                        )
+                    elif output_path.suffix == ".json":
+                        output_path.write_text("{}\n", encoding="utf-8")
+                    else:
+                        output_path.write_text(
+                            "marker\n" + marker + "\n",
+                            encoding="utf-8",
+                        )
+                collected[marker] = orchestration.AdapterRunner(
+                    manifest
+                )._collect_outputs(root, adapter_dir)
+
+            uk_candidate = Path(
+                collected["uk"]["candidate_jsonl"].path
+            )
+            us_candidate = Path(
+                collected["us"]["candidate_jsonl"].path
+            )
+
+            self.assertNotEqual(uk_candidate, us_candidate)
+            self.assertEqual(
+                json.loads(uk_candidate.read_text(encoding="utf-8"))["marker"],
+                "uk",
+            )
+            self.assertEqual(
+                json.loads(us_candidate.read_text(encoding="utf-8"))["marker"],
+                "us",
+            )
+
     def test_legacy_mode_still_filters_scheduled_targets(self):
         cases = (
             ("prepare_uk_sportinglife_race_detail_candidates.py", True),
@@ -1071,6 +1134,30 @@ class RaceResultRecoveryCandidateIntegrationTests(SimpleTestCase):
 
 
 class RaceResultRecoveryCoverageAndRunnerIntegrationTests(SimpleTestCase):
+    def _write_controlled_candidate_state(
+        self,
+        root: Path,
+        candidate: dict,
+    ) -> Path:
+        candidate_path = root / "candidates" / "combined_candidates.jsonl"
+        candidate_path.parent.mkdir(parents=True)
+        candidate_path.write_text(
+            json.dumps(candidate) + "\n",
+            encoding="utf-8",
+        )
+        state = orchestration.RunState(
+            run_id="coverage-test",
+            run_dir=str(root),
+            artifacts={
+                "combined_candidates": str(candidate_path),
+                "combined_candidates_identity": orchestration.file_identity(
+                    candidate_path
+                ),
+            },
+        )
+        state.write()
+        return candidate_path
+
     def test_recovery_coverage_blocks_explicitly_incomplete_finish_order(self):
         plan = {
             "purpose": "race_result_recovery",
@@ -1085,6 +1172,8 @@ class RaceResultRecoveryCoverageAndRunnerIntegrationTests(SimpleTestCase):
         }
         candidate = {
             "event_id": 426,
+            "source_provider": "sporting_life",
+            "racing_region": RacingRegion.UNITED_STATES,
             "metadata": {
                 "result_order_complete": False,
                 "result_order_check": {"missing_horse_numbers": ["2", "4", "7", "9"]},
@@ -1103,10 +1192,9 @@ class RaceResultRecoveryCoverageAndRunnerIntegrationTests(SimpleTestCase):
         }
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            candidate_path = root / "candidate.jsonl"
-            candidate_path.write_text(
-                json.dumps(candidate) + "\n",
-                encoding="utf-8",
+            candidate_path = self._write_controlled_candidate_state(
+                root,
+                candidate,
             )
 
             result = orchestration._audit_recovery_coverage(
@@ -1133,6 +1221,8 @@ class RaceResultRecoveryCoverageAndRunnerIntegrationTests(SimpleTestCase):
         }
         candidate = {
             "event_id": 80,
+            "source_provider": "jra",
+            "racing_region": RacingRegion.JAPAN,
             "modules": {
                 RaceEventModule.RESULTS: {
                     "items": [
@@ -1147,10 +1237,9 @@ class RaceResultRecoveryCoverageAndRunnerIntegrationTests(SimpleTestCase):
         }
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            candidate_path = root / "candidate.jsonl"
-            candidate_path.write_text(
-                json.dumps(candidate) + "\n",
-                encoding="utf-8",
+            candidate_path = self._write_controlled_candidate_state(
+                root,
+                candidate,
             )
             result = orchestration._audit_recovery_coverage(
                 plan=plan,
@@ -1160,6 +1249,141 @@ class RaceResultRecoveryCoverageAndRunnerIntegrationTests(SimpleTestCase):
 
         self.assertEqual(result["status"], "blocked")
         self.assertIn("incomplete_result_order", result["blocker_codes"])
+
+    def test_recovery_coverage_rejects_external_candidate_override(self):
+        plan = {
+            "purpose": "race_result_recovery",
+            "inventory_manifest_sha256": "b" * 64,
+            "regions": [
+                {
+                    "region": RacingRegion.JAPAN,
+                    "source": "jra",
+                    "event_ids": [80],
+                }
+            ],
+        }
+        controlled = {
+            "event_id": 80,
+            "source_provider": "jra",
+            "racing_region": RacingRegion.JAPAN,
+            "metadata": {"result_order_complete": False},
+            "modules": {
+                RaceEventModule.RESULTS: {
+                    "items": [{"finish_position": 1, "horse_name": "Controlled"}]
+                }
+            },
+        }
+        forged = {
+            **controlled,
+            "metadata": {"result_order_complete": True},
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_controlled_candidate_state(root, controlled)
+            forged_path = root / "forged.jsonl"
+            forged_path.write_text(
+                json.dumps(forged) + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                orchestration.PlanValidationError,
+                "controlled combined candidate",
+            ):
+                orchestration._audit_recovery_coverage(
+                    plan=plan,
+                    candidate_jsonl=forged_path,
+                    run_dir=root,
+                )
+
+    def test_recovery_coverage_blocks_wrong_source_or_region(self):
+        plan = {
+            "purpose": "race_result_recovery",
+            "inventory_manifest_sha256": "b" * 64,
+            "regions": [
+                {
+                    "region": RacingRegion.JAPAN,
+                    "source": "jra",
+                    "event_ids": [80],
+                }
+            ],
+        }
+        candidate = {
+            "event_id": 80,
+            "source_provider": "sporting_life",
+            "racing_region": RacingRegion.UNITED_STATES,
+            "metadata": {"result_order_complete": True},
+            "modules": {
+                RaceEventModule.RESULTS: {
+                    "items": [{"finish_position": 1, "horse_name": "Wrong Source"}]
+                }
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            candidate_path = self._write_controlled_candidate_state(
+                root,
+                candidate,
+            )
+            result = orchestration._audit_recovery_coverage(
+                plan=plan,
+                candidate_jsonl=candidate_path,
+                run_dir=root,
+            )
+
+        self.assertEqual(result["status"], "blocked")
+        self.assertIn("candidate_source_mismatch", result["blocker_codes"])
+        self.assertIn("candidate_region_mismatch", result["blocker_codes"])
+
+    def test_recovery_coverage_rejects_combined_candidate_identity_drift(self):
+        plan = {
+            "purpose": "race_result_recovery",
+            "inventory_manifest_sha256": "b" * 64,
+            "regions": [
+                {
+                    "region": RacingRegion.JAPAN,
+                    "source": "jra",
+                    "event_ids": [80],
+                }
+            ],
+        }
+        candidate = {
+            "event_id": 80,
+            "source_provider": "jra",
+            "racing_region": RacingRegion.JAPAN,
+            "metadata": {"result_order_complete": False},
+            "modules": {
+                RaceEventModule.RESULTS: {
+                    "items": [{"finish_position": 1, "horse_name": "Original"}]
+                }
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            candidate_path = self._write_controlled_candidate_state(
+                root,
+                candidate,
+            )
+            candidate_path.write_text(
+                json.dumps(
+                    {
+                        **candidate,
+                        "metadata": {"result_order_complete": True},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                orchestration.PlanValidationError,
+                "identity changed",
+            ):
+                orchestration._audit_recovery_coverage(
+                    plan=plan,
+                    candidate_jsonl=candidate_path,
+                    run_dir=root,
+                )
 
     def test_partial_recovery_scope_is_rejected_before_coverage_audit(self):
         plan = {

@@ -415,6 +415,18 @@ DEFAULT_ADAPTER_MANIFESTS["us_sporting_life_results"] = {
     **DEFAULT_ADAPTER_MANIFESTS["uk_sporting_life_detail"],
     "key": "us_sporting_life_results",
     "region": RacingRegion.UNITED_STATES,
+    "outputs": [
+        {
+            **output,
+            "standard_name": str(output.get("standard_name") or "").replace(
+                "uk_sporting_life_detail",
+                "us_sporting_life_results",
+            ),
+        }
+        for output in DEFAULT_ADAPTER_MANIFESTS[
+            "uk_sporting_life_detail"
+        ]["outputs"]
+    ],
 }
 
 
@@ -1972,11 +1984,34 @@ def aggregate_candidate_artifacts(
         source_paths.append(str(path.resolve()))
         for record in _read_jsonl(path):
             record.pop("_line_number", None)
+            adapter_provenance = {
+                "adapter_key": str(result.get("key") or "").strip(),
+                "source_provider": str(result.get("source") or "").strip(),
+                "source_authority": str(
+                    result.get("source_authority") or ""
+                ).strip(),
+                "racing_region": str(result.get("region") or "").strip(),
+            }
+            if recovery:
+                for field_name, expected_value in adapter_provenance.items():
+                    current = str(record.get(field_name) or "").strip()
+                    if current and expected_value and current != expected_value:
+                        raise AdapterOutputError(
+                            "recovery aggregate candidate provenance mismatch: "
+                            f"{field_name}={current!r}, "
+                            f"expected {expected_value!r}"
+                        )
+                    if expected_value:
+                        record[field_name] = expected_value
             source = str(
-                record.get("source_name")
-                or record.get("source_provider")
-                or result.get("source")
-                or ""
+                adapter_provenance["source_provider"]
+                if recovery
+                else (
+                    record.get("source_name")
+                    or record.get("source_provider")
+                    or result.get("source")
+                    or ""
+                )
             ).strip()
             authority = str(
                 record.get("source_authority")
@@ -2725,6 +2760,10 @@ def _audit_recovery_coverage(
     candidate_jsonl: str | Path,
     run_dir: str | Path,
 ) -> dict[str, Any]:
+    candidate_identity = _validate_recovery_combined_candidate_artifact(
+        candidate_jsonl=candidate_jsonl,
+        run_dir=run_dir,
+    )
     records = _read_jsonl(Path(candidate_jsonl))
     run_path = Path(run_dir)
     run_path.mkdir(parents=True, exist_ok=True)
@@ -2776,6 +2815,32 @@ def _audit_recovery_coverage(
             payload = modules.get(RaceEventModule.RESULTS)
             if _payload_items(payload):
                 result_payloads.append(payload)
+                source_provider = str(
+                    record.get("source_provider") or ""
+                ).strip()
+                racing_region = str(
+                    record.get("racing_region") or ""
+                ).strip()
+                if source_provider != target["source"]:
+                    event_codes.append("candidate_source_mismatch")
+                    blockers.append(
+                        {
+                            "code": "candidate_source_mismatch",
+                            "event_id": event_id,
+                            "expected_source": target["source"],
+                            "actual_source": source_provider,
+                        }
+                    )
+                if racing_region != target["region"]:
+                    event_codes.append("candidate_region_mismatch")
+                    blockers.append(
+                        {
+                            "code": "candidate_region_mismatch",
+                            "event_id": event_id,
+                            "expected_region": target["region"],
+                            "actual_region": racing_region,
+                        }
+                    )
                 metadata = (
                     record.get("metadata")
                     if isinstance(record.get("metadata"), dict)
@@ -2833,7 +2898,7 @@ def _audit_recovery_coverage(
         "actual_target_count": len(set(grouped) & set(expected)),
         "complete_count": complete_count,
         "candidate_jsonl": str(candidate_jsonl),
-        "candidate_identity": file_identity(candidate_jsonl),
+        "candidate_identity": candidate_identity,
         "inventory_manifest_sha256": plan["inventory_manifest_sha256"],
         "approved_modules": [RaceEventModule.RESULTS],
         "blockers": blockers,
@@ -2848,6 +2913,57 @@ def _audit_recovery_coverage(
         )
     }
     return result
+
+
+def _validate_recovery_combined_candidate_artifact(
+    *,
+    candidate_jsonl: str | Path,
+    run_dir: str | Path,
+) -> dict[str, Any]:
+    run_path = Path(run_dir)
+    state_path = run_path / "state.json"
+    if not state_path.is_file():
+        raise PlanValidationError(
+            "recovery audit requires controlled combined candidate state"
+        )
+    state = RunState.read(state_path)
+    controlled_path_text = str(
+        state.artifacts.get("combined_candidates") or ""
+    ).strip()
+    controlled_identity = state.artifacts.get(
+        "combined_candidates_identity"
+    )
+    expected_path = (
+        run_path / "candidates" / "combined_candidates.jsonl"
+    ).resolve()
+    if (
+        not controlled_path_text
+        or Path(controlled_path_text).resolve() != expected_path
+        or Path(candidate_jsonl).resolve() != expected_path
+    ):
+        raise PlanValidationError(
+            "recovery audit only accepts the controlled combined candidate"
+        )
+    if not isinstance(controlled_identity, dict):
+        raise PlanValidationError(
+            "recovery combined candidate identity is missing"
+        )
+    try:
+        controlled_size = int(controlled_identity.get("size"))
+    except (TypeError, ValueError) as exc:
+        raise PlanValidationError(
+            "recovery combined candidate identity is invalid"
+        ) from exc
+    actual_identity = file_identity(expected_path)
+    if (
+        actual_identity["sha256"]
+        != str(controlled_identity.get("sha256") or "")
+        or actual_identity["size"] != controlled_size
+    ):
+        raise PlanValidationError(
+            "recovery combined candidate identity changed after prepare"
+        )
+    return actual_identity
 
 
 def _candidate_provenance_codes(

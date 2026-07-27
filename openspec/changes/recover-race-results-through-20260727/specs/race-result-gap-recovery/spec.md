@@ -26,6 +26,10 @@
 - **WHEN** candidate 缺少 target `event_id`、完整参赛名单、任一非退赛马的结果、连续唯一的内部名次，或仅包含 discovery-only winner
 - **THEN** candidate 不得进入可写入状态；系统必须保留精确缺项，并以 coverage blocker 阻断该场
 
+#### Scenario: 外部候选或跨来源记录尝试绕过 coverage
+- **WHEN** recovery audit 输入不是当前 run state 绑定的标准 combined artifact、文件 identity 已变化，或 candidate 的来源/地区与冻结 target 不同
+- **THEN** audit 必须拒绝或阻断，不得信任 candidate 自报的 `result_order_complete=true`
+
 #### Scenario: 清单中已有取消或延期终态
 - **WHEN** inventory 生成时赛事已是 `cancelled/postponed` 且身份在后续步骤未漂移
 - **THEN** 目标保持既有终态且不得创建赛果行

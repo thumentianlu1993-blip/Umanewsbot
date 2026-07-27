@@ -1,11 +1,13 @@
 # 项目状态文档
 
-- 2026-07-27: 已在最新 `origin/main@6fcac8f1` 上完成非 JRA recovery mode、target
+- 2026-07-27: 已在 `main@cfba7151` 上建立草稿 PR `#33`，完成非 JRA recovery mode、target
   `event_id` 回传与全来源完整名次 fail-closed 修复；新增门禁覆盖缺参赛名单、缺马、重复身份、
-  无效名次及 discovery-only，相关回归 `137 passed / 1 skipped`，静态与 OpenSpec strict
-  校验通过。Eddie Read 完整候选顺序
+  无效名次及 discovery-only。首轮固定 head `1b11f985` 独立复审返回两个 P1：英美
+  Sporting Life 标准输出覆盖、coverage 未绑定受控 combined artifact/target 来源；两项已补
+  RED 并在同一分支修复，相关回归 `141 passed / 1 skipped`、OpenSpec `38/38` 通过，待新
+  head 复审。Eddie Read 完整候选顺序
   已由 Racing Post 与 DRF 交叉确认，但 Del Mar 官方 chart 尚不可用，仍不得 confirmed。
-  当前分支尚未提交、发布或部署，生产状态不变。
+  PR 尚未合并、发布或部署，生产状态不变。
 - 2026-07-27: 用户授权后已写入 event `426` 的 Del Mar 官方 post time
   `2026-07-27T01:10:00Z`，不含赛果写入。新 inventory 仍为 59 行/50 组和精确 40 场缺口；
   一次性 prepare 实际使用 `12/75` 请求，仅 4 场 JRA 形成赛果候选。Sporting Life/ZEturf

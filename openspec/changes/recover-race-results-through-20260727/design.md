@@ -81,6 +81,10 @@ inventory 同时保存：
 `withdrawn/scratched` 外的每匹马都必须恰好进入结果，内部 `finish_position` 必须为从 1
 开始的连续唯一序列。缺参赛名单、缺马、重复身份、无效名次和 TOBA discovery-only winner
 一律标记 `result_order_complete=false`，不能因 adapter 命令成功而放行。
+UK 与 US Sporting Life 虽复用同一 parser，但在单次 run 中使用互不相同的
+candidate/review/summary 标准路径。coverage 只读取并验证当前 state 记录的标准 combined
+artifact identity，拒绝 `--candidate-jsonl` 替换；随后逐场比较聚合层强制写入的
+`source_provider/racing_region` 与冻结 target，防止自报 metadata 或跨来源 event ID 绕过。
 
 本批 HRN `/entries-results/YYYY-MM-DD` 实测重定向至首页，不能承担结果恢复。其 adapter
 只保留既有行为回归，不进入本批 source map。逐场来源和当前可用性冻结在
