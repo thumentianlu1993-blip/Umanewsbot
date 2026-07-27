@@ -463,7 +463,10 @@ def _occupied_event_ids(event_ids: list[int]) -> set[int]:
     return occupied
 
 
-def _event_names(event: models.RaceEvent) -> set[str]:
+def get_normalized_accepted_race_names(
+    event: models.RaceEvent,
+) -> set[str]:
+    """Return exact normalized names accepted by the race-live identity gate."""
     names = {normalize_identity_text(event.original_name)}
     chinese_languages = {
         models.SourceLanguage.CHINESE,
@@ -522,6 +525,11 @@ def _event_names(event: models.RaceEvent) -> set[str]:
         approved_names.add(name)
         approved_names.add(f"{name} {group_token}")
     return approved_names
+
+
+def _event_names(event: models.RaceEvent) -> set[str]:
+    """Compatibility alias for existing race-live callers and tests."""
+    return get_normalized_accepted_race_names(event)
 
 
 def _load_target_events(
@@ -626,7 +634,7 @@ def _match_events(
     for event in events:
         event_timezone = ZoneInfo(event.timezone_name)
         expected_region_code = RACE_LIVE_REGION_CODES[event.country_region]
-        approved_names = _event_names(event)
+        approved_names = get_normalized_accepted_race_names(event)
         normalized_course = normalize_identity_text(event.racecourse)
         matches: list[tuple[dict[str, Any], str, datetime]] = []
         for race, response_sha in candidate_rows:

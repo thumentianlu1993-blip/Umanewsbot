@@ -5,6 +5,7 @@ import argparse
 import csv
 import json
 import re
+import sys
 import time
 import unicodedata
 from collections import defaultdict
@@ -19,7 +20,6 @@ from bs4 import BeautifulSoup
 
 
 BASE_URL = "https://www.zeturf.fr"
-COUNTRY_SUFFIX_RE = re.compile(r"\s*[\(\（][A-Z]{2,3}[\)\）]\s*$")
 STOPWORDS = {
     "al",
     "arc",
@@ -100,10 +100,6 @@ def _tokens(value: str) -> set[str]:
             continue
         tokens.add(token)
     return tokens
-
-
-def _strip_country_suffix(value: str) -> str:
-    return COUNTRY_SUFFIX_RE.sub("", _collapse(value).replace("(NP)", "")).strip()
 
 
 def _download(url: str, path: Path, *, allow_network: bool, timeout: int, sleep_seconds: float) -> str:
@@ -225,106 +221,20 @@ def _filter_events(events: list[dict], *, start_date: str, end_date: str) -> lis
     return filtered
 
 
-def _cell_text(node, selector: str) -> str:
-    found = node.select_one(selector)
-    return _collapse(found.get_text(" ", strip=True) if found else "")
-
-
-def _horse_name(node) -> str:
-    horse_node = node.select_one(".horse-name")
-    value = (
-        horse_node.get("title")
-        if horse_node and horse_node.get("title")
-        else (horse_node.get_text(" ", strip=True) if horse_node else "")
+try:
+    from stable.race_reference_parsers.zeturf import (
+        parse_legacy_page as _shared_parse_page,
     )
-    return _strip_country_suffix(value)
-
-
-def _parse_finish_position(value: str) -> int:
-    match = re.search(r"\d+", value or "")
-    return int(match.group(0)) if match else 0
+except ModuleNotFoundError:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "server"))
+    from stable.race_reference_parsers.zeturf import (
+        parse_legacy_page as _shared_parse_page,
+    )
 
 
 def _parse_page(html: str, *, source_url: str) -> tuple[list[dict], list[dict], dict]:
-    soup = BeautifulSoup(html, "lxml")
-    runners = []
-    runner_by_number = {}
-    runner_table = soup.select_one("table.table-runners")
-    if runner_table:
-        for tr in runner_table.select("tbody tr[data-runner]"):
-            number = _cell_text(tr, "td.numero")
-            horse_name = _horse_name(tr)
-            if not horse_name:
-                continue
-            jockey = _cell_text(tr, ".second-line .jockey")
-            trainer = ""
-            for trainer_node in tr.select(".second-line > span"):
-                if "jockey" not in (trainer_node.get("class") or []):
-                    trainer = _collapse(trainer_node.get_text(" ", strip=True))
-                    break
-            running_status = "withdrawn" if tr.select_one(".non-partant") or "(NP)" in tr.get_text(" ", strip=True) else "declared"
-            source_refs = {
-                "primary": source_url,
-                "source_language": "fr",
-                "source_kind": "zeturf_race_detail",
-                "horse_id": (tr.select_one("a.horse-name") or {}).get("data-runner", "") if tr.select_one("a.horse-name") else "",
-                "horse_name_raw": horse_name,
-            }
-            row = {
-                "sort_order": len(runners) + 1,
-                "horse_number": number,
-                "barrier": _cell_text(tr, "td.corde"),
-                "horse_name": horse_name,
-                "jockey_name": jockey,
-                "trainer_name": trainer,
-                "carried_weight": _cell_text(tr, "td.weight"),
-                "odds_value": _cell_text(tr, "td.cote"),
-                "running_status": running_status,
-                "source_refs": source_refs,
-            }
-            runners.append(row)
-            if number:
-                runner_by_number[number] = row
-
-    results = []
-    arrival = soup.select_one("#arriveeTab table")
-    if arrival:
-        for tr in arrival.select("tbody tr[data-runner]"):
-            cells = tr.find_all("td")
-            if len(cells) < 4:
-                continue
-            official_position = _parse_finish_position(cells[0].get_text(" ", strip=True))
-            if official_position <= 0:
-                continue
-            number = _collapse(cells[1].get_text(" ", strip=True))
-            horse_name = _horse_name(cells[2]) or (runner_by_number.get(number) or {}).get("horse_name", "")
-            if not horse_name:
-                continue
-            base = runner_by_number.get(number) or {}
-            results.append(
-                {
-                    "finish_position": len(results) + 1,
-                    "horse_number": number,
-                    "barrier": base.get("barrier", ""),
-                    "horse_name": horse_name,
-                    "jockey_name": _cell_text(cells[3], "a.jockey") or base.get("jockey_name", ""),
-                    "trainer_name": base.get("trainer_name", ""),
-                    "carried_weight": base.get("carried_weight", ""),
-                    "finish_time": "",
-                    "margin": _collapse(cells[-1].get_text(" ", strip=True)) if cells else "",
-                    "odds_value": _collapse(cells[-2].get_text(" ", strip=True)) if len(cells) >= 2 else "",
-                    "running_status": "declared",
-                    "is_confirmed": True,
-                    "source_refs": {
-                        **(base.get("source_refs") or {}),
-                        "primary": source_url,
-                        "official_finish_position": official_position,
-                    },
-                }
-            )
-    metadata = _title_parts(_title(html))
-    metadata.update({"row_count": len(runners), "result_count": len(results)})
-    return runners, results, metadata
+    """Keep the historical CLI on the same parse-only implementation."""
+    return _shared_parse_page(html, source_url=source_url)
 
 
 def _discover_event_pages(events: list[dict], source_dir: Path, args) -> tuple[dict[str, dict], list[dict]]:

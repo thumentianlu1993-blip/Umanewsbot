@@ -3,13 +3,16 @@
 ## 1. 状态
 
 - 任务 slug：`automate-race-event-lifecycle`
-- 当前阶段：探索与方案审核
-- 基线：`origin/main@9b58bfd437f58dede0de5d11d64537e2e68e214e`
-- 当前授权：只读探索、本文档目录、项目状态/决策/运维文档回写、独立方案审核
-- 下一门禁：方案 reviewer 通过后，等待用户明确“确认实现 / 开始实现 / 继续实现”
+- 当前阶段：阶段 A 已关闭部署；阶段 B0.1 赛后内部参考源处于 spec/design
+- 本轮规划基线：`origin/main@a59956b327157d29630fab1f1c98ba9c9cacfed0`
+- 当前授权：文档完善、实现准备和独立方案审核
+- 下一门禁：等待用户明确“确认实现 / 开始实现 / 继续实现”
+- 方案审核：同一 reviewer 第三轮 `APPROVED`，无开放 P0/P1/P2
 
-本文不是实现授权，不授权测试、应用代码、迁移、Celery 配置、生产数据、commit、push、
-PR、部署、迁移或服务重启。
+阶段 A 已在生产显式保持 `RACE_EVENT_LIFECYCLE_ENABLED=false`、
+`RACE_EVENT_LIFECYCLE_MODE=off`；详细证据见 `production_release_20260726.md`。本文本轮修改
+不是阶段 B0.1 实现授权，不授权测试、应用代码、迁移、Celery 配置、联网、生产数据、commit、
+push、PR、部署、迁移或服务重启。
 
 ## 2. 问题与根因
 
@@ -42,6 +45,9 @@ cancelled`。现有准实时赛果链路另用 `RaceEventLiveTracking.state` 和
 - 不自动抓取受登录墙、防护页或条款限制的来源。
 - 不把 The Racing API（TRA Free）升格为 official authority。
 - 不在阶段 A 接入新外部来源、改变 race-live scheduler 或公开赛果策略。
+- 不把 Sporting Life、ZEturf、HRN 的内部参考观察写入公开赛事、公开赛果、新闻、QQ、
+  sitemap、搜索或公开 API。
+- 不为内部参考观察提供直接 promotion/apply 能力。
 - 不因为新闻出现赛事名就特殊放行或写赛事字段。
 - 不绕过 QQ 类别/目标/频率/唯一性门禁。
 
@@ -175,6 +181,25 @@ payload/前驱 hash、连续水位和 marker。任一失败零写。消费水位
 5 分钟、RTO 30 分钟，非赛日 RPO 24 小时；超时只告警和保持结果待补，不阻断时间生命周期。
 payload 保留 30 天，manifest、receipt 和字段审计长期保留。
 
+### 7.2 内部参考源
+
+Sporting Life、ZEturf、Horse Racing Nation 统一作为 `internal_reference`：
+
+- 用户已确认本站可保留解析器并低频使用；
+- 新增观察只供有权限的内部后台查看；
+- `publication_capability/result_authority/field_apply_capability` 全部为 `none`；
+- 不能创建 `RaceEventDataCandidate`、race-live revision/projection 或 official marker；
+- 不能改变 `RaceEvent`、runner/result、lifecycle control、新闻或 QQ；
+- 完全相同重放为 noop，内容变化追加新观察，歧义匹配不绑定赛事；
+- 现有历史赛事 importer 保持原流程，本规则不追溯改变既有历史数据。
+
+详细模型、隔离与来源特有限制见 `internal_reference_sources.md`。如以后需要人工采纳，必须
+另立 change；本阶段不提供 promotion 命令或后台 action。
+
+阶段 B0.1 只复用三个 parser 当前已经证明的 `finished` 赛后结果入口，不承担赛前资料同步，
+也不注册 Celery/Beat。赛前 racecard 仍由后续 TRA/官方来源阶段负责；第三方赛前入口若需加入，
+必须另做 fixture/proof 和方案审核。
+
 ## 8. 赛前刷新窗口建议
 
 所有值集中配置并按 P0/P1 分层，不散落硬编码：
@@ -293,3 +318,5 @@ payload 保留 30 天，manifest、receipt 和字段审计长期保留。
 8. 公开日历与详情读取同一持久状态，缓存及时失效。
 9. 不重复发布新闻或发送 QQ。
 10. 现有 race-live、字段归一化、日历移动端样式不回归。
+11. Sporting Life、ZEturf、HRN 的观察只能进入内部参考模型，公开赛事/赛果/新闻/QQ 零变化。
+12. 内部参考来源相同内容重放不重复，变化内容保留版本，歧义/partial/来源失败可解释。

@@ -5,6 +5,7 @@ import argparse
 import csv
 import json
 import re
+import sys
 import time
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
@@ -20,23 +21,6 @@ from bs4 import BeautifulSoup
 
 
 SL_BASE_URL = "https://www.sportinglife.com"
-COUNTRY_SUFFIX_RE = re.compile(r"\s*[\(\（][A-Z]{2,3}[\)\）]\s*$")
-CASUALTY_STATUS_BY_REASON = {
-    "broughtdown": "brought_down",
-    "carriedout": "did_not_finish",
-    "fell": "fell",
-    "pulledup": "pulled_up",
-    "refused": "refused",
-    "refusedtorace": "refused",
-    "slippedup": "fell",
-    "unseatedrider": "unseated_rider",
-}
-
-
-def _text(node) -> str:
-    if node is None:
-        return ""
-    return " ".join(node.get_text(" ", strip=True).split())
 
 
 def _collapse(value: str) -> str:
@@ -180,10 +164,6 @@ def _event_match_keys(value: str) -> list[str]:
         if key and key not in keys:
             keys.append(key)
     return keys
-
-
-def _strip_country_suffix(value: str) -> str:
-    return COUNTRY_SUFFIX_RE.sub("", _collapse(value)).strip()
 
 
 def _download(url: str, path: Path, *, allow_network: bool, timeout: int, sleep_seconds: float) -> str:
@@ -411,159 +391,28 @@ def _find_race_summary(event: dict, races: list[dict]) -> dict | None:
     return None
 
 
-def _person_name(value) -> str:
-    if isinstance(value, dict):
-        return value.get("name") or value.get("display_name") or ""
-    return str(value or "")
-
-
-def _odds(ride: dict) -> str:
-    betting = ride.get("betting")
-    if isinstance(betting, dict):
-        return str(betting.get("current_odds") or "")
-    return ""
-
-
-def _casualty_status(ride: dict) -> str:
-    casualty = ride.get("casualty")
-    if not isinstance(casualty, dict):
-        return ""
-    reason = re.sub(r"[^a-z0-9]", "", str(casualty.get("reason") or "").casefold())
-    return CASUALTY_STATUS_BY_REASON.get(reason, "")
-
-
-def _runner_status(ride: dict) -> str:
-    try:
-        if int(ride.get("finish_position")) > 0:
-            return "declared"
-    except (TypeError, ValueError):
-        pass
-
-    casualty_status = _casualty_status(ride)
-    if casualty_status:
-        return casualty_status
-
-    status = re.sub(r"[^a-z0-9]", "", str(ride.get("ride_status") or "").casefold())
-    if status in {"nonrunner", "withdrawn"}:
-        return "withdrawn"
-
-    description = _collapse(str(ride.get("ride_description") or ""))
-    description = description.casefold().replace("-", " ").replace("_", " ")
-    if re.search(r"\bnon\s*runner\b", description):
-        return "withdrawn"
-    if re.search(r"\bbrought\s+down\b", description):
-        return "brought_down"
-    if re.search(r"\b(?:unseated|lost)\s+(?:the\s+)?rider\b", description):
-        return "unseated_rider"
-    if re.search(r"\bpulled\s+up\b", description):
-        return "pulled_up"
-    if re.search(r"\b(?:fell|slipped\s+up)\b", description):
-        return "fell"
-    if re.search(r"\brefused\b", description):
-        return "refused"
-    if re.search(
-        r"\b(?:carried\s+out|ran\s+out|failed\s+to\s+complete|stopped)\b",
-        description,
-    ):
-        return "did_not_finish"
-    if re.search(r"\bdisqualified\b", description):
-        return "disqualified"
-    return "unknown"
+try:
+    from stable.race_reference_parsers.sporting_life import (
+        _runner_status,
+        parse_legacy_page as _shared_parse_detail_page,
+    )
+except ModuleNotFoundError:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "server"))
+    from stable.race_reference_parsers.sporting_life import (
+        _runner_status,
+        parse_legacy_page as _shared_parse_detail_page,
+    )
 
 
 def _parse_detail_page(html: str, *, source_url: str) -> tuple[list[dict], list[dict], dict]:
-    race = _next_data(html)["props"]["pageProps"]["race"]
-    summary = race.get("race_summary") or {}
-    runners = []
-    result_rows = []
-    for ride in race.get("rides") or []:
-        horse = ride.get("horse") or {}
-        horse_name = _strip_country_suffix(str(horse.get("name") or ""))
-        if not horse_name:
-            continue
-        finish_position = ride.get("finish_position")
-        try:
-            finish_position_int = int(finish_position)
-        except (TypeError, ValueError):
-            finish_position_int = 0
-        source_refs = {
-            "primary": source_url,
-            "source_language": "en",
-            "source_kind": "sporting_life_result_detail",
-            "sporting_life_race_id": (summary.get("race_summary_reference") or {}).get("id"),
-            "horse_id": (horse.get("horse_reference") or {}).get("id"),
-            "horse_slug": horse.get("slug") or "",
-            "horse_name_raw": horse.get("name") or "",
-            "casualty_reason": (ride.get("casualty") or {}).get("reason", "")
-            if isinstance(ride.get("casualty"), dict)
-            else "",
-            "ride_status": ride.get("ride_status") or "",
-            "ride_description": ride.get("ride_description") or "",
-        }
-        row = {
-            "sort_order": len(runners) + 1,
-            "horse_number": str(ride.get("cloth_number") or ""),
-            "barrier": str(ride.get("draw_number") or ""),
-            "horse_name": horse_name,
-            "jockey_name": _person_name(ride.get("jockey")),
-            "trainer_name": _person_name(ride.get("trainer")),
-            "carried_weight": str(ride.get("handicap") or ""),
-            "odds_value": _odds(ride),
-            "running_status": _runner_status(ride),
-            "finish_position": finish_position_int,
-            "finish_time": summary.get("winning_time") if finish_position_int == 1 else "",
-            "margin": str(ride.get("finish_distance") or ""),
-            "source_refs": source_refs,
-        }
-        runners.append(
-            {
-                "sort_order": row["sort_order"],
-                "horse_number": row["horse_number"],
-                "barrier": row["barrier"],
-                "horse_name": row["horse_name"],
-                "jockey_name": row["jockey_name"],
-                "trainer_name": row["trainer_name"],
-                "carried_weight": row["carried_weight"],
-                "odds_value": row["odds_value"],
-                "running_status": row["running_status"],
-                "source_refs": row["source_refs"],
-            }
-        )
-        if row["running_status"] == "declared" and finish_position_int > 0:
-            result_rows.append(row)
-
-    results = []
-    for sort_position, row in enumerate(sorted(result_rows, key=lambda item: item["finish_position"]), start=1):
-        results.append(
-            {
-                "finish_position": sort_position,
-                "horse_number": row["horse_number"],
-                "barrier": row["barrier"],
-                "horse_name": row["horse_name"],
-                "jockey_name": row["jockey_name"],
-                "trainer_name": row["trainer_name"],
-                "carried_weight": row["carried_weight"],
-                "finish_time": row["finish_time"],
-                "margin": row["margin"],
-                "odds_value": row["odds_value"],
-                "running_status": row["running_status"],
-                "is_confirmed": True,
-                "source_refs": {**row["source_refs"], "official_finish_position": row["finish_position"]},
-            }
-        )
-    metadata = {
-        "race_title": summary.get("name") or "",
-        "race_id": (summary.get("race_summary_reference") or {}).get("id"),
-        "race_stage": summary.get("race_stage") or "",
-        "row_count": len(runners),
-        "result_count": len(results),
-    }
+    """Keep the historical CLI on the same parse-only implementation."""
+    runners, results, metadata = _shared_parse_detail_page(
+        html,
+        source_url=source_url,
+    )
     result_order_check = _result_order_completeness(runners, results)
     metadata["result_order_complete"] = result_order_check["complete"]
     metadata["result_order_check"] = result_order_check
-    distance_text = str(summary.get("distance") or "").strip()
-    if distance_text:
-        metadata["distance_text"] = distance_text
     return runners, results, metadata
 
 

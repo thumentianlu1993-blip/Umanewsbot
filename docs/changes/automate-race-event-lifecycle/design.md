@@ -297,9 +297,9 @@ applied:<event>:<generation>:<action>:<boundary>
 | 日本 JRA | JRA-VAN/JV-Link，经 `jrvltsql` 落独立 staging；JRA 官方公告 | `RA/SE/AV/JC/0B15` 可覆盖赛程、出马与临场变化；需真实 live proof | `0B12/HR` 可作官方确认候选 | 用户已核实限速使用边界；阶段 B/D 仍需技术 proof 和独立启用授权 |
 | 日本 NAR/JPN1 | NAR 官方 CSV，或经批准的地方競馬DATA/NV-Link | 官方 CSV 提供未来已发布出马表和约 2 分钟当日更新；许可需冻结 | 官方 CSV 含赛果/払戻候选 | 与 JRA provider/event id 分离；阶段 B/D 需新 proof/授权 |
 | 香港 | TRA Pro 主结构化源；HKJC 官方复核 | TRA Core 宣称完整覆盖，HKJC racecard/排位能力较强 | TRA provisional；HKJC official | 新 TRA 扩围和 HKJC 自动复核均需独立 proof/授权 |
-| 英国 | TRA Pro；BHA 官方复核；Sporting Life fallback | Pro 最远 T-7，临近日约 15/3 分钟更新 | TRA supplemental provisional；官方来源确认 official | event 924 以外不得沿用既有批准，需按地区扩围 proof |
-| 法国 | TRA Pro；France Galop 官方复核；Geny/ZEturf fallback | P0 G1 理论落入 global Group 范围，但需逐场验证 | TRA provisional；France Galop official | 阶段 B/D 需新 proof/授权 |
-| 美国 | TRA North America add-on；Equibase 仅人工或另签 Data Sales API | add-on 有 meets/entries/changes；具体变化语义需 proof | add-on results provisional；Equibase 获授权数据可复核 | 禁止采用 Equibase scraper/stealth；阶段 B/D 需新 proof/授权 |
+| 英国 | TRA Pro；BHA 官方复核；Sporting Life internal reference | Pro 最远 T-7，临近日约 15/3 分钟更新；Sporting Life 只供内部交叉核验 | TRA supplemental provisional；官方来源确认 official；Sporting Life 无结果权威 | event 924 以外需按地区扩围 proof；内部参考不进入 projection |
+| 法国 | TRA Pro；France Galop 官方复核；ZEturf internal reference | P0 G1 理论落入 global Group 范围，但需逐场验证；ZEturf 只供内部交叉核验 | TRA provisional；France Galop official；ZEturf 无结果权威 | 阶段 B/D 需新 proof/授权；内部参考不覆盖 France Galop |
+| 美国 | TRA North America add-on；Equibase 人工/另签；HRN internal reference | add-on 有 meets/entries/changes；HRN 只供内部发现和部分结果参考 | add-on results provisional；Equibase 获授权数据可复核；HRN 无结果权威 | 禁止 Equibase scraper/stealth；HRN 不进入 projection |
 
 TRA Free 的现状是：认证/端点/schema proof 和 event 924 有界 shadow/provisional 灰度成功，
 但不是全地区全面批准；不能产生 official。法国匹配仍有 fail-closed 缺口，其他地区也需逐场
@@ -308,10 +308,11 @@ TRA Free 的现状是：认证/端点/schema proof 和 event 924 有界 shadow/p
 来源 fallback：
 
 1. 同 provider 重试/cache；
-2. 同地区已批准次级来源生成候选；
+2. 同地区已批准次级来源生成可应用候选；
 3. 官方新闻/公告；
-4. 可信媒体仅人工候选；
-5. 全部失败时仍按时间推进状态，结果保持 pending。
+4. Sporting Life/ZEturf/HRN 只生成内部参考观察，不属于可应用 fallback；
+5. 其他可信媒体仅人工候选；
+6. 全部失败时仍按时间推进状态，结果保持 pending。
 
 ### 6.1 商业 API 候选
 
@@ -337,7 +338,40 @@ authority 必须绑定 `(provider,region,field_name,result_phase,provider_contra
 change 不接入爱尔兰，不得映射成英国或 `other`；未来必须独立变更模型、迁移、`Europe/Dublin`、
 身份、页面、测试和 rollout。
 
-### 6.2 JRA collector snapshot 合同
+### 6.2 内部参考源隔离链
+
+内部参考链复用三个现有 parser 的解析和安全请求能力，但不复用
+`import_race_event_detail_candidates --apply`：
+
+```text
+冻结 event manifest
+  -> source-specific parser/cache
+  -> reference schema validator
+  -> identity match（matched/unmatched/ambiguous/source_only）
+  -> RaceReferenceCollectionRun
+  -> immutable RaceReferencePayload
+  -> per-run RaceReferenceReceipt
+  -> staff-only read-only admin/report
+```
+
+建议新增三个模型：
+
+- `RaceReferenceCollectionRun`：记录 provider、地区、manifest、请求/cache/覆盖/错误和 artifact；
+- `RaceReferencePayload`：按 source/observation/payload hash 去重的不可变结构化来源事实；
+- `RaceReferenceReceipt`：每个 run 的 payload membership、event 匹配证据、partial/gap 与分类版本。
+
+模型本身不含 publish/apply 状态；服务层禁止调用 data candidate、race-live projection、
+news/QQ。公开 view/query/template/sitemap 不读取这些模型，admin 无 add/change/delete/promotion。
+相同 payload 跨 run 复用 payload 并新增 receipt；内容变化新增 payload；歧义不绑定 event；相同
+payload 后续重新匹配只新增 receipt。
+
+第一实现单元 B0.1 只提供 manifest-bound one-shot collect、离线 record 和 report，不注册
+Celery/Beat/task/queue。现有 parser 仅按 `finished` 赛后结果使用；赛前 route 属后续独立 proof。
+生产依次经过离线 fixture、one-shot 网络 collect、小范围内部 record 和 7 个逐日 one-shot
+观察；任何阶段都没有公开发布步骤。精确 schema、manifest、HTTP 限制和并发合同见
+`internal_reference_sources.md` 和 `phase_b_reference_implementation_handoff.md`。
+
+### 6.3 JRA collector snapshot 合同
 
 JRA-VAN authority 的主体是合同来源本身，`jrvltsql` 版本仅作为 provenance。Windows collector
 不得直接连接 Umanews 生产数据库。唯一传输方式为 Umanews 通过受限 SFTP-only 账号主动拉取的
@@ -457,6 +491,10 @@ translation success
 逐地区完成 source proof 后接入出马/时间/骑师/闸位/退赛/延期；复用 racecard revision、
 HostBudget、candidate 和 authority。
 
+阶段 B 先拆出 B0.1：Sporting Life、ZEturf、HRN 的现有赛后 parser 仅形成内部 reference
+run/payload/receipt。B0.1 可在不接入公开字段同步、不增加调度的情况下独立实现、review、
+关闭部署和逐日 one-shot 观察；B0.1 数据不得成为 B 的字段 authority 或 D 的结果 revision。
+
 ### C：赛事影响新闻联动
 
 独立迁移/分类器/特殊池/候选回写；先 shadow 分类，再小范围 enforce。不开新赛果来源。
@@ -502,6 +540,9 @@ event 924 的已存在 observation/publication 不迁移、不重跑；只对未
 - 新 lifecycle 测试文件
 - Compose/`.env.example` 仅增加默认 off flags（测试先行）
 
-阶段 B/D 预计触及 `race_events.py`、`race_live_*` 与 provider registry；阶段 C 预计触及
-`automation.py`、`validation.py`、`publishing_windows.py`、news models/tasks/admin。
+阶段 B0.1 预计新增三个 reference models/migration、`race_reference_sources.py`、四个管理命令、
+只读 admin、safe HTTP 上限，并抽取由历史 CLI 共用的三个 parse-only runtime parser；不修改
+Celery/Beat/worker/Compose。阶段 B/D 后续预计
+触及 `race_events.py`、`race_live_*` 与 provider registry；阶段 C 预计触及 `automation.py`、
+`validation.py`、`publishing_windows.py`、news models/tasks/admin。
 具体实现前必须再次做 hunk overlap preflight。
