@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-07-27 P0 官方出马页 URL 发现已生产启用
+
+- `main@cfba7151` 已部署，worker/beat 的
+  `P0_RACECARD_URL_DISCOVERY_ENABLED=true`，上海时间每日 `06:30/18:30` 运行。
+- 两次受控运行均生成可验证的持久化 generation：当前未来目标 6 场、时间不足 orphan 5 场；
+  BHA 日期索引 3、精确 found 0、暂无 8。任务未写赛事/出马/赛果业务表。
+- Equibase DMR/CNL 在生产香港网络连接超时，当前为 fail-closed 降级；调度继续低频重试，
+  不把这两场报告为成功或已确认 URL。France Galop、日本、香港及 NAR 继续保持既定
+  provider 门禁。
+- 生产 healthz、Django check、artifact verifier 通过；两个恢复点均为 `0600`。详细证据见
+  `docs/changes/schedule-p0-official-racecard-url-discovery/release_report.md`。
+
 - 2026-07-27: 联网 prepare 阻断修复已由 PR `#30` 合并并关闭态部署到
   `main@e2ae3efe`、镜像 `sha256:e0a2d3d6…61a3`。联网 prepare 的
   recovery expected-target、source-scoped adapter input 和 JRA list/受控请求上下文已在独立
