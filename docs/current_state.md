@@ -4124,3 +4124,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   NAR recovery 会受控检查同目录后发布的 `racecard.html`；法国四场使用已核验的精确
   recovery-only URL 并在下载后重验身份，将预计法国请求从 35 降至 4。恢复聚焦测试
   `39/39`、相关 adapter 回归 `48 passed / 4 skipped`。
+- 该分支已重基到 `origin/main@db96b13b`，提交并推送为 `787d6a1e`，草稿 PR `#36`
+  已创建且 GitHub 判定可合并。重基后恢复聚焦测试 `39/39`，历史 adapter 与 B0.1
+  相关回归 `192 passed / 4 skipped`，其余静态门禁通过。
+- PR `#36` 尚未合并，因此未把未合并分支部署到生产；生产仍未部署 gap-v2，也未重跑正式
+  bounded prepare、写入赛果或改变任何关闭态开关。

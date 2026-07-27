@@ -7003,3 +7003,5 @@ revision、新闻或 QQ。
 - review-only 合并包不得直接用于 audit/apply。必须先发布并部署
   `source_map_version=2026-07-27-gap-v2`，重新运行正式 bounded prepare，再进入人工官方
   route receipt、coverage audit 与 dry-run。
+- gap-v2 已以提交 `787d6a1e` 推送至草稿 PR `#36`，但 PR 尚未合并；禁止将该未合并分支
+  直接部署到生产。取得独立合并授权并合入 `main` 后，才能按本节关闭态边界执行部署。
