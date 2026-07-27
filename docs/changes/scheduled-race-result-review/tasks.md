@@ -36,28 +36,31 @@
 
 - [x] (application) 聚焦测试 GREEN，运行现有 recovery/lifecycle 回归。
 - [x] (operations) Django check、migration drift、compile、Compose config、shell 静态检查。
-- [ ] (integration) fake transport 端到端 prepare，验证邮件附件、业务写 0 和重放去重。
-- [ ] (application) 未参与实现的 reviewer 使用
+- [x] (integration) fake transport 端到端 prepare，验证邮件附件、业务写 0 和重放去重。
+- [x] (application) 未参与实现的 reviewer 使用
   `codex review -c 'sandbox_mode="read-only"' --uncommitted` 完成首次完整审核。
-- [ ] (application) 如有 finding，由实现 subagent 修复并复用同一 reviewer 限定复审。
-- [ ] (operations) 冻结完整 fingerprint、approved parent 和 content manifest hash。
+- [x] (application) 如有 finding，由实现 subagent 修复并复用同一 reviewer 限定复审。
+- [x] (operations) 冻结完整 fingerprint、approved parent 和 content manifest hash。
 
-当前审核状态：首次 review session `019fa425-c6fc-7e72-9483-5afa281fcfeb` 返回
-`REVISE`（4 项 P1）；四项均已真实 RED -> GREEN，含 PostgreSQL `2/2` 锁证据，待同一 session
-限定复审后确认原四项已关闭。该轮新增的 verify 空 scope 与 apply 部分失败退出 0 两项 P1
-也已真实 RED -> GREEN；最新聚焦 `19/19`、直接相邻组合 `109/109`，仍待同一 session
-再次限定复审后再勾选上述审核任务。
+最终独立审核已批准 fingerprint
+`a8b8a4f5dc7879d378137d88acbbfe7bb6849d8446825419a2ee9a35622c76f0`；
+approved parent 为 `0bf3fd975155795c6df885b1055bd97c342db880`，content manifest 为
+`0a20affb4c574b715b874575159d42366609e17e8edbf2cec091854f997d67e7`。
 
 ## 5. 发布与调度
 
-- [ ] (operations) 最新成功 review 后取得当前冻结版本发布授权。
-- [ ] (operations) commit、push、创建 PR、合并并部署，应用 migration，保持两个新开关关闭。
-- [ ] (operations) 验证生产版本、Compose mount、SMTP 配置、SSH wrapper 和 flag-off 三个零。
-- [ ] (integration) 在已授权窗口启用 prepare/network 和唯一收件人，执行一次受控生产 prepare。
+- [x] (operations) 最新成功 review 后取得当前冻结版本发布授权。
+- [x] (operations) commit、push、创建 PR、合并并部署，应用 migration，保持两个新开关关闭。
+- [x] (operations) 验证生产版本、Compose mount、SMTP 配置、SSH wrapper 和 flag-off 三个零。
+- [x] (integration) 在已授权窗口启用 prepare/network 和唯一收件人，执行一次受控生产 prepare。
 - [ ] (application) 用户核对测试审核邮件格式和 bundle SHA。
-- [ ] (operations) 启用生产 Beat schedule，并创建同 slot 的 Umanews Codex cron 备用触发。
-- [ ] (operations) 验证两次等价 scheduled smoke、失败通知与无重复邮件。
-- [ ] (operations) 按 evidence-only allowlist 写回生产 SHA、run ID、bundle/email/health 事实。
+- [x] (operations) 启用生产 Beat schedule，并创建同 slot 的 Umanews Codex cron 备用触发。
+- [x] (operations) 验证两次等价 scheduled smoke、失败通知与无重复邮件。
+- [x] (operations) 按 evidence-only allowlist 写回生产 SHA、run ID、bundle/email/health 事实。
+
+生产首轮虽完成调度与邮件闭环，但 `13/13` 目标为 `route_missing`、候选为 `0`。因此本 change
+的发布任务已完成，产品验收未完成；必须新增来源身份 discovery 修复并重新 prepare，不能把
+blocker 包当作完整赛果审核包。
 
 ## 6. 后续运行
 
