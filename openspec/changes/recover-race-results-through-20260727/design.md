@@ -66,8 +66,10 @@ inventory 同时保存：
 - 中国香港：HKJC adapter；
 - 英国：Sporting Life；
 - 法国：ZEturf；
-- 美国：TOBA 已发布的精确 Equibase chart discovery；TOBA 尚未更新的 7 场先用
-  Sporting Life 日期结果页生成候选，再由 Equibase 按赛场/日期人工确认。Equibase
+- 美国：19 场均由 Sporting Life 日期结果页生成完整顺序候选；其中前 12 场另由人工浏览
+  TOBA 表取得精确 Equibase chart 入口，后 7 场按赛场/日期直接定位 Equibase。TOBA
+  discovery 只保留官方入口、field 与 winner 交叉证据，不再承担结果 candidate adapter。
+  Equibase
   `manual_browser_only` chart 只产生结构化人工 receipt；本批禁止自动下载 chart，也不把
   既有离线 PDF parser 解释为网络许可；
 - TRA：只作为既有 provisional 观察或补充比对。
@@ -85,6 +87,12 @@ UK 与 US Sporting Life 虽复用同一 parser，但在单次 run 中使用互�
 candidate/review/summary 标准路径。coverage 只读取并验证当前 state 记录的标准 combined
 artifact identity，拒绝 `--candidate-jsonl` 替换；随后逐场比较聚合层强制写入的
 `source_provider/racing_region` 与冻结 target，防止自报 metadata 或跨来源 event ID 绕过。
+
+本批四场法国目标在首轮 prepare 已验证精确 ZEturf URL。`gap-v2` 仅在
+`race_result_recovery` mode 对 event `733..736` 使用这四条冻结 route，并在下载后重新核对
+日期、赛场与赛事名；身份不符即阻断，不回退到宽范围 `R/C` 探测。普通历史详情模式继续使用
+原 discovery 行为。这样可把正式重跑的法国请求从 35 次压缩到 4 次，并使全批继续满足
+`<=75` 请求门禁。
 
 本批 HRN `/entries-results/YYYY-MM-DD` 实测重定向至首页，不能承担结果恢复。其 adapter
 只保留既有行为回归，不进入本批 source map。逐场来源和当前可用性冻结在

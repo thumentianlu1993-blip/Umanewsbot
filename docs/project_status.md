@@ -1862,3 +1862,13 @@ P0 马信息补全专项的模型交接文档见
 - 系统 Python 缺 `bs4` 属于环境误用，不是产品失败；Compose 仍未验证。
 - 当前未联网、未 commit/push/PR、未部署、未执行生产迁移或生产写入；latest-main 集成版本
   必须先复用同一 reviewer 完整只读复审，再针对新 fingerprint 取得发布授权。
+
+# 2026-07-27 赛果恢复候选覆盖达到 40/40
+
+- 初次 prepare 的 13 场缺口已通过 NAR 官方更新入口和 Sporting Life 补齐；审阅层现有
+  40 场、319 条连续数字名次，无 `Also Ran` 代替顺序。
+- 生产赛果仍为 0；美国 12 场 provider 调整与 NAR 后发布入口修复已在
+  `codex/fix-race-result-gap-source-map` 完成，并以提交 `787d6a1e` 推送至草稿 PR `#36`。
+  重基后恢复聚焦测试 `39/39`，历史 adapter 与 B0.1 相关回归 `192 passed / 4 skipped`。
+- PR `#36` 尚未合并，gap-v2 尚未部署；下一门禁是取得独立合并授权，部署时保持全部开关
+  关闭，随后再以单独联网授权重跑正式 prepare 并人工核验 Equibase。

@@ -56,15 +56,12 @@ RECOVERY_SOURCE_MAP = (
     },
     {
         "region": RacingRegion.UNITED_STATES,
-        "source": "toba",
-        "adapter": "us_toba_chart_discovery",
-        "event_ids": [406, 407, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420],
-    },
-    {
-        "region": RacingRegion.UNITED_STATES,
         "source": "sporting_life",
         "adapter": "us_sporting_life_results",
-        "event_ids": [421, 422, 423, 424, 425, 426, 427],
+        "event_ids": [
+            406, 407, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420,
+            421, 422, 423, 424, 425, 426, 427,
+        ],
     },
 )
 
@@ -142,7 +139,7 @@ class RaceResultRecoveryPlanIntegrationTests(SimpleTestCase):
             "inventory_manifest_sha256": "a" * 64,
             "inventory_artifact_path": "/approved/recovery-inventory.json",
             "inventory_artifact_sha256": "b" * 64,
-            "source_map_version": "2026-07-27",
+            "source_map_version": "2026-07-27-gap-v2",
             "allow_network": False,
             "batch_size": 40,
             "max_source_cache_bytes": 512 * 1024 * 1024,
@@ -746,6 +743,46 @@ class RaceResultRecoveryAdapterModeTests(SimpleTestCase):
         )
         self.assertTrue(
             tool._should_fetch_results({"status": "finished"}, recovery_mode=False)
+        )
+
+    def test_nar_recovery_mode_rechecks_published_racecard_sibling(self):
+        tool = self._tool("prepare_nar_race_detail_candidates.py")
+        introduction = (
+            "https://www.keiba.go.jp/dirtgraderace/2026/"
+            "0720_mercurycup/introduction.html"
+        )
+
+        self.assertEqual(
+            tool._detail_url_candidates(introduction, recovery_mode=False),
+            [introduction],
+        )
+        self.assertEqual(
+            tool._detail_url_candidates(introduction, recovery_mode=True),
+            [
+                introduction,
+                "https://www.keiba.go.jp/dirtgraderace/2026/"
+                "0720_mercurycup/racecard.html",
+            ],
+        )
+
+    def test_france_recovery_uses_frozen_exact_result_routes(self):
+        tool = self._tool(
+            "prepare_france_zeturf_race_detail_candidates.py"
+        )
+
+        self.assertEqual(
+            tool._recovery_exact_result_url({"event_id": "733"}),
+            "https://www.zeturf.fr/fr/course-du-jour/2026-07-19/"
+            "R1C1-chantilly-goffs-prix-robert-papin",
+        )
+        self.assertEqual(
+            tool._recovery_exact_result_url({"event_id": "736"}),
+            "https://www.zeturf.fr/fr/course-du-jour/2026-07-22/"
+            "R5C6-vichy-grand-prix-de-vichy",
+        )
+        self.assertEqual(
+            tool._recovery_exact_result_url({"event_id": "999"}),
+            "",
         )
 
     def test_sporting_life_also_ran_without_positions_is_not_complete_order(self):
@@ -1393,7 +1430,7 @@ class RaceResultRecoveryCoverageAndRunnerIntegrationTests(SimpleTestCase):
             "inventory_manifest_sha256": "b" * 64,
             "inventory_artifact_path": "/approved/recovery-inventory.json",
             "inventory_artifact_sha256": "c" * 64,
-            "source_map_version": "2026-07-27",
+            "source_map_version": "2026-07-27-gap-v2",
             "allow_network": False,
             "batch_size": 2,
             "rate_limit": {"max_requests": 2, "request_interval_seconds": 1},

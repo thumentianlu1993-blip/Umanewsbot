@@ -20,6 +20,24 @@ from bs4 import BeautifulSoup
 
 
 BASE_URL = "https://www.zeturf.fr"
+RECOVERY_EXACT_RESULT_URLS = {
+    "733": (
+        "https://www.zeturf.fr/fr/course-du-jour/2026-07-19/"
+        "R1C1-chantilly-goffs-prix-robert-papin"
+    ),
+    "734": (
+        "https://www.zeturf.fr/fr/course-du-jour/2026-07-19/"
+        "R1C5-chantilly-darley-prix-chloe"
+    ),
+    "735": (
+        "https://www.zeturf.fr/fr/course-du-jour/2026-07-19/"
+        "R1C7-chantilly-prix-messidor"
+    ),
+    "736": (
+        "https://www.zeturf.fr/fr/course-du-jour/2026-07-22/"
+        "R5C6-vichy-grand-prix-de-vichy"
+    ),
+}
 STOPWORDS = {
     "al",
     "arc",
@@ -194,6 +212,13 @@ def _zeturf_url(event: dict, *, r_number: int, c_number: int) -> str:
     return f"{BASE_URL}/fr/course-du-jour/{event['local_date']}/R{r_number}C{c_number}-{course_slug}-{race_slug}"
 
 
+def _recovery_exact_result_url(event: dict) -> str:
+    return RECOVERY_EXACT_RESULT_URLS.get(
+        str(event.get("event_id") or ""),
+        "",
+    )
+
+
 def _read_events(
     path: Path,
     *,
@@ -239,10 +264,65 @@ def _parse_page(html: str, *, source_url: str) -> tuple[list[dict], list[dict], 
 
 def _discover_event_pages(events: list[dict], source_dir: Path, args) -> tuple[dict[str, dict], list[dict]]:
     by_date = defaultdict(list)
-    for event in events:
-        by_date[event["local_date"]].append(event)
     matched: dict[str, dict] = {}
     skipped = []
+    for event in events:
+        exact_url = (
+            _recovery_exact_result_url(event)
+            if bool(getattr(args, "recovery_mode", False))
+            else ""
+        )
+        if exact_url:
+            cache_path = (
+                source_dir
+                / f"source_zt_exact_{event['event_id']}.html"
+            )
+            try:
+                html = _download(
+                    exact_url,
+                    cache_path,
+                    allow_network=args.allow_network,
+                    timeout=args.timeout_seconds,
+                    sleep_seconds=args.sleep_seconds,
+                )
+            except Exception as exc:
+                skipped.append(
+                    {
+                        "event_id": event["event_id"],
+                        "slug": event["slug"],
+                        "reason": "exact_route_failed",
+                        "error": str(exc),
+                    }
+                )
+                continue
+            parts = _title_parts(_title(html))
+            if (
+                parts["date"] != event["local_date"]
+                or not _venue_match(
+                    event["racecourse"],
+                    parts["venue"],
+                )
+                or not _race_matches_event(event, parts["race_name"])
+            ):
+                skipped.append(
+                    {
+                        "event_id": event["event_id"],
+                        "slug": event["slug"],
+                        "reason": "exact_route_identity_mismatch",
+                        "source_url": exact_url,
+                    }
+                )
+                continue
+            matched[event["slug"]] = {
+                "event": event,
+                "url": exact_url,
+                "html": html,
+                "r": "",
+                "c": "",
+                "title": _title(html),
+            }
+            continue
+        by_date[event["local_date"]].append(event)
     for race_date, date_events in sorted(by_date.items()):
         unmatched = {event["slug"]: event for event in date_events}
         target_courses = {event["racecourse"] for event in date_events}

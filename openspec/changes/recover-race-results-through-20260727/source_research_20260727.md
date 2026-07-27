@@ -10,7 +10,7 @@
 | 日本 | 6 | 不需要第三方候选 | JRA 官方 replay 4 场；NAR `RaceMarkTable` 2 场 |
 | 英国 | 11 | Sporting Life 日期结果页 | BHA Results，仅人工浏览 |
 | 法国 | 4 | ZEturf 逐场结果页 | France Galop，仅人工浏览；当前匿名访问跳转登录 |
-| 美国 | 19 | TOBA→Equibase 12 场；Sporting Life 7 场 | Equibase chart，仅人工浏览 |
+| 美国 | 19 | Sporting Life 19 场；TOBA 为前 12 场提供 Equibase 精确入口证据 | Equibase chart，仅人工浏览 |
 
 `RaceEvent#924` Hackwood Stakes 不计入上述 40 场。它已有 `7` 条未确认赛果，应继续走现有
 race-live owner/投影链，只补 BHA official receipt，不得由历史补数命令直接覆盖。
@@ -110,6 +110,10 @@ race-live owner/投影链，只补 BHA official receipt，不得由历史补数�
 France Galop；本次匿名访问 `/en/racing/` 会跳转 Microsoft CIAM 登录，所以执行时必须由
 人工浏览器会话完成，不能把 France Galop 作为当前无人值守抓取入口。
 
+`source_map_version=2026-07-27-gap-v2` 将上述四条精确 URL 冻结为 recovery-only route。
+每次下载后仍须重验日期、赛场和赛事名；任一漂移直接 blocker，不回退到宽范围 R/C 探测。
+这不会改变普通历史详情 discovery。
+
 ## 7. 美国 19 场
 
 ### 7.1 已有精确 Equibase chart discovery 的 12 场
@@ -131,11 +135,14 @@ TOBA 当前页面已经为以下赛事给出 `eqbPDFChartPlus.cfm` 的精确 `TI
 | 419 | SAR / 07-18 / 8 | Coronation Cup |
 | 420 | SAR / 07-19 / 9 | Quick Call |
 
-这些 TOBA 链接仅用于发现具体 Equibase chart；TOBA 是 candidate/discovery 证据，不是本
-change 的官方结果 authority。最终全马名次、骑师、时间和退赛状态以对应 Equibase chart
-人工核验，不以 TOBA 的冠军列代替完整赛果，也不自动下载 chart。
+这些 TOBA 链接仅用于发现具体 Equibase chart；TOBA 是 discovery 证据，不是本 change
+的结果 candidate 或官方 authority。`2026-07-27T07:53:10Z` 的补缺批次确认 TOBA 普通
+自动请求返回 403，但交互式浏览器可读取 12 个精确 chart 入口、field 和 winner。相同
+12 场已由 Sporting Life 取得 `82` 条完整连续数字名次，且每场结果数与 TOBA field
+一致；最终全马名次、骑师、时间和退赛状态仍须以对应 Equibase chart 人工核验，不以
+TOBA winner 代替完整赛果，也不自动下载 chart。
 
-### 7.2 TOBA 尚未更新的 7 场
+### 7.2 另外 7 场
 
 | Event | 日期 / 赛场 | 赛事 | 当前候选 |
 |---:|---|---|---|
@@ -148,9 +155,17 @@ change 的官方结果 authority。最终全马名次、骑师、时间和退赛
 | 427 | 07-26 / SAR | Honorable Miss | Sporting Life 日期结果页 |
 
 TOBA 当前仍没有这 7 场的 chart link、出赛数或冠军，不能等待台账旧字段自动补齐。
-Sporting Life 三个日期页已实测逐场命中，可先生成候选；然后按日期和赛场在 Equibase
+Sporting Life 三个日期页已实测逐场命中并生成候选；然后按日期和赛场在 Equibase
 downloadable chart 中定位 race number 并人工确认。Equibase 对非浏览器请求返回拦截 HTML，
 现有 policy 也明确禁止自动抓取或绕过反爬。
+
+### 7.3 补缺后的冻结 candidate source map v2
+
+candidate `source_map_version=2026-07-27-gap-v2`：美国 19 场均归
+`sporting_life` candidate adapter；TOBA/Equibase discovery 以独立人工结构化证据保留，
+不得混入 candidate provider 身份。其余日本、英国、法国 source map 不变。NAR event 185
+仍归官方 NAR adapter，但 recovery mode 会在冻结的 `introduction.html` 无入口时受控检查
+同目录已发布的 `racecard.html`。
 
 #### event 426 Eddie Read 完整顺序复核（2026-07-27）
 

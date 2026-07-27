@@ -4107,3 +4107,25 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   lifecycle 的生产 `false/off`。由于 latest-main 集成改变了候选内容，下一门禁是复用同一
   reviewer 会话复审新的完整 fingerprint；通过后仍需针对新 fingerprint 重新取得
   commit/push/Draft PR 授权。Compose 仍未验证。
+
+# 2026-07-27 赛果恢复候选缺口已补齐，待 source map v2 发布
+
+- 关闭态生产 `prepare-20260727T073643Z` 使用 `73/75` 请求取得 27 场完整连续数字名次；
+  常驻网络/调度开关保持关闭，目标 `RaceEventResult=0`、event 426 结果为 0、目标候选仍为
+  32，未执行 audit/dry-run/apply。
+- 独立补缺批次 `gap-prepare-20260727T075310Z` 为 event 185 取得 NAR 官方 1–14 名，
+  并为 12 场美国赛事从 Sporting Life 取得 82 条完整数字名次；每场非退赛马数与结果数
+  相等。合并审阅层达到 `40 candidates / 319 results / 40 full numeric order`。
+- TOBA 交互式浏览器核验取得 12 个精确 Equibase chart 入口、field 与 winner，但
+  Equibase 完整 chart 仍只允许人工核验；当前合并文件为 review-only，不构成 official
+  confirmation 或生产写入授权。
+- 最新主线分支 `codex/fix-race-result-gap-source-map` 已将 candidate source map 升至
+  `2026-07-27-gap-v2`：美国 19 场统一由 Sporting Life 生成候选，TOBA 只保留 discovery；
+  NAR recovery 会受控检查同目录后发布的 `racecard.html`；法国四场使用已核验的精确
+  recovery-only URL 并在下载后重验身份，将预计法国请求从 35 降至 4。恢复聚焦测试
+  `39/39`、相关 adapter 回归 `48 passed / 4 skipped`。
+- 该分支已重基到 `origin/main@db96b13b`，提交并推送为 `787d6a1e`，草稿 PR `#36`
+  已创建且 GitHub 判定可合并。重基后恢复聚焦测试 `39/39`，历史 adapter 与 B0.1
+  相关回归 `192 passed / 4 skipped`，其余静态门禁通过。
+- PR `#36` 尚未合并，因此未把未合并分支部署到生产；生产仍未部署 gap-v2，也未重跑正式
+  bounded prepare、写入赛果或改变任何关闭态开关。
