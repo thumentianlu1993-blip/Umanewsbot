@@ -1,9 +1,10 @@
 # 当前状态
 
-## 2026-07-27 PR #29 已合并，联网 prepare 阻断修复通过独立代码审核
+## 2026-07-27 PR #30 已合并，联网 prepare 阻断修复已关闭态部署
 
-- PR `#29` 已合并为 `main@e7dc1b20aa36b311ade2497b96a62b15451942d2`；修复位于独立
-  worktree/分支 `codex/fix-race-result-recovery-prepare`，尚未 commit、push、发布或部署。
+- 修复提交 `00979dc443979ef0d982ae7776c3ff7dfb3d0572` 经 PR `#30` 合并为
+  `main@e2ae3efe2349623dd60745bfef498af31d7d8d84`，生产已快进并构建统一应用镜像
+  `sha256:e0a2d3d6612841df64f2ab1b8ca8ff6a749f4b14c8f4e3173317a394250e61a3`。
 - 已用测试复现并修复 `expected_target_empty`：recovery plan 现在同时绑定 inventory 文件路径、
   文件 SHA 和内部 manifest SHA，调用既有 verifier 重算当前数据库身份后，再按冻结顺序批量加载
   40 个 event ID 和 active aliases。状态、可见性、日期、名称、系列、source facts、赛果数量/
@@ -26,8 +27,18 @@
 - 同一原生只读 reviewer 已对精确 fingerprint
   `db0e38b26bacb1c6bc798303d756e6fcf1a80e4203fb1778cd6a324d552c5135`
   给出 `VERDICT: APPROVED`，前后 fingerprint 一致且未修改文件。
-- 本轮没有触网、没有连接生产、没有生成 candidate/source cache，也没有业务写入。下一门禁是新的
-  release 授权；部署后还需新的联网 prepare 授权。
+- 部署恢复点为
+  `backups/db/pre-race-result-prepare-fix-20260727T045500Z.dump`，大小
+  `259584695` bytes、SHA-256
+  `3a2d1b91ac1610e42c272957a3055067b1a326b2f11c71a81c3ce099b97cbf5c`、
+  mode `0600`，`pg_restore -l` 为 1127 项；对应 `.env` 备份同为 `0600`。
+- `web/worker/beat` 运行新镜像，`race_live_worker` 使用同镜像但保持 `Created`。四个应用容器中
+  scheduler、monitor、runner、lifecycle、historical backfill/network 八项值全部关闭；4 条
+  publication policy 为 off。event 924 的既有 `provisional_public` allowlist 保留，但在 policy
+  off 且 worker 停止时不生效。迁移无变化，Django check、公网 HTTP healthz 与 `/races/`
+  均通过，近 15 分钟应用日志无 traceback/critical/exception/error。
+- 本次部署没有运行 prepare，没有新增 candidate/source cache，也没有赛果业务写入。下一门禁仍是
+  对精确 40 场 snapshot/adapter 输入完成关闭态复核后取得新的有界联网 prepare 授权。
 
 ## 2026-07-27 赛果缺口恢复已关闭态部署，inventory 通过，联网 prepare 在零请求处阻断
 

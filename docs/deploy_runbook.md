@@ -6809,3 +6809,39 @@ python manage.py complete_horse_profiles \
   请求数必须为 0。JRA scheduled 目标仅可通过 plan 注入的显式 recovery mode 读取。
 - 任一 event 消失、地区/adapter input 漂移、request policy 摘要变化、来源交叉分片或预算账本
   缺失都停止，不得手工构造 snapshot、复用旧 approval 或直接运行 adapter。
+
+# 2026-07-27 赛果恢复联网 prepare 阻断修复关闭态部署记录
+
+1. Git 与镜像：
+   - 修复提交 `00979dc443979ef0d982ae7776c3ff7dfb3d0572` 经 PR `#30` 合并为
+     `main@e2ae3efe2349623dd60745bfef498af31d7d8d84`。
+   - 生产 `web/worker/beat/race_live_worker` 统一镜像为
+     `sha256:e0a2d3d6612841df64f2ab1b8ca8ff6a749f4b14c8f4e3173317a394250e61a3`；
+     `race_live_worker` 通过 `up --no-start --no-deps --force-recreate` 更新后保持
+     `Created`，未启动、未消费 race-live 队列。
+2. 恢复点：
+   - `backups/db/pre-race-result-prepare-fix-20260727T045500Z.dump` 为
+     `259584695` bytes，SHA-256
+     `3a2d1b91ac1610e42c272957a3055067b1a326b2f11c71a81c3ce099b97cbf5c`，
+     mode `0600`，`pg_restore -l` 为 1127 项。
+   - `.env.backup.pre-race-result-prepare-fix-20260727T045500Z` 为 mode `0600`。
+3. 关闭态：
+   - 四个应用容器均为 `RACE_LIVE_SCHEDULER_ENABLED=false`、
+     `RACE_LIVE_MONITOR_ENABLED=false`、`RACE_LIVE_ENABLED_REGIONS=`、
+     `RACE_LIVE_RUNNER_MODE=disabled`、`RACE_EVENT_LIFECYCLE_ENABLED=false`、
+     `RACE_EVENT_LIFECYCLE_MODE=off`、`HISTORICAL_RACE_BACKFILL_ENABLED=false`、
+     `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。
+   - 4 条 publication policy 均为 off。event 924 保留 1 条
+     `max_mode=provisional_public` 的既有 allowlist；它在总 policy off 且 race-live worker
+     停止时不生效，本次未改写历史授权记录。
+4. 验收：
+   - Celery 切换前 drain 为 `active=0/reserved=0`；无迁移，`0060` 保持已应用，
+     `RaceEventProductCanonicalLink=0`，Django check 通过。
+   - 公网 HTTP `/healthz/` 与 `/races/` 均为 200；HTTPS 仍拒绝连接，符合当前项目尚未完成
+     HTTPS 接入的既有状态。近 15 分钟应用日志未发现
+     traceback、critical、exception 或 error。
+   - 本次未运行联网 prepare，`runtime/race_result_recovery` 没有部署窗口内新增文件，
+     未生成 candidate/source cache，未执行赛果 apply 或其他赛果业务写入。
+5. 下一门禁：
+   - 先在网络关闭状态重建并审核精确 40 条 expected-target snapshot 与 source-scoped
+     adapter 输入；之后必须取得新的有界联网 prepare 授权，旧授权不得复用。
