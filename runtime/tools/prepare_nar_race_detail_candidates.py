@@ -48,6 +48,12 @@ def _read_events(csv_path: Path) -> list[dict]:
         return list(csv.DictReader(handle))
 
 
+def _should_fetch_results(event: dict, *, recovery_mode: bool = False) -> bool:
+    return event.get("status") == "finished" or (
+        recovery_mode and event.get("status") == "scheduled"
+    )
+
+
 def _racecard_link_from_detail(detail_html: str, detail_url: str) -> str:
     soup = BeautifulSoup(detail_html, "html.parser")
     for a in soup.find_all("a", href=True):
@@ -263,7 +269,10 @@ def prepare_candidates(args) -> dict:
                 result_url = _result_link_from_deba(deba_html, deba_url)
                 runners: list[dict]
                 results: list[dict] = []
-                if event.get("status") == "finished" and result_url:
+                if _should_fetch_results(
+                    event,
+                    recovery_mode=bool(getattr(args, "recovery_mode", False)),
+                ) and result_url:
                     result_html = _download(
                         result_url,
                         source_dir / _slug_filename("source_nar_result", result_url),
@@ -297,6 +306,8 @@ def prepare_candidates(args) -> dict:
                 "modules": modules,
                 "metadata": metadata,
             }
+            if str(event.get("event_id") or "").strip():
+                record["event_id"] = int(event["event_id"])
             jsonl.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
             summary["events"] += 1
             summary["runner_items"] += len(runners)
@@ -328,6 +339,7 @@ def main() -> None:
     parser.add_argument("--events-csv", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--allow-network", action="store_true")
+    parser.add_argument("--recovery-mode", action="store_true")
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--timeout-seconds", type=int, default=30)
     parser.add_argument("--fail-fast", action="store_true")

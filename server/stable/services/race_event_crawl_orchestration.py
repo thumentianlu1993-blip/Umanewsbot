@@ -187,8 +187,11 @@ DEFAULT_ADAPTER_MANIFESTS: dict[str, dict[str, Any]] = {
         "modules": [RaceEventModule.RUNNERS, RaceEventModule.RESULTS],
         "source_authority": "official",
         "requires_network": True,
-        "command": ["{python}", "runtime/tools/prepare_nar_race_detail_candidates.py", "--events-csv", "{events_csv}", "--output-dir", "{adapter_output_dir}", "{network_flag}"],
-        "inputs": {"events_csv": {"required": True, "artifact": "input/events.csv"}},
+        "command": ["{python}", "runtime/tools/prepare_nar_race_detail_candidates.py", "--events-csv", "{events_csv}", "{recovery_flag}", "--output-dir", "{adapter_output_dir}", "{network_flag}"],
+        "inputs": {
+            "events_csv": {"required": True, "artifact": "input/events.csv"},
+            "recovery_flag": {"required": False},
+        },
         "outputs": [
             {"key": "candidate_jsonl", "path": "nar_detail_candidates_2026.jsonl", "standard_name": "candidates/nar_detail.jsonl", "required": True},
             {"key": "review_csv", "path": "nar_detail_review_2026.csv", "standard_name": "review/nar_detail.csv", "required": True},
@@ -217,8 +220,11 @@ DEFAULT_ADAPTER_MANIFESTS: dict[str, dict[str, Any]] = {
         "modules": [RaceEventModule.RUNNERS, RaceEventModule.RESULTS],
         "source_authority": "third_party_high_access",
         "requires_network": True,
-        "command": ["{python}", "runtime/tools/prepare_uk_sportinglife_race_detail_candidates.py", "--events-csv", "{events_csv}", "--output-dir", "{adapter_output_dir}", "{network_flag}"],
-        "inputs": {"events_csv": {"required": True, "artifact": "input/events.csv"}},
+        "command": ["{python}", "runtime/tools/prepare_uk_sportinglife_race_detail_candidates.py", "--events-csv", "{events_csv}", "{recovery_flag}", "--output-dir", "{adapter_output_dir}", "{network_flag}"],
+        "inputs": {
+            "events_csv": {"required": True, "artifact": "input/events.csv"},
+            "recovery_flag": {"required": False},
+        },
         "outputs": [
             {"key": "candidate_jsonl", "path": "uk_sportinglife_detail_candidates_2026.jsonl", "standard_name": "candidates/uk_sporting_life_detail.jsonl", "required": True},
             {"key": "review_csv", "path": "uk_sportinglife_detail_review_2026.csv", "standard_name": "review/uk_sporting_life_detail.csv", "required": True},
@@ -232,8 +238,11 @@ DEFAULT_ADAPTER_MANIFESTS: dict[str, dict[str, Any]] = {
         "modules": [RaceEventModule.RUNNERS, RaceEventModule.RESULTS],
         "source_authority": "third_party_high_access",
         "requires_network": True,
-        "command": ["{python}", "runtime/tools/prepare_france_zeturf_race_detail_candidates.py", "--events-csv", "{events_csv}", "--output-dir", "{adapter_output_dir}", "{network_flag}"],
-        "inputs": {"events_csv": {"required": True, "artifact": "input/events.csv"}},
+        "command": ["{python}", "runtime/tools/prepare_france_zeturf_race_detail_candidates.py", "--events-csv", "{events_csv}", "{recovery_flag}", "--output-dir", "{adapter_output_dir}", "{network_flag}"],
+        "inputs": {
+            "events_csv": {"required": True, "artifact": "input/events.csv"},
+            "recovery_flag": {"required": False},
+        },
         "outputs": [
             {"key": "candidate_jsonl", "path": "france_zeturf_detail_candidates_2026.jsonl", "standard_name": "candidates/france_zeturf_detail.jsonl", "required": True},
             {"key": "review_csv", "path": "france_zeturf_detail_review_2026.csv", "standard_name": "review/france_zeturf_detail.csv", "required": True},
@@ -406,6 +415,18 @@ DEFAULT_ADAPTER_MANIFESTS["us_sporting_life_results"] = {
     **DEFAULT_ADAPTER_MANIFESTS["uk_sporting_life_detail"],
     "key": "us_sporting_life_results",
     "region": RacingRegion.UNITED_STATES,
+    "outputs": [
+        {
+            **output,
+            "standard_name": str(output.get("standard_name") or "").replace(
+                "uk_sporting_life_detail",
+                "us_sporting_life_results",
+            ),
+        }
+        for output in DEFAULT_ADAPTER_MANIFESTS[
+            "uk_sporting_life_detail"
+        ]["outputs"]
+    ],
 }
 
 
@@ -1581,6 +1602,7 @@ def materialize_adapter_event_inputs(
         targets_by_scope.setdefault((region, source), []).append(target)
 
     fieldnames = [
+        "event_id",
         "year",
         "slug",
         "series_key",
@@ -1636,7 +1658,16 @@ def materialize_adapter_event_inputs(
                 raise PlanValidationError(
                     f"expected target RaceEvent changed after approval: year={target['year']} slug={target['slug']}"
                 )
-            rows.append({field: approved_input.get(field, "") for field in fieldnames})
+            rows.append(
+                {
+                    field: (
+                        event_id
+                        if field == "event_id"
+                        else approved_input.get(field, "")
+                    )
+                    for field in fieldnames
+                }
+            )
         with path.open("w", encoding="utf-8-sig", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=fieldnames)
             writer.writeheader()
@@ -1653,8 +1684,21 @@ def materialize_adapter_control_inputs(
     manifest: AdapterManifest,
     run_dir: str | Path,
 ) -> dict[str, str]:
+    result: dict[str, str] = {}
+    if manifest.key in {
+        "jra_detail",
+        "nar_detail",
+        "uk_sporting_life_detail",
+        "france_zeturf_detail",
+        "us_sporting_life_results",
+    }:
+        result["recovery_flag"] = (
+            "--recovery-mode"
+            if plan.get("purpose") == RECOVERY_PURPOSE
+            else ""
+        )
     if manifest.key != "jra_detail":
-        return {}
+        return result
     run_path = Path(run_dir)
     source_html = run_path / "source" / "jra.html"
     control_dir = run_path / "control"
@@ -1689,16 +1733,12 @@ def materialize_adapter_control_inputs(
     if not shard_id:
         raise PlanValidationError("JRA controlled request shard identity is empty")
     return {
+        **result,
         "source_html": str(source_html),
         "request_policy": str(policy_path),
         "request_shard_id": shard_id,
         "request_state": str(control_dir / "jra_detail.request-state.json"),
         "host_state_root": str(host_state_root),
-        "recovery_flag": (
-            "--recovery-mode"
-            if plan.get("purpose") == RECOVERY_PURPOSE
-            else ""
-        ),
     }
 
 
@@ -1944,11 +1984,34 @@ def aggregate_candidate_artifacts(
         source_paths.append(str(path.resolve()))
         for record in _read_jsonl(path):
             record.pop("_line_number", None)
+            adapter_provenance = {
+                "adapter_key": str(result.get("key") or "").strip(),
+                "source_provider": str(result.get("source") or "").strip(),
+                "source_authority": str(
+                    result.get("source_authority") or ""
+                ).strip(),
+                "racing_region": str(result.get("region") or "").strip(),
+            }
+            if recovery:
+                for field_name, expected_value in adapter_provenance.items():
+                    current = str(record.get(field_name) or "").strip()
+                    if current and expected_value and current != expected_value:
+                        raise AdapterOutputError(
+                            "recovery aggregate candidate provenance mismatch: "
+                            f"{field_name}={current!r}, "
+                            f"expected {expected_value!r}"
+                        )
+                    if expected_value:
+                        record[field_name] = expected_value
             source = str(
-                record.get("source_name")
-                or record.get("source_provider")
-                or result.get("source")
-                or ""
+                adapter_provenance["source_provider"]
+                if recovery
+                else (
+                    record.get("source_name")
+                    or record.get("source_provider")
+                    or result.get("source")
+                    or ""
+                )
             ).strip()
             authority = str(
                 record.get("source_authority")
@@ -1984,6 +2047,8 @@ def aggregate_candidate_artifacts(
                             for item in history_items
                         ]
                     }
+                if recovery:
+                    _annotate_recovery_result_order(record)
                 record["modules"] = {
                     module: payload
                     for module, payload in modules.items()
@@ -2011,6 +2076,195 @@ def aggregate_candidate_artifacts(
         "record_count": len(records),
         "source_paths": source_paths,
     }
+
+
+def _recovery_result_identity(item: dict[str, Any]) -> tuple[str, str]:
+    horse_number = str(item.get("horse_number") or "").strip().casefold()
+    horse_name = " ".join(
+        str(item.get("horse_name") or "").split()
+    ).casefold()
+    return horse_number, horse_name
+
+
+def _recovery_runner_has_result(
+    runner: dict[str, Any],
+    result_identities: list[tuple[str, str]],
+) -> bool:
+    runner_number, runner_name = _recovery_result_identity(runner)
+    for result_number, result_name in result_identities:
+        if runner_number:
+            if result_number != runner_number:
+                continue
+            if runner_name and result_name and runner_name != result_name:
+                continue
+            return True
+        if runner_name and result_name == runner_name:
+            return True
+    return False
+
+
+def _annotate_recovery_result_order(record: dict[str, Any]) -> None:
+    modules = record.get("modules")
+    if not isinstance(modules, dict):
+        return
+    results = _payload_items(modules.get(RaceEventModule.RESULTS))
+    if not results:
+        return
+    if any(not isinstance(item, dict) for item in results):
+        raise PlanValidationError("recovery result item must be an object")
+
+    metadata = (
+        dict(record.get("metadata"))
+        if isinstance(record.get("metadata"), dict)
+        else {}
+    )
+    existing_complete = metadata.get("result_order_complete")
+    existing_check = (
+        dict(metadata.get("result_order_check"))
+        if isinstance(metadata.get("result_order_check"), dict)
+        else {}
+    )
+
+    check: dict[str, Any] = {
+        "result_count": len(results),
+        "runner_count": 0,
+        "missing_horse_numbers": [],
+        "missing_horse_names": [],
+    }
+    if any(bool(item.get("discovery_only")) for item in results):
+        check["reason"] = "discovery_only_result"
+        complete = False
+    else:
+        positions: list[int] = []
+        invalid_positions: list[Any] = []
+        for item in results:
+            raw_position = item.get("finish_position")
+            try:
+                position = int(raw_position)
+            except (TypeError, ValueError):
+                invalid_positions.append(raw_position)
+                continue
+            if position <= 0:
+                invalid_positions.append(raw_position)
+                continue
+            positions.append(position)
+        expected_positions = list(range(1, len(results) + 1))
+        check["positions"] = positions
+        check["expected_positions"] = expected_positions
+        if invalid_positions:
+            check["invalid_positions"] = invalid_positions
+            check["reason"] = "missing_or_invalid_finish_position"
+            complete = False
+        elif sorted(positions) != expected_positions:
+            check["reason"] = "non_sequential_finish_positions"
+            complete = False
+        else:
+            runners = _payload_items(modules.get(RaceEventModule.RUNNERS))
+            check["runner_count"] = len(runners)
+            if not runners:
+                check["reason"] = "missing_runner_roster"
+                complete = False
+            else:
+                if any(not isinstance(item, dict) for item in runners):
+                    raise PlanValidationError(
+                        "recovery runner item must be an object"
+                    )
+                result_identities = [
+                    _recovery_result_identity(item)
+                    for item in results
+                ]
+                result_numbers = {
+                    horse_number
+                    for horse_number, _horse_name in result_identities
+                    if horse_number
+                }
+                result_names = {
+                    horse_name
+                    for _horse_number, horse_name in result_identities
+                    if horse_name
+                }
+                expected_runners = [
+                    item
+                    for item in runners
+                    if str(item.get("running_status") or "").strip().casefold()
+                    not in {"withdrawn", "scratched"}
+                ]
+                check["expected_runner_count"] = len(expected_runners)
+                missing = [
+                    item
+                    for item in expected_runners
+                    if not _recovery_runner_has_result(
+                        item,
+                        result_identities,
+                    )
+                ]
+                duplicate_numbers = sorted(
+                    {
+                        horse_number
+                        for horse_number in result_numbers
+                        if sum(
+                            identity[0] == horse_number
+                            for identity in result_identities
+                        )
+                        > 1
+                    }
+                )
+                duplicate_names = sorted(
+                    {
+                        horse_name
+                        for horse_name in result_names
+                        if sum(
+                            identity[1] == horse_name
+                            for identity in result_identities
+                        )
+                        > 1
+                    }
+                )
+                unidentified_result_count = sum(
+                    not horse_number and not horse_name
+                    for horse_number, horse_name in result_identities
+                )
+                check["missing_horse_numbers"] = sorted(
+                    {
+                        str(item.get("horse_number") or "").strip()
+                        for item in missing
+                        if str(item.get("horse_number") or "").strip()
+                    }
+                )
+                check["missing_horse_names"] = sorted(
+                    {
+                        str(item.get("horse_name") or "").strip()
+                        for item in missing
+                        if str(item.get("horse_name") or "").strip()
+                    }
+                )
+                check["duplicate_horse_numbers"] = duplicate_numbers
+                check["duplicate_horse_names"] = duplicate_names
+                check["unidentified_result_count"] = unidentified_result_count
+                complete = (
+                    not missing
+                    and len(results) == len(expected_runners)
+                    and not duplicate_numbers
+                    and not duplicate_names
+                    and not unidentified_result_count
+                )
+                if missing:
+                    check["reason"] = "runner_missing_from_result_order"
+                elif len(results) != len(expected_runners):
+                    check["reason"] = "runner_result_count_mismatch"
+                elif duplicate_numbers or duplicate_names:
+                    check["reason"] = "duplicate_result_identity"
+                elif unidentified_result_count:
+                    check["reason"] = "unidentified_result"
+                else:
+                    check["reason"] = "complete"
+
+    if existing_complete is False:
+        complete = False
+        check = {**check, **existing_check}
+    metadata["result_order_complete"] = complete
+    metadata["result_order_check"] = check
+    record["metadata"] = metadata
 
 
 def _normalize_recovery_candidate_record(
@@ -2506,6 +2760,10 @@ def _audit_recovery_coverage(
     candidate_jsonl: str | Path,
     run_dir: str | Path,
 ) -> dict[str, Any]:
+    candidate_identity = _validate_recovery_combined_candidate_artifact(
+        candidate_jsonl=candidate_jsonl,
+        run_dir=run_dir,
+    )
     records = _read_jsonl(Path(candidate_jsonl))
     run_path = Path(run_dir)
     run_path.mkdir(parents=True, exist_ok=True)
@@ -2557,6 +2815,46 @@ def _audit_recovery_coverage(
             payload = modules.get(RaceEventModule.RESULTS)
             if _payload_items(payload):
                 result_payloads.append(payload)
+                source_provider = str(
+                    record.get("source_provider") or ""
+                ).strip()
+                racing_region = str(
+                    record.get("racing_region") or ""
+                ).strip()
+                if source_provider != target["source"]:
+                    event_codes.append("candidate_source_mismatch")
+                    blockers.append(
+                        {
+                            "code": "candidate_source_mismatch",
+                            "event_id": event_id,
+                            "expected_source": target["source"],
+                            "actual_source": source_provider,
+                        }
+                    )
+                if racing_region != target["region"]:
+                    event_codes.append("candidate_region_mismatch")
+                    blockers.append(
+                        {
+                            "code": "candidate_region_mismatch",
+                            "event_id": event_id,
+                            "expected_region": target["region"],
+                            "actual_region": racing_region,
+                        }
+                    )
+                metadata = (
+                    record.get("metadata")
+                    if isinstance(record.get("metadata"), dict)
+                    else {}
+                )
+                if metadata.get("result_order_complete") is not True:
+                    event_codes.append("incomplete_result_order")
+                    blockers.append(
+                        {
+                            "code": "incomplete_result_order",
+                            "event_id": event_id,
+                            "detail": metadata.get("result_order_check") or {},
+                        }
+                    )
         if not result_payloads:
             event_codes.append("missing_event_candidate")
             blockers.append(
@@ -2600,7 +2898,7 @@ def _audit_recovery_coverage(
         "actual_target_count": len(set(grouped) & set(expected)),
         "complete_count": complete_count,
         "candidate_jsonl": str(candidate_jsonl),
-        "candidate_identity": file_identity(candidate_jsonl),
+        "candidate_identity": candidate_identity,
         "inventory_manifest_sha256": plan["inventory_manifest_sha256"],
         "approved_modules": [RaceEventModule.RESULTS],
         "blockers": blockers,
@@ -2615,6 +2913,57 @@ def _audit_recovery_coverage(
         )
     }
     return result
+
+
+def _validate_recovery_combined_candidate_artifact(
+    *,
+    candidate_jsonl: str | Path,
+    run_dir: str | Path,
+) -> dict[str, Any]:
+    run_path = Path(run_dir)
+    state_path = run_path / "state.json"
+    if not state_path.is_file():
+        raise PlanValidationError(
+            "recovery audit requires controlled combined candidate state"
+        )
+    state = RunState.read(state_path)
+    controlled_path_text = str(
+        state.artifacts.get("combined_candidates") or ""
+    ).strip()
+    controlled_identity = state.artifacts.get(
+        "combined_candidates_identity"
+    )
+    expected_path = (
+        run_path / "candidates" / "combined_candidates.jsonl"
+    ).resolve()
+    if (
+        not controlled_path_text
+        or Path(controlled_path_text).resolve() != expected_path
+        or Path(candidate_jsonl).resolve() != expected_path
+    ):
+        raise PlanValidationError(
+            "recovery audit only accepts the controlled combined candidate"
+        )
+    if not isinstance(controlled_identity, dict):
+        raise PlanValidationError(
+            "recovery combined candidate identity is missing"
+        )
+    try:
+        controlled_size = int(controlled_identity.get("size"))
+    except (TypeError, ValueError) as exc:
+        raise PlanValidationError(
+            "recovery combined candidate identity is invalid"
+        ) from exc
+    actual_identity = file_identity(expected_path)
+    if (
+        actual_identity["sha256"]
+        != str(controlled_identity.get("sha256") or "")
+        or actual_identity["size"] != controlled_size
+    ):
+        raise PlanValidationError(
+            "recovery combined candidate identity changed after prepare"
+        )
+    return actual_identity
 
 
 def _candidate_provenance_codes(
