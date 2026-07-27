@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "proof_id": "p0-url-head-proof-20260727T054939Z",
+  "artifact": "provider_no_write_proof_20260727_v3.json",
+  "artifact_sha256": "7e4886a8ff9f02a9c39ef1e8e3e414692ad61528e184dbadb2d4b3c37b9f4b94",
+  "registry_sha256": "c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876",
+  "pre_proof_fingerprint_sha256": "199785de6117c490b569b3cc0fa2d50ce9dbe10f05cb6d3dca0c950e5c736c21",
+  "pre_proof_content_manifest_sha256": "103f734252d8659009cc238a10b64f18a1465521fac9398397a52634f907f8a2",
+  "supersedes_proof_id": "p0-url-head-proof-20260727T053742Z",
+  "binding_mode": "pre_proof_fingerprint_plus_post_proof_allowlist",
+  "status": "passed"
+}

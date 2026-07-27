@@ -6728,3 +6728,58 @@ python manage.py complete_horse_profiles \
   本地或生产执行 `--confirm-network-proof`，不得读取/复制/输出 production secret。
 - 获得联网授权后仍必须使用唯一 output 目录、精确 registry SHA、`--max-requests <= 3`，
   先核对 registry 有效期和 evidence 新鲜度；失败 artifact 也必须保留，禁止原目录重跑覆盖。
+
+## 未来重点赛事赛前数据候选与 apply 边界（方案阶段）
+
+- 当前没有可执行命令或已批准 artifact；不得根据
+  `docs/changes/fetch-upcoming-key-racecards/` 直接抓取或写库。
+- 后续实现必须保持：
+  `inventory -> source cache -> immutable candidate -> dry-run/review -> approved SHA ->
+  transaction apply -> independent verifier`。
+- 抓取层禁止写 `RaceEvent`/`RaceEventRunner`；空表、局部表、身份/时间/许可冲突整场
+  fail closed。第三方 racecard 不得标成 official。
+- 本地/测试 apply 也需明确目标数据库与批次；生产 apply 必须另备份、冻结精确 SHA、字段 diff、
+  影响行数和 rollback manifest，并等待用户对该批次授权。
+- 本 change 不启用 Celery beat、race-live scheduler、monitor、公共发布或每日自动化。
+
+## P0 官方出马页面 URL 文档（方案阶段）
+
+- 候选宿主目录：
+  `/opt/umanewsbot/runtime/upcoming_racecard_urls/`；容器目录：
+  `/app/runtime/upcoming_racecard_urls/`。计划由 default worker 使用 bind mount 持久化，
+  beat 只 dispatch，不需要写挂载。
+- 候选产物为不可变 `generations/<id>/` bundle，由单一原子 `current` 相对 symlink 切换；
+  人工固定读取 `current/latest.md`。manifest/JSON/Markdown SHA 不一致时视为不可接受，不能
+  交给人工录入。
+- 功能开关默认 false。未完成代码 review 和精确发布授权前，不得创建生产目录、修改 `.env`、
+  部署、联网或启用 schedule。
+- 发布候选应先验证 flag-off 的 `network_requests=0/file_writes=0`，再按 provider route
+  独立启用；总任务开关不能覆盖 provider 的 `automation_allowed=false`。
+- 回滚先关总开关，再恢复镜像/Compose。此链路不写业务数据库，正常回滚不需要恢复数据库；
+  最后已验证文档默认保留供人工参考。
+- 当前本地实现的 tracked registry SHA-256 为
+  `d04ec36924fc120ea6a497634f2f7ae9b0e5831ccf9ecb731979c4e855ed3fe6`，六条 route
+  均自动访问关闭。发布时若仅把总开关设为 true，验收必须明确
+  `transport=0 / URL found=0 or only pre-existing preserved / 未启用 provider`，不得把
+  “任务成功生成暂无文档”描述为抓取成功。
+
+## P0 官方出马页面 URL 文档（provider route 上线候选）
+
+- 当前候选 registry SHA-256：
+  `c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876`。
+- 允许自动 transport 的精确全集仅为：
+  - BHA `HEAD https://www.britishhorseracing.com/racing/fixtures/upcoming/`，同批去重上限 1；
+  - Equibase `HEAD https://tvg.equibase.com/static/entry/RaceCardIndex{track}{MMDDYY}USA-EQB.html`，
+    同批上限 2、同 host 最小间隔 5 秒。
+- France Galop、JRA、NAR、HKJC 必须为 transport 0。HEAD 不 follow redirect、不读取 body；
+  BHA 只显示“官方日期索引（需人工确认）”，不得称为精确单场 racecard。
+- no-write proof：
+  `docs/changes/schedule-p0-official-racecard-url-discovery/provider_no_write_proof_20260727_v3.json`，
+  SHA-256
+  `7e4886a8ff9f02a9c39ef1e8e3e414692ad61528e184dbadb2d4b3c37b9f4b94`。首次与 v2
+  proof 均已被 supersede，仅保留审计，不得用于发布。v3 以联网前 fingerprint + 精确
+  post-proof 文档 allowlist 解决 artifact 自引用，reviewer 必须确认 allowlist 外无变化。
+- 发布前必须等待最新 code review 后的新授权。授权后先备份 `.env` 与镜像，创建
+  `/opt/umanewsbot/runtime/upcoming_racecard_urls/`，保持功能开关 false 部署并完成 flag-off
+  smoke；随后才可按精确 route 做单次生产验证并启用开关。任何代码/registry 变化都会使 proof、
+  review 和授权失效。

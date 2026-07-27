@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from celery import shared_task
+from billiard.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
@@ -75,6 +76,11 @@ from stable.services.production_windows import (
     select_production_sources,
 )
 from stable.services.publishing_windows import select_publish_candidates
+from stable.services.p0_racecard_url_discovery import (
+    PublishLockBusyError,
+    SafeHttpTransport,
+    run_p0_racecard_url_discovery,
+)
 from stable.services.publish_readiness import publish_ready_age_summary
 from stable.services.pushing import push_article_to_targets
 from stable.services.qq_auto_push import (
@@ -107,6 +113,182 @@ from stable.services.race_events import (
 
 User = get_user_model()
 JRA_SKIPPABLE_DETAIL_ERRORS = (ValueError, AttributeError, IndexError, TypeError)
+
+
+@shared_task
+def discover_p0_racecard_urls_task() -> dict:
+    """Publish the current P0 official racecard URL document.
+
+    The feature flag is checked before database access, file access, registry
+    loading, or transport construction.
+    """
+    if (
+        getattr(settings, "P0_RACECARD_URL_DISCOVERY_ENABLED", False)
+        is not True
+    ):
+        return {"enabled": False}
+
+    import time
+
+    from stable.models import RaceEvent, RaceEventPriority
+
+    started_at = timezone.now()
+    monotonic_started = time.monotonic()
+    log = TaskExecutionLog.objects.create(
+        task_name="discover_p0_racecard_urls_task",
+        status=TaskStatus.STARTED,
+        payload={},
+        detail="",
+        started_at=started_at,
+    )
+    try:
+        summary = run_p0_racecard_url_discovery(
+            events=RaceEvent.objects.filter(
+                priority=RaceEventPriority.P0
+            ).iterator(chunk_size=200),
+            run_started_at=started_at,
+            artifact_root=settings.P0_RACECARD_URL_DISCOVERY_ARTIFACT_ROOT,
+            registry_path=settings.P0_RACECARD_URL_DISCOVERY_REGISTRY_FILE,
+            registry_sha256=(
+                settings.P0_RACECARD_URL_DISCOVERY_REGISTRY_SHA256
+            ),
+            transport=SafeHttpTransport(
+                total_request_budget=(
+                    settings.P0_RACECARD_URL_DISCOVERY_REQUEST_BUDGET
+                )
+            ),
+            max_targets=settings.P0_RACECARD_URL_DISCOVERY_MAX_TARGETS,
+        )
+        duration_ms = max(
+            0, int((time.monotonic() - monotonic_started) * 1000)
+        )
+        allowed_keys = {
+            "future_expected",
+            "orphans",
+            "found",
+            "listing_reachable",
+            "not_available",
+            "preserved_previous",
+            "blocked",
+            "errors",
+            "by_region",
+            "by_provider",
+        }
+        log.payload = {
+            key: summary[key] for key in allowed_keys if key in summary
+        }
+        log.payload["duration_ms"] = duration_ms
+        log.status = TaskStatus.SUCCESS
+        log.detail = "completed"
+        log.finished_at = timezone.now()
+        log.save(
+            update_fields=[
+                "payload",
+                "status",
+                "detail",
+                "finished_at",
+                "updated_at",
+            ]
+        )
+        return {"enabled": True, **summary}
+    except SoftTimeLimitExceeded:
+        log.status = TaskStatus.FAILED
+        log.payload = {
+            "future_expected": 0,
+            "orphans": 0,
+            "found": 0,
+            "listing_reachable": 0,
+            "not_available": 0,
+            "preserved_previous": 0,
+            "blocked": 0,
+            "errors": 1,
+            "by_region": {},
+            "by_provider": {},
+            "duration_ms": max(
+                0, int((time.monotonic() - monotonic_started) * 1000)
+            ),
+        }
+        log.detail = "soft_time_limit_exceeded"
+        log.finished_at = timezone.now()
+        try:
+            log.save(
+                update_fields=[
+                    "payload",
+                    "status",
+                    "detail",
+                    "finished_at",
+                    "updated_at",
+                ]
+            )
+        except Exception:
+            pass
+        raise
+    except PublishLockBusyError:
+        log.status = TaskStatus.SUCCESS
+        log.payload = {
+            "future_expected": 0,
+            "orphans": 0,
+            "found": 0,
+            "listing_reachable": 0,
+            "not_available": 0,
+            "preserved_previous": 0,
+            "blocked": 0,
+            "errors": 0,
+            "by_region": {},
+            "by_provider": {},
+            "duration_ms": max(
+                0, int((time.monotonic() - monotonic_started) * 1000)
+            ),
+        }
+        log.detail = "already_running"
+        log.finished_at = timezone.now()
+        log.save(
+            update_fields=[
+                "payload",
+                "status",
+                "detail",
+                "finished_at",
+                "updated_at",
+            ]
+        )
+        return {
+            "enabled": True,
+            "success": True,
+            "reason": "already_running",
+        }
+    except Exception:
+        log.status = TaskStatus.FAILED
+        log.payload = {
+            "future_expected": 0,
+            "orphans": 0,
+            "found": 0,
+            "listing_reachable": 0,
+            "not_available": 0,
+            "preserved_previous": 0,
+            "blocked": 0,
+            "errors": 1,
+            "by_region": {},
+            "by_provider": {},
+            "duration_ms": max(
+                0, int((time.monotonic() - monotonic_started) * 1000)
+            ),
+        }
+        log.detail = "discovery_batch_failed"
+        log.finished_at = timezone.now()
+        log.save(
+            update_fields=[
+                "payload",
+                "status",
+                "detail",
+                "finished_at",
+                "updated_at",
+            ]
+        )
+        return {
+            "enabled": True,
+            "success": False,
+            "error_code": "discovery_batch_failed",
+        }
 
 
 @shared_task

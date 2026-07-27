@@ -2095,3 +2095,62 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   行为保持兼容。
 - runner 修复、独立 review 与真实联网 proof 是三个独立授权点。本地测试通过不构成联网许可，
   当前仍禁止读取生产 secret 或发出请求。
+
+## 2026-07-27 赛前官方数据不得沿用赛果 route 或第三方 authority
+
+- 重点赛事赛前清单以现有产品规则 `P0/P1 或 featured` 穷尽枚举，再用官方 aware post time
+  判断七天半开窗口；禁止先挑有数据的赛事后宣称全量。
+- `scheduled_post_time`、`actual_off_time`、场地 `local_start_time` 和数据库
+  `race_datetime` 是不同语义。赛前计划时间使用现有 `RaceResultPhase.RACECARD`，并在
+  field provenance 记录 `time_semantics=scheduled_post_time`；同时保留原始时区、UTC、
+  地区时区和中文展示值。不得为这些语义另造数据库 phase。
+- 现有 BHA、France Galop、Equibase official route 只覆盖赛果核验，不自动授权 entries；
+  TRA 只能是 provisional 补充。provider/region/field/phase/contract version 或许可缺失时
+  必须在抓取/写入前 fail closed。
+- 当前跨地区每日官方赛前任务为 NO-GO；购买或取得授权来源、完成连续覆盖证据和新的 review
+  之前，不创建或启用 beat/scheduler。
+
+## 2026-07-27 P0 出马页 URL 发现与出马数据 apply 分离
+
+- 允许把“官方出马页面 URL 发现”作为独立窄链路建设；该链路只保存 URL 和最小审计元数据，
+  不保存页面正文/出马名单，不写赛事业务表，也不改变
+  `fetch-upcoming-key-racecards` 当前结构化数据 apply 为 0 的结论。
+- P0 范围严格等于 `RaceEvent.priority=P0`。draft/hidden、系列待审或时间证据不足的 P0 不得
+  静默丢弃，应进入完整清单并显示 blocker；P1、P2 和 featured-only 不进入本任务。
+- 上海时间每日 `06:30/18:30` 运行，冻结绝对 `[start, start+7d)`。同一赛事只保留一个当前
+  URL；新 URL 替换旧 URL，瞬时错误或后续 404 不自动清空已确认 URL，较旧运行不得覆盖较新运行。
+- 机器 JSON、人工 Markdown 和 manifest 组成不可变 generation，由单一原子 `current` 相对
+  symlink 切换；人工固定读取 `current/latest.md`。SHA 计算必须无环，读取者只可见上一完整代
+  或下一完整代。
+- 模板构造 URL 只能标记 `candidate_unverified`，不得标为 found；found 必须有官方正向存在
+  marker 或官方索引精确链接。普通 404 是 `path_unverified`，不能猜成“尚未发布”。
+- 保留上轮确认 URL 时，URL 的 `provider/provider_event_id/provider_contract_version` 必须与
+  原确认来源一起保留；本轮失败或改源检查使用独立
+  `checked_provider/checked_provider_event_id/checked_provider_contract_version`。汇总按本轮
+  checked provider 计数，禁止把旧 URL 错误归因到新失败来源。
+- 网络在锁外执行，但 outcome 与当前文档的最终 merge 必须在发布锁内重读 `current` 后完成；
+  stale CAS 只防旧运行覆盖，不能替代锁内 latest-state merge。
+- URL-only 降低了内容复制风险，但用户授权不能替代第三方站点的 robots、条款或自动访问许可。
+  每个 provider route 独立 fail closed；确定性构造 URL 可以不联网，索引发现/存在性检查仍须
+  受审 contract。
+
+## 2026-07-27 P0 URL route 的 HEAD 与正文抓取边界
+
+- 用户明确纠正前述边界：按受审规则离线生成 URL，再以 `HEAD` 检查精确路径或应用入口，
+  不属于本项目所称的网页正文抓取。该决定仅修订上一节最后一条对存在性检查的解释，不授权
+  `GET` 正文、HTML 解析、出马字段提取或绕过认证。
+- BHA 目标路径未被本轮获取的 `robots.txt` 禁止，并声明 `crawl-delay: 10`。Equibase 实际
+  请求 origin `tvg.equibase.com` 的 `robots.txt` 返回 404 且不重定向；不得借用
+  `www.equibase.com` 的 robots 规则冒充目标 origin 证据。项目仍主动采用 5 秒最小间隔。
+  route 必须按 host 去重并满足最小间隔；无论响应状态如何，`HEAD` transport 都不得读取或
+  保存 body。
+- BHA 日期变量位于 fragment，服务器无法据此判断该日期数据是否已发布。因此 BHA 的 2xx
+  只能标为 `listing_reachable/date_listing`，不能标为单场 `found`。同一批所有 BHA 日期 URL
+  共享一次去重后的应用入口 HEAD。
+- Equibase 的 `tvg.equibase.com/static/entry/RaceCardIndex{track}{MMDDYY}USA-EQB.html`
+  对当前 DMR/CNL 返回 200、伪场地或错误日期返回 404；因此允许按官方
+  `track_code + local_date` 发精确 HEAD，2xx 标为 `found`、404 标为 `not_published`。
+- France Galop 有效与伪会议 URL 都跳转认证，无法由状态码区分，继续 fail closed；JRA、
+  HKJC 保留未来 contract，NAR 继续遵守明确 robots 禁止。
+- 该判断不把任何 provider 的历史赛果或正文访问许可扩展到 entries 内容；以后若 route 需要
+  `GET` 或解析正文，必须另行形成证据、方案审核和授权。

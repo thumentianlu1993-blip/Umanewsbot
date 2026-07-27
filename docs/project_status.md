@@ -1614,3 +1614,42 @@ P0 马信息补全专项的模型交接文档见
 - 主线程相关回归 55/55，通过 Django、迁移和静态检查。
 - 独立 reviewer 已给出 `APPROVED`，无开放 P0/P1/P2。当前没有联网、提交、发布或生产写入；
   最多 3 次只读 API 请求仍需针对最终 fingerprint 的单独授权。
+
+## 2026-07-27 未来七天重点赛事官方赛前数据方案审核通过
+
+- 冻结七天窗口内生产重点赛事超集为 19 场：英国 8、美国 10、法国 1；当前均无时刻和 runner。
+- 官方赛程已证实，但现有许可/route 不支持这些地区的自动化 official entries；当前可 apply
+  为 0，每日无人值守任务暂为 NO-GO。
+- 独立方案 reviewer 已在同一会话关闭 3 high、2 medium finding并给出
+  `VERDICT: APPROVED`。本轮只完成只读盘点和方案文档；没有应用代码、测试、数据库写入、
+  调度或公开影响，当前停在“确认实现”门禁。
+
+## 2026-07-27 P0 官方出马页 URL 定时发现正在规划
+
+- 新范围仅保存未来七天全部 P0 赛事的官方出马页面 URL，计划上海时间每天
+  `06:30/18:30` 更新宿主持久化文档；无页面时显示“暂无”，同一赛事只保留最新 URL。
+- 计划覆盖 JRA、NAR、HKJC、英国、法国、美国 adapter，并保持逐 provider 自动访问门禁。
+- 规格、设计、测试、任务和 rollout 已通过独立方案审核；首次 1 blocker、4 high、3 medium
+  已在同一 reviewer 会话两轮限定复审中全部关闭，最终 `VERDICT: APPROVED`。
+- 已获确认实现并完成本地代码与 TDD；首次 code review 的 CGNAT DNS P1 与 soft timeout P2，
+  以及限定复审的 3 个 path/计数/归因 P2 均已按真实 RED 修复。聚焦 40 项、相关回归 104 项
+  通过，Django/迁移/Compose/registry/OpenSpec/diff 检查通过。
+- 一轮复审曾因 fingerprint helper raw 捕获不一致而 fail closed；随后 helper 恢复逐字节稳定，
+  五项 findings 全部关闭，原生代码 review 最终 `VERDICT: APPROVED`。
+- 当前只剩代码审核状态文档的同 reviewer 复审与最终 fingerprint 冻结；仍未取得发布授权。
+- 当前未联网、部署、写生产或启用调度；六 provider route 仍全部 fail closed，仅打开总开关
+  不会抓取 URL。
+
+## 2026-07-27 P0 官方出马页 URL provider route 本地候选
+
+- BHA 与 Equibase 的零正文 HEAD route 已完成 TDD 实现；France Galop/JRA/NAR/HKJC 继续
+  fail closed 或保留未来适配。
+- task 日志漏记 `listing_reachable` finding 已完成 RED→GREEN；修复后的 v3 bounded proof
+  为：Equibase 精确 race card index `2` 场、
+  BHA 官方日期 listing `3` 场、France Galop “暂无” `1` 场；精确 3 次 HEAD，响应正文、
+  数据库与服务器 `current` 文档写入均为 0。v3 artifact SHA-256 为
+  `7e4886a8ff9f02a9c39ef1e8e3e414692ad61528e184dbadb2d4b3c37b9f4b94`；首次与 v2 proof
+  已被 supersede。同一 reviewer 已确认无自引用绑定与日志 finding 关闭，限定复审
+  `APPROVED`；三个新 P2 仅列后续建议。
+- 总功能开关仍为 false，尚未部署或启用 06:30/18:30 调度；当前只等待审核事实文档的限定
+  复审和其后的精确发布授权。

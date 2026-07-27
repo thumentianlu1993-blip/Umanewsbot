@@ -66,6 +66,7 @@ services:
       - media_data:/app/server/media
       - app_logs:/app/logs
       - ./runtime/horse_profile_completion:/app/runtime/horse_profile_completion:rw
+      - ./runtime/upcoming_racecard_urls:/app/runtime/upcoming_racecard_urls:rw
     restart: unless-stopped
     depends_on:
       db:

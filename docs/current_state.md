@@ -3543,3 +3543,93 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 本轮只使用 fake transport，没有读取生产凭据或联网。Django check、migration drift、
   py_compile、`git diff --check` 通过；独立 reviewer 最终结论为 `APPROVED`，无开放
   P0/P1/P2。当前未 commit、push、PR、部署，真实联网仍等待独立用户授权。
+
+## 2026-07-27 未来七天重点赛事官方赛前数据方案审核通过，待确认实现
+
+- 冻结窗口为
+  `[2026-07-27T01:50:01+08:00, 2026-08-03T01:50:01+08:00)`，对应 UTC
+  `[2026-07-26T17:50:01Z, 2026-08-02T17:50:01Z)`。
+- 生产只读盘点按 `P0/P1 或 featured`、published、not cancelled、approved series 枚举出
+  19 场超集：英国 8、美国 10、法国 1；全部缺 `race_datetime`、`local_start_time` 和
+  runner。
+- 官方赛程可证明 19 场日期；但当前已审核 route 只覆盖赛果。英国/法国缺机器可用且获许可的
+  official entries route，美国 Equibase 禁止未授权自动抓取/再发布，部分 8 月 1 日页面
+  尚未发布。因此当前合规可 apply 为 0，跨地区无人值守每日任务结论为 NO-GO。
+- 方案入口为 `docs/changes/fetch-upcoming-key-racecards/`。独立 reviewer 在同一会话关闭
+  3 high、2 medium finding，最终 `VERDICT: APPROVED`。当前准确状态：
+  `plan approved / implementation not authorized /
+  production business writes 0 / scheduler unchanged`。
+
+## 2026-07-27 P0 官方出马页面 URL 定时发现进入方案审核
+
+- 用户把可先闭环的范围收窄为“只保存官方出马页面 URL”：上海时间每日 `06:30/18:30`
+  枚举未来七天全部 `RaceEvent.priority=P0` 赛事，同一赛事仅保留最新 URL；尚未发布、身份缺失
+  或 provider 受阻时显示“暂无”并保留原因。
+- 计划生成宿主持久化的不可变 generation bundle，并由单一原子 `current` 指针提供固定
+  `current/latest.md` 人工入口；不保存网页正文或出马内容，不写 RaceEvent/runner/result
+  等业务表，也不公开文档。
+- JRA、NAR、HKJC、英国、法国、美国均进入 adapter 注册表；当前无日本/香港赛事不作为删除
+  适配能力的理由。自动 transport 仍逐 provider 受 host/path、robots/terms、contract 和请求
+  预算约束，URL-only 不构成绕过第三方站点规则的依据。
+- 新 change 入口：
+  `docs/changes/schedule-p0-official-racecard-url-discovery/`。首次方案审核发现
+  1 blocker、4 high、3 medium；两轮限定复审已全部关闭，最终
+  `VERDICT: APPROVED`。当前准确状态：
+  `plan approved / implementation confirmation pending /
+  no code, network, production write, deployment or scheduler change`。
+
+## 2026-07-27 P0 官方出马页面 URL 定时发现已完成本地实现，待代码审核
+
+- 已实现严格 P0 七天窗口、有界 orphan、十 outcome 状态机、六 provider route registry、
+  HTTPS/SSRF/预算/contract 门禁、锁内 latest-state merge、不可变 generation bundle、
+  原子 `current` 指针、Celery 06:30/18:30 调度、脱敏运行日志和普通 worker 持久化 mount。
+- 两个实现中发现的并发/审计缺口均先取得真实 RED 再修复：较晚失败运行不再清空较早确认 URL；
+  保留 URL 时继续绑定原确认 provider/contract/event ID，并另存本轮 checked provider。
+- 首次独立原生 code review session `019fa011-a171-7e50-bae6-249a06ea7ddd` 发现
+  DNS 未拒绝 CGNAT 的 P1，以及两层吞 `SoftTimeLimitExceeded` 的 P2。两项均取得真实 RED
+  并修复：DNS 只接受 `is_global=True`；service/task 显式重抛 soft timeout，日志保存失败不
+  遮蔽原异常。限定复审确认两项已落实，并记录 3 个 P2 建议：编码 path traversal、保留 URL
+  错误漏计、空 checked provider 错误归因；三项也已补 RED 并修复。该轮 fingerprint helper
+  的摘要/hash 相同但 reviewer 捕获的 raw output 不同，故 fail closed，尚无批准基线。
+- 主线程验证：聚焦 `40/40`、racecard/lifecycle `79/79`；Django check、迁移漂移、compile、
+  Compose、registry SHA、OpenSpec strict `37/37`、diff check 通过。完整 realtime
+  `166` 项中 `157` 通过、`9` 项因既有 fixture 固定 2026-07-20 而当前为 2026-07-27，
+  触发 claim expired/mismatch/rate-limited；无本 change 堆栈。
+- tracked 六 provider route 仍全部
+  `automation_allowed=false/robots_allowed=false`，总开关默认 false。当前没有真实联网、文档
+  生产写入、业务数据库写入、部署或调度影响；只打开总开关也只会写“暂无”，不会抓取 URL。
+- 当前准确状态：
+  `implementation GREEN / native code review APPROVED / final documentation re-review pending /
+  release not authorized`。
+
+## 2026-07-27 P0 URL provider route 已补齐，等待最新代码审核
+
+- 用户明确把离线 URL 构造、零正文 `HEAD` 与网页正文抓取分开；方案 reviewer 在同一会话关闭
+  robots origin、请求预算和 proof 顺序 finding 后给出 `VERDICT: APPROVED`。
+- tracked registry 当前只启用两条 HEAD route：BHA 日期索引
+  `head_application_entry`，同批去重最多 1 次；Equibase
+  `RaceCardIndex{track}{MMDDYY}USA-EQB.html` 精确 HEAD，最多 2 次且同 host 间隔至少 5 秒。
+  France Galop 因真假路径均跳认证保持 blocked；JRA/HKJC 保留未来 contract，NAR 保持
+  robots blocked。registry SHA-256 为
+  `c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876`。
+- provider 增量测试先取得真实 RED（17 项中 `11 passed / 4 failed / 2 errors`），实现后
+  provider `17/17`、完整 discovery `44/44`、racecard/lifecycle `79/79`、realtime 安全子集
+  `25/25`；Django check、迁移漂移和 diff check 通过。
+- reviewer 发现 task 日志仍漏记 `listing_reachable`，已用真实 RED（`KeyError`）修复，
+  成功及固定失败日志 schema 均保留该计数。首次 proof 与 v2 现只作为不可变历史证据。
+  修复后 v3 proof 在当前 6 场 P0 上只发 3 个 HEAD：BHA 1 次 200、Equibase DMR/CNL
+  各 1 次 200，后两次间隔 7 秒，响应正文读取 0。结果为
+  `confirmed racecard index=2 / official date listing=3 / 暂无=1`。业务数据库、
+  `TaskExecutionLog` 和 `current` 写入均为 0。proof artifact SHA-256 为
+  `7e4886a8ff9f02a9c39ef1e8e3e414692ad61528e184dbadb2d4b3c37b9f4b94`。v3 绑定联网前
+  fingerprint `199785de6117c490b569b3cc0fa2d50ce9dbe10f05cb6d3dca0c950e5c736c21`，
+  联网后仅新增 proof/manifest 与更新精确状态文档，同一 reviewer 已确认原两项 finding
+  关闭、无直接 P0/P1 回归并给出 `APPROVED`。代码候选 parent/fingerprint/content hash
+  分别为 `a59956b327157d29630fab1f1c98ba9c9cacfed0`、
+  `1f665032d5bfc0d19b4f2e9885bd30f2718415de0cdee0c8a441e6b83e192959`、
+  `1df171afd380238c205e72d123f8ec3e1bd3e9021267cc4d9dc117c02c119642`。
+- reviewer 新报的 generation 目录名校验、完整 2xx 接受、认证 3xx 归类均为 P2，依限定
+  复审规则记录为非阻塞后续建议；本次不扩展实现范围。当前只剩这次审核事实文档的同 reviewer
+  限定复审与随后用户对精确版本的发布授权。
+- 当前仍未 commit、push、PR、部署、创建生产宿主目录或启用定时任务；总功能开关保持默认
+  false。审核事实文档复审通过后，仍必须重新取得针对最终 fingerprint 的发布授权。
