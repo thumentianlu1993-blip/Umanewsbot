@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-07-27 P0 URL 定时任务已重新启用
+
+- 后续部署曾把 P0 开关恢复为关闭，导致当日 `18:30` 自然调度未运行；现已在用户精确授权下
+  以生产 `5fed1a96` 恢复 worker/beat 开关并补跑一次。
+- 补跑成功，`TaskExecutionLog=3`，当前 generation 为 `19679c03…8612`；BHA 日期索引
+  仍为 3，Equibase 两个目标仍连接失败，精确 found 仍为 0。
+- 五张赛事业务表更新均为 0，Django check、artifact verifier 和内外 healthz 通过；下一次
+  自然调度为上海时间每日 `06:30/18:30`。
+
 ## 2026-07-27 P0 官方出马页 URL 发现已生产启用
 
 - `main@cfba7151` 已部署，worker/beat 的

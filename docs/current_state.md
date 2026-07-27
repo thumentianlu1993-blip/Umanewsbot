@@ -1,5 +1,30 @@
 # 当前状态
 
+## 2026-07-27 P0 URL 开关已恢复并完成一次补跑
+
+- 后续生产部署曾在 `2026-07-27 15:33 +08:00` 将
+  `P0_RACECARD_URL_DISCOVERY_ENABLED` 恢复为 `false`，因此当日 `18:30` 的首次自然调度
+  未执行。用户随后明确授权在不改代码的前提下恢复开关并立即补跑。
+- 操作前生产为 `5fed1a964d099281f59ad6d39b13196ecffd2cbe`；P0 任务、service、settings、
+  Compose 与 provider registry 相对原发布 revision `cfba7151` 无差异，registry SHA-256
+  仍为 `c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876`。
+- beat 暂停后，默认队列从 `29` 自然排空到 `0`，Celery
+  `active=0 / reserved=0 / active_confirm=0`。`.env` 恢复点为
+  `.env.backup.pre-p0-reenable-20260727T114553Z`，mode `0600`；仅将 P0 开关从
+  `false` 改为 `true`。
+- 重建 worker 时 Compose 连带重建了 db/web；未改镜像或数据卷。重建前后五张业务表总数
+  一致，db/web 恢复 healthy，回环 healthz 为 `200` 后才继续补跑。
+- 补跑于 `2026-07-27 19:46:45 +08:00` 开始并成功，`TaskExecutionLog 2 -> 3`；
+  结果为 `future_expected=6 / orphans=5 / listing_reachable=3 / found=0 /
+  not_available=8 / blocked=6 / errors=2`。新 generation 为
+  `19679c03583afb492a873c3ff5dfbdc6495ed69cb8af5e9c99b9c91b5dcc8612`，`current`
+  已切换且 verifier 通过；两代保留策略使 generation 目录计数保持 `2 -> 2`。
+- 本次运行窗口内 `RaceEvent / RaceEventRunner / RaceEventResult / ExternalRaceEntry /
+  ExternalRaceResult` 的 `updated_at` 命中均为 `0`。worker/beat 最终开关均为 `true`，
+  调度仍为 `Asia/Shanghai` 的 `30 6,18 * * *`；Django check、内外 healthz 均通过。
+- beat 恢复后补投其他既有周期任务，验收快照默认队列为 `37`，其中 active 为既有
+  `crawl_netkeiba_latest`，P0 日志仍精确为 `3`；未删除队列任务，也未额外触发 P0。
+
 ## 2026-07-27 P0 官方出马页 URL 定时任务已上线，Equibase 生产网络降级
 
 - PR `#32` 已合并为 `main@cfba71518f1024d54cd5553b7f0bb35c780f5959`，生产
