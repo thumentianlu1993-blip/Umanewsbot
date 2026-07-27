@@ -115,7 +115,7 @@
 
     {% if results %}
       <section class="panel" id="results">
-        <h2>正式赛果</h2>
+        <h2>{{ result_section_label }}</h2>
         {% if live_result_status %}
           <div class="race-result-status-summary" aria-label="本表赛果状态">
             <strong>{{ live_result_status.label }}</strong>

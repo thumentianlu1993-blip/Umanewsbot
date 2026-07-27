@@ -7038,3 +7038,17 @@ revision、新闻或 QQ。
   route receipt、coverage audit 与 dry-run。
 - gap-v2 已以提交 `787d6a1e` 推送至草稿 PR `#36`，但 PR 尚未合并；禁止将该未合并分支
   直接部署到生产。取得独立合并授权并合入 `main` 后，才能按本节关闭态边界执行部署。
+
+## 最近赛事赛果定时审核发布边界
+
+1. 首次部署保持 `RACE_RESULT_REVIEW_ENABLED=false`、
+   `RACE_RESULT_REVIEW_ALLOW_NETWORK=false`，并清空 `RACE_RESULT_REVIEW_NOTIFY_EMAILS`。
+2. 应用 migration `0062_add_scheduled_race_result_review` 后，核对 worker/beat 的
+   `/app/runtime/race_result_review` 持久卷和 route registry 可读。
+3. 关闭态 smoke 只验证 task 返回 disabled，要求 network/email/business write 均为 0。
+4. Beat 是主调度；`deploy/run-scheduled-race-result-review.sh` 是固定备用入口，两者竞争同一
+   数据库 schedule slot。
+5. 首次启用、联网 prepare、邮件收件人和 apply 分别授权。apply 必须按默认 dry-run、写前备份、
+   `--apply --confirm-apply`、独立 verify 的顺序执行。
+6. 止血先关闭总开关；只停网络则关闭 network 开关；收件人为空时 fail closed。审核包与治理
+   ledger 默认保留。

@@ -65,6 +65,7 @@ services:
     volumes:
       - media_data:/app/server/media
       - app_logs:/app/logs
+      - race_result_review_data:/app/runtime/race_result_review
       - ./runtime/horse_profile_completion:/app/runtime/horse_profile_completion:rw
       - ./runtime/upcoming_racecard_urls:/app/runtime/upcoming_racecard_urls:rw
     restart: unless-stopped
@@ -137,6 +138,7 @@ services:
       RACE_LIVE_TRA_REGISTRY_SHA256: ${RACE_LIVE_TRA_REGISTRY_SHA256:-7aca49ff1df7573ebfe6a9e403eefca5c9e64d8ee18d8d3be383d67803db550a}
     volumes:
       - app_logs:/app/logs
+      - race_result_review_data:/app/runtime/race_result_review
     restart: unless-stopped
     depends_on:
       db:
@@ -208,3 +210,4 @@ volumes:
   static_data:
   media_data:
   app_logs:
+  race_result_review_data:

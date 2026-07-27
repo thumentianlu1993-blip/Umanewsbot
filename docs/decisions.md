@@ -2264,6 +2264,18 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 阶段 B0.1 与 TRA/官方赛前同步分开 review、开关、联网和生产写入授权；连续观察成功也不会
   自动提高来源 authority。
 
+## 2026-07-27 定时赛果工具新增逐审核包人工采纳 authority
+
+- Sporting Life、ZEturf、HRN 等来源继续保持 `internal_reference`，自动采集成功和完整顺序都不把
+  来源升级为 official，也不能复用 official receipt 冒充官方确认。
+- 用户对精确 `bundle_sha256 + event_id + reviewed_row_digest` 的明确批准形成独立
+  `human_reviewed_reference` authority，只允许当前 event 的当前字段集合进入平台正式赛果投影；
+  它不是来源级白名单，也不授权未来 bundle。
+- 该路径使用独立、不可变 approval ledger 和逐 event 原子 projection。平台确认时间与官方确认
+  时间分开；公开语义为“已人工审核赛果”，不得显示为“官方赛果”。
+- official receipt 路径保持原合同不变。任何未审核、digest 漂移、名次不完整或 Also ran 文本顺序
+  继续 fail closed。
+
 # 2026-07-27 赛果补缺 candidate source map 升级为 gap-v2
 
 - 决定将美国 19 场恢复目标全部交给 Sporting Life 结果 adapter 生成完整数字顺序候选。

@@ -19,6 +19,7 @@ services:
     volumes:
       - ./server:/app/server
       - ./server/media:/app/server/media
+      - ./runtime/race_result_review:/app/runtime/race_result_review:rw
     env_file:
       - .env
     environment:
@@ -58,6 +59,7 @@ services:
     volumes:
       - ./server:/app/server
       - ./server/media:/app/server/media
+      - ./runtime/race_result_review:/app/runtime/race_result_review:rw
     env_file:
       - .env
     environment:

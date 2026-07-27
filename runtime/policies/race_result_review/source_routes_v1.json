@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "routes": [
+    {
+      "key": "uk-sporting-life-results-v1",
+      "region": "united_kingdom",
+      "provider": "sporting_life",
+      "adapter": "uk_sporting_life_detail",
+      "source_authority": "third_party_high_access",
+      "candidate_permission": "internal_reference",
+      "identity_namespaces": ["sporting_life"],
+      "modules": ["results"],
+      "automation_allowed": true,
+      "valid_until": "2026-12-31T23:59:59Z"
+    },
+    {
+      "key": "fr-zeturf-results-v1",
+      "region": "france",
+      "provider": "zeturf",
+      "adapter": "france_zeturf_detail",
+      "source_authority": "third_party_high_access",
+      "candidate_permission": "internal_reference",
+      "identity_namespaces": ["zeturf"],
+      "modules": ["results"],
+      "automation_allowed": true,
+      "valid_until": "2026-12-31T23:59:59Z"
+    },
+    {
+      "key": "us-hrn-results-v1",
+      "region": "united_states",
+      "provider": "horse_racing_nation",
+      "adapter": "us_hrn_detail",
+      "source_authority": "third_party_high_access",
+      "candidate_permission": "internal_reference",
+      "identity_namespaces": ["horse_racing_nation"],
+      "modules": ["results"],
+      "automation_allowed": true,
+      "valid_until": "2026-12-31T23:59:59Z"
+    }
+  ]
+}
