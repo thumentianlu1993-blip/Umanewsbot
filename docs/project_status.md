@@ -4,8 +4,8 @@
   `event_id` 回传与全来源完整名次 fail-closed 修复；新增门禁覆盖缺参赛名单、缺马、重复身份、
   无效名次及 discovery-only。首轮固定 head `1b11f985` 独立复审返回两个 P1：英美
   Sporting Life 标准输出覆盖、coverage 未绑定受控 combined artifact/target 来源；两项已补
-  RED 并在同一分支修复，相关回归 `141 passed / 1 skipped`、OpenSpec `38/38` 通过，待新
-  head 复审。Eddie Read 完整候选顺序
+  RED 并在同一分支修复，相关回归 `141 passed / 1 skipped`、OpenSpec `38/38` 通过；同一
+  reviewer 对固定 head `c4ce802c` closure review 为 `APPROVED`、无 findings。Eddie Read 完整候选顺序
   已由 Racing Post 与 DRF 交叉确认，但 Del Mar 官方 chart 尚不可用，仍不得 confirmed。
   PR 尚未合并、发布或部署，生产状态不变。
 - 2026-07-27: 用户授权后已写入 event `426` 的 Del Mar 官方 post time

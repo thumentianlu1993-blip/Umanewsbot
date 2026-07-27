@@ -17,13 +17,15 @@
   JSONL 自报完整性并缺少 target 来源核对。两项 P1 已补 RED 并在同一分支修复：英美输出
   路径完全分离，recovery audit 只接受 state 中绑定 SHA/size 的标准 combined artifact，
   同时逐场核对 `source_provider/racing_region`。
+- 同一 reviewer 已对修复 head `c4ce802c` 完成 closure review，结论
+  `VERDICT: APPROVED`、无 findings；全程只读、未联网、未改文件。两个 P1 均已关闭。
 - finding 修复后相关回归为 `142 tests / 141 passed / 1 skipped`；Django check、无迁移漂移、
   `py_compile`、OpenSpec strict/all（`38/38`）与 `git diff --check` 均通过。Eddie Read
   已由 Racing Post 完整结果与 DRF 赛后文字交叉确认第 5–8 名依次为
   Seal Team、Almendares、Mondego、Mi Hermano Ramon；该结论仍是第三方候选，Del Mar 官方
   chart 当次复核尚不可用，不能提升为 confirmed。
 - 修复位于 `codex/fix-race-result-recovery-completeness` 并已提交、推送至草稿 PR `#33`；
-  当前复审 finding 修复尚待新 head 推送与同一 reviewer 复审。尚未合并或部署；
+  独立复审已通过。PR 尚未合并或部署；
   生产仍运行 `main@e2ae3efe` 对应应用镜像，现有 candidate 与常驻关闭开关未改变。
 
 ## 2026-07-27 event 426 时间修正后已执行一次性联网 prepare，4/40 形成候选
