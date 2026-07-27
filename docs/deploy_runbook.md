@@ -6740,6 +6740,11 @@ python manage.py complete_horse_profiles \
 精确方案见 `docs/changes/automate-race-event-lifecycle/rollout.md`。阶段 A 已实现，
 56 项测试通过；当前代码审查进行中，未部署、未写生产。
 
+## 2026-07-27 生命周期阶段 A 关闭态更新
+
+阶段 A 后续已部署但显式关闭，生产 dry-run 已完成；shadow/enforce 未授权。恢复点和证据见
+`docs/changes/automate-race-event-lifecycle/production_release_20260726.md`。
+
 ## The Racing API schema v2 proof runner 候选操作边界
 
 - 当前候选新增 `run_race_live_source_proof --region <region>`；schema v2 缺失或非法 region
@@ -6957,3 +6962,24 @@ python manage.py complete_horse_profiles \
 5. 下一门禁：
    - 先在网络关闭状态重建并审核精确 40 条 expected-target snapshot 与 source-scoped
      adapter 输入；之后必须取得新的有界联网 prepare 授权，旧授权不得复用。
+
+## 阶段 B0.1 赛后内部参考源发布边界
+
+Sporting Life、ZEturf、HRN 只允许进入 internal reference 链。正式实现后仍按下列独立门禁：
+
+1. 先完成测试先行、实现、完整回归和独立代码 review；
+2. 最新 review 后另取 commit/push/PR 授权；
+3. 部署授权只允许新增 schema/code/one-shot 命令；不增加 Celery/Beat/task/queue/worker；
+4. 部署时不得联网、record、改公开赛事、启动 lifecycle/race-live 或处理积压；
+5. one-shot 网络 dry-run 需要新的联网授权，只写受限 cache/artifact；
+6. 内部 record 需要新的业务写入授权，只写 reference run/payload/receipt；
+7. 连续观察再单独授权，由每天逐来源的 manifest-bound one-shot collect/record 构成；
+8. 不存在把内部参考 observation 公开或 apply 的部署步骤。
+
+部署前还必须修复并 review 既有双重 migration 执行入口，确保只有一个进程执行
+`migrate --noinput`。阶段 B0.1 若包含 additive migration，不得依赖容器重启从 `DuplicateTable`
+恢复。
+
+回滚顺序：停止后续 one-shot -> 确认当前命令已结束/中止且没有数据库事务 -> 必要时回滚镜像。
+reference 审计默认保留；由于它不改变公开对象，禁止顺带批量回改 `RaceEvent`、runner/result、
+revision、新闻或 QQ。

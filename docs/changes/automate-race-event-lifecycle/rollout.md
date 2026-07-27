@@ -35,6 +35,8 @@
 - 既有 `RACE_LIVE_ENABLED_REGIONS=`
 
 不得用一个总开关同时启用生命周期、新闻绕过和赛果来源。
+阶段 B0.1 不增加内部参考配置开关或 Celery 调度；只接受 manifest-bound one-shot 命令。内部
+参考链也不设计 publication/apply 开关，不存在通过配置把内部观察公开的合法路径。
 
 ## 3. 阶段 A 发布
 
@@ -95,6 +97,8 @@ allowlist 至少包含：
 ## 4. 阶段 B/C/D
 
 - B：每个 provider 单独 proof、registry、预算和授权；先 candidate-only，再 field enforce。
+- B0.1：Sporting Life、ZEturf、HRN 先进入独立 internal reference run/payload/receipt，永不进入
+  candidate apply、public projection、新闻或 QQ。
 - C：classifier shadow -> soft-gate bypass -> field auto apply 三步分开；先用人工 gold set，
   建议 precision >= 98%、错误赛事写入为 0。
 - D：先 shadow observation，再单 event provisional；official 仅官方 authority/marker。
@@ -128,6 +132,22 @@ JRA rollback 演练顺序：关闭 provider mode -> 撤销活动 fencing token/�
 3. 新赛果来源；
 4. 全历史状态修正。
 
+### 4.1 阶段 B0.1 赛后内部参考源
+
+1. **离线 GREEN**：只运行冻结 fixture/parser/reference schema/隔离测试。
+2. **关闭部署**：新增 schema/code/命令，但不增加 Beat/task/queue/worker；零网络、零业务写入。
+3. **one-shot 网络 dry-run**：每来源使用精确 event manifest 和请求上限，只写受限 raw cache/
+   artifact，不写数据库；需要单独联网授权。
+4. **小范围 internal record**：每来源最多少量已人工核对赛事，只写 reference 三表；需要独立
+   业务写入授权。
+5. **连续观察**：至少 7 天，覆盖英国、法国、美国各一个真实赛日；每天每来源使用新 manifest
+   显式执行 one-shot collect/record，不启用 lifecycle、race-live、新闻或 QQ 新行为。
+6. **观察报告**：覆盖率、首次可用时间、字段完整率、partial、match conflict、403/429/timeout、
+   request/cache 数；公开对象变化必须为 0。
+
+扩大内部观察也必须按来源分别授权。Sporting Life、ZEturf、HRN 的连续观察成功不构成公开数据
+源 proof，不会提高 field/result authority。
+
 ## 5. 观察门禁
 
 每阶段至少观察：
@@ -137,6 +157,7 @@ JRA rollback 演练顺序：关闭 provider mode -> 撤销活动 fencing token/�
 - 每 provider request/429/403/timeout/circuit；
 - 状态错误率、字段冲突率；
 - provisional 到达时间、official overdue；
+- internal reference matched/ambiguous/partial、来源延迟与 route/schema drift；
 - 新闻 impact precision、特殊发布数、hard blocker 分布；
 - 重复公开/重复 QQ 必须为 0；
 - Celery queue age、active/reserved、数据库锁；
@@ -155,6 +176,10 @@ JRA rollback 演练顺序：关闭 provider mode -> 撤销活动 fencing token/�
 3. 保持 audit/revision，不删除证据；
 4. 停止新 selector claim，等待 active claim TTL/安全完成；
 5. 必要时回滚应用镜像。
+
+内部参考链没有常驻 collection 或 queue。回滚时停止后续 one-shot 命令并保留
+run/payload/receipt 审计；它不应需要回滚任何公开赛事、赛果、新闻或 QQ。raw cache 清理按
+保留策略另行执行，不作为紧急回滚的一部分。
 
 `RaceEvent.status` 回滚不能简单批量改回 scheduled。只允许使用 enforce 前冻结 manifest，
 逐场核对当前 generation、后续人工/高权威变化、结果 revision 后生成反向 candidate；有漂移
@@ -181,6 +206,9 @@ JRA rollback 演练顺序：关闭 provider mode -> 撤销活动 fencing token/�
 
 ## 8. 当前发布状态
 
-`NOT AUTHORIZED / NOT IMPLEMENTED / NOT REVIEWED FOR CODE / NOT DEPLOYED`
+阶段 A：`DEPLOYED DISABLED / DRY-RUN COMPLETED / SHADOW NOT AUTHORIZED`
 
-本轮方案通过后也只进入“等待实现确认”，不是发布授权。
+阶段 B0.1：`PLAN REVIEW APPROVED / WAITING IMPLEMENTATION AUTHORIZATION / NOT IMPLEMENTED /
+NOT REVIEWED FOR CODE / NOT DEPLOYED`
+
+本轮方案通过后也只进入阶段 B0.1“等待实现确认”，不是发布、联网或生产写入授权。

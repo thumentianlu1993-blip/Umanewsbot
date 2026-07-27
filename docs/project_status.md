@@ -1718,3 +1718,147 @@ P0 马信息补全专项的模型交接文档见
   且修复一个既有日历查询数失败。OpenSpec、Django、迁移、Compose、编译和 diff 门禁通过。
 - 首次独立原生只读审核的 6 项 finding 已修复，正在由同一 reviewer 限定复审。当前仍是
   未提交本地实现；尚未部署、联网生成 candidate、人工批准 official receipt 或写生产库。
+## 2026-07-27 赛事生命周期阶段 B0.1 赛后内部参考源规划
+
+- 阶段 A 已在生产关闭态部署并完成 35 场零写 dry-run；`false/off` 未改变。
+- TRA schema v2 runner 修复已随 PR `#27` 合入 `main`，但没有因此授权新的联网或 provider
+  启用。
+- Sporting Life、ZEturf、HRN 现固定为内部参考源：解析器保留，新增观察不公开、不 apply、
+  不产生 official/provisional projection，也不触发新闻或 QQ。
+- 阶段 B0.1 只处理现有 parser 的 finished 赛后入口，采用 run/payload/receipt 和逐日
+  one-shot，不增加 Celery/Beat。
+- 阶段 B0.1 spec/design/test/tasks/rollout 与自包含实现交接正在方案审核；当前没有新测试、
+  代码、迁移、配置、联网、生产写入或发布。
+- 独立 reviewer 前两轮 `REVISE` findings 已全部反映到修订稿；同一会话第三轮
+  `APPROVED`，无开放 P0/P1/P2。当前等待用户实现授权。
+
+## 2026-07-27 赛事生命周期阶段 B0.1 已通过第十七轮 review，最新 main 集成待复审
+
+- 已按真实 RED 完成三源内部 reference 的 run/payload/receipt、只读 Admin、parse-only
+  parser、安全 HTTP 和四个 one-shot 管理命令；没有 Celery/Beat/worker 或公开写入链。
+- B0.1 首轮 SQLite `41/41`；代码 review 的 4 项 P2 均先补真实 RED 后修复，当前
+  首轮为 `45/45`。第二轮限定复审另 4 项 P2 也按真实 RED 修复，当前 SQLite `49/49`、
+  第三轮新增 1 项 P1 与 3 项 P2 修复后为 SQLite `53/53`，第四轮剩余 2 项 P2 修复后为
+  SQLite `60/60`，第五轮新增 4 项 P2 修复后为 SQLite `64/64`，第六轮新增 5 项 P2
+  修复后为 SQLite `69/69`，第七轮新增 3 项 P2 修复后为 SQLite `78/78`，第八轮为
+  `80/80`，第九轮为 `82/82`，第十轮为 `84/84`，第十一轮为 `87/87`，第十二轮为
+  `89/89`，第十三轮为 `93/93`，第十四轮为 `96/96`，第十五轮为 `98/98`，第十六轮为
+  `104/104`；临时 PostgreSQL reference `3/3`、
+  lifecycle PostgreSQL `5/5` 通过，历史 HTTP/parser 回归
+  `82/82 GREEN / 4 conditional skips`。临时 PostgreSQL 16 容器已删除，未连接生产库。
+- 两组 `141` 项扩展回归各有 1 项纯 `origin/main` 可复现的既有失败；historical batch
+  扩展矩阵的 `18 errors / 7 skips` 也可在纯主线复现，代表性原因为 macOS
+  `/var` 与 `/private/var` 规范化差异。
+- Django、migration drift、编译、diff 与 workflow contract 通过。Compose 因隔离 worktree
+  缺 `.env` 尚未完成；本轮没有 Compose 配置变更。
+- 独立 reviewer session `019fa021-3552-7f23-a17f-2cae48ccc4bb` 对原 fingerprint
+  `f2463878ffa4011aa91cf5b3cd7c5fe817b66157691e9eaf6e309640623695cd`
+  给出 `VERDICT: REVISE`，P0/P1 均为 0，4 项 P2 为 collect 误绑定、ZEturf `R/C` 证明、
+  `source_only` `KeyError` 和 report 多日指标。
+- 同一 reviewer 第二轮 inner session `019fa02f-1976-7d10-b177-a18a0216591e` 对
+  fingerprint `561cdbf66dd3a26c702366bd113d2aed197dc98446eec34856d2c2c1350e9200`
+  仍给出 `REVISE`，4 项直接 P2 为 record racecourse 独立重验、report frozen event/date
+  过滤和默认开发 Compose parser 可见性。四项已用真实 RED 修复，parser 单一实现已迁至
+  `server/stable` 并由 compat wrapper/历史 CLI 复用；该轮修复后进入第三轮限定复审。
+- 第三轮 inner session `019fa044-4483-72e1-b836-53e6900df34c` 对 fingerprint
+  `22675d91cb097737bb678bd547874cce1ae1d7c481f416710911740a24981f06`
+  确认上一轮 4 项 P2 全部关闭，但仍给出 `REVISE`：1 项 P1 是全局 HTML MIME 破坏
+  PDF/JSON/XML，3 项 P2 是 ZEturf `NP`、HRN 国家后缀与 Sporting Life 下划线状态。
+  修复已测试先行完成：MIME opt-in、collect 显式 HTML/XHTML、三 parser 规范化并保留 raw；
+  该轮修复后进入第四轮限定复审。
+- 第四轮 inner session `019fa051-bcf9-7e71-bd04-f11090fe8112` 对 fingerprint
+  `a3f862fd93041831250fe855e383ee911843f6eb940433604c5a08b1f835b63b`
+  关闭第三轮 3 项 finding、部分关闭 Sporting Life description，仍以 2 项 P2 返回
+  `REVISE`：`ride_description` 下划线和 manifest parser identity 未绑定实际模块。两项均已
+  先补真实 RED 后修复；service/build/collect/record 现按实际 stable 模块常量 fail closed。
+  该轮修复后进入第五轮限定复审。
+- 第五轮 inner session `019fa062-e917-76e2-aacd-e807fb0f1f9b` 对 fingerprint
+  `50b50866f19853534daad66c9a2cd18650d4d74cafbfebec106b09c8b36c274d`
+  确认第四轮 2 项 P2 全部关闭，但新增 4 项 P2 并返回 `REVISE`：transport-only circuit、
+  parse failure raw、HRN race block 与固定 15 秒 timeout。四项均已先补真实 RED 并修复，
+  该轮修复后进入第六轮限定复审。
+- 第六轮 inner session `019fa071-ca82-7b80-9af1-d4725efb6c` 对 fingerprint
+  `41307729d9896c7fbd721b2e8864177990a7d190d3c25011b53a0bf284db0d87`
+  确认第五轮 4 项 P2 全部关闭，但新增 5 项 P2 并返回 `REVISE`：失败请求计数、HRN alias、
+  ZEturf `FR + NP`、重复指标与 event-filtered run count。五项均已先补真实 RED 并修复，
+  该轮修复后进入第七轮限定复审。
+- 第七轮 inner session `019fa07f-90e2-7f60-b08d-125e01d55ba3` 对 fingerprint
+  `6dd68951fe0ff90847c74f3873fb0539eec8226441473c294e7c444591ebba1a`
+  确认第六轮 5 项 P2 全部关闭，但新增 3 项 P2 并返回 `REVISE`：ledger 完整性、
+  unknown completeness 和 matched receipt `SET_NULL` 约束。三项均已先补真实 RED 并修复，
+  该轮修复后进入第八轮限定复审。
+- 第八轮 review session `019fa08e-e782-7d31-9cbc-921bb3b4efbd`、fingerprint 前缀
+  `d98034f…` 的唯一 P2 是 runtime safe HTTP 会被默认开发 bind mount 遮蔽。3 项真实 RED
+  后已改为 stable 唯一实现、runtime 兼容 wrapper、collect 直接 import stable；当前
+  B0.1 `80/80`、历史 HTTP/parser `81/81`（4 skip）。
+- Django、migration drift、编译、workflow 与 diff 通过；错误的整仓/app 容器挂载失败是
+  验证环境误用，不是产品失败。Compose config 因 worktree 缺 `.env` 仍未执行成功。
+- 第九轮 session `019fa09e-88c5-7180-a678-39874ff6e045` 对 fingerprint
+  `84e8f4fafc4db634911c9aa18f6f473bdba12078e2957072a660434505c5ce6f`
+  返回 `REVISE`（1 P1、3 P2）：runtime CLI `sys.path`、event/raw 逐场绑定、
+  `error_summary` 与无 receipt 失败 run 报告。四项真实 RED 后已修复，当前 B0.1
+  `82/82`、历史 HTTP/parser `82/82`（4 skip），项目 venv CLI `--help=0`。
+- 第十轮 session `019fa0ad-c024-7a21-8ebb-31b19df760ab` 对 fingerprint
+  `abbc00318318447abb86627ffe29a076012f8eceee4aa1b8d3f6c0c157dc4b20`
+  仍返回 `REVISE`，唯一 P2 是 observations 必须与 `outcome=parsed` ledger event 精确
+  一一对应，`parse_error` 必须零 observation。2 项真实 RED 后已最小修复，既有正向
+  fixture 改为合法 `parsed + observation` 且 replay 继续验证；当前 B0.1 `84/84`、历史
+  HTTP/parser `82/82`（4 skip），Django、migration drift、编译、workflow 与 diff 通过。
+- 第十一轮 session `019fa0b9-b2c8-77d0-9473-7caff58d87eb` 对 fingerprint
+  `ef778594f1d471a239432c6bd65054dcb2491fb918c46a660ea321436a827b0d`
+  仍返回 `REVISE`（2 P2）：共享 safe HTTP 默认 `4MiB / 2 跳` 破坏 legacy 大
+  PDF/redirect，跨日 run 的单日报告错误误归。纯 `origin/main` 调查确认旧 transport
+  无 body cap 且 `urllib` 默认处理 redirect；3 项真实 RED 后，legacy 默认不自定义这些
+  限制，collect 显式保留 `4MiB / 2 跳`，report 按 event/date 归属并单列
+  `unattributed_errors`。当前 B0.1 `87/87`、历史 HTTP/parser `82/82`（4 skip），Django、
+  migration drift、编译、workflow 与 diff 通过。
+- 第十二轮 session `019fa0c7-7f55-7960-9f5d-5b81ba13437c` 对 fingerprint
+  `6b0246db6647786e351492822d86f70a8dd15dbb272a19a6a34a324f15ca7b3b`
+  仍返回 `REVISE`（2 P2）：matched 未核对来源赛事名，单日无 receipt 错误未回退 run
+  唯一日期。反例 RED 后复用 race-live exact normalized alias 合同，manifest 冻结
+  `normalized_accepted_race_names` 并纳入 snapshot SHA，record 要求 exact membership；
+  single-day fallback 已补齐，过时 fixture 已修正。当前 B0.1 `89/89`、race-live
+  `23/23`、历史 HTTP/parser `82/82`（4 skip），真实 PostgreSQL 并发/锁 `2/2`、
+  `SET_NULL` `1/1` 且临时容器已删除；Django、migration drift、编译、workflow 与 diff 通过。
+- 第十三轮 session `019fa0db-0a80-72c0-a6ad-bb1142432a83` 对 fingerprint
+  `384ef97820f9e6d9c0c8f6df7190f1fb546746570aff018379b742a41e3b0c00`
+  仍返回 `REVISE`（3 P2）：collect 异名未降 `source_only`、多日错误 detail 缺
+  `local_date`、`--event-id` 漏无 receipt 匹配错误 run。3 项真实 RED 后，collect 改为
+  exact frozen name 分类，ledger 逐 event 冻结日期并由 record 核验，event filter 按错误
+  detail 纳入 run 且隔离其他错误；6 个旧 fixture 已补字段。当前 B0.1 `93/93`、
+  race-live `23/23`、历史 HTTP/parser `82/82`（4 skip）、真实 PostgreSQL `3/3` 且临时
+  容器已删除；Django、migration drift、编译、workflow 与 diff 通过。
+- 第十四轮 session `019fa0ea-65a3-7383-b208-c0f571e7b98a` 对 fingerprint
+  `18ac8b531f2d123b132fbe45104999feeea814315087ac6e4cdc0d043a4baeae`
+  仍返回 `REVISE`（2 P2）：record 丢 artifact 采集窗口，无 receipt 失败 run 不计
+  `duplicate_runs`。RED 锁定最早 ledger `fetched_at` 至 artifact `completed_at`，拒绝
+  逆序/naive/显著未来，并覆盖同 event/day 重复失败 run；修复增加 5 分钟 clock skew、
+  原子保存签名窗口，并统一 receipt/error-detail run membership。当前 B0.1 `96/96`、
+  race-live `23/23`、历史 HTTP/parser `82/82`（4 skip）、真实 PostgreSQL `3/3` 且临时
+  容器已删除；Django、migration drift、编译、workflow 与 diff 通过。
+- 第十五轮 session `019fa0fa-b908-7d43-9f7e-807bf132a9a3` 对 fingerprint
+  `59ffcb96972cef74dcff8df87e5a9d1b0f3923ecf59f5f5b594e58e48594424f`
+  仍返回 `REVISE`（2 P2）：只校验最早 ledger 时间，observation provenance 的
+  `fetched_at/final_url` 未逐 event 绑定。重签 artifact 反例 RED 后，record 要求
+  `max(ledger fetched_at) <= artifact.completed_at`，且 observation 的 URL、时间及
+  raw/ref/hash 与 manifest、parse ledger、response 逐 event 精确一致。当前 B0.1
+  `98/98`、race-live `23/23`、历史 HTTP/parser `82/82`（4 skip）、真实 PostgreSQL
+  `3/3` 且临时容器已删除；Django、migration drift、编译、workflow 与 diff 通过。
+- 第十六轮 session `019fa106-3b52-7a02-b756-31f718ffe4d0` 对 fingerprint
+  `571664940ea3e77b60368fe4ddf72292404060fedfb27f281d6b7f7d1f815cc7`
+  仍返回 `REVISE`（唯一 P2）：Payload/Receipt
+  `QuerySet.update/bulk_update/delete` 可绕过 append-only。6 项真实 RED 和 5 项实例/
+  `SET_NULL` 正例后，专用 QuerySet/Manager 拒绝 Payload 全部批量变更；Receipt 仅允许
+  Collector 精确清空 event FK，其他均拒绝；无需迁移。当前 B0.1 `104/104`、race-live
+  `23/23`、历史 HTTP/parser `82/82`（4 skip）、真实 PostgreSQL `3/3` 且临时容器已删除；
+  Django、migration drift、编译、workflow 与 diff 通过。
+- 第十七轮 session `019fa113-9c02-7c63-b48d-466c40d323cf` 对 fingerprint
+  `5095a06e326a9cef470f4ef5d2111c87e8daa77a45fbc9507a27b024369edea7`
+  给出 `APPROVED`，P0/P1/P2/P3 为 0，审前审后 fingerprint 一致。
+- 用户授权发布后，fetch 发现 `origin/main` 已前进到 `6ac08e40`。候选已迁移到该最新主线，
+  同时保留上游 recovery-mode/结果完整度与 B0.1 stable parser 委托。集成后 B0.1
+  `104/104`、race-live `23/23`、历史 HTTP/parser `82/82`（4 skip）、真实 PostgreSQL
+  `3/3` 通过；上游新增组合的 `14/87` macOS 路径错误在纯最新 main 精确复现。
+- 系统 Python 缺 `bs4` 属于环境误用，不是产品失败；Compose 仍未验证。
+- 当前未联网、未 commit/push/PR、未部署、未执行生产迁移或生产写入；latest-main 集成版本
+  必须先复用同一 reviewer 完整只读复审，再针对新 fingerprint 取得发布授权。

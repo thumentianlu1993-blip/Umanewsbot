@@ -2236,3 +2236,20 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   且使用 PostgreSQL advisory lock 与 row lock。
 - 本地实现、代码审核、部署、联网 candidate prepare、人工 official 审批和生产 apply
   是独立授权点；任一前置完成不授权后续动作。
+## 2026-07-27 Sporting Life、ZEturf、HRN 固定为内部参考源
+
+- 用户已与三方确认本站可保留现有解析器并低频使用；项目记录该确认作为当前使用边界，不在
+  仓库保存敏感往来内容。
+- 三源新增生命周期观察统一为 `internal_reference`：允许内部采集、匹配、版本比较和后台查看，
+  不允许公开展示、字段 apply、赛果 authority、新闻引用自动发布或 QQ 分发。
+- 内部参考链必须使用独立 run/payload/receipt 模型和只读后台；禁止直接复用
+  `import_race_event_detail_candidates --apply`、`RaceEventDataCandidate`、race-live revision/
+  projection。
+- Sporting Life 不能产生英国 official，ZEturf 不能覆盖 France Galop，HRN 的 payout/
+  also-rans 不能冒充完整正式结果。
+- 本决定不追溯修改按既有历史赛事审核流程已经导入的数据。未来若要人工采纳内部观察，必须
+  另立 change，不在阶段 B0.1 提供 promotion action。
+- 阶段 B0.1 只处理现有 parser 的 `finished` 赛后入口，不注册 Celery/Beat；多日观察使用逐日
+  manifest-bound one-shot。赛前 route 或无人值守调度属于后续独立范围。
+- 阶段 B0.1 与 TRA/官方赛前同步分开 review、开关、联网和生产写入授权；连续观察成功也不会
+  自动提高来源 authority。
