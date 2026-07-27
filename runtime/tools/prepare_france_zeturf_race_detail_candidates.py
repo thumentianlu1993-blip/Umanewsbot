@@ -198,11 +198,17 @@ def _zeturf_url(event: dict, *, r_number: int, c_number: int) -> str:
     return f"{BASE_URL}/fr/course-du-jour/{event['local_date']}/R{r_number}C{c_number}-{course_slug}-{race_slug}"
 
 
-def _read_events(path: Path) -> list[dict]:
+def _read_events(
+    path: Path,
+    *,
+    recovery_mode: bool = False,
+) -> list[dict]:
     events = []
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         for row in csv.DictReader(handle):
-            if row.get("status") == "finished":
+            if row.get("status") == "finished" or (
+                recovery_mode and row.get("status") == "scheduled"
+            ):
                 events.append(row)
     return events
 
@@ -387,7 +393,10 @@ def prepare_candidates(args) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     source_dir = output_dir / "sources"
     source_dir.mkdir(exist_ok=True)
-    events = _read_events(Path(args.events_csv))
+    events = _read_events(
+        Path(args.events_csv),
+        recovery_mode=bool(getattr(args, "recovery_mode", False)),
+    )
     events = _filter_events(events, start_date=args.start_date, end_date=args.end_date)
     if args.limit:
         events = events[: args.limit]
@@ -426,6 +435,8 @@ def prepare_candidates(args) -> dict:
                 "modules": {"runners": {"items": runners}, "results": {"items": results}},
                 "metadata": {**metadata, "zeturf_r": item["r"], "zeturf_c": item["c"], "title": item["title"]},
             }
+            if str(event.get("event_id") or "").strip():
+                record["event_id"] = int(event["event_id"])
             jsonl.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
             summary["events"] += 1
             summary["runner_items"] += len(runners)
@@ -457,6 +468,7 @@ def main() -> None:
     parser.add_argument("--events-csv", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--allow-network", action="store_true")
+    parser.add_argument("--recovery-mode", action="store_true")
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--start-date", default="")
     parser.add_argument("--end-date", default="")

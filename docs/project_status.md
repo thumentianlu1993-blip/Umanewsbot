@@ -1,5 +1,17 @@
 # 项目状态文档
 
+- 2026-07-27: 已在最新 `origin/main@6fcac8f1` 上完成非 JRA recovery mode、target
+  `event_id` 回传与全来源完整名次 fail-closed 修复；新增门禁覆盖缺参赛名单、缺马、重复身份、
+  无效名次及 discovery-only，相关回归 `137 passed / 1 skipped`，静态与 OpenSpec strict
+  校验通过。Eddie Read 完整候选顺序
+  已由 Racing Post 与 DRF 交叉确认，但 Del Mar 官方 chart 尚不可用，仍不得 confirmed。
+  当前分支尚未提交、发布或部署，生产状态不变。
+- 2026-07-27: 用户授权后已写入 event `426` 的 Del Mar 官方 post time
+  `2026-07-27T01:10:00Z`，不含赛果写入。新 inventory 仍为 59 行/50 组和精确 40 场缺口；
+  一次性 prepare 实际使用 `12/75` 请求，仅 4 场 JRA 形成赛果候选。Sporting Life/ZEturf
+  因 scheduled 过滤静默空跑，TOBA 返回 403，故 task 4.3 仍未完成。Eddie Read 人工复核前四
+  为 Gold Phoenix、Cabo Spirit、Formidable Man、Stay Hot，但尚未进入受审 candidate/receipt。
+  常驻开关仍全关，生产赛果仍零写入。
 - 2026-07-27: 联网 prepare 阻断修复已由 PR `#30` 合并并关闭态部署到
   `main@e2ae3efe`、镜像 `sha256:e0a2d3d6…61a3`。联网 prepare 的
   recovery expected-target、source-scoped adapter input 和 JRA list/受控请求上下文已在独立

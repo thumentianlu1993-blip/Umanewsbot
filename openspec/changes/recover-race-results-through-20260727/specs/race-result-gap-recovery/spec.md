@@ -18,6 +18,14 @@
 - **WHEN** 候选只有第三方结果或官方页面无法确认完整 finish order
 - **THEN** 目标必须保持 `blocked_with_evidence`，不得伪造 confirmed 终态，且 run 必须保持 partial/blocked
 
+#### Scenario: 来源只列出 Also Ran 而没有完整名次
+- **WHEN** 来源仅给出前若干名，并把其余完赛马统一标为 `Also Ran`、`N/A` 或其他无顺序状态
+- **THEN** adapter 不得按页面顺序补造后续名次，candidate 必须标记 `result_order_complete=false`，coverage 以 `incomplete_result_order` 阻断该场
+
+#### Scenario: 任一恢复来源无法证明完整排名
+- **WHEN** candidate 缺少 target `event_id`、完整参赛名单、任一非退赛马的结果、连续唯一的内部名次，或仅包含 discovery-only winner
+- **THEN** candidate 不得进入可写入状态；系统必须保留精确缺项，并以 coverage blocker 阻断该场
+
 #### Scenario: 清单中已有取消或延期终态
 - **WHEN** inventory 生成时赛事已是 `cancelled/postponed` 且身份在后续步骤未漂移
 - **THEN** 目标保持既有终态且不得创建赛果行

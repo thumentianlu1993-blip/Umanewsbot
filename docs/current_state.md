@@ -1,5 +1,53 @@
 # 当前状态
 
+## 2026-07-27 非 JRA recovery mode 与完整名次门禁已本地修复，尚未发布
+
+- 生产首轮 prepare 暴露的 NAR/Sporting Life/ZEturf `scheduled` 静默过滤已补有效 RED。
+  runner 现在仅在 `purpose=race_result_recovery` 时向四类详情 adapter 传入
+  `--recovery-mode`；普通模式继续只接受 `finished`。
+- Sporting Life 若只给前若干名并将其余完赛马标为 `Also Ran/N/A`，不会按页面顺序补造名次。
+  聚合层现对所有 recovery 来源强制核对冻结 `event_id`、完整参赛名单、非退赛马覆盖、
+  连续唯一内部名次与非 discovery-only；任一不满足均写入 `result_order_complete=false`，
+  coverage 以 `incomplete_result_order` 阻断。
+- source-scoped adapter CSV 现携带生产 `event_id`，JRA、NAR、Sporting Life、ZEturf 与
+  TOBA candidate 会原样回传，coverage 可以唯一绑定目标，不再把合法结果误列为
+  `candidate_event_id_missing`。
+- 新增门禁 RED→GREEN 已通过；adapter/orchestration 相关回归为 `138 tests / 137 passed /
+  1 skipped`，Django check、无迁移漂移、`py_compile`、OpenSpec strict 与 `git diff --check`
+  均通过。Eddie Read 已由 Racing Post 完整结果与 DRF 赛后文字交叉确认第 5–8 名依次为
+  Seal Team、Almendares、Mondego、Mi Hermano Ramon；该结论仍是第三方候选，Del Mar 官方
+  chart 当次复核尚不可用，不能提升为 confirmed。
+- 修复位于 `codex/fix-race-result-recovery-completeness`，尚未提交、推送、创建 PR、合并或部署；
+  生产仍运行 `main@e2ae3efe` 对应应用镜像，现有 candidate 与常驻关闭开关未改变。
+
+## 2026-07-27 event 426 时间修正后已执行一次性联网 prepare，4/40 形成候选
+
+- 用户明确授权写入 event `426` 的官方开赛时间。生产事务将 `race_datetime` 从 `null`
+  更新为 `2026-07-27T01:10:00Z`，来源为 Del Mar 2026-07-26 Race 9 官方 entry
+  （当地 post time `18:10`）；`status/local_start_time` 未改，赛果行仍为 `0`。写前快照
+  SHA-256 为 `ce8e5fb9…1d53`，写入回执 SHA-256 为 `59627477…c74`，并新增
+  `race_event_official_start_time_set` 审计。
+- 新 inventory `inventory-20260727T060200Z.json` 仍满足 `59 event rows / 50 race groups`，
+  分类保持 `40 missing + 9 duplicate-zero + 9 duplicate-confirmed + 1 provisional`；
+  文件 SHA-256 `327e8c16…0aa3`、manifest SHA-256 `d569534a…cfda`。event `426/427`
+  均为 `result_due=true`，精确 40 场 ID 不变。
+- run `prepare-20260727T060300Z` 的 expected targets 为 `40`、preflight blocker 为 `0`；
+  expected-target SHA-256 `5e444a53…03b`，审批 SHA-256 `87464712…0ca3`。一次性 one-off
+  容器联网 prepare 已运行，实际请求 `12/75`，runtime 总大小约 `1.24 MiB`。
+- JRA 官方详情形成 4 场候选、58 条 result item，combined candidate SHA-256
+  `033fc60d…489c`。NAR 仅形成一场 racecard 候选、没有 result item；Mercury Cup 被上游页面
+  判为 `racecard_not_published`。TOBA 2023–2026 四个年度页均返回 HTTP 403。
+- 英国/美国 Sporting Life 与法国 ZEturf adapter 因仍只读取 `status=finished`，对 recovery
+  CSV 中合法保留的 `scheduled` 目标产生 `events=0` 的静默空跑；因此 Eddie Read 未进入
+  runner candidate。人工联网复核确认其前四名为 `#5 Gold Phoenix / #3 Cabo Spirit /
+  #8 Formidable Man / #6 Stay Hot`，`#1 Astronomer` 退赛，但该网页证据尚未转换为受审
+  recovery candidate/receipt。
+- 四个常驻应用容器的 scheduler、monitor、runner、lifecycle、historical backfill/network
+  八项仍全部关闭。40 个目标的生产 `RaceEventResult` 行为 `0`，event 426 赛果为 `0`，
+  没有 `race_result_recovery_apply` 审计；本轮只写 event 426 的获批时间元数据，未写赛果。
+  task 4.3 仍未完成，下一步必须修复并重新发布非 JRA adapter 的显式 recovery mode，不能改写
+  CSV status、直接绕过 runner 或把空跑声明为完成。
+
 ## 2026-07-27 PR #30 已合并，联网 prepare 阻断修复已关闭态部署
 
 - 修复提交 `00979dc443979ef0d982ae7776c3ff7dfb3d0572` 经 PR `#30` 合并为

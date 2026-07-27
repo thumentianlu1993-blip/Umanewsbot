@@ -1,5 +1,19 @@
 # 关键决策
 
+## 2026-07-27 recovery adapter 不得以成功空跑替代 scheduled 目标处理
+
+- inventory 中 `scheduled + result_due=true` 是本次历史赛果恢复的合法冻结状态；显式
+  recovery mode 必须贯穿 JRA、NAR、Sporting Life 和 ZEturf 等存在状态过滤的详情 adapter，
+  普通模式继续只接受 `finished`；TOBA discovery 继续按精确 target scope 执行。
+- adapter 对精确输入产生 `events=0` 时，即使命令 return code 为 0，也必须按未覆盖 target
+  形成 blocker；不得把空 candidate/review CSV 解释为 prepare 完成。
+- source-scoped CSV 必须携带冻结生产 `event_id` 并由 candidate 回传。聚合层对所有来源独立
+  校验完整参赛名单、所有非 `withdrawn/scratched` 马的结果覆盖、连续唯一内部名次及
+  discovery-only 标记；缺一项即 `incomplete_result_order`，`Also Ran` 页面顺序不得成为名次。
+- 本轮不通过手改 CSV status、直接运行 adapter 或手工拼接 combined candidate 绕过 runner。
+  非 JRA adapter 的恢复状态过滤需按测试、独立 review、release、关闭态部署后再重新联网；
+  已取得的网页赛果只能作为人工审核线索，未进入 receipt 前不得授权生产 apply。
+
 ## 2026-07-27 recovery adapter 输入按来源分片，JRA 同时服从两层请求账本
 
 - `race_result_recovery` plan 必须同时绑定 inventory 文件路径、文件 SHA-256 与内部
