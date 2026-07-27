@@ -6792,3 +6792,20 @@ python manage.py complete_horse_profiles \
    - transport 请求 `0`、manual-only 请求 `0`、candidate/source cache `0`、赛果业务写入 `0`。
    - 禁止绕过 runner。先修 recovery event-ID snapshot 和 JRA 受控请求输入，完成新一轮测试、
      独立 review、发布和联网授权后再执行。
+# 2026-07-27 赛果恢复联网 prepare 阻断修复发布前门禁
+
+- PR `#29` 已合并为 `main@e7dc1b20aa36b311ade2497b96a62b15451942d2`；当前修复分支为
+  `codex/fix-race-result-recovery-prepare`，未发布、未部署、未触网。
+- 修复版部署前必须取得最新独立代码审核和精确 release 授权。部署继续保持 race-live、
+  lifecycle、historical network/apply、scheduler 和 publication 全关闭。
+- 部署后不得沿用此前已消耗的联网授权。应先在网络关闭状态用冻结 plan 重新生成 40 条
+  expected-target snapshot；plan 必须绑定 inventory 文件路径、文件 SHA 和内部 manifest SHA，
+  同时必须携带当前批准的 `source_map_version` 并精确匹配 40 场 source map，再通过数据库
+  drift verifier。随后核对 JRA/NAR 与 TOBA/Sporting Life 的 source-scoped CSV，
+  审批 snapshot 后再取得新的有界联网授权。
+- JRA 执行时必须同时出现共享 `request_budget.json` 和
+  `control/jra_detail.request-state.json`/host-state 证据；总请求仍 `<=75`、单请求
+  `<=30s`、间隔 `>=1s`、source cache `<=512 MiB`，每个 redirect 分别计数，manual-only
+  请求数必须为 0。JRA scheduled 目标仅可通过 plan 注入的显式 recovery mode 读取。
+- 任一 event 消失、地区/adapter input 漂移、request policy 摘要变化、来源交叉分片或预算账本
+  缺失都停止，不得手工构造 snapshot、复用旧 approval 或直接运行 adapter。

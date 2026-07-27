@@ -9,7 +9,7 @@ import time
 from contextlib import ExitStack
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Mapping
+from typing import Callable, Mapping
 from urllib.parse import parse_qsl, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
@@ -331,12 +331,20 @@ class ControlledRequestSession:
 
 
 class _ControlledRedirectHandler(HTTPRedirectHandler):
-    def __init__(self, session: ControlledRequestSession):
+    def __init__(
+        self,
+        session: ControlledRequestSession,
+        *,
+        before_request: Callable[[str], None] | None = None,
+    ):
         super().__init__()
         self.session = session
+        self.before_request = before_request
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         self.session.reserve_redirect(newurl)
+        if self.before_request is not None:
+            self.before_request(newurl)
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
@@ -349,6 +357,7 @@ def controlled_http_get(
     host_state_root: str | Path,
     timeout: int,
     headers: Mapping[str, str] | None = None,
+    before_request: Callable[[str], None] | None = None,
 ) -> bytes:
     if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout <= 0:
         raise ControlledHTTPError("request timeout must be a positive integer")
@@ -359,7 +368,14 @@ def controlled_http_get(
         host_state_root=host_state_root,
     )
     session.reserve_initial(url)
-    opener = build_opener(_ControlledRedirectHandler(session))
+    if before_request is not None:
+        before_request(url)
+    opener = build_opener(
+        _ControlledRedirectHandler(
+            session,
+            before_request=before_request,
+        )
+    )
     request = Request(url, headers=dict(headers or {}), method="GET")
     with opener.open(request, timeout=timeout) as response:
         final_url = response.geturl()
