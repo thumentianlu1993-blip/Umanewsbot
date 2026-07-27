@@ -152,6 +152,27 @@ Sporting Life 三个日期页已实测逐场命中，可先生成候选；然后
 downloadable chart 中定位 race number 并人工确认。Equibase 对非浏览器请求返回拦截 HTML，
 现有 policy 也明确禁止自动抓取或绕过反爬。
 
+#### event 426 Eddie Read 完整顺序复核（2026-07-27）
+
+Sporting Life 结果页只给前四名，随后将四匹完赛马统一列为 `Also Ran/N/A`，不能据页面顺序
+推断第 5–8 名。Racing Post 的完整结果与 DRF 赛后文字交叉一致，候选顺序为：
+
+1. `#5 Gold Phoenix`
+2. `#3 Cabo Spirit`
+3. `#8 Formidable Man`
+4. `#6 Stay Hot`
+5. `#7 Seal Team`
+6. `#4 Almendares`
+7. `#2 Mondego`
+8. `#9 Mi Hermano Ramon`
+
+`#1 Astronomer` 为 non-runner。Sporting Life：
+`https://www.sportinglife.com/racing/results/2026-07-26/del-mar/930562/race-9-eddie-read-stakes-grade-2`；
+Racing Post：`https://www.racingpost.com/results/444/del-mar/2026-07-27/925395/`；DRF：
+`https://www.drf.com/news/gold-phoenix-catches-cabo-spirit-late-eddie-read-record-sixth-del-mar-stakes-win`。
+Del Mar 官方 replay 只确认前四名，官方 results 页当次复核仍显示 chart unavailable；因此完整
+顺序目前是两份第三方一致候选，不替代 Equibase/赛场官方完整 chart receipt，也不授权 confirmed。
+
 ## 8. 执行边界
 
 本调研只确认来源与可行性，不产生 candidate artifact，不写数据库，也不构成联网批量采集、

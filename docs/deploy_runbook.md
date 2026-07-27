@@ -1,5 +1,25 @@
 # 部署运行手册
 
+## 2026-07-27 event 426 时间修正与联网 prepare 记录
+
+1. 写前确认 event `426` 为 `EDDIE READ S.`、`local_date=2026-07-26`、
+   `timezone_name=America/Los_Angeles`、`race_datetime=null`、赛果 `0`。事务使用
+   `select_for_update()` 和身份/CAS 检查，仅写
+   `race_datetime=2026-07-27T01:10:00Z` 与审计日志。
+2. 写前与回执位于
+   `/opt/umanewsbot/runtime/race_result_recovery/event426-time-fix-20260727T060100Z/`，
+   SHA-256 分别为 `ce8e5fb9…1d53`、`59627477…c74`，权限 `0600`。
+3. 新 inventory 为
+   `/opt/umanewsbot/runtime/race_result_recovery/inventory-20260727T060200Z.json`
+   （file `327e8c16…0aa3`、manifest `d569534a…cfda`）。plan 为
+   `race-result-recovery-prepare-20260727T060300Z.plan.json`（`b70ce2c2…f21d`）。
+4. plan 阶段保持 `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`；prepare 仅在 one-off
+   容器临时设置 historical enabled/network 为 true，常驻 `.env` 和四应用容器均保持 false。
+   实际请求 `12/75`，manual-only 自动请求 `0`。
+5. combined candidate SHA-256 为 `033fc60d…489c`，仅含 4 场 JRA 官方赛果。Sporting Life
+   和 ZEturf 因 scheduled 状态过滤而空跑，TOBA 为 403；不得继续到 apply。修复后必须创建新
+   immutable run，不覆盖 `prepare-20260727T060300Z`。
+
 ## task 5.4 最终生产执行记录（2026-07-24）
 
 - 精确提交 `044f3d57f4f3bb75eac31f0567917132e5ae5cff`，生产镜像

@@ -226,14 +226,63 @@ def _next_data(html: str) -> dict:
     return json.loads(script.string)
 
 
-def _read_events(paths: list[Path]) -> list[dict]:
+def _read_events(
+    paths: list[Path],
+    *,
+    recovery_mode: bool = False,
+) -> list[dict]:
     events: list[dict] = []
     for path in paths:
         with path.open("r", encoding="utf-8-sig", newline="") as handle:
             for row in csv.DictReader(handle):
-                if row.get("status") == "finished":
+                if row.get("status") == "finished" or (
+                    recovery_mode and row.get("status") == "scheduled"
+                ):
                     events.append(row)
     return events
+
+
+def _result_order_completeness(
+    runners: list[dict],
+    results: list[dict],
+) -> dict:
+    def identity(row: dict) -> tuple[str, str]:
+        return (
+            str(row.get("horse_number") or "").strip(),
+            _collapse(str(row.get("horse_name") or "")).casefold(),
+        )
+
+    expected = [
+        row
+        for row in runners
+        if str(row.get("running_status") or "") != "withdrawn"
+    ]
+    result_identities = {identity(row) for row in results}
+    missing = [row for row in expected if identity(row) not in result_identities]
+    positions = [
+        int(row.get("finish_position") or 0)
+        for row in results
+        if int(row.get("finish_position") or 0) > 0
+    ]
+    positions_complete = (
+        len(positions) == len(results)
+        and len(set(positions)) == len(positions)
+        and sorted(positions) == list(range(1, len(positions) + 1))
+    )
+    return {
+        "complete": not missing and positions_complete,
+        "expected_outcome_count": len(expected),
+        "result_count": len(results),
+        "missing_horse_numbers": [
+            str(row.get("horse_number") or "")
+            for row in missing
+        ],
+        "missing_horse_names": [
+            str(row.get("horse_name") or "")
+            for row in missing
+        ],
+        "positions_complete": positions_complete,
+    }
 
 
 def _approved_result_url(event: dict, *, provider: str) -> str:
@@ -509,6 +558,9 @@ def _parse_detail_page(html: str, *, source_url: str) -> tuple[list[dict], list[
         "row_count": len(runners),
         "result_count": len(results),
     }
+    result_order_check = _result_order_completeness(runners, results)
+    metadata["result_order_complete"] = result_order_check["complete"]
+    metadata["result_order_check"] = result_order_check
     distance_text = str(summary.get("distance") or "").strip()
     if distance_text:
         metadata["distance_text"] = distance_text
@@ -516,7 +568,10 @@ def _parse_detail_page(html: str, *, source_url: str) -> tuple[list[dict], list[
 
 
 def prepare_candidates(args) -> dict:
-    events = _read_events([Path(path) for path in args.events_csv])
+    events = _read_events(
+        [Path(path) for path in args.events_csv],
+        recovery_mode=bool(getattr(args, "recovery_mode", False)),
+    )
     if args.limit:
         events = events[: args.limit]
     output_dir = Path(args.output_dir)
@@ -602,6 +657,8 @@ def prepare_candidates(args) -> dict:
                 "modules": {"runners": {"items": runners}, "results": {"items": results}},
                 "metadata": metadata,
             }
+            if str(event.get("event_id") or "").strip():
+                record["event_id"] = int(event["event_id"])
             jsonl.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
             summary["events"] += 1
             summary["runner_items"] += len(runners)
@@ -632,6 +689,7 @@ def main() -> None:
     parser.add_argument("--events-csv", nargs="+", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--allow-network", action="store_true")
+    parser.add_argument("--recovery-mode", action="store_true")
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--timeout-seconds", type=int, default=30)
     parser.add_argument("--sleep-seconds", type=float, default=0.0)

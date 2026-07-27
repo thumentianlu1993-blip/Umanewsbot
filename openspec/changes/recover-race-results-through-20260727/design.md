@@ -72,6 +72,20 @@ inventory 同时保存：
   既有离线 PDF parser 解释为网络许可；
 - TRA：只作为既有 provisional 观察或补充比对。
 
+`scheduled` 是本次已到期 recovery inventory 的合法冻结状态。runner 仅在
+`purpose=race_result_recovery` 时向 JRA、NAR、Sporting Life 和 ZEturf 详情 adapter 传入
+显式 recovery mode；普通历史详情模式继续只接受 `finished`。来源仅给前若干名并把其余完赛马
+标为 `Also Ran/N/A` 时，adapter 保留已知事实但写入 `result_order_complete=false`，coverage
+必须产生 `incomplete_result_order` blocker，禁止按页面排列补造名次。
+聚合层对所有恢复来源再次独立核对：candidate 必须携带冻结 `event_id`，参赛名单中除
+`withdrawn/scratched` 外的每匹马都必须恰好进入结果，内部 `finish_position` 必须为从 1
+开始的连续唯一序列。缺参赛名单、缺马、重复身份、无效名次和 TOBA discovery-only winner
+一律标记 `result_order_complete=false`，不能因 adapter 命令成功而放行。
+UK 与 US Sporting Life 虽复用同一 parser，但在单次 run 中使用互不相同的
+candidate/review/summary 标准路径。coverage 只读取并验证当前 state 记录的标准 combined
+artifact identity，拒绝 `--candidate-jsonl` 替换；随后逐场比较聚合层强制写入的
+`source_provider/racing_region` 与冻结 target，防止自报 metadata 或跨来源 event ID 绕过。
+
 本批 HRN `/entries-results/YYYY-MM-DD` 实测重定向至首页，不能承担结果恢复。其 adapter
 只保留既有行为回归，不进入本批 source map。逐场来源和当前可用性冻结在
 `source_research_20260727.md`。

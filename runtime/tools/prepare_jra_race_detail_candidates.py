@@ -390,6 +390,8 @@ def prepare_candidates(args) -> dict:
                 },
                 "metadata": metadata,
             }
+            if str(event.get("event_id") or "").strip():
+                record["event_id"] = int(event["event_id"])
             jsonl.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
             summary["events"] += 1
             summary["runner_items"] += len(runners)

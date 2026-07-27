@@ -268,22 +268,25 @@ def prepare(args: argparse.Namespace) -> dict:
                     }
                 )
                 continue
+            record = {
+                "year": int(event["year"]),
+                "slug": event["slug"],
+                "source_name": "toba_american_graded_stakes_history",
+                "source_url": TOBA_URL.format(year=max(years)),
+                "modules": {"history_winners": {"items": items}},
+                "metadata": {
+                    "source_kind": "toba_american_graded_stakes_history",
+                    "years": years,
+                    "matched_keys": matched_keys,
+                    "partial_history": bool(errors),
+                    "diagnostics": errors,
+                },
+            }
+            if str(event.get("event_id") or "").strip():
+                record["event_id"] = int(event["event_id"])
             jsonl.write(
                 json.dumps(
-                    {
-                        "year": int(event["year"]),
-                        "slug": event["slug"],
-                        "source_name": "toba_american_graded_stakes_history",
-                        "source_url": TOBA_URL.format(year=max(years)),
-                        "modules": {"history_winners": {"items": items}},
-                        "metadata": {
-                            "source_kind": "toba_american_graded_stakes_history",
-                            "years": years,
-                            "matched_keys": matched_keys,
-                            "partial_history": bool(errors),
-                            "diagnostics": errors,
-                        },
-                    },
+                    record,
                     ensure_ascii=False,
                     separators=(",", ":"),
                 )
