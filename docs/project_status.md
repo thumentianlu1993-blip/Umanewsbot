@@ -1,5 +1,12 @@
 # 项目状态文档
 
+- 2026-07-27: PR `#29` 已合并为 `main@e7dc1b20`；联网 prepare 的
+  recovery expected-target、source-scoped adapter input 和 JRA list/受控请求上下文已在独立
+  分支完成测试先行修复；两轮复审的 4 个 P1 已修复，包括强制当前
+  `source_map_version` 与精确 40 场映射，受影响范围
+  `100 passed / 3 skipped`；同一原生只读 reviewer 已对 fingerprint `db0e38b2…5135`
+  给出 `VERDICT: APPROVED`。修复版未发布，
+  本轮请求数、candidate 和生产写入仍为 0。
 - 2026-07-27: 赛果恢复 PR `#28` 已关闭态部署到生产 `dfbd24e1`，迁移 `0060` 与
   59 行/50 组只读 inventory 通过；有界联网 prepare 因 recovery plan 的
   `expected_target_empty` 实现缺口在 transport 前阻断，请求数为 0，尚无候选或赛果写入。

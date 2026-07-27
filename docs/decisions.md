@@ -1,5 +1,20 @@
 # 关键决策
 
+## 2026-07-27 recovery adapter 输入按来源分片，JRA 同时服从两层请求账本
+
+- `race_result_recovery` plan 必须同时绑定 inventory 文件路径、文件 SHA-256 与内部
+  manifest SHA-256，并强制携带当前批准的 `source_map_version`；缺失或版本不符直接拒绝，
+  精确 40 场 source map 不允许降级为任意子集。expected target 创建和既有 snapshot 恢复都先运行 inventory verifier
+  重算当前数据库 identity，再按冻结 event ID 顺序绑定；event、状态、赛果、地区或其他
+  inventory 字段漂移直接拒绝，不生成可人工补写的伪 snapshot。
+- adapter 输入不能只按地区分组。同一地区允许多个批准来源时必须以 `region + source` 分片，
+  runner 只向 manifest 的精确来源交付对应 CSV，避免 JRA/NAR 或 TOBA/Sporting Life 交叉扩张
+  网络范围。
+- JRA 年度列表与详情页复用同一 source cache。显式 recovery mode 可读取已审批 CSV 中仍为
+  `scheduled` 的恢复目标，普通模式继续只接受 `finished`。每个初始请求和每次 redirect 都先
+  通过 runner v2 的 JRA-only HTTPS host/path，再分别占用全批次共享预算；任一层拒绝都不得
+  发起 transport。该决定不放宽 BHA、France Galop、Equibase 等 manual-only 路由。
+
 ## 2026-07-27 赛果候选联网在 expected-target 构造缺口处保持零请求阻断
 
 - `race_result_recovery` 的 40 个 event ID source map 校验通过，不代表运行时 expected-target

@@ -38,12 +38,13 @@
 - [x] 3.1 (application) 运行 inventory/evidence/participant/canonical/owner-revision/apply/verifier/rollback/page focused 测试至 GREEN；SQLite 覆盖功能语义，PostgreSQL 单独覆盖 owner/generation、advisory/row lock、并发 canonical 审批与 apply，不宣称 SQLite 等价并发。
 - [x] 3.2 (integration) 运行五地区 adapter 离线 fixture、结果专用编排、既有三模块编排、准实时 authority/publication 和生命周期回归，证明旧流程不变。
 - [x] 3.3 (application) 运行完整 `stable` 回归、Django check、`makemigrations --check --dry-run`、OpenSpec strict/all、Compose config、`py_compile` 和 `git diff --check`。
+- [x] 3.3a (integration) 对生产零请求暴露的 recovery expected-target、source-scoped adapter 输入和 JRA list/request-context 缺口补有效 RED，并完成最小修复与受影响回归。
 - [ ] 3.4 (operations) 对精确实现 fingerprint 运行独立只读代码审核；修复 finding 后重新执行受影响测试并复审至无 actionable finding。
 
 ## 4. 生产只读盘点与候选收集
 
-- [ ] 4.1 (operations) 取得精确 release 授权后部署受审版本，保持恢复 apply、网络自动化、TRA public、scheduler 和 publication 开关关闭，并验证生产 commit/镜像/迁移/健康。
-- [ ] 4.2 (operations) 生成 `2026-07-08..2026-07-27` 生产只读 inventory，核对 event row 数、race group 数、26 条重点缺口、9 组重复候选、event 924 provisional 和五地区分布。
+- [x] 4.1 (operations) 取得精确 release 授权后部署受审版本，保持恢复 apply、网络自动化、TRA public、scheduler 和 publication 开关关闭，并验证生产 commit/镜像/迁移/健康。
+- [x] 4.2 (operations) 生成 `2026-07-08..2026-07-27` 生产只读 inventory，核对 event row 数、race group 数、26 条重点缺口、9 组重复候选、event 924 provisional 和五地区分布。
 - [ ] 4.3 (operations) 对 inventory manifest 和 `source_research_20260727.md` 的精确 40 场 source map 取得明确审批后，仅对有自动化许可的 candidate route 按 `<=75` 请求、`<=30s` timeout、`<=512 MiB` cache 执行网络 prepare；manual-only 官方路由请求数必须为 0，只生成候选/source-cache/artifact，不写业务数据库。
 - [ ] 4.4 (operations) 完成人工官方路由逐场核验、重复 identity review、字段 diff 和 blocker 分类，生成逐场 coverage、candidate SHA 与 dry-run。
 - [ ] 4.5 (operations) 由独立 verifier 复核所有冻结目标 accounted 守恒，并分别报告 completion 是否 `blocker=0`、精确预计 result-row/revision/canonical-link create/update/delete、owner 分流和未闭环 blocker。

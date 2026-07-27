@@ -1,5 +1,34 @@
 # 当前状态
 
+## 2026-07-27 PR #29 已合并，联网 prepare 阻断修复通过独立代码审核
+
+- PR `#29` 已合并为 `main@e7dc1b20aa36b311ade2497b96a62b15451942d2`；修复位于独立
+  worktree/分支 `codex/fix-race-result-recovery-prepare`，尚未 commit、push、发布或部署。
+- 已用测试复现并修复 `expected_target_empty`：recovery plan 现在同时绑定 inventory 文件路径、
+  文件 SHA 和内部 manifest SHA，调用既有 verifier 重算当前数据库身份后，再按冻结顺序批量加载
+  40 个 event ID 和 active aliases。状态、可见性、日期、名称、系列、source facts、赛果数量/
+  内容、event 消失、地区漂移或重复 ID 均 fail closed；既有 snapshot 恢复时也重新验证。
+- adapter CSV 从仅按地区改为按 `region + source` 精确分片，避免日本 JRA/NAR 与美国
+  TOBA/Sporting Life 互相取得对方目标；40 场 snapshot 与输入物化均固定为 2 条 SQL。
+- JRA adapter 现在由 runner 物化年度列表缓存路径、精确 host/path request policy、
+  shard/request-state/host-state，并在缺少缓存时先受控抓取年度列表。每个 JRA 请求同时进入
+  全批次共享请求预算和 runner v2 host/path/间隔账本，每个 redirect 也单独占用共享预算；
+  只有显式 recovery mode 才允许冻结目标保持 `scheduled` 时进入候选，旧模式仍只接收
+  `finished`。manual-only 路由未改变。
+- 首轮独立复审提出 inventory 未重验、scheduled 被过滤和 redirect 预算低报 3 个 P1；第二轮
+  复审进一步发现可省略 `source_map_version` 绕过精确 40 场映射，现均已补 RED 并修复。
+  recovery plan 必须携带当前批准的 source-map 版本且始终精确匹配冻结范围。受影响范围测试为
+  `100 passed / 3 skipped`，HTTP 预算 `3/3`、runner-v2
+  contract `29/29`；Django check、迁移漂移、OpenSpec strict、
+  `py_compile` 与 `git diff --check` 通过。现有本地测试镜像的完整 `stable` 因缺
+  `openpyxl`、无 Redis 及既有无关失败只能如实记录为 `2003 tests / 19 failures /
+  91 errors / 5 skipped`，不能作为本修复 GREEN 证据。
+- 同一原生只读 reviewer 已对精确 fingerprint
+  `db0e38b26bacb1c6bc798303d756e6fcf1a80e4203fb1778cd6a324d552c5135`
+  给出 `VERDICT: APPROVED`，前后 fingerprint 一致且未修改文件。
+- 本轮没有触网、没有连接生产、没有生成 candidate/source cache，也没有业务写入。下一门禁是新的
+  release 授权；部署后还需新的联网 prepare 授权。
+
 ## 2026-07-27 赛果缺口恢复已关闭态部署，inventory 通过，联网 prepare 在零请求处阻断
 
 - PR `#28` 已合并，release commit `88cc4eafe4a7b5263aa2a6c30cd7d70978323989`，

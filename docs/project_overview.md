@@ -223,3 +223,8 @@ results-only 候选，由官方 route receipt 和 participant identity 审批后
 
 实现、部署、联网 candidate prepare、人工 official 审批和生产 apply 分别授权；默认状态下
 不会联网或写业务数据库。
+
+同一地区存在多个候选来源时，恢复 adapter 输入按 `region + source` 精确分片。JRA 年度列表
+和详情页由 runner 物化受控上下文，每个初始请求与 redirect 都同时受全批次共享预算与
+JRA-only host/path/间隔策略约束；显式 recovery mode 才能消费冻结的过期 scheduled 目标，
+人工官方路由仍不得由该链路自动请求。

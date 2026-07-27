@@ -19,6 +19,7 @@ from typing import Any
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db.models import Prefetch
 from django.utils import timezone
 
 from stable.models import (
@@ -28,10 +29,15 @@ from stable.models import (
     HistoricalRaceEventTarget,
     HistoricalRaceResolutionStatus,
     RaceEvent,
+    RaceEventAlias,
     RaceEventModule,
     RacingRegion,
 )
 from stable.services.historical_race_batches import target_identity
+from stable.services.race_result_recovery_inventory import (
+    RecoveryInventoryDrift,
+    verify_recovery_inventory,
+)
 
 
 TARGET_LAYER = "race_event"
@@ -143,13 +149,30 @@ DEFAULT_ADAPTER_MANIFESTS: dict[str, dict[str, Any]] = {
             "{events_csv}",
             "--source-html",
             "{source_html}",
+            "--request-policy",
+            "{request_policy}",
+            "--request-shard-id",
+            "{request_shard_id}",
+            "--request-state",
+            "{request_state}",
+            "--host-state-root",
+            "{host_state_root}",
+            "{recovery_flag}",
             "--output-dir",
             "{adapter_output_dir}",
             "{network_flag}",
         ],
         "inputs": {
             "events_csv": {"required": True, "artifact": "input/events.csv"},
-            "source_html": {"required": True, "artifact": "source/jra.html"},
+            "source_html": {"required": False, "artifact": "source/jra.html"},
+            "request_policy": {
+                "required": True,
+                "artifact": "control/jra_detail.request-policy.json",
+            },
+            "request_shard_id": {"required": False},
+            "request_state": {"required": False},
+            "host_state_root": {"required": False},
+            "recovery_flag": {"required": False},
         },
         "outputs": [
             {"key": "candidate_jsonl", "path": "jra_detail_candidates_2026.jsonl", "standard_name": "candidates/jra_detail.jsonl", "required": True},
@@ -964,10 +987,24 @@ def _validate_recovery_source_map(plan: dict[str, Any]) -> None:
         raise PlanValidationError(
             "race_result_recovery requires an inventory manifest SHA"
         )
-    if str(plan.get("source_map_version") or "") not in {
-        "",
-        RECOVERY_SOURCE_MAP_VERSION,
-    }:
+    artifact_path = str(plan.get("inventory_artifact_path") or "").strip()
+    artifact_sha = str(plan.get("inventory_artifact_sha256") or "")
+    if not artifact_path:
+        raise PlanValidationError(
+            "race_result_recovery requires an inventory artifact path"
+        )
+    if not Path(artifact_path).is_absolute():
+        raise PlanValidationError(
+            "race_result_recovery inventory artifact path must be absolute"
+        )
+    if re.fullmatch(r"[0-9a-f]{64}", artifact_sha) is None:
+        raise PlanValidationError(
+            "race_result_recovery requires an inventory artifact SHA"
+        )
+    if (
+        str(plan.get("source_map_version") or "")
+        != RECOVERY_SOURCE_MAP_VERSION
+    ):
         raise PlanValidationError("recovery source map version is not approved")
     observed: dict[tuple[str, str], set[int]] = {}
     all_event_ids: list[int] = []
@@ -998,11 +1035,7 @@ def _validate_recovery_source_map(plan: dict[str, Any]) -> None:
         raise PlanValidationError(
             "recovery source map assigns an event more than once"
         )
-    enforce_frozen_map = (
-        str(plan.get("source_map_version") or "")
-        == RECOVERY_SOURCE_MAP_VERSION
-    )
-    if enforce_frozen_map and (
+    if (
         observed != RECOVERY_EVENT_IDS_BY_SOURCE
         or set(all_event_ids) != RECOVERY_EVENT_IDS
     ):
@@ -1183,17 +1216,22 @@ def validate_first_acceptance_fixture(plan_path: str | Path) -> dict[str, Any]:
 
 
 def _race_event_adapter_input(event: RaceEvent) -> dict[str, Any]:
+    prefetched_aliases = getattr(event, "_active_adapter_aliases", None)
+    if prefetched_aliases is None:
+        aliases = list(
+            event.aliases.filter(is_active=True)
+            .order_by("source_language", "text")
+            .values_list("text", flat=True)
+        )
+    else:
+        aliases = [alias.text for alias in prefetched_aliases]
     return {
         "year": event.year,
         "slug": event.slug,
         "series_key": event.series_key,
         "original_name": event.original_name,
         "chinese_name": event.chinese_name,
-        "aliases": "|".join(
-            event.aliases.filter(is_active=True)
-            .order_by("source_language", "text")
-            .values_list("text", flat=True)
-        ),
+        "aliases": "|".join(aliases),
         "country_region": event.country_region,
         "racing_region": event.country_region,
         "racecourse": event.racecourse,
@@ -1207,9 +1245,30 @@ def _race_event_adapter_input(event: RaceEvent) -> dict[str, Any]:
     }
 
 
+def _race_events_with_adapter_aliases(
+    event_ids: list[int],
+) -> dict[int, RaceEvent]:
+    aliases = RaceEventAlias.objects.filter(is_active=True).order_by(
+        "source_language", "text"
+    )
+    return (
+        RaceEvent.objects.filter(pk__in=event_ids)
+        .prefetch_related(
+            Prefetch(
+                "aliases",
+                queryset=aliases,
+                to_attr="_active_adapter_aliases",
+            )
+        )
+        .in_bulk(event_ids)
+    )
+
+
 def expected_targets_from_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
     if plan.get("historical_inventory_sha256"):
         return _historical_expected_targets_from_plan(plan)
+    if plan.get("purpose") == RECOVERY_PURPOSE:
+        return _recovery_expected_targets_from_plan(plan)
     targets: list[dict[str, Any]] = []
     seen: set[tuple[int, str]] = set()
     for region_plan in plan.get("regions") or []:
@@ -1250,6 +1309,109 @@ def expected_targets_from_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
     if not targets:
         raise PlanValidationError("expected_target_empty")
     return targets
+
+
+def _recovery_expected_targets_from_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    inventory = _verified_recovery_inventory_from_plan(plan)
+    target_rows = [
+        (region_plan, int(event_id))
+        for region_plan in plan.get("regions") or []
+        for event_id in region_plan.get("event_ids") or []
+    ]
+    event_ids = [event_id for _region_plan, event_id in target_rows]
+    if len(event_ids) != len(set(event_ids)):
+        raise PlanValidationError("duplicate recovery event id")
+    events_by_id = _race_events_with_adapter_aliases(event_ids)
+    results: list[dict[str, Any]] = []
+    inventory_sha = str(plan.get("inventory_manifest_sha256") or "")
+    inventory_rows = {
+        int(row["event_id"]): row for row in inventory.get("event_rows") or []
+    }
+    for region_plan, event_id in target_rows:
+        inventory_row = inventory_rows.get(event_id)
+        if inventory_row is None:
+            raise PlanValidationError(
+                f"recovery event is absent from approved inventory: {event_id}"
+            )
+        if (
+            inventory_row.get("classification") != "missing_result"
+            or int(inventory_row.get("result_count") or 0) != 0
+            or not bool(inventory_row.get("result_due"))
+        ):
+            raise PlanValidationError(
+                f"recovery event is outside approved missing-result scope: {event_id}"
+            )
+        event = events_by_id.get(event_id)
+        if event is None:
+            raise PlanValidationError(f"recovery event disappeared: {event_id}")
+        region = str(region_plan.get("region") or "")
+        if event.country_region != region:
+            raise PlanValidationError(
+                f"recovery event region mismatch: {event_id} "
+                f"expected={region} actual={event.country_region}"
+            )
+        results.append(
+            {
+                "inventory_manifest_sha256": inventory_sha,
+                "year": event.year,
+                "slug": event.slug,
+                "series_key": event.series_key,
+                "racing_region": event.country_region,
+                "source": str(region_plan.get("source") or ""),
+                "source_authority": str(
+                    region_plan.get("source_authority") or ""
+                ),
+                "modules": sorted((region_plan.get("modules") or {}).keys()),
+                "race_event_id": event.pk,
+                "race_event_original_name": event.original_name,
+                "race_event_chinese_name": event.chinese_name,
+                "race_event_series_key": event.series_key,
+                "adapter_input": _race_event_adapter_input(event),
+                "preflight_status": "ready",
+            }
+        )
+    if not results:
+        raise PlanValidationError("expected_target_empty")
+    return results
+
+
+def _verified_recovery_inventory_from_plan(
+    plan: dict[str, Any],
+) -> dict[str, Any]:
+    artifact_path = Path(str(plan.get("inventory_artifact_path") or ""))
+    expected_file_sha = str(plan.get("inventory_artifact_sha256") or "")
+    try:
+        if artifact_path.is_symlink():
+            raise PlanValidationError(
+                "recovery inventory artifact cannot be a symlink"
+            )
+        identity = file_identity(artifact_path)
+    except (OSError, PlanValidationError) as exc:
+        raise PlanValidationError(
+            f"recovery inventory artifact is unavailable: {artifact_path}"
+        ) from exc
+    if identity["sha256"] != expected_file_sha:
+        raise PlanValidationError(
+            "recovery inventory artifact SHA does not match approved plan"
+        )
+    try:
+        artifact = _read_json(artifact_path)
+    except (OSError, json.JSONDecodeError, UnicodeError, PlanValidationError) as exc:
+        raise PlanValidationError("recovery inventory artifact is invalid") from exc
+    if (
+        str(artifact.get("manifest_sha256") or "")
+        != str(plan.get("inventory_manifest_sha256") or "")
+    ):
+        raise PlanValidationError(
+            "recovery inventory manifest SHA does not match approved plan"
+        )
+    try:
+        verify_recovery_inventory(artifact)
+    except RecoveryInventoryDrift as exc:
+        raise PlanValidationError(
+            "recovery inventory drift: " + ",".join(exc.reason_codes)
+        ) from exc
+    return artifact
 
 
 def _historical_expected_targets_from_plan(plan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1313,6 +1475,8 @@ def ensure_expected_targets_snapshot(
     review_path = run_path / "review" / "expected_targets_review.csv"
     plan_identity = file_identity(plan_path)
     if snapshot_path.exists():
+        if plan.get("purpose") == RECOVERY_PURPOSE:
+            _verified_recovery_inventory_from_plan(plan)
         payload = _read_json(snapshot_path)
         recorded_plan = payload.get("plan_identity") if isinstance(payload.get("plan_identity"), dict) else {}
         if recorded_plan.get("sha256") != plan_identity["sha256"]:
@@ -1410,10 +1574,11 @@ def materialize_adapter_event_inputs(
     expected_snapshot: dict[str, Any],
     run_dir: str | Path,
 ) -> dict[str, str]:
-    targets_by_region: dict[str, list[dict[str, Any]]] = {}
+    targets_by_scope: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for target in expected_snapshot.get("targets") or []:
         region = str(target.get("racing_region") or "").strip()
-        targets_by_region.setdefault(region, []).append(target)
+        source = str(target.get("source") or "").strip()
+        targets_by_scope.setdefault((region, source), []).append(target)
 
     fieldnames = [
         "year",
@@ -1435,17 +1600,30 @@ def materialize_adapter_event_inputs(
     ]
     input_dir = Path(run_dir) / "input"
     input_dir.mkdir(parents=True, exist_ok=True)
+    event_ids = [
+        int(target["race_event_id"])
+        for targets in targets_by_scope.values()
+        for target in targets
+    ]
+    if len(event_ids) != len(set(event_ids)):
+        raise PlanValidationError("expected target snapshot contains duplicate RaceEvent IDs")
+    events_by_id = _race_events_with_adapter_aliases(event_ids)
     result: dict[str, str] = {}
-    for region, targets in sorted(targets_by_region.items()):
-        path = input_dir / f"events_{region}.csv"
+    region_source_counts: dict[str, int] = {}
+    for region, _source in targets_by_scope:
+        region_source_counts[region] = region_source_counts.get(region, 0) + 1
+    for (region, source), targets in sorted(targets_by_scope.items()):
+        safe_source = re.sub(r"[^a-z0-9_-]+", "_", source.casefold()).strip("_")
+        path = input_dir / f"events_{region}_{safe_source or 'source'}.csv"
         rows: list[dict[str, Any]] = []
         for target in sorted(targets, key=lambda item: (int(item["year"]), str(item["slug"]))):
-            event = RaceEvent.objects.filter(
-                pk=target.get("race_event_id"),
-                year=int(target["year"]),
-                slug=str(target["slug"]),
-            ).first()
-            if event is None:
+            event_id = int(target["race_event_id"])
+            event = events_by_id.get(event_id)
+            if (
+                event is None
+                or event.year != int(target["year"])
+                or event.slug != str(target["slug"])
+            ):
                 raise PlanValidationError(
                     f"expected target RaceEvent disappeared: year={target['year']} slug={target['slug']}"
                 )
@@ -1463,8 +1641,65 @@ def materialize_adapter_event_inputs(
             writer = csv.DictWriter(handle, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(rows)
-        result[region] = str(path)
+        result[f"{region}:{source}"] = str(path)
+        if region_source_counts[region] == 1:
+            result[region] = str(path)
     return result
+
+
+def materialize_adapter_control_inputs(
+    *,
+    plan: dict[str, Any],
+    manifest: AdapterManifest,
+    run_dir: str | Path,
+) -> dict[str, str]:
+    if manifest.key != "jra_detail":
+        return {}
+    run_path = Path(run_dir)
+    source_html = run_path / "source" / "jra.html"
+    control_dir = run_path / "control"
+    host_state_root = control_dir / "host-state"
+    source_html.parent.mkdir(parents=True, exist_ok=True)
+    control_dir.mkdir(parents=True, exist_ok=True)
+    host_state_root.mkdir(parents=True, exist_ok=True)
+    rate_limit = plan.get("rate_limit") or {}
+    max_requests = int(rate_limit.get("max_requests") or 0)
+    minimum_interval = float(rate_limit.get("request_interval_seconds") or 0)
+    if max_requests <= 0:
+        raise PlanValidationError("JRA controlled request budget must be positive")
+    policy = {
+        "schema_version": "2.0",
+        "max_requests": max_requests,
+        "max_requests_per_host": max_requests,
+        "minimum_interval_seconds": minimum_interval,
+        "allowed_hosts": ["www.jra.go.jp"],
+        "redirect_hosts": ["www.jra.go.jp"],
+        "url_patterns": {
+            "www.jra.go.jp": [
+                r"/datafile/seiseki/replay/2026/jyusyo\.html",
+                r"/datafile/seiseki/replay/2026/\d{3}\.html",
+                r"/datafile/seiseki/g1/[a-z0-9_-]+/result/[a-z0-9_-]+2026\.html",
+            ]
+        },
+    }
+    policy_path = control_dir / "jra_detail.request-policy.json"
+    _write_json(policy_path, policy)
+    raw_shard_id = f"{plan.get('run_id') or 'run'}-{manifest.key}"
+    shard_id = re.sub(r"[^A-Za-z0-9._-]+", "-", raw_shard_id).strip("-")[:128]
+    if not shard_id:
+        raise PlanValidationError("JRA controlled request shard identity is empty")
+    return {
+        "source_html": str(source_html),
+        "request_policy": str(policy_path),
+        "request_shard_id": shard_id,
+        "request_state": str(control_dir / "jra_detail.request-state.json"),
+        "host_state_root": str(host_state_root),
+        "recovery_flag": (
+            "--recovery-mode"
+            if plan.get("purpose") == RECOVERY_PURPOSE
+            else ""
+        ),
+    }
 
 
 def create_run(plan_path: str | Path, run_dir: str | Path | None = None) -> RunState:
@@ -1549,15 +1784,22 @@ def prepare_adapters(plan: dict[str, Any], state: RunState, *, resume: bool = Fa
         manifest = _manifest_from_plan_adapter(adapter_payload)
         runner = AdapterRunner(manifest)
         execution_policy = _execution_policy_for_manifest(plan, manifest)
-        if "events_csv" in manifest.inputs and manifest.region not in event_inputs:
-            raise PlanValidationError(
-                f"adapter {manifest.key} has no approved expected targets for region {manifest.region}"
-            )
-        adapter_inputs = (
-            {"events_csv": event_inputs[manifest.region]}
-            if "events_csv" in manifest.inputs and manifest.region in event_inputs
-            else {}
+        scoped_input_key = f"{manifest.region}:{manifest.source}"
+        event_input = event_inputs.get(scoped_input_key) or event_inputs.get(
+            manifest.region
         )
+        if "events_csv" in manifest.inputs and event_input is None:
+            raise PlanValidationError(
+                f"adapter {manifest.key} has no approved expected targets for "
+                f"region/source {manifest.region}/{manifest.source}"
+            )
+        adapter_inputs = materialize_adapter_control_inputs(
+            plan=plan,
+            manifest=manifest,
+            run_dir=state.run_dir,
+        )
+        if "events_csv" in manifest.inputs and event_input is not None:
+            adapter_inputs["events_csv"] = event_input
         previous = state.adapter_states.get(manifest.key) or {}
         try:
             fingerprint = runner.input_fingerprint(
@@ -1632,9 +1874,15 @@ def prepare_adapters(plan: dict[str, Any], state: RunState, *, resume: bool = Fa
             raise
 
         result_payload = result.to_dict()
+        completed_fingerprint = runner.input_fingerprint(
+            inputs=adapter_inputs,
+            run_dir=state.run_dir,
+            allow_network=bool(plan.get("allow_network", False)),
+            execution_policy=execution_policy,
+        )
         state.adapter_states[manifest.key] = {
             "status": "succeeded",
-            "input_fingerprint": fingerprint,
+            "input_fingerprint": completed_fingerprint,
             "resume_action": resume_action,
             "result": result_payload,
         }
