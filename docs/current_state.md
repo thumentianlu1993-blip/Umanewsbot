@@ -4175,3 +4175,43 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   相关回归 `192 passed / 4 skipped`，其余静态门禁通过。
 - PR `#36` 尚未合并，因此未把未合并分支部署到生产；生产仍未部署 gap-v2，也未重跑正式
   bounded prepare、写入赛果或改变任何关闭态开关。
+
+# 2026-07-27 最近赛事赛果定时审核实现已完成，待独立代码审核
+
+- 已实现默认关闭的每日 `06:30/18:30 Asia/Shanghai` 审核链路：最近 72 小时新目标与
+  14 天 pending 并集、最多 28 个漏跑 slot 合并为一次 prepare、canonical route 合同、
+  不可变审核包和 durable 邮件 intent。
+- migration `0062_add_scheduled_race_result_review` 新增 run、pending、delivery、approval
+  四张治理表。人工采纳保留原来源 authority，显示“已人工审核赛果”，不伪装 official receipt。
+- apply 默认 dry-run；完整 bundle SHA、逐 event digest、reviewer 与双确认齐备后才逐场事务写入，
+  并提供独立 verify。
+- GREEN 与相邻回归 `94/94`；Django check、迁移漂移、编译、wrapper、三份 Compose config
+  和 diff 检查通过。
+- 未联网、未发邮件、未执行生产迁移/业务写、未 commit/push/PR/部署；新开关保持 false。
+  下一门禁是未参与实现者的完整只读代码审核。
+
+# 2026-07-27 定时赛果审核首次代码 review 四项 P1 已修复
+
+- 首次独立 review session `019fa425-c6fc-7e72-9483-5afa281fcfeb` 返回 `REVISE`：
+  verify 写前/写后语义、同 slot lease、apply 锁内 baseline、人工审核公开标签共 4 项 P1。
+- 四项均先取得真实 RED（聚焦 16 项中 `2 failures + 2 errors`），修复后聚焦 `17/17`；
+  recovery inventory/projection/public pages 与 lifecycle 相邻组合 `107/107`。
+- 真实 PostgreSQL `2/2` 证明同 slot 并发只进入一次 prepare，以及 event -> results 锁序会等待
+  并识别并发已提交的 baseline 漂移；临时容器和测试库已删除。
+- exact apply 重放现返回 `already_applied`，独立 verify 只核对写后 approval/result/digest/
+  authority；claim token CAS 阻止失去 lease 的旧 worker 写终态；公开详情只有当前结果 digest
+  对应不可变 human approval 时显示“已人工审核赛果”。
+- 未联网、未部署、未执行生产迁移/写入、未 commit/push。下一门禁是复用同一 reviewer session
+  做四项 finding 的限定复审。
+
+# 2026-07-27 定时赛果审核命令退出码两项 P1 已修复
+
+- 同一 reviewer 限定复审确认原四项 P1 已关闭，但新增两项直接 P1：空 `--verify` scope
+  错误退出 0，以及 apply summary 含 blocked、缺失或 unexpected event 时错误退出 0。
+- 两项命令测试先取得真实 RED：`2` 项产生 `4 failures`；修复后 `2/2`，完整聚焦
+  `19/19`，与 recovery/public pages/lifecycle 直接相邻组合 `109/109`。
+- verify 现必须提供至少一个 `--approve`。apply 会先保留逐 event JSON summary，再校验
+  returned event scope 精确守恒、状态只能是 `applied/already_applied` 且 unexpected 为空；
+  否则抛 `CommandError` 令进程非零退出。
+- Django check、迁移漂移、编译与 diff 检查通过。仍未联网、未生产写、未提交或部署；
+  下一门禁是同一 reviewer 再次限定复审。

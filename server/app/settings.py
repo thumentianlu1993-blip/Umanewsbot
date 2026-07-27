@@ -613,6 +613,37 @@ RACE_EVENT_LIFECYCLE_SOFT_TIME_LIMIT = int(
 RACE_EVENT_LIFECYCLE_TIME_LIMIT = int(
     env("RACE_EVENT_LIFECYCLE_TIME_LIMIT", "150")
 )
+# ── Scheduled race-result review (disabled until a production release gate) ──
+RACE_RESULT_REVIEW_ENABLED = env_bool("RACE_RESULT_REVIEW_ENABLED", False)
+RACE_RESULT_REVIEW_ALLOW_NETWORK = env_bool(
+    "RACE_RESULT_REVIEW_ALLOW_NETWORK", False
+)
+RACE_RESULT_REVIEW_ARTIFACT_ROOT = env(
+    "RACE_RESULT_REVIEW_ARTIFACT_ROOT", "/app/runtime/race_result_review"
+)
+RACE_RESULT_REVIEW_BUNDLE_ROOT = str(
+    Path(RACE_RESULT_REVIEW_ARTIFACT_ROOT) / "generations"
+)
+RACE_RESULT_REVIEW_ROUTE_REGISTRY = env(
+    "RACE_RESULT_REVIEW_ROUTE_REGISTRY",
+    "/app/runtime/policies/race_result_review/source_routes_v1.json",
+)
+RACE_RESULT_REVIEW_RECIPIENT = env("RACE_RESULT_REVIEW_NOTIFY_EMAILS", "")
+RACE_RESULT_REVIEW_LOOKBACK_HOURS = int(
+    env("RACE_RESULT_REVIEW_LOOKBACK_HOURS", "72")
+)
+RACE_RESULT_REVIEW_PENDING_MAX_AGE_DAYS = int(
+    env("RACE_RESULT_REVIEW_PENDING_MAX_AGE_DAYS", "14")
+)
+RACE_RESULT_REVIEW_DELIVERY_LEASE_SECONDS = int(
+    env("RACE_RESULT_REVIEW_DELIVERY_LEASE_SECONDS", "300")
+)
+RACE_RESULT_REVIEW_ATTACHMENT_MAX_BYTES = int(
+    env("RACE_RESULT_REVIEW_ATTACHMENT_MAX_BYTES", "5000000")
+)
+RACE_RESULT_REVIEW_MAX_REQUESTS = int(
+    env("RACE_RESULT_REVIEW_MAX_REQUESTS", "100")
+)
 
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
@@ -629,8 +660,13 @@ CELERY_TASK_ROUTES = {
     "stable.tasks.poll_race_live_event_task": {"queue": "race_live"},
     "stable.tasks.monitor_race_live_sla_task": {"queue": "race_live"},
     "stable.tasks.advance_race_event_lifecycle_task": {"queue": "default"},
+    "stable.tasks.scheduled_race_result_review_task": {"queue": "celery"},
 }
 CELERY_TASK_ANNOTATIONS = {
+    "stable.tasks.scheduled_race_result_review_task": {
+        "soft_time_limit": 900,
+        "time_limit": 960,
+    },
     "stable.tasks.poll_race_live_event_task": {
         "soft_time_limit": CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT,
         "time_limit": CELERY_RACE_LIVE_WORKER_TIME_LIMIT,
@@ -650,6 +686,10 @@ CELERY_TASK_ANNOTATIONS = {
 }
 
 CELERY_BEAT_SCHEDULE = {
+    "scheduled-race-result-review": {
+        "task": "stable.tasks.scheduled_race_result_review_task",
+        "schedule": crontab(minute=30, hour="6,18"),
+    },
     "discover-p0-racecard-urls": {
         "task": "stable.tasks.discover_p0_racecard_urls_task",
         "schedule": crontab(minute=30, hour="6,18"),

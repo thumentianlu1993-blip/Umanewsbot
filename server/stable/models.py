@@ -4700,6 +4700,107 @@ class TaskExecutionLog(TimestampedModel):
         ordering = ("-started_at", "-id")
 
 
+class RaceResultReviewRun(TimestampedModel):
+    schedule_slot = models.DateTimeField(unique=True)
+    status = models.CharField(max_length=32, default="claimed")
+    selector_sha256 = models.CharField(max_length=64, blank=True)
+    bundle_sha256 = models.CharField(max_length=64, blank=True)
+    cursor = models.JSONField(default=dict, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    terminal_summary = models.JSONField(default=dict, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-schedule_slot", "-id")
+
+
+class RaceResultReviewPendingEvent(TimestampedModel):
+    event = models.OneToOneField(
+        RaceEvent,
+        on_delete=models.CASCADE,
+        related_name="result_review_pending",
+    )
+    first_seen_at = models.DateTimeField()
+    last_seen_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    reason_code = models.CharField(max_length=64)
+    snapshot_sha256 = models.CharField(max_length=64)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ("first_seen_at", "event_id")
+
+
+class RaceResultReviewDelivery(TimestampedModel):
+    bundle_sha256 = models.CharField(max_length=64)
+    recipient = models.EmailField()
+    status = models.CharField(max_length=16, default="queued")
+    message_id = models.CharField(max_length=255, blank=True)
+    attempt_count = models.PositiveIntegerField(default=0)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    last_error_code = models.CharField(max_length=64, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("bundle_sha256", "recipient"),
+                name="uq_result_review_delivery_bundle_recipient",
+            )
+        ]
+        ordering = ("-created_at", "-id")
+
+
+class RaceResultReviewApprovalQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("RaceResultReviewApproval 是不可变记录，禁止修改。")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValidationError("RaceResultReviewApproval 是不可变记录，禁止修改。")
+
+    def delete(self):
+        raise ValidationError("RaceResultReviewApproval 是不可变记录，禁止删除。")
+
+
+class RaceResultReviewApproval(models.Model):
+    objects = RaceResultReviewApprovalQuerySet.as_manager()
+
+    bundle_sha256 = models.CharField(max_length=64)
+    event = models.ForeignKey(
+        RaceEvent,
+        on_delete=models.PROTECT,
+        related_name="result_review_approvals",
+    )
+    reviewed_row_digest = models.CharField(max_length=64)
+    authority = models.CharField(
+        max_length=32,
+        choices=(
+            ("official", "官方"),
+            ("human_reviewed_reference", "人工审核参考来源"),
+        ),
+    )
+    reviewer = models.CharField(max_length=255)
+    confirmed_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("bundle_sha256", "event", "reviewed_row_digest"),
+                name="uq_result_review_approval_exact_scope",
+            )
+        ]
+        ordering = ("-created_at", "-id")
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("RaceResultReviewApproval 是不可变记录，禁止修改。")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("RaceResultReviewApproval 是不可变记录，禁止删除。")
+
+
 class AutomationLog(TimestampedModel):
     article = models.ForeignKey(NewsArticle, on_delete=models.CASCADE, related_name="automation_logs")
     phase = models.CharField(max_length=16, choices=AutomationPhase.choices)

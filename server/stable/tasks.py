@@ -116,6 +116,13 @@ JRA_SKIPPABLE_DETAIL_ERRORS = (ValueError, AttributeError, IndexError, TypeError
 
 
 @shared_task
+def scheduled_race_result_review_task() -> dict:
+    from stable.services.scheduled_race_result_review import run_scheduled_prepare
+
+    return run_scheduled_prepare()
+
+
+@shared_task
 def discover_p0_racecard_urls_task() -> dict:
     """Publish the current P0 official racecard URL document.
 

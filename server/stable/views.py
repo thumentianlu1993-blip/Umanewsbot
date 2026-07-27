@@ -3459,6 +3459,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         .prefetch_related(
             "runners",
             "results",
+            "result_review_approvals",
             "history_winners",
             "article_links__article",
         ),
@@ -3539,6 +3540,29 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         if hide_live_results
         else _attach_result_display_positions(list(event.results.all()))
     )
+    result_section_label = "正式赛果"
+    if results and all(result.official_finish_position is None for result in results):
+        from stable.services.scheduled_race_result_review import (
+            compute_reviewed_row_digest,
+        )
+
+        current_digest = compute_reviewed_row_digest(
+            [
+                {
+                    "finish_position": result.finish_position,
+                    "horse_number": result.horse_number,
+                    "horse_name": result.horse_name,
+                    "running_status": result.running_status,
+                }
+                for result in results
+            ]
+        )
+        if any(
+            approval.authority == "human_reviewed_reference"
+            and approval.reviewed_row_digest == current_digest
+            for approval in event.result_review_approvals.all()
+        ):
+            result_section_label = "已人工审核赛果"
     history_winners = _series_history_winners(
         event,
         exclude_result_event_id=event.pk if hide_live_results else None,
@@ -3578,6 +3602,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "series_events": series_events,
             "news_groups": news_groups,
             "live_result_status": live_result_status,
+            "result_section_label": result_section_label,
             "canonical_product_event": (
                 canonical_product_link.canonical_event
                 if canonical_product_link
