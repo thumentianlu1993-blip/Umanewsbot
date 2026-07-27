@@ -63,6 +63,17 @@ def _racecard_link_from_detail(detail_html: str, detail_url: str) -> str:
     return ""
 
 
+def _detail_url_candidates(
+    detail_url: str,
+    *,
+    recovery_mode: bool,
+) -> list[str]:
+    candidates = [detail_url]
+    if recovery_mode and detail_url.endswith("/introduction.html"):
+        candidates.append(urljoin(detail_url, "racecard.html"))
+    return candidates
+
+
 def _result_link_from_deba(deba_html: str, deba_url: str) -> str:
     soup = BeautifulSoup(deba_html, "html.parser")
     for a in soup.find_all("a", href=True):
@@ -250,15 +261,41 @@ def prepare_candidates(args) -> dict:
                 summary["skipped"].append({"slug": event["slug"], "reason": "missing_detail_url"})
                 continue
             try:
-                detail_html = _download(
+                deba_url = ""
+                attempted_detail_urls = []
+                for candidate_detail_url in _detail_url_candidates(
                     detail_url,
-                    source_dir / _slug_filename("source_nar_detail", detail_url),
-                    allow_network=args.allow_network,
-                    timeout=args.timeout_seconds,
-                )
-                deba_url = _racecard_link_from_detail(detail_html, detail_url)
+                    recovery_mode=bool(
+                        getattr(args, "recovery_mode", False)
+                    ),
+                ):
+                    attempted_detail_urls.append(candidate_detail_url)
+                    detail_html = _download(
+                        candidate_detail_url,
+                        source_dir
+                        / _slug_filename(
+                            "source_nar_detail",
+                            candidate_detail_url,
+                        ),
+                        allow_network=args.allow_network,
+                        timeout=args.timeout_seconds,
+                    )
+                    deba_url = _racecard_link_from_detail(
+                        detail_html,
+                        candidate_detail_url,
+                    )
+                    if deba_url:
+                        detail_url = candidate_detail_url
+                        break
                 if not deba_url:
-                    summary["skipped"].append({"slug": event["slug"], "reason": "racecard_not_published", "detail_url": detail_url})
+                    summary["skipped"].append(
+                        {
+                            "slug": event["slug"],
+                            "reason": "racecard_not_published",
+                            "detail_url": detail_url,
+                            "attempted_detail_urls": attempted_detail_urls,
+                        }
+                    )
                     continue
                 deba_html = _download(
                     deba_url,

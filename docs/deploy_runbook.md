@@ -6983,3 +6983,23 @@ Sporting Life、ZEturf、HRN 只允许进入 internal reference 链。正式实�
 回滚顺序：停止后续 one-shot -> 确认当前命令已结束/中止且没有数据库事务 -> 必要时回滚镜像。
 reference 审计默认保留；由于它不改变公开对象，禁止顺带批量回改 `RaceEvent`、runner/result、
 revision、新闻或 QQ。
+
+# 2026-07-27 赛果恢复补缺候选运行记录
+
+- 正式关闭态 prepare：`/opt/umanewsbot/runtime/race_result_recovery/prepare-20260727T073643Z`，
+  请求 `73/75`、最小间隔 `1.000064s`、source cache `14760016` bytes、manual-only 请求 0。
+- 补缺批次：`/opt/umanewsbot/runtime/race_result_recovery/gap-prepare-20260727T075310Z`。
+  event 185 使用 NAR 已发布 racecard/RaceMarkTable 生成 14 条结果；美国 12 场使用
+  Sporting Life 生成 82 条结果，TOBA/Equibase 入口只由交互式浏览器结构化记录。
+- review manifest SHA-256：
+  `ebc84c098a802322eb455f98c6ca22a2161894d7d4954245a2f99e2380461f60`；
+  40 场 review-only candidate SHA-256：
+  `f40c04265bdb4de418fdc8c97cc4eea9c7329514100809222241391d1e0765b3`；
+  完整排名 CSV SHA-256：
+  `df3f547104f2e02f32f41e59c37f846c5ecd686f42b230965e7aedefb922447e`。
+- 首版 `SHA256SUMS` 因误含自身而校验失败，未作为证据；排除自身的 `SHA256SUMS.v2`
+  全部通过。两轮均未写业务数据库；web/worker/beat 的 historical network 与 P0
+  discovery/scheduler 开关复核为 false，healthz 为 ok。
+- review-only 合并包不得直接用于 audit/apply。必须先发布并部署
+  `source_map_version=2026-07-27-gap-v2`，重新运行正式 bounded prepare，再进入人工官方
+  route receipt、coverage audit 与 dry-run。

@@ -56,7 +56,7 @@ TARGET_MODULES = [
 SOURCE_AUTHORITY_LEVELS = {"official", "third_party_high_access", "third_party", "reference"}
 REPO_ROOT = Path(__file__).resolve().parents[3]
 RECOVERY_PURPOSE = "race_result_recovery"
-RECOVERY_SOURCE_MAP_VERSION = "2026-07-27"
+RECOVERY_SOURCE_MAP_VERSION = "2026-07-27-gap-v2"
 RECOVERY_EVENT_IDS_BY_SOURCE = {
     (RacingRegion.JAPAN.value, "jra"): {80, 81, 82, 83},
     (RacingRegion.JAPAN.value, "nar"): {184, 185},
@@ -64,10 +64,8 @@ RECOVERY_EVENT_IDS_BY_SOURCE = {
         917, 918, 919, 920, 921, 922, 923, 925, 926, 927, 928,
     },
     (RacingRegion.FRANCE.value, "zeturf"): {733, 734, 735, 736},
-    (RacingRegion.UNITED_STATES.value, "toba"): {
-        406, 407, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420,
-    },
     (RacingRegion.UNITED_STATES.value, "sporting_life"): {
+        406, 407, 411, 412, 413, 414, 415, 416, 417, 418, 419, 420,
         421, 422, 423, 424, 425, 426, 427,
     },
 }

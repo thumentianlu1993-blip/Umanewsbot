@@ -2253,3 +2253,19 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   manifest-bound one-shot。赛前 route 或无人值守调度属于后续独立范围。
 - 阶段 B0.1 与 TRA/官方赛前同步分开 review、开关、联网和生产写入授权；连续观察成功也不会
   自动提高来源 authority。
+
+# 2026-07-27 赛果补缺 candidate source map 升级为 gap-v2
+
+- 决定将美国 19 场恢复目标全部交给 Sporting Life 结果 adapter 生成完整数字顺序候选。
+  TOBA 对前 12 场只保留 Equibase 精确 chart 入口、field 与 winner 的 discovery 证据，
+  不再作为结果 candidate provider，也不能授权 official confirmation。
+- 原因：生产一次性 prepare 中 TOBA 自动请求返回 403，且 TOBA 表只提供 winner/discovery，
+  无法满足完整参赛名单与连续唯一名次门禁；同场 Sporting Life 已取得完整顺序，并与 TOBA
+  field/winner 一致。
+- NAR event 185 不改变 provider；recovery mode 允许在冻结的 `introduction.html` 尚无入口时
+  受控检查同目录 `racecard.html`。该行为只在 recovery mode 生效，不改变普通历史详情流程。
+- 法国 event `733..736` 在 recovery mode 使用首轮 prepare 已核验的四条精确 ZEturf route，
+  下载后必须重验日期、赛场与赛事名，失败不回退宽范围探测。该选择把预计请求数从 35 降至
+  4，使美国 19 场改走 Sporting Life 后全批仍可满足 75 请求硬上限。
+- 新 candidate source map 版本为 `2026-07-27-gap-v2`。发布前的 40 场合并包仅供审阅，
+  source map v2 未部署前不得作为正式 audit/apply 输入。

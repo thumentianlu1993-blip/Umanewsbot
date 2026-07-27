@@ -47,7 +47,7 @@
 
 - [x] 4.1 (operations) 取得精确 release 授权后部署受审版本，保持恢复 apply、网络自动化、TRA public、scheduler 和 publication 开关关闭，并验证生产 commit/镜像/迁移/健康。
 - [x] 4.2 (operations) 生成 `2026-07-08..2026-07-27` 生产只读 inventory，核对 event row 数、race group 数、26 条重点缺口、9 组重复候选、event 924 provisional 和五地区分布。
-- [ ] 4.3 (operations) 对 inventory manifest 和 `source_research_20260727.md` 的精确 40 场 source map 取得明确审批后，仅对有自动化许可的 candidate route 按 `<=75` 请求、`<=30s` timeout、`<=512 MiB` cache 执行网络 prepare；manual-only 官方路由请求数必须为 0，只生成候选/source-cache/artifact，不写业务数据库。
+- [x] 4.3 (operations) 对 inventory manifest 和 `source_research_20260727.md` 的精确 40 场 source map 取得明确审批后，仅对有自动化许可的 candidate route 按 `<=75` 请求、`<=30s` timeout、`<=512 MiB` cache 执行网络 prepare；manual-only 官方路由请求数必须为 0，只生成候选/source-cache/artifact，不写业务数据库。
 - [ ] 4.4 (operations) 完成人工官方路由逐场核验、重复 identity review、字段 diff 和 blocker 分类，生成逐场 coverage、candidate SHA 与 dry-run。
 - [ ] 4.5 (operations) 由独立 verifier 复核所有冻结目标 accounted 守恒，并分别报告 completion 是否 `blocker=0`、精确预计 result-row/revision/canonical-link create/update/delete、owner 分流和未闭环 blocker。
 
