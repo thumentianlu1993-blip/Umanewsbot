@@ -1,5 +1,30 @@
 # 部署运行手册
 
+## 2026-07-28 最近赛事赛果定时审核生产发布记录
+
+1. 发布前没有 import lock、STARTED import 或 RUNNING historical batch；数据库备份
+   `/opt/umanewsbot/backups/db/pre-scheduled-race-result-review-20260728T004929+0800.dump`
+   为 `262544260` bytes，SHA-256
+   `6edc1c6b7057f1be2ab622d570816890958edf7e67557b38b8dc95ff2c9b2205`，
+   `.env` 备份同 timestamp，另保留 rollback image
+   `umanewsbot:rollback-pre-scheduled-race-result-review-20260728T004929_0800`。
+2. PR `#39` 首次部署严格保持新开关关闭；migration `0062` 成功、route registry 可读、
+   四张治理表为 0，disabled smoke、healthz 和 Celery ping 通过。
+3. 首次启用后的 catch-up 在联网前因 JSON 序列化失败。止血顺序是停止 Beat、关闭总开关
+   和网络开关、核对业务基线与治理表均未变化；不得删除或改写生产数据来绕过错误。
+4. PR `#40` 窄修后重新执行完整关闭态部署，再次通过 disabled smoke 后启用。当前生产
+   HEAD `ca22c9fa6389984cf38f6cbb9f8c6179e7249798`，image
+   `sha256:0cb2e1787fadfb742d3733db3a53e0d08035c22d98d71779dd874bb4a06def65`。
+5. 首次受控 run `26` 为 `notified`，bundle
+   `07e7f22374bbc09a85df441f87da1cd0228f5431a8f9378a8f1e578bbecf4d47`；
+   delivery 为 1，重复 wrapper 为 `already_claimed`。业务基线仍为
+   `RaceEventResult=92223`、finished `9419`、scheduled `443`。
+6. Beat schedule 是 `30 6,18 * * *`、timezone `Asia/Shanghai`；Codex automation
+   `umanews` 执行同一生产 wrapper。回滚/止血先暂停 automation、停止 Beat并关闭总开关，
+   不得仅依赖其中一个入口。
+7. 当前 13 个目标全部 `route_missing`。在来源身份 discovery 修复并通过独立验证之前，
+   正常运行可以发送 blocker 审核包，但不得将其解释为已取得赛果，也不得执行 apply。
+
 ## 2026-07-27 event 80 非完赛解析修复的后续发布顺序
 
 1. 仅发布通过独立只读复审的精确提交；部署时保持 race-result apply、historical network、

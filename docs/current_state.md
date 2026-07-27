@@ -1,5 +1,26 @@
 # 当前状态
 
+## 2026-07-28 最近赛事赛果定时审核已发布，首轮暴露来源路由缺口
+
+- 主功能 PR `#39` 合并为 `main@dd35038f`；生产首次补跑因 coalesced slot 的
+  `datetime` 直接写入 JSONField 而在联网前失败。Beat 随即停止、两个功能开关恢复
+  `false`，业务基线保持 `RaceEventResult=92223`、已结束赛事 `9419`、赛前赛事 `443`，
+  四张新治理表均为 `0`。
+- 窄修 PR `#40` 合并为 `main@ca22c9fa`，只把 JSON 摘要中的 slot 转为 ISO 8601，
+  主 `schedule_slot` 仍为带时区字段；新增自动 catch-up 真实入库回归。修复版重新按关闭态
+  部署并通过 `disabled` smoke，production image 为
+  `sha256:0cb2e1787fadfb742d3733db3a53e0d08035c22d98d71779dd874bb4a06def65`。
+- 随后启用总开关、受限联网和唯一收件人。首次受控 prepare 为 run `26`、bundle
+  `07e7f22374bbc09a85df441f87da1cd0228f5431a8f9378a8f1e578bbecf4d47`；
+  邮件发送成功，重复 wrapper 返回 `already_claimed`，delivery 仍为 `1`。
+- 本轮 selector 找到 `13` 场，但 `candidate=0`、`blocker=13`，全部为
+  `route_missing`。因此当前只证明调度、不可变审核包、邮件和幂等链路可用，尚未满足
+  “除人工赛果审阅外无其他卡点”的产品验收；不得把 blocker 邮件表述为已收集完整赛果。
+- Beat 已按 `Asia/Shanghai` 每日 `06:30/18:30` 注册；Codex automation
+  `umanews` 作为同 slot 备用触发且仅失败通知。两者均禁止 apply，赛果审核仍是业务写入
+  的唯一人工授权点。下一项实现缺口是为当前及未来目标建立可自动解析、可验证、已批准的
+  来源身份/route discovery。
+
 ## 2026-07-27 正式 gap-v2 prepare 为 39/40，JRA 中止语义已本地修复
 
 - 生产只读联网 prepare
