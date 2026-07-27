@@ -1,5 +1,20 @@
 # 部署运行手册
 
+## 2026-07-27 event 80 非完赛解析修复的后续发布顺序
+
+1. 仅发布通过独立只读复审的精确提交；部署时保持 race-result apply、historical network、
+   race-live scheduler/monitor/runner/lifecycle 与 publication policy 全关闭，不改当前 P0
+   URL 发现开关状态。
+2. 部署后先运行 Django check、迁移漂移、容器镜像/commit 与内外 healthz 验证；不得把代码
+   部署解释为联网 prepare 或赛果写入授权。
+3. 取得新的有界联网 prepare 授权后，复用冻结 40 场 scope、expected-target/source-map
+   SHA 和现有 source cache 重跑。必须重新核对请求 `<=75`、manual-only 请求 `=0`、
+   candidate 数 `=40`，并确认 event 80 为 17 条连续数值名次加 #5 `中止/pulled_up`，
+   `result_order_complete=true`；不得给 #5 补造第 18 名。
+4. 新 candidate/approval/review manifest SHA 必须重新生成。只有独立 verifier 证明
+   40/40 accounted、`blocker=0`、精确 create/update/delete 与 owner 分流后，才可向用户
+   请求绑定这些 SHA 的生产写入授权。
+
 ## 2026-07-27 event 426 时间修正与联网 prepare 记录
 
 1. 写前确认 event `426` 为 `EDDIE READ S.`、`local_date=2026-07-26`、

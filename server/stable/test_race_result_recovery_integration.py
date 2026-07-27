@@ -605,6 +605,57 @@ class RaceResultRecoveryJraControlTests(SimpleTestCase):
         self.assertEqual(summary["events"], 1)
         self.assertEqual(records[0]["slug"], "recovery-event-80")
 
+    def test_jra_interruption_is_preserved_without_inventing_a_finish_position(self):
+        tool = self._tool()
+        source_url = "https://www.jra.go.jp/datafile/seiseki/replay/2026/063.html"
+        body = (
+            '<div class="race_header">2026年7月19日 小倉</div>'
+            '<div class="race_title">小倉記念</div>'
+            "<table>"
+            "<tr><th>着順</th></tr>"
+            '<tr><td class="place">1</td><td class="num">1</td>'
+            '<td class="horse">Winner</td></tr>'
+            '<tr><td class="place">2</td><td class="num">2</td>'
+            '<td class="horse">Runner-up</td></tr>'
+            '<tr><td class="place">中止</td><td class="num">5</td>'
+            '<td class="horse">エヒト</td></tr>'
+            "</table>"
+        ).encode("cp932")
+
+        runners, results, metadata = tool._parse_detail_page(
+            body,
+            source_url=source_url,
+        )
+
+        self.assertEqual([row["finish_position"] for row in results], [1, 2])
+        self.assertNotIn(
+            "5",
+            {row["horse_number"] for row in results},
+            "中止马不得被补造为数值名次",
+        )
+        interrupted = next(row for row in runners if row["horse_number"] == "5")
+        self.assertEqual(interrupted["running_status"], "pulled_up")
+        self.assertEqual(
+            interrupted["source_refs"]["jra_finish_position_text"],
+            "中止",
+        )
+        self.assertEqual(metadata["row_count"], 3)
+        self.assertEqual(metadata["result_count"], 2)
+
+        record = {
+            "modules": {
+                RaceEventModule.RUNNERS: {"items": runners},
+                RaceEventModule.RESULTS: {"items": results},
+            }
+        }
+        orchestration._annotate_recovery_result_order(record)
+
+        self.assertTrue(record["metadata"]["result_order_complete"])
+        self.assertEqual(
+            record["metadata"]["result_order_check"]["reason"],
+            "complete",
+        )
+
 
 class RaceResultRecoveryAdapterModeTests(SimpleTestCase):
     def _tool(self, filename: str):

@@ -2101,6 +2101,23 @@ def _recovery_runner_has_result(
     return False
 
 
+RECOVERY_UNMATCHED_RESULT_STATUSES = frozenset(
+    {
+        "scratched",
+        "withdrawn",
+        "did_not_start",
+        "did_not_finish",
+        "disqualified",
+        "non_runner",
+        "fell",
+        "pulled_up",
+        "refused",
+        "unseated_rider",
+        "brought_down",
+    }
+)
+
+
 def _annotate_recovery_result_order(record: dict[str, Any]) -> None:
     modules = record.get("modules")
     if not isinstance(modules, dict):
@@ -2185,7 +2202,7 @@ def _annotate_recovery_result_order(record: dict[str, Any]) -> None:
                     item
                     for item in runners
                     if str(item.get("running_status") or "").strip().casefold()
-                    not in {"withdrawn", "scratched"}
+                    not in RECOVERY_UNMATCHED_RESULT_STATUSES
                 ]
                 check["expected_runner_count"] = len(expected_runners)
                 missing = [
