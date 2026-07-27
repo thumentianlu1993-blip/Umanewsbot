@@ -18,11 +18,22 @@
   解析和 `git diff --check` 通过。
 - 独立代码 reviewer 经过首次 `REVISE` 和两轮限定返修后最终 `VERDICT: APPROVED`，无剩余
   P0/P1/P2 finding。
-- 当前精确状态：实现 diff 尚未 commit；为在 RED 前对齐 `origin/main@a59956b3`，本地分支已有
-  未推送的 merge commit `7423d490`。其余状态为 `implementation reviewed / not pushed /
-  PR #24 unchanged / GitHub smoke not run / full network not run / not deployed / no production write`。
-  下一门禁是在最新 review 后取得针对当前 fingerprint 的发布授权，才可 commit、push 并更新
-  草稿 PR；完整公网研究运行仍需另行明确授权。
+- 用户在最终 review 后授权提交、推送、更新草稿 PR 并触发默认离线 workflow。冻结内容
+  SHA-256 为 `275957760e0ba787c3d3308cfb1a4573db20ba1ddec6c8c031b3ccb965f44e75`；
+  实现提交 `703c262bb54b68c15643727b2ca9ea9f2fbd2ef8` 已快进推送到
+  `research/2026-graded-top5-wikipedia`，PR #24 保持 OPEN 草稿并已更新说明。
+- PR synchronize 未自动生成 Actions run；随后在同一授权范围内手动
+  `workflow_dispatch full_network=false`。run
+  `30240664640` 的 tests job 11 秒成功，races 至 finalize 十个公网 job 全部 skipped。
+  artifact `30240664640-1-synthetic-checkpoint-0`（ID `8643122587`，21697 bytes，保留至
+  2026-08-10）已下载核验，包含 stage item/index、progress、safe-stop 证据、7 个最终文件和
+  `synthetic_smoke_report.json`。
+- synthetic 报告确认 `safe_stop_evidence_present=true`、恢复后 item SHA 与不中断基线相同、
+  `byte_equivalent=true`；summary 为 2 场/2 行/2 匹 synthetic 数据、1 个 resolution error、
+  5 次请求。完整公网研究仍未运行，生产未部署且数据库零写。
+- 当前精确状态：`committed / pushed / draft PR updated / offline checkpoint artifact PASS /
+  full network not run / not merged / not deployed / no production write`。下一门禁是用户另行明确
+  授权完整公网 `full_network=true`；该授权不得由本次离线 run 推导。
 
 ## 2026-07-24 首页人工头条与 AI 编辑推荐控制已实现（待独立代码审核）
 
