@@ -1,5 +1,36 @@
 # 当前状态
 
+## 2026-07-27 P0 官方出马页 URL 定时任务已上线，Equibase 生产网络降级
+
+- PR `#32` 已合并为 `main@cfba71518f1024d54cd5553b7f0bb35c780f5959`，生产
+  `/opt/umanewsbot` 已快进到该 revision；`web/worker/beat` 使用镜像
+  `sha256:a11d072d8a8fc9cc268db996bc916751cea51fe0b7a7cdfc16b715ab0f3e4bf7`。
+- 发布前恢复点为
+  `.env.backup.pre-p0-url-20260727T062445Z` 和
+  `backups/db/pre-p0-url-20260727T062445Z.dump`；两者 mode 均为 `0600`。数据库备份
+  `259806424` bytes，SHA-256
+  `5a02d4b2e2da1f9040920e046bf4bff75790c9dc5ee4a9aed82390acfd894e76`，
+  容器内 `pg_restore -l` 通过。
+- 关闭态部署先验证 `P0_RACECARD_URL_DISCOVERY_ENABLED=false`，同步调用返回
+  `{"enabled": false}`，`TaskExecutionLog` 与宿主文档文件数均保持 `0 -> 0`。随后设置
+  worker/beat 的该开关为 true；beat 确认使用 `Asia/Shanghai` 和
+  `30 6,18 * * *`，任务名为 `stable.tasks.discover_p0_racecard_urls_task`。
+- 已完成两次受控运行，均为
+  `future_expected=6 / orphans=5 / listing_reachable=3 / found=0 /
+  not_available=8 / blocked=6 / errors=2`。两个 generation ID 分别为
+  `d25176d9f07f960704caf13943f617a40e0a80a022557db9888e271791119ef9` 和
+  `5868715fb4406b552132adf4e7a24372dba72253d20b25196ffc1368b2ce68db`；
+  `current` 指向后者，generation verifier 通过。
+- BHA 三场生成官方日期索引；France Galop 与五个时间证据不足的美国 orphan 按设计显示
+  “暂无”。Equibase DMR/CNL 从香港生产服务器发起 HEAD 时连接超时，两个目标 fail closed
+  为 `source_error/error_without_previous`，没有伪造 URL。该 provider 当前为生产网络降级，
+  调度保留启用以在每日两次运行中自动重试，不能描述为全地区成功。
+- 两次运行仅新增 `TaskExecutionLog=2` 和宿主 generation 文档。两次运行完整时间范围内，
+  `RaceEvent / RaceEventRunner / RaceEventResult / ExternalRaceEntry / ExternalRaceResult`
+  的 `updated_at` 命中数均为 `0`。Django check、generation verifier、回环/公网 healthz
+  均通过；未启用 race-live、lifecycle、历史抓取、公开发布或 QQ 影响。
+- beat 重启后会补投其他既有周期任务，验收快照默认 Celery 队列为 `19`；没有删除或清空这些
+  生产任务，worker 保持运行消费。
 ## 2026-07-27 PR #33 完整名次门禁进入独立复审修复轮，尚未合并或部署
 
 - 生产首轮 prepare 暴露的 NAR/Sporting Life/ZEturf `scheduled` 静默过滤已补有效 RED。

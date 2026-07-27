@@ -6803,6 +6803,44 @@ python manage.py complete_horse_profiles \
   `/opt/umanewsbot/runtime/upcoming_racecard_urls/`，保持功能开关 false 部署并完成 flag-off
   smoke；随后才可按精确 route 做单次生产验证并启用开关。任何代码/registry 变化都会使 proof、
   review 和授权失效。
+
+## P0 官方出马页面 URL 文档（2026-07-27 生产发布记录）
+
+1. 发布身份：
+   - PR `#32`；
+   - production/main：
+     `cfba71518f1024d54cd5553b7f0bb35c780f5959`；
+   - `web/worker/beat` image：
+     `sha256:a11d072d8a8fc9cc268db996bc916751cea51fe0b7a7cdfc16b715ab0f3e4bf7`。
+2. 恢复点：
+   - `.env.backup.pre-p0-url-20260727T062445Z`，mode `0600`；
+   - `backups/db/pre-p0-url-20260727T062445Z.dump`，mode `0600`，
+     `259806424` bytes，SHA-256
+     `5a02d4b2e2da1f9040920e046bf4bff75790c9dc5ee4a9aed82390acfd894e76`，
+     容器内 `pg_restore -l` 通过。
+3. 关闭态 smoke：
+   - flag=false 时直接调用返回 `enabled=false`；
+   - P0 `TaskExecutionLog 0 -> 0`；
+   - `runtime/upcoming_racecard_urls` 子项 `0 -> 0`。
+4. 启用与验收：
+   - worker/beat flag=true；
+   - Celery timezone=`Asia/Shanghai`；
+   - schedule=`30 6,18 * * *`；
+   - 两次受控运行各生成一代，`current` 指向
+     `5868715fb4406b552132adf4e7a24372dba72253d20b25196ffc1368b2ce68db`，
+     verifier 通过；
+   - 两次运行均为 `future_expected=6 / orphans=5 / listing_reachable=3 /
+     found=0 / not_available=8 / blocked=6 / errors=2`。
+5. 当前降级：
+   - BHA 三个日期索引可用；
+   - Equibase DMR/CNL 从生产主机连接超时，固定记录
+     `source_error/error_without_previous`；
+   - 不切换为第三方 URL、不猜测成功，保留 06:30/18:30 低频自动重试。
+6. 数据边界：
+   - 新增 P0 `TaskExecutionLog=2`；
+   - 两次运行范围内 `RaceEvent/RaceEventRunner/RaceEventResult/ExternalRaceEntry/
+     ExternalRaceResult` 更新数均为 `0`；
+   - 未启用 race-live、lifecycle、历史抓取、公开发布或 QQ。
 ## 2026-07-27 赛果缺口恢复发布前门禁
 
 - 当前仅完成本地实现，禁止直接运行生产 inventory、联网 candidate prepare 或 apply。
