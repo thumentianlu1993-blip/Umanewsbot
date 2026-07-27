@@ -594,6 +594,30 @@ class ScheduledRaceResultReviewDatabaseContractTests(TestCase):
         prepare.assert_called_once()
 
     @override_settings(RACE_RESULT_REVIEW_ENABLED=True)
+    def test_automatic_catchup_persists_json_serializable_terminal_summary(self):
+        service = _scheduled_service(self)
+        with mock.patch.object(service.timezone, "now", return_value=NOW), mock.patch.object(
+            service,
+            "prepare_review_bundle",
+            return_value={
+                "status": "noop",
+                "selector_sha256": "d" * 64,
+                "target_count": 0,
+            },
+        ):
+            result = service.run_scheduled_prepare()
+
+        coalesced = models.RaceResultReviewRun.objects.filter(
+            status="coalesced_to_latest_due_slot"
+        ).order_by("schedule_slot")
+        self.assertEqual(result["status"], "noop")
+        self.assertEqual(coalesced.count(), 27)
+        self.assertEqual(
+            coalesced.first().terminal_summary["schedule_slot"],
+            coalesced.first().schedule_slot.isoformat(),
+        )
+
+    @override_settings(RACE_RESULT_REVIEW_ENABLED=True)
     def test_stale_worker_cannot_publish_terminal_state_after_cas_takeover(self):
         service = _scheduled_service(self)
 
