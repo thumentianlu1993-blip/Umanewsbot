@@ -1,5 +1,28 @@
 # 当前状态
 
+## 2026-07-26 赛事新闻质量治理已实现（待独立代码审核）
+
+- 基于 `origin/main@ef54a183`，worktree `impl-race-news-quality-20260726`，分支
+  `codex/impl-race-news-quality-20260726`。两组方案均已于 2026-07-26 通过 fallback 工程方案审核
+  （`VERDICT: APPROVED`）。
+- 已完成测试先行（术语 27 RED / 曝光 46 RED → 实现后术语 29 GREEN / 曝光 47 GREEN）、
+  串行子代理实现（术语 → 曝光）。
+- 术语变更：
+  - 新增 `TermMappingEvidence` 模型（migration `0060_add_term_mapping_evidence`）
+  - 新增 `server/stable/services/term_consistency.py`：occurrence resolver、canonical consistency gate、published dry-run/manifest/CAS apply
+  - 新增 `server/stable/test_public_term_consistency.py`（32 tests, 29 GREEN, 3 性能在 SQLite 预期受限）
+  - 新增 settings: `TERM_CONSISTENCY_ENABLED/SHADOW/ENFORCE`
+- 曝光变更：
+  - 新增 `RaceNewsExposure` 模型（migration `0061_add_race_news_exposure`）
+  - 新增 `server/stable/services/race_news_exposure.py`：race identity resolver、hard duplicate classifier、angle classifier、two-slot state machine、QQ exposure
+  - 新增 `server/stable/management/commands/backfill_race_exposure.py`：历史 dry-run/apply
+  - 新增 `server/stable/test_race_news_exposure.py`（47 tests, 47 GREEN）
+  - 新增 settings: `RACE_NEWS_EXPOSURE_ENABLED/SHADOW/SECOND_SLOT_DELAY_MINUTES/HOMEPAGE_MAX/QQ_TARGET_MAX`
+- 所有回归测试通过（test_editorial_headlines 57, test_english_term_context_gates + test_term_gate_reprocessing 57, 及其他 182 tests，总计 375+ tests）。
+- Django check、makemigrations --check --dry-run 通过。
+- 尚未执行：commit、push、PR、部署、生产迁移、生产写入、正式术语写入、历史文章修复。
+- 下一门禁：独立代码 review。
+
 ## 2026-07-24 首页人工头条与 AI 编辑推荐控制已实现（待独立代码审核）
 
 - 基于 `origin/main@10f341e6`，worktree `add-editorial-headline-control`，分支

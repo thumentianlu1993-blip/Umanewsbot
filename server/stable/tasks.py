@@ -34,6 +34,8 @@ from stable.models import (
     QQPushDeliveryStatus,
     PushTarget,
     RaceLiveAlertIncident,
+    RaceNewsExposure,
+    RaceNewsExposureStatus,
     RacingRegion,
     ReviewMode,
     SourceMode,
@@ -1971,13 +1973,60 @@ def qq_auto_push_article_task(article_id: int) -> dict:
             return {"article_id": article_id, "skipped": True, "reason": "no_targets"}
         eligible_targets = []
         target_skip_reasons: dict[str, str] = {}
-        for target in targets:
-            target_eligibility = should_push_news_to_qq(article, target=target)
-            if target_eligibility.allowed:
+
+        # Resolve race identity for exposure governance
+        _race_identity = None
+        _race_angle = "other"
+        if getattr(settings, "RACE_NEWS_EXPOSURE_ENABLED", False):
+            from stable.services.race_news_exposure import (
+                classify_angle,
+                reserve_qq_exposure,
+                resolve_race_identity,
+            )
+            _race_identity = resolve_race_identity(article)
+            if _race_identity:
+                from stable.models import RaceEvent
+                event = RaceEvent.objects.filter(pk=_race_identity["event_id"]).first()
+                if event:
+                    angle_result = classify_angle(article=article, event=event)
+                    _race_angle = angle_result["angle"]
+
+        # Single atomic block: exposure reservation + delivery creation.
+        # Inner reserve_exposure → transaction.atomic() nests as savepoints;
+        # if delivery fails the outer transaction, all inner savepoints roll back.
+        with transaction.atomic():
+            exposure_ids_by_target: dict[int, int] = {}
+            eligible_targets = []
+            for target in targets:
+                target_eligibility = should_push_news_to_qq(article, target=target)
+                if not target_eligibility.allowed:
+                    target_skip_reasons[str(target.id)] = target_eligibility.reason or "not_eligible"
+                    continue
+                if _race_identity:
+                    from stable.models import RaceEvent
+                    event = RaceEvent.objects.filter(pk=_race_identity["event_id"]).first()
+                    if event:
+                        exposure_result = reserve_qq_exposure(
+                            event=event, article=article,
+                            target=target, angle=_race_angle,
+                        )
+                        if exposure_result is None:
+                            target_skip_reasons[str(target.id)] = "no_slot_available"
+                            continue
+                        if exposure_result.get("status") == "waiting":
+                            target_skip_reasons[str(target.id)] = "slot2_waiting"
+                            continue
+                        if exposure_result.get("id"):
+                            exposure_ids_by_target[target.id] = exposure_result["id"]
                 eligible_targets.append(target)
-            else:
-                target_skip_reasons[str(target.id)] = target_eligibility.reason or "not_eligible"
-        deliveries = ensure_qq_push_deliveries(article, eligible_targets)
+            deliveries = ensure_qq_push_deliveries(article, eligible_targets)
+            # Link exposure to delivery
+            for delivery in deliveries:
+                tid = delivery.target_id
+                if tid in exposure_ids_by_target:
+                    RaceNewsExposure.objects.filter(
+                        pk=exposure_ids_by_target[tid]
+                    ).update(delivery=delivery)
         queued_ids: list[int] = []
         skipped_ids: list[int] = []
         for delivery in deliveries:
@@ -2030,6 +2079,12 @@ def qq_push_delivery_task(self, delivery_id: int) -> dict:
         if delivery.status == QQPushDeliveryStatus.FAILED:
             _log_failure(log, delivery.last_error or "qq push delivery failed")
             return result
+        # Mark linked exposure as sent on successful delivery
+        if delivery.status == QQPushDeliveryStatus.SENT:
+            RaceNewsExposure.objects.filter(delivery=delivery).update(
+                status=RaceNewsExposureStatus.SENT,
+                evidence={"sent_at": timezone.now().isoformat()},
+            )
         _log_success(log, f"status={delivery.status}")
         return result
     except Exception as exc:

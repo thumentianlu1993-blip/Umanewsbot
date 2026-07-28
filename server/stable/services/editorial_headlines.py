@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 from django.db.models import Prefetch, Q
 from django.utils import timezone
@@ -17,6 +18,10 @@ from stable.models import (
     HomepageHeadlineSelection,
     NewsArticle,
     NewsImage,
+    RaceEvent,
+    RaceNewsExposure,
+    RaceNewsExposureChannel,
+    RaceNewsExposureStatus,
     WorkflowStatus,
 )
 from stable.services.operations import log_operation
@@ -400,47 +405,122 @@ def set_manual_headline(
                 "reason": f"Article {article_id} is not eligible as headline",
             }
 
-        # Idempotency: already pointing to this article
-        if selection.article_id == article_id:
+        # Determine action
+        already_selected = selection.article_id == article_id
+        old_article_id = selection.article_id
+        had_previous = old_article_id is not None
+        action = "replaced" if had_previous else "set"
+
+        if not already_selected:
+            # Update selection
+            selection.article = article
+            selection.selected_by = user
+            selection.selected_at = timezone.now()
+            selection.version += 1
+            selection.save(
+                update_fields=["article", "selected_by", "selected_at", "version", "updated_at"]
+            )
+            selection.refresh_from_db()
+
+            # Audit — include old article ID so the full transition is reconstructable.
+            detail_parts = [
+                f"new_article={article_id}",
+                f"title={article.effective_title!r}",
+                f"version={selection.version}",
+            ]
+            if had_previous:
+                detail_parts.append(f"old_article={old_article_id}")
+            detail = " ".join(detail_parts)
+            log_operation(
+                action_type=f"headline_{action}",
+                target_type="headline_selection",
+                target_id=selection.pk,
+                detail=detail,
+                admin=user,
+            )
+            logger.info("headline_%s: %s", action, detail)
+
+        # When exposure governance is enabled, ensure the new headline article
+        # gets a homepage slot. If the same event already has slot 2 occupied,
+        # replace it with the headline article (slot 1 is never replaced).
+        # This block runs inside the same transaction.atomic() as the headline
+        # selection update above: any failure propagates and rolls back the
+        # whole operation, so a headline is never committed without its
+        # exposure state.  It also runs when the selection ALREADY points to
+        # this article (idempotent re-set): the exposure state may have
+        # degraded to waiting/suppressed since the headline was first set,
+        # and a headline without an ACTIVE exposure is invisible.
+        if getattr(settings, "RACE_NEWS_EXPOSURE_ENABLED", False):
+            from stable.services.race_news_exposure import (
+                classify_angle,
+                force_activate_exposure,
+                reserve_exposure,
+                replace_slot2,
+                resolve_race_identity,
+            )
+            identity = resolve_race_identity(article)
+            if identity:
+                event = RaceEvent.objects.filter(pk=identity["event_id"]).first()
+                if event:
+                    # Use the article's REAL classified angle.  Hardcoding
+                    # "comprehensive_result" here would falsely collide with
+                    # a comprehensive-result slot 1 and reject the headline
+                    # (or its re-activation) as same-angle.
+                    headline_angle = classify_angle(article=article, event=event)["angle"]
+                    # Check if this event already has slot 2 with a DIFFERENT article
+                    existing_slot2 = RaceNewsExposure.objects.filter(
+                        event=event,
+                        channel=RaceNewsExposureChannel.HOMEPAGE,
+                        scope_key="site",
+                        slot=2,
+                        status=RaceNewsExposureStatus.ACTIVE,
+                    ).exclude(article=article).first()
+                    if existing_slot2:
+                        sync_result = replace_slot2(
+                            event=event,
+                            channel=RaceNewsExposureChannel.HOMEPAGE,
+                            scope_key="site",
+                            old_article=existing_slot2.article,
+                            new_article=article,
+                            reason="manual_headline_replacement",
+                        )
+                    else:
+                        # No slot 2 yet — reserve a slot for the headline article
+                        sync_result = reserve_exposure(
+                            event=event,
+                            article=article,
+                            channel=RaceNewsExposureChannel.HOMEPAGE,
+                            scope_key="site",
+                            angle=headline_angle,
+                        )
+                    # Policy rejections return {"slot": None, "status": ...}
+                    # WITHOUT raising.  Honor them explicitly: committing the
+                    # headline anyway would leave a low-quality or
+                    # policy-blocked article on the homepage with no valid
+                    # exposure slot, so roll back the whole operation.
+                    if sync_result.get("slot") is None:
+                        raise ValueError(
+                            "headline exposure policy rejected: "
+                            f"{sync_result.get('status', 'unknown')}"
+                        )
+                    if sync_result.get("status") == "waiting":
+                        # A waiting slot-2 would leave the headline invisible
+                        # until promotion.  A manual headline is an editorial
+                        # override of the second-slot delay: activate now.
+                        sync_result = force_activate_exposure(
+                            sync_result["id"],
+                            reason="manual_headline_activate",
+                        )
+
+        if already_selected:
+            # Idempotency: already pointing to this article — the selection is
+            # unchanged; only the exposure sync above may have run.
             return {
                 "success": True,
                 "selection": selection,
                 "action": "set",
                 "version": selection.version,
             }
-
-        # Determine action
-        old_article_id = selection.article_id
-        had_previous = old_article_id is not None
-        action = "replaced" if had_previous else "set"
-
-        # Update selection
-        selection.article = article
-        selection.selected_by = user
-        selection.selected_at = timezone.now()
-        selection.version += 1
-        selection.save(
-            update_fields=["article", "selected_by", "selected_at", "version", "updated_at"]
-        )
-        selection.refresh_from_db()
-
-        # Audit — include old article ID so the full transition is reconstructable.
-        detail_parts = [
-            f"new_article={article_id}",
-            f"title={article.effective_title!r}",
-            f"version={selection.version}",
-        ]
-        if had_previous:
-            detail_parts.append(f"old_article={old_article_id}")
-        detail = " ".join(detail_parts)
-        log_operation(
-            action_type=f"headline_{action}",
-            target_type="headline_selection",
-            target_id=selection.pk,
-            detail=detail,
-            admin=user,
-        )
-        logger.info("headline_%s: %s", action, detail)
 
     return {
         "success": True,

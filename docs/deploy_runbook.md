@@ -1,5 +1,62 @@
 # 部署运行手册
 
+## 赛事新闻质量治理 部署配置（2026-07-26 实现完成，待部署）
+
+### 新增配置项（.env）
+
+```bash
+# 术语一致性
+TERM_CONSISTENCY_ENABLED=false
+TERM_CONSISTENCY_SHADOW=true
+TERM_CONSISTENCY_ENFORCE=false
+
+# 赛事新闻曝光
+RACE_NEWS_EXPOSURE_ENABLED=false
+RACE_NEWS_EXPOSURE_SHADOW=true
+RACE_NEWS_SECOND_SLOT_DELAY_MINUTES=15
+RACE_NEWS_HOMEPAGE_MAX=2
+RACE_NEWS_QQ_TARGET_MAX=2
+```
+
+### 新增 Migration
+
+- `0060_add_term_mapping_evidence` — 新增 `TermMappingEvidence` 表
+- `0061_add_race_news_exposure` — 新增 `RaceNewsExposure` 表及约束/索引
+- `0062_add_exposure_constraints` — exposure slot/delivery CheckConstraints
+- `0063_add_term_consistency_manifest` — 新增 `TermConsistencyManifest` 表（dry-run manifest 持久化与 rollback）
+
+### 部署验证
+
+```sh
+python manage.py check
+python manage.py makemigrations --check --dry-run
+python manage.py migrate --plan
+python manage.py test stable.test_race_news_exposure stable.test_public_term_consistency -v2
+python manage.py test stable.test_editorial_headlines stable.test_english_term_context_gates stable.test_term_gate_reprocessing -v2
+```
+
+### 灰度顺序
+
+1. 部署 schema + 代码，所有新开关关闭
+2. 开启术语 consistency shadow → 审核冲突和 unresolved
+3. 开启新闻 exposure shadow → 审核一个完整赛事窗口
+4. 术语 enforce → 新文章 canonical 门禁
+5. 首页 exposure enforce → 验证首页/赛事详情完整性
+6. 测试群 QQ enforce → 观察至少两个自然窗口
+7. 历史术语 repair dry-run → 人工审核 → 独立授权 apply
+8. 历史 exposure 回填 dry-run → 独立审核 → 单独授权 apply
+
+### 紧急回滚
+
+```sh
+# 关闭 enforce，保留审计
+# 术语
+TERM_CONSISTENCY_ENFORCE=false
+# 曝光
+RACE_NEWS_EXPOSURE_ENABLED=false
+# 不删除 migration 和审计表；旧 exposure 保留
+```
+
 ## task 5.4 最终生产执行记录（2026-07-24）
 
 - 精确提交 `044f3d57f4f3bb75eac31f0567917132e5ae5cff`，生产镜像

@@ -180,6 +180,22 @@ def select_qq_window_deliveries(
                     reason="region_window_limit",
                 )
             continue
+        # Resolve race identity once per article for exposure governance
+        _race_identity = None
+        _race_angle = "other"
+        if getattr(settings, "RACE_NEWS_EXPOSURE_ENABLED", False):
+            from stable.services.race_news_exposure import (
+                classify_angle,
+                resolve_race_identity,
+            )
+            _race_identity = resolve_race_identity(article)
+            if _race_identity:
+                from stable.models import RaceEvent
+                event = RaceEvent.objects.filter(pk=_race_identity["event_id"]).first()
+                if event:
+                    angle_result = classify_angle(article=article, event=event)
+                    _race_angle = angle_result["angle"]
+
         article_deliveries: list[QQPushDelivery] = []
         for target in targets:
             eligibility = should_push_news_to_qq(article, target=target)
@@ -192,37 +208,84 @@ def select_qq_window_deliveries(
                     reason=eligibility.reason or "not_eligible",
                 )
                 continue
-            existing_delivery = QQPushDelivery.objects.filter(article=article, target=target).first()
-            if existing_delivery is not None:
-                existing_skip_reason = _existing_delivery_skip_reason(existing_delivery)
-                if existing_skip_reason:
-                    _record_target_decision(
-                        window=window,
+            # Atomically bind exposure reservation + quota reservation +
+            # delivery creation for this target.  The exposure reservation
+            # runs in its own savepoint so a later quota rejection can roll
+            # back JUST the exposure (no orphan row) while the quota ledger
+            # bookkeeping (row created, used unchanged) still commits.
+            # A hard failure (exception) anywhere rolls back the whole
+            # bundle via the outer atomic block.
+            existing_delivery: QQPushDelivery | None = None
+            delivery: QQPushDelivery | None = None
+            skip_reason = ""
+            skip_payload: dict | None = None
+            with transaction.atomic():
+                existing_delivery = QQPushDelivery.objects.filter(article=article, target=target).first()
+                if existing_delivery is not None:
+                    skip_reason = _existing_delivery_skip_reason(existing_delivery)
+                    if skip_reason:
+                        skip_payload = {"delivery_id": existing_delivery.id}
+                exposure_id = None
+                exposure_savepoint = None
+                # Check race exposure slot availability
+                if not skip_reason and _race_identity:
+                    from stable.models import RaceEvent, RaceNewsExposure
+                    from stable.services.race_news_exposure import reserve_qq_exposure
+                    event = RaceEvent.objects.filter(pk=_race_identity["event_id"]).first()
+                    if event:
+                        exposure_savepoint = transaction.savepoint()
+                        exposure_result = reserve_qq_exposure(
+                            event=event,
+                            article=article,
+                            target=target,
+                            angle=_race_angle,
+                        )
+                        if exposure_result is None:
+                            skip_reason = "no_slot_available"
+                        # Do NOT deliver waiting slot-2 — it hasn't matured
+                        # yet.  The waiting exposure intentionally stays
+                        # committed (matches the instant-push path) so it
+                        # can be promoted once the delay elapses.
+                        elif exposure_result.get("status") == "waiting":
+                            skip_reason = "slot2_waiting"
+                            exposure_savepoint = None
+                        else:
+                            exposure_id = exposure_result.get("id")
+                if not skip_reason:
+                    reserved, quota_reason = _reserve_qq_quotas(
                         target=target,
-                        article=article,
-                        status=WindowDecisionStatus.SKIPPED,
-                        reason=existing_skip_reason,
-                        payload={"delivery_id": existing_delivery.id},
+                        window=window,
+                        group_hour_limit=group_hour_limit,
+                        site_hour_limit=site_hour_limit,
                     )
-                    zero_reasons.append(existing_skip_reason)
-                    continue
-            reserved, quota_reason = _reserve_qq_quotas(
-                target=target,
-                window=window,
-                group_hour_limit=group_hour_limit,
-                site_hour_limit=site_hour_limit,
-            )
-            if not reserved:
+                    if not reserved:
+                        skip_reason = quota_reason
+                        # Quota rejected AFTER the exposure slot was
+                        # reserved: roll back ONLY the exposure savepoint
+                        # so no orphan exposure row is committed (no
+                        # delivery will ever reference it).  The quota
+                        # ledger rows themselves still commit with `used`
+                        # unchanged, preserving the pre-existing quota
+                        # bookkeeping contract.
+                        if exposure_savepoint is not None:
+                            transaction.savepoint_rollback(exposure_savepoint)
+                if not skip_reason:
+                    delivery = existing_delivery or ensure_qq_push_deliveries(article, [target])[0]
+                    if exposure_id:
+                        # Link the exposure to its delivery inside the same
+                        # transaction so the pair commits or rolls back together.
+                        RaceNewsExposure.objects.filter(pk=exposure_id).update(delivery=delivery)
+            if skip_reason:
                 _record_target_decision(
                     window=window,
                     target=target,
                     article=article,
                     status=WindowDecisionStatus.SKIPPED,
-                    reason=quota_reason,
+                    reason=skip_reason,
+                    payload=skip_payload,
                 )
-                zero_reasons.append(quota_reason)
+                zero_reasons.append(skip_reason)
                 continue
-            delivery = existing_delivery or ensure_qq_push_deliveries(article, [target])[0]
             article_deliveries.append(delivery)
             _record_target_decision(
                 window=window,
