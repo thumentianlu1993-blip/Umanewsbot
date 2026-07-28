@@ -5,6 +5,7 @@ import argparse
 import csv
 import json
 import re
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,15 +19,6 @@ from bs4 import BeautifulSoup
 
 
 HRN_BASE_URL = "https://entries.horseracingnation.com"
-COUNTRY_SUFFIX_RE = re.compile(r"\s*[\(\（][A-Z]{2,3}[\)\）]\s*$")
-SPEED_SUFFIX_RE = re.compile(r"\s*\(\d+\)\s*$")
-RACE_HEADING_RE = re.compile(r"Race\s*#\s*(\d+)(?:,\s*([0-9:]+\s*[AP]M))?", re.IGNORECASE)
-
-
-def _text(node) -> str:
-    if node is None:
-        return ""
-    return " ".join(node.get_text(" ", strip=True).split())
 
 
 def _collapse(value: str) -> str:
@@ -62,35 +54,6 @@ def _race_no_from_chart_url(source_refs: dict) -> str:
     chart_url = source_refs.get("chart_url") or ""
     match = re.search(r"[?&]RACE=(\d+)", chart_url, re.IGNORECASE)
     return match.group(1) if match else ""
-
-
-def _display_horse_name(value: str) -> str:
-    value = _collapse(value)
-    value = SPEED_SUFFIX_RE.sub("", value).strip()
-    value = COUNTRY_SUFFIX_RE.sub("", value).strip()
-    return value
-
-
-def _split_trainer_jockey(value: str) -> tuple[str, str]:
-    value = _collapse(value)
-    if not value:
-        return "", ""
-    # HRN renders trainer and jockey in a single text cell. Keep the raw cell in
-    # source_refs; this heuristic gives usable display fields without claiming
-    # official separation when names have particles or initials.
-    parts = value.split()
-    if len(parts) <= 3:
-        return value, ""
-    return " ".join(parts[:-2]), " ".join(parts[-2:])
-
-
-def _trainer_jockey_from_cell(cell) -> tuple[str, str, str]:
-    parts = [_text(part) for part in cell.find_all("p", recursive=False) if _text(part)]
-    raw = _text(cell)
-    if len(parts) >= 2:
-        return parts[0], parts[1], raw
-    trainer, jockey = _split_trainer_jockey(raw)
-    return trainer, jockey, raw
 
 
 def _download(url: str, path: Path, *, allow_network: bool, timeout: int, sleep_seconds: float) -> str:
@@ -177,161 +140,20 @@ def _match_track(track_links: dict[str, dict], racecourse: str) -> dict | None:
     return None
 
 
-def _race_meta_after_heading(heading) -> str:
-    node = heading.find_next_sibling()
-    while node is not None:
-        if getattr(node, "name", None) == "div" and "row" in (node.get("class") or []):
-            text = _collapse(node.get_text(" ", strip=True))
-            if text:
-                return text
-        node = node.find_next_sibling()
-    return ""
-
-
-def _race_title_from_meta(meta: str) -> str:
-    parts = [part.strip() for part in meta.split(",")]
-    if len(parts) >= 3:
-        title = parts[2]
-    else:
-        title = meta
-    title = title.split("Purse:", 1)[0].strip()
-    title = title.split("|", 1)[0].strip()
-    return _collapse(title)
-
-
-def _horse_name_from_entry_cell(cell) -> tuple[str, str, str]:
-    link = cell.find("a", href=True)
-    raw = _collapse(link.get_text(" ", strip=True) if link else cell.get_text(" ", strip=True))
-    href = link["href"] if link else ""
-    return _display_horse_name(raw), raw, href
-
-
-def _parse_entries(table, *, source_url: str, race_no: str, race_meta: str) -> list[dict]:
-    rows: list[dict] = []
-    seen: set[tuple[str, str, str]] = set()
-    for index, tr in enumerate(table.find_all("tr"), start=1):
-        cells = tr.find_all(["td", "th"], recursive=False)
-        if len(cells) < 6:
-            continue
-        horse_name, raw_horse_name, horse_url = _horse_name_from_entry_cell(cells[2])
-        if not horse_name:
-            continue
-        horse_number = _text(cells[1])
-        dedupe_key = (horse_number, horse_name, horse_url)
-        if dedupe_key in seen:
-            continue
-        seen.add(dedupe_key)
-        trainer, jockey, trainer_jockey_raw = _trainer_jockey_from_cell(cells[3])
-        rows.append(
-            {
-                "sort_order": len(rows) + 1,
-                "horse_number": horse_number,
-                "barrier": "",
-                "horse_name": horse_name,
-                "jockey_name": jockey,
-                "trainer_name": trainer,
-                "odds_value": _text(cells[5]),
-                "running_status": "declared",
-                "source_refs": {
-                    "primary": source_url,
-                    "source_language": "en",
-                    "source_kind": "horse_racing_nation_track_day",
-                    "hrn_race_no": race_no,
-                    "hrn_race_meta": race_meta,
-                    "horse_name_raw": raw_horse_name,
-                    "horse_url": horse_url,
-                    "trainer_jockey_raw": trainer_jockey_raw,
-                },
-            }
-        )
-    return rows
-
-
-def _parse_payout_results(table) -> list[str]:
-    names: list[str] = []
-    for tr in table.find_all("tr"):
-        cells = tr.find_all(["td", "th"], recursive=False)
-        if len(cells) < 2:
-            continue
-        raw = _text(cells[0])
-        if not raw or raw.lower().startswith("runner"):
-            continue
-        if raw.startswith("*"):
-            continue
-        names.append(_display_horse_name(raw))
-    return names
-
-
-def _parse_also_rans(after_node) -> list[str]:
-    if after_node is None:
-        return []
-    for text_node in after_node.find_all_next(string=lambda value: value and "Also rans:" in value):
-        value = _collapse(str(text_node))
-        value = value.split("Also rans:", 1)[1].strip()
-        value = value.split("Pool", 1)[0].strip()
-        return [_display_horse_name(name.strip()) for name in value.split(",") if name.strip()]
-    return []
+try:
+    from stable.race_reference_parsers.horse_racing_nation import (
+        _parse_track_day as _shared_parse_track_day,
+    )
+except ModuleNotFoundError:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "server"))
+    from stable.race_reference_parsers.horse_racing_nation import (
+        _parse_track_day as _shared_parse_track_day,
+    )
 
 
 def _parse_track_day(html: str, *, source_url: str) -> list[dict]:
-    soup = BeautifulSoup(html, "lxml")
-    races: list[dict] = []
-    for heading in soup.find_all("h2"):
-        heading_text = _text(heading)
-        match = RACE_HEADING_RE.search(heading_text)
-        if not match:
-            continue
-        race_no = match.group(1)
-        start_time = match.group(2) or ""
-        race_meta = _race_meta_after_heading(heading)
-        race_title = _race_title_from_meta(race_meta)
-        entries_table = heading.find_next("table", class_=lambda classes: classes and "table-entries" in classes)
-        if entries_table is None:
-            continue
-        payout_table = entries_table.find_next("table", class_=lambda classes: classes and "table-payouts" in classes)
-        runners = _parse_entries(entries_table, source_url=source_url, race_no=race_no, race_meta=race_meta)
-        payout_names = _parse_payout_results(payout_table) if payout_table else []
-        also_rans = _parse_also_rans(payout_table) if payout_table else []
-        result_names: list[str] = []
-        for name in payout_names + also_rans:
-            if name and name not in result_names:
-                result_names.append(name)
-        by_name = {runner["horse_name"]: runner for runner in runners}
-        results = []
-        for position, horse_name in enumerate(result_names, start=1):
-            runner = by_name.get(horse_name)
-            if runner is None:
-                continue
-            results.append(
-                {
-                    "finish_position": position,
-                    "horse_number": runner["horse_number"],
-                    "barrier": runner["barrier"],
-                    "horse_name": runner["horse_name"],
-                    "jockey_name": runner["jockey_name"],
-                    "trainer_name": runner["trainer_name"],
-                    "odds_value": runner.get("odds_value", ""),
-                    "running_status": runner.get("running_status", "declared"),
-                    "is_confirmed": True,
-                    "source_refs": {
-                        **runner["source_refs"],
-                        "official_finish_position": position,
-                        "hrn_result_source": "payout_table_plus_also_rans",
-                    },
-                }
-            )
-        races.append(
-            {
-                "race_no": race_no,
-                "start_time": start_time,
-                "race_meta": race_meta,
-                "race_title": race_title,
-                "race_title_key": _norm(race_title),
-                "runners": runners,
-                "results": results,
-            }
-        )
-    return races
+    """Keep the historical CLI on the same parse-only implementation."""
+    return _shared_parse_track_day(html, source_url=source_url)
 
 
 def prepare_candidates(args) -> dict:

@@ -1,5 +1,250 @@
 # 当前状态
 
+## 2026-07-28 最近赛事赛果定时审核已发布，首轮暴露来源路由缺口
+
+- 主功能 PR `#39` 合并为 `main@dd35038f`；生产首次补跑因 coalesced slot 的
+  `datetime` 直接写入 JSONField 而在联网前失败。Beat 随即停止、两个功能开关恢复
+  `false`，业务基线保持 `RaceEventResult=92223`、已结束赛事 `9419`、赛前赛事 `443`，
+  四张新治理表均为 `0`。
+- 窄修 PR `#40` 合并为 `main@ca22c9fa`，只把 JSON 摘要中的 slot 转为 ISO 8601，
+  主 `schedule_slot` 仍为带时区字段；新增自动 catch-up 真实入库回归。修复版重新按关闭态
+  部署并通过 `disabled` smoke，production image 为
+  `sha256:0cb2e1787fadfb742d3733db3a53e0d08035c22d98d71779dd874bb4a06def65`。
+- 随后启用总开关、受限联网和唯一收件人。首次受控 prepare 为 run `26`、bundle
+  `07e7f22374bbc09a85df441f87da1cd0228f5431a8f9378a8f1e578bbecf4d47`；
+  邮件发送成功，重复 wrapper 返回 `already_claimed`，delivery 仍为 `1`。
+- 本轮 selector 找到 `13` 场，但 `candidate=0`、`blocker=13`，全部为
+  `route_missing`。因此当前只证明调度、不可变审核包、邮件和幂等链路可用，尚未满足
+  “除人工赛果审阅外无其他卡点”的产品验收；不得把 blocker 邮件表述为已收集完整赛果。
+- Beat 已按 `Asia/Shanghai` 每日 `06:30/18:30` 注册；Codex automation
+  `umanews` 作为同 slot 备用触发且仅失败通知。两者均禁止 apply，赛果审核仍是业务写入
+  的唯一人工授权点。下一项实现缺口是为当前及未来目标建立可自动解析、可验证、已批准的
+  来源身份/route discovery。
+
+## 2026-07-27 正式 gap-v2 prepare 为 39/40，JRA 中止语义已本地修复
+
+- 生产只读联网 prepare
+  `formal-gap-v2-20260727T114705Z/outputs/prepare-20260727T114705Z`
+  对冻结 40 场生成 40 个 candidate、319 条数值名次；实际请求 `56/75`，
+  manual-only 请求为 `0`，未写 `RaceEventResult` 或 `RaceEventDataCandidate`。
+- 39 场完整。唯一 blocker 为 event `80`（小仓纪念）：JRA 官方页完整列出第 1–17 名，
+  #5 `エヒト` 的官方状态为 `中止`。旧 adapter 保留了原始文字，但错误规范化为
+  `unknown`，聚合层因此报告 `runner_missing_from_result_order`；该马没有、也不应获得
+  数值名次。
+- 独立工作树 `codex/fix-jra-nonfinish-result-status` 基于
+  `origin/main@a079c93c70086298e4ea68c9b9b37023ed587103` 完成测试先行窄修：
+  JRA `中止 -> pulled_up`，恢复完整性只豁免受控退赛/非完赛状态；
+  `unknown/declared/Also Ran` 仍然阻断，且不会按页面顺序补造名次。
+- 新增真实 RED 精确失败于 `unknown != pulled_up`；修复后赛果恢复模块
+  `40/40` 通过，另有 JRA 中止、Also Ran 和普通缺马三项定点回归 `3/3` 通过。
+  扩大组合测试中的缺 fixture/子进程导入路径问题均位于未修改代码路径，不能计为本修复
+  GREEN，也未据此扩大修改范围。
+- 本修复尚未提交、推送、建 PR、独立发布复审或部署；生产仍运行旧解析语义，正式 prepare
+  artifact 未被覆盖，4.4/4.5 仍未完成，更未取得生产赛果写入授权。
+
+## 2026-07-27 P0 URL 开关已恢复并完成一次补跑
+
+- 后续生产部署曾在 `2026-07-27 15:33 +08:00` 将
+  `P0_RACECARD_URL_DISCOVERY_ENABLED` 恢复为 `false`，因此当日 `18:30` 的首次自然调度
+  未执行。用户随后明确授权在不改代码的前提下恢复开关并立即补跑。
+- 操作前生产为 `5fed1a964d099281f59ad6d39b13196ecffd2cbe`；P0 任务、service、settings、
+  Compose 与 provider registry 相对原发布 revision `cfba7151` 无差异，registry SHA-256
+  仍为 `c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876`。
+- beat 暂停后，默认队列从 `29` 自然排空到 `0`，Celery
+  `active=0 / reserved=0 / active_confirm=0`。`.env` 恢复点为
+  `.env.backup.pre-p0-reenable-20260727T114553Z`，mode `0600`；仅将 P0 开关从
+  `false` 改为 `true`。
+- 重建 worker 时 Compose 连带重建了 db/web；未改镜像或数据卷。重建前后五张业务表总数
+  一致，db/web 恢复 healthy，回环 healthz 为 `200` 后才继续补跑。
+- 补跑于 `2026-07-27 19:46:45 +08:00` 开始并成功，`TaskExecutionLog 2 -> 3`；
+  结果为 `future_expected=6 / orphans=5 / listing_reachable=3 / found=0 /
+  not_available=8 / blocked=6 / errors=2`。新 generation 为
+  `19679c03583afb492a873c3ff5dfbdc6495ed69cb8af5e9c99b9c91b5dcc8612`，`current`
+  已切换且 verifier 通过；两代保留策略使 generation 目录计数保持 `2 -> 2`。
+- 本次运行窗口内 `RaceEvent / RaceEventRunner / RaceEventResult / ExternalRaceEntry /
+  ExternalRaceResult` 的 `updated_at` 命中均为 `0`。worker/beat 最终开关均为 `true`，
+  调度仍为 `Asia/Shanghai` 的 `30 6,18 * * *`；Django check、内外 healthz 均通过。
+- beat 恢复后补投其他既有周期任务，验收快照默认队列为 `37`，其中 active 为既有
+  `crawl_netkeiba_latest`，P0 日志仍精确为 `3`；未删除队列任务，也未额外触发 P0。
+
+## 2026-07-27 P0 官方出马页 URL 定时任务已上线，Equibase 生产网络降级
+
+- PR `#32` 已合并为 `main@cfba71518f1024d54cd5553b7f0bb35c780f5959`，生产
+  `/opt/umanewsbot` 已快进到该 revision；`web/worker/beat` 使用镜像
+  `sha256:a11d072d8a8fc9cc268db996bc916751cea51fe0b7a7cdfc16b715ab0f3e4bf7`。
+- 发布前恢复点为
+  `.env.backup.pre-p0-url-20260727T062445Z` 和
+  `backups/db/pre-p0-url-20260727T062445Z.dump`；两者 mode 均为 `0600`。数据库备份
+  `259806424` bytes，SHA-256
+  `5a02d4b2e2da1f9040920e046bf4bff75790c9dc5ee4a9aed82390acfd894e76`，
+  容器内 `pg_restore -l` 通过。
+- 关闭态部署先验证 `P0_RACECARD_URL_DISCOVERY_ENABLED=false`，同步调用返回
+  `{"enabled": false}`，`TaskExecutionLog` 与宿主文档文件数均保持 `0 -> 0`。随后设置
+  worker/beat 的该开关为 true；beat 确认使用 `Asia/Shanghai` 和
+  `30 6,18 * * *`，任务名为 `stable.tasks.discover_p0_racecard_urls_task`。
+- 已完成两次受控运行，均为
+  `future_expected=6 / orphans=5 / listing_reachable=3 / found=0 /
+  not_available=8 / blocked=6 / errors=2`。两个 generation ID 分别为
+  `d25176d9f07f960704caf13943f617a40e0a80a022557db9888e271791119ef9` 和
+  `5868715fb4406b552132adf4e7a24372dba72253d20b25196ffc1368b2ce68db`；
+  `current` 指向后者，generation verifier 通过。
+- BHA 三场生成官方日期索引；France Galop 与五个时间证据不足的美国 orphan 按设计显示
+  “暂无”。Equibase DMR/CNL 从香港生产服务器发起 HEAD 时连接超时，两个目标 fail closed
+  为 `source_error/error_without_previous`，没有伪造 URL。该 provider 当前为生产网络降级，
+  调度保留启用以在每日两次运行中自动重试，不能描述为全地区成功。
+- 两次运行仅新增 `TaskExecutionLog=2` 和宿主 generation 文档。两次运行完整时间范围内，
+  `RaceEvent / RaceEventRunner / RaceEventResult / ExternalRaceEntry / ExternalRaceResult`
+  的 `updated_at` 命中数均为 `0`。Django check、generation verifier、回环/公网 healthz
+  均通过；未启用 race-live、lifecycle、历史抓取、公开发布或 QQ 影响。
+- beat 重启后会补投其他既有周期任务，验收快照默认 Celery 队列为 `19`；没有删除或清空这些
+  生产任务，worker 保持运行消费。
+## 2026-07-27 PR #33 完整名次门禁进入独立复审修复轮，尚未合并或部署
+
+- 生产首轮 prepare 暴露的 NAR/Sporting Life/ZEturf `scheduled` 静默过滤已补有效 RED。
+  runner 现在仅在 `purpose=race_result_recovery` 时向四类详情 adapter 传入
+  `--recovery-mode`；普通模式继续只接受 `finished`。
+- Sporting Life 若只给前若干名并将其余完赛马标为 `Also Ran/N/A`，不会按页面顺序补造名次。
+  聚合层现对所有 recovery 来源强制核对冻结 `event_id`、完整参赛名单、非退赛马覆盖、
+  连续唯一内部名次与非 discovery-only；任一不满足均写入 `result_order_complete=false`，
+  coverage 以 `incomplete_result_order` 阻断。
+- source-scoped adapter CSV 现携带生产 `event_id`，JRA、NAR、Sporting Life、ZEturf 与
+  TOBA candidate 会原样回传，coverage 可以唯一绑定目标，不再把合法结果误列为
+  `candidate_event_id_missing`。
+- PR `#33` 以 `main@cfba7151` 为 base、首轮受审 head `1b11f985`。独立只读复审返回
+  `REVISE`：UK/US Sporting Life 共用标准输出路径会覆盖英国候选；coverage 可接受外部
+  JSONL 自报完整性并缺少 target 来源核对。两项 P1 已补 RED 并在同一分支修复：英美输出
+  路径完全分离，recovery audit 只接受 state 中绑定 SHA/size 的标准 combined artifact，
+  同时逐场核对 `source_provider/racing_region`。
+- 同一 reviewer 已对修复 head `c4ce802c` 完成 closure review，结论
+  `VERDICT: APPROVED`、无 findings；全程只读、未联网、未改文件。两个 P1 均已关闭。
+- finding 修复后相关回归为 `142 tests / 141 passed / 1 skipped`；Django check、无迁移漂移、
+  `py_compile`、OpenSpec strict/all（`38/38`）与 `git diff --check` 均通过。Eddie Read
+  已由 Racing Post 完整结果与 DRF 赛后文字交叉确认第 5–8 名依次为
+  Seal Team、Almendares、Mondego、Mi Hermano Ramon；该结论仍是第三方候选，Del Mar 官方
+  chart 当次复核尚不可用，不能提升为 confirmed。
+- 修复位于 `codex/fix-race-result-recovery-completeness` 并已提交、推送至草稿 PR `#33`；
+  独立复审已通过。PR 尚未合并或部署；
+  生产仍运行 `main@e2ae3efe` 对应应用镜像，现有 candidate 与常驻关闭开关未改变。
+
+## 2026-07-27 event 426 时间修正后已执行一次性联网 prepare，4/40 形成候选
+
+- 用户明确授权写入 event `426` 的官方开赛时间。生产事务将 `race_datetime` 从 `null`
+  更新为 `2026-07-27T01:10:00Z`，来源为 Del Mar 2026-07-26 Race 9 官方 entry
+  （当地 post time `18:10`）；`status/local_start_time` 未改，赛果行仍为 `0`。写前快照
+  SHA-256 为 `ce8e5fb9…1d53`，写入回执 SHA-256 为 `59627477…c74`，并新增
+  `race_event_official_start_time_set` 审计。
+- 新 inventory `inventory-20260727T060200Z.json` 仍满足 `59 event rows / 50 race groups`，
+  分类保持 `40 missing + 9 duplicate-zero + 9 duplicate-confirmed + 1 provisional`；
+  文件 SHA-256 `327e8c16…0aa3`、manifest SHA-256 `d569534a…cfda`。event `426/427`
+  均为 `result_due=true`，精确 40 场 ID 不变。
+- run `prepare-20260727T060300Z` 的 expected targets 为 `40`、preflight blocker 为 `0`；
+  expected-target SHA-256 `5e444a53…03b`，审批 SHA-256 `87464712…0ca3`。一次性 one-off
+  容器联网 prepare 已运行，实际请求 `12/75`，runtime 总大小约 `1.24 MiB`。
+- JRA 官方详情形成 4 场候选、58 条 result item，combined candidate SHA-256
+  `033fc60d…489c`。NAR 仅形成一场 racecard 候选、没有 result item；Mercury Cup 被上游页面
+  判为 `racecard_not_published`。TOBA 2023–2026 四个年度页均返回 HTTP 403。
+- 英国/美国 Sporting Life 与法国 ZEturf adapter 因仍只读取 `status=finished`，对 recovery
+  CSV 中合法保留的 `scheduled` 目标产生 `events=0` 的静默空跑；因此 Eddie Read 未进入
+  runner candidate。人工联网复核确认其前四名为 `#5 Gold Phoenix / #3 Cabo Spirit /
+  #8 Formidable Man / #6 Stay Hot`，`#1 Astronomer` 退赛，但该网页证据尚未转换为受审
+  recovery candidate/receipt。
+- 四个常驻应用容器的 scheduler、monitor、runner、lifecycle、historical backfill/network
+  八项仍全部关闭。40 个目标的生产 `RaceEventResult` 行为 `0`，event 426 赛果为 `0`，
+  没有 `race_result_recovery_apply` 审计；本轮只写 event 426 的获批时间元数据，未写赛果。
+  task 4.3 仍未完成，下一步必须修复并重新发布非 JRA adapter 的显式 recovery mode，不能改写
+  CSV status、直接绕过 runner 或把空跑声明为完成。
+
+## 2026-07-27 PR #30 已合并，联网 prepare 阻断修复已关闭态部署
+
+- 修复提交 `00979dc443979ef0d982ae7776c3ff7dfb3d0572` 经 PR `#30` 合并为
+  `main@e2ae3efe2349623dd60745bfef498af31d7d8d84`，生产已快进并构建统一应用镜像
+  `sha256:e0a2d3d6612841df64f2ab1b8ca8ff6a749f4b14c8f4e3173317a394250e61a3`。
+- 已用测试复现并修复 `expected_target_empty`：recovery plan 现在同时绑定 inventory 文件路径、
+  文件 SHA 和内部 manifest SHA，调用既有 verifier 重算当前数据库身份后，再按冻结顺序批量加载
+  40 个 event ID 和 active aliases。状态、可见性、日期、名称、系列、source facts、赛果数量/
+  内容、event 消失、地区漂移或重复 ID 均 fail closed；既有 snapshot 恢复时也重新验证。
+- adapter CSV 从仅按地区改为按 `region + source` 精确分片，避免日本 JRA/NAR 与美国
+  TOBA/Sporting Life 互相取得对方目标；40 场 snapshot 与输入物化均固定为 2 条 SQL。
+- JRA adapter 现在由 runner 物化年度列表缓存路径、精确 host/path request policy、
+  shard/request-state/host-state，并在缺少缓存时先受控抓取年度列表。每个 JRA 请求同时进入
+  全批次共享请求预算和 runner v2 host/path/间隔账本，每个 redirect 也单独占用共享预算；
+  只有显式 recovery mode 才允许冻结目标保持 `scheduled` 时进入候选，旧模式仍只接收
+  `finished`。manual-only 路由未改变。
+- 首轮独立复审提出 inventory 未重验、scheduled 被过滤和 redirect 预算低报 3 个 P1；第二轮
+  复审进一步发现可省略 `source_map_version` 绕过精确 40 场映射，现均已补 RED 并修复。
+  recovery plan 必须携带当前批准的 source-map 版本且始终精确匹配冻结范围。受影响范围测试为
+  `100 passed / 3 skipped`，HTTP 预算 `3/3`、runner-v2
+  contract `29/29`；Django check、迁移漂移、OpenSpec strict、
+  `py_compile` 与 `git diff --check` 通过。现有本地测试镜像的完整 `stable` 因缺
+  `openpyxl`、无 Redis 及既有无关失败只能如实记录为 `2003 tests / 19 failures /
+  91 errors / 5 skipped`，不能作为本修复 GREEN 证据。
+- 同一原生只读 reviewer 已对精确 fingerprint
+  `db0e38b26bacb1c6bc798303d756e6fcf1a80e4203fb1778cd6a324d552c5135`
+  给出 `VERDICT: APPROVED`，前后 fingerprint 一致且未修改文件。
+- 部署恢复点为
+  `backups/db/pre-race-result-prepare-fix-20260727T045500Z.dump`，大小
+  `259584695` bytes、SHA-256
+  `3a2d1b91ac1610e42c272957a3055067b1a326b2f11c71a81c3ce099b97cbf5c`、
+  mode `0600`，`pg_restore -l` 为 1127 项；对应 `.env` 备份同为 `0600`。
+- `web/worker/beat` 运行新镜像，`race_live_worker` 使用同镜像但保持 `Created`。四个应用容器中
+  scheduler、monitor、runner、lifecycle、historical backfill/network 八项值全部关闭；4 条
+  publication policy 为 off。event 924 的既有 `provisional_public` allowlist 保留，但在 policy
+  off 且 worker 停止时不生效。迁移无变化，Django check、公网 HTTP healthz 与 `/races/`
+  均通过，近 15 分钟应用日志无 traceback/critical/exception/error。
+- 本次部署没有运行 prepare，没有新增 candidate/source cache，也没有赛果业务写入。下一门禁仍是
+  对精确 40 场 snapshot/adapter 输入完成关闭态复核后取得新的有界联网 prepare 授权。
+
+## 2026-07-27 赛果缺口恢复已关闭态部署，inventory 通过，联网 prepare 在零请求处阻断
+
+- PR `#28` 已合并，release commit `88cc4eafe4a7b5263aa2a6c30cd7d70978323989`，
+  merge/生产 HEAD `dfbd24e10f5910580945f29fe19219b7d838730c`。生产应用镜像为
+  `sha256:35a53589e051c39806397fe8aec1e00f0bcbd1df9d0a9ffec29a72f35dc4d751`；
+  `stable.0060_raceeventproductcanonicallink` 已成功应用，新增表保持 `0` 行。
+- 部署恢复点为
+  `backups/db/pre-race-result-recovery-20260726T200011Z.dump`，大小
+  `257629113` bytes，SHA-256
+  `682848bdb63edc43b809056fa3a5b1331ebca7f2f6e2cfae806208fa105c9efc`，
+  mode `0600` 且 `pg_restore -l` 通过；环境恢复点为
+  `.env.backup.pre-race-result-recovery-20260726T200011Z`，mode `0600`。
+- 生产运行时保持关闭：race-live scheduler/monitor=false、enabled regions 为空、
+  runner mode=disabled、lifecycle=false/off、historical backfill/network=false；
+  4 条既有 race-live publication policy 已切到 off，1 条 allowlist 已 disabled。
+  event `924` 的 7 条暂定结果未删除，未创建正式赛果或 canonical link。
+- 只读 inventory 位于
+  `runtime/race_result_recovery/inventory-20260726T200544Z.json`，文件 SHA-256
+  `a4380f2b4bb5fafe96f7990e2bc0ef9e032a7d84e17718ebd0b091d5b60b267a`，
+  manifest SHA-256
+  `f3a4cb7f26bfac5db4312af3f3af46d9fe11f9e50d2241ef54d4606403dbed1b`。
+  守恒精确为 `59 event rows / 50 race groups / 40 missing / 9 duplicate-zero /
+  9 duplicate-confirmed / 1 provisional(event 924)`，并生成 9 组 pending identity review。
+- 为保持 race-live worker 停止而执行 Compose `create` 时，Compose 意外连带重建 db
+  容器但未删除 PostgreSQL 持久卷；db 一度处于 Created，`/races/` 瞬时返回 500。
+  已启动原数据卷上的 db、等待 healthy 并重启 web/worker/beat，最终
+  `RaceEvent=9867`、公网 HTTP healthz 与 `/races/` 均恢复 200；race-live worker
+  使用新镜像但保持 Created/未运行。
+- 有界联网 prepare 在 transport 前 fail closed：`race_result_recovery` plan 已正确验证
+  40 个冻结 event ID，但 `expected_targets_from_plan()` 仍只处理普通 `series` 或历史
+  `targets`，生产只读调用报 `expected_target_empty`。本次网络请求 `0`、manual-only
+  请求 `0`、candidate/source cache `0`，未写赛果业务表。不得绕过 approved runner；
+  需先补 recovery event-ID snapshot 路径并解决 JRA 受控请求输入，再重新测试、独立 review、
+  发布和取得新的联网执行授权。
+
+## 2026-07-27 赛事赛果缺口恢复方案已通过工程审核（待确认实施）
+
+- 生产只读盘点确认 `2026-07-08..2026-07-27` 有 59 条公开 `RaceEvent`，初步对应约 50 场真实赛事；
+  其中 9 组赛果落在跨 `RaceSeries` 的另一条实体，event `924` 有 7 条未确认 TRA 结果，重点口径有
+  26 条已过期赛事仍为 `scheduled + results=0`。公网 `/races/?when=finished` 实际最晚只展示
+  `2026-07-05`。
+- 已从 `origin/main@a59956b3` 建立独立 worktree `recover-race-results-through-20260727`，
+  OpenSpec change 同名，proposal/design/四份 delta spec/tasks 均通过 strict 校验；另补
+  `test_cases.md` 与 `rollout.md`。
+- 首轮工程审核发现 direct `RaceEventResult` 写入会绕过 owner/revision arbitration、canonical
+  映射未持久化、blocker 被误算完成以及缺测试/rollout 四项问题；现已改为 owner-aware official
+  revision 投影、新增最小 `RaceEventProductCanonicalLink`、完成条件 `blocker=0`，同一 reviewer
+  复审为 `VERDICT: APPROVED`。
+- 本轮只执行生产数据库只读查询与公网页面核验；尚未实现代码、运行赛事来源网络 prepare、部署、迁移或
+  写入生产。下一门禁是用户确认实施；实现完成后仍须分别取得 release、network prepare 和精确
+  candidate/approval SHA 的生产写入授权。
 ## 2026-07-26 赛事新闻质量治理已实现（待独立代码审核）
 
 - 基于 `origin/main@ef54a183`，worktree `impl-race-news-quality-20260726`，分支
@@ -8,12 +253,12 @@
 - 已完成测试先行（术语 27 RED / 曝光 46 RED → 实现后术语 29 GREEN / 曝光 47 GREEN）、
   串行子代理实现（术语 → 曝光）。
 - 术语变更：
-  - 新增 `TermMappingEvidence` 模型（migration `0060_add_term_mapping_evidence`）
+  - 新增 `TermMappingEvidence` 模型（migration `0063_add_term_mapping_evidence`（合并时顺延））
   - 新增 `server/stable/services/term_consistency.py`：occurrence resolver、canonical consistency gate、published dry-run/manifest/CAS apply
   - 新增 `server/stable/test_public_term_consistency.py`（32 tests, 29 GREEN, 3 性能在 SQLite 预期受限）
   - 新增 settings: `TERM_CONSISTENCY_ENABLED/SHADOW/ENFORCE`
 - 曝光变更：
-  - 新增 `RaceNewsExposure` 模型（migration `0061_add_race_news_exposure`）
+  - 新增 `RaceNewsExposure` 模型（migration `0064_add_race_news_exposure`（合并时顺延））
   - 新增 `server/stable/services/race_news_exposure.py`：race identity resolver、hard duplicate classifier、angle classifier、two-slot state machine、QQ exposure
   - 新增 `server/stable/management/commands/backfill_race_exposure.py`：历史 dry-run/apply
   - 新增 `server/stable/test_race_news_exposure.py`（47 tests, 47 GREEN）
@@ -3553,3 +3798,463 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - worktree `.worktrees/automate-race-event-lifecycle`，分支 `codex/automate-race-event-lifecycle`，
   rebase 到 `origin/main@0aeb0ed7`。新增模型/迁移/服务/task/admin/管理命令，SQLite 56 项测试。
 - 当前：代码审查进行中；未 commit / push / PR / 部署 / 生产写入。
+
+## 2026-07-26 The Racing API schema v2 proof runner 已完成本地修复
+
+- 分支 `codex/fix-tra-schema-v2-proof-runner` 从
+  `origin/main@ef54a1836dd1fe1840f2d4765ebb73a1d130c645` 创建。
+- 测试先行新增 4 项真实 RED：runner 不接受 region、命令无 `--region`、schema v2 仍读取
+  v1 `registry["endpoints"]`。实现后新增 4 项、完整 proof 16 项，以及 proof /
+  multiregion pipeline / racecard sync 合计 55 项均 GREEN。
+- schema v2 现在要求显式 region，按该地区固定构建 today racecard、tomorrow racecard、
+  results today 三条已审核 route，最多执行 registry 允许的 3 个请求；schema v1 行为保持兼容。
+- 本轮只使用 fake transport，没有读取生产凭据或联网。Django check、migration drift、
+  py_compile、`git diff --check` 通过；独立 reviewer 最终结论为 `APPROVED`，无开放
+  P0/P1/P2。当前未 commit、push、PR、部署，真实联网仍等待独立用户授权。
+
+## 2026-07-27 未来七天重点赛事官方赛前数据方案审核通过，待确认实现
+
+- 冻结窗口为
+  `[2026-07-27T01:50:01+08:00, 2026-08-03T01:50:01+08:00)`，对应 UTC
+  `[2026-07-26T17:50:01Z, 2026-08-02T17:50:01Z)`。
+- 生产只读盘点按 `P0/P1 或 featured`、published、not cancelled、approved series 枚举出
+  19 场超集：英国 8、美国 10、法国 1；全部缺 `race_datetime`、`local_start_time` 和
+  runner。
+- 官方赛程可证明 19 场日期；但当前已审核 route 只覆盖赛果。英国/法国缺机器可用且获许可的
+  official entries route，美国 Equibase 禁止未授权自动抓取/再发布，部分 8 月 1 日页面
+  尚未发布。因此当前合规可 apply 为 0，跨地区无人值守每日任务结论为 NO-GO。
+- 方案入口为 `docs/changes/fetch-upcoming-key-racecards/`。独立 reviewer 在同一会话关闭
+  3 high、2 medium finding，最终 `VERDICT: APPROVED`。当前准确状态：
+  `plan approved / implementation not authorized /
+  production business writes 0 / scheduler unchanged`。
+
+## 2026-07-27 P0 官方出马页面 URL 定时发现进入方案审核
+
+- 用户把可先闭环的范围收窄为“只保存官方出马页面 URL”：上海时间每日 `06:30/18:30`
+  枚举未来七天全部 `RaceEvent.priority=P0` 赛事，同一赛事仅保留最新 URL；尚未发布、身份缺失
+  或 provider 受阻时显示“暂无”并保留原因。
+- 计划生成宿主持久化的不可变 generation bundle，并由单一原子 `current` 指针提供固定
+  `current/latest.md` 人工入口；不保存网页正文或出马内容，不写 RaceEvent/runner/result
+  等业务表，也不公开文档。
+- JRA、NAR、HKJC、英国、法国、美国均进入 adapter 注册表；当前无日本/香港赛事不作为删除
+  适配能力的理由。自动 transport 仍逐 provider 受 host/path、robots/terms、contract 和请求
+  预算约束，URL-only 不构成绕过第三方站点规则的依据。
+- 新 change 入口：
+  `docs/changes/schedule-p0-official-racecard-url-discovery/`。首次方案审核发现
+  1 blocker、4 high、3 medium；两轮限定复审已全部关闭，最终
+  `VERDICT: APPROVED`。当前准确状态：
+  `plan approved / implementation confirmation pending /
+  no code, network, production write, deployment or scheduler change`。
+
+## 2026-07-27 P0 官方出马页面 URL 定时发现已完成本地实现，待代码审核
+
+- 已实现严格 P0 七天窗口、有界 orphan、十 outcome 状态机、六 provider route registry、
+  HTTPS/SSRF/预算/contract 门禁、锁内 latest-state merge、不可变 generation bundle、
+  原子 `current` 指针、Celery 06:30/18:30 调度、脱敏运行日志和普通 worker 持久化 mount。
+- 两个实现中发现的并发/审计缺口均先取得真实 RED 再修复：较晚失败运行不再清空较早确认 URL；
+  保留 URL 时继续绑定原确认 provider/contract/event ID，并另存本轮 checked provider。
+- 首次独立原生 code review session `019fa011-a171-7e50-bae6-249a06ea7ddd` 发现
+  DNS 未拒绝 CGNAT 的 P1，以及两层吞 `SoftTimeLimitExceeded` 的 P2。两项均取得真实 RED
+  并修复：DNS 只接受 `is_global=True`；service/task 显式重抛 soft timeout，日志保存失败不
+  遮蔽原异常。限定复审确认两项已落实，并记录 3 个 P2 建议：编码 path traversal、保留 URL
+  错误漏计、空 checked provider 错误归因；三项也已补 RED 并修复。该轮 fingerprint helper
+  的摘要/hash 相同但 reviewer 捕获的 raw output 不同，故 fail closed，尚无批准基线。
+- 主线程验证：聚焦 `40/40`、racecard/lifecycle `79/79`；Django check、迁移漂移、compile、
+  Compose、registry SHA、OpenSpec strict `37/37`、diff check 通过。完整 realtime
+  `166` 项中 `157` 通过、`9` 项因既有 fixture 固定 2026-07-20 而当前为 2026-07-27，
+  触发 claim expired/mismatch/rate-limited；无本 change 堆栈。
+- tracked 六 provider route 仍全部
+  `automation_allowed=false/robots_allowed=false`，总开关默认 false。当前没有真实联网、文档
+  生产写入、业务数据库写入、部署或调度影响；只打开总开关也只会写“暂无”，不会抓取 URL。
+- 当前准确状态：
+  `implementation GREEN / native code review APPROVED / final documentation re-review pending /
+  release not authorized`。
+
+## 2026-07-27 P0 URL provider route 已补齐，等待最新代码审核
+
+- 用户明确把离线 URL 构造、零正文 `HEAD` 与网页正文抓取分开；方案 reviewer 在同一会话关闭
+  robots origin、请求预算和 proof 顺序 finding 后给出 `VERDICT: APPROVED`。
+- tracked registry 当前只启用两条 HEAD route：BHA 日期索引
+  `head_application_entry`，同批去重最多 1 次；Equibase
+  `RaceCardIndex{track}{MMDDYY}USA-EQB.html` 精确 HEAD，最多 2 次且同 host 间隔至少 5 秒。
+  France Galop 因真假路径均跳认证保持 blocked；JRA/HKJC 保留未来 contract，NAR 保持
+  robots blocked。registry SHA-256 为
+  `c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876`。
+- provider 增量测试先取得真实 RED（17 项中 `11 passed / 4 failed / 2 errors`），实现后
+  provider `17/17`、完整 discovery `44/44`、racecard/lifecycle `79/79`、realtime 安全子集
+  `25/25`；Django check、迁移漂移和 diff check 通过。
+- reviewer 发现 task 日志仍漏记 `listing_reachable`，已用真实 RED（`KeyError`）修复，
+  成功及固定失败日志 schema 均保留该计数。首次 proof 与 v2 现只作为不可变历史证据。
+  修复后 v3 proof 在当前 6 场 P0 上只发 3 个 HEAD：BHA 1 次 200、Equibase DMR/CNL
+  各 1 次 200，后两次间隔 7 秒，响应正文读取 0。结果为
+  `confirmed racecard index=2 / official date listing=3 / 暂无=1`。业务数据库、
+  `TaskExecutionLog` 和 `current` 写入均为 0。proof artifact SHA-256 为
+  `7e4886a8ff9f02a9c39ef1e8e3e414692ad61528e184dbadb2d4b3c37b9f4b94`。v3 绑定联网前
+  fingerprint `199785de6117c490b569b3cc0fa2d50ce9dbe10f05cb6d3dca0c950e5c736c21`，
+  联网后仅新增 proof/manifest 与更新精确状态文档，同一 reviewer 已确认原两项 finding
+  关闭、无直接 P0/P1 回归并给出 `APPROVED`。代码候选 parent/fingerprint/content hash
+  分别为 `a59956b327157d29630fab1f1c98ba9c9cacfed0`、
+  `1f665032d5bfc0d19b4f2e9885bd30f2718415de0cdee0c8a441e6b83e192959`、
+  `1df171afd380238c205e72d123f8ec3e1bd3e9021267cc4d9dc117c02c119642`。
+- reviewer 新报的 generation 目录名校验、完整 2xx 接受、认证 3xx 归类均为 P2，依限定
+  复审规则记录为非阻塞后续建议；本次不扩展实现范围。当前只剩这次审核事实文档的同 reviewer
+  限定复审与随后用户对精确版本的发布授权。
+- 当前仍未 commit、push、PR、部署、创建生产宿主目录或启用定时任务；总功能开关保持默认
+  false。审核事实文档复审通过后，仍必须重新取得针对最终 fingerprint 的发布授权。
+## 2026-07-27 赛事赛果缺口来源调研完成
+
+- 生产 `2026-07-08..2026-07-27` 的 `49` 个零赛果事件中有 `9` 个重复赛事已在另一历史实体
+  上保存确认赛果；真实待采集为 `40` 场：日本 `6`、英国 `11`、法国 `4`、美国 `19`。
+- 日本 6 场均已定位到 JRA replay 或 NAR `RaceMarkTable` 官方页；英国 11 场已在
+  Sporting Life 日期结果页逐场命中；法国 4 场已定位 ZEturf 精确 `R/C` 页面；美国前
+  12 场已从 TOBA 定位精确 Equibase chart，后 7 场已在 Sporting Life 日期页命中但 TOBA
+  尚无 chart link。
+- 官方确认继续按地区走 JRA/NAR、BHA、France Galop、Equibase。BHA/France Galop/
+  Equibase 当前只能人工浏览确认；HRN 旧日期入口已重定向首页，不再作为本批可靠入口。
+- `RaceEvent#924` Hackwood Stakes 另有 7 条未确认赛果，不计入 40 场，继续由 race-live
+  owner 链补 official receipt。
+- 逐场来源表见
+  `openspec/changes/recover-race-results-through-20260727/source_research_20260727.md`。
+  本轮仅只读调研，没有生成候选、写生产库、发布或提升 official 状态。
+
+## 2026-07-27 赛果缺口恢复已完成本地实现，待独立代码审核
+
+- 隔离分支 `codex/recover-race-results-through-20260727` 基于
+  `origin/main@a59956b327157d29630fab1f1c98ba9c9cacfed0`，已实现双层 inventory、
+  结果专用受限编排、官方 receipt、participant 精确绑定、逐场原子投影、write-ahead
+  rollback ledger、独立 verifier 和公开 canonical 去重；新增迁移 `0060`。
+- 冻结守恒仍为
+  `59 event rows = 40 missing + 9 duplicate-zero + 9 duplicate-confirmed + 1 provisional`，
+  对应 `50 race groups`。event `924` 继续由既有 live owner 处理，不进入 historical apply。
+- SQLite 恢复专属测试 `45/45` 通过（另有 2 个 PostgreSQL-only skip），PostgreSQL 16
+  并发测试 `2/2` 通过；受影响回归除干净主线已存在的“暂定页面栏目标题”断言外无新增失败。
+  完整候选 `3433` 项为 `24 failures / 39 errors / 68 skipped`，同环境干净主线 `3393`
+  项为 `25 failures / 39 errors / 66 skipped`；候选无新增红项，并修复主线一个日历查询数失败。
+- Django check、迁移漂移、OpenSpec `38/38` strict/all、三份 Compose config、`py_compile`
+  和 `git diff --check` 均通过。首次独立原生只读审核提出 6 项 actionable finding；
+  当前已补齐完整写前身份 CAS、来源合同实时重验、ledger 故障回滚、verifier 深校验、
+  canonical link apply 和已批准 participant fallback，等待同一 reviewer 限定复审。
+  尚未 commit、push、PR、部署、联网收集候选或写生产数据。
+## 2026-07-27 赛事生命周期阶段 A 关闭态生产事实补录
+
+- PR `#25` 已部署到生产 revision
+  `ef54a1836dd1fe1840f2d4765ebb73a1d130c645`，migration `stable.0058/0059` 已应用。
+- 生产显式保持 `RACE_EVENT_LIFECYCLE_ENABLED=false`、
+  `RACE_EVENT_LIFECYCLE_MODE=off`；没有 lifecycle control、状态推进、provider 调用或
+  赛事/新闻业务写入。
+- 过去 7 天至未来 14 天的 35 场重点赛事只读 dry-run 为
+  `7 transition / 28 noop / 0 error`，前后业务摘要和四类 lifecycle 表计数不变。
+- 35 场全部缺少 `race_datetime`；本次只覆盖英国、法国、美国纽约/洛杉矶，没有日本、香港
+  观察样本，不能据此启用 shadow/enforce。
+- 完整恢复点、SHA、迁移竞态和 dry-run 证据见
+  `docs/changes/automate-race-event-lifecycle/production_release_20260726.md`。
+- PR `#27` 已把 TRA schema v2 proof runner 修复合入当前
+  `origin/main@a59956b327157d29630fab1f1c98ba9c9cacfed0`；合入不等于新的联网或 provider
+  启用授权。
+
+## 2026-07-27 阶段 B0.1 赛后内部参考源进入方案审核准备
+
+- 用户确认保留并使用 Sporting Life、ZEturf、Horse Racing Nation 三个现有解析器；
+  新增抓取结果只供站长内部参考，不公开。
+- 三源固定为 `internal_reference`，没有 field apply、result authority 或 publication 能力；
+  不进入 `RaceEventDataCandidate` apply、race-live projection、新闻、QQ、搜索、sitemap 或
+  公开 API。
+- 现有历史赛事 importer 行为不追溯改变。阶段 B0.1 建议新增独立 collection
+  run/payload/receipt、只读 admin、manifest-bound collect/离线 record/report 命令。
+- 首版只复用三个 parser 的 `finished` 赛后入口，不实现赛前 racecard，也不注册
+  Celery/Beat/task/queue；7 天观察由逐日 one-shot 组成。
+- 当前只完成文档，尚未写测试、代码、迁移或配置，也未执行联网、生产 record、调度启用、
+  commit、push、PR 或部署。
+- 规格入口：
+  `docs/changes/automate-race-event-lifecycle/internal_reference_sources.md`；
+  实现交接：
+  `docs/changes/automate-race-event-lifecycle/phase_b_reference_implementation_handoff.md`。
+- 独立方案 reviewer 前两轮 `REVISE` 后，同一会话第三轮已给出 `APPROVED`，无开放
+  P0/P1/P2。当前停在实现确认门禁；未授权写测试、代码、迁移或配置。
+
+## 2026-07-27 阶段 B0.1 已通过第十七轮 review，最新 main 集成待复审
+
+- 用户已明确授权实现阶段 B0.1。隔离 worktree 中已按测试先行完成内部
+  `RaceReferenceCollectionRun / RaceReferencePayload / RaceReferenceReceipt`、additive
+  migration、只读 Admin、三个 parse-only parser、安全 HTTP 门禁及
+  manifest build / collect / offline record / report 命令。
+- 首轮真实 RED 来自模型、服务、parser、命令和安全 HTTP 合同尚不存在；后补的 4 项
+  append-only 实例 `save/delete` 测试也因预期 `ValidationError` 未抛出而真实 RED，完成实例级
+  不可变门禁后转为 GREEN。
+- B0.1 首轮 SQLite 聚焦矩阵为 `41/41 GREEN`。首轮独立代码 review 的 4 项 P2 新增真实
+  RED 并修复后为 `45/45`；第二轮限定复审的另 4 项 P2 同样先补真实 RED 后修复，当前为
+  `49/49 GREEN`；第三轮新增 1 项 P1 与 3 项 P2 均先补真实 RED 后修复，当前为
+  `53/53 GREEN`；第四轮剩余 2 项 P2 继续先补真实 RED 后修复，当前为
+  `60/60 GREEN`；第五轮新增 4 项 P2 均先补真实 RED 后修复，当前为
+  `64/64 GREEN`；第六轮新增 5 项 P2 均先补真实 RED 后修复，当前为
+  `69/69 GREEN`；第七轮新增 3 项 P2 均先补真实 RED 后修复，当前为
+  `78/78 GREEN`；第八轮唯一 P2 对应 3 项真实 RED，修复后当前为
+  `80/80 GREEN`；第九轮 1 项 P1 与 3 项 P2 对应 4 项真实 RED，修复后当前为
+  `82/82 GREEN`；第十轮唯一 P2 对应 2 项真实 RED，修复后当前为
+  `84/84 GREEN`；第十一轮 2 项 P2 对应 3 项真实 RED，修复后当前为
+  `87/87 GREEN`；第十二轮 2 项 P2 对应反例 RED，修复后当前为
+  `89/89 GREEN`；第十三轮 3 项 P2 对应 3 项真实 RED，修复后当前为
+  `93/93 GREEN`；第十四轮 2 项 P2 对应时间窗口与重复分组 RED，修复后当前为
+  `96/96 GREEN`；第十五轮 2 项 P2 对应重签 artifact 真实 RED，修复后当前为
+  `98/98 GREEN`；第十六轮唯一 P2 对应 6 项真实 RED 和 5 项实例/`SET_NULL` 正例，
+  修复后当前为 `104/104 GREEN`。临时本机 PostgreSQL 16 容器中的 reference 测试
+  `3/3 GREEN`，
+  lifecycle PostgreSQL 测试 `5/5 GREEN`。
+  临时容器已删除；这些操作不是
+  生产迁移或生产数据写入。
+- 三源历史 parser/direct URL/安全 HTTP 聚焦回归为
+  `82/82 GREEN / 4 conditional skips`。lifecycle/race-live/calendar 组合为
+  `140/141`，唯一红项是暂定页面仍含“正式赛果”栏目标题；新闻门禁组合为 `140/141`，唯一红项
+  是错误消息 wording mismatch；两项均已在纯 `origin/main` 同环境复现。
+- historical batch 扩展矩阵 `123` 项中有 `18 errors / 7 skips`；代表性错误同样在纯
+  `origin/main` 复现，根因为 macOS `/var` 与 `/private/var` 路径规范化差异。本阶段不把这些
+  主线既有红项误记为 B0.1 回归，也不宣称扩展矩阵全绿。
+- Django check、migration drift、变更文件 `py_compile`、`git diff --check` 已通过；
+  workflow contract 为 fingerprint `24/24`、transition `10/10`、workflow `26/26`。
+  Compose config 因隔离 worktree 不含 `.env` 未成功执行；代码差异不含 Compose、Celery
+  task/route、Beat 或 worker 变更。
+- 独立代码 reviewer session
+  `019fa021-3552-7f23-a17f-2cae48ccc4bb` 对原 fingerprint
+  `f2463878ffa4011aa91cf5b3cd7c5fe817b66157691e9eaf6e309640623695cd`
+  返回 `VERDICT: REVISE`，无 P0/P1，共 4 项 P2：collect 误绑定、ZEturf 未证明 `R/C`、
+  `source_only` 可能 `KeyError`、report 缺少多日指标。四项均先补真实 RED，再由原实现
+  subagent 修复；修复后 SQLite `45/45`、历史 parser `52 OK / 4 conditional skips`、
+  PostgreSQL concurrency `2/2`，Django、migration drift 与 diff 检查通过。
+- 同一 reviewer 第二轮限定复审的 inner session 为
+  `019fa02f-1976-7d10-b177-a18a0216591e`，fingerprint 为
+  `561cdbf66dd3a26c702366bd113d2aed197dc98446eec34856d2c2c1350e9200`，
+  结论仍为 `VERDICT: REVISE`，共 4 项直接 P2：record 未独立重验 racecourse；report
+  `event-id` 错误依赖 nullable FK；report 日期只按 run 范围；默认开发 Compose bind mount
+  遮住 `runtime` parser。四项均先补真实 RED 后修复：record 与 collect 共用 racecourse
+  helper 且 record 独立重验；report 使用 frozen snapshot `event_id/local_date`；parser 单一
+  实现迁至 `server/stable`，compat wrapper 和历史 CLI 共同复用。
+- 第二轮修复后 SQLite `49/49`、历史 parser `52 OK / 4 conditional skips`、PostgreSQL
+  concurrency `2/2`，Django、migration drift、workflow contract 与 diff 检查通过。
+- 同一 reviewer 第三轮 inner session 为
+  `019fa044-4483-72e1-b836-53e6900df34c`，fingerprint 为
+  `22675d91cb097737bb678bd547874cce1ae1d7c481f416710911740a24981f06`。
+  本轮确认第二轮 4 项 P2 全部关闭，但结论仍为 `VERDICT: REVISE`：新发现 1 项 P1，即
+  safe HTTP 全局强制 HTML MIME 会破坏现有 PDF/JSON/XML；另有 3 项 P2，分别为
+  ZEturf `NP`、HRN 国家后缀、Sporting Life 下划线状态未统一规范化。
+- 四项均先补真实 RED 后修复：MIME 合同改为 opt-in，internal reference collect 显式要求
+  HTML/XHTML；三个 parser 统一规范化并保留 raw 证据。修复后 SQLite `53/53`、历史
+  HTTP/parser `80 OK / 4 conditional skips`、PostgreSQL concurrency `2/2`，Django、
+  migration drift、workflow contract 与 diff 检查通过。
+- 同一 reviewer 第四轮 inner session 为
+  `019fa051-bcf9-7e71-bd04-f11090fe8112`，fingerprint 为
+  `a3f862fd93041831250fe855e383ee911843f6eb940433604c5a08b1f835b63b`。
+  本轮对第三轮 4 项 finding 关闭 3 项，Sporting Life description 仅部分关闭，结论仍为
+  `VERDICT: REVISE`；剩余 2 项 P2 是 `ride_description` 下划线值和 manifest parser
+  identity 未绑定实际模块。
+- 两项均先补真实 RED 后修复：description 统一规范化；service 冻结
+  `source -> stable module / parser name / reference-v1`，validate/record 漂移时
+  fail closed，build/collect 在创建目录或联网前实际 import 并核对模块常量，合法 fixtures
+  同步。修复后 SQLite `60/60`、历史 HTTP/parser `80 OK / 4 conditional skips`、
+  PostgreSQL concurrency `2/2`，Django、migration drift、workflow contract 与 diff 检查通过。
+- 同一 reviewer 第五轮 inner session 为
+  `019fa062-e917-76e2-aacd-e807fb0f1f9b`，fingerprint 为
+  `50b50866f19853534daad66c9a2cd18650d4d74cafbfebec106b09c8b36c274d`。
+  本轮确认第四轮 2 项 P2 全部关闭，但仍以 4 项新 P2 返回 `VERDICT: REVISE`：只有
+  transport failure 应计入 circuit；parse 失败没有保存 raw；HRN 可能跨 race block；
+  timeout 未唯一固定为 15 秒。
+- 四项均先补真实 RED 后修复：network/parse 分段并只分类 transport failure；fetch 后、
+  parse 前保存 raw 与 responses ledger，失败追加 `parse_error`；HRN 严格限定当前 heading
+  block；timeout 唯一为 15 秒。修复后 SQLite `64/64`、历史 HTTP/parser
+  `80 OK / 4 conditional skips`、PostgreSQL concurrency `2/2`，Django、migration drift、
+  workflow contract 与 diff 检查通过。
+- 同一 reviewer 第六轮 inner session 为
+  `019fa071-ca82-7b80-9af1-d4725efb6c`，fingerprint 为
+  `41307729d9896c7fbd721b2e8864177990a7d190d3c25011b53a0bf284db0d87`。
+  本轮确认第五轮 4 项 P2 全部关闭，但新增 5 项 P2，仍为 `VERDICT: REVISE`：
+  `request_count` 漏失败请求、HRN alias 过宽/错误、ZEturf `FR + NP`、报告缺重复指标，以及
+  `event-id` 过滤后的 run 计数混入无关运行。
+- 五项均先补真实 RED 后修复：ledger phase 与 `request_issued` 严格绑定；HRN 显式双向
+  alias 且不做 substring；ZEturf 迭代规范化后缀；report 增加 duplicate runs/observations，
+  并按过滤结果 distinct run。修复后 SQLite `69/69`、历史 HTTP/parser
+  `80 OK / 4 conditional skips`、PostgreSQL concurrency `2/2`，Django、migration drift、
+  workflow contract 与 diff 检查通过。
+- 同一 reviewer 第七轮 inner session 为
+  `019fa07f-90e2-7f60-b08d-125e01d55ba3`，fingerprint 为
+  `6dd68951fe0ff90847c74f3873fb0539eec8226441473c294e7c444591ebba1a`。
+  本轮确认第六轮 5 项 P2 全部关闭，但新增 3 项 P2，仍为 `VERDICT: REVISE`：不完整
+  ledger 可 record、unknown 被误算 complete、receipt `SET_NULL` 与 matched event 约束冲突。
+- 三项均先补真实 RED 后修复：ledger 精确覆盖 manifest 并强绑定 source/final/response；
+  unknown 计入 incomplete；event 删除后历史 matched receipt 保留 matched snapshot，数据库
+  约束要求 snapshot，而 service 新建 matched receipt 仍必须绑定 event。修复后 SQLite
+  `78/78`、历史 HTTP/parser `80 OK / 4 conditional skips`、PostgreSQL concurrency +
+  `SET_NULL` `3/3`，Django、migration drift、workflow contract 与 diff 检查通过。
+- 同一 reviewer 第八轮 review session 为
+  `019fa08e-e782-7d31-9cbc-921bb3b4efbd`；交接只提供 review fingerprint 前缀
+  `d98034f…`，不得据此前缀虚构完整 digest。本轮唯一 P2 是 collect 依赖 runtime safe HTTP
+  实现，会被默认开发 `./server` bind mount 遮蔽。
+- 该 P2 先取得 3 项真实 RED 后修复：`server/stable/race_event_safe_http.py` 成为唯一实现，
+  runtime 路径只保留兼容 wrapper，collect 直接 import stable。主线程复验 B0.1 `80/80`、
+  历史 HTTP/parser `81/81`（另 4 项 conditional skip），Django check、migration drift、
+  `py_compile`、workflow contract 与 diff 检查通过。
+- 一次把整仓错误挂到 app 容器导致的验证失败属于验证环境/挂载方式误用，不是产品失败或
+  B0.1 回归。Compose config 仍因隔离 worktree 缺 `.env` 未执行成功，不能宣称已通过。
+- 同一 reviewer 第九轮 session 为
+  `019fa09e-88c5-7180-a678-39874ff6e045`，fingerprint 为
+  `84e8f4fafc4db634911c9aa18f6f473bdba12078e2957072a660434505c5ce6f`，
+  结论为 `VERDICT: REVISE`。1 项 P1 是 runtime CLI `sys.path`，3 项 P2 是 event/raw
+  逐场绑定、`error_summary` 和无 receipt 失败 run 报告。
+- 四项均先补真实 RED 后修复。主线程复验 B0.1 `82/82`、历史 HTTP/parser `82/82`
+  （另 4 项 conditional skip），项目 venv 真实 runtime CLI `--help` 退出码为 `0`；
+  Django、migration drift、`py_compile`、workflow contract 与 diff 检查通过。系统 Python
+  因缺 `bs4` 失败属于环境误用，不是产品失败。
+- 同一 reviewer 第十轮 session 为
+  `019fa0ad-c024-7a21-8ebb-31b19df760ab`，fingerprint 为
+  `abbc00318318447abb86627ffe29a076012f8eceee4aa1b8d3f6c0c157dc4b20`，
+  结论仍为 `VERDICT: REVISE`。唯一 P2 是 reference observations 必须与 ledger 中
+  `outcome=parsed` 的 event 精确一一对应，`parse_error` event 必须零 observation。
+- 该 finding 先取得 2 项真实 RED 后最小修复；既有正向 fixture 同步改为合法
+  `parsed + observation`，跨 run replay 继续验证。主线程复验 B0.1 `84/84`、历史
+  HTTP/parser `82/82`（另 4 项 conditional skip）；Django check、migration drift、
+  `py_compile`、workflow contract 与 diff 检查通过。
+- 同一 reviewer 第十一轮 session 为
+  `019fa0b9-b2c8-77d0-9473-7caff58d87eb`，fingerprint 为
+  `ef778594f1d471a239432c6bd65054dcb2491fb918c46a660ea321436a827b0d`，
+  结论仍为 `VERDICT: REVISE`。2 项 P2 是共享 safe HTTP 默认 `4MiB / 2 跳` 破坏
+  legacy 大 PDF/redirect，以及跨日 run 的单日报告错误误归日期。
+- 测试调查在纯 `origin/main` 确认旧 transport 没有 body cap，且 `urllib` 默认处理
+  redirect；3 项真实 RED 后，legacy 默认不再自定义 body cap/redirect 上限，internal
+  reference collect 仍显式使用 `4MiB / 2 跳`；report 改按 event/date 归属，并单列
+  `unattributed_errors`。主线程复验 B0.1 `87/87`、历史 HTTP/parser `82/82`
+  （另 4 项 conditional skip）；Django check、migration drift、`py_compile`、workflow
+  contract 与 diff 检查通过。
+- 同一 reviewer 第十二轮 session 为
+  `019fa0c7-7f55-7960-9f5d-5b81ba13437c`，fingerprint 为
+  `6b0246db6647786e351492822d86f70a8dd15dbb272a19a6a34a324f15ca7b3b`，
+  结论仍为 `VERDICT: REVISE`。2 项 P2 是 matched 未核对来源赛事名，以及单日无 receipt
+  错误未回退到 run 唯一日期。
+- 测试调查确认复用 race-live exact normalized alias 合同并冻结进 manifest；反例 RED 后
+  新增公开 normalization helper，manifest 冻结 `normalized_accepted_race_names` 并纳入
+  snapshot SHA，record 要求 exact membership；单日 run 增加唯一日期 fallback，过时
+  fixture 按新合同修正。主线程复验 B0.1 `89/89`、race-live `23/23`、历史 HTTP/parser
+  `82/82`（另 4 项 conditional skip）；真实 PostgreSQL 并发/锁 `2/2`、`SET_NULL`
+  `1/1`，临时容器已删除；Django check、migration drift、`py_compile`、workflow contract
+  与 diff 检查通过。
+- 同一 reviewer 第十三轮 session 为
+  `019fa0db-0a80-72c0-a6ad-bb1142432a83`，fingerprint 为
+  `384ef97820f9e6d9c0c8f6df7190f1fb546746570aff018379b742a41e3b0c00`，
+  结论仍为 `VERDICT: REVISE`。3 项 P2 是 collect 异名未降为 `source_only`、多日错误
+  detail 缺 `local_date`、`--event-id` 漏掉无 receipt 但匹配错误明细的 run。
+- 三项均先取得真实 RED。collect 现按冻结赛事名 exact membership 分类；ledger 每个 event
+  冻结 `local_date` 且 record 核验；event filter 按错误 detail 纳入匹配 run 并隔离其他
+  错误；6 个旧 fixture 已补新合同必需字段。主线程复验 B0.1 `93/93`、race-live
+  `23/23`、历史 HTTP/parser `82/82`（另 4 项 conditional skip）、真实 PostgreSQL
+  `3/3` 且临时容器已删除；Django check、migration drift、`py_compile`、workflow contract
+  与 diff 检查通过。
+- 同一 reviewer 第十四轮 session 为
+  `019fa0ea-65a3-7383-b208-c0f571e7b98a`，fingerprint 为
+  `18ac8b531f2d123b132fbe45104999feeea814315087ac6e4cdc0d043a4baeae`，
+  结论仍为 `VERDICT: REVISE`。2 项 P2 是 record 丢失 artifact 采集窗口，以及无 receipt
+  失败 run 未计入 `duplicate_runs`。
+- 测试锁定 started 为最早 ledger `fetched_at`、finished 为 artifact `completed_at`，逆序、
+  naive datetime 和显著未来时间必须拒绝；同 event/day 失败 run 重复分组也先取得 RED。
+  修复后允许 5 分钟 clock skew，原子保存签名窗口；report 将 receipt 与 error details
+  统一纳入 run membership。主线程复验 B0.1 `96/96`、race-live `23/23`、历史
+  HTTP/parser `82/82`（另 4 项 conditional skip）、真实 PostgreSQL `3/3` 且临时容器
+  已删除；Django check、migration drift、`py_compile`、workflow contract 与 diff 检查通过。
+- 同一 reviewer 第十五轮 session 为
+  `019fa0fa-b908-7d43-9f7e-807bf132a9a3`，fingerprint 为
+  `59ffcb96972cef74dcff8df87e5a9d1b0f3923ecf59f5f5b594e58e48594424f`，
+  结论仍为 `VERDICT: REVISE`。2 项 P2 是仅校验最早 ledger 时间，以及 observation
+  provenance 的 `fetched_at/final_url` 未逐 event 绑定。
+- 重签 artifact 反例先取得真实 RED。修复后要求 `max(ledger fetched_at) <=
+  artifact.completed_at`，并要求每个 observation 的 `source_url/final_url/fetched_at`
+  及 raw/ref/hash 与 manifest、parse ledger、response 逐 event 精确一致。主线程复验
+  B0.1 `98/98`、race-live `23/23`、历史 HTTP/parser `82/82`
+  （另 4 项 conditional skip）、真实 PostgreSQL `3/3` 且临时容器已删除；Django check、
+  migration drift、`py_compile`、workflow contract 与 diff 检查通过。
+- 同一 reviewer 第十六轮 session 为
+  `019fa106-3b52-7a02-b756-31f718ffe4d0`，fingerprint 为
+  `571664940ea3e77b60368fe4ddf72292404060fedfb27f281d6b7f7d1f815cc7`，
+  结论仍为 `VERDICT: REVISE`。唯一 P2 是 Payload/Receipt 的
+  `QuerySet.update/bulk_update/delete` 可绕过 append-only。
+- 6 项真实 RED 与 5 项实例/`SET_NULL` 正例锁定边界后，新增专用 QuerySet/Manager；
+  Payload 全部拒绝，Receipt 仅允许 Collector 精确执行 `event=None/event_id=None`，
+  其他批量变更全部拒绝；无需迁移。主线程复验 B0.1 `104/104`、race-live `23/23`、
+  历史 HTTP/parser `82/82`（另 4 项 conditional skip）、真实 PostgreSQL `3/3` 且临时
+  容器已删除；Django check、migration drift、`py_compile`、workflow contract 与 diff 检查通过。
+- 同一 reviewer 第十七轮 session
+  `019fa113-9c02-7c63-b48d-466c40d323cf` 对 fingerprint
+  `5095a06e326a9cef470f4ef5d2111c87e8daa77a45fbc9507a27b024369edea7`
+  给出 `VERDICT: APPROVED`，P0/P1/P2/P3 均为 0，审前审后 fingerprint 完全一致。
+- 用户随后授权 fetch 最新 main、commit、push 和 Draft PR。fetch 发现 `origin/main` 从
+  `e7dc1b20` 前进 14 个提交到 `6ac08e40`，因此旧批准父提交失效，未直接 staging。
+  候选已通过可恢复 stash 迁移到 `origin/main@6ac08e40`；5 份追加式状态文档保留双方记录，
+  Sporting Life/ZEturf 历史 CLI 同时保留上游 recovery 能力和 B0.1 单一 stable parser。
+  stash 仍保留为恢复点。
+- 最新 main 集成后，B0.1 `104/104`、race-live `23/23`、历史 HTTP/parser
+  `82/82`（另 4 项 conditional skip）、真实 PostgreSQL `3/3` 通过，临时容器已删除；
+  Django check、migration drift、`py_compile`、workflow contract 与 diff 检查通过。
+  上游新增的 recovery/P0 URL/HTTP budget 组合 `87` 项出现 `14` 个 macOS
+  `/var` -> `/private/var` 安全路径错误；同样的 `14` 个错误已在纯
+  `origin/main@6ac08e40` 临时 worktree 精确复现，不归因于 B0.1。
+- 当前仍未执行 provider 联网、commit、push、PR、部署、生产迁移或生产写入；也没有改变
+  lifecycle 的生产 `false/off`。由于 latest-main 集成改变了候选内容，下一门禁是复用同一
+  reviewer 会话复审新的完整 fingerprint；通过后仍需针对新 fingerprint 重新取得
+  commit/push/Draft PR 授权。Compose 仍未验证。
+
+# 2026-07-27 赛果恢复候选缺口已补齐，待 source map v2 发布
+
+- 关闭态生产 `prepare-20260727T073643Z` 使用 `73/75` 请求取得 27 场完整连续数字名次；
+  常驻网络/调度开关保持关闭，目标 `RaceEventResult=0`、event 426 结果为 0、目标候选仍为
+  32，未执行 audit/dry-run/apply。
+- 独立补缺批次 `gap-prepare-20260727T075310Z` 为 event 185 取得 NAR 官方 1–14 名，
+  并为 12 场美国赛事从 Sporting Life 取得 82 条完整数字名次；每场非退赛马数与结果数
+  相等。合并审阅层达到 `40 candidates / 319 results / 40 full numeric order`。
+- TOBA 交互式浏览器核验取得 12 个精确 Equibase chart 入口、field 与 winner，但
+  Equibase 完整 chart 仍只允许人工核验；当前合并文件为 review-only，不构成 official
+  confirmation 或生产写入授权。
+- 最新主线分支 `codex/fix-race-result-gap-source-map` 已将 candidate source map 升至
+  `2026-07-27-gap-v2`：美国 19 场统一由 Sporting Life 生成候选，TOBA 只保留 discovery；
+  NAR recovery 会受控检查同目录后发布的 `racecard.html`；法国四场使用已核验的精确
+  recovery-only URL 并在下载后重验身份，将预计法国请求从 35 降至 4。恢复聚焦测试
+  `39/39`、相关 adapter 回归 `48 passed / 4 skipped`。
+- 该分支已重基到 `origin/main@db96b13b`，提交并推送为 `787d6a1e`，草稿 PR `#36`
+  已创建且 GitHub 判定可合并。重基后恢复聚焦测试 `39/39`，历史 adapter 与 B0.1
+  相关回归 `192 passed / 4 skipped`，其余静态门禁通过。
+- PR `#36` 尚未合并，因此未把未合并分支部署到生产；生产仍未部署 gap-v2，也未重跑正式
+  bounded prepare、写入赛果或改变任何关闭态开关。
+
+# 2026-07-27 最近赛事赛果定时审核实现已完成，待独立代码审核
+
+- 已实现默认关闭的每日 `06:30/18:30 Asia/Shanghai` 审核链路：最近 72 小时新目标与
+  14 天 pending 并集、最多 28 个漏跑 slot 合并为一次 prepare、canonical route 合同、
+  不可变审核包和 durable 邮件 intent。
+- migration `0062_add_scheduled_race_result_review` 新增 run、pending、delivery、approval
+  四张治理表。人工采纳保留原来源 authority，显示“已人工审核赛果”，不伪装 official receipt。
+- apply 默认 dry-run；完整 bundle SHA、逐 event digest、reviewer 与双确认齐备后才逐场事务写入，
+  并提供独立 verify。
+- GREEN 与相邻回归 `94/94`；Django check、迁移漂移、编译、wrapper、三份 Compose config
+  和 diff 检查通过。
+- 未联网、未发邮件、未执行生产迁移/业务写、未 commit/push/PR/部署；新开关保持 false。
+  下一门禁是未参与实现者的完整只读代码审核。
+
+# 2026-07-27 定时赛果审核首次代码 review 四项 P1 已修复
+
+- 首次独立 review session `019fa425-c6fc-7e72-9483-5afa281fcfeb` 返回 `REVISE`：
+  verify 写前/写后语义、同 slot lease、apply 锁内 baseline、人工审核公开标签共 4 项 P1。
+- 四项均先取得真实 RED（聚焦 16 项中 `2 failures + 2 errors`），修复后聚焦 `17/17`；
+  recovery inventory/projection/public pages 与 lifecycle 相邻组合 `107/107`。
+- 真实 PostgreSQL `2/2` 证明同 slot 并发只进入一次 prepare，以及 event -> results 锁序会等待
+  并识别并发已提交的 baseline 漂移；临时容器和测试库已删除。
+- exact apply 重放现返回 `already_applied`，独立 verify 只核对写后 approval/result/digest/
+  authority；claim token CAS 阻止失去 lease 的旧 worker 写终态；公开详情只有当前结果 digest
+  对应不可变 human approval 时显示“已人工审核赛果”。
+- 未联网、未部署、未执行生产迁移/写入、未 commit/push。下一门禁是复用同一 reviewer session
+  做四项 finding 的限定复审。
+
+# 2026-07-27 定时赛果审核命令退出码两项 P1 已修复
+
+- 同一 reviewer 限定复审确认原四项 P1 已关闭，但新增两项直接 P1：空 `--verify` scope
+  错误退出 0，以及 apply summary 含 blocked、缺失或 unexpected event 时错误退出 0。
+- 两项命令测试先取得真实 RED：`2` 项产生 `4 failures`；修复后 `2/2`，完整聚焦
+  `19/19`，与 recovery/public pages/lifecycle 直接相邻组合 `109/109`。
+- verify 现必须提供至少一个 `--approve`。apply 会先保留逐 event JSON summary，再校验
+  returned event scope 精确守恒、状态只能是 `applied/already_applied` 且 unexpected 为空；
+  否则抛 `CommandError` 令进程非零退出。
+- Django check、迁移漂移、编译与 diff 检查通过。仍未联网、未生产写、未提交或部署；
+  下一门禁是同一 reviewer 再次限定复审。

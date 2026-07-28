@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('stable', '0062_add_exposure_constraints'),
+        ('stable', '0065_add_exposure_constraints'),
     ]
 
     operations = [

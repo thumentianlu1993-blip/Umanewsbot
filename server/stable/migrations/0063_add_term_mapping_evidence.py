@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('stable', '0059_add_lifecycle_manifest_data'),
+        ('stable', '0062_add_scheduled_race_result_review'),
     ]
 
     operations = [

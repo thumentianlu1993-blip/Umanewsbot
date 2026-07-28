@@ -576,6 +576,42 @@ TERM_CONSISTENCY_ENABLED = env_bool("TERM_CONSISTENCY_ENABLED", False)
 TERM_CONSISTENCY_SHADOW = env_bool("TERM_CONSISTENCY_SHADOW", True)
 TERM_CONSISTENCY_ENFORCE = env_bool("TERM_CONSISTENCY_ENFORCE", False)
 
+P0_RACECARD_URL_DISCOVERY_ENABLED = env_bool(
+    "P0_RACECARD_URL_DISCOVERY_ENABLED", False
+)
+P0_RACECARD_URL_DISCOVERY_ARTIFACT_ROOT = (
+    env(
+        "P0_RACECARD_URL_DISCOVERY_ARTIFACT_ROOT",
+        "/app/runtime/upcoming_racecard_urls",
+    )
+    or "/app/runtime/upcoming_racecard_urls"
+).strip()
+P0_RACECARD_URL_DISCOVERY_REGISTRY_FILE = (
+    env(
+        "P0_RACECARD_URL_DISCOVERY_REGISTRY_FILE",
+        "/app/runtime/policies/p0_racecard_urls/official_url_routes_v1.json",
+    )
+    or "/app/runtime/policies/p0_racecard_urls/official_url_routes_v1.json"
+).strip()
+P0_RACECARD_URL_DISCOVERY_REGISTRY_SHA256 = (
+    env(
+        "P0_RACECARD_URL_DISCOVERY_REGISTRY_SHA256",
+        "c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876",
+    )
+    or "c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876"
+).strip()
+P0_RACECARD_URL_DISCOVERY_MAX_TARGETS = int(
+    env("P0_RACECARD_URL_DISCOVERY_MAX_TARGETS", "500")
+)
+P0_RACECARD_URL_DISCOVERY_REQUEST_BUDGET = int(
+    env("P0_RACECARD_URL_DISCOVERY_REQUEST_BUDGET", "50")
+)
+P0_RACECARD_URL_DISCOVERY_SOFT_TIME_LIMIT = int(
+    env("P0_RACECARD_URL_DISCOVERY_SOFT_TIME_LIMIT", "240")
+)
+P0_RACECARD_URL_DISCOVERY_TIME_LIMIT = int(
+    env("P0_RACECARD_URL_DISCOVERY_TIME_LIMIT", "270")
+)
 # ── Race Event Lifecycle (Phase A) ──
 RACE_EVENT_LIFECYCLE_ENABLED = env_bool("RACE_EVENT_LIFECYCLE_ENABLED", False)
 RACE_EVENT_LIFECYCLE_MODE = env("RACE_EVENT_LIFECYCLE_MODE", "off")
@@ -588,6 +624,37 @@ RACE_EVENT_LIFECYCLE_SOFT_TIME_LIMIT = int(
 )
 RACE_EVENT_LIFECYCLE_TIME_LIMIT = int(
     env("RACE_EVENT_LIFECYCLE_TIME_LIMIT", "150")
+)
+# ── Scheduled race-result review (disabled until a production release gate) ──
+RACE_RESULT_REVIEW_ENABLED = env_bool("RACE_RESULT_REVIEW_ENABLED", False)
+RACE_RESULT_REVIEW_ALLOW_NETWORK = env_bool(
+    "RACE_RESULT_REVIEW_ALLOW_NETWORK", False
+)
+RACE_RESULT_REVIEW_ARTIFACT_ROOT = env(
+    "RACE_RESULT_REVIEW_ARTIFACT_ROOT", "/app/runtime/race_result_review"
+)
+RACE_RESULT_REVIEW_BUNDLE_ROOT = str(
+    Path(RACE_RESULT_REVIEW_ARTIFACT_ROOT) / "generations"
+)
+RACE_RESULT_REVIEW_ROUTE_REGISTRY = env(
+    "RACE_RESULT_REVIEW_ROUTE_REGISTRY",
+    "/app/runtime/policies/race_result_review/source_routes_v1.json",
+)
+RACE_RESULT_REVIEW_RECIPIENT = env("RACE_RESULT_REVIEW_NOTIFY_EMAILS", "")
+RACE_RESULT_REVIEW_LOOKBACK_HOURS = int(
+    env("RACE_RESULT_REVIEW_LOOKBACK_HOURS", "72")
+)
+RACE_RESULT_REVIEW_PENDING_MAX_AGE_DAYS = int(
+    env("RACE_RESULT_REVIEW_PENDING_MAX_AGE_DAYS", "14")
+)
+RACE_RESULT_REVIEW_DELIVERY_LEASE_SECONDS = int(
+    env("RACE_RESULT_REVIEW_DELIVERY_LEASE_SECONDS", "300")
+)
+RACE_RESULT_REVIEW_ATTACHMENT_MAX_BYTES = int(
+    env("RACE_RESULT_REVIEW_ATTACHMENT_MAX_BYTES", "5000000")
+)
+RACE_RESULT_REVIEW_MAX_REQUESTS = int(
+    env("RACE_RESULT_REVIEW_MAX_REQUESTS", "100")
 )
 
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", "redis://localhost:6379/0")
@@ -605,8 +672,13 @@ CELERY_TASK_ROUTES = {
     "stable.tasks.poll_race_live_event_task": {"queue": "race_live"},
     "stable.tasks.monitor_race_live_sla_task": {"queue": "race_live"},
     "stable.tasks.advance_race_event_lifecycle_task": {"queue": "default"},
+    "stable.tasks.scheduled_race_result_review_task": {"queue": "celery"},
 }
 CELERY_TASK_ANNOTATIONS = {
+    "stable.tasks.scheduled_race_result_review_task": {
+        "soft_time_limit": 900,
+        "time_limit": 960,
+    },
     "stable.tasks.poll_race_live_event_task": {
         "soft_time_limit": CELERY_RACE_LIVE_WORKER_SOFT_TIME_LIMIT,
         "time_limit": CELERY_RACE_LIVE_WORKER_TIME_LIMIT,
@@ -619,9 +691,21 @@ CELERY_TASK_ANNOTATIONS = {
         "soft_time_limit": RACE_EVENT_LIFECYCLE_SOFT_TIME_LIMIT,
         "time_limit": RACE_EVENT_LIFECYCLE_TIME_LIMIT,
     },
+    "stable.tasks.discover_p0_racecard_urls_task": {
+        "soft_time_limit": P0_RACECARD_URL_DISCOVERY_SOFT_TIME_LIMIT,
+        "time_limit": P0_RACECARD_URL_DISCOVERY_TIME_LIMIT,
+    },
 }
 
 CELERY_BEAT_SCHEDULE = {
+    "scheduled-race-result-review": {
+        "task": "stable.tasks.scheduled_race_result_review_task",
+        "schedule": crontab(minute=30, hour="6,18"),
+    },
+    "discover-p0-racecard-urls": {
+        "task": "stable.tasks.discover_p0_racecard_urls_task",
+        "schedule": crontab(minute=30, hour="6,18"),
+    },
     "select-due-race-live-events": {
         "task": "stable.tasks.select_due_race_live_events_task",
         "schedule": crontab(minute="*"),

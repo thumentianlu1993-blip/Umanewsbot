@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('stable', '0060_add_term_mapping_evidence'),
+        ('stable', '0063_add_term_mapping_evidence'),
     ]
 
     operations = [

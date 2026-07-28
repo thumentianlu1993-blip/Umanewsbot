@@ -1,5 +1,76 @@
 # 关键决策
 
+## 2026-07-27 明确非完赛状态计入完整性，但不得成为名次
+
+- 官方 `SCR/DNF/DSQ/中止` 等受控状态表示该参赛者已被官方交代，但没有数值完赛名次；
+  adapter 必须同时保留来源原文与规范化状态，不得把表格行号或后续顺序写成名次。
+- JRA `中止` 采用现有模型语义 `pulled_up`。恢复聚合只允许明确列入受控集合的退赛/非完赛
+  状态退出数值名次分母；`unknown`、`declared`、`Also Ran`、`N/A` 等不确定或无顺序状态
+  继续产生 `incomplete_result_order` blocker。
+- 完整名次是所有实际完赛马的连续、唯一数值顺序；“非完赛状态已交代”和“完整排名”是两个
+  并存事实。该决定不放宽官方 evidence、participant identity、receipt 或生产 apply 门禁。
+
+## 2026-07-27 recovery adapter 不得以成功空跑替代 scheduled 目标处理
+
+- inventory 中 `scheduled + result_due=true` 是本次历史赛果恢复的合法冻结状态；显式
+  recovery mode 必须贯穿 JRA、NAR、Sporting Life 和 ZEturf 等存在状态过滤的详情 adapter，
+  普通模式继续只接受 `finished`；TOBA discovery 继续按精确 target scope 执行。
+- adapter 对精确输入产生 `events=0` 时，即使命令 return code 为 0，也必须按未覆盖 target
+  形成 blocker；不得把空 candidate/review CSV 解释为 prepare 完成。
+- source-scoped CSV 必须携带冻结生产 `event_id` 并由 candidate 回传。聚合层对所有来源独立
+  校验完整参赛名单、所有非 `withdrawn/scratched` 马的结果覆盖、连续唯一内部名次及
+  discovery-only 标记；缺一项即 `incomplete_result_order`，`Also Ran` 页面顺序不得成为名次。
+- 同一 run 内不同地区 adapter 的 `standard_name` 必须唯一；UK/US Sporting Life 即使复用
+  parser，也必须分别保存 candidate/review/summary，禁止后执行来源覆盖先执行来源。
+- recovery coverage 只接受当前 run `state.json` 绑定的标准
+  `candidates/combined_candidates.jsonl`，并复核其 SHA-256/size；CLI 显式外部 JSONL、
+  identity 漂移或缺 state 一律拒绝。逐场 candidate 的 `source_provider/racing_region`
+  还必须与 plan target 完全一致，不能靠自报 `result_order_complete=true` 跨 shard 放行。
+- 本轮不通过手改 CSV status、直接运行 adapter 或手工拼接 combined candidate 绕过 runner。
+  非 JRA adapter 的恢复状态过滤需按测试、独立 review、release、关闭态部署后再重新联网；
+  已取得的网页赛果只能作为人工审核线索，未进入 receipt 前不得授权生产 apply。
+
+## 2026-07-27 recovery adapter 输入按来源分片，JRA 同时服从两层请求账本
+
+- `race_result_recovery` plan 必须同时绑定 inventory 文件路径、文件 SHA-256 与内部
+  manifest SHA-256，并强制携带当前批准的 `source_map_version`；缺失或版本不符直接拒绝，
+  精确 40 场 source map 不允许降级为任意子集。expected target 创建和既有 snapshot 恢复都先运行 inventory verifier
+  重算当前数据库 identity，再按冻结 event ID 顺序绑定；event、状态、赛果、地区或其他
+  inventory 字段漂移直接拒绝，不生成可人工补写的伪 snapshot。
+- adapter 输入不能只按地区分组。同一地区允许多个批准来源时必须以 `region + source` 分片，
+  runner 只向 manifest 的精确来源交付对应 CSV，避免 JRA/NAR 或 TOBA/Sporting Life 交叉扩张
+  网络范围。
+- JRA 年度列表与详情页复用同一 source cache。显式 recovery mode 可读取已审批 CSV 中仍为
+  `scheduled` 的恢复目标，普通模式继续只接受 `finished`。每个初始请求和每次 redirect 都先
+  通过 runner v2 的 JRA-only HTTPS host/path，再分别占用全批次共享预算；任一层拒绝都不得
+  发起 transport。该决定不放宽 BHA、France Galop、Equibase 等 manual-only 路由。
+
+## 2026-07-27 赛果候选联网在 expected-target 构造缺口处保持零请求阻断
+
+- `race_result_recovery` 的 40 个 event ID source map 校验通过，不代表运行时 expected-target
+  snapshot 已可生成。生产只读调用实证 `expected_targets_from_plan()` 返回
+  `expected_target_empty`；此时不得手工伪造 snapshot、改用普通三模块 plan、直接运行 adapter
+  或跳过 historical runner。
+- 本次联网权限没有被解释为绕过编排权限：自动请求、manual-only 请求、candidate 和 source
+  cache 均为 0。修复必须先为 recovery event ID 构造并绑定精确 `RaceEvent` identity，
+  同时补齐 JRA list/source 与受控请求上下文，再按测试、独立 review、精确 release、部署和
+  新联网授权顺序推进。
+- 关闭态部署允许修改控制面开关，但不授权正式赛果投影。既有 race-live publication policies
+  和 allowlist 已关闭；event 924 暂定结果保留，正式结果、canonical link 和新闻/QQ 均不改。
+
+## 2026-07-27 赛果恢复必须服从 projection owner 并以 blocker=0 才算完成
+
+- 指定窗口的赛果恢复不得直接按名称/日期复制数据，也不得直接写 `RaceEventResult`。所有正式结果先形成
+  official revision/evidence，再按 `RaceEventProjectionControl` 的 `live / historical /
+  unmanaged / manual_paused` owner 分流；event `924` 保持 live owner。
+- 跨 `RaceSeries` 的重复实体只生成身份候选；人工批准后以
+  `RaceEventProductCanonicalLink` 持久化非 canonical → canonical 展示关系。底层赛事、系列、
+  revision 和 evidence 不删除，旧详情 URL 保留。
+- inventory 的到期判定复用 `decide_race_lifecycle()`：有时间用 T+30m，无时间用当地次日零时；
+  非法时区/日期 fail closed。
+- `confirmed/cancelled/postponed/blocked` 只用于 accounted 守恒；只要仍有一个
+  `blocked_with_evidence`，恢复 run 就不能标记 completed，也不能对外宣称“全部收集并确认完成”。
+- 实现、部署、网络候选收集和生产写入是四个独立授权面；后一阶段必须绑定其精确 artifact/commit SHA。
 ## 2026-07-26 赛事新闻质量治理实现完成（代码就位，待审核与发布）
 
 - 按已审方案实现赛事新闻曝光治理和多语言术语统一两组变更，使用单一协调实现分支
@@ -2097,3 +2168,138 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 时区合同：日本→Asia/Tokyo、香港→Asia/Hong_Kong、英国→Europe/London、法国→Europe/Paris、
   美国→manifest 逐场审核 America/*；其他 region fail closed。
 - 默认 mode=off，所有配置关闭；不接入 provider、不改新闻门禁、不 dispatch race-live。
+
+## 2026-07-26 The Racing API schema v2 proof 路由必须显式绑定地区
+
+- schema v2 proof 禁止隐式默认英国；调用者必须显式给出 registry 中已审核的 region。
+- 单次 proof 固定顺序为该地区 `racecards today`、`racecards tomorrow`、无地区过滤的
+  `results today skip=0`，最多 3 请求；所有 URL 均由 registry v2 route contract builder
+  构建，并继续受 HTTPS host、请求参数、15 秒超时、2 MiB、无 redirect/retry 和 1.05 秒间隔约束。
+- v2 artifact 只记录本次实际尝试的请求 path，不把未执行路由写成已执行证据；v1 proof
+  行为保持兼容。
+- runner 修复、独立 review 与真实联网 proof 是三个独立授权点。本地测试通过不构成联网许可，
+  当前仍禁止读取生产 secret 或发出请求。
+
+## 2026-07-27 赛前官方数据不得沿用赛果 route 或第三方 authority
+
+- 重点赛事赛前清单以现有产品规则 `P0/P1 或 featured` 穷尽枚举，再用官方 aware post time
+  判断七天半开窗口；禁止先挑有数据的赛事后宣称全量。
+- `scheduled_post_time`、`actual_off_time`、场地 `local_start_time` 和数据库
+  `race_datetime` 是不同语义。赛前计划时间使用现有 `RaceResultPhase.RACECARD`，并在
+  field provenance 记录 `time_semantics=scheduled_post_time`；同时保留原始时区、UTC、
+  地区时区和中文展示值。不得为这些语义另造数据库 phase。
+- 现有 BHA、France Galop、Equibase official route 只覆盖赛果核验，不自动授权 entries；
+  TRA 只能是 provisional 补充。provider/region/field/phase/contract version 或许可缺失时
+  必须在抓取/写入前 fail closed。
+- 当前跨地区每日官方赛前任务为 NO-GO；购买或取得授权来源、完成连续覆盖证据和新的 review
+  之前，不创建或启用 beat/scheduler。
+
+## 2026-07-27 P0 出马页 URL 发现与出马数据 apply 分离
+
+- 允许把“官方出马页面 URL 发现”作为独立窄链路建设；该链路只保存 URL 和最小审计元数据，
+  不保存页面正文/出马名单，不写赛事业务表，也不改变
+  `fetch-upcoming-key-racecards` 当前结构化数据 apply 为 0 的结论。
+- P0 范围严格等于 `RaceEvent.priority=P0`。draft/hidden、系列待审或时间证据不足的 P0 不得
+  静默丢弃，应进入完整清单并显示 blocker；P1、P2 和 featured-only 不进入本任务。
+- 上海时间每日 `06:30/18:30` 运行，冻结绝对 `[start, start+7d)`。同一赛事只保留一个当前
+  URL；新 URL 替换旧 URL，瞬时错误或后续 404 不自动清空已确认 URL，较旧运行不得覆盖较新运行。
+- 机器 JSON、人工 Markdown 和 manifest 组成不可变 generation，由单一原子 `current` 相对
+  symlink 切换；人工固定读取 `current/latest.md`。SHA 计算必须无环，读取者只可见上一完整代
+  或下一完整代。
+- 模板构造 URL 只能标记 `candidate_unverified`，不得标为 found；found 必须有官方正向存在
+  marker 或官方索引精确链接。普通 404 是 `path_unverified`，不能猜成“尚未发布”。
+- 保留上轮确认 URL 时，URL 的 `provider/provider_event_id/provider_contract_version` 必须与
+  原确认来源一起保留；本轮失败或改源检查使用独立
+  `checked_provider/checked_provider_event_id/checked_provider_contract_version`。汇总按本轮
+  checked provider 计数，禁止把旧 URL 错误归因到新失败来源。
+- 网络在锁外执行，但 outcome 与当前文档的最终 merge 必须在发布锁内重读 `current` 后完成；
+  stale CAS 只防旧运行覆盖，不能替代锁内 latest-state merge。
+- URL-only 降低了内容复制风险，但用户授权不能替代第三方站点的 robots、条款或自动访问许可。
+  每个 provider route 独立 fail closed；确定性构造 URL 可以不联网，索引发现/存在性检查仍须
+  受审 contract。
+
+## 2026-07-27 P0 URL route 的 HEAD 与正文抓取边界
+
+- 用户明确纠正前述边界：按受审规则离线生成 URL，再以 `HEAD` 检查精确路径或应用入口，
+  不属于本项目所称的网页正文抓取。该决定仅修订上一节最后一条对存在性检查的解释，不授权
+  `GET` 正文、HTML 解析、出马字段提取或绕过认证。
+- BHA 目标路径未被本轮获取的 `robots.txt` 禁止，并声明 `crawl-delay: 10`。Equibase 实际
+  请求 origin `tvg.equibase.com` 的 `robots.txt` 返回 404 且不重定向；不得借用
+  `www.equibase.com` 的 robots 规则冒充目标 origin 证据。项目仍主动采用 5 秒最小间隔。
+  route 必须按 host 去重并满足最小间隔；无论响应状态如何，`HEAD` transport 都不得读取或
+  保存 body。
+- BHA 日期变量位于 fragment，服务器无法据此判断该日期数据是否已发布。因此 BHA 的 2xx
+  只能标为 `listing_reachable/date_listing`，不能标为单场 `found`。同一批所有 BHA 日期 URL
+  共享一次去重后的应用入口 HEAD。
+- Equibase 的 `tvg.equibase.com/static/entry/RaceCardIndex{track}{MMDDYY}USA-EQB.html`
+  对当前 DMR/CNL 返回 200、伪场地或错误日期返回 404；因此允许按官方
+  `track_code + local_date` 发精确 HEAD，2xx 标为 `found`、404 标为 `not_published`。
+- France Galop 有效与伪会议 URL 都跳转认证，无法由状态码区分，继续 fail closed；JRA、
+  HKJC 保留未来 contract，NAR 继续遵守明确 robots 禁止。
+- 该判断不把任何 provider 的历史赛果或正文访问许可扩展到 entries 内容；以后若 route 需要
+  `GET` 或解析正文，必须另行形成证据、方案审核和授权。
+## 2026-07-27 赛果缺口恢复采用地区化候选源与官方确认双层来源
+
+- 日本缺口直接以 JRA/NAR 官方结果页作为采集和确认来源。
+- 英国使用 Sporting Life 生成结构化候选、BHA Results 人工确认；法国使用 ZEturf
+  生成候选、France Galop 人工确认。
+- 美国优先从 TOBA 发现精确 Equibase chart；TOBA 尚未更新时允许 Sporting Life 生成候选，
+  但完整赛果仍须 Equibase chart 人工确认。HRN 日期入口本次已验证失效，不作为该批主来源。
+- 第三方候选不得单独写成 confirmed。官方站点的反爬、token 或登录限制不得通过 stealth、
+  验证码绕过或未批准自动化规避。
+
+## 2026-07-27 赛果恢复投影与实时公开门禁按 owner 分流
+
+- `historical` owner 的缺口恢复使用 non-live official receipt 和逐场 CAS 投影，不复用
+  race-live 的 provisional/publication 授权；`live`、既有 `unmanaged` 以及
+  `manual_paused` 的 current result revision 仍经过原实时公开策略读取门禁。
+- canonical 去重只隐藏已批准 active duplicate 的日历、首页、周焦点和 sitemap 入口；
+  旧详情 URL 保留并指向 canonical 赛事。链接创建必须同地区、同年度、无自环、无链/环，
+  且使用 PostgreSQL advisory lock 与 row lock。
+- 本地实现、代码审核、部署、联网 candidate prepare、人工 official 审批和生产 apply
+  是独立授权点；任一前置完成不授权后续动作。
+## 2026-07-27 Sporting Life、ZEturf、HRN 固定为内部参考源
+
+- 用户已与三方确认本站可保留现有解析器并低频使用；项目记录该确认作为当前使用边界，不在
+  仓库保存敏感往来内容。
+- 三源新增生命周期观察统一为 `internal_reference`：允许内部采集、匹配、版本比较和后台查看，
+  不允许公开展示、字段 apply、赛果 authority、新闻引用自动发布或 QQ 分发。
+- 内部参考链必须使用独立 run/payload/receipt 模型和只读后台；禁止直接复用
+  `import_race_event_detail_candidates --apply`、`RaceEventDataCandidate`、race-live revision/
+  projection。
+- Sporting Life 不能产生英国 official，ZEturf 不能覆盖 France Galop，HRN 的 payout/
+  also-rans 不能冒充完整正式结果。
+- 本决定不追溯修改按既有历史赛事审核流程已经导入的数据。未来若要人工采纳内部观察，必须
+  另立 change，不在阶段 B0.1 提供 promotion action。
+- 阶段 B0.1 只处理现有 parser 的 `finished` 赛后入口，不注册 Celery/Beat；多日观察使用逐日
+  manifest-bound one-shot。赛前 route 或无人值守调度属于后续独立范围。
+- 阶段 B0.1 与 TRA/官方赛前同步分开 review、开关、联网和生产写入授权；连续观察成功也不会
+  自动提高来源 authority。
+
+## 2026-07-27 定时赛果工具新增逐审核包人工采纳 authority
+
+- Sporting Life、ZEturf、HRN 等来源继续保持 `internal_reference`，自动采集成功和完整顺序都不把
+  来源升级为 official，也不能复用 official receipt 冒充官方确认。
+- 用户对精确 `bundle_sha256 + event_id + reviewed_row_digest` 的明确批准形成独立
+  `human_reviewed_reference` authority，只允许当前 event 的当前字段集合进入平台正式赛果投影；
+  它不是来源级白名单，也不授权未来 bundle。
+- 该路径使用独立、不可变 approval ledger 和逐 event 原子 projection。平台确认时间与官方确认
+  时间分开；公开语义为“已人工审核赛果”，不得显示为“官方赛果”。
+- official receipt 路径保持原合同不变。任何未审核、digest 漂移、名次不完整或 Also ran 文本顺序
+  继续 fail closed。
+
+# 2026-07-27 赛果补缺 candidate source map 升级为 gap-v2
+
+- 决定将美国 19 场恢复目标全部交给 Sporting Life 结果 adapter 生成完整数字顺序候选。
+  TOBA 对前 12 场只保留 Equibase 精确 chart 入口、field 与 winner 的 discovery 证据，
+  不再作为结果 candidate provider，也不能授权 official confirmation。
+- 原因：生产一次性 prepare 中 TOBA 自动请求返回 403，且 TOBA 表只提供 winner/discovery，
+  无法满足完整参赛名单与连续唯一名次门禁；同场 Sporting Life 已取得完整顺序，并与 TOBA
+  field/winner 一致。
+- NAR event 185 不改变 provider；recovery mode 允许在冻结的 `introduction.html` 尚无入口时
+  受控检查同目录 `racecard.html`。该行为只在 recovery mode 生效，不改变普通历史详情流程。
+- 法国 event `733..736` 在 recovery mode 使用首轮 prepare 已核验的四条精确 ZEturf route，
+  下载后必须重验日期、赛场与赛事名，失败不回退宽范围探测。该选择把预计请求数从 35 降至
+  4，使美国 19 场改走 Sporting Life 后全批仍可满足 75 请求硬上限。
+- 新 candidate source map 版本为 `2026-07-27-gap-v2`。发布前的 40 场合并包仅供审阅，
+  source map v2 未部署前不得作为正式 audit/apply 输入。

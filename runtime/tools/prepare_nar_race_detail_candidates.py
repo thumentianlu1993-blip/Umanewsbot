@@ -48,6 +48,12 @@ def _read_events(csv_path: Path) -> list[dict]:
         return list(csv.DictReader(handle))
 
 
+def _should_fetch_results(event: dict, *, recovery_mode: bool = False) -> bool:
+    return event.get("status") == "finished" or (
+        recovery_mode and event.get("status") == "scheduled"
+    )
+
+
 def _racecard_link_from_detail(detail_html: str, detail_url: str) -> str:
     soup = BeautifulSoup(detail_html, "html.parser")
     for a in soup.find_all("a", href=True):
@@ -55,6 +61,17 @@ def _racecard_link_from_detail(detail_html: str, detail_url: str) -> str:
         if "TodayRaceInfo/DebaTable" in href:
             return urljoin(detail_url, href)
     return ""
+
+
+def _detail_url_candidates(
+    detail_url: str,
+    *,
+    recovery_mode: bool,
+) -> list[str]:
+    candidates = [detail_url]
+    if recovery_mode and detail_url.endswith("/introduction.html"):
+        candidates.append(urljoin(detail_url, "racecard.html"))
+    return candidates
 
 
 def _result_link_from_deba(deba_html: str, deba_url: str) -> str:
@@ -244,15 +261,41 @@ def prepare_candidates(args) -> dict:
                 summary["skipped"].append({"slug": event["slug"], "reason": "missing_detail_url"})
                 continue
             try:
-                detail_html = _download(
+                deba_url = ""
+                attempted_detail_urls = []
+                for candidate_detail_url in _detail_url_candidates(
                     detail_url,
-                    source_dir / _slug_filename("source_nar_detail", detail_url),
-                    allow_network=args.allow_network,
-                    timeout=args.timeout_seconds,
-                )
-                deba_url = _racecard_link_from_detail(detail_html, detail_url)
+                    recovery_mode=bool(
+                        getattr(args, "recovery_mode", False)
+                    ),
+                ):
+                    attempted_detail_urls.append(candidate_detail_url)
+                    detail_html = _download(
+                        candidate_detail_url,
+                        source_dir
+                        / _slug_filename(
+                            "source_nar_detail",
+                            candidate_detail_url,
+                        ),
+                        allow_network=args.allow_network,
+                        timeout=args.timeout_seconds,
+                    )
+                    deba_url = _racecard_link_from_detail(
+                        detail_html,
+                        candidate_detail_url,
+                    )
+                    if deba_url:
+                        detail_url = candidate_detail_url
+                        break
                 if not deba_url:
-                    summary["skipped"].append({"slug": event["slug"], "reason": "racecard_not_published", "detail_url": detail_url})
+                    summary["skipped"].append(
+                        {
+                            "slug": event["slug"],
+                            "reason": "racecard_not_published",
+                            "detail_url": detail_url,
+                            "attempted_detail_urls": attempted_detail_urls,
+                        }
+                    )
                     continue
                 deba_html = _download(
                     deba_url,
@@ -263,7 +306,10 @@ def prepare_candidates(args) -> dict:
                 result_url = _result_link_from_deba(deba_html, deba_url)
                 runners: list[dict]
                 results: list[dict] = []
-                if event.get("status") == "finished" and result_url:
+                if _should_fetch_results(
+                    event,
+                    recovery_mode=bool(getattr(args, "recovery_mode", False)),
+                ) and result_url:
                     result_html = _download(
                         result_url,
                         source_dir / _slug_filename("source_nar_result", result_url),
@@ -297,6 +343,8 @@ def prepare_candidates(args) -> dict:
                 "modules": modules,
                 "metadata": metadata,
             }
+            if str(event.get("event_id") or "").strip():
+                record["event_id"] = int(event["event_id"])
             jsonl.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
             summary["events"] += 1
             summary["runner_items"] += len(runners)
@@ -328,6 +376,7 @@ def main() -> None:
     parser.add_argument("--events-csv", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--allow-network", action="store_true")
+    parser.add_argument("--recovery-mode", action="store_true")
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--timeout-seconds", type=int, default=30)
     parser.add_argument("--fail-fast", action="store_true")

@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('stable', '0061_add_race_news_exposure'),
+        ('stable', '0064_add_race_news_exposure'),
     ]
 
     operations = [

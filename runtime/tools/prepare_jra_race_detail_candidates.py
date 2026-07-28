@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 
 from historical_race_detail_http import controlled_http_get
+from race_event_request_budget import before_network_request
 from race_event_source_cache import write_source_cache
 from jra_legacy_replay_detail_parser import try_parse_jra_legacy_replay_detail
 
@@ -18,6 +19,9 @@ from bs4 import BeautifulSoup
 
 
 JRA_BASE_URL = "https://www.jra.go.jp"
+JRA_RESULT_LIST_URL = (
+    "https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html"
+)
 JRA_RESULT_RE = re.compile(r"/datafile/seiseki/(?:replay/2026/\d{3}|g1/[^\"']+/result/[^\"']+2026)\.html")
 WAKU_RE = re.compile(r"枠(\d+)")
 STRUCTURED_DISTANCE_RE = re.compile(
@@ -79,6 +83,7 @@ def _download(
         host_state_root=request_context.get("host_state_root"),
         timeout=timeout,
         headers={"User-Agent": "UmaFansBot/1.0"},
+        before_request=before_network_request,
     )
     write_source_cache(path, body, source_url=url)
     return body
@@ -168,13 +173,22 @@ def _source_filename(source_url: str) -> str:
     return f"source_jra_{slug[-80:]}.html"
 
 
-def _read_finished_events(csv_path: Path) -> list[dict]:
+def _read_finished_events(
+    csv_path: Path,
+    *,
+    recovery_mode: bool = False,
+) -> list[dict]:
     with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
+        accepted_statuses = (
+            {"scheduled", "finished"}
+            if recovery_mode
+            else {"finished"}
+        )
         return [
             row
             for row in reader
-            if (row.get("status") or "").strip() == "finished"
+            if (row.get("status") or "").strip() in accepted_statuses
         ]
 
 
@@ -202,7 +216,7 @@ def _runner_status_from_finish_position(value: str) -> str:
     if value == "除外":
         return "scratched"
     if value == "中止":
-        return "unknown"
+        return "pulled_up"
     return "declared"
 
 
@@ -316,11 +330,22 @@ def _parse_detail_page(body: bytes, *, source_url: str) -> tuple[list[dict], lis
 def prepare_candidates(args) -> dict:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    finished_events = _read_finished_events(Path(args.events_csv))
+    finished_events = _read_finished_events(
+        Path(args.events_csv),
+        recovery_mode=bool(getattr(args, "recovery_mode", False)),
+    )
     if args.limit:
         finished_events = finished_events[: args.limit]
-    result_links = _match_result_links(Path(args.source_html), finished_events)
     request_context = _request_context_from_args(args)
+    source_html = Path(args.source_html)
+    _download(
+        JRA_RESULT_LIST_URL,
+        source_html,
+        allow_network=args.allow_network,
+        timeout=args.timeout_seconds,
+        request_context=request_context,
+    )
+    result_links = _match_result_links(source_html, finished_events)
 
     jsonl_path = output_dir / "jra_detail_candidates_2026.jsonl"
     review_csv_path = output_dir / "jra_detail_review_2026.csv"
@@ -365,6 +390,8 @@ def prepare_candidates(args) -> dict:
                 },
                 "metadata": metadata,
             }
+            if str(event.get("event_id") or "").strip():
+                record["event_id"] = int(event["event_id"])
             jsonl.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
             summary["events"] += 1
             summary["runner_items"] += len(runners)
@@ -400,6 +427,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--timeout-seconds", type=int, default=30)
     parser.add_argument("--fail-fast", action="store_true")
+    parser.add_argument("--recovery-mode", action="store_true")
     parser.add_argument("--request-policy")
     parser.add_argument("--request-shard-id")
     parser.add_argument("--request-state")

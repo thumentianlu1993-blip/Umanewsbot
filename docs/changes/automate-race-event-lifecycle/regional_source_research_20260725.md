@@ -204,3 +204,17 @@ TRA Pro 仍无法满足 T-14/T-21。更早阶段只维护已有赛事日历和�
 - https://www.theracingapi.com/data-coverage
 - https://www.theracingapi.com/terms-of-service
 - https://www.equibase.com/products/whataredownloadablecharts.cfm
+
+## 8. 2026-07-27 内部参考源决策补充
+
+用户已确认 Sporting Life、ZEturf、Horse Racing Nation 可由本站保留现有解析器并低频使用，
+但抓取结果不公开，只供站长参考。该决策不改变上述官方/商业主来源矩阵：
+
+- 英国自动结构化主来源仍优先 TRA，BHA/获授权官方数据负责权威确认；
+- 法国自动结构化主来源仍优先 TRA，France Galop 负责权威确认；
+- 美国自动结构化主来源仍优先 TRA North America，获授权 Equibase 负责权威确认；
+- Sporting Life、ZEturf、HRN 统一为 `internal_reference`，不具有 field apply、result
+  authority 或 publication 能力。
+
+工程上必须写入独立 reference run/payload/receipt，不得直接调用现有历史详情
+`import_race_event_detail_candidates --apply`。详细合同见 `internal_reference_sources.md`。

@@ -1,5 +1,64 @@
 # 部署运行手册
 
+## 2026-07-28 最近赛事赛果定时审核生产发布记录
+
+1. 发布前没有 import lock、STARTED import 或 RUNNING historical batch；数据库备份
+   `/opt/umanewsbot/backups/db/pre-scheduled-race-result-review-20260728T004929+0800.dump`
+   为 `262544260` bytes，SHA-256
+   `6edc1c6b7057f1be2ab622d570816890958edf7e67557b38b8dc95ff2c9b2205`，
+   `.env` 备份同 timestamp，另保留 rollback image
+   `umanewsbot:rollback-pre-scheduled-race-result-review-20260728T004929_0800`。
+2. PR `#39` 首次部署严格保持新开关关闭；migration `0062` 成功、route registry 可读、
+   四张治理表为 0，disabled smoke、healthz 和 Celery ping 通过。
+3. 首次启用后的 catch-up 在联网前因 JSON 序列化失败。止血顺序是停止 Beat、关闭总开关
+   和网络开关、核对业务基线与治理表均未变化；不得删除或改写生产数据来绕过错误。
+4. PR `#40` 窄修后重新执行完整关闭态部署，再次通过 disabled smoke 后启用。当前生产
+   HEAD `ca22c9fa6389984cf38f6cbb9f8c6179e7249798`，image
+   `sha256:0cb2e1787fadfb742d3733db3a53e0d08035c22d98d71779dd874bb4a06def65`。
+5. 首次受控 run `26` 为 `notified`，bundle
+   `07e7f22374bbc09a85df441f87da1cd0228f5431a8f9378a8f1e578bbecf4d47`；
+   delivery 为 1，重复 wrapper 为 `already_claimed`。业务基线仍为
+   `RaceEventResult=92223`、finished `9419`、scheduled `443`。
+6. Beat schedule 是 `30 6,18 * * *`、timezone `Asia/Shanghai`；Codex automation
+   `umanews` 执行同一生产 wrapper。回滚/止血先暂停 automation、停止 Beat并关闭总开关，
+   不得仅依赖其中一个入口。
+7. 当前 13 个目标全部 `route_missing`。在来源身份 discovery 修复并通过独立验证之前，
+   正常运行可以发送 blocker 审核包，但不得将其解释为已取得赛果，也不得执行 apply。
+
+## 2026-07-27 event 80 非完赛解析修复的后续发布顺序
+
+1. 仅发布通过独立只读复审的精确提交；部署时保持 race-result apply、historical network、
+   race-live scheduler/monitor/runner/lifecycle 与 publication policy 全关闭，不改当前 P0
+   URL 发现开关状态。
+2. 部署后先运行 Django check、迁移漂移、容器镜像/commit 与内外 healthz 验证；不得把代码
+   部署解释为联网 prepare 或赛果写入授权。
+3. 取得新的有界联网 prepare 授权后，复用冻结 40 场 scope、expected-target/source-map
+   SHA 和现有 source cache 重跑。必须重新核对请求 `<=75`、manual-only 请求 `=0`、
+   candidate 数 `=40`，并确认 event 80 为 17 条连续数值名次加 #5 `中止/pulled_up`，
+   `result_order_complete=true`；不得给 #5 补造第 18 名。
+4. 新 candidate/approval/review manifest SHA 必须重新生成。只有独立 verifier 证明
+   40/40 accounted、`blocker=0`、精确 create/update/delete 与 owner 分流后，才可向用户
+   请求绑定这些 SHA 的生产写入授权。
+
+## 2026-07-27 event 426 时间修正与联网 prepare 记录
+
+1. 写前确认 event `426` 为 `EDDIE READ S.`、`local_date=2026-07-26`、
+   `timezone_name=America/Los_Angeles`、`race_datetime=null`、赛果 `0`。事务使用
+   `select_for_update()` 和身份/CAS 检查，仅写
+   `race_datetime=2026-07-27T01:10:00Z` 与审计日志。
+2. 写前与回执位于
+   `/opt/umanewsbot/runtime/race_result_recovery/event426-time-fix-20260727T060100Z/`，
+   SHA-256 分别为 `ce8e5fb9…1d53`、`59627477…c74`，权限 `0600`。
+3. 新 inventory 为
+   `/opt/umanewsbot/runtime/race_result_recovery/inventory-20260727T060200Z.json`
+   （file `327e8c16…0aa3`、manifest `d569534a…cfda`）。plan 为
+   `race-result-recovery-prepare-20260727T060300Z.plan.json`（`b70ce2c2…f21d`）。
+4. plan 阶段保持 `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`；prepare 仅在 one-off
+   容器临时设置 historical enabled/network 为 true，常驻 `.env` 和四应用容器均保持 false。
+   实际请求 `12/75`，manual-only 自动请求 `0`。
+5. combined candidate SHA-256 为 `033fc60d…489c`，仅含 4 场 JRA 官方赛果。Sporting Life
+   和 ZEturf 因 scheduled 状态过滤而空跑，TOBA 为 403；不得继续到 apply。修复后必须创建新
+   immutable run，不覆盖 `prepare-20260727T060300Z`。
 ## 赛事新闻质量治理 部署配置（2026-07-26 实现完成，待部署）
 
 ### 新增配置项（.env）
@@ -20,10 +79,13 @@ RACE_NEWS_QQ_TARGET_MAX=2
 
 ### 新增 Migration
 
-- `0060_add_term_mapping_evidence` — 新增 `TermMappingEvidence` 表
-- `0061_add_race_news_exposure` — 新增 `RaceNewsExposure` 表及约束/索引
-- `0062_add_exposure_constraints` — exposure slot/delivery CheckConstraints
-- `0063_add_term_consistency_manifest` — 新增 `TermConsistencyManifest` 表（dry-run manifest 持久化与 rollback）
+- `0063_add_term_mapping_evidence` — 新增 `TermMappingEvidence` 表
+- `0064_add_race_news_exposure` — 新增 `RaceNewsExposure` 表及约束/索引
+- `0065_add_exposure_constraints` — exposure slot/delivery CheckConstraints
+- `0066_add_term_consistency_manifest` — 新增 `TermConsistencyManifest` 表（dry-run manifest 持久化与 rollback）
+
+注：合并时因 main 已占用 `0060–0062`（race reference / scheduled result review），本组迁移由
+原 `0060–0063` 顺延为 `0063–0066`，依赖链挂到 `0062_add_scheduled_race_result_review` 之后。
 
 ### 部署验证
 
@@ -6776,3 +6838,301 @@ python manage.py complete_horse_profiles \
 
 精确方案见 `docs/changes/automate-race-event-lifecycle/rollout.md`。阶段 A 已实现，
 56 项测试通过；当前代码审查进行中，未部署、未写生产。
+
+## 2026-07-27 生命周期阶段 A 关闭态更新
+
+阶段 A 后续已部署但显式关闭，生产 dry-run 已完成；shadow/enforce 未授权。恢复点和证据见
+`docs/changes/automate-race-event-lifecycle/production_release_20260726.md`。
+
+## The Racing API schema v2 proof runner 候选操作边界
+
+- 当前候选新增 `run_race_live_source_proof --region <region>`；schema v2 缺失或非法 region
+  必须在 transport 前失败。
+- 在当前候选完成独立 review、冻结 fingerprint 并取得最多 3 请求的独立用户授权前，不得在
+  本地或生产执行 `--confirm-network-proof`，不得读取/复制/输出 production secret。
+- 获得联网授权后仍必须使用唯一 output 目录、精确 registry SHA、`--max-requests <= 3`，
+  先核对 registry 有效期和 evidence 新鲜度；失败 artifact 也必须保留，禁止原目录重跑覆盖。
+
+## 未来重点赛事赛前数据候选与 apply 边界（方案阶段）
+
+- 当前没有可执行命令或已批准 artifact；不得根据
+  `docs/changes/fetch-upcoming-key-racecards/` 直接抓取或写库。
+- 后续实现必须保持：
+  `inventory -> source cache -> immutable candidate -> dry-run/review -> approved SHA ->
+  transaction apply -> independent verifier`。
+- 抓取层禁止写 `RaceEvent`/`RaceEventRunner`；空表、局部表、身份/时间/许可冲突整场
+  fail closed。第三方 racecard 不得标成 official。
+- 本地/测试 apply 也需明确目标数据库与批次；生产 apply 必须另备份、冻结精确 SHA、字段 diff、
+  影响行数和 rollback manifest，并等待用户对该批次授权。
+- 本 change 不启用 Celery beat、race-live scheduler、monitor、公共发布或每日自动化。
+
+## P0 官方出马页面 URL 文档（方案阶段）
+
+- 候选宿主目录：
+  `/opt/umanewsbot/runtime/upcoming_racecard_urls/`；容器目录：
+  `/app/runtime/upcoming_racecard_urls/`。计划由 default worker 使用 bind mount 持久化，
+  beat 只 dispatch，不需要写挂载。
+- 候选产物为不可变 `generations/<id>/` bundle，由单一原子 `current` 相对 symlink 切换；
+  人工固定读取 `current/latest.md`。manifest/JSON/Markdown SHA 不一致时视为不可接受，不能
+  交给人工录入。
+- 功能开关默认 false。未完成代码 review 和精确发布授权前，不得创建生产目录、修改 `.env`、
+  部署、联网或启用 schedule。
+- 发布候选应先验证 flag-off 的 `network_requests=0/file_writes=0`，再按 provider route
+  独立启用；总任务开关不能覆盖 provider 的 `automation_allowed=false`。
+- 回滚先关总开关，再恢复镜像/Compose。此链路不写业务数据库，正常回滚不需要恢复数据库；
+  最后已验证文档默认保留供人工参考。
+- 当前本地实现的 tracked registry SHA-256 为
+  `d04ec36924fc120ea6a497634f2f7ae9b0e5831ccf9ecb731979c4e855ed3fe6`，六条 route
+  均自动访问关闭。发布时若仅把总开关设为 true，验收必须明确
+  `transport=0 / URL found=0 or only pre-existing preserved / 未启用 provider`，不得把
+  “任务成功生成暂无文档”描述为抓取成功。
+
+## P0 官方出马页面 URL 文档（provider route 上线候选）
+
+- 当前候选 registry SHA-256：
+  `c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876`。
+- 允许自动 transport 的精确全集仅为：
+  - BHA `HEAD https://www.britishhorseracing.com/racing/fixtures/upcoming/`，同批去重上限 1；
+  - Equibase `HEAD https://tvg.equibase.com/static/entry/RaceCardIndex{track}{MMDDYY}USA-EQB.html`，
+    同批上限 2、同 host 最小间隔 5 秒。
+- France Galop、JRA、NAR、HKJC 必须为 transport 0。HEAD 不 follow redirect、不读取 body；
+  BHA 只显示“官方日期索引（需人工确认）”，不得称为精确单场 racecard。
+- no-write proof：
+  `docs/changes/schedule-p0-official-racecard-url-discovery/provider_no_write_proof_20260727_v3.json`，
+  SHA-256
+  `7e4886a8ff9f02a9c39ef1e8e3e414692ad61528e184dbadb2d4b3c37b9f4b94`。首次与 v2
+  proof 均已被 supersede，仅保留审计，不得用于发布。v3 以联网前 fingerprint + 精确
+  post-proof 文档 allowlist 解决 artifact 自引用，reviewer 必须确认 allowlist 外无变化。
+- 发布前必须等待最新 code review 后的新授权。授权后先备份 `.env` 与镜像，创建
+  `/opt/umanewsbot/runtime/upcoming_racecard_urls/`，保持功能开关 false 部署并完成 flag-off
+  smoke；随后才可按精确 route 做单次生产验证并启用开关。任何代码/registry 变化都会使 proof、
+  review 和授权失效。
+
+## P0 官方出马页面 URL 文档（2026-07-27 生产发布记录）
+
+1. 发布身份：
+   - PR `#32`；
+   - production/main：
+     `cfba71518f1024d54cd5553b7f0bb35c780f5959`；
+   - `web/worker/beat` image：
+     `sha256:a11d072d8a8fc9cc268db996bc916751cea51fe0b7a7cdfc16b715ab0f3e4bf7`。
+2. 恢复点：
+   - `.env.backup.pre-p0-url-20260727T062445Z`，mode `0600`；
+   - `backups/db/pre-p0-url-20260727T062445Z.dump`，mode `0600`，
+     `259806424` bytes，SHA-256
+     `5a02d4b2e2da1f9040920e046bf4bff75790c9dc5ee4a9aed82390acfd894e76`，
+     容器内 `pg_restore -l` 通过。
+3. 关闭态 smoke：
+   - flag=false 时直接调用返回 `enabled=false`；
+   - P0 `TaskExecutionLog 0 -> 0`；
+   - `runtime/upcoming_racecard_urls` 子项 `0 -> 0`。
+4. 启用与验收：
+   - worker/beat flag=true；
+   - Celery timezone=`Asia/Shanghai`；
+   - schedule=`30 6,18 * * *`；
+   - 两次受控运行各生成一代，`current` 指向
+     `5868715fb4406b552132adf4e7a24372dba72253d20b25196ffc1368b2ce68db`，
+     verifier 通过；
+   - 两次运行均为 `future_expected=6 / orphans=5 / listing_reachable=3 /
+     found=0 / not_available=8 / blocked=6 / errors=2`。
+5. 当前降级：
+   - BHA 三个日期索引可用；
+   - Equibase DMR/CNL 从生产主机连接超时，固定记录
+     `source_error/error_without_previous`；
+   - 不切换为第三方 URL、不猜测成功，保留 06:30/18:30 低频自动重试。
+6. 数据边界：
+   - 新增 P0 `TaskExecutionLog=2`；
+   - 两次运行范围内 `RaceEvent/RaceEventRunner/RaceEventResult/ExternalRaceEntry/
+     ExternalRaceResult` 更新数均为 `0`；
+   - 未启用 race-live、lifecycle、历史抓取、公开发布或 QQ。
+
+### 2026-07-27 开关恢复与补跑事实
+
+- 后续部署将 P0 开关恢复为 `false`，当日 `18:30` 调度未执行。用户授权后确认生产
+  `5fed1a96` 的 P0 实现相对原发布版无差异、registry SHA-256 仍为
+  `c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876`。
+- beat 暂停期间默认队列 `29 -> 0`，Celery drain 为
+  `active=0 / reserved=0 / active_confirm=0`。`.env` 备份
+  `.env.backup.pre-p0-reenable-20260727T114553Z` 为 `0600`，随后只恢复 P0 开关。
+- worker 重建连带重建 db/web；业务表总数保持不变且健康检查通过后执行补跑。补跑成功，
+  `TaskExecutionLog 2 -> 3`，generation 更新为
+  `19679c03583afb492a873c3ff5dfbdc6495ed69cb8af5e9c99b9c91b5dcc8612`。
+- 补跑统计为 `future_expected=6 / orphans=5 / listing_reachable=3 / found=0 /
+  not_available=8 / blocked=6 / errors=2`；五张赛事业务表的运行窗口更新数均为 `0`。
+- worker/beat 最终开关均为 true，调度保持 `Asia/Shanghai` 的 `30 6,18 * * *`；
+  Django check、generation verifier 和内外 healthz 通过。beat 恢复后的默认队列快照为
+  `37`，均为其他既有周期任务；未清理队列或追加 P0 运行。
+
+## 2026-07-27 赛果缺口恢复发布前门禁
+
+- 当前仅完成本地实现，禁止直接运行生产 inventory、联网 candidate prepare 或 apply。
+- 发布前必须先完成独立原生只读代码审核，再针对精确 fingerprint 取得 release 授权；部署时
+  保持恢复 apply、网络自动化、TRA public、scheduler 和 publication 开关关闭。
+- 部署后先运行只读 inventory，冻结
+  `59 event rows / 50 race groups / 40 missing / 9 duplicate groups / event 924 provisional`
+  守恒。任何 ID 或计数漂移都停止，不通过调整分母继续。
+- 联网 prepare 需要对精确 source map 的新授权，并受 `<=75` 请求、单请求 `<=30s`、
+  cache `<=512 MiB` 约束；manual-only 官方 route 请求必须为 0。
+- 生产 apply 需要 candidate/approval 双 SHA、逐场预计写入、canonical 映射、blocker=0、
+  队列排空、备份和写前快照的再次授权。执行后逐地区立即 verify 与幂等重放；任一 CAS、
+  ledger 或数据库身份不一致即停止。
+
+## 2026-07-27 赛果缺口恢复关闭态部署与联网阻断记录
+
+1. Git 与镜像：
+   - PR `#28` release commit：
+     `88cc4eafe4a7b5263aa2a6c30cd7d70978323989`。
+   - merge/生产 HEAD：
+     `dfbd24e10f5910580945f29fe19219b7d838730c`。
+   - `web/worker/beat` 应用镜像：
+     `sha256:35a53589e051c39806397fe8aec1e00f0bcbd1df9d0a9ffec29a72f35dc4d751`。
+     race-live worker 已重建为同一镜像但保持 Created/停止。
+2. 恢复点：
+   - PostgreSQL custom dump：
+     `backups/db/pre-race-result-recovery-20260726T200011Z.dump`，
+     `257629113` bytes，SHA-256
+     `682848bdb63edc43b809056fa3a5b1331ebca7f2f6e2cfae806208fa105c9efc`，
+     mode `0600`，`pg_restore -l` 通过。
+   - `.env.backup.pre-race-result-recovery-20260726T200011Z`，mode `0600`。
+3. 关闭态：
+   - `RACE_LIVE_SCHEDULER_ENABLED=false`
+   - `RACE_LIVE_MONITOR_ENABLED=false`
+   - `RACE_LIVE_ENABLED_REGIONS=`
+   - `RACE_LIVE_RUNNER_MODE=disabled`
+   - `RACE_EVENT_LIFECYCLE_ENABLED=false`
+   - `RACE_EVENT_LIFECYCLE_MODE=off`
+   - `HISTORICAL_RACE_BACKFILL_ENABLED=false`
+   - `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`
+   - 4 条 race-live publication policy 为 off，enabled allowlist 为 0。
+4. 迁移与验收：
+   - `stable.0060_raceeventproductcanonicallink` 成功，表记录为 0。
+   - Django check 通过；公网 HTTP `healthz` 与 `/races/` 最终为 200。
+   - Compose `create race_live_worker` 曾连带把 db 容器重建为 Created；PostgreSQL volume
+     未删除。启动 db 并等待 healthy 后重启 web/worker/beat，`RaceEvent=9867`，页面恢复。
+     后续禁止用未加 `--no-deps` 的 `compose create` 维护停止态 worker。
+5. 只读 inventory：
+   - 文件：
+     `runtime/race_result_recovery/inventory-20260726T200544Z.json`。
+   - 文件 SHA-256：
+     `a4380f2b4bb5fafe96f7990e2bc0ef9e032a7d84e17718ebd0b091d5b60b267a`。
+   - manifest SHA-256：
+     `f3a4cb7f26bfac5db4312af3f3af46d9fe11f9e50d2241ef54d4606403dbed1b`。
+   - 守恒：
+     `59 rows / 50 groups / 40 missing / 9 duplicate-zero /
+     9 duplicate-confirmed / 1 provisional(event 924)`。
+6. 联网 prepare：
+   - 在网络保持关闭的生产只读调用中，plan 校验 40 个冻结 ID 后，
+     `expected_targets_from_plan()` 报 `expected_target_empty`。
+   - transport 请求 `0`、manual-only 请求 `0`、candidate/source cache `0`、赛果业务写入 `0`。
+   - 禁止绕过 runner。先修 recovery event-ID snapshot 和 JRA 受控请求输入，完成新一轮测试、
+     独立 review、发布和联网授权后再执行。
+# 2026-07-27 赛果恢复联网 prepare 阻断修复发布前门禁
+
+- PR `#29` 已合并为 `main@e7dc1b20aa36b311ade2497b96a62b15451942d2`；当前修复分支为
+  `codex/fix-race-result-recovery-prepare`，未发布、未部署、未触网。
+- 修复版部署前必须取得最新独立代码审核和精确 release 授权。部署继续保持 race-live、
+  lifecycle、historical network/apply、scheduler 和 publication 全关闭。
+- 部署后不得沿用此前已消耗的联网授权。应先在网络关闭状态用冻结 plan 重新生成 40 条
+  expected-target snapshot；plan 必须绑定 inventory 文件路径、文件 SHA 和内部 manifest SHA，
+  同时必须携带当前批准的 `source_map_version` 并精确匹配 40 场 source map，再通过数据库
+  drift verifier。随后核对 JRA/NAR 与 TOBA/Sporting Life 的 source-scoped CSV，
+  审批 snapshot 后再取得新的有界联网授权。
+- JRA 执行时必须同时出现共享 `request_budget.json` 和
+  `control/jra_detail.request-state.json`/host-state 证据；总请求仍 `<=75`、单请求
+  `<=30s`、间隔 `>=1s`、source cache `<=512 MiB`，每个 redirect 分别计数，manual-only
+  请求数必须为 0。JRA scheduled 目标仅可通过 plan 注入的显式 recovery mode 读取。
+- 任一 event 消失、地区/adapter input 漂移、request policy 摘要变化、来源交叉分片或预算账本
+  缺失都停止，不得手工构造 snapshot、复用旧 approval 或直接运行 adapter。
+
+# 2026-07-27 赛果恢复联网 prepare 阻断修复关闭态部署记录
+
+1. Git 与镜像：
+   - 修复提交 `00979dc443979ef0d982ae7776c3ff7dfb3d0572` 经 PR `#30` 合并为
+     `main@e2ae3efe2349623dd60745bfef498af31d7d8d84`。
+   - 生产 `web/worker/beat/race_live_worker` 统一镜像为
+     `sha256:e0a2d3d6612841df64f2ab1b8ca8ff6a749f4b14c8f4e3173317a394250e61a3`；
+     `race_live_worker` 通过 `up --no-start --no-deps --force-recreate` 更新后保持
+     `Created`，未启动、未消费 race-live 队列。
+2. 恢复点：
+   - `backups/db/pre-race-result-prepare-fix-20260727T045500Z.dump` 为
+     `259584695` bytes，SHA-256
+     `3a2d1b91ac1610e42c272957a3055067b1a326b2f11c71a81c3ce099b97cbf5c`，
+     mode `0600`，`pg_restore -l` 为 1127 项。
+   - `.env.backup.pre-race-result-prepare-fix-20260727T045500Z` 为 mode `0600`。
+3. 关闭态：
+   - 四个应用容器均为 `RACE_LIVE_SCHEDULER_ENABLED=false`、
+     `RACE_LIVE_MONITOR_ENABLED=false`、`RACE_LIVE_ENABLED_REGIONS=`、
+     `RACE_LIVE_RUNNER_MODE=disabled`、`RACE_EVENT_LIFECYCLE_ENABLED=false`、
+     `RACE_EVENT_LIFECYCLE_MODE=off`、`HISTORICAL_RACE_BACKFILL_ENABLED=false`、
+     `HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`。
+   - 4 条 publication policy 均为 off。event 924 保留 1 条
+     `max_mode=provisional_public` 的既有 allowlist；它在总 policy off 且 race-live worker
+     停止时不生效，本次未改写历史授权记录。
+4. 验收：
+   - Celery 切换前 drain 为 `active=0/reserved=0`；无迁移，`0060` 保持已应用，
+     `RaceEventProductCanonicalLink=0`，Django check 通过。
+   - 公网 HTTP `/healthz/` 与 `/races/` 均为 200；HTTPS 仍拒绝连接，符合当前项目尚未完成
+     HTTPS 接入的既有状态。近 15 分钟应用日志未发现
+     traceback、critical、exception 或 error。
+   - 本次未运行联网 prepare，`runtime/race_result_recovery` 没有部署窗口内新增文件，
+     未生成 candidate/source cache，未执行赛果 apply 或其他赛果业务写入。
+5. 下一门禁：
+   - 先在网络关闭状态重建并审核精确 40 条 expected-target snapshot 与 source-scoped
+     adapter 输入；之后必须取得新的有界联网 prepare 授权，旧授权不得复用。
+
+## 阶段 B0.1 赛后内部参考源发布边界
+
+Sporting Life、ZEturf、HRN 只允许进入 internal reference 链。正式实现后仍按下列独立门禁：
+
+1. 先完成测试先行、实现、完整回归和独立代码 review；
+2. 最新 review 后另取 commit/push/PR 授权；
+3. 部署授权只允许新增 schema/code/one-shot 命令；不增加 Celery/Beat/task/queue/worker；
+4. 部署时不得联网、record、改公开赛事、启动 lifecycle/race-live 或处理积压；
+5. one-shot 网络 dry-run 需要新的联网授权，只写受限 cache/artifact；
+6. 内部 record 需要新的业务写入授权，只写 reference run/payload/receipt；
+7. 连续观察再单独授权，由每天逐来源的 manifest-bound one-shot collect/record 构成；
+8. 不存在把内部参考 observation 公开或 apply 的部署步骤。
+
+部署前还必须修复并 review 既有双重 migration 执行入口，确保只有一个进程执行
+`migrate --noinput`。阶段 B0.1 若包含 additive migration，不得依赖容器重启从 `DuplicateTable`
+恢复。
+
+回滚顺序：停止后续 one-shot -> 确认当前命令已结束/中止且没有数据库事务 -> 必要时回滚镜像。
+reference 审计默认保留；由于它不改变公开对象，禁止顺带批量回改 `RaceEvent`、runner/result、
+revision、新闻或 QQ。
+
+# 2026-07-27 赛果恢复补缺候选运行记录
+
+- 正式关闭态 prepare：`/opt/umanewsbot/runtime/race_result_recovery/prepare-20260727T073643Z`，
+  请求 `73/75`、最小间隔 `1.000064s`、source cache `14760016` bytes、manual-only 请求 0。
+- 补缺批次：`/opt/umanewsbot/runtime/race_result_recovery/gap-prepare-20260727T075310Z`。
+  event 185 使用 NAR 已发布 racecard/RaceMarkTable 生成 14 条结果；美国 12 场使用
+  Sporting Life 生成 82 条结果，TOBA/Equibase 入口只由交互式浏览器结构化记录。
+- review manifest SHA-256：
+  `ebc84c098a802322eb455f98c6ca22a2161894d7d4954245a2f99e2380461f60`；
+  40 场 review-only candidate SHA-256：
+  `f40c04265bdb4de418fdc8c97cc4eea9c7329514100809222241391d1e0765b3`；
+  完整排名 CSV SHA-256：
+  `df3f547104f2e02f32f41e59c37f846c5ecd686f42b230965e7aedefb922447e`。
+- 首版 `SHA256SUMS` 因误含自身而校验失败，未作为证据；排除自身的 `SHA256SUMS.v2`
+  全部通过。两轮均未写业务数据库；web/worker/beat 的 historical network 与 P0
+  discovery/scheduler 开关复核为 false，healthz 为 ok。
+- review-only 合并包不得直接用于 audit/apply。必须先发布并部署
+  `source_map_version=2026-07-27-gap-v2`，重新运行正式 bounded prepare，再进入人工官方
+  route receipt、coverage audit 与 dry-run。
+- gap-v2 已以提交 `787d6a1e` 推送至草稿 PR `#36`，但 PR 尚未合并；禁止将该未合并分支
+  直接部署到生产。取得独立合并授权并合入 `main` 后，才能按本节关闭态边界执行部署。
+
+## 最近赛事赛果定时审核发布边界
+
+1. 首次部署保持 `RACE_RESULT_REVIEW_ENABLED=false`、
+   `RACE_RESULT_REVIEW_ALLOW_NETWORK=false`，并清空 `RACE_RESULT_REVIEW_NOTIFY_EMAILS`。
+2. 应用 migration `0062_add_scheduled_race_result_review` 后，核对 worker/beat 的
+   `/app/runtime/race_result_review` 持久卷和 route registry 可读。
+3. 关闭态 smoke 只验证 task 返回 disabled，要求 network/email/business write 均为 0。
+4. Beat 是主调度；`deploy/run-scheduled-race-result-review.sh` 是固定备用入口，两者竞争同一
+   数据库 schedule slot。
+5. 首次启用、联网 prepare、邮件收件人和 apply 分别授权。apply 必须按默认 dry-run、写前备份、
+   `--apply --confirm-apply`、独立 verify 的顺序执行。
+6. 止血先关闭总开关；只停网络则关闭 network 开关；收件人为空时 fail closed。审核包与治理
+   ledger 默认保留。

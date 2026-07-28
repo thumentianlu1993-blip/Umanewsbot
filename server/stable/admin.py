@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count
@@ -42,6 +44,7 @@ from .models import (
     RaceEventLiveTracking,
     RaceEventParticipant,
     RaceEventParticipantSourceIdentity,
+    RaceEventProductCanonicalLink,
     RaceEventProjectionControl,
     RaceEventRevision,
     RaceEventRevisionEvidence,
@@ -53,6 +56,9 @@ from .models import (
     RaceEventFieldChange,
     RaceEventLifecycleControl,
     RaceEventLifecycleTransition,
+    RaceReferenceCollectionRun,
+    RaceReferencePayload,
+    RaceReferenceReceipt,
     RaceLiveEventPublicationAllowlist,
     RaceLiveAlertIncident,
     RaceLiveHostBudget,
@@ -153,6 +159,33 @@ class RaceLiveReadOnlyAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(RaceEventProductCanonicalLink)
+class RaceEventProductCanonicalLinkAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "duplicate_event",
+        "canonical_event",
+        "is_active",
+        "approved_by",
+        "approved_at",
+        "deactivated_at",
+    )
+    list_filter = ("is_active", "approved_at", "deactivated_at")
+    search_fields = (
+        "duplicate_event__chinese_name",
+        "duplicate_event__original_name",
+        "canonical_event__chinese_name",
+        "canonical_event__original_name",
+        "identity_sha256",
+        "manifest_sha256",
+    )
+    raw_id_fields = (
+        "duplicate_event",
+        "canonical_event",
+        "approved_by",
+        "deactivated_by",
+    )
 
 
 @admin.register(RaceEventProjectionControl)
@@ -1233,6 +1266,128 @@ class RaceEventFieldChangeAdmin(RaceLiveReadOnlyAdmin):
     list_filter = ("subject_type", "applied", "field_name")
     search_fields = ("event__chinese_name", "subject_key", "field_name")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(RaceReferenceCollectionRun)
+class RaceReferenceCollectionRunAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "source_key",
+        "country_region",
+        "status",
+        "local_date_from",
+        "local_date_to",
+        "target_count",
+        "matched_count",
+        "ambiguous_count",
+        "partial_count",
+        "error_count",
+        "created_at",
+    )
+    list_filter = ("source_key", "country_region", "status")
+    search_fields = (
+        "scope_manifest_sha256",
+        "artifact_sha256",
+        "parser_name",
+        "parser_version",
+    )
+    readonly_fields = tuple(
+        field.name for field in RaceReferenceCollectionRun._meta.fields
+    ) + ("_internal_notice",)
+    actions = None
+
+    @admin.display(description="用途边界")
+    def _internal_notice(self, obj):
+        return "仅内部参考，不影响公开赛事或正式赛果"
+
+
+@admin.register(RaceReferencePayload)
+class RaceReferencePayloadAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "source_key",
+        "provider_event_key",
+        "payload_sha256",
+        "_completeness",
+        "created_at",
+    )
+    list_filter = ("source_key", "created_at")
+    search_fields = (
+        "provider_event_key",
+        "observation_key",
+        "payload_sha256",
+    )
+    readonly_fields = tuple(
+        field.name for field in RaceReferencePayload._meta.fields
+    ) + ("_internal_notice", "_structured_payload_view")
+    exclude = ("structured_payload",)
+    actions = None
+
+    @admin.display(description="完整度")
+    def _completeness(self, obj):
+        completeness = (obj.structured_payload or {}).get("completeness") or {}
+        return (
+            f"race={completeness.get('race_identity', '—')} "
+            f"runners={completeness.get('runners', '—')} "
+            f"results={completeness.get('results', '—')}"
+        )
+
+    @admin.display(description="用途边界")
+    def _internal_notice(self, obj):
+        return "仅内部参考，不影响公开赛事或正式赛果"
+
+    @admin.display(description="结构化来源事实")
+    def _structured_payload_view(self, obj):
+        rendered = json.dumps(
+            obj.structured_payload,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        if len(rendered) > 32_768:
+            rendered = rendered[:32_768] + "\n…（后台显示已截断）"
+        return format_html(
+            '<pre style="white-space:pre-wrap;max-width:1000px">{}</pre>',
+            rendered,
+        )
+
+
+@admin.register(RaceReferenceReceipt)
+class RaceReferenceReceiptAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "source_name",
+        "event",
+        "match_status",
+        "match_confidence",
+        "is_partial",
+        "parser_version",
+        "recorded_at",
+    )
+    list_filter = (
+        "payload__source_key",
+        "match_status",
+        "is_partial",
+        "recorded_at",
+    )
+    search_fields = (
+        "event__chinese_name",
+        "event__original_name",
+        "payload__provider_event_key",
+        "payload__payload_sha256",
+        "provenance_sha256",
+        "source_url",
+    )
+    raw_id_fields = ("run", "payload", "event")
+    readonly_fields = tuple(
+        field.name for field in RaceReferenceReceipt._meta.fields
+    ) + ("_internal_notice",)
+    actions = None
+
+    @admin.display(description="来源", ordering="payload__source_key")
+    def source_name(self, obj):
+        return obj.payload.source_key
+
+    @admin.display(description="用途边界")
+    def _internal_notice(self, obj):
+        return "仅内部参考，不影响公开赛事或正式赛果"
 
 
 @admin.register(RaceEventAlias)
