@@ -71,6 +71,18 @@
 - `confirmed/cancelled/postponed/blocked` 只用于 accounted 守恒；只要仍有一个
   `blocked_with_evidence`，恢复 run 就不能标记 completed，也不能对外宣称“全部收集并确认完成”。
 - 实现、部署、网络候选收集和生产写入是四个独立授权面；后一阶段必须绑定其精确 artifact/commit SHA。
+## 2026-07-26 赛事新闻质量治理实现完成（代码就位，待审核与发布）
+
+- 按已审方案实现赛事新闻曝光治理和多语言术语统一两组变更，使用单一协调实现分支
+  `codex/impl-race-news-quality-20260726`。
+- 曝光：新增 `RaceNewsExposure` 模型、两席状态机、主赛事身份解析、硬重复分类、角度分类；
+  首页/头条/热门榜/QQ 统一读取同一 exposure 预算。
+- 术语：新增 `TermMappingEvidence` 模型、共享 occurrence resolver、公开字段 canonical 门禁、
+  published CAS repair。旧中文译名只进入 `aliases_zh`，`TermAlias.source_language` 不接受中文。
+- 两组变更默认关闭（ENABLED=false, SHADOW=true），代码回滚仅关闭 enforce，保留审计表和 migration。
+- 实现采用测试先行：RED → 子代理实现 → GREEN，所有新增和回归测试通过。
+- 具体实现见 `docs/changes/govern-race-news-exposure/` 和 `docs/changes/unify-public-racing-terms/`。
+- 未实际发布，不授权部署、生产术语写入、历史文章修复或生产 exposure 写入。
 
 ## 2026-07-24 首页人工头条实现完成（代码就位，待审核与发布）
 

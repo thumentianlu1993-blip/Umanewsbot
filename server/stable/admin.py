@@ -67,6 +67,7 @@ from .models import (
     RaceLiveOfficialPublicationAuthorization,
     RaceLiveOfficialVerificationIncident,
     RaceLivePublicationPolicy,
+    RaceNewsExposure,
     RaceResultObservation,
     RaceResultSourceIdentity,
     RaceSeries,
@@ -78,6 +79,8 @@ from .models import (
     TermAlias,
     TermEntry,
     TermGateReprocessRun,
+    TermMappingEvidence,
+    TermConsistencyManifest,
     TranslationRun,
     WindowCandidateDecision,
     WindowTargetDecision,
@@ -94,6 +97,55 @@ from .tasks import crawl_news_source_task, translate_article_task
 admin.site.register(TermCandidate)
 admin.site.register(TermCandidateEvidence)
 admin.site.register(TermAlias)
+
+
+@admin.register(TermMappingEvidence)
+class TermMappingEvidenceAdmin(admin.ModelAdmin):
+    list_display = (
+        "term",
+        "alias",
+        "evidence_kind",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "created_at",
+    )
+    list_filter = ("evidence_kind", "review_status", "created_at")
+    search_fields = (
+        "term__source_ja",
+        "term__target_zh",
+        "alias__text",
+        "source_url",
+        "source_digest",
+        "reviewed_by",
+        "identity_sha256",
+    )
+    readonly_fields = ("term", "alias", "source_url", "source_digest",
+                       "identity_payload", "identity_sha256", "created_at", "updated_at")
+
+
+@admin.register(TermConsistencyManifest)
+class TermConsistencyManifestAdmin(admin.ModelAdmin):
+    list_display = (
+        "run_id",
+        "status",
+        "approved_by",
+        "committed_at",
+        "rolled_back_at",
+        "created_at",
+    )
+    list_filter = ("status", "created_at")
+    search_fields = ("run_id", "manifest_sha256", "approved_by")
+    readonly_fields = (
+        "run_id",
+        "manifest_sha256",
+        "term_snapshot_sha256",
+        "settings_sha256",
+        "resolver_version",
+        "diffs",
+        "created_at",
+        "updated_at",
+    )
 
 
 class RaceLiveReadOnlyAdmin(admin.ModelAdmin):
@@ -1451,9 +1503,14 @@ class TermEntryAdmin(admin.ModelAdmin):
         "priority",
         "is_active",
         "updated_at",
+        "mapping_evidence_count",
     )
     list_filter = ("source_language", "racing_region", "term_type", "translation_status", "race_grade", "is_active")
     search_fields = ("source_ja", "target_zh", "notes")
+
+    @admin.display(description="mapping evidence")
+    def mapping_evidence_count(self, obj: TermEntry) -> int:
+        return obj.mapping_evidence.count()
 
 
 @admin.register(HorseProfileCompletionRun)
@@ -1632,3 +1689,49 @@ class TermGateReprocessRunAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(RaceNewsExposure)
+class RaceNewsExposureAdmin(admin.ModelAdmin):
+    list_display = (
+        "event",
+        "article",
+        "channel",
+        "scope_key",
+        "slot",
+        "status",
+        "angle",
+        "activated_at",
+        "replaced_at",
+        "lease_expires_at",
+        "created_at",
+    )
+    list_filter = ("channel", "status", "angle", "slot", "created_at")
+    search_fields = (
+        "event__chinese_name",
+        "event__original_name",
+        "article__title_zh",
+        "article__title_ja",
+        "scope_key",
+        "reason",
+    )
+    raw_id_fields = ("event", "article", "replaced_by", "delivery")
+    readonly_fields = (
+        "event",
+        "article",
+        "channel",
+        "scope_key",
+        "slot",
+        "status",
+        "angle",
+        "policy_version",
+        "reason",
+        "evidence",
+        "activated_at",
+        "replaced_at",
+        "replaced_by",
+        "delivery",
+        "lease_expires_at",
+        "created_at",
+        "updated_at",
+    )

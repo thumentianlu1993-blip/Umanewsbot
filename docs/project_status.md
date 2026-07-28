@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-07-29 赛事新闻质量治理已上线（默认关闭 + shadow）
+
+- PR `#42`（实现 `497590e0` + main 合并 `7ad0994a`）已合并部署，生产 checkout
+  `main@8440b897`；migration `0063–0066` 已应用，`web/worker/beat/nginx` 全部恢复。
+- 代码经十轮限定复审收敛至零开放问题；部署验证：Django check、迁移零漂移、
+  公网首页/healthz 200、所有新开关保持默认（enforce 全关、shadow 全开）。
+- 部署插曲：主机内存压力致部署脚本 exit 137，collectstatic 与 worker/beat 由人工补跑完成，
+  nginx 上游缓存导致短暂 502 已随 restart 恢复；详情见 deploy_runbook 部署记录。
+
 ## 2026-07-28 赛事日历默认比赛日窗口已实现并通过验收，处于代码复审门禁
 
 - `fix-race-calendar-default-date-window` 根因是自然日 ±30 天与前 40 场截断共同造成陈旧
@@ -82,6 +91,7 @@
 - 2026-07-27: 赛果恢复 PR `#28` 已关闭态部署到生产 `dfbd24e1`，迁移 `0060` 与
   59 行/50 组只读 inventory 通过；有界联网 prepare 因 recovery plan 的
   `expected_target_empty` 实现缺口在 transport 前阻断，请求数为 0，尚无候选或赛果写入。
+- 2026-07-26: 赛事新闻质量治理代码实现完成，待独立代码 review 和发布授权。
 - 2026-07-24: 首页人工头条与 AI 编辑推荐控制代码实现完成，待独立代码 review 和发布授权。
 
 ## 2026-07-27 赛果缺口恢复方案

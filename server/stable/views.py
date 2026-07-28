@@ -3701,11 +3701,37 @@ def public_news_feed(request: HttpRequest):
     redirect_response = _redirect_legacy_region(request)
     if redirect_response:
         return redirect_response
+    from django.conf import settings as dj_settings
+    from collections import Counter
+
     queryset = _public_published_articles()
+
+    # -- Exposure governance: filter same-event articles at DB level --
+    _exposure_homepage_max = getattr(dj_settings, "RACE_NEWS_HOMEPAGE_MAX", 2)
+    if getattr(dj_settings, "RACE_NEWS_EXPOSURE_ENABLED", False) and _exposure_homepage_max > 0:
+        from stable.models import RaceNewsExposure, RaceNewsExposureStatus, RaceNewsExposureChannel
+        from django.db.models import Exists, OuterRef
+        # Exclude race-linked articles that lack an active homepage exposure slot.
+        # This is ONE EXISTS subquery per article — no in-memory ID lists.
+        has_race_link = ArticleRaceLink.objects.filter(
+            article_id=OuterRef("pk"),
+            status__in=(ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL),
+        )
+        has_active_exposure = RaceNewsExposure.objects.filter(
+            article_id=OuterRef("pk"),
+            channel=RaceNewsExposureChannel.HOMEPAGE,
+            scope_key="site",
+            status=RaceNewsExposureStatus.ACTIVE,
+        )
+        queryset = queryset.exclude(
+            Exists(has_race_link) & ~Exists(has_active_exposure)
+        )
+
     headline_article = resolve_homepage_headline(queryset)
     hot_articles = _build_hot_articles(queryset)
     paginator = Paginator(queryset, PUBLIC_FEED_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
+
     feed_articles = [article for article in page_obj if not headline_article or article.pk != headline_article.pk]
     pagination_params = request.GET.copy()
     pagination_params.pop("page", None)

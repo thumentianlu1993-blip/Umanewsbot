@@ -5316,6 +5316,147 @@ class RaceEventFieldChange(TimestampedModel):
         return f"{self.event} {self.subject_type}:{self.subject_key}.{self.field_name}"
 
 
+class TermMappingEvidence(TimestampedModel):
+    """Evidence for a formal term/alias mapping with audit trail."""
+    term = models.ForeignKey("TermEntry", on_delete=models.CASCADE, related_name="mapping_evidence")
+    alias = models.ForeignKey("TermAlias", on_delete=models.CASCADE, null=True, blank=True, related_name="mapping_evidence")
+    evidence_kind = models.CharField(max_length=32)
+    source_url = models.CharField(max_length=1000, blank=True)
+    source_digest = models.CharField(max_length=64, blank=True)
+    review_status = models.CharField(max_length=16, default="pending")
+    reviewed_by = models.CharField(max_length=128, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    identity_payload = models.JSONField(default=dict, blank=True)
+    identity_sha256 = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=("term", "review_status")),
+            models.Index(fields=("alias", "review_status")),
+        ]
+
+    def __str__(self) -> str:
+        alias_label = f" alias={self.alias_id}" if self.alias_id else ""
+        return f"evidence[{self.evidence_kind}] term={self.term_id}{alias_label} status={self.review_status}"
+
+
+class TermConsistencyManifestStatus(models.TextChoices):
+    PENDING = "pending", "待提交"
+    COMMITTED = "committed", "已提交"
+    ROLLED_BACK = "rolled_back", "已回滚"
+
+
+class TermConsistencyManifest(TimestampedModel):
+    """Persisted dry-run manifest for canonical consistency repair.
+
+    Manifests survive process restarts so that a dry-run produced by one
+    worker can be committed (or rolled back) by another.  ``diffs`` stores
+    per-field ``before_value``/``after_value`` pairs so a committed manifest
+    can be rolled back with CAS semantics.
+    """
+
+    run_id = models.CharField(max_length=64, unique=True)
+    manifest_sha256 = models.CharField(max_length=64)
+    term_snapshot_sha256 = models.CharField(max_length=64)
+    settings_sha256 = models.CharField(max_length=64)
+    resolver_version = models.CharField(max_length=16, default="1.0.0")
+    diffs = models.JSONField(default=list, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=TermConsistencyManifestStatus.choices,
+        default=TermConsistencyManifestStatus.PENDING,
+    )
+    approved_by = models.CharField(max_length=128, blank=True)
+    committed_at = models.DateTimeField(null=True, blank=True)
+    rolled_back_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=("status", "created_at")),
+        ]
+
+    def __str__(self) -> str:
+        return f"manifest[{self.run_id}] {self.status} diffs={len(self.diffs or [])}"
+
+
+class RaceNewsExposureChannel(models.TextChoices):
+    HOMEPAGE = "homepage", "首页"
+    QQ = "qq", "QQ"
+
+
+class RaceNewsExposureStatus(models.TextChoices):
+    WAITING = "waiting", "等待"
+    ACTIVE = "active", "生效"
+    REPLACED = "replaced", "已替换"
+    SENT = "sent", "已发送"
+    SUPPRESSED = "suppressed", "已抑制"
+
+
+class RaceNewsAngle(models.TextChoices):
+    COMPREHENSIVE_RESULT = "comprehensive_result", "综合赛果"
+    WINNER = "winner", "胜者"
+    CONNECTIONS = "connections", "关系者"
+    RUNNER = "runner", "参赛马"
+    ANALYSIS = "analysis", "分析"
+    MARKET = "market", "市场"
+    OTHER = "other", "其他"
+
+
+class RaceNewsExposure(TimestampedModel):
+    event = models.ForeignKey("RaceEvent", on_delete=models.CASCADE, related_name="news_exposures")
+    article = models.ForeignKey("NewsArticle", on_delete=models.CASCADE, related_name="race_exposures")
+    channel = models.CharField(max_length=16, choices=RaceNewsExposureChannel.choices)
+    scope_key = models.CharField(max_length=128)  # "site" for homepage, "target:<id>" for QQ
+    slot = models.PositiveSmallIntegerField()  # 1 or 2
+    status = models.CharField(max_length=16, choices=RaceNewsExposureStatus.choices, default=RaceNewsExposureStatus.WAITING)
+    angle = models.CharField(max_length=32, choices=RaceNewsAngle.choices, default=RaceNewsAngle.OTHER)
+    policy_version = models.CharField(max_length=16, default="1.0")
+    reason = models.TextField(blank=True)
+    evidence = models.JSONField(default=dict, blank=True)
+    activated_at = models.DateTimeField(null=True, blank=True)
+    replaced_at = models.DateTimeField(null=True, blank=True)
+    replaced_by = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="replaced_exposures")
+    delivery = models.ForeignKey("QQPushDelivery", on_delete=models.SET_NULL, null=True, blank=True, related_name="race_exposures")
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            # 同一 (event, channel, scope_key, article) 唯一
+            models.UniqueConstraint(
+                fields=("event", "channel", "scope_key", "article"),
+                name="uq_race_exposure_event_channel_scope_article",
+            ),
+            # 首页 waiting/active 同席位唯一（条件约束）
+            models.UniqueConstraint(
+                fields=("event", "channel", "scope_key", "slot"),
+                condition=(models.Q(channel="homepage") & (models.Q(status="waiting") | models.Q(status="active"))),
+                name="uq_homepage_exposure_active_slot",
+            ),
+            # QQ waiting/active/sent 同席位唯一（条件约束）
+            models.UniqueConstraint(
+                fields=("event", "channel", "scope_key", "slot"),
+                condition=(models.Q(channel="qq") & (models.Q(status="waiting") | models.Q(status="active") | models.Q(status="sent"))),
+                name="uq_qq_exposure_active_slot",
+            ),
+            # slot 只能是 1 或 2
+            models.CheckConstraint(
+                condition=models.Q(slot__in=(1, 2)),
+                name="ck_race_exposure_slot_valid",
+            ),
+            # delivery 只在 channel="qq" 时有值
+            models.CheckConstraint(
+                condition=(models.Q(delivery__isnull=True) | models.Q(channel=RaceNewsExposureChannel.QQ)),
+                name="ck_race_exposure_delivery_channel",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("event", "channel", "scope_key")),
+            models.Index(fields=("article", "channel")),
+            models.Index(fields=("status", "lease_expires_at")),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.event_id} {self.channel}:{self.scope_key} slot={self.slot} {self.status}"
 # ── Post-race internal reference observations (Phase B0.1) ──────────
 
 

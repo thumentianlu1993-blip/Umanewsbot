@@ -1,5 +1,20 @@
 # 当前状态
 
+## 2026-07-29 赛事新闻质量治理已合并上线（开关全关，shadow 观察中）
+
+- PR `#42` 已合并为 `main@8440b897` 并部署生产：曝光治理（`RaceNewsExposure` 两席状态机、
+  首页 DB 层过滤、窗口 QQ exposure/quota/delivery 原子绑定、人工头条曝光同步）与术语一致性
+  （`TermMappingEvidence` 证据门禁、canonical 门禁 fail-closed、`TermConsistencyManifest`
+  DB 持久化 + 单事务 CAS commit/rollback）。
+- 合并时 main 已占用 migration `0060–0062`，本组迁移顺延为 `0063–0066` 并已在生产应用。
+- 部署过程一次异常：脚本在 collectstatic 前被 SIGKILL（exit 137，主机内存压力），已手动补跑
+  collectstatic 与 worker/beat 恢复；nginx 因缓存旧 web 上游 IP 短暂 502，restart 后恢复。
+- 验证：migrate --plan 空、Django check 通过、全部 6 容器 Up、内外 healthz 与首页 200；
+  `TERM_CONSISTENCY_ENABLED/ENFORCE=False`、`RACE_NEWS_EXPOSURE_ENABLED=False`、
+  shadow 均为 True。当前为 shadow 观察阶段，灰度顺序见 deploy_runbook 顶部。
+- 下一轮：观察一个完整赛事窗口的 shadow 输出后，按 runbook 顺序逐项开启 enforce；
+  历史术语修复与曝光回填均需独立 dry-run 审核与单独授权。
+
 ## 2026-07-28 赛事日历默认比赛日窗口已实现并通过验收，处于代码复审门禁
 
 - 已从最新 `origin/main@7385f59a` 建立独立干净 worktree
@@ -284,6 +299,28 @@
 - 本轮只执行生产数据库只读查询与公网页面核验；尚未实现代码、运行赛事来源网络 prepare、部署、迁移或
   写入生产。下一门禁是用户确认实施；实现完成后仍须分别取得 release、network prepare 和精确
   candidate/approval SHA 的生产写入授权。
+## 2026-07-26 赛事新闻质量治理已实现（待独立代码审核）
+
+- 基于 `origin/main@ef54a183`，worktree `impl-race-news-quality-20260726`，分支
+  `codex/impl-race-news-quality-20260726`。两组方案均已于 2026-07-26 通过 fallback 工程方案审核
+  （`VERDICT: APPROVED`）。
+- 已完成测试先行（术语 27 RED / 曝光 46 RED → 实现后术语 29 GREEN / 曝光 47 GREEN）、
+  串行子代理实现（术语 → 曝光）。
+- 术语变更：
+  - 新增 `TermMappingEvidence` 模型（migration `0063_add_term_mapping_evidence`（合并时顺延））
+  - 新增 `server/stable/services/term_consistency.py`：occurrence resolver、canonical consistency gate、published dry-run/manifest/CAS apply
+  - 新增 `server/stable/test_public_term_consistency.py`（32 tests, 29 GREEN, 3 性能在 SQLite 预期受限）
+  - 新增 settings: `TERM_CONSISTENCY_ENABLED/SHADOW/ENFORCE`
+- 曝光变更：
+  - 新增 `RaceNewsExposure` 模型（migration `0064_add_race_news_exposure`（合并时顺延））
+  - 新增 `server/stable/services/race_news_exposure.py`：race identity resolver、hard duplicate classifier、angle classifier、two-slot state machine、QQ exposure
+  - 新增 `server/stable/management/commands/backfill_race_exposure.py`：历史 dry-run/apply
+  - 新增 `server/stable/test_race_news_exposure.py`（47 tests, 47 GREEN）
+  - 新增 settings: `RACE_NEWS_EXPOSURE_ENABLED/SHADOW/SECOND_SLOT_DELAY_MINUTES/HOMEPAGE_MAX/QQ_TARGET_MAX`
+- 所有回归测试通过（test_editorial_headlines 57, test_english_term_context_gates + test_term_gate_reprocessing 57, 及其他 182 tests，总计 375+ tests）。
+- Django check、makemigrations --check --dry-run 通过。
+- 尚未执行：commit、push、PR、部署、生产迁移、生产写入、正式术语写入、历史文章修复。
+- 下一门禁：独立代码 review。
 
 ## 2026-07-24 首页人工头条与 AI 编辑推荐控制已实现（待独立代码审核）
 
