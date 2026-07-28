@@ -1,10 +1,11 @@
 # 项目状态文档
 
-- 2026-07-27: PR #24 的 2026 重赏前五名 Wikipedia 研究工具已完成本地阶段化、checkpoint、
-  精确 attempt 恢复和 11-job artifact DAG 改造；27 项离线/synthetic 测试及独立代码 review
-  通过。实现提交 `703c262b` 已推送到现有研究分支并更新 OPEN 草稿 PR #24；离线 Actions run
-  `30240664640` 成功，artifact `30240664640-1-synthetic-checkpoint-0` 已验证 safe-stop、
-  resume、fan-in、纯离线 finalize 和字节等价。完整公网任务未运行，PR 未合并、未部署且未写生产。
+- 2026-07-28: PR #24 的精确 checkpoint 修复已由独立 reviewer `APPROVED` 并以
+  `c7cb5d7d` 推送到研究分支。首次公网 run `30352874692` 在三个 search shard 安全停止后，
+  run `30358779591` 使用相同 head、attempt 和 `source_stage=wikidata_search` 精确续跑成功。
+  最终 artifact `30358779591-1-finalize-0`（ID `8689425746`）已核验：422 场、2110 条
+  前五名记录、1490 匹去重马；`14 exact / 4 probable / 0 ambiguous / 1136 no_page /
+  336 resolution_error`。PR 仍为 OPEN 草稿，未合并、未部署、未迁移且未写生产。
 - 2026-07-24: 首页人工头条与 AI 编辑推荐控制代码实现完成，待独立代码 review 和发布授权。
 
 ## 2026-07-24 首页编辑控制方案审核通过，待确认实现

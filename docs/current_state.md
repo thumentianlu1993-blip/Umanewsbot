@@ -1,39 +1,46 @@
 # 当前状态
 
-## 2026-07-27 2026 重赏前五名 Wikipedia 研究流水线已完成本地改造与代码审核
+## 2026-07-28 2026 重赏前五名 Wikipedia 公网研究已生成最终 artifact
 
-- 草稿 PR #24 的原始单体 workflow 已证实两次在约 `700/1540` 匹马的 Wikidata 搜索阶段达到
-  180 分钟上限；此前已有 456 场赛事、2231 条前五名记录和 1540 个马匹种子的有效设计成果，
-  但进程取消时没有 checkpoint，最新两次长运行均没有 artifact。
-- 已在隔离 worktree 的本地分支 `codex/resumable-2026-graded-top5-wikipedia` 完成可续跑改造：
-  races、profiles、Wikidata search、entities、horse scoring、finalize 均可独立执行，使用原子
-  checkpoint、稳定分片、精确上游 SHA/manifest/tool/input 绑定、结构化错误和实际请求计数。
-- GitHub workflow 已改为 11-job artifact DAG。PR 默认只运行离线 synthetic safe-stop/resume
-  smoke；完整公网任务必须手动 `workflow_dispatch full_network=true`，并使用精确
-  `source_run_id + source_attempt` 恢复。安全停止码 `75` 会保留 checkpoint、令 job 失败并
-  阻断下游，恢复成功返回 0 后才继续。
-- 测试先行证据：初始 `14` 项为 `3 failures + 10 errors`；首轮 review 返修扩展到 `26` 项时
-  为 `2 failures + 4 errors`；最终 `27/27` 通过。synthetic CLI 实际覆盖退出 75、续跑、
-  fan-in、纯离线 finalize、字节等价、结构化错误和请求数聚合；`py_compile`、11-job YAML
-  解析和 `git diff --check` 通过。
-- 独立代码 reviewer 经过首次 `REVISE` 和两轮限定返修后最终 `VERDICT: APPROVED`，无剩余
-  P0/P1/P2 finding。
-- 用户在最终 review 后授权提交、推送、更新草稿 PR 并触发默认离线 workflow。冻结内容
-  SHA-256 为 `275957760e0ba787c3d3308cfb1a4573db20ba1ddec6c8c031b3ccb965f44e75`；
-  实现提交 `703c262bb54b68c15643727b2ca9ea9f2fbd2ef8` 已快进推送到
-  `research/2026-graded-top5-wikipedia`，PR #24 保持 OPEN 草稿并已更新说明。
-- PR synchronize 未自动生成 Actions run；随后在同一授权范围内手动
-  `workflow_dispatch full_network=false`。run
-  `30240664640` 的 tests job 11 秒成功，races 至 finalize 十个公网 job 全部 skipped。
-  artifact `30240664640-1-synthetic-checkpoint-0`（ID `8643122587`，21697 bytes，保留至
-  2026-08-10）已下载核验，包含 stage item/index、progress、safe-stop 证据、7 个最终文件和
-  `synthetic_smoke_report.json`。
-- synthetic 报告确认 `safe_stop_evidence_present=true`、恢复后 item SHA 与不中断基线相同、
-  `byte_equivalent=true`；summary 为 2 场/2 行/2 匹 synthetic 数据、1 个 resolution error、
-  5 次请求。完整公网研究仍未运行，生产未部署且数据库零写。
-- 当前精确状态：`committed / pushed / draft PR updated / offline checkpoint artifact PASS /
-  full network not run / not merged / not deployed / no production write`。下一门禁是用户另行明确
-  授权完整公网 `full_network=true`；该授权不得由本次离线 run 推导。
+- 草稿 PR #24 的阶段化 workflow 在首次完整公网运行前补齐精确恢复修复：恢复输入增加
+  `source_stage`，只恢复已到达阶段的 artifact；已完成阶段按已验证字节 no-op，仅
+  safe-stop checkpoint 可续跑；缺失或漂移的 progress/index、提交、tool identity、输入和
+  上游 SHA 均 fail closed。修复提交
+  `c7cb5d7da5f528384d90bcdbeeab37dabf7f01dd` 已推送到
+  `research/2026-graded-top5-wikipedia`，PR #24 保持 OPEN 草稿。
+- 修复验证为专项测试 `32/32`、`py_compile`、11-job workflow YAML 和
+  `git diff --check` 全部通过。独立只读 reviewer 在两项 P1 返修后给出 `APPROVED`；
+  受审 fingerprint 为
+  `90fd66533ab5bf5a673d620868e04ac79d6e5abee5f1a067f79f585c0647f301`，
+  content hash 为
+  `6d05bbf912d9176785a258f53723fc64fa31a2d2f844b8fea4e1395e589e0f26`。
+- 首次 `full_network=true` run
+  [30352874692](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/30352874692)
+  从新提交开始：races、profiles、merge_profiles 成功，Wikidata search shard 2 完成，
+  shard 0/1/3 按预算安全停止并保留 artifact。随后只用相同 head 的精确
+  `source_run_id=30352874692 + source_attempt=1 + source_stage=wikidata_search`
+  触发 run
+  [30358779591](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/30358779591)，
+  已于 `2026-07-28T13:15:33Z` 全部成功；此前完成的 races/profiles/search shard 2
+  通过验证后 no-op，其余阶段续跑至 finalize。
+- 正式范围发现 `456` 个赛事 URL；races 阶段 `422` 成功、`34` 个 retryable error，
+  实际请求 `459` 次。最终 artifact 覆盖当前 UmaFans 公开且 data-quality-complete 的
+  `422` 场赛事、`2110` 条前五名记录和 `1490` 匹去重马；地区赛事计数为日本 `74`、
+  中国香港 `19`、美国 `190`、英国 `70`、法国 `69`。
+- Wikipedia 结果为 `14 exact / 4 probable / 0 ambiguous / 1136 no_page /
+  336 resolution_error`，总和严格等于 `1490`。`errors.json` 共 `1484` 条结构化记录：
+  `1450 entity_not_found`（其中 entities `1114`、scoring resolution error `336`）和
+  races `34 RuntimeError`；这些错误均保留为未解决证据，没有猜测成功。
+- 最终 artifact `30358779591-1-finalize-0`（ID `8689425746`，压缩大小 `289782`
+  bytes，保留至 `2026-10-26T12:24:04Z`）包含预定 7 个文件。联合下载该 final artifact
+  与 races stage artifact `30358779591-1-races-0`（ID `8687898901`）后确认：final
+  CSV 行数、422 条唯一 source manifest URL、全部 manifest HTTP 200 与 64 位 SHA-256
+  均一致；races stage 的 run manifest 绑定 `base_commit=c7cb5d7d...` 和 tool identity；
+  计数不变量一致，常见密钥模式扫描无命中。
+- 本轮只运行公开网络研究并生成 GitHub artifact；没有合并 PR、登录或修改生产服务器、
+  部署、迁移或写生产数据库。当前精确状态：
+  `full-network artifact PASS / draft PR open / not merged / not deployed /
+  no production write`。
 
 ## 2026-07-24 首页人工头条与 AI 编辑推荐控制已实现（待独立代码审核）
 
