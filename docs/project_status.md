@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-07-29 赛事新闻质量治理已上线（默认关闭 + shadow）
+
+- PR `#42`（实现 `497590e0` + main 合并 `7ad0994a`）已合并部署，生产 checkout
+  `main@8440b897`；migration `0063–0066` 已应用，`web/worker/beat/nginx` 全部恢复。
+- 代码经十轮限定复审收敛至零开放问题；部署验证：Django check、迁移零漂移、
+  公网首页/healthz 200、所有新开关保持默认（enforce 全关、shadow 全开）。
+- 部署插曲：主机内存压力致部署脚本 exit 137，collectstatic 与 worker/beat 由人工补跑完成，
+  nginx 上游缓存导致短暂 502 已随 restart 恢复；详情见 deploy_runbook 部署记录。
+
 ## 2026-07-28 定时赛果审核已上线，自动来源发现仍未闭环
 
 - PR `#39` 与补跑 JSON 窄修 PR `#40` 已合并并部署，生产为

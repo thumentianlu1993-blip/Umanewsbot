@@ -1,5 +1,20 @@
 # 当前状态
 
+## 2026-07-29 赛事新闻质量治理已合并上线（开关全关，shadow 观察中）
+
+- PR `#42` 已合并为 `main@8440b897` 并部署生产：曝光治理（`RaceNewsExposure` 两席状态机、
+  首页 DB 层过滤、窗口 QQ exposure/quota/delivery 原子绑定、人工头条曝光同步）与术语一致性
+  （`TermMappingEvidence` 证据门禁、canonical 门禁 fail-closed、`TermConsistencyManifest`
+  DB 持久化 + 单事务 CAS commit/rollback）。
+- 合并时 main 已占用 migration `0060–0062`，本组迁移顺延为 `0063–0066` 并已在生产应用。
+- 部署过程一次异常：脚本在 collectstatic 前被 SIGKILL（exit 137，主机内存压力），已手动补跑
+  collectstatic 与 worker/beat 恢复；nginx 因缓存旧 web 上游 IP 短暂 502，restart 后恢复。
+- 验证：migrate --plan 空、Django check 通过、全部 6 容器 Up、内外 healthz 与首页 200；
+  `TERM_CONSISTENCY_ENABLED/ENFORCE=False`、`RACE_NEWS_EXPOSURE_ENABLED=False`、
+  shadow 均为 True。当前为 shadow 观察阶段，灰度顺序见 deploy_runbook 顶部。
+- 下一轮：观察一个完整赛事窗口的 shadow 输出后，按 runbook 顺序逐项开启 enforce；
+  历史术语修复与曝光回填均需独立 dry-run 审核与单独授权。
+
 ## 2026-07-28 最近赛事赛果定时审核已发布，首轮暴露来源路由缺口
 
 - 主功能 PR `#39` 合并为 `main@dd35038f`；生产首次补跑因 coalesced slot 的

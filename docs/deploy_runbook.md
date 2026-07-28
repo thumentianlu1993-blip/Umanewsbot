@@ -1,5 +1,23 @@
 # 部署运行手册
 
+## 2026-07-29 赛事新闻质量治理生产部署记录
+
+1. PR `#42` 合并为 `main@8440b897`（实现提交 `497590e0` + main 合并提交 `7ad0994a`）；
+   合并时 main 已占用 migration `0060–0062`，本组迁移顺延为 `0063–0066`。
+2. 生产 `/opt/umanewsbot` `git pull --ff-only` 至 `8440b897`；镜像
+   `umanewsbot:prod`（build ID `02f2f7d16df1`）；celery drain 归零后停 worker，
+   web 重建，`migrate` 依次应用 `0063_add_term_mapping_evidence`、`0064_add_race_news_exposure`、
+   `0065_add_exposure_constraints`、`0066_add_term_consistency_manifest`，全部 OK。
+3. 异常与处置：部署脚本在 collectstatic 前被 SIGKILL（`exit 137`，2 vCPU/4 GiB 主机内存
+   压力）。已手动补跑 `collectstatic --noinput`（0 copied / 131 unmodified / 360 post-processed）
+   并 `up -d --no-deps worker beat nginx`；随后首页 502，原因为 nginx 缓存旧 web 上游 IP
+   （web 重建而 nginx 未重建），`restart nginx` 后恢复。
+4. 部署后验证：`migrate --plan` 空、Django check 通过、6 容器全部 Up、
+   `TERM_CONSISTENCY_ENABLED/ENFORCE=False`、`RACE_NEWS_EXPOSURE_ENABLED=False`、
+   shadow 均为 `True`；本地与公网首页/healthz 均 200。
+5. 当前为 shadow 观察阶段；enforce 开启、历史术语修复 apply、历史曝光回填 apply
+   均需按下方灰度顺序逐项独立授权。
+
 ## 2026-07-28 最近赛事赛果定时审核生产发布记录
 
 1. 发布前没有 import lock、STARTED import 或 RUNNING historical batch；数据库备份
@@ -59,7 +77,7 @@
 5. combined candidate SHA-256 为 `033fc60d…489c`，仅含 4 场 JRA 官方赛果。Sporting Life
    和 ZEturf 因 scheduled 状态过滤而空跑，TOBA 为 403；不得继续到 apply。修复后必须创建新
    immutable run，不覆盖 `prepare-20260727T060300Z`。
-## 赛事新闻质量治理 部署配置（2026-07-26 实现完成，待部署）
+## 赛事新闻质量治理 部署配置（2026-07-29 已上线，shadow 观察中）
 
 ### 新增配置项（.env）
 
