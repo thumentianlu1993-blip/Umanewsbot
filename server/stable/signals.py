@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import threading
+from contextlib import contextmanager
 
 from django.contrib.auth.signals import user_logged_in, user_logged_out, user_login_failed
 from django.db.models.signals import post_delete, post_save, pre_delete
@@ -11,6 +13,32 @@ from stable.services.operations import log_operation
 from stable.services.race_event_public_cache import invalidate_public_race_cache
 
 logger = logging.getLogger(__name__)
+
+# Per-thread flag for suppressing side effects during repair apply.
+# Uses threading.local() to prevent cross-thread leakage in multi-threaded
+# WSGI servers (e.g. gunicorn with threads); safe for Celery fork-based workers.
+_qq_state = threading.local()
+
+
+@contextmanager
+def suppress_qq_push():
+    """Context manager to suppress QQ push and notification side effects.
+
+    Used during published repair CAS apply so that history-fix saves do
+    not trigger re-publish, QQ delivery, or notification dispatch.
+    Thread-safe: each thread has its own suppression flag.
+    """
+    saved = getattr(_qq_state, "push_suppressed", False)
+    _qq_state.push_suppressed = True
+    try:
+        yield
+    finally:
+        _qq_state.push_suppressed = saved
+
+
+def is_qq_push_suppressed() -> bool:
+    """Check whether QQ push side effects are currently suppressed."""
+    return getattr(_qq_state, "push_suppressed", False)
 
 
 @receiver(user_logged_in)
