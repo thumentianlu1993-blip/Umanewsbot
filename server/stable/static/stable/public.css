@@ -1222,6 +1222,8 @@ a {
 .date-axis a { position: relative; display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; padding: 8px 14px 10px; color: var(--ink-3); font-size: 12px; }
 .date-axis a b { color: var(--ink-2); font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .date-axis a.today b { color: var(--turf); }
+.date-axis a.anchor:not(.today) b { font-weight: 900; }
+.date-axis a.anchor:not(.today)::after { content: ""; position: absolute; right: 12px; bottom: -1px; left: 12px; height: 3px; border-radius: 3px 3px 0 0; background: var(--gold); }
 .date-year { font-size: 11px; color: var(--ink-3); }
 .date-axis a.today::after { content: ""; position: absolute; right: 12px; bottom: -1px; left: 12px; height: 3px; border-radius: 3px 3px 0 0; background: var(--turf); }
 .race-dot { width: 5px; height: 5px; margin-top: 3px; border-radius: 50%; background: var(--gold); }

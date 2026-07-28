@@ -16355,7 +16355,9 @@ class RaceEventPageMVPTests(TestCase):
             response = self.client.get(reverse("public-race-calendar"), {"tab": "all"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertLessEqual(len(context), 8)
+        # 预算 8 -> 10：赛事日历默认日期窗口改造（docs/changes/fix-race-calendar-default-date-window/design.md）
+        # 获批新增 2 条有界 distinct 比赛日聚合查询；修改前实测 3 条。
+        self.assertLessEqual(len(context), 10)
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)

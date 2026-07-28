@@ -4406,6 +4406,9 @@ class RaceLivePublicStatusTests(TestCase):
 
     def test_policy_off_also_hides_materialized_live_results_from_calendar(self):
         event = self._event_with_revision("l" * 8, "provisional")
+        # 默认日期窗口改造后默认模式不再展示 local_date=None 赛事；显式补当天日期。
+        event.local_date = timezone.localdate()
+        event.save(update_fields=["local_date", "updated_at"])
         calendar_url = reverse("public-race-calendar")
 
         with patch("stable.views.timezone.now", return_value=self.NOW):
@@ -4427,6 +4430,9 @@ class RaceLivePublicStatusTests(TestCase):
 
     def test_missing_event_policy_hides_from_detail_and_bulk_calendar_reads(self):
         event = self._event_with_revision("m" * 8, "provisional")
+        # 默认日期窗口改造后默认模式不再展示 local_date=None 赛事；显式补当天日期。
+        event.local_date = timezone.localdate()
+        event.save(update_fields=["local_date", "updated_at"])
         stable_models.RaceLivePublicationPolicy.objects.filter(
             scope_type=stable_models.RaceLivePublicationScopeType.EVENT,
             scope_key=str(event.pk),
@@ -4450,6 +4456,10 @@ class RaceLivePublicStatusTests(TestCase):
             )
             for index in range(40)
         ]
+        # 默认日期窗口改造后默认模式不再展示 local_date=None 赛事；显式补当天日期。
+        for event in events:
+            event.local_date = timezone.localdate()
+            event.save(update_fields=["local_date", "updated_at"])
 
         with patch("stable.views.timezone.now", return_value=self.NOW):
             with CaptureQueriesContext(connection) as captured:
@@ -4461,9 +4471,11 @@ class RaceLivePublicStatusTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, events[0].chinese_name)
         self.assertContains(response, events[-1].chinese_name)
+        # 预算 12 -> 14：默认日期窗口改造获批新增 2 条有界日期聚合查询
+        # （docs/changes/fix-race-calendar-default-date-window/design.md）；修改前实测 12 条。
         self.assertLessEqual(
             len(captured),
-            12,
+            14,
             f"赛事日历 live read gate 查询数不应随 40 场赛事线性增长，实际 {len(captured)}",
         )
 
@@ -4475,6 +4487,10 @@ class RaceLivePublicStatusTests(TestCase):
             )
             for index in range(40)
         ]
+        # 默认日期窗口改造后默认模式不再展示 local_date=None 赛事；显式补当天日期。
+        for event in events:
+            event.local_date = timezone.localdate()
+            event.save(update_fields=["local_date", "updated_at"])
 
         with patch("stable.views.timezone.now", return_value=self.NOW):
             with CaptureQueriesContext(connection) as captured:
@@ -4486,9 +4502,11 @@ class RaceLivePublicStatusTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, events[0].chinese_name)
         self.assertContains(response, events[-1].chinese_name)
+        # 预算 20 -> 22：默认日期窗口改造获批新增 2 条有界日期聚合查询
+        # （docs/changes/fix-race-calendar-default-date-window/design.md）；修改前实测 12 条。
         self.assertLessEqual(
             len(captured),
-            20,
+            22,
             "40 场 official/corrected 日历 read gate 必须保持有界查询，"
             f"实际 {len(captured)}",
         )
