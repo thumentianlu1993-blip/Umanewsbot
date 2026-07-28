@@ -1,5 +1,44 @@
 # 当前状态
 
+## 2026-07-28 赛事日历默认比赛日窗口已实现并通过验收，处于代码复审门禁
+
+- 已从最新 `origin/main@7385f59a` 建立独立干净 worktree
+  `codex/fix-race-calendar-default-date-window`；方案五文档与 Claude 实施交接见
+  `docs/changes/fix-race-calendar-default-date-window/`。
+- 根因：默认查询使用“北京时间今天前后 30 个连续自然日”，再按日期升序截取前
+  40 场赛事并由这批赛事反推日期栏；2026-07-27 的下界因此正好是 2026-06-27，密集赛事
+  会让 40 场上限在 2026-07-19 左右耗尽。不是硬编码日期或动态页面缓存。
+- 已按已审方案实现：新增 `stable.services.race_calendar`（`select_balanced_race_dates`
+  纯函数与两条有界 distinct 日期聚合的 `public_default_race_date_window`）；view 以
+  `Asia/Shanghai` 今日一次性贯穿锚点、分组、状态标签与模板标记；默认模式取今日→最近
+  未来→最近历史锚点并平衡出最多 11 个实际比赛日；保留 40 卡上限并以每日期代表赛事
+  优先保证每个日期至少一卡；移动端默认锚点以只改 `scrollLeft` 的最小脚本水平居中；
+  非法/不完整 cursor 安全回退默认模式；year/q/cursor 显式模式语义不变。无迁移、无配置、
+  无生产数据写入。
+- 测试先行的真实 RED/GREEN 均已取得：新增
+  `stable/test_race_calendar_default_date_window.py` 41 个用例（2 个规定 RED 因目标
+  窗口未实现失败，实现后 41/41 GREEN）；既有日历测试窄改 4 处（预算 8→10、12→14、
+  20→22，A8 日期待定改显式模式，live read-gate 日历用例补 `local_date`），A6 断言
+  按新锚点标记放宽为 `class="today anchor"`。
+- 主线程验证通过：窗口聚焦 + responsive 62/62；read-gate 日历用例 4/4；page
+  regression/navigation 44/44；`test_realtime_race_results` 9 个失败与
+  `RaceEventPageMVPTests` 3 个失败均经 stash 基线对照证实为改动前既有失败；
+  Django check、`makemigrations --check --dry-run`、`git diff --check` 通过。
+- 查询预算实测（基线 → 改后，均为 +2 条有界日期聚合）：轻量默认 3→5（≤10）、
+  40 卡 live 12→14（≤14）、40 卡 official 12→14（≤22）。
+- 真实浏览器验收通过：1440px 11 个比赛日全可见；390px 与 320px 锚点居中于日期轴
+  （中心偏移 -12px）、仅水平滚动、纵向位置不跳、无横向 overflow、G1/G2/G3 徽标
+  42×42；显式 cursor/q 模式无锚点、无定位脚本、scrollLeft 为 0；控制台唯一错误为
+  开发环境 favicon 404（与本改动无关）。
+- 代码复审进展：首轮独立 reviewer（Claude 协调会话，`codex review --uncommitted` 只读）
+  REVISE 的两项 P2（NULL 发走时刻排序对齐生产 PostgreSQL NULLS LAST；状态文档失实）
+  已修复并经同会话复审 APPROVED。此后应用户要求追加一轮全新的 Codex 独立审查
+  （session `019fa932-ca46-7b23-a2d6-c9fc9381cca7`）：代码实现未发现问题，范围、指纹
+  前后一致、内层只读均满足，但首轮 REVISE——1 项 P2 指两份状态文档标题将任务提前到
+  “等待发布授权”，与正文复审未完成矛盾。该 P2 已修复（标题改为“处于代码复审门禁”），
+  待同一 Codex 会话限定复审。全程未 commit/push/PR/部署；新一轮 review APPROVED 并
+  重新冻结 fingerprint 后，才进入等待用户发布授权的门禁。
+
 ## 2026-07-28 最近赛事赛果定时审核已发布，首轮暴露来源路由缺口
 
 - 主功能 PR `#39` 合并为 `main@dd35038f`；生产首次补跑因 coalesced slot 的

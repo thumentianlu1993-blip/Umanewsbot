@@ -7,6 +7,7 @@ import unicodedata
 import uuid
 from datetime import datetime, time, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib import messages
@@ -16,7 +17,7 @@ from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.core.signing import BadSignature, SignatureExpired
 from django.db import transaction
-from django.db.models import BooleanField, Count, Exists, F, OuterRef, Prefetch, Q, Value
+from django.db.models import BooleanField, Case, Count, Exists, F, OuterRef, Prefetch, Q, Value, When
 from django.db.models.functions import Lower
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -132,6 +133,7 @@ from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
 from .services.news_production_integrity import source_health_snapshot
 from .services.onebot import BotPusher
 from .services.operations import log_operation
+from .services.race_calendar import public_default_race_date_window
 from .services.race_event_public_cache import (
     public_race_calendar_years,
     public_race_sitemap_count,
@@ -193,7 +195,6 @@ PUBLIC_HOT_CANDIDATE_LIMIT = 48
 PUBLIC_HOT_DISPLAY_LIMIT = 6
 QUICK_TERM_FOLLOWUP_SESSION_KEY = "article_quick_term_followup"
 RACE_CALENDAR_PAGE_SIZE = 40
-RACE_CALENDAR_WINDOW_DAYS = 30
 HORSE_PROFILE_PAGE_SIZE = 40
 PUBLIC_HORSE_PAGE_SIZE = 24
 PUBLIC_HORSE_RACE_RECORD_PAGE_SIZE = 20
@@ -3050,15 +3051,25 @@ def _public_next_key_race():
     return queryset.order_by("local_date", "local_start_time", "id").first()
 
 
-def _race_calendar_queryset(request: HttpRequest):
+def _public_race_calendar_base_queryset(filters: dict):
+    """赛事日历公开基础 queryset：published、排除 active canonical duplicate、
+    tab/region/grade/when。默认日期窗口与赛事列表复用同一基础 queryset；
+    read-gate 展示 annotation 只在最终赛事对象查询上加。"""
     queryset = RaceEvent.objects.filter(
         visibility_status=RaceEventVisibility.PUBLISHED
-    ).exclude(canonical_product_links__is_active=True).annotate(
-        public_current_result_revision_id=F(
-            "projection_control__current_result_revision_id"
-        ),
-        public_projection_write_owner=F("projection_control__write_owner"),
-    )
+    ).exclude(canonical_product_links__is_active=True)
+    if filters["tab"] == "key":
+        queryset = queryset.filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
+    if filters["region"]:
+        queryset = queryset.filter(country_region=filters["region"])
+    if filters["grade"]:
+        queryset = queryset.filter(normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS[filters["grade"]])
+    if filters["when"]:
+        queryset = queryset.filter(status__in=PUBLIC_RACE_WHEN_FILTERS[filters["when"]])
+    return queryset
+
+
+def _race_calendar_queryset(request: HttpRequest, *, today):
     tab = request.GET.get("tab", "key").strip() or "key"
     region = request.GET.get("region", "").strip()
     direction = request.GET.get("direction", "").strip()
@@ -3071,15 +3082,24 @@ def _race_calendar_queryset(request: HttpRequest):
         grade = ""
     if when not in PUBLIC_RACE_WHEN_FILTERS:
         when = ""
-    today = timezone.localdate()
-    if tab == "key":
-        queryset = queryset.filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
-    if region:
-        queryset = queryset.filter(country_region=region)
-    if grade:
-        queryset = queryset.filter(normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS[grade])
-    if when:
-        queryset = queryset.filter(status__in=PUBLIC_RACE_WHEN_FILTERS[when])
+    filters = {
+        "tab": tab,
+        "region": region,
+        "direction": direction,
+        "cursor": cursor,
+        "year": year,
+        "q": query,
+        "grade": grade,
+        "when": when,
+    }
+    base_queryset = _public_race_calendar_base_queryset(filters)
+    queryset = base_queryset.annotate(
+        public_current_result_revision_id=F(
+            "projection_control__current_result_revision_id"
+        ),
+        public_projection_write_owner=F("projection_control__write_owner"),
+    )
+    cross_period = bool(year or query)
     if year.isdigit():
         queryset = queryset.filter(year=int(year))
     if query:
@@ -3096,36 +3116,37 @@ def _race_calendar_queryset(request: HttpRequest):
             | Q(race_series__chinese_name__icontains=query)
             | series_name_match
         ).distinct()
-    if cursor and not (year or query):
+    cursor_date = None
+    if cursor and not cross_period:
         try:
             cursor_date = datetime.fromisoformat(cursor).date()
         except ValueError:
-            cursor_date = today
+            cursor_date = None
+    if cursor_date is not None and direction in {"past", "future"}:
+        # 显式独占边界分页（行为保留）
         if direction == "past":
             queryset = queryset.filter(local_date__lt=cursor_date).order_by("-local_date", "-local_start_time", "id")
-        elif direction == "future":
-            queryset = queryset.filter(local_date__gt=cursor_date).order_by("local_date", "local_start_time", "id")
         else:
-            queryset = queryset.order_by("local_date", "local_start_time", "id")
-    elif not (year or query):
-        start = today - timedelta(days=RACE_CALENDAR_WINDOW_DAYS)
-        end = today + timedelta(days=RACE_CALENDAR_WINDOW_DAYS)
-        queryset = queryset.filter(Q(local_date__gte=start, local_date__lte=end) | Q(local_date__isnull=True)).order_by("local_date", "local_start_time", "id")
-    else:
+            queryset = queryset.filter(local_date__gt=cursor_date).order_by("local_date", "local_start_time", "id")
+        return queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE], filters, None
+    if cross_period:
+        # 显式 year/q 跨期模式（行为保留）
         queryset = queryset.order_by("local_date", "local_start_time", "id")
-    return queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE], {
-        "tab": tab,
-        "region": region,
-        "direction": direction,
-        "cursor": cursor,
-        "year": year,
-        "q": query,
-        "grade": grade,
-        "when": when,
-    }
+        return queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE], filters, None
+    # 默认日期窗口模式（含非法/不完整 cursor 的安全回退）
+    window = public_default_race_date_window(base_queryset, today=today)
+    if not window.dates:
+        return queryset.none(), filters, window
+    queryset = queryset.filter(local_date__in=window.dates).order_by(
+        Case(When(pk__in=window.representative_ids, then=0), default=1),
+        "local_date",
+        "local_start_time",
+        "id",
+    )
+    return queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE], filters, window
 
 
-def _group_race_events_by_date(events):
+def _group_race_events_by_date(events, *, today, anchor_date=None):
     groups: list[dict] = []
     current_date = object()
     current_group = None
@@ -3159,14 +3180,15 @@ def _group_race_events_by_date(events):
         winner = _confirmed_race_winner(event.top_results) if event.status == RaceEventStatus.FINISHED else None
         event.public_winner_result = winner
         event.public_winner_name = winner.horse_name if winner else ""
-        event.public_status_label = _public_race_status_label(event, timezone.localdate(), winner)
+        event.public_status_label = _public_race_status_label(event, today, winner)
         if event.local_date != current_date:
             current_date = event.local_date
             current_group = {
                 "date": event.local_date,
                 "events": [],
                 "anchor_id": f"race-date-{event.local_date.isoformat()}" if event.local_date else "race-date-undated",
-                "is_today": event.local_date == timezone.localdate(),
+                "is_today": event.local_date == today,
+                "is_anchor": anchor_date is not None and event.local_date == anchor_date,
             }
             groups.append(current_group)
         current_group["events"].append(event)
@@ -3177,8 +3199,9 @@ def _group_race_events_by_date(events):
     return groups
 
 
-def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | None = None) -> list[RaceEvent]:
-    today = timezone.localdate()
+def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | None = None, today=None) -> list[RaceEvent]:
+    if today is None:
+        today = timezone.localdate()
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
     if events is not None:
@@ -3334,11 +3357,25 @@ def _attach_race_term_display_names(event_records):
 
 
 def public_race_calendar(request: HttpRequest):
-    events, filters = _race_calendar_queryset(request)
+    shanghai_today = timezone.localdate(timezone=ZoneInfo("Asia/Shanghai"))
+    events, filters, window = _race_calendar_queryset(request, today=shanghai_today)
     events = list(events)
-    if filters["direction"] == "past":
-        events = list(reversed(events))
-    groups = _group_race_events_by_date(events)
+    if window is None:
+        if filters["direction"] == "past":
+            events = list(reversed(events))
+    else:
+        # 代表赛事优先截取后在 Python 中恢复现有时间升序；local_start_time 为 None
+        # 的赛事排在当天定时赛事之后，对齐生产 PostgreSQL ASC NULLS LAST 语义。
+        events.sort(
+            key=lambda event: (
+                event.local_date,
+                event.local_start_time is None,
+                event.local_start_time or time.min,
+                event.pk,
+            )
+        )
+    default_anchor_date = window.anchor if window is not None else None
+    groups = _group_race_events_by_date(events, today=shanghai_today, anchor_date=default_anchor_date)
     date_axis_spans_years = len({group["date"].year for group in groups if group["date"]}) > 1
     def filter_url(**changes):
         params = request.GET.copy()
@@ -3383,7 +3420,8 @@ def public_race_calendar(request: HttpRequest):
         {
             "groups": groups,
             "filters": filters,
-            "focus_events": _public_weekly_focus_events(filters["region"], events=events),
+            "focus_events": _public_weekly_focus_events(filters["region"], events=events, today=shanghai_today),
+            "default_anchor_date": default_anchor_date,
             "date_axis": [group for group in groups if group["date"]],
             "date_axis_spans_years": date_axis_spans_years,
             "years": public_race_calendar_years(),

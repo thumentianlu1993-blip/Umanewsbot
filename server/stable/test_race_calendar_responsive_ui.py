@@ -222,9 +222,9 @@ class CalendarDateDisplayTests(TestCase):
         today = _FIXED_TODAY
         _make_event(local_date=today, chinese_name="A6-today")
         html = self._html(tab="all")
-        # CSS class today on date-axis link
-        self.assertIn('class="today"', html,
-                      "A6: date-axis link should have today class")
+        # CSS class today on date-axis link (default mode anchor adds the anchor class)
+        self.assertIn('class="today anchor"', html,
+                      "A6: date-axis link should have today class (anchor may be appended in default mode)")
         # '今天' label
         self.assertIn("今天", html,
                       "A6: should show '今天' label")
@@ -266,7 +266,8 @@ class CalendarDateDisplayTests(TestCase):
         _make_event(local_date=None, chinese_name="A8-undated")
         # Also create a dated event to trigger the calendar
         _make_event(local_date=date(2026, 7, 24), chinese_name="A8-dated")
-        html = self._html(tab="all")
+        # 默认日期窗口改造后默认模式不再展示日期待定赛事；改用显式 q 模式（现有语义保留）。
+        html = self._html(tab="all", q="A8")
         self.assertIn("日期待定", html, "A8: undated should show '日期待定'")
         # No fake year-month-day for the undated entry
         self.assertNotIn("1970", html, "A8: should not show 1970 or other fake date")
