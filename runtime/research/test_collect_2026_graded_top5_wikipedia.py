@@ -85,11 +85,11 @@ def write_manifest(root: Path, race_urls: list[str]) -> tuple[dict, str]:
     return manifest, collector.sha256_bytes((root / "run_manifest.json").read_bytes())
 
 
-def sample_row(key: str = "japan|甲") -> object:
+def sample_row(key: str = "japan|甲", horse_display_name: str = "甲") -> object:
     return collector.RaceResultRow(
         region="japan", region_label="日本", race_date="2026-07-01",
         race_name_zh="测试重赏", race_name_original="Test Stakes", grade="G1",
-        racecourse="东京", finish_position=1, horse_display_name="甲",
+        racecourse="东京", finish_position=1, horse_display_name=horse_display_name,
         jockey_name="", trainer_name="", finish_time="", margin="",
         race_url="https://umafans.run/races/2026/test/",
         race_page_sha256="abc", horse_lookup_key=key,
@@ -169,7 +169,7 @@ class CheckpointContractTests(unittest.TestCase):
                 ["horse-a", "horse-b"], store=store, process=process, resume=True
             )
             self.assertEqual(calls, ["horse-b"])
-            self.assertEqual(result["processed"], 1)
+            self.assertEqual(result["processed"], 2)
             self.assertEqual(result["cached"], 1)
 
     def test_partial_failure_preserves_successful_items(self):
@@ -238,6 +238,7 @@ class CheckpointContractTests(unittest.TestCase):
             root = Path(raw)
             count = {"value": 0}
             attempts = {"b": 0}
+            ticks = iter([0.0, 0.0, 0.0, 1.0, 1.0])
             store = collector.StageStore(root, stage="profiles", shard_index=0, shard_count=1)
 
             def process(key: str):
@@ -247,15 +248,18 @@ class CheckpointContractTests(unittest.TestCase):
                     raise OSError("retry")
                 return {"key": key, "status": "success"}
 
+            first = collector.run_checkpointed_items(
+                ["a", "b", "c"], store=store, process=process, resume=True,
+                request_counter=lambda: count["value"],
+                time_budget_seconds=0.5,
+                clock=lambda: next(ticks),
+            )
+            self.assertTrue(first["safe_stopped"])
             collector.run_checkpointed_items(
-                ["a", "b"], store=store, process=process, resume=True,
+                ["a", "b", "c"], store=store, process=process, resume=True,
                 request_counter=lambda: count["value"],
             )
-            collector.run_checkpointed_items(
-                ["a", "b"], store=store, process=process, resume=True,
-                request_counter=lambda: count["value"],
-            )
-            self.assertEqual(store.verify_index()["request_count"], 3)
+            self.assertEqual(store.verify_index()["request_count"], 4)
 
     def test_budget_stop_saves_progress_and_resume_finishes(self):
         ticks = iter([0.0, 0.0, 1.0, 1.0, 1.0])
@@ -280,6 +284,207 @@ class CheckpointContractTests(unittest.TestCase):
             self.assertFalse(second["safe_stopped"])
             self.assertEqual(second["cached"], 1)
             self.assertEqual(len(store.verify_index()["items"]), 2)
+
+    def test_completed_races_resume_is_byte_noop_even_with_retryable_errors(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            store = collector.StageStore(root, stage="races", shard_index=0, shard_count=1)
+            requests = {"value": 0}
+
+            def first_process(key: str):
+                requests["value"] += 1
+                if key == "race-b":
+                    raise OSError("retryable but stage completed")
+                return {"key": key, "status": "success"}
+
+            first = collector.run_checkpointed_items(
+                ["race-a", "race-b"],
+                store=store,
+                process=first_process,
+                resume=True,
+                request_counter=lambda: requests["value"],
+                request_counter_start=0,
+                now=lambda: "2026-07-27T00:00:00+00:00",
+            )
+            self.assertFalse(first["safe_stopped"])
+            self.assertEqual(first["failed"], 1)
+            self.assertEqual(store.verify_index()["request_count"], 2)
+            before = {
+                "index": store.index_path.read_bytes(),
+                "progress": store.progress_path.read_bytes(),
+                "items": {
+                    path.name: path.read_bytes()
+                    for path in sorted(store.items_dir.glob("*.json"))
+                },
+            }
+            resumed_calls: list[str] = []
+
+            def resumed_process(key: str):
+                resumed_calls.append(key)
+                requests["value"] += 1
+                return {"key": key, "status": "success"}
+
+            second = collector.run_checkpointed_items(
+                ["race-a", "race-b"],
+                store=store,
+                process=resumed_process,
+                resume=True,
+                request_counter=lambda: requests["value"],
+                now=lambda: "2026-07-28T00:00:00+00:00",
+            )
+            after = {
+                "index": store.index_path.read_bytes(),
+                "progress": store.progress_path.read_bytes(),
+                "items": {
+                    path.name: path.read_bytes()
+                    for path in sorted(store.items_dir.glob("*.json"))
+                },
+            }
+            self.assertEqual(resumed_calls, [])
+            self.assertEqual(second["request_count"], 2)
+            self.assertEqual(after, before)
+
+            tampered_progress = json.loads(store.progress_path.read_text(encoding="utf-8"))
+            tampered_progress["index_sha256"] = "0" * 64
+            collector.atomic_write_json(store.progress_path, tampered_progress)
+            with self.assertRaisesRegex(ValueError, "progress index drift"):
+                collector.run_checkpointed_items(
+                    ["race-a", "race-b"],
+                    store=store,
+                    process=resumed_process,
+                    resume=True,
+                    request_counter=lambda: requests["value"],
+                )
+
+    def test_safe_stopped_shard_resumes_retryable_items_and_finishes(self):
+        ticks = iter([0.0, 0.0, 1.0, 1.0, 1.0])
+        with tempfile.TemporaryDirectory() as raw:
+            store = collector.StageStore(
+                Path(raw), stage="wikidata_search", shard_index=0, shard_count=1
+            )
+            attempts: list[str] = []
+
+            def first_process(key: str):
+                attempts.append(f"first:{key}")
+                raise OSError("temporary")
+
+            first = collector.run_checkpointed_items(
+                ["horse-a", "horse-b"],
+                store=store,
+                process=first_process,
+                resume=True,
+                time_budget_seconds=0.5,
+                clock=lambda: next(ticks),
+                now=lambda: "2026-07-27T00:00:00+00:00",
+            )
+            self.assertTrue(first["safe_stopped"])
+            self.assertEqual(first["processed"], 1)
+
+            def resumed_process(key: str):
+                attempts.append(f"resume:{key}")
+                return {"key": key, "status": "success"}
+
+            second = collector.run_checkpointed_items(
+                ["horse-a", "horse-b"],
+                store=store,
+                process=resumed_process,
+                resume=True,
+                now=lambda: "2026-07-27T00:10:00+00:00",
+            )
+            self.assertFalse(second["safe_stopped"])
+            self.assertEqual(attempts, [
+                "first:horse-a", "resume:horse-a", "resume:horse-b"
+            ])
+            self.assertEqual(
+                [item["status"] for item in store.verify_index()["items"]],
+                ["success", "success"],
+            )
+
+    def test_resume_recovers_verified_index_ahead_of_safe_stopped_progress(self):
+        ticks = iter([0.0, 0.0, 1.0, 1.0, 1.0])
+        with tempfile.TemporaryDirectory() as raw:
+            store = collector.StageStore(
+                Path(raw), stage="wikidata_search", shard_index=0, shard_count=1
+            )
+            first = collector.run_checkpointed_items(
+                ["horse-a", "horse-b", "horse-c"],
+                store=store,
+                process=lambda key: {"key": key, "status": "success"},
+                resume=True,
+                time_budget_seconds=0.5,
+                clock=lambda: next(ticks),
+                now=lambda: "2026-07-28T00:00:00+00:00",
+            )
+            self.assertTrue(first["safe_stopped"])
+            self.assertEqual(first["processed"], 1)
+
+            old_progress = store.progress_path.read_bytes()
+            store.save_item("horse-b", {"key": "horse-b", "status": "success"})
+            advanced_index = store.rebuild_index(request_count=2)
+            self.assertEqual(len(advanced_index["items"]), 2)
+            self.assertEqual(store.progress_path.read_bytes(), old_progress)
+
+            calls: list[str] = []
+
+            def process(key: str):
+                calls.append(key)
+                return {"key": key, "status": "success"}
+
+            resumed = collector.run_checkpointed_items(
+                ["horse-a", "horse-b", "horse-c"],
+                store=store,
+                process=process,
+                resume=True,
+                now=lambda: "2026-07-28T00:10:00+00:00",
+            )
+            self.assertEqual(calls, ["horse-c"])
+            self.assertFalse(resumed["safe_stopped"])
+            self.assertEqual(resumed["processed"], resumed["total"])
+
+    def test_resume_recovers_verified_partial_index_when_progress_is_missing(self):
+        with tempfile.TemporaryDirectory() as raw:
+            store = collector.StageStore(
+                Path(raw), stage="profiles", shard_index=0, shard_count=1
+            )
+            store.save_item("horse-a", {"key": "horse-a", "status": "success"})
+            store.input_keys_sha256 = collector.keys_sha256(["horse-a", "horse-b"])
+            store.rebuild_index(request_count=1)
+            self.assertFalse(store.progress_path.exists())
+            calls: list[str] = []
+
+            resumed = collector.run_checkpointed_items(
+                ["horse-a", "horse-b"],
+                store=store,
+                process=lambda key: (
+                    calls.append(key)
+                    or {"key": key, "status": "success"}
+                ),
+                resume=True,
+                now=lambda: "2026-07-28T00:10:00+00:00",
+            )
+            self.assertEqual(calls, ["horse-b"])
+            self.assertFalse(resumed["safe_stopped"])
+            self.assertEqual(resumed["processed"], resumed["total"])
+
+            with tempfile.TemporaryDirectory() as complete_raw:
+                complete = collector.StageStore(
+                    Path(complete_raw), stage="profiles", shard_index=0, shard_count=1
+                )
+                for key in ("horse-a", "horse-b"):
+                    complete.save_item(key, {"key": key, "status": "success"})
+                complete.input_keys_sha256 = collector.keys_sha256(
+                    ["horse-a", "horse-b"]
+                )
+                complete.rebuild_index(request_count=2)
+                with self.assertRaisesRegex(
+                    ValueError, "progress missing for complete index"
+                ):
+                    collector.run_checkpointed_items(
+                        ["horse-a", "horse-b"],
+                        store=complete,
+                        process=lambda key: {"key": key, "status": "success"},
+                        resume=True,
+                    )
 
     def test_interrupted_resume_items_match_uninterrupted_baseline(self):
         keys = ["horse-a", "horse-b", "horse-c"]
@@ -415,7 +620,8 @@ class ResolutionAndNetworkContractTests(unittest.TestCase):
             )
             race_store.save_item(
                 row.race_url,
-                {"key": row.race_url, "status": "success", "rows": [asdict(row)],
+                {"key": row.race_url, "status": "success",
+                 "rows": [asdict(row), asdict(sample_row("japan|other", "乙"))],
                  "source": {"url": row.race_url, "sha256": "abc"}},
             )
             race_store.rebuild_index(request_count=1)
@@ -431,6 +637,15 @@ class ResolutionAndNetworkContractTests(unittest.TestCase):
                 input_keys_sha256=collector.keys_sha256([seed.key]),
             )
             profile_store.save_item(seed.key, profile)
+            other_seed = collector.HorseSeed(
+                key="japan|other", regions={"japan"}, display_names={"Other"}
+            )
+            other_profile = collector.seed_to_record(other_seed)
+            other_profile.update({"status": "success", "lookup_keys": [other_seed.key]})
+            profile_store.save_item(other_seed.key, other_profile)
+            profile_store.input_keys_sha256 = collector.keys_sha256(
+                [seed.key, other_seed.key]
+            )
             profile_store.rebuild_index()
             calls: list[str] = []
 
@@ -455,12 +670,25 @@ class ResolutionAndNetworkContractTests(unittest.TestCase):
             args = collector.parse_args(
                 ["--stage", "wikidata_search", "--resume", "--output-dir", raw]
             )
+            original_runner = collector.run_checkpointed_items
+            ticks = iter([0.0, 0.0, 1.0, 1.0])
+
+            def safe_stop_after_first(*runner_args, **runner_kwargs):
+                runner_kwargs["time_budget_seconds"] = 0.5
+                runner_kwargs["clock"] = lambda: next(ticks)
+                return original_runner(*runner_args, **runner_kwargs)
+
+            with patch.object(collector, "make_client", return_value=FakeClient({})), patch.object(
+                collector, "WikidataResolver", FakeResolver
+            ), patch.object(
+                collector, "run_checkpointed_items", side_effect=safe_stop_after_first
+            ):
+                collector.run_stage(args)
             with patch.object(collector, "make_client", return_value=FakeClient({})), patch.object(
                 collector, "WikidataResolver", FakeResolver
             ):
                 collector.run_stage(args)
-                collector.run_stage(args)
-            self.assertEqual(calls, ["en", "ja", "ja"])
+            self.assertEqual(calls, ["en", "ja", "ja", "en", "ja"])
             result = collector.StageStore(
                 root, stage="wikidata_search", shard_index=0, shard_count=1
             ).load_item(seed.key)
@@ -509,6 +737,7 @@ class ManifestContractTests(unittest.TestCase):
         collector.validate_run_manifest(manifest)
         for field, value in (
             ("race_urls_sha256", "0" * 64),
+            ("collector_source_sha256", "0" * 64),
             ("parser_version", "old-parser"),
             ("scorer_version", "old-scorer"),
             ("schema_version", 999),
@@ -641,10 +870,20 @@ class OfflineFinalizeTests(unittest.TestCase):
 
 
 class WorkflowContractTests(unittest.TestCase):
+    @staticmethod
+    def workflow_text():
+        return (
+            SCRIPT_PATH.parents[2]
+            / ".github/workflows/research_2026_graded_top5_wikipedia.yml"
+        ).read_text(encoding="utf-8")
+
+    @staticmethod
+    def job_block(workflow: str, job_name: str) -> str:
+        remainder = workflow.split(f"\n  {job_name}:\n", 1)[1]
+        return re.split(r"\n  [a-z_]+:\n", remainder, maxsplit=1)[0]
+
     def test_workflow_is_staged_and_does_not_patch_source(self):
-        workflow = (SCRIPT_PATH.parents[2] / ".github/workflows/research_2026_graded_top5_wikipedia.yml").read_text(
-            encoding="utf-8"
-        )
+        workflow = self.workflow_text()
         self.assertNotIn("path.write_text(text.replace", workflow)
         for job in (
             "tests:",
@@ -688,11 +927,55 @@ class WorkflowContractTests(unittest.TestCase):
         for stage in (
             "races", "profiles", "wikidata_search", "wikidata_entities", "score_horses"
         ):
-            remainder = workflow.split(f"\n  {stage}:\n", 1)[1]
-            job = re.split(r"\n  [a-z_]+:\n", remainder, maxsplit=1)[0]
+            job = self.job_block(workflow, stage)
             self.assertNotIn("set +e", job)
             self.assertNotIn("code=$?", job)
             self.assertIn("if: always()", job)
+
+    def test_workflow_source_stage_restores_only_existing_prefix(self):
+        workflow = self.workflow_text()
+        dispatch = workflow.split("permissions:", 1)[0]
+        self.assertIn("source_stage:", dispatch)
+        for stage in (
+            "races", "profiles", "wikidata_search", "wikidata_entities", "score_horses"
+        ):
+            self.assertRegex(dispatch, rf"(?m)^\s+- {stage}$")
+
+        expected_guards = {
+            "races": "inputs.source_stage != ''",
+            "profiles": "inputs.source_stage != 'races'",
+            "wikidata_search": (
+                "contains('wikidata_search,wikidata_entities,score_horses', "
+                "inputs.source_stage)"
+            ),
+            "wikidata_entities": (
+                "contains('wikidata_entities,score_horses', inputs.source_stage)"
+            ),
+            "score_horses": "inputs.source_stage == 'score_horses'",
+        }
+        for stage, guard in expected_guards.items():
+            job = self.job_block(workflow, stage)
+            source_name = (
+                "${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-"
+                f"{stage}-"
+            )
+            self.assertIn(source_name, job)
+            self.assertIn(guard, job)
+
+        self.assertIn(
+            "source_run_id, source_attempt and source_stage must be provided together",
+            workflow,
+        )
+        self.assertIn(
+            "(inputs.source_run_id == '' || inputs.source_attempt == '' || "
+            "inputs.source_stage == '')",
+            workflow,
+        )
+        self.assertIn(
+            "(inputs.source_run_id != '' || inputs.source_attempt != '' || "
+            "inputs.source_stage != '')",
+            workflow,
+        )
 
 
 if __name__ == "__main__":

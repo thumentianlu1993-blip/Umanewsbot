@@ -540,8 +540,84 @@ def run_checkpointed_items(
         raise ValueError("stage input key drift")
     store.input_keys_sha256 = selected_digest
     prior_requests = 0
+    prior_index: dict[str, Any] | None = None
     if store.index_path.exists():
-        prior_requests = int(store.verify_index().get("request_count", 0))
+        prior_index = store.verify_index()
+        prior_requests = int(prior_index.get("request_count", 0))
+        if resume:
+            indexed_keys = {str(item["key"]) for item in prior_index.get("items", [])}
+            planned_keys = set(planned)
+            if not indexed_keys <= planned_keys:
+                raise ValueError("stage checkpoint coverage drift")
+            if store.progress_path.exists():
+                progress_bytes = store.progress_path.read_bytes()
+                try:
+                    prior_progress = json.loads(progress_bytes)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("stage progress invalid for resume") from exc
+                if not isinstance(prior_progress, dict):
+                    raise ValueError("stage progress invalid for resume")
+                if prior_progress.get("stage") != store.stage:
+                    raise ValueError("stage progress stage drift")
+                progress_total = prior_progress.get("total")
+                progress_processed = prior_progress.get("processed")
+                progress_requests = prior_progress.get("request_count")
+                if (
+                    isinstance(progress_total, bool)
+                    or not isinstance(progress_total, int)
+                    or progress_total != len(planned)
+                ):
+                    raise ValueError("stage progress total drift")
+                if (
+                    isinstance(progress_processed, bool)
+                    or not isinstance(progress_processed, int)
+                    or not 0 <= progress_processed <= progress_total
+                ):
+                    raise ValueError("stage progress processed drift")
+                if (
+                    isinstance(progress_requests, bool)
+                    or not isinstance(progress_requests, int)
+                    or progress_requests < 0
+                ):
+                    raise ValueError("stage progress request count drift")
+                safe_stopped_value = prior_progress.get("safe_stopped")
+                if not isinstance(safe_stopped_value, bool):
+                    raise ValueError("stage progress safe-stop drift")
+                progress_index_sha = prior_progress.get("index_sha256")
+                if not isinstance(progress_index_sha, str) or not re.fullmatch(
+                    r"[0-9a-f]{64}", progress_index_sha
+                ):
+                    raise ValueError("stage progress index drift")
+                progress_matches_index = progress_index_sha == sha256_bytes(
+                    store.index_path.read_bytes()
+                )
+                if progress_matches_index:
+                    if progress_requests != prior_requests:
+                        raise ValueError("stage progress request count drift")
+                    if progress_processed != len(indexed_keys):
+                        raise ValueError("stage progress coverage drift")
+                    if not safe_stopped_value:
+                        if (
+                            progress_processed != progress_total
+                            or indexed_keys != planned_keys
+                        ):
+                            raise ValueError("completed stage coverage drift")
+                        return prior_progress
+                else:
+                    if (
+                        not safe_stopped_value
+                        or progress_processed >= len(indexed_keys)
+                    ):
+                        raise ValueError("stage progress index drift")
+                    if progress_requests > prior_requests:
+                        raise ValueError("stage progress request count drift")
+                    # The verified index atomically advanced beyond the last
+                    # safe-stopped progress. Continue from its terminal items;
+                    # never infer that this unknown window was completed.
+            elif len(indexed_keys) >= len(planned):
+                raise ValueError("stage progress missing for complete index")
+    elif resume and store.progress_path.exists():
+        raise ValueError("stage index missing for resume")
     request_start = (
         request_counter_start
         if request_counter_start is not None
@@ -585,12 +661,18 @@ def run_checkpointed_items(
         request_counter() - request_start if request_counter else 0
     )
     index = store.rebuild_index(request_count=request_count)
+    indexed_keys = {str(item["key"]) for item in index["items"]}
+    safe_stopped = safe_stopped or indexed_keys != set(planned)
+    status_counts = Counter(str(item.get("status", "")) for item in index["items"])
     progress = {
         "stage": store.stage,
-        "processed": processed,
+        "processed": len(indexed_keys),
         "total": len(planned),
-        "success": succeeded,
-        "failed": failed,
+        "success": status_counts.get("success", 0),
+        "failed": sum(
+            status_counts.get(status, 0)
+            for status in RETRYABLE_ITEM_STATUSES | {"permanent_error"}
+        ),
         "cached": cached,
         "last_object": last_key,
         "updated_at": now(),

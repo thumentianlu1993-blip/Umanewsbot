@@ -15,7 +15,9 @@
   index；checkpoint upload 使用 `if: always()`，失败后仍保留恢复材料。只有后续精确恢复返回
   `0`，DAG 才继续。
 - workflow 不使用 attempt 通配下载或 `merge-multiple`。跨 run 恢复必须同时指定唯一
-  `source_run_id` 与 `source_attempt`；缺一拒绝，下载后的 manifest/index 身份不兼容也拒绝。
+  `source_run_id`、`source_attempt` 与 `source_stage`；三者全空表示新 run，部分提供即拒绝。
+  `source_stage` 是源 run 实际到达的最后一个网络阶段，只下载该阶段及之前的精确 artifact，
+  不探测源 run 尚未产生的未来 artifact。
 
 ## 目录与 checkpoint
 
@@ -27,6 +29,18 @@
 每个 index 还冻结真实 manifest SHA、按 stage 命名的全部上游 index SHA、计划输入 key digest、
 collector/parser/scorer/schema/base commit 身份和该网络阶段的累计实际 request count。resume、
 merge、finalize 会重算 item、manifest、输入与上游链；任一漂移均 fail closed。
+
+`--resume` 读取既有 checkpoint 时先验证 index/items、计划输入覆盖以及
+`progress.index_sha256`。若 `progress.safe_stopped=false` 且 `processed==total`，该 stage/shard
+已经完成：即使保留 retryable errors 和非零 request count，也直接返回既有 progress，不调用
+processor，不重写 item/index/progress。只有 `safe_stopped=true` 才继续缺失 item 并重试
+retryable errors。
+
+index 与 progress 是分别原子写入的。若进程崩溃在 periodic index 落盘之后，resume 只接受两种
+可证明窗口：已验证 index 的 item 数严格领先旧 `safe_stopped=true` progress，且旧 request
+count 不大于 index；或 progress 尚不存在且 index 只覆盖计划输入的严格子集。两者都按
+safe-stopped 继续，当前 index 的 item 与 request count 为权威。完整 index 缺 progress、同覆盖
+但 hash 不同、非法类型或任一 identity/input/item 漂移仍 fail closed，绝不推断未知窗口已完成。
 
 根目录 `run_manifest.json` 冻结 year、cutoff、base URL、race URL 清单及摘要、collector 源码
 SHA、parser/scorer/schema version 和基线 commit。resume 遇到 tool、输入或 shard 参数漂移会
@@ -80,6 +94,23 @@ python runtime/research/collect_2026_graded_top5_wikipedia.py \
 
 所有网络阶段还支持 `--start-index`、`--limit`。稳定 shard 归属为
 `int(sha256(canonical_key), 16) % shard_count`，不使用 Python `hash()`。
+
+跨 GitHub Actions run 恢复时，在 `workflow_dispatch` 同时填写：
+
+```text
+full_network=true
+source_run_id=<精确源 run ID>
+source_attempt=<精确源 attempt>
+source_stage=races|profiles|wikidata_search|wikidata_entities|score_horses
+```
+
+例如源 run 停在 `wikidata_search`，workflow 只恢复 races、profiles 与四个 search shard；
+races/已完成 profile shard 校验后字节级 no-op，只有 `safe_stopped=true` 的 search shard 继续，
+随后 merge 与未来阶段均在当前 run 重建。该命令说明不构成联网授权。
+
+修复版首次运行必须三项 source 输入全空，从新提交 fresh start。旧 `0cdec…` artifacts 仅保留
+为 evidence；后续只在相同新 HEAD、collector source SHA 和完整 tool identity 的 runs 间恢复，
+跨 commit 不提供迁移并会 fail closed。
 
 ## 离线 synthetic smoke
 

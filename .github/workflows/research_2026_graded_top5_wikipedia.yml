@@ -24,6 +24,18 @@ on:
         required: false
         type: string
         default: ""
+      source_stage:
+        description: Last network stage reached by the exact source run; blank starts fresh
+        required: false
+        type: choice
+        default: ""
+        options:
+          - ""
+          - races
+          - profiles
+          - wikidata_search
+          - wikidata_entities
+          - score_horses
 
 permissions:
   actions: read
@@ -89,13 +101,15 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: python -m pip install requests beautifulsoup4 urllib3
-      - name: Validate exact source attempt selector
-        if: (inputs.source_run_id == '') != (inputs.source_attempt == '')
+      - name: Validate exact source attempt and stage selector
+        if: >-
+          (inputs.source_run_id == '' || inputs.source_attempt == '' || inputs.source_stage == '') &&
+          (inputs.source_run_id != '' || inputs.source_attempt != '' || inputs.source_stage != '')
         run: |
-          echo "source_run_id and source_attempt must be provided together"
+          echo "source_run_id, source_attempt and source_stage must be provided together"
           exit 1
       - name: Restore one exact compatible source attempt
-        if: inputs.source_run_id != '' && inputs.source_attempt != ''
+        if: inputs.source_run_id != '' && inputs.source_attempt != '' && inputs.source_stage != ''
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-races-0
@@ -129,7 +143,9 @@ jobs:
         with: {python-version: "3.12"}
       - run: python -m pip install requests beautifulsoup4 urllib3
       - name: Restore this shard from one exact source attempt
-        if: inputs.source_run_id != '' && inputs.source_attempt != ''
+        if: >-
+          inputs.source_run_id != '' && inputs.source_attempt != '' &&
+          inputs.source_stage != 'races'
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-profiles-${{ matrix.shard }}
@@ -190,7 +206,9 @@ jobs:
         with: {python-version: "3.12"}
       - run: python -m pip install requests beautifulsoup4 urllib3
       - name: Restore this shard from one exact source attempt
-        if: inputs.source_run_id != '' && inputs.source_attempt != ''
+        if: >-
+          inputs.source_run_id != '' && inputs.source_attempt != '' &&
+          contains('wikidata_search,wikidata_entities,score_horses', inputs.source_stage)
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-wikidata_search-${{ matrix.shard }}
@@ -251,7 +269,9 @@ jobs:
         with: {python-version: "3.12"}
       - run: python -m pip install requests beautifulsoup4 urllib3
       - name: Restore this shard from one exact source attempt
-        if: inputs.source_run_id != '' && inputs.source_attempt != ''
+        if: >-
+          inputs.source_run_id != '' && inputs.source_attempt != '' &&
+          contains('wikidata_entities,score_horses', inputs.source_stage)
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-wikidata_entities-${{ matrix.shard }}
@@ -312,7 +332,9 @@ jobs:
         with: {python-version: "3.12"}
       - run: python -m pip install requests beautifulsoup4 urllib3
       - name: Restore this shard from one exact source attempt
-        if: inputs.source_run_id != '' && inputs.source_attempt != ''
+        if: >-
+          inputs.source_run_id != '' && inputs.source_attempt != '' &&
+          inputs.source_stage == 'score_horses'
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-score_horses-${{ matrix.shard }}

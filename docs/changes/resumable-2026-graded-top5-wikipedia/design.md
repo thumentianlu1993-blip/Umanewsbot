@@ -62,6 +62,43 @@
 另保存该数组规范 JSON 的汇总 SHA-256。resume、merge 和 finalize 都重读 item 并重算，任何
 item/index/tool version 漂移都 fail closed。
 
+`progress.json.index_sha256` 必须指向同目录已验证的 `index.json`。恢复状态机只有两个可写分支：
+
+1. `safe_stopped=false`：stage/shard 已完成。先完整验证 manifest/index/items/progress 绑定，
+   然后直接返回成功；不得调用 item processor，不得重试 `retryable_error`，不得执行
+   `rebuild_index` 或 `save_progress`。因此 item、index、progress 和 request count 字节均不变。
+2. `safe_stopped=true`：stage/shard 在 item/batch 边界安全停止。验证完成后继续缺失 item，
+   并允许重试已保存的 `retryable_error`；结束时原子更新 index/progress。
+
+完成是“计划输入均已形成本次执行结果且没有因预算中断”，不是“所有 item 均成功”。如果希望在
+完成 run 后重新处理 retryable errors，应建立新的明确研究 run，不得借跨 run resume 隐式改变证据。
+
+### Index/progress 崩溃窗口协调
+
+`save_item -> periodic rebuild_index -> save_progress` 不是跨文件事务。进程若在 periodic
+`rebuild_index` 后退出，index 可以比 progress 多一个或多个已原子完成的 item；第一轮 periodic
+checkpoint 后退出时也可能只有 partial index、尚无 progress。这两种状态不能永久拒绝，也不能
+被解释成 completed。
+
+恢复顺序固定为：
+
+1. 先验证 manifest/tool identity、input digest、index schema、每个 item path/status/content SHA
+   和 index 汇总；任何失败立即拒绝。
+2. 若 progress 存在且其 hash 与当前 index 一致，沿用正常完成态/safe-stop 规则。
+3. 若 hash 不一致，仅当 progress 自身 stage/total/processed 类型合法、
+   `safe_stopped=true`、当前已验证 index key 数严格大于 progress.processed、key 仍为计划输入
+   子集且 index request count 不小于 progress request count 时，才认定为“index 已前进”。
+   使用当前 index 的 key/request count 在内存中重建 `safe_stopped=true` 状态并继续。
+4. 若 progress 缺失，仅当当前已验证 index 是计划输入的严格子集时按安全停止恢复。完整覆盖但
+   progress 缺失不猜测 completed，保持 fail closed。
+5. 若 index 覆盖数等于 progress.processed 但 hash 不同，仍视为 tamper/drift 并拒绝。恢复完成
+   后才原子写新的 index/progress；未知状态永远不能走完成态 byte no-op。
+
+`0cdec…` 旧 artifact 不进入上述协调路径：manifest 的 `base_commit` 与
+`collector_source_sha256` 必须等于当前工具身份。修复版 rollout 从新提交 fresh start，旧
+checkpoint 仅保留为失败证据；之后 resume 只发生在相同新 HEAD/tool identity 的 runs 之间，
+不提供跨版本迁移器。
+
 ## 原子写
 
 统一 helper：
@@ -188,8 +225,26 @@ tests -> races
 - artifact 名绑定 `${run_id}-${run_attempt}-${stage}-${shard}`，v4 不覆盖同名 artifact。
 - workflow 禁止 attempt 通配下载和 `merge-multiple`。当前 DAG 只下载当前精确
   `${run_id}-${run_attempt}` artifact；跨 run 恢复必须同时提供唯一 `source_run_id` 与
-  `source_attempt`，只下载该 attempt 的精确 artifact 名。下载后仍由 manifest/tool/input/
-  upstream SHA 校验，不兼容即拒绝。结束时 `if: always()` 上传新 artifact。
+  `source_attempt`，并提供 `source_stage`。三者必须全有或全空；`source_stage` 是受控 choice：
+  `races|profiles|wikidata_search|wikidata_entities|score_horses`。只下载该 attempt 的精确
+  artifact 名，下载后仍由 manifest/tool/input/upstream SHA 校验，不兼容即拒绝。结束时
+  `if: always()` 上传新 artifact。
+- 源 artifact 下载是前缀闭包，不是未来阶段探测：
+  - `races`：任何非空 `source_stage` 都恢复；
+  - `profiles`：除 `source_stage=races` 外恢复各精确 shard；
+  - `wikidata_search`：仅 source stage 为 search/entities/score 时恢复各精确 shard；
+  - `wikidata_entities`：仅 source stage 为 entities/score 时恢复各精确 shard；
+  - `score_horses`：仅 source stage 为 score 时恢复各精确 shard。
+  这些条件分别对应 workflow guard：
+  `inputs.source_stage != ''`、`inputs.source_stage != 'races'`、
+  `contains('wikidata_search,wikidata_entities,score_horses', inputs.source_stage)`、
+  `contains('wikidata_entities,score_horses', inputs.source_stage)`、
+  `inputs.source_stage == 'score_horses'`。choice 输入使 substring guard 的值域封闭。
+- merge artifact 不从源 run 下载；当前 run 先复用并验证已完成上游 shard（字节级 no-op），
+  仅恢复安全停止 shard，然后确定性重建 merge artifact。这样下游始终只消费当前
+  `${run_id}-${run_attempt}` artifact，同时完成 races index SHA 不会从源 run 的值漂移。
+- `source_stage` 只描述同一提交身份下源 run 到达的阶段，不放宽 manifest/tool 校验。新修复
+  提交的首个 run 必须三项 source 输入全空；旧 `0cdec…` artifact 仅供审计下载，不参与恢复。
 - merge/finalize 下载所有上游 artifact，冲突 fail closed。
 - `merge_entities` 只消费全部 entity shard completion index 并产出完整 entity index；
   `score_horses` 同时消费 merged search 和 merged entity index；`merge_scores` 要求全部

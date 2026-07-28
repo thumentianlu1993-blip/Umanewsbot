@@ -24,7 +24,12 @@ PR #24 已具备公开赛事页解析、马匹页补全、Wikidata 候选搜索�
 1. `races`
    - 冻结发现的赛事 URL 清单和输入参数。
    - 每个 URL 保存成功、跳过或错误结果；成功结果包含页面 SHA、正式名次行和来源证据。
-   - `--resume` 时跳过已完成 item；可重试明确标记为 retryable 的错误。
+   - `--resume` 先校验 stage index、item、manifest、输入 digest、tool identity 和 progress 对
+     index SHA 的绑定。若 `progress.safe_stopped=false`，该 stage 已完成：即使其中保留
+     `retryable_error` 和非零 `request_count`，也必须字节级 no-op，不重试错误，不重写
+     item/index/progress，不改变上游 index SHA。
+   - 只有 `progress.safe_stopped=true` 的 stage/shard 才继续处理未完成 item，并重试其中
+     `retryable_error`；恢复完成后才写新的 index/progress。
 2. `profiles`
    - 从赛事 checkpoint 构造不可变 `lookup_key`：有来源 horse identity/profile href 时使用
      `region|source_identity`；否则使用 `region|normalized_name`。赛事 URL、名称和日期只作为
@@ -73,7 +78,23 @@ PR #24 已具备公开赛事页解析、马匹页补全、Wikidata 候选搜索�
 - 每个 stage index 保存按 key 排序的 item path、状态、内容 SHA-256 及其汇总 SHA，并冻结
   run manifest 文件 SHA、全部具名上游 index 文件 SHA、完整计划输入 key digest、tool identity
   与累计实际 request count；resume、merge、finalize 读取时逐项重算和核对。
+- `progress.json` 同时是一次 stage/shard 执行是否安全停止的恢复门禁，并用 `index_sha256`
+  绑定已验证 index。`safe_stopped=false` 表示该次 stage/shard 已完成，不等于所有 item 都成功；
+  retryable error 可以作为完成结果留待单独的新研究 run 处理，不能在跨 run 恢复时被隐式重试。
+- 完成 stage/shard 的 `--resume` 返回 `0` 且不写任何 checkpoint 字节；只有
+  `safe_stopped=true` 才允许改变该 stage/shard 的 request count、item、index 或 progress。
 - tool version 绑定 collector 源码 SHA、parser/scorer/schema version 与基线 commit。
+- checkpoint 只允许在相同 `base_commit`、`collector_source_sha256` 和完整 tool identity 的
+  run 间恢复。旧提交 `0cdec…` 产生的 artifact 只作为审计 evidence，不做兼容迁移，也不作为
+  修复后 run 的 source checkpoint；修复发布后必须从该新提交 fresh start，后续才可在同一
+  新 HEAD/collector identity 的 runs 间 resume。跨 commit 或 collector 漂移必须 fail closed。
+- item 与 index 先于 progress 原子落盘，因此允许一种严格受限的崩溃恢复：
+  - 已验证 index 的 key 覆盖严格领先于既有 `safe_stopped=true` progress 的 `processed` 时，
+    将当前 index 视为安全停止后的最新完整 item 集继续运行；不得当作 completed。
+  - progress 缺失但已验证 index 只覆盖计划输入的严格子集时，同样按 `safe_stopped=true`
+    恢复，跳过 terminal item 并继续缺失/retryable item。
+  - index 覆盖与 progress `processed` 相同而 `index_sha256` 不同，或 identity/input/item
+    任一验证失败，仍必须 fail closed；不得把普通 hash 漂移伪装成崩溃窗口。
 
 ### 可观测性
 
@@ -123,5 +144,15 @@ profile lookup、每次 Wikidata search、每个 QID entity 都保存成功/失�
   实际 `run_manifest/index/items/progress/final` 证据；测试源码本身不算 checkpoint artifact。
 - 真实 races/profile/search/entity/score stage 返回 `75` 时 job 必须保持失败以阻止下游；其
   checkpoint upload 仍须 `if: always()` 执行。只有恢复后返回 `0` 才满足 downstream 门禁。
+- 跨 run 恢复必须同时提供精确 `source_run_id`、`source_attempt` 和 `source_stage`；三者全空
+  表示新 run，部分提供必须 fail closed。`source_stage` 只能是
+  `races|profiles|wikidata_search|wikidata_entities|score_horses`，表示源 run 实际到达的最后一个
+  网络阶段。
+- workflow 只按精确 artifact 名恢复 `source_stage` 及之前的网络 stage/shard；不得尝试下载
+  源 run 在 `source_stage` 之后从未产生的 artifact。已完成上游校验后字节级 no-op，只有
+  `source_stage` 中 `safe_stopped=true` 的 shard 继续；merge artifact 在当前 run 由恢复后的
+  shard 重建。
+- 修复版首次公网研究 run 不得选择旧 `0cdec…` run 作为 source；必须 fresh start。只有同一
+  修复提交和 collector identity 产生的新 run 才能互相作为 source。
 - 任一长阶段不会因单个 job 超时使既有成果归零。
 - 全部实现通过未参与实现的 reviewer 独立审核。

@@ -37,6 +37,42 @@
 - 返修聚焦测试由 `26 tests / 2 failures + 4 errors` RED 收敛到 `27 tests / OK`。未运行公网采集，
   未 commit、push、更新 PR、部署或写生产；下一步仅为原 reviewer 会话复审。
 
+## 2026-07-27 正式 run 续跑失败检查点
+
+- 源 run `30241479829` 已完成 races/profiles/merge_profiles；其 search shard `0/1/3` 以
+  safe-stop `75` 结束，shard `2` 完成。失败阶段之后没有 entities/score/finalize artifact。
+- 恢复 run `30246234850` 提供精确 source run/attempt，但 workflow 从 races 开始重跑。已完成
+  races 中仍有 retryable failures，runner 将其重试并重建 index，使 SHA 从 `b8bb…` 变为
+  `4734…`；四个 profiles shard 均因绑定旧 races SHA 而报 `stage upstream index drift`。
+- 根因是恢复合同只锁定 source attempt，没有锁定 source stage；同时 runner 把 item
+  `retryable_error` 误当成任何 resume 都应重试，未区分“完整 stage 中保留的错误”和
+  “safe-stopped stage 待继续的错误”。
+- 本轮仅新增规格与离线 RED：聚焦测试 `Ran 30 tests`、`failures=2`，分别命中完成 races 被
+  重跑和 workflow 缺 `source_stage`；safe-stopped shard 继续用例通过。未修改实现、workflow
+  或 README，未调用 GitHub、联网、commit、push、部署或写生产。
+- GREEN 实现已收敛为 `Ran 30 tests / OK`：完成 stage/shard 只有在 index/item/progress/
+  planned coverage 全部验证且 `safe_stopped=false && processed==total` 时才字节级 no-op；
+  safe-stopped shard 仍可续跑。workflow 已加入 source 三元组和精确 stage 前缀下载，README
+  已记录恢复命令。编译、YAML `11` jobs、静态合同和 diff check 通过；仍未联网或发布。
+
+## 2026-07-28 reviewer 019fa715 P1 边界
+
+- `0cdec…` 旧 collector 产生的正式 run artifacts 与修复提交的 base commit/source SHA 不兼容。
+  既定 rollout 不做旧 checkpoint 迁移：旧 artifacts 只保留为 evidence，修复提交发布后的首个
+  研究 run 必须三项 source 输入全空并 fresh start。
+- 后续恢复仅允许相同新 HEAD、`collector_source_sha256` 和完整 tool identity 的 runs；即使
+  workflow source selector 精确，跨提交恢复仍由 manifest 校验 fail closed。
+- reviewer 还指出 periodic index 与 progress 之间存在合法崩溃窗口。本轮先新增 RED：仅允许
+  已验证 index 严格领先 safe-stopped progress，或 progress 缺失且 index 为严格 partial coverage
+  时按 safe-stopped 继续；同覆盖 hash 错误仍拒绝，未知状态不得当成 completed。
+- 聚焦 RED 为 `Ran 32 tests / errors=2`：分别是 `stage progress index drift` 和
+  `stage progress missing for resume`；其余 30 项通过，包括 base commit/collector source 漂移
+  拒绝和同覆盖错误 hash fail closed。本检查点未修改实现、workflow 或 README。
+- P1 GREEN 后为 `Ran 32 tests / OK`。collector 只协调 verified index 严格领先 safe-stopped
+  progress，以及 progress 缺失的严格 partial index；当前 index items/request count 为权威，
+  完整 index 缺 progress、同覆盖 hash 错和所有 identity/input/item 漂移继续 fail closed。
+  README 已写明 `0cdec…` evidence-only 与新提交 fresh start；workflow 无需继续扩展。
+
 ## 安全检查点
 
 1. 方案 review APPROVED。
@@ -56,7 +92,11 @@
   stage+shard checkpoint，并上传绑定 run/attempt/stage/shard 的独立 artifact。
 - 一个 shard 失败时保留其他 shard；不得用新提交取消正在完成的长任务。
 - 第二 attempt 只为安全停止 shard 选择 manifest/tool/input SHA 全兼容的最新 checkpoint；
-  已成功 shard 复用其 artifact，不重跑。v4 artifact 不同名覆盖。
+  已完成 shard 完整校验后字节级 no-op，不重试其 retryable errors、不重写 index/progress。
+  v4 artifact 不同名覆盖。
+- 跨 run dispatch 必须提供 `source_run_id + source_attempt + source_stage` 三元组；
+  `source_stage` 之后的源 artifact 一律不下载。源阶段之前的完成 stage 只验证并复用，源阶段
+  内仅 `safe_stopped=true` 的 shard 继续。
 - merge job 只下载明确 artifact，缺 shard 或冲突则 fail closed。
 - DAG 固定为 profiles merge、search merge、entities merge、horse scoring merge 后再 finalize；
   finalize 不直接读取单个 entity/search shard。

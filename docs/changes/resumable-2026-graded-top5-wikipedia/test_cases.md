@@ -75,6 +75,30 @@
 24. `test_synthetic_smoke_safe_stop_resume_matches_baseline`
     - 第一次返回 75 并保留 checkpoint，第二次执行真实 fan-in/finalize；恢复 item bytes 与不中断
       基线一致，最终 artifact 包含结构化错误和非零请求计数。
+25. `test_completed_races_resume_is_byte_noop_even_with_retryable_errors`
+    - 构造 `safe_stopped=false` 的完整 races stage，其中保留 retryable failure 且
+      `request_count>0`；再次 resume 不调用 processor，不重试错误，item/index/progress/request
+      count 全部字节不变。
+26. `test_safe_stopped_shard_resumes_retryable_items_and_finishes`
+    - 构造 `safe_stopped=true` 的 search shard；resume 会重试已有 retryable item、补齐未处理
+      item，并把 shard 完成状态写回。
+27. `test_workflow_source_stage_restores_only_existing_prefix`
+    - dispatch 要求 `source_run_id + source_attempt + source_stage` 全有或全空，source stage 为受控
+      choice。
+    - 各网络 job 的源 artifact 下载 guard 只覆盖 source stage 及之前的精确 artifact；不会探测
+      未来 artifact。完成上游依赖用例 25 的字节 no-op 保证 index SHA 不漂移。
+28. `test_resume_recovers_verified_index_ahead_of_safe_stopped_progress`
+    - 先保存 safe-stopped progress，再模拟 periodic `rebuild_index` 多落一个完整 success item
+      后崩溃；resume 验证 index/item 后按安全停止继续，只处理剩余 key，不永久拒绝，也不把
+      index-ahead 状态当 completed。
+29. `test_resume_recovers_verified_partial_index_when_progress_is_missing`
+    - 模拟第一轮 periodic index 已落盘但 progress 尚未创建；已验证 partial index 按
+      safe-stopped 恢复，terminal item 不重跑，继续缺失 item。
+    - 用例 25 中“相同完整覆盖但 progress hash 被篡改”继续要求 fail closed，证明恢复条件不是
+      遇到任意 hash mismatch 都放行。
+30. `test_manifest_recomputes_race_urls_and_all_identity_fields`
+    - 除已有字段外显式篡改 `collector_source_sha256` 与 `base_commit` 都必须拒绝；旧 `0cdec…`
+      artifact 与修复提交不兼容，不提供迁移。
 
 ## 验证层级
 
@@ -89,3 +113,17 @@
 
 实现前记录失败测试名称、失败原因与命令输出摘要到 `tasks.md`。不要求既有已实现行为重新变红。
 动态时间只在固定 clock fixture 中参与跨 run 字节比较。
+
+## 正式 run 续跑回归
+
+正式源 run `30241479829` 的 `wikidata_search` shard `0/1/3` 以 safe-stop `75` 结束，shard `2`
+完成；源 run 在该失败阶段之后没有未来 stage artifacts。恢复 run `30246234850` 使用精确
+source run/attempt 后仍重跑了已经完成的 races，导致 races index SHA 从 `b8bb…` 变为
+`4734…`，四个 profiles shard 随后均以 `stage upstream index drift` 确定性失败。
+
+上述 25—27 是对此真实失败路径的最小回归，不访问 GitHub 或公网；RED 必须分别证明“完成 stage
+被重写”和“workflow 缺少精确 source stage 前缀”两项缺失行为。
+
+reviewer 会话 `019fa715-f13b-77d0-a282-2b85ffb433c4` 的后续 P1 使用用例 28—30 收口：旧提交
+artifact 只保留 evidence；新提交 fresh start；同 identity run 之间若崩溃在 index/progress
+原子写之间，可以只接受严格可证明的 index-ahead/partial-index 状态。
