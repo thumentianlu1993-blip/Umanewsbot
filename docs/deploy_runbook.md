@@ -1,5 +1,28 @@
 # 部署运行手册
 
+## 2026-07-29 赛事日历默认日期窗口生产部署记录
+
+1. PR `#43` 合并为 `main@c8508b4e`（实现 `64dff42c` + main 合并 `f5642138`）；合并时
+   `origin/main` 已推进 PR `#42`，冲突仅 `docs/current_state.md`/`docs/project_status.md`
+   顶部追加位置，保留双方条目解决；`views.py` 自动合并干净。合并树复测 62/62 通过。
+2. 发布门禁：用户针对冻结 fingerprint（approved content hash `632eb5258c…b66e57`）
+   明确授权；staging 前重算指纹内容零漂移、`review_release_transition.py index` 返回
+   `INDEX_TRANSITION_OK`。
+3. 生产 `/opt/umanewsbot` `git pull --ff-only`：`8440b897 -> c8508b4e`。写前恢复点
+   `.env.backup.pre-race-calendar-20260728T200132Z`（0600）与回滚镜像
+   `umanewsbot:rollback-pre-race-calendar-20260728T200132Z`（旧 prod = `02f2f7d16df1`）；
+   无迁移、无配置变更、无业务数据写入，按轻量代码发布先例未做数据库备份。
+4. `./deploy_lowcost.sh` 一次通过：drain=0、`No migrations to apply`、collectstatic
+   1/130/360；新镜像 `umanewsbot:prod`=`b7b797467022`；未复现上次的 SIGKILL 与
+   nginx 持续 502（仅在 web 重建窗口有一条瞬时 502，已随 healthy 恢复）。
+5. 验证：6 容器 Up（web healthy）、check 0 issues、`migrate --plan` 空、内外 healthz 200；
+   `/races/` 日期栏 11 个实际比赛日、当天 2026-07-29 唯一锚点（`today anchor` +
+   `aria-current="date"`）、28 卡；显式 cursor/year/q 200 且无锚点脚本；390px/1440px
+   浏览器正常、徽标 42×42；web/worker 日志无 error。
+6. 回滚：`git reset --hard 8440b897` 重跑 deploy 脚本或恢复上述 rollback 镜像 tag；
+   不恢复数据库。完整证据见
+   `docs/changes/fix-race-calendar-default-date-window/release_report.md`。
+
 ## 2026-07-29 赛事新闻质量治理生产部署记录
 
 1. PR `#42` 合并为 `main@8440b897`（实现提交 `497590e0` + main 合并提交 `7ad0994a`）；

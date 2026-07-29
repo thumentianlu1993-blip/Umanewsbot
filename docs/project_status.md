@@ -9,21 +9,22 @@
 - 部署插曲：主机内存压力致部署脚本 exit 137，collectstatic 与 worker/beat 由人工补跑完成，
   nginx 上游缓存导致短暂 502 已随 restart 恢复；详情见 deploy_runbook 部署记录。
 
-## 2026-07-28 赛事日历默认比赛日窗口已实现并通过验收，处于代码复审门禁
+## 2026-07-28 赛事日历默认比赛日窗口已上线生产
 
 - `fix-race-calendar-default-date-window` 根因是自然日 ±30 天与前 40 场截断共同造成陈旧
-  日期轴；已按已审方案在独立 worktree 实现：上海时区今日锚点（今日→最近未来→最近
-  历史）、最多 11 个实际比赛日的 5+1+5 平衡窗口、保留 40 卡上限且每日期至少一卡、
-  移动端锚点 `scrollLeft` 水平居中；显式 cursor/year/q 语义不变。无迁移、无配置、
-  无数据写入。
+  日期轴；已按已审方案实现：上海时区今日锚点（今日→最近未来→最近历史）、最多 11 个
+  实际比赛日的 5+1+5 平衡窗口、保留 40 卡上限且每日期至少一卡、移动端锚点
+  `scrollLeft` 水平居中；显式 cursor/year/q 语义不变。无迁移、无配置、无数据写入。
 - 测试先行取得真实 RED 后实现 GREEN：新增 41 个聚焦用例全通过；既有日历测试窄改
   预算断言（10/14/22）与 A6/A8 适配；主线程回归、查询预算（+2 条有界聚合，实测
   5/14/14）与 1440px/390px/320px 真实浏览器验收均通过。
-- 代码复审进展：首轮 reviewer 会话两项 P2 修复后 APPROVED；追加的新一轮 Codex 独立
-  审查（session `019fa932-ca46-7b23-a2d6-c9fc9381cca7`）首轮 REVISE——1 项 P2 指
-  状态文档标题提前推进工作流（“等待发布授权”与正文复审未完成矛盾），已修复为
-  “处于代码复审门禁”，待同一 Codex 会话限定复审。未 commit/push/PR/部署；新一轮
-  review APPROVED 并重新冻结 fingerprint 后才进入发布授权门禁。
+- 复审与发布：两轮独立代码 review（首轮会话 + 全新 Codex 会话
+  `019fa932-ca46-7b23-a2d6-c9fc9381cca7`）共 3 项 P2 修复后均 APPROVED；用户针对冻结
+  fingerprint（approved content hash `632eb5258c…b66e57`）明确授权发布，
+  `INDEX_TRANSITION_OK` 后合并 PR `#43` 为 `main@c8508b4e` 并部署生产。生产验证：
+  内外 healthz 200，`/races/` 日期栏 11 个实际比赛日、当天 2026-07-29 为唯一锚点，
+  显式模式不变，390px/1440px 浏览器正常，零迁移零业务数据写入。事实证据见
+  `docs/changes/fix-race-calendar-default-date-window/release_report.md`。
 
 ## 2026-07-28 定时赛果审核已上线，自动来源发现仍未闭环
 

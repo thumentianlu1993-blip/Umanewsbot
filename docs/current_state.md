@@ -15,7 +15,7 @@
 - 下一轮：观察一个完整赛事窗口的 shadow 输出后，按 runbook 顺序逐项开启 enforce；
   历史术语修复与曝光回填均需独立 dry-run 审核与单独授权。
 
-## 2026-07-28 赛事日历默认比赛日窗口已实现并通过验收，处于代码复审门禁
+## 2026-07-28 赛事日历默认比赛日窗口已上线生产
 
 - 已从最新 `origin/main@7385f59a` 建立独立干净 worktree
   `codex/fix-race-calendar-default-date-window`；方案五文档与 Claude 实施交接见
@@ -45,14 +45,18 @@
   （中心偏移 -12px）、仅水平滚动、纵向位置不跳、无横向 overflow、G1/G2/G3 徽标
   42×42；显式 cursor/q 模式无锚点、无定位脚本、scrollLeft 为 0；控制台唯一错误为
   开发环境 favicon 404（与本改动无关）。
-- 代码复审进展：首轮独立 reviewer（Claude 协调会话，`codex review --uncommitted` 只读）
+- 代码复审与发布：首轮独立 reviewer（Claude 协调会话，`codex review --uncommitted` 只读）
   REVISE 的两项 P2（NULL 发走时刻排序对齐生产 PostgreSQL NULLS LAST；状态文档失实）
-  已修复并经同会话复审 APPROVED。此后应用户要求追加一轮全新的 Codex 独立审查
-  （session `019fa932-ca46-7b23-a2d6-c9fc9381cca7`）：代码实现未发现问题，范围、指纹
-  前后一致、内层只读均满足，但首轮 REVISE——1 项 P2 指两份状态文档标题将任务提前到
-  “等待发布授权”，与正文复审未完成矛盾。该 P2 已修复（标题改为“处于代码复审门禁”），
-  待同一 Codex 会话限定复审。全程未 commit/push/PR/部署；新一轮 review APPROVED 并
-  重新冻结 fingerprint 后，才进入等待用户发布授权的门禁。
+  已修复并经同会话复审 APPROVED。此后应用户要求追加的全新 Codex 独立审查
+  （session `019fa932-ca46-7b23-a2d6-c9fc9381cca7`）首轮 REVISE 的 1 项 P2（状态文档
+  标题提前）修复后，同会话限定复审 APPROVED，冻结 approved content hash
+  `632eb5258c…b66e57`。用户针对该 fingerprint 明确授权发布；staging 校验
+  `INDEX_TRANSITION_OK`（受审内容零漂移）后合并 PR `#43` 为 `main@c8508b4e` 并部署生产
+  （新镜像 `umanewsbot:prod`=`b7b797467022`，回滚 tag
+  `umanewsbot:rollback-pre-race-calendar-20260728T200132Z`）。生产验证全部通过：
+  内外 healthz 200，`/races/` 日期栏为 11 个实际比赛日并以当天 2026-07-29 为唯一锚点，
+  显式 cursor/year/q 语义不变，390px/1440px 真实浏览器正常，零迁移零业务数据写入。
+  完整发布事实见本目录 `release_report.md`。
 
 ## 2026-07-28 最近赛事赛果定时审核已发布，首轮暴露来源路由缺口
 
