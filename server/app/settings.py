@@ -697,6 +697,28 @@ CELERY_TASK_ANNOTATIONS = {
     },
 }
 
+
+def build_race_live_beat_schedule(
+    *,
+    scheduler_enabled: bool,
+    monitor_enabled: bool,
+) -> dict:
+    schedule = {}
+    if scheduler_enabled:
+        schedule["select-due-race-live-events"] = {
+            "task": "stable.tasks.select_due_race_live_events_task",
+            "schedule": crontab(minute="*"),
+            "options": {"queue": "celery", "expires": 55},
+        }
+    if monitor_enabled:
+        schedule["monitor-race-live-sla"] = {
+            "task": "stable.tasks.monitor_race_live_sla_task",
+            "schedule": crontab(minute="*"),
+            "options": {"queue": "race_live", "expires": 55},
+        }
+    return schedule
+
+
 CELERY_BEAT_SCHEDULE = {
     "scheduled-race-result-review": {
         "task": "stable.tasks.scheduled_race_result_review_task",
@@ -705,14 +727,6 @@ CELERY_BEAT_SCHEDULE = {
     "discover-p0-racecard-urls": {
         "task": "stable.tasks.discover_p0_racecard_urls_task",
         "schedule": crontab(minute=30, hour="6,18"),
-    },
-    "select-due-race-live-events": {
-        "task": "stable.tasks.select_due_race_live_events_task",
-        "schedule": crontab(minute="*"),
-    },
-    "monitor-race-live-sla": {
-        "task": "stable.tasks.monitor_race_live_sla_task",
-        "schedule": crontab(minute="*"),
     },
     "crawl-netkeiba-latest-hourly": {
         "task": "stable.tasks.crawl_netkeiba_latest",
@@ -785,6 +799,12 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(minute=20, hour=9),
     },
 }
+CELERY_BEAT_SCHEDULE.update(
+    build_race_live_beat_schedule(
+        scheduler_enabled=RACE_LIVE_SCHEDULER_ENABLED,
+        monitor_enabled=RACE_LIVE_MONITOR_ENABLED,
+    )
+)
 
 LOG_LEVEL = env("LOG_LEVEL", "INFO")
 LOG_DIR = env("LOG_DIR")
