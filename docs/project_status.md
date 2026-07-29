@@ -1,5 +1,32 @@
 # 项目状态文档
 
+## 2026-07-30 Celery race-live P0 新增 P1 已修复，待再次限定复审
+
+- 基于 `origin/main@78719a467a2eceb57572b484a906cb78761badf8` 的分支
+  `codex/harden-celery-p0-admission` 已完成本地实现：两个 race-live Beat entry 按各自开关
+  条件注册，开启态保持 selector→`celery`、monitor→`race_live` 并使用最佳努力
+  `expires=55`；tasks/routes/models/migrations 未变。
+- 新增 `deploy/deploy_race_live_p0_closed.sh prepare|start-beat`，覆盖生产根 test/fake
+  拒绝、三状态门禁、资源/OOM/磁盘、两次零 migration plan、候选关闭态 schedule 和失败后
+  Beat 保持停止/旧 web 与普通 worker 恢复；本 P0 不得原样使用 `deploy_lowcost.sh`。
+- 首次 review 的五项 finding 已修复：部分停止后的 worker 恢复、模糊服务状态拒绝、
+  PID 1 唯一精确 `--queues=celery`、start-beat 五轮持续后验及异常停 Beat、完整 suite
+  同 HEAD 基线对照。
+- 同一 reviewer 限定复审 session `019faecf-f5fe-7900-be8d-95998bcb6b42` 已关闭原五项，
+  但因 `pull nginx` 改变可变镜像且没有 nginx 镜像级回滚而新增 P1，verdict 为
+  `REVISE`。该 P1 已按真实 RED/GREEN 最小修复：取消 nginx pull，保留以当前本地 image
+  `--force-recreate nginx` 和 healthz 检查。
+- 主代理已在当前候选复跑四组聚焦：`63/63 / 54.863s / exit 0`，其中部署合同
+  `32/32`；Django check、无 migration 漂移、`sh -n` 和 diff check 均为 exit `0`，并已
+  静态确认脚本无 nginx pull、仍有 nginx recreate/healthz。当前仍待同一 reviewer 再次
+  限定复审，不能写成 review 通过。
+- 完整 stable 候选 `3830`、基线 `3790`；两边均
+  `26 failures / 148 errors / 72 skipped / exit 1`。原始唯一 headings `174` 与规范化方法
+  `153` 均逐项同集，候选新增失败标识为 `0`；这不是全绿或 review 通过。
+- 尚未连接或改变生产：未提交、推送、部署、清队列或启动 worker，生产状态仍未知；约
+  `5782` 仅为旧快照。下一步是回到同一 reviewer 再次限定复审新增 P1 修复；发布任务仍
+  未完成。
+
 ## 2026-07-29 赛事新闻质量治理已上线（默认关闭 + shadow）
 
 - PR `#42`（实现 `497590e0` + main 合并 `7ad0994a`）已合并部署，生产 checkout

@@ -1,5 +1,26 @@
 # 关键决策
 
+## 2026-07-29 race-live P0 采用条件注册、保持告警队列并实施两阶段关闭态发布
+
+- P0 在 Beat 生产者侧按
+  `RACE_LIVE_SCHEDULER_ENABLED`、`RACE_LIVE_MONITOR_ENABLED` 独立构造周期 entry；
+  关闭即不注册，对应 task body 的 `disabled` 防御继续保留。分钟 entry 开启时附带
+  `expires=55`，该值只表示 Celery 最佳努力过期元数据，不承诺 broker 立即物理删除或已预取
+  消息绝不执行。
+- P0 不把 monitor 或 alert delivery 迁移到普通 `celery`。selector 继续投递
+  `celery`，monitor、delivery 和 poll 继续使用 `race_live`；在完成 incident 级 durable
+  dispatch admission、并发领取和 broker 失败恢复之前，不通过换队列把重复告警风险扩散到
+  普通 worker。
+- 首次关闭态发布固定使用
+  `deploy/deploy_race_live_p0_closed.sh prepare` 与
+  `deploy/deploy_race_live_p0_closed.sh start-beat` 两个阶段。`prepare` 在构建前先停止并
+  验证 Beat、drain/停止普通 worker，通过两次零 migration plan 和候选关闭态 schedule 后只
+  准备 web/普通 worker/nginx；`start-beat` 复核候选状态后才单独启动 Beat。原样
+  `deploy_lowcost.sh` 不具备这一候选检查点，不作为本 P0 的发布入口。
+- 本决策不新增告警队列、模型、migration 或业务数据动作，也不授权清理历史积压、启动
+  `race_live_worker`、启用 race-live flags 或执行生产发布。当前只完成本地实现，下一步为
+  独立代码 review。
+
 ## 2026-07-27 明确非完赛状态计入完整性，但不得成为名次
 
 - 官方 `SCR/DNF/DSQ/中止` 等受控状态表示该参赛者已被官方交代，但没有数值完赛名次；

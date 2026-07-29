@@ -2121,15 +2121,18 @@ class RaceLiveHostOutcomeTests(TestCase):
 class RaceLiveCeleryIsolationTests(TestCase):
     NOW = datetime(2026, 7, 20, 8, 0, tzinfo=dt_timezone.utc)
 
-    def test_default_settings_keep_scheduler_off_and_route_poll_to_isolated_queue(self):
+    def test_default_settings_keep_scheduler_off_and_omit_selector_schedule(self):
         self.assertIs(settings.RACE_LIVE_SCHEDULER_ENABLED, False)
+        self.assertNotIn(
+            "select-due-race-live-events",
+            settings.CELERY_BEAT_SCHEDULE,
+        )
+
+    def test_poll_task_route_remains_on_isolated_queue(self):
         self.assertEqual(
             settings.CELERY_TASK_ROUTES["stable.tasks.poll_race_live_event_task"],
             {"queue": "race_live"},
         )
-        schedule = settings.CELERY_BEAT_SCHEDULE["select-due-race-live-events"]
-        self.assertEqual(schedule["task"], "stable.tasks.select_due_race_live_events_task")
-        self.assertEqual(schedule["schedule"].minute, set(range(60)))
 
     @override_settings(RACE_LIVE_SCHEDULER_ENABLED=False)
     @patch("stable.tasks.claim_due_race_event_live_tracking")

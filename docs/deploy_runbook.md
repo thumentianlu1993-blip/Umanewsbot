@@ -1,5 +1,129 @@
 # 部署运行手册
 
+## 2026-07-30 race-live P0 关闭态两阶段发布入口（新增 P1 已修复，尚未生产执行）
+
+> 当前状态：脚本和合同测试已在
+> `codex/harden-celery-p0-admission` 本地实现。同一 reviewer 限定复审已关闭首次 code
+> review 的五项 finding，但因 nginx 可变镜像缺少镜像级回滚新增 P1 并给出 `REVISE`；
+> 该 P1 已修复，当前待同一 reviewer 再次限定复审。尚未 review 通过，也未 commit、
+> push、merge 或部署。本 change 没有连接生产；生产 HEAD、flags、容器、队列、OOM 与
+> 资源状态均未知。此前约 `5782` 条 monitor 消息只是历史快照，禁止作为发布前计数。
+
+本 P0 针对仓库现有低成本
+`docker-compose.prod.lowcost.yml` 拓扑提供唯一验收入口：
+
+```bash
+cd /opt/umanewsbot
+./deploy/deploy_race_live_p0_closed.sh prepare
+# 保存并审核 CANDIDATE_READY 证据，确认 Beat 仍停止后，才可进入下一阶段
+./deploy/deploy_race_live_p0_closed.sh start-beat
+```
+
+该脚本不替代标准 RDS 的 `docker-compose.prod.yml` 部署模式；标准 RDS 与低成本本机
+PostgreSQL 两种仓库模式继续保留。若实际生产目标不是上述低成本拓扑，必须停止并另行适配、
+测试和 review，不得猜测脚本可以跨 Compose 模式使用。
+
+### 绝对禁止
+
+- 未取得最新成功代码 review 后的当前任务发布授权前，禁止运行上述生产命令；
+- 禁止原样运行 `deploy_lowcost.sh` 发布本 P0；这不是对其他常规低成本发布的全局禁用；
+- 禁止启用 scheduler、monitor 或 runner，禁止启动 `race_live_worker`；
+- 禁止清空、删除、迁移、消费或重放 `celery`/`race_live` 历史消息；
+- 禁止用脚本直接执行 `manage.py migrate --noinput`；候选待应用 migration 必须精确为
+  `0`；
+- 禁止在 `/opt/umanewsbot` 生产根启用 `RACE_LIVE_P0_TEST_MODE`、测试 sentinel、fake path
+  或 `P0_FAKE_*` 覆盖；脚本会拒绝这类输入。
+
+### `prepare` 门禁与状态
+
+1. `PRE_STOP_PREFLIGHT` 只读核对 `.env` 中三个值精确为
+   `RACE_LIVE_SCHEDULER_ENABLED=false`、
+   `RACE_LIVE_MONITOR_ENABLED=false`、
+   `RACE_LIVE_RUNNER_MODE=disabled`，并核对当前 image、Compose/Beat 状态、仓库与 Docker
+   数据目录磁盘、最近 15 分钟 OOM。任一项未知即 no-go。
+2. 资源门禁要求仓库和 Docker 数据目录各至少 `6 GiB` 可用；要求
+   `MemAvailable >= 1536 MiB`，且当 `SwapFree < 1024 MiB` 时要求
+   `MemAvailable >= 2048 MiB`。停普通 worker 后、构建前必须再次通过资源门禁。
+3. 停止 Beat 后必须实际确认其为 stopped，才进入 `BEAT_STOPPED`。对进入命令时仍为
+   running 的 Beat，stop 命令失败或 no-op 都不能被解释为成功；pre-stop 失败不调用
+   build/up，并报告 Beat 进入命令前的真实 running/stopped/unknown 状态没有被本命令改变。
+   Compose 状态为 `restarting/paused/unknown` 或无法唯一解析时不属于停止证据。
+4. Beat 停止后才允许 drain 并停止普通 worker。stop 命令返回后先复核实际状态；若命令非零
+   但 worker 已经停止，必须先记录 worker 已停，再由失败 trap 恢复普通 worker并保持 Beat
+   停止。模糊状态不得继续构建。确认后才可建立 rollback image tag、运行历史 runner
+   preflight 和受控构建 web。P0 脚本不执行 nginx pull，不改变当前本地 nginx image。
+5. 候选 image 先通过 Django check，并使用 migration graph 只读取得待应用数量；该数量在
+   候选 web 启动前必须两次精确为 `0`。查询失败或非零时禁止启动候选 web；脚本自身不执行
+   migrate，现有 `start-web.sh` 的 migrate 调用只能在第二次零计划确认后作为 schema no-op
+   发生。
+6. 候选容器必须重新解析三个关闭态值和 `CELERY_BEAT_SCHEDULE`，确认
+   `select-due-race-live-events`、`monitor-race-live-sla` 均不存在；然后只启动并验证
+   web、普通 worker和 nginx；nginx 使用当前本地 image
+   `--force-recreate nginx` 并通过 healthz。普通 worker 隔离必须从 PID 1 的
+   `/proc/1/cmdline` 证明 queue 选项只出现一次且精确为 `--queues=celery`；逗号多队列、
+   前缀近似、重复 queue 参数或分离式多队列值均 no-go。
+7. 成功状态为 `CANDIDATE_READY`：Beat 与 `race_live_worker` 均继续停止。进入
+   `BEAT_STOPPED` 后的任一失败都必须再次确认 Beat 未运行；候选 web/普通 worker 不健康时
+   只允许用本窗口 rollback tag 恢复旧 web/普通 worker，不自动启动 Beat。
+
+### `start-beat` 门禁与验证
+
+1. 再次验证三个关闭态值、候选 schedule 不含两个目标 entry、web/普通 worker 健康、
+   `race_live_worker` 明确停止，并复核普通 worker PID 1 queue 唯一精确；
+2. 只有全部通过后才单独执行 Beat 的 `up -d --no-deps`，并核对 Beat 与 web/普通 worker
+   使用相同 image；
+3. 启动前保存两个队列长度及 selector/monitor task 计数基线。启动后连续执行五轮后验；
+   每轮复核 Beat/web/普通 worker 为 running、race-live worker 仍明确停止、三服务 image
+   与候选一致、healthz/ping 和 PID 1 queue 正常，保存队列长度与目标 task 计数，并检查从
+   本次启动时间起的 Beat 日志不含两个目标 entry/task；
+4. 任一轮服务状态、镜像、health、worker queue、目标 task 计数或 Beat 日志异常，都立即
+   停止并复核 Beat 为 stopped，保留已完成轮次证据；仍不清队列、不启动
+   `race_live_worker`。只有五轮全部通过才可成功返回。
+
+### 同一 reviewer 限定复审、finding 修复与本地证据
+
+首次 review 的五项 actionable finding 已分别落实到当前候选实现：
+
+1. 普通 worker 部分停止后不会因 stop 非零遗漏恢复；
+2. `restarting/paused/unknown` 不会被当作 worker 已停止；
+3. 普通 worker 以 PID 1 参数验证唯一精确 `--queues=celery`；
+4. start-beat 内置连续五轮后验，任一轮异常立即停止 Beat；
+5. 完整 stable 与同
+   `HEAD=78719a467a2eceb57572b484a906cb78761badf8` 干净 worktree 比较。
+
+同一 reviewer 限定复审 session `019faecf-f5fe-7900-be8d-95998bcb6b42` 已确认上述五项
+全部关闭，但新增 P1：`pull nginx` 会改变可变镜像，而现有 rollback 没有 nginx 镜像级
+恢复，故 verdict 为 `REVISE`。该 P1 已按真实 RED/GREEN 最小修复：脚本不再 pull nginx，
+不改变当前本地 nginx image；启动阶段仍以该 image `--force-recreate nginx` 并执行
+healthz 检查。
+
+新增 P1 修复后的当前候选已由主代理复跑四组聚焦：
+`stable.test_race_live_sla_monitor`、`RaceLiveCeleryIsolationTests`、
+`RaceLiveWorkerDeploymentContractTests` 和
+`stable.test_race_live_p0_deployment_contract`，结果为
+`63/63 / 54.863s / exit 0`，其中部署合同 `32/32`。Django check 为 exit `0`；
+`makemigrations --check --dry-run` 输出 `No changes detected`；`sh -n` 和
+`git diff --check` 均为 exit `0`；静态核对确认脚本无 nginx pull、仍有 nginx
+recreate/healthz。这些证据不能冒充复审结论。完整 stable 候选为
+`3830 tests / 216.643s / 26 failures / 148 errors / 72 skipped / exit 1`，基线为
+`3790 tests / 167.124s / 26 failures / 148 errors / 72 skipped / exit 1`；原始唯一
+headings 均 `174`、规范化失败方法均 `153`，双向差集均 `0`。该证据表示本 scope 新增失败
+标识为 `0`，不表示完整 suite 全绿。逐行规范化清单见
+`docs/changes/harden-celery-p0-admission/full_stable_failure_baseline.txt`。
+
+### 回滚
+
+本 change 无模型、migration 或业务数据变化。回滚候选代码前先停止并确认 Beat 已停，再使用
+`prepare` 保存的旧 image/tag 恢复 web 与普通 worker，验证 healthz 和 worker 只消费
+`celery`。P0 不 pull 或替换 nginx image，因此 nginx 继续使用进入窗口时的本地 image，
+失败恢复不依赖不存在的 nginx 镜像级 rollback。旧代码会恢复无条件周期投递，所以回滚后
+Beat 必须保持停止，直到恢复本 P0 候选或存在另一个经审核的生产者止血方案；三个 race-live
+flags 和 `race_live_worker` 继续关闭，数据库和历史队列均不恢复、不改写。
+
+本节记录的是仓库预期，不是生产执行回执。真实发布完成或失败后，必须按 evidence-only
+规则追加生产 SHA、image、rollback tag、阶段、资源、migration plan、schedule、队列计数、
+health 和实际回滚结果，并复用同一代码 reviewer 会话审核证据 patch。
+
 ## 2026-07-29 赛事日历默认日期窗口生产部署记录
 
 1. PR `#43` 合并为 `main@c8508b4e`（实现 `64dff42c` + main 合并 `f5642138`）；合并时

@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from django.test import SimpleTestCase, TestCase, override_settings
 
+from app import settings as app_settings
 from stable import models
 from stable import tasks
 from stable.services import race_events
@@ -66,19 +67,141 @@ class RaceLiveAlertIncidentSchemaTests(SimpleTestCase):
 
 
 class RaceLiveSlaMonitorTaskContractTests(SimpleTestCase):
-    def test_monitor_is_default_off_and_has_a_once_per_minute_beat_entry(self):
+    RACE_LIVE_BEAT_ENTRY_NAMES = {
+        "select-due-race-live-events",
+        "monitor-race-live-sla",
+    }
+
+    def _build_schedule(self, *, scheduler_enabled, monitor_enabled):
+        builder = getattr(app_settings, "build_race_live_beat_schedule", None)
+        self.assertTrue(
+            callable(builder),
+            "build_race_live_beat_schedule 纯构造函数尚未实现",
+        )
+        return builder(
+            scheduler_enabled=scheduler_enabled,
+            monitor_enabled=monitor_enabled,
+        )
+
+    def _build_or_read_enabled_schedule(self):
+        builder = getattr(app_settings, "build_race_live_beat_schedule", None)
+        if callable(builder):
+            return builder(
+                scheduler_enabled=True,
+                monitor_enabled=True,
+            )
+        return {
+            name: settings.CELERY_BEAT_SCHEDULE[name]
+            for name in self.RACE_LIVE_BEAT_ENTRY_NAMES
+            if name in settings.CELERY_BEAT_SCHEDULE
+        }
+
+    def test_default_off_omits_both_race_live_beat_entries(self):
+        self.assertIs(settings.RACE_LIVE_SCHEDULER_ENABLED, False)
         self.assertTrue(
             hasattr(settings, "RACE_LIVE_MONITOR_ENABLED"),
             "RACE_LIVE_MONITOR_ENABLED 设置尚未实现",
         )
         self.assertIs(settings.RACE_LIVE_MONITOR_ENABLED, False)
-        schedule = settings.CELERY_BEAT_SCHEDULE.get("monitor-race-live-sla")
-        self.assertIsNotNone(schedule)
+        self.assertTrue(
+            self.RACE_LIVE_BEAT_ENTRY_NAMES.isdisjoint(
+                settings.CELERY_BEAT_SCHEDULE
+            ),
+            "默认关闭时不应注册 race-live Beat entry",
+        )
+
+    def test_builder_omits_both_entries_when_both_flags_are_off(self):
+        schedule = self._build_schedule(
+            scheduler_enabled=False,
+            monitor_enabled=False,
+        )
+
+        self.assertEqual(schedule, {})
+
+    def test_builder_includes_only_selector_when_only_scheduler_is_on(self):
+        schedule = self._build_schedule(
+            scheduler_enabled=True,
+            monitor_enabled=False,
+        )
+
+        self.assertEqual(set(schedule), {"select-due-race-live-events"})
+
+    def test_builder_includes_only_monitor_when_only_monitor_is_on(self):
+        schedule = self._build_schedule(
+            scheduler_enabled=False,
+            monitor_enabled=True,
+        )
+
+        self.assertEqual(set(schedule), {"monitor-race-live-sla"})
+
+    def test_builder_includes_both_entries_when_both_flags_are_on(self):
+        schedule = self._build_schedule(
+            scheduler_enabled=True,
+            monitor_enabled=True,
+        )
+
+        self.assertEqual(set(schedule), self.RACE_LIVE_BEAT_ENTRY_NAMES)
+
+    def test_selector_entry_keeps_celery_route_and_best_effort_expiry(self):
+        schedule = self._build_or_read_enabled_schedule()
+        selector = schedule["select-due-race-live-events"]
+
         self.assertEqual(
-            schedule["task"],
+            selector["task"],
+            "stable.tasks.select_due_race_live_events_task",
+        )
+        self.assertEqual(selector["schedule"].minute, set(range(60)))
+        self.assertEqual(
+            selector.get("options"),
+            {"queue": "celery", "expires": 55},
+        )
+
+    def test_monitor_entry_keeps_race_live_route_and_best_effort_expiry(self):
+        schedule = self._build_or_read_enabled_schedule()
+        monitor = schedule["monitor-race-live-sla"]
+
+        self.assertEqual(
+            monitor["task"],
             "stable.tasks.monitor_race_live_sla_task",
         )
-        self.assertEqual(schedule["schedule"].minute, set(range(60)))
+        self.assertEqual(monitor["schedule"].minute, set(range(60)))
+        self.assertEqual(
+            monitor.get("options"),
+            {"queue": "race_live", "expires": 55},
+        )
+
+    def test_builder_does_not_mutate_other_beat_entries(self):
+        before = {
+            name: entry.copy()
+            for name, entry in settings.CELERY_BEAT_SCHEDULE.items()
+            if name not in self.RACE_LIVE_BEAT_ENTRY_NAMES
+        }
+
+        for scheduler_enabled, monitor_enabled in (
+            (False, False),
+            (True, False),
+            (False, True),
+            (True, True),
+        ):
+            self._build_schedule(
+                scheduler_enabled=scheduler_enabled,
+                monitor_enabled=monitor_enabled,
+            )
+
+        after = {
+            name: entry.copy()
+            for name, entry in settings.CELERY_BEAT_SCHEDULE.items()
+            if name not in self.RACE_LIVE_BEAT_ENTRY_NAMES
+        }
+        self.assertEqual(after, before)
+
+    def test_monitor_task_route_remains_on_race_live_queue(self):
+        self.assertEqual(
+            settings.CELERY_TASK_ROUTES[
+                "stable.tasks.monitor_race_live_sla_task"
+            ],
+            {"queue": "race_live"},
+        )
 
     def test_monitor_is_a_separate_task(self):
         self.assertTrue(
@@ -130,6 +253,38 @@ class RaceLiveSlaMonitorTaskContractTests(SimpleTestCase):
         self.assertEqual(delay(attempt_number=2), timedelta(minutes=5))
         self.assertEqual(delay(attempt_number=3), timedelta(minutes=15))
         self.assertIsNone(delay(attempt_number=4))
+
+    @override_settings(
+        RACE_LIVE_MONITOR_ENABLED=True,
+        RACE_LIVE_ENABLED_REGIONS=("japan",),
+    )
+    @patch("stable.tasks.deliver_race_live_alert_task.apply_async")
+    @patch(
+        "stable.tasks.stage_race_live_sla_alerts",
+        return_value=(17,),
+    )
+    @patch(
+        "stable.tasks.transaction.on_commit",
+        side_effect=lambda callback: callback(),
+    )
+    def test_monitor_explicitly_dispatches_delivery_to_race_live_queue(
+        self,
+        on_commit,
+        stage_alerts,
+        apply_async,
+    ):
+        result = tasks.monitor_race_live_sla_task.run()
+
+        stage_alerts.assert_called_once()
+        on_commit.assert_called_once()
+        apply_async.assert_called_once_with(
+            kwargs={"incident_id": 17},
+            queue="race_live",
+        )
+        self.assertEqual(
+            result,
+            {"enabled": True, "staged": 1, "dispatched": 1},
+        )
 
 
 class RaceLiveAlertDeliveryLeaseBehaviorTests(TestCase):
