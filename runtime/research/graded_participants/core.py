@@ -28,6 +28,10 @@ REGION_LABELS = {
     "阿联酋": "middle_east", "阿拉伯联合酋长国": "middle_east",
     "沙特阿拉伯": "middle_east", "沙特": "middle_east",
     "卡塔尔": "middle_east", "巴林": "middle_east",
+    "Australia": "australia", "Germany": "germany",
+    "Middle East": "middle_east", "United Arab Emirates": "middle_east",
+    "UAE": "middle_east", "Saudi Arabia": "middle_east",
+    "Qatar": "middle_east", "Bahrain": "middle_east",
 }
 REGION_OUTPUT = {
     "japan": "日本", "hong_kong": "中国香港", "united_states": "美国",
@@ -69,6 +73,7 @@ COUNTRY_SUFFIX_RE = re.compile(r"\s*\(([A-Z]{2,3})\)\s*$")
 NON_START_TOKENS = {
     "SCR", "SCRATCHED", "退赛", "取消出走", "未出赛", "未实际出赛",
     "NR", "NONRUNNER", "NON-RUNNER", "WD", "WITHDRAWN", "除外",
+    "取消", "出走取消", "競走除外", "竞走除外", "発走除外", "发走除外",
 }
 RESULT_STATUS_ALIASES = {
     "DNF": "did_not_finish", "未完赛": "did_not_finish", "中止": "did_not_finish",
@@ -254,6 +259,17 @@ def infer_names(display_names: Iterable[str], original_name: str) -> tuple[str, 
     return name_zh, name_ja, name_en
 
 
+def current_tool_version() -> str:
+    package_dir = Path(__file__).resolve().parent
+    files = [
+        package_dir / "core.py", package_dir / "checkpoint.py",
+        package_dir / "collector.py", package_dir / "pipeline.py",
+        package_dir.parent / "collect_graded_race_participants.py",
+    ]
+    manifest = {path.name: sha256_bytes(path.read_bytes()) for path in files if path.exists()}
+    return sha256_bytes(canonical_json_bytes(manifest))
+
+
 @dataclass
 class ParticipantRow:
     region: str; region_label: str; race_date: str; race_name_zh: str; race_name_original: str
@@ -262,7 +278,8 @@ class ParticipantRow:
     trainer_name: str; finish_time: str; margin: str; odds_popularity: str; race_url: str
     race_page_sha256: str; horse_lookup_key: str; horse_profile_url: str = ""
     horse_original_name: str = ""; horse_birth_year: str = ""; horse_name_zh: str = ""
-    horse_name_ja: str = ""; horse_name_en: str = ""; english_name_required: bool = False
+    horse_name_ja: str = ""; horse_name_en: str = ""; chinese_name_missing: bool = False
+    japanese_name_missing: bool = False; english_name_required: bool = False
     english_name_missing: bool = False
 
 
