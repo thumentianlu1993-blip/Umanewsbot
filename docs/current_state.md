@@ -1,6 +1,6 @@
 # 当前状态
 
-## 2026-07-31 单年度分级赛 full-network 443 根因已定位并完成本地修复
+## 2026-07-31 单年度分级赛 full-network 443 修复已离线发布
 
 - 2025 正式运行连续 6 个有界 workflow run 均停在
   `https://umafans.run/sitemap.xml`；最后 checkpoint 为 `request_count=30`、
@@ -12,7 +12,7 @@
   `CN=47.239.167.86` 的自签名证书，不是可直接启用的正式域名证书。
 - 根因是研究 workflow 和 collector 默认来源错误写成 HTTPS；URL scheme 自动选择 443，
   Compose 端口映射又不等于容器内存在 TLS listener，因而每次均在首个 sitemap 请求失败。
-- 本地候选把正式 workflow 与 collector 默认来源对齐为 `http://umafans.run/`，并在保持
+- 已发布修复把正式 workflow 与 collector 默认来源对齐为 `http://umafans.run/`，并在保持
   UmaFans 精确 host、无凭据、无显式端口、规范 path/query 门禁的前提下允许 HTTP/HTTPS
   且保留原 scheme。sitemap race URL 识别改为按受控 URL 的精确年份 path 判断，不再写死
   `https://`；地区 manifest 的 durable contract 与示例同步改为当前 HTTP exact URL，scheme
@@ -22,8 +22,19 @@
 - 真实 RED 同时报出 HTTP scheme 被拒和 workflow 仍使用 HTTPS；GREEN 为 collector
   `87/87`、workflow `12/12`、全局 workflow contract `26/26`。独立 review 先后发现地区
   manifest scheme miss 与派生 URL 可跨回 HTTPS 两项直接回归，均已补测试并修复。本机通过正式 HTTP origin
-  用 2 次只读请求解析 sitemap，发现 2025 race URL `1075` 个。当前仅完成本地候选与
-  只读生产诊断；未提交、推送、创建 PR、改生产配置或重新触发联网 workflow。
+  用 2 次只读请求解析 sitemap，发现 2025 race URL `1075` 个。
+- 冻结内容提交 `1fd83de41c45ed0bd974a08804b4d2113579b076` 经
+  [PR #53](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/53) 合并为
+  `main@cd42cb4d8ceb67b6c16ab4ecc058a066516a7cb5`；PR tests success。
+  默认离线生产 dispatch
+  [30575216646](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/30575216646)
+  在该 main head 上 success，tests job `17s`。synthetic artifact
+  `30575216646-1-synthetic-checkpoint-0` 为 `12959` bytes，digest
+  `sha256:3ea2ad2795db806549128033d839e58e5a027b78604539056abedef8029296f8`；
+  `full_network=false`，网络 DAG 按设计 skipped。
+- 本次生产部署只发布 GitHub research workflow；未 pull、重建或重启
+  `/opt/umanewsbot`，未修改 Nginx/TLS、迁移或写生产数据库。2025 full-network fresh
+  dispatch 尚未执行。
 
 ## 2026-07-30 单年度分级赛研究执行面已离线发布，full-network 仍关闭
 

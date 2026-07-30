@@ -17,6 +17,12 @@
    identity/config/schema/4xx 等确定性错误立即停止并一次性报告。
 5. 本轮没有部署应用、改 Nginx、启用 443、替换证书或写生产数据。若另行推进 HTTPS，
    必须走独立证书与 Nginx 发布方案、回滚和域名 TLS 验收，不能与研究采集续跑混合。
+6. 发布证据：修复提交 `1fd83de4` 经 PR `#53` 合并为 `main@cd42cb4d`；默认离线
+   dispatch `30575216646` success，tests job `17s`。artifact
+   `30575216646-1-synthetic-checkpoint-0` 为 `12959` bytes，digest
+   `sha256:3ea2ad2795db806549128033d839e58e5a027b78604539056abedef8029296f8`。
+   本次 `full_network=false`，因此 races/profiles/merge_profiles/finalize 网络 jobs 均按设计
+   skipped；这只证明离线部署成功，不是 2025 正式数据 artifact。
 
 ## 2026-07-30 race-live P0 已完成关闭态发布与五轮观察
 
