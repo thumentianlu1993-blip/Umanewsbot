@@ -1,5 +1,149 @@
 # 当前状态
 
+## 2026-07-30 单年度分级赛全部参赛马研究代码审核 REVISE，修复待最终确认
+
+- 已从最新 `origin/main@6d073dc07cb29201bbc922255923820c872a0467` 建立独立干净
+  worktree `/Users/mentianlu/.codex/worktrees/graded-race-participants/umanews`，分支
+  `codex/generalize-graded-race-participants`；原主工作区的大量其他会话改动未触碰。
+- `collect-yearly-graded-race-participants` 已按获准方案完成离线实现：新增显式单年度
+  collector、83 项聚焦自动化测试、11 项 workflow 静态合同测试、collector/region manifest
+  说明和默认离线的 GitHub Actions workflow；从旧研究分支只移植 checkpoint、稳定分片、
+  fan-in 等通用基础，不引入旧状态文档或 Wikipedia/Wikidata 阶段。
+- 八地区为日本、中国香港、美国、英国、法国、澳大利亚、德国和中东；中东 v1 固定阿联酋、
+  沙特阿拉伯、卡塔尔和巴林。当前公开模型把新增地区归为 `other`，实现以年度 exact race URL
+  classification manifest + SHA 补足；未完整分类时只报告 `classification_incomplete`，不猜地区。
+- “参赛”只接受正式结果表中可证明已经起跑的受控状态；退赛/non-runner 和未知状态均不计入，
+  后者进入 unresolved 复核。中文、日文为尽力字段；除日本和香港外英文为强制字段，并与其他
+  名称问题按正交状态和可组合 issue codes 报告。
+- 独立方案 reviewer 首轮提出 4 个 P1：未知状态误算参赛、名称完整性单枚举冲突、generic
+  `other` profile 同名误配、地区清单不完整时误报零赛事；第二轮补充 1 个直接 P1，要求把
+  `profile_unresolved` 纳入枚举和 complete 阈值。三轮同一 reviewer 复审后最终
+  `VERDICT: APPROVED`，无剩余直接 P0/P1。
+- 测试先行证据：新增测试在 collector 尚不存在时为
+  `14 tests / 14 failures / 0 errors`，旧 checkpoint 基础层离线回归为 `17 tests / OK`。
+  第一至第二十轮 findings 修复后的历史回归分别为 collector `32/32`、`39/39`、`46/46`、
+  `49/49`、`53/53`、`56/56`、`60/60`、`64/64`、`66/66`、`69/69`、`70/70`、`71/71`、
+  `73/73`、`75/75`、`76/76`、`77/77`、`79/79`、`81/81`、`82/82`；当前离线复验为
+  collector `83/83`、
+  workflow 静态合同 `11/11`、
+  现有 workflow contract `26/26`，相关文件 `py_compile` 和 checker 直接检查通过；synthetic
+  首次以 `75` 安全停止，
+  在同目录移除 `--limit` 后 exit `0`、`byte_equivalent=True`，并精确生成 7 个最终文件；
+  `git diff --check` 通过。
+- 独立代码 reviewer 首轮结论为 `REVISE`，共 `7 P1 + 4 P2`。findings 1–10 涵盖赛果状态、
+  checkpoint 恢复、safe-stop、profile identity/merge、coverage、名称 issue、请求预算及
+  workflow 显式预算等直接路径；P2-11 指出为使合同测试通过而改写赛事日历历史实际 review
+  命令会破坏审计真实性。当前 findings 1–11 均已完成本地修复：历史记录恢复实际命令，checker
+  只豁免内容精确且明确标注为旧规则、不可执行的审计块；当前操作说明中的裸命令仍由 mutation
+  测试拒绝。
+- 同一 reviewer 第二轮限定复审仍为 `REVISE`，新增 `2 P1 + 3 P2`：resume 必须累计而非重置
+  请求预算；暂定赛果不得作为正式参赛证据；profile 搜索须支持受控原名别名；搜索须安全遍历
+  分页；coverage 必须逐地区计算，不能用合并状态代替。五项均已完成本地修复并纳入当前
+  候选。
+- 同一 reviewer 第三轮限定复审仍为 `REVISE`，新增 `4 P1 + 2 P2`：网络请求计数改为
+  crash-safe write-ahead ledger；profile 详情必须二次核验地区/country；非 live 但已人工审核
+  的正式赛果可作为证据；provisional 必须形成结构化 error、partial coverage/outcome；HTTP
+  状态须区分 permanent/retryable，profile 404 单独处理；`errors.json` 必须包含去重且可组合的
+  名称完整性问题。六项均已完成本地修复并纳入历史 `46/46`。workflow 同步加入 ledger
+  artifact/restore 合同，并明确 hard cancellation 或 runner timeout 无法保证 post-step 上传。
+- 同一 reviewer 第四轮限定复审仍为 `REVISE`，新增 `3 P1`：pending conflict 必须保持
+  non-final；profile 详情缺少真实详情名时禁止以搜索名 fallback；provisional 必须成为终态
+  `evidence_gap`，并由正式 DAG 继续产出 partial 的 7 个最终文件。三项均已完成本地修复；
+  workflow 同步接受 `evidence_gap`、修正 races index 路径并新增完整离线 harness，纳入历史
+  collector `49/49` 与 workflow `11/11`。
+- 同一 reviewer 第五轮限定复审仍为 `REVISE`，新增 `1 P1 + 3 P2`：真实 `HttpClient`
+  必须严格且仅允许受控 `/horses/?q=&page=` 搜索查询；coverage 中 error 必须优先于已有
+  occurrence；unresolved 结构化错误必须保留 region、country 和 source URL；零行 CSV 仍须
+  输出固定表头。四项均已完成本地修复并纳入历史 collector `53/53`。
+- 同一 reviewer 第六轮限定复审仍为 `REVISE`，新增 `1 P1 + 1 P2`：profile country
+  事实中的受控 ISO alpha-2/alpha-3 国家代码必须归一到规范 country，并拒绝非目标或伪代码；
+  当正式结果全部为未知状态时，race 必须成为终态 `evidence_gap`，逐行保留马名、原始状态、
+  region、country 和 source URL 证据，并由完整 DAG 产出 partial 7 文件。两项均已完成本地
+  修复并纳入历史 collector `56/56`。
+- 同一 reviewer 第七轮限定复审仍为 `REVISE`，新增 `2 P1 + 2 P2`：checkpoint 恢复必须以
+  已验证的 index/request ledger 为权威并可安全重建 progress；共享 profile URL 必须逐条校验
+  occurrence identity；`region_unresolved` 必须进入 source manifest、结构化 errors 和 partial
+  coverage；中东 occurrence 即使 region 相同也必须逐 country 检查冲突。四项均已完成本地修复
+  并纳入历史 collector `60/60`。
+- 同一 reviewer 第八轮限定复审仍为 `REVISE`，新增 `2 P1`：races discovery 与 profile
+  分页必须共享同一 stage monotonic deadline；discovery 必须把 queue、visited、
+  discovered URLs、inflight 与请求计数精确写入 `discovery_progress.json` 并可 resume；
+  profile 分页必须逐页检查 deadline，且只有搜索第一页 404 可视为空结果，后续页 404 必须
+  fail closed。修复同时由 workflow 合同锁定：即使尚无 run manifest，也上传并恢复
+  discovery progress/request ledger。上述修复已纳入历史 collector `64/64`、workflow `11/11`。
+- 同一 reviewer 第九轮限定复审仍为 `REVISE（P0=0 / P1=0 / P2=1）`：discovery 的
+  `RetryableHttpError` 在重试耗尽后必须保存精确 progress/request ledger 并以 exit `75` 安全
+  停止，resume 后从 inflight URL 精确继续；确定性 4xx 仍须保持 permanent error，不得误转为
+  safe-stop。唯一 P2 已完成本地修复并纳入历史 collector `66/66`。
+- 同一 reviewer 第十轮限定复审仍为 `REVISE（2 P1 + 1 P2）`：sitemap discovery 必须按
+  `sitemapindex`/`urlset` 文档类型解析并只接收精确目标年份 race URL；generic `other` profile
+  必须使用详情页多语 alias 与 occurrence alias 的受控交集，并结合出生年/country 等附加
+  identity 事实；coverage 只能由实际 in-scope graded race 证据驱动，Listed-only 不得标记
+  `covered`。三项均已完成本地修复并纳入历史 collector `69/69`。
+- 同一 reviewer 第十一轮限定复审仍为 `REVISE（P1=1）`：Australia/Germany generic
+  `other` profile 在 alias 相交且出生年份匹配时，即使详情未提供 country 也可满足附加身份；
+  详情一旦提供 country 就必须与 occurrence 一致，否则 ambiguous；Middle East 仍强制要求
+  country 证据。唯一 P1 已完成本地修复并纳入历史 collector `70/70`。
+- 同一 reviewer 第十二轮限定复审仍为 `REVISE（P1=1）`：direct profile URL 与搜索候选必须
+  共用同一 group validator，对 canonical group 内每条 occurrence 分别验证 alias、region、
+  country 和 birth year；任一 occurrence 冲突时整组必须 fail closed，并保留逐条 identity
+  review，不能只验证代表行。唯一 P1 已完成本地修复并纳入历史 collector `71/71`。
+- 同一 reviewer 第十三轮限定复审仍为 `REVISE（1 P1 + 1 P2）`：搜索路径必须对 canonical
+  group 的全部受控 aliases 按确定性顺序逐一 query，汇总候选并按 canonical profile URL 去重，
+  不能只查代表 alias；profile 冲突错误必须同时保留 expected/actual 两侧的 aliases、region、
+  country、birth year，以及 profile URL 与 `conflict_fields`。两项均已完成本地修复并纳入历史
+  collector `73/73`。
+- 同一 reviewer 第十四轮限定复审仍为 `REVISE（1 P1 + 1 P2）`：profile URL 必须在
+  validate、search candidate、direct fetch、group key、merge 和输出全链路严格 canonicalize
+  为 `/horses/<id>/` trailing-slash 形式，禁止等价 URL 重复；Middle East 的 expected/actual
+  country 缺失、非受控或不一致都必须 fail closed，并在 review/errors 中保留双侧 raw/canonical
+  country 与明确 reason。两项均已完成本地修复并纳入历史 collector `75/75`。
+- 同一 reviewer 第十五轮限定复审仍为 `REVISE（P1=1）`：profile URL 必须按未规范化的原始
+  path 验证为唯一真实路由 `/horses/<positive-integer>/`，只允许补齐缺失的末尾 slash；零值、
+  负数、slug、重复 slash、dot segment、percent-encoded ID、额外 path、query 和 fragment 均
+  必须拒绝，并在 canonical key、direct/search、merge 等入口一致执行。synthetic 也已改用合法
+  数值 ID。唯一 P1 已完成本地修复并纳入历史 collector `76/76`。
+- 同一 reviewer 第十六轮限定复审仍为 `REVISE（P1=1）`：profile URL 验证必须直接检查
+  原始 `str`，不得先做 NFKC 或 trim；前后或 path 内的 Unicode whitespace、Unicode control、
+  全角字符、percent encoding 等绕过均须严格拒绝，只接受 ASCII 正整数
+  `/horses/<id>/` 路由，并在全部身份入口一致执行。唯一 P1 已完成本地修复并纳入当前
+  collector `77/77`。
+- 同一 reviewer 第十七轮限定复审仍为 `REVISE（2 P1）`：所有 profile URL 原始字段必须
+  不经预先 normalize 直接进入严格校验；race/profile HTML 的 `href` 必须通过专用严格
+  resolver，禁止 `urljoin` 先折叠非法相对路径。HTTP profile 请求必须禁用自动 redirect，
+  对原始 `Location` 先做严格 href 解析并限定同 host，响应 final URL 也必须直接执行严格
+  profile URL 校验。两项 P1 均已完成本地修复并纳入历史 collector `79/79`。
+- 同一 reviewer 第十八轮限定复审仍为 `REVISE（P1=1）`：absolute profile href、redirect
+  `Location` 与响应 final URL 的 hostname 必须分别与来源页面或原始 profile 请求 hostname
+  精确一致；`umafans.run` 与 `www.umafans.run` 虽都在 allowlist 内，也不得相互切换。唯一 P1
+  已完成本地修复并纳入历史 collector `81/81`。
+- 同一 reviewer 第十九轮限定复审已给出 `VERDICT: APPROVED`，P0/P1/P2=`0/0/0`，session
+  `019fb2f6-da26-7463-81b3-0b3c52ed4cf0`。审阅时基线 HEAD 为
+  `6d073dc07cb29201bbc922255923820c872a0467`，批准 fingerprint 为
+  `89a8021db567eaaed7003680cd85377ca04ec7ee08d48168ef3212cbcb51d262`，content manifest
+  为 `cfb5630c1dc29a0d04b62816a4ce2f296640308e838614d96d57af2d6fbce0a1`；pre/review/post
+  均 exit `0` 且 reviewer 全程只读。以上哈希只标识第十九轮审阅时快照；本次状态文档写回会
+  改变候选内容，仍须对更新后的完整差异执行一次最终只读确认并冻结新 fingerprint，不得把上述
+  fingerprint 称为最终发布指纹。该结论现仅作为历史审阅快照，不代表当前候选仍为
+  `APPROVED`。
+- 同一 reviewer 第二十轮最终确认结论为 `REVISE（P2=1）`：当标准五地区——日本、中国香港、
+  美国、英国、法国——的 profile region 已明确匹配时，profile country 可以缺失；若 country
+  存在但与 occurrence 冲突，仍须 fail closed。Australia、Germany、Middle East 的附加
+  country/birth-year 证据规则不放宽。唯一 P2 已完成本地修复并纳入历史 collector `82/82`。
+- 同一 reviewer 第二十一轮最终确认仍为 `REVISE（P2=1）`：profile country 事实必须显式区分
+  `missing`、`controlled`、`uncontrolled`；非空但未知的 country 必须保留 raw 事实，不能按
+  region 回填为受控 country，并须 fail closed。标准五地区仅在 country 真正 `missing` 且
+  region 明确匹配时可通过；Australia、Germany、Middle East 的附加证据规则不放宽。唯一 P2
+  已完成本地修复并纳入当前 collector `83/83`，但尚未由同一 reviewer 第二十二轮最终确认。
+- 当前准确状态：
+  `plan approved / implementation complete but uncommitted / code review REVISE /
+  final read-only confirmation pending /
+  no GitHub Actions run / no full-network collector run / no commit or push /
+  no deployment or production write`。这些结果仅证明本地离线候选，不证明真实年度数据覆盖。
+  下一门禁是复用同一 reviewer 会话执行第二十二轮最终只读确认并生成新 fingerprint；确认成功后
+  仍须等待用户针对新 fingerprint 单独授权 commit/push/PR。正式 `full_network=true` 单年度
+  run 还需要再次单独授权，不能由代码 review 或发布授权推导。
+
 ## 2026-07-30 Celery race-live P0 已在关闭态完成发布与五轮观察
 
 - 初始实现 `611c6aab` 经 PR `#46` 合并为 `main@7cd144ab`。首次生产 `prepare` 成功，
@@ -117,7 +261,10 @@
   （中心偏移 -12px）、仅水平滚动、纵向位置不跳、无横向 overflow、G1/G2/G3 徽标
   42×42；显式 cursor/q 模式无锚点、无定位脚本、scrollLeft 为 0；控制台唯一错误为
   开发环境 favicon 404（与本改动无关）。
-- 代码复审与发布：首轮独立 reviewer（Claude 协调会话，`codex review --uncommitted` 只读）
+<!-- WORKFLOW_CONTRACT:HISTORICAL_REVIEW_COMMAND:START -->
+- 历史命令审计标记（旧规则下的历史事实，非当前可执行指令）：`codex review --uncommitted`；仅记录当时实际命令，不授权或指导再次执行。
+<!-- WORKFLOW_CONTRACT:HISTORICAL_REVIEW_COMMAND:END -->
+- 代码复审与发布：首轮独立 reviewer（Claude 协调会话，使用上述当时实际命令）
   REVISE 的两项 P2（NULL 发走时刻排序对齐生产 PostgreSQL NULLS LAST；状态文档失实）
   已修复并经同会话复审 APPROVED。此后应用户要求追加的全新 Codex 独立审查
   （session `019fa932-ca46-7b23-a2d6-c9fc9381cca7`）首轮 REVISE 的 1 项 P2（状态文档

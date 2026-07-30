@@ -1,5 +1,81 @@
 # 项目状态文档
 
+## 2026-07-30 单年度八地区分级赛参赛马研究代码审核 REVISE，修复待最终确认
+
+- `collect-yearly-graded-race-participants` 方案已通过同一独立 reviewer 三轮审核。计划把旧
+  研究分支的固定 2026/五地区/前五名/Wikipedia 流水线改为显式单年度、八地区、全部实际参赛马、
+  中日英名称、无 Wikipedia/Wikidata，并保留 checkpoint 和精确恢复；当前离线候选已经实现。
+- 新增地区使用 SHA 绑定的年度 URL classification manifest；未知赛果状态和 generic `other`
+  profile 均 fail closed。第一至第二十轮 findings 修复后的 `32/32`、`39/39`、`46/46`、
+  `49/49`、`53/53`、`56/56`、`60/60`、`64/64`、`66/66`、`69/69`、`70/70`、`71/71`、
+  `73/73`、`75/75`、`76/76`、`77/77`、`79/79`、`81/81`、`82/82` 为历史轮次；当前离线
+  复验为 collector `83/83`、
+  workflow 静态合同 `11/11`、
+  现有 workflow contract `26/26`；synthetic 首次 exit `75`，同目录续跑 exit `0`、
+  `byte_equivalent=True` 并精确生成 7 文件。
+- 独立代码 review 首轮为 `REVISE（7 P1 + 4 P2）`；findings 1–11 已全部完成
+  本地修复与上述离线复验。P2-11 的历史实际命令已恢复，checker 只识别明确标注为旧规则、
+  非执行性的精确历史记录，当前命令门禁没有放宽。同一 reviewer 第二轮限定复审仍为
+  `REVISE（2 P1 + 3 P2）`，resume 累计预算、暂定赛果门禁、受控别名、搜索分页和逐地区
+  coverage 五项均已修复。同一 reviewer 第三轮仍为 `REVISE（4 P1 + 2 P2）`；write-ahead
+  ledger、详情地区二次核验、人工审核赛果、provisional error/coverage/outcome、HTTP 错误分类
+  和 `errors.json` 名称完整性六项均已修复。同一 reviewer 第四轮仍为
+  `REVISE（3 P1）`：pending conflict non-final、profile 缺真实详情名禁止 fallback，以及
+  provisional 终态 `evidence_gap` 继续正式 DAG 并产出 partial 7 文件；workflow 同步接受
+  `evidence_gap`、修正 races index 路径并新增完整离线 harness。上述三项均已本地修复。
+  同一 reviewer 第五轮仍为 `REVISE（1 P1 + 3 P2）`：真实 `HttpClient` 严格允许受控
+  `/horses/?q=&page=`、coverage error 优先、unresolved 错误保留 region/country/source URL、
+  空 CSV 固定表头。四项均已本地修复。同一 reviewer 第六轮仍为
+  `REVISE（1 P1 + 1 P2）`：受控 ISO alpha-2/alpha-3 国家代码归一化；全部未知状态行形成终态
+  `evidence_gap`、保留逐行证据并由完整 DAG 产出 partial 7 文件。两项均已本地修复。
+  同一 reviewer 第七轮仍为 `REVISE（2 P1 + 2 P2）`：index/request ledger 权威且 progress
+  可安全重建；共享 profile URL 逐 occurrence identity 校验；`region_unresolved` 进入
+  source/errors/partial coverage；Middle East 同 region 仍逐 country 冲突检查。四项均已本地
+  修复。同一 reviewer 第八轮仍为 `REVISE（2 P1）`：统一 stage monotonic deadline；
+  `discovery_progress.json` 精确 checkpoint/resume queue、visited、discovered、inflight 与请求
+  计数；profile 分页检查 deadline 且后续页 404 fail closed。workflow 合同同步锁定
+  discovery progress/request ledger 在无 manifest 时仍上传恢复。修复已本地验证。同一
+  reviewer 第九轮仍为 `REVISE（P0=0 / P1=0 / P2=1）`：discovery retryable 错误重试耗尽后
+  保存 progress/ledger 并 exit `75`，resume 从 inflight URL 精确继续；确定性 4xx 仍为
+  permanent。唯一 P2 已本地修复。同一 reviewer 第十轮仍为 `REVISE（2 P1 + 1 P2）`：
+  sitemapindex/urlset 类型与目标年份过滤；generic `other` profile 多语 alias 交集加附加
+  identity；coverage 只由实际 in-scope graded 证据驱动，Listed-only 不得 `covered`。三项均已
+  本地修复。同一 reviewer 第十一轮仍为 `REVISE（P1=1）`：AU/DE generic `other` 可由 alias
+  交集加出生年份满足附加身份；若详情存在 country 则必须一致；Middle East 仍强制 country。
+  唯一 P1 已本地修复。同一 reviewer 第十二轮仍为 `REVISE（P1=1）`：direct/search 共用公共
+  group validator，逐 occurrence 校验 alias/region/country/birth year，任一冲突整组
+  fail closed 并保留 review。唯一 P1 已本地修复。同一 reviewer 第十三轮仍为
+  `REVISE（1 P1 + 1 P2）`：canonical group 全 aliases 确定性多 query、候选 profile URL 去重；
+  冲突 error 保留 expected/actual 双侧 aliases/region/country/birth，以及
+  profile URL/conflict fields。两项均已本地修复。同一 reviewer 第十四轮仍为
+  `REVISE（1 P1 + 1 P2）`：profile URL 全链路严格 canonical trailing slash；Middle East
+  country missing/uncontrolled/mismatch 均保留 expected/actual raw/canonical 事实和明确 reason。
+  两项均已本地修复。同一 reviewer 第十五轮仍为 `REVISE（P1=1）`：profile URL 以原始 path
+  只接受正整数真实路由，拒绝重复 slash、slug、dot/编码绕过等，synthetic 同步改用合法数值
+  ID。唯一 P1 已本地修复。同一 reviewer 第十六轮仍为 `REVISE（P1=1）`：验证器不得先做
+  NFKC 或 trim，必须基于原始 `str` 拒绝 Unicode whitespace/control、全角字符、
+  percent encoding 等绕过，只接受 ASCII 正整数 profile 路由，并在全部身份入口一致执行。
+  唯一 P1 已本地修复。同一 reviewer 第十七轮仍为 `REVISE（2 P1）`：所有 profile URL
+  原始字段不得预先 normalize；HTML profile `href` 必须由严格 resolver 在拼接前校验；
+  HTTP profile 请求须禁用自动 redirect，对原始 `Location` 严格解析并限定同 host，final URL
+  也须直接严格校验。两项 P1 已本地修复。同一 reviewer 第十八轮仍为
+  `REVISE（P1=1）`：absolute profile href、redirect `Location` 和 final URL 必须与对应
+  来源页面或原始请求的 hostname 精确一致，allowlist 内的 bare/`www` hostname 也不得互换。
+  唯一 P1 已本地修复。同一 reviewer 第十九轮已 `APPROVED`，P0/P1/P2=`0/0/0`，session
+  `019fb2f6-da26-7463-81b3-0b3c52ed4cf0`；审阅时 fingerprint
+  `89a8021db567eaaed7003680cd85377ca04ec7ee08d48168ef3212cbcb51d262`、content manifest
+  `cfb5630c1dc29a0d04b62816a4ce2f296640308e838614d96d57af2d6fbce0a1`，pre/review/post
+  均 exit `0` 且只读。该 fingerprint 仅标识第十九轮历史审阅快照，不代表当前候选已批准。
+  同一 reviewer 第二十轮最终确认仍为 `REVISE（P2=1）`：标准五地区的 profile region 明确
+  匹配时允许 country 缺失，但存在 country 冲突仍 fail closed；AU/DE/Middle East 不放宽。
+  唯一 P2 已本地修复并纳入历史 `82/82`。同一 reviewer 第二十一轮最终确认仍为
+  `REVISE（P2=1）`：country fact 必须区分 missing/controlled/uncontrolled，非空未知值不得由
+  region 回填且须 fail closed；标准五地区仅 missing 可按明确 region 通过，AU/DE/Middle East
+  不放宽。唯一 P2 已本地修复并纳入 `83/83`；下一步是同一 reviewer 第二十二轮最终只读确认并
+  冻结新 fingerprint，之后才等待用户针对新 fingerprint 授权发布。
+- 当前改动未提交、未推送，尚未运行 GitHub Actions 或任何联网正式 run，也没有部署和生产
+  写入。代码复审通过、发布授权和每个 `full_network=true` 单年度 run 是三道独立门禁。
+
 ## 2026-07-30 Celery race-live P0 已完成关闭态发布
 
 - 初始 `start-beat` 因 Django auto-import banner 污染严格 queue snapshot，在真正启动 Beat

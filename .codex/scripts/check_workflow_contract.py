@@ -45,6 +45,12 @@ REVIEW_COMMANDS = {
     "codex review -c 'sandbox_mode=\"read-only\"' --commit <commit_oid>",
 }
 SAFE_REVIEW_OVERRIDE = " -c 'sandbox_mode=\"read-only\"'"
+HISTORICAL_REVIEW_BLOCK_START = "<!-- WORKFLOW_CONTRACT:HISTORICAL_REVIEW_COMMAND:START -->"
+HISTORICAL_REVIEW_BLOCK_END = "<!-- WORKFLOW_CONTRACT:HISTORICAL_REVIEW_COMMAND:END -->"
+HISTORICAL_REVIEW_RECORD = (
+    "- 历史命令审计标记（旧规则下的历史事实，非当前可执行指令）："
+    "`codex review --uncommitted`；仅记录当时实际命令，不授权或指导再次执行。"
+)
 FINGERPRINT_FREEZE_ENTRIES = {
     "成功 review 记录受审 scope、完整 fingerprint、approved parent（审核时 HEAD）和 approved content hash（`content_manifest_sha256`），作为当前任务最新审核基线。",
     "用户授权后、staging 前完整 fingerprint 必须用相同 scope 重算并与审核基线逐字节一致；不一致则停止。",
@@ -143,8 +149,34 @@ def normalize_cli_text(text: str) -> str:
     return re.sub(r"\s+", " ", without_continuations)
 
 
+def strip_valid_historical_review_blocks(text: str, label: str) -> str:
+    start_count = text.count(HISTORICAL_REVIEW_BLOCK_START)
+    end_count = text.count(HISTORICAL_REVIEW_BLOCK_END)
+    require(
+        start_count == end_count,
+        f"{label} historical review command block missing/duplicate marker",
+    )
+    while HISTORICAL_REVIEW_BLOCK_START in text:
+        before, rest = text.split(HISTORICAL_REVIEW_BLOCK_START, 1)
+        require(
+            HISTORICAL_REVIEW_BLOCK_END in rest,
+            f"{label} historical review command block unterminated",
+        )
+        block, after = rest.split(HISTORICAL_REVIEW_BLOCK_END, 1)
+        require(
+            block.strip() == HISTORICAL_REVIEW_RECORD,
+            f"{label} historical review command block must be the exact non-executable audit record",
+        )
+        text = before + " " + after
+    require(
+        HISTORICAL_REVIEW_BLOCK_END not in text,
+        f"{label} historical review command block has an unmatched end marker",
+    )
+    return text
+
+
 def check_safe_review_occurrences(text: str, label: str) -> None:
-    normalized = normalize_cli_text(text)
+    normalized = normalize_cli_text(strip_valid_historical_review_blocks(text, label))
     for match in re.finditer(r"(?<![\w-])codex review\b", normalized):
         tail = normalized[match.end() :]
         require(
