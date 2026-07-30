@@ -7,7 +7,7 @@
 - [x] (application) 实现原子 checkpoint、稳定分片、resume 和 time budget 安全停止。
 - [x] (application) 移除 Wikipedia/Wikidata 依赖与输出。
 - [x] (application) 实现非日本/香港英文名质量门禁和复核队列。
-- [ ] (integration) 在仓库 CI 中运行专项测试与 py_compile。
+- [x] (integration) 仓库 CI 已完成 py_compile、14 项专项测试和 diff check。
 - [ ] (integration) 使用少量赛事 URL 做一次真实网络 smoke run。
 - [ ] (review) 由未参与实现的 reviewer 做只读代码审核。
 - [ ] (operations) 用户确认后再决定是否执行完整历史年份任务；不部署生产、不写数据库。
