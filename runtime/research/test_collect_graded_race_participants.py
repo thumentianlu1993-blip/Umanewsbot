@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from graded_participants.checkpoint import CheckpointStore, run_checkpointed
+from graded_participants.checkpoint import CheckpointStore, merge_stage, run_checkpointed
 from graded_participants.collector import Collector
 from graded_participants.core import (
     ParticipantRow, classify_region, grade_is_in_scope, infer_names,
@@ -113,6 +113,22 @@ class Tests(unittest.TestCase):
     def test_stable_shards(self):
         keys = [f'horse-{i}' for i in range(100)]
         self.assertEqual({k: stable_shard(k, 4) for k in keys}, {k: stable_shard(k, 4) for k in reversed(keys)})
+
+    def test_english_region_labels(self):
+        empty = {'labels': {}, 'racecourses': {}, 'urls': {}}
+        self.assertEqual(classify_region(label='Australia', racecourse='', race_name_original='', url='https://umafans.run/x', overrides=empty), 'australia')
+        self.assertEqual(classify_region(label='UAE', racecourse='', race_name_original='', url='https://umafans.run/x', overrides=empty), 'middle_east')
+
+    def test_merge_rejects_retryable_checkpoint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); keys = ['a']
+            store = CheckpointStore(root, stage='source', manifest_sha256='x' * 64,
+                                    shard_index=0, shard_count=1, input_keys_sha256=keys_sha256(keys))
+            store.save_item('a', {'status': 'retryable_error'})
+            store.rebuild_index()
+            with self.assertRaisesRegex(ValueError, 'nonterminal'):
+                merge_stage(root, source_stage='source', target_stage='merged',
+                            manifest_sha='x' * 64, keys=keys, shard_count=1)
 
     def test_args_single_year(self):
         args = parse_args(['--stage', 'discover', '--year', '2025'])
