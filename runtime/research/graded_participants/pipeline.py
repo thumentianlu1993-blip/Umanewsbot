@@ -12,8 +12,8 @@ from .collector import Collector, HttpClient, resolve_base_url
 from .core import (
     ENGLISH_OPTIONAL_REGIONS, PARSER_VERSION, REGION_OUTPUT, SAFE_STOP_EXIT_CODE,
     SCHEMA_VERSION, TARGET_JAPAN_GRADES, TARGET_STANDARD_GRADES, HorseSeed,
-    ParticipantRow, atomic_write_json, atomic_write_text, keys_sha256,
-    load_region_overrides, sha256_bytes, utc_now_iso, write_csv,
+    ParticipantRow, atomic_write_json, atomic_write_text, current_tool_version,
+    keys_sha256, load_region_overrides, sha256_bytes, utc_now_iso, write_csv,
 )
 
 
@@ -22,7 +22,7 @@ def load_manifest(root: Path) -> tuple[dict[str, Any], str]:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     required = {
         "year", "cutoff", "base_url", "race_urls", "race_urls_sha256",
-        "region_overrides_sha256", "created_at",
+        "region_overrides_sha256", "tool_version", "created_at",
     }
     missing = sorted(required - set(manifest))
     if missing: raise ValueError(f"run manifest missing fields: {missing}")
@@ -82,6 +82,8 @@ def finalize(root: Path, *, fail_on_missing_english: bool) -> int:
                 "horse_name_ja": profile.get("name_ja", ""),
                 "horse_name_en": profile.get("name_en", ""),
             })
+            row["chinese_name_missing"] = not bool(row["horse_name_zh"])
+            row["japanese_name_missing"] = not bool(row["horse_name_ja"])
             row["english_name_required"] = row["region"] not in ENGLISH_OPTIONAL_REGIONS
             row["english_name_missing"] = bool(row["english_name_required"] and not row["horse_name_en"])
             rows.append(row)
@@ -104,8 +106,16 @@ def finalize(root: Path, *, fail_on_missing_english: bool) -> int:
     occurrences = Counter(row["horse_lookup_key"] for row in rows); horse_rows: list[dict[str, Any]] = []
     for key in profile_keys:
         profile = profiles[key]; seed = seeds[key]
+        chinese_missing = not bool(profile.get("name_zh", ""))
+        japanese_missing = not bool(profile.get("name_ja", ""))
         english_required = seed.region not in ENGLISH_OPTIONAL_REGIONS
         english_missing = english_required and not profile.get("name_en", "")
+        review_reasons = []
+        if chinese_missing: review_reasons.append("missing_chinese")
+        if japanese_missing: review_reasons.append("missing_japanese")
+        if english_missing: review_reasons.append("missing_required_english")
+        if profile.get("status") in {"not_found", "ambiguous", "retryable_error"}:
+            review_reasons.append(f"profile_{profile.get('status')}")
         horse_rows.append({
             "horse_key": key, "region": seed.region, "region_label": REGION_OUTPUT[seed.region],
             "horse_name_zh": profile.get("name_zh", ""), "horse_name_ja": profile.get("name_ja", ""),
@@ -113,7 +123,9 @@ def finalize(root: Path, *, fail_on_missing_english: bool) -> int:
             "original_name": profile.get("original_name", ""), "birth_year": profile.get("birth_year", ""),
             "profile_url": profile.get("profile_url", ""), "profile_status": profile.get("status", ""),
             "name_quality_status": "missing_required_english" if english_missing else profile.get("name_quality_status", "complete"),
+            "chinese_name_missing": chinese_missing, "japanese_name_missing": japanese_missing,
             "english_name_required": english_required, "english_name_missing": english_missing,
+            "name_review_reasons": "|".join(review_reasons),
             "graded_race_count": len(seed.race_urls), "participant_occurrences": occurrences[key],
         })
     horse_rows.sort(key=lambda item: (
@@ -122,13 +134,12 @@ def finalize(root: Path, *, fail_on_missing_english: bool) -> int:
     horse_fields = list(horse_rows[0]) if horse_rows else [
         "horse_key", "region", "region_label", "horse_name_zh", "horse_name_ja", "horse_name_en",
         "display_names", "original_name", "birth_year", "profile_url", "profile_status",
-        "name_quality_status", "english_name_required", "english_name_missing",
+        "name_quality_status", "chinese_name_missing", "japanese_name_missing",
+        "english_name_required", "english_name_missing", "name_review_reasons",
         "graded_race_count", "participant_occurrences",
     ]
     write_csv(final_dir / f"horse_name_mapping_{year}.csv", horse_rows, horse_fields)
-    review_rows = [item for item in horse_rows if item["english_name_missing"] or item["profile_status"] in {
-        "not_found", "ambiguous", "retryable_error"
-    }]
+    review_rows = [item for item in horse_rows if item["name_review_reasons"]]
     write_csv(final_dir / f"name_review_queue_{year}.csv", review_rows, horse_fields)
     atomic_write_text(final_dir / "source_manifest.jsonl", "".join(
         json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n"
@@ -138,6 +149,8 @@ def finalize(root: Path, *, fail_on_missing_english: bool) -> int:
 
     races_by_region: dict[str, set[str]] = defaultdict(set)
     for row in rows: races_by_region[row["region"]].add(row["race_url"])
+    missing_chinese = sum(bool(item["chinese_name_missing"]) for item in horse_rows)
+    missing_japanese = sum(bool(item["japanese_name_missing"]) for item in horse_rows)
     missing_required_english = sum(bool(item["english_name_missing"]) for item in horse_rows)
     summary = {
         "artifact_type": "umafans_graded_race_participants",
@@ -155,6 +168,7 @@ def finalize(root: Path, *, fail_on_missing_english: bool) -> int:
             "unique_horses": len(horse_rows),
             "races_by_region": {REGION_OUTPUT[key]: len(value) for key, value in sorted(races_by_region.items())},
             "rows_by_result_status": dict(sorted(Counter(row["result_status"] for row in rows).items())),
+            "missing_chinese": missing_chinese, "missing_japanese": missing_japanese,
             "missing_required_english": missing_required_english,
             "name_review_queue": len(review_rows), "errors": len(errors),
         },
@@ -195,8 +209,10 @@ def run_stage(args: argparse.Namespace) -> int:
         manifest_path = root / "run_manifest.json"
         if manifest_path.exists() and not args.refresh_discovery:
             existing, _ = load_manifest(root)
-            if int(existing["year"]) != args.year or existing["cutoff"] != cutoff.isoformat() or existing.get("region_overrides_sha256", "") != override_sha:
-                raise ValueError("existing run manifest scope differs from CLI")
+            if (int(existing["year"]) != args.year or existing["cutoff"] != cutoff.isoformat()
+                    or existing.get("region_overrides_sha256", "") != override_sha
+                    or existing.get("tool_version") != current_tool_version()):
+                raise ValueError("existing run manifest scope or tool version differs from CLI")
             print(f"Reusing {len(existing['race_urls'])} discovered race URLs for {args.year}", flush=True)
             return 0
         client = HttpClient(delay=args.delay, timeout=args.timeout, user_agent=args.user_agent)
@@ -209,6 +225,7 @@ def run_stage(args: argparse.Namespace) -> int:
             "year": args.year, "cutoff": cutoff.isoformat(), "base_url": base_url,
             "requested_base_url": args.base_url, "race_urls": race_urls,
             "race_urls_sha256": keys_sha256(race_urls), "region_overrides_sha256": override_sha,
+            "tool_version": current_tool_version(),
             "created_at": utc_now_iso(), "http_request_count": client.request_count,
         })
         print(f"Discovered {len(race_urls)} race URLs for {args.year}", flush=True); return 0
@@ -218,6 +235,8 @@ def run_stage(args: argparse.Namespace) -> int:
         raise ValueError("CLI scope differs from run manifest")
     if manifest.get("region_overrides_sha256", "") != override_sha:
         raise ValueError("region override file differs from run manifest")
+    if manifest.get("tool_version") != current_tool_version():
+        raise ValueError("collector code differs from run manifest")
     race_urls = list(manifest["race_urls"])
 
     if args.stage == "races":
