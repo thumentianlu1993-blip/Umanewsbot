@@ -206,6 +206,7 @@ class ClosedDeployHarness:
             "P0_FAKE_BEAT_LOG_TARGET_AT_MINUTE": "0",
             "P0_FAKE_CELERY_QUEUE_LENGTH": "11",
             "P0_FAKE_RACE_LIVE_QUEUE_LENGTH": "22",
+            "P0_FAKE_QUEUE_SNAPSHOT_OUTPUT": "",
             "RACE_LIVE_P0_TEST_OBSERVATION_INTERVAL_SECONDS": "0",
             # 生产默认仍指向 /proc/meminfo；合同测试只替换读取来源。
             "RACE_LIVE_P0_MEMINFO_FILE": str(self.meminfo_file),
@@ -373,10 +374,25 @@ class ClosedDeployHarness:
                   selector_count=1
                 fi
                 log "queue-observation|minute=${current_minute}|celery=${P0_FAKE_CELERY_QUEUE_LENGTH:-11}|race_live=${P0_FAKE_RACE_LIVE_QUEUE_LENGTH:-22}|selector=${selector_count}|monitor=${monitor_count}"
-                printf 'celery_length=%s race_live_length=%s selector_count=%s monitor_count=%s\n' \
-                  "${P0_FAKE_CELERY_QUEUE_LENGTH:-11}" \
-                  "${P0_FAKE_RACE_LIVE_QUEUE_LENGTH:-22}" \
-                  "$selector_count" "$monitor_count"
+                case "$args" in
+                  *" --no-imports "*)
+                    log "queue-snapshot-command|no-imports"
+                    ;;
+                  *)
+                    log "queue-snapshot-output|django-auto-import-banner"
+                    printf '%s\n\n' \
+                      '105 objects imported automatically (use -v 2 for details).'
+                    ;;
+                esac
+                if [ -n "${P0_FAKE_QUEUE_SNAPSHOT_OUTPUT:-}" ]; then
+                  log "queue-snapshot-output|override"
+                  printf '%s\n' "$P0_FAKE_QUEUE_SNAPSHOT_OUTPUT"
+                else
+                  printf 'celery_length=%s race_live_length=%s selector_count=%s monitor_count=%s\n' \
+                    "${P0_FAKE_CELERY_QUEUE_LENGTH:-11}" \
+                    "${P0_FAKE_RACE_LIVE_QUEUE_LENGTH:-22}" \
+                    "$selector_count" "$monitor_count"
+                fi
                 [ "$selector_count" -eq 0 ] && [ "$monitor_count" -eq 0 ]
                 exit
                 ;;
@@ -1541,7 +1557,9 @@ class RaceLiveP0DeploymentPostStartObservationTests(
         )
         self.assert_observation_failure_stops_beat(result, failed_minute=3)
 
-    def test_success_observes_five_minutes_before_returning(self):
+    def test_machine_queue_snapshot_runs_five_minutes_and_malformed_fails_closed(
+        self,
+    ):
         with ClosedDeployHarness(
             self,
             initial_beat_state="stopped",
@@ -1577,3 +1595,56 @@ class RaceLiveP0DeploymentPostStartObservationTests(
                 f"beat-log-check|minute={minute}|since=start",
                 result.calls,
             )
+
+        with ClosedDeployHarness(
+            self,
+            initial_beat_state="stopped",
+        ) as harness:
+            malformed = harness.run(
+                "start-beat",
+                env={"P0_FAKE_QUEUE_SNAPSHOT_OUTPUT": "malformed"},
+            )
+
+        self.assertIn("queue-snapshot-output|override", malformed.calls)
+        self.assertNotEqual(
+            malformed.process.returncode,
+            0,
+            malformed.output,
+        )
+        self.assertIn("队列/task 计数格式不可确认", malformed.output)
+        self.assertEqual(self.logical_minutes(malformed), [])
+        self.assertEqual(self.beat_up_calls(malformed), [], malformed.calls)
+        self.assertEqual(malformed.beat_state, "stopped")
+
+    def test_queue_snapshot_disables_django_auto_import_banner(self):
+        with ClosedDeployHarness(
+            self,
+            initial_beat_state="stopped",
+        ) as harness:
+            result = harness.run("start-beat")
+
+        snapshot_calls = [
+            arguments
+            for arguments in self.compose_calls(result)
+            if "run" in arguments
+            and "manage.py" in arguments
+            and "shell" in arguments
+            and "json" in arguments
+        ]
+        self.assertTrue(snapshot_calls, result.calls)
+        for arguments in snapshot_calls:
+            self.assertIn("--no-imports", arguments, result.calls)
+        self.assertNotIn(
+            "queue-snapshot-output|django-auto-import-banner",
+            result.calls,
+        )
+        self.assertEqual(result.process.returncode, 0, result.output)
+        self.assertEqual(self.logical_minutes(result), [1, 2, 3, 4, 5])
+        self.assertEqual(len(snapshot_calls), 6, result.calls)
+        self.assertEqual(
+            result.calls.count("queue-snapshot-command|no-imports"),
+            6,
+            result.calls,
+        )
+        self.assertEqual(len(self.beat_up_calls(result)), 1, result.calls)
+        self.assertEqual(result.beat_state, "running")

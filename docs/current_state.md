@@ -1,53 +1,41 @@
 # 当前状态
 
-## 2026-07-30 Celery race-live P0 新增 P1 已修复，待同一 reviewer 再次限定复审
+## 2026-07-30 Celery race-live P0 部分部署停在安全检查点，修复待复审/重新授权
 
-- 本 change 基于
-  `origin/main@78719a467a2eceb57572b484a906cb78761badf8`，工作分支为
-  `codex/harden-celery-p0-admission`。已在 `server/app/settings.py` 实现纯
-  `build_race_live_beat_schedule()`：scheduler/monitor 关闭时分别不注册 selector/monitor，
-  四种开关组合互相独立；开启 entry 保持
-  `selector -> celery`、`monitor -> race_live`，并附加 Celery 最佳努力
-  `expires=55` 元数据。
-- 本轮未修改 `server/stable/tasks.py`、现有 task route、模型或 migration；monitor
-  delivery 和 poll 仍使用 `race_live`，task body 的关闭态防御继续保留。
-- 已新增关闭态专用入口 `deploy/deploy_race_live_p0_closed.sh prepare|start-beat`。脚本在
-  生产根拒绝 test mode/fake 覆盖，使用
-  `PRE_STOP_PREFLIGHT -> BEAT_STOPPED -> CANDIDATE_READY` 状态边界，并覆盖精确关闭态、
-  OOM/磁盘/内存/swap、停止 Beat 与普通 worker、两次零 migration plan、候选 schedule、
-  候选健康和失败后 Beat 保持停止/恢复旧 web 与普通 worker。该入口不得由原样运行
-  `deploy_lowcost.sh` 替代。
-- 首次 code review 提出五项 actionable finding，现已补实现与合同：
-  普通 worker stop 非零但已经停止时进入失败恢复并恢复 worker；显式拒绝把
-  `restarting/paused/unknown` 当作 stopped；从普通 worker PID 1 参数证明唯一精确
-  `--queues=celery`；start-beat 启动后连续执行五轮状态、镜像、health、队列/task 计数和
-  Beat 日志后验；任一轮异常立即停止并复核 Beat。
-- 同一 reviewer 限定复审 session
-  `019faecf-f5fe-7900-be8d-95998bcb6b42` 已确认原五项 finding 全部关闭，但新增一项
-  P1：脚本 `pull nginx` 会改变可变镜像，而现有 rollback 只覆盖应用 image，没有 nginx
-  镜像级回滚，因此 verdict 为 `REVISE`。该 P1 已按真实 RED/GREEN 最小修复：P0 脚本取消
-  nginx pull，不改变当前本地 nginx image；仍以该本地 image
-  `--force-recreate nginx` 并执行 healthz 检查。
-- 新增 P1 修复后的当前候选已由主代理复跑
-  `stable.test_race_live_sla_monitor`、
-  `RaceLiveCeleryIsolationTests`、`RaceLiveWorkerDeploymentContractTests` 和
-  `stable.test_race_live_p0_deployment_contract`，结果为
-  `63/63 / 54.863s / exit 0`，其中部署合同为 `32/32`。Django check 为 exit `0`；
-  `makemigrations --check --dry-run` 为 exit `0` 且输出 `No changes detected`；
-  `sh -n` 与 `git diff --check` 均为 exit `0`；脚本静态核对确认不再 pull nginx，同时仍有
-  nginx force-recreate 与 healthz。上述是当前候选验证证据，不代表 code review 通过。
-- 完整 `stable` 已建立同 HEAD 干净基线：候选
-  `3830 tests / 216.643s / 26 failures / 148 errors / 72 skipped / exit 1`；基线
-  `HEAD=78719a467a2eceb57572b484a906cb78761badf8`，
-  `3790 tests / 167.124s / 26 failures / 148 errors / 72 skipped / exit 1`。原始唯一
-  headings 均为 `174`、规范化失败方法均为 `153`，两种口径候选 only/基线 only 均为
-  `0`。这只证明本 scope 新增失败标识为 `0`，完整 suite 仍非全绿；逐行清单见
-  `docs/changes/harden-celery-p0-admission/full_stable_failure_baseline.txt`。
-- 当前只完成本地实现与验证：未提交、未推送、未部署，未连接生产，未清理队列，未启动任何
-  worker，也未执行生产迁移或业务写入。生产 HEAD、flags、Beat、worker、队列和资源状态仍
-  未知；此前约 `5782` 条 monitor 消息仅为历史快照，不是当前计数。下一道门禁是回到首次
-  code reviewer 的同一会话再次限定复审新增 P1 修复和直接触及路径；复审成功后仍需另行
-  取得发布授权。
+- 初始实现 commit 为 `611c6aab`，已通过 PR `#46` 合并为
+  `main@7cd144ab`。生产 `/opt/umanewsbot` 从 `4221affa` fast-forward 到
+  `7cd144ab`；进入窗口前已有的 dirty 只包含 `12` 个 deploy 脚本 mode-only 差异，已原样
+  保留，没有清理或覆盖。
+- 生产首次只读预检确认 Docker Compose `5.1.2`；三个开关精确为
+  scheduler=`false`、monitor=`false`、runner=`disabled`；
+  `race_live_worker` 为 `Created`。首次 Celery active/reserved/scheduled 均为 `0`，
+  `celery` 队列为 `0`；`race_live` 从首次观察的 `6055` 增至 prepare 前 `6574`，逐项均为
+  `monitor_race_live_sla_task`。
+- 首次资源门禁以 `MemAvailable=867284 KiB`、`SwapFree=0 KiB` 正确返回 NO-GO。经用户对
+  该资源维护动作另行授权，生产创建并启用
+  `/swapfile-umanews-p0-20260730`，大小 `2 GiB`、mode `0600`，未写入 `/etc/fstab`；
+  普通 worker 在空闲状态下优雅重启，临时停止的 OneBot 已恢复为 running。
+- `prepare` 随后成功到达 `CANDIDATE_READY`：drain 中观察到 active `2` 自然归零，没有
+  revoke 或清队列；旧 image
+  `sha256:7d730634...8774` 已保留为
+  `umanewsbot:rollback-race-live-p0-20260730T030255Z`，候选 image 为
+  `sha256:17562c52...acea7`。两次 migration plan 均为 `0`，候选 settings 保持关闭；
+  web/worker/nginx、内外 healthz 均为 `200`，Beat 为 exited，
+  `race_live_worker` 仍为 `Created`。
+- `start-beat` 在真正执行 `up beat` 前 fail closed：Django shell 将
+  `105 objects imported automatically (use -v 2 for details).` 写入 machine queue
+  snapshot stdout，严格 parser 拒绝该输出。失败恢复后 OneBot 为 running、Beat 仍为
+  exited，未完成五轮观察，`race_live` 后验仍为 `6574`；没有清理、迁移或消费积压。
+- 当前本地分支 `codex/fix-p0-queue-snapshot-output` 已按真实 RED/GREEN 只把 machine
+  snapshot 调用改为 `manage.py shell --no-imports -c`，未放宽 parser。部署合同
+  `33/33 / 56.236s / exit 0`，四组聚焦
+  `64/64 / 57.693s / exit 0`；Django check、migration drift、`sh -n` 与
+  `git diff --check` 均通过。
+- 当前不是发布成功：生产仍运行不含上述 stdout 修复的候选 image，Beat 保持 exited。
+  下一道门禁是复用同一代码 reviewer session 对 final fix 限定复审，并针对受审版本重新
+  取得发布授权；之后必须拉取已审 final fix，重新运行 `prepare` 构建精确最终 image，再运行
+  `start-beat` 完成五轮。禁止直接热补丁或手工启动 Beat。完整事实见
+  `docs/changes/harden-celery-p0-admission/release_report.md`。
 
 ## 2026-07-29 赛事新闻质量治理已合并上线（开关全关，shadow 观察中）
 

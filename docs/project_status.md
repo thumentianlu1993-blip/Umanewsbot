@@ -1,31 +1,28 @@
 # 项目状态文档
 
-## 2026-07-30 Celery race-live P0 新增 P1 已修复，待再次限定复审
+## 2026-07-30 Celery race-live P0 部分部署停在安全检查点，修复待复审/重新授权
 
-- 基于 `origin/main@78719a467a2eceb57572b484a906cb78761badf8` 的分支
-  `codex/harden-celery-p0-admission` 已完成本地实现：两个 race-live Beat entry 按各自开关
-  条件注册，开启态保持 selector→`celery`、monitor→`race_live` 并使用最佳努力
-  `expires=55`；tasks/routes/models/migrations 未变。
-- 新增 `deploy/deploy_race_live_p0_closed.sh prepare|start-beat`，覆盖生产根 test/fake
-  拒绝、三状态门禁、资源/OOM/磁盘、两次零 migration plan、候选关闭态 schedule 和失败后
-  Beat 保持停止/旧 web 与普通 worker 恢复；本 P0 不得原样使用 `deploy_lowcost.sh`。
-- 首次 review 的五项 finding 已修复：部分停止后的 worker 恢复、模糊服务状态拒绝、
-  PID 1 唯一精确 `--queues=celery`、start-beat 五轮持续后验及异常停 Beat、完整 suite
-  同 HEAD 基线对照。
-- 同一 reviewer 限定复审 session `019faecf-f5fe-7900-be8d-95998bcb6b42` 已关闭原五项，
-  但因 `pull nginx` 改变可变镜像且没有 nginx 镜像级回滚而新增 P1，verdict 为
-  `REVISE`。该 P1 已按真实 RED/GREEN 最小修复：取消 nginx pull，保留以当前本地 image
-  `--force-recreate nginx` 和 healthz 检查。
-- 主代理已在当前候选复跑四组聚焦：`63/63 / 54.863s / exit 0`，其中部署合同
-  `32/32`；Django check、无 migration 漂移、`sh -n` 和 diff check 均为 exit `0`，并已
-  静态确认脚本无 nginx pull、仍有 nginx recreate/healthz。当前仍待同一 reviewer 再次
-  限定复审，不能写成 review 通过。
-- 完整 stable 候选 `3830`、基线 `3790`；两边均
-  `26 failures / 148 errors / 72 skipped / exit 1`。原始唯一 headings `174` 与规范化方法
-  `153` 均逐项同集，候选新增失败标识为 `0`；这不是全绿或 review 通过。
-- 尚未连接或改变生产：未提交、推送、部署、清队列或启动 worker，生产状态仍未知；约
-  `5782` 仅为旧快照。下一步是回到同一 reviewer 再次限定复审新增 P1 修复；发布任务仍
-  未完成。
+- 初始实现 `611c6aab` 已经 PR `#46` 合并为 `main@7cd144ab`；生产仓库从
+  `4221affa` fast-forward 到 `7cd144ab`，既有 `12` 个 deploy 脚本 mode-only dirty
+  差异保留。
+- 生产预检为 Compose `5.1.2`、flags `false/false/disabled`、
+  `race_live_worker=Created`、`celery=0`；首次 active/reserved/scheduled 均为 `0`。
+  `race_live` 从 `6055` 增至 prepare 前 `6574`，全部是 monitor task。
+- `MemAvailable=867284 KiB / SwapFree=0 KiB` 首次触发 NO-GO。经额外授权创建并启用
+  `/swapfile-umanews-p0-20260730`（`2 GiB`、`0600`、不写 fstab），空闲普通 worker
+  优雅重启；临时停止的 OneBot 已恢复 running。
+- `prepare` 已成功：drain active `2→0`，rollback tag
+  `umanewsbot:rollback-race-live-p0-20260730T030255Z` 绑定旧 image
+  `sha256:7d730634...8774`，候选为 `sha256:17562c52...acea7`；两次 migration `0`，
+  settings closed，web/worker/nginx 与内外 healthz `200`，Beat exited，
+  `race_live_worker=Created`。
+- `start-beat` 在 `up beat` 前因 Django 的
+  `105 objects imported automatically...` 污染 machine snapshot stdout 而 fail closed。
+  OneBot 已恢复 running，Beat 仍 exited，队列后验 `6574`，五轮观察未开始；发布未完成。
+- 本地 final fix 只增加 `shell --no-imports -c`，parser 不放宽。部署合同
+  `33/33 / 56.236s`、四组聚焦 `64/64 / 57.693s`，均 exit `0`；Django、迁移、shell 语法
+  和 diff 门禁通过。当前必须由同一 reviewer 限定复审并重新取得发布授权，再拉取 final
+  fix、重跑 `prepare` 构建最终 image、执行 `start-beat` 五轮；禁止热补丁或手工启动 Beat。
 
 ## 2026-07-29 赛事新闻质量治理已上线（默认关闭 + shadow）
 

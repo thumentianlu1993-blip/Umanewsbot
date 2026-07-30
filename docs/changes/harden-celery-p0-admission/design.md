@@ -209,14 +209,17 @@ P0 不新增锁、模型或 migration：
 2. 再次从候选 image 启动的一次性容器解析 schedule，确认两个 entry 不存在；
 3. 确认 web/普通 worker 健康、race-live worker 处于明确停止态，并确认普通 worker
    PID 1 只有一个且精确的 `--queues=celery` 参数；
-4. 单独 `up -d --no-deps beat`；
-5. 验证 Beat 使用与 web/worker 相同 image ID；
-6. 启动前保存两个队列长度及 selector/monitor task 计数基线；随后连续五轮执行后验，每轮
+4. 使用 `manage.py shell --no-imports -c` 取得启动前两个队列长度及 selector/monitor
+   task 计数；stdout 必须只包含 machine snapshot。parser 保持严格，任何 banner、多余行或
+   畸形输出都在启动 Beat 前 fail closed；
+5. 单独 `up -d --no-deps beat`；
+6. 验证 Beat 使用与 web/worker 相同 image ID；
+7. 连续五轮执行后验；每轮使用同一无 auto-import 的 machine snapshot 路径，并
    复核 Beat/web/普通 worker 为 running、race-live worker 仍明确停止、三者使用候选 image、
    普通 worker PID 1 queue 仍精确、healthz/ping 正常、目标 task 计数未超过启动前基线，
    且本窗口 Beat 日志不含两个关闭态 entry/task 名称。
 
-若第 1～3 步任一失败，不执行启动 Beat 的命令。五轮内任一健康、镜像、状态、队列计数或
+若第 1～4 步任一失败，不执行启动 Beat 的命令。五轮内任一健康、镜像、状态、队列计数或
 日志验证失败，立即停止并复核 Beat，保留已完成轮次证据，不清队列、不启动 race-live worker。
 
 ## 部署合同测试
@@ -240,6 +243,8 @@ P0 不新增锁、模型或 migration：
 - start-beat 只接受普通 worker PID 1 唯一精确 `--queues=celery`；
 - start-beat 成功返回前必须完成五轮持续后验；第 3 轮健康失败、目标 task 计数增长、
   Beat 日志出现目标 entry/task 或 race-live worker 转为 restarting 时都会立即停止 Beat；
+- queue snapshot 必须调用 `manage.py shell --no-imports -c`；Django auto-import banner
+  不得进入 stdout，畸形或多余输出不得通过放宽 parser 绕过；
 - 失败恢复只允许恢复 web/普通 worker，始终保持 Beat 停止。
 
 测试固定脚本入口和命令序列，避免文档顺序与实际脚本漂移。
