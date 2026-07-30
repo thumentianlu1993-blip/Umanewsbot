@@ -50,6 +50,7 @@ SAFE_STOP_EXIT_CODE = 75
 PROFILE_SHARD_COUNT = 4
 REQUEST_BUDGETS = {"races": 5000, "profiles": 2000}
 ALLOWED_HOSTS = ("umafans.run", "www.umafans.run")
+ALLOWED_SCHEMES = ("http", "https")
 STAGES = ("races", "profiles", "merge_profiles", "finalize", "synthetic_smoke")
 TERMINAL_ITEM_STATUSES = frozenset(
     {"success", "skipped", "permanent_error", "not_found", "evidence_gap"}
@@ -390,11 +391,17 @@ def grade_is_in_scope(region: str, grade: Any) -> bool:
 
 
 def validate_request_url(
-    url: Any, *, allow_horse_search_query: bool = False
+    url: Any,
+    *,
+    allow_horse_search_query: bool = False,
+    expected_scheme: str | None = None,
 ) -> str:
     parsed = urlparse(normalize_space(url))
-    if parsed.scheme != "https":
+    scheme = parsed.scheme.casefold()
+    if scheme not in ALLOWED_SCHEMES:
         raise ValueError("URL scheme is not allowed")
+    if expected_scheme is not None and scheme != expected_scheme.casefold():
+        raise ValueError("URL scheme drift")
     if parsed.username or parsed.password or parsed.port is not None:
         raise ValueError("URL credentials or port are not allowed")
     if (parsed.hostname or "").casefold() not in ALLOWED_HOSTS:
@@ -409,7 +416,7 @@ def validate_request_url(
     ):
         raise ValueError("URL path is not canonical")
     canonical = urlunparse(
-        ("https", parsed.netloc.casefold(), path, "", "", "")
+        (scheme, parsed.netloc.casefold(), path, "", "", "")
     )
     if not parsed.query:
         return canonical
@@ -448,8 +455,10 @@ def validate_request_url(
     return f"{canonical}?{urlencode(normalized_pairs)}"
 
 
-def validate_race_url(url: Any, year: int) -> str:
-    canonical = validate_request_url(url)
+def validate_race_url(
+    url: Any, year: int, *, expected_scheme: str | None = None
+) -> str:
+    canonical = validate_request_url(url, expected_scheme=expected_scheme)
     if not urlparse(canonical).path.endswith("/"):
         parsed = urlparse(canonical)
         canonical = urlunparse(
@@ -460,7 +469,9 @@ def validate_race_url(url: Any, year: int) -> str:
     return canonical
 
 
-def validate_profile_url(url: Any) -> str:
+def validate_profile_url(
+    url: Any, *, expected_scheme: str | None = None
+) -> str:
     if not isinstance(url, str) or not url or url != url.strip():
         raise ValueError("profile URL must be one unmodified non-empty string")
     if any(
@@ -480,8 +491,11 @@ def validate_profile_url(url: Any) -> str:
         or not re.fullmatch(r"/horses/[1-9][0-9]*/?", raw_path)
     ):
         raise ValueError("profile URL is not an exact positive integer horse path")
-    if parsed.scheme.casefold() != "https":
+    scheme = parsed.scheme.casefold()
+    if scheme not in ALLOWED_SCHEMES:
         raise ValueError("profile URL scheme is not allowed")
+    if expected_scheme is not None and scheme != expected_scheme.casefold():
+        raise ValueError("profile URL scheme drift")
     if parsed.username or parsed.password or port is not None:
         raise ValueError("profile URL credentials or port are not allowed")
     host = (parsed.hostname or "").casefold()
@@ -492,7 +506,7 @@ def validate_profile_url(url: Any) -> str:
     path = raw_path
     if not path.endswith("/"):
         path += "/"
-    return urlunparse(("https", host, path, "", "", ""))
+    return urlunparse((scheme, host, path, "", "", ""))
 
 
 def optional_profile_url(value: Any) -> str:
@@ -507,9 +521,10 @@ def resolve_profile_href(href: Any, *, base_url: str) -> str:
     base = urlsplit(validate_request_url(base_url))
     if re.fullmatch(r"/horses/[1-9][0-9]*/?", href):
         return validate_profile_url(
-            urlunparse(("https", base.netloc, href, "", "", ""))
+            urlunparse((base.scheme, base.netloc, href, "", "", "")),
+            expected_scheme=base.scheme,
         )
-    profile_url = validate_profile_url(href)
+    profile_url = validate_profile_url(href, expected_scheme=base.scheme)
     if urlsplit(profile_url).hostname != base.hostname:
         raise ValueError("absolute profile href host drift")
     return profile_url
@@ -545,7 +560,12 @@ def _manifest_entry_map(manifest: Mapping[str, Any] | None) -> dict[str, dict[st
     return entries
 
 
-def validate_region_manifest(manifest: Mapping[str, Any], *, year: int) -> dict[str, Any]:
+def validate_region_manifest(
+    manifest: Mapping[str, Any],
+    *,
+    year: int,
+    expected_scheme: str | None = None,
+) -> dict[str, Any]:
     if manifest.get("schema_version") != 1:
         raise ValueError("region manifest schema drift")
     if manifest.get("year") != year:
@@ -560,7 +580,9 @@ def validate_region_manifest(manifest: Mapping[str, Any], *, year: int) -> dict[
     for raw in raw_entries:
         if not isinstance(raw, dict):
             raise ValueError("region manifest race entry is invalid")
-        url = validate_race_url(raw.get("url"), year)
+        url = validate_race_url(
+            raw.get("url"), year, expected_scheme=expected_scheme
+        )
         if url in seen:
             raise ValueError("region manifest duplicate URL")
         seen.add(url)
@@ -596,7 +618,11 @@ def validate_region_manifest(manifest: Mapping[str, Any], *, year: int) -> dict[
 
 
 def load_region_manifest(
-    path: str | Path, *, year: int, worktree_root: str | Path
+    path: str | Path,
+    *,
+    year: int,
+    worktree_root: str | Path,
+    expected_scheme: str | None = None,
 ) -> dict[str, Any]:
     candidate = Path(path)
     root = Path(worktree_root).resolve(strict=True)
@@ -633,7 +659,9 @@ def load_region_manifest(
         raise ValueError("region manifest JSON is invalid") from exc
     if not isinstance(raw, dict):
         raise ValueError("region manifest root must be an object")
-    return validate_region_manifest(raw, year=year)
+    return validate_region_manifest(
+        raw, year=year, expected_scheme=expected_scheme
+    )
 
 
 def classify_other_coverage(
@@ -643,12 +671,29 @@ def classify_other_coverage(
     manifest: Mapping[str, Any] | None,
     in_scope_urls: Iterable[str] = (),
 ) -> dict[str, Any]:
-    discovered = {validate_race_url(url, year) for url in discovered_other_urls}
-    evidenced_in_scope = {validate_race_url(url, year) for url in in_scope_urls}
+    raw_discovered = list(discovered_other_urls)
+    raw_in_scope = list(in_scope_urls)
+    schemes = {
+        urlparse(validate_race_url(url, year)).scheme
+        for url in [*raw_discovered, *raw_in_scope]
+    }
+    if len(schemes) > 1:
+        raise ValueError("coverage URL scheme drift")
+    expected_scheme = next(iter(schemes), None)
+    discovered = {
+        validate_race_url(url, year, expected_scheme=expected_scheme)
+        for url in raw_discovered
+    }
+    evidenced_in_scope = {
+        validate_race_url(url, year, expected_scheme=expected_scheme)
+        for url in raw_in_scope
+    }
     if not evidenced_in_scope <= discovered:
         raise ValueError("in-scope evidence URL was not discovered")
     normalized = (
-        validate_region_manifest(manifest, year=year)
+        validate_region_manifest(
+            manifest, year=year, expected_scheme=expected_scheme
+        )
         if manifest is not None
         else {
             "schema_version": 1,
@@ -925,7 +970,11 @@ def parse_race_html(
     region_label = meta_text.split("·", 1)[0].strip()
     region, country = normalize_region_label(region_label)
     manifest_entries = _manifest_entry_map(
-        validate_region_manifest(region_manifest, year=year)
+        validate_region_manifest(
+            region_manifest,
+            year=year,
+            expected_scheme=urlparse(canonical_url).scheme,
+        )
         if region_manifest is not None
         else None
     )
@@ -2421,6 +2470,7 @@ class HttpClient:
                 f"{current}?{urlencode(params)}",
                 allow_horse_search_query=True,
             )
+        request_scheme = urlsplit(current).scheme
         profile_request = bool(
             re.fullmatch(
                 r"/horses/[1-9][0-9]*/?",
@@ -2507,10 +2557,13 @@ class HttpClient:
             if status not in {301, 302, 303, 307, 308}:
                 self.check_deadline()
                 response_url = (
-                    validate_profile_url(final_url)
+                    validate_profile_url(
+                        final_url, expected_scheme=request_scheme
+                    )
                     if profile_request
                     else validate_request_url(
-                        urlunparse((*urlparse(final_url)[:3], "", "", ""))
+                        urlunparse((*urlparse(final_url)[:3], "", "", "")),
+                        expected_scheme=request_scheme,
                     )
                 )
                 if (
@@ -2544,6 +2597,7 @@ class HttpClient:
                 current = validate_request_url(
                     urljoin(current, location),
                     allow_horse_search_query=True,
+                    expected_scheme=request_scheme,
                 )
             self.check_deadline()
         raise RuntimeError("too many redirects")
@@ -2581,10 +2635,25 @@ def _validate_discovery_progress(
         raise ValueError("discovery progress URL duplication")
     if set(queue) & set(visited):
         raise ValueError("discovery progress queue/visited overlap")
-    normalized_queue = [validate_request_url(url) for url in queue]
-    normalized_visited = [validate_request_url(url) for url in visited]
+    scheme_source = identity.get("base_url") or next(
+        iter([*queue, *visited, *discovered]), ""
+    )
+    expected_scheme = (
+        urlparse(validate_request_url(scheme_source)).scheme
+        if scheme_source
+        else None
+    )
+    normalized_queue = [
+        validate_request_url(url, expected_scheme=expected_scheme)
+        for url in queue
+    ]
+    normalized_visited = [
+        validate_request_url(url, expected_scheme=expected_scheme)
+        for url in visited
+    ]
     normalized_discovered = [
-        validate_race_url(url, year) for url in discovered
+        validate_race_url(url, year, expected_scheme=expected_scheme)
+        for url in discovered
     ]
     if (
         normalized_queue != queue
@@ -2627,6 +2696,7 @@ def discover_race_urls(
     deadline: StageDeadline | None = None,
 ) -> list[str]:
     base = validate_request_url(base_url)
+    expected_scheme = urlparse(base).scheme
     sitemap = urljoin(base, "/sitemap.xml")
     expected_identity = dict(identity or {})
     state = {
@@ -2687,7 +2757,9 @@ def discover_race_urls(
                 if node.text
             ]
             for location in locations:
-                candidate = validate_request_url(location)
+                candidate = validate_request_url(
+                    location, expected_scheme=expected_scheme
+                )
                 sitemap_path = urlparse(candidate).path.casefold()
                 if not sitemap_path.endswith(".xml") or "sitemap" not in sitemap_path:
                     raise ValueError("sitemapindex contains a non-sitemap URL")
@@ -2700,14 +2772,23 @@ def discover_race_urls(
                 for node in root.findall("./{*}url/{*}loc")
                 if node.text
             ]
-            target_pattern = re.compile(
-                rf"^https://[^/]+/races/{year}/[^/]+/$"
+            target_path_pattern = re.compile(
+                rf"^/races/{year}/[^/]+/$"
             )
-            race_pattern = re.compile(r"^https://[^/]+/races/\d{4}/[^/]+/$")
+            race_path_pattern = re.compile(
+                r"^/races/\d{4}/[^/]+/$"
+            )
             for location in locations:
-                if target_pattern.match(location):
-                    discovered.add(validate_race_url(location, year))
-                elif race_pattern.match(location):
+                path = urlparse(location).path
+                if target_path_pattern.match(path):
+                    discovered.add(
+                        validate_race_url(
+                            location,
+                            year,
+                            expected_scheme=expected_scheme,
+                        )
+                    )
+                elif race_path_pattern.match(path):
                     continue
         else:
             raise ValueError("unsupported sitemap XML root")
@@ -2724,11 +2805,20 @@ def discover_race_urls(
 
 
 def _region_manifest_binding(
-    path: str | None, *, year: int, worktree_root: Path
+    path: str | None,
+    *,
+    year: int,
+    worktree_root: Path,
+    expected_scheme: str,
 ) -> tuple[dict[str, Any] | None, str]:
     if not path:
         return None, "none"
-    manifest = load_region_manifest(path, year=year, worktree_root=worktree_root)
+    manifest = load_region_manifest(
+        path,
+        year=year,
+        worktree_root=worktree_root,
+        expected_scheme=expected_scheme,
+    )
     candidate = Path(path)
     if not candidate.is_absolute():
         candidate = worktree_root / candidate
@@ -2768,6 +2858,7 @@ def validate_run_manifest(
     *,
     year: int,
     region_manifest_sha256: str,
+    expected_base_url: str | None = None,
 ) -> dict[str, Any]:
     required = {
         *current_tool_identity_record(),
@@ -2804,14 +2895,20 @@ def validate_run_manifest(
         raise ValueError("run manifest participant policy drift")
     if manifest.get("request_budgets") != REQUEST_BUDGETS:
         raise ValueError("run manifest request budget drift")
+    base_url = validate_request_url(manifest.get("base_url"))
+    if (
+        expected_base_url is not None
+        and base_url != validate_request_url(expected_base_url)
+    ):
+        raise ValueError("run manifest base URL drift")
+    expected_scheme = urlparse(base_url).scheme
     urls = manifest.get("race_urls")
     if not isinstance(urls, list) or urls != sorted(set(urls)):
         raise ValueError("run manifest race URL ordering drift")
     for url in urls:
-        validate_race_url(url, year)
+        validate_race_url(url, year, expected_scheme=expected_scheme)
     if manifest.get("race_urls_sha256") != keys_sha256(urls):
         raise ValueError("run manifest race URL digest drift")
-    validate_request_url(manifest.get("base_url"))
     return dict(manifest)
 
 
@@ -3296,9 +3393,16 @@ def _validate_profile_group(
     return {**profile, "resolution_state": "resolved"}
 
 
-def _horse_search_page_url(url: str, *, expected_query: str) -> str:
+def _horse_search_page_url(
+    url: str,
+    *,
+    expected_query: str,
+    expected_scheme: str | None = None,
+) -> str:
     canonical = validate_request_url(
-        url, allow_horse_search_query=True
+        url,
+        allow_horse_search_query=True,
+        expected_scheme=expected_scheme,
     )
     pairs = parse_qsl(urlparse(canonical).query, keep_blank_values=True)
     if pairs[0] != ("q", expected_query):
@@ -3329,6 +3433,7 @@ def _profile_search_next_url(
     return _horse_search_page_url(
         urljoin(current_url, next_links[0].attrs["href"]),
         expected_query=expected_query,
+        expected_scheme=urlparse(current_url).scheme,
     )
 
 
@@ -3378,8 +3483,11 @@ def fetch_profile(
     occurrences: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     representative = occurrences[0]
+    expected_scheme = urlparse(validate_request_url(base_url)).scheme
     direct_urls = {
-        profile_url
+        validate_profile_url(
+            profile_url, expected_scheme=expected_scheme
+        )
         for item in occurrences
         if (profile_url := optional_profile_url(item.get("profile_url")))
     }
@@ -3685,7 +3793,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("--year", required=True)
     parser.add_argument("--stage", required=True, choices=STAGES)
     parser.add_argument("--output-dir", required=True)
-    parser.add_argument("--base-url", default="https://umafans.run/")
+    parser.add_argument("--base-url", default="http://umafans.run/")
     parser.add_argument("--race-region-manifest")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--shard-index", type=int, default=0)
@@ -3989,10 +4097,12 @@ def run_stage(args: argparse.Namespace) -> int:
         atomic_write_json(root / "synthetic_smoke_report.json", report)
         return int(report.get("exit_code", 0))
     worktree_root = Path(__file__).resolve().parents[2]
+    selected_base_url = validate_request_url(args.base_url)
     region_manifest, region_manifest_sha = _region_manifest_binding(
         args.race_region_manifest,
         year=args.year,
         worktree_root=worktree_root,
+        expected_scheme=urlparse(selected_base_url).scheme,
     )
     manifest_path = root / "run_manifest.json"
     stage_deadline = StageDeadline.from_budget(args.time_budget_seconds)
@@ -4004,6 +4114,7 @@ def run_stage(args: argparse.Namespace) -> int:
                 json.loads(manifest_path.read_text(encoding="utf-8")),
                 year=args.year,
                 region_manifest_sha256=region_manifest_sha,
+                expected_base_url=selected_base_url,
             )
             discovery_ledger = _discovery_request_ledger(
                 root,
@@ -4068,6 +4179,7 @@ def run_stage(args: argparse.Namespace) -> int:
                 manifest,
                 year=args.year,
                 region_manifest_sha256=region_manifest_sha,
+                expected_base_url=selected_base_url,
             )
         manifest_sha = sha256_bytes(manifest_path.read_bytes())
         tool_identity = {
@@ -4192,6 +4304,7 @@ def run_stage(args: argparse.Namespace) -> int:
         json.loads(manifest_path.read_text(encoding="utf-8")),
         year=args.year,
         region_manifest_sha256=region_manifest_sha,
+        expected_base_url=selected_base_url,
     )
     manifest_sha = sha256_bytes(manifest_path.read_bytes())
     tool_identity = {key: manifest[key] for key in current_tool_identity_record()}

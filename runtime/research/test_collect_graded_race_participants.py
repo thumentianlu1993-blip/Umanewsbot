@@ -21,6 +21,12 @@ from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).with_name("collect_graded_race_participants.py")
+WORKFLOW_PATH = (
+    Path(__file__).parents[2]
+    / ".github"
+    / "workflows"
+    / "research_graded_race_participants.yml"
+)
 EIGHT_REGIONS = {
     "日本": ("japan", "japan"),
     "中国香港": ("hong_kong", "hong_kong"),
@@ -2364,6 +2370,8 @@ class ReviewFindingRegressionTests(unittest.TestCase):
                         "2025",
                         "--stage",
                         "races",
+                        "--base-url",
+                        "https://umafans.run/",
                         "--output-dir",
                         str(root),
                         "--time-budget-seconds",
@@ -2469,6 +2477,8 @@ class ReviewFindingRegressionTests(unittest.TestCase):
                             "2025",
                             "--stage",
                             "races",
+                            "--base-url",
+                            "https://umafans.run/",
                             "--output-dir",
                             str(output),
                             "--delay",
@@ -2568,6 +2578,8 @@ class ReviewFindingRegressionTests(unittest.TestCase):
                     "2025",
                     "--stage",
                     "races",
+                    "--base-url",
+                    "https://umafans.run/",
                     "--output-dir",
                     str(root),
                     "--delay",
@@ -3120,6 +3132,8 @@ class ReviewFindingRegressionTests(unittest.TestCase):
                         "2025",
                         "--stage",
                         stage,
+                        "--base-url",
+                        "https://umafans.run/",
                         "--output-dir",
                         str(root),
                         *extra,
@@ -3215,6 +3229,8 @@ class ReviewFindingRegressionTests(unittest.TestCase):
                         "2025",
                         "--stage",
                         stage,
+                        "--base-url",
+                        "https://umafans.run/",
                         "--output-dir",
                         str(root),
                         *extra,
@@ -3333,6 +3349,8 @@ class ReviewFindingRegressionTests(unittest.TestCase):
                         "2025",
                         "--stage",
                         stage,
+                        "--base-url",
+                        "https://umafans.run/",
                         "--output-dir",
                         str(root),
                         *extra,
@@ -4156,9 +4174,136 @@ class ReviewFindingRegressionTests(unittest.TestCase):
                 client.opener.open.assert_not_called()
                 self.assertEqual(client.request_count, 0)
 
+    def test_current_public_http_origin_preserves_scheme_across_urls(self):
+        collector = load_collector(self)
+        self.assertEqual(
+            collector.validate_request_url(
+                "http://UMAFANS.RUN/sitemap.xml"
+            ),
+            "http://umafans.run/sitemap.xml",
+        )
+        self.assertEqual(
+            collector.validate_profile_url(
+                "http://umafans.run/horses/42"
+            ),
+            "http://umafans.run/horses/42/",
+        )
+        self.assertEqual(
+            collector.resolve_profile_href(
+                "/horses/42/",
+                base_url="http://umafans.run/races/2025/example/",
+            ),
+            "http://umafans.run/horses/42/",
+        )
+        with self.assertRaisesRegex(ValueError, "scheme drift"):
+            collector.resolve_profile_href(
+                "https://umafans.run/horses/42/",
+                base_url="http://umafans.run/races/2025/example/",
+            )
+        for invalid in (
+            "ftp://umafans.run/sitemap.xml",
+            "http://evil.example/sitemap.xml",
+            "http://umafans.run:8080/sitemap.xml",
+        ):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                collector.validate_request_url(invalid)
+
+    def test_current_public_http_sitemap_discovers_http_race_urls(self):
+        collector = load_collector(self)
+        root_url = "http://umafans.run/sitemap.xml"
+        shard_url = "http://umafans.run/sitemaps/races-1.xml"
+        target_race = "http://umafans.run/races/2025/target/"
+        routes = {
+            root_url: (
+                '<?xml version="1.0"?>'
+                '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                f"<sitemap><loc>{shard_url}</loc></sitemap>"
+                "</sitemapindex>"
+            ),
+            shard_url: (
+                '<?xml version="1.0"?>'
+                '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+                f"<url><loc>{target_race}</loc></url>"
+                "</urlset>"
+            ),
+        }
+
+        class Client:
+            request_count = 0
+
+            def get(self, url):
+                self.request_count += 1
+                return FakeResponse(routes[url], url)
+
+        self.assertEqual(
+            collector.discover_race_urls(
+                Client(), base_url="http://umafans.run/", year=2025
+            ),
+            [target_race],
+        )
+        cross_scheme_routes = {
+            root_url: routes[root_url].replace(
+                shard_url, "https://umafans.run/sitemaps/races-1.xml"
+            )
+        }
+
+        class CrossSchemeClient:
+            request_count = 0
+
+            def get(self, url):
+                self.request_count += 1
+                return FakeResponse(cross_scheme_routes[url], url)
+
+        with self.assertRaisesRegex(ValueError, "scheme drift"):
+            collector.discover_race_urls(
+                CrossSchemeClient(),
+                base_url="http://umafans.run/",
+                year=2025,
+            )
+
+    def test_run_and_region_manifests_reject_mixed_schemes(self):
+        collector = load_collector(self)
+        https_race = "https://umafans.run/races/2025/example/"
+        with self.assertRaisesRegex(ValueError, "scheme drift"):
+            collector.validate_region_manifest(
+                {
+                    "schema_version": 1,
+                    "year": 2025,
+                    "classification_complete": False,
+                    "races": [
+                        {
+                            "url": https_race,
+                            "region": "germany",
+                            "country": "germany",
+                            "evidence": "reviewed identity",
+                        }
+                    ],
+                },
+                year=2025,
+                expected_scheme="http",
+            )
+        manifest = collector._new_run_manifest(
+            year=2025,
+            base_url="http://umafans.run/",
+            race_urls=[https_race],
+            region_manifest_sha256="none",
+            created_at="2025-01-01T00:00:00+00:00",
+        )
+        with self.assertRaisesRegex(ValueError, "scheme drift"):
+            collector.validate_run_manifest(
+                manifest,
+                year=2025,
+                region_manifest_sha256="none",
+            )
+
+    def test_full_network_workflow_uses_current_public_http_origin(self):
+        workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+        self.assertIn("--base-url http://umafans.run/", workflow)
+        self.assertNotIn("--base-url https://umafans.run/", workflow)
+
     def test_complete_other_manifest_reports_each_region_independently(self):
         collector = load_collector(self)
-        australia_url = "https://umafans.run/races/2025/australia-cup/"
+        australia_url = "http://umafans.run/races/2025/australia-cup/"
         other = collector.classify_other_coverage(
             year=2025,
             discovered_other_urls=[australia_url],
@@ -4742,6 +4887,8 @@ class ReviewFindingRegressionTests(unittest.TestCase):
                         "2025",
                         "--stage",
                         stage,
+                        "--base-url",
+                        "https://umafans.run/",
                         "--output-dir",
                         str(root),
                         *extra,

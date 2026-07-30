@@ -1,5 +1,30 @@
 # 当前状态
 
+## 2026-07-31 单年度分级赛 full-network 443 根因已定位并完成本地修复
+
+- 2025 正式运行连续 6 个有界 workflow run 均停在
+  `https://umafans.run/sitemap.xml`；最后 checkpoint 为 `request_count=30`、
+  `queue=1`、`visited=0`、`discovered=0`，没有最终 artifact。该状态是可验证的
+  transport safe-stop，不是数据为空或运行成功。
+- 生产只读核验确认宿主 Docker 映射 `80:80` 与 `443:443`，但 Nginx 生效配置只有
+  `listen 80`；443 server block 与证书配置仍为注释。`http://127.0.0.1/sitemap.xml`
+  使用正式 Host 返回 200，HTTPS 握手为 unexpected EOF。现有证书为
+  `CN=47.239.167.86` 的自签名证书，不是可直接启用的正式域名证书。
+- 根因是研究 workflow 和 collector 默认来源错误写成 HTTPS；URL scheme 自动选择 443，
+  Compose 端口映射又不等于容器内存在 TLS listener，因而每次均在首个 sitemap 请求失败。
+- 本地候选把正式 workflow 与 collector 默认来源对齐为 `http://umafans.run/`，并在保持
+  UmaFans 精确 host、无凭据、无显式端口、规范 path/query 门禁的前提下允许 HTTP/HTTPS
+  且保留原 scheme。sitemap race URL 识别改为按受控 URL 的精确年份 path 判断，不再写死
+  `https://`；地区 manifest 的 durable contract 与示例同步改为当前 HTTP exact URL，scheme
+  继续属于清单 identity；所有派生 sitemap/race/profile URL 与 redirect 也必须保持本次
+  base scheme。旧 HTTPS checkpoint 因 base URL identity 不同，不允许续跑；修复发布后的
+  首次正式运行必须 fresh dispatch。
+- 真实 RED 同时报出 HTTP scheme 被拒和 workflow 仍使用 HTTPS；GREEN 为 collector
+  `87/87`、workflow `12/12`、全局 workflow contract `26/26`。独立 review 先后发现地区
+  manifest scheme miss 与派生 URL 可跨回 HTTPS 两项直接回归，均已补测试并修复。本机通过正式 HTTP origin
+  用 2 次只读请求解析 sitemap，发现 2025 race URL `1075` 个。当前仅完成本地候选与
+  只读生产诊断；未提交、推送、创建 PR、改生产配置或重新触发联网 workflow。
+
 ## 2026-07-30 单年度分级赛研究执行面已离线发布，full-network 仍关闭
 
 - 已从最新 `origin/main@6d073dc07cb29201bbc922255923820c872a0467` 建立独立干净

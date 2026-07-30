@@ -1,5 +1,20 @@
 # 关键决策
 
+## 2026-07-31 年度参赛马研究暂以生产 HTTP origin 为唯一正式来源入口
+
+- 当前生产对外验收入口仍是 `http://umafans.run/`；研究 workflow 必须显式使用该 origin，
+  不得因 Compose 映射了 443 或目录中存在证书文件就推断 HTTPS 可用。
+- collector 可以校验并保留 HTTP/HTTPS scheme，但 host 仍只允许 UmaFans 两个精确域名，
+  并继续禁止凭据、显式端口、越界 query/fragment、非规范 path 与 offsite race/profile
+  URL；这不是通用明文 HTTP 放行。每次 run 选定 scheme 后，全部 sitemap、race、profile、
+  redirect、run manifest 和 region manifest URL 必须保持同一 scheme。
+- base URL 是 checkpoint identity 的一部分。HTTPS 失败 checkpoint 不得原地改写或以
+  HTTP 参数续跑；协议修复后的第一轮必须 fresh，以免请求账本与 queue 身份失真。
+- 年度 `other` 地区清单仍按完整 canonical race URL 精确匹配；scheme 是 key 的一部分。
+  当前 HTTP run 只能使用 HTTP manifest URL，不能把 HTTPS 清单自动降级归一化后复用。
+- 为域名取得可信证书、启用 Nginx 443 server、验证 TLS 后，是否切回 HTTPS 作为独立运维
+  change 处理；不得把本次研究脚本修复扩大为未经设计和验收的证书上线。
+
 ## 2026-07-29 race-live P0 采用条件注册、保持告警队列并实施两阶段关闭态发布
 
 - P0 在 Beat 生产者侧按

@@ -1,5 +1,18 @@
 # 项目状态文档
 
+## 2026-07-31 年度参赛马 443 修复待发布
+
+- 2025 full-network 的 6 次 run 均在写死的 HTTPS sitemap 上 safe-stop；生产实际只启用
+  HTTP Nginx server，443 虽被 Docker publish，但容器内无 TLS listener，现有证书也是 IP
+  自签名证书。
+- 本地已把 workflow/default base URL 对齐为正式 HTTP origin，并让严格 URL 验证全链路
+  保留受控 HTTP/HTTPS scheme，且单次 run 的全部派生 URL/redirect/manifest 必须绑定所选
+  scheme；真实 HTTP sitemap smoke 用 2 次请求发现 1075 个 2025
+  race URL。地区 manifest 的 exact URL 合同与示例也已对齐 HTTP scheme。离线回归为
+  collector `87/87`、workflow `12/12`、全局 contract `26/26`。
+- 尚未 commit/push/PR，也未重新触发联网运行。旧 HTTPS checkpoint 与新 HTTP identity
+  不同，发布后的第一轮必须 fresh，不能用旧 source 三元组续跑。
+
 ## 2026-07-30 单年度八地区分级赛研究执行面已离线发布
 
 - `collect-yearly-graded-race-participants` 方案已通过同一独立 reviewer 三轮审核。计划把旧

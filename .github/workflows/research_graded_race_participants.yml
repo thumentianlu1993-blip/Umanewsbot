@@ -241,7 +241,7 @@ jobs:
             --request-budget 5000 \
             --checkpoint-every 20 \
             --time-budget-seconds 3600 \
-            --base-url https://umafans.run/ \
+            --base-url http://umafans.run/ \
             --output-dir "$OUTPUT_DIR" \
             "${manifest_args[@]}"
           code=$?
