@@ -1,6 +1,6 @@
 # 当前状态
 
-## 2026-07-30 单年度分级赛全部参赛马研究代码审核 REVISE，修复待最终确认
+## 2026-07-30 单年度分级赛研究执行面已离线发布，full-network 仍关闭
 
 - 已从最新 `origin/main@6d073dc07cb29201bbc922255923820c872a0467` 建立独立干净
   worktree `/Users/mentianlu/.codex/worktrees/graded-race-participants/umanews`，分支
@@ -134,15 +134,37 @@
   `missing`、`controlled`、`uncontrolled`；非空但未知的 country 必须保留 raw 事实，不能按
   region 回填为受控 country，并须 fail closed。标准五地区仅在 country 真正 `missing` 且
   region 明确匹配时可通过；Australia、Germany、Middle East 的附加证据规则不放宽。唯一 P2
-  已完成本地修复并纳入当前 collector `83/83`，但尚未由同一 reviewer 第二十二轮最终确认。
+  已完成本地修复并纳入当前 collector `83/83`。
+- 同一 reviewer 第二十二轮最终确认已给出 `VERDICT: APPROVED`，P0/P1/P2=`0/0/0`，session
+  `019fb360-79a8-7aa0-8064-b5a604bc7c7e`；pre/review/post 均 exit `0`。approved parent
+  `6d073dc07cb29201bbc922255923820c872a0467`，approved fingerprint
+  `21a32cf22ef48207d44880d21ec2059ccdd711fe6758a80ee60cb069277f61ce`，
+  content manifest SHA-256
+  `35672bc11172cd5ca7372da53d3ff38de7d31157c952361822c55de27adeffb1`。该最终批准先于随后
+  用户授权的 commit/push/PR/merge 与离线生产部署。
+- 用户已明确授权 commit/push/PR/merge 与本变更生产部署。feature commit
+  `34626865d5cfe336a97fd7a375238e76c8afbec2` 经
+  [PR #50](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/50) 合并；merge commit
+  `d47dd513e666874243815c2feee7cc755ce483ba`，合并时间
+  `2026-07-30T15:14:21Z`，PR `tests` check success（15 秒）。
+- 本变更只改变 GitHub research 执行面，不改变 Django runtime、migration 或数据库 schema。
+  本次生产部署以 workflow 进入 default `main` 并由 default branch 成功完成一次
+  `full_network=false` dispatch 为准：
+  [run 30555834994](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/30555834994)
+  使用 head `d47dd513`，conclusion=`success`；`tests` job 13 秒，races/profiles/merge/finalize
+  因离线模式按设计 skipped。artifact `30555834994-1-synthetic-checkpoint-0` 大小
+  `12957` bytes，根代理已核验其包含 `run_manifest.json`、synthetic report 和 final 严格
+  7 文件。该成功只证明默认分支离线合同，不证明任何真实年度数据覆盖。
+- 生产服务器 `/opt/umanewsbot` 的只读 preflight 为 HEAD `be1c89bf`，存在长期 dirty deploy
+  scripts 和运行产物；容器健康、internal healthz、`manage.py check`、公网 direct IP/Host
+  及 `--resolve` healthz 均通过。为避免覆盖服务器长期 dirty 状态，本次未执行 `git pull`，
+  未重建或重启容器、未迁移、未写数据库；因无数据库变更，未创建 DB backup。不得宣称服务器
+  代码 HEAD 已更新到 `d47dd513`。
 - 当前准确状态：
-  `plan approved / implementation complete but uncommitted / code review REVISE /
-  final read-only confirmation pending /
-  no GitHub Actions run / no full-network collector run / no commit or push /
-  no deployment or production write`。这些结果仅证明本地离线候选，不证明真实年度数据覆盖。
-  下一门禁是复用同一 reviewer 会话执行第二十二轮最终只读确认并生成新 fingerprint；确认成功后
-  仍须等待用户针对新 fingerprint 单独授权 commit/push/PR。正式 `full_network=true` 单年度
-  run 还需要再次单独授权，不能由代码 review 或发布授权推导。
+  `implementation committed and merged / default-branch offline workflow deployed /
+  final code review APPROVED / no full-network collector run /
+  server HEAD unchanged / no container restart, migration, DB write or backup`。
+  `full_network=true` 单年度 run 未获授权、未执行，不能由本次 Git 发布或离线部署授权推导。
 
 ## 2026-07-30 Celery race-live P0 已在关闭态完成发布与五轮观察
 
