@@ -1,5 +1,26 @@
 # 项目状态文档
 
+## 2026-07-30 Celery race-live P0 已完成关闭态发布
+
+- 初始 `start-beat` 因 Django auto-import banner 污染严格 queue snapshot，在真正启动 Beat
+  前 fail closed。final fix 使用 `shell --no-imports -c` 且不放宽 parser，部署合同
+  `33/33`、四组聚焦 `64/64` 通过；限定复审 `APPROVED` 和
+  `INDEX_TRANSITION_OK` 后，commit `24a49c2a` 经 PR `#47` 合并为
+  `main@be1c89bf`。
+- 生产重新完整执行 `prepare`：Django check、historical runner preflight、两次 migration
+  plan `0/0` 与关闭态 settings 全通过；最终 image 为
+  `sha256:c3197503...b5f5`，本窗口 rollback tag
+  `umanewsbot:rollback-race-live-p0-20260730T043615Z` 指向上一候选
+  `sha256:17562c52...acea7`。
+- `start-beat` 五轮全部通过。`race_live=6574 / selector=0 / monitor=6574` 相对启动前
+  基线每轮不变；普通 `celery` 队列为 `36/35/30/28/30`。最终生产
+  HEAD=`be1c89bf`，web/worker/beat image 一致且运行；`race_live_worker=Created`，
+  flags 与两个目标 schedule entry 保持关闭，目标 Beat 日志计数 `0`，普通 worker 只监听
+  `celery` 且 ping 正常。
+- 终验队列为 `celery=23 / race_live=6574`，内外 HTTP healthz 200、OneBot running、
+  最近 15 分钟无 OOM；没有清理、迁移、消费或重放历史 `race_live` 积压。临时 2 GiB swap
+  仍启用且全空闲，最终 `MemAvailable=1576148 KiB`，资源余量很窄；swap 移除仍须单独授权。
+
 ## 2026-07-30 Celery race-live P0 部分部署停在安全检查点，修复待复审/重新授权
 
 - 初始实现 `611c6aab` 已经 PR `#46` 合并为 `main@7cd144ab`；生产仓库从

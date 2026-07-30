@@ -136,3 +136,44 @@ review、提交、合并或部署。
 5. 不清理 `race_live=6574`，不回滚数据库。
 
 临时 swapfile 的停用/删除是独立资源维护动作，不与应用回滚捆绑，仍需单独授权和验证。
+
+## 最终发布收口
+
+上述“部分部署”记录按当时事实原样保留。本节追加最终发布证据，不回写或覆盖前述安全检查点。
+
+- 同一 reviewer 对 stdout final fix 的限定复审结果为 `APPROVED`，inner session
+  `019fb110-7ef5-7270-8bfc-28b1c93ab5bb`；冻结 fingerprint
+  `4c785e742630e1d628d13ce419fce3f61995cac4e58e4f9144709b7e4ea8a000` 与 content
+  manifest `a17ac407620a3c56b6e740c7c1671dbab5b4c82bf441fb9e74523958acd3f416`。
+- 用户针对该版本明确授权后，暂存转换返回 `INDEX_TRANSITION_OK`；final fix commit
+  `24a49c2a` 经 PR `#47` 合并为 `main@be1c89bf`，生产仓库随后 fast-forward 到该版本。
+- 生产重新执行完整 `prepare`：普通 worker 在
+  `active=0 / reserved=0` 后才停止；historical runner preflight 为 `migration_safe`，
+  Django check 通过，两次 migration plan 为 `0/0`，关闭态 settings/schedule 通过。
+  rollback tag
+  `umanewsbot:rollback-race-live-p0-20260730T043615Z` 指向上一候选
+  `sha256:17562c52...acea7`；最终候选为
+  `sha256:c319750374c9ec197b4f6e230ad70b8fc5a8a144daef5a2ad5c4657916ecb5f5`。
+  脚本返回 `CANDIDATE_READY`，此时 Beat 与 `race_live_worker` 均保持停止。
+- `start-beat` 基线为
+  `celery=0 / race_live=6574 / selector=0 / monitor=6574`。五轮 `celery` 依次为
+  `36/35/30/28/30`；`race_live=6574 / selector=0 / monitor=6574` 每轮不变。
+  每轮 Beat/web/worker running 且 image 一致，普通 worker 只监听 `celery` 并可 ping，
+  `race_live_worker` 未运行，healthz 正常，Beat 日志不含两个关闭态目标。
+- 脚本外终验：生产 HEAD=`be1c89bf`，web/worker/beat 均使用
+  `sha256:c3197503...b5f5`；Beat running，`race_live_worker=Created`；
+  `.env` 与容器 settings 均为 `false/false/disabled`，两个目标 schedule entry 不存在；
+  队列为 `celery=23 / race_live=6574 / selector=0 / monitor=6574`，最近十分钟目标 Beat
+  日志计数 `0`。容器内、本机 Nginx、`umafans.run` 与 `www.umafans.run` 的 HTTP
+  healthz 均为 `200`；OneBot running，最近 15 分钟无 OOM。
+- 临时 `/swapfile-umanews-p0-20260730` 仍启用，总量/空闲量均为
+  `2097148 KiB`，未写 fstab；终验 `MemAvailable=1576148 KiB`，只略高于
+  `1536 MiB` 硬门。停用/删除 swap 仍须单独授权，不能在当前负载下顺带执行。
+- 生产进入窗口前已有的 `12` 个 deploy 脚本 mode-only 差异原样保留；全程没有清理、
+  迁移、消费或重放历史 `race_live=6574` 积压。
+
+当前回滚优先使用
+`umanewsbot:rollback-race-live-p0-20260730T043615Z` 恢复到上一候选；该候选不含 stdout
+final fix，恢复后 Beat 必须保持停止。若需继续退回更早版本，才使用
+`umanewsbot:rollback-race-live-p0-20260730T030255Z`。任一回滚都不得改写历史队列或顺带
+移除临时 swap。
