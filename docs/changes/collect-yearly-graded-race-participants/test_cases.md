@@ -305,8 +305,12 @@
      profile region 回填为合法 country，且须在 direct/search、identity review 和结构化 errors
      中 fail closed。标准五地区只有真正 `missing` 时可按明确 region 通过；AU/DE/Middle East
      不放宽。
-- 唯一 P2 已完成本地修复并纳入当前 `83/83`，但尚未由同一 reviewer 第二十二轮最终确认，不得
-  称当前候选为 `APPROVED`。
+- 唯一 P2 已完成本地修复并纳入当前 `83/83`。
+- 同一 reviewer 第二十二轮最终确认已 `APPROVED`，P0/P1/P2=`0/0/0`，session
+  `019fb360-79a8-7aa0-8064-b5a604bc7c7e`；pre/review/post=`0/0/0`。approved parent
+  `6d073dc07cb29201bbc922255923820c872a0467`，approved fingerprint
+  `21a32cf22ef48207d44880d21ec2059ccdd711fe6758a80ee60cb069277f61ce`，content manifest
+  SHA-256 `35672bc11172cd5ca7372da53d3ff38de7d31157c952361822c55de27adeffb1`。
 
 ## 2026-07-30 当前 GREEN 与离线验证
 
@@ -346,8 +350,17 @@
 
 ## 尚待验证
 
-- 尚未运行 GitHub Actions，也未执行 `workflow_dispatch full_network=true` 或任何其他联网
-  collector run；因此没有真实年份、赛事数、参赛马数或名称完整性结论。
-- 独立代码 reviewer 第十九轮 `APPROVED` 现仅为历史快照；第二十轮和第二十一轮最终确认均为
-  `REVISE（P2=1）`。第二十一轮唯一 P2 修复后必须复用同一会话执行第二十二轮最终只读确认并冻结新
-  fingerprint；确认前不得请求 commit/push/PR 授权。正式 `full_network=true` run 仍需单独授权。
+- PR #50 `tests` check 已 success（15 秒）。default `main` 的正式离线
+  `workflow_dispatch` run `30555834994` 使用 head `d47dd513`、`full_network=false`，
+  conclusion=`success`；`tests` job 13 秒，races/profiles/merge/finalize 按设计 skipped。
+  artifact `30555834994-1-synthetic-checkpoint-0`（`12957` bytes）已核验包含
+  `run_manifest.json`、synthetic report 和 final 严格 7 文件。
+- 尚未执行 `workflow_dispatch full_network=true` 或任何其他联网 collector run；因此没有
+  真实年份、赛事数、参赛马数或名称完整性结论。
+- 生产服务器只读 preflight/health 验证通过，但 HEAD 仍为 `be1c89bf`；本变更未 pull、重建、
+  重启、迁移、写 DB 或备份。服务器未更新是本次 GitHub-only 部署的预期边界，不是部署失败，
+  也不得被写成服务器已部署新 HEAD。
+- 独立代码 reviewer 第十九轮 `APPROVED` 仅为历史快照；第二十轮和第二十一轮
+  `REVISE（P2=1）` 的 findings 修复后，第二十二轮最终确认已
+  `APPROVED（P0/P1/P2=0/0/0）`。随后用户授权并完成 Git 发布和离线 deployment；正式
+  `full_network=true` run 仍需单独授权。

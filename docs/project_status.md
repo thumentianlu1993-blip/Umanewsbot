@@ -1,6 +1,6 @@
 # 项目状态文档
 
-## 2026-07-30 单年度八地区分级赛参赛马研究代码审核 REVISE，修复待最终确认
+## 2026-07-30 单年度八地区分级赛研究执行面已离线发布
 
 - `collect-yearly-graded-race-participants` 方案已通过同一独立 reviewer 三轮审核。计划把旧
   研究分支的固定 2026/五地区/前五名/Wikipedia 流水线改为显式单年度、八地区、全部实际参赛马、
@@ -71,10 +71,25 @@
   唯一 P2 已本地修复并纳入历史 `82/82`。同一 reviewer 第二十一轮最终确认仍为
   `REVISE（P2=1）`：country fact 必须区分 missing/controlled/uncontrolled，非空未知值不得由
   region 回填且须 fail closed；标准五地区仅 missing 可按明确 region 通过，AU/DE/Middle East
-  不放宽。唯一 P2 已本地修复并纳入 `83/83`；下一步是同一 reviewer 第二十二轮最终只读确认并
-  冻结新 fingerprint，之后才等待用户针对新 fingerprint 授权发布。
-- 当前改动未提交、未推送，尚未运行 GitHub Actions 或任何联网正式 run，也没有部署和生产
-  写入。代码复审通过、发布授权和每个 `full_network=true` 单年度 run 是三道独立门禁。
+  不放宽。唯一 P2 已本地修复并纳入 `83/83`。同一 reviewer 第二十二轮最终确认已
+  `APPROVED（P0/P1/P2=0/0/0）`，session
+  `019fb360-79a8-7aa0-8064-b5a604bc7c7e`；pre/review/post=`0/0/0`，approved parent
+  `6d073dc07cb29201bbc922255923820c872a0467`，approved fingerprint
+  `21a32cf22ef48207d44880d21ec2059ccdd711fe6758a80ee60cb069277f61ce`，content manifest
+  SHA-256 `35672bc11172cd5ca7372da53d3ff38de7d31157c952361822c55de27adeffb1`。
+- 用户已授权 Git 发布与本变更生产部署。feature commit
+  `34626865d5cfe336a97fd7a375238e76c8afbec2` 经
+  [PR #50](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/50) 合并为
+  `main@d47dd513e666874243815c2feee7cc755ce483ba`；PR tests success（15 秒）。
+  default `main` 的
+  [离线 dispatch 30555834994](https://github.com/thumentianlu1993-blip/Umanewsbot/actions/runs/30555834994)
+  在 head `d47dd513` 上 success，`tests` job 13 秒；网络 DAG 按
+  `full_network=false` 设计 skipped，synthetic artifact `30555834994-1-synthetic-checkpoint-0`
+  为 `12957` bytes，含 run manifest、report 和严格 final 7 文件。
+- 本变更生产部署定义仅为 GitHub research workflow 进入 default `main` 并成功离线 dispatch。
+  生产服务器 `/opt/umanewsbot` 仍为 `be1c89bf` 且存在长期 dirty deploy scripts/运行产物；
+  健康检查通过，但未 pull、重建、重启、迁移、写 DB 或备份。不得宣称服务器 HEAD 已更新。
+  `full_network=true` 未授权、未执行。
 
 ## 2026-07-30 Celery race-live P0 已完成关闭态发布
 

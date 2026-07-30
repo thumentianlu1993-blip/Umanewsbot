@@ -38,7 +38,7 @@
    workflow 静态合同 `11/11`、现有 workflow
    contract `26/26`；synthetic 首次 exit `75`、同目录续跑 exit `0`，逐字节等价并生成
    精确 7 文件。
-7. [ ] 独立代码 reviewer 首轮为 `REVISE（7 P1 + 4 P2）`，第二轮为
+7. [x] 独立代码 reviewer 首轮为 `REVISE（7 P1 + 4 P2）`，第二轮为
    `REVISE（2 P1 + 3 P2）`，第三轮为 `REVISE（4 P1 + 2 P2）`，第四轮为
    `REVISE（3 P1）`，第五轮为 `REVISE（1 P1 + 3 P2）`，第六轮为
    `REVISE（1 P1 + 1 P2）`，第七轮为 `REVISE（2 P1 + 2 P2）`，第八轮为
@@ -54,14 +54,31 @@
    均 exit `0` 且只读。该结论仅为历史快照。第二十轮与第二十一轮最终确认均为
    `REVISE（P2=1）`；最新修复显式区分 country fact 的 missing/controlled/uncontrolled，
    非空未知 country 不按 region 回填并 fail closed；标准五地区仅 missing 可按明确 region
-   通过，AU/DE/Middle East 不放宽。修复已纳入 `83/83`，待第二十二轮确认至 actionable
-   finding 清零。
-8. [ ] 复用同一 reviewer 会话执行第二十二轮最终只读确认并冻结新 fingerprint。第十九轮审阅时
-   fingerprint `89a8021db567eaaed7003680cd85377ca04ec7ee08d48168ef3212cbcb51d262`
-   不得称为最终发布指纹。
-9. [ ] 第二十二轮确认后，等待用户针对新 fingerprint 授权 commit/push/创建或更新 PR。
-10. [ ] 正式 `full_network=true` 单年度 run 需要单独明确授权；每个年份均是独立 run/manifest，
+   通过，AU/DE/Middle East 不放宽。修复已纳入 `83/83`。
+8. [x] 同一 reviewer 第二十二轮最终确认已
+   `APPROVED（P0/P1/P2=0/0/0）`，session
+   `019fb360-79a8-7aa0-8064-b5a604bc7c7e`，pre/review/post=`0/0/0`；approved parent
+   `6d073dc07cb29201bbc922255923820c872a0467`，approved fingerprint
+   `21a32cf22ef48207d44880d21ec2059ccdd711fe6758a80ee60cb069277f61ce`，content manifest
+   SHA-256 `35672bc11172cd5ca7372da53d3ff38de7d31157c952361822c55de27adeffb1`。
+9. [x] 用户已授权并完成 commit/push/PR/merge：feature
+   `34626865d5cfe336a97fd7a375238e76c8afbec2` 经 PR #50 合并为
+   `main@d47dd513e666874243815c2feee7cc755ce483ba`；PR tests success。
+10. [x] default `main` 的 `full_network=false` run `30555834994` success；tests job 通过，
+    网络 DAG 按设计 skipped，artifact `30555834994-1-synthetic-checkpoint-0` 已核验包含
+    run manifest、synthetic report 和 final 严格 7 文件。本项即为本变更生产部署完成定义。
+11. [ ] 正式 `full_network=true` 单年度 run 需要单独明确授权；每个年份均是独立 run/manifest，
     不得从代码审查或 Git 发布授权推导。
+
+## 发布验证与回滚
+
+- 服务器 `/opt/umanewsbot` preflight HEAD=`be1c89bf`，存在长期 dirty deploy scripts/运行产物；
+  容器健康、internal healthz、`manage.py check`、公网 direct IP/Host 与 `--resolve` healthz
+  均通过。本次未 pull、重建/重启容器、迁移或写 DB；无 DB 变更，因此未创建 DB backup。
+- 若 default `main` 的 research workflow 需要回滚，创建新 PR revert merge commit
+  `d47dd513e666874243815c2feee7cc755ce483ba`，合并后重新执行一次
+  `full_network=false` dispatch，并要求 tests success、网络 DAG skipped、synthetic final
+  严格 7 文件。服务器未部署本变更，不需要执行服务器代码或数据库回滚。
 
 ## 首次实施迁移
 

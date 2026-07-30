@@ -149,6 +149,14 @@
 - [x] (integration) 修复第二十一轮唯一 P2：country fact 显式区分
   missing/controlled/uncontrolled，非空未知值不再按 region 回填并 fail closed；标准五地区
   仅 missing 可按明确 region 通过，AU/DE/Middle East 不放宽。
-- [ ] (integration) 复用同一 reviewer 会话执行第二十二轮最终只读确认并冻结新 fingerprint。
-- [ ] (operations) 在最新 review 后等待用户单独授权 commit/push/PR。
+- [x] (integration) 复用同一 reviewer 会话执行第二十二轮最终只读确认；结论为
+  `APPROVED（P0/P1/P2=0/0/0）`，批准 fingerprint
+  `21a32cf22ef48207d44880d21ec2059ccdd711fe6758a80ee60cb069277f61ce`。
+- [x] (operations) 用户授权后完成 feature commit
+  `34626865d5cfe336a97fd7a375238e76c8afbec2`、push、PR #50、merge
+  `d47dd513e666874243815c2feee7cc755ce483ba`。
+- [x] (operations) default `main` 执行 `full_network=false` workflow run `30555834994`；
+  conclusion=`success`，离线 artifact 已核验，完成本变更定义的生产部署。
+- [x] (operations) 只读核验服务器与公网 healthz；因 `/opt/umanewsbot` 长期 dirty 且本变更无
+  Django runtime/DB 变化，未 pull、重建、重启、迁移或备份，服务器 HEAD 保持 `be1c89bf`。
 - [ ] (operations) full-network 单年度 run 另行授权；不得从代码发布授权推导。
