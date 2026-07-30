@@ -1,0 +1,41 @@
+name: Test graded race participant collector
+
+on:
+  pull_request:
+    paths:
+      - runtime/research/collect_graded_race_participants.py
+      - runtime/research/graded_participants/**
+      - runtime/research/test_collect_graded_race_participants.py
+      - docs/changes/graded-race-participants-multiyear/**
+      - .github/workflows/research_graded_race_participants.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: graded-participant-tests-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install requests beautifulsoup4 urllib3
+      - name: Compile
+        run: |
+          python -m py_compile \
+            runtime/research/collect_graded_race_participants.py \
+            runtime/research/graded_participants/*.py \
+            runtime/research/test_collect_graded_race_participants.py
+      - name: Unit tests
+        run: python -m unittest -v runtime/research/test_collect_graded_race_participants.py
+      - name: Diff check
+        run: git diff --check
