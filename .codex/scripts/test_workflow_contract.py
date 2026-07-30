@@ -153,6 +153,31 @@ class WorkflowContractTests(unittest.TestCase):
         )
         result = self.check(success=False)
         self.assertIn("review command", result.stderr)
+        self.replace(
+            "docs/codex_workflow.md",
+            "codex review --uncommitted",
+            "codex review -c 'sandbox_mode=\"read-only\"' --uncommitted",
+        )
+
+        self.replace(
+            "docs/current_state.md",
+            "旧规则下的历史事实，非当前可执行指令",
+            "旧规则下的历史事实，当前可执行指令",
+        )
+        result = self.check(success=False)
+        self.assertIn("historical review command", result.stderr)
+        self.replace(
+            "docs/current_state.md",
+            "旧规则下的历史事实，当前可执行指令",
+            "旧规则下的历史事实，非当前可执行指令",
+        )
+
+        self.append(
+            "docs/current_state.md",
+            "\n当前操作说明：`codex review --uncommitted`。\n",
+        )
+        result = self.check(success=False)
+        self.assertIn("review command", result.stderr)
 
     def test_mutation_multiline_review_command_without_read_only_override_fails(self) -> None:
         self.append(
