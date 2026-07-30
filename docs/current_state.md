@@ -4388,3 +4388,89 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   否则抛 `CommandError` 令进程非零退出。
 - Django check、迁移漂移、编译与 diff 检查通过。仍未联网、未生产写、未提交或部署；
   下一门禁是同一 reviewer 再次限定复审。
+
+# 2026-07-28 单一 migration owner 进入方案审核门禁
+
+- 已从最新 `origin/main@7385f59ab87bcce5193f3313ecca6809b165ad89` 创建隔离分支
+  `codex/fix-single-migration-owner`，未修改主工作区。
+- 只读盘点确认双执行者同时存在于标准/低成本 deploy、两条 rollback 与
+  `deploy/docker/start-web.sh`：`compose up web` 后的显式 `exec migrate` 可与 web 主进程
+  的自动 migrate 并发。
+- 已建立 `docs/changes/fix-single-migration-owner/` 的 spec、design、test cases、tasks、
+  rollout 和自包含 `HANDOFF.md`。推荐把 migration/collectstatic 收敛到单个 Compose one-shot
+  release task；web 常驻入口不再迁移，并增加 host-local 部署锁和 web healthy 硬门禁。
+- 当前只改文档，未修改测试、部署脚本、Compose、应用代码或 migration；未连接生产，未
+  commit/push/PR/部署。
+- 独立方案 reviewer `/root/single_migration_plan_review` 首轮发现 4 项 P1：race-live 未停、
+  wrapper 绕锁、pre-contract rollback 不可用和 greenfield 语义错误；限定复审再发现 manual
+  release 运行态门禁与权威 runbook 两项直接 P1。全部只通过文档修订关闭，同一 reviewer
+  第三轮给出 `APPROVED`，开放 P0/P1 为 0。
+- 下一门禁是用户明确“确认实现/开始实现/继续实现”；此前禁止写测试或部署脚本、启动实现
+  subagent、commit/push/PR、部署、迁移或生产写入。
+
+# 2026-07-29 单一 migration owner 实现落地（待复审）
+
+- `fix-single-migration-owner` 已在隔离分支完成 deploy/ 实现：唯一容器内 release task
+  （`deploy/docker/run-release-tasks.sh`）、受保护宿主 wrapper、host-local 部署锁、
+  web 健康等待、共享 release 编排、手工恢复入口、pre-contract 回滚兼容桥与
+  `release_contract_v1` marker；`start-web.sh` 与四条 deploy/rollback 脚本中的重复
+  migrate/collectstatic 已全部移除，drain 脚本支持 `EXPECTED_CELERY_WORKERS` 完整
+  快照核对。
+- 首轮实现后协调复审指出两条 rollback 丢失 historical runner preflight，已按裁决在
+  target ref 校验（rev-parse + release_contract_v1 marker）通过之后、`git checkout`
+  之前恢复调用，与 deploy 语义一致、无 `--initial-install` 分支。
+- 实现 review 六项 findings 已修复：`compose ps -q` 探测失败在编排/手工/桥三处一律
+  fail closed（不再当作 not-running）；deploy 锁 acquire 移到 historical preflight
+  之前且 acquire 记录 COMPOSE_FILE；manual release 的 restarting 检测改用
+  `State.Status` 第三列；drain 的 expected node 改为精确匹配（全名或 `@` 后缀）；
+  pre-contract 桥在停服前用 `docker image inspect` 自检冻结镜像。rollback checkout
+  替换执行中脚本自身经裁决属 pre-existing 模式，记录为后续建议。
+- 第 3 轮 Codex 原生 review（REVISE）七项 findings 已修复：race_live 冻结状态持久化到
+  `${DEPLOYMENT_LOCK_DIR}.race-live-state` 跨重试复用、成功后删除；bridge schema 门禁
+  必须显式 true/false；rollback checkout 前逐一 `git cat-file -e` 全部 8 个 v1 路径并
+  绑定不可变 OID；三处 probe 的 running 字段精确 true/false 校验；文档顺序与状态同步。
+- 第 4 轮复审（REVISE）findings 已修复：状态文件只决定恢复意图、每次尝试仍重新 probe
+  当前态决定停止与 drain（frozen=not-running+current=running 必须在 release/tag 前停
+  race_live 且当前 node 进 drain）；v1 helper 扩到 9 个路径；`TARGET_OID` 必须单行
+  40 位小写 hex，畸形输出在任何 cat-file/preflight/checkout 前非零；drain 内嵌代码
+  首行承载 expected nodes 使调用日志可见；design/runbook/guide 文档同步为 OID 语义。
+- 聚焦套件 `stable.test_single_migration_owner` 94/96：14 项 RED 全绿，剩 2 项为测试
+  文件张力（T11 两个成功用例未给 fake rev-parse 准备 OID 输出，与 malformed-empty 子例
+  可观察输入相同但期望相反；需测试侧补 `git-rev-parse-output`，同第 3 轮 T12 修法）。
+  相邻 historical runner 合同测试 `11/11` 通过；`sh -n deploy/*.sh deploy/docker/*.sh`
+  与 `git diff --check` 通过。
+- 未 commit/push/PR，未部署、未迁移、未连接生产；下一门禁是测试侧修正后同一 reviewer
+  第 5 轮复审并冻结新指纹。
+
+# 2026-07-30 单一 migration owner 原地 re-baseline 至 6d073dc0
+
+- worktree 已原地迁移：`origin/main@7385f59` -> `origin/main@6d073dc07cb29201bbc922255923820c872a0467`，
+  分三跳完成：第一跳至 `7cd144ab`（main 增量 65 文件，含 race-calendar 日期窗口、race-news
+  质量治理、harden-celery-p0-admission）；第二跳至 `be1c89bf`（PR #47
+  fix-p0-queue-snapshot-output，p0 脚本与其合同测试及 3 份状态文档）；第三跳至 `6d073dc0`
+  （PR #48，纯文档增量：p0 release_report 与三份状态文档，无代码变化，三方合并零冲突）。
+- 4 份重叠文档重叠区由主线程三方合并；本 change 内容仅追加。
+- main 新增 `deploy/deploy_race_live_p0_closed.sh` 含 collectstatic，经用户批准登记为 T01/T02
+  显式例外；最终基线上前提复核仍成立（1 次 collectstatic、0 migrate、2 次
+  `verify_migration_plan_zero` 调用）；单一 migration owner 不变量不受影响。
+- 聚焦套件终值 97 用例；文档侧 spec/design/runbook/REVIEW_HANDOFF 已同步基线与例外决策。
+- 旧冻结指纹全部失效；待同一 reviewer 在新基线上做第 5 轮复审后冻结新指纹，再等待发布授权。
+
+# 2026-07-30 单一 migration owner 第 5 轮 findings 修复完成
+
+- 第 5 轮复审（REVISE）三组 findings 已修复：p0 closed-admission 脚本接入共享部署锁
+  （action 扩入 p0-closed-admission/resume-release）；新增 `deploy/resume_stopped_release.sh`
+  受审恢复入口；race-live 冻结意图改六字段 mode-600 绑定并经共享 `deploy/race_live_state.sh`
+  可信校验（编排/桥 fail closed、resume 告警跳过 race-live）。
+- 聚焦套件 `113/113`、p0 合同套件 `35/35`、相邻 historical runner `11/11` 全绿；
+  `sh -n deploy/*.sh deploy/docker/*.sh` 与 `git diff --check` 通过。
+- 未 commit/push/PR，未部署、未迁移、未连接生产；待同一 reviewer 第 5 轮复审确认后冻结新指纹。
+
+# 2026-07-30 单一 migration owner 第 6 轮修复完成
+
+- 第 6 轮复审（REVISE）P1 已修复：resume 对可信 race-live 意图文件改为全链路成功后消费
+  删除（running/not-running 一致；不可信保留人工核对；中途失败保留）。四项 P2 建议
+  （属主检查 fail open、六字段唯一完整、RELEASE_ACTION 必填化、resume 中间态）仅记录于
+  REVIEW_HANDOFF 后续建议节，本轮不改代码。
+- 聚焦套件 `117/117`、p0 合同套件 `35/35` 全绿；`sh -n` 与 `git diff --check` 通过。
+- 未 commit/push/PR，未部署、未迁移、未连接生产；待同一 reviewer 第 7 轮复审冻结新指纹。

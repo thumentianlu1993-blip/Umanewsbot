@@ -172,6 +172,8 @@ class ClosedDeployHarness:
             "RACE_LIVE_P0_TEST_MODE": "1",
             "RACE_LIVE_P0_TEST_SENTINEL": str(self.test_sentinel),
             "P0_FAKE_CALL_LOG": str(self.call_log),
+            "DEPLOYMENT_LOCK_DIR": str(self.state_dir / "deployment.lock"),
+            "P0_FAKE_LOCK_ACQUIRE_EXIT": "0",
             "P0_FAKE_BEAT_STATE_FILE": str(self.beat_state_file),
             "P0_FAKE_WEB_STATE_FILE": str(self.web_state_file),
             "P0_FAKE_WORKER_STATE_FILE": str(self.worker_state_file),
@@ -506,6 +508,36 @@ class ClosedDeployHarness:
             set -eu
             printf 'historical-preflight|%s\n' "$*" >> "$P0_FAKE_CALL_LOG"
             exit "${P0_FAKE_PREFLIGHT_EXIT:-0}"
+            """,
+        )
+        self._write_executable(
+            self.deploy_dir / "deployment_lock.sh",
+            r"""
+            #!/bin/sh
+            set -eu
+            cmd="${1:-}"
+            printf 'deployment-lock|%s\n' "$cmd" >> "$P0_FAKE_CALL_LOG"
+            lock_dir="${DEPLOYMENT_LOCK_DIR:?DEPLOYMENT_LOCK_DIR required}"
+            case "$cmd" in
+              acquire)
+                rc="${P0_FAKE_LOCK_ACQUIRE_EXIT:-0}"
+                [ "$rc" = "0" ] || exit "$rc"
+                mkdir "$lock_dir" 2>/dev/null || exit 1
+                printf '%s\n' "${DEPLOYMENT_LOCK_TOKEN:-}" > "$lock_dir/token"
+                ;;
+              verify)
+                [ -f "$lock_dir/token" ] || exit 1
+                [ "$(cat "$lock_dir/token")" = "${DEPLOYMENT_LOCK_TOKEN:-}" ] \
+                  || exit 1
+                ;;
+              release)
+                rm -rf "$lock_dir"
+                ;;
+              *)
+                exit 2
+                ;;
+            esac
+            exit 0
             """,
         )
 
@@ -849,6 +881,56 @@ class RaceLiveP0DeploymentPrepareFlowTests(
     DeploymentContractAssertions,
     SimpleTestCase,
 ):
+    def test_prepare_acquires_deployment_lock_before_first_stateful_call(self):
+        with ClosedDeployHarness(self) as harness:
+            result = harness.run("prepare")
+
+        self.assertEqual(result.process.returncode, 0, result.output)
+        self.assertIn(
+            "deployment-lock|acquire",
+            result.calls,
+            "p0 脚本必须接入共享部署锁（acquire）",
+        )
+        acquire_index = result.calls.index("deployment-lock|acquire")
+        first_stateful_index = next(
+            index
+            for index, call in enumerate(result.calls)
+            if call.startswith("compose|")
+            and any(
+                operation in shlex.split(call.split("|", 1)[1])
+                for operation in ("stop", "build", "up", "run")
+            )
+        )
+        self.assertLess(
+            acquire_index,
+            first_stateful_index,
+            f"锁 acquire 必须在首个有状态 compose 调用之前: {result.calls}",
+        )
+        self.assertIn(
+            "deployment-lock|release",
+            result.calls,
+            "正常退出必须经 trap 释放部署锁",
+        )
+
+    def test_prepare_lock_acquire_failure_blocks_all_stateful_calls(self):
+        with ClosedDeployHarness(self) as harness:
+            result = harness.run(
+                "prepare", env={"P0_FAKE_LOCK_ACQUIRE_EXIT": "1"}
+            )
+
+        self.assertNotEqual(result.process.returncode, 0, result.output)
+        self.assert_no_mutating_compose_calls(result)
+        self.assertEqual(
+            self.compose_operation_calls(result, "run"),
+            [],
+            f"锁获取失败后仍调用 compose run: {result.calls}",
+        )
+        self.assertNotIn(
+            "deployment-lock|release",
+            result.calls,
+            "竞争失败者不得安装释放锁 trap",
+        )
+
     def assert_unconfirmed_stop_keeps_pre_stop_boundary(
         self,
         result: ScriptResult,

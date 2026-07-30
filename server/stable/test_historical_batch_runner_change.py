@@ -1944,12 +1944,21 @@ class HistoricalBatchRunnerOperationsContractTests(SimpleTestCase):
         self.assertNotIn('-v control_password="$password"', text)
 
     def test_ordinary_deploy_is_no_deps_and_never_bootstraps(self):
-        for relative in ("deploy/deploy.sh", "deploy/deploy_lowcost.sh", "deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+        entrypoints = (
+            "deploy/deploy.sh",
+            "deploy/deploy_lowcost.sh",
+            "deploy/rollback.sh",
+            "deploy/rollback_lowcost.sh",
+        )
+        for relative in entrypoints:
             text = self._read(relative)
             self.assertIn("historical_runner_preflight", text)
-            self.assertIn("wait_for_celery_drain", text)
-            self.assertIn("--no-deps", text)
+            self.assertIn("run_application_release", text)
             self.assertNotIn("bootstrap_infrastructure", text)
+        orchestration = self._read("deploy/run_application_release.sh")
+        self.assertIn("wait_for_celery_drain", orchestration)
+        self.assertIn("--no-deps", orchestration)
+        self.assertNotIn("bootstrap_infrastructure", orchestration)
 
     def test_celery_drain_requires_worker_response_and_empty_active_reserved(self):
         text = self._read("deploy/wait_for_celery_drain.sh")

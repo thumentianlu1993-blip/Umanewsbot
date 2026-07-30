@@ -2324,3 +2324,21 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   4，使美国 19 场改走 Sporting Life 后全批仍可满足 75 请求硬上限。
 - 新 candidate source map 版本为 `2026-07-27-gap-v2`。发布前的 40 场合并包仅供审阅，
   source map v2 未部署前不得作为正式 audit/apply 输入。
+
+## 2026-07-28 数据库 migration 采用显式一次性 release task 作为唯一 owner
+
+- 当前 `start-web.sh` 与四条 deploy/rollback 入口都能执行 migration，`up -d web` 后再
+  `exec web migrate` 存在真实并发 DDL 风险。
+- 设计决定不再把 migration/collectstatic 绑定到常驻 web 启动；两者由共享的 Compose
+  one-shot release task 串行执行。标准/低成本 deploy 与 rollback 只调用这一入口。
+- release task 前必须停 beat，冻结并完整排空普通/race-live worker，停普通 worker、原本
+  running 的 race_live_worker 和 web；release 成功后先启动 web 并等待 `healthy`，再启动
+  worker/beat/nginx，race_live_worker 只按原始状态恢复。任一失败均非零并禁止继续。
+- deploy、rollback 和手工 release 共享 host-local fail-closed 部署锁与 owner token。内部
+  wrapper 缺 token 拒绝，竞争失败者不能释放赢家锁；遗留锁不得自动过期删除。
+- 通用 rollback 只接受含 `release_contract_v1` 的目标；首次发布回退到 pre-contract 版本时
+  保留新控制面 checkout，只恢复冻结旧 image，由旧 web 作为唯一 migration owner。
+- greenfield bootstrap 不在本 change 范围；historical runner initial-install 不等于站点初装。
+- 代码 rollback 不等于数据库反向 migration。目标 schema 不兼容时必须显式反向迁移或恢复
+  已校验备份，不能只 checkout 旧代码后继续启动。
+- 本决定目前处于设计/审核阶段，不是实现或生产授权。

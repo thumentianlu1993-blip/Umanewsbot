@@ -7377,3 +7377,122 @@ revision、新闻或 QQ。
    `--apply --confirm-apply`、独立 verify 的顺序执行。
 6. 止血先关闭总开关；只停网络则关闭 network 开关；收件人为空时 fail closed。审核包与治理
    ledger 默认保留。
+
+## 2026-07-28 `fix-single-migration-owner` 方案边界
+
+当前 main 的标准/低成本 deploy 和两条 rollback 在 `up -d web` 后显式执行
+`manage.py migrate --noinput`，而 `deploy/docker/start-web.sh` 也在 web 主进程内执行同一命令。
+`up -d` 不等待容器启动脚本完成，因此这是两个可能并发的 migration owner，不是安全的串行重放。
+
+已设计但尚未实现的收敛方式：
+
+1. 唯一 owner 为 Compose `run --rm --no-deps web` 启动的容器内 release-task；
+2. release-task 串行执行依赖等待、migrate 和 collectstatic；
+3. web 常驻入口只做依赖等待、可选 seed 和 Gunicorn；
+4. deploy/rollback 共享 host-local 排他锁、owner token 和 release orchestration；内部 wrapper
+   缺当前 token 时零 Compose call，竞争失败者不能释放赢家锁；
+5. 顺序固定为停 beat、冻结普通/race-live worker node 与运行态、完整排空并停普通 worker 和
+   原本 running 的 race_live_worker、停 web、release、启动并等待 web healthy、再启动
+   worker/beat/nginx，race_live_worker 只按原始 running 状态恢复；
+6. migration、collectstatic 或 health 任一失败时，web/worker/beat/nginx/race_live_worker
+   零启动；
+7. 全新站点 greenfield bootstrap 不在本 change 范围；
+   `HISTORICAL_RUNNER_INITIAL_INSTALL=true` 只表示已有健康 web/db/redis 上的 historical
+   runner 首次纳管。既有环境手工 release 只有在 web/worker/beat/race_live_worker 全部可验证
+   为非运行时才能执行，完成后也不启动服务；
+8. 通用 rollback 只接受含 `release_contract_v1` 的目标 ref。首次发布回退到 pre-contract
+   版本时保留新控制面 checkout，使用部署前冻结旧 image 的兼容桥，且不调用新 one-shot 或旧
+   rollback 的显式 migrate；
+9. rollback 的 forward migrate 不能当作 schema 回退；不兼容时使用已审核反向 migration
+   或校验备份。
+
+上述方案已于 2026-07-29 在隔离分支 `codex/fix-single-migration-owner` 实现（见下节），
+尚未 commit/push，未部署、未连接生产。
+
+## 2026-07-29 `fix-single-migration-owner` 实现与操作要点
+
+实现落在 `deploy/`，聚焦合同测试 `stable.test_single_migration_owner`（117 项 = 97 项
+re-baseline 基线 + 各轮 findings 新增）。
+
+### 新入口与脚本
+
+- `deploy/docker/run-release-tasks.sh`：唯一 migration/collectstatic 所有者。容器内
+  依次 `wait_for_services.py`、`manage.py migrate --noinput`、`manage.py
+  collectstatic --noinput`，`set -eu` 保证任一步失败后续零执行；不启动任何常驻进程。
+- `deploy/run_release_tasks.sh`：受保护宿主 wrapper（内部入口，操作者不得直接调用）。
+  要求 allowlist `COMPOSE_FILE` 与 `DEPLOYMENT_LOCK_TOKEN`，先 verify 部署锁再执行恰好
+  一次 `compose run --rm --no-deps web /app/deploy/docker/run-release-tasks.sh`。
+- `deploy/deployment_lock.sh acquire|verify|release`：host-local 排他锁（默认
+  `/tmp/umanews-deployment.lock`）。`mkdir` 原子抢锁；元数据只含 PID、动作
+  （deploy/rollback/manual-release/pre-contract-rollback）、UTC 时间、Compose 文件和
+  token 的 SHA-256；锁目录已存在一律 fail closed，绝不自动清理；verify/release 均需
+  token hash 匹配，非 owner 不能释放。遗留锁只能人工确认无部署进程后手工删除。
+- `deploy/wait_for_compose_service_healthy.sh`：仅支持 web；只有精确 `true healthy`
+  返回 0，`false *`/`unhealthy` 立即非零，absent/starting/inspect 错误每 2 秒重试至
+  `SERVICE_HEALTH_TIMEOUT_SECONDS`（默认 300）超时非零；日志只含 service、容器 ID
+  前 12 位和最后状态。
+- `deploy/run_application_release.sh`：deploy 与 post-contract rollback 的共享编排。
+  先冻结普通 worker 与 race_live_worker 的 container hostname/运行态（探测失败在
+  任何停服前 fail closed），再 停 beat -> 排空（`EXPECTED_CELERY_WORKERS` 传入冻结
+  节点集合，缺一即失败）-> 停 worker -> 原本 running 才停 race_live_worker ->
+  停 web -> 单次 release task -> 启动 web -> 等待 healthy -> 启动 worker/beat/nginx
+  -> 原本 running 才恢复 race_live_worker -> `ps`。
+- `deploy/manual_release.sh`：既有环境手工恢复顶层入口。自行生成高熵 token 并
+  acquire 锁（成功才安装 release trap；竞争失败者不触碰赢家锁）；web/worker/beat/
+  race_live_worker 任一 running、restarting 或状态不可读即 fail closed（零 Compose
+  `run`）；全部非运行才调用一次受保护 wrapper；完成后不启动任何服务。
+- `deploy/rollback_pre_single_owner.sh <冻结旧 image tag>`：首次发布回退桥。不
+  checkout 旧 ref；同一锁内停服/排空后 `docker tag <冻结tag> umanewsbot:prod`，只
+  启动一个旧 web（旧 image 入口自行迁移一次），healthy 后恢复下游；
+  `SCHEMA_COMPATIBLE_WITH_TARGET=false` 时在 image 切换前非零停止；绝不调用新
+  one-shot 或旧 rollback 脚本。
+- `deploy/release_contract_v1`：空 marker。通用 rollback 先把目标 ref 解析为不可变
+  `TARGET_OID`（必须是单行 40 位小写十六进制，畸形输出在任何检查前非零），再对 marker
+  与全部 9 个 v1 helper 逐一 `git cat-file -e "<OID>:<path>"`，任一缺失在任何
+  checkout/停服前非零拒绝；checkout 也只使用该 OID。
+
+### 修改的既有入口
+
+- `deploy/docker/start-web.sh`：删除 migrate/collectstatic，保留 wait_for_services、
+  可选 seed_admin 和 `exec gunicorn`。
+- `deploy/deploy.sh` / `deploy/deploy_lowcost.sh`：保留 `.env` 检查、historical
+  runner preflight（含 `--initial-install` 分支）、`pull nginx`、`build web`；在任何
+  有状态动作前 acquire 锁（action=deploy，高熵 token，acquire 成功才安装 trap）；
+  删除全部 `exec web ... migrate/collectstatic` 和直接 `up web`，改调
+  `run_application_release.sh`。
+- `deploy/rollback.sh` / `deploy/rollback_lowcost.sh`：空 ref usage 非零；acquire 锁
+  （action=rollback）；`rev-parse --verify` 失败零停服零 release；解析出的不可变 OID
+  必须通过格式校验（单行 40 位小写 hex）；marker 与全部 v1 helper 缺失在任何
+  checkout/停服前非零拒绝；OID 校验通过后、`git checkout`（只 checkout 该 OID）前执行
+  `historical_runner_preflight.sh`（此时既有 web 仍在运行，前置条件成立，无
+  `--initial-install` 分支）；然后 build web、共享编排。
+- `deploy/wait_for_celery_drain.sh`：新增可选 `EXPECTED_CELERY_WORKERS`（空格分隔
+  container hostname，校验字符集后透传进 `compose exec` argv 的内嵌 python）；
+  ping/active/reserved/active_confirm 快照必须完整包含全部 expected node，缺任一即
+  非零；未设置时保持原行为。
+
+### release 失败后的受审恢复路径
+
+1. 先按失败矩阵定位并修复根因（依赖、migration、静态卷、镜像、healthcheck），禁止在未修复
+   根因时盲目重试。
+2. 需要重跑 schema/static 时：确认 web/worker/beat/race_live_worker 全部停止后执行
+   `COMPOSE_FILE=<allowlisted> ./deploy/manual_release.sh`（一次性 release task，完成后
+   服务保持停止）。
+3. 只需恢复已停止的服务时：`COMPOSE_FILE=<allowlisted> ./deploy/resume_stopped_release.sh`
+   （受审恢复入口，action=resume-release 共享锁；四服务全部确认停止才启动 web -> 等
+   healthy -> worker/beat/nginx -> 按可信冻结意图恢复 race_live_worker；绝不调用 one-shot）。
+4. 冻结意图文件 `${DEPLOYMENT_LOCK_DIR}.race-live-state` 为六字段绑定（state/node/
+   compose_file/action/head/frozen_at_utc，mode 600）：编排/桥对任何绑定或可信性失败
+   在任何 stop 前 fail closed；resume 对不可信文件只告警并跳过 race-live 恢复、核心服务
+   照恢复。任何情况下遗留意图文件都只能人工核对后删除，脚本不自动清理不可信文件。
+
+### 操作警示
+
+- **forward migrate 不等于数据库回退**：共享 release task 只把目标代码已知 migration
+  推到 forward head，绝不撤销较新的 migration；schema 不兼容时必须停在 release 前，
+  由人工选择已审核反向 migration 或恢复部署前已校验备份。
+- `HISTORICAL_RUNNER_INITIAL_INSTALL=true` **不是**全新站点 greenfield 安装能力，只是
+  historical runner 首次纳管预检，前置要求既有健康 web/db/redis；无健康 web 时
+  deploy 在任何迁移前 fail closed。
+- release task、web 启动或健康等待任一失败时，worker/beat/nginx/race_live_worker
+  零启动；按失败矩阵人工恢复，禁止用“临时把 migrate 加回 start-web”作为恢复方式。

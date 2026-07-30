@@ -130,6 +130,23 @@ HISTORICAL_PREFLIGHT="$ROOT_DIR/deploy/historical_runner_preflight.sh"
   exit 1
 }
 
+# 接入共享部署锁（与 deploy.sh 同型）：覆盖 prepare/start-beat 全部有状态路径。
+# acquire 成功才安装 release trap；竞争失败者零有状态调用且不得触碰赢家锁。
+DEPLOYMENT_LOCK_TOKEN="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+export DEPLOYMENT_LOCK_TOKEN
+release_lock() {
+  COMPOSE_FILE="$COMPOSE_FILE" "$ROOT_DIR"/deploy/deployment_lock.sh release >/dev/null 2>&1 || true
+}
+if ! COMPOSE_FILE="$COMPOSE_FILE" DEPLOYMENT_LOCK_ACTION=p0-closed-admission \
+  "$ROOT_DIR/deploy/deployment_lock.sh" acquire; then
+  echo "另一部署/回滚/恢复流程持有部署锁；拒绝继续。" >&2
+  exit 1
+fi
+trap release_lock EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 STATE="PRE_STOP_PREFLIGHT"
 INITIAL_BEAT_STATE="unknown"
 WORKER_STOPPED=0
@@ -654,34 +671,36 @@ restart_safe_services_after_failure() {
 on_exit() {
   exit_status="$?"
   trap - EXIT
-  [ "$exit_status" -ne 0 ] || return 0
 
-  if [ "$PHASE" = "prepare" ]; then
-    if [ "$STATE" = "PRE_STOP_PREFLIGHT" ]; then
-      if [ "$STOP_ATTEMPTED" -eq 0 ] \
-        || [ "$STOP_UNCHANGED_CONFIRMED" -eq 1 ]; then
-        echo "Beat 原状态为 ${INITIAL_BEAT_STATE}，未被本命令改变。" >&2
+  if [ "$exit_status" -ne 0 ]; then
+    if [ "$PHASE" = "prepare" ]; then
+      if [ "$STATE" = "PRE_STOP_PREFLIGHT" ]; then
+        if [ "$STOP_ATTEMPTED" -eq 0 ] \
+          || [ "$STOP_UNCHANGED_CONFIRMED" -eq 1 ]; then
+          echo "Beat 原状态为 ${INITIAL_BEAT_STATE}，未被本命令改变。" >&2
+        else
+          echo "Beat 原状态为 ${INITIAL_BEAT_STATE}；stop 后状态为 ${STOP_OBSERVED_STATE}，停止未确认。" >&2
+        fi
       else
-        echo "Beat 原状态为 ${INITIAL_BEAT_STATE}；stop 后状态为 ${STOP_OBSERVED_STATE}，停止未确认。" >&2
+        restart_safe_services_after_failure || exit_status=1
+        if assert_beat_stopped; then
+          echo "失败复核：Beat 仍保持停止，未自动启动。" >&2
+        else
+          echo "失败复核：Beat 停止态未知；保持 fail closed。" >&2
+          exit_status=1
+        fi
       fi
-    else
-      restart_safe_services_after_failure || exit_status=1
-      if assert_beat_stopped; then
-        echo "失败复核：Beat 仍保持停止，未自动启动。" >&2
-      else
-        echo "失败复核：Beat 停止态未知；保持 fail closed。" >&2
+    elif [ "$BEAT_STARTED_BY_COMMAND" -eq 1 ]; then
+      "$COMPOSE" -f "$COMPOSE_FILE" stop --timeout 30 beat >/dev/null 2>&1 \
+        || exit_status=1
+      if ! assert_beat_stopped; then
+        echo "start-beat 失败且无法确认 Beat 已重新停止。" >&2
         exit_status=1
       fi
     fi
-  elif [ "$BEAT_STARTED_BY_COMMAND" -eq 1 ]; then
-    "$COMPOSE" -f "$COMPOSE_FILE" stop --timeout 30 beat >/dev/null 2>&1 \
-      || exit_status=1
-    if ! assert_beat_stopped; then
-      echo "start-beat 失败且无法确认 Beat 已重新停止。" >&2
-      exit_status=1
-    fi
   fi
 
+  release_lock
   exit "$exit_status"
 }
 
