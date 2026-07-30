@@ -204,6 +204,7 @@ PUBLIC_REGION_TABS = [
     {"value": RacingRegion.UNITED_KINGDOM, "label": "英国", "color": "#1D4E9E"},
     {"value": RacingRegion.FRANCE, "label": "法国", "color": "#2A7FBF"},
     {"value": RacingRegion.UNITED_STATES, "label": "美国", "color": "#3E5C3A"},
+    {"value": RacingRegion.OTHER, "label": "其他", "color": "#0E5A38"},
 ]
 PUBLIC_REGION_COLORS = {
     "": "#14181F",
@@ -212,6 +213,7 @@ PUBLIC_REGION_COLORS = {
     RacingRegion.UNITED_KINGDOM: "#1D4E9E",
     RacingRegion.FRANCE: "#2A7FBF",
     RacingRegion.UNITED_STATES: "#3E5C3A",
+    RacingRegion.OTHER: "#0E5A38",
 }
 
 
@@ -3764,12 +3766,12 @@ def public_article_detail(request: HttpRequest, article_id: int):
 
 
 def public_horse_index(request: HttpRequest):
-    redirect_response = _redirect_legacy_region(request)
-    if redirect_response:
-        return redirect_response
     token_hash = _follow_token_hash_from_request(request)
     queryset = _public_horse_queryset(token_hash=token_hash)
     query = request.GET.get("q", "").strip()
+    active_region = _resolve_public_region(request.GET.get("region", ""))
+    if active_region:
+        queryset = queryset.filter(racing_region=active_region)
     if query:
         queryset = queryset.filter(
             Q(display_name_zh__icontains=query)
@@ -3790,7 +3792,8 @@ def public_horse_index(request: HttpRequest):
         {
             "page_obj": page_obj,
             "horse_profiles": page_obj.object_list,
-            "filters": {"q": query},
+            "filters": {"q": query, "region": active_region},
+            "region_tabs": _region_tab_context(active_region),
             "pagination_querystring": pagination_params.urlencode(),
         },
     )

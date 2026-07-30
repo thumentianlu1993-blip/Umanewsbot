@@ -201,6 +201,7 @@ services:
       - ./deploy/certs:/etc/nginx/certs:ro
       - static_data:/var/www/static:ro
       - media_data:/var/www/media:ro
+      - ./data:/opt/umanewsbot/data:ro
       - app_logs:/var/log/umanewsbot:ro
     restart: unless-stopped
 
