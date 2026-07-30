@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import unittest
@@ -7,13 +8,14 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from graded_participants.checkpoint import CheckpointStore, merge_stage, run_checkpointed
+from graded_participants.checkpoint import CheckpointStore, merge_stage, run_checkpointed, store_for
 from graded_participants.collector import Collector
 from graded_participants.core import (
-    ParticipantRow, classify_region, grade_is_in_scope, infer_names,
-    keys_sha256, normalize_result_status, stable_shard,
+    ParticipantRow, atomic_write_json, classify_region, current_tool_version,
+    grade_is_in_scope, infer_names, keys_sha256, normalize_result_status,
+    sha256_bytes, stable_shard,
 )
-from graded_participants.pipeline import parse_args
+from graded_participants.pipeline import finalize, parse_args
 
 
 class FakeResponse:
@@ -129,6 +131,47 @@ class Tests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'nonterminal'):
                 merge_stage(root, source_stage='source', target_stage='merged',
                             manifest_sha='x' * 64, keys=keys, shard_count=1)
+
+    def test_finalize_english_quality_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); race_url = 'https://umafans.run/races/2025/test/'
+            manifest = {
+                'year': 2025, 'cutoff': '2025-12-31', 'base_url': 'https://umafans.run',
+                'race_urls': [race_url], 'race_urls_sha256': keys_sha256([race_url]),
+                'region_overrides_sha256': '', 'tool_version': current_tool_version(),
+                'created_at': '2025-12-31T00:00:00+00:00',
+            }
+            manifest_path = root / 'run_manifest.json'; atomic_write_json(manifest_path, manifest)
+            manifest_sha = sha256_bytes(manifest_path.read_bytes())
+            participant = ParticipantRow(
+                region='australia', region_label='澳大利亚', race_date='2025-03-01',
+                race_name_zh='测试锦标', race_name_original='Test Stakes', grade='G1',
+                racecourse='Flemington', finish_position=1, finish_position_text='1',
+                result_status='finished', horse_number='1', horse_display_name='Alpha',
+                jockey_name='', trainer_name='', finish_time='', margin='', odds_popularity='',
+                race_url=race_url, race_page_sha256='a' * 64, horse_lookup_key='australia|alpha',
+            )
+            races = store_for(root, stage='races_merged', manifest_sha=manifest_sha,
+                              keys=[race_url], shard_index=None, shard_count=1)
+            races.save_item(race_url, {'status': 'success', 'included': True,
+                                       'rows': [participant.__dict__], 'source': {'url': race_url}})
+            races.rebuild_index()
+            profiles = store_for(root, stage='profiles_merged', manifest_sha=manifest_sha,
+                                 keys=['australia|alpha'], shard_index=None, shard_count=1)
+            profiles.save_item('australia|alpha', {
+                'status': 'not_found', 'region': 'australia', 'display_names': ['Alpha'],
+                'profile_url': '', 'original_name': '', 'birth_year': '',
+                'name_zh': '', 'name_ja': '', 'name_en': '',
+                'name_quality_status': 'profile_not_found',
+            })
+            profiles.rebuild_index()
+            self.assertEqual(finalize(root, fail_on_missing_english=False), 0)
+            summary = json.loads((root / 'final' / 'summary.json').read_text(encoding='utf-8'))
+            self.assertEqual(summary['counts']['missing_required_english'], 1)
+            self.assertEqual(summary['counts']['missing_chinese'], 1)
+            self.assertEqual(summary['counts']['missing_japanese'], 1)
+            self.assertFalse(summary['quality']['english_name_contract_passed'])
+            self.assertEqual(finalize(root, fail_on_missing_english=True), 2)
 
     def test_args_single_year(self):
         args = parse_args(['--stage', 'discover', '--year', '2025'])
