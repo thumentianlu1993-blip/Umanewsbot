@@ -110,7 +110,7 @@ Region manifest schema v1：
   "classification_complete": true,
   "races": [
     {
-      "url": "https://umafans.run/races/2025/example/",
+      "url": "http://umafans.run/races/2025/example/",
       "region": "middle_east",
       "country": "united_arab_emirates",
       "evidence": "reviewed UmaFans RaceEvent identity"
@@ -122,7 +122,9 @@ Region manifest schema v1：
 规则：
 
 - year 必须等于 CLI year。
-- URL 必须通过 UmaFans HTTPS allowlist、canonical 化并唯一。
+- URL 必须通过 UmaFans 受控 HTTP/HTTPS scheme 与精确 host allowlist、canonical 化并唯一；
+  scheme 属于 exact identity，必须与本次 run 的 base origin 和 sitemap URL 一致。当前正式
+  workflow 使用 `http://umafans.run/`。
 - `region` 接受三个新增地区或 `out_of_scope`；中东必须带 allowlisted country，
   `out_of_scope` 仍必须保留审核 country/evidence。
 - manifest 自身只提供地区身份，不提供参赛马、等级或名称。

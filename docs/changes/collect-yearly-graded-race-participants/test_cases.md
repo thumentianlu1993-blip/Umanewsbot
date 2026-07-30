@@ -246,7 +246,8 @@
 - 同一 reviewer 第十四轮限定复审结论仍为 `REVISE`，新增 `1 P1 + 1 P2`：
 
   1. profile URL 必须在 validation、search candidate、direct fetch、canonical group、merge
-     和最终 record 全链路收敛为严格 `https://umafans.run/horses/<id>/`；缺 trailing slash
+     和最终 record 全链路收敛为严格、保留受控 scheme 的
+     `<http|https>://umafans.run/horses/<id>/`；缺 trailing slash
      与规范形式必须去重，只允许单段数字 ID，query、fragment、编码绕过和额外 path 拒绝；
   2. Middle East 的 expected/actual country 任一侧 missing、uncontrolled 或 mismatch 都必须
      fail closed；identity review、结构化 errors 与最终 `errors.json` 必须保留

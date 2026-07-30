@@ -1,5 +1,23 @@
 # 部署运行手册
 
+## 2026-07-31 年度参赛马 workflow 的 443 诊断与恢复
+
+1. 若 checkpoint 停在 `https://umafans.run/sitemap.xml`，先区分“宿主映射 443”和
+   “Nginx 已监听 TLS”：同时核对宿主 listener、Compose publish、容器内 `nginx -T`、
+   证书 subject/issuer/dates，以及 HTTP/HTTPS 的真实请求结果。
+2. 本次生产证据为宿主 80/443 均由 Docker publish，但容器生效配置只有 `listen 80`；
+   HTTP sitemap 为 200，HTTPS 握手 EOF。现有 IP 自签名证书不能作为域名 TLS 完成证据。
+3. 修复候选将年度研究 workflow 的 races base URL 固定为 `http://umafans.run/`。
+   发布后首次 full-network 必须不传 source 三元组，从 fresh checkpoint 开始；此前 6 次
+   HTTPS run 的 artifact 只保留作失败证据，禁止改写 queue、ledger 或 progress 后续跑。
+   如传地区 manifest，其中每个 exact race URL 也必须是当前 HTTP sitemap URL；HTTPS
+   manifest 与 HTTP run identity 不同，必须在运行前以来源证据重新生成并审核 SHA。
+4. fresh run 仍遵守最多 6 次有界 workflow run、每次精确 checkpoint 的既有操作边界。
+   暂时网络错误可从同 scheme、同代码、同年份和同 manifest 的精确 artifact 恢复；
+   identity/config/schema/4xx 等确定性错误立即停止并一次性报告。
+5. 本轮没有部署应用、改 Nginx、启用 443、替换证书或写生产数据。若另行推进 HTTPS，
+   必须走独立证书与 Nginx 发布方案、回滚和域名 TLS 验收，不能与研究采集续跑混合。
+
 ## 2026-07-30 race-live P0 已完成关闭态发布与五轮观察
 
 1. stdout final fix 只把 machine snapshot 改为 `manage.py shell --no-imports -c`，

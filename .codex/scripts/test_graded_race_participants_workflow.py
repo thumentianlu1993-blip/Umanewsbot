@@ -160,6 +160,11 @@ class GradedRaceParticipantsWorkflowContractTests(unittest.TestCase):
         self.assertNotIn("--request-budget", finalize)
         self.assertEqual(self.source.count("--request-budget"), 2)
 
+    def test_races_stage_uses_the_current_public_http_origin(self) -> None:
+        races = self.step("运行 races checkpoint")
+        self.assertIn("--base-url http://umafans.run/", races)
+        self.assertNotIn("--base-url https://umafans.run/", races)
+
     def test_crash_safe_request_ledgers_are_preserved_and_timeout_has_margin(self) -> None:
         races_upload = self.step("上传本次 races checkpoint")
         profile_upload = self.step("上传本次 profile shard checkpoint")

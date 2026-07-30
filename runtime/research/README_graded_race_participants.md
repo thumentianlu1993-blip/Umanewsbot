@@ -3,6 +3,12 @@
 `collect_graded_race_participants.py` 是独立、只读、artifact-only 的研究入口。它不导入
 Django、不连接数据库、不读取生产凭据；网络阶段只访问 UmaFans 公共页。
 
+当前正式公网入口是 `http://umafans.run/`：生产 Nginx 只启用 80，HTTPS server block
+仍保持注释。采集器只允许 `http|https` 两种 scheme、`umafans.run|www.umafans.run`
+两个精确 host，继续拒绝凭据、显式端口、非规范路径和越界查询；workflow 的正式网络阶段
+固定传入当前可用的 HTTP origin。单次 run 选定 scheme 后，sitemap、race、profile、
+redirect 与地区 manifest 均不得跨 scheme。这只是对齐现有来源入口，不表示 HTTPS 已完成。
+
 ## 阶段
 
 固定 DAG：
@@ -31,6 +37,9 @@ checkpoint 均绑定该预算，resume 时仍须传入相同值。`merge_profile
 `synthetic_smoke` 不联网，不传 `--request-budget`。全部 profile shard 完成后运行
 `merge_profiles` 和 `finalize`。达到 `--time-budget-seconds` 时退出码为 `75`；保留
 checkpoint 后用完全相同的年份、代码、地区清单和请求预算加 `--resume` 继续。
+checkpoint identity 同时绑定 base URL；此前以 `https://umafans.run/` 产生并停在
+443 transport error 的 checkpoint 不得迁移或改写为 HTTP，修复后的首次运行必须 fresh
+dispatch，不填写旧 `source_run_id/source_attempt/source_stage`。
 
 离线 synthetic：
 

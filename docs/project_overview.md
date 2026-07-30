@@ -128,6 +128,12 @@ promotion/disable/restore manifest。暂定赛果可以先公开，但页面必�
 
 正式 artifact 流水线已在生产镜像 `main@ab95c6ef` 部署并通过隔离、暂停恢复和工具根拒绝 smoke。年度赛历 request/cache/parse 扩展已完成本地验收，法国 2023-2024 达到 `250/250`；batch006 将按冻结的 1061 场 selection 拆为 11 个地区×年份 scope，待新镜像部署后开始抓取，历史公开继续关闭。
 
+单年度八地区分级赛参赛马研究是独立、只读、artifact-only 的 GitHub Actions 链路，不连接
+生产数据库。它从 UmaFans sitemap 和公开赛事/马匹页生成 checkpoint 与七文件 artifact；
+当前正式来源 origin 为 `http://umafans.run/`，因为生产 Nginx 尚未启用域名 HTTPS。
+collector 仍以精确 host、scheme、path/query 和逐跳校验限制请求边界，base URL 同时绑定
+checkpoint identity；未来切换 HTTPS 必须作为独立运维变更，并从 fresh checkpoint 开始。
+
 ## P0 马资料链路
 
 P0 马范围由“active 且有中文译名的正式 horse term”与“五地区全部重点分级赛参赛马”组成。赛事产品覆盖只负责确定 P0 候选来源；马匹基础资料、二代血统和完整生涯必须继续按马匹主来源采集，不能从重点赛事总账反推。
