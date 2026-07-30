@@ -76,15 +76,16 @@ NON_START_TOKENS = {
     "取消", "出走取消", "競走除外", "竞走除外", "発走除外", "发走除外",
 }
 RESULT_STATUS_ALIASES = {
-    "DNF": "did_not_finish", "未完赛": "did_not_finish", "中止": "did_not_finish",
-    "PU": "pulled_up", "PULLEDUP": "pulled_up", "PULLED-UP": "pulled_up", "拉停": "pulled_up",
-    "F": "fell", "FELL": "fell", "堕马": "fell", "落马": "fell",
+    "DNF": "did_not_finish", "未完赛": "did_not_finish",
+    "PU": "pulled_up", "中止": "pulled_up", "PULLEDUP": "pulled_up", "PULLED-UP": "pulled_up", "拉停": "pulled_up",
+    "F": "fell", "FELL": "fell", "堕马": "fell", "落马": "fell", "跌倒": "fell",
     "UR": "unseated_rider", "UNSEATEDRIDER": "unseated_rider",
     "UNSEATED-RIDER": "unseated_rider", "骑师落马": "unseated_rider",
     "BD": "brought_down", "BROUGHTDOWN": "brought_down",
     "BROUGHT-DOWN": "brought_down", "被带倒": "brought_down",
     "DSQ": "disqualified", "DQ": "disqualified", "DISQUALIFIED": "disqualified", "失格": "disqualified",
-    "DH": "dead_heat", "DEADHEAT": "dead_heat", "DEAD-HEAT": "dead_heat", "同着": "dead_heat",
+    "DH": "dead_heat", "DEADHEAT": "dead_heat", "DEAD-HEAT": "dead_heat", "同着": "dead_heat", "并列": "dead_heat",
+    "REF": "refused", "REFUSED": "refused", "拒跑": "refused",
 }
 
 
