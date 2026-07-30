@@ -1,5 +1,40 @@
 # 当前状态
 
+## 2026-07-30 Celery race-live P0 已在关闭态完成发布与五轮观察
+
+- 初始实现 `611c6aab` 经 PR `#46` 合并为 `main@7cd144ab`。首次生产 `prepare` 成功，
+  但 `start-beat` 在启动 Beat 前因 Django auto-import banner 污染严格 machine snapshot
+  而 fail closed；没有清队列、启动 Beat/race-live worker 或执行业务写入。
+- final fix 只把 snapshot 改为 `manage.py shell --no-imports -c`，parser 不放宽；部署合同
+  `33/33`、四组聚焦 `64/64` 通过。同一 reviewer 限定复审 `APPROVED`，冻结 fingerprint
+  `4c785e74...a000` 与 content manifest `a17ac407...f416`；用户授权后
+  `INDEX_TRANSITION_OK`，commit `24a49c2a` 经 PR `#47` 合并为
+  `main@be1c89bf`。
+- 生产已 fast-forward 到 `be1c89bf` 并重新完整执行 `prepare`。普通 worker 在
+  `active=0 / reserved=0` 后才停止；historical runner preflight 为 `migration_safe`，
+  Django check 通过，两次 migration plan 为 `0/0`，脚本返回 `CANDIDATE_READY`。
+  本窗口 rollback tag
+  `umanewsbot:rollback-race-live-p0-20260730T043615Z` 指向上一候选
+  `sha256:17562c52...acea7`；最终候选为
+  `sha256:c3197503...b5f5`。
+- `start-beat` 基线为
+  `celery=0 / race_live=6574 / selector=0 / monitor=6574`。五轮普通队列依次为
+  `36/35/30/28/30`，`race_live=6574 / selector=0 / monitor=6574` 每轮均未变化；
+  每轮 Beat/web/worker running 且 image 一致，普通 worker 只监听 `celery`，
+  `race_live_worker` 未运行，healthz/ping 正常，Beat 日志没有两个关闭态目标。
+- 脚本外终验：生产 HEAD=`be1c89bf`，web/worker/beat 均为
+  `sha256:c3197503...b5f5`；Beat running，`race_live_worker=Created`；三个开关与候选
+  settings 均为 `false/false/disabled`，两个目标 schedule entry 不存在；普通 worker
+  PID 1 queue 为 `--queues=celery` 且 ping 正常。队列为
+  `celery=23 / race_live=6574 / selector=0 / monitor=6574`，最近十分钟目标 Beat 日志
+  计数 `0`；容器内、本机 Nginx、两个正式 HTTP 域名 healthz 均为 `200`，OneBot running，
+  最近 15 分钟无 OOM。
+- 临时 `/swapfile-umanews-p0-20260730` 仍启用、总量/空闲量均为
+  `2097148 KiB`，未写 fstab；最终 `MemAvailable=1576148 KiB`，仅略高于 `1536 MiB`
+  部署硬门，禁止在当前负载下顺带移除。停用和删除 swap 仍须单独授权。生产进入窗口前已有
+  的 `12` 个 deploy 脚本 mode-only 差异原样保留。完整事实见
+  `docs/changes/harden-celery-p0-admission/release_report.md`。
+
 ## 2026-07-30 Celery race-live P0 部分部署停在安全检查点，修复待复审/重新授权
 
 - 初始实现 commit 为 `611c6aab`，已通过 PR `#46` 合并为

@@ -1,5 +1,32 @@
 # 部署运行手册
 
+## 2026-07-30 race-live P0 已完成关闭态发布与五轮观察
+
+1. stdout final fix 只把 machine snapshot 改为 `manage.py shell --no-imports -c`，
+   parser 不放宽；同一 reviewer 限定复审为 `APPROVED`。用户针对冻结指纹授权后，
+   `INDEX_TRANSITION_OK`，commit `24a49c2a` 经 PR `#47` 合并为
+   `main@be1c89bf`，生产仓库 fast-forward 到该版本；既有 `12` 个 deploy 脚本
+   mode-only 差异原样保留。
+2. 生产重新完整执行 `prepare`：普通 worker 在 `active=0 / reserved=0` 后停止，
+   historical runner preflight 为 `migration_safe`，Django check 与两次 migration plan
+   `0/0` 通过。rollback tag
+   `umanewsbot:rollback-race-live-p0-20260730T043615Z` 指向上一候选
+   `sha256:17562c52...acea7`；最终候选为 `sha256:c3197503...b5f5`，脚本返回
+   `CANDIDATE_READY`。
+3. `start-beat` 基线为
+   `celery=0 / race_live=6574 / selector=0 / monitor=6574`。五轮 `celery` 为
+   `36/35/30/28/30`；`race_live=6574 / selector=0 / monitor=6574` 每轮不变。
+   每轮三应用 image 一致、普通 worker 隔离与 ping 正常、race-live worker 未运行、
+   healthz 正常，Beat 日志不含两个关闭态目标。
+4. 脚本外终验：生产 HEAD=`be1c89bf`，web/worker/beat 均使用
+   `sha256:c3197503...b5f5`；Beat running，`race_live_worker=Created`，
+   flags/schedule closed，队列为 `celery=23 / race_live=6574 / selector=0 /
+   monitor=6574`，最近十分钟目标 Beat 日志计数 `0`。容器内、本机和两个正式 HTTP 域名
+   healthz 均为 `200`；OneBot running，最近 15 分钟无 OOM。
+5. 临时 `/swapfile-umanews-p0-20260730` 仍启用，总量/空闲量均为
+   `2097148 KiB`，终验 `MemAvailable=1576148 KiB`；swap 未移除。全程没有清理、
+   迁移、消费或重放历史 `race_live=6574` 积压。
+
 ## 2026-07-30 race-live P0 部分部署停在安全检查点，修复待复审/重新授权
 
 > 当前状态：初始实现 `611c6aab` 已经 PR `#46` 合并为 `main@7cd144ab`，生产已完成
