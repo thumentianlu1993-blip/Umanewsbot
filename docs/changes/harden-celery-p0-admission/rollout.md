@@ -2,18 +2,17 @@
 
 ## 当前阶段
 
-本 change 已完成方案审核、用户实现授权、真实 RED 和首轮实现。同一代码 reviewer 限定
-复审 session `019faecf-f5fe-7900-be8d-95998bcb6b42` 已确认首次五项 finding 全部关闭，
-但新增 P1：`pull nginx` 改变可变镜像且没有 nginx 镜像级回滚，因此 verdict 为
-`REVISE`。新增 P1 已按真实 RED/GREEN 最小修复，阶段为
-`新增 P1 已修复 -> 待同一 reviewer 再次限定复审`；这不是代码 review 通过。方案
-reviewer 第三轮限定复审结论为 `APPROVED`，其冻结范围为：
+初始实现 commit `611c6aab` 已经 PR `#46` 合并为 `main@7cd144ab`。生产已成功完成
+`prepare`，但 `start-beat` 在真正执行 `up beat` 前因 Django auto-import banner 污染
+machine queue snapshot stdout 而 fail closed。当前阶段为
+`部分部署停在安全检查点 -> stdout final fix 已 GREEN -> 待同一 reviewer 限定复审和重新授权`；
+这不是发布成功。方案 reviewer 第三轮限定复审结论为 `APPROVED`，其冻结范围为：
 
 - P0 只做关闭态 Beat 生产者止血，不迁移 monitor/delivery 队列；
 - `expires=55` 只作为 Celery 最佳努力元数据；
 - 关闭态发布入口固定为 `prepare` / `start-beat` 两阶段；
 - migration 零计划双重门禁和 Beat 三状态失败语义纳入自动化合同；
-- 当前生产状态仍未知，方案通过不代表允许实现后的发布或任何生产操作。
+- 方案审核时生产状态仍未知；该历史方案结论不替代后续真实生产预检、发布授权或运行态证据。
 
 实现事实：
 
@@ -31,14 +30,16 @@ reviewer 第三轮限定复审结论为 `APPROVED`，其冻结范围为：
   Beat 日志后验；任一异常立即停止并复核 Beat。
 - P0 脚本不再 pull nginx，不改变当前本地 nginx image；仍以该 image
   `--force-recreate nginx` 并执行 healthz 检查。
+- 当前本地 final fix 只把 machine snapshot 改为 `manage.py shell --no-imports -c`，
+  parser 继续严格拒绝 banner、多余行和畸形输出。
 
 验证边界：
 
-- 新增 P1 修复后的当前候选已由主代理复跑四组聚焦，结果为
-  `63/63 / 54.863s / exit 0`，其中部署合同 `32/32`；Django check 为 exit `0`，
+- stdout final fix 后当前候选已由主代理复跑四组聚焦，结果为
+  `64/64 / 57.693s / exit 0`，其中部署合同
+  `33/33 / 56.236s / exit 0`；Django check 为 exit `0`，
   `makemigrations --check --dry-run` 为 `No changes detected`，`sh -n` 与
-  `git diff --check` 均为 exit `0`；脚本静态核对确认无 nginx pull、仍有 nginx
-  recreate/healthz；
+  `git diff --check` 均为 exit `0`；
 - 完整 stable 候选为
   `3830 tests / 216.643s / 26 failures / 148 errors / 72 skipped / exit 1`；
   同 HEAD 干净基线为
@@ -50,20 +51,38 @@ reviewer 第三轮限定复审结论为 `APPROVED`，其冻结范围为：
   两种口径候选 only/基线 only 均为 `0`，因此本 scope 新增失败标识为 `0`，但完整 suite
   仍非全绿。完整方法清单见 `full_stable_failure_baseline.txt`。
 
-当前允许回到代码 reviewer 的同一会话，仅再次复审新增 P1、对应修复和直接触及路径；原
-五项 finding 已由该 reviewer 关闭。复审必须按 `docs/codex_workflow.md` 对完整
-uncommitted scope 执行原生只读审核和前后 fingerprint 核对。聚焦 `63/63` 和静态检查
-通过不等于 review 通过。
+当前只允许回到代码 reviewer 的同一会话，限定复审 stdout final fix 和直接触及路径。复审
+必须按 `docs/codex_workflow.md` 对完整 uncommitted scope 执行原生只读审核和前后
+fingerprint 核对。聚焦 `64/64` 和静态检查通过不等于 review 通过。
 
 当前未允许：
 
 - 把 finding 修复、部署合同通过或基线同集表述为代码 review 通过；
-- commit、push、PR/merge 或部署；
+- 未经复审和新授权直接 commit、push、PR/merge 或继续部署；
 - 清理/迁移队列、启动 worker、启用 flag、执行 migration 或生产写入；
-- 使用此前实现授权代替最新成功 review 后的发布授权。
+- 热补丁生产脚本、手工启动 Beat，或使用此前授权代替变化后版本的新发布授权。
 
-截至本次回写，本 change 未连接生产、未部署、未清队列、未启动 worker；生产 HEAD、flags、
-Beat、队列和资源状态仍未知。历史约 `5782` 条 monitor 消息不是当前运行态证据。
+截至本次回写，生产 HEAD 为 `7cd144ab`，web/worker 运行初始候选 image
+`sha256:17562c52...acea7`；Beat exited、race-live worker `Created`，flags 仍为
+`false/false/disabled`。`race_live=6574` 为未处理 monitor 积压。final fix 尚未进入生产，
+五轮后验尚未开始。
+
+## 2026-07-30 部分部署证据
+
+- 预检：Compose `5.1.2`；首次 active/reserved/scheduled `0/0/0`、`celery=0`；
+  `race_live` 从 `6055` 增到 prepare 前 `6574`，全部是 monitor。
+- 资源门禁先以 `MemAvailable=867284 KiB / SwapFree=0 KiB` NO-GO。用户额外授权后创建并
+  启用 `/swapfile-umanews-p0-20260730`（`2 GiB`、`0600`、不写 fstab），空闲 worker
+  优雅重启，OneBot 最终 running。
+- 生产仓库 `4221affa -> 7cd144ab`；既有 `12` 个 deploy 脚本 mode-only dirty 保留。
+- `prepare`：drain active `2→0`；rollback tag
+  `umanewsbot:rollback-race-live-p0-20260730T030255Z` 指向旧 image
+  `sha256:7d730634...8774`；候选 `sha256:17562c52...acea7`；migration `0/0`，
+  settings closed，web/worker/nginx 与内外 healthz `200`。
+- `start-beat`：启动前 queue snapshot stdout 出现
+  `105 objects imported automatically (use -v 2 for details).`，严格 parser
+  fail closed；Beat 没有启动，五轮未执行，后验队列仍为 `6574`。
+- 完整证据和后续门禁见 `release_report.md`。
 
 ## 基线
 
@@ -79,12 +98,13 @@ Beat、队列和资源状态仍未知。历史约 `5782` 条 monitor 消息不�
 - 基线 `origin/main@78719a467a2eceb57572b484a906cb78761badf8`：Beat 无条件注册两个
   race-live 周期任务；monitor 和 delivery 使用 `race_live`；普通 worker 默认消费
   `celery`，专用 worker 只消费 `race_live`。
-- 当前本地候选：Beat 按两个开关独立注册对应 entry；默认关闭时两项均不存在，开启态队列
-  拓扑不变并带最佳努力 `expires=55`。该候选尚未通过独立代码 review 或部署。
-- 历史运行快照：服务器重启恢复后曾观察到约 `5782` 条
-  `monitor_race_live_sla_task` 且专用 worker 未运行。
-- 当前生产：本 change 尚未重新连接服务器，生产 HEAD、开关、队列长度、任务类型构成和
-  worker 状态均视为未知；任何发布/积压决策前必须重新只读核对。
+- 当前生产初始候选：Beat 按两个开关独立注册 entry，关闭态两项均不存在；开启态队列拓扑
+  不变并带最佳努力 `expires=55`。生产已通过 prepare，但未通过 start-beat 五轮。
+- 当前本地 final fix：仅为 machine queue snapshot 增加 `--no-imports`；尚未 review、
+  commit、merge 或部署。
+- 当前生产：HEAD `7cd144ab`、flags `false/false/disabled`、Beat exited、
+  race-live worker `Created`、`race_live=6574`。继续动作前仍须重新只读核对，不能把本次
+  快照冒充未来运行态。
 
 ## 并行工作与脏工作区
 

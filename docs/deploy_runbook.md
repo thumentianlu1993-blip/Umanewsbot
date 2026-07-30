@@ -1,13 +1,11 @@
 # 部署运行手册
 
-## 2026-07-30 race-live P0 关闭态两阶段发布入口（新增 P1 已修复，尚未生产执行）
+## 2026-07-30 race-live P0 部分部署停在安全检查点，修复待复审/重新授权
 
-> 当前状态：脚本和合同测试已在
-> `codex/harden-celery-p0-admission` 本地实现。同一 reviewer 限定复审已关闭首次 code
-> review 的五项 finding，但因 nginx 可变镜像缺少镜像级回滚新增 P1 并给出 `REVISE`；
-> 该 P1 已修复，当前待同一 reviewer 再次限定复审。尚未 review 通过，也未 commit、
-> push、merge 或部署。本 change 没有连接生产；生产 HEAD、flags、容器、队列、OOM 与
-> 资源状态均未知。此前约 `5782` 条 monitor 消息只是历史快照，禁止作为发布前计数。
+> 当前状态：初始实现 `611c6aab` 已经 PR `#46` 合并为 `main@7cd144ab`，生产已完成
+> `prepare`，但 `start-beat` 在真正启动 Beat 前因 machine snapshot stdout 被 Django
+> auto-import banner 污染而 fail closed。Beat 仍 exited，发布未完成。本地 final fix 尚未
+> review、提交、合并或部署；必须复用同一 reviewer 限定复审并重新取得发布授权。
 
 本 P0 针对仓库现有低成本
 `docker-compose.prod.lowcost.yml` 拓扑提供唯一验收入口：
@@ -23,6 +21,41 @@ cd /opt/umanewsbot
 PostgreSQL 两种仓库模式继续保留。若实际生产目标不是上述低成本拓扑，必须停止并另行适配、
 测试和 review，不得猜测脚本可以跨 Compose 模式使用。
 
+### 本次生产运行事实
+
+1. 只读预检：Compose `5.1.2`；scheduler/monitor/runner 为
+   `false/false/disabled`；`race_live_worker=Created`；首次
+   active/reserved/scheduled 均为 `0`，`celery=0`。`race_live` 从 `6055` 增至
+   prepare 前 `6574`，均为 `monitor_race_live_sla_task`。
+2. 首次资源门禁以 `MemAvailable=867284 KiB / SwapFree=0 KiB` 返回 NO-GO。经用户额外
+   授权，创建并启用 `/swapfile-umanews-p0-20260730`（`2 GiB`、mode `0600`），没有写入
+   `/etc/fstab`；普通 worker 在空闲时优雅重启，临时停止的 OneBot 已恢复 running。
+3. 生产仓库从 `4221affa` fast-forward 到 `7cd144ab`；原有 `12` 个 deploy 脚本
+   mode-only dirty 差异保留。
+4. `prepare` 成功：drain active `2→0`；旧 image
+   `sha256:7d730634...8774` 的 rollback tag 为
+   `umanewsbot:rollback-race-live-p0-20260730T030255Z`；候选 image 为
+   `sha256:17562c52...acea7`。两次 migration plan `0`，候选 settings closed，
+   web/worker/nginx 和内外 healthz `200`；Beat exited，race-live worker 仍为 `Created`。
+5. `start-beat` 的启动前 queue snapshot 收到
+   `105 objects imported automatically (use -v 2 for details).`，严格 parser 拒绝后
+   非零退出；没有执行 `up beat`，五轮观察未开始。失败后 OneBot running、Beat exited，
+   `race_live=6574`，未清理、迁移或消费队列。
+
+### 当前续跑门禁
+
+- 生产当前 candidate image 不含 stdout final fix，禁止直接再次运行 `start-beat`；
+- 禁止在生产热补丁脚本，禁止手工 `up beat`；
+- 本地 fix 必须先由同一 reviewer session 限定复审，再针对已审内容重新取得发布授权；
+- 授权后生产必须拉取已审 final fix，重新执行 `prepare` 构建并验证精确最终 image；不能复用
+  `sha256:17562c52...acea7` 冒充最终候选；
+- 新 `prepare` 成功并保存证据后，才运行 `start-beat`，完成全部五轮后验才可宣告发布完成；
+- `race_live=6574` 是保留的历史 monitor 积压，不得为续跑而清空、迁移或消费。
+
+临时 swap 不是仓库永久配置，也未写 fstab。后续移除必须单独授权，并在无构建/重启负载时
+先确认内存足以承受 `swapoff`；只有 `swapoff /swapfile-umanews-p0-20260730` 成功并验证
+`swapon` 已无该条目后，才可删除该文件。不得把重启后未自动启用解释为文件已经删除。
+
 ### 绝对禁止
 
 - 未取得最新成功代码 review 后的当前任务发布授权前，禁止运行上述生产命令；
@@ -33,6 +66,7 @@ PostgreSQL 两种仓库模式继续保留。若实际生产目标不是上述低
   `0`；
 - 禁止在 `/opt/umanewsbot` 生产根启用 `RACE_LIVE_P0_TEST_MODE`、测试 sentinel、fake path
   或 `P0_FAKE_*` 覆盖；脚本会拒绝这类输入。
+- 禁止跳过 final fix 的限定复审和新发布授权，禁止直接热补丁或手工启动 Beat。
 
 ### `prepare` 门禁与状态
 
@@ -70,9 +104,11 @@ PostgreSQL 两种仓库模式继续保留。若实际生产目标不是上述低
 
 1. 再次验证三个关闭态值、候选 schedule 不含两个目标 entry、web/普通 worker 健康、
    `race_live_worker` 明确停止，并复核普通 worker PID 1 queue 唯一精确；
-2. 只有全部通过后才单独执行 Beat 的 `up -d --no-deps`，并核对 Beat 与 web/普通 worker
-   使用相同 image；
-3. 启动前保存两个队列长度及 selector/monitor task 计数基线。启动后连续执行五轮后验；
+2. 使用 `manage.py shell --no-imports -c` 保存两个队列长度及 selector/monitor task
+   计数基线；stdout 必须只含 machine snapshot，格式不可确认即在 `up beat` 前 fail closed，
+   parser 不跳过或容忍任何 banner；
+3. 只有全部通过后才单独执行 Beat 的 `up -d --no-deps`，并核对 Beat 与 web/普通 worker
+   使用相同 image。启动后连续执行五轮后验；
    每轮复核 Beat/web/普通 worker 为 running、race-live worker 仍明确停止、三服务 image
    与候选一致、healthz/ping 和 PID 1 queue 正常，保存队列长度与目标 task 计数，并检查从
    本次启动时间起的 Beat 日志不含两个目标 entry/task；
@@ -80,7 +116,7 @@ PostgreSQL 两种仓库模式继续保留。若实际生产目标不是上述低
    停止并复核 Beat 为 stopped，保留已完成轮次证据；仍不清队列、不启动
    `race_live_worker`。只有五轮全部通过才可成功返回。
 
-### 同一 reviewer 限定复审、finding 修复与本地证据
+### 初始 review、部分部署与 final fix 本地证据
 
 首次 review 的五项 actionable finding 已分别落实到当前候选实现：
 
@@ -97,14 +133,20 @@ PostgreSQL 两种仓库模式继续保留。若实际生产目标不是上述低
 不改变当前本地 nginx image；启动阶段仍以该 image `--force-recreate nginx` 并执行
 healthz 检查。
 
-新增 P1 修复后的当前候选已由主代理复跑四组聚焦：
+初始修复已形成 commit `611c6aab` 并通过 PR `#46` 合并到 `main@7cd144ab`。生产
+`prepare` 成功，但 `start-beat` 在启动 Beat 前暴露 Django auto-import banner 污染 queue
+snapshot stdout；严格 parser 正确 fail closed。
+
+本地 final fix 只把该 machine snapshot 调用改为
+`manage.py shell --no-imports -c`，没有放宽 parser。当前已复跑四组聚焦：
 `stable.test_race_live_sla_monitor`、`RaceLiveCeleryIsolationTests`、
 `RaceLiveWorkerDeploymentContractTests` 和
 `stable.test_race_live_p0_deployment_contract`，结果为
-`63/63 / 54.863s / exit 0`，其中部署合同 `32/32`。Django check 为 exit `0`；
+`64/64 / 57.693s / exit 0`，其中部署合同
+`33/33 / 56.236s / exit 0`。Django check 为 exit `0`；
 `makemigrations --check --dry-run` 输出 `No changes detected`；`sh -n` 和
-`git diff --check` 均为 exit `0`；静态核对确认脚本无 nginx pull、仍有 nginx
-recreate/healthz。这些证据不能冒充复审结论。完整 stable 候选为
+`git diff --check` 均为 exit `0`。这些证据不能冒充 review 通过或发布授权。完整 stable
+候选的既有基线为
 `3830 tests / 216.643s / 26 failures / 148 errors / 72 skipped / exit 1`，基线为
 `3790 tests / 167.124s / 26 failures / 148 errors / 72 skipped / exit 1`；原始唯一
 headings 均 `174`、规范化失败方法均 `153`，双向差集均 `0`。该证据表示本 scope 新增失败
@@ -119,6 +161,13 @@ headings 均 `174`、规范化失败方法均 `153`，双向差集均 `0`。该�
 失败恢复不依赖不存在的 nginx 镜像级 rollback。旧代码会恢复无条件周期投递，所以回滚后
 Beat 必须保持停止，直到恢复本 P0 候选或存在另一个经审核的生产者止血方案；三个 race-live
 flags 和 `race_live_worker` 继续关闭，数据库和历史队列均不恢复、不改写。
+
+本次生产 rollback tag 为
+`umanewsbot:rollback-race-live-p0-20260730T030255Z`（旧 image
+`sha256:7d730634...8774`）。当前 Beat 已退出，因此若在 final fix 发布前决定回退应用，
+必须保持 Beat stopped，使用该 tag 恢复 web/普通 worker并重新验证内外 healthz；
+`race_live=6574` 不清理。临时 swap 的停用/删除是独立资源维护动作，不与应用 rollback
+捆绑，仍需单独授权和上述 `swapoff` 验证。
 
 本节记录的是仓库预期，不是生产执行回执。真实发布完成或失败后，必须按 evidence-only
 规则追加生产 SHA、image、rollback tag、阶段、资源、migration plan、schedule、队列计数、

@@ -50,17 +50,21 @@
 - [x] (operations) 按同一 reviewer 新增 P1 的真实 RED/GREEN 最小修复 P0 脚本：取消
   nginx pull，不改变当前本地 nginx image；仍以该 image `--force-recreate nginx` 并
   验证 healthz。
+- [x] (operations) 生产 `start-beat` 在 `up beat` 前因 Django auto-import banner
+  污染 machine snapshot stdout 而 fail closed 后，取得真实 RED；final fix 只为该调用增加
+  `shell --no-imports -c`，parser 不放宽。
 
 ## 验证
 
 - [x] (integration) 逐个 RED 转 GREEN，并执行局部 REFACTOR。
-- [x] (integration) 在新增 P1 修复后的当前候选上复跑
+- [x] (integration) 在 stdout final fix 后的当前候选上复跑
   `stable.test_race_live_sla_monitor`、`RaceLiveCeleryIsolationTests`、
   `RaceLiveWorkerDeploymentContractTests` 和
   `stable.test_race_live_p0_deployment_contract`；主代理实跑
-  `63/63 / 54.863s / exit 0`。
-- [x] (operations) 新增 P1 修复后的部署合同为 `32/32`；测试使用 fake command，未真实
-  调用 Docker/Redis/网络；该集合已包含在主代理当前候选 `63/63` 中。
+  `64/64 / 57.693s / exit 0`。
+- [x] (operations) stdout final fix 后的部署合同为
+  `33/33 / 56.236s / exit 0`；测试使用 fake command，未真实调用 Docker/Redis/网络；
+  该集合已包含在主代理当前候选 `64/64` 中。
 - [x] (integration) 运行完整 `stable` 并与同 HEAD 干净基线比较。候选为
   `3830 tests / 216.643s / 26 failures / 148 errors / 72 skipped / exit 1`；基线
   `HEAD=78719a467a2eceb57572b484a906cb78761badf8`，结果为
@@ -76,10 +80,11 @@
   原始巨大 subtest repr 只记录 `174` 条计数和
   `a214e6a1ac4ff5cdfe0c0f2a0670525d3ed30bf41a191b18cbcaa85d9acd7040`，不复制正文。
 
-新增 P1 修复后的当前候选聚焦为 `63/63 / 54.863s / exit 0`，其中部署合同 `32/32`。
+stdout final fix 后的当前候选聚焦为 `64/64 / 57.693s / exit 0`，其中部署合同
+`33/33 / 56.236s / exit 0`。
 Django check 为 exit `0`；`makemigrations --check --dry-run` 为
-`No changes detected`；`sh -n` 与 `git diff --check` 均为 exit `0`；脚本静态核对确认无
-nginx pull、仍有 nginx recreate/healthz。以上均不代表代码 review 通过。
+`No changes detected`；`sh -n` 与 `git diff --check` 均为 exit `0`。以上均不代表代码
+review 通过或发布授权。
 
 ## Review
 
@@ -92,7 +97,10 @@ nginx pull、仍有 nginx recreate/healthz。以上均不代表代码 review 通
   `019faecf-f5fe-7900-be8d-95998bcb6b42` 已关闭原五项 finding，但因 `pull nginx`
   改变可变镜像且没有 nginx 镜像级回滚新增 P1，verdict 为 `REVISE`。
 - [x] (operations) 新增 P1 已按真实 RED/GREEN 修复并复跑聚焦与静态门禁。
-- [ ] (integration) 回到同一 reviewer session 再次限定复审新增 P1 修复和直接触及路径。
+- [x] (integration) 初始实现已形成 commit `611c6aab` 并通过 PR `#46` 合并为
+  `main@7cd144ab`。
+- [ ] (integration) 回到同一 reviewer session 限定复审生产暴露的 stdout final fix 和
+  直接触及路径。
 - [ ] (operations) 复审时按工作流保存审核前后完整 fingerprint、内层只读启动头、命令退出
   状态和 findings。
 - [ ] (operations) 最新成功 review 后冻结 scope、approved parent 和
@@ -102,13 +110,18 @@ nginx pull、仍有 nginx recreate/healthz。以上均不代表代码 review 通
 
 - [ ] (operations) 仅在最新成功 review 后取得用户针对当前 fingerprint 的明确发布授权。
 - [ ] (operations) 授权后、staging 前重算 fingerprint，并通过 index transition。
-- [ ] (operations) 经授权后完成 commit、push、PR/merge；不得把实现授权当发布授权。
-- [ ] (operations) 部署前重新只读核对生产 SHA、flags、worker 队列、active/reserved、
-  队列长度、task 构成、待应用 migration 数和 OOM/资源状态。
-- [ ] (operations) 首次发布唯一使用
-  `./deploy/deploy_race_live_p0_closed.sh prepare`；不得原样运行 `deploy_lowcost.sh`。
-- [ ] (operations) 保存 prepare 成功且 Beat 仍停止的候选证据后，才运行
-  `./deploy/deploy_race_live_p0_closed.sh start-beat`。
+- [ ] (operations) 经新授权后完成 final fix 的 commit、push、PR/merge；不得把初始版本
+  授权当作变化后版本的发布授权。
+- [x] (operations) 初始版本生产预检已核对 SHA、flags、worker/队列、OOM 与资源状态；
+  首次资源门禁按低内存/零 swap 返回 NO-GO。
+- [x] (operations) 经用户额外授权创建并启用临时 `2 GiB` swapfile（`0600`、不写
+  fstab），优雅重启空闲普通 worker，OneBot 已恢复 running。
+- [x] (operations) 初始版本已运行专用 `prepare` 并到达 `CANDIDATE_READY`；没有原样运行
+  `deploy_lowcost.sh`。
+- [ ] (operations) final fix 合并和新授权后拉取精确版本，重新运行 `prepare` 构建最终
+  image；不得直接热补丁或复用旧候选 image。
+- [ ] (operations) 保存新 prepare 成功且 Beat 仍停止的候选证据后，才运行
+  `start-beat`；此前一次尝试在 `up beat` 前 fail closed。
 - [ ] (operations) 启动 Beat 后观察至少 5 分钟，确认不再新增两个目标周期 task。
 - [ ] (operations) 不启用 scheduler/monitor/runner，不启动 race-live worker，不处理历史
   积压；这些操作另行规划和授权。

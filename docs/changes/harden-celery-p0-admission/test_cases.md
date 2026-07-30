@@ -64,13 +64,16 @@
     race-live worker 转为 restarting 时，命令非零退出并立即停止、复核 Beat。
 36. prepare 不执行 `pull nginx`，不改变可变 nginx image；仍使用当前本地 image
     `--force-recreate nginx` 并执行 healthz 检查。
+37. start-beat 的 machine queue snapshot 必须使用
+    `manage.py shell --no-imports -c`；Django auto-import banner 不得污染 stdout。
+    parser 继续严格拒绝畸形或多余输出，并在任何 `up beat` 前 fail closed。
 
 ### 静态与配置回归
 
-37. 没有模型或迁移变化。
-38. settings 可以在默认关闭环境正常导入。
-39. Django system check 通过。
-40. 专用脚本通过 `sh -n`；文档和脚本固定使用同一入口和阶段名。
+38. 没有模型或迁移变化。
+39. settings 可以在默认关闭环境正常导入。
+40. Django system check 通过。
+41. 专用脚本通过 `sh -n`；文档和脚本固定使用同一入口和阶段名。
 
 ## RED 取得方式
 
@@ -132,6 +135,13 @@ monitor["options"] == {"queue": "race_live", "expires": 55}
 对应的真实 RED。测试必须按一个行为一个断言推进，不能用只读取脚本文本的脆弱子串匹配替代
 控制流验证。
 
+### RED 6：Django auto-import banner 污染 machine stdout
+
+生产 `start-beat` 在真正执行 `up beat` 前取得 queue snapshot 时，Django shell 输出
+`105 objects imported automatically (use -v 2 for details).`，严格 parser 因多余 stdout
+正确 fail closed。合同测试先复现该 banner，并断言 Beat 未启动；GREEN 只允许为 machine
+snapshot 增加 `shell --no-imports -c`。不得删除严格格式断言、跳过首行或容忍任意前缀。
+
 ## GREEN 与验证命令
 
 实现后至少运行：
@@ -162,7 +172,7 @@ git diff --check
 和生产数据库。若仓库精确类名在实现前因 main 漂移，先更新方案并回到同一 reviewer 复审，
 不得用“以实现时为准”替代冻结命令。
 
-## 同一 reviewer 限定复审、finding 回归与完整基线
+## 部分部署后 stdout 修复与当前验证
 
 首次代码 review 提出的五项 actionable finding 已分别补入上述部署合同：普通 worker
 部分停止恢复、模糊 Compose 状态拒绝、PID 1 唯一精确 queue、start-beat 五轮持续后验与
@@ -172,7 +182,9 @@ git diff --check
 补充上述第 36 项合同并最小修复：取消 nginx pull，保留当前本地 image 的
 force-recreate 与 healthz。
 
-新增 P1 修复后的当前候选已由主代理复跑：
+初始实现 commit `611c6aab` 已经 PR `#46` 合并为 `main@7cd144ab`。生产
+`prepare` 成功；`start-beat` 因上述 banner 在 `up beat` 前 fail closed，Beat 保持
+exited。当前本地 final fix 已由主代理复跑：
 
 ```text
 stable.test_race_live_sla_monitor
@@ -181,10 +193,11 @@ stable.test_realtime_race_results.RaceLiveWorkerDeploymentContractTests
 stable.test_race_live_p0_deployment_contract
 ```
 
-结果为 `63/63 / 54.863s / exit 0`，其中部署合同 `32/32`。Django check 为 exit `0`；
+结果为 `64/64 / 57.693s / exit 0`，其中部署合同为
+`33/33 / 56.236s / exit 0`。Django check 为 exit `0`；
 `makemigrations --check --dry-run` 输出 `No changes detected`；`sh -n` 与
-`git diff --check` 均为 exit `0`；脚本静态核对确认无 nginx pull、仍有 nginx
-recreate/healthz。这些是当前候选验证证据，不能冒充再次限定复审通过。
+`git diff --check` 均为 exit `0`。这些是当前候选验证证据，不能冒充限定复审通过或新的
+发布授权。
 
 完整 `stable` 对照结果：
 

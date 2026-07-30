@@ -469,7 +469,7 @@ print(
 )'
   if ! queue_snapshot_line="$(
     "$COMPOSE" -f "$COMPOSE_FILE" run --rm --no-deps web \
-      python manage.py shell -c "$queue_snapshot_code"
+      python manage.py shell --no-imports -c "$queue_snapshot_code"
   )"; then
     echo "队列/task 计数不可读；保持 fail closed。" >&2
     return 1
