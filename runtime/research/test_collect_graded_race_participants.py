@@ -55,6 +55,10 @@ class Tests(unittest.TestCase):
     def test_result_statuses(self):
         self.assertEqual(normalize_result_status('3'), (3, 'finished', True))
         self.assertEqual(normalize_result_status('PU'), (None, 'pulled_up', True))
+        self.assertEqual(normalize_result_status('中止'), (None, 'pulled_up', True))
+        self.assertEqual(normalize_result_status('跌倒'), (None, 'fell', True))
+        self.assertEqual(normalize_result_status('拒跑'), (None, 'refused', True))
+        self.assertEqual(normalize_result_status('并列'), (None, 'dead_heat', True))
         self.assertEqual(normalize_result_status('DSQ'), (None, 'disqualified', True))
         self.assertEqual(normalize_result_status('SCR'), (None, 'scratched', False))
         self.assertEqual(normalize_result_status('NR'), (None, 'non_runner', False))
