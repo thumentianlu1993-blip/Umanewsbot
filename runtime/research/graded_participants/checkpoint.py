@@ -143,6 +143,8 @@ def merge_stage(root: Path, *, source_stage: str, target_stage: str,
         index = store.verify_index(); request_count += int(index.get("request_count", 0))
         for record in store.records():
             key = record["key"]
+            if record.get("status") not in TERMINAL_STATUSES:
+                raise ValueError(f"nonterminal {source_stage} record: {key} status={record.get('status')}")
             if key in records and canonical_json_bytes(records[key]) != canonical_json_bytes(record):
                 raise ValueError(f"conflicting shard record: {key}")
             records[key] = record
