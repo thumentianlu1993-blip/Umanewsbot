@@ -12,14 +12,63 @@ fi
 TARGET_REF="$1"
 
 COMPOSE="./deploy/docker/compose-wrapper.sh"
+COMPOSE_FILE="docker-compose.prod.yml"
+
+# Acquire the host-local deployment lock before any stateful action. The
+# release trap is installed only after a successful acquire so a contender
+# that loses the race never touches the winner's lock.
+DEPLOYMENT_LOCK_TOKEN="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+export DEPLOYMENT_LOCK_TOKEN
+COMPOSE_FILE="$COMPOSE_FILE" DEPLOYMENT_LOCK_ACTION=rollback ./deploy/deployment_lock.sh acquire
+release_lock() {
+  ./deploy/deployment_lock.sh release >/dev/null 2>&1 || true
+}
+trap release_lock EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 git fetch --all --tags
-git rev-parse --verify "$TARGET_REF^{commit}" >/dev/null
-COMPOSE_FILE=docker-compose.prod.yml ./deploy/historical_runner_preflight.sh
-"$COMPOSE" -f docker-compose.prod.yml stop beat
-COMPOSE_FILE=docker-compose.prod.yml ./deploy/wait_for_celery_drain.sh
-"$COMPOSE" -f docker-compose.prod.yml stop worker
-git checkout "$TARGET_REF"
-"$COMPOSE" -f docker-compose.prod.yml build web
-"$COMPOSE" -f docker-compose.prod.yml up -d --no-deps web
-"$COMPOSE" -f docker-compose.prod.yml exec web python manage.py migrate --noinput
-"$COMPOSE" -f docker-compose.prod.yml up -d --no-deps worker beat nginx
+# Resolve the target once and bind every later check to the immutable OID.
+TARGET_OID="$(git rev-parse --verify "$TARGET_REF^{commit}")"
+# The resolved OID must be a single 40-character lowercase hex commit ID;
+# reject empty, multi-line or otherwise malformed output before any
+# cat-file, preflight or checkout.
+case "$TARGET_OID" in
+  *[!0-9a-f]*)
+    echo "rollback: resolved OID is malformed; refusing before any check" >&2
+    exit 1
+    ;;
+esac
+if [ "${#TARGET_OID}" -ne 40 ]; then
+  echo "rollback: resolved OID is not a 40-character commit id; refusing before any check" >&2
+  exit 1
+fi
+# The target must carry the release contract and every v1 helper; refuse
+# before any checkout or service stop. Forward migrate is NOT a database
+# rollback.
+for helper in \
+  deploy/release_contract_v1 \
+  deploy/run_application_release.sh \
+  deploy/deployment_lock.sh \
+  deploy/run_release_tasks.sh \
+  deploy/wait_for_compose_service_healthy.sh \
+  deploy/wait_for_celery_drain.sh \
+  deploy/docker/run-release-tasks.sh \
+  deploy/docker/start-web.sh \
+  deploy/docker/compose-wrapper.sh
+do
+  if ! git cat-file -e "$TARGET_OID:$helper"; then
+    echo "rollback: target is missing required v1 helper $helper; refusing before checkout" >&2
+    exit 1
+  fi
+done
+
+# The existing web is still running here, so the historical runner preflight
+# preconditions hold (same semantics as deploy; no --initial-install branch).
+COMPOSE_FILE="$COMPOSE_FILE" ./deploy/historical_runner_preflight.sh
+
+git checkout "$TARGET_OID"
+"$COMPOSE" -f "$COMPOSE_FILE" build web
+
+COMPOSE_FILE="$COMPOSE_FILE" RELEASE_ACTION=rollback ./deploy/run_application_release.sh

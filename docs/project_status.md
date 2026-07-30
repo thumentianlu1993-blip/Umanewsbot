@@ -2077,3 +2077,56 @@ P0 马信息补全专项的模型交接文档见
 - 同一 reviewer 已确认原四项关闭；后续发现的 verify 空 scope 与 apply 部分失败退出 0
   两项 P1 也已完成真实 RED -> GREEN。最新聚焦 `19/19`、直接相邻组合 `109/109`；
   继续等待限定复审，发布状态不变。
+
+# 2026-07-28 部署 migration 单一 owner 方案已建立
+
+- 最新 main 的标准/低成本 deploy、两条 rollback 和 web 启动入口存在重复 migration owner；
+  `up -d web` 与随后的 `exec web migrate` 可能并发，是后续带 migration change 的共同发布
+  blocker。
+- 独立 change `fix-single-migration-owner` 已完成 Codex 原生 spec/design/test/tasks/rollout
+  与自包含实现交接。推荐使用唯一 Compose one-shot release task、host-local 部署锁和 web
+  healthy 下游启动门禁。
+- 当前仅为文档设计，未实现、未提交、未部署、未连接生产。先独立方案审核，再等待用户明确
+  实现授权。
+- 同一独立方案 reviewer 三轮已关闭 race-live migration 窗口、owner token、pre-contract
+  rollback bridge、greenfield 非目标、manual release 停服门禁和权威 runbook 一致性问题，
+  最终 `APPROVED`，开放 P0/P1 为 0。当前已停在用户实现确认门禁。
+
+# 2026-07-29 部署 migration 单一 owner 实现完成（待复审）
+
+- 隔离分支 `codex/fix-single-migration-owner` 已完成全部脚本实现：migration/
+  collectstatic 收敛为唯一 Compose one-shot release task，deploy/rollback/manual
+  release 共享 host-local 部署锁与同一 release 编排，web healthy 前下游零启动，
+  race_live_worker 仅按原始运行态停/恢复，pre-contract 回滚走独立兼容桥。
+- 协调复审裁决后已在两条 rollback 的 ref 校验与 checkout 之间恢复 historical
+  runner preflight；实现 review 六项 findings（ps 探测 fail closed、锁覆盖
+  preflight、锁元数据 COMPOSE_FILE、manual restarting 检测列、drain 精确节点匹配、
+  桥镜像自检）已全部修复。第 3 轮 Codex 原生 REVISE 的七项 findings（race-live
+  状态跨重试持久化、bridge schema 显式门禁、v1 helper 全量 cat-file + 不可变 OID、
+  probe 输出合法性、文档同步）也已修复。第 4 轮复审 findings（恢复意图与当前态
+  probe 分离的重试语义、helper 扩 9 路径、OID 格式显式校验、文档 OID 化）已修复，
+  14 项 RED 全绿；剩 2 项为测试侧张力（T11 成功用例需补 `git-rev-parse-output`）。
+  相邻 historical runner 回归 `11/11`、shell 语法检查与 diff 检查通过。
+- 未发布、未部署、未连接生产；等待测试侧修正与同一 reviewer 第 5 轮复审后冻结新指纹。
+
+# 2026-07-30 部署 migration 单一 owner 完成 re-baseline
+
+- 基线迁至 `6d073dc07cb29201bbc922255923820c872a0467`，分三跳：`7385f59` -> `7cd144ab`
+  （main 增量 65 文件：race-calendar 日期窗口、race-news 质量、harden-celery-p0-admission 等）
+  -> `be1c89bf`（PR #47 fix-p0-queue-snapshot-output）-> `6d073dc0`（PR #48，纯文档增量，
+  无代码变化）；重叠文档均由主线程三方合并，零冲突。
+- p0 closed-admission 脚本的 collectstatic 经用户批准登记为显式例外，最终基线上前提复核
+  仍成立（1 次 collectstatic、0 migrate、2 次 `verify_migration_plan_zero`）；T01/T02 合同断言
+  同步修订；聚焦套件终值 97 用例。
+- 未发布、未部署、未连接生产；旧指纹失效，等待第 5 轮复审在新基线上冻结新指纹。
+
+# 2026-07-30 部署 migration 单一 owner 第 5 轮 findings 修复完成
+
+- p0 脚本接入共享部署锁、新增 resume 受审恢复入口、race-live 意图六字段可信绑定三组
+  findings 已修复；owner 套件 `113/113`、p0 套件 `35/35`、相邻回归 `11/11` 通过。
+- 未发布、未部署、未连接生产；等待同一 reviewer 第 5 轮复审并冻结新指纹。
+
+# 2026-07-30 部署 migration 单一 owner 第 6 轮修复完成
+
+- resume 可信意图消费后删除的 P1 已修复；四项 P2 建议记录在案不改代码。owner 套件
+  `117/117`、p0 套件 `35/35` 通过。未发布、未部署、未连接生产；等待第 7 轮复审冻结新指纹。
