@@ -6,11 +6,20 @@ import re
 import sys
 from pathlib import Path
 
+from django.conf import settings
+from django.core.management.base import CommandError
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 
 from stable.models import RaceEvent, RaceEventStatus
 from stable.services.race_event_lifecycle import reconcile_lifecycle_controls
+from stable.services.race_event_lifecycle_enrollment import (
+    EnrollmentError,
+    apply_enrollment,
+    load_enrollment_manifest,
+    peek_manifest_schema,
+    preflight_enrollment,
+)
 
 _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 _VALID_MODES = frozenset({"off", "shadow", "enforce"})
@@ -25,6 +34,8 @@ class Command(BaseCommand):
         parser.add_argument("--apply", action="store_true")
         parser.add_argument("--manifest-file")
         parser.add_argument("--manifest-sha256")
+        parser.add_argument("--expected-commit")
+        parser.add_argument("--confirm-shadow-enrollment", action="store_true")
         parser.add_argument("--event-ids", nargs="*", type=int)
         parser.add_argument("--auto-discover", action="store_true")
         parser.add_argument("--default-mode", choices=["off", "shadow", "enforce"], default="shadow")
@@ -38,6 +49,21 @@ class Command(BaseCommand):
         auto_discover = options["auto_discover"]
         default_mode = options["default_mode"]
         page_size = options["page_size"]
+
+        if manifest_file:
+            schema_version = self._peek_manifest_schema(manifest_file)
+            if schema_version == 2:
+                return self._handle_v2_manifest(
+                    manifest_file=manifest_file,
+                    manifest_sha=manifest_sha,
+                    expected_commit=options.get("expected_commit") or "",
+                    apply=apply,
+                    confirmed=options.get("confirm_shadow_enrollment", False),
+                )
+            if apply:
+                raise CommandError(
+                    "schema v1 永久只读；任何 v1 --apply 均被拒绝且零写入"
+                )
 
         if apply:
             if not manifest_file or not manifest_sha:
@@ -126,6 +152,65 @@ class Command(BaseCommand):
                 return
             target_modes = {str(eid): default_mode for eid in ids}
             self._run(ids, target_modes, {}, {}, {}, manifest_sha or "dry-run", page_size, apply=False)
+
+    @staticmethod
+    def _peek_manifest_schema(manifest_file):
+        try:
+            return peek_manifest_schema(manifest_file)
+        except EnrollmentError as exc:
+            raise CommandError(f"manifest 无法解析: {exc}") from exc
+
+    def _handle_v2_manifest(
+        self,
+        *,
+        manifest_file,
+        manifest_sha,
+        expected_commit,
+        apply,
+        confirmed,
+    ):
+        if not manifest_sha:
+            raise CommandError("v2 manifest 必须提供 --manifest-sha256")
+        if not expected_commit:
+            raise CommandError("v2 manifest 必须提供 --expected-commit")
+        if apply and not confirmed:
+            raise CommandError("--apply v2 必须显式提供 --confirm-shadow-enrollment")
+
+        # This is intentionally before transaction entry or row locking.  Only
+        # the exact bool False and exact string "off" constitute a closed gate.
+        if apply and not (
+            getattr(settings, "RACE_EVENT_LIFECYCLE_ENABLED", None) is False
+            and getattr(settings, "RACE_EVENT_LIFECYCLE_MODE", None) == "off"
+        ):
+            raise CommandError(
+                "v2 apply 只允许在严格 RACE_EVENT_LIFECYCLE_ENABLED=false、"
+                "RACE_EVENT_LIFECYCLE_MODE=off 下执行"
+            )
+
+        try:
+            manifest = load_enrollment_manifest(
+                manifest_file,
+                expected_raw_sha256=manifest_sha,
+                expected_commit=expected_commit,
+            )
+            result = apply_enrollment(manifest) if apply else preflight_enrollment(manifest)
+        except EnrollmentError as exc:
+            raise CommandError(str(exc)) from exc
+
+        label = "APPLY" if apply else "DRY-RUN"
+        for event_id in manifest.event_ids:
+            snapshot = manifest.data["events"][str(event_id)]
+            self.stdout.write(
+                f"  event={event_id} result={result.outcomes[event_id]} "
+                f"decision={snapshot['predicted_decision']['action']} "
+                f"next_refresh={snapshot['predicted_next_refresh_at']}"
+            )
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"[{label}] schema=v2 total={len(manifest.event_ids)} "
+                f"would_create={result.would_create} replay={result.replayed} error=0"
+            )
+        )
 
     def _run(self, ids, target_modes, us_zones_map, eligibility, schedule_hashes,
              manifest_sha, page_size, apply):

@@ -4905,3 +4905,70 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - non-blocking P2 为 apply/rollback 与 maintenance exit 的理论锁顺序反转；PG `5/5` 未复现，
   但未执行专项并发 exit 验证，故未关闭并转后续任务。
 - 无 commit/push/PR/deploy、生产 census/apply；发布未授权。
+
+# 2026-07-31 lifecycle shadow 纳管准备进入方案审核
+
+- 已从最新 `origin/main@43b81fd3288a1e7b997ffad78d03565327e3d990` 创建独立干净
+  worktree `.worktrees/prepare-lifecycle-shadow-enrollment` 和分支
+  `codex/prepare-lifecycle-shadow-enrollment`，未触碰主工作区现有改动。
+- 本地只读盘点确认阶段 A 已有 control/transition、时间决策、claim、scanner 和
+  shadow proposal 能力；缺口是生产 manifest 仍需手工构造，且现有 manifest dry-run
+  没有执行与 apply 相同的完整 schema、美国 zone、冻结资格和 schedule/DB 漂移门禁。
+- 生产只读核对：`HEAD=23abf5289f9dac8310c4ba0300b0e925e72d3f40`，
+  lifecycle 保持 `false/off`，control/transition 均为 0。未来 90 天 172 场已发布重点赛事
+  `race_datetime` 非空为 0、`local_start_time` 非空为 9；未来 45 天 85 场中 6 场地区
+  时区错误为 `Asia/Shanghai`，不得纳管。首个查询因误用 `name_zh` 在 ORM 解析阶段失败，
+  修正为 `chinese_name` 后成功；两次均为零写。
+- 已建立 `docs/changes/prepare-lifecycle-shadow-enrollment/` 的 spec、design、test cases、
+  tasks、rollout 和自包含 HANDOFF。推荐新增只读 prepare + strict manifest v2，并让
+  dry-run/apply 共用 preflight；首次 apply 只允许 ≤20 场 shadow、完整 DB CAS、整批事务。
+- 当前只修改文档，未修改测试、应用代码、migration、配置或生产数据，未调用 provider，
+  未打开 lifecycle。下一门禁是独立方案 review；通过后仍需用户明确“确认实现”。
+- 独立 reviewer session `019fb494-dfc3-7c71-a543-fa75421ef21a` 首轮 `REVISE` 的两项 P1
+  已写回方案：v2 apply 必须技术强制严格 `false/off` 并核对 worker/claim 运行态；v1
+  永久 dry-run-only，任何 apply 零写拒绝。待同一 reviewer 限定复审。
+- 同一 reviewer 限定复审已确认两项 P1 关闭、无新的直接 P0/P1，最终
+  `VERDICT: APPROVED`。当前停在用户“确认实现”门禁，仍未修改测试/代码/配置或执行生产动作。
+- 用户随后明确“确认实现”。测试子代理先取得真实 RED：目标 prepare 命令不存在导致
+  10 errors，旧 v1 apply 仍创建 control 导致 1 failure；实现后 enrollment SQLite 合同
+  扩至 30 项，并通过跨位数 ID RED 锁定和修复 canonical 数值排序问题。
+- 已新增 strict v2 enrollment service、只读 prepare 命令及 PostgreSQL 双 apply 合同，
+  并扩展 reconcile：v2 dry-run/apply 共用 loader/preflight，apply 强制 strict
+  `false/off`、shadow-only、≤20、排序锁、单事务 CAS/replay；v1 apply 永久零写拒绝。
+- 首轮独立代码 review（session `019fb637-a018-7f43-a119-4f54f55cba00`）结论
+  `REVISE`：服务层关闭态门禁、跨时间边界预测、祖先 symlink、schema 无界预读共
+  1 P1 + 3 P2。首轮限定复审又发现 caller-controlled now、固定 alias 例外和读中 TOCTOU
+  三项 P2；第二轮限定复审剩余 writer 验证到发布之间的祖先替换 P2。全部先补真实 RED，
+  再修复；第三轮限定复审又发现 staging name/fd 换绑 P2，现已增加 rename 前后 inode
+  绑定和 quarantine。第四轮限定复审发现名称扫描后 rmdir 的 cleanup 竞态及 quarantine
+  断言不足；现已收敛为只通过 owned fd 清空本进程文件、允许空 staging，并锁定 marker 保全。
+- 第五轮限定复审发现 rename 后最终校验失败会遗留公开空目录并阻断同路径重试；已用真实
+  RED 锁定，并改为经稳定 parent fd 隔离公开名称后再清空 owned 文件。第六轮又发现
+  rename 自身失败也会因标志位过早置位而移动竞争者目录；现只在 rename 成功后置位，
+  conflict RED 已转绿且竞争者 inode/marker 原位保留。第七轮补出普通 rename 可覆盖
+  并发空目录的 P2；现以 Linux renameat2/macOS renameatx_np 原子 no-replace 发布，
+  能力缺失时 fail closed，空/非空竞争者和 staging swap 测试均通过。第八轮进一步要求
+  在业务写入前验证 kernel/flag/同文件系统语义；现以两个空的 0700 高熵 probe 目录证明
+  no-clobber 和 inode 保持，不支持或错误覆盖时业务写入次数为 0。
+- 主线程复验：SQLite enrollment + 既有 lifecycle `91/91`，日历/页面/字段/race-live/
+  scheduled-result 相邻回归 `190/190`，隔离 PostgreSQL enrollment + 既有 lifecycle
+  并发最新复跑 `6/6`；Django check、migration drift、diff check 均通过。同一独立
+  reviewer 第九轮限定复审已 `APPROVED`，P0/P1/P2/P3 均为 0，原生只读会话退出码 0，
+  审前/审后 fingerprint `3932d1fd…749ef` 一致。
+- 未新增 migration/settings/Beat/Compose，未联网或连接生产，未 commit/push/PR、部署、
+  apply control 或打开 lifecycle。当前只追加审核证据并冻结 evidence fingerprint；
+  下一门禁为用户对 commit、push 和 Draft PR 的明确授权。
+
+# 2026-08-01 lifecycle shadow 纳管准备整合最新 main
+
+- 用户已授权在上线准备通过后直接 commit、push、创建 PR 并合并；不授权部署、迁移、生产
+  写入、control apply 或打开 lifecycle。
+- 分支已从原基线 `43b81fd3` 快进整合到最新 `origin/main@1cdd066b`（PR #55 历史赛历
+  完整性修复）。应用/测试文件无冲突；三份状态/决策文档保留主线新增事实后追加 lifecycle
+  记录，deploy runbook 自动合并，未覆盖主线记录。
+- 最新验证为 lifecycle SQLite `91/91`、新主线赛事年份合同 `20/20`、隔离 PostgreSQL
+  `6/6`；Django check、migration drift 与 diff check 通过。原相邻 190 项中的 3 个
+  `public_year/local_date` fixture error 已在独立干净 `origin/main@1cdd066b` 精确复现，
+  属于主线既有失败，不在本 change 顺带修复。
+- 旧 fingerprint 已因主线迁移失效；当前等待同一独立 reviewer 对基线迁移后的完整候选
+  复审。复审通过后才执行已授权的 commit/push/PR/merge；生产生命周期仍保持关闭。

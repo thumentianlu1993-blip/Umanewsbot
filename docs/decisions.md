@@ -2423,3 +2423,23 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   保证 gate 前 writer 排空、gate 后 writer 拒绝且等待者重新检查。
 - repair 的 bypass 不是通用开关，只能在已核验 manifest/action scope 且 exact active gate 的
   apply/rollback 事务内使用。该决定仍处于本地代码复审前状态，不构成生产写入授权。
+
+## 2026-07-31 lifecycle shadow 采用 prepare manifest 与启用分离
+
+- 不直接用现有 `--auto-discover` 或人工 JSON 纳管生产赛事。先以明确 event IDs 生成
+  strict schema v2 manifest，再由同一 loader/preflight 完成 dry-run 和 apply。
+- 首次纳管入口固定 shadow-only、1–20 场；apply 在单事务内排序锁定全部 event/control，
+  对资格、状态、地区、时区、日期/时间、event 更新时间和 existing control 做完整 CAS。
+  任一漂移整批零写；相同 manifest 只允许精确 replay，不同 manifest 不更新既有 control。
+- control apply 必须在全局 `false/off` 下完成并独立 verify。打开
+  `true/shadow` 是针对精确 manifest、赛事范围和观察窗口的第二次用户授权；观察成功也不
+  自动进入 enforce。
+- `local_start_time` 只是展示 wall-clock，不用于推导 `race_datetime`。当前生产未来赛事
+  `race_datetime=0`，所以首批只能验证无时间的当地次日 proposal，不能宣称有时间路径已
+  完成线上验证。
+- 方案已通过独立审核，用户已授权测试先行与本地实现；实现仍不构成生产 apply、开关、
+  commit/push/PR 或部署授权。
+- 首轮方案 review 后补充：v2 apply 的 `false/off` 必须是代码硬门禁，不能只依赖操作
+  runbook；v1 只保留 dry-run compatibility，永久禁止 apply，避免绕过 v2 合同。
+- 实现采用同一 strict loader/preflight 服务承载 v2 dry-run/apply；跨位数 event ID 的
+  canonical 排序按整数处理，避免字符串 `10 < 9` 导致 producer 生成后被 loader 自拒绝。

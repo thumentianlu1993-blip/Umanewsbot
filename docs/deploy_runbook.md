@@ -7558,6 +7558,25 @@ re-baseline 基线 + 各轮 findings 新增）。
    在任何 stop 前 fail closed；resume 对不可信文件只告警并跳过 race-live 恢复、核心服务
    照恢复。任何情况下遗留意图文件都只能人工核对后删除，脚本不自动清理不可信文件。
 
+## Lifecycle shadow 纳管准备（实现通过复审，待代码发布）
+
+- 生产纳管禁止使用 `--auto-discover`，也不手工拼 manifest。计划新增只读 prepare 命令，
+  对明确 1–20 个 event IDs 生成 strict manifest v2 和 summary。
+- 顺序固定为：关闭态部署 -> 生产只读 prepare/dry-run -> 精确 SHA 授权 -> `false/off`
+  下 control apply/verify -> 第二次授权 -> `true/shadow` -> 至少 48 小时观察。
+- apply 和启用不得在同一步执行。control apply 后，`RaceEvent.status`、transition、赛果、
+  新闻和 QQ 必须仍为零变化；shadow 开启后也只允许 proposal/audit。
+- v2 apply 自身必须确认严格 `false/off`；执行前另核对 Beat/普通 worker 同为关闭态、
+  lifecycle active/reserved/有效 claim 为 0。v1 manifest 永久禁止 apply。
+- 首批排除地区时区不符合合同的赛事。当前没有未来 `race_datetime` 样本，只能观察当地
+  次日规则；running/T+30 必须在可信时间补齐后另行纳管。
+- 紧急停止：设置 lifecycle `false/off`，重建必要 Beat/普通 worker，验证 scanner disabled。
+  已排队任务在事务内复查开关并零写退出；保留 control/proposal，不删审计、不反改赛事状态。
+- 完整方案见
+  `docs/changes/prepare-lifecycle-shadow-enrollment/rollout.md`。本地实现、测试和最新 main
+  整合复审已完成；用户仅授权 commit、push、创建 PR 并合并。生产 apply、生命周期启用、
+  部署、迁移、联网 proof 和其他生产写入仍未授权；不得提前运行本节生产命令。
+
 ### 操作警示
 
 - **forward migrate 不等于数据库回退**：共享 release task 只把目标代码已知 migration
