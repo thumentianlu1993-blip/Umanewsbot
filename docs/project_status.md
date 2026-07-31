@@ -2325,3 +2325,10 @@ P0 马信息补全专项的模型交接文档见
   migration drift、diff check 通过。相邻 190 项的 3 个年份 fixture error 在干净 main
   精确复现，记录为主线既有失败，不由本 change 顺带修复。
 - 旧 fingerprint 已失效，等待同一 reviewer 复核整合候选；生产开关继续关闭。
+
+# 2026-08-01 lifecycle shadow 纳管准备代码已合并
+
+- 最终只读 review `APPROVED`，P0–P3 为 0；代码提交 `ca37d51e…f53fc` 经 PR #56 合并，
+  main merge commit 为 `3ba5defc526259b2785f4d84736551ab826804b3`。
+- 本轮未部署、未迁移、未执行生产写入或联网 proof，lifecycle 未启用；后续生产步骤继续
+  分开授权。完整证据见 change 目录 `release_report.md`。
