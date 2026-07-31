@@ -12,6 +12,7 @@ from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from stable.models import (
@@ -42,6 +43,7 @@ from stable.services.historical_race_importer import (
     historical_basic_fields_complete,
 )
 from stable.services.historical_race_inventory import InventoryValidationError
+from stable.services.race_event_years import event_edition_year
 
 
 SCHEMA_VERSION = "2.0"
@@ -709,7 +711,8 @@ def _detail_source_row(
         "target_id": target.pk,
         "expected_target_sha256": target_identity(target)["target_sha256"],
         "inventory_artifact_sha256": target.artifact_sha256,
-        "year": target.year,
+        "year": event.year,
+        "edition_year": target.year,
         "slug": event.slug,
         "source_name": source["name"],
         "source_url": source["url"],
@@ -807,12 +810,21 @@ def _execute_chunk(chunk: ApprovedChunk, receipt: HistoricalRaceDetailImportRece
         _validate_pending_target(target, rows_by_id[target.pk])
 
     pairs = {(target.race_series_id, target.year) for target in locked_targets}
+    edition_years = {pair[1] for pair in pairs}
     potential_events = list(
         RaceEvent.objects.select_for_update()
-        .filter(race_series_id__in={pair[0] for pair in pairs}, year__in={pair[1] for pair in pairs})
+        .filter(race_series_id__in={pair[0] for pair in pairs})
+        .filter(
+            Q(edition_year__in=edition_years)
+            | Q(edition_year__isnull=True, year__in=edition_years)
+        )
         .order_by("pk")
     )
-    conflicts = [event for event in potential_events if (event.race_series_id, event.year) in pairs]
+    conflicts = [
+        event
+        for event in potential_events
+        if (event.race_series_id, event_edition_year(event)) in pairs
+    ]
     if conflicts:
         raise HistoricalRaceDetailChunkError("chunk has an existing RaceEvent conflict")
 
@@ -1298,11 +1310,14 @@ def reconcile_historical_race_detail_receipt(
             ):
                 raise HistoricalRaceDetailChunkError("receipt target identity changed after STARTED")
         pairs = {(target.race_series_id, target.year) for target in targets}
+        edition_years = {pair[1] for pair in pairs}
         if any(
-            (event.race_series_id, event.year) in pairs
+            (event.race_series_id, event_edition_year(event)) in pairs
             for event in RaceEvent.objects.select_for_update().filter(
                 race_series_id__in={pair[0] for pair in pairs},
-                year__in={pair[1] for pair in pairs},
+            ).filter(
+                Q(edition_year__in=edition_years)
+                | Q(edition_year__isnull=True, year__in=edition_years)
             )
         ):
             raise HistoricalRaceDetailChunkError("related RaceEvent exists")

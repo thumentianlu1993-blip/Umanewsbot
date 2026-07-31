@@ -1,5 +1,47 @@
 # 部署运行手册
 
+## 2026-07-31 历史赛事赛历完整性 Release A 未来发布门禁
+
+> 本节是仓库候选的未来发布门禁，不是部署授权或生产执行记录。当前没有 commit、push、PR、
+> 部署、生产只读 census 或生产写入授权。
+
+1. Release A 候选必须固定到经独立代码 review 通过的精确 commit/image；migration graph
+   只允许新增 `0067_historical_calendar_release_a.py`。若出现 Release B series/edition
+   约束或 Release C non-null/自然年 check migration，立即停止，不得合并发布。
+2. 发布前分别验证标准 RDS `docker-compose.prod.yml` 与低成本本机 PostgreSQL
+   `docker-compose.prod.lowcost.yml` 的 config。两种模式都必须保存 schema/数据备份、
+   当前 commit/image、migration leaf/plan 和回滚 image；不得改变现有数据库模式或把一种
+   Compose 的验证冒充另一种。
+3. 运行聚焦 Django/collector、Django check、`makemigrations --check --dry-run`、migration
+   graph/漂移和 `git diff --check`。当前完整 `stable` 基线为
+   `3989 tests / 25 failures / 54 errors / 72 skipped`，包含测试子进程缺少 `python` PATH、
+   Redis 不可达、时效测试、旧 CSV 门禁和 migration-owner guard；发布前必须重新冻结并比较
+   失败集合，不能报告“全绿”，也不能用该基线豁免本 scope 新失败。
+4. Release A 只部署 nullable `edition_year`、canonical path registry 回填、repair receipt、
+   target supersession 和兼容代码。migration 后核对 `0067` 单一 leaf、pending plan 为零、
+   registry 每个既有 event 恰有一个 canonical path，并验证历史重点、超过 40 条的
+   `year/q` 前后分页、legacy 301、canonical sitemap 与当前年运营重点回归。
+5. Release A 部署不得自动运行 `repair_historical_race_calendar_integrity`，不得生成生产
+   census、创建 legacy 修复路径、改香港/其他地区 event/target，也不得启动联网 collector。
+   生产全地区 prepare 是后续独立只读阶段，仍需明确授权和全 scope artifact SHA。
+6. 若 Release A 应用代码异常，优先恢复冻结旧 image/commit；nullable 字段、registry 和 receipt
+   表保留，不做自动反向删除。若 `0067` 数据回填或 schema 本身异常，停止写入并由人工选择经
+   审核的反向 migration 或部署前备份恢复，不能只 checkout 旧代码猜测兼容。
+7. 生产 census 完成且冲突清零后，Release B 才可作为独立 change 创建、review、授权和发布；
+   数据 apply 还需精确 approval/actor/action scope、maintenance/freeze 与备份。独立 verifier
+   通过后才允许创建 Release C。每一阶段分别记录实际 commit/image/schema/artifact/receipt，
+   前一阶段成功不自动授权后一阶段。
+8. 后续获批的数据 apply/rollback 必须先用
+   `repair_historical_race_calendar_integrity --enter-maintenance` 创建绑定精确
+   manifest SHA、action scope SHA 和 actor 的数据库 active gate，再提交相同 identity 的
+   apply/rollback；JSON maintenance evidence 不能替代 live gate。完成独立 verifier 后才可用
+   `--exit-maintenance` 退出。gate 不匹配、已退出或存在第二个 active gate 时一律停止。
+9. 发布前必须确认年份写入校验和 repair classifier 都调用
+   `race_event_years.validate_authority_url()`；不得恢复 classifier 私有 URL 解析。用合法 HTTPS
+   path/query 与 fragment、HTTP、credentials、非 URL 样本复验：非法证据必须保持
+   manual/block，不能进入 action。当前 `76/76` 只属于本地聚焦证据，仍需绑定新 reviewer
+   fingerprint 后才可用于发布判断。
+
 ## 2026-07-31 年度参赛马 workflow 的 443 诊断与恢复
 
 1. 若 checkpoint 停在 `https://umafans.run/sitemap.xml`，先区分“宿主映射 443”和
@@ -6622,7 +6664,13 @@ python manage.py evaluate_multiregion_attribution_gold \
 
 - 二号批次 selection 为 250 个目标。当前最终来源包只包含 246 个可导入 held 目标，adapter 分布为 `jra=50 / equibase=48 / hkjc=50 / uk_sportinglife=48 / zeturf=50`；source URL、ledger 和 cache identity 必须均为 246 个且一一对应。
 - 不得把四个缺口伪装成 held 候选：Brooklyn Stakes、Cougar II Stakes 保留 TOBA `not run` 审核项；Classic Handicap Chase、Dick Poole Fillies Stakes 保留 Sporting Life `ABANDONED` 证据，后续须通过正式 expectation correction 流程处理。
-- 香港赛季目标的赛事日期跨自然年时，provider 必须同时写 `actual_year=<local_date.year>` 和非空 `cross_year_reason=hong_kong_racing_season_spans_calendar_years`。英国来源距离可保留 `2m4f`、`3m21/2f` 等原文，解析结果必须拆成 mile/furlong/yard 组件，不能改写成裸数字或公制猜测。
+- 本段历史记录中的香港规则已被
+  `docs/changes/repair-historical-race-calendar-integrity/` 废弃：
+  `hong_kong_racing_season_spans_calendar_years` 不再是合法届次跨年原因，包含该原因的旧 artifact
+  不得审批或 apply，必须重新 prepare。普通香港马季按实际比赛自然年建立 target/event；只有真实
+  延期且有非废弃原因、权威证据和人工批准时，才允许 edition year 与公开自然年不同。英国来源
+  距离仍可保留 `2m4f`、`3m21/2f` 等原文，解析结果必须拆成 mile/furlong/yard 组件，不能改写成
+  裸数字或公制猜测。
 - 当前生产镜像不含紧凑英制距离修复。必须先把修复提交并合入最新 main，运行完整组合回归，构建可复现 AMD64 镜像并按共享生产切换门禁部署；随后重新 normalize/build，预期结果才是 `246 candidate / 4 gap`。旧 `219/31` artifact 不得审批或 commit。
 - 新 artifact 仍须经历 manifest 审批、数据库备份、`gzip -t`、SHA-256、dry-run、单命令临时写入开关、写后逐目标核验和常驻开关复核。详情候选必须在日期 apply 改变 target SHA 后重新导出并重新打包，公开展示开关保持关闭。
 

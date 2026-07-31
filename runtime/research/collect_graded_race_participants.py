@@ -56,6 +56,10 @@ TERMINAL_ITEM_STATUSES = frozenset(
     {"success", "skipped", "permanent_error", "not_found", "evidence_gap"}
 )
 RETRYABLE_ITEM_STATUSES = frozenset({"retryable_error"})
+INCOMPATIBLE_CHECKPOINT_MESSAGE = (
+    "collector tool/checkpoint is incompatible; fresh output root is required; "
+    "no migration is supported"
+)
 
 TARGET_REGIONS = (
     "japan",
@@ -211,6 +215,21 @@ def utc_now_iso() -> str:
 def normalize_space(value: Any) -> str:
     text = unicodedata.normalize("NFKC", str(value or ""))
     return " ".join(text.replace("\u3000", " ").split())
+
+
+def normalize_horse_number(value: Any) -> str:
+    number = normalize_space(value)
+    if number in {"-", "–", "—"}:
+        return ""
+    return number
+
+
+class MissingNumberAmbiguityError(ValueError):
+    """缺少更强身份且规范化马名重复。"""
+
+
+class RealHorseNumberConflictError(ValueError):
+    """同场同一真实马号指向不同马匹。"""
 
 
 def normalize_identity(value: Any) -> str:
@@ -770,8 +789,12 @@ def parse_result_rows(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     excluded_rows: list[dict[str, Any]] = []
     seen_exact: set[bytes] = set()
     identity_by_number: dict[str, str] = {}
+    missing_number_name_identities: set[str] = set()
     duplicate_rows = 0
     result_rows_with_horse = 0
+    missing_number_rows = 0
+    profile_fallback = 0
+    name_fallback = 0
     for raw_row in rows:
         row = {str(key): value for key, value in raw_row.items()}
         name = normalize_space(row.get("horse_display_name"))
@@ -779,22 +802,40 @@ def parse_result_rows(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
             continue
         result_rows_with_horse += 1
         row["horse_display_name"] = name
-        row["horse_number"] = normalize_space(row.get("horse_number"))
+        row["horse_number"] = normalize_horse_number(row.get("horse_number"))
         row["raw_finish_status"] = normalize_space(row.get("raw_finish_status"))
         profile_url = optional_profile_url(row.get("profile_url"))
         row["profile_url"] = profile_url
         number = row["horse_number"]
-        identity = normalize_identity(name)
-        if number and number in identity_by_number and identity_by_number[number] != identity:
-            raise ValueError(f"horse number identity conflict: {number}")
-        if number:
-            identity_by_number[number] = identity
+        name_identity = normalize_identity(name)
         encoded = canonical_json_bytes(row)
         if encoded in seen_exact:
             duplicate_rows += 1
             result_rows_with_horse -= 1
             continue
         seen_exact.add(encoded)
+        participant_identity = (
+            f"profile:{profile_url}" if profile_url else f"name:{name_identity}"
+        )
+        if number:
+            existing_identity = identity_by_number.get(number)
+            if existing_identity and existing_identity != participant_identity:
+                raise RealHorseNumberConflictError(
+                    f"horse number identity conflict: {number}"
+                )
+            identity_by_number[number] = participant_identity
+        else:
+            missing_number_rows += 1
+            if profile_url:
+                profile_fallback += 1
+            else:
+                name_fallback += 1
+                if name_identity in missing_number_name_identities:
+                    raise MissingNumberAmbiguityError(
+                        "ambiguous missing horse number identity: "
+                        f"normalized_name={name_identity}"
+                    )
+                missing_number_name_identities.add(name_identity)
         status, position = normalize_participant_status(row["raw_finish_status"])
         row["participant_status"] = status
         row["normalized_finish_position"] = position
@@ -816,6 +857,9 @@ def parse_result_rows(rows: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         "non_starters_excluded": len(excluded_rows),
         "participant_status_unresolved": len(unresolved_rows),
         "duplicate_result_rows": duplicate_rows,
+        "missing_number_rows": missing_number_rows,
+        "profile_fallback": profile_fallback,
+        "name_fallback": name_fallback,
     }
 
 
@@ -1199,6 +1243,9 @@ def parse_race_html(
                         "non_starters_excluded",
                         "participant_status_unresolved",
                         "duplicate_result_rows",
+                        "missing_number_rows",
+                        "profile_fallback",
+                        "name_fallback",
                     )
                 },
             }
@@ -1215,6 +1262,9 @@ def parse_race_html(
             "non_starters_excluded",
             "participant_status_unresolved",
             "duplicate_result_rows",
+            "missing_number_rows",
+            "profile_fallback",
+            "name_fallback",
         )},
     }
 
@@ -1230,6 +1280,33 @@ def canonical_horse_key(occurrence: Mapping[str, Any]) -> str:
         or normalize_space(occurrence.get("horse_display_name"))
     )
     return f"name|{region}|{country}|{normalize_identity(name)}"
+
+
+def normalize_participant_identity_row(
+    occurrence: Mapping[str, Any],
+) -> dict[str, Any]:
+    """在 checkpoint 读取、去重和最终输出前统一身份投影。"""
+
+    row = dict(occurrence)
+    row["horse_number"] = normalize_horse_number(row.get("horse_number"))
+    row["horse_display_name"] = normalize_space(row.get("horse_display_name"))
+    row["profile_url"] = optional_profile_url(row.get("profile_url"))
+    return row
+
+
+def race_participant_identity(
+    occurrence: Mapping[str, Any],
+) -> tuple[str, str, str]:
+    row = normalize_participant_identity_row(occurrence)
+    race_url = normalize_space(row.get("race_url"))
+    if row["horse_number"]:
+        return race_url, "number", row["horse_number"]
+    if row["profile_url"]:
+        return race_url, "profile", validate_profile_url(row["profile_url"])
+    name_identity = normalize_identity(row["horse_display_name"])
+    if not name_identity:
+        raise ValueError("race participant normalized identity is empty")
+    return race_url, "name", name_identity
 
 
 def _candidate_name_fields(candidate: Mapping[str, Any]) -> dict[str, str]:
@@ -1459,6 +1536,8 @@ def validate_resume_identity(saved: Mapping[str, Any], current: Mapping[str, Any
     )
     for field in fields:
         if saved.get(field) != current.get(field):
+            if field in {"tool_sha256", "checkpoint_sha256"}:
+                raise ValueError(INCOMPATIBLE_CHECKPOINT_MESSAGE)
             label = (
                 "region manifest"
                 if field == "region_manifest_sha256"
@@ -1538,6 +1617,8 @@ class RequestLedger:
             raise ValueError("request ledger is missing or invalid") from exc
         for field, expected in self.identity.items():
             if payload.get(field) != expected:
+                if field in {"schema_version", "tool_identity"}:
+                    raise ValueError(INCOMPATIBLE_CHECKPOINT_MESSAGE)
                 raise ValueError(f"request ledger identity drift: {field}")
         if payload.get("request_budget") != self.request_budget:
             raise ValueError("request ledger identity drift: request_budget")
@@ -1717,6 +1798,8 @@ class StageStore:
             raise ValueError("stage checkpoint index is missing or invalid") from exc
         for field, expected in self._identity().items():
             if index.get(field) != expected:
+                if field in {"schema_version", "tool_identity"}:
+                    raise ValueError(INCOMPATIBLE_CHECKPOINT_MESSAGE)
                 raise ValueError(f"stage {field} drift")
         entries = index.get("items")
         if not isinstance(entries, list) or entries != sorted(
@@ -2105,6 +2188,43 @@ def _deduplicated_errors(
     )
 
 
+def participant_identity_observability(
+    source_manifest: Sequence[Mapping[str, Any]],
+    errors: Sequence[Mapping[str, Any]],
+) -> dict[str, int]:
+    """汇总缺号 fallback；普通缺号不进入 errors，歧义/冲突保持失败信号。"""
+
+    totals = {
+        "missing_number_rows": 0,
+        "profile_fallback": 0,
+        "name_fallback": 0,
+    }
+    for item in source_manifest:
+        values: dict[str, int] = {}
+        for key in totals:
+            value = item.get(key, 0)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                raise ValueError(f"participant identity counter is invalid: {key}")
+            values[key] = value
+            totals[key] += value
+        if values["missing_number_rows"] != (
+            values["profile_fallback"] + values["name_fallback"]
+        ):
+            raise ValueError("participant identity fallback counters drift")
+    return totals | {
+        "ambiguity_gap": sum(
+            normalize_space(item.get("error_code"))
+            == MissingNumberAmbiguityError.__name__
+            for item in errors
+        ),
+        "real_number_conflict": sum(
+            normalize_space(item.get("error_code"))
+            == RealHorseNumberConflictError.__name__
+            for item in errors
+        ),
+    }
+
+
 def finalize_artifacts(
     *,
     output_dir: Path,
@@ -2124,9 +2244,11 @@ def finalize_artifacts(
     unexpected = existing - set(final_filenames(year))
     if unexpected:
         raise ValueError(f"final directory contains unexpected files: {sorted(unexpected)}")
+    normalized_occurrences = [
+        normalize_participant_identity_row(raw) for raw in occurrences
+    ]
     grouped_by_lookup: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for raw in occurrences:
-        row = dict(raw)
+    for row in normalized_occurrences:
         grouped_by_lookup[canonical_horse_key(row)].append(row)
     lookup_to_profile: dict[str, dict[str, Any]] = {}
     for raw in profiles:
@@ -2214,7 +2336,8 @@ def finalize_artifacts(
     if sum(profile_counts.values()) != len(horse_rows):
         raise ValueError("profile resolution invariant failed")
     participant_counts = Counter(
-        normalize_space(item.get("participant_status")) for item in occurrences
+        normalize_space(item.get("participant_status"))
+        for item in normalized_occurrences
     )
     counts = {
         "discovered_urls": len(
@@ -2224,8 +2347,8 @@ def finalize_artifacts(
         "included_races": len(
             {normalize_space(item.get("race_url")) for item in occurrences}
         ),
-        "participant_rows": len(occurrences),
-        "included_participant_rows": len(occurrences),
+        "participant_rows": len(normalized_occurrences),
+        "included_participant_rows": len(normalized_occurrences),
         "unique_horses": len(horse_rows),
         "non_starters_excluded": sum(
             int(item.get("non_starters_excluded", 0)) for item in source_manifest
@@ -2254,6 +2377,7 @@ def finalize_artifacts(
             for item in all_errors
         ),
         "request_count": request_count,
+        **participant_identity_observability(source_manifest, all_errors),
         **{
             key: int(other_coverage.get(key, 0))
             for key in (
@@ -2290,7 +2414,7 @@ def finalize_artifacts(
         else "complete"
     )
     occurrence_rows = sorted(
-        (dict(row) for row in occurrences),
+        (dict(row) for row in normalized_occurrences),
         key=lambda row: (
             normalize_space(row.get("race_date")),
             normalize_space(row.get("race_url")),
@@ -2329,7 +2453,7 @@ def finalize_artifacts(
         "outcome": outcome,
         "counts": counts,
         "coverage_by_region": coverage_by_region(
-            occurrences=occurrences,
+            occurrences=normalized_occurrences,
             other_coverage=other_coverage,
             errors=all_errors,
         ),
@@ -2624,6 +2748,8 @@ def _validate_discovery_progress(
 ) -> dict[str, Any]:
     for key, expected in identity.items():
         if state.get(key) != expected:
+            if key in {"schema_version", "tool_identity"}:
+                raise ValueError(INCOMPATIBLE_CHECKPOINT_MESSAGE)
             raise ValueError(f"discovery progress {key} drift")
     queue = state.get("queue")
     visited = state.get("visited")
@@ -2877,6 +3003,8 @@ def validate_run_manifest(
     }
     missing = sorted(required - set(manifest))
     if missing:
+        if {"schema_version", "collector_source_sha256"} & set(missing):
+            raise ValueError(INCOMPATIBLE_CHECKPOINT_MESSAGE)
         raise ValueError(f"run manifest missing fields: {missing}")
     if manifest.get("year") != year:
         raise ValueError("run manifest year drift")
@@ -2888,6 +3016,8 @@ def validate_run_manifest(
         raise ValueError("run manifest region manifest drift")
     for key, expected in current_tool_identity_record().items():
         if manifest.get(key) != expected:
+            if key in {"schema_version", "collector_source_sha256"}:
+                raise ValueError(INCOMPATIBLE_CHECKPOINT_MESSAGE)
             raise ValueError(f"run manifest tool identity drift: {key}")
     if manifest.get("target_regions") != list(TARGET_REGIONS):
         raise ValueError("run manifest region policy drift")
@@ -2962,12 +3092,8 @@ def _race_occurrences(records: Sequence[Mapping[str, Any]]) -> list[dict[str, An
         if item.get("status") != "success":
             continue
         for raw in item.get("rows", []):
-            row = dict(raw)
-            identity = (
-                normalize_space(row.get("race_url")),
-                normalize_space(row.get("horse_number")),
-                normalize_identity(row.get("horse_display_name")),
-            )
+            row = normalize_participant_identity_row(raw)
+            identity = race_participant_identity(row)
             if identity in identities:
                 raise ValueError(f"duplicate race participant identity: {identity}")
             identities.add(identity)
@@ -3833,6 +3959,45 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     return args
 
 
+def validate_formal_output_root(
+    root: Path, *, stage: str, resume: bool
+) -> None:
+    """正式采集只从空目录开始；已有断点必须显式、原样恢复。"""
+
+    root = Path(root)
+    if root.is_symlink():
+        raise ValueError("formal output root symlink is not allowed")
+    if not root.exists():
+        return
+    if not root.is_dir():
+        raise ValueError("formal output root must be a directory")
+    entries = {path.name for path in root.iterdir()}
+    if "final" in entries:
+        raise ValueError(
+            "formal output root contains immutable output; use a fresh output root"
+        )
+    if not entries:
+        return
+    unexpected = entries - {"run_manifest.json", "stages"}
+    if unexpected:
+        raise ValueError(
+            "formal output root contains unknown or immutable artifacts; "
+            "use a fresh output root"
+        )
+    if stage == "races":
+        if not resume:
+            raise ValueError(
+                "formal output root contains a checkpoint; pass --resume for "
+                "this exact run or use a fresh output root"
+            )
+        return
+    if not (root / "run_manifest.json").is_file():
+        raise ValueError(
+            "run_manifest.json is required for a later stage; old checkpoints "
+            "are not migrated"
+        )
+
+
 def run_synthetic_smoke(
     root: Path, *, year: int = 2025, stop_after: int = 0
 ) -> dict[str, Any]:
@@ -4089,13 +4254,15 @@ def _discovery_request_ledger(
 
 def run_stage(args: argparse.Namespace) -> int:
     root = Path(args.output_dir)
-    root.mkdir(parents=True, exist_ok=True)
     if args.stage == "synthetic_smoke":
+        root.mkdir(parents=True, exist_ok=True)
         report = run_synthetic_smoke(
             root, year=args.year, stop_after=1 if args.limit else 0
         )
         atomic_write_json(root / "synthetic_smoke_report.json", report)
         return int(report.get("exit_code", 0))
+    validate_formal_output_root(root, stage=args.stage, resume=args.resume)
+    root.mkdir(parents=True, exist_ok=True)
     worktree_root = Path(__file__).resolve().parents[2]
     selected_base_url = validate_request_url(args.base_url)
     region_manifest, region_manifest_sha = _region_manifest_binding(
@@ -4280,6 +4447,9 @@ def run_stage(args: argparse.Namespace) -> int:
                 "non_starters_excluded",
                 "participant_status_unresolved",
                 "duplicate_result_rows",
+                "missing_number_rows",
+                "profile_fallback",
+                "name_fallback",
             ):
                 source[field] = int(parsed.get(field, 0))
             parsed["source"] = source

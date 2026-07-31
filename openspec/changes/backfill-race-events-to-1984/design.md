@@ -182,7 +182,13 @@ inventory commit、series mapping、永久不可得批准、publication transiti
 2. 按地区来源优先级抓取年度日期、赛果页和可得的赛前页面，所有请求继续走共享预算与 source cache manifest。
 3. 输出 `date_source_candidates.jsonl`、人工 review、缺口账本、summary 和 manifest；同一目标出现多日期、跨赛事匹配或低权威覆盖高权威时阻断。
 4. 批准 apply 保留既有 `source_refs`，只补充 `local_date`、顶层稳定直接 URL 键及 `source_refs.detail_discovery` provenance；不得改变 series/year/expectation 等赛事身份。held 目标必须有结果页或可继续定位结果的权威直接赛事页；cancelled 目标可用 `cancellation_url` 代替结果页。满足门禁后，同一事务把 `pending` 转为 `ready` 并 materialize draft/cancelled `RaceEvent`，输出 apply 前后 target SHA 映射；失败必须整批回滚。
-5. 赛事届次年份与实际举办日年份必须分开：`HistoricalRaceEventTarget.year` 和公开 URL 继续表示届次年份；`local_date` 表示实际日期。二者不同时，候选必须提供 `actual_year`、跨年原因和权威证据并经人工批准，保存到 `source_refs.detail_discovery`；不得沿用目录 adapter 的“日期年份必须等于届次年份”假设。
+5. 赛事届次年份与实际举办自然年必须分开：后续由
+   `docs/changes/repair-historical-race-calendar-integrity/` 接管该合同。
+   `HistoricalRaceEventTarget.year` 与 `RaceEvent.edition_year` 表示届次年份；
+   `RaceEvent.year`、公开 URL 与 `local_date` 表示实际举办自然年。二者不同时，候选必须提供
+   `actual_year`、非废弃跨年原因和权威证据并经人工批准，保存到
+   `source_refs.detail_discovery`。普通香港马季不得再使用
+   `hong_kong_racing_season_spans_calendar_years` 证明届次跨年。
 6. 详情 adapter 优先消费 `source_refs.result_url / declared_runners_url / actual_runners_url / non_runner_url / cancellation_url`，不得重新进行无边界全网猜测。
 7. 第一批采用两阶段固定范围：预发现选择器从批准总账锁定约45个 `target_id`；日期 apply/materialize 后，详情计划必须使用相同 `target_id`，并绑定 apply 后新 target SHA，禁止悄悄用容易抓取的目标替换失败目标。
 8. discovery 与详情 adapter 必须为各来源声明允许的 HTTPS host；候选 URL、每次重定向和最终 URL 都必须落在对应 adapter 白名单，拒绝凭 artifact 抓取任意 host、内网地址或非 HTTP(S) scheme。

@@ -16,7 +16,7 @@ from typing import Any, Iterable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.db import connection, transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from stable.models import (
@@ -31,6 +31,7 @@ from stable.models import (
     RaceEventRunner,
     RaceEventStatus,
 )
+from stable.services.race_event_years import event_edition_year
 
 
 SCHEMA_VERSION = "1.0"
@@ -262,7 +263,7 @@ def _classification(
         base["candidate_event_identity"] = event_identity(event)
         if (
             event.race_series_id != target.race_series_id
-            or event.year != target.year
+            or event_edition_year(event) != target.year
             or event.country_region != target.country_region
             or target.race_series.country_region != target.country_region
         ):
@@ -297,7 +298,7 @@ def _classification(
             event.country_region != target.country_region
             or target.race_series.country_region != target.country_region
             or event.race_series.country_region != event.country_region
-            or event.year != target.year
+            or event_edition_year(event) != target.year
         ):
             base.update(classification="identity_conflict", reason="series_year_region_mismatch")
         elif not _status_is_compatible(target, event):
@@ -348,10 +349,11 @@ def classify_historical_race_event_targets(
     by_series_year: dict[tuple[int, int], list[RaceEvent]] = defaultdict(list)
     by_year_name: dict[tuple[int, str], list[RaceEvent]] = defaultdict(list)
     for event in all_events:
+        edition_year = event_edition_year(event)
         if event.race_series_id:
-            by_series_year[(event.race_series_id, event.year)].append(event)
+            by_series_year[(event.race_series_id, edition_year)].append(event)
         for name in _normalized_names(event.original_name, event.chinese_name):
-            by_year_name[(event.year, name)].append(event)
+            by_year_name[(edition_year, name)].append(event)
     owner_by_event = dict(
         HistoricalRaceEventTarget.objects.exclude(event_id=None).values_list("event_id", "id")
     )
@@ -369,7 +371,11 @@ def classify_historical_race_event_targets(
 def _single_target_classification(target: HistoricalRaceEventTarget) -> dict[str, Any]:
     events = list(
         RaceEvent.objects.select_related("race_series")
-        .filter(race_series_id=target.race_series_id, year=target.year)
+        .filter(race_series_id=target.race_series_id)
+        .filter(
+            Q(edition_year=target.year)
+            | Q(edition_year__isnull=True, year=target.year)
+        )
         .order_by("id")
     )
     by_series_year = {(target.race_series_id, target.year): events}
@@ -381,9 +387,16 @@ def _single_target_classification(target: HistoricalRaceEventTarget) -> dict[str
         target.race_series.chinese_name,
     )
     if not events:
-        for event in RaceEvent.objects.select_related("race_series").filter(year=target.year).order_by("id"):
+        for event in (
+            RaceEvent.objects.select_related("race_series")
+            .filter(
+                Q(edition_year=target.year)
+                | Q(edition_year__isnull=True, year=target.year)
+            )
+            .order_by("id")
+        ):
             for name in _normalized_names(event.original_name, event.chinese_name) & target_names:
-                by_year_name[(event.year, name)].append(event)
+                by_year_name[(event_edition_year(event), name)].append(event)
     owner_by_event = dict(
         HistoricalRaceEventTarget.objects.exclude(event_id=None).values_list("event_id", "id")
     )

@@ -8,7 +8,7 @@ from typing import Iterable
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -449,6 +449,19 @@ class HistoricalRaceResolutionStatus(models.TextChoices):
     IDENTITY_REVIEW_REQUIRED = "identity_review_required", "系列身份待审"
     PERMANENTLY_UNAVAILABLE = "permanently_unavailable", "永久不可得"
     IMPORTED = "imported", "已导入"
+    SUPERSEDED = "superseded", "已被替代"
+
+
+class HistoricalRaceCalendarRepairReceiptStatus(models.TextChoices):
+    APPLIED = "applied", "已应用"
+    VERIFIED = "verified", "已核验"
+    VERIFICATION_FAILED = "verification_failed", "核验失败"
+    ROLLED_BACK = "rolled_back", "已回滚"
+
+
+class RaceEventPublicPathKind(models.TextChoices):
+    CANONICAL = "canonical", "正式路径"
+    LEGACY = "legacy", "历史路径"
 
 
 class HistoricalBatchPhase(models.TextChoices):
@@ -1057,8 +1070,115 @@ class RaceSeriesRelation(TimestampedModel):
         return f"{self.from_series} {self.relation_type} {self.to_series}"
 
 
+class RaceEventQuerySet(models.QuerySet):
+    IDENTITY_FIELDS = {"year", "edition_year", "local_date", "source_refs", "slug"}
+
+    @transaction.atomic
+    def delete(self):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().delete()
+
+    @transaction.atomic
+    def update(self, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        changed = self.IDENTITY_FIELDS.intersection(kwargs)
+        if changed:
+            raise ValidationError(
+                {
+                    field: (
+                        "赛事身份字段禁止使用 QuerySet.update；"
+                        "必须通过 RaceEvent.save 的集中校验和路径同步。"
+                    )
+                    for field in changed
+                }
+            )
+        return super().update(**kwargs)
+
+    @transaction.atomic
+    def bulk_create(self, objs, **kwargs):
+        if kwargs.get("ignore_conflicts") or kwargs.get("update_conflicts"):
+            raise ValidationError("RaceEvent bulk_create 不允许绕过身份与路径冲突。")
+        created = []
+        with transaction.atomic():
+            for obj in objs:
+                obj.save(force_insert=True)
+                created.append(obj)
+        return created
+
+    @transaction.atomic
+    def bulk_update(self, objs, fields, **kwargs):
+        if self.IDENTITY_FIELDS.intersection(fields):
+            raise ValidationError(
+                "RaceEvent 身份字段禁止 bulk_update；必须逐条 save。"
+            )
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().bulk_update(objs, fields, **kwargs)
+
+
+class RaceEventManager(models.Manager.from_queryset(RaceEventQuerySet)):
+    pass
+
+
+class HistoricalCalendarScopedQuerySet(models.QuerySet):
+    @transaction.atomic
+    def delete(self):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().delete()
+
+    @transaction.atomic
+    def update(self, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().update(**kwargs)
+
+    @transaction.atomic
+    def bulk_create(self, objs, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().bulk_create(objs, **kwargs)
+
+    @transaction.atomic
+    def bulk_update(self, objs, fields, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().bulk_update(objs, fields, **kwargs)
+
+
+class HistoricalCalendarScopedManager(
+    models.Manager.from_queryset(HistoricalCalendarScopedQuerySet)
+):
+    pass
+
+
 class RaceEvent(TimestampedModel):
+    objects = RaceEventManager()
     year = models.PositiveSmallIntegerField()
+    edition_year = models.PositiveSmallIntegerField(null=True, blank=True)
     slug = models.SlugField(max_length=160)
     series_key = models.SlugField(max_length=160, blank=True)
     original_name = models.CharField(max_length=255)
@@ -1167,18 +1287,114 @@ class RaceEvent(TimestampedModel):
     def __str__(self) -> str:
         return f"{self.chinese_name or self.original_name} {self.year}"
 
+    def clean(self):
+        super().clean()
+        from stable.services.race_event_years import validate_event_years
+
+        evidence = (
+            self.source_refs.get("cross_year_evidence")
+            if isinstance(self.source_refs, dict)
+            else None
+        )
+        validate_event_years(
+            self.year,
+            self.edition_year if self.edition_year is not None else self.year,
+            self.local_date,
+            evidence,
+        )
+
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+        from stable.services.race_event_public_paths import sync_canonical_public_path
+        from stable.services.race_event_years import validate_event_years
+
+        assert_historical_calendar_write_admitted()
+        requested_update_fields = kwargs.get("update_fields")
+        edition_year_was_filled = False
+        if self.edition_year is None and self.year is not None:
+            self.edition_year = self.year
+            edition_year_was_filled = True
+        slug_was_generated = False
         if not self.slug:
             base = slugify(self.original_name or self.chinese_name, allow_unicode=False) or f"race-{self.year}"
             self.slug = base[:160]
+            slug_was_generated = True
         if self.race_series_id:
             self.series_key = self.race_series.key
         elif not self.series_key:
             self.series_key = self.slug
-        update_fields = kwargs.get("update_fields")
-        if update_fields is not None:
-            kwargs["update_fields"] = set(update_fields) | {"slug", "series_key"}
-        super().save(*args, **kwargs)
+        effective_update_fields = None
+        if requested_update_fields is not None:
+            effective_update_fields = set(requested_update_fields)
+            if slug_was_generated:
+                effective_update_fields.add("slug")
+            if edition_year_was_filled:
+                effective_update_fields.add("edition_year")
+            if (
+                "race_series" in effective_update_fields
+                or slug_was_generated
+                or "series_key" in effective_update_fields
+            ):
+                effective_update_fields.add("series_key")
+            kwargs["update_fields"] = effective_update_fields
+        is_new = self.pk is None
+        identity_fields = {"year", "edition_year", "local_date", "source_refs"}
+        identity_changed = is_new
+        path_changed = is_new
+        validation_values = {
+            "year": self.year,
+            "edition_year": self.edition_year,
+            "local_date": self.local_date,
+            "source_refs": self.source_refs,
+        }
+        if not is_new:
+            previous = (
+                type(self).objects.filter(pk=self.pk)
+                .values("year", "edition_year", "local_date", "source_refs", "slug")
+                .first()
+            )
+            if previous is None:
+                identity_changed = True
+                path_changed = True
+            else:
+                fields_written = (
+                    identity_fields | {"slug"}
+                    if effective_update_fields is None
+                    else effective_update_fields
+                )
+                identity_changed = any(
+                    field in fields_written
+                    and previous[field] != getattr(self, field)
+                    for field in identity_fields
+                )
+                path_changed = (
+                    ("year" in fields_written and previous["year"] != self.year)
+                    or ("slug" in fields_written and previous["slug"] != self.slug)
+                )
+                for field in identity_fields:
+                    if field not in fields_written:
+                        validation_values[field] = previous[field]
+        if identity_changed:
+            source_refs = validation_values["source_refs"]
+            evidence = (
+                source_refs.get("cross_year_evidence")
+                if isinstance(source_refs, dict)
+                else None
+            )
+            validate_event_years(
+                validation_values["year"],
+                validation_values["edition_year"],
+                validation_values["local_date"],
+                evidence,
+            )
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            if path_changed:
+                self.refresh_from_db(fields={"year", "slug"})
+                sync_canonical_public_path(self)
 
     @property
     def is_public(self) -> bool:
@@ -1212,6 +1428,15 @@ class RaceEvent(TimestampedModel):
     def get_absolute_url(self) -> str:
         return self.public_path
 
+    @transaction.atomic
+    def delete(self, *args, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().delete(*args, **kwargs)
+
     @property
     def is_key_race(self) -> bool:
         return self.priority in {RaceEventPriority.P0, RaceEventPriority.P1} or self.is_featured
@@ -1230,6 +1455,71 @@ class RaceEvent(TimestampedModel):
     @property
     def grade_badge_label(self) -> str:
         return (self.normalized_grade or self.grade_text or "").strip()[:4]
+
+
+class RaceEventPublicPath(TimestampedModel):
+    objects = HistoricalCalendarScopedManager()
+    year = models.PositiveSmallIntegerField()
+    slug = models.SlugField(max_length=160)
+    event = models.ForeignKey(
+        RaceEvent,
+        on_delete=models.CASCADE,
+        related_name="public_paths",
+    )
+    path_kind = models.CharField(
+        max_length=16,
+        choices=RaceEventPublicPathKind.choices,
+    )
+    reason = models.CharField(max_length=128, blank=True)
+    manifest_sha256 = models.CharField(max_length=64, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_race_event_public_paths",
+    )
+
+    class Meta:
+        ordering = ("year", "slug")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("year", "slug"),
+                name="uq_race_public_path_year_slug",
+            ),
+            models.UniqueConstraint(
+                fields=("event",),
+                condition=models.Q(path_kind=RaceEventPublicPathKind.CANONICAL),
+                name="uq_race_public_path_event_canonical",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("event", "path_kind"),
+                name="race_pub_path_event_kind_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"/races/{self.year}/{self.slug}/ ({self.path_kind})"
+
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().save(*args, **kwargs)
+
+    @transaction.atomic
+    def delete(self, *args, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().delete(*args, **kwargs)
 
 
 class RaceEventProductCanonicalLink(TimestampedModel):
@@ -2240,6 +2530,7 @@ class RaceLiveOfficialVerificationIncident(TimestampedModel):
 
 
 class HistoricalRaceEventTarget(TimestampedModel):
+    objects = HistoricalCalendarScopedManager()
     race_series = models.ForeignKey(RaceSeries, on_delete=models.PROTECT, related_name="historical_targets")
     year = models.PositiveSmallIntegerField()
     country_region = models.CharField(max_length=32, choices=RacingRegion.choices)
@@ -2271,6 +2562,15 @@ class HistoricalRaceEventTarget(TimestampedModel):
         blank=True,
         related_name="historical_target",
     )
+    superseded_by = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="superseded_targets",
+    )
+    superseded_at = models.DateTimeField(null=True, blank=True)
+    supersession_manifest_sha256 = models.CharField(max_length=64, blank=True)
     last_checked_at = models.DateTimeField(null=True, blank=True)
     permanent_unavailable_approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -2323,6 +2623,22 @@ class HistoricalRaceEventTarget(TimestampedModel):
                 raise ValidationError({"resolution_status": "尚未到期的年度目标不能标记为已导入。"})
         if self.resolution_status == HistoricalRaceResolutionStatus.IMPORTED and not self.event_id:
             raise ValidationError({"event": "标记已导入前必须关联正式赛事。"})
+        if self.resolution_status == HistoricalRaceResolutionStatus.SUPERSEDED:
+            supersession_errors = {}
+            if self.event_id:
+                supersession_errors["event"] = "已被替代的年度目标必须解除赛事关联。"
+            if not self.superseded_by_id:
+                supersession_errors["superseded_by"] = "已被替代的年度目标必须指向保留目标。"
+            if not self.superseded_at:
+                supersession_errors["superseded_at"] = "已被替代的年度目标必须记录替代时间。"
+            if not self.supersession_manifest_sha256:
+                supersession_errors["supersession_manifest_sha256"] = (
+                    "已被替代的年度目标必须绑定修复清单。"
+                )
+            if self.pk and self.superseded_by_id == self.pk:
+                supersession_errors["superseded_by"] = "年度目标不能替代自身。"
+            if supersession_errors:
+                raise ValidationError(supersession_errors)
         if self.resolution_status == HistoricalRaceResolutionStatus.PERMANENTLY_UNAVAILABLE:
             if not (
                 self.permanent_unavailable_approved_by_id
@@ -2331,12 +2647,19 @@ class HistoricalRaceEventTarget(TimestampedModel):
             ):
                 raise ValidationError("永久不可得必须记录批准人、批准时间和双来源证据。")
         if self.event_id:
-            if self.event.year != self.year:
-                raise ValidationError({"event": "关联赛事年份必须与年度目标一致。"})
+            event_edition_year = self.event.edition_year or self.event.year
+            if event_edition_year != self.year:
+                raise ValidationError({"event": "关联赛事届次年份必须与年度目标一致。"})
             if self.event.race_series_id != self.race_series_id:
                 raise ValidationError({"event": "关联赛事必须属于同一赛事系列。"})
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
         if self.race_series_id:
             self.country_region = self.race_series.country_region
         update_fields = kwargs.get("update_fields")
@@ -2344,8 +2667,84 @@ class HistoricalRaceEventTarget(TimestampedModel):
             kwargs["update_fields"] = set(update_fields) | {"country_region"}
         super().save(*args, **kwargs)
 
+    @transaction.atomic
+    def delete(self, *args, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().delete(*args, **kwargs)
+
     def __str__(self) -> str:
         return f"{self.race_series} {self.year}"
+
+
+class HistoricalRaceCalendarRepairReceipt(TimestampedModel):
+    manifest_sha256 = models.CharField(max_length=64, unique=True)
+    approval_sha256 = models.CharField(max_length=64)
+    action_scope_sha256 = models.CharField(max_length=64)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="historical_race_calendar_repair_receipts",
+    )
+    status = models.CharField(
+        max_length=24,
+        choices=HistoricalRaceCalendarRepairReceiptStatus.choices,
+        default=HistoricalRaceCalendarRepairReceiptStatus.APPLIED,
+    )
+    rollback_sha256 = models.CharField(max_length=64)
+    applied_at = models.DateTimeField()
+    verified_at = models.DateTimeField(null=True, blank=True)
+    rolled_back_at = models.DateTimeField(null=True, blank=True)
+    verifier_result_sha256 = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        ordering = ("-applied_at", "-id")
+        indexes = [
+            models.Index(
+                fields=("status", "-applied_at"),
+                name="hist_cal_receipt_status_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.manifest_sha256} {self.status}"
+
+
+class HistoricalRaceCalendarMaintenanceGate(TimestampedModel):
+    manifest_sha256 = models.CharField(max_length=64)
+    action_scope_sha256 = models.CharField(max_length=64)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="entered_historical_race_calendar_gates",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=(("active", "生效中"), ("exited", "已退出")),
+        default="active",
+    )
+    entered_at = models.DateTimeField()
+    exited_at = models.DateTimeField(null=True, blank=True)
+    exited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="exited_historical_race_calendar_gates",
+    )
+
+    class Meta:
+        ordering = ("-entered_at", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("status",),
+                condition=models.Q(status="active"),
+                name="uq_hist_cal_one_active_gate",
+            )
+        ]
 
 
 class HistoricalBatchRun(TimestampedModel):
