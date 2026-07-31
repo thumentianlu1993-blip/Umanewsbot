@@ -186,6 +186,13 @@ class Command(BaseCommand):
         limit = options.get("limit")
         batch_size = options["batch_size"]
 
+        # Pre-load existing TermEntry keys to avoid collisions when generating
+        # disambiguated source_ja values.
+        used_term_keys: set[tuple[str, str]] = {
+            (t.source_ja, t.racing_region)
+            for t in TermEntry.objects.filter(term_type=TermType.HORSE, is_active=True)
+        }
+
         term_created = term_existing = profile_created = profile_existing = record_created = 0
         total_horses_processed = 0
         offset = 0
@@ -231,20 +238,30 @@ class Command(BaseCommand):
                         term = profile.primary_term
                         term_existing += 1
                     else:
-                        # Create a dedicated TermEntry per horse.  Using the full name
-                        # (including the country suffix, e.g. "Qirat (GB)") as source_ja
-                        # keeps TermEntry unique and avoids the HorseProfile.primary_term
-                        # OneToOne constraint violation when two horses share the same
-                        # base name within the same region.
+                        # Create a dedicated TermEntry per horse.  Prefer the clean base
+                        # name; only add a disambiguating suffix when the same base name
+                        # already exists for this region.
+                        candidates = [base_name]
+                        if country:
+                            candidates.append(f"{base_name} ({country})")
+                        candidates.append(f"{base_name} ({horse_id})")
+
+                        source_ja = base_name
+                        for candidate in candidates:
+                            if (candidate, racing_region) not in used_term_keys:
+                                source_ja = candidate
+                                break
+
                         term = TermEntry.objects.create(
                             term_type=TermType.HORSE,
                             source_language=SourceLanguage.ENGLISH,
                             racing_region=racing_region,
-                            source_ja=full_name or base_name,
+                            source_ja=source_ja,
                             target_zh="",
                             translation_status=TermTranslationStatus.PENDING,
                             is_active=True,
                         )
+                        used_term_keys.add((source_ja, racing_region))
                         term_created += 1
 
                     profile_defaults = {
