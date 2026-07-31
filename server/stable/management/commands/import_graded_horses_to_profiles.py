@@ -33,7 +33,6 @@ from stable.models import (
     HorseRaceRecord,
     HorseRaceResultStatus,
     HorseRaceStartStatus,
-    RaceEvent,
     RaceGrade,
     RacingRegion,
     SourceLanguage,
@@ -289,18 +288,9 @@ class Command(BaseCommand):
                         grade_text = rec.get("pattern") or ""
                         result_status = _result_status(position)
 
-                        # Try to link to an existing RaceEvent by race_id.
-                        event = None
-                        if race_id:
-                            try:
-                                event = RaceEvent.objects.get(external_race_id=race_id)
-                            except RaceEvent.DoesNotExist:
-                                event = None
-
                         new_records.append(
                             HorseRaceRecord(
                                 horse_profile=profile,
-                                event=event,
                                 race_name=rec.get("race_name") or "",
                                 race_year=race_date.year if race_date else None,
                                 race_date=race_date,
