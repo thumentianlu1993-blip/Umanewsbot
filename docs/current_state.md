@@ -4972,3 +4972,15 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   属于主线既有失败，不在本 change 顺带修复。
 - 旧 fingerprint 已因主线迁移失效；当前等待同一独立 reviewer 对基线迁移后的完整候选
   复审。复审通过后才执行已授权的 commit/push/PR/merge；生产生命周期仍保持关闭。
+
+# 2026-08-01 lifecycle shadow 纳管准备代码已合并
+
+- 最新 main 整合候选经同一独立 reviewer 复审后 `APPROVED`，P0–P3 为 0；最终审核
+  fingerprint `11928d99…fcd1c`、content `6a501ebc…97975`。
+- 代码提交 `ca37d51e5720c674bc234ab01f6b2a23d62f53fc` 已通过 index/commit transition，
+  PR #56 于 `2026-07-31T20:29:35Z` 合并，main merge commit 为
+  `3ba5defc526259b2785f4d84736551ab826804b3`。
+- 本次只完成代码发布：未部署、未迁移、未执行生产 control apply/数据库写入、未联网 proof，
+  也未打开 lifecycle。下一阶段仍需针对部署、生产只读 prepare/dry-run、control apply 和
+  `true/shadow` 分别取得对应授权。
+- 完整证据见 `docs/changes/prepare-lifecycle-shadow-enrollment/release_report.md`。
