@@ -122,12 +122,11 @@ def _is_major_win(grade_text: str, position: str) -> bool:
 
 
 def _load_horse_profile_batch(offset: int, limit: int) -> list[dict[str, Any]]:
-    """Load a batch of horse profiles; region is extracted from JSONB in SQL."""
+    """Load a batch of horse profiles."""
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT horse_id, name, sex, sire, dam, damsire,
-                   COALESCE(raw_payload->>'region', '') AS region
+            SELECT horse_id, name, sex, sire, dam, damsire
             FROM theracingapi.horse_profile
             ORDER BY horse_id
             LIMIT %s OFFSET %s
@@ -136,6 +135,18 @@ def _load_horse_profile_batch(offset: int, limit: int) -> list[dict[str, Any]]:
         )
         columns = [col[0] for col in cursor.description]
         return [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+
+def _derive_region(results: list[dict[str, Any]]) -> str:
+    """Derive a horse's racing region from its career results (most common region)."""
+    if not results:
+        return RacingRegion.OTHER
+    counts: dict[str, int] = defaultdict(int)
+    for rec in results:
+        counts[(rec.get("region") or "").strip().lower()] += 1
+    # Prefer any non-empty region; fall back to OTHER only when everything is blank.
+    best = max(counts, key=lambda k: (counts[k], k != ""))
+    return _map_region(best) if best else RacingRegion.OTHER
 
 
 def _load_results_for_horses(horse_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
@@ -210,7 +221,8 @@ class Command(BaseCommand):
                     full_name = raw["name"] or ""
                     country = _parse_country(full_name)
                     base_name = _strip_country(full_name)
-                    racing_region = _map_region(raw.get("region") or "")
+                    horse_results = results_by_horse.get(horse_id, [])
+                    racing_region = _derive_region(horse_results)
 
                     # 2. HorseProfile (look up first to decide whether to create a new TermEntry)
                     profile = existing_profiles.get(horse_id)
