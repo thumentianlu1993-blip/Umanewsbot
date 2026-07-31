@@ -9,6 +9,7 @@ from datetime import datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -19,7 +20,13 @@ from django.core.signing import BadSignature, SignatureExpired
 from django.db import transaction
 from django.db.models import BooleanField, Case, Count, Exists, F, OuterRef, Prefetch, Q, Value, When
 from django.db.models.functions import Lower
-from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse
+from django.http import (
+    Http404,
+    HttpRequest,
+    HttpResponse,
+    HttpResponseForbidden,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.html import format_html
@@ -133,7 +140,12 @@ from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
 from .services.news_production_integrity import source_health_snapshot
 from .services.onebot import BotPusher
 from .services.operations import log_operation
-from .services.race_calendar import public_default_race_date_window
+from .services.race_calendar import (
+    decode_race_calendar_cursor,
+    encode_race_calendar_cursor,
+    public_default_race_date_window,
+    race_calendar_cursor_filter,
+)
 from .services.race_event_public_cache import (
     public_race_calendar_years,
     public_race_sitemap_count,
@@ -3051,15 +3063,36 @@ def _public_next_key_race():
     return queryset.order_by("local_date", "local_start_time", "id").first()
 
 
-def _public_race_calendar_base_queryset(filters: dict):
+def _public_race_calendar_base_queryset(filters: dict, *, today):
     """赛事日历公开基础 queryset：published、排除 active canonical duplicate、
     tab/region/grade/when。默认日期窗口与赛事列表复用同一基础 queryset；
     read-gate 展示 annotation 只在最终赛事对象查询上加。"""
     queryset = RaceEvent.objects.filter(
         visibility_status=RaceEventVisibility.PUBLISHED
     ).exclude(canonical_product_links__is_active=True)
+    selected_year = (
+        int(filters["year"])
+        if filters["year"].isdigit()
+        else None
+    )
     if filters["tab"] == "key":
-        queryset = queryset.filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
+        if selected_year is not None and selected_year < today.year:
+            queryset = queryset.filter(
+                normalized_grade__in=[
+                    *PUBLIC_RACE_GRADE_FILTERS["g1"],
+                    *PUBLIC_RACE_GRADE_FILTERS["g2"],
+                ]
+            )
+        else:
+            queryset = queryset.filter(
+                Q(
+                    priority__in=[
+                        RaceEventPriority.P0,
+                        RaceEventPriority.P1,
+                    ]
+                )
+                | Q(is_featured=True)
+            )
     if filters["region"]:
         queryset = queryset.filter(country_region=filters["region"])
     if filters["grade"]:
@@ -3071,6 +3104,8 @@ def _public_race_calendar_base_queryset(filters: dict):
 
 def _race_calendar_queryset(request: HttpRequest, *, today):
     tab = request.GET.get("tab", "key").strip() or "key"
+    if tab not in {"all", "key"}:
+        tab = "key"
     region = request.GET.get("region", "").strip()
     direction = request.GET.get("direction", "").strip()
     cursor = request.GET.get("cursor", "").strip()
@@ -3092,7 +3127,7 @@ def _race_calendar_queryset(request: HttpRequest, *, today):
         "grade": grade,
         "when": when,
     }
-    base_queryset = _public_race_calendar_base_queryset(filters)
+    base_queryset = _public_race_calendar_base_queryset(filters, today=today)
     queryset = base_queryset.annotate(
         public_current_result_revision_id=F(
             "projection_control__current_result_revision_id"
@@ -3128,22 +3163,79 @@ def _race_calendar_queryset(request: HttpRequest, *, today):
             queryset = queryset.filter(local_date__lt=cursor_date).order_by("-local_date", "-local_start_time", "id")
         else:
             queryset = queryset.filter(local_date__gt=cursor_date).order_by("local_date", "local_start_time", "id")
-        return queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE], filters, None
+        return (
+            queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE],
+            filters,
+            None,
+            None,
+        )
     if cross_period:
-        # 显式 year/q 跨期模式（行为保留）
-        queryset = queryset.order_by("local_date", "local_start_time", "id")
-        return queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE], filters, None
+        # 显式 year/q 跨期模式：签名复合游标绑定规范化筛选，并以 NULLS LAST
+        # 的日期、时间、主键顺序稳定遍历。每次只读取 page_size + 1。
+        decoded_cursor = None
+        if cursor and direction in {"past", "future"}:
+            decoded_cursor = decode_race_calendar_cursor(
+                cursor,
+                filters=filters,
+            )
+        if decoded_cursor is None:
+            filters["cursor"] = ""
+            filters["direction"] = ""
+            direction = ""
+        else:
+            queryset = queryset.filter(
+                race_calendar_cursor_filter(
+                    decoded_cursor,
+                    direction=direction,
+                )
+            )
+        if direction == "past":
+            ordering = (
+                F("local_date").desc(nulls_first=True),
+                F("local_start_time").desc(nulls_first=True),
+                "-id",
+            )
+        else:
+            ordering = (
+                F("local_date").asc(nulls_last=True),
+                F("local_start_time").asc(nulls_last=True),
+                "id",
+            )
+        page_rows = list(
+            queryset.order_by(*ordering)
+            .prefetch_related("results")[: RACE_CALENDAR_PAGE_SIZE + 1]
+        )
+        has_extra = len(page_rows) > RACE_CALENDAR_PAGE_SIZE
+        page_rows = page_rows[:RACE_CALENDAR_PAGE_SIZE]
+        if direction == "past":
+            page_rows.reverse()
+        pagination = {
+            "has_previous": (
+                has_extra if direction == "past" else decoded_cursor is not None
+            ),
+            "has_next": (
+                decoded_cursor is not None
+                if direction == "past"
+                else has_extra
+            ),
+        }
+        return page_rows, filters, None, pagination
     # 默认日期窗口模式（含非法/不完整 cursor 的安全回退）
     window = public_default_race_date_window(base_queryset, today=today)
     if not window.dates:
-        return queryset.none(), filters, window
+        return queryset.none(), filters, window, None
     queryset = queryset.filter(local_date__in=window.dates).order_by(
         Case(When(pk__in=window.representative_ids, then=0), default=1),
         "local_date",
         "local_start_time",
         "id",
     )
-    return queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE], filters, window
+    return (
+        queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE],
+        filters,
+        window,
+        None,
+    )
 
 
 def _group_race_events_by_date(events, *, today, anchor_date=None):
@@ -3358,10 +3450,13 @@ def _attach_race_term_display_names(event_records):
 
 def public_race_calendar(request: HttpRequest):
     shanghai_today = timezone.localdate(timezone=ZoneInfo("Asia/Shanghai"))
-    events, filters, window = _race_calendar_queryset(request, today=shanghai_today)
+    events, filters, window, pagination = _race_calendar_queryset(
+        request,
+        today=shanghai_today,
+    )
     events = list(events)
     if window is None:
-        if filters["direction"] == "past":
+        if pagination is None and filters["direction"] == "past":
             events = list(reversed(events))
     else:
         # 代表赛事优先截取后在 Python 中恢复现有时间升序；local_start_time 为 None
@@ -3386,7 +3481,12 @@ def public_race_calendar(request: HttpRequest):
                 params[key] = value
             else:
                 params.pop(key, None)
-        return f"?{params.urlencode()}" if params else "?"
+        query_string = params.urlencode()
+        return (
+            f"{request.path}?{query_string}"
+            if query_string
+            else request.path
+        )
 
     region_tabs = [{"value": "", "label": "全部", "is_active": filters["region"] == "", "url": filter_url(region="")}]
     for value, label in RacingRegion.choices:
@@ -3400,8 +3500,26 @@ def public_race_calendar(request: HttpRequest):
                 "url": filter_url(region=value),
             }
         )
-    previous_cursor = events[0].local_date.isoformat() if events and events[0].local_date else ""
-    next_cursor = events[-1].local_date.isoformat() if events and events[-1].local_date else ""
+    if pagination is not None and events:
+        previous_cursor = encode_race_calendar_cursor(
+            events[0],
+            filters=filters,
+        )
+        next_cursor = encode_race_calendar_cursor(
+            events[-1],
+            filters=filters,
+        )
+    else:
+        previous_cursor = (
+            events[0].local_date.isoformat()
+            if events and events[0].local_date
+            else ""
+        )
+        next_cursor = (
+            events[-1].local_date.isoformat()
+            if events and events[-1].local_date
+            else ""
+        )
     grade_tabs = [
         {"value": "", "label": "全部等级", "is_active": filters["grade"] == "", "url": filter_url(grade="")},
         *[
@@ -3431,8 +3549,26 @@ def public_race_calendar(request: HttpRequest):
             "all_tab_url": filter_url(tab="all"),
             "key_tab_url": filter_url(tab="key"),
             "clear_search_url": filter_url(year="", q=""),
-            "previous_url": filter_url(direction="past", cursor=previous_cursor) if previous_cursor and not (filters["year"] or filters["q"]) else "",
-            "next_url": filter_url(direction="future", cursor=next_cursor) if next_cursor and not (filters["year"] or filters["q"]) else "",
+            "previous_url": (
+                filter_url(direction="past", cursor=previous_cursor)
+                if previous_cursor
+                and (
+                    pagination["has_previous"]
+                    if pagination is not None
+                    else not (filters["year"] or filters["q"])
+                )
+                else ""
+            ),
+            "next_url": (
+                filter_url(direction="future", cursor=next_cursor)
+                if next_cursor
+                and (
+                    pagination["has_next"]
+                    if pagination is not None
+                    else not (filters["year"] or filters["q"])
+                )
+                else ""
+            ),
         },
     )
 
@@ -3487,8 +3623,54 @@ def _series_history_winners(
 
 
 def public_race_detail(request: HttpRequest, year: int, slug: str):
-    event = get_object_or_404(
-        RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED)
+    registry_model = None
+    try:
+        registry_model = apps.get_model("stable", "RaceEventPublicPath")
+    except LookupError:
+        # Release A 滚动升级期间兼容尚未加载 registry schema 的旧进程。
+        pass
+    event_id = None
+    if registry_model is not None:
+        path_row = (
+            registry_model.objects.select_related("event")
+            .filter(year=year, slug=slug)
+            .first()
+        )
+        if path_row is not None:
+            if (
+                path_row.event.visibility_status
+                != RaceEventVisibility.PUBLISHED
+            ):
+                raise Http404
+            if path_row.path_kind == "legacy":
+                canonical = (
+                    registry_model.objects.filter(
+                        event_id=path_row.event_id,
+                        path_kind="canonical",
+                    )
+                    .only("year", "slug")
+                    .first()
+                )
+                if canonical is None:
+                    raise Http404
+                return redirect(
+                    "public-race-detail",
+                    year=canonical.year,
+                    slug=canonical.slug,
+                    permanent=True,
+                )
+            if path_row.path_kind != "canonical":
+                raise Http404
+            event_id = path_row.event_id
+
+    event_lookup = {"pk": event_id} if event_id is not None else {
+        "year": year,
+        "slug": slug,
+    }
+    event_queryset = (
+        RaceEvent.objects.filter(
+            visibility_status=RaceEventVisibility.PUBLISHED
+        )
         .select_related(
             "race_series",
             "projection_control__current_result_revision",
@@ -3500,9 +3682,15 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "result_review_approvals",
             "history_winners",
             "article_links__article",
-        ),
-        year=year,
-        slug=slug,
+        )
+    )
+    if registry_model is not None and event_id is None:
+        # 只有尚未迁入 registry 的兼容行允许直接按 event 投影解析；一旦
+        # event 已有 registry 路径，所有入口都必须由 registry 明确占用。
+        event_queryset = event_queryset.filter(public_paths__isnull=True)
+    event = get_object_or_404(
+        event_queryset,
+        **event_lookup,
     )
     live_result_status = None
     canonical_product_link = (
@@ -3663,6 +3851,8 @@ def _race_sitemap_queryset():
             Q(historical_target__isnull=True)
             | Q(historical_target__resolution_status=HistoricalRaceResolutionStatus.IMPORTED)
         )
+        # RaceEvent.year/slug 是 canonical registry 的兼容投影；legacy path
+        # 只存在于 registry，因此不会进入 sitemap。
         .order_by("year", "slug", "id")
     )
 

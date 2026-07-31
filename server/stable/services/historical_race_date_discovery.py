@@ -31,6 +31,7 @@ from stable.services.historical_race_inventory import (
     canonical_json,
     file_identity,
 )
+from stable.services.race_event_years import DEPRECATED_CROSS_YEAR_REASONS
 
 
 DATE_SOURCE_DISCOVERY_SCHEMA_VERSION = "1.0"
@@ -308,6 +309,9 @@ def _candidate_issues(row: dict[str, Any], target: HistoricalRaceEventTarget) ->
         parsed_date = None
         issues.append("missing_date" if not row.get("local_date") else "invalid_date")
     actual_year = row.get("actual_year")
+    cross_year_reason = str(row.get("cross_year_reason") or "").strip()
+    if cross_year_reason in DEPRECATED_CROSS_YEAR_REASONS:
+        issues.append("cross_year_reason_deprecated")
     if parsed_date:
         if parsed_date.year != target.year and actual_year in (None, ""):
             issues.append("actual_year_missing")
@@ -318,7 +322,7 @@ def _candidate_issues(row: dict[str, Any], target: HistoricalRaceEventTarget) ->
         else:
             if actual_year != parsed_date.year:
                 issues.append("actual_year_date_mismatch")
-            if parsed_date.year != target.year and not str(row.get("cross_year_reason") or "").strip():
+            if parsed_date.year != target.year and not cross_year_reason:
                 issues.append("cross_year_reason_missing")
             if abs(parsed_date.year - target.year) > 1:
                 issues.append("cross_year_out_of_range")
@@ -360,7 +364,7 @@ def _candidate_issues(row: dict[str, Any], target: HistoricalRaceEventTarget) ->
             "adapter_key": adapter_key,
             "local_date": parsed_date.isoformat(),
             "actual_year": actual_year,
-            "cross_year_reason": str(row.get("cross_year_reason") or "").strip(),
+            "cross_year_reason": cross_year_reason,
             "urls": urls,
             "distance_evidence": distance_evidence,
         }
@@ -771,6 +775,9 @@ def apply_date_source_discovery_artifact(
                 "adapter_key": candidate["adapter_key"],
                 "actual_year": candidate["actual_year"],
                 "cross_year_reason": candidate["cross_year_reason"],
+                "approved": True,
+                "approved_by": str(approval["approved_by"]),
+                "approved_at": str(approval["approved_at"]),
                 "urls": candidate["urls"],
                 "distance_evidence": candidate["distance_evidence"],
             }

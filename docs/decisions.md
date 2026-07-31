@@ -1,5 +1,30 @@
 # 关键决策
 
+## 2026-07-31 历史赛事赛历完整性当前只闭合 Release A 本地范围
+
+- 当前候选只允许包含 nullable `RaceEvent.edition_year`、统一
+  `RaceEventPublicPath` registry、target supersession、
+  `HistoricalRaceCalendarRepairReceipt`、兼容读写代码、前台修复、collector 修复及离线
+  census/repair 工具；对应唯一 migration 为 `0067_historical_calendar_release_a.py`。
+- Release B 的 series/edition 唯一约束切换和 Release C 的 `edition_year` non-null/自然年
+  check 必须分别等待生产全地区 census、数据 verifier、独立 review 和新授权后再创建。B/C
+  migration 提前出现在 Release A 图中即为阻塞。
+- public year 固定为自然年，edition year 固定为届次身份；历史“重点”以 G1/G2 等级族表达，
+  不批量篡改运营 `priority/is_featured`；公共旧路径只保留 registry 301，不复制第二张 event。
+- 全地区 `prepare/apply/verifier/rollback` 是本地可执行工具，不是生产执行回执。生产 census
+  即使只读也需独立授权；任何 apply 还需冻结 manifest/approval/action scope/actor、
+  maintenance 和已验证备份，不随代码部署自动触发。
+- 本轮完整 `stable` 的 `3989 / 25 failure / 54 error / 72 skip` 只能作为失败边界证据。
+  其中已识别环境/既有失败不等于本 scope 回归，也不能据此声称完整 suite 全绿；当前发布判断
+  只能引用聚焦 `61/61`、collector `101/101`、Django check、migration drift/graph 和
+  diff check，并继续把真实 PostgreSQL、并发、性能与独立代码 review 作为未完成门禁。
+- 实现授权不等于发布或生产数据授权；当前没有 commit、push、PR、部署、生产只读或生产写入
+  权限。
+- 跨届次 `authority_url` 只允许由 `race_event_years.validate_authority_url()` 定义一份中央
+  合同；年份写入和 repair classifier 禁止各自实现 URL 判断。当前合同为有效 HTTPS、hostname
+  存在、无 credentials/fragment/whitespace，允许合法 path/query；任何不通过者在 classifier
+  中保持 manual/block，不得形成 action。该修复通过聚焦 `76/76`，但仍须重新独立 review。
+
 ## 2026-07-31 年度参赛马研究暂以生产 HTTP origin 为唯一正式来源入口
 
 - 当前生产对外验收入口仍是 `http://umafans.run/`；研究 workflow 必须显式使用该 origin，
@@ -2357,3 +2382,44 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 代码 rollback 不等于数据库反向 migration。目标 schema 不兼容时必须显式反向迁移或恢复
   已校验备份，不能只 checkout 旧代码后继续启动。
 - 本决定目前处于设计/审核阶段，不是实现或生产授权。
+
+## 2026-07-31 历史年份“重点”按赛事等级展示 G1+G2
+
+- 用户确认：选择历史年份时，“重点”应展示该筛选范围内的 G1 与 G2 赛事，不应依赖当期运营
+  `priority` 或 `is_featured` 是否被人工赋值。
+- `normalized_grade` 是历史赛事事实字段；`priority/is_featured` 是运营字段，两者不得通过批量
+  把历史赛事改为 P1 来混用。
+- 现有 OpenSpec `backfill-race-events-to-1984` 对“重点”的旧定义曾是 P0/P1 或人工置顶，与本
+  决定冲突；本地实现已同步旧规格，并保留未选择历史年份及当前年份的运营口径。
+- 用户后续仅授权本地实现；本决定仍不授权历史数据写入、发布或部署。
+
+## 2026-07-31 赛事公开自然年与届次年分离
+
+- `RaceEvent.year` 作为公开自然年；已知 `local_date` 时必须等于 `local_date.year`。年份筛选、
+  页面标题、canonical URL 和 sitemap 均使用公开自然年。
+- 新增 `RaceEvent.edition_year` 表达真正的届次身份；
+  `HistoricalRaceEventTarget.year` 与它关联。普通香港马季跨自然年不是延期，不得使用赛季结束年
+  冒充届次年；真实延期仍须权威证据和人工批准。
+- 公开路径使用统一 registry 承载 canonical/legacy，并在单表内唯一，旧错误 URL 只做 301，
+  不保留第二张公开卡片。
+- schema 必须拆成三个独立 release：A 为 nullable/兼容层，B 在全库 census 后切换届次唯一约束，
+  C 在数据修复 verifier 后增加 non-null/自然年 check。后续 migration 不得提前存在于前一
+  release 镜像。
+- 全库最终约束意味着 census 不能只检查香港；香港是强制修复子集，其他地区 mismatch 也必须
+  分类为合法跨届次、待修或 blocker。
+- 用户后续仅授权 Release A 本地实现；本决定不授权生产 census、数据 apply 或发布，Release
+  B/C 仍需各自重新 review 与授权。
+
+## 2026-07-31 历史赛历 writer admission 与 canonical path 采用集中事务合同
+
+- 不能把年份合同只放在 `full_clean()`：`RaceEvent.save/create/update_or_create` 对新行和身份
+  变更统一调用 `validate_event_years`；已知 identity bulk/update 写拒绝并要求逐条 writer。
+- 为兼容 Release A 存量坏行，非身份字段更新不重验旧错误；任何 year、edition_year、
+  local_date 或 source_refs 变化仍须重新验证。
+- canonical path reservation 是 event 写事务的一部分。event 新建或 year/slug 改动必须同步
+  registry；legacy 已占用目标路径时整笔失败，不允许静默覆盖。
+- maintenance evidence 仅是外部观测，不替代数据库实时 gate。`0067` 内加入有 enter/exit 审计的
+  active gate；普通 writer 在事务内 admission，PostgreSQL 以 shared/exclusive advisory lock
+  保证 gate 前 writer 排空、gate 后 writer 拒绝且等待者重新检查。
+- repair 的 bypass 不是通用开关，只能在已核验 manifest/action scope 且 exact active gate 的
+  apply/rollback 事务内使用。该决定仍处于本地代码复审前状态，不构成生产写入授权。

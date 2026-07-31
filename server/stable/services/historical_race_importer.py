@@ -32,6 +32,7 @@ from stable.services.historical_race_inventory import (
     merge_authoritative_fields,
 )
 from stable.services.race_events import apply_data_candidate, save_data_candidate
+from stable.services.race_event_years import event_edition_year
 
 
 RUNNER_DERIVED_FIELDS = (
@@ -188,8 +189,10 @@ def historical_basic_fields_complete(
         missing_fields.append("mismatch.event")
     if target.race_series_id != event.race_series_id:
         missing_fields.append("mismatch.race_series")
-    if target.year != event.year:
-        missing_fields.append("mismatch.year")
+    if target.year != event_edition_year(event):
+        missing_fields.append("mismatch.edition_year")
+    if event.local_date and event.year != event.local_date.year:
+        missing_fields.append("mismatch.public_year")
     if target.country_region != event.country_region:
         missing_fields.append("mismatch.country_region")
 

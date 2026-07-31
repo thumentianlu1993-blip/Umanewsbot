@@ -1,5 +1,83 @@
 # 当前状态
 
+## 2026-07-31 历史赛事 Release A URL 中央校验 P1 已通过限定复审，证据写回待复审
+
+- 已从 `origin/main@43b81fd3288a1e7b997ffad78d03565327e3d990` 建立隔离 worktree
+  `/Users/mentianlu/.codex/worktrees/diagnose-historical-race-calendar-gaps/umanews`，
+  分支 `codex/diagnose-historical-race-calendar-gaps`，当前
+  `HEAD=43b81fd3288a1e7b997ffad78d03565327e3d990`；原主工作区未触碰。
+- Release A 已本地实现：`RaceEvent.edition_year` 保持 nullable，新增统一
+  `RaceEventPublicPath` canonical/legacy registry、target supersession 字段与
+  `HistoricalRaceCalendarRepairReceipt`；唯一新增 migration 为
+  `0067_historical_calendar_release_a.py`。Release B 的 series/edition 约束切换和 Release C
+  的 non-null/自然年 check migration 均未生成。
+- 前台已实现历史年份“重点”按 G1/G2 等级族筛选，当前年继续沿用运营重点；显式 `year/q`
+  使用带筛选 fingerprint 的稳定双向分页，不再截断于最早 40 条；legacy 公共路径仅对已发布
+  event 返回 301 到 canonical，sitemap 只输出 canonical。
+- 年度参赛马 collector 已把 `-`、`–`、`—` 等占位符统一归一为空马号，并按真实马号、
+  profile/source identity、规范化马名逐级回退；正式输出要求 fresh root，旧 checkpoint/
+  tool fingerprint 不兼容时明确拒绝。summary 新增缺号、profile fallback、name fallback、
+  ambiguity gap 和真实马号冲突计数。
+- 已实现全地区离线 `prepare/apply/verifier/rollback` 工具：prepare 为零数据库写入并生成
+  census、manifest、review CSV、报告与 approval 模板；apply 绑定 approval、actor、
+  maintenance evidence、action scope 和 receipt；verifier/rollback 均按精确 SHA 与状态
+  fail closed。该工具尚未对生产运行 census 或 apply，香港及其他地区存量数据均未改写。
+- 本地验证：最新主线程 Django 复验 `205/205`，collector 离线套件 `101/101`；URL + detail
+  子聚焦 `166/166`、总门禁子聚焦 `68/68`。Django check、
+  `makemigrations --check --dry-run`、migration graph/漂移检查及 `git diff --check` 均通过。
+  完整 `stable` 为 `3989 tests / 25 failures / 54 errors / 72 skipped`，已确认包含环境或既有
+  失败（测试子进程缺少 `python` PATH、Redis 不可达、时效测试、旧 CSV 门禁及
+  migration-owner guard），因此不能声称全量回归全绿；50k 数据集性能等未执行门禁仍未完成。
+- 新增 `test_historical_calendar_release_a_postgres.py`，在隔离真实 PostgreSQL 上连续两轮
+  `5/5` 通过。fresh migrate 为 `7.96s`，`0066→0067` 为 `0.346s`，
+  `0067→0066` 约 `0.463–0.475s`。shared/exclusive advisory lock 以实际 `pg_locks`
+  未授予记录确认等待，观测约 `0.024s`；排队 writer 在取锁后重新检查 active gate 并被拒绝，
+  gate exit 后 writer 恢复，无死锁、无陈旧提交。
+- 同一 PostgreSQL 验收还覆盖 public path 冲突整笔回滚、event/path `CASCADE`、receipt
+  manifest unique 与单 active gate 条件唯一约束。临时容器
+  `umanews-histcal-pg-accept-20260731-a1` 及 tmpfs 已删除，未改变其他容器。
+- 最终扫描新增的 `1 P1 + 1 P2` 已修复：public path FK 删除语义改为 `CASCADE`；orphan ledger
+  通过 controlled path、symlink rejection 与 `O_NOFOLLOW` descriptor 单次读取，同一 bytes
+  用于 digest/JSON，避免 TOCTOU。
+- 本轮另两项 finding 已修复：current-year descriptor 显式区分 public year 与 edition year，
+  slug、query 和 identity 均只使用 public year，真实跨届次记录仍强制提供 descriptor；apply/
+  rollback 只在事务成功提交后的 `transaction.on_commit` 失效 public cache，失败事务和 existing
+  receipt 幂等重入均不清缓存。
+- 最新三项 finding 已实现：apply/rollback 强制要求
+  `HISTORICAL_RACE_BACKFILL_ENABLED=true`，existing receipt 重入也不能绕过；prepare/verify
+  保持只读且不受该写开关影响。跨届次 `authority_url` 必须是有效 HTTPS、存在 hostname、无凭据/
+  fragment，合法 query 原样保留。detail `edition_year` 仅在字段缺失时回退，显式值必须是非
+  bool 的 `int` 且位于 `1..9999`。
+- 最新直接 P1 已修复：`race_event_years.validate_authority_url()` 成为跨届次证据的中央 URL
+  validator，年份写入校验与 repair classifier 均复用同一 HTTPS/hostname/无 credentials/
+  fragment/whitespace 合同；classifier 不再自行解析 URL。直接 RED 捕获 fragment 被错误批准，
+  修复后 integrity/tooling/year/review/descriptor 聚焦 `76/76`。同一 reviewer 限定复审已确认
+  `URL central validator P1 CLOSED` 并给出 `APPROVED`。
+- detail clean RED 没有保存：首次失败被陈旧 SHA fixture 提前遮蔽，修正 fixture 后直接进入
+  GREEN；因此只记录现有行为与 `166/166` 证据，不把该过程追溯表述为已取得 clean RED。
+- 同一独立代码 reviewer 第二轮限定复审已给出 `VERDICT: APPROVED`，前轮
+  `1 P1 + 3 P2` 均关闭。原生命令
+  `codex review -c 'sandbox_mode="read-only"' --uncommitted` 完成且 exit `0`；review
+  前后 fingerprint 均为
+  `88c53c265cd0de5748438648f637e0975e75389ee8b636ab1c3848f68d033eb3`。
+  approved parent 为 `43b81fd3288a1e7b997ffad78d03565327e3d990`，approved content 为
+  `1a31d68e51d8aa4ce28249c4feb2f3fa82517d9277818da063214972fda9646f`。该 content hash
+  不包含其后的 P1/P2 加固、PostgreSQL 测试或事实文档，已由后续限定复审取代。
+- 最新限定复审原生命令以 read-only 模式 exit `0`，结论 `APPROVED`；pre/post fingerprint
+  均为 `91fed97e63acacbb28ee8fed717edc049d1812f0dead8465c5a6f139bd110a39`，approved parent
+  为 `43b81fd3288a1e7b997ffad78d03565327e3d990`，approved content 为
+  `b3353358647cd7b842a5a16326deee25ecc09485f37f7cd6974ed32b53868d2e`。该 content 只覆盖
+  本次 evidence-only 文档写回前的快照；文档写回后过期，须复用同一 reviewer 做 evidence 复审。
+- reviewer 另记 non-blocking P2：apply/rollback 与 maintenance exit 存在理论锁顺序反转。
+  真实 PostgreSQL `5/5` 两轮未复现，但也未做专门的并发 exit 验证，因此该项未关闭，保留为
+  后续任务，不能报告“锁顺序风险已验证关闭”。
+- 详细诊断与设计见
+  [historical_race_calendar_gap_diagnosis_20260731.md](historical_race_calendar_gap_diagnosis_20260731.md)
+  和
+  [repair-historical-race-calendar-integrity](changes/repair-historical-race-calendar-integrity/)。
+  下一门禁是同一 reviewer 对本次 evidence-only 文档增量的复审；发布授权尚未请求或取得。当前仍无
+  commit、push、PR、部署或任何生产 census/apply 权限。
+
 ## 2026-07-31 单年度分级赛 full-network 443 修复已离线发布
 
 - 2025 正式运行连续 6 个有界 workflow run 均停在
@@ -4679,3 +4757,151 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   REVIEW_HANDOFF 后续建议节，本轮不改代码。
 - 聚焦套件 `117/117`、p0 合同套件 `35/35` 全绿；`sh -n` 与 `git diff --check` 通过。
 - 未 commit/push/PR，未部署、未迁移、未连接生产；待同一 reviewer 第 7 轮复审冻结新指纹。
+
+# 2026-07-31 历史赛事年份、完整性与重点筛选完成只读诊断
+
+- 已从 `origin/main@43b81fd3` 创建隔离 worktree
+  `/Users/mentianlu/.codex/worktrees/diagnose-historical-race-calendar-gaps/umanews`，
+  分支为 `codex/diagnose-historical-race-calendar-gaps`；主工作区未修改。
+- 香港 2024/2025 页面存在普通马季上半段被归入后一自然年的确定错误；香港杯抽样进一步显示
+  2019—2025 均指向前一自然年，故正式修复前必须普查全部香港
+  `year != local_date.year` 记录，不能只改已知 12 场。
+- 2024 日本筛选只到 4 月 6 日并非采集不全：`year/q` 查询按日期升序截取前 40 条，同时关闭
+  前后游标；5—11 月赛事仍可由同年度搜索命中。
+- A. P. Smithwick Hurdle 等跨栏赛以 `-` 表示无马号；年度参赛马采集器把 `-` 当成真实唯一
+  编号，第二匹马即触发 identity conflict。历史详情链已有允许多个空马号并按稳定来源身份/
+  马名回退的正确合同，相关既有测试本轮复跑 `1/1` 通过。
+- 历史年份“重点”当前仍按 P0/P1 或人工置顶过滤；历史物化记录默认 P2/未置顶，所以 G1/G2
+  全部被排除。用户确认历史“重点”应显示 G1+G2；该口径与现有
+  `backfill-race-events-to-1984` OpenSpec 冲突，需先修订规格再实现。
+- 详细证据与修复边界见 `docs/historical_race_calendar_gap_diagnosis_20260731.md`。本轮未修改
+  业务代码、未访问生产数据库、未执行生产写入，亦未 commit/push/PR/部署。
+
+# 2026-07-31 历史赛事四类缺口进入一体化方案审核
+
+- 已建立 `docs/changes/repair-historical-race-calendar-integrity/` 五文档，范围统一包含：
+  公开自然年/届次年拆分、全库 mismatch census 与香港存量修复、历史重点 G1/G2、year/q 稳定
+  分页、跨栏赛缺马号身份。
+- 方案采用 `RaceEvent.year=公开自然年`、新增 `edition_year=届次年`，并以统一
+  `RaceEventPublicPath` registry 同时承载 canonical/legacy 路径，避免跨表路径抢占。
+- schema/代码明确拆为三个独立 commit/image/review/release：A 只加 nullable 字段和 registry；
+  B 在全库 census 后切换 series/edition 唯一约束；C 在数据 verifier 后收紧 non-null/自然年
+  check。同一 release task 不会提前执行后续 migration。
+- 独立方案 reviewer 三轮完成：首轮 `REVISE`（3 P0、7 P1、3 P2），第二轮剩余 1 P0/2 P1，
+  第三轮全部关闭并给出 `APPROVED`，开放 P0/P1 为 0。最终方案包含全地区 action、连续错年
+  duplicate supersession/tombstone、不可变 approval/actor、maintenance/freeze、repair receipt、
+  NULL-safe signed cursor、fresh collector output 和 Release C 后回滚边界。
+- 旧在途 `backfill-race-events-to-1984` 的历史重点/公开年份冲突合同和 runbook 中
+  `hong_kong_racing_season_spans_calendar_years` 已在设计层标记为被本 change 取代。
+- 以上为方案审核阶段的历史记录；随后用户已明确“开始实现”，Release A 本地实现与 RED/GREEN
+  已完成。此后实现快照也已通过第二轮限定代码 review；当前门禁以上方最新状态为准：事实文档
+  写回待同一 reviewer 复审，仍未访问/修改生产数据库，也未 commit/push/PR/部署。
+
+# 2026-07-31 历史赛历首次代码审核 findings 已在第二轮限定复审关闭
+
+- 首次代码审核提出 4 项 actionable findings；本地逐项修复后，同一 reviewer 第二轮限定复审
+  已给出 `VERDICT: APPROVED`，前轮 `1 P1 + 3 P2` 全部关闭。
+- `RaceEvent` 新建与年份身份变更现在强制走集中 `validate_event_years`；直接
+  `QuerySet.update/bulk_update` 修改 year/edition/local_date/source_refs/slug 会被拒绝。
+  Release A 仍允许已有坏行只更新 notes/status 等非身份字段。
+- canonical public path 由 `RaceEvent.save` 同事务自动 reserve/sync；新建、rename、legacy
+  collision 和事务回滚已有 SQLite 合同测试。
+- `0067` 原地加入 `HistoricalRaceCalendarMaintenanceGate`，未新增 `0068`。apply/rollback
+  要求 exact active gate；普通 RaceEvent/target/path writer 在事务内检查 live gate。
+- orphan rollback ledger 的 crash 重试、篡改拒绝和数据库 pre-state 校验已覆盖。
+- 首次修复阶段的聚焦 GREEN `51/51`；`manage.py check`、`makemigrations --check --dry-run`、
+  fresh `0066→0067→latest` 与 `0067→0066` 均通过。该阶段尚无真实 PostgreSQL 并发证据；
+  后续验收见下方最新记录。未 commit/push/PR/部署，未访问或修改生产。
+- 扩大到 historical batch/inventory/detail source、current import 和前台 calendar 的一次
+  SQLite 组合运行执行 268 项，其中 261 通过、7 项均停在 macOS `/var` 与 `/private/var`
+  临时目录别名导致的既有 `Path.relative_to` 错误；本轮未把该环境问题修复或误报为全绿。
+- 第一次复审又指出 1 P1 与 3 个同源 P2：现已恢复 `RaceReferenceReceipt` instance delete 的
+  永久不可变保护；`RaceEvent.save(update_fields=...)` 改按 effective write-set；public path/
+  target instance delete 接入 gate；dependency snapshot 的同 model 多 FK 改用 relation identity
+  分键。新增 RED 后，review fixes + integrity/tooling + years + frontend 聚焦 `115/115`。
+  check、migration drift、diff check 通过；`0067` 未增加 schema 且没有新 migration。原生
+  `codex review -c 'sandbox_mode="read-only"' --uncommitted` exit `0`，审前/审后 fingerprint
+  相同。以上批准只覆盖文档写回前的
+  实现快照；本次事实文档变更后仍须复用同一 reviewer 限定复审。
+- 最终全量扫描又发现 1 P1/1 P2：`RaceEventPublicPath.event` 已在 model/既有 `0067` 改为
+  `CASCADE`，普通 event 删除原子清理 registry，active gate 下 event/path 均保留；orphan
+  ledger 改为 controlled path + symlink rejection + `O_NOFOLLOW` 单次安全读取，同一 bytes
+  用于 digest 与 JSON。root 内/外 symlink RED/GREEN 和普通 orphan 恢复均覆盖。相关聚焦
+  `116/116`，fresh SQLite `0066→0067→0066`、check、migration drift、diff check 通过；
+  第二轮批准指纹不覆盖本次增量，当前重新处于待复审状态。
+
+# 2026-07-31 历史赛历 Release A 真实 PostgreSQL 验收完成
+
+- 新增真实 PostgreSQL 专项 `test_historical_calendar_release_a_postgres.py`，连续两轮均
+  `5/5`。fresh migrate `7.96s`，`0066→0067` `0.346s`，反向 `0067→0066` 两轮约
+  `0.463s / 0.475s`，均低于 Release A 预设 migration 时间门禁。
+- shared/exclusive advisory lock 通过实际 `pg_locks` wait 证明，约 `0.024s`；排队 writer
+  在锁后重查 active gate 并拒绝，exit 后恢复写入，线程无 deadlock，数据库无陈旧提交。
+- PostgreSQL 约束覆盖路径冲突事务回滚、event/path `CASCADE`、receipt manifest unique 和
+  单 active gate 条件唯一。临时容器 `umanews-histcal-pg-accept-20260731-a1` 与 tmpfs 已删除，
+  未变更其他容器。
+- 这不代表完整 `stable` 全绿；既有 `3989 / 25 failures / 54 errors / 72 skipped` 未重新变成
+  全绿，50k 性能门禁也未执行。此前 review fingerprint 已因加固、测试和文档增量失效，必须
+  重新 review；仍无 commit/push/PR/deploy、生产 census/apply 或发布授权。
+
+# 2026-07-31 历史赛历 descriptor 与提交后缓存失效加固完成
+
+- current-year descriptor 现在分别保存 public/edition year；slug、query、identity 继续严格以
+  public year 为准，跨届次 event 仍必须携带 descriptor，不能因当前年路径省略届次事实。
+- apply/rollback 的 public cache invalidation 改为 `transaction.on_commit`：只有事务成功提交才
+  清理；失败事务和 existing receipt 幂等重入不产生无效缓存失效。
+- 主线程合并 Django `224/224`、collector `101/101`，其中 descriptor `13/13`、cache
+  `10/10`；check、migration drift、diff check 通过。真实 PostgreSQL `5/5` 两轮证据继续有效。
+- 完整 `stable` 仍是既有/环境 `3989 / 25 failures / 54 errors / 72 skipped`，不能称全绿。
+  此增量未被旧 fingerprint 覆盖，待同一 reviewer 复审；无 commit/push/PR/deploy、生产
+  census/apply 或发布授权。
+
+# 2026-07-31 历史赛历写总门禁、authority URL 与 detail edition 加固完成
+
+- apply/rollback（包括 existing receipt 重入）必须同时满足
+  `HISTORICAL_RACE_BACKFILL_ENABLED=true`；prepare/verify 是只读入口，不受写总开关影响。
+- 跨届次 `authority_url` 仅接受有效 HTTPS、受控 host、无 credentials/fragment；合法 query
+  保留，不通过宽松归一化丢失证据身份。
+- detail `edition_year` 仅在字段缺失时回退；显式 `bool`、非整数、`<=0` 或 `>9999` 均拒绝。
+  该项首次失败被陈旧 SHA fixture 遮蔽，未保存 clean RED，不得补写为 TDD RED 证据。
+- 最新主线程 `205/205`、URL + detail `166/166`、gate `68/68`；collector `101/101`、真实
+  PostgreSQL `5/5` 两轮继续有效，check、migration drift、diff check 通过。
+- 完整 `stable` 仍非全绿，旧 fingerprint 仍失效且必须复审；无 commit/push/PR/deploy、生产
+  census/apply 或发布授权。
+
+# 2026-07-31 历史赛历受控路径 raw symlink P2 实现关闭
+
+- `_controlled_path` 已改为 absolute raw path 先逐组件 `lstat`，再 resolve/relative-to 并复核
+  resolved components；受控 root 内 alias 不再被 resolve 隐藏。
+- controlled reads 进一步以 root dirfd 为锚逐层 `O_NOFOLLOW` 打开父目录和 leaf，缩小检查到
+  打开之间的父组件替换窗口；digest/JSON 仍复用同一 descriptor bytes。
+- manifest、approval、maintenance evidence 三类 in-root symlink alias 均 fail closed；direct
+  canonical regular file 与 root 外门禁保持，读取仍使用同一安全 bytes 做 digest/JSON。
+- integrity/tooling/review fixes + descriptor/cache/public path 聚焦 `98/98`；check、migration
+  drift、diff check 通过，无 migration 变化。实现 finding 已关闭，仍待 reviewer 复审；无
+  commit/push/生产操作。
+
+# 2026-07-31 历史赛历 apply 总写门 P1 实现关闭
+
+- `apply_historical_race_calendar_integrity` 与 `rollback_historical_race_calendar_integrity`
+  现在在读取 artifact、查询/更新 receipt 或创建 rollback ledger 前统一要求
+  `HISTORICAL_RACE_BACKFILL_ENABLED=true`；配置缺省或 false 均 fail closed。
+- rollback 会恢复业务行并更新 receipt，因此与 apply 共用同一历史写入总门；prepare/verify
+  保持只读，不受该写门影响。existing receipt 重入在开关关闭时也不会借 verifier 更新状态。
+- 新增 3 项 RED 后取得 GREEN；integrity/tooling/review-fixes 聚焦 `55/55`，加入 descriptor
+  回归后 `68/68`。Django check、migration drift 与 diff check 通过。无 migration、commit、
+  push、部署或生产操作；本增量仍待同一 reviewer 限定复审。
+
+# 2026-07-31 历史赛历 URL 中央 validator P1 限定复审通过
+
+- 同一 reviewer 确认 `URL central validator P1 CLOSED`，最终 `APPROVED`；原生 review
+  read-only、exit `0`，pre/post fingerprint 均为
+  `91fed97e63acacbb28ee8fed717edc049d1812f0dead8465c5a6f139bd110a39`。
+- approved parent 为 `43b81fd3288a1e7b997ffad78d03565327e3d990`，approved content 为
+  `b3353358647cd7b842a5a16326deee25ecc09485f37f7cd6974ed32b53868d2e`；本次文档写回会使
+  content 过期，须复用同一 reviewer 做 evidence 增量复审。
+- 验证证据为 URL 相关 `76/76`、主线程 `205/205`、真实 PostgreSQL `5/5` 两轮、collector
+  `101/101`；完整 `stable` 仍非全绿。
+- non-blocking P2 为 apply/rollback 与 maintenance exit 的理论锁顺序反转；PG `5/5` 未复现，
+  但未执行专项并发 exit 验证，故未关闭并转后续任务。
+- 无 commit/push/PR/deploy、生产 census/apply；发布未授权。

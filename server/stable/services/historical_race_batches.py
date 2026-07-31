@@ -10,8 +10,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Q
 
 from stable.models import (
     HistoricalRaceEventTarget,
@@ -29,6 +30,11 @@ from stable.services.historical_race_inventory import (
     InventoryValidationError,
     canonical_json,
     file_identity,
+)
+from stable.services.race_event_years import (
+    event_edition_year,
+    historical_event_identity,
+    validate_event_years,
 )
 
 
@@ -149,11 +155,15 @@ def validate_selection_snapshot_target_identities(
     return set(expected_by_id)
 
 
-def historical_event_slug(target: HistoricalRaceEventTarget) -> str:
+def historical_event_slug(
+    target: HistoricalRaceEventTarget,
+    *,
+    public_year: int | None = None,
+) -> str:
     prefix = f"{target.country_region}-"
     stable_key = target.race_series.key
     base = stable_key if stable_key.startswith(prefix) else f"{prefix}{stable_key}"
-    suffix = f"-{target.year}"
+    suffix = f"-{public_year if public_year is not None else target.year}"
     return f"{base[: 160 - len(suffix)]}{suffix}"
 
 
@@ -177,11 +187,22 @@ def materialize_historical_event(target: HistoricalRaceEventTarget, *, actor=Non
         event = RaceEvent.objects.select_related("race_series").get(pk=target.event_id)
         if (
             event.race_series_id != target.race_series_id
-            or event.year != target.year
+            or event_edition_year(event) != target.year
             or event.country_region != target.country_region
             or event.status not in {RaceEventStatus.SCHEDULED, RaceEventStatus.POSTPONED}
         ):
             raise InventoryValidationError("not-due target existing RaceEvent identity/status mismatch")
+        try:
+            validate_event_years(
+                event.year,
+                event_edition_year(event),
+                event.local_date,
+                (event.source_refs or {}).get("cross_year_evidence"),
+            )
+        except ValidationError as exc:
+            raise InventoryValidationError(
+                f"not-due target existing RaceEvent year identity is invalid: {exc}"
+            ) from exc
         return event
     if target.race_series.review_status != RaceSeriesReviewStatus.APPROVED:
         raise InventoryValidationError("target series is not approved")
@@ -192,18 +213,54 @@ def materialize_historical_event(target: HistoricalRaceEventTarget, *, actor=Non
         raise InventoryValidationError("target is not ready for RaceEvent materialization")
     if not target.original_name or not target.racecourse or not target.source_refs:
         raise InventoryValidationError("target is missing source-backed basic identity")
-    slug = historical_event_slug(target)
-    conflict = RaceEvent.objects.filter(year=target.year, slug=slug).exclude(race_series=target.race_series).first()
+    try:
+        identity = historical_event_identity(target, target.local_date)
+    except ValidationError as exc:
+        raise InventoryValidationError(f"historical event year identity is invalid: {exc}") from exc
+    public_year = int(identity["public_year"])
+    edition_year = int(identity["edition_year"])
+    slug = historical_event_slug(target, public_year=public_year)
+    conflict = next(
+        (
+            event
+            for event in RaceEvent.objects.filter(year=public_year, slug=slug)
+            if event.race_series_id != target.race_series_id
+            or event_edition_year(event) != edition_year
+        ),
+        None,
+    )
     if conflict:
-        raise InventoryValidationError(f"historical slug conflict: {target.year}/{slug}")
+        raise InventoryValidationError(f"historical slug conflict: {public_year}/{slug}")
     with transaction.atomic():
         locked = _locked_historical_target(target.pk).get()
-        event = locked.event or RaceEvent.objects.filter(race_series=locked.race_series, year=locked.year).first()
+        try:
+            locked_identity = historical_event_identity(locked, locked.local_date)
+        except ValidationError as exc:
+            raise InventoryValidationError(f"historical event year identity is invalid: {exc}") from exc
+        if locked_identity != identity:
+            raise InventoryValidationError("historical event year identity changed before materialization")
+        event = locked.event or (
+            RaceEvent.objects.filter(race_series=locked.race_series)
+            .filter(
+                Q(edition_year=edition_year)
+                | Q(edition_year__isnull=True, year=edition_year)
+            )
+            .order_by("pk")
+            .first()
+        )
         created = event is None
         if event is None:
+            source_refs = {
+                **(locked.source_refs or {}),
+                "historical_target_id": locked.pk,
+                "inventory_artifact_sha256": locked.artifact_sha256,
+            }
+            if identity["cross_year_evidence"]:
+                source_refs["cross_year_evidence"] = identity["cross_year_evidence"]
             event = RaceEvent.objects.create(
                 race_series=locked.race_series,
-                year=locked.year,
+                year=public_year,
+                edition_year=edition_year,
                 slug=slug,
                 series_key=locked.race_series.key,
                 original_name=locked.original_name,
@@ -222,12 +279,29 @@ def materialize_historical_event(target: HistoricalRaceEventTarget, *, actor=Non
                 ),
                 visibility_status=RaceEventVisibility.DRAFT,
                 data_quality_status=RaceEventDataQuality.INCOMPLETE,
-                source_refs={
-                    **(locked.source_refs or {}),
-                    "historical_target_id": locked.pk,
-                    "inventory_artifact_sha256": locked.artifact_sha256,
-                },
+                source_refs=source_refs,
             )
+        else:
+            try:
+                validate_event_years(
+                    event.year,
+                    event_edition_year(event),
+                    event.local_date,
+                    (event.source_refs or {}).get("cross_year_evidence"),
+                )
+            except ValidationError as exc:
+                raise InventoryValidationError(
+                    f"existing historical RaceEvent year identity is invalid: {exc}"
+                ) from exc
+            if (
+                event_edition_year(event) != edition_year
+                or event.year != public_year
+                or event.slug != slug
+                or event.country_region != locked.country_region
+            ):
+                raise InventoryValidationError(
+                    "existing historical RaceEvent identity does not match target"
+                )
         if locked.event_id != event.pk:
             locked.event = event
             locked.save(update_fields={"event"})
@@ -306,6 +380,7 @@ def write_event_input_csvs(
                 "target_sha256": identity["target_sha256"],
                 "inventory_artifact_sha256": target.artifact_sha256,
                 "year": event.year,
+                "edition_year": event_edition_year(event),
                 "slug": event.slug,
                 "original_name": event.original_name,
                 "chinese_name": event.chinese_name,
@@ -327,6 +402,7 @@ def write_event_input_csvs(
         "target_sha256",
         "inventory_artifact_sha256",
         "year",
+        "edition_year",
         "slug",
         "original_name",
         "chinese_name",

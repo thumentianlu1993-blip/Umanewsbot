@@ -5,7 +5,11 @@
 
 #### Scenario: 切换重点赛事
 - **WHEN** 用户选择“重点”tab
-- **THEN** 系统 SHALL 只展示 P0/P1 或人工标记为重点的前台可见赛事
+- **THEN** 显式选择早于当前上海自然年的年份时，系统 SHALL 只展示 G1/G2 等级族的前台可见赛事
+- **AND** 当前年、未来年或未选择年份时，系统 SHALL 只展示 P0/P1 或人工标记为重点的前台可见赛事
+- **AND** 本场景由
+  `docs/changes/repair-historical-race-calendar-integrity/spec.md`
+  的历史重点合同取代旧的全时期 P0/P1 口径
 
 #### Scenario: 按地区筛选
 - **WHEN** 用户选择日本、中国香港、英国、法国或美国

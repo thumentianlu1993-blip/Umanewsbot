@@ -210,6 +210,54 @@ class HistoricalRaceDetailImportPrimitiveTests(TestCase):
                     approved_at="2026-07-13T00:00:00Z",
                 )
 
+    def test_approved_detail_source_edition_year_only_falls_back_when_field_is_missing(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def current_row(**changes):
+                self.target.refresh_from_db()
+                return {
+                    **self._source_row(root),
+                    "expected_target_sha256": target_identity(self.target)[
+                        "target_sha256"
+                    ],
+                    **changes,
+                }
+
+            apply_approved_detail_source(
+                target=self.target,
+                event=self.event,
+                row=current_row(),
+                artifact_root=root,
+                artifact_manifest_sha256="b" * 64,
+                approved_by="admin",
+                approved_at="2026-07-13T00:00:00Z",
+            )
+            apply_approved_detail_source(
+                target=self.target,
+                event=self.event,
+                row=current_row(edition_year=2012),
+                artifact_root=root,
+                artifact_manifest_sha256="b" * 64,
+                approved_by="admin",
+                approved_at="2026-07-13T00:00:00Z",
+            )
+
+            invalid_values = (0, "", False, True, "2012", "not-a-year", -1, 10000)
+            for edition_year in invalid_values:
+                with self.subTest(edition_year=edition_year), self.assertRaisesMessage(
+                    InventoryValidationError, "edition_year"
+                ):
+                    apply_approved_detail_source(
+                        target=self.target,
+                        event=self.event,
+                        row=current_row(edition_year=edition_year),
+                        artifact_root=root,
+                        artifact_manifest_sha256="b" * 64,
+                        approved_by="admin",
+                        approved_at="2026-07-13T00:00:00Z",
+                    )
+
     def test_basic_complete_report_distinguishes_required_and_policy_optional_fields(self):
         report = historical_basic_fields_complete(self.target, self.event)
         self.assertTrue(report["complete"])

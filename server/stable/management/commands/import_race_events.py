@@ -11,6 +11,7 @@ from pathlib import Path
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime, parse_time
 from django.utils.text import slugify
@@ -37,6 +38,11 @@ from stable.services.historical_race_inventory import InventoryValidationError
 from stable.services.race_event_reconciliation import (
     RaceEventReconciliationError,
     adopt_existing_race_event_for_target,
+)
+from stable.services.race_event_years import (
+    derive_public_year,
+    event_edition_year,
+    historical_event_identity,
 )
 from stable.services.race_events import apply_race_event_normalization
 
@@ -241,7 +247,7 @@ def _validate_current_year_descriptor(
         if (
             target_id <= 0
             or target_id in targets_by_id
-            or target_year != protected_scope_year
+            or target_year <= 0
             or not str(selected.get("series_key") or "").strip()
             or not str(selected.get("country_region") or "").strip()
             or not SHA256_RE.fullmatch(target_sha)
@@ -354,11 +360,18 @@ def _format_validation_error(error: ValidationError) -> str:
     return "；".join(str(message) for message in error.messages)
 
 
-def _parse_event_row(row: dict, *, line_number: int) -> tuple[int, str, dict, list[str], str]:
+def _parse_event_row(
+    row: dict,
+    *,
+    line_number: int,
+    public_year: int | None = None,
+    edition_year: int | None = None,
+) -> tuple[int, str, dict, list[str], str]:
     try:
         original_name = (row.get("original_name") or "").strip()
         chinese_name = (row.get("chinese_name") or "").strip()
-        year = int(row["year"])
+        row_year = int(row["year"])
+        year = row_year if public_year is None else public_year
         slug = (row.get("slug") or "").strip() or slugify(original_name, allow_unicode=False) or f"race-{year}"
         defaults = {
             "series_key": (row.get("series_key") or "").strip() or slug,
@@ -383,6 +396,8 @@ def _parse_event_row(row: dict, *, line_number: int) -> tuple[int, str, dict, li
             "source_refs": _parse_json(row.get("source_refs") or ""),
             "notes": (row.get("notes") or "").strip(),
         }
+        if edition_year is not None:
+            defaults["edition_year"] = edition_year
         aliases = _parse_aliases(row.get("aliases") or "")
     except (TypeError, ValueError, json.JSONDecodeError) as exc:
         raise CommandError(f"第 {line_number} 行解析失败：{exc}") from exc
@@ -397,6 +412,33 @@ def _parse_event_row(row: dict, *, line_number: int) -> tuple[int, str, dict, li
     if alias_language and alias_language not in SourceLanguage.values:
         raise CommandError(f"第 {line_number} 行 alias_language 非法：{alias_language}")
     return year, slug, defaults, aliases, alias_language
+
+
+def _parse_current_year_descriptor_event_row(
+    row: dict,
+    *,
+    line_number: int,
+    context: CurrentYearDescriptorContext,
+) -> tuple[int, str, dict, list[str], str]:
+    target_id = _descriptor_row_target_id(row, line_number=line_number)
+    selected = context.targets_by_id.get(target_id)
+    if selected is None:
+        raise CommandError(f"第 {line_number} 行 target 不在批准 selection 中")
+    try:
+        edition_year = int(row["year"])
+        selected_edition_year = int(selected["year"])
+        local_date = _parse_date(row.get("local_date") or "")
+        public_year = derive_public_year(local_date, edition_year)
+    except (KeyError, TypeError, ValueError, ValidationError) as exc:
+        raise CommandError(f"第 {line_number} 行年份身份非法：{exc}") from exc
+    if edition_year != selected_edition_year:
+        raise CommandError(f"第 {line_number} 行 edition year 与批准 selection 不一致")
+    return _parse_event_row(
+        row,
+        line_number=line_number,
+        public_year=public_year,
+        edition_year=edition_year,
+    )
 
 
 def _descriptor_row_target_id(row: dict, *, line_number: int) -> int:
@@ -435,7 +477,7 @@ def _apply_current_year_descriptor_rows(
             for line_number, (row, parsed) in enumerate(
                 zip(rows, parsed_rows), start=2
             ):
-                year, slug, defaults, aliases, alias_language = parsed
+                public_year, slug, defaults, aliases, alias_language = parsed
                 target_id = _descriptor_row_target_id(row, line_number=line_number)
                 if target_id in seen_target_ids:
                     raise CommandError(f"第 {line_number} 行 target_id 重复")
@@ -462,10 +504,15 @@ def _apply_current_year_descriptor_rows(
                 selected_series_key = str(selected["series_key"])
                 selected_region = str(selected["country_region"])
                 row_series_key = str(row.get("series_key") or selected_series_key)
+                try:
+                    row_edition_year = int(row["year"])
+                except (TypeError, ValueError) as exc:
+                    raise CommandError(f"第 {line_number} 行 edition year 非法") from exc
                 if (
-                    year != context.protected_scope_year
-                    or year != target.year
-                    or year != int(selected["year"])
+                    public_year != context.protected_scope_year
+                    or row_edition_year != target.year
+                    or row_edition_year != int(selected["year"])
+                    or defaults.get("edition_year") != target.year
                     or row_series_key != selected_series_key
                     or target.race_series.key != selected_series_key
                     or defaults["country_region"] != selected_region
@@ -478,20 +525,29 @@ def _apply_current_year_descriptor_rows(
                     or target.event_id is not None
                 ):
                     raise CommandError(f"第 {line_number} 行 target 不是 pending/unmaterialized")
-                expected_slug = historical_event_slug(target)
+                expected_slug = historical_event_slug(
+                    target,
+                    public_year=public_year,
+                )
                 if slug != expected_slug:
                     raise CommandError(
                         f"第 {line_number} 行 slug 与 target 不一致：{slug} != {expected_slug}"
                     )
                 existing_event = (
                     RaceEvent.objects.select_related("race_series")
-                    .filter(race_series=target.race_series, year=year)
+                    .filter(race_series=target.race_series, year=public_year)
+                    .filter(
+                        Q(edition_year=target.year)
+                        | Q(edition_year__isnull=True, year=target.year)
+                    )
                     .first()
                 )
-                if RaceEvent.objects.filter(year=year, slug=slug).exclude(
+                if RaceEvent.objects.filter(year=public_year, slug=slug).exclude(
                     pk=existing_event.pk if existing_event else None
                 ).exists():
-                    raise CommandError(f"第 {line_number} 行 slug conflict：{year}/{slug}")
+                    raise CommandError(
+                        f"第 {line_number} 行 slug conflict：{public_year}/{slug}"
+                    )
 
                 target.original_name = defaults["original_name"]
                 target.chinese_name = defaults["chinese_name"]
@@ -504,6 +560,17 @@ def _apply_current_year_descriptor_rows(
                 target.source_refs = defaults["source_refs"]
                 target.resolution_status = HistoricalRaceResolutionStatus.READY
                 target.last_checked_at = timezone.now()
+                try:
+                    identity = historical_event_identity(target, target.local_date)
+                except ValidationError as exc:
+                    raise CommandError(
+                        f"第 {line_number} 行年份身份校验失败：{_format_validation_error(exc)}"
+                    ) from exc
+                if (
+                    int(identity["public_year"]) != public_year
+                    or int(identity["edition_year"]) != target.year
+                ):
+                    raise CommandError(f"第 {line_number} 行公开/届次年份身份不一致")
                 try:
                     target.full_clean()
                 except ValidationError as exc:
@@ -544,7 +611,8 @@ def _apply_current_year_descriptor_rows(
                 if (
                     event is None
                     or event.race_series_id != target.race_series_id
-                    or event.year != target.year
+                    or event.year != public_year
+                    or event_edition_year(event) != target.year
                     or (existing_event is None and event.slug != expected_slug)
                 ):
                     raise CommandError(f"第 {line_number} 行 materialized event 身份不一致")
@@ -644,10 +712,16 @@ class Command(BaseCommand):
         contains_protected_scope = False
         for row in rows:
             try:
-                contains_protected_scope = contains_protected_scope or int(
-                    str(row.get("year") or "").strip()
-                ) >= PROTECTED_CURRENT_YEAR_SCOPE_START
-            except ValueError:
+                planned_year = int(str(row.get("year") or "").strip())
+                public_year = derive_public_year(
+                    _parse_date(row.get("local_date") or ""),
+                    planned_year,
+                )
+                contains_protected_scope = (
+                    contains_protected_scope
+                    or public_year >= PROTECTED_CURRENT_YEAR_SCOPE_START
+                )
+            except (TypeError, ValueError, ValidationError):
                 pass
         if contains_protected_scope and not all(descriptor_options):
             raise CommandError(
@@ -671,10 +745,20 @@ class Command(BaseCommand):
                 approval_path=Path(options["current_year_approval"]),
                 approved_cutoff=approved_cutoff,
             )
-        parsed_rows = [
-            _parse_event_row(row, line_number=index)
-            for index, row in enumerate(rows, start=2)
-        ]
+        if descriptor_context is not None:
+            parsed_rows = [
+                _parse_current_year_descriptor_event_row(
+                    row,
+                    line_number=index,
+                    context=descriptor_context,
+                )
+                for index, row in enumerate(rows, start=2)
+            ]
+        else:
+            parsed_rows = [
+                _parse_event_row(row, line_number=index)
+                for index, row in enumerate(rows, start=2)
+            ]
         if descriptor_context is not None:
             for index, (row, parsed) in enumerate(zip(rows, parsed_rows), start=2):
                 local_date = parsed[2]["local_date"]

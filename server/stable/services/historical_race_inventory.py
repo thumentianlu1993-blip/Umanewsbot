@@ -38,6 +38,7 @@ from stable.models import (
     RacingRegion,
 )
 from stable.services.race_event_public_cache import invalidate_public_race_cache
+from stable.services.race_event_years import event_edition_year
 
 
 INVENTORY_SCHEMA_VERSION = "1.0"
@@ -1542,8 +1543,13 @@ def historical_publication_blockers(
         blockers.append("target_not_imported")
     if event is None:
         return [*blockers, "race_event_missing"]
-    if event.race_series_id != target.race_series_id or event.year != target.year:
+    if (
+        event.race_series_id != target.race_series_id
+        or event_edition_year(event) != target.year
+    ):
         blockers.append("annual_identity_mismatch")
+    if event.local_date and event.year != event.local_date.year:
+        blockers.append("public_year_mismatch")
     if not event.original_name or not event.country_region or not event.source_refs:
         blockers.append("basic_identity_or_source_missing")
     if target.expectation_status == HistoricalRaceExpectationStatus.CANCELLED or event.status == RaceEventStatus.CANCELLED:

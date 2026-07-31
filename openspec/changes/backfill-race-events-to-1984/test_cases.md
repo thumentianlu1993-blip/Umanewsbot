@@ -162,7 +162,7 @@
 | TC-ADAPTER-001 | JRA/NAR 1984 fixture | 解析年度目录 | 输出地区、年份、原名、等级、日期/马场、source URL 和 parser version | F |
 | TC-ADAPTER-002 | JRA/NAR 中间/近年 fixture | 分别解析 | 标准 schema 一致，旧格式分支可审计 | F |
 | TC-ADAPTER-003 | 日本系列升格前 timeline | 解析沿革/结果索引 | 前分级届次和真实等级进入 timeline | F |
-| TC-ADAPTER-004 | HKJC 1980s 赛季 fixture | 解析 | 正确处理跨年赛季、繁中/英文名称和分级语义 | F |
+| TC-ADAPTER-004 | HKJC 1980s 赛季 fixture | 解析 | 按实际自然年输出、拒绝废弃的 `hong_kong_racing_season_spans_calendar_years` 原因，并正确处理繁中/英文名称和分级语义 | F |
 | TC-ADAPTER-005 | HKJC 改名/停办 fixture | timeline | 名称有效期、not-held/最后举办年正确 | F |
 | TC-ADAPTER-006 | HKJC 页面空壳或 locale 错误 | 解析 | 不把空壳当成功，输出 blocker | F |
 | TC-ADAPTER-007 | BHA Flat 1980s fixture | 解析 | Pattern 等级、日期、马场正确 | F |

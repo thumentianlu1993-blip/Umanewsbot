@@ -450,7 +450,8 @@ class HistoricalRaceDateDiscoveryTests(TestCase):
         target.refresh_from_db()
         self.assertEqual(target.year, 2001)
         self.assertEqual(target.local_date, date(2002, 1, 11))
-        self.assertEqual(target.event.year, 2001)
+        self.assertEqual(target.event.year, 2002)
+        self.assertEqual(target.event.edition_year, 2001)
         self.assertEqual(target.source_refs["detail_discovery"]["actual_year"], 2002)
 
     def test_cancelled_target_accepts_cancellation_evidence_without_fake_details(self):
