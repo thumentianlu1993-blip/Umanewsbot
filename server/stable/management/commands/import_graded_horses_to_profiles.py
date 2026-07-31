@@ -175,12 +175,6 @@ class Command(BaseCommand):
         limit = options.get("limit")
         batch_size = options["batch_size"]
 
-        # Existing TermEntry lookup by source_ja + term_type + region.
-        existing_terms: dict[tuple[str, str, str], TermEntry] = {
-            (t.source_ja, t.term_type, t.racing_region): t
-            for t in TermEntry.objects.filter(term_type=TermType.HORSE, is_active=True)
-        }
-
         term_created = term_existing = profile_created = profile_existing = record_created = 0
         total_horses_processed = 0
         offset = 0
@@ -218,26 +212,29 @@ class Command(BaseCommand):
                     base_name = _strip_country(full_name)
                     racing_region = _map_region(raw.get("region") or "")
 
-                    # 1. TermEntry
-                    term_key = (base_name, TermType.HORSE, racing_region)
-                    term = existing_terms.get(term_key)
-                    if not term:
+                    # 2. HorseProfile (look up first to decide whether to create a new TermEntry)
+                    profile = existing_profiles.get(horse_id)
+                    if profile:
+                        # Re-use the existing TermEntry for this horse.
+                        term = profile.primary_term
+                        term_existing += 1
+                    else:
+                        # Create a dedicated TermEntry per horse.  Using the full name
+                        # (including the country suffix, e.g. "Qirat (GB)") as source_ja
+                        # keeps TermEntry unique and avoids the HorseProfile.primary_term
+                        # OneToOne constraint violation when two horses share the same
+                        # base name within the same region.
                         term = TermEntry.objects.create(
                             term_type=TermType.HORSE,
                             source_language=SourceLanguage.ENGLISH,
                             racing_region=racing_region,
-                            source_ja=base_name,
+                            source_ja=full_name or base_name,
                             target_zh="",
                             translation_status=TermTranslationStatus.PENDING,
                             is_active=True,
                         )
-                        existing_terms[term_key] = term
                         term_created += 1
-                    else:
-                        term_existing += 1
 
-                    # 2. HorseProfile
-                    profile = existing_profiles.get(horse_id)
                     profile_defaults = {
                         "primary_term": term,
                         "english_name": full_name,
