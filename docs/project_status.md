@@ -22,7 +22,7 @@
   shared/exclusive wait 约 `0.024s`，并验证锁后 active gate 拒绝、exit 恢复、无死锁/
   陈旧提交，以及路径冲突回滚、`CASCADE`、receipt unique、单 active gate 条件唯一。
 - 同一 reviewer 第二轮限定复审为 `VERDICT: APPROVED`，前轮 `1 P1 + 3 P2` 已关闭；
-  `codex review` read-only exit `0`，pre/post fingerprint 均为
+  `codex review -c 'sandbox_mode="read-only"' --uncommitted` exit `0`，pre/post fingerprint 均为
   `88c53c265cd0de5748438648f637e0975e75389ee8b636ab1c3848f68d033eb3`。
   approved parent 为 `43b81fd3288a1e7b997ffad78d03565327e3d990`，approved content 为
   `1a31d68e51d8aa4ce28249c4feb2f3fa82517d9277818da063214972fda9646f`，仅标识本次文档

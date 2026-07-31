@@ -56,7 +56,8 @@
 - detail clean RED 没有保存：首次失败被陈旧 SHA fixture 提前遮蔽，修正 fixture 后直接进入
   GREEN；因此只记录现有行为与 `166/166` 证据，不把该过程追溯表述为已取得 clean RED。
 - 同一独立代码 reviewer 第二轮限定复审已给出 `VERDICT: APPROVED`，前轮
-  `1 P1 + 3 P2` 均关闭。原生命令 `codex review` 在 read-only 模式完成且 exit `0`；review
+  `1 P1 + 3 P2` 均关闭。原生命令
+  `codex review -c 'sandbox_mode="read-only"' --uncommitted` 完成且 exit `0`；review
   前后 fingerprint 均为
   `88c53c265cd0de5748438648f637e0975e75389ee8b636ab1c3848f68d033eb3`。
   approved parent 为 `43b81fd3288a1e7b997ffad78d03565327e3d990`，approved content 为
@@ -4819,7 +4820,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   target instance delete 接入 gate；dependency snapshot 的同 model 多 FK 改用 relation identity
   分键。新增 RED 后，review fixes + integrity/tooling + years + frontend 聚焦 `115/115`。
   check、migration drift、diff check 通过；`0067` 未增加 schema 且没有新 migration。原生
-  `codex review` read-only exit `0`，审前/审后 fingerprint 相同。以上批准只覆盖文档写回前的
+  `codex review -c 'sandbox_mode="read-only"' --uncommitted` exit `0`，审前/审后 fingerprint
+  相同。以上批准只覆盖文档写回前的
   实现快照；本次事实文档变更后仍须复用同一 reviewer 限定复审。
 - 最终全量扫描又发现 1 P1/1 P2：`RaceEventPublicPath.event` 已在 model/既有 `0067` 改为
   `CASCADE`，普通 event 删除原子清理 registry，active gate 下 event/path 均保留；orphan
