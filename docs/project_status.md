@@ -2286,3 +2286,42 @@ P0 马信息补全专项的模型交接文档见
   须 evidence 复审。
 - URL `76/76`、主线程 `205/205`、PG `5/5` 两轮、collector `101/101`；stable 全量非绿。
 - 理论锁顺序反转 P2 未专项并发 exit 验证，转后续任务；无发布或生产动作。
+
+# 2026-07-31 lifecycle shadow 纳管准备
+
+- 新 change `prepare-lifecycle-shadow-enrollment` 已在最新 main 的独立 worktree 完成只读探索
+  和五份规格/交接文档，等待独立方案审核。
+- 生产仍为 lifecycle `false/off`、control/transition 为 0；未来 90 天 172 场重点赛事
+  没有 `race_datetime`，近期另有 6 场地区时区错误样本，不能直接打开 shadow。
+- 推荐先实现 strict manifest v2、dry-run/apply parity 和完整 DB CAS；control 纳管与
+  shadow 开启分开授权。当前未写测试/代码/配置，未执行生产写入或开关变更。
+- 首轮独立方案 review 的两项 P1 已修正规格：v2 apply 强制 false/off；v1 永久禁止 apply。
+  同一 reviewer 限定复审已 `APPROVED`；当前等待用户明确“确认实现”。
+- 用户已确认实现；测试先行 RED、strict manifest v2/prepare/reconcile 实现及跨位数 ID
+  canonical 修复完成。首轮代码 review 的服务门禁、时间漂移、祖先 symlink、无界预读
+  四项及首轮限定复审的时间注入、alias 例外、读中 TOCTOU 已测试先行修复；SQLite
+  writer 的祖先替换与 staging 名称换绑竞态也已以稳定 dir_fd、inode 双向核验和
+  quarantine 修复；异常 cleanup 已进一步收敛为只清理 owned fd 内两个文件，不再按名称
+  删除目录。第五轮限定复审发现 rename 后最终校验失败会遗留公开空目录并阻断同路径重试；
+  已用真实 RED 锁定，并改为经稳定 parent fd 隔离公开名称后再清空 owned 文件。第六轮又
+  发现 rename 自身失败会因标志位过早置位而移动竞争者目录；现只在 rename 成功后置位，
+  conflict RED 已转绿且竞争者 inode/marker 原位保留。第七轮补出普通 rename 可覆盖
+  并发空目录的 P2；现以 Linux renameat2/macOS renameatx_np 原子 no-replace 发布，
+  能力缺失时 fail closed，空/非空竞争者和 staging swap 测试均通过。第八轮进一步要求
+  在业务写入前验证 kernel/flag/同文件系统语义；现以两个空的 0700 高熵 probe 目录证明
+  no-clobber 和 inode 保持，不支持或错误覆盖时业务写入次数为 0。SQLite `91/91`、
+  相邻回归 `190/190`、隔离 PostgreSQL `6/6` 通过。未新增迁移或配置，未联网、
+  未部署、未改生产开关。同一独立 reviewer 第九轮限定复审已 `APPROVED`，P0–P3 为 0，
+  原生只读会话退出码 0，审前/审后 fingerprint `3932d1fd…749ef` 一致。当前只追加审核
+  证据并冻结 evidence fingerprint；下一门禁为 commit、push 和 Draft PR 用户授权。
+
+# 2026-08-01 lifecycle shadow 纳管准备整合最新 main
+
+- 用户已授权通过最新基线复验/复审后 commit、push、创建 PR 并合并；不含部署、迁移、
+  生产写入、control apply 或 lifecycle 启用。
+- 分支已从 `43b81fd3` 快进整合到 `origin/main@1cdd066b`。应用/测试无冲突，重叠文档保留
+  PR #55 历史赛历事实并追加 lifecycle 事实。
+- 最新验证：lifecycle `91/91`、新主线年份合同 `20/20`、隔离 PostgreSQL `6/6`；check、
+  migration drift、diff check 通过。相邻 190 项的 3 个年份 fixture error 在干净 main
+  精确复现，记录为主线既有失败，不由本 change 顺带修复。
+- 旧 fingerprint 已失效，等待同一 reviewer 复核整合候选；生产开关继续关闭。
