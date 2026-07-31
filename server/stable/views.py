@@ -2688,7 +2688,7 @@ def _region_tab_context(active_region: str) -> list[dict]:
             {
                 **tab,
                 "is_active": value == active_region,
-                "url": "/" if not value else f"/?region={value}",
+                "url": "" if not value else f"?region={value}",
             }
         )
     return tabs
