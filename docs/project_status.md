@@ -2342,3 +2342,13 @@ P0 马信息补全专项的模型交接文档见
 - 已保存并校验数据库、环境和旧镜像恢复点。本轮没有 control apply、联网 proof、lifecycle
   业务数据写入或开关启用；排空前自然完成的既有术语发现任务不属于该零写结论。下一步是
   另获授权后执行生产只读 prepare/dry-run。
+
+# 2026-08-01 首批 8 场近期重点赛事时间已写入生产
+
+- PR #58（上一轮关闭态部署证据）已合并为 main `52456cc5`；本轮没有重新部署或迁移。
+- 已按官方/可信第三方证据，在单事务内为 event `430/431/433/434/435/436/740/940` 写入
+  aware `race_datetime`，并同步举办地 `local_date/local_start_time/timezone_name`；共 8 场、
+  23 个实际字段变化，23 条字段权威和 23 条 append-only 变化审计。
+- 写前恢复点 SHA-256 为 `96703a39…f0ce`；manifest SHA-256 为 `ad103cb1…0886`。写后 verifier、
+  DB 计数、8 个公开详情页、赛事日历和 healthz 通过，生命周期仍为 `false/off`、control/
+  transition 为 0。本次未准备或启用 strict shadow enrollment。
