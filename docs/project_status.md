@@ -2399,3 +2399,10 @@ P0 马信息补全专项的模型交接文档见
   而 fail closed；生产已恢复 `false/off`，没有赛事状态或 proposal 写入。
 - 本地已把该 task 改投普通 worker 的 `celery`，101 项 lifecycle/enrollment 回归通过，
   正等待独立代码 review。代码发布、关闭态部署和 R3 重试是三个独立授权门禁。
+
+# 2026-08-02 生命周期队列路由修复已发布，shadow 仍关闭
+
+- PR #65 已合并并以 `false/off` 完成生产部署；运行时 route 与普通 worker 均为 `celery`。
+- 16 场灰度赛事仍为 scheduled，0 proposal/applied，旧 `default=2` 未消费，race-live 未启动。
+- 下一门禁为独立授权的 R3 smoke：先确认无 `default` consumer，再重新 claim 并核对 generation
+  增长；本次发布不等于 shadow 已开启。
