@@ -7678,3 +7678,22 @@ re-baseline 基线 + 各轮 findings 新增）。
   临时 chmod 后重试；应修复仓库 mode、增加 fake-Docker 直接执行测试并重新 review/授权。
 - 修复后的部署仍从头执行全部 preflight、有效 custom-format 备份、旧镜像冻结、单一 release
   owner、web healthy 门禁和 `false/off` 验收，不得把首次早期失败当作已完成任何步骤。
+
+## 2026-08-02 Lifecycle R0 执行位修复后关闭态部署实录
+
+- 发布 revision：`2dba891fd0b4e5b5671d4a18ed30289e08febc96`；隔离 release 目录：
+  `/opt/umanews-release-2dba891f-LDatiL/umanewsbot`；最终镜像：
+  `sha256:24fc89cfd801f624c4c2e42bfb5654def6cf50785bda6f8a4d89bb9028c67b9f`。
+- 恢复点：
+  `/opt/umanewsbot/backups/db/pre-remove-lifecycle-key-race-gate-20260801T170915Z.dump`，
+  `373763059` bytes、TOC `1288`、mode `0600`、SHA-256
+  `285de333ac811363edf3377336e4f036a76a605d19b96a0d4a000c4c2a7edc7f`；旧镜像 tag 为
+  `umanewsbot:rollback-pre-remove-lifecycle-key-race-gate-20260801T170915Z`。
+- historical runner preflight 为 `migration_safe`。Beat 停止后 Celery 自然 drain 到
+  `active=0 / reserved=0 / active_confirm=0`，再停止 worker/web；唯一 release task 报告无待
+  应用 migration。web healthy 后才启动 worker/beat/nginx；race-live 前后均未运行。
+- 三个常驻应用容器均为 lifecycle `false/off`，control/transition/active claim 为 0；scanner
+  disabled smoke 为 `enabled=False / claimed=0 / dispatched=0`。迁移计划、worker ping、HTTP
+  healthz/赛事页和 15 分钟错误日志均通过，发布锁和 race-live 意图文件不存在。
+- 本次 R0 没有 control apply、赛事状态推进或 lifecycle 启用。后续 R1 只读 prepare/dry-run、
+  R2 false/off apply 与 R3 true/shadow 仍需各自独立授权。
