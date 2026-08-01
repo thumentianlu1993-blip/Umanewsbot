@@ -2352,3 +2352,16 @@ P0 马信息补全专项的模型交接文档见
 - 写前恢复点 SHA-256 为 `96703a39…f0ce`；manifest SHA-256 为 `ad103cb1…0886`。写后 verifier、
   DB 计数、8 个公开详情页、赛事日历和 healthz 通过，生命周期仍为 `false/off`、control/
   transition 为 0。本次未准备或启用 strict shadow enrollment。
+
+# 2026-08-01 8 月 1–8 日赛事时间补采完成
+
+- 对生产日历 28 场赛事完成逐场证据盘点；16 场获得明确时间，首批 8 场此前已写入，本次再为
+  event `84/85/86/432/437/941/942/943` 写入举办地时间、IANA 时区和 aware UTC。12 场无明确
+  逐场时间，保持原值。
+- 第二批 manifest SHA 为 `4e2e342d…c6922`，run ID 为 `race-datetime-4e2e342dcc8b7def`；
+  dry-run/apply/verify 均为 8 场、19 个字段，数据库审计计数为 `19/19/1`。
+- custom-format 写前取证快照 SHA 为 `9be6d50c…df77`，TOC 1295、mode 0600；两次锁之间未证明
+  其他模块零写，未批准直接整库恢复。首次运行在 dry-run 前失败且目标业务零写；修正后只执行
+  一次单事务 apply。
+- 8 个 HTTP 详情页、日历、healthz、worker/beat 和错误日志通过；lifecycle 继续为
+  `false/off`，control/transition 为 0。HTTPS 既有握手失败仍存在。

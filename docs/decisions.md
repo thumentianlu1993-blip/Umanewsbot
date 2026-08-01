@@ -2454,3 +2454,14 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   `RaceEventFieldAuthority` 与 append-only `RaceEventFieldChange`。
 - 本次 8 场修正只解决已人工核对的时间元数据，不自动创建 lifecycle control，不改变
   `RaceEvent.status`，也不构成打开 shadow/enforce、启用 provider 或 race-live worker 的授权。
+
+## 2026-08-01 第二批时间补采继续采用“逐场明确证据，不推断缺失时间”
+
+- 本次 8 月 1–8 日盘点只写入了可由 JRA、NYRA、The Jockey Club 官方页面或已批准 Racing
+  Post 逐场核对的 8 场；未找到逐场明确时间的 12 场保持原值，未由赛事日期、首场时间或场次
+  顺序推导。
+- 本次官方页面字段采用 authority `500`，Glorious Stakes 的 Racing Post 字段采用 `200`；
+  `local_start_time/timezone_name/race_datetime` 作为同一时间事实一起核对，未把上海展示时间
+  继续保存为日本或英国赛事的举办地 wall-clock。
+- 本次生产运行始终保持 lifecycle `false/off`，未创建 control/transition，未改变赛事状态，
+  也未启用 provider、shadow、enforce 或 race-live worker。

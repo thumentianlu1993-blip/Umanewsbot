@@ -5032,3 +5032,34 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   `/opt/umanewsbot/runtime/operations/race-datetime-20260801T080504Z/`；包含 manifest、执行脚本、
   dry-run/apply/verify 与写后数据库快照。本次未执行 enforce，未生成或 apply strict lifecycle
   shadow manifest，也未打开 `true/shadow`。
+
+# 2026-08-01 8 月 1–8 日赛事时间补采与第二批 8 场生产写入完成
+
+- 首批写入证据经 PR #60 合并为 main `76676818582898536aa12189242bd565d6a8b94b`；该 PR
+  只有 4 个文档、73 行事实追加，没有触发服务重建、迁移或 lifecycle 启用。
+- 本次盘点生产日历 2026-08-01 至 2026-08-08 的 28 场已发布赛事；16 场取得逐场明确时间，
+  其中首批 8 场此前已写入。本次补写 event `84/85/86/432/437/941/942/943`；其余 12 场因
+  未取得逐场明确时间而保持原值，没有用场次顺序或首场时间推断。
+- JRA 官方日程核对朱鹮夏季短跑、女王锦标和榆树锦标；NYRA 官方 race page 核对 Lake
+  George 与 Adirondack；The Jockey Club 官方活动页核对 Rose of Lancaster 与 Sweet
+  Solera；Glorious Stakes 使用已批准可信媒体 Racing Post。官方来源 authority 为 `500`，
+  Racing Post 为 `200`。
+- canonical manifest SHA-256 为
+  `4e2e342dcc8b7def3b04bbe7b3e8db36f4f94634119f37d1ee1f7f09919c6922`，run ID 为
+  `race-datetime-4e2e342dcc8b7def`。dry-run 为 `8` 场、`19` 个字段变化；单事务 apply 与独立
+  verify 均精确通过，新增 `19` 条 field authority、`19` 条 append-only field change 和
+  `1` 条 OperationLog。
+- 写前取证快照为
+  `/opt/umanewsbot/backups/db/pre-race-datetime-4e2e342d-20260801T133257Z.dump`，
+  `373005202` bytes、mode `0600`、TOC `1295`，SHA-256
+  `9be6d50ca9433eda897e47e3aca7eefcf1cdaccbafaf2f7be4ccc2482c8adf77`。该快照与正式
+  apply 的两次锁之间存在间隔，未证明其他模块在间隔内零写，因此未将其批准为可直接整库
+  恢复点；manifest 保留了本批目标字段的逐字段 before 值。
+- 首次执行因容器真实工作目录为 `/app/server` 而在 dry-run 前失败；shell 管道未传播左侧退出码，
+  只继续生成了数据库备份。精确进程树随后终止，确认 authority/OperationLog 均为 0、锁已释放；
+  该快照经 `pg_restore -l` 验证结构完整，但正式重试未据此宣称其他写入者持续暂停。重试移除
+  管道并逐项断言 JSON，再执行唯一一次 apply；失败事实保存在生产证据目录的
+  `attempt-1-failure.txt`。
+- 8 个公开 HTTP 详情页均为 200 并显示预期举办地时间；healthz、赛事日历、worker ping、
+  beat 和近 15 分钟错误计数通过。生命周期保持 `false/off`，control/transition 为 0，部署锁
+  已释放；HTTPS 握手仍失败，未被本次时间数据写入改变。
