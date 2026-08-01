@@ -7630,3 +7630,28 @@ re-baseline 基线 + 各轮 findings 新增）。
   部署锁不存在。生命周期仍关闭，未部署、迁移、创建 control、推进状态或启动 race-live。
 - 本次已生成并校验上述 custom-format 恢复点；manifest 同时保存了每个字段写前/写后值。
   本次未生成或批准临时反向脚本，也未执行整库恢复。
+
+## 2026-08-01 第二批近期赛事 `race_datetime` 生产修正实录
+
+- event 范围为 `84/85/86/432/437/941/942/943`；canonical manifest SHA-256 为
+  `4e2e342dcc8b7def3b04bbe7b3e8db36f4f94634119f37d1ee1f7f09919c6922`，证据目录为
+  `/opt/umanewsbot/runtime/operations/race-datetime-20260801T133257Z/`。
+- 生产归档工作树缺少仓库版 `deploy/deployment_lock.sh`。本次从已合并 `origin/main` 取得同一
+  受审脚本，三端 SHA-256 均为
+  `e9c0aa075bdee2642b96b91aae710562281d4807e4d59f0f76677a792d4ecb45`；脚本只临时放在
+  `/tmp`，以 `manual-release` action 获取共享锁，完成后已删除，未修改生产仓库。
+- 首次命令把容器目录误写为 `/app`，dry-run 在 Django 启动前失败；因 `tee` 管道未传播左侧
+  退出码，命令继续进入只读 pg_dump。该精确进程树被终止后，数据库核对为 field authority
+  `0`、OperationLog `0`，锁已释放；空 dry-run 日志与 `attempt-1-failure.txt` 保留为证据。
+- pg_dump 在终止前已完整结束，写前取证快照
+  `/opt/umanewsbot/backups/db/pre-race-datetime-4e2e342d-20260801T133257Z.dump` 经重新核对为
+  `373005202` bytes、mode `0600`、TOC `1295`，SHA-256
+  `9be6d50ca9433eda897e47e3aca7eefcf1cdaccbafaf2f7be4ccc2482c8adf77`。该快照完成后的
+  锁释放到正式重试重新取锁之间，未取得其他生产写入者持续暂停的证据，因此本次未把它批准
+  为可直接整库恢复点；manifest 已保存本批各目标字段的 before/after 值。
+- 正式重试使用容器真实目录 `/app/server`，不再使用输出管道；dry-run、apply、verify 的末行
+  JSON 均断言 manifest SHA、`event_count=8`、`field_change_count=19`。唯一一次单事务 apply
+  写入 19 条 field authority、19 条 field change 和 1 条 OperationLog，verify 精确通过。
+- 写后 lifecycle 为 `false/off`、control/transition 为 0，部署锁不存在。web/worker/beat/nginx
+  正常，worker ping 为 1 node online，近 15 分钟相关错误计数为 0；赛事日历、healthz 和 8 个
+  HTTP 详情页均为 200，页面逐场包含预期举办地时间。HTTPS TLS 握手仍为既有失败。
