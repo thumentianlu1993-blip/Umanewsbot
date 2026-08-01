@@ -2465,3 +2465,13 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   继续保存为日本或英国赛事的举办地 wall-clock。
 - 本次生产运行始终保持 lifecycle `false/off`，未创建 control/transition，未改变赛事状态，
   也未启用 provider、shadow、enforce 或 race-live worker。
+# 2026-08-01 生命周期适用于所有已纳管赛事，重点属性不再作为资格门禁
+
+- 用户明确决定：赛事生命周期是赛事基础能力，`priority`、`is_featured` 和
+  `is_key_race` 不应决定赛事能否自动更新状态。strict manifest 明确选中的合法赛事即使为
+  P2/非 featured，也允许进入 shadow；这些字段继续冻结为审计快照。
+- 本决定不等同于自动给全部历史赛事创建 control。首次纳管继续使用 1–20 场 explicit-ID、
+  strict v2、SHA/CAS、false/off apply 和 shadow-only 合同；全量自动纳管另行设计。
+- 用户希望 shadow 不长期停留，决策窗口为 24–48 小时。该窗口用于形成 enforce GO/NO-GO，
+  只统计真实跨过边界的赛事；未到期赛事不得记为已完成生产时序观察，enforce 仍需独立 change、
+  review 和授权。

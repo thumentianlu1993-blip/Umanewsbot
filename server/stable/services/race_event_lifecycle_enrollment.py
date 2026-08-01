@@ -599,8 +599,6 @@ def _validate_enrollment_eligibility(
     *,
     allowed_us_zones: list[str],
 ) -> None:
-    if not event.is_key_race:
-        raise EnrollmentError(f"event {event.id}: 不是重点赛事")
     if event.visibility_status != "published":
         raise EnrollmentError(f"event {event.id}: 未发布")
     if event.status != RaceEventStatus.SCHEDULED:

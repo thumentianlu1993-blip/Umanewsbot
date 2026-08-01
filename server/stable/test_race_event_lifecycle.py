@@ -667,6 +667,127 @@ class RaceEventLifecycleNoLiveDispatchTests(TestCase):
             mock_poll.assert_not_called()
 
 
+# ── rollback/global-gate fail-closed contracts ─────────────────────
+
+class RaceEventLifecycleDisabledGateTests(TestCase):
+    control_runtime_fields = (
+        "mode",
+        "next_refresh_at",
+        "schedule_generation",
+        "last_attempt_at",
+        "last_success_at",
+        "last_result_code",
+        "last_error",
+        "last_source_key",
+        "consecutive_failures",
+        "claim_token",
+        "claim_generation",
+        "claim_expires_at",
+        "updated_at",
+    )
+
+    def _runtime_snapshot(self, control):
+        return stable_models.RaceEventLifecycleControl.objects.filter(
+            pk=control.pk
+        ).values(*self.control_runtime_fields).get()
+
+    def _make_due_non_key_control(self, *, slug):
+        now = django_timezone.now()
+        event = _make_event(
+            slug=slug,
+            priority="P2",
+            is_featured=False,
+            race_datetime=now - timedelta(hours=1),
+            local_date=now.date(),
+        )
+        self.assertFalse(event.is_key_race)
+        control = _make_control(
+            event,
+            mode="shadow",
+            next_refresh_at=now - timedelta(minutes=5),
+            schedule_generation=7,
+        )
+        stable_models.RaceEventLifecycleControl.objects.filter(
+            pk=control.pk
+        ).update(
+            last_attempt_at=now - timedelta(minutes=15),
+            last_success_at=now - timedelta(minutes=20),
+            last_result_code="prior-result",
+            last_error="prior-error",
+            last_source_key="prior-source",
+            consecutive_failures=2,
+            claim_token="queued-attempt",
+            claim_generation=3,
+            claim_expires_at=now - timedelta(minutes=1),
+        )
+        control.refresh_from_db()
+        return event, control
+
+    @override_settings(
+        RACE_EVENT_LIFECYCLE_ENABLED=False,
+        RACE_EVENT_LIFECYCLE_MODE="off",
+    )
+    def test_disabled_scanner_does_not_claim_or_dispatch_due_non_key_control(self):
+        event, control = self._make_due_non_key_control(
+            slug="disabled-scan-non-key"
+        )
+        before_control = self._runtime_snapshot(control)
+
+        with patch(
+            "stable.tasks.advance_race_event_lifecycle_task.apply_async"
+        ) as dispatch:
+            from stable.tasks import scan_due_race_event_lifecycle_task
+
+            result = scan_due_race_event_lifecycle_task()
+
+        self.assertEqual(
+            result,
+            {"enabled": False, "claimed": 0, "dispatched": 0},
+        )
+        dispatch.assert_not_called()
+        self.assertEqual(self._runtime_snapshot(control), before_control)
+        event.refresh_from_db()
+        self.assertEqual(event.status, "scheduled")
+        self.assertEqual(
+            stable_models.RaceEventLifecycleTransition.objects.count(), 0
+        )
+
+    @override_settings(
+        RACE_EVENT_LIFECYCLE_ENABLED=False,
+        RACE_EVENT_LIFECYCLE_MODE="off",
+    )
+    def test_disabled_queued_advance_is_noop_for_non_key_control(self):
+        event, control = self._make_due_non_key_control(
+            slug="disabled-queued-non-key"
+        )
+        before_status = event.status
+        before_control = self._runtime_snapshot(control)
+
+        from stable.tasks import advance_race_event_lifecycle_task
+
+        result = advance_race_event_lifecycle_task(
+            event_id=event.id,
+            expected_generation=control.schedule_generation,
+            attempt_token=control.claim_token,
+            expected_claim_generation=control.claim_generation,
+        )
+
+        self.assertEqual(
+            result,
+            {
+                "processed": False,
+                "reason": "lifecycle_disabled_mid_flight",
+                "event_id": event.id,
+            },
+        )
+        event.refresh_from_db()
+        self.assertEqual(event.status, before_status)
+        self.assertEqual(self._runtime_snapshot(control), before_control)
+        self.assertEqual(
+            stable_models.RaceEventLifecycleTransition.objects.count(), 0
+        )
+
+
 # ── manifest US zone enforcement ────────────────────────────────────
 
 class ManifestUSZoneValidationTests(SimpleTestCase):
