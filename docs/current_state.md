@@ -5118,3 +5118,16 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   `celery`；配置合同、旧 generation 隔离与 lifecycle/enrollment 回归 101/101 通过，
   Django check、迁移零漂移和 diff 检查通过。尚待独立代码 review；未 commit、push、PR、
   部署或重新启用 shadow。
+
+# 2026-08-02 生命周期任务队列路由修复已关闭态部署
+
+- PR #65 已合并为 `main@d5ae1d7e`，并从精确隔离 checkout 完成关闭态部署；最终
+  web/worker/beat 镜像统一为 `sha256:b1fecc46…41a73`。
+- runtime 已确认 advance task route=`celery`，worker 只消费 `celery`；三容器保持 lifecycle
+  `false/off`。16 个 control 对应赛事仍全部 scheduled，transition/proposal/applied/active
+  claim 均为 0，scanner 关闭态 smoke 未 claim 或 dispatch。
+- `default=2` 和 `race_live=7543` 均未处理；race-live worker 未启动。内部/公网 healthz 和
+  赛事页 200，迁移计划为 0，观察窗口日志错误和 Nginx 502 均为 0。
+- 恢复点、镜像、证据 SHA 和并行 one-off 偏差见
+  `docs/changes/fix-lifecycle-task-queue-routing/release_report.md`。下一步仍是独立授权的 R3
+  shadow 重试，而不是自动开启。

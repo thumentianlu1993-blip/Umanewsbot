@@ -7707,3 +7707,22 @@ re-baseline 基线 + 各轮 findings 新增）。
 - 修复发布必须先关闭态部署。新的 R3 授权后，启用前须以实际 worker `active_queues` 确认
   无人消费 `default`；再启用 true/shadow，用 Beat 停止的手工 scanner smoke，先确认目标
   control generation 增长，再验证 `celery` 消费与 proposal 生成。
+
+# 2026-08-02 生命周期队列路由修复关闭态部署实录
+
+- 发布 `main@d5ae1d7e`，隔离目录
+  `/opt/umanews-release-d5ae1d7e-8biMT2TI/umanewsbot`；最终镜像
+  `sha256:b1fecc4624ac7fc181197156189b6326a40abb36f287feae72c9a2f533341a73`。
+- custom-format 恢复点
+  `/opt/umanewsbot/backups/db/pre-lifecycle-queue-routing-20260801T192601Z.dump` 为
+  `374107496` bytes、TOC `1288`、mode `0600`、SHA-256
+  `a05e166259e646ffbc464bb900052b8d8f4f2a9d9b599c5396ae0315f2d8125d`；旧镜像和 `.env`
+  均已冻结。
+- 部署锁、historical preflight、Celery drain、唯一 release task、web healthy 门禁均通过；
+  migration plan 为 0，race-live 未启动。
+- web/worker/beat 为 `false/off`，advance route 和 worker active queue 均为 `celery`；16 controls、
+  0 transitions/proposals/applied/active claims，关闭态 scanner 零 claim/dispatch。
+- 两分钟观察后 `celery=0 / default=2 / race_live=7543`，HTTP 三项 200、应用错误 0、Nginx
+  502 为 0、锁和 intent 均不存在。旧队列未处理，R3 仍需单独授权。
+- 同期存在独立 P0 马身份 one-off prepare；它早于本次 release task、使用旧镜像，本发布未停止
+  或删除。完整证据见 change 的 `release_report.md`。
