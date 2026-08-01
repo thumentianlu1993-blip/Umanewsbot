@@ -2376,3 +2376,11 @@ P0 马信息补全专项的模型交接文档见
   shadow 仍按 R0–R3 独立授权推进。
 - 发布前已整合最新 `origin/main@96d31468`；main 增量仅为独立赛事译名发布证据文档，与
   lifecycle 应用、测试、配置和部署文件零重叠。旧 fingerprint 因基线迁移失效，需限定复审。
+# 2026-08-02 lifecycle R0 部署入口执行位修复待 review
+
+- 非重点赛事 lifecycle 纳管代码已合并，但首次关闭态部署在任何生产变更前因
+  `compose-wrapper.sh` 缺执行位安全停止；线上仍为旧镜像和 `false/off`，无 control。
+- 首轮 reviewer 发现单 wrapper 修复会被测试 harness 的 chmod 掩盖；候选已覆盖完整 R0
+  标准/lowcost 直接执行图的六个 Git mode，并以 raw-checkout 调用图测试锁定，脚本内容未变。
+  部署相关 `165/165` 和静态检查通过；下一门禁为同一 reviewer 限定复审，随后需新的发布
+  授权才能重试部署。

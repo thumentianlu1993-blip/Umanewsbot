@@ -5081,3 +5081,17 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 主线程最新验证：SQLite `98/98`、相邻回归 `101/101`、无卷 PostgreSQL 16 `6/6`；Django
   check、migration drift 和 diff check 通过。当前未 commit、push、PR、部署、重启、创建生产
   control 或修改开关；生产仍保持已确认的 `false/off`。下一门禁为独立原生代码 review。
+# 2026-08-02 lifecycle R0 代码已合并，关闭态部署因 wrapper 执行位安全失败
+
+- `remove-lifecycle-key-race-gate` 已通过 PR #62 合并为 main `7252d59a`。首次关闭态部署从
+  精确 commit 创建隔离 release 目录，但在首个 historical runner preflight 调用
+  `deploy/docker/compose-wrapper.sh` 时以 exit `126 / Permission denied` 停止；仓库 Git mode
+  为 `100644`。
+- 失败发生在备份、镜像 tag/build、停 beat、Celery drain、release task、迁移和服务重启
+  之前。部署锁已释放，线上镜像、服务、数据库和生命周期开关均未改变；web/worker/beat
+  继续 `false/off`，control/transition 为 `0/0`，healthz 与赛事页为 200。
+- 用户已授权修复执行位并独立 review。测试先行取得精确 RED；首轮 reviewer 发现 harness
+  chmod 掩盖完整 R0 直接执行图，已把标准/lowcost 两个根入口、两个内部入口、compose wrapper
+  和 drain helper 共六个 Git mode 从 `100644` 修为 `100755`，所有内容 SHA 不变。raw-checkout
+  调用图测试与部署合同 `165/165`、Django/migration/shell/diff 检查通过。当前等待同一 reviewer
+  限定复审，未 commit、push、PR 或重试生产部署。

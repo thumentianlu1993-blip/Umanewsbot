@@ -7667,3 +7667,14 @@ re-baseline 基线 + 各轮 findings 新增）。
   区分“已观察边界”和“尚未生产观察”。enforce 仍是独立 change。
 - 若回滚到旧校验代码，先恢复严格 `false/off`；非重点 controls 完成受审暂停或 mode-off
   处置前禁止重新开启 shadow/enforce，且不得删除 proposal/transition 审计。
+## 2026-08-02 Compose wrapper 执行位故障与门禁
+
+- R0 标准/lowcost 直接执行图包含根 `deploy.sh/deploy_lowcost.sh`、内部
+  `deploy/deploy.sh/deploy_lowcost.sh`、`deploy/docker/compose-wrapper.sh` 和
+  `deploy/wait_for_celery_drain.sh`；六者必须以 Git mode `100755` 发布。`sh -n` 只证明语法
+  正确，fake harness 的统一 chmod 也不能替代 raw Git checkout 可执行合同。
+- 若部署在首个 preflight 以 `Permission denied` / exit `126` 失败，先确认 trap 已释放共享锁，
+  并核对是否尚未进入备份、build、停 beat、drain、release task 或重启。禁止在 release 目录
+  临时 chmod 后重试；应修复仓库 mode、增加 fake-Docker 直接执行测试并重新 review/授权。
+- 修复后的部署仍从头执行全部 preflight、有效 custom-format 备份、旧镜像冻结、单一 release
+  owner、web healthy 门禁和 `false/off` 验收，不得把首次早期失败当作已完成任何步骤。

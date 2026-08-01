@@ -2020,6 +2020,71 @@ class DeploymentLockCoverageTests(SimpleTestCase):
 class ShellAndComposeStaticValidationTests(SimpleTestCase):
     """T16: sh -n over deploy scripts and real compose config validation."""
 
+    def test_t16_r0_host_entry_and_direct_helper_graph_is_executable(self):
+        graph_sources = (
+            "deploy.sh",
+            "deploy_lowcost.sh",
+            "deploy/deploy.sh",
+            "deploy/deploy_lowcost.sh",
+            "deploy/run_application_release.sh",
+        )
+        direct_paths = {"deploy.sh", "deploy_lowcost.sh"}
+        direct_path_pattern = re.compile(r"\./(deploy/[A-Za-z0-9_./-]+\.sh)")
+        for relative in graph_sources:
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            direct_paths.update(direct_path_pattern.findall(source))
+
+        required_paths = {
+            "deploy.sh",
+            "deploy_lowcost.sh",
+            "deploy/deploy.sh",
+            "deploy/deploy_lowcost.sh",
+            "deploy/docker/compose-wrapper.sh",
+            "deploy/wait_for_celery_drain.sh",
+        }
+        self.assertTrue(
+            required_paths <= direct_paths,
+            "R0 source parsing must retain the standard/lowcost entry and "
+            "direct-helper execution graph",
+        )
+
+        missing_execute_bits = {
+            relative: oct((ROOT / relative).stat().st_mode & 0o777)
+            for relative in sorted(direct_paths)
+            if (ROOT / relative).stat().st_mode & 0o111 != 0o111
+        }
+        self.assertEqual(
+            missing_execute_bits,
+            {},
+            "raw Git checkout files invoked directly by the R0 standard/lowcost "
+            f"host graph must retain all execute bits: {missing_execute_bits}",
+        )
+
+    def test_t16_compose_wrapper_direct_execution_uses_fake_docker(self):
+        wrapper = DEPLOY_DIR / "docker" / "compose-wrapper.sh"
+        with TemporaryDirectory() as tmp:
+            fake_docker = Path(tmp) / "docker"
+            _write_executable(
+                fake_docker,
+                """#!/bin/sh
+if [ "$*" = "compose version" ] || [ "$*" = "compose --help" ]; then
+  exit 0
+fi
+exit 99
+""",
+            )
+            result = subprocess.run(
+                [str(wrapper), "--help"],
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **os.environ,
+                    "PATH": f"{tmp}{os.pathsep}/usr/bin:/bin",
+                },
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_t16_all_deploy_shell_scripts_pass_syntax_check(self):
         scripts = sorted(DEPLOY_DIR.glob("*.sh")) + sorted(
             (DEPLOY_DIR / "docker").glob("*.sh")
