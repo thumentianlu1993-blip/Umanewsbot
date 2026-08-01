@@ -5108,3 +5108,13 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - HTTP healthz、赛事日历、Celery ping 和近 15 分钟错误日志验收通过。数据库恢复点 SHA-256
   为 `285de333…edc7f`，完整证据见 change 的 `release_report.md`。下一步仍须单独授权 R1
   生产只读 prepare/dry-run；本次授权不包含 control apply 或开启 shadow。
+# 2026-08-02 生命周期 R3 队列路由阻断已完成本地修复
+
+- R3 shadow smoke 中 scanner 成功 claim/dispatch 2 场，但单赛事任务被路由到无人消费的
+  `default`，普通生产 worker 只消费 `celery`，因此未生成 proposal。
+- 失败后已恢复 lifecycle `false/off`；赛事状态、proposal 与 applied 均未改变，
+  `race_live_worker` 未启动。`default` 中 2 条旧消息保留，不清理、不重放。
+- 独立 worktree `codex/fix-lifecycle-task-queue-routing` 已将 advance task 最小改投
+  `celery`；配置合同、旧 generation 隔离与 lifecycle/enrollment 回归 101/101 通过，
+  Django check、迁移零漂移和 diff 检查通过。尚待独立代码 review；未 commit、push、PR、
+  部署或重新启用 shadow。

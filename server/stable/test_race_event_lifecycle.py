@@ -6,9 +6,12 @@ postponement, claim/generation, dry-run/shadow/enforce, manifest enrollment,
 cache invalidation, query bounds, and global-mode capping.
 """
 
+import re
 from datetime import date, datetime, time, timedelta, timezone as dt_timezone
+from pathlib import Path
 from unittest.mock import patch
 
+from django.conf import settings
 from django.db import connection, transaction
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
@@ -293,6 +296,108 @@ class RaceEventLifecycleIdempotencyTests(TestCase):
             now=now, batch_size=10, ttl_seconds=240,
         )
         self.assertGreaterEqual(len(claims), 1)
+
+    def test_expired_claim_message_is_stale_after_reclaim(self):
+        now = datetime(2026, 8, 2, 6, 0, 0, tzinfo=dt_timezone.utc)
+        event = _make_event(
+            slug="expired-claim-message",
+            race_datetime=now - timedelta(minutes=5),
+        )
+        control = _make_control(
+            event,
+            mode="shadow",
+            next_refresh_at=now - timedelta(minutes=10),
+            schedule_generation=1,
+        )
+        old_token = "generation-one-token"
+        stable_models.RaceEventLifecycleControl.objects.filter(
+            pk=control.pk,
+        ).update(
+            claim_token=old_token,
+            claim_generation=1,
+            claim_expires_at=now - timedelta(seconds=1),
+        )
+
+        claims = race_event_lifecycle.claim_due_lifecycle_controls(
+            now=now,
+            batch_size=10,
+            ttl_seconds=240,
+        )
+        claim = next(item for item in claims if item.event_id == event.id)
+        self.assertEqual(claim.schedule_generation, 1)
+        self.assertEqual(claim.claim_generation, 2)
+        self.assertNotEqual(claim.attempt_token, old_token)
+
+        control_fields = tuple(
+            field.attname
+            for field in stable_models.RaceEventLifecycleControl._meta.concrete_fields
+        )
+        control_after_reclaim = (
+            stable_models.RaceEventLifecycleControl.objects.filter(pk=control.pk)
+            .values(*control_fields)
+            .get()
+        )
+        event_after_reclaim = (
+            stable_models.RaceEvent.objects.filter(pk=event.pk)
+            .values("status", "updated_at")
+            .get()
+        )
+
+        stale_result = _apply(
+            event,
+            expected_generation=1,
+            now=now,
+            mode="shadow",
+            attempt_token=old_token,
+            expected_claim_generation=1,
+        )
+
+        self.assertIn(
+            stale_result.action,
+            ("claim_not_expired", "claim_generation_mismatch"),
+        )
+        self.assertEqual(
+            stable_models.RaceEventLifecycleControl.objects.filter(pk=control.pk)
+            .values(*control_fields)
+            .get(),
+            control_after_reclaim,
+        )
+        self.assertEqual(
+            stable_models.RaceEvent.objects.filter(pk=event.pk)
+            .values("status", "updated_at")
+            .get(),
+            event_after_reclaim,
+        )
+        self.assertEqual(
+            stable_models.RaceEventLifecycleTransition.objects.filter(event=event).count(),
+            0,
+        )
+
+        fresh_result = _apply(
+            event,
+            expected_generation=claim.schedule_generation,
+            now=now,
+            mode="shadow",
+            attempt_token=claim.attempt_token,
+            expected_claim_generation=claim.claim_generation,
+        )
+
+        self.assertEqual(fresh_result.action, "proposed")
+        event.refresh_from_db()
+        self.assertEqual(event.status, "scheduled")
+        self.assertEqual(
+            stable_models.RaceEventLifecycleTransition.objects.filter(
+                event=event,
+                record_kind="proposal",
+            ).count(),
+            1,
+        )
+        self.assertFalse(
+            stable_models.RaceEventLifecycleTransition.objects.filter(
+                event=event,
+                record_kind="applied",
+            ).exists()
+        )
 
 
 # ── A19-A22: dry-run / shadow / enforce / rollback ───────────────────
@@ -647,6 +752,41 @@ class RaceEventLifecycleQueryCountTests(TestCase):
 
 
 # ── scanner does not dispatch race-live ──────────────────────────────
+
+class RaceEventLifecycleTaskRouteContractTests(SimpleTestCase):
+    def test_lifecycle_route_matches_production_worker_default_queue(self):
+        worker_script = (
+            Path(__file__).resolve().parents[2]
+            / "deploy"
+            / "docker"
+            / "start-worker.sh"
+        ).read_text(encoding="utf-8")
+        queue_match = re.search(
+            r'--queues="\$\{CELERY_WORKER_QUEUES:-([^}]+)\}"',
+            worker_script,
+        )
+        self.assertIsNotNone(
+            queue_match,
+            "start-worker.sh must declare the production worker default queue",
+        )
+        worker_default_queue = queue_match.group(1)
+        lifecycle_route = settings.CELERY_TASK_ROUTES[
+            "stable.tasks.advance_race_event_lifecycle_task"
+        ]["queue"]
+
+        self.assertEqual(worker_default_queue, "celery")
+        self.assertEqual(lifecycle_route, worker_default_queue)
+
+    def test_race_live_routes_remain_isolated(self):
+        self.assertEqual(
+            settings.CELERY_TASK_ROUTES["stable.tasks.poll_race_live_event_task"],
+            {"queue": "race_live"},
+        )
+        self.assertEqual(
+            settings.CELERY_TASK_ROUTES["stable.tasks.monitor_race_live_sla_task"],
+            {"queue": "race_live"},
+        )
+
 
 class RaceEventLifecycleNoLiveDispatchTests(TestCase):
     def test_lifecycle_scanner_never_dispatches_poll_race_live(self):

@@ -7697,3 +7697,13 @@ re-baseline 基线 + 各轮 findings 新增）。
   healthz/赛事页和 15 分钟错误日志均通过，发布锁和 race-live 意图文件不存在。
 - 本次 R0 没有 control apply、赛事状态推进或 lifecycle 启用。后续 R1 只读 prepare/dry-run、
   R2 false/off apply 与 R3 true/shadow 仍需各自独立授权。
+# 2026-08-02 生命周期 R3 队列路由故障恢复检查点
+
+- 症状：scanner 返回 `claimed=2, dispatched=2`，但 proposal 在有界窗口内保持 0。
+- 根因：`advance_race_event_lifecycle_task` 显式 route=`default`，生产普通 worker 只监听
+  `celery`；Redis 同期观测为 `default=2`、`celery=0`。
+- 已执行安全恢复：恢复 `.env` lifecycle `false/off`，重建 web/worker/beat，健康检查 200，
+  赛事业务快照不变。旧 `default` 消息不得在本修复发布中 purge 或消费。
+- 修复发布必须先关闭态部署。新的 R3 授权后，启用前须以实际 worker `active_queues` 确认
+  无人消费 `default`；再启用 true/shadow，用 Beat 停止的手工 scanner smoke，先确认目标
+  control generation 增长，再验证 `celery` 消费与 proposal 生成。

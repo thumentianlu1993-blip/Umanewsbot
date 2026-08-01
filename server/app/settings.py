@@ -671,7 +671,7 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_ROUTES = {
     "stable.tasks.poll_race_live_event_task": {"queue": "race_live"},
     "stable.tasks.monitor_race_live_sla_task": {"queue": "race_live"},
-    "stable.tasks.advance_race_event_lifecycle_task": {"queue": "default"},
+    "stable.tasks.advance_race_event_lifecycle_task": {"queue": "celery"},
     "stable.tasks.scheduled_race_result_review_task": {"queue": "celery"},
 }
 CELERY_TASK_ANNOTATIONS = {

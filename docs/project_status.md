@@ -2393,3 +2393,9 @@ P0 马信息补全专项的模型交接文档见
 - lifecycle 继续为 `false/off`，control/transition/active claim 为 0，禁用 scanner 未 claim 或
   dispatch。R0 没有赛事状态或 lifecycle 数据写入；下一门禁是另行授权的 R1 只读
   prepare/dry-run。
+# 2026-08-02 赛事生命周期 shadow 尚未开始观察
+
+- 16 场灰度赛事已纳管，但首次 R3 smoke 因 advance task 路由到无人消费的 `default` 队列
+  而 fail closed；生产已恢复 `false/off`，没有赛事状态或 proposal 写入。
+- 本地已把该 task 改投普通 worker 的 `celery`，101 项 lifecycle/enrollment 回归通过，
+  正等待独立代码 review。代码发布、关闭态部署和 R3 重试是三个独立授权门禁。
