@@ -2443,3 +2443,14 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   runbook；v1 只保留 dry-run compatibility，永久禁止 apply，避免绕过 v2 合同。
 - 实现采用同一 strict loader/preflight 服务承载 v2 dry-run/apply；跨位数 event ID 的
   canonical 排序按整数处理，避免字符串 `10 < 9` 导致 producer 生成后被 loader 自拒绝。
+
+## 2026-08-01 首批近期赛事时间采用“举办地 wall-clock + IANA + aware UTC”原子修正
+
+- 本次写入将 `local_date/local_start_time/timezone_name` 核对为举办地当地时间，未把中文站
+  展示时区投影回写为赛事当地字段；`race_datetime` 保存了同一时刻的 aware UTC。四个字段
+  在本次 manifest 中保持一致，未只补 `race_datetime` 而留下冲突数据。
+- 本次 Del Mar/NYRA 官方结构化页面采用 authority `500`；Racing Post 等已批准可信媒体采用
+  authority `200`，未将可信媒体伪装为官方或专业 API。所有本次实际变化均同时写入当前
+  `RaceEventFieldAuthority` 与 append-only `RaceEventFieldChange`。
+- 本次 8 场修正只解决已人工核对的时间元数据，不自动创建 lifecycle control，不改变
+  `RaceEvent.status`，也不构成打开 shadow/enforce、启用 provider 或 race-live worker 的授权。

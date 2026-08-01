@@ -5001,3 +5001,34 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   一条既有术语发现任务自然完成；该任务会写自身日志且可能写术语候选/证据，不属于 lifecycle
   零写结论，也未被中断、重跑或扩项。下一门禁为生产只读 prepare/dry-run；apply 与
   `true/shadow` 继续分开授权。HTTPS 尚未启用，未在本次扩项。
+
+# 2026-08-01 首批 8 场近期重点赛事出走时间已受控写入
+
+- 用户明确授权合并部署证据 PR 并真实写入 `race_datetime`。证据 PR #58 已合并，main merge
+  commit 为 `52456cc5ba7a91c370e2efabf0fc0e481a0b051b`；该 PR 仅含上一轮部署证据文档，生产
+  应用镜像仍为已验收的 `6a185eaa` / `sha256:8ae8ce4e…d31b`，本轮未重新部署或迁移。
+- 生产只读盘点锁定赛事 `430/431/433/434/435/436/740/940`。Del Mar 与 NYRA 官方页面提供
+  Clement L. Hirsch、Saratoga Special、Jim Dandy 的出走时间；Racing Post（并由赛事组织方
+  赛程佐证日期/赛事身份）提供 Colonial Downs 三场、Prix Rothschild 与 Lillie Langtry 的
+  明确时间。manifest 为 canonical JSON，SHA-256
+  `ad103cb19d62622a7f09436c047095460d2f5ad60c4aa9927d4dbbdaf8960886`。
+- 写前 dry-run 在生产精确通过：`8` 场、`23` 个字段变化；逐行 identity/updated_at CAS、
+  scheduled/published 状态、manual lock、IANA 时区换算、既有 authority、lifecycle
+  `false/off`、control/transition 均通过。Colonial Downs 三场和 Lillie Langtry 同时修正了
+  “上海展示时间误存为举办地当地时间”的旧值，不能只补 UTC 而保留矛盾字段。
+- 写前恢复点为
+  `/opt/umanewsbot/backups/db/pre-race-datetime-20260801T080504Z.dump`，`173009409` bytes、
+  mode `0600`、`pg_restore -l=1295`，SHA-256
+  `96703a396885bb345f08b08b8b3a708bea65caab3fd7366e38d8aa6993c2f0ce`。
+- 唯一一次 apply 在单个 PostgreSQL 事务内完成：8 场均写入 aware `race_datetime`，共追加
+  `RaceEventFieldChange=23`、`RaceEventFieldAuthority=23`、批次 `OperationLog=1`；官方
+  Del Mar/NYRA 时间记 authority `500`，经用户批准的可信媒体时间记 authority `200`，没有
+  把媒体升级成官方来源。run ID 为 `race-datetime-ad103cb19d62622a`。
+- 独立 verify 精确通过：8 场当地日期/时间/IANA 时区/UTC 与 manifest 一致，23 条当前权威的
+  source/value hash 一致；lifecycle 仍为 `false/off`，control/transition 仍为 0，赛事状态
+  继续为 `scheduled`。`/healthz/`、`/races/` 和 8 个赛事详情页均为 HTTP 200，页面逐场显示
+  预期举办地时间，近 15 分钟相关错误计数为 0，部署锁不存在。
+- 生产证据目录为
+  `/opt/umanewsbot/runtime/operations/race-datetime-20260801T080504Z/`；包含 manifest、执行脚本、
+  dry-run/apply/verify 与写后数据库快照。本次未执行 enforce，未生成或 apply strict lifecycle
+  shadow manifest，也未打开 `true/shadow`。

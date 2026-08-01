@@ -7609,3 +7609,24 @@ re-baseline 基线 + 各轮 findings 新增）。
   HTTP healthz、`/races/`、worker ping、migration plan 和近 15 分钟错误计数通过。
 - HTTPS 当前仍未启用；本次验收以仓库已完成的 HTTP 路径为准，不把 HTTPS 后续工作混入
   lifecycle 发布。下一步只读 prepare/dry-run、control apply、`true/shadow` 分别授权。
+
+## 2026-08-01 首批近期赛事 `race_datetime` 生产修正实录
+
+- 范围固定为 event ID `430/431/433/434/435/436/740/940`；manifest SHA-256 为
+  `ad103cb19d62622a7f09436c047095460d2f5ad60c4aa9927d4dbbdaf8960886`，生产证据目录为
+  `/opt/umanewsbot/runtime/operations/race-datetime-20260801T080504Z/`。
+- 本次写前核验结果为 lifecycle `false/off`、目标 control/transition 为 0、目标无 manual
+  lock、目标四个时间字段与 `updated_at` 精确命中 manifest CAS、既有字段 authority 为 0。
+  dry-run 结果为 `events=8 / field_changes=23`；本次任一项漂移都会整批拒绝，实际未发生漂移。
+- 写前 custom-format 恢复点：
+  `/opt/umanewsbot/backups/db/pre-race-datetime-20260801T080504Z.dump`，`173009409` bytes、
+  mode `0600`、TOC `1295`，SHA-256
+  `96703a396885bb345f08b08b8b3a708bea65caab3fd7366e38d8aa6993c2f0ce`。
+- apply 本次只执行一次，并在单事务内写入 8 场、23 条 field change、23 条 field authority
+  和 1 条批次 OperationLog。写后已用同一 manifest 独立 verify，并直接读取数据库计数与逐场
+  值；本次未用页面 200 代替数据库 verifier。
+- 最终 HTTP 验收覆盖 `/healthz/`、`/races/` 与 8 个详情页，均为 200；每页包含预期举办地
+  当地时间。web/worker/beat/nginx 保持运行，近 15 分钟相关 Traceback/IntegrityError 等为 0，
+  部署锁不存在。生命周期仍关闭，未部署、迁移、创建 control、推进状态或启动 race-live。
+- 本次已生成并校验上述 custom-format 恢复点；manifest 同时保存了每个字段写前/写后值。
+  本次未生成或批准临时反向脚本，也未执行整库恢复。
