@@ -2475,3 +2475,11 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 用户希望 shadow 不长期停留，决策窗口为 24–48 小时。该窗口用于形成 enforce GO/NO-GO，
   只统计真实跨过边界的赛事；未到期赛事不得记为已完成生产时序观察，enforce 仍需独立 change、
   review 和授权。
+# 2026-08-02 生命周期 advance task 复用普通 celery 队列
+
+- 决定将 `advance_race_event_lifecycle_task` 路由到生产普通 worker 已消费的 `celery`。
+- 不扩大普通 worker 去消费 `default`：该队列的任务类型和既有消息未在本变更中完成审计。
+- 生产 `default` 中既有 2 条旧 lifecycle 消息不清理；claim 过期不等于 stale。后续 R3
+  启用前必须确认无人消费 `default`，并在 scanner 后确认新 claim generation 已增长，才可
+  依赖陈旧任务防护隔离旧消息。
+- 修复发布保持 lifecycle `false/off`；关闭态部署与 R3 重试分别重新授权。
