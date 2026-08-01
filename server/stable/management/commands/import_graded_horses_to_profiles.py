@@ -40,6 +40,7 @@ from stable.models import (
     TermTranslationStatus,
     TermType,
 )
+from stable.services.horse_race_record_event_matching import RaceEventMatcher
 
 
 # Map The Racing API region codes to the project's RacingRegion choices.
@@ -193,7 +194,16 @@ class Command(BaseCommand):
             for t in TermEntry.objects.filter(term_type=TermType.HORSE, is_active=True)
         }
 
+        # Pre-load event matcher so new HorseRaceRecord rows can be linked to
+        # existing RaceEvents heuristically.
+        event_matcher: RaceEventMatcher | None = None
+        if not dry_run and not skip_records:
+            self.stdout.write("正在预加载 RaceEvent 索引用于启发式赛事关联...")
+            event_matcher = RaceEventMatcher()
+            self.stdout.write(f"已索引 {len(event_matcher.events)} 个赛事")
+
         term_created = term_existing = profile_created = profile_existing = record_created = 0
+        linked_record_count = 0
         total_horses_processed = 0
         offset = 0
 
@@ -333,6 +343,13 @@ class Command(BaseCommand):
                                 source_refs={"theracingapi_race_id": race_id},
                             )
                         )
+                    # Heuristic event linking for new records before bulk_create.
+                    if event_matcher is not None and new_records:
+                        for record in new_records:
+                            match = event_matcher.find_best_match(record, profile=profile)
+                            if match is not None:
+                                record.event = match.event
+                                linked_record_count += 1
                     if new_records:
                         HorseRaceRecord.objects.bulk_create(new_records, ignore_conflicts=True)
                         record_created += len(new_records)
@@ -344,7 +361,7 @@ class Command(BaseCommand):
                 f"[batch] offset={offset} processed={total_horses_processed} "
                 f"terms_created={term_created} terms_existing={term_existing} "
                 f"profiles_created={profile_created} profiles_existing={profile_existing} "
-                f"records_created={record_created}"
+                f"records_created={record_created} records_linked={linked_record_count}"
             )
 
             if limit and total_horses_processed >= limit:
@@ -355,6 +372,6 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"terms_created={term_created} terms_existing={term_existing} "
                 f"profiles_created={profile_created} profiles_existing={profile_existing} "
-                f"records_created={record_created}"
+                f"records_created={record_created} records_linked={linked_record_count}"
             )
         )
