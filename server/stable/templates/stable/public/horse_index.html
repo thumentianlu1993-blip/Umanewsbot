@@ -13,6 +13,12 @@
       </form>
     </section>
 
+    <section class="horse-region-tabs" aria-label="地区筛选">
+      {% for tab in region_tabs %}
+        <a href="{{ tab.url }}" class="region-tab{% if tab.is_active %} active{% endif %}" style="--region-color: {{ tab.color }}">{{ tab.label }}</a>
+      {% endfor %}
+    </section>
+
     <section class="horse-grid" aria-label="马匹列表">
       {% for profile in horse_profiles %}
         <article class="horse-card" style="--region-color: {{ profile.public_region_color }}">
