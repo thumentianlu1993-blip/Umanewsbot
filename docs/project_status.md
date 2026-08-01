@@ -2384,3 +2384,12 @@ P0 马信息补全专项的模型交接文档见
   标准/lowcost 直接执行图的六个 Git mode，并以 raw-checkout 调用图测试锁定，脚本内容未变。
   部署相关 `165/165` 和静态检查通过；下一门禁为同一 reviewer 限定复审，随后需新的发布
   授权才能重试部署。
+
+# 2026-08-02 lifecycle R0 关闭态部署完成
+
+- 完整执行图的 Git mode 修复已由 PR #63 合并，生产部署 revision 为 `2dba891f`，镜像为
+  `sha256:24fc89c…67b9f`。备份、旧镜像 tag、单一 release owner、Celery drain、web healthy、
+  worker/beat/nginx 恢复和发布后只读验收均通过；race-live 保持停止。
+- lifecycle 继续为 `false/off`，control/transition/active claim 为 0，禁用 scanner 未 claim 或
+  dispatch。R0 没有赛事状态或 lifecycle 数据写入；下一门禁是另行授权的 R1 只读
+  prepare/dry-run。

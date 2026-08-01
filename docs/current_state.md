@@ -5095,3 +5095,16 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   和 drain helper 共六个 Git mode 从 `100644` 修为 `100755`，所有内容 SHA 不变。raw-checkout
   调用图测试与部署合同 `165/165`、Django/migration/shell/diff 检查通过。当前等待同一 reviewer
   限定复审，未 commit、push、PR 或重试生产部署。
+
+# 2026-08-02 lifecycle R0 执行位修复已发布，关闭态部署完成
+
+- 执行位修复经 PR #63 合并为 `main@2dba891f`；从该精确 revision 的隔离 release 目录完成
+  R0 标准发布，最终镜像为 `sha256:24fc89c…67b9f`。共享部署锁、historical preflight、有效
+  custom-format 备份、旧镜像冻结、Celery 自然 drain、唯一 release task 和 web healthy 门禁
+  均通过；迁移报告无待应用项。
+- web/worker/beat 均保持 lifecycle `false/off`，control/transition/active claim 为 `0/0/0`；
+  scanner 关闭态 smoke 为 `enabled=False / claimed=0 / dispatched=0`。race-live 未启动，发布锁和
+  意图文件均已清除。本轮没有 lifecycle 业务写入。
+- HTTP healthz、赛事日历、Celery ping 和近 15 分钟错误日志验收通过。数据库恢复点 SHA-256
+  为 `285de333…edc7f`，完整证据见 change 的 `release_report.md`。下一步仍须单独授权 R1
+  生产只读 prepare/dry-run；本次授权不包含 control apply 或开启 shadow。
