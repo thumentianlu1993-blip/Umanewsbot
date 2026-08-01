@@ -7587,3 +7587,25 @@ re-baseline 基线 + 各轮 findings 新增）。
   deploy 在任何迁移前 fail closed。
 - release task、web 启动或健康等待任一失败时，worker/beat/nginx/race_live_worker
   零启动；按失败矩阵人工恢复，禁止用“临时把 migrate 加回 start-web”作为恢复方式。
+
+## 2026-08-01 Lifecycle shadow 纳管准备关闭态部署实录
+
+- 部署 revision：`6a185eaa35c9ea89211a33fa5a6cde81d76dbee3`；release 目录：
+  `/opt/umanews-release-6a185eaa-069tQL/umanewsbot`；最终 image：
+  `sha256:8ae8ce4e7ee4a08a1e3208cff06cbf2e89cd83aebe52587dbe117b621326d31b`。
+- 数据库恢复点：
+  `/opt/umanewsbot/backups/db/pre-lifecycle-shadow-enrollment-6a185eaa-20260731T211429Z.dump`，
+  `371214432` bytes、mode `0600`、`pg_restore -l=1295`、SHA-256
+  `98d9629615f68d747f54866e75f4b892453e9ccd18be9144e724176f8599dd05`。
+- 环境恢复点：
+  `/opt/umanewsbot/.env.backup.pre-lifecycle-shadow-enrollment-6a185eaa-20260731T211429Z`；
+  旧 image rollback tag：
+  `umanewsbot:rollback-pre-lifecycle-shadow-enrollment-6a185eaa-20260731T211429Z`。
+- 目标 migration plan 为空。发布通过共享锁和单一 release-task owner；Beat 停止后先等待
+  既有 `discover_term_candidates_task` 自然完成，未取消或强停任务。race-live 部署前未运行，
+  因而没有恢复；发布后锁和可信意图文件均不存在。
+- 三个常驻应用容器均核对 lifecycle `false/off`。关闭态 scanner 为
+  `enabled=False / claimed=0 / dispatched=0`，control/transition/active claim 均为 0。
+  HTTP healthz、`/races/`、worker ping、migration plan 和近 15 分钟错误计数通过。
+- HTTPS 当前仍未启用；本次验收以仓库已完成的 HTTP 路径为准，不把 HTTPS 后续工作混入
+  lifecycle 发布。下一步只读 prepare/dry-run、control apply、`true/shadow` 分别授权。

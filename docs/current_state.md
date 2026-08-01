@@ -4984,3 +4984,20 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   也未打开 lifecycle。下一阶段仍需针对部署、生产只读 prepare/dry-run、control apply 和
   `true/shadow` 分别取得对应授权。
 - 完整证据见 `docs/changes/prepare-lifecycle-shadow-enrollment/release_report.md`。
+
+# 2026-08-01 lifecycle shadow 纳管准备已关闭态部署
+
+- `main@6a185eaa35c9ea89211a33fa5a6cde81d76dbee3` 已从隔离 release 目录部署；
+  web/worker/beat 统一运行 image `sha256:8ae8ce4e…d31b`，未修改生产主 checkout 的既有改动。
+- 发布前 custom-format 备份为 `371214432` bytes、mode `0600`、`pg_restore -l=1295`，
+  SHA-256 `98d96296…9dd05`；旧 image 已冻结为独立 rollback tag。
+- 目标无待应用 migration。发布使用共享部署锁和单一 release-task owner；排空阶段等待一条
+  既有术语发现任务自然结束，随后完整恢复 web/worker/beat/nginx。race-live 发布前未运行，
+  发布后继续未运行；部署锁与 intent 文件均已清理。
+- lifecycle 在 web/worker/beat 均保持 `false/off`；关闭态 scanner 返回
+  `claimed=0 / dispatched=0`，control/transition/active claim 均为 0。HTTP healthz、赛事
+  日历、worker ping、迁移计划和近期错误日志验收通过。
+- 本次没有 control apply、provider proof、lifecycle 业务数据写入或 lifecycle 启用。排空前
+  一条既有术语发现任务自然完成；该任务会写自身日志且可能写术语候选/证据，不属于 lifecycle
+  零写结论，也未被中断、重跑或扩项。下一门禁为生产只读 prepare/dry-run；apply 与
+  `true/shadow` 继续分开授权。HTTPS 尚未启用，未在本次扩项。
