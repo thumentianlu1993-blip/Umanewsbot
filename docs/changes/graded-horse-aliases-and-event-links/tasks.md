@@ -13,16 +13,16 @@
 - [x] 本地运行新增测试，全部通过
 - [x] 本地运行 `stable.tests.test_management_command` 回归测试
 - [x] reviewer 复审判分页修复通过
-- [ ] 生产 dry-run 预览匹配率
-- [ ] 生产执行别名命令并复查计数
-- [ ] 生产执行赛事关联命令并复查计数
+- [x] 生产 dry-run 预览匹配率
+- [x] 生产执行别名命令并复查计数
+- [x] 生产执行赛事关联命令并复查计数
 - [ ] 访问前端马匹详情页确认赛事链接出现
 
 ## (operations) 部署
 
 - [x] 创建变更文档（spec/design/test_cases/tasks/rollout）
 - [x] 通过独立 reviewer 审核
-- [ ] 用户授权发布
-- [ ] 部署到生产环境
-- [ ] 运行生产命令并记录证据
-- [ ] 更新 `docs/current_state.md` / `docs/project_status.md`
+- [x] 用户授权发布
+- [x] 部署到生产环境
+- [x] 运行生产命令并记录证据
+- [x] 更新 `docs/current_state.md` / `docs/project_status.md`
