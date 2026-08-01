@@ -2332,3 +2332,13 @@ P0 马信息补全专项的模型交接文档见
   main merge commit 为 `3ba5defc526259b2785f4d84736551ab826804b3`。
 - 本轮未部署、未迁移、未执行生产写入或联网 proof，lifecycle 未启用；后续生产步骤继续
   分开授权。完整证据见 change 目录 `release_report.md`。
+
+# 2026-08-01 lifecycle shadow 纳管准备关闭态部署完成
+
+- 生产已运行 `main@6a185eaa` 对应新镜像，web/worker/beat 镜像一致；发布通过单一 migration
+  owner 编排完成，目标没有待应用 migration，race-live 继续保持未运行。
+- lifecycle 仍为 `false/off`，control/transition/active claim 均为 0；scanner 关闭态 smoke、
+  worker ping、HTTP healthz、赛事日历和近期错误日志通过。
+- 已保存并校验数据库、环境和旧镜像恢复点。本轮没有 control apply、联网 proof、lifecycle
+  业务数据写入或开关启用；排空前自然完成的既有术语发现任务不属于该零写结论。下一步是
+  另获授权后执行生产只读 prepare/dry-run。
