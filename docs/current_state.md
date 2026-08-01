@@ -1,5 +1,21 @@
 # 当前状态
 
+## 2026-08-01 重赏导入马术语别名与赛事关联已发布
+
+- PR `#59` 分支 `graded-horse-aliases-and-event-links`、commit `89928466` 已部署生产；
+  生产镜像 `umanewsbot:prod` (`ccf28ce6c850`)，`web/worker/beat` 均使用新镜像，
+  `healthz` 为 `200`。
+- 已执行 `add_graded_horse_term_aliases`：3,518 个带国别后缀的马术语成功添加基础名别名。
+- 已执行 `link_graded_horse_race_records`：51,698 条待关联 `HorseRaceRecord` 中，
+  4,085 条成功关联到 `RaceEvent`，关联率约 7.9%。
+- 生产验证计数：`conflict_terms=3612`、`with_base_alias=3612`、
+  `linked_records=4085`、`total_records=51698`。
+- 回滚：别名可清空对应 `TermAlias` 与 `aliases_ja`；赛事关联可清空
+  `HorseRaceRecord.event`。详细发布报告见
+  `docs/changes/graded-horse-aliases-and-event-links/release_report.md`。
+- 未匹配记录的主要原因是 `RaceResultSourceIdentity` 中 `the_racing_api` 仅 1 条，
+  启发式匹配保守依赖日期+马场+赛事名+出马表马名；后续可扩展外部身份数据或放宽策略。
+
 ## 2026-07-28 最近赛事赛果定时审核已发布，首轮暴露来源路由缺口
 
 - 主功能 PR `#39` 合并为 `main@dd35038f`；生产首次补跑因 coalesced slot 的

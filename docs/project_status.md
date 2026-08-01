@@ -1,5 +1,13 @@
 # 项目状态文档
 
+## 2026-08-01 重赏导入马别名与赛事关联已上线
+
+- PR `#59` 已部署生产，镜像 `umanewsbot:prod` (`ccf28ce6c850`)。
+- 已为 3,518 个带国别后缀的重赏导入马术语添加基础英文名别名。
+- 已通过启发式匹配将 4,085 条 `HorseRaceRecord` 关联到 `RaceEvent`（覆盖率 7.9%）。
+- 服务健康，`healthz=200`，`web/worker/beat` 均运行新镜像。
+- 详细发布报告：`docs/changes/graded-horse-aliases-and-event-links/release_report.md`。
+
 ## 2026-07-28 定时赛果审核已上线，自动来源发现仍未闭环
 
 - PR `#39` 与补跑 JSON 窄修 PR `#40` 已合并并部署，生产为
