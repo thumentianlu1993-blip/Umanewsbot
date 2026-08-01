@@ -2365,3 +2365,14 @@ P0 马信息补全专项的模型交接文档见
   一次单事务 apply。
 - 8 个 HTTP 详情页、日历、healthz、worker/beat 和错误日志通过；lifecycle 继续为
   `false/off`，control/transition 为 0。HTTPS 既有握手失败仍存在。
+# 2026-08-01 lifecycle 非重点赛事纳管修复待代码审核
+
+- 已按用户决定移除 strict v2 enrollment 的 `is_key_race` 资格拒绝；运营优先级继续作为
+  manifest 审计快照，不再决定生命周期适用性。
+- 真实 RED、SQLite `98/98`（含 reviewer 要求的关闭态 scanner/queued-task 两项）、相邻
+  `101/101`、隔离 PostgreSQL `6/6` 和静态检查已完成。
+  当前候选尚未经过独立代码 review，也未发布或改变生产 `false/off`。
+- 本修复只允许 explicit-ID manifest 纳管普通赛事，不自动扫描或接管全部历史赛事；16 场生产
+  shadow 仍按 R0–R3 独立授权推进。
+- 发布前已整合最新 `origin/main@96d31468`；main 增量仅为独立赛事译名发布证据文档，与
+  lifecycle 应用、测试、配置和部署文件零重叠。旧 fingerprint 因基线迁移失效，需限定复审。

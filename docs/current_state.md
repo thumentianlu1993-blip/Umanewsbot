@@ -5063,3 +5063,21 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 8 个公开 HTTP 详情页均为 200 并显示预期举办地时间；healthz、赛事日历、worker ping、
   beat 和近 15 分钟错误计数通过。生命周期保持 `false/off`，control/transition 为 0，部署锁
   已释放；HTTPS 握手仍失败，未被本次时间数据写入改变。
+# 2026-08-01 生命周期重点赛事资格门禁移除已实现，待独立代码审核
+
+- 用户决定 lifecycle 属于赛事基础能力，P2/非 featured 赛事不应因
+  `is_key_race=false` 被 strict v2 纳管拒绝。新 change
+  `remove-lifecycle-key-race-gate` 已从 `origin/main@53de0665` 建立独立 worktree；发布前 main
+  前进到 `96d31468`，只新增一份赛事译名发布证据文档，候选已 fast-forward 整合且 lifecycle
+  文件无重叠。主工作区既有改动未触碰。
+- 方案 reviewer 首轮提出授权停点、观察口径和旧代码回滚三项 finding；修订后同一 reviewer
+  `APPROVED`。R0 代码发布、R1 只读 prepare、R2 false/off apply、R3 true/shadow 继续分别授权。
+- 测试先行真实 RED 为两个合法非重点 fixture 精确失败于“不是重点赛事”。实现只删除 enrollment
+  service 的两行资格拒绝，manifest 仍冻结 priority/featured/is_key，其他 published、scheduled、
+  地区/时区、manual lock、strict v2、20 场、CAS、false/off 和 shadow-only 门禁不变。
+- 首轮代码 reviewer 唯一 P2 指出回滚 fail-closed 缺直接自动化覆盖；现已新增严格
+  `false/off` 下 scanner 与已排队 task 对非重点 control 零 claim/零 proposal测试，并断言
+  event、全部 claim/attempt 字段和 transition 均不变。
+- 主线程最新验证：SQLite `98/98`、相邻回归 `101/101`、无卷 PostgreSQL 16 `6/6`；Django
+  check、migration drift 和 diff check 通过。当前未 commit、push、PR、部署、重启、创建生产
+  control 或修改开关；生产仍保持已确认的 `false/off`。下一门禁为独立原生代码 review。

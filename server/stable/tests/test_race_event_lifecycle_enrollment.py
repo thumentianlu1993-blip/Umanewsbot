@@ -192,6 +192,120 @@ class LifecycleEnrollmentCommandTests(TestCase):
             before_events,
         )
 
+    def test_prepare_accepts_non_key_p2_event_and_freezes_false_snapshot(self):
+        event = _make_event(
+            slug="prepare-non-key-p2",
+            priority="P2",
+            is_featured=False,
+            race_datetime=datetime(
+                2026, 8, 2, 6, 0, tzinfo=dt_timezone.utc
+            ),
+        )
+
+        self.assertFalse(event.is_key_race)
+        self.assertEqual(event.visibility_status, "published")
+        self.assertEqual(event.status, "scheduled")
+        self.assertEqual(event.country_region, "japan")
+        self.assertEqual(event.timezone_name, "Asia/Tokyo")
+        self.assertEqual(event.local_date, date(2026, 8, 2))
+        self.assertEqual(event.manual_lock_flags, {})
+        self.assertFalse(
+            RaceEventLifecycleControl.objects.filter(event=event).exists()
+        )
+
+        with TemporaryDirectory() as tmp:
+            _, manifest, _ = self._prepare(Path(tmp), [event])
+
+        snapshot = manifest["events"][str(event.pk)]
+        self.assertEqual(snapshot["priority"], "P2")
+        self.assertFalse(snapshot["is_featured"])
+        self.assertFalse(snapshot["eligibility"]["is_key_race"])
+        self.assertEqual(RaceEventLifecycleControl.objects.count(), 0)
+        self.assertEqual(RaceEventLifecycleTransition.objects.count(), 0)
+
+    def test_prepare_accepts_mixed_key_and_non_key_events_atomically(self):
+        key_event = _make_event(
+            slug="prepare-mixed-key",
+            priority="P1",
+            is_featured=False,
+            race_datetime=datetime(
+                2026, 8, 2, 6, 0, tzinfo=dt_timezone.utc
+            ),
+        )
+        non_key_event = _make_event(
+            slug="prepare-mixed-non-key",
+            priority="P2",
+            is_featured=False,
+            race_datetime=datetime(
+                2026, 8, 2, 7, 0, tzinfo=dt_timezone.utc
+            ),
+        )
+
+        self.assertTrue(key_event.is_key_race)
+        self.assertFalse(non_key_event.is_key_race)
+        self.assertEqual(
+            RaceEventLifecycleControl.objects.filter(
+                event_id__in=[key_event.pk, non_key_event.pk]
+            ).count(),
+            0,
+        )
+
+        with TemporaryDirectory() as tmp:
+            _, manifest, _ = self._prepare(
+                Path(tmp), [non_key_event, key_event]
+            )
+
+        self.assertEqual(
+            [int(event_id) for event_id in manifest["events"]],
+            sorted([key_event.pk, non_key_event.pk]),
+        )
+        self.assertTrue(
+            manifest["events"][str(key_event.pk)]["eligibility"]["is_key_race"]
+        )
+        self.assertFalse(
+            manifest["events"][str(non_key_event.pk)]["eligibility"][
+                "is_key_race"
+            ]
+        )
+        self.assertEqual(RaceEventLifecycleControl.objects.count(), 0)
+        self.assertEqual(RaceEventLifecycleTransition.objects.count(), 0)
+
+    def test_non_key_p2_v2_dry_run_reports_would_create_with_zero_writes(self):
+        event = _make_event(
+            slug="dry-run-non-key-p2",
+            priority="P2",
+            is_featured=False,
+            race_datetime=datetime(
+                2026, 8, 2, 6, 0, tzinfo=dt_timezone.utc
+            ),
+        )
+        self.assertFalse(event.is_key_race)
+
+        with TemporaryDirectory() as tmp:
+            path, manifest, sha = self._prepare(Path(tmp), [event])
+            stdout = StringIO()
+            call_command(
+                "reconcile_race_event_lifecycle_controls",
+                "--manifest-file",
+                str(path),
+                "--manifest-sha256",
+                sha,
+                "--expected-commit",
+                APPROVED_COMMIT,
+                stdout=stdout,
+            )
+
+        self.assertFalse(
+            manifest["events"][str(event.pk)]["eligibility"]["is_key_race"]
+        )
+        self.assertIn(f"event={event.pk} result=would_create", stdout.getvalue())
+        self.assertIn(
+            "[DRY-RUN] schema=v2 total=1 would_create=1 replay=0 error=0",
+            stdout.getvalue(),
+        )
+        self.assertEqual(RaceEventLifecycleControl.objects.count(), 0)
+        self.assertEqual(RaceEventLifecycleTransition.objects.count(), 0)
+
     def test_prepare_rejects_duplicate_nonpositive_empty_and_twenty_first_id_before_output(self):
         events = [_make_event(slug=f"limit-{index}") for index in range(21)]
         cases = (
@@ -1598,6 +1712,88 @@ class LifecycleEnrollmentCommandTests(TestCase):
                     "mode": "shadow",
                     "schedule_generation": 1,
                 },
+            ],
+        )
+        self.assertEqual(RaceEventLifecycleTransition.objects.count(), 0)
+
+    @override_settings(
+        RACE_EVENT_LIFECYCLE_ENABLED=False,
+        RACE_EVENT_LIFECYCLE_MODE="off",
+    )
+    def test_non_key_p2_apply_creates_shadow_generation_one(self):
+        event = _make_event(
+            slug="apply-non-key-p2",
+            priority="P2",
+            is_featured=False,
+            race_datetime=datetime(
+                2026, 8, 2, 6, 0, tzinfo=dt_timezone.utc
+            ),
+        )
+        self.assertFalse(event.is_key_race)
+
+        with TemporaryDirectory() as tmp:
+            path, manifest, sha = self._prepare(Path(tmp), [event])
+            self._reconcile(path, sha, apply=True)
+
+        snapshot = manifest["events"][str(event.pk)]
+        control = RaceEventLifecycleControl.objects.get(event=event)
+        self.assertFalse(snapshot["eligibility"]["is_key_race"])
+        self.assertEqual(control.mode, "shadow")
+        self.assertEqual(control.schedule_generation, 1)
+        self.assertEqual(control.enrollment_manifest_sha256, sha)
+        self.assertEqual(
+            control.manifest_data["content_sha256"],
+            manifest["content_sha256"],
+        )
+        self.assertEqual(RaceEventLifecycleTransition.objects.count(), 0)
+
+    @override_settings(
+        RACE_EVENT_LIFECYCLE_ENABLED=False,
+        RACE_EVENT_LIFECYCLE_MODE="off",
+    )
+    def test_mixed_key_and_non_key_apply_creates_exact_control_set(self):
+        key_event = _make_event(
+            slug="apply-mixed-key",
+            priority="P0",
+            is_featured=False,
+            race_datetime=datetime(
+                2026, 8, 2, 6, 0, tzinfo=dt_timezone.utc
+            ),
+        )
+        non_key_event = _make_event(
+            slug="apply-mixed-non-key",
+            priority="P2",
+            is_featured=False,
+            race_datetime=datetime(
+                2026, 8, 2, 7, 0, tzinfo=dt_timezone.utc
+            ),
+        )
+        self.assertTrue(key_event.is_key_race)
+        self.assertFalse(non_key_event.is_key_race)
+
+        with TemporaryDirectory() as tmp:
+            path, manifest, sha = self._prepare(
+                Path(tmp), [non_key_event, key_event]
+            )
+            self._reconcile(path, sha, apply=True)
+
+        self.assertTrue(
+            manifest["events"][str(key_event.pk)]["eligibility"]["is_key_race"]
+        )
+        self.assertFalse(
+            manifest["events"][str(non_key_event.pk)]["eligibility"][
+                "is_key_race"
+            ]
+        )
+        self.assertEqual(
+            list(
+                RaceEventLifecycleControl.objects.order_by("event_id").values_list(
+                    "event_id", "mode", "schedule_generation"
+                )
+            ),
+            [
+                (key_event.pk, "shadow", 1),
+                (non_key_event.pk, "shadow", 1),
             ],
         )
         self.assertEqual(RaceEventLifecycleTransition.objects.count(), 0)

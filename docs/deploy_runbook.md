@@ -7655,3 +7655,15 @@ re-baseline 基线 + 各轮 findings 新增）。
 - 写后 lifecycle 为 `false/off`、control/transition 为 0，部署锁不存在。web/worker/beat/nginx
   正常，worker ping 为 1 node online，近 15 分钟相关错误计数为 0；赛事日历、healthz 和 8 个
   HTTP 详情页均为 200，页面逐场包含预期举办地时间。HTTPS TLS 握手仍为既有失败。
+## Lifecycle 普通赛事 strict v2 纳管（待代码审核）
+
+- `priority`、`is_featured`、`is_key_race` 只作为 manifest 审计快照，不得再作为 lifecycle
+  资格门禁；published、scheduled、支持地区/IANA 时区、美国逐场 allowlist、local_date、
+  manual lock、SHA/CAS、20 场上限、false/off apply 与 shadow-only 仍是硬门禁。
+- 发布顺序必须保持 R0 关闭态代码发布 -> R1 只读 prepare/dry-run 并停 -> R2 exact-SHA
+  false/off apply/verify 并停 -> R3 exact IDs/manifest/revision/window true/shadow。任何一步不得
+  复用更早授权跨越下一停点。
+- 24–48 小时是用户指定的 enforce 决策窗口，不代表未到期赛事已经跨过 T/T+30；逐场证据必须
+  区分“已观察边界”和“尚未生产观察”。enforce 仍是独立 change。
+- 若回滚到旧校验代码，先恢复严格 `false/off`；非重点 controls 完成受审暂停或 mode-off
+  处置前禁止重新开启 shadow/enforce，且不得删除 proposal/transition 审计。
