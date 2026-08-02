@@ -7726,3 +7726,20 @@ re-baseline 基线 + 各轮 findings 新增）。
   502 为 0、锁和 intent 均不存在。旧队列未处理，R3 仍需单独授权。
 - 同期存在独立 P0 马身份 one-off prepare；它早于本次 release task、使用旧镜像，本发布未停止
   或删除。完整证据见 change 的 `release_report.md`。
+# Race-data-sync 切片 A 关闭态部署前置（尚未授权）
+
+- schema 入口为 additive migration `stable.0068_race_data_sync_pipeline_a_field_audit` 与
+  PostgreSQL-only 可逆 guard `stable.0069_race_data_sync_pipeline_a_ledger_guards`；部署前必须先跑
+  `showmigrations stable`、`migrate --plan`、备份/恢复点和旧代码兼容检查。当前未授权执行 migration。
+- 以下开关必须保持默认关闭：`RACE_DATA_SYNC_ENABLED=false`，providers/regions/fields 均为空。
+  本切片没有 Beat schedule；关闭态部署后 request、dispatch、field apply 必须为 0。
+- 即使 legacy race-live 被单独打开，TRA racecard 的 schedule 变化也只允许生成
+  `slice_c_required` field changes，不得改变 `RaceEvent` 的时间/状态；验收需核对 event/control 前后
+  snapshot 与 `RaceEventFieldChange` ledger。
+- 其余 provider adapter 当前为 `proof_required`。任何联网 proof、TRA Pro credential、2–4 场地区
+  灰度、字段 apply、migration、服务重启都需要新的精确授权，不能随关闭态代码部署一起执行。
+- Ireland 不在首发 cohort。直接 reconciliation admission 的 Ireland marker 复用仍是独立审核记录的
+  非阻塞 follow-up；该门禁补齐并重新 review 前，Ireland provider/region 不得加入运行时 allowlist。
+- 关闭态验收必须从真实 TRA race-live 入口证明 observation 之外的 runner/authority/applied ledger 为
+  0；单独打开 provider、region 或 field 仍应零写。raw cleanup smoke 同时验证 held、路径漂移、越界、
+  symlink 和并发一次性清理；回滚 0069 前须先确保没有依赖 append-only guard 的写入窗口。

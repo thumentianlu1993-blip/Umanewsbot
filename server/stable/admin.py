@@ -1253,19 +1253,40 @@ class RaceEventLifecycleTransitionAdmin(RaceLiveReadOnlyAdmin):
 @admin.register(RaceEventFieldAuthority)
 class RaceEventFieldAuthorityAdmin(RaceLiveReadOnlyAdmin):
     list_display = ("event", "subject_type", "subject_key", "field_name",
-                    "authority_level", "manual_lock")
+                    "legacy_authority_level", "manual_lock")
     list_filter = ("subject_type", "authority_level", "manual_lock")
     search_fields = ("event__chinese_name", "subject_key", "field_name")
     readonly_fields = ("created_at", "updated_at")
 
+    @admin.display(description="Legacy authority level (not used for new decisions)")
+    def legacy_authority_level(self, obj):
+        return obj.authority_level
+
 
 @admin.register(RaceEventFieldChange)
 class RaceEventFieldChangeAdmin(RaceLiveReadOnlyAdmin):
-    list_display = ("event", "subject_type", "subject_key", "field_name",
-                    "authority_level", "applied", "created_at")
-    list_filter = ("subject_type", "applied", "field_name")
-    search_fields = ("event__chinese_name", "subject_key", "field_name")
-    readonly_fields = ("created_at", "updated_at")
+    list_display = (
+        "event", "subject_type", "subject_key", "field_name", "decision",
+        "source_key", "source_class", "observation", "contract_version",
+        "contract_digest", "registry_digest", "raw_sha256",
+        "normalized_sha256", "celery_task_id", "applied", "created_at",
+    )
+    list_filter = ("subject_type", "decision", "source_key", "source_class", "applied", "field_name")
+    search_fields = (
+        "event__chinese_name", "subject_key", "field_name", "source_key",
+        "contract_version", "contract_digest", "registry_digest",
+        "celery_task_id",
+    )
+    readonly_fields = (
+        "event", "subject_type", "subject_key", "field_name", "old_value",
+        "new_value", "source_key", "source_url", "external_id", "confidence",
+        "authority_level", "trigger_task", "run_id", "article", "candidate",
+        "revision", "observation", "source_class", "source_updated_at",
+        "parser_version", "raw_sha256", "normalized_sha256", "registry_digest",
+        "contract_version", "contract_digest", "celery_task_id", "decision",
+        "schedule_generation", "operation_mode", "applied", "rejection_reason",
+        "created_at", "updated_at",
+    )
 
 
 @admin.register(RaceReferenceCollectionRun)

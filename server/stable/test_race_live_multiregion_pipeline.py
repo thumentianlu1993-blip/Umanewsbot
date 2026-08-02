@@ -5,7 +5,7 @@ import importlib
 import json
 from pathlib import Path
 
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from stable import models
 from stable.services import race_events
@@ -516,6 +516,20 @@ class RaceLiveRegionResultsSnapshotContractTests(SimpleTestCase):
         self.assertEqual(kwargs["cache_backend"].timeout, 150)
 
 
+@override_settings(
+    RACE_DATA_SYNC_ENABLED=True,
+    RACE_DATA_SYNC_ENABLED_PROVIDERS=("the_racing_api",),
+    RACE_DATA_SYNC_ENABLED_REGIONS=("france",),
+    RACE_DATA_SYNC_ENABLED_FIELDS=(
+        "off_time",
+        "local_start_time",
+        "participants.draw",
+        "participants.horse_name",
+        "participants.jockey_name",
+        "participants.number",
+        "participants.status",
+    ),
+)
 class RaceLiveRacecardRefreshBehaviorTests(TestCase):
     NOW = datetime(2026, 7, 20, 8, 0, tzinfo=dt_timezone.utc)
 

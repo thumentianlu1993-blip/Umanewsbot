@@ -153,6 +153,9 @@ def merge_race_live_racecard_participants(
             if status not in {
                 models.RaceEventRevisionItemStatus.DECLARED,
                 models.RaceEventRevisionItemStatus.REINSTATED,
+                models.RaceEventRevisionItemStatus.SCRATCHED,
+                models.RaceEventRevisionItemStatus.WITHDRAWN,
+                models.RaceEventRevisionItemStatus.NON_RUNNER,
             }:
                 raise PermissionError(
                     "racecard refresh only accepts explicit pre-off statuses"
@@ -178,7 +181,6 @@ def merge_race_live_racecard_participants(
         replacement = incoming_by_id.get(external_runner_id)
         if replacement is None:
             preserved = dict(row)
-            preserved["status"] = models.RaceEventRevisionItemStatus.DECLARED
             merged.append(preserved)
             missing.append(external_runner_id)
         else:
