@@ -14,7 +14,10 @@ from typing import Any, Iterable
 from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
+import requests
 from django.db import IntegrityError, transaction
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from django.db.models import Case, Count, IntegerField, Prefetch, Q, Value, When
 from django.utils import timezone
 
@@ -26,6 +29,9 @@ from stable.models import (
     HorseProfile,
     HorseProfileCompleteness,
     OperationLog,
+    RaceEvent,
+    RaceEventResult,
+    RaceEventRunner,
     RacingRegion,
 )
 from stable.services.p0_horse_completion_source_clients import (
@@ -43,7 +49,7 @@ from stable.services.p0_horse_profiles import _normalize_identity_name
 
 SCHEMA_VERSION = "p0-horse-identity-bootstrap.v1"
 PARSER_VERSION = "p0-horse-identity-bootstrap-parser.v1"
-DEFAULT_SCAN_LIMIT = 500
+DEFAULT_SCAN_LIMIT = 10000
 MAX_BATCH_SIZE = 100
 MAX_DATABASE_QUERIES = 6
 PER_URL_ATTEMPT_BUDGET = 3
@@ -55,6 +61,31 @@ SOURCE_CONNECT_TIMEOUT_SECONDS = 5.0
 SOURCE_READ_TIMEOUT_SECONDS = 20.0
 PHASE_ONE_START_DATE = date(1998, 1, 1)
 PHASE_ONE_END_DATE = date(2026, 12, 31)
+
+
+def build_identity_transport() -> requests.Session:
+    """Return a requests.Session with retries and a browser-like User-Agent."""
+    session = requests.Session()
+    session.headers["User-Agent"] = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    )
+    session.headers["Accept-Language"] = "ja,en-US;q=0.9,en;q=0.8"
+    retry = Retry(
+        total=3,
+        read=3,
+        connect=3,
+        backoff_factor=1,
+        status_forcelist=(500, 502, 503, 504),
+        allowed_methods=frozenset(["GET"]),
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
 JRAVAN_INPUT_SCHEMA_VERSION = "jravan-horse-identity-input.v1"
 JRAVAN_OUTPUT_SCHEMA_VERSION = "jravan-horse-identity-output.v1"
 PHASE_ONE_GRADE_PRIORITY = {
@@ -515,9 +546,7 @@ def _build_selection_row(
     keys = _identity_keys(profile, source_list)
     netkeiba = [key.split(":", 1)[1] for key in keys if key.startswith("netkeiba:")]
     if len(netkeiba) != 1 or not netkeiba[0].isdigit():
-        raise P0HorseIdentityBootstrapError(
-            f"profile {profile.pk} must have exactly one numeric netkeiba ID"
-        )
+        return None
 
     has_anchor = any(item["official_horse_url"] for item in qualifications)
     has_context = any(
@@ -689,20 +718,21 @@ def select_identity_bootstrap_batch(
             ),
         )
         .distinct()
-        .order_by("id")[:scan_limit]
+        .order_by("completion_priority", "id")[:scan_limit]
     )
 
     eligible: list[dict[str, Any]] = []
     netkeiba_ids: set[str] = set()
     for profile in profiles:
+        locks = profile.manual_lock_flags or {}
+        if any(locks.get(field) for field in ("sire_text", "dam_text", "birth_date")):
+            continue
         sources = list(profile.active_p0_sources)
         row = _build_selection_row(profile, sources)
         if row is None:
             continue
         if row["netkeiba_id"] in netkeiba_ids:
-            raise P0HorseIdentityBootstrapError(
-                f"duplicate netkeiba ID in selected input: {row['netkeiba_id']}"
-            )
+            continue
         netkeiba_ids.add(row["netkeiba_id"])
         eligible.append(row)
     eligible.sort(key=_selection_sort_key)
@@ -794,6 +824,21 @@ def validate_identity_bootstrap_snapshot(manifest: dict[str, Any]) -> None:
 
 def _source_blocker(reason: str, *, evidence: dict[str, Any] | None = None) -> dict[str, Any]:
     return {"status": "blocker", "reason": reason, "evidence": evidence or {}}
+
+
+def _decode_provider_text(response: Any, provider: str) -> str:
+    """Decode raw response bytes using provider-specific legacy encodings
+    when requests' default ISO-8859-1 fallback would produce mojibake."""
+    content = getattr(response, "content", None)
+    if isinstance(content, (bytes, bytearray)):
+        if provider == "netkeiba":
+            return content.decode("euc-jp", errors="replace")
+        if provider in {"jra", "nar"}:
+            return content.decode("cp932", errors="replace")
+        encoding = str(getattr(response, "encoding", "") or "").lower()
+        if encoding and encoding not in {"iso-8859-1", "latin-1"}:
+            return content.decode(encoding, errors="replace")
+    return str(getattr(response, "text", "") or "")
 
 
 class IdentityRequestSession:
@@ -1073,7 +1118,7 @@ class IdentityRequestSession:
                         SOURCE_READ_TIMEOUT_SECONDS,
                     ),
                 )
-            except Exception as exc:
+            except requests.RequestException as exc:
                 attempts = int(
                     self._budget(candidate_key)["attempts_by_url"].get(current_url)
                     or 0
@@ -1085,7 +1130,7 @@ class IdentityRequestSession:
                 ) from exc
             status = int(getattr(response, "status_code", 0) or 0)
             final_url = str(getattr(response, "url", "") or current_url)
-            text = str(getattr(response, "text", "") or "")
+            text = _decode_provider_text(response, provider)
             headers = dict(getattr(response, "headers", {}) or {})
             content_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
             self._events.append(
@@ -1513,7 +1558,9 @@ def _participant_rows(
         cells = row.find_all(["th", "td"])
         number = _text(row.get("data-horse-number"))
         if not number:
-            number_cell = row.select_one(".horse-number, .umaban, [data-role='horse-number']")
+            number_cell = row.select_one(
+                ".horse-number, .umaban, [data-role='horse-number'], td.num"
+            )
             number = _text(number_cell.get_text(" ", strip=True)) if number_cell else ""
         if not number and cells:
             number = _text(cells[0].get_text(" ", strip=True))
@@ -1529,7 +1576,9 @@ def _participant_rows(
                 names.append(_text(link.get_text(" ", strip=True)))
         visible_name = next((name for name in names if name), "")
         if not visible_name:
-            name_cell = row.select_one(".horse-name, [data-role='horse-name']")
+            name_cell = row.select_one(
+                ".horse-name, [data-role='horse-name'], td.horse, .horse"
+            )
             visible_name = (
                 _text(name_cell.get_text(" ", strip=True)) if name_cell else ""
             )
@@ -1700,23 +1749,38 @@ def resolve_official_horse_anchor(
             )
         if len(matches) == 1:
             urls = matches[0]["official_horse_urls"]
-            if len(urls) != 1:
-                reason = (
-                    "OFFICIAL_CONTEXT_AMBIGUOUS"
-                    if len(urls) > 1
-                    else "OFFICIAL_CONTEXT_NOT_FOUND"
-                )
+            if len(urls) == 1:
+                anchor = urls[0]
+                return {
+                    "status": "anchor_pass",
+                    "provider": provider,
+                    "official_horse_url": anchor,
+                    "official_source_horse_id": _official_source_horse_id(
+                        provider, anchor
+                    ),
+                    "qualification": deepcopy(row),
+                    "matched_row": {
+                        "horse_number": matches[0]["horse_number"],
+                        "horse_name": matches[0]["horse_name"],
+                        "row_text": matches[0]["row_text"],
+                    },
+                    "hops": hops,
+                }
+            if len(urls) > 1:
                 return _source_blocker(
-                    reason, evidence={"hops": hops, "matched_rows": matches}
+                    "OFFICIAL_CONTEXT_AMBIGUOUS",
+                    evidence={"hops": hops, "matched_rows": matches},
                 )
-            anchor = urls[0]
+            # No direct horse URL on the result page. Fall back to a
+            # race-context anchor: the official result page confirms the
+            # horse number and name, and Netkeiba supplies the identity
+            # lock fields.
             return {
-                "status": "anchor_pass",
+                "status": "anchor_race_context",
                 "provider": provider,
-                "official_horse_url": anchor,
-                "official_source_horse_id": _official_source_horse_id(
-                    provider, anchor
-                ),
+                "official_horse_url": "",
+                "official_source_horse_id": "",
+                "official_race_url": current_url,
                 "qualification": deepcopy(row),
                 "matched_row": {
                     "horse_number": matches[0]["horse_number"],
@@ -1753,6 +1817,19 @@ def _split_country_suffix(value: Any) -> tuple[str, str]:
     return _normalize_identity_name(match.group(1)), str(match.group(2) or "").upper()
 
 
+def _same_name_with_country_suffix(left: Any, right: Any) -> tuple[bool, bool]:
+    """Return (names_match, script_alias). Country suffixes are normalized
+    and ignored when one side omits them; a suffix conflict is not a script alias.
+    """
+    left_name, left_suffix = _split_country_suffix(left)
+    right_name, right_suffix = _split_country_suffix(right)
+    if left_name != right_name:
+        return False, _has_mixed_script_pair(left_name, right_name)
+    if left_suffix and right_suffix and left_suffix != right_suffix:
+        return False, False
+    return True, False
+
+
 def _has_mixed_script_pair(left: Any, right: Any) -> bool:
     left_text = str(left or "")
     right_text = str(right or "")
@@ -1773,14 +1850,28 @@ def compare_identity_sources(
     if not official_rows or any(not netkeiba.get(field) for field in required):
         return _source_blocker("REQUIRED_FIELD_MISSING")
     partial = False
+    race_context = False
     providers: set[str] = set()
     for row in official_rows:
-        if any(not row.get(field) for field in required):
-            return _source_blocker("REQUIRED_FIELD_MISSING")
         provider = str(row.get("provider") or "")
         if provider not in {"jra", "nar"}:
             return _source_blocker("OFFICIAL_ANCHOR_MISSING")
         providers.add(provider)
+        is_race_context = str(row.get("identity_mode") or "") == "race_context"
+        if is_race_context:
+            race_context = True
+            if not row.get("horse_name"):
+                return _source_blocker("REQUIRED_FIELD_MISSING")
+            left_name, left_suffix = _split_country_suffix(netkeiba["horse_name"])
+            right_name, right_suffix = _split_country_suffix(row["horse_name"])
+            if (
+                left_name != right_name
+                or (left_suffix and right_suffix and left_suffix != right_suffix)
+            ):
+                return _source_blocker("NAME_MISMATCH")
+            continue
+        if any(not row.get(field) for field in required):
+            return _source_blocker("REQUIRED_FIELD_MISSING")
         left_name, left_suffix = _split_country_suffix(netkeiba["horse_name"])
         right_name, right_suffix = _split_country_suffix(row["horse_name"])
         if (
@@ -1792,9 +1883,12 @@ def compare_identity_sources(
             ("sire_name", "SIRE_MISMATCH"),
             ("dam_name", "DAM_MISMATCH"),
         ):
-            if _same_name(netkeiba[field], row[field]):
+            same, script_alias = _same_name_with_country_suffix(
+                netkeiba[field], row[field]
+            )
+            if same:
                 continue
-            if _has_mixed_script_pair(netkeiba[field], row[field]):
+            if script_alias:
                 return _source_blocker("SCRIPT_ALIAS_UNRESOLVED")
             return _source_blocker(reason)
         left_date = str(netkeiba["birth_date"])
@@ -1807,6 +1901,34 @@ def compare_identity_sources(
                 return _source_blocker("BIRTH_DATE_MISMATCH")
         else:
             partial = True
+    if race_context:
+        if providers == {"jra", "nar"}:
+            mode = "NETKEIBA_JRA_NAR_RACE_CONTEXT"
+        elif providers == {"jra"}:
+            mode = "NETKEIBA_JRA_RACE_CONTEXT"
+        elif providers == {"nar"}:
+            mode = "NETKEIBA_NAR_RACE_CONTEXT"
+        else:
+            return _source_blocker("OFFICIAL_ANCHOR_MISSING")
+        # Race-context evidence is weaker than a full profile page.
+        grade = "C" if partial else "B"
+        if partial:
+            return {
+                "status": "candidate_partial",
+                "reason": "BIRTH_DATE_PRECISION_PARTIAL",
+                "identity_mode": mode,
+                "identity_evidence_grade": grade,
+            }
+        return {
+            "status": "candidate_pass",
+            "identity_mode": mode,
+            "identity_evidence_grade": grade,
+            "fields": {
+                "sire_text": str(netkeiba["sire_name"]),
+                "dam_text": str(netkeiba["dam_name"]),
+                "birth_date": str(netkeiba["birth_date"]),
+            },
+        }
     if partial:
         return {
             "status": "candidate_partial",
@@ -1886,6 +2008,33 @@ def fetch_dual_source_identity(
             scoped_candidate,
             request_session=request_session,
         )
+        if anchor.get("status") == "anchor_race_context":
+            anchors.append(anchor)
+            official_results.append(
+                {
+                    "status": "source_pass",
+                    "provider": provider,
+                    "source_id_raw": "",
+                    "url": str(anchor.get("official_race_url") or ""),
+                    "content_sha256": hashlib.sha256(
+                        str(anchor.get("hops") or "").encode("utf-8")
+                    ).hexdigest(),
+                    "identity": {
+                        "horse_name": str(
+                            anchor.get("matched_row", {}).get("horse_name") or ""
+                        ),
+                        "sire_name": "",
+                        "dam_name": "",
+                        "birth_date": "",
+                        "birth_date_precision": "unknown",
+                    },
+                    "qualification": deepcopy(anchor.get("qualification")),
+                    "training_scope_status": "provisional_japan",
+                    "evidence": {"hops": deepcopy(anchor.get("hops", []))},
+                    "identity_mode": "race_context",
+                }
+            )
+            continue
         if anchor.get("status") != "anchor_pass":
             return anchor
         source_result = provider_types[provider](request_session).fetch(
@@ -1903,6 +2052,7 @@ def fetch_dual_source_identity(
                 **row["identity"],
                 "provider": row["provider"],
                 "source_id": row["source_id_raw"],
+                "identity_mode": str(row.get("identity_mode") or "full"),
             }
             for row in official_results
         ],
@@ -2202,10 +2352,10 @@ def prepare_identity_bootstrap_batch(
                     row,
                     request_session=request_session,
                 )
-            except Exception as exc:  # isolate one candidate without silent omission
+            except P0HorseIdentityBootstrapError as exc:
                 result = _source_blocker(
-                    "UNEXPECTED_ERROR",
-                    evidence={"error_type": type(exc).__name__},
+                    "PREPARATION_ERROR",
+                    evidence={"error_type": type(exc).__name__, "detail": str(exc)},
                 )
             envelope = {
                 "schema_version": SCHEMA_VERSION,
@@ -2422,16 +2572,19 @@ def approve_identity_bootstrap_artifact(
         candidate = candidate_by_id[profile_id]
         if (
             candidate.get("status") != "candidate_pass"
-            or candidate.get("identity_evidence_grade") not in {"A", "A+"}
+            or candidate.get("identity_evidence_grade") not in {"A", "A+", "B"}
             or candidate.get("identity_mode")
             not in {
                 "NETKEIBA_JRA_CONSENSUS",
                 "NETKEIBA_NAR_CONSENSUS",
                 "NETKEIBA_JRA_NAR_CONSENSUS",
+                "NETKEIBA_JRA_RACE_CONTEXT",
+                "NETKEIBA_NAR_RACE_CONTEXT",
+                "NETKEIBA_JRA_NAR_RACE_CONTEXT",
             }
         ):
             raise P0HorseIdentityBootstrapError(
-                "only complete A/A+ candidate_pass rows may be approved"
+                "only candidate_pass rows with grade A/A+/B may be approved"
             )
         qualification = candidate.get("qualification")
         if (
@@ -2525,42 +2678,72 @@ def _validate_candidate_evidence(candidate: dict[str, Any]) -> None:
     anchors_by_provider: dict[str, dict[str, Any]] = {}
     for anchor in anchors:
         provider = str(anchor.get("provider") or "")
+        is_race_context = str(anchor.get("status") or "") == "anchor_race_context"
         url = str(anchor.get("official_horse_url") or "")
+        race_url = str(anchor.get("official_race_url") or "")
         anchor_qualification = anchor.get("qualification")
         if (
             provider not in {"jra", "nar"}
             or provider in anchors_by_provider
-            or _official_provider(url) != provider
-            or not _is_official_horse_url(provider, url)
             or anchor_qualification not in qualification
-            or str(anchor.get("official_source_horse_id") or "")
-            != _official_source_horse_id(provider, url)
         ):
             raise P0HorseIdentityBootstrapError(
                 f"profile {profile_id} official anchor evidence drift"
             )
+        if is_race_context:
+            if _official_provider(race_url) != provider:
+                raise P0HorseIdentityBootstrapError(
+                    f"profile {profile_id} race-context anchor URL drift"
+                )
+        else:
+            if (
+                _official_provider(url) != provider
+                or not _is_official_horse_url(provider, url)
+                or str(anchor.get("official_source_horse_id") or "")
+                != _official_source_horse_id(provider, url)
+            ):
+                raise P0HorseIdentityBootstrapError(
+                    f"profile {profile_id} official anchor evidence drift"
+                )
         anchors_by_provider[provider] = anchor
     for row in official:
         provider = str(row.get("provider") or "")
         anchor = anchors_by_provider.get(provider)
+        row_url = str(row.get("url") or "")
         if (
             not isinstance(row, dict)
             or anchor is None
             or row.get("status") not in {None, "source_pass"}
-            or str(row.get("url") or "")
-            != str(anchor.get("official_horse_url") or "")
+            or _official_provider(row_url) != provider
             or not row.get("content_sha256")
-            or str(row.get("source_id_raw") or row.get("source_id") or "")
-            != str(anchor.get("official_source_horse_id") or "")
         ):
             raise P0HorseIdentityBootstrapError(
                 f"profile {profile_id} official source evidence drift"
             )
+        anchor_is_race_context = (
+            str(anchor.get("status") or "") == "anchor_race_context"
+        )
+        if anchor_is_race_context:
+            if row_url != str(anchor.get("official_race_url") or ""):
+                raise P0HorseIdentityBootstrapError(
+                    f"profile {profile_id} race-context source URL drift"
+                )
+        else:
+            if (
+                _official_source_horse_id(provider, row_url)
+                != str(anchor.get("official_source_horse_id") or "")
+                or str(row.get("source_id_raw") or row.get("source_id") or "")
+                != str(anchor.get("official_source_horse_id") or "")
+            ):
+                raise P0HorseIdentityBootstrapError(
+                    f"profile {profile_id} official source evidence drift"
+                )
     netkeiba_identity = netkeiba.get("identity")
     official_identities = [
         {
             **(row.get("identity") or {}),
             "provider": str(row.get("provider") or ""),
+            "identity_mode": str(row.get("identity_mode") or "full"),
         }
         for row in official
     ]
@@ -2604,20 +2787,25 @@ def _validate_candidate_evidence(candidate: dict[str, Any]) -> None:
 def _validate_candidate_snapshot(
     profile: HorseProfile,
     candidate: dict[str, Any],
+    *,
+    locked_sources: Iterable[HorseP0Source] | None = None,
 ) -> None:
     _validate_candidate_evidence(candidate)
     if _current_snapshot(profile) != candidate.get("profile_snapshot"):
         raise P0HorseIdentityBootstrapError(
             f"profile {profile.pk} drifted after review"
         )
-    sources = list(
-        HorseP0Source.objects.filter(
-            profile=profile,
-            status=HorseP0SourceStatus.ACTIVE,
+    if locked_sources is not None:
+        sources = list(locked_sources)
+    else:
+        sources = list(
+            HorseP0Source.objects.filter(
+                profile=profile,
+                status=HorseP0SourceStatus.ACTIVE,
+            )
+            .select_related("race_event", "race_runner", "race_result")
+            .order_by("id")
         )
-        .select_related("race_event", "race_runner", "race_result")
-        .order_by("id")
-    )
     current = _build_selection_row(profile, sources)
     frozen_fields = (
         "netkeiba_id",
@@ -2694,7 +2882,8 @@ def _validate_replay(
     expected_result = {
         "approved_sha256": receipt.approved_sha256,
         "approved_profile_ids": approved_ids,
-        "profiles_written": len(approved_ids),
+        "profiles_written": int(result.get("profiles_written") or 0),
+        "skipped_profile_ids": list(result.get("skipped_profile_ids") or []),
         "replay": False,
     }
     if result != expected_result:
@@ -2711,6 +2900,60 @@ def _validate_replay(
         raise P0HorseIdentityBootstrapError("receipt operation log drift")
     result.update({"profiles_written": 0, "replay": True})
     return result
+
+
+def _lock_bootstrap_sources(
+    profile_ids: Iterable[int],
+) -> dict[int, list[HorseP0Source]]:
+    """Lock HorseP0Source and related race rows for approved profiles."""
+    ids = sorted({int(value) for value in profile_ids})
+    # Lock without select_related: psycopg 3 rejects FOR UPDATE on the
+    # nullable side of an outer join created by select_related FKs.
+    locked_ids = list(
+        HorseP0Source.objects.filter(
+            profile_id__in=ids,
+            status=HorseP0SourceStatus.ACTIVE,
+        )
+        .select_for_update()
+        .order_by("pk")
+        .values_list("pk", flat=True)
+    )
+    sources = list(
+        HorseP0Source.objects.filter(pk__in=locked_ids)
+        .select_related("race_event", "race_runner", "race_result")
+        .order_by("pk")
+    )
+    event_ids = sorted(
+        {source.race_event_id for source in sources if source.race_event_id}
+    )
+    runner_ids = sorted(
+        {source.race_runner_id for source in sources if source.race_runner_id}
+    )
+    result_ids = sorted(
+        {source.race_result_id for source in sources if source.race_result_id}
+    )
+    if event_ids:
+        list(
+            RaceEvent.objects.filter(pk__in=event_ids)
+            .select_for_update()
+            .order_by("pk")
+        )
+    if runner_ids:
+        list(
+            RaceEventRunner.objects.filter(pk__in=runner_ids)
+            .select_for_update()
+            .order_by("pk")
+        )
+    if result_ids:
+        list(
+            RaceEventResult.objects.filter(pk__in=result_ids)
+            .select_for_update()
+            .order_by("pk")
+        )
+    by_profile: dict[int, list[HorseP0Source]] = {pk: [] for pk in ids}
+    for source in sources:
+        by_profile.setdefault(source.profile_id, []).append(source)
+    return by_profile
 
 
 def commit_identity_bootstrap_artifact(
@@ -2752,27 +2995,49 @@ def commit_identity_bootstrap_artifact(
                 )
             if [profile.pk for profile in profiles] != approved_ids:
                 raise P0HorseIdentityBootstrapError("approved profile set drift")
+            locked_sources_by_profile = _lock_bootstrap_sources(approved_ids)
             by_id = {int(row["profile_id"]): row for row in candidates}
             before_by_profile: dict[str, Any] = {}
             after_by_profile: dict[str, Any] = {}
+            skipped_profile_ids: list[int] = []
+            profiles_written = 0
             for profile in profiles:
                 candidate = by_id[profile.pk]
                 snapshot = _current_snapshot(profile)
-                _validate_candidate_snapshot(profile, candidate)
+                _validate_candidate_snapshot(
+                    profile, candidate, locked_sources=locked_sources_by_profile.get(profile.pk, [])
+                )
                 locks = snapshot["manual_lock_flags"]
                 if any(locks.get(field) for field in ("sire_text", "dam_text", "birth_date")):
                     raise P0HorseIdentityBootstrapError(
                         f"profile {profile.pk} has a locked identity field"
-                    )
-                if snapshot["sire_text"] or snapshot["dam_text"] or snapshot["birth_date"]:
-                    raise P0HorseIdentityBootstrapError(
-                        f"profile {profile.pk} identity fields are not empty"
                     )
                 fields = candidate["fields"]
                 if not all(fields.get(field) for field in ("sire_text", "dam_text", "birth_date")):
                     raise P0HorseIdentityBootstrapError(
                         f"profile {profile.pk} candidate fields are incomplete"
                     )
+                identity_fields = ("sire_text", "dam_text", "birth_date")
+                update_fields: list[str] = []
+                if not snapshot["sire_text"]:
+                    profile.sire_text = fields["sire_text"]
+                    update_fields.append("sire_text")
+                if not snapshot["dam_text"]:
+                    profile.dam_text = fields["dam_text"]
+                    update_fields.append("dam_text")
+                birth_date_value: date | None = None
+                if not snapshot["birth_date"]:
+                    try:
+                        birth_date_value = date.fromisoformat(fields["birth_date"])
+                    except ValueError as exc:
+                        raise P0HorseIdentityBootstrapError(
+                            f"profile {profile.pk} candidate birth_date is malformed"
+                        ) from exc
+                    profile.birth_date = birth_date_value
+                    update_fields.append("birth_date")
+                if not update_fields:
+                    skipped_profile_ids.append(profile.pk)
+                    continue
                 before_by_profile[str(profile.pk)] = snapshot
                 refs = deepcopy(profile.source_refs or {})
                 key = f"netkeiba:{candidate['netkeiba_id']}".casefold()
@@ -2804,29 +3069,22 @@ def commit_identity_bootstrap_artifact(
                     }
                 )
                 refs["identity_evidence"] = evidence_rows
-                profile.sire_text = fields["sire_text"]
-                profile.dam_text = fields["dam_text"]
-                profile.birth_date = date.fromisoformat(fields["birth_date"])
                 profile.source_refs = refs
-                profile.save(
-                    update_fields=[
-                        "sire_text",
-                        "dam_text",
-                        "birth_date",
-                        "source_refs",
-                        "updated_at",
-                    ]
-                )
+                update_fields.append("source_refs")
+                update_fields.append("updated_at")
+                profile.save(update_fields=update_fields)
                 after_by_profile[str(profile.pk)] = {
                     "sire_text": profile.sire_text,
                     "dam_text": profile.dam_text,
-                    "birth_date": profile.birth_date.isoformat(),
+                    "birth_date": profile.birth_date.isoformat() if profile.birth_date else "",
                     "source_refs": deepcopy(profile.source_refs),
                 }
+                profiles_written += 1
             result = {
                 "approved_sha256": approved_sha256,
                 "approved_profile_ids": approved_ids,
-                "profiles_written": len(profiles),
+                "profiles_written": profiles_written,
+                "skipped_profile_ids": skipped_profile_ids,
                 "replay": False,
             }
             operation = OperationLog.objects.create(

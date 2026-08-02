@@ -11,6 +11,7 @@ from django.db import IntegrityError, connection, transaction
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, SimpleTestCase, override_settings
+from requests.adapters import HTTPAdapter
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
@@ -647,6 +648,45 @@ class OfficialRaceContextResolverTests(SimpleTestCase):
         self.assertEqual(suffix_conflict["reason"], "NAME_MISMATCH")
         self.assertEqual(script_alias["reason"], "SCRIPT_ALIAS_UNRESOLVED")
 
+    def test_sire_dam_country_suffix_is_normalized_and_ignored_when_one_side_omits(self):
+        base = {
+            "horse_name": "テストホース",
+            "sire_name": "父馬(USA)",
+            "dam_name": "母馬（GB）",
+            "birth_date": "2022-03-15",
+        }
+        suffix_ok = identity_bootstrap.compare_identity_sources(
+            netkeiba=base,
+            official=[
+                {
+                    **base,
+                    "sire_name": "父馬",
+                    "dam_name": "母馬",
+                    "provider": "jra",
+                }
+            ],
+        )
+        suffix_conflict = identity_bootstrap.compare_identity_sources(
+            netkeiba=base,
+            official=[
+                {
+                    **base,
+                    "sire_name": "父馬(GB)",
+                    "dam_name": "母馬(USA)",
+                    "provider": "jra",
+                }
+            ],
+        )
+        script_alias = identity_bootstrap.compare_identity_sources(
+            netkeiba={**base, "sire_name": "American Pharoah"},
+            official=[
+                {**base, "sire_name": "アメリカンファラオ", "provider": "jra"}
+            ],
+        )
+        self.assertEqual(suffix_ok["status"], "candidate_pass")
+        self.assertEqual(suffix_conflict["reason"], "SIRE_MISMATCH")
+        self.assertEqual(script_alias["reason"], "SCRIPT_ALIAS_UNRESOLVED")
+
 
 class NetworkAccessContractTests(SimpleTestCase):
     def _session(
@@ -696,6 +736,20 @@ class NetworkAccessContractTests(SimpleTestCase):
                         official_chain=True,
                     )
                 self.assertEqual(transport.calls, [])
+
+    def test_build_identity_transport_sets_user_agent_and_retry_adapter(self):
+        session = identity_bootstrap.build_identity_transport()
+        self.assertIn(
+            "Chrome/",
+            session.headers.get("User-Agent", ""),
+        )
+        self.assertIn(
+            "ja,en-US",
+            session.headers.get("Accept-Language", ""),
+        )
+        self.assertTrue(
+            any(isinstance(adapter, HTTPAdapter) for adapter in session.adapters.values())
+        )
 
     def test_source_requests_require_https_for_input_and_redirects(self):
         with tempfile.TemporaryDirectory() as tmp:

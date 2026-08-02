@@ -3,13 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import requests
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from stable.services.p0_horse_identity_bootstrap import (
+    DEFAULT_SCAN_LIMIT,
     P0HorseIdentityBootstrapError,
     approve_identity_bootstrap_artifact,
+    build_identity_transport,
     commit_identity_bootstrap_artifact,
     prepare_identity_bootstrap_batch,
     select_identity_bootstrap_batch,
@@ -31,7 +32,7 @@ class Command(BaseCommand):
         parser.add_argument("--manifest", default="")
         parser.add_argument("--output-dir", default="")
         parser.add_argument("--target-count", type=int, default=100)
-        parser.add_argument("--scan-limit", type=int, default=500)
+        parser.add_argument("--scan-limit", type=int, default=DEFAULT_SCAN_LIMIT)
         parser.add_argument("--exclude-profile-id", action="append", type=int, default=[])
         parser.add_argument("--excluded-batch-id", default="")
         parser.add_argument("--exclusion-reason", default="")
@@ -89,7 +90,7 @@ class Command(BaseCommand):
                 **prepare_identity_bootstrap_batch(
                     manifest_value,
                     output_dir=options["output_dir"],
-                    transport=requests.Session(),
+                    transport=build_identity_transport(),
                     allow_network=options["allow_network"],
                     environment_network_enabled=bool(
                         settings.HORSE_PROFILE_COMPLETION_ALLOW_NETWORK
