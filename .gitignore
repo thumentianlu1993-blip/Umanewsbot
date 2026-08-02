@@ -3,6 +3,7 @@ __pycache__/
 .DS_Store
 .pytest_cache/
 .mypy_cache/
+.venv
 .venv/
 venv/
 
@@ -29,6 +30,7 @@ runtime/multiregion_gold_review/
 runtime/term_review/
 runtime/historical_race_inventory/
 runtime/race_live_source_proof/
+runtime/upcoming_racecard_urls/
 outputs/
 
 sample_news.json

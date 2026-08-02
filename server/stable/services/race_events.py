@@ -62,6 +62,7 @@ from stable.models import (
     RaceResultSourceIdentity,
     RaceLiveReviewStatus,
     RaceRunnerStatus,
+    RacingRegion,
     RaceSourceTermsStatus,
     TaskExecutionLog,
     TaskStatus,
@@ -70,6 +71,13 @@ from stable.models import (
 from stable.services.operations import log_operation
 from stable.services.historical_race_inventory import sanitize_structured_row_evidence
 from stable.services.terms import source_term_matches_text
+from stable.services.race_field_normalization import (
+    RACE_FIELD_NORMALIZATION_VERSION,
+    compute_input_sha256,
+    normalize_distance,
+    normalize_eligibility,
+    normalize_surface_race_type_layout_going,
+)
 
 # 赛事总账关联保持为独立领域服务；这里重导出兼容既有调用方和测试 API。
 from stable.services.race_event_reconciliation import (
@@ -4509,6 +4517,7 @@ def apply_race_live_racecard_refresh(
         return RaceLiveRacecardRefreshDecision(False, "participants_invalid")
     observation_payload = {
         **normalized_racecard,
+        "schema_version": normalized_racecard.get("schema_version", 1),
         "participants": [dict(row) if isinstance(row, dict) else row for row in incoming],
     }
 
@@ -4605,7 +4614,7 @@ def apply_race_live_racecard_refresh(
                     "jockey_name": item.jockey_name,
                     "trainer_name": item.trainer_name,
                     "carried_weight": item.carried_weight,
-                    "status": RaceEventRevisionItemStatus.DECLARED,
+                    "status": item.status,
                 }
             )
         try:
@@ -4619,7 +4628,7 @@ def apply_race_live_racecard_refresh(
             )
         merged_rows = list(merged["participants"])
         canonical_payload = {
-            **observation_payload,
+            **normalized_racecard,
             "participants": merged_rows,
             "missing_runner_source_gaps": list(
                 merged["missing_runner_source_gaps"]
@@ -4745,6 +4754,50 @@ def apply_race_live_racecard_refresh(
                 else None
             )
 
+        from stable.services.race_data_sync_pipeline import (
+            build_race_data_provider_roster,
+            reconcile_racecard_observation,
+        )
+
+        contract_region_by_event_region = {
+            RacingRegion.HONG_KONG: "hong_kong",
+            RacingRegion.UNITED_KINGDOM: "united_kingdom",
+            RacingRegion.FRANCE: "france",
+            RacingRegion.UNITED_STATES: "united_states",
+        }
+        contract_region = contract_region_by_event_region.get(event.country_region)
+        if event.country_region == RacingRegion.OTHER:
+            region_markers = []
+            if (
+                isinstance(event.source_refs, dict)
+                and "race_data_region" in event.source_refs
+            ):
+                region_markers.append(event.source_refs["race_data_region"])
+            if (
+                source.review_status == RaceLiveReviewStatus.APPROVED
+                and isinstance(source.identity_fields, dict)
+                and "race_data_region" in source.identity_fields
+            ):
+                region_markers.append(source.identity_fields["race_data_region"])
+            if region_markers and all(
+                isinstance(marker, str) and marker == "ireland"
+                for marker in region_markers
+            ):
+                contract_region = "ireland"
+        roster = build_race_data_provider_roster()
+        roster_entry = next(
+            (
+                entry
+                for entry in roster.entries
+                if entry.provider == source.source_key
+                and contract_region in entry.regions
+            ),
+            None,
+        )
+        if roster_entry is None or contract_region is None:
+            return RaceLiveRacecardRefreshDecision(
+                False, "provider_contract_missing"
+            )
         observation_decision = record_race_result_observation(
             source_identity_id=source.pk,
             observed_at=now,
@@ -4753,7 +4806,28 @@ def apply_race_live_racecard_refresh(
             raw_sha256=raw_sha256,
             result_phase=RaceResultPhase.RACECARD,
             normalized_payload=observation_payload,
-            field_provenance={"source": "the_racing_api"},
+            field_provenance={
+                "provider": source.source_key,
+                "region": contract_region,
+                "source_class": roster_entry.source_class,
+                "registry_digest": roster.registry_digest,
+                "contract_version": roster_entry.contract_version,
+                "contract_digest": roster_entry.contract_digest,
+                "automation_allowed": True,
+                "allowed_fields": [
+                    "off_time",
+                    "local_start_time",
+                    "participants.horse_name",
+                    "participants.number",
+                    "participants.draw",
+                    "participants.jockey_name",
+                    "participants.trainer_name",
+                    "participants.carried_weight",
+                    "participants.status",
+                    "participants.odds",
+                    "participants.popularity",
+                ],
+            },
             parse_warnings=[],
             permission_classification="licensed_api_automation",
         )
@@ -4765,21 +4839,106 @@ def apply_race_live_racecard_refresh(
                 False, f"observation_{observation_decision.reason}"
             )
         observation = observation_decision.observation
+        field_decision = reconcile_racecard_observation(
+            observation_id=observation.pk,
+            expected_event_id=event_id,
+            allow_schedule_apply=False,
+            task_id="race_live_racecard_refresh",
+            run_id=attempt_token[:64],
+        )
+        if field_decision.status not in {"applied", "replayed"}:
+            checkpoint_status = (
+                "racecard_needs_review"
+                if field_decision.status == "needs_review"
+                else field_decision.reason
+            )
+            tracking.next_poll_at = calculate_race_live_next_poll_at(
+                off_time=event.race_datetime,
+                now=now,
+                state=tracking.state,
+            )
+            tracking.last_observation_hash = observation.normalized_sha256
+            tracking.active_attempt_token = ""
+            tracking.claim_expires_at = None
+            tracking.checkpoint_payload = {
+                "status": checkpoint_status,
+                "observation_id": observation.pk,
+            }
+            tracking.lock_version += 1
+            tracking.save()
+            decision_reason = (
+                "racecard_needs_review"
+                if field_decision.status == "needs_review"
+                else field_decision.reason
+            )
+            return RaceLiveRacecardRefreshDecision(
+                False, f"field_{decision_reason}"
+            )
+
+        canonical_runners = list(
+            RaceEventRunner.objects.select_for_update()
+            .filter(event_id=event_id)
+            .order_by("id")
+        )
+        canonical_rows = []
+        for row in merged_rows:
+            external_runner_id = row["external_runner_id"]
+            runner = next(
+                (
+                    candidate
+                    for candidate in canonical_runners
+                    if (
+                        isinstance(candidate.source_refs, dict)
+                        and candidate.source_refs.get(source.source_key)
+                        == external_runner_id
+                    )
+                    or candidate.external_runner_id == external_runner_id
+                ),
+                None,
+            )
+            if runner is None:
+                return RaceLiveRacecardRefreshDecision(
+                    False, "canonical_runner_missing"
+                )
+            canonical_rows.append(
+                {
+                    "external_runner_id": external_runner_id,
+                    "horse_name": runner.horse_name,
+                    "number": runner.horse_number,
+                    "draw": runner.barrier,
+                    "jockey_name": runner.jockey_name,
+                    "trainer_name": runner.trainer_name,
+                    "carried_weight": runner.carried_weight,
+                    "status": runner.running_status,
+                    "odds": runner.odds_value,
+                    "popularity": runner.popularity,
+                }
+            )
+        merged_rows = canonical_rows
+        canonical_payload = {
+            **canonical_payload,
+            "participants": canonical_rows,
+        }
+        content_sha256 = build_race_live_canonical_sha256(
+            normalized_payload=canonical_payload
+        )
+        existing_revision = RaceEventRevision.objects.filter(
+            event_id=event_id,
+            kind=RaceEventRevisionKind.RACECARD,
+            phase=RaceResultPhase.RACECARD,
+            content_sha256=content_sha256,
+        ).first()
 
         if existing_revision is not None:
-            for external_runner_id, legacy_runner in (
-                legacy_by_external.items()
-            ):
-                if (
-                    legacy_runner is not None
-                    and not legacy_runner.external_runner_id
-                ):
+            # Preserve the pre-existing deterministic identity remediation for
+            # an unchanged revision.  This only fills a blank identity column;
+            # provider-controlled racecard fields remain gated by the unified
+            # Slice-A ledger above.
+            for external_runner_id, legacy_runner in legacy_by_external.items():
+                if legacy_runner is not None and not legacy_runner.external_runner_id:
                     legacy_runner.external_runner_id = external_runner_id
                     legacy_runner.save(
-                        update_fields=(
-                            "external_runner_id",
-                            "updated_at",
-                        )
+                        update_fields=("external_runner_id", "updated_at")
                     )
             tracking.next_poll_at = calculate_race_live_next_poll_at(
                 off_time=event.race_datetime,
@@ -4853,7 +5012,11 @@ def apply_race_live_racecard_refresh(
                     ],
                     source_order=index,
                     internal_order=index,
-                    status=RaceEventRevisionItemStatus.DECLARED,
+                    status=str(
+                        row.get(
+                            "status", RaceEventRevisionItemStatus.DECLARED
+                        )
+                    ),
                     raw_status=str(
                         row.get("status", RaceEventRevisionItemStatus.DECLARED)
                     ),
@@ -4886,59 +5049,8 @@ def apply_race_live_racecard_refresh(
                 "updated_at",
             )
         )
-        for index, row in enumerate(merged_rows, start=1):
-            external_runner_id = row["external_runner_id"]
-            defaults = {
-                "external_runner_id": external_runner_id,
-                "sort_order": index,
-                "horse_name": participants_by_external[
-                    external_runner_id
-                ].canonical_name,
-                "barrier": str(row.get("draw", row.get("barrier", ""))),
-                "jockey_name": str(row.get("jockey_name", "")),
-                "trainer_name": str(row.get("trainer_name", "")),
-                "carried_weight": str(row.get("carried_weight", "")),
-                "running_status": RaceRunnerStatus.DECLARED,
-                "dynamic_updated_at": now,
-                "source_refs": {
-                    "source_key": source.source_key,
-                    "external_runner_id": external_runner_id,
-                },
-                "raw_payload": {},
-            }
-            legacy_runner = legacy_by_external[external_runner_id]
-            if legacy_runner is None:
-                RaceEventRunner.objects.create(
-                    event_id=event_id,
-                    horse_number=str(row.get("number", "")),
-                    **defaults,
-                )
-            else:
-                legacy_locks = (
-                    legacy_runner.manual_lock_flags
-                    if isinstance(legacy_runner.manual_lock_flags, dict)
-                    else {}
-                )
-                for field_name, value in defaults.items():
-                    if legacy_locks.get(field_name) is not True:
-                        setattr(legacy_runner, field_name, value)
-                if legacy_locks.get("horse_number") is not True:
-                    legacy_runner.horse_number = str(row.get("number", ""))
-                legacy_runner.save()
-
-        if (
-            proposed_off_time != event.race_datetime
-            or proposed_local_start_time != event.local_start_time
-        ):
-            event.race_datetime = proposed_off_time
-            event.local_start_time = proposed_local_start_time
-            event.save(
-                update_fields=(
-                    "race_datetime",
-                    "local_start_time",
-                    "updated_at",
-                )
-            )
+        # Slice A records schedule candidates but cannot apply them.  Slice C
+        # owns the lifecycle generation/claim invalidation transaction.
         tracking.next_poll_at = calculate_race_live_next_poll_at(
             off_time=event.race_datetime,
             now=now,
@@ -6460,6 +6572,88 @@ def _candidate_items(payload: dict | list) -> list[dict]:
     return [item for item in payload.get("items", []) if isinstance(item, dict)]
 
 
+def apply_race_event_normalization(event: RaceEvent) -> None:
+    """Apply field normalization to a RaceEvent and persist normalized fields.
+
+    This is a non-blocking operation: normalization failures are recorded in
+    ``normalization_issues`` without aborting the write path.  The normalizer
+    reads ``surface``, ``distance_text`` and ``eligibility_text`` from the
+    event and writes the computed normalized fields back to the database.
+    """
+    issues: list[dict[str, str]] = []
+    now = timezone.now()
+    input_parts: dict[str, str] = {}
+
+    # --- Surface / race-type / layout / going ---
+    try:
+        surface_result = normalize_surface_race_type_layout_going(
+            raw_value=event.surface,
+            going_text=None,
+        )
+        event.normalized_surface = surface_result.surface.value
+        event.normalized_race_type = surface_result.race_type.value
+        event.course_layout_text = surface_result.course_layout
+        event.going_text = surface_result.going_text
+        input_parts["surface"] = event.surface
+    except Exception as exc:
+        issues.append({"field": "surface", "error": str(exc)})
+
+    # --- Distance ---
+    try:
+        distance_result = normalize_distance(
+            raw_value=event.distance_text,
+            official_metric_meters=None,
+        )
+        if distance_result.meters is not None:
+            event.distance_meters_normalized = float(distance_result.meters) if distance_result.meters is not None else None
+        event.distance_precision = distance_result.precision.value
+        input_parts["distance_text"] = event.distance_text
+    except Exception as exc:
+        issues.append({"field": "distance", "error": str(exc)})
+
+    # --- Eligibility (age / sex restriction) ---
+    try:
+        eligibility_result = normalize_eligibility(
+            raw_value=event.eligibility_text,
+        )
+        event.minimum_age = eligibility_result.min_age
+        event.maximum_age = eligibility_result.max_age
+        event.age_open_ended = eligibility_result.age_open_ended
+        event.sex_restriction = eligibility_result.sex.value
+        event.eligibility_constraints = eligibility_result.extra_constraints
+        input_parts["eligibility_text"] = event.eligibility_text
+    except Exception as exc:
+        issues.append({"field": "eligibility", "error": str(exc)})
+
+    # --- Normalization metadata ---
+    event.normalization_version = RACE_FIELD_NORMALIZATION_VERSION
+    event.normalization_input_sha256 = compute_input_sha256(**input_parts)
+    event.normalization_issues = issues
+    event.normalized_at = now
+
+    # Persist only normalization-related fields
+    event.save(
+        update_fields=[
+            "normalized_surface",
+            "normalized_race_type",
+            "course_layout_text",
+            "going_text",
+            "distance_meters_normalized",
+            "distance_precision",
+            "minimum_age",
+            "maximum_age",
+            "age_open_ended",
+            "sex_restriction",
+            "eligibility_constraints",
+            "normalization_version",
+            "normalization_input_sha256",
+            "normalization_issues",
+            "normalized_at",
+            "updated_at",
+        ]
+    )
+
+
 def apply_data_candidate(candidate: RaceEventDataCandidate, *, user: User | None = None) -> dict:
     event = candidate.event
     payload = candidate.candidate_payload or {}
@@ -6470,6 +6664,7 @@ def apply_data_candidate(candidate: RaceEventDataCandidate, *, user: User | None
             updated_fields = _set_unlocked_event_fields(event, payload)
             if updated_fields:
                 event.save(update_fields=[*updated_fields, "updated_at"])
+            apply_race_event_normalization(event)
             summary["updated_fields"] = updated_fields
         elif module == RaceEventModule.RUNNERS:
             summary["created_count"] = _replace_runners(event, _candidate_items(payload))

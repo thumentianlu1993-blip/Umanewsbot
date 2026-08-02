@@ -21,6 +21,7 @@ class Command(BaseCommand):
         parser.add_argument("--registry-sha256", required=True)
         parser.add_argument("--output-dir", required=True)
         parser.add_argument("--max-requests", type=int, required=True)
+        parser.add_argument("--region")
         parser.add_argument(
             "--confirm-network-proof",
             action="store_true",
@@ -40,6 +41,7 @@ class Command(BaseCommand):
                 transport=the_racing_api_transport,
                 sleep=time.sleep,
                 max_requests=options["max_requests"],
+                region=options["region"],
             )
         except (OSError, ValueError, PermissionError) as exc:
             raise CommandError(str(exc)) from exc

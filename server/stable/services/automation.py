@@ -33,6 +33,7 @@ from stable.services.multiregion import auto_publish_policy_for_article
 from stable.services.news_attribution import classify_news_content
 from stable.services.publish_readiness import transition_to_publish_ready
 from stable.services.race_grades import better_race_priority, normalize_race_grade, race_priority_for_grade
+from stable.services.term_consistency import apply_consistency_gate
 
 
 P0_OVERSEAS_RACES = [
@@ -798,6 +799,49 @@ def mark_publish_ready(
     ready_at=None,
     refresh_ready_at: bool = False,
 ) -> None:
+    # Safety gate: verify term consistency before marking publish-ready.
+    # Only active when TERM_CONSISTENCY_ENABLED is set, to avoid adding
+    # queries to existing automation paths.  When the gate finds blockers,
+    # route to manual review instead.
+    if getattr(settings, "TERM_CONSISTENCY_ENABLED", False):
+        try:
+            gate_result = apply_consistency_gate(article)
+            if not gate_result.passed:
+                blocker_messages = "; ".join(
+                    b.get("message", "") for b in gate_result.blockers
+                )[:200]
+                article.review_mode = ReviewMode.MANUAL
+                article.risk_level = RiskLevel.MEDIUM
+                article.workflow_status = WorkflowStatus.PENDING_REVIEW
+                article.decision_summary = f"术语一致性门禁未通过：{blocker_messages}"
+                article.automation_error_message = article.decision_summary
+                article.gate_issues = gate_result.issues
+                article.save(
+                    update_fields=[
+                        "review_mode", "risk_level", "workflow_status",
+                        "decision_summary", "automation_error_message",
+                        "gate_issues", "updated_at",
+                    ]
+                )
+                log_automation(
+                    article,
+                    phase=AutomationPhase.VALIDATE,
+                    result=AutomationResult.FAILED,
+                    reason=article.decision_summary,
+                )
+                return
+        except Exception:
+            # If the gate itself fails, fail-closed: do NOT proceed to publish.
+            # A failing gate indicates an unvalidated state that must be
+            # resolved before the article can be trusted for auto-publish.
+            log_automation(
+                article,
+                phase=AutomationPhase.VALIDATE,
+                result=AutomationResult.FAILED,
+                reason="term_consistency_gate_error",
+            )
+            return
+
     ready_at_changed = transition_to_publish_ready(
         article,
         ready_at=ready_at,

@@ -1,0 +1,463 @@
+name: 单年度分级赛全部参赛马研究
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - runtime/research/collect_graded_race_participants.py
+      - runtime/research/test_collect_graded_race_participants.py
+      - runtime/research/README_graded_race_participants.md
+      - runtime/research/region_manifests/**
+      - .codex/scripts/test_graded_race_participants_workflow.py
+      - .github/workflows/research_graded_race_participants.yml
+  workflow_dispatch:
+    inputs:
+      year:
+        description: 单次运行处理的四位自然年（1984 至当前 UTC 年）
+        required: true
+        type: string
+      full_network:
+        description: 显式启用只读 UmaFans 公网采集阶段
+        required: true
+        type: boolean
+        default: false
+      region_manifest_path:
+        description: 可选的仓库相对地区清单路径；必须与 SHA-256 同时提供
+        required: false
+        type: string
+        default: ""
+      region_manifest_sha256:
+        description: 可选地区清单的精确小写 SHA-256；必须与路径同时提供
+        required: false
+        type: string
+        default: ""
+      source_run_id:
+        description: 精确续跑来源 workflow run ID；三项来源输入必须全空或全有
+        required: false
+        type: string
+        default: ""
+      source_attempt:
+        description: 与来源 run ID 配对的精确 run attempt
+        required: false
+        type: string
+        default: ""
+      source_stage:
+        description: 来源 run 已到达的网络 checkpoint 阶段
+        required: false
+        type: choice
+        default: ""
+        options:
+          - ""
+          - races
+          - profiles
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: graded-race-participants-${{ github.event.pull_request.number || inputs.year || github.ref }}
+  cancel-in-progress: false
+
+env:
+  COLLECTOR: runtime/research/collect_graded_race_participants.py
+  REQUESTED_YEAR: ${{ github.event_name == 'workflow_dispatch' && inputs.year || '2025' }}
+  OUTPUT_DIR: runtime/research/output/${{ github.event_name == 'workflow_dispatch' && inputs.year || '2025' }}-graded-race-participants
+  SMOKE_DIR: runtime/research/output/graded-race-participants-synthetic
+  SMOKE_YEAR: "2025"
+  REGION_MANIFEST_PATH: ${{ github.event_name == 'workflow_dispatch' && inputs.region_manifest_path || '' }}
+  REGION_MANIFEST_SHA256: ${{ github.event_name == 'workflow_dispatch' && inputs.region_manifest_sha256 || '' }}
+  SOURCE_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.source_run_id || '' }}
+  SOURCE_ATTEMPT: ${{ github.event_name == 'workflow_dispatch' && inputs.source_attempt || '' }}
+  SOURCE_STAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.source_stage || '' }}
+  SAFE_STOP_CODE: "75"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 检出受测版本
+        uses: actions/checkout@v4
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 校验显式输入
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$REQUESTED_YEAR" =~ ^[0-9]{4}$ ]]; then
+            echo "year 必须是四位十进制整数" >&2
+            exit 1
+          fi
+          current_year="$(date -u +%Y)"
+          if (( 10#$REQUESTED_YEAR < 1984 || 10#$REQUESTED_YEAR > 10#$current_year )); then
+            echo "year 必须位于 1984..当前 UTC 年" >&2
+            exit 1
+          fi
+
+          source_count=0
+          [[ -n "$SOURCE_RUN_ID" ]] && source_count=$((source_count + 1))
+          [[ -n "$SOURCE_ATTEMPT" ]] && source_count=$((source_count + 1))
+          [[ -n "$SOURCE_STAGE" ]] && source_count=$((source_count + 1))
+          if (( source_count != 0 && source_count != 3 )); then
+            echo "source_run_id、source_attempt、source_stage 必须全空或全有" >&2
+            exit 1
+          fi
+          if (( source_count == 3 )); then
+            [[ "$SOURCE_RUN_ID" =~ ^[1-9][0-9]*$ ]] || {
+              echo "source_run_id 必须是正整数" >&2
+              exit 1
+            }
+            [[ "$SOURCE_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || {
+              echo "source_attempt 必须是正整数" >&2
+              exit 1
+            }
+            [[ "$SOURCE_STAGE" =~ ^(races|profiles)$ ]] || {
+              echo "source_stage 只接受 races|profiles" >&2
+              exit 1
+            }
+          fi
+
+          manifest_count=0
+          [[ -n "$REGION_MANIFEST_PATH" ]] && manifest_count=$((manifest_count + 1))
+          [[ -n "$REGION_MANIFEST_SHA256" ]] && manifest_count=$((manifest_count + 1))
+          if (( manifest_count != 0 && manifest_count != 2 )); then
+            echo "region manifest 路径和 SHA-256 必须同时提供" >&2
+            exit 1
+          fi
+          if (( manifest_count == 2 )); then
+            [[ "$REGION_MANIFEST_PATH" != /* ]] || {
+              echo "region manifest 必须使用仓库相对路径" >&2
+              exit 1
+            }
+            [[ ! "$REGION_MANIFEST_PATH" =~ (^|/)\.\.(/|$) ]] || {
+              echo "region manifest 路径不得包含上级目录" >&2
+              exit 1
+            }
+            [[ "$REGION_MANIFEST_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
+              echo "region manifest SHA-256 必须是 64 位小写十六进制" >&2
+              exit 1
+            }
+            candidate="$GITHUB_WORKSPACE/$REGION_MANIFEST_PATH"
+            [[ ! -L "$candidate" && -f "$candidate" ]] || {
+              echo "region manifest 必须是仓库内 regular file，且不得是 symlink" >&2
+              exit 1
+            }
+            resolved="$(realpath "$candidate")"
+            [[ "$resolved" == "$GITHUB_WORKSPACE/"* ]] || {
+              echo "region manifest 解析后必须仍位于工作树内" >&2
+              exit 1
+            }
+            actual_sha="$(sha256sum "$resolved" | awk '{print $1}')"
+            [[ "$actual_sha" == "$REGION_MANIFEST_SHA256" ]] || {
+              echo "region manifest SHA-256 不匹配" >&2
+              exit 1
+            }
+          fi
+      - name: 离线合同
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            "$COLLECTOR" \
+            runtime/research/test_collect_graded_race_participants.py \
+            .codex/scripts/test_graded_race_participants_workflow.py
+          python -m unittest runtime.research.test_collect_graded_race_participants -v
+          python .codex/scripts/test_graded_race_participants_workflow.py -v
+          python .codex/scripts/test_workflow_contract.py -v
+      - name: Synthetic 安全停止、续跑、fan-in 与 finalize
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          python "$COLLECTOR" \
+            --year "$SMOKE_YEAR" \
+            --stage synthetic_smoke \
+            --limit 1 \
+            --output-dir "$SMOKE_DIR"
+          code=$?
+          set -e
+          [[ "$code" -eq "$SAFE_STOP_CODE" ]] || {
+            echo "synthetic 首次运行必须以 75 安全停止，实际为 $code" >&2
+            exit 1
+          }
+          python "$COLLECTOR" \
+            --year "$SMOKE_YEAR" \
+            --stage synthetic_smoke \
+            --resume \
+            --output-dir "$SMOKE_DIR"
+          python -c \
+            'import json,sys; p=json.load(open(sys.argv[1], encoding="utf-8")); assert p["byte_equivalent"] is True; assert len(p["final_files"]) == 7' \
+            "$SMOKE_DIR/synthetic_smoke_report.json"
+      - name: 上传 synthetic checkpoint 证据
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-synthetic-checkpoint-0
+          path: |
+            ${{ env.SMOKE_DIR }}/run_manifest.json
+            ${{ env.SMOKE_DIR }}/stages/
+            ${{ env.SMOKE_DIR }}/synthetic_smoke_report.json
+            ${{ env.SMOKE_DIR }}/final/
+          if-no-files-found: error
+          retention-days: 14
+
+  races:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network == true
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: 检出精确工具版本
+        uses: actions/checkout@v4
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 恢复精确来源 races checkpoint
+        if: env.SOURCE_RUN_ID != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-races-0
+          path: ${{ env.OUTPUT_DIR }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - name: 运行 races checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest_args=()
+          if [[ -n "$REGION_MANIFEST_PATH" ]]; then
+            manifest_args+=(--race-region-manifest "$REGION_MANIFEST_PATH")
+          fi
+          set +e
+          python "$COLLECTOR" \
+            --year "$REQUESTED_YEAR" \
+            --stage races \
+            --resume \
+            --request-budget 5000 \
+            --checkpoint-every 20 \
+            --time-budget-seconds 3600 \
+            --base-url http://umafans.run/ \
+            --output-dir "$OUTPUT_DIR" \
+            "${manifest_args[@]}"
+          code=$?
+          set -e
+          [[ "$code" -eq 0 ]] || exit "$code"
+          python -c \
+            'import json,re,sys; p=json.load(open(sys.argv[1], encoding="utf-8")); items=p["items"]; statuses=[x["status"] for x in items]; retry=[x for x in items if x["status"]=="retryable_error"]; temporary=lambda x: x.get("error_code") in {"URLError","TimeoutError","ConnectionResetError","RemoteDisconnected","IncompleteRead"} or (x.get("error_code")=="HTTPError" and re.search(r"HTTP Error (408|425|429|500|502|503|504)\b",x.get("error",""))); sys.exit(1 if "permanent_error" in statuses or any(x not in {"success","skipped","evidence_gap","permanent_error","retryable_error"} for x in statuses) or any(not temporary(x) for x in retry) else 75 if retry else 0)' \
+            "$OUTPUT_DIR/stages/races/shards/0/index.json"
+      - name: 上传本次 races checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-races-0
+          # 必须上传整个 races stage；即使尚无 run_manifest，也要保留
+          # discovery_progress.json、discovery_request_ledger.json 与 request_ledger.json。
+          path: |
+            ${{ env.OUTPUT_DIR }}/run_manifest.json
+            ${{ env.OUTPUT_DIR }}/stages/races/
+          if-no-files-found: error
+          retention-days: 14
+
+  profiles:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network == true
+    needs: races
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: 检出精确工具版本
+        uses: actions/checkout@v4
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 恢复来源 profile shard checkpoint
+        if: env.SOURCE_RUN_ID != '' && env.SOURCE_STAGE == 'profiles'
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-profiles-${{ matrix.shard }}
+          path: ${{ env.OUTPUT_DIR }}/stages/profiles/shards/${{ matrix.shard }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - name: 恢复本次 races checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-races-0
+          path: ${{ env.OUTPUT_DIR }}
+      - name: 运行 profile shard checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest_args=()
+          if [[ -n "$REGION_MANIFEST_PATH" ]]; then
+            manifest_args+=(--race-region-manifest "$REGION_MANIFEST_PATH")
+          fi
+          set +e
+          python "$COLLECTOR" \
+            --year "$REQUESTED_YEAR" \
+            --stage profiles \
+            --resume \
+            --shard-index "${{ matrix.shard }}" \
+            --shard-count 4 \
+            --request-budget 2000 \
+            --checkpoint-every 25 \
+            --time-budget-seconds 3600 \
+            --output-dir "$OUTPUT_DIR" \
+            "${manifest_args[@]}"
+          code=$?
+          set -e
+          [[ "$code" -eq 0 ]] || exit "$code"
+          python -c \
+            'import json,re,sys; p=json.load(open(sys.argv[1], encoding="utf-8")); items=p["items"]; statuses=[x["status"] for x in items]; retry=[x for x in items if x["status"]=="retryable_error"]; temporary=lambda x: x.get("error_code") in {"URLError","TimeoutError","ConnectionResetError","RemoteDisconnected","IncompleteRead"} or (x.get("error_code")=="HTTPError" and re.search(r"HTTP Error (408|425|429|500|502|503|504)\b",x.get("error",""))); sys.exit(1 if "permanent_error" in statuses or any(x not in {"success","not_found","permanent_error","retryable_error"} for x in statuses) or any(not temporary(x) for x in retry) else 75 if retry else 0)' \
+            "$OUTPUT_DIR/stages/profiles/shards/${{ matrix.shard }}/index.json"
+      - name: 上传本次 profile shard checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-profiles-${{ matrix.shard }}
+          # 必须上传整个 shard，不能收窄到 items/index，以免遗漏 request_ledger.json。
+          path: ${{ env.OUTPUT_DIR }}/stages/profiles/shards/${{ matrix.shard }}/
+          if-no-files-found: error
+          retention-days: 14
+
+  merge_profiles:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network == true
+    needs: profiles
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 检出精确工具版本
+        uses: actions/checkout@v4
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 恢复本次 races checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-races-0
+          path: ${{ env.OUTPUT_DIR }}
+      - name: 恢复本次 profile shard 0
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-profiles-0
+          path: ${{ env.OUTPUT_DIR }}/stages/profiles/shards/0
+      - name: 恢复本次 profile shard 1
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-profiles-1
+          path: ${{ env.OUTPUT_DIR }}/stages/profiles/shards/1
+      - name: 恢复本次 profile shard 2
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-profiles-2
+          path: ${{ env.OUTPUT_DIR }}/stages/profiles/shards/2
+      - name: 恢复本次 profile shard 3
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-profiles-3
+          path: ${{ env.OUTPUT_DIR }}/stages/profiles/shards/3
+      - name: 合并四个 profile shards
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest_args=()
+          if [[ -n "$REGION_MANIFEST_PATH" ]]; then
+            manifest_args+=(--race-region-manifest "$REGION_MANIFEST_PATH")
+          fi
+          python "$COLLECTOR" \
+            --year "$REQUESTED_YEAR" \
+            --stage merge_profiles \
+            --shard-count 4 \
+            --output-dir "$OUTPUT_DIR" \
+            "${manifest_args[@]}"
+      - name: 上传本次 merged profiles checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-merge_profiles-0
+          path: ${{ env.OUTPUT_DIR }}/stages/profiles/merged/
+          if-no-files-found: error
+          retention-days: 14
+
+  finalize:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network == true
+    needs: merge_profiles
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 检出精确工具版本
+        uses: actions/checkout@v4
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 恢复本次 races checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-races-0
+          path: ${{ env.OUTPUT_DIR }}
+      - name: 恢复本次 profile shard 0
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-profiles-0
+          path: ${{ env.OUTPUT_DIR }}/stages/profiles/shards/0
+      - name: 恢复本次 profile shard 1
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-profiles-1
+          path: ${{ env.OUTPUT_DIR }}/stages/profiles/shards/1
+      - name: 恢复本次 profile shard 2
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-profiles-2
+          path: ${{ env.OUTPUT_DIR }}/stages/profiles/shards/2
+      - name: 恢复本次 profile shard 3
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-profiles-3
+          path: ${{ env.OUTPUT_DIR }}/stages/profiles/shards/3
+      - name: 恢复本次 merged profiles checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-merge_profiles-0
+          path: ${{ env.OUTPUT_DIR }}/stages/profiles/merged
+      - name: 纯离线 finalize 并验证精确文件集合
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest_args=()
+          if [[ -n "$REGION_MANIFEST_PATH" ]]; then
+            manifest_args+=(--race-region-manifest "$REGION_MANIFEST_PATH")
+          fi
+          python "$COLLECTOR" \
+            --year "$REQUESTED_YEAR" \
+            --stage finalize \
+            --shard-count 4 \
+            --output-dir "$OUTPUT_DIR" \
+            "${manifest_args[@]}"
+          python -c \
+            'import os,sys; y=sys.argv[1]; root=sys.argv[2]; expected={f"race_participants_{y}.csv",f"horse_names_{y}.csv",f"horse_name_review_queue_{y}.csv","source_manifest.jsonl","summary.json","errors.json","README.md"}; actual=set(os.listdir(root)); assert actual == expected, (actual, expected); assert all(os.path.isfile(os.path.join(root,n)) and not os.path.islink(os.path.join(root,n)) for n in expected)' \
+            "$REQUESTED_YEAR" \
+            "$OUTPUT_DIR/final"
+      - name: 上传严格七份最终 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-finalize-0
+          path: |
+            ${{ env.OUTPUT_DIR }}/final/race_participants_${{ env.REQUESTED_YEAR }}.csv
+            ${{ env.OUTPUT_DIR }}/final/horse_names_${{ env.REQUESTED_YEAR }}.csv
+            ${{ env.OUTPUT_DIR }}/final/horse_name_review_queue_${{ env.REQUESTED_YEAR }}.csv
+            ${{ env.OUTPUT_DIR }}/final/source_manifest.jsonl
+            ${{ env.OUTPUT_DIR }}/final/summary.json
+            ${{ env.OUTPUT_DIR }}/final/errors.json
+            ${{ env.OUTPUT_DIR }}/final/README.md
+          if-no-files-found: error
+          retention-days: 30

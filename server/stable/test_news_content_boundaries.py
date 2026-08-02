@@ -51,6 +51,56 @@ def fixture_html(name: str) -> str:
 
 
 class InternationalNewsContentBoundaryTests(TestCase):
+    def test_hrn_removes_role_dialog_without_clipping_surrounding_article_blocks(self):
+        detail = HorseRacingNationAdapter().parse_detail_html(
+            fixture_html("hrn_race_video_dialog.html"),
+            url="https://www.horseracingnation.com/news/saratoga_race_preview_123",
+        )
+
+        self.assertEqual(detail.metadata["body_parse_status"], "ok")
+        self.assertEqual(detail.metadata["body_selector"], ".article-body")
+        self.assertNotIn("Last race replay", detail.body_ja_raw)
+        self.assertNotIn("modal-title", detail.body_ja_raw)
+
+        expected_blocks = (
+            "The opening paragraph explains why the favorite has improved.",
+            "Race shape",
+            "Race Video is also the name of a legitimate section discussed in this sentence.",
+            "The inside runner should press the pace.",
+            "The closer needs a clean trip.",
+            "Post",
+            "Patient Runner",
+            "The rider said the colt is ready for the assignment.",
+            "The 3 × 2 exercise was completed before the final paragraph confirmed the plan.",
+        )
+        positions = [detail.body_ja_raw.index(block) for block in expected_blocks]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(detail.body_ja_raw.count("Race Video"), 1)
+        self.assertIn("3 × 2 exercise", detail.body_ja_raw)
+        self.assertEqual(
+            detail.metadata["body_cleaning"]["removed_rules"]["hrn_structured_noise"],
+            1,
+        )
+
+    def test_non_hrn_role_dialog_is_not_removed_by_hrn_specific_rule(self):
+        detail = TDNAdapter().parse_detail_html(
+            """
+            <html><head><meta property="og:title" content="Dialog semantics in an article"></head>
+            <body><article>
+              <p>The first paragraph remains.</p>
+              <div role="dialog"><p>Quoted dialog belongs to this non-HRN source.</p></div>
+              <p>The final paragraph remains.</p>
+            </article></body></html>
+            """,
+            url="https://www.thoroughbreddailynews.com/dialog-semantics/",
+        )
+
+        self.assertIn("Quoted dialog belongs to this non-HRN source.", detail.body_ja_raw)
+        self.assertNotIn(
+            "hrn_structured_noise",
+            detail.metadata["body_cleaning"]["removed_rules"],
+        )
+
     def test_hrn_9623_extracts_only_trusted_article_body(self):
         detail = HorseRacingNationAdapter().parse_detail_html(
             fixture_html("hrn_9623.html"),

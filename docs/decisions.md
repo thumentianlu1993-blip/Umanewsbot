@@ -1,5 +1,207 @@
 # 关键决策
 
+## 2026-07-31 历史赛事赛历完整性当前只闭合 Release A 本地范围
+
+- 当前候选只允许包含 nullable `RaceEvent.edition_year`、统一
+  `RaceEventPublicPath` registry、target supersession、
+  `HistoricalRaceCalendarRepairReceipt`、兼容读写代码、前台修复、collector 修复及离线
+  census/repair 工具；对应唯一 migration 为 `0067_historical_calendar_release_a.py`。
+- Release B 的 series/edition 唯一约束切换和 Release C 的 `edition_year` non-null/自然年
+  check 必须分别等待生产全地区 census、数据 verifier、独立 review 和新授权后再创建。B/C
+  migration 提前出现在 Release A 图中即为阻塞。
+- public year 固定为自然年，edition year 固定为届次身份；历史“重点”以 G1/G2 等级族表达，
+  不批量篡改运营 `priority/is_featured`；公共旧路径只保留 registry 301，不复制第二张 event。
+- 全地区 `prepare/apply/verifier/rollback` 是本地可执行工具，不是生产执行回执。生产 census
+  即使只读也需独立授权；任何 apply 还需冻结 manifest/approval/action scope/actor、
+  maintenance 和已验证备份，不随代码部署自动触发。
+- 本轮完整 `stable` 的 `3989 / 25 failure / 54 error / 72 skip` 只能作为失败边界证据。
+  其中已识别环境/既有失败不等于本 scope 回归，也不能据此声称完整 suite 全绿；当前发布判断
+  只能引用聚焦 `61/61`、collector `101/101`、Django check、migration drift/graph 和
+  diff check，并继续把真实 PostgreSQL、并发、性能与独立代码 review 作为未完成门禁。
+- 实现授权不等于发布或生产数据授权；当前没有 commit、push、PR、部署、生产只读或生产写入
+  权限。
+- 跨届次 `authority_url` 只允许由 `race_event_years.validate_authority_url()` 定义一份中央
+  合同；年份写入和 repair classifier 禁止各自实现 URL 判断。当前合同为有效 HTTPS、hostname
+  存在、无 credentials/fragment/whitespace，允许合法 path/query；任何不通过者在 classifier
+  中保持 manual/block，不得形成 action。该修复通过聚焦 `76/76`，但仍须重新独立 review。
+
+## 2026-07-31 年度参赛马研究暂以生产 HTTP origin 为唯一正式来源入口
+
+- 当前生产对外验收入口仍是 `http://umafans.run/`；研究 workflow 必须显式使用该 origin，
+  不得因 Compose 映射了 443 或目录中存在证书文件就推断 HTTPS 可用。
+- collector 可以校验并保留 HTTP/HTTPS scheme，但 host 仍只允许 UmaFans 两个精确域名，
+  并继续禁止凭据、显式端口、越界 query/fragment、非规范 path 与 offsite race/profile
+  URL；这不是通用明文 HTTP 放行。每次 run 选定 scheme 后，全部 sitemap、race、profile、
+  redirect、run manifest 和 region manifest URL 必须保持同一 scheme。
+- base URL 是 checkpoint identity 的一部分。HTTPS 失败 checkpoint 不得原地改写或以
+  HTTP 参数续跑；协议修复后的第一轮必须 fresh，以免请求账本与 queue 身份失真。
+- 年度 `other` 地区清单仍按完整 canonical race URL 精确匹配；scheme 是 key 的一部分。
+  当前 HTTP run 只能使用 HTTP manifest URL，不能把 HTTPS 清单自动降级归一化后复用。
+- 为域名取得可信证书、启用 Nginx 443 server、验证 TLS 后，是否切回 HTTPS 作为独立运维
+  change 处理；不得把本次研究脚本修复扩大为未经设计和验收的证书上线。
+
+## 2026-07-29 race-live P0 采用条件注册、保持告警队列并实施两阶段关闭态发布
+
+- P0 在 Beat 生产者侧按
+  `RACE_LIVE_SCHEDULER_ENABLED`、`RACE_LIVE_MONITOR_ENABLED` 独立构造周期 entry；
+  关闭即不注册，对应 task body 的 `disabled` 防御继续保留。分钟 entry 开启时附带
+  `expires=55`，该值只表示 Celery 最佳努力过期元数据，不承诺 broker 立即物理删除或已预取
+  消息绝不执行。
+- P0 不把 monitor 或 alert delivery 迁移到普通 `celery`。selector 继续投递
+  `celery`，monitor、delivery 和 poll 继续使用 `race_live`；在完成 incident 级 durable
+  dispatch admission、并发领取和 broker 失败恢复之前，不通过换队列把重复告警风险扩散到
+  普通 worker。
+- 首次关闭态发布固定使用
+  `deploy/deploy_race_live_p0_closed.sh prepare` 与
+  `deploy/deploy_race_live_p0_closed.sh start-beat` 两个阶段。`prepare` 在构建前先停止并
+  验证 Beat、drain/停止普通 worker，通过两次零 migration plan 和候选关闭态 schedule 后只
+  准备 web/普通 worker/nginx；`start-beat` 复核候选状态后才单独启动 Beat。原样
+  `deploy_lowcost.sh` 不具备这一候选检查点，不作为本 P0 的发布入口。
+- 本决策不新增告警队列、模型、migration 或业务数据动作，也不授权清理历史积压、启动
+  `race_live_worker`、启用 race-live flags 或执行生产发布。当前只完成本地实现，下一步为
+  独立代码 review。
+
+## 2026-07-27 明确非完赛状态计入完整性，但不得成为名次
+
+- 官方 `SCR/DNF/DSQ/中止` 等受控状态表示该参赛者已被官方交代，但没有数值完赛名次；
+  adapter 必须同时保留来源原文与规范化状态，不得把表格行号或后续顺序写成名次。
+- JRA `中止` 采用现有模型语义 `pulled_up`。恢复聚合只允许明确列入受控集合的退赛/非完赛
+  状态退出数值名次分母；`unknown`、`declared`、`Also Ran`、`N/A` 等不确定或无顺序状态
+  继续产生 `incomplete_result_order` blocker。
+- 完整名次是所有实际完赛马的连续、唯一数值顺序；“非完赛状态已交代”和“完整排名”是两个
+  并存事实。该决定不放宽官方 evidence、participant identity、receipt 或生产 apply 门禁。
+
+## 2026-07-27 recovery adapter 不得以成功空跑替代 scheduled 目标处理
+
+- inventory 中 `scheduled + result_due=true` 是本次历史赛果恢复的合法冻结状态；显式
+  recovery mode 必须贯穿 JRA、NAR、Sporting Life 和 ZEturf 等存在状态过滤的详情 adapter，
+  普通模式继续只接受 `finished`；TOBA discovery 继续按精确 target scope 执行。
+- adapter 对精确输入产生 `events=0` 时，即使命令 return code 为 0，也必须按未覆盖 target
+  形成 blocker；不得把空 candidate/review CSV 解释为 prepare 完成。
+- source-scoped CSV 必须携带冻结生产 `event_id` 并由 candidate 回传。聚合层对所有来源独立
+  校验完整参赛名单、所有非 `withdrawn/scratched` 马的结果覆盖、连续唯一内部名次及
+  discovery-only 标记；缺一项即 `incomplete_result_order`，`Also Ran` 页面顺序不得成为名次。
+- 同一 run 内不同地区 adapter 的 `standard_name` 必须唯一；UK/US Sporting Life 即使复用
+  parser，也必须分别保存 candidate/review/summary，禁止后执行来源覆盖先执行来源。
+- recovery coverage 只接受当前 run `state.json` 绑定的标准
+  `candidates/combined_candidates.jsonl`，并复核其 SHA-256/size；CLI 显式外部 JSONL、
+  identity 漂移或缺 state 一律拒绝。逐场 candidate 的 `source_provider/racing_region`
+  还必须与 plan target 完全一致，不能靠自报 `result_order_complete=true` 跨 shard 放行。
+- 本轮不通过手改 CSV status、直接运行 adapter 或手工拼接 combined candidate 绕过 runner。
+  非 JRA adapter 的恢复状态过滤需按测试、独立 review、release、关闭态部署后再重新联网；
+  已取得的网页赛果只能作为人工审核线索，未进入 receipt 前不得授权生产 apply。
+
+## 2026-07-27 recovery adapter 输入按来源分片，JRA 同时服从两层请求账本
+
+- `race_result_recovery` plan 必须同时绑定 inventory 文件路径、文件 SHA-256 与内部
+  manifest SHA-256，并强制携带当前批准的 `source_map_version`；缺失或版本不符直接拒绝，
+  精确 40 场 source map 不允许降级为任意子集。expected target 创建和既有 snapshot 恢复都先运行 inventory verifier
+  重算当前数据库 identity，再按冻结 event ID 顺序绑定；event、状态、赛果、地区或其他
+  inventory 字段漂移直接拒绝，不生成可人工补写的伪 snapshot。
+- adapter 输入不能只按地区分组。同一地区允许多个批准来源时必须以 `region + source` 分片，
+  runner 只向 manifest 的精确来源交付对应 CSV，避免 JRA/NAR 或 TOBA/Sporting Life 交叉扩张
+  网络范围。
+- JRA 年度列表与详情页复用同一 source cache。显式 recovery mode 可读取已审批 CSV 中仍为
+  `scheduled` 的恢复目标，普通模式继续只接受 `finished`。每个初始请求和每次 redirect 都先
+  通过 runner v2 的 JRA-only HTTPS host/path，再分别占用全批次共享预算；任一层拒绝都不得
+  发起 transport。该决定不放宽 BHA、France Galop、Equibase 等 manual-only 路由。
+
+## 2026-07-27 赛果候选联网在 expected-target 构造缺口处保持零请求阻断
+
+- `race_result_recovery` 的 40 个 event ID source map 校验通过，不代表运行时 expected-target
+  snapshot 已可生成。生产只读调用实证 `expected_targets_from_plan()` 返回
+  `expected_target_empty`；此时不得手工伪造 snapshot、改用普通三模块 plan、直接运行 adapter
+  或跳过 historical runner。
+- 本次联网权限没有被解释为绕过编排权限：自动请求、manual-only 请求、candidate 和 source
+  cache 均为 0。修复必须先为 recovery event ID 构造并绑定精确 `RaceEvent` identity，
+  同时补齐 JRA list/source 与受控请求上下文，再按测试、独立 review、精确 release、部署和
+  新联网授权顺序推进。
+- 关闭态部署允许修改控制面开关，但不授权正式赛果投影。既有 race-live publication policies
+  和 allowlist 已关闭；event 924 暂定结果保留，正式结果、canonical link 和新闻/QQ 均不改。
+
+## 2026-07-27 赛果恢复必须服从 projection owner 并以 blocker=0 才算完成
+
+- 指定窗口的赛果恢复不得直接按名称/日期复制数据，也不得直接写 `RaceEventResult`。所有正式结果先形成
+  official revision/evidence，再按 `RaceEventProjectionControl` 的 `live / historical /
+  unmanaged / manual_paused` owner 分流；event `924` 保持 live owner。
+- 跨 `RaceSeries` 的重复实体只生成身份候选；人工批准后以
+  `RaceEventProductCanonicalLink` 持久化非 canonical → canonical 展示关系。底层赛事、系列、
+  revision 和 evidence 不删除，旧详情 URL 保留。
+- inventory 的到期判定复用 `decide_race_lifecycle()`：有时间用 T+30m，无时间用当地次日零时；
+  非法时区/日期 fail closed。
+- `confirmed/cancelled/postponed/blocked` 只用于 accounted 守恒；只要仍有一个
+  `blocked_with_evidence`，恢复 run 就不能标记 completed，也不能对外宣称“全部收集并确认完成”。
+- 实现、部署、网络候选收集和生产写入是四个独立授权面；后一阶段必须绑定其精确 artifact/commit SHA。
+## 2026-07-26 赛事新闻质量治理实现完成（代码就位，待审核与发布）
+
+- 按已审方案实现赛事新闻曝光治理和多语言术语统一两组变更，使用单一协调实现分支
+  `codex/impl-race-news-quality-20260726`。
+- 曝光：新增 `RaceNewsExposure` 模型、两席状态机、主赛事身份解析、硬重复分类、角度分类；
+  首页/头条/热门榜/QQ 统一读取同一 exposure 预算。
+- 术语：新增 `TermMappingEvidence` 模型、共享 occurrence resolver、公开字段 canonical 门禁、
+  published CAS repair。旧中文译名只进入 `aliases_zh`，`TermAlias.source_language` 不接受中文。
+- 两组变更默认关闭（ENABLED=false, SHADOW=true），代码回滚仅关闭 enforce，保留审计表和 migration。
+- 实现采用测试先行：RED → 子代理实现 → GREEN，所有新增和回归测试通过。
+- 具体实现见 `docs/changes/govern-race-news-exposure/` 和 `docs/changes/unify-public-racing-terms/`。
+- 未实际发布，不授权部署、生产术语写入、历史文章修复或生产 exposure 写入。
+## 2026-07-25 日本重赏 P0 一期采用 Netkeiba + JRA/NAR 身份共识
+
+- JAIRS 完全退出自动化与人工主链。JRA 中央马档案和 NAR 地方马档案分别作为正式 provider；
+  有直接官方马匹 ID/URL 时优先使用，没有锚点时只允许带赛事日期、马号和官方来源的有界上下文
+  检索，只有 Netkeiba 的对象继续阻断。
+- 一期范围包含 G1/G2/G3、J-G1/J-G2/J-G3、JpnⅠ/JpnⅡ/JpnⅢ及证据完整的日本训练马
+  海外 G1/G2/G3。等级只决定 `G1 → G2 → G3` 的批次顺序；G3 的完整双源证据可以通过，
+  G1 的单一 Netkeiba 证据仍必须阻断。
+- 自动候选只接受马名、父、母和完整出生日期一致：Netkeiba+JRA 或 Netkeiba+NAR 为 A，
+  三源一致为 A+；任何冲突、年份级日期、字段缺失或候选不唯一均不提交。
+- “日本训练”使用独立证据门禁：JRA 的美浦/栗东等所属、NAR 地方所属，或绑定来源与赛事日期的
+  已审核等价证据；比赛地点、日文名、日本产地和 profile 地区均不能单独证明。
+- 项目所有者确认网站是个人非商用学习项目，不另设商业授权申请前置。访问合同仍保持最小化、
+  低频、缓存、请求预算、拒绝即停且不公开复制源页面；用途改变时重新评估来源合同。
+- JRA-VAN DataLab 只定义 Windows 清单导出与 Linux 离线校验接口：交换包必须绑定 UM record
+  type、血统登记编号、数据规格版本、带时区 snapshot、逐记录 SHA、输入清单与输出清单 SHA；
+  校验器拒绝夹带原始 UM record。普通 DataLab 原始记录不直接复制到公开产品，本期网页 PoC
+  不依赖 Windows 节点，也不实现常驻采集服务。
+- 2026-07-25 只读盘点确认直接官方马匹锚点为 0 后，首个 PoC 固定从第二层开始：只消费冻结的
+  官方赛事 URL、日期、场地、马号和精确马名；索引页最多跟随一个唯一详情链接，参赛行和同源
+  马匹链接都必须唯一，禁止站内开放式马名搜索。外国出生/转籍线索只决定抽样覆盖，不证明
+  日本训练身份。单匹总计最多 6 个不同 URL/18 次传输，JRA/NAR 上下文链最多 3 URL/6 次传输。
+- 审核批准与正式写入继续分离：approve 生成包含 reviewer、获批 profile 集合、时间、prepare
+  artifact SHA 的不可变审核事件；commit/verify 除精确批准 SHA 外还必须显式确认该 artifact。
+  approve 还必须从冻结的 Netkeiba 与 JRA/NAR 原始身份字段重新计算共识，不能信任候选中的
+  `fields` 自述或只靠伴随文件 SHA；真实 prepare 候选必须携带 commit 复验所需的完整冻结选择
+  字段，approve 必须要求内嵌 candidate/blocker 与已哈希 JSONL sidecar 规范字节一致。
+  所有来源 URL 与重定向逐跳限定为 allowlist HTTPS，
+  JRA/NAR 直连锚点必须携带非空来源 ID，每次传输使用显式连接/读取超时。
+  首次事务以唯一批准 SHA 写入 receipt 与 OperationLog；重复执行只有在 before/after、资格、
+  官方来源证据摘要、结果 payload 和审计日志全部与 receipt 一致时才返回零写 replay，不能仅凭
+  当前字段值相同推断历史写入成功。
+
+## 2026-07-24 首页人工头条实现完成（代码就位，待审核与发布）
+
+- 已按审核通过的方案实现 HomepageHeadlineSelection / HomepageHeadlineRecommendation
+  模型、服务层、signals 协调、admin 修复、路由、视图和模板。
+- 具体实现与 `docs/changes/add-editorial-headline-control/design.md` 的通过版本一致。
+- 未实际发布，不授权部署或生产写入。
+
+## 2026-07-24 首页人工头条采用唯一控制行，AI 推荐保持独立记录
+
+- 规划中的首页人工头条不在 `NewsArticle` 增加 `is_headline` 布尔字段。全站唯一头条是跨文章不变量，
+  用多文章布尔字段会把替换、并发和残余状态分散到多行，也容易让 Django Admin 绕过资格与审计。
+- 方案采用固定 `homepage_primary` slot 的 `HomepageHeadlineSelection` 单例控制行；所有设置、替换、
+  取消、接受推荐和失效协调锁同一行，并用 `version` 拒绝陈旧页面。数据库以固定 slot
+  CheckConstraint 和 `UNIQUE(slot)` 保证当前版本全库只有一个合法控制位。
+- AI 编辑推荐使用独立 `HomepageHeadlineRecommendation` 快照和 active 条件唯一约束。推荐生成只读取
+  已保存的赛事优先级、自动分数、封面和发布时间信号，不新增第二套 LLM 调用；生成推荐永不写 selection，
+  只有有权限用户明确接受后才可切换人工头条。
+- 头条统一资格要求文章当前已发布、网页公开时间不在未来、有效标题/摘要/正文非空；不强制封面。
+  人工选择、AI 推荐和算法 fallback 共用该资格；选择失效时清除人工状态并记录审计，保留原有三级时间
+  窗口、48 篇合格候选和排序元组，避免无效文章被算法立即选回。
+- 首页当前没有页面级或 headline cache，本变更不为头条新增缓存；实时性通过数据库读取和连续请求验证。
+  若后续需要 cache，必须另行补 key、TTL、事务提交后失效和故障回退设计。
+- 本决策已由同一独立方案 reviewer 三轮收敛并获得 `VERDICT: APPROVED`；最终字段和文件范围以
+  `docs/changes/add-editorial-headline-control/` 的通过版本为准。当前只完成规划，尚未授权实现或发布。
+
 ## 2026-07-24 已审核空胜绩采用显式证据语义并版本化发布候选
 
 - “没有胜绩记录”不再等同于“胜绩资料缺失”。有实际胜绩沿用原判定；没有实际胜绩时，只有最新
@@ -2030,3 +2232,315 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   只允许修改 decision/review_note，不能通过同时修改机器列与哈希自证。
 - 首批所有正负动作使用一个互斥 manifest 和一个数据库事务，不拆 shard；若容量或互斥性不满足，
   必须停止并重新设计、复审、授权，不能接受部分首批完成。
+
+## 2026-07-25 HRN 同名机构采用来源级确定性译名，不改全局英国词条
+
+- HRN `.article-body` 内的交互式视频 modal 以 `role="dialog"` DOM 语义在文本提取前删除；
+  不使用 `Race Video`、乘号或中文污染词黑名单，普通正文中的同词和非 HRN dialog 不受影响。
+- `The Jockey Club` 同时可指美国和英国机构。HRN 英文新闻采用来源级确定性映射“美国赛马会”，
+  并与人物术语共用经过字段次数校验的 TERM 占位符；冲突英国 glossary 和生成后映射在该来源
+  计划内排除。
+- 生产中既有英国词条不修改，非 HRN 来源继续使用原术语解析。未来出现不同来源、缩写或新 DOM
+  结构时必须用真实样本另行审核，不扩成全局字符串替换。
+
+## 2026-07-26 本次部署后新发现的同结构污染使用独立 cohort
+
+- 本次发布后使用新解析器重跑了完整权威 cohort，因此没有仅以冻结目标的 apply 数量推算
+  `source_clean` 增量。
+- 新解析器使 8 篇旧 `source_clean` 文章变为 `source_changed`。逐篇 diff 证明它们属于同一
+  已审核 DOM 结构后，本次为其建立了独立 ID-set SHA、candidate、批准、receipt 和
+  rollback；冻结 36 篇的 completion 保持不变。
+- 本次新发现 8 篇均只移除 HRN dialog 的 `Race Video / ×`，独立 cohort SHA 为
+  `f70b56c3aaa4d988c827f28aee076c43199312132be9774c1ccd010a4e51e137`。
+- 其中已公开且已有 sent delivery 的文章 `9783` 仅按批准正文更新了数据库与网页，没有重发
+  QQ；写前/写后逐篇比对确认 delivery 与公开状态未漂移。
+
+## 2026-07-26 赛事生命周期设计决策（阶段 A 已实现）
+
+- 状态推进与赛果权威分离；时间规则按 IANA 时区执行；cancelled/postponed/finished 为终态。
+- 时区合同：日本→Asia/Tokyo、香港→Asia/Hong_Kong、英国→Europe/London、法国→Europe/Paris、
+  美国→manifest 逐场审核 America/*；其他 region fail closed。
+- 默认 mode=off，所有配置关闭；不接入 provider、不改新闻门禁、不 dispatch race-live。
+
+## 2026-07-26 The Racing API schema v2 proof 路由必须显式绑定地区
+
+- schema v2 proof 禁止隐式默认英国；调用者必须显式给出 registry 中已审核的 region。
+- 单次 proof 固定顺序为该地区 `racecards today`、`racecards tomorrow`、无地区过滤的
+  `results today skip=0`，最多 3 请求；所有 URL 均由 registry v2 route contract builder
+  构建，并继续受 HTTPS host、请求参数、15 秒超时、2 MiB、无 redirect/retry 和 1.05 秒间隔约束。
+- v2 artifact 只记录本次实际尝试的请求 path，不把未执行路由写成已执行证据；v1 proof
+  行为保持兼容。
+- runner 修复、独立 review 与真实联网 proof 是三个独立授权点。本地测试通过不构成联网许可，
+  当前仍禁止读取生产 secret 或发出请求。
+
+## 2026-07-27 赛前官方数据不得沿用赛果 route 或第三方 authority
+
+- 重点赛事赛前清单以现有产品规则 `P0/P1 或 featured` 穷尽枚举，再用官方 aware post time
+  判断七天半开窗口；禁止先挑有数据的赛事后宣称全量。
+- `scheduled_post_time`、`actual_off_time`、场地 `local_start_time` 和数据库
+  `race_datetime` 是不同语义。赛前计划时间使用现有 `RaceResultPhase.RACECARD`，并在
+  field provenance 记录 `time_semantics=scheduled_post_time`；同时保留原始时区、UTC、
+  地区时区和中文展示值。不得为这些语义另造数据库 phase。
+- 现有 BHA、France Galop、Equibase official route 只覆盖赛果核验，不自动授权 entries；
+  TRA 只能是 provisional 补充。provider/region/field/phase/contract version 或许可缺失时
+  必须在抓取/写入前 fail closed。
+- 当前跨地区每日官方赛前任务为 NO-GO；购买或取得授权来源、完成连续覆盖证据和新的 review
+  之前，不创建或启用 beat/scheduler。
+
+## 2026-07-27 P0 出马页 URL 发现与出马数据 apply 分离
+
+- 允许把“官方出马页面 URL 发现”作为独立窄链路建设；该链路只保存 URL 和最小审计元数据，
+  不保存页面正文/出马名单，不写赛事业务表，也不改变
+  `fetch-upcoming-key-racecards` 当前结构化数据 apply 为 0 的结论。
+- P0 范围严格等于 `RaceEvent.priority=P0`。draft/hidden、系列待审或时间证据不足的 P0 不得
+  静默丢弃，应进入完整清单并显示 blocker；P1、P2 和 featured-only 不进入本任务。
+- 上海时间每日 `06:30/18:30` 运行，冻结绝对 `[start, start+7d)`。同一赛事只保留一个当前
+  URL；新 URL 替换旧 URL，瞬时错误或后续 404 不自动清空已确认 URL，较旧运行不得覆盖较新运行。
+- 机器 JSON、人工 Markdown 和 manifest 组成不可变 generation，由单一原子 `current` 相对
+  symlink 切换；人工固定读取 `current/latest.md`。SHA 计算必须无环，读取者只可见上一完整代
+  或下一完整代。
+- 模板构造 URL 只能标记 `candidate_unverified`，不得标为 found；found 必须有官方正向存在
+  marker 或官方索引精确链接。普通 404 是 `path_unverified`，不能猜成“尚未发布”。
+- 保留上轮确认 URL 时，URL 的 `provider/provider_event_id/provider_contract_version` 必须与
+  原确认来源一起保留；本轮失败或改源检查使用独立
+  `checked_provider/checked_provider_event_id/checked_provider_contract_version`。汇总按本轮
+  checked provider 计数，禁止把旧 URL 错误归因到新失败来源。
+- 网络在锁外执行，但 outcome 与当前文档的最终 merge 必须在发布锁内重读 `current` 后完成；
+  stale CAS 只防旧运行覆盖，不能替代锁内 latest-state merge。
+- URL-only 降低了内容复制风险，但用户授权不能替代第三方站点的 robots、条款或自动访问许可。
+  每个 provider route 独立 fail closed；确定性构造 URL 可以不联网，索引发现/存在性检查仍须
+  受审 contract。
+
+## 2026-07-27 P0 URL route 的 HEAD 与正文抓取边界
+
+- 用户明确纠正前述边界：按受审规则离线生成 URL，再以 `HEAD` 检查精确路径或应用入口，
+  不属于本项目所称的网页正文抓取。该决定仅修订上一节最后一条对存在性检查的解释，不授权
+  `GET` 正文、HTML 解析、出马字段提取或绕过认证。
+- BHA 目标路径未被本轮获取的 `robots.txt` 禁止，并声明 `crawl-delay: 10`。Equibase 实际
+  请求 origin `tvg.equibase.com` 的 `robots.txt` 返回 404 且不重定向；不得借用
+  `www.equibase.com` 的 robots 规则冒充目标 origin 证据。项目仍主动采用 5 秒最小间隔。
+  route 必须按 host 去重并满足最小间隔；无论响应状态如何，`HEAD` transport 都不得读取或
+  保存 body。
+- BHA 日期变量位于 fragment，服务器无法据此判断该日期数据是否已发布。因此 BHA 的 2xx
+  只能标为 `listing_reachable/date_listing`，不能标为单场 `found`。同一批所有 BHA 日期 URL
+  共享一次去重后的应用入口 HEAD。
+- Equibase 的 `tvg.equibase.com/static/entry/RaceCardIndex{track}{MMDDYY}USA-EQB.html`
+  对当前 DMR/CNL 返回 200、伪场地或错误日期返回 404；因此允许按官方
+  `track_code + local_date` 发精确 HEAD，2xx 标为 `found`、404 标为 `not_published`。
+- France Galop 有效与伪会议 URL 都跳转认证，无法由状态码区分，继续 fail closed；JRA、
+  HKJC 保留未来 contract，NAR 继续遵守明确 robots 禁止。
+- 该判断不把任何 provider 的历史赛果或正文访问许可扩展到 entries 内容；以后若 route 需要
+  `GET` 或解析正文，必须另行形成证据、方案审核和授权。
+## 2026-07-27 赛果缺口恢复采用地区化候选源与官方确认双层来源
+
+- 日本缺口直接以 JRA/NAR 官方结果页作为采集和确认来源。
+- 英国使用 Sporting Life 生成结构化候选、BHA Results 人工确认；法国使用 ZEturf
+  生成候选、France Galop 人工确认。
+- 美国优先从 TOBA 发现精确 Equibase chart；TOBA 尚未更新时允许 Sporting Life 生成候选，
+  但完整赛果仍须 Equibase chart 人工确认。HRN 日期入口本次已验证失效，不作为该批主来源。
+- 第三方候选不得单独写成 confirmed。官方站点的反爬、token 或登录限制不得通过 stealth、
+  验证码绕过或未批准自动化规避。
+
+## 2026-07-27 赛果恢复投影与实时公开门禁按 owner 分流
+
+- `historical` owner 的缺口恢复使用 non-live official receipt 和逐场 CAS 投影，不复用
+  race-live 的 provisional/publication 授权；`live`、既有 `unmanaged` 以及
+  `manual_paused` 的 current result revision 仍经过原实时公开策略读取门禁。
+- canonical 去重只隐藏已批准 active duplicate 的日历、首页、周焦点和 sitemap 入口；
+  旧详情 URL 保留并指向 canonical 赛事。链接创建必须同地区、同年度、无自环、无链/环，
+  且使用 PostgreSQL advisory lock 与 row lock。
+- 本地实现、代码审核、部署、联网 candidate prepare、人工 official 审批和生产 apply
+  是独立授权点；任一前置完成不授权后续动作。
+## 2026-07-27 Sporting Life、ZEturf、HRN 固定为内部参考源
+
+- 用户已与三方确认本站可保留现有解析器并低频使用；项目记录该确认作为当前使用边界，不在
+  仓库保存敏感往来内容。
+- 三源新增生命周期观察统一为 `internal_reference`：允许内部采集、匹配、版本比较和后台查看，
+  不允许公开展示、字段 apply、赛果 authority、新闻引用自动发布或 QQ 分发。
+- 内部参考链必须使用独立 run/payload/receipt 模型和只读后台；禁止直接复用
+  `import_race_event_detail_candidates --apply`、`RaceEventDataCandidate`、race-live revision/
+  projection。
+- Sporting Life 不能产生英国 official，ZEturf 不能覆盖 France Galop，HRN 的 payout/
+  also-rans 不能冒充完整正式结果。
+- 本决定不追溯修改按既有历史赛事审核流程已经导入的数据。未来若要人工采纳内部观察，必须
+  另立 change，不在阶段 B0.1 提供 promotion action。
+- 阶段 B0.1 只处理现有 parser 的 `finished` 赛后入口，不注册 Celery/Beat；多日观察使用逐日
+  manifest-bound one-shot。赛前 route 或无人值守调度属于后续独立范围。
+- 阶段 B0.1 与 TRA/官方赛前同步分开 review、开关、联网和生产写入授权；连续观察成功也不会
+  自动提高来源 authority。
+
+## 2026-07-27 定时赛果工具新增逐审核包人工采纳 authority
+
+- Sporting Life、ZEturf、HRN 等来源继续保持 `internal_reference`，自动采集成功和完整顺序都不把
+  来源升级为 official，也不能复用 official receipt 冒充官方确认。
+- 用户对精确 `bundle_sha256 + event_id + reviewed_row_digest` 的明确批准形成独立
+  `human_reviewed_reference` authority，只允许当前 event 的当前字段集合进入平台正式赛果投影；
+  它不是来源级白名单，也不授权未来 bundle。
+- 该路径使用独立、不可变 approval ledger 和逐 event 原子 projection。平台确认时间与官方确认
+  时间分开；公开语义为“已人工审核赛果”，不得显示为“官方赛果”。
+- official receipt 路径保持原合同不变。任何未审核、digest 漂移、名次不完整或 Also ran 文本顺序
+  继续 fail closed。
+
+# 2026-07-27 赛果补缺 candidate source map 升级为 gap-v2
+
+- 决定将美国 19 场恢复目标全部交给 Sporting Life 结果 adapter 生成完整数字顺序候选。
+  TOBA 对前 12 场只保留 Equibase 精确 chart 入口、field 与 winner 的 discovery 证据，
+  不再作为结果 candidate provider，也不能授权 official confirmation。
+- 原因：生产一次性 prepare 中 TOBA 自动请求返回 403，且 TOBA 表只提供 winner/discovery，
+  无法满足完整参赛名单与连续唯一名次门禁；同场 Sporting Life 已取得完整顺序，并与 TOBA
+  field/winner 一致。
+- NAR event 185 不改变 provider；recovery mode 允许在冻结的 `introduction.html` 尚无入口时
+  受控检查同目录 `racecard.html`。该行为只在 recovery mode 生效，不改变普通历史详情流程。
+- 法国 event `733..736` 在 recovery mode 使用首轮 prepare 已核验的四条精确 ZEturf route，
+  下载后必须重验日期、赛场与赛事名，失败不回退宽范围探测。该选择把预计请求数从 35 降至
+  4，使美国 19 场改走 Sporting Life 后全批仍可满足 75 请求硬上限。
+- 新 candidate source map 版本为 `2026-07-27-gap-v2`。发布前的 40 场合并包仅供审阅，
+  source map v2 未部署前不得作为正式 audit/apply 输入。
+
+## 2026-07-28 数据库 migration 采用显式一次性 release task 作为唯一 owner
+
+- 当前 `start-web.sh` 与四条 deploy/rollback 入口都能执行 migration，`up -d web` 后再
+  `exec web migrate` 存在真实并发 DDL 风险。
+- 设计决定不再把 migration/collectstatic 绑定到常驻 web 启动；两者由共享的 Compose
+  one-shot release task 串行执行。标准/低成本 deploy 与 rollback 只调用这一入口。
+- release task 前必须停 beat，冻结并完整排空普通/race-live worker，停普通 worker、原本
+  running 的 race_live_worker 和 web；release 成功后先启动 web 并等待 `healthy`，再启动
+  worker/beat/nginx，race_live_worker 只按原始状态恢复。任一失败均非零并禁止继续。
+- deploy、rollback 和手工 release 共享 host-local fail-closed 部署锁与 owner token。内部
+  wrapper 缺 token 拒绝，竞争失败者不能释放赢家锁；遗留锁不得自动过期删除。
+- 通用 rollback 只接受含 `release_contract_v1` 的目标；首次发布回退到 pre-contract 版本时
+  保留新控制面 checkout，只恢复冻结旧 image，由旧 web 作为唯一 migration owner。
+- greenfield bootstrap 不在本 change 范围；historical runner initial-install 不等于站点初装。
+- 代码 rollback 不等于数据库反向 migration。目标 schema 不兼容时必须显式反向迁移或恢复
+  已校验备份，不能只 checkout 旧代码后继续启动。
+- 本决定目前处于设计/审核阶段，不是实现或生产授权。
+
+## 2026-07-31 历史年份“重点”按赛事等级展示 G1+G2
+
+- 用户确认：选择历史年份时，“重点”应展示该筛选范围内的 G1 与 G2 赛事，不应依赖当期运营
+  `priority` 或 `is_featured` 是否被人工赋值。
+- `normalized_grade` 是历史赛事事实字段；`priority/is_featured` 是运营字段，两者不得通过批量
+  把历史赛事改为 P1 来混用。
+- 现有 OpenSpec `backfill-race-events-to-1984` 对“重点”的旧定义曾是 P0/P1 或人工置顶，与本
+  决定冲突；本地实现已同步旧规格，并保留未选择历史年份及当前年份的运营口径。
+- 用户后续仅授权本地实现；本决定仍不授权历史数据写入、发布或部署。
+
+## 2026-07-31 赛事公开自然年与届次年分离
+
+- `RaceEvent.year` 作为公开自然年；已知 `local_date` 时必须等于 `local_date.year`。年份筛选、
+  页面标题、canonical URL 和 sitemap 均使用公开自然年。
+- 新增 `RaceEvent.edition_year` 表达真正的届次身份；
+  `HistoricalRaceEventTarget.year` 与它关联。普通香港马季跨自然年不是延期，不得使用赛季结束年
+  冒充届次年；真实延期仍须权威证据和人工批准。
+- 公开路径使用统一 registry 承载 canonical/legacy，并在单表内唯一，旧错误 URL 只做 301，
+  不保留第二张公开卡片。
+- schema 必须拆成三个独立 release：A 为 nullable/兼容层，B 在全库 census 后切换届次唯一约束，
+  C 在数据修复 verifier 后增加 non-null/自然年 check。后续 migration 不得提前存在于前一
+  release 镜像。
+- 全库最终约束意味着 census 不能只检查香港；香港是强制修复子集，其他地区 mismatch 也必须
+  分类为合法跨届次、待修或 blocker。
+- 用户后续仅授权 Release A 本地实现；本决定不授权生产 census、数据 apply 或发布，Release
+  B/C 仍需各自重新 review 与授权。
+
+## 2026-07-31 历史赛历 writer admission 与 canonical path 采用集中事务合同
+
+- 不能把年份合同只放在 `full_clean()`：`RaceEvent.save/create/update_or_create` 对新行和身份
+  变更统一调用 `validate_event_years`；已知 identity bulk/update 写拒绝并要求逐条 writer。
+- 为兼容 Release A 存量坏行，非身份字段更新不重验旧错误；任何 year、edition_year、
+  local_date 或 source_refs 变化仍须重新验证。
+- canonical path reservation 是 event 写事务的一部分。event 新建或 year/slug 改动必须同步
+  registry；legacy 已占用目标路径时整笔失败，不允许静默覆盖。
+- maintenance evidence 仅是外部观测，不替代数据库实时 gate。`0067` 内加入有 enter/exit 审计的
+  active gate；普通 writer 在事务内 admission，PostgreSQL 以 shared/exclusive advisory lock
+  保证 gate 前 writer 排空、gate 后 writer 拒绝且等待者重新检查。
+- repair 的 bypass 不是通用开关，只能在已核验 manifest/action scope 且 exact active gate 的
+  apply/rollback 事务内使用。该决定仍处于本地代码复审前状态，不构成生产写入授权。
+
+## 2026-07-31 lifecycle shadow 采用 prepare manifest 与启用分离
+
+- 不直接用现有 `--auto-discover` 或人工 JSON 纳管生产赛事。先以明确 event IDs 生成
+  strict schema v2 manifest，再由同一 loader/preflight 完成 dry-run 和 apply。
+- 首次纳管入口固定 shadow-only、1–20 场；apply 在单事务内排序锁定全部 event/control，
+  对资格、状态、地区、时区、日期/时间、event 更新时间和 existing control 做完整 CAS。
+  任一漂移整批零写；相同 manifest 只允许精确 replay，不同 manifest 不更新既有 control。
+- control apply 必须在全局 `false/off` 下完成并独立 verify。打开
+  `true/shadow` 是针对精确 manifest、赛事范围和观察窗口的第二次用户授权；观察成功也不
+  自动进入 enforce。
+- `local_start_time` 只是展示 wall-clock，不用于推导 `race_datetime`。当前生产未来赛事
+  `race_datetime=0`，所以首批只能验证无时间的当地次日 proposal，不能宣称有时间路径已
+  完成线上验证。
+- 方案已通过独立审核，用户已授权测试先行与本地实现；实现仍不构成生产 apply、开关、
+  commit/push/PR 或部署授权。
+- 首轮方案 review 后补充：v2 apply 的 `false/off` 必须是代码硬门禁，不能只依赖操作
+  runbook；v1 只保留 dry-run compatibility，永久禁止 apply，避免绕过 v2 合同。
+- 实现采用同一 strict loader/preflight 服务承载 v2 dry-run/apply；跨位数 event ID 的
+  canonical 排序按整数处理，避免字符串 `10 < 9` 导致 producer 生成后被 loader 自拒绝。
+
+## 2026-08-01 首批近期赛事时间采用“举办地 wall-clock + IANA + aware UTC”原子修正
+
+- 本次写入将 `local_date/local_start_time/timezone_name` 核对为举办地当地时间，未把中文站
+  展示时区投影回写为赛事当地字段；`race_datetime` 保存了同一时刻的 aware UTC。四个字段
+  在本次 manifest 中保持一致，未只补 `race_datetime` 而留下冲突数据。
+- 本次 Del Mar/NYRA 官方结构化页面采用 authority `500`；Racing Post 等已批准可信媒体采用
+  authority `200`，未将可信媒体伪装为官方或专业 API。所有本次实际变化均同时写入当前
+  `RaceEventFieldAuthority` 与 append-only `RaceEventFieldChange`。
+- 本次 8 场修正只解决已人工核对的时间元数据，不自动创建 lifecycle control，不改变
+  `RaceEvent.status`，也不构成打开 shadow/enforce、启用 provider 或 race-live worker 的授权。
+
+## 2026-08-01 第二批时间补采继续采用“逐场明确证据，不推断缺失时间”
+
+- 本次 8 月 1–8 日盘点只写入了可由 JRA、NYRA、The Jockey Club 官方页面或已批准 Racing
+  Post 逐场核对的 8 场；未找到逐场明确时间的 12 场保持原值，未由赛事日期、首场时间或场次
+  顺序推导。
+- 本次官方页面字段采用 authority `500`，Glorious Stakes 的 Racing Post 字段采用 `200`；
+  `local_start_time/timezone_name/race_datetime` 作为同一时间事实一起核对，未把上海展示时间
+  继续保存为日本或英国赛事的举办地 wall-clock。
+- 本次生产运行始终保持 lifecycle `false/off`，未创建 control/transition，未改变赛事状态，
+  也未启用 provider、shadow、enforce 或 race-live worker。
+# 2026-08-01 生命周期适用于所有已纳管赛事，重点属性不再作为资格门禁
+
+- 用户明确决定：赛事生命周期是赛事基础能力，`priority`、`is_featured` 和
+  `is_key_race` 不应决定赛事能否自动更新状态。strict manifest 明确选中的合法赛事即使为
+  P2/非 featured，也允许进入 shadow；这些字段继续冻结为审计快照。
+- 本决定不等同于自动给全部历史赛事创建 control。首次纳管继续使用 1–20 场 explicit-ID、
+  strict v2、SHA/CAS、false/off apply 和 shadow-only 合同；全量自动纳管另行设计。
+- 用户希望 shadow 不长期停留，决策窗口为 24–48 小时。该窗口用于形成 enforce GO/NO-GO，
+  只统计真实跨过边界的赛事；未到期赛事不得记为已完成生产时序观察，enforce 仍需独立 change、
+  review 和授权。
+# 2026-08-02 生命周期 advance task 复用普通 celery 队列
+
+- 决定将 `advance_race_event_lifecycle_task` 路由到生产普通 worker 已消费的 `celery`。
+- 不扩大普通 worker 去消费 `default`：该队列的任务类型和既有消息未在本变更中完成审计。
+- 生产 `default` 中既有 2 条旧 lifecycle 消息不清理；claim 过期不等于 stale。后续 R3
+  启用前必须确认无人消费 `default`，并在 scanner 后确认新 claim generation 已增长，才可
+  依赖陈旧任务防护隔离旧消息。
+- 修复发布保持 lifecycle `false/off`；关闭态部署与 R3 重试分别重新授权。
+# 2026-08-02 race-data-sync A 采用 provider-neutral ledger 与 schedule fail-closed
+
+- roster 中 HKJC/JRA/NAR/France Galop/Equibase/HRI/TRA/Sporting Life/ZEturf/HRN 保留真实
+  source class，但新 reconciliation 不再读取 legacy `authority_level` 决定覆盖；同源新版可修正，
+  跨来源异值和 manual lock 进入 `needs_review`。
+- 切片 A 可以自动写入非 schedule runner 字段，但 `race_datetime/local_start_time/timezone/status`
+  只形成带 observation/contract/hash 的 candidate ledger；C 的 generation/claim/reschedule 未完成前
+  任何入口都不得直接改赛事时间或状态。
+- provider roster 与 flags 默认关闭。已有 TRA adapter 标记 implemented；其他来源在逐来源 proof 和
+  parser fixture 完成前必须保持 `proof_required`，不能因来源可信就伪称采集实现已完成。
+- 自动写入必须同时满足 source identity 已审批、automation allowed、adapter implemented、transport
+  enabled、apply enabled，以及 global/provider/region/field 四维运行开关；预录 observation 不能绕过
+  proof 或已撤销 contract。参赛马外部 ID 必须位于 provider/source identity 命名空间，跨来源只接受
+  已审核 `RaceEventParticipantSourceIdentity` 的确定映射。
+- `RaceEventFieldChange` 新 decision 受 enum/check 约束，PostgreSQL 通过可逆 trigger 禁止 update/delete；
+  raw artifact 删除使用 directory FD/unlinkat 等价语义并在数据库锁内重验，不能依赖 Linux-only `/proc`。
+- 空 `source_refs` 的 legacy runner 不代表任何 provider ownership；必须有本来源 ownership 或已批准的
+  participant source identity mapping 才能更新。赔率/人气不享有隐式放行；所有字段服从同一 allowlist。
+  runner 动态更新时间只随真正 applied 且严格更新的 freshness watermark 前进。raw cleanup 使用稳定
+  keyset 分页越过任意数量 held rows，不能用固定扩大扫描窗口近似解决饥饿。
+- field reconciliation 的准入结果同时约束 legacy runner 和 canonical racecard revision；关闭态不推进
+  revision/pointer，部分字段准入只能把获准后的 canonical state 投影进 revision。单 observation 内发现
+  needs-review 必须回滚本轮全部 applied 字段，并完成 tracking checkpoint/claim 收尾；同 observation 在
+  后续扩大 allowlist 时按字段补处理，已决字段不重复写 ledger。
+- `jockey_id` 等被 strict schema 明确识别的 provider metadata 可保留在 observation，但不自动成为
+  writable field、runtime allowlist 或 field ledger。`RacingRegion.OTHER` 不等于 Ireland；只有 event
+  source refs 或已批准 source identity 中精确 `race_data_region=ireland` 才允许反向路由，禁止根据场名猜测。
+- event/source identity 的 Ireland markers 只要有一个存在的值不是精确字符串 `ireland` 即判冲突并
+  fail closed；仅一方存在不冲突，两方存在必须一致，不能用 OR 掩盖相反地区证据。

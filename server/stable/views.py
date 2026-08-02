@@ -7,7 +7,9 @@ import unicodedata
 import uuid
 from datetime import datetime, time, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -16,9 +18,15 @@ from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.core.signing import BadSignature, SignatureExpired
 from django.db import transaction
-from django.db.models import BooleanField, Count, Exists, F, OuterRef, Prefetch, Q, Value
+from django.db.models import BooleanField, Case, Count, Exists, F, OuterRef, Prefetch, Q, Value, When
 from django.db.models.functions import Lower
-from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse
+from django.http import (
+    Http404,
+    HttpRequest,
+    HttpResponse,
+    HttpResponseForbidden,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.html import format_html
@@ -30,6 +38,7 @@ from .forms import (
     ArticleEditorForm,
     ArticleQuickTermForm,
     BackendAuthenticationForm,
+    HeadlineControlForm,
     HorseArticleLinkForm,
     HorseProfileForm,
     HorseRaceRecordForm,
@@ -52,6 +61,7 @@ from .models import (
     ArticleTranslationStatus,
     CrawlJob,
     HistoricalRaceResolutionStatus,
+    HomepageHeadlineRecommendation,
     HorseCareerHistoryStatus,
     HorseFollow,
     HorseP0SourceStatus,
@@ -64,6 +74,7 @@ from .models import (
     HorseRaceLink,
     HorseRaceRecord,
     HorseRaceResultStatus,
+    HorseRaceStartStatus,
     MediaAsset,
     NewsArticle,
     NewsImage,
@@ -85,6 +96,7 @@ from .models import (
     RaceEventDataQuality,
     RaceEventHistoryWinner,
     RaceEventPriority,
+    RaceEventProductCanonicalLink,
     RaceEventResult,
     RaceRunnerStatus,
     RaceEventStatus,
@@ -128,6 +140,12 @@ from .services.multiregion import PRODUCTION_REGIONS, region_production_rows
 from .services.news_production_integrity import source_health_snapshot
 from .services.onebot import BotPusher
 from .services.operations import log_operation
+from .services.race_calendar import (
+    decode_race_calendar_cursor,
+    encode_race_calendar_cursor,
+    public_default_race_date_window,
+    race_calendar_cursor_filter,
+)
 from .services.race_event_public_cache import (
     public_race_calendar_years,
     public_race_sitemap_count,
@@ -161,7 +179,18 @@ from .services.term_admin import (
     validate_term_payload,
 )
 from .services.term_candidate_review import accept_candidate, merge_candidate, set_candidate_status
+from .services.race_term_display import RaceTermResolver
 from .services.terms import apply_created_term_to_article
+from .services.editorial_headlines import (
+    accept_headline_recommendation,
+    cancel_manual_headline,
+    generate_headline_recommendation,
+    get_headline_state,
+    headline_candidate_queryset,
+    is_headline_eligible,
+    resolve_homepage_headline,
+    set_manual_headline,
+)
 from .tasks import (
     batch_translate_articles_task,
     crawl_news_source_task,
@@ -178,7 +207,6 @@ PUBLIC_HOT_CANDIDATE_LIMIT = 48
 PUBLIC_HOT_DISPLAY_LIMIT = 6
 QUICK_TERM_FOLLOWUP_SESSION_KEY = "article_quick_term_followup"
 RACE_CALENDAR_PAGE_SIZE = 40
-RACE_CALENDAR_WINDOW_DAYS = 30
 HORSE_PROFILE_PAGE_SIZE = 40
 PUBLIC_HORSE_PAGE_SIZE = 24
 PUBLIC_HORSE_RACE_RECORD_PAGE_SIZE = 20
@@ -2246,6 +2274,10 @@ def article_editor(request: HttpRequest, article_id: int):
         ),
         pk=article_id,
     )
+    active_rec = HomepageHeadlineRecommendation.objects.select_related("article").filter(
+        slot="homepage_primary", status="active"
+    ).first()
+    can_manage_headline = request.user.has_perm("stable.change_homepageheadlineselection")
     article.ensure_editable_fields()
     if request.method == "POST":
         form = ArticleEditorForm(request.POST, instance=article)
@@ -2270,6 +2302,8 @@ def article_editor(request: HttpRequest, article_id: int):
                             allow_publish_without_cover=True,
                             term_type_choices=TermType.choices,
                             quick_term_followup=None,
+                            active_headline_recommendation=active_rec,
+                            can_manage_headline=can_manage_headline,
                         ),
                     )
                 article.workflow_status = WorkflowStatus.PUBLISHED
@@ -2322,6 +2356,8 @@ def article_editor(request: HttpRequest, article_id: int):
             allow_publish_without_cover=False,
             term_type_choices=TermType.choices,
             quick_term_followup=_pop_quick_term_followup(request, article, "editor"),
+            active_headline_recommendation=active_rec,
+            can_manage_headline=can_manage_headline,
         ),
     )
 
@@ -2333,6 +2369,167 @@ def article_preview(request: HttpRequest, article_id: int):
         return denied
     article = get_object_or_404(NewsArticle, pk=article_id)
     return render(request, "stable/console/article_preview.html", _console_context(request, article=article))
+
+
+@login_required
+def headline_control(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    if not request.user.has_perm("stable.change_homepageheadlineselection"):
+        return HttpResponseForbidden("无首页头条管理权限。")
+
+    state = get_headline_state()
+    # Apply exact Python eligibility to the database superset so that
+    # articles with empty effective_summary / effective_body (which may
+    # have non-empty fallback fields) are not shown as selectable.
+    qs = headline_candidate_queryset()
+    eligible_articles = []
+    for article in qs[:192]:
+        if is_headline_eligible(article):
+            eligible_articles.append(article)
+            if len(eligible_articles) >= 48:
+                break
+
+    active_rec = state.get("active_recommendation")
+    recommendation = None
+    if active_rec:
+        try:
+            recommendation = HomepageHeadlineRecommendation.objects.select_related(
+                "article", "generated_by"
+            ).get(pk=active_rec.pk)
+        except HomepageHeadlineRecommendation.DoesNotExist:
+            pass
+
+    recent_logs = OperationLog.objects.select_related("admin").filter(
+        action_type__in=[
+            "headline_set", "headline_replaced", "headline_cancelled",
+            "headline_invalidated", "headline_recommendation_generated",
+            "headline_recommendation_superseded",
+            "headline_recommendation_accepted",
+            "headline_recommendation_invalidated",
+        ]
+    ).order_by("-created_at")[:20]
+
+    return render(
+        request,
+        "stable/console/headline_control.html",
+        _console_context(
+            request,
+            state=state,
+            eligible_articles=eligible_articles,
+            recommendation=recommendation,
+            recent_logs=recent_logs,
+        ),
+    )
+
+
+@login_required
+@require_POST
+def headline_select(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    if not request.user.has_perm("stable.change_homepageheadlineselection"):
+        return HttpResponseForbidden("无首页头条管理权限。")
+
+    form = HeadlineControlForm(request.POST)
+    if not form.is_valid():
+        for error in form.errors.get("article_id", []):
+            messages.error(request, f"选择失败：{error}")
+        return redirect("console-headline-control")
+
+    article_id = form.cleaned_data["article_id"]
+    expected_version = form.cleaned_data["expected_version"]
+    try:
+        result = set_manual_headline(article_id, user=request.user, expected_version=expected_version)
+        if result.get("success"):
+            messages.success(request, "已设置首页头条。")
+        else:
+            messages.error(request, f"设置失败：{result.get('reason', '未知错误')}")
+    except (PermissionError, ValueError) as exc:
+        messages.error(request, f"设置失败：{exc}")
+    return redirect("console-headline-control")
+
+
+@login_required
+@require_POST
+def headline_cancel(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    if not request.user.has_perm("stable.change_homepageheadlineselection"):
+        return HttpResponseForbidden("无首页头条管理权限。")
+
+    try:
+        expected_version = int(request.POST.get("expected_version", -1))
+    except (TypeError, ValueError):
+        messages.error(request, "版本号格式不正确。")
+        return redirect("console-headline-control")
+    if expected_version < 0:
+        messages.error(request, "缺少版本号。")
+        return redirect("console-headline-control")
+
+    try:
+        result = cancel_manual_headline(user=request.user, expected_version=expected_version)
+        if result.get("success"):
+            messages.success(request, "已取消人工头条，首页将使用算法回退。")
+        else:
+            messages.error(request, f"取消失败：{result.get('reason', '未知错误')}")
+    except (PermissionError, ValueError) as exc:
+        messages.error(request, f"取消失败：{exc}")
+    return redirect("console-headline-control")
+
+
+@login_required
+@require_POST
+def headline_recommend(request: HttpRequest):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    if not request.user.has_perm("stable.change_homepageheadlineselection"):
+        return HttpResponseForbidden("无首页头条管理权限。")
+
+    try:
+        result = generate_headline_recommendation(user=request.user)
+        if result is None:
+            messages.warning(request, "当前没有合格的候选文章可供推荐。")
+        else:
+            messages.success(request, "已生成新的 AI 编辑推荐。")
+    except (PermissionError, ValueError) as exc:
+        messages.error(request, f"推荐生成失败：{exc}")
+    return redirect("console-headline-control")
+
+
+@login_required
+@require_POST
+def headline_accept_recommendation(request: HttpRequest, recommendation_id: int):
+    denied = _ensure_staff(request)
+    if denied:
+        return denied
+    if not request.user.has_perm("stable.change_homepageheadlineselection"):
+        return HttpResponseForbidden("无首页头条管理权限。")
+
+    try:
+        expected_version = int(request.POST.get("expected_version", -1))
+    except (TypeError, ValueError):
+        messages.error(request, "版本号格式不正确。")
+        return redirect("console-headline-control")
+    if expected_version < 0:
+        messages.error(request, "缺少版本号。")
+        return redirect("console-headline-control")
+
+    try:
+        result = accept_headline_recommendation(
+            recommendation_id, user=request.user, expected_selection_version=expected_version
+        )
+        if result.get("success"):
+            messages.success(request, "已接受推荐并更新首页头条。")
+        else:
+            messages.error(request, f"接受失败：{result.get('reason', '未知错误')}")
+    except (PermissionError, ValueError) as exc:
+        messages.error(request, f"接受失败：{exc}")
+    return redirect("console-headline-control")
 
 
 @login_required
@@ -2509,17 +2706,46 @@ def _region_tab_context(active_region: str) -> list[dict]:
 
 
 def _public_horse_queryset(*, token_hash: str = ""):
+    stats_enabled = getattr(settings, "RACE_FIELD_NORMALIZED_STATS_ENABLED", False)
+    if stats_enabled:
+        starts_count = Count(
+            "race_records",
+            filter=~Q(race_records__start_status__in=[
+                HorseRaceStartStatus.DID_NOT_START,
+            ]) & ~Q(race_records__result_status__in=[
+                HorseRaceResultStatus.SCRATCHED,
+                HorseRaceResultStatus.WITHDRAWN,
+                HorseRaceResultStatus.UNKNOWN,
+            ]),
+        )
+        wins_count = Count("race_records", filter=Q(race_records__normalized_finish_position=1))
+        seconds_count = Count("race_records", filter=Q(race_records__normalized_finish_position=2))
+        thirds_count = Count("race_records", filter=Q(race_records__normalized_finish_position=3))
+    else:
+        starts_count = Count(
+            "race_records",
+            filter=~Q(race_records__result_status__in=[
+                HorseRaceResultStatus.SCRATCHED,
+                HorseRaceResultStatus.WITHDRAWN,
+                HorseRaceResultStatus.UNKNOWN,
+            ]),
+        )
+        wins_count = Count(
+            "race_records",
+            filter=Q(race_records__result_status=HorseRaceResultStatus.WON)
+            | Q(race_records__finish_position__in=["1", "01"]),
+        )
+        seconds_count = Count("race_records", filter=Q(race_records__finish_position__in=["2", "02"]))
+        thirds_count = Count("race_records", filter=Q(race_records__finish_position__in=["3", "03"]))
+
     queryset = (
         HorseProfile.objects.filter(review_status=HorseProfileStatus.PUBLISHED)
         .select_related("primary_term", "sire_horse_profile", "dam_horse_profile")
         .annotate(
-            starts_count=Count("race_records", filter=~Q(race_records__result_status=HorseRaceResultStatus.SCRATCHED)),
-            wins_count=Count(
-                "race_records",
-                filter=Q(race_records__result_status=HorseRaceResultStatus.WON) | Q(race_records__finish_position__startswith="1"),
-            ),
-            seconds_count=Count("race_records", filter=Q(race_records__finish_position__startswith="2")),
-            thirds_count=Count("race_records", filter=Q(race_records__finish_position__startswith="3")),
+            starts_count=starts_count,
+            wins_count=wins_count,
+            seconds_count=seconds_count,
+            thirds_count=thirds_count,
         )
         .order_by("-is_featured", "display_name_zh", "original_name", "id")
     )
@@ -2543,12 +2769,71 @@ def _horse_stats(profile: HorseProfile) -> dict[str, int]:
 
 
 def _horse_record_position(record: HorseRaceRecord) -> str:
-    match = re.match(r"^\s*([123])(?:\D|$)", record.finish_position or "")
+    display_enabled = getattr(settings, "RACE_FIELD_NORMALIZED_DISPLAY_ENABLED", False)
+
+    if display_enabled:
+        if record.normalized_finish_position is not None:
+            if record.normalized_result_status == "dead_heat":
+                return f"{record.normalized_finish_position} (同着)"
+            return str(record.normalized_finish_position)
+        if record.normalized_result_status and record.normalized_result_status != "unknown":
+            status_labels = {
+                "finished": "完赛",
+                "dead_heat": "同着",
+                "did_not_finish": "未完赛",
+                "pulled_up": "拉停",
+                "brought_down": "拉停(被带倒)",
+                "unseated_rider": "落马",
+                "fell": "堕马",
+                "disqualified": "失格",
+                "scratched": "退赛",
+                "non_runner": "未出赛",
+                "withdrawn": "退出",
+            }
+            label = status_labels.get(record.normalized_result_status)
+            if label:
+                return label
+
+    # Fallback: fixed old logic
+    pos_raw = (record.finish_position or "").strip()
+
+    # Known abbreviation codes for non-finish status
+    abbreviation_labels = {
+        "PU": "拉停",
+        "DNF": "未完赛",
+        "SCR": "退赛",
+    }
+    upper_pos = pos_raw.upper()
+    if upper_pos in abbreviation_labels:
+        return abbreviation_labels[upper_pos]
+
+    # Empty position: try result_status for a descriptive label
+    if not pos_raw or pos_raw == "-":
+        status_labels_raw = {
+            HorseRaceResultStatus.DID_NOT_FINISH: "未完赛",
+            HorseRaceResultStatus.SCRATCHED: "退赛",
+            HorseRaceResultStatus.WITHDRAWN: "取消出走",
+            HorseRaceResultStatus.DISQUALIFIED: "失格",
+        }
+        label = status_labels_raw.get(record.result_status)
+        if label:
+            return label
+        # WON with no position data
+        if record.result_status == HorseRaceResultStatus.WON:
+            return "1"
+        return "-"
+
+    # Numeric position: strip leading zeros ("01" -> "1", "10" -> "10")
+    if pos_raw.isdigit():
+        return str(int(pos_raw))
+
+    # Original regex for e.g. "1", "2", "3" followed by non-digit
+    match = re.match(r"^\s*([123])(?:\D|$)", pos_raw)
     if match:
         return match.group(1)
     if record.result_status == HorseRaceResultStatus.WON:
         return "1"
-    return (record.finish_position or "-").strip() or "-"
+    return pos_raw
 
 
 def _public_horse_article_entries(profile: HorseProfile, *, limit: int = 12) -> list[dict]:
@@ -2731,7 +3016,7 @@ def _public_today_races() -> tuple[list[dict], bool]:
     base = RaceEvent.objects.filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
         local_date__isnull=False,
-    )
+    ).exclude(canonical_product_links__is_active=True)
     events = list(
         base.filter(local_date__gte=today, local_date__lte=today + timedelta(days=1)).order_by(
             "local_date", "local_start_time", "id"
@@ -2771,13 +3056,56 @@ def _public_next_key_race():
         visibility_status=RaceEventVisibility.PUBLISHED,
         local_date__isnull=False,
         local_date__gte=today,
-    ).filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
+    ).exclude(canonical_product_links__is_active=True).filter(
+        Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1])
+        | Q(is_featured=True)
+    )
     return queryset.order_by("local_date", "local_start_time", "id").first()
 
 
-def _race_calendar_queryset(request: HttpRequest):
-    queryset = RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED)
+def _public_race_calendar_base_queryset(filters: dict, *, today):
+    """赛事日历公开基础 queryset：published、排除 active canonical duplicate、
+    tab/region/grade/when。默认日期窗口与赛事列表复用同一基础 queryset；
+    read-gate 展示 annotation 只在最终赛事对象查询上加。"""
+    queryset = RaceEvent.objects.filter(
+        visibility_status=RaceEventVisibility.PUBLISHED
+    ).exclude(canonical_product_links__is_active=True)
+    selected_year = (
+        int(filters["year"])
+        if filters["year"].isdigit()
+        else None
+    )
+    if filters["tab"] == "key":
+        if selected_year is not None and selected_year < today.year:
+            queryset = queryset.filter(
+                normalized_grade__in=[
+                    *PUBLIC_RACE_GRADE_FILTERS["g1"],
+                    *PUBLIC_RACE_GRADE_FILTERS["g2"],
+                ]
+            )
+        else:
+            queryset = queryset.filter(
+                Q(
+                    priority__in=[
+                        RaceEventPriority.P0,
+                        RaceEventPriority.P1,
+                    ]
+                )
+                | Q(is_featured=True)
+            )
+    if filters["region"]:
+        queryset = queryset.filter(country_region=filters["region"])
+    if filters["grade"]:
+        queryset = queryset.filter(normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS[filters["grade"]])
+    if filters["when"]:
+        queryset = queryset.filter(status__in=PUBLIC_RACE_WHEN_FILTERS[filters["when"]])
+    return queryset
+
+
+def _race_calendar_queryset(request: HttpRequest, *, today):
     tab = request.GET.get("tab", "key").strip() or "key"
+    if tab not in {"all", "key"}:
+        tab = "key"
     region = request.GET.get("region", "").strip()
     direction = request.GET.get("direction", "").strip()
     cursor = request.GET.get("cursor", "").strip()
@@ -2789,15 +3117,24 @@ def _race_calendar_queryset(request: HttpRequest):
         grade = ""
     if when not in PUBLIC_RACE_WHEN_FILTERS:
         when = ""
-    today = timezone.localdate()
-    if tab == "key":
-        queryset = queryset.filter(Q(priority__in=[RaceEventPriority.P0, RaceEventPriority.P1]) | Q(is_featured=True))
-    if region:
-        queryset = queryset.filter(country_region=region)
-    if grade:
-        queryset = queryset.filter(normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS[grade])
-    if when:
-        queryset = queryset.filter(status__in=PUBLIC_RACE_WHEN_FILTERS[when])
+    filters = {
+        "tab": tab,
+        "region": region,
+        "direction": direction,
+        "cursor": cursor,
+        "year": year,
+        "q": query,
+        "grade": grade,
+        "when": when,
+    }
+    base_queryset = _public_race_calendar_base_queryset(filters, today=today)
+    queryset = base_queryset.annotate(
+        public_current_result_revision_id=F(
+            "projection_control__current_result_revision_id"
+        ),
+        public_projection_write_owner=F("projection_control__write_owner"),
+    )
+    cross_period = bool(year or query)
     if year.isdigit():
         queryset = queryset.filter(year=int(year))
     if query:
@@ -2814,47 +3151,120 @@ def _race_calendar_queryset(request: HttpRequest):
             | Q(race_series__chinese_name__icontains=query)
             | series_name_match
         ).distinct()
-    if cursor and not (year or query):
+    cursor_date = None
+    if cursor and not cross_period:
         try:
             cursor_date = datetime.fromisoformat(cursor).date()
         except ValueError:
-            cursor_date = today
+            cursor_date = None
+    if cursor_date is not None and direction in {"past", "future"}:
+        # 显式独占边界分页（行为保留）
         if direction == "past":
             queryset = queryset.filter(local_date__lt=cursor_date).order_by("-local_date", "-local_start_time", "id")
-        elif direction == "future":
-            queryset = queryset.filter(local_date__gt=cursor_date).order_by("local_date", "local_start_time", "id")
         else:
-            queryset = queryset.order_by("local_date", "local_start_time", "id")
-    elif not (year or query):
-        start = today - timedelta(days=RACE_CALENDAR_WINDOW_DAYS)
-        end = today + timedelta(days=RACE_CALENDAR_WINDOW_DAYS)
-        queryset = queryset.filter(Q(local_date__gte=start, local_date__lte=end) | Q(local_date__isnull=True)).order_by("local_date", "local_start_time", "id")
-    else:
-        queryset = queryset.order_by("local_date", "local_start_time", "id")
-    return queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE], {
-        "tab": tab,
-        "region": region,
-        "direction": direction,
-        "cursor": cursor,
-        "year": year,
-        "q": query,
-        "grade": grade,
-        "when": when,
-    }
+            queryset = queryset.filter(local_date__gt=cursor_date).order_by("local_date", "local_start_time", "id")
+        return (
+            queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE],
+            filters,
+            None,
+            None,
+        )
+    if cross_period:
+        # 显式 year/q 跨期模式：签名复合游标绑定规范化筛选，并以 NULLS LAST
+        # 的日期、时间、主键顺序稳定遍历。每次只读取 page_size + 1。
+        decoded_cursor = None
+        if cursor and direction in {"past", "future"}:
+            decoded_cursor = decode_race_calendar_cursor(
+                cursor,
+                filters=filters,
+            )
+        if decoded_cursor is None:
+            filters["cursor"] = ""
+            filters["direction"] = ""
+            direction = ""
+        else:
+            queryset = queryset.filter(
+                race_calendar_cursor_filter(
+                    decoded_cursor,
+                    direction=direction,
+                )
+            )
+        if direction == "past":
+            ordering = (
+                F("local_date").desc(nulls_first=True),
+                F("local_start_time").desc(nulls_first=True),
+                "-id",
+            )
+        else:
+            ordering = (
+                F("local_date").asc(nulls_last=True),
+                F("local_start_time").asc(nulls_last=True),
+                "id",
+            )
+        page_rows = list(
+            queryset.order_by(*ordering)
+            .prefetch_related("results")[: RACE_CALENDAR_PAGE_SIZE + 1]
+        )
+        has_extra = len(page_rows) > RACE_CALENDAR_PAGE_SIZE
+        page_rows = page_rows[:RACE_CALENDAR_PAGE_SIZE]
+        if direction == "past":
+            page_rows.reverse()
+        pagination = {
+            "has_previous": (
+                has_extra if direction == "past" else decoded_cursor is not None
+            ),
+            "has_next": (
+                decoded_cursor is not None
+                if direction == "past"
+                else has_extra
+            ),
+        }
+        return page_rows, filters, None, pagination
+    # 默认日期窗口模式（含非法/不完整 cursor 的安全回退）
+    window = public_default_race_date_window(base_queryset, today=today)
+    if not window.dates:
+        return queryset.none(), filters, window, None
+    queryset = queryset.filter(local_date__in=window.dates).order_by(
+        Case(When(pk__in=window.representative_ids, then=0), default=1),
+        "local_date",
+        "local_start_time",
+        "id",
+    )
+    return (
+        queryset.prefetch_related("results")[:RACE_CALENDAR_PAGE_SIZE],
+        filters,
+        window,
+        None,
+    )
 
 
-def _group_race_events_by_date(events):
+def _group_race_events_by_date(events, *, today, anchor_date=None):
     groups: list[dict] = []
     current_date = object()
     current_group = None
     read_now = timezone.now()
-    live_public_reads = resolve_race_live_public_reads(
-        event_ids=[event.pk for event in events],
-        now=read_now,
+    live_revision_event_ids = [
+        event.pk
+        for event in events
+        if getattr(event, "public_current_result_revision_id", None) is not None
+        and getattr(event, "public_projection_write_owner", None)
+        != "historical"
+    ]
+    live_public_reads = (
+        resolve_race_live_public_reads(
+            event_ids=live_revision_event_ids,
+            now=read_now,
+        )
+        if live_revision_event_ids
+        else {}
     )
     for event in events:
-        live_public_read = live_public_reads[event.pk]
-        if live_public_read.revision_id is not None and not live_public_read.visible:
+        live_public_read = live_public_reads.get(event.pk)
+        if (
+            live_public_read is not None
+            and live_public_read.revision_id is not None
+            and not live_public_read.visible
+        ):
             event.top_results = []
         else:
             event.top_results = list(event.results.all()[:5])
@@ -2862,14 +3272,15 @@ def _group_race_events_by_date(events):
         winner = _confirmed_race_winner(event.top_results) if event.status == RaceEventStatus.FINISHED else None
         event.public_winner_result = winner
         event.public_winner_name = winner.horse_name if winner else ""
-        event.public_status_label = _public_race_status_label(event, timezone.localdate(), winner)
+        event.public_status_label = _public_race_status_label(event, today, winner)
         if event.local_date != current_date:
             current_date = event.local_date
             current_group = {
                 "date": event.local_date,
                 "events": [],
                 "anchor_id": f"race-date-{event.local_date.isoformat()}" if event.local_date else "race-date-undated",
-                "is_today": event.local_date == timezone.localdate(),
+                "is_today": event.local_date == today,
+                "is_anchor": anchor_date is not None and event.local_date == anchor_date,
             }
             groups.append(current_group)
         current_group["events"].append(event)
@@ -2880,8 +3291,9 @@ def _group_race_events_by_date(events):
     return groups
 
 
-def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | None = None) -> list[RaceEvent]:
-    today = timezone.localdate()
+def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | None = None, today=None) -> list[RaceEvent]:
+    if today is None:
+        today = timezone.localdate()
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
     if events is not None:
@@ -2898,7 +3310,7 @@ def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | N
         local_date__gte=week_start,
         local_date__lte=week_end,
         normalized_grade__in=PUBLIC_RACE_GRADE_FILTERS["g1"],
-    )
+    ).exclude(canonical_product_links__is_active=True)
     if region:
         queryset = queryset.filter(country_region=region)
     return list(queryset.order_by("local_date", "local_start_time", "id")[:3])
@@ -3037,11 +3449,29 @@ def _attach_race_term_display_names(event_records):
 
 
 def public_race_calendar(request: HttpRequest):
-    events, filters = _race_calendar_queryset(request)
+    shanghai_today = timezone.localdate(timezone=ZoneInfo("Asia/Shanghai"))
+    events, filters, window, pagination = _race_calendar_queryset(
+        request,
+        today=shanghai_today,
+    )
     events = list(events)
-    if filters["direction"] == "past":
-        events = list(reversed(events))
-    groups = _group_race_events_by_date(events)
+    if window is None:
+        if pagination is None and filters["direction"] == "past":
+            events = list(reversed(events))
+    else:
+        # 代表赛事优先截取后在 Python 中恢复现有时间升序；local_start_time 为 None
+        # 的赛事排在当天定时赛事之后，对齐生产 PostgreSQL ASC NULLS LAST 语义。
+        events.sort(
+            key=lambda event: (
+                event.local_date,
+                event.local_start_time is None,
+                event.local_start_time or time.min,
+                event.pk,
+            )
+        )
+    default_anchor_date = window.anchor if window is not None else None
+    groups = _group_race_events_by_date(events, today=shanghai_today, anchor_date=default_anchor_date)
+    date_axis_spans_years = len({group["date"].year for group in groups if group["date"]}) > 1
     def filter_url(**changes):
         params = request.GET.copy()
         params.pop("cursor", None)
@@ -3051,7 +3481,12 @@ def public_race_calendar(request: HttpRequest):
                 params[key] = value
             else:
                 params.pop(key, None)
-        return f"?{params.urlencode()}" if params else "?"
+        query_string = params.urlencode()
+        return (
+            f"{request.path}?{query_string}"
+            if query_string
+            else request.path
+        )
 
     region_tabs = [{"value": "", "label": "全部", "is_active": filters["region"] == "", "url": filter_url(region="")}]
     for value, label in RacingRegion.choices:
@@ -3065,8 +3500,26 @@ def public_race_calendar(request: HttpRequest):
                 "url": filter_url(region=value),
             }
         )
-    previous_cursor = events[0].local_date.isoformat() if events and events[0].local_date else ""
-    next_cursor = events[-1].local_date.isoformat() if events and events[-1].local_date else ""
+    if pagination is not None and events:
+        previous_cursor = encode_race_calendar_cursor(
+            events[0],
+            filters=filters,
+        )
+        next_cursor = encode_race_calendar_cursor(
+            events[-1],
+            filters=filters,
+        )
+    else:
+        previous_cursor = (
+            events[0].local_date.isoformat()
+            if events and events[0].local_date
+            else ""
+        )
+        next_cursor = (
+            events[-1].local_date.isoformat()
+            if events and events[-1].local_date
+            else ""
+        )
     grade_tabs = [
         {"value": "", "label": "全部等级", "is_active": filters["grade"] == "", "url": filter_url(grade="")},
         *[
@@ -3085,8 +3538,10 @@ def public_race_calendar(request: HttpRequest):
         {
             "groups": groups,
             "filters": filters,
-            "focus_events": _public_weekly_focus_events(filters["region"], events=events),
+            "focus_events": _public_weekly_focus_events(filters["region"], events=events, today=shanghai_today),
+            "default_anchor_date": default_anchor_date,
             "date_axis": [group for group in groups if group["date"]],
+            "date_axis_spans_years": date_axis_spans_years,
             "years": public_race_calendar_years(),
             "region_tabs": region_tabs,
             "grade_tabs": grade_tabs,
@@ -3094,8 +3549,26 @@ def public_race_calendar(request: HttpRequest):
             "all_tab_url": filter_url(tab="all"),
             "key_tab_url": filter_url(tab="key"),
             "clear_search_url": filter_url(year="", q=""),
-            "previous_url": filter_url(direction="past", cursor=previous_cursor) if previous_cursor and not (filters["year"] or filters["q"]) else "",
-            "next_url": filter_url(direction="future", cursor=next_cursor) if next_cursor and not (filters["year"] or filters["q"]) else "",
+            "previous_url": (
+                filter_url(direction="past", cursor=previous_cursor)
+                if previous_cursor
+                and (
+                    pagination["has_previous"]
+                    if pagination is not None
+                    else not (filters["year"] or filters["q"])
+                )
+                else ""
+            ),
+            "next_url": (
+                filter_url(direction="future", cursor=next_cursor)
+                if next_cursor
+                and (
+                    pagination["has_next"]
+                    if pagination is not None
+                    else not (filters["year"] or filters["q"])
+                )
+                else ""
+            ),
         },
     )
 
@@ -3150,8 +3623,54 @@ def _series_history_winners(
 
 
 def public_race_detail(request: HttpRequest, year: int, slug: str):
-    event = get_object_or_404(
-        RaceEvent.objects.filter(visibility_status=RaceEventVisibility.PUBLISHED)
+    registry_model = None
+    try:
+        registry_model = apps.get_model("stable", "RaceEventPublicPath")
+    except LookupError:
+        # Release A 滚动升级期间兼容尚未加载 registry schema 的旧进程。
+        pass
+    event_id = None
+    if registry_model is not None:
+        path_row = (
+            registry_model.objects.select_related("event")
+            .filter(year=year, slug=slug)
+            .first()
+        )
+        if path_row is not None:
+            if (
+                path_row.event.visibility_status
+                != RaceEventVisibility.PUBLISHED
+            ):
+                raise Http404
+            if path_row.path_kind == "legacy":
+                canonical = (
+                    registry_model.objects.filter(
+                        event_id=path_row.event_id,
+                        path_kind="canonical",
+                    )
+                    .only("year", "slug")
+                    .first()
+                )
+                if canonical is None:
+                    raise Http404
+                return redirect(
+                    "public-race-detail",
+                    year=canonical.year,
+                    slug=canonical.slug,
+                    permanent=True,
+                )
+            if path_row.path_kind != "canonical":
+                raise Http404
+            event_id = path_row.event_id
+
+    event_lookup = {"pk": event_id} if event_id is not None else {
+        "year": year,
+        "slug": slug,
+    }
+    event_queryset = (
+        RaceEvent.objects.filter(
+            visibility_status=RaceEventVisibility.PUBLISHED
+        )
         .select_related(
             "race_series",
             "projection_control__current_result_revision",
@@ -3160,13 +3679,25 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         .prefetch_related(
             "runners",
             "results",
+            "result_review_approvals",
             "history_winners",
             "article_links__article",
-        ),
-        year=year,
-        slug=slug,
+        )
+    )
+    if registry_model is not None and event_id is None:
+        # 只有尚未迁入 registry 的兼容行允许直接按 event 投影解析；一旦
+        # event 已有 registry 路径，所有入口都必须由 registry 明确占用。
+        event_queryset = event_queryset.filter(public_paths__isnull=True)
+    event = get_object_or_404(
+        event_queryset,
+        **event_lookup,
     )
     live_result_status = None
+    canonical_product_link = (
+        RaceEventProductCanonicalLink.objects.select_related("canonical_event")
+        .filter(duplicate_event=event, is_active=True)
+        .first()
+    )
     projection_control = getattr(event, "projection_control", None)
     current_result_revision = (
         projection_control.current_result_revision if projection_control else None
@@ -3235,6 +3766,29 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         if hide_live_results
         else _attach_result_display_positions(list(event.results.all()))
     )
+    result_section_label = "正式赛果"
+    if results and all(result.official_finish_position is None for result in results):
+        from stable.services.scheduled_race_result_review import (
+            compute_reviewed_row_digest,
+        )
+
+        current_digest = compute_reviewed_row_digest(
+            [
+                {
+                    "finish_position": result.finish_position,
+                    "horse_number": result.horse_number,
+                    "horse_name": result.horse_name,
+                    "running_status": result.running_status,
+                }
+                for result in results
+            ]
+        )
+        if any(
+            approval.authority == "human_reviewed_reference"
+            and approval.reviewed_row_digest == current_digest
+            for approval in event.result_review_approvals.all()
+        ):
+            result_section_label = "已人工审核赛果"
     history_winners = _series_history_winners(
         event,
         exclude_result_event_id=event.pk if hide_live_results else None,
@@ -3274,6 +3828,12 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             "series_events": series_events,
             "news_groups": news_groups,
             "live_result_status": live_result_status,
+            "result_section_label": result_section_label,
+            "canonical_product_event": (
+                canonical_product_link.canonical_event
+                if canonical_product_link
+                else None
+            ),
             "has_news": has_news,
             "status_label": _public_race_status_label(event, timezone.localdate(), winner),
         },
@@ -3286,10 +3846,13 @@ def _race_sitemap_queryset():
             visibility_status=RaceEventVisibility.PUBLISHED,
             data_quality_status=RaceEventDataQuality.COMPLETE,
         )
+        .exclude(canonical_product_links__is_active=True)
         .filter(
             Q(historical_target__isnull=True)
             | Q(historical_target__resolution_status=HistoricalRaceResolutionStatus.IMPORTED)
         )
+        # RaceEvent.year/slug 是 canonical registry 的兼容投影；legacy path
+        # 只存在于 registry，因此不会进入 sitemap。
         .order_by("year", "slug", "id")
     )
 
@@ -3328,11 +3891,37 @@ def public_news_feed(request: HttpRequest):
     redirect_response = _redirect_legacy_region(request)
     if redirect_response:
         return redirect_response
+    from django.conf import settings as dj_settings
+    from collections import Counter
+
     queryset = _public_published_articles()
-    headline_article = _select_headline_article(queryset)
+
+    # -- Exposure governance: filter same-event articles at DB level --
+    _exposure_homepage_max = getattr(dj_settings, "RACE_NEWS_HOMEPAGE_MAX", 2)
+    if getattr(dj_settings, "RACE_NEWS_EXPOSURE_ENABLED", False) and _exposure_homepage_max > 0:
+        from stable.models import RaceNewsExposure, RaceNewsExposureStatus, RaceNewsExposureChannel
+        from django.db.models import Exists, OuterRef
+        # Exclude race-linked articles that lack an active homepage exposure slot.
+        # This is ONE EXISTS subquery per article — no in-memory ID lists.
+        has_race_link = ArticleRaceLink.objects.filter(
+            article_id=OuterRef("pk"),
+            status__in=(ArticleRaceLinkStatus.AUTO, ArticleRaceLinkStatus.MANUAL),
+        )
+        has_active_exposure = RaceNewsExposure.objects.filter(
+            article_id=OuterRef("pk"),
+            channel=RaceNewsExposureChannel.HOMEPAGE,
+            scope_key="site",
+            status=RaceNewsExposureStatus.ACTIVE,
+        )
+        queryset = queryset.exclude(
+            Exists(has_race_link) & ~Exists(has_active_exposure)
+        )
+
+    headline_article = resolve_homepage_headline(queryset)
     hot_articles = _build_hot_articles(queryset)
     paginator = Paginator(queryset, PUBLIC_FEED_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
+
     feed_articles = [article for article in page_obj if not headline_article or article.pk != headline_article.pk]
     pagination_params = request.GET.copy()
     pagination_params.pop("page", None)
@@ -3499,6 +4088,73 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
     ).get_page(request.GET.get("records_page"))
     records_pagination_params = request.GET.copy()
     records_pagination_params.pop("records_page", None)
+
+    # Batch resolve race and racecourse display names from term entries.
+    # When the display flag is enabled, resolve formal Chinese names via the
+    # term database.  When disabled, fall back to the original names so the
+    # template never encounters a missing attribute.
+    display_enabled = getattr(settings, "RACE_FIELD_NORMALIZED_DISPLAY_ENABLED", False)
+    major_wins_list = list(major_win_records(profile))
+
+    if display_enabled:
+        from stable.services.race_field_normalization import PROVIDER_LANGUAGE_MAP
+
+        term_resolver = RaceTermResolver()
+        def _record_region(rec) -> str:
+            """Use race_region; fall back to linked event's country_region."""
+            r = getattr(rec, "race_region", "") or ""
+            if not r and getattr(rec, "event", None):
+                r = getattr(rec.event, "country_region", "") or ""
+            return r
+
+        for record in race_records_page.object_list:
+            region = _record_region(record)
+            lang = PROVIDER_LANGUAGE_MAP.get(
+                (getattr(record, "source_name", "") or "").strip(), ""
+            )
+            term_resolver.add_race_name(
+                record.race_name, region=region, source_language=lang
+            )
+            term_resolver.add_racecourse_name(
+                record.racecourse, region=region, source_language=lang
+            )
+        for record in major_wins_list:
+            region = _record_region(record)
+            lang = PROVIDER_LANGUAGE_MAP.get(
+                (getattr(record, "source_name", "") or "").strip(), ""
+            )
+            term_resolver.add_race_name(
+                record.race_name, region=region, source_language=lang
+            )
+        term_resolver.resolve()
+
+        for record in race_records_page.object_list:
+            region = _record_region(record)
+            lang = PROVIDER_LANGUAGE_MAP.get(
+                (getattr(record, "source_name", "") or "").strip(), ""
+            )
+            record.display_race_name = term_resolver.display_race_name(
+                record.race_name, region=region, source_language=lang
+            )
+            record.display_racecourse = term_resolver.display_racecourse_name(
+                record.racecourse, region=region, source_language=lang
+            )
+        for record in major_wins_list:
+            region = _record_region(record)
+            lang = PROVIDER_LANGUAGE_MAP.get(
+                (getattr(record, "source_name", "") or "").strip(), ""
+            )
+            record.display_race_name = term_resolver.display_race_name(
+                record.race_name, region=region, source_language=lang
+            )
+    else:
+        # Display flag off: use original names so template attributes are always populated
+        for record in race_records_page.object_list:
+            record.display_race_name = record.race_name or ""
+            record.display_racecourse = record.racecourse or ""
+        for record in major_wins_list:
+            record.display_race_name = record.race_name or ""
+
     for record in race_records_page.object_list:
         record.public_position = _horse_record_position(record)
         record.podium_class = f"p{record.public_position}" if record.public_position in {"1", "2", "3"} else ""
@@ -3524,7 +4180,7 @@ def public_horse_detail(request: HttpRequest, profile_id: int):
         {
             "profile": profile,
             "horse_stats": _horse_stats(profile),
-            "major_wins": major_win_records(profile),
+            "major_wins": major_wins_list,
             "article_entries": _public_horse_article_entries(profile),
             "race_links": public_race_links[:12],
             "race_records": race_records_page.object_list,

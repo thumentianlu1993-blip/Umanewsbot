@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -306,6 +307,42 @@ class RaceEventSourceCacheTests(SimpleTestCase):
 class RaceEventSafeHttpTests(SimpleTestCase):
     def setUp(self):
         self.module = _load_safe_http_module()
+
+    def test_runtime_compatibility_file_reexports_stable_transport_objects(self):
+        stable_http = importlib.import_module("stable.race_event_safe_http")
+
+        self.assertIs(self.module.SafeHttpError, stable_http.SafeHttpError)
+        self.assertIs(self.module.fetch_https, stable_http.fetch_https)
+        self.assertIs(
+            self.module.validate_https_url,
+            stable_http.validate_https_url,
+        )
+
+    def test_historical_sportinglife_cli_help_runs_from_repository_root(self):
+        repository_root = Path(__file__).resolve().parents[2]
+        environment = os.environ.copy()
+        environment.pop("PYTHONPATH", None)
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "runtime/tools/prepare_uk_sportinglife_race_detail_candidates.py",
+                "--help",
+            ],
+            cwd=repository_root,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+
+        self.assertEqual(
+            result.returncode,
+            0,
+            f"historical CLI must remain directly runnable:\n{result.stderr}",
+        )
+        self.assertIn("usage:", result.stdout.lower())
 
     def test_rejects_non_https_private_and_unapproved_initial_urls(self):
         for url in (

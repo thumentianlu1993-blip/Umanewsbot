@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone as dt_timezone
 import hashlib
 import importlib
+from io import StringIO
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from django.core.management import get_commands
+from django.core.management import call_command, get_commands
+from django.core.management.base import CommandError
 from django.test import SimpleTestCase
 
 
@@ -97,6 +99,193 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
             elapsed_ms=125,
             redirect_url=None,
         )
+
+    def _registry_v2(self, root: Path, **overrides) -> tuple[Path, str]:
+        payload = {
+            "schema_version": 2,
+            "source_key": "the_racing_api",
+            "host": "api.theracingapi.com",
+            "terms_status": "approved",
+            "proof_network_allowed": True,
+            "automation_allowed": True,
+            "valid_until": "2026-08-17T00:00:00+00:00",
+            "max_requests": 3,
+            "evidence": {
+                "documentation_url": "https://api.theracingapi.com/documentation",
+                "terms_url": "https://www.theracingapi.com/terms-of-service",
+                "verified_at": "2026-07-17T00:00:00+00:00",
+                "authorization_basis": "user_confirmed_automation_permission",
+            },
+            "allowed_region_codes": {
+                "united_kingdom": "gb",
+                "france": "fr",
+                "hong_kong": "hk",
+                "japan": "jpn",
+                "united_states": "usa",
+            },
+            "route_contracts": {
+                "racecards_free": {
+                    "path": "/v1/racecards/free",
+                    "day": ["today", "tomorrow"],
+                    "limit": [500],
+                    "skip": [0],
+                },
+                "results_today_free": {
+                    "path": "/v1/results/today/free",
+                    "limit": [50],
+                    "skip": list(range(0, 500, 50)),
+                },
+            },
+        }
+        payload.update(overrides)
+        path = root / "source-registry-v2.json"
+        path.write_text(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        return path, hashlib.sha256(path.read_bytes()).hexdigest()
+
+    def test_schema_v2_builds_region_routes_in_fixed_order_and_records_actual_paths(
+        self,
+    ):
+        service = self._service()
+        runner = service.run_the_racing_api_free_proof
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            secret = self._secret(root)
+            registry, digest = self._registry_v2(root)
+            output = root / "v2-proof"
+            calls = []
+            bodies = {
+                "racecards_sync_today": {"racecards": []},
+                "racecards_sync_tomorrow": {"racecards": []},
+                "results_today": {"results": []},
+            }
+
+            def transport(**kwargs):
+                calls.append(kwargs)
+                return self._response(bodies[kwargs["endpoint_name"]])
+
+            with patch.object(
+                service,
+                "build_the_racing_api_route_url",
+                wraps=service.build_the_racing_api_route_url,
+            ) as route_builder:
+                result = runner(
+                    secret_env_file=secret,
+                    registry_file=registry,
+                    expected_registry_sha256=digest,
+                    output_dir=output,
+                    now=self.NOW,
+                    transport=transport,
+                    sleep=lambda _: None,
+                    max_requests=3,
+                    region="france",
+                    clock=lambda: self.FINISHED,
+                )
+
+            self.assertTrue(result.completed)
+            self.assertEqual(
+                [call["endpoint_name"] for call in calls],
+                [
+                    "racecards_sync_today",
+                    "racecards_sync_tomorrow",
+                    "results_today",
+                ],
+            )
+            expected_urls = [
+                (
+                    "https://api.theracingapi.com/v1/racecards/free"
+                    "?day=today&region_codes=fr&limit=500&skip=0"
+                ),
+                (
+                    "https://api.theracingapi.com/v1/racecards/free"
+                    "?day=tomorrow&region_codes=fr&limit=500&skip=0"
+                ),
+                (
+                    "https://api.theracingapi.com/v1/results/today/free"
+                    "?limit=50&skip=0"
+                ),
+            ]
+            self.assertEqual([call["url"] for call in calls], expected_urls)
+            route_calls = [
+                call.kwargs for call in route_builder.call_args_list
+            ]
+            self.assertEqual(
+                [call["route_name"] for call in route_calls],
+                [
+                    "racecards_free",
+                    "racecards_free",
+                    "results_today_free",
+                ],
+            )
+            self.assertEqual(
+                [call["region"] for call in route_calls],
+                ["france", "france", "france"],
+            )
+            self.assertEqual(
+                [call.get("day") for call in route_calls],
+                ["today", "tomorrow", None],
+            )
+            self.assertTrue(
+                all(call["limit"] in {50, 500} and call["skip"] == 0 for call in route_calls)
+            )
+            manifest = json.loads(
+                (output / "manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                manifest["endpoints"],
+                [
+                    url.removeprefix("https://api.theracingapi.com")
+                    for url in expected_urls
+                ],
+            )
+
+    def test_schema_v2_region_and_registry_budget_fail_closed_before_transport(self):
+        service = self._service()
+        runner = service.run_the_racing_api_free_proof
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            secret = self._secret(root)
+            registry, digest = self._registry_v2(root)
+            limited_root = root / "limited"
+            limited_root.mkdir()
+            limited_registry, limited_digest = self._registry_v2(
+                limited_root,
+                max_requests=2,
+            )
+            transport_calls = []
+
+            def transport(**kwargs):
+                transport_calls.append(kwargs)
+                raise AssertionError("transport must not be called")
+
+            cases = (
+                ("missing", registry, digest, None, 3),
+                ("invalid", registry, digest, "ireland", 3),
+                (
+                    "registry-budget",
+                    limited_registry,
+                    limited_digest,
+                    "france",
+                    3,
+                ),
+            )
+            for name, registry_file, registry_digest, region, max_requests in cases:
+                with self.subTest(case=name):
+                    with self.assertRaises((ValueError, PermissionError)):
+                        runner(
+                            secret_env_file=secret,
+                            registry_file=registry_file,
+                            expected_registry_sha256=registry_digest,
+                            output_dir=root / f"blocked-{name}",
+                            now=self.NOW,
+                            transport=transport,
+                            sleep=lambda _: None,
+                            max_requests=max_requests,
+                            region=region,
+                        )
+            self.assertEqual(transport_calls, [])
 
     def test_success_is_budgeted_rate_limited_atomic_and_sanitized(self):
         service = self._service()
@@ -575,6 +764,70 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
             "受控来源 proof 管理命令尚未注册",
         )
 
+    def test_management_command_accepts_region_and_passes_it_to_the_runner(self):
+        service = self._service()
+        command_module = importlib.import_module(
+            "stable.management.commands.run_race_live_source_proof"
+        )
+        result = service.RaceLiveSourceProofResult(
+            completed=True,
+            request_count=3,
+            output_dir=Path("/tmp/v2-proof-output"),
+        )
+        with patch.object(
+            command_module,
+            "run_the_racing_api_free_proof",
+            return_value=result,
+        ) as runner:
+            call_command(
+                "run_race_live_source_proof",
+                secret_env_file="/tmp/proof-secret.env",
+                registry_file="/tmp/proof-registry.json",
+                registry_sha256="a" * 64,
+                output_dir="/tmp/v2-proof-output",
+                max_requests=3,
+                region="france",
+                confirm_network_proof=True,
+                stdout=StringIO(),
+            )
+
+        self.assertEqual(runner.call_count, 1)
+        self.assertEqual(runner.call_args.kwargs["region"], "france")
+
+    def test_management_command_rejects_schema_v2_without_region_before_transport(
+        self,
+    ):
+        command_module = importlib.import_module(
+            "stable.management.commands.run_race_live_source_proof"
+        )
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            secret = self._secret(root)
+            registry, digest = self._registry_v2(root)
+            transport_calls = []
+
+            def transport(**kwargs):
+                transport_calls.append(kwargs)
+                raise AssertionError("transport must not be called")
+
+            with patch.object(
+                command_module,
+                "the_racing_api_transport",
+                side_effect=transport,
+            ):
+                with self.assertRaisesRegex(CommandError, "region"):
+                    call_command(
+                        "run_race_live_source_proof",
+                        secret_env_file=str(secret),
+                        registry_file=str(registry),
+                        registry_sha256=digest,
+                        output_dir=str(root / "missing-region"),
+                        max_requests=3,
+                        confirm_network_proof=True,
+                        stdout=StringIO(),
+                    )
+            self.assertEqual(transport_calls, [])
+
     def test_sync_routes_are_exactly_allowlisted_without_expanding_proof_budget(self):
         service = self._service()
         with TemporaryDirectory() as directory:
@@ -622,22 +875,30 @@ class TheRacingApiFreeSourceProofTests(SimpleTestCase):
                         allow_redirects=False,
                     )
 
-            for unsafe_url in (
-                "https://api.theracingapi.com/v1/racecards/free?region_codes=gb&day=today&limit=500&skip=0",
-                "https://api.theracingapi.com/v1/racecards/free?day=today&region_codes=fr&limit=500&skip=0",
-                "https://api.theracingapi.com/v1/racecards/free?day=yesterday&region_codes=gb&limit=500&skip=0",
-            ):
-                with self.subTest(url=unsafe_url):
-                    with self.assertRaises(PermissionError):
-                        service.the_racing_api_transport(
-                            endpoint_name="racecards_sync_today",
-                            url=unsafe_url,
-                            username="user",
-                            password="password",
-                            timeout_seconds=15,
-                            max_response_bytes=2 * 1024 * 1024,
-                            allow_redirects=False,
-                        )
+            with patch.object(
+                service,
+                "_resolve_public_addresses",
+                side_effect=AssertionError(
+                    "unsafe URL must be rejected before DNS resolution"
+                ),
+            ) as resolver:
+                for unsafe_url in (
+                    "https://api.theracingapi.com/v1/racecards/free?region_codes=gb&day=today&limit=500&skip=0",
+                    "https://api.theracingapi.com/v1/racecards/free?day=today&region_codes=ie&limit=500&skip=0",
+                    "https://api.theracingapi.com/v1/racecards/free?day=yesterday&region_codes=gb&limit=500&skip=0",
+                ):
+                    with self.subTest(url=unsafe_url):
+                        with self.assertRaises(PermissionError):
+                            service.the_racing_api_transport(
+                                endpoint_name="racecards_sync_today",
+                                url=unsafe_url,
+                                username="user",
+                                password="password",
+                                timeout_seconds=15,
+                                max_response_bytes=2 * 1024 * 1024,
+                                allow_redirects=False,
+                            )
+                resolver.assert_not_called()
 
     def test_results_pagination_uses_one_exact_allowlisted_endpoint_name(self):
         service = self._service()

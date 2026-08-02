@@ -10,19 +10,30 @@ if [ ! -f .env ]; then
 fi
 
 COMPOSE="./deploy/docker/compose-wrapper.sh"
+COMPOSE_FILE="docker-compose.prod.lowcost.yml"
+
+# Acquire the host-local deployment lock before any stateful action; the lock
+# covers the historical preflight as well (spec 5.4). The release trap is
+# installed only after a successful acquire so a contender that loses the
+# race never touches the winner's lock.
+DEPLOYMENT_LOCK_TOKEN="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+export DEPLOYMENT_LOCK_TOKEN
+COMPOSE_FILE="$COMPOSE_FILE" DEPLOYMENT_LOCK_ACTION=deploy ./deploy/deployment_lock.sh acquire
+release_lock() {
+  ./deploy/deployment_lock.sh release >/dev/null 2>&1 || true
+}
+trap release_lock EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 if [ "${HISTORICAL_RUNNER_INITIAL_INSTALL:-false}" = "true" ]; then
-  COMPOSE_FILE=docker-compose.prod.lowcost.yml ./deploy/historical_runner_preflight.sh --initial-install
+  COMPOSE_FILE="$COMPOSE_FILE" ./deploy/historical_runner_preflight.sh --initial-install
 else
-  COMPOSE_FILE=docker-compose.prod.lowcost.yml ./deploy/historical_runner_preflight.sh
+  COMPOSE_FILE="$COMPOSE_FILE" ./deploy/historical_runner_preflight.sh
 fi
-"$COMPOSE" -f docker-compose.prod.lowcost.yml pull nginx
-"$COMPOSE" -f docker-compose.prod.lowcost.yml build web
-"$COMPOSE" -f docker-compose.prod.lowcost.yml stop beat
-COMPOSE_FILE=docker-compose.prod.lowcost.yml ./deploy/wait_for_celery_drain.sh
-"$COMPOSE" -f docker-compose.prod.lowcost.yml stop worker
-"$COMPOSE" -f docker-compose.prod.lowcost.yml up -d --no-deps web
-"$COMPOSE" -f docker-compose.prod.lowcost.yml exec web python manage.py migrate --noinput
-"$COMPOSE" -f docker-compose.prod.lowcost.yml exec web python manage.py collectstatic --noinput
-"$COMPOSE" -f docker-compose.prod.lowcost.yml up -d --no-deps worker beat nginx
-"$COMPOSE" -f docker-compose.prod.lowcost.yml ps
+
+"$COMPOSE" -f "$COMPOSE_FILE" pull nginx
+"$COMPOSE" -f "$COMPOSE_FILE" build web
+
+COMPOSE_FILE="$COMPOSE_FILE" RELEASE_ACTION=deploy ./deploy/run_application_release.sh

@@ -26,6 +26,7 @@ from stable.services.historical_race_inventory import (
     canonical_json,
     file_identity,
 )
+from stable.services.race_event_years import event_edition_year
 
 
 DETAIL_SOURCE_ARTIFACT_SCHEMA_VERSION = "1.0"
@@ -227,7 +228,8 @@ def build_detail_source_artifact(
             "target_id": target.pk,
             "expected_target_sha256": identity["target_sha256"],
             "inventory_artifact_sha256": target.artifact_sha256,
-            "year": target.year,
+            "year": target.event.year,
+            "edition_year": target.year,
             "slug": target.event.slug,
             "source_name": source_name,
             "source_url": source_url,
@@ -240,7 +242,8 @@ def build_detail_source_artifact(
         review_rows.append(
             {
                 "target_id": target.pk,
-                "year": target.year,
+                "year": target.event.year,
+                "edition_year": target.year,
                 "slug": target.event.slug,
                 "source_provider": provider,
                 "source_url": source_url,
@@ -394,7 +397,26 @@ def _validate_approved_detail_source_row(
         raise InventoryValidationError("detail source target is no longer ready/materialized")
     if int(row.get("target_id") or 0) != target.pk:
         raise InventoryValidationError("detail source row target identity mismatch")
-    if int(row.get("year") or 0) != target.year or str(row.get("slug") or "") != event.slug:
+    expected_edition_year = event_edition_year(event)
+    if "edition_year" not in row:
+        row_edition_year = expected_edition_year
+    else:
+        row_edition_year = row["edition_year"]
+        if (
+            isinstance(row_edition_year, bool)
+            or not isinstance(row_edition_year, int)
+            or row_edition_year <= 0
+            or row_edition_year > 9999
+        ):
+            raise InventoryValidationError(
+                "detail source row edition_year must be a valid integer year"
+            )
+    if (
+        int(row.get("year") or 0) != event.year
+        or row_edition_year != expected_edition_year
+        or expected_edition_year != target.year
+        or str(row.get("slug") or "") != event.slug
+    ):
         raise InventoryValidationError("detail source row event identity mismatch")
     if target_identity(target)["target_sha256"] != row.get("expected_target_sha256"):
         raise InventoryValidationError("detail source target changed after approval")

@@ -43,6 +43,7 @@ from stable.services.terms import (
 )
 from stable.services.news_attribution import article_region_set
 from stable.services.publish_readiness import transition_to_publish_ready
+from stable.services.term_consistency import apply_consistency_gate
 
 
 _NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
@@ -1555,6 +1556,32 @@ def validate_rewrite(
                 payload={"quote_fragments": quote_fragments},
             )
         )
+
+    # Term consistency gate: check canonical Chinese fields for non-standard
+    # term usage.  Only active when TERM_CONSISTENCY_ENABLED is set, to avoid
+    # adding queries to the existing publish-gate flow.
+    if getattr(settings, "TERM_CONSISTENCY_ENABLED", False):
+        try:
+            consistency_gate = apply_consistency_gate(article)
+            if not consistency_gate.passed:
+                for blocker in consistency_gate.blockers:
+                    issues.append(
+                        _issue(
+                            "term_consistency_blocker",
+                            SEVERITY_BLOCKER,
+                            "术语一致性门禁未通过：" + blocker.get("message", ""),
+                            route=ROUTE_MANUAL,
+                            payload=blocker,
+                        )
+                    )
+        except Exception:
+            # Fail-closed: if the gate itself errors, the article has NOT
+            # been validated and must not pass the publish gate silently.
+            # Mirror automation.mark_publish_ready, which refuses to proceed
+            # when the gate raises.
+            issues.append(
+                _issue("term_consistency_error", SEVERITY_BLOCKER, "术语一致性检查异常，按未通过处理", route=ROUTE_MANUAL)
+            )
 
     duplicate_issue = detect_duplicate_issue(
         article,

@@ -45,9 +45,14 @@
 
 #### Scenario: 届次年份与实际举办年份不同
 - **WHEN** 权威来源证明某年度届次在相邻自然年举办，例如2001届布里斯托尔新秀跨栏赛于2002-01-11举行
-- **THEN** `year` SHALL 保持年度届次年份且 `local_date` SHALL 保存实际举办日期
+- **THEN** `HistoricalRaceEventTarget.year` 与 `RaceEvent.edition_year` SHALL 保持年度届次年份
+- **AND** `RaceEvent.year` SHALL 保存实际举办自然年，`local_date` SHALL 保存实际举办日期
 - **AND** 候选 MUST 记录 `actual_year`、跨年原因和权威证据并经过人工批准
-- **AND** 系统 MUST NOT 仅因 `local_date.year != year` 拒绝该目标
+- **AND** 普通香港马季跨自然年不构成不同届次年，旧原因
+  `hong_kong_racing_season_spans_calendar_years` MUST NOT 作为该场景证据
+- **AND** 本场景的公开年份语义由
+  `docs/changes/repair-historical-race-calendar-integrity/spec.md`
+  取代旧的“公开 year 保持届次年”口径
 
 #### Scenario: 日期来源批准后进入可抓取状态
 - **WHEN** pending held目标具有已批准日期和结果页或权威直接赛事页

@@ -52,7 +52,7 @@ class P0HorseSourceBlocked(ValueError):
 
 
 RETRY_AFTER_CAP_SECONDS = 300.0
-NETKEIBA_PARSER_VERSION = "netkeiba-parser.v3"
+NETKEIBA_PARSER_VERSION = "netkeiba-parser.v5"
 
 
 MANUAL_SUPPLEMENT_CSV_FIELDS = (
@@ -337,7 +337,14 @@ def _field(values: dict[str, str], *labels: str) -> str:
 
 
 def _pedigree_from_roles(soup: BeautifulSoup) -> dict[str, str]:
-    return {
+    """Extract pedigree names. Prefer explicit data-role markers (test fixtures);
+    fall back to the real netkeiba 5-generation blood_table layout.
+
+    Netkeiba's blood_table lists the sire's binary tree first, then the dam's
+    binary tree. The two cells with the largest rowspan are the horse's sire
+    and dam respectively.
+    """
+    result: dict[str, str] = {
         field: _text(
             node.get_text(" ", strip=True)
             if (node := soup.select_one(f'[data-role="{role}"]'))
@@ -352,6 +359,26 @@ def _pedigree_from_roles(soup: BeautifulSoup) -> dict[str, str]:
             ("dam_dam", "dam-dam"),
         )
     }
+    if result.get("sire") and result.get("dam"):
+        return result
+    table = soup.select_one("table.blood_table")
+    if table is None:
+        return result
+    cells = table.find_all("td")
+    rowspans = [int(cell.get("rowspan") or 0) for cell in cells]
+    if not rowspans:
+        return result
+    max_rowspan = max(rowspans)
+    parents = [cells[i] for i, rs in enumerate(rowspans) if rs == max_rowspan]
+    if len(parents) >= 1:
+        result["sire"] = _netkeiba_pedigree_name(
+            parents[0].get_text(" ", strip=True)
+        )
+    if len(parents) >= 2:
+        result["dam"] = _netkeiba_pedigree_name(
+            parents[1].get_text(" ", strip=True)
+        )
+    return result
 
 
 def _strong_label_values(container: Any) -> dict[str, str]:
@@ -2251,10 +2278,24 @@ _NETKEIBA_PEDIGREE_CELLS = {
 
 
 def _netkeiba_pedigree_name(value: Any) -> str:
-    """Strip country marks, year, color and [血統]/[産駒] markers."""
+    """Strip country marks, year, color and [血統]/[産駒] markers.
+
+    Netkeiba pedigree cells often append the English registered name after
+    the Japanese name (e.g. ``サンデーサイレンス Sunday Silence``). When the
+    leading portion is Japanese script, drop that trailing Latin suffix so
+    the identity lock stores the primary Japanese name.
+    """
     text = _text(value)
     text = re.split(r"[\[（(]|\d{4}", text, maxsplit=1)[0]
-    return text.strip(" 　")
+    text = text.strip(" 　")
+    # Drop a trailing English alias that follows a Japanese primary name.
+    match = re.match(
+        r"^([぀-ヿ一-鿿]+)(?:\s+[A-Za-z][A-Za-z\s]*)$",
+        text,
+    )
+    if match:
+        return match.group(1)
+    return text
 
 
 def _netkeiba_japanese_date(value: Any) -> str:

@@ -8,7 +8,7 @@ from typing import Iterable
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -449,6 +449,19 @@ class HistoricalRaceResolutionStatus(models.TextChoices):
     IDENTITY_REVIEW_REQUIRED = "identity_review_required", "系列身份待审"
     PERMANENTLY_UNAVAILABLE = "permanently_unavailable", "永久不可得"
     IMPORTED = "imported", "已导入"
+    SUPERSEDED = "superseded", "已被替代"
+
+
+class HistoricalRaceCalendarRepairReceiptStatus(models.TextChoices):
+    APPLIED = "applied", "已应用"
+    VERIFIED = "verified", "已核验"
+    VERIFICATION_FAILED = "verification_failed", "核验失败"
+    ROLLED_BACK = "rolled_back", "已回滚"
+
+
+class RaceEventPublicPathKind(models.TextChoices):
+    CANONICAL = "canonical", "正式路径"
+    LEGACY = "legacy", "历史路径"
 
 
 class HistoricalBatchPhase(models.TextChoices):
@@ -779,6 +792,52 @@ class TermCandidateStatus(models.TextChoices):
     MERGED = "merged", "已合并"
 
 
+class NormalizedRaceResultStatus(models.TextChoices):
+    FINISHED = "finished", "完赛"
+    DEAD_HEAT = "dead_heat", "同着"
+    DID_NOT_FINISH = "did_not_finish", "未完赛"
+    PULLED_UP = "pulled_up", "拉停"
+    BROUGHT_DOWN = "brought_down", "拉停(被带倒)"
+    UNSEATED_RIDER = "unseated_rider", "落马"
+    FELL = "fell", "堕马"
+    DISQUALIFIED = "disqualified", "失格"
+    SCRATCHED = "scratched", "退赛"
+    NON_RUNNER = "non_runner", "未出赛"
+    WITHDRAWN = "withdrawn", "退出"
+    UNKNOWN = "unknown", "未知"
+
+
+class DistancePrecision(models.TextChoices):
+    OFFICIAL_METRIC = "official_metric", "官方公制"
+    EXACT_CONVERSION = "exact_conversion", "精确换算"
+    APPROXIMATE_CONVERSION = "approximate_conversion", "近似换算"
+    UNKNOWN = "unknown", "未知"
+
+
+class NormalizedSurface(models.TextChoices):
+    TURF = "turf", "草地"
+    DIRT = "dirt", "泥地"
+    SYNTHETIC = "synthetic", "合成"
+    UNKNOWN = "unknown", "未知"
+
+
+class NormalizedRaceType(models.TextChoices):
+    FLAT = "flat", "平地"
+    HURDLE = "hurdle", "障碍"
+    STEEPLECHASE = "steeplechase", "越野障碍"
+    OTHER = "other", "其他"
+    UNKNOWN = "unknown", "未知"
+
+
+class RaceSexRestriction(models.TextChoices):
+    OPEN = "open", "不限"
+    FEMALE = "female", "牝马"
+    MALE = "male", "牡马"
+    MALE_OR_FEMALE = "male_or_female", "牡/牝"
+    OTHER = "other", "其他"
+    UNKNOWN = "unknown", "未知"
+
+
 class TimestampedModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -1011,8 +1070,115 @@ class RaceSeriesRelation(TimestampedModel):
         return f"{self.from_series} {self.relation_type} {self.to_series}"
 
 
+class RaceEventQuerySet(models.QuerySet):
+    IDENTITY_FIELDS = {"year", "edition_year", "local_date", "source_refs", "slug"}
+
+    @transaction.atomic
+    def delete(self):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().delete()
+
+    @transaction.atomic
+    def update(self, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        changed = self.IDENTITY_FIELDS.intersection(kwargs)
+        if changed:
+            raise ValidationError(
+                {
+                    field: (
+                        "赛事身份字段禁止使用 QuerySet.update；"
+                        "必须通过 RaceEvent.save 的集中校验和路径同步。"
+                    )
+                    for field in changed
+                }
+            )
+        return super().update(**kwargs)
+
+    @transaction.atomic
+    def bulk_create(self, objs, **kwargs):
+        if kwargs.get("ignore_conflicts") or kwargs.get("update_conflicts"):
+            raise ValidationError("RaceEvent bulk_create 不允许绕过身份与路径冲突。")
+        created = []
+        with transaction.atomic():
+            for obj in objs:
+                obj.save(force_insert=True)
+                created.append(obj)
+        return created
+
+    @transaction.atomic
+    def bulk_update(self, objs, fields, **kwargs):
+        if self.IDENTITY_FIELDS.intersection(fields):
+            raise ValidationError(
+                "RaceEvent 身份字段禁止 bulk_update；必须逐条 save。"
+            )
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().bulk_update(objs, fields, **kwargs)
+
+
+class RaceEventManager(models.Manager.from_queryset(RaceEventQuerySet)):
+    pass
+
+
+class HistoricalCalendarScopedQuerySet(models.QuerySet):
+    @transaction.atomic
+    def delete(self):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().delete()
+
+    @transaction.atomic
+    def update(self, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().update(**kwargs)
+
+    @transaction.atomic
+    def bulk_create(self, objs, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().bulk_create(objs, **kwargs)
+
+    @transaction.atomic
+    def bulk_update(self, objs, fields, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().bulk_update(objs, fields, **kwargs)
+
+
+class HistoricalCalendarScopedManager(
+    models.Manager.from_queryset(HistoricalCalendarScopedQuerySet)
+):
+    pass
+
+
 class RaceEvent(TimestampedModel):
+    objects = RaceEventManager()
     year = models.PositiveSmallIntegerField()
+    edition_year = models.PositiveSmallIntegerField(null=True, blank=True)
     slug = models.SlugField(max_length=160)
     series_key = models.SlugField(max_length=160, blank=True)
     original_name = models.CharField(max_length=255)
@@ -1066,6 +1232,35 @@ class RaceEvent(TimestampedModel):
         related_name="race_events",
     )
     notes = models.TextField(blank=True)
+    # Normalized fields
+    distance_meters_normalized = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="规范距离(米)"
+    )
+    distance_precision = models.CharField(
+        max_length=32, choices=DistancePrecision.choices, blank=True, default="", verbose_name="距离精度"
+    )
+    normalized_surface = models.CharField(
+        max_length=32, choices=NormalizedSurface.choices, blank=True, default="", verbose_name="规范场地"
+    )
+    normalized_race_type = models.CharField(
+        max_length=32, choices=NormalizedRaceType.choices, blank=True, default="", verbose_name="规范赛种"
+    )
+    course_layout_text = models.CharField(max_length=128, blank=True, default="", verbose_name="路线")
+    going_text = models.CharField(max_length=128, blank=True, default="", verbose_name="场地状况")
+    minimum_age = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="最低年龄")
+    maximum_age = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="最高年龄")
+    age_open_ended = models.BooleanField(default=False, verbose_name="年龄无上限")
+    sex_restriction = models.CharField(
+        max_length=32, choices=RaceSexRestriction.choices, blank=True, default="", verbose_name="性别限制"
+    )
+    eligibility_constraints = models.JSONField(default=dict, blank=True, verbose_name="资格约束")
+    racecourse_term = models.ForeignKey(
+        "TermEntry", null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="马场术语"
+    )
+    normalization_version = models.CharField(max_length=64, blank=True, default="", verbose_name="规范化版本")
+    normalization_input_sha256 = models.CharField(max_length=64, blank=True, default="", verbose_name="规范化输入摘要")
+    normalization_issues = models.JSONField(default=list, blank=True, verbose_name="规范化问题")
+    normalized_at = models.DateTimeField(null=True, blank=True, verbose_name="规范化时间")
 
     class Meta:
         ordering = ("local_date", "local_start_time", "country_region", "chinese_name")
@@ -1092,18 +1287,114 @@ class RaceEvent(TimestampedModel):
     def __str__(self) -> str:
         return f"{self.chinese_name or self.original_name} {self.year}"
 
+    def clean(self):
+        super().clean()
+        from stable.services.race_event_years import validate_event_years
+
+        evidence = (
+            self.source_refs.get("cross_year_evidence")
+            if isinstance(self.source_refs, dict)
+            else None
+        )
+        validate_event_years(
+            self.year,
+            self.edition_year if self.edition_year is not None else self.year,
+            self.local_date,
+            evidence,
+        )
+
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+        from stable.services.race_event_public_paths import sync_canonical_public_path
+        from stable.services.race_event_years import validate_event_years
+
+        assert_historical_calendar_write_admitted()
+        requested_update_fields = kwargs.get("update_fields")
+        edition_year_was_filled = False
+        if self.edition_year is None and self.year is not None:
+            self.edition_year = self.year
+            edition_year_was_filled = True
+        slug_was_generated = False
         if not self.slug:
             base = slugify(self.original_name or self.chinese_name, allow_unicode=False) or f"race-{self.year}"
             self.slug = base[:160]
+            slug_was_generated = True
         if self.race_series_id:
             self.series_key = self.race_series.key
         elif not self.series_key:
             self.series_key = self.slug
-        update_fields = kwargs.get("update_fields")
-        if update_fields is not None:
-            kwargs["update_fields"] = set(update_fields) | {"slug", "series_key"}
-        super().save(*args, **kwargs)
+        effective_update_fields = None
+        if requested_update_fields is not None:
+            effective_update_fields = set(requested_update_fields)
+            if slug_was_generated:
+                effective_update_fields.add("slug")
+            if edition_year_was_filled:
+                effective_update_fields.add("edition_year")
+            if (
+                "race_series" in effective_update_fields
+                or slug_was_generated
+                or "series_key" in effective_update_fields
+            ):
+                effective_update_fields.add("series_key")
+            kwargs["update_fields"] = effective_update_fields
+        is_new = self.pk is None
+        identity_fields = {"year", "edition_year", "local_date", "source_refs"}
+        identity_changed = is_new
+        path_changed = is_new
+        validation_values = {
+            "year": self.year,
+            "edition_year": self.edition_year,
+            "local_date": self.local_date,
+            "source_refs": self.source_refs,
+        }
+        if not is_new:
+            previous = (
+                type(self).objects.filter(pk=self.pk)
+                .values("year", "edition_year", "local_date", "source_refs", "slug")
+                .first()
+            )
+            if previous is None:
+                identity_changed = True
+                path_changed = True
+            else:
+                fields_written = (
+                    identity_fields | {"slug"}
+                    if effective_update_fields is None
+                    else effective_update_fields
+                )
+                identity_changed = any(
+                    field in fields_written
+                    and previous[field] != getattr(self, field)
+                    for field in identity_fields
+                )
+                path_changed = (
+                    ("year" in fields_written and previous["year"] != self.year)
+                    or ("slug" in fields_written and previous["slug"] != self.slug)
+                )
+                for field in identity_fields:
+                    if field not in fields_written:
+                        validation_values[field] = previous[field]
+        if identity_changed:
+            source_refs = validation_values["source_refs"]
+            evidence = (
+                source_refs.get("cross_year_evidence")
+                if isinstance(source_refs, dict)
+                else None
+            )
+            validate_event_years(
+                validation_values["year"],
+                validation_values["edition_year"],
+                validation_values["local_date"],
+                evidence,
+            )
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            if path_changed:
+                self.refresh_from_db(fields={"year", "slug"})
+                sync_canonical_public_path(self)
 
     @property
     def is_public(self) -> bool:
@@ -1137,6 +1428,15 @@ class RaceEvent(TimestampedModel):
     def get_absolute_url(self) -> str:
         return self.public_path
 
+    @transaction.atomic
+    def delete(self, *args, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().delete(*args, **kwargs)
+
     @property
     def is_key_race(self) -> bool:
         return self.priority in {RaceEventPriority.P0, RaceEventPriority.P1} or self.is_featured
@@ -1155,6 +1455,133 @@ class RaceEvent(TimestampedModel):
     @property
     def grade_badge_label(self) -> str:
         return (self.normalized_grade or self.grade_text or "").strip()[:4]
+
+
+class RaceEventPublicPath(TimestampedModel):
+    objects = HistoricalCalendarScopedManager()
+    year = models.PositiveSmallIntegerField()
+    slug = models.SlugField(max_length=160)
+    event = models.ForeignKey(
+        RaceEvent,
+        on_delete=models.CASCADE,
+        related_name="public_paths",
+    )
+    path_kind = models.CharField(
+        max_length=16,
+        choices=RaceEventPublicPathKind.choices,
+    )
+    reason = models.CharField(max_length=128, blank=True)
+    manifest_sha256 = models.CharField(max_length=64, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_race_event_public_paths",
+    )
+
+    class Meta:
+        ordering = ("year", "slug")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("year", "slug"),
+                name="uq_race_public_path_year_slug",
+            ),
+            models.UniqueConstraint(
+                fields=("event",),
+                condition=models.Q(path_kind=RaceEventPublicPathKind.CANONICAL),
+                name="uq_race_public_path_event_canonical",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("event", "path_kind"),
+                name="race_pub_path_event_kind_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"/races/{self.year}/{self.slug}/ ({self.path_kind})"
+
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().save(*args, **kwargs)
+
+    @transaction.atomic
+    def delete(self, *args, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().delete(*args, **kwargs)
+
+
+class RaceEventProductCanonicalLink(TimestampedModel):
+    """Audited product-display choice for two records of the same race."""
+
+    duplicate_event = models.ForeignKey(
+        RaceEvent,
+        on_delete=models.PROTECT,
+        related_name="canonical_product_links",
+    )
+    canonical_event = models.ForeignKey(
+        RaceEvent,
+        on_delete=models.PROTECT,
+        related_name="canonical_product_sources",
+    )
+    identity_sha256 = models.CharField(max_length=64)
+    manifest_sha256 = models.CharField(max_length=64)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="approved_race_event_canonical_links",
+    )
+    approved_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    deactivated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="deactivated_race_event_canonical_links",
+    )
+    deactivated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("duplicate_event",),
+                condition=models.Q(is_active=True),
+                name="uq_race_canon_duplicate_active",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(duplicate_event=models.F("canonical_event")),
+                name="race_canon_not_self",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(identity_sha256__regex=r"^[0-9a-f]{64}$"),
+                name="race_canon_identity_sha256",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(manifest_sha256__regex=r"^[0-9a-f]{64}$"),
+                name="race_canon_manifest_sha256",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("canonical_event", "is_active"),
+                name="race_canon_event_active_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.duplicate_event} -> {self.canonical_event}"
 
 
 class RaceEventProjectionControl(TimestampedModel):
@@ -2103,6 +2530,7 @@ class RaceLiveOfficialVerificationIncident(TimestampedModel):
 
 
 class HistoricalRaceEventTarget(TimestampedModel):
+    objects = HistoricalCalendarScopedManager()
     race_series = models.ForeignKey(RaceSeries, on_delete=models.PROTECT, related_name="historical_targets")
     year = models.PositiveSmallIntegerField()
     country_region = models.CharField(max_length=32, choices=RacingRegion.choices)
@@ -2134,6 +2562,15 @@ class HistoricalRaceEventTarget(TimestampedModel):
         blank=True,
         related_name="historical_target",
     )
+    superseded_by = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="superseded_targets",
+    )
+    superseded_at = models.DateTimeField(null=True, blank=True)
+    supersession_manifest_sha256 = models.CharField(max_length=64, blank=True)
     last_checked_at = models.DateTimeField(null=True, blank=True)
     permanent_unavailable_approved_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -2186,6 +2623,22 @@ class HistoricalRaceEventTarget(TimestampedModel):
                 raise ValidationError({"resolution_status": "尚未到期的年度目标不能标记为已导入。"})
         if self.resolution_status == HistoricalRaceResolutionStatus.IMPORTED and not self.event_id:
             raise ValidationError({"event": "标记已导入前必须关联正式赛事。"})
+        if self.resolution_status == HistoricalRaceResolutionStatus.SUPERSEDED:
+            supersession_errors = {}
+            if self.event_id:
+                supersession_errors["event"] = "已被替代的年度目标必须解除赛事关联。"
+            if not self.superseded_by_id:
+                supersession_errors["superseded_by"] = "已被替代的年度目标必须指向保留目标。"
+            if not self.superseded_at:
+                supersession_errors["superseded_at"] = "已被替代的年度目标必须记录替代时间。"
+            if not self.supersession_manifest_sha256:
+                supersession_errors["supersession_manifest_sha256"] = (
+                    "已被替代的年度目标必须绑定修复清单。"
+                )
+            if self.pk and self.superseded_by_id == self.pk:
+                supersession_errors["superseded_by"] = "年度目标不能替代自身。"
+            if supersession_errors:
+                raise ValidationError(supersession_errors)
         if self.resolution_status == HistoricalRaceResolutionStatus.PERMANENTLY_UNAVAILABLE:
             if not (
                 self.permanent_unavailable_approved_by_id
@@ -2194,12 +2647,19 @@ class HistoricalRaceEventTarget(TimestampedModel):
             ):
                 raise ValidationError("永久不可得必须记录批准人、批准时间和双来源证据。")
         if self.event_id:
-            if self.event.year != self.year:
-                raise ValidationError({"event": "关联赛事年份必须与年度目标一致。"})
+            event_edition_year = self.event.edition_year or self.event.year
+            if event_edition_year != self.year:
+                raise ValidationError({"event": "关联赛事届次年份必须与年度目标一致。"})
             if self.event.race_series_id != self.race_series_id:
                 raise ValidationError({"event": "关联赛事必须属于同一赛事系列。"})
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
         if self.race_series_id:
             self.country_region = self.race_series.country_region
         update_fields = kwargs.get("update_fields")
@@ -2207,8 +2667,84 @@ class HistoricalRaceEventTarget(TimestampedModel):
             kwargs["update_fields"] = set(update_fields) | {"country_region"}
         super().save(*args, **kwargs)
 
+    @transaction.atomic
+    def delete(self, *args, **kwargs):
+        from stable.services.historical_race_calendar_admission import (
+            assert_historical_calendar_write_admitted,
+        )
+
+        assert_historical_calendar_write_admitted()
+        return super().delete(*args, **kwargs)
+
     def __str__(self) -> str:
         return f"{self.race_series} {self.year}"
+
+
+class HistoricalRaceCalendarRepairReceipt(TimestampedModel):
+    manifest_sha256 = models.CharField(max_length=64, unique=True)
+    approval_sha256 = models.CharField(max_length=64)
+    action_scope_sha256 = models.CharField(max_length=64)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="historical_race_calendar_repair_receipts",
+    )
+    status = models.CharField(
+        max_length=24,
+        choices=HistoricalRaceCalendarRepairReceiptStatus.choices,
+        default=HistoricalRaceCalendarRepairReceiptStatus.APPLIED,
+    )
+    rollback_sha256 = models.CharField(max_length=64)
+    applied_at = models.DateTimeField()
+    verified_at = models.DateTimeField(null=True, blank=True)
+    rolled_back_at = models.DateTimeField(null=True, blank=True)
+    verifier_result_sha256 = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        ordering = ("-applied_at", "-id")
+        indexes = [
+            models.Index(
+                fields=("status", "-applied_at"),
+                name="hist_cal_receipt_status_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.manifest_sha256} {self.status}"
+
+
+class HistoricalRaceCalendarMaintenanceGate(TimestampedModel):
+    manifest_sha256 = models.CharField(max_length=64)
+    action_scope_sha256 = models.CharField(max_length=64)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="entered_historical_race_calendar_gates",
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=(("active", "生效中"), ("exited", "已退出")),
+        default="active",
+    )
+    entered_at = models.DateTimeField()
+    exited_at = models.DateTimeField(null=True, blank=True)
+    exited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="exited_historical_race_calendar_gates",
+    )
+
+    class Meta:
+        ordering = ("-entered_at", "-id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("status",),
+                condition=models.Q(status="active"),
+                name="uq_hist_cal_one_active_gate",
+            )
+        ]
 
 
 class HistoricalBatchRun(TimestampedModel):
@@ -2931,6 +3467,27 @@ class HorseProfileCompletionRun(TimestampedModel):
         return self.name or f"P0 horse completion run #{self.pk}"
 
 
+class HorseIdentityEvidenceCommitReceipt(TimestampedModel):
+    approved_sha256 = models.CharField(max_length=64, unique=True)
+    artifact_sha256 = models.CharField(max_length=64)
+    approved_by = models.CharField(max_length=255)
+    approved_profile_ids = models.JSONField(default=list)
+    before_after = models.JSONField(default=dict)
+    evidence_summary = models.JSONField(default=dict)
+    result_payload = models.JSONField(default=dict)
+    operation_log = models.OneToOneField(
+        "OperationLog",
+        on_delete=models.PROTECT,
+        related_name="horse_identity_evidence_receipt",
+    )
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:
+        return f"P0 horse identity receipt {self.approved_sha256[:12]}"
+
+
 class HorseP0Source(TimestampedModel):
     profile = models.ForeignKey(HorseProfile, on_delete=models.CASCADE, related_name="p0_sources")
     term = models.ForeignKey("TermEntry", on_delete=models.SET_NULL, null=True, blank=True, related_name="p0_sources")
@@ -3174,6 +3731,43 @@ class HorseRaceRecord(TimestampedModel):
     canonical_race_key = models.CharField(max_length=64, blank=True)
     source_refs = models.JSONField(default=dict, blank=True)
     raw_payload = models.JSONField(default=dict, blank=True)
+    # Normalized fields
+    normalized_finish_position = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="规范名次")
+    normalized_result_status = models.CharField(
+        max_length=32, choices=NormalizedRaceResultStatus.choices, blank=True, default="", verbose_name="规范结果状态"
+    )
+    normalization_version = models.CharField(max_length=64, blank=True, default="", verbose_name="规范化版本")
+    normalization_input_sha256 = models.CharField(max_length=64, blank=True, default="", verbose_name="规范化输入摘要")
+    normalization_issues = models.JSONField(default=list, blank=True, verbose_name="规范化问题")
+    normalized_at = models.DateTimeField(null=True, blank=True, verbose_name="规范化时间")
+    distance_meters_normalized = models.DecimalField(
+        max_digits=10, decimal_places=3, null=True, blank=True, verbose_name="规范距离(米)"
+    )
+    distance_precision = models.CharField(
+        max_length=32, choices=DistancePrecision.choices, blank=True, default="", verbose_name="距离精度"
+    )
+    normalized_surface = models.CharField(
+        max_length=32, choices=NormalizedSurface.choices, blank=True, default="", verbose_name="规范场地"
+    )
+    normalized_race_type = models.CharField(
+        max_length=32, choices=NormalizedRaceType.choices, blank=True, default="", verbose_name="规范赛种"
+    )
+    course_layout_text = models.CharField(max_length=128, blank=True, default="", verbose_name="路线")
+    going_text = models.CharField(max_length=128, blank=True, default="", verbose_name="场地状况")
+    race_term = models.ForeignKey(
+        "TermEntry", null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="赛事术语"
+    )
+    racecourse_term = models.ForeignKey(
+        "TermEntry", null=True, blank=True, on_delete=models.SET_NULL, related_name="+", verbose_name="马场术语"
+    )
+    eligibility_text = models.CharField(max_length=255, blank=True, default="", verbose_name="参赛资格原文")
+    minimum_age = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="最低年龄")
+    maximum_age = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="最高年龄")
+    age_open_ended = models.BooleanField(default=False, verbose_name="年龄无上限")
+    sex_restriction = models.CharField(
+        max_length=32, choices=RaceSexRestriction.choices, blank=True, default="", verbose_name="性别限制"
+    )
+    eligibility_constraints = models.JSONField(default=dict, blank=True, verbose_name="资格约束")
 
     class Meta:
         ordering = ("horse_profile", "-race_date", "-race_year", "major_win_order", "id")
@@ -3184,6 +3778,7 @@ class HorseRaceRecord(TimestampedModel):
             models.Index(fields=("horse_profile", "idempotency_key"), name="horse_record_idem_idx"),
             models.Index(fields=("horse_profile", "start_status"), name="horse_record_start_idx"),
             models.Index(fields=("horse_profile", "canonical_race_key"), name="horse_record_canon_idx"),
+            models.Index(fields=("horse_profile", "normalized_finish_position"), name="horse_record_norm_finish_idx"),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -4525,6 +5120,107 @@ class TaskExecutionLog(TimestampedModel):
         ordering = ("-started_at", "-id")
 
 
+class RaceResultReviewRun(TimestampedModel):
+    schedule_slot = models.DateTimeField(unique=True)
+    status = models.CharField(max_length=32, default="claimed")
+    selector_sha256 = models.CharField(max_length=64, blank=True)
+    bundle_sha256 = models.CharField(max_length=64, blank=True)
+    cursor = models.JSONField(default=dict, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    terminal_summary = models.JSONField(default=dict, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-schedule_slot", "-id")
+
+
+class RaceResultReviewPendingEvent(TimestampedModel):
+    event = models.OneToOneField(
+        RaceEvent,
+        on_delete=models.CASCADE,
+        related_name="result_review_pending",
+    )
+    first_seen_at = models.DateTimeField()
+    last_seen_at = models.DateTimeField()
+    expires_at = models.DateTimeField()
+    reason_code = models.CharField(max_length=64)
+    snapshot_sha256 = models.CharField(max_length=64)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ("first_seen_at", "event_id")
+
+
+class RaceResultReviewDelivery(TimestampedModel):
+    bundle_sha256 = models.CharField(max_length=64)
+    recipient = models.EmailField()
+    status = models.CharField(max_length=16, default="queued")
+    message_id = models.CharField(max_length=255, blank=True)
+    attempt_count = models.PositiveIntegerField(default=0)
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+    last_error_code = models.CharField(max_length=64, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("bundle_sha256", "recipient"),
+                name="uq_result_review_delivery_bundle_recipient",
+            )
+        ]
+        ordering = ("-created_at", "-id")
+
+
+class RaceResultReviewApprovalQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError("RaceResultReviewApproval 是不可变记录，禁止修改。")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValidationError("RaceResultReviewApproval 是不可变记录，禁止修改。")
+
+    def delete(self):
+        raise ValidationError("RaceResultReviewApproval 是不可变记录，禁止删除。")
+
+
+class RaceResultReviewApproval(models.Model):
+    objects = RaceResultReviewApprovalQuerySet.as_manager()
+
+    bundle_sha256 = models.CharField(max_length=64)
+    event = models.ForeignKey(
+        RaceEvent,
+        on_delete=models.PROTECT,
+        related_name="result_review_approvals",
+    )
+    reviewed_row_digest = models.CharField(max_length=64)
+    authority = models.CharField(
+        max_length=32,
+        choices=(
+            ("official", "官方"),
+            ("human_reviewed_reference", "人工审核参考来源"),
+        ),
+    )
+    reviewer = models.CharField(max_length=255)
+    confirmed_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("bundle_sha256", "event", "reviewed_row_digest"),
+                name="uq_result_review_approval_exact_scope",
+            )
+        ]
+        ordering = ("-created_at", "-id")
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("RaceResultReviewApproval 是不可变记录，禁止修改。")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError("RaceResultReviewApproval 是不可变记录，禁止删除。")
+
+
 class AutomationLog(TimestampedModel):
     article = models.ForeignKey(NewsArticle, on_delete=models.CASCADE, related_name="automation_logs")
     phase = models.CharField(max_length=16, choices=AutomationPhase.choices)
@@ -4666,3 +5362,818 @@ class MultiregionAttributionLock(TimestampedModel):
 
     class Meta:
         ordering = ("key",)
+
+
+class HomepageHeadlineSelection(models.Model):
+    SLOT_HOMEPAGE_PRIMARY = "homepage_primary"
+
+    slot = models.CharField(max_length=32, unique=True, default=SLOT_HOMEPAGE_PRIMARY)
+    article = models.ForeignKey(
+        "NewsArticle", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+"
+    )
+    selected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+"
+    )
+    selected_at = models.DateTimeField(null=True, blank=True)
+    version = models.PositiveBigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(slot="homepage_primary"),
+                name="headline_selection_slot_check",
+            ),
+        ]
+        indexes = []
+
+
+class HomepageHeadlineRecommendation(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = "active", "活跃"
+        ACCEPTED = "accepted", "已接受"
+        SUPERSEDED = "superseded", "已替换"
+        INVALIDATED = "invalidated", "已失效"
+
+    SLOT_HOMEPAGE_PRIMARY = "homepage_primary"
+
+    slot = models.CharField(max_length=32, default=SLOT_HOMEPAGE_PRIMARY)
+    article = models.ForeignKey(
+        "NewsArticle", null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+"
+    )
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.ACTIVE
+    )
+    reason = models.TextField(blank=True)
+    evidence = models.JSONField(default=dict)
+    engine_version = models.CharField(max_length=64)
+    generated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL,
+        related_name="+"
+    )
+    accepted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name="+"
+    )
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(slot="homepage_primary"),
+                name="headline_recommendation_slot_check",
+            ),
+            models.UniqueConstraint(
+                fields=("slot",),
+                condition=models.Q(status="active"),
+                name="headline_recommendation_unique_active",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("slot", "status", "-created_at"),
+                name="headline_rec_slot_status_idx",
+            ),
+        ]
+
+class RaceFieldNormalizationRun(TimestampedModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "待执行"
+        RUNNING = "running", "执行中"
+        COMPLETED = "completed", "已完成"
+        FAILED = "failed", "失败"
+
+    status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
+    model_scope = models.CharField(max_length=64)
+    manifest_sha256 = models.CharField(max_length=64, blank=True, default="")
+    normalizer_version = models.CharField(max_length=64)
+    term_snapshot_digest = models.CharField(max_length=64, blank=True, default="")
+    checkpoint_data = models.JSONField(default=dict, blank=True)
+    planned_count = models.PositiveIntegerField(default=0)
+    actual_count = models.PositiveIntegerField(default=0)
+    skipped_count = models.PositiveIntegerField(default=0)
+    conflict_count = models.PositiveIntegerField(default=0)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class RaceFieldNormalizationReceipt(models.Model):
+    run = models.ForeignKey(RaceFieldNormalizationRun, on_delete=models.CASCADE, related_name="receipts")
+    batch_number = models.PositiveIntegerField(default=0)
+    model_label = models.CharField(max_length=64)
+    object_pk = models.PositiveIntegerField()
+    before_snapshot = models.JSONField(default=dict)
+    after_snapshot = models.JSONField(default=dict)
+    input_sha256 = models.CharField(max_length=64, blank=True, default="")
+    race_term_id = models.PositiveIntegerField(null=True, blank=True)
+    racecourse_term_id = models.PositiveIntegerField(null=True, blank=True)
+    normalizer_version = models.CharField(max_length=64)
+    committed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["run", "model_label", "object_pk"],
+                name="unique_normalization_receipt_per_object",
+            )
+        ]
+        ordering = ["run", "batch_number", "pk"]
+
+
+# ── Race Event Lifecycle (Phase A) ────────────────────────────────────
+
+
+class RaceEventLifecycleMode(models.TextChoices):
+    OFF = "off", "关闭"
+    SHADOW = "shadow", "影子"
+    ENFORCE = "enforce", "执行"
+
+
+class RaceEventLifecycleTransitionKind(models.TextChoices):
+    PROPOSAL = "proposal", "提案"
+    APPLIED = "applied", "已应用"
+
+
+class RaceEventFieldSubjectType(models.TextChoices):
+    EVENT = "event", "赛事"
+    PARTICIPANT = "participant", "参赛马"
+
+
+class RaceEventFieldChangeDecision(models.TextChoices):
+    APPLIED = "applied", "已应用"
+    REPLAYED = "replayed", "重放"
+    NEEDS_REVIEW = "needs_review", "待审核"
+    REJECTED = "rejected", "已拒绝"
+
+
+class RaceEventLifecycleControl(TimestampedModel):
+    """Per-event lifecycle operational control (one-to-one with RaceEvent)."""
+
+    event = models.OneToOneField(
+        "RaceEvent",
+        on_delete=models.CASCADE,
+        related_name="lifecycle_control",
+    )
+    mode = models.CharField(
+        max_length=16,
+        choices=RaceEventLifecycleMode.choices,
+        default=RaceEventLifecycleMode.OFF,
+    )
+    next_refresh_at = models.DateTimeField(null=True, blank=True)
+    schedule_generation = models.PositiveBigIntegerField(default=0)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_success_at = models.DateTimeField(null=True, blank=True)
+    last_result_code = models.CharField(max_length=64, blank=True)
+    last_error = models.TextField(blank=True)
+    last_source_key = models.CharField(max_length=128, blank=True)
+    refresh_profile = models.CharField(max_length=8, blank=True, default="")  # e.g. P0, P1
+    consecutive_failures = models.PositiveIntegerField(default=0)
+    claim_token = models.CharField(max_length=64, blank=True)
+    claim_generation = models.PositiveBigIntegerField(default=0)
+    claim_expires_at = models.DateTimeField(null=True, blank=True)
+    manual_pause_reason = models.TextField(blank=True)
+    enrollment_manifest_sha256 = models.CharField(max_length=64, blank=True)
+    manifest_data = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(
+                fields=("mode", "next_refresh_at"),
+                name="lifecycle_ctrl_m_refresh_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.event} mode={self.mode} gen={self.schedule_generation}"
+
+
+class RaceEventLifecycleTransition(TimestampedModel):
+    """Append-only audit log of lifecycle state transitions."""
+
+    event = models.ForeignKey(
+        "RaceEvent",
+        on_delete=models.CASCADE,
+        related_name="lifecycle_transitions",
+    )
+    from_status = models.CharField(max_length=16, choices=RaceEventStatus.choices)
+    to_status = models.CharField(max_length=16, choices=RaceEventStatus.choices)
+    reason_code = models.CharField(max_length=64)
+    effective_at = models.DateTimeField()
+    source_authority = models.CharField(max_length=32, blank=True)
+    source_key = models.CharField(max_length=128, blank=True)
+    source_url = models.CharField(max_length=1000, blank=True)
+    trigger_task = models.CharField(max_length=128, blank=True)
+    run_id = models.CharField(max_length=64, blank=True)
+    schedule_generation = models.PositiveBigIntegerField(default=0)
+    record_kind = models.CharField(
+        max_length=16,
+        choices=RaceEventLifecycleTransitionKind.choices,
+    )
+    dedupe_key = models.CharField(max_length=255)
+    based_on_proposal = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="applied_transitions",
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("dedupe_key",),
+                name="uq_lifecycle_transition_dedupe_key",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("event", "record_kind"),
+                name="lifecycle_trans_event_kind_idx",
+            ),
+            models.Index(
+                fields=("event", "schedule_generation"),
+                name="lifecycle_trans_event_gen_idx",
+            ),
+        ]
+        ordering = ("event", "effective_at", "id")
+
+    def __str__(self) -> str:
+        return f"{self.event} {self.from_status}→{self.to_status} [{self.record_kind}]"
+
+
+class RaceEventFieldAuthority(TimestampedModel):
+    """Tracks the current authority level and source for each field of each subject."""
+
+    event = models.ForeignKey(
+        "RaceEvent",
+        on_delete=models.CASCADE,
+        related_name="field_authorities",
+    )
+    subject_type = models.CharField(
+        max_length=16,
+        choices=RaceEventFieldSubjectType.choices,
+    )
+    subject_key = models.CharField(max_length=255)
+    field_name = models.CharField(max_length=64)
+    authority_level = models.PositiveSmallIntegerField(default=0)
+    source_key = models.CharField(max_length=128, blank=True)
+    source_url = models.CharField(max_length=1000, blank=True)
+    external_id = models.CharField(max_length=255, blank=True)
+    confidence = models.PositiveSmallIntegerField(default=0)
+    observed_at = models.DateTimeField(null=True, blank=True)
+    article = models.ForeignKey(
+        "NewsArticle",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    candidate = models.ForeignKey(
+        "RaceEventDataCandidate",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    revision = models.ForeignKey(
+        "RaceEventRevision",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    value_sha256 = models.CharField(max_length=64, blank=True)
+    manual_lock = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("event", "subject_type", "subject_key", "field_name"),
+                name="uq_field_authority_subject_field",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("event", "subject_type", "subject_key"),
+                name="field_auth_event_subject_idx",
+            ),
+        ]
+        verbose_name_plural = "race event field authorities"
+
+    def __str__(self) -> str:
+        return f"{self.event} {self.subject_type}:{self.subject_key}.{self.field_name} lv={self.authority_level}"
+
+
+class RaceEventFieldChange(TimestampedModel):
+    """Append-only log of each field value change with provenance."""
+
+    event = models.ForeignKey(
+        "RaceEvent",
+        on_delete=models.CASCADE,
+        related_name="field_changes",
+    )
+    subject_type = models.CharField(
+        max_length=16,
+        choices=RaceEventFieldSubjectType.choices,
+    )
+    subject_key = models.CharField(max_length=255)
+    field_name = models.CharField(max_length=64)
+    old_value = models.JSONField(null=True, blank=True)
+    new_value = models.JSONField(null=True, blank=True)
+    source_key = models.CharField(max_length=128, blank=True)
+    source_url = models.CharField(max_length=1000, blank=True)
+    external_id = models.CharField(max_length=255, blank=True)
+    confidence = models.PositiveSmallIntegerField(default=0)
+    authority_level = models.PositiveSmallIntegerField(default=0)
+    trigger_task = models.CharField(max_length=128, blank=True)
+    run_id = models.CharField(max_length=64, blank=True)
+    article = models.ForeignKey(
+        "NewsArticle",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    candidate = models.ForeignKey(
+        "RaceEventDataCandidate",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    revision = models.ForeignKey(
+        "RaceEventRevision",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+    observation = models.ForeignKey(
+        "RaceResultObservation",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="field_changes",
+    )
+    source_class = models.CharField(max_length=32, blank=True)
+    source_updated_at = models.DateTimeField(null=True, blank=True)
+    parser_version = models.CharField(max_length=64, blank=True)
+    raw_sha256 = models.CharField(max_length=64, blank=True)
+    normalized_sha256 = models.CharField(max_length=64, blank=True)
+    registry_digest = models.CharField(max_length=64, blank=True)
+    contract_version = models.CharField(max_length=64, blank=True)
+    contract_digest = models.CharField(max_length=64, blank=True)
+    celery_task_id = models.CharField(max_length=255, blank=True)
+    decision = models.CharField(
+        max_length=16,
+        choices=RaceEventFieldChangeDecision.choices,
+        blank=True,
+    )
+    schedule_generation = models.PositiveBigIntegerField(default=0)
+    operation_mode = models.CharField(max_length=16, blank=True)
+    applied = models.BooleanField(default=True)
+    rejection_reason = models.TextField(blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(decision="")
+                    | models.Q(decision__in=RaceEventFieldChangeDecision.values)
+                ),
+                name="race_field_change_decision_valid",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("event", "subject_type", "subject_key"),
+                name="field_change_event_subject_idx",
+            ),
+            models.Index(
+                fields=("event", "field_name"),
+                name="field_change_event_field_idx",
+            ),
+        ]
+        ordering = ("event", "created_at", "id")
+
+    def __str__(self) -> str:
+        return f"{self.event} {self.subject_type}:{self.subject_key}.{self.field_name}"
+
+
+class TermMappingEvidence(TimestampedModel):
+    """Evidence for a formal term/alias mapping with audit trail."""
+    term = models.ForeignKey("TermEntry", on_delete=models.CASCADE, related_name="mapping_evidence")
+    alias = models.ForeignKey("TermAlias", on_delete=models.CASCADE, null=True, blank=True, related_name="mapping_evidence")
+    evidence_kind = models.CharField(max_length=32)
+    source_url = models.CharField(max_length=1000, blank=True)
+    source_digest = models.CharField(max_length=64, blank=True)
+    review_status = models.CharField(max_length=16, default="pending")
+    reviewed_by = models.CharField(max_length=128, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    identity_payload = models.JSONField(default=dict, blank=True)
+    identity_sha256 = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=("term", "review_status")),
+            models.Index(fields=("alias", "review_status")),
+        ]
+
+    def __str__(self) -> str:
+        alias_label = f" alias={self.alias_id}" if self.alias_id else ""
+        return f"evidence[{self.evidence_kind}] term={self.term_id}{alias_label} status={self.review_status}"
+
+
+class TermConsistencyManifestStatus(models.TextChoices):
+    PENDING = "pending", "待提交"
+    COMMITTED = "committed", "已提交"
+    ROLLED_BACK = "rolled_back", "已回滚"
+
+
+class TermConsistencyManifest(TimestampedModel):
+    """Persisted dry-run manifest for canonical consistency repair.
+
+    Manifests survive process restarts so that a dry-run produced by one
+    worker can be committed (or rolled back) by another.  ``diffs`` stores
+    per-field ``before_value``/``after_value`` pairs so a committed manifest
+    can be rolled back with CAS semantics.
+    """
+
+    run_id = models.CharField(max_length=64, unique=True)
+    manifest_sha256 = models.CharField(max_length=64)
+    term_snapshot_sha256 = models.CharField(max_length=64)
+    settings_sha256 = models.CharField(max_length=64)
+    resolver_version = models.CharField(max_length=16, default="1.0.0")
+    diffs = models.JSONField(default=list, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=TermConsistencyManifestStatus.choices,
+        default=TermConsistencyManifestStatus.PENDING,
+    )
+    approved_by = models.CharField(max_length=128, blank=True)
+    committed_at = models.DateTimeField(null=True, blank=True)
+    rolled_back_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=("status", "created_at")),
+        ]
+
+    def __str__(self) -> str:
+        return f"manifest[{self.run_id}] {self.status} diffs={len(self.diffs or [])}"
+
+
+class RaceNewsExposureChannel(models.TextChoices):
+    HOMEPAGE = "homepage", "首页"
+    QQ = "qq", "QQ"
+
+
+class RaceNewsExposureStatus(models.TextChoices):
+    WAITING = "waiting", "等待"
+    ACTIVE = "active", "生效"
+    REPLACED = "replaced", "已替换"
+    SENT = "sent", "已发送"
+    SUPPRESSED = "suppressed", "已抑制"
+
+
+class RaceNewsAngle(models.TextChoices):
+    COMPREHENSIVE_RESULT = "comprehensive_result", "综合赛果"
+    WINNER = "winner", "胜者"
+    CONNECTIONS = "connections", "关系者"
+    RUNNER = "runner", "参赛马"
+    ANALYSIS = "analysis", "分析"
+    MARKET = "market", "市场"
+    OTHER = "other", "其他"
+
+
+class RaceNewsExposure(TimestampedModel):
+    event = models.ForeignKey("RaceEvent", on_delete=models.CASCADE, related_name="news_exposures")
+    article = models.ForeignKey("NewsArticle", on_delete=models.CASCADE, related_name="race_exposures")
+    channel = models.CharField(max_length=16, choices=RaceNewsExposureChannel.choices)
+    scope_key = models.CharField(max_length=128)  # "site" for homepage, "target:<id>" for QQ
+    slot = models.PositiveSmallIntegerField()  # 1 or 2
+    status = models.CharField(max_length=16, choices=RaceNewsExposureStatus.choices, default=RaceNewsExposureStatus.WAITING)
+    angle = models.CharField(max_length=32, choices=RaceNewsAngle.choices, default=RaceNewsAngle.OTHER)
+    policy_version = models.CharField(max_length=16, default="1.0")
+    reason = models.TextField(blank=True)
+    evidence = models.JSONField(default=dict, blank=True)
+    activated_at = models.DateTimeField(null=True, blank=True)
+    replaced_at = models.DateTimeField(null=True, blank=True)
+    replaced_by = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="replaced_exposures")
+    delivery = models.ForeignKey("QQPushDelivery", on_delete=models.SET_NULL, null=True, blank=True, related_name="race_exposures")
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            # 同一 (event, channel, scope_key, article) 唯一
+            models.UniqueConstraint(
+                fields=("event", "channel", "scope_key", "article"),
+                name="uq_race_exposure_event_channel_scope_article",
+            ),
+            # 首页 waiting/active 同席位唯一（条件约束）
+            models.UniqueConstraint(
+                fields=("event", "channel", "scope_key", "slot"),
+                condition=(models.Q(channel="homepage") & (models.Q(status="waiting") | models.Q(status="active"))),
+                name="uq_homepage_exposure_active_slot",
+            ),
+            # QQ waiting/active/sent 同席位唯一（条件约束）
+            models.UniqueConstraint(
+                fields=("event", "channel", "scope_key", "slot"),
+                condition=(models.Q(channel="qq") & (models.Q(status="waiting") | models.Q(status="active") | models.Q(status="sent"))),
+                name="uq_qq_exposure_active_slot",
+            ),
+            # slot 只能是 1 或 2
+            models.CheckConstraint(
+                condition=models.Q(slot__in=(1, 2)),
+                name="ck_race_exposure_slot_valid",
+            ),
+            # delivery 只在 channel="qq" 时有值
+            models.CheckConstraint(
+                condition=(models.Q(delivery__isnull=True) | models.Q(channel=RaceNewsExposureChannel.QQ)),
+                name="ck_race_exposure_delivery_channel",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("event", "channel", "scope_key")),
+            models.Index(fields=("article", "channel")),
+            models.Index(fields=("status", "lease_expires_at")),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.event_id} {self.channel}:{self.scope_key} slot={self.slot} {self.status}"
+# ── Post-race internal reference observations (Phase B0.1) ──────────
+
+
+class RaceReferenceCollectionStatus(models.TextChoices):
+    RUNNING = "running", "采集中"
+    FINISHED = "finished", "已完成"
+    FAILED = "failed", "失败"
+
+
+class RaceReferenceMatchStatus(models.TextChoices):
+    MATCHED = "matched", "已匹配"
+    UNMATCHED = "unmatched", "未匹配"
+    AMBIGUOUS = "ambiguous", "歧义"
+    SOURCE_ONLY = "source_only", "仅来源记录"
+
+
+class RaceReferenceCollectionRun(models.Model):
+    """Immutable membership boundary for one manifest-bound collection artifact."""
+
+    source_key = models.CharField(max_length=64)
+    country_region = models.CharField(max_length=32, choices=RacingRegion.choices)
+    parser_name = models.CharField(max_length=64)
+    parser_version = models.CharField(max_length=64)
+    scope_manifest_sha256 = models.CharField(max_length=64)
+    local_date_from = models.DateField(null=True, blank=True)
+    local_date_to = models.DateField(null=True, blank=True)
+    target_count = models.PositiveIntegerField(default=0)
+    status = models.CharField(
+        max_length=16,
+        choices=RaceReferenceCollectionStatus.choices,
+        default=RaceReferenceCollectionStatus.RUNNING,
+    )
+    trigger_kind = models.CharField(max_length=32, default="management_command")
+    trigger_task_id = models.CharField(max_length=128, blank=True)
+    started_at = models.DateTimeField()
+    finished_at = models.DateTimeField(null=True, blank=True)
+    request_count = models.PositiveIntegerField(default=0)
+    cache_hit_count = models.PositiveIntegerField(default=0)
+    matched_count = models.PositiveIntegerField(default=0)
+    unmatched_count = models.PositiveIntegerField(default=0)
+    ambiguous_count = models.PositiveIntegerField(default=0)
+    partial_count = models.PositiveIntegerField(default=0)
+    unchanged_count = models.PositiveIntegerField(default=0)
+    changed_count = models.PositiveIntegerField(default=0)
+    error_count = models.PositiveIntegerField(default=0)
+    artifact_sha256 = models.CharField(max_length=64)
+    summary = models.JSONField(default=dict, blank=True)
+    error_summary = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("scope_manifest_sha256", "artifact_sha256"),
+                name="uq_race_ref_run_manifest_artifact",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        source_key="reference_sporting_life",
+                        country_region=RacingRegion.UNITED_KINGDOM,
+                    )
+                    | models.Q(
+                        source_key="reference_zeturf",
+                        country_region=RacingRegion.FRANCE,
+                    )
+                    | models.Q(
+                        source_key="reference_horse_racing_nation",
+                        country_region=RacingRegion.UNITED_STATES,
+                    )
+                ),
+                name="race_ref_run_source_region_ck",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(status=RaceReferenceCollectionStatus.FINISHED)
+                    | models.Q(finished_at__isnull=False)
+                ),
+                name="race_ref_run_finished_at_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("source_key", "created_at"),
+                name="race_ref_run_source_at_idx",
+            ),
+        ]
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:
+        return f"{self.source_key} {self.scope_manifest_sha256[:12]} {self.status}"
+
+
+class RaceReferencePayloadQuerySet(models.QuerySet):
+    """Reject in-place mutation of append-only semantic payload rows."""
+
+    def update(self, **kwargs):
+        raise ValidationError("RaceReferencePayload 是不可变记录，禁止修改。")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValidationError("RaceReferencePayload 是不可变记录，禁止修改。")
+
+    def delete(self):
+        raise ValidationError("RaceReferencePayload 是不可变记录，禁止删除。")
+
+
+class RaceReferencePayload(models.Model):
+    """Deduplicated semantic source facts; rows are append-only."""
+
+    objects = RaceReferencePayloadQuerySet.as_manager()
+
+    source_key = models.CharField(max_length=64)
+    provider_event_key = models.CharField(max_length=255)
+    observation_key = models.CharField(max_length=384)
+    payload_sha256 = models.CharField(max_length=64)
+    structured_payload = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("source_key", "observation_key", "payload_sha256"),
+                name="uq_race_ref_payload_identity_hash",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(source_key__in=(
+                    "reference_sporting_life",
+                    "reference_zeturf",
+                    "reference_horse_racing_nation",
+                )),
+                name="race_ref_payload_source_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("source_key", "provider_event_key", "created_at"),
+                name="race_ref_payload_src_evt_idx",
+            ),
+        ]
+        ordering = ("-created_at", "-id")
+
+    def __str__(self) -> str:
+        return f"{self.observation_key} {self.payload_sha256[:12]}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("RaceReferencePayload 是不可变记录，禁止修改。")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("RaceReferencePayload 是不可变记录，禁止删除。")
+        return super().delete(*args, **kwargs)
+
+
+class RaceReferenceReceiptQuerySet(models.QuerySet):
+    """Reject mutations except Django Collector's controlled FK SET_NULL."""
+
+    def update(self, **kwargs):
+        if kwargs == {"event": None} or kwargs == {"event_id": None}:
+            return super().update(**kwargs)
+        raise ValidationError("RaceReferenceReceipt 是不可变记录，禁止修改。")
+
+    def bulk_update(self, objs, fields, batch_size=None):
+        raise ValidationError("RaceReferenceReceipt 是不可变记录，禁止修改。")
+
+    def delete(self):
+        raise ValidationError("RaceReferenceReceipt 是不可变记录，禁止删除。")
+
+
+class RaceReferenceReceipt(models.Model):
+    """Per-run provenance and classification for an immutable payload."""
+
+    objects = RaceReferenceReceiptQuerySet.as_manager()
+
+    run = models.ForeignKey(
+        RaceReferenceCollectionRun,
+        on_delete=models.PROTECT,
+        related_name="receipts",
+    )
+    payload = models.ForeignKey(
+        RaceReferencePayload,
+        on_delete=models.PROTECT,
+        related_name="receipts",
+    )
+    source_url = models.URLField(max_length=1000)
+    final_url = models.URLField(max_length=1000)
+    source_observed_at = models.DateTimeField(null=True, blank=True)
+    fetched_at = models.DateTimeField()
+    parser_name = models.CharField(max_length=64)
+    parser_version = models.CharField(max_length=64)
+    legacy_payload_sha256 = models.CharField(max_length=64)
+    raw_sha256 = models.CharField(max_length=64)
+    source_cache_ref = models.CharField(max_length=500)
+    provenance_sha256 = models.CharField(max_length=64)
+    event = models.ForeignKey(
+        "RaceEvent",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reference_receipts",
+    )
+    match_status = models.CharField(
+        max_length=16,
+        choices=RaceReferenceMatchStatus.choices,
+    )
+    match_confidence = models.PositiveSmallIntegerField(default=0)
+    match_evidence = models.JSONField(default=dict, blank=True)
+    event_snapshot = models.JSONField(default=dict, blank=True)
+    event_snapshot_sha256 = models.CharField(max_length=64)
+    classification_version = models.CharField(max_length=64)
+    is_partial = models.BooleanField(default=False)
+    gap_codes = models.JSONField(default=list, blank=True)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("run", "payload"),
+                name="uq_race_ref_receipt_run_payload",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    (
+                        models.Q(match_status=RaceReferenceMatchStatus.MATCHED)
+                        & ~models.Q(event_snapshot={})
+                    )
+                    | (
+                        ~models.Q(match_status=RaceReferenceMatchStatus.MATCHED)
+                        & models.Q(event__isnull=True)
+                    )
+                ),
+                name="race_ref_receipt_match_evt_ck",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(match_confidence__lte=100),
+                name="race_ref_receipt_conf_ck",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("event", "recorded_at"),
+                name="race_ref_receipt_event_at_idx",
+            ),
+            models.Index(
+                fields=("match_status", "recorded_at"),
+                name="race_ref_receipt_match_at_idx",
+            ),
+        ]
+        ordering = ("-recorded_at", "-id")
+
+    def __str__(self) -> str:
+        return f"{self.run_id}:{self.payload_id} {self.match_status}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("RaceReferenceReceipt 是不可变记录，禁止修改。")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError("RaceReferenceReceipt 是不可变记录，禁止删除。")
+        return super().delete(*args, **kwargs)

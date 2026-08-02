@@ -5,6 +5,7 @@ import argparse
 import csv
 import json
 import re
+import sys
 import time
 import unicodedata
 from collections import defaultdict
@@ -19,7 +20,24 @@ from bs4 import BeautifulSoup
 
 
 BASE_URL = "https://www.zeturf.fr"
-COUNTRY_SUFFIX_RE = re.compile(r"\s*[\(\（][A-Z]{2,3}[\)\）]\s*$")
+RECOVERY_EXACT_RESULT_URLS = {
+    "733": (
+        "https://www.zeturf.fr/fr/course-du-jour/2026-07-19/"
+        "R1C1-chantilly-goffs-prix-robert-papin"
+    ),
+    "734": (
+        "https://www.zeturf.fr/fr/course-du-jour/2026-07-19/"
+        "R1C5-chantilly-darley-prix-chloe"
+    ),
+    "735": (
+        "https://www.zeturf.fr/fr/course-du-jour/2026-07-19/"
+        "R1C7-chantilly-prix-messidor"
+    ),
+    "736": (
+        "https://www.zeturf.fr/fr/course-du-jour/2026-07-22/"
+        "R5C6-vichy-grand-prix-de-vichy"
+    ),
+}
 STOPWORDS = {
     "al",
     "arc",
@@ -100,10 +118,6 @@ def _tokens(value: str) -> set[str]:
             continue
         tokens.add(token)
     return tokens
-
-
-def _strip_country_suffix(value: str) -> str:
-    return COUNTRY_SUFFIX_RE.sub("", _collapse(value).replace("(NP)", "")).strip()
 
 
 def _download(url: str, path: Path, *, allow_network: bool, timeout: int, sleep_seconds: float) -> str:
@@ -198,11 +212,24 @@ def _zeturf_url(event: dict, *, r_number: int, c_number: int) -> str:
     return f"{BASE_URL}/fr/course-du-jour/{event['local_date']}/R{r_number}C{c_number}-{course_slug}-{race_slug}"
 
 
-def _read_events(path: Path) -> list[dict]:
+def _recovery_exact_result_url(event: dict) -> str:
+    return RECOVERY_EXACT_RESULT_URLS.get(
+        str(event.get("event_id") or ""),
+        "",
+    )
+
+
+def _read_events(
+    path: Path,
+    *,
+    recovery_mode: bool = False,
+) -> list[dict]:
     events = []
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         for row in csv.DictReader(handle):
-            if row.get("status") == "finished":
+            if row.get("status") == "finished" or (
+                recovery_mode and row.get("status") == "scheduled"
+            ):
                 events.append(row)
     return events
 
@@ -219,114 +246,83 @@ def _filter_events(events: list[dict], *, start_date: str, end_date: str) -> lis
     return filtered
 
 
-def _cell_text(node, selector: str) -> str:
-    found = node.select_one(selector)
-    return _collapse(found.get_text(" ", strip=True) if found else "")
-
-
-def _horse_name(node) -> str:
-    horse_node = node.select_one(".horse-name")
-    value = (
-        horse_node.get("title")
-        if horse_node and horse_node.get("title")
-        else (horse_node.get_text(" ", strip=True) if horse_node else "")
+try:
+    from stable.race_reference_parsers.zeturf import (
+        parse_legacy_page as _shared_parse_page,
     )
-    return _strip_country_suffix(value)
-
-
-def _parse_finish_position(value: str) -> int:
-    match = re.search(r"\d+", value or "")
-    return int(match.group(0)) if match else 0
+except ModuleNotFoundError:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "server"))
+    from stable.race_reference_parsers.zeturf import (
+        parse_legacy_page as _shared_parse_page,
+    )
 
 
 def _parse_page(html: str, *, source_url: str) -> tuple[list[dict], list[dict], dict]:
-    soup = BeautifulSoup(html, "lxml")
-    runners = []
-    runner_by_number = {}
-    runner_table = soup.select_one("table.table-runners")
-    if runner_table:
-        for tr in runner_table.select("tbody tr[data-runner]"):
-            number = _cell_text(tr, "td.numero")
-            horse_name = _horse_name(tr)
-            if not horse_name:
-                continue
-            jockey = _cell_text(tr, ".second-line .jockey")
-            trainer = ""
-            for trainer_node in tr.select(".second-line > span"):
-                if "jockey" not in (trainer_node.get("class") or []):
-                    trainer = _collapse(trainer_node.get_text(" ", strip=True))
-                    break
-            running_status = "withdrawn" if tr.select_one(".non-partant") or "(NP)" in tr.get_text(" ", strip=True) else "declared"
-            source_refs = {
-                "primary": source_url,
-                "source_language": "fr",
-                "source_kind": "zeturf_race_detail",
-                "horse_id": (tr.select_one("a.horse-name") or {}).get("data-runner", "") if tr.select_one("a.horse-name") else "",
-                "horse_name_raw": horse_name,
-            }
-            row = {
-                "sort_order": len(runners) + 1,
-                "horse_number": number,
-                "barrier": _cell_text(tr, "td.corde"),
-                "horse_name": horse_name,
-                "jockey_name": jockey,
-                "trainer_name": trainer,
-                "carried_weight": _cell_text(tr, "td.weight"),
-                "odds_value": _cell_text(tr, "td.cote"),
-                "running_status": running_status,
-                "source_refs": source_refs,
-            }
-            runners.append(row)
-            if number:
-                runner_by_number[number] = row
-
-    results = []
-    arrival = soup.select_one("#arriveeTab table")
-    if arrival:
-        for tr in arrival.select("tbody tr[data-runner]"):
-            cells = tr.find_all("td")
-            if len(cells) < 4:
-                continue
-            official_position = _parse_finish_position(cells[0].get_text(" ", strip=True))
-            if official_position <= 0:
-                continue
-            number = _collapse(cells[1].get_text(" ", strip=True))
-            horse_name = _horse_name(cells[2]) or (runner_by_number.get(number) or {}).get("horse_name", "")
-            if not horse_name:
-                continue
-            base = runner_by_number.get(number) or {}
-            results.append(
-                {
-                    "finish_position": len(results) + 1,
-                    "horse_number": number,
-                    "barrier": base.get("barrier", ""),
-                    "horse_name": horse_name,
-                    "jockey_name": _cell_text(cells[3], "a.jockey") or base.get("jockey_name", ""),
-                    "trainer_name": base.get("trainer_name", ""),
-                    "carried_weight": base.get("carried_weight", ""),
-                    "finish_time": "",
-                    "margin": _collapse(cells[-1].get_text(" ", strip=True)) if cells else "",
-                    "odds_value": _collapse(cells[-2].get_text(" ", strip=True)) if len(cells) >= 2 else "",
-                    "running_status": "declared",
-                    "is_confirmed": True,
-                    "source_refs": {
-                        **(base.get("source_refs") or {}),
-                        "primary": source_url,
-                        "official_finish_position": official_position,
-                    },
-                }
-            )
-    metadata = _title_parts(_title(html))
-    metadata.update({"row_count": len(runners), "result_count": len(results)})
-    return runners, results, metadata
+    """Keep the historical CLI on the same parse-only implementation."""
+    return _shared_parse_page(html, source_url=source_url)
 
 
 def _discover_event_pages(events: list[dict], source_dir: Path, args) -> tuple[dict[str, dict], list[dict]]:
     by_date = defaultdict(list)
-    for event in events:
-        by_date[event["local_date"]].append(event)
     matched: dict[str, dict] = {}
     skipped = []
+    for event in events:
+        exact_url = (
+            _recovery_exact_result_url(event)
+            if bool(getattr(args, "recovery_mode", False))
+            else ""
+        )
+        if exact_url:
+            cache_path = (
+                source_dir
+                / f"source_zt_exact_{event['event_id']}.html"
+            )
+            try:
+                html = _download(
+                    exact_url,
+                    cache_path,
+                    allow_network=args.allow_network,
+                    timeout=args.timeout_seconds,
+                    sleep_seconds=args.sleep_seconds,
+                )
+            except Exception as exc:
+                skipped.append(
+                    {
+                        "event_id": event["event_id"],
+                        "slug": event["slug"],
+                        "reason": "exact_route_failed",
+                        "error": str(exc),
+                    }
+                )
+                continue
+            parts = _title_parts(_title(html))
+            if (
+                parts["date"] != event["local_date"]
+                or not _venue_match(
+                    event["racecourse"],
+                    parts["venue"],
+                )
+                or not _race_matches_event(event, parts["race_name"])
+            ):
+                skipped.append(
+                    {
+                        "event_id": event["event_id"],
+                        "slug": event["slug"],
+                        "reason": "exact_route_identity_mismatch",
+                        "source_url": exact_url,
+                    }
+                )
+                continue
+            matched[event["slug"]] = {
+                "event": event,
+                "url": exact_url,
+                "html": html,
+                "r": "",
+                "c": "",
+                "title": _title(html),
+            }
+            continue
+        by_date[event["local_date"]].append(event)
     for race_date, date_events in sorted(by_date.items()):
         unmatched = {event["slug"]: event for event in date_events}
         target_courses = {event["racecourse"] for event in date_events}
@@ -387,7 +383,10 @@ def prepare_candidates(args) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
     source_dir = output_dir / "sources"
     source_dir.mkdir(exist_ok=True)
-    events = _read_events(Path(args.events_csv))
+    events = _read_events(
+        Path(args.events_csv),
+        recovery_mode=bool(getattr(args, "recovery_mode", False)),
+    )
     events = _filter_events(events, start_date=args.start_date, end_date=args.end_date)
     if args.limit:
         events = events[: args.limit]
@@ -426,6 +425,8 @@ def prepare_candidates(args) -> dict:
                 "modules": {"runners": {"items": runners}, "results": {"items": results}},
                 "metadata": {**metadata, "zeturf_r": item["r"], "zeturf_c": item["c"], "title": item["title"]},
             }
+            if str(event.get("event_id") or "").strip():
+                record["event_id"] = int(event["event_id"])
             jsonl.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
             summary["events"] += 1
             summary["runner_items"] += len(runners)
@@ -457,6 +458,7 @@ def main() -> None:
     parser.add_argument("--events-csv", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--allow-network", action="store_true")
+    parser.add_argument("--recovery-mode", action="store_true")
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--start-date", default="")
     parser.add_argument("--end-date", default="")

@@ -1,5 +1,25 @@
 # 项目总览
 
+## 日本重赏 P0 身份来源
+
+日本马一期候选范围为 1998–2026 年的 G1/G2/G3、J-G1/J-G2/J-G3、
+JpnⅠ/JpnⅡ/JpnⅢ，以及身份和训练证据完整的日本训练马海外 G1/G2/G3。系统从重赏赛事
+反向取得官方马匹锚点，以 Netkeiba 与 JRA/NAR 的马名、父、母、完整出生日期共识建立待审核
+身份底稿；JRA/NAR 冲突、官方锚点缺失或只有单一来源时保持阻断。
+
+赛事等级只决定处理顺序，不替代身份证据。JRA-VAN 预留为 Windows 离线补证来源，不进入
+常驻采集；整个流程继续经过显式清单、有界 prepare、人工审核、精确 SHA 和原子 commit。
+当前生产没有直接官方马匹锚点，因此首个 PoC 从第二层赛事上下文开始：赛事索引最多跟随一个
+唯一详情页，再以马号和精确马名锁定唯一参赛行及同 provider 马匹链接；不使用站内马名搜索。
+本地实现现已完成候选选择、三套来源适配器、网络预算/缓存、双/三源比较、离线审核 artifact、
+JRA-VAN 交换校验合同，以及不可变批准事件、唯一 commit receipt 和严格幂等复验。正式写入
+命令要求操作者显式确认精确批准 artifact；重复提交必须完整匹配 receipt、证据摘要、结果和
+审计记录才允许返回零写。来源客户端逐跳强制 HTTPS，并要求 JRA/NAR 官方锚点携带非空来源 ID；
+approve 会从冻结的双/三源身份重新计算共识，不能通过修改候选字段并重算文件 SHA 自证。
+真实 prepare 候选还会保存 commit 所需的完整冻结选择字段；approve 要求内嵌 candidate/blocker
+与已哈希 JSONL sidecar 规范字节一致，避免审核包与待写候选脱钩。当前仍处于未部署、未触网、
+未写生产的实现验证阶段，代码审查问题已修复，待原生 reviewer 会话复审。
+
 ## P0 马资料生产批准链路
 
 P0 滚动批次的内容审核与生产批准现在是两层门禁：
@@ -128,6 +148,12 @@ promotion/disable/restore manifest。暂定赛果可以先公开，但页面必�
 
 正式 artifact 流水线已在生产镜像 `main@ab95c6ef` 部署并通过隔离、暂停恢复和工具根拒绝 smoke。年度赛历 request/cache/parse 扩展已完成本地验收，法国 2023-2024 达到 `250/250`；batch006 将按冻结的 1061 场 selection 拆为 11 个地区×年份 scope，待新镜像部署后开始抓取，历史公开继续关闭。
 
+单年度八地区分级赛参赛马研究是独立、只读、artifact-only 的 GitHub Actions 链路，不连接
+生产数据库。它从 UmaFans sitemap 和公开赛事/马匹页生成 checkpoint 与七文件 artifact；
+当前正式来源 origin 为 `http://umafans.run/`，因为生产 Nginx 尚未启用域名 HTTPS。
+collector 仍以精确 host、scheme、path/query 和逐跳校验限制请求边界，base URL 同时绑定
+checkpoint identity；未来切换 HTTPS 必须作为独立运维变更，并从 fresh checkpoint 开始。
+
 ## P0 马资料链路
 
 P0 马范围由“active 且有中文译名的正式 horse term”与“五地区全部重点分级赛参赛马”组成。赛事产品覆盖只负责确定 P0 候选来源；马匹基础资料、二代血统和完整生涯必须继续按马匹主来源采集，不能从重点赛事总账反推。
@@ -199,3 +225,49 @@ P0 马范围由“active 且有中文译名的正式 horse term”与“五地�
 
 - 网页端公开访问
 - QQ Bot 自动推送（默认灰度关闭，基于 OneBot；后台手动推送保留）
+# 赛事生命周期规划
+
+赛事产品将补齐一条与新闻、历史回填和准实时赛果相互解耦的自动生命周期：
+
+`重点赛事时间扫描 -> 当地时区状态推进 -> 赛前结构化候选 -> 赛事影响新闻候选 ->
+复用 race-live 暂定/正式赛果 -> 字段与状态审计`
+
+赛事是否已经发生继续由 `RaceEvent.status` 表达；暂定、正式和更正赛果继续由现有 live
+revision 表达。来源失败不会使赛事永久停留赛前，也不会被解释为已有赛果。该能力按生命周期、
+赛前资料、新闻联动、赛果四阶段独立灰度；当前仅完成规划，生产行为未改变。
+
+赛前资料和赛果允许采购商业 API，但订阅价格与来源权威分开判断。低成本聚合 API 可做
+supplemental/provisional，只有逐地区、逐字段、逐结果阶段的官方合同或 rights-holder 证明才能
+取得 official authority；合同、proof、registry 和生产启用分别授权。
+
+# 历史赛果缺口恢复链路
+
+赛果缺口恢复与 race-live 分流：先冻结 event/race-group 双层 inventory，再按地区生成
+results-only 候选，由官方 route receipt 和 participant identity 审批后逐场原子投影。
+重复赛事通过显式 canonical link 在公开入口去重，旧详情 URL 保留。historical owner
+不得把第三方候选直接提升为 confirmed，也不得接管 live owner 的暂定赛果。
+
+实现、部署、联网 candidate prepare、人工 official 审批和生产 apply 分别授权；默认状态下
+不会联网或写业务数据库。
+同一地区存在多个候选来源时，恢复 adapter 输入按 `region + source` 精确分片。JRA 年度列表
+和详情页由 runner 物化受控上下文，每个初始请求与 redirect 都同时受全批次共享预算与
+JRA-only host/path/间隔策略约束；显式 recovery mode 才能消费冻结的过期 scheduled 目标，
+人工官方路由仍不得由该链路自动请求。
+
+阶段 A schema/code 已以功能关闭状态部署，shadow/enforce 尚未启用。阶段 B0.1 将 Sporting Life、
+ZEturf、Horse Racing Nation 作为独立内部参考层：保留现有解析器，只供有权限的后台交叉核验，
+不进入公开赛事、正式/暂定赛果、新闻、QQ、搜索或公开 API。内部观察与可应用字段候选使用不同
+模型和命令，避免把“抓取成功”误当成“可以公开”。首版只处理赛后 finished 入口，以逐日
+one-shot 观察，不增加自动调度。
+
+后续定时审核层已有默认关闭实现：每天北京时间 06:30/18:30 从最近 72 小时赛事和 14 天
+pending 中生成不可变审核包并发给唯一审核人。第三方内部参考只有在审核人明确批准完整
+bundle SHA、event 和行摘要后，才以“已人工审核赛果”投影；它不会因此成为官方来源。
+
+# Race-data-sync 切片 A（本地候选，尚未发布）
+
+赛前结构化资料新增 provider-neutral observation -> contract/authority -> field ledger -> canonical
+racecard projection 候选链路，复用现有 race-live、赛事参与者身份和 revision，不新建第二套状态机或
+调度器。赛事时间、取消和延期在生命周期集成切片 C 前只记候选，不直接改变 `RaceEvent` 或 control。
+所有 provider/region/field 开关默认关闭；当前仅复用已有 The Racing API adapter，其余来源需完成各自
+parser/proof 后才可进入运行时准入。该候选尚未 commit、PR、迁移或部署，生产行为没有变化。

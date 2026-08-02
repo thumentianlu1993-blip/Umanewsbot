@@ -358,6 +358,9 @@ a {
 
 .grade-badge {
   flex: 0 0 42px;
+  width: 42px;
+  min-width: 42px;
+  max-width: 42px;
   height: 42px;
   border-radius: 9px;
   display: flex;
@@ -366,8 +369,15 @@ a {
   font-family: var(--serif);
   font-weight: 900;
   font-size: 15px;
+  line-height: 1;
+  white-space: nowrap;
+  text-align: center;
   color: #fff;
   background: linear-gradient(160deg, #9aa3b2, var(--g2));
+}
+
+.grade-badge:empty::before {
+  content: "—";
 }
 
 .grade-badge.g1 {
@@ -381,6 +391,14 @@ a {
 
 .grade-badge.g3 {
   background: linear-gradient(160deg, #b9835f, var(--g3));
+}
+
+.grade-badge.g-other {
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding: 2px;
 }
 
 .race-row-main {
@@ -1202,8 +1220,11 @@ a {
 .date-axis { display: flex; gap: 4px; margin: 0 0 20px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); }
 .date-axis::-webkit-scrollbar { display: none; }
 .date-axis a { position: relative; display: flex; flex: 0 0 auto; flex-direction: column; align-items: center; padding: 8px 14px 10px; color: var(--ink-3); font-size: 12px; }
-.date-axis a b { color: var(--ink-2); font-size: 16px; font-variant-numeric: tabular-nums; }
+.date-axis a b { color: var(--ink-2); font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .date-axis a.today b { color: var(--turf); }
+.date-axis a.anchor:not(.today) b { font-weight: 900; }
+.date-axis a.anchor:not(.today)::after { content: ""; position: absolute; right: 12px; bottom: -1px; left: 12px; height: 3px; border-radius: 3px 3px 0 0; background: var(--gold); }
+.date-year { font-size: 11px; color: var(--ink-3); }
 .date-axis a.today::after { content: ""; position: absolute; right: 12px; bottom: -1px; left: 12px; height: 3px; border-radius: 3px 3px 0 0; background: var(--turf); }
 .race-dot { width: 5px; height: 5px; margin-top: 3px; border-radius: 50%; background: var(--gold); }
 .agenda { display: flex; flex-direction: column; gap: 24px; padding-bottom: 40px; }
@@ -1211,13 +1232,15 @@ a {
 .agenda-date { padding-top: 4px; text-align: right; }
 .agenda-date .d { font-family: var(--serif); font-size: 30px; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .agenda-date .w { margin-top: 2px; color: var(--ink-3); font-size: 12px; }
+.agenda-date .m { font-size: 14px; color: var(--ink-3); font-weight: 700; }
 .agenda-date.today .d, .agenda-date.today .w { color: var(--turf); }
 .agenda-races { display: flex; flex-direction: column; gap: 10px; padding-left: 18px; border-left: 2px solid var(--line); }
 .agenda-day.today .agenda-races { border-left-color: var(--gold); }
+.agenda-day:target { outline: 2px solid var(--gold); outline-offset: 4px; border-radius: var(--radius); }
 .cal-card { display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-1); transition: transform .15s ease, box-shadow .15s ease; }
 .cal-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
 .cal-card-main { flex: 1; min-width: 0; }
-.cal-card-name { display: block; font-family: var(--serif); font-size: 17px; font-weight: 900; }
+.cal-card-name { display: block; font-family: var(--serif); font-size: 17px; font-weight: 900; overflow-wrap: anywhere; }
 .cal-card-name small { margin-left: 8px; color: var(--ink-3); font-family: var(--sans); font-size: 12px; font-weight: 500; }
 .cal-card-meta { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-top: 4px; color: var(--ink-3); font-size: 12px; }
 .cal-card-status { flex: 0 0 auto; text-align: right; }
@@ -1654,7 +1677,7 @@ a {
 
   .race-filter-row { display: block; }
   .cal-card { align-items: flex-start; flex-wrap: wrap; padding: 12px; }
-  .cal-card .grade-badge { flex: 0 0 auto; }
+  .cal-card .grade-badge { flex: 0 0 42px; }
   .cal-card-main { flex: 1 1 calc(100% - 58px); }
   .cal-card-status { flex: 1 1 100%; padding-left: 56px; text-align: left; }
   .countdown-hero-digits small { display: block; margin: 6px 0 0; }

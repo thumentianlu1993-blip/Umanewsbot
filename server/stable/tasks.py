@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from celery import shared_task
+from billiard.exceptions import SoftTimeLimitExceeded
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
@@ -34,6 +35,8 @@ from stable.models import (
     QQPushDeliveryStatus,
     PushTarget,
     RaceLiveAlertIncident,
+    RaceNewsExposure,
+    RaceNewsExposureStatus,
     RacingRegion,
     ReviewMode,
     SourceMode,
@@ -75,6 +78,11 @@ from stable.services.production_windows import (
     select_production_sources,
 )
 from stable.services.publishing_windows import select_publish_candidates
+from stable.services.p0_racecard_url_discovery import (
+    PublishLockBusyError,
+    SafeHttpTransport,
+    run_p0_racecard_url_discovery,
+)
 from stable.services.publish_readiness import publish_ready_age_summary
 from stable.services.pushing import push_article_to_targets
 from stable.services.qq_auto_push import (
@@ -107,6 +115,189 @@ from stable.services.race_events import (
 
 User = get_user_model()
 JRA_SKIPPABLE_DETAIL_ERRORS = (ValueError, AttributeError, IndexError, TypeError)
+
+
+@shared_task
+def scheduled_race_result_review_task() -> dict:
+    from stable.services.scheduled_race_result_review import run_scheduled_prepare
+
+    return run_scheduled_prepare()
+
+
+@shared_task
+def discover_p0_racecard_urls_task() -> dict:
+    """Publish the current P0 official racecard URL document.
+
+    The feature flag is checked before database access, file access, registry
+    loading, or transport construction.
+    """
+    if (
+        getattr(settings, "P0_RACECARD_URL_DISCOVERY_ENABLED", False)
+        is not True
+    ):
+        return {"enabled": False}
+
+    import time
+
+    from stable.models import RaceEvent, RaceEventPriority
+
+    started_at = timezone.now()
+    monotonic_started = time.monotonic()
+    log = TaskExecutionLog.objects.create(
+        task_name="discover_p0_racecard_urls_task",
+        status=TaskStatus.STARTED,
+        payload={},
+        detail="",
+        started_at=started_at,
+    )
+    try:
+        summary = run_p0_racecard_url_discovery(
+            events=RaceEvent.objects.filter(
+                priority=RaceEventPriority.P0
+            ).iterator(chunk_size=200),
+            run_started_at=started_at,
+            artifact_root=settings.P0_RACECARD_URL_DISCOVERY_ARTIFACT_ROOT,
+            registry_path=settings.P0_RACECARD_URL_DISCOVERY_REGISTRY_FILE,
+            registry_sha256=(
+                settings.P0_RACECARD_URL_DISCOVERY_REGISTRY_SHA256
+            ),
+            transport=SafeHttpTransport(
+                total_request_budget=(
+                    settings.P0_RACECARD_URL_DISCOVERY_REQUEST_BUDGET
+                )
+            ),
+            max_targets=settings.P0_RACECARD_URL_DISCOVERY_MAX_TARGETS,
+        )
+        duration_ms = max(
+            0, int((time.monotonic() - monotonic_started) * 1000)
+        )
+        allowed_keys = {
+            "future_expected",
+            "orphans",
+            "found",
+            "listing_reachable",
+            "not_available",
+            "preserved_previous",
+            "blocked",
+            "errors",
+            "by_region",
+            "by_provider",
+        }
+        log.payload = {
+            key: summary[key] for key in allowed_keys if key in summary
+        }
+        log.payload["duration_ms"] = duration_ms
+        log.status = TaskStatus.SUCCESS
+        log.detail = "completed"
+        log.finished_at = timezone.now()
+        log.save(
+            update_fields=[
+                "payload",
+                "status",
+                "detail",
+                "finished_at",
+                "updated_at",
+            ]
+        )
+        return {"enabled": True, **summary}
+    except SoftTimeLimitExceeded:
+        log.status = TaskStatus.FAILED
+        log.payload = {
+            "future_expected": 0,
+            "orphans": 0,
+            "found": 0,
+            "listing_reachable": 0,
+            "not_available": 0,
+            "preserved_previous": 0,
+            "blocked": 0,
+            "errors": 1,
+            "by_region": {},
+            "by_provider": {},
+            "duration_ms": max(
+                0, int((time.monotonic() - monotonic_started) * 1000)
+            ),
+        }
+        log.detail = "soft_time_limit_exceeded"
+        log.finished_at = timezone.now()
+        try:
+            log.save(
+                update_fields=[
+                    "payload",
+                    "status",
+                    "detail",
+                    "finished_at",
+                    "updated_at",
+                ]
+            )
+        except Exception:
+            pass
+        raise
+    except PublishLockBusyError:
+        log.status = TaskStatus.SUCCESS
+        log.payload = {
+            "future_expected": 0,
+            "orphans": 0,
+            "found": 0,
+            "listing_reachable": 0,
+            "not_available": 0,
+            "preserved_previous": 0,
+            "blocked": 0,
+            "errors": 0,
+            "by_region": {},
+            "by_provider": {},
+            "duration_ms": max(
+                0, int((time.monotonic() - monotonic_started) * 1000)
+            ),
+        }
+        log.detail = "already_running"
+        log.finished_at = timezone.now()
+        log.save(
+            update_fields=[
+                "payload",
+                "status",
+                "detail",
+                "finished_at",
+                "updated_at",
+            ]
+        )
+        return {
+            "enabled": True,
+            "success": True,
+            "reason": "already_running",
+        }
+    except Exception:
+        log.status = TaskStatus.FAILED
+        log.payload = {
+            "future_expected": 0,
+            "orphans": 0,
+            "found": 0,
+            "listing_reachable": 0,
+            "not_available": 0,
+            "preserved_previous": 0,
+            "blocked": 0,
+            "errors": 1,
+            "by_region": {},
+            "by_provider": {},
+            "duration_ms": max(
+                0, int((time.monotonic() - monotonic_started) * 1000)
+            ),
+        }
+        log.detail = "discovery_batch_failed"
+        log.finished_at = timezone.now()
+        log.save(
+            update_fields=[
+                "payload",
+                "status",
+                "detail",
+                "finished_at",
+                "updated_at",
+            ]
+        )
+        return {
+            "enabled": True,
+            "success": False,
+            "error_code": "discovery_batch_failed",
+        }
 
 
 @shared_task
@@ -1971,13 +2162,60 @@ def qq_auto_push_article_task(article_id: int) -> dict:
             return {"article_id": article_id, "skipped": True, "reason": "no_targets"}
         eligible_targets = []
         target_skip_reasons: dict[str, str] = {}
-        for target in targets:
-            target_eligibility = should_push_news_to_qq(article, target=target)
-            if target_eligibility.allowed:
+
+        # Resolve race identity for exposure governance
+        _race_identity = None
+        _race_angle = "other"
+        if getattr(settings, "RACE_NEWS_EXPOSURE_ENABLED", False):
+            from stable.services.race_news_exposure import (
+                classify_angle,
+                reserve_qq_exposure,
+                resolve_race_identity,
+            )
+            _race_identity = resolve_race_identity(article)
+            if _race_identity:
+                from stable.models import RaceEvent
+                event = RaceEvent.objects.filter(pk=_race_identity["event_id"]).first()
+                if event:
+                    angle_result = classify_angle(article=article, event=event)
+                    _race_angle = angle_result["angle"]
+
+        # Single atomic block: exposure reservation + delivery creation.
+        # Inner reserve_exposure → transaction.atomic() nests as savepoints;
+        # if delivery fails the outer transaction, all inner savepoints roll back.
+        with transaction.atomic():
+            exposure_ids_by_target: dict[int, int] = {}
+            eligible_targets = []
+            for target in targets:
+                target_eligibility = should_push_news_to_qq(article, target=target)
+                if not target_eligibility.allowed:
+                    target_skip_reasons[str(target.id)] = target_eligibility.reason or "not_eligible"
+                    continue
+                if _race_identity:
+                    from stable.models import RaceEvent
+                    event = RaceEvent.objects.filter(pk=_race_identity["event_id"]).first()
+                    if event:
+                        exposure_result = reserve_qq_exposure(
+                            event=event, article=article,
+                            target=target, angle=_race_angle,
+                        )
+                        if exposure_result is None:
+                            target_skip_reasons[str(target.id)] = "no_slot_available"
+                            continue
+                        if exposure_result.get("status") == "waiting":
+                            target_skip_reasons[str(target.id)] = "slot2_waiting"
+                            continue
+                        if exposure_result.get("id"):
+                            exposure_ids_by_target[target.id] = exposure_result["id"]
                 eligible_targets.append(target)
-            else:
-                target_skip_reasons[str(target.id)] = target_eligibility.reason or "not_eligible"
-        deliveries = ensure_qq_push_deliveries(article, eligible_targets)
+            deliveries = ensure_qq_push_deliveries(article, eligible_targets)
+            # Link exposure to delivery
+            for delivery in deliveries:
+                tid = delivery.target_id
+                if tid in exposure_ids_by_target:
+                    RaceNewsExposure.objects.filter(
+                        pk=exposure_ids_by_target[tid]
+                    ).update(delivery=delivery)
         queued_ids: list[int] = []
         skipped_ids: list[int] = []
         for delivery in deliveries:
@@ -2030,6 +2268,12 @@ def qq_push_delivery_task(self, delivery_id: int) -> dict:
         if delivery.status == QQPushDeliveryStatus.FAILED:
             _log_failure(log, delivery.last_error or "qq push delivery failed")
             return result
+        # Mark linked exposure as sent on successful delivery
+        if delivery.status == QQPushDeliveryStatus.SENT:
+            RaceNewsExposure.objects.filter(delivery=delivery).update(
+                status=RaceNewsExposureStatus.SENT,
+                evidence={"sent_at": timezone.now().isoformat()},
+            )
         _log_success(log, f"status={delivery.status}")
         return result
     except Exception as exc:
@@ -2054,3 +2298,96 @@ def publish_article(article: NewsArticle, user) -> None:
         detail=f"发布文章《{article.effective_title}》",
         admin=user,
     )
+
+
+# ── Race Event Lifecycle (Phase A) ────────────────────────────────────
+
+@shared_task
+def scan_due_race_event_lifecycle_task() -> dict:
+    """Celery Beat task: claim due lifecycle controls and dispatch per-event tasks.
+
+    Runs every 5 minutes. Does NOT dispatch race-live polling.
+    """
+    if not getattr(settings, "RACE_EVENT_LIFECYCLE_ENABLED", False):
+        return {"enabled": False, "claimed": 0, "dispatched": 0}
+
+    from stable.services.race_event_lifecycle import claim_due_lifecycle_controls
+
+    now = timezone.now()
+    claims = claim_due_lifecycle_controls(
+        now=now,
+        batch_size=getattr(settings, "RACE_EVENT_LIFECYCLE_BATCH_SIZE", 100),
+        ttl_seconds=getattr(settings, "RACE_EVENT_LIFECYCLE_CLAIM_TTL_SECONDS", 240),
+    )
+
+    for claim in claims:
+        dispatch_kwargs = {
+            "event_id": claim.event_id,
+            "expected_generation": claim.schedule_generation,
+            "attempt_token": claim.attempt_token,
+            "expected_claim_generation": claim.claim_generation,
+        }
+        transaction.on_commit(
+            lambda kwargs=dispatch_kwargs: advance_race_event_lifecycle_task.apply_async(
+                kwargs=kwargs,
+            )
+        )
+
+    count = len(claims)
+    return {"enabled": True, "claimed": count, "dispatched": count}
+
+
+@shared_task
+def advance_race_event_lifecycle_task(
+    event_id: int,
+    expected_generation: int,
+    attempt_token: str,
+    expected_claim_generation: int = 0,
+) -> dict:
+    """Advance a single event's lifecycle based on time rules only.
+
+    No network, no provider calls, no race-live dispatch.
+    Must be called inside transaction.atomic() because the underlying
+    service uses select_for_update().
+    """
+    from stable.services.race_event_lifecycle import apply_race_lifecycle_decision
+
+    from stable.models import RaceEventLifecycleControl
+
+    now = timezone.now()
+    with transaction.atomic():
+        # Re-check both ENABLED and MODE inside the transaction to prevent
+        # stale queued tasks from writing after the feature is disabled.
+        if not getattr(settings, "RACE_EVENT_LIFECYCLE_ENABLED", False):
+            return {"processed": False, "reason": "lifecycle_disabled_mid_flight", "event_id": event_id}
+        lifecycle_mode = getattr(settings, "RACE_EVENT_LIFECYCLE_MODE", "off")
+        if lifecycle_mode not in ("shadow", "enforce"):
+            return {"processed": False, "reason": "lifecycle_disabled_mid_flight", "event_id": event_id}
+
+        # Read per-event US zone allowlist from control manifest
+        allowed_us_zones = None
+        try:
+            ctrl = RaceEventLifecycleControl.objects.only("manifest_data").get(event_id=event_id)
+            zones = ctrl.manifest_data.get("allowed_us_zones")
+            if zones:
+                allowed_us_zones = frozenset(zones)
+        except RaceEventLifecycleControl.DoesNotExist:
+            pass
+
+        result = apply_race_lifecycle_decision(
+            event_id=event_id,
+            expected_generation=expected_generation,
+            now=now,
+            mode=lifecycle_mode,
+            attempt_token=attempt_token,
+            expected_claim_generation=expected_claim_generation,
+            allowed_us_zones=allowed_us_zones,
+        )
+
+    return {
+        "processed": True,
+        "event_id": event_id,
+        "action": result.action,
+        "error": result.error,
+        "transition_id": result.transition_id,
+    }

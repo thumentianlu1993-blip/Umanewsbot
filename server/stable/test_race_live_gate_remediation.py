@@ -705,6 +705,8 @@ class RacecardReplayLegacyIdentityRemediationTests(TestCase):
                     "jockey_name": "Old Jockey",
                     "trainer_name": "",
                     "carried_weight": "",
+                    "odds": "",
+                    "popularity": "",
                     "status": "declared",
                 },
             ),
@@ -721,6 +723,8 @@ class RacecardReplayLegacyIdentityRemediationTests(TestCase):
                     "jockey_name": "Old Jockey",
                     "trainer_name": "",
                     "carried_weight": "",
+                    "odds": "",
+                    "popularity": "",
                     "status": "declared",
                 },
             ),
@@ -840,9 +844,29 @@ class RacecardReplayLegacyIdentityRemediationTests(TestCase):
         )
         self.assertEqual(self._racecard_write_state(), before)
 
+    @override_settings(
+        RACE_DATA_SYNC_ENABLED=True,
+        RACE_DATA_SYNC_ENABLED_PROVIDERS=("the_racing_api",),
+        RACE_DATA_SYNC_ENABLED_REGIONS=("france",),
+        RACE_DATA_SYNC_ENABLED_FIELDS=(
+            "participants.carried_weight",
+            "participants.draw",
+            "participants.horse_name",
+            "participants.jockey_name",
+            "participants.number",
+            "participants.odds",
+            "participants.popularity",
+            "participants.status",
+            "participants.trainer_name",
+        ),
+    )
     def test_unchanged_replay_lazily_migrates_unique_legacy_source_identity(self):
         normalized = self._normalized_racecard()
         self._force_unchanged_revision(normalized)
+        models.RaceEventParticipantSourceIdentity.objects.filter(
+            source_identity=self.source,
+            external_runner_id="runner-1",
+        ).delete()
         legacy = models.RaceEventRunner.objects.create(
             event=self.event,
             external_runner_id="",

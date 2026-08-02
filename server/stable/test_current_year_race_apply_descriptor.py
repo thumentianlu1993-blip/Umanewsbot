@@ -105,6 +105,27 @@ class CurrentYearRaceApplyDescriptorTests(TestCase):
             "is_featured": True,
         }
 
+    def _cross_year_evidence(self, *, public_year: int) -> dict:
+        return {
+            "actual_year": public_year,
+            "reason": "officially_postponed_to_next_calendar_year",
+            "authority_url": "https://example.test/official/postponement",
+            "source_authority": "official",
+            "approved": True,
+            "approved_by": "test-operator",
+            "approved_at": "2026-01-02T10:00:00+08:00",
+            "manifest_sha256": "b" * 64,
+        }
+
+    def _rewrite_due_row(self, paths: dict[str, Path], **updates) -> None:
+        rows = list(csv.DictReader(paths["due_csv"].open(encoding="utf-8-sig")))
+        rows[0].update(updates)
+        with paths["due_csv"].open("w", encoding="utf-8-sig", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+            writer.writeheader()
+            writer.writerows(rows)
+        self._refresh_signed_chain(paths)
+
     def _refresh_signed_chain(self, paths: dict[str, Path]) -> None:
         manifest = json.loads(paths["manifest"].read_text())
         manifest["apply_artifacts"]["events_hong_kong"] = CLASSIFIER.identity(
@@ -260,6 +281,32 @@ class CurrentYearRaceApplyDescriptorTests(TestCase):
             with self.assertRaisesRegex(CommandError, "current-year.*descriptor"):
                 call_command("import_race_events", "--csv", str(raw_csv), "--dry-run")
 
+    def test_cross_edition_current_public_year_cannot_use_legacy_path(self):
+        target = self._target("cross-edition-legacy-gate", year=2025)
+        evidence = self._cross_year_evidence(public_year=2026)
+        with TemporaryDirectory() as temporary:
+            raw_csv = Path(temporary) / "events_hong_kong_cross_edition.csv"
+            row = self._date_match(target)
+            row.update(
+                {
+                    "slug": historical_event_slug(target, public_year=2026),
+                    "local_date": "2026-01-07",
+                    "source_refs": json.dumps(
+                        {"cross_year_evidence": evidence},
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                }
+            )
+            with raw_csv.open("w", encoding="utf-8-sig", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=list(row))
+                writer.writeheader()
+                writer.writerow(row)
+
+            with self.assertRaisesRegex(CommandError, "current-year.*descriptor"):
+                call_command("import_race_events", "--csv", str(raw_csv), "--dry-run")
+
     def test_cutoff_after_today_is_rejected(self):
         with TemporaryDirectory() as temporary:
             paths = self._fixture(Path(temporary))
@@ -328,6 +375,88 @@ class CurrentYearRaceApplyDescriptorTests(TestCase):
         self.assertEqual(log.payload["created"], 1)
         self.assertEqual(log.payload["adopted"], 0)
         self.assertIn("created=1 adopted=0", output.getvalue())
+
+    def test_descriptor_materializes_approved_cross_edition_target_by_public_year(self):
+        target = self._target("postponed-edition", year=2025)
+        evidence = self._cross_year_evidence(public_year=2026)
+        target.source_refs = {"cross_year_evidence": evidence}
+        target.save(update_fields={"source_refs"})
+
+        with TemporaryDirectory() as temporary:
+            paths = self._fixture(Path(temporary), targets=[target])
+            self._rewrite_due_row(
+                paths,
+                slug=historical_event_slug(target, public_year=2026),
+                local_date="2026-01-07",
+                source_refs=json.dumps(
+                    {"cross_year_evidence": evidence},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+            )
+
+            call_command(
+                "import_race_events",
+                *self._argv(paths, dry_run=False),
+            )
+
+        target.refresh_from_db()
+        event = target.event
+        self.assertIsNotNone(event)
+        self.assertEqual(event.year, 2026)
+        self.assertEqual(event.edition_year, 2025)
+        self.assertEqual(event.slug, "hong_kong-postponed-edition-2026")
+        self.assertEqual(target.year, 2025)
+        self.assertEqual(target.resolution_status, HistoricalRaceResolutionStatus.READY)
+
+    def test_descriptor_does_not_adopt_same_series_edition_with_wrong_public_year(self):
+        target = self._target("postponed-existing", year=2025)
+        evidence = self._cross_year_evidence(public_year=2026)
+        target.source_refs = {"cross_year_evidence": evidence}
+        target.save(update_fields={"source_refs"})
+        wrong_public_event = RaceEvent.objects.create(
+            race_series=target.race_series,
+            year=2025,
+            edition_year=2025,
+            slug="hong_kong-postponed-existing-2025",
+            original_name=target.race_series.canonical_name_original,
+            chinese_name=target.race_series.chinese_name,
+            country_region=target.country_region,
+            racecourse="Happy Valley",
+            grade_text="G3",
+            normalized_grade="G3",
+            surface=RaceEventSurface.TURF,
+            local_date=date(2025, 1, 7),
+            status=RaceEventStatus.FINISHED,
+            visibility_status=RaceEventVisibility.PUBLISHED,
+        )
+
+        with TemporaryDirectory() as temporary:
+            paths = self._fixture(Path(temporary), targets=[target])
+            self._rewrite_due_row(
+                paths,
+                slug=historical_event_slug(target, public_year=2026),
+                local_date="2026-01-07",
+                source_refs=json.dumps(
+                    {"cross_year_evidence": evidence},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+            )
+
+            with self.assertRaisesRegex(CommandError, "materialization|身份"):
+                call_command(
+                    "import_race_events",
+                    *self._argv(paths, dry_run=False),
+                )
+
+        target.refresh_from_db()
+        wrong_public_event.refresh_from_db()
+        self.assertIsNone(target.event_id)
+        self.assertEqual(wrong_public_event.year, 2025)
+        self.assertEqual(wrong_public_event.edition_year, 2025)
 
     def test_descriptor_adopts_unique_existing_event_without_changing_publication_state(self):
         target = self._target("existing-calendar-event")

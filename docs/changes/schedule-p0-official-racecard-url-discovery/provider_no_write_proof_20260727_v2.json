@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "proof_id": "p0-url-head-proof-20260727T053742Z",
+  "started_at": "2026-07-27T05:37:42Z",
+  "finished_at": "2026-07-27T05:37:50Z",
+  "window": {
+    "start": "2026-07-27T05:37:42Z",
+    "end": "2026-08-03T05:37:42Z",
+    "timezone": "Asia/Shanghai"
+  },
+  "code_binding": {
+    "head": "a59956b327157d29630fab1f1c98ba9c9cacfed0",
+    "review_scope": "uncommitted",
+    "fingerprint_sha256": "088befcf488fc1745cb08e7d995f51645030da849e177495305235c61fc54c33",
+    "content_manifest_sha256": "9913352280b11ee057b9d6ba13a4cca30a2120091769abf497743daa4fb4330b"
+  },
+  "registry": {
+    "path": "runtime/policies/p0_racecard_urls/official_url_routes_v1.json",
+    "sha256": "c96f042941d38682ec3c77eb57b80f90d7810d69829543b82d6dcfee09819876",
+    "bha_contract_digest": "b33d7e42edc4aa9c8eda76e9e9e2863203877f8007a259035de1de5c7249c3bd",
+    "equibase_contract_digest": "8a6ab3aa94e93509343e2cf36ab48ef081aafeb42e3ad663180a975b36ebefe4"
+  },
+  "target_inventory": [
+    {
+      "event_id": 929,
+      "region": "united_kingdom",
+      "local_date": "2026-07-28",
+      "series_key": "uk-al-shaqab-goodwood-cup-stakes"
+    },
+    {
+      "event_id": 932,
+      "region": "united_kingdom",
+      "local_date": "2026-07-29",
+      "series_key": "uk-visit-qatar-sussex-stakes"
+    },
+    {
+      "event_id": 935,
+      "region": "united_kingdom",
+      "local_date": "2026-07-30",
+      "series_key": "uk-qatar-nassau-stakes"
+    },
+    {
+      "event_id": 430,
+      "region": "united_states",
+      "local_date": "2026-08-01",
+      "series_key": "united-states-clement-l-hirsch",
+      "track_code": "DMR"
+    },
+    {
+      "event_id": 435,
+      "region": "united_states",
+      "local_date": "2026-08-01",
+      "series_key": "united-states-arlington-million",
+      "track_code": "CNL"
+    },
+    {
+      "event_id": 740,
+      "region": "france",
+      "local_date": "2026-08-02",
+      "series_key": "fr-prix-rothschild-fonds-europeen-de-l-elevage"
+    }
+  ],
+  "request_receipts": [
+    {
+      "provider": "bha",
+      "method": "HEAD",
+      "host": "www.britishhorseracing.com",
+      "path_template_id": "bha-date-listing-head-v1",
+      "verification_scope": "date_listing",
+      "started_at": "2026-07-27T05:37:42Z",
+      "status_code": 200,
+      "response_class": "success",
+      "body_bytes_read": 0,
+      "candidate_request_url_sha256": "b222c27cfc7200dc189b1de03d35e58b7d5b65ef5f8888f5a5ff2203ab4613d4"
+    },
+    {
+      "provider": "equibase",
+      "method": "HEAD",
+      "host": "tvg.equibase.com",
+      "path_template_id": "equibase-track-date-head-v1",
+      "verification_scope": "track_date_racecard_index",
+      "started_at": "2026-07-27T05:37:43Z",
+      "status_code": 200,
+      "response_class": "success",
+      "body_bytes_read": 0,
+      "candidate_request_url_sha256": "e9ae9b604cf23bbad1cfc23fbdeef40a2dc9ca7584158bef4e0dbf14feffda92"
+    },
+    {
+      "provider": "equibase",
+      "method": "HEAD",
+      "host": "tvg.equibase.com",
+      "path_template_id": "equibase-track-date-head-v1",
+      "verification_scope": "track_date_racecard_index",
+      "started_at": "2026-07-27T05:37:49Z",
+      "status_code": 200,
+      "response_class": "success",
+      "body_bytes_read": 0,
+      "candidate_request_url_sha256": "f0690041098b02ecc27804db41462f4263fd7f8ad829c9dff5a2ccfa6bb282f0"
+    }
+  ],
+  "event_results": [
+    {
+      "event_id": 929,
+      "outcome": "listing_reachable",
+      "verification_method": "head_application_entry",
+      "verification_scope": "date_listing",
+      "source_url": "https://www.britishhorseracing.com/racing/fixtures/upcoming/",
+      "url": "https://www.britishhorseracing.com/racing/fixtures/upcoming/#!/?fromdate=20260728&todate=20260728&pagenum=1"
+    },
+    {
+      "event_id": 932,
+      "outcome": "listing_reachable",
+      "verification_method": "head_application_entry",
+      "verification_scope": "date_listing",
+      "source_url": "https://www.britishhorseracing.com/racing/fixtures/upcoming/",
+      "url": "https://www.britishhorseracing.com/racing/fixtures/upcoming/#!/?fromdate=20260729&todate=20260729&pagenum=1"
+    },
+    {
+      "event_id": 935,
+      "outcome": "listing_reachable",
+      "verification_method": "head_application_entry",
+      "verification_scope": "date_listing",
+      "source_url": "https://www.britishhorseracing.com/racing/fixtures/upcoming/",
+      "url": "https://www.britishhorseracing.com/racing/fixtures/upcoming/#!/?fromdate=20260730&todate=20260730&pagenum=1"
+    },
+    {
+      "event_id": 430,
+      "outcome": "found",
+      "verification_method": "head_exact_path",
+      "verification_scope": "track_date_racecard_index",
+      "source_url": "https://tvg.equibase.com/static/entry/RaceCardIndexDMR080126USA-EQB.html",
+      "url": "https://tvg.equibase.com/static/entry/RaceCardIndexDMR080126USA-EQB.html"
+    },
+    {
+      "event_id": 435,
+      "outcome": "found",
+      "verification_method": "head_exact_path",
+      "verification_scope": "track_date_racecard_index",
+      "source_url": "https://tvg.equibase.com/static/entry/RaceCardIndexCNL080126USA-EQB.html",
+      "url": "https://tvg.equibase.com/static/entry/RaceCardIndexCNL080126USA-EQB.html"
+    },
+    {
+      "event_id": 740,
+      "outcome": "path_unverified",
+      "verification_method": "",
+      "verification_scope": "",
+      "source_url": "",
+      "url": null
+    }
+  ],
+  "counts": {
+    "targets": 6,
+    "requests_total": 3,
+    "requests_by_provider": {
+      "bha": 1,
+      "equibase": 2,
+      "france_galop": 0,
+      "hkjc": 0,
+      "jra": 0,
+      "nar": 0
+    },
+    "found": 2,
+    "listing_reachable": 3,
+    "not_available": 1,
+    "business_database_writes": 0,
+    "task_execution_log_writes": 0,
+    "current_publications": 0,
+    "response_body_bytes_read": 0
+  },
+  "supersedes_proof_id": "p0-url-head-proof-20260727T052024Z",
+  "proof_status": "passed"
+}

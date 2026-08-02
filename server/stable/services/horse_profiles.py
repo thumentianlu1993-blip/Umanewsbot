@@ -309,7 +309,16 @@ def race_grade_rank(record: HorseRaceRecord) -> int:
 
 def major_win_records(profile: HorseProfile) -> QuerySet[HorseRaceRecord]:
     manual_ids = list(profile.race_records.filter(is_major_win=True).values_list("id", flat=True))
-    wins = list(profile.race_records.filter(result_status=HorseRaceResultStatus.WON))
+    stats_enabled = getattr(settings, "RACE_FIELD_NORMALIZED_STATS_ENABLED", False)
+    if stats_enabled:
+        wins = list(profile.race_records.filter(normalized_finish_position=1))
+    else:
+        wins = list(
+            profile.race_records.filter(
+                Q(finish_position__in=["1", "01"])
+                | (Q(result_status=HorseRaceResultStatus.WON) & Q(finish_position=""))
+            )
+        )
     if not wins:
         return profile.race_records.filter(id__in=manual_ids).order_by("major_win_order", "-race_date", "id")
     best_rank = min(race_grade_rank(record) for record in wins)

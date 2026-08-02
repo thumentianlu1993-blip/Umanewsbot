@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count
@@ -42,6 +44,7 @@ from .models import (
     RaceEventLiveTracking,
     RaceEventParticipant,
     RaceEventParticipantSourceIdentity,
+    RaceEventProductCanonicalLink,
     RaceEventProjectionControl,
     RaceEventRevision,
     RaceEventRevisionEvidence,
@@ -49,6 +52,13 @@ from .models import (
     RaceEventRevisionPublication,
     RaceEventResult,
     RaceEventRunner,
+    RaceEventFieldAuthority,
+    RaceEventFieldChange,
+    RaceEventLifecycleControl,
+    RaceEventLifecycleTransition,
+    RaceReferenceCollectionRun,
+    RaceReferencePayload,
+    RaceReferenceReceipt,
     RaceLiveEventPublicationAllowlist,
     RaceLiveAlertIncident,
     RaceLiveHostBudget,
@@ -57,6 +67,7 @@ from .models import (
     RaceLiveOfficialPublicationAuthorization,
     RaceLiveOfficialVerificationIncident,
     RaceLivePublicationPolicy,
+    RaceNewsExposure,
     RaceResultObservation,
     RaceResultSourceIdentity,
     RaceSeries,
@@ -68,6 +79,8 @@ from .models import (
     TermAlias,
     TermEntry,
     TermGateReprocessRun,
+    TermMappingEvidence,
+    TermConsistencyManifest,
     TranslationRun,
     WindowCandidateDecision,
     WindowTargetDecision,
@@ -86,6 +99,55 @@ admin.site.register(TermCandidateEvidence)
 admin.site.register(TermAlias)
 
 
+@admin.register(TermMappingEvidence)
+class TermMappingEvidenceAdmin(admin.ModelAdmin):
+    list_display = (
+        "term",
+        "alias",
+        "evidence_kind",
+        "review_status",
+        "reviewed_by",
+        "reviewed_at",
+        "created_at",
+    )
+    list_filter = ("evidence_kind", "review_status", "created_at")
+    search_fields = (
+        "term__source_ja",
+        "term__target_zh",
+        "alias__text",
+        "source_url",
+        "source_digest",
+        "reviewed_by",
+        "identity_sha256",
+    )
+    readonly_fields = ("term", "alias", "source_url", "source_digest",
+                       "identity_payload", "identity_sha256", "created_at", "updated_at")
+
+
+@admin.register(TermConsistencyManifest)
+class TermConsistencyManifestAdmin(admin.ModelAdmin):
+    list_display = (
+        "run_id",
+        "status",
+        "approved_by",
+        "committed_at",
+        "rolled_back_at",
+        "created_at",
+    )
+    list_filter = ("status", "created_at")
+    search_fields = ("run_id", "manifest_sha256", "approved_by")
+    readonly_fields = (
+        "run_id",
+        "manifest_sha256",
+        "term_snapshot_sha256",
+        "settings_sha256",
+        "resolver_version",
+        "diffs",
+        "created_at",
+        "updated_at",
+    )
+
+
 class RaceLiveReadOnlyAdmin(admin.ModelAdmin):
     """Shared observation-only surface for quasi-realtime race state."""
 
@@ -97,6 +159,33 @@ class RaceLiveReadOnlyAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(RaceEventProductCanonicalLink)
+class RaceEventProductCanonicalLinkAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "duplicate_event",
+        "canonical_event",
+        "is_active",
+        "approved_by",
+        "approved_at",
+        "deactivated_at",
+    )
+    list_filter = ("is_active", "approved_at", "deactivated_at")
+    search_fields = (
+        "duplicate_event__chinese_name",
+        "duplicate_event__original_name",
+        "canonical_event__chinese_name",
+        "canonical_event__original_name",
+        "identity_sha256",
+        "manifest_sha256",
+    )
+    raw_id_fields = (
+        "duplicate_event",
+        "canonical_event",
+        "approved_by",
+        "deactivated_by",
+    )
 
 
 @admin.register(RaceEventProjectionControl)
@@ -698,8 +787,12 @@ class NewsArticleAdmin(admin.ModelAdmin):
 
     @admin.action(description="标记为待审核")
     def mark_pending_review(self, request, queryset):
-        count = queryset.update(workflow_status=WorkflowStatus.PENDING_REVIEW)
-        self.message_user(request, f"已将 {count} 篇文章标记为待审核。", messages.SUCCESS)
+        count = 0
+        for article in queryset:
+            article.workflow_status = WorkflowStatus.PENDING_REVIEW
+            article.save(update_fields=["workflow_status", "updated_at"])
+            count += 1
+        self.message_user(request, f"已将 {count} 篇文章标记为待审核。", messages.SUCCESS, fail_silently=True)
 
     @admin.action(description="标记为可推送")
     def mark_published_ready(self, request, queryset):
@@ -1109,14 +1202,213 @@ class RaceEventAdmin(admin.ModelAdmin):
         RaceEventDataCandidateInline,
         RaceEventArticleLinkInline,
     ]
+    readonly_fields = ("created_at", "updated_at", "_lifecycle_info")
 
+    @admin.display(description="生命周期状态")
+    def _lifecycle_info(self, obj):
+        try:
+            ctrl = obj.lifecycle_control
+        except Exception:
+            return "—"
+        lines = [
+            f"模式: {ctrl.get_mode_display()}",
+            f"下次刷新: {ctrl.next_refresh_at or '—'}",
+            f"世代: {ctrl.schedule_generation}",
+            f"最后尝试: {ctrl.last_attempt_at or '—'}",
+            f"最后结果: {ctrl.last_result_code or '—'}",
+            f"连续失败: {ctrl.consecutive_failures}",
+        ]
+        return " | ".join(lines)
+
+
+# ── Lifecycle admin (read-only) ───────────────────────────────────────
 
 @admin.register(RaceEventDataCandidate)
 class RaceEventDataCandidateAdmin(admin.ModelAdmin):
-    list_display = ("event", "module", "source_name", "status", "confidence", "fetched_at", "applied_by", "applied_at")
+    list_display = ("event", "module", "source_name", "status", "confidence",
+                    "fetched_at", "applied_by", "applied_at")
     list_filter = ("module", "status", "source_name", "fetched_at")
-    search_fields = ("event__chinese_name", "event__original_name", "source_name", "source_url", "error_message")
+    search_fields = ("event__chinese_name", "event__original_name", "source_name",
+                     "source_url", "error_message")
     readonly_fields = ("created_at", "updated_at")
+
+@admin.register(RaceEventLifecycleControl)
+class RaceEventLifecycleControlAdmin(RaceLiveReadOnlyAdmin):
+    list_display = ("event", "mode", "next_refresh_at", "schedule_generation",
+                    "last_attempt_at", "last_result_code", "consecutive_failures")
+    list_filter = ("mode",)
+    search_fields = ("event__chinese_name", "event__original_name", "event__slug")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(RaceEventLifecycleTransition)
+class RaceEventLifecycleTransitionAdmin(RaceLiveReadOnlyAdmin):
+    list_display = ("event", "from_status", "to_status", "record_kind",
+                    "reason_code", "effective_at", "schedule_generation")
+    list_filter = ("record_kind", "from_status", "to_status")
+    search_fields = ("event__chinese_name", "dedupe_key")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(RaceEventFieldAuthority)
+class RaceEventFieldAuthorityAdmin(RaceLiveReadOnlyAdmin):
+    list_display = ("event", "subject_type", "subject_key", "field_name",
+                    "legacy_authority_level", "manual_lock")
+    list_filter = ("subject_type", "authority_level", "manual_lock")
+    search_fields = ("event__chinese_name", "subject_key", "field_name")
+    readonly_fields = ("created_at", "updated_at")
+
+    @admin.display(description="Legacy authority level (not used for new decisions)")
+    def legacy_authority_level(self, obj):
+        return obj.authority_level
+
+
+@admin.register(RaceEventFieldChange)
+class RaceEventFieldChangeAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "event", "subject_type", "subject_key", "field_name", "decision",
+        "source_key", "source_class", "observation", "contract_version",
+        "contract_digest", "registry_digest", "raw_sha256",
+        "normalized_sha256", "celery_task_id", "applied", "created_at",
+    )
+    list_filter = ("subject_type", "decision", "source_key", "source_class", "applied", "field_name")
+    search_fields = (
+        "event__chinese_name", "subject_key", "field_name", "source_key",
+        "contract_version", "contract_digest", "registry_digest",
+        "celery_task_id",
+    )
+    readonly_fields = (
+        "event", "subject_type", "subject_key", "field_name", "old_value",
+        "new_value", "source_key", "source_url", "external_id", "confidence",
+        "authority_level", "trigger_task", "run_id", "article", "candidate",
+        "revision", "observation", "source_class", "source_updated_at",
+        "parser_version", "raw_sha256", "normalized_sha256", "registry_digest",
+        "contract_version", "contract_digest", "celery_task_id", "decision",
+        "schedule_generation", "operation_mode", "applied", "rejection_reason",
+        "created_at", "updated_at",
+    )
+
+
+@admin.register(RaceReferenceCollectionRun)
+class RaceReferenceCollectionRunAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "source_key",
+        "country_region",
+        "status",
+        "local_date_from",
+        "local_date_to",
+        "target_count",
+        "matched_count",
+        "ambiguous_count",
+        "partial_count",
+        "error_count",
+        "created_at",
+    )
+    list_filter = ("source_key", "country_region", "status")
+    search_fields = (
+        "scope_manifest_sha256",
+        "artifact_sha256",
+        "parser_name",
+        "parser_version",
+    )
+    readonly_fields = tuple(
+        field.name for field in RaceReferenceCollectionRun._meta.fields
+    ) + ("_internal_notice",)
+    actions = None
+
+    @admin.display(description="用途边界")
+    def _internal_notice(self, obj):
+        return "仅内部参考，不影响公开赛事或正式赛果"
+
+
+@admin.register(RaceReferencePayload)
+class RaceReferencePayloadAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "source_key",
+        "provider_event_key",
+        "payload_sha256",
+        "_completeness",
+        "created_at",
+    )
+    list_filter = ("source_key", "created_at")
+    search_fields = (
+        "provider_event_key",
+        "observation_key",
+        "payload_sha256",
+    )
+    readonly_fields = tuple(
+        field.name for field in RaceReferencePayload._meta.fields
+    ) + ("_internal_notice", "_structured_payload_view")
+    exclude = ("structured_payload",)
+    actions = None
+
+    @admin.display(description="完整度")
+    def _completeness(self, obj):
+        completeness = (obj.structured_payload or {}).get("completeness") or {}
+        return (
+            f"race={completeness.get('race_identity', '—')} "
+            f"runners={completeness.get('runners', '—')} "
+            f"results={completeness.get('results', '—')}"
+        )
+
+    @admin.display(description="用途边界")
+    def _internal_notice(self, obj):
+        return "仅内部参考，不影响公开赛事或正式赛果"
+
+    @admin.display(description="结构化来源事实")
+    def _structured_payload_view(self, obj):
+        rendered = json.dumps(
+            obj.structured_payload,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        if len(rendered) > 32_768:
+            rendered = rendered[:32_768] + "\n…（后台显示已截断）"
+        return format_html(
+            '<pre style="white-space:pre-wrap;max-width:1000px">{}</pre>',
+            rendered,
+        )
+
+
+@admin.register(RaceReferenceReceipt)
+class RaceReferenceReceiptAdmin(RaceLiveReadOnlyAdmin):
+    list_display = (
+        "source_name",
+        "event",
+        "match_status",
+        "match_confidence",
+        "is_partial",
+        "parser_version",
+        "recorded_at",
+    )
+    list_filter = (
+        "payload__source_key",
+        "match_status",
+        "is_partial",
+        "recorded_at",
+    )
+    search_fields = (
+        "event__chinese_name",
+        "event__original_name",
+        "payload__provider_event_key",
+        "payload__payload_sha256",
+        "provenance_sha256",
+        "source_url",
+    )
+    raw_id_fields = ("run", "payload", "event")
+    readonly_fields = tuple(
+        field.name for field in RaceReferenceReceipt._meta.fields
+    ) + ("_internal_notice",)
+    actions = None
+
+    @admin.display(description="来源", ordering="payload__source_key")
+    def source_name(self, obj):
+        return obj.payload.source_key
+
+    @admin.display(description="用途边界")
+    def _internal_notice(self, obj):
+        return "仅内部参考，不影响公开赛事或正式赛果"
 
 
 @admin.register(RaceEventAlias)
@@ -1232,9 +1524,14 @@ class TermEntryAdmin(admin.ModelAdmin):
         "priority",
         "is_active",
         "updated_at",
+        "mapping_evidence_count",
     )
     list_filter = ("source_language", "racing_region", "term_type", "translation_status", "race_grade", "is_active")
     search_fields = ("source_ja", "target_zh", "notes")
+
+    @admin.display(description="mapping evidence")
+    def mapping_evidence_count(self, obj: TermEntry) -> int:
+        return obj.mapping_evidence.count()
 
 
 @admin.register(HorseProfileCompletionRun)
@@ -1413,3 +1710,49 @@ class TermGateReprocessRunAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(RaceNewsExposure)
+class RaceNewsExposureAdmin(admin.ModelAdmin):
+    list_display = (
+        "event",
+        "article",
+        "channel",
+        "scope_key",
+        "slot",
+        "status",
+        "angle",
+        "activated_at",
+        "replaced_at",
+        "lease_expires_at",
+        "created_at",
+    )
+    list_filter = ("channel", "status", "angle", "slot", "created_at")
+    search_fields = (
+        "event__chinese_name",
+        "event__original_name",
+        "article__title_zh",
+        "article__title_ja",
+        "scope_key",
+        "reason",
+    )
+    raw_id_fields = ("event", "article", "replaced_by", "delivery")
+    readonly_fields = (
+        "event",
+        "article",
+        "channel",
+        "scope_key",
+        "slot",
+        "status",
+        "angle",
+        "policy_version",
+        "reason",
+        "evidence",
+        "activated_at",
+        "replaced_at",
+        "replaced_by",
+        "delivery",
+        "lease_expires_at",
+        "created_at",
+        "updated_at",
+    )
