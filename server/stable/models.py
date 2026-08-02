@@ -5511,6 +5511,13 @@ class RaceEventFieldSubjectType(models.TextChoices):
     PARTICIPANT = "participant", "参赛马"
 
 
+class RaceEventFieldChangeDecision(models.TextChoices):
+    APPLIED = "applied", "已应用"
+    REPLAYED = "replayed", "重放"
+    NEEDS_REVIEW = "needs_review", "待审核"
+    REJECTED = "rejected", "已拒绝"
+
+
 class RaceEventLifecycleControl(TimestampedModel):
     """Per-event lifecycle operational control (one-to-one with RaceEvent)."""
 
@@ -5714,12 +5721,42 @@ class RaceEventFieldChange(TimestampedModel):
         blank=True,
         related_name="+",
     )
+    observation = models.ForeignKey(
+        "RaceResultObservation",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="field_changes",
+    )
+    source_class = models.CharField(max_length=32, blank=True)
+    source_updated_at = models.DateTimeField(null=True, blank=True)
+    parser_version = models.CharField(max_length=64, blank=True)
+    raw_sha256 = models.CharField(max_length=64, blank=True)
+    normalized_sha256 = models.CharField(max_length=64, blank=True)
+    registry_digest = models.CharField(max_length=64, blank=True)
+    contract_version = models.CharField(max_length=64, blank=True)
+    contract_digest = models.CharField(max_length=64, blank=True)
+    celery_task_id = models.CharField(max_length=255, blank=True)
+    decision = models.CharField(
+        max_length=16,
+        choices=RaceEventFieldChangeDecision.choices,
+        blank=True,
+    )
     schedule_generation = models.PositiveBigIntegerField(default=0)
     operation_mode = models.CharField(max_length=16, blank=True)
     applied = models.BooleanField(default=True)
     rejection_reason = models.TextField(blank=True)
 
     class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(decision="")
+                    | models.Q(decision__in=RaceEventFieldChangeDecision.values)
+                ),
+                name="race_field_change_decision_valid",
+            ),
+        ]
         indexes = [
             models.Index(
                 fields=("event", "subject_type", "subject_key"),

@@ -7740,3 +7740,49 @@ re-baseline 基线 + 各轮 findings 新增）。
   healthz/赛事页和 15 分钟错误日志均通过，发布锁和 race-live 意图文件不存在。
 - 本次 R0 没有 control apply、赛事状态推进或 lifecycle 启用。后续 R1 只读 prepare/dry-run、
   R2 false/off apply 与 R3 true/shadow 仍需各自独立授权。
+# 2026-08-02 生命周期 R3 队列路由故障恢复检查点
+
+- 症状：scanner 返回 `claimed=2, dispatched=2`，但 proposal 在有界窗口内保持 0。
+- 根因：`advance_race_event_lifecycle_task` 显式 route=`default`，生产普通 worker 只监听
+  `celery`；Redis 同期观测为 `default=2`、`celery=0`。
+- 已执行安全恢复：恢复 `.env` lifecycle `false/off`，重建 web/worker/beat，健康检查 200，
+  赛事业务快照不变。旧 `default` 消息不得在本修复发布中 purge 或消费。
+- 修复发布必须先关闭态部署。新的 R3 授权后，启用前须以实际 worker `active_queues` 确认
+  无人消费 `default`；再启用 true/shadow，用 Beat 停止的手工 scanner smoke，先确认目标
+  control generation 增长，再验证 `celery` 消费与 proposal 生成。
+
+# 2026-08-02 生命周期队列路由修复关闭态部署实录
+
+- 发布 `main@d5ae1d7e`，隔离目录
+  `/opt/umanews-release-d5ae1d7e-8biMT2TI/umanewsbot`；最终镜像
+  `sha256:b1fecc4624ac7fc181197156189b6326a40abb36f287feae72c9a2f533341a73`。
+- custom-format 恢复点
+  `/opt/umanewsbot/backups/db/pre-lifecycle-queue-routing-20260801T192601Z.dump` 为
+  `374107496` bytes、TOC `1288`、mode `0600`、SHA-256
+  `a05e166259e646ffbc464bb900052b8d8f4f2a9d9b599c5396ae0315f2d8125d`；旧镜像和 `.env`
+  均已冻结。
+- 部署锁、historical preflight、Celery drain、唯一 release task、web healthy 门禁均通过；
+  migration plan 为 0，race-live 未启动。
+- web/worker/beat 为 `false/off`，advance route 和 worker active queue 均为 `celery`；16 controls、
+  0 transitions/proposals/applied/active claims，关闭态 scanner 零 claim/dispatch。
+- 两分钟观察后 `celery=0 / default=2 / race_live=7543`，HTTP 三项 200、应用错误 0、Nginx
+  502 为 0、锁和 intent 均不存在。旧队列未处理，R3 仍需单独授权。
+- 同期存在独立 P0 马身份 one-off prepare；它早于本次 release task、使用旧镜像，本发布未停止
+  或删除。完整证据见 change 的 `release_report.md`。
+# Race-data-sync 切片 A 关闭态部署前置（尚未授权）
+
+- schema 入口为 additive migration `stable.0068_race_data_sync_pipeline_a_field_audit` 与
+  PostgreSQL-only 可逆 guard `stable.0069_race_data_sync_pipeline_a_ledger_guards`；部署前必须先跑
+  `showmigrations stable`、`migrate --plan`、备份/恢复点和旧代码兼容检查。当前未授权执行 migration。
+- 以下开关必须保持默认关闭：`RACE_DATA_SYNC_ENABLED=false`，providers/regions/fields 均为空。
+  本切片没有 Beat schedule；关闭态部署后 request、dispatch、field apply 必须为 0。
+- 即使 legacy race-live 被单独打开，TRA racecard 的 schedule 变化也只允许生成
+  `slice_c_required` field changes，不得改变 `RaceEvent` 的时间/状态；验收需核对 event/control 前后
+  snapshot 与 `RaceEventFieldChange` ledger。
+- 其余 provider adapter 当前为 `proof_required`。任何联网 proof、TRA Pro credential、2–4 场地区
+  灰度、字段 apply、migration、服务重启都需要新的精确授权，不能随关闭态代码部署一起执行。
+- Ireland 不在首发 cohort。直接 reconciliation admission 的 Ireland marker 复用仍是独立审核记录的
+  非阻塞 follow-up；该门禁补齐并重新 review 前，Ireland provider/region 不得加入运行时 allowlist。
+- 关闭态验收必须从真实 TRA race-live 入口证明 observation 之外的 runner/authority/applied ledger 为
+  0；单独打开 provider、region 或 field 仍应零写。raw cleanup smoke 同时验证 held、路径漂移、越界、
+  symlink 和并发一次性清理；回滚 0069 前须先确保没有依赖 append-only guard 的写入窗口。

@@ -172,6 +172,25 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 SITE_URL = env("SITE_URL", "http://localhost:8000")
 
+# Race-data slice A remains fail-closed until each provider, region and field is
+# explicitly admitted.  No setting here initiates network traffic.
+RACE_DATA_SYNC_ENABLED = env_bool("RACE_DATA_SYNC_ENABLED", False)
+RACE_DATA_SYNC_ENABLED_PROVIDERS = tuple(
+    item.strip()
+    for item in env("RACE_DATA_SYNC_ENABLED_PROVIDERS", "").split(",")
+    if item.strip()
+)
+RACE_DATA_SYNC_ENABLED_REGIONS = tuple(
+    item.strip()
+    for item in env("RACE_DATA_SYNC_ENABLED_REGIONS", "").split(",")
+    if item.strip()
+)
+RACE_DATA_SYNC_ENABLED_FIELDS = tuple(
+    item.strip()
+    for item in env("RACE_DATA_SYNC_ENABLED_FIELDS", "").split(",")
+    if item.strip()
+)
+
 HISTORICAL_RACE_BACKFILL_ENABLED = env_bool("HISTORICAL_RACE_BACKFILL_ENABLED", False)
 HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK = env_bool("HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK", False)
 HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET = int(env("HISTORICAL_RACE_BACKFILL_REQUEST_BUDGET", "250"))
@@ -671,7 +690,7 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_ROUTES = {
     "stable.tasks.poll_race_live_event_task": {"queue": "race_live"},
     "stable.tasks.monitor_race_live_sla_task": {"queue": "race_live"},
-    "stable.tasks.advance_race_event_lifecycle_task": {"queue": "default"},
+    "stable.tasks.advance_race_event_lifecycle_task": {"queue": "celery"},
     "stable.tasks.scheduled_race_result_review_task": {"queue": "celery"},
 }
 CELERY_TASK_ANNOTATIONS = {

@@ -263,3 +263,11 @@ one-shot 观察，不增加自动调度。
 后续定时审核层已有默认关闭实现：每天北京时间 06:30/18:30 从最近 72 小时赛事和 14 天
 pending 中生成不可变审核包并发给唯一审核人。第三方内部参考只有在审核人明确批准完整
 bundle SHA、event 和行摘要后，才以“已人工审核赛果”投影；它不会因此成为官方来源。
+
+# Race-data-sync 切片 A（本地候选，尚未发布）
+
+赛前结构化资料新增 provider-neutral observation -> contract/authority -> field ledger -> canonical
+racecard projection 候选链路，复用现有 race-live、赛事参与者身份和 revision，不新建第二套状态机或
+调度器。赛事时间、取消和延期在生命周期集成切片 C 前只记候选，不直接改变 `RaceEvent` 或 control。
+所有 provider/region/field 开关默认关闭；当前仅复用已有 The Racing API adapter，其余来源需完成各自
+parser/proof 后才可进入运行时准入。该候选尚未 commit、PR、迁移或部署，生产行为没有变化。

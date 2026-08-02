@@ -5178,3 +5178,55 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - HTTP healthz、赛事日历、Celery ping 和近 15 分钟错误日志验收通过。数据库恢复点 SHA-256
   为 `285de333…edc7f`，完整证据见 change 的 `release_report.md`。下一步仍须单独授权 R1
   生产只读 prepare/dry-run；本次授权不包含 control apply 或开启 shadow。
+# 2026-08-02 生命周期 R3 队列路由阻断已完成本地修复
+
+- R3 shadow smoke 中 scanner 成功 claim/dispatch 2 场，但单赛事任务被路由到无人消费的
+  `default`，普通生产 worker 只消费 `celery`，因此未生成 proposal。
+- 失败后已恢复 lifecycle `false/off`；赛事状态、proposal 与 applied 均未改变，
+  `race_live_worker` 未启动。`default` 中 2 条旧消息保留，不清理、不重放。
+- 独立 worktree `codex/fix-lifecycle-task-queue-routing` 已将 advance task 最小改投
+  `celery`；配置合同、旧 generation 隔离与 lifecycle/enrollment 回归 101/101 通过，
+  Django check、迁移零漂移和 diff 检查通过。尚待独立代码 review；未 commit、push、PR、
+  部署或重新启用 shadow。
+
+# 2026-08-02 生命周期任务队列路由修复已关闭态部署
+
+- PR #65 已合并为 `main@d5ae1d7e`，并从精确隔离 checkout 完成关闭态部署；最终
+  web/worker/beat 镜像统一为 `sha256:b1fecc46…41a73`。
+- runtime 已确认 advance task route=`celery`，worker 只消费 `celery`；三容器保持 lifecycle
+  `false/off`。16 个 control 对应赛事仍全部 scheduled，transition/proposal/applied/active
+  claim 均为 0，scanner 关闭态 smoke 未 claim 或 dispatch。
+- `default=2` 和 `race_live=7543` 均未处理；race-live worker 未启动。内部/公网 healthz 和
+  赛事页 200，迁移计划为 0，观察窗口日志错误和 Nginx 502 均为 0。
+- 恢复点、镜像、证据 SHA 和并行 one-off 偏差见
+  `docs/changes/fix-lifecycle-task-queue-routing/release_report.md`。下一步仍是独立授权的 R3
+  shadow 重试，而不是自动开启。
+# 2026-08-02 race-data-sync 切片 A 本地实现与独立代码审核完成
+
+- `build-race-data-sync-pipeline` 已从最新 `origin/main@54a79308` 的独立 worktree 实现切片 A 核心：
+  provider-neutral strict normalization/reconciliation、10-provider versioned roster、runner 字段冲突
+  ledger、schedule candidate 禁入、90 天 raw cleanup，以及默认关闭的 provider/region/field 三层开关。
+- `RaceEventFieldChange` 通过 additive migration `0068` 增加 observation、source class、source updated
+  time、parser/raw/normalized/registry/contract/task/decision 等 11 个审计字段；`0069` 增加 decision
+  enum/check 与 PostgreSQL 可逆 append-only trigger。TRA racecard refresh
+  已接入统一 reconciliation；时间、本地时间、取消和延期在 C 完成前只写 `slice_c_required`
+  candidate，不修改 `RaceEvent` 或 lifecycle control。
+- 独立代码 reviewer 首轮给出 6 个 P1、2 个 P2；第二轮限定复审再发现 1 个 P1、3 个 P2；
+  第三轮再发现 canonical revision 门禁旁路和 needs-review 部分提交/claim 悬空 2 个 P1；第四轮
+  发现真实 TRA `jockey_id` metadata 被误算为写字段的 P1 与 Ireland 明确路由缺口 P2；第五轮
+  再发现 Ireland 双 marker 冲突仍被 OR 放行的 P1。随后新增真实 RED 覆盖 runtime flags、精确 roster
+  contract、provider-scoped participant identity、TRA 第二写、freshness watermark、安全 raw cleanup、
+  decision/append-only/Admin，以及 legacy runner ownership、odds/popularity allowlist、动态水位单调性和
+  超过 10,000 held rows 的清理饥饿、canonical partial projection、needs-review 原子回滚/claim 收尾和
+  allowlist 扩大后的字段级幂等、真实 TRA fixture metadata 和显式 Ireland marker/冲突矩阵。修复后主代理独立验证 SQLite A `64/64`、相邻 race-live
+  `48/48`、真实 PostgreSQL `11/11`；Django check、migration drift、py_compile 与 diff check 通过。
+- raw cleanup 使用逐级 `O_NOFOLLOW` directory FD、`unlink(..., dir_fd=...)`、文件身份复核、锁内
+  hold/path/retention 重验和 DB CAS；不再依赖 Linux-only `/proc/self/fd`，macOS 与 Linux 语义一致。
+- 更宽的 207 项回归为 7 errors、2 failures、3 skips；去掉本切片 46 项后，同一 161 项在未修改的
+  `origin/main@54a79308` 临时 worktree 精确得到相同 7 errors、2 failures、3 skips，属于既有日期、
+  CAS 与公开文案 fixture 漂移，本任务未修改无关测试。
+- 同一独立 reviewer 第六次限定复审最终 `VERDICT: APPROVED`，无阻塞 P0/P1。非阻塞 follow-up 为
+  Ireland 直接预录 observation 的 reconciliation admission 尚未复用 marker 合同；本轮本就不含 Ireland
+  cohort，因此 Ireland 自动化保持不可发布，后续纳入前必须先补此门禁并重新 review。
+- 当前未 commit/push/PR/部署/migrate、未调用 provider/收费 API、未读取
+  生产凭据或修改生产开关。除现有 TRA adapter 外，其余 provider 均保持 `proof_required`。

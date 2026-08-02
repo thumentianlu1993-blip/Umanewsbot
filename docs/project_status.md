@@ -2413,3 +2413,29 @@ P0 马信息补全专项的模型交接文档见
 - lifecycle 继续为 `false/off`，control/transition/active claim 为 0，禁用 scanner 未 claim 或
   dispatch。R0 没有赛事状态或 lifecycle 数据写入；下一门禁是另行授权的 R1 只读
   prepare/dry-run。
+# 2026-08-02 赛事生命周期 shadow 尚未开始观察
+
+- 16 场灰度赛事已纳管，但首次 R3 smoke 因 advance task 路由到无人消费的 `default` 队列
+  而 fail closed；生产已恢复 `false/off`，没有赛事状态或 proposal 写入。
+- 本地已把该 task 改投普通 worker 的 `celery`，101 项 lifecycle/enrollment 回归通过，
+  正等待独立代码 review。代码发布、关闭态部署和 R3 重试是三个独立授权门禁。
+
+# 2026-08-02 生命周期队列路由修复已发布，shadow 仍关闭
+
+- PR #65 已合并并以 `false/off` 完成生产部署；运行时 route 与普通 worker 均为 `celery`。
+- 16 场灰度赛事仍为 scheduled，0 proposal/applied，旧 `default=2` 未消费，race-live 未启动。
+- 下一门禁为独立授权的 R3 smoke：先确认无 `default` consumer，再重新 claim 并核对 generation
+  增长；本次发布不等于 shadow 已开启。
+# 2026-08-02 race-data-sync A 本地实现与独立代码审核完成
+
+- 出马表/赛程同步的 provider-neutral 核心已完成五轮 reviewer 返修（首轮 6 P1/2 P2，第二轮
+  1 P1/3 P2，第三轮 2 P1，第四轮 1 P1/1 P2，第五轮 1 P1）：SQLite `64/64`、PostgreSQL `11/11`、
+  相邻 race-live `48/48`；新增 additive
+  migration 0068 与 PostgreSQL-only
+  可逆 ledger guard 0069，所有新开关默认关闭。
+- 当前仅 TRA 复用既有 adapter；其他确认来源已进入 versioned roster，但在真实 proof/parser fixture
+  前保持 `proof_required`，APPROVED observation 也不能绕过 implemented/transport/apply 门禁。schedule
+  字段只审计不应用，生命周期集成仍等待 C。
+- 更宽回归的 7 errors/2 failures 已在未修改 origin/main 等口径复现；第六次同 reviewer 限定复审
+  `VERDICT: APPROVED`。Ireland 直接 reconciliation marker 校验列为非阻塞 follow-up，Ireland 仍排除在
+  首发 cohort 外。尚未 commit、push、PR 或发布，不代表生产可用。
