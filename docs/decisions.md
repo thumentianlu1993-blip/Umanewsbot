@@ -2483,3 +2483,32 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   启用前必须确认无人消费 `default`，并在 scanner 后确认新 claim generation 已增长，才可
   依赖陈旧任务防护隔离旧消息。
 - 修复发布保持 lifecycle `false/off`；关闭态部署与 R3 重试分别重新授权。
+# 2026-08-02 race-data-sync A 采用 provider-neutral ledger 与 schedule fail-closed
+
+- roster 中 HKJC/JRA/NAR/France Galop/Equibase/HRI/TRA/Sporting Life/ZEturf/HRN 保留真实
+  source class，但新 reconciliation 不再读取 legacy `authority_level` 决定覆盖；同源新版可修正，
+  跨来源异值和 manual lock 进入 `needs_review`。
+- 切片 A 可以自动写入非 schedule runner 字段，但 `race_datetime/local_start_time/timezone/status`
+  只形成带 observation/contract/hash 的 candidate ledger；C 的 generation/claim/reschedule 未完成前
+  任何入口都不得直接改赛事时间或状态。
+- provider roster 与 flags 默认关闭。已有 TRA adapter 标记 implemented；其他来源在逐来源 proof 和
+  parser fixture 完成前必须保持 `proof_required`，不能因来源可信就伪称采集实现已完成。
+- 自动写入必须同时满足 source identity 已审批、automation allowed、adapter implemented、transport
+  enabled、apply enabled，以及 global/provider/region/field 四维运行开关；预录 observation 不能绕过
+  proof 或已撤销 contract。参赛马外部 ID 必须位于 provider/source identity 命名空间，跨来源只接受
+  已审核 `RaceEventParticipantSourceIdentity` 的确定映射。
+- `RaceEventFieldChange` 新 decision 受 enum/check 约束，PostgreSQL 通过可逆 trigger 禁止 update/delete；
+  raw artifact 删除使用 directory FD/unlinkat 等价语义并在数据库锁内重验，不能依赖 Linux-only `/proc`。
+- 空 `source_refs` 的 legacy runner 不代表任何 provider ownership；必须有本来源 ownership 或已批准的
+  participant source identity mapping 才能更新。赔率/人气不享有隐式放行；所有字段服从同一 allowlist。
+  runner 动态更新时间只随真正 applied 且严格更新的 freshness watermark 前进。raw cleanup 使用稳定
+  keyset 分页越过任意数量 held rows，不能用固定扩大扫描窗口近似解决饥饿。
+- field reconciliation 的准入结果同时约束 legacy runner 和 canonical racecard revision；关闭态不推进
+  revision/pointer，部分字段准入只能把获准后的 canonical state 投影进 revision。单 observation 内发现
+  needs-review 必须回滚本轮全部 applied 字段，并完成 tracking checkpoint/claim 收尾；同 observation 在
+  后续扩大 allowlist 时按字段补处理，已决字段不重复写 ledger。
+- `jockey_id` 等被 strict schema 明确识别的 provider metadata 可保留在 observation，但不自动成为
+  writable field、runtime allowlist 或 field ledger。`RacingRegion.OTHER` 不等于 Ireland；只有 event
+  source refs 或已批准 source identity 中精确 `race_data_region=ireland` 才允许反向路由，禁止根据场名猜测。
+- event/source identity 的 Ireland markers 只要有一个存在的值不是精确字符串 `ireland` 即判冲突并
+  fail closed；仅一方存在不冲突，两方存在必须一致，不能用 OR 掩盖相反地区证据。

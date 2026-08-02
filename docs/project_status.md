@@ -2406,3 +2406,16 @@ P0 马信息补全专项的模型交接文档见
 - 16 场灰度赛事仍为 scheduled，0 proposal/applied，旧 `default=2` 未消费，race-live 未启动。
 - 下一门禁为独立授权的 R3 smoke：先确认无 `default` consumer，再重新 claim 并核对 generation
   增长；本次发布不等于 shadow 已开启。
+# 2026-08-02 race-data-sync A 本地实现与独立代码审核完成
+
+- 出马表/赛程同步的 provider-neutral 核心已完成五轮 reviewer 返修（首轮 6 P1/2 P2，第二轮
+  1 P1/3 P2，第三轮 2 P1，第四轮 1 P1/1 P2，第五轮 1 P1）：SQLite `64/64`、PostgreSQL `11/11`、
+  相邻 race-live `48/48`；新增 additive
+  migration 0068 与 PostgreSQL-only
+  可逆 ledger guard 0069，所有新开关默认关闭。
+- 当前仅 TRA 复用既有 adapter；其他确认来源已进入 versioned roster，但在真实 proof/parser fixture
+  前保持 `proof_required`，APPROVED observation 也不能绕过 implemented/transport/apply 门禁。schedule
+  字段只审计不应用，生命周期集成仍等待 C。
+- 更宽回归的 7 errors/2 failures 已在未修改 origin/main 等口径复现；第六次同 reviewer 限定复审
+  `VERDICT: APPROVED`。Ireland 直接 reconciliation marker 校验列为非阻塞 follow-up，Ireland 仍排除在
+  首发 cohort 外。尚未 commit、push、PR 或发布，不代表生产可用。
