@@ -1,5 +1,40 @@
 # 当前状态
 
+## 2026-08-08 Release B 发布在 migration history 门禁停止，生产已恢复
+
+- Release B feature commit `5561d1da5dbd988be02ae54f965e5eeac18d8aa0` 经 PR `#69`
+  合并为 `main@ba9c0f00bc435c806864fa7a27f00dce545f1efc`。最终限定只读复审为
+  `APPROVED`，冻结 fingerprint
+  `7be81a18315015d953a74d67c90619a0ee6d016b86a554242854c17b7f34333b`，content
+  manifest `69799241bb7490fd7f189d12dc28980174984fcdf5886a07c540fe185ca5482a`。
+- 生产预检确认运行镜像仍为 `sha256:b1fecc4624ac7fc181197156189b6326a40abb36f287feae72c9a2f533341a73`，
+  旧应用只认识到 `0067`；数据库 identity SHA-256 为
+  `a986cc11149981c54e9d4915ad35e7c46e9382584d6670c8f950eceda26e471c`。v1 census
+  artifact 为 `81 mismatch / 81 canonicalize_duplicate / 81 block / 0 action`，因此没有
+  maintenance、approval 或数据 apply。
+- 因生产只有约 `236 MiB` 可用内存且无 swap，部署前先停止 Beat，并在 Celery
+  `active=0 / reserved=0` 后停止普通 worker；可用内存恢复到约 `1.29 GiB`。恢复点
+  `backups/db/pre-release-b-prereq-832cc074-20260808T020900Z.dump` 为 `408607125` bytes、
+  mode `0600`、TOC `1304`、SHA-256
+  `e0cd6899ea0f5dcc1a06dbde075ed9cdf6874965d2ddcd70e662a77d28e05cab`；旧镜像 tag 为
+  `umanewsbot:rollback-pre-release-b-prereq-20260808T020900Z`。
+- 为满足 Release B 受审前置 leaf `0070`，先在隔离 release 目录
+  `/opt/umanews-release-832cc074-RBPRE01/umanewsbot` 尝试关闭态部署
+  `main@832cc07465a73f2e59947e00e65482b64d39d027`。候选镜像构建完成，release task 在任何
+  新 migration 执行前由 Django 拒绝：生产 `django_migrations` 已存在
+  `0067_historical_calendar_release_a` 和
+  `0070_horse_identity_evidence_commit_receipt`，但缺少后者当前依赖的
+  `0068_race_data_sync_pipeline_a_field_audit` 与
+  `0069_race_data_sync_pipeline_a_ledger_guards`，错误为 `InconsistentMigrationHistory`。
+- 失败后未修改 migration history、未手工 fake migration、未应用 `0068/0069/0071`。已把
+  `umanewsbot:prod` 恢复到旧镜像并使用受审 resume 入口恢复 web/worker/beat/nginx；三个应用
+  容器镜像一致，内外 HTTP healthz 均正常，历史写入/网络 flags 仍为 false。race-live
+  restore intent 因绑定不同 HEAD 被明确判为不可信并跳过；race-live 原本未运行。
+- 当前确定性 blocker 是修复 `0070` 提前 applied 的 migration history 与实际 schema 一致性。
+  在独立设计、测试、复审和新授权前不得直接删除/补写 `django_migrations`，不得继续部署
+  `0071`、生产回填或触发 2025 `full_network=true`。本轮 GitHub full-network run 为 0 次，
+  没有生成新 checkpoint 或最终 artifact。
+
 ## 2026-08-01 历史赛历 Release B 本地实现与第四轮修订完成，待最终只读复审
 
 - 2026-08-02 reviewer session `019fc318-431e-7771-aa79-bf01a9fdb992` 的三个 P1 已限定修复：
