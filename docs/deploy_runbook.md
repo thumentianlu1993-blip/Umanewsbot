@@ -1,5 +1,27 @@
 # 部署运行手册
 
+## 2026-08-08 Release B 首次生产尝试失败与恢复检查点
+
+1. 发布代码已合并为 `main@ba9c0f00`，但生产仍运行旧镜像 `sha256:b1fecc…341a`；不得把 PR
+   merge 表述为部署成功。
+2. 前置恢复点为
+   `backups/db/pre-release-b-prereq-832cc074-20260808T020900Z.dump`，大小 `408607125`、
+   mode `0600`、TOC `1304`、SHA-256 `e0cd6899…5cab`；旧 image tag 为
+   `umanewsbot:rollback-pre-release-b-prereq-20260808T020900Z`。
+3. 生产 `django_migrations` 的精确异常是：`0067_historical_calendar_release_a` 已 applied，
+   `0070_horse_identity_evidence_commit_receipt` 也已 applied，但 `0068`、`0069` 不存在。
+   当前主线中 `0070` 依赖 `0069`，因此任何知道当前 graph 的 Django release task 都会在迁移前
+   抛出 `InconsistentMigrationHistory`。
+4. 禁止直接删除 `0070` 记录、手工插入 `0068/0069`、使用 `--fake`、改 migration dependency
+   或恢复整库备份来猜测修复。下一任务必须先只读证明 `0068/0069/0070` 对应 schema/table/index/
+   constraint/receipt 的真实存在状态，再设计精确 forward repair 与 rollback。
+5. 本次失败后旧 image 已重新 tag 为 `umanewsbot:prod`，受审 resume 入口已恢复
+   web/worker/beat/nginx，内外 HTTP healthz 正常。release lock 不存在；不可信 race-live intent
+   只记录并跳过，不得人工改内容后恢复。
+6. migration history 修复完成并取得新授权前，Release B preflight、`0071`、v2 census/overlay/
+   maintenance/apply/verifier 和 2025 full-network workflow 全部保持停止。重试必须从新的数据库
+   备份、候选 image 和完整 preflight 开始，不能复用本次半途状态。
+
 ## 2026-08-01 历史赛历 Release B 候选发布门禁
 
 > 以下是本地候选的未来操作合同，不是部署授权。当前未 commit/push/PR/deploy，也未运行生产

@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-08-08 Release B 生产发布被既有 migration history 阻断
+
+- Release B 已经 PR `#69` 合并为 `main@ba9c0f00`，但尚未部署生产；生产应用已恢复到既有
+  `sha256:b1fecc…341a` 并保持健康。
+- 生产数据库实际记录为 `0067` 后直接 applied `0070`，缺少 `0070` 当前依赖的 `0068/0069`；
+  前置主线 release task 因 `InconsistentMigrationHistory` 在任何新 migration 前停止。
+- 已验证恢复点为 `408607125` bytes、SHA-256 `e0cd6899…5cab`；本轮没有修改 migration
+  history、没有应用 `0068/0069/0071`、没有历史数据 apply，也没有触发 2025 full-network
+  workflow。
+- 下一步必须把“`0070` 迁移记录与生产实际 schema 对账并安全修复”作为独立高风险任务，完成
+  设计、真实 PostgreSQL RED/GREEN、独立 review 和新发布授权后，才能重新开始 Release B。
+
 ## 2026-08-01 历史赛历 Release B 已完成第四轮本地审查修订，尚未进入发布
 
 - 最新 reviewer 的三个 P1 已修复：未知生产 applied migration fail closed、supersession 时间戳
