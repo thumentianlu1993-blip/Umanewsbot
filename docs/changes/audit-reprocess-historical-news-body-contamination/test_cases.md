@@ -2,7 +2,6 @@
 
 ## 1. RED 取得原则
 
-实现授权后由测试 subagent 先增加测试。有效 RED 必须来自尚不存在的历史 inventory/candidate/review/apply
 行为；fixture、依赖、语法或数据库环境错误不计。预计首个有效 RED 是新服务/管理命令缺失或现有扫描不能
 识别“来源已干净、中文仍陈旧”的层级差异。
 

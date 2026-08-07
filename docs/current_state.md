@@ -1,5 +1,17 @@
 # 当前状态
 
+## 2026-08-08 Codex 工作流与门禁治理收敛
+
+- 根 `AGENTS.md` 现在是全部目录、任务、worktree 和代理的唯一人工确认门禁来源，统一为
+  G1 范围确认、G2 交付确认、G3 高影响动作确认。
+- 测试、review、CI、备份、SHA/队列/迁移计划和健康检查是自动技术检查；范围清楚的初始实现
+  指令可直接计作 G1，commit、push 与 Draft PR 不再拆成独立确认点。
+- `docs/codex_workflow.md`、`docs/session_bootstrap.md`、领域 agents 与 skills 已改为只引用根规则。
+- 旧规格流程目录、兼容技能、路由资料和旧治理迁移产物已从受控仓库删除；契约检查会拒绝
+  旧流程路径/文本、嵌套门禁文件或 G1/G2/G3 定义漂移。
+- `main` 只作为受保护远端引用：线程使用独立 worktree/分支，长任务绑定固定 SHA，远端合并与
+  生产发布分别按真实资源域互斥，由单一 release coordinator 操作生产发布面。
+
 ## 2026-08-08 Release B 发布在 migration history 门禁停止，生产已恢复
 
 - Release B feature commit `5561d1da5dbd988be02ae54f965e5eeac18d8aa0` 经 PR `#69`
@@ -34,7 +46,6 @@
   在独立设计、测试、复审和新授权前不得直接删除/补写 `django_migrations`，不得继续部署
   `0071`、生产回填或触发 2025 `full_network=true`。本轮 GitHub full-network run 为 0 次，
   没有生成新 checkpoint 或最终 artifact。
-
 ## 2026-08-01 历史赛历 Release B 本地实现与第四轮修订完成，待最终只读复审
 
 - 2026-08-02 reviewer session `019fc318-431e-7771-aa79-bf01a9fdb992` 的三个 P1 已限定修复：
@@ -126,7 +137,6 @@
   preflight 和 81→14 脱敏 fixture 要求均已关闭，最终 `VERDICT: APPROVED`。
 - 当前仍只有方案与状态文档，没有测试、应用代码、migration、commit、push、PR、部署或生产
   写入。按仓库工作流，必须在 APPROVED 后取得一次明确实现确认，才进入 RED 与实现。
-
 
 ## 2026-07-31 历史赛事 Release A URL 中央校验 P1 已通过限定复审，证据写回待复审
 
@@ -659,7 +669,7 @@
 - 同一 reviewer 已对修复 head `c4ce802c` 完成 closure review，结论
   `VERDICT: APPROVED`、无 findings；全程只读、未联网、未改文件。两个 P1 均已关闭。
 - finding 修复后相关回归为 `142 tests / 141 passed / 1 skipped`；Django check、无迁移漂移、
-  `py_compile`、OpenSpec strict/all（`38/38`）与 `git diff --check` 均通过。Eddie Read
+  `py_compile`、旧规格流程 strict/all（`38/38`）与 `git diff --check` 均通过。Eddie Read
   已由 Racing Post 完整结果与 DRF 赛后文字交叉确认第 5–8 名依次为
   Seal Team、Almendares、Mondego、Mi Hermano Ramon；该结论仍是第三方候选，Del Mar 官方
   chart 当次复核尚不可用，不能提升为 confirmed。
@@ -715,7 +725,7 @@
   复审进一步发现可省略 `source_map_version` 绕过精确 40 场映射，现均已补 RED 并修复。
   recovery plan 必须携带当前批准的 source-map 版本且始终精确匹配冻结范围。受影响范围测试为
   `100 passed / 3 skipped`，HTTP 预算 `3/3`、runner-v2
-  contract `29/29`；Django check、迁移漂移、OpenSpec strict、
+  contract `29/29`；Django check、迁移漂移、旧规格流程 strict、
   `py_compile` 与 `git diff --check` 通过。现有本地测试镜像的完整 `stable` 因缺
   `openpyxl`、无 Redis 及既有无关失败只能如实记录为 `2003 tests / 19 failures /
   91 errors / 5 skipped`，不能作为本修复 GREEN 证据。
@@ -777,7 +787,7 @@
   26 条已过期赛事仍为 `scheduled + results=0`。公网 `/races/?when=finished` 实际最晚只展示
   `2026-07-05`。
 - 已从 `origin/main@a59956b3` 建立独立 worktree `recover-race-results-through-20260727`，
-  OpenSpec change 同名，proposal/design/四份 delta spec/tasks 均通过 strict 校验；另补
+  旧规格流程 change 同名，proposal/design/四份 delta spec/tasks 均通过 strict 校验；另补
   `test_cases.md` 与 `rollout.md`。
 - 首轮工程审核发现 direct `RaceEventResult` 写入会绕过 owner/revision arbitration、canonical
   映射未持久化、blocker 被误算完成以及缺测试/rollout 四项问题；现已改为 owner-aware official
@@ -859,7 +869,7 @@
   `tests_legacy.py`；不将它们解释为本变更回归。
 - 第三次独立只读代码审查已返回 6 项 finding：迁移主线冲突、approve 未从来源身份重算共识、
   URL 未强制 HTTPS、直连官方锚点可缺来源 ID、请求无连接/读取超时，以及新 change 误放
-  OpenSpec 目录。当前已同步主线并改为 `0058`，approve 会重算四字段共识，来源请求逐跳强制
+  旧规格流程 目录。当前已同步主线并改为 `0058`，approve 会重算四字段共识，来源请求逐跳强制
   HTTPS 且使用 `5s/20s` 超时，JRA/NAR 锚点要求非空 `CNAME/k_lineageLoginCode`，durable
   artifacts 已迁至 `docs/changes/bootstrap-p0-horse-identity-evidence/` 并补齐
   `test_cases.md/rollout.md`；随后原生完整范围 review 又发现两项 P1：真实 prepare 候选缺少
@@ -1003,7 +1013,7 @@
   未连接或写入生产、未部署、未生成新 candidate。
 - 排除上述已确认基线失败后，最终 P0 写入链路 246 项与三项新增完整度测试合计 `249/249`
   通过；Django
-  check、迁移漂移、OpenSpec strict/all `37/37` 与 diff check 全部通过。
+  check、迁移漂移、旧规格流程 strict/all `37/37` 与 diff check 全部通过。
 - 独立审查发现并修复两项 P1：空胜绩证据曾误接受非空 applied payload；策略版本曾误阻断
   历史 v1 artifact 的只读复验。当前仅 v2 正式发布链路强制当前策略，历史 v1 仍只读兼容；
   两项均有先失败后通过的回归测试。
@@ -1101,7 +1111,7 @@
   再次调用发布。publish 未完成或失败时普通 commit 在 DB/publish 重跑前 fail closed，只允许显式
   `--retry-publish` 恢复。
 - 新增 3 项定向测试；auto-publish 类 `72/72`、P0 相关三模块 `263/263` 通过。Django check、
-  迁移漂移、OpenSpec strict/all 与 diff check 见本轮最终验证记录。
+  迁移漂移、旧规格流程 strict/all 与 diff check 见本轮最终验证记录。
 - 当前仍是本地未提交差异；先前针对 `41086464` 的 review 结论不覆盖本补丁。未触网、未 push、
   未部署，也未执行生产 bundle/prepare-release/commit；下一步必须 fresh read-only review。
 
@@ -1115,7 +1125,7 @@
   `origin/main@97dd2350a193c74d5063bf7432a283e4d47f6d0a`，集成提交为
   `8e3716bc`；四份追加式状态文档冲突均保留双方完整记录，代码无冲突。
 - 集成及 4.10j 返修后 P0 相关 `263/263` 通过，主线新闻边界/赛事系列身份相邻回归
-  `90/90`（1 skip）通过；Django check、迁移漂移、OpenSpec strict/all `37/37` 和 diff check
+  `90/90`（1 skip）通过；Django check、迁移漂移、旧规格流程 strict/all `37/37` 和 diff check
   通过。相同禁网 SQLite/Celery eager 环境下，最新主线完整基线为
   `2784 tests / 21F / 67E / 59 skipped`，集成提交为
   `2882 / 21F / 67E / 59 skipped`；新增 98 项，failure/error/skipped 增量均为 0。
@@ -1146,7 +1156,7 @@
   才允许从不可变 snapshot 幂等恢复。
 - TDD 与复验：相关
   `stable.test_horse_profile_publish + stable.test_p0_horse_completion_batch +
-  stable.test_p0_horse_production_apply` 为 `260/260`；Django check、迁移漂移、OpenSpec
+  stable.test_p0_horse_production_apply` 为 `260/260`；Django check、迁移漂移、旧规格流程
   strict/all `37/37`、diff check 通过。完整 stable：基线
   `21610ae8` 为 `2748 tests / 21F / 67E / 57 skipped`，本分支新增 88 项后为
   `2836 / 21F / 67E / 57 skipped`，失败/错误/跳过增量均为 0；既有失败集中在历史 runner 的
@@ -1309,7 +1319,7 @@
 
 ## 2026-07-23 publish_ready 积压治理（21 篇历史稿已舍弃，五地区新 24 小时观察中）
 
-- OpenSpec change `recover-publish-ready-backlog` 已完成代码主体：`NewsArticle` 新增 nullable
+- 旧规格流程 change `recover-publish-ready-backlog` 已完成代码主体：`NewsArticle` 新增 nullable
   `publish_ready_at` 和 `region/status/time` 组合索引，迁移不回填历史值。新稿仅在
   “非 ready → publish_ready”时写入资格时间；重复校验、普通保存和历史 NULL 均不自动刷新，
   只有显式榜单重处理或审核 manifest 恢复可刷新。
@@ -1332,7 +1342,7 @@
   `2635 tests / 14 failures / 67 errors / 57 skipped`，同一 `origin/main@26eb03e3` 基线为
   `2616 / 14 / 67 / 57`，新增 19 项且新增失败/错误/跳过均为 0；现有失败集中在历史 runner
   macOS 临时路径、准实时赛果时钟和既有环境契约。迁移 apply/rollback/reapply、Django check、
-  三份 Compose、OpenSpec strict/all、compileall 和 diff check 均通过。
+  三份 Compose、旧规格流程 strict/all、compileall 和 diff check 均通过。
 - 舍弃动作已从生产 `3d573583` fast-forward 部署到
   `7a6f30d8708c0560ba2120c44fd640ff35a7ea3e`，web/worker/beat/race_live_worker 统一使用
   `sha256:fa2fdf9bb952…`。本次恢复点为
@@ -1401,7 +1411,7 @@
 - 当前修复已重放到最新 `origin/main@0dcdbdab`；集成候选的精确提交与内容身份由最终
   base review 报告在仓库外固定，避免在提交正文中自引用过期 SHA。运行手册冲突按
   “保留主线新发布记录并追加本专项段落”解决，代码无冲突。P0 聚焦回归 `285/285` 通过；
-  Django check、迁移漂移、OpenSpec strict/all `37/37` 与 diff check 通过。完整 `stable`
+  Django check、迁移漂移、旧规格流程 strict/all `37/37` 与 diff check 通过。完整 `stable`
   回归为 `2741` 项、`21 failures + 70 errors + 57 skipped`；同一环境下 `origin/main` 基线为
   `2726` 项且失败/错误/跳过计数完全相同，本轮新增 15 项测试，没有新增失败。首次全量运行暴露的 2 个本轮
   错误文本兼容失败已修复并完成聚焦及全量复跑。首次独立原生 code review 另发现旧版
@@ -1448,7 +1458,7 @@
   “性别年龄 + 毛色”。本地返修改为独立读取 `.eng_name` 与 `.txt_01`，只允许状态为空或
   既有枚举，未知状态仍 fail closed；已知 `partial_career:` 改为可解释 source blocker。
   canonical 解析规则变化使 parser version 必须递增为 `netkeiba-parser.v3`。
-- 本地验证：四套件 `292/292`，Django check、迁移漂移、OpenSpec strict/all `37/37`、
+- 本地验证：四套件 `292/292`，Django check、迁移漂移、旧规格流程 strict/all `37/37`、
   diff check 通过；完整 `stable` 为 `2,748` 项，干净 HEAD 基线为 `2,741` 项，两边均为
   `21 failures + 65 errors + 57 skipped`，零新增失败。独立 review 首轮发现真实 validator
   包装路径未覆盖的 `partial_career` P1；改为沿 cause 链精确识别底层 blocker、测试改走真实
@@ -1457,7 +1467,7 @@
 
 ## 2026-07-22 netkeiba 马匹客户端专项：本地实现完成（未部署）
 
-- OpenSpec change `add-netkeiba-horse-client` 完成 plan-eng-review 与全部本地实现
+- 旧规格流程 change `add-netkeiba-horse-client` 完成 plan-eng-review 与全部本地实现
   （tasks `0.1-4.2`），解开 2026-07-22 首个日本批次 100/100 JBIS 同名歧义阻断。
 - 核心实现：`_NetkeibaClient`（按候选 `netkeiba:{id}` 直取马匹页 + 战绩页 + 血统页
   3 页，provider-bound 身份，页面提取四字段与完整生涯）；`_JapanDispatcherClient`
@@ -1494,7 +1504,7 @@
   普遍返回 2-4 个同名结果（实测 ドラゴンウェルズ/ディーズメンフィス 各 2、
   コンプリート 4），候选四字段为空无法消歧。身份回填解决了选批但解决不了抓取时
   身份锁（设计已预判）。批次已 abandon 留证。用户决定：先完成存量发布（已做），
-  再新开 OpenSpec change 做 **netkeiba 马匹客户端**（候选 ID 与 netkeiba key 同源，
+  再新开 旧规格流程 change 做 **netkeiba 马匹客户端**（候选 ID 与 netkeiba key 同源，
   URL 直取无检索歧义，页面含父母/出生日期/生涯，同时解开身份锁与四字段两个堵点）。
 - 运维状态：ALLOW_NETWORK 已恢复 false，beat/worker/race_live_worker 已重启，
   公网 healthz 200，数据核验 2,797 匹发布完好。
@@ -1503,7 +1513,7 @@
 
 ## 2026-07-22 P0 BASIC 层自动首发专项：本地实现完成（未部署）
 
-- OpenSpec change `publish-p0-horses-basic-tier` 完成 plan-eng-review 与全部本地实现
+- 旧规格流程 change `publish-p0-horses-basic-tier` 完成 plan-eng-review 与全部本地实现
   （tasks `0.1-6.2`）：目标是把公开 `/horses/` 从 12 匹推向全部 46,318 匹 P0。
   用户已确认三项产品决策：BASIC 层公开门槛（名称 + 五地区 + verified 身份或三字段
   齐全）、批次审核后自动首次发布、日本先行滚动补全。
@@ -1526,7 +1536,7 @@
 - 验证：专项测试 `test_horse_profile_publish` 23/23、批次套件 116/116（含自动首发
   钩子 11 项）、完整 `stable` 2,569 项与基线逐数一致（14F+70E，零新增）；
   `manage.py check`、`makemigrations --check --dry-run`（无迁移）、
-  `openspec validate --strict`、`git diff --check` 全部通过。
+  `旧规格流程 validate --strict`、`git diff --check` 全部通过。
 - 本 change 尚未部署生产、未写任何生产数据；生产执行（tasks `7.1-7.4`）见
   `docs/deploy_runbook.md` 顶部操作手册，需分步用户授权。
 
@@ -1543,7 +1553,7 @@
 
 ## 2026-07-22 P0 身份回填专项：本地实现 + 生产执行完成
 
-- OpenSpec change `enrich-p0-horse-external-identity` 完成全部实现（tasks `0.1-6.5`
+- 旧规格流程 change `enrich-p0-horse-external-identity` 完成全部实现（tasks `0.1-6.5`
   勾选）：四个离线证据源（netkeiba `ExternalHorse/Alias`、`ExternalRaceEntry/Result`
   回推、UK/FR `RaceEventRunner/Result.source_refs`、HKJC/NAR 本地 HTML 缓存重解析）
   统一产出 identity 候选，唯一强匹配 + 双向唯一 + 四字段不矛盾才写入，歧义一律
@@ -1563,7 +1573,7 @@
   `RaceEventPageMVPTests` 既有基线失败，stash 基线对照完全一致，与赛事历史
   专项在途改动相关，非本 change 引入）；完整 `stable` 套件失败数与基线相同
   （14 failures + 70 errors，基线 14 + 71，零新增）；`manage.py check`、
-  `makemigrations --check --dry-run`、`openspec validate --all`（30/30）、
+  `makemigrations --check --dry-run`、`旧规格流程 validate --all`（30/30）、
   `git diff --check` 全部通过。
 - 生产执行（tasks `6.5`，用户逐步授权访问/部署/写入后完成）：生产 fast-forward 至
   `349c822f` 并重建镜像；备份 dump SHA-256 `23818ce0…`。NAR 探针覆盖率 0.02%
@@ -1637,7 +1647,7 @@
 
 ## 2026-07-21 P0 滚动批次产品化已完成本地实现（未部署）
 
-- OpenSpec change `productize-p0-horse-batch-completion` 已完成 plan-eng-review
+- 旧规格流程 change `productize-p0-horse-batch-completion` 已完成 plan-eng-review
   （2 P0 + 6 P1 + 5 P2 全部修复，phase=reviewed）和全部代码实现，覆盖
   `complete-p0-horse-profile-data` 的 tasks `4.2` 长期版本。
 - 批次形态：队列选批（默认每地区 100、单批合计 500，无界执行 fail closed）、
@@ -1653,7 +1663,7 @@
 - 端到端 sqlite 证据：select → approve → prepare（fixture 缓存）→ bundle →
   release → dry-run → commit → 幂等复验全通，`FOREVER TEST` 严格完整落库。
 - 本地验证：专项测试 `82/82`、既有 P0 adapter `45/45`、赛事编排 `66/66`、
-  Django check、迁移漂移（本 change 无迁移）、OpenSpec 严格/全量 `31/31`、
+  Django check、迁移漂移（本 change 无迁移）、旧规格流程 严格/全量 `31/31`、
   `git diff --check` 通过；完整 `stable` 回归与独立 code review 进行中。
 - 新增依赖 `openpyxl==3.1.5`（复审工作簿），部署需重建镜像验证。
 - 本 change 尚未部署生产、未触网、未写任何马匹资料；生产默认仍
@@ -1695,7 +1705,7 @@
   `25` 匹中文名已翻译、`25` 匹仍为待译且后台显示原始马名；本批 `published=0`、
   `published_at=0`，没有自动首次发布。每地区人工发布 `1-2` 匹和公开页面验收仍是独立任务。
 - 本地最终验证为五地区/P0 组合 `182/182`、真实 PostgreSQL `7/7`、Django check、
-  migration drift、OpenSpec `30/30` 和 diff 检查通过；独立复审最终无 actionable finding。
+  migration drift、旧规格流程 `30/30` 和 diff 检查通过；独立复审最终无 actionable finding。
 - 下一批建议继续采用“五地区各 10 匹”的可审计滚动批次，优先处理重点赛事新进入 P0 且尚无
   完整档案的马；沿用本批严格来源、强身份、完整生涯和独立发布门禁。先完成 6.7 的首批公开
   验收，再决定是否提高单批数量，不因本次落库成功自动扩大生产发布范围。
@@ -1739,7 +1749,7 @@
 - prepare 只能产出 pending；apply 必须同时绑定固定 v2 SHA、可信 manifest SHA、调用方显式
   SHA 与实际文件 SHA。记录、身份、来源、计数发生漂移或出现重复记录时一律 fail closed。
   用户本次“继续推进”不构成生产写入授权。
-- 本轮验证为工具与转换器 `48/48`、相关 Django `223/223`、Node `2/2`、OpenSpec
+- 本轮验证为工具与转换器 `48/48`、相关 Django `223/223`、Node `2/2`、旧规格流程
   `30/30`；Django check、migration drift 与 `git diff --check` clean，独立 reviewer
   第三轮 `APPROVED`。文档中的历史 `282/282` 继续保留，但不是本轮新运行结果。
 
@@ -1867,7 +1877,7 @@
   已从上一轮 `277/277` 增至最终 `282/282` 通过；Node 工作簿 summary 与 path 测试通过，
   测试分母已包含既有
   `stable.tests.P0HorseProfileDataCompletionTests` 整类。Django check、迁移漂移检查、
-  OpenSpec change strict 通过、all strict `30/30`、Python `compileall`、工作簿公式错误扫描、
+  旧规格流程 change strict 通过、all strict `30/30`、Python `compileall`、工作簿公式错误扫描、
   `9` 张预览和 `git diff --check` 均通过。
   生产仍为 `NO-GO`：没有生产写入、部署、发布或网络 career crawl。
 
@@ -2690,7 +2700,7 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 - batch006 固定身份仍为 1061 targets：manifest `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`、selection `b9a3ad6556cfd03e9a57874bec763f75ad4c45e7642751140cb063f1d0553637`、approval `a119e3bcfd3bc8940cf8b792e246e462b405c292b77f2996739b435c9185d835`。正式年度赛历按 11 个地区×届次年 scope 执行：FR `2023=120 / 2024=130`，HK `2016=35 / 2017=26`，JP `2022=88 / 2023=138 / 2024=24`，UK `2024=196 / 2025=54`，US `2024=83 / 2025=167`。
 - 法国官方来源真实 smoke 已完成：2023 `120/120`、2024 `130/130`，均 `issues=0`。France Galop 平地 programme、障碍详细赛程及固定列分组汇总均可解析；汇总只补详细赛程缺失目标，同等质量时详细记录优先，避免摘要笔误覆盖逐场日期。
 - 其他地区现有离线覆盖基线为：香港 `61/61`、日本 `248/250`、英国 `250/250`、美国 `241/250`。日本缺口为 2023/2024 东京大赏典的 Oi/NAR 日期来源；美国缺口集中在 NSA 障碍赛、2025 Remsen 同名冲突、Robert J. Frankel 未举办判断和 Tokyo City Cup 日期，继续记入统一 gap 审核，不中断其他 scope。
-- 最新验证：完整 stable `1524/1524`（11 skip）、年度赛历/来源专项 `118/118`（1 skip）、runner `70/70`、1250-target 性能 `3/3`、OpenSpec `30/30`；Django check、迁移漂移、Python compile 和 diff 检查均通过。新增实现完成 4 轮 review，最终一轮无 actionable finding。
+- 最新验证：完整 stable `1524/1524`（11 skip）、年度赛历/来源专项 `118/118`（1 skip）、runner `70/70`、1250-target 性能 `3/3`、旧规格流程 `30/30`；Django check、迁移漂移、Python compile 和 diff 检查均通过。新增实现完成 4 轮 review，最终一轮无 actionable finding。
 - 写前 custom-format 备份为 `/opt/umanewsbot/backups/db/pre-main-ccfee75f-20260715_122039.dump`，`141448192` bytes，SHA-256 `898c9a4ab3a06847023d189aed830553cbe733bf4c8e92a4ed636dd8231fa55f`，`pg_restore -l` 通过；环境备份为 `.env.backup.pre-main-ccfee75f-20260715_122039`，旧镜像回滚标签为 `umanewsbot:rollback-pre-ccfee75f-20260715_122039`。
 - 新镜像 runner provisioning、crawl 最小权限、apply 无公网出口及两步暂停/恢复 smoke 均通过；恢复时第一步没有重复执行，最终无 runner 容器、running run 或 live lock。生产可用磁盘 `7088280 KiB`，高于 5 GiB 门槛。batch006 正式网络抓取和赛事业务表写入均未启动，历史公开/常驻网络/常驻写入继续关闭；下一步按 11 个 scope 生成不可变 descriptor/shard/plan 后启动 crawl。
 
@@ -2704,11 +2714,11 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 
 ## 2026-07-15 7 月 13 日起新闻质量修复、全量重跑与生产回归完成
 
-- “正文边界与博彩噪声”“实体识别与马名保护”“日文翻译与赛马固定格式”三类问题均已完成 OpenSpec、测试、实现、复审、部署和线上回归。最终代码 revision 为 `bdc0eeff78e111d7fa8a697cbb3557888f864fb8`，生产 web/worker/beat 统一运行 image `sha256:c975a4faf979a1f78cdb203b810d4f5726aca114175007fc01c176044f13841c`。
+- “正文边界与博彩噪声”“实体识别与马名保护”“日文翻译与赛马固定格式”三类问题均已完成 旧规格流程、测试、实现、复审、部署和线上回归。最终代码 revision 为 `bdc0eeff78e111d7fa8a697cbb3557888f864fb8`，生产 web/worker/beat 统一运行 image `sha256:c975a4faf979a1f78cdb203b810d4f5726aca114175007fc01c176044f13841c`。
 - 北京时间 2026-07-13 起冻结清单共 `357` 篇，其中 `343` 篇可处理、`14` 篇重复稿；可处理稿最终 `218 published / 105 pending_review / 20 ignored`。冻结清单 `343/343` 已有成功处理结论，剩余 0。用户点名的 19 篇全部为 translated + published，生产详情页均返回 HTTP 200。
 - Sponichi 来源级修复覆盖 `81` 篇：`79` 篇赛马稿完成清洗、重译、实体与门禁重建，`2` 篇 BOATRACE 非赛马稿 `8264/8274` 明确 ignored；79 篇最终为 `47 published / 22 pending_review / 10 ignored`。本轮新发布 47 篇关闭 QQ 自动交付，新增 QQ delivery 为 0。
 - 最终验收脚本覆盖全部 357 篇、19 篇目标稿和随机样本 `8109/8186/8263/8368/8451`，`issue_count=0`；浏览器复核目标 `8086/8212/8304/8317` 及上述 5 篇随机稿，未发现框架噪声、博彩噪声、内部占位符或错误公开内容。
-- 最终源码完整 `stable 1423/1423` 通过（环境专项跳过 7），跨新闻边界、实体、日文、多地区归属和历史 runner 的组合测试 `272/272` 通过（跳过 1）；Django check、迁移漂移和 OpenSpec 全量校验均通过。未知马名重复占位继续 fail closed，重试提示只允许用“该马/其”修复省略主语，不降低发布门禁。
+- 最终源码完整 `stable 1423/1423` 通过（环境专项跳过 7），跨新闻边界、实体、日文、多地区归属和历史 runner 的组合测试 `272/272` 通过（跳过 1）；Django check、迁移漂移和 旧规格流程 全量校验均通过。未知马名重复占位继续 fail closed，重试提示只允许用“该马/其”修复省略主语，不降低发布门禁。
 - 最新可恢复数据库备份为 `/opt/umanewsbot/backups/db/post-news-final-pre-unified-bdc0eeff-20260715_033227.dump`，`140310729` bytes，SHA-256 `3e93fd9dba4fb80d3b415a2f97fce1d02337054d6afeb14a725b859cf67a5a74`，`pg_restore -l` 通过。最终 Redis/Celery 队列、active、reserved、TranslationRun started、NewsArticle translating、历史 running/applying、idle-in-transaction 均为 0，`/healthz/` 正常。
 - 历史常驻网络与写入开关仍为 false，多地区归属 mode 仍为 off。清理未引用镜像层后生产可用磁盘约 `3.0 GiB`，仍低于 historical runner 的 `5 GiB` 硬门槛，因此新闻任务已完成但 batch006 继续 no-go，等待独立磁盘治理。
 
@@ -2717,7 +2727,7 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 - 已用候选镜像对生产最近 72 小时执行新的 `all_articles` 只读审计：共 `596` 篇、全部范围完整，`27` 条主地区变化、`5` 条 `needs_review`、`0` 条锁定/缺失/漂移；端到端约 `29.36s`，不再重复执行发布门禁。159 条单审 Gold 经保守对账后有效 `156` 条，主地区准确率 `96.15%`、五运营地区相关 precision `100%`、recall `52%`，机器报告为 `qualified=true`。
 - 人工逐条检查全部主地区变化和 `needs_review` 后，仍发现 7 类不可接受错标：普通英文单词马名压过美国赛事、法国赛果被冠军马来源压到英国、正文首段爱尔兰赛场被外籍马名压过、日本当前成就被未来凯旋门梦想改成法国、英国 Jockey Club 机构新闻被嵌套赛事词改成其他，以及英国赛场标题被正文中的法国历史背景压过。因此首轮结论明确为 no-go，生产 `MULTIREGION_ATTRIBUTION_MODE=off`、相关地区查询关闭，Shadow 尚未开始计时。
 - 修正规则采用 precision 优先：ASCII 单词实体不再单独夺取主地区；明确赛事/赛场优先于参赛马来源；正文首段只有唯一且非歧义赛事证据时才补足标题；机构全名可屏蔽其内部完整词边界的伪赛事命中；日本稿的当前成就加“未来梦想”保持日本主地区、海外目标只作相关地区。7 个真实反例已固化为回归测试。
-- 修复后专项 `117` 项通过（1 项 SQLite 环境跳过），完整 `stable 1404` 项通过（7 项环境专项跳过），真实 PostgreSQL 16 的 250 篇性能契约测试体约 `0.266s`；Django check、迁移无漂移、OpenSpec strict/all `29/29` 通过。下一门禁是提交并构建第二候选，再重跑同一 72 小时范围并人工检查全部变化；未通过前不得进入 Shadow。
+- 修复后专项 `117` 项通过（1 项 SQLite 环境跳过），完整 `stable 1404` 项通过（7 项环境专项跳过），真实 PostgreSQL 16 的 250 篇性能契约测试体约 `0.266s`；Django check、迁移无漂移、旧规格流程 strict/all `29/29` 通过。下一门禁是提交并构建第二候选，再重跑同一 72 小时范围并人工检查全部变化；未通过前不得进入 Shadow。
 
 ## 2026-07-14 多地区归属 V3 审计性能与 Gold 漂移修复待部署
 
@@ -2726,7 +2736,7 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 - 159 条单审 Gold 在当前生产正文上有 `21` 条输入 SHA 漂移。对照用户原审核快照后，`18` 条满足来源 URL、标题、正文语义/长度和当前推断结论全部稳定，可保守刷新 SHA；`8230` 标题变化、`8088` 正文异常缩短、`7898` 当前推断与人工相关地区结论不同，继续阻断。新增命令只输出对账工件，不修改数据库，重复身份或既有输出目录一律 fail closed。
 - 相关地区 precision/recall 现在只计算日本、中国香港、英国、法国、美国五个实际运营频道；`other` 继续保留为审计证据，但不会因系统没有第六个频道而制造假阳性。低置信度主地区变化若与人工 Gold 主地区一致，不再误计为“无依据变化”。
 - France Galop 英文页面真实日期形如 `Sunday, July 12, 2026 - 19:04`；旧 parser 缺少星期前缀格式，导致新稿被标记为时间不可信。适配器已补充长/短星期格式，来源 probe 同时输出 `published_at_verified` 与证据，部署后须以真实页面确认纠正。
-- 专项 `109` 项通过（另 1 项 SQLite 环境跳过）；完整 `stable 1396` 项通过（7 项环境专项跳过）；一次性 PostgreSQL 16 上 250 篇性能契约通过，测试体 `0.219s`，满足 SQL/30 秒/256 MiB 三项门槛；OpenSpec strict/all `29/29` 通过。当前分支尚未提交或部署，生产归属 mode 与相关地区查询仍保持关闭，Shadow 尚未开始计时。
+- 专项 `109` 项通过（另 1 项 SQLite 环境跳过）；完整 `stable 1396` 项通过（7 项环境专项跳过）；一次性 PostgreSQL 16 上 250 篇性能契约通过，测试体 `0.219s`，满足 SQL/30 秒/256 MiB 三项门槛；旧规格流程 strict/all `29/29` 通过。当前分支尚未提交或部署，生产归属 mode 与相关地区查询仍保持关闭，Shadow 尚未开始计时。
 
 ## 2026-07-14 historical runner 生产上线、batch006 selection 与资源门禁补丁
 
@@ -2734,17 +2744,17 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 - 生产 provisioning 已创建 internal DB/egress 两张 runner 网络、最小权限 `historical_runner_control` 角色和 0600 secret 目录。`runner-smoke-20260714-1920` 已证明 crawl 业务表写入被 PostgreSQL 拒绝、apply 无公网出口、双锁冲突、40 秒 step 心跳、暂停/恢复不重复、checkpoint SHA、迁移 preflight 和普通 `--no-deps` web 更新不干扰 DB/Redis/runner 网络；smoke 容器与一次性 secret 已清理。
 - batch006 selection 已在生产正式总账上生成于 `/opt/umanewsbot/runtime/historical_race_batches/2016-2025-batch-006-20260714`：共 `1061` 场，法国 `250`、香港 `61`、日本 `250`、英国 `250`、美国 `250`；与 batch002、有效 batch003、batch004、batch005 共 `1000` 个旧 target 交集为 0，香港已抓空并退出后续地区进度比较。manifest SHA-256 为 `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`，正式总账 SHA-256 为 `ac61298f242b2c649c403eae4741771a43cdb027befef20bc75e18fe34bcbad7`。
 - 正式网络抓取尚未启动。生产 smoke 后发现直接 `python_tool` 子进程未继承编排层的请求预算、source-cache 上限和磁盘底线；生产 artifact 文件系统当时仅余约 `2.8 GiB`，低于批准的 `5 GiB`。本线程在任何 batch006 网络请求前主动停止，未产生真实请求账本、source cache 或赛事写入。
-- 现已在同一 OpenSpec change 中补充资源门禁：宿主脚本与 Django 服务双重拒绝请求预算超出 `1..250`、cache 超出 `1..2 GiB`、磁盘底线低于 `5 GiB`；crawl 父进程固定 1 秒请求间隔，并把共享请求账本/cache manifest 路径绑定到当前 artifact。嵌套 AdapterRunner 保留父级路径，数值只允许收紧；请求账本和 cache manifest 的存在状态、大小与 SHA 进入顶层 checkpoint，首步前保存基线且任何失败收尾刷新身份，暂停或失败期间创建、删除、修改会 blocked；固定生产工具根只允许显式赛事工具，术语等无关联网脚本即使 SHA 匹配也会拒绝。新增用例均先证明旧实现放行。第七轮复审无 actionable finding，runner `64/64`、historical 组合 `200/200`；最终合入最新多地区归属主线后交叉专项 `208/208`（跳过 1）、完整 `stable 1417/1417` 通过（跳过 7）。完成生产磁盘治理、候选部署与强化 smoke 前，batch006 继续保持未启动，历史常驻开关与公开开关保持关闭。
+- 现已在同一 旧规格流程 change 中补充资源门禁：宿主脚本与 Django 服务双重拒绝请求预算超出 `1..250`、cache 超出 `1..2 GiB`、磁盘底线低于 `5 GiB`；crawl 父进程固定 1 秒请求间隔，并把共享请求账本/cache manifest 路径绑定到当前 artifact。嵌套 AdapterRunner 保留父级路径，数值只允许收紧；请求账本和 cache manifest 的存在状态、大小与 SHA 进入顶层 checkpoint，首步前保存基线且任何失败收尾刷新身份，暂停或失败期间创建、删除、修改会 blocked；固定生产工具根只允许显式赛事工具，术语等无关联网脚本即使 SHA 匹配也会拒绝。新增用例均先证明旧实现放行。第七轮复审无 actionable finding，runner `64/64`、historical 组合 `200/200`；最终合入最新多地区归属主线后交叉专项 `208/208`（跳过 1）、完整 `stable 1417/1417` 通过（跳过 7）。完成生产磁盘治理、候选部署与强化 smoke 前，batch006 继续保持未启动，历史常驻开关与公开开关保持关闭。
 - 最终组合提交 `84217c56a3c483d9ff08029729f16c11bd1f42ad` 的 Git tree 为 `61341c7e3256ec417d243a809254afd91acab6b2`，source archive SHA-256 为 `aee41ac51b5347d5a1c146074079fed49e1b23dc08518ddeef36405fe6d406af`。两个独立源码上下文的本地 AMD64 构建得到相同 image ID `sha256:2e8bd05f5c138a8dfd5d5012c5ecfc811422fef2ec3ae5cbe4ed2ed45b28b31e`，正式候选 tag 为 `umanewsbot:main-84217c56-amd64-20260714-2220`；镜像内 Django check、migration drift 和 runtime 专项 `239/239` 通过（跳过 1）。过渡候选 `82fa4a3f/sha256:01397d15...` 缺少最新归属反例修复，`sha256:119f59e3...` 的 revision 标签不是有效 Git 对象，两者均明确不得部署。镜像按设计不复制生产 Compose 静态文件，该契约测试只在完整源码树执行。当前仅待生产磁盘治理、窗口交接、候选部署和强化 smoke。
 
 ## 2026-07-14 batch006 扩容与独立 historical runner 本地实现
 
-- OpenSpec change `scale-and-isolate-historical-race-batches` 已完成完整提案、两轮工程评审和测试优先实现。batch006 起标准单地区上限为 250；显式 1-249 仍合法，旧批次可继续显式传 50。selection、writer、validator、summary、manifest 和命令 JSON 使用同一 `approved_region_limit`，100 场地区领先与不可变排除 snapshot 语义不变。
+- 旧规格流程 change `scale-and-isolate-historical-race-batches` 已完成完整提案、两轮工程评审和测试优先实现。batch006 起标准单地区上限为 250；显式 1-249 仍合法，旧批次可继续显式传 50。selection、writer、validator、summary、manifest 和命令 JSON 使用同一 `approved_region_limit`，100 场地区领先与不可变排除 snapshot 语义不变。
 - 新增 `HistoricalBatchRun`、`HistoricalBatchLock`、`HistoricalBatchRunEvent` 及迁移 `0031_historical_batch_runner`。runner 同时持有 PostgreSQL 租约和 artifact `fcntl` 文件锁，默认 30 秒心跳、180 秒租约；不同 owner 即使租约过期也不能普通启动，必须满足容器不存在、无历史数据库连接、checkpoint 一致并记录操作者/原因后才可接管。
 - runner plan 只接受结构化 argv、批准命令和镜像内工具 SHA；禁止 shell。checkpoint 同时绑定 run、phase、固定镜像、plan、输入和输出 SHA，使用 `fsync + rename` 写文件后更新数据库；分叉、丢失文件或未确认的 apply step 均转 blocked。owner token 只从 artifact 外的 0600 文件读取，数据库和日志仅保留哈希或前缀。
 - 原生 Docker runner 与普通 Compose project 分离：crawl 使用 egress + control-role DB 网络且不能写业务表；apply 只连 internal DB 网络且不能访问公网。容器强制 2 CPU、2 GiB、256 PID、只读根文件系统、drop all capabilities、日志轮转和 `/app/historical-runtime` 挂载，不覆盖镜像 `/app/runtime/tools`。
 - 普通 deploy/rollback 已改为 preflight 后仅以 `--no-deps` 更新 web/worker/beat/nginx，不再 pull/start/recreate DB、Redis、runner 或 networks；首次 runner 建表必须显式使用 host-only initial-install 门禁，基础设施 bootstrap 另设独立确认脚本。
-- 本地 runner 聚焦测试 52 项、runner+历史批次组合 118 项、加历史网络日志组合 122 项；合并最新主线后的交叉组合 194 项通过（跳过 1），完整 `stable` 1386 项通过（跳过 7 项环境专项）。真实 PostgreSQL 6 项并发/trigger 测试、Django check、migration drift、OpenSpec strict/all 和 shell/diff 校验通过。隔离 Docker smoke 已证明 20 连接唯一 owner、40 秒 step 心跳、暂停/恢复不重复、crawl 业务写入失败、apply 公网连接失败、2 CPU/2 GiB/256 PID 与日志轮转生效；provisioning 二次执行保持幂等。
+- 本地 runner 聚焦测试 52 项、runner+历史批次组合 118 项、加历史网络日志组合 122 项；合并最新主线后的交叉组合 194 项通过（跳过 1），完整 `stable` 1386 项通过（跳过 7 项环境专项）。真实 PostgreSQL 6 项并发/trigger 测试、Django check、migration drift、旧规格流程 strict/all 和 shell/diff 校验通过。隔离 Docker smoke 已证明 20 连接唯一 owner、40 秒 step 心跳、暂停/恢复不重复、crawl 业务写入失败、apply 公网连接失败、2 CPU/2 GiB/256 PID 与日志轮转生效；provisioning 二次执行保持幂等。
 - 五轮代码 review 已闭环：前四轮共修复无界子进程输出、失败诊断缺失、任意 checkpoint 路径、文件锁失败遗留 running 租约、runner 删除 RaceEvent、crawl prepare 误写业务 `TaskExecutionLog`、stale takeover 未在宿主核验旧容器七项问题；第五轮没有 actionable finding。进程流先进入容器 256 MiB `/tmp` tmpfs，结束后脱敏写 artifact；runner prepare 改由 append-only run event 审计；接管必须由宿主脚本实际确认旧容器不存在，并以只读挂载核对固定 `runner-state.json`。提交/镜像/生产迁移与普通部署不干扰演练尚未完成，因此 batch006 尚未生成，生产历史公开及常驻网络/写入开关继续关闭。
 
 ## 2026-07-14 2016-2025 标准批次五号 250 场正式导入
@@ -2753,7 +2763,7 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 - 日期、详情来源和最终详情三个写阶段均为 250/250；最终逐 target 验收 `error_count=0`。本批新增法国 `414 runners / 327 results`、香港 `482 / 469`、日本 `714 / 710`、英国 `489 / 433`、美国 `484 / 425`，合计 `2583 runners / 2364 results`。
 - 三个写入阶段均有独立 PostgreSQL custom-format 备份并通过 `pg_restore -l`：日期写前 `pre-batch005-date-20260714_052929.dump`，SHA-256 `34ca0038ff8795929384b287ea34a7615c2a057b1d49ab10d1eaf6a161c57d2f`；详情来源写前 `pre-batch005-detail-source-20260714_055621.dump`，SHA-256 `0fbf2eb9915ed9e7f52aca515353135527772ea2c4b981cb20241c2d474999b3`；最终详情写前 `pre-batch005-final-20260714_055856.dump`，SHA-256 `82908208d5a32f751c1b7c258c54e3ac66993798d27b66ff6d1405393a10ffa9`。
 - 写后生产总账为 `1291 imported / 29626 pending`，共 `13507 runners / 12167 results`；1291 个历史赛事全部保持 draft，published 为 0。写入窗口结束后 worker consumer 与 beat 已恢复，常驻历史写入和网络开关继续为 false。
-- batch006 不在旧的每地区 50 场规则下直接启动。按已批准后续要求，必须先完成“每地区最多 250 场”和独立 historical batch runner 的 OpenSpec、工程评审、测试优先实现、零问题代码复审、部署与验收；公开历史赛事开关继续关闭。
+- batch006 不在旧的每地区 50 场规则下直接启动。按已批准后续要求，必须先完成“每地区最多 250 场”和独立 historical batch runner 的 旧规格流程、工程评审、测试优先实现、零问题代码复审、部署与验收；公开历史赛事开关继续关闭。
 ## 2026-07-14 多地区归属 V3 PostgreSQL 性能达标并调整单审资格口径
 
 - 本地独立 worktree 使用临时 PostgreSQL 16 和当前真实校准快照完成 250 篇性能验收：250 篇文章、17,474 条有效地区术语、21,240 条 alias、38,806 个索引候选、17 个实际来源。首次真实基准暴露每篇文章懒加载一次 `NewsSource` 的 N+1，五轮均为 `254 SQL`；已改为 `AttributionBatchContext` 一次预加载批次来源，并让性能测试中的 250 篇文章绑定真实来源以防回归。
@@ -2761,9 +2771,9 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 - 产品口径调整为：单人审核来源必须显式保留，但单审身份本身不再自动 no-go；首发覆盖门槛为有效样本至少 150 条、五个运营地区各至少 10 条、跨地区至少 20 条。满足覆盖及全部质量/性能门槛后只获得进入生产 shadow 的资格，只有 shadow 至少观察 24 小时且全部主地区变化和 `needs_review` 完成人工复核后，才可对新文章 enforce。
 - Gold Set 不以首次达标封版；新增来源、规则版本、shadow 误判和运营争议案例必须持续追加到后续版本。相关地区采用“高 precision、允许低 recall”首发策略：precision 硬门槛保持 `>=95%`，recall 从 `>=90%` 调整为 `>=50%`。当前 159 条单审 Gold Set 的最少运营地区样本为法国 11 条、跨地区 24 条，主地区准确率 `98.11%`、相关地区 precision `100%`、recall `54.84%`、过度扩散 `0%`，覆盖与质量门槛均通过，可进入 shadow。
 - 线上 recall 下降代表漏标，只告警并阻止继续扩大灰度，不单独触发自动关闭；precision 低于 95%、明显错标或过度扩散超过 1% 才要求回退。生产归属和相关地区查询继续保持关闭，本轮未连接生产数据库、未部署、未修改生产配置。
-- Gold 生成器与评估器现统一读取 `MULTIREGION_ATTRIBUTION_GOLD_MIN_TOTAL/PER_REGION/CROSS_REGION`，避免自定义门槛时生成结果与资格报告不一致。V3 已合并 `origin/main@9d6dec34` 的新闻实体、日文翻译和内容边界修复；组合专项 `205` 项、完整 `stable` `1321 passed / 1 skipped`。合并后 159 条 Gold 指标完全不变，仍为 `qualified=true / no_go_reasons=[]`；Django check、迁移无漂移、Python 编译、两个生产 Compose、OpenSpec strict/all `28/28` 和 `git diff --check` 均通过。
+- Gold 生成器与评估器现统一读取 `MULTIREGION_ATTRIBUTION_GOLD_MIN_TOTAL/PER_REGION/CROSS_REGION`，避免自定义门槛时生成结果与资格报告不一致。V3 已合并 `origin/main@9d6dec34` 的新闻实体、日文翻译和内容边界修复；组合专项 `205` 项、完整 `stable` `1321 passed / 1 skipped`。合并后 159 条 Gold 指标完全不变，仍为 `qualified=true / no_go_reasons=[]`；Django check、迁移无漂移、Python 编译、两个生产 Compose、旧规格流程 strict/all `28/28` 和 `git diff --check` 均通过。
 - 上线前复核发现旧 `reprocess_multiregion_attribution_gates` 只扫描被英文术语门禁卡住的 `manual_review_required` 文章，不能满足“最近 72 小时全部主地区变化与全部 `needs_review`”的生产验收。现新增显式 `--scope all_articles`：覆盖近期全部有效文章并包含已发布稿，排除 duplicate/rejected/withdrawn/archived/ignored；不传 scope 时仍保持原门禁补跑语义。全量模式默认不截断，显式 `--limit` 时报告 `scope_complete=false`，不得作为 go/no-go 依据。
-- 全量报告固定列出全部主地区变化、全部 `needs_review`、全部 `locked_skip`，并从其余文章按当前主地区为五个运营地区各做内容指纹确定性抽样；完整清单写入持久 run selectors，重复运行同一快照可复核。人工锁定文章在报告和 manifest 中均保留原主/相关地区，同时展示算法 proposed 结果。`scope/scope_complete/commit_policy` 已进入 manifest 绑定契约，截断 run 禁止提交，全量 commit 只写归属。最终定向 `41/41`、完整 `stable 1327 passed / 1 skipped`、Django/迁移/编译、两个 Compose 和 OpenSpec `28/28` 均通过；159 条 Gold 指标不变且 `qualified=true`。生产仍为旧镜像、mode=off、相关地区查询关闭，任务 `9.3` 尚未执行。
+- 全量报告固定列出全部主地区变化、全部 `needs_review`、全部 `locked_skip`，并从其余文章按当前主地区为五个运营地区各做内容指纹确定性抽样；完整清单写入持久 run selectors，重复运行同一快照可复核。人工锁定文章在报告和 manifest 中均保留原主/相关地区，同时展示算法 proposed 结果。`scope/scope_complete/commit_policy` 已进入 manifest 绑定契约，截断 run 禁止提交，全量 commit 只写归属。最终定向 `41/41`、完整 `stable 1327 passed / 1 skipped`、Django/迁移/编译、两个 Compose 和 旧规格流程 `28/28` 均通过；159 条 Gold 指标不变且 `qualified=true`。生产仍为旧镜像、mode=off、相关地区查询关闭，任务 `9.3` 尚未执行。
 - 修复已提交并推送远端 main `7f0827ad941452524062d478940c85bdfddf4a59`，tree `173602cd408b970b5dd9160eee1e1aba1768ce44`，source archive SHA-256 `f0217003f9c2f614fb7f0576ff00c3086b508c70b1c213614d2470e6df08179a`。服务器独立上下文 `/opt/umanewsbot-builds/main-7f0827ad-20260714-1707` 的聚合 SHA-256 为 `746271a0d97235ac800f6b65cd26a2e1c894fc75148e233cb8efb611e7899641`；AMD64 候选 `umanewsbot:main-7f0827ad-amd64-20260714-1707` 两次构建 image ID 均为 `sha256:6ad16e368d7934777a689e537c70618a6321c3466d02f304116e2f61ae2af9a1`，镜像内 41 项归属/门禁专项、Django check 和迁移漂移通过。
 - 候选尚未切换。`2026-07-14 17:12 CST` 生产仍为旧 image `sha256:d3f602de...d6d791` / revision `873845da`，`news-translate-20260713-r3` 正在按 186 篇清单执行受控翻译重试，观测时完成 7 篇，worker/beat 已停。该任务会修改 72 小时文章正文和指纹，因此本会话未 retag prod、未重启、未生成生产归属 run、未改开关；待 one-off 自然退出并确认运行账本/队列为空后，才可备份、切换并执行任务 `9.3`。
 
@@ -2787,16 +2797,16 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 
 ## 2026-07-13 多地区归属 Gold Set 双人标注已启动
 
-- OpenSpec change `fix-france-news-freshness-and-multiregion-attribution` 的任务 `5.1` 已进入真实数据阶段。新增只读命令 `prepare_multiregion_attribution_gold_review` 生成不可变快照、盲标 CSV、中文口径说明和文件哈希清单；新增 `finalize_multiregion_attribution_gold_review` 校验审核来源、输入漂移和多人冲突。该日原始双审及 `250/40/50` 口径已由 2026-07-14 的单审可用及 `150/10/20` 首发门槛取代。
+- 旧规格流程 change `fix-france-news-freshness-and-multiregion-attribution` 的任务 `5.1` 已进入真实数据阶段。新增只读命令 `prepare_multiregion_attribution_gold_review` 生成不可变快照、盲标 CSV、中文口径说明和文件哈希清单；新增 `finalize_multiregion_attribution_gold_review` 校验审核来源、输入漂移和多人冲突。该日原始双审及 `250/40/50` 口径已由 2026-07-14 的单审可用及 `150/10/20` 首发门槛取代。
 - 第一版真实审核包为 `multiregion-gold-v1-20260713`，本地路径 `runtime/multiregion_gold_review/gold-v1-20260713/`，生产只读副本路径 `/opt/umanewsbot/runtime/multiregion_gold_review/gold-v1-20260713/`。manifest SHA-256 为 `1836a9d896ca5b6e09da6da7ed07a2fb3f66f0a02f387010fe4b56475bf5c1ea`。
 - 审核包共 `250` 篇，按当前文章地区分层为日本/中国香港/英国/法国/美国各 `50` 篇，覆盖全部 `17` 个生产新闻来源；`250` 个 URL 和 `250` 个输入 SHA 均唯一。时间范围为日本 `2026-05-25–2026-07-13`、中国香港 `2026-06-23–2026-07-13`、英国/法国 `2026-06-26–2026-07-13`、美国 `2026-06-24–2026-07-12`。
 - 抽样使用与待测归属算法独立的宽地区关键词，只用于优先纳入困难样本，不向审核表泄露算法答案；本包有 `139` 篇疑似跨地区候选。审核包包含第三方正文，已由 `.gitignore` 排除，最终仓库只保存 article ID、source URL、输入 SHA、人工期望地区、审核角色和理由。
-- 该日尚未完成两次独立人工标注和冲突裁决，因此 OpenSpec `5.1` 当时未勾选；该状态已由 2026-07-14 的单审可用决策和 159 条 V3 复评取代。生产 `MULTIREGION_ATTRIBUTION_MODE=off`、相关地区查询与翻译自动重试继续关闭；生产 dry-run 与 Shadow 仍待执行。
+- 该日尚未完成两次独立人工标注和冲突裁决，因此 旧规格流程 `5.1` 当时未勾选；该状态已由 2026-07-14 的单审可用决策和 159 条 V3 复评取代。生产 `MULTIREGION_ATTRIBUTION_MODE=off`、相关地区查询与翻译自动重试继续关闭；生产 dry-run 与 Shadow 仍待执行。
 - 本分支已在完成实现后快进合入 `origin/main@693db30e`。生产在本任务期间由并行历史任务切换到 `umanewsbot:main-df2732c3-amd64-20260713-1321`，image ID `sha256:27d5d51cbe2ae6d23cb99dc758da01addc2d5935504a950bbb8a2685bce2bf13`；本任务只读复核确认常驻容器健康、无 one-off 容器、归属相关安全开关仍关闭。
-- 最新主线组合回归为 `1139 passed / 1 skipped`；Django check、迁移漂移、OpenSpec change strict、全仓 25 项 OpenSpec strict 和 `git diff --check` 均通过。macOS 全测须设置 `TMPDIR=/private/tmp`，否则未改动的历史 artifact 测试会因 `/var` 与 `/private/var` 别名产生 16 个伪错误。
+- 最新主线组合回归为 `1139 passed / 1 skipped`；Django check、迁移漂移、旧规格流程 change strict、全仓 25 项 旧规格流程 strict 和 `git diff --check` 均通过。macOS 全测须设置 `TMPDIR=/private/tmp`，否则未改动的历史 artifact 测试会因 `/var` 与 `/private/var` 别名产生 16 个伪错误。
 ## 2026-07-14 日文赛马翻译与固定格式已上线
 
-- OpenSpec change `standardize-japanese-racing-translation` 已按提案、Full 工程评审、完整测试、apply、多轮 `/review -> 修复`、部署、生产回归和规格同步流程完成，并归档到 `openspec/changes/archive/2026-07-14-standardize-japanese-racing-translation/`。日文普通片假名词现在以非马名固定译法进入文章级实体与翻译链路；拍卖产驹、追切计时、赛后访谈和出马表骑手未定使用字段级确定性格式；未知完整马名继续保留原文。种子术语占位符按字段守恒，恢复时只消除明确的边界重复，不会把“拍卖会会场”这类合法单字相接误删。
+- 旧规格流程 change `standardize-japanese-racing-translation` 已按提案、Full 工程评审、完整测试、apply、多轮 `/review -> 修复`、部署、生产回归和规格同步流程完成，并归档到 `旧规格流程/changes/archive/2026-07-14-standardize-japanese-racing-translation/`。日文普通片假名词现在以非马名固定译法进入文章级实体与翻译链路；拍卖产驹、追切计时、赛后访谈和出马表骑手未定使用字段级确定性格式；未知完整马名继续保留原文。种子术语占位符按字段守恒，恢复时只消除明确的边界重复，不会把“拍卖会会场”这类合法单字相接误删。
 - `社台/Shadai`、`ノーザンホースパーク/Northern Horse Park` 和 `セレクトセール` 已在生产术语库中各自保持唯一概念；目标分别为“社台”“北方马公园”“精选拍卖会”，日英别名完整。英文马名中文目标只在中文/繁中文章中反向匹配，不再把日文普通词 `出走` 识别成英文马名 `Movin Out`。
 - 最终生产 revision 为 `873845dacb1cec0353ed9b9834417a1a00cc6311`，源码 archive SHA-256 为 `2c00bf5bee4e824d5bd3cb408af942b5a255dd88f30de1b24436cab289ec3e09`；web/worker/beat 均运行 AMD64 镜像 `sha256:d3f602de4459158bc372e45bb35f3730a7be21f284dfea32de5535681bd6d791`。本地完整 `stable 1295` 项通过（另 `1` 项按设计跳过），候选 PostgreSQL 的迁移/check/漂移和关联 `84` 项通过，最终 review 零问题。
 - 写入前恢复点为 `.env.backup.pre-873845da-20260714_124940` 与 `backups/db/pre-873845da-20260714_124940.dump`；数据库备份 `134234023` bytes、SHA-256 `413718143809a09686ea18710a4cd8b8f9a9f7643fb6b769cee5daf23ca485a6`，已用 PostgreSQL 容器执行 `pg_restore -l` 验证。旧镜像回滚 tag 为 `umanewsbot:rollback-pre-873845da-20260714-1254`，image ID `sha256:b14844ee027a7902db2ed22c9b310e8240dd2d84f822d2785a28799271e3a1a2`。
@@ -2805,15 +2815,15 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 
 ## 2026-07-14 新闻实体语境判定与完整马名保护已上线
 
-- OpenSpec change `contextualize-news-entity-resolution` 已完成测试优先实现及 `18` 轮 `/review -> 修复`，最终一轮无问题。文章级解析结果统一供翻译、标签、发布校验、自动马匹关联与显式重处理消费；英文人物全名及篇内唯一姓氏回指会压制内部马名，英文普通词/高歧义词需要强马名语境，日文完整未知马名会先整体占位，不再被父马、冠名或短术语拆分。
-- 最终生产 revision 为 `dc1e5ec584e47ea9d28998f76454d105836b3f0a`，源码 archive SHA-256 为 `f2eec61f6d2211a76e4456f6b9cbfc3e55a5b610829162b4a68b6039aae6ffe1`；web/worker/beat 均运行镜像 `sha256:5b06821610f0d2214cb24692e58beac4ffda731ddb84674a8855b2a1d4dbb470`。本地与候选环境最终目标测试 `51` 项、完整 `stable 1249` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、OpenSpec strict 和 diff check 均通过。
+- 旧规格流程 change `contextualize-news-entity-resolution` 已完成测试优先实现及 `18` 轮 `/review -> 修复`，最终一轮无问题。文章级解析结果统一供翻译、标签、发布校验、自动马匹关联与显式重处理消费；英文人物全名及篇内唯一姓氏回指会压制内部马名，英文普通词/高歧义词需要强马名语境，日文完整未知马名会先整体占位，不再被父马、冠名或短术语拆分。
+- 最终生产 revision 为 `dc1e5ec584e47ea9d28998f76454d105836b3f0a`，源码 archive SHA-256 为 `f2eec61f6d2211a76e4456f6b9cbfc3e55a5b610829162b4a68b6039aae6ffe1`；web/worker/beat 均运行镜像 `sha256:5b06821610f0d2214cb24692e58beac4ffda731ddb84674a8855b2a1d4dbb470`。本地与候选环境最终目标测试 `51` 项、完整 `stable 1249` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、旧规格流程 strict 和 diff check 均通过。
 - 写入前有效恢复点为 `backups/db/pre-main-624dd5b9-20260714-071014.dump`，`133370327` bytes、SHA-256 `21cdce21f52ded3b48e7c083f2f536eb694130f71ad6a1e38e067620f817fa75`，`pg_restore -l` 通过；随机六篇重处理前另有 `pre-random-six-entity-reprocess-20260714-074604.dump`，SHA-256 `0f0876c492d80ab9d8af2bacfe3776e3de5c94642acc427523ddd25d0437cf91`。
 - 目标文章 `8086/8212/8221/8283/8288/8290/8291/8309/8317/8318/8330` 已逐篇完成 dry-run、commit、重译和重新校验；`8317` 正文统一为岳品贤，`8309/8330/8318` 不再产生假马标签，`8086` 只保留真实马名多爵，指定日文完整马名不再拆分。11 篇均保持原 `published`、原发布时间和 QQ 次数，公开页全部为 `200`。
 - 随机样本 `8390/8388/8386/8385/8383/8380` 在最终规则下重处理后 dry-run 无增删差异；最终 worker 自然处理的 `8393/8394` 也通过实体 dry-run 与发布校验。公网 HTTP healthz、首页、后台和目标详情均为 `200`；Celery queue/active/reserved 均为空，最近 15 分钟 web/worker/beat 无 error/traceback，历史写入/网络开关保持关闭且历史 published 为 `0`。
 
 ## 2026-07-14 国际新闻正文边界与博彩噪声修复已上线
 
-- OpenSpec change `tighten-international-article-content-boundaries` 已完成提案、Full 工程评审、测试优先实现和多轮零问题 review。最终本地验证为正文边界目标测试 `27` 项、完整 `stable` `1198` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、OpenSpec strict 和 diff check 均通过。
+- 旧规格流程 change `tighten-international-article-content-boundaries` 已完成提案、Full 工程评审、测试优先实现和多轮零问题 review。最终本地验证为正文边界目标测试 `27` 项、完整 `stable` `1198` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、旧规格流程 strict 和 diff check 均通过。
 - 国际来源正文现在只接受可信正文选择器；未命中时显式失败，不再回退整页。Sporting Life 会移除页面框架、社交组件、推荐区、责任博彩、博彩推广、独立跳转 URL 和 `BOOK NOW` 等 CTA，同时保留赔率及赛事标题、马主等专名中的博彩公司名称；TDN 会移除编辑注、纯跳转说明、完整赛果/活动链接、`Read Today's Paper` 和含 `click here` 的行动句。
 - 历史修复命令只接受显式文章 ID、默认 dry-run，commit 后记录清理规则与 `OperationLog`；同步强制重译不会改变公开状态、原发布时间或触发 QQ。翻译完整性门禁新增非空行覆盖判断，避免“日期表完整但中文自然缩短”被误判截断，同时仍拦截尾部条目缺失。
 - 最终生产 revision 为 `514af8a22aec18f01cf0193344ae3b7a45c4dbc4`，web/worker/beat 均运行镜像 `sha256:954673cc74049d4b882e492ec29b072aba01aeb1a3ae440cc85415209c8a2f8a`。源码 tree 为 `b62a80cc34b2b65c47f6dd7d541c455d04a0ef5c`，archive SHA-256 为 `507b95c9b3e3ab66b67e4813b6b4814d2e4bc3d6cb2aae6abc7ad357322ad039`，双构建 `/app` manifest SHA-256 为 `2ada2d84788d048fcfd86d589762c2b159256d1a884581ac819a614aacf92aea`。
@@ -2842,14 +2852,14 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 - 既有地区进度护栏会把五地区永久放在同一比较集合；当中国香港等低容量地区已经没有可选目标时，仍会以其较低 accounted 数阻止英国、美国等高容量地区继续推进，与 1998–2026 正式总账全量完成目标冲突。
 - 标准批次现在只比较“本批选择后仍有未排除可选 pending due 目标”的地区。地区抓空后退出领先比较；仍未完成地区之间继续严格执行 100 个标准目标上限，101 拒绝、100 放行。
 - selection snapshot 显式排除的待审目标继续保留在 `available/remaining pending`、总账分母和缺口账本中，但不把只有待审排除项的地区视为仍可抓。artifact summary 新增 `eligible_pending_by_region` 和 `progress_guard_regions`，明确记录放行依据。
-- OpenSpec 增补已完成 Full 工程评审；新增回归先在旧实现上失败，修复后历史批次专项 `66` 项和完整 `stable 1171` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、OpenSpec strict、diff check 和最终代码 review 均通过。代码已合入 `main@614f810e`，尚未部署；生产历史写入/网络和公开开关不得因此开启。
+- 旧规格流程 增补已完成 Full 工程评审；新增回归先在旧实现上失败，修复后历史批次专项 `66` 项和完整 `stable 1171` 项通过（另 `1` 项按设计跳过），Django check、迁移漂移、旧规格流程 strict、diff check 和最终代码 review 均通过。代码已合入 `main@614f810e`，尚未部署；生产历史写入/网络和公开开关不得因此开启。
 
 ## 2026-07-13 后续标准批次重复选样门禁已实现
 
 - batch002 写后生成旧 batch003 时，4 个仍为 pending 的已交代 gap 再次进入选样：英国 Classic Handicap Chase、Dick Poole Fillies Stakes，以及美国 Brooklyn、Cougar II。该工件与 batch002 重叠 4 条，视为无效，不得审批或进入抓取。
 - `build_historical_race_band_batch` 已增加可重复 `--exclude-selection-snapshot`。命令校验旧快照 schema、inventory SHA、内部 snapshot SHA、target 数量/唯一性和稳定身份，在地区 limit 前排除旧 target，并把输入原字节复制到新 artifact、以固定键写入 manifest 文件身份。
 - 排除只影响本批选样：被排除 gap 继续保持 pending，仍计入 `available/remaining pending`，不计入 accounted/imported，也不修改 held/not_held/cancelled 口径。旧目标已导入导致当前 target SHA 改变时，只要 series/year/region/inventory 稳定，历史快照仍可作为排除证据。
-- 42 项批次与日期发现聚焦测试、完整 `stable 1157` 项回归、Django check、迁移漂移、OpenSpec strict/all 和第二轮代码 review 均通过。batch002 真实 250 目标快照已通过新读取器；该门禁后续已经提交并用于 batch003/batch004，公开展示和常驻历史写入/网络开关保持关闭。
+- 42 项批次与日期发现聚焦测试、完整 `stable 1157` 项回归、Django check、迁移漂移、旧规格流程 strict/all 和第二轮代码 review 均通过。batch002 真实 250 目标快照已通过新读取器；该门禁后续已经提交并用于 batch003/batch004，公开展示和常驻历史写入/网络开关保持关闭。
 
 ## 2026-07-13 2016–2025 标准批次二号 246 场正式导入
 
@@ -2869,11 +2879,11 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 
 ## 2026-07-13 2016–2025 标准批次二号应到与日美来源发现
 
-- 由于 2016–2025 年代带仍有 pending 目标，按 OpenSpec 年代带门禁继续本年代，不提前跳到 2006–2015。生产总账生成第二个标准批次 250 场，五地区各 50；生成前各地区 accounted 均为 53，生成后领先差仍为 0。selection snapshot 内部 SHA-256 为 `fdd297a8c76cca529634128c11c59ea6ed4cf216b13e574a012d5fd35557629b`，manifest 文件 SHA-256 为 `b4db68f36e2ec378b7dffc9f8c8d2286d3cf4d4138499f2eb4fef86c8d3152f8`，审批文件 SHA-256 为 `b2650665588758c9e43cae3f80db30fe7c0f8287657cea468f728b9baf1fd6c2`。
+- 由于 2016–2025 年代带仍有 pending 目标，按 旧规格流程 年代带门禁继续本年代，不提前跳到 2006–2015。生产总账生成第二个标准批次 250 场，五地区各 50；生成前各地区 accounted 均为 53，生成后领先差仍为 0。selection snapshot 内部 SHA-256 为 `fdd297a8c76cca529634128c11c59ea6ed4cf216b13e574a012d5fd35557629b`，manifest 文件 SHA-256 为 `b4db68f36e2ec378b7dffc9f8c8d2286d3cf4d4138499f2eb4fef86c8d3152f8`，审批文件 SHA-256 为 `b2650665588758c9e43cae3f80db30fe7c0f8287657cea468f728b9baf1fd6c2`。
 - 批次审核为 250 个唯一 target、250 个唯一地区/年份/系列组合，核心身份字段无空值，同地区同年无重名；全部继承自已批准总账。年份分布为法国/日本/英国/美国各 50 场 2025，香港为 2024 年 9 场、2023 年 31 场、2022 年 10 场。
 - 复用已缓存 JRA 与 TOBA 2025 年表做零网络离线发现。修复 JRA 五个障碍/赞助名称别名、TOBA 核心限定词串场和同 URL 双 target 后，得到日本 50、美国 48 个候选，共 98 个全局唯一 URL；候选 SHA-256 为 `bff176ca9b55ca11a8a5200c1f27a02e3f14e160877dac79e1092d5409f0560e`。
 - TOBA 权威年表将美国 `Brooklyn Stakes`（target 74077，BAQ）和 `Cougar II Stakes`（target 74108，DMR）明确标为 `not run`。工具只输出 `source_reports_not_run` 审核证据，不自动改总账；两条由产品审核决定是否从 `held` 改为 `not_held`，其余 248 场可继续独立推进。
-- 技术修复按测试优先完成，109 项历史专项与完整 `stable` 1141 项通过，1 项按设计跳过；OpenSpec strict、编译和 diff 检查通过，修复后重新 review 无剩余可修问题。历史公开展示和常驻网络/写入开关继续关闭，尚未对本批执行生产网络抓取或数据库写入。
+- 技术修复按测试优先完成，109 项历史专项与完整 `stable` 1141 项通过，1 项按设计跳过；旧规格流程 strict、编译和 diff 检查通过，修复后重新 review 无剩余可修问题。历史公开展示和常驻网络/写入开关继续关闭，尚未对本批执行生产网络抓取或数据库写入。
 
 ## 2026-07-13 2016–2025 标准批次法港英 150 场正式导入
 
@@ -2887,7 +2897,7 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 
 ## 2026-07-13 权威字段门禁固化与可复现镜像切换
 
-- 权威字段批次门禁源码、测试、OpenSpec 与运行文档已提交为 `df2732c3b8ae47619728c52f54a95204f5d6b574`，历史分支和远端 `main` 同步快进；提交前完整 `stable` 回归 `1136/1136` 通过，1 项按设计跳过，最终代码 review 无待修问题。
+- 权威字段批次门禁源码、测试、旧规格流程 与运行文档已提交为 `df2732c3b8ae47619728c52f54a95204f5d6b574`，历史分支和远端 `main` 同步快进；提交前完整 `stable` 回归 `1136/1136` 通过，1 项按设计跳过，最终代码 review 无待修问题。
 - 生产从干净 detached worktree 构建 `umanewsbot:main-df2732c3-amd64-20260713-1321`，两次构建 image ID 均为 `sha256:27d5d51cbe2ae6d23cb99dc758da01addc2d5935504a950bbb8a2685bce2bf13`；架构 `amd64`，revision `df2732c3...6b574`，Git tree `d2ce464b80ec595f82dc19a531c982429bb639af`，已提交源码归档 SHA-256 `441eb2acb5c061aae5d22671e82ddccfafb2cb08af62711b030c0031354d8d5d`。
 - 切换前停止 beat 并等待 worker active/reserved 清空；外部导入、术语重处理、多地区归属 live lock 均为 0，无 one-off 容器。`.env` 备份为 `.env.backup.main-df2732c3-20260713_132757`；数据库备份 `backups/db/pre-main-df2732c3-20260713_132757.sql.gz` 为 `148455898` bytes，`gzip -t` 通过，SHA-256 `87cc176658cd2e57fa72c703bc1446e1e1930147a875d82cfccab7470d964776`。旧镜像回滚 tag 为 `pre-main-df2732c3-20260713-1327`。
 - 新镜像连接生产数据库执行 migrate 无待迁移，Django check、迁移漂移和新命令 help 均通过；随后重建 `web / worker / beat`。三容器统一使用 `sha256:27d5d51c...bf13`，web healthy，`stable.0029`、64 个模型、历史新命令和静态资源正常。
@@ -2896,7 +2906,7 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 
 ## 2026-07-13 历史源码固化与可复现生产镜像切换
 
-- 历史赛事全部保留能力已提交并推送，分支与远端 `main` 均已快进到 `304ebdb67562e655929d263a3af98b8f17905752`。源码完整 `stable` 回归为 `1128 passed / 1 skipped`，OpenSpec strict、Django check、迁移漂移与 diff check 通过。
+- 历史赛事全部保留能力已提交并推送，分支与远端 `main` 均已快进到 `304ebdb67562e655929d263a3af98b8f17905752`。源码完整 `stable` 回归为 `1128 passed / 1 skipped`，旧规格流程 strict、Django check、迁移漂移与 diff check 通过。
 - 生产最终已切换到从干净已提交 `main` 两次一致构建的 AMD64 镜像 `umanewsbot:main-304ebdb6-amd64-20260713-1230`，image ID 为 `sha256:e7ab7af0061d7362ad0582224baffc79eda07bd6d8f6467bfa573f760853877d`，Git tree 为 `5dfef5c7d219e63cd0b156071c89508cb42543ce`，context SHA-256 为 `a77a271cde3d0d06e25f9075036de5fc99415e832f2da052c84bf40bf956a7b5`。旧组合镜像已保留为回滚 tag `pre-main-304ebdb6-20260713-1240`。
 - 切换前数据库备份为 `backups/db/pre-main-304ebdb6-20260713_123828.sql.gz`，大小 `148091210` bytes，SHA-256 为 `f61038e6a9e015f0eb0d59288029903911ebd55ed1acf600eabfb15a4c6ee126`，`gzip -t` 通过；`.env` 备份为 `.env.backup.main-304ebdb6-20260713_123828`。生产遗留的未跟踪旧版 `package_historical_race_detail_candidates.py` 已按原 SHA 保存在 `runtime/deploy/pre-main-304ebdb6-20260713_1239/`，由正式跟踪的新版接管路径。
 - 切换按单一生产协调流程执行：停 beat，等待唯一术语发现任务自然结束，确认 Celery active/reserved、外部导入、归属与术语重处理锁均为 0；新镜像 migrate 无待迁移，Django check 和 `makemigrations --check --dry-run` 通过后重建 `web / worker / beat`。
@@ -2915,15 +2925,15 @@ scheduler、扩展赛事或公开；后续来源结果复核、provisional publi
 
 `2026-07-13` change `fix-france-news-freshness-and-multiregion-attribution` 已完成当时版本的本地实现与三轮 review/返修。TDN 法国入口、France Galop 时间证据、翻译恢复、多地区归属运行账本和灰度控制均已实现。该段原记录的“双审 250/40/50”Gold 门槛已由 2026-07-14 决策取代：现有 159 条单审 Gold Set 达到 `150/10/20` 首发覆盖和全部质量门槛，可进入 shadow，但生产 dry-run、至少 24 小时 shadow、全量变化复核、仅新文章 enforce 和相关地区查询灰度仍未完成，不得直接开启相关地区查询或归档 change。
 
-`2026-07-13` OpenSpec change `fix-france-news-freshness-and-multiregion-attribution` 已完成两轮完整工程评审并进入 `reviewed` 阶段，共收敛 11 个架构、测试、性能和一致性问题。方案锁定：TDN 改用日期倒序 posts 查询；France Galop 保存 verified 详情时间且 fallback 不覆盖；瞬时翻译错误最多 3 次退避重试且默认不开自动调度；归属使用 `off|shadow|enforce` 单一模式，相关地区查询独立灰度；归属 dry-run/commit 使用持久 run、独立可续租锁、manifest、断点续跑和幂等保护。该日原评审口径要求双审、`250/40/50` 覆盖和 related recall `>=90%`，已由 `2026-07-14` 决策修订为单审可用、`150/10/20` 首发覆盖且 recall 首发线 `>=50%`；precision、准确率、扩散和性能门槛不变。灰度顺序仍为代码部署且 mode=off、shadow、仅新文章 enforce、网页/测试群相关查询、近期 72 小时回填、正式群。
+`2026-07-13` 旧规格流程 change `fix-france-news-freshness-and-multiregion-attribution` 已完成两轮完整工程评审并进入 `reviewed` 阶段，共收敛 11 个架构、测试、性能和一致性问题。方案锁定：TDN 改用日期倒序 posts 查询；France Galop 保存 verified 详情时间且 fallback 不覆盖；瞬时翻译错误最多 3 次退避重试且默认不开自动调度；归属使用 `off|shadow|enforce` 单一模式，相关地区查询独立灰度；归属 dry-run/commit 使用持久 run、独立可续租锁、manifest、断点续跑和幂等保护。该日原评审口径要求双审、`250/40/50` 覆盖和 related recall `>=90%`，已由 `2026-07-14` 决策修订为单审可用、`150/10/20` 首发覆盖且 recall 首发线 `>=50%`；precision、准确率、扩散和性能门槛不变。灰度顺序仍为代码部署且 mode=off、shadow、仅新文章 enforce、网页/测试群相关查询、近期 72 小时回填、正式群。
 
 `2026-07-12` 法国新闻新鲜度与低产出专项只读排查已完成，本次未修改代码、配置或文章状态。线上三个法国来源都在按有效 15 分钟频率成功轮询，但存在四个独立阻断：一是 `tdn_france` / `tdn_france_broad` 使用 WordPress `/wp/v2/search`，该接口按相关度返回固定历史结果而非按日期倒序，来源 `#21` 每轮因此正确过滤 `80` 条旧文却漏掉最新稿；实测改用 `/wp/v2/posts?search=...&orderby=date&order=desc&after=...`，`2026-07-09` 以来 11 组法国宽关键词可得到 `12` 篇去重候选，其中包含 `2026-07-11` Grand Prix de Paris 调时和 `2026-07-09` France Galop 预算稿。二是 `FranceGalopEnglishNewsAdapter` 列表阶段用 `timezone.now()` 作为发布时间，详情页未解析页面真实时间，重复抓取还会覆盖 `NewsArticle.published_at`；线上 `7871/7699/7031` 的官方真实日期分别为 `2026-07-11 / 2026-07-10 / 2026-07-05`，但数据库时间被刷新为最近轮询时间。三是最新 France Galop 稿 `7871/7699` 已抓入库，却分别因翻译供应商 `503/429` 停在 `translation_failed`，当前没有周期性失败翻译重试，`translation_retry_count=0`。四是生产 `MULTIREGION_ATTRIBUTION_ENABLED=false`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false`，全球 TDN 最新流中的法国稿仍按来源默认记为美国，例如 `7872` Grand Prix de Paris 调时稿已入库但主地区为美国。推荐改造为：TDN 直接使用按日期倒序且带 `after` 的 posts 搜索；France Galop 解析正文官方时间并禁止 fallback 时间覆盖可信发布时间；对 `429/503` 增加有上限和退避的自动翻译重试；完成多地区归属复核后开启相关地区查询，使全球来源法国稿同时进入法国池。3 天新鲜度门禁应保留，不应通过提高上限掩盖入口排序和时间可信度问题。
 
 `2026-07-12` 已对英文术语门禁重处理结果执行受控发布。按香港 run `#7`、英国 `#8`、美国 `#10`、法国 `#11` 的 manifest 锁定提交后，共恢复 `24` 篇候选；自然发布窗口在北京时间 `18:30` 发布 `18` 篇、`18:45` 发布 `6` 篇，QQ 因 `high_value_only` 策略均返回 `no_eligible_articles`，没有产生交付。发布后复核发现法国 `NewsSource#21 / CrawlJob#9408` 属于 `fix-tdn-france-search-date-freshness` 上线前的受污染库存：其中本次公开的 `7250/7256/7259/7261/7268` 官方真实日期分别为 `2026-06-23 / 2022-03-08 / 2020-04-27 / 2020-04-27 / 2017-03-29`，均不满足抓取时 3 天新鲜度要求。已在新备份 `backups/db/pre-term-gate-stale-cleanup-20260712_185347.sql.gz`（约 `100M`，gzip 校验通过，SHA-256 `a16f85f74d2d1d9de44debbf54f1bf096cff2ad2ce0a17f448ba259e6738a118`）后，将 `CrawlJob#9408` 全部 `20` 篇标记为 `withdrawn`、清空公开时间并写入批次清理原因，防止剩余待审核旧文再次被补跑复活。最终合格公开文章为香港 `7`、英国 `3`、美国 `9`，合计 `19` 篇；5 个旧文详情已从公网撤回，QQ 误推送为 `0`。生产仍保持 `ENGLISH_TERM_CONTEXT_MODE=shadow`，本次仅在锁定 commit 命令中临时使用 `enforce`，未改变常驻服务模式。
 
-`2026-07-12` OpenSpec change `fix-english-term-context-gates-and-reprocess-performance` 已部署生产并进入 `shadow` 灰度，生产 HEAD 为 `f221c7df`。新增迁移 `stable.0028_term_gate_reprocess_runs`、只读运行后台、`off|shadow|enforce` 单一模式和带 run ID/manifest 的受控重处理；当前 `web/worker/beat` 均为 `shadow`，旧门禁继续决定自然流入文章状态。部署前备份为 `.env.backup.english-term-context-20260712_171023` 和 `backups/db/pre-english-term-context-20260712_171023.sql.gz`（109M，`gzip -t` 通过，SHA-256 `8f1cb6d3380db6c92671348d60a1c1d1633939bc637a38bcc2bdc796116486e1`）。生产 100 篇美国候选最终基准 run `#6`：7.53 秒、SQL 19 条、RSS 增量 36,503,552 bytes，术语索引 1 次，赛事实体/英文 alias/额外马名术语/重复语料预取 `2/1/0/1`，全部达标；100 篇中 20 篇可恢复、80 篇仍被真实专名或其他门禁阻断。四地区小批 dry-run 为香港 `12/16` 可恢复、英国 `3/20`、法国 `6/13`、美国 `9/20`；随后仅对已审核的 run `#7/#8/#10/#11` 执行 manifest 锁定 commit，实际恢复 `24` 篇并按上段记录完成发布与旧库存清理。抽检发现并修复 NFKC 前文字符膨胀导致审计 span 偏移，法国复验 run `#11` 已准确记录 `Exactly -> exactly`。本地最终专项 `81` 项、完整 `stable` `870` 项通过；Django、迁移、OpenSpec 和 diff 检查通过。内外 `/healthz/`、首页、新闻详情和重处理后台登录跳转已通过真实浏览器/接口验收。至少观察 24 小时并完成普通词、单词型真实马名和 uncertain 抽检前，不得切全局 `enforce`，不得继续提交其他历史 run，也暂不归档 change。
+`2026-07-12` 旧规格流程 change `fix-english-term-context-gates-and-reprocess-performance` 已部署生产并进入 `shadow` 灰度，生产 HEAD 为 `f221c7df`。新增迁移 `stable.0028_term_gate_reprocess_runs`、只读运行后台、`off|shadow|enforce` 单一模式和带 run ID/manifest 的受控重处理；当前 `web/worker/beat` 均为 `shadow`，旧门禁继续决定自然流入文章状态。部署前备份为 `.env.backup.english-term-context-20260712_171023` 和 `backups/db/pre-english-term-context-20260712_171023.sql.gz`（109M，`gzip -t` 通过，SHA-256 `8f1cb6d3380db6c92671348d60a1c1d1633939bc637a38bcc2bdc796116486e1`）。生产 100 篇美国候选最终基准 run `#6`：7.53 秒、SQL 19 条、RSS 增量 36,503,552 bytes，术语索引 1 次，赛事实体/英文 alias/额外马名术语/重复语料预取 `2/1/0/1`，全部达标；100 篇中 20 篇可恢复、80 篇仍被真实专名或其他门禁阻断。四地区小批 dry-run 为香港 `12/16` 可恢复、英国 `3/20`、法国 `6/13`、美国 `9/20`；随后仅对已审核的 run `#7/#8/#10/#11` 执行 manifest 锁定 commit，实际恢复 `24` 篇并按上段记录完成发布与旧库存清理。抽检发现并修复 NFKC 前文字符膨胀导致审计 span 偏移，法国复验 run `#11` 已准确记录 `Exactly -> exactly`。本地最终专项 `81` 项、完整 `stable` `870` 项通过；Django、迁移、旧规格流程 和 diff 检查通过。内外 `/healthz/`、首页、新闻详情和重处理后台登录跳转已通过真实浏览器/接口验收。至少观察 24 小时并完成普通词、单词型真实马名和 uncertain 抽检前，不得切全局 `enforce`，不得继续提交其他历史 run，也暂不归档 change。
 
-`2026-07-12` P0 马资料补全基础能力已部署生产提交 `ce676998`。本地分支先变基到最新 `origin/main=31cc82c`，P0 迁移因主干已有 `0023/0024/0026` 顺延为 `stable.0027_p0_horse_profile_completion`；最新主干上术语解析/旧马匹页/P0 定向测试 `104` 项通过，补齐临时环境 `pdfplumber` 后完整 `stable` `813` 项全部通过，Django check、迁移一致性、OpenSpec strict/all 和 `git diff --check` 通过。生产部署前 `HEAD=31cc82c`，容器、内外 `/healthz/`、公网 `/horses/` 正常，外部导入 started/锁和 Celery active/reserved 均为空，未发现历史回填进程；备份 `.env.backup.p0-horse-profile-20260712_162039` 与 `backups/db/pre-p0-horse-profile-20260712_162039.sql.gz`（109MB，`gzip -t` 通过）。生产已显式保持 `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`，并新增批次上限 `10`、强制来源 URL、在役履历新鲜度 `1` 天。部署后 `0027` 已应用，`manage.py check`、内外健康页、马匹页和 Django Admin 跳转通过，`web/worker/beat` 日志无 traceback；既有 `HorseRaceRecord=21`，全部回填幂等键、空键 `0`。P0 来源 dry-run 为 `term_candidates=21596`、`major_race_candidates=992`，实际重点赛事证据含 runner `5096`、result `4572`；为遵守“五地区各 10 匹先人工跑通”，本次未执行 `--sync-sources --commit`，生产 `HorseP0Source/HorseIdentityConflict/HorseProfileCompletionRun` 仍为 `0`，也未启用网络补全或自动首次发布。
+`2026-07-12` P0 马资料补全基础能力已部署生产提交 `ce676998`。本地分支先变基到最新 `origin/main=31cc82c`，P0 迁移因主干已有 `0023/0024/0026` 顺延为 `stable.0027_p0_horse_profile_completion`；最新主干上术语解析/旧马匹页/P0 定向测试 `104` 项通过，补齐临时环境 `pdfplumber` 后完整 `stable` `813` 项全部通过，Django check、迁移一致性、旧规格流程 strict/all 和 `git diff --check` 通过。生产部署前 `HEAD=31cc82c`，容器、内外 `/healthz/`、公网 `/horses/` 正常，外部导入 started/锁和 Celery active/reserved 均为空，未发现历史回填进程；备份 `.env.backup.p0-horse-profile-20260712_162039` 与 `backups/db/pre-p0-horse-profile-20260712_162039.sql.gz`（109MB，`gzip -t` 通过）。生产已显式保持 `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`，并新增批次上限 `10`、强制来源 URL、在役履历新鲜度 `1` 天。部署后 `0027` 已应用，`manage.py check`、内外健康页、马匹页和 Django Admin 跳转通过，`web/worker/beat` 日志无 traceback；既有 `HorseRaceRecord=21`，全部回填幂等键、空键 `0`。P0 来源 dry-run 为 `term_candidates=21596`、`major_race_candidates=992`，实际重点赛事证据含 runner `5096`、result `4572`；为遵守“五地区各 10 匹先人工跑通”，本次未执行 `--sync-sources --commit`，生产 `HorseP0Source/HorseIdentityConflict/HorseProfileCompletionRun` 仍为 `0`，也未启用网络补全或自动首次发布。
 
 项目当前已经完成正式域名 HTTP 接入修复，`umafans.run` 与 `www.umafans.run` 已可访问。  
 “自动化内容运营 + AI 编辑改写 MVP”已完成代码侧与生产侧上线，当前处于上线后观察与质量抽检阶段。
@@ -2966,26 +2976,26 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 
 `2026-07-11` 赛事编排第四轮技术返修已实现：coverage 新增 `actual_apply_scopes`，apply-check 对账真实地区/来源/模块组合并逐组合要求确认；全绿后生成按 SHA-256 命名的 approved candidate，最终 importer 通过 `--expected-sha256` 从同一批原始字节复核后才解析写库；自定义 adapter 缺少非空 command/modules/outputs 或 provenance 时在 plan 阶段失败，prepare 不再静默跳过；coverage 行级 blocker 与 warning 已拆分，`existing_data_diff` 单独存在时标记 `complete_with_warnings` 且仍计入完整覆盖，候选更不完整时继续 blocked。独立赛事编排专项测试 `41` 项、包含并行马匹主页功能在内的完整 `stable` 测试 `581` 项均通过，Django check 和迁移漂移检查通过；当前未执行真实抓取、未写生产数据。
 
-`2026-07-10` `classify-english-term-gate-context` 已部署生产。该变更在英文来源 `validate_rewrite()` 生成 `core_term_missing` 前加入上下文语义判定：地区过滤仍优先；本批已审核普通英文词种子和 `MULTIREGION_TERM_GATE_COMMON_ENGLISH_TERMS` 按“普通词概率更高”处理，默认降级为 `english_term_common_word_downgraded` warning；只有 `wins / returns / runs / targets / entered` 等强动作上下文才把普通词种子保守维持为 blocker。`Classic` 这类同时属于普通词和赛事 marker 的 horse term 会先走普通词上下文判断，`Contact and live updates from York` / `Live stable updates` 等弱赛马上下文不会硬挡。重校验命令 `reprocess_term_gate_blocked_articles` 已改为有界候选、批量预加载术语/alias，并输出文章级英文分类明细、真实专名阻断明细和地区 summary；`--commit` 只恢复完整门禁通过文章到可发布候选，不直接公开发布。上线前本地已通过目标测试、`manage.py check`、`openspec validate classify-english-term-gate-context --strict` 和 `git diff --check`。生产部署前已把服务器独有的移动端马匹导航修复提交合并回主线，最终上线提交为 `43898ff`；备份 `.env.backup.english-term-context-20260710_030705` 和 `backups/db/pre-english-term-context-20260710_030705.sql.gz` 均已生成且数据库备份通过 `gzip -t`。部署后 `web / worker / beat / db / redis / nginx` 正常，生产 `manage.py check`、本地 `/healthz/`、公网 `/healthz/`、首页和后台登录入口 smoke 均通过。
+`2026-07-10` `classify-english-term-gate-context` 已部署生产。该变更在英文来源 `validate_rewrite()` 生成 `core_term_missing` 前加入上下文语义判定：地区过滤仍优先；本批已审核普通英文词种子和 `MULTIREGION_TERM_GATE_COMMON_ENGLISH_TERMS` 按“普通词概率更高”处理，默认降级为 `english_term_common_word_downgraded` warning；只有 `wins / returns / runs / targets / entered` 等强动作上下文才把普通词种子保守维持为 blocker。`Classic` 这类同时属于普通词和赛事 marker 的 horse term 会先走普通词上下文判断，`Contact and live updates from York` / `Live stable updates` 等弱赛马上下文不会硬挡。重校验命令 `reprocess_term_gate_blocked_articles` 已改为有界候选、批量预加载术语/alias，并输出文章级英文分类明细、真实专名阻断明细和地区 summary；`--commit` 只恢复完整门禁通过文章到可发布候选，不直接公开发布。上线前本地已通过目标测试、`manage.py check`、`旧规格流程 validate classify-english-term-gate-context --strict` 和 `git diff --check`。生产部署前已把服务器独有的移动端马匹导航修复提交合并回主线，最终上线提交为 `43898ff`；备份 `.env.backup.english-term-context-20260710_030705` 和 `backups/db/pre-english-term-context-20260710_030705.sql.gz` 均已生成且数据库备份通过 `gzip -t`。部署后 `web / worker / beat / db / redis / nginx` 正常，生产 `manage.py check`、本地 `/healthz/`、公网 `/healthz/`、首页和后台登录入口 smoke 均通过。
 
-生产完整只读 dry-run 已完成，产物目录为 `runtime/multiregion_candidate_audit/reprocess_full_dryrun_20260710_030944/`，本次未执行 `--commit`、未恢复候选、未公开发布。四地区旧 `core_term_missing` 候选合计 `146` 篇，其中 dry-run 后完整门禁通过、可恢复为发布候选的为 `37` 篇：香港 `3/17`、英国 `5/37`、美国 `22/79`、法国 `7/13`；仍阻断 `109` 篇。普通词降级命中合计 `142` 次，仍保留真实专名 blocker 合计 `549` 次。OpenSpec change 已归档到 `openspec/changes/archive/2026-07-10-classify-english-term-gate-context/`，正式规格已同步到 `openspec/specs/automation-publish-gates/spec.md`。下一步如要实际恢复文章，应先人工抽检 dry-run JSON，确认无真实马名、赛事名或人物名被误降级，再按地区小批执行 `--commit`。
+生产完整只读 dry-run 已完成，产物目录为 `runtime/multiregion_candidate_audit/reprocess_full_dryrun_20260710_030944/`，本次未执行 `--commit`、未恢复候选、未公开发布。四地区旧 `core_term_missing` 候选合计 `146` 篇，其中 dry-run 后完整门禁通过、可恢复为发布候选的为 `37` 篇：香港 `3/17`、英国 `5/37`、美国 `22/79`、法国 `7/13`；仍阻断 `109` 篇。普通词降级命中合计 `142` 次，仍保留真实专名 blocker 合计 `549` 次。旧规格流程 change 已归档到 `旧规格流程/changes/archive/2026-07-10-classify-english-term-gate-context/`，正式规格已同步到 `旧规格流程/specs/automation-publish-gates/spec.md`。下一步如要实际恢复文章，应先人工抽检 dry-run JSON，确认无真实马名、赛事名或人物名被误降级，再按地区小批执行 `--commit`。
 `2026-07-10` 已做一次只读数据续抓盘点，本次未执行生产抓取、未写库、未部署。当前已经批量处理过的数据主线包括：新闻源抓取与多地区新闻源探测、术语种子与候选池审计、2026 五地区重要赛事基础表、部分赛事详情出走表/赛果、HKJC / Sporting Life / Geny / HRN 外部赛马数据库 proof / dry-run，以及已发布文章术语回填。后续继续抓取建议优先放在结构化赛事数据，而不是盲目扩大新闻抓取：第一优先补英国 / 法国赛事详情和五地区历届冠军；第二优先恢复 HKJC 长窗口 dry-run 并按审计门禁判断是否进入 commit；第三优先按 runbook 开始英国、法国、美国最近 60 天外部赛马数据库完整 dry-run。新闻侧继续常态观察来源健康和门禁原因即可。
 
 `2026-07-10` 已完成英法赛事详情候选的只读覆盖校验，并生成离线审计产物 `runtime/race_event_detail_imports/2026/coverage-audit-20260710/`。英国基础赛事共 `202` 场（Flat `138`、Jump `64`），CSV 状态已完赛 `123` 场；现有 Sporting Life 详情候选规范合并后 `122` 场，所有候选 slug 均能回到基础赛事，规范候选内无重复 slug、无 source URL 一对多映射。英国缺口为 `uk-bha-jump-2026-0206-016 / Jane Seymour Nov. Hurdle`，另有 `2026-07-09` 至 `2026-07-10` 已到日期但 CSV 仍为 `scheduled` 的 Flat 赛事 `5` 场，后续应刷新 Sporting Life 结果页后再补。法国基础赛事共 `173` 场，CSV 状态已完赛 `74` 场；ZEturf 候选原始记录 `80` 条，存在 `6` 个重复 slug，规范合并后 `74` 场，已覆盖全部已完赛法国赛事且候选均回到基础赛事，规范候选内无 source URL 一对多映射。法国重复中 `fr-france-galop-2026-0705-044` 曾有一条误配到 `Prix des Côteaux de Saint-Cloud` 的候选，规范包已保留匹配 `Grand Prix de Saint-Cloud` 的 `R1C5` 版本。规范候选包为 `uk_canonical_detail_candidates_20260710.jsonl` 与 `france_canonical_detail_candidates_20260710.jsonl`；本地 `import_race_event_detail_candidates --dry-run` 因本地 sqlite 未加载生产 `RaceEvent` 行而无法执行，生产 dry-run 前仍需在生产库上重新校验。
 
 `2026-07-10` 生产复核发现英法赛事详情实际上已完成正式导入：生产 `RaceEventRunner=5096`、`RaceEventResult=4572`、`RaceEventHistoryWinner=5731`、`RaceEventDataCandidate=2913`，其中英国已应用 `sporting_life` 116 组和 `sporting_life_gap` 6 组，法国已应用 `zeturf` 候选；英国 `Jane Seymour Nov. Hurdle` 当前生产状态为 `cancelled`，不是需补赛果的 finished 缺口。复核同时发现 `fr-france-galop-2026-0705-044 / GRAND PRIX DE SAINT-CLOUD` 的出走表和赛果已被正确 R1C5 覆盖，但 `RaceEventHistoryWinner` 中 `2026` 年冠军仍残留早先误配 R1C4 的 `ZELMAN`。已在生产生成单场修复 JSONL `grand_prix_saint_cloud_history_repair_20260710.jsonl`，dry-run 通过 `events=1 modules=1 items={"history_winners": 7}`；写入前备份 `backups/db/pre-race-detail-gpsc-history-repair-20260710_025949.sql.gz`（约 `96M`）且 `gzip -t` 通过；正式 apply 成功 `events=1 candidates=1 applied=1`，新增 applied candidate `2914`，该赛事 2026 历史冠军已修为 `CALANDAGAN`，公网 `/races/2026/fr-france-galop-2026-0705-044/` 可见 `CALANDAGAN`，本地/Host `/healthz/` 均返回 `ok`。本次没有重复导入整批英法 runners/results。
 
-`2026-07-10` 已为后续长期赛事历史回填创建并完成 OpenSpec change `orchestrate-race-event-data-crawls` 的 planning artifacts：`proposal.md`、`design.md`、`tasks.md`，以及 `race-event-data-crawl-orchestration` 新规格和 `race-event-pages` / `real-global-racing-data-ingestion` delta specs；已执行 `/plan-eng-review` 并将 change 标记为 `profile=feature`、`phase=reviewed`，review 轮次为 `1`，修正了 adapter 非统一脚本契约、深历史目标 `RaceEvent` 行预检 / draft seed 清单、五地区第一验收 fixture 覆盖三项计划风险。随后已新增 `server/stable/test_race_event_crawl_orchestration.py` 目标测试，并实现 `stable.services.race_event_crawl_orchestration` 与 `orchestrate_race_event_crawl` 管理命令，支持 `plan`、`prepare`、`audit`、`dry-run`、`apply-check`、`resume` 阶段。多轮返修后编排工具已处理：plan 自复制、adapter 相对路径和网络授权、分模块候选聚合、活跃锁判断、真实 resume、人工归因保护，以及正式门禁证据绑定。当前 adapter 会从 manifest 向标准候选和 summary 注入 provenance，并记录必需输出 SHA-256；coverage 会阻断缺失/冲突 source authority，记录候选身份和混合来源策略；结构化 `dry_run.json` 与 apply-check 强制核对同一候选哈希，不能用另一份 JSONL 或空壳日志绕过；resume 只在输入和必需输出哈希都一致时跳过，并可恢复 audit、dry-run 和 apply-check；所有阶段成功/失败都会写入同一 state。新闻入库同时补充保护：来源提升不得覆盖 `attribution_locked=true` 的人工主地区。默认 adapter registry 已覆盖 JRA/NAR/HKJC/UK Sporting Life/France ZEturf/US HRN/Equibase 的 runners/results 路径，以及 JRA/NAR/HKJC/UK Sporting Life/France Wikipedia/US TOBA 的 history_winners 路径；第一验收 plan fixture 位于 `server/stable/fixtures/race_event_crawl/first_acceptance_plan.json`，source authority 矩阵位于 `server/stable/fixtures/race_event_crawl/source_authority_matrix.json`。本轮验证为赛事编排专项测试 `29` 项、完整 `stable` 测试 `545` 项、Django check、迁移漂移检查、Python 编译、OpenSpec 严格/全量校验和 `git diff --check` 全部通过。该 change 目前仍未运行真实抓取、未写生产数据。已锁定的第一版边界：只服务 `RaceEvent*` 产品层，不写 `External*`；日本、香港、英国、法国、美国五地区都要参与第一验收小批；第一阶段不含 Listed；`runners`、`results`、`history_winners` 三模块同历史深度推进；历史 series 必须显式 mapping；长周期运行默认手动分批 / 一次性容器，不做 Celery Beat 或无人值守 apply。
+`2026-07-10` 已为后续长期赛事历史回填创建并完成 旧规格流程 change `orchestrate-race-event-data-crawls` 的 planning artifacts：`proposal.md`、`design.md`、`tasks.md`，以及 `race-event-data-crawl-orchestration` 新规格和 `race-event-pages` / `real-global-racing-data-ingestion` delta specs；已执行 `/plan-eng-review` 并将 change 标记为 `profile=feature`、`phase=reviewed`，review 轮次为 `1`，修正了 adapter 非统一脚本契约、深历史目标 `RaceEvent` 行预检 / draft seed 清单、五地区第一验收 fixture 覆盖三项计划风险。随后已新增 `server/stable/test_race_event_crawl_orchestration.py` 目标测试，并实现 `stable.services.race_event_crawl_orchestration` 与 `orchestrate_race_event_crawl` 管理命令，支持 `plan`、`prepare`、`audit`、`dry-run`、`apply-check`、`resume` 阶段。多轮返修后编排工具已处理：plan 自复制、adapter 相对路径和网络授权、分模块候选聚合、活跃锁判断、真实 resume、人工归因保护，以及正式门禁证据绑定。当前 adapter 会从 manifest 向标准候选和 summary 注入 provenance，并记录必需输出 SHA-256；coverage 会阻断缺失/冲突 source authority，记录候选身份和混合来源策略；结构化 `dry_run.json` 与 apply-check 强制核对同一候选哈希，不能用另一份 JSONL 或空壳日志绕过；resume 只在输入和必需输出哈希都一致时跳过，并可恢复 audit、dry-run 和 apply-check；所有阶段成功/失败都会写入同一 state。新闻入库同时补充保护：来源提升不得覆盖 `attribution_locked=true` 的人工主地区。默认 adapter registry 已覆盖 JRA/NAR/HKJC/UK Sporting Life/France ZEturf/US HRN/Equibase 的 runners/results 路径，以及 JRA/NAR/HKJC/UK Sporting Life/France Wikipedia/US TOBA 的 history_winners 路径；第一验收 plan fixture 位于 `server/stable/fixtures/race_event_crawl/first_acceptance_plan.json`，source authority 矩阵位于 `server/stable/fixtures/race_event_crawl/source_authority_matrix.json`。本轮验证为赛事编排专项测试 `29` 项、完整 `stable` 测试 `545` 项、Django check、迁移漂移检查、Python 编译、旧规格流程 严格/全量校验和 `git diff --check` 全部通过。该 change 目前仍未运行真实抓取、未写生产数据。已锁定的第一版边界：只服务 `RaceEvent*` 产品层，不写 `External*`；日本、香港、英国、法国、美国五地区都要参与第一验收小批；第一阶段不含 Listed；`runners`、`results`、`history_winners` 三模块同历史深度推进；历史 series 必须显式 mapping；长周期运行默认手动分批 / 一次性容器，不做 Celery Beat 或无人值守 apply。
 
-`2026-07-10` 第三轮赛事编排审查返修已实现并完成本地验证：run 在网络请求前根据 plan 独立生成绑定 plan SHA-256 的 `expected_targets.json` 与运营 review CSV，清单包含赛事中英文名、年份、地区、slug 和预检状态；coverage 以该清单为固定分母，空候选、缺少应到目标、出现计划外候选或 series 不一致均 fail closed。prepare 会把全部 adapter 的标准候选汇总为 `combined_candidates.jsonl`，audit / dry-run 默认复用该文件；plan 的 batch/rate limit 已从“仅记录配置”改为真实执行，全部默认网络 adapter 共享 run 级 `request_budget.json`，累计达到上限或预算证据损坏时停止请求。第一验收会逐地区检查三模块 adapter 覆盖，apply-check 会验证真实备份文件、gzip 通过和 `diff_review.status=approved`。英文门禁同时修复 ignored alias 连带豁免同记录其他可信专名的问题。目标回归 `40` 项、完整 `stable` 回归 `555` 项、Django check、迁移漂移、Python 编译、两个 change 严格校验、全量 OpenSpec `19` 项和 diff 检查全部通过。当前仍未进行真实网络抓取、生产写入或部署；第一批真实抓取前需由用户审核应到清单，技术性证据由工程侧负责。
+`2026-07-10` 第三轮赛事编排审查返修已实现并完成本地验证：run 在网络请求前根据 plan 独立生成绑定 plan SHA-256 的 `expected_targets.json` 与运营 review CSV，清单包含赛事中英文名、年份、地区、slug 和预检状态；coverage 以该清单为固定分母，空候选、缺少应到目标、出现计划外候选或 series 不一致均 fail closed。prepare 会把全部 adapter 的标准候选汇总为 `combined_candidates.jsonl`，audit / dry-run 默认复用该文件；plan 的 batch/rate limit 已从“仅记录配置”改为真实执行，全部默认网络 adapter 共享 run 级 `request_budget.json`，累计达到上限或预算证据损坏时停止请求。第一验收会逐地区检查三模块 adapter 覆盖，apply-check 会验证真实备份文件、gzip 通过和 `diff_review.status=approved`。英文门禁同时修复 ignored alias 连带豁免同记录其他可信专名的问题。目标回归 `40` 项、完整 `stable` 回归 `555` 项、Django check、迁移漂移、Python 编译、两个 change 严格校验、全量 旧规格流程 `19` 项和 diff 检查全部通过。当前仍未进行真实网络抓取、生产写入或部署；第一批真实抓取前需由用户审核应到清单，技术性证据由工程侧负责。
 
 `2026-07-08` 本地已修复 2026 赛事历届冠军 / 缺口详情候选生成工具的 apply 前安全问题：`prepare_jra_history_winner_candidates.py`、`prepare_hkjc_history_winner_candidates.py`、`prepare_nar_history_winner_candidates.py`、`prepare_uk_sportinglife_history_winner_candidates.py`、`prepare_us_toba_history_winner_candidates.py` 和 `prepare_france_wikipedia_history_winner_candidates.py` 在年份、马季、previous-winners 链路或 Wikipedia 赛事页出现中途错误时，默认跳过相关赛事并记录 `partial_*` skipped，不再生成半截 `history_winners` 候选后在正式 apply 中替换掉已有完整数据；如确需人工接受部分历史，可显式使用 `--allow-partial-history` 并在 metadata 中保留 diagnostics。`prepare_uk_sportinglife_gap_candidates.py` 现在会在 Sporting Life 详情解析出空出走表或空赛果时写入 `skipped`，不再生成可 apply 的空 runners/results 候选，避免覆盖已有赛事详情。`.gitignore` 已补充 `runtime/race_event_history_imports/` 与 `runtime/term_review/`，防止历史冠军 HTML/cache、review CSV/JSON、术语 snapshot 等运行产物被误提交；可复用脚本仍保留在 `runtime/tools/`。
 
 `2026-07-10` 已按用户抽检结论处理候选池 raw 分类结果：`raw_classified_term_candidates_candidate_pool_20260701_20260707.csv` 中 `is_likely_term=yes` 的 `369` 条全部为 `existing_termbase_residual` 且均有 `existing_term_id`；进一步生产只读核对显示对应 `350` 个唯一 `TermEntry` 当前全部存在且 active，因此无需新增术语库记录。`is_likely_term=no` 的 `89` 条已确认为非术语；本地代码新增 `MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS` 默认配置，并在发布校验中将命中该配置的 source term 记为 `non_term_gate_ignored` / `info`，不参与 `core_term_missing` / `background_term_missing` 阻断。该列表覆盖本次 raw no 类中的 HTML/布局片段、源站/导航/产品噪声、普通赛马词、片段/普通词等；`review` 类暂不处理，尤其暂无翻译的马名不批量创建中文译名。本地验证已通过目标测试、`manage.py check` 和 settings 默认值读取；本次未写生产术语库、未部署生产、未回填文章字段。
 
-`2026-07-07` OpenSpec change `fix-tdn-france-search-date-freshness` 已完成实现并部署生产，用于修复法国 `tdn_france_broad` 抓入历史旧文的问题。根因是 TDN WordPress search API 返回相关性历史结果且 search item 不带发布时间；修复后 `TDNFranceKeywordAdapter` / `TDNFranceBroadKeywordAdapter` 会用 search item 的 `id` 或 `_links.self` 二次读取 post API 的真实 `date_gmt/date`，缺失真实日期的条目会跳过，超过 3 天新鲜度窗口的历史旧文也会跳过，且 listing 阶段跳过会写入 `CrawlJob` / `NewsSource.last_crawl_message`，不再兜底为当前时间。本地验证已通过目标测试、`DB_ENGINE=sqlite python manage.py check`、完整 `stable` 测试 `493` 项、`openspec validate fix-tdn-france-search-date-freshness --strict`、`openspec validate --all` 和 `git diff --check`。生产服务器 `/opt/umanewsbot` 已通过 bundle 从 `96fde81` 快进到 `ad587ce` 并重建 `web / worker / beat`；部署前数据库备份为 `backups/db/pre-tdn-france-freshness-20260707_223913.sql.gz` 且 `gzip -t` 通过，外部导入运行数和锁均为 `0`。已将误发布的历史旧文 `7255/7263/7264/7265/7271` 标记为 `withdrawn`、清空 `published_to_web_at` 并写入清理原因，公网 `/news/<id>/` 均返回 `404`。`NewsSource#21 TDN 法国宽关键词英文新闻` 已重新启用：`enabled=true`、`production_approved=true`、`manual_pause_reason=""`。线上只读探测当前为 HTTP `200` 但 `empty_sample`，真实抓取 `CrawlJob#9445` 成功，`new_count=0`、`seen_count=0`、`skipped_count=80`，首条原因 `stale_published_at`，无新增文章，确认 2020/2022 等历史旧文已被过滤而非入库。
+`2026-07-07` 旧规格流程 change `fix-tdn-france-search-date-freshness` 已完成实现并部署生产，用于修复法国 `tdn_france_broad` 抓入历史旧文的问题。根因是 TDN WordPress search API 返回相关性历史结果且 search item 不带发布时间；修复后 `TDNFranceKeywordAdapter` / `TDNFranceBroadKeywordAdapter` 会用 search item 的 `id` 或 `_links.self` 二次读取 post API 的真实 `date_gmt/date`，缺失真实日期的条目会跳过，超过 3 天新鲜度窗口的历史旧文也会跳过，且 listing 阶段跳过会写入 `CrawlJob` / `NewsSource.last_crawl_message`，不再兜底为当前时间。本地验证已通过目标测试、`DB_ENGINE=sqlite python manage.py check`、完整 `stable` 测试 `493` 项、`旧规格流程 validate fix-tdn-france-search-date-freshness --strict`、`旧规格流程 validate --all` 和 `git diff --check`。生产服务器 `/opt/umanewsbot` 已通过 bundle 从 `96fde81` 快进到 `ad587ce` 并重建 `web / worker / beat`；部署前数据库备份为 `backups/db/pre-tdn-france-freshness-20260707_223913.sql.gz` 且 `gzip -t` 通过，外部导入运行数和锁均为 `0`。已将误发布的历史旧文 `7255/7263/7264/7265/7271` 标记为 `withdrawn`、清空 `published_to_web_at` 并写入清理原因，公网 `/news/<id>/` 均返回 `404`。`NewsSource#21 TDN 法国宽关键词英文新闻` 已重新启用：`enabled=true`、`production_approved=true`、`manual_pause_reason=""`。线上只读探测当前为 HTTP `200` 但 `empty_sample`，真实抓取 `CrawlJob#9445` 成功，`new_count=0`、`seen_count=0`、`skipped_count=80`，首条原因 `stale_published_at`，无新增文章，确认 2020/2022 等历史旧文已被过滤而非入库。
 
-`2026-07-07` 已在 worktree `/Users/mentianlu/.codex/worktrees/race-detail-page/umanews` 本地实现 OpenSpec change `horse-profile-page-mvp`。新增 `HorseProfile`、`HorseProfileDataCandidate`、`HorseRaceRecord`、`HorseRaceLink`、`ArticleHorseLink` 和 `HorseFollow`，迁移为 `stable.0022_horseprofile_horsefollow_articlehorselink_and_more`；P0 马由 `generate_horse_profiles` 从 active horse `TermEntry` 生成草稿，默认不前台可见，管理员可在 `/admin/horse-profiles/` 审核、补资料、维护参赛履历/新闻关联并手动发布，空壳也允许强制发布。公开入口新增 `/horses/`、`/horses/<id>/`、`/horses/follows/`，URL 只使用唯一 ID；新闻详情页展示已发布马匹 tag，首页新增“我的关注”模块，匿名关注只在 cookie 中保存签名 token，数据库只存 `token_hash`，可包含关注马的子孙代新闻。外部补全采用“本地 ExternalHorse/ExternalHorseAlias 缓存 + dry-run artifact + 人工审核后 commit”的门禁，`complete_horse_profiles` 会输出全局/按地区完整二代成功率、未补全占比、逐马失败原因和 source URL；commit 必须指定 `--artifact --confirm-reviewed-artifact`。KeibaScraper 调研结果：`new-village/KeibaScraper` 当前为 Apache-2.0、PyPI 3.1.5（2026-05-13 发布）、项目说明提示请求会给 netkeiba 带来负载，因此只作为受控 `external_horse_data` 导入链路的数据源，不让公开页或审核页直接访问第三方。本地验证已通过 `DB_ENGINE=sqlite python manage.py check`、`DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable.tests.HorseProfilePageMvpTests --noinput`（8 项）和完整 `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable --noinput`（498 项）。
+`2026-07-07` 已在 worktree `/Users/mentianlu/.codex/worktrees/race-detail-page/umanews` 本地实现 旧规格流程 change `horse-profile-page-mvp`。新增 `HorseProfile`、`HorseProfileDataCandidate`、`HorseRaceRecord`、`HorseRaceLink`、`ArticleHorseLink` 和 `HorseFollow`，迁移为 `stable.0022_horseprofile_horsefollow_articlehorselink_and_more`；P0 马由 `generate_horse_profiles` 从 active horse `TermEntry` 生成草稿，默认不前台可见，管理员可在 `/admin/horse-profiles/` 审核、补资料、维护参赛履历/新闻关联并手动发布，空壳也允许强制发布。公开入口新增 `/horses/`、`/horses/<id>/`、`/horses/follows/`，URL 只使用唯一 ID；新闻详情页展示已发布马匹 tag，首页新增“我的关注”模块，匿名关注只在 cookie 中保存签名 token，数据库只存 `token_hash`，可包含关注马的子孙代新闻。外部补全采用“本地 ExternalHorse/ExternalHorseAlias 缓存 + dry-run artifact + 人工审核后 commit”的门禁，`complete_horse_profiles` 会输出全局/按地区完整二代成功率、未补全占比、逐马失败原因和 source URL；commit 必须指定 `--artifact --confirm-reviewed-artifact`。KeibaScraper 调研结果：`new-village/KeibaScraper` 当前为 Apache-2.0、PyPI 3.1.5（2026-05-13 发布）、项目说明提示请求会给 netkeiba 带来负载，因此只作为受控 `external_horse_data` 导入链路的数据源，不让公开页或审核页直接访问第三方。本地验证已通过 `DB_ENGINE=sqlite python manage.py check`、`DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable.tests.HorseProfilePageMvpTests --noinput`（8 项）和完整 `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable --noinput`（498 项）。
 
 `2026-07-08` 已完成 `horse-profile-page-mvp` 本地审查修复：`complete_horse_profiles --dry-run` 不再默认截断为 100 条，未传 `--limit` 时覆盖所有地区全部 P0 马；马名和术语匹配统一对拉丁字母大小写不敏感；关注列表、首页关注模块和关注流只返回仍为 `published` 的马匹及其公开子孙代，后台下线或隐藏后不会继续在前台关注面泄露；补全 artifact commit 会在写库前生成 before/after diff，保留真实审计差异。补充回归测试后，本地验证通过 `DB_ENGINE=sqlite python manage.py check`、`DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable.tests.TermResolverTests stable.tests.HorseProfilePageMvpTests --noinput`（31 项）和完整 `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable --noinput`（503 项）。
 
@@ -2993,23 +3003,23 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 
 `2026-07-08` `horse-profile-page-mvp` 已部署生产提交 `2b28755`。部署前生产 `HEAD=01c0b9b`，容器健康，`manage.py check`、本地 `/healthz/`、公网 `/healthz/` 通过，`ExternalDataImportRun(status="started")=0` 且外部导入锁为空；备份 `.env` 为 `.env.backup.horse-profile-page-mvp-20260708_040446`，数据库备份为 `backups/db/pre-horse-profile-page-mvp-20260708_040503.sql.gz`（约 `85M`）并通过 `gzip -t`。已在生产 `.env` 显式设置保守默认：`HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=false`、`HORSE_PROFILE_COMPLETION_REQUEST_INTERVAL_SECONDS=8`、`HORSE_PROFILE_COMPLETION_CACHE_DIR=runtime/horse_profile_completion/cache`。部署后 `stable.0022_horseprofile_horsefollow_articlehorselink_and_more` 已应用，`web / worker / beat / db / redis / nginx` 正常，生产 `manage.py check` 通过，本地和公网 `/healthz/`、公网 `/horses/` 均返回 `200`。已执行 `generate_horse_profiles`，生成 `21596` 个 `HorseProfile`，全部为 `draft`，`published=0`；草稿样例 `/horses/1/` 返回 `404`，未登录 `/admin/horse-profiles/` 返回 `302`。历史新闻马匹关联 dry-run `--limit 500` 为 `created=0 updated=0 candidate=0`。全地区补全 dry-run 已输出到生产宿主机 `runtime/horse_profile_completion/dry-run-20260708_041343/`，覆盖 `21596` 匹 P0 马：完整二代 `0`、未补全 `21596`、未补全占比 `1.0`；原因分布为 `no_external_match=15293`、`source_unavailable=6301`、`profile_only=2`，按地区 `france/hong_kong/japan/other/united_kingdom/united_states` 的未补全占比均为 `1.0`。本次未应用补全 artifact，后续需先人工审核 `horse_profile_completion_review.csv` 后再 commit。
 
-`2026-07-08` OpenSpec change `horse-profile-page-mvp` 已归档到 `openspec/changes/archive/2026-07-08-horse-profile-page-mvp/`。归档前已将 delta spec 同步到正式规格：新增 `openspec/specs/horse-profile-pages/spec.md` 与 `openspec/specs/horse-profile-data-completion/spec.md`，并把首页关注模块、关注管理入口和新闻详情马匹 tag 要求合并到 `openspec/specs/public-home-info-feed/spec.md`。归档后 `openspec validate --all` 通过 `19` 项。
+`2026-07-08` 旧规格流程 change `horse-profile-page-mvp` 已归档到 `旧规格流程/changes/archive/2026-07-08-horse-profile-page-mvp/`。归档前已将 delta spec 同步到正式规格：新增 `旧规格流程/specs/horse-profile-pages/spec.md` 与 `旧规格流程/specs/horse-profile-data-completion/spec.md`，并把首页关注模块、关注管理入口和新闻详情马匹 tag 要求合并到 `旧规格流程/specs/public-home-info-feed/spec.md`。归档后 `旧规格流程 validate --all` 通过 `19` 项。
 
 `2026-07-10` 已将马匹详情页 MVP 最后一轮前台体验修复和两匹样本马资料上线到 UmaNews 生产服务器 `root@47.239.167.86:/opt/umanewsbot`，最终生产 `HEAD=65988b0`。本次只使用 UmaNews 服务器，未使用其他项目服务器。部署前备份 `.env.backup.horse-public-polish-20260710_010639` / `backups/db/pre-horse-public-polish-20260710_010639.sql.gz`，样本写入前备份 `backups/db/pre-horse-sample-profiles-20260710_011038.sql.gz`，移动样式修复前备份 `.env.backup.horse-mobile-polish-20260710_011811` / `backups/db/pre-horse-mobile-polish-20260710_011811.sql.gz`，均已 `gzip -t`。已发布 `春秋分` `/horses/13113/` 与 `北十字星` `/horses/3873/`，来源为用户指定 netkeiba 页面 `https://db.netkeiba.com/horse/2019105219/` 与 `https://db.netkeiba.com/horse/2022105102/`；两匹马均为 `published`、`complete_pedigree_2gen`，参赛履历分别为 `10` / `11` 条，相关新闻人工关联各 `5` 篇。浏览器验收覆盖：详情页二代血统、主胜鞍、参赛履历、相关新闻、新闻详情马匹 tag 点击、匿名关注/取消关注、关注页新闻流、`croix` / `EQUINOX` 大小写搜索、移动端一级导航和地区筛选布局；测试关注已清理，最终 `HorseFollow` 样本计数为 `0`。生产 `manage.py check`、本地和公网 `/healthz/` 均通过。
 
-`2026-07-10` 已为 P0 马资料补全专项新建独立 worktree `/Users/mentianlu/.codex/worktrees/p0-horse-info-completion/umanews`，分支 `codex/p0-horse-info-completion`，并从 `origin/main` 快进对齐旧线程最终提交 `d78fab0`（其中生产运行代码为 `65988b0`，`d78fab0` 为文档验收记录）。已创建并经 `/grill-me` 需求追问重写 OpenSpec change `complete-p0-horse-profile-data`：新版 P0 马范围为“当前 active 且有中文译名的 horse `TermEntry` + 日本/中国香港/英国/法国/美国全部历史与未来重点赛事参赛马”，重点赛事等级严格限定为 `G1/G2/G3/J-G1/J-G2/J-G3/JpnⅠ/JpnⅡ/JpnⅢ`；暂无中文译名的 P0 马允许进入补全、ready 和人工发布，翻译命中时必须保留原文而不做空中文替换。首批验收口径已改为五大地区各 10 匹完整资料马，完整资料硬门槛包含身份/P0 来源证据、基础事实字段、二代血统、完整赛事履历、主胜鞍、来源 URL、赛马生涯/同步状态和人工审核记录，`intro`、相关新闻和站内相关赛事链接不作为硬门槛。已重新执行 `plan-eng-review`（Full mode，session 2，2 个问题已修复），补充了退役/在役履历同步状态与 `docs/decisions.md` 回写任务；`.openspec.yaml` 当前 `phase=reviewed`。已通过 `openspec validate complete-p0-horse-profile-data --strict`；本 change 尚未进入代码实现或生产执行。原“下一步运行 openspec apply skill”的交接已被 `2026-07-15` 新流程取代：在安全检查点读取现存规格，补齐/更新测试用例，对未实现行为取得真实 RED 后交给 subagent 实现，再由同一需求既有代码 reviewer 会话复审。
+`2026-07-10` 已为 P0 马资料补全专项新建独立 worktree `/Users/mentianlu/.codex/worktrees/p0-horse-info-completion/umanews`，分支 `codex/p0-horse-info-completion`，并从 `origin/main` 快进对齐旧线程最终提交 `d78fab0`（其中生产运行代码为 `65988b0`，`d78fab0` 为文档验收记录）。已创建并经 `/grill-me` 需求追问重写 旧规格流程 change `complete-p0-horse-profile-data`：新版 P0 马范围为“当前 active 且有中文译名的 horse `TermEntry` + 日本/中国香港/英国/法国/美国全部历史与未来重点赛事参赛马”，重点赛事等级严格限定为 `G1/G2/G3/J-G1/J-G2/J-G3/JpnⅠ/JpnⅡ/JpnⅢ`；暂无中文译名的 P0 马允许进入补全、ready 和人工发布，翻译命中时必须保留原文而不做空中文替换。首批验收口径已改为五大地区各 10 匹完整资料马，完整资料硬门槛包含身份/P0 来源证据、基础事实字段、二代血统、完整赛事履历、主胜鞍、来源 URL、赛马生涯/同步状态和人工审核记录，`intro`、相关新闻和站内相关赛事链接不作为硬门槛。已重新执行 `plan-eng-review`（Full mode，session 2，2 个问题已修复），补充了退役/在役履历同步状态与 `docs/decisions.md` 回写任务；`.旧规格流程.yaml` 当前 `phase=reviewed`。已通过 `旧规格流程 validate complete-p0-horse-profile-data --strict`；本 change 尚未进入代码实现或生产执行。原“下一步运行 旧规格流程 apply skill”的交接已被 `2026-07-15` 新流程取代：在安全检查点读取现存规格，补齐/更新测试用例，对未实现行为取得真实 RED 后交给 subagent 实现，再由同一需求既有代码 reviewer 会话复审。
 
-`2026-07-10` 已按测试先行方式为 `complete-p0-horse-profile-data` 在 `server/stable/tests.py` 新增 RED 用例。覆盖暂无中文译名马名术语的识别/原文保留/校验阻断、五大地区重点赛事参赛马进入 P0 queue、非重点等级排除、完整资料硬门槛、在役马履历同步窗口、人工审核 artifact 幂等入库、完整后仍需人工首次发布、公开页不得触发 P0 同步/补全，以及无中文译名公开页使用原文并提示中文译名待补。本轮未实现产品代码，故未勾选 OpenSpec tasks；新增测试预期在实现前失败。当前本地仅完成 `python3 -m py_compile server/stable/tests.py` 与 `git diff --check`；Django 定向测试因当前可用 Python 环境缺少 `django` 依赖未能运行。
+`2026-07-10` 已按测试先行方式为 `complete-p0-horse-profile-data` 在 `server/stable/tests.py` 新增 RED 用例。覆盖暂无中文译名马名术语的识别/原文保留/校验阻断、五大地区重点赛事参赛马进入 P0 queue、非重点等级排除、完整资料硬门槛、在役马履历同步窗口、人工审核 artifact 幂等入库、完整后仍需人工首次发布、公开页不得触发 P0 同步/补全，以及无中文译名公开页使用原文并提示中文译名待补。本轮未实现产品代码，故未勾选 旧规格流程 tasks；新增测试预期在实现前失败。当前本地仅完成 `python3 -m py_compile server/stable/tests.py` 与 `git diff --check`；Django 定向测试因当前可用 Python 环境缺少 `django` 依赖未能运行。
 
-`2026-07-10` 已开始实现 `complete-p0-horse-profile-data` 的核心应用骨架。新增迁移 `stable.0027_p0_horse_profile_completion`：`TermEntry.translation_status` 支持无中文译名 horse term，`HorseProfile` 增加完整资料状态、赛马生涯状态、履历同步时间、完整资料审核人与自动化预留字段，新增 `HorseP0Source` 和 `HorseProfileCompletionRun`，并为 `HorseRaceRecord` 增加幂等键与 run 关联。新增 `stable.services.p0_horse_profiles`，实现本地新版 P0 来源同步、五地区重点赛事等级过滤、P0 队列预览、完整资料评估、已审核 artifact 幂等写入和人工 ready 标记；公开页仍不触网。术语解析/应用/发布校验已区分“有中文译名可替换”和“暂无中文译名需保留原文”，后台术语表单/CSV、马匹后台筛选、详情质量提示和前台无译名展示已更新；新增 `p0_horse_profiles` 管理命令。已在 `/tmp/umanews-p0-venv` 临时环境完成验证：`DB_ENGINE=sqlite manage.py check` 通过，`makemigrations --check --dry-run` 无变化，新增目标测试 `10` 项通过，旧 `HorseProfilePageMvpTests` `15` 项通过，`openspec validate complete-p0-horse-profile-data --strict`、`openspec validate --all`（20 项）和 `git diff --check` 均通过。当前尚未完成五地区真实 adapter 扩展、完整 dry-run artifact 写出、每地区 10 匹样本 dry-run、生产 commit 或人工公开验收。
+`2026-07-10` 已开始实现 `complete-p0-horse-profile-data` 的核心应用骨架。新增迁移 `stable.0027_p0_horse_profile_completion`：`TermEntry.translation_status` 支持无中文译名 horse term，`HorseProfile` 增加完整资料状态、赛马生涯状态、履历同步时间、完整资料审核人与自动化预留字段，新增 `HorseP0Source` 和 `HorseProfileCompletionRun`，并为 `HorseRaceRecord` 增加幂等键与 run 关联。新增 `stable.services.p0_horse_profiles`，实现本地新版 P0 来源同步、五地区重点赛事等级过滤、P0 队列预览、完整资料评估、已审核 artifact 幂等写入和人工 ready 标记；公开页仍不触网。术语解析/应用/发布校验已区分“有中文译名可替换”和“暂无中文译名需保留原文”，后台术语表单/CSV、马匹后台筛选、详情质量提示和前台无译名展示已更新；新增 `p0_horse_profiles` 管理命令。已在 `/tmp/umanews-p0-venv` 临时环境完成验证：`DB_ENGINE=sqlite manage.py check` 通过，`makemigrations --check --dry-run` 无变化，新增目标测试 `10` 项通过，旧 `HorseProfilePageMvpTests` `15` 项通过，`旧规格流程 validate complete-p0-horse-profile-data --strict`、`旧规格流程 validate --all`（20 项）和 `git diff --check` 均通过。当前尚未完成五地区真实 adapter 扩展、完整 dry-run artifact 写出、每地区 10 匹样本 dry-run、生产 commit 或人工公开验收。
 
 `2026-07-10` P0 核心骨架完成第二轮审查返修。马匹自动身份合并改为依赖“来源命名空间 + 外部 horse ID”强身份键，名字和地区只用于候选检索；同名马强身份键不同可建立独立资料，既有同名资料缺强身份键时保留歧义并停止自动合并。P0 来源同步支持地区作用域，普通 `--sync-sources --commit` 只新增/刷新来源，只有显式 `--full-reconcile` 才撤销全地区失效来源；queue 支持重复 `--profile-id`。完整资料评估默认按 `HORSE_PROFILE_ACTIVE_RECORD_FRESHNESS_DAYS=1` 检查在役马履历，并以每模块最新审核结论为准，新冲突会撤销 `complete_profile_full`；退役马同步日期不得早于最新赛绩。已修复赛绩来源门禁不可达、待译马名被中文 alias 误放行、术语待译状态在控制台/API 缺失等问题。专项与旧马匹页回归共 `83` 项通过；完整 `stable` 从仓库根目录以 eager 模式运行 `538` 项，仅剩 `3` 个随当前日期漂移的既有 TDN France fixture 失败。尚未执行真实 adapter 扩展、五地区各 10 匹 dry-run、生产 commit 或公开验收。
 
-`2026-07-10` 已根据代码审查和用户确认返修 P0 核心门禁。马匹地区不再参与身份唯一匹配，跨地区重点赛事复用全局唯一正式马名/alias，赛事地区只写 P0 来源且不覆盖 `HorseProfile.racing_region`；歧义身份不直接写主表。暂无中文译名 horse term 的原文保护跨地区生效，已有中文译名的歧义英文术语继续使用既有地区门禁。P0 全量同步会把本轮失效的术语/重点赛事来源标记为 `revoked` 并保留历史。完整资料现在阻止 `racing_career_status=unknown`，要求退役/在役履历同步标记、每条赛绩来源名与 URL、审核人/时间及基础资料/血统/赛事履历/主胜鞍四模块 applied 记录。artifact commit 改为顶层、行级、模块级三层审核，并区分旧赛绩接管、新增、修正和未变化；迁移为唯一旧赛绩回填幂等键，已有重复旧赛绩组转冲突且不会新增第三条，修正保存 before/after。目标与兼容测试 `20` 项、旧马匹页 `15` 项、`manage.py check`、迁移一致性、OpenSpec strict/all 和 `git diff --check` 通过。完整 `stable` 回归共 `526` 项，除 `3` 个使用 `2026-07-07` 固定发布时间、在当前日期已越过三天窗口的 TDN France 时效测试外均通过；这三个失败与本次 P0 改动无关，尚未在本专项修改。
+`2026-07-10` 已根据代码审查和用户确认返修 P0 核心门禁。马匹地区不再参与身份唯一匹配，跨地区重点赛事复用全局唯一正式马名/alias，赛事地区只写 P0 来源且不覆盖 `HorseProfile.racing_region`；歧义身份不直接写主表。暂无中文译名 horse term 的原文保护跨地区生效，已有中文译名的歧义英文术语继续使用既有地区门禁。P0 全量同步会把本轮失效的术语/重点赛事来源标记为 `revoked` 并保留历史。完整资料现在阻止 `racing_career_status=unknown`，要求退役/在役履历同步标记、每条赛绩来源名与 URL、审核人/时间及基础资料/血统/赛事履历/主胜鞍四模块 applied 记录。artifact commit 改为顶层、行级、模块级三层审核，并区分旧赛绩接管、新增、修正和未变化；迁移为唯一旧赛绩回填幂等键，已有重复旧赛绩组转冲突且不会新增第三条，修正保存 before/after。目标与兼容测试 `20` 项、旧马匹页 `15` 项、`manage.py check`、迁移一致性、旧规格流程 strict/all 和 `git diff --check` 通过。完整 `stable` 回归共 `526` 项，除 `3` 个使用 `2026-07-07` 固定发布时间、在当前日期已越过三天窗口的 TDN France 时效测试外均通过；这三个失败与本次 P0 改动无关，尚未在本专项修改。
 
 `2026-07-11` 第三轮 P0 审查返修确立两层身份原则：来源命名空间内 external horse ID 直接定位来源身份；跨来源归并数据库已有马必须完整唯一命中经术语库多语种归一的“马名 + 父名 + 母名 + 出生年份”，`racing_region` 不参与唯一性。术语识别支持外文主名、中文译名和多语言 alias；同一原名对应多个 active horse term 时保留原文、禁止任选中文译名。队列按 `HorseProfile.racing_region` 每匹马只出现一次，人工来源和重点赛事证据优先；冲突审计覆盖旧 applied 结论，通用完整度刷新不再错误降级有效的 `complete_profile_full`。身份冲突的最终持久化与处理方案以紧随其后的第四轮记录为准。
 
-`2026-07-11` 第四轮审查返修进一步修复五个身份与审核边界：同一赛事参赛记录改为优先按马号、其次按来源 external ID 分组，同名不同马号不再提前折叠；完整对账遇到参赛记录仍存在但 source URL 暂缺时保留既有 P0 来源，不误标 `revoked`；通用候选应用服务端只接受 `pending`，冲突/忽略/已应用记录不能通过直接 POST 变成 applied；人工 `complete_profile_full` 审核必须显式提供整匹马资料 URL，不能借用单场赛果 URL 给基础资料和血统背书。身份歧义采用专用 `HorseIdentityConflict`，支持无 profile 冲突、多个候选术语/资料页、赛事/马号/父母/出生年份/来源证据、pending/resolved/ignored、解决资料页、处理人和处理时间；`resolved` 必须选择最终资料页，下一次同步会按人工结论建立 P0 来源。每天 `09:20` 通知链接 Django Admin 待处理筛选。定向术语/P0/旧马匹页回归 `79` 项全部通过；完整 `stable` 回归 `556` 项仅有此前已知的 `3` 个固定日期 TDN France 时效 fixture 失败，本轮新增测试全部通过。`manage.py check`、迁移一致性、OpenSpec strict/all 和 `git diff --check` 均通过；尚未执行真实 adapter 扩展、五地区各 10 匹 dry-run、生产 commit 或公开验收。
+`2026-07-11` 第四轮审查返修进一步修复五个身份与审核边界：同一赛事参赛记录改为优先按马号、其次按来源 external ID 分组，同名不同马号不再提前折叠；完整对账遇到参赛记录仍存在但 source URL 暂缺时保留既有 P0 来源，不误标 `revoked`；通用候选应用服务端只接受 `pending`，冲突/忽略/已应用记录不能通过直接 POST 变成 applied；人工 `complete_profile_full` 审核必须显式提供整匹马资料 URL，不能借用单场赛果 URL 给基础资料和血统背书。身份歧义采用专用 `HorseIdentityConflict`，支持无 profile 冲突、多个候选术语/资料页、赛事/马号/父母/出生年份/来源证据、pending/resolved/ignored、解决资料页、处理人和处理时间；`resolved` 必须选择最终资料页，下一次同步会按人工结论建立 P0 来源。每天 `09:20` 通知链接 Django Admin 待处理筛选。定向术语/P0/旧马匹页回归 `79` 项全部通过；完整 `stable` 回归 `556` 项仅有此前已知的 `3` 个固定日期 TDN France 时效 fixture 失败，本轮新增测试全部通过。`manage.py check`、迁移一致性、旧规格流程 strict/all 和 `git diff --check` 均通过；尚未执行真实 adapter 扩展、五地区各 10 匹 dry-run、生产 commit 或公开验收。
 
 `2026-07-11` 第五轮审查返修把同场参赛身份和赛绩幂等写入升级为长期结构。`HorseP0Source` 新增持久化 `participant_key`：同场优先按马号，其次按来源 external horse ID，最后仅在赛事内马名唯一时按规范化马名识别；runner/result 先按马号、外部 ID、唯一马名分阶段配对，字段不对称时不会把同一匹马拆成两条。同场同名但不同马号即使没有外部 ID 也建立不同来源与资料页，重复同步不增生；身份纠正时旧来源标记 `revoked`，新绑定另建 active 行，保留追加式审计。赛绩写入抽到共享 `horse_race_records.upsert_race_record()`，P0 artifact 与通用人工候选均强制生成幂等键、接管唯一旧记录、拒绝重复旧记录歧义，并要求 `source_name/source_url`。定向旧马匹页/P0 回归 `59` 项全部通过；完整 `stable` 回归 `560` 项仍仅有既知 `3` 个 TDN France 固定日期 fixture 失败。`manage.py check`、迁移一致性和代码语法检查通过；真实五地区样本与生产步骤仍未执行。
 
@@ -3023,25 +3033,25 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 
 `2026-07-12` 第十轮审查返修修复三处持续运行风险。人工 `HorseP0Source` 改为按 `profile + source_type=manual` 独立 upsert，并增加条件唯一约束，多匹马依次审核不再互相撤销来源；马号冲突的所选成员无法在本轮证据中定位时，与缺 URL 使用同一恢复函数，清空无效人工结论、恢复 pending 并记录 `resolved_member_missing`；旧空键赛绩在自然字段匹配前优先扫描 `raw_payload/source_refs` external identity，同一来源 external ID 命中多条时直接报告歧义，禁止 importer 新增第三条。术语解析/旧马匹页/P0 定向回归 `99` 项通过；完整 `stable` 回归 `576` 项仅剩既知 `3` 个 TDN France 固定日期 fixture 失败。尚未部署。
 
-`2026-07-12` 按用户要求继续执行“审查 -> 修复 -> 复验”循环，直至第五轮纯审查无可操作发现。旧赛绩迁移与运行期现在从 `record.source_name` 或 `raw_payload/source_refs` 的 `source/source_name/provider/adapter` 推导有效来源命名空间，来源身份统一去空格并 `casefold()`，external ID 统一字符串化并去首尾空格；来源名只存在证据中的旧记录可被唯一接管，同 external identity 多条旧记录在 importer 和后台编辑路径都会阻断写入。P0 队列不再按完整度字符串排序，而使用明确资料缺口等级；同等级再综合人工标记、待处理候选、近 30 天已发布新闻、重点赛事证据、非空外部身份和术语优先级，并把在役过期、退役同步落后和未知生涯状态的 full profile 放入刷新层。OpenSpec `3.4` 在排序信号补齐后保持完成，尚无五地区 adapter/artifact 完整测试的 `6.2` 已恢复未完成。最终术语解析/旧马匹页/P0 定向回归 `104` 项通过；完整 `stable` 回归 `581` 项仅剩既知 `3` 个 TDN France 固定日期 fixture 失败；Django check、迁移一致性、OpenSpec strict/all 和 `git diff --check` 通过。尚未提交或部署。
+`2026-07-12` 按用户要求继续执行“审查 -> 修复 -> 复验”循环，直至第五轮纯审查无可操作发现。旧赛绩迁移与运行期现在从 `record.source_name` 或 `raw_payload/source_refs` 的 `source/source_name/provider/adapter` 推导有效来源命名空间，来源身份统一去空格并 `casefold()`，external ID 统一字符串化并去首尾空格；来源名只存在证据中的旧记录可被唯一接管，同 external identity 多条旧记录在 importer 和后台编辑路径都会阻断写入。P0 队列不再按完整度字符串排序，而使用明确资料缺口等级；同等级再综合人工标记、待处理候选、近 30 天已发布新闻、重点赛事证据、非空外部身份和术语优先级，并把在役过期、退役同步落后和未知生涯状态的 full profile 放入刷新层。旧规格流程 `3.4` 在排序信号补齐后保持完成，尚无五地区 adapter/artifact 完整测试的 `6.2` 已恢复未完成。最终术语解析/旧马匹页/P0 定向回归 `104` 项通过；完整 `stable` 回归 `581` 项仅剩既知 `3` 个 TDN France 固定日期 fixture 失败；Django check、迁移一致性、旧规格流程 strict/all 和 `git diff --check` 通过。尚未提交或部署。
 
 `2026-07-08` 已完成马匹详情页 MVP 线上浏览器验收。本次先尝试 Codex 内置浏览器访问生产页，但两次打开 `http://umafans.run/horses/` 超时；随后使用系统 Chrome headless 生成真实桌面/移动截图与 CDP 布局指标，截图保存在本地 `/tmp/umanews-horse-acceptance/`。公网复核显示 `http://umafans.run/healthz/`、`/horses/`、`/horses/follows/` 均返回 `200`，草稿样例 `/horses/1/` 返回 `404`，未登录 `/admin/horse-profiles/` 返回 `302` 到登录页，符合“P0 马默认草稿、后台审核后才公开”的策略。Chrome 验收确认桌面 `/horses/`、移动 `/horses/`、移动首页和移动草稿 404 页没有页面级横向溢出，导航 DOM 中包含“马匹”和“我的关注”；`/horses/?q=test&region=japan` 保留搜索词并正确激活日本筛选。已发现两个体验问题：`/horses/` 空状态文案仍显示“目前还没有已发布文章。”，语义应改为马匹资料；移动端顶部导航和地区筛选依赖横向滑动，功能可用但“马匹 / 我的关注”和最右侧“美国”不够显眼。因生产当前 `published=0`，未发布任何马匹详情，故无法在不改生产数据的前提下完整验收已发布详情页、关注按钮 POST、新闻详情马匹 tag 和关注新闻流；staff 后台列表/详情也因没有登录态仅验收到未登录跳转。UmaNews 生产 SSH 只以 `root@47.239.167.86` 为准，不使用其他项目服务器。
 
-`2026-07-07` OpenSpec change `hkjc-ja-alias-article-backfill` 已完成实现并部署生产。新增 `stable.services.term_maintenance`、`merge_hkjc_ja_aliases` 和 `backfill_article_terms`，用于处理 HKJC 日本马日语 alias 概念合并，以及已发布文章中文字段的术语精确回填。概念合并默认 dry-run 输出 `merge_plan.json` / review CSV / summary，正式写入必须使用已审核 `--plan-file`；apply 会重新校验 active owner 占用，只合并同类型、同中文目标、active 日语主术语的安全项，并将冗余日语主术语停用，notes 中记录 `hkjc_ja_alias_merged_into_term_id=<target>`。这也是术语库中一部分 inactive 术语的合理来源：它们不是删除，而是被更完整的正式概念吸收后的历史主术语。文章回填默认只扫描已发布文章，输出完整 before/after JSON 与人工 review CSV；正式写入必须使用已审核 `--diff-file`，或显式提供 term/article/date/source/limit 过滤范围，且默认跳过 `manually_edited_fields` 中的发布字段，不重新翻译、不调用 AI 改写、不改变发布、审核、workflow 或 QQ 推送状态。本地验证已通过 `DB_ENGINE=sqlite python manage.py check`、`DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable --noinput`（最终 `473` 项）、`openspec validate hkjc-ja-alias-article-backfill --strict` 和 `git diff --check`。生产服务器 `/opt/umanewsbot` 已部署到 `a65c1ed`；部署前备份 `.env` 为 `.env.backup.hkjc-ja-alias-backfill-20260707_184118`，数据库备份为 `backups/db/pre-hkjc-ja-alias-backfill-20260707_184118.sql.gz` 且 `gzip -t` 通过。生产 HKJC alias dry-run 为 `candidate=112 skipped=0`，正式 apply 写入 `112` 条日语 alias 并停用 `112` 条冗余日语主术语；post-apply smoke 为 `candidate=0 scanned=0`。文章回填 dry-run 扫描 `713` 篇日文已发布文章，命中 `7` 篇，计划更新 `29` 个字段、跳过 `2` 个人工字段；正式 apply 为 `updated=29 skipped=2 stale=0`。artifact 已复制到生产宿主机 `runtime/term_backfills/hkjc-ja-article-backfill-20260707_192910/`、`runtime/term_backfills/hkjc-ja-article-backfill-apply-20260707_192931/`、`runtime/term_backfills/hkjc-ja-alias-merge-postapply-smoke-20260707_192810/`。抽检确认 `Kalamatianos / カラマティアノス -> 欢快舞步` 为日本地区 active term `6443` 的 active EN/JA alias，`/news/7117/` 返回 `200` 且页面包含 `欢快舞步`；生产 `manage.py check`、本地和公网 `/healthz/` 均通过。
+`2026-07-07` 旧规格流程 change `hkjc-ja-alias-article-backfill` 已完成实现并部署生产。新增 `stable.services.term_maintenance`、`merge_hkjc_ja_aliases` 和 `backfill_article_terms`，用于处理 HKJC 日本马日语 alias 概念合并，以及已发布文章中文字段的术语精确回填。概念合并默认 dry-run 输出 `merge_plan.json` / review CSV / summary，正式写入必须使用已审核 `--plan-file`；apply 会重新校验 active owner 占用，只合并同类型、同中文目标、active 日语主术语的安全项，并将冗余日语主术语停用，notes 中记录 `hkjc_ja_alias_merged_into_term_id=<target>`。这也是术语库中一部分 inactive 术语的合理来源：它们不是删除，而是被更完整的正式概念吸收后的历史主术语。文章回填默认只扫描已发布文章，输出完整 before/after JSON 与人工 review CSV；正式写入必须使用已审核 `--diff-file`，或显式提供 term/article/date/source/limit 过滤范围，且默认跳过 `manually_edited_fields` 中的发布字段，不重新翻译、不调用 AI 改写、不改变发布、审核、workflow 或 QQ 推送状态。本地验证已通过 `DB_ENGINE=sqlite python manage.py check`、`DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable --noinput`（最终 `473` 项）、`旧规格流程 validate hkjc-ja-alias-article-backfill --strict` 和 `git diff --check`。生产服务器 `/opt/umanewsbot` 已部署到 `a65c1ed`；部署前备份 `.env` 为 `.env.backup.hkjc-ja-alias-backfill-20260707_184118`，数据库备份为 `backups/db/pre-hkjc-ja-alias-backfill-20260707_184118.sql.gz` 且 `gzip -t` 通过。生产 HKJC alias dry-run 为 `candidate=112 skipped=0`，正式 apply 写入 `112` 条日语 alias 并停用 `112` 条冗余日语主术语；post-apply smoke 为 `candidate=0 scanned=0`。文章回填 dry-run 扫描 `713` 篇日文已发布文章，命中 `7` 篇，计划更新 `29` 个字段、跳过 `2` 个人工字段；正式 apply 为 `updated=29 skipped=2 stale=0`。artifact 已复制到生产宿主机 `runtime/term_backfills/hkjc-ja-article-backfill-20260707_192910/`、`runtime/term_backfills/hkjc-ja-article-backfill-apply-20260707_192931/`、`runtime/term_backfills/hkjc-ja-alias-merge-postapply-smoke-20260707_192810/`。抽检确认 `Kalamatianos / カラマティアノス -> 欢快舞步` 为日本地区 active term `6443` 的 active EN/JA alias，`/news/7117/` 返回 `200` 且页面包含 `欢快舞步`；生产 `manage.py check`、本地和公网 `/healthz/` 均通过。
 
-`2026-07-07` 本地已实现并准备上线 OpenSpec change `expand-france-news-sources`。该变更为法国新增 `tdn_france_broad` 英文补充来源：使用 TDN 公开 WordPress 搜索 API 聚合 `French racing`、`ParisLongchamp`、`Deauville`、`Chantilly` 等关键词，`canonical_source_site=tdn`，通过 URL / source_article_id 复用既有 TDN 去重，默认 `enabled=false`、`production_approved=false`，需灰度启用后才进入生产抓取。真实只读探测显示 `tdn_france_broad` accepted：HTTP `200`、列表 `20` 条、详情样本 `2` 条、最大正文长度 `12735`、重复数 `0`；`at_the_races_france` 当前仍因 HTTP `403 / Client Challenge` 标记为 deferred/access_limited，不生产批准。探测命令已输出 `status/deferred_reason/http_status/final_url/parse_quality/duplicate_ratio/query_errors/sample_errors`，并支持多关键词来源在部分关键词失败时记录 `query_errors`、单篇详情样本失败时记录 `detail_error_count` 后继续采样后续文章；国际新闻来源生产抓取已改为“单篇详情解析失败则跳过并继续处理其他文章，全部详情都失败才将来源标记为 failed”，避免一篇坏详情拖垮整轮来源或把全失败伪装成无新稿。来源同步新增 `MULTIREGION_SUPPORTED_PRODUCTION_SOURCE_LANGUAGES=ja,en,zh-hant` 保护，法语源即使误配置 production approved 也会降级为未批准并写 `source_language_not_supported`；法国审计摘要可区分成功无新增、解析失败来源 ID、门禁 blocker 和示例文章。
+`2026-07-07` 本地已实现并准备上线 旧规格流程 change `expand-france-news-sources`。该变更为法国新增 `tdn_france_broad` 英文补充来源：使用 TDN 公开 WordPress 搜索 API 聚合 `French racing`、`ParisLongchamp`、`Deauville`、`Chantilly` 等关键词，`canonical_source_site=tdn`，通过 URL / source_article_id 复用既有 TDN 去重，默认 `enabled=false`、`production_approved=false`，需灰度启用后才进入生产抓取。真实只读探测显示 `tdn_france_broad` accepted：HTTP `200`、列表 `20` 条、详情样本 `2` 条、最大正文长度 `12735`、重复数 `0`；`at_the_races_france` 当前仍因 HTTP `403 / Client Challenge` 标记为 deferred/access_limited，不生产批准。探测命令已输出 `status/deferred_reason/http_status/final_url/parse_quality/duplicate_ratio/query_errors/sample_errors`，并支持多关键词来源在部分关键词失败时记录 `query_errors`、单篇详情样本失败时记录 `detail_error_count` 后继续采样后续文章；国际新闻来源生产抓取已改为“单篇详情解析失败则跳过并继续处理其他文章，全部详情都失败才将来源标记为 failed”，避免一篇坏详情拖垮整轮来源或把全失败伪装成无新稿。来源同步新增 `MULTIREGION_SUPPORTED_PRODUCTION_SOURCE_LANGUAGES=ja,en,zh-hant` 保护，法语源即使误配置 production approved 也会降级为未批准并写 `source_language_not_supported`；法国审计摘要可区分成功无新增、解析失败来源 ID、门禁 blocker 和示例文章。
 
-`2026-07-07` 本地已实现并准备上线 OpenSpec change `fix-english-term-gate-region-filter`。该变更针对香港、英国、美国等英文新闻被 `core_term_missing` 大量误挡的问题：英文发布校验第一版只检查文章同地区术语和 `racing_region=""` 全局术语；`class/content/link/agent/oaks/america/numbers` 等配置化高歧义英文词会降级为 warning，不再默认生成硬 blocker；未配置的短词 / 全大写词只有在非核心命中时才会派生降级，真正同地区 / 全局高可信核心马名、赛事名等缺失仍会阻断自动发布。新增 `reprocess_term_gate_blocked_articles` 管理命令，可对最近发布候选回看窗口内、因术语 blocker 进入人工审核的文章执行 dry-run 或 commit 重校验，commit 只会重新进入 `publish_ready` 候选并写 `ranked_revived_at`，不会直接公开发布文章。生产审计摘要已增加 `articles.gate_issues`，用于区分真实 blocker、高歧义降级和地区排除。上线后需只读验证香港、英国、美国最近窗口的 `core_term_missing` blocker、`publish_ready` 和公开数量。
+`2026-07-07` 本地已实现并准备上线 旧规格流程 change `fix-english-term-gate-region-filter`。该变更针对香港、英国、美国等英文新闻被 `core_term_missing` 大量误挡的问题：英文发布校验第一版只检查文章同地区术语和 `racing_region=""` 全局术语；`class/content/link/agent/oaks/america/numbers` 等配置化高歧义英文词会降级为 warning，不再默认生成硬 blocker；未配置的短词 / 全大写词只有在非核心命中时才会派生降级，真正同地区 / 全局高可信核心马名、赛事名等缺失仍会阻断自动发布。新增 `reprocess_term_gate_blocked_articles` 管理命令，可对最近发布候选回看窗口内、因术语 blocker 进入人工审核的文章执行 dry-run 或 commit 重校验，commit 只会重新进入 `publish_ready` 候选并写 `ranked_revived_at`，不会直接公开发布文章。生产审计摘要已增加 `articles.gate_issues`，用于区分真实 blocker、高歧义降级和地区排除。上线后需只读验证香港、英国、美国最近窗口的 `core_term_missing` blocker、`publish_ready` 和公开数量。
 
-`2026-07-07` OpenSpec changes `expand-france-news-sources` 与 `fix-english-term-gate-region-filter` 已部署生产。生产因 GitHub HTTPS 连接超时，改用本地 `git bundle` 将提交 `bfc3445` 传入 `/opt/umanewsbot` 并 fast-forward 部署；部署前数据库备份为 `backups/db/pre-france-source-term-gate-20260707_200124.sql.gz`，已执行 `gzip -t`。部署后 `web / worker / beat / db / redis / nginx` 正常，`manage.py check` 通过，本地与公网 `/healthz/` 均返回 `200`。`tdn_france_broad` 生产只读探测 accepted：HTTP `200`、列表 `20` 条、详情样本 `5` 条、详情错误 `0`、重复 `0`；已在生产启用 `NewsSource#21`，设置 `enabled=true`、`production_approved=true`、`effective_crawl_interval_minutes=15`，并把 `tdn_france:access` 与 canonical 入库后的 `tdn:access` 加入 `MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES`。真实人工抓取验证因中途补生产配置重启被打断，已入库法国新来源文章 `7250-7253` 共 `4` 篇；中断的人工 `CrawlJob#9330` 已标记为 failed 并记录 `success_count=4`，错误说明为部署配置重启中断，不代表来源失败。4 篇均已补翻译并重新跑自动化，当前均为 `manual_review_required / pending_review`：其中 `7250-7252` 因真实 `core_term_missing` blocker 转人工，`7253` 因总分 `69` 转人工。最终审计文件位于生产容器 `runtime/multiregion_audit/post-france-source-term-gate-final-20260707_202851.json`：法国来源总数 `4`、启用 `3`、生产批准 `3`、paused/backoff 均为 `0`，今日法国新入库 `4`、公开 `0`，公开为 0 的原因是正常门禁转人工而非抓取或来源白名单失败。英文门禁重处理 dry-run：香港、美国、法国最近 3 小时无可释放 `core_term_missing` 候选；英国有 `1` 篇候选但仍被真实核心术语缺失阻断，未执行 commit。
+`2026-07-07` 旧规格流程 changes `expand-france-news-sources` 与 `fix-english-term-gate-region-filter` 已部署生产。生产因 GitHub HTTPS 连接超时，改用本地 `git bundle` 将提交 `bfc3445` 传入 `/opt/umanewsbot` 并 fast-forward 部署；部署前数据库备份为 `backups/db/pre-france-source-term-gate-20260707_200124.sql.gz`，已执行 `gzip -t`。部署后 `web / worker / beat / db / redis / nginx` 正常，`manage.py check` 通过，本地与公网 `/healthz/` 均返回 `200`。`tdn_france_broad` 生产只读探测 accepted：HTTP `200`、列表 `20` 条、详情样本 `5` 条、详情错误 `0`、重复 `0`；已在生产启用 `NewsSource#21`，设置 `enabled=true`、`production_approved=true`、`effective_crawl_interval_minutes=15`，并把 `tdn_france:access` 与 canonical 入库后的 `tdn:access` 加入 `MULTIREGION_AUTO_PUBLISH_ALLOWED_SOURCES`。真实人工抓取验证因中途补生产配置重启被打断，已入库法国新来源文章 `7250-7253` 共 `4` 篇；中断的人工 `CrawlJob#9330` 已标记为 failed 并记录 `success_count=4`，错误说明为部署配置重启中断，不代表来源失败。4 篇均已补翻译并重新跑自动化，当前均为 `manual_review_required / pending_review`：其中 `7250-7252` 因真实 `core_term_missing` blocker 转人工，`7253` 因总分 `69` 转人工。最终审计文件位于生产容器 `runtime/multiregion_audit/post-france-source-term-gate-final-20260707_202851.json`：法国来源总数 `4`、启用 `3`、生产批准 `3`、paused/backoff 均为 `0`，今日法国新入库 `4`、公开 `0`，公开为 0 的原因是正常门禁转人工而非抓取或来源白名单失败。英文门禁重处理 dry-run：香港、美国、法国最近 3 小时无可释放 `core_term_missing` 候选；英国有 `1` 篇候选但仍被真实核心术语缺失阻断，未执行 commit。
 
 `2026-07-07 21:00` 线上回归复核：生产仓库 `HEAD=dcb9b90`，容器运行正常，`manage.py check`、本地/公网 `/healthz/`、首页和 `/admin/login/` 均通过；生产开关 `MULTIREGION_PRODUCTION_WINDOWS_*`、`NEWS_SOURCE_POLL_ENABLED` 均为开启，`tdn:access` 与 `tdn_france:access` 均在自动发布来源白名单中。法国新来源 `tdn_france_broad` 再次只读探测 accepted，HTTP `200`、列表 `20`、详情样本 `2`、详情错误 `0`，重复率 `0.5` 是因为自然抓取已写入同批文章。自然窗口已派发 `CrawlJob#9355`，截至复核时仍为 `started`，但已通过 `source_config=21` 入库 `10` 篇法国文章，其中 `9` 篇已翻译、`1` 篇翻译中；Celery active 显示该 crawl task 正在 worker 内运行，worker 日志持续出现 SiliconFlow `200 OK`，因此判断为“单轮处理耗时偏长但仍在推进”，不是来源不可用。最近 90 分钟五地区发布/QQ 窗口均为 succeeded，0 结果均有 `no_ready_candidates / no_eligible_articles / already_sent` 等原因；英文门禁 dry-run 复核为香港/美国无候选、英国 `7242` 仍真实 blocker、法国 `7250/7251/7252` 仍真实 blocker，无可释放误挡文章。
 
 `2026-07-07` 发现法国新来源 `tdn_france_broad` 抓入历史旧文并有旧文自动发布。根因是 TDN `/wp-json/wp/v2/search?search=French%20racing` 返回按相关性排序的历史搜索结果，search item 只有 `id/title/url`，没有 `date/date_gmt`；当前 adapter 复用 `TDNAdapter._api_datetime()`，在缺少日期时兜底为 `timezone.now()`，而详情页解析也未纠正为真实发布时间，导致 2020/2022/2023/2024 旧文被写成 `2026-07-07T14:05:04Z` 并进入发布窗口。已立即暂停生产 `NewsSource#21`：`enabled=false`、`production_approved=false`，`manual_pause_reason=paused 2026-07-07: TDN search endpoint returned historical articles without dates; old articles were stamped as current`。已确认公开受影响旧文包括：`7255` 实际 `2022-03-21`，`7263` 实际 `2020-04-07`，`7264` 实际 `2020-03-16`，`7265` 实际 `2020-03-13`，`7271` 实际 `2024-11-08`。后续修复应改为从 search item 的 `_links.self` / post `id` 二次读取 `/wp-json/wp/v2/posts/<id>` 的真实 `date_gmt`，并在 adapter 或生产抓取层丢弃超过允许新鲜度窗口的文章；修复前不要重新启用该来源。
 
-`2026-07-04` OpenSpec change `race-event-page-mvp` 已按已确认 Stitch 原型完成赛事日历 / 年度赛事详情页 MVP，并已部署生产。新增 `RaceEvent` 产品层模型、别名、出马表、赛果、历史冠军、候选资料和 `ArticleRaceLink`；公开入口为 `/races/` 与 `/races/<year>/<slug>/`，文章详情页会展示已确认关联赛事；业务后台新增 `/admin/race-events/`，支持赛事列表筛选、详情维护、候选资料应用、手动关联/移除新闻和人工移除保护。管理命令新增 `import_race_events`、`fetch_race_event_candidates` 和 `research_live_race_fields`，样例 CSV 位于 `server/stable/data/race_events_seed_sample.csv`。本地 code review 后已修复后台赛事列表筛选翻页丢参问题，并补充回归测试。生产服务器 `/opt/umanewsbot` 已部署提交 `f3c4c46`，迁移 `stable.0020_raceevent_articleracelink_raceeventalias_and_more` 已应用；已正式导入 5 条 P0/P1 赛事种子和 10 条别名，当前 `ArticleRaceLink=0`，后续新闻关联仍需自动匹配或人工维护。第一版不建设马匹数据库、完整赛果库、复杂赛事聚类或赛中实时进度。
+`2026-07-04` 旧规格流程 change `race-event-page-mvp` 已按已确认 Stitch 原型完成赛事日历 / 年度赛事详情页 MVP，并已部署生产。新增 `RaceEvent` 产品层模型、别名、出马表、赛果、历史冠军、候选资料和 `ArticleRaceLink`；公开入口为 `/races/` 与 `/races/<year>/<slug>/`，文章详情页会展示已确认关联赛事；业务后台新增 `/admin/race-events/`，支持赛事列表筛选、详情维护、候选资料应用、手动关联/移除新闻和人工移除保护。管理命令新增 `import_race_events`、`fetch_race_event_candidates` 和 `research_live_race_fields`，样例 CSV 位于 `server/stable/data/race_events_seed_sample.csv`。本地 code review 后已修复后台赛事列表筛选翻页丢参问题，并补充回归测试。生产服务器 `/opt/umanewsbot` 已部署提交 `f3c4c46`，迁移 `stable.0020_raceevent_articleracelink_raceeventalias_and_more` 已应用；已正式导入 5 条 P0/P1 赛事种子和 10 条别名，当前 `ArticleRaceLink=0`，后续新闻关联仍需自动匹配或人工维护。第一版不建设马匹数据库、完整赛果库、复杂赛事聚类或赛中实时进度。
 
-`2026-07-04` 本次赛事日历 / HKJC overseas 术语种子上线前，本地验证已通过 `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py test stable --noinput`（442 项）、`openspec validate --all`（17 项）和 `git diff --check`。生产部署前确认没有正在运行的外部数据导入和导入锁；备份 `.env` 为 `.env.backup.race-calendar-hkjc-overseas-20260704_182412`，数据库有效备份为 `backups/db/rds_horse_news_race_calendar_manual_20260704_182458.sql.gz` 并通过 `gzip -t`。部署后 `manage.py check` 通过，`showmigrations stable` 显示 `[X] 0020_raceevent_articleracelink_raceeventalias_and_more`，`web / worker / beat / db / redis / nginx` 均运行，`/healthz/`、`/races/`、`/races/2026/takarazuka-kinen/` 和 `/admin/login/` 均返回 `200`，未登录 `/admin/race-events/` 返回 `302` 到登录链路。生产容器内 HKJC overseas fixture smoke 生成 `candidate_count=9`、`conflict_count=0`、`request_count=0`、`dry_run_error_count=0`，输出目录为 `runtime/termbase_seed/hkjc-overseas-deploy-smoke-20260704_183048`；本次未把 HKJC overseas 候选导入正式术语库。
+`2026-07-04` 本次赛事日历 / HKJC overseas 术语种子上线前，本地验证已通过 `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py test stable --noinput`（442 项）、`旧规格流程 validate --all`（17 项）和 `git diff --check`。生产部署前确认没有正在运行的外部数据导入和导入锁；备份 `.env` 为 `.env.backup.race-calendar-hkjc-overseas-20260704_182412`，数据库有效备份为 `backups/db/rds_horse_news_race_calendar_manual_20260704_182458.sql.gz` 并通过 `gzip -t`。部署后 `manage.py check` 通过，`showmigrations stable` 显示 `[X] 0020_raceevent_articleracelink_raceeventalias_and_more`，`web / worker / beat / db / redis / nginx` 均运行，`/healthz/`、`/races/`、`/races/2026/takarazuka-kinen/` 和 `/admin/login/` 均返回 `200`，未登录 `/admin/race-events/` 返回 `302` 到登录链路。生产容器内 HKJC overseas fixture smoke 生成 `candidate_count=9`、`conflict_count=0`、`request_count=0`、`dry_run_error_count=0`，输出目录为 `runtime/termbase_seed/hkjc-overseas-deploy-smoke-20260704_183048`；本次未把 HKJC overseas 候选导入正式术语库。
 
 `2026-07-06` 已按“赛事日历正式填充前先线上验收、再给示例审核”的节奏完成第一步。生产 `/opt/umanewsbot` 当前 `HEAD=c996621`，`web` healthy，`worker / beat / db / redis / nginx` 正常；公网 `umafans.run/healthz/`、`/races/` 与 `/admin/login/` 均返回 `200`，`manage.py check` 通过，`stable.0020_raceevent_articleracelink_raceeventalias_and_more` 已应用。生产当前赛事模块计数为 `RaceEvent=5`、`RaceEventAlias=10`、`RaceEventRunner=0`、`RaceEventResult=0`、`RaceEventDataCandidate=0`、`ArticleRaceLink=0`，五地区各 1 条样例赛事，`ExternalDataImportRun(status="started")=0` 且导入锁为空。已从 JAIRS/JRA 官方英文页抓取 `2025 Japan Cup` 赛后样例审核包，路径为 `runtime/race_event_review_samples/japan-cup-2025-20260706/`，包含 `race_events_sample.csv`、`race_event_candidate_payload.json`、`source_official.html` 和 `README.md`；该样例为日本 G1、非 listed、非地区重赏，解析出基础资料 1 组、出走表 17 匹、正式完赛赛果 16 条。`import_race_events --dry-run` 对该 CSV 通过，候选 JSON 通过 JSON 校验。本次未写生产库；示例中 `visibility_status=draft`，且术语库/官方中文未命中 `Japan Cup` 与 `Tokyo Racecourse` 时按约定保留原文，等待人工审核补全。
 
@@ -3059,13 +3069,13 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 
 美国使用 TOBA 官方分级赛表确定 2026 已完赛范围，并以 TOBA `chart_url` 中的官方 RaceNo 辅助匹配 Horse Racing Nation track-day 页面；Equibase chart HTML/PDF 当前仍返回防护页，因此 HRN 仅作为可访问公开结果源。产物位于 `runtime/race_event_detail_imports/2026/united-states-hrn-details-20260706/`。生成并导入美国 TOBA Grade 1/2/3 已完赛 `195` 场、`1710` 条出走表、`1448` 条可确认赛果；马名展示字段已剥离 `(IRE)/(GB)/(SAF)` 等国籍后缀，原始写法保存在 `source_refs.horse_name_raw`。HRN 对 Kentucky Derby / Kentucky Oaks 等少量大赛页当前只公开出走表、不公开 payout/also-rans 结果块，本批不从 TOBA winner 字段猜完整名次，因此这些赛事可显示出走表但暂无赛果。首次 apply 因 HRN HTML 重复渲染同一出走马导致唯一马号冲突中止，已将旧 pending 候选标记为 failed，并在生成器中按 `horse_number + horse_name + horse_url` 去重后重跑成功。生产写入前备份为 `backups/db/pre-race-event-details-us-hrn-2026-20260707_000230.sql.gz`，约 `75M` 且 `gzip -t` 通过；最终正式应用 `390` 个候选模块。导入后生产详情表为 `RaceEventRunner=3260`、`RaceEventResult=2977`、`RaceEventHistoryWinner=0`、`RaceEventDataCandidate=992`、`AppliedCandidates=990`、`FailedCandidates=2`、`PendingCandidates=0`；其中美国详情为 `1710` 条出走表和 `1448` 条赛果。页面验收：`/races/2026/us-toba-2026-0108-001/` 显示 Robert J. Frankel S. 冠军 `Paradise Lake`、出走表和赛果；`/races/2026/us-toba-2026-0502-119/` 显示 Kentucky Derby 出走表但因 HRN 未公开结果块暂不显示赛果。当前顺序进度为日本、香港、美国已完成当前可用详情，下一步继续英国、法国，再处理历届冠军。
 
-`2026-06-27` 全球赛马数据库接入当前处于能力确认完成状态：香港 HKJC 已有生产真实 dry-run 批次证据，英国 Sporting Life、法国 Geny、美国 Horse Racing Nation 已完成少量真实 proof，证明四地公开入口、parser/importer、马匹详情链路、低频限量抓取和 proof-only 离线审计可用。用户已将本目标完成口径调整为“先保证所有地区的数据爬取能力真实可用”，不再要求本目标内完成最近 2 个月完整大量爬取或生产真实网络 commit。当前主工作树已同步外部缓存底座、HKJC、UK/France/US importer、fixtures、OpenSpec 归档和 proof JSON，用于后续恢复；这些同步内容仍是未提交工作树差异。交接索引见 `docs/global_racing_database_handoff.md`。
+`2026-06-27` 全球赛马数据库接入当前处于能力确认完成状态：香港 HKJC 已有生产真实 dry-run 批次证据，英国 Sporting Life、法国 Geny、美国 Horse Racing Nation 已完成少量真实 proof，证明四地公开入口、parser/importer、马匹详情链路、低频限量抓取和 proof-only 离线审计可用。用户已将本目标完成口径调整为“先保证所有地区的数据爬取能力真实可用”，不再要求本目标内完成最近 2 个月完整大量爬取或生产真实网络 commit。当前主工作树已同步外部缓存底座、HKJC、UK/France/US importer、fixtures、旧规格流程 归档和 proof JSON，用于后续恢复；这些同步内容仍是未提交工作树差异。交接索引见 `docs/global_racing_database_handoff.md`。
 
-同步后本地验证已覆盖 Django check、外部缓存底座、HKJC、UK/France/US importer、global racing isolation、proof-only 离线审计测试、OpenSpec 全量校验和 `git diff --check`；离线 commit 候选审计已加严为要求 plan-only 具备请求证据和成功响应，非 plan 批次具备请求证据、成功响应和非空 `races/entries/results/horses` coverage；四地 importer 的生产写库门禁已加严为只有 `completion.is_complete=true` 的严格布尔完成证明、completion 内部无受限停止或马匹详情缺口、completion 内含可解析 `unique_horses_found` / `horse_profiles_fetched` 计数、且 payload 具备非空 `races/entries/results/horses` coverage 时才允许 commit。HKJC、UK、France Geny、US 的 plan-only 命令均要求显式 `--allow-network`，避免误把最近 60 天拆批计划当成本地无网络操作；新增 `render_global_racing_batch_command` 只读命令，可从 plan JSON 渲染指定批次或全部批次的精确 dry-run/commit 命令，并可根据 `--output-dir` 给出稳定 `suggested_output_path` 和可直接执行的 `tee_command_line`，减少手工复制 `race_ids`、`race_urls` 或 `partants_urls` 以及覆盖批次 JSON 的风险，离线审计会忽略这类命令清单 artifact。详见 `docs/global_racing_database_handoff.md`。当前同步范围清单见 `docs/global_racing_sync_manifest.md`。
+同步后本地验证已覆盖 Django check、外部缓存底座、HKJC、UK/France/US importer、global racing isolation、proof-only 离线审计测试、旧规格流程 全量校验和 `git diff --check`；离线 commit 候选审计已加严为要求 plan-only 具备请求证据和成功响应，非 plan 批次具备请求证据、成功响应和非空 `races/entries/results/horses` coverage；四地 importer 的生产写库门禁已加严为只有 `completion.is_complete=true` 的严格布尔完成证明、completion 内部无受限停止或马匹详情缺口、completion 内含可解析 `unique_horses_found` / `horse_profiles_fetched` 计数、且 payload 具备非空 `races/entries/results/horses` coverage 时才允许 commit。HKJC、UK、France Geny、US 的 plan-only 命令均要求显式 `--allow-network`，避免误把最近 60 天拆批计划当成本地无网络操作；新增 `render_global_racing_batch_command` 只读命令，可从 plan JSON 渲染指定批次或全部批次的精确 dry-run/commit 命令，并可根据 `--output-dir` 给出稳定 `suggested_output_path` 和可直接执行的 `tee_command_line`，减少手工复制 `race_ids`、`race_urls` 或 `partants_urls` 以及覆盖批次 JSON 的风险，离线审计会忽略这类命令清单 artifact。详见 `docs/global_racing_database_handoff.md`。当前同步范围清单见 `docs/global_racing_sync_manifest.md`。
 
 `2026-07-03` 生产只读核对多地区术语库与外部马名索引：服务器 `/opt/umanewsbot` 当前 `HEAD=4323d32`，`web/worker/beat/db/redis/nginx` 均在运行。正式术语库 `TermEntry=2054`，全部为 `source_language=ja`，其中 `horse=1884`、`race=153`、`fixed_phrase=15`、`jockey=2`，`TermAlias=2057` 也全部为日文；正式术语的 `racing_region` 仍为空，尚未形成香港、英国、法国、美国分地区正式术语内容。术语候选池 `TermCandidate=3519`、证据 `13725`，当前同样全部为日文候选。外部马名索引 `ExternalHorseAlias=12425`，其中日本 `netkeiba/ja=12421`；香港 HKJC 只有小样本 `en=2`、`zh-hant=2`。外部缓存表中日本仍是主体：`ExternalHorse=12405`、`ExternalRace=4099`、`ExternalRaceEntry=60838`、`ExternalRaceResult=56882`；香港仅有 sample commit 级别的 `ExternalHorse=2`、`ExternalRace=1`、`ExternalRaceEntry=2`、`ExternalRaceResult=2`；英国、法国、美国当前生产 `External*` 表无写入。结论：多地区新闻源与语言/地区处理链路已上线，但正式术语内容和外部马名识别数据厚度仍明显以日本为主，英法美仍停在 proof/代码能力而非生产数据沉淀。
 
-`2026-07-04` OpenSpec change `prepare-termbase-seed-data` 已完成实现、验证和归档，归档目录为 `openspec/changes/archive/2026-07-03-prepare-termbase-seed-data`，正式规格已同步到 `openspec/specs/termbase-seed-data-preparation/spec.md`，并在 `openspec/specs/termbase-and-race-priority/spec.md` 追加“术语种子候选兼容正式术语导入”要求。本地首版已实现 `prepare_termbase_seed_data` 管理命令与 `stable.services.termbase_seed` 服务层，可从 HKJC/WP Stud fixture 或低频触网入口生成 `seed_candidates.csv`、`seed_conflicts.csv` 和 `summary.json`；内置 fixture smoke 生成 `10` 条候选与 `1` 条冲突，香港候选优先、日本候选最后，中文目标译名经 OpenCC 简体化。该能力边界是从 HKJC 体系和 WP Stud 准备第一批人工审核 CSV：`seed_candidates.csv` 严格兼容现有 `import_terms` 字段，`seed_conflicts.csv` 记录译名冲突；第一版不直接写生产 `TermEntry`、不触发翻译、发布或 QQ 推送。审查后已明确首版不做 HKJC `racecards` PDF/排位表全量抽取，必须先做 HKJC/WP Stud source discovery，默认输出到 `runtime/termbase_seed/<timestamp>/`，并要求网络失败摘要、繁简转换依赖落地和后台术语导入模板同步更新。代码审查修复已将命令内置 dry-run 预检调整为与 `import_terms` 默认一致的 `upsert`，并确保触网达到 `max_requests` 后停止所有后续来源。`2026-07-06` 本地 review 返修进一步修复 `SeedNetworkClient` 的 GET/POST 重试计数：失败重试尝试也会立即写入 request 明细并计入 `--max-requests`，避免超出请求预算，原始 timeout 错误保留在 `summary.requests`；同时为 HKJC/QIDS 马匹候选引入 `source:type:id` 全局实体 key，避免英文同名马误合并，IRE/CAN 等未建模地区保持 `other`，候选证据合并时每条最多保留 `10` 个 evidence sample。上线前本地验证已通过：`TermbaseSeedDataPreparationTests` 6 项、`stable` 全量 354 项、fixture smoke、`openspec validate --all` 和 `git diff --check`；本次 review 返修后追加验证 `TermbaseSeedDataPreparationTests` 21 项、`manage.py check`、`openspec validate --all` 和 `git diff --check` 通过。返修提交 `4b6e840` 已部署生产，部署前备份 `.env.backup.harden-hkjc-termbase-20260706_043557` 与 `backups/db/pre-harden-hkjc-termbase-20260706_043557.sql.gz`（约 `71M`，`gzip -t` 通过）；部署后 `/healthz/`、`manage.py check`、`/`、`/races/`、`/admin/login/` 和公网 `umafans.run/healthz/` 均通过。生产 fixture smoke 输出 `candidate_count=9`、`conflict_count=0`、`request_count=0`、`dry_run_error_count=0`、`incomplete=false`，QIDS 同英文名加拿大马 smoke 已确认不会误合并。本次未导入正式术语，生产计数保持 `TermEntry=15321`、`TermAlias=15537`。
+`2026-07-04` 旧规格流程 change `prepare-termbase-seed-data` 已完成实现、验证和归档，归档目录为 `旧规格流程/changes/archive/2026-07-03-prepare-termbase-seed-data`，正式规格已同步到 `旧规格流程/specs/termbase-seed-data-preparation/spec.md`，并在 `旧规格流程/specs/termbase-and-race-priority/spec.md` 追加“术语种子候选兼容正式术语导入”要求。本地首版已实现 `prepare_termbase_seed_data` 管理命令与 `stable.services.termbase_seed` 服务层，可从 HKJC/WP Stud fixture 或低频触网入口生成 `seed_candidates.csv`、`seed_conflicts.csv` 和 `summary.json`；内置 fixture smoke 生成 `10` 条候选与 `1` 条冲突，香港候选优先、日本候选最后，中文目标译名经 OpenCC 简体化。该能力边界是从 HKJC 体系和 WP Stud 准备第一批人工审核 CSV：`seed_candidates.csv` 严格兼容现有 `import_terms` 字段，`seed_conflicts.csv` 记录译名冲突；第一版不直接写生产 `TermEntry`、不触发翻译、发布或 QQ 推送。审查后已明确首版不做 HKJC `racecards` PDF/排位表全量抽取，必须先做 HKJC/WP Stud source discovery，默认输出到 `runtime/termbase_seed/<timestamp>/`，并要求网络失败摘要、繁简转换依赖落地和后台术语导入模板同步更新。代码审查修复已将命令内置 dry-run 预检调整为与 `import_terms` 默认一致的 `upsert`，并确保触网达到 `max_requests` 后停止所有后续来源。`2026-07-06` 本地 review 返修进一步修复 `SeedNetworkClient` 的 GET/POST 重试计数：失败重试尝试也会立即写入 request 明细并计入 `--max-requests`，避免超出请求预算，原始 timeout 错误保留在 `summary.requests`；同时为 HKJC/QIDS 马匹候选引入 `source:type:id` 全局实体 key，避免英文同名马误合并，IRE/CAN 等未建模地区保持 `other`，候选证据合并时每条最多保留 `10` 个 evidence sample。上线前本地验证已通过：`TermbaseSeedDataPreparationTests` 6 项、`stable` 全量 354 项、fixture smoke、`旧规格流程 validate --all` 和 `git diff --check`；本次 review 返修后追加验证 `TermbaseSeedDataPreparationTests` 21 项、`manage.py check`、`旧规格流程 validate --all` 和 `git diff --check` 通过。返修提交 `4b6e840` 已部署生产，部署前备份 `.env.backup.harden-hkjc-termbase-20260706_043557` 与 `backups/db/pre-harden-hkjc-termbase-20260706_043557.sql.gz`（约 `71M`，`gzip -t` 通过）；部署后 `/healthz/`、`manage.py check`、`/`、`/races/`、`/admin/login/` 和公网 `umafans.run/healthz/` 均通过。生产 fixture smoke 输出 `candidate_count=9`、`conflict_count=0`、`request_count=0`、`dry_run_error_count=0`、`incomplete=false`，QIDS 同英文名加拿大马 smoke 已确认不会误合并。本次未导入正式术语，生产计数保持 `TermEntry=15321`、`TermAlias=15537`。
 
 `2026-07-04` 术语种子数据准备已部署生产。服务器 `/opt/umanewsbot` 从 `4323d32` 快进到 `e81733f`，部署前备份 `.env` 为 `.env.backup.termbase-seed-20260704_012005`；因新增 `opencc-python-reimplemented==0.1.7`，本次重建并重启 `web / worker / beat`。部署后迁移显示 `No migrations to apply`，`manage.py check` 通过，生产容器内 fixture smoke 输出 `candidate_count=10`、`conflict_count=1`、`incomplete=false`、`dry_run_error_count=0`，首条候选为 `BEAUTY GENERATION`，末条为 `ディープインパクト`；本地和公网 `/healthz/` 均返回 `200`。本次未导入正式术语，不修改 `TermEntry`、`TermAlias`、`TermCandidate` 或外部马名索引。
 
@@ -3079,7 +3089,7 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 
 `2026-07-04` 已继续 HKJC 本地赛果回溯术语导入，用于补齐香港赛果中的历史马名、骑师名和赛事名。生成器新增 `--hkjc-local-results-start-date`、`--hkjc-local-results-end-date`、`--hkjc-local-results-skip-races` 与 `--hkjc-skip-horse-details`，并对 HKJC 赛日首页只直接展示第 1 场、链接从第 2 场开始的结构做了补抓；抓取时会同时请求 `en-us` 与 `zh-hk` 赛果页，对齐输出 `horse / jockey / race` 候选，中文目标译名转为简体。已正式导入 `2024-01` 至 `2024-07`、`2024-09` 至 `2025-07`、`2025-09` 至 `2026-07-04`；`2024-08` 与 `2025-08` 已逐日扫描且候选 `0`、失败 `0`，无需导入。`2024-07` 输出 `647` 条候选（`horse=575`、`race=49`、`jockey=23`），备份 `backups/db/pre-hkjc-local-results-202407-term-import-20260704_211425.sql.gz` 后导入新增 `74`、更新 `573`；`2024-09` 输出 `626` 条候选（`horse=549`、`race=54`、`jockey=23`），备份 `backups/db/pre-hkjc-local-results-202409-term-import-20260704_213327.sql.gz` 后导入新增 `62`、更新 `564`；`2024-10` 输出 `834` 条候选（`horse=735`、`race=75`、`jockey=24`），备份 `backups/db/pre-hkjc-local-results-202410-term-import-20260704_214522.sql.gz` 后导入新增 `104`、更新 `730`；`2024-11` 输出 `850` 条候选（`horse=757`、`race=69`、`jockey=24`），`2024-11-13 HV Race 7-9` 为 HKJC 双语空壳赛果页，已记录为 `skipped_races/local_result_not_available` 且不导入空数据，备份 `backups/db/pre-hkjc-local-results-202411-term-import-20260704_221006.sql.gz` 后导入新增 `97`、更新 `753`；`2024-12` 输出 `957` 条候选（`horse=832`、`race=78`、`jockey=47`），备份 `backups/db/pre-hkjc-local-results-202412-term-import-20260704_222551.sql.gz` 后导入新增 `135`、更新 `822`；`2025-01` 输出 `913` 条候选（`horse=804`、`race=78`、`jockey=31`），备份 `backups/db/pre-hkjc-local-results-202501-term-import-20260704_224151.sql.gz` 后导入新增 `73`、更新 `840`；`2025-02` 输出 `794` 条候选（`horse=703`、`race=60`、`jockey=31`），备份 `backups/db/pre-hkjc-local-results-202502-term-import-20260704_225443.sql.gz` 后导入新增 `38`、更新 `756`；`2025-03` 输出 `914` 条候选（`horse=803`、`race=78`、`jockey=33`），备份 `backups/db/pre-hkjc-local-results-202503-term-import-20260704_231134.sql.gz` 后导入新增 `30`、更新 `884`；`2025-04` 输出 `893` 条候选（`horse=782`、`race=78`、`jockey=33`），备份 `backups/db/pre-hkjc-local-results-202504-term-import-20260704_232559.sql.gz` 后导入新增 `58`、更新 `835`；`2025-05` 输出 `920` 条候选（`horse=816`、`race=79`、`jockey=25`），备份 `backups/db/pre-hkjc-local-results-202505-term-import-20260704_234206.sql.gz` 后导入新增 `38`、更新 `882`；`2025-06` 输出 `826` 条候选（`horse=741`、`race=63`、`jockey=22`），备份 `backups/db/pre-hkjc-local-results-202506-term-import-20260704_235659.sql.gz` 后导入新增 `44`、更新 `782`；`2025-07` 输出 `675` 条候选（`horse=603`、`race=49`、`jockey=23`），备份 `backups/db/pre-hkjc-local-results-202507-term-import-20260705_000915.sql.gz` 后导入新增 `19`、更新 `656`；`2025-09` 输出 `632` 条候选（`horse=560`、`race=49`、`jockey=23`），`2025-09-21 ST Race 9-10` 为 HKJC 双语空壳赛果页，已记录为 `skipped_races/local_result_not_available` 且不导入空数据，备份 `backups/db/pre-hkjc-local-results-202509-term-import-20260705_002604.sql.gz` 后导入新增 `17`、更新 `615`；`2025-10` 输出 `882` 条候选（`horse=786`、`race=73`、`jockey=23`），备份 `backups/db/pre-hkjc-local-results-202510-term-import-20260705_004245.sql.gz` 后导入新增 `41`、更新 `841`；`2025-11` 输出 `933` 条候选（`horse=826`、`race=81`、`jockey=26`），备份 `backups/db/pre-hkjc-local-results-202511-term-import-20260705_010022.sql.gz` 后导入新增 `45`、更新 `888`；`2025-12` 输出 `912` 条候选（`horse=803`、`race=68`、`jockey=41`），备份 `backups/db/pre-hkjc-local-results-202512-term-import-20260705_011812.sql.gz` 后导入新增 `42`、更新 `870`；`2026-01` 输出 `978` 条候选（`horse=875`、`race=78`、`jockey=25`），备份 `backups/db/pre-hkjc-local-results-202601-term-import-20260705_013522.sql.gz` 后导入新增 `28`、更新 `950`；`2026-02` 输出 `930` 条候选（`horse=836`、`race=69`、`jockey=25`），备份 `backups/db/pre-hkjc-local-results-202602-term-import-20260705_015108.sql.gz` 后导入新增 `18`、更新 `912`；`2026-03` 输出 `944` 条候选（`horse=838`、`race=81`、`jockey=25`），备份 `backups/db/pre-hkjc-local-results-202603-term-import-20260705_020814.sql.gz` 后导入新增 `18`、更新 `926`；`2026-04` 输出 `975` 条候选（`horse=859`、`race=83`、`jockey=33`），备份 `backups/db/pre-hkjc-local-results-202604-term-import-20260705_022703.sql.gz` 后导入新增 `41`、更新 `934`；`2026-05` 输出 `979` 条候选（`horse=873`、`race=80`、`jockey=26`），备份 `backups/db/pre-hkjc-local-results-202605-term-import-20260705_024451.sql.gz` 后导入新增 `33`、更新 `946`；`2026-06` 输出 `844` 条候选（`horse=757`、`race=63`、`jockey=24`），备份 `backups/db/pre-hkjc-local-results-202606-term-import-20260705_025830.sql.gz` 后导入新增 `20`、更新 `824`；`2026-07-01` 至 `2026-07-04` 输出 `310` 条候选（`horse=265`、`race=21`、`jockey=24`），备份 `backups/db/pre-hkjc-local-results-20260701-20260704-term-import-20260705_030505.sql.gz` 后导入新增 `5`、更新 `305`。以上新增批次生产 dry-run 均为错误 `0`，正式导入均为跳过 `0`。导入后生产 `TermEntry=5948`、`TermAlias=6164`，`source_language=en/racing_region=hong_kong` 合计中 `horse=2479`、`jockey=70`、`race=1132`，另保留既有 `fixed_phrase=1`、`racecourse=1`、`trainer=1`；`http://127.0.0.1/healthz/` 返回 `200`。当前 HKJC 香港本地赛果已回溯到 `2026-07-04`；仍需另行补 HKJC overseas 与 WP Stud 赛事/骑手缺口。
 
-`2026-07-04` 已创建并完成 plan-eng-review 的 OpenSpec change `prepare-hkjc-overseas-termbase-seeds`，用于把 HKJC overseas simulcast Race Card 扩展为海外马名、骑师和赛事名的官方中文术语种子来源。该 change 已完成 `proposal.md`、`design.md`、`tasks.md` 与 `termbase-seed-data-preparation` delta spec，并通过 `openspec validate prepare-hkjc-overseas-termbase-seeds --strict`；当前本地已完成代码侧实现，新增 `prepare_termbase_seed_data --source hkjc_overseas`、`--hkjc-overseas-race RaceDate=YYYY-MM-DD,Racecourse=<code>,RaceNo=<number>`、`--limit-meetings`、`--limit-races`，输出继续不写正式术语库、不写 `ExternalHorse`，并新增 `source_evidence.json` 记录 Race Card 参数、中英页面 URL、原始繁体、地区映射、horse profile 证据、跳过和失败原因。review 约束已落地：渲染 fallback 默认不引入生产浏览器硬依赖；若无可用渲染器或渲染后缓存，会记录 `render_fallback_unavailable` 并标记 `incomplete=true`。本地 fixture smoke 输出 `runtime/termbase_seed/hkjc-overseas-fixture-smoke-migrated/`，候选 `9` 条、冲突 `0`、`incomplete=false`、`dry_run_error_count=0`，并通过 `import_terms --dry-run`。后续 review 修复已明确术语种子冲突输出规则：同一实体如出现多个中文译名，`seed_candidates.csv` 只保留一个正式 `target_zh`，其他译名进入 `aliases_zh`，同时 `seed_conflicts.csv` 保留冲突证据。用户确认后已执行 HKJC overseas 低上限 live dry-run：命令使用 `--source hkjc_overseas --allow-network --limit-meetings 1 --limit-races 1 --max-requests 6 --request-interval-seconds 3 --timeout-seconds 15`，输出目录为 `runtime/termbase_seed/hkjc-overseas-live-smoke-20260704_174924/`；结果为候选 `0` 条、冲突 `0`、跳过 `0`、请求 `1` 次且入口页 `https://racing.hkjc.com/en-us/overseas/` 返回 `200`，但直接 HTML 未暴露 Race Card 链接，因此记录 `render_fallback_unavailable: no race card links in direct HTML`，`incomplete=true`，`dry_run_error_count=0`。这证明当前实现不会把 HKJC Next.js shell 误当作空数据成功；要批量取得海外 Race Card 正式候选，还需要后续补浏览器渲染缓存或解析 HKJC 前端 API。本能力尚未部署生产，live dry-run 也未写正式术语库。
+`2026-07-04` 已创建并完成 plan-eng-review 的 旧规格流程 change `prepare-hkjc-overseas-termbase-seeds`，用于把 HKJC overseas simulcast Race Card 扩展为海外马名、骑师和赛事名的官方中文术语种子来源。该 change 已完成 `proposal.md`、`design.md`、`tasks.md` 与 `termbase-seed-data-preparation` delta spec，并通过 `旧规格流程 validate prepare-hkjc-overseas-termbase-seeds --strict`；当前本地已完成代码侧实现，新增 `prepare_termbase_seed_data --source hkjc_overseas`、`--hkjc-overseas-race RaceDate=YYYY-MM-DD,Racecourse=<code>,RaceNo=<number>`、`--limit-meetings`、`--limit-races`，输出继续不写正式术语库、不写 `ExternalHorse`，并新增 `source_evidence.json` 记录 Race Card 参数、中英页面 URL、原始繁体、地区映射、horse profile 证据、跳过和失败原因。review 约束已落地：渲染 fallback 默认不引入生产浏览器硬依赖；若无可用渲染器或渲染后缓存，会记录 `render_fallback_unavailable` 并标记 `incomplete=true`。本地 fixture smoke 输出 `runtime/termbase_seed/hkjc-overseas-fixture-smoke-migrated/`，候选 `9` 条、冲突 `0`、`incomplete=false`、`dry_run_error_count=0`，并通过 `import_terms --dry-run`。后续 review 修复已明确术语种子冲突输出规则：同一实体如出现多个中文译名，`seed_candidates.csv` 只保留一个正式 `target_zh`，其他译名进入 `aliases_zh`，同时 `seed_conflicts.csv` 保留冲突证据。用户确认后已执行 HKJC overseas 低上限 live dry-run：命令使用 `--source hkjc_overseas --allow-network --limit-meetings 1 --limit-races 1 --max-requests 6 --request-interval-seconds 3 --timeout-seconds 15`，输出目录为 `runtime/termbase_seed/hkjc-overseas-live-smoke-20260704_174924/`；结果为候选 `0` 条、冲突 `0`、跳过 `0`、请求 `1` 次且入口页 `https://racing.hkjc.com/en-us/overseas/` 返回 `200`，但直接 HTML 未暴露 Race Card 链接，因此记录 `render_fallback_unavailable: no race card links in direct HTML`，`incomplete=true`，`dry_run_error_count=0`。这证明当前实现不会把 HKJC Next.js shell 误当作空数据成功；要批量取得海外 Race Card 正式候选，还需要后续补浏览器渲染缓存或解析 HKJC 前端 API。本能力尚未部署生产，live dry-run 也未写正式术语库。
 
 `2026-07-05` HKJC overseas 术语批量回溯已通过本地 QIDS GraphQL 抽取和生产 `import_terms` 正式导入完成，覆盖 `2024-01-01` 至 `2026-07-04`。生成器新增 `--hkjc-overseas-start-date` 与 `--hkjc-overseas-end-date`，会从 HKJC overseas results 发现转播赛日，再通过 HKJC QIDS `raceMeetingProfile` 对齐海外 Race Card 的英文/繁中 `horse / jockey / race`；该本地代码尚未部署生产，但生成产物已用于生产导入。月度产物合并目录为 `runtime/termbase_seed/hkjc-overseas-qids-merged-20240101-20260704/`，原始行 `11633` 条、候选 `7691` 条、冲突 `3` 条，候选结构为 `horse=6481`、`jockey=847`、`race=363`。生产导入文件为 `/opt/umanewsbot/imports/hkjc-overseas-qids-merged-20240101-20260704/seed_candidates.csv`；导入前备份为 `backups/db/pre-hkjc-overseas-qids-term-import-20260705_040238.sql.gz` 并通过 `gzip -t`；生产 dry-run 为总计 `7691`、新增 `7688`、更新 `3`、错误 `0`，正式导入为新增 `7482`、更新 `209`、跳过 `0`。因当前正式术语 upsert 身份是 `term_type + source_language + source_ja`，不是按地区拆分，同名国际骑师会被后导入地区覆盖；已用 `runtime/termbase_seed/hkjc-local-jockey-region-restore-20260705/seed_candidates.csv` 对 HKJC 本地赛果骑师做地区恢复，备份 `backups/db/pre-hkjc-local-jockey-region-restore-20260705_040950.sql.gz`，dry-run 和正式导入均为 `69` 条更新、`0` 错误/跳过。恢复后 HKJC 本地赛果覆盖仍为 `en/hong_kong horse=2479, jockey=69, race=1132`，海外 HKJC 官方来源计数为 `7483`。
 
@@ -3087,42 +3097,42 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
 
 `2026-07-06/07` 已完成 HKJC / WP Stud 术语库清洗、WP Stud HorseList 全量马名补齐和生产正式导入。返修代码让 HKJC overseas 与美国详情来源中的马名去除尾部国别后缀，例如 `A Bit Of Spirit (IRE)` 清洗为 `A Bit Of Spirit`；带年份或替代名称的复合赛事名会拆成独立术语，例如 `International Stakes` 与 `Benson & Hedges Gold Cup Stakes`；WP Stud `HorseList.html` 已作为默认来源，解析日文马名、英文别名和简体中文译名。最终审核产物位于 `runtime/termbase_seed/final-reviewed-import-20260706/`，`seed_candidates_final.csv` 共 `11257` 行，输入覆盖 HKJC `7691`、WP Stud race/jockey/racecourse `1891` 和 WP Stud HorseList `1866`；清洗统计包括去除马名国别后缀 `6481` 次、拆分年份赛事标记 `59` 次、去重 `254` 行，并生成 HKJC 日本地区英文马名日文 alias `907` 行，其中马名 `883` 行已全部找到日文名。生产服务器 `/opt/umanewsbot` 导入时 `HEAD=b1ddb54`，导入前 `TermEntry=15321`、`TermAlias=15537`，备份 `backups/db/pre-final-termbase-review-20260706_234427.sql.gz` 约 `75M` 且 `gzip -t` 通过；正式脚本先清理既有脏 active 术语，再执行 `import_terms`，结果为新增 `1169`、更新 `10088`、错误/跳过 `0`。导入后生产 `TermEntry=16558`、`TermAlias=19293`、active `TermEntry=16428`，active 马名国别后缀术语 `0`、active 赛事年份标记术语 `0`，`ExternalDataImportRun(status="started")=0` 且导入锁为空，`manage.py check`、`127.0.0.1/healthz/` 与 Host `umafans.run` 健康检查均通过。抽检确认 `A Bit Of Spirit (IRE)` 已无 active 词条而 `A Bit Of Spirit -> 点燃斗志` 有效，`International Stakes -> 国际锦标` 与 `Benson & Hedges Gold Cup Stakes -> 宾臣暨赫捷仕金杯` 已拆分，`A Shin Resume / Dragon / Dynamic / Sophia` 等 HKJC 日本马英文词条已挂日文 alias。另有 `26` 个 HKJC 日本马日文 alias 因生产已有同日文 `TermAlias` 或日文主词而未直接挂到英文词条，其中大多数中文目标一致；`Raijin / ライジン` 和 `Scintillation / シンチレーション` 存在既有译名占用，导入脚本按“不强行合并冲突概念”跳过，保留 HKJC 英文主译名。
 
-`2026-07-05` OpenSpec change `prepare-hkjc-overseas-termbase-seeds` 已完成正式规格同步并归档，归档目录为 `openspec/changes/archive/2026-07-05-prepare-hkjc-overseas-termbase-seeds/`。归档前已将 delta spec 合并到 `openspec/specs/termbase-seed-data-preparation/spec.md`：正式规格现在包含 `hkjc_overseas` 来源、Race Card 自动发现与精确参数、马名/骑师/赛事名候选、简体中文目标、官方来源元数据、结构化证据、地区映射以及包含 `racing_region` 的导入兼容表头。归档前 `openspec validate prepare-hkjc-overseas-termbase-seeds --strict && openspec validate --all` 通过，归档后 `openspec validate --all` 通过 `17` 项。
-仓库已于 `2026-06-06` 加入 OpenSpec + Codex 协作支持，用于在较大功能、跨模块改动、架构调整和生产高风险变更前先对齐规格，再进入实现。
+`2026-07-05` 旧规格流程 change `prepare-hkjc-overseas-termbase-seeds` 已完成正式规格同步并归档，归档目录为 `旧规格流程/changes/archive/2026-07-05-prepare-hkjc-overseas-termbase-seeds/`。归档前已将 delta spec 合并到 `旧规格流程/specs/termbase-seed-data-preparation/spec.md`：正式规格现在包含 `hkjc_overseas` 来源、Race Card 自动发现与精确参数、马名/骑师/赛事名候选、简体中文目标、官方来源元数据、结构化证据、地区映射以及包含 `racing_region` 的导入兼容表头。归档前 `旧规格流程 validate prepare-hkjc-overseas-termbase-seeds --strict && 旧规格流程 validate --all` 通过，归档后 `旧规格流程 validate --all` 通过 `17` 项。
+仓库已于 `2026-06-06` 加入 旧规格流程 + Codex 协作支持，用于在较大功能、跨模块改动、架构调整和生产高风险变更前先对齐规格，再进入实现。
 
-OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试、本地隔离环境浏览器验收，并归档为 `2026-06-06-add-term-candidate-discovery`；正式能力规格已同步到 `openspec/specs/term-candidate-discovery/spec.md`。
+旧规格流程 change `add-term-candidate-discovery` 已完成实现、自动化测试、本地隔离环境浏览器验收，并归档为 `2026-06-06-add-term-candidate-discovery`；正式能力规格已同步到 `旧规格流程/specs/term-candidate-discovery/spec.md`。
 
-`2026-06-30` OpenSpec change `operate-multiregion-news-production` 已完成实现、代码审查返修、生产部署和归档。新增多地区新闻生产只读审计命令 `audit_multiregion_news_production`、通用 enabled 新闻来源轮询任务 `crawl_enabled_news_sources_task`、地区/来源自动发布 allowlist 与地区上限策略、后台 `/admin/regions/` 地区生产概览、来源管理地区筛选、QQ 国际新闻地区标签、地区查询索引和运行手册。返修后，地区生产概览的自动发布、人工发布和公开数量按今日窗口统计，待翻译、翻译失败和待审核保留为当前积压；审计中的来源抓取状态改为按 `NewsSource.last_crawl_status` 当前来源状态聚合，不再累计历史 `CrawlJob` 次数；正式术语 `TermEntry` 增加可选适用地区，空值表示全局通用，术语列表/表单/API/CSV 导入和多地区审计均支持地区口径；自动发布批次在地区每日/每轮上限跳过大量国际候选时，会在主扫描未填满后执行有限的日本候选兜底扫描，避免拖慢符合既有策略的日本文章。生产服务器 `/opt/umanewsbot` 已从 `7b6e51b` 快进到 `62a0f9a` 并执行 `bash ./deploy_lowcost.sh`，部署前备份 `.env` 为 `.env.backup.multiregion-news-20260630_185150`；迁移 `stable.0014_multiregion_news_indexes` 与 `stable.0015_termentry_racing_region` 已应用，`web / worker / beat` 已重建，`manage.py check`、`http://umafans.run/healthz/`、首页和后台登录入口均通过。随后已按用户要求开启多地区新闻生产开关，备份 `.env` 为 `.env.backup.enable-all-multiregion-20260630_203647`；当前 `NEWS_SOURCE_POLL_ENABLED=true`、轮询间隔 `30` 分钟、每轮最多 `12` 个来源，覆盖 `japan / hong_kong / united_kingdom / france / united_states` 五个地区；非日本自动发布 allowlist 已开启 `hong_kong / united_kingdom / france / united_states` 四个地区和当前已启用的国际来源，并设置首日护栏上限 `hong_kong:5 / united_kingdom:5 / france:3 / united_states:3`。开关生效后手动执行通用轮询 smoke，已选中并派发 `12` 个 due 来源，固定调度的 netkeiba/JRA 被正确跳过；worker 并发为 `2`，当前先处理 Sponichi 两个任务，其余任务在队列中等待消化。正式 QQ 群仍需显式配置 `PushTarget.allowed_regions` 才接收国际新闻。外部赛马数据库 `External*` importer 不进入新闻常态调度，不自动生成公开新闻或 QQ 推送。归档目录为 `openspec/changes/archive/2026-06-30-operate-multiregion-news-production/`，正式规格已同步到 `openspec/specs/multiregion-news-production/spec.md` 及相关能力规格。
+`2026-06-30` 旧规格流程 change `operate-multiregion-news-production` 已完成实现、代码审查返修、生产部署和归档。新增多地区新闻生产只读审计命令 `audit_multiregion_news_production`、通用 enabled 新闻来源轮询任务 `crawl_enabled_news_sources_task`、地区/来源自动发布 allowlist 与地区上限策略、后台 `/admin/regions/` 地区生产概览、来源管理地区筛选、QQ 国际新闻地区标签、地区查询索引和运行手册。返修后，地区生产概览的自动发布、人工发布和公开数量按今日窗口统计，待翻译、翻译失败和待审核保留为当前积压；审计中的来源抓取状态改为按 `NewsSource.last_crawl_status` 当前来源状态聚合，不再累计历史 `CrawlJob` 次数；正式术语 `TermEntry` 增加可选适用地区，空值表示全局通用，术语列表/表单/API/CSV 导入和多地区审计均支持地区口径；自动发布批次在地区每日/每轮上限跳过大量国际候选时，会在主扫描未填满后执行有限的日本候选兜底扫描，避免拖慢符合既有策略的日本文章。生产服务器 `/opt/umanewsbot` 已从 `7b6e51b` 快进到 `62a0f9a` 并执行 `bash ./deploy_lowcost.sh`，部署前备份 `.env` 为 `.env.backup.multiregion-news-20260630_185150`；迁移 `stable.0014_multiregion_news_indexes` 与 `stable.0015_termentry_racing_region` 已应用，`web / worker / beat` 已重建，`manage.py check`、`http://umafans.run/healthz/`、首页和后台登录入口均通过。随后已按用户要求开启多地区新闻生产开关，备份 `.env` 为 `.env.backup.enable-all-multiregion-20260630_203647`；当前 `NEWS_SOURCE_POLL_ENABLED=true`、轮询间隔 `30` 分钟、每轮最多 `12` 个来源，覆盖 `japan / hong_kong / united_kingdom / france / united_states` 五个地区；非日本自动发布 allowlist 已开启 `hong_kong / united_kingdom / france / united_states` 四个地区和当前已启用的国际来源，并设置首日护栏上限 `hong_kong:5 / united_kingdom:5 / france:3 / united_states:3`。开关生效后手动执行通用轮询 smoke，已选中并派发 `12` 个 due 来源，固定调度的 netkeiba/JRA 被正确跳过；worker 并发为 `2`，当前先处理 Sponichi 两个任务，其余任务在队列中等待消化。正式 QQ 群仍需显式配置 `PushTarget.allowed_regions` 才接收国际新闻。外部赛马数据库 `External*` importer 不进入新闻常态调度，不自动生成公开新闻或 QQ 推送。归档目录为 `旧规格流程/changes/archive/2026-06-30-operate-multiregion-news-production/`，正式规格已同步到 `旧规格流程/specs/multiregion-news-production/spec.md` 及相关能力规格。
 
-`2026-07-02` OpenSpec change `increase-multiregion-news-volume` 已整体上线到生产。生产 `/opt/umanewsbot` 当前运行 `9e97e8c`，与 `origin/main` 一致；部署前数据库备份为 `backups/db/pre-multiregion-volume-20260702_040811.sql.gz`，`.env` 备份为 `.env.backup.multiregion-volume-20260702_040811`，启用前另备份 `.env.backup.enable-multiregion-volume-20260702_041242`。迁移 `stable.0017_majorraceevent_productionwindow_quotaledger_and_more` 与 `stable.0018_alter_notificationlog_type` 已应用，`web / worker / beat` 运行健康，本地和公网 `/healthz/` 均返回 `200`。本次上线开启 `MULTIREGION_PRODUCTION_WINDOWS_ENABLED=true`、抓取/发布/QQ 三条窗口开关均为 `true`，覆盖 `japan / hong_kong / united_kingdom / france / united_states`；当前 16 个启用新闻源已标记 `production_approved=true`，日常抓取默认 15 分钟，重要赛事窗口默认 5 分钟。上线过程中发现并修复抓取窗口把 Celery `AsyncResult` 写入 JSON payload 导致窗口失败的问题，修复提交为 `9e97e8c`，窗口现在保存 `dispatch_result.task_id`。生产 smoke：20:15 抓取窗口派发 15 个 due 来源，最终 14 个成功、1 个 `Sponichi 新闻ランキング` 因上游 `502 Bad Gateway` 失败且写入明确原因；20:15 发布窗口香港自动发布 1 篇、美国自动发布 3 篇，20:30 发布窗口美国继续发布 1 篇，其他地区为 `no_ready_candidates`；20:15 QQ 窗口美国发送 2 条 delivery，20:30 QQ 窗口美国为 `already_sent`，其他地区为 `no_eligible_articles`。公开首页和地区页浏览器验收通过，首页可见 20:15 窗口新发布的香港/美国文章。ops 摘要通知已配置到 `UmaFans测试群(1026525240)`，`production_summary_task` 已产生 `NotificationLog #13051`，状态 `sent`。因当前为后半夜新闻低峰，用户确认跳过实际 4 个自然窗口等待，改为次日继续观察来源失败、候选质量、0 原因和 QQ 限流情况。
+`2026-07-02` 旧规格流程 change `increase-multiregion-news-volume` 已整体上线到生产。生产 `/opt/umanewsbot` 当前运行 `9e97e8c`，与 `origin/main` 一致；部署前数据库备份为 `backups/db/pre-multiregion-volume-20260702_040811.sql.gz`，`.env` 备份为 `.env.backup.multiregion-volume-20260702_040811`，启用前另备份 `.env.backup.enable-multiregion-volume-20260702_041242`。迁移 `stable.0017_majorraceevent_productionwindow_quotaledger_and_more` 与 `stable.0018_alter_notificationlog_type` 已应用，`web / worker / beat` 运行健康，本地和公网 `/healthz/` 均返回 `200`。本次上线开启 `MULTIREGION_PRODUCTION_WINDOWS_ENABLED=true`、抓取/发布/QQ 三条窗口开关均为 `true`，覆盖 `japan / hong_kong / united_kingdom / france / united_states`；当前 16 个启用新闻源已标记 `production_approved=true`，日常抓取默认 15 分钟，重要赛事窗口默认 5 分钟。上线过程中发现并修复抓取窗口把 Celery `AsyncResult` 写入 JSON payload 导致窗口失败的问题，修复提交为 `9e97e8c`，窗口现在保存 `dispatch_result.task_id`。生产 smoke：20:15 抓取窗口派发 15 个 due 来源，最终 14 个成功、1 个 `Sponichi 新闻ランキング` 因上游 `502 Bad Gateway` 失败且写入明确原因；20:15 发布窗口香港自动发布 1 篇、美国自动发布 3 篇，20:30 发布窗口美国继续发布 1 篇，其他地区为 `no_ready_candidates`；20:15 QQ 窗口美国发送 2 条 delivery，20:30 QQ 窗口美国为 `already_sent`，其他地区为 `no_eligible_articles`。公开首页和地区页浏览器验收通过，首页可见 20:15 窗口新发布的香港/美国文章。ops 摘要通知已配置到 `UmaFans测试群(1026525240)`，`production_summary_task` 已产生 `NotificationLog #13051`，状态 `sent`。因当前为后半夜新闻低峰，用户确认跳过实际 4 个自然窗口等待，改为次日继续观察来源失败、候选质量、0 原因和 QQ 限流情况。
 
-`2026-07-01` 已将 `add-netkeiba-horse-data-import`、`expand-international-racing-coverage`、`guard-qqbot-offline-send` 全部归档，正式规格同步到 `openspec/specs/external-horse-data-import/`、`openspec/specs/international-racing-coverage/` 及相关能力规格；`openspec list` 为空，`openspec validate --all` 12 项通过。本次同时补齐 `ExternalDataSource` 对 `sporting_life / france_galop / geny_france / horse_racing_nation` 的 choices 和迁移 `stable.0016`，避免英法美外部数据导入 source 值与模型枚举不一致。生产服务器 `/opt/umanewsbot` 已从 `538a1a9` 快进到 `8c83708` 并执行 `bash ./deploy_lowcost.sh`，部署前数据库备份为 `backups/db/pre-archive-all-20260701_153301.sql.gz` 且 `gzip -t` 通过；部署后 `web / worker / beat` 已重建，迁移 `stable.0016_alter_externaldataimporterror_source_and_more` 已应用，`manage.py check`、本地和公网 `/healthz/`、首页、后台登录入口和 `/admin/regions/` 均通过。浏览器验收确认首页地区 tab 正常，香港/英国地区页可渲染已发布国际新闻，地区生产页可显示五地区来源与 QQ 状态。生产开关仍为 `NEWS_SOURCE_POLL_ENABLED=true`、轮询间隔 `30` 分钟、每轮最多 `12` 个来源、覆盖五地区，`QQ_PUSH_ENABLED=true` 且 `QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`。来源状态复核显示五地区 enabled 来源多数最近抓取为 `success`；当前仅 `Sponichi 新闻ランキング` 因上游 `502 Bad Gateway` 处于失败状态，属于来源站响应异常，不影响本次部署成立。
+`2026-07-01` 已将 `add-netkeiba-horse-data-import`、`expand-international-racing-coverage`、`guard-qqbot-offline-send` 全部归档，正式规格同步到 `旧规格流程/specs/external-horse-data-import/`、`旧规格流程/specs/international-racing-coverage/` 及相关能力规格；`旧规格流程 list` 为空，`旧规格流程 validate --all` 12 项通过。本次同时补齐 `ExternalDataSource` 对 `sporting_life / france_galop / geny_france / horse_racing_nation` 的 choices 和迁移 `stable.0016`，避免英法美外部数据导入 source 值与模型枚举不一致。生产服务器 `/opt/umanewsbot` 已从 `538a1a9` 快进到 `8c83708` 并执行 `bash ./deploy_lowcost.sh`，部署前数据库备份为 `backups/db/pre-archive-all-20260701_153301.sql.gz` 且 `gzip -t` 通过；部署后 `web / worker / beat` 已重建，迁移 `stable.0016_alter_externaldataimporterror_source_and_more` 已应用，`manage.py check`、本地和公网 `/healthz/`、首页、后台登录入口和 `/admin/regions/` 均通过。浏览器验收确认首页地区 tab 正常，香港/英国地区页可渲染已发布国际新闻，地区生产页可显示五地区来源与 QQ 状态。生产开关仍为 `NEWS_SOURCE_POLL_ENABLED=true`、轮询间隔 `30` 分钟、每轮最多 `12` 个来源、覆盖五地区，`QQ_PUSH_ENABLED=true` 且 `QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`。来源状态复核显示五地区 enabled 来源多数最近抓取为 `success`；当前仅 `Sponichi 新闻ランキング` 因上游 `502 Bad Gateway` 处于失败状态，属于来源站响应异常，不影响本次部署成立。
 
 `2026-06-07` 已将术语候选发现部署到生产：服务器从 `7123e4e` 拉到 `e2e3e07`，应用迁移 `0006` 新建候选与证据表，`.env` 补入术语发现开关并保持 `TERM_DISCOVERY_ENABLED=false`（灰度，先关后开）。本次部署同时核实线上 `AUTOMATION_ENABLED=true`、`REWRITE_PROVIDER=siliconflow` 仍在生效。
 
-仓库已明确长期语言约定：Codex 新增或维护的协作文档、OpenSpec 产物与代理说明默认使用中文；仅保留必要的代码标识符、命令和工具机器语法。
+仓库已明确长期语言约定：Codex 新增或维护的协作文档、旧规格流程 产物与代理说明默认使用中文；仅保留必要的代码标识符、命令和工具机器语法。
 
-`2026-06-19` 已创建公开首页资讯流升级主 OpenSpec change：`upgrade-public-home-info-feed`。该 change 作为后续前台 Web + 移动 H5 首页子任务的指导规范，目标是把当前 MVP 公开首页从“大说明 + 大卡片网格”升级为成熟资讯流：移动端轻头条 + 高密度新闻列表，桌面端门户式主内容 + 侧栏。`2026-06-21` 已完成 plan-eng-review 与 `/opsx:apply` 本地实现；实施过程按严格 TDD 执行发布过滤、头条选择、普通流去重、热门代理、公开静态资源和详情页结构测试，并已通过本地 Django 测试、OpenSpec 校验和桌面/移动浏览器验收。`2026-06-22` 已将 delta spec 同步为正式规格 `openspec/specs/public-home-info-feed/spec.md`，并归档为 `openspec/changes/archive/2026-06-22-upgrade-public-home-info-feed/`；同日 PR #1 已合并并部署到生产，服务器运行 `e834f58`，公开首页已切换到 `stable/public.css` 和新资讯流模板。`2026-06-23` PR #2 已合并并部署生产，服务器运行 `04e2ee9`，移动 H5 首屏密度 follow-up 已上线。
+`2026-06-19` 已创建公开首页资讯流升级主 旧规格流程 change：`upgrade-public-home-info-feed`。该 change 作为后续前台 Web + 移动 H5 首页子任务的指导规范，目标是把当前 MVP 公开首页从“大说明 + 大卡片网格”升级为成熟资讯流：移动端轻头条 + 高密度新闻列表，桌面端门户式主内容 + 侧栏。`2026-06-21` 已完成 plan-eng-review 与 `/opsx:apply` 本地实现；实施过程按严格 TDD 执行发布过滤、头条选择、普通流去重、热门代理、公开静态资源和详情页结构测试，并已通过本地 Django 测试、旧规格流程 校验和桌面/移动浏览器验收。`2026-06-22` 已将 delta spec 同步为正式规格 `旧规格流程/specs/public-home-info-feed/spec.md`，并归档为 `旧规格流程/changes/archive/2026-06-22-upgrade-public-home-info-feed/`；同日 PR #1 已合并并部署到生产，服务器运行 `e834f58`，公开首页已切换到 `stable/public.css` 和新资讯流模板。`2026-06-23` PR #2 已合并并部署生产，服务器运行 `04e2ee9`，移动 H5 首屏密度 follow-up 已上线。
 
-`2026-06-24` 已完成自动发布门禁优化 OpenSpec change：`refine-automation-publish-gates` 的实现、PR 合并与生产上线。代码已将自动发布门禁拆为 `blocker / warning / info`：`blocker` 阻断自动发布，`warning` 初期不阻断但记录并对高价值文章邮件告警，`info` 仅用于诊断；同时支持基准翻译稿自动发布、高价值来源评分放行、非马名普通词过滤、关键术语分层校验和重复内容拦截。生产服务器当前运行 PR #4 squash merge 后的提交 `42a4622`，迁移 `stable.0009_automation_publish_gates` 已应用。
+`2026-06-24` 已完成自动发布门禁优化 旧规格流程 change：`refine-automation-publish-gates` 的实现、PR 合并与生产上线。代码已将自动发布门禁拆为 `blocker / warning / info`：`blocker` 阻断自动发布，`warning` 初期不阻断但记录并对高价值文章邮件告警，`info` 仅用于诊断；同时支持基准翻译稿自动发布、高价值来源评分放行、非马名普通词过滤、关键术语分层校验和重复内容拦截。生产服务器当前运行 PR #4 squash merge 后的提交 `42a4622`，迁移 `stable.0009_automation_publish_gates` 已应用。
 
-`2026-06-25` 已将本轮三个运营改造 change 合并到 `main` 并部署生产：抓取新鲜度与来源健康、后台原文选区快速加入术语库、新增术语后一次性应用到当前稿。服务器 `/opt/umanewsbot` 已从 `268100d` 更新到 `7f54f13`，`web / worker / beat` 已重建，`manage.py check`、`/healthz/` 和首页 HTTP 验证通过。相关 OpenSpec change 已归档并同步正式规格；其中抓取返修的 `fix-crawl-health-running-and-schedule-stagger` 是 change1 的后续规格，随 change1 一并归档。
+`2026-06-25` 已将本轮三个运营改造 change 合并到 `main` 并部署生产：抓取新鲜度与来源健康、后台原文选区快速加入术语库、新增术语后一次性应用到当前稿。服务器 `/opt/umanewsbot` 已从 `268100d` 更新到 `7f54f13`，`web / worker / beat` 已重建，`manage.py check`、`/healthz/` 和首页 HTTP 验证通过。相关 旧规格流程 change 已归档并同步正式规格；其中抓取返修的 `fix-crawl-health-running-and-schedule-stagger` 是 change1 的后续规格，随 change1 一并归档。
 
 `2026-06-25` 已将榜单重点新闻 QQ 推送与公开文章 ID URL 改造通过 PR #8 合并并部署生产。服务器 `/opt/umanewsbot` 已更新到 `00e4bd4`，部署前 `.env` 备份为 `.env.backup.qq-ranked-idurl-20260625_191826`；生产 `.env` 已切换为 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`。`web / worker / beat` 已重建，`manage.py check`、`http://umafans.run/healthz/`、`http://umafans.run/`、`/news/<article_id>/` 公开详情和旧 slug 到 ID URL 的 `302` 跳转均已验证通过。本次不补推历史公开新闻，后续只等待自然榜单新闻触发测试群推送。
 
-`2026-06-26` 已将国际赛马资讯扩展 OpenSpec change：`expand-international-racing-coverage` 合并到 `main` 并部署生产，服务器 `/opt/umanewsbot` 已从 `2f0c35c` 更新到 `5865e58`，部署前 `.env` 备份为 `.env.backup.international-coverage-20260626_103923`。本次部署应用迁移 `stable.0011`、`0012`、`0013`，`web / worker / beat` 已重建，`manage.py check`、`http://127.0.0.1/healthz/` 和首页 HTTP 验证通过。部署前发现生产 netkeiba 外部马名导入脚本仍在连续运行，已等待当前批次完成并释放 `ExternalDataImportLock` 后再部署；外层脚本 `/opt/umanewsbot/imports/run_horse_import_202504_to_202406_20260626_083946.sh` 已停止，最近两批 `1958 / 1959` 均停在 `paused`，避免部署与导入写库重叠。国际来源已同步并灰度启用第一版清单：`Sponichi latest/access`、`HKJC Racing News`、`SCMP Racing`、`Sporting Life Racing`、`Sky Sports Racing latest/access`、`France Galop English News`、`TDN France keyword`、`TDN`、`Horse Racing Nation latest/access`；生产探测中 `BHA official` 返回 `403`，已暂时停用，`At The Races`、`Paulick Report` 和 `BloodHorse` 仍保留为候选但不启用。测试 QQ 群 `1026525240` 已配置允许 `japan / hong_kong / united_kingdom / france / united_states` 五个地区。首轮手动触发 12 个新增来源抓取任务后，`Sponichi latest` 已完成并入库 `13` 篇新稿、`7` 篇重复稿，`Sponichi access` 与 `HKJC Racing News` 已开始执行，其他国际来源仍在 worker 队列中等待；后续重点观察 `CrawlJob`、翻译结果、自动发布门禁和 QQ 群推送。
+`2026-06-26` 已将国际赛马资讯扩展 旧规格流程 change：`expand-international-racing-coverage` 合并到 `main` 并部署生产，服务器 `/opt/umanewsbot` 已从 `2f0c35c` 更新到 `5865e58`，部署前 `.env` 备份为 `.env.backup.international-coverage-20260626_103923`。本次部署应用迁移 `stable.0011`、`0012`、`0013`，`web / worker / beat` 已重建，`manage.py check`、`http://127.0.0.1/healthz/` 和首页 HTTP 验证通过。部署前发现生产 netkeiba 外部马名导入脚本仍在连续运行，已等待当前批次完成并释放 `ExternalDataImportLock` 后再部署；外层脚本 `/opt/umanewsbot/imports/run_horse_import_202504_to_202406_20260626_083946.sh` 已停止，最近两批 `1958 / 1959` 均停在 `paused`，避免部署与导入写库重叠。国际来源已同步并灰度启用第一版清单：`Sponichi latest/access`、`HKJC Racing News`、`SCMP Racing`、`Sporting Life Racing`、`Sky Sports Racing latest/access`、`France Galop English News`、`TDN France keyword`、`TDN`、`Horse Racing Nation latest/access`；生产探测中 `BHA official` 返回 `403`，已暂时停用，`At The Races`、`Paulick Report` 和 `BloodHorse` 仍保留为候选但不启用。测试 QQ 群 `1026525240` 已配置允许 `japan / hong_kong / united_kingdom / france / united_states` 五个地区。首轮手动触发 12 个新增来源抓取任务后，`Sponichi latest` 已完成并入库 `13` 篇新稿、`7` 篇重复稿，`Sponichi access` 与 `HKJC Racing News` 已开始执行，其他国际来源仍在 worker 队列中等待；后续重点观察 `CrawlJob`、翻译结果、自动发布门禁和 QQ 群推送。
 
-`2026-06-26` 已创建新的本地 Codex 工作树 `/Users/mentianlu/.codex/worktrees/openspec-ready-20260626/umanews`，基线为 `origin/main` 的 `4d09d25`。该工作树已带入 `.codex/skills/openspec-*`、`.codex/skills/plan-eng-review`、`.codex/skills/tdd`、`.codex/skills/workflow-spine` 和 `.agents/skills` 镜像，并补齐 `gate-templates.md` 引用副本；已通过 `openspec list`、`openspec validate --all`、`openspec validate expand-international-racing-coverage --strict`、`openspec validate add-netkeiba-horse-data-import --strict`、`openspec status --change expand-international-racing-coverage --json` 和 skill 文件一致性检查。该记录仅描述本地协作工作树准备状态，不代表新的产品或生产部署变更。
+`2026-06-26` 已创建新的本地 Codex 工作树 `/Users/mentianlu/.codex/worktrees/旧规格流程-ready-20260626/umanews`，基线为 `origin/main` 的 `4d09d25`。该工作树已带入 `.codex/skills/旧规格流程-*`、`.codex/skills/plan-eng-review`、`.codex/skills/tdd`、`.codex/skills/workflow-spine` 和 `.agents/skills` 镜像，并补齐 `gate-templates.md` 引用副本；已通过 `旧规格流程 list`、`旧规格流程 validate --all`、`旧规格流程 validate expand-international-racing-coverage --strict`、`旧规格流程 validate add-netkeiba-horse-data-import --strict`、`旧规格流程 status --change expand-international-racing-coverage --json` 和 skill 文件一致性检查。该记录仅描述本地协作工作树准备状态，不代表新的产品或生产部署变更。
 
-`2026-06-26` 已新增并完成计划审查 OpenSpec change `start-hkjc-data-import-and-global-spikes`，用于启动香港 HKJC 外部赛马数据受控导入，并为英国 `Sporting Life + BHA`、美国 `Equibase`、法国 `France Galop` 产出结构化数据库 spike。该 change 明确不续跑日本 netkeiba 外部数据导入，日本导入由其他线程继续；本轮也不实现前台比赛页、赛果页或马匹页。已创建 `proposal.md`、`design.md`、`specs/global-racing-data-import-readiness/spec.md` 和 `tasks.md`，并通过 `/plan-eng-review`；审查后补齐 HKJC 生产 commit 前的隔离库验证、数据库备份、用户显式确认、`HKJC_IMPORT_*` 环境配置入口，以及英法美 spike 前后正式表计数保持不变的验收要求。当前 `.openspec.yaml` 为 `phase: reviewed`，已通过 `openspec validate start-hkjc-data-import-and-global-spikes --strict`、`openspec validate --all` 和 `git diff --check`。随后按 TDD 红灯阶段新增 `openspec/changes/start-hkjc-data-import-and-global-spikes/test_cases.md` 和自动化测试；本轮实现已将 4 个红灯转绿：补齐 `HKJC_IMPORT_*` settings 和 `.env.example`，新增 HKJC `--allow-network` dry-run 请求边界输出，新增英法美只读 spike runner 和正式表 before/after 计数检查。HKJC 最小样本 fixture 已保存到 `server/stable/fixtures/hkjc/`，本地隔离 SQLite `/tmp/umanews-hkjc-apply.sqlite3` 已完成赛日、单场、单马 dry-run/commit，结果写入 `docs/hkjc_data_import_samples.md`；隔离库最终统计为 3 个 import run、1 场比赛、2 个 entries、2 条 results、2 匹马、4 条别名。英法美 read-only spike 已执行 6 次公开页面 GET，请求证据、字段覆盖矩阵和准入判断已写入 `docs/global_racing_data_source_spikes.md`；三地当前均为 `needs_more_spike`，且正式表 before/after 计数保持不变。验证通过：`manage.py check`、HKJC/spike 目标测试 12 项、完整 `stable` 测试 246 项。
+`2026-06-26` 已新增并完成计划审查 旧规格流程 change `start-hkjc-data-import-and-global-spikes`，用于启动香港 HKJC 外部赛马数据受控导入，并为英国 `Sporting Life + BHA`、美国 `Equibase`、法国 `France Galop` 产出结构化数据库 spike。该 change 明确不续跑日本 netkeiba 外部数据导入，日本导入由其他线程继续；本轮也不实现前台比赛页、赛果页或马匹页。已创建 `proposal.md`、`design.md`、`specs/global-racing-data-import-readiness/spec.md` 和 `tasks.md`，并通过 `/plan-eng-review`；审查后补齐 HKJC 生产 commit 前的隔离库验证、数据库备份、用户显式确认、`HKJC_IMPORT_*` 环境配置入口，以及英法美 spike 前后正式表计数保持不变的验收要求。当前 `.旧规格流程.yaml` 为 `phase: reviewed`，已通过 `旧规格流程 validate start-hkjc-data-import-and-global-spikes --strict`、`旧规格流程 validate --all` 和 `git diff --check`。随后按 TDD 红灯阶段新增 `旧规格流程/changes/start-hkjc-data-import-and-global-spikes/test_cases.md` 和自动化测试；本轮实现已将 4 个红灯转绿：补齐 `HKJC_IMPORT_*` settings 和 `.env.example`，新增 HKJC `--allow-network` dry-run 请求边界输出，新增英法美只读 spike runner 和正式表 before/after 计数检查。HKJC 最小样本 fixture 已保存到 `server/stable/fixtures/hkjc/`，本地隔离 SQLite `/tmp/umanews-hkjc-apply.sqlite3` 已完成赛日、单场、单马 dry-run/commit，结果写入 `docs/hkjc_data_import_samples.md`；隔离库最终统计为 3 个 import run、1 场比赛、2 个 entries、2 条 results、2 匹马、4 条别名。英法美 read-only spike 已执行 6 次公开页面 GET，请求证据、字段覆盖矩阵和准入判断已写入 `docs/global_racing_data_source_spikes.md`；三地当前均为 `needs_more_spike`，且正式表 before/after 计数保持不变。验证通过：`manage.py check`、HKJC/spike 目标测试 12 项、完整 `stable` 测试 246 项。
 
 `2026-06-26` 已将 `start-hkjc-data-import-and-global-spikes` 实现提交 `b0361cf` 推送到 `main` 并部署生产。服务器 `/opt/umanewsbot` 已从 `4d09d25` 快进到 `b0361cf`，部署前 `.env` 备份为 `.env.backup.hkjc-global-spikes-20260626_164045`。部署前确认生产无运行中 `ExternalDataImportLock`，无 `ExternalDataImportRun(status="started")`；`bash ./deploy_lowcost.sh` 执行成功，迁移显示 `No migrations to apply`，`web / worker / beat` 已重建，`web` healthy。生产验证通过：`manage.py check` 无问题，`http://127.0.0.1/healthz/`、`http://umafans.run/healthz/` 和首页均返回 `200`；HKJC 样本命令以 dry-run 方式读取容器内 `stable/fixtures/hkjc/2026-06-21-race-date-sample.json`，返回 `coverage_stats={"races":1,"entries":2,"results":2,"horses":2}` 且 `would_write_formal_tables=false`。部署当时未执行 HKJC commit，也未启用英法美正式导入。
 
-`2026-06-26` 已归档 `start-hkjc-data-import-and-global-spikes`，归档目录为 `openspec/changes/archive/2026-06-26-start-hkjc-data-import-and-global-spikes/`；delta spec 已同步为正式规格 `openspec/specs/global-racing-data-import-readiness/spec.md`。归档后 `openspec validate --all` 通过，`global-racing-data-import-readiness` 正式规格包含 6 个 requirement。归档提交 `db0f3cc` 已推送到 `main` 并在生产 `/opt/umanewsbot` 快进；该提交只移动 OpenSpec/文档，不重建容器，生产服务代码仍为已部署验证过的 `b0361cf` 镜像内容，线上 `/healthz/` 和首页保持 `200`。
+`2026-06-26` 已归档 `start-hkjc-data-import-and-global-spikes`，归档目录为 `旧规格流程/changes/archive/2026-06-26-start-hkjc-data-import-and-global-spikes/`；delta spec 已同步为正式规格 `旧规格流程/specs/global-racing-data-import-readiness/spec.md`。归档后 `旧规格流程 validate --all` 通过，`global-racing-data-import-readiness` 正式规格包含 6 个 requirement。归档提交 `db0f3cc` 已推送到 `main` 并在生产 `/opt/umanewsbot` 快进；该提交只移动 旧规格流程/文档，不重建容器，生产服务代码仍为已部署验证过的 `b0361cf` 镜像内容，线上 `/healthz/` 和首页保持 `200`。
 
 `2026-06-26` 已按用户确认启动 HKJC 生产样本导入，但范围仅限仓库 fixture `stable/fixtures/hkjc/2026-06-21-race-date-sample.json`，不是 HKJC 真实网络持续抓取。执行前已在生产服务器创建数据库备份 `backups/db/pre-hkjc-sample-20260626_180646.sql.gz` 并通过 `gzip -t` 校验；预检查显示无运行中 HKJC 导入、无 started run，`web` healthy。生产 dry-run 再次返回 `coverage_stats={"races":1,"entries":2,"results":2,"horses":2}` 且不写正式表；随后执行 `--commit` 成功，`run_id=1960`、`success_count=7`、`failure_count=0`、`skipped_count=0`。提交后生产 HKJC 外部表统计为 `ExternalRace=1`、`ExternalRaceEntry=2`、`ExternalRaceResult=2`、`ExternalHorse=2`、`ExternalHorseAlias=4`，马名索引 `STELLAR EXPRESS` 命中 `HKH_STELLAR_EXPRESS`；`ExternalDataImportLock` 仅保留未占用的来源占位记录，未发现仍在运行的 HKJC 导入进程，`http://umafans.run/healthz/` 返回 `200`。真实 HKJC 网络入口仍未确认，不能把这次样本导入理解为已开启自动抓取。
 
-`2026-06-26` 已新建 OpenSpec change `connect-real-global-racing-databases`，目标是按 `香港 -> 英国 -> 法国 -> 美国` 顺序接入真实赛马数据库，抓取每个地区最近 2 个月赛事和涉及马匹详情后停止，不创建公开比赛页或持续调度。香港阶段已定位 HKJC 官方真实 HTML 入口：赛日列表 `localresults`、单场结果 `localresults?racedate=YYYY/MM/DD&Racecourse=HV|ST&RaceNo=N`、马匹详情 `horse?horseid=...`。本地 TDD 已新增 HKJC HTML parser、race link 聚合、recent-days/date-range、马匹详情补抓、限速、请求上限和 `completion` 完成度测试，`HKJCExternalDataImportTests` 21 项通过；真实 HKJC 单场 dry-run `HK20260624HV01` 请求 1 次官方页面并解析 `1` 场、`12` entries、`12` results、`12` unique horses，未写库。随后在隔离 SQLite `/tmp/umanews-hkjc-real-single.sqlite3` 执行同一真实单场 `--commit --allow-network`，成功写入 `ExternalRace=1`、`ExternalRaceEntry=12`、`ExternalRaceResult=12`、`ExternalHorseAlias=12`，`run_id=1`、`success_count=25`、`failure_count=0`。同日又完成 HKJC `--recent-days 60 --end-date 2026-06-26 --limit-races 1 --limit-horses 1` 真实小范围链路：dry-run 请求赛日列表、赛日页、单场结果和马匹详情共 `4` 次，解析 `1` 场、`12` entries、`12` results、`12` unique horses，并返回 `completion.is_complete=false`、`stop_reason=limit_horses_reached`、`meetings_found=28`，明确这是样本而非全量；隔离 SQLite `/tmp/umanews-hkjc-real-range.sqlite3` commit 后写入 `ExternalRace=1`、`ExternalRaceEntry=12`、`ExternalRaceResult=12`、`ExternalHorse=1`、`ExternalHorseAlias=12`，重复执行后正式对象计数不增长。当前仍未部署生产，也未执行生产最近两个月全量 dry-run/commit；下一步需要生产部署前锁检查、备份、用户确认后再低频运行 HKJC 最近两个月范围。
+`2026-06-26` 已新建 旧规格流程 change `connect-real-global-racing-databases`，目标是按 `香港 -> 英国 -> 法国 -> 美国` 顺序接入真实赛马数据库，抓取每个地区最近 2 个月赛事和涉及马匹详情后停止，不创建公开比赛页或持续调度。香港阶段已定位 HKJC 官方真实 HTML 入口：赛日列表 `localresults`、单场结果 `localresults?racedate=YYYY/MM/DD&Racecourse=HV|ST&RaceNo=N`、马匹详情 `horse?horseid=...`。本地 TDD 已新增 HKJC HTML parser、race link 聚合、recent-days/date-range、马匹详情补抓、限速、请求上限和 `completion` 完成度测试，`HKJCExternalDataImportTests` 21 项通过；真实 HKJC 单场 dry-run `HK20260624HV01` 请求 1 次官方页面并解析 `1` 场、`12` entries、`12` results、`12` unique horses，未写库。随后在隔离 SQLite `/tmp/umanews-hkjc-real-single.sqlite3` 执行同一真实单场 `--commit --allow-network`，成功写入 `ExternalRace=1`、`ExternalRaceEntry=12`、`ExternalRaceResult=12`、`ExternalHorseAlias=12`，`run_id=1`、`success_count=25`、`failure_count=0`。同日又完成 HKJC `--recent-days 60 --end-date 2026-06-26 --limit-races 1 --limit-horses 1` 真实小范围链路：dry-run 请求赛日列表、赛日页、单场结果和马匹详情共 `4` 次，解析 `1` 场、`12` entries、`12` results、`12` unique horses，并返回 `completion.is_complete=false`、`stop_reason=limit_horses_reached`、`meetings_found=28`，明确这是样本而非全量；隔离 SQLite `/tmp/umanews-hkjc-real-range.sqlite3` commit 后写入 `ExternalRace=1`、`ExternalRaceEntry=12`、`ExternalRaceResult=12`、`ExternalHorse=1`、`ExternalHorseAlias=12`，重复执行后正式对象计数不增长。当前仍未部署生产，也未执行生产最近两个月全量 dry-run/commit；下一步需要生产部署前锁检查、备份、用户确认后再低频运行 HKJC 最近两个月范围。
 
 `2026-06-26` 已为 `connect-real-global-racing-databases` 追加英法美只读 spike 复核，共执行 `18` 次公开页面 GET，不写任何 `External*` 表。英国 `Sporting Life` racecards、fast-results 和 horse profile 均返回 `200`，fast-results 暴露具体 racecard 与 horse profile 链接；`BHA` horses/fixtures 返回 `200`，暴露 horses feed、search 和 fixtures/racecards 相关入口，因此英国当前优先级最高，建议后续以 Sporting Life 为正式导入主候选、BHA 为官方补字段候选。美国 `Equibase` entries、chart/PDF index 和具体 horse profile 均返回 `200`，但 chart/PDF 解析成本和访问限制仍需 fixture spike。法国 `France Galop` 官方页面和 app 说明页返回 `200` 并有 race card/results/calendar 浅层信号，但尚未定位稳定结构化查询参数，仍为 `needs_more_spike`。证据已写入 `docs/global_racing_data_source_spikes.md`。
 
@@ -3130,7 +3140,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 `2026-06-26` 已将 `connect-real-global-racing-databases` 当前 HKJC 真实网络实现部署到生产，部署前数据库备份为 `backups/db/pre-hkjc-real-network-20260626_202442.sql.gz` 并通过 `gzip -t` 校验。生产 `65d41eb` 部署后 `manage.py check`、本地和公网 `/healthz/`、HKJC 精确 race-id 小样本 dry-run 均通过；生产 plan-only 仍显示最近 60 天本地香港 `HV/ST` 比赛 `144` 场、拆为 `8` 批。随后第 1 批 full dry-run 在马匹 profile 补抓阶段遇到 HKJC `ReadTimeout` / TLS handshake timeout 中断；该次未使用 `--commit`，未写正式表，中断后生产 HKJC 锁为空、`started_runs=0`、HKJC 表计数仍为上次 fixture 样本 `ExternalRace=1`、`ExternalRaceEntry=2`、`ExternalRaceResult=2`、`ExternalHorse=2`、`ExternalHorseAlias=4`。已按 TDD 追加 transient timeout retry 并部署到生产 `04c0444`，单请求最多 `3` 次并记录失败尝试；目前已将前 6 个 plan-only 批次拆成 24 个 5 场小批次完成 full dry-run，累计覆盖 `120` 场、`1522` entries、`1522` results、`1522` 个 horse profile 请求，所有小批次均 `completion.is_complete=true`，未写正式表。3c 首次执行时遇到一次执行容器 `137` 中断，输出文件为 `0` 字节；复查服务、锁和表计数均安全，随后改用一次性 `docker compose run --rm --no-deps web ...` 容器重跑 3c/3d 并完成；5a 出现 `2` 次 transient retry 记录但最终完成。当前停在生产 commit 前确认点，并可继续第 7 批 dry-run。
 
-`2026-06-27` 全球赛马数据库目标已调整并完成“能力真实可用”确认：香港 HKJC 已有生产真实 dry-run 批次证据，英国 Sporting Life、法国 Geny、美国 Horse Racing Nation 已完成少量真实 proof，证明四地公开入口、parser/importer、马匹详情链路、低频限量抓取和 proof-only 离线审计可用。本次上线包从 `origin/main` 干净基线单独整理，只包含全球赛马数据库 importer、fixtures、审计工具、批次命令渲染器、OpenSpec 规格/归档、proof 证据和相关文档；刻意排除当前本地大工作树中的 QQ 推送、前台信息流、compose 端口等旁支差异。本目标不再要求本轮完成最近 60 天完整大量爬取或生产 `--commit`；后续完整爬取需另按 `docs/global_racing_next_run_checklist.md` 与 `docs/global_racing_full_crawl_runbook.md` 新开执行窗口。代码提交 `93b7007` 已推送并部署到生产；部署后 `manage.py check` 通过，`http://127.0.0.1/healthz/`、`http://umafans.run/healthz/` 和首页均返回 `200`，UK / France / US 导入命令与 batch 渲染命令可用，proof-only 审计通过，`ExternalDataImportRun(status="started")=0` 且 HKJC/netkeiba 锁为空。
+`2026-06-27` 全球赛马数据库目标已调整并完成“能力真实可用”确认：香港 HKJC 已有生产真实 dry-run 批次证据，英国 Sporting Life、法国 Geny、美国 Horse Racing Nation 已完成少量真实 proof，证明四地公开入口、parser/importer、马匹详情链路、低频限量抓取和 proof-only 离线审计可用。本次上线包从 `origin/main` 干净基线单独整理，只包含全球赛马数据库 importer、fixtures、审计工具、批次命令渲染器、旧规格流程 规格/归档、proof 证据和相关文档；刻意排除当前本地大工作树中的 QQ 推送、前台信息流、compose 端口等旁支差异。本目标不再要求本轮完成最近 60 天完整大量爬取或生产 `--commit`；后续完整爬取需另按 `docs/global_racing_next_run_checklist.md` 与 `docs/global_racing_full_crawl_runbook.md` 新开执行窗口。代码提交 `93b7007` 已推送并部署到生产；部署后 `manage.py check` 通过，`http://127.0.0.1/healthz/`、`http://umafans.run/healthz/` 和首页均返回 `200`，UK / France / US 导入命令与 batch 渲染命令可用，proof-only 审计通过，`ExternalDataImportRun(status="started")=0` 且 HKJC/netkeiba 锁为空。
 
 `2026-06-30` 已按用户要求开始尝试香港 HKJC 慢速真实 dry-run，但仍未执行生产 `--commit`，也未写正式表。生产服务器 `/opt/umanewsbot` 当前代码为 `7b6e51b`；执行前确认 `docker compose -f docker-compose.prod.lowcost.yml ps` 中 `web/db/redis` healthy、`worker/beat/nginx` 运行，`ExternalDataImportRun(status="started")=0`，HKJC 与 netkeiba 的 `ExternalDataImportLock.locked_by_run_id=None`。最新 `--recent-days 60 --end-date 2026-06-30 --plan-only --limit-races 20 --max-requests 160 --allow-network` 输出为 `runtime/global_racing_import/hkjc-20260630/hkjc-plan-20260630.json`，显示 `meetings=29`、`races=146`、`estimated_requests_without_horses=176`，拆为 `8` 批；该结果已不同于历史 `144` 场，因此不能把旧的 `120/144` 停点直接当作有效续跑点。随后以 `HKJC_IMPORT_REQUEST_INTERVAL_SECONDS=8`、`HKJC_IMPORT_MAX_REQUESTS_PER_RUN=100` 执行精确 `race_ids=HK20260627ST02,HK20260627ST03` 小批 dry-run，输出 `runtime/global_racing_import/hkjc-20260630/hkjc-batch1-races-001-002-dryrun-20260630.json`：`dry_run=true`、`would_write_formal_tables=false`、`coverage_stats={"races":2,"entries":28,"results":28,"horses":28}`、`completion.is_complete=true`、`stop_reason=complete`、`horse_profiles_fetched=28`、`requests_len=30` 且全部 `status_code=200`。执行后复查 `ExternalDataImportRun(status="started")=0`、HKJC/netkeiba 锁为空，无 `umanewsbot-web-run-*` 临时容器残留，`http://umafans.run/healthz/` 和 `http://127.0.0.1/healthz/` 均返回 `200`。下一步如果继续香港，应按最新 `146` 场 plan 重新切批，从第 1 批剩余 race_ids 或重新渲染批次命令继续，而不是沿用旧 `skip-races=120`。
 
@@ -3154,14 +3164,14 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - `AGENTS.md` 与 `docs/codex_workflow.md` 定义探索、持久 spec/design、测试先行、subagent 实现、独立 `/review` 和发布授权门禁
   - 新任务持久产物写入 `docs/changes/<slug>/`；`.codex/skills/plan-eng-review` 仅在缺少通用原生方案审核能力时作为 fallback
   - `.codex/agents/` 提供 `application / integration / operations` 实现代理，以及 `reviewer / security-scanner` 只读审核代理
-  - `openspec/config.yaml` 与既有 OpenSpec artifacts 只作 legacy 兼容；相关 skills、workflow-spine、CLI phase 和 journal 不再是新流程入口或门禁
+  - `旧规格流程/config.yaml` 与既有 旧规格流程 artifacts 只作 legacy 兼容；相关 skills、workflow-spine、CLI phase 和 journal 不再是新流程入口或门禁
 - 专有术语候选发现与待标注池已完成：
   - 支持马名、比赛名、骑手名和马主名发现
   - 支持候选去重、证据聚合、工作人员审核和安全写入正式术语
   - 已完成 69 项测试与本地浏览器功能验收
   - 生产默认关闭，等待灰度启用
 
-## 当前进行中的 OpenSpec change
+## 当前进行中的 旧规格流程 change
 
 - `start-hkjc-data-import-and-global-spikes`：已完成实现、生产部署、验证和归档；生产服务镜像来自 `b0361cf`。已在生产执行一次 HKJC fixture 样本 commit（`run_id=1960`），但未启用 HKJC 真实网络持续抓取，也未启用英法美正式导入。
 - `connect-real-global-racing-databases`：本轮已按用户调整后的“能力真实可用”口径完成并归档；香港 HKJC 生产真实 dry-run 证据成立，英国 Sporting Life、法国 Geny、美国 Horse Racing Nation 少量真实 proof 成立，四地 importer、低频限量抓取、proof-only 审计和后续完整抓取门禁已可用。最近 60 天完整大量爬取和任何生产 `--commit` 不属于本轮完成口径，后续需要新执行窗口。
@@ -3203,15 +3213,15 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 2026-06-25 榜单重点新闻 QQ 推送规划
 
-- 已形成协调总纲：`docs/ranked_news_push_plan.md`。该文档只作为本轮计划说明，不作为 OpenSpec 长期能力规格。
-- 本轮拆为三个 OpenSpec 子 change：`elevate-ranked-netkeiba-sources`、`push-ranked-news-to-qq`、`use-article-id-public-urls`。
+- 已形成协调总纲：`docs/ranked_news_push_plan.md`。该文档只作为本轮计划说明，不作为 旧规格流程 长期能力规格。
+- 本轮拆为三个 旧规格流程 子 change：`elevate-ranked-netkeiba-sources`、`push-ranked-news-to-qq`、`use-article-id-public-urls`。
 - 推送策略方向：`QQ_PUSH_SCOPE` 继续表示“全推 / 重点推”，重点推送的判定方式由后续配置承载；本期统一实现 `ranked` 榜单策略，即只推 `netkeiba:access` 与 `netkeiba:attention` 新闻。
 - QQ 推送 blocker 判断必须复用现有 `NewsArticle.gate_blockers` / `gate_issues.severity=blocker` 结构化门禁结果，不在 QQ 服务里重新实现一套发布门禁。
-- 归档状态：`add-qqbot-auto-push` 已先归档为正式 `qqbot-auto-push` 规格，随后本轮三个子 change 已归档到 `openspec/changes/archive/2026-06-25-*` 并同步正式规格。后续仍建议维护者定期清理其他已完成的 active change。
+- 归档状态：`add-qqbot-auto-push` 已先归档为正式 `qqbot-auto-push` 规格，随后本轮三个子 change 已归档到 `旧规格流程/changes/archive/2026-06-25-*` 并同步正式规格。后续仍建议维护者定期清理其他已完成的 active change。
 - `elevate-ranked-netkeiba-sources` 已完成并部署生产：`upsert_article_from_draft()` 会将同一 netkeiba 文章从 `latest` 提升为首次命中的 `access` 或 `attention`，二者之间不互相覆盖，`latest` 也不会覆盖榜单来源；每次命中仍创建 `NewsSnapshot`。入库结果新增 `source_elevated` 稳定信号，且仍兼容旧的 `article, created = ...` 解包方式。
 - `push-ranked-news-to-qq` 已完成并部署生产：新增 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，`high_value_only` 下只推 `netkeiba:access` / `netkeiba:attention` 且无 blocker 的公开文章；已公开文章被榜单来源提升时会触发 QQ 自动推送编排，并继续依靠 `QQPushDelivery(article, target)` 唯一约束去重。QQ delivery 真正发送前也会复检推送资格，若文章后来出现 blocker 或不再符合范围，会标记为 `skipped/not_eligible`，不会继续发群消息。
 - `use-article-id-public-urls` 已完成并部署生产：`NewsArticle.public_path` 改为 `/news/<article_id>/`，公开详情页可通过文章 ID 访问，非纯数字旧 slug URL 会跳转到 ID URL；首页、热门列表、后台前台查看入口和 QQ 自动推送消息均继续通过 `article.public_path` 使用 ID URL。
-- 本地已通过完整 `stable` 测试、三个子 change 的严格校验、`openspec validate --all` 和 `git diff --check`；生产已通过容器重建、Django check、外部健康检查、首页检查、ID URL 与旧 slug 跳转 smoke test。
+- 本地已通过完整 `stable` 测试、三个子 change 的严格校验、`旧规格流程 validate --all` 和 `git diff --check`；生产已通过容器重建、Django check、外部健康检查、首页检查、ID URL 与旧 slug 跳转 smoke test。
 
 ## 当前已知风险与待确认项
 
@@ -3225,11 +3235,11 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 需要补足更标准的部署基线、回滚与备份演练
 - QQ Bot 自动推送已在生产开启测试群灰度；如出现 QQ 客户端发送异常，优先通过 `QQ_PUSH_ENABLED=false` 停止自动推送并保留 OneBot 网关排查。
 
-## 2026-06-23 QQ 群自动推送 OpenSpec change
+## 2026-06-23 QQ 群自动推送 旧规格流程 change
 
 ### 当前实现
 
-- 新增 OpenSpec change：`add-qqbot-auto-push`。
+- 新增 旧规格流程 change：`add-qqbot-auto-push`。
 - 新增自动 QQ 推送交付模型，以“文章 x QQ 群”为唯一粒度记录状态、尝试次数、最大尝试次数、错误类型、错误信息、OneBot 响应、消息 ID、最后尝试时间和成功时间。
 - 自动推送默认关闭：`QQ_PUSH_ENABLED=false`。
 - 自动推送默认范围：`QQ_PUSH_SCOPE=high_value_only`，首版高价值口径为 `score_total >= AUTO_REVIEW_THRESHOLD`；也支持 `all_public`。
@@ -3263,7 +3273,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 2026-06-24 自动发布门禁优化本地实现
 
-- OpenSpec change：`refine-automation-publish-gates`，当前 `tasks.md` 已完成本地实现和验证。
+- 旧规格流程 change：`refine-automation-publish-gates`，当前 `tasks.md` 已完成本地实现和验证。
 - 新增配置：
   - `AUTO_REWRITE_ENABLED=false`：默认跳过 AI 改写前置。
   - `AUTO_PUBLISH_CONTENT_SOURCE=base_translation`：默认使用基准翻译稿作为自动发布内容源。
@@ -3283,7 +3293,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py check`：通过。
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.AutomationFlowTests stable.tests.ConsoleFlowTests --noinput`：通过，23 项。
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：通过，106 项。
-  - `openspec validate refine-automation-publish-gates --strict`：通过。
+  - `旧规格流程 validate refine-automation-publish-gates --strict`：通过。
 
 ### 生产上线结果
 
@@ -3311,7 +3321,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 2026-06-24 抓取新鲜度与 JRA 日期解析本地实现
 
-- OpenSpec change：`fix-crawl-freshness-and-jra-date-parse`，当前已完成本地实现并于 `2026-06-25` 部署生产。
+- 旧规格流程 change：`fix-crawl-freshness-and-jra-date-parse`，当前已完成本地实现并于 `2026-06-25` 部署生产。
 - 修复范围：
   - JRA 官方新闻日期解析兼容 `2026年5月31日`、`5月31日`、零填充和非零填充日期。
   - JRA 无年份日期优先使用列表月份或 URL 年份；缺少上下文时使用当前东京年份，若推断日期晚于当前东京日期超过 7 天则回退上一年。
@@ -3324,8 +3334,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py check`：通过。
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.AdapterTests stable.tests.ConsoleFlowTests stable.tests.CrawlAutoTranslateTests --noinput`：通过，25 项。
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：通过，118 项。
-  - `openspec validate fix-crawl-health-running-and-schedule-stagger --strict`：通过。
-  - `openspec validate --all`：通过，7 项。
+  - `旧规格流程 validate fix-crawl-health-running-and-schedule-stagger --strict`：通过。
+  - `旧规格流程 validate --all`：通过，7 项。
 - 生产部署：
   - 服务器 `/opt/umanewsbot` 已于 `2026-06-25` 更新到 `7f54f13`，部署前 `.env` 备份为 `.env.backup.three-changes-20260625_003714`。
   - `web / worker / beat` 已重建，`manage.py check` 通过，`http://127.0.0.1/healthz/` 与 `/` 均返回 `200`。
@@ -3342,20 +3352,20 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 长采访或引语较多、翻译未成功、缺少基准中文翻译等会转为 `manual` / `pending_review`，需要人工审核后发布。
 - 人工发布通过运营后台文章编辑页完成时会写入 `workflow_status=published`、`published_to_web_at`、`published_by_mode=manual`；无封面时需要二次确认。Django Admin 或后台 API 若只改 `workflow_status` 而不补 `published_to_web_at`，仍不会被公开前台接收。
 
-## 2026-06-23 外部赛马数据导入 OpenSpec 提案
+## 2026-06-23 外部赛马数据导入 旧规格流程 提案
 
-- 已创建 OpenSpec change：`add-netkeiba-horse-data-import`。
+- 已创建 旧规格流程 change：`add-netkeiba-horse-data-import`。
 - 提案目标：使用 `keibascraper` / netkeiba 作为低频离线导入来源，先抓取近两年比赛、出走、赛果、赔率、马匹血统和马匹履历数据，保存结构化字段与原始 payload，并派生本地马名索引。
 - 关键约束：导入默认关闭，不加入自动全量调度；生产必须人工显式执行、强制限速、随机抖动、小批量、可暂停、可恢复；导入失败不得影响新闻抓取、翻译、自动化发布或公开前台。
 - 当前状态：仅完成 proposal、design、delta spec 和 tasks，尚未实现代码，尚未执行真实爬取。
 
-## 2026-06-19 公开首页资讯流升级 OpenSpec 主 change
+## 2026-06-19 公开首页资讯流升级 旧规格流程 主 change
 
 ### 已归档产物
 
-- 正式规格：`openspec/specs/public-home-info-feed/spec.md`
-- 归档目录：`openspec/changes/archive/2026-06-22-upgrade-public-home-info-feed/`
-- 归档内保留 proposal、design、delta spec、tasks 和 `.openspec.yaml`
+- 正式规格：`旧规格流程/specs/public-home-info-feed/spec.md`
+- 归档目录：`旧规格流程/changes/archive/2026-06-22-upgrade-public-home-info-feed/`
+- 归档内保留 proposal、design、delta spec、tasks 和 `.旧规格流程.yaml`
 
 ### 主范围
 
@@ -3385,8 +3395,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ### 校验结果
 
-- `openspec validate upgrade-public-home-info-feed --strict`：归档前通过。
-- `openspec validate --all`：归档前通过；归档并同步正式 spec 后再次通过。
+- `旧规格流程 validate upgrade-public-home-info-feed --strict`：归档前通过。
+- `旧规格流程 validate --all`：归档前通过；归档并同步正式 spec 后再次通过。
 - `/plan-eng-review upgrade-public-home-info-feed`：通过。
 - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable.tests.PublicHomeInfoFeedTests`：通过，10 项。
 - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py check`：通过。
@@ -3515,7 +3525,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 - `DB_ENGINE=sqlite python manage.py check`：通过。
 - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable`：通过，69 项。
-- `openspec validate --all`：通过。
+- `旧规格流程 validate --all`：通过。
 - 两种生产 Compose 配置基于 `.env.example` 检查通过。
 - 已使用独立 SQLite 数据库部署本地验收环境，并通过浏览器完成筛选、单篇重跑、接受、合并、拒绝、忽略、批量操作、操作日志和别名搜索验收。
 
@@ -3575,7 +3585,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ### 本地已实现
 
-- 新增 OpenSpec change：`add-netkeiba-horse-data-import`。
+- 新增 旧规格流程 change：`add-netkeiba-horse-data-import`。
 - 新增 `keibascraper==3.1.5` 依赖，并通过管理命令提供 import 冒烟检查入口。
 - 新增外部赛马数据表：比赛、出走表、赛果、赔率、马匹、马匹履历、马名索引、导入运行、导入错误和单来源导入锁。
 - 新增 `stable.services.external_horse_data`：
@@ -3658,10 +3668,10 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 后台原文选区快速加入术语库
 
-- OpenSpec change：`add-selection-term-quick-add`。
+- 旧规格流程 change：`add-selection-term-quick-add`。
 - 本地分支：`codex/add-selection-term-quick-add`。
 - 实现时间：`2026-06-24`。
-- 状态：已于 `2026-06-25` 合并到 `main` 并部署生产，OpenSpec 已归档为 `openspec/changes/archive/2026-06-24-add-selection-term-quick-add/`。
+- 状态：已于 `2026-06-25` 合并到 `main` 并部署生产，旧规格流程 已归档为 `旧规格流程/changes/archive/2026-06-24-add-selection-term-quick-add/`。
 
 ### 已实现能力
 
@@ -3684,9 +3694,9 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 ### 验证结果
 
 - `DB_ENGINE=sqlite python manage.py check` 已通过（本地使用 Codex bundled Python 执行）。
-- `DB_ENGINE=sqlite python manage.py test stable.tests.ConsoleFlowTests --verbosity=2` 已通过；本轮按 OpenSpec 场景补齐非法术语类型、换行误选整段、文章不存在、非联动状态保持和原文选区脚本限制等测试。
+- `DB_ENGINE=sqlite python manage.py test stable.tests.ConsoleFlowTests --verbosity=2` 已通过；本轮按 旧规格流程 场景补齐非法术语类型、换行误选整段、文章不存在、非联动状态保持和原文选区脚本限制等测试。
 - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable --verbosity=2` 已通过，126 个测试全部通过。
-- `openspec validate add-selection-term-quick-add --strict` 已通过。
+- `旧规格流程 validate add-selection-term-quick-add --strict` 已通过。
 - 本地浏览器验收使用临时 SQLite 后台：
   - 候选详情页可创建术语并返回当前候选页。
   - 候选详情页重复创建同类型同日文原词时显示失败提示和已有术语编辑链接。
@@ -3695,9 +3705,9 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 后台快速术语创建后的当前稿联动提案
 
-- OpenSpec change：`reapply-terms-after-quick-add`。
+- 旧规格流程 change：`reapply-terms-after-quick-add`。
 - 创建时间：`2026-06-24`。
-- 当前状态：本地实现和验证已完成；review 后的浮层交互和多标签页 session pending 返修已于 `2026-06-25` 完成，并已随 `7f54f13` 部署生产。OpenSpec 已归档为 `openspec/changes/archive/2026-06-24-reapply-terms-after-quick-add/`。
+- 当前状态：本地实现和验证已完成；review 后的浮层交互和多标签页 session pending 返修已于 `2026-06-25` 完成，并已随 `7f54f13` 部署生产。旧规格流程 已归档为 `旧规格流程/changes/archive/2026-06-24-reapply-terms-after-quick-add/`。
 - 目标：在候选详情页或文章编辑台快速创建正式术语后，为当前文章提供明确的后续动作：
   - 一次性“应用该术语到当前稿”：只把刚创建的指定术语应用到当前文章整篇已有中文字段，不调用翻译模型，不重扫整个正式术语库。
   - 页面级“重新翻译”：复用现有 `translate_article_task`，异步重新走翻译链路；不属于术语成功浮层，若页面已有按钮则不新增。
@@ -3725,15 +3735,15 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py check`：通过。
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.ConsoleFlowTests --noinput`：通过，31 项。
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：通过，135 项。
-  - `openspec validate reapply-terms-after-quick-add --strict`：通过。
+  - `旧规格流程 validate reapply-terms-after-quick-add --strict`：通过。
 - 生产部署记录见 `docs/deploy_runbook.md` 的 `2026-06-25 三个运营改造 change 合并、部署与归档`。
-- 规格校验：`openspec validate reapply-terms-after-quick-add --strict` 已通过。
+- 规格校验：`旧规格流程 validate reapply-terms-after-quick-add --strict` 已通过。
 
 ## 2026-06-25 外部马名索引接入识别链路本地实现
 
-- OpenSpec change：`use-external-horse-alias-for-name-recognition`。
+- 旧规格流程 change：`use-external-horse-alias-for-name-recognition`。
 - 创建时间：`2026-06-25`。
-- 当前状态：本地实现、验证、OpenSpec 归档和生产部署已完成；归档目录为 `openspec/changes/archive/2026-06-25-use-external-horse-alias-for-name-recognition/`。
+- 当前状态：本地实现、验证、旧规格流程 归档和生产部署已完成；归档目录为 `旧规格流程/changes/archive/2026-06-25-use-external-horse-alias-for-name-recognition/`。
 - 背景：近两年外部赛马数据已导入 `ExternalHorseAlias`，当前未知马名识别仍主要依赖片假名 token + 上下文打分，无法真正判断没见过的片假名词是不是普通词，容易把 `タイトル` 等普通词误判为马名，也可能漏掉 `マヤノライジン` 等真实马名。
 - 核心边界：
   - `TermEntry` 继续表示有中文译名或固定译法的正式术语，参与翻译术语表、译后替换和正式术语校验。
@@ -3757,16 +3767,16 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - `termbase-and-race-priority`：修改翻译链路正式术语命中，并新增外部已知马名保留校验。
   - `term-candidate-discovery`：修改候选发现，使外部马名索引成为高置信来源且不绕过正式术语审核。
 - 已同步正式规格：
-  - `openspec/specs/external-horse-name-recognition/spec.md`
-  - `openspec/specs/termbase-and-race-priority/spec.md`
-  - `openspec/specs/term-candidate-discovery/spec.md`
+  - `旧规格流程/specs/external-horse-name-recognition/spec.md`
+  - `旧规格流程/specs/termbase-and-race-priority/spec.md`
+  - `旧规格流程/specs/term-candidate-discovery/spec.md`
 - 验证结果：
   - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py check`：通过。
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.TermResolverTests stable.tests.AutomationFlowTests stable.tests.TranslationWorkflowTests stable.tests.TermCandidateDiscoveryTests --noinput`：通过，49 项。
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.TermResolverTests stable.tests.AutomationFlowTests stable.tests.TranslationWorkflowTests --noinput`：review 返修后通过，39 项。
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：review 返修后通过，147 项。
-  - `openspec validate use-external-horse-alias-for-name-recognition --strict`：通过。
-  - `openspec validate --all`：归档前后均通过。
+  - `旧规格流程 validate use-external-horse-alias-for-name-recognition --strict`：通过。
+  - `旧规格流程 validate --all`：归档前后均通过。
 - 生产部署结果：
   - GitHub PR #6 `[codex] Use external horse aliases for name recognition` 已 squash merge 到 `main`，merge commit 为 `35b0866`。
   - 服务器 `/opt/umanewsbot` 已从 `817e1c8` 快进到 `35b0866`，部署前 `.env` 备份为 `.env.backup.external-horse-alias-20260625_182936`。
@@ -3781,7 +3791,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 2026-06-25 国际赛马资讯扩展本地实现
 
-- OpenSpec change：`expand-international-racing-coverage`。
+- 旧规格流程 change：`expand-international-racing-coverage`。
 - 当前状态：本地代码、迁移、测试、文档和 review 返修已完成；尚未部署生产，生产仍以已上线的日本新闻源和既有 QQ 推送配置为准。
 - 已落地能力：
   - `NewsSource`、`NewsArticle`、外部数据缓存、`TermEntry`、`TermCandidate` 和 `PushTarget` 已增加地区、原文语言、来源类型或群级推送配置字段；现有数据默认回填为 `japan / ja`。
@@ -3809,13 +3819,13 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - HKJC 管理命令：`server/stable/management/commands/import_hkjc_external_data.py`
   - 公开首页地区 tab：`server/stable/views.py`、`server/stable/templates/stable/public/feed.html`
 - 已完成的本地验证：
-  - `openspec/changes/expand-international-racing-coverage/test_cases.md`：已新增完整测试用例矩阵，按 OpenSpec `proposal/design/spec` 拆分，不依据实现代码倒推；覆盖地区/语言、国际新闻源、公开首页、术语多语言、QQ 群级推送、HKJC 导入、欧美数据源 spike、迁移和非目标边界。
+  - `旧规格流程/changes/expand-international-racing-coverage/test_cases.md`：已新增完整测试用例矩阵，按 旧规格流程 `proposal/design/spec` 拆分，不依据实现代码倒推；覆盖地区/语言、国际新闻源、公开首页、术语多语言、QQ 群级推送、HKJC 导入、欧美数据源 spike、迁移和非目标边界。
   - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py check`：通过。
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.AdapterTests stable.tests.InternationalSourceMetadataTests stable.tests.HKJCExternalDataImportTests stable.tests.AutomationFlowTests --noinput`：通过，35 项。
   - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.InternationalSourceMetadataTests stable.tests.QQAutoPushTests --verbosity 2`：通过，26 项。
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable --noinput`：最终源清单返修前通过，201 项；返修后通过，209 项；2026-06-26 上线前 review 返修后通过，210 项；第二轮 review 返修后通过，214 项，新增覆盖人工来源启用保留、国际榜单来源提升、普通 list 不覆盖榜单主来源、QQ ranked 识别国际榜单稿；本次 review 补丁后通过，217 项，新增覆盖国际榜单来源提升后触发 QQ 自动推送编排、英文外部马名索引识别、术语导入 upsert 命中跨语言别名时保留正式概念主原文；术语批量别名和 HKJC 上限口径返修后通过，219 项；本轮全球范围适配 review 返修后通过，224 项，新增覆盖英文外部马名真实写法保护、非日文外部别名候选查询、旧 QQ 群空地区日本兼容、地区 tab 翻页保留过滤和英文赛马关键词评分；本轮 review 返修后通过，227 项，新增覆盖翻译保护使用英文外部马名真实写法、发布校验不误报已保留真实写法、英文正式术语大小写不敏感匹配与替换；最终 review 补丁后通过，231 项，新增覆盖英文 P0 马匹自动化评分大小写不敏感命中、英文核心术语缺失大小写不敏感阻断、新增英文术语应用当前稿大小写不敏感替换、QQ 群非法地区配置回退日本旧行为；本轮术语生命周期补丁后完整 `stable` 测试通过 236 项，新增覆盖英文重复术语大小写不敏感拒绝、API 创建/更新同步 `TermAlias`、术语启停同步别名状态、候选合并大小写去重、同语言大小写变体导入 upsert 更新主原文，以及 AI 改写 prompt 使用英文实际命中别名；本次上线前返修后完整 `stable` 测试通过 241 项，新增覆盖术语导入 upsert 原文别名冲突预览/提交双重拒绝、`TDN France keyword` canonical 去重并保留法国地区信号、以及术语列表分页保留原文语言筛选。
-  - `openspec validate expand-international-racing-coverage --strict`：通过。
-  - `openspec validate --all`：通过，9 项。
+  - `旧规格流程 validate expand-international-racing-coverage --strict`：通过。
+  - `旧规格流程 validate --all`：通过，9 项。
   - `git diff --check`：通过。
   - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py makemigrations --check --dry-run`：通过，无额外迁移。
 - 国际新闻源 dry-run 探测：
@@ -3830,7 +3840,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 2026-07-10 多地区新闻归属与英文门禁实现
 
-- OpenSpec change：`support-multiregion-news-attribution-and-english-gates`，当前已完成本地实现，待线上前执行生产 dry-run 抽样。
+- 旧规格流程 change：`support-multiregion-news-attribution-and-english-gates`，当前已完成本地实现，待线上前执行生产 dry-run 抽样。
 - 数据模型：保留 `NewsArticle.racing_region` 作为主地区，新增 `NewsArticleRelatedRegion` 独立表记录关联地区，并增加 `attribution_source / attribution_summary / attribution_locked` 归属元数据；新增迁移 `0023_multiregion_news_attribution.py`。
 - 归属口径：新采集文章和自动化打分前会运行 `stable.services.news_attribution.apply_article_attribution()`；顺序为赛事/赛场信号优先，其次马、骑手、练马师、马主等核心对象，再回退来源地区。法国来源涉及海外赛事时进入法国池和比赛地区池；爱尔兰内容暂归英国并写入 `ireland` 标签。人工归属是否锁定由编辑页显式开关决定，锁定后自动重算不覆盖。
 - 英文门禁：`validate_rewrite()` 的英文术语地区筛选已改为使用“主地区 + 关联地区”集合，避免英国赛事/法国来源等跨地区文章被 `term_region_excluded` 误排除。
@@ -3839,22 +3849,22 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 运营入口：站内文章编辑页新增主地区、关联地区、内容类型、锁定归属字段；Django Admin 增加 `NewsArticleRelatedRegion` inline；文章列表和详情页地区标签显示所有可见地区。
 - 重算命令：新增 `reprocess_multiregion_attribution_gates`，支持 `--dry-run / --commit / --region / --hours / --limit / --json`。commit 只重新写归属、重跑门禁并把通过文章恢复为候选，不直接发布。
 - 配置：新增 `MULTIREGION_ATTRIBUTION_ENABLED`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED`、`MULTIREGION_QQ_ALLOWED_CONTENT_CATEGORIES`，已写入 `.env.example`。
-- 本地验证：`DB_ENGINE=sqlite .venv/bin/python server/manage.py check` 通过；新增/相关测试 86 项通过；`makemigrations --check --dry-run` 通过；两个生产 compose config 使用临时 `.env` 渲染通过；`openspec validate support-multiregion-news-attribution-and-english-gates --strict` 通过。
+- 本地验证：`DB_ENGINE=sqlite .venv/bin/python server/manage.py check` 通过；新增/相关测试 86 项通过；`makemigrations --check --dry-run` 通过；两个生产 compose config 使用临时 `.env` 渲染通过；`旧规格流程 validate support-multiregion-news-attribution-and-english-gates --strict` 通过。
 - `2026-07-10` 未提交改动复审后补齐 `stable.0023_multiregion_news_attribution` 迁移，并将新内容类别贯通到赛事新闻关联和 AI 改写提示：`preview / tips` 按赛前关联，`result_brief` 按赛后关联，所有新类别均有明确改写指令；保留旧类别兼容。SQLite 测试库已实际应用迁移，新增回归测试锁定新类别映射；完整 `stable` 测试 `522` 项通过。本次未部署、未执行生产迁移。
 - `2026-07-10` 未提交改动代码审查返修已完成：自动归属将明确赛事/赛场与国家、对象、机构上下文分层，赛事地优先不再受固定地区顺序干扰；多个模糊上下文并存时保守回退主来源；来源 URL/备注不参与归属。重复来源入库始终使用文章最终主来源配置，避免 TDN 法国稿被普通 TDN 重抓改回美国。`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false` 现在同时约束 QQ 即时推送；后台锁定复选框可正常取消；重处理 dry-run 对锁定文章使用与 commit 相同的有效地区并输出 `attribution_locked / attribution_applied / inferred_regions`；QQ 默认白名单移除 `other`。新增反例测试后相关测试组 `123` 项通过，完整 `stable` 回归 `529` 项通过；生产 dry-run 与部署仍未执行。
-- `2026-07-10` 第二轮代码审查返修已完成：文章编辑页通过隐藏哨兵区分旧请求与新版空多选，运营可以把全部关联地区清空；`NewsArticleRelatedRegion` 使用标准字段级 `ValidationError`，Django Admin 选择与主地区相同的关联地区时显示中文错误而不是 500；重处理命令的 `--limit` 改为按有效门禁候选计数，并输出 `scanned_count / candidate_count / has_more_candidates`；公开卡片以主地区开头，详情页和 QQ 明确区分“主地区/关联地区”，单地区回退时 QQ 不显示关联地区。目标测试 `19` 项、相关测试组 `129` 项、完整 `stable` 回归 `534` 项通过；Django check、迁移漂移、OpenSpec 严格校验和 `git diff --check` 均通过。本次仍未执行生产 dry-run 或部署。
-- `2026-07-10` 第三轮审查按确认范围只修复公开展示回退：`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false` 时，首页卡片和文章详情也只显示主地区，关联地区数据保留。按当前决策不收紧 `other` 关联地区的后台保存规则。目标测试 `20` 项、完整 `stable` 回归 `540` 项通过；Django check、迁移漂移、OpenSpec 严格校验和 `git diff --check` 均通过。生产 dry-run 与部署仍未执行。
-- `2026-07-11` 已将分支快进合并最新 `origin/main`；多地区新闻迁移顺延为 `0023_multiregion_news_attribution` 并依赖主干 horse profile `0022`。赛事历史抓取编排第五轮审查补齐基础证据链；第六轮定向返修进一步让批量候选保存/apply 整批事务回滚、把完整 adapter 输入写入批准快照并在 `RaceEvent` 漂移时阻断、只从完整 approved 记录读取混合来源策略 SHA。按用户决定，不强制所有 importer apply 提供 `--expected-sha256`，暂不增加请求预算并发锁。OpenSpec change `orchestrate-race-event-data-crawls` 已同步正式规格并归档到 `openspec/changes/archive/2026-07-11-orchestrate-race-event-data-crawls/`。目标测试 `67` 项、完整 `stable` 回归 `589` 项通过；Django check、迁移漂移、两个 change 严格校验、OpenSpec 全量 `21` 项和 `git diff --check` 均通过。本轮生产部署进行中，尚未运行赛事网络抓取或写入。
+- `2026-07-10` 第二轮代码审查返修已完成：文章编辑页通过隐藏哨兵区分旧请求与新版空多选，运营可以把全部关联地区清空；`NewsArticleRelatedRegion` 使用标准字段级 `ValidationError`，Django Admin 选择与主地区相同的关联地区时显示中文错误而不是 500；重处理命令的 `--limit` 改为按有效门禁候选计数，并输出 `scanned_count / candidate_count / has_more_candidates`；公开卡片以主地区开头，详情页和 QQ 明确区分“主地区/关联地区”，单地区回退时 QQ 不显示关联地区。目标测试 `19` 项、相关测试组 `129` 项、完整 `stable` 回归 `534` 项通过；Django check、迁移漂移、旧规格流程 严格校验和 `git diff --check` 均通过。本次仍未执行生产 dry-run 或部署。
+- `2026-07-10` 第三轮审查按确认范围只修复公开展示回退：`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false` 时，首页卡片和文章详情也只显示主地区，关联地区数据保留。按当前决策不收紧 `other` 关联地区的后台保存规则。目标测试 `20` 项、完整 `stable` 回归 `540` 项通过；Django check、迁移漂移、旧规格流程 严格校验和 `git diff --check` 均通过。生产 dry-run 与部署仍未执行。
+- `2026-07-11` 已将分支快进合并最新 `origin/main`；多地区新闻迁移顺延为 `0023_multiregion_news_attribution` 并依赖主干 horse profile `0022`。赛事历史抓取编排第五轮审查补齐基础证据链；第六轮定向返修进一步让批量候选保存/apply 整批事务回滚、把完整 adapter 输入写入批准快照并在 `RaceEvent` 漂移时阻断、只从完整 approved 记录读取混合来源策略 SHA。按用户决定，不强制所有 importer apply 提供 `--expected-sha256`，暂不增加请求预算并发锁。旧规格流程 change `orchestrate-race-event-data-crawls` 已同步正式规格并归档到 `旧规格流程/changes/archive/2026-07-11-orchestrate-race-event-data-crawls/`。目标测试 `67` 项、完整 `stable` 回归 `589` 项通过；Django check、迁移漂移、两个 change 严格校验、旧规格流程 全量 `21` 项和 `git diff --check` 均通过。本轮生产部署进行中，尚未运行赛事网络抓取或写入。
 - `2026-07-11` 上线等待空闲窗口时发现生产 worker 在归属开关关闭后仍执行完整术语扫描，两个 crawl worker 长时间高 CPU。已修正 `apply_article_attribution()`：开关关闭或人工归属锁定且未 force 时直接返回当前归属，仅对历史空内容类别做轻量分类，不调用 `infer_article_attribution()`。目标测试 `30` 项、完整 `stable` 回归 `591` 项通过；生产开关继续关闭，五地区产品抽样仍未通过，本修复待随本轮部署上线。
 - `2026-07-11` 已完成赛事历史抓取编排与多地区归属基础代码上线，生产代码提交为 `6e2cc92`。部署前备份 `.env.backup.orchestration-hotfix-20260711_093556` 和 `backups/db/pre-orchestration-hotfix-20260711_093556.sql.gz`，数据库备份约 `102M` 且 `gzip -t` 通过。`stable.0023_multiregion_news_attribution` 已应用，无新增待执行迁移。
 - 上述归属短路热修复已在生产验证：当 `MULTIREGION_ATTRIBUTION_ENABLED=false` 时，真实文章调用 `apply_article_attribution(save=False)` 不会调用 `infer_article_attribution()`，返回 `attribution_disabled`。worker 从部署前两个进程持续高 CPU 恢复到约 `0.04%`，旧抓取积压已消化，Celery reserved 为空，日志未见 traceback/error。
 - 生产 `MULTIREGION_ATTRIBUTION_ENABLED=false`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED=false` 继续保持关闭；此前五地区 dry-run 的产品归属口径仍未通过，因此 `support-multiregion-news-attribution-and-english-gates` 保持 active，任务 `9.6` 继续待办，未执行历史归属 commit。
 - 生产回归通过：六个容器正常，Django check 通过；本机与公网 `/healthz/`、首页、法国/英国地区页、赛事日历和后台登录页均正常。已通过应用内浏览器真实打开首页、法国频道、英国频道、赛事日历和后台登录页，页面标题、地区导航和文章列表正常渲染。
-- `2026-07-11` 经用户确认，`support-multiregion-news-attribution-and-english-gates` 已同步六组 delta spec 后归档至 `openspec/changes/archive/2026-07-11-support-multiregion-news-attribution-and-english-gates/`，当前无 active OpenSpec change。正式规格新增 `multiregion-news-attribution`，并同步英文门禁、国际内容分类、发布窗口、公开地区 tab 和 QQ 多地区规则；OpenSpec 全量 `21` 项通过。归档时保留任务 `9.6` 未完成警告：五地区生产 dry-run 的产品归属口径仍未通过，生产两个多地区开关继续关闭。
+- `2026-07-11` 经用户确认，`support-multiregion-news-attribution-and-english-gates` 已同步六组 delta spec 后归档至 `旧规格流程/changes/archive/2026-07-11-support-multiregion-news-attribution-and-english-gates/`，当前无 active 旧规格流程 change。正式规格新增 `multiregion-news-attribution`，并同步英文门禁、国际内容分类、发布窗口、公开地区 tab 和 QQ 多地区规则；旧规格流程 全量 `21` 项通过。归档时保留任务 `9.6` 未完成警告：五地区生产 dry-run 的产品归属口径仍未通过，生产两个多地区开关继续关闭。
 
 ## 2026-07-01 多地区新闻增量窗口实现与生产验证
 
-- OpenSpec change：`increase-multiregion-news-volume`，已完成实现、归档、部署生产，并开启抓取 / 发布 / QQ 三条生产窗口。
+- 旧规格流程 change：`increase-multiregion-news-volume`，已完成实现、归档、部署生产，并开启抓取 / 发布 / QQ 三条生产窗口。
 - 已新增窗口运行模型：`ProductionWindow`、`WindowCandidateDecision`、`WindowTargetDecision`、`QuotaLedger`、`MajorRaceEvent`；`NewsSource` 增加生产批准、有效抓取间隔、backoff、人工暂停、错误分类、连续成功/失败和重要赛事升频字段。
 - 已实现日常/重要赛事窗口服务：日常 15 分钟、重要赛事 5 分钟、最多 3 小时回看；重要赛事按地区当地时间录入，开跑前 3 小时到开跑后 1 小时升频，无开跑时间时按当地日期级窗口处理。
 - 已实现新抓取窗口：只选择 `enabled=true`、`production_approved=true`、未暂停、未 backoff 的来源；连续失败 3 次自动降频，403/429/验证码类错误使用更保守 backoff，连续成功 3 次恢复默认 15 分钟。
@@ -3871,7 +3881,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   - `DB_ENGINE=sqlite manage.py check`：通过。
   - `DB_ENGINE=sqlite manage.py makemigrations --check --dry-run`：通过。
   - 模型/窗口/来源/发布/QQ/重要赛事导入相关目标测试通过。
-  - `2026-07-02` review 返修后，窗口相关目标测试 26 项通过，完整 `stable` 测试 399 项通过；`DB_ENGINE=sqlite manage.py check`、`openspec validate increase-multiregion-news-volume --strict`、`openspec validate --all` 和 `git diff --check` 均通过。
+  - `2026-07-02` review 返修后，窗口相关目标测试 26 项通过，完整 `stable` 测试 399 项通过；`DB_ENGINE=sqlite manage.py check`、`旧规格流程 validate increase-multiregion-news-volume --strict`、`旧规格流程 validate --all` 和 `git diff --check` 均通过。
   - 临时 SQLite 迁移后 `audit_multiregion_news_production` 可输出有效 JSON。
 - 生产运行验证：
   - `2026-07-02` 已部署到生产 `a122130`，容器 `web / worker / beat` 正常，`http://umafans.run/healthz/`、首页和抽检 `/news/<article_id>/` 均返回 `200`，Celery `active/reserved` 为空。
@@ -3889,13 +3899,13 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 ## 2026-07-02 榜单唤醒未发布文章实现
 
-- OpenSpec change：`revive-ranked-news-for-publish`，当前已完成实现、归档和生产部署。生产服务器 `/opt/umanewsbot` 已部署到 `a774672`，部署前备份 `.env` 为 `.env.backup.ranked-revival-20260702_145529`，数据库备份为 `backups/db/pre-ranked-revival-20260702_145529.sql.gz`。
+- 旧规格流程 change：`revive-ranked-news-for-publish`，当前已完成实现、归档和生产部署。生产服务器 `/opt/umanewsbot` 已部署到 `a774672`，部署前备份 `.env` 为 `.env.backup.ranked-revival-20260702_145529`，数据库备份为 `backups/db/pre-ranked-revival-20260702_145529.sql.gz`。
 - 用户确认的产品规则：榜单二次命中不是直接发布按钮，而是“这篇文章值得重新认真看一次”的强信号。未发布文章从普通来源升级为榜单来源时，应允许低分忽略、价值不足转人工、待翻译或翻译失败文章被唤醒；翻译失败或待翻译文章需要自动重试翻译；翻译成功后重新评分，高价值来源信号参与自动发布判断。
 - 边界：榜单唤醒不得绕过翻译成功、自动评分、发布校验、发布窗口配额和 QQ 限流；人工拒绝、撤回、已发布、高度重复 blocker、正文缺失、核心术语缺失等硬门禁仍不自动复活。
 - 规格影响：修改 `automation-publish-gates` 和 `multiregion-news-production`，新增榜单唤醒、翻译重试、重新评分、按唤醒时间进入发布候选池以及窗口决策留痕要求。
 - 代码实现：新增 `NewsArticle.ranked_revived_at` nullable/indexed 字段和迁移 `0019_newsarticle_ranked_revived_at.py`；新增 `revive_article_after_ranked_source_elevation()` 服务，记录 `decision_reason.ranked_revival`，区分 `translation_retry / rescore / blocked / already_retrying_translation`；netkeiba 榜单和国际榜单抓取在 `source_elevated=true` 时对未发布文章执行榜单唤醒，已发布文章继续沿用现有 QQ 补推；发布窗口候选查询支持 `first_seen_at` 或 `ranked_revived_at` 最近 3 小时，并在 `WindowCandidateDecision.payload` 写入榜单唤醒来源和时间。
 - 测试进展：已按 TDD RED-GREEN 补充并跑通 `server/stable/tests.py` 中的榜单唤醒测试，覆盖 nullable/indexed `ranked_revived_at` 字段契约、低分 ignored 复活、价值不足人工状态复活、翻译失败/待翻译重试、人工终态/duplicate/blocker 不复活、重复榜单命中幂等、发布窗口按 `ranked_revived_at` 回看、以及 netkeiba/国际榜单抓取对未发布文章走唤醒而非 QQ 直推。
-- 验证：`DB_ENGINE=sqlite manage.py check` 通过；`DB_ENGINE=sqlite manage.py makemigrations --check --dry-run` 通过；`DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true manage.py test stable --noinput` 通过，418 项；归档前 `openspec validate revive-ranked-news-for-publish --strict` 通过，归档后 `openspec validate --all` 通过，14 项；`git diff --check` 通过。
+- 验证：`DB_ENGINE=sqlite manage.py check` 通过；`DB_ENGINE=sqlite manage.py makemigrations --check --dry-run` 通过；`DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true manage.py test stable --noinput` 通过，418 项；归档前 `旧规格流程 validate revive-ranked-news-for-publish --strict` 通过，归档后 `旧规格流程 validate --all` 通过，14 项；`git diff --check` 通过。
 - 上线结果：迁移 `stable.0019_newsarticle_ranked_revived_at` 已应用；`manage.py check` 通过；生产模型确认 `ranked_revived_at null=True db_index=True`，榜单唤醒服务可 import；`http://127.0.0.1/healthz/`、`http://umafans.run/healthz/`、首页和后台登录入口均返回 `200`；`web / worker / beat` 已重建并运行，Celery `active/reserved` 为空，近 80 行 `web / worker / beat` 日志未见 traceback/error。
 - 上线后观察：继续观察发布窗口候选决策中的 `ranked_revival` payload、翻译重试数量、重新评分结果和 QQ 是否仍只推已发布/合格文章。回滚代码后 `ranked_revived_at` 字段可保留不用；如需彻底清理，后续单独做清理迁移。
 
@@ -3913,7 +3923,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 公开赛事详情页和赛事日历赛果将马名、骑师名批量关联 active `TermEntry / TermAlias`；精确命中时展示正式中文译名，候选优先级为赛事同地区、全局、其他地区，未命中保留来源原文。
 - 出马表不再使用抓取来源行序直接展示。当前日本、香港、英国、法国、美国均优先按马号自然升序，缺马号时回退闸位，再回退来源 `sort_order`；支持 `1A / 2 / 10` 等编号。
 - 修复只改变公开展示，不覆盖 `RaceEventRunner / RaceEventResult / RaceEventHistoryWinner` 中的来源原文，也不改变赛果名次顺序。
-- 本地目标测试 `23` 项、完整 `stable` 回归 `612` 项、Django check、迁移漂移检查、OpenSpec 严格校验和 `git diff --check` 均通过。
+- 本地目标测试 `23` 项、完整 `stable` 回归 `612` 项、Django check、迁移漂移检查、旧规格流程 严格校验和 `git diff --check` 均通过。
 - 已部署生产提交 `d071952`，无新增迁移。生产 `web / worker / beat` 重建正常，内外 healthz、赛事日历和日本德比详情均返回 `200`，近 5 分钟服务日志无 traceback/error。
 - 线上首批术语覆盖抽检：香港赛果已是中文原文；英国马名 `13/13`、骑师 `9/13` 命中；美国马名 `2/18`、骑师 `11/18` 命中；法国马名 `1/7`、骑师 `0/7` 命中；日本德比马名 `1/18`、骑师 `0/18` 命中。日本德比当前冠军 `ロブチェン` 和骑师 `松山 弘平` 尚无 active 正式术语，页面按规则保留原文，后续需补词库而不是改展示逻辑。
 - 部署前 `.env` 备份为 `.env.backup.race-display-20260712_002533`；数据库备份为 `backups/db/pre-race-display-20260712_002533.sql.gz`，约 `105M`，gzip 校验通过，SHA-256 为 `99994e84d3154dd9d4c1503b96688cd24bf7e00d9ad13aca02a965a69d64a8c0`。
@@ -3922,7 +3932,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 新长期目标已锁定：日本、中国香港、英国、法国、美国赛事采用相同历史深度，统一追溯至 1984 年，并沿用应到清单、跨来源关联、去重补漏、五地区抽样、覆盖审计、dry-run、备份、分批写入和写后核验门禁。
 - 生产只读基线：`RaceEvent=995`，全部为 2026 年；日本 `186`、香港 `20`、英国 `203`、法国 `174`、美国 `412`。按现有系列机械乘以 1984–2026 的 43 年，理论上限约 `42,785` 个年度对象，但该数字尚未扣除创办年、停办/取消和历史等级范围变化。
 - 当前前置缺口：编排器支持年份范围，但要求每个年份先存在正式 `RaceEvent`；日本、香港部分 `series_key` 带 2026 日期，美国另有两个同年重复系列键，不能直接复制当前赛历生成历史年度对象。
-- 已创建 OpenSpec change `backfill-race-events-to-1984`，完成 proposal、design、4 份 delta spec 和 tasks；`/grill-me` 共锁定 22 个产品决策。两轮 `/plan-eng-review` 已收敛，最终 verdict 为 APPROVED，审查记录见 `engineering_review.md`。当前只获准进入“编写完整测试用例”阶段，尚未实现代码、触网、创建历史赛事或写生产数据。
+- 已创建 旧规格流程 change `backfill-race-events-to-1984`，完成 proposal、design、4 份 delta spec 和 tasks；`/grill-me` 共锁定 22 个产品决策。两轮 `/plan-eng-review` 已收敛，最终 verdict 为 APPROVED，审查记录见 `engineering_review.md`。当前只获准进入“编写完整测试用例”阶段，尚未实现代码、触网、创建历史赛事或写生产数据。
 - `/grill-me` Q1 已确认选择 A：历史范围为当前五地区全部 graded/pattern 系列，包括日本 JRA/NAR 分级赛、香港分级赛、英国/法国 Pattern Race 和美国 Graded Stakes；明确排除普通赛、让赛和未胜利赛。
 - `/grill-me` Q2 已确认选择 A：入选赛事系列按完整系列史收录，从 `max(1984, 实际创办年)` 开始；赛事升级为分级赛之前的届次也纳入，并保存当年真实等级。
 - `/grill-me` Q3 已确认选择 A：纳入 1984–当前年度任一年曾属于 graded/pattern 体系、但后来停办、降级退出或不在 2026 当前目录中的历史独有系列。完整目录必须逐年发现，不能只从现役 2026 系列向前复制。
@@ -3945,8 +3955,8 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - `/grill-me` Q20 已确认选择 A：赛事日历增加年份筛选和赛事名称搜索，结果进入现有年度详情页；不新增系列页，也不要求按短窗口连续翻到 1984 年。
 - `/grill-me` Q21 已确认选择 A：哈希锁定 artifact 是审批与 apply 唯一凭证；后台增加按地区/年代/系列/状态/冲突查看的汇总入口，但不得绕过 artifact 直接批量写入。
 - `/grill-me` Q22 已确认选择 A：质量达标且 published 的历史年度赛事允许搜索引擎收录并进入分片 sitemap；draft、身份冲突、资料不足和 not_held 不收录。
-- 本轮 `/grill-me` 当时已完成关键产品分支确认，后续也已完成旧 OpenSpec design、delta specs 和 tasks 编写；这是一条历史进度记录，不是现行下一步。`2026-07-15` 起剩余工作按本文件顶部的新流程迁移。
-- `backfill-race-events-to-1984` 已完成两轮 Full `/plan-eng-review`，最终 APPROVED；随后已创建 `test_cases.md`，共 160 个唯一测试用例，覆盖范围、系列/迁移、年度状态机、来源权威、artifact、五地区 adapter、批次、导入、公开页面、运维和非目标回归。OpenSpec change strict、全量 22 项和 `git diff --check` 均通过。历史上曾按旧流程进入 apply 阶段；该交接已由 `2026-07-15` 新流程取代，后续从安全检查点读取现存规格并只对未实现行为补真实 RED，再由 subagent 实现并复用同一需求既有 reviewer 会话审核。此处不伪造既往 RED，也不重做已完成生产动作。
+- 本轮 `/grill-me` 当时已完成关键产品分支确认，后续也已完成旧 旧规格流程 design、delta specs 和 tasks 编写；这是一条历史进度记录，不是现行下一步。`2026-07-15` 起剩余工作按本文件顶部的新流程迁移。
+- `backfill-race-events-to-1984` 已完成两轮 Full `/plan-eng-review`，最终 APPROVED；随后已创建 `test_cases.md`，共 160 个唯一测试用例，覆盖范围、系列/迁移、年度状态机、来源权威、artifact、五地区 adapter、批次、导入、公开页面、运维和非目标回归。旧规格流程 change strict、全量 22 项和 `git diff --check` 均通过。历史上曾按旧流程进入 apply 阶段；该交接已由 `2026-07-15` 新流程取代，后续从安全检查点读取现存规格并只对未实现行为补真实 RED，再由 subagent 实现并复用同一需求既有 reviewer 会话审核。此处不伪造既往 RED，也不重做已完成生产动作。
 
 ## 2026-07-12 历史赛事回填 apply 第一阶段
 
@@ -3958,7 +3968,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 新增默认关闭配置：`HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false`，并设置请求、source cache 和最小剩余磁盘预算。历史 prepare 必须同时通过功能开关、网络开关、plan 显式授权和预算校验。
 - 当前相关模型、service、command、后台、旧赛事页面和旧编排回归共 `122` 项通过；空 SQLite 正向迁移、反向回滚、再迁移、Django check 和迁移漂移检查通过。完整实现、全量回归、代码 review 和生产验收仍未完成。
 - 后续 apply 与生产准备已推进到 `65/82` 项，代码与自动化测试任务已全部完成：除总账切批、历史 importer、公开搜索和分片 sitemap 外，已新增五地区统一离线目录 adapter、`parse_historical_race_catalog` 标准候选命令、共享 source cache/请求预算锁、历史网络运行日志，以及 sitemap/年份缓存和查询索引。五地区三年代测试摘录只验证解析契约，不代表生产目录已收齐。
-- 本轮专项测试覆盖目录、模型、artifact、批次、日志、缓存和编排，完整 `stable` 回归最终为 `743/743`；Django check、迁移无漂移、OpenSpec strict/all `23/23`、三套 Compose 配置、实际 Docker 镜像构建及容器内 `/app/runtime` 路径检查均通过。
+- 本轮专项测试覆盖目录、模型、artifact、批次、日志、缓存和编排，完整 `stable` 回归最终为 `743/743`；Django check、迁移无漂移、旧规格流程 strict/all `23/23`、三套 Compose 配置、实际 Docker 镜像构建及容器内 `/app/runtime` 路径检查均通过。
 - 已完成多轮 `/review -> 修复 -> 重新 review`：修复目录年份/香港赛季与 provenance、稳定 key 冲突、批准人和人工锁、artifact/cache 路径边界、apply-check cache 保护、已导入/永久缺档状态漂移、共享 Redis cache 降级，以及受保护 cache 不可覆盖和大文件分块校验。最终一轮 review 无 actionable finding，代码门禁 clean；工具已部署并完成 2026 mapping，但尚未创建历史总账、抓取 1984–2025 详情或公开历史赛事。
 - 生产部署和 2026 mapping 已完成，当前进度 `65/82`。剩余 `17` 项全部是生产操作：逐年官方 source cache/总账、首批五地区验收、分年代带抓取落库和最终审计。1984 起官方年鉴 cache 尚未收齐，不能把测试 fixture 当作生产总账分母。
 
@@ -4008,7 +4018,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 邮件告警接收地址已配置为 `754652181@qq.com`，但生产尚无 SMTP/EMAIL_HOST 凭据，因此 `TRANSLATION_FAILURE_EMAIL_ENABLED=false`。在完成 SMTP 配置和测试邮件前，不得宣称邮件通知可用或开启该开关。
 - 运行验收：服务器内部 `http://127.0.0.1/healthz/` 与公网 `http://umafans.run/healthz/` 返回 200；浏览器真实打开首页、法国频道和 `/news/8093/` 详情页均正常，详情页含 8 个正文段落且无前端错误。HTTPS 仍未接入证书，Nginx 443 TLS server 块原本即为注释状态，本次不将 HTTPS 计为已完成能力。
 - 法国只读 probe 未写文章：France Galop / TDN France / TDN France Broad 分别得到 `20 / 4 / 12` 条列表候选，三个来源均为 accepted，抽取的 6 篇详情全部成功；最新样本时间覆盖 2026-07-10 至 2026-07-12，未再返回 2020/2022 历史稿。生产法国来源 13/14/21 仍为 enabled、production approved、最近抓取 success。
-- 该日 OpenSpec 进度为 `59/68`，其双审 Gold 待办已由后续单审资格决策取代。当前 OpenSpec 为 `63/71`：159 条 Gold 已通过本地覆盖与质量门槛，生产 gold/dry-run、人工复核、时间修复与翻译小批处理、shadow/enforce 灰度、网页/测试群/正式群扩展和窗口数量验收仍未完成，因此 change 保持 `implementing`，不得归档。
+- 该日 旧规格流程 进度为 `59/68`，其双审 Gold 待办已由后续单审资格决策取代。当前 旧规格流程 为 `63/71`：159 条 Gold 已通过本地覆盖与质量门槛，生产 gold/dry-run、人工复核、时间修复与翻译小批处理、shadow/enforce 灰度、网页/测试群/正式群扩展和窗口数量验收仍未完成，因此 change 保持 `implementing`，不得归档。
 ## 2026-07-13 历史赛事第一批生产详情写入
 
 - 第一批 selection snapshot 固定为五地区各 9 场、共 45 场，绑定 inventory manifest `ac61298f242b2c649c403eae4741771a43cdb027befef20bc75e18fe34bcbad7`。日期发现审核后形成 `36 ready / 9 pending gap`：日本、香港、法国各 9 场有日期；英国 6 场有日期、2000 年 3 场缺口；美国 3 场有日期、2000/2012 年 6 场缺口。
@@ -4041,7 +4051,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 美国两场障碍赛已由 NSA 官方结果 PDF 补齐：A.P. Smithwick Memorial 为 `8 runners / 8 results`，Beverly R. Steinman Memorial 为 `7 runners / 6 results`；后者保留 faller CARLOUN 为 runner，不伪造完赛名次。候选 SHA-256 为 `478e263ee1b2e07ca6ef3cba23c683549393400b263ae250eef9b15fa0c3a1ff`。
 - 写入前备份为 `backups/db/pre-band-2016-2025-nsa-import-20260713_015750.sql.gz`，大小 `117926527` bytes，SHA-256 `9a34f879a98e0fd8bda27b426b81f009bf6fcef0ce882b031589fe7c8867f3bc`。dry-run 与正式 apply 均通过；至此标准批次日美 100 场全部 imported，共 `1172 runners / 1094 results`，常驻历史功能、网络和公开展示开关继续关闭。
 - 随后发现生产 `umanewsbot:prod` 被历史分支旧底座镜像覆盖：镜像含历史能力，但缺少 `origin/main@badc10e0` 的法国新鲜度、翻译恢复、多地区归属代码及 `stable.0027–0029` 对应写路径。数据库已经应用 `0029`，netkeiba 新增触发 `attribution_rule_version` 非空约束错误；收到 P0 后已立即停止新的历史写入、生产构建和容器重启，恢复动作由生产协调线程接管。
-- 当前历史 worktree 已合入 `origin/main@1a70b22e`，保留全部历史能力并通过 Django check、迁移无漂移、323 项组合测试、完整 `stable 1093/1093`（1 skip）、OpenSpec strict `25/25` 和 `git diff --check`。生产镜像替换继续由生产协调线程统一执行。
+- 当前历史 worktree 已合入 `origin/main@1a70b22e`，保留全部历史能力并通过 Django check、迁移无漂移、323 项组合测试、完整 `stable 1093/1093`（1 skip）、旧规格流程 strict `25/25` 和 `git diff --check`。生产镜像替换继续由生产协调线程统一执行。
 - 生产协调已短时切回 `umanewsbot:pre-irishracing-20260713`（`sha256:982fac66…`），恢复后成功新增并翻译 9 篇 netkeiba 文章，新增 NULL 约束异常为 0。独立 staging 已构建兼容镜像 `umanewsbot:merged-main-historical-amd64-20260713-1008`，完整 ID `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`，内容 commit `0068715fceb0f629b5bfcb0c0b760427dfc6edc5`，构建树 SHA-256 `e51e6992e57649445aeff2aa7f2a0c925f3c5c742771fceac13053459beceec6`。该镜像尚未 retag 为 prod、未重启容器，等待生产协调线程最终切换。
 
 ## 2026-07-13 兼容镜像切换与法港英 150 场详情证据
@@ -4049,7 +4059,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 生产 `web / worker / beat` 已由协调线程正式切换到兼容镜像 `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`；`stable.0027–0029`、Django check、64 个模型、新闻新开关关闭、历史命令、五地区页面/后台/healthz 和日志均通过。回滚镜像为 `pre-merged-main-historical-20260713-1015`。历史线程不得再次重建或重启生产容器。
 - 2016–2025 标准批次剩余法国、香港、英国各 50 场已完成日期定位与详情抓取：法国 `449 runners / 330 results`，香港 `515 / 506`，英国修正 Aintree Bowl 误配后为 `570 / 458`；三地区均 `50/50` 无跳过、无错误。
 - 详情来源按目标一一对应，三地区分别 50 个唯一 URL、全局 `150/150` 唯一。统一日期发现证据包包含 150 条 provider 记录、150 条成功请求账本和 150 个逐文件大小/SHA-256 验证的缓存文件，共 `38,383,091` bytes，绑定 inventory manifest `ac61298f242b2c649c403eae4741771a43cdb027befef20bc75e18fe34bcbad7`。
-- Aintree Bowl 现绑定 Sporting Life race ID `850965`，Aintree Hurdle 保持 `850966`；详情 URL 去重以移除 fragment 后的规范 URL 为准。生产只读 artifact 首次构建另发现 47 场英国距离证据缺显式单位或为紧凑分数写法，现已按 `<5 mile / >=5 furlong` 和 mile/furlong/yard 规则规范化，并修复 `71/2f` 的距离消歧误读。专项 57 项及完整 `stable 1128` 项通过，Django check、迁移漂移、OpenSpec strict 和 diff 检查通过，最终复审无剩余可修复问题。
+- Aintree Bowl 现绑定 Sporting Life race ID `850965`，Aintree Hurdle 保持 `850966`；详情 URL 去重以移除 fragment 后的规范 URL 为准。生产只读 artifact 首次构建另发现 47 场英国距离证据缺显式单位或为紧凑分数写法，现已按 `<5 mile / >=5 furlong` 和 mile/furlong/yard 规则规范化，并修复 `71/2f` 的距离消歧误读。专项 57 项及完整 `stable 1128` 项通过，Django check、迁移漂移、旧规格流程 strict 和 diff 检查通过，最终复审无剩余可修复问题。
 - 日期 artifact v2 已批准并受控提交，manifest SHA-256 为 `e5ede9033485f59faac8d27c5371bd4749c17235119f4eea173cca07cc389b03`；写入前备份 `pre-band-2016-2025-fr-hk-uk-date-apply-20260713_122142.sql.gz` 为 `121,994,037` bytes，SHA-256 `dae5869d58eb7e854d359f333e979b52647da75db667db930ff53d1cce5f521f`，`gzip -t` 通过。
 - 150 个目标现均为 `ready` 并 materialize 为 150 个 draft `RaceEvent`；生产历史累计为 `145 imported + 150 ready`、2026 年前赛事 `295`，详情仍为 `1,640 runners / 1,523 results`，证明本次只写日期与赛事壳，未提前导入详情。用户要求先完成源码 Git 固化，后续详情打包、coverage、dry-run、第二次备份和正式导入现已暂停。历史公开展示开关继续关闭。
 
@@ -4057,7 +4067,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 
 - `10:00` 左右验收发现生产仓库 HEAD 虽为 `1a70b22e`，运行镜像却已被历史赛事任务从旧代码底座重建为 `deadheat-fix-amd64-20260713`。该镜像仅加载 57 个模型，不认识 `stable.0027-0029` 和新增设置；数据库已经应用 `0029`，因此 netkeiba 新稿插入触发 `attribution_rule_version` 非空约束失败。问题属于应用镜像与数据库 schema 不匹配，不是来源失效。
 - 已在 Celery/one-off 为空时短时切回 `pre-irishracing-20260713`，恢复后 netkeiba 完整抓取成功：新增 `3`、重复 `117`；本次恢复后共新增 9 篇，9 篇均完成翻译，`attribution_rule_version IS NULL=0`。由验收同步探测中断产生的 `CrawlJob 16266` 已显式标记失败并注明原因，未遗留伪运行状态。
-- 历史赛事 worktree 已合入 `origin/main@1a70b22e`，组合源码通过专项 `323` 项、完整 `stable 1093` 项（1 skip）、Django/迁移/OpenSpec/diff 检查。生产最终切换到 AMD64 组合镜像 `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`，镜像 tag 为 `umanewsbot:merged-main-historical-amd64-20260713-1008`；内容 commit 标签 `0068715fceb0f629b5bfcb0c0b760427dfc6edc5`，构建上下文树 SHA256 `e51e6992e57649445aeff2aa7f2a0c925f3c5c742771fceac13053459beceec6`。
+- 历史赛事 worktree 已合入 `origin/main@1a70b22e`，组合源码通过专项 `323` 项、完整 `stable 1093` 项（1 skip）、Django/迁移/旧规格流程/diff 检查。生产最终切换到 AMD64 组合镜像 `sha256:383a36c1c986143805c0985e6286c77726a5dad8af516dc9bb080f011939c7b4`，镜像 tag 为 `umanewsbot:merged-main-historical-amd64-20260713-1008`；内容 commit 标签 `0068715fceb0f629b5bfcb0c0b760427dfc6edc5`，构建上下文树 SHA256 `e51e6992e57649445aeff2aa7f2a0c925f3c5c742771fceac13053459beceec6`。
 - 最终运行验收：`web/worker/beat` 使用上述同一镜像，`stable.0029` 已应用，Django check 通过；归属、相关地区查询、翻译自动重试与失败邮件继续关闭。五地区页、后台登录入口和 HTTP `/healthz/` 全部返回 200，最近日志无 traceback/error/not-null constraint。
 - 组合镜像包含历史任务尚未全部提交到 `main` 的实现，虽然已绑定内容 commit、上下文树 SHA 和回滚镜像，但仍不是最终可复现发布。历史任务完成当前批次后必须提交并推送全部生产代码；后续生产重建必须先合入最新 `origin/main`，禁止从旧分支或旧上下文直接覆盖 `umanewsbot:prod`。
 
@@ -4068,19 +4078,19 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - `multiregion-v3` 增加按语言 token/bigram 的 `AttributionTermIndex`，17,474 条术语、38,806 个候选下，159 篇纯推断约 `0.8` 秒，完整 Docker 评估约 `2–4` 秒；候选命中后仍调用原边界匹配器。主地区达到 `98.11%`，日本/香港/英国/美国 `100%`、法国 `90.91%`、other `60%`；相关 precision `100%`、recall `54.84%`，无依据变化 `1.89%`、过度扩散 `0%`。
 - V3 规则按标题叙事中心、明确赛事、导语唯一上下文、来源 fallback 分层；普通单词马名、短日文马名、同名单词赛事和正文背景不得单独改区。`other` 现在可作为主/相关归属证据持久化，但不新增生产频道、发布配额或 QQ 窗口。文章没有提供的历史参赛地区不为提高 recall 自动补齐。
 - enforce 遇到 `needs_review` 时只写 `review_candidate` 审计，不修改主地区或关联表。归属/相关地区生产开关继续保持关闭，本轮没有部署、生产归属写入、镜像构建或容器重启。
-- 归属与 Gold 审核目标测试 `82` 项通过（其中 1 项 PostgreSQL 专用性能测试在 SQLite 环境按设计跳过）；从仓库根目录、内存 Celery backend 运行最终完整 `stable` 回归为 `1156 passed / 1 skipped`。Django check、迁移无漂移、Python compileall、OpenSpec strict/all `25/25` 均通过。PostgreSQL 250 篇基准、生产 72 小时 dry-run 和灰度仍待后续验证。
+- 归属与 Gold 审核目标测试 `82` 项通过（其中 1 项 PostgreSQL 专用性能测试在 SQLite 环境按设计跳过）；从仓库根目录、内存 Celery backend 运行最终完整 `stable` 回归为 `1156 passed / 1 skipped`。Django check、迁移无漂移、Python compileall、旧规格流程 strict/all `25/25` 均通过。PostgreSQL 250 篇基准、生产 72 小时 dry-run 和灰度仍待后续验证。
 
 ## 2026-07-13 法港英详情导入前字段门禁与 Git 固化
 
 - 生产只读导出的法港英 150 个 ready 目标与审核证据对比后确认：日期 apply 已物化赛事日期和来源，但 `distance_text` 仍沿用原始 TJCIS 裸数字，未保留法国/香港的米制 `m` 和英国的 `mile/furlong/yard` 单位；另有 8 个权威场地名和 6 个法国 surface 差异需要在详情导入前校正。
 - 已新增 `import_historical_race_event_field_candidates` 管理命令和整批服务。候选 JSONL 同时绑定整文件 SHA、target SHA、inventory artifact SHA、字段证据 SHA 和逐来源快照；仅允许基础字段白名单，dry-run 输出逐字段 before/after，apply 保护人工锁并同时锁定 target/RaceEvent，任一目标漂移或后段失败都会整批回滚。
 - 基础字段 apply 会改变 target SHA，旧详情候选因此自动失效；正确顺序固定为字段 dry-run/备份/apply、重新导出 event input、重新打包详情、coverage、详情 dry-run/第二次备份/apply。禁止手工修改生产 `RaceEvent` 或复用旧候选绕过身份校验。
-- 本轮目标/相邻测试 `34/89` 项通过；在临时 Redis 和 macOS 真实临时目录下完整 `stable` 回归 `1136/1136` 通过，1 项按设计跳过。Django check、迁移无漂移、OpenSpec strict 和 `git diff --check` 均通过；两轮代码复审最终无待修问题。
+- 本轮目标/相邻测试 `34/89` 项通过；在临时 Redis 和 macOS 真实临时目录下完整 `stable` 回归 `1136/1136` 通过，1 项按设计跳过。Django check、迁移无漂移、旧规格流程 strict 和 `git diff --check` 均通过；两轮代码复审最终无待修问题。
 - 当前生产仍运行 `main@304ebdb6` 对应可复现 AMD64 镜像，历史公开数据保持关闭。本轮字段门禁尚未部署，也未执行字段或详情生产写入；先完成源码提交、推送和合入最新 `main`，再由最新主线构建并受控替换生产镜像。
 
 ## 2026-07-13 历史来源匹配器主线固化与可复现镜像切换
 
-- 历史赛事全部必须保留的源码已提交并合入 `main@58786b91fba9c44054a6102055766824677bcbcb`。该版本新增 JRA 当前赛事别名、TOBA 核心限定词全词匹配、同一结果 URL 跨目标复用阻断，以及 TOBA `not run` 证据解析；完整 `stable` 回归为 `1141 passed / 1 skipped`，迁移无漂移，OpenSpec strict/all `25/25`，最终代码复审无 actionable finding。
+- 历史赛事全部必须保留的源码已提交并合入 `main@58786b91fba9c44054a6102055766824677bcbcb`。该版本新增 JRA 当前赛事别名、TOBA 核心限定词全词匹配、同一结果 URL 跨目标复用阻断，以及 TOBA `not run` 证据解析；完整 `stable` 回归为 `1141 passed / 1 skipped`，迁移无漂移，旧规格流程 strict/all `25/25`，最终代码复审无 actionable finding。
 - 在生产独立上下文 `/opt/umanewsbot-builds/main-58786b91-20260713-1435` 两次构建得到相同 AMD64 image ID `sha256:c6a3670fdc42db9c0b8ded5772630ac1b0511b98a521ea7f4a9cbe7e25864691`。镜像标签绑定 Git tree `5d8b7ccf775f6be7051c88e8f440b034ad02f4df` 和 source archive SHA-256 `184f05c39d3df5dd0bb1f410bdccda418ed3052964edea99b07faf22723fa07e`，已替换生产 `web / worker / beat`。
 - 切换前数据库备份为 `backups/db/pre-main-58786b91-20260713_143748.sql.gz`，大小 `149,960,820` bytes，SHA-256 `9f29cd1a28b41761591a1966c68125c611a36290953cf0d845cdcead05891f27`，`gzip -t` 通过；旧镜像保留为 `pre-main-58786b91-20260713-1439`。
 - 部署后 `stable.0029_france_freshness_translation_attribution` 已应用、64 个模型可加载，五地区页面、赛事页、马匹页、后台、内外 healthz 和近期日志均通过。生产历史总账 `30,917` 个目标，历史赛事 `295` 场、`3,174 runners / 2,817 results`，全部仍为 `draft`，published 为 `0`；常驻历史写入与网络开关均为 `false`。
@@ -4102,7 +4112,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - 首次离线快照曾为 `249 candidate / 1 gap`、`2,635 runners / 2,346 results`，候选 SHA-256 `31c8cf61191d937c766f98b50a656ec98e92f774b59e5d0635fd54090ee2ad1a`；该快照遗漏 Hampton 移师后的实际赛果，已隔离并被上方 batch003 正式结果取代，不得审批或恢复。
 - `target_id=60693` 的 Warwick 页面只证明原定场次 `ABANDONED`；用户提供 Windsor 正式结果后已按正常举办收口，不能再作为 gap 或 cancelled 候选。
 - 修复了 ZEturf 发现页把实际缓存 URL 重写成另一目标 slug 的身份错误，并把 NAR `keiba.go.jp` 与法国 Zone-Turf 同步登记到日期校验、补充来源审批和最终详情打包三层。年度日历的 `flat/jumps` 只证明竞赛类型，不再用它覆盖已审核的 `surface`；Hoppings Stakes 保持 Newcastle synthetic。
-- 专项 73 项、完整 `stable 1161/1161`（1 skip）、Django check、迁移无漂移、OpenSpec strict `25/25` 和 `git diff --check` 全部通过；代码复审无剩余可修复问题。
+- 专项 73 项、完整 `stable 1161/1161`（1 skip）、Django check、迁移无漂移、旧规格流程 strict `25/25` 和 `git diff --check` 全部通过；代码复审无剩余可修复问题。
 - 生产仍运行 `sha256:77eb11385d1d23843d2e2bae96bc5b4da4453732edb567d46cb0cc0fb01c3da0`。先前候选镜像 `sha256:9cd0b966...45bc1` 不包含本轮来源修复，已视为过期；必须从最新 main 重建可复现 AMD64 镜像后，才允许连接生产库生成日期/来源 artifact、dry-run 和后续受控写入。历史公开展示继续关闭。
 
 ## 2026-07-13 batch003 来源门禁镜像生产切换
@@ -4162,7 +4172,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   9 个工作表已完成公式错误扫描和逐表视觉核验。
 - 真实 HKJC 页面形状、Sporting Life casualty、法国 N/A 补证、官方总数/逐场权威性、模型与完整
   履历分页、人工赛果证据身份/比赛绑定相关回归在该历史轮次为 `277/277`；第十四轮最终增至
-  `282/282`。Django check、迁移无漂移、OpenSpec、工作簿摘要测试和公式错误扫描通过。
+  `282/282`。Django check、迁移无漂移、旧规格流程、工作簿摘要测试和公式错误扫描通过。
   task `4.2` 继续未完成；美国逐场官方性等剩余语义按
   `missing/partial/source_blocked/parser_gap` 保留。
 
@@ -4471,7 +4481,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   错误漏计、空 checked provider 错误归因；三项也已补 RED 并修复。该轮 fingerprint helper
   的摘要/hash 相同但 reviewer 捕获的 raw output 不同，故 fail closed，尚无批准基线。
 - 主线程验证：聚焦 `40/40`、racecard/lifecycle `79/79`；Django check、迁移漂移、compile、
-  Compose、registry SHA、OpenSpec strict `37/37`、diff check 通过。完整 realtime
+  Compose、registry SHA、旧规格流程 strict `37/37`、diff check 通过。完整 realtime
   `166` 项中 `157` 通过、`9` 项因既有 fixture 固定 2026-07-20 而当前为 2026-07-27，
   触发 claim expired/mismatch/rate-limited；无本 change 堆栈。
 - tracked 六 provider route 仍全部
@@ -4525,7 +4535,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
 - `RaceEvent#924` Hackwood Stakes 另有 7 条未确认赛果，不计入 40 场，继续由 race-live
   owner 链补 official receipt。
 - 逐场来源表见
-  `openspec/changes/recover-race-results-through-20260727/source_research_20260727.md`。
+  `旧规格流程/changes/recover-race-results-through-20260727/source_research_20260727.md`。
   本轮仅只读调研，没有生成候选、写生产库、发布或提升 official 状态。
 
 ## 2026-07-27 赛果缺口恢复已完成本地实现，待独立代码审核
@@ -4541,7 +4551,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   并发测试 `2/2` 通过；受影响回归除干净主线已存在的“暂定页面栏目标题”断言外无新增失败。
   完整候选 `3433` 项为 `24 failures / 39 errors / 68 skipped`，同环境干净主线 `3393`
   项为 `25 failures / 39 errors / 66 skipped`；候选无新增红项，并修复主线一个日历查询数失败。
-- Django check、迁移漂移、OpenSpec `38/38` strict/all、三份 Compose config、`py_compile`
+- Django check、迁移漂移、旧规格流程 `38/38` strict/all、三份 Compose config、`py_compile`
   和 `git diff --check` 均通过。首次独立原生只读审核提出 6 项 actionable finding；
   当前已补齐完整写前身份 CAS、来源合同实时重验、ledger 故障回滚、verifier 深校验、
   canonical link apply 和已批准 participant fallback，等待同一 reviewer 限定复审。
@@ -4971,7 +4981,7 @@ OpenSpec change `add-term-candidate-discovery` 已完成实现、自动化测试
   马名回退的正确合同，相关既有测试本轮复跑 `1/1` 通过。
 - 历史年份“重点”当前仍按 P0/P1 或人工置顶过滤；历史物化记录默认 P2/未置顶，所以 G1/G2
   全部被排除。用户确认历史“重点”应显示 G1+G2；该口径与现有
-  `backfill-race-events-to-1984` OpenSpec 冲突，需先修订规格再实现。
+  `backfill-race-events-to-1984` 旧规格流程 冲突，需先修订规格再实现。
 - 详细证据与修复边界见 `docs/historical_race_calendar_gap_diagnosis_20260731.md`。本轮未修改
   业务代码、未访问生产数据库、未执行生产写入，亦未 commit/push/PR/部署。
 

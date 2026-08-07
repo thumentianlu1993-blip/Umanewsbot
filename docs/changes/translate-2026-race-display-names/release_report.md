@@ -21,7 +21,6 @@
    - R4 的历史结论记为 **APPROVED**，并记录 build/commit/verify 三层例外一致。
 3. 用户审核：工作簿 573 行逐行定稿，209 行改名、6 行人工裁决、8 行重名处理、
    0 否决、0 重名残留。
-4. 用户发布授权：2026-07-23 对定稿 SHA `47ba2e32…` 和功能发布提交
    `bd03b100` 回复「发布吧」。
 5. 上述 Claude Code「等价复审」不等于现行 `docs/codex_workflow.md` 要求的 Codex 原生
    只读 review；现存证据中没有合格原生 review 的命令、内层 read-only 启动头、前后一致指纹

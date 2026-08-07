@@ -2,7 +2,6 @@
 
 ## 当前状态
 
-- 本 change 已获实现授权并完成本地实现、测试先行及最后两项核心 P1 修复；rebase 后当前去重 333 项完整矩阵、77 项语言回归，以及 identity/security/N+1、article 9595、discovery field/span/context 专项均 GREEN。
 - `git rebase --autostash origin/main` 已无冲突完成；当前 `HEAD` 与 `origin/main` 均为 `97a38cf5e2a692b7336c8518a4cdd6dfcc511d2a`，本 change 的未提交修改已恢复。
 - rebase 后 Django check 通过，`makemigrations --check --dry-run` 返回 `No changes detected`，`git diff --check` 通过。
 - 最新核心修复与 base 更新已产生新的 fingerprint；下一步是一轮新的独立只读 review，当前不得视为 review 已通过。
@@ -78,7 +77,6 @@ article 9595 预期：13 条普通词 horse warning 归零，Logician 保留 con
 - 代码回滚恢复上一受审版本；若保留运行模式开关，先回到 shadow/off 并按既有服务重建流程执行。
 - 本 change 预计无数据库迁移；普通代码回滚不恢复数据库。
 - 若历史状态更新造成问题，只针对锁定 manifest 使用 before snapshot 恢复 gate audit fields；公开状态、发布时钟和 QQ ledger不得被覆盖。
-- 回滚和任何生产写入均需独立授权，不与代码发布授权混用。
 
 ## 发布前禁止项
 

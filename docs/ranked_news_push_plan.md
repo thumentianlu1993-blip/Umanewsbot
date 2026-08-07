@@ -8,12 +8,12 @@ QQ 群自动推送已经具备多群、去重、有限重试、URL 检查、OneB
 
 ## 总体原则
 
-- 主体能力由三个 OpenSpec 子 change 承载；本文档只作为本轮协调总纲，不作为产品能力规格归档。
+- 主体能力由三个 旧规格流程 子 change 承载；本文档只作为本轮协调总纲，不作为产品能力规格归档。
 - 本期 QQ 重点推送统一采用“按榜单推”：`netkeiba:access` 与 `netkeiba:attention`。
 - 后续可能扩展多种推送方式，例如“按榜单推 + 每场比赛当天高频推”和“按分数推”，因此实现时需要把“是否全推”和“重点如何判定”分开配置。
 - QQ 推送不得绕过发布门禁；blocker 判断复用现有 `NewsArticle.gate_blockers` / `gate_issues.severity=blocker` 结构化结果。
 - 不补推历史公开新闻，以上线后的自然抓取、翻译、发布和榜单提升触发为准。
-- 本轮全部实现并部署验收后，应提醒维护者尽可能归档已经完成的 OpenSpec change，避免 active change 长期堆积。
+- 本轮全部实现并部署验收后，应提醒维护者尽可能归档已经完成的 旧规格流程 change，避免 active change 长期堆积。
 
 ## 子 change 拆分
 

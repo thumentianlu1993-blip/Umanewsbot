@@ -29,7 +29,6 @@
 - 不删除合法 `ExternalHorseAlias`，不批量修改/停用正式 `TermEntry` 或 `TermAlias`。
 - 不以不断扩充英文停用词或文章级黑名单作为主要方案。
 - 不在本 change 中修复 article 9595 的地区归属；`tdn:latest` 当前归为美国而原文属于 Europe 是独立问题。
-- 不在代码 review 和新的明确发布授权前提交、推送、建 PR、部署、迁移、重启或写生产。
 
 ## 三类判定
 

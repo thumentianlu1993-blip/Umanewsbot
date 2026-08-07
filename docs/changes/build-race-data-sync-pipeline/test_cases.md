@@ -2,7 +2,6 @@
 
 ## 1. TDD 与 RED
 
-用户确认实现后，每个 PR 先由测试 subagent 写测试并实际取得目标合同导致的 RED；fixture、依赖、
 命令、语法或 SQLite 锁语义失败不算 RED。A、A2、B、C 分别取得 RED，不补写历史 RED。
 
 ## 2. A：racecard、来源合同与字段冲突

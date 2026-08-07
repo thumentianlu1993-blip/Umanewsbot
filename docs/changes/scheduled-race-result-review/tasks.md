@@ -6,7 +6,7 @@
 - [x] (integration) 只读梳理一次性 recovery inventory、adapter、coverage、dry-run/apply 与邮件链路。
 - [x] (application) 明确最近 72 小时、完整赛果、Also ran、唯一审核授权和状态修复语义。
 - [x] (application) 完成首次独立方案审核并关闭全部阻断 finding。
-- [x] (operations) 方案通过后向用户汇报并取得“确认实现”。
+- [x] (operations) 方案通过后向用户汇报并取得“G1 范围确认”。
 
 ## 2. 测试先行
 
@@ -49,7 +49,6 @@ approved parent 为 `0bf3fd975155795c6df885b1055bd97c342db880`，content manifes
 
 ## 5. 发布与调度
 
-- [x] (operations) 最新成功 review 后取得当前冻结版本发布授权。
 - [x] (operations) commit、push、创建 PR、合并并部署，应用 migration，保持两个新开关关闭。
 - [x] (operations) 验证生产版本、Compose mount、SMTP 配置、SSH wrapper 和 flag-off 三个零。
 - [x] (integration) 在已授权窗口启用 prepare/network 和唯一收件人，执行一次受控生产 prepare。

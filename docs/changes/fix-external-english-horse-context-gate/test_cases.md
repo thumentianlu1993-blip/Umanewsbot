@@ -823,7 +823,6 @@ git diff --check
 
 diff 范围复核：未修改 `AGENTS.md`、全局 `current_state/project_status/project_overview/decisions/deploy_runbook`，未触碰 source adapter、新闻 HTML 抓取或正文提取器。visible-source helper 是把 validation 既有 `script/style/nav/aside + strip_tags + whitespace` 表示迁移为共享函数，并按语言选择 resolver 输入；未扩充或改变 HTML 清洗标签/规则。
 
-本轮仅完成 finding 修复后的本地独立验证；代码 fingerprint 已变化，必须重新进入同一 reviewer 会话复审。复审成功后仍须取得用户针对当前版本的明确发布授权。当前禁止 commit、push、PR、merge、部署、历史重处理和生产写入。
 
 ## Reviewer P1：structured evidence occurrence-local 修复（2026-07-24）
 
@@ -899,7 +898,6 @@ DB_ENGINE=sqlite /Users/mentianlu/Code/umanews/.venv/bin/python server/manage.py
 
 `manage.py check`、本 change 相关 Python `py_compile`、`git diff --check` 均通过。diff 未触碰 `AGENTS.md`、全局状态文档、source adapters、HTML extraction 或正文提取器；共享 visible-source helper 仍为此前 validation 既有规则的迁移，没有新增清洗标签或规则。
 
-本轮修复再次改变代码 fingerprint。当前仍须由同一 reviewer 会话对新 fingerprint 给出 `APPROVED`，随后还须取得用户针对该 fingerprint 的明确发布授权；发布继续冻结，禁止 commit、push、PR、merge、部署、历史重处理和生产写入。
 
 ## Reviewer 两项 P2：committed replay identity 与 query telemetry（2026-07-24）
 
@@ -994,7 +992,6 @@ DB_ENGINE=sqlite /Users/mentianlu/Code/umanews/.venv/bin/python server/manage.py
 
 `manage.py check`、本 change 所有相关 Python `py_compile`、`git diff --check` 均通过。diff 未触碰 `AGENTS.md`、全局状态文档、source adapters、HTML extraction 或正文提取器；未改变 visible-source 清洗规则。
 
-两项 P2 修复及测试契约更新再次改变 fingerprint。必须复用同一 reviewer 会话对当前 fingerprint 取得 `APPROVED`，随后仍需用户明确发布授权；当前继续禁止 commit、push、PR、merge、部署、历史重处理和生产写入。
 
 ## 第十六轮扩大验证回归 RED（2026-07-24）
 

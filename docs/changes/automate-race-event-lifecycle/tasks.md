@@ -1,6 +1,5 @@
 # 赛事日历自动更新与赛事生命周期任务
 
-> 阶段 B0.1 已取得实现授权并完成测试先行、子代理实现和主线程本地验证。独立只读代码
 > review 首轮及第二轮限定复审均为 `REVISE`；两轮各 4 项 P2 均已按新增真实 RED 修复，
 > 第三轮确认上一轮 4 项 P2 全部关闭，但新增 1 项 P1 与 3 项 P2；均已按新增真实 RED 修复，
 > 第四轮关闭其中 3 项、另 1 项部分关闭，并留下 2 项 P2；均已按真实 RED 修复，
@@ -17,7 +16,6 @@
 > 第十五轮 2 项 P2 已以重签 artifact 真实 RED 修复，
 > 第十六轮唯一 P2 已以 6 项真实 RED 修复；第十七轮同一 reviewer 已 `APPROVED`。
 > 用户随后授权 fetch/commit/push/Draft PR，但 `origin/main` 前进 14 个提交，候选已迁移到
-> 最新 `main@6ac08e40`，当前等待该集成版本复审和新的 fingerprint 发布授权。
 > 联网、部署、生产迁移和生产写入仍未授权。
 
 > 状态更正：阶段 A 已完成实现、review、关闭态部署和一次生产零写 dry-run，但 shadow/enforce
@@ -56,11 +54,9 @@
 
 - [ ] (operations) 冻结 uncommitted fingerprint，由未参与实现的 reviewer 执行原生只读 `/review`。
 - [ ] (application) 修复 actionable findings，并复用同一 reviewer 会话限定复审。
-- [ ] (operations) review 通过后记录 approved parent/content hash 并停止等待发布授权。
 
 ### 发布
 
-- [ ] (operations) 最新 review 后取得当前阶段发布授权，才允许 commit/push/PR。
 - [ ] (operations) 备份、核对生产 HEAD/image/队列/锁/磁盘，先部署 mode=off。
 - [ ] (operations) 冻结逐场 baseline manifest，再依次一次性 dry-run、shadow、小范围
   enforce；每步独立验收/回滚。

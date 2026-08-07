@@ -1,6 +1,6 @@
 """Application RED contracts for official recovery projection.
 
-OpenSpec task: 1.4.
+Native change task: official recovery projection contract.
 
 No recovery run/receipt/rollback database tables are required here.  The
 contracts deliberately reuse the existing source identity, participant,

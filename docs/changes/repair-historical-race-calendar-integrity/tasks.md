@@ -1,6 +1,5 @@
 # 历史赛事赛历完整性修复任务
 
-> 方案审核和用户实现授权均已取得；Release A 早期实现快照曾通过第二轮限定代码审查，但随后
 > 的 P1/P2 加固、PostgreSQL 专项和文档增量使原 fingerprint 失效，当前必须重新 review。
 > 勾选项不表示发布或生产数据授权。
 
@@ -106,11 +105,9 @@
 ## 10. 方案与代码审核门禁
 
 - [x] 10.1 (application) 当前五文档经独立方案 reviewer 三轮审核，关闭全部 actionable findings
-- [x] 10.2 (application) 主线程汇报最终范围、RED、数据边界、风险/回滚，等待用户明确实现授权
 - [ ] 10.3 (application) 实现完成后由未参与实现的独立 reviewer 执行受指纹保护的原生只读 review
   （URL 中央 validator P1 已获限定复审 APPROVED；本次 evidence-only 文档写回使 content 过期，
   须复用同一 reviewer 完成 evidence 复审后才能勾选总项）
-- [ ] 10.4 (operations) 最新成功 review 后另行等待用户发布授权；不得复用实现授权
 
 ## 11. 生产阶段（不由代码部署自动触发）
 
@@ -173,7 +170,6 @@
 - approved content：
   `1a31d68e51d8aa4ce28249c4feb2f3fa82517d9277818da063214972fda9646f`。
 - approved content 仅标识本次文档写回前的实现快照；本节写入后须复用同一 reviewer 再审
-  文档增量。发布授权尚未请求或取得。
 
 ## 16. 最终全量扫描 follow-up（待复审）
 

@@ -10,14 +10,12 @@
   -> `6d073dc0`（PR #48，纯文档增量，无代码变化））
 - 隔离分支：`codex/fix-single-migration-owner`
 - 当前阶段：实现已完成（含四轮代码审核 findings 修复）并迁移至新基线，聚焦合同测试 97/97
-- 当前授权：实现与测试已完成；等待针对复审后新冻结指纹的发布授权
 - 方案审核：同一 reviewer 三轮，最终 `APPROVED`；开放 P0/P1 为 0
 - 代码审核：第 1 轮 REVISE（7 项 findings 已修复关闭）、第 2 轮 APPROVED、
   第 3 轮 Codex 原生 REVISE（P1-1/P1-2/P2-3/P2-4/P2-5/P3-6/P3-7 已修复）、
   第 4 轮复审 REVISE（P1 重试语义/P2 helper 扩 9 路径与 OID 格式/P3 文档残留已修复）
-- 下一门禁：同一 reviewer 在新基线上做第 5 轮复审，通过后冻结新指纹并等待用户发布授权
 
-本 change 禁止使用 OpenSpec skills、OpenSpec CLI 或创建 OpenSpec change。发布前仍不授权
+本 change 禁止使用 旧规格流程 skills、旧规格流程 CLI 或创建 旧规格流程 change。发布前仍不授权
 commit、push、PR、部署、迁移、生产服务器访问、数据库写入或服务重启。
 
 ## 2. 当前问题

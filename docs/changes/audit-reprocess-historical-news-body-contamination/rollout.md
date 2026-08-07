@@ -7,14 +7,12 @@
 
 ## Gate 1：工具实现与本地验证
 
-- 用户确认实现后测试先行，取得有效 RED。
 - subagent 按文件边界实现 inventory、candidate、review、apply/verify/rollback。
 - GREEN、真实 PostgreSQL、安全/性能检查与独立原生代码 review 全部通过。
 - 无 migration 为预期；若需要 migration，返回方案审核。
 
 ## Gate 2：工具发布
 
-- 仅在最新 code review 后取得当前版本发布授权。
 - 创建数据库和环境恢复点，核对服务器 checkout、四个应用服务镜像、容器内 revision。
 - 部署工具但不运行正式 inventory/candidate/apply。
 - 验收 Django check、migration drift、命令 help、worker/beat、内外 healthz。

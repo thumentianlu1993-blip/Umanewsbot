@@ -2,7 +2,6 @@
 
 ## 测试原则
 
-- 实现授权前只定义用例，不编写测试。
 - 授权后由测试 subagent 新建聚焦测试并取得真实 RED；失败必须来自月份/跨年/徽标尺寸契约尚未实现。
 - 自动化测试使用 SQLite 与本地 fixture，不访问真实网络或生产数据库。
 - CSS 几何最终以真实浏览器计算尺寸为准；自动化静态契约测试负责阻止 `flex: auto`、尺寸下限缺失等
@@ -49,7 +48,6 @@ CSS 自动化测试应提取具体 selector block 后断言属性，不能用整
 
 ## RED 取得方式
 
-实现授权后先由测试 subagent：
 
 1. 新建 `server/stable/test_race_calendar_responsive_ui.py`；
 2. 只写 A/B 对应自动化测试，不改 view/template/CSS；

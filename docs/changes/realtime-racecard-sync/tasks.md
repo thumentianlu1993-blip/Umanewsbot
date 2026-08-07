@@ -59,7 +59,6 @@
 - [ ] (operations) 记录最终 review fingerprint、approved parent 和 content manifest。
 - [ ] (operations) 等待用户在最新成功 review 后授权 commit/push/部署。
 
-## 5. 发布后（不由本次实现授权自动触发）
 
 - [ ] (operations) 部署代码但保持 scheduler/runner/public policy 关闭。
 - [ ] (operations) 在生产以显式英国 event IDs 运行受控 prepare（仅 HostBudget 控制面写入）。

@@ -28,7 +28,7 @@
 
 1. [x] 五份方案文档齐全。
 2. [x] 独立方案 reviewer `APPROVED`。
-3. [x] 用户针对已审方案明确确认实现。
+3. [x] 用户针对已审方案明确G1 范围确认。
 4. [x] 新测试取得真实 RED。
 5. [x] 实现 subagent 在限定文件内完成 GREEN；未 commit/push/联网。
 6. [x] 第一至第二十轮 findings 修复后的 collector `32/32`、`39/39`、`46/46`、`49/49`、
@@ -68,7 +68,6 @@
     网络 DAG 按设计 skipped，artifact `30555834994-1-synthetic-checkpoint-0` 已核验包含
     run manifest、synthetic report 和 final 严格 7 文件。本项即为本变更生产部署完成定义。
 11. [ ] 正式 `full_network=true` 单年度 run 需要单独明确授权；每个年份均是独立 run/manifest，
-    不得从代码审查或 Git 发布授权推导。
 
 ## 发布验证与回滚
 

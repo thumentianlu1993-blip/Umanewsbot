@@ -12,7 +12,7 @@
 
 ### 来自 `origin/main` 的外部数据底座
 
-这部分提供 `External*` 外部缓存表、导入运行记录、锁、HKJC importer 和既有 OpenSpec / 文档基础：
+这部分提供 `External*` 外部缓存表、导入运行记录、锁、HKJC importer 和既有 旧规格流程 / 文档基础：
 
 - `server/stable/models.py`
 - `server/stable/migrations/0008_externaldataimportrun_externaldataimportlock_and_more.py`
@@ -22,14 +22,14 @@
 - `server/stable/services/external_hkjc_data.py`
 - `server/stable/services/global_racing_spikes.py`
 - `server/stable/fixtures/hkjc/`
-- `openspec/specs/global-racing-data-import-readiness/`
-- `openspec/changes/archive/2026-06-26-start-hkjc-data-import-and-global-spikes/`
+- `旧规格流程/specs/global-racing-data-import-readiness/`
+- `旧规格流程/changes/archive/2026-06-26-start-hkjc-data-import-and-global-spikes/`
 
 ### 来自 proof 工作树的英法美接入与审计
 
 来源工作树：
 
-- `/Users/mentianlu/.codex/worktrees/openspec-ready-20260626/umanews`
+- `/Users/mentianlu/.codex/worktrees/旧规格流程-ready-20260626/umanews`
 - 分支：`codex/start-hkjc-global-spikes`
 
 同步内容：
@@ -44,8 +44,8 @@
 - `server/stable/fixtures/uk/`
 - `server/stable/fixtures/france_galop/`
 - `server/stable/fixtures/us_hrn/`
-- `openspec/specs/real-global-racing-data-ingestion/`
-- `openspec/changes/archive/2026-06-26-connect-real-global-racing-databases/`
+- `旧规格流程/specs/real-global-racing-data-ingestion/`
+- `旧规格流程/changes/archive/2026-06-26-connect-real-global-racing-databases/`
 
 ### proof 产物
 
@@ -78,12 +78,12 @@
 - `stable.tests.GlobalRacingImportOutputAuditTests`：通过，`28` 项；新增门禁覆盖 plan-only 必须有请求证据且请求状态成功，非 plan 批次必须有请求证据、请求状态成功、`races/entries/results/horses` coverage 非空，并忽略只读 batch command artifact。
 - `stable.tests.GlobalRacingImporterCommitGateTests`：通过，`14` 项；四地 importer 生产 commit 只接受 `completion.is_complete=true` 的严格布尔完成证明，拒绝受限 `stop_reason`、马匹详情缺口、缺少可解析马匹详情覆盖计数或缺少 `races/entries/results/horses` 基本覆盖的 payload，要求 UK/France/US plan-only 命令显式携带 `--allow-network`，并覆盖从 plan JSON 渲染指定 batch 或全部 batches 命令的只读工具及稳定 `suggested_output_file/path`、`tee_command_line`。
 - `audit_global_racing_import_outputs --proof-only --fail-on-incomplete` 复跑 `runtime/global_racing_import/proof-20260627`：通过 proof 口径，`proof_ready=true`、`proof_blocking_reasons=[]`、`commit_candidate_ready=false`。
-- `openspec validate --all`：通过，`12` 项。
+- `旧规格流程 validate --all`：通过，`12` 项。
 - `stable` 完整测试集：通过，`347` 项。
 - `python server/manage.py makemigrations --check --dry-run`：通过，`No changes detected`。
 - `python server/manage.py showmigrations stable`：当前本地 SQLite 已应用到 `0007`；同步进来的 `0008` 至 `0013` 处于未应用状态，符合“代码已同步但当前本地库未执行新迁移”的状态。
 - `python server/manage.py migrate --plan`：通过，可列出 `0008` 至 `0013` 的待执行迁移计划，包含外部缓存表、自动发布门禁、QQ 推送、来源语言/地区字段、`TermAlias` 和来源字段调整。
-- `openspec/changes/archive/2026-06-26-connect-real-global-racing-databases/tasks.md` 已复核并校正法国、美国任务标题，使其明确停在用户新 proof 边界，不再暗示最近 2 个月完整拆批 dry-run 已完成。
+- `旧规格流程/changes/archive/2026-06-26-connect-real-global-racing-databases/tasks.md` 已复核并校正法国、美国任务标题，使其明确停在用户新 proof 边界，不再暗示最近 2 个月完整拆批 dry-run 已完成。
 - `git diff --check`：通过。
 
 ## 命令入口核对

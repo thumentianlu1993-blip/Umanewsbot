@@ -65,12 +65,10 @@
 40. 用户已授权进入上线推进。专项先 stash 后 `ff-only` 对齐 `origin/main@283bacf2`；四份顶部状态文档冲突已同时保留主线赛事身份/关联事实和本专项事实，`race_events.py` 自动合并仅涉及主线新增 re-export 与专项追加实现。当前从新增公开准入能力的真实 RED 开始；实际生产发布仍须在最新成功代码 review 后取得一次新授权。
 41. 首次完整代码 review 因原生 reviewer 模型容量中断而未通过门禁；人工补充检查提出 4 个 P1、1 个 P2：网络后旧时钟、incident 跨轮 replay、日历 read gate、缺生产初始化路径和 raw official marker 旁路。旧时钟、incident replay、日历 gate 与 marker evidence 已按真实 RED 修复；同一 reviewer 仍须完成限定复审和原生 review。
 42. 生产初始化缺口已按真实 RED 补齐：严格 manifest/commit/event baseline，dry-run/apply/verify、全事务、精确 replay、四层 shadow policy、allowlist、host budget、control/tracking/source/participant/racecard/audit 均可执行；未来 manifest、人工锁和 TRA authority 错写继续 fail closed。SQLite 初始化器与 runner 聚焦 `13/13`，PostgreSQL 初始化并发及既有锁语义 `5/5`。
-43. shadow runner 不再把 `shadow_only` 计为失败；只保存 observation/未发布 revision 和成功 checkpoint，公开物化、publication 与 incident 均为零。当前仍没有生产 manifest、生产写入、迁移、worker 启动或开关变化；下一门禁为完整回归、同一 reviewer 限定复审成功，以及成功 review 后的新发布授权。
 44. 首次成功原生完整 review 已关闭此前 findings，但新增唯一直接 P1：赛事日历逐场 public-read gate 在 40 场时产生 `525` 次查询。真实 RED 后已改为批量 resolver，固定加载 live revision、publication、source、四层 policy 与 allowlist，硬门禁为 40 场 `<=12`；公开状态 `6/6`、SQLite 专项 `160/160`、PostgreSQL `5/5` 通过。发布仍停在同一 reviewer 限定复审与复审后新授权之前。
 45. 最终本地候选镜像为 `sha256:4a281e426e3299287c948bc6fe7d6e2d0fcda52dbaa322da8db9982530b5b099`；镜像内 check、初始化器+TRA runner `13/13`、registry SHA 和无 secret 检查通过。完整源码树 `160/160`、三份 Compose、worker shell、migration drift 与 diff check 独立通过；部署契约测试读取仓库根文件，不把其在运行镜像中缺 Compose/源 registry 的预期失败误报为业务回归。
 46. 用户授权原冻结提交后，远端 main 已前进至 `ccb56f7d`，包含赛事身份 PostgreSQL 锁修复与生产证据。原提交已安全推送到独立分支，不覆盖 main；发布整合改为从最新 main 建立单父分支并重放准实时补丁，冲突只在两份顶部状态文档且完整保留双方事实。SQLite 组合 `180/180`（1 skip）、PostgreSQL 精确目标 `6/6`、整合镜像 `sha256:87f8603320f8...73bcf` 的 check/`13/13`/registry/no-secret 通过；该整合树必须由同一 reviewer 复审并在成功后重新取得授权。
 
-出口：原方案和 TRA provisional public 新口径均已由对应 reviewer `APPROVED`，用户已授权进入开发与上线准备；这仍不构成最新成功代码 review 后的生产发布授权。
 
 ## 阶段 1：来源 proof
 
@@ -112,7 +110,6 @@
 部署顺序：
 
 1. 历史任务已安全完成/暂停并按 manifest 交接，目标 event ownership 已精确转为 live。
-2. 完整代码 review 通过且用户发布授权。
 3. 备份、迁移；所有 live mode 仍 off。
 4. 启动独立 `race_live` worker，不启动公开写入。
 5. 开单地区 `shadow` + 精确 event allowlist；Beat 只发 due tasks。
@@ -164,7 +161,6 @@ The Racing API 是暂定赛果首发主链：完整 API 结果通过唯一 publi
 
 最终门槛：
 
-- 最新代码 review 成功，用户在该 review 后明确发布授权。
 - 生产内容与受审 fingerprint 一致。
 - 备份、迁移、worker/Beat route、flags、health、页面、admin、队列、资源和日志验收通过。
 - 各地区 source terms/许可未过期；The Racing API 价格/计划在实际购买前重新核对。
@@ -176,7 +172,6 @@ The Racing API 是暂定赛果首发主链：完整 API 结果通过唯一 publi
 
 1. 生成 Basic upgrade recommendation，列出 Free 证据、缺字段、预期收益、最新价格/税/退款/条款。
 2. 向 The Racing API 支持书面确认计划层级是否解决具体字段/覆盖问题。
-3. 用户单独批准购买；发布授权不能替代采购授权。
 4. 只购买一个月 Basic，记录开始/续费/取消日期；首月复测，无收益则取消。
 5. 不购买 £499 历史包、North America £49.99/月 add-on 或其他扩展，除非以后另立专项并获授权。
 

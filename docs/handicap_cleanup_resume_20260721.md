@@ -6,7 +6,7 @@
 
 - worktree：`/Users/mentianlu/Code/umanews/.worktrees/remove-handicap-markers`
 - 分支：`codex/remove-handicap-markers-from-race-names`（基于 `origin/main`）
-- OpenSpec change：`openspec/changes/remove-handicap-markers-from-race-names/`（proposal/design/tasks + delta spec，strict 31/31 通过）
+- 旧规格流程 change：`旧规格流程/changes/remove-handicap-markers-from-race-names/`（proposal/design/tasks + delta spec，strict 31/31 通过）
 - 代码（已实现、未提交进生产）：`server/stable/services/race_name_handicap_cleanup.py`、`server/stable/management/commands/clean_race_name_handicap_markers.py`、`server/stable/test_race_name_handicap_cleanup.py`
 - 测试：SQLite `21/21`、PostgreSQL 16 `21/21`、完整 stable 回归 exit 0、`git diff --check` 通过
 - **未写生产、未部署、未合并 main**
@@ -41,4 +41,4 @@
 ## 相关断点（另一任务，已完成无需续接）
 
 - 五区赛事中文名导入：已于 2026-07-21 正式写入生产并验收（worktree `.worktrees/translate-collected-race-horse-names`，分支 `codex/translate-collected-race-horse-names` 已推送；证据 `docs/changes/import-reviewed-race-name-translations/release_report.md`）。
-- 遗留后续项（未立项）：2026 赛历与历史系列双卡片问题、1300 系列术语同步、新闻历史文章让赛回填。需要时另起 OpenSpec change。
+- 遗留后续项（未立项）：2026 赛历与历史系列双卡片问题、1300 系列术语同步、新闻历史文章让赛回填。需要时另起 旧规格流程 change。

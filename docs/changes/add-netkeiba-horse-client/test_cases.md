@@ -3,7 +3,7 @@
 ## 范围
 
 本文件补齐在途 `add-netkeiba-horse-client` 变更进入 task 5.3 前的测试合同。规格与设计仍以
-`openspec/changes/add-netkeiba-horse-client/` 为准；本轮只修复“人工复审后、生产提交前”缺失的
+`旧规格流程/changes/add-netkeiba-horse-client/` 为准；本轮只修复“人工复审后、生产提交前”缺失的
 精确授权门禁，不扩大来源抓取或马匹资料模型。
 
 task 5.4 空胜绩修复追加两项不可回退合同：
@@ -462,7 +462,7 @@ GREEN：
 
 - 相关集合由主代理再次执行：`260/260` 通过。
 - `python manage.py check`：无问题；`makemigrations --check --dry-run`：无漂移。
-- `openspec validate add-netkeiba-horse-client --strict` 与 `openspec validate --all`：
+- `旧规格流程 validate add-netkeiba-horse-client --strict` 与 `旧规格流程 validate --all`：
   `37/37` 通过；`git diff --check` 通过。
 - 使用相同 SQLite、Celery eager/memory backend、禁网环境对 detached
   `21610ae8` 基线与当前工作区分别运行完整 `stable`：
@@ -483,7 +483,7 @@ GREEN：
   形成集成提交 `8e3716bc`。
 - 集成及 4.10j 返修后 P0 相关三模块 `263/263`；主线新闻正文边界与赛事系列身份相邻模块
   `90/90`（1 skip）。
-- Django check 无问题，`makemigrations --check --dry-run` 无漂移，OpenSpec strict/all
+- Django check 无问题，`makemigrations --check --dry-run` 无漂移，旧规格流程 strict/all
   `37/37`，`git diff --check` 通过。
 - 使用相同 SQLite、Celery eager/memory backend、禁网环境完整运行 stable：
   - `origin/main@97dd2350`：`2784 tests / 21 failures / 67 errors / 59 skipped`；
@@ -561,7 +561,7 @@ GREEN：
 - commit DB-window 与 abandon post-body 双线程测试均确认 prepare-release 等待 A 完整退出；随后
   分别以 committed/abandoned 拒绝，candidate 文件、A 完成后的 state 与 ledger bytes 不变。
 - 两项线程测试在 pipeline 基类及 auto-publish 子类继承集合共执行 4 项，全部通过；SQLite/Celery
-  eager 禁网的 P0 三模块为 `270/270`。Django、迁移、OpenSpec 与 diff 门禁见本轮验证记录；
+  eager 禁网的 P0 三模块为 `270/270`。Django、迁移、旧规格流程 与 diff 门禁见本轮验证记录；
   未访问生产。
 
 ## task 5.4 已审核空胜绩门禁返修
@@ -588,5 +588,5 @@ GREEN：
   未访问生产。
 - 排除上述基线失败后单独运行两项新增完整度回归与
   `stable.test_p0_horse_production_apply + stable.test_p0_horse_completion_batch`，
-  `247/247` 通过。Django check 无问题，迁移无漂移，OpenSpec strict/all `37/37`，diff check
+  `247/247` 通过。Django check 无问题，迁移无漂移，旧规格流程 strict/all `37/37`，diff check
   通过。

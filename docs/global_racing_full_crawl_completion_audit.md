@@ -2,7 +2,7 @@
 
 日期：2026-06-27
 
-关联能力规格：`openspec/specs/real-global-racing-data-ingestion/spec.md`
+关联能力规格：`旧规格流程/specs/real-global-racing-data-ingestion/spec.md`
 
 ## 结论
 
@@ -12,7 +12,7 @@
 
 ## 当前主树同步状态
 
-`2026-06-27` 当前主工作树 `/Users/mentianlu/Code/umanews` 已同步恢复所需的代码、fixtures、OpenSpec 产物、proof JSON 和文档，但这些同步内容仍是未提交工作树差异，且本地 `main` 仍落后 `origin/main`。审查和提交前应先阅读：
+`2026-06-27` 当前主工作树 `/Users/mentianlu/Code/umanews` 已同步恢复所需的代码、fixtures、旧规格流程 产物、proof JSON 和文档，但这些同步内容仍是未提交工作树差异，且本地 `main` 仍落后 `origin/main`。审查和提交前应先阅读：
 
 - `docs/global_racing_sync_manifest.md`
 - `docs/global_racing_change_partition.md`
@@ -27,7 +27,7 @@
 - 外部缓存底座、HKJC、UK、France、US importer 和 global racing audit 相关局部测试
 - `python server/manage.py makemigrations --check --dry-run`
 - `python server/manage.py migrate --plan`
-- `openspec validate --all`
+- `旧规格流程 validate --all`
 - proof-only 审计通过，且同一组 proof JSON 按完整 commit 候选口径会被正确阻断
 - `git diff --check`
 

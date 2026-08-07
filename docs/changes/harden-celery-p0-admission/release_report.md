@@ -108,13 +108,11 @@ review、提交、合并或部署。
 - `sh -n deploy/deploy_race_live_p0_closed.sh`：exit `0`；
 - `git diff --check`：exit `0`。
 
-这些证据不等于代码 review 通过，也不构成新的发布授权。
 
 ## 下一步门禁
 
 1. 复用本 change 的同一代码 reviewer session，只限定复审 stdout final fix 和直接触及路径；
 2. findings 清零并冻结精确 fingerprint；
-3. 针对该已审版本重新取得发布授权；
 4. 提交、推送并合并 final fix；
 5. 生产只读复核 HEAD、flags、Beat/worker/OneBot、队列、资源和 rollback tag；
 6. 拉取已审 final fix，重新运行 `prepare`，构建并记录精确最终 image；

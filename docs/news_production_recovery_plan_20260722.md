@@ -48,7 +48,7 @@
 
 ### 阶段 1：P0 新闻索引即时修复
 
-对应 change：[`repair-news-production-integrity`](../openspec/changes/repair-news-production-integrity/)。此阶段不等待代码实现，先处理仍在持续发生的生产数据完整性风险。
+对应 change：[`repair-news-production-integrity`](../旧规格流程/changes/repair-news-production-integrity/)。此阶段不等待代码实现，先处理仍在持续发生的生产数据完整性风险。
 
 1. 申请约 10 分钟文章写维护窗口，暂停 beat、worker 和后台文章编辑；公开只读访问可继续。
 2. 核对目标索引身份、活动写入、磁盘空间和数据库版本，生成并验证数据库及 `.env` 备份。
@@ -72,7 +72,7 @@
 
 ### 阶段 3：修复 publish_ready 积压漏选
 
-对应 change：[`recover-publish-ready-backlog`](../openspec/changes/recover-publish-ready-backlog/)。
+对应 change：[`recover-publish-ready-backlog`](../旧规格流程/changes/recover-publish-ready-backlog/)。
 
 1. 为文章增加 nullable、可索引的 `publish_ready_at`，历史数据不自动回填。
 2. 只有非 ready→ready 的状态转换，或显式审核/恢复意图，才能设置或刷新资格时间；重复校验和普通保存不得刷新。
@@ -85,7 +85,7 @@
 
 ### 阶段 4：完成英文术语上下文门禁
 
-继续既有 change：[`fix-english-term-context-gates-and-reprocess-performance`](../openspec/changes/fix-english-term-context-gates-and-reprocess-performance/)，当前 `52/60` 项完成，不另建重复方案。
+继续既有 change：[`fix-english-term-context-gates-and-reprocess-performance`](../旧规格流程/changes/fix-english-term-context-gates-and-reprocess-performance/)，当前 `52/60` 项完成，不另建重复方案。
 
 1. 先完成 PostgreSQL 生产等价性能验收：100 篇完整 dry-run ≤60 秒、SQL ≤35、峰值 RSS 增量 ≤256 MiB，并满足既定预取上限。
 2. 部署后保持 `off`，再进入至少 24 小时 `shadow`；shadow 不改变文章门禁或工作流。
@@ -96,7 +96,7 @@
 
 ### 阶段 5：翻译失败分类与有界恢复
 
-对应 change：[`harden-news-translation-recovery`](../openspec/changes/harden-news-translation-recovery/)。
+对应 change：[`harden-news-translation-recovery`](../旧规格流程/changes/harden-news-translation-recovery/)。
 
 1. 建立稳定错误码，分开 429/5xx/timeout/connection、JSON/响应不完整、placeholder、required term、认证/配置和 unknown。
 2. 仅对瞬态类别执行任务级退避重试；包含首次执行在内总任务尝试默认最多 3 次，并设置 jitter、next_retry_at 和队列预算。
@@ -109,7 +109,7 @@
 
 ### 阶段 6：地区漏斗归因与逐源提产
 
-对应 change：[`improve-low-yield-regional-news-sources`](../openspec/changes/improve-low-yield-regional-news-sources/)。
+对应 change：[`improve-low-yield-regional-news-sources`](../旧规格流程/changes/improve-low-yield-regional-news-sources/)。
 
 1. CrawlJob 记录有界结构化漏斗：列表发现、详情成功、过期、非赛马、重复、创建；再关联翻译、门禁、ready 和公开。
 2. 先对香港、法国现有 adapter 做真实只读探测与修复；只有仍有供给缺口时才评估新增来源。
@@ -129,25 +129,25 @@
 - 索引物理错误为 0，新增 stale CrawlJob 为 0，发布积压年龄持续收敛。
 - 翻译瞬态重试没有造成队列或 provider 风暴；内容错误仍保持人工边界。
 - 供给目标未达时给出漏斗层级和下一动作，不以降低质量门禁补量。
-- 完成后逐项归档 OpenSpec；只有已上线并通过真实生产观察的结果才写为“已解决”。
+- 完成后逐项归档 旧规格流程；只有已上线并通过真实生产观察的结果才写为“已解决”。
 
 ## 5. 交付与验证纪律
 
 每个阶段都按以下门禁独立交付：
 
-1. 目标测试与完整回归、Django check、迁移 apply/rollback/reapply（如有）、Compose config、OpenSpec strict 和 diff 检查通过。
+1. 目标测试与完整回归、Django check、迁移 apply/rollback/reapply（如有）、Compose config、旧规格流程 strict 和 diff 检查通过。
 2. 部署前核对生产 HEAD、运行任务、备份和开关；部署后核对实际容器代码与环境，不只核对仓库。
 3. 除第 6 阶段按用户确认采用有界并行生产直开外，其他阶段仍先只读/dry-run，再 shadow 或小批 apply，再扩大；每次状态改变都需要与精确 artifact/manifest 绑定。
 4. 代码就绪、生产部署、数据 apply、来源批准和公开发布是不同授权，不相互替代。
 5. 任一阶段出现 BLOCKER，关闭该阶段开关或回滚该阶段代码，不连带扩大后续方案。
 
-## 6. OpenSpec 审查状态
+## 6. 旧规格流程 审查状态
 
 - `repair-news-production-integrity`：已完成 full 工程审查；审查修正了 P0 顺序，明确索引修复不等待代码部署。
 - `recover-publish-ready-backlog`：已完成 full 工程审查；审查修正了 ready 时间被重复校验不断刷新的风险。
 - `harden-news-translation-recovery`：已完成 full 工程审查；审查补齐了 legacy 错误码迁移与低置信投影边界。
 - `improve-low-yield-regional-news-sources`：原 shadow 方案曾完成 full 工程审查；用户改为“每地区最多 2 个 accepted 来源并行生产直开”后，scope 已修订并退回 `proposed`。第 6 阶段实施前必须按新 scope 重新完成工程审查，不能复用旧结论。
-- 四个新 change 均通过 `openspec validate <change> --strict`；全库严格校验通过。严格校验只证明文档结构有效，不替代上述新 scope 的工程复审。既有英文门禁 change 继续复用，不重复提案。
+- 四个新 change 均通过 `旧规格流程 validate <change> --strict`；全库严格校验通过。严格校验只证明文档结构有效，不替代上述新 scope 的工程复审。既有英文门禁 change 继续复用，不重复提案。
 
 ## 7. 用户已确认的决策
 

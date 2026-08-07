@@ -84,7 +84,6 @@
   - [x] (integration) 统一十页 results deadline 与 Celery 软硬时间预算。
 - [ ] (integration) 复审复用同一 reviewer session，只核对 findings、修复及直接路径。
 - [ ] (operations) 记录 scope、approved parent、fingerprint 和 content manifest SHA。
-- [ ] (operations) 最新 review 成功后停止，取得当前冻结版本的用户发布授权。
 
 ## 6. 部署
 

@@ -182,7 +182,6 @@ P0/P1 或 is_featured、应用 region/grade/when。不以 `data_quality_status` 
 - 代码审核第 3 轮（应用户要求追加的全新 Codex 独立审查，session
   `019fa932-ca46-7b23-a2d6-c9fc9381cca7`，即按本文档执行的那一轮）：代码实现未发现
   问题，范围/指纹/只读均满足，但首轮 REVISE——1 项 P2：`docs/current_state.md` 与
-  `docs/project_status.md` 的本任务条目**标题**写"等待发布授权"，与正文"复审未完成"
   矛盾，错误提前推进工作流状态。已修复：两个标题改为"处于代码复审门禁"，正文同步
   记录本轮 REVISE 与修复事实，待同一 Codex 会话限定复审关闭。
 

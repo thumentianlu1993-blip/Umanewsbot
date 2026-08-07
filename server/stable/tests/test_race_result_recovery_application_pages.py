@@ -1,6 +1,6 @@
 """Application RED contracts for canonical public race pages.
 
-OpenSpec task: 1.5.
+Native change task: canonical public pages contract.
 """
 
 from __future__ import annotations

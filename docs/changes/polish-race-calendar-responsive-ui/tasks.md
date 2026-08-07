@@ -12,7 +12,6 @@
 - [x] 0.7 (application) 有 finding 时修订方案并复用同一 reviewer 会话限定复审至通过
 - [x] 0.8 (operations) 方案审核通过后向用户汇报并停在实现确认门禁
 
-## 1. 测试先行（取得用户实现授权后）
 
 - [x] 1.1 (operations) 启动测试 subagent 前重新记录并行公共页面 change 的 HEAD、完整修改文件和
   共享函数/selector hunk；只有稳定版本、完成 rebase 或双方 owner 锁定不重叠边界之一成立才继续

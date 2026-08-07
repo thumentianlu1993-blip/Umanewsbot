@@ -9,7 +9,6 @@
 - 尚未实现、提交、推送、创建 PR、部署、联网或创建 automation。
 
 本 change 的“唯一需授权点”指部署后的每个审核包只需一次赛果内容批准。首次实现与发布仍按
-仓库治理取得方案后实现确认和代码 review 后发布授权。
 
 ## 2. 发布前门禁
 
@@ -19,7 +18,6 @@
 - 真实 RED/GREEN 和受影响回归；
 - 独立代码 review 所有 actionable finding 清零；
 - 冻结 fingerprint、approved parent、content manifest hash；
-- 用户对该冻结版本的发布授权；
 - 生产运行态、队列、外部 import lock、磁盘、SMTP 和 SSH 可用性只读盘点。
 
 ## 3. 默认关闭部署

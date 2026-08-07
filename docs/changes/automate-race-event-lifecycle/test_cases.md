@@ -2,7 +2,6 @@
 
 ## 1. RED 原则
 
-取得用户实现授权后，先由测试 subagent 写测试并运行。RED 必须由以下目标能力尚不存在导致：
 
 - lifecycle control/audit 模型不存在；
 - 纯时间决策/原子推进服务不存在；
@@ -378,7 +377,6 @@ GREEN: command / timestamp / exit / counts
   （另 4 项 conditional skip）、真实 PostgreSQL `3/3` 通过；
 - 上游新增 recovery/P0 URL/HTTP budget 组合的 `14/87` macOS 路径错误在纯
   `origin/main@6ac08e40` 精确复现，不是 B0.1 增量；
-- latest-main 集成版本仍需重新冻结 fingerprint 并复用同一 reviewer 复审；此前发布授权
   不跨父提交复用。
 
 ## 2. 阶段 A：生命周期

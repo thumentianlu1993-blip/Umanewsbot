@@ -77,7 +77,6 @@
 
 ## RED 取得方式
 
-实现授权后由测试 subagent 先只修改测试。每个 RED 单独运行、保存失败命令、失败断言和原因，
 不得一次写完所有测试后只保存一张总红灯。
 
 ### RED 1：关闭态仍注册
@@ -197,7 +196,6 @@ stable.test_race_live_p0_deployment_contract
 `33/33 / 56.236s / exit 0`。Django check 为 exit `0`；
 `makemigrations --check --dry-run` 输出 `No changes detected`；`sh -n` 与
 `git diff --check` 均为 exit `0`。这些是当前候选验证证据，不能冒充限定复审通过或新的
-发布授权。
 
 完整 `stable` 对照结果：
 
@@ -216,7 +214,6 @@ stable.test_race_live_p0_deployment_contract
 `full_stable_failure_baseline.txt`；原始 headings 中的巨大 subtest repr 不复制进仓库，
 只保存其计数、差集与 hash。
 
-## 运行态验证（发布授权后）
 
 - 只使用 `deploy_race_live_p0_closed.sh prepare`，不得原样运行 `deploy_lowcost.sh`；
 - 从候选容器解析 settings，确认三个关闭态值和两个 schedule key；
@@ -227,5 +224,3 @@ stable.test_race_live_p0_deployment_contract
 - 连续至少 5 个分钟边界，关闭态不得新增 selector/monitor；
 - healthz、首页、赛事入口和普通 Celery ping 正常；
 - 不消费、不删除、不迁移现有 `race_live` 历史消息。
-
-运行态验证是部署后证据，不替代自动化 RED/GREEN，也不得在发布授权前执行。

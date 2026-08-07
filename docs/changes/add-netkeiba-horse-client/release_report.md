@@ -82,7 +82,7 @@
   修复前 `04c89e35` 基线全部复现，增量失败为 0。
 - 排除已确认基线失败后，P0 production apply/batch 246 项与三项新增完整度回归合计 `249/249`
   通过；
-  Django check、迁移检查、OpenSpec strict/all `37/37`、diff check 均通过。
+  Django check、迁移检查、旧规格流程 strict/all `37/37`、diff check 均通过。
 - 独立审查提出的两项 P1 已修复并补回归：非空 applied payload 不得作为无胜绩证据；新策略
   只在 v2 发布链路强制，历史 v1 artifact 保留只读复验能力。
 - 后续直接路径复审发现的 v1 commit 和手工 ready 问题也已 RED→GREEN：可信 v1 只能 dry-run，

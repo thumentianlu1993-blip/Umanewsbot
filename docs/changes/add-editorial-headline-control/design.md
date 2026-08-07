@@ -324,7 +324,6 @@ POST /admin/headline/recommend/<id>/accept/   接受推荐
 - `server/stable/templates/stable/console/article_editor.html`
 - `server/stable/templates/stable/console/base.html`
 
-测试（取得实现授权后才创建）：
 
 - `server/stable/test_editorial_headlines.py`（新增）
 - 必要时增加 PostgreSQL 专项测试文件，或在同文件按 vendor 跳过。

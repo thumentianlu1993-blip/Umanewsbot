@@ -1,6 +1,6 @@
 ---
 name: plan-eng-review
-description: Umanews 仓库级方案审核兜底。工作流进入方案审核阶段，且当前环境没有更合适的 Codex 原生方案审核能力时自动使用，无需用户再次点名；也可响应用户明确要求审核 plan/spec/design。仅用于实现前方案审核，不用于编写方案、实现代码、实现后代码审核、部署或驱动/维护 OpenSpec 工作流状态。
+description: Umanews 仓库级方案审核兜底。工作流进入方案审核阶段，且当前环境没有更合适的 Codex 原生方案审核能力时自动使用，无需用户再次点名；也可响应用户明确要求审核 plan/spec/design。仅用于实现前方案审核，不用于编写方案、实现代码、实现后代码审核、部署或驱动其他规格工作流状态。
 ---
 
 # Umanews 通用方案审核（repository fallback）
@@ -16,10 +16,10 @@ description: Umanews 仓库级方案审核兜底。工作流进入方案审核�
 
 - 只读审核：不得修改被审方案、代码、测试、状态文件或项目文档。
 - 不运行部署、迁移、生产命令或真实网络请求。
-- 不调用 OpenSpec CLI，不读取或写入 change phase、journal、ledger 等流程状态。
+- 不调用其他规格流程 CLI，不读取或写入 phase、journal、ledger 等流程状态。
 - 不承担代码审核；实现后的代码由该需求首次代码审核建立的 reviewer 会话执行 `/review`。
 - 不因自动触发而扩大范围：仍只审核已经指定或在当前任务目录中发现的方案输入，不编写或修改方案。
-- 可以把既有 `openspec/changes/<change>/` 中的文件作为普通输入读取，但不能依赖 OpenSpec 流程语义推进工作。
+- 历史方案若仍有独立文档，只能作为普通事实输入；不得依赖已删除流程的状态语义推进工作。
 
 ## 输入发现
 
@@ -32,8 +32,7 @@ description: Umanews 仓库级方案审核兜底。工作流进入方案审核�
    - `test_cases.md`
    - `tasks.md`
    - `rollout.md`
-5. 若用户指定的是既有 `openspec/changes/<change>/`，可读取该目录下等价文件以及相关 delta spec；不要读取或修改流程状态文件。
-6. 只按审核所需追踪相关代码、模型、迁移、Celery task、部署配置和文档，不做无边界全仓扫描。
+5. 只按审核所需追踪相关代码、模型、迁移、Celery task、部署配置和文档，不做无边界全仓扫描。
 
 输入不完整时，不要补写或猜测缺失方案。`spec.md`、`design.md`、`test_cases.md`、
 `tasks.md` 或 `rollout.md` 缺失时，必须把缺失项及其对安全检查点、在途 worktree、恢复

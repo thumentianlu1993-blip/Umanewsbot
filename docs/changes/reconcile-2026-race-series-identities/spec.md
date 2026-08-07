@@ -70,8 +70,6 @@ SHA；若与本基线漂移，停止并向用户报告，不静默扩大范围�
    只能 `defer`。decisions 必须携带工作簿锁定的 target/event 及 source/destination series 四项
    identity SHA；任何目标/候选/系列身份、before 值或依赖快照漂移均由 prepare 整批拒绝，不能以
    prepare 时的新状态重建审核基线。
-4. 审核工作簿本身只读生产数据，不构成发布授权；正式 apply 仍需成功代码 review、精确 artifact
-   SHA、写前备份和用户对冻结版本的发布授权。
 
 ## 验收标准
 

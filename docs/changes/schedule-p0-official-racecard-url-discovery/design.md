@@ -157,6 +157,5 @@ route 增加：
   rollout 必须通过 route/inspect/消费 smoke 验证，不依赖未记录生产覆盖。
 - 代码可带 schedule 发布，但 `P0_RACECARD_URL_DISCOVERY_ENABLED=false`。
 - 先做 flag-off smoke，确认 transport=0/file_write=0。
-- 后续发布授权后创建宿主目录、备份 `.env`、设置普通 worker bind mount、部署并单次受控运行。
 - 每个 provider route 独立启用；总开关不能覆盖 provider contract。
 - 回滚先关 flag，再恢复镜像/compose；不需数据库恢复。

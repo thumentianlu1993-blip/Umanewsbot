@@ -46,7 +46,6 @@
 ## 5. 代码门禁
 
 - [x] (application) 完成独立原生代码 review；前后 fingerprint 一致、内层只读、actionable 清零
-- [ ] (operations) 冻结代码/生成器版本；取得用户对部署只读工具的精确发布授权
 
 ## 6. 生产只读审核包
 
@@ -60,7 +59,6 @@
 ## 7. 数据发布门禁
 
 - [ ] (application) 对精确 decisions/manifest 和直接触及路径完成同一代码 reviewer 限定复审
-- [ ] (operations) 冻结 manifest/approval/代码 fingerprint，取得用户对该精确批次的新发布授权
 - [ ] (operations) 执行 custom-format 生产备份、SHA-256 和 `pg_restore -l`
 - [ ] (operations) 以首批单一 manifest 运行既有单事务 commit；立即运行 independent verifier
 - [ ] (integration) 核对全量/逐事件守恒；对每个实际含正向动作的地区至少抽查 2 个系列（不足则全量），

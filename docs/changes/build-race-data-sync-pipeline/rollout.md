@@ -9,7 +9,7 @@
 - A 新增测试、应用代码及未应用 migration `0068/0069`；没有生产写、收费 API、credential、
   commit/push/PR/deploy/migrate。
 - 同一独立方案 reviewer 首轮提出 5 个 high finding；修订后限定复审为 `VERDICT: APPROVED`。
-- 用户已确认实现；当前仅完成 A 的本地关闭态核心，同一独立代码 reviewer 经六轮返修后最终
+- 用户已G1 范围确认；当前仅完成 A 的本地关闭态核心，同一独立代码 reviewer 经六轮返修后最终
   `VERDICT: APPROVED`。无 provider 网络 proof，因此除已有 TRA adapter 外，其余 roster entry 保持
   `proof_required`；Ireland 直接 reconciliation marker follow-up 完成并重新 review 前不得进入首发。
 - 2026-08-02 快照为 16 个 shadow controls、0 transition、全局 false/off、两个过期 claim、
@@ -148,7 +148,7 @@ profile-link reverse manifest，经人工审核回退。只有数据库级损坏
 验证运行 image/flags、Django/migration、worker/queues/claims、HTTP race pages、exact event DB verifier、
 15–30 分钟日志与零重复通知。不能以 HTTP 200 代替 DB/queue/generation 证据。
 
-独立方案审核已经 APPROVED，用户随后明确“确认实现”。当前只完成 A 切片本地实现：SQLite `64/64`、
+独立方案审核已经 APPROVED，用户随后明确“G1 范围确认”。当前只完成 A 切片本地实现：SQLite `64/64`、
 真实 PostgreSQL `11/11`、相邻 race-live `48/48`，同一独立 reviewer 经六轮审查最终
 `VERDICT: APPROVED`。Ireland 直接 reconciliation marker 校验仍是非阻塞 follow-up，因此 Ireland
 不进入首发 cohort。A2/B/C、provider 联网 proof、生产数据处理、commit、push、PR、migration 和每个

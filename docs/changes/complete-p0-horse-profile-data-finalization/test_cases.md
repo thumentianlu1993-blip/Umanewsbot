@@ -162,8 +162,8 @@ docker run --rm --network none \
 ```bash
 DB_ENGINE=sqlite python manage.py check
 DB_ENGINE=sqlite python manage.py makemigrations --check --dry-run
-openspec validate complete-p0-horse-profile-data --strict
-openspec validate --all
+旧规格流程 validate complete-p0-horse-profile-data --strict
+旧规格流程 validate --all
 git diff --check
 ```
 
@@ -172,7 +172,7 @@ git diff --check
 - Django check：`System check identified no issues (0 silenced)`。
 - 迁移漂移：`No changes detected`。
 - 目标变更严格校验：`Change 'complete-p0-horse-profile-data' is valid`。
-- 全量 OpenSpec：`30 passed, 0 failed`。
+- 全量 旧规格流程：`30 passed, 0 failed`。
 
 以上 Django 命令实际在同一 `--network none` 测试镜像中执行；`git diff --check` 最终退出 `0`。本阶段没有真实网络抓取、生产数据库写入、commit、push、merge 或部署。
 
@@ -296,8 +296,8 @@ docker run --rm --network none \
 ```bash
 DB_ENGINE=sqlite python manage.py check
 DB_ENGINE=sqlite python manage.py makemigrations --check --dry-run
-openspec validate complete-p0-horse-profile-data --strict
-openspec validate --all
+旧规格流程 validate complete-p0-horse-profile-data --strict
+旧规格流程 validate --all
 git diff --check
 ```
 
@@ -305,8 +305,8 @@ git diff --check
 
 - Django check：`System check identified no issues (0 silenced)`。
 - 迁移漂移：`No changes detected`。
-- 目标 OpenSpec：`Change 'complete-p0-horse-profile-data' is valid`。
-- 全量 OpenSpec：`30 passed, 0 failed`。
+- 目标 旧规格流程：`Change 'complete-p0-horse-profile-data' is valid`。
+- 全量 旧规格流程：`30 passed, 0 failed`。
 - Python 编译和 `git diff --check` 均退出 `0`。
 
 全过程没有真实网络抓取、生产数据库写入、commit、push、merge 或部署。
@@ -466,19 +466,19 @@ docker run --rm --network none \
 - staging 前按候选、字段、当前值、建议值和完整 source evidence 指纹逐条对账，状态只允许 `applied/already_applied/blocked/ignored`；
 - 新增污染 cache、混合来源、缺失 outcome、重复 outcome、未知状态、证据备注漂移和无输入旧 outcome 的 fail-closed 测试，失败时最终 output 目录不存在。
 
-第四轮修复后 source-client 为 `63/63`（`Ran 63 tests in 5.960s`），四模块为 `118/118`（`Ran 118 tests in 26.382s`），均为 `OK`。Django check、迁移无漂移、OpenSpec strict/all `30/30` 和 `git diff --check` 同时通过；仍未执行真实网络批次或数据库写入。
+第四轮修复后 source-client 为 `63/63`（`Ran 63 tests in 5.960s`），四模块为 `118/118`（`Ran 118 tests in 26.382s`），均为 `OK`。Django check、迁移无漂移、旧规格流程 strict/all `30/30` 和 `git diff --check` 同时通过；仍未执行真实网络批次或数据库写入。
 
-第五轮独立 review 指出递归纯净检查只处理 `dict/list`，自定义 client 可把人工标记藏入 tuple，首次检查放行后由 JSON 序列化变成数组并污染 cache。修复后 canonical payload 在检查人工标记前先递归验证严格 JSON 类型：对象键必须是字符串，容器只允许 `dict/list`，标量只允许 `null/string/boolean/integer/finite float`。真实 custom-client + network + cache 测试把 `manual_review` 藏入 tuple，证明调用失败且 cache 文件不存在。修复后 source-client `63/63`（`Ran 63 tests in 6.391s`）、四模块 `118/118`（`Ran 118 tests in 26.855s`），Django check、迁移无漂移、OpenSpec strict/all `30/30` 和 `git diff --check` 全部通过。
+第五轮独立 review 指出递归纯净检查只处理 `dict/list`，自定义 client 可把人工标记藏入 tuple，首次检查放行后由 JSON 序列化变成数组并污染 cache。修复后 canonical payload 在检查人工标记前先递归验证严格 JSON 类型：对象键必须是字符串，容器只允许 `dict/list`，标量只允许 `null/string/boolean/integer/finite float`。真实 custom-client + network + cache 测试把 `manual_review` 藏入 tuple，证明调用失败且 cache 文件不存在。修复后 source-client `63/63`（`Ran 63 tests in 6.391s`）、四模块 `118/118`（`Ran 118 tests in 26.855s`），Django check、迁移无漂移、旧规格流程 strict/all `30/30` 和 `git diff --check` 全部通过。
 
-第六轮独立 review 指出循环/过深容器会泄漏裸 `RecursionError`，且 tuple 测试未经过真实审核批次包装层。修复后严格 JSON validator 改为迭代 enter/exit 遍历，以当前活动容器 ID 检测循环，并以 `CANONICAL_JSON_MAX_DEPTH=100` 阻断过深结构。新增直接 adapter 的循环/过深测试，以及真实授权 reviewed batch + custom factory 测试：英国 10 匹中分别注入 tuple、set、非字符串 key、NaN、Infinity、循环和过深结构 7 类非法 payload，结果为 `7 blocked / 3 complete`，10 匹均被调用，非法候选归入 `source_cache_or_adapter_error`，cache 目录精确只包含 3 个合法候选 JSON，无目标污染文件或临时残留。修复后 source-client `64/64`（`Ran 64 tests in 7.070s`）、四模块 `119/119`（`Ran 119 tests in 26.864s`），Django check、迁移无漂移、OpenSpec strict/all `30/30` 和 `git diff --check` 全部通过。
+第六轮独立 review 指出循环/过深容器会泄漏裸 `RecursionError`，且 tuple 测试未经过真实审核批次包装层。修复后严格 JSON validator 改为迭代 enter/exit 遍历，以当前活动容器 ID 检测循环，并以 `CANONICAL_JSON_MAX_DEPTH=100` 阻断过深结构。新增直接 adapter 的循环/过深测试，以及真实授权 reviewed batch + custom factory 测试：英国 10 匹中分别注入 tuple、set、非字符串 key、NaN、Infinity、循环和过深结构 7 类非法 payload，结果为 `7 blocked / 3 complete`，10 匹均被调用，非法候选归入 `source_cache_or_adapter_error`，cache 目录精确只包含 3 个合法候选 JSON，无目标污染文件或临时残留。修复后 source-client `64/64`（`Ran 64 tests in 7.070s`）、四模块 `119/119`（`Ran 119 tests in 26.864s`），Django check、迁移无漂移、旧规格流程 strict/all `30/30` 和 `git diff --check` 全部通过。
 
-第七轮独立 review 指出 source validator 在严格形状检查前先 `deepcopy`，且 `_read_cache()` 未包装 JSON decoder 对超深 cache 的 `RecursionError`。修复后 validator 先在原始对象上执行迭代 JSON 检查和人工标记检查，只有通过后才复制；直接测试使用 1200 层对象及会主动抛错的 `__deepcopy__` 对象，证明前者转为最大深度 blocker，后者在复制前作为非 JSON 值阻断。磁盘测试写入 1200 层真实 JSON cache，通过完整 reviewed batch 证明其归入 `source_cache_or_adapter_error`，其余 9 个 cache hit 继续、client 网络调用为 0、地区结果为 `1 blocked / 9 complete`。修复后 source-client `66/66`（`Ran 66 tests in 7.027s`）、四模块 `121/121`（`Ran 121 tests in 27.128s`），Django check、迁移无漂移、OpenSpec strict/all `30/30` 和 `git diff --check` 全部通过。
+第七轮独立 review 指出 source validator 在严格形状检查前先 `deepcopy`，且 `_read_cache()` 未包装 JSON decoder 对超深 cache 的 `RecursionError`。修复后 validator 先在原始对象上执行迭代 JSON 检查和人工标记检查，只有通过后才复制；直接测试使用 1200 层对象及会主动抛错的 `__deepcopy__` 对象，证明前者转为最大深度 blocker，后者在复制前作为非 JSON 值阻断。磁盘测试写入 1200 层真实 JSON cache，通过完整 reviewed batch 证明其归入 `source_cache_or_adapter_error`，其余 9 个 cache hit 继续、client 网络调用为 0、地区结果为 `1 blocked / 9 complete`。修复后 source-client `66/66`（`Ran 66 tests in 7.027s`）、四模块 `121/121`（`Ran 121 tests in 27.128s`），Django check、迁移无漂移、旧规格流程 strict/all `30/30` 和 `git diff --check` 全部通过。
 
-第八轮独立 review 指出自定义 `dict/list` 子类仍可在通过 `isinstance` 后利用 `__deepcopy__` 抛错或篡改内容，且深层坏 cache 测试未核对原文件不变。修复后容器只接受精确内置 `dict/list`，标量继续兼容项目实际使用的 `RacingRegion` 字符串枚举；通过形状与人工标记检查后，用 `json.dumps(..., allow_nan=False)` + `json.loads()` 生成纯内置类型副本，不再调用 payload 自定义复制钩子。直接测试新增抛错型 dict 子类和篡改型 list 子类，两者均在复制前作为非 JSON 值阻断。cache-hit 批次记录运行前后全部 cache 文件名和字节，结果逐项完全一致，因此同时证明无删除、截断、改写或临时残留。四模块再次为 `121/121`（`Ran 121 tests in 27.222s`），Django check、迁移无漂移、OpenSpec strict/all `30/30` 和 `git diff --check` 全部通过。
+第八轮独立 review 指出自定义 `dict/list` 子类仍可在通过 `isinstance` 后利用 `__deepcopy__` 抛错或篡改内容，且深层坏 cache 测试未核对原文件不变。修复后容器只接受精确内置 `dict/list`，标量继续兼容项目实际使用的 `RacingRegion` 字符串枚举；通过形状与人工标记检查后，用 `json.dumps(..., allow_nan=False)` + `json.loads()` 生成纯内置类型副本，不再调用 payload 自定义复制钩子。直接测试新增抛错型 dict 子类和篡改型 list 子类，两者均在复制前作为非 JSON 值阻断。cache-hit 批次记录运行前后全部 cache 文件名和字节，结果逐项完全一致，因此同时证明无删除、截断、改写或临时残留。四模块再次为 `121/121`（`Ran 121 tests in 27.222s`），Django check、迁移无漂移、旧规格流程 strict/all `30/30` 和 `git diff --check` 全部通过。
 
-第九轮独立 review 指出 JSON 规范化后未再次检查人工标记，且 `merge_reviewed_manual_supplements` / `merge_p0_horse_source_payloads` 仍可能在严格检查前复制输入。修复后 canonical validator 在原对象与规范化副本上各检查一次人工标记；测试用自定义 `str` 子类让原始 `== manual_review` 和 `manual_supplements in dict` 返回假，但 JSON round-trip 后变成普通字符串，证明二次检查能阻断，同时 `RacingRegion` 仍规范为普通 `str`。两个合并 helper 现在先对主 payload 和补充列表执行严格 JSON 规范化；直接测试使用抛错型嵌套 dict 与篡改型补充 list 子类，四条路径均在复制或合并前阻断。修复后 source-client `68/68`（`Ran 68 tests in 7.292s`）、四模块 `123/123`（`Ran 123 tests in 27.244s`），Django check、迁移无漂移、OpenSpec strict/all `30/30` 和 `git diff --check` 全部通过。
+第九轮独立 review 指出 JSON 规范化后未再次检查人工标记，且 `merge_reviewed_manual_supplements` / `merge_p0_horse_source_payloads` 仍可能在严格检查前复制输入。修复后 canonical validator 在原对象与规范化副本上各检查一次人工标记；测试用自定义 `str` 子类让原始 `== manual_review` 和 `manual_supplements in dict` 返回假，但 JSON round-trip 后变成普通字符串，证明二次检查能阻断，同时 `RacingRegion` 仍规范为普通 `str`。两个合并 helper 现在先对主 payload 和补充列表执行严格 JSON 规范化；直接测试使用抛错型嵌套 dict 与篡改型补充 list 子类，四条路径均在复制或合并前阻断。修复后 source-client `68/68`（`Ran 68 tests in 7.292s`）、四模块 `123/123`（`Ran 123 tests in 27.244s`），Django check、迁移无漂移、旧规格流程 strict/all `30/30` 和 `git diff --check` 全部通过。
 
-第十轮独立 review 指出 `reject_manual_supplements_from_canonical_source_payload()` 仍只检查原始对象，虽然随后完整 validator 会偶然补拦，但该独立 purity gate 自身可被欺骗型字符串绕过。修复后 gate 先执行严格形状检查和安全 JSON copy，再同时检查原对象与规范化副本。既有欺骗值/键测试现在分别直接调用 purity gate 和完整 validator；实际 adapter + network + cache 测试也加入欺骗型 `entry_method`，证明来源在 cache 写入前被阻断且 cache 文件不存在。四模块再次为 `123/123`（`Ran 123 tests in 27.711s`），Django check、迁移无漂移、OpenSpec strict/all `30/30` 和 `git diff --check` 全部通过。
+第十轮独立 review 指出 `reject_manual_supplements_from_canonical_source_payload()` 仍只检查原始对象，虽然随后完整 validator 会偶然补拦，但该独立 purity gate 自身可被欺骗型字符串绕过。修复后 gate 先执行严格形状检查和安全 JSON copy，再同时检查原对象与规范化副本。既有欺骗值/键测试现在分别直接调用 purity gate 和完整 validator；实际 adapter + network + cache 测试也加入欺骗型 `entry_method`，证明来源在 cache 写入前被阻断且 cache 文件不存在。四模块再次为 `123/123`（`Ran 123 tests in 27.711s`），Django check、迁移无漂移、旧规格流程 strict/all `30/30` 和 `git diff --check` 全部通过。
 
 第十一轮同一独立 reviewer 重新读取完整 diff 后返回 `VERDICT: APPROVED`，明确无 actionable findings。审前与审后 fingerprint 均为 `9d2a7a276236306d3468e7a302df46e448ecfee257c64763db4700197edc8303`，reviewer stdout SHA-256 为 `b124808e0a93c4662687790b11f87dd192f29d9dff53692ff9383d96edb8ed8a`，sandbox 为只读且未修改文件。该审查结论不授权真实网络批次、生产数据库写入、发布、Git 合并或部署。
 
@@ -566,7 +566,7 @@ field evidence / 1439 career records / 2679 career field evidence / 9 previews /
 errors 0`；首页预览已人工检查，无溢出或遮挡。
 
 最终 Python 离线组合回归从 `277/277` 增至 `282/282`；Node summary/path 测试、Django check、
-迁移漂移、Python `compileall`、OpenSpec change strict 通过、all strict `30/30`、工作簿公式
+迁移漂移、Python `compileall`、旧规格流程 change strict 通过、all strict `30/30`、工作簿公式
 错误扫描和 `9` 张预览均通过。50 匹仍为
 `1439 records = 1432 actual + 7 non-start`，缺少/多采均为 `0`，严格完整 `40/50`，美国
 `10` 匹数量对齐但逐场官方性待确认。全过程没有生产写入、部署、发布或网络 career crawl，
@@ -616,7 +616,7 @@ errors 0`；首页预览已人工检查，无溢出或遮挡。
 
 本轮严格测试先行，只修改
 `server/stable/test_p0_horse_completion_source_clients.py` 与本测试证据文档。没有修改
-service、management command、model、settings、OpenSpec tasks 或其他文档。新增测试复用既有
+service、management command、model、settings、旧规格流程 tasks 或其他文档。新增测试复用既有
 50 匹 reviewed CSV 生成器，并只通过 fake source-client factory 返回内存 payload；容器全程
 `--network none`，不会访问真实网站。
 
@@ -683,7 +683,7 @@ RED 精确暴露两个尚未实现的入口层缺口：
 
 ### 任务 4.2：真实来源 blocker 异常分类 RED（2026-07-18）
 
-本轮继续严格限制为测试和测试证据文档，没有修改实现、配置、OpenSpec tasks 或其他文件。
+本轮继续严格限制为测试和测试证据文档，没有修改实现、配置、旧规格流程 tasks 或其他文件。
 测试使用注入的单个法国 fake source client：第 1 匹先设置
 `last_request_count=2`，再抛真实
 `p0_horse_completion_source_clients.P0HorseSourceBlocked("rate_limited: HTTP 429")`；
@@ -744,7 +744,7 @@ subtest：
 
 ### Reviewer 三项 finding 的新增合同测试（2026-07-18）
 
-本轮仍只修改 source-client 测试与本测试证据文档，没有修改实现、配置、OpenSpec tasks
+本轮仍只修改 source-client 测试与本测试证据文档，没有修改实现、配置、旧规格流程 tasks
 或其他文件。所有网络相关对象均为 patch/fake，容器保持 `--network none`。
 
 新增测试前的 29 项基线：
@@ -1067,7 +1067,7 @@ race_name='取消記念':     P0HorseSourceBlocked not raised
 
 ### JBIS `cell[12]` 精确值与缺列 mutation GREEN 保护（2026-07-18）
 
-reviewer 已确认实现采用 `cell[12]` 精确值判断是正确方向，本轮只补测试 mutation 保护，
+reviewer 已G1 范围确认采用 `cell[12]` 精确值判断是正确方向，本轮只补测试 mutation 保护，
 没有修改实现或状态文档。
 
 新增测试前的 38 项基线：
@@ -1161,7 +1161,6 @@ git diff --check -- \
   docs/changes/complete-p0-horse-profile-data-finalization/test_cases.md
 ```
 
-Python 编译已退出 `0`。本节只记录真实 RED，不构成 GREEN、reviewer 通过、网络抓取、生产写入或发布授权。
 
 ### 真实页面兼容实现与离线 GREEN（2026-07-18）
 

@@ -2,7 +2,6 @@
 
 ## RED 计划
 
-实现授权后先编写以下测试，并实际确认因目标能力不存在而失败：
 
 1. `Asia/Shanghai` aware `[start, end)` 与半开边界；恰等于 start 纳入、恰等于 end 排除。
 2. 英国/法国/美国 DST 换算；禁止使用固定 offset，处理不存在/歧义 local time 时 fail closed。
@@ -55,10 +54,9 @@
 - parser fixture 离线测试；
 - `git diff --check`；
 - 现存 racecard/realtime/lifecycle/historical candidate 回归；
-- OpenSpec 仅做既有兼容目录的 strict validation（若仓库 CLI 可用），不把它作为新 change
-  工作流或实现授权。
+- 旧规格流程 仅做既有兼容目录的 strict validation（若仓库 CLI 可用），不把它作为新 change
 
 ## 当前测试状态
 
 尚未创建或修改自动化测试。原因不是 RED 豁免，而是 AGENTS 工作流要求方案审核通过并获得用户
-针对本版方案的“确认实现”后才进入 TDD。当前只允许文档结构、链接、diff 和计划审核检查。
+针对本版方案的“G1 范围确认”后才进入 TDD。当前只允许文档结构、链接、diff 和计划审核检查。

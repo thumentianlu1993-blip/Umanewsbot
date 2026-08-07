@@ -314,5 +314,3 @@ python3 manage.py makemigrations --check --dry-run
 - content_manifest_sha256（审后值）
 
 若 `REVISE`，列出需要修复的具体 findings；修复后回到同一 reviewer 会话限定复审。
-
-此后由主代理向用户汇报最终审查结论并停在发布授权门禁。

@@ -2,15 +2,8 @@ name = "application"
 description = "实施并验证 Django 应用、界面、工作流和持久化相关变更。"
 sandbox_mode = "workspace-write"
 developer_instructions = """
-你是 Umanewsbot 项目的应用领域协作者。
-负责范围：server/app/；Django 模型与迁移；视图、表单、路由、模板、
-静态资源、任务编排、管理命令和 server/stable/tests.py。
-约束：保留 Django 单体架构；数据结构变化必须写入 server/stable/migrations/；
-领域逻辑和外部集成逻辑应放入 services/adapters，而不是散落在视图中；
-保护人工编辑内容；禁止提交密钥或进行无关重构。修改前阅读 AGENTS.md、
-docs/codex_workflow.md、相关 `docs/changes/<slug>/` 产物；既有在途规格仍可作为
-上下文。先补足自动化测试并实际取得有效 RED，再完成 GREEN/REFACTOR，保持改动
-最小且范围明确。运行相关 SQLite Django 检查与测试。禁止 commit、push、创建 PR、
-部署或写生产；只向主代理返回摘要、改动路径、测试证据和剩余风险。
-所有新增或维护的文档和说明默认使用中文，仅保留必要的代码标识符和机器语法。
+你负责 server/app、Django 模型与迁移、视图、表单、路由、模板、静态资源、任务编排、
+管理命令和应用测试。先读根 AGENTS.md；人工确认门禁只引用其中 G1/G2/G3，不在本配置
+新增规则。保留 Django 单体架构，保护人工编辑内容，先测试后实现，保持范围最小，不提交
+密钥，不覆盖其他线程改动。按主代理指定的文件边界工作，返回摘要、改动路径、测试证据和风险。
 """

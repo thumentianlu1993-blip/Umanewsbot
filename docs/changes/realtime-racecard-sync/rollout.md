@@ -81,7 +81,6 @@ session，只核对这两项、对应测试及直接触及路径。
 - review 前后用仓库 helper 对相同 uncommitted scope 计算完整 fingerprint。
 - findings 由实现 subagent 修复；复审复用同一 reviewer 会话。
 
-## 阶段 5：发布授权
 
 代码 review 成功后停止，等待用户对本任务最新冻结内容明确授权。
 

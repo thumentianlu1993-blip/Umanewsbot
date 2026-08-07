@@ -12,7 +12,6 @@ machine queue snapshot stdout 而 fail closed。当前阶段为
 - `expires=55` 只作为 Celery 最佳努力元数据；
 - 关闭态发布入口固定为 `prepare` / `start-beat` 两阶段；
 - migration 零计划双重门禁和 Beat 三状态失败语义纳入自动化合同；
-- 方案审核时生产状态仍未知；该历史方案结论不替代后续真实生产预检、发布授权或运行态证据。
 
 实现事实：
 
@@ -60,7 +59,6 @@ fingerprint 核对。聚焦 `64/64` 和静态检查通过不等于 review 通过
 - 把 finding 修复、部署合同通过或基线同集表述为代码 review 通过；
 - 未经复审和新授权直接 commit、push、PR/merge 或继续部署；
 - 清理/迁移队列、启动 worker、启用 flag、执行 migration 或生产写入；
-- 热补丁生产脚本、手工启动 Beat，或使用此前授权代替变化后版本的新发布授权。
 
 截至本次回写，生产 HEAD 为 `7cd144ab`，web/worker 运行初始候选 image
 `sha256:17562c52...acea7`；Beat exited、race-live worker `Created`，flags 仍为

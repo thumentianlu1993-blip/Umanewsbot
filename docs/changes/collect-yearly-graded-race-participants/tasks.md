@@ -25,7 +25,6 @@
 - [x] (application) 核对公开 RaceEvent/HorseProfile 页面实际暴露的地区、结果和名称字段。
 - [x] (integration) 编写 spec、design、test_cases、tasks、rollout。
 - [x] (integration) 完成独立方案审核并在同一 reviewer 会话修订至 APPROVED。
-- [x] (integration) 向用户汇报最终方案、RED 方式、风险和边界，取得新的明确实现授权。
 
 ## 测试先行
 
@@ -159,4 +158,3 @@
   conclusion=`success`，离线 artifact 已核验，完成本变更定义的生产部署。
 - [x] (operations) 只读核验服务器与公网 healthz；因 `/opt/umanewsbot` 长期 dirty 且本变更无
   Django runtime/DB 变化，未 pull、重建、重启、迁移或备份，服务器 HEAD 保持 `be1c89bf`。
-- [ ] (operations) full-network 单年度 run 另行授权；不得从代码发布授权推导。

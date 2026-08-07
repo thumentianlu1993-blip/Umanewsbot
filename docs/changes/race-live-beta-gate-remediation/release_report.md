@@ -2,7 +2,6 @@
 
 ## 结论
 
-`2026-07-20` 已发布授权冻结版本。coupled runner 身份、rollback bundle、四层
 maintenance CAS、current revision CAS 和 legacy identity 冲突门禁已进入生产；
 event `924` 保持同一暂定赛果公开。法国真实重验不再出现
 `racecard_schema_invalid`，但因 `racecard_not_found` 整批 fail-closed，未初始化法国或

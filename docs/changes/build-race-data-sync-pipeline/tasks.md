@@ -1,6 +1,6 @@
 # 出马资料、赛果同步与生命周期集成任务
 
-规划已完成并获用户“确认实现”。当前仅 A 切片完成测试先行、实现和独立代码审核；A2/B/C 与发布仍未开始。
+规划已完成并获用户“G1 范围确认”。当前仅 A 切片完成测试先行、实现和独立代码审核；A2/B/C 与发布仍未开始。
 
 ## 0. 方案门禁
 
@@ -9,7 +9,7 @@
 - [x] (integration) 调研目标地区公开来源并编写覆盖矩阵。
 - [x] (operations) 编写 spec/design/test_cases/tasks/rollout 并完成用户 grilling。
 - [x] (operations) 同一独立 reviewer 审核与限定复审完成，最终 `VERDICT: APPROVED`。
-- [x] (operations) 汇报方案、RED、风险/回滚并取得用户“确认实现”。
+- [x] (operations) 汇报方案、RED、风险/回滚并取得用户“G1 范围确认”。
 
 ## A. `sync-racecards-and-race-schedules`
 

@@ -35,7 +35,7 @@ P0 马定义：active 且有中文译名的 horse 术语 ∪ 五地区（日本/
 美国）G1-G3、J-G1-G3、JpnⅠ-Ⅲ 重点赛事全部参赛马。当前 46,318 匹 profile、
 56,745 条来源。**最终目标：46,318 匹全部在前台 `/horses/` 展示。**
 
-## 3. 需求链全景（五个 OpenSpec change）
+## 3. 需求链全景（五个 旧规格流程 change）
 
 | change | 状态 | 内容 |
 | --- | --- | --- |
@@ -158,7 +158,7 @@ P0 马定义：active 且有中文译名的 horse 术语 ∪ 五地区（日本/
 - 测试命令：
   `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/Code/umanews/.venv/bin/python server/manage.py test stable --noinput`
   （codex runtime python 无 django，用主工作区 `.venv`）
-- openspec CLI 必须在对应 worktree 目录下运行。
+- 旧规格流程 CLI 必须在对应 worktree 目录下运行。
 
 ### 7.3 关键代码入口
 

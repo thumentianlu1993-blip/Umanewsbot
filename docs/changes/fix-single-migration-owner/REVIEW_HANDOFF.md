@@ -10,7 +10,7 @@
 - 分支：`codex/fix-single-migration-owner`
 - HEAD（当前基线）：`6d073dc07cb29201bbc922255923820c872a0467`（= 2026-07-30 re-baseline 后的 origin/main）
 - 原 approved parent：`7385f59ab87bcce5193f3313ecca6809b165ad89`（设计/首轮审核基线，已被基线迁移取代）
-- 工作流：Codex 原生（见根 `AGENTS.md` 与 `docs/codex_workflow.md` 第 7 节），禁止 OpenSpec
+- 工作流：Codex 原生（见根 `AGENTS.md` 与 `docs/codex_workflow.md` 第 7 节），禁止 旧规格流程
 - 本 change 详细规范：同目录 `spec.md`、`design.md`、`test_cases.md`、`tasks.md`、`rollout.md`、`HANDOFF.md`
 
 ## 2. 根因（要修的问题）
@@ -145,7 +145,7 @@ RED/GREEN（命令均在 `server/` 下：`../.venv/bin/python manage.py test sta
 | `manage.py check` | 0 issues |
 | `manage.py makemigrations --check --dry-run` | No changes detected |
 | `git diff --check` | 通过 |
-| 唯一 owner 证据：`rg -n "manage\.py migrate --noinput\|manage\.py collectstatic --noinput" . --glob '!docs/**' --glob '!openspec/**' --glob '!.git/**' --glob '!.venv/**'` | 仅命中 `deploy/docker/run-release-tasks.sh:10-11` 各一次（另两处为测试断言字符串） |
+| 唯一 owner 证据：`rg -n "manage\.py migrate --noinput\|manage\.py collectstatic --noinput" . --glob '!docs/**' --glob '!旧规格流程/**' --glob '!.git/**' --glob '!.venv/**'` | 仅命中 `deploy/docker/run-release-tasks.sh:10-11` 各一次（另两处为测试断言字符串） |
 | 两份 `compose config`（T16，本机真实 docker CLI + 临时无敏感 env） | 通过 |
 
 明确未验证项：**真实本地 Compose 的正常/重放/失败三路径未执行**。本机 Docker daemon 可用，
@@ -223,10 +223,8 @@ gitignored 临时 dummy `.env`），但执行真实 `manage.py migrate` 被会�
 ## 7. 指纹（重要）
 
 基线迁移使此前全部冻结指纹失效；新指纹必须在第 7 轮复审确认本 change 在
-`6d073dc07cb29201bbc922255923820c872a0467` 上的最终状态后重新冻结，发布授权只针对该新指纹。
 
 第 6 轮 REVISE findings 已修复并通过 117/117；历史各轮修复均已完成，**新指纹尚未冻结**：
-需同一 reviewer 会话做第 7 轮复审确认本批修复后重新冻结，发布授权必须针对复审后的新指纹。
 
 历史冻结基线（已失效，仅作记录）：
 
@@ -234,7 +232,6 @@ gitignored 临时 dummy `.env`），但执行真实 `manage.py migrate` 被会�
 - content_manifest_sha256：`716f647f98c7d6db3a2e819551055fcbfde9d2ef4cf6344422ccff1c7b581a43`
 - head：`7385f59ab87bcce5193f3313ecca6809b165ad89`
 
-本轮审核通过后的新冻结指纹即当前任务最新审核基线，发布授权必须针对该新指纹。
 
 ## 8. 残余风险与已知项（非 actionable，供审核者核对是否认可）
 

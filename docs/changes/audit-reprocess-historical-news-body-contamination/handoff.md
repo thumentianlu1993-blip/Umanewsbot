@@ -43,10 +43,8 @@ git rev-parse HEAD origin/main
 8. `docs/changes/fix-news-body-extraction-boundaries/` 全部文件
 9. 本目录 `spec.md/design.md/test_cases.md/tasks.md/rollout.md`
 
-禁止调用任何 OpenSpec skill 或 CLI。现行主流程是：
+禁止调用任何 旧规格流程 skill 或 CLI。现行主流程是：
 
-探索 → spec/design → 方案审核 → 用户确认实现 → 测试先行 → 子代理实现 →
-独立 reviewer 会话 `/review` → 用户授权后发布。
 
 ## 4. 已完成的前置修复
 
@@ -153,7 +151,7 @@ git rev-parse HEAD origin/main
 
 ## 8. 当前门禁和下一步
 
-当前阶段：方案审核已通过，等待用户明确确认实现。
+当前阶段：方案审核已通过，等待用户明确G1 范围确认。
 
 独立 reviewer 首轮给出 5 项 P1，限定复审又发现 1 项事务/文件顺序 P1；修订后同一 reviewer 会话
 最终结论为 `VERDICT: APPROVED`。已关闭的问题是：
@@ -167,7 +165,7 @@ git rev-parse HEAD origin/main
 
 下一位 agent：
 
-1. 先确认用户是否已经在本方案审核通过后明确回复“确认实现/开始实现/继续实现”；旧任务中的授权
+1. 先确认用户是否已经在本方案审核通过后明确回复“G1 范围确认/开始实现/继续实现”；旧任务中的授权
    不得自动继承到本专项；
 2. 若尚未授权，继续停止并向用户汇报：
    - 根因；

@@ -520,7 +520,7 @@ run/payload/receipt。B0.1 可在不接入公开字段同步、不增加调度�
 event 924 的已存在 observation/publication 不迁移、不重跑；只对未来 `racecard_ready` claim
 应用 T+3 合同，并保留其既有 public policy/kill-switch。
 
-不建议一次性完成四阶段：来源 proof、新闻治理和 live result 的回滚面不同。用户若确认实现，
+不建议一次性完成四阶段：来源 proof、新闻治理和 live result 的回滚面不同。用户若G1 范围确认，
 默认授权范围应先解释为阶段 A；B/C/D 各自在开始测试前再次确认精确来源和开关范围。
 
 ## 12. 预计文件范围

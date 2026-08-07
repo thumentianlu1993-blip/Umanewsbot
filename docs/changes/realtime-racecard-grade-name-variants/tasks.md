@@ -35,7 +35,6 @@
 - [x] (application) 委派未参与实现的 reviewer subagent，实际执行 Codex 原生只读 review。
 - [ ] (application) 修复 findings 时复用同一 reviewer 会话限定复审。
 - [ ] (operations) 成功代码 review 后记录 fingerprint、approved parent/content hash，并等待本任务
-  新发布授权。
 
 ## 发布后
 

@@ -7,7 +7,6 @@
 固定日期测试未冻结视图时钟、worktree 本地 `.venv` 绝对路径 symlink 会污染发布范围、
 durable status 未同步。三项均已做窄修复，等待同一 reviewer 会话限定复审。
 
-当前没有发布授权，未 commit、push、创建 PR、merge 或部署。
 
 ## 基线与 worktree
 
@@ -71,7 +70,6 @@ Git 自动合并判断安全。若前序 change 仍混有未归属的 model/migr
 
 ### 2026-07-24 task 1.1 预检结果
 
-**预检时间**：2026-07-24（实现授权取得后，测试 subagent 启动前）
 
 **并行 change worktree 快照**：
 
@@ -108,17 +106,14 @@ Git 自动合并判断安全。若前序 change 仍混有未归属的 model/migr
 
 ## 发布前门禁
 
-1. 独立方案 review 通过后，先取得用户实现授权。
 2. 测试 subagent 取得真实 RED；实现 subagent 串行完成 GREEN。
 3. 主代理完成聚焦、相邻、联合和必要完整回归，Django check、无迁移、模板与 diff 检查。
 4. 完成 1440px/390px 和必要窄屏真实视觉验收。
 5. 未参与实现的 reviewer 按 fingerprint 规则完成原生只读 code review，actionable finding 清零。
-6. 最新成功 code review 后再次取得用户针对精确版本的发布授权。
 7. staging 前重算相同 scope fingerprint；stage 后核对 approved parent、内容 hash 与工作树状态。
 
 ## 生产发布与验收
 
-本 change 是无迁移的 Django view/template/static 发布。取得发布授权后：
 
 1. 核对生产 HEAD、镜像、容器状态和并行公共页面 change 是否已合并。
 2. 建立并验证常规数据库与 `.env` 恢复点；虽然本 change 不写业务数据，仍遵守门户发布 runbook。

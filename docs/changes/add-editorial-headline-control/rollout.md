@@ -10,7 +10,7 @@
 - 当前禁止：测试/业务实现、实现 subagent、commit、push、PR、部署、迁移、服务重启和生产写入
 - 方案审核：同一独立 reviewer 三轮收敛，首轮 6 项 finding 全部关闭，最终
   `VERDICT: APPROVED`，剩余 P0/P1/P2 finding 为 0
-- 下一门禁：等待用户明确“确认实现/开始实现”
+- 下一门禁：等待用户明确“G1 范围确认/开始实现”
 
 ## 2. 前序 change 与冲突面
 
@@ -61,7 +61,6 @@
 - `git diff --check`；
 - 1440px/390px 首页和后台验收；
 - 独立原生只读 review 成功，前后 fingerprint 完全一致；
-- 最新 review 后取得当前版本发布授权。
 
 生产预检：
 
@@ -134,7 +133,6 @@
 - 撤稿后仍显示无效人工头条；
 - 首页或后台在 1440px/390px 有横向溢出/关键按钮不可用；
 - review fingerprint 漂移；
-- 缺少最新成功 review 后的明确发布授权；
 - 生产备份、HEAD、镜像或服务状态无法确认。
 
 ## 9. 证据与 handoff

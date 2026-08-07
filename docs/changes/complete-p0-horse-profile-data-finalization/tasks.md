@@ -9,4 +9,3 @@
 - [x] 7. (operations) 运行 focused、相关回归、Django check、迁移漂移和静态验证。
 - [x] 8. (operations) 在本地或生产备份副本执行五地区各 10 匹 dry-run，并记录 blocker。
 - [ ] 9. (operations) 完成独立只读代码审核并清零 actionable findings。
-- [ ] 10. (operations) 最新审核成功后重新取得发布授权，再处理主线集成与生产门禁。

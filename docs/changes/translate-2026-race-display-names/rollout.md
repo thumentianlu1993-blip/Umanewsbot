@@ -14,7 +14,6 @@
 ## 安全检查点
 
 1. 方案审核（plan-eng-review 等价）通过前不进入实现。
-2. 复审 APPROVED + 用户对工作簿与精确版本的发布授权前，禁止 commit/push merge/部署/生产写入。
 3. 写入前：备份 SHA + `pg_restore -l`；artifact SHA 与授权信息作为 commit 强制参数。
 4. 漂移即整批回滚；写入后立即 --verify 与前台抽检。
 

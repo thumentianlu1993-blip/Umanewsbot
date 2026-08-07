@@ -1,5 +1,27 @@
 # 关键决策
 
+## 2026-08-08 为什么人工确认门禁只保留在根 AGENTS.md
+
+此前范围确认、实现确认、Git 操作、review、发布和生产动作授权散落在工作流文档、session
+模板、skills、agents、任务交接和历史规格中，同一任务换线程后容易重复询问。现在根
+`AGENTS.md` 是唯一权威，统一为 G1 范围、G2 交付、G3 高影响动作；其他文件只可引用，
+不能新增或改写。初始明确实现指令可以满足 G1，机械 Git 步骤不再单独停顿；自动技术检查
+只在范围、指纹、环境漂移或新增高影响动作时触发重新确认。
+
+## 2026-08-08 为什么项目只保留 Codex 原生工作流
+
+旧规格流程虽然早已不再是主流程，但仓库仍保存兼容目录、skills、契约分支和路径引用，导致
+新线程继续尝试旧入口。为消除双重权威，本次删除旧流程目录、兼容 skill、workflow 路由与
+专用历史治理 change；后续较大任务只在 `docs/changes/<slug>/` 按风险维护原生
+spec/design/test/tasks/rollout 产物。历史业务事实可保留，但不再保留旧工具名或可执行入口。
+
+## 2026-08-08 为什么 main 只作为受保护远端引用
+
+长脚本与 PR 合并争抢同一个 checkout，会让运行中任务读取变化后的代码，也让脏工作区阻塞
+集成。现在每个线程使用独立 `codex/<slug>` worktree，长任务固定到 commit SHA/镜像，PR
+优先远端合并；只有影响相同数据库、服务、队列、配置或输入契约的生产发布才互斥。短时
+integration lock 与 production release lock 分离，并由单一 release coordinator 操作生产面。
+
 ## 2026-08-01 Release B 以系列级链路治理取代逐 event duplicate 推断
 
 - v1 `canonicalize_duplicate` 只表示 Release A 无法安全处理唯一约束冲突，不能作为 81 条生产
@@ -41,7 +63,6 @@
   1 个 P2，最终 `VERDICT: APPROVED`。Release B 实现、部署、v2 census、人工 overlay、生产 apply
   和 Release C 继续是独立门禁。用户已明确确认本地实现，但该确认不授权 commit、PR、部署或
   生产数据操作；实现完成后仍须完整验证和独立代码 review。
-
 
 ## 2026-07-31 历史赛事赛历完整性当前只闭合 Release A 本地范围
 
@@ -757,8 +778,8 @@
 - 发布授权只对当前任务有效，必须在最新成功 review 后由用户明确给出。成功 review 记录完整 fingerprint、approved parent 与 `content_manifest_sha256`；授权后 staging 前完整 fingerprint 必须不变。显式 stage 全部受审改动后允许 status/index 表示变化，但 HEAD 必须仍为 approved parent、无 unstaged/untracked/conflict，且 index content hash 必须等于受审值；漏 stage、夹带或内容变化均停止。不另引入 receipt 或 CAS 发布协议。
 - 部署后 evidence-only closure 的精确文件 allowlist 只有 current state、project status、deploy runbook、必要发布 decisions 和本任务 release report；仅追加已发生证据并复用同一需求既有代码 reviewer 会话审核。代码、测试、配置、迁移、spec、tasks、skills、agents 均禁入；超出集合或改变行为/治理时返回完整 review + 新授权。
 - 活跃 `grill-me-codex` 仅是一问一答的 Codex 原生只读探索 skill：先查仓库、每题给推荐答案与理由、用户可随时停止；不写 PLAN/spec/design，不启动其他模型或 nested review。原 Claude 双阶段版本完整归档，仅作恢复依据。
-- `openspec-explore`、`openspec-propose`、`openspec-apply-change`、`openspec-archive-change`、`openspec-sync-specs` 及 OpenSpec workflow-spine 停用。既有 OpenSpec artifacts 原地保留为历史/在途上下文，OpenSpec CLI、phase 和 journal 不再是新流程门禁。
-- `2026-07-15` 已在途任务先完成当前原子操作并停在安全检查点，再按“读取现存规格 -> 补齐/更新 test_cases -> 对尚未实现行为取得真实 RED -> subagent 实现 -> 复用同一需求既有 reviewer 会话（没有时首次建立）”迁移。不得伪造已经错过的历史 RED，也不得重做已完成生产动作；旧文档里的 OpenSpec “下一步”自此仅为历史记录，不再是现行指令。
+- `旧规格流程-explore`、`旧规格流程-propose`、`旧规格流程-apply-change`、`旧规格流程-archive-change`、`旧规格流程-sync-specs` 及 旧规格流程 workflow-spine 停用。既有 旧规格流程 artifacts 原地保留为历史/在途上下文，旧规格流程 CLI、phase 和 journal 不再是新流程门禁。
+- `2026-07-15` 已在途任务先完成当前原子操作并停在安全检查点，再按“读取现存规格 -> 补齐/更新 test_cases -> 对尚未实现行为取得真实 RED -> subagent 实现 -> 复用同一需求既有 reviewer 会话（没有时首次建立）”迁移。不得伪造已经错过的历史 RED，也不得重做已完成生产动作；旧文档里的 旧规格流程 “下一步”自此仅为历史记录，不再是现行指令。
 - 本迁移由用户直接要求立即建立规则；最早一批编辑发生时新流程及 `docs/changes/codex-native-workflow-migration/` 尚不存在，因此不追溯伪称前置 artifacts 已完成。目录建立后的 helper 强化必须保留真实 RED/GREEN 证据。
 - `codex-native-workflow-migration` 当前尚未发布；其他现有 worktree 不批量改写 tracked
   治理文件，以免破坏在途工作，只在安全检查点通过 handoff/rebase/main 同步。base/commit
@@ -818,7 +839,7 @@
 - 扩容不能只修改一个命令行默认值。选择器、地区进度护栏、artifact 摘要、测试和运行手册必须使用同一口径；既有排除 snapshot、100 场地区领先护栏和待审 gap 记账规则继续有效，除非后续产品审核另行修改。
 - 后续历史批次使用独立 runner 容器，固定到已验收镜像 revision，显式挂载 runtime artifact，并设置资源限制。普通 web/worker/beat 部署不得重建、停止或接管 runner，也不得借此重建 DB、Redis 或共享网络。
 - runner 必须具有数据库级与应用级互斥锁、心跳、可恢复 checkpoint 和失联接管门禁；迁移前必须安全暂停。抓取阶段只允许 `network=true / write=false`，落库阶段只允许 `network=false / write=true`，任何阶段都不能同时获得两种权限。
-- 该能力在当时必须走 OpenSpec、工程评审、完整测试、实现和反复代码 review，并在部署验收通过后才允许启动 batch006；其中技术验收事实继续有效，但流程入口已由本文件顶部 `2026-07-15` 新流程取代。历史公开展示继续保持关闭。
+- 该能力在当时必须走 旧规格流程、工程评审、完整测试、实现和反复代码 review，并在部署验收通过后才允许启动 batch006；其中技术验收事实继续有效，但流程入口已由本文件顶部 `2026-07-15` 新流程取代。历史公开展示继续保持关闭。
 - 实现采用三张独立控制表、PostgreSQL 租约与 `fcntl` 双锁；过期租约不能被普通启动覆盖。接管必须同时证明旧容器不存在、`pg_stat_activity` 无对应 `application_name`、runtime/DB checkpoint 一致，并写入操作者与原因。
 - owner token 原文只能位于 artifact 外的 0600 文件；resume/takeover 也不得通过命令行传 token。crawl control role 对 event 表只允许 append，不能删除审计事件，更不能读取或写入赛事、新闻、术语等业务表。
 - 普通部署首次引入 `0031` 时只能显式设置一次 initial-install 门禁；后续迁移必须让 active runner 安全暂停。数据库、Redis 和共享网络只允许由独立 bootstrap 首次创建，普通 deploy/rollback 永远不隐式补建。
@@ -1052,7 +1073,7 @@ P0 马匹页可以从 active horse `TermEntry` 默认生成，但生成后状态
 - `RaceEvent*`：产品层赛事，服务 `/races/`、赛事详情页、后台赛事工作台、出走表、赛果、历届冠军和相关新闻组织。
 - `ExternalRace*`：外部来源缓存层，服务真实赛马数据库导入、外部马名索引和原始来源证据。
 
-本轮 OpenSpec change `orchestrate-race-event-data-crawls` 的第一版目标是补齐赛事页可展示和可运营的结构化赛事信息，因此只服务 `RaceEvent*`，不写 `ExternalRace*` / `ExternalHorse*`。这样可以避免把“产品层赛事历史回填”和“底层外部数据库导入”混成一个过大的系统，也能让 apply 门禁聚焦在 `RaceEventRunner`、`RaceEventResult`、`RaceEventHistoryWinner` 和 `RaceEventDataCandidate` 的完整性与覆盖风险上。
+本轮 旧规格流程 change `orchestrate-race-event-data-crawls` 的第一版目标是补齐赛事页可展示和可运营的结构化赛事信息，因此只服务 `RaceEvent*`，不写 `ExternalRace*` / `ExternalHorse*`。这样可以避免把“产品层赛事历史回填”和“底层外部数据库导入”混成一个过大的系统，也能让 apply 门禁聚焦在 `RaceEventRunner`、`RaceEventResult`、`RaceEventHistoryWinner` 和 `RaceEventDataCandidate` 的完整性与覆盖风险上。
 
 对应边界：
 
@@ -1313,19 +1334,19 @@ France Galop 官方结果入口当前会重定向到认证页，不能稳定批�
 
 因此本轮先从已确认 `RaceEventResult` 中抽取每场 `2026` 年冠军写入 `RaceEventHistoryWinner`：已有赛果的已完赛赛事不会再显示“暂无历史冠军资料”，也不会猜测缺赛果赛事。这个数据层只代表当前年度冠军，不等同于完整历届冠军；后续补齐过去年份时，应以地区官方历史源生成完整 `history_winners.items` 后覆盖同一赛事的历史冠军列表。
 
-## 为什么引入 OpenSpec + Codex 领域代理
+## 为什么引入 旧规格流程 + Codex 领域代理
 
 项目已经进入自动化运营、HTTPS、部署稳定化和运维完善并行推进阶段，跨模块与生产高风险改动会逐渐增加。
 
-因此仓库引入 OpenSpec 作为较大改动的规格驱动工作流：
+因此仓库引入 旧规格流程 作为较大改动的规格驱动工作流：
 
 - 在实现前先形成可版本化的 proposal、spec、design 和 tasks
 - 通过 `tasks.md` 保留进度，使新 session 可以从仓库恢复上下文
 - 使用 `application / integration / operations` 三个真实仓库领域拆分任务
 - 子代理只在明确要求时启用，避免无控制的并行修改
-- 小型修复不强制创建 OpenSpec change，但仍遵守现有阅读、验证与文档回写要求
+- 小型修复不强制创建 旧规格流程 change，但仍遵守现有阅读、验证与文档回写要求
 
-OpenSpec 项目上下文与任务规则以 `openspec/config.yaml` 为准；项目全局状态仍以 `docs/current_state.md` 为准。
+旧规格流程 项目上下文与任务规则以 `旧规格流程/config.yaml` 为准；项目全局状态仍以 `docs/current_state.md` 为准。
 
 ## 为什么仓库协作文档默认使用中文
 
@@ -1333,10 +1354,10 @@ OpenSpec 项目上下文与任务规则以 `openspec/config.yaml` 为准；项�
 
 具体约定：
 
-- OpenSpec proposal、spec、design、tasks 的说明性内容使用中文
+- 旧规格流程 proposal、spec、design、tasks 的说明性内容使用中文
 - Codex 代理描述、项目上下文和面向协作者的说明使用中文
 - 命令、代码标识符、协议字段、第三方工具强制要求的机器语法可以保留英文
-- OpenSpec 规格校验依赖的 `ADDED Requirements / Requirement / Scenario / WHEN / THEN` 等结构关键字保留英文，具体标题和内容使用中文
+- 旧规格流程 规格校验依赖的 `ADDED Requirements / Requirement / Scenario / WHEN / THEN` 等结构关键字保留英文，具体标题和内容使用中文
 - 上游工具自动生成且约定不手工修改的文件维持原样
 
 ## 为什么术语发现结果必须先进入候选池
@@ -1389,16 +1410,16 @@ HKJC 官方英文概念和既有日语主术语如果拥有同一术语类型和
 
 这能把生产写入范围限制在可审计、可恢复的最小改动内；大范围内容重译或风格重写应另起 change。
 
-## 为什么公开首页升级先做主 OpenSpec change
+## 为什么公开首页升级先做主 旧规格流程 change
 
-公开首页从 MVP 页面升级为 Web + 移动 H5 成熟资讯流，虽然主要发生在模板、样式和视图层，但它会影响前台信息架构、后续子能力边界和用户内容消费路径，因此先创建主 OpenSpec change `upgrade-public-home-info-feed` 作为指导规范。
+公开首页从 MVP 页面升级为 Web + 移动 H5 成熟资讯流，虽然主要发生在模板、样式和视图层，但它会影响前台信息架构、后续子能力边界和用户内容消费路径，因此先创建主 旧规格流程 change `upgrade-public-home-info-feed` 作为指导规范。
 
 这样做的原因：
 
 - 首页不再只是“已发布文章列表”，而是要定义头条、普通流、热门代理、详情页和响应式布局的长期基础。
 - 后续手工置顶、搜索频道、专题、赛事日历、站内热度等能力都可能接入首页，如果没有主规范，容易把不同问题混在一次实现里。
 - 当前前台模板直接引用后台 `console.css`，需要先确立公开站点样式解耦方向，避免后台和前台继续互相牵连。
-- OpenSpec 主 change 可以明确本轮只做公开资讯消费体验，不改抓取、翻译、自动发布和部署主链路。
+- 旧规格流程 主 change 可以明确本轮只做公开资讯消费体验，不改抓取、翻译、自动发布和部署主链路。
 
 ## 为什么第一版首页不新增手工置顶或赛事日历模型
 
@@ -1538,7 +1559,7 @@ HKJC 官方英文概念和既有日语主术语如果拥有同一术语类型和
 - QQ 自动推送从全局范围配置扩展为群级配置，因为不同 QQ 群可能只想看不同地区或不同范围的新闻。
 - 外部数据库第一期正式实现 HKJC，因为香港官方数据集中、字段完整、中文用户价值高；美国 `Equibase`、英国 `Sporting Life + BHA`、法国 `France Galop` 先做小样本 spike，确认字段、入口和反爬/语言风险后再进入正式导入。
 
-该决策最初只对应 OpenSpec change `expand-international-racing-coverage` 的规划边界；`2026-06-25` 已在独立 worktree 开始本地实现。当时后续部署要求完整测试、OpenSpec 校验和生产窗口确认；这是历史门禁记录，`2026-07-15` 后新变更以当前 Codex 工作流和任务专属发布授权为准。
+该决策最初只对应 旧规格流程 change `expand-international-racing-coverage` 的规划边界；`2026-06-25` 已在独立 worktree 开始本地实现。当时后续部署要求完整测试、旧规格流程 校验和生产窗口确认；这是历史门禁记录，`2026-07-15` 后新变更以当前 Codex 工作流和任务专属发布授权为准。
 
 review 返修后补充实现边界：HKJC 外部数据导入必须参考 netkeiba 的单来源互斥锁语义，已有运行中导入时拒绝并发写入；在真实网络抓取实现前，`--commit` 不允许写入占位 payload，必须通过 `--payload-file` 提供真实小样本；payload 超过 `max_races / max_horses` 时直接失败，不静默截断或部分写入；`max_horses` 的统计口径必须覆盖顶层 `horses`、赛事 `entries` 和 `results` 中实际会写入缓存或别名的唯一马匹，避免 entries/results 绕过批量上限；多语言术语后处理和自动化评分必须按文章 `source_language` 隔离，避免英语、繁中、日语术语在翻译、改写、重点马和赛事优先级判断中串用。
 
@@ -1613,7 +1634,7 @@ review 返修后补充实现边界：HKJC 外部数据导入必须参考 netkeib
 - 英国 `Sporting Life + BHA`：Sporting Life racecards/results/profile 信号较好，优先级最高；BHA 官方搜索、监管和补字段入口仍需单独复验。
 - 法国 `France Galop`：英文站浅层页面可访问，但结构化赛程、报名、出马、赛果和马匹资料的稳定查询入口仍未确认；法语新闻正文仍不进入新闻审核、翻译、自动发布或 QQ 推送主链路。
 
-该决策当时要求正式导入英法美数据库源前另起 OpenSpec change，先把每个地区的具体 URL 参数、字段映射、限速、失败恢复、正式表写入边界和回滚口径设计清楚；`2026-07-15` 起等价工作改为新建 `docs/changes/<slug>/` spec/design，不再调用旧 OpenSpec skills。
+该决策当时要求正式导入英法美数据库源前另起 旧规格流程 change，先把每个地区的具体 URL 参数、字段映射、限速、失败恢复、正式表写入边界和回滚口径设计清楚；`2026-07-15` 起等价工作改为新建 `docs/changes/<slug>/` spec/design，不再调用旧 旧规格流程 skills。
 
 2026-06-26 `connect-real-global-racing-databases` 追加只读复核后，英法美仍不进入正式写库，但职责边界更清晰：
 
@@ -2001,7 +2022,7 @@ HKJC 官方来源适合作为国际和香港赛马术语主译名，但生产库
 
 - 用户最新执行顺序明确拆为两个完整年代 scope：先补齐并审核 `1998–当前` 总账，再按该总账抓取和写入全部赛事详情，验收后打开该 scope 的正式展示；随后继续调研 `1984–1997` 完整目录。
 - 该决定覆盖此前“1984–1997 未齐前不得批准任何总账或详情批次”的门禁，但不降低最终历史深度。`1998–当前` 只有在自身逐年五地区分母完整、来源冲突和身份冲突审核完成、manifest 独立批准后才能写入或公开。
-- `1984–1997` 仍是同一长期目标的必做 scope，不得因 1998–当前上线而标记 OpenSpec change 全部完成或归档。
+- `1984–1997` 仍是同一长期目标的必做 scope，不得因 1998–当前上线而标记 旧规格流程 change 全部完成或归档。
 - 两个年代 scope 必须分别保存 source cache、manifest、approval、请求预算、备份和写后核验；公开开关只能在 1998–当前数据全部验收通过后开启。
 ## 为什么 P0 马范围扩展到五大地区重点赛事参赛马
 
@@ -2464,7 +2485,7 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   `priority` 或 `is_featured` 是否被人工赋值。
 - `normalized_grade` 是历史赛事事实字段；`priority/is_featured` 是运营字段，两者不得通过批量
   把历史赛事改为 P1 来混用。
-- 现有 OpenSpec `backfill-race-events-to-1984` 对“重点”的旧定义曾是 P0/P1 或人工置顶，与本
+- 现有 旧规格流程 `backfill-race-events-to-1984` 对“重点”的旧定义曾是 P0/P1 或人工置顶，与本
   决定冲突；本地实现已同步旧规格，并保留未选择历史年份及当前年份的运营口径。
 - 用户后续仅授权本地实现；本决定仍不授权历史数据写入、发布或部署。
 

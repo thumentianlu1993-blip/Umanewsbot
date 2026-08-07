@@ -58,7 +58,7 @@
 - 完整 `stable.test_realtime_race_results` 实跑 `166` 项为 `157 passed / 9 failed`。9 项均在
   既有 `RaceLiveTheRacingApiFreeRunnerTests`：fixture 固定 `2026-07-20`，runner 读取当前
   `2026-07-27` 后返回 `checkpoint_claim_expired/mismatch/rate_limited`；无本 change 堆栈。
-- Django check、迁移漂移、compile、Compose 无 env 解析、registry SHA、OpenSpec strict
+- Django check、迁移漂移、compile、Compose 无 env 解析、registry SHA、旧规格流程 strict
   `37/37` 与 `git diff --check` 通过。
 
 ## 单元测试
@@ -148,6 +148,6 @@
 - `python manage.py makemigrations --check --dry-run`，预期无 migration。
 - Compose config 检查。
 - `python -m compileall` 覆盖新增模块。
-- 兼容性执行 `openspec validate --all --strict`，不把它作为新工作流门禁。
+- 兼容性执行 `旧规格流程 validate --all --strict`，不把它作为新工作流门禁。
 - `git diff --check`。
 - 独立 reviewer 实际运行 Codex 原生只读 review。

@@ -59,8 +59,8 @@ git rev-parse origin/main
 9. `docs/changes/govern-race-news-exposure/{spec,design,test_cases,tasks,rollout}.md`
 10. `docs/changes/unify-public-racing-terms/{spec,design,test_cases,tasks,rollout}.md`
 
-本项目已停用 OpenSpec。禁止调用任何 `openspec-*` skill 或 OpenSpec CLI，也不要在
-`openspec/changes/` 下建立新 change。
+本项目已停用 旧规格流程。禁止调用任何 `旧规格流程-*` skill 或 旧规格流程 CLI，也不要在
+`旧规格流程/changes/` 下建立新 change。
 
 ## 3. 当前工作流状态与授权
 
@@ -70,11 +70,9 @@ git rev-parse origin/main
 探索
   -> spec/design
   -> 方案审核
-  -> 用户确认实现
   -> 测试先行
   -> subagent 实现
   -> 独立 reviewer 会话 /review
-  -> 用户授权后发布
 ```
 
 当前状态：
@@ -82,11 +80,9 @@ git rev-parse origin/main
 - 探索：完成。
 - 两组 `spec/design/test_cases/tasks/rollout`：完成。
 - fallback 工程方案审核：首轮 `REVISE`，修订后限定复审 `VERDICT: APPROVED`。
-- 用户确认实现：已取得。2026-07-26 用户明确要求“将该项目交接给 Claude 来实现”。
 - RED、应用代码、配置、migration、历史数据处理：尚未开始。
 - commit、push、PR、部署、生产写入：未授权。
 
-上述实现授权允许新 agent：
 
 - 编写和运行自动化测试，取得真实 RED；
 - 启动符合仓库规则的测试/实现 subagent；
@@ -100,7 +96,6 @@ git rev-parse origin/main
 - 写入正式术语、回填历史文章、创建/修改生产 exposure；
 - 发送 QQ 或改动任何生产数据。
 
-代码完成并通过独立原生只读 review 后，必须停下并向用户索取针对冻结版本的新发布授权。代码发布
 与历史数据 apply 也应分开报告和授权。
 
 ## 4. 线上问题与诊断证据
@@ -461,7 +456,6 @@ RACE_NEWS_QQ_TARGET_MAX=2
 - reviewer 结论和冻结 fingerprint；
 - 发布、术语写入、历史文章修复、exposure 回填仍需哪些授权。
 
-没有最新成功 code review 和之后取得的当前版本发布授权，不得 commit、push、PR、部署或生产写入。
 
 ## 13. 文档回写
 

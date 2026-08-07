@@ -7,7 +7,6 @@
 ## 发布前门禁
 
 1. 独立 reviewer 在只读沙箱中通过，并冻结受审 fingerprint、approved parent 和 content hash。
-2. 获得 review 后针对精确受审版本的发布授权。
 3. 部署时常驻 `web/worker/beat/race_live_worker` 的马匹网络开关保持 false。
 4. 生产迁移只新增 `HorseIdentityEvidenceCommitReceipt`；先验证迁移计划和备份，再执行。
 
@@ -38,7 +37,7 @@
 
 - 首轮只读审查会话：`019f9970-cc09-74f0-99d8-514586296a86`。
 - 首轮 finding：迁移主线冲突、批准前未重算共识、未强制 HTTPS、直连锚点可缺 ID、请求无超时、
-  新 change 误放 OpenSpec 目录。全部已修复。
+  新 change 误放 旧规格流程 目录。全部已修复。
 - 完整范围原生 review 会话 `019f99c5-9fa6-7022-a0a6-c999e1dbd68d` 发现两项 P1：真实
   prepare 候选缺少 commit 冻结字段，approve 未把内嵌候选绑定到已审核 sidecar。两项均已补
   RED 并修复；身份模块 `46/46`、相关主链 `551/551`、Django、migration drift、`0058`

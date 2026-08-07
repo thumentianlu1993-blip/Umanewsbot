@@ -4,7 +4,6 @@
 
 - 使用最新 `origin/main` 的独立 worktree。
 - 完成真实 RED、GREEN、受影响回归和独立代码 review。
-- 最新 review 通过后重新向用户取得当前版本发布授权。
 - 授权前禁止 commit、push、PR、部署和生产写入。
 
 ## 阶段 2：代码部署

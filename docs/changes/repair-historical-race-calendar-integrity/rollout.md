@@ -12,7 +12,7 @@
 
 ## 2. 与既有在途工作的关系
 
-- `backfill-race-events-to-1984` 旧 OpenSpec 仍是历史链在途基线，但其中“公开 URL 使用届次年”
+- `backfill-race-events-to-1984` 旧 旧规格流程 仍是历史链在途基线，但其中“公开 URL 使用届次年”
   和“重点=P0/P1/人工置顶”两项合同被本 change 显式取代；其具体 spec/design/test 与 runbook
   必须在实现中同步，不能只依赖本 rollout 声明。
 - `formalize-historical-batch-crawl-pipeline`、`scale-and-isolate-historical-race-batches` 的
@@ -42,7 +42,6 @@
 
 ### R2：Release A 关闭态发布
 
-- 最新 review 后取得发布授权。
 - 镜像只包含 nullable `edition_year`、全量 canonical path registry 回填、target supersession、
   `HistoricalRaceCalendarRepairReceipt` 和兼容代码；Release B/C migration 在该 commit 中
   不得存在。
@@ -144,7 +143,6 @@
   `1a31d68e51d8aa4ce28249c4feb2f3fa82517d9277818da063214972fda9646f`。
 - approved content 不含最终 P1/P2 加固、PostgreSQL 专项和本次文档增量，现已失效；必须复用
   同一 reviewer 重审当前完整 diff。未运行生产 census/apply，未访问或修改生产数据库，未
-  commit/push/PR/部署，发布授权尚未请求或取得。
 
 ## 10. 首次代码审核修复（第二轮限定复审已关闭）
 
@@ -156,7 +154,6 @@
   legacy 抢占目标路径时 fail closed 并回滚 event 写。
 - crash recovery 只接受 exact orphan ledger 且数据库保持 manifest pre-state；篡改/漂移拒绝。
 - 该段为首次 review 修复时的历史状态；后续已取得下述真实 PostgreSQL 验收。仍不得据此宣称
-  当前增量已 review、已获发布授权或生产门禁通过。
 
 ### 第一次复审 follow-up
 
@@ -178,7 +175,6 @@
 - approved content：
   `1a31d68e51d8aa4ce28249c4feb2f3fa82517d9277818da063214972fda9646f`。
 - 该批准仅标识后续 P1/P2、PostgreSQL 专项与事实文档写回前的实现快照，当前已失效；必须
-  复用同一 reviewer 重审。发布授权尚未请求或取得。
 
 ### 最终全量扫描 follow-up（待复审）
 
@@ -210,7 +206,6 @@
 - descriptor `13/13`、cache `10/10`，合并 Django `224/224`、collector `101/101`；check、
   migration drift、diff check 通过。真实 PostgreSQL `5/5` 两轮证据保留。
 - 旧 review fingerprint 不覆盖该增量，必须复用同一 reviewer 复审；完整 `stable` 仍保留既有/
-  环境 `25F / 54E / 72S`，无 commit/push/PR/deploy、生产 census/apply 或发布授权。
 
 ### 写总门禁、authority URL 与 detail edition follow-up
 
@@ -223,7 +218,6 @@
 - 最新主线程 `205/205`、URL + detail `166/166`、gate `68/68`；真实 PostgreSQL `5/5`
   两轮、collector `101/101` 保留，check、migration drift、diff check 通过。
 - 完整 `stable` 仍非全绿，旧 fingerprint 失效待同一 reviewer 复审；无 commit/push/PR/deploy、
-  生产 census/apply 或发布授权。
 
 ### URL 中央 validator P1 限定复审
 
