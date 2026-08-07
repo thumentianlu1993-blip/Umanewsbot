@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta
 
 from celery import shared_task
@@ -113,6 +114,7 @@ from stable.services.race_events import (
 )
 
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 JRA_SKIPPABLE_DETAIL_ERRORS = (ValueError, AttributeError, IndexError, TypeError)
 
@@ -2326,6 +2328,10 @@ def scan_due_race_event_lifecycle_task() -> dict:
             "expected_generation": claim.schedule_generation,
             "attempt_token": claim.attempt_token,
             "expected_claim_generation": claim.claim_generation,
+            "expected_runtime_enabled": True,
+            "expected_runtime_mode": getattr(
+                settings, "RACE_EVENT_LIFECYCLE_MODE", "off"
+            ),
         }
         transaction.on_commit(
             lambda kwargs=dispatch_kwargs: advance_race_event_lifecycle_task.apply_async(
@@ -2343,6 +2349,8 @@ def advance_race_event_lifecycle_task(
     expected_generation: int,
     attempt_token: str,
     expected_claim_generation: int = 0,
+    expected_runtime_enabled: bool | None = None,
+    expected_runtime_mode: str | None = None,
 ) -> dict:
     """Advance a single event's lifecycle based on time rules only.
 
@@ -2354,13 +2362,48 @@ def advance_race_event_lifecycle_task(
 
     from stable.models import RaceEventLifecycleControl
 
+    actual_runtime_enabled = getattr(
+        settings, "RACE_EVENT_LIFECYCLE_ENABLED", False
+    )
+    actual_runtime_mode = getattr(settings, "RACE_EVENT_LIFECYCLE_MODE", "off")
+    runtime_mismatch = (
+        expected_runtime_enabled is not None
+        and expected_runtime_enabled != actual_runtime_enabled
+    ) or (
+        expected_runtime_mode is not None
+        and expected_runtime_mode != actual_runtime_mode
+    )
+    if runtime_mismatch:
+        logger.error(
+            "lifecycle_runtime_config_mismatch event_id=%s "
+            "expected_enabled=%s expected_mode=%s "
+            "actual_enabled=%s actual_mode=%s",
+            event_id,
+            expected_runtime_enabled,
+            expected_runtime_mode,
+            actual_runtime_enabled,
+            actual_runtime_mode,
+            extra={
+                "lifecycle_event_id": event_id,
+                "lifecycle_expected_enabled": expected_runtime_enabled,
+                "lifecycle_expected_mode": expected_runtime_mode,
+                "lifecycle_actual_enabled": actual_runtime_enabled,
+                "lifecycle_actual_mode": actual_runtime_mode,
+            },
+        )
+        return {
+            "processed": False,
+            "reason": "lifecycle_runtime_config_mismatch",
+            "event_id": event_id,
+        }
+
     now = timezone.now()
     with transaction.atomic():
         # Re-check both ENABLED and MODE inside the transaction to prevent
         # stale queued tasks from writing after the feature is disabled.
-        if not getattr(settings, "RACE_EVENT_LIFECYCLE_ENABLED", False):
+        if not actual_runtime_enabled:
             return {"processed": False, "reason": "lifecycle_disabled_mid_flight", "event_id": event_id}
-        lifecycle_mode = getattr(settings, "RACE_EVENT_LIFECYCLE_MODE", "off")
+        lifecycle_mode = actual_runtime_mode
         if lifecycle_mode not in ("shadow", "enforce"):
             return {"processed": False, "reason": "lifecycle_disabled_mid_flight", "event_id": event_id}
 

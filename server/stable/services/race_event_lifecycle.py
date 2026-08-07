@@ -386,11 +386,47 @@ def _apply_shadow(
         },
     )
     if not created:
-        _record_attempt(control, now, result_code="proposal_duplicate")
+        expected_identity = {
+            "event_id": event.id,
+            "record_kind": RaceEventLifecycleTransitionKind.PROPOSAL,
+            "schedule_generation": control.schedule_generation,
+            "from_status": event.status,
+            "to_status": decision.to_status,
+            "reason_code": decision.reason_code,
+        }
+        conflicting_fields = tuple(
+            field_name
+            for field_name, expected_value in expected_identity.items()
+            if getattr(transition, field_name) != expected_value
+        )
+        if conflicting_fields:
+            error = (
+                "existing proposal identity conflict for fields: "
+                + ", ".join(conflicting_fields)
+            )
+            _record_attempt(
+                control,
+                now,
+                result_code="proposal_identity_conflict",
+                error=error,
+            )
+            _bump_next_refresh_forward(event, control, now)
+            return ApplyResult(
+                action="error",
+                error=error,
+                reason_code="proposal_identity_conflict",
+            )
+
+        _record_attempt(
+            control,
+            now,
+            result_code="proposal_duplicate",
+            success=True,
+        )
         _bump_next_refresh_forward(event, control, now, to_status=decision.to_status)
         return ApplyResult(action="noop", reason_code="proposal_duplicate")
 
-    _record_attempt(control, now, result_code="shadow_proposed")
+    _record_attempt(control, now, result_code="shadow_proposed", success=True)
     _recompute_next_refresh(event, control, now, to_status=decision.to_status)
     return ApplyResult(action="proposed", transition_id=transition.id)
 

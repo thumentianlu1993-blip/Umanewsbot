@@ -2608,3 +2608,19 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   source refs 或已批准 source identity 中精确 `race_data_region=ireland` 才允许反向路由，禁止根据场名猜测。
 - event/source identity 的 Ireland markers 只要有一个存在的值不是精确字符串 `ireland` 即判冲突并
   fail closed；仅一方存在不冲突，两方存在必须一致，不能用 OR 掩盖相反地区证据。
+# 2026-08-08 lifecycle shadow 观察加固采用运行配置握手与单向关闭收敛
+
+- shadow proposal 与 proposal duplicate 均按成功处理，更新 `last_success_at` 并把
+  `consecutive_failures` 归零；真实 decision error 的失败计数和退避不放宽。
+- scanner 消息携带期望 enabled/mode；worker 配置不一致时零业务写、记录固定结构化错误，
+  claim 依靠既有 TTL/CAS 恢复，旧消息保持向后兼容。
+- 生产一致性验收采用宿主全量 running-container census，强制核对 expected Compose project、
+  release directory、不可变 image ID、release commit 与 flags；只看当前 project 不足。
+- lifecycle mode 只允许通过共享锁保护的专用入口在 `false/off` 与 `true/shadow` 间切换。
+  任一失败的自动安全目标固定为双 env 和 web/worker `false/off`、Beat stopped；安全收敛自身
+  失败时停止 worker/Beat、保留锁和证据人工接管。
+- Compose wrapper one-off 采用 canonical grammar；`run` 必须精确以
+  `run --rm --no-deps` 开头，子命令前未知/缺值/歧义 global option fail closed。直接原生 Docker
+  绕过不属于受支持路径。
+- 修复后自然 shadow 样本须重新冻结尚未到 T、至少覆盖日本和英国的 2–4 场；样本不足 NO-GO。
+  既有 8 月 8 日 proposal 不自动替代修复后证据，enforce 仍为独立 change。

@@ -2505,3 +2505,15 @@ P0 马信息补全专项的模型交接文档见
 - 更宽回归的 7 errors/2 failures 已在未修改 origin/main 等口径复现；第六次同 reviewer 限定复审
   `VERDICT: APPROVED`。Ireland 直接 reconciliation marker 校验列为非阻塞 follow-up，Ireland 仍排除在
   首发 cohort 外。尚未 commit、push、PR 或发布，不代表生产可用。
+# 2026-08-08 Lifecycle shadow 观察加固已实现，尚未发布
+
+- Compose working-directory 漂移和 `shadow_proposed` 虚假失败已按测试先行完成本地修复；新增
+  runtime handshake、host-wide census、canonical no-deps wrapper 和 fail-closed mode switch。
+- 三轮 review findings 均已取得真实 RED 并修复；新增 hardening `37/37`、合并回归 `294/294`、
+  真实 PostgreSQL `6/6`，Django/migration/shell/
+  Compose/workflow/diff 检查通过；实现基线已整合到 `origin/main@11abe4bf`。
+- 无 migration、provider、状态机、queue 或公开行为扩张；生产仍以先前 `true/shadow` 快照为
+  背景，未在本轮重建或切换。
+- 同一独立 reviewer 第四轮限定复审已 `APPROVED`，无剩余 actionable finding。当前仅收口审核
+  结论文档并冻结最终 fingerprint；仍需用户针对该 fingerprint 授权，才可
+  commit/push/PR/merge；关闭态部署、恢复 shadow 和 enforce 继续分开授权。
