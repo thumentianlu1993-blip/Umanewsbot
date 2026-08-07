@@ -7838,3 +7838,26 @@ re-baseline 基线 + 各轮 findings 新增）。
 - 关闭态验收必须从真实 TRA race-live 入口证明 observation 之外的 runner/authority/applied ledger 为
   0；单独打开 provider、region 或 field 仍应零写。raw cleanup smoke 同时验证 held、路径漂移、越界、
   symlink 和并发一次性清理；回滚 0069 前须先确保没有依赖 append-only guard 的写入窗口。
+# Lifecycle shadow 观察加固（2026-08-08 本地实现，尚未部署）
+
+- 新增的 `deploy/verify_lifecycle_runtime_coherence.sh` 和
+  `deploy/switch_lifecycle_mode.sh` 当前只存在于未发布候选；生产仍不得把它们当作可执行入口。
+- coherence 以宿主全量 running containers 为范围，验收 web/worker/Beat 的 project、working
+  directory、image ID、release commit 和 lifecycle flags，并拒绝跨 project resident/one-off。
+- mode switch 使用 `lifecycle-mode-switch` 共享锁和 Beat-last 顺序；任何失败只允许收敛到双 env
+  与 web/worker `false/off`、Beat stopped。无法完成安全收敛时保留锁和证据人工接管。
+- wrapper one-off 候选限定 canonical `run --rm --no-deps` grammar，已覆盖 Release B 的重复
+  `-e VALUE` 调用。代码合并并完成关闭态部署前，该门禁不构成线上事实。
+- 首轮 review 后 mode switch 进一步要求：脚本物理目录必须精确等于 expected release，生产
+  canonical env 固定为 `/opt/umanewsbot/.env`；启用前先在共享锁内核验当前三服务为
+  `running false/off`，全部 Compose mutation 显式绑定 expected project directory/name。旧 checkout
+  或运行态漂移必须在文件、服务 mutation 前失败。
+- 安全恢复的 coherence 若因跨 project resident 或 expected project running one-off 的 worker/Beat
+  失败，须以宿主 census 逐 CID 严格核验 service/project/one-off/running 后，仅按精确 CID 尽力
+  停止违规实例；禁止名称或宽 selector。枚举、inspect、stop 或最终 coherence 任一步失败均保留
+  共享锁并人工接管，不得把 expected project 自身重建成功误报为宿主已收敛。
+- 通用 `worker`/`beat` 名称不是 Umanews 身份。自动停止前还必须精确核验受控 Compose project、
+  物理 release 目录组件边界、冻结 image ID 与 OCI revision；other-app、`umanews-evil` 等前缀
+  混淆或任一身份缺失都不得 stop，只能保留锁交人工确认。
+- 修复后 shadow 必须重新冻结未来日本+英国 2–4 场自然边界；不得以手工 scanner、已过期
+  proposal 或本轮部署前的 observation 替代。enforce 不属于本 change。

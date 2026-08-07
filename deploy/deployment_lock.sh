@@ -10,7 +10,8 @@
 #   DEPLOYMENT_LOCK_DIR     lock directory (default /tmp/umanews-deployment.lock)
 #   DEPLOYMENT_LOCK_ACTION  required for acquire; one of
 #                           deploy|rollback|manual-release|pre-contract-rollback|
-#                           p0-closed-admission|resume-release
+#                           p0-closed-admission|resume-release|
+#                           lifecycle-mode-switch
 #   DEPLOYMENT_LOCK_TOKEN   required for all subcommands; only its SHA-256 is
 #                           stored, never the raw token
 #
@@ -65,9 +66,9 @@ verify_token() {
 case "$command" in
   acquire)
     case "$ACTION" in
-      deploy|rollback|manual-release|pre-contract-rollback|p0-closed-admission|resume-release) ;;
+      deploy|rollback|manual-release|pre-contract-rollback|p0-closed-admission|resume-release|lifecycle-mode-switch) ;;
       *)
-        echo "DEPLOYMENT_LOCK_ACTION must be one of deploy|rollback|manual-release|pre-contract-rollback|p0-closed-admission|resume-release" >&2
+        echo "DEPLOYMENT_LOCK_ACTION must be one of deploy|rollback|manual-release|pre-contract-rollback|p0-closed-admission|resume-release|lifecycle-mode-switch" >&2
         exit 1
         ;;
     esac

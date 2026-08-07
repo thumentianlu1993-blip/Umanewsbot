@@ -5368,3 +5368,24 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   cohort，因此 Ireland 自动化保持不可发布，后续纳入前必须先补此门禁并重新 review。
 - 当前未 commit/push/PR/部署/migrate、未调用 provider/收费 API、未读取
   生产凭据或修改生产开关。除现有 TRA adapter 外，其余 provider 均保持 `proof_required`。
+# 2026-08-08 lifecycle shadow 观察加固已通过独立代码审核，待最终 fingerprint 与发布授权
+
+- 独立 worktree `.worktrees/harden-lifecycle-shadow-observation` 已快进整合最新
+  `origin/main@11abe4bf2d2badbfe1daa2f5fdd8f8e97f5f0093`；主工作区既有改动未修改或清理。
+- 生产只读快照（`2026-08-08 02:04 +08:00`）为 web/worker/Beat 同一隔离 release、统一
+  `true/shadow`，16 controls、16 proposals、0 applied、0 active claim；race-live 未运行，
+  `default=2 / race_live=7543` 未处理。该快照只作实现背景，不是当前发布证明。
+- 已按真实 RED 实现：shadow proposal/duplicate 成功统计；scanner→worker expected runtime
+  握手与 mismatch 结构化 error；Compose wrapper canonical `run --rm --no-deps`；宿主全量
+  project/release/image/commit/flags census；共享锁保护且失败单向收敛至
+  `false/off + Beat stopped` 的 mode switch。无 migration、状态机、provider 或 queue 变化。
+- 测试先行初始为 28 tests、`38 failures + 4 errors`，均来自目标能力缺失。首轮 review findings
+  再取得 `10 failures` 的真实 RED；第二轮 review 的宿主恢复 P1 再取得 `6 failures`。修复后
+  hardening 扩展为 `37/37`，与既有生命周期、纳管、单一 migration owner、P0 deployment
+  合并回归 `294/294`，隔离 PostgreSQL 16 `6/6`、
+  Release B deploy contract `1/1`；
+  Django、migration drift、compile、workflow contract、shell、Compose 和 diff checks 通过。
+- 当前未 commit/push/PR、部署、重启、修改生产 flag/数据或启用 enforce/race-live。下一门禁是
+  同一独立 reviewer 首轮 5 项 finding、第二轮宿主收敛 P1 与第三轮 Umanews 身份证明 P1
+  均已测试先行修复；第四轮原生只读复审最终 `APPROVED`，无剩余 actionable finding。
+  当前只进行审核结论文档与最终 fingerprint 收口；随后停止并等待当前版本发布授权。
