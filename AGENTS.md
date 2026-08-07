@@ -2,153 +2,125 @@
 
 ## 项目定位
 
-这是一个面向中文用户的日本赛马新闻平台，目标是把日本赛马资讯整理成清晰可读的中文内容，并提供后台审核、网页发布与后续 QQ 群分发能力。
+这是一个面向中文用户的赛马新闻与赛事数据平台，主干技术为 Django、PostgreSQL、
+Celery、Redis、Docker Compose 与 Nginx。项目优先保证中文内容生产、后台审核、网页发布、
+赛事数据和 QQ 分发链路可用，再推进扩展与优化。
 
-技术栈主干：
+## 规则作用域与唯一权威
 
-- Django
-- PostgreSQL
-- Celery
-- Redis
-- Docker Compose
-- Nginx
+- 本文件适用于仓库内全部目录、任务、worktree、代理和协作者，是本仓库唯一的人工确认门禁定义。
+- 其他文档、skill、agent 配置、任务交接和运行手册只能引用本节，不得复制、增加、减少或改写人工确认门禁。
+- 子目录若以后新增 `AGENTS.md`，只能补充该目录的技术约定，不得定义人工确认门禁；需要改变门禁时只能修改根 `AGENTS.md`。
+- 业务校验、数据质量规则、feature flag、dry-run、备份、测试、review、CI、健康检查和回滚验证属于自动技术检查，不属于人工确认门禁。
+- 用户在当前任务中的明确指令优先；授权只覆盖指令的实际范围，不自动扩大到无关系统或生产资源。
 
-## 当前阶段
+## 三道人工作业门禁
 
-当前阶段已经完成：
+### G1：范围确认
 
-- 基础采集、翻译、后台、前台链路搭建
-- 公网服务器部署
-- 正式域名 `umafans.run` / `www.umafans.run` 的 HTTP 接入修复
-- 自动化内容运营 + AI 编辑改写 MVP 代码侧落地
+仅在以下任一情况触发：
 
-下一阶段准备推进：
+- 产品能力、公开行为、用户交互、业务规则或运营口径会变化；
+- 数据范围、身份规则、权限边界、架构或生产安全边界会变化；
+- 需求存在会显著改变结果的未决分支，无法从代码、文档或只读运行态确定。
 
-- 自动化运营 MVP 生产部署、迁移与灰度启用
-- HTTPS / 证书接入
-- 部署稳定化
-- 监控、备份、回滚流程完善
+用户最初的明确“修改/实现/修复/构建”指令在范围清楚时即视为 G1，不得机械地再问一次
+“是否开始实现”。G1 通过后，代理可在批准范围内连续完成探索、方案、测试、实现、纯技术
+修复、文档回写、commit、push 和 Draft PR；这些机械步骤不得拆成新的确认点。
 
-## 工作原则
+只读检查、诊断、解释、方案讨论，以及不改变产品或生产边界的小型技术修复，不单独触发 G1。
 
-- 先闭环可用，再谈优化和扩展
-- 不轻易重构主干架构
-- 不把聊天记录当项目记忆
-- 所有关键状态、决策、排查过程都要写回仓库文档
-- 做生产相关改动时，优先核对运行态，而不是只看本地代码预期
+### G2：交付确认
+
+准备改变共享主线或生产环境前，在当前 PR/变更已经完成必要测试与独立 review 后，向用户提供一次
+清晰选择：
+
+- 只合并，不发布；或
+- 合并并执行一个精确绑定的发布包。
+
+发布包必须列明提交或 PR、是否包含迁移、配置变化、服务重建/重启、生产数据动作、功能开关、
+验证和回滚。用户批准整个发布包后，包内已列明的机械步骤连续执行，不逐项重复询问。
+
+### G3：高影响动作确认
+
+以下动作若未被 G2 的精确发布包明确包含，执行前单独确认一次：
+
+- 批量生产数据写入或删除、不可逆或高成本修复；
+- 开启 `enforce`、自动发布、race-live 或同等级公开自动化；
+- 对外发送 QQ、邮件、通知或其他代表用户的消息；
+- 扩大真实网络抓取、付费调用、数据覆盖范围或访问权限。
+
+manifest 驱动的动作应把确认绑定到 manifest SHA、目标范围和有效条件；内容未变化时不得针对
+prepare、backup、dry-run、apply 分别重复询问。G2 已逐项列明并批准同一高影响动作时，不再额外触发 G3。
+
+### 重新确认的唯一条件
+
+只有以下情况使已有确认失效：
+
+- 产品/数据/生产范围扩大或关键实现方案发生实质变化；
+- PR、commit、manifest、目标环境或发布包与获准版本不一致；
+- 自动技术检查失败，且继续需要改变已批准动作或安全边界；
+- 出现新的不可逆影响、外部发送或敏感权限需求。
+
+测试通过、review 返修、备份完成、等待窗口结束、线程切换或普通时间流逝本身不要求重新确认。
+纯技术 review finding 默认直接修复并复验；如果修复会改变产品行为或扩大范围，再回到 G1。
 
 ## Codex 原生工作流
 
-本项目从 `2026-07-15` 起统一使用以下主流程；完整说明见
-[`docs/codex_workflow.md`](docs/codex_workflow.md)：
+项目统一使用 Codex 原生流程：
 
-`探索 -> spec/design -> 方案审核 -> 用户确认实现 -> 测试先行 -> 子代理实现 -> 独立 reviewer 会话 /review -> 用户授权后发布`
+`探索/定位 -> 按风险规划 -> 测试与实现 -> 独立 review -> 按 G2/G3 交付`
 
-- 探索阶段使用 Codex 原生只读调研与规划能力。需求不清、决策分支多或风险较高时，可以使用 `grill-me-codex` 逐项确认；禁止使用 `openspec-explore`。
-- spec/design 阶段优先使用 Codex 原生规划能力。新任务的持久产物放在 `docs/changes/<slug>/`，至少包含 `spec.md`、`design.md`、`test_cases.md`、`tasks.md`、`rollout.md` 五份 durable artifacts；`tasks.md` 使用 `(application)`、`(integration)` 或 `(operations)` 域前缀，并按“测试 -> 实现 -> 验证”排列。
-- 方案审核优先使用可用的 Codex 原生方案审核能力；工作流进入“方案审核”阶段且当前没有合适的 Codex 原生方案审核能力时，自动使用 `plan-eng-review`，无需用户再次点名。首次方案审核建立 reviewer 会话；同一需求的方案复审复用该 reviewer 的同一会话与上下文，仅在会话不可恢复时新建并交接。复审只核对上轮具体 findings、对应修复和直接触及路径；仅直接 P0/P1 回归可新增阻塞，其他新发现记为后续建议并结束。审核结论未通过前不得进入开发。
-- 方案审核通过后必须向用户提交根因、最终范围、测试与 RED 方案、历史数据边界、风险/非目标/回滚和 reviewer 结论，并停在“用户确认实现”门禁。只有用户针对当前版本明确回复“确认实现”“开始实现”“继续实现”或同义授权后，才可编写/修改自动化测试、修改应用代码/配置/迁移、启动实现 subagent 或执行历史数据重处理；最初任务描述和探索/规划授权不得视为实现授权。
-- 开发前必须补足 `test_cases.md` 和对应自动化测试，并实际看到新增/变更测试因目标能力尚未实现而失败（RED）；再逐项完成 GREEN 和 REFACTOR。只有不改变任何运行时行为的纯文档或纯配置整理，才可以在 `test_cases.md` 中写明 RED 不适用原因，并给出、执行相应验证。feature flag、队列/路由、权限、依赖、容器或部署顺序、数据行为等配置变化不得豁免测试先行。
-- 任何 subagent（实现、测试、审核、调研或其他用途）启动后，直到全部 active subagent 结束，主代理只能继续派出新的 subagent，或等待/接收结果；不得读/改文件、跑测试、继续调研、向其他任务发消息、处理用户追加的无关工作或执行其他工具调用。写密集任务默认串行；并行时必须保证文件边界不重叠。
-- 实现 subagent 不得 commit、push、部署或写生产；返回内容必须包含摘要、改动路径、测试证据和剩余风险。主代理仅在所有实现 subagent 结束后检查、整合和验证结果。
-- 代码首次审核必须派出一个未参与本轮实现的 reviewer subagent，并实际调用 Codex 原生 review。同一需求后续复审必须复用该 reviewer 的同一会话与上下文；只有 reviewer 明确确认会话不可恢复时才能新建，并记录原因、上轮 findings 与已知问题交接。复审范围只包括上轮具体 actionable findings（漏洞/阻塞项）、对应修复和修复直接触及路径的回归；仅当前漏洞的直接 P0/P1 回归可新增阻塞，其他新发现记录为后续建议后结束本需求审核。具体命令、fingerprint 与 fail-closed 规则见 `docs/codex_workflow.md` 第 7 节。
+- 不引入其他规格工作流、CLI、skill、phase、journal 或兼容目录。
+- 大功能、跨模块、架构、迁移和高风险生产变更，在 `docs/changes/<slug>/` 记录必要的
+  `spec.md`、`design.md`、`test_cases.md`、`tasks.md`、`rollout.md`；小型修复只记录实际需要的内容。
+- `tasks.md` 使用 `(application)`、`(integration)`、`(operations)` 前缀，并按测试、实现、验证排列。
+- 功能行为变化优先取得真实 RED，再完成 GREEN/REFACTOR；纯文档治理变更可用解析、引用扫描、契约测试和 `git diff --check` 验证。
+- subagent 仅在用户明确要求时启用。启用时必须声明文件/责任边界，且不得回退或覆盖其他线程的改动。
+- 独立 reviewer 保持只读；actionable finding 在原 reviewer 上下文中修复和复审，review 本身不是发布授权。
+- 完整执行细节见 `docs/codex_workflow.md`；该文档不得定义人工确认门禁。
 
-<!-- WORKFLOW_CONTRACT:REVIEW_COMMANDS:START -->
-- `codex review -c 'sandbox_mode="read-only"' --uncommitted`
-- `codex review -c 'sandbox_mode="read-only"' --base <base_oid>`
-- `codex review -c 'sandbox_mode="read-only"' --commit <commit_oid>`
-<!-- WORKFLOW_CONTRACT:REVIEW_COMMANDS:END -->
+## 多线程、worktree 与 `main`
 
-<!-- WORKFLOW_CONTRACT:RELEASE_AUTHORIZATION:START -->
-当前任务发布授权必须在最新一轮成功 review 之后取得。
-<!-- WORKFLOW_CONTRACT:RELEASE_AUTHORIZATION:END -->
+- `main` 是受保护的远端引用，不是日常开发目录或长脚本运行目录。
+- 每个线程使用独立 `codex/<slug>` 分支和独立 worktree；禁止在共享脏工作区切分支、pull、merge 或清理他人文件。
+- 长脚本绑定固定 commit SHA 或镜像运行，产物写入专用 runtime/artifact 目录，不依赖会随合并变化的工作树。
+- PR 优先通过远端合并；本地需要集成测试时，从最新 `origin/main` 创建临时集成分支，不 checkout 或直接修改 `main`。
+- 合并与部署分开判断：固定 SHA 上的脚本通常不阻塞远端合并；只有会影响其数据库、服务、队列、配置或输入契约的部署才互斥。
+- 使用两类资源锁：短时 integration lock 保护本地整合/推送，production release lock 保护部署、迁移、配置、重启和冲突的生产任务。锁必须记录 owner、线程、operation、SHA、资源域、开始时间和存活信息；不得依赖无法自动释放的裸 lock 文件。
+- 同一时间只允许一个 release coordinator 操作生产发布面。其他线程做到 PR ready 后交接，不自行竞争发布资源。
 
-review 前的旧授权、`let's go`、其他任务的授权和历史文档中的词均无效。最新成功 review
-后若受审内容发生变化，必须回到同一 reviewer 会话复审变更及其直接触及路径，并重新取得授权。
+## 开始任务前的读取规则
 
-<!-- WORKFLOW_CONTRACT:FINGERPRINT_FREEZE:START -->
-- 成功 review 记录受审 scope、完整 fingerprint、approved parent（审核时 HEAD）和 approved content hash（`content_manifest_sha256`），作为当前任务最新审核基线。
-- 用户授权后、staging 前完整 fingerprint 必须用相同 scope 重算并与审核基线逐字节一致；不一致则停止。
-- 显式 stage 全部受审改动后，允许 status/index 表示发生变化；但 HEAD 必须仍为 approved parent，且无 unstaged、untracked 或 conflict，index 的 `content_manifest_sha256` 必须与 approved content hash 一致。漏 stage、夹带或内容变化均停止。
-- 任何实际内容差异都会使该轮 review 与授权失效；必须回到同一 reviewer 会话，仅复审变化、对应修复和直接触及路径，并在成功后重新取得当前任务授权。
-<!-- WORKFLOW_CONTRACT:FINGERPRINT_FREEZE:END -->
+所有任务先读本文件，然后按需读取，不再每次全量加载全部历史文档：
 
-部署后一次性 evidence-only closure 的文件 allowlist 也是精确全集：
+- 任何代码/文档任务：`docs/session_bootstrap.md`，并针对关键词查询 `docs/current_state.md` 与 `docs/decisions.md`。
+- 产品定位或主链路变化：补读 `docs/project_overview.md` 与 `docs/project_status.md`。
+- 部署、排障、生产数据或服务操作：补读 `docs/deploy_runbook.md`、`docs/deploy_production.md`、
+  `docs/alicloud_hongkong_step_by_step.md`、`docs/rollback_guide.md`、`docs/backup_recovery.md` 中相关章节，并实时核对生产运行态。
+- `docs/current_state.md` 是当前状态主文档；与 `docs/project_status.md` 冲突时以前者为准。
 
-<!-- WORKFLOW_CONTRACT:EVIDENCE_ALLOWLIST:START -->
-- `docs/current_state.md`
-- `docs/project_status.md`
-- `docs/deploy_runbook.md`
-- `docs/decisions.md（仅必要发布决策）`
-- `docs/changes/<slug>/release_report.md`
-<!-- WORKFLOW_CONTRACT:EVIDENCE_ALLOWLIST:END -->
+开始修改前用自己的话确认：任务目标、当前真实状态、改动范围、已知阻塞和适用的 G1/G2/G3；
+不需要把这一步变成用户确认，除非确实触发相应门禁。
 
-`docs/decisions.md` 仅可记录发布时不可避免且已经发生的必要决策，不得借此修改治理规则。evidence-only patch 必须仅追加事实证据，并复用同一需求既有代码 reviewer 会话审核该证据范围；以下类别一律不得进入该通道：
+## 实施与安全原则
 
-<!-- WORKFLOW_CONTRACT:EVIDENCE_FORBIDDEN:START -->
-- 代码
-- 测试
-- 配置
-- 迁移
-- spec
-- tasks
-- skills
-- agents
-<!-- WORKFLOW_CONTRACT:EVIDENCE_FORBIDDEN:END -->
+- 先闭环可用，再优化扩展；不轻易重构 Django/Celery 主干。
+- 先确认当前代码、工作树和运行态，不把聊天记录、旧截图、历史测试或旧部署记录当当前证据。
+- 保留脏工作区与其他线程改动；需要隔离时从最新 `origin/main` 新建 worktree。
+- 自动测试不得访问真实生产数据库、Redis、队列或第三方服务。
+- 生产相关动作必须有边界、备份/恢复面、可验证结果和明确回滚；异常时 fail closed，不猜测成功。
+- 密钥、令牌、Cookie、个人数据和生产凭据不得写入仓库或输出。
+- 新增或维护的仓库文档、规格、代理说明默认使用中文；代码标识符和机器语法保留英文。
 
-若证据修复超出 allowlist、触及上述禁入类别或改变行为/治理，必须回到完整 review，并在成功 review 后重新取得当前任务授权。证据 commit 自身 SHA 仅在最终回复/PR 元数据中报告，不为写回自身 SHA 再制造 patch。
-- 小型修复也不得绕过测试先行、subagent 实现、独立 review 和发布授权；可按风险缩短 spec/design，但必须保留可追溯记录。
+## 文档回写
 
-### OpenSpec 兼容边界
+仅按实际影响更新，避免为每个任务机械改写所有状态文档：
 
-- `openspec/` 下既有规格和在途 change 原地保留，作为历史或在途上下文；它们可继续被读取，但后续工作按上述新流程推进。
-- 对 `2026-07-15` 时仍在途的任务，不中断正在执行的原子操作或共享维护窗口；先到达安全检查点，再切换到新流程。切换后读取现存规格，补齐或更新 `test_cases.md`，对尚未实现的行为取得真实 RED，再由 subagent 实现并由该需求代码 reviewer 会话审核。不得为补流程伪造已经错过的历史 RED，也不得重做已完成的生产动作。
-- 禁止调用 `openspec-explore`、`openspec-propose`、`openspec-apply-change`、`openspec-archive-change`、`openspec-sync-specs`，也不再把 OpenSpec CLI、phase、journal 或 workflow-spine 作为新流程门禁。
-- `openspec/config.yaml` 仅为兼容既有 artifacts 保留，不代表 OpenSpec 仍是项目主工作流。
+- 当前工作状态变化：`docs/current_state.md`；
+- 新的产品、架构或治理决策：`docs/decisions.md`；
+- 部署、排障或运维变化：`docs/deploy_runbook.md`；
+- 产品定位或主链路变化：`docs/project_overview.md`；
+- 项目级里程碑摘要变化：`docs/project_status.md`。
 
-## 开始任何任务前必须先阅读
-
-1. [docs/project_overview.md](E:/Codex/docs/project_overview.md)
-2. [docs/current_state.md](E:/Codex/docs/current_state.md)
-3. [docs/decisions.md](E:/Codex/docs/decisions.md)
-4. [docs/deploy_runbook.md](E:/Codex/docs/deploy_runbook.md)
-5. [docs/session_bootstrap.md](E:/Codex/docs/session_bootstrap.md)
-6. [docs/codex_workflow.md](docs/codex_workflow.md)
-7. 如涉及部署或运维，再补充阅读：
-   - [docs/deploy_production.md](E:/Codex/docs/deploy_production.md)
-   - [docs/alicloud_hongkong_step_by_step.md](E:/Codex/docs/alicloud_hongkong_step_by_step.md)
-   - [docs/rollback_guide.md](E:/Codex/docs/rollback_guide.md)
-   - [docs/backup_recovery.md](E:/Codex/docs/backup_recovery.md)
-
-补充约定：
-
-- [docs/current_state.md](E:/Codex/docs/current_state.md) 是当前真实工作状态主文档
-- [docs/project_status.md](E:/Codex/docs/project_status.md) 是面向项目全局的概览/摘要
-- 两者如有重复或冲突，以 [docs/current_state.md](E:/Codex/docs/current_state.md) 为准
-
-## 输出风格
-
-- Codex 新增或维护的仓库文档、规格与设计产物、代理说明和面向协作者的文字默认使用中文
-- 命令、代码标识符、协议字段、第三方工具要求的机器语法，以及无法合理翻译的专有名词可以保留英文
-- 既有 OpenSpec 规格中的 `ADDED Requirements / Requirement / Scenario / WHEN / THEN` 等校验关键字必须保留，但其标题和正文内容使用中文
-- 先确认当前真实状态，再给建议
-- 涉及生产问题时，优先给文件、命令、路由、配置片段级别的说明
-- 如果用户要求部署/排障，必须区分：
-  - 仓库当前预期
-  - 服务器当前运行态
-- 不给模糊候选结论；如果有多个入口或路径，必须明确“本次验收以哪个为准”
-
-## 每次任务结束后必须更新
-
-发布任务按 `docs/codex_workflow.md` 的 evidence-only closure 回写：完整审核范围（包括
-治理文件）在发布前冻结，部署后只向获准的状态/运维文档追加事实证据并复用同一需求既有代码 reviewer 会话
-审核；证据 review 通过后提交该文档 patch 即完成收尾，不再为记录证据 commit 自身 SHA
-产生递归更新。会改变治理、产品或链路的决策必须在成功 review 前写入并纳入审核；部署时
-已经发生且不可避免的必要发布决策可按受检 allowlist 追加到 `docs/decisions.md`，但不得
-改变治理规则或行为，且必须进入 evidence review。
-
-- [docs/current_state.md](E:/Codex/docs/current_state.md)
-- [docs/decisions.md](E:/Codex/docs/decisions.md)（治理/行为决策须在成功 review 前纳入冻结；部署后仅限必要发布决策证据）
-- [docs/deploy_runbook.md](E:/Codex/docs/deploy_runbook.md)（若涉及部署、排障、运维）
-- [docs/project_overview.md](E:/Codex/docs/project_overview.md)（若产品定位或链路变化，须在成功 review 前更新并纳入冻结范围）
-- [docs/project_status.md](E:/Codex/docs/project_status.md)（保留为项目级概览/摘要，如与 current_state 重复，以 current_state 为准）
+历史事实可以记录当时是否获得授权，但不得在这些文档中重新定义通用人工确认门禁；统一引用本文件。

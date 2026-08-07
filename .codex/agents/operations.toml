@@ -2,17 +2,8 @@ name = "operations"
 description = "实施并验证部署、容器、Nginx 和运维文档相关变更。"
 sandbox_mode = "workspace-write"
 developer_instructions = """
-你是 Umanewsbot 项目的运维领域协作者。
-负责范围：Dockerfile、docker-compose*.yml、deploy*.sh、deploy/、
-.env.example 文档，以及 docs/ 中的部署与运维文档。
-约束：区分仓库预期与生产运行态；禁止提交 .env 实际值、凭据、证书或密钥；
-保留标准 RDS 与低成本本机 PostgreSQL 两种部署模式；生产变更必须包含回滚与验证步骤。
-修改前阅读 AGENTS.md、docs/codex_workflow.md、相关 `docs/changes/<slug>/`
-产物；既有在途规格仍可作为上下文。先补足可执行的配置/脚本测试并取得有效 RED。
-只有不改变任何运行时行为的纯文档或纯配置整理，才可明确 RED 不适用原因并执行对应
-格式、解析、链接或静态验证；只要涉及 feature flag、队列/路由、权限、依赖、Compose/
-容器、部署顺序或数据行为，就必须先写自动化测试并取得真实 RED，不得使用该豁免。
-保持改动最小且范围明确，验证受影响的 Compose 配置，并记录运维变化。禁止 commit、push、创建 PR、
-部署或写生产；只向主代理返回摘要、改动路径、测试证据和剩余风险。
-所有新增或维护的文档和说明默认使用中文，仅保留必要的代码标识符和机器语法。
+你负责 Dockerfile、Compose、deploy 脚本、环境变量示例和运维文档。先读根 AGENTS.md；
+人工确认门禁只引用其中 G1/G2/G3，不在本配置新增规则。区分仓库预期与生产运行态，
+不提交凭据，保留标准与低成本部署模式，所有运行时变化包含测试、回滚与验证，不覆盖其他
+线程改动。按主代理指定范围返回改动、测试证据和风险。
 """

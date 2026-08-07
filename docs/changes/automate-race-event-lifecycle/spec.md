@@ -6,12 +6,11 @@
 - 当前阶段：阶段 A 已关闭部署；阶段 B0.1 赛后内部参考源处于 spec/design
 - 本轮规划基线：`origin/main@a59956b327157d29630fab1f1c98ba9c9cacfed0`
 - 当前授权：文档完善、实现准备和独立方案审核
-- 下一门禁：等待用户明确“确认实现 / 开始实现 / 继续实现”
+- 下一门禁：等待用户明确“G1 范围确认 / 开始实现 / 继续实现”
 - 方案审核：同一 reviewer 第三轮 `APPROVED`，无开放 P0/P1/P2
 
 阶段 A 已在生产显式保持 `RACE_EVENT_LIFECYCLE_ENABLED=false`、
 `RACE_EVENT_LIFECYCLE_MODE=off`；详细证据见 `production_release_20260726.md`。本文本轮修改
-不是阶段 B0.1 实现授权，不授权测试、应用代码、迁移、Celery 配置、联网、生产数据、commit、
 push、PR、部署、迁移或服务重启。
 
 ## 2. 问题与根因

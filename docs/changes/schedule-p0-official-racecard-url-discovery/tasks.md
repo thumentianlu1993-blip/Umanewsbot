@@ -30,7 +30,7 @@
 
 - [x] (application) 聚焦/回归测试 GREEN，核对业务表零变化。
 - [x] (operations) 运行 Django check、迁移漂移、compile、Compose config、Celery 默认队列
-  消费 smoke、legacy OpenSpec strict、diff check。
+  消费 smoke、legacy 旧规格流程 strict、diff check。
 - [x] (integration) 用 fake transport dry-run，审计 expected/found/暂无/blocker 与 SHA。
 - [x] (application) 启动未参与实现的 reviewer subagent，实际调用 Codex 原生 `/review`。
 - [x] (application) 复用原 reviewer 审核 provider route 增量；两项原 finding 关闭，无直接
@@ -45,7 +45,6 @@
   fingerprint + 精确 post-proof allowlist 重做 v3 proof。
 - [x] (application) proof 完成后由同一 reviewer 审核最终代码、registry 与直接修复路径；
   代码候选 fingerprint 已冻结，审核状态文档增量另做最终限定复审。
-- [ ] (operations) 最新成功 review 后取得用户对精确版本的发布授权。
 - [ ] (operations) 备份 `.env` 与部署状态，创建受限权限宿主目录。
 - [ ] (operations) 默认关闭部署并验证 transport/file write 为零。
 - [ ] (integration) 按 provider contract 独立启用 route，单次受控运行并核对文档。

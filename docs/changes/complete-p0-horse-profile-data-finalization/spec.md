@@ -2,7 +2,7 @@
 
 ## 范围
 
-本增量承接 `openspec/changes/complete-p0-horse-profile-data/` 已确认设计，只完成尚未落地的五地区单马资料采集、统一候选 payload、完整生涯履历 payload、审核 artifact 和模块级审核处理。
+本增量承接 `旧规格流程/changes/complete-p0-horse-profile-data/` 已确认设计，只完成尚未落地的五地区单马资料采集、统一候选 payload、完整生涯履历 payload、审核 artifact 和模块级审核处理。
 
 首批范围固定为生产只读候选中的日本、中国香港、英国、法国、美国各 10 匹，共 50 匹。用户已确认 50 匹全部纳入本批；纳入本批不豁免身份补强或完整资料门禁。
 

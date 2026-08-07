@@ -158,7 +158,6 @@ adapter outcome：
 - 不公开文档，不新增前台/API 下载入口。
 - 不启用 race-live scheduler、monitor 或结果发布。
 - 实现完成不等于生产部署、网络 route 启用或 Celery beat 生效；这些动作在最新 code review 后
-  仍需精确发布授权。
 - 不绕过官方站点的 robots、条款、认证、验证码或限流。
 
 ## 8. 验收

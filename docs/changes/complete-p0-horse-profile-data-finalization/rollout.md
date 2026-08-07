@@ -42,7 +42,6 @@
   `f67ad84408e68af69f14e2eef06e7135ca0b19cfc4fd18faf8925798acdbb1eb`。
 - Kentucky Wood 的父系 Balko 已从错误的 Netkeiba `000a02bd3f`（1925 年同名马）纠正为
   Racing Post `595446`（2001，Pistolet Bleu / Ella Royale）；v1 不改，纠错只进入 v2 审计。
-- 本轮只获实现授权，未获 commit、push、merge、部署或生产写入授权。
 
 ## 实施边界
 
@@ -57,7 +56,7 @@
 ## 第十四轮：父母来源身份与 v2 产物最终冻结
 
 - 本轮在第十三轮 `277/277` 基础上增加 5 项回归，最终 Python 组合回归为 `282/282`。
-  Node summary/path 测试、Django check、迁移漂移、Python `compileall`、OpenSpec change
+  Node summary/path 测试、Django check、迁移漂移、Python `compileall`、旧规格流程 change
   strict 通过、all strict `30/30`、公式错误扫描和 `9` 张工作簿预览均通过。
 - 父母实体来源身份现在全局执行 provider namespace + opaque external ID 一致性；自动
   Netkeiba 候选 URL 只接受精确 `https://en.netkeiba.com/db/horse/<id>/`，凭据、端口、
@@ -69,7 +68,7 @@
   test 先以缺少导出取得 exit `1`，修复后 summary/path tests 均 exit `0`，builder/summary
   Node `--check` 通过；重建统计保持 `50 / 2050 / 1439 / 2679 / 9 previews / 0 formula
   errors`，首页预览人工检查无溢出或遮挡。
-- 本轮只完成离线证据和文档/OpenSpec 收口，没有生产写入、部署、发布或网络 career crawl。
+- 本轮只完成离线证据和文档/旧规格流程 收口，没有生产写入、部署、发布或网络 career crawl。
 
 ## 第十五轮：来源调研与批次文案动态化（2026-07-20）
 
@@ -122,5 +121,4 @@
 ## 恢复点
 
 - 实现期间只产生 worktree 文件和本地 artifact。
-- 未取得发布授权前不提交、不推送、不部署、不写生产。
 - dry-run 失败时保留原 artifact、请求统计和缓存，不覆盖后重跑。

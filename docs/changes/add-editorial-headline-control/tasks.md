@@ -10,10 +10,9 @@
 - [x] 0.5 (operations) 由独立方案 reviewer 使用 plan-eng-review 完成首次审核（结论 REVISE）
 - [x] 0.6 (operations) 有 finding 时修正规格并复用同一 reviewer 会话复审至通过（三轮，
   最终 `VERDICT: APPROVED`）
-- [x] 0.7 (operations) 审核通过后停止，等待用户明确“确认实现/开始实现”
+- [x] 0.7 (operations) 审核通过后停止，等待用户明确“G1 范围确认/开始实现”
 - [x] 0.8 (operations) 编写可供无上下文 Claude agent 接手的完整 `handoff.md`
 
-## 1. 测试（仅在用户确认实现后）
 
 - [ ] 1.0 (operations) 测试前确认未提交内容仅为本任务规格/状态文档，记录 `git status`、完整 diff
   与这些文件的内容 fingerprint；用命名 `git stash push -u` 暂存并记录精确 stash OID，确认 worktree
@@ -64,12 +63,10 @@
   `codex review -c 'sandbox_mode="read-only"' --uncommitted`
 - [ ] 4.3 (application) 有 actionable finding 时由实现 subagent 修复
 - [ ] 4.4 (operations) 复用同一代码 reviewer 会话只复审 finding、修复及直接触及路径
-- [ ] 4.5 (operations) review 通过且 fingerprint 不变后停止，等待用户对当前版本明确发布授权
 
 ## 5. 发布（仅在最新成功 review 后取得明确授权）
 
 - [ ] 5.1 (operations) 重新 fetch，确认已审核 HEAD 仍基于当前 `origin/main` 且远端没有新增漂移；若主干
-  已推进则停止，集成后重新验证、代码 review，并在最新成功 review 后重新取得发布授权
 - [ ] 5.2 (operations) staging 前用相同 scope 重算 fingerprint 并与批准基线逐字节一致
 - [ ] 5.3 (operations) 显式 stage 后验证 approved parent、无 unstaged/untracked/conflict 和 content hash
 - [ ] 5.4 (operations) 经授权后 commit、push、创建 PR；未授权不得执行

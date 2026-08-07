@@ -33,11 +33,9 @@
   范围，保存前后 fingerprint 与结论。
 - [ ] (application) 若有 actionable finding，在同一 reviewer 会话完成限定复审直至清零。
 - [ ] (operations) 冻结最新成功 review 的 scope、approved parent 和 content hash，停止等待
-  当前 fingerprint 的发布授权。
 
 ## 发布
 
-- [ ] (operations) 仅在最新成功代码 review 后取得用户针对当前 fingerprint 的明确发布授权。
 - [ ] (operations) 授权后按 fingerprint transition 完成 commit、push、PR/merge 与部署。
 - [ ] (operations) 验证默认/显式入口、1440px/390px、healthz、日志及零业务数据写入。
 - [ ] (operations) 按 evidence-only 规则回写真实发布结果并由同一代码 reviewer 审核。

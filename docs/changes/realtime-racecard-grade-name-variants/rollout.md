@@ -57,7 +57,6 @@ SQLite `210/210`，静态门禁为 0；等待同一 reviewer 会话限定复审�
 
 未参与实现的 reviewer subagent 必须执行原生只读 review。成功后记录 uncommitted scope 的
 完整 fingerprint、approved parent 和 content hash；任何受审内容变化回到同一 reviewer 限定
-复审。最新成功 review 后才请求用户对本 change 的发布授权。
 
 ## 阶段 4：生产代码部署
 

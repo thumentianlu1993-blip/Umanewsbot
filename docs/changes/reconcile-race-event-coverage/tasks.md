@@ -12,6 +12,5 @@
   - 旧失败 `RaceEventPageMVPTests.test_csv_import_candidate_fetch_and_candidate_apply` 已以测试夹具最小修正解决，单测 `1/1`；生产门禁未放宽。
   - 按用户要求未重新启动超长完整 `stable`，因此本项保留未完成。
 - [ ] 9. (operations) 在生产生成全量只读审计，核对 2025–2026 五地区及东海锦标。
-- [ ] 10. (operations) 取得当前内容的发布授权后构建并切换镜像。
 - [ ] 11. (operations) 备份、校验、dry-run、串行 apply、逐目标 verifier；公开开关保持关闭。
 - [ ] 12. (operations) 回写 current_state、decisions、deploy_runbook、project_status。

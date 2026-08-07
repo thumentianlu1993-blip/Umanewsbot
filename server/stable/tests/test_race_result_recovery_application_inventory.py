@@ -1,6 +1,6 @@
 """Application RED contracts for the race-result recovery inventory.
 
-OpenSpec tasks: 1.2.
+Native change task: application inventory contract.
 
 These tests intentionally freeze the public service boundary used by the
 integration and application implementations.  The inventory is an immutable

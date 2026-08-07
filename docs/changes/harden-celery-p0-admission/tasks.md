@@ -84,7 +84,6 @@ stdout final fix 后的当前候选聚焦为 `64/64 / 57.693s / exit 0`，其中
 `33/33 / 56.236s / exit 0`。
 Django check 为 exit `0`；`makemigrations --check --dry-run` 为
 `No changes detected`；`sh -n` 与 `git diff --check` 均为 exit `0`。以上均不代表代码
-review 通过或发布授权。
 
 ## Review
 
@@ -104,14 +103,11 @@ review 通过或发布授权。
 - [ ] (operations) 复审时按工作流保存审核前后完整 fingerprint、内层只读启动头、命令退出
   状态和 findings。
 - [ ] (operations) 最新成功 review 后冻结 scope、approved parent 和
-  `content_manifest_sha256`，停止等待发布授权。
 
 ## 发布
 
-- [ ] (operations) 仅在最新成功 review 后取得用户针对当前 fingerprint 的明确发布授权。
 - [ ] (operations) 授权后、staging 前重算 fingerprint，并通过 index transition。
 - [ ] (operations) 经新授权后完成 final fix 的 commit、push、PR/merge；不得把初始版本
-  授权当作变化后版本的发布授权。
 - [x] (operations) 初始版本生产预检已核对 SHA、flags、worker/队列、OOM 与资源状态；
   首次资源门禁按低内存/零 swap 返回 NO-GO。
 - [x] (operations) 经用户额外授权创建并启用临时 `2 GiB` swapfile（`0600`、不写

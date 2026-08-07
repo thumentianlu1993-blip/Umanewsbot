@@ -11,7 +11,6 @@ subagent、commit、push、PR、部署或生产写入。
 `scrollLeft` 真实行为；两项均已进入自动化/浏览器验收门禁。
 
 面向 Claude/新实现 agent 的自包含交接已写入同目录
-`implementation_handoff.md`。该文档只汇总已审核方案、当前基线和后续门禁，不构成实现授权。
 
 ## 基线
 

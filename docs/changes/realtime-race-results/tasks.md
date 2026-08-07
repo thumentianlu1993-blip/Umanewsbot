@@ -95,7 +95,6 @@
 - [ ] (integration) 压测 selector、host batch 去重、慢源/circuit、web p95 和新闻队列回归。
 - [x] (operations) durable artifacts、current state、project status、decisions 与 deploy runbook 已按 latest main、验证证据和候选发布/回滚契约更新，纳入最终 review scope。
 - [ ] (integration) 派未参与实现的 reviewer subagent 建立代码 reviewer 会话并实际执行只读原生 review；actionable findings 清零。
-- [ ] (operations) 最新成功 review 后等待用户对当前任务的发布授权；授权前不 commit/push/PR/部署/迁移/生产写入。
 
 ## 8. 分阶段 rollout
 

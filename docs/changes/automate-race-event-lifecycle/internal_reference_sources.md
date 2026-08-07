@@ -323,7 +323,6 @@ artifact；成功或失败退出均释放，stale lock 的人工恢复需独立�
 - collection 失败不能改变 `RaceEvent.status`、runner/result、revision 或 lifecycle control。
 
 如以后需要人工采纳某条信息，必须另立 change，生成新的独立候选并重新执行来源权威、字段冲突、
-审核、测试和发布授权；本阶段不提供 promotion 按钮或命令。
 
 ## 7. 来源特有限制
 

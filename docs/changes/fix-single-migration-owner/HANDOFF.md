@@ -3,7 +3,7 @@
 ## 0. 给接手会话的第一句话
 
 你要实现的是 Umanews 部署入口的“单一迁移执行者”修复，不是赛事生命周期业务功能。请只在最新、
-干净、隔离的 `codex/` worktree 中工作，严格测试先行；不要使用 OpenSpec，不要连接生产，不要
+干净、隔离的 `codex/` worktree 中工作，严格测试先行；不要使用 旧规格流程，不要连接生产，不要
 commit、push、创建 PR 或部署，除非用户针对当前 fingerprint 另行授权。
 
 ## 1. 当前基线
@@ -13,11 +13,10 @@ commit、push、创建 PR 或部署，除非用户针对当前 fingerprint 另�
   `/Users/mentianlu/Code/umanews/.worktrees/fix-single-migration-owner`
 - 规划分支：`codex/fix-single-migration-owner`
 - 规划 parent：`origin/main@7385f59ab87bcce5193f3313ecca6809b165ad89`
-- 工作流：Codex 原生，禁止 OpenSpec skills/CLI/change
+- 工作流：Codex 原生，禁止 旧规格流程 skills/CLI/change
 - 当前成果：spec/design/test/tasks/rollout/handoff，仅文档
 - 方案 reviewer：`/root/single_migration_plan_review`，三轮限定复审后
   `VERDICT: APPROVED`；首轮 4 项 P1、第二轮 2 项直接 P1 均已关闭，无开放 P0/P1
-- 当前授权：没有实现授权；接手时必须先核对用户是否已明确说“确认实现/开始实现/继续实现”
 
 开始前必须重新：
 
@@ -167,7 +166,7 @@ git diff --check
 
 ```bash
 rg -n "manage\\.py migrate --noinput|manage\\.py collectstatic --noinput" \
-  . --glob '!docs/**' --glob '!openspec/**' --glob '!.git/**'
+  . --glob '!docs/**' --glob '!旧规格流程/**' --glob '!.git/**'
 ```
 
 预期只命中 `deploy/docker/run-release-tasks.sh` 各一次。
@@ -193,7 +192,6 @@ Compose config 需要 `.env` 时，只能使用隔离的非敏感测试 env；�
    - historical runner initial-install 是否被误称为 greenfield bootstrap；
    - fake harness 是否真的跑了脚本；
 4. 有 finding 时先补 RED、修复，并复用同一 reviewer 会话复审；
-5. `APPROVED` 后重新冻结 fingerprint，停止等待用户发布授权。
 
 ## 8. 生产与授权边界
 

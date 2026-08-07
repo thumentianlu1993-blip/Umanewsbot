@@ -6,9 +6,8 @@
 - [x] 0.2 (integration) 只读核对既有解析修复、翻译/改写写入路径、状态模型及生产冻结 cohort
 - [x] 0.3 (operations) 编写 spec/design/test/tasks/rollout 与零上下文 handoff
 - [x] 0.4 (operations) 完成独立方案审核；两轮 finding 修订后复用同一 reviewer 会话复审通过
-- [x] 0.5 (operations) 方案审核通过后停止，等待用户明确确认实现
+- [x] 0.5 (operations) 方案审核通过后停止，等待用户明确G1 范围确认
 
-## 1. 测试（仅在用户确认实现后）
 
 - [ ] 1.1 (integration) 测试 subagent 添加层级污染、正常正文、缺 HTML/解析失败 fixture 与 inventory RED
 - [ ] 1.2 (application) 测试 subagent 添加 candidate prepare 零写入、人工字段保护、exact output hash RED
@@ -38,7 +37,6 @@
 - [ ] 3.3 (operations) 运行 Django check、migration drift、compile/static、Compose config、diff check
 - [ ] 3.4 (operations) 未参与实现的 reviewer 执行 Codex 原生只读 `/review` 并记录 fingerprint
 - [ ] 3.5 (application) 有 actionable finding 时由实现 subagent 修复并复用同一 reviewer 会话复审
-- [ ] 3.6 (operations) 最新 code review 通过后停止，等待当前精确版本发布授权
 
 ## 4. 工具发布（独立授权）
 

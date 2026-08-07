@@ -5,13 +5,12 @@
 
 ## 1. 给接手 Agent 的一句话说明
 
-这是一个已经完成只读探索、持久规格、设计和独立方案审核，但**尚未获得实现授权**的前台小型修复：
 
 1. 让赛事日历中的每个日期直接显示月份，并消除跨年歧义；
 2. 修复移动端赛事等级徽标被 flex 布局压窄的问题。
 
-接手后不要重新走 OpenSpec，也不要立即写测试或代码。首先向用户确认：当前交接是否同时构成
-“确认实现 / 开始实现 / 继续实现”的明确授权。若用户没有明确授权，只能继续只读核验和维护方案文档。
+接手后不要重新走 旧规格流程，也不要立即写测试或代码。首先向用户确认：当前交接是否同时构成
+“G1 范围确认 / 开始实现 / 继续实现”的明确授权。若用户没有明确授权，只能继续只读核验和维护方案文档。
 
 ## 2. 仓库、分支与工作目录
 
@@ -49,16 +48,12 @@ git worktree list --porcelain
 探索
 → spec/design
 → 方案审核
-→ 用户确认实现
 → 测试先行
 → 子代理实现
 → 独立 reviewer 会话 /review
-→ 用户授权后发布
 ```
 
-当前已完成前三步，正停在“用户确认实现”门前。
 
-### 未取得实现授权前禁止
 
 - 编写或修改自动化测试；
 - 修改 view、模板、CSS、配置或迁移；
@@ -66,7 +61,6 @@ git worktree list --porcelain
 - commit、push、创建 PR、merge、部署；
 - 服务重启、数据库迁移或生产数据写入。
 
-### 取得实现授权后仍须遵守
 
 - 先执行第 11 节的并行变更预检；
 - 所有测试与实现必须委派给 subagent；
@@ -74,11 +68,10 @@ git worktree list --porcelain
 - 写密集任务串行，subagent 不得 commit、push、建 PR、部署或写生产；
 - 完成主代理验证和真实视觉验收；
 - 使用未参与实现的 reviewer 实际执行原生只读 `/review`；
-- code review 通过后再次停下，等待用户针对精确版本的发布授权。
 
 ### 明确禁止
 
-- 使用任何 OpenSpec skill 或 OpenSpec CLI；
+- 使用任何 旧规格流程 skill 或 旧规格流程 CLI；
 - 修改 `AGENTS.md`；
 - 顺手重构整个 `public.css` 或赛事日历；
 - 修改新闻正文提取、英文马名识别、新闻来源展示、新闻地区 Tab 或马匹国家 Tab；
@@ -96,7 +89,6 @@ git worktree list --porcelain
 6. `docs/decisions.md`
 7. `docs/deploy_runbook.md`
 
-若后续取得发布授权，再补读：
 
 - `docs/deploy_production.md`
 - `docs/alicloud_hongkong_step_by_step.md`
@@ -448,7 +440,7 @@ git -C /Users/mentianlu/Code/umanews/.worktrees/simplify-public-navigation-and-a
 - `public_race_calendar()`
 - `race_calendar.html`
 
-用户的“确认实现”不会自动绕过这个技术门禁。
+用户的“G1 范围确认”不会自动绕过这个技术门禁。
 
 ## 12. 方案审核记录
 
@@ -485,7 +477,6 @@ VERDICT: APPROVED
 
 ## 14. 发布门禁
 
-代码审核通过并不构成发布授权。必须再次取得用户对当前受审版本的明确授权，才可：
 
 - commit；
 - push；
@@ -527,7 +518,7 @@ VERDICT: APPROVED
 1. 阅读第 4 节全部文件；
 2. 核对当前 worktree 与并行 change 快照；
 3. 向用户说明方案已 `APPROVED`、当前仍停在实现门；
-4. 等待“确认实现 / 开始实现 / 继续实现”或明确同义授权。
+4. 等待“G1 范围确认 / 开始实现 / 继续实现”或明确同义授权。
 
 ### 若用户明确授权实现
 
@@ -538,13 +529,12 @@ VERDICT: APPROVED
 5. 主代理完成全部 GREEN、回归和视觉验收；
 6. 启动未参与实现的独立 code reviewer；
 7. findings 清零后向用户汇报并停止；
-8. 等待新的发布授权。
 
 ### 当前绝对不要做
 
 - 不要因交接发生而默认用户已经授权实现；
 - 不要重做或替换已批准设计；
-- 不要运行 OpenSpec；
+- 不要运行 旧规格流程；
 - 不要先改 CSS 再补测试；
 - 不要吸收并行 worktree 中未归属的 model/migration；
 - 不要 commit、push、建 PR 或部署。

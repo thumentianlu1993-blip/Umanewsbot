@@ -991,7 +991,7 @@ commit 利用后续人工降级或 gate 放宽重新公开对象。
 最新主线集成返修验证基线：修复重放到 `origin/main@0dcdbdab`；集成候选的精确提交、
 content hash 与 fingerprint 以最终 base review 报告为准，不在提交正文中写入会因 amend
 自失效的 SHA。P0 聚焦
-`285/285`，Django check、`makemigrations --check --dry-run`、OpenSpec strict/all `37/37`、
+`285/285`，Django check、`makemigrations --check --dry-run`、旧规格流程 strict/all `37/37`、
 `git diff --check` 均通过。完整 `stable` 为 `2741` 项、`21 failures + 70 errors + 57 skipped`；
 临时干净工作树中的同一 `origin/main` 基线为 `2726` 项且失败/错误/跳过计数完全相同，差异
 仅为本专项新增 15 项测试。首次
@@ -1288,7 +1288,7 @@ artifact 字节。生产主机为 2 vCPU / 4 GiB / no swap：禁止无地区全�
 7. 最终运行验收：Django check、migration drift、内外 `/healthz/`、两个 worker
    ping/active/reserved、近期 traceback/critical/integrity 日志均通过。后台抽检待译马
    `Double Major` 显示原文、中文名待补和完整资料状态；其公开 URL 返回 `404`。
-   本批 `published=0`，后续公开必须走 OpenSpec 6.7 的人工发布与公开页面验收。
+   本批 `published=0`，后续公开必须走 旧规格流程 6.7 的人工发布与公开页面验收。
 
 ## P0 Phase A 首次迁移回滚与二次门禁（2026-07-20）
 
@@ -1437,7 +1437,7 @@ PostgreSQL commit 在 `SERIALIZABLE` 事务开始后、任何 mapping snapshot �
    `outputs/019f481e-4133-7f43-9844-e7a59b33ba9a/P0马五地区50匹完整解析与字段可用性审核-v2.xlsx`
    含 `2050` 条逐字段证据，仅用于人工核验，不能传给 `complete_horse_profiles --commit`，
    也不能替代模块级审核 CSV、diff、source evidence manifest 或冻结 SHA。
-4. 在 `50/50` 前不得执行 OpenSpec `6.5/6.6/6.7`，不得批量写生产 `HorseRaceRecord`、
+4. 在 `50/50` 前不得执行 旧规格流程 `6.5/6.6/6.7`，不得批量写生产 `HorseRaceRecord`、
    创建普通比赛 `RaceEvent` 或公开马匹。补齐后先在最新集成版本重新生成正式 dry-run
    artifact，并重新执行完整回归与独立代码审查。部署迁移时还必须抽检原
    `career_history_status=complete` 且权威性未知的旧记录已降为 `needs_review`，原
@@ -2262,7 +2262,7 @@ closed。初始化完成后仍保持 scheduler false、runner disabled，直到�
 
 生产部署阶段已完成：`main@ccfee75fdff6fab7238b19484ba0489c2848dd50`、AMD64 image `sha256:e86c2339a6e690e801df2426a5edb408cbedf4c7eddd8cfd08011ed659ef773d`、tree `0c8fb1d65eea121a51366584a84749c7d2e3d88f`、source SHA-256 `635fa8a01b5c4685c66650355938af4930d8bebc90a9ece144fd76a2f1fa0d19`。写前备份 `pre-main-ccfee75f-20260715_122039.dump` 为 `141448192` bytes、SHA-256 `898c9a4ab3a06847023d189aed830553cbe733bf4c8e92a4ed636dd8231fa55f`，`pg_restore -l` 通过；回滚 tag 为 `umanewsbot:rollback-pre-ccfee75f-20260715_122039`。runner provisioning、crawl 最小权限、apply 无公网出口、两步暂停/恢复及最终空容器/空锁门禁通过，web/worker/beat 镜像一致，公开及常驻历史开关仍关闭。以下第 2-7 项继续作为 batch006 运行门禁。
 
-1. 已完成 `formalize-historical-batch-crawl-pipeline` 的完整 stable、真实 PostgreSQL READ ONLY、OpenSpec strict/all、迁移漂移、shell/diff、零问题 review、双构建和生产强化 smoke；后续若代码变化，必须重新执行同一门禁并生成新镜像身份。
+1. 已完成 `formalize-historical-batch-crawl-pipeline` 的完整 stable、真实 PostgreSQL READ ONLY、旧规格流程 strict/all、迁移漂移、shell/diff、零问题 review、双构建和生产强化 smoke；后续若代码变化，必须重新执行同一门禁并生成新镜像身份。
 2. batch006 只接受现有冻结身份：1061 targets，法国/香港/日本/英国/美国 `250/61/250/250/250`；manifest `62aca6ced7dcd9c7aecac510cfb65c1468ef54564d61df609cb60226d1b096e3`、selection `b9a3ad6556cfd03e9a57874bec763f75ad4c45e7642751140cb063f1d0553637`、approval `a119e3bcfd3bc8940cf8b792e246e462b405c292b77f2996739b435c9185d835`。任一字节漂移停止，不重新生成审批掩盖漂移。
 3. 使用 `build_historical_batch_crawl_plan --descriptor <tracked-artifact>/descriptor.json --shard-id <region-NN> --output-dir <new-empty-dir>` 为每个 shard 原子生成 `scope.json`、`runner-plan.json`、stage manifest 和 summary。每个 shard 只能包含一个地区、最多 250 targets/请求；runner plan 必须使用镜像内 `/app/runtime/tools`，不得指向 `tmp/`、artifact 子目录或宿主脚本。
 4. 每个 crawl shard 使用独立 artifact 根、请求账本、source-cache manifest、runner state 和 checkpoint。启动前执行资源 preflight，生产可用磁盘至少 5 GiB；网络阶段 `network=true/write=false`，写入阶段 `network=false/write=true`。暂停、失败或恢复时不得删除或缩小账本/cache 以重获额度。
@@ -2282,7 +2282,7 @@ closed。初始化完成后仍保持 scheduler false、runner disabled，直到�
 ## 待执行：多地区归属 V3 第二候选生产只读验收
 
 1. 第一候选的 72 小时 `all_articles` run 虽然 `scope_complete=true` 且 Gold `qualified=true`，但人工检查 27 条主地区变化和 5 条 `needs_review` 后发现 7 类明确错标，结论为 no-go。不得复用该 run 批准 Shadow。
-2. 第二候选必须包含对应真实反例测试，并通过专项、完整 stable、真实 PostgreSQL 250 篇性能、Django check、迁移漂移和 OpenSpec strict/all。构建必须固定 main revision/tree/source SHA，AMD64 至少两次构建得到同一 image ID。
+2. 第二候选必须包含对应真实反例测试，并通过专项、完整 stable、真实 PostgreSQL 250 篇性能、Django check、迁移漂移和 旧规格流程 strict/all。构建必须固定 main revision/tree/source SHA，AMD64 至少两次构建得到同一 image ID。
 3. 生产保持 mode `off`、相关地区查询 false。使用第二候选连接生产库执行只读 `--scope all_articles --hours 72`，写入全新 artifact 目录；不得覆盖第一轮报告，不得开启门禁验证，不得 commit 归属。
 4. 重新评估同一份保守对账后的 Gold，并人工检查新 run 的全部主地区变化、全部 `needs_review` 和分地区稳定样本。明确复核普通单词实体、赛果标题、正文首段赛场、日本当前成就/海外梦想、机构全名嵌套赛事词和正文历史背景六类边界。
 5. 只有第二轮 Gold 仍满足主地区/precision/recall/扩散门槛，且人工清单无明确错标，才可部署代码并从 `off` 切到 `shadow`。Shadow 计时从生产配置实际启用且健康验收通过时开始，修复前 run 不计入 24 小时。
@@ -2515,7 +2515,7 @@ closed。初始化完成后仍保持 scheduler false、runner disabled，直到�
 
 ## 2026-07-14 已耗尽地区进度门禁交付要求
 
-- 交付前必须确认代码包含 `eligible_pending_by_region` 与 `progress_guard_regions`，并通过历史批次专项、完整 `stable`、Django check、迁移漂移和 OpenSpec strict。该修复无迁移、无新环境变量，不改变常驻历史开关。
+- 交付前必须确认代码包含 `eligible_pending_by_region` 与 `progress_guard_regions`，并通过历史批次专项、完整 `stable`、Django check、迁移漂移和 旧规格流程 strict。该修复无迁移、无新环境变量，不改变常驻历史开关。
 - 生成下一标准批次时仍必须传入所有既有 gap 的 `--exclude-selection-snapshot`。审核 summary 时同时核对：`remaining_pending_by_region` 仍包含待审排除项，`eligible_pending_by_region` 已扣除排除项，`progress_guard_regions` 只列本批后仍有可抓目标的地区。
 - 若两个或以上 `progress_guard_regions` 的 prospective accounted 差超过 100，命令必须失败；恰为 100 可继续。某地区抓空或仅剩显式排除项时可退出比较，但不得据此修改其 expectation/resolution 或从总账删除。
 - 代码已合入 `main@614f810e`，尚未部署。必须从最新 main 的干净 tree 构建可复现 AMD64 镜像，由生产协调线程完成镜像切换和健康验收后，才可用于后续批次 artifact；不得从本地分支直接执行生产写入。
@@ -2525,7 +2525,7 @@ closed。初始化完成后仍保持 scheduler false、runner disabled，直到�
 - 旧 batch003 与 batch002 重叠 4 个 pending gap，必须删除或隔离，禁止审批、抓取或写入。新批次只允许由包含本门禁的已提交 AMD64 镜像生成。
 - 生成时追加 `--exclude-selection-snapshot /workspace/runtime/historical_race_batches/2016-2025-batch-002-20260713/selection_snapshot.json`；如还有其他仍含 pending gap 的旧批次，可重复传入该参数。不得手工摘取或改写 snapshot。
 - 命令成功后必须核对：五地区各 50、与所有排除 snapshot 的 target ID 交集为 0、manifest 中存在 `excluded_selection_snapshot_NNN` 文件身份、复制件逐字节一致、summary 的 `excluded_pending_by_region` 与已知 gap 相符，且 `remaining_pending_by_region` 未扣除排除 gap。
-- 当前实现仅在本地通过 42 项聚焦测试、完整 `stable 1157` 项、Django check、迁移漂移和 OpenSpec strict/all；尚未部署。部署前先提交并同步 main，再交付可复现 AMD64 镜像；本门禁不要求重启常驻 web/worker/beat，可由协调线程批准后仅用于一次性只读批次生成。
+- 当前实现仅在本地通过 42 项聚焦测试、完整 `stable 1157` 项、Django check、迁移漂移和 旧规格流程 strict/all；尚未部署。部署前先提交并同步 main，再交付可复现 AMD64 镜像；本门禁不要求重启常驻 web/worker/beat，可由协调线程批准后仅用于一次性只读批次生成。
 - 全程保持生产常驻 `HISTORICAL_RACE_BACKFILL_ENABLED=false`、`HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK=false` 和历史公开关闭；本步骤不得执行生产数据库写入。
 
 ## 2026-07-13 2016–2025 第二标准批次 246 场日期与详情导入
@@ -2624,7 +2624,7 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web \
 - 部署后：`0027` 已应用，`manage.py check` 通过；内外 `/healthz/` 返回 `200`，`/horses/` 返回 `200`，身份冲突 Django Admin 未登录跳转正常；容器健康，`web/worker/beat` 日志无 traceback。
 - 数据抽检：`HorseRaceRecord=21`、非空幂等键 `21`、空键 `0`；新 P0 来源、身份冲突、补全 run 均为 `0`。
 - P0 dry-run：`term_candidates=21596`、`major_race_candidates=992`；其中重点赛事含 runner `5096`、result `4572`。本次未执行 `p0_horse_profiles --sync-sources --commit`，避免绕过“五地区各 10 匹先人工跑通”直接全量写入数千匹马。
-- 本地上线验证：最新主干定向 `104` 项通过，完整 `stable` `813` 项全部通过；Django check、迁移一致性、OpenSpec strict/all、`git diff --check` 通过。
+- 本地上线验证：最新主干定向 `104` 项通过，完整 `stable` `813` 项全部通过；Django check、迁移一致性、旧规格流程 strict/all、`git diff --check` 通过。
 
 回滚代码可使用部署前提交 `31cc82c`；若需要恢复迁移前数据库，使用上述 `pre-p0-horse-profile` 备份。`0027` 新表和字段在代码回滚后可暂时保留不用，只有确认需要彻底恢复时才执行数据库恢复。
 ## 2026-07-13 美国Equibase六场补源与第一批45场完成
@@ -2663,7 +2663,7 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web \
 - 本地上线前验证：
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true ... manage.py test stable.tests.AutomationFlowTests...`：11 项目标测试通过。
   - `DB_ENGINE=sqlite ... manage.py check`：通过。
-  - `openspec validate classify-english-term-gate-context --strict`：通过。
+  - `旧规格流程 validate classify-english-term-gate-context --strict`：通过。
   - `git diff --check`：通过。
 - 生产上线后第一步必须只读 dry-run，人工确认前不得执行 `--commit`。若在 `2026-07-10` 执行，`--hours 240` 足以覆盖北京时间 `2026-07-01 00:00` 以来数据；若推迟执行，需要增大 `--hours` 覆盖完整窗口。
 
@@ -2951,7 +2951,7 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py s
 - 公开入口异常：先将受影响 `HorseProfile.review_status` 批量改回 `hidden` 或 `draft`，再修代码。
 ## 2026-07-10 RaceEvent 赛事信息编排工具运行边界
 
-本工具对应 OpenSpec change `orchestrate-race-event-data-crawls`，第一版只服务 `RaceEvent*` 产品层赛事详情回填，不写 `ExternalRace*` / `ExternalHorse*`，不创建新闻文章，不触发翻译、自动发布或 QQ 推送。长期历史抓取必须手动分批或一次性容器执行，不加入 Celery Beat。
+本工具对应 旧规格流程 change `orchestrate-race-event-data-crawls`，第一版只服务 `RaceEvent*` 产品层赛事详情回填，不写 `ExternalRace*` / `ExternalHorse*`，不创建新闻文章，不触发翻译、自动发布或 QQ 推送。长期历史抓取必须手动分批或一次性容器执行，不加入 Celery Beat。
 
 本地/生产通用阶段：
 
@@ -3254,7 +3254,7 @@ python manage.py backfill_article_terms \
 
 ## 2026-07-07 法国新闻源扩展与英文术语门禁修复待上线
 
-- 本次待上线 OpenSpec changes：
+- 本次待上线 旧规格流程 changes：
   - `expand-france-news-sources`
   - `fix-english-term-gate-region-filter`
 - 代码范围：
@@ -3268,9 +3268,9 @@ python manage.py backfill_article_terms \
   - `DB_ENGINE=sqlite .venv/bin/python server/manage.py test stable.tests.FranceNewsSourceExpansionTests ...`
   - `DB_ENGINE=sqlite .venv/bin/python server/manage.py test stable.tests.TermRegionFilterTests ...`
   - `DB_ENGINE=sqlite .venv/bin/python server/manage.py check`
-  - `openspec validate expand-france-news-sources --strict`
-  - `openspec validate fix-english-term-gate-region-filter --strict`
-  - `openspec validate --all`
+  - `旧规格流程 validate expand-france-news-sources --strict`
+  - `旧规格流程 validate fix-english-term-gate-region-filter --strict`
+  - `旧规格流程 validate --all`
   - `git diff --check`
 - 生产部署前检查：
   - `git rev-parse --short HEAD`
@@ -3700,7 +3700,7 @@ python manage.py backfill_article_terms \
 - 上线前本地验证：
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py test stable.tests.TermbaseSeedDataPreparationTests --noinput`：通过，21 项。
   - `DB_ENGINE=sqlite .venv/bin/python server/manage.py check`：通过。
-  - `openspec validate --all`：通过，17 项。
+  - `旧规格流程 validate --all`：通过，17 项。
   - `git diff --check`：通过。
 - 上线前生产检查：
   - `ExternalDataImportRun(status="started")=0`。
@@ -3733,7 +3733,7 @@ python manage.py backfill_article_terms \
 - 生产服务器：`/opt/umanewsbot` 从 `3aa22fb` 快进到 `f3c4c46`。
 - 上线前本地验证：
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true .venv/bin/python server/manage.py test stable --noinput`：通过，442 项。
-  - `openspec validate --all`：通过，17 项。
+  - `旧规格流程 validate --all`：通过，17 项。
   - `git diff --check`：通过。
 - 上线前生产检查：
   - `ExternalDataImportRun(status="started")=0`。
@@ -4009,7 +4009,7 @@ python manage.py research_live_race_fields --url https://example.com/race-page
 - `codex/fix-crawl-freshness-and-health`：抓取新鲜度、JRA 日期解析、来源健康摘要和 netkeiba `00/16/26` 分错峰调度。
 - `codex/add-selection-term-quick-add`：后台候选详情页 / 文章编辑台原文选区快速加入术语库。
 - `codex/add-selection-term-quick-add` 后续提交：新增术语成功后的 15 秒一次性浮层，可点击后仅将该术语应用到当前文章已有中文字段。
-- 注意：`fix-crawl-health-running-and-schedule-stagger` 是抓取 change 的后续返修 OpenSpec 目录，随抓取 change 一并归档。
+- 注意：`fix-crawl-health-running-and-schedule-stagger` 是抓取 change 的后续返修 旧规格流程 目录，随抓取 change 一并归档。
 
 ### 部署前检查
 
@@ -4035,14 +4035,14 @@ python manage.py research_live_race_fields --url https://example.com/race-page
 
 ### 归档结果
 
-- `openspec/changes/archive/2026-06-24-fix-crawl-freshness-and-jra-date-parse/`
-- `openspec/changes/archive/2026-06-24-fix-crawl-health-running-and-schedule-stagger/`
-- `openspec/changes/archive/2026-06-24-add-selection-term-quick-add/`
-- `openspec/changes/archive/2026-06-24-reapply-terms-after-quick-add/`
+- `旧规格流程/changes/archive/2026-06-24-fix-crawl-freshness-and-jra-date-parse/`
+- `旧规格流程/changes/archive/2026-06-24-fix-crawl-health-running-and-schedule-stagger/`
+- `旧规格流程/changes/archive/2026-06-24-add-selection-term-quick-add/`
+- `旧规格流程/changes/archive/2026-06-24-reapply-terms-after-quick-add/`
 - 正式规格已同步：
-  - `openspec/specs/crawl-freshness-and-source-health/spec.md`
-  - `openspec/specs/termbase-and-race-priority/spec.md`
-- 归档后 `openspec validate --all` 通过。
+  - `旧规格流程/specs/crawl-freshness-and-source-health/spec.md`
+  - `旧规格流程/specs/termbase-and-race-priority/spec.md`
+- 归档后 `旧规格流程 validate --all` 通过。
 
 ### 后续观察
 
@@ -4058,8 +4058,8 @@ python manage.py research_live_race_fields --url https://example.com/race-page
   - `DB_ENGINE=sqlite ... server/manage.py check`
   - `DB_ENGINE=sqlite ... server/manage.py makemigrations --check --dry-run`
   - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true ... server/manage.py test stable --noinput`：241 项通过
-  - `openspec validate expand-international-racing-coverage --strict`
-  - `openspec validate --all`
+  - `旧规格流程 validate expand-international-racing-coverage --strict`
+  - `旧规格流程 validate --all`
   - `git diff --check`
 - 生产部署前发现 `/opt/umanewsbot/imports/run_horse_import_202504_to_202406_20260626_083946.sh` 正在连续执行 netkeiba 外部马名导入。已等待当前批次完成并确认 `ExternalDataImportLock.locked_by_run_id=None` 后再部署；外层导入脚本已停止，避免继续自动开下一批。
 
@@ -5335,12 +5335,12 @@ bash ./deploy_lowcost.sh
 
 ### 归档结果
 
-- `add-qqbot-auto-push` 已归档为 `openspec/changes/archive/2026-06-25-add-qqbot-auto-push/`，并创建正式规格 `openspec/specs/qqbot-auto-push/spec.md`。
-- `elevate-ranked-netkeiba-sources` 已归档为 `openspec/changes/archive/2026-06-25-elevate-ranked-netkeiba-sources/`，并同步到 `openspec/specs/crawl-freshness-and-source-health/spec.md`。
-- `use-article-id-public-urls` 已归档为 `openspec/changes/archive/2026-06-25-use-article-id-public-urls/`，并同步到 `openspec/specs/public-home-info-feed/spec.md`。
-- `push-ranked-news-to-qq` 已归档为 `openspec/changes/archive/2026-06-25-push-ranked-news-to-qq/`，并同步到 `openspec/specs/qqbot-auto-push/spec.md`。
-- 前期废弃的空目录 `openspec/changes/refine-ranked-news-push/` 已清理，避免 OpenSpec active 列表出现无任务占位 change。
-- 归档后 `openspec validate --all` 通过。
+- `add-qqbot-auto-push` 已归档为 `旧规格流程/changes/archive/2026-06-25-add-qqbot-auto-push/`，并创建正式规格 `旧规格流程/specs/qqbot-auto-push/spec.md`。
+- `elevate-ranked-netkeiba-sources` 已归档为 `旧规格流程/changes/archive/2026-06-25-elevate-ranked-netkeiba-sources/`，并同步到 `旧规格流程/specs/crawl-freshness-and-source-health/spec.md`。
+- `use-article-id-public-urls` 已归档为 `旧规格流程/changes/archive/2026-06-25-use-article-id-public-urls/`，并同步到 `旧规格流程/specs/public-home-info-feed/spec.md`。
+- `push-ranked-news-to-qq` 已归档为 `旧规格流程/changes/archive/2026-06-25-push-ranked-news-to-qq/`，并同步到 `旧规格流程/specs/qqbot-auto-push/spec.md`。
+- 前期废弃的空目录 `旧规格流程/changes/refine-ranked-news-push/` 已清理，避免 旧规格流程 active 列表出现无任务占位 change。
+- 归档后 `旧规格流程 validate --all` 通过。
 
 ### 自动推送上线步骤
 
@@ -5541,8 +5541,8 @@ docker compose -f docker-compose.prod.lowcost.yml exec -T web python manage.py i
 
 - 归档提交：`db0f3cc`
 - 服务器 `/opt/umanewsbot` 已从 `b0361cf` 快进到 `db0f3cc`。
-- `db0f3cc` 仅移动 OpenSpec change 到 archive 并同步正式 spec，不包含服务代码变更；因此未重新 build 或重启容器。
-- 服务器未安装 `openspec` CLI，归档后的 `openspec validate --all` 在本地 worktree 执行并通过。
+- `db0f3cc` 仅移动 旧规格流程 change 到 archive 并同步正式 spec，不包含服务代码变更；因此未重新 build 或重启容器。
+- 服务器未安装 `旧规格流程` CLI，归档后的 `旧规格流程 validate --all` 在本地 worktree 执行并通过。
 - 归档同步后 `http://umafans.run/healthz/` 和 `http://umafans.run/` 仍返回 `200`。
 
 ## 2026-06-26 HKJC 生产样本 commit
@@ -5641,14 +5641,14 @@ curl -sS -o /dev/null -w "public_healthz=%{http_code}\n" http://umafans.run/heal
 - UK / France / US importer 与管理命令
 - `audit_global_racing_import_outputs` 离线审计命令
 - `render_global_racing_batch_command` 只读批次命令渲染器
-- 四地真实来源 fixtures、OpenSpec `real-global-racing-data-ingestion` 规格/归档
+- 四地真实来源 fixtures、旧规格流程 `real-global-racing-data-ingestion` 规格/归档
 - `docs/global_racing_*` 交接、runbook、审计和 proof 记录
 
 上线后验收重点：
 
 - `manage.py check` 通过
 - 全球赛马目标测试通过
-- `openspec validate --all` 通过
+- `旧规格流程 validate --all` 通过
 - `/healthz/` 返回 `200`
 - `import_uk_external_data --help`、`import_france_external_data --help`、`import_us_external_data --help`、`audit_global_racing_import_outputs --help` 可用
 - 生产不新增 `ExternalDataImportRun(status="started")`，不持有 `ExternalDataImportLock`
@@ -5938,14 +5938,14 @@ QQ_PUSH_ENABLED=false
 
 ### 归档结果
 
-- OpenSpec change：`operate-multiregion-news-production`。
-- 归档目录：`openspec/changes/archive/2026-06-30-operate-multiregion-news-production/`。
+- 旧规格流程 change：`operate-multiregion-news-production`。
+- 归档目录：`旧规格流程/changes/archive/2026-06-30-operate-multiregion-news-production/`。
 - 正式规格已同步：
-  - `openspec/specs/multiregion-news-production/spec.md`
-  - `openspec/specs/crawl-freshness-and-source-health/spec.md`
-  - `openspec/specs/automation-publish-gates/spec.md`
-  - `openspec/specs/qqbot-auto-push/spec.md`
-  - `openspec/specs/termbase-and-race-priority/spec.md`
+  - `旧规格流程/specs/multiregion-news-production/spec.md`
+  - `旧规格流程/specs/crawl-freshness-and-source-health/spec.md`
+  - `旧规格流程/specs/automation-publish-gates/spec.md`
+  - `旧规格流程/specs/qqbot-auto-push/spec.md`
+  - `旧规格流程/specs/termbase-and-race-priority/spec.md`
 
 ### 后续注意
 
@@ -6027,19 +6027,19 @@ QQ_PUSH_ENABLED=false
 
 修改 `.env` 后重启 `web / worker / beat`，再执行 `audit_multiregion_news_production` 和日志检查。
 
-## 2026-07-01 全部 OpenSpec 归档与生产部署
+## 2026-07-01 全部 旧规格流程 归档与生产部署
 
 ### 范围
 
 - 归档 `add-netkeiba-horse-data-import`、`expand-international-racing-coverage`、`guard-qqbot-offline-send`。
-- 同步正式规格到 `openspec/specs/external-horse-data-import/`、`openspec/specs/international-racing-coverage/` 及相关能力规格。
+- 同步正式规格到 `旧规格流程/specs/external-horse-data-import/`、`旧规格流程/specs/international-racing-coverage/` 及相关能力规格。
 - 补齐 `ExternalDataSource` choices：`sporting_life`、`france_galop`、`geny_france`、`horse_racing_nation`。
 - 新增并应用迁移 `stable.0016_alter_externaldataimporterror_source_and_more`。
 
 ### 本地验证
 
-- `openspec list --json`：`changes=[]`。
-- `openspec validate --all`：12 项通过。
+- `旧规格流程 list --json`：`changes=[]`。
+- `旧规格流程 validate --all`：12 项通过。
 - `DB_ENGINE=sqlite python server/manage.py check`：通过。
 - `DB_ENGINE=sqlite python server/manage.py makemigrations --check --dry-run`：`No changes detected`。
 - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python server/manage.py test stable --noinput`：362 项通过。
@@ -6108,7 +6108,7 @@ enabled 来源最近状态显示五地区均有来源记录，多数为 `success
 
 ## 2026-07-01 多地区新闻增量窗口部署注意事项
 
-本节对应 OpenSpec change `increase-multiregion-news-volume`。该变更包含新迁移和新 Celery Beat 项，部署后默认关闭。
+本节对应 旧规格流程 change `increase-multiregion-news-volume`。该变更包含新迁移和新 Celery Beat 项，部署后默认关闭。
 
 ### 部署前
 
@@ -6120,8 +6120,8 @@ enabled 来源最近状态显示五地区均有来源记录，多数为 `success
 DB_ENGINE=sqlite python server/manage.py check
 DB_ENGINE=sqlite python server/manage.py makemigrations --check --dry-run
 DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python server/manage.py test stable.tests.ProductionWindowModelTests stable.tests.ProductionWindowServiceTests stable.tests.PublishWindowServiceTests stable.tests.QQWindowServiceTests --noinput
-openspec validate increase-multiregion-news-volume --strict
-openspec validate --all
+旧规格流程 validate increase-multiregion-news-volume --strict
+旧规格流程 validate --all
 git diff --check
 ```
 
@@ -6180,7 +6180,7 @@ QQ_PUSH_ENABLED=false
 
 ## 2026-07-02 多地区新闻增量窗口生产上线记录
 
-本节对应 OpenSpec change `increase-multiregion-news-volume`。
+本节对应 旧规格流程 change `increase-multiregion-news-volume`。
 
 ### 部署前检查
 
@@ -6350,7 +6350,7 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
    - `DB_ENGINE=sqlite .venv/bin/python server/manage.py check`
    - `.venv/bin/python server/manage.py makemigrations --check --dry-run`
    - `.venv/bin/python server/manage.py test stable.tests.MultiRegionAttributionAndGateTests stable.tests.IngestionSourceElevationTests stable.tests.InternationalSourceMetadataTests stable.tests.MultiRegionNewsProductionTests stable.tests.TermRegionFilterTests stable.tests.QQAutoPushTests stable.tests.QQWindowServiceTests stable.tests.PublishWindowServiceTests --keepdb`
-   - `openspec validate support-multiregion-news-attribution-and-english-gates --strict`
+   - `旧规格流程 validate support-multiregion-news-attribution-and-english-gates --strict`
 4. 如本地没有 `.env`，`docker compose ... config` 可临时复制 `.env.example` 为 `.env`，校验后立即删除。
 
 上线后：
@@ -6556,7 +6556,7 @@ MULTIREGION_OPS_NOTIFICATION_QQ_GROUP_ID=1026525240
 
 - 部署提交：`d071952`。
 - 产品行为：赛事详情、历史冠军和赛事日历赛果中的马名/骑师名精确命中 active 正式术语主原文或别名时展示中文译名；未命中保留原文。出马表按马号自然升序，缺号回退闸位，赛果仍按完赛名次。
-- 本地验证：赛事页目标测试 `23` 项、完整 `stable` 回归 `612` 项、Django check、迁移漂移、OpenSpec 严格校验和 `git diff --check` 全部通过。
+- 本地验证：赛事页目标测试 `23` 项、完整 `stable` 回归 `612` 项、Django check、迁移漂移、旧规格流程 严格校验和 `git diff --check` 全部通过。
 - 部署前生产 HEAD：`8fbc6c6`；外部导入、外部锁和抓取中任务均为 `0`，内外 healthz 正常。
 - `.env` 备份：`.env.backup.race-display-20260712_002533`。
 - 数据库备份：`backups/db/pre-race-display-20260712_002533.sql.gz`，约 `105M`，已通过 `gzip -t`；SHA-256 为 `99994e84d3154dd9d4c1503b96688cd24bf7e00d9ad13aca02a965a69d64a8c0`。

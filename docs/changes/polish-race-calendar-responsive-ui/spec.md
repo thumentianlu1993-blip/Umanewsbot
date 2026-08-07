@@ -11,7 +11,6 @@
   `VERDICT: APPROVED`
 - 实现状态：测试先行、应用实现、1440px/390px 视觉验收已完成
 - 独立代码 review：首轮 `REVISE`，3 项 P2（DOM 断言、.venv symlink、基线过期）已窄修复
-- 发布授权：未取得
 
 当前仍禁止 commit、push、创建 PR、merge、部署或生产写入。只有独立代码 review 的
 actionable finding 清零、fingerprint 前后稳定，并取得用户针对该精确版本的明确上线授权后，

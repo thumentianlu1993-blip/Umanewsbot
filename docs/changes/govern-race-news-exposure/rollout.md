@@ -47,6 +47,5 @@
 - 最新 `origin/main`、迁移图、Django check、目标测试与完整受影响回归。
 - shadow 报告及英皇锦标逐篇决策。
 - reviewer 成功结论与冻结 fingerprint。
-- 最新 review 之后用户对当前精确版本的发布授权。
 - 实现完成后更新 `docs/current_state.md`、`docs/decisions.md`、`docs/project_status.md`；涉及开关、
   worker、迁移、灰度和回滚的实际命令与证据同步更新 `docs/deploy_runbook.md`。

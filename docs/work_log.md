@@ -2,30 +2,30 @@
 
 ## 2026-06-06
 
-### 项目：OpenSpec + Codex 仓库协作支持
+### 项目：旧规格流程 + Codex 仓库协作支持
 
 #### 已完成
 
-- 安装并验证 OpenSpec CLI `1.4.1`
-- 使用 Codex 工具配置初始化 OpenSpec，生成 5 个 `openspec-*` skills
-- 基于真实 Django/Celery/Docker Compose 架构编写 `openspec/config.yaml`
-- 为 OpenSpec tasks 增加 `application / integration / operations` 域路由
+- 安装并验证 旧规格流程 CLI `1.4.1`
+- 使用 Codex 工具配置初始化 旧规格流程，生成 5 个 `旧规格流程-*` skills
+- 基于真实 Django/Celery/Docker Compose 架构编写 `旧规格流程/config.yaml`
+- 为 旧规格流程 tasks 增加 `application / integration / operations` 域路由
 - 创建三个领域代理与只读 `security-scanner`
-- 在 `AGENTS.md` 中增量加入 OpenSpec / Codex 使用约定
+- 在 `AGENTS.md` 中增量加入 旧规格流程 / Codex 使用约定
 
 #### 验证
 
-- `openspec --version`：通过，版本 `1.4.1`
-- `openspec list --json`：通过，当前无活动 change
-- `openspec schema validate spec-driven`：通过
-- 临时 change 的 `openspec instructions tasks --json` 已确认真实项目上下文与 5 条任务域规则会被注入
+- `旧规格流程 --version`：通过，版本 `1.4.1`
+- `旧规格流程 list --json`：通过，当前无活动 change
+- `旧规格流程 schema validate spec-driven`：通过
+- 临时 change 的 `旧规格流程 instructions tasks --json` 已确认真实项目上下文与 5 条任务域规则会被注入
 - 已确认生成 skills 未被手工修改，项目上下文无外部项目模板残留
 
 ### 项目：自动化术语候选发现规划
 
 #### 已完成
 
-- 创建 OpenSpec change：`add-term-candidate-discovery`
+- 创建 旧规格流程 change：`add-term-candidate-discovery`
 - 完成 proposal、`term-candidate-discovery` capability spec、技术设计和 22 项领域路由任务
 - 明确首版仅覆盖马名、比赛名、骑手名和马主名
 - 明确候选与文章证据分层存储、规则优先识别、管理员确认后才能进入 `TermEntry`
@@ -33,15 +33,15 @@
 
 #### 验证
 
-- `openspec validate add-term-candidate-discovery`：通过
-- OpenSpec 状态：全部 planning artifacts 完成，已达到 apply-ready
+- `旧规格流程 validate add-term-candidate-discovery`：通过
+- 旧规格流程 状态：全部 planning artifacts 完成，已达到 apply-ready
 - 当前尚未开始应用代码实现
 
 ### 项目：仓库协作文档中文化
 
 #### 已完成
 
-- 将 OpenSpec 项目上下文和任务规则说明改为中文
+- 将 旧规格流程 项目上下文和任务规则说明改为中文
 - 将 Codex 自定义代理描述与指令改为中文
 - 将 `add-term-candidate-discovery` 的 proposal、spec、design 和 tasks 说明性内容改为中文
 - 在 `AGENTS.md` 与 `docs/decisions.md` 记录长期语言约定
@@ -50,7 +50,7 @@
 
 - Codex 新增或维护的协作文档默认使用中文
 - 命令、代码标识符和第三方工具要求的机器语法可以保留英文
-- 上游自动生成且约定不手工修改的 OpenSpec skills 保持原样
+- 上游自动生成且约定不手工修改的 旧规格流程 skills 保持原样
 
 ## 2026-05-17
 
@@ -160,7 +160,7 @@
 
 - `DB_ENGINE=sqlite python manage.py check`：通过。
 - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true python manage.py test stable`：通过，69 项。
-- `openspec validate add-term-candidate-discovery`：通过。
+- `旧规格流程 validate add-term-candidate-discovery`：通过。
 - 两种生产 Compose 配置基于 `.env.example` 检查通过。
 - 使用 `/tmp/umanews-term-acceptance.sqlite3` 部署隔离测试环境，并通过浏览器完成完整后台审核流程。
 - 浏览器验收中修复状态成功提示重复“已”和正式术语别名搜索不兼容 SQLite 的问题。
@@ -169,7 +169,7 @@
 
 - 功能代码已完成，生产默认关闭。
 - 下一阶段应先做单篇手动发现和候选质量抽检，再通过 `TERM_DISCOVERY_ENABLED=true` 灰度启用。
-- OpenSpec change 已归档为 `2026-06-06-add-term-candidate-discovery`，正式规格已同步到主规格目录。
+- 旧规格流程 change 已归档为 `2026-06-06-add-term-candidate-discovery`，正式规格已同步到主规格目录。
 
 ## 2026-06-07
 
@@ -210,13 +210,13 @@
 - 复核四地管理命令入口：`import_hkjc_external_data`、`import_uk_external_data`、`import_france_external_data`、`import_us_external_data` 均具备 `--allow-network`、低频/限量、精确批次、dry-run 和受控 `--commit` 能力。
 - 生产只读核对 HKJC：服务器 `/opt/umanewsbot` 当前为 `9ff667a`，`runtime/hkjc_import/` 中存在真实 dry-run 批次 JSON；有效批次合计覆盖 `130` 场、`1652` 条 entries/results/horses、`1783` 次请求，抽样为 `dry_run=true`、`would_write_formal_tables=false`、`completion.is_complete=true`。
 - 复核 UK / France / US proof：`runtime/global_racing_import/proof-20260627` 中三地 proof 均有真实 `200` 响应、非写库 dry-run、非空 coverage，并通过 proof-only 审计。
-- Review 当前文件改造必要性：四地 importer、fixtures、审计命令、batch command 渲染器、OpenSpec 规格和 `docs/global_racing_*` 属于本目标必要改造；QQ 推送、前台信息流、历史 archive、OneBot compose 端口等旁支差异不属于本目标必要范围。
+- Review 当前文件改造必要性：四地 importer、fixtures、审计命令、batch command 渲染器、旧规格流程 规格和 `docs/global_racing_*` 属于本目标必要改造；QQ 推送、前台信息流、历史 archive、OneBot compose 端口等旁支差异不属于本目标必要范围。
 
 #### 验证
 
 - `stable.tests.HKJCExternalDataImportTests`、`UKExternalDataImportTests`、`FranceExternalDataImportTests`、`USExternalDataImportTests`、`GlobalRacingImporterCommitGateTests`、`GlobalRacingImportOutputAuditTests`、`GlobalRacingSpikeIsolationTests`：通过。
 - `audit_global_racing_import_outputs --proof-only --fail-on-incomplete` 复跑 `runtime/global_racing_import/proof-20260627`：通过，`proof_ready=true`、`proof_blocking_reasons=[]`、`commit_candidate_ready=false`。
-- `openspec validate --all`：通过。
+- `旧规格流程 validate --all`：通过。
 - `git diff --check`：通过。
 
 #### 生产部署

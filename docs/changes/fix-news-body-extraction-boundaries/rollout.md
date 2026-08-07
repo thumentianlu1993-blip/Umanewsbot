@@ -2,7 +2,6 @@
 
 ## 当前状态
 
-本文件是计划，不是发布授权。测试、实现与本地验证已完成，等待独立代码审核；未执行生产历史扫描或重处理，
 未 commit、push、建 PR 或部署。当前 GREEN 不授权 Gate A–D 的任何生产动作。
 
 ## Gate A：此前从未入库的全新文章采集修复
@@ -17,7 +16,6 @@
 
 ### 发布前
 
-1. 最新成功 code review 后取得当前精确版本的用户发布授权。
 2. 用同一 scope 重算 fingerprint，显式 stage 后验证 index 内容与 approved content hash 一致。
 3. 核对生产 HEAD、web/worker/beat 镜像、HRN source 配置、Celery active/reserved/queue。
 4. 建立 `.env` 与 PostgreSQL 备份并验证可读；本变更无迁移。

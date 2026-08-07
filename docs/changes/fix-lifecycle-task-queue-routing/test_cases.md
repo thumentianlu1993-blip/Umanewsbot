@@ -35,7 +35,6 @@
 - 无新增 lifecycle proposal/transition/applied。
 - 不消费或清理 `default` 队列旧消息。
 
-## T06：R3 重试验收（不属于本轮发布授权）
 
 - beat 停止，手工 scanner 最多处理目标 16 场的 due controls。
 - 启用前用实际 worker `active_queues` 证明无人消费 `default`，否则 fail closed。

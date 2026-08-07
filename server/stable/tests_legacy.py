@@ -7855,7 +7855,7 @@ class GlobalRacingSpikeIsolationTests(TestCase):
         self.assertFalse(report["wrote_formal_tables"])
 
     def test_uk_fr_us_spikes_reject_commit_mode(self):
-        # Mutation: accepting commit=True for spike sources would bypass the OpenSpec read-only boundary.
+        # Mutation: accepting commit=True for spike sources would bypass the read-only proof boundary.
         from stable.services.global_racing_spikes import run_source_spike
 
         for source in ("equibase", "sporting_life_bha", "france_galop"):

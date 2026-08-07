@@ -1,11 +1,12 @@
 # 历史赛历 Release B 任务
 
-## 0. 设计与门禁
+## 0. 设计与范围
 
 - [x] 0.1 (operations) 固化 Release A 生产基线、v1 census SHA、81 条分类与 14 个 series 的只读
   证据；明确本 change 不执行生产 apply
 - [x] 0.2 (application) 完成独立方案审核并关闭所有 actionable findings
-- [x] 0.3 (operations) 方案审核通过后向用户汇报范围、RED、数据边界和回滚，等待明确实现授权
+- [x] 0.3 (operations) 方案审核通过后记录范围、RED、数据边界和回滚；人工确认统一由根
+  `AGENTS.md` 判定
 
 ## 1. 测试先行：migration 与 planner
 
@@ -76,10 +77,11 @@
 - [x] 5.5 (operations) 更新 current_state、project_status、decisions、deploy_runbook 与本 change
   rollout；保持生产与本地证据分层
 
-## 6. 审核与发布门禁
+## 6. 审核与交付
 
 - [ ] 6.1 (application) 由未参与实现的独立 reviewer 在只读模式审核完整 diff，并冻结 fingerprint
-- [ ] 6.2 (operations) 最新 review 成功后另行等待 commit/push/PR/Release B 发布授权
+- [ ] 6.2 (operations) 最新 review 成功后整理 commit/push/PR 与 Release B 交付证据；人工确认
+  统一由根 `AGENTS.md` 判定
 - [ ] 6.3 (operations) Release B 关闭态部署，保存备份、旧 image、commit/image/migration leaf；不
   执行 v2 census 或数据 apply
 - [ ] 6.4 (operations) evidence-only 收尾并复用同一代码 reviewer 会话审核事实文档

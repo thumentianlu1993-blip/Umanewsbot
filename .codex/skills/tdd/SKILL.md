@@ -85,4 +85,5 @@ description: Umanews 的 Django/Celery/Python 测试先行兜底。仅在进入�
 - 测试可捕获的 mutation
 - 本分支修改文件清单
 
-缺少 RED/GREEN 证据时，父任务不得把该实现视为完成。不得把本 skill 与任何 OpenSpec skill 或 OpenSpec CLI 状态耦合。
+缺少 RED/GREEN 证据时，父任务不得把该实现视为完成。本 skill 只服务 Codex 原生执行流程，
+不得引入另一套规格工作流或人工确认门禁；确认边界统一引用根 `AGENTS.md`。

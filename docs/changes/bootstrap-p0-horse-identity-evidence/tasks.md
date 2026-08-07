@@ -47,7 +47,6 @@
 
 ## 5. 生产 PoC 与滚动批次
 
-- [ ] 5.1 (operations) 获得发布授权后部署精确受审版本；确认常驻服务网络开关为 false、容器健康且无竞争导入。
 - [ ] 5.2 (operations) 从最新生产只读快照的第二层候选生成 20 匹 PoC 清单，冻结唯一 Netkeiba ID、不完整底稿、资格赛事、官方赛事 URL/日期/场地/马号/精确马名，验证样本构成和旧 blocker 零交集；不足时报告缺口并停止。
 - [ ] 5.3 (operations) 获得当次触网授权后，在一次性容器中低频执行 PoC；结束立即关网，审核 JRA/NAR/Netkeiba 解析、访问边界、缓存、请求账本和 artifact。
 - [ ] 5.4 (operations) PoC 通过并另获授权后，按稳定优先级执行首个最多 100 匹 prepare；立即关网，按最高等级/provider 交付 xlsx、候选 SHA 和 blocker 分布。

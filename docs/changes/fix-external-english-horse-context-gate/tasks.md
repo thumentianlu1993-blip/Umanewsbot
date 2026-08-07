@@ -1,6 +1,5 @@
 # 任务清单
 
-## 测试（用户确认实现后）
 
 - [ ] (application) 新增 article 9595 等价正文回归，先取得由 13 条 pending horse warning 导致的真实 RED。
 - [ ] (application) 新增 pending `TermEntry` 与 alias-only 的五类强语境、Logician、同文双角色和 payload 完整性 RED。
@@ -28,7 +27,6 @@
 - [ ] (operations) 仅做本地/隔离环境历史 dry-run；保存 article 9595 输入 hash、分类、issues 和状态不变证据，不写生产。
 - [x] (application) 运行 `DB_ENGINE=sqlite python manage.py check` 与 `git diff --check`。
 - [ ] (operations) 由未参与实现的 reviewer subagent 按 `docs/codex_workflow.md` 运行 Codex 原生只读 `/review`/CLI review 和 fingerprint 门禁；actionable findings 清零后停止。
-- [ ] (operations) 最新成功代码 review 后等待用户对精确 fingerprint 的发布授权；授权前不得 commit、push、PR、部署、迁移、重启或生产写入。
 
 ## Reviewer findings 测试先行（2026-07-23）
 
@@ -122,12 +120,10 @@
 - [x] (application) 修复 confirmed horse placeholder 的全字段 longest non-overlap 选择，并让 discovery finding 直接保留 occurrence metadata；未修改 extraction、cleaning rules 或 source adapters。
 - [x] (integration) 未参与实现的测试所有者复跑两项目标、当前去重 325 项完整矩阵、77 项语言回归及 5 项批量/查询边界，全部 GREEN；Django check、相关 py_compile、`git diff --check` 通过。
 - [ ] (operations) 复用同一独立 reviewer 会话对最新 fingerprint 重新执行只读 review；actionable findings 清零前继续冻结发布。
-- [ ] (operations) Review 成功后停止并取得用户针对当前 fingerprint 的明确发布授权；授权前禁止 commit、push、PR、merge、部署、历史重处理及生产写入。
 - [x] (integration) Reviewer P1 测试先行：同文 strong `Brilliant won...` 与 lexical-only `Brilliant Result Announced...` 共享 runner/result surface evidence 时必须 occurrence-level 分类，取得第二处被文章级 evidence 错误升级为 confirmed/preserve 的 RED。
 - [x] (application) 将 structured identity 的独立确认限制为 surface 全文唯一；多 occurrence 时由各自 strong/local 语境确认并仅向 confirmed occurrence 附加 evidence。
 - [x] (integration) 未参与实现的测试所有者复跑 P1 目标、去重 326 项完整矩阵、77 项语言专项及 8 项一致性/query-budget 回归全部 GREEN；Django check、相关 py_compile、`git diff --check` 通过。
 - [ ] (operations) 复用同一 reviewer 会话审核 occurrence-local structured evidence 修复后的最新 fingerprint，取得明确 `APPROVED` 前保持发布冻结。
-- [ ] (operations) Reviewer `APPROVED` 后仍须取得用户对该新 fingerprint 的明确发布授权；授权前继续禁止 commit、push、PR、merge、部署、历史重处理和生产写入。
 - [x] (operations) Reviewer P2 测试先行：锁定 committed published-audit replay 的 explicit reviewer identity 必须匹配 prepared/receipt binding，同 reviewer保持幂等，取得不同 reviewer 未被拒绝的 RED。
 - [x] (integration) Reviewer P2 测试先行：锁定 mixed-language batch telemetry 必须反映每 language bucket 的 ExternalHorseAlias/TermAlias/TermEntry 实际查询，并保持 2/20 篇 query count 恒定，取得 alias 固定上报 1 的 RED。
 - [x] (operations) 修复 committed receipt 的 prepared/receipt/supplied reviewer binding 校验；same reviewer replay 继续 `already_committed`，mismatch fail closed。

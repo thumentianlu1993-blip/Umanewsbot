@@ -99,8 +99,7 @@
   B0.1 `104/104`、race-live `23/23`、历史 HTTP/parser `82/82`（4 skip）、真实
   PostgreSQL `3/3` 通过。上游新增组合的 `14/87` macOS 路径错误在纯最新 main 精确复现。
 - 该 latest-main 集成版本尚未复审、commit、push 或创建 PR；必须重新冻结 fingerprint，
-  复用同一 reviewer 审核后再取得当前版本发布授权。
-- 禁止使用 OpenSpec skills、OpenSpec CLI 或新建 OpenSpec change。
+- 禁止使用 旧规格流程 skills、旧规格流程 CLI 或新建 旧规格流程 change。
 - commit、push、PR、部署、联网、生产迁移和生产写入仍分别需要后续明确授权。
 
 ## 1. 当前真实状态
@@ -400,7 +399,6 @@ raw cache、请求账本、budget、manifest 与 COMPLETE 都保存在本次输�
 
 ## 7. 测试先行
 
-实现授权后先由测试 subagent负责以下文件：
 
 - 新建 `server/stable/test_race_reference_sources.py`
 - 新建 `server/stable/test_race_reference_sources_postgres.py`
@@ -419,7 +417,6 @@ raw cache、请求账本、budget、manifest 与 COMPLETE 都保存在本次输�
 
 ## 8. 实现 subagent 文件边界
 
-取得实现授权后，建议串行：
 
 1. 测试 subagent：只拥有新测试和必要 fixture；
 2. application subagent：

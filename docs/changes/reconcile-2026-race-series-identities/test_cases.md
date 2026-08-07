@@ -68,7 +68,6 @@
 ## 生产验收
 
 39. 正式导出先记录生产 HEAD、as-of 和新计数；与探索基线差异或异常清单非空必须人工确认。
-40. 用户定稿后，只读 prepare/verifier 与 manifest/approval SHA 全部通过才申请发布授权。
 41. 写前 custom-format 备份通过 `pg_restore -l`；失败则不 apply。
 42. apply 前后 RaceEvent/runner/result/article/history-winner 总量及逐事件详情哈希守恒。
 43. 每个实际含正向动作的地区至少抽查 2 个已合并系列（不足 2 个则全量），2026 详情页能读取

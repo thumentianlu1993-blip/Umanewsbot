@@ -1,6 +1,5 @@
 # tasks：赛事新闻聚类与首页 / QQ 曝光治理
 
-## 测试（用户确认实现后）
 
 - [x] (application) 新增赛事身份、硬重复、角度和两席状态机测试并取得真实 RED。
 - [x] (application) 新增首页、分页、热门榜与手工头条共同计数测试并取得真实 RED。
@@ -25,4 +24,3 @@
 - [ ] (operations) 在冻结样本运行 shadow，审核英皇锦标及至少两个非目标赛事。
 - [ ] (operations) 执行 Django check、migration plan/drift、桌面与移动浏览器验收。
 - [ ] (operations) 由未参与实现的 reviewer 会话执行原生只读 code review。
-- [ ] (operations) review 通过后停止，等待当前版本的发布授权。

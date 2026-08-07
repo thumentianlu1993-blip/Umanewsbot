@@ -85,7 +85,7 @@ def _verified_namespaces(profile: HorseProfile) -> set[str]:
 
 
 def evaluate_basic_publish_gate(profile: HorseProfile) -> PublishGateResult:
-    """BASIC-tier publish gate (see openspec publish-p0-horses-basic-tier)."""
+    """Evaluate the BASIC-tier horse-profile publication contract."""
     reasons: list[str] = []
     if not str(profile.display_name or "").strip():
         reasons.append("gate.name")

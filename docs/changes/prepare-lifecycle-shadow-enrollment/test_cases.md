@@ -1,6 +1,6 @@
 # Lifecycle shadow 纳管准备测试用例
 
-取得“确认实现”后先写测试并取得真实 RED。RED 必须来自新 prepare/v2 parity/CAS 能力不存在，
+取得“G1 范围确认”后先写测试并取得真实 RED。RED 必须来自新 prepare/v2 parity/CAS 能力不存在，
 不能来自 fixture、环境、迁移或语法错误。
 
 ## A. Manifest 与 prepare

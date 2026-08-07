@@ -4,7 +4,6 @@
 
 ## 发布门禁与合并
 
-- 发布授权：用户针对最新成功 review 的冻结 fingerprint 明确授权“可以上线了”。
 - 授权后 staging 校验：重算 `review_fingerprint.py`，`content_manifest_sha256`
   `632eb5258cd9a5daf9aaa1fc2470951a020bd12bf719627f7ef845b7b6b66e57` 与 approved content
   hash 逐字节一致，`head` 为 approved parent `7385f59ab87bcce5193f3313ecca6809b165ad89`；

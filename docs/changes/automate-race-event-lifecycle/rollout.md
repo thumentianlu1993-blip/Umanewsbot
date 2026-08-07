@@ -43,7 +43,6 @@
 ### 3.1 部署但关闭
 
 1. 核对 review fingerprint、approved parent/content hash。
-2. 在最新成功 review 后取得当前版本发布授权。
 3. 等新闻正文批次进入安全检查点。
 4. 备份数据库并验证可恢复；记录旧 HEAD/image/env filtered hash。
 5. 核对生产 HEAD、四应用 image、Celery active/reserved/scheduled、race_live queue、

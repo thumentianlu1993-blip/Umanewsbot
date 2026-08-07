@@ -8,9 +8,9 @@
 - 当前阶段：探索、spec/design、用户 grilling 与独立方案审核。
 - 当前授权不包含测试/应用代码、migration、Celery 配置、联网 proof、生产写入、开关修改、
   commit、push、PR、部署、迁移或服务重启。
-- 方案审核通过后必须停在用户“确认实现”门禁；实现必须先取得真实 RED，再交给实现 subagent。
+- 方案审核通过后必须停在用户“G1 范围确认”门禁；实现必须先取得真实 RED，再交给实现 subagent。
 
-本 change 是既有赛事生命周期 Phase A 的后续能力，不创建 OpenSpec change，不调用 OpenSpec
+本 change 是既有赛事生命周期 Phase A 的后续能力，不创建 旧规格流程 change，不调用 旧规格流程
 skills/CLI，不替代既有赛事、赛果或调度链路。
 
 ## 2. 当前事实与根因

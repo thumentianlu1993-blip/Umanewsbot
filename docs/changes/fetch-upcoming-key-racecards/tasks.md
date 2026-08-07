@@ -7,9 +7,8 @@
 - [x] (integration) 研究实际地区官方来源、route contract、条款、稳定 ID 与发布时间。
 - [x] (integration) 识别既有 JRA/HKJC/NAR、historical candidate 和 race-live 复用边界。
 - [x] (application) 完成独立方案审核并关闭 P0/P1 finding。
-- [x] (operations) 向用户报告最终方案并停在“确认实现”门禁。
+- [x] (operations) 向用户报告最终方案并停在“G1 范围确认”门禁。
 
-## 测试（取得实现授权后）
 
 - [ ] (application) 为窗口、半开边界、地区时区与 DST 编写真实 RED。
 - [ ] (integration) 为 source contract、官方 event/runner ID 和 fail-closed 编写真实 RED。
@@ -20,7 +19,6 @@
   替换/路径逃逸编写真实 RED。
 - [ ] (operations) 为无网络 fixture 和 transport 零调用编写真实 RED。
 
-## 实现（取得实现授权后）
 
 - [ ] (application) 实现确定性窗口 inventory 与覆盖快照。
 - [ ] (integration) 实现版本化官方来源合同和 transport 前许可门禁。
@@ -37,7 +35,7 @@
 ## 验证与审核
 
 - [ ] (integration) 跑聚焦测试和既有 parser/candidate/racecard/realtime/lifecycle 回归。
-- [ ] (operations) 跑 Django check、migration drift、OpenSpec 兼容检查和 diff check。
+- [ ] (operations) 跑 Django check、migration drift、旧规格流程 兼容检查和 diff check。
 - [ ] (application) 派出未参与实现的 reviewer subagent，并实际执行 Codex 原生 review。
 - [ ] (application) 关闭 findings，冻结 scope、fingerprint、approved parent 和 content hash。
 

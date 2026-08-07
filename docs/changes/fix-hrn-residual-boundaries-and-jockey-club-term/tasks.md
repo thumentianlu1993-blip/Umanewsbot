@@ -17,7 +17,5 @@
 - [x] 3.1 (integration) 主代理复跑聚焦、translation/terms、内容边界和历史管线回归
 - [x] 3.2 (application) 运行 Django check、migration drift、diff 检查
 - [ ] 3.3 (application) 未参与实现的 reviewer subagent 执行原生只读 review 与 fingerprint 双检
-- [ ] 3.4 (operations) 最新 review 通过后停止，等待当前版本发布授权
-- [ ] 3.5 (operations) 获得发布授权后按冻结 fingerprint 提交、推送、合并和部署
 - [ ] 3.6 (operations) 部署后重新 prepare 剩余 36 篇，逐篇抽查并按最多 10 篇批准/apply/verify
 - [ ] 3.7 (operations) 输出成功、失败、拒绝、receipt、rollback 与剩余清单，完成 evidence-only closure

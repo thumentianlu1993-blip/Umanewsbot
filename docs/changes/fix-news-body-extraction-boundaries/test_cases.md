@@ -2,7 +2,7 @@
 
 ## 当前门禁
 
-- 用户已明确确认实现；测试与 fixture 已由测试 subagent 编写，并在实现前取得真实 RED。
+- 用户已明确G1 范围确认；测试与 fixture 已由测试 subagent 编写，并在实现前取得真实 RED。
 - 当前测试已 GREEN，等待独立代码审核；这不构成 commit、发布或历史生产重处理授权。
 
 ## RED 取得方式
@@ -43,7 +43,6 @@ RED 必须是断言目标行为尚未实现导致；fixture 读取、导入、�
 | T13 | application | legacy v1、缺少 v2 字段，或 manifest 文件 SHA、文章集合、`updated_at`、HTML、旧正文、标题/raw/normalized 正文、canonical parse metadata 任一漂移 | 锁行复核后整批零写入、零 OperationLog；不接受当前状态为新基线 |
 | T14 | application | 历史识别文章有人工正文或 `rewrite_body_zh` | 报告人工字段/有效正文层与 hash，供重处理决策，不自动覆盖或清除 |
 | T15 | integration | 翻译 provider 输入 | 解析后的 HRN source body 不含页面框架，合法首尾和结构文本完整进入 prompt |
-| T16 | operations | 工作流契约 checker 与现有基线 mutation test | AGENTS/workflow/bootstrap 三处八阶段 canonical 流程通过；删除“用户确认实现”或恢复旧七阶段时失败；inventory 保持 `26/26` |
 
 ## 手工/运行态验收（发布后，需另行授权）
 
@@ -59,7 +58,6 @@ RED 必须是断言目标行为尚未实现导致；fixture 读取、导入、�
 5. 若未来另行批准重处理，至少逐篇验收 `9623`、`9519` 和一个正常反例，核对发布时间、文章 ID、
    workflow、人工字段和 QQ delivery 数。
 
-## 验证命令候选（实现授权后）
 
 ```bash
 DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true <bundled-python> server/manage.py test \

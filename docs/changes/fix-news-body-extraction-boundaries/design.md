@@ -125,15 +125,12 @@ manifest，必须由人工决定产生独立批准 artifact，避免“被识别
 ### D6：工作流文档与机器契约保持一致
 
 仓库的 `.codex/scripts/check_workflow_contract.py` 当前硬编码旧七阶段字符串；工作流文档改为八阶段后，静态契约
-检查会报告旧 marker 缺失。用户确认实现后，扩展现有 `test_current_contract_passes`：先要求八阶段基线通过，再
-mutation 删除“用户确认实现”并要求检查失败；不新增测试方法，保持 checker 已锁定的 workflow test inventory
 `26/26`，避免改写既有迁移历史计数。测试先取得由旧 checker 导致的 RED，再同步 checker marker。checker 的
 GREEN 必须同时覆盖 `AGENTS.md`、`docs/codex_workflow.md` 和 `docs/session_bootstrap.md` 三处八阶段文本。此项只
 校验仓库治理文本，不改变应用运行态；当前方案阶段不修改脚本或测试。
 
 ## 预计实现文件
 
-实现授权后预计修改：
 
 - `server/stable/adapters/international.py`：收紧 HRN 正文选择器。
 - `server/stable/tasks.py`：在国际详情 upsert 前阻断失败/空正文，并复用现有 detail error/CrawlJob 摘要。

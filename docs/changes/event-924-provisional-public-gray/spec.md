@@ -6,7 +6,6 @@
 - 变更：event `924` 已存 shadow 赛果的单赛事 `provisional_public` 灰度
 - 基线：`origin/main@353464c76c63d1e43043ccbefe0ebc88274b0888`
 - 阶段：方案限定复审 `APPROVED`，进入测试先行
-- 生产边界：方案审核、代码审核和精确发布授权完成前，不改生产策略、不晋级
   revision、不新增公开结果、不打开 scheduler、不扩展其他赛事
 
 ## 背景

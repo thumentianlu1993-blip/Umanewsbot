@@ -3,7 +3,6 @@
 ## 当前门禁
 
 方案审核和本地 RED/GREEN 已完成，当前停在阶段 C 的首次代码 review 前。以下动作在最新
-成功代码 review 后取得当前冻结版本的精确发布授权前全部禁止：
 
 - 改 production policy；
 - 晋级 revision `2`；
@@ -60,7 +59,6 @@
    - full fingerprint；
    - approved parent；
    - `content_manifest_sha256`。
-4. 成功 review 后再向用户请求对精确冻结版本的发布授权。
 
 任何受审内容变化都使 review/授权失效。
 
@@ -68,7 +66,6 @@
 
 前置：
 
-- 精确发布授权；
 - 生产历史 runner/receipt/lease/checkpoint 处于已记录安全状态；
 - 普通新闻 worker/Beat 可安全维护；
 - event 924 facts 与 manifest 预期无漂移；
@@ -218,7 +215,6 @@ event 924 精确 disable manifest：
 5. revision/publication/legacy result/incident 数量不减少；
 6. scheduler/queue/其他 event 不变。
 
-是否恢复 `provisional_public` 属于该次发布授权的明确子步骤；若授权不覆盖恢复，演练后保持
 隐藏并向用户报告。
 
 ## 回滚矩阵

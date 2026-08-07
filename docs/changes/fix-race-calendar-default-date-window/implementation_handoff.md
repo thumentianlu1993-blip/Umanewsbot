@@ -2,7 +2,6 @@
 
 > 交接对象：Claude 或其他新的实现 agent  
 > 交接日期：2026-07-28  
-> 当前状态：探索、规格、设计和独立方案审核已完成；尚未取得实现授权  
 > 本文目标：让接手者不依赖聊天记录即可安全继续
 
 ## 1. 先读结论
@@ -26,7 +25,6 @@
 
 ## 2. 当前授权边界
 
-本交接文档的创建不构成实现授权。
 
 当前已经授权并完成：
 
@@ -43,11 +41,10 @@
 - commit、push、创建 PR、merge；
 - 部署、服务重启、联网或生产数据写入。
 
-接手者必须先让用户针对当前已审方案明确回复“确认实现”“开始实现”“继续实现”或同义语句。
+接手者必须先让用户针对当前已审方案明确回复“G1 范围确认”“开始实现”“继续实现”或同义语句。
 取得该授权后，才进入测试先行和实现。
 
 即使实现后的独立代码 review 已通过，仍不得直接 commit/push/PR/部署。必须冻结最新成功
-review fingerprint，再取得用户针对该 fingerprint 的明确发布授权。
 
 ## 3. 仓库、worktree 与基线
 
@@ -104,13 +101,13 @@ CSS、赛事和历史数据改动。
 13. 本目录的 `rollout.md`
 14. 本文
 
-本任务禁止使用 OpenSpec skills 或 OpenSpec CLI，包括：
+本任务禁止使用 旧规格流程 skills 或 旧规格流程 CLI，包括：
 
-- `openspec-explore`
-- `openspec-propose`
-- `openspec-apply-change`
-- `openspec-archive-change`
-- `openspec-sync-specs`
+- `旧规格流程-explore`
+- `旧规格流程-propose`
+- `旧规格流程-apply-change`
+- `旧规格流程-archive-change`
+- `旧规格流程-sync-specs`
 
 ## 5. 项目背景
 
@@ -557,11 +554,9 @@ hunk 或目标测试文件，先停止并向用户报告精确重叠和建议集
 
 这两项已进入测试和浏览器门禁。
 
-方案审核通过不等于代码 review，也不等于实现或发布授权。
 
 ## 22. 实现 subagent 边界
 
-获得实现授权后，顺序必须是：
 
 1. 测试 subagent 只写测试并取得真实 RED；
 2. 测试 subagent 结束；
@@ -610,7 +605,6 @@ python3 .codex/scripts/review_fingerprint.py
 
 最新成功代码 review 后仍需用户针对当前 fingerprint 明确说“上线”“发布吧”或同义语句。
 
-发布授权前禁止：
 
 - commit；
 - push；
@@ -630,13 +624,10 @@ python3 .codex/scripts/review_fingerprint.py
 接手者应先向用户报告：
 
 1. 已读取本文和五份方案；
-2. 当前没有实现授权；
 3. 当前 worktree/HEAD/origin-main/重叠检查结果；
 4. 将在用户确认后先让测试 subagent 取得真实 RED；
 5. 不会自动 commit、push、PR 或部署。
 
-然后停止，等待明确实现授权。不要仅凭“已交给 Claude 实现”这句话假定当前 agent 已获得仓库
-实现授权；如果用户在 Claude 会话中明确说“开始实现”或同义语句，才进入下一阶段。
 
 ## 26. 完成定义
 
@@ -654,7 +645,6 @@ python3 .codex/scripts/review_fingerprint.py
 - 独立代码 reviewer 最终 APPROVED；
 - fingerprint 已冻结；
 - 没有 commit/push/PR/部署；
-- 已停止等待发布授权。
 
 ## 27. 权威文件顺序
 

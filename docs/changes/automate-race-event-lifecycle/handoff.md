@@ -3,7 +3,6 @@
 ## 0. 交接状态与强制门禁
 
 本文是本任务的独立实现入口。Claude 可以仅凭本文和仓库当前文件完成实现与自测，不需要重新
-询问产品范围或重新设计状态机；但本文**不是实现授权或发布授权**。
 
 当前状态：
 
@@ -16,7 +15,7 @@
 - 未完成：任何自动化测试、应用代码、迁移、配置、实现代码 review、commit、push、PR、部署
   或生产写入。
 
-Claude 开始时必须先检查用户在**当前已审方案之后**是否明确回复了“确认实现”“开始实现”
+Claude 开始时必须先检查用户在**当前已审方案之后**是否明确回复了“G1 范围确认”“开始实现”
 “继续实现”或同义授权。没有该授权时，只能阅读和解释本文，禁止：
 
 - 编写或修改测试；
@@ -24,7 +23,6 @@ Claude 开始时必须先检查用户在**当前已审方案之后**是否明确
 - 启动测试/实现 subagent；
 - commit、push、PR、部署、迁移、服务重启或生产写入。
 
-取得实现授权后，直接从本文第 8 节阶段 A 开始，不需要再次做开放式方案调查。若必须采购套餐、
 取得凭据或批准新的 provider proof，应 fail closed 并继续完成不依赖它们的阶段 A。
 
 代码 review 通过后仍必须停下。只有用户针对**最新成功 review 的精确内容**另行明确授权发布，
@@ -64,7 +62,7 @@ Claude 开始时必须先检查用户在**当前已审方案之后**是否明确
 7. `rollout.md` 对灰度、发布和回滚的要求；
 8. 本文。
 
-禁止使用任何 OpenSpec skill、OpenSpec CLI 或新建 OpenSpec change。历史 `openspec/` 仅可读。
+禁止使用任何 旧规格流程 skill、旧规格流程 CLI 或新建 旧规格流程 change。历史 `旧规格流程/` 仅可读。
 
 ## 2. 当前真实数据流与根因
 
@@ -429,7 +427,6 @@ QQ `(article, target)` 唯一性必须保留；racecard update 默认不自动�
 
 ## 7. 测试先行执行规则
 
-取得实现授权后，第一位 subagent 必须只拥有测试文件，先写阶段 A 测试并实际取得 RED。主线程
 在任一 subagent active 时遵守 `docs/codex_workflow.md` 静默规则，只能等待或派发无冲突任务。
 
 有效 RED：
@@ -544,7 +541,7 @@ git diff --unified=0 HEAD..origin/main -- \
 3. 无相关重叠时，从最新已验证 `origin/main` 重新建立或更新独立干净 worktree；
 4. 有相关重叠、迁移冲突或已审假设变化时，先修订 spec/design/test/tasks/rollout，并回到同一
    `lifecycle_plan_reviewer` 会话复审；
-5. 方案重新通过且用户对当前版本重新确认实现后，才启动测试 subagent。
+5. 方案重新通过且用户对当前版本重新G1 范围确认后，才启动测试 subagent。
 
 工作区与主线预检完成后，再自动发现当前可用 Python/Docker 环境：
 
@@ -623,7 +620,6 @@ python3 .codex/scripts/review_fingerprint.py
 - review 覆盖全部 tracked/untracked 改动；
 - 所有 P0-P3 和其他 actionable finding 清零；
 - 记录 reviewed scope、approved parent、`content_manifest_sha256`、完整 fingerprint；
-- review 通过后冻结内容并停止，等待用户发布授权。
 
 普通 diff、测试或人工阅读不能替代原生 review。
 
@@ -661,7 +657,6 @@ python3 .codex/scripts/review_fingerprint.py
 - 启用新赛果来源；
 - 批量修正全部历史赛事。
 
-发布前必须重新核对最新 review fingerprint，取得当前版本发布授权，备份数据库，核对生产
 HEAD、镜像、Celery 队列、锁、磁盘和当前新闻正文生产批次。若新闻正文历史批次仍在做生产写入，
 本任务不得并发执行生产数据库写入、Beat 变更、服务重建或部署。
 
@@ -686,7 +681,6 @@ manifest、SHA/generation 漂移校验产生反向 candidate；禁止无审计�
 3. PostgreSQL 并发、Django check、migration drift、diff check 通过；
 4. 独立原生只读 review 无 actionable finding；
 5. fingerprint 冻结；
-6. 停止等待当前版本发布授权；
 7. 发布后只按 `docs/codex_workflow.md` evidence-only allowlist 回写真实运行证据。
 
 任何 provider 尚无 proof、合同未冻结、marker 未登记、时区不确定或身份关联冲突，都应保持

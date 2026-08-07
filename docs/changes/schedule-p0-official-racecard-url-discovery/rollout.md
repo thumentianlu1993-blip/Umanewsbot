@@ -4,7 +4,6 @@
 
 既有实现曾完成代码 review，但用户要求补齐 provider route 后受审内容将变化，旧 fingerprint
 不再是发布基线。provider route TDD、增量实现、v3 bounded proof 与同一代码 reviewer
-限定复审均已完成；最新结论为 `APPROVED`，当前停在发布授权门禁。仍未授权：
 
 - commit/push/PR；
 - 部署、修改生产 `.env` 或创建宿主目录；
@@ -76,7 +75,6 @@ service、task、registry 三个 SHA。联网后只允许新增 v3 artifact/mani
 reviewer 审核最终代码/registry及直接修复路径 -> 冻结 fingerprint -> 用户针对该精确版本发布
 授权 -> 默认关闭部署 -> 单次生产验证 -> 按已获授权启用 06:30/18:30 定时任务`。
 
-proof 后任何受审内容变化都必须重做 proof、复审并重新取得发布授权。
 
 最新限定复审使用原生命令
 `codex review -c 'sandbox_mode="read-only"' --uncommitted`，session
@@ -89,11 +87,9 @@ HEAD 接受完整 2xx、认证 3xx 的 outcome 归类。文档回写前批准候
 - content hash `1df171afd380238c205e72d123f8ec3e1bd3e9021267cc4d9dc117c02c119642`。
 
 本段及同步状态文档属于审核后事实回写，必须由同一 reviewer 再做纯文档限定复审，并以其
-新 fingerprint 作为最终发布授权基线。
 
 ## 3. 默认关闭部署
 
-获得精确发布授权后：
 
 1. 核对生产 HEAD/服务/队列/现有任务。
 2. 备份 `.env`，记录回滚镜像。
@@ -119,7 +115,6 @@ HEAD 接受完整 2xx、认证 3xx 的 outcome 归类。文档回写前批准候
 - 重跑一次，验证幂等和旧 URL 保护；
 - 重建 worker 后确认文件仍在。
 
-只有上述证据和最新 review 通过，并重新取得精确发布授权后，才部署并把总任务开关置为 true，
 让 beat 在上海时间每日 06:30/18:30 触发。
 未获准/受阻 provider 保持 `adapter_disabled` 或 `policy_blocked`，不能暗中联网。
 

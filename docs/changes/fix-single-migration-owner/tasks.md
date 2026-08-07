@@ -1,11 +1,10 @@
 # 单一迁移执行者修复任务
 
 实现与测试已完成（聚焦 87/87、相邻回归 11/11）。子代理仍不得 commit、push、PR、
-部署、迁移或连接生产；发布相关任务保持未勾选，等待发布授权。
 
 ## 测试
 
-- [x] (operations) 冻结最新 `origin/main`、工作树状态和设计 fingerprint，确认实现授权范围。
+- [x] (operations) 冻结最新 `origin/main`、工作树状态和设计 fingerprint，G1 范围确认授权范围。
 - [x] (operations) 由测试 subagent 新建 `stable.test_single_migration_owner`，覆盖唯一 owner、
   release 顺序、健康等待、锁、race-live 状态保持、标准/lowcost deploy 和两类 rollback。
 - [x] (operations) 运行聚焦测试取得真实 RED，保存失败用例、命令、exit 和能力缺口。
@@ -43,7 +42,6 @@
 - [x] (operations) 由未参与实现的独立 reviewer 执行 Codex 原生只读代码 review，重点检查单一
   owner、并发、失败边界、rollback、greenfield 非目标和测试真实性。
 - [x] (operations) 有 finding 时先补真实 RED，再修复，并复用同一 reviewer 会话复审。
-- [ ] (operations) review `APPROVED` 后重新冻结 fingerprint，停止并等待用户发布授权。
 
 ## 发布
 

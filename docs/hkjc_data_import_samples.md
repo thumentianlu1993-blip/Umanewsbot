@@ -2,7 +2,7 @@
 
 日期：2026-06-26
 
-关联 OpenSpec change：`start-hkjc-data-import-and-global-spikes`
+关联 旧规格流程 change：`start-hkjc-data-import-and-global-spikes`
 
 ## 边界
 

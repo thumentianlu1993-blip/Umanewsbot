@@ -472,7 +472,6 @@ ASSERTION_ONLY_SCAN_EXCLUSIONS = {
 def _scan_repo_text_files():
     excluded_dirs = {
         "docs",
-        "openspec",
         "__pycache__",
         "node_modules",
         "staticfiles",

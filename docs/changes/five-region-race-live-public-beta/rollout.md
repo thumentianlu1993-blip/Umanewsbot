@@ -48,7 +48,6 @@ Jpn/JG 只承认赛事总账已有标准化等级，不按香港地区或赛事�
 1. 未参与实现的 reviewer subagent 执行原生 review。
 2. findings 由实现 subagent 修复，同 reviewer 复审。
 3. 成功后冻结完整 scope/fingerprint/content hash。
-4. 停止并向用户请求该精确冻结版本的发布授权。
 5. 授权后若内容变化，旧 review/授权失效。
 
 ## 5. Gate D：代码部署，全部新增范围关闭

@@ -367,7 +367,6 @@ receipt 已准备。promotion 后 15 分钟内必须完成首次 manual probe：
 发布前：
 
 1. 最新代码 review 成功；
-2. 对受审 fingerprint 取得用户精确发布授权；
 3. 备份数据库并验证 SHA 与 `pg_restore -l`；
 4. 部署受审 image，保持 scheduler false；
 5. 人工打开 BHA Results，确认受审 manual route 当前可执行；

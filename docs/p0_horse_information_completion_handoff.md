@@ -15,7 +15,7 @@
 4. `docs/deploy_runbook.md`
 5. `docs/project_status.md`
 6. `docs/p0_horse_career_history_policy.md`
-7. `openspec/changes/complete-p0-horse-profile-data/`
+7. `旧规格流程/changes/complete-p0-horse-profile-data/`
 
 `docs/current_state.md` 是状态主文档；本文是专项导航和交接摘要。两者冲突时，以
 `docs/current_state.md` 和生产实时核验为准。
@@ -225,7 +225,7 @@ P0，它参加过的普通比赛仍必须进入该马的完整生涯履历。
   访问限制或许可条款。
 
 最终专项 Python 组合回归为 `282/282`；生产发布前后还执行过 P0/五地区组合、
-PostgreSQL 迁移、Django check、migration drift、OpenSpec 和幂等复跑验证。精确测试分母与
+PostgreSQL 迁移、Django check、migration drift、旧规格流程 和幂等复跑验证。精确测试分母与
 SHA 以 `docs/current_state.md` 顶部记录为准。
 
 ## 7. 已完成的生产数据
@@ -347,7 +347,7 @@ f773f5ec0a98974cc402b202cfe2f0eed91fc4f022e58a621f2c7b2b63b96378
 
 ### 9.2 通用五地区批量 adapter 仍未完全产品化
 
-OpenSpec `tasks.md` 中 `4.2` 仍未完成。首批 50 匹已经通过受控来源 client、缓存、人工补证和
+旧规格流程 `tasks.md` 中 `4.2` 仍未完成。首批 50 匹已经通过受控来源 client、缓存、人工补证和
 冻结 artifact 跑通，但还缺可面向整个 4.6 万匹队列长期运行的通用批处理能力，包括：
 
 - 可恢复分页和检查点
@@ -379,10 +379,10 @@ HORSE_PROFILE_COMPLETION_BATCH_LIMIT=10
 
 ### 9.4 公开验收尚未完成
 
-OpenSpec `6.7` 仍未完成：尚未每地区人工发布 1-2 匹，验收公开索引、详情页、移动端、
+旧规格流程 `6.7` 仍未完成：尚未每地区人工发布 1-2 匹，验收公开索引、详情页、移动端、
 完整履历、主胜鞍、关注入口、新闻 tag 和 no-network 边界。
 
-### 9.5 OpenSpec 尚未归档
+### 9.5 旧规格流程 尚未归档
 
 `complete-p0-horse-profile-data` 仍有 `4.2` 和 `6.7` 未完成，不得为了清单好看而勾选或归档。
 
@@ -390,7 +390,7 @@ OpenSpec `6.7` 仍未完成：尚未每地区人工发布 1-2 匹，验收公开
 
 ### 第一步：建立可恢复的详情补全批处理
 
-在独立 worktree 中实现 OpenSpec `4.2` 的长期版本：
+在独立 worktree 中实现 旧规格流程 `4.2` 的长期版本：
 
 1. 支持任意审核批次，而不是固定 5×10 CSV。
 2. 按地区和 profile ID 分片，单批默认不超过 `10`。
@@ -443,7 +443,7 @@ OpenSpec `6.7` 仍未完成：尚未每地区人工发布 1-2 匹，验收公开
 
 ### 第五步：完成首批公开验收
 
-从已完成的 50 匹中每地区选择 1-2 匹人工发布，执行 OpenSpec `6.7`，然后再决定是否启用
+从已完成的 50 匹中每地区选择 1-2 匹人工发布，执行 旧规格流程 `6.7`，然后再决定是否启用
 更大范围的人工首次发布或未来自动首次发布。不要把详情写入和公开发布合并成一个授权。
 
 ### 第六步：更新状态并归档
@@ -455,7 +455,7 @@ OpenSpec `6.7` 仍未完成：尚未每地区人工发布 1-2 匹，验收公开
 3. 如有新决策，更新 `docs/decisions.md`
 4. 如涉及生产，更新 `docs/deploy_runbook.md`
 5. 运行完整验证和独立 code review
-6. 同步 OpenSpec 主规格并归档 change
+6. 同步 旧规格流程 主规格并归档 change
 
 ## 11. 关键代码入口
 
@@ -473,7 +473,7 @@ OpenSpec `6.7` 仍未完成：尚未每地区人工发布 1-2 匹，验收公开
 | 马匹后台/公开页面 | `server/stable/views.py` |
 | 专项主测试 | `server/stable/test_p0_horse_completion_adapters.py` |
 | P0 基础测试 | `server/stable/tests.py` |
-| OpenSpec 任务 | `openspec/changes/complete-p0-horse-profile-data/tasks.md` |
+| 旧规格流程 任务 | `旧规格流程/changes/complete-p0-horse-profile-data/tasks.md` |
 
 ## 12. 关键产物
 

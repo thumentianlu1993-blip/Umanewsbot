@@ -9,7 +9,6 @@
 - [x] 0.5 (operations) 完成独立方案审核；首轮 findings 已修正并由同一 reviewer 会话复审通过
 - [x] 0.6 (operations) 方案审核通过后停止，并取得用户明确“开始实现”授权
 
-## 1. 测试（仅在用户确认实现后）
 
 - [x] 1.1 (integration) 测试 subagent 添加 HRN `9623` 等价真实结构最小 fixture，不含凭据/广告脚本/无关整页内容
 - [x] 1.2 (integration) 测试 subagent 添加 HRN 可信容器、框架排除、首尾/小标题/引用/列表/表格保留测试
@@ -17,7 +16,6 @@
 - [x] 1.4 (integration) 测试 subagent 添加国际详情失败在 upsert 前阻断、既有文章不更新、无术语/翻译派发及 CrawlJob 可见证据测试
 - [x] 1.5 (application) 测试 subagent 添加历史只读全量 scope、冻结 max ID、稳定分页、分类计数、哈希与零副作用测试
 - [x] 1.6 (application) 测试 subagent 添加批准 manifest/file SHA、事务锁行后全集哈希校验、漂移整批零写入和人工/机器改写状态报告测试
-- [x] 1.7 (operations) 测试 subagent 扩展现有 workflow contract 基线测试，要求三处八阶段和删除“用户确认实现”时失败；保持 `26/26` inventory，并记录旧 checker 导致的 RED
 - [x] 1.8 (integration) 实际运行聚焦测试并记录由目标行为未实现导致的 RED；环境/fixture/语法错误必须先修正后重取 RED
 
 ## 2. 实现（仅在有效 RED 后）
@@ -40,12 +38,10 @@
 - [x] 3.4 (application) 针对 reviewer 的 manifest 输出绑定 P2 先取得 RED，再升级 schema v2，绑定
   `title_ja/body_ja_raw/body_ja_normalized` 和 canonical parse metadata；legacy/缺字段/输出漂移整批拒绝
 - [ ] 3.5 (operations) 若仍有 actionable finding，由实现 subagent 修复并复用同一 code reviewer 会话限定复审
-- [ ] 3.6 (operations) 最新成功 code review 后停止，汇报完整 fingerprint 与残余风险，等待当前版本发布授权
 
 ## 4. 全新文章采集修复发布（需最新 review 后单独授权）
 
 - [ ] 4.1 (operations) 核对精确受审内容、生产 HEAD/镜像/队列/开关，创建并验证数据库与 `.env` 恢复点
-- [ ] 4.2 (operations) commit、push、PR/merge 与部署只在用户明确发布授权后执行
 - [ ] 4.3 (operations) 验证 Django check、迁移漂移、容器镜像、healthz、来源状态与一个此前从未入库的 HRN 样本端到端正文；既有重复文章不计入本 Gate
 - [ ] 4.4 (operations) 异常时暂停 HRN 来源/自动发布并按部署前镜像回滚；不得用模板隐藏止血冒充修复
 

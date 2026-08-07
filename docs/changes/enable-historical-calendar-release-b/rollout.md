@@ -52,7 +52,7 @@ Release B + Release A 完整性 + 部署合同最终组合 `176/176`。
 ### B0：设计与审核
 
 - 建立 spec/design/test/tasks/rollout。
-- 方案 reviewer APPROVED 后向用户汇报并等待实现授权。
+- 方案 reviewer APPROVED 后记录评审结论；后续动作按根 `AGENTS.md` 执行。
 
 ### B1：测试先行与本地实现
 
@@ -67,7 +67,7 @@ Release B + Release A 完整性 + 部署合同最终组合 `176/176`。
   `4043 / 26F / 133E / 77S`，包含范围外/环境问题，未表述为全绿。临时 PostgreSQL 容器与性能
   artifact 已删除。
 
-### B2：代码审核与发布授权
+### B2：代码审核与交付
 
 - 首轮实现 reviewer session `019fb9a4-86fa-7ca1-b4cc-e5c558258dbc` 为原生 read-only，提出
   `4 P1 + 2 P2`；实际 applied migration leaf、重复等价性、target 审计与字段范围、published
@@ -143,5 +143,5 @@ Release B + Release A 完整性 + 部署合同最终组合 `176/176`。
   target supersession 强合同和停服前 schema preflight；1 个 P2 要求脱敏的 81→14 守恒 fixture。
 - 第一轮限定复审关闭 P1-1/P1-2/P1-3/P2-1，仅 P1-4 要求明确 preflight 的候选 image 执行身份；
   修订为 candidate one-shot 后，同一会话第二轮限定复审关闭 P1-4。
-- 最终结论为 `VERDICT: APPROVED`，无开放 finding。当前等待用户在此结论之后明确确认实现；确认
-  前不得进入测试先行或实现。
+- 最终结论为 `VERDICT: APPROVED`，无开放 finding。该结论及当时的执行状态仅作为历史证据；
+  当前人工确认规则以根 `AGENTS.md` 为准。

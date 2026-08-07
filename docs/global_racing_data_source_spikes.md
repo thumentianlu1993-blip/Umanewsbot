@@ -2,11 +2,11 @@
 
 日期：2026-06-25 / 2026-06-26
 
-关联 OpenSpec change：`expand-international-racing-coverage`、`start-hkjc-data-import-and-global-spikes`、`connect-real-global-racing-databases`
+关联 旧规格流程 change：`expand-international-racing-coverage`、`start-hkjc-data-import-and-global-spikes`、`connect-real-global-racing-databases`
 
 ## 边界
 
-- 本文档先记录小样本技术 spike 结论和后续建议；`2026-06-26` 后续 OpenSpec change `connect-real-global-racing-databases` 已将英法美从“只读 spike”升级为真实抓取目标。
+- 本文档先记录小样本技术 spike 结论和后续建议；`2026-06-26` 后续 旧规格流程 change `connect-real-global-racing-databases` 已将英法美从“只读 spike”升级为真实抓取目标。
 - `start-hkjc-data-import-and-global-spikes` 阶段没有把 `Equibase`、英国 `Sporting Life + BHA` 或法国 `France Galop` 加入 Celery Beat、生产管理命令调度或正式导入队列。
 - 截至英国第一版 dry-run，仍没有向正式 `ExternalRace / ExternalRaceEntry / ExternalRaceResult / ExternalHorse / ExternalHorseAlias` 表写入欧美数据。
 - 后续正式导入欧美数据库必须在 `connect-real-global-racing-databases` 下执行，单独满足字段设计、限速、失败恢复、备份、dry-run、锁检查和用户确认门禁。

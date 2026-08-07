@@ -18,7 +18,7 @@
 主工作树 `/Users/mentianlu/Code/umanews` 当前仍在较旧 `main` 分支位置，落后 `origin/main`，但已把后续恢复所需内容同步为未提交工作树差异：
 
 - `origin/main` 中已有的外部缓存底座、HKJC importer、模型、迁移、管理命令和相关测试。
-- proof 工作树中尚未进入 `origin/main` 的 UK / France / US importer、离线审计命令、fixtures、OpenSpec 归档和 proof JSON。
+- proof 工作树中尚未进入 `origin/main` 的 UK / France / US importer、离线审计命令、fixtures、旧规格流程 归档和 proof JSON。
 
 当前主工作树已补入以下交接文档：
 
@@ -31,7 +31,7 @@
 
 原始 proof 与实现工作来源于独立工作树：
 
-- `/Users/mentianlu/.codex/worktrees/openspec-ready-20260626/umanews`
+- `/Users/mentianlu/.codex/worktrees/旧规格流程-ready-20260626/umanews`
 - 分支：`codex/start-hkjc-global-spikes`
 - 相关证明文件：
   - `runtime/global_racing_import/proof-20260627/uk/uk-race-url-proof.json`
@@ -56,7 +56,7 @@
 - `stable.tests.GlobalRacingImporterCommitGateTests`：通过，`14` 项；四地生产 commit 门禁要求严格完成证明、马匹详情覆盖计数、非空基础 coverage，要求 UK/France/US plan-only 命令显式携带 `--allow-network`，并覆盖从 plan JSON 渲染指定 batch 或全部 batches 命令的只读工具及稳定 `suggested_output_file/path`、`tee_command_line`。
 - `stable` 完整测试集：通过，`347` 项。
 - `audit_global_racing_import_outputs --proof-only --fail-on-incomplete` 复跑 `runtime/global_racing_import/proof-20260627`：通过 proof 口径，输出仍为 `proof_ready=true`、`proof_blocking_reasons=[]`、`commit_candidate_ready=false`。
-- `openspec validate --all`：通过，`12` 项。
+- `旧规格流程 validate --all`：通过，`12` 项。
 - `git diff --check`：通过。
 
 以上验证证明当前主工作树已经能加载外部缓存底座、HKJC、UK/France/US importer、proof-only 审计命令和相关 fixture 测试；它仍不证明完整最近 2 个月大量爬取或生产 commit 已完成。

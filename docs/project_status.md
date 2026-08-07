@@ -1,5 +1,11 @@
 # 项目状态文档
 
+## 2026-08-08 工作流治理
+
+- 全仓人工确认门禁已统一到根 `AGENTS.md` 的 G1/G2/G3，其他文档和代理只引用该规则。
+- 项目只使用 Codex 原生工作流；旧规格目录、兼容技能和旧路由资料已从受控仓库清除。
+- 并行任务使用独立 worktree 和固定 SHA；`main` 不作为长任务工作目录，生产发布由单一协调者按真实资源互斥。
+
 ## 2026-08-08 Release B 生产发布被既有 migration history 阻断
 
 - Release B 已经 PR `#69` 合并为 `main@ba9c0f00`，但尚未部署生产；生产应用已恢复到既有
@@ -11,7 +17,6 @@
   workflow。
 - 下一步必须把“`0070` 迁移记录与生产实际 schema 对账并安全修复”作为独立高风险任务，完成
   设计、真实 PostgreSQL RED/GREEN、独立 review 和新发布授权后，才能重新开始 Release B。
-
 ## 2026-08-01 历史赛历 Release B 已完成第四轮本地审查修订，尚未进入发布
 
 - 最新 reviewer 的三个 P1 已修复：未知生产 applied migration fail closed、supersession 时间戳
@@ -60,7 +65,6 @@
   target 单层无环 supersession、候选 image one-shot 停服前 preflight 和 81→14 守恒 fixture。
 - 当前等待用户在 APPROVED 后明确确认实现；尚未写测试、代码或 migration，也未 commit、push、
   PR、部署、运行生产 v2 census 或执行生产写入。
-
 
 ## 2026-07-31 历史赛事 Release A URL 中央校验 P1 已通过限定复审
 
@@ -339,7 +343,7 @@
   `event_id` 回传与全来源完整名次 fail-closed 修复；新增门禁覆盖缺参赛名单、缺马、重复身份、
   无效名次及 discovery-only。首轮固定 head `1b11f985` 独立复审返回两个 P1：英美
   Sporting Life 标准输出覆盖、coverage 未绑定受控 combined artifact/target 来源；两项已补
-  RED 并在同一分支修复，相关回归 `141 passed / 1 skipped`、OpenSpec `38/38` 通过；同一
+  RED 并在同一分支修复，相关回归 `141 passed / 1 skipped`、旧规格流程 `38/38` 通过；同一
   reviewer 对固定 head `c4ce802c` closure review 为 `APPROVED`、无 findings。Eddie Read 完整候选顺序
   已由 Racing Post 与 DRF 交叉确认，但 Del Mar 官方 chart 尚不可用，仍不得 confirmed。
   PR 尚未合并、发布或部署，生产状态不变。
@@ -436,7 +440,7 @@
 - artifact/candidate 新增完整度策略版本绑定，旧 candidate `8ef0f718...` 在新代码下不可复用，
   必须重新生成 SHA 并重新授权。
 - 本地关键测试已转绿；312 项组合中 308 通过，4 个失败与修复前基线完全一致；排除基线失败后
-  最终 P0 相关集合 `247/247`，Django、迁移、OpenSpec `37/37` 与 diff check 通过。尚未独立
+  最终 P0 相关集合 `247/247`，Django、迁移、旧规格流程 `37/37` 与 diff check 通过。尚未独立
   review、push、部署或触碰生产。
 - 冻结输入下预估净增：0 匹新马、1,490 条履历、244 条模块审计、1 条 completion run、0 条新
   P0 source、0 匹新增公开；61 个 profile 和 61 条既有 source 将更新/upsert。
@@ -496,7 +500,7 @@
 - 已把受审实现提交为 `ffa12214`，并显式合并
   `origin/main@97dd2350a193c74d5063bf7432a283e4d47f6d0a`，当前集成提交为 `8e3716bc`。
   合并仅在四份追加式文档发生冲突，双方状态记录全部保留，行为代码无冲突。
-- P0 `263/263`、主线相邻 `90/90`（1 skip）、Django、迁移、OpenSpec `37/37` 和 diff check
+- P0 `263/263`、主线相邻 `90/90`（1 skip）、Django、迁移、旧规格流程 `37/37` 和 diff check
   通过。完整 stable 对照为主线 `2784 / 21F / 67E / 59S`、集成
   `2882 / 21F / 67E / 59S`，新增 98 项且失败/错误/跳过增量均为 0。
 - 用户已授权继续到无写入 task 5.3；当前仍未 push/deploy/bundle/prepare-release。必须先完成
@@ -516,7 +520,7 @@
   artifact path+SHA 的 committed-run 可跳过 current 漂移并从不可变 snapshot 恢复。
 - 相关 `260/260` 通过；完整 stable 相对 `21610ae8` 新增 88 项，最终对照为
   `2836 tests / 21 failures / 67 errors / 57 skipped`，failure/error/skipped 增量均为 0。
-  Django check、迁移、OpenSpec `37/37`、diff check 通过。第十一轮 native full-diff review
+  Django check、迁移、旧规格流程 `37/37`、diff check 通过。第十一轮 native full-diff review
   `APPROVED`，P0/P1/P2 为 0，session
   `019f901d-7b9f-77e3-96e0-792546d3eb4f`，审查前后 fingerprint
   `60cf62da1514f00fce451c89aa39b46146d20a4ef5245bdc84651a037559e164` 一致。
@@ -613,7 +617,7 @@
 - 含舍弃动作的专项 20/20；此前合计 118 项相关/相邻回归完成。发现的 3 个旧测试数据缺少新
   资格时间、1 个后台查询预算回归已修正并复验。此前完整套件相对 `origin/main` 新增 19 项、
   失败/错误/跳过增量均为 0；PostgreSQL 16 的 1,000
-  条积压测试为 2 条候选 SQL、0.456 秒。迁移往返、Django、Compose、OpenSpec 和静态检查通过。
+  条积压测试为 2 条候选 SQL、0.456 秒。迁移往返、Django、Compose、旧规格流程 和静态检查通过。
 - 生产已到 `7a6f30d8`，四应用统一镜像 `sha256:fa2fdf9bb952…`，`0053` 已应用。此前关闭态
   五区只读候选预览与零写入验收通过。香港单区 `17:45 / 18:00 / 18:15 / 18:30`
   四个真实窗口全部成功，无候选/无发布/无决策与地区配额写入，性能与抓取稳定。
@@ -647,7 +651,7 @@ P0 马信息补全专项的模型交接文档见
   guard；首次独立 review 发现的 stale cache 无法覆盖 P1 已用 sidecar lock + 原子替换修复。
   同一 reviewer 连续复审已清零 actionable finding。修复随后重放到最新
   `origin/main@0dcdbdab`；集成候选的精确提交与内容身份由最终 base review 报告固定，
-  不在提交正文中记录会因 amend 自失效的 SHA。P0 聚焦 `285/285`、OpenSpec `37/37`
+  不在提交正文中记录会因 amend 自失效的 SHA。P0 聚焦 `285/285`、旧规格流程 `37/37`
   通过，完整 `stable 2741` 与主线基线 `2726` 的失败计数均为
   `21 failures + 70 errors + 57 skipped`。集成版本最终 review 以 HEAD `15645b05`、
   fingerprint `43313e31…2441` 通过并取得精确部署授权；生产已切换为该 HEAD 和统一应用
@@ -662,13 +666,13 @@ P0 马信息补全专项的模型交接文档见
   `2` 条已知 `partial_career` 被误归为 unexpected，因此未通过验收并已 abandon。
 - 未 bundle、未 commit、未自动公开；公开马仍为 `2,797/日本 2,463`。网络开关在宿主、
   四应用容器和 Django setting 均恢复 false，全部 worker、healthz 和日本马匹页正常。
-- 本地已形成 parser v3 返修并通过四套件 `292/292`、OpenSpec `37/37` 和完整基线逐数
+- 本地已形成 parser v3 返修并通过四套件 `292/292`、旧规格流程 `37/37` 和完整基线逐数
   对照；独立 review 修正 1 个真实 validator 包装路径 P1 后最终 `APPROVED`、0 actionable
   findings。尚未部署；task 5.2 仍未完成，下一次生产操作必须绑定新的受审精确版本。
 
 ## 2026-07-22 netkeiba 马匹客户端专项完成本地实现（未部署）
 
-- OpenSpec change `add-netkeiba-horse-client` 完成 tasks `0.1-4.2`：`_NetkeibaClient`
+- 旧规格流程 change `add-netkeiba-horse-client` 完成 tasks `0.1-4.2`：`_NetkeibaClient`
   ID 直取（3 页/马，provider-bound 身份 + 四字段 + 完整生涯）、日本 dispatcher、
   select netkeiba 偏好、预算 3→4；解析全 fail closed。
 - plan-eng-review 1 P0 与独立 code review 2 P1 全部修复；专项 25/25、补全套件
@@ -679,7 +683,7 @@ P0 马信息补全专项的模型交接文档见
 
 ## 2026-07-22 P0 BASIC 层自动首发专项完成本地实现（未部署）
 
-- OpenSpec change `publish-p0-horses-basic-tier` 完成 tasks `0.1-6.2`：BASIC 发布门禁
+- 旧规格流程 change `publish-p0-horses-basic-tier` 完成 tasks `0.1-6.2`：BASIC 发布门禁
   （只信 verified provenance）、批次 commit 复验后自动首发（含 create_new、四通道
   审计、发布失败阻断 committed 终态 + `--retry-publish` 恢复）、存量发布命令
   （dry-run → 批准 → 分批 commit）、前台「资料补全中」徽章。
@@ -698,7 +702,7 @@ P0 马信息补全专项的模型交接文档见
 
 ## 2026-07-22 P0 身份回填专项已完成本地实现与生产执行
 
-- OpenSpec change `enrich-p0-horse-external-identity` tasks `0.1-6.5` 全部完成：四离线
+- 旧规格流程 change `enrich-p0-horse-external-identity` tasks `0.1-6.5` 全部完成：四离线
   证据源统一候选、唯一强匹配 fail-closed 写入门禁、dry-run → 批准 → 分批 commit、
   冲突聚合与批量裁决建议通道、批次视角前后对比度量；`_participant_identity_keys`
   支持 `horse_url`/`horse_slug` 同源 ID 提取。独立 code review 的 1 P0 + 5 P1 已
@@ -713,7 +717,7 @@ P0 马信息补全专项的模型交接文档见
 
 ## 2026-07-21 P0 滚动批次产品化已完成本地实现（未部署）
 
-- OpenSpec change `productize-p0-horse-batch-completion` 已完成 plan-eng-review 与全部
+- 旧规格流程 change `productize-p0-horse-batch-completion` 已完成 plan-eng-review 与全部
   代码实现，覆盖 `complete-p0-horse-profile-data` 的 tasks `4.2` 长期版本：
   队列选批（默认 100/地区、500/批、无界 fail closed）、批次 manifest 人工批准 +
   append-only 台账、抓取 checkpoint/resume、按地区持久请求预算与 per-host 限速、
@@ -778,7 +782,7 @@ P0 马信息补全专项的模型交接文档见
 - prepare 只能输出 pending；apply 绑定固定 v2 SHA、可信 manifest SHA、调用方显式 SHA 和
   实际文件 SHA，记录、身份、来源、计数漂移或重复记录一律 fail closed。用户本次“继续推进”
   不构成生产写入授权。
-- 本轮验证为工具与转换器 `48/48`、相关 Django `223/223`、Node `2/2`、OpenSpec
+- 本轮验证为工具与转换器 `48/48`、相关 Django `223/223`、Node `2/2`、旧规格流程
   `30/30`；Django check、migration drift、`git diff --check` clean，独立 reviewer 第三轮
   `APPROVED`。下方历史 `282/282` 继续作为旧轮次记录，不代表本轮重新运行。
 
@@ -855,7 +859,7 @@ P0 马信息补全专项的模型交接文档见
   人工证据应用 ID `3d5ab289cc5590e3cc405a4f28e532b98c86466f1b8da656e01183ca1fb2508c`）。
 - 真实页面形状、模型/页面、50 匹产物最终化、字段身份消歧和既有完整档案整类回归已从
   `277/277` 增至 `282/282` 通过；Node summary/path、Django check、迁移无漂移、Python
-  `compileall`、OpenSpec change strict 通过、all strict `30/30`、工作簿公式错误扫描和 `9` 张
+  `compileall`、旧规格流程 change strict 通过、all strict `30/30`、工作簿公式错误扫描和 `9` 张
   预览均通过。美国逐场官方性等剩余语义继续按
   `missing/partial/source_blocked/parser_gap` 保留，不猜值；生产仍为 `NO-GO`，没有生产写入、
   部署、发布或网络 career crawl。
@@ -948,7 +952,7 @@ P0 马信息补全专项的模型交接文档见
   也先规范化主 payload 与补充行，独立 canonical purity gate 同样检查规范化副本；欺骗型
   字符串值/键及异常/篡改型直接输入均阻断，实际 adapter 路径不落 cache。
   最新 source-client `68/68`、四模块 `123/123`，
-  Django check、迁移无漂移、OpenSpec `30/30` 和 diff check 均通过。
+  Django check、迁移无漂移、旧规格流程 `30/30` 和 diff check 均通过。
 - 同一独立 reviewer 第十一轮最终 `APPROVED`，无 actionable findings；审前/审后 fingerprint
   `9d2a7a276236306d3468e7a302df46e448ecfee257c64763db4700197edc8303`，reviewer stdout
   SHA-256 `b124808e0a93c4662687790b11f87dd192f29d9dff53692ff9383d96edb8ed8a`。该结论不改变
@@ -1283,7 +1287,7 @@ P0 马信息补全专项的模型交接文档见
 
 ## 2026-07-15 batch006 年度赛历流水线已部署
 
-- 正式年度赛历 request/cache/parse 流水线已完成实现和零问题 review：支持全量或分片 ledger、共享 URL 去重、partial 终态、缓存身份复核、五地区 parser、complete/gap 分母及 runner 目录 checkpoint；完整 stable `1524/1524`（11 skip），专项 `118/118`（1 skip）、runner `70/70`、性能 `3/3`、OpenSpec `30/30`。
+- 正式年度赛历 request/cache/parse 流水线已完成实现和零问题 review：支持全量或分片 ledger、共享 URL 去重、partial 终态、缓存身份复核、五地区 parser、complete/gap 分母及 runner 目录 checkpoint；完整 stable `1524/1524`（11 skip），专项 `118/118`（1 skip）、runner `70/70`、性能 `3/3`、旧规格流程 `30/30`。
 - 法国真实官方来源已达到 2023 `120/120`、2024 `130/130`、issues=0；香港现有覆盖 `61/61`、日本 `248/250`、英国 `250/250`、美国 `241/250`，剩余日美缺口继续进入统一审核账本。
 - 生产 web/worker/beat 已统一到 `main@ccfee75f` / image `sha256:e86c2339...773d`；迁移、Django check、runner provisioning、crawl/apply 隔离、暂停/恢复和最终空锁验收均通过。写前备份 SHA-256 为 `898c9a4ab3a06847023d189aed830553cbe733bf4c8e92a4ed636dd8231fa55f`，历史常驻与公开开关继续关闭。
 - batch006 仍为 1061 场 approved selection，按 11 个地区×届次年 scope 执行：FR `120/130`、HK `35/26`、JP `88/138/24`、UK `196/54`、US `83/167`。正式网络请求与赛事业务表写入尚未开始；下一步生成不可变 descriptor/shards/runner plans 后逐 scope crawl，并把日美少量 gap 累计到最终统一审核。
@@ -1300,7 +1304,7 @@ P0 马信息补全专项的模型交接文档见
 - 三类新闻质量缺陷已上线：正文边界/博彩噪声、实体语境/完整未知马名保护、日文普通词/产驹/追切/访谈/出马表固定格式。
 - 冻结范围 `357` 篇，`343` 篇可处理、`14` 篇重复；最终 `218 published / 105 pending_review / 20 ignored`，点名 19 篇全部公开且 HTTP 200。
 - 生产 web/worker/beat 已统一到 revision `bdc0eeff78e111d7fa8a697cbb3557888f864fb8`、image `sha256:c975a4faf979a1f78cdb203b810d4f5726aca114175007fc01c176044f13841c`；最终任务、队列、翻译状态和数据库事务均为空，healthz 正常。
-- OpenSpec 相关 change 已归档且全量校验通过。历史 batch006 因生产可用磁盘约 `3.0 GiB < 5 GiB` 继续关闭，不属于新闻发布完成状态。
+- 旧规格流程 相关 change 已归档且全量校验通过。历史 batch006 因生产可用磁盘约 `3.0 GiB < 5 GiB` 继续关闭，不属于新闻发布完成状态。
 
 最后更新时间：`2026-07-16`
 当前版本：`v0.0.1`（正式域名 HTTP 接入已修复，自动化运营 MVP、公开首页资讯流、抓取新鲜度修复、后台快速术语创建与当前稿术语应用、外部马名索引识别链路、榜单重点 QQ 推送、公开文章 ID URL、国际赛马资讯扩展、多地区生产窗口、术语种子数据准备、赛事日历 MVP 和马匹详情页 MVP 均已部署生产）
@@ -1309,14 +1313,14 @@ P0 马信息补全专项的模型交接文档见
 
 - 首轮候选在生产 72 小时只读范围内完成 `596` 篇审计，约 `29.36s`；Gold 有效 156 条，主地区准确率 `96.15%`、相关 precision `100%`、recall `52%`，机器门槛合格。
 - 人工全量复核主地区变化与 `needs_review` 仍发现 7 类错标，涉及普通单词马名、赛事与马来源优先级、日本当前成就/海外梦想、机构名嵌套赛事词及正文历史背景。因此生产继续 `off`，没有开始 Shadow。
-- 反例已固化并完成规则修复；专项 117、完整 stable 1404、真实 PostgreSQL 250 篇性能、Django/迁移和 OpenSpec 29/29 均通过。下一步是第二候选的生产只读重跑和同口径人工验收，不以旧 `qualified=true` 直接上线。
+- 反例已固化并完成规则修复；专项 117、完整 stable 1404、真实 PostgreSQL 250 篇性能、Django/迁移和 旧规格流程 29/29 均通过。下一步是第二候选的生产只读重跑和同口径人工验收，不以旧 `qualified=true` 直接上线。
 
 ## 2026-07-14 多地区归属 V3 生产审计性能修复
 
 - 生产首个 72 小时全量 run 已覆盖 597 篇，但旧报告阶段因逐篇发布门禁超过 30 分钟而中断。当前分支已把全量归属报告与门禁复核拆开，并支持从持久 run 原子重建审核 JSON；缺失/漂移文章自动必审，run 内容漂移直接拒绝。
 - 159 条单审 Gold 当前有 21 条正文 SHA 漂移；原审核快照对账预计可安全续签 18 条，标题变化、正文异常缩短和推断变化各 1 条继续阻断。该结果尚待新代码部署后在生产只读命令中生成正式 artifact 与 SHA。
 - France Galop 已补星期前缀英文日期解析和 probe 时间证据字段；部署后应能把真实官方日期标为 verified，而不是使用抓取时间。当前生产多地区 mode 与相关查询仍关闭，尚未进入 24 小时 Shadow。
-- 本地专项 109 项、完整 stable 1396 项、一次性 PostgreSQL 250 篇性能契约和 OpenSpec 29/29 均通过。下一步是提交/构建安全关闭候选，生产只读重建 Gold 与 72 小时报告，再依据完整清单决定是否开始 Shadow。
+- 本地专项 109 项、完整 stable 1396 项、一次性 PostgreSQL 250 篇性能契约和 旧规格流程 29/29 均通过。下一步是提交/构建安全关闭候选，生产只读重建 Gold 与 72 小时报告，再依据完整清单决定是否开始 Shadow。
 
 > 角色说明：
 > 本文档用于保留项目级概览与摘要信息。
@@ -1327,14 +1331,14 @@ P0 马信息补全专项的模型交接文档见
 - `scale-and-isolate-historical-race-batches` 已把 batch006+ 单地区标准上限统一为 250，并将可恢复的独立 historical runner、迁移 `0031`、最小权限 provisioning、隔离 smoke、迁移暂停 preflight 和独立 infrastructure bootstrap 部署到生产。当前生产镜像为 `sha256:33055eb8...25385` / revision `8741de98`。
 - runner 使用数据库租约 + runtime 文件锁、30 秒心跳/180 秒租约、固定镜像与 plan/input/output SHA checkpoint；crawl 只有网络和控制账本权限，apply 只有内部数据库写入权限，全部历史 RaceEvent 继续保持 draft。
 - 生产 runner smoke、双锁、暂停/恢复、越权拒绝和普通部署不干扰均已通过；batch006 selection 已生成 `1061` 场，五地区为 `250/61/250/250/250`，与前四个有效批次零重叠。正式网络抓取尚未启动。
-- smoke 后发现直接 `python_tool` 未强制继承请求/cache/磁盘预算，且生产仅余约 2.8 GiB，低于 5 GiB 门禁。已按 OpenSpec 补充宿主与 Django 双层校验、共享账本、失败/强杀 checkpoint、显式赛事工具白名单及嵌套 AdapterRunner 收紧继承；第七轮 review 无问题，本地 runner `64/64`、historical 组合 `200/200`。最终合入最新主线后交叉专项 `208/208`（跳过 1）、完整 `stable 1417/1417` 通过（跳过 7）。释放生产空间、部署候选和强化 smoke 完成后才允许启动 batch006。
+- smoke 后发现直接 `python_tool` 未强制继承请求/cache/磁盘预算，且生产仅余约 2.8 GiB，低于 5 GiB 门禁。已按 旧规格流程 补充宿主与 Django 双层校验、共享账本、失败/强杀 checkpoint、显式赛事工具白名单及嵌套 AdapterRunner 收紧继承；第七轮 review 无问题，本地 runner `64/64`、historical 组合 `200/200`。最终合入最新主线后交叉专项 `208/208`（跳过 1）、完整 `stable 1417/1417` 通过（跳过 7）。释放生产空间、部署候选和强化 smoke 完成后才允许启动 batch006。
 - 最终组合提交 `84217c56` 的两个独立本地 AMD64 构建 image ID 一致为 `sha256:2e8bd05f...28b31e`；候选 tag `umanewsbot:main-84217c56-amd64-20260714-2220`，OCI revision 精确匹配真实 Git 对象，镜像内 check、migration drift、runtime 专项 `239/239` 通过（跳过 1）。旧 `82fa4a3f` 候选及 revision 标签错误的 `sha256:119f59e3...` 均明确作废。仍未 retag `prod`、未部署、未连接生产、未启动 batch006；必须等待新闻维护窗口重新交还后先治理磁盘并执行 hardened smoke。
 ## 2026-07-14 多地区归属 V3 性能与审核策略
 
 - 已用临时 PostgreSQL 16 和真实校准规模完成 250 篇基准。首次发现来源配置 N+1 导致 254 SQL；批上下文增加 17 个来源一次预加载后，五轮稳定为 5 SQL、1.66–2.14 秒、约 49 MiB，性能门槛已通过。
 - 单审身份不再自动 no-go：首发覆盖门槛为有效样本至少 150、五个运营地区各至少 10、跨地区至少 20；达到全部质量/性能门槛后可进入生产 shadow。至少 24 小时 shadow 和全量差异复核通过后，才允许仅新文章 enforce；多人审核冲突仍须裁决。
 - 现有 159 条单审 Gold Set 的最少运营地区样本为法国 11、跨地区 24，主地区准确率 98.11%、相关地区 precision 100%、recall 54.84%、过度扩散 0%，已达到进入 Shadow 的覆盖与质量线。Gold Set 后续持续吸收新增来源、规则改版、shadow 误判和运营争议；生产归属和相关地区查询尚未开启，本轮没有生产操作。
-- Gold 生成器与评估器已共用可配置的 `150/10/20` 默认门槛；合并 `origin/main@9d6dec34` 并补齐全量审计契约后，完整 `stable` 1327 项通过（1 项按设计跳过），159 条 Gold 仍为合格，OpenSpec strict/all 28/28 通过。
+- Gold 生成器与评估器已共用可配置的 `150/10/20` 默认门槛；合并 `origin/main@9d6dec34` 并补齐全量审计契约后，完整 `stable` 1327 项通过（1 项按设计跳过），159 条 Gold 仍为合格，旧规格流程 strict/all 28/28 通过。
 - 上线前补齐了生产审计入口：`--scope all_articles` 才表示最近窗口全量有效文章（包含已发布稿），默认 `gate_candidates` 继续只服务术语门禁补跑。全量审计输出全部主地区变化、全部 `needs_review/locked_skip` 和五地区可重复分层样本；显式 limit 导致不完整时会明确阻断验收。当前改动尚未部署，生产 dry-run 与 24 小时 Shadow 仍待执行。
 - 代码已推送 main `7f0827ad`，可复现 AMD64 候选为 `sha256:6ad16e36...af9a1`，镜像内专项通过。生产切换因正在运行的 186 篇受控翻译重试 one-off 暂停；生产仍是旧镜像，归属 mode=off、相关查询关闭，尚无 72 小时归属 run。
 
@@ -1354,8 +1358,8 @@ P0 马信息补全专项的模型交接文档见
 
 - 已从生产库只读生成 `multiregion-gold-v1-20260713` 双人盲标包：共 `250` 篇，五地区各 `50`，覆盖 `17` 个来源，URL 和输入 SHA 各自全量唯一，manifest SHA-256 为 `1836a9d896ca5b6e09da6da7ed07a2fb3f66f0a02f387010fe4b56475bf5c1ea`。
 - 已补齐抽样与合并命令，能阻止同一审核人重复充当双审、正文/身份漂移、未裁决冲突和样本结构不足；正文审核包不进入 Git，正式 Gold Labels 才进入版本控制。
-- 本段是原始候选包记录。用户后续明确不再补第二审核人，OpenSpec `5.1` 已按 159 条单审 Gold Set 完成；若未来增加多人审核，仍需合并冲突并裁决。多地区归属和相关地区查询继续关闭，下一步是生产 Gold/dry-run 与 Shadow 验收。
-- 本分支已同步 `origin/main@693db30e`，最新组合回归 `1139 passed / 1 skipped`，Django、迁移、OpenSpec strict 和 diff 检查通过。
+- 本段是原始候选包记录。用户后续明确不再补第二审核人，旧规格流程 `5.1` 已按 159 条单审 Gold Set 完成；若未来增加多人审核，仍需合并冲突并裁决。多地区归属和相关地区查询继续关闭，下一步是生产 Gold/dry-run 与 Shadow 验收。
+- 本分支已同步 `origin/main@693db30e`，最新组合回归 `1139 passed / 1 skipped`，Django、迁移、旧规格流程 strict 和 diff 检查通过。
 ## 2026-07-14 日文赛马翻译与固定格式上线
 
 - `standardize-japanese-racing-translation` 已部署 `main@873845da` 并归档。普通片假名、完整未知马名、产驹、追切、访谈、骑手未定及三语机构术语均进入确定性翻译契约；种子术语恢复会处理明确边界重复，英文术语中文目标不会反向污染日文普通词。
@@ -1373,11 +1377,11 @@ P0 马信息补全专项的模型交接文档见
 - batch005 五地区各 50 场已完成日期、详情来源、出马表和赛果正式导入，最终逐场验收 `0 errors`；新增 `2583 runners / 2364 results`。
 - 最终详情候选 SHA-256 为 `269c65e646b11be0a1edef70c8c088e5b4b9a2b0a69527ca0efc6242cb84d6e3`；最终写前备份为 `pre-batch005-final-20260714_055856.dump`，SHA-256 `82908208d5a32f751c1b7c258c54e3ac66993798d27b66ff6d1405393a10ffa9`，`pg_restore -l` 通过。
 - 生产累计为 `1291 imported / 29626 pending`、`13507 runners / 12167 results`；全部历史赛事仍为 draft，published 0，常驻历史网络/写入开关 false。
-- batch006 前先建设每地区最多 250 场与独立 historical batch runner，完成 OpenSpec、工程审查、测试、实现、零问题 review 和部署验收后再继续抓取。
+- batch006 前先建设每地区最多 250 场与独立 historical batch runner，完成 旧规格流程、工程审查、测试、实现、零问题 review 和部署验收后再继续抓取。
 
 ## 2026-07-14 国际新闻正文边界修复上线
 
-- `tighten-international-article-content-boundaries` 已完成完整 OpenSpec 流程并部署 `main@514af8a2`；web/worker/beat 同为镜像 `sha256:954673cc74049d4b882e492ec29b072aba01aeb1a3ae440cc85415209c8a2f8a`。
+- `tighten-international-article-content-boundaries` 已完成完整 旧规格流程 流程并部署 `main@514af8a2`；web/worker/beat 同为镜像 `sha256:954673cc74049d4b882e492ec29b072aba01aeb1a3ae440cc85415209c8a2f8a`。
 - Sporting Life/TDN 现在只从可信正文容器解析，并清理站点框架、社交/推荐、编辑注、结果/活动链接、责任博彩、博彩推广、独立跳转 URL 与行动 CTA；赔率和赛事/马主专名中的博彩公司名称继续保留。
 - 目标文章 `8086/8267/8316/8318` 已修复、重译并保持原公开状态/发布时间，QQ 零重复；随机抽检 `8306/8311/8326/8331/8336` 的保存正文、当前重解析和译文均通过，噪声标记为 0。
 - 最终验证为目标测试 `27`、完整 `stable 1198` 项通过（跳过 1）；内外 healthz、目标详情、容器、空队列和日志正常。最新可读数据库备份为 `pre-main-514af8a2-20260714-051127.sql.gz`，SHA-256 `9fc72efba29ee8d32c9709665809d259ca49e47a217c43626c99b084d99d4b0a`。
@@ -1386,7 +1390,7 @@ P0 马信息补全专项的模型交接文档见
 
 - 标准批次进度护栏改为只比较本批后仍有未排除可抓 pending due 目标的地区；低容量地区抓空后退出比较，其他未完成地区仍严格遵守 100 场领先上限。
 - 待审 selection snapshot 排除项继续保留总账和 remaining pending 分母，不会被技术修复伪装成完成；artifact summary 新增可抓分母和实际护栏地区，便于审批追溯。
-- OpenSpec、测试优先实现和最终 review 已完成；专项 `66` 项、完整 `stable 1171` 项通过，`1` 项按设计跳过。代码已合入 `main@614f810e`，尚待可复现 AMD64 镜像切换；生产历史开关和公开展示保持关闭。
+- 旧规格流程、测试优先实现和最终 review 已完成；专项 `66` 项、完整 `stable 1171` 项通过，`1` 项按设计跳过。代码已合入 `main@614f810e`，尚待可复现 AMD64 镜像切换；生产历史开关和公开展示保持关闭。
 
 ## 2026-07-14 第四标准批次 250 场导入完成
 
@@ -1430,13 +1434,13 @@ P0 马信息补全专项的模型交接文档见
 
 - change 保持 `implementing`：本地已完成 TDN 日期查询、France Galop 可信时间、翻译失败有界恢复、多地区归属 run/manifest/灰度和运营可观测性，生产尚未部署。
 - 三轮 review/返修后专项 `120` 项全部通过；完整 `stable` 回归 `968` 项通过，PostgreSQL 专项性能契约 `1` 项在 SQLite 按设计跳过，最终 review 无待修复问题。
-- 配置默认保持归属 `off`、相关地区查询关闭、翻译自动重试关闭。该日 OpenSpec 为 `57/68`；双审与 `250/40/50` 门槛已由 2026-07-14 的单审及 `150/10/20` 决策取代，当前进度和资格以本文顶部为准。
+- 配置默认保持归属 `off`、相关地区查询关闭、翻译自动重试关闭。该日 旧规格流程 为 `57/68`；双审与 `250/40/50` 门槛已由 2026-07-14 的单审及 `150/10/20` 决策取代，当前进度和资格以本文顶部为准。
 - 因此代码已具备灰度基础，但功能尚未在线，也不能据本地合成测试宣称多地区归属已达到生产准确率。
 - 终态翻译失败将向 `754652181@qq.com` 发送包含文章、失败分类和后台快速入口的邮件；生产部署仍须确认 SMTP 配置。测试群通过 `PushTarget.multiregion_test_enabled` 显式标记，默认关闭，避免 `web_test_groups` 阶段影响正式群。
 
 ## 2026-07-13 法国新鲜度与多地区归属方案完成工程评审（历史状态）
 
-- OpenSpec change `fix-france-news-freshness-and-multiregion-attribution` 当日已完成两轮 full review 并进入 `reviewed`；后续代码已安全关闭部署，当前仍待生产 dry-run 与 Shadow 验收。
+- 旧规格流程 change `fix-france-news-freshness-and-multiregion-attribution` 当日已完成两轮 full review 并进入 `reviewed`；后续代码已安全关闭部署，当前仍待生产 dry-run 与 Shadow 验收。
 - 方案覆盖 TDN 日期倒序抓取、France Galop 可信发布时间、瞬时翻译失败有界重试、多地区归属准确度和分阶段上线。
 - 上线前必须通过版本化 gold set、真实生产 dry-run、250 篇批处理性能门槛和单次发布/QQ 交付幂等测试；归属默认 `off`，相关地区查询默认关闭。
 
@@ -1444,7 +1448,7 @@ P0 马信息补全专项的模型交接文档见
 
 法国新闻低产出排查确认不是 3 天门禁过严，而是 TDN 关键词入口按相关度返回历史稿、France Galop 未解析真实发布时间、两篇最新稿因翻译供应商 `429/503` 且没有周期重试，以及多地区归属开关仍关闭四项叠加。TDN 按日期 posts 搜索在 `2026-07-09` 以来可找到 `12` 篇宽口径候选；本次仅记录证据，尚未改代码、重试文章或开启归属。
 
-上述四类问题已纳入 OpenSpec change `fix-france-news-freshness-and-multiregion-attribution`。该 change 同时要求提高多地区归属准确度，以真实五地区 Gold Set 和明确 precision/recall/过度扩散门槛控制生产资格，并按 shadow、仅写入、网页/测试群、72 小时回填、正式群五阶段启用。该段为早期规划记录；当前代码已部署为安全关闭，159 条首发 Gold 已达标，生产多地区开关仍为关闭。
+上述四类问题已纳入 旧规格流程 change `fix-france-news-freshness-and-multiregion-attribution`。该 change 同时要求提高多地区归属准确度，以真实五地区 Gold Set 和明确 precision/recall/过度扩散门槛控制生产资格，并按 shadow、仅写入、网页/测试群、72 小时回填、正式群五阶段启用。该段为早期规划记录；当前代码已部署为安全关闭，159 条首发 Gold 已达标，生产多地区开关仍为关闭。
 
 历史首批45个目标当前为 `33 imported / 3 ready / 9 pending`。法国2012/2025六场已通过独立补充来源审批链导入 `70` 条出马和 `41` 条赛果；36个已materialize历史赛事仍全部为draft，历史回填与网络开关继续保持false，线上未公开。下一步补法国2000、英国2000和美国2000/2012来源缺口。
 
@@ -1495,8 +1499,8 @@ P0 马信息补全专项的模型交接文档见
 - 榜单重点推送：已部署 `QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，`QQ_PUSH_SCOPE=high_value_only` 下只推 netkeiba 访问量榜 / 注目数榜且无 blocker 的公开文章。
 - 公开文章 ID URL：已部署公开详情主路径 `/news/<article_id>/`，非纯数字旧 slug URL 跳转到 ID URL，QQ 消息链接不再包含标题全文。
 - 赛事日历 / 年度赛事页 MVP：已部署生产 `f3c4c46`。已实现 `RaceEvent` 产品层、公开 `/races/` 赛事日历、年度详情页、后台 `/admin/race-events/` 工作台、CSV 种子导入、候选资料写入/应用、新闻自动/手动关联和人工移除保护；生产已导入 5 条 P0/P1 赛事种子与 10 条别名，第一版不建设马匹数据库或完整赛果库。
-- 马匹详情页 MVP：`2026-07-10` 已更新部署到生产 `65988b0`，OpenSpec change `horse-profile-page-mvp` 已归档到 `openspec/changes/archive/2026-07-08-horse-profile-page-mvp/`，正式规格已同步到 `horse-profile-pages`、`horse-profile-data-completion` 和 `public-home-info-feed`。新增 `HorseProfile`、候选资料、参赛履历、马-赛事/新闻关联和匿名关注模型；公开 `/horses/`、`/horses/<id>/`、`/horses/follows/` 已实现，后台 `/admin/horse-profiles/` 支持审核发布、字段锁定、候选 diff、参赛履历和新闻关联维护。P0 马已默认生成 `21596` 个草稿，前台默认不可见，管理员可强制发布空壳；外部补全走本地缓存 dry-run artifact + 人工审核 commit，公开请求路径不访问第三方。`2026-07-08` 已补审查修复：全量 dry-run 默认不截断、马名和术语匹配大小写不敏感、关注面过滤未发布马匹、补全 commit 保留写库前 diff、资料保存不能绕过发布审计、按地区输出补全比例、stale 扫描任务不扩大范围。生产全地区补全 dry-run artifact 位于 `runtime/horse_profile_completion/dry-run-20260708_041343/`，当前完整二代 `0/21596`，未补全占比 `100%`，主要原因是本地外部缓存无匹配或来源不可用；本次未 commit 补全结果。线上已发布样本 `春秋分` `/horses/13113/` 与 `北十字星` `/horses/3873/`，均为完整二代血统，参赛履历分别 `10` / `11` 条，相关新闻各 `5` 篇；浏览器验收确认详情页、新闻 tag 点击、关注 / 取消关注、关注页新闻流、英文大小写搜索和移动端一级导航 / 地区筛选布局均通过。
-- P0 马资料补全专项：`2026-07-10` 已在独立 worktree `/Users/mentianlu/.codex/worktrees/p0-horse-info-completion/umanews` 创建并重写 OpenSpec change `complete-p0-horse-profile-data`，并对齐旧线程最终提交 `d78fab0`。新版 P0 范围扩展为“当前 active 且有中文译名的 horse `TermEntry` + 五大地区全部历史与未来重点赛事参赛马”，重点赛事等级限定为 `G1/G2/G3/J-G1/J-G2/J-G3/JpnⅠ/JpnⅡ/JpnⅢ`；暂无中文译名的 P0 马允许补全和人工发布，翻译命中时保留原文。首批验收为日本、中国香港、英国、法国、美国各 10 匹完整资料马，完整资料硬门槛包括 P0 来源证据、基础事实字段、二代血统、完整赛事履历、主胜鞍、来源 URL 和人工审核记录。计划工程审查已重新完成，`.openspec.yaml` 当前 `phase=reviewed`。核心骨架已完成三轮审查返修：马匹地区不属于身份键，来源内 external horse ID 可直接定位；跨来源归并数据库已有马必须完整唯一命中经术语库多语种归一的“马名 + 父名 + 母名 + 出生年份”，歧义写候选并每天通知管理员；同一原名对应多个马术语时保留原文且禁止任意替换。管理员可从冲突筛选列表进入详情填写处理说明；P0 普通同步只增量刷新，显式全量对账才执行 revoked，待处理歧义不会误撤销仍在输入中的来源；artifact 使用顶层/行级/模块级审核；完整资料按最新模块审核结论、在役马同步新鲜度、退役马最新赛绩、逐条赛绩来源和四模块审计判断。定向 P0 回归 `35` 项、系统/迁移检查和 OpenSpec 校验通过；完整 `stable` `549` 项仅剩 `3` 个随日期漂移的既有 TDN France 时效 fixture 失败。当前尚未执行五地区真实 adapter 扩展、每地区 10 匹 dry-run、生产 commit 或人工公开验收。
+- 马匹详情页 MVP：`2026-07-10` 已更新部署到生产 `65988b0`，旧规格流程 change `horse-profile-page-mvp` 已归档到 `旧规格流程/changes/archive/2026-07-08-horse-profile-page-mvp/`，正式规格已同步到 `horse-profile-pages`、`horse-profile-data-completion` 和 `public-home-info-feed`。新增 `HorseProfile`、候选资料、参赛履历、马-赛事/新闻关联和匿名关注模型；公开 `/horses/`、`/horses/<id>/`、`/horses/follows/` 已实现，后台 `/admin/horse-profiles/` 支持审核发布、字段锁定、候选 diff、参赛履历和新闻关联维护。P0 马已默认生成 `21596` 个草稿，前台默认不可见，管理员可强制发布空壳；外部补全走本地缓存 dry-run artifact + 人工审核 commit，公开请求路径不访问第三方。`2026-07-08` 已补审查修复：全量 dry-run 默认不截断、马名和术语匹配大小写不敏感、关注面过滤未发布马匹、补全 commit 保留写库前 diff、资料保存不能绕过发布审计、按地区输出补全比例、stale 扫描任务不扩大范围。生产全地区补全 dry-run artifact 位于 `runtime/horse_profile_completion/dry-run-20260708_041343/`，当前完整二代 `0/21596`，未补全占比 `100%`，主要原因是本地外部缓存无匹配或来源不可用；本次未 commit 补全结果。线上已发布样本 `春秋分` `/horses/13113/` 与 `北十字星` `/horses/3873/`，均为完整二代血统，参赛履历分别 `10` / `11` 条，相关新闻各 `5` 篇；浏览器验收确认详情页、新闻 tag 点击、关注 / 取消关注、关注页新闻流、英文大小写搜索和移动端一级导航 / 地区筛选布局均通过。
+- P0 马资料补全专项：`2026-07-10` 已在独立 worktree `/Users/mentianlu/.codex/worktrees/p0-horse-info-completion/umanews` 创建并重写 旧规格流程 change `complete-p0-horse-profile-data`，并对齐旧线程最终提交 `d78fab0`。新版 P0 范围扩展为“当前 active 且有中文译名的 horse `TermEntry` + 五大地区全部历史与未来重点赛事参赛马”，重点赛事等级限定为 `G1/G2/G3/J-G1/J-G2/J-G3/JpnⅠ/JpnⅡ/JpnⅢ`；暂无中文译名的 P0 马允许补全和人工发布，翻译命中时保留原文。首批验收为日本、中国香港、英国、法国、美国各 10 匹完整资料马，完整资料硬门槛包括 P0 来源证据、基础事实字段、二代血统、完整赛事履历、主胜鞍、来源 URL 和人工审核记录。计划工程审查已重新完成，`.旧规格流程.yaml` 当前 `phase=reviewed`。核心骨架已完成三轮审查返修：马匹地区不属于身份键，来源内 external horse ID 可直接定位；跨来源归并数据库已有马必须完整唯一命中经术语库多语种归一的“马名 + 父名 + 母名 + 出生年份”，歧义写候选并每天通知管理员；同一原名对应多个马术语时保留原文且禁止任意替换。管理员可从冲突筛选列表进入详情填写处理说明；P0 普通同步只增量刷新，显式全量对账才执行 revoked，待处理歧义不会误撤销仍在输入中的来源；artifact 使用顶层/行级/模块级审核；完整资料按最新模块审核结论、在役马同步新鲜度、退役马最新赛绩、逐条赛绩来源和四模块审计判断。定向 P0 回归 `35` 项、系统/迁移检查和 旧规格流程 校验通过；完整 `stable` `549` 项仅剩 `3` 个随日期漂移的既有 TDN France 时效 fixture 失败。当前尚未执行五地区真实 adapter 扩展、每地区 10 匹 dry-run、生产 commit 或人工公开验收。
 - P0 第四轮审查返修：同场同名参赛马改按马号/来源身份拆分，URL 暂缺的仍存在来源不会在完整对账中误撤销；非 pending 候选不能通过通用应用入口改为 applied；人工完整审核必须提供明确整匹马资料 URL。身份歧义采用专用 `HorseIdentityConflict`，可在无 profile 时保存多个候选术语、身份原始证据和人工解决状态；resolved 必须选择最终资料页，后续同步按人工结论建立 P0 来源。每日运营通知链接到 Django Admin pending 列表。定向术语/P0/旧马匹页回归 `79` 项通过；完整 `stable` `556` 项仅剩 `3` 个随日期漂移的既有 TDN France fixture 失败。
 - P0 第五轮审查返修：`HorseP0Source.participant_key` 持久化同场参赛身份，runner/result 按马号、来源 ID、赛事内唯一马名配对；无外部 ID 的同场同名马可按不同马号稳定拆分，重复同步不增生，身份纠正保留 revoked 旧绑定。P0 artifact 与通用人工候选统一调用共享赛绩幂等 upsert，并强制完整来源名/URL。定向旧马匹页/P0 回归 `59` 项通过；完整 `stable` `560` 项仍仅有既知 `3` 个 TDN France 固定日期 fixture 失败。
 - P0 第六轮审查返修：参赛键从 external identity 升级到马号时迁移既有 active 来源，不保留重复 active；runner/result 非空马号冲突时禁止按 external ID 降级合并并写身份冲突证据；后台手工新增/编辑赛绩统一走共享幂等服务，编辑后重算键且来源 URL 双层必填。定向旧马匹页/P0 回归 `63` 项通过；完整 `stable` `564` 项仅有既知 `3` 个 TDN France 固定日期 fixture 失败；并发争用按用户决定不在本轮处理。
@@ -1504,7 +1508,7 @@ P0 马信息补全专项的模型交接文档见
 - P0 第八轮审查返修：马号冲突 resolved 必须同时选择最终资料页和候选马号，后续只绑定该马号记录；冲突 evidence 保存全部成员与 URL，完全无 URL 也落库，fingerprint 排除可变 URL；imported 赛绩人工编辑继续沿用 external ID 和原 source namespace 幂等键。定向旧马匹页/P0 回归 `69` 项通过；完整 `stable` `570` 项仍仅有既知 `3` 个 TDN France 固定日期 fixture 失败。
 - P0 第九轮审查返修：迁移回填同时读取 `raw_payload/source_refs` 的 external ID；共享任一身份键的参赛记录按完整连通组生成单条冲突，交叉身份不会丢成员；resolved 马号必须具备成员或赛事 URL，URL 后续缺失时同步恢复 pending、清空无效选择并记录原因，确保继续通知管理员。定向回归 `96` 项通过；完整 `stable` `573` 项仅剩既知 `3` 个 TDN France 固定日期 fixture 失败，当前仍未部署。
 - P0 第十轮审查返修：人工 P0 来源按马匹独立 upsert 并增加唯一约束；resolved 马号成员无法定位时统一恢复 pending 并重新通知；旧空键赛绩优先按 external identity 接管或报告多记录歧义，不再因事实字段变化新增第三条。定向回归 `99` 项通过；完整 `stable` `576` 项仅剩既知 `3` 个 TDN France 固定日期 fixture 失败，当前仍未部署。
-- P0 连续审查收敛：按用户要求持续执行审查与返修，第五轮纯审查无可操作发现。旧赛绩来源命名空间支持从证据回填并统一大小写/空格，external ID 统一去空格，importer 与后台编辑都会阻断多条旧 external identity；补全队列按真实资料缺口和刷新需求排序，再综合人工、候选、近期新闻、重点赛事、外部身份和术语优先级，完整马不再挤占未完成样本限额。OpenSpec `6.2` 因五地区 adapter/artifact 尚未完成而恢复未勾选。定向回归 `104` 项通过；完整 `stable` `581` 项仅剩既知 `3` 个 TDN France 固定日期 fixture 失败，当前仍未提交或部署。
+- P0 连续审查收敛：按用户要求持续执行审查与返修，第五轮纯审查无可操作发现。旧赛绩来源命名空间支持从证据回填并统一大小写/空格，external ID 统一去空格，importer 与后台编辑都会阻断多条旧 external identity；补全队列按真实资料缺口和刷新需求排序，再综合人工、候选、近期新闻、重点赛事、外部身份和术语优先级，完整马不再挤占未完成样本限额。旧规格流程 `6.2` 因五地区 adapter/artifact 尚未完成而恢复未勾选。定向回归 `104` 项通过；完整 `stable` `581` 项仅剩既知 `3` 个 TDN France 固定日期 fixture 失败，当前仍未提交或部署。
 - 2026 五地区重要赛事填充：已按官方来源导入日本 JRA/NAR、香港 HKJC 当前公开 2025/26 马季内香港 G1/G2/G3、美国 TOBA Grade 1/2/3、英国 BHA Flat Group 1/2/3 与 Jump 2026 年 1-4 月 Grade 1/2、法国 France Galop Groupe I/II/III。当前生产 `RaceEvent=995`、`RaceEventAlias=3277`；2026 五地区计数为日本 `186`、香港 `20`、美国 `412`、英国 `203`、法国 `174`。剩余缺口是 HKJC 尚未公开 2026/27 年末香港本地分级赛日期，以及英国 Jump 2026 年 10-12 月仍需下一季官方书或其他官方结构化来源。
 - 赛事信息编排工具：`2026-07-11` 已完成第四轮技术返修，在既有独立应到清单、run 级候选汇总、共享请求预算和全阶段 state 基础上，新增实际 apply scope 对账与逐组合确认、按哈希命名的 approved candidate、importer 执行时 `--expected-sha256` 复核、严格 adapter manifest，以及 `complete_with_warnings` 行状态。独立赛事编排专项测试 `41` 项、完整 `stable` 测试 `581` 项、Django check 和迁移漂移检查均通过；当前尚未运行真实抓取、未写生产数据。
 - 国际赛马资讯扩展：已部署多地区新闻源、公开首页地区 tab、多语言术语别名、群级 QQ 地区配置和 HKJC 受控导入；生产第一版已启用 `Sponichi`、`HKJC Racing News`、`SCMP Racing`、`Sporting Life Racing`、`Sky Sports Racing`、`France Galop English News`、`TDN France keyword`、`TDN`、`Horse Racing Nation`，其中 `BHA` 因生产探测返回 `403` 暂停启用。
@@ -1513,22 +1517,22 @@ P0 马信息补全专项的模型交接文档见
 - 多地区正式术语库补齐：`2026-07-04` 已导入 WP Stud 香港/来港社区马名 `210` 条、HKJC 当前本地马 A-Z 官方译名 `1258` 条，并从 HKJC 本地赛果回溯香港历史马名、骑师名和赛事名到 `2026-07-04`。`2026-07-05` 已继续完成 HKJC overseas 官方 Race Card/QIDS 术语回溯，覆盖 `2024-01-01` 至 `2026-07-04`，正式导入海外 `horse / jockey / race` 候选 `7691` 条中的新增/更新项；同时补齐当前发现的 WP Stud 赛事、骑师和马场社区术语，正式新增 `1891` 条。`2026-07-06/07` 已完成最终清洗与 WP Stud HorseList 全量马名补齐：最终 `seed_candidates_final.csv` 共 `11257` 行，生产正式导入新增 `1169`、更新 `10088`、错误/跳过 `0`，并修复既有马名国别后缀和赛事年份标记脏数据。当前生产正式术语为 `TermEntry=16558`、`TermAlias=19293`，active 马名国别后缀术语 `0`、active 赛事年份标记术语 `0`；`source_language=en` 已覆盖香港、英国、法国、美国、日本和 other 的马名/赛事/骑师/马场，HKJC 官方仍保持最高优先级，WP Stud 只作为社区来源和人工审核佐证。
 - HKJC 日语 alias 合并与文章术语回填工具：`2026-07-07` change `hkjc-ja-alias-article-backfill` 已实现并部署生产 `a65c1ed`。新增 `merge_hkjc_ja_aliases` 用于把同中文目标的日语主术语安全并入 HKJC 英文概念并停用冗余日语主术语；新增 `backfill_article_terms` 用于对已发布文章中文字段执行可审计术语回填。生产已合并 `112` 条 HKJC 日语 alias，文章回填扫描 `713` 篇日文已发布文章并更新 `29` 个字段、跳过 `2` 个人工字段；`/news/7117/` 已确认显示 `欢快舞步`。
 - 多地区新闻常态生产：`operate-multiregion-news-production` 已实现、部署生产并归档；`2026-07-01` 已继续归档 `add-netkeiba-horse-data-import`、`expand-international-racing-coverage`、`guard-qqbot-offline-send`，生产服务器运行 `8c83708`，已具备只读审计、通用 enabled 新闻来源轮询、非日本默认人工审核、地区/来源自动发布灰度、后台地区生产概览、QQ 国际新闻地区标签和运行手册。当前 `NEWS_SOURCE_POLL_ENABLED=true`，轮询覆盖五个地区，每轮最多 12 个来源；非日本自动发布 allowlist 已开启香港、英国、法国、美国四个地区并保留每日小上限护栏，正式群仍需显式配置地区。
-- 法国新闻源扩展：`2026-07-07` OpenSpec change `expand-france-news-sources` 已部署生产提交 `bfc3445`。新增 `tdn_france_broad` 英文补充来源，生产只读探测 accepted：HTTP `200`、列表 `20`、详情样本 `5`、详情错误 `0`、重复 `0`。生产已启用 `NewsSource#21`，`enabled=true`、`production_approved=true`、有效轮询 `15` 分钟；发布白名单已加入 `tdn_france:access` 和 canonical 入库使用的 `tdn:access`。真实抓取验证已入库法国新来源文章 `4` 篇，均完成翻译并进入正常人工复核，当前无来源白名单或抓取失败阻断。
-- 英文术语门禁误挡修复：`2026-07-07` OpenSpec change `fix-english-term-gate-region-filter` 已部署生产提交 `bfc3445`。英文发布校验第一版改为同地区 + 全局术语范围，配置化高歧义英文词降级为 warning；新增近期误挡文章重处理命令和生产审计 `gate_issues` 摘要。上线后 dry-run 验证：香港、美国、法国最近 3 小时无可释放 `core_term_missing` 候选；英国有 `1` 篇候选但仍是真实核心术语缺失，未执行 commit。
+- 法国新闻源扩展：`2026-07-07` 旧规格流程 change `expand-france-news-sources` 已部署生产提交 `bfc3445`。新增 `tdn_france_broad` 英文补充来源，生产只读探测 accepted：HTTP `200`、列表 `20`、详情样本 `5`、详情错误 `0`、重复 `0`。生产已启用 `NewsSource#21`，`enabled=true`、`production_approved=true`、有效轮询 `15` 分钟；发布白名单已加入 `tdn_france:access` 和 canonical 入库使用的 `tdn:access`。真实抓取验证已入库法国新来源文章 `4` 篇，均完成翻译并进入正常人工复核，当前无来源白名单或抓取失败阻断。
+- 英文术语门禁误挡修复：`2026-07-07` 旧规格流程 change `fix-english-term-gate-region-filter` 已部署生产提交 `bfc3445`。英文发布校验第一版改为同地区 + 全局术语范围，配置化高歧义英文词降级为 warning；新增近期误挡文章重处理命令和生产审计 `gate_issues` 摘要。上线后 dry-run 验证：香港、美国、法国最近 3 小时无可释放 `core_term_missing` 候选；英国有 `1` 篇候选但仍是真实核心术语缺失，未执行 commit。
 - 非术语门禁误挡修复：`2026-07-10` 本地已按候选池 raw 分类检查 `is_likely_term=yes/no/review`。`yes` 共 `369` 条均已存在正式术语 ID，生产只读核对对应 `350` 个唯一 `TermEntry` 全部存在且 active，无需补库；`no` 共 `89` 条已确认为非术语，代码新增 `MULTIREGION_TERM_GATE_IGNORED_SOURCE_TERMS` 默认列表，发布校验命中后写 `non_term_gate_ignored` / `info` 且不生成核心术语 blocker；`review` 类暂不批量建词。当前已通过本地目标测试和 `manage.py check`，尚未部署生产。
 - `2026-07-07 21:00` 线上回归复核：生产 `HEAD=dcb9b90`，服务健康；`tdn_france_broad` 再次探测 accepted，生产自然窗口已通过 `source_config=21` 入库法国文章 `10` 篇，其中 `9` 篇已翻译、`1` 篇翻译中。该来源当前 `CrawlJob#9355` 仍在运行，Celery 日志显示模型接口持续 `200 OK`，结论为单轮处理耗时偏长但仍在推进；最近 90 分钟发布/QQ 窗口均有成功账本和明确 0 原因。英文门禁 dry-run 未发现可释放误挡文章。
-- `2026-07-07` 已修复并重新启用 `tdn_france_broad`：该来源此前使用 TDN WordPress search API，返回历史相关性结果且不带发布时间，adapter 将缺失日期兜底为当前时间，导致 2020/2022/2023/2024 旧文被当作当天新闻入库并有 5 篇自动发布。OpenSpec change `fix-tdn-france-search-date-freshness` 已部署生产 `ad587ce`，现在会二次读取 TDN post API 的真实 `date_gmt/date`，缺失日期或超过 3 天新鲜度窗口的条目会跳过且写入抓取摘要。已将误发布旧文 `7255/7263/7264/7265/7271` 撤回公开，公网详情均返回 `404`；生产 `NewsSource#21` 已恢复 `enabled=true`、`production_approved=true`。线上真实抓取 `CrawlJob#9445` 成功，`new_count=0`、`seen_count=0`、`skipped_count=80`，无新增旧文。
+- `2026-07-07` 已修复并重新启用 `tdn_france_broad`：该来源此前使用 TDN WordPress search API，返回历史相关性结果且不带发布时间，adapter 将缺失日期兜底为当前时间，导致 2020/2022/2023/2024 旧文被当作当天新闻入库并有 5 篇自动发布。旧规格流程 change `fix-tdn-france-search-date-freshness` 已部署生产 `ad587ce`，现在会二次读取 TDN post API 的真实 `date_gmt/date`，缺失日期或超过 3 天新鲜度窗口的条目会跳过且写入抓取摘要。已将误发布旧文 `7255/7263/7264/7265/7271` 撤回公开，公网详情均返回 `404`；生产 `NewsSource#21` 已恢复 `enabled=true`、`production_approved=true`。线上真实抓取 `CrawlJob#9445` 成功，`new_count=0`、`seen_count=0`、`skipped_count=80`，无新增旧文。
 - 后台术语运营：候选详情页和文章编辑台支持原文选区快速加入术语库；新增术语成功后可一次性将该术语应用到当前文章已有中文稿
 - 前后台移动端适配
 
 ## 3.1 已完成并部署生产（体验升级）
 
-- 公开首页资讯流升级主 OpenSpec change：`upgrade-public-home-info-feed`
+- 公开首页资讯流升级主 旧规格流程 change：`upgrade-public-home-info-feed`
   - Web 端已实现：轻导航、主头条、普通新闻流、右侧热门/重点辅助模块
   - 移动 H5 已实现：轻顶部、轻量头条、高密度左文右图新闻列表
   - 实施方式：严格 TDD，按可测试行为逐轮执行 RED -> GREEN -> REFACTOR；热门代理使用有限候选集与批量快照读取
   - 首版不做原生 App、手工置顶、搜索频道、专题、赛事日历、站内评论或站内浏览量
-  - 当前状态：本地实现、Django 测试、OpenSpec 校验、桌面/移动浏览器验收和 OpenSpec 归档已完成；`2026-06-22` 已通过 PR #1 合并并部署到生产 `e834f58`
+  - 当前状态：本地实现、Django 测试、旧规格流程 校验、桌面/移动浏览器验收和 旧规格流程 归档已完成；`2026-06-22` 已通过 PR #1 合并并部署到生产 `e834f58`
 - 移动端首页密度 follow-up：
   - 已小幅压缩移动端头条区域，隐藏头条摘要并收紧顶部间距
   - 390px 浏览器验收中，首屏普通新闻卡可见数量从生产基线的 3 条提升到 4 条
@@ -1599,30 +1603,30 @@ P0 马信息补全专项的模型交接文档见
 - 工程计划审核 fallback：`.codex/skills/plan-eng-review`
 - Codex 领域代理：`application`、`integration`、`operations`
 - Codex 只读审核代理：`reviewer`、`security-scanner`
-- OpenSpec legacy 配置与历史/在途 artifacts：`openspec/config.yaml`、`openspec/specs/`、`openspec/changes/`；相关 skills 与 workflow-spine 已停用，不作为新流程入口或门禁
+- 旧规格流程 legacy 配置与历史/在途 artifacts：`旧规格流程/config.yaml`、`旧规格流程/specs/`、`旧规格流程/changes/`；相关 skills 与 workflow-spine 已停用，不作为新流程入口或门禁
 - 当前流程为“探索 -> spec/design -> 方案审核 -> 测试先行 -> 子代理实现 -> 新子代理 `/review` -> 用户授权后发布”
-- `start-hkjc-data-import-and-global-spikes` 已完成 `/plan-eng-review`、TDD 红灯测试、最小实现、read-only spike、生产部署、验证和归档；生产服务镜像来自 `b0361cf`。2026-06-26 已在生产执行一次 HKJC fixture 样本 commit（`run_id=1960`），写入 `1` 场、`2` 条报名、`2` 条成绩、`2` 匹马和 `4` 条别名；该样本不来自真实网络抓取，也不生成公开比赛页。英法美三地当前均为 `needs_more_spike`。正式规格已同步到 `openspec/specs/global-racing-data-import-readiness/spec.md`；后续如要正式导入英法美或真实 HKJC 网络适配，应另起 change。
-- `connect-real-global-racing-databases` 已创建并通过 OpenSpec 严格校验；目标按香港、英国、法国、美国顺序接入真实赛马数据库，每地抓最近 2 个月赛事和涉及马匹详情后停止。当前香港阶段已完成 HKJC 官方 HTML 单场真实 dry-run 和隔离 SQLite commit：`HK20260624HV01` 解析并写入 `1` 场、`12` 条报名、`12` 条成绩、`12` 条英文别名；并已完成 recent-days/date-range 小范围真实链路，`--recent-days 60 --end-date 2026-06-26 --limit-races 1 --limit-horses 1` dry-run 请求 `4` 次官方页面，返回 `completion.is_complete=false`、`meetings_found=28`，隔离 SQLite commit 写入 `1` 场、`12` 条报名、`12` 条成绩、`1` 匹马 profile 和 `12` 条别名，重复执行正式对象计数不增长。HKJC 追加 plan-only 批次预检：过滤 overseas `S*` racecourse 后，最近 60 天本地香港 `HV/ST` 比赛为 `144` 场，可按每批 `20` 场拆为 `8` 批；已通过 `--skip-races 20` 真实 smoke 证明日期范围后续批次可从第 21 场开始，并通过 `--race-ids HK20260624HV02,HK20260613ST04 --limit-horses 1` 真实 smoke 证明可按指定 race_id 精确批次只请求目标比赛和受限马匹详情。英法美已追加 `18` 次只读入口复核：英国 `Sporting Life + BHA` 可行性最高，美国 `Equibase` 入口更具体但 chart/PDF 仍需 fixture spike，法国 `France Galop` 仍未定位稳定结构化查询参数。下一步仍需部署后执行 HKJC 生产最近 2 个月全量 dry-run/commit，香港完成后再按顺序进入英国正式 parser/importer TDD。
+- `start-hkjc-data-import-and-global-spikes` 已完成 `/plan-eng-review`、TDD 红灯测试、最小实现、read-only spike、生产部署、验证和归档；生产服务镜像来自 `b0361cf`。2026-06-26 已在生产执行一次 HKJC fixture 样本 commit（`run_id=1960`），写入 `1` 场、`2` 条报名、`2` 条成绩、`2` 匹马和 `4` 条别名；该样本不来自真实网络抓取，也不生成公开比赛页。英法美三地当前均为 `needs_more_spike`。正式规格已同步到 `旧规格流程/specs/global-racing-data-import-readiness/spec.md`；后续如要正式导入英法美或真实 HKJC 网络适配，应另起 change。
+- `connect-real-global-racing-databases` 已创建并通过 旧规格流程 严格校验；目标按香港、英国、法国、美国顺序接入真实赛马数据库，每地抓最近 2 个月赛事和涉及马匹详情后停止。当前香港阶段已完成 HKJC 官方 HTML 单场真实 dry-run 和隔离 SQLite commit：`HK20260624HV01` 解析并写入 `1` 场、`12` 条报名、`12` 条成绩、`12` 条英文别名；并已完成 recent-days/date-range 小范围真实链路，`--recent-days 60 --end-date 2026-06-26 --limit-races 1 --limit-horses 1` dry-run 请求 `4` 次官方页面，返回 `completion.is_complete=false`、`meetings_found=28`，隔离 SQLite commit 写入 `1` 场、`12` 条报名、`12` 条成绩、`1` 匹马 profile 和 `12` 条别名，重复执行正式对象计数不增长。HKJC 追加 plan-only 批次预检：过滤 overseas `S*` racecourse 后，最近 60 天本地香港 `HV/ST` 比赛为 `144` 场，可按每批 `20` 场拆为 `8` 批；已通过 `--skip-races 20` 真实 smoke 证明日期范围后续批次可从第 21 场开始，并通过 `--race-ids HK20260624HV02,HK20260613ST04 --limit-horses 1` 真实 smoke 证明可按指定 race_id 精确批次只请求目标比赛和受限马匹详情。英法美已追加 `18` 次只读入口复核：英国 `Sporting Life + BHA` 可行性最高，美国 `Equibase` 入口更具体但 chart/PDF 仍需 fixture spike，法国 `France Galop` 仍未定位稳定结构化查询参数。下一步仍需部署后执行 HKJC 生产最近 2 个月全量 dry-run/commit，香港完成后再按顺序进入英国正式 parser/importer TDD。
 - 生产 HKJC 真实网络运行状态：`connect-real-global-racing-databases` 当前实现已部署到生产 `04c0444`，备份 `backups/db/pre-hkjc-real-network-20260626_202442.sql.gz` 通过校验，部署后 check/healthz/小样本 dry-run 通过，生产 plan-only 仍为 `144` 场、`8` 批；第 1 批 full dry-run 曾在马匹 profile 补抓阶段遇到 HKJC `ReadTimeout` / TLS handshake timeout 中断，该次未 commit、未写表，HKJC 锁为空且表计数仍为上次 fixture 样本 `1/2/2/2/4`。已按 TDD 补 transient timeout retry 并重新部署，随后将前 6 个 plan-only 批次拆成 24 个 5 场小批次 dry-run，均 `completion.is_complete=true`，累计覆盖 `120` 场、`1522` 条 entries、`1522` 条 results 和 `1522` 个 horse profile 请求，当前停在生产 commit 前确认点。
-- `connect-real-global-racing-databases` 的本轮目标已在 `2026-06-27` 调整为确认四地真实抓取能力可用，并按该口径完成：HKJC 生产真实 dry-run 证据成立，UK / France / US 少量真实 proof 证明 Sporting Life、Geny、Horse Racing Nation 的赛事、赛果和马匹详情入口可访问并可解析；新增 importer、审计命令、batch command 渲染器、fixtures、OpenSpec 规格/归档和 proof 文档已从干净 `origin/main` 基线整理为独立上线包。代码提交 `93b7007` 已部署生产，check/healthz/首页/命令入口/proof-only 审计和导入锁状态均通过；最近 60 天完整大量爬取和生产 `--commit` 保持为后续单独执行窗口。
+- `connect-real-global-racing-databases` 的本轮目标已在 `2026-06-27` 调整为确认四地真实抓取能力可用，并按该口径完成：HKJC 生产真实 dry-run 证据成立，UK / France / US 少量真实 proof 证明 Sporting Life、Geny、Horse Racing Nation 的赛事、赛果和马匹详情入口可访问并可解析；新增 importer、审计命令、batch command 渲染器、fixtures、旧规格流程 规格/归档和 proof 文档已从干净 `origin/main` 基线整理为独立上线包。代码提交 `93b7007` 已部署生产，check/healthz/首页/命令入口/proof-only 审计和导入锁状态均通过；最近 60 天完整大量爬取和生产 `--commit` 保持为后续单独执行窗口。
 
 ## 5. 当前验证结果
 
 - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py check`：通过
 - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable`：通过，147 项
 - `DB_ENGINE=sqlite CELERY_TASK_ALWAYS_EAGER=true /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 server/manage.py test stable.tests.TermResolverTests stable.tests.AutomationFlowTests stable.tests.TranslationWorkflowTests stable.tests.TermCandidateDiscoveryTests --noinput`：通过，49 项
-- `openspec validate use-external-horse-alias-for-name-recognition --strict`：通过
+- `旧规格流程 validate use-external-horse-alias-for-name-recognition --strict`：通过
 - `DB_ENGINE=sqlite /Users/mentianlu/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 manage.py test stable.tests.PublicHomeInfoFeedTests`：通过，10 项
-- `openspec validate upgrade-public-home-info-feed --strict`：归档前通过
-- `openspec validate --all`：归档前通过；同步正式规格并归档后再次通过
+- `旧规格流程 validate upgrade-public-home-info-feed --strict`：归档前通过
+- `旧规格流程 validate --all`：归档前通过；同步正式规格并归档后再次通过
 - 公开首页资讯流浏览器验收：桌面首页、移动首页、桌面详情页、移动详情页通过；移动普通卡约 128px 高，无横向溢出，图片加载正常
 - 公开首页资讯流生产验收：服务器 HEAD `e834f58`，`http://umafans.run/healthz/` 与 `/` 均返回 `200`，首页引用 `/static/stable/public.2eec24723b45.css`，390px 移动端普通新闻卡约 `128px` 高且首屏头条后可见 3 条普通新闻
 - 移动端首页密度 follow-up 生产验收：服务器 HEAD `04e2ee9`，`http://umafans.run/healthz/` 与 `/` 均返回 `200`，首页引用 `/static/stable/public.9aaf4b105424.css`，390px 视口下头条约 `257px` 高，第一张普通新闻卡 `top=388`，首屏可见 4 条普通新闻卡，普通卡仍约 `128px` 高，无横向溢出
 - 自动发布门禁优化生产验收：服务器 HEAD `42a4622`，迁移 `stable.0009_automation_publish_gates` 已应用，`AUTO_REWRITE_ENABLED=false`、`AUTO_PUBLISH_CONTENT_SOURCE=base_translation`、`AUTOMATION_WARNING_EMAIL_ENABLED=true` 已生效，`http://umafans.run/healthz/` 与 `/` 均返回 `200`
-- 三个运营改造 change 生产验收：服务器 HEAD `7f54f13`，`web / worker / beat` 已重建，`manage.py check` 通过，`http://127.0.0.1/healthz/` 与 `/` 均返回 `200`；运行态确认 netkeiba 新着顺 / 访问量榜 / 注目数榜调度分钟为 `00/16/26`，OpenSpec 归档后 `openspec validate --all` 通过
+- 三个运营改造 change 生产验收：服务器 HEAD `7f54f13`，`web / worker / beat` 已重建，`manage.py check` 通过，`http://127.0.0.1/healthz/` 与 `/` 均返回 `200`；运行态确认 netkeiba 新着顺 / 访问量榜 / 注目数榜调度分钟为 `00/16/26`，旧规格流程 归档后 `旧规格流程 validate --all` 通过
 - 外部马名索引识别链路生产验收：服务器 HEAD `35b0866`，`manage.py check` 通过，`http://127.0.0.1/healthz/`、`http://umafans.run/healthz/` 和 `/` 均返回 `200`；生产只读 smoke test 确认 `ExternalHorseAlias=11521`，`ロブチェン` 可识别为 `external_alias`
 - 榜单重点 QQ 推送与公开文章 ID URL 生产验收：服务器 HEAD `00e4bd4`，生产 `.env` 已切换为 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`；`manage.py check` 通过，`http://umafans.run/healthz/` 与 `/` 均返回 `200`，抽检 `/news/<article_id>/` 返回 `200`，旧 slug URL 返回 `302` 并跳转到 ID URL
-- 榜单重点 QQ 推送相关 OpenSpec 归档：`add-qqbot-auto-push`、`elevate-ranked-netkeiba-sources`、`push-ranked-news-to-qq`、`use-article-id-public-urls` 已归档并同步正式规格，归档后 `openspec validate --all` 通过
+- 榜单重点 QQ 推送相关 旧规格流程 归档：`add-qqbot-auto-push`、`elevate-ranked-netkeiba-sources`、`push-ranked-news-to-qq`、`use-article-id-public-urls` 已归档并同步正式规格，归档后 `旧规格流程 validate --all` 通过
 - QQ Bot 登录态恢复与离线防护本地验证：2026-06-26 排查确认 NapCat 登录态失效会导致 OneBot 无法发送；重新扫码登录后 `/get_status online=true`、测试群消息发送成功，并恢复 `QQ_PUSH_ENABLED=true`。本轮补充自动推送发送前 OneBot 在线预检，离线或状态检查失败时不调用发送接口、不增加 `attempt_count`，完整 `stable` 测试通过 268 项。
 - QQ Bot 离线防护生产验收：服务器 HEAD `a2146d6`，部署前 `.env` 备份为 `.env.backup.qqbot-offline-guard-20260626_223731`；部署后 `manage.py check` 通过，本地和公网 `/healthz/` 均返回 `200`，worker 环境确认 `QQ_PUSH_ENABLED=true`、`QQ_PUSH_SCOPE=high_value_only`、`QQ_PUSH_IMPORTANCE_STRATEGY=ranked`，`BotPusher().is_online()` 返回 `(True, '')`，测试群 `1026525240` 发送部署验证消息成功。
 - `docker compose -f docker-compose.prod.yml config`：通过
@@ -1636,10 +1640,10 @@ P0 马信息补全专项的模型交接文档见
 - 下一轮数据续抓建议优先补结构化赛事数据：先补英国 / 法国赛事详情与五地区历届冠军，再恢复 HKJC 长窗口 dry-run，最后按 `global_racing_full_crawl_runbook` 推进英国、法国、美国最近 60 天外部赛马数据库完整 dry-run。`2026-07-10` 已只读校验英法赛事详情候选：英国基础赛事 `202` 场、已完赛 `123` 场、规范候选 `122` 场；法国基础赛事 `173` 场、已完赛 `74` 场、规范候选 `74` 场，原始 ZEturf 候选 `80` 条中的 `6` 个重复 slug 已在规范包中去重。随后生产复核显示英法详情已经正式导入，英国 `Jane Seymour Nov. Hurdle` 在线状态为 `cancelled` 不需补赛果；本次仅修复 `GRAND PRIX DE SAINT-CLOUD` 历史冠军当前年残留误配，将 `2026` 冠军从 `ZELMAN` 修为 `CALANDAGAN`，生产备份为 `backups/db/pre-race-detail-gpsc-history-repair-20260710_025949.sql.gz`。
 - 赛事日历正式填充：`2026-07-06` 已按“官方源优先、本地语言优先、先 CSV/JSONL dry-run 再正式导入”的流程批量写入 2026 目标地区重要赛事。生产当前 `RaceEvent=995`、`RaceEventAlias=3277`；2026 五地区计数为日本 `186`、香港 `20`、美国 `412`、英国 `203`、法国 `174`。已完成基础表：日本 JRA 中央重赏 `140` 场、日本 NAR/交流ダートグレード `46` 场、香港 HKJC 已公开 2026 分级赛 `19` 场、美国 TOBA Grade 1/2/3 `411` 条、英国 BHA Flat Group 1/2/3 `138` 场、英国 BHA Jump 2026 年 1-4 月 Grade 1/2 `64` 场、法国 France Galop Groupe I/II/III `173` 条。详情表已导入日本、香港、美国当前可用批次：JRA 已完赛中央重赏 `74` 场、NAR 已完赛 `20` 场、NAR `2026-07-08` 已公布赛前出走表 `1` 场、HKJC 已公开香港分级赛 `19` 场、美国 TOBA 已完赛 Grade 1/2/3 `195` 场；生产 `RaceEventRunner=3260`、`RaceEventResult=2977`、`RaceEventHistoryWinner=0`。`取消/除外/中止/空白着顺/WV` 保留在出走表状态中，同着用唯一排序位写库并在 `source_refs.official_finish_position` 保留官方名次，前台已热补丁为展示官方名次。美国 Equibase chart 当前仍返回防护页，因此美国赛果暂用 HRN track-day 可见结果顺序；Kentucky Derby / Oaks 等 HRN 未公开结果块的场次只显示出走表。剩余详情缺口：JRA 未来 66 场、NAR 未来 25 场需等官方出走表或赛果发布，英国/法国详情来源解析，以及五地区历届冠军。
 - 多地区术语库与外部马名索引：`2026-07-03` 生产只读核对显示，正式术语库和术语候选池仍主要是日文。`2026-07-04` 至 `2026-07-07` 已连续导入术语种子：第一批 fixture 候选、WP Stud 香港/海外来港社区马名、HKJC 当前本地马 A-Z 官方英文马名、HKJC 本地赛果 `2024-01-01` 至 `2026-07-04` 候选、HKJC overseas `2024-01-01` 至 `2026-07-04` 官方 `horse / jockey / race` 候选、WP Stud 赛事/骑师/马场社区候选，以及 WP Stud HorseList 全量马名。当前生产为 `TermEntry=16558`、`TermAlias=19293`；`source_language=en` 已覆盖香港、英国、法国、美国、日本和 other 的马名/赛事/骑师/马场，active 马名国别后缀和赛事年份标记脏数据均为 `0`。外部马名索引仍以日本 `netkeiba` 为主体；英国、法国、美国当前生产 `External*` 表无写入。当前应把多地区识别能力理解为“正式术语库已大幅补齐，尤其 HKJC 官方本地/海外术语可用于英文新闻识别”，仍不等同于英法美外部赛马数据库正式落库。
-- 术语种子数据准备：OpenSpec change `prepare-termbase-seed-data` 已完成实现、验证和归档；本地首版已新增 `prepare_termbase_seed_data` 管理命令、`stable.services.termbase_seed` 服务层、HKJC/WP Stud fixture、操作文档和后台术语导入模板更新；内置 fixture smoke 可生成 `seed_candidates.csv`、`seed_conflicts.csv` 与 `summary.json`，候选主表严格兼容现有 `import_terms` 字段，中文目标译名统一简体化。HKJC 专用抽取已从真实页面打通 `selecthorse -> selecthorsebychar -> zh-hk horse detail`，并新增 `--hkjc-letter` 支持按 A-Z 拆批；本地赛果路径已支持日期范围、跳过马匹详情页、双语空壳赛果页进入 `skipped_races`。OpenSpec change `prepare-hkjc-overseas-termbase-seeds` 已完成本地实现、正式规格同步和归档，归档目录为 `openspec/changes/archive/2026-07-05-prepare-hkjc-overseas-termbase-seeds/`；正式规格已包含 `hkjc_overseas` 来源、Race Card 自动发现/精确参数、QIDS 日期范围抽取、官方来源元数据、结构化证据、地区映射和 `racing_region` 导入表头。`2026-07-05` 已用该路径生成并导入 `2024-01-01` 至 `2026-07-04` 海外术语。WP Stud 解析器已扩展到赛事、骑师、马场和 HorseList 马名表；生产导入时遇到既有 HKJC 官方术语或既有日文 alias 占用时，不覆盖官方主译名，不强行合并冲突概念。`2026-07-06/07` 最终返修已验证 WP Stud HorseList 触网解析、HKJC 马名国别后缀清洗、复合年份赛事拆分和 HKJC 日本马日文 alias 补充；正式导入后生产计数为 `TermEntry=16558`、`TermAlias=19293`。
+- 术语种子数据准备：旧规格流程 change `prepare-termbase-seed-data` 已完成实现、验证和归档；本地首版已新增 `prepare_termbase_seed_data` 管理命令、`stable.services.termbase_seed` 服务层、HKJC/WP Stud fixture、操作文档和后台术语导入模板更新；内置 fixture smoke 可生成 `seed_candidates.csv`、`seed_conflicts.csv` 与 `summary.json`，候选主表严格兼容现有 `import_terms` 字段，中文目标译名统一简体化。HKJC 专用抽取已从真实页面打通 `selecthorse -> selecthorsebychar -> zh-hk horse detail`，并新增 `--hkjc-letter` 支持按 A-Z 拆批；本地赛果路径已支持日期范围、跳过马匹详情页、双语空壳赛果页进入 `skipped_races`。旧规格流程 change `prepare-hkjc-overseas-termbase-seeds` 已完成本地实现、正式规格同步和归档，归档目录为 `旧规格流程/changes/archive/2026-07-05-prepare-hkjc-overseas-termbase-seeds/`；正式规格已包含 `hkjc_overseas` 来源、Race Card 自动发现/精确参数、QIDS 日期范围抽取、官方来源元数据、结构化证据、地区映射和 `racing_region` 导入表头。`2026-07-05` 已用该路径生成并导入 `2024-01-01` 至 `2026-07-04` 海外术语。WP Stud 解析器已扩展到赛事、骑师、马场和 HorseList 马名表；生产导入时遇到既有 HKJC 官方术语或既有日文 alias 占用时，不覆盖官方主译名，不强行合并冲突概念。`2026-07-06/07` 最终返修已验证 WP Stud HorseList 触网解析、HKJC 马名国别后缀清洗、复合年份赛事拆分和 HKJC 日本马日文 alias 补充；正式导入后生产计数为 `TermEntry=16558`、`TermAlias=19293`。
 - 观察自动发布质量与自动化日志
 - 补充翻译 warning 可视化和术语库补全流程
-- 继续评审 OpenSpec change `expand-international-racing-coverage` 的本地实现：多地区新闻源、公开首页地区 tab、`TermEntry + TermAlias` 多语言术语概念模型、群级 QQ 推送配置、HKJC 外部数据导入和全球数据源 spike 已完成本地实现与 review 返修；上线前 review 已补齐快照 metadata 不保存整页 HTML、TDN 缺详情日期时保留列表 API 时间、英文外部马名索引识别、跨语言术语 upsert 主原文保护、术语批量别名匹配、HKJC entries/results 马匹上限统计、英文术语生命周期大小写不敏感、术语启停同步别名状态、术语导入别名冲突保护、TDN/TDN France canonical 去重和术语列表语言筛选翻页保留，尚未部署生产
+- 继续评审 旧规格流程 change `expand-international-racing-coverage` 的本地实现：多地区新闻源、公开首页地区 tab、`TermEntry + TermAlias` 多语言术语概念模型、群级 QQ 推送配置、HKJC 外部数据导入和全球数据源 spike 已完成本地实现与 review 返修；上线前 review 已补齐快照 metadata 不保存整页 HTML、TDN 缺详情日期时保留列表 API 时间、英文外部马名索引识别、跨语言术语 upsert 主原文保护、术语批量别名匹配、HKJC entries/results 马匹上限统计、英文术语生命周期大小写不敏感、术语启停同步别名状态、术语导入别名冲突保护、TDN/TDN France canonical 去重和术语列表语言筛选翻页保留，尚未部署生产
 - 观察外部马名索引识别链路生产效果，重点抽检 `external_horse_not_preserved` warning、候选池 `external_horse_alias` 来源质量和 JRA 活动公告类启发式误报
 - 推进 HTTPS / 证书接入
 - 做部署稳定化
@@ -1649,7 +1653,7 @@ P0 马信息补全专项的模型交接文档见
 
 ## 6.1 国际赛马资讯扩展规划状态
 
-- OpenSpec change：`expand-international-racing-coverage`
+- 旧规格流程 change：`expand-international-racing-coverage`
 - 当前状态：已完成 proposal、design、tasks、delta specs 和本地实现；尚未部署生产
 - 一期新闻源本地接入最终清单：
   - 日本：`Sponichi`
@@ -1661,13 +1665,13 @@ P0 马信息补全专项的模型交接文档见
 - 排序型入口：本轮确认 `Sponichi 新闻ランキング`、`Sky Sports Racing Top Stories`、`Horse Racing Nation Trending` 可公开抓取，已作为独立排序/榜单源加入并保留原站 rank；review 返修后，同源普通 list 不会覆盖已入库的排序/榜单主来源，QQ `ranked` 重点策略也会识别这些国际榜单稿；`At The Races`、`Paulick Report`、`BloodHorse` 因 403、反爬或空样本风险保留为候选，不进入第一版默认清单
 - 前台实现：公开首页增加 `综合 / 日本 / 中国香港 / 英国 / 法国 / 美国` 地区 tab，综合流第一期使用已发布文章倒序；地区页翻页保留 `region` 查询参数；公开详情继续使用 `/news/<NewsArticle.id>/` 全局自增数字 ID，国际来源去重键与公开 ID 分离
 - 后台实现：术语库支持 `TermEntry` 正式术语概念 + `TermAlias` 多语言原文别名，先保留 `source_ja / aliases_ja` 现有物理字段兼容；翻译、改写、自动标签和自动化评分的术语命中按文章原文语言选择别名，并批量加载参与匹配术语的别名，避免每条术语各查一次；英文/繁中外部马名索引按同语言参与识别，先按文章候选片段收窄查询，并使用原文真实写法做保护和校验；英文正式术语按大小写不敏感方式命中并保留原文真实 matched_text；最终 review 返修后，自动化 P0 马匹命中、发布校验核心/背景术语判定和“新增术语后应用当前稿”也统一复用语言感知匹配，避免英文大小写漏判或漏替换；本轮补丁进一步将同语言术语查重、别名去重、导入 upsert、候选合并和术语 API 保存统一为大小写不敏感，并让后台/API 启停术语同步所有语言 `TermAlias` 状态；同语言大小写变体导入 upsert 会更新正式主原文并同步别名表，术语导入 upsert 命中跨语言别名时仍只维护该语言别名、不覆盖正式概念主原文；本次返修又补齐别名冲突保护，只有主原文命中时才允许 upsert，别名撞到其它术语会报错；AI 改写 prompt 的术语表使用文章实际命中的 `matched_text`，避免英文稿看到日文概念主名而漏用标准译名；自动化评分补充英文/繁中赛马关键词；QQ 推送从全局范围配置扩展为群级地区 / 范围 / 重点策略配置，旧群空地区或非法地区配置按日本兼容；内置来源同步保留人工 `enabled` 状态，支持后续按来源灰度启用
-- 测试用例：`openspec/changes/expand-international-racing-coverage/test_cases.md` 已按 OpenSpec `proposal/design/spec` 建立完整验收矩阵，覆盖地区/语言、国际新闻源、公开首页、术语多语言、QQ 群级推送、HKJC 导入、欧美数据源 spike、迁移和非目标边界
+- 测试用例：`旧规格流程/changes/expand-international-racing-coverage/test_cases.md` 已按 旧规格流程 `proposal/design/spec` 建立完整验收矩阵，覆盖地区/语言、国际新闻源、公开首页、术语多语言、QQ 群级推送、HKJC 导入、欧美数据源 spike、迁移和非目标边界
 - 真实新闻源探测：`probe_international_news_sources` dry-run 默认探测第一版最终矩阵；`Sponichi latest/access`、`HKJC Racing News`、`SCMP Racing`、`Sporting Life Racing`、`Sky Sports Racing access/latest`、`BHA official`、`France Galop English News official`、`TDN France keyword`、`TDN`、`Horse Racing Nation access/latest` 均已成功解析两篇真实样本
-- 验证：新增测试用例矩阵和最终源清单返修后，本地 `manage.py check`、完整 `stable` 测试、`makemigrations --check --dry-run`、`openspec validate expand-international-racing-coverage --strict`、`openspec validate --all` 和 `git diff --check` 均已通过；2026-06-26 最终 review 返修后完整 `stable` 测试通过 231 项，已覆盖国际榜单来源提升后触发 QQ 自动推送编排、英文外部马名索引识别与真实写法保护、翻译保护和发布校验使用真实 matched_text、英文正式术语大小写不敏感匹配与当前稿替换、英文 P0 马匹评分、跨语言术语 upsert 主原文保护、术语别名批量匹配、HKJC entries/results 马匹上限统计、旧 QQ 群空/非法地区日本兼容、地区 tab 翻页保留过滤和英文赛马关键词评分；本轮术语生命周期补丁后完整 `stable` 测试通过 236 项，新增覆盖英文重复术语大小写不敏感拒绝、API 创建/更新同步别名、术语启停同步别名状态、候选合并大小写去重、同语言大小写变体导入 upsert 更新主原文，以及 AI 改写 prompt 使用英文实际命中别名；本次上线前返修后完整 `stable` 测试通过 241 项，新增覆盖术语导入 upsert 原文别名冲突预览/提交双重拒绝、`TDN France keyword` canonical 去重并保留法国地区信号、以及术语列表分页保留原文语言筛选
+- 验证：新增测试用例矩阵和最终源清单返修后，本地 `manage.py check`、完整 `stable` 测试、`makemigrations --check --dry-run`、`旧规格流程 validate expand-international-racing-coverage --strict`、`旧规格流程 validate --all` 和 `git diff --check` 均已通过；2026-06-26 最终 review 返修后完整 `stable` 测试通过 231 项，已覆盖国际榜单来源提升后触发 QQ 自动推送编排、英文外部马名索引识别与真实写法保护、翻译保护和发布校验使用真实 matched_text、英文正式术语大小写不敏感匹配与当前稿替换、英文 P0 马匹评分、跨语言术语 upsert 主原文保护、术语别名批量匹配、HKJC entries/results 马匹上限统计、旧 QQ 群空/非法地区日本兼容、地区 tab 翻页保留过滤和英文赛马关键词评分；本轮术语生命周期补丁后完整 `stable` 测试通过 236 项，新增覆盖英文重复术语大小写不敏感拒绝、API 创建/更新同步别名、术语启停同步别名状态、候选合并大小写去重、同语言大小写变体导入 upsert 更新主原文，以及 AI 改写 prompt 使用英文实际命中别名；本次上线前返修后完整 `stable` 测试通过 241 项，新增覆盖术语导入 upsert 原文别名冲突预览/提交双重拒绝、`TDN France keyword` canonical 去重并保留法国地区信号、以及术语列表分页保留原文语言筛选
 
 ## 7. 当前上线进展（摘要）
 
-- 2026-07-10 `classify-english-term-gate-context` 已部署生产 `43898ff` 并归档到 `openspec/changes/archive/2026-07-10-classify-english-term-gate-context/`，正式规格已同步到 `automation-publish-gates`：英文术语门禁会在生成 `core_term_missing` 前按上下文输出 `common_word / proper_noun / uncertain`；普通英文词种子默认降级为 warning，只有 `wins / returns / runs / targets / entered` 等强动作上下文才继续保守阻断；`Classic`、`Contact and live updates from York`、`Live stable updates` 等普通语境均有回归测试覆盖。重校验命令已支持有界候选、批量术语/alias 预加载、文章级英文分类明细和地区 summary。上线前后已通过本地 check、11 项目标测试、OpenSpec 严格校验、语法检查、生产 `manage.py check` 和内外 `/healthz/` smoke。生产只读完整 dry-run 产物在 `runtime/multiregion_candidate_audit/reprocess_full_dryrun_20260710_030944/`：四地区旧 `core_term_missing` 候选合计 `146` 篇，完整门禁通过可恢复候选 `37` 篇（香港 `3`、英国 `5`、美国 `22`、法国 `7`），仍阻断 `109` 篇；本次未执行 `--commit`。
+- 2026-07-10 `classify-english-term-gate-context` 已部署生产 `43898ff` 并归档到 `旧规格流程/changes/archive/2026-07-10-classify-english-term-gate-context/`，正式规格已同步到 `automation-publish-gates`：英文术语门禁会在生成 `core_term_missing` 前按上下文输出 `common_word / proper_noun / uncertain`；普通英文词种子默认降级为 warning，只有 `wins / returns / runs / targets / entered` 等强动作上下文才继续保守阻断；`Classic`、`Contact and live updates from York`、`Live stable updates` 等普通语境均有回归测试覆盖。重校验命令已支持有界候选、批量术语/alias 预加载、文章级英文分类明细和地区 summary。上线前后已通过本地 check、11 项目标测试、旧规格流程 严格校验、语法检查、生产 `manage.py check` 和内外 `/healthz/` smoke。生产只读完整 dry-run 产物在 `runtime/multiregion_candidate_audit/reprocess_full_dryrun_20260710_030944/`：四地区旧 `core_term_missing` 候选合计 `146` 篇，完整门禁通过可恢复候选 `37` 篇（香港 `3`、英国 `5`、美国 `22`、法国 `7`），仍阻断 `109` 篇；本次未执行 `--commit`。
 - 2026-07-10 `support-multiregion-news-attribution-and-english-gates` 已完成本地实现：文章从单地区扩展为“主地区 + 关联地区”，英文术语门禁改为使用文章地区集合，公开地区 tab / QQ / 运营汇总按关联地区可见，发布配额仍只由主地区消耗；站内编辑页和 Django Admin 支持人工修正并锁定归属。新增 `reprocess_multiregion_attribution_gates` 命令用于 dry-run/commit 重算归属与门禁，commit 不直接发布。新增配置 `MULTIREGION_ATTRIBUTION_ENABLED`、`MULTIREGION_RELATED_REGION_QUERIES_ENABLED`、`MULTIREGION_QQ_ALLOWED_CONTENT_CATEGORIES`；关联地区查询开关关闭时，公开卡片和详情也只显示主地区，不删除关联数据。本地目标测试 20 项、完整 `stable` 回归 540 项通过，线上前仍需执行生产 dry-run 抽样。
 - 2026-07-10 未提交改动复审已补齐 `stable.0023_multiregion_news_attribution` 迁移，并修正新内容类别的下游兼容：赛事关联识别 `preview / tips / result_brief`，AI 改写覆盖全部新类别，同时保留旧类别；SQLite 测试库已实际应用迁移并新增类别映射回归测试，完整 `stable` 测试 `522` 项通过。本次未部署或执行生产迁移。
 - 2026-07-10 多地区 change 代码审查返修已完成：赛事/赛场与一般地区上下文分层，多个模糊上下文回退主来源，来源 URL 不参与归属，重复来源抓取使用文章最终主来源；单地区回退开关覆盖 QQ 即时推送；人工归属锁定可取消；重处理 dry-run 与 commit 对锁定文章保持一致；`other` 默认不进入 QQ。相关测试组 `123` 项、完整 `stable` 回归 `529` 项通过，生产抽样任务仍保持未完成。
@@ -1680,8 +1684,8 @@ P0 马信息补全专项的模型交接文档见
 - 2026-07-03 00:13 今日窗口复核：今日目前只有 `00:00` 一个自然窗口，抓取 / 发布 / QQ 均正常生成并成功；新入库 1 篇美国 TDN 新闻，发布 0 篇、QQ 0 条，原因分别为 `no_ready_candidates` 和 `already_sent / no_eligible_articles`；16 个生产批准来源最新状态均为 `success`。
 - 2026-07-03 复核 2026-07-02 全日窗口：昨日实际覆盖 `04:00-23:45` 共 80 个 15 分钟窗口起点；发布窗口五地区各 80 个且全部成功，窗口发布日本 37、香港 1、美国 10，英国/法国 0；QQ 窗口五地区各 80 个且全部成功，窗口派发日本 3、美国 5，所有昨日 QQPushDelivery 记录均为 sent；抓取窗口无 failed，窗口 payload 新增日本 79、香港 5、英国 11、法国 1、美国 28，日本榜单唤醒 7 次。
 - 2026-07-03 地区归属错配审计：现有 `NewsArticle.racing_region` 与新闻源地区完全一致，6598 篇中 0 篇偏离“按新闻源地区”。严格实体地区口径只覆盖 462 篇且均为日本文章，按用户提出的第一种/第二种逻辑未发现结构化错配；但生产实体地区数据不足，审计当时 `TermEntry.racing_region` 全为空，英法美外部马名/赛事正式缓存未落库，因此该 0 只能视为下限。2026-07-04 仅补写了首批 `10` 条术语地区，仍不足以支撑可信实体地区识别。关键词粗扫有 1213 篇疑似跨地区提及，需后续做实体地区识别改造后才能给出可信错配数。
-- 2026-07-02 OpenSpec change `revive-ranked-news-for-publish` 已完成本地实现：未发布文章从普通来源升级为榜单来源时会写入 `ranked_revived_at` 和 `decision_reason.ranked_revival`；低分 ignored、价值不足人工状态、翻译失败和待翻译文章可被唤醒，翻译未完成先重试，已翻译文章重新进入自动化评分；人工拒绝、撤回、重复 blocker 和硬门禁不绕过。发布窗口候选回看同时支持 `first_seen_at` 与 `ranked_revived_at`，候选决策 payload 会记录榜单唤醒来源和时间；已发布文章仍只沿用现有 QQ 补推，不重复发布。
-- 2026-07-02 `revive-ranked-news-for-publish` 验证与上线：目标榜单唤醒测试通过，完整 `stable` 测试通过 418 项；`manage.py check`、`makemigrations --check --dry-run`、OpenSpec 严格校验、全量 OpenSpec 校验和 `git diff --check` 均通过。OpenSpec change 已归档并部署生产 `a774672`，迁移 `0019_newsarticle_ranked_revived_at` 已应用；生产 `/healthz/`、首页、后台登录入口、容器状态、Celery 队列和日志 smoke 均通过。
+- 2026-07-02 旧规格流程 change `revive-ranked-news-for-publish` 已完成本地实现：未发布文章从普通来源升级为榜单来源时会写入 `ranked_revived_at` 和 `decision_reason.ranked_revival`；低分 ignored、价值不足人工状态、翻译失败和待翻译文章可被唤醒，翻译未完成先重试，已翻译文章重新进入自动化评分；人工拒绝、撤回、重复 blocker 和硬门禁不绕过。发布窗口候选回看同时支持 `first_seen_at` 与 `ranked_revived_at`，候选决策 payload 会记录榜单唤醒来源和时间；已发布文章仍只沿用现有 QQ 补推，不重复发布。
+- 2026-07-02 `revive-ranked-news-for-publish` 验证与上线：目标榜单唤醒测试通过，完整 `stable` 测试通过 418 项；`manage.py check`、`makemigrations --check --dry-run`、旧规格流程 严格校验、全量 旧规格流程 校验和 `git diff --check` 均通过。旧规格流程 change 已归档并部署生产 `a774672`，迁移 `0019_newsarticle_ranked_revived_at` 已应用；生产 `/healthz/`、首页、后台登录入口、容器状态、Celery 队列和日志 smoke 均通过。
 - 目标服务器：阿里云香港 ECS，采用低成本部署方案（本机 PostgreSQL + OSS）
 - 仓库线上基线：`main` 分支已包含生产化改造与低成本部署脚本
 - 已发现并修复一项部署兼容性风险：
@@ -1732,7 +1736,7 @@ P0 马信息补全专项的模型交接文档见
 
 ## 10. 外部赛马数据导入状态
 
-- 已实现 `add-netkeiba-horse-data-import` OpenSpec change 的首版代码。
+- 已实现 `add-netkeiba-horse-data-import` 旧规格流程 change 的首版代码。
 - 新增外部比赛、出走、赛果、赔率、马匹、履历、马名索引、导入运行、错误记录和单来源锁模型。
 - 新增 `import_external_horse_data` 管理命令和 `import_external_horse_data_task` Celery 任务。
 - 生产默认关闭：`EXTERNAL_HORSE_DATA_IMPORT_ENABLED=false`、`EXTERNAL_HORSE_DATA_ALLOW_NETWORK=false`。
@@ -1743,7 +1747,7 @@ P0 马信息补全专项的模型交接文档见
 - 生产第二批续跑已完成：`run_id=2`，累计 20 场比赛、274 个唯一马 ID/马名索引，失败 0。
 - 生产第三批续跑已完成：`run_id=3`，累计 50 场比赛、695 个唯一马 ID/马名索引，失败 0。
 - 生产长循环导入在 `run_id=9` 以退出码 `137` 中断；已停止继续导入、释放锁并标记 partial。当前累计 182 场比赛、2401 个唯一马 ID/马名索引，服务健康。
-- 外部马名索引已接入生产识别链路：翻译阶段保护外部已知但无中文译名的马名，发布校验输出独立 `external_horse_not_preserved` warning，术语候选发现会把新闻中出现且缺少正式中文译名的外部马名以 `external_horse_alias` 来源送入候选池；同名普通词需要强马名上下文才会被识别为马名；review 返修后，保护名单 `limit` 不再被已有中文译名的正式马名占用。OpenSpec change `use-external-horse-alias-for-name-recognition` 已归档到 `openspec/changes/archive/2026-06-25-use-external-horse-alias-for-name-recognition/`，正式规格已同步，并已通过 PR #6 部署到生产 `35b0866`。
+- 外部马名索引已接入生产识别链路：翻译阶段保护外部已知但无中文译名的马名，发布校验输出独立 `external_horse_not_preserved` warning，术语候选发现会把新闻中出现且缺少正式中文译名的外部马名以 `external_horse_alias` 来源送入候选池；同名普通词需要强马名上下文才会被识别为马名；review 返修后，保护名单 `limit` 不再被已有中文译名的正式马名占用。旧规格流程 change `use-external-horse-alias-for-name-recognition` 已归档到 `旧规格流程/changes/archive/2026-06-25-use-external-horse-alias-for-name-recognition/`，正式规格已同步，并已通过 PR #6 部署到生产 `35b0866`。
 - 长文样本抽检显示：netkeiba 长文可有效命中外部马名索引，但 JRA 活动公告类长文仍会通过启发式误报普通片假名词，后续需要继续补普通词过滤或收紧启发式马名规则。
 
 ## 11. 2026-07-11 未提交变更状态
@@ -1751,12 +1755,12 @@ P0 马信息补全专项的模型交接文档见
 - 当前分支已快进到最新 `origin/main`，保留并整合多地区新闻归属、英文门禁和赛事历史抓取编排两组未提交改动。
 - 多地区新闻迁移已调整为 `0023_multiregion_news_attribution`，依赖主干 horse profile `0022`，本轮未执行生产迁移。
 - 赛事抓取编排已补齐应到审批、地区专属 adapter 输入、空内容与来源 URL 门禁、应到身份复核、真实 gzip 校验和完整人工批准元数据。
-- 目标测试 `48` 项、完整 `stable` 回归 `588` 项通过；Django check、迁移漂移、两个 change 严格校验、OpenSpec 全量 `21` 项和 `git diff --check` 均通过。
+- 目标测试 `48` 项、完整 `stable` 回归 `588` 项通过；Django check、迁移漂移、两个 change 严格校验、旧规格流程 全量 `21` 项和 `git diff --check` 均通过。
 - 后续 review 中纯技术问题由 Codex 直接判断修复；产品能力、运营口径和交互变化仍由用户审核。
-- 2026-07-11 第六轮赛事抓取返修：批量 importer 已整批事务化；应到快照保存完整 adapter 输入且审批后 `RaceEvent` 漂移会阻断；pending 混合来源确认不再提供策略 SHA。按用户决定暂不强制哈希参数、暂不增加请求预算并发锁。目标测试 `67` 项、完整 `stable` 回归 `589` 项通过，Django/迁移/OpenSpec/diff 校验均通过；`orchestrate-race-event-data-crawls` 已同步正式规格并归档。
+- 2026-07-11 第六轮赛事抓取返修：批量 importer 已整批事务化；应到快照保存完整 adapter 输入且审批后 `RaceEvent` 漂移会阻断；pending 混合来源确认不再提供策略 SHA。按用户决定暂不强制哈希参数、暂不增加请求预算并发锁。目标测试 `67` 项、完整 `stable` 回归 `589` 项通过，Django/迁移/旧规格流程/diff 校验均通过；`orchestrate-race-event-data-crawls` 已同步正式规格并归档。
 - 2026-07-11 生产部署前发现多地区归属开关关闭后仍扫描完整术语库，导致 crawl worker 高 CPU；已增加禁用/人工锁定短路，目标测试 `30` 项、完整回归 `591` 项通过。归属开关保持关闭，五地区产品抽样仍待修正口径后重验。
 - 2026-07-11 已部署生产提交 `6e2cc92`：赛事历史抓取编排已归档并上线，多地区归属模型/迁移已上线但两个功能开关继续关闭。部署前 `.env` 与数据库备份均已完成并校验；归属短路热修复使 worker CPU 从持续高占用恢复至空闲约 `0.04%`。Django、容器、Celery、健康检查、首页、法国/英国频道、赛事日历及后台登录页回归通过。`support-multiregion-news-attribution-and-english-gates` 仍待五地区产品口径验收，不得开启开关或提交历史重算。
-- 2026-07-11 `support-multiregion-news-attribution-and-english-gates` 已在用户接受任务 `9.6` 未完成警告后归档；六组 delta spec 已同步到正式规格，OpenSpec 全量 `21` 项通过，当前无 active change。归档不代表五地区产品归属验收通过，多地区生产开关仍须保持关闭。
+- 2026-07-11 `support-multiregion-news-attribution-and-english-gates` 已在用户接受任务 `9.6` 未完成警告后归档；六组 delta spec 已同步到正式规格，旧规格流程 全量 `21` 项通过，当前无 active change。归档不代表五地区产品归属验收通过，多地区生产开关仍须保持关闭。
 - 2026-07-11 已生成赛事编排第一批五地区应到清单：日本德比、富卫保险女皇杯、BETFRED DERBY、PRIX DE DIANE LONGINES、KENTUCKY DERBY PRESENTED BY WOODFORD RESERVE 各 1 场，三模块齐全且 5 行预检均为 `ready`。run 审批仍为 `pending`、网络关闭，等待用户审核 `expected_targets_review.csv`，尚未开始真实抓取。
 - 用户已批准上述清单；网络版 run 与原清单逐字段一致。prepare 前检查发现生产镜像遗漏 `runtime/tools` adapter 脚本，当前先修复 Docker 构建内容并部署，尚未发出网络请求。
 - 第一批网络抓取 v2 已由覆盖审计安全阻断且未写库：香港、英国、法国完整，日本详情错配到中山金杯，美国缺 Equibase 赛果与可用 TOBA 历届冠军。JRA 已改为按赛事名称唯一匹配；v3 不改变已批准五场赛事，只新增美国 Equibase 赛果适配器，并复用已验证 TOBA 年度页缓存。必须先取得五地区三模块完整覆盖，才进入 dry-run。
@@ -1768,7 +1772,7 @@ P0 马信息补全专项的模型交接文档见
 - 用户确认后第一批五地区赛事已正式写入：apply-check 8 个 scope 全绿，15 个候选全部 applied；写后合计 runners 75、results 64、history winners 47，服务健康。写前 105M 数据库备份已通过 gzip/SHA 校验，最终运行证据已同步到生产宿主机和本地审核目录。
 - 2026-07-11 国际新闻生产验收未通过：最近 24 小时英文稿 `50` 篇中 `25` 篇仍有 `core_term_missing`；`America/Oaks` 等已降级，但一批被错误登记为马名的普通词仍作为 proper noun 阻断。地区新增/公开为日本 `114/21`、香港 `3/0`、英国 `12/2`、法国 `1/0`、美国 `34/13`；法国宽关键词新源 24 小时新增 `0`，香港/英国/美国后续扩源尚未实施。重处理 dry-run 即使 `limit=5` 也存在长时间满核问题，修复前不得在生产批量运行。
 - 2026-07-12 已部署赛事公开页展示修复 `d071952`：出马表、赛果、历史冠军和赛事日历前列赛果中的马名/骑师名会精确关联 active 正式术语及别名，命中时显示中文译名、未命中保留原文；出马表按马号自然升序，缺号回退闸位，不再沿用赛果来源行序。目标测试 `23` 项、完整回归 `612` 项通过；线上排序已生效。首批术语覆盖不均，日本德比当前马名仅命中 `1/18`、骑师 `0/18`，后续应补正式术语库。
-- 2026-07-12 已启动五地区赛事统一追溯至 1984 年的新目标，并创建 OpenSpec change `backfill-race-events-to-1984`。生产基线 `RaceEvent=995` 且全部集中在 2026 年；按当前目录机械外推为约 `42,785` 个年度对象，但真实分母必须由逐年目录和系列 timeline 生成。proposal、design、4 份 delta spec、82 项 tasks 和 22 轮问答决策已完成；两轮 `/plan-eng-review` 最终 APPROVED。当前下一门禁是编写完整测试用例，尚未实现、触网或写历史赛事。
+- 2026-07-12 已启动五地区赛事统一追溯至 1984 年的新目标，并创建 旧规格流程 change `backfill-race-events-to-1984`。生产基线 `RaceEvent=995` 且全部集中在 2026 年；按当前目录机械外推为约 `42,785` 个年度对象，但真实分母必须由逐年目录和系列 timeline 生成。proposal、design、4 份 delta spec、82 项 tasks 和 22 轮问答决策已完成；两轮 `/plan-eng-review` 最终 APPROVED。当前下一门禁是编写完整测试用例，尚未实现、触网或写历史赛事。
 - 用户已确认范围选择 A：覆盖五地区当前全部 graded/pattern 系列，不扩展到普通赛、让赛或未胜利赛。
 - 用户已确认完整系列史口径：入选系列从 1984 年或实际创办年起收录，成为分级赛之前的年度届次也纳入，等级使用各年真实值。
 - 用户已确认历史独有系列也纳入：凡 1984 年以来任一年进入 graded/pattern 体系，即使后来停办或降级退出，也进入系列目录。
@@ -1791,7 +1795,7 @@ P0 马信息补全专项的模型交接文档见
 - 用户已确认赛事日历增加年份筛选和赛事名称搜索，作为历史年度赛事入口。
 - 用户已确认 artifact 为唯一批量审批/apply 凭证，同时增加后台汇总和冲突查看入口。
 - 用户已确认达标 published 历史赛事允许被搜索引擎收录，使用分片 sitemap 排除草稿/冲突/空壳/not_held。
-- OpenSpec 文档已通过两轮 Full 工程审核并获得 APPROVED；`test_cases.md` 已建立 160 个唯一用例。代码实现、clean review、生产部署和 2026 mapping 已完成，生产历史功能和网络门禁仍关闭。
+- 旧规格流程 文档已通过两轮 Full 工程审核并获得 APPROVED；`test_cases.md` 已建立 160 个唯一用例。代码实现、clean review、生产部署和 2026 mapping 已完成，生产历史功能和网络门禁仍关闭。
 
 ### 2026-07-12 历史赛事工具上线与系列身份基线
 
@@ -1804,7 +1808,7 @@ P0 马信息补全专项的模型交接文档见
 - 已完成 `/opsx:apply`、完整测试、反复 review、生产迁移和 2026 系列 mapping；稳定赛事系列、年度应到总账、official finish position、并列冠军迁移，以及离线 inventory artifact/审批/幂等 commit 基础能力均已上线。
 - 历史功能和网络开关继续默认关闭；生产当前只有 2026 系列绑定，没有历史年度总账、1984–2025 赛事或历史公开数据。
 - 后续仍需完成五地区逐年官方 source cache、年度总账审批、首批详情验收和分年代带回填；所有写入继续走既定 artifact、coverage、备份和写后核验门禁。
-- 当前 OpenSpec 任务进度 `62/82`；代码与自动化测试任务已完成，包含五地区目录 cache parser、标准候选命令、共享预算/缓存锁、历史网络日志、批次 importer、公开搜索、动态冠军、sitemap 缓存与索引。完整 `stable` 回归最终 `743/743`，Django/迁移/OpenSpec/Compose/实际 Docker 镜像检查通过。
+- 当前 旧规格流程 任务进度 `62/82`；代码与自动化测试任务已完成，包含五地区目录 cache parser、标准候选命令、共享预算/缓存锁、历史网络日志、批次 importer、公开搜索、动态冠军、sitemap 缓存与索引。完整 `stable` 回归最终 `743/743`，Django/迁移/旧规格流程/Compose/实际 Docker 镜像检查通过。
 - 多轮代码 review 的全部技术 finding 已修复并逐轮复审，最终 review clean。剩余 `20` 项均为生产 mapping、官方逐年 source cache、总账审批、首批及四年代带抓取落库和最终审计；生产功能和网络开关继续关闭，尚未部署或写入本变更的历史数据。
 
 ### 2026-07-12 历史目录年鉴解析器就绪
@@ -1836,7 +1840,7 @@ P0 马信息补全专项的模型交接文档见
 - 生产详情写入前备份、候选/缓存 SHA 核验、dry-run、正式 apply、逐目标写后计数、容量检查和服务健康检查均已通过。下一步优先补齐本批 18 个显式缺口，再做五地区前台验收和扩大年代带抓取。
 
 - 法国补源已向前推进：2012/2025 六场 ZEturf 详情离线解析完成，共 70 条 runners、41 条官方名次；旧页面兼容和同名误配已修复，826 项完整回归通过。该批仍停在本地候选阶段，必须先完成详情来源补充 artifact 和 target URL 绑定，不能直接写生产。法国 2000 三场仍待其他可信来源。
-- 英法IrishRacing备用源与美国Equibase单场PDF能力已完成测试、反复review和生产部署；最终完整`stable`回归 `848` 项通过，OpenSpec strict/all、Django check、迁移漂移和diff检查均通过。
+- 英法IrishRacing备用源与美国Equibase单场PDF能力已完成测试、反复review和生产部署；最终完整`stable`回归 `848` 项通过，旧规格流程 strict/all、Django check、迁移漂移和diff检查均通过。
 - 第一批五地区45个历史目标现已全部完成生产写入：`45/45 imported`，合计 `468 runners / 429 results`，全部保持draft且历史published为0。美国最后六场写入 `58 runners / 58 results`，候选SHA-256为 `94b62febe849b9a0562e5ab641d87671ae3468a202355b5336a7f4405e8abe75`；长期历史抓取/网络开关继续关闭。
 - 2016–2025 首个标准批次已批准 250 场。日本和美国 100 场日期已写入，其中 98 场完整详情已 imported，新增 `1157 runners / 1080 results`；两场 NSA 障碍赛待详情，法国、香港、英国各 50 场仍处于日期来源缺口。公开开关继续关闭。
 
@@ -1853,7 +1857,7 @@ P0 马信息补全专项的模型交接文档见
 
 - 现有 Gold Set 以用户完成的 `159` 条单审标签固定校准，不再补第二审核人；审核来源始终保留为 `provisional_single_review`。该身份本身不再禁止进入生产 Shadow；只有生产全量 dry-run、至少 24 小时 Shadow 和全量差异复核也通过后，才允许仅对新文章 enforce。
 - 本地冻结快照对比：旧规则主地区 `81.76%`，V3 为 `98.11%`；V3 的日本/香港/英国/美国均 `100%`、法国 `90.91%`，相关 precision `100%`、recall `54.84%`，过度扩散 `0%`。低 recall 主要是文章未提供的历史参赛地区，不自动猜测。
-- 术语候选索引把 159 篇纯推断降到约 `0.8` 秒；相关目标测试 `82` 项通过，最终完整 `stable` 回归 `1156 passed / 1 skipped`，Django/迁移/编译/OpenSpec strict/all 均通过。生产归属、相关地区查询仍关闭，本轮未部署或写生产数据。
+- 术语候选索引把 159 篇纯推断降到约 `0.8` 秒；相关目标测试 `82` 项通过，最终完整 `stable` 回归 `1156 passed / 1 skipped`，Django/迁移/编译/旧规格流程 strict/all 均通过。生产归属、相关地区查询仍关闭，本轮未部署或写生产数据。
 - 下一门禁是 PostgreSQL 250 篇性能基准、生产 72 小时只读 dry-run 和运营复核；未满足前不得归档本 change。
 - 法港英 150 场已完成权威字段校正、旧候选失效验证、重新导出、0-gap 打包、dry-run、第二次备份、正式导入和写后核验。新增 `1534 runners / 1294 results`，标准批次累计 250 场全部 imported；生产历史合计 295 场、3174 runners、2817 results，全部 draft、published 0，常驻历史写入/网络开关保持关闭。
 - 2016–2025 第二标准批次已固定五地区各 50 场并完成日美离线来源发现：日本 50、美国 48 个候选对应 98 个唯一 URL；Brooklyn 与 Cougar II 的 2025 届被 TOBA 明确标为 `not run`，保留为产品审核项。来源匹配技术修复完整 `stable` 1141 项通过，尚未开始本批生产网络抓取或写入。
@@ -1884,7 +1888,7 @@ P0 马信息补全专项的模型交接文档见
   产地与育马者、中国香港完整出生日期与育马者、美国毛色；履历结果和美国官方总数边界不变。
 - 本轮未写生产数据、未部署。严格整匹马完成门禁仍需同时满足基础资料、生涯完整度和逐场权威性，
   不能因祖父母已补齐就把总体完成度从 `10/50` 提升。
-- 离线组合回归 `142/142`、Django check、迁移漂移检查、OpenSpec strict/all 和工作簿公式扫描
+- 离线组合回归 `142/142`、Django check、迁移漂移检查、旧规格流程 strict/all 和工作簿公式扫描
   均通过。
 
 ## 2026-07-19 五地区准实时赛果公开 Beta 候选状态
@@ -2024,7 +2028,7 @@ P0 马信息补全专项的模型交接文档见
   已在同一 reviewer 会话两轮限定复审中全部关闭，最终 `VERDICT: APPROVED`。
 - 已获确认实现并完成本地代码与 TDD；首次 code review 的 CGNAT DNS P1 与 soft timeout P2，
   以及限定复审的 3 个 path/计数/归因 P2 均已按真实 RED 修复。聚焦 40 项、相关回归 104 项
-  通过，Django/迁移/Compose/registry/OpenSpec/diff 检查通过。
+  通过，Django/迁移/Compose/registry/旧规格流程/diff 检查通过。
 - 一轮复审曾因 fingerprint helper raw 捕获不一致而 fail closed；随后 helper 恢复逐字节稳定，
   五项 findings 全部关闭，原生代码 review 最终 `VERDICT: APPROVED`。
 - 当前只剩代码审核状态文档的同 reviewer 复审与最终 fingerprint 冻结；仍未取得发布授权。
@@ -2059,7 +2063,7 @@ P0 马信息补全专项的模型交接文档见
   rollback / verify 和历史批处理 allowlist；冻结范围仍为 40 场真实缺口、9 组重复赛事及
   单独保留 live owner 的 event 924。
 - 恢复专属 SQLite `45/45` 与 PostgreSQL `2/2` 测试通过；完整候选相对同环境干净主线没有新增红项，
-  且修复一个既有日历查询数失败。OpenSpec、Django、迁移、Compose、编译和 diff 门禁通过。
+  且修复一个既有日历查询数失败。旧规格流程、Django、迁移、Compose、编译和 diff 门禁通过。
 - 首次独立原生只读审核的 6 项 finding 已修复，正在由同一 reviewer 限定复审。当前仍是
   未提交本地实现；尚未部署、联网生成 candidate、人工批准 official receipt 或写生产库。
 ## 2026-07-27 赛事生命周期阶段 B0.1 赛后内部参考源规划
@@ -2290,7 +2294,7 @@ P0 马信息补全专项的模型交接文档见
   截断 40 条且无分页；跨栏赛 `-` 马号被误作真实唯一编号；历史“重点”沿用 P0/P1/置顶，
   导致默认 P2 的历史 G1/G2 全部为空。
 - 香港杯样本表明年份偏移至少可追溯到 2019，2024/2025 只是已明确观察区间；正式修复必须先做
-  全量只读依赖审计。历史“重点=G1+G2”是用户确认的新产品口径，并与现有 OpenSpec 有冲突。
+  全量只读依赖审计。历史“重点=G1+G2”是用户确认的新产品口径，并与现有 旧规格流程 有冲突。
 - 本轮仅形成诊断文档并复跑空马号既有合同测试 `1/1`；未改业务代码、未连接生产、未提交或部署。
 
 # 2026-07-31 历史赛事四类缺口形成一体化设计候选

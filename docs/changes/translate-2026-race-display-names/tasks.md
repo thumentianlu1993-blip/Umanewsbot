@@ -17,7 +17,6 @@
 - [x] (integration) L3 新翻译候选（4 个地区代理，326/326 全覆盖）合入审核工作簿（high 280/medium 81/low 212）
 - [ ] (integration) 独立 reviewer 只读复审：首轮 REVISE（P2-1 工作簿 5 行让赛标记→已转 manual；P2-2 decision 契约→已加校验+spec 文档化），待限定复审（fingerprint 前后一致，APPROVED 且 actionable 清零）
 - [ ] (operations) 合并 main → `deploy_lowcost.sh` 部署 → 生产核验（`git rev-parse HEAD`、容器状态、`/healthz/`、命令 `--help` 可用）
-- [ ] (operations) 用户审核工作簿定稿 + 发布授权（精确版本：commit SHA + artifact SHA + 部署后生产 HEAD）
 - [ ] (operations) 生产备份（custom-format + pg_restore -l）→ --commit → --verify（H4）
 - [ ] (operations) 前台抽检（DB verify 为主；命中目标赛事的 region/year/q 视图 + ≥5 场详情）→ evidence-only 回写：release_report 落 `docs/changes/translate-2026-race-display-names/release_report.md`，同步 `docs/current_state.md`、`docs/project_status.md`、`docs/deploy_runbook.md`，新锁定规则（如有）记 `docs/decisions.md`
 

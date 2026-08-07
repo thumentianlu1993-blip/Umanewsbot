@@ -49,7 +49,6 @@ dry-run 或 apply 失败。
 - manifest 仍冻结 `priority/is_featured/eligibility.is_key_race` 作为审计快照，字段漂移仍拒绝；
 - `false/off` apply、shadow-only、单事务、最多 20 场、replay 和零公开状态写入合同保持不变。
 
-## 6. 发布授权与观察口径
 
 代码发布、生产只读 prepare/dry-run、`false/off` control apply、`true/shadow` 启用仍是四个
 独立停点，分别使用当前步骤的新授权。任何较早授权不得跨越代码 review 后的发布门禁。

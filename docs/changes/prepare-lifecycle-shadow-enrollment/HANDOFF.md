@@ -2,7 +2,7 @@
 
 ## 1. 从这里开始
 
-这是 Codex 原生 change，不使用 OpenSpec。先读同目录：
+这是 Codex 原生 change，不使用 旧规格流程。先读同目录：
 
 1. `spec.md`
 2. `design.md`
@@ -18,7 +18,7 @@
   `/Users/mentianlu/Code/umanews/.worktrees/prepare-lifecycle-shadow-enrollment`
 - 分支：`codex/prepare-lifecycle-shadow-enrollment`
 - 设计基线：`origin/main@43b81fd3288a1e7b997ffad78d03565327e3d990`
-- 用户已明确回复“确认实现”，测试先行与本地实现已获授权并完成。
+- 用户已明确回复“G1 范围确认”，测试先行与本地实现已获授权并完成。
 - 仍未授权 commit/push/PR、联网、生产写入、部署、control apply 或开关变更。
 - 当前门禁为独立代码 review；通过后冻结 fingerprint 并停止等待发布 Git 动作授权。
 

@@ -6,7 +6,7 @@
 
 当前主工作树 `/Users/mentianlu/Code/umanews` 的本地 `main` 落后 `origin/main`。为了让后续会话能从当前工作树恢复全球赛马数据库接入工作，已把两类内容同步成未提交工作树差异：
 
-1. `origin/main` 已有的外部缓存底座、HKJC importer、迁移、fixtures、OpenSpec 归档和相关测试。
+1. `origin/main` 已有的外部缓存底座、HKJC importer、迁移、fixtures、旧规格流程 归档和相关测试。
 2. proof 工作树里的 UK / France / US importer、离线审计命令、fixtures、proof JSON 和交接文档。
 
 因此不要直接把“相对本地旧 `HEAD` 的大 diff”当成同一件新改造审查；应先分层。
@@ -15,7 +15,7 @@
 
 ### 第一层：先对齐 `origin/main`
 
-本地 `main` 当前落后 `origin/main`。相对旧 `HEAD` 出现的大量文件，包括外部缓存底座、HKJC importer、历史 OpenSpec 归档、QQ 推送、前台信息流等，很多已经属于 `origin/main`。
+本地 `main` 当前落后 `origin/main`。相对旧 `HEAD` 出现的大量文件，包括外部缓存底座、HKJC importer、历史 旧规格流程 归档、QQ 推送、前台信息流等，很多已经属于 `origin/main`。
 
 后续若要整理 PR 或提交，建议先让工作树基线对齐 `origin/main`，再审查全球赛马数据库新增部分。不要把 `origin/main` 已有内容和本轮 UK / France / US proof 追加混成一个审查单元。
 
@@ -33,8 +33,8 @@
 - `server/stable/fixtures/uk/`
 - `server/stable/fixtures/france_galop/`
 - `server/stable/fixtures/us_hrn/`
-- `openspec/specs/real-global-racing-data-ingestion/`
-- `openspec/changes/archive/2026-06-26-connect-real-global-racing-databases/`
+- `旧规格流程/specs/real-global-racing-data-ingestion/`
+- `旧规格流程/changes/archive/2026-06-26-connect-real-global-racing-databases/`
 - `runtime/global_racing_import/proof-20260627/`
 - `runtime/global_racing_import/proof-20260627-audit.json`
 - `docs/global_racing_*.md`
@@ -58,7 +58,7 @@
 - `python server/manage.py test stable`，`327` 项通过
 - `python server/manage.py makemigrations --check --dry-run`
 - `python server/manage.py migrate --plan`
-- `openspec validate --all`
+- `旧规格流程 validate --all`
 - `audit_global_racing_import_outputs --proof-only --fail-on-incomplete`
 - proof JSON 按完整 commit 候选口径审计会被正确阻断
 - `git diff --check`
@@ -67,9 +67,9 @@
 
 ## 2026-06-27 review 结论
 
-- 必须保留：四地 importer、真实来源 fixtures、`External*` 缓存模型与写库门禁、proof-only 离线审计、batch command 渲染器、OpenSpec `real-global-racing-data-ingestion` 规格和 `docs/global_racing_*` 交接/runbook。这些直接支撑“能力真实可用”和后续完整抓取。
+- 必须保留：四地 importer、真实来源 fixtures、`External*` 缓存模型与写库门禁、proof-only 离线审计、batch command 渲染器、旧规格流程 `real-global-racing-data-ingestion` 规格和 `docs/global_racing_*` 交接/runbook。这些直接支撑“能力真实可用”和后续完整抓取。
 - 不能直接提交当前大工作树：本地 `main` 落后 `origin/main`，相对 `origin/main` 会显示大量已在线上存在的文件被删除，同时本地又有同名未跟踪副本。上线或 PR 前必须先对齐基线或重新整理分支，避免把工作树卫生问题变成删除风险。
-- 非本目标必需：QQ 推送、前台信息流、历史 OpenSpec archive、`docker-compose` OneBot 端口映射等旁支差异不属于全球赛马数据库能力确认范围；后续提交应拆开处理。
+- 非本目标必需：QQ 推送、前台信息流、历史 旧规格流程 archive、`docker-compose` OneBot 端口映射等旁支差异不属于全球赛马数据库能力确认范围；后续提交应拆开处理。
 
 ## 禁止误判
 

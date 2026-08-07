@@ -6,7 +6,7 @@
 - 基线：`origin/main@a59956b327157d29630fab1f1c98ba9c9cacfed0`。
 - reviewer：`/root/phase_b_plan_review`。
 - reviewer 未参与规格、设计和交接文档编写，仅执行只读方案审核。
-- 本记录是 Codex 原生工作流产物，不属于 OpenSpec change。
+- 本记录是 Codex 原生工作流产物，不属于 旧规格流程 change。
 
 ## 第一轮：REVISE
 
@@ -82,5 +82,3 @@ reviewer 提出以下 finding：
 - 跨文档未发现不可实现矛盾，`git diff --check` 通过。
 
 最终结论：`VERDICT: APPROVED`。
-
-该结论只代表阶段 B0.1 方案审核通过，不构成实现、联网、生产写入或发布授权。
