@@ -7861,3 +7861,17 @@ re-baseline 基线 + 各轮 findings 新增）。
   混淆或任一身份缺失都不得 stop，只能保留锁交人工确认。
 - 修复后 shadow 必须重新冻结未来日本+英国 2–4 场自然边界；不得以手工 scanner、已过期
   proposal 或本轮部署前的 observation 替代。enforce 不属于本 change。
+
+# Lifecycle shadow 观察加固部署阻断检查点（2026-08-08）
+
+- 发布目标 `main@c4ad7277` 的候选镜像已构建，但 Release B schema preflight 在唯一 release task 前
+  fail closed。禁止绕过：生产 recorder 当前为 `0067 + 0070`，缺少 `0068/0069`，main 另含 `0071`。
+- 此检查点不允许 fake migration、直接修改 `django_migrations`、跳过 identity 或从候选镜像运行
+  `migrate`。应另立生产 migration history 修复 change，完成设计、RED/GREEN、独立 review、恢复演练和
+  精确授权。
+- 阻断后恢复口径：在共享部署锁内把 `umanewsbot:prod` 指回冻结旧镜像，先 web healthy，再恢复
+  worker/Beat/nginx；race-live 不恢复，lifecycle 双开关固定 `false/off`。恢复完成后核对 lock/one-off
+  不存在、scanner 零派发、MigrationRecorder 原样、HTTP/worker/log/queue。
+- 2026-08-08 实际恢复后 `default=2` 的两条 lifecycle 消息与部署前一致且无人消费；不得 purge、改投或
+  启动 default consumer。`race_live=7543` 同样保持不动。完整证据见
+  `docs/changes/harden-lifecycle-shadow-observation/release_report.md`。

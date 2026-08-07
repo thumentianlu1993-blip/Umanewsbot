@@ -2517,3 +2517,12 @@ P0 马信息补全专项的模型交接文档见
 - 同一独立 reviewer 第四轮限定复审已 `APPROVED`，无剩余 actionable finding。当前仅收口审核
   结论文档并冻结最终 fingerprint；仍需用户针对该 fingerprint 授权，才可
   commit/push/PR/merge；关闭态部署、恢复 shadow 和 enforce 继续分开授权。
+
+# 2026-08-08 Lifecycle shadow 观察加固代码已合并，生产仍为关闭态旧版本
+
+- PR #72 已合并为 `main@c4ad7277`，但 Release B schema preflight 在 release task 前发现生产迁移历史
+  为 `0067 + 0070` 且缺少 `0068/0069`，因此候选没有部署。
+- 生产已恢复旧镜像并统一为 `false/off`；没有 migration 或业务数据写入，race-live 未启动，HTTP 与
+  worker 健康。现有 `default=2` 和 `race_live=7543` 积压保持不动。
+- 后续必须先以独立 change 修复生产 migration history，再重新授权关闭态部署；本次结果不代表 lifecycle
+  shadow 已恢复。
