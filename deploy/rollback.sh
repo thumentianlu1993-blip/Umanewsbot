@@ -64,11 +64,27 @@ do
   fi
 done
 
+# The generic rollback release task cannot unapply a migration that is absent
+# from the target checkout. Cross-schema rollback needs a separately reviewed
+# stopped-service procedure; fail before preflight, checkout, or service stop.
+if ! git cat-file -e "$TARGET_OID:server/stable/migrations/0071_historical_calendar_release_b.py"; then
+  echo "rollback: target predates Release B schema; use the reviewed cross-schema recovery procedure" >&2
+  exit 1
+fi
+
 # The existing web is still running here, so the historical runner preflight
 # preconditions hold (same semantics as deploy; no --initial-install branch).
 COMPOSE_FILE="$COMPOSE_FILE" ./deploy/historical_runner_preflight.sh
 
 git checkout "$TARGET_OID"
+UMANEWS_RELEASE_COMMIT="$TARGET_OID"
+export UMANEWS_RELEASE_COMMIT
 "$COMPOSE" -f "$COMPOSE_FILE" build web
+
+# This generic path is B-to-B only: it keeps 0071 applied. Validate the target
+# image against the current Release B schema; reverse compatibility belongs
+# exclusively to the separately reviewed cross-schema recovery procedure.
+COMPOSE_FILE="$COMPOSE_FILE" EXPECTED_CANDIDATE_COMMIT="$TARGET_OID" \
+  ./deploy/run_historical_calendar_release_b_preflight.sh
 
 COMPOSE_FILE="$COMPOSE_FILE" RELEASE_ACTION=rollback ./deploy/run_application_release.sh

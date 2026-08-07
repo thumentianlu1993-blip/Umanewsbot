@@ -34,6 +34,15 @@ else
 fi
 
 "$COMPOSE" -f "$COMPOSE_FILE" pull nginx
+UMANEWS_RELEASE_COMMIT="$(git rev-parse HEAD)"
+case "$UMANEWS_RELEASE_COMMIT" in
+  [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+  *) echo "release commit must be a 40-character lowercase git OID" >&2; exit 1 ;;
+esac
+export UMANEWS_RELEASE_COMMIT
 "$COMPOSE" -f "$COMPOSE_FILE" build web
+
+COMPOSE_FILE="$COMPOSE_FILE" EXPECTED_CANDIDATE_COMMIT="$UMANEWS_RELEASE_COMMIT" \
+  ./deploy/run_historical_calendar_release_b_preflight.sh
 
 COMPOSE_FILE="$COMPOSE_FILE" RELEASE_ACTION=deploy ./deploy/run_application_release.sh

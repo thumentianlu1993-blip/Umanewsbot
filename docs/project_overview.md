@@ -19,6 +19,20 @@ approve 会从冻结的双/三源身份重新计算共识，不能通过修改�
 真实 prepare 候选还会保存 commit 所需的完整冻结选择字段；approve 要求内嵌 candidate/blocker
 与已哈希 JSONL sidecar 规范字节一致，避免审核包与待写候选脱钩。当前仍处于未部署、未触网、
 未写生产的实现验证阶段，代码审查问题已修复，待原生 reviewer 会话复审。
+## 2026-08-01 历史赛历 Release B 本地链路
+
+- 历史自然年修复改为按完整赛事系列生成 v2 census；人工审核 survivor、届次、target、公开路径和
+  依赖策略后，才允许进入 manifest-bound apply。
+- Release B 只切换 series/edition 与 active target schema 身份；数据修复继续受默认关闭开关、
+  实时 maintenance gate、独立 reviewer approval、receipt、verifier 和 exact rollback 控制。
+- deploy/rollback 在 DDL 前用候选/当前 Release B image 运行只读 schema preflight；commit、image、
+  migration leaf 与目标数据库 identity 任一不匹配均在应用停服前拒绝。
+- 通用 rollback 只处理保留 `0071` 的 B→B 目标，并用目标 image 做 forward preflight；pre-0071
+  reverse migration 是独立停服恢复流程，不与普通回滚混用。
+- schema preflight 的 leaf 来自目标库已应用的 `django_migrations`，不是候选代码图；v2 重复边界、
+  target 审计、published canonical path 与 artifact no-replace 均按独立审核结论 fail closed。
+- exact duplicate 同时绑定来源身份、核心字段和 runner/result；canonicalize 前必须进入确定性的
+  draft/detached tombstone 终态，不能让仍公开或仍属于系列的 event 只靠 link 隐藏。
 
 ## P0 马资料生产批准链路
 

@@ -290,7 +290,7 @@ class HistoricalTargetSupersessionAndReceiptTests(
         )
         duplicate = HistoricalRaceEventTarget(
             race_series=series,
-            year=2025,
+            year=2024,
             country_region=series.country_region,
             resolution_status="superseded",
             event=event,

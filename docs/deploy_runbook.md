@@ -1,5 +1,35 @@
 # 部署运行手册
 
+## 2026-08-01 历史赛历 Release B 候选发布门禁
+
+> 以下是本地候选的未来操作合同，不是部署授权。当前未 commit/push/PR/deploy，也未运行生产
+> v2 census 或数据 apply。
+
+2026-08-02 主线集成后，本次发布迁移固定为
+`0071_historical_calendar_release_b`，直接依赖
+`0070_horse_identity_evidence_commit_receipt`。升级前候选 preflight 只接受生产 applied leaf
+`0070`，升级后或 B→B rollback 的目标 image preflight 只接受 `0071`；wrapper 同时列出二者是为
+同一只读命令覆盖这两个明确阶段，不允许其他 leaf。
+
+1. deploy 前必须取得并人工核对目标生产数据库 identity SHA，导出
+   `EXPECTED_PRODUCTION_DB_IDENTITY_SHA256=<64位小写sha256>`；缺失或格式错误时停服务前失败。
+2. deploy 构建同时带 OCI revision label 和 runtime `UMANEWS_RELEASE_COMMIT` 的候选 image，随后
+   运行 `run_historical_calendar_release_b_preflight.sh`。commit、image ID、DB identity、
+   `0070/0071` 单一 leaf 和 forward 冲突必须全部通过，之后才调用 release orchestration。leaf
+   必须从目标库 `django_migrations` 的实际 applied 状态计算，不得使用候选镜像 migration graph
+   冒充目标数据库状态。目标库存在任何候选 graph 不认识的 `stable.*` applied node 时必须输出
+   `migration_graph_known=false` 和精确 node 列表并失败；不得把未知 node 过滤后继续计算“合法” leaf。
+3. 通用 `rollback*.sh` 只接受仍包含 `0071` 的目标，即只执行 B→B rollback；目标早于 Release B
+   时在 checkout/停服务前 fail closed。B→B checkout 并构建目标 image 后，以目标 commit/image
+   运行 forward preflight，再进入 release orchestration；不得运行 reverse preflight，因为合法的
+   B-only 数据形态本就可能不兼容旧约束。回到 pre-0071 必须另行审批停服、reverse preflight、
+   反向 migration 与旧 image 恢复流程，不得根据 receipt 缺失或“尚未 apply”猜测兼容。
+4. Release B 关闭态部署只应用 `0071` 并验证 schema/code；不得调用 `--prepare-v2`、
+   `--apply-v2` 或启用 historical write/network flags。81 mismatch 保持不变是预期。
+5. 后续另行授权的数据阶段依次为 `--prepare-v2`、人工 overlay、`--prepare-reviewed-v2`、独立 v2
+   approval、maintenance/live gate、`--apply-v2`、`--verify-v2`。回滚只接受同 receipt 的
+   no-replace artifact 和 `--rollback-v2`，post-state 漂移时停止。
+
 ## 2026-07-31 历史赛事赛历完整性 Release A 未来发布门禁
 
 > 本节是仓库候选的未来发布门禁，不是部署授权或生产执行记录。当前没有 commit、push、PR、
