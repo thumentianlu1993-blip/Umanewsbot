@@ -1,5 +1,48 @@
 # 关键决策
 
+## 2026-08-01 Release B 以系列级链路治理取代逐 event duplicate 推断
+
+- v1 `canonicalize_duplicate` 只表示 Release A 无法安全处理唯一约束冲突，不能作为 81 条生产
+  数据都是独立重复赛事的事实结论。
+- Release B 的最小 schema 范围是 event series/edition 与 active target series/year 两组约束
+  切换；数据 action 改为一个 series 一个原子 ledger，禁止逐 event 部分提交。
+- 同日重复 boundary 只有在来源与 runner/result 核心身份等价并经人工选择 survivor 后才可
+  tombstone；后续错位链的 event 必须保留并重挂正确 target/path。
+- duplicate 等价摘要必须包含 `source_refs` SHA；被判定 equivalent 的 duplicate 只有在审核终态
+  为 `draft`、`race_series=NULL`、slug 精确为 `release-b-tombstone-<event_id>` 时才可建立 active
+  canonical link，避免不同上游身份或仍公开记录被错误合并。
+- duplicate 的既有依赖默认留在 tombstone，复用 `RaceEventProductCanonicalLink` 隐藏产品重复；
+  无逐行 mapping/SHA 时禁止删除、repoint 或 dedupe。
+- canonical product link 必须作为独立 managed ledger，不得同时计入 immutable reverse dependency
+  SHA；inactive canonical link 是不可删除的审计记录。target supersession 必须同
+  series/edition、指向 active survivor、仅一层且无链环。
+- Release B 候选镜像构建后，必须由绑定 commit/image、`0070` leaf 与 DB identity 的 candidate
+  one-shot 在旧服务仍运行时完成 forward schema preflight；运行时还必须显式绑定预先核对的生产
+  DB identity。失败不得进入 release orchestration。通用 rollback 只允许 B→B，必须用 checkout
+  后的目标 image 做 forward preflight；reverse preflight 仅属于另行审批的 pre-0071 跨 schema
+  恢复，不能混入合法 B-only 数据的普通回滚。
+- migration leaf 必须来自目标库实际 applied migration；review overlay 不得把不同身份摘要的
+  同日记录判为等价，不得修改赛历修复范围外 target 字段，artifact 目录必须原子 no-replace
+  发布；published event 缺少唯一 canonical path 时 verifier 必须失败。
+- recorder 中任一候选 graph 未知的 `stable.*` applied migration 都是 schema identity 不明，必须
+  明确列出并 fail closed，禁止静默过滤。reviewed supersession 的时间身份按 UTC 微秒规范值比较；
+  series/edition 链式交换只允许在同一事务内使用完整 manifest SHA 绑定的临时身份解除即时唯一键，
+  最终状态、ledger、verifier 与 exact rollback 合同不变。
+- superseded target 的 manifest 字段在 overlay 使用固定 sentinel，apply 时写入当前已审核 manifest
+  SHA；canonical links 必须与 equivalent boundary 的 pair/identity 精确相等，并允许多个 duplicate
+  共享同一 survivor。既有 inventory 只处理非 superseded active target。
+- 通用 rollback 不承担跨 schema 反向迁移：pre-0071 target 必须在任何 checkout/停服前拒绝，另走
+  独立审批的停服恢复。所有 imported target 必须有关联 event；series identity collision 使用
+  edition-year identity。
+- review template 与 reviewed overlay 使用同一字段形状；模板中的 census manifest SHA 在完整
+  census 生成后由审核者填写。target 若已有 `superseded_targets`，自身不得再被 supersede，模型
+  校验与 v2 overlay 共同阻断多层链。
+- 替代 read-only reviewer session `019fb946-ae91-7a21-b455-29ce02766fd7` 已关闭首轮 4 个 P1 和
+  1 个 P2，最终 `VERDICT: APPROVED`。Release B 实现、部署、v2 census、人工 overlay、生产 apply
+  和 Release C 继续是独立门禁。用户已明确确认本地实现，但该确认不授权 commit、PR、部署或
+  生产数据操作；实现完成后仍须完整验证和独立代码 review。
+
+
 ## 2026-07-31 历史赛事赛历完整性当前只闭合 Release A 本地范围
 
 - 当前候选只允许包含 nullable `RaceEvent.edition_year`、统一

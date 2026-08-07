@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from stable.models import (
@@ -347,7 +348,8 @@ def _series_dependency_snapshot(series_id: int) -> dict[str, list[int]]:
 
 def _destination_year_event_ids(series_id: int, year: int) -> list[int]:
     return list(
-        RaceEvent.objects.filter(race_series_id=series_id, year=year)
+        RaceEvent.objects.filter(race_series_id=series_id)
+        .filter(Q(edition_year=year) | Q(edition_year__isnull=True, year=year))
         .order_by("pk")
         .values_list("id", flat=True)
     )

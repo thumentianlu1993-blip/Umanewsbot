@@ -1,5 +1,55 @@
 # 项目状态文档
 
+## 2026-08-01 历史赛历 Release B 已完成第四轮本地审查修订，尚未进入发布
+
+- 最新 reviewer 的三个 P1 已修复：未知生产 applied migration fail closed、supersession 时间戳
+  规范化比较、manifest-bound 临时身份解除 series/edition 链式交换冲突。直接测试 `6/6`、
+  Release B 专项 `33/33`、真实 PostgreSQL `3/3`、相邻完整性与部署组合 `176/176` 通过；尚待
+  同一 reviewer 限定复审。
+- 2026-08-02 候选已集成 `main@832cc074`，Release B migration 顺延到依赖主线 `0070` 的
+  `0071`；集成后专项 `29/29`、相邻完整性与部署组合 `170/170`、SQLite
+  `0070→0071→0070→0071`、Django/migration/shell/Compose/diff 静态门禁均通过。该集成阶段
+  当时未重跑真实 PostgreSQL；其后 P1 修复已完成 `3/3`。完整 stable 未重跑，且集成后内容尚未
+  独立复审。
+- Release B 已在隔离分支实现并集成最新主线；migration 因主线占用 `0068`–`0070` 顺延为
+  `0071_historical_calendar_release_b`，候选镜像双向 preflight、series-level v2 census/review/
+  apply/verifier/exact rollback；Release C 约束仍不存在。
+- 首轮独立只读实现审核的 `4 P1 + 2 P2` 已全部修复；修订后专项为 SQLite `45/45`、部署编排
+  `117/117`、真实 PostgreSQL `28/28`。完整 stable 仍有范围外/环境失败，不能称全绿。50k/
+  50k fixture 的 v2 prepare `13.40s`，预检后正反 DDL `0.086s/0.076s`。
+- 第二轮 `3 P1 + 2 P2` 已修复，最终专项更新为 SQLite `47/47`、inventory + deploy `159/159`、
+  PostgreSQL `30/30`；rollback commit label、active inventory、supersession manifest 与 canonical
+  link star topology 均已覆盖。
+- 第三轮 `2 P1 + 1 P2` 已修复：pre-0071 自动 rollback fail closed、imported target/event 强合同、
+  series identity edition-year 冲突检查；相关组合 `168/168`（另 1 skip）。
+- 第四轮 `1 P1 + 2 P2` 已修复：B→B rollback 使用目标 image forward preflight，review template
+  与 overlay parser 同构，已有 dependents 的 target 不得再次 supersede。最终 PostgreSQL 专项
+  `26/26`；SQLite/deploy 组合唯一 error 为测试 image 缺 `git`，三项修订待只读复审确认。
+- 最新 `2 P1` 已修复：duplicate 等价性绑定 `source_refs` SHA，且 canonicalize 前强制精确
+  draft/detached/deterministic-tombstone 终态；直接回归 `14/14`，待最终只读复审。
+- 生产仍保持此前只读基线与关闭 flags；未运行生产 v2 census、maintenance 或 apply，81 mismatch
+  没有因本地实现而改变。
+- 当前只需对修订后 fingerprint 做最终独立只读复审。无 commit、push、PR、deploy 或生产授权。
+
+## 2026-08-01 历史赛历 Release B 方案审核通过，等待实现确认
+
+- 独立 worktree/branch：
+  `/Users/mentianlu/.codex/worktrees/release-b-historical-calendar/umanews` /
+  `codex/release-b-historical-calendar`，基线 `main@1cdd066b`。
+- Release B 五份方案文档已建立。核心修正是把 v1 逐 event duplicate block 改为 series-level
+  reviewed plan，分别表达同日重复边界、连续年份链、同年多届和合法跨年届次。
+- 计划中的 schema 仅切换 event `(series, edition_year)` 与非 superseded target
+  `(series, year)` 条件唯一约束；`edition_year` 仍 nullable，不包含 Release C。
+- 生产保持 `9867 events / 81 mismatch / 0 receipt / 0 active gate`，两个 historical flags
+  关闭，没有执行 v2 census 或 apply。
+- 原 reviewer 因外部 503 无结论；替代 read-only reviewer session
+  `019fb946-ae91-7a21-b455-29ce02766fd7` 首轮 4 个 P1、1 个 P2 已经两轮限定修订全部关闭，最终
+  `VERDICT: APPROVED`。新增硬合同包括旧约束 reverse preflight、互斥 canonical-link ledger、
+  target 单层无环 supersession、候选 image one-shot 停服前 preflight 和 81→14 守恒 fixture。
+- 当前等待用户在 APPROVED 后明确确认实现；尚未写测试、代码或 migration，也未 commit、push、
+  PR、部署、运行生产 v2 census 或执行生产写入。
+
+
 ## 2026-07-31 历史赛事 Release A URL 中央校验 P1 已通过限定复审
 
 - 隔离 worktree/branch 为

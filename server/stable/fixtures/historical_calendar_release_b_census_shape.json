@@ -1,0 +1,20 @@
+{
+  "schema_version": "historical-calendar-release-b-sanitized-shape/v1",
+  "source_manifest_sha256": "f45b888b78bf38f65c6ed7fdec8b22a79858ebb09fc60af349b1086b53705b46",
+  "series": [
+    {"key": "hk-01", "region": "hong_kong", "mismatch_count": 6, "duplicate_boundary_count": 1},
+    {"key": "hk-02", "region": "hong_kong", "mismatch_count": 6, "duplicate_boundary_count": 1},
+    {"key": "hk-03", "region": "hong_kong", "mismatch_count": 6, "duplicate_boundary_count": 1},
+    {"key": "hk-04", "region": "hong_kong", "mismatch_count": 6, "duplicate_boundary_count": 1},
+    {"key": "hk-05", "region": "hong_kong", "mismatch_count": 6, "duplicate_boundary_count": 1},
+    {"key": "hk-06", "region": "hong_kong", "mismatch_count": 6, "duplicate_boundary_count": 1},
+    {"key": "hk-07", "region": "hong_kong", "mismatch_count": 6, "duplicate_boundary_count": 1},
+    {"key": "hk-08", "region": "hong_kong", "mismatch_count": 6, "duplicate_boundary_count": 1},
+    {"key": "hk-09", "region": "hong_kong", "mismatch_count": 6, "duplicate_boundary_count": 1},
+    {"key": "hk-10", "region": "hong_kong", "mismatch_count": 6, "duplicate_boundary_count": 1},
+    {"key": "hk-11", "region": "hong_kong", "mismatch_count": 6, "duplicate_boundary_count": 1},
+    {"key": "hk-12", "region": "hong_kong", "mismatch_count": 6, "duplicate_boundary_count": 1},
+    {"key": "hk-13", "region": "hong_kong", "mismatch_count": 8, "duplicate_boundary_count": 0},
+    {"key": "uk-01", "region": "united_kingdom", "mismatch_count": 1, "duplicate_boundary_count": 0, "cross_year_exception": true}
+  ]
+}

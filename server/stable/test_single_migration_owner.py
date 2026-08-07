@@ -94,6 +94,17 @@ pop_line() {
 cmd="${1:-}"
 if [ $# -gt 0 ]; then shift; fi
 case "$cmd" in
+  image)
+    case " $* " in
+      *org.opencontainers.image.revision*)
+        if [ -f "$state/git-rev-parse-head" ]; then cat "$state/git-rev-parse-head"; fi
+        ;;
+      *" inspect "*)
+        printf '%s\n' 'sha256:candidate-image-id'
+        ;;
+    esac
+    exit "$(rc_file image)"
+    ;;
   compose)
     while [ $# -gt 0 ]; do
       case "$1" in
@@ -337,6 +348,7 @@ class Harness:
             "DEPLOYMENT_LOCK_DIR": str(self.lock_dir),
             "CELERY_DRAIN_TIMEOUT_SECONDS": "2",
             "SERVICE_HEALTH_TIMEOUT_SECONDS": "2",
+            "EXPECTED_PRODUCTION_DB_IDENTITY_SHA256": "a" * 64,
         }
         for key, value in overrides.items():
             if value is None:
@@ -389,6 +401,10 @@ class Harness:
 
 def seed_services(harness: Harness, *, web: str = "running", race_live: str = "running") -> None:
     """Seed fake service state. Modes: running / stopped / absent."""
+    harness.set_state(
+        "git-rev-parse-head",
+        "0123456789abcdef0123456789abcdef01234567\n",
+    )
     for service, cid in SERVICE_IDS.items():
         if service == "web":
             mode = web
@@ -440,7 +456,7 @@ def is_drain_exec(event) -> bool:
 
 def is_release_run(event) -> bool:
     kind, _cf, argv = event
-    return kind == "compose" and argv[:1] == ["run"]
+    return kind == "compose" and argv == EXPECTED_RELEASE_RUN_ARGV
 
 
 # Files whose migrate/collectstatic mentions are assertion strings inside
@@ -1160,6 +1176,22 @@ class DeployOrchestrationTests(SimpleTestCase):
     def _run_deploy(self, harness: Harness, script_rel: str, **env):
         return harness.run_script(script_rel, **env)
 
+    def test_candidate_schema_preflight_failure_stops_before_release_or_service_stop(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(harness)
+            harness.set_rc("compose-run", 1)
+
+            result = self._run_deploy(harness, "deploy/deploy.sh")
+
+            self.assertNotEqual(result.returncode, 0)
+            events = harness.events()
+            self.assertEqual([event for event in events if is_release_run(event)], [])
+            self.assertEqual(
+                [event for event in events if event[0] == "compose" and event[2][:1] == ["stop"]],
+                [],
+            )
+
     def _assert_full_orchestration(
         self, harness: Harness, result, compose_file: str
     ) -> None:
@@ -1179,7 +1211,9 @@ class DeployOrchestrationTests(SimpleTestCase):
 
         # T09.4: release wrapper invoked exactly once with the exact argv.
         runs = [argv for _cf, argv in calls if argv[:1] == ["run"]]
-        self.assertEqual(runs, [EXPECTED_RELEASE_RUN_ARGV])
+        self.assertEqual(len(runs), 2)
+        self.assertIn("check_historical_calendar_release_b_schema", runs[0])
+        self.assertEqual(runs[1], EXPECTED_RELEASE_RUN_ARGV)
 
         def index(predicate, label):
             found = first_index(evts, predicate)
@@ -1365,11 +1399,21 @@ class RollbackOrchestrationTests(SimpleTestCase):
                 self.assertEqual(actual_file, compose_file)
         self.assertEqual([e for e in evts if is_exec_migrate(e)], [])
         runs = [argv for _cf, argv in calls if argv[:1] == ["run"]]
-        self.assertEqual(runs, [EXPECTED_RELEASE_RUN_ARGV])
+        self.assertEqual(len(runs), 2)
+        self.assertIn("check_historical_calendar_release_b_schema", runs[0])
+        self.assertNotIn("--direction=reverse", runs[0])
+        self.assertEqual(runs[1], EXPECTED_RELEASE_RUN_ARGV)
         checkout = first_index(
             evts, lambda e: e[0] == "git" and e[2][:1] == ["checkout"]
         )
         self.assertIsNotNone(checkout, "rollback must checkout the target ref")
+        preflight = first_index(
+            evts,
+            lambda e: e[0] == "compose"
+            and "check_historical_calendar_release_b_schema" in e[2],
+        )
+        self.assertIsNotNone(preflight)
+        self.assertLess(checkout, preflight)
         release = first_index(evts, is_release_run)
         self.assertIsNotNone(release)
         self.assertLess(checkout, release)
@@ -1394,6 +1438,22 @@ class RollbackOrchestrationTests(SimpleTestCase):
                 "deploy/rollback_lowcost.sh", "releasecontractref"
             )
             self._assert_rollback_orchestration(harness, result, COMPOSE_LOWCOST)
+
+    def test_candidate_schema_preflight_failure_stops_rollback_before_release_or_stop(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._seed(harness)
+            harness.set_rc("compose-run", 1)
+
+            result = harness.run_script("deploy/rollback.sh", "releasecontractref")
+
+            self.assertNotEqual(result.returncode, 0)
+            events = harness.events()
+            self.assertEqual([event for event in events if is_release_run(event)], [])
+            self.assertEqual(
+                [event for event in events if event[0] == "compose" and event[2][:1] == ["stop"]],
+                [],
+            )
 
     def test_t11_docs_warn_forward_migrate_is_not_database_rollback(self):
         combined = "\n".join(
@@ -2163,7 +2223,7 @@ class HistoricalInitialInstallSemanticsTests(SimpleTestCase):
 
 
 class MigrationDriftGuardTests(SimpleTestCase):
-    """T19: this change must not create new Django migrations."""
+    """T19: only the explicitly reviewed Release B migration may be new."""
 
     def test_t19_no_new_migration_files(self):
         result = subprocess.run(
@@ -2173,11 +2233,14 @@ class MigrationDriftGuardTests(SimpleTestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(
-            result.stdout.strip(),
-            "",
-            f"unexpected migration drift:\n{result.stdout}",
-        )
+        unexpected = [
+            line
+            for line in result.stdout.splitlines()
+            if not line.endswith(
+                "server/stable/migrations/0071_historical_calendar_release_b.py"
+            )
+        ]
+        self.assertEqual(unexpected, [], f"unexpected migration drift:\n{result.stdout}")
 
 
 def race_live_state_file(harness: Harness) -> Path:

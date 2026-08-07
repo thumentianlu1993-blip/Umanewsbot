@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        UMANEWS_RELEASE_COMMIT: ${UMANEWS_RELEASE_COMMIT:-unknown}
     image: umanewsbot:prod
     command: /app/deploy/docker/start-web.sh
     env_file:

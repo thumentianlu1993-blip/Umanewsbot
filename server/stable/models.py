@@ -1267,9 +1267,12 @@ class RaceEvent(TimestampedModel):
         constraints = [
             models.UniqueConstraint(fields=("year", "slug"), name="uq_race_event_year_slug"),
             models.UniqueConstraint(
-                fields=("race_series", "year"),
-                condition=models.Q(race_series__isnull=False),
-                name="uq_race_event_series_year",
+                fields=("race_series", "edition_year"),
+                condition=models.Q(
+                    race_series__isnull=False,
+                    edition_year__isnull=False,
+                ),
+                name="uq_race_event_series_edition",
             ),
         ]
         indexes = [
@@ -2588,7 +2591,13 @@ class HistoricalRaceEventTarget(TimestampedModel):
     class Meta:
         ordering = ("country_region", "year", "race_series")
         constraints = [
-            models.UniqueConstraint(fields=("race_series", "year"), name="uq_historical_target_series_year"),
+            models.UniqueConstraint(
+                fields=("race_series", "year"),
+                condition=~models.Q(
+                    resolution_status=HistoricalRaceResolutionStatus.SUPERSEDED,
+                ),
+                name="uq_hist_target_active_series_year",
+            ),
             models.CheckConstraint(
                 condition=~models.Q(
                     expectation_status=HistoricalRaceExpectationStatus.NOT_HELD,
@@ -2625,6 +2634,12 @@ class HistoricalRaceEventTarget(TimestampedModel):
             raise ValidationError({"event": "标记已导入前必须关联正式赛事。"})
         if self.resolution_status == HistoricalRaceResolutionStatus.SUPERSEDED:
             supersession_errors = {}
+            if self.pk and type(self)._base_manager.filter(
+                superseded_by_id=self.pk
+            ).exists():
+                supersession_errors["superseded_by"] = (
+                    "已有年度目标指向当前目标，禁止形成多层替代链。"
+                )
             if self.event_id:
                 supersession_errors["event"] = "已被替代的年度目标必须解除赛事关联。"
             if not self.superseded_by_id:
@@ -2637,6 +2652,24 @@ class HistoricalRaceEventTarget(TimestampedModel):
                 )
             if self.pk and self.superseded_by_id == self.pk:
                 supersession_errors["superseded_by"] = "年度目标不能替代自身。"
+            if self.superseded_by_id and self.superseded_by_id != self.pk:
+                survivor = self.superseded_by
+                if survivor.race_series_id != self.race_series_id:
+                    supersession_errors["superseded_by"] = (
+                        "保留目标必须属于同一赛事系列。"
+                    )
+                elif survivor.year != self.year:
+                    supersession_errors["superseded_by"] = (
+                        "保留目标必须属于同一届次年份。"
+                    )
+                elif (
+                    survivor.resolution_status
+                    == HistoricalRaceResolutionStatus.SUPERSEDED
+                    or survivor.superseded_by_id is not None
+                ):
+                    supersession_errors["superseded_by"] = (
+                        "保留目标必须是 active 单层终点，禁止替代链或环。"
+                    )
             if supersession_errors:
                 raise ValidationError(supersession_errors)
         if self.resolution_status == HistoricalRaceResolutionStatus.PERMANENTLY_UNAVAILABLE:

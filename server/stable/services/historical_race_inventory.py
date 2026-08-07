@@ -979,6 +979,9 @@ def commit_inventory_artifact(*, artifact_dir: str | Path, approval_path: str | 
             existing = (
                 HistoricalRaceEventTarget.objects.select_for_update()
                 .filter(race_series=series, year=row["year"])
+                .exclude(
+                    resolution_status=HistoricalRaceResolutionStatus.SUPERSEDED
+                )
                 .first()
             )
             if existing and existing.resolution_status == HistoricalRaceResolutionStatus.IMPORTED:

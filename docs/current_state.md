@@ -1,5 +1,98 @@
 # 当前状态
 
+## 2026-08-01 历史赛历 Release B 本地实现与第四轮修订完成，待最终只读复审
+
+- 2026-08-02 reviewer session `019fc318-431e-7771-aa79-bf01a9fdb992` 的三个 P1 已限定修复：
+  schema preflight 对生产 recorder 中候选 graph 未知的 `stable.*` applied node 输出明确列表并
+  `ok=false`，deploy/rollback 不进入 release 或停服务；v2 verifier 将 overlay 字符串与 ORM
+  datetime 的 `superseded_at` 统一为 UTC 微秒表示；apply 使用完整 manifest SHA 绑定的临时
+  event/path identity，并先清空 scope 内 `race_series/edition_year`，避免链式交换的中间唯一冲突。
+- 三项直接测试先分别复现错误 `ok=true`、合法 supersession post-verify 失败和届次交换
+  `IntegrityError`，修复后直接 SQLite/部署 `6/6`、Release B 专项 `33/33`、真实 PostgreSQL
+  rotation + supersession + unknown migration `3/3`，Release B + Release A 完整性 + 部署合同
+  最终组合 `176/176`。本轮 PostgreSQL 容器已删除；当前改动仍待同一 reviewer 限定复审。
+- 2026-08-02 已将该未提交候选安全 fast-forward 集成到
+  `origin/main@832cc07465a73f2e59947e00e65482b64d39d027`，保留主线 P0 马匹身份、赛果同步和
+  生命周期改动；唯一内容冲突位于 `docs/project_overview.md`，已合并保留双方段落。迁移编号与
+  依赖、rollback 目标检查、schema preflight、测试和五份 change 文档均已从原 `0068` 校准为
+  `0071`，升级前/后允许 leaf 为 `0070/0071`。历史 RED/GREEN 与旧 reviewer 证据仅作为当时事实
+  保留；主线集成后的当前内容尚未复审，不复用旧 fingerprint。
+- 集成后本地验证：Release B 专项 `29/29`；Release B + Release A 完整性 + 部署合同组合
+  `170/170`；SQLite fresh DB 完成 `0070→0071→0070→0071`，最终单一 leaf 为 `0071` 且新约束名
+  正确；Django check、`makemigrations --check --dry-run`、shell syntax、两份 Compose
+  `config --no-env-resolution` 与 `git diff --check` 均通过。该主线集成阶段当时未重跑真实
+  PostgreSQL；其后本轮 P1 已完成上述 `3/3`。完整 stable 仍未重跑。
+- 用户已在方案 `APPROVED` 后明确确认实现；当前仍位于隔离 worktree/branch，未 commit、push、
+  PR、部署或访问生产。生产基线继续沿用此前只读证据，不能把本地结果表述为线上已修复。
+- Release B 候选已集成 `origin/main@832cc07465a73f2e59947e00e65482b64d39d027`；主线新增
+  `0068`、`0069`、`0070` 后，本变更唯一 migration 顺延为
+  `0071_historical_calendar_release_b`，依赖当前单一 leaf
+  `0070_horse_identity_evidence_commit_receipt`。event 唯一身份切换为非空
+  `(race_series, edition_year)`，target 切换为非 superseded `(race_series, year)`；没有 Release C。
+- 新增候选镜像 forward/reverse schema preflight，绑定 commit、image ID、`0070/0071` leaf 和显式
+  `EXPECTED_PRODUCTION_DB_IDENTITY_SHA256`；deploy 在停服务前执行。通用 rollback 仅允许 B→B，
+  checkout/build 目标 image 后运行 forward preflight；reverse 只属于另行审核的跨 schema 恢复。
+- v2 repair 以完整 series 为 action，冻结 event/target/path/canonical-link/全部 reverse FK 行级
+  ledger；人工 overlay 后才生成独立 v2 manifest/approval。apply 保留 inactive canonical audit，
+  verifier 覆盖全局约束，rollback 要求当前 post-state 与 after snapshot 精确相等。
+- 首轮独立只读代码审核 session `019fb9a4-86fa-7ca1-b4cc-e5c558258dbc` 提出 `4 P1 + 2 P2`：
+  已改为从 `django_migrations` 计算实际 applied leaf；非等价重复边界、缺失 target supersession
+  审计、越权 target 字段和 published 无 canonical path 均 fail closed；两类 v2 artifact 目录使用
+  原子 no-replace 发布。
+- 修订后 SQLite Release B + 相邻完整性回归 `45/45`、部署编排 `117/117`、真实 PostgreSQL
+  Release B + Release A 组合 `28/28`。修订前更宽的相邻回归为 `75/75`；两份 Compose config、
+  Django check、migration drift、compile/diff check 均已通过。
+- 第二轮 read-only reviewer session `019fb9b1-f74c-78b0-92c5-6bc7532291be` 的 `3 P1 + 2 P2`
+  也已关闭：rollback 目标镜像保留 target commit label；inventory 排除 superseded audit；新增
+  supersession manifest sentinel 并在 apply 时绑定真实 manifest SHA；canonical link 必须与审核
+  boundary/identity 精确相等，同时允许多个 duplicate 指向同一 survivor。最终修订验证为 SQLite
+  `47/47`、inventory + deploy `159/159`、真实 PostgreSQL `30/30`。
+- 第三轮 reviewer session `019fb9bc-b0c8-7c03-afce-f0359f710765` 的 `2 P1 + 1 P2` 已修复：通用
+  rollback 现在在 checkout/停服前拒绝缺少 `0071` 的目标，跨 schema 恢复必须走独立审核的停服
+  流程；imported target 必须关联 event；series identity review 的冲突键改为 edition year。相关
+  Release B + series identity + deploy 组合为 `168/168`（另 `1` 项 PostgreSQL-only skip）。
+  50k event + 50k target、500 mismatch/100 series prepare 为 `13.40s`；绑定预检后的 forward/
+  reverse DDL 为 `0.086s/0.076s`。临时 PostgreSQL 容器与性能 artifact 已删除。
+- 第四轮 reviewer session `019fb9c9-1bd5-7b30-b1a8-fce75de79fc7` 提出 `1 P1 + 2 P2`：已将
+  通用 B→B rollback 的错误 reverse preflight 改为目标 image forward preflight；生成的 review
+  template 现在只保留 parser 接受的 overlay 字段，并留空 census manifest SHA 供审核者填写；
+  target `clean()` 也拒绝再次 supersede 已有下游引用的 survivor。最新真实 PostgreSQL Release B
+  专项 `26/26`；SQLite/deploy 组合执行 `144` 项时 `141` 通过、`2` skip，唯一 error 是测试 image
+  缺少 `git` 可执行文件，并非断言失败。三项修订仍待最终 read-only re-review。
+- 后续全量 read-only reviewer session `019fb9d8-1ee0-7db3-b28f-7a0651a5cef2` 又发现 `2 P1`：
+  duplicate identity 现已纳入 `source_refs` SHA，不同上游身份不能判为 exact duplicate；所有
+  equivalent duplicate 必须为 `draft`、解除 series，并使用精确
+  `release-b-tombstone-<event_id>` slug 后才能创建 canonical link。直接回归 `14/14`，待复审清零。
+- 完整 `stable` 为 `4043 tests / 26 failures / 133 errors / 77 skipped`，首个失败是范围外的翻译
+  错误文本断言，另有本机缺 `python`、Redis 不可达和 canonical worktree 路径等环境/既有问题；
+  不能表述为全绿，也不能与旧 `3989` 集合直接作增量结论。当前只差修订后最终 fingerprint 与
+  最终只读复审；无 commit/push/PR/部署或生产授权。
+
+## 2026-08-01 历史赛历 Release B 方案审核通过，等待实现确认
+
+- 已从最新 `origin/main@1cdd066b80861520f60515d3912c0f0a8283b0eb` 创建干净 worktree
+  `/Users/mentianlu/.codex/worktrees/release-b-historical-calendar/umanews`，分支
+  `codex/release-b-historical-calendar`；Release A evidence worktree 的未提交文档未复制或修改。
+- 新建 `docs/changes/enable-historical-calendar-release-b/` 五份方案文档，当前只有 spec/design/
+  test/tasks/rollout，无测试、应用代码、migration、commit、push、PR 或生产写入。
+- Release A 生产只读基线仍为 `9867 events / 81 mismatch / 0 receipt / 0 active gate`，historical
+  backfill/network flags 均为 false；v1 census manifest SHA 为
+  `f45b888b78bf38f65c6ed7fdec8b22a79858ebb09fc60af349b1086b53705b46`。
+- 进一步只读核验确认 81 mismatch 涉及 14 个 series：12 个香港 series 有同日 duplicate
+  boundary，67 个 duplicate candidate 自身也是 mismatch，证明主体是“重复边界 + 连续错位链”而
+  不是 81 个独立 duplicate；另有香港同一自然年多届和英国跨年届次。
+- mismatch event 的非零依赖为 runner `823`、result `803`、data candidate `162`、
+  HorseP0Source `176`、HorseIdentityConflict `782`。Release B 方案因此采用 series-level
+  reviewed ledger，默认依赖留在 tombstone，不允许无逐行证据删除或重挂。
+- 原 Full reviewer session `019fb93f-3e25-7e71-ac5a-333b1695a8c8` 因持续外部 503 且无法以
+  read-only 恢复，没有形成结论。替代 read-only reviewer session
+  `019fb946-ae91-7a21-b455-29ce02766fd7` 首轮提出 4 个 P1 与 1 个 P2；经同会话两轮限定复审，
+  reverse migration 兼容性、三类互斥 ledger、target supersession 强合同、候选镜像停服前
+  preflight 和 81→14 脱敏 fixture 要求均已关闭，最终 `VERDICT: APPROVED`。
+- 当前仍只有方案与状态文档，没有测试、应用代码、migration、commit、push、PR、部署或生产
+  写入。按仓库工作流，必须在 APPROVED 后取得一次明确实现确认，才进入 RED 与实现。
+
+
 ## 2026-07-31 历史赛事 Release A URL 中央校验 P1 已通过限定复审，证据写回待复审
 
 - 已从 `origin/main@43b81fd3288a1e7b997ffad78d03565327e3d990` 建立隔离 worktree
