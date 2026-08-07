@@ -5389,3 +5389,18 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   同一独立 reviewer 首轮 5 项 finding、第二轮宿主收敛 P1 与第三轮 Umanews 身份证明 P1
   均已测试先行修复；第四轮原生只读复审最终 `APPROVED`，无剩余 actionable finding。
   当前只进行审核结论文档与最终 fingerprint 收口；随后停止并等待当前版本发布授权。
+
+# 2026-08-08 lifecycle shadow 观察加固已合并，但生产部署被迁移预检阻断
+
+- PR #72 已合并为 `main@c4ad7277498846695065c71239dc59334e04370e`；候选镜像
+  `sha256:eb701e55…28b53` 已构建，但未进入生产运行态。
+- Release B schema preflight 在唯一 release task 前报告 `ok=false / identity_ok=false`，生产相关迁移叶为
+  `stable.0067_historical_calendar_release_a,stable.0070_horse_identity_evidence_commit_receipt`；`0068/0069`
+  未应用，当前 main 还包含 `0071`。本轮没有 migration、collectstatic 或 lifecycle 业务写入。
+- 已在共享部署锁内恢复旧镜像 `sha256:b1fecc46…41a73`。web/worker/Beat 为 `false/off`，race-live
+  未启动；healthz/首页 200、worker ping 正常、近期应用错误与 nginx 502 均为 0。
+- lifecycle 快照为 `16 controls / 16 proposals / 0 applied / 0 active claims`，关闭态 scanner 为
+  `enabled=False / claimed=0 / dispatched=0`。部署前已存在的 `default=2` lifecycle 消息未增加且无人消费，
+  `race_live=7543` 未处理。
+- 下一门禁是独立的生产 migration history 修复，不得直接恢复 shadow。完整恢复点、预检输出与执行偏差见
+  `docs/changes/harden-lifecycle-shadow-observation/release_report.md`。

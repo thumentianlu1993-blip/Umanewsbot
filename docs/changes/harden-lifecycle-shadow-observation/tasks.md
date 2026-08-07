@@ -20,7 +20,7 @@
 ## Review
 
 - [x] (application) 由未参与实现的独立 reviewer 执行原生只读 `/review`，修复全部 actionable findings 并复用同一会话复审。
-- [ ] (operations) 冻结最终 fingerprint、approved parent 与 content hash，停止等待发布授权。
+- [x] (operations) 冻结最终 fingerprint、approved parent 与 content hash，停止等待发布授权。
 
 ## 发布
 
@@ -28,3 +28,7 @@
 - [ ] (operations) 核对备份、共享锁、单一 release owner、三服务一致性、HTTP、队列、migration 和 race-live 关闭态。
 - [ ] (operations) 另获授权后恢复现有 16 场 `true/shadow`，运行一致性检查并观察两地区 2–4 场自然 T/T+30。
 - [ ] (integration) 追加 evidence-only 发布报告并复用同一 reviewer 完成证据收口；enforce 另立 change。
+
+> 2026-08-08：commit、push、PR #72 与 merge 已完成；关闭态部署被 Release B schema preflight 在
+> release task 前安全阻断，已恢复旧镜像并保持 `false/off`。因此上述部署与后续 shadow 发布项保持未完成，
+> 详见 `release_report.md`。
