@@ -1,5 +1,13 @@
 # 项目状态文档
 
+## 2026-08-09 Release B 数据门禁最小修复候选
+
+- 已完成无 migration 的官方结果身份候选：把受审 HKJC provider/URL/content SHA 与客观字段、
+  runner/result 用于 duplicate equivalence，同时保留完整 provenance 漂移保护和严格 fallback。
+- 生产 12 对只读证据全部满足新合同，Release B 聚焦测试 `36/36` 通过。
+- 独立只读 review 未发现 actionable defect；当前仍为未提交、未部署、零生产数据写入，下一门禁是
+  固定 PR 后的一次精确发布确认。
+
 ## 2026-08-08 Release B 生产部署成功，数据阶段因 v2 census 确定性阻断
 
 - 7 个过期 `RaceResultReviewRun` claim 已按独立复审的一次性事务转为 terminal `noop`，after artifact

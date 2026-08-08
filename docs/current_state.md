@@ -1,5 +1,17 @@
 # 当前状态
 
+## 2026-08-09 Release B 官方结果身份最小修复实现中
+
+- 已把生产 v2 census 的确定性 blocker 收敛到 `_duplicate_identity_sha256()`：完整 `source_refs`
+  digest 把 TJCIS catalog provenance 错当成赛事核心身份。
+- 最小候选只在嵌套 official result URL 与唯一 approved source/provider/content SHA 精确匹配时，
+  使用官方结果身份；否则保留赛事名 + 完整 `source_refs` 的严格 fallback。
+- 生产只读复核确认 12/12 对均有相同受审 HKJC provider、URL、缓存内容 SHA、客观字段和
+  runner/result；没有新增模糊赛事或用户待判项。
+- 无模型、migration、配置、采集或公开行为变化；Release B 测试 `36/36` 通过，独立只读 review
+  会话 `019fe233-9c84-7b23-9ff6-ca7701cd060f` 未发现 actionable defect。当前尚未提交、合并、
+  部署或执行任何生产数据写入，旧 v2 census 继续不可执行。
+
 ## 2026-08-08 Release B 已部署，v2 census 在 duplicate identity 门禁确定性停止
 
 - 生产过期 review claim `39/43/44/45/46/47/48` 已在停 Beat/worker/race-live、custom-format
