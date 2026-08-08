@@ -1,5 +1,13 @@
 # 关键决策
 
+## 2026-08-09 canonical path 轮转必须先解除条件唯一身份
+
+Release B apply 的临时阶段不能只替换 path 的 `year/slug`。当 reviewed topology 把另一条 path
+轮转为同一 event 的新 canonical 时，旧 canonical 尚在会触发 `uq_race_public_path_event_canonical`。
+最小修复固定为：锁定完整 path scope 后，在同一事务内先把全部受控 path 临时设为 `legacy` 并
+写临时 key，再逐行写最终 owner/key/kind。该修复不放宽最终唯一约束，也不改变 reviewed artifact
+的业务决策；必须由回归测试证明失败事务零写、修复后最终每个 published event 恰有一个 canonical。
+
 ## 2026-08-09 数据回填继续绑定人工 survivor 与跨年届次审核
 
 - 官方身份相等只证明 duplicate boundary 是同一实际赛事，不自动决定哪条生产记录成为 survivor。

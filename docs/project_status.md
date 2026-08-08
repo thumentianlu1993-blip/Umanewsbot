@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-08-09 Release B apply 确定性停止，生产零业务数据变化
+
+- 14-action reviewed manifest `c9e9b222…1e4c64` 已通过生成校验，写前备份 SHA 为
+  `91a38cf2…e17aa`。
+- apply 因 canonical path 轮转的瞬时条件唯一冲突在单事务内失败；receipt/link 均为 0，81 mismatch
+  与原 scope 未变，maintenance 已退出，服务和健康已恢复。
+- 2025 `full_network` 未启动。下一步仅允许修复临时 path staging、补回归测试、独立复审和重新发布，
+  随后生成全新 artifact 再申请精确 G3。
+
 ## 2026-08-09 Release B 身份修复已上线，新 census 等待人工数据门禁
 
 - PR `#77` 已合并并部署 `main@55d41b5f`；生产 image 为 `sha256:c9f0a89f…9ef4`，发布后

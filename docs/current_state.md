@@ -1,5 +1,24 @@
 # 当前状态
 
+## 2026-08-09 Release B 数据 apply 在事务内确定性停止并安全恢复
+
+- 用户批准的 14-action reviewed artifact 已通过严格生成门禁：review overlay SHA 为
+  `8a1f3f2cadd7d7b4446b52548b010be1b2738d0da8c5bebe31ce19259ca26dbe`，执行 manifest SHA 为
+  `c9e9b22299b94dc62af4a2afccb87dca0d7d906c9f84539a8b8a7727591e4c64`，action scope SHA 为
+  `0f633f215e45c47d6c4fd8cd2b720158436d2849362462f5581c092cb9f0af01`。
+- 写前备份 `/opt/umanewsbot/backups/db/pre-release-b-data-apply-20260808T165235Z.dump` 为
+  `412849582` bytes、mode `0600`、TOC `1308`、SHA-256
+  `91a38cf276005f614c6171ea13cde87532485a8e63dca1e96e280405d39e17aa`。
+- apply 在同一事务内更新 path 时触发 `uq_race_public_path_event_canonical`：event `1214` 的旧
+  canonical path 尚未临时降级，另一条轮转 path 已先被设为该 event 的 canonical，形成瞬时冲突。
+  命令按确定性错误规则停止，未重试、未运行 verifier 或 2025 `full_network`。
+- 回滚证据：receipt `0`、批准范围 active canonical link `0`、mismatch 仍 `81`、scope 仍为原
+  `a324261f…11665`，event `1214/1838` 保持原 published 状态，rollback artifact 不存在。maintenance
+  gate `1` 已退出，worker/beat 已恢复，Celery、Django、writer census 和 HTTP healthz 通过。
+- 最小代码修复是在最终 path 写入前，把所有受控 path 的临时态同时设为 `legacy`，解除
+  `event_id` 条件唯一约束，再按 reviewed topology 写回 canonical/legacy；必须补轮转路径回归测试、
+  独立复审、发布并生成新 census/manifest 后重新取得精确 G3，禁止复用本次执行 artifact。
+
 ## 2026-08-09 Release B 官方结果身份修复已发布，等待 G3 数据决策
 
 - PR `#77` 已合并为 `main@55d41b5f84f072e11862fa14213cecc027708719`，生产统一运行

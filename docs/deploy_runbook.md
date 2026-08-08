@@ -1,5 +1,17 @@
 # 部署运行手册
 
+## 2026-08-09 Release B 数据 apply 确定性 STOP 检查点
+
+1. 执行 manifest `c9e9b222…1e4c64`、approval `245baaf3…a2420`、maintenance evidence
+   `ba8711b2…dcc3b4` 均已冻结；写前 dump SHA 为 `91a38cf2…e17aa`。
+2. apply 因 `uq_race_public_path_event_canonical` 在 path 轮转的瞬时中间态失败；错误发生在 receipt
+   创建和 rollback artifact 生成前，外层事务已回滚。不得用手工 SQL、禁用 constraint、改 overlay
+   顺序或直接重放命令绕过。
+3. 安全恢复必须验证 receipt=0、active link=0、mismatch=81、原 action scope 不变、gate exited，
+   再启动 worker/beat 并核验 Celery、writer census 与 healthz。本次这些条件全部成立。
+4. 后续只允许发布“临时 path 全部 legacy”最小修复及轮转回归测试；重新部署后必须重新生成 census、
+   reviewed manifest、approval、maintenance evidence 和写前备份。本次 artifact 不可直接重试。
+
 ## 2026-08-09 官方结果身份修复发布与新 census 检查点
 
 1. PR `#77` 的 merge commit 为 `55d41b5f84f072e11862fa14213cecc027708719`；生产 release 目录为

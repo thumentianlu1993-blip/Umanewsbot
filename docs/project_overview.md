@@ -7,6 +7,9 @@ Release B 已将赛事系列唯一身份切换到 edition，并把 duplicate equ
 漂移校验，但不再把同一实际赛事误判为不同比赛。生产发布和新全库只读 census 已完成，后续产品
 数据变化仍必须经过 14 个 series action 的人工 survivor、届次、target 与公开路径审核；在 reviewed
 manifest、独立 approval 和 maintenance gate 齐备前，不会改写公开赛事或启动联网回填。
+首次正式 apply 已证明 path 轮转还需要一个实现级原子性修复：临时态必须解除 canonical-per-event
+条件唯一身份，再恢复最终 topology。该问题没有改变数据决策，但在修复发布和新 artifact 审核前，
+生产回填与联网运行继续关闭。
 
 ## 日本重赏 P0 身份来源
 
