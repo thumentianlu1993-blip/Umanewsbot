@@ -10,6 +10,7 @@ from typing import Any, Iterable
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -48,6 +49,7 @@ from stable.services.historical_race_calendar_integrity import (
     _aware_timestamp,
 )
 from stable.services.race_event_public_cache import invalidate_public_race_cache
+from stable.services.race_event_years import validate_authority_url
 from stable.services.race_series_identity_review import _publish_directory_no_replace
 
 
@@ -362,6 +364,60 @@ def _event_snapshot(event: RaceEvent) -> dict[str, Any]:
     }
 
 
+def _official_result_identity(source_refs: Any) -> dict[str, str] | None:
+    if not isinstance(source_refs, dict):
+        return None
+    discovery = source_refs.get("detail_discovery")
+    if not isinstance(discovery, dict):
+        return None
+    urls = discovery.get("urls")
+    if not isinstance(urls, dict):
+        return None
+    result = urls.get("result_url")
+    if not isinstance(result, dict):
+        return None
+    if str(result.get("source_authority") or "").strip().casefold() != "official":
+        return None
+    source_provider = str(result.get("source_provider") or "").strip().casefold()
+    if not source_provider:
+        return None
+    try:
+        parsed = validate_authority_url(result.get("url"))
+    except ValidationError:
+        return None
+    official_url = parsed.geturl()
+    approved_sources = discovery.get("approved_detail_sources")
+    if not isinstance(approved_sources, list):
+        return None
+    approved_matches = [
+        source
+        for source in approved_sources
+        if isinstance(source, dict)
+        and str(source.get("source_authority") or "").strip().casefold()
+        == "official"
+        and str(source.get("source_provider") or "").strip().casefold()
+        == source_provider
+        and str(source.get("url") or "").strip() == official_url
+    ]
+    if len(approved_matches) != 1:
+        return None
+    cache_identity = approved_matches[0].get("source_cache_identity")
+    content_sha256 = (
+        str(cache_identity.get("sha256") or "").strip().casefold()
+        if isinstance(cache_identity, dict)
+        else ""
+    )
+    if len(content_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in content_sha256
+    ):
+        return None
+    return {
+        "source_provider": source_provider,
+        "url": official_url,
+        "content_sha256": content_sha256,
+    }
+
+
 def _duplicate_identity_sha256(event: RaceEvent) -> str:
     runner_fields = (
         "sort_order",
@@ -384,18 +440,28 @@ def _duplicate_identity_sha256(event: RaceEvent) -> str:
         "carried_weight",
         "running_status",
     )
+    official_result_identity = _official_result_identity(event.source_refs)
+    core = {
+        "country_region": event.country_region,
+        "racecourse": " ".join(event.racecourse.casefold().split()),
+        "grade_text": " ".join(event.grade_text.casefold().split()),
+        "normalized_grade": event.normalized_grade,
+        "surface": event.surface,
+        "distance_text": " ".join(event.distance_text.casefold().split()),
+        "local_date": event.local_date.isoformat() if event.local_date else None,
+    }
+    if official_result_identity is None:
+        core.update(
+            {
+                "original_name": " ".join(event.original_name.casefold().split()),
+                "source_refs_sha256": _digest(event.source_refs),
+            }
+        )
+    else:
+        core["official_result_identity"] = official_result_identity
     payload = {
-        "core": {
-            "original_name": " ".join(event.original_name.casefold().split()),
-            "country_region": event.country_region,
-            "racecourse": " ".join(event.racecourse.casefold().split()),
-            "grade_text": " ".join(event.grade_text.casefold().split()),
-            "normalized_grade": event.normalized_grade,
-            "surface": event.surface,
-            "distance_text": " ".join(event.distance_text.casefold().split()),
-            "local_date": event.local_date.isoformat() if event.local_date else None,
-            "source_refs_sha256": _digest(event.source_refs),
-        },
+        "identity_contract": "official-result-or-strict-source-refs.v1",
+        "core": core,
         "runners": list(event.runners.order_by(*runner_fields).values(*runner_fields)),
         "results": list(event.results.order_by(*result_fields).values(*result_fields)),
     }

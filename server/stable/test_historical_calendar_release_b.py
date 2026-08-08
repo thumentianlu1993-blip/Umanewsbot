@@ -385,6 +385,147 @@ class ReleaseBSeriesPlannerTests(TransactionTestCase):
         self.assertEqual(action["disposition"], "block")
         self.assertIn("reviewed_overlay_required", action["block_reasons"])
 
+    @staticmethod
+    def _official_result_refs(*, url: str, catalog_manifest: str) -> dict:
+        return {
+            "detail_discovery": {
+                "approved_detail_sources": [
+                    {
+                        "url": url,
+                        "source_authority": "official",
+                        "source_provider": "hkjc",
+                        "source_cache_identity": {"sha256": "c" * 64},
+                    }
+                ],
+                "urls": {
+                    "result_url": {
+                        "url": url,
+                        "source_authority": "official",
+                        "source_provider": "hkjc",
+                    }
+                },
+                "manifest_sha256": catalog_manifest,
+            },
+            "season_label": "2018/19" if catalog_manifest == "a" * 64 else "2017/18",
+            "source_provider": "tjcis",
+        }
+
+    def test_duplicate_identity_uses_official_result_not_catalog_provenance(self):
+        first = self._event(year=2023, slug="sponsorless-name", day=5)
+        second = self._event(year=2024, slug="sponsored-name", day=5)
+        official_url = (
+            "https://racing.hkjc.com/racing/Info/Meeting/Results/English/"
+            "Local/20240105/ST/8"
+        )
+        RaceEvent._base_manager.filter(pk=first.pk).update(
+            local_date=date(2024, 1, 5),
+            original_name="Jockey Club Sprint",
+            source_refs=self._official_result_refs(
+                url=official_url,
+                catalog_manifest="a" * 64,
+            ),
+        )
+        RaceEvent._base_manager.filter(pk=second.pk).update(
+            original_name="Jockey Club Sprint [Sponsor]",
+            source_refs=self._official_result_refs(
+                url=official_url,
+                catalog_manifest="b" * 64,
+            ),
+        )
+        first.refresh_from_db()
+        second.refresh_from_db()
+
+        from stable.services.historical_race_calendar_integrity_v2 import (
+            _duplicate_identity_sha256,
+            _event_snapshot,
+        )
+
+        self.assertEqual(
+            _duplicate_identity_sha256(first),
+            _duplicate_identity_sha256(second),
+        )
+        self.assertNotEqual(
+            _event_snapshot(first)["source_refs_sha256"],
+            _event_snapshot(second)["source_refs_sha256"],
+        )
+
+    def test_duplicate_identity_rejects_different_official_result_url(self):
+        first = self._event(year=2023, slug="first-official-race", day=5)
+        second = self._event(year=2024, slug="second-official-race", day=5)
+        RaceEvent._base_manager.filter(pk=first.pk).update(
+            local_date=date(2024, 1, 5),
+            original_name="Same display name",
+            source_refs=self._official_result_refs(
+                url="https://racing.hkjc.com/results/20240105/ST/7",
+                catalog_manifest="a" * 64,
+            ),
+        )
+        RaceEvent._base_manager.filter(pk=second.pk).update(
+            original_name="Same display name",
+            source_refs=self._official_result_refs(
+                url="https://racing.hkjc.com/results/20240105/ST/8",
+                catalog_manifest="a" * 64,
+            ),
+        )
+        first.refresh_from_db()
+        second.refresh_from_db()
+
+        from stable.services.historical_race_calendar_integrity_v2 import (
+            _duplicate_identity_sha256,
+        )
+
+        self.assertNotEqual(
+            _duplicate_identity_sha256(first),
+            _duplicate_identity_sha256(second),
+        )
+
+    def test_duplicate_identity_keeps_strict_fallback_without_official_result(self):
+        first = self._event(year=2023, slug="untrusted-first", day=5)
+        second = self._event(year=2024, slug="untrusted-second", day=5)
+        shared_url = "https://www.tjcis.com/catalog/2024.pdf"
+        RaceEvent._base_manager.filter(pk=first.pk).update(
+            local_date=date(2024, 1, 5),
+            original_name="Same catalog race",
+            source_refs={
+                "detail_discovery": {
+                    "urls": {
+                        "result_url": {
+                            "url": shared_url,
+                            "source_authority": "official",
+                            "source_provider": "tjcis",
+                        }
+                    }
+                },
+                "catalog_manifest": "a" * 64,
+            },
+        )
+        RaceEvent._base_manager.filter(pk=second.pk).update(
+            original_name="Same catalog race",
+            source_refs={
+                "detail_discovery": {
+                    "urls": {
+                        "result_url": {
+                            "url": shared_url,
+                            "source_authority": "official",
+                            "source_provider": "tjcis",
+                        }
+                    }
+                },
+                "catalog_manifest": "b" * 64,
+            },
+        )
+        first.refresh_from_db()
+        second.refresh_from_db()
+
+        from stable.services.historical_race_calendar_integrity_v2 import (
+            _duplicate_identity_sha256,
+        )
+
+        self.assertNotEqual(
+            _duplicate_identity_sha256(first),
+            _duplicate_identity_sha256(second),
+        )
+
     def test_canonical_links_are_managed_not_immutable_dependencies(self):
         duplicate = self._event(year=2023, slug="duplicate", day=3)
         canonical = self._event(year=2024, slug="winner", day=4)

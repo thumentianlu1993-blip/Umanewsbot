@@ -33,6 +33,9 @@ approve 会从冻结的双/三源身份重新计算共识，不能通过修改�
   target 审计、published canonical path 与 artifact no-replace 均按独立审核结论 fail closed。
 - exact duplicate 同时绑定来源身份、核心字段和 runner/result；canonicalize 前必须进入确定性的
   draft/detached tombstone 终态，不能让仍公开或仍属于系列的 event 只靠 link 隐藏。
+- duplicate 来源身份优先使用唯一受审的 official result provider、URL 与内容 SHA；完整 catalog
+  provenance 继续进入 census precondition，但不再整体充当赛事身份。没有受审官方结果时仍按赛事名
+  与完整 `source_refs` 严格拒绝。
 - migration-history repair 的 recovery intent 在关闭态 verifier 后、任何 migration 前 durable
   持久化，并绑定 candidate/action/original artifact/DB identity/初始 leaf；active marker 期间只允许
   同候选 forward resume。受审 audit 以最小单文件进入候选 image；rollback 在 checkout/build 前保全

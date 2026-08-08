@@ -1,5 +1,15 @@
 # 关键决策
 
+## 2026-08-09 duplicate equivalence 以受审官方结果身份为最小锚点
+
+- 完整 `source_refs` 是 provenance 与漂移证据，不再整体决定“是否同一场赛事”。
+- 只有 HTTPS official result、非空 provider、唯一匹配的 approved detail source 和内容 SHA 全部
+  成立时，等价摘要才使用 `provider + URL + content SHA`，并继续要求客观字段、runner/result 一致。
+- 该官方身份存在时，赞助商展示名和 TJCIS season catalog 差异不阻断同赛；任一官方证据条件
+  缺失时回退赛事名 + 完整 `source_refs` SHA，保持 fail-closed。
+- 完整 `source_refs` SHA 继续进入 event snapshot 和 series precondition；旧 census/overlay 不可复用。
+  本修复不新增 schema 或 migration。
+
 ## 2026-08-08 production audit 只允许由运行时 collector 生成
 
 receipt repair baseline 不再接受独立手写 SQL 的 positional row 编码。唯一口径固定为
