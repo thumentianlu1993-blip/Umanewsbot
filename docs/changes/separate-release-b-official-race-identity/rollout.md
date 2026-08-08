@@ -39,3 +39,15 @@ P1 修复后 SQLite 与 PostgreSQL 16 完整 Release B 套件均为 `38/38`。
 同一 reviewer 会话随后独立复跑无网络 SQLite 与临时 PostgreSQL 16 完整套件各 `38/38`，并核对
 Django check、migration drift、`git diff --check` 和工作树范围，最终结论为 `APPROVED`，无剩余
 actionable defect。
+
+## 2026-08-09 path staging follow-up 已发布并冻结新 G3
+
+PR `#80` 已合并并部署固定 commit `75294a4dea51538962741ec6c0835dc3090558ff`，生产 image 为
+`sha256:1894484989084e61ced236eec93a30fd0b963b7ee946ad8ee8bd8e15357e413d`。部署后 check、
+migration 零计划、health、Celery drain/空队列和关闭开关全部通过。
+
+新 census/review/reviewed/action-scope SHA 分别为 `e626c8b4…70ec`、`083610c5…5883`、
+`89387fab…e96b`、`d7052d43…00bd`。静态审计确认 14 actions、177 events、12 tombstones、12
+canonical links、12 superseded targets、165 canonical paths、12 legacy paths、2 个跨年 edition，
+所有碰撞为 0。未生成 approval/maintenance evidence，未 apply/verifier，未启动 `full_network`；
+等待绑定上述精确 artifact 的 G3。
