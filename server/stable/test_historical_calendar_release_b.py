@@ -89,7 +89,9 @@ class ReleaseBSchemaPreflightTests(TestCase):
                 }
             ],
         ):
-            result = check_release_b_schema_compatibility(direction="forward")
+            result = check_release_b_schema_compatibility(
+                direction="forward", allow_nonproduction_database=True
+            )
         after = RaceEvent._base_manager.count()
 
         self.assertFalse(result["ok"])
@@ -103,14 +105,21 @@ class ReleaseBSchemaPreflightTests(TestCase):
         import json
 
         output = StringIO()
-        call_command(
-            "check_historical_calendar_release_b_schema",
-            direction="forward",
-            json_output=True,
-            stdout=output,
-        )
+        with patch(
+            "stable.services.historical_calendar_release_b_schema.database_vendor_contract",
+            return_value={"ok": True, "expected": "postgresql", "actual": "postgresql"},
+        ), patch(
+            "stable.services.historical_calendar_release_b_schema._postgres_catalog_state",
+            return_value={"ok": True, "drift_paths": [], "catalog_sha256": "c" * 64},
+        ):
+            call_command(
+                "check_historical_calendar_release_b_schema",
+                direction="forward",
+                json_output=True,
+                stdout=output,
+            )
         payload = json.loads(output.getvalue())
-        self.assertEqual(payload["schema_version"], "historical-calendar-release-b-preflight/v1")
+        self.assertEqual(payload["schema_version"], "migration-history-repair-preflight/v2")
         self.assertEqual(payload["direction"], "forward")
         self.assertIn("migration_leaf", payload)
         self.assertIn("database_identity_sha256", payload)
@@ -132,8 +141,13 @@ class ReleaseBSchemaPreflightTests(TestCase):
                 ("stable", "0071_historical_calendar_release_b"),
                 ("stable", "9999_unknown_production_migration"),
             },
+        ), patch(
+            "stable.services.historical_calendar_release_b_schema."
+            "MigrationLoader.check_consistent_history"
         ):
-            result = check_release_b_schema_compatibility(direction="forward")
+            result = check_release_b_schema_compatibility(
+                direction="forward", allow_nonproduction_database=True
+            )
 
         self.assertFalse(result["ok"])
         self.assertFalse(result["migration_graph_known"])
@@ -156,6 +170,15 @@ class ReleaseBSchemaPreflightTests(TestCase):
                 ("stable", "0071_historical_calendar_release_b"),
                 ("stable", "9999_unknown_production_migration"),
             },
+        ), patch(
+            "stable.services.historical_calendar_release_b_schema.database_vendor_contract",
+            return_value={"ok": True, "expected": "postgresql", "actual": "postgresql"},
+        ), patch(
+            "stable.services.historical_calendar_release_b_schema."
+            "MigrationLoader.check_consistent_history"
+        ), patch(
+            "stable.services.historical_calendar_release_b_schema._postgres_catalog_state",
+            return_value={"ok": True, "drift_paths": [], "catalog_sha256": "c" * 64},
         ), self.assertRaisesMessage(CommandError, "schema preflight failed"):
             call_command(
                 "check_historical_calendar_release_b_schema",
@@ -254,8 +277,12 @@ class ReleaseBSchemaPreflightTests(TestCase):
             check_release_b_schema_compatibility,
         )
 
-        self.assertTrue(check_release_b_schema_compatibility(direction="forward")["ok"])
-        self.assertFalse(check_release_b_schema_compatibility(direction="reverse")["ok"])
+        self.assertTrue(check_release_b_schema_compatibility(
+            direction="forward", allow_nonproduction_database=True
+        )["ok"])
+        self.assertFalse(check_release_b_schema_compatibility(
+            direction="reverse", allow_nonproduction_database=True
+        )["ok"])
 
     def test_active_target_unique_allows_superseded_audit_row(self):
         HistoricalRaceEventTarget._base_manager.bulk_create(
@@ -301,12 +328,12 @@ class ReleaseBDeployContractTests(SimpleTestCase):
             encoding="utf-8"
         )
         self.assertIn("run --rm --no-deps", wrapper)
-        self.assertIn("check_historical_calendar_release_b_schema", wrapper)
+        self.assertIn("create_historical_calendar_release_b_handoff", wrapper)
         self.assertIn("EXPECTED_CANDIDATE_COMMIT", wrapper)
         self.assertIn("EXPECTED_CANDIDATE_IMAGE_ID", wrapper)
         self.assertIn("EXPECTED_PRODUCTION_DB_IDENTITY_SHA256", wrapper)
-        self.assertIn("stable.0070_horse_identity_evidence_commit_receipt", wrapper)
-        self.assertIn("stable.0071_historical_calendar_release_b", wrapper)
+        self.assertIn("RELEASE_B_PREFLIGHT_ARTIFACT_PATH", wrapper)
+        self.assertIn("deployment-lock-token-sha256", wrapper)
 
 
 class ReleaseBSeriesPlannerTests(TransactionTestCase):

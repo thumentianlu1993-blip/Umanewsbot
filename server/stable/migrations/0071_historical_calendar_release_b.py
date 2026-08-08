@@ -3,6 +3,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
+        ("stable", "0069_race_data_sync_pipeline_a_ledger_guards"),
         ("stable", "0070_horse_identity_evidence_commit_receipt"),
     ]
 

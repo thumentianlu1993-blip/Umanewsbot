@@ -2624,3 +2624,78 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   绕过不属于受支持路径。
 - 修复后自然 shadow 样本须重新冻结尚未到 T、至少覆盖日本和英国的 2–4 场；样本不足 NO-GO。
   既有 8 月 8 日 proposal 不自动替代修复后证据，enforce 仍为独立 change。
+
+# 2026-08-08 Release B 生产动作只接受 PostgreSQL
+
+- 所有 Release B handoff/preflight/deploy/manual/rollback/forward-resume/control-state retry 和
+  historical initial-install 都以 Django live connection 的 `vendor=postgresql` 为硬合同。
+- `DB_ENGINE` 名称、artifact 或 catalog 的既有摘要不能替代 live vendor；catalog 未执行也不得视为成功。
+- 非生产数据库兼容只存在于 Python 内部测试参数，不提供 management option 或 shell 环境变量旁路。
+
+# 2026-08-08 historical initial-install 使用 durable required intent
+
+- pre-0070 的唯一批准起点是 exact `stable.0067_historical_calendar_release_a`，不是泛化的“任何旧库”。
+- initial-install marker 固定 origin、candidate commit/image、DB identity、artifact/lock provenance、初始
+  catalog SHA，唯一恢复动作是同候选 `forward-resume`；其他 action/candidate/DB 一律拒绝。
+- 允许的中断状态按 Django 实际 plan 固定为 0067、0070、0068+0070、0069+0070、0071；不接受
+  0068-only、0069-only 或任意已应用组合。
+
+# 2026-08-08 completion audit 由可信 recovery origin 决定
+
+- `recovery_origin_action` 只能来自 SHA 验证通过的 artifact，并必须与可信 marker origin 一致；不增加
+  CLI/env origin 参数。
+- initial-install completion 的数据不变量为原始 legacy counts 不变且新 receipt 表为空；repair
+  completion 继续使用 reviewed-static production audit。两套审计不得按“receipt 恰好为空”互相降级。
+
+# 2026-08-08 migration leaf 之前必须验证完整 recorder history
+
+- leaf set 与 0068+ plan 不能替代 Django 对全部已记录 migration dependency 的一致性检查；任何早期
+  dependency 缺行都以 `migration.history_consistency` 阻断。
+- migration 0024 的 event legacy `UniqueConstraint(condition=...)` 在 PostgreSQL 中是 partial unique
+  index，不是 table constraint；这是唯一明确例外。historical target 的无条件 UniqueConstraint 才是
+  table constraint + backing index，二者分别按真实 catalog 精确合同验收。
+
+# 2026-08-08 rollback control-state 前必须可恢复原控制面
+
+- rollback 从 checkout 到 durable control-state 验签成功之间属于 provisional control window：失败必须
+  恢复精确原 HEAD OID、原 branch/detached 语义和原 production image tag，并复核恢复结果；该窗口禁止停服。
+- control-state 成功验签后不再回切原控制面，后续失败只允许按 exact target/image/artifact/state 的 pinned
+  resume 继续，避免同一次尝试在“回原状态”和“续跑目标状态”之间产生双重解释。
+- 通用 resume 不可信任 control-state 自述路径。必须由当前 reviewed host verifier 先完成 nofollow/fstat、
+  canonical state SHA 和全 catalog SHA/mode/owner 验证，之后才可执行 state 指定的 pinned resume。
+
+# 2026-08-08 旧镜像 smoke 的数据库认证必须独立前置
+
+- 随机只读角色密码不得通过未引用 heredoc 拼成 SQL；使用 `psql \getenv` 读取受控环境值，并分别以
+  identifier/literal quoting 绑定角色和密码，日志与命令参数不得输出密码。
+- 权限创建完成后必须从 fixture PostgreSQL 的 TCP 认证入口，以该角色验证身份与
+  `default_transaction_read_only`，通过后才允许启动任何旧镜像进程。认证失败属于 harness pre-start
+  failure，不得归因于旧镜像兼容性。
+
+# 2026-08-08 固定旧镜像双 partial-state 证据通过技术门禁
+
+- 只有参数化 role auth 修复后，精确固定 image 在 `{0068,0070}` 与 `{0069,0070}` 两态完整通过
+  auth/read-only/write-denied、check、health/ping/beat、日志和 digest 不变，才计为 compatibility GREEN。
+- fixture env-string、`post_migrate` 或 role auth 阶段的失败属于 setup/pre-smoke failure；即使已安全
+  清理，也不能计为兼容性正例或负例。
+- 该 GREEN 只关闭发布技术证据缺口，不授权 commit/push/PR/merge、生产部署或 migration。
+
+# 2026-08-08 recovery provenance 只能由 artifact-bound forward-resume 使用
+
+- provenance SHA 表示既有 active marker 的原始 handoff，不是普通发布可继承的默认值。只有新 handoff
+  明确且已验证为 `forward-resume` 时才能把它传入 ensure/completion。
+- deploy、manual-release、rollback 与 initial-install 必须忽略进程环境中的旧 provenance，并始终以
+  当前 preflight artifact SHA 创建和完成本次 intent；否则普通发布可能在 migrate 后才发现 marker
+  绑定错误，破坏“迁移前 fail closed”。
+- host wrapper 与容器 release task 都执行 action gate。受审 resume 入口从原 artifact/control-state
+  恢复精确 provenance；仅凭外部环境变量不能把普通 action 升级为 restricted recovery。
+
+# 2026-08-08 Release B partial unique index 必须绑定精确 owning relation
+
+- 索引名称在 schema 内唯一，但名称、列和 predicate 相同仍不能证明它属于受审业务表。若原索引被删除，
+  同名索引可在其他表上重建；只按名称映射会把错误 relation 误当成 Release B 合同。
+- 两个 `0071` 索引必须同时匹配当前 schema 与固定 table name：
+  `uq_race_event_series_edition → stable_raceevent`，
+  `uq_hist_target_active_series_year → stable_historicalraceeventtarget`。
+- collector 对受审名称进行补充收集，使错误表上的同名索引进入 validator 并产生对应 drift；对象位于
+  其他 schema 时，受审 schema 中索引缺失同样 fail closed。

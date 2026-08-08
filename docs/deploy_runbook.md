@@ -1,5 +1,117 @@
 # 部署运行手册
 
+## 2026-08-08 migration history repair 只读审计检查点
+
+1. 生产 recorder 为 `0067` 与 `0070`；`0070` applied at
+   `2026-08-02 05:07:24.615789+00`，receipt 表随后写入 7 条正式记录。
+2. receipt 表的 11 列、PK、approved SHA unique、operation-log unique/FK、varchar pattern index 与
+   owned sequence 均存在；7 条 receipt 的 operation log 与 JSON 类型校验通过。
+3. `stable_raceeventfieldchange` 不含 `0068` 的 11 个新增字段/observation FK；`0069` 的
+   `race_field_change_decision_valid`、`stable_race_field_change_append_only` 与
+   `stable_reject_race_field_change_mutation()` 均不存在。
+4. 当前候选修复只允许把 graph 恢复为 `0067→0068→0069→0071` 与
+   `0067→0070→0071`。禁止删除/插入 recorder、`--fake`、重建非空 receipt 表或跳过精确 preflight。
+5. 实现后的候选 preflight 必须同时验证 recorder/schema/forward plan 与 receipt row digest；允许的
+   发布前 leaf set 仅为 `{0070}`、`{0068,0070}`、`{0069,0070}`，发布后仅 `{0071}`。
+6. 受审 baseline 完整值位于
+   `docs/changes/repair-production-migration-history/production_audit.json`。第一次 preflight 必须
+   在 repair leaf 精确比较 expected DB identity 与数据 baseline，并生成 mode `0600` no-clobber artifact；`{0071}` B-to-B
+   只冻结本次 live baseline。服务全部停止后、migration 前必须消费同一路径/SHA再次核验。
+   restricted marker 必须由 Python canonical verifier 校验 owner/mode/parent、candidate/artifact 与 live
+   初始 `{0070}`、candidate/action/original artifact/DB identity，不能用 shell grep 解析。关闭态 verifier
+   后、任何 migration 前必须在同一锁和 one-shot 内 durable 写入 intent，紧接着 migrate；禁止依赖
+   migrate 失败后事后补写。partial-state 只能在固定旧镜像兼容 smoke 通过后进入受限恢复。
+   普通 deploy 不硬编码 `{0070}`；manual 与 resume 必须在自己的新锁下生成 fresh handoff。resume
+   旧 artifact 只作 marker provenance。normal deploy 的同镜像 flow 可在 migrate 后直接完成 marker；
+   rollback 必须依次由 pinned control image 执行 `migrate-verify`、exact target image 执行 collectstatic、
+   pinned control image 执行 `complete-intent`，之后才允许 health/startup。target collectstatic 前后都要
+   证明 tag 的 image ID 等于 artifact candidate ID；失败保留 active marker/control-state 供精确续跑。
+   partial leaf 对普通 deploy/manual/rollback 必须 fail closed；仅 marker-bound `forward-resume` 可进入。
+   active marker 遇到 exact `{0071}` 仍阻断普通 deploy/manual/rollback，只允许同 candidate 的
+   `forward-resume` 幂等完成 transition，不得把任意 final state 视为安全。
+   `0069` decision check 必须是 PostgreSQL 实际生成的
+   `decision = '' OR decision = ANY(ARRAY[四个业务值])` 精确完整表达式；只允许括号、空白与 type cast
+   表示差异，额外值、缺值、错列或逻辑改变都 fail closed。同名 guard function 必须只有一个无参数
+   signature，任何 overload 都 fail closed。
+   production audit 必须以唯一最小文件复制到候选 image 的
+   `/app/docs/changes/repair-production-migration-history/production_audit.json`，与代码 `AUDIT_PATH`
+   一致；禁止复制整个 docs。`0071` 两个 partial unique predicate 必须完整 canonical 等值，不能
+   以字段 substring 通过 `AND false`、`OR true` 或换列逻辑。
+   rollback 取得 deployment lock 后必须在任何 fetch/checkout/build/image 变化前检查 canonical
+   marker path、owner、mode 与 no-symlink；存在或 trust 异常都停止，且不得改变 marker provenance。
+   rollback 必须从本次 fresh artifact 提取并导出 DB identity。
+   completed transition 使用固定可信 parent 内的 active→transition→completed 两次原子 rename，持续
+   持有首次认证 fd 并逐边界核对 dev/inode/owner/mode；禁止 path unlink。active+transition 冲突、
+   伪造 slot 或 replacement 均停止并保留现场；第一次 rename 后从 transition 续跑，第二次后以绑定
+   SHA 的 completed receipt 幂等确认。两次 rename 必须分别使用 Linux
+   `renameat2(RENAME_NOREPLACE)` 或 macOS `renameatx_np(RENAME_EXCL)`；不可用或 destination 并发出现
+   都 fail closed 且不覆盖任一文件。required/not-required mode 必须来自同一受信任 handoff artifact；
+   ensure 输出的 device/inode 必须原样传给 completion，required marker 丢失或同内容换 inode 均不得
+   启动服务。final forward-resume 仍使用 reviewed-static 7-row audit。
+   attempt mode 的启用信号是精确 artifact 内实际存在的 SHA-bound 字段，不是进程环境中碰巧残留的
+   同名变量。旧/non-Release-B retry 或 artifact 尚不存在时必须局部清理陈旧值并保持原 release、
+   race-live frozen intent 与 `resume_stopped_release` 语义；artifact required 与环境冲突时在停服务前拒绝。
+   B→B rollback 必须在 checkout 前保存当前 v2 control scripts/image。目标 build 后先另存 target tag，
+   `umanewsbot:prod` 保持目标 image；control one-shot 只能通过 mode `0400` Compose override 绑定 immutable
+   control image ID，禁止把 control image retag 为 production。保存脚本生成绑定 target commit/image ID/
+   DB identity/lock 的 artifact；目标 pre-v2 helper 不得生成或消费 artifact。one-shot 前写 mode `0600`
+   control-state，失败后仅精确 forward-resume 可复核同一 control/target/compose 并重试，成功后转
+   completed。`resume_stopped_release.sh` 遇 active/transition 必须在任何服务探测/启动前拒绝并提示改走
+   forward-resume；active control-state 同样阻断，completed receipt/state 不阻断。
+   若失败 handoff 的 `recovery_intent_mode=not-required`，禁止创建伪 marker；只能使用失败日志给出的
+   `$CONTROL_DIR/resume-rollback-release.sh`，并显式传入原 target commit/image。该入口验证 state mode/
+   owner、初始 artifact/lock-token SHA、HEAD、prod/target/control image、脚本与 override；错误 target
+   零服务动作，重试失败保留 state，成功后转 completed。`required` 仍只走 migration-history
+   forward-resume。通用 B→B wrapper 对 `SCHEMA_PREFLIGHT_DIRECTION=reverse` 在 Compose 前拒绝；
+   reverse migration 必须走另行审核的跨 schema procedure。
+   control-state 必须为 `rollback-control-state/v1` canonical JSON，`state_sha256` 覆盖 preflight、
+   application release、release tasks、专用 resume、state creator 与 Compose override 的 path/mode/bytes
+   SHA。resume 在取 lock 前及 lock 内分别以 nofollow parent fd/openat/fstat 验证；任何文件同 mode
+   内容变化、symlink/path replacement、缺项/多项或 state SHA 漂移都必须在 Git/Docker/Compose 前退出。
+   completed receipt 文件名必须为
+   `restricted-recovery-control.completed.<target-oid>.<initiating-artifact-sha>.<state-sha>.json`。禁止退回
+   target-only 命名。completion 用 no-clobber hard-link 发布、fsync parent、删除 active、再次 fsync；
+   active+completed 仅同 inode/state 可收口，completed-only 同 attempt 重放不得改变 inode/bytes。
+   retry 命令必须同时提供 `EXPECTED_ROLLBACK_INITIATING_ARTIFACT_SHA256` 与
+   `EXPECTED_ROLLBACK_CONTROL_STATE_SHA256`；入口只接受 exact attempt receipt，不按 target glob。
+6. 普通 deploy/rollback/manual-release 在取得 deployment lock 后先运行
+   `python3 deploy/ensure_migration_history_repair_runtime.py`，再运行 marker gate。初始化器以 nofollow
+   dirfd 创建缺失 repair root 为 `0700` 并 lstat/fstat 复验。`resume_stopped_release.sh` 禁止创建；
+   repair root 缺失、symlink、owner 非当前用户或 mode 非 `0700` 时，即使目录无 child 也必须停止且
+   不启动任何服务。
+7. `HISTORICAL_RUNNER_INITIAL_INSTALL=true` 仅用于已有健康 web/db/redis 上、runner trace/table/role
+   不存在且 `django_migrations` 不含 `stable.0070/0071` 的首次纳管。该精确分支执行原受审
+   migrate→collectstatic one-shot；不得创建 Release B handoff。未设置 flag 的 pre-0070 state 仍必须在
+   v2 preflight 停止；0070 repair 不得设置该 flag 绕过。
+8. 旧 image partial-state smoke 必须为 web/worker/beat 创建一次性非超级只读 role：撤销应用 schema
+   DML、CREATE、database TEMP 与非系统函数执行，设置 role default read-only。启动服务前必须由旧
+   image 自身连接并打印/断言 exact `current_user` 与 `transaction_read_only=on`，再在 savepoint 中向
+   `django_migrations` INSERT 并证明数据库拒绝。管理员使用 `BEGIN READ ONLY` 对 recorder 与关键全行
+   digest 做前后复核；不得以 `pg_stat_user_tables` 或五表 count 作为零写证明。三个容器须持续 running，
+   日志不得出现 write rejection、traceback、ERROR 或 CRITICAL。
+9. Release B schema check 必须先完成 recorder + pg_catalog object/column/type contract。输出
+   `receipt_audit_safe=false` 时不得执行 live receipt audit；检查 JSON 中 `drift_paths`，例如
+   `0070.table_presence`、`0070.columns`、`0070.column_semantics`。CLI 非零应为 JSON 后的
+   `CommandError`。若是连接断开/timeout/`OperationalError`，按数据库运行故障处理，不得改写成 schema
+   drift 或继续发布。
+   新 lock/new artifact 可再次回滚同一 target，active canonical state 仍阻断并发 attempt。
+7. 最终实现与独立审查状态为 `VERIFIED`；精确旧生产镜像在 PostgreSQL 16 的
+   `{0068,0070}` 与 `{0069,0070}` 两态 compatibility gate 均已 GREEN。该技术结论不等于发布授权；
+   截至本记录检查点仍不得直接重试 Release B、v2 census、回填或 full-network。
+8. 通用 `rollback*.sh` 在 checkout/build 前必须运行
+   `deploy/verify_rollback_target_migration.py --target-oid <40-hex-oid>`。该门禁用 `git show` 读取目标
+   0071 原始内容，并与 `deploy/reviewed_release_b_rollback_migrations.json` 的 exact SHA/dependencies
+   双重匹配；文件仅存在、placeholder、改依赖或改 operation 都不合格。新增兼容版本必须单独审核其
+   完整 migration bytes、最终 schema 兼容性与 rationale 后才能更新 allowlist。
+9. PostgreSQL preflight 对 receipt 表要求 constraint/index 完整集合精确相等；看到
+   `0070.constraint_set` 或 `0070.index_set` 必须作为确定性 schema drift 停止。不得删除不明对象后
+   直接续跑；先核对对象来源和预期 migration。该查询限定四张显式用户表，不扫描 system/TOAST。
+10. rollback split phase 中，control run 必须携带 `RELEASE_TASK_PHASE=migrate-verify` 或
+    `complete-intent`；二者均不得调用 collectstatic。中间 target run 必须使用仅覆盖 `web.image` 的
+    临时 Compose override 执行 `python manage.py collectstatic --noinput`，从而复用基础 Compose 的 static
+    volume。该命令失败、目标 tag ID 不符或完成阶段失败时禁止任何 `up`；按 control-state 指示使用
+    markerless 专用 retry 或 migration-history forward-resume，不要手工补跑 control-image collectstatic。
+
 ## 2026-08-08 Release B 首次生产尝试失败与恢复检查点
 
 1. 发布代码已合并为 `main@ba9c0f00`，但生产仍运行旧镜像 `sha256:b1fecc…341a`；不得把 PR
@@ -7838,10 +7950,11 @@ re-baseline 基线 + 各轮 findings 新增）。
 - 关闭态验收必须从真实 TRA race-live 入口证明 observation 之外的 runner/authority/applied ledger 为
   0；单独打开 provider、region 或 field 仍应零写。raw cleanup smoke 同时验证 held、路径漂移、越界、
   symlink 和并发一次性清理；回滚 0069 前须先确保没有依赖 append-only guard 的写入窗口。
-# Lifecycle shadow 观察加固（2026-08-08 本地实现，尚未部署）
 
-- 新增的 `deploy/verify_lifecycle_runtime_coherence.sh` 和
-  `deploy/switch_lifecycle_mode.sh` 当前只存在于未发布候选；生产仍不得把它们当作可执行入口。
+# Lifecycle shadow 观察加固（2026-08-08 已合并，生产未部署）
+
+- `deploy/verify_lifecycle_runtime_coherence.sh` 和 `deploy/switch_lifecycle_mode.sh` 已随 PR #72
+  合并，但候选部署被 schema preflight 阻断；生产旧镜像仍不得把它们当作可执行入口。
 - coherence 以宿主全量 running containers 为范围，验收 web/worker/Beat 的 project、working
   directory、image ID、release commit 和 lifecycle flags，并拒绝跨 project resident/one-off。
 - mode switch 使用 `lifecycle-mode-switch` 共享锁和 Beat-last 顺序；任何失败只允许收敛到双 env
@@ -7864,7 +7977,7 @@ re-baseline 基线 + 各轮 findings 新增）。
 
 # Lifecycle shadow 观察加固部署阻断检查点（2026-08-08）
 
-- 发布目标 `main@c4ad7277` 的候选镜像已构建，但 Release B schema preflight 在唯一 release task 前
+- 发布目标 `main@c4ad7277`（PR #72）的候选镜像已构建，但 Release B schema preflight 在唯一 release task 前
   fail closed。禁止绕过：生产 recorder 当前为 `0067 + 0070`，缺少 `0068/0069`，main 另含 `0071`。
 - 此检查点不允许 fake migration、直接修改 `django_migrations`、跳过 identity 或从候选镜像运行
   `migrate`。应另立生产 migration history 修复 change，完成设计、RED/GREEN、独立 review、恢复演练和
@@ -7874,4 +7987,95 @@ re-baseline 基线 + 各轮 findings 新增）。
   不存在、scanner 零派发、MigrationRecorder 原样、HTTP/worker/log/queue。
 - 2026-08-08 实际恢复后 `default=2` 的两条 lifecycle 消息与部署前一致且无人消费；不得 purge、改投或
   启动 default consumer。`race_live=7543` 同样保持不动。完整证据见
-  `docs/changes/harden-lifecycle-shadow-observation/release_report.md`。
+  `docs/changes/harden-lifecycle-shadow-observation/release_report.md`；该证据由 PR #73 合并到
+  `main@bcea5aa8`，只记录阻断与恢复，不代表生产部署完成。
+
+# Release B PostgreSQL 引擎硬门禁
+
+- 任何 handoff、artifact-only retry、intent ensure/verify/complete 或 release task 必须先得到结构化
+  `database_vendor.expected=postgresql`、`actual=postgresql`；`database.vendor` drift 必须立即停止。
+- historical initial-install 在 historical runner preflight、build 和停服务前读取既有 web 的
+  `connection.vendor`；空值、SQLite、命令失败均停止，禁止以 `DB_ENGINE` 缺失解释为可继续。
+- 候选 release task 在 wait-for-services 后、migrate 前再次执行 vendor command。该门禁无生产 bypass；
+  `catalog.checked=false` 同样失败。失败后不得重试 migration，也不得把 artifact 校验成功当数据库验收成功。
+
+# Historical initial-install 中断恢复
+
+- initial-install 只允许 exact 0067 起点。候选 build 后、任何 stop 前必须创建 action=`initial-install`
+  artifact；停服后的 release task 必须依次 verify artifact -> ensure required marker -> migrate。
+- migrate 中断后不要重新运行 ordinary deploy，也不要重跑 initial-install flag；保持服务关闭，使用同一
+  commit/image、原 artifact SHA 和 canonical marker 进入 `resume_migration_history_repair.sh`。
+- resume 仅接受 0067/0070/0068+0070/0069+0070/0071 exact recorder leaf，并逐次复核当前 catalog、
+  DB identity 与 marker origin。到 0071 但 marker 未完成仍属 recovery，必须先原子完成 marker 才能启动服务。
+
+# Completion origin 核验
+
+- completion 先验证 artifact、marker、candidate/image、DB identity 与 provenance，再比较两者的
+  recovery origin；不允许操作员通过参数声明或覆盖 origin。
+- origin=initial-install 时检查 final 0071 catalog、原始 legacy counts 和 `receipt_count=0`，不得运行
+  7-row baseline；origin=migration-history-repair 时仍必须通过 reviewed-static，空 receipt 应失败。
+- origin 不一致或任一原始 audit binding 缺失时保留 active/transition marker，不启动服务、不手工改 marker。
+
+# Full migration history 与 pre-0071 legacy object 核验
+
+- production preflight 必须先通过完整 `check_consistent_history`，再解释 leaf/plan；
+  `migration.history_consistency` 一律在停服务和 release task/migrate 前停止，禁止补假 recorder row 绕过。
+- pre-0071 event 必须是 0024 定义的 partial unique btree index：`stable_raceevent`、
+  `(race_series_id, year)`、predicate `race_series_id IS NOT NULL`、`int8_ops/int2_ops`、valid/ready/live，
+  且无同名 constraint。target 必须是 `stable_historicalraceeventtarget` table UNIQUE constraint 及
+  同名无 predicate backing btree。任何同名替代对象都不算兼容。
+
+# Rollback checkout/build 失败恢复与 control-state resume
+
+- `rollback.sh` / `rollback_lowcost.sh` 在 checkout 前冻结原 HEAD OID、symbolic branch（若有）和
+  `umanewsbot:prod` image ID。control-state 验签前的 build 或 target preflight 失败应看到脚本恢复原
+  branch 或 detached HEAD、重新绑定原 image，并保持全部既有服务未 stop/up；任一恢复校验失败按失败处置。
+- 一旦 `restricted-recovery-control.json` 已创建且通过当前 verifier，临时恢复 trap 即解除。此后不得手工
+  checkout、重建、重标 prod tag 或运行普通 deploy；按报错给出的 exact pinned resume，或带原
+  commit/image/artifact 的 `resume_migration_history_repair.sh` 进入同一 pinned 路径。
+- 通用 resume 发现 control-state 时，首个可执行检查必须是
+  `deploy/verify_rollback_control_state.py`。若 state 本身、parent、control dir、任一脚本/override 的
+  owner/mode/SHA 或 symlink 状态异常，必须保持零 Git/Docker/Compose/lock 执行并保留现场，禁止 source
+  JSON、grep 出路径后尝试绕行。
+
+# 旧镜像 smoke 的 role authentication preflight
+
+- 只读角色由 `psql \getenv smoke_password SMOKE_ROLE_PASSWORD` 接收随机密码，禁止恢复为
+  `PASSWORD '$SMOKE_APP_PASSWORD'` 一类 shell-expanded SQL。角色创建前即安装 cleanup trap。
+- 权限配置后先在 fixture DB 容器中以 `-h 127.0.0.1`、新角色和新密码建立 TCP 会话，并要求输出精确
+  `<role>|on`。看到 `old-image-role-auth-verified` 后才进入 before-audit 与旧镜像 one-shot/daemon。
+- 若此探针失败，确认日志中没有 `docker run`，保留脱敏 FATAL、清理临时角色后停止；不要启动旧镜像、
+  不要放宽只读角色，也不要把该结果记录为 compatibility failure。
+
+## 2026-08-08 固定旧镜像 gate 完成证据
+
+- 已验镜像：
+  `sha256:b1fecc4624ac7fc181197156189b6326a40abb36f287feae72c9a2f533341a73`（`linux/amd64`），
+  由生产只读 `docker save` 后在本地精确导入；生产没有容器变更或数据库写入。
+- 已验状态：PostgreSQL 16 `{0068,0070}` / 脚本 `0068-only`，以及 `{0069,0070}` /
+  `0069-complete`。两者均完成 role auth/read-only/write-denied、check、web health、worker ping、beat、
+  clean logs 与 before/after audited digest equality，脚本输出 passed。
+- 两次 fixture 均已完整清理。前置 setup/auth 失败不得纳入 gate 统计；当前 compatibility 技术门禁
+  GREEN，但执行 Release B 仍需重新核对最终 fingerprint、授权、备份、锁/队列/flags 与生产 preflight。
+
+# Recovery provenance 环境隔离
+
+- 启动普通 `deploy.sh`、`deploy_lowcost.sh`、`manual_release.sh`、`rollback*.sh` 或
+  `run_historical_initial_install_release.sh` 时，入口必须先 unset
+  `RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256`。不要从旧 shell、systemd 或手工命令复制该值。
+- 只有 `resume_migration_history_repair.sh` 或已验签 control-state 的 required resume 可从原
+  artifact 恢复 provenance。新 preflight 必须产生 `handoff_action=forward-resume`；host wrapper
+  与容器脚本随后同时验证 action 与 SHA 形态，marker/handoff verifier 再核对真实绑定。
+- 普通 action 即使继承合法格式的旧 SHA，也必须在停服/migrate 前清理；ensure 的 provenance 参数为空，
+  completion 使用当前 `RELEASE_B_PREFLIGHT_ARTIFACT_SHA256`。若日志显示普通 action 携带非空
+  provenance，立即停止，不得继续 migrate 或手工补 marker。
+
+# Release B unique index owner 检查
+
+- preflight 中两个 `0071` partial unique index 必须分别报告 owning schema 为当前 schema，且
+  `table_name` 精确为 `stable_raceevent` /
+  `stable_historicalraceeventtarget`。名称、columns、predicate 全部相同但表名不同仍是确定性 drift。
+- 出现 `0071.uq_race_event_series_edition` 或
+  `0071.uq_hist_target_active_series_year` 时，先核对 `pg_index.indrelid` 对应 relation；禁止通过
+  在其他表创建同名索引、改 search_path 或手工补 recorder 继续发布。
+- 修复或恢复测试对象后必须重新收集完整 catalog，合法两个 owner 均通过后才可继续其他发布门禁。

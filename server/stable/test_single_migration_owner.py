@@ -11,9 +11,11 @@ a copied deploy tree inside temporary directories.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -100,7 +102,29 @@ case "$cmd" in
         if [ -f "$state/git-rev-parse-head" ]; then cat "$state/git-rev-parse-head"; fi
         ;;
       *" inspect "*)
-        printf '%s\n' 'sha256:candidate-image-id'
+        ref=""
+        for a in "$@"; do
+          case "$a" in --format|--format=*) ;; '{{.Id}}') ;; *) ref="$a" ;; esac
+        done
+        case "$ref" in
+          umanewsbot:prod)
+            if [ -f "$state/prod-image-id" ]; then cat "$state/prod-image-id"; else printf '%s\n' 'sha256:candidate-image-id'; fi
+            ;;
+          umanewsbot:rollback-control-*)
+            if [ -f "$state/control-image-id" ]; then cat "$state/control-image-id"; else printf '%s\n' 'sha256:candidate-image-id'; fi
+            ;;
+          umanewsbot:rollback-target-*)
+            if [ -f "$state/target-image-id-seq" ]; then
+              pop_line "$state/target-image-id-seq"
+            elif [ -f "$state/target-image-id" ]; then
+              cat "$state/target-image-id"
+            else
+              printf '%s\n' 'sha256:candidate-image-id'
+            fi
+            ;;
+          sha256:*) printf '%s\n' "$ref" ;;
+          *) printf '%s\n' 'sha256:candidate-image-id' ;;
+        esac
         ;;
     esac
     exit "$(rc_file image)"
@@ -108,7 +132,14 @@ case "$cmd" in
   compose)
     while [ $# -gt 0 ]; do
       case "$1" in
-        -f) shift 2 ;;
+        -f)
+          case "${2:-}" in
+            *target-collectstatic.*.yml)
+              if [ -f "$2" ]; then cp "$2" "$state/last-target-collectstatic-override.yml"; fi
+              ;;
+          esac
+          shift 2
+          ;;
         *) break ;;
       esac
     done
@@ -143,6 +174,24 @@ case "$cmd" in
             exit "$(rc_file exec-preflight)"
             ;;
           *" shell "*)
+            case " $* " in
+              *"print(connection.vendor)"*)
+                if [ -f "$state/database-vendor" ]; then
+                  cat "$state/database-vendor"
+                else
+                  printf '%s\n' postgresql
+                fi
+                exit "$(rc_file database-vendor)"
+                ;;
+              *historical-initial-install-0070-or-later*)
+                if [ -f "$state/initial-install-schema" ]; then
+                  cat "$state/initial-install-schema"
+                else
+                  printf '%s\n' historical-initial-install-0070-or-later
+                fi
+                exit "$(rc_file initial-install-schema)"
+                ;;
+            esac
             if [ -f "$state/drain-strict" ] && [ -n "${EXPECTED_CELERY_WORKERS:-}" ]; then
               missing=""
               for node in $EXPECTED_CELERY_WORKERS; do
@@ -172,7 +221,56 @@ case "$cmd" in
         esac
         ;;
       run)
-        exit "$(rc_file compose-run)"
+        run_rc_name="compose-run"
+        case " $* " in
+          *" manage.py collectstatic --noinput "*)
+            run_rc_name="compose-target-collectstatic"
+            ;;
+          *" /app/deploy/docker/run-release-tasks.sh "*)
+            case " $* " in
+              *" RELEASE_TASK_PHASE=complete-intent "*) run_rc_name="compose-complete-intent" ;;
+              *)
+                if [ -f "$state/rc-compose-release-task" ]; then
+                  run_rc_name="compose-release-task"
+                fi
+                ;;
+            esac
+            ;;
+        esac
+        output_path=""
+        handoff_action="deploy"
+        for arg in "$@"; do
+          case "$arg" in
+            --output-path=*) output_path="${arg#--output-path=}" ;;
+            --action=*) handoff_action="${arg#--action=}" ;;
+          esac
+        done
+        if [ -n "$output_path" ] && [ "$(rc_file "$run_rc_name")" -eq 0 ]; then
+          attempt_mode="not-required"
+          if [ -f "$state/preflight-attempt-mode" ]; then attempt_mode="$(cat "$state/preflight-attempt-mode")"; fi
+          printf '%s' "{\"artifact_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"database_identity_sha256\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"handoff_action\":\"$handoff_action\",\"recovery_intent_mode\":\"$attempt_mode\"}" > "$output_path"
+          chmod 600 "$output_path"
+        fi
+        case " $* " in
+          *" RELEASE_TASK_PHASE=migrate-verify "*)
+            case " $* " in
+              *" RESTRICTED_RECOVERY_ATTEMPT_MODE=required "*)
+                marker_path=""
+                for arg in "$@"; do
+                  case "$arg" in RESTRICTED_RECOVERY_MARKER_PATH=*) marker_path="${arg#*=}" ;; esac
+                done
+                if [ -n "$marker_path" ]; then
+                  mkdir -p "$(dirname "$marker_path")"
+                  printf '%s\n' '{"marker_sha256":"fake"}' > "$marker_path"
+                  chmod 600 "$marker_path"
+                fi
+                printf '%s\n' 'release-marker-identity=1:2'
+                ;;
+              *) printf '%s\n' 'release-marker-identity=none' ;;
+            esac
+            ;;
+        esac
+        exit "$(rc_file "$run_rc_name")"
         ;;
       stop)
         last=""
@@ -196,6 +294,9 @@ case "$cmd" in
         exit "$(rc_file up)"
         ;;
       build)
+        if [ "$(rc_file build)" -eq 0 ] && [ -f "$state/prod-image-id" ]; then
+          printf '%s\n' 'sha256:candidate-image-id' > "$state/prod-image-id"
+        fi
         exit "$(rc_file build)"
         ;;
       pull)
@@ -236,6 +337,22 @@ case "$cmd" in
     exit 0
     ;;
   tag)
+    source_ref="${1:-}"
+    target_ref="${2:-}"
+    if [ -f "$state/prod-image-id" ]; then
+      case "$source_ref" in
+        umanewsbot:prod) source_id="$(cat "$state/prod-image-id")" ;;
+        sha256:*) source_id="$source_ref" ;;
+        umanewsbot:rollback-control-*) source_id="$(cat "$state/control-image-id")" ;;
+        umanewsbot:rollback-target-*) source_id="$(cat "$state/target-image-id")" ;;
+        *) source_id="sha256:candidate-image-id" ;;
+      esac
+      case "$target_ref" in
+        umanewsbot:prod) printf '%s\n' "$source_id" > "$state/prod-image-id" ;;
+        umanewsbot:rollback-control-*) printf '%s\n' "$source_id" > "$state/control-image-id" ;;
+        umanewsbot:rollback-target-*) printf '%s\n' "$source_id" > "$state/target-image-id" ;;
+      esac
+    fi
     exit "$(rc_file tag)"
     ;;
   container|network)
@@ -257,6 +374,10 @@ if [ $# -gt 0 ]; then shift; fi
 f="$state/rc-git-$cmd"
 if [ -f "$f" ]; then exit "$(cat "$f")"; fi
 case "$cmd" in
+  symbolic-ref)
+    if [ -f "$state/git-head-ref" ]; then cat "$state/git-head-ref"; exit 0; fi
+    exit 1
+    ;;
   rev-parse)
     # `git rev-parse HEAD` (binding the current checkout) reads
     # git-rev-parse-head; `git rev-parse --verify <ref>` reads
@@ -292,6 +413,77 @@ case "$cmd" in
     fi
     exit 0
     ;;
+  show)
+    if [ -f "$state/git-show-0071" ]; then
+      cat "$state/git-show-0071"
+      exit 0
+    fi
+    exit 1
+    ;;
+  checkout)
+    checkout_target=""
+    for checkout_arg in "$@"; do
+      case "$checkout_arg" in --detach) ;; *) checkout_target="$checkout_arg" ;; esac
+    done
+    if [ -f "$state/git-stateful-head" ]; then
+      target=""
+      detached=false
+      for a in "$@"; do
+        if [ "$a" = "--detach" ]; then detached=true; else target="$a"; fi
+      done
+      if [ "$detached" = true ]; then
+        rm -f "$state/git-head-ref"
+        printf '%s\n' "$target" > "$state/git-rev-parse-head"
+      else
+        case "$target" in
+          refs/heads/*)
+            printf '%s\n' "$target" > "$state/git-head-ref"
+            cat "$state/git-original-head-oid" > "$state/git-rev-parse-head"
+            ;;
+          *)
+            current_branch=""
+            if [ -f "$state/git-original-head-ref" ]; then current_branch="$(cat "$state/git-original-head-ref")"; current_branch="${current_branch#refs/heads/}"; fi
+            if [ -n "$current_branch" ] && [ "$target" = "$current_branch" ]; then
+              cat "$state/git-original-head-ref" > "$state/git-head-ref"
+              cat "$state/git-original-head-oid" > "$state/git-rev-parse-head"
+            else
+              rm -f "$state/git-head-ref"
+              printf '%s\n' "$target" > "$state/git-rev-parse-head"
+            fi
+            ;;
+        esac
+      fi
+    fi
+    if [ -f "$state/git-checkout-pre-v2-control" ]; then
+      original_branch=""
+      if [ -f "$state/git-original-head-ref" ]; then original_branch="$(cat "$state/git-original-head-ref")"; original_branch="${original_branch#refs/heads/}"; fi
+      case "$checkout_target" in
+        refs/heads/*|"$original_branch")
+          cp "$state/original-preflight.sh" deploy/run_historical_calendar_release_b_preflight.sh
+          cp "$state/original-application.sh" deploy/run_application_release.sh
+          cp "$state/original-release-tasks.sh" deploy/run_release_tasks.sh
+          ;;
+        *)
+          if [ -f "$state/git-original-head-oid" ] && [ "$checkout_target" = "$(cat "$state/git-original-head-oid")" ]; then
+            cp "$state/original-preflight.sh" deploy/run_historical_calendar_release_b_preflight.sh
+            cp "$state/original-application.sh" deploy/run_application_release.sh
+            cp "$state/original-release-tasks.sh" deploy/run_release_tasks.sh
+          else
+            if [ ! -f "$state/original-preflight.sh" ]; then
+              cp deploy/run_historical_calendar_release_b_preflight.sh "$state/original-preflight.sh"
+              cp deploy/run_application_release.sh "$state/original-application.sh"
+              cp deploy/run_release_tasks.sh "$state/original-release-tasks.sh"
+            fi
+            printf '%s\n' '#!/bin/sh' 'exit 0' > deploy/run_historical_calendar_release_b_preflight.sh
+            printf '%s\n' '#!/bin/sh' 'echo target-v1-application-helper-used >&2' 'exit 97' > deploy/run_application_release.sh
+            printf '%s\n' '#!/bin/sh' 'echo target-v1-release-helper-used >&2' 'exit 98' > deploy/run_release_tasks.sh
+          fi
+          ;;
+      esac
+      chmod +x deploy/run_historical_calendar_release_b_preflight.sh deploy/run_application_release.sh deploy/run_release_tasks.sh
+    fi
+    exit 0
+    ;;
 esac
 exit 0
 """
@@ -302,6 +494,14 @@ log="${FAKE_CALL_LOG:?FAKE_CALL_LOG required}"
 printf 'python %s\n' "$*" >> "$log"
 rc=0
 case " $* " in
+  *" check_production_database_vendor "*)
+    rc="${FAKE_PY_DATABASE_VENDOR_RC:-0}" ;;
+  *" ensure_historical_calendar_recovery_intent "*)
+    case " $* " in
+      *" --attempt-mode=required "*)
+        printf '%s\n' '{"marker_device": 1, "marker_inode": 2, "ok": true, "status": "verified"}' ;;
+      *) printf '%s\n' '{"ok": true, "status": "not-required"}' ;;
+    esac ;;
   *" migrate "*)
     rc="${FAKE_PY_MIGRATE_RC:-0}" ;;
   *" collectstatic "*)
@@ -335,6 +535,10 @@ class Harness:
         _write_executable(self.fakes / "git", FAKE_GIT)
         self.state = base / "state"
         self.state.mkdir()
+        shutil.copyfile(
+            ROOT / "server/stable/migrations/0071_historical_calendar_release_b.py",
+            self.state / "git-show-0071",
+        )
         self.log = base / "calls.log"
         self.log.touch()
         self.lock_dir = base / "deployment.lock"
@@ -390,8 +594,9 @@ class Harness:
             if parts[:2] == ["docker", "compose"]:
                 rest = parts[2:]
                 compose_file = None
-                if rest[:1] == ["-f"]:
-                    compose_file = rest[1]
+                while len(rest) >= 2 and rest[:1] == ["-f"]:
+                    if compose_file is None:
+                        compose_file = rest[1]
                     rest = rest[2:]
                 evts.append(("compose", compose_file, rest))
             elif parts[0] in ("docker", "git", "python"):
@@ -456,7 +661,12 @@ def is_drain_exec(event) -> bool:
 
 def is_release_run(event) -> bool:
     kind, _cf, argv = event
-    return kind == "compose" and argv == EXPECTED_RELEASE_RUN_ARGV
+    return (
+        kind == "compose"
+        and argv[:3] == ["run", "--rm", "--no-deps"]
+        and argv[-2:] == ["web", RELEASE_TASK_CONTAINER_PATH]
+        and "RELEASE_B_PREFLIGHT_ARTIFACT_PATH=" in " ".join(argv)
+    )
 
 
 # Files whose migrate/collectstatic mentions are assertion strings inside
@@ -466,6 +676,7 @@ ASSERTION_ONLY_SCAN_EXCLUSIONS = {
     # assertFalse any("manage.py migrate" in call) — a negative assertion
     # string, not a migration entry point.
     "server/stable/test_race_live_p0_deployment_contract.py",
+    "server/stable/test_migration_history_repair.py",
 }
 
 
@@ -534,7 +745,11 @@ class MigrationCommandOwnershipTests(SimpleTestCase):
         # is itself a single-process release path gated by an empty migration
         # plan. Every other file must still have zero occurrences.
         p0_exception = "deploy/deploy_race_live_p0_closed.sh"
-        allowed = {RELEASE_TASK_SCRIPT_REL: 1, p0_exception: 1}
+        allowed = {
+            RELEASE_TASK_SCRIPT_REL: 1,
+            HOST_WRAPPER_REL: 1,
+            p0_exception: 1,
+        }
         hits = {}
         for rel, text in _scan_repo_text_files():
             count = len(re.findall(r"manage\.py\s+collectstatic\s+--noinput", text))
@@ -618,7 +833,7 @@ class StartWebEntrypointTests(SimpleTestCase):
 
 
 class ReleaseTasksContainerScriptTests(SimpleTestCase):
-    """T04: the in-container release task runs wait -> migrate -> collectstatic."""
+    """T04: normal release stays whole; rollback control phases never collect static."""
 
     def _script_path(self) -> Path:
         script = DEPLOY_DIR / "docker" / "run-release-tasks.sh"
@@ -641,10 +856,23 @@ class ReleaseTasksContainerScriptTests(SimpleTestCase):
         _write_executable(fakes / "python", FAKE_PYTHON)
         log = tmp / "python-calls.log"
         log.touch()
+        (tmp / "preflight.json").write_text(
+            '{"handoff_action":"deploy","recovery_intent_mode":"not-required"}\n',
+            encoding="utf-8",
+        )
         env = {
             "PATH": f"{fakes}{os.pathsep}{os.environ.get('PATH', '/usr/bin:/bin')}",
             "HOME": str(tmp),
             "FAKE_CALL_LOG": str(log),
+            "RELEASE_B_PREFLIGHT_ARTIFACT_PATH": str(tmp / "preflight.json"),
+            "RELEASE_B_PREFLIGHT_ARTIFACT_SHA256": "a" * 64,
+            "EXPECTED_CANDIDATE_COMMIT": "b" * 40,
+            "EXPECTED_CANDIDATE_IMAGE_ID": "sha256:" + "c" * 64,
+            "EXPECTED_PRODUCTION_DB_IDENTITY_SHA256": "d" * 64,
+            "RESTRICTED_RECOVERY_ATTEMPT_MODE": "not-required",
+            "EXPECTED_COMPOSE_FILE": COMPOSE_STANDARD,
+            "EXPECTED_DEPLOYMENT_LOCK_TOKEN_SHA256": "e" * 64,
+            "RESTRICTED_RECOVERY_MARKER_PATH": str(tmp / "restricted.json"),
         }
         env.update(env_overrides)
         result = subprocess.run(
@@ -662,8 +890,14 @@ class ReleaseTasksContainerScriptTests(SimpleTestCase):
         for line in lines:
             if "wait_for_services" in line:
                 stages.append("wait")
+            elif "verify_historical_calendar_release_b_handoff" in line:
+                stages.append("verify")
+            elif "ensure_historical_calendar_recovery_intent" in line:
+                stages.append("intent")
             elif " migrate " in f" {line} ":
                 stages.append("migrate")
+            elif "complete_historical_calendar_restricted_recovery" in line:
+                stages.append("complete")
             elif " collectstatic " in f" {line} ":
                 stages.append("collectstatic")
         return stages
@@ -683,19 +917,39 @@ class ReleaseTasksContainerScriptTests(SimpleTestCase):
         with TemporaryDirectory() as tmp:
             result, lines = self._run_copy(Path(tmp))
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self._stages(lines), ["wait", "migrate", "collectstatic"])
+        self.assertEqual(
+            self._stages(lines),
+            ["wait", "verify", "intent", "migrate", "complete", "collectstatic"],
+        )
 
     def test_t04_migrate_failure_skips_collectstatic(self):
         with TemporaryDirectory() as tmp:
             result, lines = self._run_copy(Path(tmp), FAKE_PY_MIGRATE_RC="1")
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self._stages(lines), ["wait", "migrate"])
+        self.assertEqual(self._stages(lines), ["wait", "verify", "intent", "migrate"])
+
+    def test_initial_install_intent_is_durable_before_a_migrate_crash(self):
+        bridge = (ROOT / "deploy/run_historical_initial_install_release.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertLess(
+            bridge.index("RELEASE_B_PREFLIGHT_ACTION=initial-install"),
+            bridge.index("run_application_release.sh"),
+        )
+        self.assertIn('RESTRICTED_RECOVERY_ATTEMPT_MODE" != required', bridge)
+        with TemporaryDirectory() as tmp:
+            result, lines = self._run_copy(Path(tmp), FAKE_PY_MIGRATE_RC="47")
+        self.assertEqual(result.returncode, 47)
+        self.assertEqual(self._stages(lines), ["wait", "verify", "intent", "migrate"])
 
     def test_t04_collectstatic_failure_fails_whole_script(self):
         with TemporaryDirectory() as tmp:
             result, lines = self._run_copy(Path(tmp), FAKE_PY_COLLECTSTATIC_RC="1")
         self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(self._stages(lines), ["wait", "migrate", "collectstatic"])
+        self.assertEqual(
+            self._stages(lines),
+            ["wait", "verify", "intent", "migrate", "complete", "collectstatic"],
+        )
 
     def test_t04_no_gunicorn_or_celery_is_invoked(self):
         with TemporaryDirectory() as tmp:
@@ -704,7 +958,77 @@ class ReleaseTasksContainerScriptTests(SimpleTestCase):
         joined = "\n".join(lines).lower()
         self.assertNotIn("gunicorn", joined)
         self.assertNotIn("celery", joined)
-        self.assertEqual(len(lines), 3)
+        self.assertEqual(len(lines), 7)
+
+    def test_t04_initial_install_uses_required_intent_flow(self):
+        with TemporaryDirectory() as tmp:
+            result, lines = self._run_copy(Path(tmp))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            self._stages(lines),
+            ["wait", "verify", "intent", "migrate", "complete", "collectstatic"],
+        )
+
+    def test_initial_install_non_postgresql_stops_before_migrate_and_collectstatic(self):
+        with TemporaryDirectory() as tmp:
+            result, lines = self._run_copy(
+                Path(tmp),
+                DB_ENGINE="",
+                FAKE_PY_DATABASE_VENDOR_RC="1",
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self._stages(lines), ["wait"])
+
+    def test_initial_install_postgresql_vendor_gate_passes_to_migrate(self):
+        with TemporaryDirectory() as tmp:
+            result, lines = self._run_copy(
+                Path(tmp),
+                DB_ENGINE="django.db.backends.postgresql",
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            self._stages(lines),
+            ["wait", "verify", "intent", "migrate", "complete", "collectstatic"],
+        )
+
+    def test_rollback_control_migrate_phase_skips_completion_and_collectstatic(self):
+        with TemporaryDirectory() as tmp:
+            result, lines = self._run_copy(
+                Path(tmp),
+                RELEASE_TASK_PHASE="migrate-verify",
+                RESTRICTED_RECOVERY_ATTEMPT_MODE="required",
+                FAKE_PY_COLLECTSTATIC_RC="97",
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            self._stages(lines), ["wait", "verify", "intent", "migrate"]
+        )
+        self.assertIn("release-marker-identity=1:2", result.stdout)
+
+    def test_rollback_control_completion_phase_only_completes_intent(self):
+        with TemporaryDirectory() as tmp:
+            result, lines = self._run_copy(
+                Path(tmp),
+                RELEASE_TASK_PHASE="complete-intent",
+                FAKE_PY_MIGRATE_RC="96",
+                FAKE_PY_COLLECTSTATIC_RC="97",
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self._stages(lines), ["wait", "complete"])
+
+    def test_required_split_completion_reuses_pre_static_marker_identity(self):
+        with TemporaryDirectory() as tmp:
+            result, lines = self._run_copy(
+                Path(tmp),
+                RELEASE_TASK_PHASE="complete-intent",
+                RESTRICTED_RECOVERY_ATTEMPT_MODE="required",
+                RELEASE_EXPECTED_MARKER_DEVICE="11",
+                RELEASE_EXPECTED_MARKER_INODE="22",
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self._stages(lines), ["wait", "complete"])
+        self.assertIn("--expected-marker-device=11", lines[-1])
+        self.assertIn("--expected-marker-inode=22", lines[-1])
 
 
 class HostReleaseWrapperTests(SimpleTestCase):
@@ -728,7 +1052,35 @@ class HostReleaseWrapperTests(SimpleTestCase):
         harness.clear_log()
 
     def _run_wrapper(self, harness: Harness, **env):
-        return harness.run_script(HOST_WRAPPER_REL, **env)
+        repair = harness.work.resolve() / "runtime" / "migration_history_repair"
+        artifact_dir = repair / "preflight" / "before.test"
+        artifact_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        handoff_action = env.pop("TEST_HANDOFF_ACTION", "deploy")
+        recovery_intent_mode = env.get(
+            "RESTRICTED_RECOVERY_ATTEMPT_MODE", "not-required"
+        )
+        (artifact_dir / "preflight.json").write_text(
+            json.dumps(
+                {
+                    "handoff_action": handoff_action,
+                    "recovery_intent_mode": recovery_intent_mode,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        defaults = {
+            "RELEASE_B_PREFLIGHT_ARTIFACT_PATH": str(artifact_dir / "preflight.json"),
+            "RELEASE_B_PREFLIGHT_ARTIFACT_SHA256": "a" * 64,
+            "EXPECTED_CANDIDATE_COMMIT": "b" * 40,
+            "EXPECTED_CANDIDATE_IMAGE_ID": "sha256:" + "c" * 64,
+            "EXPECTED_PRODUCTION_DB_IDENTITY_SHA256": "d" * 64,
+            "RESTRICTED_RECOVERY_ATTEMPT_MODE": "not-required",
+        }
+        defaults.update(env)
+        return harness.run_script(HOST_WRAPPER_REL, **defaults)
 
     def test_t05_missing_compose_file_fails_before_any_compose_call(self):
         with TemporaryDirectory() as tmp:
@@ -775,7 +1127,7 @@ class HostReleaseWrapperTests(SimpleTestCase):
         self.assertEqual(len(calls), 1, f"expected exactly one compose call: {calls}")
         actual_file, argv = calls[0]
         self.assertEqual(actual_file, compose_file)
-        self.assertEqual(argv, EXPECTED_RELEASE_RUN_ARGV)
+        self.assertTrue(is_release_run(("compose", actual_file, argv)), argv)
 
     def test_t05_standard_compose_file_runs_exactly_one_one_shot(self):
         with TemporaryDirectory() as tmp:
@@ -801,6 +1153,46 @@ class HostReleaseWrapperTests(SimpleTestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self._assert_one_shot(harness, COMPOSE_LOWCOST)
 
+    def test_t05_stale_provenance_is_cleared_for_normal_release(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._prepared(harness)
+            result = self._run_wrapper(
+                harness,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+                DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
+                RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256="b" * 64,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            _compose_file, argv = compose_calls(harness.events())[0]
+            self.assertIn(
+                "RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256=", argv
+            )
+            self.assertNotIn(
+                f"RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256={'b' * 64}",
+                argv,
+            )
+
+    def test_t05_forward_resume_preserves_exact_provenance(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._prepared(harness)
+            provenance = "b" * 64
+            result = self._run_wrapper(
+                harness,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+                DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
+                TEST_HANDOFF_ACTION="forward-resume",
+                RESTRICTED_RECOVERY_ATTEMPT_MODE="required",
+                RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256=provenance,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            _compose_file, argv = compose_calls(harness.events())[0]
+            self.assertIn(
+                f"RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256={provenance}",
+                argv,
+            )
+
     def test_t05_compose_failure_is_propagated(self):
         with TemporaryDirectory() as tmp:
             harness = Harness(Path(tmp))
@@ -813,6 +1205,105 @@ class HostReleaseWrapperTests(SimpleTestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self._assert_one_shot(harness, COMPOSE_STANDARD)
+
+    def test_rollback_split_uses_control_target_control_image_phases(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._prepared(harness)
+            control_override = harness.work / "runtime/control.yml"
+            control_override.parent.mkdir(parents=True, exist_ok=True)
+            control_override.write_text(
+                'services:\n  web:\n    image: "sha256:control-image-id"\n',
+                encoding="utf-8",
+            )
+            control_override.chmod(0o400)
+            target_tag = "umanewsbot:rollback-target-" + "a" * 64
+            result = self._run_wrapper(
+                harness,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+                DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
+                EXPECTED_CANDIDATE_IMAGE_ID="sha256:candidate-image-id",
+                RELEASE_CONTROL_COMPOSE_OVERRIDE=str(control_override),
+                RELEASE_TARGET_IMAGE_TAG=target_tag,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            runs = [
+                argv
+                for _compose_file, argv in compose_calls(harness.events())
+                if argv[:1] == ["run"]
+            ]
+            self.assertEqual(len(runs), 3)
+            self.assertIn("RELEASE_TASK_PHASE=migrate-verify", runs[0])
+            self.assertEqual(
+                runs[1][-5:],
+                ["web", "python", "manage.py", "collectstatic", "--noinput"],
+            )
+            self.assertIn("RELEASE_TASK_PHASE=complete-intent", runs[2])
+            target_override = (
+                harness.state / "last-target-collectstatic-override.yml"
+            ).read_text(encoding="utf-8")
+            self.assertEqual(
+                target_override,
+                f'services:\n  web:\n    image: "{target_tag}"\n',
+            )
+
+    def test_rollback_split_rejects_wrong_target_image_before_any_phase(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._prepared(harness)
+            control_override = harness.work / "runtime/control.yml"
+            control_override.parent.mkdir(parents=True, exist_ok=True)
+            control_override.write_text("services: {}\n", encoding="utf-8")
+            control_override.chmod(0o400)
+            harness.set_state("target-image-id", "sha256:wrong-image-id\n")
+            result = self._run_wrapper(
+                harness,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+                DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
+                EXPECTED_CANDIDATE_IMAGE_ID="sha256:candidate-image-id",
+                RELEASE_CONTROL_COMPOSE_OVERRIDE=str(control_override),
+                RELEASE_TARGET_IMAGE_TAG="umanewsbot:rollback-target-" + "a" * 64,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(compose_calls(harness.events()), [])
+
+    def test_rollback_split_rejects_target_tag_drift_after_collectstatic(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._prepared(harness)
+            control_override = harness.work / "runtime/control.yml"
+            control_override.parent.mkdir(parents=True, exist_ok=True)
+            control_override.write_text("services: {}\n", encoding="utf-8")
+            control_override.chmod(0o400)
+            harness.set_state(
+                "target-image-id-seq",
+                "sha256:candidate-image-id\n"
+                "sha256:candidate-image-id\n"
+                "sha256:drifted-image-id\n",
+            )
+            result = self._run_wrapper(
+                harness,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+                DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
+                EXPECTED_CANDIDATE_IMAGE_ID="sha256:candidate-image-id",
+                RELEASE_CONTROL_COMPOSE_OVERRIDE=str(control_override),
+                RELEASE_TARGET_IMAGE_TAG="umanewsbot:rollback-target-" + "a" * 64,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            runs = [
+                argv
+                for _compose_file, argv in compose_calls(harness.events())
+                if argv[:1] == ["run"]
+            ]
+            self.assertEqual(len(runs), 2)
+            self.assertIn("RELEASE_TASK_PHASE=migrate-verify", runs[0])
+            self.assertEqual(
+                runs[1][-5:],
+                ["web", "python", "manage.py", "collectstatic", "--noinput"],
+            )
+            self.assertFalse(
+                any("RELEASE_TASK_PHASE=complete-intent" in argv for argv in runs)
+            )
 
 
 class DeploymentLockTests(SimpleTestCase):
@@ -941,6 +1432,10 @@ class ManualReleaseTests(SimpleTestCase):
         )
 
     def _run_manual(self, harness: Harness, **env):
+        harness.set_state(
+            "git-rev-parse-head",
+            "0123456789abcdef0123456789abcdef01234567\n",
+        )
         return harness.run_script(
             MANUAL_RELEASE_REL, COMPOSE_FILE=COMPOSE_STANDARD, **env
         )
@@ -1002,7 +1497,9 @@ class ManualReleaseTests(SimpleTestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = compose_calls(harness.events())
             runs = [argv for _cf, argv in calls if argv[:1] == ["run"]]
-            self.assertEqual(runs, [EXPECTED_RELEASE_RUN_ARGV])
+            self.assertEqual(len(runs), 2)
+            self.assertIn("create_historical_calendar_release_b_handoff", runs[0])
+            self.assertTrue(is_release_run(("compose", COMPOSE_STANDARD, runs[1])))
             ups = [argv for _cf, argv in calls if argv[:1] == ["up"]]
             self.assertEqual(ups, [], "manual release must not start any service")
 
@@ -1191,10 +1688,31 @@ class DeployOrchestrationTests(SimpleTestCase):
                 [],
             )
 
+    def test_full_history_consistency_failure_is_zero_stop_zero_migrate(self):
+        for script in ("deploy/deploy.sh", "deploy/deploy_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness)
+                seed_git_head(harness)
+                harness.set_rc("compose-run", 74)
+                result = self._run_deploy(harness, script)
+                self.assertEqual(result.returncode, 74)
+                events = harness.events()
+                self.assertEqual(
+                    [e for e in events if e[0] == "compose" and e[2][:1] == ["stop"]],
+                    [],
+                )
+                self.assertEqual([e for e in events if is_exec_migrate(e)], [])
+                self.assertEqual([e for e in events if is_release_run(e)], [])
+
     def _assert_full_orchestration(
         self, harness: Harness, result, compose_file: str
     ) -> None:
         self.assertEqual(result.returncode, 0, result.stderr)
+        repair_root = harness.work / "runtime" / "migration_history_repair"
+        self.assertTrue(repair_root.is_dir())
+        self.assertFalse(repair_root.is_symlink())
+        self.assertEqual(stat.S_IMODE(repair_root.stat().st_mode), 0o700)
         evts = harness.events()
         calls = compose_calls(evts)
         for actual_file, _argv in calls:
@@ -1211,8 +1729,8 @@ class DeployOrchestrationTests(SimpleTestCase):
         # T09.4: release wrapper invoked exactly once with the exact argv.
         runs = [argv for _cf, argv in calls if argv[:1] == ["run"]]
         self.assertEqual(len(runs), 2)
-        self.assertIn("check_historical_calendar_release_b_schema", runs[0])
-        self.assertEqual(runs[1], EXPECTED_RELEASE_RUN_ARGV)
+        self.assertIn("create_historical_calendar_release_b_handoff", runs[0])
+        self.assertTrue(is_release_run(("compose", compose_file, runs[1])), runs[1])
 
         def index(predicate, label):
             found = first_index(evts, predicate)
@@ -1387,6 +1905,45 @@ class RollbackOrchestrationTests(SimpleTestCase):
                         "pre-contract target must be rejected with zero stop and zero release",
                     )
 
+    def test_active_restricted_marker_blocks_before_fetch_checkout_or_build(self):
+        for relative in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            lock = text.index("deployment_lock.sh acquire")
+            marker_gate = text.index("check_restricted_recovery_marker.sh")
+            fetch = text.index("git fetch --all --tags")
+            checkout = text.index('git checkout "$TARGET_OID"')
+            build = text.index('build web')
+            self.assertLess(lock, marker_gate, relative)
+            self.assertLess(marker_gate, fetch, relative)
+            self.assertLess(marker_gate, checkout, relative)
+            self.assertLess(marker_gate, build, relative)
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._seed(harness)
+            marker_dir = harness.work / "runtime" / "migration_history_repair"
+            marker_dir.mkdir(parents=True, mode=0o700)
+            marker_dir.chmod(0o700)
+            marker = marker_dir / "restricted-recovery.json"
+            marker.write_text('{"marker_sha256":"preserve-me"}', encoding="utf-8")
+            marker.chmod(0o600)
+            before = (marker.stat().st_ino, marker.stat().st_mode, marker.read_bytes())
+            for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+                with self.subTest(script=script):
+                    harness.clear_log()
+                    result = harness.run_script(script, "releasecontractref")
+                    self.assertNotEqual(result.returncode, 0)
+                    events = harness.events()
+                    self.assertFalse(
+                        any(e[0] == "git" and e[2][:1] in (["fetch"], ["checkout"]) for e in events),
+                        events,
+                    )
+                    self.assertFalse(
+                        any(e[0] == "compose" and e[2][:1] == ["build"] for e in events),
+                        events,
+                    )
+                    after = (marker.stat().st_ino, marker.stat().st_mode, marker.read_bytes())
+                    self.assertEqual(after, before)
+
     def _assert_rollback_orchestration(
         self, harness: Harness, result, compose_file: str
     ) -> None:
@@ -1398,10 +1955,21 @@ class RollbackOrchestrationTests(SimpleTestCase):
                 self.assertEqual(actual_file, compose_file)
         self.assertEqual([e for e in evts if is_exec_migrate(e)], [])
         runs = [argv for _cf, argv in calls if argv[:1] == ["run"]]
-        self.assertEqual(len(runs), 2)
-        self.assertIn("check_historical_calendar_release_b_schema", runs[0])
+        self.assertEqual(len(runs), 4)
+        self.assertIn("create_historical_calendar_release_b_handoff", runs[0])
         self.assertNotIn("--direction=reverse", runs[0])
-        self.assertEqual(runs[1], EXPECTED_RELEASE_RUN_ARGV)
+        self.assertTrue(is_release_run(("compose", compose_file, runs[1])), runs[1])
+        self.assertIn("RELEASE_TASK_PHASE=migrate-verify", runs[1])
+        self.assertEqual(
+            runs[2][-5:],
+            ["web", "python", "manage.py", "collectstatic", "--noinput"],
+        )
+        self.assertTrue(is_release_run(("compose", compose_file, runs[3])), runs[3])
+        self.assertIn("RELEASE_TASK_PHASE=complete-intent", runs[3])
+        target_override = (
+            harness.state / "last-target-collectstatic-override.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("umanewsbot:rollback-target-", target_override)
         checkout = first_index(
             evts, lambda e: e[0] == "git" and e[2][:1] == ["checkout"]
         )
@@ -1409,13 +1977,28 @@ class RollbackOrchestrationTests(SimpleTestCase):
         preflight = first_index(
             evts,
             lambda e: e[0] == "compose"
-            and "check_historical_calendar_release_b_schema" in e[2],
+            and "create_historical_calendar_release_b_handoff" in e[2],
         )
         self.assertIsNotNone(preflight)
         self.assertLess(checkout, preflight)
         release = first_index(evts, is_release_run)
         self.assertIsNotNone(release)
         self.assertLess(checkout, release)
+        target_collectstatic = first_index(
+            evts,
+            lambda e: e[0] == "compose"
+            and e[2][-5:]
+            == ["web", "python", "manage.py", "collectstatic", "--noinput"],
+        )
+        self.assertIsNotNone(target_collectstatic)
+        complete = first_index(
+            evts,
+            lambda e: is_release_run(e)
+            and "RELEASE_TASK_PHASE=complete-intent" in e[2],
+        )
+        self.assertIsNotNone(complete)
+        self.assertLess(release, target_collectstatic)
+        self.assertLess(target_collectstatic, complete)
         stop_web = first_index(
             evts, lambda e: e[0] == "compose" and e[2] == ["stop", "web"]
         )
@@ -1628,9 +2211,24 @@ class ApplicationReleaseOrchestrationTests(SimpleTestCase):
         harness.clear_log()
 
     def _run_orchestration(self, harness: Harness, **env):
+        repair = harness.work.resolve() / "runtime" / "migration_history_repair"
+        artifact_dir = repair / "preflight" / "before.orchestration"
+        artifact_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        artifact_path = artifact_dir / "preflight.json"
+        if not artifact_path.exists():
+            artifact_path.write_text(
+                '{"handoff_action":"deploy"}\n',
+                encoding="utf-8",
+            )
         overrides = {
             "COMPOSE_FILE": COMPOSE_STANDARD,
             "DEPLOYMENT_LOCK_TOKEN": LOCK_TOKEN_A,
+            "RELEASE_B_PREFLIGHT_ARTIFACT_PATH": str(artifact_path),
+            "RELEASE_B_PREFLIGHT_ARTIFACT_SHA256": "a" * 64,
+            "EXPECTED_CANDIDATE_COMMIT": "b" * 40,
+            "EXPECTED_CANDIDATE_IMAGE_ID": "sha256:" + "c" * 64,
+            "EXPECTED_PRODUCTION_DB_IDENTITY_SHA256": "d" * 64,
+            "RESTRICTED_RECOVERY_ATTEMPT_MODE": "not-required",
         }
         overrides.update(env)
         return harness.run_script(ORCHESTRATION_REL, **overrides)
@@ -1641,6 +2239,87 @@ class ApplicationReleaseOrchestrationTests(SimpleTestCase):
             for _cf, a in compose_calls(evts)
             if a[:1] == [verb] and "race_live_worker" in a
         ]
+
+    def test_attempt_mode_only_activates_from_exact_artifact_and_stale_env_is_cleared(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._prepared(harness, race_live="running")
+            result = self._run_orchestration(
+                harness, RESTRICTED_RECOVERY_ATTEMPT_MODE="required"
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            release_calls = [
+                argv
+                for _compose_file, argv in compose_calls(harness.events())
+                if argv[:3] == ["run", "--rm", "--no-deps"]
+            ]
+            self.assertEqual(len(release_calls), 1)
+            self.assertIn(
+                "RESTRICTED_RECOVERY_ATTEMPT_MODE=not-required",
+                " ".join(release_calls[0]),
+            )
+
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._prepared(harness, race_live="running")
+            artifact = (
+                harness.work.resolve()
+                / "runtime"
+                / "migration_history_repair"
+                / "preflight"
+                / "before.orchestration"
+                / "preflight.json"
+            )
+            artifact.parent.mkdir(parents=True, mode=0o700)
+            artifact.write_text(
+                '{"handoff_action":"deploy","recovery_intent_mode":"required"}',
+                encoding="utf-8",
+            )
+            artifact.chmod(0o600)
+            result = self._run_orchestration(
+                harness, RESTRICTED_RECOVERY_ATTEMPT_MODE=None
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            release_calls = [
+                argv
+                for _compose_file, argv in compose_calls(harness.events())
+                if argv[:3] == ["run", "--rm", "--no-deps"]
+            ]
+            self.assertEqual(len(release_calls), 1)
+            self.assertIn(
+                "RESTRICTED_RECOVERY_ATTEMPT_MODE=required",
+                " ".join(release_calls[0]),
+            )
+
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._prepared(harness, race_live="running")
+            artifact = (
+                harness.work.resolve()
+                / "runtime"
+                / "migration_history_repair"
+                / "preflight"
+                / "before.orchestration"
+                / "preflight.json"
+            )
+            artifact.parent.mkdir(parents=True, mode=0o700)
+            artifact.write_text(
+                '{"handoff_action":"deploy","recovery_intent_mode":"required"}',
+                encoding="utf-8",
+            )
+            artifact.chmod(0o600)
+            result = self._run_orchestration(
+                harness, RESTRICTED_RECOVERY_ATTEMPT_MODE="not-required"
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(
+                [
+                    argv
+                    for _compose_file, argv in compose_calls(harness.events())
+                    if argv[:1] == ["stop"]
+                ],
+                [],
+            )
 
     def test_t13_race_live_running_is_stopped_before_release_and_restored_once(self):
         with TemporaryDirectory() as tmp:
@@ -2220,6 +2899,114 @@ class HistoricalInitialInstallSemanticsTests(SimpleTestCase):
             "deploy docs must explicitly state initial-install is not a greenfield install",
         )
 
+    def test_t18_no_release_task_bypass_mode_survives(self):
+        for relative in (
+            "deploy/run_application_release.sh",
+            "deploy/run_release_tasks.sh",
+            "deploy/docker/run-release-tasks.sh",
+        ):
+            self.assertNotIn(
+                "historical-initial-install",
+                (ROOT / relative).read_text(encoding="utf-8"),
+                relative,
+            )
+
+    def test_t18_pre_0070_initial_install_reaches_release_for_standard_and_lowcost(self):
+        for script, compose_file in (
+            ("deploy/deploy.sh", COMPOSE_STANDARD),
+            ("deploy/deploy_lowcost.sh", COMPOSE_LOWCOST),
+        ):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                seed_git_head(harness)
+                harness.set_state(
+                    "initial-install-schema", "historical-initial-install-pre-0070\n"
+                )
+                harness.set_state("preflight-attempt-mode", "required\n")
+                result = harness.run_script(
+                    script, HISTORICAL_RUNNER_INITIAL_INSTALL="true"
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                runs = [a for _cf, a in compose_calls(harness.events()) if a[:1] == ["run"]]
+                self.assertEqual(len(runs), 2)
+                self.assertTrue(any("--action=initial-install" in arg for arg in runs[0]))
+                self.assertTrue(any("--output-path=" in arg for arg in runs[0]))
+                self.assertIn("RELEASE_HANDOFF_MODE=release-b", runs[1])
+                self.assertEqual(
+                    {cf for cf, _a in compose_calls(harness.events()) if cf},
+                    {compose_file},
+                )
+
+    def test_t18_missing_or_sqlite_database_engine_stops_before_stateful_release(self):
+        for script in ("deploy/deploy.sh", "deploy/deploy_lowcost.sh"):
+            for engine_case in ("missing", "sqlite"):
+                with self.subTest(script=script, engine=engine_case), TemporaryDirectory() as tmp:
+                    harness = Harness(Path(tmp))
+                    seed_services(harness, race_live="running")
+                    seed_git_head(harness)
+                    harness.set_state("database-vendor", "sqlite\n")
+                    harness.set_state(
+                        "initial-install-schema",
+                        "historical-initial-install-pre-0070\n",
+                    )
+                    result = harness.run_script(
+                        script,
+                        HISTORICAL_RUNNER_INITIAL_INSTALL="true",
+                        DB_ENGINE=(None if engine_case == "missing" else "django.db.backends.sqlite3"),
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    calls = compose_calls(harness.events())
+                    self.assertEqual(
+                        [a for _cf, a in calls if a[:1] in (["build"], ["stop"], ["up"], ["run"])],
+                        [],
+                    )
+                    self.assertEqual([e for e in harness.events() if is_exec_migrate(e)], [])
+
+    def test_t18_pre_0070_without_flag_still_requires_release_b_preflight(self):
+        for script in ("deploy/deploy.sh", "deploy/deploy_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                seed_git_head(harness)
+                harness.set_state(
+                    "initial-install-schema", "historical-initial-install-pre-0070\n"
+                )
+                harness.set_rc("compose-run", 81)
+                result = harness.run_script(script)
+                self.assertEqual(result.returncode, 81, result.stderr)
+                self.assertEqual(
+                    [a for _cf, a in compose_calls(harness.events()) if a[:1] == ["stop"]],
+                    [],
+                )
+                self.assertFalse(
+                    any(
+                        RELEASE_TASK_CONTAINER_PATH in a
+                        for _cf, a in compose_calls(harness.events())
+                    )
+                )
+
+    def test_t18_0070_or_later_cannot_use_initial_install_bypass(self):
+        for script in ("deploy/deploy.sh", "deploy/deploy_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                seed_git_head(harness)
+                harness.set_state(
+                    "initial-install-schema",
+                    "historical-initial-install-0070-or-later\n",
+                )
+                result = harness.run_script(
+                    script, HISTORICAL_RUNNER_INITIAL_INSTALL="true"
+                )
+                self.assertNotEqual(result.returncode, 0)
+                stateful = [
+                    a
+                    for _cf, a in compose_calls(harness.events())
+                    if a[:1] in (["build"], ["stop"], ["up"], ["run"])
+                ]
+                self.assertEqual(stateful, [])
+
 
 class MigrationDriftGuardTests(SimpleTestCase):
     """T19: only the explicitly reviewed Release B migration may be new."""
@@ -2235,9 +3022,10 @@ class MigrationDriftGuardTests(SimpleTestCase):
         unexpected = [
             line
             for line in result.stdout.splitlines()
-            if not line.endswith(
-                "server/stable/migrations/0071_historical_calendar_release_b.py"
-            )
+            if not line.endswith((
+                "server/stable/migrations/0070_horse_identity_evidence_commit_receipt.py",
+                "server/stable/migrations/0071_historical_calendar_release_b.py",
+            ))
         ]
         self.assertEqual(unexpected, [], f"unexpected migration drift:\n{result.stdout}")
 
@@ -2245,6 +3033,24 @@ class MigrationDriftGuardTests(SimpleTestCase):
 def race_live_state_file(harness: Harness) -> Path:
     """Frozen race_live_worker state shared across release retries."""
     return Path(f"{harness.lock_dir}.race-live-state")
+
+
+def release_b_handoff_env(harness: Harness) -> dict[str, str]:
+    repair = harness.work.resolve() / "runtime" / "migration_history_repair"
+    artifact_dir = repair / "preflight" / "before.shared"
+    artifact_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    artifact_path = artifact_dir / "preflight.json"
+    artifact_path.write_text(
+        '{"handoff_action":"deploy"}\n',
+        encoding="utf-8",
+    )
+    return {
+        "RELEASE_B_PREFLIGHT_ARTIFACT_PATH": str(artifact_path),
+        "RELEASE_B_PREFLIGHT_ARTIFACT_SHA256": "a" * 64,
+        "EXPECTED_CANDIDATE_COMMIT": "b" * 40,
+        "EXPECTED_CANDIDATE_IMAGE_ID": "sha256:" + "c" * 64,
+        "EXPECTED_PRODUCTION_DB_IDENTITY_SHA256": "d" * 64,
+    }
 
 
 HEAD_OID = "f1f2f3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0"
@@ -2301,6 +3107,7 @@ class RaceLiveStatePersistenceTests(SimpleTestCase):
             COMPOSE_FILE=COMPOSE_STANDARD,
             DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
             RELEASE_ACTION="deploy",
+            **release_b_handoff_env(harness),
         )
 
     def _race_live_ups(self, harness: Harness) -> list:
@@ -2395,6 +3202,7 @@ class RaceLiveRetrySemanticsTests(SimpleTestCase):
             COMPOSE_FILE=COMPOSE_STANDARD,
             DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
             RELEASE_ACTION="deploy",
+            **release_b_handoff_env(harness),
         )
 
     def _race_live_calls(self, harness: Harness, verb: str) -> list:
@@ -2559,6 +3367,7 @@ class RaceLiveStateBindingTests(SimpleTestCase):
             COMPOSE_FILE=COMPOSE_STANDARD,
             DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
             RELEASE_ACTION="deploy",
+            **release_b_handoff_env(harness),
         )
 
     def _assert_fail_closed_before_any_stop(self, harness: Harness, result) -> None:
@@ -2682,6 +3491,9 @@ class ResumeStoppedReleaseTests(SimpleTestCase):
         harness.set_state("ps-seq-web", f"\n{SERVICE_IDS['web']}\n")
         harness.set_state(f"inspect-{SERVICE_IDS['web']}", f"{web_health}\n")
         seed_git_head(harness)
+        repair_root = harness.work / "runtime" / "migration_history_repair"
+        repair_root.mkdir(parents=True, mode=0o700)
+        repair_root.chmod(0o700)
 
     def _stateful_calls(self, harness: Harness) -> list:
         return [
@@ -2739,6 +3551,37 @@ class ResumeStoppedReleaseTests(SimpleTestCase):
                 [],
                 "without an intent file resume must not start race_live_worker",
             )
+
+    def test_p1_resume_rejects_missing_or_untrusted_empty_repair_parent_before_start(self):
+        cases = ("missing", "symlink", "wrong-mode", "wrong-owner")
+        for case in cases:
+            with self.subTest(case=case), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                self._seed_all_stopped(harness)
+                repair_root = harness.work / "runtime" / "migration_history_repair"
+                if case == "missing":
+                    repair_root.rmdir()
+                elif case == "symlink":
+                    repair_root.rmdir()
+                    target = harness.work / "runtime" / "marker-target"
+                    target.mkdir(mode=0o700)
+                    repair_root.symlink_to(target)
+                elif case == "wrong-mode":
+                    repair_root.chmod(0o755)
+                else:
+                    _write_executable(
+                        harness.fakes / "stat",
+                        """#!/bin/sh
+case "$*" in
+  *migration_history_repair*) printf '%s\\n' 999999 ;;
+  *) exec /usr/bin/stat "$@" ;;
+esac
+""",
+                    )
+                harness.clear_log()
+                result = self._run_resume(harness)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self._up_calls(harness, "web", "worker", "beat"), [])
 
     def test_p1_resume_restores_race_live_from_running_intent_and_removes_file(self):
         with TemporaryDirectory() as tmp:
@@ -2907,6 +3750,7 @@ class ResumeStoppedReleaseTests(SimpleTestCase):
                 COMPOSE_FILE=COMPOSE_STANDARD,
                 DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
                 RELEASE_ACTION="deploy",
+                **release_b_handoff_env(harness),
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             evts = harness.events()
@@ -2928,6 +3772,35 @@ class ResumeStoppedReleaseTests(SimpleTestCase):
                 "probe; a consumed intent file must not leak a stale "
                 "not-running intent into this attempt",
             )
+
+    def test_active_or_transition_repair_marker_blocks_all_service_restart(self):
+        for name in (
+            "restricted-recovery.json",
+            "restricted-recovery.transition.json",
+        ):
+            with self.subTest(name=name), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                self._assert_script_exists(harness)
+                self._seed_all_stopped(harness)
+                marker_dir = (
+                    harness.work / "runtime" / "migration_history_repair"
+                )
+                marker_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+                marker_dir.chmod(0o700)
+                marker = marker_dir / name
+                marker.write_text("{}", encoding="utf-8")
+                marker.chmod(0o600)
+                result = self._run_resume(harness)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("forward-resume", result.stderr)
+                self.assertEqual(
+                    [
+                        argv
+                        for _compose_file, argv in compose_calls(harness.events())
+                        if argv[:1] == ["up"]
+                    ],
+                    [],
+                )
 
     def test_p1_resume_keeps_untrusted_intent_file(self):
         with TemporaryDirectory() as tmp:
@@ -3007,6 +3880,962 @@ class RollbackContractValidationTests(SimpleTestCase):
     )
     FIXED_OID = "0123456789abcdef0123456789abcdef01234567"
 
+    def _seed_stateful_original(self, harness: Harness, *, branch: bool) -> tuple[str, str]:
+        original_oid = "fedcba9876543210fedcba9876543210fedcba98"
+        original_image = "sha256:original-production-image"
+        harness.set_state("git-stateful-head", "1\n")
+        harness.set_state("git-original-head-oid", f"{original_oid}\n")
+        harness.set_state("git-rev-parse-head", f"{original_oid}\n")
+        if branch:
+            harness.set_state("git-head-ref", "refs/heads/production\n")
+            harness.set_state("git-original-head-ref", "refs/heads/production\n")
+        harness.set_state("prod-image-id", f"{original_image}\n")
+        return original_oid, original_image
+
+    def _assert_original_restored(
+        self, harness: Harness, original_oid: str, original_image: str, *, branch: bool
+    ) -> None:
+        self.assertEqual(
+            (harness.state / "git-rev-parse-head").read_text().strip(), original_oid
+        )
+        self.assertEqual(
+            (harness.state / "prod-image-id").read_text().strip(), original_image
+        )
+        head_ref = harness.state / "git-head-ref"
+        if branch:
+            self.assertEqual(head_ref.read_text().strip(), "refs/heads/production")
+        else:
+            self.assertFalse(head_ref.exists())
+        self.assertEqual(
+            [
+                argv
+                for _compose_file, argv in compose_calls(harness.events())
+                if argv[:1] in (["stop"], ["up"])
+            ],
+            [],
+        )
+
+    def test_pre_control_build_failure_restores_branch_head_and_prod_image(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(harness, race_live="running")
+            harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+            original_oid, original_image = self._seed_stateful_original(
+                harness, branch=True
+            )
+            helper = harness.work / "deploy/run_application_release.sh"
+            original_helper = helper.read_bytes()
+            harness.set_state("git-checkout-pre-v2-control", "1\n")
+            harness.set_rc("build", 71)
+            result = harness.run_script("deploy/rollback.sh", "build-fails")
+            self.assertEqual(result.returncode, 71, result.stderr)
+            self._assert_original_restored(
+                harness, original_oid, original_image, branch=True
+            )
+            self.assertFalse(
+                (harness.work / "runtime/migration_history_repair/restricted-recovery-control.json").exists()
+            )
+            self.assertEqual(helper.read_bytes(), original_helper)
+
+    def test_pre_control_target_preflight_failure_restores_detached_head_and_prod_image(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(harness, race_live="running")
+            harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+            original_oid, original_image = self._seed_stateful_original(
+                harness, branch=False
+            )
+            harness.set_rc("compose-run", 72)
+            result = harness.run_script("deploy/rollback_lowcost.sh", "preflight-fails")
+            self.assertEqual(result.returncode, 72, result.stderr)
+            self._assert_original_restored(
+                harness, original_oid, original_image, branch=False
+            )
+
+    def test_malformed_target_sha_keeps_original_head_and_prod_image(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(harness, race_live="running")
+            original_oid, original_image = self._seed_stateful_original(
+                harness, branch=True
+            )
+            harness.set_state("git-rev-parse-output", "not-an-oid\n")
+            result = harness.run_script("deploy/rollback.sh", "bad-sha")
+            self.assertNotEqual(result.returncode, 0)
+            self._assert_original_restored(
+                harness, original_oid, original_image, branch=True
+            )
+
+    def test_reviewed_0071_allowlist_covers_legacy_and_repaired_exact_contracts(self):
+        allowlist = json.loads(
+            (
+                ROOT / "deploy/reviewed_release_b_rollback_migrations.json"
+            ).read_text(encoding="utf-8")
+        )
+        variants = allowlist["reviewed_variants"]
+        self.assertEqual(
+            {item["sha256"] for item in variants},
+            {
+                "74ee3ca9f03e60fca3735d2d90d3fdebcde40579387cb76e146720ef2ee23197",
+                "e82f720970ae7f38a321b43fbfa5f8ff68a4637c4bd0e285754d9a12aa0b3260",
+            },
+        )
+        self.assertTrue(all(item["rationale"].strip() for item in variants))
+
+    def test_legacy_reviewed_0071_content_remains_b_to_b_eligible(self):
+        repaired = (
+            ROOT / "server/stable/migrations/0071_historical_calendar_release_b.py"
+        ).read_bytes()
+        repaired_dependency = (
+            b'        ("stable", "0069_race_data_sync_pipeline_a_ledger_guards"),\n'
+        )
+        self.assertEqual(repaired.count(repaired_dependency), 1)
+        legacy = repaired.replace(repaired_dependency, b"", 1)
+        self.assertEqual(
+            hashlib.sha256(legacy).hexdigest(),
+            "74ee3ca9f03e60fca3735d2d90d3fdebcde40579387cb76e146720ef2ee23197",
+        )
+        for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                (harness.state / "git-show-0071").write_bytes(legacy)
+                result = harness.run_script(script, "legacy-release-b")
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_unreviewed_0071_content_or_dependencies_fail_before_checkout_and_build(self):
+        reviewed = (
+            ROOT / "server/stable/migrations/0071_historical_calendar_release_b.py"
+        ).read_text(encoding="utf-8")
+        cases = {
+            "placeholder": "from django.db import migrations\nclass Migration(migrations.Migration):\n    dependencies = []\n    operations = []\n",
+            "dependency": reviewed.replace(
+                '"0069_race_data_sync_pipeline_a_ledger_guards"',
+                '"0068_race_data_sync_pipeline_a_field_audit"',
+                1,
+            ),
+            "operation": reviewed.replace(
+                'name="uq_race_event_series_edition"',
+                'name="uq_race_event_series_edition_drift"',
+                1,
+            ),
+        }
+        for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            for label, source in cases.items():
+                with self.subTest(script=script, drift=label), TemporaryDirectory() as tmp:
+                    harness = Harness(Path(tmp))
+                    seed_services(harness, race_live="running")
+                    harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                    harness.set_state("git-show-0071", source)
+                    result = harness.run_script(script, "unreviewed-release-b")
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("reviewed rollback allowlist", result.stderr)
+                    events = harness.events()
+                    self.assertFalse(
+                        any(
+                            event[0] == "git" and event[2][:1] == ["checkout"]
+                            for event in events
+                        )
+                    )
+                    self.assertFalse(
+                        any(
+                            event[0] == "compose" and "build" in event[2]
+                            for event in events
+                        )
+                    )
+
+    def test_release_b_parent_does_not_need_later_v2_marker_file(self):
+        verifier_call = (
+            "python3 ./deploy/verify_rollback_target_migration.py "
+            '--target-oid "$TARGET_OID"'
+        )
+        for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            text = (ROOT / script).read_text(encoding="utf-8")
+            self.assertNotIn("deploy/release_contract_v2", text)
+            self.assertIn(verifier_call, text)
+            self.assertLess(
+                text.index(verifier_call),
+                text.index('git checkout "$TARGET_OID"'),
+                "target migration verifier must run before checkout",
+            )
+            self.assertNotIn(
+                "server/stable/migrations/0071_historical_calendar_release_b.py",
+                text,
+                "the shell must delegate target migration details to the verifier",
+            )
+
+        verifier = (
+            ROOT / "deploy/verify_rollback_target_migration.py"
+        ).read_text(encoding="utf-8")
+        allowlist = json.loads(
+            (
+                ROOT / "deploy/reviewed_release_b_rollback_migrations.json"
+            ).read_text(encoding="utf-8")
+        )
+        self.assertIn('["git", "show", f"{target_oid}:{path}"]', verifier)
+        self.assertIn('item.get("sha256") == digest', verifier)
+        self.assertIn('item.get("dependencies") == dependencies', verifier)
+        self.assertEqual(
+            allowlist["migration_path"],
+            "server/stable/migrations/0071_historical_calendar_release_b.py",
+        )
+        self.assertEqual(
+            {
+                tuple(map(tuple, item["dependencies"]))
+                for item in allowlist["reviewed_variants"]
+            },
+            {
+                (("stable", "0070_horse_identity_evidence_commit_receipt"),),
+                (
+                    ("stable", "0069_race_data_sync_pipeline_a_ledger_guards"),
+                    ("stable", "0070_horse_identity_evidence_commit_receipt"),
+                ),
+            },
+        )
+
+        for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                harness.set_state(
+                    "git-cat-file-missing", "deploy/release_contract_v2\n"
+                )
+                result = harness.run_script(script, "release-b-parent")
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_pre_v2_target_uses_preserved_v2_control_plane_for_artifact_and_release(self):
+        for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                harness.set_state("git-checkout-pre-v2-control", "1\n")
+                result = harness.run_script(script, "release-b-pre-v2")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertNotIn("target-v1-", result.stderr)
+                artifacts = list(
+                    (harness.work / "runtime" / "migration_history_repair").glob(
+                        "preflight/before.*/preflight.json"
+                    )
+                )
+                self.assertEqual(len(artifacts), 1)
+                self.assertGreater(artifacts[0].stat().st_size, 0)
+                docker_tags = [
+                    e[2]
+                    for e in harness.events()
+                    if e[0] == "docker" and e[2][:1] == ["tag"]
+                ]
+                self.assertTrue(
+                    any("rollback-control-" in " ".join(argv) for argv in docker_tags)
+                )
+                self.assertTrue(
+                    any("rollback-target-" in " ".join(argv) for argv in docker_tags)
+                )
+                self.assertFalse(
+                    any(
+                        argv[-1:] == ["umanewsbot:prod"]
+                        and "rollback-control-" in " ".join(argv)
+                        for argv in docker_tags
+                    ),
+                    "the immutable control image must never replace the production tag",
+                )
+
+    def test_markerless_pre_v2_failure_has_only_pinned_control_retry(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(harness, race_live="running")
+            harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+            harness.set_state("git-checkout-pre-v2-control", "1\n")
+            harness.set_rc("compose-release-task", 73)
+
+            failed = harness.run_script("deploy/rollback.sh", "release-b-pre-v2")
+            self.assertEqual(failed.returncode, 73, failed.stderr)
+            self.assertNotIn("target-v1-", failed.stderr)
+            runtime = harness.work / "runtime" / "migration_history_repair"
+            active_state = runtime / "restricted-recovery-control.json"
+            self.assertTrue(active_state.is_file())
+            state = json.loads(active_state.read_text(encoding="utf-8"))
+            self.assertEqual(state["target_commit"], self.FIXED_OID)
+            self.assertEqual(state["target_image_id"], "sha256:candidate-image-id")
+            self.assertEqual(state["recovery_intent_mode"], "not-required")
+            self.assertEqual(state["initiating_artifact_sha256"], "a" * 64)
+            self.assertEqual(len(state["initiating_lock_token_sha256"]), 64)
+            self.assertEqual(
+                state["initiating_database_identity_sha256"], "d" * 64
+            )
+            self.assertTrue(Path(state["control_override"]).is_file())
+            retry_script = Path(state["control_dir"]) / "resume-rollback-release.sh"
+            self.assertTrue(retry_script.is_file())
+            self.assertIn(
+                f"EXPECTED_ROLLBACK_INITIATING_ARTIFACT_SHA256={state['initiating_artifact_sha256']}",
+                failed.stderr,
+            )
+            self.assertIn(
+                f"EXPECTED_ROLLBACK_CONTROL_STATE_SHA256={state['state_sha256']}",
+                failed.stderr,
+            )
+
+            docker_tags = [
+                e[2]
+                for e in harness.events()
+                if e[0] == "docker" and e[2][:1] == ["tag"]
+            ]
+            self.assertFalse(
+                any(
+                    argv[-1:] == ["umanewsbot:prod"]
+                    and "rollback-control-" in " ".join(argv)
+                    for argv in docker_tags
+                ),
+                "a failed one-shot must leave prod on the target/original image, never control",
+            )
+
+            harness.clear_log()
+            ordinary_resume = harness.run_script(
+                RESUME_SCRIPT_REL, COMPOSE_FILE=COMPOSE_STANDARD
+            )
+            self.assertNotEqual(ordinary_resume.returncode, 0)
+            self.assertEqual(
+                [
+                    argv
+                    for _compose_file, argv in compose_calls(harness.events())
+                    if argv[:1] == ["up"]
+                ],
+                [],
+                "ordinary stopped-service recovery must not bypass active control state",
+            )
+
+            retry_rel = str(
+                Path(os.path.realpath(retry_script)).relative_to(
+                    Path(os.path.realpath(harness.work))
+                )
+            )
+            harness.clear_log()
+            wrong_target = harness.run_script(
+                retry_rel,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+                EXPECTED_ROLLBACK_TARGET_COMMIT="f" * 40,
+                EXPECTED_ROLLBACK_TARGET_IMAGE_ID="sha256:candidate-image-id",
+                EXPECTED_ROLLBACK_INITIATING_ARTIFACT_SHA256=state["initiating_artifact_sha256"],
+                EXPECTED_ROLLBACK_CONTROL_STATE_SHA256=state["state_sha256"],
+            )
+            self.assertNotEqual(wrong_target.returncode, 0)
+            self.assertTrue(active_state.is_file())
+            self.assertEqual(
+                [
+                    argv
+                    for _compose_file, argv in compose_calls(harness.events())
+                    if argv[:1] in (["stop"], ["up"], ["run"])
+                ],
+                [],
+            )
+
+            harness.clear_log()
+            retry_failed = harness.run_script(
+                retry_rel,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+                EXPECTED_ROLLBACK_TARGET_COMMIT=self.FIXED_OID,
+                EXPECTED_ROLLBACK_TARGET_IMAGE_ID="sha256:candidate-image-id",
+                EXPECTED_ROLLBACK_INITIATING_ARTIFACT_SHA256=state["initiating_artifact_sha256"],
+                EXPECTED_ROLLBACK_CONTROL_STATE_SHA256=state["state_sha256"],
+            )
+            self.assertEqual(retry_failed.returncode, 73, retry_failed.stderr)
+            self.assertTrue(
+                active_state.is_file(),
+                "a failed dedicated retry must retain the exact control state",
+            )
+            self.assertEqual(
+                [
+                    argv
+                    for _compose_file, argv in compose_calls(harness.events())
+                    if argv[:1] == ["up"]
+                ],
+                [],
+            )
+
+            (harness.state / "rc-compose-release-task").unlink()
+            harness.clear_log()
+            resumed = harness.run_script(
+                retry_rel,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+                EXPECTED_ROLLBACK_TARGET_COMMIT=self.FIXED_OID,
+                EXPECTED_ROLLBACK_TARGET_IMAGE_ID="sha256:candidate-image-id",
+                EXPECTED_ROLLBACK_INITIATING_ARTIFACT_SHA256=state["initiating_artifact_sha256"],
+                EXPECTED_ROLLBACK_CONTROL_STATE_SHA256=state["state_sha256"],
+            )
+            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            self.assertNotIn("target-v1-", resumed.stderr)
+            self.assertFalse(active_state.exists())
+            self.assertTrue(
+                (
+                    runtime
+                    / f"restricted-recovery-control.completed.{self.FIXED_OID}.{state['initiating_artifact_sha256']}.{state['state_sha256']}.json"
+                ).is_file()
+            )
+            resumed_log = "\n".join(harness.log_lines())
+            self.assertIn(state["control_override"], resumed_log)
+            self.assertIn(state["target_image_tag"], resumed_log)
+
+    def test_target_collectstatic_failure_is_retryable_for_both_markerless_rollbacks(self):
+        for rollback_script, compose_file in (
+            ("deploy/rollback.sh", COMPOSE_STANDARD),
+            ("deploy/rollback_lowcost.sh", COMPOSE_LOWCOST),
+        ):
+            with self.subTest(rollback=rollback_script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                harness.set_rc("compose-target-collectstatic", 74)
+                failed = harness.run_script(rollback_script, "release-b-target-static")
+                self.assertEqual(failed.returncode, 74, failed.stderr)
+                runtime = harness.work / "runtime/migration_history_repair"
+                active_state = runtime / "restricted-recovery-control.json"
+                self.assertTrue(active_state.is_file())
+                payload = json.loads(active_state.read_text(encoding="utf-8"))
+                failed_runs = [
+                    argv
+                    for _compose_file, argv in compose_calls(harness.events())
+                    if argv[:1] == ["run"]
+                ]
+                self.assertTrue(
+                    any(
+                        argv[-5:]
+                        == [
+                            "web",
+                            "python",
+                            "manage.py",
+                            "collectstatic",
+                            "--noinput",
+                        ]
+                        for argv in failed_runs
+                    )
+                )
+                self.assertFalse(
+                    any("RELEASE_TASK_PHASE=complete-intent" in argv for argv in failed_runs)
+                )
+                self.assertEqual(
+                    [
+                        argv
+                        for _compose_file, argv in compose_calls(harness.events())
+                        if argv[:1] == ["up"]
+                    ],
+                    [],
+                )
+
+                retry_script = Path(payload["control_dir"]) / "resume-rollback-release.sh"
+                retry_rel = str(
+                    Path(os.path.realpath(retry_script)).relative_to(
+                        Path(os.path.realpath(harness.work))
+                    )
+                )
+                (harness.state / "rc-compose-target-collectstatic").unlink()
+                harness.clear_log()
+                resumed = harness.run_script(
+                    retry_rel,
+                    COMPOSE_FILE=compose_file,
+                    EXPECTED_ROLLBACK_TARGET_COMMIT=self.FIXED_OID,
+                    EXPECTED_ROLLBACK_TARGET_IMAGE_ID="sha256:candidate-image-id",
+                    EXPECTED_ROLLBACK_INITIATING_ARTIFACT_SHA256=payload[
+                        "initiating_artifact_sha256"
+                    ],
+                    EXPECTED_ROLLBACK_CONTROL_STATE_SHA256=payload["state_sha256"],
+                )
+                self.assertEqual(resumed.returncode, 0, resumed.stderr)
+                resumed_runs = [
+                    argv
+                    for _compose_file, argv in compose_calls(harness.events())
+                    if argv[:1] == ["run"]
+                ]
+                self.assertEqual(
+                    sum(
+                        argv[-5:]
+                        == [
+                            "web",
+                            "python",
+                            "manage.py",
+                            "collectstatic",
+                            "--noinput",
+                        ]
+                        for argv in resumed_runs
+                    ),
+                    1,
+                )
+                self.assertTrue(
+                    any("RELEASE_TASK_PHASE=complete-intent" in argv for argv in resumed_runs)
+                )
+                self.assertFalse(active_state.exists())
+
+    def test_required_rollback_forward_resume_retries_target_collectstatic(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(harness, race_live="running")
+            harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+            harness.set_state("preflight-attempt-mode", "required\n")
+            harness.set_rc("compose-target-collectstatic", 75)
+            failed = harness.run_script("deploy/rollback.sh", "release-b-required")
+            self.assertEqual(failed.returncode, 75, failed.stderr)
+            active_state = (
+                harness.work
+                / "runtime/migration_history_repair/restricted-recovery-control.json"
+            )
+            self.assertTrue(active_state.is_file())
+
+            resume_env = {
+                "COMPOSE_FILE": COMPOSE_STANDARD,
+                "RELEASE_B_PREFLIGHT_ARTIFACT_SHA256": "a" * 64,
+                "EXPECTED_CANDIDATE_COMMIT": self.FIXED_OID,
+                "EXPECTED_CANDIDATE_IMAGE_ID": "sha256:candidate-image-id",
+            }
+            harness.clear_log()
+            failed_again = harness.run_script(
+                "deploy/resume_migration_history_repair.sh", **resume_env
+            )
+            self.assertEqual(failed_again.returncode, 75, failed_again.stderr)
+            self.assertTrue(active_state.is_file())
+            self.assertEqual(
+                [
+                    argv
+                    for _compose_file, argv in compose_calls(harness.events())
+                    if argv[:1] == ["up"]
+                ],
+                [],
+            )
+
+            (harness.state / "rc-compose-target-collectstatic").unlink()
+            harness.clear_log()
+            resumed = harness.run_script(
+                "deploy/resume_migration_history_repair.sh", **resume_env
+            )
+            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            runs = [
+                argv
+                for _compose_file, argv in compose_calls(harness.events())
+                if argv[:1] == ["run"]
+            ]
+            self.assertEqual(
+                sum(
+                    argv[-5:]
+                    == ["web", "python", "manage.py", "collectstatic", "--noinput"]
+                    for argv in runs
+                ),
+                1,
+            )
+            self.assertTrue(
+                any("RELEASE_TASK_PHASE=complete-intent" in argv for argv in runs)
+            )
+            self.assertFalse(active_state.exists())
+
+    def test_generic_resume_verifies_control_state_and_files_before_any_execution(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(harness, race_live="running")
+            harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+            harness.set_rc("compose-release-task", 73)
+            failed = harness.run_script("deploy/rollback.sh", "resume-verifier")
+            self.assertEqual(failed.returncode, 73, failed.stderr)
+            active_state = (
+                harness.work
+                / "runtime/migration_history_repair/restricted-recovery-control.json"
+            )
+            state_bytes = active_state.read_bytes()
+            state = json.loads(state_bytes)
+            resume_env = {
+                "COMPOSE_FILE": COMPOSE_STANDARD,
+                "RELEASE_B_PREFLIGHT_ARTIFACT_SHA256": state[
+                    "initiating_artifact_sha256"
+                ],
+                "EXPECTED_CANDIDATE_COMMIT": self.FIXED_OID,
+                "EXPECTED_CANDIDATE_IMAGE_ID": "sha256:candidate-image-id",
+            }
+
+            drifted = dict(state)
+            drifted["target_image_tag"] += "-tampered"
+            active_state.chmod(0o700)
+            active_state.write_text(
+                json.dumps(drifted, sort_keys=True, separators=(",", ":")) + "\n"
+            )
+            active_state.chmod(0o600)
+            harness.clear_log()
+            rejected_state = harness.run_script(RESUME_SCRIPT_REL, **resume_env)
+            self.assertNotEqual(rejected_state.returncode, 0)
+            self.assertEqual(harness.events(), [])
+            active_state.chmod(0o700)
+            active_state.write_bytes(state_bytes)
+            active_state.chmod(0o600)
+
+            verifier = Path(state["control_files"]["control_state_verifier"]["path"])
+            verifier_bytes = verifier.read_bytes()
+            verifier.chmod(0o700)
+            verifier.write_bytes(verifier_bytes + b"\n# tampered\n")
+            verifier.chmod(0o500)
+            harness.clear_log()
+            rejected_file = harness.run_script(RESUME_SCRIPT_REL, **resume_env)
+            self.assertNotEqual(rejected_file.returncode, 0)
+            self.assertEqual(harness.events(), [])
+            verifier.chmod(0o700)
+            verifier.write_bytes(verifier_bytes)
+            verifier.chmod(0o500)
+
+            preflight = Path(state["control_files"]["preflight"]["path"])
+            saved = preflight.with_name("preflight.saved")
+            preflight.rename(saved)
+            preflight.symlink_to(saved.name)
+            harness.clear_log()
+            rejected_symlink = harness.run_script(RESUME_SCRIPT_REL, **resume_env)
+            self.assertNotEqual(rejected_symlink.returncode, 0)
+            self.assertEqual(harness.events(), [])
+            preflight.unlink()
+            saved.rename(preflight)
+
+    def test_reverse_handoff_direction_is_rejected_before_compose(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(harness, race_live="running")
+            locked = acquire_lock(harness, LOCK_TOKEN_A, action="rollback")
+            self.assertEqual(locked.returncode, 0, locked.stderr)
+            artifact_dir = (
+                harness.work
+                / "runtime"
+                / "migration_history_repair"
+                / "preflight"
+                / "reverse.test"
+            )
+            artifact_dir.mkdir(parents=True, mode=0o700)
+            artifact_dir.chmod(0o700)
+            harness.clear_log()
+            result = harness.run_script(
+                "deploy/run_historical_calendar_release_b_preflight.sh",
+                COMPOSE_FILE=COMPOSE_STANDARD,
+                DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
+                EXPECTED_CANDIDATE_COMMIT=self.FIXED_OID,
+                RELEASE_B_PREFLIGHT_ARTIFACT_PATH=str(
+                    artifact_dir / "preflight.json"
+                ),
+                RELEASE_B_PREFLIGHT_ACTION="rollback",
+                SCHEMA_PREFLIGHT_DIRECTION="reverse",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("reverse schema preflight is unsupported", result.stderr)
+            self.assertEqual(
+                [
+                    argv
+                    for _compose_file, argv in compose_calls(harness.events())
+                    if argv[:1] == ["run"]
+                ],
+                [],
+            )
+
+    def test_every_pinned_control_file_rejects_same_mode_tamper_for_both_rollbacks(self):
+        cases = (
+            ("deploy/rollback.sh", COMPOSE_STANDARD),
+            ("deploy/rollback_lowcost.sh", COMPOSE_LOWCOST),
+        )
+        for rollback_script, compose_file in cases:
+            with self.subTest(rollback=rollback_script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                harness.set_state("git-checkout-pre-v2-control", "1\n")
+                harness.set_rc("compose-release-task", 73)
+                failed = harness.run_script(rollback_script, "release-b-pre-v2")
+                self.assertEqual(failed.returncode, 73, failed.stderr)
+
+                runtime = harness.work / "runtime" / "migration_history_repair"
+                active_state = runtime / "restricted-recovery-control.json"
+                state = json.loads(active_state.read_text(encoding="utf-8"))
+                self.assertEqual(
+                    set(state["control_files"]),
+                    {
+                        "application_release",
+                        "control_state_creator",
+                        "control_state_verifier",
+                        "preflight",
+                        "release_tasks",
+                        "resume_rollback",
+                        "compose_override",
+                    },
+                )
+                self.assertEqual(len(state["state_sha256"]), 64)
+                retry_script = Path(state["control_dir"]) / "resume-rollback-release.sh"
+                retry_rel = str(
+                    Path(os.path.realpath(retry_script)).relative_to(
+                        Path(os.path.realpath(harness.work))
+                    )
+                )
+                original_state = active_state.read_bytes()
+                drifted_state = json.loads(original_state)
+                drifted_state["target_image_tag"] += "-same-mode-tamper"
+                active_state.chmod(0o700)
+                active_state.write_text(
+                    json.dumps(
+                        drifted_state,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                active_state.chmod(0o600)
+                harness.clear_log()
+                state_rejected = harness.run_script(
+                    retry_rel,
+                    COMPOSE_FILE=compose_file,
+                    EXPECTED_ROLLBACK_TARGET_COMMIT=self.FIXED_OID,
+                    EXPECTED_ROLLBACK_TARGET_IMAGE_ID="sha256:candidate-image-id",
+                    EXPECTED_ROLLBACK_INITIATING_ARTIFACT_SHA256=state["initiating_artifact_sha256"],
+                    EXPECTED_ROLLBACK_CONTROL_STATE_SHA256=state["state_sha256"],
+                )
+                self.assertNotEqual(state_rejected.returncode, 0)
+                self.assertEqual(harness.events(), [])
+                active_state.chmod(0o700)
+                active_state.write_bytes(original_state)
+                active_state.chmod(0o600)
+
+                for name, binding in state["control_files"].items():
+                    with self.subTest(rollback=rollback_script, control_file=name):
+                        path = Path(binding["path"])
+                        original = path.read_bytes()
+                        original_mode = stat.S_IMODE(path.stat().st_mode)
+                        path.chmod(original_mode | stat.S_IWUSR)
+                        path.write_bytes(original + b"\n# same-mode tamper\n")
+                        path.chmod(original_mode)
+                        harness.clear_log()
+                        rejected = harness.run_script(
+                            retry_rel,
+                            COMPOSE_FILE=compose_file,
+                            EXPECTED_ROLLBACK_TARGET_COMMIT=self.FIXED_OID,
+                            EXPECTED_ROLLBACK_TARGET_IMAGE_ID="sha256:candidate-image-id",
+                            EXPECTED_ROLLBACK_INITIATING_ARTIFACT_SHA256=state["initiating_artifact_sha256"],
+                            EXPECTED_ROLLBACK_CONTROL_STATE_SHA256=state["state_sha256"],
+                        )
+                        self.assertNotEqual(rejected.returncode, 0)
+                        self.assertTrue(active_state.is_file())
+                        self.assertEqual(
+                            [
+                                event
+                                for event in harness.events()
+                                if event[0] in ("docker", "compose", "git")
+                            ],
+                            [],
+                            "content drift must fail before Docker, Compose, or Git",
+                        )
+                        path.chmod(original_mode | stat.S_IWUSR)
+                        path.write_bytes(original)
+                        path.chmod(original_mode)
+
+                preflight = Path(state["control_files"]["preflight"]["path"])
+                saved_preflight = preflight.with_name("preflight.saved")
+                preflight.rename(saved_preflight)
+                preflight.symlink_to(saved_preflight.name)
+                harness.clear_log()
+                replaced = harness.run_script(
+                    retry_rel,
+                    COMPOSE_FILE=compose_file,
+                    EXPECTED_ROLLBACK_TARGET_COMMIT=self.FIXED_OID,
+                    EXPECTED_ROLLBACK_TARGET_IMAGE_ID="sha256:candidate-image-id",
+                    EXPECTED_ROLLBACK_INITIATING_ARTIFACT_SHA256=state["initiating_artifact_sha256"],
+                    EXPECTED_ROLLBACK_CONTROL_STATE_SHA256=state["state_sha256"],
+                )
+                self.assertNotEqual(replaced.returncode, 0)
+                self.assertEqual(harness.events(), [])
+                preflight.unlink()
+                saved_preflight.rename(preflight)
+
+                (harness.state / "rc-compose-release-task").unlink()
+                harness.clear_log()
+                resumed = harness.run_script(
+                    retry_rel,
+                    COMPOSE_FILE=compose_file,
+                    EXPECTED_ROLLBACK_TARGET_COMMIT=self.FIXED_OID,
+                    EXPECTED_ROLLBACK_TARGET_IMAGE_ID="sha256:candidate-image-id",
+                    EXPECTED_ROLLBACK_INITIATING_ARTIFACT_SHA256=state["initiating_artifact_sha256"],
+                    EXPECTED_ROLLBACK_CONTROL_STATE_SHA256=state["state_sha256"],
+                )
+                self.assertEqual(resumed.returncode, 0, resumed.stderr)
+                self.assertFalse(active_state.exists())
+
+    def test_two_successful_rollbacks_to_same_target_get_distinct_idempotent_receipts(self):
+        for rollback_script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            with self.subTest(rollback=rollback_script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                runtime = harness.work / "runtime" / "migration_history_repair"
+
+                first = harness.run_script(rollback_script, "same-target")
+                self.assertEqual(first.returncode, 0, first.stderr)
+                receipts = sorted(
+                    runtime.glob(
+                        f"restricted-recovery-control.completed.{self.FIXED_OID}.*.json"
+                    )
+                )
+                self.assertEqual(len(receipts), 1)
+
+                second = harness.run_script(rollback_script, "same-target")
+                self.assertEqual(second.returncode, 0, second.stderr)
+                receipts = sorted(
+                    runtime.glob(
+                        f"restricted-recovery-control.completed.{self.FIXED_OID}.*.json"
+                    )
+                )
+                self.assertEqual(len(receipts), 2)
+                self.assertNotEqual(receipts[0].name, receipts[1].name)
+
+                for receipt in receipts:
+                    payload = json.loads(receipt.read_text(encoding="utf-8"))
+                    unsigned = {
+                        key: value
+                        for key, value in payload.items()
+                        if key != "state_sha256"
+                    }
+                    actual_sha = hashlib.sha256(
+                        json.dumps(
+                            unsigned,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode("utf-8")
+                    ).hexdigest()
+                    self.assertEqual(payload["state_sha256"], actual_sha)
+                    self.assertTrue(receipt.name.endswith(f".{actual_sha}.json"))
+                    self.assertEqual(stat.S_IMODE(receipt.stat().st_mode), 0o600)
+
+                    before = (
+                        receipt.stat().st_ino,
+                        receipt.read_bytes(),
+                    )
+                    creator = Path(payload["control_dir"]) / "create-control-state.py"
+                    replay = subprocess.run(
+                        [
+                            os.environ.get("PYTHON", "python3"),
+                            str(creator),
+                            "complete",
+                            "--state-path",
+                            str(runtime / "restricted-recovery-control.json"),
+                            "--completed-path",
+                            str(receipt),
+                            "--expected-state-sha256",
+                            actual_sha,
+                        ],
+                        cwd=harness.work,
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+                    self.assertEqual(replay.returncode, 0, replay.stderr)
+                    self.assertIn("already-completed", replay.stdout)
+                    self.assertEqual(
+                        (receipt.stat().st_ino, receipt.read_bytes()), before
+                    )
+
+    def test_retry_closes_same_inode_active_completed_crash_without_release_replay(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(harness, race_live="running")
+            harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+            harness.set_rc("compose-release-task", 73)
+            failed = harness.run_script("deploy/rollback.sh", "same-attempt-crash")
+            self.assertEqual(failed.returncode, 73, failed.stderr)
+            runtime = harness.work / "runtime" / "migration_history_repair"
+            active = runtime / "restricted-recovery-control.json"
+            payload = json.loads(active.read_text(encoding="utf-8"))
+            completed = runtime / (
+                "restricted-recovery-control.completed."
+                f"{self.FIXED_OID}.{payload['initiating_artifact_sha256']}."
+                f"{payload['state_sha256']}.json"
+            )
+            os.link(active, completed)
+            before = (completed.stat().st_ino, completed.read_bytes())
+            retry_script = Path(payload["control_dir"]) / "resume-rollback-release.sh"
+            retry_rel = str(
+                Path(os.path.realpath(retry_script)).relative_to(
+                    Path(os.path.realpath(harness.work))
+                )
+            )
+            harness.clear_log()
+            resumed = harness.run_script(
+                retry_rel,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+                EXPECTED_ROLLBACK_TARGET_COMMIT=self.FIXED_OID,
+                EXPECTED_ROLLBACK_TARGET_IMAGE_ID="sha256:candidate-image-id",
+                EXPECTED_ROLLBACK_INITIATING_ARTIFACT_SHA256=payload["initiating_artifact_sha256"],
+                EXPECTED_ROLLBACK_CONTROL_STATE_SHA256=payload["state_sha256"],
+            )
+            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            self.assertFalse(active.exists())
+            self.assertEqual(
+                (completed.stat().st_ino, completed.read_bytes()), before
+            )
+            self.assertEqual(
+                [
+                    event
+                    for event in harness.events()
+                    if event[0] in ("git", "docker", "compose")
+                ],
+                [],
+                "completion crash replay must not rerun release or inspect images",
+            )
+
+    def test_retry_completed_only_crash_is_exact_and_skips_release_replay(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(harness, race_live="running")
+            harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+            runtime = harness.work / "runtime" / "migration_history_repair"
+
+            first = harness.run_script("deploy/rollback.sh", "same-target")
+            self.assertEqual(first.returncode, 0, first.stderr)
+            first_receipt = next(
+                runtime.glob(
+                    f"restricted-recovery-control.completed.{self.FIXED_OID}.*.json"
+                )
+            )
+            payload = json.loads(first_receipt.read_text(encoding="utf-8"))
+            second = harness.run_script("deploy/rollback.sh", "same-target")
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(
+                len(
+                    list(
+                        runtime.glob(
+                            f"restricted-recovery-control.completed.{self.FIXED_OID}.*.json"
+                        )
+                    )
+                ),
+                2,
+                "an unrelated older/newer receipt must coexist without fuzzy matching",
+            )
+
+            retry_script = Path(payload["control_dir"]) / "resume-rollback-release.sh"
+            retry_rel = str(
+                Path(os.path.realpath(retry_script)).relative_to(
+                    Path(os.path.realpath(harness.work))
+                )
+            )
+            harness.clear_log()
+            replay = harness.run_script(
+                retry_rel,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+                EXPECTED_ROLLBACK_TARGET_COMMIT=self.FIXED_OID,
+                EXPECTED_ROLLBACK_TARGET_IMAGE_ID="sha256:candidate-image-id",
+                EXPECTED_ROLLBACK_INITIATING_ARTIFACT_SHA256=payload[
+                    "initiating_artifact_sha256"
+                ],
+                EXPECTED_ROLLBACK_CONTROL_STATE_SHA256=payload["state_sha256"],
+            )
+            self.assertEqual(replay.returncode, 0, replay.stderr)
+            self.assertIn("already completed", replay.stdout)
+            self.assertEqual(
+                [
+                    event
+                    for event in harness.events()
+                    if event[0] in ("git", "docker", "compose")
+                ],
+                [],
+                "completed-only crash replay must return before Git, Docker, or Compose",
+            )
+
     def test_p2_rollback_rejects_target_missing_any_v1_helper(self):
         for missing in (
             "deploy/deployment_lock.sh",
@@ -3072,6 +4901,17 @@ class RollbackContractValidationTests(SimpleTestCase):
                             checked_paths,
                             f"rollback must cat-file -e the v1 helper {helper}",
                         )
+                    shows = [
+                        e[2] for e in evts if e[0] == "git" and e[2][:1] == ["show"]
+                    ]
+                    self.assertEqual(
+                        shows,
+                        [[
+                            "show",
+                            f"{self.FIXED_OID}:server/stable/migrations/"
+                            "0071_historical_calendar_release_b.py",
+                        ]],
+                    )
                     checkouts = [
                         e[2] for e in evts if e[0] == "git" and e[2][:1] == ["checkout"]
                     ]

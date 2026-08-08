@@ -1,0 +1,2 @@
+Release contract v2: exact no-clobber Release B artifact handoff, closed-state
+verification immediately before migrate, and bound restricted forward recovery.

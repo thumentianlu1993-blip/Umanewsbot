@@ -21,6 +21,7 @@ COPY server /app/server
 COPY runtime/tools /app/runtime/tools
 COPY runtime/policies /app/runtime/policies
 COPY docs/changes/realtime-race-results/source_registry_the_racing_api_free.json /app/runtime/policies/race_live/source_registry_the_racing_api_free.json
+COPY docs/changes/repair-production-migration-history/production_audit.json /app/docs/changes/repair-production-migration-history/production_audit.json
 COPY deploy /app/deploy
 COPY scripts /app/scripts
 COPY .env.example /app/.env.example
