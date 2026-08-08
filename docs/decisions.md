@@ -1,5 +1,15 @@
 # 关键决策
 
+## 2026-08-09 数据回填继续绑定人工 survivor 与跨年届次审核
+
+- 官方身份相等只证明 duplicate boundary 是同一实际赛事，不自动决定哪条生产记录成为 survivor。
+- 12 对香港重复边界推荐保留自然年/届次均正确的原记录，墓碑化错位记录，并把后续错位链的
+  public year、edition、target 与 path 按 ledger 顺移；不得仅建立 canonical link 后保留重复公开记录。
+- `series-5963` 的 2020 届赛事实际日期为 2019-12-29，`series-6501` 的 2015 届赛事实际日期为
+  2016-01-09；推荐保留 edition，public year 使用实际自然年。
+- 上述 14 actions 必须作为同一 reviewed manifest 完整审核并取得 G3 精确授权；代码发布、只读 census
+  或旧 manifest 的授权均不等于生产数据 apply 或联网运行授权。
+
 ## 2026-08-09 duplicate equivalence 以受审官方结果身份为最小锚点
 
 - 完整 `source_refs` 是 provenance 与漂移证据，不再整体决定“是否同一场赛事”。

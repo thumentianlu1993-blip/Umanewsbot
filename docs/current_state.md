@@ -1,5 +1,22 @@
 # 当前状态
 
+## 2026-08-09 Release B 官方结果身份修复已发布，等待 G3 数据决策
+
+- PR `#77` 已合并为 `main@55d41b5f84f072e11862fa14213cecc027708719`，生产统一运行
+  image `sha256:c9f0a89fbb3a28f135a0dd32546b609164b89d845c6181483eb553ddbd249ef4`。
+  部署前备份 SHA-256 为 `629a5495010d564da6c8233e887becebdb08d7d31d73ea0503bb48cdd381de70`；
+  handoff canonical artifact SHA 为
+  `09262ebbdb2ffad4ca46112b19d972cf725754d4d6fae1156c946b5b5828f602`。
+- 发布后 Django check、migration plan=0、`0068/0069/0071` applied、内外 HTTP healthz、唯一
+  Celery worker ping 与空 writer/false flags 全部通过，部署锁已释放。
+- 新只读 v2 census 已持久化到
+  `/opt/umanewsbot/backups/release-state/release-b-census-official-identity-20260808T164124Z`；manifest
+  SHA-256 为 `85978b9bed6ff75742d1eed4cb0ad1e4f6105c9ebc82146e3c05efdff1682a13`，守恒仍为
+  `14 actions / 81 mismatch / 12 duplicate boundaries / 0 unscoped / 0 executable`。
+- 12 对 duplicate 的官方身份 SHA 已逐对相等，确定性代码 blocker 已解除。当前唯一门禁是人工审核：
+  12 对 survivor/错位链，以及 `series-5963`、`series-6501` 两个合法跨自然年届次。尚无 reviewed
+  overlay、approval、maintenance、数据 apply/verifier 或 2025 `full_network` run。
+
 ## 2026-08-09 Release B 官方结果身份最小修复实现中
 
 - 已把生产 v2 census 的确定性 blocker 收敛到 `_duplicate_identity_sha256()`：完整 `source_refs`

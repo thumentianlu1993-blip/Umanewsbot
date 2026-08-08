@@ -1,5 +1,27 @@
 # 部署运行手册
 
+## 2026-08-09 官方结果身份修复发布与新 census 检查点
+
+1. PR `#77` 的 merge commit 为 `55d41b5f84f072e11862fa14213cecc027708719`；生产 release 目录为
+   `/opt/umanews-release-55d41b5f-RBID-20260809/umanewsbot`，image 为
+   `sha256:c9f0a89fbb3a28f135a0dd32546b609164b89d845c6181483eb553ddbd249ef4`。
+2. 数据库恢复点
+   `/opt/umanewsbot/backups/db/pre-release-b-identity-20260809T003400Z.dump` 为 `412641242` bytes、
+   mode `0600`、TOC `1308`、SHA-256
+   `629a5495010d564da6c8233e887becebdb08d7d31d73ea0503bb48cdd381de70`；旧 image 保留为
+   `umanewsbot:rollback-pre-release-b-identity-20260809T003400Z`。
+3. preflight 文件在
+   `runtime/migration_history_repair/preflight/before.tYCLRdVx/preflight.json`；文件 SHA 与 JSON 内嵌
+   canonical artifact SHA 是不同口径，发布绑定值必须使用内嵌
+   `09262ebbdb2ffad4ca46112b19d972cf725754d4d6fae1156c946b5b5828f602`。
+4. 新 census 持久目录为
+   `/opt/umanewsbot/backups/release-state/release-b-census-official-identity-20260808T164124Z`，目录
+   `0700`、文件 `0600`。manifest/census/review template/summary SHA 分别为
+   `85978b9b…2a13`、`4902f3b8…4472`、`937c4cf3…0bc`、`41a1c116…2552`。
+5. census 后仍保持历史写入、历史网络、race sync/live flags 为 false，claimed review 为 0。未取得
+   绑定新 manifest 的 G3 前，禁止生成 approval、进入 maintenance、执行 apply/verifier 或启动 2025
+   `full_network`。
+
 ## 2026-08-08 Release B 正式发布与 v2 census STOP 检查点
 
 1. 过期 scheduled-review claim 必须先按冻结 before/停机证据/备份/独立 approval 的一次性事务收口；
