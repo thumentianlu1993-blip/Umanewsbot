@@ -158,3 +158,7 @@
   conclusion=`success`，离线 artifact 已核验，完成本变更定义的生产部署。
 - [x] (operations) 只读核验服务器与公网 healthz；因 `/opt/umanewsbot` 长期 dirty 且本变更无
   Django runtime/DB 变化，未 pull、重建、重启、迁移或备份，服务器 HEAD 保持 `be1c89bf`。
+- [x] (operations) Release B verifier 通过后 fresh dispatch 2025 `full_network=true` run
+  `31269803408`；首轮全部 job success，最终七文件 artifact digest 为 `sha256:ef8bbc10…7535`。
+- [x] (integration) 审核 `summary.json` 与七文件集合：结果为 `partial`，1063 场、9292 条参赛、
+  4965 匹马；AU/DE/Middle East 分类覆盖及英文名/profile 存在确定性缺口，故停止且不自动重跑。

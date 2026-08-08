@@ -79,16 +79,24 @@
 
 ## 6. 审核与交付
 
-- [ ] 6.1 (application) 由未参与实现的独立 reviewer 在只读模式审核完整 diff，并冻结 fingerprint
-- [ ] 6.2 (operations) 最新 review 成功后整理 commit/push/PR 与 Release B 交付证据；人工确认
-  统一由根 `AGENTS.md` 判定
-- [ ] 6.3 (operations) Release B 关闭态部署，保存备份、旧 image、commit/image/migration leaf；不
-  执行 v2 census 或数据 apply
-- [ ] 6.4 (operations) evidence-only 收尾并复用同一代码 reviewer 会话审核事实文档
+- [x] 6.1 (application) 由未参与实现的独立 reviewer 在只读模式审核完整 diff；后续官方身份与
+  canonical path staging 最小修复也分别完成同会话限定复审并最终 `APPROVED`
+- [x] 6.2 (operations) 已完成 Release B 及后续最小修复的 commit/push/PR 交付；最终 path staging
+  代码经 PR `#80` 合并为 `75294a4d…`
+- [x] 6.3 (operations) Release B 关闭态 schema 发布及 path staging 修复均已部署；最终生产 image
+  `sha256:18944849…e413d`，相关备份、旧 image、commit/image/migration leaf 已保存，数据 apply 在
+  后续独立 G3 执行
+- [x] 6.4 (operations) evidence-only 收尾已由独立 reviewer 只读审核，生产 SHA、workflow artifact、
+  partial 口径、HTTP/HTTPS 边界和历史检查点一致性均通过
 
 ## 7. 后续阶段（不属于本 change 的自动动作）
 
-- [ ] 7.1 (integration) 另行取得生产只读授权，生成 v2 census/review template
-- [ ] 7.2 (application) 完成人工 survivor/chain/path/FK overlay 审核并冻结新 SHA
-- [ ] 7.3 (operations) 另行取得生产写入授权，maintenance + 备份 + apply + verifier + 公网抽检
+- [x] 7.1 (integration) 已取得生产只读授权并生成 v2 census/review template；最终 fresh census
+  manifest 为 `e626c8b4…70ec`
+- [x] 7.2 (application) 已完成人工 survivor/chain/path/FK overlay 审核并冻结 reviewed manifest
+  `89387fab…e96b` 与 action scope `d7052d43…00bd`
+- [x] 7.3 (operations) 已取得绑定 production revision `75294a4d…`、reviewed manifest
+  `89387fab…e96b`、action scope `d7052d43…00bd` 的精确生产写入授权；fresh backup、maintenance、
+  manifest-bound apply、独立 verifier、maintenance exit 与 HTTP healthz 抽检均完成，receipt `#1`
+  为 `verified`
 - [ ] 7.4 (operations) verifier 清零后另建 Release C change

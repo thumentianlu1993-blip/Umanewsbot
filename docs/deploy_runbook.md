@@ -1,5 +1,36 @@
 # 部署运行手册
 
+## 2026-08-09 Release B 精确 G3 apply/verifier 与 2025 正式 run 收口
+
+1. 本次唯一授权绑定 production revision `75294a4dea51538962741ec6c0835dc3090558ff`、reviewed
+   manifest `89387fab38f4c2a435c3b009802907a6b9710547354b38f91c3057546f41e96b`、action scope
+   `d7052d4392c027522ffde7c14955c98a2bc4ebfa99714c8681237c0ab65900bd`。
+2. 写前备份为
+   `/opt/umanewsbot/backups/db/pre-release-b-data-apply-path-staging-20260808T172850Z.dump`，
+   `413103571` bytes、mode `0600`、TOC `1308`、SHA-256
+   `af6aa018da8a14311de4ad86801e729af1c7b9fe40bcb1adca050c0d868a832a`。进入 maintenance 前 writer
+   census 为零，并先安全排空 Celery。
+3. approval SHA 为 `f5df52d3320aae1c611f652fbcd5e41a438c73b43be346f8ed6fca5f4de55ecf`；maintenance
+   evidence SHA 为 `840d87a8c5319fb09047d702fb4592a82a4c956a2b1ee582b11a525a8dfdc661`。首次 apply 调用因
+   `historical race backfill is disabled` 在写入前拒绝，receipt 仍为零；该命令合同要求 one-shot
+   apply 进程自身显式设置 `HISTORICAL_RACE_BACKFILL_ENABLED=true`。只对精确 manifest-bound
+   进程注入该环境变量，不修改全局 `.env`，随后 apply 成功。
+4. receipt `#1` 为 `verified`；rollback artifact 的 SHA-256 为
+   `acb1fc2b2dee46f979517d496be1f81169c27fa56a4be6042ae8e97b7be3342c`，并已持久化到
+   `/opt/umanewsbot/backups/release-state/release-b-reviewed-path-staging-20260808T172107Z/`。
+   独立 verifier 返回 `errors=[]`，result SHA 为
+   `f71c2bc93dc5ff93a7b12ef81518958e9c79ba5ecf65b17e39e30927ebadf0ac`；manifest-bound active
+   canonical links 为 `12`。
+5. maintenance gate 已退出，active gate=`0`；worker/beat 已恢复，Django check 与内外
+   `http://.../healthz/` 为 ok，相关全局 flags 保持 false。443 当前拒绝连接；验收仍以仓库既定的
+   HTTP-only 生产入口为准，不把该检查写成 HTTPS 成功。
+6. verifier 通过后 fresh dispatch 2025 `full_network=true`，run `31269803408` 首轮全部 job
+   success。最终 artifact `31269803408-1-finalize-0`（ID `9025592068`）digest 为
+   `sha256:ef8bbc107379413aa2e2ca8ed0dc144759fb7b3578b4d15746b421b923477535`。
+7. `summary.json` 为 `outcome=partial`：1063 races、9292 participants、4965 horses；AU/DE/Middle
+   East 均 `classification_incomplete`，且存在名称/profile 确定性缺口。因此不把 workflow success
+   表述为八地区数据完整，不使用临时网络 checkpoint 重试规则重复相同输入；本次消耗 `1/6` runs。
+
 ## 2026-08-09 Release B path staging 修复发布与新 G3 检查点
 
 1. PR `#80` merge commit 为 `75294a4dea51538962741ec6c0835dc3090558ff`；隔离 release 为

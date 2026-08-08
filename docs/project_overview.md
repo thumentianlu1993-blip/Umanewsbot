@@ -7,9 +7,10 @@ Release B 已将赛事系列唯一身份切换到 edition，并把 duplicate equ
 漂移校验，但不再把同一实际赛事误判为不同比赛。生产发布和新全库只读 census 已完成，后续产品
 数据变化仍必须经过 14 个 series action 的人工 survivor、届次、target 与公开路径审核；在 reviewed
 manifest、独立 approval 和 maintenance gate 齐备前，不会改写公开赛事或启动联网回填。
-首次正式 apply 已证明 path 轮转还需要一个实现级原子性修复：临时态必须解除 canonical-per-event
-条件唯一身份，再恢复最终 topology。该问题没有改变数据决策，但在修复发布和新 artifact 审核前，
-生产回填与联网运行继续关闭。
+canonical path staging 原子性修复发布后，reviewed manifest 已完成生产 apply 和独立 verifier；
+receipt 为 verified，maintenance 已退出且相关全局开关继续默认关闭。随后 2025 单年度正式研究
+workflow 首轮成功生成七文件 artifact；artifact 诚实标记为 partial，澳洲、德国和中东的公开分类
+覆盖以及大量英文名/profile 仍需后续数据来源改进，不能视为八地区完整语料。
 
 ## 日本重赏 P0 身份来源
 
@@ -74,10 +75,11 @@ approve 会从冻结的双/三源身份重新计算共识，不能通过修改�
   artifact 绑定的 target image 通过仅改 image 的 Compose override 写同一 static volume，成功后 control
   image 才完成 intent 并允许启动服务；失败沿用同 control-state 精确重试。normal deploy 不拆分。
 - 2026-08-08 生产已应用 migration-history repair 与 Release B `0068/0069/0071`，schema/code 发布完成；
-  数据阶段仍受 reviewed v2 census gate 约束。
-- 首份生产 v2 census 完整但不可执行：12 对 HKJC 同赛因相邻 TJCIS catalog provenance 不同而完整
-  identity SHA 不同。系统保持零 overlay/approval/apply/full-network；下一步先把稳定赛事身份与来源
-  provenance 分层，再重新发布和生成 census。
+  当时数据阶段仍受 reviewed v2 census gate 约束。
+- 首份生产 v2 census 当时完整但不可执行：12 对 HKJC 同赛因相邻 TJCIS catalog provenance 不同而
+  完整 identity SHA 不同。该检查点保持零 overlay/approval/apply/full-network；其后稳定赛事身份与
+  来源 provenance 已分层、重新发布并生成新 census，最终 apply/verifier 和 2025 正式 run 的现状
+  以本节顶部 2026-08-09 记录为准。
 
 ## P0 马资料生产批准链路
 

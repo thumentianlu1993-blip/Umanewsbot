@@ -1,5 +1,33 @@
 # 当前状态
 
+## 2026-08-09 Release B 已验证写入，2025 正式研究 run 产出 partial artifact
+
+- 用户批准的生产 revision `75294a4dea51538962741ec6c0835dc3090558ff`、reviewed manifest
+  `89387fab38f4c2a435c3b009802907a6b9710547354b38f91c3057546f41e96b` 与 action scope
+  `d7052d4392c027522ffde7c14955c98a2bc4ebfa99714c8681237c0ab65900bd` 已按精确 G3 完成。
+- 写前 custom-format dump 为
+  `/opt/umanewsbot/backups/db/pre-release-b-data-apply-path-staging-20260808T172850Z.dump`，
+  `413103571` bytes、mode `0600`、TOC `1308`、SHA-256
+  `af6aa018da8a14311de4ad86801e729af1c7b9fe40bcb1adca050c0d868a832a`。
+- approval SHA 为 `f5df52d3320aae1c611f652fbcd5e41a438c73b43be346f8ed6fca5f4de55ecf`，
+  maintenance evidence SHA 为 `840d87a8c5319fb09047d702fb4592a82a4c956a2b1ee582b11a525a8dfdc661`。
+  首次命令因 one-shot 进程未显式设置 `HISTORICAL_RACE_BACKFILL_ENABLED=true` 在任何写入前
+  fail closed；未修改全局 `.env`，只为精确 apply 进程注入该必需开关后成功。
+- receipt `#1` 状态为 `verified`，rollback SHA 为
+  `acb1fc2b2dee46f979517d496be1f81169c27fa56a4be6042ae8e97b7be3342c`，独立 verifier
+  `errors=[]`、result SHA 为 `f71c2bc93dc5ff93a7b12ef81518958e9c79ba5ecf65b17e39e30927ebadf0ac`；
+  12 条 active canonical link 已绑定 reviewed manifest。rollback artifact 已复制到持久备份目录，
+  maintenance 已退出，worker/beat 已恢复，Django check 与内外 HTTP healthz 均通过；历史相关全局
+  flags 仍为 false。域名 443 当前拒绝连接，与仓库记录的 HTTP-only 生产边界一致，不记为 HTTPS 成功。
+- verifier 通过后启动 2025 `full_network=true` fresh run `31269803408`，首轮全部 job success，未使用
+  checkpoint 续跑。最终 artifact `31269803408-1-finalize-0`（ID `9025592068`）digest 为
+  `sha256:ef8bbc107379413aa2e2ca8ed0dc144759fb7b3578b4d15746b421b923477535`。
+- 最终 artifact 为诚实的 `outcome=partial`：`1063` 场、`9292` 条参赛记录、`4965` 匹马、
+  `6982` 次请求；法国、香港、日本、英国、美国 covered，澳洲、德国、中东均为
+  `classification_incomplete`。另有 required English missing `3905`、profile not found `3998`、
+  ambiguous `32`、unresolved `15`。这些是确定性覆盖/资料缺口，不是临时网络失败；按授权立即停止，
+  workflow run 使用 `1/6`，不对相同输入自动重跑。
+
 ## 2026-08-09 Release B canonical path staging 修复已发布，等待新 G3
 
 - apply 的临时 path 阶段现在除临时 `year/slug` 外，同时把完整受控 scope 设为 `legacy`；最终
