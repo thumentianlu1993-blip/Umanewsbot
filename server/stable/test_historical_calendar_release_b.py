@@ -1502,3 +1502,212 @@ class ReleaseBEditionRotationTests(TransactionTestCase):
         self.assertEqual(self.first.edition_year, 2023)
         self.assertEqual(self.second.edition_year, 2024)
         self.assertEqual(rolled_back["status"], "rolled_back")
+
+    def test_path_rotation_releases_old_canonical_before_reassignment(self):
+        from stable.services.historical_race_calendar_integrity_v2 import (
+            _series_action,
+            apply_release_b_series_actions,
+            release_b_action_scope_sha256,
+            rollback_release_b_series_actions,
+        )
+
+        RaceEvent._base_manager.filter(pk=self.second.pk).update(
+            local_date=date(2023, 2, 1)
+        )
+        current = _series_action(self.series.pk)
+        first_path = self.first.public_paths.get(path_kind="canonical")
+        second_path = self.second.public_paths.get(path_kind="canonical")
+        action = {
+            **current,
+            "disposition": "action",
+            "block_reasons": [],
+            "operations": ["rotate_ordinary_season_chain", "reassign_targets_paths"],
+            "reviewed": {
+                "events": [
+                    {
+                        "id": self.first.pk,
+                        "year": 2023,
+                        "edition_year": 2023,
+                        "slug": f"release-b-tombstone-{self.first.pk}",
+                        "race_series_id": None,
+                        "visibility_status": "draft",
+                    },
+                    {
+                        "id": self.second.pk,
+                        "year": 2023,
+                        "edition_year": 2024,
+                        "slug": "rotation-first",
+                        "race_series_id": self.series.pk,
+                        "visibility_status": "draft",
+                    },
+                ],
+                "targets": [],
+                "paths": [
+                    {
+                        "id": first_path.pk,
+                        "event_id": self.second.pk,
+                        "year": 2023,
+                        "slug": "rotation-first",
+                        "path_kind": "canonical",
+                    },
+                    {
+                        "id": second_path.pk,
+                        "event_id": self.second.pk,
+                        "year": 2024,
+                        "slug": "rotation-second",
+                        "path_kind": "legacy",
+                    },
+                ],
+                "canonical_links": [],
+                "duplicate_boundaries": [],
+                "dependency_policies": {
+                    key: "retain_on_tombstone"
+                    for key in current["ledgers"]["immutable_reverse_dependencies"]
+                },
+            },
+        }
+        action_scope = release_b_action_scope_sha256([action])
+        enter_historical_calendar_maintenance(
+            manifest_sha256="9" * 64,
+            action_scope_sha256=action_scope,
+            actor=self.actor,
+        )
+
+        applied = apply_release_b_series_actions(
+            actions=[action],
+            manifest_sha256="9" * 64,
+            action_scope_sha256=action_scope,
+            actor=self.actor,
+            confirm_reviewed_artifact=True,
+        )
+
+        self.assertFalse(
+            self.first.public_paths.filter(path_kind="canonical").exists()
+        )
+        self.assertTrue(
+            self.second.public_paths.filter(
+                pk=first_path.pk,
+                year=2023,
+                slug="rotation-first",
+                path_kind="canonical",
+            ).exists()
+        )
+        self.assertTrue(
+            self.second.public_paths.filter(
+                pk=second_path.pk,
+                path_kind="legacy",
+            ).exists()
+        )
+
+        rolled_back = rollback_release_b_series_actions(
+            rollback_payload=applied["rollback_payload"],
+            manifest_sha256="9" * 64,
+            action_scope_sha256=action_scope,
+            actor=self.actor,
+            confirm_reviewed_artifact=True,
+        )
+        self.assertTrue(
+            self.first.public_paths.filter(
+                pk=first_path.pk, path_kind="canonical"
+            ).exists()
+        )
+        self.assertTrue(
+            self.second.public_paths.filter(
+                pk=second_path.pk, path_kind="canonical"
+            ).exists()
+        )
+        self.assertEqual(rolled_back["status"], "rolled_back")
+
+    def test_exact_rollback_releases_canonical_paths_before_two_way_swap(self):
+        from stable.services.historical_race_calendar_integrity_v2 import (
+            _series_action,
+            apply_release_b_series_actions,
+            release_b_action_scope_sha256,
+            rollback_release_b_series_actions,
+        )
+
+        RaceEvent._base_manager.filter(pk=self.first.pk).update(
+            local_date=date(2024, 1, 1)
+        )
+        RaceEvent._base_manager.filter(pk=self.second.pk).update(
+            local_date=date(2023, 1, 1)
+        )
+        current = _series_action(self.series.pk)
+        first_path = self.first.public_paths.get(path_kind="canonical")
+        second_path = self.second.public_paths.get(path_kind="canonical")
+        action = {
+            **current,
+            "disposition": "action",
+            "block_reasons": [],
+            "operations": ["rotate_ordinary_season_chain", "reassign_targets_paths"],
+            "reviewed": {
+                "events": [
+                    {
+                        "id": self.first.pk,
+                        "year": 2024,
+                        "edition_year": 2024,
+                        "slug": "rotation-second",
+                        "race_series_id": self.series.pk,
+                        "visibility_status": "draft",
+                    },
+                    {
+                        "id": self.second.pk,
+                        "year": 2023,
+                        "edition_year": 2023,
+                        "slug": "rotation-first",
+                        "race_series_id": self.series.pk,
+                        "visibility_status": "draft",
+                    },
+                ],
+                "targets": [],
+                "paths": [
+                    {
+                        "id": first_path.pk,
+                        "event_id": self.second.pk,
+                        "year": 2023,
+                        "slug": "rotation-first",
+                        "path_kind": "canonical",
+                    },
+                    {
+                        "id": second_path.pk,
+                        "event_id": self.first.pk,
+                        "year": 2024,
+                        "slug": "rotation-second",
+                        "path_kind": "canonical",
+                    },
+                ],
+                "canonical_links": [],
+                "duplicate_boundaries": [],
+                "dependency_policies": {
+                    key: "retain_on_tombstone"
+                    for key in current["ledgers"]["immutable_reverse_dependencies"]
+                },
+            },
+        }
+        action_scope = release_b_action_scope_sha256([action])
+        enter_historical_calendar_maintenance(
+            manifest_sha256="a" * 64,
+            action_scope_sha256=action_scope,
+            actor=self.actor,
+        )
+
+        applied = apply_release_b_series_actions(
+            actions=[action],
+            manifest_sha256="a" * 64,
+            action_scope_sha256=action_scope,
+            actor=self.actor,
+            confirm_reviewed_artifact=True,
+        )
+        self.assertEqual(first_path.pk, self.second.public_paths.get(path_kind="canonical").pk)
+        self.assertEqual(second_path.pk, self.first.public_paths.get(path_kind="canonical").pk)
+
+        rolled_back = rollback_release_b_series_actions(
+            rollback_payload=applied["rollback_payload"],
+            manifest_sha256="a" * 64,
+            action_scope_sha256=action_scope,
+            actor=self.actor,
+            confirm_reviewed_artifact=True,
+        )
+        self.assertEqual(first_path.pk, self.first.public_paths.get(path_kind="canonical").pk)
+        self.assertEqual(second_path.pk, self.second.public_paths.get(path_kind="canonical").pk)
+        self.assertEqual(rolled_back["status"], "rolled_back")

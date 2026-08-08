@@ -23,3 +23,19 @@
 
 实现与 36 项 Release B 测试已通过；独立只读 review 未发现 actionable defect。尚未提交、合并或
 部署，未生成新 census，零生产写入。
+
+## 2026-08-09 path staging follow-up
+
+首次生产 apply 在事务内暴露 canonical-per-event 的中间态冲突并已安全回滚。follow-up 只让受控
+paths 在临时 key 阶段统一变成 `legacy`，最终 reviewed topology 写入逻辑不变。新增生产顺序回归后，
+SQLite 与 PostgreSQL 16 的完整 Release B 套件均为 `37/37`。旧执行 manifest 不可重试；候选须经
+独立 review、发布后重新生成 census/reviewed artifact，并停在新的 G3。
+
+独立 reviewer 会话 `019fe254-9543-7440-bfaf-8fac75d6ff30` 提出 1 个 P1：apply 释放 canonical
+后，rollback 也必须对称释放，否则双向 canonical swap 的 exact rollback 仍可能瞬时冲突。候选已
+在 rollback 临时阶段同样设 `legacy`，并新增双向 swap 的 apply/rollback 回归后交回同会话复核。
+P1 修复后 SQLite 与 PostgreSQL 16 完整 Release B 套件均为 `38/38`。
+
+同一 reviewer 会话随后独立复跑无网络 SQLite 与临时 PostgreSQL 16 完整套件各 `38/38`，并核对
+Django check、migration drift、`git diff --check` 和工作树范围，最终结论为 `APPROVED`，无剩余
+actionable defect。

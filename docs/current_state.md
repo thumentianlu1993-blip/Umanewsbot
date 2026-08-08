@@ -1,5 +1,20 @@
 # 当前状态
 
+## 2026-08-09 Release B canonical path staging 最小修复候选
+
+- apply 的临时 path 阶段现在除临时 `year/slug` 外，同时把完整受控 scope 设为 `legacy`；最终
+  reviewed loop 再恢复精确 owner/year/slug/kind。最终约束、overlay、manifest、业务决策和 schema
+  均未放宽或改变。
+- 新回归测试复现生产危险顺序：新 canonical 先转给仍持有旧 canonical 的 event，旧 path 后降为
+  legacy；并验证最终唯一 canonical。独立审查进一步发现 exact rollback 需要同样释放 canonical，
+  候选已对称修复并新增双向 canonical swap 的 apply/rollback 回归。最终 SQLite 与真实 PostgreSQL
+  16 完整 Release B 套件均为 `38/38`。
+- 独立 reviewer 在同一会话 `019fe254-9543-7440-bfaf-8fac75d6ff30` 自行复跑 SQLite 与
+  PostgreSQL 16 完整套件各 `38/38`，并完成 Django check、migration drift 与 diff check，最终
+  明确 `APPROVED`、无剩余 actionable defect。
+- 当前尚未 commit、push、PR、合并或重新部署；旧 reviewed manifest `c9e9b222…1e4c64` 继续禁止
+  复用。下一步是发布固定 SHA，并生成全新 census/reviewed artifact 后申请精确 G3。
+
 ## 2026-08-09 Release B 数据 apply 在事务内确定性停止并安全恢复
 
 - 用户批准的 14-action reviewed artifact 已通过严格生成门禁：review overlay SHA 为

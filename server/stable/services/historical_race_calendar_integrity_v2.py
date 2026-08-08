@@ -1286,6 +1286,7 @@ def apply_release_b_series_actions(
                 RaceEventPublicPath._base_manager.filter(pk=path_id).update(
                     year=32767,
                     slug=f"release-b-temp-path-{temporary_identity}-{path_id}",
+                    path_kind="legacy",
                     updated_at=timezone.now(),
                 )
             desired_links = {
@@ -1670,6 +1671,7 @@ def rollback_release_b_series_actions(
                 RaceEventPublicPath._base_manager.filter(pk=path_id).update(
                     year=30000 + (path_id % 2000),
                     slug=f"release-b-temp-path-{path_id}",
+                    path_kind="legacy",
                 )
             for payload in before["events"]:
                 RaceEvent._base_manager.filter(pk=payload["id"]).update(
