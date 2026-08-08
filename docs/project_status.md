@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-08-09 Release B 身份修复已上线，新 census 等待人工数据门禁
+
+- PR `#77` 已合并并部署 `main@55d41b5f`；生产 image 为 `sha256:c9f0a89f…9ef4`，发布后
+  check、迁移零计划、内外 healthz、Celery、关闭开关和空 writer 均通过。
+- 新 v2 manifest SHA 为 `85978b9b…2a13`，结果 `14/81/12/0`。12 对官方身份 SHA 现已逐对一致，
+  证明最小代码修复解除原确定性 blocker。
+- 当前停在人工 reviewed overlay：推荐 12 对均保留自然年正确记录并修正后续错位链，另保留两项合法
+  跨年 edition。未执行生产数据 apply/verifier，也未启动 2025 `full_network`。
+
 ## 2026-08-09 Release B 数据门禁最小修复候选
 
 - 已完成无 migration 的官方结果身份候选：把受审 HKJC provider/URL/content SHA 与客观字段、

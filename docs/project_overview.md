@@ -1,5 +1,13 @@
 # 项目总览
 
+## 2026-08-09 Release B 数据治理当前边界
+
+Release B 已将赛事系列唯一身份切换到 edition，并把 duplicate equivalence 的最小身份锚点收敛为
+唯一受审的官方结果 provider、HTTPS URL 与缓存内容 SHA；season catalog 等 provenance 仍完整参与
+漂移校验，但不再把同一实际赛事误判为不同比赛。生产发布和新全库只读 census 已完成，后续产品
+数据变化仍必须经过 14 个 series action 的人工 survivor、届次、target 与公开路径审核；在 reviewed
+manifest、独立 approval 和 maintenance gate 齐备前，不会改写公开赛事或启动联网回填。
+
 ## 日本重赏 P0 身份来源
 
 日本马一期候选范围为 1998–2026 年的 G1/G2/G3、J-G1/J-G2/J-G3、
