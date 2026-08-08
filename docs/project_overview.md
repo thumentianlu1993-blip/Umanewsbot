@@ -59,6 +59,11 @@ approve 会从冻结的双/三源身份重新计算共识，不能通过修改�
 - rollback 控制面与静态资源写入现明确分权：冻结的 control image 只负责 schema/migration/intent，
   artifact 绑定的 target image 通过仅改 image 的 Compose override 写同一 static volume，成功后 control
   image 才完成 intent 并允许启动服务；失败沿用同 control-state 精确重试。normal deploy 不拆分。
+- 2026-08-08 生产已应用 migration-history repair 与 Release B `0068/0069/0071`，schema/code 发布完成；
+  数据阶段仍受 reviewed v2 census gate 约束。
+- 首份生产 v2 census 完整但不可执行：12 对 HKJC 同赛因相邻 TJCIS catalog provenance 不同而完整
+  identity SHA 不同。系统保持零 overlay/approval/apply/full-network；下一步先把稳定赛事身份与来源
+  provenance 分层，再重新发布和生成 census。
 
 ## P0 马资料生产批准链路
 

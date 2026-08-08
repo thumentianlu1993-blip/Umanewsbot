@@ -1,5 +1,30 @@
 # 部署运行手册
 
+## 2026-08-08 Release B 正式发布与 v2 census STOP 检查点
+
+1. 过期 scheduled-review claim 必须先按冻结 before/停机证据/备份/独立 approval 的一次性事务收口；
+   本次最终 `39/43/44/45/46/47/48 -> noop`，reason code 为 `stale_claim_reconciled`，after SHA 为
+   `1e24890db5f744aa2381f7621daf51e38d5343c0944a6a65198e7f9a42ceeb8d`。禁止改用 scheduler 不认识的
+   自定义终态，也禁止在 SQL commit 后才检查 after 路径。
+2. 本次迁移恢复点为
+   `/opt/umanewsbot/backups/db/pre-release-b-after-stale-reconcile-20260808T131400Z.dump`，精确
+   `411796037:600`、TOC `1304`、SHA
+   `1f6b276bc139377af93709f80cb8b64d6c026022789b2e1c6651adea582b8d1b`。回滚 image tag 为
+   `umanewsbot:rollback-pre-release-b-after-stale-reconcile-20260808T131400Z`。
+3. 正式 release 目录固定 `/opt/umanews-release-4e3ffa8d-MR3-20260808/umanewsbot`；handoff SHA
+   `62300fbfdcc4c5ac16505067dad4fa5a68bfddcdb1e22e2ef90ceebdf51bb5f4`。worker drain 必须为唯一节点
+   active/reserved/active_confirm 全 0。`0068/0069/0071` 已应用，当前 prod image 为
+   `sha256:e2102ff87e465c4904b1db470ddfa3e3679dfe681bd63a405c6922954fe7afe1`。
+4. v2 census 原始文件必须从 web 容器的非持久 `/app/runtime` 立即复制到宿主 mode `0700/0600`
+   证据目录；本次持久目录为
+   `/opt/umanewsbot/backups/release-state/release-b-census-v2-20260808T132000Z`。四个 SHA 见
+   `docs/changes/repair-production-migration-history/production_census_v2_review_20260808.md`。
+5. 本次 overlay gate 为确定性 STOP：12 个 duplicate boundary 的 official HKJC result URL、核心赛事、
+   runner/result 相同，但完整 source refs 因相邻 TJCIS catalog 不同而 identity SHA 不同。不得标记
+   `distinct` 绕过，也不得手工伪造 `equivalent`。在 duplicate equivalence 合同经代码修复、测试、
+   独立 review、部署并重新生成 census 前，禁止 approval、maintenance、apply/verifier 和 2025
+   `full_network`。
+
 ## 2026-08-08 migration history repair 只读审计检查点
 
 生成或复核 reviewed-static baseline 时，唯一入口为：
