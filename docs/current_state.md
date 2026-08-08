@@ -1,5 +1,33 @@
 # 当前状态
 
+## 2026-08-09 2025 参赛马完整补全正在本地实现，尚未发布或写生产
+
+- 隔离分支 `codex/complete-2025-graded-horse-data` 已固化七文件 gap census；旧 artifact 的
+  `1063/9292/4965/15854` 计数与逐文件 SHA 可离线复现。
+- 生产只读差集确认多出的两场英国赛事是 2025-01-11 的两场 G2 障碍赛；均为
+  `draft + incomplete` 且结果数为 `0`，因此旧公共页采集无法发现。
+- 已修复纯拉丁官方赛果马名不能成为英文名证据的问题，policy 升至 v2；collector 聚焦套件
+  `102/102` 通过。
+- 已新增 AU/DE/UAE/SA/QAT/BHR 官方源 URL policy、请求预算和严格离线 parser，并用四个当前
+  官方端点做有限 live smoke。新增 manifest-bound 官方赛果 runner 会逐跳限域、保存原始 response
+  SHA、按精确 checkpoint 续跑；临时网络错误返回 `75`，解析/身份错误确定性停止。独立审查发现的
+  并列名次、DNF/PU/F/UR/DSQ 实际起跑保留、deterministic resume 禁止重新联网及 cache path 越界
+  已修复并补反例。
+- TJCIS 2025 官方 Blue Book（327 页，SHA-256 `ca6aafb6…feb6`）整本解析已在释放逐页 cache 后成功：
+  总计 `1491` 场，其中 Australia `312`、Germany `42`、Middle East `47`（UAE `33`、Bahrain `2`、
+  Saudi Arabia `12`）。同页 Bahrain/Saudi 多国家段落已按页首/页脚两种布局修复；真实整本回放仍为
+  `1491/312/42/47`，无分母漂移。France/US 的 parsed/declared count 差异被显式记录为来源冲突。
+- P0 参赛马候选桥现支持八地区、单一年份与 `actual_starts_only`，输出
+  `bind_existing/create_new/ambiguous/blocked`；provider ID 优先，纯马名仍只能 blocked。相关 Django
+  组合回归 `110/110`、研究侧回归 `112/112`、workflow contract `16/16` 通过。v2 census 的赛事身份
+  已改用规范化完整 URL（保留排序后的 query），不再把不同德国赛事折叠成 `rennen.php`。
+- 同一独立 reviewer 对全部五项 P1 的最终反例复核为 `APPROVED`；其中 cache path 同时拒绝 `../`、
+  absolute、resolved-outside-root、非 race-bound 及 output root 内 symlink alias。
+- `RacingRegion` 已在本地加入 Australia/Germany/Middle East，并生成 state-only migration 0072；
+  `makemigrations --check`、Django check 与枚举回归通过。
+- 尚待把受审官方赛事 URL manifest 接入 workflow DAG、补新增地区完整 profile/career source client，
+  并扩展 reviewed apply/verifier。当前没有 commit/push/PR/部署或生产写入。
+
 ## 2026-08-09 Release B 已验证写入，2025 正式研究 run 产出 partial artifact
 
 - 用户批准的生产 revision `75294a4dea51538962741ec6c0835dc3090558ff`、reviewed manifest

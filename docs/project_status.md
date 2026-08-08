@@ -1,5 +1,19 @@
 # 项目状态文档
 
+## 2026-08-09 2025 参赛马补全进入实现阶段
+
+- 已完成旧 artifact 严格 gap census、英文名证据修复、六类官方结果 parser、manifest-bound 官方赛果
+  checkpoint runner 和三个新地区枚举/migration 0072。2025 TJCIS 整本 327 页可有界解析；新地区目录
+  为 AU `312`、DE `42`、Middle East `47`。
+- 生产身份候选桥已扩展为八地区、单一年份、仅实际起跑，并明确输出
+  `bind_existing/create_new/ambiguous/blocked`，仍禁止纯马名绑定。独立审查提出的五项 P1 已完成本地
+  修复：实际起跑异常状态/并列、deterministic resume、checkpoint cache confinement、TJCIS 同页多国家、
+  完整 URL 赛事身份。Django 组合回归 `110/110`、研究侧 `112/112`、workflow contract `16/16` 通过；
+  2025 官方 327 页整本回放计数保持 `1491`，同一独立 reviewer 最终 `APPROVED`。
+- 生产只读确认旧 artifact 少的两场是无结果的 UK G2 障碍赛，不是已采集 participant 丢行。
+- 尚待受审官方赛事 URL manifest 的 workflow DAG 接线、新地区完整资料/血统/生涯 source client 和
+  reviewed import bridge；尚未 commit/push/PR、部署或写生产。
+
 ## 2026-08-09 Release B 数据阶段完成，2025 full-network 首轮产出 partial
 
 - 精确 G3 已对生产 `75294a4d…`、manifest `89387fab…e96b`、scope `d7052d43…00bd` 执行；写前

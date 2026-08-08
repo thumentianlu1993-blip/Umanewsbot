@@ -49,6 +49,9 @@ SUPPORTED_REGIONS = {
     RacingRegion.UNITED_KINGDOM,
     RacingRegion.FRANCE,
     RacingRegion.UNITED_STATES,
+    RacingRegion.AUSTRALIA,
+    RacingRegion.GERMANY,
+    RacingRegion.MIDDLE_EAST,
 }
 SOURCE_AUTHORITY_RANKS = {
     "reference": 10,

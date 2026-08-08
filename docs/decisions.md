@@ -1,5 +1,15 @@
 # 关键决策
 
+## 2026-08-09 新地区赛果必须绑定官方页面与同域数据端点
+
+- 澳洲、德国、中东补全不使用 Wikipedia/Wikidata，也不以媒体报道代替全体参赛结果。
+- 服务端页面直接含结果时保存页面证据；ERA/JCSA 等加载型页面必须同时保存页面声明和同域
+  AJAX/API 响应，两者共同绑定 race identity、内容 SHA 和 parser version。
+- 只接受 allowlist HTTPS host；普通 403、空壳 Loading/Error 或缺失 catalog 均按证据缺口停止，
+  不绕过反爬、不猜测参赛马。
+- 生产地区使用 `australia`、`germany`、`middle_east` 一等枚举，中东具体国家继续写入 country，
+  不把它们降级为 `other`。
+
 ## 2026-08-09 canonical path 轮转必须先解除条件唯一身份
 
 Release B apply 的临时阶段不能只替换 path 的 `year/slug`。当 reviewed topology 把另一条 path
@@ -2662,6 +2672,16 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 修复后自然 shadow 样本须重新冻结尚未到 T、至少覆盖日本和英国的 2–4 场；样本不足 NO-GO。
   既有 8 月 8 日 proposal 不自动替代修复后证据，enforce 仍为独立 change。
 
+# 2026-08-09 新地区分级赛以 TJCIS 目录和 provider-bound 官方赛果分层
+
+- TJCIS Blue Book 只作为年度 G1/G2/G3 目录与地区/国家 provenance，不直接证明参赛马；实际参赛必须
+  来自对应官方 provider 的正式赛果，并排除 nonstarter/unknown。
+- 官方赛果运行以 reviewed manifest 精确绑定 race key、provider、URL、地区、国家、等级与 catalog
+  SHA；逐跳 HTTPS allowlist、provider request budget、原始 response SHA 和 parser/policy SHA 全部进入
+  checkpoint identity。临时网络错误可精确续跑，确定性解析或身份错误立即停止。
+- 年度候选映射只允许 provider identity 或完整四字段身份产生 `bind_existing/create_new`；冲突为
+  `ambiguous`，只有马名或来源不足一律 `blocked`，不得因名称唯一就写入生产。
+
 # 2026-08-08 Release B 生产动作只接受 PostgreSQL
 
 - 所有 Release B handoff/preflight/deploy/manual/rollback/forward-resume/control-state retry 和
@@ -2746,3 +2766,11 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 决策是 fail closed：当前 census 只作为证据冻结，不制作 overlay/approval。后续 change 应以稳定官方
   赛事身份、核心字段、runner/result 判断同赛，并把 season-catalog provenance 差异保留在独立审计
   ledger；修复须重新测试、独立 review、部署和生成 census，不能复用本次 manifest SHA。
+# 2026-08-09 官方赛果 actual-start 与 checkpoint 恢复合同
+
+- 正式赛果中的并列名次合法；DNF/PU/F/UR 等保留为 `did_not_finish`，DQ/DSQ 保留为
+  `disqualified`，只有明确 NR/SCR/WD 才排除。未知状态确定性停止，不得静默丢行。
+- checkpoint 只允许 `retryable_error` 续跑；`deterministic_error` 必须沿用原错误停止，修改输入或
+  parser 后以新 identity/fresh checkpoint 运行。缓存路径必须精确等于 race key 派生路径且位于 output root。
+- 外部赛事身份采用规范化完整 URL 并保留排序 query；path basename 只可作为唯一时的生产 diff 显示别名，
+  不得参与赛事计数或 participant/manifest 一致性门禁。

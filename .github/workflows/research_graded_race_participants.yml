@@ -6,6 +6,12 @@ on:
     paths:
       - runtime/research/collect_graded_race_participants.py
       - runtime/research/test_collect_graded_race_participants.py
+      - runtime/research/audit_graded_horse_artifact.py
+      - runtime/research/test_audit_graded_horse_artifact.py
+      - runtime/research/official_graded_race_sources.py
+      - runtime/research/test_official_graded_race_sources.py
+      - runtime/research/collect_official_graded_race_results.py
+      - runtime/research/test_collect_official_graded_race_results.py
       - runtime/research/README_graded_race_participants.md
       - runtime/research/region_manifests/**
       - .codex/scripts/test_graded_race_participants_workflow.py
@@ -165,8 +171,19 @@ jobs:
           python -m py_compile \
             "$COLLECTOR" \
             runtime/research/test_collect_graded_race_participants.py \
+            runtime/research/audit_graded_horse_artifact.py \
+            runtime/research/test_audit_graded_horse_artifact.py \
+            runtime/research/official_graded_race_sources.py \
+            runtime/research/test_official_graded_race_sources.py \
+            runtime/research/collect_official_graded_race_results.py \
+            runtime/research/test_collect_official_graded_race_results.py \
             .codex/scripts/test_graded_race_participants_workflow.py
-          python -m unittest runtime.research.test_collect_graded_race_participants -v
+          python -m unittest \
+            runtime.research.test_collect_graded_race_participants \
+            runtime.research.test_audit_graded_horse_artifact \
+            runtime.research.test_official_graded_race_sources \
+            runtime.research.test_collect_official_graded_race_results \
+            -v
           python .codex/scripts/test_graded_race_participants_workflow.py -v
           python .codex/scripts/test_workflow_contract.py -v
       - name: Synthetic 安全停止、续跑、fan-in 与 finalize

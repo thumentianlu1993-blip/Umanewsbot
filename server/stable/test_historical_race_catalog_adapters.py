@@ -74,7 +74,13 @@ def _sha256(path: Path) -> str:
 
 class HistoricalRaceCatalogAdapterTests(SimpleTestCase):
     def test_tjcis_compact_grades_are_accepted_by_uk_and_france_adapters(self):
-        for adapter_key in ("bha_pattern_catalog", "france_galop_pattern_catalog"):
+        for adapter_key in (
+            "bha_pattern_catalog",
+            "france_galop_pattern_catalog",
+            "racing_australia_pattern_catalog",
+            "deutscher_galopp_pattern_catalog",
+            "middle_east_official_pattern_catalog",
+        ):
             config = ADAPTER_CONFIGS[adapter_key]
             with self.subTest(adapter_key=adapter_key):
                 self.assertEqual(_normalized_grade(config, "G1", record_type="catalog"), RaceGrade.G1)

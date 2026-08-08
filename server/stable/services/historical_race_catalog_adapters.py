@@ -113,6 +113,24 @@ ADAPTER_CONFIGS = {
             (r"^(?:Grade|G)\s*(?:III|3)$", RaceGrade.G3),
         ),
     ),
+    "racing_australia_pattern_catalog": CatalogAdapterConfig(
+        key="racing_australia_pattern_catalog",
+        region=RacingRegion.AUSTRALIA,
+        providers=frozenset({"racing_australia", "tjcis"}),
+        grade_patterns=_patterns((r"^(?:(?:Group\s*)?1|G1)$", RaceGrade.G1), (r"^(?:(?:Group\s*)?2|G2)$", RaceGrade.G2), (r"^(?:(?:Group\s*)?3|G3)$", RaceGrade.G3)),
+    ),
+    "deutscher_galopp_pattern_catalog": CatalogAdapterConfig(
+        key="deutscher_galopp_pattern_catalog",
+        region=RacingRegion.GERMANY,
+        providers=frozenset({"deutscher_galopp", "tjcis"}),
+        grade_patterns=_patterns((r"^(?:(?:Gruppe\s*)?1|G1)$", RaceGrade.G1), (r"^(?:(?:Gruppe\s*)?2|G2)$", RaceGrade.G2), (r"^(?:(?:Gruppe\s*)?3|G3)$", RaceGrade.G3)),
+    ),
+    "middle_east_official_pattern_catalog": CatalogAdapterConfig(
+        key="middle_east_official_pattern_catalog",
+        region=RacingRegion.MIDDLE_EAST,
+        providers=frozenset({"era", "jcsa", "qrec", "bahrain_turf_club", "tjcis"}),
+        grade_patterns=_patterns((r"^(?:(?:Group\s*)?1|G1)$", RaceGrade.G1), (r"^(?:(?:Group\s*)?2|G2)$", RaceGrade.G2), (r"^(?:(?:Group\s*)?3|G3)$", RaceGrade.G3)),
+    ),
 }
 
 
@@ -388,6 +406,7 @@ def parse_historical_catalog_manifest(manifest_path: str | Path) -> list[dict[st
                             "source_duplicate_count": int(source_duplicate_count),
                             "parser_version": ADAPTER_PARSER_VERSION,
                             "manifest_path": str(path),
+                            "country": str(row.get("country") or "").strip(),
                             "season_label": season_label,
                             "source_scope": source_scope,
                             "discipline": discipline,
