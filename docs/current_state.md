@@ -1,6 +1,6 @@
 # 当前状态
 
-## 2026-08-09 Release B canonical path staging 最小修复候选
+## 2026-08-09 Release B canonical path staging 修复已发布，等待新 G3
 
 - apply 的临时 path 阶段现在除临时 `year/slug` 外，同时把完整受控 scope 设为 `legacy`；最终
   reviewed loop 再恢复精确 owner/year/slug/kind。最终约束、overlay、manifest、业务决策和 schema
@@ -12,8 +12,17 @@
 - 独立 reviewer 在同一会话 `019fe254-9543-7440-bfaf-8fac75d6ff30` 自行复跑 SQLite 与
   PostgreSQL 16 完整套件各 `38/38`，并完成 Django check、migration drift 与 diff check，最终
   明确 `APPROVED`、无剩余 actionable defect。
-- 当前尚未 commit、push、PR、合并或重新部署；旧 reviewed manifest `c9e9b222…1e4c64` 继续禁止
-  复用。下一步是发布固定 SHA，并生成全新 census/reviewed artifact 后申请精确 G3。
+- PR `#80` 已合并并部署 `main@75294a4dea51538962741ec6c0835dc3090558ff`；生产 image 为
+  `sha256:1894484989084e61ced236eec93a30fd0b963b7ee946ad8ee8bd8e15357e413d`。部署后 Django
+  check、migration 零计划、内外 HTTP health、Celery 空队列、关闭开关与零 active gate 均通过。
+- 全新 census manifest SHA 为 `e626c8b48b5231890b0f1d4ac06f4fa22ee595fb9502d6aaead69f1169d070ec`；
+  review overlay SHA 为 `083610c50097dea568d8c948654f28fe38200806ca9bd3006ff558bcea6f5883`；
+  reviewed manifest SHA 为 `89387fab38f4c2a435c3b009802907a6b9710547354b38f91c3057546f41e96b`；
+  action scope SHA 为 `d7052d4392c027522ffde7c14955c98a2bc4ebfa99714c8681237c0ab65900bd`。
+- reviewed artifact 静态审计为 14 actions、177 events、12 tombstones、12 canonical links、12
+  superseded targets、165 canonical paths、12 legacy paths、2 个合法跨年 edition，全部 collision
+  为 0。尚未生成 approval、进入 maintenance、执行 apply/verifier 或启动 2025 `full_network`；旧
+  reviewed manifest `c9e9b222…1e4c64` 继续禁止复用，当前精确停在新 G3。
 
 ## 2026-08-09 Release B 数据 apply 在事务内确定性停止并安全恢复
 

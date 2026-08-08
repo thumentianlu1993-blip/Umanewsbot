@@ -1,6 +1,6 @@
 # 项目状态文档
 
-## 2026-08-09 Release B path staging 最小修复已本地验证
+## 2026-08-09 Release B path staging 最小修复已上线，等待 G3
 
 - 候选仅在临时 path staging 增加 `path_kind=legacy`，避免逐行最终写入出现瞬时双 canonical；无
   migration、配置、overlay 或业务决策变化。
@@ -8,7 +8,11 @@
   发现 rollback 对称 staging P1 后已修复并补双向 swap 测试。
 - P1 修复后的 SQLite 与 PostgreSQL 16 完整 Release B 套件均为 `38/38`。
 - 同一独立 reviewer 会话自行复跑双栈 `38/38` 和静态门禁后明确 `APPROVED`。
-- 尚未发布或重试数据 apply；待固定 SHA 部署和全新 artifact 后重新申请 G3。
+- PR `#80` 已合并并部署 `75294a4d…`，生产 image `sha256:18944849…e413d`；健康、迁移零计划、
+  Celery 空队列、关闭开关和零 active gate 均通过。
+- 全新 census/review/reviewed/action-scope SHA 依次为 `e626c8b4…70ec`、`083610c5…5883`、
+  `89387fab…e96b`、`d7052d43…00bd`；14-action 静态审计全部通过且 collision 为 0。
+- 尚未重试数据 apply/verifier，也未启动 2025 `full_network`；当前停在绑定上述新 artifact 的精确 G3。
 
 ## 2026-08-09 Release B apply 确定性停止，生产零业务数据变化
 

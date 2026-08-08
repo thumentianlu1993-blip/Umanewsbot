@@ -1,5 +1,29 @@
 # 部署运行手册
 
+## 2026-08-09 Release B path staging 修复发布与新 G3 检查点
+
+1. PR `#80` merge commit 为 `75294a4dea51538962741ec6c0835dc3090558ff`；隔离 release 为
+   `/opt/umanews-release-75294a4d-RBPATH-20260809/umanewsbot`，生产 image 为
+   `sha256:1894484989084e61ced236eec93a30fd0b963b7ee946ad8ee8bd8e15357e413d`。部署后 revision
+   label/runtime、Django check、migration 零计划、HTTP health、Celery 空队列和关闭开关均通过。
+2. 部署前 custom-format dump 为
+   `/opt/umanewsbot/backups/db/pre-release-b-path-staging-20260808T171241Z.dump`，`413003730`
+   bytes、mode `0600`、TOC `1308`、SHA-256
+   `67d087b977f016c6404adf059f0ae98115af8d4a76c2a11126ebf63bfc3569d6`；旧 image 回滚标签为
+   `umanewsbot:rollback-pre-release-b-path-staging-20260808T171241Z`。
+3. 新 census 持久目录为
+   `/opt/umanewsbot/backups/release-state/release-b-census-path-staging-20260808T172022Z`，manifest
+   SHA 为 `e626c8b48b5231890b0f1d4ac06f4fa22ee595fb9502d6aaead69f1169d070ec`。review overlay SHA 为
+   `083610c50097dea568d8c948654f28fe38200806ca9bd3006ff558bcea6f5883`。
+4. 新 reviewed 目录为
+   `/opt/umanewsbot/backups/release-state/release-b-reviewed-path-staging-20260808T172107Z`，manifest
+   SHA 为 `89387fab38f4c2a435c3b009802907a6b9710547354b38f91c3057546f41e96b`，action scope SHA 为
+   `d7052d4392c027522ffde7c14955c98a2bc4ebfa99714c8681237c0ab65900bd`；目录 `0700`、文件
+   `0600`。14/177/12/12/12/165/12/2 静态审计及所有 collision=0 门禁通过。
+5. 当前 receipt=0、批准范围 canonical link=0、active maintenance gate=0。未生成 approval 或
+   maintenance evidence；取得绑定上述精确 SHA 的 G3 前，禁止 apply/verifier 和 2025
+   `full_network`。旧 manifest `c9e9b222…1e4c64` 永久禁止重试。
+
 ## 2026-08-09 Release B 数据 apply 确定性 STOP 检查点
 
 1. 执行 manifest `c9e9b222…1e4c64`、approval `245baaf3…a2420`、maintenance evidence
