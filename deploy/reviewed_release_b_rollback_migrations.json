@@ -1,0 +1,30 @@
+{
+  "migration_path": "server/stable/migrations/0071_historical_calendar_release_b.py",
+  "reviewed_variants": [
+    {
+      "dependencies": [
+        [
+          "stable",
+          "0070_horse_identity_evidence_commit_receipt"
+        ]
+      ],
+      "rationale": "Legacy Release B migration before the migration-history repair. Its operations are identical to the repaired variant and its image remains compatible with an already-applied 0071 schema during a B-to-B rollback.",
+      "sha256": "74ee3ca9f03e60fca3735d2d90d3fdebcde40579387cb76e146720ef2ee23197"
+    },
+    {
+      "dependencies": [
+        [
+          "stable",
+          "0069_race_data_sync_pipeline_a_ledger_guards"
+        ],
+        [
+          "stable",
+          "0070_horse_identity_evidence_commit_receipt"
+        ]
+      ],
+      "rationale": "Repaired Release B migration joins the independently applied 0069 and 0070 branches; its operations are byte-reviewed for the same final Release B schema.",
+      "sha256": "e82f720970ae7f38a321b43fbfa5f8ff68a4637c4bd0e285754d9a12aa0b3260"
+    }
+  ],
+  "schema_version": "release-b-rollback-migration-allowlist/v1"
+}

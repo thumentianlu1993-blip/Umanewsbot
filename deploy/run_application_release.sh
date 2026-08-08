@@ -15,7 +15,7 @@
 #   -> stop worker
 #   -> stop race_live_worker only if it was running
 #   -> stop web
-#   -> single one-shot release task
+#   -> release task (one all-phase run normally; control/target/control for rollback)
 #   -> up web
 #   -> bounded wait for web healthy
 #   -> up worker/beat/nginx
@@ -23,7 +23,7 @@
 #   -> ps
 set -eu
 
-ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="${UMANEWS_ROOT_DIR:-$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)}"
 cd "$ROOT_DIR"
 COMPOSE="./deploy/docker/compose-wrapper.sh"
 
@@ -40,6 +40,59 @@ if [ -z "${DEPLOYMENT_LOCK_TOKEN:-}" ]; then
   echo "DEPLOYMENT_LOCK_TOKEN is required" >&2
   exit 1
 fi
+RELEASE_HANDOFF_MODE="${RELEASE_HANDOFF_MODE:-release-b}"
+case "$RELEASE_HANDOFF_MODE" in release-b) ;; *) echo "RELEASE_HANDOFF_MODE is invalid" >&2; exit 1 ;; esac
+if [ -z "${RELEASE_B_PREFLIGHT_ARTIFACT_PATH:-}" ]; then echo "RELEASE_B_PREFLIGHT_ARTIFACT_PATH is required for the exact Release B handoff" >&2; exit 1; fi
+if [ -z "${RELEASE_B_PREFLIGHT_ARTIFACT_SHA256:-}" ]; then echo "RELEASE_B_PREFLIGHT_ARTIFACT_SHA256 is required for the exact Release B handoff" >&2; exit 1; fi
+if [ -z "${EXPECTED_CANDIDATE_COMMIT:-}" ]; then echo "EXPECTED_CANDIDATE_COMMIT is required for the exact Release B handoff" >&2; exit 1; fi
+if [ -z "${EXPECTED_CANDIDATE_IMAGE_ID:-}" ]; then echo "EXPECTED_CANDIDATE_IMAGE_ID is required for the exact Release B handoff" >&2; exit 1; fi
+if [ -z "${EXPECTED_PRODUCTION_DB_IDENTITY_SHA256:-}" ]; then echo "EXPECTED_PRODUCTION_DB_IDENTITY_SHA256 is required for the exact Release B handoff" >&2; exit 1; fi
+RELEASE_TASK_WRAPPER_PATH="${RELEASE_TASK_WRAPPER_PATH:-$ROOT_DIR/deploy/run_release_tasks.sh}"
+case "$RELEASE_TASK_WRAPPER_PATH" in "$ROOT_DIR"/*) ;; *) echo "release task wrapper must stay under the repository root" >&2; exit 1 ;; esac
+if [ ! -f "$RELEASE_TASK_WRAPPER_PATH" ] || [ -L "$RELEASE_TASK_WRAPPER_PATH" ]; then echo "release task wrapper is untrusted" >&2; exit 1; fi
+if [ -n "${RELEASE_TARGET_IMAGE_TAG:-}" ]; then
+  target_image_id="$(docker image inspect --format '{{.Id}}' "$RELEASE_TARGET_IMAGE_TAG")" || exit 1
+  if [ "$target_image_id" != "$EXPECTED_CANDIDATE_IMAGE_ID" ]; then echo "preserved rollback target image ID mismatch" >&2; exit 1; fi
+fi
+
+# Only a new handoff artifact that actually carries the SHA-bound field enables
+# recovery-attempt semantics. Legacy/non-Release-B retries may still provide
+# the older handoff-shaped environment, and an inherited mode must not leak
+# into them. The in-container verifier remains authoritative for the artifact.
+artifact_attempt_mode=""
+if [ "$RELEASE_HANDOFF_MODE" = "release-b" ] && [ -f "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" ] && [ ! -L "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" ]; then
+  artifact_attempt_mode="$(sed -n 's/.*"recovery_intent_mode":"\([a-z-]*\)".*/\1/p' "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" | head -n 1)"
+fi
+case "$artifact_attempt_mode" in
+  required|not-required)
+    if [ -n "${RESTRICTED_RECOVERY_ATTEMPT_MODE:-}" ] && [ "$RESTRICTED_RECOVERY_ATTEMPT_MODE" != "$artifact_attempt_mode" ]; then
+      echo "RESTRICTED_RECOVERY_ATTEMPT_MODE does not match the exact handoff artifact" >&2
+      exit 1
+    fi
+    RESTRICTED_RECOVERY_ATTEMPT_MODE="$artifact_attempt_mode"
+    ;;
+  "")
+    RESTRICTED_RECOVERY_ATTEMPT_MODE="not-required"
+    ;;
+  *)
+    echo "invalid recovery_intent_mode in exact handoff artifact" >&2
+    exit 1
+    ;;
+esac
+artifact_handoff_action="$(sed -n 's/.*"handoff_action":"\([^"]*\)".*/\1/p' "$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" | head -n 1)"
+case "$artifact_handoff_action" in
+  forward-resume)
+    provenance_sha256="${RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256:-}"
+    case "$provenance_sha256" in *[!0-9a-f]*) echo "forward-resume provenance artifact SHA is invalid" >&2; exit 1 ;; esac
+    if [ "${#provenance_sha256}" -ne 64 ]; then echo "forward-resume provenance artifact SHA is invalid" >&2; exit 1; fi
+    RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256="$provenance_sha256"
+    export RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256
+    ;;
+  deploy|manual-release|rollback|initial-install)
+    unset RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256
+    ;;
+  *) echo "invalid handoff_action in exact handoff artifact" >&2; exit 1 ;;
+esac
 
 # The intent file records which entry froze it; deploy.sh passes
 # RELEASE_ACTION=deploy, rollback.sh passes RELEASE_ACTION=rollback.
@@ -152,8 +205,20 @@ fi
 echo "release: stopping web"
 "$COMPOSE" -f "$COMPOSE_FILE" stop web
 
-echo "release: running the single one-shot release task"
-COMPOSE_FILE="$COMPOSE_FILE" DEPLOYMENT_LOCK_TOKEN="$DEPLOYMENT_LOCK_TOKEN" ./deploy/run_release_tasks.sh
+echo "release: running the bounded release task phases"
+COMPOSE_FILE="$COMPOSE_FILE" DEPLOYMENT_LOCK_TOKEN="$DEPLOYMENT_LOCK_TOKEN" \
+  RELEASE_HANDOFF_MODE="$RELEASE_HANDOFF_MODE" \
+  RELEASE_B_PREFLIGHT_ARTIFACT_PATH="$RELEASE_B_PREFLIGHT_ARTIFACT_PATH" \
+  RELEASE_B_PREFLIGHT_ARTIFACT_SHA256="$RELEASE_B_PREFLIGHT_ARTIFACT_SHA256" \
+  EXPECTED_CANDIDATE_COMMIT="$EXPECTED_CANDIDATE_COMMIT" \
+  EXPECTED_CANDIDATE_IMAGE_ID="$EXPECTED_CANDIDATE_IMAGE_ID" \
+  EXPECTED_PRODUCTION_DB_IDENTITY_SHA256="$EXPECTED_PRODUCTION_DB_IDENTITY_SHA256" \
+  RESTRICTED_RECOVERY_ACTIVE="${RESTRICTED_RECOVERY_ACTIVE:-false}" \
+  RESTRICTED_RECOVERY_ATTEMPT_MODE="$RESTRICTED_RECOVERY_ATTEMPT_MODE" \
+  RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256="${RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256:-}" \
+  RELEASE_CONTROL_COMPOSE_OVERRIDE="${RELEASE_CONTROL_COMPOSE_OVERRIDE:-}" \
+  RELEASE_TARGET_IMAGE_TAG="${RELEASE_TARGET_IMAGE_TAG:-}" \
+  UMANEWS_ROOT_DIR="$ROOT_DIR" "$RELEASE_TASK_WRAPPER_PATH"
 
 echo "release: starting web"
 "$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps web

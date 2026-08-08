@@ -2505,24 +2505,43 @@ P0 马信息补全专项的模型交接文档见
 - 更宽回归的 7 errors/2 failures 已在未修改 origin/main 等口径复现；第六次同 reviewer 限定复审
   `VERDICT: APPROVED`。Ireland 直接 reconciliation marker 校验列为非阻塞 follow-up，Ireland 仍排除在
   首发 cohort 外。尚未 commit、push、PR 或发布，不代表生产可用。
-# 2026-08-08 Lifecycle shadow 观察加固已实现，尚未发布
 
-- Compose working-directory 漂移和 `shadow_proposed` 虚假失败已按测试先行完成本地修复；新增
-  runtime handshake、host-wide census、canonical no-deps wrapper 和 fail-closed mode switch。
-- 三轮 review findings 均已取得真实 RED 并修复；新增 hardening `37/37`、合并回归 `294/294`、
-  真实 PostgreSQL `6/6`，Django/migration/shell/
-  Compose/workflow/diff 检查通过；实现基线已整合到 `origin/main@11abe4bf`。
-- 无 migration、provider、状态机、queue 或公开行为扩张；生产仍以先前 `true/shadow` 快照为
-  背景，未在本轮重建或切换。
-- 同一独立 reviewer 第四轮限定复审已 `APPROVED`，无剩余 actionable finding。当前仅收口审核
-  结论文档并冻结最终 fingerprint；仍需用户针对该 fingerprint 授权，才可
-  commit/push/PR/merge；关闭态部署、恢复 shadow 和 enforce 继续分开授权。
+# 2026-08-08 Lifecycle shadow 加固已合并，生产保持关闭态旧版本
 
-# 2026-08-08 Lifecycle shadow 观察加固代码已合并，生产仍为关闭态旧版本
+- 加固实现的 hardening `37/37`、合并回归 `294/294`、PostgreSQL `6/6` 和独立 review
+  `APPROVED` 均已完成；PR #72 合并为 `main@c4ad7277`。
+- 候选部署因生产 recorder 为 `0067 + 0070`、缺少 `0068/0069`，在唯一 release task 前
+  fail closed。PR #73 随后仅把阻断与恢复证据合并为 `main@bcea5aa8`，不代表候选已部署。
+- 生产已恢复固定旧镜像
+  `sha256:b1fecc4624ac7fc181197156189b6326a40abb36f287feae72c9a2f533341a73`
+  和 `false/off`；没有 migration 或业务数据写入，race-live 未启动，HTTP/worker 健康。
+  `16 controls / 16 proposals / 0 applied / 0 active claims`，`default=2` 与
+  `race_live=7543` 均保持不动。
 
-- PR #72 已合并为 `main@c4ad7277`，但 Release B schema preflight 在 release task 前发现生产迁移历史
-  为 `0067 + 0070` 且缺少 `0068/0069`，因此候选没有部署。
-- 生产已恢复旧镜像并统一为 `false/off`；没有 migration 或业务数据写入，race-live 未启动，HTTP 与
-  worker 健康。现有 `default=2` 和 `race_live=7543` 积压保持不动。
-- 后续必须先以独立 change 修复生产 migration history，再重新授权关闭态部署；本次结果不代表 lifecycle
-  shadow 已恢复。
+# 2026-08-08 migration-history repair 最终 VERIFIED，发布未执行
+
+- 只读对账确认 `0070` receipt schema 与 7 条数据完整，`0068/0069` schema 未应用；修复保留
+  `0067→0070` 独立分支并由 `0071` 汇合 `0069/0070`，不 fake migration 或手改 recorder。
+- 最终 SQLite 三套件 `256/256`（`255 passed / 1 Docker-gated skipped`）、PostgreSQL 16
+  migration/catalog `23/23`、语法与 diff 检查通过，独立审查后的实现状态为 `VERIFIED`。
+- 固定旧生产镜像以生产只读 `docker save` 导出并在本地精确导入；PostgreSQL 16
+  `{0068,0070}` / `0068-only` 与 `{0069,0070}` / `0069-complete` 两态的认证、
+  只读/拒写、check、web/worker/Beat、日志和前后 digest 门禁全部 GREEN，fixture 已清理。
+- 前置环境字符串、`post_migrate` 和首次认证失败不计正式 gate。截至本记录检查点，修复尚未部署，
+  未执行生产 migration、Release B、v2 census、回填或 2025 `full_network`。
+
+# 2026-08-08 发布前 provenance P2 已完成 RED→GREEN
+
+- 普通 deploy/manual/rollback/initial-install 已显式清除旧
+  `RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256`，intent 全程绑定本次 preflight artifact。
+- 只有 artifact action 为 `forward-resume` 的受审 resume 路径保留原 provenance；host 与容器双层
+  gate 均拒绝错误 action、缺失或畸形 SHA，且在 migrate 前停止。
+- 新增残留旧 SHA 测试与发布编排回归已转 GREEN；最终三套件 `256/256`（含 1 个 Docker 条件
+  跳过）。仍未 stage、commit、push、部署或执行生产 migration。
+
+# 2026-08-08 发布前 0071 索引 owner P2 已完成 RED→GREEN
+
+- 两个 Release B partial unique index 已绑定当前 schema 与各自固定业务表，错 schema/错 table 均 drift。
+- 真实 PostgreSQL wrong-table fixture 使用同名、同列、同 predicate 伪索引验证拒绝，`finally` 恢复
+  原索引后合法 catalog 通过；PostgreSQL 专项 `24/24`。
+- 隔离容器已清理，未 stage、commit、push、部署或执行生产 migration。

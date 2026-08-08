@@ -1,0 +1,14 @@
+{
+  "captured_at": "2026-08-07T18:52:27Z",
+  "database_identity_sha256": "a986cc11149981c54e9d4915ad35e7c46e9382584d6670c8f950eceda26e471c",
+  "expected_applied_nodes": [
+    "stable.0067_historical_calendar_release_a",
+    "stable.0070_horse_identity_evidence_commit_receipt"
+  ],
+  "operation_log_count": 7,
+  "operation_log_fk_sha256": "90d2ba4da19c827dfb743dc0c0ff4bbafe855178caf6f30d5c7207dd173ede8c",
+  "operation_log_rows_sha256": "58f62742f596eb80ebff163e9b696a125ff4a1665ba5dca628b2d1f9a74368a1",
+  "receipt_count": 7,
+  "receipt_rows_sha256": "99410674f36929c5e7b77cefe99a51e98127ac5c2f47602237a5e6883d2749a4",
+  "schema_version": "migration-history-repair-production-audit/v1"
+}

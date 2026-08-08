@@ -5368,39 +5368,66 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   cohort，因此 Ireland 自动化保持不可发布，后续纳入前必须先补此门禁并重新 review。
 - 当前未 commit/push/PR/部署/migrate、未调用 provider/收费 API、未读取
   生产凭据或修改生产开关。除现有 TRA adapter 外，其余 provider 均保持 `proof_required`。
-# 2026-08-08 lifecycle shadow 观察加固已通过独立代码审核，待最终 fingerprint 与发布授权
 
-- 独立 worktree `.worktrees/harden-lifecycle-shadow-observation` 已快进整合最新
-  `origin/main@11abe4bf2d2badbfe1daa2f5fdd8f8e97f5f0093`；主工作区既有改动未修改或清理。
-- 生产只读快照（`2026-08-08 02:04 +08:00`）为 web/worker/Beat 同一隔离 release、统一
-  `true/shadow`，16 controls、16 proposals、0 applied、0 active claim；race-live 未运行，
-  `default=2 / race_live=7543` 未处理。该快照只作实现背景，不是当前发布证明。
-- 已按真实 RED 实现：shadow proposal/duplicate 成功统计；scanner→worker expected runtime
-  握手与 mismatch 结构化 error；Compose wrapper canonical `run --rm --no-deps`；宿主全量
-  project/release/image/commit/flags census；共享锁保护且失败单向收敛至
-  `false/off + Beat stopped` 的 mode switch。无 migration、状态机、provider 或 queue 变化。
-- 测试先行初始为 28 tests、`38 failures + 4 errors`，均来自目标能力缺失。首轮 review findings
-  再取得 `10 failures` 的真实 RED；第二轮 review 的宿主恢复 P1 再取得 `6 failures`。修复后
-  hardening 扩展为 `37/37`，与既有生命周期、纳管、单一 migration owner、P0 deployment
-  合并回归 `294/294`，隔离 PostgreSQL 16 `6/6`、
-  Release B deploy contract `1/1`；
-  Django、migration drift、compile、workflow contract、shell、Compose 和 diff checks 通过。
-- 当前未 commit/push/PR、部署、重启、修改生产 flag/数据或启用 enforce/race-live。下一门禁是
-  同一独立 reviewer 首轮 5 项 finding、第二轮宿主收敛 P1 与第三轮 Umanews 身份证明 P1
-  均已测试先行修复；第四轮原生只读复审最终 `APPROVED`，无剩余 actionable finding。
-  当前只进行审核结论文档与最终 fingerprint 收口；随后停止并等待当前版本发布授权。
+# 2026-08-08 lifecycle shadow 观察加固已通过独立代码审核
 
-# 2026-08-08 lifecycle shadow 观察加固已合并，但生产部署被迁移预检阻断
+- 独立 worktree `.worktrees/harden-lifecycle-shadow-observation` 已整合
+  `origin/main@11abe4bf2d2badbfe1daa2f5fdd8f8e97f5f0093`；生产只读背景快照当时为统一
+  `true/shadow`、16 controls、16 proposals、0 applied、0 active claim，race-live 未运行，
+  `default=2 / race_live=7543` 未处理。
+- runtime handshake、host-wide census、canonical no-deps wrapper 和 fail-closed mode switch
+  已按真实 RED 实现。hardening `37/37`、合并回归 `294/294`、PostgreSQL 16 `6/6`、
+  Release B deploy contract `1/1` 及其余静态检查通过；独立 reviewer 最终 `APPROVED`。
+- 该实现未扩张 migration、provider、状态机、queue 或公开行为。
+
+# 2026-08-08 lifecycle shadow 加固已合并，部署证据已由 PR #73 收口
 
 - PR #72 已合并为 `main@c4ad7277498846695065c71239dc59334e04370e`；候选镜像
-  `sha256:eb701e55…28b53` 已构建，但未进入生产运行态。
-- Release B schema preflight 在唯一 release task 前报告 `ok=false / identity_ok=false`，生产相关迁移叶为
-  `stable.0067_historical_calendar_release_a,stable.0070_horse_identity_evidence_commit_receipt`；`0068/0069`
-  未应用，当前 main 还包含 `0071`。本轮没有 migration、collectstatic 或 lifecycle 业务写入。
-- 已在共享部署锁内恢复旧镜像 `sha256:b1fecc46…41a73`。web/worker/Beat 为 `false/off`，race-live
-  未启动；healthz/首页 200、worker ping 正常、近期应用错误与 nginx 502 均为 0。
-- lifecycle 快照为 `16 controls / 16 proposals / 0 applied / 0 active claims`，关闭态 scanner 为
-  `enabled=False / claimed=0 / dispatched=0`。部署前已存在的 `default=2` lifecycle 消息未增加且无人消费，
-  `race_live=7543` 未处理。
-- 下一门禁是独立的生产 migration history 修复，不得直接恢复 shadow。完整恢复点、预检输出与执行偏差见
-  `docs/changes/harden-lifecycle-shadow-observation/release_report.md`。
+  `sha256:eb701e55…28b53` 已构建，但 Release B schema preflight 在唯一 release task 前发现
+  生产 migration leaf 为 `0067 + 0070`、缺少 `0068/0069`，因此候选未部署。
+- 阻断与恢复证据随后由 PR #73 合并为
+  `main@bcea5aa89f35e13d7ed13a29ebbdb6e58b6f978d`。该 PR 只收口证据，不改变生产运行态。
+- 生产已恢复旧镜像 `sha256:b1fecc4624ac7fc181197156189b6326a40abb36f287feae72c9a2f533341a73`
+  并统一为 `false/off`；没有 migration、collectstatic 或 lifecycle 业务写入，race-live 未启动，
+  HTTP、worker 与近期日志健康。16 controls / 16 proposals / 0 applied / 0 active claims；
+  `default=2` 与 `race_live=7543` 积压保持不动。
+
+# 2026-08-08 migration-history repair 最终技术门禁 VERIFIED，尚未发布
+
+- 生产只读对账确认 `0070` receipt schema 与 7 条数据完整，而 `0068/0069` schema 完全未应用。
+  修复采用恢复 `0067→0070` 独立分支、由 `0071` 汇合 `0069/0070` 的真实迁移图；禁止直接
+  修改 `django_migrations` 或 fake migration。
+- 最终 SQLite 三套件为 `256/256`（`255 passed / 1 Docker-gated skipped`），PostgreSQL 16
+  migration/catalog 专项 `23/23`，语法与 diff 检查通过；独立审查后的实现状态为 `VERIFIED`。
+- 固定旧生产镜像
+  `sha256:b1fecc4624ac7fc181197156189b6326a40abb36f287feae72c9a2f533341a73`
+  （`linux/amd64`）仅以生产 `docker save` 只读导出并在本地精确导入。PostgreSQL 16
+  `{0068,0070}`（`0068-only`）与 `{0069,0070}`（`0069-complete`）两态均完成
+  TCP role auth、read-only/write-denied、旧镜像 check、web health、worker ping、Beat、clean logs
+  和 audited digest before/after equality；两项兼容性 gate 均为 GREEN，fixture 已清理。
+- 更早的环境字符串、`post_migrate` 与首次认证失败均发生在正式 smoke 前，不计 compatibility gate。
+  截至本记录检查点，修复发布仍未执行：没有生产部署、migration、Release B、v2 census、回填或
+  2025 `full_network` 运行。
+
+# 2026-08-08 migration-history repair 发布前 P2 provenance 隔离已修复
+
+- `RESTRICTED_RECOVERY_PROVENANCE_ARTIFACT_SHA256` 现在只允许由 artifact-bound
+  `handoff_action=forward-resume` 使用；普通 deploy、manual release、rollback 与 initial-install
+  均在 host 入口显式清除继承值，并以本次 `RELEASE_B_PREFLIGHT_ARTIFACT_SHA256` 建立和完成 intent。
+- 容器 release task 同样按精确 handoff action 二次分流：普通 action 的旧 provenance SHA 不会进入
+  ensure/completion，forward-resume 则继续要求 64 位小写 SHA，并由 handoff/marker verifier 绑定原
+  provenance。错误 action 或缺失 resume provenance 均在 migrate 前停止。
+- 新增 RED 已证明旧实现会把普通 deploy 的残留 SHA 传入 ensure/completion；修复后 host、容器、
+  initial-install、rollback 与两类 resume 定向回归 GREEN；最终三套件 `256/256`（含 1 个 Docker
+  条件跳过）。当前仍未 stage/commit/push/部署或执行生产 migration。
+
+# 2026-08-08 migration-history repair 发布前索引 owner P2 已修复
+
+- `0071` 的 `uq_race_event_series_edition` 与
+  `uq_hist_target_active_series_year` 现在除名称、唯一性、列、opclass、predicate 与状态外，还必须
+  精确属于当前 PostgreSQL schema 下的 `stable_raceevent` 与
+  `stable_historicalraceeventtarget`。
+- catalog collector 会按受审索引名收集同 schema 的错表对象，不能再因表 allowlist 而只表现为缺失。
+  纯函数覆盖合法 owner、错 schema、错 table；真实 PostgreSQL fixture 将原索引替换为其他表上的同名、
+  同列、同 predicate 索引，validator 精确拒绝，并在 `finally` 恢复后再次验证合法 catalog。
+- PostgreSQL 专项 `24/24` 通过，隔离容器已删除；未 stage/commit/push/部署或连接生产。

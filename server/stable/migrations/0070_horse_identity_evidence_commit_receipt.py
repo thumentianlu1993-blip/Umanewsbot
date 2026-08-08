@@ -4,7 +4,7 @@ import django.db.models.deletion
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("stable", "0069_race_data_sync_pipeline_a_ledger_guards"),
+        ("stable", "0067_historical_calendar_release_a"),
     ]
 
     operations = [

@@ -33,6 +33,32 @@ approve 会从冻结的双/三源身份重新计算共识，不能通过修改�
   target 审计、published canonical path 与 artifact no-replace 均按独立审核结论 fail closed。
 - exact duplicate 同时绑定来源身份、核心字段和 runner/result；canonicalize 前必须进入确定性的
   draft/detached tombstone 终态，不能让仍公开或仍属于系列的 event 只靠 link 隐藏。
+- migration-history repair 的 recovery intent 在关闭态 verifier 后、任何 migration 前 durable
+  持久化，并绑定 candidate/action/original artifact/DB identity/初始 leaf；active marker 期间只允许
+  同候选 forward resume。受审 audit 以最小单文件进入候选 image；rollback 在 checkout/build 前保全
+  marker provenance。`0069` decision、guard function signature/overload 与 `0071` partial predicate
+  使用精确 catalog 合同。
+- marker 完成转换使用 active→transition→completed 双原子 rename 状态机，不执行 path unlink；
+  artifact 同时绑定 intent 是否 required。路径替换/冲突 fail closed 并保留现场，两个 rename 崩溃
+  边界均可幂等恢复；Linux/macOS 均要求内核 no-replace，原语不可用即停止；final forward-resume
+  仍受 reviewed-static 生产 audit 约束。
+- attempt mode 仅由实际含该绑定字段的精确 artifact 激活；旧/non-Release-B 重试不会因继承陈旧环境
+  值而改变 race-live freeze/restore 或 stopped-release recovery 行为。
+- B→B rollback 在 checkout 前固定 v2 控制脚本与镜像；pre-v2 目标只提供最终应用镜像，artifact 仍
+  精确绑定目标 commit/image，而 verifier/intent/completion 不降级到目标旧 helper。控制镜像只经
+  immutable-ID Compose override 使用，不覆盖 `umanewsbot:prod`；失败续跑由受信任 control-state 固定
+  同一 control/target/compose 绑定。markerless `not-required` 失败使用 checkout 前保存的唯一 control-dir
+  retry script，普通 stopped-service resume 也不能绕过 active marker/control-state gate；通用 rollback
+  仅支持 forward，reverse 参数显式拒绝。control-state canonical SHA 完整绑定所有 copied helper 与
+  override 的 path/mode/content SHA，resume 以 nofollow fd 在 lock 前和锁内双验后才进入控制面。
+  completed receipt 以 target OID、初始 artifact SHA、state SHA 标识 attempt；no-clobber/idempotent
+  completion 允许未来新 attempt 再次回滚同一 target，同时 active state 单槽继续禁止并发。
+- B→B rollback 目标资格现由 target commit 内 0071 的 exact bytes SHA 与 dependency contract 共同决定，
+  仅允许显式受审的 legacy/repaired 两个兼容版本；路径存在不再足够。receipt schema preflight 同时把
+  PK、两个 unique、FK 及四个 backing/pattern index 当作完整集合校验，额外对象也会 fail closed。
+- rollback 控制面与静态资源写入现明确分权：冻结的 control image 只负责 schema/migration/intent，
+  artifact 绑定的 target image 通过仅改 image 的 Compose override 写同一 static volume，成功后 control
+  image 才完成 intent 并允许启动服务；失败沿用同 control-state 精确重试。normal deploy 不拆分。
 
 ## P0 马资料生产批准链路
 
@@ -285,3 +311,36 @@ racecard projection 候选链路，复用现有 race-live、赛事参与者身�
 调度器。赛事时间、取消和延期在生命周期集成切片 C 前只记候选，不直接改变 `RaceEvent` 或 control。
 所有 provider/region/field 开关默认关闭；当前仅复用已有 The Racing API adapter，其余来源需完成各自
 parser/proof 后才可进入运行时准入。该候选尚未 commit、PR、迁移或部署，生产行为没有变化。
+
+## Migration-history recovery 控制面补充（本地候选）
+
+repair runtime directory 本身是发布安全边界：普通 deploy/rollback/manual release 只在持锁后安全
+初始化并复验，stopped-service resume 对缺失或不可信 parent fail closed。markerless rollback 的专用
+retry 以 target、artifact SHA、state SHA 精确标识 attempt；completed-only 重放验证 exact receipt 后
+不再执行 Git、Docker 或 Compose。该变化尚未 commit、PR 或部署，生产行为没有变化。
+
+historical runner 首次纳管继续兼容 pre-0070 既有安装：只有显式 flag 与数据库/host trace 双重证明
+首次安装时才跳过 Release B handoff；0070+ 永不允许此旁路。旧镜像 partial-schema 兼容 smoke 的零写
+边界由 PostgreSQL 专用只读角色和权限撤销同步强制，不再依赖异步统计推断。
+
+Release B preflight 采用 recorder/catalog-first：只有对象、列与类型合同安全后才读取 receipt 业务数据。
+已知 schema drift 是稳定 JSON，连接故障仍是明确运行错误，避免把损坏 schema 误报为采集异常。
+在 recorder/catalog 之前还有不可绕过的 PostgreSQL vendor 门禁；SQLite 或未知引擎不会进入生产
+handoff、migration 或停服路径，catalog 未实际检查也不能产生绿色结果。
+pre-0070 historical initial-install 也使用同一 durable recovery 控制面：唯一批准起点为 0067，artifact
+和 marker 绑定 candidate/DB/lock/catalog；迁移中断只允许沿实际 Django plan 的 exact 单调前缀继续，
+成功到 0071 后完成 marker 才可启动应用。
+completion 的审计策略由已验证 artifact/marker 共同声明的 recovery origin 决定：initial-install
+验证空 receipt 与 legacy 数据不变，migration-history repair 保留 reviewed-static 基线，二者不可由 CLI 切换。
+所有生产 preflight 在 leaf/plan 之前验证完整 migration recorder dependency history；pre-0071 的两个
+legacy uniqueness 对象则分别遵循 0024 的真实 PostgreSQL 形态（event partial index、target constraint
++ backing index），防止同名但语义错误的对象进入 0071。
+rollback 控制面现在明确分为两个阶段：durable control-state 前保持原 HEAD/image 可恢复且不停服；
+验签成功后只沿 content-bound pinned resume 前进。通用 migration-history resume 不直接解释 state
+自述路径，先由当前 host verifier 验证 state 与完整 pinned catalog，再交给 preserved control plane。
+固定旧镜像的 partial-schema compatibility smoke 还包含独立数据库认证层：临时只读角色必须先从
+fixture TCP 入口证明密码、身份与 read-only default，再允许旧镜像执行任何 check 或启动服务；认证层
+故障与应用兼容性结论分离。
+该兼容层现已用固定生产旧镜像 `sha256:b1fecc…341a73` 在 PostgreSQL 16 的 `{0068,0070}` 与
+`{0069,0070}` 两态完成真实容器验证，零写 digest、服务健康与日志门禁均通过；这关闭了技术证据缺口，
+不改变生产发布仍需单独授权的治理边界。

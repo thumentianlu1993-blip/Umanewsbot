@@ -47,6 +47,13 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+# A stopped-service recovery must never bypass an unfinished migration-history
+# transition. Completed receipts do not use either canonical active path.
+if ! ./deploy/check_restricted_recovery_marker.sh; then
+  echo "resume: active migration repair requires the reviewed forward-resume entry" >&2
+  exit 1
+fi
+
 # Fail closed if any application service is running, restarting, or its state
 # cannot be read (same standard as manual_release.sh). No service may be
 # started before this gate.
