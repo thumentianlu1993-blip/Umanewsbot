@@ -156,15 +156,12 @@ class MigrationHistoryRepairBaselineRedTests(SimpleTestCase):
         return json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
 
     def _live(self) -> dict:
+        from stable.services.historical_calendar_release_b_schema import (
+            AUDIT_FIELDS,
+        )
+
         baseline = self._baseline()
-        return {
-            "database_identity_sha256": baseline["database_identity_sha256"],
-            "receipt_count": baseline["receipt_count"],
-            "receipt_rows_sha256": baseline["receipt_rows_sha256"],
-            "operation_log_count": baseline["operation_log_count"],
-            "operation_log_rows_sha256": baseline["operation_log_rows_sha256"],
-            "operation_log_fk_sha256": baseline["operation_log_fk_sha256"],
-        }
+        return {field: baseline[field] for field in AUDIT_FIELDS}
 
     def test_reviewed_baseline_accepts_only_an_exact_live_match(self):
         from stable.services.historical_calendar_release_b_schema import (

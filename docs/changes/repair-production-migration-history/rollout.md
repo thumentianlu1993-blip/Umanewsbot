@@ -14,8 +14,11 @@
 - receipt table 为 11 列，含 PK、approved SHA unique、operation-log one-to-one unique/FK、pattern
   index 与 owned sequence；7 条 receipt 的时间范围为 `05:07:40` 至 `06:15:53 UTC`。
 - 7 条 receipt 的 operation log 均存在，JSON 字段类型全部符合合同。
-- 受审 baseline：receipt rows SHA `99410674…49a4`、operation-log rows SHA `58f62742…68a1`、
-  FK set SHA `90d2ba4d…de8c`；完整值保存在 `production_audit.json`。
+- 旧 baseline 的 positional/nested-FK 临时生成口径已废止。二次只读确认的 v2 baseline 为 receipt
+  `d9866c…c557`、operation-log `e49ae6…814c`、scalar FK `7a0cb0…90b1`；IDs 分别为 `1..7` 与
+  `108491..108497`，完整值和 UTC 微秒 time bounds 保存在 `production_audit.json`。
+- 发布前两份备份的目标 receipt/op 行字节 SHA 分别相同，生产 receipt/operation 时间仍停在
+  2026-08-02；本轮差异根因是手工生成器与 runtime collector representation 不一致。
 - `stable_raceeventfieldchange` 没有 `0068` 的 11 个新增字段；不存在 `0069` 的 decision check、
   append-only trigger 或 function。
 - 本轮探索只执行系统目录与业务计数/SHA 所需的只读 SQL，没有修改 recorder、schema 或业务行。
@@ -34,6 +37,15 @@ RED→GREEN 修订。受审 graph 固定为 `0067→0068→0069→0071` 与 `006
 固定控制面与 markerless retry 实现。最新完整三 suite 为 `251 tests / 250 passed / 1 Docker-gated
 skipped`，真实 PostgreSQL catalog/migration 专项 `23/23`；固定旧镜像双态容器 gate 另按下述 R3
 证据为 GREEN。
+
+production audit v2 增加唯一只读生成入口、named-object/scalar-FK raw-row fixture、ID/FK/time-bound
+严格比较与 PostgreSQL read-only transaction 证据；更新后 SQLite 四套件 `263/263`（含 1 个既有
+Docker 条件跳过），真实 PostgreSQL 专项 `25/25`，不改变上述 release gate。
+
+生产首次重试在停服和 migration 前由旧 positional baseline 的三项 SHA mismatch 阻断；恢复后
+web/worker/beat 均继续运行旧镜像 `sha256:b1fecc…341a`，内外 healthz 正常，recorder 保持
+`0067+0070`。新 generator 随后在只读容器和 `REPEATABLE READ READ ONLY` 事务中于
+`2026-08-08T11:41:07.525084Z` 生成当前 v2 payload；没有执行 `0068/0069/0071` 或数据写入。
 
 ### R2：代码审核与发布授权
 

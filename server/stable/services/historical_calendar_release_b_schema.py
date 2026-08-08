@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Count
 from django.db.migrations.loader import MigrationLoader
 from django.db.migrations.exceptions import InconsistentMigrationHistory
@@ -23,6 +23,12 @@ from stable.models import (
 
 SCHEMA_VERSION = "migration-history-repair-preflight/v2"
 LEGACY_SCHEMA_VERSION = "historical-calendar-release-b-preflight/v1"
+PRODUCTION_AUDIT_SCHEMA_VERSION = "migration-history-repair-production-audit/v2"
+PRODUCTION_AUDIT_CANONICALIZATION_VERSION = "named-object-scalar-fk/v1"
+PRODUCTION_AUDIT_EXPECTED_APPLIED_NODES = [
+    "stable.0067_historical_calendar_release_a",
+    "stable.0070_horse_identity_evidence_commit_receipt",
+]
 TARGET = ("stable", "0071_historical_calendar_release_b")
 AUDIT_PATH = (
     Path(__file__).resolve().parents[3]
@@ -83,12 +89,40 @@ INITIAL_INSTALL_FORWARD_STATES = {
 }
 
 AUDIT_FIELDS = (
+    "canonicalization_version",
     "database_identity_sha256",
     "receipt_count",
     "receipt_rows_sha256",
+    "receipt_ids",
     "operation_log_count",
     "operation_log_rows_sha256",
+    "operation_log_ids",
     "operation_log_fk_sha256",
+    "operation_log_fk_ids",
+    "time_bounds",
+)
+
+RECEIPT_AUDIT_FIELDS = (
+    "id",
+    "created_at",
+    "updated_at",
+    "approved_sha256",
+    "artifact_sha256",
+    "approved_by",
+    "approved_profile_ids",
+    "before_after",
+    "evidence_summary",
+    "result_payload",
+    "operation_log_id",
+)
+OPERATION_LOG_AUDIT_FIELDS = (
+    "id",
+    "action_type",
+    "target_type",
+    "target_id",
+    "detail",
+    "created_at",
+    "admin_id",
 )
 
 
@@ -120,11 +154,93 @@ def _digest(value: Any) -> str:
 
 def load_reviewed_production_audit() -> dict:
     payload = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
-    if payload.get("schema_version") != "migration-history-repair-production-audit/v1":
+    if payload.get("schema_version") != PRODUCTION_AUDIT_SCHEMA_VERSION:
         raise ValueError("unsupported production audit schema_version")
-    missing = [field for field in AUDIT_FIELDS if field not in payload]
-    if missing:
-        raise ValueError(f"production audit missing fields: {','.join(missing)}")
+    expected_fields = {
+        "schema_version",
+        "captured_at",
+        "expected_applied_nodes",
+        *AUDIT_FIELDS,
+    }
+    actual_fields = set(payload)
+    if actual_fields != expected_fields:
+        missing = sorted(expected_fields - actual_fields)
+        extra = sorted(actual_fields - expected_fields)
+        raise ValueError(
+            "production audit field set mismatch: "
+            f"missing={','.join(missing)} extra={','.join(extra)}"
+        )
+    if (
+        payload["canonicalization_version"]
+        != PRODUCTION_AUDIT_CANONICALIZATION_VERSION
+    ):
+        raise ValueError("unsupported production audit canonicalization_version")
+    try:
+        captured_at = datetime.fromisoformat(
+            payload["captured_at"].replace("Z", "+00:00")
+        )
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise ValueError("production audit captured_at is invalid") from exc
+    if (
+        not payload["captured_at"].endswith("Z")
+        or captured_at.utcoffset() != timezone.utc.utcoffset(None)
+    ):
+        raise ValueError("production audit captured_at must be UTC Z")
+    if payload["expected_applied_nodes"] != PRODUCTION_AUDIT_EXPECTED_APPLIED_NODES:
+        raise ValueError("production audit expected_applied_nodes mismatch")
+    for field in (
+        "database_identity_sha256",
+        "receipt_rows_sha256",
+        "operation_log_rows_sha256",
+        "operation_log_fk_sha256",
+    ):
+        if not isinstance(payload[field], str) or not re.fullmatch(
+            r"[0-9a-f]{64}", payload[field]
+        ):
+            raise ValueError(f"production audit {field} is invalid")
+    for count_field, ids_field in (
+        ("receipt_count", "receipt_ids"),
+        ("operation_log_count", "operation_log_ids"),
+        ("receipt_count", "operation_log_fk_ids"),
+    ):
+        count = payload[count_field]
+        ids = payload[ids_field]
+        if (
+            not isinstance(count, int)
+            or isinstance(count, bool)
+            or count < 0
+            or not isinstance(ids, list)
+            or len(ids) != count
+            or any(not isinstance(item, int) or isinstance(item, bool) for item in ids)
+            or ids != sorted(set(ids))
+        ):
+            raise ValueError(
+                f"production audit {count_field}/{ids_field} identity mismatch"
+            )
+    if payload["operation_log_ids"] != payload["operation_log_fk_ids"]:
+        raise ValueError("production audit operation/FK identity mismatch")
+    expected_bound_fields = {
+        "receipt_created_at",
+        "receipt_updated_at",
+        "operation_log_created_at",
+    }
+    bounds = payload["time_bounds"]
+    if not isinstance(bounds, dict) or set(bounds) != expected_bound_fields:
+        raise ValueError("production audit time_bounds field set mismatch")
+    for field in sorted(expected_bound_fields):
+        pair = bounds[field]
+        if not isinstance(pair, dict) or set(pair) != {"min", "max"}:
+            raise ValueError(f"production audit time_bounds.{field} is invalid")
+        for edge in ("min", "max"):
+            value = pair[edge]
+            if value is not None and (
+                not isinstance(value, str)
+                or not value.endswith("Z")
+                or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T.*Z", value)
+            ):
+                raise ValueError(
+                    f"production audit time_bounds.{field}.{edge} is invalid"
+                )
     return payload
 
 
@@ -161,48 +277,123 @@ def compare_catalog_contract(*, expected: dict, live: dict) -> dict:
     return {"ok": not drift_paths, "drift_paths": sorted(set(drift_paths))}
 
 
+def _audit_time_bounds(rows: list[dict], field: str) -> dict:
+    values = [row[field] for row in rows]
+    if not values:
+        return {"min": None, "max": None}
+    return {"min": _canonicalize(min(values)), "max": _canonicalize(max(values))}
+
+
+def build_production_audit_from_rows(
+    *,
+    receipts: list[dict],
+    operations: list[dict],
+    database_identity_sha256: str,
+) -> dict:
+    for rows, fields, label in (
+        (receipts, RECEIPT_AUDIT_FIELDS, "receipt"),
+        (operations, OPERATION_LOG_AUDIT_FIELDS, "operation-log"),
+    ):
+        for row in rows:
+            if not isinstance(row, dict) or set(row) != set(fields):
+                raise ValueError(f"{label} audit rows must be exact named objects")
+    receipt_ids = [row["id"] for row in receipts]
+    operation_ids = [row["id"] for row in operations]
+    fk_ids = [row["operation_log_id"] for row in receipts]
+    return {
+        "canonicalization_version": PRODUCTION_AUDIT_CANONICALIZATION_VERSION,
+        "database_identity_sha256": database_identity_sha256,
+        "receipt_count": len(receipts),
+        "receipt_rows_sha256": _digest(receipts),
+        "receipt_ids": receipt_ids,
+        "operation_log_count": len(operations),
+        "operation_log_rows_sha256": _digest(operations),
+        "operation_log_ids": operation_ids,
+        "operation_log_fk_sha256": _digest(fk_ids),
+        "operation_log_fk_ids": fk_ids,
+        "time_bounds": {
+            "receipt_created_at": _audit_time_bounds(receipts, "created_at"),
+            "receipt_updated_at": _audit_time_bounds(receipts, "updated_at"),
+            "operation_log_created_at": _audit_time_bounds(
+                operations, "created_at"
+            ),
+        },
+    }
+
+
 def collect_live_production_audit() -> dict:
-    receipt_fields = (
-        "id",
-        "created_at",
-        "updated_at",
-        "approved_sha256",
-        "artifact_sha256",
-        "approved_by",
-        "approved_profile_ids",
-        "before_after",
-        "evidence_summary",
-        "result_payload",
-        "operation_log_id",
-    )
-    operation_fields = (
-        "id",
-        "action_type",
-        "target_type",
-        "target_id",
-        "detail",
-        "created_at",
-        "admin_id",
-    )
     receipts = list(
         HorseIdentityEvidenceCommitReceipt._base_manager.order_by("pk").values(
-            *receipt_fields
+            *RECEIPT_AUDIT_FIELDS
         )
     )
     operation_ids = [row["operation_log_id"] for row in receipts]
     operations = list(
         OperationLog.objects.filter(pk__in=operation_ids).order_by("pk").values(
-            *operation_fields
+            *OPERATION_LOG_AUDIT_FIELDS
         )
     )
-    fk_set = [row["operation_log_id"] for row in receipts]
+    return build_production_audit_from_rows(
+        receipts=receipts,
+        operations=operations,
+        database_identity_sha256=_database_identity_sha256(),
+    )
+
+
+def validate_production_audit_recorder_state(
+    *,
+    recorded_nodes: set[tuple[str, str]],
+    known_nodes: set[tuple[str, str]],
+) -> list[str]:
+    unknown = sorted(recorded_nodes - known_nodes)
+    if unknown:
+        raise ValueError(
+            "production audit recorder contains unknown migrations: "
+            + ",".join(_format_node(node) for node in unknown)
+        )
+    expected = {
+        ("stable", node.removeprefix("stable."))
+        for node in PRODUCTION_AUDIT_EXPECTED_APPLIED_NODES
+    }
+    repair_nodes = {
+        node
+        for node in recorded_nodes
+        if node[0] == "stable" and node[1] >= "0067"
+    }
+    if repair_nodes != expected:
+        raise ValueError(
+            "production audit capture requires the exact repair recorder state"
+        )
+    return list(PRODUCTION_AUDIT_EXPECTED_APPLIED_NODES)
+
+
+def capture_reviewed_production_audit() -> dict:
+    if connection.vendor != "postgresql":
+        raise ValueError("production audit capture requires PostgreSQL")
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+            )
+        loader = MigrationLoader(connection, ignore_no_migrations=True)
+        recorded_nodes = set(MigrationRecorder(connection).applied_migrations())
+        expected_applied_nodes = validate_production_audit_recorder_state(
+            recorded_nodes=recorded_nodes,
+            known_nodes=set(loader.graph.node_map),
+        )
+        try:
+            loader.check_consistent_history(connection)
+        except InconsistentMigrationHistory as exc:
+            raise ValueError(
+                "production audit capture requires consistent migration history"
+            ) from exc
+        live = collect_live_production_audit()
+        captured_at = _canonicalize(datetime.now(timezone.utc))
     return {
-        "database_identity_sha256": _database_identity_sha256(),
-        "receipt_count": len(receipts),
-        "receipt_rows_sha256": _digest(receipts),
-        "operation_log_count": len(operations),
-        "operation_log_rows_sha256": _digest(operations),
-        "operation_log_fk_sha256": _digest(fk_set),
+        "schema_version": PRODUCTION_AUDIT_SCHEMA_VERSION,
+        "captured_at": captured_at,
+        "expected_applied_nodes": expected_applied_nodes,
+        **live,
     }
 
 

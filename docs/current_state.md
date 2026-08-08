@@ -1,5 +1,24 @@
 # 当前状态
 
+## 2026-08-08 migration-history production audit 生成口径已修复
+
+- 首次受审 baseline 的三项 SHA 来自临时 raw SQL：receipt/operation 行被编码为 positional array，
+  FK 被编码为 nested array；运行时 preflight 则一直使用 ORM named-object rows 与 scalar FK list。
+  因此同一 7 行数据会得到不同 SHA，不能把这次门禁失败解释为生产数据变化。
+- 唯一生成入口现为 `generate_migration_history_production_audit`。它在 PostgreSQL
+  `REPEATABLE READ READ ONLY` 事务内调用与 preflight 完全相同的
+  `collect_live_production_audit()`，输出 schema/canonicalization version、精确 ID/FK 列表和时间边界；
+  loader 对缺项、多项、版本、ID 次序与 time-bound 结构严格拒绝。
+- 两份既有生产备份中的 7 条 receipt 与其 7 条 operation-log 行字节一致；二次只读核对的当前
+  named-object/scalar-FK SHA 已写入 `production_audit.json`。本修复不放宽 graph、catalog、TOCTOU、
+  recovery 或数据库 identity 门禁。SQLite 四套件 `263/263`（含 1 skip）、PostgreSQL `25/25`。
+- 首次生产重试在任何停服/migration 前因旧 positional baseline mismatch 停止。候选镜像保留为
+  `umanewsbot:migration-repair-candidate-13541057`，`umanewsbot:prod` 和 web/worker/beat 已恢复并保持旧
+  `sha256:b1fecc…341a`，内外 healthz 正常，recorder 仍为 `0067+0070`。恢复点 dump 为
+  `411053136` bytes、TOC `1297`、SHA-256 `e12ee97c…c2cb6d`。
+- 新 generator 已在只读容器和同一 `REPEATABLE READ READ ONLY` 事务内于
+  `2026-08-08T11:41:07.525084Z` 生成 v2 payload；本轮没有执行 `0068/0069/0071`、业务回填或数据库写入。
+
 ## 2026-08-08 Codex 工作流与门禁治理收敛
 
 - 根 `AGENTS.md` 现在是全部目录、任务、worktree 和代理的唯一人工确认门禁来源，统一为

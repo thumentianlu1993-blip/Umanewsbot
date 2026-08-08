@@ -1,5 +1,14 @@
 # 关键决策
 
+## 2026-08-08 production audit 只允许由运行时 collector 生成
+
+receipt repair baseline 不再接受独立手写 SQL 的 positional row 编码。唯一口径固定为
+`named-object-scalar-fk/v1`：行是带字段名的 object，FK 是按 receipt 主键排序的 scalar ID list；
+生产 baseline 生成命令必须在 PostgreSQL `REPEATABLE READ READ ONLY` 事务内直接调用 preflight
+使用的同一 collector。baseline 同时绑定 receipt IDs、operation IDs/FK IDs 和 created/updated
+time bounds，loader 对完整字段集与版本 fail closed。这样修正生成口径而不改变任何 migration graph、
+catalog、handoff、TOCTOU 或 restricted-recovery 决策。
+
 ## 2026-08-08 为什么人工确认门禁只保留在根 AGENTS.md
 
 此前范围确认、实现确认、Git 操作、review、发布和生产动作授权散落在工作流文档、session

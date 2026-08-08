@@ -1,14 +1,56 @@
 {
-  "captured_at": "2026-08-07T18:52:27Z",
+  "canonicalization_version": "named-object-scalar-fk/v1",
+  "captured_at": "2026-08-08T11:41:07.525084Z",
   "database_identity_sha256": "a986cc11149981c54e9d4915ad35e7c46e9382584d6670c8f950eceda26e471c",
   "expected_applied_nodes": [
     "stable.0067_historical_calendar_release_a",
     "stable.0070_horse_identity_evidence_commit_receipt"
   ],
   "operation_log_count": 7,
-  "operation_log_fk_sha256": "90d2ba4da19c827dfb743dc0c0ff4bbafe855178caf6f30d5c7207dd173ede8c",
-  "operation_log_rows_sha256": "58f62742f596eb80ebff163e9b696a125ff4a1665ba5dca628b2d1f9a74368a1",
+  "operation_log_fk_ids": [
+    108491,
+    108492,
+    108493,
+    108494,
+    108495,
+    108496,
+    108497
+  ],
+  "operation_log_fk_sha256": "7a0cb0d7117dcbe0663b20869b637a8434a8aea63f83c3940ced5cf9fdf990b1",
+  "operation_log_ids": [
+    108491,
+    108492,
+    108493,
+    108494,
+    108495,
+    108496,
+    108497
+  ],
+  "operation_log_rows_sha256": "e49ae6f6d28a04b059d139c59a998a6aeb793ee4bde47623cfe482e975c9814c",
   "receipt_count": 7,
-  "receipt_rows_sha256": "99410674f36929c5e7b77cefe99a51e98127ac5c2f47602237a5e6883d2749a4",
-  "schema_version": "migration-history-repair-production-audit/v1"
+  "receipt_ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "receipt_rows_sha256": "d9866c0330de5a20ca5ca27acbbeda3c19b6575b215c454b0d367a37ed72c557",
+  "schema_version": "migration-history-repair-production-audit/v2",
+  "time_bounds": {
+    "operation_log_created_at": {
+      "max": "2026-08-02T06:15:53.418277Z",
+      "min": "2026-08-02T05:07:40.904321Z"
+    },
+    "receipt_created_at": {
+      "max": "2026-08-02T06:15:53.420579Z",
+      "min": "2026-08-02T05:07:40.911578Z"
+    },
+    "receipt_updated_at": {
+      "max": "2026-08-02T06:15:53.420596Z",
+      "min": "2026-08-02T05:07:40.911596Z"
+    }
+  }
 }

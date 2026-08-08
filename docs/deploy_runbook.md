@@ -2,6 +2,26 @@
 
 ## 2026-08-08 migration history repair 只读审计检查点
 
+生成或复核 reviewed-static baseline 时，唯一入口为：
+
+```bash
+python manage.py generate_migration_history_production_audit
+```
+
+该命令只支持 PostgreSQL，在 `REPEATABLE READ READ ONLY` 事务内复用 preflight 的
+`collect_live_production_audit()`，stdout 为单行 canonical JSON。禁止再用 raw SQL tuple、手写字段
+拼接或 nested FK list 生成 SHA。输出需经独立 review 后才能更新候选 image 内
+`production_audit.json`；命令本身不修改该文件。当前版本必须为
+`migration-history-repair-production-audit/v2` / `named-object-scalar-fk/v1`，并精确绑定 ID/FK 列表和
+time bounds。缺项、多项、错序或版本漂移均停止，不能删除字段后继续。
+
+2026-08-08 首次修复发布重试由旧 positional/nested-FK baseline 在任何停服和 migration 前阻断。
+恢复后生产继续运行旧镜像 `sha256:b1fecc…341a`，recorder 为 `0067+0070`，内外 healthz 正常；新备份
+`backups/db/pre-migration-repair-20260808T073557Z.dump` 为 `411053136` bytes、mode `0600`、TOC
+`1297`、SHA-256 `e12ee97cfd1db3a67571e2e525cea8bb050d939ef26450d12b0d5acd8fc2cb6d`。
+新 generator 在只读容器中于 `2026-08-08T11:41:07.525084Z` 输出 v2 payload；此证据仍需 commit、
+独立 review 与重新发布门禁，不能直接复用失败 handoff 或绕过 preflight。
+
 1. 生产 recorder 为 `0067` 与 `0070`；`0070` applied at
    `2026-08-02 05:07:24.615789+00`，receipt 表随后写入 7 条正式记录。
 2. receipt 表的 11 列、PK、approved SHA unique、operation-log unique/FK、varchar pattern index 与
