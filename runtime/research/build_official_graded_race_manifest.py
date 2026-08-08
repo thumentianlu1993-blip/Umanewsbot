@@ -16,13 +16,17 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from runtime.research.official_graded_race_sources import POLICIES, validate_provider_url  # noqa: E402
+from runtime.research.official_graded_race_sources import (  # noqa: E402
+    POLICIES,
+    canonical_provider_url_identity,
+    validate_provider_url,
+)
 
 
 SCHEMA_VERSION = 1
@@ -87,15 +91,6 @@ def _catalog_key(row: dict[str, str]) -> str:
         )
     }
     return sha256_bytes(canonical_json_bytes(identity))
-
-
-def _canonical_url_identity(url: str) -> str:
-    parsed = urlsplit(url)
-    host = (parsed.hostname or "").lower()
-    port = parsed.port
-    netloc = host if port in (None, 443) else f"{host}:{port}"
-    query = urlencode(sorted(parse_qsl(parsed.query, keep_blank_values=True)), doseq=True)
-    return urlunsplit((parsed.scheme.lower(), netloc, parsed.path or "/", query, ""))
 
 
 def load_catalogs(paths: list[Path], *, year: int) -> tuple[list[dict[str, str]], str]:
@@ -227,7 +222,7 @@ def compile_review(paths: list[Path], *, year: int, reviewed_path: Path, expecte
                 date.fromisoformat(local_date)
             except ValueError as exc:
                 raise ManifestBuildError("collected race local_date is invalid") from exc
-            url_identity = (fixed["provider"], _canonical_url_identity(url))
+            url_identity = (fixed["provider"], canonical_provider_url_identity(url))
             if url_identity in seen_result_urls:
                 raise ManifestBuildError("reviewed mapping duplicates provider/result_url")
             seen_result_urls.add(url_identity)

@@ -14,6 +14,10 @@ on:
       - runtime/research/test_collect_official_graded_race_results.py
       - runtime/research/build_official_graded_race_manifest.py
       - runtime/research/test_build_official_graded_race_manifest.py
+      - runtime/research/validate_official_graded_race_package.py
+      - runtime/research/test_validate_official_graded_race_package.py
+      - runtime/research/build_graded_race_completion_bundle.py
+      - runtime/research/test_build_graded_race_completion_bundle.py
       - runtime/research/README_graded_race_participants.md
       - runtime/research/region_manifests/**
       - .codex/scripts/test_graded_race_participants_workflow.py
@@ -36,6 +40,16 @@ on:
         default: ""
       region_manifest_sha256:
         description: 可选地区清单的精确小写 SHA-256；必须与路径同时提供
+        required: false
+        type: string
+        default: ""
+      official_result_package_dir:
+        description: 仓库相对的受审官方赛果三文件包目录；full_network 时必填
+        required: false
+        type: string
+        default: ""
+      official_result_summary_sha256:
+        description: 官方赛果包 summary.json 的精确 SHA-256；full_network 时必填
         required: false
         type: string
         default: ""
@@ -78,6 +92,10 @@ env:
   SOURCE_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.source_run_id || '' }}
   SOURCE_ATTEMPT: ${{ github.event_name == 'workflow_dispatch' && inputs.source_attempt || '' }}
   SOURCE_STAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.source_stage || '' }}
+  FULL_NETWORK: ${{ github.event_name == 'workflow_dispatch' && inputs.full_network == true && 'true' || 'false' }}
+  OFFICIAL_RESULT_PACKAGE_DIR: ${{ github.event_name == 'workflow_dispatch' && inputs.official_result_package_dir || '' }}
+  OFFICIAL_RESULT_SUMMARY_SHA256: ${{ github.event_name == 'workflow_dispatch' && inputs.official_result_summary_sha256 || '' }}
+  OFFICIAL_RESULT_OUTPUT_DIR: runtime/research/output/${{ github.event_name == 'workflow_dispatch' && inputs.year || '2025' }}-official-graded-results
   SAFE_STOP_CODE: "75"
   PYTHONUNBUFFERED: "1"
 
@@ -126,6 +144,32 @@ jobs:
             }
             [[ "$SOURCE_STAGE" =~ ^(races|profiles)$ ]] || {
               echo "source_stage 只接受 races|profiles" >&2
+              exit 1
+            }
+          fi
+
+          official_count=0
+          [[ -n "$OFFICIAL_RESULT_PACKAGE_DIR" ]] && official_count=$((official_count + 1))
+          [[ -n "$OFFICIAL_RESULT_SUMMARY_SHA256" ]] && official_count=$((official_count + 1))
+          if (( official_count != 0 && official_count != 2 )); then
+            echo "official result package 目录和 summary SHA-256 必须同时提供" >&2
+            exit 1
+          fi
+          if [[ "$FULL_NETWORK" == "true" && "$official_count" -ne 2 ]]; then
+            echo "full_network 正式运行必须提供受审 official result package" >&2
+            exit 1
+          fi
+          if (( official_count == 2 )); then
+            [[ "$OFFICIAL_RESULT_PACKAGE_DIR" != /* ]] || {
+              echo "official result package 必须使用仓库相对路径" >&2
+              exit 1
+            }
+            [[ ! "$OFFICIAL_RESULT_PACKAGE_DIR" =~ (^|/)\.\.(/|$) ]] || {
+              echo "official result package 路径不得包含上级目录" >&2
+              exit 1
+            }
+            [[ "$OFFICIAL_RESULT_SUMMARY_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
+              echo "official result summary SHA-256 必须是 64 位小写十六进制" >&2
               exit 1
             }
           fi
@@ -181,6 +225,10 @@ jobs:
             runtime/research/test_collect_official_graded_race_results.py \
             runtime/research/build_official_graded_race_manifest.py \
             runtime/research/test_build_official_graded_race_manifest.py \
+            runtime/research/validate_official_graded_race_package.py \
+            runtime/research/test_validate_official_graded_race_package.py \
+            runtime/research/build_graded_race_completion_bundle.py \
+            runtime/research/test_build_graded_race_completion_bundle.py \
             .codex/scripts/test_graded_race_participants_workflow.py
           python -m unittest \
             runtime.research.test_collect_graded_race_participants \
@@ -188,7 +236,15 @@ jobs:
             runtime.research.test_official_graded_race_sources \
             runtime.research.test_collect_official_graded_race_results \
             runtime.research.test_build_official_graded_race_manifest \
+            runtime.research.test_validate_official_graded_race_package \
+            runtime.research.test_build_graded_race_completion_bundle \
             -v
+          if [[ -n "$OFFICIAL_RESULT_PACKAGE_DIR" ]]; then
+            python runtime/research/validate_official_graded_race_package.py \
+              --package-dir "$OFFICIAL_RESULT_PACKAGE_DIR" \
+              --summary-sha256 "$OFFICIAL_RESULT_SUMMARY_SHA256" \
+              --year "$REQUESTED_YEAR"
+          fi
           python .codex/scripts/test_graded_race_participants_workflow.py -v
           python .codex/scripts/test_workflow_contract.py -v
       - name: Synthetic 安全停止、续跑、fan-in 与 finalize
@@ -226,6 +282,58 @@ jobs:
             ${{ env.SMOKE_DIR }}/final/
           if-no-files-found: error
           retention-days: 14
+
+  official_results:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network == true
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: 检出精确工具与受审 package
+        uses: actions/checkout@v4
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 恢复精确 official checkpoint
+        if: env.SOURCE_RUN_ID != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-official-results-0
+          path: ${{ env.OFFICIAL_RESULT_OUTPUT_DIR }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+      - name: 验证 package 并运行 official checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          package_json="$(python runtime/research/validate_official_graded_race_package.py \
+            --package-dir "$OFFICIAL_RESULT_PACKAGE_DIR" \
+            --summary-sha256 "$OFFICIAL_RESULT_SUMMARY_SHA256" \
+            --year "$REQUESTED_YEAR")"
+          manifest_sha="$(python -c 'import json,sys; print(json.loads(sys.argv[1])["manifest_sha256"])' "$package_json")"
+          set +e
+          python runtime/research/collect_official_graded_race_results.py \
+            --manifest "$OFFICIAL_RESULT_PACKAGE_DIR/official_result_manifest.json" \
+            --manifest-sha256 "$manifest_sha" \
+            --output-dir "$OFFICIAL_RESULT_OUTPUT_DIR" \
+            --resume \
+            --allow-network \
+            --timeout 30 \
+            --request-interval-seconds 2 \
+            --time-budget-seconds 3600
+          code=$?
+          set -e
+          [[ "$code" -eq 0 || "$code" -eq "$SAFE_STOP_CODE" ]] || exit "$code"
+          exit "$code"
+      - name: 上传本次 official checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-official-results-0
+          path: ${{ env.OFFICIAL_RESULT_OUTPUT_DIR }}/
+          if-no-files-found: error
+          retention-days: 30
 
   races:
     if: github.event_name == 'workflow_dispatch' && inputs.full_network == true
@@ -481,5 +589,64 @@ jobs:
             ${{ env.OUTPUT_DIR }}/final/summary.json
             ${{ env.OUTPUT_DIR }}/final/errors.json
             ${{ env.OUTPUT_DIR }}/final/README.md
+          if-no-files-found: error
+          retention-days: 30
+
+  completion_bundle:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_network == true
+    needs: [finalize, official_results]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 检出精确工具与受审 package
+        uses: actions/checkout@v4
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 恢复既有七文件
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-finalize-0
+          path: runtime/research/output/completion-bundle/legacy
+      - name: 恢复官方赛果完成 checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-official-results-0
+          path: ${{ env.OFFICIAL_RESULT_OUTPUT_DIR }}
+      - name: 生成跨来源 bundle identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_root="runtime/research/output/completion-bundle"
+          reviewed_stage="$bundle_root/reviewed_package"
+          [[ ! -e "$reviewed_stage" && ! -L "$reviewed_stage" ]] || {
+            echo "固定 reviewed package staging 已存在" >&2
+            exit 1
+          }
+          mkdir -m 0700 "$reviewed_stage"
+          cp -- "$OFFICIAL_RESULT_PACKAGE_DIR/official_result_manifest.json" \
+            "$reviewed_stage/official_result_manifest.json"
+          cp -- "$OFFICIAL_RESULT_PACKAGE_DIR/official_result_gaps.json" \
+            "$reviewed_stage/official_result_gaps.json"
+          cp -- "$OFFICIAL_RESULT_PACKAGE_DIR/summary.json" \
+            "$reviewed_stage/summary.json"
+          chmod 0600 "$reviewed_stage"/*.json
+          python runtime/research/build_graded_race_completion_bundle.py \
+            --year "$REQUESTED_YEAR" \
+            --legacy-dir "$bundle_root/legacy" \
+            --official-dir "$OFFICIAL_RESULT_OUTPUT_DIR/final" \
+            --reviewed-package-dir "$reviewed_stage" \
+            --reviewed-summary-sha256 "$OFFICIAL_RESULT_SUMMARY_SHA256" \
+            --output "$bundle_root/bundle_manifest.json"
+      - name: 上传年度完整研究 bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.run_id }}-${{ github.run_attempt }}-completion-bundle-0
+          path: |
+            runtime/research/output/completion-bundle/legacy/
+            ${{ env.OFFICIAL_RESULT_OUTPUT_DIR }}/final/
+            runtime/research/output/completion-bundle/reviewed_package/
+            runtime/research/output/completion-bundle/bundle_manifest.json
           if-no-files-found: error
           retention-days: 30

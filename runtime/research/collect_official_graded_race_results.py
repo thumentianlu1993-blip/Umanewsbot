@@ -16,6 +16,7 @@ import socket
 import ssl
 import sys
 import time
+from datetime import date
 from pathlib import Path
 from typing import Any
 from urllib import error, request
@@ -27,6 +28,7 @@ if str(REPO_ROOT) not in sys.path:
 from runtime.research.official_graded_race_sources import (  # noqa: E402
     POLICIES,
     OfficialSourceError,
+    canonical_provider_url_identity,
     derive_data_url,
     parse_official_results,
     validate_provider_url,
@@ -100,6 +102,9 @@ def load_manifest(path: Path, *, expected_sha256: str) -> tuple[dict, str]:
     catalog_sha = manifest.get("catalog_sha256")
     if not isinstance(catalog_sha, str) or not SHA_RE.fullmatch(catalog_sha):
         raise RunnerError("manifest catalog SHA-256 is invalid")
+    reviewed_mapping_sha = manifest.get("reviewed_mapping_sha256")
+    if not isinstance(reviewed_mapping_sha, str) or not SHA_RE.fullmatch(reviewed_mapping_sha):
+        raise RunnerError("manifest reviewed mapping SHA-256 is invalid")
     races = manifest.get("races")
     if not isinstance(races, list) or not races:
         raise RunnerError("manifest races must be a non-empty list")
@@ -125,7 +130,14 @@ def load_manifest(path: Path, *, expected_sha256: str) -> tuple[dict, str]:
         expected_country = str(item.get("country") or "").strip()
         if expected_region != policy.region or expected_country != policy.country:
             raise RunnerError(f"manifest provider geography mismatch: {race_key}")
-        url_key = (provider, result_url)
+        local_date = str(item.get("local_date") or "").strip()
+        try:
+            parsed_date = date.fromisoformat(local_date)
+        except ValueError as exc:
+            raise RunnerError(f"manifest local_date is invalid: {race_key}") from exc
+        if parsed_date.year != year:
+            raise RunnerError(f"manifest local_date year drift: {race_key}")
+        url_key = (provider, canonical_provider_url_identity(result_url))
         if url_key in seen_urls:
             raise RunnerError("manifest provider/result_url is duplicated")
         seen_keys.add(race_key)
@@ -139,7 +151,7 @@ def load_manifest(path: Path, *, expected_sha256: str) -> tuple[dict, str]:
                 "country": policy.country,
                 "grade": grade,
                 "race_name": str(item.get("race_name") or "").strip(),
-                "local_date": str(item.get("local_date") or "").strip(),
+                "local_date": local_date,
             }
         )
     provider_counts: dict[str, int] = {}
@@ -229,6 +241,27 @@ def _write_checkpoint(path: Path, checkpoint: dict) -> None:
     atomic_write(path, canonical_json_bytes(checkpoint))
 
 
+def _validate_checkpoint_state(checkpoint: dict, manifest: dict) -> None:
+    races = {race["race_key"]: race for race in manifest["races"]}
+    items = checkpoint["items"]
+    if not set(items).issubset(races):
+        raise RunnerError("checkpoint contains race outside manifest")
+    for race_key, item in items.items():
+        if not isinstance(item, dict) or item.get("status") not in {
+            "success",
+            "retryable_error",
+            "deterministic_error",
+        }:
+            raise RunnerError(f"checkpoint item status is invalid: {race_key}")
+    manifest_providers = {race["provider"] for race in manifest["races"]}
+    counts = checkpoint["provider_request_counts"]
+    if not set(counts).issubset(manifest_providers):
+        raise RunnerError("checkpoint contains provider outside manifest")
+    for provider, value in counts.items():
+        if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= POLICIES[provider].request_budget:
+            raise RunnerError(f"checkpoint provider request count is invalid: {provider}")
+
+
 def _cache_path(root: Path, race_key: str) -> Path:
     digest = hashlib.sha256(race_key.encode()).hexdigest()
     return root / "source" / f"{digest}.response"
@@ -266,6 +299,7 @@ def run(args) -> dict:
     checkpoint_path = root / "checkpoint.json"
     identity = _checkpoint_identity(manifest_sha, manifest["year"])
     checkpoint = _load_checkpoint(checkpoint_path, identity, resume=args.resume)
+    _validate_checkpoint_state(checkpoint, manifest)
     started = time.monotonic()
     last_request_at: float | None = None
     for race in manifest["races"]:

@@ -58,6 +58,9 @@
   P1；均以 RED 修复。runner manifest 绑定 review SHA，summary 绑定 manifest/gap/package SHA；当前
   受影响 Django `434/434`、研究 `117/117`、workflow `16/16` 全绿；同一 reviewer 限定复审为
   `APPROVED`，无 P0/P1/P2。
+- workflow 增量把 official_results 与旧七文件分支收敛为 completion bundle；独立审查发现自由 package
+  路径进入 artifact glob 的一项 P1，现改为固定 mode `0700/0600` staging、固定文件名复制、重验后上传。
+  最终研究 `122/122`、workflow `17/17`，第三轮 reviewer `APPROVED`、无 P0-P2。
 
 ## 门禁
 

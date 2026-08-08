@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass
 from html import unescape
 from html.parser import HTMLParser
 from typing import Any, Callable
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
 
 POS = re.compile(r"^(\d+)(?:st|nd|rd|th|\.)?$", re.I)
 HORSE_ID = re.compile(r"/hors?e?s?/([^/?#]+)", re.I)
@@ -50,6 +50,15 @@ def validate_provider_url(provider: str, url: str, *, year: int) -> str:
     if str(year) not in url:
         raise OfficialSourceError(f"provider URL lacks requested year: {provider}")
     return parsed.geturl()
+
+
+def canonical_provider_url_identity(url: str) -> str:
+    parsed = urlsplit(clean(url))
+    host = (parsed.hostname or "").lower()
+    port = parsed.port
+    netloc = host if port in (None, 443) else f"{host}:{port}"
+    query = urlencode(sorted(parse_qsl(parsed.query, keep_blank_values=True)), doseq=True)
+    return urlunsplit((parsed.scheme.lower(), netloc, parsed.path or "/", query, ""))
 
 
 def derive_data_url(provider: str, page_url: str, *, year: int) -> str:

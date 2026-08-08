@@ -15,7 +15,7 @@
 - [x] (integration) 实现 TJCIS AU/DE/Middle East catalog parser/adapter、官方 result parser 与
   manifest-bound checkpoint runner；受审赛事 URL manifest 的自动发现/接线仍属 workflow 任务
 - [x] (integration) 实现 404 场目录到 reviewed URL/gap 的离线 1:1 manifest 编译门禁
-- [ ] (operations) 扩展 workflow checkpoint DAG、artifact identity 和 safe-stop 合同
+- [x] (operations) 扩展 workflow checkpoint DAG、artifact identity 和 safe-stop 合同；full_network 必须绑定受审 package
 
 ## 2. 生产身份与地区
 

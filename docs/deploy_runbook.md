@@ -1,5 +1,21 @@
 # 部署运行手册
 
+## 2026-08-09 八地区 2025 正式研究 workflow 新门禁（尚未部署）
+
+1. `full_network=true` 必须提供仓库相对的 official result 三文件包目录和 `summary.json` 精确 SHA；
+   三文件固定为 `official_result_manifest.json`、`official_result_gaps.json`、`summary.json`。目录、文件
+   或任一 catalog/review/manifest/gap/package SHA 漂移均在联网前拒绝。
+2. 正式 DAG 为 `official_results` 与旧 `races -> profiles[0..3] -> merge_profiles -> finalize` 并行。
+   official runner 逐 provider 限域，保留 response cache/checkpoint；临时网络错误返回 `75`，确定性
+   manifest/parser/identity 错误返回 `1` 并禁止 fresh fallback。
+3. 续跑仍使用精确 `source_run_id/source_attempt/source_stage=races|profiles`。official artifact 只要
+   来源 run 存在就总是恢复；旧分支按 source_stage 恢复，单个 workflow run 内不循环重试。最多六次
+   dispatch 属于外部监控授权，不写入 YAML 自循环。
+4. 只有两个分支均成功才上传 `completion-bundle-0`；bundle manifest 绑定旧七文件、official final
+   三文件和固定 staging 中 reviewed package 三文件的逐文件 SHA；自由输入目录不直接传给 artifact
+   uploader。该 bundle 仍是研究证据，不连接 Django、不写生产，
+   也不构成后续 profile apply 的 G3。
+
 ## 2026-08-09 Release B 精确 G3 apply/verifier 与 2025 正式 run 收口
 
 1. 本次唯一授权绑定 production revision `75294a4dea51538962741ec6c0835dc3090558ff`、reviewed

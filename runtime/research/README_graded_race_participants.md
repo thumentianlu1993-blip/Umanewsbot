@@ -14,7 +14,8 @@ redirect 与地区 manifest 均不得跨 scheme。这只是对齐现有来源入
 固定 DAG：
 
 ```text
-races -> profiles[0..3] -> merge_profiles -> finalize
+tests -> official_results -------------------------------> completion_bundle
+      -> races -> profiles[0..3] -> merge_profiles -> finalize ---^
 ```
 
 `--year` 必填，范围为 `1984..当前 UTC 年`。每个 output 目录只绑定一个年份、collector
@@ -75,16 +76,22 @@ python3 runtime/research/collect_graded_race_participants.py \
   `1984..当前 UTC 年`；
 - 可选地区清单必须用仓库相对路径和精确小写 SHA-256 成对提供；workflow 先拒绝 symlink、
   工作树外路径和 SHA 漂移，collector 再校验 JSON schema、年份和 URL；
+- `full_network=true` 必须同时提供仓库相对的 official result 三文件包目录和 `summary.json` 精确
+  SHA；离线 validator 校验 exact file set、catalog/review/manifest/gap/package SHA 与
+  `collect + gap = catalog` 后才允许官方 provider 网络阶段；
 - workflow 对 `races` 显式传 `--request-budget 5000`，对每个 profile shard 显式传
   `--request-budget 2000`；同一 stage 的 fresh/resume 共用该调用，merge/finalize 不传预算；
 - 只有另行授权并显式选择 `full_network=true`，才会进入
-  `tests -> races -> profiles[0..3] -> merge_profiles -> finalize`。
+  两条并行分支，并在两者均完成后生成 completion bundle。
 
 正式阶段的 artifact 名固定包含 `run_id/run_attempt/stage/shard`。`races`、四个 profile shard
 和 merged profiles 分别上传自己的精确 checkpoint；fan-in job 显式下载所有上游 shard。
 安全停止或暂时网络错误以退出码 `75` 保持 job failure，同时由 `if: always()` 上传当前
-checkpoint。后续如获授权，可用同一仓库中的精确 `source_run_id`、`source_attempt` 和
-`source_stage=races|profiles` 三元组重新 dispatch；三项必须全空或全有。
+checkpoint。官方结果 checkpoint 同样绑定 tool/parser/manifest/review identity；任何后续 dispatch
+只要提供来源 run，就恢复它，避免旧分支在另一分支暂时失败时重复触网。后续如获授权，可用同一
+仓库中的精确 `source_run_id`、`source_attempt` 和
+`source_stage=races|profiles` 三元组重新 dispatch；三项必须全空或全有。`source_stage` 表示旧分支
+恢复深度，official checkpoint 只要存在来源 run 就总是精确恢复。
 
 请求预算使用 crash-safe write-ahead ledger。races artifact 上传整个 `stages/races/`，其中
 包含精确队列续跑所需的 `discovery_progress.json`、`discovery_request_ledger.json` 和正式
@@ -101,7 +108,7 @@ races index 的真实路径是 `stages/races/shards/0/index.json`。其中 termi
 `outcome=partial` artifact。只有真实 `retryable_error` 映射为 `75`；`permanent_error`、
 未知状态或非暂时性错误继续 fail closed。
 
-races 和 profiles job 的 `timeout-minutes=75`，脚本 time budget 为 `3600` 秒，正常情况下给
+official_results、races 和 profiles job 的 `timeout-minutes=75`，脚本 time budget 为 `3600` 秒，正常情况下给
 退出码 `75`、原子 checkpoint 和 artifact post-step 留出 15 分钟余量。但 GitHub Actions 的
 hard cancellation 或 runner timeout 可能直接终止 runner，`if: always()` post-step 无法保证
 执行；workflow 不声称已捕获这种中断。遇到此类状态只能从最后一份已成功上传的精确 artifact
@@ -111,7 +118,11 @@ hard cancellation 或 runner timeout 可能直接终止 runner，`if: always()` 
 收敛。是否再次 dispatch 属于独立的监控/操作授权。确定性配置、manifest、schema、identity
 或 checkpoint 漂移直接失败，不自动 fresh fallback。
 
-`finalize` 不联网，只 fan-in 已验证 checkpoint；最终 artifact 的上传 allowlist 精确为本年度
+`finalize` 不联网，只 fan-in 已验证 checkpoint；既有 artifact 的上传 allowlist 精确为本年度
 三份 CSV、`source_manifest.jsonl`、`summary.json`、`errors.json` 和 `README.md` 七个文件。
+`completion_bundle` 再绑定这七文件、官方 participants/sources/summary 和受审三文件包的逐文件 SHA，
+生成 `graded-race-completion-bundle.v1` manifest；它保留两种来源的原始语义，不把 partial 七文件单独
+冒充八地区完整结果。受审三文件先按固定文件名复制到固定 `completion-bundle/reviewed_package/`
+staging，再校验并上传；自由输入目录不会直接进入 artifact uploader 的 glob/排除规则。
 workflow 只有 `actions: read` 与 `contents: read`，不运行 Django、数据库、Celery、Docker 或
 生产写入。

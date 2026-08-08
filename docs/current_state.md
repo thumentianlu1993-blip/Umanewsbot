@@ -18,8 +18,8 @@
   Saudi Arabia `12`、Qatar `3`）。Qatar 三场原来夹在 `OTHER` 页的 unsupported country 段落之间，
   现已由官方整本真实回放证明并补入；France/US 的 parsed/declared count 差异仍显式记录为来源冲突。
 - P0 参赛马候选桥现支持八地区、单一年份与 `actual_starts_only`，输出
-  `bind_existing/create_new/ambiguous/blocked`；provider ID 优先，纯马名仍只能 blocked。相关 Django
-  当前受影响 Django 组合回归 `434/434`、研究侧回归 `117/117`、workflow 合同 `16/16` 通过。v2 census 的赛事身份
+  `bind_existing/create_new/ambiguous/blocked`；provider ID 优先，纯马名仍只能 blocked。当前受影响
+  Django 组合回归 `434/434`、研究侧回归 `122/122`、workflow 合同 `17/17` 通过。v2 census 的赛事身份
   已改用规范化完整 URL（保留排序后的 query），不再把不同德国赛事折叠成 `rennen.php`。
 - 同一独立 reviewer 对首批五项 P1 的最终反例复核为 `APPROVED`；其中 cache path 同时拒绝 `../`、
   absolute、resolved-outside-root、非 race-bound 及 output root 内 symlink alias。后续 URL manifest/
@@ -36,7 +36,10 @@
   Netkeiba fixture 的 parser version `v3→v5` 测试漂移，不改变生产 parser。
 - `RacingRegion` 已在本地加入 Australia/Germany/Middle East，并生成 state-only migration 0072；
   `makemigrations --check`、Django check 与枚举回归通过。
-- 尚待自动发现并审核官方赛事 URL、把受审 manifest 接入 workflow DAG，并生成新增地区完整
+- 正式 workflow 已接为旧七文件与 official_results 两条并行分支；`full_network=true` 缺受审三文件包
+  会拒绝，临时错误以 exact official checkpoint 续跑，两条分支均成功后生成逐文件 SHA 绑定的
+  `graded-race-completion-bundle.v1`。自由 package 路径不直接进入 artifact glob，而是复制到固定权限
+  staging 后重验。第三轮独立审查最终 `APPROVED`、无 P0-P2。尚待自动发现并审核官方赛事 URL，并生成新增地区完整
   profile/career canonical cache。基础实现已提交为 `3dcbd46f` 并推送到 Draft PR #83；当前未部署、
   未扩大正式网络或写生产。
 

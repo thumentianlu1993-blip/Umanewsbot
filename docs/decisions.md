@@ -2800,3 +2800,15 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   官方目录；不能借用其他国家 provider 的可访问页面作为证据。
 - runner manifest 自身绑定 reviewed mapping SHA；summary 再绑定 manifest、gap artifact 和 package SHA，
   避免只拿 runner 文件时丢失审核来源，或三个输出被跨批次拼接。
+
+# 2026-08-09 2025 正式 workflow 必须同时收敛旧七文件与官方新地区分支
+
+- `full_network=true` 不再允许缺少受审 official result 三文件包；否则只会重复产生已知
+  `classification_incomplete` 七文件，不能推进八地区目标。
+- official_results 与旧 UmaFans races/profiles 并行运行，各自使用独立 checkpoint；任一暂时错误返回
+  `75` 并上传完整 stage。恢复来源 run 时 official checkpoint 总是恢复，旧分支仍按 `races|profiles`
+  指定深度恢复，避免一条分支失败导致另一条重复触网。
+- 只有两条分支都成功，才生成 `graded-race-completion-bundle.v1`；bundle 绑定旧七文件、官方三文件、
+  受审三文件包及 package SHA，但保持来源分层，不把旧 partial artifact 单独改名冒充完整。
+- workflow 输入目录只用于 literal file read；受审三文件必须先复制到固定 staging 目录并重新通过
+  package validator，artifact uploader 只接受固定路径，避免自由目录名被二次解释为 glob 或 `!` 排除。

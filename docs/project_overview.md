@@ -6,6 +6,8 @@
   provider-bound 官方赛果，不用 Wikipedia/Wikidata，也不把报名或退赛当作参赛。
 - 官方赛果通过 reviewed manifest、逐跳 HTTPS allowlist、请求预算、原始 response SHA、parser/policy
   SHA 和精确 checkpoint 运行；临时网络错误安全续跑，确定性解析/身份错误立即停止。
+- 正式年度 workflow 将既有 UmaFans 七文件与新增地区 official results 作为两条独立分支；只有二者
+  都完成才生成逐文件 SHA 绑定的 completion bundle，缺受审官方三文件包时禁止 full-network。
 - 生产侧候选按单一年份和实际起跑生成，只允许 provider ID 或完整身份事实绑定/新建；纯马名保持
   blocked。完整资料、二代血统、全生涯和由履历重算的主胜鞍仍须通过 reviewed apply/verifier，当前
   本地实现不会自动公开或写入生产。

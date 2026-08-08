@@ -21,6 +21,7 @@ class OfficialGradedResultRunnerTests(unittest.TestCase):
             "schema_version": 1,
             "year": 2025,
             "catalog_sha256": "a" * 64,
+            "reviewed_mapping_sha256": "b" * 64,
             "races": races
             or [
                 {
@@ -134,16 +135,40 @@ class OfficialGradedResultRunnerTests(unittest.TestCase):
                 "region": "germany",
                 "country": "united_arab_emirates",
                 "grade": "G1",
+                "local_date": "2025-01-01",
             }
             manifest, manifest_sha = self.manifest(root, [race])
             with self.assertRaisesRegex(runner.RunnerError, "geography mismatch"):
                 runner.load_manifest(manifest, expected_sha256=manifest_sha)
 
             race["region"] = "middle_east"
-            duplicate = {**race, "race_key": "bad-2"}
+            duplicate = {
+                **race,
+                "race_key": "bad-2",
+                "result_url": (
+                    "https://emiratesracing.com/racecard/2025-01-01/1/results?b=2&a=1"
+                ),
+            }
+            race["result_url"] += "?a=1&b=2"
             manifest, manifest_sha = self.manifest(root, [race, duplicate])
             with self.assertRaisesRegex(runner.RunnerError, "duplicated"):
                 runner.load_manifest(manifest, expected_sha256=manifest_sha)
+
+    def test_manifest_requires_review_binding_and_same_year_local_date(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest, _ = self.manifest(root)
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            payload.pop("reviewed_mapping_sha256")
+            manifest.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(runner.RunnerError, "reviewed mapping"):
+                runner.load_manifest(manifest, expected_sha256=digest(manifest))
+
+            payload["reviewed_mapping_sha256"] = "b" * 64
+            payload["races"][0]["local_date"] = "2024-12-31"
+            manifest.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(runner.RunnerError, "year drift"):
+                runner.load_manifest(manifest, expected_sha256=digest(manifest))
 
     def test_tool_identity_change_invalidates_checkpoint(self):
         with TemporaryDirectory() as temporary:
@@ -211,6 +236,36 @@ class OfficialGradedResultRunnerTests(unittest.TestCase):
             fetch.assert_not_called()
             checkpoint = json.loads((output / "checkpoint.json").read_text(encoding="utf-8"))
             self.assertEqual(checkpoint["provider_request_counts"], {"de_deutscher_galopp": 1})
+
+    def test_checkpoint_rejects_unknown_race_provider_and_invalid_count(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest, manifest_sha = self.manifest(root)
+            output = root / "output"
+            output.mkdir()
+            base = {
+                **runner._checkpoint_identity(manifest_sha, 2025),
+                "items": {"outside": {"status": "retryable_error"}},
+                "provider_request_counts": {},
+            }
+            checkpoint = output / "checkpoint.json"
+            checkpoint.write_text(json.dumps(base), encoding="utf-8")
+            with mock.patch.object(runner, "fetch") as fetch, self.assertRaisesRegex(
+                runner.RunnerError, "race outside manifest"
+            ):
+                runner.run(self.args(manifest, manifest_sha, output, resume=True))
+            fetch.assert_not_called()
+
+            base["items"] = {}
+            base["provider_request_counts"] = {"uae_era": 1}
+            checkpoint.write_text(json.dumps(base), encoding="utf-8")
+            with self.assertRaisesRegex(runner.RunnerError, "provider outside manifest"):
+                runner.run(self.args(manifest, manifest_sha, output, resume=True))
+
+            base["provider_request_counts"] = {"de_deutscher_galopp": -1}
+            checkpoint.write_text(json.dumps(base), encoding="utf-8")
+            with self.assertRaisesRegex(runner.RunnerError, "request count is invalid"):
+                runner.run(self.args(manifest, manifest_sha, output, resume=True))
 
     def test_checkpoint_cache_path_must_match_race_bound_path(self):
         with TemporaryDirectory() as temporary:
