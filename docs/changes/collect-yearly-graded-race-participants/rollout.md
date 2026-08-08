@@ -1,18 +1,30 @@
 # 单年度分级赛全部参赛马研究 Rollout
 
-## 当前检查点
+## 2026-08-09 首次正式 full-network 结果
 
-- 原主工作区 `/Users/mentianlu/Code/umanews` 在任务开始时包含大量其他会话改动，本任务不触碰。
-- 独立 worktree：
+- 用户在 Release B verifier 通过后授权 2025 `full_network=true`；fresh run `31269803408` 首轮全部
+  job success，未使用 checkpoint continuation，运行额度消耗 `1/6`。
+- 最终七文件 artifact `31269803408-1-finalize-0`（ID `9025592068`）digest 为
+  `sha256:ef8bbc107379413aa2e2ca8ed0dc144759fb7b3578b4d15746b421b923477535`。
+- `summary.json` 为 `outcome=partial`：1063 races、9292 participant rows、4965 horses；France、
+  Hong Kong、Japan、UK、US covered，Australia、Germany、Middle East classification incomplete。
+  required English missing `3905`，profile not found/ambiguous/unresolved `3998/32/15`。
+- 上述是确定性来源覆盖和资料完整性缺口，不是 exit 75 或临时网络错误；按失败边界停止，不对同一
+  输入使用剩余五次额度自动重跑。
+
+## 实施前历史检查点
+
+- 原主工作区 `/Users/mentianlu/Code/umanews` 在任务开始时包含大量其他会话改动，本任务未触碰。
+- 当时使用的独立 worktree：
   `/Users/mentianlu/.codex/worktrees/graded-race-participants/umanews`。
 - 分支：`codex/generalize-graded-race-participants`。
 - 基线：`origin/main@6d073dc07cb29201bbc922255923820c872a0467`。
 - 旧研究来源：`origin/research/2026-graded-top5-wikipedia@61d4c526`；实际可复用代码版本
   `c7cb5d7d`。
 - 旧研究相对新主线 ahead 12 / behind 49，禁止整分支 merge。
-- 已按获准方案完成 collector、测试、workflow、README 和 region manifest 说明的离线候选；
-  当前全部为未提交改动。未运行 GitHub Actions 或联网 collector，未 commit、push、创建 PR、
-  部署或触碰生产。
+- 当时已按获准方案完成 collector、测试、workflow、README 和 region manifest 说明的离线候选，
+  尚未提交，也未运行 GitHub Actions 或联网 collector。其后的发布与正式 run 结果见本文顶部及
+  第 9–11 项门禁；这段只保留为实施前历史边界。
 
 ## 并行与重叠
 
@@ -67,7 +79,8 @@
 10. [x] default `main` 的 `full_network=false` run `30555834994` success；tests job 通过，
     网络 DAG 按设计 skipped，artifact `30555834994-1-synthetic-checkpoint-0` 已核验包含
     run manifest、synthetic report 和 final 严格 7 文件。本项即为本变更生产部署完成定义。
-11. [ ] 正式 `full_network=true` 单年度 run 需要单独明确授权；每个年份均是独立 run/manifest，
+11. [x] 已取得 2025 正式 `full_network=true` 单年度授权并完成 run `31269803408`；最终 artifact
+    为可审计 `partial`，不是八地区完整成功。后续年份仍需逐年独立授权、run 与 manifest。
 
 ## 发布验证与回滚
 

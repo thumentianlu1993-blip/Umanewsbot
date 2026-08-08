@@ -1,5 +1,14 @@
 # 历史赛历 Release B Rollout
 
+## 2026-08-09 最终生产数据阶段
+
+- production revision `75294a4d…` 的新 path staging 已通过精确 reviewed manifest
+  `89387fab…e96b` 和 action scope `d7052d43…00bd` 完成 manifest-bound apply。
+- fresh backup SHA 为 `af6aa018…832a`；receipt `#1` 为 `verified`，rollback/verifier SHA 为
+  `acb1fc2b…342c` / `f71c2bc9…f0ac`，12 条 canonical links 生效，active maintenance gate 为零。
+- 首次 apply 只因 one-shot write flag 缺失在零写入处 fail closed；按命令合同仅对精确 apply 进程
+  注入 flag 后成功，全局配置未打开。Release B 的 B4 数据 apply/verifier 已完成。
+
 ## 1. 工作区与基线
 
 - worktree：`/Users/mentianlu/.codex/worktrees/release-b-historical-calendar/umanews`

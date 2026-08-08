@@ -1,5 +1,18 @@
 # 项目状态文档
 
+## 2026-08-09 Release B 数据阶段完成，2025 full-network 首轮产出 partial
+
+- 精确 G3 已对生产 `75294a4d…`、manifest `89387fab…e96b`、scope `d7052d43…00bd` 执行；写前
+  备份 SHA 为 `af6aa018…832a`，receipt `#1` 为 `verified`，rollback/verifier SHA 分别为
+  `acb1fc2b…342c`、`f71c2bc9…f0ac`，12 条 active canonical link 已生效。
+- apply 的首次调用因缺少 one-shot write flag 在零写入处拒绝；只对精确 apply 进程注入必需 flag 后
+  成功，全局 flags 仍关闭。maintenance 已退出，worker/beat、Django check、HTTP healthz 正常。
+- 2025 `full_network=true` run `31269803408` 首轮全部成功，最终 artifact digest 为
+  `sha256:ef8bbc10…7535`，共 `1063` 场、`9292` 条参赛、`4965` 匹马。
+- artifact 明确为 `partial`：澳洲、德国、中东 classification incomplete；required English missing
+  `3905`，profile not found/ambiguous/unresolved 为 `3998/32/15`。这属于确定性资料/覆盖缺口，故未
+  自动重跑；当前 workflow run 消耗 `1/6`。
+
 ## 2026-08-09 Release B path staging 最小修复已上线，等待 G3
 
 - 候选仅在临时 path staging 增加 `path_kind=legacy`，避免逐行最终写入出现瞬时双 canonical；无
