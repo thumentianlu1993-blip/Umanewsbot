@@ -1,5 +1,38 @@
 # 当前状态
 
+## 2026-08-08 Release B 已部署，v2 census 在 duplicate identity 门禁确定性停止
+
+- 生产过期 review claim `39/43/44/45/46/47/48` 已在停 Beat/worker/race-live、custom-format
+  备份与独立审查后，由一次性 `SERIALIZABLE` PostgreSQL 事务收口为既有终态 `noop`；业务原因仍为
+  `stale_claim_reconciled`。最终 approval SHA 为
+  `968f0e8d5bac63f099b9cad4bbf84cabf489bf545677a9e476523afad2a00bb1`，after artifact 为
+  `13632` bytes、mode `0600`、SHA-256
+  `1e24890db5f744aa2381f7621daf51e38d5343c0944a6a65198e7f9a42ceeb8d`。第一次包装器因旧 web
+  镜像缺新 helper 在 SQL 前停止，锁已释放、7 行仍 claimed、无 migration；v2 包装器改用等价内联
+  digest 并经独立复审后成功。
+- 最新迁移前备份
+  `/opt/umanewsbot/backups/db/pre-release-b-after-stale-reconcile-20260808T131400Z.dump` 为
+  `411796037` bytes、mode `0600`、TOC `1304`、SHA-256
+  `1f6b276bc139377af93709f80cb8b64d6c026022789b2e1c6651adea582b8d1b`；旧镜像另存为
+  `umanewsbot:rollback-pre-release-b-after-stale-reconcile-20260808T131400Z`。
+- fresh release `/opt/umanews-release-4e3ffa8d-MR3-20260808/umanewsbot` 固定
+  `main@4e3ffa8dd0224ae9254b17eda6c42fa11b2c730b`。新 handoff artifact SHA 为
+  `62300fbfdcc4c5ac16505067dad4fa5a68bfddcdb1e22e2ef90ceebdf51bb5f4`；关闭态 verifier 显示
+  writer count 全 0、所有历史/网络/同步/live flags 为 false。`0068/0069/0071` 顺序应用成功，
+  restricted marker 完成；生产镜像为
+  `sha256:e2102ff87e465c4904b1db470ddfa3e3679dfe681bd63a405c6922954fe7afe1`，revision 为
+  `4e3ffa8d...`。Django check、migration plan=0、web health、唯一 Celery worker ping 与关闭 flags 通过。
+- 部署后只读 v2 census 已生成并持久化到
+  `/opt/umanewsbot/backups/release-state/release-b-census-v2-20260808T132000Z`。manifest 为
+  `16329022` bytes、SHA-256 `547d169535580d3948e81f57fb10b474e571d94aa8e1c3a9e1523317246abcdc`；
+  结果为 `14 actions / 81 mismatch / 12 duplicate boundaries / 0 unscoped / 0 executable`。
+- 独立 reviewer 复算 actions、scope、177 events、261 targets、177 paths 与 6279 immutable
+  dependency rows 后结论 `BLOCKED`：12 对同 series/date/HKJC official result URL 且 runner/result
+  相同的赛事来自相邻 TJCIS season catalog，但完整 `source_refs` 不同，导致 identity SHA 不同。
+  当前 validator 不允许标记 equivalent/collapse；标记 distinct 又会把同一场比赛误作两场。
+  因此未生成 reviewed overlay/approval，未进入 maintenance/apply/verifier，2025 `full_network` run
+  保持 0。下一步必须先修改 duplicate equivalence 合同、测试、独立复审、重新部署并重新生成 census。
+
 ## 2026-08-08 migration-history production audit 生成口径已修复
 
 - 首次受审 baseline 的三项 SHA 来自临时 raw SQL：receipt/operation 行被编码为 positional array，

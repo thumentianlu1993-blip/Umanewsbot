@@ -2708,3 +2708,13 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   `uq_hist_target_active_series_year → stable_historicalraceeventtarget`。
 - collector 对受审名称进行补充收集，使错误表上的同名索引进入 validator 并产生对应 drift；对象位于
   其他 schema 时，受审 schema 中索引缺失同样 fail closed。
+
+# 2026-08-08 duplicate equivalence 不得由完整 provenance blob 决定
+
+- 生产 v2 census 证明 12 对香港事件具有相同 series、local date、official HKJC result URL、规范化
+  runner/result，但来自相邻 TJCIS season catalog，因此完整 `source_refs` 不同。
+- 当前 `_duplicate_identity_sha256()` 把整个 `source_refs` digest 纳入等价 identity，导致这些同赛无法
+  标记 equivalent；把它们标记 distinct 又会制造两个产品事件，违反 duplicate contract。
+- 决策是 fail closed：当前 census 只作为证据冻结，不制作 overlay/approval。后续 change 应以稳定官方
+  赛事身份、核心字段、runner/result 判断同赛，并把 season-catalog provenance 差异保留在独立审计
+  ledger；修复须重新测试、独立 review、部署和生成 census，不能复用本次 manifest SHA。

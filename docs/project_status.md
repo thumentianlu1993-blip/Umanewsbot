@@ -1,5 +1,18 @@
 # 项目状态文档
 
+## 2026-08-08 Release B 生产部署成功，数据阶段因 v2 census 确定性阻断
+
+- 7 个过期 `RaceResultReviewRun` claim 已按独立复审的一次性事务转为 terminal `noop`，after artifact
+  SHA 为 `1e24890d...eb8d`；没有生成 bundle、delivery 或通知。
+- fresh 备份 SHA 为 `1f6b276b...8d1b`。生产已从 `main@4e3ffa8d` 构建并切换到镜像
+  `sha256:e2102ff8...afe1`，`0068/0069/0071` 全部 applied；Django、migration plan、web、Celery 和
+  false/off flags 验收通过。
+- v2 census manifest SHA 为 `547d1695...abcdc`，守恒为 `14/81/12/0`（series actions / mismatch /
+  duplicate boundaries / executable）。独立审核确认 census 完整，但 12 对 HKJC 同赛因相邻 TJCIS
+  catalog provenance 不同而 identity SHA 不同，现有合同无法安全 collapse，也不能误标 distinct。
+- 当前明确停止在 reviewed overlay 之前：无 approval、maintenance、数据 apply 或 2025
+  `full_network` workflow。后续是 duplicate equivalence 合同修复 change，不得手填 overlay 绕过。
+
 ## 2026-08-08 migration-history audit baseline 口径修复
 
 - 已证明旧 expected SHA 使用 positional row/nested FK 临时脚本，而正式 preflight 使用
