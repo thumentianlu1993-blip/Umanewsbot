@@ -9,6 +9,9 @@
 - 生产侧候选按单一年份和实际起跑生成，只允许 provider ID 或完整身份事实绑定/新建；纯马名保持
   blocked。完整资料、二代血统、全生涯和由履历重算的主胜鞍仍须通过 reviewed apply/verifier，当前
   本地实现不会自动公开或写入生产。
+- 澳洲、德国和中东的资料标准化器只接受已审核的 canonical v2 cache；常驻旧五地区网络批次不因
+  新增适配器自动扩围。生产 apply 已沿用同一 reviewed mapping、release manifest 和 verifier 合同，
+  不为新地区另开低门槛写入入口。
 
 ## 2026-08-09 Release B 数据治理当前边界
 

@@ -14,6 +14,7 @@
 - [x] (integration) 写入六类 result fixture 与严格 parser 回归；catalog fixture 随 catalog adapter 补入
 - [x] (integration) 实现 TJCIS AU/DE/Middle East catalog parser/adapter、官方 result parser 与
   manifest-bound checkpoint runner；受审赛事 URL manifest 的自动发现/接线仍属 workflow 任务
+- [x] (integration) 实现 404 场目录到 reviewed URL/gap 的离线 1:1 manifest 编译门禁
 - [ ] (operations) 扩展 workflow checkpoint DAG、artifact identity 和 safe-stop 合同
 
 ## 2. 生产身份与地区
@@ -25,7 +26,7 @@
 
 ## 3. 完整资料补全
 
-- [ ] (integration) 扩展 P0 adapter config 至 AU/DE/Middle East，并冻结逐 provider authority
+- [x] (integration) 扩展 P0 adapter config 至 AU/DE/Middle East，冻结逐 provider cache authority，且不扩大旧 rolling network batch
 - [ ] (integration) 实现新增来源 cache/parser/identity/budget/checkpoint
 - [ ] (application) 验证基础资料、二代血统、完整生涯及主胜鞍重算门禁
 - [ ] (integration) 生成全部 2025 候选的 reviewed completion artifact

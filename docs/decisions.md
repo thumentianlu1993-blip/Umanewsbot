@@ -2774,3 +2774,29 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   parser 后以新 identity/fresh checkpoint 运行。缓存路径必须精确等于 race key 派生路径且位于 output root。
 - 外部赛事身份采用规范化完整 URL 并保留排序 query；path basename 只可作为唯一时的生产 diff 显示别名，
   不得参与赛事计数或 participant/manifest 一致性门禁。
+# 2026-08-09 Qatar 必须作为 TJCIS OTHER 页中的独立中东国家解析
+
+- 2025 官方 Blue Book 同时在 Part I 与 Part II 列出 Qatar 三场 G1/G3；它们分别被夹在
+  Bahrain/Scandinavia 和 Poland/Spain 段落之间，不能用“每页一个地区”或只看目录索引的方式跳过。
+- 正确整本计数为 `1494`，新增地区为 `404 = Australia 312 + Germany 42 + Middle East 50`；
+  Middle East 国家分布固定为 UAE 33、Saudi 12、Qatar 3、Bahrain 2。
+- 官方赛果 URL 不按赛事名自动模糊绑定。先生成 404 行 review queue，再以 SHA 绑定 reviewed mapping
+  编译 runner manifest；缺稳定结果页必须作为显式 evidence gap 保留。
+
+# 2026-08-09 新地区 P0 资料阶段先采用 reviewed canonical cache-only
+
+- AU/DE/Middle East 可以复用现有 `p0-horse-source-cache.v2` 完整度、身份、履历和主胜鞍重算合同，
+  但未独立批准逐 provider live client 前，不把它们加入旧五地区 rolling network batch。
+- 新地区 cache 必须声明匹配的 adapter/provider，并通过基础资料、二代血统、source start count 与完整
+  records 守恒；cache 缺失时明确阻断，不回退成临时搜索或手工 placeholder。
+- cache-only 是 adapter 入口的不变量，不只依赖默认 source-client factory；即使调用者设置
+  `allow_network=true` 并注入 client，AU/DE/Middle East cache miss 也必须在零 client 调用处阻断。
+
+# 2026-08-09 官方赛果 reviewed mapping 必须绑定 canonical URL、provider 与输出包
+
+- 同一 provider/result URL 的 query 参数排序差异不构成两场赛事；duplicate 检查使用规范化
+  scheme/host/path/query identity，不能比较原始字符串。
+- `evidence_gap` 只能引用本场 provider allowlist 内且含目标年份的 HTTPS 证据，或含目标年份的 TJCIS
+  官方目录；不能借用其他国家 provider 的可访问页面作为证据。
+- runner manifest 自身绑定 reviewed mapping SHA；summary 再绑定 manifest、gap artifact 和 package SHA，
+  避免只拿 runner 文件时丢失审核来源，或三个输出被跨批次拼接。

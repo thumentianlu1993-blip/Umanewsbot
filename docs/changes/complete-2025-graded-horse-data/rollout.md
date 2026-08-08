@@ -41,16 +41,23 @@
   `Silviniaco Conti Chase`：均为 2025-01-11 G2 障碍赛、`draft + incomplete`、赛果 `0`。
 - 官方源探测确认德国、巴林为服务端表；ERA/JCSA 页面声明的同域 AJAX/API 返回完整赛果。
   已新增六地区 URL policy、请求预算、严格离线 result parser 与 manifest-bound checkpoint runner。
-- TJCIS 2025 整本 327 页在逐页释放 parser cache 后完成解析：AU `312`、DE `42`、Middle East `47`
-  （UAE `33`、Bahrain `2`、Saudi `12`）；France/US 两项 declared-count 冲突保持显式阻断/审批路径。
+- TJCIS 2025 整本 327 页在逐页释放 parser cache 后完成解析：AU `312`、DE `42`、Middle East `50`
+  （UAE `33`、Bahrain `2`、Saudi `12`、Qatar `3`）；France/US 两项 declared-count 冲突保持显式阻断/审批路径。
 - P0 candidate artifact 已支持八地区、`year=2025`、`actual_starts_only=true`，并输出四类生产映射
   disposition。
 - 首轮独立审查的五项 P1 已修复：官方结果保留并列与非完赛实际起跑状态；确定性 checkpoint 不可
   resume 重抓；cache path 必须精确绑定 race/output root；TJCIS 同页多国家按页首/页脚布局切分；
   census 赛事身份保留规范化完整 URL/query。
-- 修复后组合回归 `110/110`，研究侧 `112/112`，workflow contract `16/16`；2025 TJCIS 官方整本
-  回放仍为总计 `1491`、AU `312`、DE `42`、Middle East `47`。同一独立 reviewer 对最终 symlink
+- 首批修复后组合回归 `110/110`，研究侧 `112/112`，workflow contract `16/16`；随后整本真实回放又发现
+  Qatar `3` 场原被 `OTHER` 页的 unsupported country 边界遮蔽，修复后正确总数为 `1494`、新增地区
+  `404` 场。同一独立 reviewer 对前序最终 symlink
   反例及全部旧 finding 复核后给出 `APPROVED`。
+- 新增离线 URL manifest 编译器；逐场 review queue 必须完整覆盖 `404` 场并以 SHA 绑定，compile
+  后 `collect + evidence_gap + not_held = catalog`，无 reviewed mapping 时不能进入正式 runner。
+- 增量独立审查复现 canonical URL 重复、跨 provider gap evidence 和注入 client 绕过 cache-only 三项
+  P1；均以 RED 修复。runner manifest 绑定 review SHA，summary 绑定 manifest/gap/package SHA；当前
+  受影响 Django `434/434`、研究 `117/117`、workflow `16/16` 全绿；同一 reviewer 限定复审为
+  `APPROVED`，无 P0/P1/P2。
 
 ## 门禁
 

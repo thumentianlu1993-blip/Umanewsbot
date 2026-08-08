@@ -33,11 +33,14 @@ from stable.models import (
     HorseProfileCompletionRun,
     RacingRegion,
 )
-from stable.services.p0_horse_completion_adapters import REGION_ADAPTERS
+from stable.services.p0_horse_completion_adapters import REGION_ADAPTERS, REVIEWED_CANDIDATE_REGIONS
 from stable.services.p0_horse_profiles import build_p0_completion_queue
 
 P0_HORSE_BATCH_SCHEMA_VERSION = "p0-horse-completion-batch.v1"
-P0_HORSE_BATCH_REGIONS: tuple[str, ...] = tuple(REGION_ADAPTERS.keys())
+# The legacy rolling batch remains the reviewed five-region network product.
+# New regions use direct, reviewed canonical caches until provider clients are
+# separately approved; adding their normalizers must not silently expand it.
+P0_HORSE_BATCH_REGIONS: tuple[str, ...] = tuple(REVIEWED_CANDIDATE_REGIONS)
 P0_HORSE_BATCH_MANIFEST_FILENAME = "batch_manifest.json"
 P0_HORSE_BATCH_LEDGER_FILENAME = "approvals_ledger.jsonl"
 P0_HORSE_BATCH_SERIAL_LOCK_FILENAME = "serial-window.lock"

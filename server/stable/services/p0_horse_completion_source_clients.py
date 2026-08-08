@@ -21,6 +21,7 @@ from django.core.validators import URLValidator
 from stable.models import HorseCareerRecordAuthorityStatus, RacingRegion
 from stable.services.p0_horse_completion_adapters import (
     REGION_ADAPTERS,
+    REVIEWED_CACHE_ONLY_REGIONS,
     REQUIRED_BASIC_PROFILE_FIELDS,
     REQUIRED_PEDIGREE_FIELDS,
     SOURCE_CACHE_SCHEMA_VERSION,
@@ -3436,6 +3437,19 @@ _CLIENTS = {
 }
 
 
+class _ReviewedCacheOnlyClient(_BaseSourceClient):
+    """Fail closed on network; new regions currently accept reviewed v2 caches only."""
+
+    provider_name = "reviewed_official_cache"
+
+    def __init__(self, transport: P0HorseTransport, *, region: str, **kwargs: Any):
+        self.region = region
+        super().__init__(transport, **kwargs)
+
+    def _fetch(self, request: P0HorseCompletionRequest) -> dict[str, Any]:
+        raise P0HorseSourceBlocked(f"reviewed_canonical_cache_required: {request.region}")
+
+
 def build_p0_horse_completion_source_client(
     region: str,
     transport: P0HorseTransport,
@@ -3446,6 +3460,13 @@ def build_p0_horse_completion_source_client(
     **client_kwargs: Any,
 ) -> _BaseSourceClient:
     client_class = _CLIENTS.get(region)
+    if region in REVIEWED_CACHE_ONLY_REGIONS:
+        return _ReviewedCacheOnlyClient(
+            transport,
+            region=region,
+            manual_supplements_by_candidate=manual_supplements_by_candidate,
+            **client_kwargs,
+        )
     if client_class is None:
         raise P0HorseSourceBlocked(f"unsupported_region: {region}")
     return client_class(

@@ -183,6 +183,28 @@ Pt I—OTHER RACES
             self.assertEqual({row["country"] for row in rows}, {"bahrain", "saudi_arabia"})
             self.assertEqual(len(rows), 2)
 
+    def test_qatar_section_between_unsupported_countries_is_preserved(self):
+        page = """
+Pt II—OTHER
+OTHER RACES
+POLAND
+Wielka Warszawska (L) .... 100,000 .... 3up .... 2600 T .... Sluzewiec
+QATAR
+(Racing season October 2024 - May 2025)
+Qatar DerbyQA G1 .... US$500,000 .... 3yo .... 2000 T .... Al Rayyan
+Qatar Gold TrophyQA G1 .... US$250,000 .... 3up .... 2200 T .... Al Rayyan
+SCANDINAVIA
+Stockholm Cup International G3 .... 1,000,000 .... 3up .... 2400 T .... Bro Park
+SPAIN
+Gran Premio de Madrid (L) .... 85,000 .... 3up .... 2500 T .... La Zarzuela
+"""
+
+        rows = self.module.parse_ics_pages([page], year=2025)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Qatar Derby", "Qatar Gold Trophy"])
+        self.assertEqual({row["country"] for row in rows}, {"qatar"})
+        self.assertEqual({row["country_region"] for row in rows}, {"middle_east"})
+
     def test_parenthesized_grade_does_not_leak_open_paren_into_name(self):
         rows = self.module.parse_ics_pages(
             ["Al Khail Trophy (G3) .... 700,000 .... 4up .... 2810 T .... Meydan\nPt I—UNITED ARAB EMIRATES"],

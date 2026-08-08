@@ -258,7 +258,28 @@ REGION_ADAPTERS = {
         region=RacingRegion.UNITED_STATES,
         source_names=frozenset({"equibase", "hrn"}),
     ),
+    RacingRegion.AUSTRALIA: RegionAdapter(
+        key="australia_racing_australia_reviewed_cache",
+        region=RacingRegion.AUSTRALIA,
+        source_names=frozenset({"racing_australia"}),
+    ),
+    RacingRegion.GERMANY: RegionAdapter(
+        key="germany_deutscher_galopp_reviewed_cache",
+        region=RacingRegion.GERMANY,
+        source_names=frozenset({"deutscher_galopp"}),
+    ),
+    RacingRegion.MIDDLE_EAST: RegionAdapter(
+        key="middle_east_official_reviewed_cache",
+        region=RacingRegion.MIDDLE_EAST,
+        source_names=frozenset(
+            {"emirates_racing_authority", "jcsa", "qrec", "bahrain_turf_club"}
+        ),
+    ),
 }
+
+REVIEWED_CACHE_ONLY_REGIONS = frozenset(
+    {RacingRegion.AUSTRALIA, RacingRegion.GERMANY, RacingRegion.MIDDLE_EAST}
+)
 
 
 def _canonical_json_bytes(value: Any) -> bytes:
@@ -1960,6 +1981,10 @@ def run_p0_horse_completion_adapter(
         cache_hit = True
         network_request_count = 0
     else:
+        if request.region in REVIEWED_CACHE_ONLY_REGIONS:
+            raise P0HorseCompletionNetworkDisabled(
+                f"reviewed canonical cache is required for {request.region}"
+            )
         if not request.allow_network:
             raise P0HorseCompletionNetworkDisabled(
                 "P0 horse completion network access is disabled and no cache is available"

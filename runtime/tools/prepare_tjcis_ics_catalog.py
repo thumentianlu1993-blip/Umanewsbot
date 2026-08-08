@@ -51,6 +51,7 @@ REGION_PREFIXES = {
     "middle_east": "middle-east",
     "united_arab_emirates": "united-arab-emirates",
     "saudi_arabia": "saudi-arabia",
+    "qatar": "qatar",
     "bahrain": "bahrain",
 }
 MIN_REGION_ROWS = {
@@ -278,6 +279,8 @@ def _page_context(text: str) -> tuple[str | None, str]:
         return "united_arab_emirates", "flat"
     if re.search(r"PT(?:I|II)[—-](?:OTHERRACES.*)?BAHRAIN", upper, re.S):
         return "bahrain", "flat"
+    if re.search(r"PT(?:I|II)[—-](?:OTHER(?:RACES)?.*)?QATAR", upper, re.S):
+        return "qatar", "flat"
     if re.search(r"PT(?:I|II)[—-](?:OTHERRACES.*)?(?:KINGDOMOF)?SAUDIARABIA", upper, re.S):
         return "saudi_arabia", "flat"
     if "PTI—OTHER" in upper or "PTI-OTHER" in upper:
@@ -314,6 +317,7 @@ def _hong_kong_segment(text: str) -> str:
 def _country_segment(text: str, region: str) -> str:
     headings = {
         "bahrain": r"BAHRAIN",
+        "qatar": r"QATAR",
         "saudi_arabia": r"(?:Kingdom\s+of\s+)?SAUDI\s+ARABIA",
     }
     heading = headings.get(region)
@@ -329,7 +333,7 @@ def _country_segment(text: str, region: str) -> str:
     tail = text[match.start() :]
     next_country = re.search(
         r"\n\s*(?:ITALY|KINGDOM\s+OF\s+SAUDI\s+ARABIA|SAUDI\s+ARABIA|BAHRAIN|"
-        r"QATAR|UNITED\s+ARAB\s+EMIRATES|TURKEY|KOREA|MACAU|MALAYSIA)\s*\n",
+        r"QATAR|UNITED\s+ARAB\s+EMIRATES|TURKEY|SPAIN|POLAND|SCANDINAVIA|KOREA|MACAU|MALAYSIA)\s*\n",
         tail[match.end() - match.start() :],
         re.I,
     )
@@ -339,7 +343,7 @@ def _country_segment(text: str, region: str) -> str:
 
 
 MIDDLE_EAST_HEADING_RE = re.compile(
-    r"(?im)^\s*(UNITED\s+ARAB\s+EMIRATES|BAHRAIN|(?:KINGDOM\s+OF\s+)?SAUDI\s+ARABIA)\s*$"
+    r"(?im)^\s*(UNITED\s+ARAB\s+EMIRATES|BAHRAIN|QATAR|(?:KINGDOM\s+OF\s+)?SAUDI\s+ARABIA)\s*$"
 )
 
 
@@ -351,6 +355,7 @@ def _middle_east_country_segments(text: str) -> list[tuple[str, str]]:
     regions = {
         "UNITED ARAB EMIRATES": "united_arab_emirates",
         "BAHRAIN": "bahrain",
+        "QATAR": "qatar",
         "SAUDI ARABIA": "saudi_arabia",
         "KINGDOM OF SAUDI ARABIA": "saudi_arabia",
     }
@@ -439,6 +444,7 @@ def _metadata_line(line: str) -> bool:
             "GERMANY",
             "UNITEDARABEMIRATES",
             "BAHRAIN",
+            "QATAR",
             "SAUDIARABIA",
             "KINGDOMOFSAUDIARABIA",
         }
@@ -468,6 +474,7 @@ def _clean_name(value: str) -> str:
         flags=re.I,
     ).strip()
     value = re.sub(r"\s+[123]\s*$", "", value)
+    value = re.sub(r"\s*QA\s*$", "", value, flags=re.I)
     return value.strip(" .").rstrip(" (")
 
 
@@ -770,7 +777,7 @@ def parse_ics_pages(
                 f"parsed={parsed_totals.get(key, 0)} declared={declared}; "
                 f"parsed_grades={parsed_grades} declared_grades={expected_grades}"
             )
-    middle_east_countries = {"united_arab_emirates", "saudi_arabia", "bahrain"}
+    middle_east_countries = {"united_arab_emirates", "saudi_arabia", "qatar", "bahrain"}
     for row in rows:
         source_region = row["country_region"]
         row["country"] = source_region if source_region in middle_east_countries else source_region

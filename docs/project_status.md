@@ -4,15 +4,20 @@
 
 - 已完成旧 artifact 严格 gap census、英文名证据修复、六类官方结果 parser、manifest-bound 官方赛果
   checkpoint runner 和三个新地区枚举/migration 0072。2025 TJCIS 整本 327 页可有界解析；新地区目录
-  为 AU `312`、DE `42`、Middle East `47`。
+  为 AU `312`、DE `42`、Middle East `50`（含此前漏解析的 Qatar `3`）。
 - 生产身份候选桥已扩展为八地区、单一年份、仅实际起跑，并明确输出
   `bind_existing/create_new/ambiguous/blocked`，仍禁止纯马名绑定。独立审查提出的五项 P1 已完成本地
   修复：实际起跑异常状态/并列、deterministic resume、checkpoint cache confinement、TJCIS 同页多国家、
-  完整 URL 赛事身份。Django 组合回归 `110/110`、研究侧 `112/112`、workflow contract `16/16` 通过；
-  2025 官方 327 页整本回放计数保持 `1491`，同一独立 reviewer 最终 `APPROVED`。
+  完整 URL 赛事身份。当前受影响 Django 组合回归 `434/434`、研究侧 `117/117`、workflow contract `16/16` 通过；
+  2025 官方 327 页整本回放的正确计数为 `1494`；首轮独立 reviewer 对当时 diff 最终 `APPROVED`。
+- 新增逐场 URL review queue/manifest 编译器，要求 404 场新增地区目录逐项守恒并绑定 review SHA，
+  同时绑定 canonical URL、逐 provider gap evidence 与三文件 package identity；
+  尚未执行正式外部 URL 映射或网络采集。
+- 新地区资料 normalizer 只接受完整 reviewed canonical cache；旧五地区 rolling network batch 未扩大，
+  注入 client 也不能绕过 adapter cache-only；production apply 三地区 create-new 回归通过。
 - 生产只读确认旧 artifact 少的两场是无结果的 UK G2 障碍赛，不是已采集 participant 丢行。
-- 尚待受审官方赛事 URL manifest 的 workflow DAG 接线、新地区完整资料/血统/生涯 source client 和
-  reviewed import bridge；尚未 commit/push/PR、部署或写生产。
+- 基础实现已提交推送至 Draft PR #83；尚待自动发现/审核官方赛事 URL、workflow DAG 接线和新增地区
+  完整资料/血统/生涯 canonical cache。未部署或写生产。
 
 ## 2026-08-09 Release B 数据阶段完成，2025 full-network 首轮产出 partial
 
