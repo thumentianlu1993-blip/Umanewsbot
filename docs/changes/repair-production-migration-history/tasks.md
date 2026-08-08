@@ -85,6 +85,9 @@
   deploy/manual/rollback/initial-install 双层清理旧环境，并补残留 SHA 的 RED→GREEN 回归。
 - [x] (application) 关闭最终 commit review P2：两个 `0071` partial unique index 精确绑定 owning
   schema/table，并补 pure 与 PostgreSQL wrong-table 恢复 fixture。
+- [x] (operations) 修复 production audit baseline 生成口径：唯一命令复用 runtime collector，绑定
+  named-object/scalar-FK canonicalization、IDs 与 time bounds；旧 positional/nested-FK fixture RED，
+  pure 与真实 PostgreSQL read-only transaction GREEN。
 - [ ] (operations) review 后向用户申请当前精确 fingerprint 的 commit/push/PR/merge/生产发布授权。
 
 ## 4. 后续发布

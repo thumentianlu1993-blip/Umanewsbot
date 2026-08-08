@@ -44,22 +44,33 @@ receipt/operation-log/FK digest，并在关闭态逐字节比较。当前 repair
 
 - production DB identity SHA-256
   `a986cc11149981c54e9d4915ad35e7c46e9382584d6670c8f950eceda26e471c`；
-- receipt count `7`；rows SHA-256
-  `99410674f36929c5e7b77cefe99a51e98127ac5c2f47602237a5e6883d2749a4`；
+- receipt count `7`；named-object rows SHA-256
+  `d9866c0330de5a20ca5ca27acbbeda3c19b6575b215c454b0d367a37ed72c557`；
 - referenced operation-log count `7`；rows SHA-256
-  `58f62742f596eb80ebff163e9b696a125ff4a1665ba5dca628b2d1f9a74368a1`；
-- operation-log FK set SHA-256
-  `90d2ba4da19c827dfb743dc0c0ff4bbafe855178caf6f30d5c7207dd173ede8c`。
+  `e49ae6f6d28a04b059d139c59a998a6aeb793ee4bde47623cfe482e975c9814c`；
+- scalar operation-log FK set SHA-256
+  `7a0cb0d7117dcbe0663b20869b637a8434a8aea63f83c3940ced5cf9fdf990b1`。
 
 canonicalization 固定为 UTF-8 JSON、`ensure_ascii=false`、key 排序、紧凑 separators；SQL 行按
 主键升序，JSON object key 排序而 array 保持原顺序；datetime 统一 UTC、6 位微秒、`Z` 后缀；
-SQL NULL 编码为 JSON `null`。
+SQL NULL 编码为 JSON `null`。canonicalization version 固定为
+`named-object-scalar-fk/v1`；receipt/op/FK IDs 与三组时间边界也是比较字段，不是说明性元数据。
 
 receipt 字段全集为 `id/created_at/updated_at/approved_sha256/artifact_sha256/approved_by/
 approved_profile_ids/before_after/evidence_summary/result_payload/operation_log_id`。operation-log
 字段全集为 `id/action_type/target_type/target_id/detail/created_at/admin_id`。FK set 按 receipt 主键
 排序后只编码 `operation_log_id`。因此 receipt 非 FK 字段、operation-log 内容或 FK 映射任一变化
 都会与 expected baseline 不同。
+
+最初 SHA 由一次临时 raw SQL/Django shell 生成：cursor tuple 被编码成 positional JSON arrays，FK
+被编码成 `[[id], ...]`。正式 runtime collector 使用 ORM `.values()` named objects 与 `[id, ...]`，
+所以相同数据必然产生不同 SHA。两份发布前备份中的目标 receipt/op 行字节一致，二次只读 collector
+也保持 count `7`、DB identity、IDs 与 2026-08-02 时间范围不变，根因因此锁定为生成口径而非数据更新。
+
+唯一生成入口 `generate_migration_history_production_audit` 在 PostgreSQL
+`REPEATABLE READ READ ONLY` 事务内直接调用 `collect_live_production_audit()`，只向 stdout 输出单行
+canonical JSON，不改文件。loader 只接受 v2 完整字段集、精确 canonicalization version、升序唯一
+ID/FK 列表与完整 time-bound 结构；missing/extra/错序均 fail closed。
 
 ## 5. Preflight 与关闭态 handoff 合同
 

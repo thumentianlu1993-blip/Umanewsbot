@@ -11,6 +11,9 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.db.migrations.recorder import MigrationRecorder
 from django.test import TestCase, TransactionTestCase
+from django.test.utils import CaptureQueriesContext
+
+from stable.models import HorseIdentityEvidenceCommitReceipt, OperationLog
 
 from stable.services.historical_calendar_release_b_schema import (
     check_initial_install_schema_compatibility,
@@ -45,6 +48,78 @@ def _stable_plan(executor: MigrationExecutor) -> list[str]:
         for migration, backwards in executor.migration_plan([M0071])
         if migration.app_label == "stable" and not backwards and migration.name >= "0068"
     ]
+
+
+@skipUnless(POSTGRES, "requires PostgreSQL read-only transaction semantics")
+class ProductionAuditBaselinePostgresTests(TransactionTestCase):
+    def test_generator_uses_repeatable_read_read_only_and_runtime_collector(self):
+        operation = OperationLog.objects.create(
+            action_type="production_audit_fixture",
+            target_type="horse_identity",
+            target_id="1",
+            detail="named-object baseline fixture",
+        )
+        receipt = HorseIdentityEvidenceCommitReceipt.objects.create(
+            approved_sha256="a" * 64,
+            artifact_sha256="b" * 64,
+            approved_by="postgres-fixture",
+            approved_profile_ids=[1],
+            before_after={"before": None, "after": 1},
+            evidence_summary={"fixture": True},
+            result_payload={"ok": True},
+            operation_log=operation,
+        )
+        output = StringIO()
+        final_nodes = (M0068, M0069, M0071)
+        placeholders = ", ".join(["(%s, %s)"] * len(final_nodes))
+        params = [part for node in final_nodes for part in node]
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, app, name, applied FROM django_migrations "
+                f"WHERE (app, name) IN ({placeholders}) ORDER BY id",
+                params,
+            )
+            final_records = cursor.fetchall()
+        self.assertEqual(
+            {(row[1], row[2]) for row in final_records}, set(final_nodes)
+        )
+        recorder = MigrationRecorder(connection)
+        for node in final_nodes:
+            recorder.record_unapplied(*node)
+        try:
+            with CaptureQueriesContext(connection) as queries:
+                call_command(
+                    "generate_migration_history_production_audit", stdout=output
+                )
+            payload = json.loads(output.getvalue())
+            live = collect_live_production_audit()
+            self.assertEqual(
+                {key: payload[key] for key in live},
+                live,
+            )
+            self.assertEqual(payload["receipt_ids"], [receipt.pk])
+            self.assertEqual(payload["operation_log_ids"], [operation.pk])
+            self.assertEqual(payload["operation_log_fk_ids"], [operation.pk])
+            sql = [query["sql"] for query in queries.captured_queries]
+            self.assertTrue(
+                any(
+                    "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+                    in statement.upper()
+                    for statement in sql
+                ),
+                sql,
+            )
+            data_sql = "\n".join(sql).upper()
+            self.assertNotIn("INSERT INTO", data_sql)
+            self.assertNotIn("UPDATE ", data_sql)
+            self.assertNotIn("DELETE FROM", data_sql)
+        finally:
+            with connection.cursor() as cursor:
+                cursor.executemany(
+                    "INSERT INTO django_migrations (id, app, name, applied) "
+                    "VALUES (%s, %s, %s, %s)",
+                    final_records,
+                )
 
 
 @skipUnless(POSTGRES, "requires PostgreSQL pg_catalog and transactional DDL")

@@ -25,6 +25,16 @@ RED 必须来自上述目标能力缺失；不得用语法错误、错误 fixtur
 
 ### 1.2 2026-08-08 实际 RED 证据
 
+production audit 口径修复另新增 `stable.test_production_audit_baseline`：首次运行 `5` 项中 `4` 项
+因唯一生成命令和 raw-row builder 不存在而有效 RED；修正测试自身临时文件 patch 后，RED 仍稳定为
+4 项目标能力缺失。固定 fixture 明确证明 positional receipt/op rows 与 nested FK 相对 runtime
+named-object/scalar-FK 会产生三项独立 drift；ID missing/extra/wrong-order 也必须拒绝。
+
+GREEN 后运行 migration repair、Release B、single-owner 与新 baseline 四套 SQLite suite：
+`263/263` 通过，1 项既有 Docker 条件跳过；隔离 PostgreSQL 16 完整专项 `25/25`。新增 PG 用例捕获
+唯一生成命令 SQL，确认存在 `SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`，命令窗口
+不含 `INSERT/UPDATE/DELETE`，输出 audit 字段逐项等于同一时刻直接调用 runtime collector 的结果。
+
 以下命令均使用现有 SQLite 测试环境，Django system check 通过；非零退出来自目标能力缺失，
 不是数据库不可达、语法错误或 fixture 漏建：
 

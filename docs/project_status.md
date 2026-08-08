@@ -1,5 +1,16 @@
 # 项目状态文档
 
+## 2026-08-08 migration-history audit baseline 口径修复
+
+- 已证明旧 expected SHA 使用 positional row/nested FK 临时脚本，而正式 preflight 使用
+  named-object/scalar FK；生产 count、DB identity、ID/时间范围及两份备份字节证据均未显示数据更新。
+- 候选新增唯一只读生成命令和 v2 严格 loader，当前受审 baseline 改为 receipt
+  `d9866c…c557`、operation `e49ae6…814c`、FK `7a0cb0…90b1`。
+- 本变更只修复 baseline 生成口径；Release B graph/catalog/TOCTOU/recovery 门禁未放宽。首次生产
+  重试已在 migration 前停止并恢复旧镜像，`0068/0069/0071`、回填与 full-network 均未执行；随后
+  只读 generator 于 `2026-08-08T11:41:07.525084Z` 生成 v2 payload。SQLite 四套件 `263/263`
+  （含 1 skip）、PostgreSQL 专项 `25/25`。
+
 ## 2026-08-08 工作流治理
 
 - 全仓人工确认门禁已统一到根 `AGENTS.md` 的 G1/G2/G3，其他文档和代理只引用该规则。
