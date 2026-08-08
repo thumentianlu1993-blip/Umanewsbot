@@ -9,3 +9,7 @@
 - [ ] (operations) 合并、部署固定 SHA、生成新 census 并审核 overlay。
 - [ ] (operations) 门禁通过后执行 manifest-bound apply/verifier。
 - [ ] (integration) 启动并有界监控 2025 `full_network=true` workflow。
+- [x] (application) 修复 canonical path 临时 staging 的条件唯一冲突并新增生产形状回归。
+- [x] (application) 在 SQLite 与 PostgreSQL 16 运行最终完整 Release B `38/38`。
+- [x] (application) 对 path staging follow-up 完成独立只读审查。
+- [ ] (operations) 发布 follow-up 固定 SHA 并生成全新 census/reviewed artifact。
