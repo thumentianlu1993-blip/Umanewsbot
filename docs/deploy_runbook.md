@@ -1,5 +1,22 @@
 # 部署运行手册
 
+## 2026-08-09 2025 official-results 新目录与重跑门禁
+
+1. 旧 `404` queue 来自未修复 index 的 TJCIS；旧 `399` queue 虽修复 index，仍错误把澳洲跨年赛季
+   当作自然年。两者及其 reviewed mapping/manifest/gap/summary SHA 均禁止复用。新守恒必须是
+   Australia `346` + Germany `42` + Middle East `45` = `433`。
+2. 澳洲目录只能从冻结的 Racing Australia 两份相邻赛季 Group/Listed 官方文件生成，并核对
+   `G1/G2/G3 = 77/97/172`。结果 URL 可由同一 meeting page 复用，但 manifest 必须携带非空
+   `source_race_name`、正整数 `distance` 和 `grade`；parser 选不到唯一比赛即确定性停止。
+3. Qatar display URL 仍是受审身份入口，runner 派生到 `api.qrec.gov.qa` 数据 URL。bootstrap 只允许
+   QREC 官方主页、`_app-*.js`、固定 token endpoint 和进程内缓存；不得冻结或提交 token。Saudi
+   `Place = -` 只在完整 JCSA participant row 中解释为 `did_not_finish`。
+4. 合并/部署前须通过目标套件、完整 `runtime/research`、真实澳洲页面 smoke、冻结 PDF/XLSX 视觉核验
+   与独立代码审查。部署后先从具备访问能力的受控环境验证澳洲 `346` 条候选和逐场选择器，再生成
+   source-revision 精确绑定的 reviewed mapping/三文件包。
+5. PR `#86` 的合并和部署是新的 G2；生产回填、official-results 网络采集与 2025
+   `full_network=true` 仍分别需要新鲜 G3。当前 CDN `403` 不允许被记成采集成功或用旧缓存代替。
+
 ## 2026-08-09 德国 official-results parser 发布前门禁
 
 1. 德国官方结果表可能在 participant rows 后包含一个 `colspan` 单格投注/时间摘要。候选 parser 只

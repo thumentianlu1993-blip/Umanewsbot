@@ -1,5 +1,28 @@
 # 当前状态
 
+## 2026-08-09 2025 新地区官方赛果目录已重建，正式运行仍待门禁
+
+- migration `0072` 的 G2 关闭态发布已完成：生产 revision 为
+  `0b93aa552f7abfeadb0a91e5fe7f2610178ee8ca`，统一 image 为
+  `sha256:0f184c78be6632fd467d16465ffb3554e44757c69468ee22c86c0cd84eddd8a8`；迁移为 no-op
+  completion，服务与 verifier 正常，所有历史/网络高风险开关仍关闭。本次状态不包含生产回填或
+  `full_network`。
+- 冻结 TJCIS 2025 PDF 视觉与正文均明确澳洲章节口径是赛季
+  `2024-08-01..2025-07-31`，不能作为 2025 自然年完整目录。澳洲改用 Racing Australia 官方相邻
+  两赛季 Group/Listed 日历交集，得到 2025 自然年 G1/G2/G3 `346` 场（`77/97/172`），分布在
+  `117` 个官方赛马日页面；德国 `42`、中东 `45`，新地区总目录为 `433`。旧 `404`、修正 index 后
+  的 `399` review queue 与对应 summary 全部作废。
+- 澳洲一个官方赛马日页面包含多场结果，manifest/runner 现仅对澳洲允许同一 URL 绑定不同的
+  `source_race_name + distance + grade`，parser 用三者精确选表；相同选择器重复仍拒绝。官网当前归档
+  CDN 在本地对 `t.` host 返回 `403`，因此 `346` 条 URL 只标记为待独立网络验证，不声称已采集成功。
+- Qatar 展示页不含结果数组；候选只从当前 QREC 官方前端读取公开 API bootstrap 配置、取得进程内
+  临时 token，再访问 `api.qrec.gov.qa`，不把 token 写入代码或 artifact。Qatar `3`、Bahrain `2`、
+  Saudi `7` 共 `12` 场官方结果已有限联网解析；Saudi Cup 的 `Place = -` 经实际 starter 行确认仅在
+  JCSA adapter 中保留为 `did_not_finish`。
+- 上述增量目标测试 `36/36`、完整 research 套件 `146/146` 通过；真实 Racing Australia 当前页面的
+  单场选择 smoke 解析 `8` 匹。代码仍在 Draft PR `#86`，尚未完成本轮独立复审、合并或部署；更未
+  生成可授权的最终三文件包、执行生产回填或启动正式 `full_network`。
+
 ## 2026-08-09 德国官方赛果页脚解析最小修复待审查
 
 - 2025 德国官方日历按 `von_submit/bis_submit` 与 G1/G2/G3 过滤后得到 `42` 场，和 TJCIS 德国目录

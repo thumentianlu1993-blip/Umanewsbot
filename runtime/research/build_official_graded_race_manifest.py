@@ -24,13 +24,14 @@ if str(REPO_ROOT) not in sys.path:
 
 from runtime.research.official_graded_race_sources import (  # noqa: E402
     POLICIES,
+    canonical_au_selector_identity,
     canonical_provider_url_identity,
     validate_provider_url,
 )
 
 
 SCHEMA_VERSION = 1
-TOOL_VERSION = "official-race-manifest.v1"
+TOOL_VERSION = "official-race-manifest.v2"
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 TARGET_REGIONS = {"australia", "germany", "middle_east"}
@@ -135,8 +136,10 @@ def prepare_review(paths: list[Path], *, year: int) -> dict[str, Any]:
                 "country": row["country"],
                 "series_key": row["series_key"],
                 "race_name": row["canonical_name_original"],
+                "source_race_name": row.get("source_race_name") or row["canonical_name_original"],
                 "grade": row["grade_text"],
                 "racecourse": row["racecourse"],
+                "distance": row["distance_text"],
                 "expectation_status": row["expectation_status"],
                 "provider": PROVIDER_BY_GEOGRAPHY[(row["country_region"], row["country"])],
                 "result_url": "",
@@ -194,13 +197,15 @@ def compile_review(paths: list[Path], *, year: int, reviewed_path: Path, expecte
         raise ManifestBuildError("reviewed mapping must cover the catalog exactly")
     races = []
     gaps = []
-    seen_result_urls: set[tuple[str, str]] = set()
+    seen_result_urls: set[tuple[str, ...]] = set()
     for row in rows:
         item = by_key[row["catalog_key"]]
         fixed = {
             "region": row["country_region"], "country": row["country"],
             "series_key": row["series_key"], "race_name": row["canonical_name_original"],
+            "source_race_name": row.get("source_race_name") or row["canonical_name_original"],
             "grade": row["grade_text"], "racecourse": row["racecourse"],
+            "distance": row["distance_text"],
             "expectation_status": row["expectation_status"],
             "provider": PROVIDER_BY_GEOGRAPHY[(row["country_region"], row["country"])],
         }
@@ -223,13 +228,19 @@ def compile_review(paths: list[Path], *, year: int, reviewed_path: Path, expecte
             except ValueError as exc:
                 raise ManifestBuildError("collected race local_date is invalid") from exc
             url_identity = (fixed["provider"], canonical_provider_url_identity(url))
+            if fixed["provider"] == "au_racing_australia":
+                url_identity += canonical_au_selector_identity(
+                    fixed["source_race_name"], fixed["distance"], fixed["grade"]
+                )
             if url_identity in seen_result_urls:
                 raise ManifestBuildError("reviewed mapping duplicates provider/result_url")
             seen_result_urls.add(url_identity)
             races.append({
                 "race_key": row["catalog_key"], "provider": fixed["provider"], "result_url": url,
                 "region": fixed["region"], "country": fixed["country"], "grade": fixed["grade"],
-                "race_name": fixed["race_name"], "local_date": local_date,
+                "race_name": fixed["race_name"], "source_race_name": fixed["source_race_name"],
+                "distance": fixed["distance"],
+                "local_date": local_date,
             })
         elif disposition == "evidence_gap":
             if item.get("result_url") or item.get("local_date"):

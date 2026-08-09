@@ -1,5 +1,17 @@
 # 关键决策
 
+## 2026-08-09 澳洲年度目录按自然年拼接官方相邻赛季
+
+- TJCIS 澳洲章节明确采用 `8 月 1 日至次年 7 月 31 日` 赛季口径，不能直接代表单一自然年。
+- 2025 正式目录改为 Racing Australia 官方 `2024-2025` 与 `2025-2026` 两份 Group/Listed 日历中
+  `local_date.year == 2025` 的 G1/G2/G3 并集；每届身份包含官方 group ID 与实际日期，允许同一赛事
+  因年内改期出现两届，不按名称去重。
+- 澳洲官方结果以 meeting page 发布。同一页面的多场赛事必须以来源赛名、途程与级别共同选表；只有
+  澳洲可共享结果 URL，完全相同选择器仍视为重复并 fail closed。URL 不能访问或选表不唯一时保留
+  evidence gap，不回退到 Wikipedia、模糊名称或第一页结果。
+- QREC 结果使用其官方前端公开配置引导的官方 API；认证材料仅驻留当前进程，不写日志、代码或工件。
+  任何 bootstrap、host、年份或响应合同漂移都确定性停止。
+
 ## 2026-08-09 新 migration 必须同步推进受审 preflight 最终叶
 
 - `0072` 虽然只改变 Django choices、数据库 SQL 为 no-op，仍会写入 migration recorder；因此发布

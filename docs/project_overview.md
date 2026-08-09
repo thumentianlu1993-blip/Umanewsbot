@@ -1,8 +1,9 @@
 # 项目总览
 
-当前八地区链路代码已随 PR `#83` 进入生产候选并应用 migration `0072`；首次发布暴露的受审迁移
-最终叶仍停在 `0071`，正式 release completion 因而 fail-closed。服务已用同一候选镜像安全恢复，
-但只有最终叶合同修复通过测试、复核、合并并重新完成发布后，才可进入新增地区 artifact 与 G3 数据阶段。
+八地区链路和 migration `0072` 已以关闭态完成 G2 发布，生产 revision 为 `0b93aa55…e8ca`；服务与
+completion verifier 正常，网络及历史写入开关仍关闭。新增地区 artifact 仍在重建：澳洲自然年目录已
+改用 Racing Australia 相邻两赛季官方表，德国和中东继续使用修正后的官方目录/结果身份。Draft PR
+`#86` 尚未合并或部署，生产回填与 2025 `full_network` 仍等待新的代码审查、精确工件和 G3。
 
 ## 2026-08-09 八地区单年度分级赛参赛马补全链路（实现中）
 
@@ -18,6 +19,9 @@
 - 澳洲、德国和中东的资料标准化器只接受已审核的 canonical v2 cache；常驻旧五地区网络批次不因
   新增适配器自动扩围。生产 apply 已沿用同一 reviewed mapping、release manifest 和 verifier 合同，
   不为新地区另开低门槛写入入口。
+- 澳洲单年 G1/G2/G3 目录不能直接使用 TJCIS 的跨年赛季章节；当前由 Racing Australia 两份相邻
+  赛季官方日历拼成 2025 自然年 `346` 场，并以赛名、途程、级别从 `117` 个 meeting page 精确选表。
+  Qatar 则由官网展示页派生到官方 API，临时认证信息不落盘。
 
 ## 2026-08-09 Release B 数据治理当前边界
 

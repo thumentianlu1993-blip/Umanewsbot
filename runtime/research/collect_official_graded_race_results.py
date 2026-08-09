@@ -20,6 +20,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 from urllib import error, request
+from urllib.parse import urlencode, urljoin, urlparse
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -28,21 +29,25 @@ if str(REPO_ROOT) not in sys.path:
 from runtime.research.official_graded_race_sources import (  # noqa: E402
     POLICIES,
     OfficialSourceError,
+    canonical_au_selector_identity,
     canonical_provider_url_identity,
+    clean,
     derive_data_url,
     parse_official_results,
+    validate_data_url,
     validate_provider_url,
 )
 from runtime.research import official_graded_race_sources as official_sources  # noqa: E402
 
 
 SCHEMA_VERSION = 1
-TOOL_VERSION = "official-graded-results.v1"
+TOOL_VERSION = "official-graded-results.v2"
 SAFE_STOP_CODE = 75
 MAX_RESPONSE_BYTES = 10 * 1024 * 1024
 RETRYABLE_HTTP = {408, 425, 429, 500, 502, 503, 504}
 GRADE_RE = re.compile(r"^G[123]$")
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
+QREC_AUTH_CACHE: dict[str, str] = {}
 
 
 class RunnerError(RuntimeError):
@@ -109,7 +114,7 @@ def load_manifest(path: Path, *, expected_sha256: str) -> tuple[dict, str]:
     if not isinstance(races, list) or not races:
         raise RunnerError("manifest races must be a non-empty list")
     seen_keys: set[str] = set()
-    seen_urls: set[tuple[str, str]] = set()
+    seen_urls: set[tuple[str, ...]] = set()
     normalized = []
     for item in races:
         if not isinstance(item, dict):
@@ -118,6 +123,8 @@ def load_manifest(path: Path, *, expected_sha256: str) -> tuple[dict, str]:
         provider = str(item.get("provider") or "").strip()
         result_url = str(item.get("result_url") or "").strip()
         grade = str(item.get("grade") or "").strip().upper()
+        distance = str(item.get("distance") or "").strip()
+        source_race_name = str(item.get("source_race_name") or item.get("race_name") or "").strip()
         if not race_key or race_key in seen_keys:
             raise RunnerError("manifest race_key is blank or duplicated")
         if provider not in POLICIES:
@@ -125,6 +132,10 @@ def load_manifest(path: Path, *, expected_sha256: str) -> tuple[dict, str]:
         validate_provider_url(provider, result_url, year=year)
         if not GRADE_RE.fullmatch(grade):
             raise RunnerError(f"manifest grade is invalid: {race_key}")
+        if not distance.isdigit() or int(distance) <= 0:
+            raise RunnerError(f"manifest distance is invalid: {race_key}")
+        if not source_race_name:
+            raise RunnerError(f"manifest source race name is invalid: {race_key}")
         policy = POLICIES[provider]
         expected_region = str(item.get("region") or "").strip()
         expected_country = str(item.get("country") or "").strip()
@@ -138,6 +149,8 @@ def load_manifest(path: Path, *, expected_sha256: str) -> tuple[dict, str]:
         if parsed_date.year != year:
             raise RunnerError(f"manifest local_date year drift: {race_key}")
         url_key = (provider, canonical_provider_url_identity(result_url))
+        if provider == "au_racing_australia":
+            url_key += canonical_au_selector_identity(source_race_name, distance, grade)
         if url_key in seen_urls:
             raise RunnerError("manifest provider/result_url is duplicated")
         seen_keys.add(race_key)
@@ -150,6 +163,8 @@ def load_manifest(path: Path, *, expected_sha256: str) -> tuple[dict, str]:
                 "region": policy.region,
                 "country": policy.country,
                 "grade": grade,
+                "distance": distance,
+                "source_race_name": source_race_name,
                 "race_name": str(item.get("race_name") or "").strip(),
                 "local_date": local_date,
             }
@@ -170,24 +185,118 @@ class StrictRedirectHandler(request.HTTPRedirectHandler):
         self.year = year
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        validate_provider_url(self.provider, newurl, year=self.year)
+        if self.provider == "qa_qrec":
+            raise RunnerError("QREC result endpoint redirected")
+        validate_data_url(self.provider, newurl, year=self.year)
         return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+class QrecBootstrapRedirectHandler(request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        origin = urlparse(req.full_url)
+        target = urlparse(newurl)
+        if origin.hostname == "api.qrec.gov.qa":
+            raise RunnerError("QREC token endpoint redirected")
+        if target.scheme != "https" or target.hostname not in {"qrec.gov.qa", "www.qrec.gov.qa"}:
+            raise RunnerError("QREC bootstrap redirected outside official host")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _bounded_response(response, *, source_url: str) -> bytes:
+    body = response.read(MAX_RESPONSE_BYTES + 1)
+    if len(body) > MAX_RESPONSE_BYTES:
+        raise RunnerError(f"official response exceeds byte budget: {source_url}")
+    return body
+
+
+def _qrec_headers(*, timeout: int) -> dict[str, str]:
+    if QREC_AUTH_CACHE:
+        return dict(QREC_AUTH_CACHE)
+    user_agent = "UmaFansBot/1.0 (+https://umafans.run; official graded result audit)"
+    home_url = "https://qrec.gov.qa/"
+    opener = request.build_opener(QrecBootstrapRedirectHandler())
+    with opener.open(request.Request(home_url, headers={"User-Agent": user_agent}), timeout=timeout) as response:
+        if urlparse(response.geturl()).hostname not in {"qrec.gov.qa", "www.qrec.gov.qa"}:
+            raise RunnerError("QREC bootstrap redirected outside official host")
+        try:
+            home = _bounded_response(response, source_url=home_url).decode("utf-8", errors="strict")
+        except UnicodeError as exc:
+            raise RunnerError("QREC bootstrap page is not valid UTF-8") from exc
+    app_match = re.search(
+        r'src=["\']([^"\']*/_next/static/chunks/pages/_app-[^"\']+\.js)["\']',
+        home,
+        re.I,
+    )
+    if not app_match:
+        raise RunnerError("QREC bootstrap app bundle was not found")
+    app_url = urljoin(home_url, app_match.group(1))
+    app_identity = urlparse(app_url)
+    if app_identity.scheme != "https" or app_identity.hostname not in {"qrec.gov.qa", "www.qrec.gov.qa"}:
+        raise RunnerError("QREC app bundle URL is outside official host")
+    with opener.open(request.Request(app_url, headers={"User-Agent": user_agent}), timeout=timeout) as response:
+        if urlparse(response.geturl()).hostname not in {"qrec.gov.qa", "www.qrec.gov.qa"}:
+            raise RunnerError("QREC app bundle redirected outside official host")
+        try:
+            app = _bounded_response(response, source_url=app_url).decode("utf-8", errors="strict")
+        except UnicodeError as exc:
+            raise RunnerError("QREC app bundle is not valid UTF-8") from exc
+    grant_match = re.search(r'NEXT_PUBLIC_AUTH_GRANT_TOKEN\|\|"([^"]+)"', app)
+    api_key_match = re.search(r'NEXT_PUBLIC_API_KEY\|\|"([^"]+)"', app)
+    if not grant_match or not api_key_match:
+        raise RunnerError("QREC public API bootstrap contract drift")
+    grant = grant_match.group(1)
+    api_key = api_key_match.group(1)
+    token_url = "https://api.qrec.gov.qa/v1/qrec/token/generate"
+    token_request = request.Request(
+        token_url,
+        data=urlencode({"grant_type": "client_credentials"}).encode(),
+        headers={
+            "User-Agent": user_agent,
+            "apiKey": api_key,
+            "channel": "Portal",
+            "language": "en",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": f"Basic {grant}",
+        },
+        method="POST",
+    )
+    with opener.open(token_request, timeout=timeout) as response:
+        if response.geturl() != token_url:
+            raise RunnerError("QREC token endpoint redirected")
+        token_body = _bounded_response(response, source_url=token_url)
+    try:
+        token = clean(json.loads(token_body).get("access_token"))
+    except (UnicodeError, json.JSONDecodeError, AttributeError) as exc:
+        raise RunnerError("QREC token response is invalid") from exc
+    if not token:
+        raise RunnerError("QREC token response lacks access token")
+    QREC_AUTH_CACHE.update(
+        {
+            "User-Agent": user_agent,
+            "apiKey": api_key,
+            "apiToken": token,
+            "channel": "Portal",
+            "language": "en",
+            "Authorization": f"Bearer {grant}",
+        }
+    )
+    return dict(QREC_AUTH_CACHE)
 
 
 def fetch(provider: str, page_url: str, *, year: int, timeout: int) -> tuple[bytes, str]:
     data_url = derive_data_url(provider, page_url, year=year)
-    validate_provider_url(provider, data_url, year=year)
+    validate_data_url(provider, data_url, year=year)
     opener = request.build_opener(StrictRedirectHandler(provider, year))
-    req = request.Request(
-        data_url,
-        headers={"User-Agent": "UmaFansBot/1.0 (+https://umafans.run; official graded result audit)"},
-    )
     try:
+        headers = (
+            _qrec_headers(timeout=timeout)
+            if provider == "qa_qrec"
+            else {"User-Agent": "UmaFansBot/1.0 (+https://umafans.run; official graded result audit)"}
+        )
+        req = request.Request(data_url, headers=headers)
         with opener.open(req, timeout=timeout) as response:
-            final_url = validate_provider_url(provider, response.geturl(), year=year)
-            body = response.read(MAX_RESPONSE_BYTES + 1)
-            if len(body) > MAX_RESPONSE_BYTES:
-                raise RunnerError(f"official response exceeds byte budget: {data_url}")
+            final_url = validate_data_url(provider, response.geturl(), year=year)
+            body = _bounded_response(response, source_url=data_url)
             return body, final_url
     except error.HTTPError as exc:
         if exc.code in RETRYABLE_HTTP:
@@ -336,7 +445,13 @@ def run(args) -> dict:
             body, final_url = fetch(
                 provider, race["result_url"], year=manifest["year"], timeout=args.timeout
             )
-            participants = parse_official_results(race["provider"], body.decode("utf-8", errors="replace"))
+            participants = parse_official_results(
+                race["provider"],
+                body.decode("utf-8", errors="replace"),
+                race_name=race["source_race_name"],
+                distance=race["distance"],
+                grade=race["grade"],
+            )
         except RetryableNetworkError:
             checkpoint["items"][race_key] = {"status": "retryable_error"}
             _write_checkpoint(checkpoint_path, checkpoint)
@@ -376,7 +491,11 @@ def run(args) -> dict:
         if cache_path.is_symlink() or not cache_path.is_file() or sha256_file(cache_path) != item["cache_sha256"]:
             raise RunnerError(f"source cache identity mismatch at finalize: {race['race_key']}")
         participants = parse_official_results(
-            race["provider"], cache_path.read_text(encoding="utf-8", errors="replace")
+            race["provider"],
+            cache_path.read_text(encoding="utf-8", errors="replace"),
+            race_name=race["source_race_name"],
+            distance=race["distance"],
+            grade=race["grade"],
         )
         source = {**race, **item}
         sources.append(source)

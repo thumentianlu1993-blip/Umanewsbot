@@ -96,5 +96,45 @@ class OfficialManifestBuilderTests(unittest.TestCase):
             with self.assertRaisesRegex(builder.ManifestBuildError,"duplicates provider/result_url"):
                 builder.compile_review(catalogs,year=2025,reviewed_path=reviewed,expected_sha256=builder.sha256_file(reviewed))
 
+    def test_australia_review_can_bind_two_races_to_one_meeting_page(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            fields=["country_region","country","year","series_key","canonical_name_original","source_race_name","grade_text","racecourse","distance_text","surface","expectation_status","raw_source_url"]
+            rows=[
+                {"country_region":"australia","country":"australia","year":"2025","series_key":"au-one","canonical_name_original":"KINDERGARTEN STAKES","source_race_name":"WIDDEN KINDERGARTEN STAKES","grade_text":"G3","racecourse":"Royal Randwick","distance_text":"1100","surface":"turf","expectation_status":"held","raw_source_url":"https://racingaustralia.horse/2025"},
+                {"country_region":"australia","country":"australia","year":"2025","series_key":"au-two","canonical_name_original":"ADRIAN KNOX STAKES","source_race_name":"TAB ADRIAN KNOX STAKES","grade_text":"G3","racecourse":"Royal Randwick","distance_text":"2000","surface":"turf","expectation_status":"held","raw_source_url":"https://racingaustralia.horse/2025"},
+            ]
+            catalog=root/"australia.csv"
+            with catalog.open("w",encoding="utf-8",newline="") as handle:
+                writer=csv.DictWriter(handle,fieldnames=fields); writer.writeheader(); writer.writerows(rows)
+            review=builder.prepare_review([catalog],year=2025)
+            review.update({"reviewed_by":"reviewer","reviewed_at":"2026-08-09T00:00:00Z"})
+            url="https://www.racingaustralia.horse/FreeFields/Results.aspx?Key=2025Apr05%2CNSW%2CRoyal+Randwick"
+            for item in review["items"]:
+                item.update({"disposition":"collect","result_url":url,"local_date":"2025-04-05"})
+            reviewed=root/"reviewed.json"; reviewed.write_bytes(builder.canonical_json_bytes(review))
+            manifest,_,_=builder.compile_review([catalog],year=2025,reviewed_path=reviewed,expected_sha256=builder.sha256_file(reviewed))
+        self.assertEqual(len(manifest["races"]),2)
+        self.assertEqual({race["source_race_name"] for race in manifest["races"]},{"WIDDEN KINDERGARTEN STAKES","TAB ADRIAN KNOX STAKES"})
+
+    def test_australia_punctuation_equivalent_selectors_are_duplicates(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            fields=["country_region","country","year","series_key","canonical_name_original","source_race_name","grade_text","racecourse","distance_text","surface","expectation_status","raw_source_url"]
+            rows=[]
+            for key,name in (("au-one","C.F. ORR STAKES"),("au-two","cf orr stakes")):
+                rows.append({"country_region":"australia","country":"australia","year":"2025","series_key":key,"canonical_name_original":name,"source_race_name":name,"grade_text":"G1","racecourse":"Caulfield","distance_text":"1400","surface":"turf","expectation_status":"held","raw_source_url":"https://racingaustralia.horse/2025"})
+            catalog=root/"australia.csv"
+            with catalog.open("w",encoding="utf-8",newline="") as handle:
+                writer=csv.DictWriter(handle,fieldnames=fields); writer.writeheader(); writer.writerows(rows)
+            review=builder.prepare_review([catalog],year=2025)
+            review.update({"reviewed_by":"reviewer","reviewed_at":"2026-08-09T00:00:00Z"})
+            url="https://www.racingaustralia.horse/FreeFields/Results.aspx?Key=2025Feb08%2CVIC%2CCaulfield"
+            for item in review["items"]:
+                item.update({"disposition":"collect","result_url":url,"local_date":"2025-02-08"})
+            reviewed=root/"reviewed.json"; reviewed.write_bytes(builder.canonical_json_bytes(review))
+            with self.assertRaisesRegex(builder.ManifestBuildError,"duplicates provider/result_url"):
+                builder.compile_review([catalog],year=2025,reviewed_path=reviewed,expected_sha256=builder.sha256_file(reviewed))
+
 
 if __name__ == "__main__": unittest.main()
