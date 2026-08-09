@@ -1,0 +1,41 @@
+{
+  "schema_version": "official-result-package-review/v1",
+  "year": 2025,
+  "source_revision": "45da956a4542d0b28a820d9cbc00852350a22baf",
+  "package_dir": "runtime/research/reviewed_packages/2025-official-results-433-r2",
+  "summary_sha256": "7ddc901ff50f09376799865c541345239f65df06cbcf256b1134bca63bd28d5b",
+  "package_sha256": "e9abb13986294135f038d45c30682fcef2d5222e4021cf70432fe62b976a15ca",
+  "catalog_set_sha256": "e8b01fa01a0ec709302a8a5a394fcfec2accec1713f7094517f7ffeceb2b69e0",
+  "reviewed_mapping_sha256": "7ec4aed242ce34b0852cac741ece9b8681e37619659ff6cb87005acd2f89eb7a",
+  "manifest_sha256": "f6f1e8de2f979af1eddf38b800488f56083650f6f3c2c95c5593498732a4fb7f",
+  "gaps_sha256": "ac0e52d39655f2efb04b849c565bb744555d2d3e8c35ad7b60472aa6381dea26",
+  "parser_replay_sha256": "1f5656d25e9ec990eee13173303b5e128bf885132174ebeb46a64056c4feb105",
+  "counts": {
+    "catalog": 433,
+    "collect": 87,
+    "evidence_gap": 346,
+    "replayed_starters": 790
+  },
+  "collect_scope": {
+    "germany": 42,
+    "middle_east": 45
+  },
+  "gap_scope": {
+    "australia": 346,
+    "reason": "stable_public_result_unavailable"
+  },
+  "independent_review": {
+    "verdict": "APPROVED",
+    "p0": 0,
+    "p1": 0,
+    "p2": 0,
+    "network_used": false,
+    "production_write_performed": false
+  },
+  "authorization": {
+    "production_backfill": false,
+    "official_results_collection": false,
+    "full_network": false,
+    "australia_collection": false
+  }
+}

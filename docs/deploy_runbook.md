@@ -1,5 +1,19 @@
 # 部署运行手册
 
+## 2026-08-09 reviewed official-results package 发布前验证
+
+1. 仓库相对 package 固定为
+   `runtime/research/reviewed_packages/2025-official-results-433-r2`，summary SHA 固定为
+   `7ddc901ff50f09376799865c541345239f65df06cbcf256b1134bca63bd28d5b`。目录只能包含三份 JSON。
+2. 合并前从仓库根直接执行：
+   `python runtime/research/validate_official_graded_race_package.py --package-dir runtime/research/reviewed_packages/2025-official-results-433-r2 --summary-sha256 7ddc901ff50f09376799865c541345239f65df06cbcf256b1134bca63bd28d5b --year 2025`。
+   返回值必须为 0，且输出 `catalog=433/collect=87/gap=346`。
+3. 冻结 parser replay receipt SHA 为
+   `1f5656d25e9ec990eee13173303b5e128bf885132174ebeb46a64056c4feb105`：87/87 场、790 starters、
+   cache identity/starter count/top 3 全匹配；独立审核为 `APPROVED`、无 P0-P2。
+4. 本 package 仍不授权生产回填、澳洲网络验证、official-results 采集或 `full_network`。澳洲 346 场
+   保持 `evidence_gap`，直至取得外部许可或用户明确批准本轮只处理非澳洲 87 场。
+
 ## 2026-08-09 2025 official-results 新目录与重跑门禁
 
 1. 旧 `404` queue 来自未修复 index 的 TJCIS；旧 `399` queue 虽修复 index，仍错误把澳洲跨年赛季

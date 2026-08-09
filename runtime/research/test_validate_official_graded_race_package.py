@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -11,6 +13,31 @@ from runtime.research import validate_official_graded_race_package as validator
 
 
 class OfficialPackageValidatorTests(unittest.TestCase):
+    def test_checked_in_reviewed_package_validates_through_workflow_cli(self):
+        repository = Path(__file__).resolve().parents[2]
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "runtime/research/validate_official_graded_race_package.py",
+                "--package-dir",
+                "runtime/research/reviewed_packages/2025-official-results-433-r2",
+                "--summary-sha256",
+                "7ddc901ff50f09376799865c541345239f65df06cbcf256b1134bca63bd28d5b",
+                "--year",
+                "2025",
+            ],
+            cwd=repository,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        result = json.loads(completed.stdout)
+        self.assertEqual(
+            (result["catalog_count"], result["collect_count"], result["gap_count"]),
+            (433, 87, 346),
+        )
+
     def package(self, root: Path) -> tuple[Path, str]:
         helper = fixtures.OfficialManifestBuilderTests()
         catalogs = helper.catalogs(root)

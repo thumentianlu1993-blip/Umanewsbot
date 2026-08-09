@@ -1,5 +1,24 @@
 # 当前状态
 
+## 2026-08-09 2025 reviewed package 已通过独立离线复审，等待范围与写入门禁
+
+- 当前生产 web/worker/beat 统一运行 revision
+  `45da956a4542d0b28a820d9cbc00852350a22baf`、image
+  `sha256:b1686e59cc21598c30b439d4a33e34a8d32246dae148b982ab18c59301194c82`；migration plan 为空，
+  HTTP health 正常，高风险开关与 writer/lock 均关闭。本阶段未执行生产回填、澳洲正式网络验证、
+  official-results 网络采集或 `full_network`。
+- 新受审三文件包守恒为 `433 = 87 collect + 346 evidence_gap`：德国 42、UAE 33、Bahrain 2、
+  Qatar 3、Saudi 7 进入 collect；澳洲 346 因官方稳定公开赛果不可用而保留 gap。包 identity 为
+  `e9abb139…a15ca`，summary SHA 为 `7ddc901f…28d5b`。
+- 冻结缓存已用 revision `45da956a…22baf` 的当前 parser 逐场重放：87/87、790 名实际参赛马，
+  每场 cache SHA/size、starter count 与 top 3 全部一致，receipt SHA 为 `1f5656d2…105`。独立复审
+  `APPROVED`，无 P0-P2。
+- workflow 实际 CLI 暴露 validator 与 completion bundle 未 bootstrap 仓库根的确定性 import 错误；
+  当前候选只补两处入口 bootstrap 与真实 CLI 回归测试，并把受审包登记为仓库相对路径。尚未合并或
+  部署，也不构成后续数据动作授权。
+- 下一人工门禁一次性包含：是否先按非澳洲 87 场推进并明确排除澳洲 346 场，或等待取得澳洲数据
+  存储/再发布许可；以及候选 PR 通过 CI 后的 G2 与精确 manifest-bound 生产写入 G3。
+
 ## 2026-08-09 2025 新地区官方赛果目录已重建，正式运行仍待门禁
 
 - migration `0072` 的 G2 关闭态发布已完成：生产 revision 为

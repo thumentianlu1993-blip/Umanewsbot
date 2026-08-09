@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -11,6 +13,17 @@ from runtime.research import test_validate_official_graded_race_package as packa
 
 
 class GradedRaceCompletionBundleTests(unittest.TestCase):
+    def test_workflow_cli_bootstraps_repository_imports(self):
+        repository = Path(__file__).resolve().parents[2]
+        completed = subprocess.run(
+            [sys.executable, "runtime/research/build_graded_race_completion_bundle.py", "--help"],
+            cwd=repository,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
     def test_bundle_binds_legacy_official_and_reviewed_package(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
