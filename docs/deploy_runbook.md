@@ -8331,3 +8331,25 @@ re-baseline 基线 + 各轮 findings 新增）。
    stale `create_new` manifest 并行写入。
 7. 正式 apply 继续要求 fresh 写前备份、零 writer/lock、精确 release candidate SHA、用户 G3、完整
    verifier 和默认关闭的全局高风险开关；本代码发布本身不包含 profile 网络或生产数据写入。
+
+## participant 全阻断 attempt 的精确 retry
+
+当 active ledger 已为 `prepared`，且独立审查确认该 completion 为同批全部阻断、零数据库写入，修复对应
+确定性 blocker 后才允许执行：
+
+```bash
+python3 runtime/research/p0_participant_execution_ledger.py \
+  --action retry \
+  --index <frozen-batch-index.json> \
+  --ledger <execution-ledger.json> \
+  --batch <exact-batch-path> \
+  --review-manifest-sha256 <exact-review-sha256> \
+  --completion-manifest <current-all-blocked-completion-manifest.json> \
+  --retry-reason deterministic_blocker_repaired
+```
+
+命令必须验证原 completion SHA 与 ledger 当前值一致、`database_writes=0`、`complete=0`、
+`blocked=processed=expected row_count`；成功后旧 SHA 保留在 `prepare_attempts`，phase 回到 `claimed`。
+不得删除 ledger、另建平行 ledger、覆盖旧 artifact，或对已 released/applied 批次使用 retry。续跑仍使用
+同一 batch/review SHA、原 cache、空的新 output 目录、单一 one-shot 和数据库 read-only；新 completion
+通过独立审查前不得进入 release/G3。

@@ -5741,3 +5741,22 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   纯函数覆盖合法 owner、错 schema、错 table；真实 PostgreSQL fixture 将原索引替换为其他表上的同名、
   同列、同 predicate 索引，validator 精确拒绝，并在 `finally` 恢复后再次验证合法 catalog。
 - PostgreSQL 专项 `24/24` 通过，隔离容器已删除；未 stage/commit/push/部署或连接生产。
+
+# 2026-08-10 participant batch-0001 首次 network prepare 与最小修复
+
+- 生产 `main@6c357985` 对 `batch-0001-japan-0001`、review manifest
+  `f910082d…f12` 执行一次单批、串行、数据库强制只读的 network prepare：50 匹产生 76 次请求与
+  22 个 JBIS canonical cache，`database_writes=0`，数据库 before/after SHA 均为
+  `18e08300…43c0`。completion SHA 为 `7d555ef9…07dec`，但结果为
+  `complete=0 / blocked=50`，独立复审 `REVISE`，未进入 release/G3。
+- 确定性分类为：23 个缺 netkeiba provider-bound ID、22 个 JBIS 唯一命中后被旧 expected identity
+  合同拒绝、2 个 JBIS `**` 中止/失格状态未归一化、2 个歧义、1 个姓名不匹配。当前生产仍全部高风险
+  开关关闭，无 one-off 或资料写入。
+- 干净分支 `codex/fix-p0-participant-identity` 已实现最小修复：只有真实数字 netkeiba horse ID 才走
+  netkeiba 直连；reviewed Japan occurrence 可由 JBIS 唯一精确搜索、完整 search/profile identity
+  一致性建立 provider-bound identity；精确 `中止/失格` 分别归一为
+  `did_not_finish/disqualified`，其他未知 `**` 继续 fail closed。
+- execution ledger 新增受控 `retry`：仅允许同一 active identity、旧 phase=`prepared`、旧 completion
+  全部阻断且零写入，并要求 reason=`deterministic_blocker_repaired`；旧 completion SHA 写入
+  `prepare_attempts` 后才回到 `claimed`。相关 P0 组合回归 `383/383`、participant/源合同 `90/90`
+  与 ledger `2/2` 通过。当前记录点尚未提交、合并、部署或续跑。

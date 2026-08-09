@@ -786,6 +786,7 @@ def _jbis_nonstart_record_html(
     status_cell: str,
     race_name: str = "4歳以上1勝クラス",
     include_status_tail: bool = True,
+    source_start_count: int = 1,
 ) -> str:
     status_tail = (
         f"<div>{status_cell}</div><div>482</div><div></div>"
@@ -794,7 +795,7 @@ def _jbis_nonstart_record_html(
     )
     return f"""
 <html><body>
-  <h2>1戦中 1戦の成績表示</h2>
+  <h2>{source_start_count}戦中 {source_start_count}戦の成績表示</h2>
   <div class="data-6-5">
     <div>
       <div>日付</div><div>競馬場</div><div>競走名</div><div>着順</div>
@@ -2972,6 +2973,109 @@ class P0HorseCompletionSourceClientTests(SimpleTestCase):
             1,
         )
         self.assertEqual(normalized["career_history"]["gap_count"], 0)
+
+    def test_jbis_exact_dnf_and_disqualified_statuses_count_as_actual_starts(self):
+        expected_statuses = {
+            "中止": "did_not_finish",
+            "失格": "disqualified",
+        }
+        for source_status, normalized_status in expected_statuses.items():
+            with self.subTest(source_status=source_status):
+                transport = ScriptedTransport(
+                    [
+                        StubResponse(
+                            JBIS_REAL_SEARCH_HTML,
+                            url="https://www.jbis.or.jp/horse/result/",
+                        ),
+                        StubResponse(
+                            JBIS_REAL_PROFILE_HTML,
+                            url="https://www.jbis.or.jp/horse/0000123456/",
+                        ),
+                        StubResponse(
+                            _jbis_nonstart_record_html(
+                                status_cell=source_status,
+                                source_start_count=2,
+                            ),
+                            url=(
+                                "https://www.jbis.or.jp/horse/"
+                                "0000123456/record/"
+                            ),
+                        ),
+                    ]
+                )
+                source_clients = _source_module()
+                client = source_clients.build_p0_horse_completion_source_client(
+                    RacingRegion.JAPAN,
+                    transport=transport,
+                )
+                normalized = completion.run_p0_horse_completion_adapter(
+                    _request(
+                        RacingRegion.JAPAN,
+                        horse_name="ソーステスト",
+                        expected_sire_name="Test Sire",
+                        expected_dam_name="Test Dam",
+                        expected_birth_year=2021,
+                        request_budget=3,
+                    ),
+                    source_client=client,
+                )
+                special_record = next(
+                    record
+                    for record in normalized["race_records"]
+                    if record["race_name"] == "4歳以上1勝クラス"
+                )
+                self.assertEqual(special_record["result_status"], normalized_status)
+                self.assertEqual(special_record["start_status"], "started")
+                self.assertEqual(
+                    normalized["career_history"]["collected_start_count"],
+                    2,
+                )
+
+    def test_japan_occurrence_without_netkeiba_id_uses_unique_jbis_identity(self):
+        transport = ScriptedTransport(
+            [
+                StubResponse(
+                    JBIS_REAL_SEARCH_HTML,
+                    url="https://www.jbis.or.jp/horse/result/",
+                ),
+                StubResponse(
+                    JBIS_REAL_PROFILE_HTML,
+                    url="https://www.jbis.or.jp/horse/0000123456/",
+                ),
+                StubResponse(
+                    JBIS_REAL_RECORD_HTML,
+                    url="https://www.jbis.or.jp/horse/0000123456/record/",
+                ),
+            ]
+        )
+        source_clients = _source_module()
+        client = source_clients.build_p0_horse_completion_source_client(
+            RacingRegion.JAPAN,
+            transport=transport,
+        )
+        request = _request(
+            RacingRegion.JAPAN,
+            candidate_key="observation:event:1021:number:1",
+            horse_name="ソーステスト",
+            candidate_source_name="netkeiba",
+            external_horse_id="",
+            expected_sire_name="",
+            expected_dam_name="",
+            expected_birth_year=None,
+            request_budget=3,
+        )
+
+        normalized = completion.run_p0_horse_completion_adapter(
+            request,
+            source_client=client,
+        )
+
+        self.assertEqual(normalized["identity"]["source_name"], "jbis")
+        self.assertEqual(normalized["external_horse_id"], "0000123456")
+        self.assertEqual(normalized["identity"]["sire_name"], "Test Sire")
+        self.assertEqual(normalized["identity"]["dam_name"], "Test Dam")
+        self.assertEqual(normalized["identity"]["birth_year"], 2021)
+        self.assertEqual(len(transport.calls), 3)
 
     def test_jbis_unknown_double_asterisk_with_ordinary_status_fails_closed(self):
         transport = ScriptedTransport(

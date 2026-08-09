@@ -13,6 +13,125 @@ from runtime.research.p0_participant_execution_ledger import (
 
 
 class ParticipantExecutionLedgerTests(unittest.TestCase):
+    def test_retry_preserves_all_blocked_attempt_and_reopens_same_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            index = root / "index.json"
+            index.write_text(
+                json.dumps(
+                    {
+                        "artifact_type": "p0_horse_participant_completion_batch_plan",
+                        "batch_count": 1,
+                        "candidate_count": 2,
+                        "batches": [
+                            {"path": "batch-1", "ordinal": 1, "row_count": 2}
+                        ],
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            index_sha = hashlib.sha256(index.read_bytes()).hexdigest()
+            ledger = root / "ledger.json"
+            review_sha = "a" * 64
+            completion = root / "completion.json"
+            completion.write_text(
+                json.dumps(
+                    {
+                        "artifact_type": "p0_horse_completion_batch_manifest",
+                        "database_writes": 0,
+                        "summary": {
+                            "processed_count": 2,
+                            "complete_candidate_count": 0,
+                            "blocked_count": 2,
+                        },
+                        "review_manifest_input": {
+                            "sha256": review_sha,
+                            "batch_contract": {
+                                "batch_membership": {
+                                    "path": "batch-1",
+                                    "ordinal": 1,
+                                    "index_sha256": index_sha,
+                                }
+                            },
+                        },
+                    },
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+            update_execution_ledger(
+                action="claim",
+                index_path=index,
+                ledger_path=ledger,
+                batch_path="batch-1",
+                review_manifest_sha256=review_sha,
+            )
+            update_execution_ledger(
+                action="prepared",
+                index_path=index,
+                ledger_path=ledger,
+                batch_path="batch-1",
+                review_manifest_sha256=review_sha,
+                completion_manifest_path=completion,
+            )
+
+            retried = update_execution_ledger(
+                action="retry",
+                index_path=index,
+                ledger_path=ledger,
+                batch_path="batch-1",
+                review_manifest_sha256=review_sha,
+                completion_manifest_path=completion,
+                retry_reason="deterministic_blocker_repaired",
+            )
+
+            completion_sha = hashlib.sha256(completion.read_bytes()).hexdigest()
+            self.assertEqual(retried["active"]["phase"], "claimed")
+            self.assertEqual(
+                retried["active"]["prepare_attempts"],
+                [
+                    {
+                        "completion_manifest_sha256": completion_sha,
+                        "retry_reason": "deterministic_blocker_repaired",
+                    }
+                ],
+            )
+            replacement = root / "replacement.json"
+            replacement_payload = json.loads(completion.read_text(encoding="utf-8"))
+            replacement_payload["summary"].update(
+                {"complete_candidate_count": 1, "blocked_count": 1}
+            )
+            replacement.write_text(
+                json.dumps(replacement_payload, sort_keys=True),
+                encoding="utf-8",
+            )
+            prepared_again = update_execution_ledger(
+                action="prepared",
+                index_path=index,
+                ledger_path=ledger,
+                batch_path="batch-1",
+                review_manifest_sha256=review_sha,
+                completion_manifest_path=replacement,
+            )
+            self.assertEqual(
+                prepared_again["active"]["prepare_attempts"],
+                retried["active"]["prepare_attempts"],
+            )
+            with self.assertRaisesRegex(
+                ParticipantExecutionLedgerError,
+                "retry completion manifest",
+            ):
+                update_execution_ledger(
+                    action="retry",
+                    index_path=index,
+                    ledger_path=ledger,
+                    batch_path="batch-1",
+                    review_manifest_sha256=review_sha,
+                    completion_manifest_path=replacement,
+                    retry_reason="deterministic_blocker_repaired",
+                )
+
     def test_enforces_order_resume_identity_and_completion_binding(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
