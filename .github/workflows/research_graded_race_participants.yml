@@ -20,6 +20,7 @@ on:
       - runtime/research/test_build_graded_race_completion_bundle.py
       - runtime/research/README_graded_race_participants.md
       - runtime/research/region_manifests/**
+      - runtime/research/reviewed_packages/**
       - .codex/scripts/test_graded_race_participants_workflow.py
       - .github/workflows/research_graded_race_participants.yml
   workflow_dispatch:

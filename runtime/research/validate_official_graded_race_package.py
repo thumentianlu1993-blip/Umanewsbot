@@ -6,17 +6,21 @@ import argparse
 import json
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
-from runtime.research.build_official_graded_race_manifest import (
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from runtime.research.build_official_graded_race_manifest import (  # noqa: E402
     canonical_json_bytes,
     sha256_bytes,
     sha256_file,
 )
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 EXPECTED_FILES = {
     "official_result_manifest.json",
     "official_result_gaps.json",

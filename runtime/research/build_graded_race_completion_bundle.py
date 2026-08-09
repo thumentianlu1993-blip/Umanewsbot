@@ -5,16 +5,21 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
-from runtime.research.build_official_graded_race_manifest import (
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from runtime.research.build_official_graded_race_manifest import (  # noqa: E402
     atomic_write,
     canonical_json_bytes,
     sha256_bytes,
     sha256_file,
 )
-from runtime.research.validate_official_graded_race_package import validate_package
+from runtime.research.validate_official_graded_race_package import validate_package  # noqa: E402
 
 
 LEGACY_FILES = {

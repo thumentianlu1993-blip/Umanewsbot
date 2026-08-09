@@ -1,5 +1,16 @@
 # 关键决策
 
+## 2026-08-09 受审 official-results 包必须仓库内可寻址且 CLI 可直接执行
+
+- `full_network=true` 只接受仓库相对三文件包，因此独立审核通过的包必须以精确 summary SHA 登记到
+  `runtime/research/reviewed_packages/`，包目录内不得混入 receipt 或说明文件。
+- GitHub Actions 使用 `python runtime/research/<script>.py` 直接运行验证器与 bundle builder；两个入口
+  必须自行把仓库根加入 import path，不能依赖开发机的隐式 `PYTHONPATH`。
+- checked-in package 的 CLI 测试必须验证 `433 = 87 + 346` 守恒。审核 receipt 明确记录所有生产、
+  澳洲采集、official-results 与 `full_network` 权限均为 false，避免把证据提交误解成运行授权。
+- 澳洲 346 场的外部许可门禁不能由用户普通运行授权或技术审核替代；未取得许可时只能保持可审计 gap，
+  或由用户明确把本轮写入范围缩为非澳洲 87 场。
+
 ## 2026-08-09 澳洲年度目录按自然年拼接官方相邻赛季
 
 - TJCIS 澳洲章节明确采用 `8 月 1 日至次年 7 月 31 日` 赛季口径，不能直接代表单一自然年。

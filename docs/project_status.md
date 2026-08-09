@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-08-09 2025 reviewed package 技术审核已清零
+
+- 当前生产为 revision `45da956a…22baf` 的关闭态部署；未执行任何本轮数据写入或正式网络运行。
+- 受审包覆盖 433 场：非澳洲 87 场可采集，澳洲 346 场为可审计 evidence gap；87 场冻结缓存重放
+  得到 790 名参赛马，逐场 starter count/top 3 全匹配，独立复审 `APPROVED`、无 P0-P2。
+- 新候选把 package 放入 workflow 可寻址的仓库相对目录，并修复 validator/bundle 直接 CLI 的确定性
+  import 失败。目标 official-results 套件 43/43、workflow 合同 13/13、全局合同 4/4 通过。
+- 下一步先完成候选 PR/CI；随后只在澳洲许可/范围选择和精确生产写入 G3 停下确认。
+
 ## 2026-08-09 2025 新地区目录已纠正，等待 PR #86 独立复审
 
 - migration `0072` G2 已在生产 revision `0b93aa55…e8ca` 完整收口；本轮没有回填或联网正式运行。
