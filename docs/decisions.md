@@ -1,5 +1,15 @@
 # 关键决策
 
+## 2026-08-09 新 merge SHA 必须重新冻结 race-live 恢复意图
+
+- race-live state 绑定创建它的 commit；上一轮 `eb1e221f…` 的可信 state 不能在
+  `0b93aa55…` 发布中直接复用，否则当前脚本会在任何停服前 fail closed。
+- 本次先记录旧 state SHA `3c0fd4ed23dd218697f8664c54b82810cea2c5b0b0346a0d8d205f93797c01a4`，再将其归档到
+  `/opt/umanewsbot/backups/release-state/migration-0072-completion-g2-20260809T075009Z/`；新 attempt
+  重新冻结实际 `race_live_worker=not-running`，成功完成后由 release wrapper 清理活动 state。
+- 不允许改写旧 state 的 HEAD、复制旧字段到新文件或跳过 trust verifier；跨 commit 重试应保留旧证据，
+  由新 release 重新获取当前运行态。
+
 ## 2026-08-09 新 migration 必须同步推进受审 preflight 最终叶
 
 - `0072` 虽然只改变 Django choices、数据库 SQL 为 no-op，仍会写入 migration recorder；因此发布

@@ -1,5 +1,31 @@
 # 当前状态
 
+## 2026-08-09 migration 0072 发布合同修复已完成生产验收
+
+- PR `#84` 已合并为 `main@0b93aa552f7abfeadb0a91e5fe7f2610178ee8ca`，生产隔离 release 为
+  `/opt/umanews-release-0b93aa55-M72-20260809/umanewsbot`。web/worker/beat 现统一运行 image
+  `sha256:0f184c78be6632fd467d16465ffb3554e44757c69468ee22c86c0cd84eddd8a8`，OCI/runtime revision
+  均为精确 merge SHA，web healthy。
+- fresh 写前 custom-format dump 为
+  `/opt/umanewsbot/backups/db/pre-migration-0072-completion-g2-20260809T075009Z.dump`，大小
+  `415662596` bytes、mode `0600`、TOC `1308`、SHA-256
+  `ae9069cfef4c4e5aaa7b79650a01cc8aa9f03134c9e0c25e1eb02bcd712a9b40`；旧 image 回滚标签为
+  `umanewsbot:rollback-pre-migration-0072-completion-g2-20260809T075009Z`。
+- 0072 preflight artifact 位于
+  `runtime/migration_history_repair/preflight/before.aWGfHyzP/preflight.json`，文件 SHA-256 为
+  `0e9a278670e755e23c2bed59d6043d6c8cc9e61db2ad7f76bdc73177cab621fa`，内嵌 canonical artifact SHA
+  为 `f73a505a61694da03caab58884387a3b2a9827356c0ab765f33980ce8ab3b7ad`。Celery 在停服务前精确排空
+  为 `active/reserved/active_confirm=0/0/0`；release task 确认 PostgreSQL、writer census 与 artifact
+  绑定后执行 `No migrations to apply`，completion 返回 `not-required` 并成功收口。
+- 写后 schema verifier 为 `ok=true`、`drift_paths=[]`、migration leaf 精确为
+  `stable.0072_add_extended_racing_regions`、plan 为空、database identity 为
+  `a986cc11149981c54e9d4915ad35e7c46e9382584d6670c8f950eceda26e471c`。0072 recorder 精确一行；
+  外部导入 started/lock、historical batch、资料补全 run、claimed result review 均为 `0`；历史写入、
+  历史网络、资料网络、race live monitor/scheduler 与 race data sync 六开关均为 false。
+- deployment lock、race-live state 与 restricted marker 均已清理；数据库/Redis、Celery ping、容器内及
+  两个正式 HTTP 域名 healthz、赛事页和近 10 分钟 web/worker/beat 严重错误扫描均通过。Beat 恢复后
+  的普通新闻抓取属于既有运营流量；本次没有执行生产回填、G3 或 `full_network`。
+
 ## 2026-08-09 migration 0072 已应用，发布合同叶节点修复待合并
 
 - PR `#83` 已合并为 `main@eb1e221f2791948616c3a72f0e45183d72fdc350`。生产隔离 release 为

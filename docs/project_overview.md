@@ -1,8 +1,9 @@
 # 项目总览
 
-当前八地区链路代码已随 PR `#83` 进入生产候选并应用 migration `0072`；首次发布暴露的受审迁移
-最终叶仍停在 `0071`，正式 release completion 因而 fail-closed。服务已用同一候选镜像安全恢复，
-但只有最终叶合同修复通过测试、复核、合并并重新完成发布后，才可进入新增地区 artifact 与 G3 数据阶段。
+当前八地区链路代码已随 PR `#83` 应用 migration `0072`，其最终叶合同修复又随 PR `#84` 合并并完成
+受保护生产发布。线上 web/worker/beat 已统一到 `main@0b93aa55…8ca` 对应 image，0072 schema、零计划
+migration、completion、运行态与关闭态 verifier 均通过。该 G2 只完成代码/schema 发布；新增地区正式
+artifact、生产回填与 `full_network` 仍是后续独立 G3，不因本次成功自动启用。
 
 ## 2026-08-09 八地区单年度分级赛参赛马补全链路（实现中）
 
