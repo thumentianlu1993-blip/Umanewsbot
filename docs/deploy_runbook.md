@@ -1,5 +1,17 @@
 # 部署运行手册
 
+## 2026-08-09 德国 official-results parser 发布前门禁
+
+1. 德国官方结果表可能在 participant rows 后包含一个 `colspan` 单格投注/时间摘要。候选 parser 只
+   跳过未同时映射到 `position` 与 `horse` 的不完整 row；不得把 `placing()` 的未知状态异常改成跳过。
+   该 provider 的 `Pl. = -` 仅在完整 participant row 中规范为 `did_not_finish`，因为官网 starter 汇总
+   明确把它计入实际 starter 且非 `Nichtstarter`；该规则不得扩到其他 provider。
+2. 合并前至少复跑 `runtime.research.test_official_graded_race_sources`，并用冻结的真实 2025 德国结果页
+   证明 starter rows 可解析且摘要行未进入结果。部署后才可重新开始 official-results 正式 runner；
+   旧生产 revision 上该错误是确定性的，不按临时网络 checkpoint 重试。
+3. 本修复无 migration、配置或数据写入。发布与后续 G3 数据动作仍是两个独立门禁；代码部署本身不
+   授权生产回填或 `full_network=true`。
+
 ## 2026-08-09 migration 0072 首次发布 STOP 与恢复
 
 1. PR `#83` merge SHA 为 `eb1e221f2791948616c3a72f0e45183d72fdc350`；隔离 release 固定

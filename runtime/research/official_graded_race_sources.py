@@ -162,6 +162,8 @@ def header_parser(provider: str, html: str, aliases: dict[str, tuple[str,...]], 
         result=[]
         for raw in table[1:]:
             offset=max(0,len(raw)-len(heads)); values={k:raw[i+offset] for k,i in indexes.items() if i+offset<len(raw)}
+            if not {"position", "horse"} <= values.keys():
+                continue
             item=builder(values)
             if item: result.append(item)
         if result: return finish(provider,result)
@@ -179,7 +181,7 @@ def parse_au(html):
 def parse_de(html):
     aliases={"position":("Pl.",),"horse":("Name",),"number":("Nr.",),"margin":("Abstand",),"trainer":("Trainer",),"jockey":("Reiter",)}
     def build(v):
-        result=placing(v["position"].text)
+        result=(None, "did_not_finish") if clean(v["position"].text) == "-" else placing(v["position"].text)
         return None if result is None else row("de_deutscher_galopp",result[0],v["horse"].text,participant_status=result[1],number=v["number"].text,cell=v["horse"],jockey=v["jockey"].text,trainer=v["trainer"].text,margin=v["margin"].text)
     return header_parser("de_deutscher_galopp",html,aliases,build)
 

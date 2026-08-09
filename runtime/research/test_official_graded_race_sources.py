@@ -14,8 +14,10 @@ class OfficialSourceTests(unittest.TestCase):
         r=parse_official_results("au_racing_australia",h)[0]; self.assertEqual((r["horse_name"],r["provider_horse_id"]),("Example (NZ)","123"))
 
     def test_germany(self):
-        h="<table><tr><th>Pl.</th><th>Name</th><th>Nr.</th><th>Abstand</th><th>Trainer</th><th>Reiter</th></tr><tr><td>1.</td><td>Partnun</td><td>5</td><td>Kampf</td><td>T</td><td>J</td></tr></table>"
-        r=parse_official_results("de_deutscher_galopp",h)[0]; self.assertEqual((r["finish_position"],r["horse_number"]),(1,"5"))
+        h="<table><tr><th>Pl.</th><th>Name</th><th>Nr.</th><th>Abstand</th><th>Trainer</th><th>Reiter</th></tr><tr><td>1.</td><td>Partnun</td><td>5</td><td>Kampf</td><td>T</td><td>J</td></tr><tr><td>-</td><td>The Sheriff</td><td>15</td><td></td><td>T2</td><td>J2</td></tr><tr><td colspan='6'>Quoten zu 1 €: Siegwette 7,8 - STARTER: 2</td></tr></table>"
+        rows=parse_official_results("de_deutscher_galopp",h)
+        self.assertEqual((rows[0]["finish_position"],rows[0]["horse_number"]),(1,"5"))
+        self.assertEqual((rows[1]["finish_position"],rows[1]["participant_status"]),(None,"did_not_finish"))
 
     def test_era(self):
         c=["1","-","Owner","4 (13)","FIRST CLASSS (US) 8 YO - GREY - GELDING","Jockey: Connor Beasley Rating: 119 Time: 2:12.65 Trainer: Doug Watson Weight: 57","","","","FIRST CLASSS (US)","8","119","57","41","10","19"]

@@ -1,5 +1,18 @@
 # 当前状态
 
+## 2026-08-09 德国官方赛果页脚解析最小修复待审查
+
+- 2025 德国官方日历按 `von_submit/bis_submit` 与 G1/G2/G3 过滤后得到 `42` 场，和 TJCIS 德国目录
+  `42` 场守恒；第一张真实赛果页包含与参赛表共用 `<table>` 的单格投注赔率/开跑时间页脚。
+- 现有通用表格 parser 会把该不完整页脚误当作名次并以 `unknown official result status` 确定性停止。
+  最小候选仅在 row 同时具备已识别的 `position` 与 `horse` 列时才交给 provider builder；真实未知名次
+  仍由 `placing()` fail-closed。德国官方另以 `Pl. = -` 表示已在 starter 表中且非 `Nichtstarter`、但
+  没有数值名次的实际起跑马；仅德国 adapter 把该值保留为 `did_not_finish`，不全局放宽状态集合。
+- 聚焦测试 `26/26`、研究套件 `136/136` 通过，真实德国缓存页已覆盖普通结果与 `Pl. = -` 形状；
+  独立 reviewer 另验证德国完整未知状态及 AU/Bahrain 的 `-` 仍拒绝，最终 `APPROVED`、无 P0-P2。
+  当前尚未提交、合并或部署；旧生产 image 仍会在该页确定性停止，因此不得在旧 revision 启动正式
+  official-results/full-network run。
+
 ## 2026-08-09 migration 0072 已应用，发布合同叶节点修复待合并
 
 - PR `#83` 已合并为 `main@eb1e221f2791948616c3a72f0e45183d72fdc350`。生产隔离 release 为
