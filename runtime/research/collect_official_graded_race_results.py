@@ -27,6 +27,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from runtime.research.official_graded_race_sources import (  # noqa: E402
+    DISTANCE_OVERRIDE_REASON,
     POLICIES,
     OfficialSourceError,
     canonical_au_selector_identity,
@@ -134,6 +135,27 @@ def load_manifest(path: Path, *, expected_sha256: str) -> tuple[dict, str]:
             raise RunnerError(f"manifest grade is invalid: {race_key}")
         if not distance.isdigit() or int(distance) <= 0:
             raise RunnerError(f"manifest distance is invalid: {race_key}")
+        catalog_distance = str(item.get("catalog_distance") or distance).strip()
+        override_reason = str(item.get("distance_override_reason") or "").strip()
+        override_evidence_url = str(
+            item.get("distance_override_evidence_url") or ""
+        ).strip()
+        override_fields = {}
+        if catalog_distance != distance:
+            if not catalog_distance.isdigit() or int(catalog_distance) <= 0:
+                raise RunnerError(f"manifest catalog distance is invalid: {race_key}")
+            if override_reason != DISTANCE_OVERRIDE_REASON:
+                raise RunnerError(f"manifest distance override reason is invalid: {race_key}")
+            validate_provider_url(provider, override_evidence_url, year=year)
+            if canonical_provider_url_identity(override_evidence_url) != canonical_provider_url_identity(result_url):
+                raise RunnerError(f"manifest distance override evidence identity mismatch: {race_key}")
+            override_fields = {
+                "catalog_distance": catalog_distance,
+                "distance_override_reason": override_reason,
+                "distance_override_evidence_url": override_evidence_url,
+            }
+        elif override_reason or override_evidence_url or "catalog_distance" in item:
+            raise RunnerError(f"manifest distance override is redundant: {race_key}")
         if not source_race_name:
             raise RunnerError(f"manifest source race name is invalid: {race_key}")
         policy = POLICIES[provider]
@@ -167,6 +189,7 @@ def load_manifest(path: Path, *, expected_sha256: str) -> tuple[dict, str]:
                 "source_race_name": source_race_name,
                 "race_name": str(item.get("race_name") or "").strip(),
                 "local_date": local_date,
+                **override_fields,
             }
         )
     provider_counts: dict[str, int] = {}

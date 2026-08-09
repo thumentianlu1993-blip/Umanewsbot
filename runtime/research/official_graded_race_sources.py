@@ -14,6 +14,7 @@ from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse, urlsplit, url
 POS = re.compile(r"^(\d+)(?:st|nd|rd|th|\.)?$", re.I)
 HORSE_ID = re.compile(r"/hors?e?s?/([^/?#]+)", re.I)
 AGED_NAME = re.compile(r"^(.*?)\s+\d+\s+YO\b", re.I)
+DISTANCE_OVERRIDE_REASON = "official_result_distance_differs_from_catalog"
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,15 @@ def validate_provider_url(provider: str, url: str, *, year: int) -> str:
     parsed = urlparse(clean(url))
     if parsed.scheme != "https" or parsed.hostname not in POLICIES[provider].hosts:
         raise OfficialSourceError(f"provider URL is outside allowlist: {provider}")
-    if str(year) not in url:
+    if provider == "qa_qrec" and parsed.path == "/race-calendar":
+        race_date = clean((parse_qs(parsed.query).get("racedate") or [""])[0])
+        try:
+            parsed_race_date = date.fromisoformat(race_date)
+        except ValueError as exc:
+            raise OfficialSourceError("provider URL has invalid race date: qa_qrec") from exc
+        if parsed_race_date.year != year:
+            raise OfficialSourceError("provider URL has requested-year drift: qa_qrec")
+    elif str(year) not in url:
         raise OfficialSourceError(f"provider URL lacks requested year: {provider}")
     return parsed.geturl()
 

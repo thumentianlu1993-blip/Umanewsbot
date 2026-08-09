@@ -281,6 +281,54 @@ class OfficialGradedResultRunnerTests(unittest.TestCase):
             with self.assertRaisesRegex(runner.RunnerError, "year drift"):
                 runner.load_manifest(manifest, expected_sha256=digest(manifest))
 
+    def test_manifest_preserves_reviewed_official_distance_override(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            race = {
+                "race_key": "qatar-amir-trophy-2025",
+                "provider": "qa_qrec",
+                "result_url": "https://qrec.gov.qa/race-calendar?racedate=2025-02-15&meetid=10270&raceid=25612&tab=Results",
+                "region": "middle_east",
+                "country": "qatar",
+                "grade": "G3",
+                "distance": "2300",
+                "catalog_distance": "2400",
+                "distance_override_reason": runner.DISTANCE_OVERRIDE_REASON,
+                "distance_override_evidence_url": "https://qrec.gov.qa/race-calendar?racedate=2025-02-15&meetid=10270&raceid=25612&tab=Results",
+                "race_name": "HH The Amir Trophy International",
+                "local_date": "2025-02-15",
+            }
+            manifest, manifest_sha = self.manifest(root, [race])
+            normalized, _ = runner.load_manifest(manifest, expected_sha256=manifest_sha)
+            actual = normalized["races"][0]
+            self.assertEqual((actual["distance"], actual["catalog_distance"]), ("2300", "2400"))
+
+            del race["distance_override_evidence_url"]
+            manifest, manifest_sha = self.manifest(root, [race])
+            with self.assertRaisesRegex(runner.OfficialSourceError, "outside allowlist"):
+                runner.load_manifest(manifest, expected_sha256=manifest_sha)
+
+    def test_qrec_override_evidence_uses_structured_race_year(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            race = {
+                "race_key": "qatar-cross-year",
+                "provider": "qa_qrec",
+                "result_url": "https://qrec.gov.qa/race-calendar?racedate=2025-02-15&raceid=25612",
+                "region": "middle_east",
+                "country": "qatar",
+                "grade": "G3",
+                "distance": "2300",
+                "catalog_distance": "2400",
+                "distance_override_reason": runner.DISTANCE_OVERRIDE_REASON,
+                "distance_override_evidence_url": "https://qrec.gov.qa/race-calendar?racedate=2024-12-20&raceid=20250",
+                "race_name": "HH The Amir Trophy International",
+                "local_date": "2025-02-15",
+            }
+            manifest, manifest_sha = self.manifest(root, [race])
+            with self.assertRaisesRegex(runner.OfficialSourceError, "year drift"):
+                runner.load_manifest(manifest, expected_sha256=manifest_sha)
+
     def test_tool_identity_change_invalidates_checkpoint(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -23,6 +23,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from runtime.research.official_graded_race_sources import (  # noqa: E402
+    DISTANCE_OVERRIDE_REASON,
     POLICIES,
     canonical_au_selector_identity,
     canonical_provider_url_identity,
@@ -200,6 +201,15 @@ def compile_review(paths: list[Path], *, year: int, reviewed_path: Path, expecte
     seen_result_urls: set[tuple[str, ...]] = set()
     for row in rows:
         item = by_key[row["catalog_key"]]
+        override_field_names = (
+            "actual_distance",
+            "distance_override_reason",
+            "distance_override_evidence_url",
+        )
+        has_override_fields = any(
+            str(item.get(field) if item.get(field) is not None else "").strip()
+            for field in override_field_names
+        )
         fixed = {
             "region": row["country_region"], "country": row["country"],
             "series_key": row["series_key"], "race_name": row["canonical_name_original"],
@@ -213,7 +223,7 @@ def compile_review(paths: list[Path], *, year: int, reviewed_path: Path, expecte
             raise ManifestBuildError(f"reviewed mapping catalog facts drift: {row['catalog_key']}")
         disposition = str(item.get("disposition") or "").strip()
         if row["expectation_status"] == "not_held":
-            if disposition != "not_held" or item.get("result_url") or item.get("local_date"):
+            if disposition != "not_held" or item.get("result_url") or item.get("local_date") or has_override_fields:
                 raise ManifestBuildError("not-held race mapping is invalid")
             gaps.append({**fixed, "catalog_key": row["catalog_key"], "disposition": disposition, "gap_reason": "not_held"})
             continue
@@ -227,10 +237,39 @@ def compile_review(paths: list[Path], *, year: int, reviewed_path: Path, expecte
                 date.fromisoformat(local_date)
             except ValueError as exc:
                 raise ManifestBuildError("collected race local_date is invalid") from exc
+            manifest_distance = fixed["distance"]
+            override_distance = str(
+                item.get("actual_distance")
+                if item.get("actual_distance") is not None
+                else ""
+            ).strip()
+            override_reason = str(item.get("distance_override_reason") or "").strip()
+            override_evidence_url = str(
+                item.get("distance_override_evidence_url") or ""
+            ).strip()
+            override_fields = {}
+            if override_distance:
+                if not override_distance.isdigit() or int(override_distance) <= 0:
+                    raise ManifestBuildError("collected race actual_distance is invalid")
+                if override_distance == fixed["distance"]:
+                    raise ManifestBuildError("collected race distance override is redundant")
+                if override_reason != DISTANCE_OVERRIDE_REASON:
+                    raise ManifestBuildError("collected race distance override reason is invalid")
+                validate_provider_url(fixed["provider"], override_evidence_url, year=year)
+                if canonical_provider_url_identity(override_evidence_url) != canonical_provider_url_identity(url):
+                    raise ManifestBuildError("collected race distance override evidence identity mismatch")
+                manifest_distance = override_distance
+                override_fields = {
+                    "catalog_distance": fixed["distance"],
+                    "distance_override_reason": override_reason,
+                    "distance_override_evidence_url": override_evidence_url,
+                }
+            elif override_reason or override_evidence_url:
+                raise ManifestBuildError("collected race distance override is incomplete")
             url_identity = (fixed["provider"], canonical_provider_url_identity(url))
             if fixed["provider"] == "au_racing_australia":
                 url_identity += canonical_au_selector_identity(
-                    fixed["source_race_name"], fixed["distance"], fixed["grade"]
+                    fixed["source_race_name"], manifest_distance, fixed["grade"]
                 )
             if url_identity in seen_result_urls:
                 raise ManifestBuildError("reviewed mapping duplicates provider/result_url")
@@ -239,11 +278,12 @@ def compile_review(paths: list[Path], *, year: int, reviewed_path: Path, expecte
                 "race_key": row["catalog_key"], "provider": fixed["provider"], "result_url": url,
                 "region": fixed["region"], "country": fixed["country"], "grade": fixed["grade"],
                 "race_name": fixed["race_name"], "source_race_name": fixed["source_race_name"],
-                "distance": fixed["distance"],
+                "distance": manifest_distance,
                 "local_date": local_date,
+                **override_fields,
             })
         elif disposition == "evidence_gap":
-            if item.get("result_url") or item.get("local_date"):
+            if item.get("result_url") or item.get("local_date") or has_override_fields:
                 raise ManifestBuildError("evidence gap must not carry collection fields")
             reason = str(item.get("gap_reason") or "").strip()
             evidence_url = str(item.get("evidence_url") or "").strip()
