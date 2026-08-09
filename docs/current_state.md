@@ -10,9 +10,15 @@
   没有数值名次的实际起跑马；仅德国 adapter 把该值保留为 `did_not_finish`，不全局放宽状态集合。
 - 阿联酋 ERA 的真实 Jebel Hatta 结果页使用完整文案 `Did Not Finish`；该受控官方状态已加入既有
   did-not-finish 集合，未知完整状态仍拒绝。
+- 冻结 2025 TJCIS PDF 的 `Part I - INDEX` 采用完整 `Part` 而不是既有 fixture 的 `Pt`；旧 parser
+  未重置上一页 Saudi context，把 `American Turf/Andrés S. Torres/Colin Jillings/Durham Cup/Remus`
+  五条索引项错误解析为沙特赛事。候选把 `PART I/II/IV - INDEX` 纳入同一 unsupported boundary，
+  parser version 升至 `2026.08.2` 并补跨页 Saudi→Index 回归；正式目录与 404 review queue 必须在
+  该修复后全量重建，旧文件作废。
 - 聚焦测试 `26/26`、研究套件 `136/136` 通过，真实德国缓存页已覆盖普通结果与 `Pl. = -` 形状；
   独立 reviewer 另验证德国完整未知状态及 AU/Bahrain 的 `-` 仍拒绝，最终 `APPROVED`、无 P0-P2。
-  当前候选已提交推送至 Draft PR `#86`，新增 ERA 状态增量也经独立复核 `APPROVED`；尚未合并或部署。
+  当前候选已提交推送至 Draft PR `#86`；新增 ERA 状态和 TJCIS `Part` index boundary 增量也分别经
+  独立复核 `APPROVED`，均无 P0-P2；尚未合并或部署。
   旧生产 image 仍会在该页确定性停止，因此不得在旧 revision 启动正式
   official-results/full-network run。
 

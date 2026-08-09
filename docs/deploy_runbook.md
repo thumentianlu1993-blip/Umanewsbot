@@ -12,6 +12,9 @@
    旧生产 revision 上该错误是确定性的，不按临时网络 checkpoint 重试。
 3. 本修复无 migration、配置或数据写入。发布与后续 G3 数据动作仍是两个独立门禁；代码部署本身不
    授权生产回填或 `full_network=true`。
+4. TJCIS 整本 PDF 同时存在 `Pt IV—INDEX` 与 `Part I - INDEX` 标题；两者都必须清空上一页 country
+   context。修复前生成的 2025 catalog/review queue 不得局部删行复用，必须从冻结 PDF 全量重建并重算
+   catalog set/review SHA，再重新执行逐 provider 守恒审查。
 
 ## 2026-08-09 migration 0072 首次发布 STOP 与恢复
 

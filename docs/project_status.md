@@ -10,6 +10,8 @@
   通过；独立复核 `APPROVED`、无 P0-P2。候选已进入 Draft PR `#86`，尚待合并和部署。
 - 阿联酋 ERA 真实结果页另使用完整状态 `Did Not Finish`；候选把它加入既有受控非完赛集合，未把
   任意未知状态改为容错。
+- 2025 PDF 真实回放还发现 `Part I - INDEX` 未触发 country reset，导致五条跨国家索引项污染 Saudi
+  目录。最小修复扩展 index boundary 并补跨页回归；旧的 404 场 review queue 必须作废重建。
 
 ## 2026-08-09 PR #83 已运行，migration 合同最小修复待发布
 
