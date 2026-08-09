@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import tempfile
 import unicodedata
 from copy import deepcopy
@@ -27,6 +28,8 @@ PAYLOAD_SCHEMA_VERSION = "p0-horse-completion.v1"
 SOURCE_CACHE_SCHEMA_VERSION = "p0-horse-source-cache.v2"
 ARTIFACT_SCHEMA_VERSION = "p0-horse-completion-artifact.v1"
 BATCH_MANIFEST_SCHEMA_VERSION = "p0-horse-completion-batch-manifest.v1"
+PARTICIPANT_REVIEW_BATCH_SCHEMA_VERSION = "p0-horse-participant-review-batch.v2"
+PARTICIPANT_REVIEW_BATCH_MAX_ROWS_PER_REGION = 100
 REVIEWED_CANDIDATE_DECISION = "confirm_batch_inclusion"
 REVIEWED_CANDIDATE_REGIONS = (
     RacingRegion.JAPAN,
@@ -61,6 +64,10 @@ REVIEWED_CANDIDATE_REQUIRED_FIELDS = {
     "reviewed",
     "review_decision",
     "review_notes",
+}
+PARTICIPANT_REVIEW_BATCH_REQUIRED_FIELDS = {
+    "mapping_disposition",
+    "actual_start_evidence_count",
 }
 REQUIRED_BASIC_PROFILE_FIELDS = (
     "country",
@@ -1609,10 +1616,107 @@ def _parse_json_list(value: Any, *, field: str, row_number: int) -> list[Any]:
     return parsed
 
 
+def _read_regular_file_once(path: Path, *, label: str) -> bytes:
+    try:
+        metadata = path.lstat()
+    except OSError as exc:
+        raise P0HorseCompletionBatchError(f"{label} is unreadable") from exc
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise P0HorseCompletionBatchError(
+            f"{label} must be a regular non-symlink file"
+        )
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+        try:
+            opened = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_dev != metadata.st_dev
+                or opened.st_ino != metadata.st_ino
+            ):
+                raise P0HorseCompletionBatchError(
+                    f"{label} changed before it could be read"
+                )
+            chunks: list[bytes] = []
+            while chunk := os.read(descriptor, 1024 * 1024):
+                chunks.append(chunk)
+        finally:
+            os.close(descriptor)
+    except P0HorseCompletionBatchError:
+        raise
+    except OSError as exc:
+        raise P0HorseCompletionBatchError(f"{label} is unreadable") from exc
+    return b"".join(chunks)
+
+
+def _read_confined_regular_file_once(
+    root: Path,
+    path: Path,
+    *,
+    label: str,
+) -> bytes:
+    root = Path(os.path.abspath(root))
+    path = Path(os.path.abspath(path))
+    if path == root or root not in path.parents:
+        raise P0HorseCompletionBatchError(f"{label} escapes its batch root")
+    directory_flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    file_flags = (
+        os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptors: list[int] = []
+    try:
+        relative_parts = path.relative_to(root).parts
+        root_descriptor = os.open(root, directory_flags)
+        descriptors.append(root_descriptor)
+        current_descriptor = root_descriptor
+        for part in relative_parts[:-1]:
+            child_descriptor = os.open(
+                part,
+                directory_flags,
+                dir_fd=current_descriptor,
+            )
+            descriptors.append(child_descriptor)
+            opened = os.fstat(child_descriptor)
+            if not stat.S_ISDIR(opened.st_mode):
+                raise P0HorseCompletionBatchError(
+                    f"{label} parent must be a regular non-symlink directory"
+                )
+            current_descriptor = child_descriptor
+        file_descriptor = os.open(
+            relative_parts[-1],
+            file_flags,
+            dir_fd=current_descriptor,
+        )
+        descriptors.append(file_descriptor)
+        opened = os.fstat(file_descriptor)
+        if not stat.S_ISREG(opened.st_mode):
+            raise P0HorseCompletionBatchError(
+                f"{label} must be a regular non-symlink file"
+            )
+        chunks: list[bytes] = []
+        while chunk := os.read(file_descriptor, 1024 * 1024):
+            chunks.append(chunk)
+    except P0HorseCompletionBatchError:
+        raise
+    except OSError as exc:
+        raise P0HorseCompletionBatchError(f"{label} is unreadable") from exc
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+    return b"".join(chunks)
+
+
 def load_reviewed_p0_horse_candidates(
     reviewed_candidates_csv: str | Path,
     *,
     captured_bytes: bytes | None = None,
+    participant_batch_contract: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     path = Path(reviewed_candidates_csv)
     try:
@@ -1627,7 +1731,10 @@ def load_reviewed_p0_horse_candidates(
         )
         reader = csv.DictReader(input_file)
         fieldnames = set(reader.fieldnames or [])
-        missing_fields = REVIEWED_CANDIDATE_REQUIRED_FIELDS - fieldnames
+        required_fields = set(REVIEWED_CANDIDATE_REQUIRED_FIELDS)
+        if participant_batch_contract is not None:
+            required_fields.update(PARTICIPANT_REVIEW_BATCH_REQUIRED_FIELDS)
+        missing_fields = required_fields - fieldnames
         if missing_fields:
             raise P0HorseCompletionBatchError(
                 "reviewed candidate CSV is missing required fields: "
@@ -1639,9 +1746,16 @@ def load_reviewed_p0_horse_candidates(
             f"reviewed candidate CSV is unreadable: {path}"
         ) from exc
 
-    if len(raw_rows) != 50:
+    expected_region_counts = (
+        participant_batch_contract["region_counts"]
+        if participant_batch_contract is not None
+        else {region: 10 for region in REVIEWED_CANDIDATE_REGIONS}
+    )
+    expected_row_count = sum(expected_region_counts.values())
+    if len(raw_rows) != expected_row_count:
         raise P0HorseCompletionBatchError(
-            f"reviewed candidate CSV must contain exactly 50 rows, got {len(raw_rows)}"
+            "reviewed candidate CSV row count does not match its contract: "
+            f"expected {expected_row_count}, got {len(raw_rows)}"
         )
 
     rows: list[dict[str, Any]] = []
@@ -1652,7 +1766,7 @@ def load_reviewed_p0_horse_candidates(
     for row_number, raw_row in enumerate(raw_rows, start=2):
         row = {key: str(value or "").strip() for key, value in raw_row.items()}
         region = row["sample_region"]
-        if region not in region_ranks:
+        if region not in expected_region_counts:
             raise P0HorseCompletionBatchError(
                 f"reviewed candidate row {row_number} has unsupported region: {region}"
             )
@@ -1662,7 +1776,10 @@ def load_reviewed_p0_horse_candidates(
             raise P0HorseCompletionBatchError(
                 f"reviewed candidate row {row_number} has invalid sample_rank"
             ) from exc
-        if sample_rank not in range(1, 11) or sample_rank in region_ranks[region]:
+        if (
+            sample_rank not in range(1, expected_region_counts[region] + 1)
+            or sample_rank in region_ranks[region]
+        ):
             raise P0HorseCompletionBatchError(
                 f"reviewed candidate row {row_number} has invalid or duplicate sample_rank"
             )
@@ -1690,6 +1807,19 @@ def load_reviewed_p0_horse_candidates(
         normalized = dict(row)
         normalized["sample_rank"] = sample_rank
         normalized["reviewed"] = True
+        if participant_batch_contract is not None:
+            try:
+                actual_start_count = int(row["actual_start_evidence_count"])
+            except ValueError as exc:
+                raise P0HorseCompletionBatchError(
+                    f"reviewed candidate row {row_number} has invalid "
+                    "actual_start_evidence_count"
+                ) from exc
+            if actual_start_count <= 0:
+                raise P0HorseCompletionBatchError(
+                    f"reviewed candidate row {row_number} has no actual start evidence"
+                )
+            normalized["actual_start_evidence_count"] = actual_start_count
         birth_year_text = row.get("birth_year", "")
         if birth_year_text:
             if (
@@ -1734,20 +1864,465 @@ def load_reviewed_p0_horse_candidates(
     invalid_region_counts = {
         region: len(ranks)
         for region, ranks in region_ranks.items()
-        if ranks != set(range(1, 11))
+        if region in expected_region_counts
+        and ranks != set(range(1, expected_region_counts[region] + 1))
     }
     if invalid_region_counts:
         raise P0HorseCompletionBatchError(
-            "reviewed candidate CSV must contain ranks 1-10 exactly once per region: "
+            "reviewed candidate CSV ranks do not match its region contract: "
             + json.dumps(invalid_region_counts, ensure_ascii=False, sort_keys=True)
         )
-    return sorted(
+    sorted_rows = sorted(
         rows,
         key=lambda row: (
             REVIEWED_CANDIDATE_REGIONS.index(row["sample_region"]),
             row["sample_rank"],
         ),
     )
+    if participant_batch_contract is not None:
+        _validate_participant_batch_source_rows(
+            sorted_rows,
+            participant_batch_contract=participant_batch_contract,
+        )
+    return sorted_rows
+
+
+def _load_participant_batch_contract(
+    manifest_path: Path,
+    manifest: dict[str, Any],
+) -> dict[str, Any] | None:
+    raw_contract = manifest.get("batch_contract")
+    if raw_contract is None:
+        return None
+    if not isinstance(raw_contract, dict) or raw_contract.get(
+        "schema_version"
+    ) != PARTICIPANT_REVIEW_BATCH_SCHEMA_VERSION:
+        raise P0HorseCompletionBatchError(
+            "P0 horse review manifest has an invalid participant batch contract"
+        )
+    if raw_contract.get("actual_starts_only") is not True:
+        raise P0HorseCompletionBatchError(
+            "participant batch contract must set actual_starts_only=true"
+        )
+    if not str(manifest.get("decision_reference") or "").strip():
+        raise P0HorseCompletionBatchError(
+            "participant batch review manifest decision_reference is missing"
+        )
+    year = raw_contract.get("year")
+    if isinstance(year, bool) or not isinstance(year, int):
+        raise P0HorseCompletionBatchError("participant batch contract year is invalid")
+    max_rows = raw_contract.get("max_rows_per_region")
+    if (
+        isinstance(max_rows, bool)
+        or not isinstance(max_rows, int)
+        or not 1 <= max_rows <= PARTICIPANT_REVIEW_BATCH_MAX_ROWS_PER_REGION
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch contract max_rows_per_region is invalid"
+        )
+    raw_counts = raw_contract.get("region_counts")
+    if not isinstance(raw_counts, dict) or not raw_counts:
+        raise P0HorseCompletionBatchError(
+            "participant batch contract region_counts is invalid"
+        )
+    region_counts: dict[str, int] = {}
+    for region, count in raw_counts.items():
+        if region not in REVIEWED_CANDIDATE_REGIONS:
+            raise P0HorseCompletionBatchError(
+                f"participant batch contract has unsupported region: {region}"
+            )
+        if (
+            isinstance(count, bool)
+            or not isinstance(count, int)
+            or not 1 <= count <= max_rows
+        ):
+            raise P0HorseCompletionBatchError(
+                f"participant batch contract has invalid count for {region}"
+            )
+        region_counts[region] = count
+    if sum(region_counts.values()) > (
+        PARTICIPANT_REVIEW_BATCH_MAX_ROWS_PER_REGION
+        * len(REVIEWED_CANDIDATE_REGIONS)
+    ):
+        raise P0HorseCompletionBatchError("participant batch contract is too large")
+    source_identity = raw_contract.get("source_candidate_artifact")
+    if not isinstance(source_identity, dict):
+        raise P0HorseCompletionBatchError(
+            "participant batch contract source candidate artifact is missing"
+        )
+    relative_path = str(source_identity.get("path") or "")
+    if not relative_path or Path(relative_path).is_absolute():
+        raise P0HorseCompletionBatchError(
+            "participant batch source path must be relative"
+        )
+    allowed_root = Path(os.path.abspath(manifest_path.parent.parent))
+    source_path = Path(os.path.abspath(manifest_path.parent / relative_path))
+    if source_path != allowed_root and allowed_root not in source_path.parents:
+        raise P0HorseCompletionBatchError(
+            "participant batch source path escapes its batch root"
+        )
+    source_bytes = _read_confined_regular_file_once(
+        allowed_root,
+        source_path,
+        label="participant batch source candidate artifact",
+    )
+    expected_size = source_identity.get("size")
+    if (
+        isinstance(expected_size, bool)
+        or not isinstance(expected_size, int)
+        or expected_size != len(source_bytes)
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch source candidate artifact size does not match"
+        )
+    expected_sha = str(source_identity.get("sha256") or "")
+    if (
+        not re.fullmatch(r"[0-9a-f]{64}", expected_sha)
+        or hashlib.sha256(source_bytes).hexdigest() != expected_sha
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch source candidate artifact SHA-256 does not match"
+        )
+    try:
+        source_payload = json.loads(source_bytes)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise P0HorseCompletionBatchError(
+            "participant batch source candidate artifact is invalid JSON"
+        ) from exc
+    if (
+        not isinstance(source_payload, dict)
+        or source_payload.get("artifact_type") != "p0_horse_participant_candidates"
+        or source_payload.get("read_only") is not True
+        or source_payload.get("actual_starts_only") is not True
+        or source_payload.get("year") != year
+        or not isinstance(source_payload.get("candidates"), list)
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch source candidate artifact identity is invalid"
+        )
+    source_manifest_identity = raw_contract.get("source_candidate_manifest")
+    if not isinstance(source_manifest_identity, dict):
+        raise P0HorseCompletionBatchError(
+            "participant batch source candidate manifest is missing"
+        )
+    source_manifest_relative_path = str(
+        source_manifest_identity.get("path") or ""
+    )
+    if (
+        not source_manifest_relative_path
+        or Path(source_manifest_relative_path).is_absolute()
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch source manifest path must be relative"
+        )
+    source_manifest_path = Path(
+        os.path.abspath(manifest_path.parent / source_manifest_relative_path)
+    )
+    if (
+        source_manifest_path != allowed_root
+        and allowed_root not in source_manifest_path.parents
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch source manifest path escapes its batch root"
+        )
+    source_manifest_bytes = _read_confined_regular_file_once(
+        allowed_root,
+        source_manifest_path,
+        label="participant batch source candidate manifest",
+    )
+    expected_manifest_size = source_manifest_identity.get("size")
+    if (
+        isinstance(expected_manifest_size, bool)
+        or not isinstance(expected_manifest_size, int)
+        or expected_manifest_size != len(source_manifest_bytes)
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch source candidate manifest size does not match"
+        )
+    expected_manifest_sha = str(source_manifest_identity.get("sha256") or "")
+    if (
+        not re.fullmatch(r"[0-9a-f]{64}", expected_manifest_sha)
+        or hashlib.sha256(source_manifest_bytes).hexdigest()
+        != expected_manifest_sha
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch source candidate manifest SHA-256 does not match"
+        )
+    try:
+        source_manifest_payload = json.loads(source_manifest_bytes)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise P0HorseCompletionBatchError(
+            "participant batch source candidate manifest is invalid JSON"
+        ) from exc
+    source_manifest_files = (
+        source_manifest_payload.get("files")
+        if isinstance(source_manifest_payload, dict)
+        else None
+    )
+    source_manifest_candidate = (
+        source_manifest_files.get("candidates")
+        if isinstance(source_manifest_files, dict)
+        else None
+    )
+    if (
+        not isinstance(source_manifest_payload, dict)
+        or source_manifest_payload.get("artifact_type")
+        != "p0_horse_participant_candidate_manifest"
+        or source_manifest_payload.get("read_only") is not True
+        or not isinstance(source_manifest_candidate, dict)
+        or source_manifest_candidate.get("path") != source_path.name
+        or source_manifest_candidate.get("size_bytes") != expected_size
+        or source_manifest_candidate.get("sha256") != expected_sha
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch source candidate manifest does not bind the source artifact"
+        )
+    membership = raw_contract.get("batch_membership")
+    if not isinstance(membership, dict):
+        raise P0HorseCompletionBatchError(
+            "participant batch membership is missing"
+        )
+    batch_path = str(membership.get("path") or "")
+    ordinal = membership.get("ordinal")
+    batch_count = membership.get("batch_count")
+    if (
+        batch_path != manifest_path.parent.name
+        or isinstance(ordinal, bool)
+        or not isinstance(ordinal, int)
+        or isinstance(batch_count, bool)
+        or not isinstance(batch_count, int)
+        or not 1 <= ordinal <= batch_count
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch membership identity is invalid"
+        )
+    index_relative_path = str(membership.get("index_path") or "")
+    if not index_relative_path or Path(index_relative_path).is_absolute():
+        raise P0HorseCompletionBatchError(
+            "participant batch index path must be relative"
+        )
+    index_path = Path(
+        os.path.abspath(manifest_path.parent / index_relative_path)
+    )
+    index_bytes = _read_confined_regular_file_once(
+        allowed_root,
+        index_path,
+        label="participant batch index",
+    )
+    expected_index_size = membership.get("index_size")
+    expected_index_sha = str(membership.get("index_sha256") or "")
+    if (
+        isinstance(expected_index_size, bool)
+        or not isinstance(expected_index_size, int)
+        or expected_index_size != len(index_bytes)
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch index size does not match"
+        )
+    if (
+        not re.fullmatch(r"[0-9a-f]{64}", expected_index_sha)
+        or hashlib.sha256(index_bytes).hexdigest() != expected_index_sha
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch index SHA-256 does not match"
+        )
+    try:
+        index_payload = json.loads(index_bytes)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise P0HorseCompletionBatchError(
+            "participant batch index is invalid JSON"
+        ) from exc
+    index_batches = (
+        index_payload.get("batches")
+        if isinstance(index_payload, dict)
+        else None
+    )
+    if (
+        not isinstance(index_payload, dict)
+        or index_payload.get("artifact_type")
+        != "p0_horse_participant_completion_batch_plan"
+        or index_payload.get("schema_version")
+        != PARTICIPANT_REVIEW_BATCH_SCHEMA_VERSION
+        or index_payload.get("year") != year
+        or index_payload.get("decision_reference")
+        != manifest.get("decision_reference")
+        or index_payload.get("source_candidate_artifact_sha256") != expected_sha
+        or index_payload.get("source_candidate_manifest_sha256")
+        != expected_manifest_sha
+        or index_payload.get("batch_count") != batch_count
+        or not isinstance(index_batches, list)
+        or len(index_batches) != batch_count
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch index identity is invalid"
+        )
+    index_candidate_count = index_payload.get("candidate_count")
+    seen_paths: set[str] = set()
+    seen_ordinals: set[int] = set()
+    seen_candidate_keys: set[str] = set()
+    selected_index_entry: dict[str, Any] | None = None
+    for entry in index_batches:
+        if not isinstance(entry, dict):
+            raise P0HorseCompletionBatchError(
+                "participant batch index entry is invalid"
+            )
+        entry_path = str(entry.get("path") or "")
+        entry_ordinal = entry.get("ordinal")
+        entry_region = str(entry.get("region") or "")
+        entry_row_count = entry.get("row_count")
+        entry_keys = entry.get("candidate_keys")
+        if (
+            not entry_path
+            or entry_path in seen_paths
+            or isinstance(entry_ordinal, bool)
+            or not isinstance(entry_ordinal, int)
+            or entry_ordinal in seen_ordinals
+            or not 1 <= entry_ordinal <= batch_count
+            or entry_region not in REVIEWED_CANDIDATE_REGIONS
+            or isinstance(entry_row_count, bool)
+            or not isinstance(entry_row_count, int)
+            or not 1 <= entry_row_count <= PARTICIPANT_REVIEW_BATCH_MAX_ROWS_PER_REGION
+            or not isinstance(entry_keys, list)
+            or len(entry_keys) != entry_row_count
+            or any(not isinstance(key, str) or not key for key in entry_keys)
+            or seen_candidate_keys.intersection(entry_keys)
+        ):
+            raise P0HorseCompletionBatchError(
+                "participant batch index entry is invalid or overlapping"
+            )
+        seen_paths.add(entry_path)
+        seen_ordinals.add(entry_ordinal)
+        seen_candidate_keys.update(entry_keys)
+        if entry_path == batch_path:
+            selected_index_entry = entry
+    if (
+        seen_ordinals != set(range(1, batch_count + 1))
+        or isinstance(index_candidate_count, bool)
+        or not isinstance(index_candidate_count, int)
+        or index_candidate_count != len(seen_candidate_keys)
+        or selected_index_entry is None
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch index coverage is invalid"
+        )
+    manifest_files = manifest.get("files")
+    manifest_csv_entries = (
+        list(manifest_files.values())
+        if isinstance(manifest_files, dict)
+        else []
+    )
+    selected_region, selected_count = next(iter(region_counts.items()))
+    if (
+        len(region_counts) != 1
+        or selected_index_entry.get("ordinal") != ordinal
+        or selected_index_entry.get("region") != selected_region
+        or selected_index_entry.get("row_count") != selected_count
+        or len(manifest_csv_entries) != 1
+        or not isinstance(manifest_csv_entries[0], dict)
+        or selected_index_entry.get("csv_sha256")
+        != manifest_csv_entries[0].get("sha256")
+    ):
+        raise P0HorseCompletionBatchError(
+            "participant batch manifest does not match its global index entry"
+        )
+    return {
+        "schema_version": PARTICIPANT_REVIEW_BATCH_SCHEMA_VERSION,
+        "year": year,
+        "actual_starts_only": True,
+        "max_rows_per_region": max_rows,
+        "region_counts": region_counts,
+        "source_candidate_artifact": {
+            "path": relative_path,
+            "size": expected_size,
+            "sha256": expected_sha,
+        },
+        "source_candidate_manifest": {
+            "path": source_manifest_relative_path,
+            "size": expected_manifest_size,
+            "sha256": expected_manifest_sha,
+        },
+        "batch_membership": {
+            "path": batch_path,
+            "ordinal": ordinal,
+            "batch_count": batch_count,
+            "index_path": index_relative_path,
+            "index_size": expected_index_size,
+            "index_sha256": expected_index_sha,
+        },
+        "batch_candidate_keys": selected_index_entry["candidate_keys"],
+        "source_payload": source_payload,
+    }
+
+
+def _validate_participant_batch_source_rows(
+    reviewed_rows: list[dict[str, Any]],
+    *,
+    participant_batch_contract: dict[str, Any],
+) -> None:
+    if [row["candidate_key"] for row in reviewed_rows] != (
+        participant_batch_contract["batch_candidate_keys"]
+    ):
+        raise P0HorseCompletionBatchError(
+            "reviewed candidates do not match the global batch index entry"
+        )
+    source_rows: dict[str, dict[str, Any]] = {}
+    for source_row in participant_batch_contract["source_payload"]["candidates"]:
+        if not isinstance(source_row, dict):
+            continue
+        key = str(source_row.get("candidate_key") or "")
+        if not key:
+            continue
+        if key in source_rows:
+            raise P0HorseCompletionBatchError(
+                f"participant batch source has duplicate candidate key: {key}"
+            )
+        source_rows[key] = source_row
+    scalar_fields = (
+        "horse_name",
+        "identity_status",
+        "review_status",
+        "mapping_disposition",
+        "source_namespace",
+        "sire_name",
+        "dam_name",
+    )
+    list_fields = (
+        "aliases",
+        "matched_profile_ids",
+        "identity_keys",
+        "source_namespaces",
+        "source_urls",
+        "event_regions",
+    )
+    for reviewed in reviewed_rows:
+        key = reviewed["candidate_key"]
+        source = source_rows.get(key)
+        if source is None:
+            raise P0HorseCompletionBatchError(
+                f"reviewed candidate does not exist in source candidate artifact: {key}"
+            )
+        mismatch = any(
+            reviewed.get(field, "") != str(source.get(field) or "")
+            for field in scalar_fields
+        )
+        mismatch = mismatch or any(
+            reviewed.get(field) != source.get(field) for field in list_fields
+        )
+        mismatch = mismatch or reviewed.get("birth_year") != source.get("birth_year")
+        mismatch = mismatch or reviewed["actual_start_evidence_count"] != int(
+            source.get("actual_start_evidence_count") or 0
+        )
+        mismatch = mismatch or source.get("review_status") not in {
+            "ready_for_profile_resolution",
+            "needs_identity_enrichment",
+        }
+        mismatch = mismatch or source.get("event_regions") != [
+            reviewed["sample_region"]
+        ]
+        if mismatch:
+            raise P0HorseCompletionBatchError(
+                f"reviewed candidate does not match source candidate artifact: {key}"
+            )
 
 
 def p0_horse_completion_cache_path(
@@ -2158,6 +2733,7 @@ def _load_review_manifest_binding(
     manifest_bytes: bytes | None = None,
     expected_sha256: str | None = None,
     authorized_by_setting: bool = False,
+    participant_batch_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     manifest_path = Path(review_manifest_path)
     if manifest_bytes is None:
@@ -2227,7 +2803,7 @@ def _load_review_manifest_binding(
             "P0 horse review manifest row_count does not match reviewed candidates"
         )
 
-    return {
+    result = {
         "path": str(manifest_path),
         "size_bytes": len(manifest_bytes),
         "sha256": hashlib.sha256(manifest_bytes).hexdigest(),
@@ -2242,6 +2818,13 @@ def _load_review_manifest_binding(
             "sha256": manifest_sha256,
         },
     }
+    if participant_batch_contract is not None:
+        result["batch_contract"] = {
+            key: deepcopy(value)
+            for key, value in participant_batch_contract.items()
+            if key != "source_payload"
+        }
+    return result
 
 
 def run_reviewed_p0_horse_completion_batch(
@@ -2345,9 +2928,35 @@ def run_reviewed_p0_horse_completion_batch(
             f"reviewed candidate CSV is unreadable: {reviewed_path}"
         ) from exc
     reviewed_sha256 = hashlib.sha256(reviewed_bytes).hexdigest()
+    participant_batch_contract: dict[str, Any] | None = None
+    if review_manifest_path is not None:
+        manifest_path = Path(review_manifest_path)
+        manifest_bytes = authorized_manifest_bytes
+        if manifest_bytes is None:
+            try:
+                manifest_bytes = manifest_path.read_bytes()
+            except OSError as exc:
+                raise P0HorseCompletionBatchError(
+                    f"P0 horse review manifest is unreadable: {manifest_path}"
+                ) from exc
+        try:
+            manifest_payload = json.loads(manifest_bytes)
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise P0HorseCompletionBatchError(
+                f"P0 horse review manifest is invalid: {manifest_path}"
+            ) from exc
+        if not isinstance(manifest_payload, dict):
+            raise P0HorseCompletionBatchError(
+                "P0 horse review manifest must be a JSON object"
+            )
+        participant_batch_contract = _load_participant_batch_contract(
+            manifest_path,
+            manifest_payload,
+        )
     candidates = load_reviewed_p0_horse_candidates(
         reviewed_path,
         captured_bytes=reviewed_bytes,
+        participant_batch_contract=participant_batch_contract,
     )
     manual_supplements_by_candidate: dict[
         str,
@@ -2411,6 +3020,7 @@ def run_reviewed_p0_horse_completion_batch(
             manifest_bytes=authorized_manifest_bytes,
             expected_sha256=expected_review_manifest_sha256,
             authorized_by_setting=review_manifest_authorized_by_setting,
+            participant_batch_contract=participant_batch_contract,
         )
         if review_manifest_path is not None
         else None

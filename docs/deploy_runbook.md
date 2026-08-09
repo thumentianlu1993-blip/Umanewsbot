@@ -8301,3 +8301,33 @@ re-baseline 基线 + 各轮 findings 新增）。
   `0071.uq_hist_target_active_series_year` 时，先核对 `pg_index.indrelid` 对应 relation；禁止通过
   在其他表创建同名索引、改 search_path 或手工补 recorder 继续发布。
 - 修复或恢复测试对象后必须重新收集完整 catalog，合法两个 owner 均通过后才可继续其他发布门禁。
+# 2026-08-09 2025 五地区 participant completion batch 运行手册
+
+1. 本轮地区只允许 `japan,hong_kong,united_kingdom,france,united_states`；澳洲、德国和中东不得出现在
+   batch index、network regions 或 production release manifest。
+2. 生产只读 census 使用 `p0_horse_profiles --extract-candidates --year 2025 --actual-starts-only`，并将
+   candidates、observations、summary、sample review 和 manifest 五文件下载到独立 artifact 目录后逐一
+   验证生产 manifest 的大小和 SHA。本轮 candidates SHA 为 `59c0a4a9…0783`。
+3. 用 `runtime/research/build_p0_participant_completion_batches.py` 生成单地区批次；index 必须守恒
+   `7731 candidates = 156 batches + 0 exclusions`，最终 summary SHA 为 `80331699…f287`、全局 batch plan
+   SHA 为 `79b479a1…a5b3`，并绑定生产 census
+   manifest SHA `41b30c7a…3828`。任一 source、source manifest、CSV、region count、rank 或 actual-start
+   漂移都必须在联网前拒绝。
+4. 每次 network prepare 只对一个精确 review manifest SHA 以 one-shot 环境开启
+   `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true` 与匹配的
+   `HORSE_PROFILE_COMPLETION_REVIEW_MANIFEST_SHA256`；不得修改全局 `.env`，不得并行运行两个生产资料
+   prepare。临时网络失败保留 cache 后按同一 manifest 续跑；确定性 identity/adapter 错误进入 blocker。
+   prepare 前必须用 `runtime/research/p0_participant_execution_ledger.py --action claim` 绑定同一
+   `batch_index.json`、下一 ordinal 与 review manifest SHA；随后必须严格登记 `prepared` completion、
+   `released` mapping/release/G3 evidence、`applied` receipt 和 `verified` 写后零剩余 evidence。只有
+   `verified` 才清除 active 并开放下一 ordinal；相同 active 身份允许精确续跑，跳批、重复已完成批次、
+   不同 manifest 抢占和预生成 stale mapping 均拒绝。全部结束必须 `--action verify` 证明 156 批无遗漏。
+   `planned_remaining` 必须精确包含 profile create/update、race record create/update、module audit 五键，
+   值均为非布尔整数 `0`；missing/extra/空值/布尔/字符串一律拒绝。该合同已通过独立只读复审。
+5. prepare 只生成资料、二代血统、完整生涯、由履历重算主胜鞍和审核 workbook，不写数据库。只有完整
+   对象才能进入 module review、mapping snapshot 和 v2 production release candidate。
+6. 同一匹马的弱 occurrence 可能跨批次重复；必须按 `prepare -> review -> prepare-release -> G3 apply ->
+   verifier` 顺序逐批收敛，下一批 production mapping 在上一批 verifier 后重新生成。禁止预先批准多个
+   stale `create_new` manifest 并行写入。
+7. 正式 apply 继续要求 fresh 写前备份、零 writer/lock、精确 release candidate SHA、用户 G3、完整
+   verifier 和默认关闭的全局高风险开关；本代码发布本身不包含 profile 网络或生产数据写入。
