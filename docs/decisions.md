@@ -2848,3 +2848,20 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   受审三文件包及 package SHA，但保持来源分层，不把旧 partial artifact 单独改名冒充完整。
 - workflow 输入目录只用于 literal file read；受审三文件必须先复制到固定 staging 目录并重新通过
   package validator，artifact uploader 只接受固定路径，避免自由目录名被二次解释为 glob 或 `!` 排除。
+# 2026-08-09 五地区参赛马资料上线使用 source-bound participant batch
+
+- 本轮明确排除澳洲、德国和中东资料写入；不把已完成的 87 场德国/中东 official-results 研究分支
+  误当作 HorseProfile production package。
+- 生产 RaceEvent 参赛行缺 provider horse ID 时，不允许按规范化马名直接跨赛事绑定或新建；这些行
+  可以进入受审 provider identity probe，但搜索无结果、多解或马名、父、母、出生年不一致必须阻断。
+- 旧首批 50 匹 CSV 继续严格要求五地区各 10 匹。年度全量改用单地区、有界、source census 与生产
+  manifest SHA 双绑定的 v2 batch contract；每批还必须属于同一份全局无重叠 plan，并通过严格顺序
+  execution ledger 的 `claimed -> prepared -> released -> applied -> verified` 状态链。下一 ordinal 只在
+  上一批绑定 production release、G3 approval、apply receipt 且写后 verifier 零剩余后开放；由机器拒绝
+  跳批、重复、不同 manifest 抢占、stale mapping 并行和最终漏跑，不能只靠 runbook 人工记忆。
+- 写后零剩余必须复用生产合同的精确五字段：profile create/update、race record create/update 和 module
+  audit；字段集合不得增减，每值必须是非布尔整数 `0`。最终独立只读复审已用 missing/extra/`None`/
+  `False`/字符串反例确认这些形状不能进入 `verified`，结论 `APPROVED`、无 P0-P2。
+- 同一弱身份马可能在多个保守 occurrence candidate 中出现；正式 production release 必须按批次顺序
+  生成 mapping snapshot，并在前一批 verifier 后再生成后续写入候选，禁止一次性冻结多个 `create_new`
+  决策后并行写入导致重复档案。

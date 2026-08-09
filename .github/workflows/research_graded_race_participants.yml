@@ -18,6 +18,12 @@ on:
       - runtime/research/test_validate_official_graded_race_package.py
       - runtime/research/build_graded_race_completion_bundle.py
       - runtime/research/test_build_graded_race_completion_bundle.py
+      - runtime/research/build_p0_participant_completion_batches.py
+      - runtime/research/test_build_p0_participant_completion_batches.py
+      - runtime/research/p0_participant_execution_ledger.py
+      - runtime/research/test_p0_participant_execution_ledger.py
+      - server/stable/services/p0_horse_completion_adapters.py
+      - server/stable/test_p0_horse_participant_batch_contract.py
       - runtime/research/README_graded_race_participants.md
       - runtime/research/region_manifests/**
       - runtime/research/reviewed_packages/**
@@ -230,6 +236,12 @@ jobs:
             runtime/research/test_validate_official_graded_race_package.py \
             runtime/research/build_graded_race_completion_bundle.py \
             runtime/research/test_build_graded_race_completion_bundle.py \
+            runtime/research/build_p0_participant_completion_batches.py \
+            runtime/research/test_build_p0_participant_completion_batches.py \
+            runtime/research/p0_participant_execution_ledger.py \
+            runtime/research/test_p0_participant_execution_ledger.py \
+            server/stable/services/p0_horse_completion_adapters.py \
+            server/stable/test_p0_horse_participant_batch_contract.py \
             .codex/scripts/test_graded_race_participants_workflow.py
           python -m unittest \
             runtime.research.test_collect_graded_race_participants \
@@ -239,6 +251,8 @@ jobs:
             runtime.research.test_build_official_graded_race_manifest \
             runtime.research.test_validate_official_graded_race_package \
             runtime.research.test_build_graded_race_completion_bundle \
+            runtime.research.test_build_p0_participant_completion_batches \
+            runtime.research.test_p0_participant_execution_ledger \
             -v
           if [[ -n "$OFFICIAL_RESULT_PACKAGE_DIR" ]]; then
             python runtime/research/validate_official_graded_race_package.py \

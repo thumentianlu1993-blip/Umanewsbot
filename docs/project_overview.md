@@ -1,9 +1,10 @@
 # 项目总览
 
-八地区链路和 migration `0072` 已以关闭态完成 G2 发布，生产 revision 为 `0b93aa55…e8ca`；服务与
-completion verifier 正常，网络及历史写入开关仍关闭。新增地区 artifact 仍在重建：澳洲自然年目录已
-改用 Racing Australia 相邻两赛季官方表，德国和中东继续使用修正后的官方目录/结果身份。Draft PR
-`#86` 尚未合并或部署，生产回填与 2025 `full_network` 仍等待新的代码审查、精确工件和 G3。
+八地区链路、migration `0072`、PR `#86` parser 修复与 PR `#89` 受审 official package 已以关闭态发布，
+当前生产 revision 为 `0c755da6…d11c8d`；服务与 verifier 正常，网络及历史写入开关仍关闭。正式研究
+run `31319364383` 已完成，但旧五地区七文件仍诚实标记为 partial，不能直接导入 HorseProfile。当前
+推进范围按用户决定暂收缩为日本、中国香港、英国、法国和美国，并通过 source-bound participant
+batch 桥接到既有 P0 补全、审核、release 与 verifier；生产 profile 网络和数据写入仍需后续门禁。
 
 ## 2026-08-09 八地区单年度分级赛参赛马补全链路（实现中）
 
@@ -19,6 +20,9 @@ completion verifier 正常，网络及历史写入开关仍关闭。新增地区
 - 澳洲、德国和中东的资料标准化器只接受已审核的 canonical v2 cache；常驻旧五地区网络批次不因
   新增适配器自动扩围。生产 apply 已沿用同一 reviewed mapping、release manifest 和 verifier 合同，
   不为新地区另开低门槛写入入口。
+- 当前生产推进范围已按用户决定暂时收缩为既有五地区。年度实际起跑 census 通过 source-bound v2
+  participant batch 接入现有 P0 profile adapter；弱身份只允许由 provider profile 完整身份事实补强，
+  不以马名直接合并。每批仍须经过 module review、production snapshot、release candidate 和 verifier。
 - 澳洲单年 G1/G2/G3 目录不能直接使用 TJCIS 的跨年赛季章节；当前由 Racing Australia 两份相邻
   赛季官方日历拼成 2025 自然年 `346` 场，并以赛名、途程、级别从 `117` 个 meeting page 精确选表。
   Qatar 则由官网展示页派生到官方 API，临时认证信息不落盘。

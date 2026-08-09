@@ -1,0 +1,41 @@
+name: P0 参赛马生产桥接合同
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - runtime/research/build_p0_participant_completion_batches.py
+      - runtime/research/test_build_p0_participant_completion_batches.py
+      - runtime/research/p0_participant_execution_ledger.py
+      - runtime/research/test_p0_participant_execution_ledger.py
+      - server/stable/services/p0_horse_completion_adapters.py
+      - server/stable/test_p0_horse_participant_batch_contract.py
+      - .github/workflows/p0_participant_contract.yml
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: 安装应用测试依赖
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: 运行纯离线编译器与账本合同
+        run: |
+          python -m unittest \
+            runtime.research.test_build_p0_participant_completion_batches \
+            runtime.research.test_p0_participant_execution_ledger \
+            -v
+      - name: 运行生产 adapter 的 source-bound 合同
+        working-directory: server
+        env:
+          DB_ENGINE: sqlite
+          DJANGO_SETTINGS_MODULE: app.settings
+        run: python -m django test stable.test_p0_horse_participant_batch_contract --noinput

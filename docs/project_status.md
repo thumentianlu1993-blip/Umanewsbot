@@ -1,5 +1,18 @@
 # 项目状态文档
 
+## 2026-08-09 五地区 2025 参赛马进入 production bridge 阶段
+
+- 用户将本轮 HorseProfile 上线范围收缩到既有五地区，暂不处理澳洲、德国和中东。run
+  `31319364383` 的 87 场/790 条 official 分支已通过内容审核，但仅保留为研究证据。
+- 生产只读 census 为 1065 场、9292 条实际赛果、7731 个保守候选；其中 5453 个因参赛行无 provider
+  horse ID 保持 blocked，不允许按马名强绑。
+- 候选已实现 source-bound v2 batch compiler/loader：真实 census 可稳定切为 156 个单地区批次，运行时
+  逐行回验 production source、census manifest 与全局无重叠 plan，并由严格顺序 ledger 防漏跑/重复。
+  最终 r3 首批 50 匹已通过无网络、零数据库写入的真实 CLI 与 ledger smoke；旧 50 匹合同不变。
+  Django `211/211`、研究 `156/156`、workflow `13/13` 与独立只读复审均通过，reviewer 最终
+  `APPROVED`、无 P0-P2。当前代码仍在本地候选分支；未部署、未触网 profile 来源、未写生产。
+
+
 ## 2026-08-09 2025 reviewed package 技术审核已清零
 
 - 当前生产为 revision `45da956a…22baf` 的关闭态部署；未执行任何本轮数据写入或正式网络运行。

@@ -1,5 +1,32 @@
 # 当前状态
 
+## 2026-08-09 2025 五地区生产资料桥接正在实现
+
+- 用户已明确本轮暂不处理澳洲、德国和中东；当前生产资料范围只包含日本、中国香港、英国、法国和
+  美国。澳洲 346 场继续保留许可 gap，德国 42 场和中东 45 场官方结果不进入本轮 HorseProfile 写入。
+- 正式 workflow run `31319364383` 首次即成功，未使用续跑额度。completion bundle canonical SHA 为
+  `0e699786…be1f8`；独立复核确认 13 个绑定文件 SHA 全部匹配，official 分支为 87/87 场、790 条
+  实际参赛记录、无重复身份或缺冠军。该 bundle 是合格研究证据，但缺 production P0 manifest，不能
+  直接写 HorseProfile。
+- 生产只读 `--year 2025 --actual-starts-only` census 得到 1065 场、9292 条实际赛果、7731 个保守身份
+  候选：1358 `bind_existing`、920 `create_new`、5453 `blocked`。按地区为日本 2030、香港 191、英国
+  1537、法国 749、美国 3224。弱身份不按马名合并；provider 搜索无结果、多解或四字段不一致时继续
+  fail closed。
+- 当前候选新增 source-bound v2 batch contract 和离线编译器：真实 census SHA
+  `59c0a4a9…0783` 已稳定切为 156 个单地区、每批最多 50 匹的 reviewed prepare 批次；summary SHA
+  `80331699…f287`、全局 batch plan SHA `79b479a1…a5b3`、exclusions 为 0，同时绑定生产 census
+  manifest `41b30c7a…3828`。每批运行前重验 source/source manifest 的 regular file、路径边界、大小、
+  SHA、地区、全局 membership、rank、马名、来源和实际起跑证据；严格顺序 execution ledger 机器拒绝
+  跳批、重复和不同 manifest 抢占；下一 ordinal 还必须等待上一批 release/G3/apply/写后 verifier 证据
+  全部绑定并进入 `verified`，旧五地区各 10 匹合同保持不变。
+- 最终 r3 的日本第 1 批已在 `--network none` 下跑通真实 CLI：`processed=50`、`blocked=50`、
+  `network_request_count=0`、`database_writes=0`；同一 completion manifest 已完成 ledger ordinal 1 的
+  精确 claim/prepared smoke，且下一 ordinal 在 production verifier 前保持关闭。当前相关 Django
+  `211/211`、研究套件 `156/156`、workflow 合同 `13/13`、纯编译器/账本 `3/3` 通过；第二次全量重建
+  与 r3 逐字节一致。独立 reviewer 关闭 macOS 祖先 symlink、dirfd/openat TOCTOU、生产 verifier 绑定及
+  `planned_remaining` 精确五字段合同后最终 `APPROVED`，无 P0-P2。当前仍未合并、部署、触发外部
+  profile 网络、生成 production release candidate 或写生产数据库。
+
 ## 2026-08-09 2025 reviewed package 已通过独立离线复审，等待范围与写入门禁
 
 - 当前生产 web/worker/beat 统一运行 revision
