@@ -5760,3 +5760,26 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   全部阻断且零写入，并要求 reason=`deterministic_blocker_repaired`；旧 completion SHA 写入
   `prepare_attempts` 后才回到 `claimed`。相关 P0 组合回归 `383/383`、participant/源合同 `90/90`
   与 ledger `2/2` 通过。当前记录点尚未提交、合并、部署或续跑。
+
+# 2026-08-10 participant batch-0001 最小修复已闭锁部署并完成精确续跑
+
+- 最小修复由 PR #91 合并为
+  `main@0149eab88bb74521602e1fe73beb240bc7ddd919`；生产镜像
+  `sha256:71d56e74be554a329dfb147493fe8850220833fbd7ea3c85d713cbc8f8d1eb6a`
+  已在全部高风险开关关闭下部署。fresh 写前备份为
+  `pre-p0-identity-fix-0149eab8-20260809T2010Z.dump`，SHA-256
+  `1fc928af…52c`；migration no-op，唯一 leaf 为 `stable.0072_add_extended_racing_regions`。
+- 部署 verifier 通过：web/worker/beat revision、镜像与 workdir 一致，Django check、空 migration plan、
+  Redis、Celery ping/active/reserved、零 writer/lock/one-off、内外 `/healthz/` 200 与近期错误日志均正常；
+  全局 horse/history/race-live/race-data 网络与调度开关仍为 `false`。
+- execution ledger 以原 completion `7d555ef9…07dec` 和固定 reason
+  `deterministic_blocker_repaired` 执行一次 retry，保留旧 SHA 后回到 `claimed`。随后仅对
+  `batch-0001-japan-0001`、原 review manifest `f910082d…f12`、原 cache 运行单一数据库强制只读
+  one-shot；没有启动其他批次、release、apply 或 G3。
+- r2 completion SHA 为 `2cf2c634…04b8`：`50 processed = 34 complete + 16 blocked`，
+  `120` 次网络请求，`database_writes=0`。数据库六项 before/after 文件逐字节一致，SHA 均为
+  `18e08300…43c0`；账本当前精确停在 ordinal 1 `prepared`，绑定 r2 SHA 并保留唯一 r1 retry history。
+- 独立 artifact 审查最终 `VERDICT: APPROVED`，无 P0/P1/P2。16 个 blocker 为 14 个 JBIS HTTP 403、
+  1 个 `ambiguous_identity`、1 个 request horse-name mismatch，全部正确 fail closed；34 个完整 occurrence
+  对应 32 个 provider ID，两个跨 occurrence 重复须在后续 mapping snapshot 合并。当前批准只允许进入
+  34 项模块人工审核/候选生成，16 项冻结排除；review CSV 尚未完成人工模块决策，不等于 G3 或生产写入授权。
