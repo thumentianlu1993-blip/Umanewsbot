@@ -84,6 +84,7 @@ def update_execution_ledger(
     review_manifest_sha256: str = "",
     completion_manifest_path: str | Path | None = None,
     stage_evidence_path: str | Path | None = None,
+    retry_reason: str = "",
 ) -> dict[str, Any]:
     index_sha, index = _load_index(Path(index_path))
     ledger_file = Path(ledger_path)
@@ -120,6 +121,11 @@ def update_execution_ledger(
             )
         for completed_ordinal, completed_entry in enumerate(completed, start=1):
             expected_completed = index["batches"][completed_ordinal - 1]
+            prepare_attempts = (
+                completed_entry.get("prepare_attempts", [])
+                if isinstance(completed_entry, dict)
+                else None
+            )
             if (
                 not isinstance(completed_entry, dict)
                 or completed_entry.get("path") != expected_completed.get("path")
@@ -143,6 +149,17 @@ def update_execution_ledger(
                 or not re.fullmatch(
                     r"[0-9a-f]{64}",
                     str(completed_entry.get("verifier_evidence_sha256") or ""),
+                )
+                or not isinstance(prepare_attempts, list)
+                or any(
+                    not isinstance(attempt, dict)
+                    or not re.fullmatch(
+                        r"[0-9a-f]{64}",
+                        str(attempt.get("completion_manifest_sha256") or ""),
+                    )
+                    or attempt.get("retry_reason")
+                    != "deterministic_blocker_repaired"
+                    for attempt in prepare_attempts
                 )
             ):
                 raise ParticipantExecutionLedgerError(
@@ -188,6 +205,65 @@ def update_execution_ledger(
             raise ParticipantExecutionLedgerError(
                 "stage transition requires the exact active batch identity"
             )
+        if action == "retry":
+            if active.get("phase") != "prepared":
+                raise ParticipantExecutionLedgerError(
+                    "retry requires a prepared active batch"
+                )
+            if retry_reason != "deterministic_blocker_repaired":
+                raise ParticipantExecutionLedgerError(
+                    "retry reason is not authorized"
+                )
+            if completion_manifest_path is None:
+                raise ParticipantExecutionLedgerError(
+                    "retry requires the current completion manifest"
+                )
+            completion_bytes, completion = _read_json(
+                Path(completion_manifest_path), label="completion manifest"
+            )
+            completion_sha = hashlib.sha256(completion_bytes).hexdigest()
+            summary = completion.get("summary")
+            if (
+                completion_sha != active.get("completion_manifest_sha256")
+                or completion.get("artifact_type")
+                != "p0_horse_completion_batch_manifest"
+                or completion.get("database_writes") != 0
+                or not isinstance(summary, dict)
+                or summary.get("processed_count") != expected.get("row_count")
+                or summary.get("complete_candidate_count") != 0
+                or summary.get("blocked_count") != expected.get("row_count")
+            ):
+                raise ParticipantExecutionLedgerError(
+                    "retry completion manifest is not an all-blocked read-only attempt"
+                )
+            existing_attempts = active.get("prepare_attempts", [])
+            if not isinstance(existing_attempts, list) or any(
+                not isinstance(attempt, dict)
+                or not re.fullmatch(
+                    r"[0-9a-f]{64}",
+                    str(attempt.get("completion_manifest_sha256") or ""),
+                )
+                or attempt.get("retry_reason")
+                != "deterministic_blocker_repaired"
+                for attempt in existing_attempts
+            ):
+                raise ParticipantExecutionLedgerError(
+                    "retry attempt history is invalid"
+                )
+            prepare_attempts = list(existing_attempts)
+            prepare_attempts.append(
+                {
+                    "completion_manifest_sha256": completion_sha,
+                    "retry_reason": retry_reason,
+                }
+            )
+            ledger["active"] = {
+                **identity,
+                "phase": "claimed",
+                "prepare_attempts": prepare_attempts,
+            }
+            _write_atomic(ledger_file, ledger)
+            return ledger
         if action == "prepared":
             if active.get("phase") not in {"claimed", "prepared"}:
                 raise ParticipantExecutionLedgerError(
@@ -234,6 +310,7 @@ def update_execution_ledger(
                     "prepared completion manifest identity drifted"
                 )
             ledger["active"] = {
+                **active,
                 **identity,
                 "phase": "prepared",
                 "completion_manifest_sha256": completion_sha,
@@ -337,6 +414,7 @@ def update_execution_ledger(
             completed.append(
                 {
                     **identity,
+                    "prepare_attempts": list(active.get("prepare_attempts") or []),
                     "completion_manifest_sha256": active["completion_manifest_sha256"],
                     "release_evidence_sha256": active["release_evidence_sha256"],
                     "apply_evidence_sha256": active["apply_evidence_sha256"],
@@ -356,7 +434,15 @@ def main() -> int:
     parser.add_argument(
         "--action",
         required=True,
-        choices=("claim", "prepared", "released", "applied", "verified", "verify"),
+        choices=(
+            "claim",
+            "retry",
+            "prepared",
+            "released",
+            "applied",
+            "verified",
+            "verify",
+        ),
     )
     parser.add_argument("--index", required=True)
     parser.add_argument("--ledger", required=True)
@@ -364,6 +450,7 @@ def main() -> int:
     parser.add_argument("--review-manifest-sha256", default="")
     parser.add_argument("--completion-manifest")
     parser.add_argument("--stage-evidence")
+    parser.add_argument("--retry-reason", default="")
     args = parser.parse_args()
     try:
         result = update_execution_ledger(
@@ -374,6 +461,7 @@ def main() -> int:
             review_manifest_sha256=args.review_manifest_sha256,
             completion_manifest_path=args.completion_manifest,
             stage_evidence_path=args.stage_evidence,
+            retry_reason=args.retry_reason,
         )
     except ParticipantExecutionLedgerError as exc:
         print(str(exc), file=os.sys.stderr)

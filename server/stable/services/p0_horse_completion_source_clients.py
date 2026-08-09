@@ -2176,10 +2176,12 @@ class _JBISClient(_BaseSourceClient):
                         "NFKC",
                         _text(cells[12].get_text(" ", strip=True)),
                     )
-                    if status == "除外":
-                        finish = "withdrawn"
-                    elif status == "取消":
-                        finish = "scratched"
+                    finish = {
+                        "除外": "withdrawn",
+                        "取消": "scratched",
+                        "中止": "did_not_finish",
+                        "失格": "disqualified",
+                    }.get(status, finish)
                 records.append(
                     {
                         "external_race_id": _id_from_race_url(race_url),
@@ -2551,20 +2553,22 @@ class _JapanDispatcherClient(_BaseSourceClient):
         self._jbis = _JBISClient(*args, **kwargs)
         self._active: _BaseSourceClient = self._jbis
 
+    def _client_for(self, request: P0HorseCompletionRequest) -> _BaseSourceClient:
+        if (
+            _normalized(request.candidate_source_name) == "netkeiba"
+            and _text(request.external_horse_id).isdigit()
+        ):
+            return self._netkeiba
+        return self._jbis
+
     def has_manual_supplements(self, request: P0HorseCompletionRequest) -> bool:
-        if _normalized(request.candidate_source_name) == "netkeiba":
-            return self._netkeiba.has_manual_supplements(request)
-        return self._jbis.has_manual_supplements(request)
+        return self._client_for(request).has_manual_supplements(request)
 
     def apply_manual_supplements(self, payload, request):
         return self._active.apply_manual_supplements(payload, request)
 
     def _fetch(self, request: P0HorseCompletionRequest) -> dict[str, Any]:
-        self._active = (
-            self._netkeiba
-            if _normalized(request.candidate_source_name) == "netkeiba"
-            else self._jbis
-        )
+        self._active = self._client_for(request)
         try:
             return self._active.fetch_source_payload(request)
         finally:

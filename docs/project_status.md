@@ -2703,3 +2703,12 @@ P0 马信息补全专项的模型交接文档见
 - 真实 PostgreSQL wrong-table fixture 使用同名、同列、同 predicate 伪索引验证拒绝，`finally` 恢复
   原索引后合法 catalog 通过；PostgreSQL 专项 `24/24`。
 - 隔离容器已清理，未 stage、commit、push、部署或执行生产 migration。
+
+# 2026-08-10 2025 participant batch-0001 修复待发布
+
+- 首次生产只读 network prepare 已安全完成但 `0/50` complete，DB 前后完全一致；独立复审阻止了
+  release/G3。
+- 最小本地修复已覆盖 Japan 缺 netkeiba ID 时的 JBIS 唯一身份 enrichment、JBIS 中止/失格标记和
+  全阻断 prepared attempt 的审计保留式 retry；相关组合测试 `383/383` 通过。
+- 当前下一门禁为独立代码审查、PR 合并、全部高风险开关关闭的生产部署，再以原 cache、相同 batch 和
+  review manifest 精确续跑。当前没有生产资料写入授权，也未启动 release/G3。

@@ -2865,3 +2865,16 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
 - 同一弱身份马可能在多个保守 occurrence candidate 中出现；正式 production release 必须按批次顺序
   生成 mapping snapshot，并在前一批 verifier 后再生成后续写入候选，禁止一次性冻结多个 `create_new`
   决策后并行写入导致重复档案。
+
+# 2026-08-10 Japan occurrence 身份 enrichment 使用受限 JBIS authority
+
+- reviewed participant occurrence 只有在 `candidate_key` 属于 `observation:event:*`、JBIS 搜索唯一精确
+  命中、profile horse name 匹配、search/profile 的父母与出生年一致且 source payload 身份字段完整时，
+  才允许 JBIS 补足候选原本缺失的父母、出生年和 provider horse ID。该例外不适用于普通候选、其他地区、
+  多解或姓名不一致结果。
+- `candidate_source_name=netkeiba` 只表示赛事证据来源，不等于已有 netkeiba horse identity；只有同时存在
+  数字 external horse ID 才走 netkeiba ID 直连，否则 Japan dispatcher 使用上述 JBIS 唯一精确路由。
+- JBIS `finish=**` 只有 status cell 精确为 `除外/取消/中止/失格` 时才分别映射为
+  `withdrawn/scratched/did_not_finish/disqualified`；包含词、空值或其他标记继续确定性阻断。
+- 已登记为 `prepared` 的全阻断零写入 attempt 不得覆盖或删除。ledger retry 必须绑定原 completion SHA、
+  相同 batch/review identity 和固定 repair reason，并把旧 SHA 追加到 `prepare_attempts` 后回到 `claimed`。

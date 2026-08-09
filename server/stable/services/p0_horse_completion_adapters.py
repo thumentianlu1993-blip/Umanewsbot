@@ -994,6 +994,26 @@ def _require_expected_identity_matches_payload(
     )
     if not must_lock_identity:
         return
+    is_reviewed_japan_occurrence_enrichment = (
+        request.region == RacingRegion.JAPAN
+        and str(request.candidate_key or "").startswith("observation:event:")
+        and _normalized_text(target_source_name) == "jbis"
+        and bool(target_external_horse_id)
+        and all(
+            expected[field] in ("", None)
+            for field in ("sire_name", "dam_name", "birth_year")
+        )
+        and all(
+            identity.get(field) not in ("", None)
+            for field in ("horse_name", "sire_name", "dam_name", "birth_year")
+        )
+    )
+    if is_reviewed_japan_occurrence_enrichment:
+        # The reviewed participant batch proves the occurrence, while JBIS's
+        # unique exact-name result and search/profile identity check supply
+        # the previously absent provider-bound identity. Keep this exception
+        # scoped to the participant bridge.
+        return
     if any(expected[field] in ("", None) for field in expected):
         missing_expected_fields = [
             {
