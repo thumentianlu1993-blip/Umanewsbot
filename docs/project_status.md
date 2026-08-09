@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-08-09 migration 0072 受保护发布已完整完成
+
+- PR `#84` merge SHA 为 `0b93aa55…8ca`；生产 web/worker/beat 已统一到 image
+  `0f184c78…dd8a8`，revision 与 runtime commit 精确匹配，web healthy。
+- fresh dump 为 `pre-migration-0072-completion-g2-20260809T075009Z.dump`，`415662596` bytes、
+  TOC `1308`、SHA-256 `ae9069cf…a9b40`；旧 image `ca19687a…bf5ee` 已保留精确 rollback tag。
+- 0072 preflight、零计划 migration、completion、写后 schema verifier、Django check、image/revision、
+  recorder、Celery、HTTP、flags、writer census、锁/marker 清理和近期日志均通过。生产 leaf 精确为
+  `stable.0072_add_extended_racing_regions`，schema/database audit 无 drift。
+- 本次 G2 不含数据阶段：未执行生产回填、G3 或 `full_network`。下一步仍是生成并审核新增地区正式
+  evidence/artifact，满足独立门禁后再申请精确 G3。
+
 ## 2026-08-09 PR #83 已运行，migration 合同最小修复待发布
 
 - PR `#83` 已合并为 `eb1e221f…c350`，生产已应用 state-only migration `0072` 并运行统一候选

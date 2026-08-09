@@ -1,5 +1,30 @@
 # 部署运行手册
 
+## 2026-08-09 migration 0072 completion 修复正式发布
+
+1. PR `#84` merge SHA 为 `0b93aa552f7abfeadb0a91e5fe7f2610178ee8ca`；全新 release 固定为
+   `/opt/umanews-release-0b93aa55-M72-20260809/umanewsbot`，生产 image 为
+   `sha256:0f184c78be6632fd467d16465ffb3554e44757c69468ee22c86c0cd84eddd8a8`。
+2. fresh 写前 dump 为
+   `/opt/umanewsbot/backups/db/pre-migration-0072-completion-g2-20260809T075009Z.dump`，
+   `415662596` bytes、mode `0600`、TOC `1308`、SHA-256
+   `ae9069cfef4c4e5aaa7b79650a01cc8aa9f03134c9e0c25e1eb02bcd712a9b40`；旧 image tag 为
+   `umanewsbot:rollback-pre-migration-0072-completion-g2-20260809T075009Z`。
+3. 上一轮绑定 `eb1e221f…` 的 race-live state 在记录 SHA 后归档到
+   `/opt/umanewsbot/backups/release-state/migration-0072-completion-g2-20260809T075009Z/`。不要改写旧
+   state 的 HEAD；新 release 应重新冻结实际运行态。本次实际为 `not-running`，发布后未启动
+   race_live_worker。
+4. preflight 文件为
+   `runtime/migration_history_repair/preflight/before.aWGfHyzP/preflight.json`，文件 SHA-256
+   `0e9a2786…21fa`、内嵌 canonical SHA `f73a505a…b7ad`。Celery 排空为 `0/0/0` 后才停止 worker/web；
+   one-shot 验证 PostgreSQL、artifact、writer census 和 0072 leaf 后显示 `No migrations to apply`，
+   completion 为 `not-required` 并成功。
+5. 写后 verifier：Django check 通过、migration plan 空、schema `ok=true` 且无 drift、0072 recorder
+   精确一行、database identity `a986cc11…e471c`。web/worker/beat image 与 revision 一致；六个高风险
+   开关 false，受控 writer/lock 为零，deployment lock/race-live state/restricted marker 均不存在。
+   PostgreSQL、Redis、Celery ping、容器内及两个正式 HTTP 域名 healthz、赛事页和近期严重日志扫描通过。
+6. 本次发布不包含 G3、生产回填或 `full_network`。不得因 schema 发布完成而自动进入数据阶段。
+
 ## 2026-08-09 migration 0072 首次发布 STOP 与恢复
 
 1. PR `#83` merge SHA 为 `eb1e221f2791948616c3a72f0e45183d72fdc350`；隔离 release 固定
