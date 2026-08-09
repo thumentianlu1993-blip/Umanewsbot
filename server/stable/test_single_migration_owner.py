@@ -414,10 +414,18 @@ case "$cmd" in
     exit 0
     ;;
   show)
-    if [ -f "$state/git-show-0071" ]; then
-      cat "$state/git-show-0071"
-      exit 0
-    fi
+    case "${1:-}" in
+      *0071_historical_calendar_release_b.py)
+        [ -f "$state/git-show-0071" ] || exit 1
+        cat "$state/git-show-0071"
+        exit 0
+        ;;
+      *0072_add_extended_racing_regions.py)
+        [ -f "$state/git-show-0072" ] || exit 1
+        cat "$state/git-show-0072"
+        exit 0
+        ;;
+    esac
     exit 1
     ;;
   checkout)
@@ -538,6 +546,10 @@ class Harness:
         shutil.copyfile(
             ROOT / "server/stable/migrations/0071_historical_calendar_release_b.py",
             self.state / "git-show-0071",
+        )
+        shutil.copyfile(
+            ROOT / "server/stable/migrations/0072_add_extended_racing_regions.py",
+            self.state / "git-show-0072",
         )
         self.log = base / "calls.log"
         self.log.touch()
@@ -3966,23 +3978,49 @@ class RollbackContractValidationTests(SimpleTestCase):
                 harness, original_oid, original_image, branch=True
             )
 
-    def test_reviewed_0071_allowlist_covers_legacy_and_repaired_exact_contracts(self):
+    def test_rollback_allowlist_requires_reviewed_0071_and_0072_contracts(self):
         allowlist = json.loads(
             (
                 ROOT / "deploy/reviewed_release_b_rollback_migrations.json"
             ).read_text(encoding="utf-8")
         )
-        variants = allowlist["reviewed_variants"]
+        contracts = {
+            item["migration_path"]: item["reviewed_variants"]
+            for item in allowlist["required_migrations"]
+        }
         self.assertEqual(
-            {item["sha256"] for item in variants},
+            set(contracts),
+            {
+                "server/stable/migrations/0071_historical_calendar_release_b.py",
+                "server/stable/migrations/0072_add_extended_racing_regions.py",
+            },
+        )
+        self.assertEqual(
+            {item["sha256"] for item in contracts[
+                "server/stable/migrations/0071_historical_calendar_release_b.py"
+            ]},
             {
                 "74ee3ca9f03e60fca3735d2d90d3fdebcde40579387cb76e146720ef2ee23197",
                 "e82f720970ae7f38a321b43fbfa5f8ff68a4637c4bd0e285754d9a12aa0b3260",
             },
         )
-        self.assertTrue(all(item["rationale"].strip() for item in variants))
+        self.assertEqual(
+            {item["sha256"] for item in contracts[
+                "server/stable/migrations/0072_add_extended_racing_regions.py"
+            ]},
+            {
+                "f53cd64d7625fecc6f0cad9458e36d670c8e95cf6c2b23cd6ef7fab5123be67a",
+            },
+        )
+        self.assertTrue(
+            all(
+                item["rationale"].strip()
+                for variants in contracts.values()
+                for item in variants
+            )
+        )
 
-    def test_legacy_reviewed_0071_content_remains_b_to_b_eligible(self):
+    def test_legacy_reviewed_0071_with_exact_0072_remains_b_to_b_eligible(self):
         repaired = (
             ROOT / "server/stable/migrations/0071_historical_calendar_release_b.py"
         ).read_bytes()
@@ -3991,33 +4029,72 @@ class RollbackContractValidationTests(SimpleTestCase):
         )
         self.assertEqual(repaired.count(repaired_dependency), 1)
         legacy = repaired.replace(repaired_dependency, b"", 1)
-        self.assertEqual(
-            hashlib.sha256(legacy).hexdigest(),
-            "74ee3ca9f03e60fca3735d2d90d3fdebcde40579387cb76e146720ef2ee23197",
-        )
         for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
             with self.subTest(script=script), TemporaryDirectory() as tmp:
                 harness = Harness(Path(tmp))
                 seed_services(harness, race_live="running")
                 harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
                 (harness.state / "git-show-0071").write_bytes(legacy)
-                result = harness.run_script(script, "legacy-release-b")
+                result = harness.run_script(script, "legacy-0071-with-0072")
                 self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_unreviewed_0071_content_or_dependencies_fail_before_checkout_and_build(self):
-        reviewed = (
+    def test_exact_0072_with_unreviewed_0071_fails_before_checkout_and_build(self):
+        reviewed_0071 = (
             ROOT / "server/stable/migrations/0071_historical_calendar_release_b.py"
+        ).read_text(encoding="utf-8")
+        drifted_0071 = reviewed_0071.replace(
+            'name="uq_race_event_series_edition"',
+            'name="uq_race_event_series_edition_drift"',
+            1,
+        )
+        self.assertNotEqual(reviewed_0071, drifted_0071)
+        for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                harness.set_state("git-show-0071", drifted_0071)
+                result = harness.run_script(script, "drifted-0071-exact-0072")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("reviewed rollback allowlist", result.stderr)
+                events = harness.events()
+                self.assertFalse(any(
+                    event[0] == "git" and event[2][:1] == ["checkout"]
+                    for event in events
+                ))
+                self.assertFalse(any(
+                    event[0] == "compose" and "build" in event[2]
+                    for event in events
+                ))
+
+    def test_pre_0072_target_is_not_b_to_b_eligible(self):
+        pre_0072 = (
+            ROOT / "server/stable/migrations/0071_historical_calendar_release_b.py"
+        ).read_bytes()
+        for script in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            with self.subTest(script=script), TemporaryDirectory() as tmp:
+                harness = Harness(Path(tmp))
+                seed_services(harness, race_live="running")
+                harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
+                (harness.state / "git-show-0072").write_bytes(pre_0072)
+                result = harness.run_script(script, "pre-0072-release")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("reviewed rollback allowlist", result.stderr)
+
+    def test_unreviewed_0072_content_or_dependencies_fail_before_checkout_and_build(self):
+        reviewed = (
+            ROOT / "server/stable/migrations/0072_add_extended_racing_regions.py"
         ).read_text(encoding="utf-8")
         cases = {
             "placeholder": "from django.db import migrations\nclass Migration(migrations.Migration):\n    dependencies = []\n    operations = []\n",
             "dependency": reviewed.replace(
-                '"0069_race_data_sync_pipeline_a_ledger_guards"',
-                '"0068_race_data_sync_pipeline_a_field_audit"',
+                "'0071_historical_calendar_release_b'",
+                "'0070_horse_identity_evidence_commit_receipt'",
                 1,
             ),
             "operation": reviewed.replace(
-                'name="uq_race_event_series_edition"',
-                'name="uq_race_event_series_edition_drift"',
+                "model_name='externaldataimporterror'",
+                "model_name='externaldataimporterror_drift'",
                 1,
             ),
         }
@@ -4027,7 +4104,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                     harness = Harness(Path(tmp))
                     seed_services(harness, race_live="running")
                     harness.set_state("git-rev-parse-output", f"{self.FIXED_OID}\n")
-                    harness.set_state("git-show-0071", source)
+                    harness.set_state("git-show-0072", source)
                     result = harness.run_script(script, "unreviewed-release-b")
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn("reviewed rollback allowlist", result.stderr)
@@ -4045,7 +4122,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                         )
                     )
 
-    def test_release_b_parent_does_not_need_later_v2_marker_file(self):
+    def test_0072_rollback_target_does_not_need_later_v2_marker_file(self):
         verifier_call = (
             "python3 ./deploy/verify_rollback_target_migration.py "
             '--target-oid "$TARGET_OID"'
@@ -4060,10 +4137,22 @@ class RollbackContractValidationTests(SimpleTestCase):
                 "target migration verifier must run before checkout",
             )
             self.assertNotIn(
-                "server/stable/migrations/0071_historical_calendar_release_b.py",
+                "server/stable/migrations/0072_add_extended_racing_regions.py",
                 text,
                 "the shell must delegate target migration details to the verifier",
             )
+            self.assertIn(
+                "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET="
+                "stable.0072_add_extended_racing_regions",
+                text,
+            )
+
+        resume = (
+            ROOT / "deploy/resume_rollback_control_state.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "EXPECTED_LEAF=stable.0072_add_extended_racing_regions", resume
+        )
 
         verifier = (
             ROOT / "deploy/verify_rollback_target_migration.py"
@@ -4077,20 +4166,13 @@ class RollbackContractValidationTests(SimpleTestCase):
         self.assertIn('item.get("sha256") == digest', verifier)
         self.assertIn('item.get("dependencies") == dependencies', verifier)
         self.assertEqual(
-            allowlist["migration_path"],
-            "server/stable/migrations/0071_historical_calendar_release_b.py",
-        )
-        self.assertEqual(
             {
-                tuple(map(tuple, item["dependencies"]))
-                for item in allowlist["reviewed_variants"]
+                item["migration_path"]
+                for item in allowlist["required_migrations"]
             },
             {
-                (("stable", "0070_horse_identity_evidence_commit_receipt"),),
-                (
-                    ("stable", "0069_race_data_sync_pipeline_a_ledger_guards"),
-                    ("stable", "0070_horse_identity_evidence_commit_receipt"),
-                ),
+                "server/stable/migrations/0071_historical_calendar_release_b.py",
+                "server/stable/migrations/0072_add_extended_racing_regions.py",
             },
         )
 
@@ -4906,11 +4988,18 @@ class RollbackContractValidationTests(SimpleTestCase):
                     ]
                     self.assertEqual(
                         shows,
-                        [[
-                            "show",
-                            f"{self.FIXED_OID}:server/stable/migrations/"
-                            "0071_historical_calendar_release_b.py",
-                        ]],
+                        [
+                            [
+                                "show",
+                                f"{self.FIXED_OID}:server/stable/migrations/"
+                                "0071_historical_calendar_release_b.py",
+                            ],
+                            [
+                                "show",
+                                f"{self.FIXED_OID}:server/stable/migrations/"
+                                "0072_add_extended_racing_regions.py",
+                            ],
+                        ],
                     )
                     checkouts = [
                         e[2] for e in evts if e[0] == "git" and e[2][:1] == ["checkout"]

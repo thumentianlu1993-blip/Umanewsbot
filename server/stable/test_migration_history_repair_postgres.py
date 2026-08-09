@@ -35,6 +35,7 @@ M0068 = ("stable", "0068_race_data_sync_pipeline_a_field_audit")
 M0069 = ("stable", "0069_race_data_sync_pipeline_a_ledger_guards")
 M0070 = ("stable", "0070_horse_identity_evidence_commit_receipt")
 M0071 = ("stable", "0071_historical_calendar_release_b")
+M0072 = ("stable", "0072_add_extended_racing_regions")
 POSTGRES = connection.vendor == "postgresql"
 
 
@@ -45,7 +46,7 @@ def _executor() -> MigrationExecutor:
 def _stable_plan(executor: MigrationExecutor) -> list[str]:
     return [
         migration.name
-        for migration, backwards in executor.migration_plan([M0071])
+        for migration, backwards in executor.migration_plan([M0072])
         if migration.app_label == "stable" and not backwards and migration.name >= "0068"
     ]
 
@@ -70,7 +71,7 @@ class ProductionAuditBaselinePostgresTests(TransactionTestCase):
             operation_log=operation,
         )
         output = StringIO()
-        final_nodes = (M0068, M0069, M0071)
+        final_nodes = (M0068, M0069, M0071, M0072)
         placeholders = ", ".join(["(%s, %s)"] * len(final_nodes))
         params = [part for node in final_nodes for part in node]
         with connection.cursor() as cursor:
@@ -128,7 +129,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
 
     def tearDown(self):
         # Never leave the shared Django test database at a partial migration leaf.
-        _executor().migrate([M0071])
+        _executor().migrate([M0072])
         super().tearDown()
 
     def test_initial_install_exact_origin_and_monotonic_prefixes_have_exact_catalogs(self):
@@ -138,7 +139,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
         self.assertTrue(origin["initial_install_origin"])
         self.assertEqual(
             origin["migration_plan"],
-            [M0070[1], M0068[1], M0069[1], M0071[1]],
+            [M0070[1], M0068[1], M0069[1], M0071[1], M0072[1]],
         )
 
         _executor().migrate([M0068, M0070])
@@ -157,7 +158,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
             [f"{M0069[0]}.{M0069[1]}", f"{M0070[0]}.{M0070[1]}"],
         )
 
-        _executor().migrate([M0071])
+        _executor().migrate([M0072])
         final = check_initial_install_schema_compatibility()
         self.assertTrue(final["ok"], final)
 
@@ -316,7 +317,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
             identity = json.loads(ensure_out.getvalue())
             self.assertTrue(marker_path.exists())
 
-            _executor().migrate([M0071])
+            _executor().migrate([M0072])
             self.assertEqual(collect_live_production_audit()["receipt_count"], 0)
             complete_out = StringIO()
             call_command(
@@ -368,7 +369,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
             )
             publish_restricted_recovery_marker(path=marker_path, marker=marker)
             info = marker_path.stat()
-            _executor().migrate([M0071])
+            _executor().migrate([M0072])
             output = StringIO()
             with self.assertRaises(CommandError):
                 call_command(
@@ -419,7 +420,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
             )
             publish_restricted_recovery_marker(path=marker_path, marker=repair_marker)
             info = marker_path.stat()
-            _executor().migrate([M0071])
+            _executor().migrate([M0072])
             with self.assertRaisesRegex(CommandError, "artifact/marker binding mismatch"):
                 call_command(
                     "complete_historical_calendar_restricted_recovery",
@@ -465,10 +466,10 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
         executor = _executor()
         self.assertEqual(
             _stable_plan(executor),
-            [M0068[1], M0069[1], M0071[1]],
+            [M0068[1], M0069[1], M0071[1], M0072[1]],
         )
         self.assertNotIn(M0070[1], _stable_plan(executor))
-        executor.migrate([M0071])
+        executor.migrate([M0072])
 
         self.assertEqual(collect_live_production_audit(), before)
         executor = _executor()
@@ -487,7 +488,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
     def test_fresh_install_creates_receipt_once_and_second_plan_is_empty(self):
         _executor().migrate([("stable", None)])
         executor = _executor()
-        executor.migrate([M0071])
+        executor.migrate([M0072])
         with connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -506,7 +507,9 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
         _executor().migrate([M0067])
         _executor().migrate([M0068, M0070])
         executor = _executor()
-        self.assertEqual(_stable_plan(executor), [M0069[1], M0071[1]])
+        self.assertEqual(
+            _stable_plan(executor), [M0069[1], M0071[1], M0072[1]]
+        )
         applied = {
             f"{app}.{name}"
             for app, name in executor.loader.applied_migrations
@@ -519,7 +522,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
 
         executor.migrate([M0069, M0070])
         executor = _executor()
-        self.assertEqual(_stable_plan(executor), [M0071[1]])
+        self.assertEqual(_stable_plan(executor), [M0071[1], M0072[1]])
         applied = {
             f"{app}.{name}"
             for app, name in executor.loader.applied_migrations

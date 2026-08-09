@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed unless a rollback target carries an exactly reviewed 0071."""
+"""Fail closed unless a rollback target carries an exactly reviewed 0072."""
 
 from __future__ import annotations
 
@@ -14,13 +14,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOWLIST_PATH = ROOT / "deploy" / "reviewed_release_b_rollback_migrations.json"
+EXPECTED_MIGRATION_PATHS = (
+    "server/stable/migrations/0071_historical_calendar_release_b.py",
+    "server/stable/migrations/0072_add_extended_racing_regions.py",
+)
 
 
-def _literal_dependencies(source: bytes) -> list[list[str]]:
+def _literal_dependencies(source: bytes, *, filename: str) -> list[list[str]]:
     try:
-        module = ast.parse(source, filename="0071_historical_calendar_release_b.py")
+        module = ast.parse(source, filename=filename)
     except (SyntaxError, UnicodeDecodeError) as exc:
-        raise ValueError(f"target 0071 is not parseable Python: {exc}") from exc
+        raise ValueError(f"target migration is not parseable Python: {exc}") from exc
     for node in module.body:
         if isinstance(node, ast.ClassDef) and node.name == "Migration":
             for statement in node.body:
@@ -34,28 +38,23 @@ def _literal_dependencies(source: bytes) -> list[list[str]]:
                     try:
                         value = ast.literal_eval(statement.value)
                     except (ValueError, TypeError) as exc:
-                        raise ValueError("target 0071 dependencies are not literal") from exc
+                        raise ValueError("target migration dependencies are not literal") from exc
                     if not isinstance(value, list) or any(
                         not isinstance(item, tuple)
                         or len(item) != 2
                         or not all(isinstance(part, str) for part in item)
                         for item in value
                     ):
-                        raise ValueError("target 0071 dependencies have an invalid shape")
+                        raise ValueError("target migration dependencies have an invalid shape")
                     return [list(item) for item in value]
-    raise ValueError("target 0071 Migration.dependencies is missing")
+    raise ValueError("target migration Migration.dependencies is missing")
 
 
-def verify(target_oid: str) -> dict:
-    if len(target_oid) != 40 or any(char not in "0123456789abcdef" for char in target_oid):
-        raise ValueError("target OID must be one lowercase 40-character commit id")
-    allowlist = json.loads(ALLOWLIST_PATH.read_text(encoding="utf-8"))
-    if allowlist.get("schema_version") != "release-b-rollback-migration-allowlist/v1":
-        raise ValueError("rollback migration allowlist schema is invalid")
-    path = allowlist.get("migration_path")
-    variants = allowlist.get("reviewed_variants")
-    if not isinstance(path, str) or not isinstance(variants, list) or not variants:
-        raise ValueError("rollback migration allowlist is incomplete")
+def _verify_required_migration(
+    *, target_oid: str, path: str, variants: object
+) -> dict:
+    if not isinstance(variants, list) or not variants:
+        raise ValueError("rollback migration allowlist contract is incomplete")
     try:
         source = subprocess.run(
             ["git", "show", f"{target_oid}:{path}"],
@@ -66,9 +65,11 @@ def verify(target_oid: str) -> dict:
         ).stdout
     except subprocess.CalledProcessError as exc:
         detail = exc.stderr.decode("utf-8", errors="replace").strip()
-        raise ValueError(f"target does not expose reviewed 0071 content: {detail}") from exc
+        raise ValueError(
+            f"target does not expose required reviewed migration {path}: {detail}"
+        ) from exc
     digest = hashlib.sha256(source).hexdigest()
-    dependencies = _literal_dependencies(source)
+    dependencies = _literal_dependencies(source, filename=path)
     matches = [
         item
         for item in variants
@@ -80,12 +81,42 @@ def verify(target_oid: str) -> dict:
     ]
     if len(matches) != 1:
         raise ValueError(
-            "target 0071 content/dependency contract is not in the reviewed rollback allowlist"
+            f"target migration {path} content/dependency contract is not in "
+            "the reviewed rollback allowlist"
         )
     return {
         "migration_path": path,
         "sha256": digest,
         "dependencies": dependencies,
+        "reviewed": True,
+    }
+
+
+def verify(target_oid: str) -> dict:
+    if len(target_oid) != 40 or any(char not in "0123456789abcdef" for char in target_oid):
+        raise ValueError("target OID must be one lowercase 40-character commit id")
+    allowlist = json.loads(ALLOWLIST_PATH.read_text(encoding="utf-8"))
+    if allowlist.get("schema_version") != "release-b-rollback-migration-allowlist/v2":
+        raise ValueError("rollback migration allowlist schema is invalid")
+    contracts = allowlist.get("required_migrations")
+    if not isinstance(contracts, list):
+        raise ValueError("rollback migration allowlist is incomplete")
+    paths = [
+        item.get("migration_path") if isinstance(item, dict) else None
+        for item in contracts
+    ]
+    if tuple(paths) != EXPECTED_MIGRATION_PATHS:
+        raise ValueError("rollback migration allowlist required paths are invalid")
+    migrations = [
+        _verify_required_migration(
+            target_oid=target_oid,
+            path=item["migration_path"],
+            variants=item.get("reviewed_variants"),
+        )
+        for item in contracts
+    ]
+    return {
+        "migrations": migrations,
         "reviewed": True,
     }
 

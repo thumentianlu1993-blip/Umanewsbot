@@ -7,6 +7,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 
 from stable.services.historical_calendar_release_b_handoff import (
+    FINAL_LEAF_SET,
     complete_restricted_recovery_marker,
     collect_handoff_preflight,
     collect_initial_install_preflight,
@@ -21,7 +22,7 @@ from stable.services.historical_calendar_release_b_schema import (
 
 
 class Command(BaseCommand):
-    help = "migration 成功到 0071 后原子转换 restricted-recovery marker。"
+    help = "migration 成功到当前受审最终叶节点后原子转换 restricted-recovery marker。"
 
     def add_arguments(self, parser):
         parser.add_argument("--marker-path", required=True)
@@ -104,7 +105,7 @@ class Command(BaseCommand):
             marker_result = verify_restricted_marker_for_live_state(
                 path=marker_source,
                 expected_binding=marker_binding,
-                live_leaf_set=["stable.0071_historical_calendar_release_b"],
+                live_leaf_set=list(FINAL_LEAF_SET),
             )
             if not marker_result["ok"]:
                 raise CommandError("completion artifact/marker binding mismatch")
@@ -127,12 +128,14 @@ class Command(BaseCommand):
         if not live.get("ok"):
             self.stdout.write(json.dumps(live, ensure_ascii=False, sort_keys=True))
             raise CommandError("restricted recovery requires a valid live preflight")
-        if live.get("migration_leaf_set") != [
-            "stable.0071_historical_calendar_release_b"
-        ] or live.get("database_identity_sha256") != options[
+        if live.get("migration_leaf_set") != list(FINAL_LEAF_SET) or live.get(
+            "database_identity_sha256"
+        ) != options[
             "database_identity_sha256"
         ]:
-            raise CommandError("restricted recovery has not reached exact 0071 state")
+            raise CommandError(
+                "restricted recovery has not reached the exact reviewed final state"
+            )
         if origin_action == "initial-install":
             assert marker_payload is not None
             initial_audit = collect_initial_install_completion_audit(

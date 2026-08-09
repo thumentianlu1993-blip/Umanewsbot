@@ -29,7 +29,7 @@ PRODUCTION_AUDIT_EXPECTED_APPLIED_NODES = [
     "stable.0067_historical_calendar_release_a",
     "stable.0070_horse_identity_evidence_commit_receipt",
 ]
-TARGET = ("stable", "0071_historical_calendar_release_b")
+TARGET = ("stable", "0072_add_extended_racing_regions")
 AUDIT_PATH = (
     Path(__file__).resolve().parents[3]
     / "docs"
@@ -43,6 +43,7 @@ ALLOWED_FORWARD_STATES = {
         "0068_race_data_sync_pipeline_a_field_audit",
         "0069_race_data_sync_pipeline_a_ledger_guards",
         "0071_historical_calendar_release_b",
+        "0072_add_extended_racing_regions",
     ],
     (
         "stable.0068_race_data_sync_pipeline_a_field_audit",
@@ -50,15 +51,19 @@ ALLOWED_FORWARD_STATES = {
     ): [
         "0069_race_data_sync_pipeline_a_ledger_guards",
         "0071_historical_calendar_release_b",
+        "0072_add_extended_racing_regions",
     ],
     (
         "stable.0069_race_data_sync_pipeline_a_ledger_guards",
         "stable.0070_horse_identity_evidence_commit_receipt",
-    ): ["0071_historical_calendar_release_b"],
-    ("stable.0071_historical_calendar_release_b",): [],
+    ): ["0071_historical_calendar_release_b", "0072_add_extended_racing_regions"],
+    ("stable.0071_historical_calendar_release_b",): [
+        "0072_add_extended_racing_regions"
+    ],
+    ("stable.0072_add_extended_racing_regions",): [],
 }
 
-# Exact recorder states reachable when Django executes the reviewed 0071 plan
+# Exact recorder states reachable when Django executes the reviewed 0072 plan
 # from the sole approved pre-0070 origin.  This is deliberately not merged
 # into ALLOWED_FORWARD_STATES: ordinary Release B deploys must never acquire an
 # initial-install bypass merely because they happen to see an old database.
@@ -68,11 +73,13 @@ INITIAL_INSTALL_FORWARD_STATES = {
         "0068_race_data_sync_pipeline_a_field_audit",
         "0069_race_data_sync_pipeline_a_ledger_guards",
         "0071_historical_calendar_release_b",
+        "0072_add_extended_racing_regions",
     ],
     ("stable.0070_horse_identity_evidence_commit_receipt",): [
         "0068_race_data_sync_pipeline_a_field_audit",
         "0069_race_data_sync_pipeline_a_ledger_guards",
         "0071_historical_calendar_release_b",
+        "0072_add_extended_racing_regions",
     ],
     (
         "stable.0068_race_data_sync_pipeline_a_field_audit",
@@ -80,12 +87,16 @@ INITIAL_INSTALL_FORWARD_STATES = {
     ): [
         "0069_race_data_sync_pipeline_a_ledger_guards",
         "0071_historical_calendar_release_b",
+        "0072_add_extended_racing_regions",
     ],
     (
         "stable.0069_race_data_sync_pipeline_a_ledger_guards",
         "stable.0070_horse_identity_evidence_commit_receipt",
-    ): ["0071_historical_calendar_release_b"],
-    ("stable.0071_historical_calendar_release_b",): [],
+    ): ["0071_historical_calendar_release_b", "0072_add_extended_racing_regions"],
+    ("stable.0071_historical_calendar_release_b",): [
+        "0072_add_extended_racing_regions"
+    ],
+    ("stable.0072_add_extended_racing_regions",): [],
 }
 
 AUDIT_FIELDS = (

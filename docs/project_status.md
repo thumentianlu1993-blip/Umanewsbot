@@ -1,5 +1,18 @@
 # 项目状态文档
 
+## 2026-08-09 PR #83 已运行，migration 合同最小修复待发布
+
+- PR `#83` 已合并为 `eb1e221f…c350`，生产已应用 state-only migration `0072` 并运行统一候选
+  image `ca19687a…bf5ee`；备份 SHA 为 `9f836669…b60f42`。
+- Release-B preflight 最终叶仍固定 `0071`，导致 migration 后 completion fail-closed；服务已安全恢复，
+  health 正常、写入/网络 flags 关闭、writer/locks 为零，但正式 release completion 尚未通过。
+- `codex/allow-0072-release-preflight` 已完成最小合同修复，迁移合同 `65/65`、真实 PostgreSQL 16
+  migration/catalog `25/25`、single-owner `162/162`（含 rollback contract `22/22`）通过；同一只读
+  reviewer 最终限定复审 `APPROVED`、无剩余 P0-P2。下一步是提交，并在新 G2 下合并该修复、重新
+  完成发布；G3 full-network 与生产回填仍未授权。
+- 普通 rollback 与 retry 已一并推进到 `0072`，目标 verifier 要求受审 `0071` 依赖与精确 `0072`
+  migration 同时匹配；pre-0072 镜像不再被误判为 code-only rollback 兼容。
+
 ## 2026-08-09 2025 参赛马补全进入实现阶段
 
 - 已完成旧 artifact 严格 gap census、英文名证据修复、六类官方结果 parser、manifest-bound 官方赛果
