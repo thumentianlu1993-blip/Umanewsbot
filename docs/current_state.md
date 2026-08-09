@@ -1,5 +1,25 @@
 # 当前状态
 
+## 2026-08-09 PR #86 已完成 G2 关闭态生产发布
+
+- PR `#86` 已从 Draft 转为 Ready，并以 merge commit
+  `e1bc86634c7d11adc8ce2f4090bc03b767a64b0c` 合入 `main`。生产从隔离 release
+  `/opt/umanews-release-e1bc8663-PR86-20260809/umanewsbot` 构建并切换，未触碰宿主机上有其他工作
+  的 `/opt/umanewsbot` checkout。
+- 新鲜写前备份为 `/opt/umanewsbot/backups/db/pre-pr86-g2-20260809T114000Z.dump`，大小
+  `416252566` bytes、TOC `1308`、SHA-256
+  `5b7698f0399db862591e491791a18fef0878fc8edba7c2de5ad1e2720a24380e`。候选 preflight artifact
+  SHA-256 为 `6b28439717bfd0fcfe1c1298c531330c43a78306168cff1754fcfdaf2fd2fe2e`。
+- 生产 web/worker/beat 已统一到 image
+  `sha256:14f6bd457e7f17a6583991e3acf7440bfcf163583b3db5934ceee90510d1f6c0`，OCI revision 与运行
+  release 均精确绑定上述 merge commit。`stable.0072_add_extended_racing_regions` 保持已应用，
+  `migrate --plan` 为空；Django check、内外 HTTP healthz、日志扫描均通过。
+- verifier 重新确认三个常驻应用容器的历史回填、外部马匹导入、马资料联网、race-live、生命周期、
+  race-data-sync、多地区归属和相关查询开关全部为 `false/off/empty`；race-live worker 未运行，所有
+  受控 writer/active lock 为 `0`，最终 Celery active/reserved/scheduled 均为空。
+- 本次没有执行生产回填、澳洲正式网络验证、official-results 采集或 2025 `full_network`。PR #86
+  只把官方赛果 parser/catalog 修复发布到关闭态生产，后续任何数据动作仍需独立新鲜授权。
+
 ## 2026-08-09 2025 新地区官方赛果目录已重建，正式运行仍待门禁
 
 - migration `0072` 的 G2 关闭态发布已完成：生产 revision 为
@@ -20,8 +40,8 @@
   Saudi `7` 共 `12` 场官方结果已有限联网解析；Saudi Cup 的 `Place = -` 经实际 starter 行确认仅在
   JCSA adapter 中保留为 `did_not_finish`。
 - 上述增量目标测试 `36/36`、完整 research 套件 `146/146` 通过；真实 Racing Australia 当前页面的
-  单场选择 smoke 解析 `8` 匹。代码仍在 Draft PR `#86`，尚未完成本轮独立复审、合并或部署；更未
-  生成可授权的最终三文件包、执行生产回填或启动正式 `full_network`。
+  单场选择 smoke 解析 `8` 匹。代码随后完成独立复审并通过 PR `#86` 合并、关闭态部署；仍未生成
+  可授权的最终三文件包、执行生产回填或启动正式 `full_network`。
 
 ## 2026-08-09 德国官方赛果页脚解析最小修复待审查
 
@@ -40,10 +60,8 @@
   该修复后全量重建，旧文件作废。
 - 聚焦测试 `26/26`、研究套件 `136/136` 通过，真实德国缓存页已覆盖普通结果与 `Pl. = -` 形状；
   独立 reviewer 另验证德国完整未知状态及 AU/Bahrain 的 `-` 仍拒绝，最终 `APPROVED`、无 P0-P2。
-  当前候选已提交推送至 Draft PR `#86`；新增 ERA 状态和 TJCIS `Part` index boundary 增量也分别经
-  独立复核 `APPROVED`，均无 P0-P2；尚未合并或部署。
-  旧生产 image 仍会在该页确定性停止，因此不得在旧 revision 启动正式
-  official-results/full-network run。
+  候选、ERA 状态和 TJCIS `Part` index boundary 增量随后已通过 PR `#86` 合并并完成上述关闭态
+  部署；official-results/full-network 仍需独立授权。
 
 ## 2026-08-09 migration 0072 已应用，发布合同叶节点修复待合并
 
