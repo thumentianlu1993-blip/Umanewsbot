@@ -7,7 +7,9 @@
 - 本地最小修复只跳过缺少 `position + horse` 完整列的表内非参赛行；未知的完整名次行继续硬失败。
   德国 provider 特有的 `Pl. = -`（在 starter 表中且非 `Nichtstarter`）保留为无数值名次的
   `did_not_finish`，不修改其他 provider。聚焦测试 `26/26`、研究套件 `136/136` 与真实缓存页解析
-  通过；独立复核 `APPROVED`、无 P0-P2。尚待提交、合并和部署。
+  通过；独立复核 `APPROVED`、无 P0-P2。候选已进入 Draft PR `#86`，尚待合并和部署。
+- 阿联酋 ERA 真实结果页另使用完整状态 `Did Not Finish`；候选把它加入既有受控非完赛集合，未把
+  任意未知状态改为容错。
 
 ## 2026-08-09 PR #83 已运行，migration 合同最小修复待发布
 

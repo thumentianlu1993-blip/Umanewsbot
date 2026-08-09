@@ -6,6 +6,7 @@
    跳过未同时映射到 `position` 与 `horse` 的不完整 row；不得把 `placing()` 的未知状态异常改成跳过。
    该 provider 的 `Pl. = -` 仅在完整 participant row 中规范为 `did_not_finish`，因为官网 starter 汇总
    明确把它计入实际 starter 且非 `Nichtstarter`；该规则不得扩到其他 provider。
+   ERA 的完整文案 `Did Not Finish` 是受控通用非完赛状态；仍须用未知完整状态反例证明 fail-closed。
 2. 合并前至少复跑 `runtime.research.test_official_graded_race_sources`，并用冻结的真实 2025 德国结果页
    证明 starter rows 可解析且摘要行未进入结果。部署后才可重新开始 official-results 正式 runner；
    旧生产 revision 上该错误是确定性的，不按临时网络 checkpoint 重试。

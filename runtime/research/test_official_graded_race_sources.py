@@ -45,7 +45,7 @@ class OfficialSourceTests(unittest.TestCase):
         h="<table><tr><th>Pl.</th><th>Name</th><th>Nr.</th><th>Abstand</th><th>Trainer</th><th>Reiter</th></tr>"+"".join(f"<tr><td>{status}</td><td>{name}</td><td>{name}</td><td></td><td>T</td><td>J</td></tr>" for status,name in (("1.","A"),("DNF","B"),("DSQ","C"),("NR","D")))+"</table>"
         rows=parse_official_results("de_deutscher_galopp",h)
         self.assertEqual([(r["horse_name"],r["finish_position"],r["participant_status"]) for r in rows],[("A",1,"finished"),("B",None,"did_not_finish"),("C",None,"disqualified")])
-        for status in ("PU", "F", "UR"):
+        for status in ("PU", "F", "UR", "Did Not Finish"):
             self.assertEqual(placing(status), (None, "did_not_finish"))
 
     def test_unknown_result_status_fails_closed(self):
