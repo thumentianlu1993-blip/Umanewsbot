@@ -8353,3 +8353,19 @@ python3 runtime/research/p0_participant_execution_ledger.py \
 不得删除 ledger、另建平行 ledger、覆盖旧 artifact，或对已 released/applied 批次使用 retry。续跑仍使用
 同一 batch/review SHA、原 cache、空的新 output 目录、单一 one-shot 和数据库 read-only；新 completion
 通过独立审查前不得进入 release/G3。
+
+## 2026-08-10 batch-0001 精确 retry 实际证据
+
+- 发布 revision：`0149eab88bb74521602e1fe73beb240bc7ddd919`；生产镜像：
+  `sha256:71d56e74be554a329dfb147493fe8850220833fbd7ea3c85d713cbc8f8d1eb6a`。
+- 写前备份：`pre-p0-identity-fix-0149eab8-20260809T2010Z.dump`，SHA-256
+  `1fc928afd129e7631be8ba06a763f2a3c48e55aa46882dcb97173ad1bbd6525c`；`pg_restore -l` 通过。
+- r2 必须复用 r1 cache，但输出使用独立 `network-prepare-r2/output`；one-shot 同时设置
+  `PGOPTIONS=-c default_transaction_read_only=on`，且只有该容器临时设置
+  `HORSE_PROFILE_COMPLETION_ALLOW_NETWORK=true`。常驻服务开关不得改变。
+- r2 completion SHA：`2cf2c634ec3a63ebf36e456ba8ddced814fdcd6897cec737853ee0b6decc04b8`；
+  DB before/after evidence SHA 均为
+  `18e0830076d7602c704b87dcf4be71ea800071ab81d736c8fe733740e67443c0`。
+- 结果为 34 complete、16 fail-closed。14 个 HTTP 403、1 个歧义、1 个姓名不一致不得自动重试或进入
+  mapping；34 项经人工模块审核前也不得生成 G3 写入授权。账本必须保持 ordinal 1 `prepared`，直到新的
+  mapping/release/G3 明确授权链建立。

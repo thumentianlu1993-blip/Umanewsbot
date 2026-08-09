@@ -2712,3 +2712,14 @@ P0 马信息补全专项的模型交接文档见
   全阻断 prepared attempt 的审计保留式 retry；相关组合测试 `383/383` 通过。
 - 当前下一门禁为独立代码审查、PR 合并、全部高风险开关关闭的生产部署，再以原 cache、相同 batch 和
   review manifest 精确续跑。当前没有生产资料写入授权，也未启动 release/G3。
+
+# 2026-08-10 2025 participant batch-0001 已完成闭锁部署与 r2 prepare
+
+- PR #91 已合并并以 `main@0149eab8`、镜像 `sha256:71d56e74…eb6a` 闭锁部署；migration no-op，
+  服务、队列、锁、开关、日志和 HTTP verifier 全部通过。
+- 同一 batch/review manifest、原 cache、数据库强制只读的 r2 已完成：50 项中 34 complete、16 blocked，
+  completion SHA `2cf2c634…04b8`，数据库 before/after 完全一致且无业务写入。
+- 独立审查 `APPROVED`、无 P0-P2；16 项按 14 个 HTTP 403、1 个歧义、1 个姓名不一致冻结。账本停在
+  ordinal 1 `prepared`，保留 r1 retry history；尚未执行 release、G3、production apply 或后续批次。
+- 下一门禁是 34 项模块人工审核与 mapping snapshot。两个跨 occurrence 重复身份必须合并；只有形成新的
+  release candidate 并取得独立 G3 授权后，才可考虑生产写入。
