@@ -1,5 +1,18 @@
 # 关键决策
 
+## 2026-08-09 新 migration 必须同步推进受审 preflight 最终叶
+
+- `0072` 虽然只改变 Django choices、数据库 SQL 为 no-op，仍会写入 migration recorder；因此发布
+  合同不能继续把 `0071` 当作永久最终叶。
+- 最小修复把 schema compatibility target、restricted-recovery final leaf、completion 命令和 host
+  preflight allowlist 原子推进到 `0072`，同时保留 `0071` 作为单向合法中间态。
+- 禁止通过删除 recorder、伪造 handoff、忽略 `migration.state` 或直接跳过 completion 恢复发布。
+  首次失败后的生产只允许同一候选镜像恢复服务；正式完成仍须发布修复后的代码并重新生成 fresh
+  preflight artifact。
+- 普通 B→B rollback 也必须同时绑定受审 `0071` 依赖与精确 `0072` migration 内容/依赖；不含
+  `0072` 的旧 image 不再是 code-only rollback 目标。回到 pre-0072 版本必须使用另行审批的数据库
+  恢复/跨 schema 合同。
+
 ## 2026-08-09 新地区赛果必须绑定官方页面与同域数据端点
 
 - 澳洲、德国、中东补全不使用 Wikipedia/Wikidata，也不以媒体报道代替全体参赛结果。
@@ -100,9 +113,9 @@ integration lock 与 production release lock 分离，并由单一 release coord
 - superseded target 的 manifest 字段在 overlay 使用固定 sentinel，apply 时写入当前已审核 manifest
   SHA；canonical links 必须与 equivalent boundary 的 pair/identity 精确相等，并允许多个 duplicate
   共享同一 survivor。既有 inventory 只处理非 superseded active target。
-- 通用 rollback 不承担跨 schema 反向迁移：pre-0071 target 必须在任何 checkout/停服前拒绝，另走
-  独立审批的停服恢复。所有 imported target 必须有关联 event；series identity collision 使用
-  edition-year identity。
+- 通用 rollback 不承担跨 schema 反向迁移：目标必须同时满足受审 `0071` 依赖合同与精确 `0072`
+  终态；pre-0072 target 必须在任何 checkout/停服前拒绝，另走独立审批的停服恢复。所有 imported
+  target 必须有关联 event；series identity collision 使用 edition-year identity。
 - review template 与 reviewed overlay 使用同一字段形状；模板中的 census manifest SHA 在完整
   census 生成后由审核者填写。target 若已有 `superseded_targets`，自身不得再被 supersede，模型
   校验与 v2 overlay 共同阻断多层链。

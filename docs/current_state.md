@@ -1,5 +1,29 @@
 # 当前状态
 
+## 2026-08-09 migration 0072 已应用，发布合同叶节点修复待合并
+
+- PR `#83` 已合并为 `main@eb1e221f2791948616c3a72f0e45183d72fdc350`。生产隔离 release 为
+  `/opt/umanews-release-eb1e221f-GR20260809/umanewsbot`；写前 custom-format dump 为
+  `/opt/umanewsbot/backups/db/pre-2025-completion-g2-20260809T064812Z.dump`，大小
+  `415467279` bytes、mode `0600`、TOC `1308`、SHA-256
+  `9f836669f9e801944f339ad717a30f13219978fb34bb0adb9c9f5ff0d9b60f42`。
+- 首次受保护部署已构建 image
+  `sha256:ca19687a91c481e19aa51d774a432c9b770cae66bd4ba6092d126c776c8bf5ee`，并成功应用
+  state-only migration `0072_add_extended_racing_regions`；随后 completion 因 Release-B schema
+  合同的最终受审叶仍固定为 `0071`，把合法 recorder 变化判为 `migration.state` drift 而
+  fail-closed。未执行业务回填、外部网络或 G3 数据写入。
+- web/worker/beat 已从同一 `eb1e221f` image 恢复，web healthy、HTTP healthz 为 ok；历史回填、
+  历史网络、马匹资料网络、race sync/live flags 均为 false，外部导入、导入锁和运行中资料补全均为
+  `0`。正式 release completion 尚未通过，因此不能把本次记为完整发布验收。
+- 最小修复分支 `codex/allow-0072-release-preflight` 将 schema target/final leaf 统一推进到 `0072`，
+  保留 `0071` 为合法中间态，并同步 completion、restricted marker 与 shell leaf allowlist。
+  普通 B→B rollback、retry 和目标 migration allowlist 也同步要求受审 `0071` 依赖与精确 `0072`
+  终态同时匹配；pre-0072 image 只允许另行审批的数据库恢复。
+  migration-history 套件 `65/65`、真实 PostgreSQL 16 migration/catalog 套件 `25/25`、
+  single-migration-owner 套件 `162/162`（含 rollback contract `22/22`）、Django check 与 migration
+  drift 检查通过；同一只读 reviewer 最终限定复审为 `APPROVED`、无剩余 P0-P2。待提交并经新 G2
+  合并后重新完成受保护发布。
+
 ## 2026-08-09 2025 参赛马完整补全正在本地实现，尚未发布或写生产
 
 - 隔离分支 `codex/complete-2025-graded-horse-data` 已固化七文件 gap census；旧 artifact 的

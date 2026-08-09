@@ -1,5 +1,28 @@
 # 部署运行手册
 
+## 2026-08-09 migration 0072 首次发布 STOP 与恢复
+
+1. PR `#83` merge SHA 为 `eb1e221f2791948616c3a72f0e45183d72fdc350`；隔离 release 固定
+   `/opt/umanews-release-eb1e221f-GR20260809/umanewsbot`，候选 image 为
+   `sha256:ca19687a91c481e19aa51d774a432c9b770cae66bd4ba6092d126c776c8bf5ee`。
+2. 写前 dump 为
+   `/opt/umanewsbot/backups/db/pre-2025-completion-g2-20260809T064812Z.dump`，`415467279` bytes、
+   mode `0600`、TOC `1308`、SHA-256 `9f836669…b60f42`；旧 image 回滚标签为
+   `umanewsbot:rollback-pre-2025-completion-g2-20260809T064812Z`。
+3. 首次发布在 Celery `active/reserved/active_confirm=0/0/0` 后应用 `0072` 成功，但 completion
+   发现 preflight 最终叶仍硬编码 `0071`，以 `migration.state` drift 确定性停止。不要删除
+   `django_migrations` 行、伪造 artifact 或手工跳过 completion。
+4. 安全恢复：确认 deployment lock 已释放、`0072` recorder 精确一行且候选 image/revision 正确，
+   只从同一 release `up -d --no-deps web` 并等待 healthy，再恢复 worker/beat；复核所有高风险 flags
+   为 false、writer/lock 为零和 HTTP healthz。保留 race-live-state 文件供后续正式 release 重用。
+5. 代码修复必须把 schema target、allowed forward states、restricted final/intermediate states、
+   completion verifier 与 host leaf allowlist 一起推进到 `0072`。修复合并部署前，当前状态只能记为
+   “服务恢复、migration 已应用、正式 release completion 未通过”。
+6. 普通 `rollback.sh` / `rollback_lowcost.sh` 及其 markerless retry 必须要求 live leaf `0072`，目标
+   image 必须同时携带 allowlist 中受审 `0071` 依赖与精确 `0072` migration。旧回滚标签
+   `rollback-pre-2025-completion-g2-*` 不含 `0072`，只能结合本节写前 dump 走另行审批的数据库恢复，
+   禁止作为普通 code-only B→B rollback 目标。
+
 ## 2026-08-09 八地区 2025 正式研究 workflow 新门禁（尚未部署）
 
 1. `full_network=true` 必须提供仓库相对的 official result 三文件包目录和 `summary.json` 精确 SHA；
@@ -249,10 +272,11 @@ time bounds。缺项、多项、错序或版本漂移均停止，不能删除字
    `{0068,0070}` 与 `{0069,0070}` 两态 compatibility gate 均已 GREEN。该技术结论不等于发布授权；
    截至本记录检查点仍不得直接重试 Release B、v2 census、回填或 full-network。
 8. 通用 `rollback*.sh` 在 checkout/build 前必须运行
-   `deploy/verify_rollback_target_migration.py --target-oid <40-hex-oid>`。该门禁用 `git show` 读取目标
-   0071 原始内容，并与 `deploy/reviewed_release_b_rollback_migrations.json` 的 exact SHA/dependencies
-   双重匹配；文件仅存在、placeholder、改依赖或改 operation 都不合格。新增兼容版本必须单独审核其
-   完整 migration bytes、最终 schema 兼容性与 rationale 后才能更新 allowlist。
+   `deploy/verify_rollback_target_migration.py --target-oid <40-hex-oid>`。该门禁用 `git show` 分别读取
+   目标 `0071` 与 `0072` 原始内容，并与 `deploy/reviewed_release_b_rollback_migrations.json` 中两份
+   required migration 的 exact SHA/dependencies 同时匹配；`0071` 可为受审 legacy/repaired 版本之一，
+   `0072` 必须为受审终态。文件仅存在、placeholder、改依赖或改 operation 都不合格。新增兼容版本
+   必须单独审核完整 migration bytes、最终 schema 兼容性与 rationale 后才能更新 allowlist。
 9. PostgreSQL preflight 对 receipt 表要求 constraint/index 完整集合精确相等；看到
    `0070.constraint_set` 或 `0070.index_set` 必须作为确定性 schema drift 停止。不得删除不明对象后
    直接续跑；先核对对象来源和预期 migration。该查询限定四张显式用户表，不扫描 system/TOAST。
@@ -289,26 +313,27 @@ time bounds。缺项、多项、错序或版本漂移均停止，不能删除字
 > 以下是本地候选的未来操作合同，不是部署授权。当前未 commit/push/PR/deploy，也未运行生产
 > v2 census 或数据 apply。
 
-2026-08-02 主线集成后，本次发布迁移固定为
-`0071_historical_calendar_release_b`，直接依赖
-`0070_horse_identity_evidence_commit_receipt`。升级前候选 preflight 只接受生产 applied leaf
-`0070`，升级后或 B→B rollback 的目标 image preflight 只接受 `0071`；wrapper 同时列出二者是为
-同一只读命令覆盖这两个明确阶段，不允许其他 leaf。
+2026-08-09 当前发布迁移终态固定为 `0072_add_extended_racing_regions`，直接依赖
+`0071_historical_calendar_release_b`；`0071` 继续作为受审的单向中间态。候选 preflight 只接受
+`0070`、`0071` 或 `0072` 这三个明确阶段，正式完成与 B→B rollback 的目标 image 必须以 `0072`
+为精确 leaf；wrapper 列出中间态仅用于受保护的 forward resume，不把它们视为最终成功。
 
 1. deploy 前必须取得并人工核对目标生产数据库 identity SHA，导出
    `EXPECTED_PRODUCTION_DB_IDENTITY_SHA256=<64位小写sha256>`；缺失或格式错误时停服务前失败。
 2. deploy 构建同时带 OCI revision label 和 runtime `UMANEWS_RELEASE_COMMIT` 的候选 image，随后
    运行 `run_historical_calendar_release_b_preflight.sh`。commit、image ID、DB identity、
-   `0070/0071` 单一 leaf 和 forward 冲突必须全部通过，之后才调用 release orchestration。leaf
+   `0070/0071/0072` 中唯一受支持的 applied leaf 和 forward 冲突必须全部通过，之后才调用 release
+   orchestration。leaf
    必须从目标库 `django_migrations` 的实际 applied 状态计算，不得使用候选镜像 migration graph
    冒充目标数据库状态。目标库存在任何候选 graph 不认识的 `stable.*` applied node 时必须输出
    `migration_graph_known=false` 和精确 node 列表并失败；不得把未知 node 过滤后继续计算“合法” leaf。
-3. 通用 `rollback*.sh` 只接受仍包含 `0071` 的目标，即只执行 B→B rollback；目标早于 Release B
-   时在 checkout/停服务前 fail closed。B→B checkout 并构建目标 image 后，以目标 commit/image
+3. 通用 `rollback*.sh` 只接受以 `0072` 为精确 leaf 且同时通过 `0071`/`0072` 双 migration 字节合同
+   的目标，即只执行当前 schema 的 B→B rollback；pre-0072 目标在 checkout/停服务前 fail closed。
+   B→B checkout 并构建目标 image 后，以目标 commit/image
    运行 forward preflight，再进入 release orchestration；不得运行 reverse preflight，因为合法的
-   B-only 数据形态本就可能不兼容旧约束。回到 pre-0071 必须另行审批停服、reverse preflight、
+   B-only 数据形态本就可能不兼容旧约束。回到 pre-0072 必须另行审批停服、reverse preflight、
    反向 migration 与旧 image 恢复流程，不得根据 receipt 缺失或“尚未 apply”猜测兼容。
-4. Release B 关闭态部署只应用 `0071` 并验证 schema/code；不得调用 `--prepare-v2`、
+4. Release B 关闭态部署按顺序应用至 `0072` 并验证 schema/code；不得调用 `--prepare-v2`、
    `--apply-v2` 或启用 historical write/network flags。81 mismatch 保持不变是预期。
 5. 后续另行授权的数据阶段依次为 `--prepare-v2`、人工 overlay、`--prepare-reviewed-v2`、独立 v2
    approval、maintenance/live gate、`--apply-v2`、`--verify-v2`。回滚只接受同 receipt 的

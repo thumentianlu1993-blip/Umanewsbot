@@ -271,7 +271,7 @@ export RELEASE_B_PREFLIGHT_ARTIFACT_PATH
 unset EXPECTED_PRODUCTION_DB_IDENTITY_SHA256
 if [ "$ATTEMPT_MODE" = "not-required" ]; then
   PREFLIGHT_ACTION=rollback
-  EXPECTED_LEAF=stable.0071_historical_calendar_release_b
+  EXPECTED_LEAF=stable.0072_add_extended_racing_regions
 else
   PREFLIGHT_ACTION=forward-resume
   EXPECTED_LEAF=""

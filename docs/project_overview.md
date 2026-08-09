@@ -1,5 +1,9 @@
 # 项目总览
 
+当前八地区链路代码已随 PR `#83` 进入生产候选并应用 migration `0072`；首次发布暴露的受审迁移
+最终叶仍停在 `0071`，正式 release completion 因而 fail-closed。服务已用同一候选镜像安全恢复，
+但只有最终叶合同修复通过测试、复核、合并并重新完成发布后，才可进入新增地区 artifact 与 G3 数据阶段。
+
 ## 2026-08-09 八地区单年度分级赛参赛马补全链路（实现中）
 
 - 既有 UmaFans 五地区 artifact 与 TJCIS 官方年度 G1/G2/G3 目录分层；新增地区的实际参赛事实只接受
@@ -54,8 +58,8 @@ approve 会从冻结的双/三源身份重新计算共识，不能通过修改�
   实时 maintenance gate、独立 reviewer approval、receipt、verifier 和 exact rollback 控制。
 - deploy/rollback 在 DDL 前用候选/当前 Release B image 运行只读 schema preflight；commit、image、
   migration leaf 与目标数据库 identity 任一不匹配均在应用停服前拒绝。
-- 通用 rollback 只处理保留 `0071` 的 B→B 目标，并用目标 image 做 forward preflight；pre-0071
-  reverse migration 是独立停服恢复流程，不与普通回滚混用。
+- 通用 rollback 只处理以 `0072` 为精确终态、同时保留受审 `0071` 依赖字节的目标，并用目标 image
+  做 forward preflight；pre-0072 reverse migration 是独立停服恢复流程，不与普通回滚混用。
 - schema preflight 的 leaf 来自目标库已应用的 `django_migrations`，不是候选代码图；v2 重复边界、
   target 审计、published canonical path 与 artifact no-replace 均按独立审核结论 fail closed。
 - exact duplicate 同时绑定来源身份、核心字段和 runner/result；canonicalize 前必须进入确定性的
@@ -83,9 +87,10 @@ approve 会从冻结的双/三源身份重新计算共识，不能通过修改�
   override 的 path/mode/content SHA，resume 以 nofollow fd 在 lock 前和锁内双验后才进入控制面。
   completed receipt 以 target OID、初始 artifact SHA、state SHA 标识 attempt；no-clobber/idempotent
   completion 允许未来新 attempt 再次回滚同一 target，同时 active state 单槽继续禁止并发。
-- B→B rollback 目标资格现由 target commit 内 0071 的 exact bytes SHA 与 dependency contract 共同决定，
-  仅允许显式受审的 legacy/repaired 两个兼容版本；路径存在不再足够。receipt schema preflight 同时把
-  PK、两个 unique、FK 及四个 backing/pattern index 当作完整集合校验，额外对象也会 fail closed。
+- B→B rollback 目标资格现同时绑定 target commit 内 `0071` 与 `0072` 的 exact bytes SHA 和 dependency
+  contract：`0071` 仅允许显式受审的 legacy/repaired 两个兼容版本，`0072` 必须为唯一受审终态；路径
+  存在不再足够。receipt schema preflight 同时把 PK、两个 unique、FK 及四个 backing/pattern index
+  当作完整集合校验，额外对象也会 fail closed。
 - rollback 控制面与静态资源写入现明确分权：冻结的 control image 只负责 schema/migration/intent，
   artifact 绑定的 target image 通过仅改 image 的 Compose override 写同一 static volume，成功后 control
   image 才完成 intent 并允许启动服务；失败沿用同 control-state 精确重试。normal deploy 不拆分。

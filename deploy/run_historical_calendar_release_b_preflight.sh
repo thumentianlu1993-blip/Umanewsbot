@@ -55,6 +55,9 @@ case "$EXPECTED_MIGRATION_LEAF_SET" in
   stable.0071_historical_calendar_release_b)
     leaf_args="--expected-migration-leaf-set=stable.0071_historical_calendar_release_b"
     ;;
+  stable.0072_add_extended_racing_regions)
+    leaf_args="--expected-migration-leaf-set=stable.0072_add_extended_racing_regions"
+    ;;
   *) echo "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET must be one complete reviewed leaf set" >&2; exit 1 ;;
 esac
 RELEASE_B_PREFLIGHT_ACTION="${RELEASE_B_PREFLIGHT_ACTION:-}"

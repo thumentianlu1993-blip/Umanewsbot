@@ -7,6 +7,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 
 from stable.services.historical_calendar_release_b_handoff import (
+    FINAL_LEAF_SET,
     collect_handoff_preflight,
     collect_initial_install_preflight,
     find_completed_restricted_recovery_marker,
@@ -65,14 +66,13 @@ class Command(BaseCommand):
             )
             result = {
                 "ok": completed is not None
-                and live["migration_leaf_set"]
-                == ["stable.0071_historical_calendar_release_b"],
+                and live["migration_leaf_set"] == list(FINAL_LEAF_SET),
                 "errors": [] if completed is not None else ["marker_missing"],
                 "completed_marker": str(completed) if completed else None,
             }
-        result["completion_required"] = live["migration_leaf_set"] == [
-            "stable.0071_historical_calendar_release_b"
-        ]
+        result["completion_required"] = (
+            live["migration_leaf_set"] == list(FINAL_LEAF_SET)
+        )
         result["live_ok"] = live["ok"]
         result["ok"] = result["ok"] and live["ok"]
         self.stdout.write(json.dumps(result, ensure_ascii=False, sort_keys=True))

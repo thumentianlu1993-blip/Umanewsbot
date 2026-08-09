@@ -32,12 +32,13 @@ M0068 = ("stable", "0068_race_data_sync_pipeline_a_field_audit")
 M0069 = ("stable", "0069_race_data_sync_pipeline_a_ledger_guards")
 M0070 = ("stable", "0070_horse_identity_evidence_commit_receipt")
 M0071 = ("stable", "0071_historical_calendar_release_b")
+M0072 = ("stable", "0072_add_extended_racing_regions")
 
 
 def _stable_plan(loader: MigrationLoader, applied: set[tuple[str, str]]) -> list[str]:
     return [
         name
-        for app, name in loader.graph.forwards_plan(M0071)
+        for app, name in loader.graph.forwards_plan(M0072)
         if app == "stable" and (app, name) not in applied and name >= "0068"
     ]
 
@@ -62,17 +63,18 @@ class MigrationHistoryRepairGraphRedTests(TestCase):
 
         self.assertEqual(
             _stable_plan(loader, applied),
-            [M0068[1], M0069[1], M0071[1]],
+            [M0068[1], M0069[1], M0071[1], M0072[1]],
         )
         self.assertNotIn(M0070[1], _stable_plan(loader, applied))
 
     def test_recovery_leaf_sets_have_exact_forward_plans(self):
         loader = MigrationLoader(connection, ignore_no_migrations=True)
         cases = (
-            ({M0067, M0070}, [M0068[1], M0069[1], M0071[1]]),
-            ({M0067, M0068, M0070}, [M0069[1], M0071[1]]),
-            ({M0067, M0068, M0069, M0070}, [M0071[1]]),
-            ({M0067, M0068, M0069, M0070, M0071}, []),
+            ({M0067, M0070}, [M0068[1], M0069[1], M0071[1], M0072[1]]),
+            ({M0067, M0068, M0070}, [M0069[1], M0071[1], M0072[1]]),
+            ({M0067, M0068, M0069, M0070}, [M0071[1], M0072[1]]),
+            ({M0067, M0068, M0069, M0070, M0071}, [M0072[1]]),
+            ({M0067, M0068, M0069, M0070, M0071, M0072}, []),
         )
         for applied, expected in cases:
             with self.subTest(applied=sorted(applied)):
@@ -118,7 +120,9 @@ class MigrationHistoryRepairLeafSetRedTests(TestCase):
             payload["migration_leaf_set"],
             [f"{M0068[0]}.{M0068[1]}", f"{M0070[0]}.{M0070[1]}"],
         )
-        self.assertEqual(payload["migration_plan"], [M0069[1], M0071[1]])
+        self.assertEqual(
+            payload["migration_plan"], [M0069[1], M0071[1], M0072[1]]
+        )
         self.assertTrue(payload["migration_state_allowed"])
 
     def test_illegal_partial_leaf_set_fails_closed(self):
@@ -219,12 +223,12 @@ class MigrationHistoryRepairBaselineRedTests(SimpleTestCase):
         for leaf_set in repair_states:
             self.assertEqual(production_audit_policy_for_leaf_set(leaf_set), "reviewed-static")
         self.assertEqual(
-            production_audit_policy_for_leaf_set([f"{M0071[0]}.{M0071[1]}"]),
+            production_audit_policy_for_leaf_set([f"{M0072[0]}.{M0072[1]}"]),
             "live-handoff",
         )
         self.assertEqual(
             production_audit_policy_for_leaf_set(
-                [f"{M0071[0]}.{M0071[1]}"], repair_intent=True
+                [f"{M0072[0]}.{M0072[1]}"], repair_intent=True
             ),
             "reviewed-static",
         )
@@ -236,7 +240,7 @@ class MigrationHistoryRepairBaselineRedTests(SimpleTestCase):
 
         initial = {
             "ok": True,
-            "migration_leaf_set": [f"{M0071[0]}.{M0071[1]}"],
+            "migration_leaf_set": [f"{M0072[0]}.{M0072[1]}"],
         }
         enforced = {**initial, "production_audit_ok": False}
         with patch(
@@ -256,7 +260,7 @@ class MigrationHistoryRepairBaselineRedTests(SimpleTestCase):
 
         initial = {
             "ok": True,
-            "migration_leaf_set": [f"{M0071[0]}.{M0071[1]}"],
+            "migration_leaf_set": [f"{M0072[0]}.{M0072[1]}"],
             "production_audit_live": None,
         }
         live = {"receipt_count": 9, "receipt_rows_sha256": "a" * 64}
@@ -313,11 +317,13 @@ class MigrationHistoryRepairBaselineRedTests(SimpleTestCase):
         state = {
             "applied_nodes": [f"{M0070[0]}.{M0070[1]}"],
             "migration_leaf_set": [f"{M0070[0]}.{M0070[1]}"],
-            "migration_plan": [M0068[1], M0069[1], M0071[1]],
+            "migration_plan": [M0068[1], M0069[1], M0071[1], M0072[1]],
             "unknown_applied_migrations": [],
             "migration_graph_known": True,
             "migration_state_allowed": True,
-            "expected_plan_for_leaf_set": [M0068[1], M0069[1], M0071[1]],
+            "expected_plan_for_leaf_set": [
+                M0068[1], M0069[1], M0071[1], M0072[1]
+            ],
         }
         catalog_state = {
             "ok": False,
@@ -483,7 +489,7 @@ class MigrationHistoryRepairBaselineRedTests(SimpleTestCase):
             "applied_nodes": ["stable.0067_historical_calendar_release_a"],
             "migration_leaf_set": ["stable.0067_historical_calendar_release_a"],
             "migration_plan": [
-                M0070[1], M0068[1], M0069[1], M0071[1]
+                M0070[1], M0068[1], M0069[1], M0071[1], M0072[1]
             ],
             "unknown_applied_migrations": [],
             "migration_graph_known": True,
@@ -1130,7 +1136,7 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
         }
         live = {
             "ok": True,
-            "migration_leaf_set": [f"{M0071[0]}.{M0071[1]}"],
+            "migration_leaf_set": [f"{M0072[0]}.{M0072[1]}"],
             "database_identity_sha256": "d" * 64,
         }
         with TemporaryDirectory() as tmp:
@@ -1246,7 +1252,7 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
     def test_completion_rejects_a_different_live_database_identity(self):
         live = {
             "ok": True,
-            "migration_leaf_set": [f"{M0071[0]}.{M0071[1]}"],
+            "migration_leaf_set": [f"{M0072[0]}.{M0072[1]}"],
             "database_identity_sha256": "0" * 64,
         }
         with patch(
@@ -1289,7 +1295,7 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
     def test_required_completion_cannot_noop_after_marker_deletion(self):
         live = {
             "ok": True,
-            "migration_leaf_set": [f"{M0071[0]}.{M0071[1]}"],
+            "migration_leaf_set": [f"{M0072[0]}.{M0072[1]}"],
             "database_identity_sha256": "d" * 64,
         }
         with TemporaryDirectory() as tmp, patch(
@@ -1751,7 +1757,7 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
             authorize_handoff_action,
         )
 
-        final = [f"{M0071[0]}.{M0071[1]}"]
+        final = [f"{M0072[0]}.{M0072[1]}"]
         for action in ("deploy", "manual-release", "rollback"):
             with self.subTest(action=action):
                 self.assertFalse(
@@ -1784,7 +1790,7 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
     def test_create_handoff_command_cannot_bypass_active_final_marker(self):
         live = {
             "ok": True,
-            "migration_leaf_set": [f"{M0071[0]}.{M0071[1]}"],
+            "migration_leaf_set": [f"{M0072[0]}.{M0072[1]}"],
             "database_identity_sha256": "d" * 64,
         }
         with TemporaryDirectory() as tmp:
@@ -1833,7 +1839,7 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
                 binding=binding, leaf_set=marker_leaf
             )
             publish_restricted_recovery_marker(path=path, marker=marker)
-            final = [f"{M0071[0]}.{M0071[1]}"]
+            final = [f"{M0072[0]}.{M0072[1]}"]
             self.assertTrue(
                 verify_restricted_marker_for_live_state(
                     path=path, expected_binding=binding, live_leaf_set=final
@@ -2208,3 +2214,15 @@ class MigrationHistoryRepairOperationsContractRedTests(TestCase):
         self.assertIn('$LOCK_DIR/token_sha256', lock)
         self.assertIn('/token_sha256', preflight)
         self.assertIn('/token_sha256', release)
+
+    def test_release_b_preflight_allowlists_current_0072_leaf(self):
+        preflight = (
+            ROOT / "deploy/run_historical_calendar_release_b_preflight.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "stable.0072_add_extended_racing_regions)", preflight
+        )
+        self.assertIn(
+            "--expected-migration-leaf-set=stable.0072_add_extended_racing_regions",
+            preflight,
+        )
