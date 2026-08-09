@@ -31,11 +31,15 @@ class OfficialGradedResultRunnerTests(unittest.TestCase):
                     "region": "germany",
                     "country": "germany",
                     "grade": "G1",
+                    "distance": "2000",
                     "race_name": "Test Preis",
                     "local_date": "2025-06-01",
                 }
             ],
         }
+        for race in payload["races"]:
+            race.setdefault("distance", "2000")
+            race.setdefault("race_name", "Test Race")
         path = root / "manifest.json"
         path.write_text(json.dumps(payload), encoding="utf-8")
         return path, digest(path)
@@ -153,6 +157,113 @@ class OfficialGradedResultRunnerTests(unittest.TestCase):
             manifest, manifest_sha = self.manifest(root, [race, duplicate])
             with self.assertRaisesRegex(runner.RunnerError, "duplicated"):
                 runner.load_manifest(manifest, expected_sha256=manifest_sha)
+
+    def test_australia_allows_distinct_races_on_one_official_meeting_page(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            url = "https://www.racingaustralia.horse/FreeFields/Results.aspx?Key=2025Apr05%2CNSW%2CRoyal+Randwick"
+            races = [
+                {
+                    "race_key": "au-one",
+                    "provider": "au_racing_australia",
+                    "result_url": url,
+                    "region": "australia",
+                    "country": "australia",
+                    "grade": "G3",
+                    "distance": "1100",
+                    "race_name": "Kindergarten Stakes",
+                    "source_race_name": "WIDDEN KINDERGARTEN STAKES",
+                    "local_date": "2025-04-05",
+                },
+                {
+                    "race_key": "au-two",
+                    "provider": "au_racing_australia",
+                    "result_url": url,
+                    "region": "australia",
+                    "country": "australia",
+                    "grade": "G3",
+                    "distance": "2000",
+                    "race_name": "Adrian Knox Stakes",
+                    "source_race_name": "TAB ADRIAN KNOX STAKES",
+                    "local_date": "2025-04-05",
+                },
+            ]
+            manifest, manifest_sha = self.manifest(root, races)
+            normalized, _ = runner.load_manifest(manifest, expected_sha256=manifest_sha)
+            self.assertEqual(len(normalized["races"]), 2)
+
+            races[1]["source_race_name"] = "widden-kindergarten stakes"
+            races[1]["distance"] = races[0]["distance"]
+            manifest, manifest_sha = self.manifest(root, races)
+            with self.assertRaisesRegex(runner.RunnerError, "duplicated"):
+                runner.load_manifest(manifest, expected_sha256=manifest_sha)
+
+    def test_qrec_bootstrap_uses_ephemeral_public_frontend_config(self):
+        class Response:
+            def __init__(self, url, body):
+                self.url = url
+                self.body = body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def geturl(self):
+                return self.url
+
+            def read(self, _limit):
+                return self.body
+
+        responses = [
+            Response("https://qrec.gov.qa/", b'<script src="/_next/static/chunks/pages/_app-test.js"></script>'),
+            Response("https://qrec.gov.qa/_next/static/chunks/pages/_app-test.js", b'NEXT_PUBLIC_AUTH_GRANT_TOKEN||"grant-value";NEXT_PUBLIC_API_KEY||"key-value"'),
+            Response("https://api.qrec.gov.qa/v1/qrec/token/generate", b'{"access_token":"temporary-token"}'),
+        ]
+        class Opener:
+            def __init__(self):
+                self.responses = iter(responses)
+                self.call_count = 0
+
+            def open(self, _request, timeout):
+                self.call_count += 1
+                self.timeout = timeout
+                return next(self.responses)
+
+        opener = Opener()
+        runner.QREC_AUTH_CACHE.clear()
+        try:
+            with mock.patch.object(runner.request, "build_opener", return_value=opener):
+                headers = runner._qrec_headers(timeout=3)
+                cached = runner._qrec_headers(timeout=3)
+            self.assertEqual(headers["apiToken"], "temporary-token")
+            self.assertEqual(cached, headers)
+            self.assertEqual(opener.call_count, 3)
+        finally:
+            runner.QREC_AUTH_CACHE.clear()
+
+    def test_qrec_bootstrap_redirects_fail_closed_before_credentials_can_follow(self):
+        handler = runner.QrecBootstrapRedirectHandler()
+        home = runner.request.Request("https://qrec.gov.qa/")
+        with self.assertRaisesRegex(runner.RunnerError, "outside official host"):
+            handler.redirect_request(home, None, 302, "Found", {}, "https://example.com/app.js")
+        token = runner.request.Request("https://api.qrec.gov.qa/v1/qrec/token/generate")
+        with self.assertRaisesRegex(runner.RunnerError, "token endpoint redirected"):
+            handler.redirect_request(token, None, 302, "Found", {}, "https://qrec.gov.qa/")
+        result_handler = runner.StrictRedirectHandler("qa_qrec", 2025)
+        data = runner.request.Request(
+            "https://api.qrec.gov.qa/v1/qrec/race/data?pageaction=jsonracetab&raceid=27059&lang=en&racedate=2025-12-20"
+        )
+        with self.assertRaisesRegex(runner.RunnerError, "result endpoint redirected"):
+            result_handler.redirect_request(
+                data,
+                None,
+                302,
+                "Found",
+                {},
+                "https://api.qrec.gov.qa/v1/qrec/race/data?pageaction=jsonracetab&raceid=99999&lang=en&racedate=2025-12-20",
+            )
 
     def test_manifest_requires_review_binding_and_same_year_local_date(self):
         with TemporaryDirectory() as temporary:

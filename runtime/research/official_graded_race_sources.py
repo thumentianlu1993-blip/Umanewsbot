@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import asdict, dataclass
+from datetime import date
 from html import unescape
 from html.parser import HTMLParser
 from typing import Any, Callable
-from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
 
 POS = re.compile(r"^(\d+)(?:st|nd|rd|th|\.)?$", re.I)
 HORSE_ID = re.compile(r"/hors?e?s?/([^/?#]+)", re.I)
@@ -31,6 +32,9 @@ POLICIES = {
     "qa_qrec": Policy("middle_east", "qatar", ("www.qrec.gov.qa", "qrec.gov.qa"), 500),
     "bh_btc": Policy("middle_east", "bahrain", ("bahrainturfclub.com", "www.bahrainturfclub.com"), 500),
 }
+DATA_HOSTS = {
+    provider: policy.hosts for provider, policy in POLICIES.items()
+} | {"qa_qrec": ("api.qrec.gov.qa",)}
 
 
 class OfficialSourceError(ValueError):
@@ -49,6 +53,25 @@ def validate_provider_url(provider: str, url: str, *, year: int) -> str:
         raise OfficialSourceError(f"provider URL is outside allowlist: {provider}")
     if str(year) not in url:
         raise OfficialSourceError(f"provider URL lacks requested year: {provider}")
+    return parsed.geturl()
+
+
+def validate_data_url(provider: str, url: str, *, year: int) -> str:
+    if provider not in DATA_HOSTS:
+        raise OfficialSourceError(f"unknown provider: {provider}")
+    parsed = urlparse(clean(url))
+    if parsed.scheme != "https" or parsed.hostname not in DATA_HOSTS[provider]:
+        raise OfficialSourceError(f"provider data URL is outside allowlist: {provider}")
+    if provider == "qa_qrec":
+        race_date = clean((parse_qs(parsed.query).get("racedate") or [""])[0])
+        try:
+            parsed_race_date = date.fromisoformat(race_date)
+        except ValueError as exc:
+            raise OfficialSourceError("provider data URL has invalid race date: qa_qrec") from exc
+        if parsed_race_date.year != year:
+            raise OfficialSourceError("provider data URL has requested-year drift: qa_qrec")
+    elif str(year) not in url:
+        raise OfficialSourceError(f"provider data URL lacks requested year: {provider}")
     return parsed.geturl()
 
 
@@ -73,6 +96,31 @@ def derive_data_url(provider: str, page_url: str, *, year: int) -> str:
         if not match:
             raise OfficialSourceError("invalid JCSA results page path")
         return f"https://www.jcsa.sa/api/meeting-info/en/{match[1]}/{match[2]}/Results/True"
+    if provider == "qa_qrec":
+        if parsed.path != "/race-calendar":
+            raise OfficialSourceError("invalid QREC results page path")
+        query = parse_qs(parsed.query)
+        race_id = clean((query.get("raceid") or [""])[0])
+        race_date = clean((query.get("racedate") or [""])[0])
+        if not race_id.isdigit() or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", race_date):
+            raise OfficialSourceError("invalid QREC race identity")
+        try:
+            parsed_race_date = date.fromisoformat(race_date)
+        except ValueError as exc:
+            raise OfficialSourceError("invalid QREC race date") from exc
+        if parsed_race_date.year != year:
+            raise OfficialSourceError("QREC race date has requested-year drift")
+        return (
+            "https://api.qrec.gov.qa/v1/qrec/race/data?"
+            + urlencode(
+                {
+                    "pageaction": "jsonracetab",
+                    "raceid": race_id,
+                    "lang": "en",
+                    "racedate": race_date,
+                }
+            )
+        )
     return parsed.geturl()
 
 
@@ -113,7 +161,7 @@ def pos(value: str):
 NONSTARTER_STATUSES = {"NR", "SCR", "SCRATCHED", "WD", "WITHDRAWN"}
 DISQUALIFIED_STATUSES = {"DQ", "DSQ", "DISQUALIFIED"}
 DID_NOT_FINISH_STATUSES = {
-    "BD", "BROUGHT DOWN", "DNF", "F", "FELL", "PU", "PULLED UP",
+    "BD", "BROUGHT DOWN", "DID NOT FINISH", "DNF", "F", "FELL", "PU", "PULLED UP",
     "RO", "RAN OUT", "UR", "UNSEATED RIDER",
 }
 
@@ -162,24 +210,71 @@ def header_parser(provider: str, html: str, aliases: dict[str, tuple[str,...]], 
         result=[]
         for raw in table[1:]:
             offset=max(0,len(raw)-len(heads)); values={k:raw[i+offset] for k,i in indexes.items() if i+offset<len(raw)}
+            if not {"position", "horse"} <= values.keys():
+                continue
             item=builder(values)
             if item: result.append(item)
         if result: return finish(provider,result)
     raise OfficialSourceError(f"{provider} result table schema not found")
 
 
-def parse_au(html):
+def canonical_au_selector_identity(race_name: str, distance: str, grade: str) -> tuple[str, str, str]:
+    return (
+        re.sub(r"[^A-Z0-9]+", "", clean(race_name).upper()),
+        clean(distance),
+        clean(grade).upper(),
+    )
+
+
+def parse_au(html, *, race_name: str = "", distance: str = "", grade: str = ""):
     aliases={"position":("Finish","Place"),"number":("No.","No"),"horse":("Horse",),"trainer":("Trainer",),"jockey":("Jockey",),"margin":("Margin",)}
     def build(v):
         result=placing(v["position"].text)
         return None if result is None else row("au_racing_australia",result[0],v["horse"].text,participant_status=result[1],number=v.get("number",Cell("",[])).text,cell=v["horse"],jockey=v.get("jockey",Cell("",[])).text,trainer=v.get("trainer",Cell("",[])).text,margin=v.get("margin",Cell("",[])).text)
-    return header_parser("au_racing_australia",html,aliases,build)
+    if not race_name:
+        return header_parser("au_racing_australia",html,aliases,build)
+    candidates = []
+    for segment in re.split(r'(?=<a\s+name=["\']Race\d+["\'])', html, flags=re.I):
+        title_match = re.search(
+            r'<table[^>]+class=["\']race-title["\'][^>]*>(.*?)</table>',
+            segment,
+            re.I | re.S,
+        )
+        if not title_match:
+            continue
+        heading_match = re.search(r"<(?:th|td)[^>]*>(.*?)</(?:th|td)>", title_match.group(1), re.I | re.S)
+        if not heading_match:
+            continue
+        heading = clean(re.sub(r"<[^>]+>", " ", unescape(heading_match.group(1))))
+        identity_match = re.fullmatch(
+            r"Race\s+\d+\s*-\s*\d{1,2}:\d{2}(?:AM|PM)\s+(.*?)\s+\((\d+)\s+METRES\)(?:\s+Times displayed.*)?",
+            heading,
+            re.I,
+        )
+        if not identity_match:
+            continue
+        actual_name, actual_distance = identity_match.groups()
+        if distance and actual_distance != str(distance):
+            continue
+        if grade and not re.search(rf"\bGROUP\s+{re.escape(grade[-1])}\b", segment, re.I):
+            continue
+        expected_name = canonical_au_selector_identity(race_name, distance, grade)[0]
+        actual_name_identity = canonical_au_selector_identity(actual_name, distance, grade)[0]
+        if expected_name != actual_name_identity:
+            continue
+        candidates.append((actual_name, segment))
+    candidates.sort(key=lambda item: item[0])
+    if not candidates:
+        raise OfficialSourceError("au_racing_australia target race was not found")
+    if len(candidates) > 1:
+        raise OfficialSourceError("au_racing_australia target race is ambiguous")
+    return header_parser("au_racing_australia", candidates[0][1], aliases, build)
 
 
 def parse_de(html):
     aliases={"position":("Pl.",),"horse":("Name",),"number":("Nr.",),"margin":("Abstand",),"trainer":("Trainer",),"jockey":("Reiter",)}
     def build(v):
-        result=placing(v["position"].text)
+        result=(None, "did_not_finish") if clean(v["position"].text) == "-" else placing(v["position"].text)
         return None if result is None else row("de_deutscher_galopp",result[0],v["horse"].text,participant_status=result[1],number=v["number"].text,cell=v["horse"],jockey=v["jockey"].text,trainer=v["trainer"].text,margin=v["margin"].text)
     return header_parser("de_deutscher_galopp",html,aliases,build)
 
@@ -206,7 +301,8 @@ def parse_sa(html):
             # JCSA desktop rows insert a silk cell after Place although the header
             # represents it through colspan, so later columns are shifted by one.
             if len(cells) < 8: continue
-            result_status=placing(cells[0].text); shift=1 if len(cells)>len(table[0]) else 0
+            result_status=(None, "did_not_finish") if clean(cells[0].text) == "-" else placing(cells[0].text)
+            shift=1 if len(cells)>len(table[0]) else 0
             horse=cells[1+shift]; text=horse.text
             if result_status is None: continue
             jockey=re.search(r"\sJ\s(.*?)\sT\s",text); trainer=re.search(r"\sT\s(.*?)\sO\s",text)
@@ -253,6 +349,15 @@ def parse_bh(html):
 PARSERS={"au_racing_australia":parse_au,"de_deutscher_galopp":parse_de,"uae_era":parse_era,"sa_jcsa":parse_sa,"qa_qrec":parse_qa,"bh_btc":parse_bh}
 
 
-def parse_official_results(provider: str, payload: str):
+def parse_official_results(
+    provider: str,
+    payload: str,
+    *,
+    race_name: str = "",
+    distance: str = "",
+    grade: str = "",
+):
     if provider not in PARSERS: raise OfficialSourceError(f"unknown provider: {provider}")
+    if provider == "au_racing_australia":
+        return parse_au(payload, race_name=race_name, distance=distance, grade=grade)
     return PARSERS[provider](payload)

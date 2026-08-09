@@ -29,7 +29,7 @@ from race_event_source_cache import write_source_cache  # noqa: E402
 BASE_URL = "https://www.tjcis.com"
 PAST_EDITIONS_URL = f"{BASE_URL}/default.asp?content=PASSYR"
 CURRENT_EDITION_URL = f"{BASE_URL}/default.asp?content=ICS"
-PARSER_VERSION = "2026.08.1"
+PARSER_VERSION = "2026.08.2"
 REGION_ADAPTERS = {
     "japan": "japan_official_catalog",
     "hong_kong": "hkjc_official_catalog",
@@ -112,7 +112,7 @@ SUPPLEMENT_BOUNDARY_RE = re.compile(
 )
 SOURCE_CONFLICT_POLICY = "explicit_graded_rows_with_regional_official_corrections"
 UNSUPPORTED_SECTION_RE = re.compile(
-    r"PT(?:I|II|IV)[—-](?:ARGENTINA|BRAZIL|CANADA|CHILE|CZECHREPUBLIC|INDIA|IRE(?:LAND)?(?:JUMPS?)?|IRISHJUMPS|ITALY|ITALIANJUMPS|KOREA|MACAU|MALAYSIA|NEWZEALAND(?:JUMPS)?|PANAMA|PERU|PUERTORICO|SCANDINAVIA|SINGAPORE|SOUTHAFRICA|SPAIN|SWITZERLANDJUMPS|URUGUAY|VENEZUELA|INDEX)"
+    r"(?:PT|PART)(?:I|II|IV)[—-](?:ARGENTINA|BRAZIL|CANADA|CHILE|CZECHREPUBLIC|INDIA|IRE(?:LAND)?(?:JUMPS?)?|IRISHJUMPS|ITALY|ITALIANJUMPS|KOREA|MACAU|MALAYSIA|NEWZEALAND(?:JUMPS)?|PANAMA|PERU|PUERTORICO|SCANDINAVIA|SINGAPORE|SOUTHAFRICA|SPAIN|SWITZERLANDJUMPS|URUGUAY|VENEZUELA|INDEX)"
 )
 UNSUPPORTED_COUNTRY_TITLES = {
     "ARGENTINA",
@@ -250,7 +250,7 @@ def canonical_series_name(name: str) -> str:
 
 def _page_context(text: str) -> tuple[str | None, str]:
     upper = unicodedata.normalize("NFKC", text).upper().replace(" ", "")
-    if re.search(r"PTIV[—-]INDEX", upper):
+    if re.search(r"(?:PT|PART)(?:I|II|IV)[—-]INDEX", upper):
         return None, "flat"
     if "JUMPS" in upper or "JUMPRACES" in upper:
         if "GBJUMPS" in upper or "GREATBRITAINJUMPS" in upper or "GREATBRITAINJUMPRACES" in upper:

@@ -183,6 +183,17 @@ Pt I—OTHER RACES
             self.assertEqual({row["country"] for row in rows}, {"bahrain", "saudi_arabia"})
             self.assertEqual(len(rows), 2)
 
+    def test_part_i_index_resets_previous_supported_country(self):
+        pages = [
+            "Saudi Cup G1 .... 20,000,000 .... 4up .... 1800 D .... King Abdulaziz\nPt I—OTHER RACES\nKingdom of SAUDI ARABIA",
+            "Part I - INDEX\nRACE PAGE RACE PAGE\nAmerican Turf S. G1 .... 1-73\nAndrés S. Torres G3 .... 1-1",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=2025)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Saudi Cup"])
+        self.assertEqual(rows[0]["country"], "saudi_arabia")
+
     def test_qatar_section_between_unsupported_countries_is_preserved(self):
         page = """
 Pt II—OTHER
