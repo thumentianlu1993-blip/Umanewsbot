@@ -45,7 +45,7 @@ from urllib.request import (
 
 SCHEMA_VERSION = 1
 PARSER_VERSION = "graded-race-participants-v1"
-TOOL_POLICY_VERSION = "year-region-status-name-v1"
+TOOL_POLICY_VERSION = "year-region-status-name-v2"
 SAFE_STOP_EXIT_CODE = 75
 PROFILE_SHARD_COUNT = 4
 REQUEST_BUDGETS = {"races": 5000, "profiles": 2000}
@@ -1391,9 +1391,16 @@ def build_horse_name_record(
                 break
     if not names["name_en"]:
         for item in occurrences:
-            candidate = normalize_space(item.get("original_name"))
-            if LATIN_RE.search(candidate) and not HAN_RE.search(candidate) and not KANA_RE.search(candidate):
-                names["name_en"] = candidate
+            for field in ("original_name", "horse_display_name"):
+                candidate = normalize_space(item.get(field))
+                if (
+                    LATIN_RE.search(candidate)
+                    and not HAN_RE.search(candidate)
+                    and not KANA_RE.search(candidate)
+                ):
+                    names["name_en"] = candidate
+                    break
+            if names["name_en"]:
                 break
     resolution = normalize_space(
         profile.get("resolution_state") or profile.get("profile_resolution_state")

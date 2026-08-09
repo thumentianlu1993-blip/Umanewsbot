@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -220,7 +221,7 @@ class P0HorseCandidateExtractionTests(TestCase):
             grade_text=grade,
             normalized_grade=grade,
             surface=RaceEventSurface.TURF,
-            local_date=f"{year}-06-01",
+            local_date=date(year, 6, 1),
             source_refs={
                 "detail_source": {
                     "source_url": f"https://example.com/races/{slug}",
@@ -334,6 +335,11 @@ class P0HorseCandidateExtractionTests(TestCase):
         self.assertEqual(
             {row["identity_status"] for row in us_candidates},
             {"needs_identity_enrichment"},
+        )
+        self.assertEqual(uk_candidate["mapping_disposition"], "create_new")
+        self.assertEqual(
+            {row["mapping_disposition"] for row in us_candidates},
+            {"blocked"},
         )
         self.assertEqual(
             artifact["summary"]["regions"][RacingRegion.UNITED_STATES]["sample_count"],
@@ -489,6 +495,7 @@ class P0HorseCandidateExtractionTests(TestCase):
         self.assertEqual(candidate["dam_name"], "Known Dam")
         self.assertEqual(candidate["birth_year"], 2021)
         self.assertEqual(candidate["review_status"], "ready_for_profile_resolution")
+        self.assertEqual(candidate["mapping_disposition"], "create_new")
 
         third_event = self._event(
             region=RacingRegion.FRANCE,
@@ -563,6 +570,42 @@ class P0HorseCandidateExtractionTests(TestCase):
                 stdout=StringIO(),
             )
 
+    def test_unique_existing_provider_identity_is_bind_existing(self):
+        term = TermEntry.objects.create(
+            term_type=TermType.HORSE,
+            source_language=SourceLanguage.ENGLISH,
+            source_ja="Bound Horse",
+            racing_region=RacingRegion.UNITED_KINGDOM,
+        )
+        profile = HorseProfile.objects.create(
+            primary_term=term,
+            original_name="Bound Horse",
+            racing_region=RacingRegion.UNITED_KINGDOM,
+            source_refs={"horse_identity_keys": ["sporting_life:4242"]},
+        )
+        event = self._event(
+            region=RacingRegion.UNITED_KINGDOM,
+            year=2025,
+            slug="existing-provider-identity",
+        )
+        self._participant(
+            event,
+            horse_name="Bound Horse",
+            horse_number="1",
+            source_kind="sporting_life_result_detail",
+            horse_id="4242",
+        )
+
+        artifact = build_p0_participant_candidate_artifact(
+            regions=[RacingRegion.UNITED_KINGDOM],
+            sample_per_region=10,
+            year=2025,
+            actual_starts_only=True,
+        )
+
+        self.assertEqual(artifact["candidates"][0]["matched_profile_ids"], [profile.id])
+        self.assertEqual(artifact["candidates"][0]["mapping_disposition"], "bind_existing")
+
     def test_external_and_pedigree_evidence_for_different_profiles_is_a_conflict(self):
         external_term = TermEntry.objects.create(
             term_type=TermType.HORSE,
@@ -624,6 +667,7 @@ class P0HorseCandidateExtractionTests(TestCase):
             "external_pedigree_identity_conflict",
         )
         self.assertEqual(candidate["review_status"], "identity_conflict")
+        self.assertEqual(candidate["mapping_disposition"], "ambiguous")
         self.assertEqual(
             candidate["matched_profile_ids"],
             sorted([external_profile.id, pedigree_profile.id]),
@@ -685,6 +729,92 @@ class P0HorseCandidateExtractionTests(TestCase):
             candidates["Runner Withdrawn Horse"]["nonstarter_evidence_count"],
             1,
         )
+
+    def test_year_and_actual_start_scope_cover_extended_regions(self):
+        included_event = self._event(
+            region=RacingRegion.AUSTRALIA,
+            year=2025,
+            slug="australia-actual-start",
+        )
+        self._participant(
+            included_event,
+            horse_name="Official Starter",
+            horse_number="1",
+            source_kind="au_racing_australia",
+            horse_id="AU-123",
+            source_url="https://www.racingaustralia.horse/FreeFields/Results.aspx?Key=2025",
+        )
+        excluded_nonstarter = self._event(
+            region=RacingRegion.GERMANY,
+            year=2025,
+            slug="germany-withdrawn",
+        )
+        self._participant(
+            excluded_nonstarter,
+            horse_name="Withdrawn Runner",
+            horse_number="2",
+            source_kind="de_deutscher_galopp",
+            running_status=RaceRunnerStatus.WITHDRAWN,
+            source_url="https://www.deutscher-galopp.de/gr/renntage/rennen.php?datum=2025-06-01",
+        )
+        excluded_year = self._event(
+            region=RacingRegion.MIDDLE_EAST,
+            year=2024,
+            slug="uae-prior-year",
+        )
+        self._participant(
+            excluded_year,
+            horse_name="Prior Year Runner",
+            horse_number="3",
+            source_kind="uae_era",
+            source_url="https://emiratesracing.com/racecard/2024-01-01/1/results",
+        )
+
+        artifact = build_p0_participant_candidate_artifact(
+            regions=[
+                RacingRegion.AUSTRALIA,
+                RacingRegion.GERMANY,
+                RacingRegion.MIDDLE_EAST,
+            ],
+            sample_per_region=10,
+            year=2025,
+            actual_starts_only=True,
+        )
+
+        self.assertEqual(artifact["year"], 2025)
+        self.assertTrue(artifact["actual_starts_only"])
+        self.assertEqual([row["horse_name"] for row in artifact["candidates"]], ["Official Starter"])
+        self.assertEqual(artifact["candidates"][0]["identity_keys"], ["racing_australia:au-123"])
+        self.assertEqual(artifact["summary"]["eligible_event_count"], 2)
+        self.assertEqual(artifact["summary"]["participant_observation_count"], 1)
+        self.assertEqual(artifact["summary"]["mapping_dispositions"], {"create_new": 1})
+
+    def test_command_rejects_year_scope_outside_candidate_extraction(self):
+        with self.assertRaisesMessage(
+            CommandError,
+            "--year/--actual-starts-only 只能配合 --extract-candidates",
+        ):
+            call_command(
+                "p0_horse_profiles",
+                "--queue",
+                "--year",
+                "2025",
+                stdout=StringIO(),
+            )
+
+    def test_extended_regions_cannot_enter_operational_sync_or_queue(self):
+        for mode in ("--sync-sources", "--queue"):
+            with self.subTest(mode=mode), self.assertRaisesMessage(
+                CommandError,
+                "新增地区当前只允许 --extract-candidates",
+            ):
+                call_command(
+                    "p0_horse_profiles",
+                    mode,
+                    "--region",
+                    RacingRegion.AUSTRALIA,
+                    stdout=StringIO(),
+                )
 
     def test_command_writes_reviewable_artifacts_without_database_writes(self):
         event = self._event(

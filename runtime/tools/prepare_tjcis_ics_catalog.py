@@ -29,13 +29,16 @@ from race_event_source_cache import write_source_cache  # noqa: E402
 BASE_URL = "https://www.tjcis.com"
 PAST_EDITIONS_URL = f"{BASE_URL}/default.asp?content=PASSYR"
 CURRENT_EDITION_URL = f"{BASE_URL}/default.asp?content=ICS"
-PARSER_VERSION = "2026.07.4"
+PARSER_VERSION = "2026.08.1"
 REGION_ADAPTERS = {
     "japan": "japan_official_catalog",
     "hong_kong": "hkjc_official_catalog",
     "united_kingdom": "bha_pattern_catalog",
     "france": "france_galop_pattern_catalog",
     "united_states": "toba_graded_stakes_catalog",
+    "australia": "racing_australia_pattern_catalog",
+    "germany": "deutscher_galopp_pattern_catalog",
+    "middle_east": "middle_east_official_pattern_catalog",
 }
 REGION_PREFIXES = {
     "japan": "japan",
@@ -43,6 +46,13 @@ REGION_PREFIXES = {
     "united_kingdom": "united-kingdom",
     "france": "france",
     "united_states": "united-states",
+    "australia": "australia",
+    "germany": "germany",
+    "middle_east": "middle-east",
+    "united_arab_emirates": "united-arab-emirates",
+    "saudi_arabia": "saudi-arabia",
+    "qatar": "qatar",
+    "bahrain": "bahrain",
 }
 MIN_REGION_ROWS = {
     "japan": 50,
@@ -50,9 +60,13 @@ MIN_REGION_ROWS = {
     "united_kingdom": 50,
     "france": 50,
     "united_states": 300,
+    "australia": 100,
+    "germany": 15,
+    "middle_east": 10,
 }
 CSV_FIELDS = [
     "record_type",
+    "country",
     "year",
     "series_key",
     "canonical_name_original",
@@ -98,23 +112,20 @@ SUPPLEMENT_BOUNDARY_RE = re.compile(
 )
 SOURCE_CONFLICT_POLICY = "explicit_graded_rows_with_regional_official_corrections"
 UNSUPPORTED_SECTION_RE = re.compile(
-    r"PT(?:I|II|IV)[—-](?:ARGENTINA|AUSTRALIA|BRAZIL|CANADA|CHILE|CZECHREPUBLIC|GERMAN(?:Y|JUMPS)|INDIA|IRE(?:LAND)?(?:JUMPS?)?|IRISHJUMPS|ITALY|ITALIANJUMPS|KOREA|MACAU|MALAYSIA|NEWZEALAND(?:JUMPS)?|PANAMA|PERU|PUERTORICO|SCANDINAVIA|SINGAPORE|SOUTHAFRICA|SPAIN|SWITZERLANDJUMPS|UNITEDARABEMIRATES|URUGUAY|VENEZUELA|INDEX)"
+    r"PT(?:I|II|IV)[—-](?:ARGENTINA|BRAZIL|CANADA|CHILE|CZECHREPUBLIC|INDIA|IRE(?:LAND)?(?:JUMPS?)?|IRISHJUMPS|ITALY|ITALIANJUMPS|KOREA|MACAU|MALAYSIA|NEWZEALAND(?:JUMPS)?|PANAMA|PERU|PUERTORICO|SCANDINAVIA|SINGAPORE|SOUTHAFRICA|SPAIN|SWITZERLANDJUMPS|URUGUAY|VENEZUELA|INDEX)"
 )
 UNSUPPORTED_COUNTRY_TITLES = {
     "ARGENTINA",
-    "AUSTRALIA",
     "BRAZIL",
     "CANADA",
     "CHILE",
     "CZECHREPUBLIC",
-    "GERMANY",
     "INDIA",
     "IRELAND",
     "IRELANDJUMPRACES",
     "IRISHJUMPRACES",
     "ITALY",
     "ITALIANJUMPRACES",
-    "GERMANJUMPRACES",
     "INDEX",
     "KOREA",
     "MACAU",
@@ -128,7 +139,6 @@ UNSUPPORTED_COUNTRY_TITLES = {
     "SOUTHAFRICA",
     "SPAIN",
     "SWITZERLAND",
-    "UNITEDARABEMIRATES",
     "URUGUAY",
     "VENEZUELA",
 }
@@ -261,6 +271,18 @@ def _page_context(text: str) -> tuple[str | None, str]:
         return "japan", "flat"
     if re.search(r"PT(?:I|II)[—-](?:HONGKONG|HKG|HK)", upper):
         return "hong_kong", "flat"
+    if re.search(r"PTI[—-]AUSTRALIA", upper):
+        return "australia", "flat"
+    if re.search(r"PTI[—-]GERMANY", upper):
+        return "germany", "flat"
+    if re.search(r"PTI[—-]UNITEDARABEMIRATES", upper):
+        return "united_arab_emirates", "flat"
+    if re.search(r"PT(?:I|II)[—-](?:OTHERRACES.*)?BAHRAIN", upper, re.S):
+        return "bahrain", "flat"
+    if re.search(r"PT(?:I|II)[—-](?:OTHER(?:RACES)?.*)?QATAR", upper, re.S):
+        return "qatar", "flat"
+    if re.search(r"PT(?:I|II)[—-](?:OTHERRACES.*)?(?:KINGDOMOF)?SAUDIARABIA", upper, re.S):
+        return "saudi_arabia", "flat"
     if "PTI—OTHER" in upper or "PTI-OTHER" in upper:
         return "other", "flat"
     return None, "flat"
@@ -292,6 +314,104 @@ def _hong_kong_segment(text: str) -> str:
     return tail
 
 
+def _country_segment(text: str, region: str) -> str:
+    headings = {
+        "bahrain": r"BAHRAIN",
+        "qatar": r"QATAR",
+        "saudi_arabia": r"(?:Kingdom\s+of\s+)?SAUDI\s+ARABIA",
+    }
+    heading = headings.get(region)
+    if not heading:
+        return text
+    match = re.search(rf"(?:^|\n)\s*{heading}\s*(?:\n|$)", text, re.I)
+    if not match:
+        return text
+    first_grade = GRADE_RE.search(text)
+    if first_grade and first_grade.start() < match.start():
+        # Some legacy/extracted fixtures place the section marker as a footer.
+        return text
+    tail = text[match.start() :]
+    next_country = re.search(
+        r"\n\s*(?:ITALY|KINGDOM\s+OF\s+SAUDI\s+ARABIA|SAUDI\s+ARABIA|BAHRAIN|"
+        r"QATAR|UNITED\s+ARAB\s+EMIRATES|TURKEY|SPAIN|POLAND|SCANDINAVIA|KOREA|MACAU|MALAYSIA)\s*\n",
+        tail[match.end() - match.start() :],
+        re.I,
+    )
+    if next_country:
+        return tail[: match.end() - match.start() + next_country.start()]
+    return tail
+
+
+MIDDLE_EAST_HEADING_RE = re.compile(
+    r"(?im)^\s*(UNITED\s+ARAB\s+EMIRATES|BAHRAIN|QATAR|(?:KINGDOM\s+OF\s+)?SAUDI\s+ARABIA)\s*$"
+)
+
+
+def _middle_east_country_segments(text: str) -> list[tuple[str, str]]:
+    """Split a multi-country Other Races page without guessing race identity."""
+    matches = list(MIDDLE_EAST_HEADING_RE.finditer(text))
+    if len(matches) < 2:
+        return []
+    regions = {
+        "UNITED ARAB EMIRATES": "united_arab_emirates",
+        "BAHRAIN": "bahrain",
+        "QATAR": "qatar",
+        "SAUDI ARABIA": "saudi_arabia",
+        "KINGDOM OF SAUDI ARABIA": "saudi_arabia",
+    }
+    first_grade = GRADE_RE.search(text)
+    footer_layout = bool(first_grade and first_grade.start() < matches[0].start())
+    segments = []
+    for index, match in enumerate(matches):
+        heading = re.sub(r"\s+", " ", match.group(1)).upper()
+        region = regions[heading]
+        if footer_layout:
+            start = matches[index - 1].end() if index else 0
+            end = match.end()
+        else:
+            start = match.start()
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        segment = _country_segment(text[start:end], region)
+        if GRADE_RE.search(segment):
+            segments.append((region, segment))
+    return segments
+
+
+def _parse_page_records(text: str, *, region: str, discipline: str, year: int) -> list[dict]:
+    season = _season_label(text, year) if region == "hong_kong" else ""
+    rows = []
+    buffer: list[str] = []
+    for raw_line in text.splitlines():
+        line = re.sub(r"\s+", " ", raw_line).strip()
+        if _metadata_line(line):
+            continue
+        if buffer:
+            buffered = " ".join(buffer)
+            if DOTS_RE.search(buffered) and AGE_RE.search(buffered) and not (
+                GRADE_RE.search(buffered) or LISTED_RE.search(buffered)
+            ):
+                buffer = []
+        if line.lstrip().startswith("*") and (GRADE_RE.search(line) or LISTED_RE.search(line)):
+            buffer = []
+            row = _parse_record(line, region=region, discipline=discipline, year=year, season_label=season)
+            if row:
+                rows.append(row)
+            continue
+        if buffer and (GRADE_RE.search(line) or LISTED_RE.search(line)):
+            buffered = " ".join(buffer)
+            if GRADE_RE.search(buffered) or LISTED_RE.search(buffered) or DOTS_RE.search(buffered):
+                buffer = []
+        buffer.append(line)
+        combined = " ".join(buffer)
+        if not _record_complete(combined, discipline=discipline):
+            continue
+        row = _parse_record(combined, region=region, discipline=discipline, year=year, season_label=season)
+        if row:
+            rows.append(row)
+        buffer = []
+    return rows
+
+
 def _season_label(text: str, year: int) -> str:
     match = re.search(r"Racing season\s+\w+\s+(\d{4})\s*-\s*\w+\s+(\d{4})", text, re.I)
     if match:
@@ -320,6 +440,13 @@ def _metadata_line(line: str) -> bool:
             "UNITEDSTATESJUMPRACES",
             "UNITEDSTATESOFAMERICA",
             "OTHERRACES",
+            "AUSTRALIA",
+            "GERMANY",
+            "UNITEDARABEMIRATES",
+            "BAHRAIN",
+            "QATAR",
+            "SAUDIARABIA",
+            "KINGDOMOFSAUDIARABIA",
         }
         or re.fullmatch(r"\d{4}AQPSRACES:?", compact) is not None
         or compact.startswith("(RACINGSEASON")
@@ -339,7 +466,7 @@ def _clean_name(value: str) -> str:
     value = DOTS_RE.sub(" ", value)
     value = re.sub(r"\s+", " ", value).strip(" .")
     value = re.sub(
-        r"^(?:(?:HONG KONG(?:\s+SAR,?\s*CHINA)?|JAPAN|UNITED STATES OF AMERICA)\s+)?"
+        r"^(?:(?:HONG KONG(?:\s+SAR,?\s*CHINA)?|JAPAN|UNITED STATES OF AMERICA|AUSTRALIA|GERMANY|UNITED ARAB EMIRATES|BAHRAIN|(?:KINGDOM OF )?SAUDI ARABIA)\s+)?"
         r"(?:(?:JAPANESE|UNITED STATES) JUMP ?RACES\s+)?"
         r"(?:\([^)]*(?:DOLLARS|POUNDS|YEN|METERS|FURLONGS|SURFACE|HK\$)[^)]*\)\s*)+",
         "",
@@ -347,7 +474,8 @@ def _clean_name(value: str) -> str:
         flags=re.I,
     ).strip()
     value = re.sub(r"\s+[123]\s*$", "", value)
-    return value.strip(" .")
+    value = re.sub(r"\s*QA\s*$", "", value, flags=re.I)
+    return value.strip(" .").rstrip(" (")
 
 
 def _parse_record(raw: str, *, region: str, discipline: str, year: int, season_label: str) -> dict | None:
@@ -587,51 +715,29 @@ def parse_ics_pages(
         elif _has_unsupported_country_title(page_text):
             current_region, current_discipline = None, "flat"
         region, discipline = current_region, current_discipline
+        country_segments = _middle_east_country_segments(page_text)
+        if country_segments:
+            for country_region, country_text in country_segments:
+                rows.extend(
+                    _parse_page_records(
+                        country_text,
+                        region=country_region,
+                        discipline="flat",
+                        year=year,
+                    )
+                )
+            current_region, current_discipline = country_segments[-1][0], "flat"
+            if appendix_starts:
+                current_region, current_discipline = None, "flat"
+            continue
         if not region:
             continue
-        text = _hong_kong_segment(page_text) if region == "other" else page_text
+        text = _hong_kong_segment(page_text) if region == "other" else _country_segment(page_text, region)
         if region == "other":
             region = "hong_kong"
         if not text:
             continue
-        season = _season_label(text, year) if region == "hong_kong" else ""
-        buffer: list[str] = []
-        for raw_line in text.splitlines():
-            line = re.sub(r"\s+", " ", raw_line).strip()
-            if _metadata_line(line):
-                continue
-            if buffer:
-                buffered = " ".join(buffer)
-                if (
-                    DOTS_RE.search(buffered)
-                    and AGE_RE.search(buffered)
-                    and not (GRADE_RE.search(buffered) or LISTED_RE.search(buffered))
-                ):
-                    buffer = []
-            if line.lstrip().startswith("*") and (GRADE_RE.search(line) or LISTED_RE.search(line)):
-                buffer = []
-                row = _parse_record(
-                    line,
-                    region=region,
-                    discipline=discipline,
-                    year=year,
-                    season_label=season,
-                )
-                if row:
-                    rows.append(row)
-                continue
-            if buffer and (GRADE_RE.search(line) or LISTED_RE.search(line)):
-                buffered = " ".join(buffer)
-                if GRADE_RE.search(buffered) or LISTED_RE.search(buffered) or DOTS_RE.search(buffered):
-                    buffer = []
-            buffer.append(line)
-            combined = " ".join(buffer)
-            if not _record_complete(combined, discipline=discipline):
-                continue
-            row = _parse_record(combined, region=region, discipline=discipline, year=year, season_label=season)
-            if row:
-                rows.append(row)
-            buffer = []
+        rows.extend(_parse_page_records(text, region=region, discipline=discipline, year=year))
         if appendix_starts:
             current_region, current_discipline = None, "flat"
     if not rows:
@@ -671,6 +777,12 @@ def parse_ics_pages(
                 f"parsed={parsed_totals.get(key, 0)} declared={declared}; "
                 f"parsed_grades={parsed_grades} declared_grades={expected_grades}"
             )
+    middle_east_countries = {"united_arab_emirates", "saudi_arabia", "qatar", "bahrain"}
+    for row in rows:
+        source_region = row["country_region"]
+        row["country"] = source_region if source_region in middle_east_countries else source_region
+        if source_region in middle_east_countries:
+            row["country_region"] = "middle_east"
     return _deduplicate_and_disambiguate_same_year_keys(rows)
 
 
@@ -724,8 +836,17 @@ def _source_conflicts_sha256(conflicts: list[dict]) -> str:
 
 
 def _pdf_pages(path: Path) -> list[str]:
+    pages = []
     with pdfplumber.open(path) as pdf:
-        return [page.extract_text() or "" for page in pdf.pages]
+        for page in pdf.pages:
+            try:
+                pages.append(page.extract_text() or "")
+            finally:
+                # pdfplumber/pdfminer caches layout objects per page. A full
+                # Blue Book is hundreds of pages, so release each page before
+                # advancing to keep the runner's memory bounded.
+                page.close()
+    return pages
 
 
 def _sha256(path: Path) -> str:

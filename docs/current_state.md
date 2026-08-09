@@ -1,5 +1,48 @@
 # 当前状态
 
+## 2026-08-09 2025 参赛马完整补全正在本地实现，尚未发布或写生产
+
+- 隔离分支 `codex/complete-2025-graded-horse-data` 已固化七文件 gap census；旧 artifact 的
+  `1063/9292/4965/15854` 计数与逐文件 SHA 可离线复现。
+- 生产只读差集确认多出的两场英国赛事是 2025-01-11 的两场 G2 障碍赛；均为
+  `draft + incomplete` 且结果数为 `0`，因此旧公共页采集无法发现。
+- 已修复纯拉丁官方赛果马名不能成为英文名证据的问题，policy 升至 v2；collector 聚焦套件
+  `102/102` 通过。
+- 已新增 AU/DE/UAE/SA/QAT/BHR 官方源 URL policy、请求预算和严格离线 parser，并用四个当前
+  官方端点做有限 live smoke。新增 manifest-bound 官方赛果 runner 会逐跳限域、保存原始 response
+  SHA、按精确 checkpoint 续跑；临时网络错误返回 `75`，解析/身份错误确定性停止。独立审查发现的
+  并列名次、DNF/PU/F/UR/DSQ 实际起跑保留、deterministic resume 禁止重新联网及 cache path 越界
+  已修复并补反例。
+- TJCIS 2025 官方 Blue Book（327 页，SHA-256 `ca6aafb6…feb6`）整本解析已在释放逐页 cache 后成功：
+  总计 `1494` 场，其中 Australia `312`、Germany `42`、Middle East `50`（UAE `33`、Bahrain `2`、
+  Saudi Arabia `12`、Qatar `3`）。Qatar 三场原来夹在 `OTHER` 页的 unsupported country 段落之间，
+  现已由官方整本真实回放证明并补入；France/US 的 parsed/declared count 差异仍显式记录为来源冲突。
+- P0 参赛马候选桥现支持八地区、单一年份与 `actual_starts_only`，输出
+  `bind_existing/create_new/ambiguous/blocked`；provider ID 优先，纯马名仍只能 blocked。当前受影响
+  Django 组合回归 `434/434`、研究侧回归 `122/122`、workflow 合同 `17/17` 通过。v2 census 的赛事身份
+  已改用规范化完整 URL（保留排序后的 query），不再把不同德国赛事折叠成 `rennen.php`。
+- 同一独立 reviewer 对首批五项 P1 的最终反例复核为 `APPROVED`；其中 cache path 同时拒绝 `../`、
+  absolute、resolved-outside-root、非 race-bound 及 output root 内 symlink alias。后续 URL manifest/
+  cache-only 增量审查发现的 canonical duplicate、跨 provider gap evidence 与注入 client 绕过均已补 RED
+  后修复；同一 reviewer 限定复审最终为 `APPROVED`，无 P0/P1/P2。
+- 已新增完全离线的官方 URL manifest 编译器：先生成 `404` 场新增地区逐场 review queue，再只接受
+  SHA 绑定、目录事实不漂移且 1:1 守恒的 `collect/evidence_gap/not_held` reviewed mapping；runner
+  manifest 直接绑定 review SHA，summary 再绑定 manifest/gap/package SHA。URL 去重使用 canonical query，
+  gap evidence 只能来自本场 provider 或当年 TJCIS；禁止名称模糊自动绑定。
+- P0 completion normalizer 已加入 AU/DE/Middle East 的逐 provider allowlist，但新地区当前严格为
+  reviewed canonical cache-only：缺完整 v2 cache 即阻断，不允许网络临时补半份资料；旧五地区 rolling
+  batch 的地区集合保持不变，adapter 层即使注入任意 client 也禁止 cache miss 触网。生产 reviewed
+  apply 的三地区 create-new 回归已通过。顺带修复既有
+  Netkeiba fixture 的 parser version `v3→v5` 测试漂移，不改变生产 parser。
+- `RacingRegion` 已在本地加入 Australia/Germany/Middle East，并生成 state-only migration 0072；
+  `makemigrations --check`、Django check 与枚举回归通过。
+- 正式 workflow 已接为旧七文件与 official_results 两条并行分支；`full_network=true` 缺受审三文件包
+  会拒绝，临时错误以 exact official checkpoint 续跑，两条分支均成功后生成逐文件 SHA 绑定的
+  `graded-race-completion-bundle.v1`。自由 package 路径不直接进入 artifact glob，而是复制到固定权限
+  staging 后重验。第三轮独立审查最终 `APPROVED`、无 P0-P2。尚待自动发现并审核官方赛事 URL，并生成新增地区完整
+  profile/career canonical cache。基础实现已提交为 `3dcbd46f` 并推送到 Draft PR #83；当前未部署、
+  未扩大正式网络或写生产。
+
 ## 2026-08-09 Release B 已验证写入，2025 正式研究 run 产出 partial artifact
 
 - 用户批准的生产 revision `75294a4dea51538962741ec6c0835dc3090558ff`、reviewed manifest

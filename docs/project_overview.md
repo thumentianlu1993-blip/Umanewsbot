@@ -1,5 +1,20 @@
 # 项目总览
 
+## 2026-08-09 八地区单年度分级赛参赛马补全链路（实现中）
+
+- 既有 UmaFans 五地区 artifact 与 TJCIS 官方年度 G1/G2/G3 目录分层；新增地区的实际参赛事实只接受
+  provider-bound 官方赛果，不用 Wikipedia/Wikidata，也不把报名或退赛当作参赛。
+- 官方赛果通过 reviewed manifest、逐跳 HTTPS allowlist、请求预算、原始 response SHA、parser/policy
+  SHA 和精确 checkpoint 运行；临时网络错误安全续跑，确定性解析/身份错误立即停止。
+- 正式年度 workflow 将既有 UmaFans 七文件与新增地区 official results 作为两条独立分支；只有二者
+  都完成才生成逐文件 SHA 绑定的 completion bundle，缺受审官方三文件包时禁止 full-network。
+- 生产侧候选按单一年份和实际起跑生成，只允许 provider ID 或完整身份事实绑定/新建；纯马名保持
+  blocked。完整资料、二代血统、全生涯和由履历重算的主胜鞍仍须通过 reviewed apply/verifier，当前
+  本地实现不会自动公开或写入生产。
+- 澳洲、德国和中东的资料标准化器只接受已审核的 canonical v2 cache；常驻旧五地区网络批次不因
+  新增适配器自动扩围。生产 apply 已沿用同一 reviewed mapping、release manifest 和 verifier 合同，
+  不为新地区另开低门槛写入入口。
+
 ## 2026-08-09 Release B 数据治理当前边界
 
 Release B 已将赛事系列唯一身份切换到 edition，并把 duplicate equivalence 的最小身份锚点收敛为

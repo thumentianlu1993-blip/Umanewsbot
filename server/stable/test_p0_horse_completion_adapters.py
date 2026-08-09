@@ -268,7 +268,7 @@ class _CapturingSourceClient:
 class P0HorseCompletionAdapterContractTests(SimpleTestCase):
     def test_five_region_cached_fixtures_share_one_payload_contract(self):
         module = _target_module()
-        self.assertEqual(set(module.REGION_ADAPTERS), set(REGION_FIXTURES))
+        self.assertTrue(set(REGION_FIXTURES) < set(module.REGION_ADAPTERS))
 
         key_sets = []
         for region in REGION_FIXTURES:
@@ -292,6 +292,46 @@ class P0HorseCompletionAdapterContractTests(SimpleTestCase):
                 self.assertEqual(client.calls, [])
 
         self.assertTrue(all(keys == key_sets[0] for keys in key_sets))
+
+    def test_new_regions_accept_only_complete_reviewed_canonical_caches(self):
+        module = _target_module()
+        source_by_region = {
+            RacingRegion.AUSTRALIA: ("racing_australia", "australia_racing_australia_reviewed_cache", "AU"),
+            RacingRegion.GERMANY: ("deutscher_galopp", "germany_deutscher_galopp_reviewed_cache", "DE"),
+            RacingRegion.MIDDLE_EAST: ("emirates_racing_authority", "middle_east_official_reviewed_cache", "AE"),
+        }
+        base = json.loads((FIXTURE_ROOT / "united_states.json").read_text(encoding="utf-8"))
+        for region, (source_name, adapter_key, country) in source_by_region.items():
+            with self.subTest(region=region), TemporaryDirectory() as temporary:
+                payload = json.loads(json.dumps(base))
+                payload.update({"adapter_key": adapter_key, "region": region})
+                payload["source"].update({"name": source_name, "url": f"https://example.test/{source_name}/horse/1"})
+                payload["basic_profile"]["country"] = country
+                cache = Path(temporary) / "cache.json"
+                _write_source_cache(cache, payload)
+                request = module.P0HorseCompletionRequest(
+                    candidate_key=f"external:{source_name}:us-001", region=region,
+                    horse_name=payload["identity"]["horse_name"], source_url=payload["source"]["url"],
+                    external_horse_id="us-001", expected_sire_name=payload["identity"]["sire_name"],
+                    expected_dam_name=payload["identity"]["dam_name"], expected_birth_year=2020,
+                    cache_path=str(cache), allow_network=False,
+                )
+                result = module.run_p0_horse_completion_adapter(request, source_client=_FailIfCalledSourceClient())
+                self.assertEqual(result["region"], region)
+                cache.unlink()
+                with self.assertRaises(module.P0HorseCompletionNetworkDisabled):
+                    module.run_p0_horse_completion_adapter(request, source_client=_FailIfCalledSourceClient())
+                network_request = replace(request, allow_network=True)
+                injected = _CapturingSourceClient(payload)
+                with self.assertRaisesRegex(
+                    module.P0HorseCompletionNetworkDisabled,
+                    "reviewed canonical cache is required",
+                ):
+                    module.run_p0_horse_completion_adapter(
+                        network_request,
+                        source_client=injected,
+                    )
+                self.assertEqual(injected.calls, [])
 
     def test_us_cached_payload_must_match_the_expected_four_field_identity(self):
         module = _target_module()

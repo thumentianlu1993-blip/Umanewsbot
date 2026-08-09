@@ -120,12 +120,113 @@ class TjcisIcsCatalogParserTests(SimpleTestCase):
     def test_unsupported_country_header_resets_previous_region_context(self):
         pages = [
             "Prix Exemple G3 .... 80,000 .... 3up .... 2000 T .... Chantilly\nPt I—FRANCE",
-            "Not French G1 .... 80,000 .... 3up .... 2000 T .... Cologne\nPt I—GERMANY",
+            "Not French G1 .... 80,000 .... 3up .... 2000 T .... Rome\nPt I—ITALY",
         ]
 
         rows = self.module.parse_ics_pages(pages, year=2016)
 
         self.assertEqual([row["original_name"] for row in rows], ["Prix Exemple"])
+
+    def test_extended_regions_and_middle_east_country_are_preserved(self):
+        pages = [
+            "Example Australian S. G1 .... 1,000,000 .... 3up .... 2000 T .... Randwick\nPt I—AUSTRALIA",
+            "Example German Preis G2 .... 70,000 .... 3up .... 2200 T .... Cologne\nPt I—GERMANY",
+            "Example UAE S. G3 .... 700,000 .... 4up .... 1800 T .... Meydan\nPt I—UNITED ARAB EMIRATES",
+            "Example Bahrain Trophy G2 .... 1,000,000 .... 3up .... 2000 T .... REHC\nPt I—OTHER RACES\nBAHRAIN",
+            "Example Saudi Cup G3 .... 1,500,000 .... 4up .... 1800 D .... King Abdulaziz\nPt I—OTHER RACES\nKingdom of SAUDI ARABIA",
+        ]
+
+        rows = self.module.parse_ics_pages(pages, year=2025)
+
+        self.assertEqual(
+            {row["country_region"] for row in rows},
+            {"australia", "germany", "middle_east"},
+        )
+        self.assertEqual(
+            {row["country"] for row in rows if row["country_region"] == "middle_east"},
+            {"united_arab_emirates", "bahrain", "saudi_arabia"},
+        )
+
+    def test_other_races_page_stops_at_next_country_heading(self):
+        page = """
+Pt I—OTHER RACES
+OTHER RACES
+BAHRAIN
+Bahrain International Trophy G2 .... 1,000,000 .... 3up .... 2000 T .... REHC
+ITALY
+Premio Roma G2 .... 250,000 .... 3up .... 2000 T .... Rome
+"""
+
+        rows = self.module.parse_ics_pages([page], year=2025)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Bahrain International Trophy"])
+        self.assertEqual(rows[0]["country"], "bahrain")
+
+    def test_other_races_multi_country_page_parses_every_section(self):
+        heading_layout = """
+Pt I—OTHER RACES
+BAHRAIN
+Bahrain International Trophy G2 .... 1,000,000 .... 3up .... 2000 T .... REHC
+Kingdom of SAUDI ARABIA
+Saudi Cup G1 .... 20,000,000 .... 4up .... 1800 D .... King Abdulaziz
+"""
+        footer_layout = """
+Bahrain Turf S. G3 .... 500,000 .... 3up .... 1600 T .... REHC
+BAHRAIN
+Riyadh Cup G2 .... 1,000,000 .... 4up .... 1800 D .... King Abdulaziz
+SAUDI ARABIA
+Pt I—OTHER RACES
+"""
+
+        for page in (heading_layout, footer_layout):
+            rows = self.module.parse_ics_pages([page], year=2025)
+            self.assertEqual({row["country"] for row in rows}, {"bahrain", "saudi_arabia"})
+            self.assertEqual(len(rows), 2)
+
+    def test_qatar_section_between_unsupported_countries_is_preserved(self):
+        page = """
+Pt II—OTHER
+OTHER RACES
+POLAND
+Wielka Warszawska (L) .... 100,000 .... 3up .... 2600 T .... Sluzewiec
+QATAR
+(Racing season October 2024 - May 2025)
+Qatar DerbyQA G1 .... US$500,000 .... 3yo .... 2000 T .... Al Rayyan
+Qatar Gold TrophyQA G1 .... US$250,000 .... 3up .... 2200 T .... Al Rayyan
+SCANDINAVIA
+Stockholm Cup International G3 .... 1,000,000 .... 3up .... 2400 T .... Bro Park
+SPAIN
+Gran Premio de Madrid (L) .... 85,000 .... 3up .... 2500 T .... La Zarzuela
+"""
+
+        rows = self.module.parse_ics_pages([page], year=2025)
+
+        self.assertEqual([row["original_name"] for row in rows], ["Qatar Derby", "Qatar Gold Trophy"])
+        self.assertEqual({row["country"] for row in rows}, {"qatar"})
+        self.assertEqual({row["country_region"] for row in rows}, {"middle_east"})
+
+    def test_parenthesized_grade_does_not_leak_open_paren_into_name(self):
+        rows = self.module.parse_ics_pages(
+            ["Al Khail Trophy (G3) .... 700,000 .... 4up .... 2810 T .... Meydan\nPt I—UNITED ARAB EMIRATES"],
+            year=2025,
+        )
+
+        self.assertEqual(rows[0]["original_name"], "Al Khail Trophy")
+
+    def test_pdf_extraction_releases_each_page_cache(self):
+        page_one = mock.Mock()
+        page_one.extract_text.return_value = "first"
+        page_two = mock.Mock()
+        page_two.extract_text.return_value = None
+        document = mock.MagicMock()
+        document.__enter__.return_value.pages = [page_one, page_two]
+
+        with mock.patch.object(self.module.pdfplumber, "open", return_value=document):
+            pages = self.module._pdf_pages(Path("book.pdf"))
+
+        self.assertEqual(pages, ["first", ""])
+        page_one.close.assert_called_once_with()
+        page_two.close.assert_called_once_with()
 
     def test_blank_section_footer_does_not_join_with_race_name_as_country(self):
         pages = [

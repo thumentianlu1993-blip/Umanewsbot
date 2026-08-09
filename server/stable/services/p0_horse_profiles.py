@@ -65,6 +65,11 @@ P0_REGIONS = {
     RacingRegion.FRANCE,
     RacingRegion.UNITED_STATES,
 }
+P0_PARTICIPANT_CANDIDATE_REGIONS = P0_REGIONS | {
+    RacingRegion.AUSTRALIA,
+    RacingRegion.GERMANY,
+    RacingRegion.MIDDLE_EAST,
+}
 P0_MAJOR_RACE_GRADES = {
     RaceGrade.G1,
     RaceGrade.G2,
@@ -113,6 +118,9 @@ GENERIC_SOURCE_NAMESPACES = {
     "web",
 }
 SOURCE_NAMESPACE_ALIASES = {
+    "au_racing_australia": "racing_australia",
+    "bh_btc": "bahrain_turf_club",
+    "de_deutscher_galopp": "deutscher_galopp",
     "equibase": "equibase",
     "equibase_pdf_chart": "equibase",
     "equibase_yearbook": "equibase",
@@ -121,6 +129,7 @@ SOURCE_NAMESPACE_ALIASES = {
     "hkjc": "hkjc",
     "hkjc_local_results": "hkjc",
     "hkjc_official_result_page": "hkjc",
+    "qa_qrec": "qrec",
     "horse_racing_nation": "horse_racing_nation",
     "horse_racing_nation_track_day": "horse_racing_nation",
     "irishracing": "irishracing",
@@ -137,6 +146,8 @@ SOURCE_NAMESPACE_ALIASES = {
     "nsa_official_result_pdf": "nsa",
     "sporting_life": "sporting_life",
     "sporting_life_result_detail": "sporting_life",
+    "sa_jcsa": "jcsa",
+    "uae_era": "emirates_racing_authority",
     "zeturf": "zeturf",
     "zeturf_race_detail": "zeturf",
     "zone_turf": "zone_turf",
@@ -216,12 +227,16 @@ def _display_snapshot_from_term(term: TermEntry) -> dict[str, str]:
     }
 
 
-def _normalized_regions(regions: Iterable[str] | None) -> list[str]:
-    region_list = list(dict.fromkeys(regions or sorted(P0_REGIONS)))
-    invalid_regions = sorted(set(region_list) - P0_REGIONS)
+def _normalized_regions(
+    regions: Iterable[str] | None,
+    *,
+    allowed_regions: set[str] = P0_REGIONS,
+) -> list[str]:
+    region_list = list(dict.fromkeys(regions or sorted(allowed_regions)))
+    invalid_regions = sorted(set(region_list) - allowed_regions)
     if invalid_regions:
         raise ValueError(
-            f"P0 horse profiles only support these regions: {', '.join(sorted(P0_REGIONS))}; "
+            f"P0 horse profiles only support these regions: {', '.join(sorted(allowed_regions))}; "
             f"invalid: {', '.join(invalid_regions)}"
         )
     return region_list
@@ -251,6 +266,9 @@ def _matched_identity_profile_ids(identity_keys: set[str], identity_index: dict[
 
 
 SOURCE_DOMAIN_NAMESPACES = {
+    "bahrainturfclub.com": "bahrain_turf_club",
+    "deutscher-galopp.de": "deutscher_galopp",
+    "emiratesracing.com": "emirates_racing_authority",
     "equibase.com": "equibase",
     "france-galop.com": "france_galop",
     "geny.com": "geny",
@@ -259,10 +277,13 @@ SOURCE_DOMAIN_NAMESPACES = {
     "irishracing.com": "irishracing",
     "jbis.or.jp": "jbis",
     "jra.go.jp": "jra",
+    "jcsa.sa": "jcsa",
     "keiba.go.jp": "keiba_go_jp",
     "nationalsteeplechase.com": "nsa",
     "netkeiba.com": "netkeiba",
     "racingpost.com": "racing_post",
+    "racingaustralia.horse": "racing_australia",
+    "qrec.gov.qa": "qrec",
     "sportinglife.com": "sporting_life",
     "zeturf.fr": "zeturf",
     "zone-turf.fr": "zone_turf",
@@ -1655,11 +1676,19 @@ def sync_p0_horse_sources(
     return summary
 
 
-def _major_race_events(regions: Iterable[str] | None = None):
-    return RaceEvent.objects.filter(
-        country_region__in=_normalized_regions(regions),
+def _major_race_events(
+    regions: Iterable[str] | None = None,
+    *,
+    year: int | None = None,
+    allowed_regions: set[str] = P0_REGIONS,
+):
+    queryset = RaceEvent.objects.filter(
+        country_region__in=_normalized_regions(regions, allowed_regions=allowed_regions),
         normalized_grade__in=P0_MAJOR_RACE_GRADES,
-    ).order_by(
+    )
+    if year is not None:
+        queryset = queryset.filter(year=year)
+    return queryset.order_by(
         "country_region",
         "local_date",
         "id",
@@ -1966,6 +1995,15 @@ def _finalize_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
     else:
         identity_status = "mixed_identity_evidence"
         review_status = "identity_conflict"
+    mapping_disposition = (
+        "ambiguous"
+        if review_status == "identity_conflict"
+        else "bind_existing"
+        if review_status == "ready_for_profile_resolution" and len(matched_profile_ids) == 1
+        else "create_new"
+        if review_status == "ready_for_profile_resolution" and not matched_profile_ids
+        else "blocked"
+    )
     return {
         **candidate,
         "horse_name": horse_name,
@@ -1983,6 +2021,7 @@ def _finalize_candidate(candidate: dict[str, Any]) -> dict[str, Any]:
         "birth_year": next(iter(birth_year_evidence), None),
         "identity_status": identity_status,
         "review_status": review_status,
+        "mapping_disposition": mapping_disposition,
     }
 
 
@@ -1990,10 +2029,15 @@ def build_p0_participant_candidate_artifact(
     *,
     regions: Iterable[str] | None = None,
     sample_per_region: int = 10,
+    year: int | None = None,
+    actual_starts_only: bool = False,
 ) -> dict[str, Any]:
     if sample_per_region <= 0:
         raise ValueError("sample_per_region must be greater than zero")
-    region_list = _normalized_regions(regions)
+    region_list = _normalized_regions(
+        regions,
+        allowed_regions=P0_PARTICIPANT_CANDIDATE_REGIONS,
+    )
     identity_index = _identity_index()
     name_index = _horse_name_identity_index()
     pedigree_index = _pedigree_profile_identity_index(name_index)
@@ -2004,7 +2048,11 @@ def build_p0_participant_candidate_artifact(
     runner_counts: Counter[str] = Counter()
     result_counts: Counter[str] = Counter()
 
-    events = _major_race_events(region_list).prefetch_related("runners", "results")
+    events = _major_race_events(
+        region_list,
+        year=year,
+        allowed_regions=P0_PARTICIPANT_CANDIDATE_REGIONS,
+    ).prefetch_related("runners", "results")
     for event in events.iterator(chunk_size=100):
         event_counts[event.country_region] += 1
         runner_counts[event.country_region] += len(event.runners.all())
@@ -2021,6 +2069,8 @@ def build_p0_participant_candidate_artifact(
                 participant=participant,
                 identity=identity,
             )
+            if actual_starts_only and observation["participation_status"] != "actual_start":
+                continue
             identities.append(identity)
             observations.append(observation)
 
@@ -2185,6 +2235,9 @@ def build_p0_participant_candidate_artifact(
                 row["review_status"] == "ready_for_profile_resolution"
                 for row in region_sample
             ),
+            "mapping_dispositions": dict(
+                sorted(Counter(row["mapping_disposition"] for row in region_candidates).items())
+            ),
         }
     return {
         "artifact_type": "p0_horse_participant_candidates",
@@ -2192,11 +2245,14 @@ def build_p0_participant_candidate_artifact(
         "generated_at": timezone.now().isoformat(),
         "read_only": True,
         "regions": region_list,
+        "year": year,
+        "actual_starts_only": actual_starts_only,
         "eligible_grades": sorted(P0_MAJOR_RACE_GRADES),
         "sample_per_region": sample_per_region,
         "selection_policy": {
             "cross_event_merge": "existing profile, external source identity, or complete name+sire+dam+birth_year only",
             "name_only_merge": False,
+            "participant_scope": "actual starts only" if actual_starts_only else "all runner and result observations",
             "sample_order": "identity readiness, actual-start evidence, result evidence, nonstarter count, stable name/key",
             "sample_uniqueness": "candidate key is globally unique; duplicate normalized names are suppressed only for weak identity observations",
         },
@@ -2206,6 +2262,9 @@ def build_p0_participant_candidate_artifact(
             "result_row_count": sum(result_counts.values()),
             "participant_observation_count": len(observations),
             "candidate_count": len(candidates),
+            "mapping_dispositions": dict(
+                sorted(Counter(row["mapping_disposition"] for row in candidates).items())
+            ),
             "sample_count": len(sample_rows),
             "unique_sample_candidate_count": len(
                 {row["candidate_key"] for row in sample_rows}

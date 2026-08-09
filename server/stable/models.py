@@ -59,6 +59,9 @@ class RacingRegion(models.TextChoices):
     UNITED_KINGDOM = "united_kingdom", "英国"
     FRANCE = "france", "法国"
     UNITED_STATES = "united_states", "美国"
+    AUSTRALIA = "australia", "澳大利亚"
+    GERMANY = "germany", "德国"
+    MIDDLE_EAST = "middle_east", "中东"
     OTHER = "other", "其他"
 
 

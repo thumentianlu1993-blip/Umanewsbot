@@ -480,7 +480,13 @@ class HorseNameContractTests(unittest.TestCase):
         self.assertNotIn("missing_required_english", record["name_issue_codes"])
 
         missing_both = collector.build_horse_name_record(
-            [{**occurrence, "profile_url": ""}],
+            [
+                {
+                    **occurrence,
+                    "horse_display_name": "Пример",
+                    "profile_url": "",
+                }
+            ],
             profile={
                 "resolution_state": "not_found",
                 "name_zh": "",
@@ -498,6 +504,27 @@ class HorseNameContractTests(unittest.TestCase):
                 "profile_not_found",
             },
         )
+
+    def test_latin_result_row_is_valid_english_name_evidence_without_profile(self):
+        collector = load_collector(self)
+        record = collector.build_horse_name_record(
+            [
+                {
+                    "region": "united_kingdom",
+                    "country": "united_kingdom",
+                    "horse_display_name": "Example Horse",
+                    "original_name": "",
+                    "profile_url": "",
+                    "race_url": "https://umafans.run/races/2025/example/",
+                }
+            ],
+            profile={"resolution_state": "not_found"},
+        )
+
+        self.assertEqual(record["name_en"], "Example Horse")
+        self.assertEqual(record["required_english_status"], "complete")
+        self.assertNotIn("missing_required_english", record["name_issue_codes"])
+        self.assertIn("profile_not_found", record["name_issue_codes"])
 
     def test_generic_other_unique_name_is_unresolved_without_identity_fact(self):
         collector = load_collector(self)
@@ -3771,7 +3798,7 @@ class ReviewFindingRegressionTests(unittest.TestCase):
         occurrence = {
             "region": "france",
             "country": "france",
-            "horse_display_name": "Example",
+            "horse_display_name": "Пример",
             "profile_url": "https://umafans.run/horses/42/",
             "race_url": "https://umafans.run/races/2025/example/",
             "race_date": "2025-01-01",
@@ -4702,7 +4729,7 @@ class ReviewFindingRegressionTests(unittest.TestCase):
                 {
                     "region": "france",
                     "country": "france",
-                    "horse_display_name": "Example",
+                    "horse_display_name": "Пример",
                     "profile_url": "https://umafans.run/horses/42/",
                 }
             ],

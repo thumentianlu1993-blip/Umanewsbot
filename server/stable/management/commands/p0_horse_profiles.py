@@ -25,9 +25,15 @@ class Command(BaseCommand):
         parser.add_argument(
             "--region",
             action="append",
-            choices=sorted(p0_horse_profiles.P0_REGIONS),
+            choices=sorted(p0_horse_profiles.P0_PARTICIPANT_CANDIDATE_REGIONS),
         )
         parser.add_argument("--profile-id", action="append", type=int, help="预览指定马资料；可重复指定。")
+        parser.add_argument("--year", type=int, help="候选提取限定单一自然年。")
+        parser.add_argument(
+            "--actual-starts-only",
+            action="store_true",
+            help="候选提取仅保留有实际赛果且非退出/未知状态的参赛马。",
+        )
         parser.add_argument("--limit-per-region", type=int)
         parser.add_argument(
             "--output-dir",
@@ -47,8 +53,17 @@ class Command(BaseCommand):
             raise CommandError("--limit-per-region 必须大于 0")
         if options["commit"] and not options["sync_sources"]:
             raise CommandError("--commit 只能配合 --sync-sources")
+        unsupported_operational_regions = set(options.get("region") or ()) - p0_horse_profiles.P0_REGIONS
+        if not options["extract_candidates"] and unsupported_operational_regions:
+            raise CommandError(
+                "新增地区当前只允许 --extract-candidates，只读候选通过 reviewed import 前不得同步或排队"
+            )
         if options["output_dir"] and not options["extract_candidates"]:
             raise CommandError("--output-dir 只能配合 --extract-candidates")
+        if (options["year"] is not None or options["actual_starts_only"]) and not options["extract_candidates"]:
+            raise CommandError("--year/--actual-starts-only 只能配合 --extract-candidates")
+        if options["year"] is not None and options["year"] < 1998:
+            raise CommandError("--year 必须不早于 1998")
         if options["limit_per_region"] is not None and options["sync_sources"]:
             raise CommandError("--limit-per-region 只适用于 --queue 或 --extract-candidates")
         if options["full_reconcile"] and not (options["sync_sources"] and options["commit"]):
@@ -94,6 +109,8 @@ class Command(BaseCommand):
             artifact = p0_horse_profiles.build_p0_participant_candidate_artifact(
                 regions=options.get("region"),
                 sample_per_region=options["limit_per_region"] or 10,
+                year=options["year"],
+                actual_starts_only=options["actual_starts_only"],
             )
             try:
                 paths = p0_horse_profiles.write_p0_participant_candidate_artifacts(

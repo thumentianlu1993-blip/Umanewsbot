@@ -55,6 +55,8 @@ class GradedRaceParticipantsWorkflowContractTests(unittest.TestCase):
             "full_network:",
             "region_manifest_path:",
             "region_manifest_sha256:",
+            "official_result_package_dir:",
+            "official_result_summary_sha256:",
             "source_run_id:",
             "source_attempt:",
             "source_stage:",
@@ -75,17 +77,22 @@ class GradedRaceParticipantsWorkflowContractTests(unittest.TestCase):
             r"inputs\.full_network == true",
         )
 
-    def test_dag_is_tests_races_four_profiles_merge_finalize(self) -> None:
-        for job in ("tests", "races", "profiles", "merge_profiles", "finalize"):
+    def test_dag_is_tests_two_network_branches_and_completion_bundle(self) -> None:
+        for job in ("tests", "official_results", "races", "profiles", "merge_profiles", "finalize", "completion_bundle"):
             with self.subTest(job=job):
                 self.assertRegex(self.source, rf"(?m)^  {job}:$")
         self.assertRegex(self.source, r"(?ms)^  races:.*?\n    needs: tests\b")
+        self.assertRegex(self.source, r"(?ms)^  official_results:.*?\n    needs: tests\b")
         self.assertRegex(self.source, r"(?ms)^  profiles:.*?\n    needs: races\b")
         self.assertRegex(
             self.source, r"(?ms)^  merge_profiles:.*?\n    needs: profiles\b"
         )
         self.assertRegex(
             self.source, r"(?ms)^  finalize:.*?\n    needs: merge_profiles\b"
+        )
+        self.assertRegex(
+            self.source,
+            r"(?ms)^  completion_bundle:.*?\n    needs: \[finalize, official_results\]",
         )
         self.assertRegex(self.source, r"shard:\s*\[0,\s*1,\s*2,\s*3\]")
         self.assertIn("--shard-count 4", self.source)
@@ -100,8 +107,11 @@ class GradedRaceParticipantsWorkflowContractTests(unittest.TestCase):
             "${{ github.run_id }}-${{ github.run_attempt }}-races-0",
             "${{ github.run_id }}-${{ github.run_attempt }}-profiles-${{ matrix.shard }}",
             "${{ github.run_id }}-${{ github.run_attempt }}-merge_profiles-0",
+            "${{ github.run_id }}-${{ github.run_attempt }}-official-results-0",
+            "${{ github.run_id }}-${{ github.run_attempt }}-completion-bundle-0",
             "${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-races-0",
             "${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-profiles-${{ matrix.shard }}",
+            "${{ inputs.source_run_id }}-${{ inputs.source_attempt }}-official-results-0",
             "run-id: ${{ inputs.source_run_id }}",
             "github-token: ${{ github.token }}",
             "if: always()",
@@ -193,9 +203,9 @@ class GradedRaceParticipantsWorkflowContractTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            len(re.findall(r"(?m)^    timeout-minutes: 75$", self.source)), 2
+            len(re.findall(r"(?m)^    timeout-minutes: 75$", self.source)), 3
         )
-        self.assertEqual(self.source.count("--time-budget-seconds 3600"), 2)
+        self.assertEqual(self.source.count("--time-budget-seconds 3600"), 3)
         readme = (
             ROOT / "runtime/research/README_graded_race_participants.md"
         ).read_text(encoding="utf-8")
@@ -233,6 +243,8 @@ class GradedRaceParticipantsWorkflowContractTests(unittest.TestCase):
             "REQUESTED_YEAR:",
             "REGION_MANIFEST_PATH:",
             "REGION_MANIFEST_SHA256:",
+            "OFFICIAL_RESULT_PACKAGE_DIR:",
+            "OFFICIAL_RESULT_SUMMARY_SHA256:",
             "SOURCE_RUN_ID:",
             "SOURCE_ATTEMPT:",
             "SOURCE_STAGE:",
@@ -291,6 +303,30 @@ class GradedRaceParticipantsWorkflowContractTests(unittest.TestCase):
         }
         self.assertEqual(actual, set(expected))
         self.assertIn("if-no-files-found: error", self.source)
+
+    def test_official_branch_is_review_bound_resumable_and_bundled(self) -> None:
+        run = self.step("验证 package 并运行 official checkpoint")
+        restore = self.step("恢复精确 official checkpoint")
+        upload = self.step("上传本次 official checkpoint")
+        bundle = self.step("生成跨来源 bundle identity")
+        bundle_upload = self.step("上传年度完整研究 bundle")
+        self.assertIn("validate_official_graded_race_package.py", run)
+        self.assertIn("collect_official_graded_race_results.py", run)
+        self.assertIn("--manifest-sha256", run)
+        self.assertIn("--allow-network", run)
+        self.assertIn("--resume", run)
+        self.assertIn("--time-budget-seconds 3600", run)
+        self.assertIn("if: env.SOURCE_RUN_ID != ''", restore)
+        self.assertNotIn("SOURCE_STAGE", restore)
+        self.assertIn("if: always()", upload)
+        self.assertIn("${{ env.OFFICIAL_RESULT_OUTPUT_DIR }}/", upload)
+        self.assertIn("build_graded_race_completion_bundle.py", bundle)
+        self.assertIn("--reviewed-summary-sha256", bundle)
+        self.assertIn('reviewed_stage="$bundle_root/reviewed_package"', bundle)
+        self.assertIn('! -e "$reviewed_stage"', bundle)
+        self.assertIn("cp --", bundle)
+        self.assertIn("runtime/research/output/completion-bundle/reviewed_package/", bundle_upload)
+        self.assertNotIn("OFFICIAL_RESULT_PACKAGE_DIR", bundle_upload)
 
     def test_no_wikimedia_or_production_database_surface(self) -> None:
         for forbidden in (

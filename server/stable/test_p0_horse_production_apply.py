@@ -1046,6 +1046,29 @@ class P0HorseProductionApplyTests(TestCase):
         ):
             self._dry_run(artifact_path)
 
+    def test_create_new_supports_reviewed_australia_germany_and_middle_east_regions(self):
+        regions = ("australia", "germany", "middle_east")
+        horses = [self._horse(index) for index in range(len(regions))]
+        for horse, region in zip(horses, regions):
+            horse["region"] = region
+            horse["candidate"]["sample_region"] = region
+        artifact_path, _ = self._prepare(
+            horses,
+            [{"decision": "create_new"} for _ in horses],
+        )
+
+        summary = self._commit(artifact_path)
+
+        self.assertEqual(summary["strict_complete_count"], 3)
+        self.assertCountEqual(
+            HorseProfile.objects.values_list("racing_region", flat=True),
+            regions,
+        )
+        self.assertCountEqual(
+            HorseP0Source.objects.values_list("racing_region", flat=True),
+            regions,
+        )
+
     def test_create_new_ignores_same_name_non_horse_term(self):
         horse = self._horse(0)
         non_horse = TermEntry.objects.create(
