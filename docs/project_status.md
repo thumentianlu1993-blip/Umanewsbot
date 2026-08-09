@@ -1,6 +1,17 @@
 # 项目状态文档
 
-## 2026-08-09 2025 新地区目录已纠正，等待 PR #86 独立复审
+## 2026-08-09 PR #86 已合并并完成关闭态生产部署
+
+- PR `#86` 已合并为 `e1bc8663…a64b0c`，生产 web/worker/beat 统一运行 image
+  `sha256:14f6bd45…1f6c0`；精确 revision、0072/no-op migration、Django check、HTTP health、日志与
+  Celery 空队列 verifier 全部通过。
+- 新鲜写前备份 SHA-256 为 `5b7698f0…380e`，候选 preflight artifact SHA-256 为
+  `6b284397…fe2e`。所有本轮高风险数据/网络开关保持关闭，race-live worker 未运行，受控 writer/lock
+  为零。
+- 本次没有生产回填、澳洲正式网络验证、official-results 采集或 `full_network`。新地区 2025 正式
+  数据仍停在独立 G3 之前。
+
+## 2026-08-09 2025 新地区目录已纠正，数据阶段仍待独立 G3
 
 - migration `0072` G2 已在生产 revision `0b93aa55…e8ca` 完整收口；本轮没有回填或联网正式运行。
 - 澳洲由官方相邻赛季表重建为 2025 自然年 `346` 场，德国 `42`、中东 `45`，新地区总计 `433`；
@@ -9,7 +20,8 @@
 - Qatar 三场已通过 QREC 官方 API 合同真实解析；Bahrain/Qatar/Saudi 剩余 `12` 场全部得到官方结果。
   Saudi `Place = -` 的实际起跑马保留为 `did_not_finish`。目标测试 `36/36`、研究套件 `146/146` 通过。
 - 澳洲归档 host 在当前本地网络返回 CDN `403`，所以 URL 候选仍待具备访问能力的受控环境验证；不得
-  把候选记成成功。Draft PR `#86` 尚未独立复审、合并或部署，三文件包/G3/full-network 均未开始。
+  把候选记成成功。PR `#86` 后续已完成独立复审、合并与关闭态部署，三文件包/G3/full-network
+  仍未开始。
 
 ## 2026-08-09 德国官方赛果真实页脚触发 parser blocker
 
@@ -18,7 +30,7 @@
 - 本地最小修复只跳过缺少 `position + horse` 完整列的表内非参赛行；未知的完整名次行继续硬失败。
   德国 provider 特有的 `Pl. = -`（在 starter 表中且非 `Nichtstarter`）保留为无数值名次的
   `did_not_finish`，不修改其他 provider。聚焦测试 `26/26`、研究套件 `136/136` 与真实缓存页解析
-  通过；独立复核 `APPROVED`、无 P0-P2。候选已进入 Draft PR `#86`，尚待合并和部署。
+  通过；独立复核 `APPROVED`、无 P0-P2。候选随后已通过 PR `#86` 合并并完成关闭态部署。
 - 阿联酋 ERA 真实结果页另使用完整状态 `Did Not Finish`；候选把它加入既有受控非完赛集合，未把
   任意未知状态改为容错。
 - 2025 PDF 真实回放还发现 `Part I - INDEX` 未触发 country reset，导致五条跨国家索引项污染 Saudi

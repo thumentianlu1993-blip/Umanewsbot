@@ -1,5 +1,29 @@
 # 部署运行手册
 
+## 2026-08-09 PR #86 official-results parser 关闭态发布记录
+
+1. PR `#86` merge commit 为 `e1bc86634c7d11adc8ce2f4090bc03b767a64b0c`；隔离 release 固定为
+   `/opt/umanews-release-e1bc8663-PR86-20260809/umanewsbot`，生产 image 为
+   `sha256:14f6bd457e7f17a6583991e3acf7440bfcf163583b3db5934ceee90510d1f6c0`。web/worker/beat 的
+   image ID、OCI revision 与 Compose working directory 完全一致；共享 `/opt/umanewsbot` checkout
+   有其他现场改动，本次未读取其 Git 状态作为 release source，也未覆盖该 checkout。
+2. 写前 custom-format dump 为
+   `/opt/umanewsbot/backups/db/pre-pr86-g2-20260809T114000Z.dump`，`416252566` bytes、mode `0600`、
+   TOC `1308`、SHA-256 `5b7698f0399db862591e491791a18fef0878fc8edba7c2de5ad1e2720a24380e`。
+3. candidate preflight artifact SHA-256 为
+   `6b28439717bfd0fcfe1c1298c531330c43a78306168cff1754fcfdaf2fd2fe2e`。发布前 leaf 为
+   `stable.0072_add_extended_racing_regions`，migration plan 为空；release task 再次确认 no-op migration
+   并完成 collectstatic。部署期间先停 Beat，等待构建期间产生的两个普通 news crawl 自然完成，
+   `active/reserved/active_confirm=0/0/0` 后才停止 worker/web，未强杀任务。
+4. 发布后 Django check、migration 零计划、web healthy、内外 `http://umafans.run/healthz/` 200、近十分钟
+   web/worker/beat/nginx error 扫描均通过。deployment lock 已释放，race-live worker 仍未运行；最终
+   Celery active/reserved/scheduled 为零，external import、historical batch、horse completion、live
+   result review writer 与 active import lock 均为零。
+5. 三个常驻应用容器均核对历史回填、外部马匹导入、马资料联网、race-live scheduler/monitor、
+   lifecycle、race-data-sync、多地区 attribution/related query 为关闭态。本次授权和执行均不包含生产
+   回填、澳洲正式网络验证、official-results 采集或 `full_network`；不得从本次代码部署推导任何数据
+   G3 已获批。
+
 ## 2026-08-09 2025 official-results 新目录与重跑门禁
 
 1. 旧 `404` queue 来自未修复 index 的 TJCIS；旧 `399` queue 虽修复 index，仍错误把澳洲跨年赛季
