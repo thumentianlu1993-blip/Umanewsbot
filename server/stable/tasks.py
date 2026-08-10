@@ -2315,11 +2315,44 @@ def scan_due_race_event_lifecycle_task() -> dict:
 
     from stable.services.race_event_lifecycle import claim_due_lifecycle_controls
 
+    runtime_mode = getattr(settings, "RACE_EVENT_LIFECYCLE_MODE", "off")
+    canary_sha = ""
+    canary_event_ids = ""
+    canary_activation_id = ""
+    enforce_event_ids = None
+    if runtime_mode == "enforce":
+        from stable.services.race_event_lifecycle_canary import (
+            parse_canary_event_ids,
+            validate_active_canary_cohort,
+        )
+
+        canary_sha = getattr(
+            settings, "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256", ""
+        )
+        canary_event_ids = getattr(
+            settings, "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS", ""
+        )
+        valid, result = validate_active_canary_cohort(
+            raw_sha256=canary_sha,
+            event_ids_text=canary_event_ids,
+        )
+        if not valid:
+            logger.error("lifecycle_canary_scanner_blocked reason=%s", result)
+            return {
+                "enabled": True,
+                "claimed": 0,
+                "dispatched": 0,
+                "reason": result,
+            }
+        canary_activation_id = result
+        enforce_event_ids = parse_canary_event_ids(canary_event_ids)
+
     now = timezone.now()
     claims = claim_due_lifecycle_controls(
         now=now,
         batch_size=getattr(settings, "RACE_EVENT_LIFECYCLE_BATCH_SIZE", 100),
         ttl_seconds=getattr(settings, "RACE_EVENT_LIFECYCLE_CLAIM_TTL_SECONDS", 240),
+        enforce_event_ids=enforce_event_ids,
     )
 
     for claim in claims:
@@ -2332,6 +2365,9 @@ def scan_due_race_event_lifecycle_task() -> dict:
             "expected_runtime_mode": getattr(
                 settings, "RACE_EVENT_LIFECYCLE_MODE", "off"
             ),
+            "expected_canary_sha256": canary_sha,
+            "expected_canary_event_ids": canary_event_ids,
+            "expected_canary_activation_id": canary_activation_id,
         }
         transaction.on_commit(
             lambda kwargs=dispatch_kwargs: advance_race_event_lifecycle_task.apply_async(
@@ -2351,6 +2387,9 @@ def advance_race_event_lifecycle_task(
     expected_claim_generation: int = 0,
     expected_runtime_enabled: bool | None = None,
     expected_runtime_mode: str | None = None,
+    expected_canary_sha256: str = "",
+    expected_canary_event_ids: str = "",
+    expected_canary_activation_id: str = "",
 ) -> dict:
     """Advance a single event's lifecycle based on time rules only.
 
@@ -2401,11 +2440,53 @@ def advance_race_event_lifecycle_task(
     with transaction.atomic():
         # Re-check both ENABLED and MODE inside the transaction to prevent
         # stale queued tasks from writing after the feature is disabled.
-        if not actual_runtime_enabled:
+        current_runtime_enabled = getattr(
+            settings, "RACE_EVENT_LIFECYCLE_ENABLED", False
+        )
+        current_runtime_mode = getattr(
+            settings, "RACE_EVENT_LIFECYCLE_MODE", "off"
+        )
+        if (
+            not current_runtime_enabled
+            or current_runtime_enabled != actual_runtime_enabled
+            or current_runtime_mode != actual_runtime_mode
+        ):
             return {"processed": False, "reason": "lifecycle_disabled_mid_flight", "event_id": event_id}
-        lifecycle_mode = actual_runtime_mode
+        lifecycle_mode = current_runtime_mode
         if lifecycle_mode not in ("shadow", "enforce"):
             return {"processed": False, "reason": "lifecycle_disabled_mid_flight", "event_id": event_id}
+
+        actual_canary_sha = getattr(
+            settings, "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256", ""
+        )
+        actual_canary_ids = getattr(
+            settings, "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS", ""
+        )
+        if lifecycle_mode == "enforce":
+            if (
+                expected_canary_sha256 != actual_canary_sha
+                or expected_canary_event_ids != actual_canary_ids
+                or not expected_canary_activation_id
+            ):
+                return {
+                    "processed": False,
+                    "reason": "lifecycle_canary_runtime_config_mismatch",
+                    "event_id": event_id,
+                }
+            from stable.services.race_event_lifecycle_canary import (
+                validate_active_canary_cohort,
+            )
+            valid, cohort_result = validate_active_canary_cohort(
+                raw_sha256=actual_canary_sha,
+                event_ids_text=actual_canary_ids,
+                expected_activation_id=expected_canary_activation_id,
+            )
+            if not valid:
+                return {
+                    "processed": False,
+                    "reason": cohort_result,
+                    "event_id": event_id,
+                }
 
         # Read per-event US zone allowlist from control manifest
         allowed_us_zones = None
@@ -2425,6 +2506,9 @@ def advance_race_event_lifecycle_task(
             attempt_token=attempt_token,
             expected_claim_generation=expected_claim_generation,
             allowed_us_zones=allowed_us_zones,
+            expected_canary_sha256=actual_canary_sha,
+            expected_canary_event_ids=actual_canary_ids,
+            expected_canary_activation_id=expected_canary_activation_id,
         )
 
     return {

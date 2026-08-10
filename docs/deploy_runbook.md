@@ -8490,3 +8490,39 @@ python3 runtime/research/p0_participant_execution_ledger.py \
 5. 新 artifact 经独立审查后，重新提交精确 G3，范围仍须列明 profile/race record/P0 source/module audit/
    首次发布目标及冻结 blocker。fresh 写前备份、maintenance/drain、manifest-bound apply 和完整 verifier
    必须绑定同一新 release；只有 verifier 通过才推进 ledger，`full_network` 仍需按授权范围另行判断。
+
+## Lifecycle enforce canary 受审入口（event 186/187）
+
+代码部署本身不得自动执行以下动作。精确 G3 获批后，先用 prepare 命令只读生成两场 artifact 并核对
+raw SHA、apply/runtime 期限、revision 与 DB 快照；再确保全局已通过 mode switch 收敛到 false/off。
+
+关闭态 promotion 只能使用共享锁 wrapper：
+
+```bash
+COMPOSE_FILE=docker-compose.prod.lowcost.yml \
+EXPECTED_COMPOSE_PROJECT=umanews \
+EXPECTED_RELEASE_DIR=<exact-release-dir> \
+EXPECTED_IMAGE_ID=<exact-image-id> \
+EXPECTED_RELEASE_COMMIT=<40-hex> \
+EXPECTED_CANARY_EVENT_IDS=186,187 \
+MANIFEST_FILE=<host-manifest.json> \
+MANIFEST_SHA256=<raw-sha256> \
+DEPLOYMENT_LOCK_TOKEN=<high-entropy-token> \
+./deploy/promote_lifecycle_enforce_canary.sh
+```
+
+wrapper 在锁内验证宿主 web/worker/Beat 均 false/off，将 no-follow、regular、≤1 MiB 且 SHA 匹配的
+冻结字节经 stdin 传给 resident web；容器 command 还会在任何 DB 写入前把 manifest IDs 与 wrapper
+传入的精确 `186,187` 再比较，并在写后再次验证关闭态。首次部署旧 resident 若尚无两项 canary env
+键，false/off coherence 将“缺失”安全等价为空；重复或非空仍拒绝，后续 mode switch 会补齐空键。
+随后 `switch_lifecycle_mode.sh` 的
+`true/enforce` 路径必须使用同一 manifest/SHA/IDs/revision；它按 web→healthy→inactive verifier→
+worker→runtime coherence→activate→active verifier→Beat 执行，不手工发 scanner，也不启动 race-live。
+
+任何异常立即使用 `TARGET_LIFECYCLE_ENABLED=false`、`TARGET_LIFECYCLE_MODE=off` 的同一 mode switch
+止写；off 路径不读取 manifest，并清空两份 env 的 canary SHA/IDs。不得直接调用 Django promotion/
+activation command 绕过宿主 shared lock，也不得手工把其他 control 改成 enforce。
+
+短暂切回 off 后如需在原 runtime window 内重新启用，同一 manifest 只允许 lifecycle 自身已产生的单向
+状态/刷新字段进展；schedule、generation、enrollment、可见性、人工锁/暂停和 cohort 仍严格冻结，且每次
+activation 必须产生新的 ID。范围外 enforce control 在 scanner claim 查询层即排除，不允许留下 TTL claim。

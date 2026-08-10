@@ -18,6 +18,9 @@ for name in COMPOSE_FILE EXPECTED_LIFECYCLE_ENABLED EXPECTED_LIFECYCLE_MODE \
   require "$name"
 done
 
+EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256="${EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256:-}"
+EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS="${EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS:-}"
+
 case "$COMPOSE_FILE" in
   docker-compose.prod.yml|docker-compose.prod.lowcost.yml) ;;
   *) fail "COMPOSE_FILE is not allowlisted" ;;
@@ -32,6 +35,26 @@ case "$EXPECTED_RELEASE_COMMIT" in
   *[!0-9a-f]*|"") fail "EXPECTED_RELEASE_COMMIT must be a lowercase 40-character OID" ;;
 esac
 [ "${#EXPECTED_RELEASE_COMMIT}" -eq 40 ] || fail "EXPECTED_RELEASE_COMMIT must be a lowercase 40-character OID"
+if [ "$EXPECTED_LIFECYCLE_MODE" = "enforce" ]; then
+  case "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256" in
+    *[!0-9a-f]*|"") fail "expected enforce canary SHA must be lowercase SHA-256" ;;
+  esac
+  [ "${#EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256}" -eq 64 ] || fail "expected enforce canary SHA must be lowercase SHA-256"
+  case "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS" in
+    *[!0-9,]*|""|*,*,*) fail "expected enforce canary event IDs must be two comma-separated integers" ;;
+  esac
+  first_canary_id="${EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS%%,*}"
+  second_canary_id="${EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS#*,}"
+  [ -n "$first_canary_id" ] && [ -n "$second_canary_id" ] \
+    && [ "$first_canary_id" != "$second_canary_id" ] \
+    || fail "expected enforce canary event IDs must be two distinct integers"
+  case "$first_canary_id/$second_canary_id" in
+    0/*|0?*/*|*/0|*/0?*) fail "expected enforce canary event IDs must be canonical positive integers" ;;
+  esac
+else
+  [ -z "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256" ] || fail "canary SHA must be empty outside enforce"
+  [ -z "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS" ] || fail "canary event IDs must be empty outside enforce"
+fi
 
 snapshot="$(mktemp "${TMPDIR:-/tmp}/umanews-lifecycle-census.XXXXXX")" || fail "cannot create census snapshot"
 trap 'rm -f "$snapshot"' EXIT HUP INT TERM
@@ -88,12 +111,27 @@ check_service() {
   env_output="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$selected")" || fail "$service environment inspect failed"
   enabled_count="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENABLED"{n++} END{print n+0}')"
   mode_count="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_MODE"{n++} END{print n+0}')"
+  canary_sha_count="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256"{n++} END{print n+0}')"
+  canary_ids_count="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS"{n++} END{print n+0}')"
   [ "$enabled_count" -eq 1 ] || fail "$service lifecycle enabled key count is not one"
   [ "$mode_count" -eq 1 ] || fail "$service lifecycle mode key count is not one"
+  if [ "$EXPECTED_LIFECYCLE_ENABLED/$EXPECTED_LIFECYCLE_MODE" = "false/off" ] \
+    && [ -z "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256" ] \
+    && [ -z "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS" ]; then
+    [ "$canary_sha_count" -le 1 ] || fail "$service enforce canary SHA key count exceeds one"
+    [ "$canary_ids_count" -le 1 ] || fail "$service enforce canary event IDs key count exceeds one"
+  else
+    [ "$canary_sha_count" -eq 1 ] || fail "$service enforce canary SHA key count is not one"
+    [ "$canary_ids_count" -eq 1 ] || fail "$service enforce canary event IDs key count is not one"
+  fi
   actual_enabled="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENABLED"{print substr($0,index($0,"=")+1)}')"
   actual_mode="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_MODE"{print substr($0,index($0,"=")+1)}')"
+  actual_canary_sha="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256"{print substr($0,index($0,"=")+1)}')"
+  actual_canary_ids="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS"{print substr($0,index($0,"=")+1)}')"
   [ "$actual_enabled" = "$EXPECTED_LIFECYCLE_ENABLED" ] || fail "$service lifecycle enabled mismatch"
   [ "$actual_mode" = "$EXPECTED_LIFECYCLE_MODE" ] || fail "$service lifecycle mode mismatch"
+  [ "$actual_canary_sha" = "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256" ] || fail "$service enforce canary SHA mismatch"
+  [ "$actual_canary_ids" = "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS" ] || fail "$service enforce canary event IDs mismatch"
 }
 
 check_service web present

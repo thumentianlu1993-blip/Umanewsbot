@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone as django_timezone
@@ -223,6 +224,9 @@ def apply_race_lifecycle_decision(
     attempt_token: str = "",
     expected_claim_generation: int = 0,
     allowed_us_zones: frozenset[str] | None = None,
+    expected_canary_sha256: str = "",
+    expected_canary_event_ids: str = "",
+    expected_canary_activation_id: str = "",
 ) -> ApplyResult:
     """Atomically apply the lifecycle decision for one event.
 
@@ -237,8 +241,64 @@ def apply_race_lifecycle_decision(
     if dry_run or mode == "dry_run":
         return _apply_dry(event_id, expected_generation, now, allowed_us_zones)
 
+    runtime_enforce = (
+        mode == "enforce"
+        and (
+            getattr(settings, "RACE_EVENT_LIFECYCLE_MODE", "off") == "enforce"
+            or expected_canary_sha256
+            or expected_canary_event_ids
+        )
+    )
+    prelocked_control = None
+    canary_transition_metadata: dict = {}
+    # Global enforce still permits per-control shadow.  Read the target mode
+    # before taking the ordered cohort locks so an out-of-cohort shadow control
+    # keeps producing proposals instead of being rejected by the canary gate.
+    # Promotion is allowed only while the runtime is false/off, so a mode
+    # change during a live enforce run is itself invalid and is checked below.
+    target_control_mode = None
+    if runtime_enforce:
+        target_control_mode = (
+            RaceEventLifecycleControl.objects.filter(event_id=event_id)
+            .values_list("mode", flat=True)
+            .first()
+        )
+    if runtime_enforce and target_control_mode == RaceEventLifecycleMode.ENFORCE:
+        from stable.services.race_event_lifecycle_canary import (
+            CanaryError,
+            parse_canary_event_ids,
+        )
+        try:
+            cohort_ids = parse_canary_event_ids(
+                expected_canary_event_ids
+                or getattr(
+                    settings,
+                    "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS",
+                    "",
+                )
+            )
+        except CanaryError:
+            return ApplyResult(
+                action="noop", reason_code="canary_runtime_settings_invalid"
+            )
+        if event_id not in cohort_ids:
+            return ApplyResult(action="noop", reason_code="canary_event_out_of_scope")
+        cohort_controls = list(
+            RaceEventLifecycleControl.objects.select_for_update(of=("self",))
+            .filter(event_id__in=cohort_ids)
+            .order_by("event_id")
+        )
+        if tuple(item.event_id for item in cohort_controls) != cohort_ids:
+            return ApplyResult(
+                action="noop", reason_code="canary_control_cohort_incomplete"
+            )
+        prelocked_control = next(
+            item for item in cohort_controls if item.event_id == event_id
+        )
+
     control = _lock_and_validate_control(
-        event_id, expected_generation, attempt_token, expected_claim_generation, now
+        event_id, expected_generation, attempt_token, expected_claim_generation, now,
+        prelocked_control=prelocked_control,
     )
     if isinstance(control, ApplyResult):
         return control  # validation failed
@@ -250,6 +310,43 @@ def apply_race_lifecycle_decision(
     effective = _effective_mode(mode, control.mode)
     if effective not in ("shadow", "enforce"):
         return ApplyResult(action="noop", reason_code=f"effective_mode_{effective}")
+
+    # The canary gate is required only for the real global enforce runtime.
+    # Keeping direct, isolated service tests independent of Django's default
+    # off setting preserves the pure lower-level API while every production
+    # task passes through the independently configured runtime trust root.
+    if effective == "enforce" and runtime_enforce:
+        if prelocked_control is None:
+            return ApplyResult(
+                action="noop", reason_code="canary_control_mode_changed"
+            )
+        from stable.services.race_event_lifecycle_canary import (
+            validate_event_for_enforce,
+        )
+
+        canary_error = validate_event_for_enforce(
+            event=event,
+            control=control,
+            raw_sha256=expected_canary_sha256
+            or getattr(settings, "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256", ""),
+            event_ids_text=expected_canary_event_ids
+            or getattr(settings, "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS", ""),
+            expected_activation_id=expected_canary_activation_id,
+            now=now,
+        )
+        if canary_error:
+            return ApplyResult(action="noop", reason_code=canary_error)
+        evidence = control.manifest_data["enforce_canary"]
+        canary_transition_metadata = {
+            "enforce_canary": {
+                "schema_version": 1,
+                "raw_sha256": evidence["raw_sha256"],
+                "content_sha256": evidence["content_sha256"],
+                "event_ids": evidence["event_ids"],
+                "approved_commit": evidence["approved_commit"],
+                "activation_id": evidence["activation_id"],
+            }
+        }
 
     decision = decide_race_lifecycle(
         race_datetime=event.race_datetime,
@@ -276,7 +373,14 @@ def apply_race_lifecycle_decision(
     if effective == "shadow":
         return _apply_shadow(event, control, decision, now, run_id)
     else:
-        return _apply_enforce(event, control, decision, now, run_id)
+        return _apply_enforce(
+            event,
+            control,
+            decision,
+            now,
+            run_id,
+            transition_metadata=canary_transition_metadata,
+        )
 
     return ApplyResult(action="noop")
 
@@ -287,14 +391,18 @@ def _lock_and_validate_control(
     attempt_token: str,
     expected_claim_generation: int,
     now: datetime,
+    prelocked_control: RaceEventLifecycleControl | None = None,
 ) -> RaceEventLifecycleControl | ApplyResult:
     """Lock the control row and validate claim identity + generation."""
-    try:
-        control = RaceEventLifecycleControl.objects.select_for_update(
-            of=("self",),
-        ).get(event_id=event_id)
-    except RaceEventLifecycleControl.DoesNotExist:
-        return ApplyResult(action="noop", error="no lifecycle control")
+    if prelocked_control is None:
+        try:
+            control = RaceEventLifecycleControl.objects.select_for_update(
+                of=("self",),
+            ).get(event_id=event_id)
+        except RaceEventLifecycleControl.DoesNotExist:
+            return ApplyResult(action="noop", error="no lifecycle control")
+    else:
+        control = prelocked_control
 
     if control.mode == RaceEventLifecycleMode.OFF:
         return ApplyResult(action="noop", reason_code="mode_off")
@@ -437,6 +545,7 @@ def _apply_enforce(
     decision: LifecycleDecision,
     now: datetime,
     run_id: str,
+    transition_metadata: dict | None = None,
 ) -> ApplyResult:
     applied_dedupe_key = (
         f"applied:{event.id}:{control.schedule_generation}:"
@@ -471,6 +580,7 @@ def _apply_enforce(
         run_id=run_id,
         source_authority="time_rule",
         based_on_proposal=based_on,
+        metadata=transition_metadata or {},
     )
 
     event.status = decision.to_status
@@ -588,6 +698,7 @@ def claim_due_lifecycle_controls(
     now: datetime,
     batch_size: int,
     ttl_seconds: int,
+    enforce_event_ids: tuple[int, ...] | None = None,
 ) -> list[LifecycleBatchClaim]:
     """Atomically claim a bounded batch of due lifecycle control rows.
 
@@ -601,13 +712,21 @@ def claim_due_lifecycle_controls(
         return []
 
     with transaction.atomic():
+        mode_scope = Q(mode=RaceEventLifecycleMode.SHADOW)
+        if enforce_event_ids is None:
+            mode_scope |= Q(mode=RaceEventLifecycleMode.ENFORCE)
+        elif enforce_event_ids:
+            mode_scope |= Q(
+                mode=RaceEventLifecycleMode.ENFORCE,
+                event_id__in=enforce_event_ids,
+            )
         due_rows = list(
             RaceEventLifecycleControl.objects.select_for_update(
                 skip_locked=True,
                 of=("self",),
             )
             .filter(
-                mode__in=(RaceEventLifecycleMode.SHADOW, RaceEventLifecycleMode.ENFORCE),
+                mode_scope,
                 next_refresh_at__lte=now,
                 manual_pause_reason="",
             )

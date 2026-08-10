@@ -5922,3 +5922,27 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   幂等及通用 upsert 全局影响均无阻断项。当前没有生产数据写入；下一步为 commit/push/PR/合并、全部
   高风险开关关闭的部署，再基于精确新 revision 和新鲜生产快照生成全新 candidate/artifact；完成独立
   artifact 审查后重新申请 G3。
+
+# 2026-08-10 lifecycle enforce canary 独立代码审核 APPROVED，待发布授权
+
+- 独立 worktree `codex/lifecycle-enforce-canary` 基于 `origin/main@70f365c7`，只实现 event 186/187
+  的 manifest-bound enforce 灰度；其他 control 继续 shadow，不接入 provider、race-live、新闻、QQ
+  或新状态机，不含 migration。
+- 方案经同一独立 reviewer 三轮收敛至 `APPROVED`。实现采用独立 env/settings SHA+IDs 信任根、
+  inactive/active 两阶段 evidence、两场共享 64 位小写 activation ID、shared deployment lock、
+  PostgreSQL advisory transaction lock、bounded stdin manifest 与 web→verify→worker→activate→Beat
+  顺序；false/off 不依赖 artifact 并清空信任根。
+- 测试先行先取得 4/4 load-bearing RED；主线程随后发现并以真实 RED 修复“范围外 shadow control 在
+  global enforce 下被错误 noop”问题。独立 reviewer 首轮 `REVISE` 的 3 项 P1 与 1 项 P2 也已全部
+  按测试先行修复：management command 与 wrapper 写前绑定授权 event IDs；scanner claim 查询排除
+  范围外 enforce；旧 resident 在严格 false/off 下允许缺失 canary 空键完成 bootstrap；合法生命周期
+  进展后可安全 disarm/reactivate，且新 activation ID 不复用。
+- 第 2 轮 reviewer 确认首轮三项 P1 已关闭，仅新增 1 项 reactivation provenance P1：状态属于
+  running/finished 不足以证明由本 canary 推进。主线程新增外部直改状态负例并取得真实 RED；修复后
+  canary applied transition 写入 manifest/activation provenance，reactivation 验证精确状态链、generation、
+  reason 与 T/T+30 时间连续性，普通或无 transition 的状态变更均拒绝。
+- 当前组合回归 `147/147`、隔离 PostgreSQL 16 并发 promotion 再次 `1/1`；Django/migration/shell/
+  workflow/diff 门禁全部通过，临时容器已删除。同一独立 reviewer 第 3 轮最终结论 `APPROVED`，无
+  P0/P1；仅记录首次 tick 直接 `scheduled→finished` 后同 manifest reactivation 会保守拒绝的非阻塞 P2，
+  不影响首次 canary、不扩大写入范围。当前没有 commit、push、PR、部署、生产 control/event/env 写入
+  或 enforce 启用；下一步需用户分别授权 G2 代码发布与绑定生产 revision/manifest SHA/186,187 的 G3。

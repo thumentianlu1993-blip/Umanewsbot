@@ -611,6 +611,8 @@ class CoherenceHarness:
         env_lines: str = (
             "RACE_EVENT_LIFECYCLE_ENABLED=true\n"
             "RACE_EVENT_LIFECYCLE_MODE=shadow\n"
+            "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256=\n"
+            "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS=\n"
             "SECRET_MUST_NOT_LEAK=hunter2\n"
         ),
     ):
@@ -675,6 +677,23 @@ class LifecycleRuntimeCoherenceContractTests(SimpleTestCase):
             result = harness.run()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("hunter2", result.stdout + result.stderr)
+
+    def test_false_off_treats_absent_canary_keys_as_empty_during_bootstrap(self):
+        env_lines = (
+            "RACE_EVENT_LIFECYCLE_ENABLED=false\n"
+            "RACE_EVENT_LIFECYCLE_MODE=off\n"
+        )
+        with TemporaryDirectory() as temporary:
+            harness = self._harness(Path(temporary))
+            for service, cid in harness.services.items():
+                harness.set_container(cid, service=service, env_lines=env_lines)
+            result = harness.run(
+                EXPECTED_LIFECYCLE_ENABLED="false",
+                EXPECTED_LIFECYCLE_MODE="off",
+                EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256="",
+                EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS="",
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_duplicate_cross_project_worker_and_oneoff_fail_closed(self):
         for oneoff in ("False", "True"):
@@ -929,7 +948,9 @@ class ModeSwitchHarness:
         path.write_text(
             "KEEP_ME=unchanged\n"
             f"RACE_EVENT_LIFECYCLE_ENABLED={enabled}\n"
-            f"RACE_EVENT_LIFECYCLE_MODE={mode}\n",
+            f"RACE_EVENT_LIFECYCLE_MODE={mode}\n"
+            "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256=\n"
+            "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS=\n",
             encoding="utf-8",
         )
         path.chmod(0o600)
@@ -1149,6 +1170,8 @@ class LifecycleModeSwitchContractTests(SimpleTestCase):
             {
                 "RACE_EVENT_LIFECYCLE_ENABLED": "true",
                 "RACE_EVENT_LIFECYCLE_MODE": "shadow",
+                "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256": "",
+                "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS": "",
             },
         )
         self.assertEqual(malicious_before, malicious_after)
@@ -1190,6 +1213,8 @@ class LifecycleModeSwitchContractTests(SimpleTestCase):
             {
                 "RACE_EVENT_LIFECYCLE_ENABLED": "true",
                 "RACE_EVENT_LIFECYCLE_MODE": "shadow",
+                "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256": "",
+                "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS": "",
             },
         )
         expected_dir = str(harness.release)
@@ -1357,6 +1382,8 @@ class LifecycleModeSwitchContractTests(SimpleTestCase):
                         {
                             "RACE_EVENT_LIFECYCLE_ENABLED": "false",
                             "RACE_EVENT_LIFECYCLE_MODE": "off",
+                            "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256": "",
+                            "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS": "",
                         },
                     )
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -634,6 +635,46 @@ P0_RACECARD_URL_DISCOVERY_TIME_LIMIT = int(
 # ── Race Event Lifecycle (Phase A) ──
 RACE_EVENT_LIFECYCLE_ENABLED = env_bool("RACE_EVENT_LIFECYCLE_ENABLED", False)
 RACE_EVENT_LIFECYCLE_MODE = env("RACE_EVENT_LIFECYCLE_MODE", "off")
+RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256 = (
+    env("RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256", "") or ""
+)
+RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS = (
+    env("RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS", "") or ""
+)
+if RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256 and not re.fullmatch(
+    r"[0-9a-f]{64}", RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256
+):
+    raise ValueError(
+        "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256 must be 64 lowercase hex"
+    )
+if RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS:
+    _lifecycle_canary_parts = RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS.split(",")
+    if (
+        len(_lifecycle_canary_parts) != 2
+        or any(not re.fullmatch(r"[1-9][0-9]*", part) for part in _lifecycle_canary_parts)
+        or [int(part) for part in _lifecycle_canary_parts]
+        != sorted({int(part) for part in _lifecycle_canary_parts})
+    ):
+        raise ValueError(
+            "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS must be two unique "
+            "positive IDs in ascending comma order"
+        )
+if bool(RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256) != bool(
+    RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS
+):
+    raise ValueError("lifecycle enforce canary SHA and event IDs must be set together")
+if RACE_EVENT_LIFECYCLE_MODE == "enforce":
+    if not (
+        RACE_EVENT_LIFECYCLE_ENABLED
+        and RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256
+        and RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS
+    ):
+        raise ValueError("true/enforce requires the complete lifecycle canary trust root")
+elif (
+    RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256
+    or RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS
+):
+    raise ValueError("lifecycle canary trust root must be empty outside enforce mode")
 RACE_EVENT_LIFECYCLE_BATCH_SIZE = int(env("RACE_EVENT_LIFECYCLE_BATCH_SIZE", "100"))
 RACE_EVENT_LIFECYCLE_CLAIM_TTL_SECONDS = int(
     env("RACE_EVENT_LIFECYCLE_CLAIM_TTL_SECONDS", "240")
