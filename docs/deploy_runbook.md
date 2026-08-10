@@ -1,5 +1,20 @@
 # 部署运行手册
 
+## 2026-08-10 batch-0001 r2 candidate 与精确 G3 门禁
+
+1. 四模块 bundle 已冻结：research `e9a3e93a…81643`、mapping `69ba9f10…6ba7`、authority
+   `670932e6…d136`；`32/32 bind_existing`，profile ID 唯一，`16` blocker 继续冻结。
+2. release candidate SHA 为 `fc7962c3e337945b70303fbe1868bd7f100c5ff3437296356cfc0955f487e16e`，
+   commit artifact SHA 为 `9d2a1e32efbe658f10989771d26c4627a48f395cf99a629a73c2432491c39c16`，
+   production snapshot SHA 为 `1bb55ec97fe5439c96c010b2fa163f666b46a13b9fedf1677761c510782dfbe4`。
+3. 精确动作范围：profile update `32`、race record create `410`、update `0`、existing `12`、P0 source
+   upsert `32`、module audit `128`；首次发布尝试仅限 draft profile `8307/45666/45738`。
+4. 未取得绑定上述 SHA、动作范围和 publish scope 的 G3 前，禁止 `--commit`。获批后仍先做 fresh
+   custom-format DB 备份、锁/queue/writer 复核、进入 maintenance，再以精确 candidate SHA、独立
+   `approved_by` 和 active superuser executor 执行。任一 snapshot drift 确定性停止。
+5. commit 后须核对 planned remaining 五字段全零、422 条履历守恒、98 条主胜鞍来自胜出履历、三个
+   draft profile 的实际发布结果和完整 HTTP/writer verifier；全部通过后才能推进 ledger 并处理下一批。
+
 ## 2026-08-10 participant batch-0001 r2 release draft 桥接
 
 0. PR `#93` 已按 merge SHA `25ea0df188f323e1a24a78f781bab6a27bf0ac73` 部署到

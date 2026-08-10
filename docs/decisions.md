@@ -1,5 +1,15 @@
 # 关键决策
 
+## 2026-08-10 batch-0001 r2 模块批准不等于生产写入批准
+
+- 用户批准只覆盖 `32` 个 identity 的四模块并继续冻结 `16` 个 blocker；它允许生成只读 mapping bundle
+  和 immutable release candidate，不自动授权 `--commit`、自动首次发布或 `full_network`。
+- 精确 G3 必须绑定 candidate `fc7962c3…e16e`、artifact `9d2a1e32…9c16`、production snapshot
+  `1bb55ec9…fbe4` 及完整 action/publish scope。执行前仍需 fresh 写前备份、writer/lock/queue 复核与
+  maintenance；写后 verifier 通过前不得推进 execution ledger 或 ordinal 2。
+- 三个 draft profile `8307/45666/45738` 的首次发布属于候选显式动作范围，不能隐含在“资料更新”中；
+  G3 必须明确包含或排除。其余 `29` 个已发布 profile 只更新受审资料，不改变发布状态。
+
 ## 2026-08-10 production draft 保留权威 evidence root 的路径身份
 
 - participant bridge 的 source binding 会记录实际输入路径；生产生成时不复制 PR90 r2 到新 release，
