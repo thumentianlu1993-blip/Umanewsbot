@@ -1,5 +1,35 @@
 # 部署运行手册
 
+## 2026-08-10 participant batch-0001 r2 release draft 桥接
+
+1. 闭锁部署后保持所有 profile network、production apply、auto publish、race-live 与 `full_network` 开关
+   为 false。先复核 production revision、容器 image、writer/queue/lock、HTTP health 与 migration leaf；
+   本命令本身不访问网络或数据库。
+2. 只对 execution ledger 中精确 active `prepared` 的 batch 执行：
+
+   ```bash
+   python manage.py bridge_p0_participant_release \
+     --batch-index <participant-batches-root>/batch_index.json \
+     --execution-ledger <participant-execution-root>/execution-ledger.json \
+     --completion-manifest <r2-output>/p0_horse_completion_batch_manifest.json \
+     --candidates <r2-output>/p0_horse_completion_candidates.jsonl \
+     --output <participant-execution-root>/batch-0001-japan-0001/release-draft-r1
+   ```
+
+   期望为 `occurrence_count=50`、`unique_identity_count=32`、
+   `deduplicated_occurrence_count=2`、`blocked_occurrence_count=16`、
+   `module_review_status=pending`、`database_writes=0`。任一值不同都停止，不继续 bundle。
+3. 核对 `artifact/participant_source_binding.json` 精确绑定 completion SHA
+   `2cf2c634ec3a63ebf36e456ba8ddced814fdcd6897cec737853ee0b6decc04b8`、review manifest SHA
+   `f910082db6e649c8aed07648e8488da99e0e5deabd2451621cb617bdeed47f12` 和当前 batch index/ledger；
+   32 行 research identity 必须唯一。输出目录已存在时命令拒绝覆盖，重建必须使用新目录。
+4. 在用户明确批准 32 个 identity 的 profile/pedigree/race_record/major_wins 四模块且 16 blocker 继续冻结
+   前，禁止执行 `p0_horse_completion_batch --bundle`。批准后才以 active superuser reviewer 生成新鲜只读
+   production mapping snapshot；映射冲突则返回人工处理，不进入 release candidate。
+5. `--prepare-release` 之后仍需独立 release approval 和精确 G3。生产 apply 前执行 fresh 写前备份、服务
+   排空和 maintenance；只有 verifier `planned_remaining` 五字段全零后，execution ledger 才可从
+   `prepared` 依次推进到 `released -> applied -> verified`，随后才允许 ordinal 2。
+
 ## 2026-08-09 reviewed official-results package 发布前验证
 
 1. 仓库相对 package 固定为
