@@ -2758,3 +2758,12 @@ P0 马信息补全专项的模型交接文档见
   ordinal 1 `prepared`，保留 r1 retry history；尚未执行 release、G3、production apply 或后续批次。
 - 下一门禁是 34 项模块人工审核与 mapping snapshot。两个跨 occurrence 重复身份必须合并；只有形成新的
   release candidate 并取得独立 G3 授权后，才可考虑生产写入。
+
+# 2026-08-10 batch-0001 r2 G3 回滚与最小修复状态
+
+- 首次 G3 apply 因同 11 场 Netkeiba/JBIS 履历被计划为双份，触发 `インターポーザー` strict-complete
+  门禁并完整回滚；线上资料、履历、P0 source、发布状态和 ledger 均未推进，`full_network` 未启动。
+- 本地最小修复已统一跨来源同赛解析、写前 merged-start 守恒和重复提交校验；多候选/身份冲突继续
+  fail closed。定向 `3/3`、核心 `44/44`、相邻 `366/366`、PostgreSQL 本次路径 `1/1` 通过。
+- 独立只读代码审查 `APPROVED`、无 P0-P2。旧 candidate/artifact/G3 已失效；下一步按既有授权提交、
+  合并和闭锁部署，部署后生成并独立审核全新 candidate，生产 apply 前仍需用户给出新的精确 G3。

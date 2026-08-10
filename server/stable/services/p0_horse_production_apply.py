@@ -42,8 +42,12 @@ from stable.models import (
     TermType,
 )
 from stable.services.horse_race_records import (
+    AmbiguousLegacyRaceRecordError,
+    DuplicateRaceRecordError,
     canonical_race_key,
+    race_record_matches_upsert_payload,
     record_idempotency_key,
+    resolve_existing_race_record,
     valid_http_url,
     _normalize_race_record,
 )
@@ -1726,67 +1730,17 @@ def _profile_records_match_payload(
 ) -> bool:
     if profile.race_records.count() != len(records):
         return False
-    compared_fields = (
-        "race_name",
-        "race_year",
-        "race_date_precision",
-        "race_name_normalized",
-        "race_region",
-        "race_number",
-        "grade_text",
-        "normalized_grade",
-        "racecourse",
-        "distance_text",
-        "distance_meters",
-        "surface",
-        "race_type_text",
-        "horse_number",
-        "barrier",
-        "jockey_name",
-        "carried_weight",
-        "finish_time",
-        "prize_text",
-        "finish_position",
-        "result_status",
-        "start_status",
-        "is_overseas",
-        "is_major_win",
-        "source_name",
-        "source_url",
-    )
+    resolved_ids: set[int] = set()
     for payload in records:
-        idempotency = record_idempotency_key(profile, payload)
-        canonical = canonical_race_key(profile, payload)
-        identity_query = Q(
-            horse_profile=profile,
-            idempotency_key=idempotency,
-        )
-        if canonical:
-            identity_query |= Q(
-                horse_profile=profile,
-                canonical_race_key=canonical,
-            )
-        record = HorseRaceRecord.objects.filter(identity_query).first()
-        if record is None:
+        try:
+            record = resolve_existing_race_record(profile, payload)
+        except (AmbiguousLegacyRaceRecordError, DuplicateRaceRecordError):
             return False
-        if (
-            record.race_date.isoformat() if record.race_date else None
-        ) != payload.get("race_date"):
+        if record is None or record.id in resolved_ids:
             return False
-        for field in compared_fields:
-            expected = payload.get(field)
-            if field == "race_year":
-                expected = expected or None
-            elif field == "distance_meters":
-                expected = expected or None
-            elif field == "grade_text":
-                expected = payload.get("grade_text", payload.get("normalized_grade", ""))
-            elif field in {"is_overseas", "is_major_win"}:
-                expected = bool(expected)
-            elif expected is None:
-                expected = ""
-            if getattr(record, field) != expected:
-                return False
+        resolved_ids.add(record.id)
+        if not race_record_matches_upsert_payload(record, payload):
+            return False
     return True
 
 
@@ -1867,24 +1821,46 @@ def _validate_artifact_row(
 
 def _planned_record_actions(profile: HorseProfile | None, records: list[dict[str, Any]]) -> dict[str, int]:
     if profile is None:
-        return {"creates": len(records), "updates": 0, "existing": 0}
+        return {
+            "creates": len(records),
+            "updates": 0,
+            "existing": 0,
+            "merged_started_count": sum(
+                record.get("start_status") == "started" for record in records
+            ),
+        }
     creates = updates = existing = 0
+    merged_started = {
+        record.id: record.start_status == "started"
+        for record in profile.race_records.all()
+    }
+    matched_record_ids: set[int] = set()
+    created_started_count = 0
     for record in records:
-        idempotency = record_idempotency_key(profile, record)
-        canonical = canonical_race_key(profile, record)
-        identity_query = Q(
-            horse_profile=profile,
-            idempotency_key=idempotency,
-        )
-        if canonical:
-            identity_query |= Q(
-                horse_profile=profile,
-                canonical_race_key=canonical,
-            )
-        current = HorseRaceRecord.objects.filter(identity_query).first()
+        try:
+            current = resolve_existing_race_record(profile, record)
+        except (AmbiguousLegacyRaceRecordError, DuplicateRaceRecordError) as exc:
+            _fail(f"{profile.display_name} race record identity is ambiguous: {exc}")
         if current is None:
             creates += 1
+            created_started_count += int(record.get("start_status") == "started")
         else:
+            if current.id in matched_record_ids:
+                _fail(
+                    f"{profile.display_name} multiple reviewed records resolve to "
+                    f"existing race record {current.id}"
+                )
+            matched_record_ids.add(current.id)
+            incoming_status = str(record.get("start_status") or "")
+            incoming_source = str(record.get("source_name") or "").strip().casefold()
+            existing_source = str(current.source_name or "").strip().casefold()
+            cross_source = bool(
+                incoming_source
+                and existing_source
+                and incoming_source != existing_source
+            )
+            if not cross_source or current.start_status == "unconfirmed":
+                merged_started[current.id] = incoming_status == "started"
             expected = {
                 "race_name": record.get("race_name", ""),
                 "race_date": record.get("race_date"),
@@ -1905,7 +1881,13 @@ def _planned_record_actions(profile: HorseProfile | None, records: list[dict[str
                 existing += 1
             else:
                 updates += 1
-    return {"creates": creates, "updates": updates, "existing": existing}
+    return {
+        "creates": creates,
+        "updates": updates,
+        "existing": existing,
+        "merged_started_count": sum(merged_started.values())
+        + created_started_count,
+    }
 
 
 def _simulate(artifact: dict[str, Any], *, artifact_sha256: str, lock: bool = False) -> dict[str, Any]:
@@ -1920,6 +1902,7 @@ def _simulate(artifact: dict[str, Any], *, artifact_sha256: str, lock: bool = Fa
         "planned_module_audits": 0,
         "planned_metadata_reconciliations": 0,
         "already_applied_profiles": 0,
+        "merged_started_count_checks": 0,
         "database_write_count": 0,
     }
     seen_identity_keys: set[str] = set()
@@ -1958,6 +1941,16 @@ def _simulate(artifact: dict[str, Any], *, artifact_sha256: str, lock: bool = Fa
             report["planned_p0_source_upserts"] += 1
             report["planned_module_audits"] += len(REQUIRED_COMPLETION_MODULES)
         actions = _planned_record_actions(profile, row["race_records_payload"])
+        expected_started_count = row["career_history"].get(
+            "official_or_source_start_count"
+        )
+        if actions["merged_started_count"] != expected_started_count:
+            _fail(
+                f"{row['identity']['horse_name']} merged started count "
+                f"{actions['merged_started_count']} does not match reviewed official "
+                f"count {expected_started_count}"
+            )
+        report["merged_started_count_checks"] += 1
         report["planned_race_record_creates"] += actions["creates"]
         report["planned_race_record_updates"] += actions["updates"]
         report["existing_race_records"] += actions["existing"]

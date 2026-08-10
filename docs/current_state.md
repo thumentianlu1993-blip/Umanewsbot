@@ -5851,3 +5851,23 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   1 个 `ambiguous_identity`、1 个 request horse-name mismatch，全部正确 fail closed；34 个完整 occurrence
   对应 32 个 provider ID，两个跨 occurrence 重复须在后续 mapping snapshot 合并。当前批准只允许进入
   34 项模块人工审核/候选生成，16 项冻结排除；review CSV 尚未完成人工模块决策，不等于 G3 或生产写入授权。
+
+# 2026-08-10 batch-0001 r2 首次 G3 已回滚，跨来源同赛最小修复待发布
+
+- 已批准 candidate `fc7962c3…e16e` / artifact `9d2a1e32…9c16` 的 manifest-bound apply 在
+  `インターポーザー` strict-complete 门禁确定性停止；事务完整回滚，32 个 profile、243 条既有履历、
+  50 条 P0 source、completion run 与 task log 均无净变化，3 个 draft 仍未发布，`full_network` 未启动。
+- 根因是该 profile 已有 11 条 Netkeiba 完整履历，artifact 又提供同 11 场 JBIS 履历；provider identity
+  与赛名差异使旧逻辑计划新增 11 条，合并后实际出赛会变成 22，而官方/来源计数仍为 11。旧 candidate、
+  artifact、release manifest 和 G3 不得重放。
+- 干净分支 `codex/fix-p0-cross-source-race-dedupe` 已实现保守同赛等价：仅不同来源、精确日期、同场地、
+  同公制距离、同完赛名次、同 actual result/status 的 started 记录可合并；race number/event 冲突、多候选
+  或多种 identity 指向不同记录均 fail closed。prepare/dry-run/commit 统一按合并后 started count 与受审
+  official/source count 守恒，并复用同一语义执行重复提交漂移检查。
+- 当前验证：定向 `3/3`、production apply + career history `44/44`、相邻 participant/completion
+  `366/366`；真实 PostgreSQL 16 上本次跨来源首次提交与重复提交 `1/1`。PostgreSQL 旧专项中的 5 项
+  legacy-v1 fixture 会在进入本次路径前被现行 v2-only 门禁拒绝，另 2 项锁测试通过；未将其误报为本次全绿。
+- 独立只读代码审查最终 `APPROVED`、无 P0-P2；确认保守等价、多解/冲突拒绝、锁内写前守恒、重复提交
+  幂等及通用 upsert 全局影响均无阻断项。当前没有生产数据写入；下一步为 commit/push/PR/合并、全部
+  高风险开关关闭的部署，再基于精确新 revision 和新鲜生产快照生成全新 candidate/artifact；完成独立
+  artifact 审查后重新申请 G3。

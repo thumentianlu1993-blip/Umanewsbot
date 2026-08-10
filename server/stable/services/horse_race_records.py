@@ -334,6 +334,164 @@ def _source_evidence_identity_matches(profile: HorseProfile, payload: dict) -> l
     return matches
 
 
+def _distance_identity(*, meters: Any, text: Any) -> str:
+    if meters not in (None, ""):
+        try:
+            return f"m:{int(meters)}"
+        except (TypeError, ValueError):
+            return ""
+    normalized = _normalize_identity_text(text).replace(" ", "")
+    match = re.fullmatch(r"(\d{3,5})(?:m|metres?|meters?|メートル)", normalized)
+    return f"m:{int(match.group(1))}" if match else ""
+
+
+def cross_source_equivalent_race_records(
+    profile: HorseProfile,
+    payload: dict,
+) -> list[HorseRaceRecord]:
+    """Return exact same-start matches whose provider race identity differs.
+
+    A horse cannot make two actual starts at the same venue on the same exact
+    date.  The additional distance, finish and result checks keep this fallback
+    fail-closed when provider race names differ (for example JBIS ``サラ系``
+    prefixes versus Netkeiba class suffixes).  Non-starts and incomplete facts
+    deliberately remain source-specific.
+    """
+
+    incoming_source = str(payload.get("source_name") or "").strip().casefold()
+    race_date = parse_record_date(payload.get("race_date"))
+    racecourse = _normalize_identity_text(payload.get("racecourse"))
+    distance = _distance_identity(
+        meters=payload.get("distance_meters"),
+        text=payload.get("distance_text"),
+    )
+    finish_position = _normalize_identity_text(payload.get("finish_position"))
+    start_status = _resolved_start_status(payload)
+    result_status = str(payload.get("result_status") or "").strip()
+    if (
+        not incoming_source
+        or not race_date
+        or _resolved_date_precision(payload) != HorseRaceDatePrecision.EXACT
+        or not racecourse
+        or not distance
+        or not finish_position
+        or start_status != HorseRaceStartStatus.STARTED
+        or result_status not in _ACTUAL_START_RESULTS
+    ):
+        return []
+
+    incoming_race_number = _normalize_identity_text(payload.get("race_number"))
+    incoming_event_id = payload.get("event_id")
+    matches: list[HorseRaceRecord] = []
+    queryset = HorseRaceRecord.objects.filter(
+        horse_profile=profile,
+        race_date=race_date,
+        race_date_precision=HorseRaceDatePrecision.EXACT,
+    ).order_by("id")
+    for record in queryset.iterator():
+        existing_source = _record_source_name(record).casefold()
+        if not existing_source or existing_source == incoming_source:
+            continue
+        if record.start_status != HorseRaceStartStatus.STARTED:
+            continue
+        if record.result_status != result_status:
+            continue
+        if _normalize_identity_text(record.racecourse) != racecourse:
+            continue
+        if _distance_identity(
+            meters=record.distance_meters,
+            text=record.distance_text,
+        ) != distance:
+            continue
+        if _normalize_identity_text(record.finish_position) != finish_position:
+            continue
+        existing_race_number = _normalize_identity_text(record.race_number)
+        if (
+            incoming_race_number
+            and existing_race_number
+            and incoming_race_number != existing_race_number
+        ):
+            continue
+        if (
+            incoming_event_id
+            and record.event_id
+            and int(incoming_event_id) != record.event_id
+        ):
+            continue
+        matches.append(record)
+        if len(matches) == 2:
+            break
+    return matches
+
+
+def resolve_existing_race_record(
+    profile: HorseProfile,
+    payload: dict,
+) -> HorseRaceRecord | None:
+    """Resolve one existing row using the same identities as formal upsert."""
+
+    key = record_idempotency_key(profile, payload)
+    idempotent_record = HorseRaceRecord.objects.filter(
+        horse_profile=profile,
+        idempotency_key=key,
+    ).first()
+    source_evidence_records = _source_evidence_identity_matches(profile, payload)
+    if len(source_evidence_records) > 1:
+        raise DuplicateRaceRecordError("source identity resolves to multiple race records")
+    source_evidence_record = source_evidence_records[0] if source_evidence_records else None
+
+    canonical_record = None
+    canonical_key = canonical_race_key(profile, payload)
+    if canonical_key:
+        canonical_record = HorseRaceRecord.objects.filter(
+            horse_profile=profile,
+            canonical_race_key=canonical_key,
+        ).first()
+    if canonical_record is None and payload.get("event_id"):
+        fact_payload = dict(payload)
+        fact_payload.pop("event_id", None)
+        fact_payload.pop("result_id", None)
+        fact_key = canonical_race_key(profile, fact_payload)
+        if fact_key:
+            canonical_record = HorseRaceRecord.objects.filter(
+                horse_profile=profile,
+                canonical_race_key=fact_key,
+            ).first()
+
+    cross_source_records = cross_source_equivalent_race_records(profile, payload)
+    if len(cross_source_records) > 1:
+        raise AmbiguousLegacyRaceRecordError(
+            "cross-source race facts resolve to multiple race records"
+        )
+    cross_source_record = cross_source_records[0] if cross_source_records else None
+    identity_records = {
+        candidate.pk: candidate
+        for candidate in (
+            idempotent_record,
+            source_evidence_record,
+            canonical_record,
+            cross_source_record,
+        )
+        if candidate is not None
+    }
+    if len(identity_records) > 1:
+        raise DuplicateRaceRecordError(
+            "source identity and canonical identity resolve to different records"
+        )
+    record = next(iter(identity_records.values()), None)
+    if record is not None:
+        return record
+
+    if has_ambiguous_legacy_race_record(profile, payload):
+        raise AmbiguousLegacyRaceRecordError(
+            "multiple legacy race records match this payload"
+        )
+    legacy_matches = _legacy_external_identity_matches(profile, payload)
+    if not legacy_matches:
+        legacy_matches = _legacy_race_record_matches(profile, payload)
+    return legacy_matches[0] if len(legacy_matches) == 1 else None
+
+
 def _legacy_race_record_matches(profile: HorseProfile, payload: dict) -> list[HorseRaceRecord]:
     queryset = HorseRaceRecord.objects.filter(
         horse_profile=profile,
@@ -360,6 +518,9 @@ def has_ambiguous_legacy_race_record(profile: HorseProfile, payload: dict) -> bo
     external_matches = _legacy_external_identity_matches(profile, payload)
     if external_matches:
         return len(external_matches) > 1
+    cross_source_matches = cross_source_equivalent_race_records(profile, payload)
+    if cross_source_matches:
+        return len(cross_source_matches) > 1
     return len(_legacy_race_record_matches(profile, payload)) > 1
 
 
@@ -663,6 +824,29 @@ def _cross_source_value(record: HorseRaceRecord, field_name: str, value: Any) ->
     return value
 
 
+def race_record_matches_upsert_payload(
+    record: HorseRaceRecord,
+    payload: dict,
+) -> bool:
+    """Return whether an upsert would leave all formal payload fields unchanged."""
+
+    incoming_source = str(payload.get("source_name") or "").strip().casefold()
+    existing_source = _record_source_name(record).casefold()
+    cross_source = bool(
+        incoming_source
+        and existing_source
+        and incoming_source != existing_source
+    )
+    for field_name, value in _race_record_values(payload).items():
+        if field_name == "raw_payload":
+            continue
+        if cross_source:
+            value = _cross_source_value(record, field_name, value)
+        if getattr(record, field_name) != value:
+            return False
+    return True
+
+
 def _apply_record_values(
     record: HorseRaceRecord,
     values: dict[str, Any],
@@ -874,60 +1058,22 @@ def upsert_race_record(
         refresh_career_history_completeness(profile)
         return RaceRecordUpsertResult(record=record, action="updated" if diff else "unchanged", diff=diff)
 
-    idempotent_record = HorseRaceRecord.objects.filter(horse_profile=profile, idempotency_key=key).first()
-    source_evidence_records = _source_evidence_identity_matches(profile, payload)
-    if len(source_evidence_records) > 1:
-        raise DuplicateRaceRecordError("source identity resolves to multiple race records")
-    source_evidence_record = source_evidence_records[0] if source_evidence_records else None
-    canonical_record = None
-    if canonical_key:
-        canonical_record = HorseRaceRecord.objects.filter(
-            horse_profile=profile,
-            canonical_race_key=canonical_key,
-        ).first()
-    if canonical_record is None and payload.get("event_id"):
-        fact_payload = dict(payload)
-        fact_payload.pop("event_id", None)
-        fact_payload.pop("result_id", None)
-        fact_key = canonical_race_key(profile, fact_payload)
-        if fact_key:
-            canonical_record = HorseRaceRecord.objects.filter(
-                horse_profile=profile,
-                canonical_race_key=fact_key,
-            ).first()
-    identity_records = {
-        candidate.pk: candidate
-        for candidate in (idempotent_record, source_evidence_record, canonical_record)
-        if candidate is not None
-    }
-    if len(identity_records) > 1:
-        raise DuplicateRaceRecordError("source identity and canonical identity resolve to different records")
-    record = next(iter(identity_records.values()), None)
+    record = resolve_existing_race_record(profile, payload)
     action = "unchanged"
     if record is not None and not record.idempotency_key:
         record.idempotency_key = key
         action = "adopted"
     if record is None:
-        if has_ambiguous_legacy_race_record(profile, payload):
-            raise AmbiguousLegacyRaceRecordError("multiple legacy race records match this payload")
-        legacy_matches = _legacy_external_identity_matches(profile, payload)
-        if not legacy_matches:
-            legacy_matches = _legacy_race_record_matches(profile, payload)
-        record = legacy_matches[0] if len(legacy_matches) == 1 else None
-        if record is not None:
-            record.idempotency_key = key
-            action = "adopted"
-        else:
-            values["source_refs"] = _merge_source_refs(None, payload)
-            values["canonical_race_key"] = canonical_key
-            record = HorseRaceRecord.objects.create(
-                horse_profile=profile,
-                idempotency_key=key,
-                **values,
-            )
-            _normalize_race_record(record)
-            refresh_career_history_completeness(profile)
-            return RaceRecordUpsertResult(record=record, action="created", diff={})
+        values["source_refs"] = _merge_source_refs(None, payload)
+        values["canonical_race_key"] = canonical_key
+        record = HorseRaceRecord.objects.create(
+            horse_profile=profile,
+            idempotency_key=key,
+            **values,
+        )
+        _normalize_race_record(record)
+        refresh_career_history_completeness(profile)
+        return RaceRecordUpsertResult(record=record, action="created", diff={})
 
     incoming_source = str(payload.get("source_name") or "").strip().casefold()
     existing_source = _record_source_name(record).casefold()

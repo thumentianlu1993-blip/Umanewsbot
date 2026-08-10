@@ -2920,3 +2920,16 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   `withdrawn/scratched/did_not_finish/disqualified`；包含词、空值或其他标记继续确定性阻断。
 - 已登记为 `prepared` 的全阻断零写入 attempt 不得覆盖或删除。ledger retry 必须绑定原 completion SHA、
   相同 batch/review identity 和固定 repair reason，并把旧 SHA 追加到 `prepare_attempts` 后回到 `claimed`。
+
+# 2026-08-10 跨来源同赛只能以完整出赛事实保守合并
+
+- provider external identity 和赛名不能单独证明两条履历不同；Netkeiba/JBIS 对同场比赛可使用不同赛事名。
+- fallback 等价只适用于不同来源的实际出赛，并同时要求精确日期、规范化场地、公制距离、完赛名次和
+  actual result status 相同；双方都有 race number 或 event ID 时还必须一致。非出赛、日期不精确、事实
+  不完整或任一冲突都不得合并。
+- 多个旧记录同时命中，或 provider/canonical/fact identity 指向不同记录时必须确定性拒绝，不得任选。
+- 正式 artifact 在任何写入前必须用与 upsert 相同的解析逻辑计算“现有记录 + 受审记录”合并后的 started
+  count，并与受审 official/source start count 精确相等。首次 apply、dry-run 和幂等复核不得各自实现不同
+  身份语义。
+- 任何改变合并语义的代码都会使旧 production snapshot 与 expected actions 失效；必须闭锁部署后生成
+  全新 candidate/artifact/release，并取得新的精确 G3，禁止复用失败批次的授权哈希。
