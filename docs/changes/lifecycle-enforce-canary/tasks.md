@@ -27,6 +27,6 @@
 
 ## 发布
 
-- [ ] (operations) 等待用户绑定 commit/PR 的 G2 授权；本实现轮不提交或发布。
-- [ ] (operations) 另行等待绑定 canary manifest SHA、event 186/187 和生产 revision 的 G3 授权。
-- [ ] (operations) 获准后按 false/off→control apply→true/enforce→smoke/观察执行；异常立即 false/off。
+- [x] (operations) 按用户 G2 授权合并 PR #100，并以全部 lifecycle 关闭完成隔离 release 部署。
+- [x] (operations) 按绑定 production revision、manifest SHA 和 event 186/187 的精确 G3 授权执行。
+- [x] (operations) 完成 false/off→control apply→true/enforce→smoke；当前进入 T/T+30 持续观察。

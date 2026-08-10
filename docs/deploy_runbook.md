@@ -8526,3 +8526,13 @@ activation command 绕过宿主 shared lock，也不得手工把其他 control �
 短暂切回 off 后如需在原 runtime window 内重新启用，同一 manifest 只允许 lifecycle 自身已产生的单向
 状态/刷新字段进展；schedule、generation、enrollment、可见性、人工锁/暂停和 cohort 仍严格冻结，且每次
 activation 必须产生新的 ID。范围外 enforce control 在 scanner claim 查询层即排除，不允许留下 TTL claim。
+
+### 2026-08-10 双赛事 canary 首次生产执行证据
+
+- production revision=`a7e3783ff7d188481cecd421cd2595f43e9a706b`，image=
+  `sha256:afa0379f04d1ca8d0115f4ef724fdc9d08a4e34157682c2f657a6fd59f0f441f`，manifest raw
+  SHA=`eacffda63284e25b59c3efa5815d138a562c10e86eec7fe5ed1ed41219d303fc`。
+- 写前备份 SHA=`9265fd9e6619cee3d036f5db2da5eaecdede532694f5453338584c504a53a078`；promotion、
+  active verifier、runtime coherence、scanner smoke、Celery/HTTP/日志验收均通过。
+- 当前信任根精确为 event `186,187`，activation ID=`fb222bb1…010e`；race-live 保持关闭。逐时间点
+  观察与完整路径见 `docs/changes/lifecycle-enforce-canary/release_report.md`。
