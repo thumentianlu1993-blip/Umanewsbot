@@ -1,5 +1,25 @@
 # 部署运行手册
 
+## 2026-08-10 PR #98 部署与新 candidate 的精确 G3 入口
+
+1. 当前生产 application revision 为 `127d4833da89e4a8f6b1b9a93bbaec1e65119528`，image 为
+   `sha256:37f84597d96a59d48b0e18f567eda399a8bce6bcd1e05241fdb46e6633838852`；迁移 leaf `0072`、
+   flags closed、HTTP/writer/lock/log verifier 通过。代码部署备份 SHA 为 `793c51ad…10ff8`。
+2. 全新 candidate 为 `d95b580b1d97fb61cbbebe4ae60640ccfccab6e1dcd649ed824ef0215d5a418a`，artifact 为
+   `f74c116f63ff1bc561edac10a3a49f3c0643a13a079ec40b13fd5806d266ce0c`；旧 candidate/release/
+   approval/G3 禁止使用。新 candidate 当前仅为 `pending_independent_release_approval`，不得直接 apply。
+3. G3 获批后先重新核对 exact revision/image、candidate/artifact SHA、7 项 binding、writer/lock/queue 和
+   16 blocker 冻结，再生成绑定新 candidate 的全新 release manifest/approval。随后创建 fresh 写前 DB
+   备份，进入 maintenance，停止 beat 并安全 drain worker；不得强杀常规任务。
+4. manifest-bound dry-run 必须精确得到 profile create `0`/update `32`、race create `180`/update `230`/
+   existing `12`、P0 source `32`、module audit `128`。任一 snapshot、动作数、多解或 artifact row 重复解析
+   漂移均停止，禁止进入 commit。
+5. apply 后完整 verifier 必须证明 planned remaining 全零、422=421 started+1 nonstart、98 major wins 只来自
+   `won`、逐马 official count 守恒、source_refs 合并、16 blocker 未进入范围；首次发布只检查
+   `8307/45666/45738`。全部通过后才推进 ledger；本次不启动 `full_network`。
+6. 独立审查的自定义 230-row DB 重放未完成，不得写成通过。现有动态证据是生产 `prepare-release` 内置
+   `_simulate` 成功；正式 dry-run 仍必须重新执行且是唯一写前动态准入。
+
 ## 2026-08-10 PR #97 后续日本场地/距离表示修复发布规则
 
 1. PR `#97` 已按 merge SHA `afe0856da2d2ebbd615898b93c4adb3a5f410978` 闭锁部署，生产 image

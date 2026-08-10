@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-08-10 PR #98 已部署，新 candidate 等待精确 G3
+
+- 生产 revision `127d4833…9528`、image `sha256:37f84597…8852`，fresh 代码部署备份 SHA
+  `793c51ad…10ff8`；migration no-op/leaf 0072、服务、HTTP、writer/lock、日志与关闭态 flags 全部通过。
+- 新 candidate `d95b580b…a418a`、artifact `f74c116f…6ce0c` 已成功生成：32 profile update、180 race
+  create、230 race update、12 existing、32 source、128 audit；422=421 started+1 nonstart，98 major wins
+  全来自 won，首次发布只尝试 8307/45666/45738，16 blocker 冻结。
+- 独立静态复审 `APPROVED`、无 P0-P2；内置 `_simulate` 已把 profile 45661 的 11 场归入 update。额外
+  自定义 230-row DB 重放未完成，明确不得误报；正式 G3 dry-run 必须再次精确验证 snapshot/动作/唯一解析。
+- 当前未创建绑定新 candidate 的 release approval/manifest，未写 P0 业务数据，未启动 full_network。旧
+  candidate/release/G3 不得复用；下一步仅等待新精确 G3。
+
 ## 2026-08-10 PR #97 已闭锁部署，后续严格表示修复验证完成
 
 - PR `#97` merge SHA `afe0856d…0978` 已以 image `sha256:bd8b1206…19c0` 部署生产；migration no-op、

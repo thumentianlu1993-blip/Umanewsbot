@@ -1,5 +1,32 @@
 # 当前状态
 
+## 2026-08-10 PR #98 已闭锁部署；全新 candidate/artifact 等待精确 G3
+
+- PR `#98` 已按精确 merge SHA `127d4833da89e4a8f6b1b9a93bbaec1e65119528` 部署到独立 release
+  `/opt/umanews-release-127d4833-PR98-20260810/umanewsbot`；web/worker/beat 统一 image 为
+  `sha256:37f84597d96a59d48b0e18f567eda399a8bce6bcd1e05241fdb46e6633838852`。Release B preflight SHA
+  `f20aaa156cf0b0fa0cda193e8bb071453e6e7a148fe8a136c376a8cb496f896e`，migration no-op/leaf `0072`、
+  Django、容器 revision、内外 HTTP、writer/lock、日志与高风险开关关闭 verifier 均通过。
+- fresh 代码部署备份为 `/opt/umanewsbot/backups/db/pre-pr98-race-fact-normalization-20260810T115900Z.dump`，
+  `420593131` bytes、mode `0600`、TOC `1308`、SHA-256
+  `793c51ad6625852eb98cf194c182554da3a3b8768be8830e0638d84414e10ff8`；旧 image 保留为
+  `umanewsbot:rollback-pre-pr98-20260810`。部署排空观察到常规新闻 crawl `active=2→1→0`，未强杀任务；
+  `race_live_worker` 与 7543 条关闭态 backlog 保持原状。
+- 生产 image 内严格语义探针确认：Netkeiba `3中京8→('中京','3:8')`，非 Netkeiba
+  `4中京7` 保持完整；`芝2000`、`ダ2000`、`2000m` 分别保留 turf/dirt/unknown 类型提示。
+- 使用原受审 research/mapping/authority 和 fresh 生产快照成功生成全新 candidate
+  `d95b580b1d97fb61cbbebe4ae60640ccfccab6e1dcd649ed824ef0215d5a418a`、artifact
+  `f74c116f63ff1bc561edac10a3a49f3c0643a13a079ec40b13fd5806d266ce0c`。动作固定为 profile create
+  `0`/update `32`、race create `180`/update `230`/existing `12`、P0 source `32`、module audit `128`；
+  422 条履历为 421 started + 1 nonstart，98 条 major wins 全部来自 `won`。首次发布仍仅尝试
+  `8307/45666/45738`，16 blocker 继续冻结。
+- 独立 artifact 静态复审 `APPROVED`、无 P0-P2；profile `45661` 的 11 场在内置 `_simulate` 中进入 update
+  而不是重复 create。额外自定义 230-row 生产 DB 重放两次未在有界时间内返回汇总，已停止且不得误报
+  为通过；此项记录为非阻断 P3，因为正式 dry-run/apply 会再次校验 snapshot、唯一解析和精确动作数。
+- 当前仍无本批业务写入、无新 release approval/manifest。旧 candidate `fc7962c3…e16e` 及其旧 approval
+  不得复用。下一步只等待绑定新 candidate/artifact、精确动作、三个发布目标与 16 blocker 冻结边界的 G3；
+  `full_network` 不在本次范围。
+
 ## 2026-08-10 PR #97 已闭锁部署；新候选在零写入阶段暴露 Netkeiba 表示差异
 
 - PR `#97` 已按精确 merge SHA `afe0856da2d2ebbd615898b93c4adb3a5f410978` 部署到独立 release
