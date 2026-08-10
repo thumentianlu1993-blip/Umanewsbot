@@ -1,5 +1,21 @@
 # 当前状态
 
+## 2026-08-10 batch-0001 r2 已生成候选，等待精确 G3
+
+- 用户已批准 `32` 个唯一 identity 的 profile/pedigree/race_record/major_wins 四模块，`16` 个 blocker
+  继续冻结。生产只读 bundle 生成成功：research SHA `e9a3e93a…81643`、mapping SHA
+  `69ba9f10…6ba7`、authority SHA `670932e6…d136`；`32/32` 均绑定现有且互不重复的 profile。
+- 独立只读审查 `APPROVED`、无 P0-P2：共 `422` 条履历（`421` started、`1` did_not_start），`98`
+  条主胜鞍严格由 `result_status=won` 的履历投影，`16` 个 blocker 未进入 research/mapping。
+- 实时 production snapshot 复核无漂移，已生成 immutable release candidate
+  `fc7962c3e337945b70303fbe1868bd7f100c5ff3437296356cfc0955f487e16e`，commit artifact SHA 为
+  `9d2a1e32efbe658f10989771d26c4627a48f395cf99a629a73c2432491c39c16`，production snapshot SHA 为
+  `1bb55ec97fe5439c96c010b2fa163f666b46a13b9fedf1677761c510782dfbe4`。
+- 候选动作固定为 `32` profile updates、`410` race record creates、`0` race record updates、`12`
+  existing records、`32` P0 source upserts、`128` module audits；profile `8307/45666/45738` 为 draft，
+  commit 后将尝试首次发布。当前仍为零业务写入、writer activity 为零、健康检查 `200`；生产 apply、
+  首次发布及后续 full_network 均未获授权，必须等待绑定该候选与动作范围的精确 G3。
+
 ## 2026-08-10 batch-0001 r2 已补齐 participant→release draft 最小桥接
 
 - PR `#93` 已合并并按精确 merge SHA `25ea0df188f323e1a24a78f781bab6a27bf0ac73` 闭锁部署；生产 image
@@ -26,8 +42,7 @@
   module/release approval 均不存在，数据库写入 `0`。
 - 相关组合回归最终 `262/262` 通过。独立 reviewer 提出的 active review SHA 格式与三类 schema version
   fail-open 已补反例并修复；限定复审最终 `APPROVED`，无剩余 P0-P2。
-- 四模块工作簿仍等待用户批准；桥接不会代替该判断。批准后才可在生产只读事务中生成新鲜 mapping
-  snapshot 和既有 release candidate；G3、写前备份、apply 与 verifier 仍为独立门禁。
+- 该门禁随后已按上节记录通过；本节保留 draft 生成时的历史状态。
 
 ## 2026-08-09 2025 五地区生产资料桥接正在实现
 

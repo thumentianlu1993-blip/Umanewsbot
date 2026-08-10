@@ -1,5 +1,15 @@
 # 项目状态文档
 
+## 2026-08-10 batch-0001 r2 等待精确 G3
+
+- `32` 个 identity / `128` 个模块已获批准并生成 production mapping；`16` blocker 继续冻结。
+- 独立只读审查 `APPROVED`、无 P0-P2：`422` 条履历（`421` started、`1` did_not_start），`98` 条
+  主胜鞍全部由胜出履历投影。
+- immutable candidate 为 `fc7962c3…e16e`，artifact 为 `9d2a1e32…9c16`；预计更新 `32` profile、
+  新增 `410` 履历、保留 `12` 既有履历，并写入 `32` P0 source / `128` module audit。
+- profile `8307/45666/45738` 为 draft，候选会在 commit 后尝试首次发布。当前无业务写入，服务健康且
+  风险开关关闭；下一步只等待绑定精确 SHA、动作和 publish scope 的 G3。
+
 ## 2026-08-10 batch-0001 r2 等待四模块人工审核，release draft 桥接已实现
 
 - PR `#93` 已合并并闭锁部署到精确 merge SHA `25ea0df1…ac73`；生产 image 为
@@ -13,8 +23,7 @@
   通过，独立限定复审 `APPROVED`、无 P0-P2。
 - production draft `p0batch-5e17bcd17816` 已生成并通过语义 verifier；combined SHA 为
   `77cdb63b…fa6aa`，source-binding SHA 为 `0e3d269a…4456b`，module/release approval 均不存在。
-- 当前下一门禁只有一项：用户明确批准 32 个 identity 的四模块，并确认 16 blocker 继续冻结。未经该
-  批准不生成 mapping approval、release candidate 或生产写入。
+- 该人工模块门禁随后已通过；本节保留 release draft 阶段的历史状态，当前门禁以上节为准。
 
 ## 2026-08-09 五地区 2025 参赛马进入 production bridge 阶段
 

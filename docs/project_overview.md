@@ -5,8 +5,9 @@
 并通过 source-bound participant batch 接入既有 P0 补全、审核、release 与 verifier。首批日本 r2 已
 得到 34 个完整参赛 occurrence / 16 blocker；新增桥接以 provider identity 将其保守归并为 32 个唯一
 HorseProfile draft，同时保全全部 occurrence evidence。production draft 已在零网络、零数据库写入下
-生成并通过语义 verifier，但仍等待四模块人工审核；production
-mapping、release、G3 和数据写入均未发生。
+生成并通过语义 verifier。用户随后批准 32 个 identity 的四模块并继续冻结 16 个 blocker；production
+mapping bundle 与 immutable release candidate `fc7962c3…e16e` 已生成并通过只读核验。当前仍为零业务
+写入，正在等待绑定候选、动作范围及三个 draft profile 首次发布范围的精确 G3。
 
 ## 2026-08-09 八地区单年度分级赛参赛马补全链路（实现中）
 
