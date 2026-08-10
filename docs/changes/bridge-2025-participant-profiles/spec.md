@@ -30,3 +30,15 @@ fail closed 到 blocker，不得按马名直接绑定或新建。
 
 没有新 batch contract 的既有审核 CSV 继续严格要求五地区各 10 匹。新入口不能放宽历史 artifact 或
 production apply 的审核、release candidate、用户批准和 verifier 门禁。
+
+### Requirement: participant occurrence 必须确定性桥接为唯一生产身份
+
+网络补全的 completion manifest、全局 batch index 与 execution ledger 必须精确绑定同一 active
+`prepared` 批次，且候选文件必须保持 `database_writes=0`。桥接只接纳无 blocker、具备 provider
+身份与完整四字段身份的行；同一 provider identity 的多次参赛 occurrence 只有在忽略抓取时间、
+candidate key 与 reviewed-candidate 赛事入口后其余内容完全相同时才可合并。canonical 行按最新官方
+核验时间及 candidate key 确定，同时保存全部 occurrence key、赛事入口证据和原始文件 SHA；内容冲突、
+跨 provider 四字段重名或任一计数漂移必须 fail closed。
+
+桥接产物只能标记 module review pending。它可以复用既有 rolling P0 的 research、mapping、release
+candidate 和 verifier 链，但不得自动生成四模块批准、G3 或数据库写入授权。

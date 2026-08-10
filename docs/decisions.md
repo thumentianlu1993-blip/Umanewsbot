@@ -1,5 +1,18 @@
 # 关键决策
 
+## 2026-08-10 participant occurrence 不直接进入 production apply
+
+- participant census 的记账单位是一次参赛 occurrence，HorseProfile production apply 的记账单位是
+  唯一马匹身份；两者不能通过放宽“duplicate identity”校验拼接。
+- 唯一允许的转换键为 `source_name + external_horse_id`。重复行还必须拥有相同马名、父、母、出生年，
+  且除 candidate key、抓取/官方核验时间、该次参赛入口 evidence 外的完整补全内容逐字节语义相等；
+  否则保持阻断。跨 provider 的相同四字段身份也不自动合并。
+- canonical 选择固定为最新 `official_start_count_verified_at`，再以 candidate key 破同值；桥接 artifact
+  必须绑定全部 occurrence、blocker、batch index、execution ledger、completion manifest 和 candidates
+  SHA。去重不允许丢失参赛证据。
+- participant batch inclusion approval 与四模块资料审核是两个门禁。桥接只记录前者并生成 pending
+  draft；不得把命令执行者、历史工作簿或聊天推断成 module reviewer，也不得自动生成 release/G3。
+
 ## 2026-08-09 受审 official-results 包必须仓库内可寻址且 CLI 可直接执行
 
 - `full_network=true` 只接受仓库相对三文件包，因此独立审核通过的包必须以精确 summary SHA 登记到

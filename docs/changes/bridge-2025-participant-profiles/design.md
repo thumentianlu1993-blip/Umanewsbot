@@ -12,3 +12,15 @@ reviewed CSV 和 v2 review manifest；独立 execution ledger 以文件锁和原
 - 网络 adapter、cache、完整度、module review 和 production release 逻辑不变。
 
 本变更不新增 migration，不写生产数据库，不启用常驻网络开关，也不纳入澳洲、德国或中东。
+
+participant completion 以参赛 occurrence 为行，旧 production apply 则要求唯一四字段身份。新增
+`bridge_p0_participant_release` 作为两者间唯一入口：一次读取并验证 batch index、execution ledger、
+completion manifest 和 candidates JSONL，按 `source_name + external_horse_id` 分组；重复组只忽略
+`candidate_key`、抓取/官方核验时间以及 occurrence 自身的 reviewed-candidate evidence 后比较全部内容。
+选择最新核验行作为 canonical，同时在 `participant_source_binding.json` 保留所有 occurrence key、
+赛事入口 evidence、blocker 与输入 SHA。
+
+输出目录采用既有 rolling batch 的 `batch_manifest.json + state.json + artifact/combined_candidates.jsonl`
+形状，但只继承原 participant batch inclusion 决策，状态仍是四模块 `pending`。用户完成精确模块审核后，
+才调用既有 `--bundle` 查询新鲜 production mapping snapshot；随后 `--prepare-release`、独立 release
+approval、G3、apply 和 verifier 完全复用原链路，不新增旁路。

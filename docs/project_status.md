@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-08-10 batch-0001 r2 等待四模块人工审核，release draft 桥接已实现
+
+- r2 精确续跑已收敛为 34 complete / 16 blocked，零数据库写入；32 个唯一 provider identity 的生产
+  read-only mapping preview 全部为 `bind_existing`。两匹马各出现两次，故 34 occurrence 不能直接送入
+  只接受唯一四字段身份的 production apply。
+- 最小桥接实现已用真实 r2 输入两次重建并证明确定性：32 unique、2 deduplicated、16 blocked，所有
+  occurrence evidence 与四份上游输入 SHA 均保留；输出仍是 module review pending，不构成 release/G3。
+- active review SHA 与 index/completion/candidate schema 均已改为精确 fail-closed；相关回归 `262/262`
+  通过，独立限定复审 `APPROVED`、无 P0-P2。
+- 当前下一门禁只有一项：用户明确批准 32 个 identity 的四模块，并确认 16 blocker 继续冻结。代码合并
+  与闭锁部署可先完成，但未经该批准不生成 mapping approval、release candidate 或生产写入。
+
 ## 2026-08-09 五地区 2025 参赛马进入 production bridge 阶段
 
 - 用户将本轮 HorseProfile 上线范围收缩到既有五地区，暂不处理澳洲、德国和中东。run

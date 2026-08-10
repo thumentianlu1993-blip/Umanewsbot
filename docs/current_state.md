@@ -1,5 +1,23 @@
 # 当前状态
 
+## 2026-08-10 batch-0001 r2 已补齐 participant→release draft 最小桥接
+
+- 生产关闭态当前仍为 PR `#91` revision `0149eab8…d919`；PR `#92` 仅为 evidence 文档，不影响运行
+  image。batch-0001 r2 completion SHA 为 `2cf2c634…04b8`，守恒为 `50 occurrence = 34 complete +
+  16 blocked`，网络请求 `120`、数据库写入 `0`，execution ledger 仍停在 ordinal 1 `prepared`。
+- 旧 production apply 要求唯一四字段身份，34 个 complete occurrence 中有 2 组重复 provider identity，
+  因而不能直接导入。新增离线桥接命令精确重验 batch index、active ledger、completion manifest 与
+  candidates 文件 SHA/大小/计数，再按 provider identity 语义去重；只有 candidate key、抓取时间和
+  occurrence 自身赛事入口可不同，其余内容漂移立即拒绝。
+- 用生产 r2 文件本地真实验证得到 `32` 个唯一 identity、`2` 个被折叠 occurrence、`16` 个继续冻结
+  blocker；两次独立输出的 batch SHA、combined SHA 与 source-binding SHA 逐字节一致。桥接产物显式
+  `module_review_status=pending`、`database_writes=0`，并保留全部 occurrence key、赛事入口 evidence
+  与原始输入 SHA。
+- 相关组合回归最终 `262/262` 通过。独立 reviewer 提出的 active review SHA 格式与三类 schema version
+  fail-open 已补反例并修复；限定复审最终 `APPROVED`，无剩余 P0-P2。
+- 四模块工作簿仍等待用户批准；桥接不会代替该判断。批准后才可在生产只读事务中生成新鲜 mapping
+  snapshot 和既有 release candidate；G3、写前备份、apply 与 verifier 仍为独立门禁。
+
 ## 2026-08-09 2025 五地区生产资料桥接正在实现
 
 - 用户已明确本轮暂不处理澳洲、德国和中东；当前生产资料范围只包含日本、中国香港、英国、法国和
