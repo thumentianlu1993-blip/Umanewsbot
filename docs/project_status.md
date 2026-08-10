@@ -2791,3 +2791,19 @@ P0 马信息补全专项的模型交接文档见
   fail closed。定向 `3/3`、核心 `44/44`、相邻 `366/366`、PostgreSQL 本次路径 `1/1` 通过。
 - 独立只读代码审查 `APPROVED`、无 P0-P2。旧 candidate/artifact/G3 已失效；下一步按既有授权提交、
   合并和闭锁部署，部署后生成并独立审核全新 candidate，生产 apply 前仍需用户给出新的精确 G3。
+
+# 2026-08-10 lifecycle enforce 双赛事 canary 独立审核 APPROVED
+
+- 已为 event 186/187 实现 manifest-bound false/off promotion 与分阶段 true/enforce；独立 env/settings
+  信任根、inactive/active activation、shared host lock 和 PostgreSQL advisory lock 防止范围扩大与并发
+  cohort。
+- 真实 RED 已转绿；独立 reviewer 首轮 3 项 P1、1 项 P2 均先补 RED 再修复，覆盖授权 IDs 写前绑定、
+  范围外 enforce 零 claim、旧 false/off resident 缺键 bootstrap，以及合法推进后的安全重新激活。
+  第 2 轮唯一 reactivation provenance P1 也已用外部直改状态 RED 锁住：只有带精确
+  manifest/activation metadata 且状态、generation、reason、时间连续的 canary applied transition 链可
+  支持重新激活。主线程组合回归 `147/147`、隔离 PostgreSQL 16 并发专项再次 `1/1`，并修复 global
+  enforce 下范围外 shadow control 错误 noop 的集成回归。不含 migration，
+  其他 control 继续 shadow，race-live/provider/新闻/QQ 均不在范围。
+- 同一独立 reviewer 第 3 轮最终 `APPROVED`，无 P0/P1；保留 1 项只影响直接 T+30 补采后再次启用的
+  非阻塞 P2。当前未提交、未发布、未写生产或启用 enforce；下一步分别申请代码发布 G2，以及绑定精确
+  production revision、manifest SHA、event 186/187 的生产启用 G3。

@@ -2957,3 +2957,15 @@ artifact 顶层“已审核”只能表示整份文件进入 commit 阶段，不
   身份语义。
 - 任何改变合并语义的代码都会使旧 production snapshot 与 expected actions 失效；必须闭锁部署后生成
   全新 candidate/artifact/release，并取得新的精确 G3，禁止复用失败批次的授权哈希。
+
+# 2026-08-10 lifecycle enforce 首发只采用双赛事 manifest canary
+
+- lifecycle 的全局 `enforce` 不是公开写入的充分条件；必须同时满足 canonical/active env 与三服务
+  settings 的精确 manifest raw SHA/event IDs、control 冻结 evidence、两场共享 active activation ID。
+- 首发生产 wrapper 精确限制为 event `186,187`。应用层不硬编码赛事，但生产启用授权和 host wrapper
+  都必须绑定同一 raw SHA、release commit 和有序 ID `186,187`；范围外自洽 control 仍 fail closed。
+- promotion 只允许在宿主三服务严格 false/off、shared deployment lock 和 PostgreSQL advisory xact
+  lock 内写 inactive control；每次 enable 先 disarm，再按 web-only 验证、worker coherence、原子 activate、
+  active verify、Beat-last 顺序执行。
+- apply freshness 固定 24 小时；runtime validity 固定为最晚 race datetime +30 分钟 +24 小时。一级止损
+  永远是无需 manifest 的 false/off；已合法推进的公开状态不自动反向修改。
