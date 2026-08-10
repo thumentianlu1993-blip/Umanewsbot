@@ -1,7 +1,7 @@
 # 项目总览
 
-八地区链路与 migration `0072` 已关闭态发布；当前生产代码 revision 为 PR `#97` 的精确 merge SHA
-`afe0856d…0978`，统一 image 为 `sha256:bd8b1206…19c0`。2025 范围暂收缩为日本、中国香港、英国、法国和美国，
+八地区链路与 migration `0072` 已关闭态发布；当前生产代码 revision 为 PR `#98` 的精确 merge SHA
+`127d4833…9528`，统一 image 为 `sha256:37f84597…8852`。2025 范围暂收缩为日本、中国香港、英国、法国和美国，
 并通过 source-bound participant batch 接入既有 P0 补全、审核、release 与 verifier。首批日本 r2 已
 得到 34 个完整参赛 occurrence / 16 blocker；新增桥接以 provider identity 将其保守归并为 32 个唯一
 HorseProfile draft，同时保全全部 occurrence evidence。production draft 已在零网络、零数据库写入下
@@ -10,7 +10,9 @@ mapping bundle 与 immutable release candidate `fc7962c3…e16e` 已生成并通
 写入。精确 G3 随后执行，但因已有 Netkeiba 履历与 JBIS candidate 同场记录未跨来源等价，严格出赛数
 守恒门禁在事务内拒绝并完整回滚。第一轮跨来源事实修复已闭锁部署，随后新候选生成又在零写入阶段识别出
 Netkeiba `3中京8`/`芝2000` 与 JBIS `中京`/`2000m` 的严格表示差异；当前正以已知日本场地和公制距离
-语法做最小修复。线上健康，旧 candidate 禁止重试，`full_network` 未启动。
+语法做最小修复。该修复已部署并生成新 candidate `d95b580b…a418a` / artifact `f74c116f…6ce0c`，内置
+dry-run 把同场证据收敛为 180 create + 230 update，独立静态复审通过。线上健康，当前仍无本批业务写入；
+旧 candidate 禁止重试，新对象等待精确 G3，`full_network` 未启动。
 
 ## 2026-08-09 八地区单年度分级赛参赛马补全链路（实现中）
 

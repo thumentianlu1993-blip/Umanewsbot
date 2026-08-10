@@ -1,5 +1,17 @@
 # 关键决策
 
+## 2026-08-10 新 candidate 必须取得独立 release approval，旧 G3 不可迁移
+
+- resolver 语义变化后生成的 candidate `d95b580b…a418a` 与 artifact `f74c116f…6ce0c` 是唯一可进入下一
+  G3 的对象；旧 `fc7962c3…e16e` candidate、`46b7951d…cd33` release manifest、release approval 和旧
+  G3 均不得复制、解释或重放到新对象。
+- 新 G3 必须显式覆盖：创建绑定新 candidate 的 release approval/manifest、fresh 写前备份、maintenance/
+  drain、manifest-bound dry-run 精确重现 `32 profile update / 180 race create / 230 race update / 12
+  existing / 32 source / 128 audit`、apply 和完整 verifier。动作或 snapshot 任一漂移立即停止。
+- 独立静态复审已通过；额外自定义 230-row DB 重放未完成，不能作为证据引用。正式 dry-run 是写前必须
+  通过的权威动态门禁，不得因静态 `APPROVED` 而跳过。首次发布只允许 `8307/45666/45738`，16 blocker
+  继续冻结，`full_network` 另行授权。
+
 ## 2026-08-10 日本场地届次与场地前缀距离只做严格语法归一化
 
 - Netkeiba 的 `3中京8` 表示届次/日次包裹的 `中京`，`芝2000` 表示 2000 米；它们可分别与 JBIS
