@@ -35,3 +35,13 @@
 
 触发后立即以不依赖 manifest 的 `false/off` 路径止写；保留 control/transition/日志证据，不自动反向
 修改已合法推进的赛事状态。race-live 始终保持关闭。
+
+## 2026-08-10 实际发布状态
+
+- PR #100 已合并为 `a7e3783ff7d188481cecd421cd2595f43e9a706b`，无 migration；关闭态部署、生产
+  artifact dry-run 和绑定 raw SHA `eacffda6…d303fc` 的 G3 均已完成。
+- event 186/187 已为 `enforce/active`，全局为 `true/enforce`；其他 enforce control 为 0，race-live
+  仍关闭。两场未到 T，公开状态仍为 `scheduled`、applied transition 为 0。
+- 用户的精确 G3 明确包含手工 scanner smoke，故实际执行取代了候选步骤 6 的“不另发手工 scanner”
+  假设；同步与 Celery 队列 smoke 都是 `claimed=0 / dispatched=0`，Beat 也已自动运行一次。
+- 恢复点、activation ID、服务/HTTP/日志验收及观察时间见 `release_report.md`。

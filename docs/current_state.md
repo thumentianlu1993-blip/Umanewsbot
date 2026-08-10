@@ -5946,3 +5946,19 @@ v3 首次 prepare 在请求预算 `60/60` 时由 HRN 空候选连带阻断 Equib
   P0/P1；仅记录首次 tick 直接 `scheduled→finished` 后同 manifest reactivation 会保守拒绝的非阻塞 P2，
   不影响首次 canary、不扩大写入范围。当前没有 commit、push、PR、部署、生产 control/event/env 写入
   或 enforce 启用；下一步需用户分别授权 G2 代码发布与绑定生产 revision/manifest SHA/186,187 的 G3。
+
+# 2026-08-10 lifecycle enforce 双赛事 canary 已在生产启用
+
+- PR #100 已合并为 `a7e3783ff7d188481cecd421cd2595f43e9a706b`；生产 web/worker/Beat 统一运行
+  image `sha256:afa0379f…f441f`。无 migration，关闭态部署和严格 `false/off` artifact dry-run 先完成。
+- G3 manifest raw SHA 为 `eacffda63284e25b59c3efa5815d138a562c10e86eec7fe5ed1ed41219d303fc`，
+  精确包含 event 186/187。写前 custom-format 备份为 `421435241` bytes、`pg_restore -l=1308`，
+  SHA-256 `9265fd9e…a078`。
+- shared-lock promotion 与分阶段 mode switch 成功；当前三服务为 `true/enforce`，两场 control 为
+  `enforce/active` 且共享 activation ID `fb222bb1…010e`。其他 enforce control 为 0，race-live 仍关闭。
+- 同步与真实 Celery scanner smoke 均返回 `claimed=0 / dispatched=0`，Beat 已自动执行一次。两场尚未
+  到 T，状态仍为 `scheduled`、applied transition 为 0；公开 healthz 和详情页 200，重建完成后的
+  `Traceback/canary_blocked/502` 均为 0。
+- 下一观察点为 event 186 的 `2026-08-11 16:05/16:35`、event 187 的
+  `2026-08-13 18:55/19:25`（北京时间）。完整证据见
+  `docs/changes/lifecycle-enforce-canary/release_report.md`。

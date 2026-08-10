@@ -2807,3 +2807,12 @@ P0 马信息补全专项的模型交接文档见
 - 同一独立 reviewer 第 3 轮最终 `APPROVED`，无 P0/P1；保留 1 项只影响直接 T+30 补采后再次启用的
   非阻塞 P2。当前未提交、未发布、未写生产或启用 enforce；下一步分别申请代码发布 G2，以及绑定精确
   production revision、manifest SHA、event 186/187 的生产启用 G3。
+
+# 2026-08-10 lifecycle enforce 双赛事 canary 已进入生产观察
+
+- PR #100 与关闭态部署完成后，绑定 production revision、manifest raw SHA 和 event 186/187 的 G3
+  已执行；生产现在是 `true/enforce`，且只有这两场 control 为 `enforce/active`。
+- race-live 仍关闭，其他 enforce control 为 0；两次 scanner smoke 与一次 Beat 自动 tick 均未提前
+  claim，赛事仍为 `scheduled`、applied transition 为 0。
+- 下一验收是 event 186/187 各自的 T 与 T+30 状态/审计/缓存观察；完整恢复点和运行证据见 change 的
+  `release_report.md`。
