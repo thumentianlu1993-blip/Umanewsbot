@@ -1,5 +1,14 @@
 # 关键决策
 
+## 2026-08-10 production draft 保留权威 evidence root 的路径身份
+
+- participant bridge 的 source binding 会记录实际输入路径；生产生成时不复制 PR90 r2 到新 release，
+  而是由 PR93 精确 image 在 `--network none`、只读根文件系统下绑定权威 evidence root。
+- 因绝对路径参与 manifest 内容，生产 batch/source-binding SHA 与本地 `/tmp` 回放 SHA 不应相同；验收
+  以相同上游四份文件 SHA、combined candidates SHA、32/16/2 守恒和生产绝对路径语义 verifier 为准。
+- 失败的容器初始化或权限探针只有在 output 目录仍不存在时才允许按原参数重试；成功发布 ready marker
+  后禁止覆盖。当前 draft 只继承 batch inclusion approval，仍不能推断 module 或 release approval。
+
 ## 2026-08-10 participant occurrence 不直接进入 production apply
 
 - participant census 的记账单位是一次参赛 occurrence，HorseProfile production apply 的记账单位是

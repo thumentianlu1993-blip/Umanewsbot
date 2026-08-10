@@ -11,5 +11,5 @@
   occurrence evidence 保全桥接。
 - [x] (application) 增加重复内容冲突、ledger/completion 漂移、候选字节漂移与防覆盖测试，并用真实
   batch-0001 r2 验证 `50 occurrence = 32 unique + 16 blocked + 2 deduplicated`。
-- [ ] (operations) 合并并以高风险开关全关闭部署桥接代码；生成生产 draft 后仍等待四模块人工审核，
+- [x] (operations) 合并并以高风险开关全关闭部署桥接代码；生成生产 draft 后仍等待四模块人工审核，
   不执行 G3 或写库。

@@ -1,10 +1,11 @@
 # 项目总览
 
-八地区链路与 migration `0072` 已关闭态发布；当前生产代码 revision 为 PR `#91` 的
-`0149eab8…d919`，PR `#92` 只记录 evidence。2025 范围暂收缩为日本、中国香港、英国、法国和美国，
+八地区链路与 migration `0072` 已关闭态发布；当前生产代码 revision 为 PR `#93` 的精确 merge SHA
+`25ea0df1…ac73`，统一 image 为 `sha256:4a8667b9…cc19f`。2025 范围暂收缩为日本、中国香港、英国、法国和美国，
 并通过 source-bound participant batch 接入既有 P0 补全、审核、release 与 verifier。首批日本 r2 已
 得到 34 个完整参赛 occurrence / 16 blocker；新增桥接以 provider identity 将其保守归并为 32 个唯一
-HorseProfile draft，同时保全全部 occurrence evidence。该 draft 仍等待四模块人工审核，production
+HorseProfile draft，同时保全全部 occurrence evidence。production draft 已在零网络、零数据库写入下
+生成并通过语义 verifier，但仍等待四模块人工审核；production
 mapping、release、G3 和数据写入均未发生。
 
 ## 2026-08-09 八地区单年度分级赛参赛马补全链路（实现中）
