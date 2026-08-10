@@ -804,6 +804,8 @@ class P0HorseProductionApplyTests(TestCase):
             "source_url": "https://db.netkeiba.com/race/201807010101/",
             "external_race_id": "201807010101",
             "race_name": "3歳未勝利",
+            "racecourse": "3中京8",
+            "distance_text": "芝1600",
         }
         upsert_race_record(profile, existing)
         artifact_path, _ = self._prepare(
@@ -861,7 +863,8 @@ class P0HorseProductionApplyTests(TestCase):
                 "source_url": "https://db.netkeiba.com/race/201807010101/",
                 "external_race_id": "201807010101",
                 "race_name": "different race",
-                "distance_text": "1800m",
+                "racecourse": "3中山8",
+                "distance_text": "芝1600",
             },
         )
         before = HorseRaceRecord.objects.count()
@@ -904,6 +907,8 @@ class P0HorseProductionApplyTests(TestCase):
                 "source_url": "https://db.netkeiba.com/race/201807010101/",
                 "external_race_id": "201807010101",
                 "race_name": "3歳未勝利",
+                "racecourse": "3中京8",
+                "distance_text": "芝1600",
             },
         ).record
         first.pk = None
@@ -911,6 +916,8 @@ class P0HorseProductionApplyTests(TestCase):
         first.canonical_race_key = "e" * 64
         first.source_name = "racingpost"
         first.source_url = "https://www.racingpost.com/results/2018-01-01/chukyo/1"
+        first.racecourse = "中京"
+        first.distance_text = "1600m"
         first.save()
         before = HorseRaceRecord.objects.count()
 

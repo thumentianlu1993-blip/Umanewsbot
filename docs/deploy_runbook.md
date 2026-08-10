@@ -1,5 +1,20 @@
 # 部署运行手册
 
+## 2026-08-10 PR #97 后续日本场地/距离表示修复发布规则
+
+1. PR `#97` 已按 merge SHA `afe0856da2d2ebbd615898b93c4adb3a5f410978` 闭锁部署，生产 image
+   `sha256:bd8b12060237ec226f57d7d70e753b632cfb11870a10e29a14df8fca186119c0`，部署备份 SHA
+   `7fb1bd2e…e185`；migration/服务/HTTP/queue/flag verifier 通过，未执行 production apply。
+2. 新 image 的 `--prepare-release` 在零业务写入阶段因 `3中京8`/`中京` 与 `芝2000`/`2000m` 未等价
+   停止。该命令失败不允许手改 state、ledger、candidate、artifact 或旧 approval，也不允许重放旧 G3。
+3. 后续补丁必须先通过真实表示正例、不同场地/距离负例、多解阻断、核心 apply/career、邻接 completion
+   及 PostgreSQL 首次/重复提交测试，再经独立只读审查。发布仍使用独立 clean release、精确 merge SHA、
+   fresh 代码部署备份和全部高风险开关关闭状态。
+4. 新 revision verifier 通过后，才可对原受审 research/mapping/authority 输入重新执行 prepare-release；
+   期望逐 profile merged-start 守恒，旧 candidate 应由内置 supersede 账本流程失效，不得覆盖旧文件。
+5. 新 candidate/artifact/release 生成后必须核对 32 identity、16 frozen blocker、逐模块审核、履历动作、
+   source/audit 和首次发布范围，并完成独立 artifact 审查；随后停下申请绑定全新哈希与动作范围的精确 G3。
+
 ## 2026-08-10 batch-0001 r2 首次 apply fail-closed
 
 1. 恢复点：`pre-batch0001-r2-g3-20260810T065248Z.dump`，SHA

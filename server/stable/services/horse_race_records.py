@@ -80,6 +80,15 @@ _NON_START_RESULTS = {
     HorseRaceResultStatus.WITHDRAWN,
 }
 _OFFICIAL_COUNT_URL_VALIDATOR = URLValidator(schemes=["http", "https"])
+_NETKEIBA_JAPANESE_VENUES = (
+    "東京|中山|京都|阪神|新潟|中京|札幌|函館|福島|小倉|"
+    "大井|川崎|船橋|浦和|盛岡|水沢|金沢|笠松|名古屋|園田|"
+    "姫路|高知|佐賀|帯広|門別"
+)
+_NETKEIBA_JAPANESE_VENUE_RE = re.compile(
+    rf"^(?P<meeting>\d*)(?P<venue>{_NETKEIBA_JAPANESE_VENUES})(?P<day>\d*)$"
+)
+_JAPANESE_DISTANCE_SURFACE = {"芝": "turf", "ダ": "dirt", "障": "jumps"}
 
 
 def parse_record_date(value: Any) -> date | None:
@@ -334,15 +343,41 @@ def _source_evidence_identity_matches(profile: HorseProfile, payload: dict) -> l
     return matches
 
 
-def _distance_identity(*, meters: Any, text: Any) -> str:
+def _distance_identity(*, meters: Any, text: Any) -> tuple[str, str]:
+    normalized = _normalize_identity_text(text).replace(" ", "")
+    surface_match = re.fullmatch(
+        r"(芝|ダ|障)\d{3,5}(?:m|metres?|meters?|メートル)?",
+        normalized,
+    )
+    surface = (
+        _JAPANESE_DISTANCE_SURFACE[surface_match.group(1)]
+        if surface_match
+        else ""
+    )
     if meters not in (None, ""):
         try:
-            return f"m:{int(meters)}"
+            return f"m:{int(meters)}", surface
         except (TypeError, ValueError):
-            return ""
-    normalized = _normalize_identity_text(text).replace(" ", "")
-    match = re.fullmatch(r"(\d{3,5})(?:m|metres?|meters?|メートル)", normalized)
-    return f"m:{int(match.group(1))}" if match else ""
+            return "", surface
+    match = re.fullmatch(
+        r"(?:(?:芝|ダ|障)(\d{3,5})(?:m|metres?|meters?|メートル)?|"
+        r"(\d{3,5})(?:m|metres?|meters?|メートル))",
+        normalized,
+    )
+    if not match:
+        return "", surface
+    return f"m:{int(match.group(1) or match.group(2))}", surface
+
+
+def _racecourse_identity(value: Any, *, source_name: str) -> tuple[str, str]:
+    normalized = _normalize_identity_text(value).replace(" ", "")
+    if source_name.casefold() != "netkeiba":
+        return normalized, ""
+    match = _NETKEIBA_JAPANESE_VENUE_RE.fullmatch(normalized)
+    if not match:
+        return normalized, ""
+    wrapper = f"{match.group('meeting')}:{match.group('day')}"
+    return match.group("venue"), wrapper if wrapper != ":" else ""
 
 
 def cross_source_equivalent_race_records(
@@ -360,8 +395,11 @@ def cross_source_equivalent_race_records(
 
     incoming_source = str(payload.get("source_name") or "").strip().casefold()
     race_date = parse_record_date(payload.get("race_date"))
-    racecourse = _normalize_identity_text(payload.get("racecourse"))
-    distance = _distance_identity(
+    racecourse, incoming_venue_wrapper = _racecourse_identity(
+        payload.get("racecourse"),
+        source_name=incoming_source,
+    )
+    distance, incoming_surface = _distance_identity(
         meters=payload.get("distance_meters"),
         text=payload.get("distance_text"),
     )
@@ -396,12 +434,25 @@ def cross_source_equivalent_race_records(
             continue
         if record.result_status != result_status:
             continue
-        if _normalize_identity_text(record.racecourse) != racecourse:
+        existing_racecourse, existing_venue_wrapper = _racecourse_identity(
+            record.racecourse,
+            source_name=existing_source,
+        )
+        if existing_racecourse != racecourse:
             continue
-        if _distance_identity(
+        if (
+            incoming_venue_wrapper
+            and existing_venue_wrapper
+            and incoming_venue_wrapper != existing_venue_wrapper
+        ):
+            continue
+        existing_distance, existing_surface = _distance_identity(
             meters=record.distance_meters,
             text=record.distance_text,
-        ) != distance:
+        )
+        if existing_distance != distance:
+            continue
+        if incoming_surface and existing_surface and incoming_surface != existing_surface:
             continue
         if _normalize_identity_text(record.finish_position) != finish_position:
             continue

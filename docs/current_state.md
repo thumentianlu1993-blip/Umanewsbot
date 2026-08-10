@@ -1,5 +1,29 @@
 # 当前状态
 
+## 2026-08-10 PR #97 已闭锁部署；新候选在零写入阶段暴露 Netkeiba 表示差异
+
+- PR `#97` 已按精确 merge SHA `afe0856da2d2ebbd615898b93c4adb3a5f410978` 部署到独立 release
+  `/opt/umanews-release-afe0856d-PR97-20260810/umanewsbot`，web/worker/beat 统一 image 为
+  `sha256:bd8b12060237ec226f57d7d70e753b632cfb11870a10e29a14df8fca186119c0`。migration no-op、leaf
+  `0072`、内外 HTTP、Celery/Redis、错误日志与全部高风险开关关闭 verifier 均通过；本次部署没有执行
+  P0 production apply 或 `full_network`。
+- 代码部署前备份为 `/opt/umanewsbot/backups/db/pre-pr97-cross-source-dedupe-20260810T112657Z.dump`，
+  `420543252` bytes、mode `0600`、TOC `1301`、SHA-256
+  `7fb1bd2eddf8474fb675623042a4b506417dd0cfc40833b4fb52310f082fe185`；旧 image 已保留为
+  `umanewsbot:rollback-pre-pr97-20260810`。
+- 使用新 image 对原受审 bundle 执行 `--prepare-release` 时在任何业务写入前安全拒绝：
+  `インターポーザー merged started count 22 does not match reviewed official count 11`。逐场只读核对确认
+  日期、名次、结果与出赛状态均一致，剩余差异只是 Netkeiba `3中京8`/`芝2000` 与 JBIS
+  `中京`/`2000m` 的场地届次包装和场地前缀距离表示。
+- 后续最小修复限定为：仅 Netkeiba 来源可把已知 JRA/NAR 的数字届次包装降为精确场名；仅对
+  `芝/ダ/障 + 3-5 位公制米数` 与显式 metric unit 建立距离等价。双方都有场地类型或包装信息时，
+  任一冲突仍拒绝；日期、场地、距离、名次、actual result/start、race number/event 冲突和多解阻断
+  合同不变。定向 `8/8`、核心 `50/50`、邻接 `471/471`、PostgreSQL 16 首次/重复提交 `1/1` 已通过；
+  独立限定复审 `APPROVED`，无 P0-P3，下一步为新 PR 与闭锁部署。
+- 旧 candidate `fc7962c3…e16e`、artifact `9d2a1e32…9c16`、release 与旧 G3 继续禁止重放；当前仍为
+  零本批业务写入，16 个 blocker 冻结，`full_network` 未启动。新修复部署后必须重新生成并审核全新
+  candidate/artifact，再申请新的精确 G3。
+
 ## 2026-08-10 batch-0001 r2 G3 apply 确定性停止且完整回滚
 
 - 精确 G3 绑定 candidate `fc7962c3…e16e` 与 artifact `9d2a1e32…9c16`。fresh 写前备份为

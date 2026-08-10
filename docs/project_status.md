@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-08-10 PR #97 已闭锁部署，后续严格表示修复验证完成
+
+- PR `#97` merge SHA `afe0856d…0978` 已以 image `sha256:bd8b1206…19c0` 部署生产；migration no-op、
+  web/worker/beat、内外 HTTP、Celery/Redis、日志和关闭态 flag verifier 通过，未执行 P0 apply/full_network。
+- 新候选生成在零业务写入阶段仍拒绝 `インターポーザー 22 != 11`；只读逐场证据把剩余原因收敛为
+  Netkeiba `3中京8`/`芝2000` 与 JBIS `中京`/`2000m` 的场地和距离表示差异。
+- 后续最小补丁只对 Netkeiba 规范化已知 JRA/NAR 场地的届次/日次数字包装，并保留 `芝/ダ/障`
+  场地类型冲突；其他同场事实、双方明确包装冲突与多解门禁不变。定向 `8/8`、核心 `50/50`、邻接
+  `471/471`、PostgreSQL `1/1` 通过；独立限定复审 `APPROVED`、无 P0-P3。下一步走新 PR、闭锁部署和
+  全新 candidate/artifact。
+- 旧 candidate/release/G3 继续禁止重试，16 blocker 冻结，当前无本批业务净写入，`full_network` 未启动。
+
 ## 2026-08-10 batch-0001 r2 apply 已安全回滚，等待跨来源同场最小修复
 
 - G3 apply 在 `インターポーザー` 写后严格完整性校验处确定性停止：生产已有 Netkeiba 11 条完整履历，
