@@ -28,6 +28,7 @@ from stable.models import (
     TermEntry,
 )
 from stable.services import p0_horse_production_apply as production_apply
+from stable.services.horse_race_records import upsert_race_record
 from stable.services.p0_horse_production_apply import (
     _begin_commit_isolation,
     _lock_identity_keys,
@@ -95,6 +96,52 @@ class P0HorseProductionApplyPostgresTests(TransactionTestCase):
                     """
                 )
                 self.assertGreaterEqual(cursor.fetchone()[0], 1)
+
+    def test_cross_source_same_race_commit_is_idempotent_on_postgres(self):
+        horse = self.helper._horse(0, record_count=1)
+        incoming = horse["career"]["records"][0]
+        incoming.update(
+            {
+                "source_name": "jbis",
+                "source_url": "https://www.jbis.or.jp/race/result/20180101/001/01/",
+                "external_race_id": "20180101-001-01",
+                "external_result_id": "",
+                "race_name": "サラ系３歳 未勝利",
+                "racecourse": "中京",
+                "race_date_precision": "exact",
+                "distance_text": "1600m",
+                "finish_position": "1",
+                "result_status": "won",
+                "start_status": "started",
+            }
+        )
+        profile = self.helper._create_profile(horse["identity"])
+        upsert_race_record(
+            profile,
+            {
+                **incoming,
+                "source_name": "netkeiba",
+                "source_url": "https://db.netkeiba.com/race/201807010101/",
+                "external_race_id": "201807010101",
+                "race_name": "3歳未勝利",
+            },
+        )
+        artifact_path, _ = self.helper._prepare(
+            [horse],
+            [{"decision": "bind_existing", "profile": profile}],
+        )
+
+        first = self.helper._commit(artifact_path)
+        repeated = self.helper._commit(artifact_path)
+
+        profile.refresh_from_db()
+        self.assertEqual(first["race_records_created"], 0)
+        self.assertEqual(first["race_records_updated"], 1)
+        self.assertEqual(repeated["already_applied_profiles"], 1)
+        self.assertEqual(repeated["race_records_created"], 0)
+        self.assertEqual(repeated["race_records_updated"], 0)
+        self.assertEqual(profile.race_records.count(), 1)
+        self.assertEqual(profile.collected_start_count, 1)
 
     def test_commit_table_lock_sql_precedes_mapping_rescan_and_writes(self):
         horse = self.helper._horse(0)

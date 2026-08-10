@@ -779,6 +779,152 @@ class P0HorseProductionApplyTests(TestCase):
         with self.assertRaisesRegex(P0ReviewedArtifactError, "duplicate race"):
             self._dry_run(artifact_path)
 
+    def test_cross_source_same_race_is_merged_before_start_count_gate(self):
+        horse = self._horse(0, record_count=1)
+        incoming = horse["career"]["records"][0]
+        incoming.update(
+            {
+                "source_name": "jbis",
+                "source_url": "https://www.jbis.or.jp/race/result/20180101/001/01/",
+                "external_race_id": "20180101-001-01",
+                "external_result_id": "",
+                "race_name": "サラ系３歳 未勝利",
+                "racecourse": "中京",
+                "race_date_precision": "exact",
+                "distance_text": "1600m",
+                "finish_position": "1",
+                "result_status": "won",
+                "start_status": "started",
+            }
+        )
+        profile = self._create_profile(horse["identity"])
+        existing = {
+            **incoming,
+            "source_name": "netkeiba",
+            "source_url": "https://db.netkeiba.com/race/201807010101/",
+            "external_race_id": "201807010101",
+            "race_name": "3歳未勝利",
+        }
+        upsert_race_record(profile, existing)
+        artifact_path, _ = self._prepare(
+            [horse],
+            [{"decision": "bind_existing", "profile": profile}],
+        )
+
+        dry_run = self._dry_run(artifact_path)
+        self.assertEqual(dry_run["planned_race_record_creates"], 0)
+        self.assertEqual(dry_run["planned_race_record_updates"], 1)
+        self.assertEqual(dry_run["merged_started_count_checks"], 1)
+
+        summary = self._commit(artifact_path)
+        profile.refresh_from_db()
+        self.assertEqual(summary["race_records_created"], 0)
+        self.assertEqual(summary["race_records_updated"], 1)
+        self.assertEqual(profile.race_records.count(), 1)
+        self.assertEqual(profile.collected_start_count, 1)
+        sources = profile.race_records.get().source_refs["sources"]
+        self.assertCountEqual(
+            [source["source_name"] for source in sources],
+            ["netkeiba", "jbis"],
+        )
+
+        repeated = self._commit(artifact_path)
+        self.assertEqual(repeated["already_applied_profiles"], 1)
+        self.assertEqual(repeated["race_records_created"], 0)
+        self.assertEqual(repeated["race_records_updated"], 0)
+        self.assertEqual(profile.race_records.count(), 1)
+
+    def test_prepare_rejects_unmatched_existing_started_record_before_write(self):
+        horse = self._horse(0, record_count=1)
+        incoming = horse["career"]["records"][0]
+        incoming.update(
+            {
+                "source_name": "jbis",
+                "source_url": "https://www.jbis.or.jp/race/result/20180101/001/01/",
+                "external_race_id": "20180101-001-01",
+                "external_result_id": "",
+                "race_name": "サラ系３歳 未勝利",
+                "racecourse": "中京",
+                "race_date_precision": "exact",
+                "distance_text": "1600m",
+                "finish_position": "1",
+                "result_status": "won",
+                "start_status": "started",
+            }
+        )
+        profile = self._create_profile(horse["identity"])
+        upsert_race_record(
+            profile,
+            {
+                **incoming,
+                "source_name": "netkeiba",
+                "source_url": "https://db.netkeiba.com/race/201807010101/",
+                "external_race_id": "201807010101",
+                "race_name": "different race",
+                "distance_text": "1800m",
+            },
+        )
+        before = HorseRaceRecord.objects.count()
+
+        with self.assertRaisesRegex(
+            P0ReviewedArtifactError,
+            "merged started count",
+        ):
+            self._prepare(
+                [horse],
+                [{"decision": "bind_existing", "profile": profile}],
+            )
+
+        self.assertEqual(HorseRaceRecord.objects.count(), before)
+
+    def test_prepare_rejects_multiple_cross_source_same_race_matches(self):
+        horse = self._horse(0, record_count=1)
+        incoming = horse["career"]["records"][0]
+        incoming.update(
+            {
+                "source_name": "jbis",
+                "source_url": "https://www.jbis.or.jp/race/result/20180101/001/01/",
+                "external_race_id": "20180101-001-01",
+                "external_result_id": "",
+                "race_name": "サラ系３歳 未勝利",
+                "racecourse": "中京",
+                "race_date_precision": "exact",
+                "distance_text": "1600m",
+                "finish_position": "1",
+                "result_status": "won",
+                "start_status": "started",
+            }
+        )
+        profile = self._create_profile(horse["identity"])
+        first = upsert_race_record(
+            profile,
+            {
+                **incoming,
+                "source_name": "netkeiba",
+                "source_url": "https://db.netkeiba.com/race/201807010101/",
+                "external_race_id": "201807010101",
+                "race_name": "3歳未勝利",
+            },
+        ).record
+        first.pk = None
+        first.idempotency_key = "f" * 64
+        first.canonical_race_key = "e" * 64
+        first.source_name = "racingpost"
+        first.source_url = "https://www.racingpost.com/results/2018-01-01/chukyo/1"
+        first.save()
+        before = HorseRaceRecord.objects.count()
+
+        with self.assertRaisesRegex(
+            P0ReviewedArtifactError,
+            "cross-source race facts resolve to multiple race records",
+        ):
+            self._prepare(
+                [horse],
+                [{"decision": "bind_existing", "profile": profile}],
+            )
+
+        self.assertEqual(HorseRaceRecord.objects.count(), before)
+
     def test_dry_run_rejects_stale_completion_policy_artifact(self):
         horse = self._horse(0)
         artifact_path, artifact = self._prepare(

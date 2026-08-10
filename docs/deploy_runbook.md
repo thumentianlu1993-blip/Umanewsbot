@@ -8441,3 +8441,17 @@ python3 runtime/research/p0_participant_execution_ledger.py \
 - 结果为 34 complete、16 fail-closed。14 个 HTTP 403、1 个歧义、1 个姓名不一致不得自动重试或进入
   mapping；34 项经人工模块审核前也不得生成 G3 写入授权。账本必须保持 ordinal 1 `prepared`，直到新的
   mapping/release/G3 明确授权链建立。
+
+## batch-0001 r2 跨来源同赛失败后的恢复规则
+
+1. candidate `fc7962c3…e16e` / artifact `9d2a1e32…9c16` 已发生确定性 strict-complete 失败，即使事务已
+   完整回滚，也不得原样重试或沿用其 release approval/G3。
+2. 发布修复前先确认本地定向、核心、相邻 completion 和 PostgreSQL 跨来源幂等测试通过；生产部署必须
+   绑定精确 merge SHA，保持 horse/history/race-live/race-data 网络、调度、enforce 和 auto-publish 全关。
+3. 部署 verifier 必须重查 revision/image/workdir、migration no-op/leaf 0072、服务健康、Redis/Celery、
+   writer/lock/one-off 为零、内外 HTTP 和错误日志。部署本身不得执行 P0 apply 或 `full_network`。
+4. 只能从部署后的新鲜只读生产快照重新生成 mapping、candidate、artifact、release manifest 和 expected
+   actions；dry-run 必须逐马通过 merged started count 守恒。旧哈希不得复制到新 release。
+5. 新 artifact 经独立审查后，重新提交精确 G3，范围仍须列明 profile/race record/P0 source/module audit/
+   首次发布目标及冻结 blocker。fresh 写前备份、maintenance/drain、manifest-bound apply 和完整 verifier
+   必须绑定同一新 release；只有 verifier 通过才推进 ledger，`full_network` 仍需按授权范围另行判断。
