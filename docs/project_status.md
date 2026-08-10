@@ -1,5 +1,15 @@
 # 项目状态文档
 
+## 2026-08-10 batch-0001 r2 apply 已安全回滚，等待跨来源同场最小修复
+
+- G3 apply 在 `インターポーザー` 写后严格完整性校验处确定性停止：生产已有 Netkeiba 11 条完整履历，
+  candidate 的 JBIS 11 条同场记录未被 canonical key 识别为等价，导致模拟重复与 start-count mismatch。
+- 事务完整回滚：32 个目标 profile、243 条既有 records、50 条 P0 sources、11 个 completion runs、12 条
+  成功 apply log 均无净变化；三个 draft 仍未公开，execution ledger 未推进。
+- fresh 备份 SHA `6404536a…38ae` 可恢复；worker/beat、内外 HTTP、Django check 与 migration plan 均正常。
+- 当前旧 candidate/release 禁止重试；下一步是最小跨来源同场等价修复、回归、独立审查、闭锁部署、
+  新 candidate 与新 G3。16 blocker 继续冻结，`full_network` 未启动。
+
 ## 2026-08-10 batch-0001 r2 等待精确 G3
 
 - `32` 个 identity / `128` 个模块已获批准并生成 production mapping；`16` blocker 继续冻结。

@@ -7,7 +7,8 @@
 HorseProfile draft，同时保全全部 occurrence evidence。production draft 已在零网络、零数据库写入下
 生成并通过语义 verifier。用户随后批准 32 个 identity 的四模块并继续冻结 16 个 blocker；production
 mapping bundle 与 immutable release candidate `fc7962c3…e16e` 已生成并通过只读核验。当前仍为零业务
-写入，正在等待绑定候选、动作范围及三个 draft profile 首次发布范围的精确 G3。
+写入。精确 G3 随后执行，但因已有 Netkeiba 履历与 JBIS candidate 同场记录未跨来源等价，严格出赛数
+守恒门禁在事务内拒绝并完整回滚；线上已恢复健康，旧 candidate 禁止重试，`full_network` 未启动。
 
 ## 2026-08-09 八地区单年度分级赛参赛马补全链路（实现中）
 
