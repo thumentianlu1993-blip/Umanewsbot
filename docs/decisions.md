@@ -1,5 +1,15 @@
 # 关键决策
 
+## 2026-08-10 跨来源同场重复不得用放宽完整性门禁处理
+
+- profile 已有 Netkeiba 完整履历、candidate 携带 JBIS 同场履历时，source-aware idempotency 和包含赛名
+  变体的 canonical key 可能把同场视为两条；写后 official start count 守恒会正确拒绝。
+- 不允许删除既有记录、忽略 `start_count_mismatch`、把 career 强制改为 complete、只特判
+  `インターポーザー`，也不允许重放当前 release。最小修复必须建立可审查的跨来源同场等价合同，并证明
+  不会合并不同赛事；dry-run 还须在写前报告逐 profile 的合并后出赛数守恒。
+- release approval 已生成但 DB transaction 全回滚。任何代码/等价语义变化都要求重新部署、重新生成
+  production snapshot/artifact/candidate、独立审查和新 G3；旧 candidate `fc7962c3…e16e` 禁止重试。
+
 ## 2026-08-10 batch-0001 r2 模块批准不等于生产写入批准
 
 - 用户批准只覆盖 `32` 个 identity 的四模块并继续冻结 `16` 个 blocker；它允许生成只读 mapping bundle

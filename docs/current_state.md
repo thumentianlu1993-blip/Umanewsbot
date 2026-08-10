@@ -1,5 +1,29 @@
 # 当前状态
 
+## 2026-08-10 batch-0001 r2 G3 apply 确定性停止且完整回滚
+
+- 精确 G3 绑定 candidate `fc7962c3…e16e` 与 artifact `9d2a1e32…9c16`。fresh 写前备份为
+  `/opt/umanewsbot/backups/db/pre-batch0001-r2-g3-20260810T065248Z.dump`，`419970933` bytes、mode
+  `0600`、TOC `1308`、SHA-256 `6404536a31369b7bbd2c69ba85dfecb07c4da121c6732f6e4119a74c831438ae`；
+  `.env` 备份为 `/opt/umanewsbot/.env.backup.pre-batch0001-r2-g3-20260810T065248Z`。
+- 停止 beat 后，唯一普通 worker 的 drain 为 `active=0/reserved=0/active_confirm=0`，随后停止 worker。
+  既有 `race_live` 队列 `7543` 条均为关闭态 monitor backlog，race-live worker 保持 `created`，本次未清空、
+  未消费。默认 `celery` 队列始终为 `0`。
+- release manifest SHA 为 `46b7951db33524105e7ab0b7008f3bc16a314a5c40a31ee8ebbcfb187b15cd33`。
+  apply 在事务内确定性拒绝：`インターポーザー is not strict complete after apply`，缺口为
+  `race_history.career_status.needs_review`、`race_history.start_count_mismatch`、`race_history.gaps`。
+- 根因证据显示该 profile `45661` 生产侧已完整拥有 Netkeiba `11/11` 条履历，而 candidate 又携带 JBIS
+  `11/11` 条同场履历；当前 source-aware idempotency/canonical key 未把两来源的赛名变体识别为同场，
+  因而模拟新增并在写后导致出赛数翻倍，严格完整性门禁正确阻断。该问题可能影响其他已有履历的目标，
+  不能只特判一匹或放宽 strict-complete。
+- 事务回滚后目标 records `243→243`、major wins `0→0`、P0 sources `50→50`、completion runs
+  `11→11`、成功 apply logs `12→12`；artifact run/success log 均为 `0`，三个 draft 仍为 draft 且公开页
+  `404`。batch state 仍为 `prepared`，execution ledger 仍为 ordinal 1 `prepared`，未推进 applied/verified。
+- 后置 dry-run 仍为 `32` profile updates、`410` record creates、`12` existing、`32` source upserts、
+  `128` audits、数据库写入 `0`。worker/beat 已恢复，Django check、migration plan、内外 health/home/horses
+  均通过。禁止重试当前 candidate；修复须先解决跨来源同场等价、补回归与独立审查，再生成新 candidate
+  并重新申请精确 G3。`full_network` 未启动。
+
 ## 2026-08-10 batch-0001 r2 已生成候选，等待精确 G3
 
 - 用户已批准 `32` 个唯一 identity 的 profile/pedigree/race_record/major_wins 四模块，`16` 个 blocker
@@ -14,7 +38,7 @@
 - 候选动作固定为 `32` profile updates、`410` race record creates、`0` race record updates、`12`
   existing records、`32` P0 source upserts、`128` module audits；profile `8307/45666/45738` 为 draft，
   commit 后将尝试首次发布。当前仍为零业务写入、writer activity 为零、健康检查 `200`；生产 apply、
-  首次发布及后续 full_network 均未获授权，必须等待绑定该候选与动作范围的精确 G3。
+  首次发布及后续 full_network 均未获授权。该 G3 随后已执行并按上节确定性停止。
 
 ## 2026-08-10 batch-0001 r2 已补齐 participant→release draft 最小桥接
 

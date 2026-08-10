@@ -1,5 +1,18 @@
 # 部署运行手册
 
+## 2026-08-10 batch-0001 r2 首次 apply fail-closed
+
+1. 恢复点：`pre-batch0001-r2-g3-20260810T065248Z.dump`，SHA
+   `6404536a31369b7bbd2c69ba85dfecb07c4da121c6732f6e4119a74c831438ae`、TOC `1308`；release manifest
+   SHA `46b7951db33524105e7ab0b7008f3bc16a314a5c40a31ee8ebbcfb187b15cd33`。
+2. 当前 candidate 对 `インターポーザー` 计划新增 JBIS 11 条，但 profile `45661` 已有 Netkeiba 完整
+   11 条同场履历；跨来源 canonical 未等价，写后触发 `start_count_mismatch/gaps/needs_review` 并回滚。
+3. 回滚守恒：target records `243`、major wins `0`、P0 sources `50`、completion runs `11`、成功 apply
+   logs `12` 均不变；三个 draft 仍为 draft，batch/execution ledger 均仍为 `prepared`。
+4. 禁止重试当前 candidate/release，禁止手改 ledger 或清除既有履历。下一候选必须先实现并测试跨来源
+   同场等价与逐 profile merged-start-count dry-run 门禁，独立复审、闭锁部署后重新生成全部 SHA。
+5. worker/beat 已恢复，默认 queue `0`；关闭态 race-live backlog `7543` 未触碰。`full_network` 未启动。
+
 ## 2026-08-10 batch-0001 r2 candidate 与精确 G3 门禁
 
 1. 四模块 bundle 已冻结：research `e9a3e93a…81643`、mapping `69ba9f10…6ba7`、authority
