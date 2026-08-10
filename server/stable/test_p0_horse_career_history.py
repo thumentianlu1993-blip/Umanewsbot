@@ -350,6 +350,170 @@ class P0HorseCareerHistoryTests(TestCase):
         self.assertEqual(self.profile.deduplicated_source_record_count, 1)
         self.assertEqual(self.profile.overseas_start_count, 1)
 
+    def test_netkeiba_meeting_venue_and_surface_distance_merge_exact_japanese_start(self):
+        first = upsert_race_record(
+            self.profile,
+            self._payload(
+                source_name="netkeiba",
+                source_url="https://db.netkeiba.com/race/202507030801/",
+                external_race_id="202507030801",
+                racecourse="3中京8",
+                distance_text="芝2000",
+            ),
+        )
+        second = upsert_race_record(
+            self.profile,
+            self._payload(
+                source_name="jbis",
+                source_url="https://www.jbis.or.jp/race/result/20250720/107/01/",
+                external_race_id="20250720-107-01",
+                racecourse="中京",
+                distance_text="2000m",
+            ),
+        )
+
+        self.assertEqual(first.record.id, second.record.id)
+        self.assertEqual(self.profile.race_records.count(), 1)
+
+    def test_surface_prefixed_metric_distance_does_not_merge_different_distance(self):
+        upsert_race_record(
+            self.profile,
+            self._payload(
+                source_name="netkeiba",
+                source_url="https://db.netkeiba.com/race/202507030801/",
+                external_race_id="202507030801",
+                racecourse="3中京8",
+                distance_text="芝1800",
+            ),
+        )
+        upsert_race_record(
+            self.profile,
+            self._payload(
+                source_name="jbis",
+                source_url="https://www.jbis.or.jp/race/result/20250720/107/01/",
+                external_race_id="20250720-107-01",
+                racecourse="中京",
+                distance_text="2000m",
+            ),
+        )
+
+        self.assertEqual(self.profile.race_records.count(), 2)
+
+    def test_explicit_japanese_surface_conflicts_do_not_merge(self):
+        for first_distance, second_distance in (("芝2000", "ダ2000"), ("障3000", "芝3000")):
+            with self.subTest(first=first_distance, second=second_distance):
+                self.profile.race_records.all().delete()
+                upsert_race_record(
+                    self.profile,
+                    self._payload(
+                        source_name="netkeiba",
+                        source_url="https://db.netkeiba.com/race/202507030801/",
+                        external_race_id="202507030801",
+                        racecourse="3中京8",
+                        distance_text=first_distance,
+                    ),
+                )
+                upsert_race_record(
+                    self.profile,
+                    self._payload(
+                        source_name="jbis",
+                        source_url="https://www.jbis.or.jp/race/result/20250720/107/01/",
+                        external_race_id="20250720-107-01",
+                        racecourse="中京",
+                        distance_text=second_distance,
+                    ),
+                )
+                self.assertEqual(self.profile.race_records.count(), 2)
+
+    def test_non_netkeiba_meeting_wrapper_is_not_stripped(self):
+        upsert_race_record(
+            self.profile,
+            self._payload(
+                source_name="netkeiba",
+                source_url="https://db.netkeiba.com/race/202507030801/",
+                external_race_id="202507030801",
+                racecourse="3中京8",
+                distance_text="芝2000",
+            ),
+        )
+        upsert_race_record(
+            self.profile,
+            self._payload(
+                source_name="jbis",
+                source_url="https://www.jbis.or.jp/race/result/20250720/107/01/",
+                external_race_id="20250720-107-01",
+                racecourse="4中京7",
+                distance_text="2000m",
+            ),
+        )
+
+        self.assertEqual(self.profile.race_records.count(), 2)
+
+    def test_real_japanese_shape_still_rejects_race_number_conflict(self):
+        upsert_race_record(
+            self.profile,
+            self._payload(
+                source_name="netkeiba",
+                source_url="https://db.netkeiba.com/race/202507030801/",
+                external_race_id="202507030801",
+                racecourse="3中京8",
+                distance_text="芝2000",
+                race_number="1",
+            ),
+        )
+        upsert_race_record(
+            self.profile,
+            self._payload(
+                source_name="jbis",
+                source_url="https://www.jbis.or.jp/race/result/20250720/107/02/",
+                external_race_id="20250720-107-02",
+                racecourse="中京",
+                distance_text="2000m",
+                race_number="2",
+            ),
+        )
+
+        self.assertEqual(self.profile.race_records.count(), 2)
+
+    def test_real_japanese_shape_still_rejects_event_conflict(self):
+        events = [
+            RaceEvent.objects.create(
+                year=2024,
+                slug=f"japanese-shape-event-{index}",
+                original_name=f"Japanese shape event {index}",
+                chinese_name=f"日本场地测试赛事{index}",
+                country_region=RacingRegion.JAPAN,
+                racecourse="中京",
+                local_date=date(2024, 1, 1),
+                visibility_status=RaceEventVisibility.PUBLISHED,
+            )
+            for index in (1, 2)
+        ]
+        upsert_race_record(
+            self.profile,
+            self._payload(
+                source_name="netkeiba",
+                source_url="https://db.netkeiba.com/race/202507030801/",
+                external_race_id="202507030801",
+                racecourse="3中京8",
+                distance_text="芝2000",
+                event_id=events[0].id,
+            ),
+        )
+        upsert_race_record(
+            self.profile,
+            self._payload(
+                source_name="jbis",
+                source_url="https://www.jbis.or.jp/race/result/20250720/107/01/",
+                external_race_id="20250720-107-01",
+                racecourse="中京",
+                distance_text="2000m",
+                event_id=events[1].id,
+            ),
+        )
+
+        self.assertEqual(self.profile.race_records.count(), 2)
+
     def test_distance_units_do_not_merge_without_other_strong_identity(self):
         base = self._payload(race_number="", distance_text="1600m")
         other = self._payload(
