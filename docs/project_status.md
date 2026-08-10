@@ -2,6 +2,8 @@
 
 ## 2026-08-10 batch-0001 r2 等待四模块人工审核，release draft 桥接已实现
 
+- PR `#93` 已合并并闭锁部署到精确 merge SHA `25ea0df1…ac73`；生产 image 为
+  `sha256:4a8667b9…cc19f`，迁移 no-op、服务/HTTP verifier 通过，高风险数据开关关闭。
 - r2 精确续跑已收敛为 34 complete / 16 blocked，零数据库写入；32 个唯一 provider identity 的生产
   read-only mapping preview 全部为 `bind_existing`。两匹马各出现两次，故 34 occurrence 不能直接送入
   只接受唯一四字段身份的 production apply。
@@ -9,8 +11,10 @@
   occurrence evidence 与四份上游输入 SHA 均保留；输出仍是 module review pending，不构成 release/G3。
 - active review SHA 与 index/completion/candidate schema 均已改为精确 fail-closed；相关回归 `262/262`
   通过，独立限定复审 `APPROVED`、无 P0-P2。
-- 当前下一门禁只有一项：用户明确批准 32 个 identity 的四模块，并确认 16 blocker 继续冻结。代码合并
-  与闭锁部署可先完成，但未经该批准不生成 mapping approval、release candidate 或生产写入。
+- production draft `p0batch-5e17bcd17816` 已生成并通过语义 verifier；combined SHA 为
+  `77cdb63b…fa6aa`，source-binding SHA 为 `0e3d269a…4456b`，module/release approval 均不存在。
+- 当前下一门禁只有一项：用户明确批准 32 个 identity 的四模块，并确认 16 blocker 继续冻结。未经该
+  批准不生成 mapping approval、release candidate 或生产写入。
 
 ## 2026-08-09 五地区 2025 参赛马进入 production bridge 阶段
 

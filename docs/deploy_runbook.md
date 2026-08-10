@@ -2,9 +2,17 @@
 
 ## 2026-08-10 participant batch-0001 r2 release draft 桥接
 
-1. 闭锁部署后保持所有 profile network、production apply、auto publish、race-live 与 `full_network` 开关
-   为 false。先复核 production revision、容器 image、writer/queue/lock、HTTP health 与 migration leaf；
-   本命令本身不访问网络或数据库。
+0. PR `#93` 已按 merge SHA `25ea0df188f323e1a24a78f781bab6a27bf0ac73` 部署到
+   `/opt/umanews-release-25ea0df1-PR93-20260810/umanewsbot`；image 为
+   `sha256:4a8667b91122b2b616cd13b721d666a2be345998277932e0c683a1096a9cc19f`，Release B preflight SHA 为
+   `278224b57e901fac31115611ee677d83bf973748c90bffe60fb64e64933049e3`。发布前备份为
+   `/opt/umanewsbot/backups/db/pre-pr93-code-deploy-20260810T030655Z.dump`，SHA-256
+   `42beceff5fc6aaa85635d3b960595cb0a89ec7b62c15f178b85bcdac27091659`、TOC `1308`；回滚 image tag
+   为 `umanewsbot:rollback-pre-pr93-20260810`。
+
+1. 闭锁部署后保持本批 profile network、production apply、P0 automatic first publish、race-live 与
+   `full_network` 数据动作关闭；既有新闻运营自动化不属于本批开关，不因该部署改值。先复核 production
+   revision、容器 image、writer/queue/lock、HTTP health 与 migration leaf；本命令本身不访问网络或数据库。
 2. 只对 execution ledger 中精确 active `prepared` 的 batch 执行：
 
    ```bash
@@ -29,6 +37,12 @@
 5. `--prepare-release` 之后仍需独立 release approval 和精确 G3。生产 apply 前执行 fresh 写前备份、服务
    排空和 maintenance；只有 verifier `planned_remaining` 五字段全零后，execution ledger 才可从
    `prepared` 依次推进到 `released -> applied -> verified`，随后才允许 ordinal 2。
+6. 本次 production draft 固定在 PR90 权威 evidence root 的
+   `participant-execution-2025-6c357985-r1/batch-0001-japan-0001/release-draft-r1`。精确 batch SHA 为
+   `5e17bcd1781671fc7dcbfa4f02e3d0a219f504d7cbfb9a9dc7ebc934294e794c`，combined candidates SHA 为
+   `77cdb63b621d1e081de2a667732b0a1a7f26d1c3559c0f97fd33ae1f099fa6aa`，source-binding SHA 为
+   `0e3d269a6222f47ed01adade185202da0273c9b5a9c57366fd5fda21dac4456b`。生产绝对路径参与 binding，
+   不得用本地 `/tmp` replay 的 batch/source-binding SHA 替换这组生产身份。
 
 ## 2026-08-09 reviewed official-results package 发布前验证
 

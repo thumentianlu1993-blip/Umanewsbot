@@ -2,17 +2,28 @@
 
 ## 2026-08-10 batch-0001 r2 已补齐 participant→release draft 最小桥接
 
-- 生产关闭态当前仍为 PR `#91` revision `0149eab8…d919`；PR `#92` 仅为 evidence 文档，不影响运行
-  image。batch-0001 r2 completion SHA 为 `2cf2c634…04b8`，守恒为 `50 occurrence = 34 complete +
-  16 blocked`，网络请求 `120`、数据库写入 `0`，execution ledger 仍停在 ordinal 1 `prepared`。
+- PR `#93` 已合并并按精确 merge SHA `25ea0df188f323e1a24a78f781bab6a27bf0ac73` 闭锁部署；生产 image
+  为 `sha256:4a8667b91122b2b616cd13b721d666a2be345998277932e0c683a1096a9cc19f`，migration leaf
+  仍为 `stable.0072_add_extended_racing_regions` 且 migration plan 为空。web/worker/beat/nginx、两个
+  正式域名的 health/home/horses verifier 均通过，P0 profile network、historical、race-live、
+  race-data-sync、term enforce 与 attribution 高风险开关保持关闭。
+- 发布前 fresh custom-format PostgreSQL 备份为
+  `/opt/umanewsbot/backups/db/pre-pr93-code-deploy-20260810T030655Z.dump`，`419585214` bytes、mode `0600`、
+  TOC `1308`、SHA-256 `42beceff5fc6aaa85635d3b960595cb0a89ec7b62c15f178b85bcdac27091659`；
+  旧 image 已保留为 `umanewsbot:rollback-pre-pr93-20260810`。
+- batch-0001 r2 completion SHA 为 `2cf2c634…04b8`，守恒为 `50 occurrence = 34 complete + 16 blocked`，
+  网络请求 `120`、数据库写入 `0`，execution ledger 仍停在 ordinal 1 `prepared`。
 - 旧 production apply 要求唯一四字段身份，34 个 complete occurrence 中有 2 组重复 provider identity，
   因而不能直接导入。新增离线桥接命令精确重验 batch index、active ledger、completion manifest 与
   candidates 文件 SHA/大小/计数，再按 provider identity 语义去重；只有 candidate key、抓取时间和
   occurrence 自身赛事入口可不同，其余内容漂移立即拒绝。
-- 用生产 r2 文件本地真实验证得到 `32` 个唯一 identity、`2` 个被折叠 occurrence、`16` 个继续冻结
-  blocker；两次独立输出的 batch SHA、combined SHA 与 source-binding SHA 逐字节一致。桥接产物显式
-  `module_review_status=pending`、`database_writes=0`，并保留全部 occurrence key、赛事入口 evidence
-  与原始输入 SHA。
+- 已用精确生产 image 在 `--network none`、只读根文件系统下直接绑定 PR90 的权威 r2 evidence root，
+  生成 production draft `p0batch-5e17bcd17816`：batch SHA
+  `5e17bcd1781671fc7dcbfa4f02e3d0a219f504d7cbfb9a9dc7ebc934294e794c`、combined SHA
+  `77cdb63b621d1e081de2a667732b0a1a7f26d1c3559c0f97fd33ae1f099fa6aa`、source-binding SHA
+  `0e3d269a6222f47ed01adade185202da0273c9b5a9c57366fd5fda21dac4456b`。语义 verifier 得到 `32` 个
+  唯一 identity、`2` 个被折叠 occurrence、`16` 个继续冻结 blocker；仅有 inclusion approval，
+  module/release approval 均不存在，数据库写入 `0`。
 - 相关组合回归最终 `262/262` 通过。独立 reviewer 提出的 active review SHA 格式与三类 schema version
   fail-open 已补反例并修复；限定复审最终 `APPROVED`，无剩余 P0-P2。
 - 四模块工作簿仍等待用户批准；桥接不会代替该判断。批准后才可在生产只读事务中生成新鲜 mapping
