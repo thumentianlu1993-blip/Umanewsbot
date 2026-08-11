@@ -1,5 +1,16 @@
 # 项目状态文档
 
+## 2026-08-11 lifecycle full-cohort 本地实现通过最终复审
+
+- 生产双赛事 canary 中 event 186 已真实按 T/T+30 推进到 finished，公开页面一致；生产仍未扩大到全量。
+- 新 registry/membership、`0073`、有界 promotion、O(1) 单场授权和安全 mode switch 已在独立 worktree
+  实现；首轮两套 review 的 P1 findings 已修复。
+- 五轮 review findings 与最终原生 P1 均已修复；当前 SQLite 新旧回归 `135/135`、隔离 PostgreSQL 16
+  `14/14`，静态检查通过；最终独立复审与 Codex 原生只读 review 均为 `APPROVED`，审前审后 fingerprint
+  均为 `9d2cb55d…871c8`。未 commit、push、合并、部署、迁移或写生产。
+- 后续顺序固定为：Draft PR -> G2 发布包 -> false/off 关闭态部署 -> 生产只读 census/dry-run -> 独立
+  G3 分档 registry enforce；新赛事自动 admission 另立 E2 change。
+
 ## 2026-08-10 PR #98 已部署，新 candidate 等待精确 G3
 
 - 生产 revision `127d4833…9528`、image `sha256:37f84597…8852`，fresh 代码部署备份 SHA

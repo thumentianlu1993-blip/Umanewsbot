@@ -1,5 +1,28 @@
 # 当前状态
 
+## 2026-08-11 生命周期 full-cohort 实现通过最终独立复审
+
+- event `186` 已在生产双赛事 canary 下真实完成 `scheduled -> running -> finished`：T 与 T+30 各一条
+  applied transition，范围外 applied 为 `0`，公开详情和日历均显示“赛果待确认”。这证明当前双赛事路径
+  可用，但不等于通用全量能力已经上线；生产仍是 `186,187` canary，race-live 关闭。
+- clean worktree `codex/lifecycle-enforce-full-cohort` 基于 `origin/main@4097e386` 实现数据库 registry、逐场
+  membership、`0073` migration、严格 selector/census、每批最多 100 场的可恢复 promotion、唯一 active
+  activation、shared-advisory-lock 轮换屏障、O(1) 单场授权，以及 legacy canary 兼容和新 mode switch。
+- 测试先行初始为 15 failures + 1 PostgreSQL-only skip；独立 reviewer 与原生只读 review 随后均给出
+  `REVISE`。已修复漏掉缺 control 赛事、ID canonical 顺序、旧 root 竞态、predecessor 差集清退、active
+  retry、membership/count 绑定、Beat stopped admission、备份前静默 writers 和 100 场批次等 findings。
+- 当前主线程验证：SQLite 新旧 lifecycle 回归 `135/135`（另 2 项 PostgreSQL-only 正常跳过）；隔离
+  PostgreSQL 16 并发/行锁回归 `14/14`；Django check、migration drift、shell syntax、single-owner ownership
+  和 `git diff --check` 均通过。`origin/main` 自身 deploy one-off inventory 对两个既有 resume 脚本的失败已在
+  干净主干复现，不属于本 change。
+- 第 2–4 轮复审继续发现并已修复：可消费的缺-control enrollment plan（含美国逐场时区 allowlist）、完整 cohort dry-run、scanner shared
+  rotation barrier、active membership `PROTECT`、失败恢复保留锁、严格 predecessor/stage proof、固定 20/100
+  灰度上限、已推进赛事的 active verify/replay、完整运行四元根、首代/后继 disarm 分支和 running predecessor
+  rotation。最终限定独立复审与 Codex 原生只读 review 均为 `APPROVED`，稳定 fingerprint 为
+  `9d2cb55d6125310e114e381cc91359eae5b06f695136059bad2e2e1cc0c871c8`。当前仍未 commit、push、PR、
+  合并、部署、执行 `0073` 或修改生产 registry/control/env。下一步是创建 Draft PR 并提交 G2 发布包，
+  生产仍须先 false/off 关闭态部署、只读 census/dry-run，再按独立 G3 分档启用。
+
 ## 2026-08-10 PR #98 已闭锁部署；全新 candidate/artifact 等待精确 G3
 
 - PR `#98` 已按精确 merge SHA `127d4833da89e4a8f6b1b9a93bbaec1e65119528` 部署到独立 release

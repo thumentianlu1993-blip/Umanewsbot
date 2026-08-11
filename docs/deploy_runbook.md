@@ -1,5 +1,24 @@
 # 部署运行手册
 
+## 2026-08-11 lifecycle full-cohort 发布边界（尚未授权执行）
+
+1. 当前生产仍为 event `186,187` 双赛事 canary；event 186 的 T/T+30 已验收，不能据此直接把 IDs 扩成长
+   列表。新 registry 代码尚未合并或部署，以下仅为审核中的运行合同。
+2. G2 发布包必须绑定最终 reviewer fingerprint、merge SHA/image、migration `0073`、canonical/active env
+   filtered hash、旧 canary artifact/raw SHA/approved commit/activation ID、数据库备份与 rollback image。
+3. 共享锁内先停止 Beat，按冻结节点身份 drain worker 后停止 worker；只有 writer 静默后才创建并校验
+   custom-format DB 备份。随后切 false/off、清空 legacy/registry roots、重建 web 并验证，使用旧 artifact
+   自己的 approved commit 完成 legacy disarm。任一步失败后续零执行，race-live 始终不启动。
+4. 关闭态部署新代码和 `0073` 后先执行只读 census。缺 control 的 eligible IDs 必须先按 strict-v2 <=20
+   场批次 enrollment；registry promotion wrapper 每次只写 <=100 场并循环到完整，partial registry 不可
+   activation。caller 的 membership SHA/count 必须与 artifact 和 DB 同时一致。
+5. mode switch 接受 promotion 后严格 `Beat=stopped` 的 registry admission；在 web 仍为 false/off、worker/Beat
+   已停时 activation。若同 artifact 已 active，则完整校验并复用数据库 activation ID；写两份 env、重建
+   web/worker、四元 coherence 和 active verify 全过后，Beat 最后启动。任何失败收敛 false/off。
+6. 首档只允许未来 7 天且有 T 的最多 20 场；至少一场真实完成新 registry T/T+30 后才可扩大到 30 天。
+   无时间赛事须另做当地次日真实验收，之后才可申请 full_eligible G3。每档发现范围外/重复 applied、旧 root
+   claim、锁等待、env/DB 漂移、HTTP/worker/Beat 异常或 race-live 启动，立即 false/off 并保留审计。
+
 ## 2026-08-10 PR #98 部署与新 candidate 的精确 G3 入口
 
 1. 当前生产 application revision 为 `127d4833da89e4a8f6b1b9a93bbaec1e65119528`，image 为

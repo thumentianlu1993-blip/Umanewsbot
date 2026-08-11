@@ -5595,6 +5595,93 @@ class RaceEventLifecycleControl(TimestampedModel):
         return f"{self.event} mode={self.mode} gen={self.schedule_generation}"
 
 
+class RaceEventLifecycleEnforceRegistry(TimestampedModel):
+    """Immutable authorization root for a lifecycle enforce cohort."""
+
+    root_sha256 = models.CharField(max_length=64, unique=True)
+    generation = models.PositiveBigIntegerField(unique=True)
+    predecessor = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="successors",
+    )
+    membership_sha256 = models.CharField(max_length=64)
+    member_count = models.PositiveIntegerField()
+    state = models.CharField(max_length=16, default="inactive")
+    is_active = models.BooleanField(default=False)
+    activation_id = models.CharField(max_length=64, blank=True)
+    approved_commit = models.CharField(max_length=40)
+    selector_scope = models.JSONField(default=dict)
+    scope_sha256 = models.CharField(max_length=64)
+    census_cutoff = models.DateTimeField()
+    apply_expires_at = models.DateTimeField()
+    runtime_valid_until = models.DateTimeField()
+    artifact_receipt = models.JSONField(default=dict, blank=True)
+    activated_at = models.DateTimeField(null=True, blank=True)
+    retired_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("is_active",),
+                condition=models.Q(is_active=True),
+                name="uq_lifecycle_registry_active",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("state", "generation"), name="lifecycle_reg_state_gen_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"registry generation={self.generation} state={self.state}"
+
+
+class RaceEventLifecycleEnforceMembership(TimestampedModel):
+    """Per-event evidence granting authority under one registry root."""
+
+    registry = models.ForeignKey(
+        RaceEventLifecycleEnforceRegistry,
+        on_delete=models.CASCADE,
+        related_name="memberships",
+    )
+    event = models.ForeignKey(
+        "RaceEvent",
+        on_delete=models.PROTECT,
+        related_name="lifecycle_enforce_memberships",
+    )
+    state = models.CharField(max_length=16, default="active")
+    entry_sha256 = models.CharField(max_length=64)
+    source_enrollment_sha256 = models.CharField(max_length=64)
+    schedule_generation = models.PositiveBigIntegerField()
+    schedule_hash = models.CharField(max_length=64)
+    country_region = models.CharField(max_length=32)
+    timezone_name = models.CharField(max_length=64)
+    frozen_snapshot = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("registry", "event"),
+                name="uq_lifecycle_registry_event",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=("registry", "event"),
+                name="lifecycle_member_reg_evt_idx",
+            ),
+            models.Index(
+                fields=("registry", "state", "event"),
+                name="lifecycle_member_state_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"registry={self.registry_id} event={self.event_id}"
+
+
 class RaceEventLifecycleTransition(TimestampedModel):
     """Append-only audit log of lifecycle state transitions."""
 
