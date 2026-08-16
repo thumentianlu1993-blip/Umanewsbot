@@ -43,6 +43,21 @@
           "sha256": "f53cd64d7625fecc6f0cad9458e36d670c8e95cf6c2b23cd6ef7fab5123be67a"
         }
       ]
+    },
+    {
+      "migration_path": "server/stable/migrations/0073_lifecycle_enforce_registry.py",
+      "reviewed_variants": [
+        {
+          "dependencies": [
+            [
+              "stable",
+              "0072_add_extended_racing_regions"
+            ]
+          ],
+          "rationale": "The rollback target must understand the exact additive 0073 lifecycle registry schema already recorded in production; pre-0073 targets require separately reviewed database recovery.",
+          "sha256": "fa2b26f907ded36553f17cb75a0738ae09281adbe0e620d67aba8187d5ad9404"
+        }
+      ]
     }
   ],
   "schema_version": "release-b-rollback-migration-allowlist/v2"

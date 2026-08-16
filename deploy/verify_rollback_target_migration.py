@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed unless a rollback target carries an exactly reviewed 0072."""
+"""Fail closed unless a rollback target carries the reviewed migrations through 0073."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ ALLOWLIST_PATH = ROOT / "deploy" / "reviewed_release_b_rollback_migrations.json"
 EXPECTED_MIGRATION_PATHS = (
     "server/stable/migrations/0071_historical_calendar_release_b.py",
     "server/stable/migrations/0072_add_extended_racing_regions.py",
+    "server/stable/migrations/0073_lifecycle_enforce_registry.py",
 )
 
 

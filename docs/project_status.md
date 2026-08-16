@@ -1,5 +1,12 @@
 # 项目状态文档
 
+## 2026-08-16 lifecycle G2 暂停于 0073 发布合同修复
+
+- `0073` 已由唯一 migration owner 在生产成功应用，但旧完成校验只承认 leaf `0072`，标准部署安全停止。
+- 公网服务已恢复，lifecycle 仍为 `false/off`，race-live 关闭；尚未执行 full-cohort census/dry-run。
+- 正在以测试先行方式修复 ordinary/initial-install/rollback/catalog 四类 `0073` 合同，并复用同一独立
+  reviewer 复审；通过后才重跑标准部署并继续 G2 只读步骤。
+
 ## 2026-08-11 lifecycle full-cohort 本地实现通过最终复审
 
 - 生产双赛事 canary 中 event 186 已真实按 T/T+30 推进到 finished，公开页面一致；生产仍未扩大到全量。

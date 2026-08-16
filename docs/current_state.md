@@ -1,5 +1,16 @@
 # 当前状态
 
+## 2026-08-16 G2 在 0073 发布合同校验处安全停止并恢复 false/off 服务
+
+- PR `#102` 已合并；生产在共享锁内完成 writer 静默和备份后，由唯一 release owner 成功应用
+  `stable.0073_lifecycle_enforce_registry`。随后完成校验仍把最终叶节点固定为 `0072`，因此部署按合同失败，
+  没有把失败误报为成功。现有 web/worker/Beat 已恢复服务且保持 lifecycle `false/off`，race-live 关闭。
+- 一次性受审事务已将过期的 `RaceResultReviewRun 65/66` 精确收口为 `noop`，reason code
+  `stale_claim_reconciled`；事务 before/after 与备份证据已冻结。该修复未触及其他业务行。
+- 当前小型修复 `codex/fix-0073-release-contract` 通过真实 RED 后，将 ordinary/initial-install/rollback
+  migration 合同顺接到 `0073`，并为两个新表、FK、唯一约束及关键索引增加 PostgreSQL catalog 校验。
+  首轮独立 review 为 `REVISE`，3 项 finding 已修复，等待同一 reviewer 复审；复审通过前不再次部署。
+
 ## 2026-08-11 生命周期 full-cohort 实现通过最终独立复审
 
 - event `186` 已在生产双赛事 canary 下真实完成 `scheduled -> running -> finished`：T 与 T+30 各一条

@@ -425,6 +425,11 @@ case "$cmd" in
         cat "$state/git-show-0072"
         exit 0
         ;;
+      *0073_lifecycle_enforce_registry.py)
+        [ -f "$state/git-show-0073" ] || exit 1
+        cat "$state/git-show-0073"
+        exit 0
+        ;;
     esac
     exit 1
     ;;
@@ -550,6 +555,10 @@ class Harness:
         shutil.copyfile(
             ROOT / "server/stable/migrations/0072_add_extended_racing_regions.py",
             self.state / "git-show-0072",
+        )
+        shutil.copyfile(
+            ROOT / "server/stable/migrations/0073_lifecycle_enforce_registry.py",
+            self.state / "git-show-0073",
         )
         self.log = base / "calls.log"
         self.log.touch()
@@ -3978,7 +3987,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                 harness, original_oid, original_image, branch=True
             )
 
-    def test_rollback_allowlist_requires_reviewed_0071_and_0072_contracts(self):
+    def test_rollback_allowlist_requires_reviewed_migrations_through_0073(self):
         allowlist = json.loads(
             (
                 ROOT / "deploy/reviewed_release_b_rollback_migrations.json"
@@ -3993,6 +4002,7 @@ class RollbackContractValidationTests(SimpleTestCase):
             {
                 "server/stable/migrations/0071_historical_calendar_release_b.py",
                 "server/stable/migrations/0072_add_extended_racing_regions.py",
+                "server/stable/migrations/0073_lifecycle_enforce_registry.py",
             },
         )
         self.assertEqual(
@@ -4010,6 +4020,14 @@ class RollbackContractValidationTests(SimpleTestCase):
             ]},
             {
                 "f53cd64d7625fecc6f0cad9458e36d670c8e95cf6c2b23cd6ef7fab5123be67a",
+            },
+        )
+        self.assertEqual(
+            {item["sha256"] for item in contracts[
+                "server/stable/migrations/0073_lifecycle_enforce_registry.py"
+            ]},
+            {
+                "fa2b26f907ded36553f17cb75a0738ae09281adbe0e620d67aba8187d5ad9404",
             },
         )
         self.assertTrue(
@@ -4122,7 +4140,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                         )
                     )
 
-    def test_0072_rollback_target_does_not_need_later_v2_marker_file(self):
+    def test_0073_rollback_target_does_not_need_later_v2_marker_file(self):
         verifier_call = (
             "python3 ./deploy/verify_rollback_target_migration.py "
             '--target-oid "$TARGET_OID"'
@@ -4143,7 +4161,7 @@ class RollbackContractValidationTests(SimpleTestCase):
             )
             self.assertIn(
                 "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET="
-                "stable.0072_add_extended_racing_regions",
+                "stable.0073_lifecycle_enforce_registry",
                 text,
             )
 
@@ -4151,7 +4169,7 @@ class RollbackContractValidationTests(SimpleTestCase):
             ROOT / "deploy/resume_rollback_control_state.sh"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            "EXPECTED_LEAF=stable.0072_add_extended_racing_regions", resume
+            "EXPECTED_LEAF=stable.0073_lifecycle_enforce_registry", resume
         )
 
         verifier = (
@@ -4173,6 +4191,7 @@ class RollbackContractValidationTests(SimpleTestCase):
             {
                 "server/stable/migrations/0071_historical_calendar_release_b.py",
                 "server/stable/migrations/0072_add_extended_racing_regions.py",
+                "server/stable/migrations/0073_lifecycle_enforce_registry.py",
             },
         )
 
@@ -4998,6 +5017,11 @@ class RollbackContractValidationTests(SimpleTestCase):
                                 "show",
                                 f"{self.FIXED_OID}:server/stable/migrations/"
                                 "0072_add_extended_racing_regions.py",
+                            ],
+                            [
+                                "show",
+                                f"{self.FIXED_OID}:server/stable/migrations/"
+                                "0073_lifecycle_enforce_registry.py",
                             ],
                         ],
                     )
