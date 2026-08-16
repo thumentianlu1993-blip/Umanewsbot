@@ -1,5 +1,18 @@
 # 部署运行手册
 
+## 2026-08-16 过期 legacy lifecycle canary 的关闭态 disarm
+
+1. 先确认 web/worker/Beat 同一受审 revision/image，lifecycle 为 `false/off`、legacy/registry env roots 为空、
+   race-live scheduler/monitor 为 false 且 race-live worker 未运行；在共享部署锁内停止 Beat、drain 并停止 worker。
+2. 逐字节核对旧 manifest raw SHA、approved commit 和 event IDs；只调用
+   `verify_race_event_lifecycle_enforce_canary --phase inactive --disarm`。过期例外只影响 manifest loader，DB
+   mutation 仍执行完整 frozen cohort 与关闭态校验。
+3. 紧接着用相同 artifact 再运行一次 `--phase inactive --disarm`，必须返回幂等 `outcome=replay`；不能用
+   不带 `--disarm` 的普通 verify，因为它必须继续拒绝过期 runtime。恢复 worker/Beat 后再跑 host-wide
+   false/off coherence。任一步失败均恢复服务、释放锁、保留旧 evidence，禁止继续 census 或 registry promotion。
+4. 该动作不启用 lifecycle、不改变公开状态、不启动 race-live。只有 disarm、服务恢复与 coherence 全部通过后，
+   才进入 G2 生产只读 census/dry-run。
+
 ## 2026-08-16 0073 migration 已应用但 completion 合同失败的恢复步骤
 
 1. 该状态不是 migration 失败：先核对 recorder leaf 为 `stable.0073_lifecycle_enforce_registry`、无 pending

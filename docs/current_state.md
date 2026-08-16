@@ -1,5 +1,18 @@
 # 当前状态
 
+## 2026-08-16 G2 关闭态部署完成；旧 canary 因 runtime 过期暂未 disarm
+
+- PR `#103` merge SHA `231514eac6d52d002319abdba23e231c2560ee25` 已通过标准唯一 release owner
+  完成关闭态部署；`0073` migrate 为 no-op，catalog/completion gate 通过，web/worker/Beat 同一 image
+  `sha256:dd5e1f3b52e255b7823624a51ac4013b38f174a232250290dd4afa743f60b363`，lifecycle 保持
+  `false/off`，race-live 关闭且未运行，内外 healthz 正常。
+- 旧 event `186/187` canary disarm 在共享锁、Beat/worker 静默后被 `canary runtime 已过期` 门禁拒绝；
+  恢复 trap 已重新启动 worker/Beat，数据库 evidence 仍为 active，未发生部分写入。因此生产 census/dry-run
+  尚未执行。
+- 当前最小修复 `codex/fix-expired-canary-disarm` 只允许 verify 命令在同时带 `--disarm` 时加载过期 manifest；
+  mutation 层仍要求严格 `false/off` 并完整核对 frozen cohort。普通 verify、activate 和 enforce 路径继续拒绝
+  过期 trust root。已取得真实 RED，聚焦 application 测试 `11/11` GREEN，等待独立 review。
+
 ## 2026-08-16 G2 在 0073 发布合同校验处安全停止并恢复 false/off 服务
 
 - PR `#102` 已合并；生产在共享锁内完成 writer 静默和备份后，由唯一 release owner 成功应用

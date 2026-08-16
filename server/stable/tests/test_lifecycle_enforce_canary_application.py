@@ -313,6 +313,83 @@ class LifecycleEnforceCanaryApplicationTests(TestCase):
         self.assertEqual(reactivated.outcome, "activated")
         self.assertNotEqual(reactivated.activation_id, activated.activation_id)
 
+    def test_expired_manifest_is_accepted_only_for_closed_runtime_disarm(self):
+        self._activate()
+        ids = ",".join(map(str, self.event_ids))
+
+        with override_settings(
+            RACE_EVENT_LIFECYCLE_ENABLED=False,
+            RACE_EVENT_LIFECYCLE_MODE="off",
+        ), patch(
+            "sys.stdin", SimpleNamespace(buffer=BytesIO(self.raw))
+        ), self.assertRaisesMessage(CommandError, "canary runtime 已过期"):
+            call_command(
+                "verify_race_event_lifecycle_enforce_canary",
+                "--manifest-stdin",
+                "--manifest-sha256",
+                self.raw_sha,
+                "--expected-commit",
+                OID,
+                "--expected-event-ids",
+                ids,
+                "--phase",
+                "inactive",
+            )
+
+        with override_settings(
+            RACE_EVENT_LIFECYCLE_ENABLED=False,
+            RACE_EVENT_LIFECYCLE_MODE="off",
+        ), patch(
+            "sys.stdin", SimpleNamespace(buffer=BytesIO(self.raw))
+        ):
+            call_command(
+                "verify_race_event_lifecycle_enforce_canary",
+                "--manifest-stdin",
+                "--manifest-sha256",
+                self.raw_sha,
+                "--expected-commit",
+                OID,
+                "--expected-event-ids",
+                ids,
+                "--phase",
+                "inactive",
+                "--disarm",
+            )
+
+        replay_stdout = StringIO()
+        with override_settings(
+            RACE_EVENT_LIFECYCLE_ENABLED=False,
+            RACE_EVENT_LIFECYCLE_MODE="off",
+        ), patch(
+            "sys.stdin", SimpleNamespace(buffer=BytesIO(self.raw))
+        ):
+            call_command(
+                "verify_race_event_lifecycle_enforce_canary",
+                "--manifest-stdin",
+                "--manifest-sha256",
+                self.raw_sha,
+                "--expected-commit",
+                OID,
+                "--expected-event-ids",
+                ids,
+                "--phase",
+                "inactive",
+                "--disarm",
+                stdout=replay_stdout,
+            )
+        self.assertIn("outcome=replay", replay_stdout.getvalue())
+
+        controls = RaceEventLifecycleControl.objects.filter(
+            event_id__in=self.event_ids
+        ).order_by("event_id")
+        self.assertEqual(
+            [
+                control.manifest_data["enforce_canary"]["activation_state"]
+                for control in controls
+            ],
+            ["inactive", "inactive"],
+        )
+
     def test_reactivation_rejects_status_changed_without_canary_transition(self):
         self._activate()
         event = self.events[0]
