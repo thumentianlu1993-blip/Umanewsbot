@@ -1,5 +1,20 @@
 # 当前状态
 
+## 2026-08-17 lifecycle G2 两项关闭态阻塞已通过独立 review，待发布
+
+- 生产运行 revision 仍为 `0f3391a9…31ea6`，migration leaf 为 `0073`、plan 为空；web/worker/Beat 与
+  healthz 正常，lifecycle 为 `false/off`、race-live 关闭。旧 186/187 canary evidence 仍为 active，
+  但运行态无授权，最近一次 disarm 因 event 187 历史 direct-finish 单边而零写拒绝并完整恢复服务。
+- 生产 7 天只读 census 已证明窗口内 `race_datetime` 赛事为 0；lifecycle control/transition/registry/
+  membership 前后指纹一致，但 prepare 把正常空集合误报为“event IDs 必须非空”。
+- 候选修复测试先行：只允许精确 historical direct-finish 在显式 false/off disarm 中通过，普通 reactivate
+  仍拒绝；空 census 返回 `status=no_candidates`。首轮独立 review 的 activation ID 绑定 P1 与空集合输入
+  校验 P2 均已补真实 RED 并转绿。第二轮 review 发现 direct-finish 首次 disarm 后无法幂等重放；现已锁定
+  “首次严格绑定 active activation ID、成功收口后同 artifact 返回 `replay` 且零写”的合同并转绿。
+  聚焦回归合计 `143/143`（8 skip），Django check 与 migration drift 均通过。未参与实现的同一 reviewer
+  第 3 轮限定复审结论为 `APPROVED`；原生只读 review exit 0、审前后代码候选 fingerprint 均为
+  `c0b0282fe129a02ebc79624e0eb3d9ce643cb3f46923b7c98ac7f9eea885d986`。尚未提交或部署。
+
 ## 2026-08-16 G2 关闭态部署完成；旧 canary 因 runtime 过期暂未 disarm
 
 - PR `#103` merge SHA `231514eac6d52d002319abdba23e231c2560ee25` 已通过标准唯一 release owner

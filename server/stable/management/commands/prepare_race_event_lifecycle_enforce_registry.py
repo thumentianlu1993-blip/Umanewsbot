@@ -19,6 +19,7 @@ from stable.services.race_event_lifecycle_enforce import (
     canonical_artifact_bytes,
     select_registry_candidates,
     scope_sha256,
+    validate_registry_artifact_identity,
 )
 
 
@@ -70,6 +71,11 @@ class Command(BaseCommand):
             generated_at = timezone.now()
             if cutoff > generated_at:
                 raise RegistryError("cutoff 不得晚于实际生成时刻（future cutoff）")
+            validate_registry_artifact_identity(
+                approved_commit=options["approved_commit"],
+                generation=options["generation"],
+                predecessor_root_sha256=options["predecessor_root_sha256"],
+            )
             window_end = (
                 datetime.fromisoformat(options["window_end"])
                 if options.get("window_end") else None
@@ -201,6 +207,13 @@ class Command(BaseCommand):
             enrollment_plan_output.write_bytes(
                 canonical_artifact_bytes(plan_payload)
             )
+            if not census.included_event_ids:
+                self.stdout.write(
+                    f"status=no_candidates inspected={census.inspected} "
+                    "included=0 required=0 ready=0 blocked_us=0 batches=0 "
+                    f"census={census_output} plan={enrollment_plan_output}"
+                )
+                return
             controls = {
                 row.event_id: row.enrollment_manifest_sha256
                 for row in RaceEventLifecycleControl.objects.filter(

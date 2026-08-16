@@ -299,7 +299,11 @@ class LifecycleEnforceCanaryApplicationTests(TestCase):
             disarmed = verify_or_mutate_canary(
                 self.manifest, expected_state="inactive", disarm=True
             )
+            replay = verify_or_mutate_canary(
+                self.manifest, expected_state="inactive", disarm=True
+            )
         self.assertEqual(disarmed.outcome, "disarmed")
+        self.assertEqual(replay.outcome, "replay")
 
         with override_settings(
             RACE_EVENT_LIFECYCLE_ENABLED=True,
@@ -389,6 +393,123 @@ class LifecycleEnforceCanaryApplicationTests(TestCase):
             ],
             ["inactive", "inactive"],
         )
+
+    def test_closed_disarm_accepts_exact_legacy_direct_finish_but_reactivation_rejects_it(self):
+        activated = self._activate()
+        ids = ",".join(map(str, self.event_ids))
+        with override_settings(
+            RACE_EVENT_LIFECYCLE_ENABLED=True,
+            RACE_EVENT_LIFECYCLE_MODE="enforce",
+            RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256=self.raw_sha,
+            RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS=ids,
+        ):
+            from django.db import transaction
+            with transaction.atomic():
+                applied = apply_race_lifecycle_decision(
+                    event_id=self.event_ids[1],
+                    expected_generation=3,
+                    now=self.race_times[1] + timedelta(minutes=30),
+                    mode="enforce",
+                    expected_canary_sha256=self.raw_sha,
+                    expected_canary_event_ids=ids,
+                    expected_canary_activation_id=activated.activation_id,
+                )
+        self.assertEqual(applied.action, "applied")
+        self.events[1].refresh_from_db()
+        self.assertEqual(self.events[1].status, "finished")
+
+        with override_settings(
+            RACE_EVENT_LIFECYCLE_ENABLED=False,
+            RACE_EVENT_LIFECYCLE_MODE="off",
+        ):
+            disarmed = verify_or_mutate_canary(
+                self.manifest, expected_state="inactive", disarm=True
+            )
+            replay = verify_or_mutate_canary(
+                self.manifest, expected_state="inactive", disarm=True
+            )
+        self.assertEqual(disarmed.outcome, "disarmed")
+        self.assertEqual(replay.outcome, "replay")
+
+        with override_settings(
+            RACE_EVENT_LIFECYCLE_ENABLED=True,
+            RACE_EVENT_LIFECYCLE_MODE="enforce",
+            RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256=self.raw_sha,
+            RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS=ids,
+        ), self.assertRaisesMessage(CanaryError, "transition 链不完整"):
+            verify_or_mutate_canary(
+                self.manifest, expected_state="active", activate=True
+            )
+
+    def test_closed_disarm_rejects_legacy_direct_finish_with_wrong_provenance(self):
+        activated = self._activate()
+        ids = ",".join(map(str, self.event_ids))
+        with override_settings(
+            RACE_EVENT_LIFECYCLE_ENABLED=True,
+            RACE_EVENT_LIFECYCLE_MODE="enforce",
+            RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256=self.raw_sha,
+            RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS=ids,
+        ):
+            from django.db import transaction
+            with transaction.atomic():
+                applied = apply_race_lifecycle_decision(
+                    event_id=self.event_ids[1],
+                    expected_generation=3,
+                    now=self.race_times[1] + timedelta(minutes=30),
+                    mode="enforce",
+                    expected_canary_sha256=self.raw_sha,
+                    expected_canary_event_ids=ids,
+                    expected_canary_activation_id=activated.activation_id,
+                )
+        self.assertEqual(applied.action, "applied")
+        transition = self.events[1].lifecycle_transitions.get(record_kind="applied")
+        transition.source_authority = "untrusted"
+        transition.save(update_fields=("source_authority", "updated_at"))
+
+        with override_settings(
+            RACE_EVENT_LIFECYCLE_ENABLED=False,
+            RACE_EVENT_LIFECYCLE_MODE="off",
+        ), self.assertRaisesMessage(CanaryError, "provenance 不匹配"):
+            verify_or_mutate_canary(
+                self.manifest, expected_state="inactive", disarm=True
+            )
+
+    def test_closed_disarm_rejects_legacy_direct_finish_from_another_activation(self):
+        activated = self._activate()
+        ids = ",".join(map(str, self.event_ids))
+        with override_settings(
+            RACE_EVENT_LIFECYCLE_ENABLED=True,
+            RACE_EVENT_LIFECYCLE_MODE="enforce",
+            RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256=self.raw_sha,
+            RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS=ids,
+        ):
+            from django.db import transaction
+            with transaction.atomic():
+                applied = apply_race_lifecycle_decision(
+                    event_id=self.event_ids[1],
+                    expected_generation=3,
+                    now=self.race_times[1] + timedelta(minutes=30),
+                    mode="enforce",
+                    expected_canary_sha256=self.raw_sha,
+                    expected_canary_event_ids=ids,
+                    expected_canary_activation_id=activated.activation_id,
+                )
+        self.assertEqual(applied.action, "applied")
+        transition = self.events[1].lifecycle_transitions.get(record_kind="applied")
+        metadata = dict(transition.metadata)
+        canary_metadata = dict(metadata["enforce_canary"])
+        canary_metadata["activation_id"] = "9" * 64
+        metadata["enforce_canary"] = canary_metadata
+        transition.metadata = metadata
+        transition.save(update_fields=("metadata", "updated_at"))
+
+        with override_settings(
+            RACE_EVENT_LIFECYCLE_ENABLED=False,
+            RACE_EVENT_LIFECYCLE_MODE="off",
+        ), self.assertRaisesMessage(CanaryError, "activation provenance 不匹配"):
+            verify_or_mutate_canary(
+                self.manifest, expected_state="inactive", disarm=True
+            )
 
     def test_reactivation_rejects_status_changed_without_canary_transition(self):
         self._activate()

@@ -1,5 +1,17 @@
 # 关键决策
 
+## 2026-08-17 legacy direct-finish 只作为关闭态 disarm 的历史兼容证据
+
+- 早期 canary 可在任务首次执行已经到达 T+30 时，把赛事从 `scheduled` 直接推进为 `finished`，并留下
+  `time_t_plus_30` applied transition；不得为此伪造缺失的 `running` transition 或改写历史状态。
+- 只有显式 `--phase inactive --disarm` 且 runtime 为严格 `false/off` 时，才允许完整 provenance、精确
+  canary metadata、相同 generation 且 effective time 不早于 T+30 的 `scheduled -> finished` 单边作为
+  历史证据。首次收口还必须把 transition activation ID 与当前 active evidence 精确绑定；成功写成
+  canonical inactive evidence 后，同一 artifact 的重复 disarm 必须以零写 `replay` 返回。普通 verify、
+  activate/reactivate 与运行时 enforce 仍要求标准两段链。
+- full-cohort prepare 的空集合是正常终态：写出 canonical census/enrollment plan 后返回
+  `status=no_candidates`，不得创建空 registry，也不得把零候选误报为发布失败。
+
 ## 2026-08-16 过期 canary 只能在严格关闭态执行精确 disarm
 
 - runtime 过期必须继续阻断普通 verify、activate 和任何 enforce 使用；不能延长、重签或忽略旧 artifact 的

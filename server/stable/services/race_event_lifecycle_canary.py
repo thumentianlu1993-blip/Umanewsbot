@@ -351,7 +351,14 @@ def _expected_evidence(manifest: LoadedCanaryManifest, *, state: str, activation
     }
 
 
-def _assert_db_matches(manifest: LoadedCanaryManifest, events: list[RaceEvent], controls: list[RaceEventLifecycleControl], *, allow_promoted: bool) -> None:
+def _assert_db_matches(
+    manifest: LoadedCanaryManifest,
+    events: list[RaceEvent],
+    controls: list[RaceEventLifecycleControl],
+    *,
+    allow_promoted: bool,
+    allow_legacy_direct_finish: bool = False,
+) -> None:
     if RaceEventLifecycleControl.objects.exclude(event_id__in=manifest.event_ids).filter(mode="enforce").exists():
         raise CanaryError("存在范围外 enforce control")
     for event, control in zip(events, controls, strict=True):
@@ -387,6 +394,7 @@ def _assert_db_matches(manifest: LoadedCanaryManifest, events: list[RaceEvent], 
                 manifest=manifest,
                 event=event,
                 control=control,
+                allow_legacy_direct_finish=allow_legacy_direct_finish,
             )
             if (
                 control.mode != "enforce"
@@ -408,6 +416,7 @@ def _assert_canary_status_provenance(
     manifest: LoadedCanaryManifest,
     event: RaceEvent,
     control: RaceEventLifecycleControl,
+    allow_legacy_direct_finish: bool = False,
 ) -> None:
     """Prove non-scheduled state came from this exact canary lifecycle."""
     transitions = list(
@@ -418,12 +427,28 @@ def _assert_canary_status_provenance(
         ).order_by("effective_at", "id")
     )
     expected_edges: list[tuple[str, str, str]]
+    legacy_direct_finish = False
     if event.status == "scheduled":
         expected_edges = []
     elif event.status == "running":
         expected_edges = [
             ("scheduled", "running", "time_reached_race_datetime"),
         ]
+    elif (
+        allow_legacy_direct_finish
+        and len(transitions) == 1
+        and transitions[0].from_status == "scheduled"
+        and transitions[0].to_status == "finished"
+        and transitions[0].reason_code == "time_t_plus_30"
+    ):
+        # Early canary code could legally advance a past-due scheduled event
+        # straight to finished at T+30.  Only explicit closed-state disarm may
+        # consume that historical shape; activation and ordinary verification
+        # retain the strict two-edge lifecycle contract.
+        expected_edges = [
+            ("scheduled", "finished", "time_t_plus_30"),
+        ]
+        legacy_direct_finish = True
     else:
         expected_edges = [
             ("scheduled", "running", "time_reached_race_datetime"),
@@ -461,11 +486,36 @@ def _assert_canary_status_provenance(
             or _SHA_RE.fullmatch(metadata.get("activation_id", "")) is None
         ):
             raise CanaryError(f"event {event.id} lifecycle applied transition provenance 不匹配")
+        if legacy_direct_finish:
+            current_evidence = control.manifest_data.get("enforce_canary")
+            inactive_replay = current_evidence == _expected_evidence(
+                manifest, state="inactive"
+            )
+            current_activation_id = (
+                current_evidence.get("activation_id", "")
+                if isinstance(current_evidence, dict)
+                and current_evidence.get("activation_state") == "active"
+                else ""
+            )
+            active_evidence_matches = (
+                _SHA_RE.fullmatch(current_activation_id) is not None
+                and metadata.get("activation_id") == current_activation_id
+            )
+            if not inactive_replay and not active_evidence_matches:
+                raise CanaryError(
+                    f"event {event.id} lifecycle activation provenance 不匹配"
+                )
         if transition.effective_at < race_at:
             raise CanaryError(f"event {event.id} lifecycle transition 时间早于 T")
-        if index == 0 and transition.effective_at >= race_at + timedelta(minutes=30):
+        if (
+            reason_code == "time_reached_race_datetime"
+            and transition.effective_at >= race_at + timedelta(minutes=30)
+        ):
             raise CanaryError(f"event {event.id} running transition 不在 T 到 T+30 窗口")
-        if index == 1 and transition.effective_at < race_at + timedelta(minutes=30):
+        if (
+            reason_code == "time_t_plus_30"
+            and transition.effective_at < race_at + timedelta(minutes=30)
+        ):
             raise CanaryError(f"event {event.id} finished transition 早于 T+30")
         if previous_at is not None and transition.effective_at < previous_at:
             raise CanaryError(f"event {event.id} lifecycle transition 时间不连续")
@@ -545,7 +595,13 @@ def verify_or_mutate_canary(manifest: LoadedCanaryManifest, *, expected_state: s
         with transaction.atomic():
             _acquire_advisory_lock()
             events, controls = _load_locked_cohort(manifest)
-            _assert_db_matches(manifest, events, controls, allow_promoted=True)
+            _assert_db_matches(
+                manifest,
+                events,
+                controls,
+                allow_promoted=True,
+                allow_legacy_direct_finish=disarm,
+            )
             evidence = [control.manifest_data.get("enforce_canary") for control in controls]
             if any(control.mode != "enforce" for control in controls):
                 raise CanaryError("canary control 尚未 promotion")

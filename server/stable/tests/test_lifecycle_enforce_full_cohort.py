@@ -22,6 +22,7 @@ from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from django.db import connection
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db.models.deletion import ProtectedError
 
 from stable.services.race_event_lifecycle_enrollment import _schedule_hash
@@ -522,6 +523,82 @@ class FullCohortArtifactAndSelectorContracts(TestCase):
             (Registry.objects.count(), Membership.objects.count(), RaceEventLifecycleControl.objects.count()),
             before,
         )
+
+    def test_prepare_empty_census_returns_no_candidates_without_registry_or_writes(self):
+        Registry, Membership = _models(self)
+        before = (
+            Registry.objects.count(),
+            Membership.objects.count(),
+            RaceEventLifecycleControl.objects.count(),
+        )
+        with TemporaryDirectory() as tmp:
+            registry_path = Path(tmp) / "registry.json"
+            census_path = Path(tmp) / "census.json"
+            plan_path = Path(tmp) / "enrollment-plan.json"
+            stdout = StringIO()
+            call_command(
+                "prepare_race_event_lifecycle_enforce_registry",
+                scope_kind="datetime_7d_canary",
+                cutoff=self.cutoff.isoformat(),
+                limit=20,
+                approved_commit=OID,
+                generation=1,
+                output=str(registry_path),
+                census_output=str(census_path),
+                enrollment_plan_output=str(plan_path),
+                stdout=stdout,
+            )
+
+            self.assertFalse(registry_path.exists())
+            census_raw = census_path.read_bytes()
+            plan_raw = plan_path.read_bytes()
+            self.assertEqual(
+                census_raw,
+                self.svc().canonical_artifact_bytes(json.loads(census_raw)),
+            )
+            self.assertEqual(
+                plan_raw,
+                self.svc().canonical_artifact_bytes(json.loads(plan_raw)),
+            )
+            self.assertEqual(json.loads(census_raw)["included_event_ids"], [])
+            self.assertEqual(json.loads(plan_raw)["batches"], [])
+            self.assertIn("status=no_candidates", stdout.getvalue())
+
+        self.assertEqual(
+            (
+                Registry.objects.count(),
+                Membership.objects.count(),
+                RaceEventLifecycleControl.objects.count(),
+            ),
+            before,
+        )
+
+    def test_prepare_empty_census_rejects_invalid_identity_before_any_output(self):
+        for approved_commit, generation, message in (
+            ("not-a-commit", 1, "approved_commit 非法"),
+            (OID, 0, "generation 非法"),
+        ):
+            with self.subTest(
+                approved_commit=approved_commit, generation=generation
+            ), TemporaryDirectory() as tmp:
+                registry_path = Path(tmp) / "registry.json"
+                census_path = Path(tmp) / "census.json"
+                plan_path = Path(tmp) / "enrollment-plan.json"
+                with self.assertRaisesMessage(CommandError, message):
+                    call_command(
+                        "prepare_race_event_lifecycle_enforce_registry",
+                        scope_kind="datetime_7d_canary",
+                        cutoff=self.cutoff.isoformat(),
+                        limit=20,
+                        approved_commit=approved_commit,
+                        generation=generation,
+                        output=str(registry_path),
+                        census_output=str(census_path),
+                        enrollment_plan_output=str(plan_path),
+                    )
+                self.assertFalse(registry_path.exists())
+                self.assertFalse(census_path.exists())
+                self.assertFalse(plan_path.exists())
 
     def test_prepare_us_enrollment_requires_reviewed_allowlist_and_emits_direct_command(self):
         at = self.cutoff + timedelta(days=1)
