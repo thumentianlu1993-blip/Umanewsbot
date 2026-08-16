@@ -1,5 +1,19 @@
 # 当前状态
 
+## 2026-08-17 lifecycle G2 已完成关闭态发布、legacy 收口与只读 census
+
+- PR `#105` merge SHA `93cfd240b9ba7e95caf79bf54e9c6d089885f11c` 已部署到隔离 release；生产 image
+  `sha256:06885466…85904`，migration leaf `0073`、plan `0`，web/worker/Beat 与内外 health 正常。
+  lifecycle 保持 `false/off`、运行信任根为空，race-live 关闭且 worker 未启动。
+- fresh backup SHA-256 为 `e6741b7a…7893`（custom format、`445635636` bytes、TOC `1325`），旧 image
+  已冻结为 `umanewsbot:rollback-pre-pr105-20260817`。生产 HTTPS Nginx 配置继续保全为
+  `a506e857…b9c`；它仍是隔离 release 唯一 tracked 偏差，后续须单独安全归档入库。
+- event `186/187` 在共享锁和 worker 自然排空后首次 disarm 返回 `disarmed`，第二次返回 `replay`；
+  mid/after evidence SHA 同为 `82ce3b17…a14cb`，赛事状态与 transition 未变，control 收口为 inactive。
+- 最终生产只读 7 天 census 检查 `9867` 场，返回 `no_candidates`；未生成 registry，promotion dry-run
+  不适用。四张 lifecycle 表前后指纹同为 `dc6643fa…9b84`，未发生数据库写入。完整证据见
+  `docs/changes/lifecycle-enforce-full-cohort/g2_release_report_20260817.md`。
+
 ## 2026-08-17 lifecycle G2 两项关闭态阻塞已通过独立 review，待发布
 
 - 生产运行 revision 仍为 `0f3391a9…31ea6`，migration leaf 为 `0073`、plan 为空；web/worker/Beat 与
