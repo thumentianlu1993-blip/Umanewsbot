@@ -1,5 +1,21 @@
 # 部署运行手册
 
+## 2026-08-17 PR #105 lifecycle G2 关闭态发布证据
+
+1. 发布 revision 为 `93cfd240b9ba7e95caf79bf54e9c6d089885f11c`，image 为
+   `sha256:06885466d50171d0853997844106ed45a5ab5c65a314ba2f4947a60683885904`；备份 SHA-256 为
+   `e6741b7aa896dc2255a7ba1de372f5de6f85f6639b4333cac0de1b47bd0a7893`，回滚 tag 为
+   `umanewsbot:rollback-pre-pr105-20260817`。
+2. migration leaf `0073`、plan `0`，唯一 release task 实际 no-op；web/worker/Beat 同 revision/image，
+   lifecycle `false/off`，race-live scheduler/monitor false 且 worker 未运行。
+3. legacy 186/187 canary 第一次 disarm 为 `disarmed`，第二次为 `replay`；mid/after evidence 同 SHA，
+   control 为 inactive，公开赛事状态和 transition 未改。外围 evidence verifier 的字段存在性误判与首次
+   census 宿主/容器路径误判均已如实保留，后续只读重验/新目录重跑通过。
+4. 7 天 census 为 `9867 inspected / 0 included`，未生成 registry，四张 lifecycle 表前后指纹一致；因此
+   promotion dry-run 不适用，下一步不能直接启用 G3，须先取得未来赛事可信 `race_datetime`。
+5. 完整路径、SHA、偏差与验收见
+   `docs/changes/lifecycle-enforce-full-cohort/g2_release_report_20260817.md`。
+
 ## 2026-08-16 过期 legacy lifecycle canary 的关闭态 disarm
 
 1. 先确认 web/worker/Beat 同一受审 revision/image，lifecycle 为 `false/off`、legacy/registry env roots 为空、

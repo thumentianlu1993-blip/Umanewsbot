@@ -1,5 +1,14 @@
 # 项目状态文档
 
+## 2026-08-17 lifecycle full-cohort G2 已关闭态完成
+
+- PR `#105` 已按 merge SHA `93cfd240…f11c` 部署，生产 image `sha256:06885466…85904`；leaf `0073`、
+  migration no-op、服务/HTTP/日志/coherence 门禁通过，lifecycle 仍为 `false/off`，race-live 关闭。
+- legacy event `186/187` canary 已安全从 active 收口为 inactive；首次 `disarmed`、第二次零写 `replay`，
+  公开赛事状态/transition 未改。
+- 7 天只读 census 检查 `9867` 场但候选为 `0`；未生成 registry，也未执行 promotion。数据库前后指纹
+  一致。G2 已完成，但 G3 暂无可用 cohort，需先取得未来赛事可信 `race_datetime` 后另行授权。
+
 ## 2026-08-17 lifecycle G2 direct-finish/空 census 修复已通过独立 review
 
 - 生产仍为 `false/off`，race-live 关闭，`0073` 已应用且服务健康；旧 canary disarm 与空 census 均为

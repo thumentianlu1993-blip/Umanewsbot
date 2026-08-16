@@ -32,7 +32,8 @@
 ## 发布
 
 - [ ] (operations) 提交 G2 发布包：代码/迁移/env/服务/备份/回滚/验证精确绑定。
-- [ ] (operations) 关闭态部署并生成生产只读 census/dry-run；不自动启用全量。
+- [x] (operations) 关闭态部署并生成生产只读 census；结果为 9867 inspected / 0 candidates，未生成
+  registry，故 promotion dry-run 不适用且未自动启用全量。
 - [ ] (operations) 经 G3 依次发布 7 天、30 天、全部当前合格赛事 generation；race-live 保持关闭。
 - [ ] (operations) E1 稳定后另立 E2 自动 admission change，不在本任务宣称永久自动全量。
 
@@ -54,4 +55,5 @@
   activation ID，成功收口后的同 artifact 重放返回 `replay` 且零写。
 - [x] (application) 由未参与实现的独立 reviewer 完成三轮限定只读复审；最终 `APPROVED`，代码候选
   fingerprint 为 `c0b0282fe129a02ebc79624e0eb3d9ce643cb3f46923b7c98ac7f9eea885d986`。
-- [ ] (operations) 合并后保持 false/off 部署，重试 disarm/replay/coherence 与生产只读 census。
+- [x] (operations) 合并后保持 false/off 部署，完成 disarm/replay/coherence 与生产只读 census；
+  race-live 未启动，公开赛事状态未改。
