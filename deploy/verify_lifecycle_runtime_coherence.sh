@@ -1,5 +1,6 @@
 #!/bin/sh
-# Read-only, host-wide lifecycle runtime census.
+# Read-only, host-wide lifecycle runtime census.  In particular, false/off
+# requires both legacy and registry trust roots to be empty in every resident.
 set -eu
 
 fail() {
@@ -20,6 +21,10 @@ done
 
 EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256="${EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256:-}"
 EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS="${EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS:-}"
+EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_SHA256="${EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_SHA256:-}"
+EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256="${EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256:-}"
+EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT="${EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT:-}"
+EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID="${EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID:-}"
 
 case "$COMPOSE_FILE" in
   docker-compose.prod.yml|docker-compose.prod.lowcost.yml) ;;
@@ -35,7 +40,25 @@ case "$EXPECTED_RELEASE_COMMIT" in
   *[!0-9a-f]*|"") fail "EXPECTED_RELEASE_COMMIT must be a lowercase 40-character OID" ;;
 esac
 [ "${#EXPECTED_RELEASE_COMMIT}" -eq 40 ] || fail "EXPECTED_RELEASE_COMMIT must be a lowercase 40-character OID"
+registry_present=0
+if [ -n "$EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_SHA256$EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256$EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT$EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID" ]; then
+  registry_present=1
+  for value in "$EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_SHA256" \
+    "$EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256" \
+    "$EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID"; do
+    case "$value" in *[!0-9a-f]*|"") fail "expected registry root values must be lowercase SHA-256" ;; esac
+    [ "${#value}" -eq 64 ] || fail "expected registry root values must be lowercase SHA-256"
+  done
+  case "$EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT" in
+    *[!0-9]*|""|0|0?*) fail "expected registry member count must be a positive integer" ;;
+  esac
+fi
 if [ "$EXPECTED_LIFECYCLE_MODE" = "enforce" ]; then
+  [ "$EXPECTED_LIFECYCLE_ENABLED" = "true" ] || fail "enforce requires lifecycle enabled"
+  if [ "$registry_present" -eq 1 ]; then
+    [ -z "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256" ] || fail "legacy canary and registry roots are mutually exclusive"
+    [ -z "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS" ] || fail "legacy canary and registry roots are mutually exclusive"
+  else
   case "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256" in
     *[!0-9a-f]*|"") fail "expected enforce canary SHA must be lowercase SHA-256" ;;
   esac
@@ -51,9 +74,11 @@ if [ "$EXPECTED_LIFECYCLE_MODE" = "enforce" ]; then
   case "$first_canary_id/$second_canary_id" in
     0/*|0?*/*|*/0|*/0?*) fail "expected enforce canary event IDs must be canonical positive integers" ;;
   esac
+  fi
 else
   [ -z "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256" ] || fail "canary SHA must be empty outside enforce"
   [ -z "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS" ] || fail "canary event IDs must be empty outside enforce"
+  [ "$registry_present" -eq 0 ] || fail "registry root must be empty outside enforce"
 fi
 
 snapshot="$(mktemp "${TMPDIR:-/tmp}/umanews-lifecycle-census.XXXXXX")" || fail "cannot create census snapshot"
@@ -113,25 +138,44 @@ check_service() {
   mode_count="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_MODE"{n++} END{print n+0}')"
   canary_sha_count="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256"{n++} END{print n+0}')"
   canary_ids_count="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS"{n++} END{print n+0}')"
+  registry_sha_count="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256"{n++} END{print n+0}')"
+  registry_membership_count="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256"{n++} END{print n+0}')"
+  registry_member_count_count="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT"{n++} END{print n+0}')"
+  registry_activation_count="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID"{n++} END{print n+0}')"
   [ "$enabled_count" -eq 1 ] || fail "$service lifecycle enabled key count is not one"
   [ "$mode_count" -eq 1 ] || fail "$service lifecycle mode key count is not one"
-  if [ "$EXPECTED_LIFECYCLE_ENABLED/$EXPECTED_LIFECYCLE_MODE" = "false/off" ] \
-    && [ -z "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256" ] \
-    && [ -z "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS" ]; then
-    [ "$canary_sha_count" -le 1 ] || fail "$service enforce canary SHA key count exceeds one"
-    [ "$canary_ids_count" -le 1 ] || fail "$service enforce canary event IDs key count exceeds one"
-  else
+  if [ -n "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256" ]; then
     [ "$canary_sha_count" -eq 1 ] || fail "$service enforce canary SHA key count is not one"
     [ "$canary_ids_count" -eq 1 ] || fail "$service enforce canary event IDs key count is not one"
+  else
+    [ "$canary_sha_count" -le 1 ] || fail "$service enforce canary SHA key count exceeds one"
+    [ "$canary_ids_count" -le 1 ] || fail "$service enforce canary event IDs key count exceeds one"
+  fi
+  if [ "$registry_present" -eq 1 ]; then
+    for count in "$registry_sha_count" "$registry_membership_count" "$registry_member_count_count" "$registry_activation_count"; do
+      [ "$count" -eq 1 ] || fail "$service registry trust-root key count is not one"
+    done
+  else
+    for count in "$registry_sha_count" "$registry_membership_count" "$registry_member_count_count" "$registry_activation_count"; do
+      [ "$count" -le 1 ] || fail "$service registry trust-root key count exceeds one"
+    done
   fi
   actual_enabled="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENABLED"{print substr($0,index($0,"=")+1)}')"
   actual_mode="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_MODE"{print substr($0,index($0,"=")+1)}')"
   actual_canary_sha="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256"{print substr($0,index($0,"=")+1)}')"
   actual_canary_ids="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS"{print substr($0,index($0,"=")+1)}')"
+  actual_registry_sha="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256"{print substr($0,index($0,"=")+1)}')"
+  actual_registry_membership="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256"{print substr($0,index($0,"=")+1)}')"
+  actual_registry_member_count="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT"{print substr($0,index($0,"=")+1)}')"
+  actual_registry_activation="$(printf '%s\n' "$env_output" | awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID"{print substr($0,index($0,"=")+1)}')"
   [ "$actual_enabled" = "$EXPECTED_LIFECYCLE_ENABLED" ] || fail "$service lifecycle enabled mismatch"
   [ "$actual_mode" = "$EXPECTED_LIFECYCLE_MODE" ] || fail "$service lifecycle mode mismatch"
   [ "$actual_canary_sha" = "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256" ] || fail "$service enforce canary SHA mismatch"
   [ "$actual_canary_ids" = "$EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS" ] || fail "$service enforce canary event IDs mismatch"
+  [ "$actual_registry_sha" = "$EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_SHA256" ] || fail "$service enforce registry SHA mismatch"
+  [ "$actual_registry_membership" = "$EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256" ] || fail "$service enforce registry membership SHA mismatch"
+  [ "$actual_registry_member_count" = "$EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT" ] || fail "$service enforce registry member count mismatch"
+  [ "$actual_registry_activation" = "$EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID" ] || fail "$service enforce registry activation ID mismatch"
 }
 
 check_service web present

@@ -2320,32 +2320,53 @@ def scan_due_race_event_lifecycle_task() -> dict:
     canary_event_ids = ""
     canary_activation_id = ""
     enforce_event_ids = None
+    registry_root_sha = ""
+    registry_activation_id = ""
+    registry_membership_sha = ""
+    registry_member_count = 0
+    enforce_registry_id = None
     if runtime_mode == "enforce":
-        from stable.services.race_event_lifecycle_canary import (
-            parse_canary_event_ids,
-            validate_active_canary_cohort,
+        registry_root_sha = getattr(
+            settings, "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256", ""
         )
+        if registry_root_sha:
+            from stable.services.race_event_lifecycle_enforce import (
+                validate_runtime_registry_settings,
+            )
+            valid, result = validate_runtime_registry_settings()
+            if not valid:
+                logger.error("lifecycle_registry_scanner_blocked reason=%s", result)
+                return {"enabled": True, "claimed": 0, "dispatched": 0, "reason": result}
+            enforce_registry_id = result.id
+            registry_activation_id = result.activation_id
+            registry_membership_sha = result.membership_sha256
+            registry_member_count = result.member_count
+        else:
+            from stable.services.race_event_lifecycle_canary import (
+                parse_canary_event_ids,
+                validate_active_canary_cohort,
+            )
 
-        canary_sha = getattr(
-            settings, "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256", ""
-        )
-        canary_event_ids = getattr(
-            settings, "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS", ""
-        )
-        valid, result = validate_active_canary_cohort(
-            raw_sha256=canary_sha,
-            event_ids_text=canary_event_ids,
-        )
-        if not valid:
-            logger.error("lifecycle_canary_scanner_blocked reason=%s", result)
-            return {
-                "enabled": True,
-                "claimed": 0,
-                "dispatched": 0,
-                "reason": result,
-            }
-        canary_activation_id = result
-        enforce_event_ids = parse_canary_event_ids(canary_event_ids)
+            canary_sha = getattr(
+                settings, "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256", ""
+            )
+            canary_event_ids = getattr(
+                settings, "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS", ""
+            )
+            valid, result = validate_active_canary_cohort(
+                raw_sha256=canary_sha,
+                event_ids_text=canary_event_ids,
+            )
+            if not valid:
+                logger.error("lifecycle_canary_scanner_blocked reason=%s", result)
+                return {
+                    "enabled": True,
+                    "claimed": 0,
+                    "dispatched": 0,
+                    "reason": result,
+                }
+            canary_activation_id = result
+            enforce_event_ids = parse_canary_event_ids(canary_event_ids)
 
     now = timezone.now()
     claims = claim_due_lifecycle_controls(
@@ -2353,6 +2374,7 @@ def scan_due_race_event_lifecycle_task() -> dict:
         batch_size=getattr(settings, "RACE_EVENT_LIFECYCLE_BATCH_SIZE", 100),
         ttl_seconds=getattr(settings, "RACE_EVENT_LIFECYCLE_CLAIM_TTL_SECONDS", 240),
         enforce_event_ids=enforce_event_ids,
+        enforce_registry_id=enforce_registry_id,
     )
 
     for claim in claims:
@@ -2368,6 +2390,10 @@ def scan_due_race_event_lifecycle_task() -> dict:
             "expected_canary_sha256": canary_sha,
             "expected_canary_event_ids": canary_event_ids,
             "expected_canary_activation_id": canary_activation_id,
+            "expected_registry_root_sha256": registry_root_sha,
+            "expected_registry_activation_id": registry_activation_id,
+            "expected_registry_membership_sha256": registry_membership_sha,
+            "expected_registry_member_count": registry_member_count,
         }
         transaction.on_commit(
             lambda kwargs=dispatch_kwargs: advance_race_event_lifecycle_task.apply_async(
@@ -2390,6 +2416,10 @@ def advance_race_event_lifecycle_task(
     expected_canary_sha256: str = "",
     expected_canary_event_ids: str = "",
     expected_canary_activation_id: str = "",
+    expected_registry_root_sha256: str = "",
+    expected_registry_activation_id: str = "",
+    expected_registry_membership_sha256: str = "",
+    expected_registry_member_count: int = 0,
 ) -> dict:
     """Advance a single event's lifecycle based on time rules only.
 
@@ -2462,6 +2492,61 @@ def advance_race_event_lifecycle_task(
         actual_canary_ids = getattr(
             settings, "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS", ""
         )
+        actual_registry_root = getattr(
+            settings, "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256", ""
+        )
+        actual_registry_membership = getattr(
+            settings,
+            "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256",
+            "",
+        )
+        actual_registry_count = getattr(
+            settings, "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT", 0
+        )
+        actual_registry_activation = getattr(
+            settings, "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID", ""
+        )
+        if lifecycle_mode == "enforce" and (
+            expected_registry_root_sha256 or actual_registry_root
+        ):
+            if (
+                not expected_registry_membership_sha256
+                or expected_registry_member_count <= 0
+                or not expected_registry_activation_id
+                or expected_registry_root_sha256 != actual_registry_root
+                or expected_registry_membership_sha256 != actual_registry_membership
+                or expected_registry_member_count != actual_registry_count
+                or expected_registry_activation_id != actual_registry_activation
+            ):
+                return {
+                    "processed": False,
+                    "reason": "lifecycle_registry_runtime_config_mismatch",
+                    "event_id": event_id,
+                }
+            from stable.services.race_event_lifecycle_enforce import (
+                apply_registry_lifecycle_decision,
+            )
+            result = apply_registry_lifecycle_decision(
+                event_id=event_id,
+                expected_generation=expected_generation,
+                now=now,
+                expected_registry_root_sha256=expected_registry_root_sha256,
+                expected_registry_activation_id=expected_registry_activation_id,
+                expected_registry_membership_sha256=expected_registry_membership_sha256,
+                expected_registry_member_count=expected_registry_member_count,
+                expected_runtime_enabled=True,
+                expected_runtime_mode="enforce",
+                attempt_token=attempt_token,
+                expected_claim_generation=expected_claim_generation,
+            )
+            return {
+                "processed": True,
+                "event_id": event_id,
+                "action": result.action,
+                "reason_code": result.reason_code,
+                "error": result.error,
+                "transition_id": result.transition_id,
+            }
         if lifecycle_mode == "enforce":
             if (
                 expected_canary_sha256 != actual_canary_sha

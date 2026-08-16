@@ -641,6 +641,18 @@ RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256 = (
 RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS = (
     env("RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS", "") or ""
 )
+RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256 = (
+    env("RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256", "") or ""
+)
+RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256 = (
+    env("RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256", "") or ""
+)
+RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT = env(
+    "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT", ""
+) or ""
+RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID = (
+    env("RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID", "") or ""
+)
 if RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256 and not re.fullmatch(
     r"[0-9a-f]{64}", RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256
 ):
@@ -663,18 +675,56 @@ if bool(RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256) != bool(
     RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS
 ):
     raise ValueError("lifecycle enforce canary SHA and event IDs must be set together")
-if RACE_EVENT_LIFECYCLE_MODE == "enforce":
-    if not (
-        RACE_EVENT_LIFECYCLE_ENABLED
-        and RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256
-        and RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS
+_lifecycle_registry_root = (
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256,
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256,
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT,
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID,
+)
+if any(_lifecycle_registry_root) and not all(_lifecycle_registry_root):
+    raise ValueError("lifecycle enforce registry trust root must be complete")
+if RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256:
+    for _name, _value in (
+        (
+            "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256",
+            RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256,
+        ),
+        (
+            "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256",
+            RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256,
+        ),
+        (
+            "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID",
+            RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID,
+        ),
     ):
-        raise ValueError("true/enforce requires the complete lifecycle canary trust root")
+        if not re.fullmatch(r"[0-9a-f]{64}", _value):
+            raise ValueError(f"{_name} must be 64 lowercase hex")
+    if not re.fullmatch(
+        r"[1-9][0-9]*", RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT
+    ):
+        raise ValueError(
+            "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT must be a positive integer"
+        )
+RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT = (
+    int(RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT)
+    if RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT
+    else 0
+)
+if RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256 and RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256:
+    raise ValueError("legacy canary and registry lifecycle trust roots are mutually exclusive")
+if RACE_EVENT_LIFECYCLE_MODE == "enforce":
+    if not RACE_EVENT_LIFECYCLE_ENABLED or not (
+        RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256
+        or RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256
+    ):
+        raise ValueError("true/enforce requires exactly one complete lifecycle trust root")
 elif (
     RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256
     or RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS
+    or any(_lifecycle_registry_root)
 ):
-    raise ValueError("lifecycle canary trust root must be empty outside enforce mode")
+    raise ValueError("lifecycle trust roots must be empty outside enforce mode")
 RACE_EVENT_LIFECYCLE_BATCH_SIZE = int(env("RACE_EVENT_LIFECYCLE_BATCH_SIZE", "100"))
 RACE_EVENT_LIFECYCLE_CLAIM_TTL_SECONDS = int(
     env("RACE_EVENT_LIFECYCLE_CLAIM_TTL_SECONDS", "240")

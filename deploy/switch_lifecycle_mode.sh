@@ -40,20 +40,46 @@ case "$TARGET_LIFECYCLE_ENABLED/$TARGET_LIFECYCLE_MODE" in false/off|true/shadow
 
 canary_sha=""
 canary_ids=""
+registry_sha=""
+registry_membership_sha=""
+registry_member_count=""
+registry_activation_id=""
+enforce_root_kind=""
 if [ "$TARGET_LIFECYCLE_ENABLED/$TARGET_LIFECYCLE_MODE" = "true/enforce" ]; then
-  for name in MANIFEST_FILE MANIFEST_SHA256 EXPECTED_CANARY_EVENT_IDS; do require "$name"; done
-  [ "$EXPECTED_CANARY_EVENT_IDS" = "186,187" ] || fail "EXPECTED_CANARY_EVENT_IDS must be exactly 186,187"
-  case "$MANIFEST_SHA256" in *[!0-9a-f]*|"") fail "MANIFEST_SHA256 must be lowercase SHA-256" ;; esac
-  [ "${#MANIFEST_SHA256}" -eq 64 ] || fail "MANIFEST_SHA256 must be lowercase SHA-256"
-  canary_sha="$MANIFEST_SHA256"
-  canary_ids="$EXPECTED_CANARY_EVENT_IDS"
+  if [ -n "${REGISTRY_FILE:-}${REGISTRY_SHA256:-}" ]; then
+    enforce_root_kind="registry"
+    for name in REGISTRY_FILE REGISTRY_SHA256 EXPECTED_REGISTRY_MEMBERSHIP_SHA256 \
+      EXPECTED_REGISTRY_MEMBER_COUNT; do require "$name"; done
+    [ -z "${EXPECTED_REGISTRY_ACTIVATION_ID:-}" ] \
+      || fail "registry activation ID is generated inside the held deployment lock"
+    for value in "$REGISTRY_SHA256" "$EXPECTED_REGISTRY_MEMBERSHIP_SHA256"; do
+      case "$value" in *[!0-9a-f]*|"") fail "registry hashes must be lowercase SHA-256" ;; esac
+      [ "${#value}" -eq 64 ] || fail "registry hashes must be lowercase SHA-256"
+    done
+    case "$EXPECTED_REGISTRY_MEMBER_COUNT" in *[!0-9]*|""|0|0?*) fail "EXPECTED_REGISTRY_MEMBER_COUNT must be positive" ;; esac
+    registry_sha="$REGISTRY_SHA256"
+    registry_membership_sha="$EXPECTED_REGISTRY_MEMBERSHIP_SHA256"
+    registry_member_count="$EXPECTED_REGISTRY_MEMBER_COUNT"
+    artifact_file="$REGISTRY_FILE"
+    artifact_sha="$REGISTRY_SHA256"
+  else
+    enforce_root_kind="canary"
+    for name in MANIFEST_FILE MANIFEST_SHA256 EXPECTED_CANARY_EVENT_IDS; do require "$name"; done
+    [ "$EXPECTED_CANARY_EVENT_IDS" = "186,187" ] || fail "EXPECTED_CANARY_EVENT_IDS must be exactly 186,187"
+    case "$MANIFEST_SHA256" in *[!0-9a-f]*|"") fail "MANIFEST_SHA256 must be lowercase SHA-256" ;; esac
+    [ "${#MANIFEST_SHA256}" -eq 64 ] || fail "MANIFEST_SHA256 must be lowercase SHA-256"
+    canary_sha="$MANIFEST_SHA256"
+    canary_ids="$EXPECTED_CANARY_EVENT_IDS"
+    artifact_file="$MANIFEST_FILE"
+    artifact_sha="$MANIFEST_SHA256"
+  fi
 
-  manifest_snapshot="$(mktemp "${TMPDIR:-/tmp}/umanews-enforce-canary-manifest.XXXXXX")" || fail "cannot create manifest snapshot"
+  manifest_snapshot="$(mktemp "${TMPDIR:-/tmp}/umanews-enforce-artifact.XXXXXX")" || fail "cannot create artifact snapshot"
   chmod 600 "$manifest_snapshot"
   cleanup_early_manifest() { rm -f "$manifest_snapshot"; }
   trap cleanup_early_manifest EXIT HUP INT TERM
-  python3 - "$MANIFEST_FILE" "$MANIFEST_SHA256" "$manifest_snapshot" <<'PY' \
-    || fail "manifest no-follow/size/SHA validation failed"
+  python3 - "$artifact_file" "$artifact_sha" "$manifest_snapshot" <<'PY' \
+    || fail "artifact no-follow/size/SHA validation failed"
 import hashlib
 import os
 import stat
@@ -64,16 +90,16 @@ flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
 fd = os.open(source, flags)
 try:
     metadata = os.fstat(fd)
-    if not stat.S_ISREG(metadata.st_mode) or metadata.st_size <= 0 or metadata.st_size > 1024 * 1024:
+    if not stat.S_ISREG(metadata.st_mode) or metadata.st_size <= 0 or metadata.st_size > 16 * 1024 * 1024:
         raise SystemExit(1)
     data = bytearray()
-    while len(data) <= 1024 * 1024:
-        chunk = os.read(fd, min(65536, 1024 * 1024 + 1 - len(data)))
+    while len(data) <= 16 * 1024 * 1024:
+        chunk = os.read(fd, min(65536, 16 * 1024 * 1024 + 1 - len(data)))
         if not chunk:
             break
         data.extend(chunk)
     raw = bytes(data)
-    if len(raw) != metadata.st_size or len(raw) > 1024 * 1024:
+    if len(raw) != metadata.st_size or len(raw) > 16 * 1024 * 1024:
         raise SystemExit(1)
     if hashlib.sha256(raw).hexdigest() != expected_sha:
         raise SystemExit(1)
@@ -92,6 +118,29 @@ try:
 finally:
     os.close(out_fd)
 PY
+  if [ "$enforce_root_kind" = "registry" ]; then
+    validate_registry_artifact_roots() {
+      python3 - "$manifest_snapshot" "$registry_membership_sha" "$registry_member_count" <<'PY'
+import json
+import re
+import sys
+
+path, expected_membership, expected_count = sys.argv[1:]
+with open(path, "rb") as stream:
+    value = json.load(stream)
+actual_membership = value.get("membership_sha256")
+actual_count = value.get("member_count")
+if not isinstance(actual_membership, str) or re.fullmatch(r"[0-9a-f]{64}", actual_membership) is None:
+    raise SystemExit(1)
+if type(actual_count) is not int or actual_count <= 0:
+    raise SystemExit(1)
+if actual_membership != expected_membership or str(actual_count) != expected_count:
+    raise SystemExit(1)
+PY
+    }
+    validate_registry_artifact_roots \
+      || fail "caller registry membership root does not match frozen artifact"
+  fi
 fi
 
 lock_held=0
@@ -114,10 +163,46 @@ validate_env_file() {
   mode_count="$(awk -F= '$1=="RACE_EVENT_LIFECYCLE_MODE"{n++} END{print n+0}' "$file")"
   canary_sha_count="$(awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256"{n++} END{print n+0}' "$file")"
   canary_ids_count="$(awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS"{n++} END{print n+0}' "$file")"
+  registry_sha_count="$(awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256"{n++} END{print n+0}' "$file")"
+  registry_membership_count="$(awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256"{n++} END{print n+0}' "$file")"
+  registry_member_count_count="$(awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT"{n++} END{print n+0}' "$file")"
+  registry_activation_count="$(awk -F= '$1=="RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID"{n++} END{print n+0}' "$file")"
   [ "$enabled_count" -eq 1 ] || { echo "lifecycle mode switch: $file must contain exactly one lifecycle enabled key" >&2; return 1; }
   [ "$mode_count" -eq 1 ] || { echo "lifecycle mode switch: $file must contain exactly one lifecycle mode key" >&2; return 1; }
   [ "$canary_sha_count" -le 1 ] || { echo "lifecycle mode switch: $file contains duplicate canary SHA keys" >&2; return 1; }
   [ "$canary_ids_count" -le 1 ] || { echo "lifecycle mode switch: $file contains duplicate canary event ID keys" >&2; return 1; }
+  for count in "$registry_sha_count" "$registry_membership_count" "$registry_member_count_count" "$registry_activation_count"; do
+    [ "$count" -le 1 ] || { echo "lifecycle mode switch: $file contains duplicate registry trust-root keys" >&2; return 1; }
+  done
+  file_enabled="$(read_key "$file" RACE_EVENT_LIFECYCLE_ENABLED)"
+  file_mode_value="$(read_key "$file" RACE_EVENT_LIFECYCLE_MODE)"
+  file_canary_sha="$(read_key "$file" RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256)"
+  file_canary_ids="$(read_key "$file" RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS)"
+  file_registry_sha="$(read_key "$file" RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256)"
+  file_registry_membership="$(read_key "$file" RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256)"
+  file_registry_count="$(read_key "$file" RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT)"
+  file_registry_activation="$(read_key "$file" RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID)"
+  if { [ -n "$file_canary_sha" ] && [ -z "$file_canary_ids" ]; } \
+    || { [ -z "$file_canary_sha" ] && [ -n "$file_canary_ids" ]; }; then
+    echo "lifecycle mode switch: $file has an incomplete canary root" >&2
+    return 1
+  fi
+  registry_nonempty=0
+  registry_empty=0
+  for value in "$file_registry_sha" "$file_registry_membership" "$file_registry_count" "$file_registry_activation"; do
+    if [ -n "$value" ]; then registry_nonempty=$((registry_nonempty + 1)); else registry_empty=$((registry_empty + 1)); fi
+  done
+  [ "$registry_nonempty" -eq 0 ] || [ "$registry_empty" -eq 0 ] \
+    || { echo "lifecycle mode switch: $file has an incomplete registry root" >&2; return 1; }
+  [ -z "$file_canary_sha" ] || [ "$registry_nonempty" -eq 0 ] \
+    || { echo "lifecycle mode switch: $file enables both legacy and registry roots" >&2; return 1; }
+  if [ "$file_enabled/$file_mode_value" = "true/enforce" ]; then
+    [ -n "$file_canary_sha" ] || [ "$registry_nonempty" -eq 4 ] \
+      || { echo "lifecycle mode switch: $file enforce mode lacks a trust root" >&2; return 1; }
+  else
+    [ -z "$file_canary_sha" ] && [ "$registry_nonempty" -eq 0 ] \
+      || { echo "lifecycle mode switch: $file has a trust root outside enforce" >&2; return 1; }
+  fi
 }
 
 read_key() {
@@ -126,17 +211,30 @@ read_key() {
 
 rewrite_env() {
   file="$1" enabled="$2" mode="$3" enforce_sha="$4" enforce_ids="$5"
+  enforce_registry_sha="$6" enforce_registry_membership="$7"
+  enforce_registry_count="$8" enforce_registry_activation="$9"
   tmp="$(mktemp "${file}.lifecycle.tmp.XXXXXX")" || return 1
   chmod 600 "$tmp" || { rm -f "$tmp"; return 1; }
-  if ! awk -v enabled="$enabled" -v mode="$mode" -v enforce_sha="$enforce_sha" -v enforce_ids="$enforce_ids" '
+  if ! awk -v enabled="$enabled" -v mode="$mode" -v enforce_sha="$enforce_sha" -v enforce_ids="$enforce_ids" \
+    -v registry_sha="$enforce_registry_sha" -v membership_sha="$enforce_registry_membership" \
+    -v member_count="$enforce_registry_count" -v activation_id="$enforce_registry_activation" '
     /^RACE_EVENT_LIFECYCLE_ENABLED=/{print "RACE_EVENT_LIFECYCLE_ENABLED=" enabled; next}
     /^RACE_EVENT_LIFECYCLE_MODE=/{print "RACE_EVENT_LIFECYCLE_MODE=" mode; next}
     /^RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256=/{print "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256=" enforce_sha; saw_sha=1; next}
     /^RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS=/{print "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS=" enforce_ids; saw_ids=1; next}
+    /^RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256=/{print "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256=" registry_sha; saw_registry_sha=1; next}
+    /^RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256=/{print "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256=" membership_sha; saw_membership_sha=1; next}
+    /^RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT=/{print "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT=" member_count; saw_member_count=1; next}
+    /^RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID=/{print "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID=" activation_id; saw_activation_id=1; next}
     {print}
     END {
       if (!saw_sha) print "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256=" enforce_sha
       if (!saw_ids) print "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS=" enforce_ids
+      registry_any = registry_sha != "" || membership_sha != "" || member_count != "" || activation_id != ""
+      if (registry_any && !saw_registry_sha) print "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256=" registry_sha
+      if (registry_any && !saw_membership_sha) print "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256=" membership_sha
+      if (registry_any && !saw_member_count) print "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT=" member_count
+      if (registry_any && !saw_activation_id) print "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID=" activation_id
     }
   ' "$file" > "$tmp"; then
     rm -f "$tmp"; return 1
@@ -158,20 +256,107 @@ PY
   [ "$(read_key "$file" RACE_EVENT_LIFECYCLE_MODE)" = "$mode" ] || return 1
   [ "$(read_key "$file" RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256)" = "$enforce_sha" ] || return 1
   [ "$(read_key "$file" RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS)" = "$enforce_ids" ] || return 1
+  [ "$(read_key "$file" RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256)" = "$enforce_registry_sha" ] || return 1
+  [ "$(read_key "$file" RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256)" = "$enforce_registry_membership" ] || return 1
+  [ "$(read_key "$file" RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT)" = "$enforce_registry_count" ] || return 1
+  [ "$(read_key "$file" RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID)" = "$enforce_registry_activation" ] || return 1
 }
 
 verify_runtime() {
   beat_state="$1" enabled="$2" mode="$3" enforce_sha="$4" enforce_ids="$5"
+  expected_registry_sha="${6:-}" expected_registry_membership="${7:-}"
+  expected_registry_count="${8:-}" expected_registry_activation="${9:-}"
   EXPECTED_BEAT_STATE="$beat_state" \
   EXPECTED_LIFECYCLE_ENABLED="$enabled" \
   EXPECTED_LIFECYCLE_MODE="$mode" \
   EXPECTED_LIFECYCLE_ENFORCE_CANARY_SHA256="$enforce_sha" \
   EXPECTED_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS="$enforce_ids" \
+  EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_SHA256="$expected_registry_sha" \
+  EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256="$expected_registry_membership" \
+  EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT="$expected_registry_count" \
+  EXPECTED_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID="$expected_registry_activation" \
   EXPECTED_COMPOSE_PROJECT="$EXPECTED_COMPOSE_PROJECT" \
   EXPECTED_RELEASE_DIR="$EXPECTED_RELEASE_DIR" \
   EXPECTED_IMAGE_ID="$EXPECTED_IMAGE_ID" \
   EXPECTED_RELEASE_COMMIT="$EXPECTED_RELEASE_COMMIT" \
   COMPOSE_FILE="$COMPOSE_FILE" "$VERIFY"
+}
+
+compose_exec_registry_verify() {
+  "$COMPOSE" -f "$COMPOSE_FILE" \
+    --project-directory "$EXPECTED_RELEASE_DIR" \
+    --project-name "$EXPECTED_COMPOSE_PROJECT" \
+    exec -T web python manage.py verify_race_event_lifecycle_enforce_registry \
+    --manifest-stdin --manifest-sha256 "$registry_sha" \
+    --expected-commit "$EXPECTED_RELEASE_COMMIT" "$@" < "$manifest_snapshot"
+}
+
+activate_race_event_lifecycle_enforce_registry() {
+  activation_id="$1"
+  [ -n "$activation_id" ] || return 1
+  compose_exec_registry_verify --expected-state inactive --activate \
+    --activation-id "$activation_id"
+}
+
+parse_registry_result_activation_id() {
+  expected_outcome="$1"
+  output="$2"
+  python3 - "$expected_outcome" "$registry_member_count" "$output" <<'PY'
+import re
+import sys
+
+expected, expected_count, raw = sys.argv[1:]
+lines = [line.strip() for line in raw.splitlines() if line.strip()]
+if expected == "verified_active":
+    pattern = re.compile(
+        r"^outcome=verified_active members=([1-9][0-9]*) activation_id=([0-9a-f]{64})$"
+    )
+else:
+    pattern = re.compile(
+        rf"^outcome={re.escape(expected)} activation_id=([0-9a-f]{{64}})$"
+    )
+matches = [pattern.fullmatch(line) for line in lines]
+matches = [match for match in matches if match]
+if len(lines) != 1 or len(matches) != 1:
+    raise SystemExit(1)
+if expected == "verified_active":
+    if matches[0].group(1) != expected_count:
+        raise SystemExit(1)
+    print(matches[0].group(2))
+else:
+    print(matches[0].group(1))
+PY
+}
+
+resolve_registry_activation_id() {
+  if inactive_output="$(compose_exec_registry_verify --expected-state inactive 2>/dev/null)"; then
+    candidate="$(generate_registry_activation_id)" || return 1
+    registry_activation_id="$candidate"
+    activated_output="$(activate_race_event_lifecycle_enforce_registry "$registry_activation_id")" || return 1
+    parsed="$(parse_registry_result_activation_id activated "$activated_output")" || return 1
+    [ "$parsed" = "$candidate" ] || return 1
+    printf '%s\n' "$parsed"
+    return 0
+  fi
+
+  # A previous attempt may have committed DB activation before env rewrite or
+  # container recreation failed.  Strongly re-bind the same artifact to the
+  # active DB registry, obtain its existing ID, then execute an idempotent
+  # activation replay with that exact ID.  No fresh ID is generated here.
+  active_output="$(compose_exec_registry_verify --expected-state active)" || return 1
+  existing="$(parse_registry_result_activation_id verified_active "$active_output")" || return 1
+  registry_activation_id="$existing"
+  replay_output="$(activate_race_event_lifecycle_enforce_registry "$registry_activation_id")" || return 1
+  replay_id="$(parse_registry_result_activation_id replay "$replay_output")" || return 1
+  [ "$replay_id" = "$existing" ] || return 1
+  printf '%s\n' "$existing"
+}
+
+generate_registry_activation_id() {
+  generated="$(python3 -c 'import secrets; print(secrets.token_hex(32))')" || return 1
+  case "$generated" in *[!0-9a-f]*|"") return 1 ;; esac
+  [ "${#generated}" -eq 64 ] || return 1
+  printf '%s\n' "$generated"
 }
 
 compose_exec_canary_verify() {
@@ -296,13 +481,15 @@ EOF
 recover_off() {
   set +e
   recovery_rc=0
+  # Failure convergence writes RACE_EVENT_LIFECYCLE_ENABLED=false and then
+  # RACE_EVENT_LIFECYCLE_MODE=off to both reviewed env files.
   # Stop both schedulers and consumers before touching the trust root.  This
   # closes the queued-task window even when failure happens after activation.
   compose_mutation stop beat worker || recovery_rc=1
   # Clear RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256 and
   # RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS without requiring artifact access.
-  rewrite_env "$CANONICAL_ENV_FILE" false off "" "" || recovery_rc=1
-  rewrite_env "$ACTIVE_RELEASE_ENV_FILE" false off "" "" || recovery_rc=1
+  rewrite_env_off "$CANONICAL_ENV_FILE" || recovery_rc=1
+  rewrite_env_off "$ACTIVE_RELEASE_ENV_FILE" || recovery_rc=1
   compose_mutation up -d --no-deps --force-recreate web worker || recovery_rc=1
   if ! verify_runtime stopped false off "" ""; then
     if stop_verified_host_lifecycle_offenders \
@@ -321,6 +508,10 @@ recover_off() {
   fi
   set -e
   return 0
+}
+
+rewrite_env_off() {
+  rewrite_env "$1" false off "" "" "" "" "" ""
 }
 
 on_exit() {
@@ -366,13 +557,35 @@ if [ "$TARGET_LIFECYCLE_ENABLED" = "true" ]; then
   [ -z "$(read_key "$CANONICAL_ENV_FILE" RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS)" ] || fail "enable requires empty canonical canary event IDs"
   [ -z "$(read_key "$ACTIVE_RELEASE_ENV_FILE" RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256)" ] || fail "enable requires empty active canary SHA"
   [ -z "$(read_key "$ACTIVE_RELEASE_ENV_FILE" RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS)" ] || fail "enable requires empty active canary event IDs"
+  for key in RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256 \
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256 \
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT \
+    RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID; do
+    [ -z "$(read_key "$CANONICAL_ENV_FILE" "$key")" ] || fail "enable requires empty canonical registry root"
+    [ -z "$(read_key "$ACTIVE_RELEASE_ENV_FILE" "$key")" ] || fail "enable requires empty active registry root"
+  done
   # This preflight runs while all three resident services are still untouched.
   # A stale or cross-project runtime therefore fails with zero service or file
   # mutation and the EXIT trap releases the already-held shared lock.
-  verify_runtime running false off "" ""
+  enable_admission_beat_state=running
+  if [ "$enforce_root_kind" = "registry" ]; then
+    # Registry promotion deliberately leaves Beat stopped; that is the only
+    # reviewed stopped admission.  web/worker still undergo the full census.
+    enable_admission_beat_state=stopped
+  fi
+  verify_runtime "$enable_admission_beat_state" false off "" ""
   if [ "$TARGET_LIFECYCLE_MODE" = "enforce" ]; then
     wait_for_web_healthy
-    compose_exec_canary_verify --phase inactive --disarm
+    if [ "$enforce_root_kind" = "canary" ]; then
+      compose_exec_canary_verify --phase inactive --disarm
+    else
+      # Accept either a freshly promoted inactive registry or an exact active
+      # artifact left by a previously failed env/container phase.  The latter
+      # is fully verified and replayed after writer shutdown below.
+      if ! compose_exec_registry_verify --expected-state inactive >/dev/null 2>&1; then
+        compose_exec_registry_verify --expected-state active >/dev/null
+      fi
+    fi
   fi
 fi
 
@@ -383,6 +596,17 @@ if [ "$TARGET_LIFECYCLE_ENABLED/$TARGET_LIFECYCLE_MODE" = "true/enforce" ] \
 else
   compose_mutation stop beat
 fi
+
+# Registry activation occurs while the reviewed resident web is still
+# false/off and both Celery scheduler/consumer are stopped.  Generate the
+# activation trust-root component only after the shared lock is held, then
+# atomically activate through the bounded manifest stdin before any env write.
+if [ "$TARGET_LIFECYCLE_ENABLED/$TARGET_LIFECYCLE_MODE" = "true/enforce" ] \
+  && [ "$enforce_root_kind" = "registry" ]; then
+  registry_activation_id="$(resolve_registry_activation_id)" \
+    || fail "cannot activate or strictly replay registry activation ID"
+fi
+
 stamp="$(date -u '+%Y%m%dT%H%M%SZ').$$"
 canonical_backup="${CANONICAL_ENV_FILE}.lifecycle-backup.$stamp"
 active_backup="${ACTIVE_RELEASE_ENV_FILE}.lifecycle-backup.$stamp"
@@ -390,20 +614,31 @@ cp -p "$CANONICAL_ENV_FILE" "$canonical_backup"
 chmod 600 "$canonical_backup"
 cp -p "$ACTIVE_RELEASE_ENV_FILE" "$active_backup"
 chmod 600 "$active_backup"
-rewrite_env "$CANONICAL_ENV_FILE" "$TARGET_LIFECYCLE_ENABLED" "$TARGET_LIFECYCLE_MODE" "$canary_sha" "$canary_ids"
-rewrite_env "$ACTIVE_RELEASE_ENV_FILE" "$TARGET_LIFECYCLE_ENABLED" "$TARGET_LIFECYCLE_MODE" "$canary_sha" "$canary_ids"
+rewrite_env "$CANONICAL_ENV_FILE" "$TARGET_LIFECYCLE_ENABLED" "$TARGET_LIFECYCLE_MODE" "$canary_sha" "$canary_ids" \
+  "$registry_sha" "$registry_membership_sha" "$registry_member_count" "$registry_activation_id"
+rewrite_env "$ACTIVE_RELEASE_ENV_FILE" "$TARGET_LIFECYCLE_ENABLED" "$TARGET_LIFECYCLE_MODE" "$canary_sha" "$canary_ids" \
+  "$registry_sha" "$registry_membership_sha" "$registry_member_count" "$registry_activation_id"
 
 if [ "$TARGET_LIFECYCLE_ENABLED/$TARGET_LIFECYCLE_MODE" = "true/enforce" ]; then
   compose_mutation up -d --no-deps --force-recreate web
   wait_for_web_healthy
   # Recreated web consumes the same bounded --manifest-stdin trust root.
-  compose_exec_canary_verify --phase inactive
+  if [ "$enforce_root_kind" = "canary" ]; then
+    compose_exec_canary_verify --phase inactive
+  else
+    compose_exec_registry_verify --expected-state active \
+      --activation-id "$registry_activation_id"
+  fi
   compose_mutation up -d --no-deps --force-recreate worker
-  verify_runtime stopped true enforce "$canary_sha" "$canary_ids"
-  compose_exec_canary_verify --phase active --activate
-  compose_exec_canary_verify --phase active
+  verify_runtime stopped true enforce "$canary_sha" "$canary_ids" \
+    "$registry_sha" "$registry_membership_sha" "$registry_member_count" "$registry_activation_id"
+  if [ "$enforce_root_kind" = "canary" ]; then
+    compose_exec_canary_verify --phase active --activate
+    compose_exec_canary_verify --phase active
+  fi
   compose_mutation up -d --no-deps --force-recreate beat
-  verify_runtime running true enforce "$canary_sha" "$canary_ids"
+  verify_runtime running true enforce "$canary_sha" "$canary_ids" \
+    "$registry_sha" "$registry_membership_sha" "$registry_member_count" "$registry_activation_id"
 else
   compose_mutation up -d --no-deps --force-recreate web worker
   verify_runtime stopped "$TARGET_LIFECYCLE_ENABLED" "$TARGET_LIFECYCLE_MODE" "" ""

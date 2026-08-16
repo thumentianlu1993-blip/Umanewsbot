@@ -163,13 +163,19 @@ class LifecycleEnforceCanaryModeSwitchRedTests(SimpleTestCase):
         source = MODE_SWITCH.read_text(encoding="utf-8")
         recovery = source[source.index("recover_off() {"):source.index("on_exit() {")]
 
-        self.assertIn("RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256", recovery)
-        self.assertIn("RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS", recovery)
-        self.assertRegex(
+        self.assertIn('rewrite_env_off "$CANONICAL_ENV_FILE"', recovery)
+        self.assertIn('rewrite_env_off "$ACTIVE_RELEASE_ENV_FILE"', recovery)
+        self.assertIn(
+            'rewrite_env "$1" false off "" "" "" "" "" ""',
             recovery,
-            r'rewrite_env "\$CANONICAL_ENV_FILE" false off "" ""',
+            "false/off helper must clear both legacy values and all four registry values",
         )
-        self.assertRegex(
-            recovery,
-            r'rewrite_env "\$ACTIVE_RELEASE_ENV_FILE" false off "" ""',
-        )
+        for key in (
+            "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_SHA256",
+            "RACE_EVENT_LIFECYCLE_ENFORCE_CANARY_EVENT_IDS",
+            "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_SHA256",
+            "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBERSHIP_SHA256",
+            "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_MEMBER_COUNT",
+            "RACE_EVENT_LIFECYCLE_ENFORCE_REGISTRY_ACTIVATION_ID",
+        ):
+            self.assertIn(key, source)

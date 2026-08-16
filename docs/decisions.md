@@ -1,5 +1,23 @@
 # 关键决策
 
+## 2026-08-11 全量 lifecycle 使用 registry，不放大双赛事 canary
+
+- 双赛事 canary 的完整 cohort 校验与锁模型不能直接扩为数百场；否则每个单场 task 都读取或锁完整 ID
+  列表，形成 O(N^2) 读取和全局串行。通用路径改为唯一 active registry + 逐场 membership，单场 task 只
+  锁自身 membership/control/event；PostgreSQL per-event task 使用 shared advisory transaction lock，
+  promotion/activation 使用同键独占锁，既阻止 rotation 竞态又允许不同赛事并行。
+- “全量”本 change 只指一个冻结 census cutoff 下的当前全部合格赛事 E1，不宣称未来新赛事永久自动
+  admission。缺 control 的合格赛事必须保留在 census 并显式进入 strict-v2 enrollment；enrollment 仍每批
+  最多 20，registry promotion 每次最多 100，全部 membership 完整且摘要一致后才能 activation。
+- selector 以 `(race_datetime,event_id)` 选择和截断，但 artifact membership 统一按 event ID 数值升序
+  canonical；successor 必须绑定 predecessor。激活 successor 时同事务 retire predecessor、清理旧 claim，
+  范围外 enforce control 降为 shadow 且停止刷新，历史 canary/registry evidence 保留不改写。
+- registry runtime trust root 固定为 raw SHA、membership SHA、member count、activation ID 四元组，与 legacy
+  canary root 互斥。激活后 env 切换失败时，false/off 重试只能通过完整 artifact/DB 校验复用原 activation
+  ID；不得生成不同 ID 或凭 caller 参数覆盖数据库事实。
+- 本 change 不启用 race-live、不接新 provider、不发布新闻或 QQ，也不自动 admission 新赛事。代码审核、
+  合并、关闭态部署、census/enrollment/promotion 和 true/enforce 分别受独立门禁约束。
+
 ## 2026-08-10 新 candidate 必须取得独立 release approval，旧 G3 不可迁移
 
 - resolver 语义变化后生成的 candidate `d95b580b…a418a` 与 artifact `f74c116f…6ce0c` 是唯一可进入下一

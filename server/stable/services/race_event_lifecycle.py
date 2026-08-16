@@ -16,8 +16,8 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
-from django.db import transaction
-from django.db.models import Q
+from django.db import connection, transaction
+from django.db.models import Q, Subquery
 from django.utils import timezone as django_timezone
 
 from stable.models import (
@@ -39,6 +39,16 @@ _REGION_TIMEZONE_CONTRACT: dict[str, frozenset[str]] = {
     "united_kingdom": frozenset({"Europe/London"}),
     "france": frozenset({"Europe/Paris"}),
 }
+_REGISTRY_ADVISORY_LOCK_KEY = 0x554D415245473031  # must match enforce service
+
+
+def _acquire_registry_shared_advisory_lock() -> None:
+    if connection.vendor == "postgresql":
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_xact_lock_shared(%s)",
+                [_REGISTRY_ADVISORY_LOCK_KEY],
+            )
 
 
 def _validate_timezone(
@@ -227,6 +237,8 @@ def apply_race_lifecycle_decision(
     expected_canary_sha256: str = "",
     expected_canary_event_ids: str = "",
     expected_canary_activation_id: str = "",
+    registry_authorized: bool = False,
+    registry_transition_metadata: dict | None = None,
 ) -> ApplyResult:
     """Atomically apply the lifecycle decision for one event.
 
@@ -263,7 +275,11 @@ def apply_race_lifecycle_decision(
             .values_list("mode", flat=True)
             .first()
         )
-    if runtime_enforce and target_control_mode == RaceEventLifecycleMode.ENFORCE:
+    if (
+        runtime_enforce
+        and not registry_authorized
+        and target_control_mode == RaceEventLifecycleMode.ENFORCE
+    ):
         from stable.services.race_event_lifecycle_canary import (
             CanaryError,
             parse_canary_event_ids,
@@ -315,7 +331,7 @@ def apply_race_lifecycle_decision(
     # Keeping direct, isolated service tests independent of Django's default
     # off setting preserves the pure lower-level API while every production
     # task passes through the independently configured runtime trust root.
-    if effective == "enforce" and runtime_enforce:
+    if effective == "enforce" and runtime_enforce and not registry_authorized:
         if prelocked_control is None:
             return ApplyResult(
                 action="noop", reason_code="canary_control_mode_changed"
@@ -347,6 +363,8 @@ def apply_race_lifecycle_decision(
                 "activation_id": evidence["activation_id"],
             }
         }
+    elif effective == "enforce" and registry_authorized:
+        canary_transition_metadata = dict(registry_transition_metadata or {})
 
     decision = decide_race_lifecycle(
         race_datetime=event.race_datetime,
@@ -699,6 +717,7 @@ def claim_due_lifecycle_controls(
     batch_size: int,
     ttl_seconds: int,
     enforce_event_ids: tuple[int, ...] | None = None,
+    enforce_registry_id: int | None = None,
 ) -> list[LifecycleBatchClaim]:
     """Atomically claim a bounded batch of due lifecycle control rows.
 
@@ -712,11 +731,30 @@ def claim_due_lifecycle_controls(
         return []
 
     with transaction.atomic():
-        mode_scope = Q(mode=RaceEventLifecycleMode.SHADOW)
-        if enforce_event_ids is None:
-            mode_scope |= Q(mode=RaceEventLifecycleMode.ENFORCE)
-        elif enforce_event_ids:
-            mode_scope |= Q(
+        if enforce_registry_id is not None:
+            from stable.models import RaceEventLifecycleEnforceMembership
+
+            _acquire_registry_shared_advisory_lock()
+
+            # A registry root authorizes only explicit active memberships.
+            # Do not mix unrelated shadow controls into an enforce scan.
+            mode_scope = Q(
+                mode=RaceEventLifecycleMode.ENFORCE,
+                event_id__in=Subquery(
+                    RaceEventLifecycleEnforceMembership.objects.filter(
+                        registry_id=enforce_registry_id,
+                        registry__is_active=True,
+                        registry__state="active",
+                        state="active",
+                    ).values("event_id")
+                ),
+            )
+        else:
+            mode_scope = Q(mode=RaceEventLifecycleMode.SHADOW)
+            if enforce_event_ids is None:
+                mode_scope |= Q(mode=RaceEventLifecycleMode.ENFORCE)
+            elif enforce_event_ids:
+                mode_scope |= Q(
                 mode=RaceEventLifecycleMode.ENFORCE,
                 event_id__in=enforce_event_ids,
             )
