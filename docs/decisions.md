@@ -1,5 +1,15 @@
 # 关键决策
 
+## 2026-08-16 新 migration 必须原子推进 forward、completion、rollback 与 catalog 合同
+
+- 任何新的生产 migration leaf 不能只新增 migration 文件；同一发布必须同步 ordinary forward plan、
+  initial-install/resume 的单调前缀、restricted completion 最终边界、generic B-to-B rollback 目标校验和
+  allowlist，以及该 migration 新增表/约束/索引的 PostgreSQL catalog 语义。
+- recorder 显示 migration 已应用不等于 schema 合同成立。完成校验必须同时验证新对象的存在、FK 删除
+  语义、唯一性和关键索引；否则必须 fail closed，不能启动长期服务或宣称发布成功。
+- generic rollback 保留已应用的 additive `0073`，只允许目标提交携带精确受审的 0071/0072/0073
+  migration 内容与依赖；更早目标仍需单独的跨 schema recovery，不在普通 rollback 中反向迁移数据库。
+
 ## 2026-08-11 全量 lifecycle 使用 registry，不放大双赛事 canary
 
 - 双赛事 canary 的完整 cohort 校验与锁模型不能直接扩为数百场；否则每个单场 task 都读取或锁完整 ID

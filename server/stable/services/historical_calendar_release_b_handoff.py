@@ -38,8 +38,12 @@ PARTIAL_LEAF_SETS = {
 REPAIR_LEAF_SETS = PARTIAL_LEAF_SETS | {
     ("stable.0070_horse_identity_evidence_commit_receipt",),
 }
-PREVIOUS_FINAL_LEAF_SET = ("stable.0071_historical_calendar_release_b",)
-FINAL_LEAF_SET = ("stable.0072_add_extended_racing_regions",)
+PREVIOUS_FINAL_LEAF_SET = ("stable.0072_add_extended_racing_regions",)
+FINAL_LEAF_SET = ("stable.0073_lifecycle_enforce_registry",)
+LEGACY_FINAL_LEAF_SETS = {
+    ("stable.0071_historical_calendar_release_b",),
+    PREVIOUS_FINAL_LEAF_SET,
+}
 INITIAL_INSTALL_LEAF_SET = ("stable.0067_historical_calendar_release_a",)
 
 
@@ -587,12 +591,12 @@ def verify_restricted_marker_for_live_state(
                 "stable.0069_race_data_sync_pipeline_a_ledger_guards",
                 "stable.0070_horse_identity_evidence_commit_receipt",
             ),
-            PREVIOUS_FINAL_LEAF_SET,
+            *LEGACY_FINAL_LEAF_SETS,
             FINAL_LEAF_SET,
         }
     else:
         allowed_live_states = REPAIR_LEAF_SETS | {
-            PREVIOUS_FINAL_LEAF_SET,
+            *LEGACY_FINAL_LEAF_SETS,
             FINAL_LEAF_SET,
         }
         if marker_state != ("stable.0070_horse_identity_evidence_commit_receipt",):

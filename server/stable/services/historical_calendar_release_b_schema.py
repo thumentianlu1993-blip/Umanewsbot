@@ -29,7 +29,7 @@ PRODUCTION_AUDIT_EXPECTED_APPLIED_NODES = [
     "stable.0067_historical_calendar_release_a",
     "stable.0070_horse_identity_evidence_commit_receipt",
 ]
-TARGET = ("stable", "0072_add_extended_racing_regions")
+TARGET = ("stable", "0073_lifecycle_enforce_registry")
 AUDIT_PATH = (
     Path(__file__).resolve().parents[3]
     / "docs"
@@ -44,6 +44,7 @@ ALLOWED_FORWARD_STATES = {
         "0069_race_data_sync_pipeline_a_ledger_guards",
         "0071_historical_calendar_release_b",
         "0072_add_extended_racing_regions",
+        "0073_lifecycle_enforce_registry",
     ],
     (
         "stable.0068_race_data_sync_pipeline_a_field_audit",
@@ -52,18 +53,27 @@ ALLOWED_FORWARD_STATES = {
         "0069_race_data_sync_pipeline_a_ledger_guards",
         "0071_historical_calendar_release_b",
         "0072_add_extended_racing_regions",
+        "0073_lifecycle_enforce_registry",
     ],
     (
         "stable.0069_race_data_sync_pipeline_a_ledger_guards",
         "stable.0070_horse_identity_evidence_commit_receipt",
-    ): ["0071_historical_calendar_release_b", "0072_add_extended_racing_regions"],
-    ("stable.0071_historical_calendar_release_b",): [
-        "0072_add_extended_racing_regions"
+    ): [
+        "0071_historical_calendar_release_b",
+        "0072_add_extended_racing_regions",
+        "0073_lifecycle_enforce_registry",
     ],
-    ("stable.0072_add_extended_racing_regions",): [],
+    ("stable.0071_historical_calendar_release_b",): [
+        "0072_add_extended_racing_regions",
+        "0073_lifecycle_enforce_registry",
+    ],
+    ("stable.0072_add_extended_racing_regions",): [
+        "0073_lifecycle_enforce_registry"
+    ],
+    ("stable.0073_lifecycle_enforce_registry",): [],
 }
 
-# Exact recorder states reachable when Django executes the reviewed 0072 plan
+# Exact recorder states reachable when Django executes the reviewed 0073 plan
 # from the sole approved pre-0070 origin.  This is deliberately not merged
 # into ALLOWED_FORWARD_STATES: ordinary Release B deploys must never acquire an
 # initial-install bypass merely because they happen to see an old database.
@@ -74,12 +84,14 @@ INITIAL_INSTALL_FORWARD_STATES = {
         "0069_race_data_sync_pipeline_a_ledger_guards",
         "0071_historical_calendar_release_b",
         "0072_add_extended_racing_regions",
+        "0073_lifecycle_enforce_registry",
     ],
     ("stable.0070_horse_identity_evidence_commit_receipt",): [
         "0068_race_data_sync_pipeline_a_field_audit",
         "0069_race_data_sync_pipeline_a_ledger_guards",
         "0071_historical_calendar_release_b",
         "0072_add_extended_racing_regions",
+        "0073_lifecycle_enforce_registry",
     ],
     (
         "stable.0068_race_data_sync_pipeline_a_field_audit",
@@ -88,15 +100,24 @@ INITIAL_INSTALL_FORWARD_STATES = {
         "0069_race_data_sync_pipeline_a_ledger_guards",
         "0071_historical_calendar_release_b",
         "0072_add_extended_racing_regions",
+        "0073_lifecycle_enforce_registry",
     ],
     (
         "stable.0069_race_data_sync_pipeline_a_ledger_guards",
         "stable.0070_horse_identity_evidence_commit_receipt",
-    ): ["0071_historical_calendar_release_b", "0072_add_extended_racing_regions"],
-    ("stable.0071_historical_calendar_release_b",): [
-        "0072_add_extended_racing_regions"
+    ): [
+        "0071_historical_calendar_release_b",
+        "0072_add_extended_racing_regions",
+        "0073_lifecycle_enforce_registry",
     ],
-    ("stable.0072_add_extended_racing_regions",): [],
+    ("stable.0071_historical_calendar_release_b",): [
+        "0072_add_extended_racing_regions",
+        "0073_lifecycle_enforce_registry",
+    ],
+    ("stable.0072_add_extended_racing_regions",): [
+        "0073_lifecycle_enforce_registry"
+    ],
+    ("stable.0073_lifecycle_enforce_registry",): [],
 }
 
 AUDIT_FIELDS = (
@@ -494,6 +515,8 @@ def collect_postgresql_catalog_contract() -> dict:
         "stable_raceeventfieldchange",
         "stable_raceevent",
         "stable_historicalraceeventtarget",
+        "stable_raceeventlifecycleenforceregistry",
+        "stable_raceeventlifecycleenforcemembership",
     )
     release_b_index_names = (
         "uq_race_event_series_edition",
@@ -954,6 +977,192 @@ def database_vendor_contract() -> dict:
     }
 
 
+def validate_lifecycle_registry_catalog_contract(
+    *, contract: dict, migration_applied: bool
+) -> list[str]:
+    """Validate the additive 0073 tables and their write-safety constraints."""
+    registry = "stable_raceeventlifecycleenforceregistry"
+    membership = "stable_raceeventlifecycleenforcemembership"
+    by_table: dict[str, list[dict]] = {}
+    for row in contract.get("columns", []):
+        by_table.setdefault(row.get("table_name", ""), []).append(row)
+    registry_rows = by_table.get(registry, [])
+    membership_rows = by_table.get(membership, [])
+    registry_columns = {row.get("column_name", "") for row in registry_rows}
+    membership_columns = {
+        row.get("column_name", "") for row in membership_rows
+    }
+    present = bool(registry_columns or membership_columns)
+    if migration_applied != present:
+        return ["0073.table_presence"]
+    if not migration_applied:
+        return []
+
+    drift: list[str] = []
+    expected_registry_columns = {
+        "id", "created_at", "updated_at", "root_sha256", "generation",
+        "membership_sha256", "member_count", "state", "is_active",
+        "activation_id", "approved_commit", "selector_scope", "scope_sha256",
+        "census_cutoff", "apply_expires_at", "runtime_valid_until",
+        "artifact_receipt", "activated_at", "retired_at", "predecessor_id",
+    }
+    expected_membership_columns = {
+        "id", "created_at", "updated_at", "state", "entry_sha256",
+        "source_enrollment_sha256", "schedule_generation", "schedule_hash",
+        "country_region", "timezone_name", "frozen_snapshot", "event_id",
+        "registry_id",
+    }
+    if registry_columns != expected_registry_columns:
+        drift.append("0073.registry_columns")
+    if membership_columns != expected_membership_columns:
+        drift.append("0073.membership_columns")
+
+    expected_registry_semantics = {
+        "id": ("bigint", True),
+        "created_at": ("timestamp with time zone", True),
+        "updated_at": ("timestamp with time zone", True),
+        "root_sha256": ("character varying(64)", True),
+        "generation": ("bigint", True),
+        "membership_sha256": ("character varying(64)", True),
+        "member_count": ("integer", True),
+        "state": ("character varying(16)", True),
+        "is_active": ("boolean", True),
+        "activation_id": ("character varying(64)", True),
+        "approved_commit": ("character varying(40)", True),
+        "selector_scope": ("jsonb", True),
+        "scope_sha256": ("character varying(64)", True),
+        "census_cutoff": ("timestamp with time zone", True),
+        "apply_expires_at": ("timestamp with time zone", True),
+        "runtime_valid_until": ("timestamp with time zone", True),
+        "artifact_receipt": ("jsonb", True),
+        "activated_at": ("timestamp with time zone", False),
+        "retired_at": ("timestamp with time zone", False),
+        "predecessor_id": ("bigint", False),
+    }
+    expected_membership_semantics = {
+        "id": ("bigint", True),
+        "created_at": ("timestamp with time zone", True),
+        "updated_at": ("timestamp with time zone", True),
+        "state": ("character varying(16)", True),
+        "entry_sha256": ("character varying(64)", True),
+        "source_enrollment_sha256": ("character varying(64)", True),
+        "schedule_generation": ("bigint", True),
+        "schedule_hash": ("character varying(64)", True),
+        "country_region": ("character varying(32)", True),
+        "timezone_name": ("character varying(64)", True),
+        "frozen_snapshot": ("jsonb", True),
+        "event_id": ("bigint", True),
+        "registry_id": ("bigint", True),
+    }
+
+    def validate_column_semantics(
+        rows: list[dict], expected: dict[str, tuple[str, bool]], prefix: str
+    ) -> None:
+        actual = {
+            row.get("column_name", ""): (row.get("type"), row.get("not_null"))
+            for row in rows
+        }
+        if actual != expected:
+            drift.append(f"0073.{prefix}_column_semantics")
+        if any(row.get("default_expr") for row in rows):
+            drift.append(f"0073.{prefix}_column_defaults")
+        id_row = next(
+            (row for row in rows if row.get("column_name") == "id"), None
+        )
+        if not id_row or id_row.get("identity") != "d":
+            drift.append(f"0073.{prefix}_id_identity")
+        if any(
+            row.get("identity")
+            for row in rows
+            if row.get("column_name") != "id"
+        ):
+            drift.append(f"0073.{prefix}_unexpected_identity")
+
+    if registry_columns == expected_registry_columns:
+        validate_column_semantics(
+            registry_rows, expected_registry_semantics, "registry"
+        )
+    if membership_columns == expected_membership_columns:
+        validate_column_semantics(
+            membership_rows, expected_membership_semantics, "membership"
+        )
+
+    constraints = contract.get("constraints", [])
+
+    def constraint_matches(
+        *, table: str, kind: str, columns: list[str], target: str = "",
+        delete_action: str | None = None, name: str | None = None,
+    ) -> bool:
+        matches = [
+            row for row in constraints
+            if row.get("table_name") == table
+            and row.get("type") == kind
+            and row.get("columns") == columns
+            and (name is None or row.get("name") == name)
+        ]
+        if len(matches) != 1:
+            return False
+        row = matches[0]
+        if not row.get("validated"):
+            return False
+        if target:
+            return (
+                row.get("target_table") == target
+                and row.get("target_columns") == ["id"]
+                and row.get("delete_action") == delete_action
+                and row.get("deferrable") is True
+                and row.get("initially_deferred") is True
+            )
+        return not row.get("target_table") and not row.get("target_columns")
+
+    required_constraints = (
+        ("registry_pk", constraint_matches(table=registry, kind="p", columns=["id"])),
+        ("registry_root_unique", constraint_matches(table=registry, kind="u", columns=["root_sha256"])),
+        ("registry_generation_unique", constraint_matches(table=registry, kind="u", columns=["generation"])),
+        ("registry_predecessor_fk", constraint_matches(table=registry, kind="f", columns=["predecessor_id"], target=registry, delete_action="a")),
+        ("membership_pk", constraint_matches(table=membership, kind="p", columns=["id"])),
+        ("membership_unique", constraint_matches(table=membership, kind="u", columns=["registry_id", "event_id"], name="uq_lifecycle_registry_event")),
+        ("membership_event_fk", constraint_matches(table=membership, kind="f", columns=["event_id"], target="stable_raceevent", delete_action="a")),
+        ("membership_registry_fk", constraint_matches(table=membership, kind="f", columns=["registry_id"], target=registry, delete_action="a")),
+    )
+    drift.extend(f"0073.{name}" for name, ok in required_constraints if not ok)
+
+    indexes = {row.get("name"): row for row in contract.get("indexes", [])}
+
+    def index_matches(
+        *, name: str, table: str, columns: list[str], unique: bool,
+        predicate: str = "",
+    ) -> bool:
+        row = indexes.get(name)
+        actual_predicate = re.sub(r"\s+", "", str(row.get("predicate", ""))) if row else ""
+        while (
+            len(actual_predicate) >= 2
+            and actual_predicate[0] == "("
+            and actual_predicate[-1] == ")"
+        ):
+            actual_predicate = actual_predicate[1:-1]
+        return bool(
+            row
+            and row.get("table_name") == table
+            and row.get("method") == "btree"
+            and row.get("unique") is unique
+            and row.get("valid") is True
+            and row.get("ready") is True
+            and row.get("live") is True
+            and row.get("columns") == columns
+            and actual_predicate == predicate
+        )
+
+    required_indexes = (
+        ("active_unique", index_matches(name="uq_lifecycle_registry_active", table=registry, columns=["is_active"], unique=True, predicate="is_active")),
+        ("registry_state_generation", index_matches(name="lifecycle_reg_state_gen_idx", table=registry, columns=["state", "generation"], unique=False)),
+        ("membership_registry_event", index_matches(name="lifecycle_member_reg_evt_idx", table=membership, columns=["registry_id", "event_id"], unique=False)),
+        ("membership_state", index_matches(name="lifecycle_member_state_idx", table=membership, columns=["registry_id", "state", "event_id"], unique=False)),
+    )
+    drift.extend(f"0073.{name}" for name, ok in required_indexes if not ok)
+    return sorted(set(drift))
+
+
 def _postgres_catalog_state(
     contract: dict,
     applied_nodes: set[str],
@@ -1220,6 +1429,14 @@ def _postgres_catalog_state(
             constraints=contract["constraints"],
             indexes=contract["indexes"],
         ))
+    drift.extend(
+        validate_lifecycle_registry_catalog_contract(
+            contract=contract,
+            migration_applied=(
+                "stable.0073_lifecycle_enforce_registry" in applied_nodes
+            ),
+        )
+    )
     return {
         "ok": not drift,
         "drift_paths": sorted(set(drift)),

@@ -33,6 +33,7 @@ M0069 = ("stable", "0069_race_data_sync_pipeline_a_ledger_guards")
 M0070 = ("stable", "0070_horse_identity_evidence_commit_receipt")
 M0071 = ("stable", "0071_historical_calendar_release_b")
 M0072 = ("stable", "0072_add_extended_racing_regions")
+M0073 = ("stable", "0073_lifecycle_enforce_registry")
 
 
 def _stable_plan(loader: MigrationLoader, applied: set[tuple[str, str]]) -> list[str]:
@@ -41,6 +42,240 @@ def _stable_plan(loader: MigrationLoader, applied: set[tuple[str, str]]) -> list
         for app, name in loader.graph.forwards_plan(M0072)
         if app == "stable" and (app, name) not in applied and name >= "0068"
     ]
+
+
+class MigrationHistoryRepair0073ReleaseContractTests(TestCase):
+    """0073 must be a reviewed ordinary-release leaf, not post-migrate drift."""
+
+    def test_0072_has_exact_forward_plan_to_0073_and_0073_is_final(self):
+        from stable.services.historical_calendar_release_b_schema import (
+            ALLOWED_FORWARD_STATES,
+            TARGET,
+        )
+
+        self.assertEqual(TARGET, M0073)
+        self.assertEqual(
+            ALLOWED_FORWARD_STATES[(f"{M0072[0]}.{M0072[1]}",)],
+            [M0073[1]],
+        )
+        self.assertEqual(
+            ALLOWED_FORWARD_STATES[(f"{M0073[0]}.{M0073[1]}",)],
+            [],
+        )
+
+    def test_handoff_final_boundary_advances_from_0072_to_0073(self):
+        from stable.services.historical_calendar_release_b_handoff import (
+            FINAL_LEAF_SET,
+            PREVIOUS_FINAL_LEAF_SET,
+        )
+
+        self.assertEqual(PREVIOUS_FINAL_LEAF_SET, (f"{M0072[0]}.{M0072[1]}",))
+        self.assertEqual(FINAL_LEAF_SET, (f"{M0073[0]}.{M0073[1]}",))
+
+    def test_preflight_accepts_both_pre_migration_and_current_leaf(self):
+        preflight = (
+            ROOT / "deploy/run_historical_calendar_release_b_preflight.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn("stable.0072_add_extended_racing_regions)", preflight)
+        self.assertIn("stable.0073_lifecycle_enforce_registry)", preflight)
+
+    def test_every_initial_install_prefix_includes_0073(self):
+        from stable.services.historical_calendar_release_b_schema import (
+            INITIAL_INSTALL_FORWARD_STATES,
+        )
+
+        for leaf_set, plan in INITIAL_INSTALL_FORWARD_STATES.items():
+            with self.subTest(leaf_set=leaf_set):
+                if leaf_set != (f"{M0073[0]}.{M0073[1]}",):
+                    self.assertEqual(plan[-1], M0073[1])
+
+    def test_generic_rollback_contract_carries_0073(self):
+        for relative in ("deploy/rollback.sh", "deploy/rollback_lowcost.sh"):
+            self.assertIn(
+                "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET="
+                "stable.0073_lifecycle_enforce_registry",
+                (ROOT / relative).read_text(encoding="utf-8"),
+            )
+        self.assertIn(
+            "EXPECTED_LEAF=stable.0073_lifecycle_enforce_registry",
+            (ROOT / "deploy/resume_rollback_control_state.sh").read_text(
+                encoding="utf-8"
+            ),
+        )
+        verifier = (
+            ROOT / "deploy/verify_rollback_target_migration.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            '"server/stable/migrations/0073_lifecycle_enforce_registry.py"',
+            verifier,
+        )
+        allowlist = json.loads(
+            (ROOT / "deploy/reviewed_release_b_rollback_migrations.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            allowlist["required_migrations"][-1]["migration_path"],
+            "server/stable/migrations/0073_lifecycle_enforce_registry.py",
+        )
+
+    def test_0073_catalog_contract_validates_tables_fks_constraints_and_indexes(self):
+        from stable.services import historical_calendar_release_b_schema as schema
+
+        self.assertTrue(
+            hasattr(schema, "validate_lifecycle_registry_catalog_contract"),
+            "0073 catalog validator is missing",
+        )
+        valid = self._valid_0073_catalog_contract()
+        self.assertEqual(
+            schema.validate_lifecycle_registry_catalog_contract(
+                contract=valid, migration_applied=True
+            ),
+            [],
+        )
+        for section, name in (
+            ("constraints", "uq_lifecycle_registry_event"),
+            ("indexes", "lifecycle_member_state_idx"),
+        ):
+            drifted = json.loads(json.dumps(valid))
+            drifted[section] = [
+                row for row in drifted[section] if row["name"] != name
+            ]
+            with self.subTest(section=section, name=name):
+                self.assertTrue(
+                    schema.validate_lifecycle_registry_catalog_contract(
+                        contract=drifted, migration_applied=True
+                    )
+                )
+
+    def test_0073_catalog_contract_rejects_wrong_active_predicate(self):
+        from stable.services import historical_calendar_release_b_schema as schema
+
+        drifted = self._valid_0073_catalog_contract()
+        active = next(
+            row
+            for row in drifted["indexes"]
+            if row["name"] == "uq_lifecycle_registry_active"
+        )
+        active["predicate"] = "NOT is_active"
+        self.assertIn(
+            "0073.active_unique",
+            schema.validate_lifecycle_registry_catalog_contract(
+                contract=drifted, migration_applied=True
+            ),
+        )
+
+    def test_0073_catalog_contract_rejects_column_semantic_drift(self):
+        from stable.services import historical_calendar_release_b_schema as schema
+
+        for table_suffix, column_name, field, value, expected_drift in (
+            ("registry", "state", "type", "character varying(1)", "0073.registry_column_semantics"),
+            ("membership", "event_id", "not_null", False, "0073.membership_column_semantics"),
+            ("registry", "id", "identity", "", "0073.registry_id_identity"),
+            ("membership", "id", "default_expr", "nextval('wrong')", "0073.membership_column_defaults"),
+        ):
+            drifted = self._valid_0073_catalog_contract()
+            row = next(
+                item
+                for item in drifted["columns"]
+                if item["table_name"].endswith(table_suffix)
+                and item["column_name"] == column_name
+            )
+            row[field] = value
+            with self.subTest(table=table_suffix, column=column_name, field=field):
+                self.assertIn(
+                    expected_drift,
+                    schema.validate_lifecycle_registry_catalog_contract(
+                        contract=drifted, migration_applied=True
+                    ),
+                )
+
+    @staticmethod
+    def _valid_0073_catalog_contract():
+        registry = "stable_raceeventlifecycleenforceregistry"
+        membership = "stable_raceeventlifecycleenforcemembership"
+        registry_columns = {
+            "id", "created_at", "updated_at", "root_sha256", "generation",
+            "membership_sha256", "member_count", "state", "is_active",
+            "activation_id", "approved_commit", "selector_scope", "scope_sha256",
+            "census_cutoff", "apply_expires_at", "runtime_valid_until",
+            "artifact_receipt", "activated_at", "retired_at", "predecessor_id",
+        }
+        membership_columns = {
+            "id", "created_at", "updated_at", "state", "entry_sha256",
+            "source_enrollment_sha256", "schedule_generation", "schedule_hash",
+            "country_region", "timezone_name", "frozen_snapshot", "event_id",
+            "registry_id",
+        }
+        registry_semantics = {
+            "id": ("bigint", True),
+            "created_at": ("timestamp with time zone", True),
+            "updated_at": ("timestamp with time zone", True),
+            "root_sha256": ("character varying(64)", True),
+            "generation": ("bigint", True),
+            "membership_sha256": ("character varying(64)", True),
+            "member_count": ("integer", True),
+            "state": ("character varying(16)", True),
+            "is_active": ("boolean", True),
+            "activation_id": ("character varying(64)", True),
+            "approved_commit": ("character varying(40)", True),
+            "selector_scope": ("jsonb", True),
+            "scope_sha256": ("character varying(64)", True),
+            "census_cutoff": ("timestamp with time zone", True),
+            "apply_expires_at": ("timestamp with time zone", True),
+            "runtime_valid_until": ("timestamp with time zone", True),
+            "artifact_receipt": ("jsonb", True),
+            "activated_at": ("timestamp with time zone", False),
+            "retired_at": ("timestamp with time zone", False),
+            "predecessor_id": ("bigint", False),
+        }
+        membership_semantics = {
+            "id": ("bigint", True),
+            "created_at": ("timestamp with time zone", True),
+            "updated_at": ("timestamp with time zone", True),
+            "state": ("character varying(16)", True),
+            "entry_sha256": ("character varying(64)", True),
+            "source_enrollment_sha256": ("character varying(64)", True),
+            "schedule_generation": ("bigint", True),
+            "schedule_hash": ("character varying(64)", True),
+            "country_region": ("character varying(32)", True),
+            "timezone_name": ("character varying(64)", True),
+            "frozen_snapshot": ("jsonb", True),
+            "event_id": ("bigint", True),
+            "registry_id": ("bigint", True),
+        }
+        columns = [
+            {
+                "table_name": table,
+                "column_name": name,
+                "type": column_type,
+                "not_null": not_null,
+                "identity": "d" if name == "id" else "",
+                "default_expr": "",
+            }
+            for table, semantics in (
+                (registry, registry_semantics),
+                (membership, membership_semantics),
+            )
+            for name, (column_type, not_null) in semantics.items()
+        ]
+        constraints = [
+            {"name": "registry_pk", "table_name": registry, "type": "p", "validated": True, "columns": ["id"], "target_table": "", "target_columns": [], "delete_action": " ", "deferrable": False, "initially_deferred": False},
+            {"name": "registry_root_key", "table_name": registry, "type": "u", "validated": True, "columns": ["root_sha256"], "target_table": "", "target_columns": [], "delete_action": " ", "deferrable": False, "initially_deferred": False},
+            {"name": "registry_generation_key", "table_name": registry, "type": "u", "validated": True, "columns": ["generation"], "target_table": "", "target_columns": [], "delete_action": " ", "deferrable": False, "initially_deferred": False},
+            {"name": "registry_predecessor_fk", "table_name": registry, "type": "f", "validated": True, "columns": ["predecessor_id"], "target_table": registry, "target_columns": ["id"], "delete_action": "a", "deferrable": True, "initially_deferred": True},
+            {"name": "membership_pk", "table_name": membership, "type": "p", "validated": True, "columns": ["id"], "target_table": "", "target_columns": [], "delete_action": " ", "deferrable": False, "initially_deferred": False},
+            {"name": "uq_lifecycle_registry_event", "table_name": membership, "type": "u", "validated": True, "columns": ["registry_id", "event_id"], "target_table": "", "target_columns": [], "delete_action": " ", "deferrable": False, "initially_deferred": False},
+            {"name": "membership_event_fk", "table_name": membership, "type": "f", "validated": True, "columns": ["event_id"], "target_table": "stable_raceevent", "target_columns": ["id"], "delete_action": "a", "deferrable": True, "initially_deferred": True},
+            {"name": "membership_registry_fk", "table_name": membership, "type": "f", "validated": True, "columns": ["registry_id"], "target_table": registry, "target_columns": ["id"], "delete_action": "a", "deferrable": True, "initially_deferred": True},
+        ]
+        indexes = [
+            {"name": "uq_lifecycle_registry_active", "table_name": registry, "method": "btree", "unique": True, "valid": True, "ready": True, "live": True, "columns": ["is_active"], "predicate": "is_active"},
+            {"name": "lifecycle_reg_state_gen_idx", "table_name": registry, "method": "btree", "unique": False, "valid": True, "ready": True, "live": True, "columns": ["state", "generation"], "predicate": ""},
+            {"name": "lifecycle_member_reg_evt_idx", "table_name": membership, "method": "btree", "unique": False, "valid": True, "ready": True, "live": True, "columns": ["registry_id", "event_id"], "predicate": ""},
+            {"name": "lifecycle_member_state_idx", "table_name": membership, "method": "btree", "unique": False, "valid": True, "ready": True, "live": True, "columns": ["registry_id", "state", "event_id"], "predicate": ""},
+        ]
+        return {"columns": columns, "constraints": constraints, "indexes": indexes}
 
 
 class MigrationHistoryRepairGraphRedTests(TestCase):
@@ -121,7 +356,8 @@ class MigrationHistoryRepairLeafSetRedTests(TestCase):
             [f"{M0068[0]}.{M0068[1]}", f"{M0070[0]}.{M0070[1]}"],
         )
         self.assertEqual(
-            payload["migration_plan"], [M0069[1], M0071[1], M0072[1]]
+            payload["migration_plan"],
+            [M0069[1], M0071[1], M0072[1], M0073[1]],
         )
         self.assertTrue(payload["migration_state_allowed"])
 
@@ -489,7 +725,7 @@ class MigrationHistoryRepairBaselineRedTests(SimpleTestCase):
             "applied_nodes": ["stable.0067_historical_calendar_release_a"],
             "migration_leaf_set": ["stable.0067_historical_calendar_release_a"],
             "migration_plan": [
-                M0070[1], M0068[1], M0069[1], M0071[1], M0072[1]
+                M0070[1], M0068[1], M0069[1], M0071[1], M0072[1], M0073[1]
             ],
             "unknown_applied_migrations": [],
             "migration_graph_known": True,
@@ -1136,7 +1372,7 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
         }
         live = {
             "ok": True,
-            "migration_leaf_set": [f"{M0072[0]}.{M0072[1]}"],
+            "migration_leaf_set": [f"{M0073[0]}.{M0073[1]}"],
             "database_identity_sha256": "d" * 64,
         }
         with TemporaryDirectory() as tmp:
@@ -1295,7 +1531,7 @@ class MigrationHistoryRepairRestrictedRecoveryRedTests(SimpleTestCase):
     def test_required_completion_cannot_noop_after_marker_deletion(self):
         live = {
             "ok": True,
-            "migration_leaf_set": [f"{M0072[0]}.{M0072[1]}"],
+            "migration_leaf_set": [f"{M0073[0]}.{M0073[1]}"],
             "database_identity_sha256": "d" * 64,
         }
         with TemporaryDirectory() as tmp, patch(

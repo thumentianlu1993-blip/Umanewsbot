@@ -1,5 +1,20 @@
 # 部署运行手册
 
+## 2026-08-16 0073 migration 已应用但 completion 合同失败的恢复步骤
+
+1. 该状态不是 migration 失败：先核对 recorder leaf 为 `stable.0073_lifecycle_enforce_registry`、无 pending
+   migration、共享锁已释放、restricted marker 不存在；不得重做或 fake migration。
+2. 若服务已停，可在共享锁内恢复现有 web/worker/Beat 以缩短中断，但必须保持 lifecycle `false/off`、
+   legacy/registry runtime roots 为空、race-live scheduler/monitor 关闭且 race-live worker 不启动；这不等于
+   新版本部署成功。
+3. 修复包必须同时更新 forward/completion/initial-install/rollback leaf 合同、rollback migration allowlist
+   与 0073 catalog verifier，并通过 migration-history、single-owner、rollback harness、shell syntax、Django
+   check、migration drift 和独立 review。
+4. 修复部署仍走标准 `deploy_lowcost.sh` 和唯一 release owner。因为 0073 已应用，migrate 应为 no-op；
+   completion 必须在 PostgreSQL 上验证两个 registry 表、FK、唯一约束和关键索引后才允许重建服务。
+5. 全部服务按同一新 revision/image 且 false/off 健康后，才继续 legacy canary disarm 和生产只读
+   census/dry-run；不得借恢复动作启用 enforce 或 race-live。
+
 ## 2026-08-11 lifecycle full-cohort 发布边界（尚未授权执行）
 
 1. 当前生产仍为 event `186,187` 双赛事 canary；event 186 的 T/T+30 已验收，不能据此直接把 IDs 扩成长
