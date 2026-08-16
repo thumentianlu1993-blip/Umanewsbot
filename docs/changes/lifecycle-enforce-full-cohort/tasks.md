@@ -43,3 +43,15 @@
   提高轮换与到期诊断可观测性。
 - [ ] (application) 后续收紧 `no_time_canary` 的 explicit IDs：缺失或不合格时 fail closed，不静默省略。
 - [ ] (integration) 后续为未发布、人工锁或暂停的 early return 增加 claim 释放或退避，减少 TTL 后重复调度。
+
+## G2 关闭态阻塞修复
+
+- [x] (application) 测试先行覆盖 legacy direct-finish 精确 disarm、错误 provenance 拒绝与普通 reactivation 拒绝。
+- [x] (application) 测试先行覆盖空 census 正常 `no_candidates`、canonical 输出、零 registry 与零 DB 写入。
+- [x] (application) 完成最小实现并复跑 canary/full-cohort 与 lifecycle 回归。
+- [x] (application) 修复首轮 review 的 direct-finish activation ID 绑定与空 census identity 预校验 finding。
+- [x] (application) 修复第二轮 review 的 direct-finish disarm 幂等回放 finding：首次严格绑定 active
+  activation ID，成功收口后的同 artifact 重放返回 `replay` 且零写。
+- [x] (application) 由未参与实现的独立 reviewer 完成三轮限定只读复审；最终 `APPROVED`，代码候选
+  fingerprint 为 `c0b0282fe129a02ebc79624e0eb3d9ce643cb3f46923b7c98ac7f9eea885d986`。
+- [ ] (operations) 合并后保持 false/off 部署，重试 disarm/replay/coherence 与生产只读 census。

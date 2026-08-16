@@ -1,5 +1,17 @@
 # 项目状态文档
 
+## 2026-08-17 lifecycle G2 direct-finish/空 census 修复已通过独立 review
+
+- 生产仍为 `false/off`，race-live 关闭，`0073` 已应用且服务健康；旧 canary disarm 与空 census 均为
+  fail-closed，没有留下业务写入。
+- 本地最小修复不补造历史 transition：仅显式关闭态 disarm 接受 provenance 完整的 direct-finish；
+  普通 reactivation 继续拒绝。零候选 prepare 改为 canonical `no_candidates` 终态。
+- 新增承重测试均先 RED 后 GREEN；首轮独立 review 的 activation ID/empty identity finding 已关闭，第二轮
+  发现的 disarm replay 回归也已修复：首次严格绑定 active activation ID，成功收口后同 artifact 重放零写。
+  相关 143 项测试通过、8 项 PostgreSQL-only/SQLite skip；同一独立 reviewer 第 3 轮限定复审已
+  `APPROVED`，代码候选 fingerprint 为 `c0b0282f…d986`。下一步按授权提交、合并并关闭态部署，再重试
+  disarm/replay 和只读 census。
+
 ## 2026-08-16 lifecycle G2 已完成 false/off 部署，等待过期 canary 安全 disarm
 
 - PR `#103` 已部署至生产 revision `231514ea…e25`，image `sha256:dd5e1f3…b363`；`0073`、catalog、

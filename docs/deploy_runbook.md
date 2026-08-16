@@ -12,6 +12,12 @@
    false/off coherence。任一步失败均恢复服务、释放锁、保留旧 evidence，禁止继续 census 或 registry promotion。
 4. 该动作不启用 lifecycle、不改变公开状态、不启动 race-live。只有 disarm、服务恢复与 coherence 全部通过后，
    才进入 G2 生产只读 census/dry-run。
+5. 若旧 applied 证据是 `scheduled -> finished / time_t_plus_30` 单边，只有其 task/source/canary metadata、
+   generation 与 T+30 时间门禁全部匹配时，显式 disarm 才可按历史兼容路径消费；不得补造 running transition。
+   首次 disarm 还须把 transition activation ID 与当前 active evidence 精确绑定；成功后同一 artifact 的第二次
+   disarm 必须返回 `replay` 且零写。同一 artifact 的普通 verify/activate 仍须拒绝该单边。
+6. census 的 included IDs 为空时，prepare 必须以 `status=no_candidates` 正常结束，保留 canonical census 与
+   enrollment plan、不生成 registry；此时 promotion dry-run 记为“不适用”，不能伪称已经验证 promotion。
 
 ## 2026-08-16 0073 migration 已应用但 completion 合同失败的恢复步骤
 

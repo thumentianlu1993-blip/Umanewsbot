@@ -375,6 +375,20 @@ def _entry_snapshot(event: RaceEvent, control: RaceEventLifecycleControl, source
     }
 
 
+def validate_registry_artifact_identity(
+    *,
+    approved_commit: str,
+    generation: int,
+    predecessor_root_sha256: str = "",
+) -> None:
+    if not _OID_RE.fullmatch(approved_commit or ""):
+        raise RegistryError("approved_commit 非法")
+    if type(generation) is not int or generation <= 0:
+        raise RegistryError("generation 非法")
+    if predecessor_root_sha256 and not _SHA_RE.fullmatch(predecessor_root_sha256):
+        raise RegistryError("predecessor root 非法")
+
+
 def build_registry_artifact(
     *,
     event_ids: tuple[int, ...] | list[int],
@@ -386,6 +400,11 @@ def build_registry_artifact(
     predecessor_root_sha256: str = "",
 ) -> bytes:
     _validate_selector_scope(selector_scope)
+    validate_registry_artifact_identity(
+        approved_commit=approved_commit,
+        generation=generation,
+        predecessor_root_sha256=predecessor_root_sha256,
+    )
     ids = tuple(sorted(set(event_ids)))
     if not ids or tuple(event_ids) != ids or any(type(item) is not int or item <= 0 for item in ids):
         raise RegistryError("registry event IDs 必须非空、唯一、升序")
@@ -393,12 +412,6 @@ def build_registry_artifact(
         not _SHA_RE.fullmatch(value or "") for value in enrollment_sha_by_event.values()
     ):
         raise RegistryError("每场必须绑定合法 enrollment SHA")
-    if not _OID_RE.fullmatch(approved_commit or ""):
-        raise RegistryError("approved_commit 非法")
-    if type(generation) is not int or generation <= 0:
-        raise RegistryError("generation 非法")
-    if predecessor_root_sha256 and not _SHA_RE.fullmatch(predecessor_root_sha256):
-        raise RegistryError("predecessor root 非法")
     generated = (now or django_timezone.now()).astimezone(timezone.utc)
     events = list(RaceEvent.objects.filter(id__in=ids).order_by("id"))
     controls = {
