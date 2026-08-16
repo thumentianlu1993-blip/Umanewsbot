@@ -130,6 +130,7 @@ def load_canary_manifest_bytes(
     expected_commit: str,
     now: datetime | None = None,
     require_apply_fresh: bool = False,
+    allow_expired_runtime: bool = False,
 ) -> LoadedCanaryManifest:
     expected_sha = parse_canary_sha(expected_raw_sha256)
     if not isinstance(expected_commit, str) or _OID_RE.fullmatch(expected_commit) is None:
@@ -157,7 +158,7 @@ def load_canary_manifest_bytes(
         raise CanaryError("manifest validation now 必须为 aware datetime")
     if require_apply_fresh and current >= apply_expires:
         raise CanaryError("canary promotion manifest apply 窗口已过期")
-    if current >= runtime_until:
+    if current >= runtime_until and not allow_expired_runtime:
         raise CanaryError("canary runtime 已过期")
     events = data["events"]
     if not isinstance(events, dict) or len(events) != 2:

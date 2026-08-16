@@ -1,5 +1,13 @@
 # 项目状态文档
 
+## 2026-08-16 lifecycle G2 已完成 false/off 部署，等待过期 canary 安全 disarm
+
+- PR `#103` 已部署至生产 revision `231514ea…e25`，image `sha256:dd5e1f3…b363`；`0073`、catalog、
+  migration no-op、容器一致性、内外 healthz、日志与 false/off/race-live 关闭门禁均通过。
+- event `186/187` 的 legacy canary manifest 已过 runtime，有效关闭态 disarm 被旧 loader 拒绝且零写恢复。
+  最小修复已测试先行，仅为 `--disarm` 放行过期 artifact 解析，仍需独立 review、合并和关闭态部署后才可
+  重试 disarm，并继续只读 census/dry-run。
+
 ## 2026-08-16 lifecycle G2 暂停于 0073 发布合同修复
 
 - `0073` 已由唯一 migration owner 在生产成功应用，但旧完成校验只承认 leaf `0072`，标准部署安全停止。

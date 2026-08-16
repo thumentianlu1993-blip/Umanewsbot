@@ -35,6 +35,11 @@ class Command(BaseCommand):
                 raw,
                 expected_raw_sha256=options["manifest_sha256"],
                 expected_commit=options["expected_commit"],
+                # An expired trust root must remain unusable for verify or
+                # activation, but false/off disarm still needs to retire its
+                # exact frozen evidence.  The mutation layer independently
+                # enforces strict closed runtime before any write.
+                allow_expired_runtime=bool(options["disarm"]),
             )
             expected_event_ids = parse_canary_event_ids(
                 options["expected_event_ids"]

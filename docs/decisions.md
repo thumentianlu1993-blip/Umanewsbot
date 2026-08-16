@@ -1,5 +1,15 @@
 # 关键决策
 
+## 2026-08-16 过期 canary 只能在严格关闭态执行精确 disarm
+
+- runtime 过期必须继续阻断普通 verify、activate 和任何 enforce 使用；不能延长、重签或忽略旧 artifact 的
+  `runtime_valid_until`。
+- 但关闭态撤销是安全收敛动作：只有 verify 命令显式 `--disarm --phase inactive` 时可加载过期 manifest，
+  后续仍必须由 mutation 层验证 lifecycle `false/off`、完整 event/control cohort、原始 SHA、approved commit、
+  frozen schedule/enrollment/evidence 和无范围外 enforce 漂移，任一不符即零写失败。
+- 该例外不改变 control mode、公开赛事状态或历史 transition，只把匹配的 legacy canary active evidence 原子
+  降为 inactive；后续 registry promotion/activation 仍按独立 G3 授权执行。
+
 ## 2026-08-16 新 migration 必须原子推进 forward、completion、rollback 与 catalog 合同
 
 - 任何新的生产 migration leaf 不能只新增 migration 文件；同一发布必须同步 ordinary forward plan、
