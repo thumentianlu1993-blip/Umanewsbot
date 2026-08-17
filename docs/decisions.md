@@ -1,5 +1,20 @@
 # 关键决策
 
+## 2026-08-17 未来赛事时间只写官方明确值，备份可恢复性先于磁盘清理
+
+- 首批未来时间只使用 York Racecourse 官方 Order of Runnings；其他地区没有明确、当前、可核对的开赛
+  时间时保持缺失，不按日期、往年时间或服务器时区猜测。
+- 赛事时间写入必须同时记录 authority、source URL、confidence、逐字段 before/after 与 operation log；
+  写入不等于 lifecycle enrollment 或 enforce 授权。
+- OSS 配置存在不等于远端恢复点成立。只有 endpoint 可解析、上传返回成功且 `head_object` 大小与本地归档
+  一致，才可记为远端备份；当前 bucket 为空，因此本地备份不得清理。
+- 标准备份格式统一为 PostgreSQL custom `.dump`，低成本部署在 Compose db 内生成/RDS 用隔离 client，
+  必须非空、TOC 有效、0600、SHA 可核对后才原子发布。Nginx 仓库配置以当前生产已验证文件为准，未来
+  发布不得再用 HTTP placeholder 覆盖正式 TLS。
+- 数据库运维脚本不得根据 checkout basename 或缺省值猜部署栈；必须显式声明 allowlisted
+  `COMPOSE_FILE` 与实际 `EXPECTED_COMPOSE_PROJECT`。low-cost 操作经受审 wrapper 精确绑定 resident
+  project；RDS 不得调用其 Compose 中不存在的 `db` service。
+
 ## 2026-08-17 legacy direct-finish 只作为关闭态 disarm 的历史兼容证据
 
 - 早期 canary 可在任务首次执行已经到达 T+30 时，把赛事从 `scheduled` 直接推进为 `finished`，并留下

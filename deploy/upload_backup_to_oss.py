@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from urllib.parse import urlparse
 
 import oss2
 
@@ -23,8 +22,12 @@ def main() -> int:
         return 1
 
     backup_path = Path(sys.argv[1]).resolve()
-    if not backup_path.exists():
+    if not backup_path.is_file():
         print(f"Backup file not found: {backup_path}")
+        return 1
+    local_size = backup_path.stat().st_size
+    if local_size <= 0:
+        print(f"Backup file is empty: {backup_path}")
         return 1
 
     access_key_id = os.getenv("OSS_ACCESS_KEY_ID", "").strip()
@@ -42,14 +45,22 @@ def main() -> int:
 
     object_key = f"{backup_prefix}/{backup_path.name}" if backup_prefix else backup_path.name
     with backup_path.open("rb") as fp:
-        bucket.put_object(object_key, fp)
+        result = bucket.put_object(object_key, fp)
+    if getattr(result, "status", None) not in {200, 201}:
+        print(f"OSS upload returned unexpected status: {getattr(result, 'status', None)}")
+        return 1
 
-    parsed = urlparse(endpoint)
-    public_url = f"{parsed.scheme}://{bucket_name}.{parsed.netloc}/{object_key}"
-    print(f"Uploaded to OSS: {public_url}")
+    remote = bucket.head_object(object_key)
+    remote_size = getattr(remote, "content_length", None)
+    if remote_size != local_size:
+        print(
+            "OSS upload size mismatch: "
+            f"local={local_size} remote={remote_size} key={object_key}"
+        )
+        return 1
+    print(f"OSS upload verified: key={object_key} size={local_size}")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

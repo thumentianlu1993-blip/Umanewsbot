@@ -241,15 +241,29 @@ COMPOSE_FILE="$COMPOSE_FILE" EXPECTED_CELERY_WORKERS="$worker_node" \
   "$ROOT_DIR/deploy/wait_for_celery_drain.sh"
 compose_mutation stop worker
 
-# The write-before-write recovery point is mandatory.  backup_db.sh currently
-# emits a gzip SQL dump; validate that real format, while an externally upgraded
-# custom-format helper is validated with pg_restore -l.
-backup_output="$(BACKUP_TARGET=local "$ROOT_DIR/deploy/backup_db.sh")"
+# The write-before-write recovery point is mandatory.  Bind the helper to this
+# reviewed Compose mode/project; it publishes only a validated custom archive.
+backup_output="$(BACKUP_TARGET=local COMPOSE_FILE="$COMPOSE_FILE" \
+  EXPECTED_COMPOSE_PROJECT="$EXPECTED_COMPOSE_PROJECT" \
+  "$ROOT_DIR/deploy/backup_db.sh")"
 backup_file="$(printf '%s\n' "$backup_output" | sed -n 's/^Backup created: //p' | tail -n 1)"
 [ -n "$backup_file" ] && [ -s "$backup_file" ] || fail "database backup is missing or empty"
 chmod 600 "$backup_file"
 case "$backup_file" in
-  *.dump) pg_restore -l "$backup_file" >/dev/null || fail "database backup catalog validation failed" ;;
+  *.dump)
+    case "$COMPOSE_FILE" in
+      docker-compose.prod.lowcost.yml)
+        compose_mutation exec -T db pg_restore -l \
+          < "$backup_file" >/dev/null \
+          || fail "database backup catalog validation failed"
+        ;;
+      docker-compose.prod.yml)
+        docker run --rm -i postgres:16 pg_restore -l \
+          < "$backup_file" >/dev/null \
+          || fail "database backup catalog validation failed"
+        ;;
+    esac
+    ;;
   *.gz) gzip -t "$backup_file" || fail "database backup gzip validation failed" ;;
   *) fail "database backup format is not reviewed" ;;
 esac

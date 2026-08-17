@@ -57,3 +57,11 @@
   fingerprint 为 `c0b0282fe129a02ebc79624e0eb3d9ce643cb3f46923b7c98ac7f9eea885d986`。
 - [x] (operations) 合并后保持 false/off 部署，完成 disarm/replay/coherence 与生产只读 census；
   race-live 未启动，公开赛事状态未改。
+
+## 首批未来赛事时间与新 census
+
+- [x] (integration) 从 York 官方 Order of Runnings 冻结 event 946–953 的时间 manifest。
+- [x] (operations) 在共享锁内完成备份、唯一 apply、字段审计和公开页面验收。
+- [x] (operations) 在 false/off 下重跑只读 census，取得 8 场、1 个 enrollment batch，四表零写。
+- [ ] (operations) 对该 enrollment batch 另行提交精确 G3；本次不 apply control、不生成 registry、
+  不启用 enforce 或 race-live。

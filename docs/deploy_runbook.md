@@ -1,5 +1,25 @@
 # 部署运行手册
 
+## 2026-08-17 York race_datetime 与备份/OSS/Nginx 运维收口
+
+1. event `946–953` 的生产时间写入以 manifest
+   `0b89c6c9082174190a0b121410b0da5e4bd3bd680ea6f8339db9b7b37e3ef24a` 为唯一输入；写前 backup
+   SHA 为 `62770ed9…1111`，apply/verify 均为 `event_count=8 / field_change_count=16`。完整证据见
+   `docs/changes/lifecycle-enforce-full-cohort/race_datetime_york_report_20260817.md`。
+2. 写后只读 lifecycle prepare 返回 `8 included / 8 required / 8 ready / 1 batch`，四表指纹前后不变。
+   该输出只能作为后续 enrollment G3 输入，当前严禁直接 promotion/enforce；lifecycle/race-live 保持关闭。
+3. 生产 `.env` 当前 `BACKUP_TARGET=oss`，但旧 endpoint DNS 解析失败；以标准香港 endpoint 只读访问时
+   bucket 为 `0 objects`。在新备份链路部署并完成真实上传/远端大小复核前，不得删除
+   `/opt/umanewsbot/backups` 中任何历史恢复点。
+4. 新 `backup_db.sh` 应输出 custom `.dump`、SHA 和 TOC；low-cost 使用 Compose db，RDS 使用隔离
+   postgres client。`BACKUP_TARGET=local` 必须覆盖 `.env`，避免 release rollback snapshot 被迫上传。
+   OSS 路径使用受审 web image 内的 uploader，成功标准包含远端对象大小一致。
+   canonical/active `.env` 还必须显式保存 allowlisted `COMPOSE_FILE` 与真实
+   `EXPECTED_COMPOSE_PROJECT`；low-cost 所有 Compose 调用经 wrapper 绑定 project，RDS promotion
+   的 archive 二次复核使用隔离 `postgres:16`，不得调用不存在的 `db` service。
+5. Nginx 候选文件 SHA `a506e857…b9c` 与当前生产挂载文件逐字一致。发布时仍须先备份 mounted config，
+   执行 `nginx -t`，仅在通过后 smooth reload；禁止 `docker compose down` 或无必要重启 Nginx。
+
 ## 2026-08-17 PR #105 lifecycle G2 关闭态发布证据
 
 1. 发布 revision 为 `93cfd240b9ba7e95caf79bf54e9c6d089885f11c`，image 为
