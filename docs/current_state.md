@@ -1,5 +1,28 @@
 # 当前状态
 
+## 2026-08-17 York 8 场时间已补齐；lifecycle census 已产生可执行 enrollment 计划
+
+- York Racecourse 官方 Order of Runnings 已用于补齐 event `946–953` 的英国当地开赛时间与 UTC
+  `race_datetime`；manifest SHA-256 为 `0b89c6c9…f24a`。8 场共写入 `16` 项赛事字段，并留下
+  `16` 条 authority、`16` 条 field change 和 `1` 条 operation log；赛事仍为 published/scheduled。
+- 写前 custom-format 备份为 `445791728` bytes、mode `0600`、TOC `1332`、SHA-256
+  `62770ed9…1111`。8 个公开详情页、赛事日历、内外 healthz 均为 `200`，页面显示时间与官方赛程一致。
+- 更新后的 7 天 lifecycle census 为 `9867 inspected / 8 included / 8 enrollment_required / 1 batch`，
+  included IDs 精确为 `946–953`；四张 lifecycle 表前后指纹同为 `28c51899…6b82`。lifecycle 继续
+  `false/off`，race-live 关闭，尚未 apply enrollment、生成 registry 或启用 enforce。
+- 运维只读盘点发现：生产 `.env` 的 OSS endpoint 无法解析，标准香港 endpoint 可访问但目标 bucket
+  当前为 `0 objects`；本地备份约 `45GB`，因此禁止清理。Nginx 生产挂载配置 syntax 正常、SHA
+  `a506e857…b9c`，仓库原先仍是旧 HTTP 模板。
+- 干净 worktree 已测试先行准备备份/恢复/OSS/Nginx 收口。独立 reviewer 首轮指出 RDS 模式隐式回退、
+  low-cost 未绑定实际 Compose project、RDS promotion 调用不存在 db service 三项 P1；均已新增承重
+  RED 后修复，backup/restore 脚本 executable mode 也已锁定。备份/Nginx 16 项、含 lifecycle operations
+  与 single-owner 的组合 `195/195` GREEN；Django/migration/workflow/shell/diff 检查通过。同一独立
+  reviewer 第 2 轮复审结论为 `APPROVED`、无直接 P0/P1，审前后代码候选 fingerprint 均为
+  `720e872ff30d19fb93d485859f6c0be886b84059b56b574c05c0c405f150092a`。当前尚未 commit、PR、合并或
+  部署。详情见
+  `docs/changes/lifecycle-enforce-full-cohort/race_datetime_york_report_20260817.md` 与
+  `docs/changes/harden-production-backup-and-nginx-config/`。
+
 ## 2026-08-17 lifecycle G2 已完成关闭态发布、legacy 收口与只读 census
 
 - PR `#105` merge SHA `93cfd240b9ba7e95caf79bf54e9c6d089885f11c` 已部署到隔离 release；生产 image

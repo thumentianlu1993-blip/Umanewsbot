@@ -1,5 +1,18 @@
 # 项目状态文档
 
+## 2026-08-17 未来赛事时间已有首批真实样本，备份链路暴露 P1 运维缺口
+
+- event `946–953` 已按 York 官方赛程补齐时间并完成生产审计/页面验收；7 天 lifecycle census 已从
+  `0 candidates` 变为 `8 included / 8 enrollment_required / 1 batch`，但 lifecycle 仍是 `false/off`，
+  尚未获得 enrollment/enforce 授权。
+- 生产 OSS endpoint 不可解析，标准香港 endpoint 下 bucket 为空；本地约 45GB 备份仍是当前唯一已观察到
+  的历史恢复集，禁止删除。候选修复改用 Compose/RDS 正确网络生成 custom dump、TOC 校验、容器化上传和
+  远端大小复核，并让恢复脚本兼容新旧格式。
+- 当前生产 Nginx 配置本身健康；候选只把其 HTTPS/ACME/hipilot 410 精确同步回仓库。独立 review
+  首轮三项 P1 已按测试先行修复：部署 mode/project 均显式、low-cost 绑定实际 Compose project、RDS
+  promotion 使用隔离 client。备份/Nginx 16 项与组合 `195/195` GREEN；同一 reviewer 第 2 轮已
+  `APPROVED`，无直接 P0/P1。当前仅待精确 G2 发布选择，尚未 commit、合并或部署。
+
 ## 2026-08-17 lifecycle full-cohort G2 已关闭态完成
 
 - PR `#105` 已按 merge SHA `93cfd240…f11c` 部署，生产 image `sha256:06885466…85904`；leaf `0073`、
