@@ -1,5 +1,56 @@
 # 当前状态
 
+## 2026-08-20 赛事数据自动同步方案已通过同一独立 reviewer 第 3 轮评审，尚未实现
+
+- 同一独立只读 reviewer 首轮结论为 `REVISE`：0 blocker、8 high、3 medium、1 low；没有修改仓库文件。
+  findings 主要是遗漏主干既有 race-data Slice A、跨 lifecycle/race-live 锁序相反、缺少存量/未来赛事
+  enrollment、R4 result/lifecycle 授权接口未闭合、新 worker 未纳入 release freeze/resume/rollback、来源
+  identity 唯一键不足、可信第三方 dead heat 展示错误、T+30 指标可被 alert 伪装，以及 live state、
+  single-flight、artifact capacity 三项边界不完整。
+- 本轮只修订 `docs/changes/automate-race-data-lifecycle-sync/`：确定 Slice A 与 `RACE_DATA_SYNC_*` 为唯一
+  roster/reconciliation/admission 内核，`race_sync_v2` 只作为隔离队列/worker 名；新增 99 场完整 census、
+  standing-policy future enrollment/disenrollment、全局锁图、唯一 result+lifecycle transaction API、
+  region/namespace identity、authority-neutral reported position、DB single-flight、容量 admission 和完整
+  release-control-plane 合同。
+- 同一 reviewer 第 2 轮确认首轮其余项目已闭合，但仍以 `REVISE` 指出 3 high + 1 medium：缺少新 writer
+  的持久 owner、保留的 Slice A racecard writer 仍是 observation -> event 逆序、result worker 没有取得
+  lifecycle claim 的可执行路径、R3 shadow revision 与 R4 公开事务可能重复建 revision。第 2 轮修订新增
+  `RaceEventProjectionWriteOwner.DATA_SYNC` 与完整 CAS/legacy transfer truth table；把 Slice A reconciler 纳入
+  全局 lock coordinator 和 racecard 交叉并发 RED；改为 R4 API 在唯一 transaction 内 evidence-driven 取得/
+  释放 lifecycle claim；并冻结“R3 唯一创建 immutable unpublished shadow revision、R4 只 promote”的合同。
+- 同一 reviewer 第 3 轮只读复核上述 3 high + 1 medium，确认全部闭合、未引入新矛盾、无 actionable
+  findings，最终结论为 `VERDICT: APPROVED`。残余风险仅属于尚未开始的实现阶段：migration、旧代码
+  fail-closed、PostgreSQL concurrency RED 与 evidence-driven claim 仍需真实实现、测试和独立代码 review。
+- 已冻结五份方案文件的 fingerprint：按 `spec/design/test_cases/tasks/rollout` 顺序生成逐文件 SHA-256 行，
+  再对这些行计算 SHA-256，结果为 `f5d13c7ce92f21773d13230d39fdab88740815e63c2cbc1e6a609fbc04076940`。
+- T+30 验收已拆为 independent upstream terminal availability、terminal detection、confirmed publication、
+  blocked alert coverage；alert 不再计入结果成功。canary 对上游确实可用的赛果要求 >=95% confirmed/public，
+  地区扩大后 >=99%，错误赛果为 0。
+- 当前仍没有应用代码、migration、真实来源网络、生产写入、配置/服务改动、commit、push、PR 或部署。
+  方案评审门禁已通过，但这不构成实现、真实来源网络、生产写入、迁移、部署或启用授权；下一步须由用户
+  决定是否创建新的实现 worktree/授权进入 R0。
+
+## 2026-08-19 已创建赛事时间、出马表与赛果自动同步原生方案，尚未实现
+
+- 已按用户要求在独立 worktree/branch `codex/race-data-automation-plan` 创建
+  `docs/changes/automate-race-data-lifecycle-sync/`，使用仓库原生 `spec/design/test_cases/tasks/rollout`
+  文档，不使用 OpenSpec，也未生成 OpenSpec 产物。
+- 方案基线为当前 `origin/main@2833558a6a2d67b7dc9816b53ea8ad5d580eb56c`，复用现有
+  `RaceEventLiveTracking`、observation/revision、字段审计、lifecycle 和定时人工赛果审核；新增建议为
+  provider checkpoint、每分钟动态 selector、独立 `race_sync_v2` 队列/worker，以及时间、出马表、
+  confirmed/corrected 赛果的原子协调。
+- `2026-08-19 23:24 +08:00` 生产只读快照确认运行 revision 同为 `2833558a`，web/普通 worker/Beat
+  正常；未来 30 天 `99` 场 published/scheduled 赛事仅 `8` 场有 `race_datetime`、`99` 场均无 runner。
+  race-data/race-live/lifecycle 自动写入全关，赛果审核 prepare 开启但不会自动 apply；普通队列为 `0`，
+  遗留 `race_live` 队列仍为 `7543`，本方案明确禁止清理、重放或复用该积压。
+- 方案沿用“官网、Racing API、可信第三方在合同与完整性门槛满足时同等自动采用”的产品口径，但
+  强制区分 `official`、`racing_api_auto`、`trusted_provider_auto` 和
+  `human_reviewed_reference` provenance；不同同资格来源冲突时 fail closed，不按抓取先后覆盖。
+- 30 分钟目标拆为两只可观测时钟：T+30 必须有 confirmed result 或明确 reason-code 告警；首次发现
+  上游完整终态后 P95 5 分钟、P99 10 分钟内完成公开更新。上游未发布终态时不得伪造赛果。
+- 当前没有应用代码、migration、provider 网络、生产数据写入、配置变更、队列消费、commit、push、
+  PR、部署或服务重启。下一门禁是独立工程方案评审；评审通过也不代表已获生产自动写入或公开授权。
+
 ## 2026-08-17 York 8 场时间已补齐；lifecycle census 已产生可执行 enrollment 计划
 
 - York Racecourse 官方 Order of Runnings 已用于补齐 event `946–953` 的英国当地开赛时间与 UTC
