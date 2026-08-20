@@ -62,6 +62,7 @@ SERVICE_IDS = {
     "worker": "cidworker222bbbb",
     "beat": "cidbeat3333cccc",
     "race_live_worker": "cidrlive4444dddd",
+    "race_sync_v2_worker": "cidrsync7777gggg",
     "db": "ciddb5555555eeee",
     "redis": "cidredis6666ffff",
 }
@@ -430,6 +431,11 @@ case "$cmd" in
         cat "$state/git-show-0073"
         exit 0
         ;;
+      *0074_race_data_sync_r0_control_plane.py)
+        [ -f "$state/git-show-0074" ] || exit 1
+        cat "$state/git-show-0074"
+        exit 0
+        ;;
     esac
     exit 1
     ;;
@@ -560,6 +566,10 @@ class Harness:
             ROOT / "server/stable/migrations/0073_lifecycle_enforce_registry.py",
             self.state / "git-show-0073",
         )
+        shutil.copyfile(
+            ROOT / "server/stable/migrations/0074_race_data_sync_r0_control_plane.py",
+            self.state / "git-show-0074",
+        )
         self.log = base / "calls.log"
         self.log.touch()
         self.lock_dir = base / "deployment.lock"
@@ -625,7 +635,13 @@ class Harness:
         return evts
 
 
-def seed_services(harness: Harness, *, web: str = "running", race_live: str = "running") -> None:
+def seed_services(
+    harness: Harness,
+    *,
+    web: str = "running",
+    race_live: str = "running",
+    race_sync: str = "absent",
+) -> None:
     """Seed fake service state. Modes: running / stopped / absent."""
     harness.set_state(
         "git-rev-parse-head",
@@ -636,6 +652,8 @@ def seed_services(harness: Harness, *, web: str = "running", race_live: str = "r
             mode = web
         elif service == "race_live_worker":
             mode = race_live
+        elif service == "race_sync_v2_worker":
+            mode = race_sync
         else:
             mode = "running"
         if mode == "absent":
@@ -2086,6 +2104,23 @@ class PreContractRollbackBridgeTests(SimpleTestCase):
         overrides.update(env)
         return harness.run_script(PRE_CONTRACT_BRIDGE_REL, *args, **overrides)
 
+    def _prepare_resume_after_bridge_abort(self, harness: Harness) -> None:
+        for service in (
+            "worker",
+            "beat",
+            "race_live_worker",
+            "race_sync_v2_worker",
+        ):
+            cid = SERVICE_IDS[service]
+            harness.set_state(f"ps-{service}", f"{cid}\n")
+            harness.set_state(f"inspect-{cid}", "false exited\n")
+        harness.set_state("ps-seq-web", f"\n{SERVICE_IDS['web']}\n")
+        harness.set_state(f"inspect-{SERVICE_IDS['web']}", "true healthy\n")
+        repair_root = harness.work / "runtime" / "migration_history_repair"
+        repair_root.mkdir(parents=True, mode=0o700)
+        repair_root.chmod(0o700)
+        harness.clear_log()
+
     def test_t12_missing_frozen_image_tag_is_rejected(self):
         with TemporaryDirectory() as tmp:
             harness = Harness(Path(tmp))
@@ -2192,6 +2227,224 @@ class PreContractRollbackBridgeTests(SimpleTestCase):
                 [],
                 "schema-incompatible rollback must not start any service",
             )
+
+    def test_t12_pre_switch_abort_resume_restores_sync_worker_intent(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._assert_script_exists(harness)
+            seed_services(harness, race_sync="running")
+            result = self._run_bridge(
+                harness,
+                self.FROZEN_TAG,
+                SCHEMA_COMPATIBLE_WITH_TARGET="false",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            state_file = Path(f"{harness.lock_dir}.race-data-sync-state")
+            self.assertTrue(state_file.exists())
+            self.assertIn("phase=pre-switch", state_file.read_text(encoding="utf-8"))
+            for service in (
+                "worker",
+                "beat",
+                "race_live_worker",
+                "race_sync_v2_worker",
+            ):
+                cid = SERVICE_IDS[service]
+                harness.set_state(f"ps-{service}", f"{cid}\n")
+                harness.set_state(f"inspect-{cid}", "false exited\n")
+            harness.set_state(
+                "ps-seq-web",
+                f"\n{SERVICE_IDS['web']}\n",
+            )
+            harness.set_state(
+                f"inspect-{SERVICE_IDS['web']}",
+                "true healthy\n",
+            )
+            repair_root = harness.work / "runtime" / "migration_history_repair"
+            repair_root.mkdir(parents=True, mode=0o700)
+            repair_root.chmod(0o700)
+            harness.clear_log()
+
+            resumed = harness.run_script(
+                RESUME_SCRIPT_REL,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+            )
+
+            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            self.assertIn(
+                ["up", "-d", "--no-deps", "race_sync_v2_worker"],
+                [argv for _compose, argv in compose_calls(harness.events())],
+            )
+            self.assertFalse(state_file.exists())
+
+    def test_t12_switching_abort_resume_starts_nothing_and_preserves_intent(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._assert_script_exists(harness)
+            seed_services(harness, race_sync="running")
+            harness.set_rc("tag", 1)
+            result = self._run_bridge(
+                harness,
+                self.FROZEN_TAG,
+                SCHEMA_COMPATIBLE_WITH_TARGET="true",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            state_file = Path(f"{harness.lock_dir}.race-data-sync-state")
+            self.assertIn("phase=switching", state_file.read_text(encoding="utf-8"))
+            self._prepare_resume_after_bridge_abort(harness)
+
+            resumed = harness.run_script(
+                RESUME_SCRIPT_REL,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+            )
+
+            self.assertNotEqual(resumed.returncode, 0)
+            self.assertIn("outcome is unknown", resumed.stderr)
+            self.assertEqual(
+                [argv for _compose, argv in compose_calls(harness.events()) if argv[:1] == ["up"]],
+                [],
+            )
+            self.assertTrue(state_file.exists())
+
+    def test_t12_switching_race_live_marker_blocks_when_sync_sibling_is_missing(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._assert_script_exists(harness)
+            seed_services(harness, race_sync="running")
+            harness.set_rc("tag", 1)
+            result = self._run_bridge(
+                harness,
+                self.FROZEN_TAG,
+                SCHEMA_COMPATIBLE_WITH_TARGET="true",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            live_state_file = Path(f"{harness.lock_dir}.race-live-state")
+            sync_state_file = Path(f"{harness.lock_dir}.race-data-sync-state")
+            self.assertIn("phase=switching", live_state_file.read_text(encoding="utf-8"))
+            sync_state_file.unlink()
+            self._prepare_resume_after_bridge_abort(harness)
+
+            resumed = harness.run_script(
+                RESUME_SCRIPT_REL,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+            )
+
+            self.assertNotEqual(resumed.returncode, 0)
+            self.assertIn("outcome is unknown", resumed.stderr)
+            self.assertEqual(
+                [argv for _compose, argv in compose_calls(harness.events()) if argv[:1] == ["up"]],
+                [],
+            )
+            self.assertTrue(live_state_file.exists())
+
+    def test_t12_switching_race_live_marker_blocks_when_sync_sibling_is_corrupt(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._assert_script_exists(harness)
+            seed_services(harness, race_sync="running")
+            harness.set_rc("tag", 1)
+            result = self._run_bridge(
+                harness,
+                self.FROZEN_TAG,
+                SCHEMA_COMPATIBLE_WITH_TARGET="true",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            live_state_file = Path(f"{harness.lock_dir}.race-live-state")
+            sync_state_file = Path(f"{harness.lock_dir}.race-data-sync-state")
+            self.assertIn("phase=switching", live_state_file.read_text(encoding="utf-8"))
+            sync_state_file.write_text("corrupt\n", encoding="utf-8")
+            sync_state_file.chmod(0o600)
+            self._prepare_resume_after_bridge_abort(harness)
+
+            resumed = harness.run_script(
+                RESUME_SCRIPT_REL,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+            )
+
+            self.assertNotEqual(resumed.returncode, 0)
+            self.assertIn("outcome is unknown", resumed.stderr)
+            self.assertEqual(
+                [argv for _compose, argv in compose_calls(harness.events()) if argv[:1] == ["up"]],
+                [],
+            )
+            self.assertTrue(live_state_file.exists())
+            self.assertTrue(sync_state_file.exists())
+
+    def test_t12_trusted_sibling_intent_mismatch_refuses_recovery(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._assert_script_exists(harness)
+            seed_services(harness, race_sync="running")
+            result = self._run_bridge(
+                harness,
+                self.FROZEN_TAG,
+                SCHEMA_COMPATIBLE_WITH_TARGET="false",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            live_state_file = Path(f"{harness.lock_dir}.race-live-state")
+            sync_state_file = Path(f"{harness.lock_dir}.race-data-sync-state")
+            sync_state_file.write_text(
+                sync_state_file.read_text(encoding="utf-8").replace(
+                    "action=pre-contract-rollback", "action=rollback"
+                ),
+                encoding="utf-8",
+            )
+            sync_state_file.chmod(0o600)
+            self._prepare_resume_after_bridge_abort(harness)
+
+            resumed = harness.run_script(
+                RESUME_SCRIPT_REL,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+            )
+
+            self.assertNotEqual(resumed.returncode, 0)
+            self.assertIn("intents disagree", resumed.stderr)
+            self.assertEqual(
+                [argv for _compose, argv in compose_calls(harness.events()) if argv[:1] == ["up"]],
+                [],
+            )
+            self.assertTrue(live_state_file.exists())
+            self.assertTrue(sync_state_file.exists())
+
+    def test_t12_image_switched_abort_resume_skips_old_catalog_sync_service(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            self._assert_script_exists(harness)
+            seed_services(harness, race_sync="running")
+            harness.set_rc("up-web", 1)
+            result = self._run_bridge(
+                harness,
+                self.FROZEN_TAG,
+                SCHEMA_COMPATIBLE_WITH_TARGET="true",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            state_file = Path(f"{harness.lock_dir}.race-data-sync-state")
+            self.assertIn(
+                "phase=image-switched", state_file.read_text(encoding="utf-8")
+            )
+            harness.set_rc("up-web", 0)
+            self._prepare_resume_after_bridge_abort(harness)
+
+            resumed = harness.run_script(
+                RESUME_SCRIPT_REL,
+                COMPOSE_FILE=COMPOSE_STANDARD,
+            )
+
+            self.assertEqual(resumed.returncode, 0, resumed.stderr)
+            up_calls = [
+                argv
+                for _compose, argv in compose_calls(harness.events())
+                if argv[:1] == ["up"]
+            ]
+            self.assertIn(["up", "-d", "--no-deps", "web"], up_calls)
+            self.assertIn(
+                ["up", "-d", "--no-deps", "worker", "beat", "nginx"],
+                up_calls,
+            )
+            self.assertFalse(
+                any("race_sync_v2_worker" in argv for argv in up_calls),
+                up_calls,
+            )
+            self.assertFalse(state_file.exists())
 
     def test_t12_race_live_not_restored_when_not_running_before(self):
         with TemporaryDirectory() as tmp:
@@ -3030,7 +3283,7 @@ class HistoricalInitialInstallSemanticsTests(SimpleTestCase):
 
 
 class MigrationDriftGuardTests(SimpleTestCase):
-    """T19: only the explicitly reviewed Release B migration may be new."""
+    """T19: only explicitly reviewed migrations may be new."""
 
     def test_t19_no_new_migration_files(self):
         result = subprocess.run(
@@ -3046,6 +3299,7 @@ class MigrationDriftGuardTests(SimpleTestCase):
             if not line.endswith((
                 "server/stable/migrations/0070_horse_identity_evidence_commit_receipt.py",
                 "server/stable/migrations/0071_historical_calendar_release_b.py",
+                "server/stable/migrations/0074_race_data_sync_r0_control_plane.py",
             ))
         ]
         self.assertEqual(unexpected, [], f"unexpected migration drift:\n{result.stdout}")
@@ -3117,6 +3371,92 @@ def seed_services_with_hostnames(harness: Harness) -> None:
     harness.set_state(
         f"inspect-{SERVICE_IDS['race_live_worker']}", "true healthy racehost01\n"
     )
+
+
+class RaceDataSyncWorkerReleaseStateTests(SimpleTestCase):
+    def _run_orchestration(self, harness: Harness):
+        return harness.run_script(
+            ORCHESTRATION_REL,
+            COMPOSE_FILE=COMPOSE_STANDARD,
+            DEPLOYMENT_LOCK_TOKEN=LOCK_TOKEN_A,
+            RELEASE_ACTION="deploy",
+            **release_b_handoff_env(harness),
+        )
+
+    def test_running_sync_worker_is_drained_stopped_and_restored(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(
+                harness,
+                race_live="stopped",
+                race_sync="running",
+            )
+            seed_git_head(harness)
+            harness.set_state(
+                f"inspect-{SERVICE_IDS['worker']}",
+                "true healthy workerhost01\n",
+            )
+            harness.set_state(
+                f"inspect-{SERVICE_IDS['race_sync_v2_worker']}",
+                "true healthy synchost01\n",
+            )
+            harness.set_state("drain-strict", "1\n")
+            harness.set_state("drain-nodes", "workerhost01 synchost01\n")
+            locked = acquire_lock(harness, LOCK_TOKEN_A)
+            self.assertEqual(locked.returncode, 0, locked.stderr)
+            harness.clear_log()
+
+            result = self._run_orchestration(harness)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            events = harness.events()
+            drain = first_index(events, is_drain_exec)
+            stop = first_index(
+                events,
+                lambda event: event[0] == "compose"
+                and event[2] == ["stop", "race_sync_v2_worker"],
+            )
+            stop_web = first_index(
+                events,
+                lambda event: event[0] == "compose"
+                and event[2] == ["stop", "web"],
+            )
+            restore = first_index(
+                events,
+                lambda event: event[0] == "compose"
+                and event[2] == ["up", "-d", "--no-deps", "race_sync_v2_worker"],
+            )
+            self.assertIsNotNone(drain)
+            self.assertIsNotNone(stop)
+            self.assertIsNotNone(stop_web)
+            self.assertIsNotNone(restore)
+            self.assertLess(drain, stop)
+            self.assertLess(stop, stop_web)
+            self.assertLess(stop_web, restore)
+            drain_calls = [event[2] for event in events if is_drain_exec(event)]
+            self.assertTrue(any("synchost01" in " ".join(call) for call in drain_calls))
+            self.assertFalse(Path(f"{harness.lock_dir}.race-data-sync-state").exists())
+
+    def test_sync_worker_probe_failure_is_before_any_stop(self):
+        with TemporaryDirectory() as tmp:
+            harness = Harness(Path(tmp))
+            seed_services(harness, race_sync="running")
+            seed_git_head(harness)
+            harness.set_rc("ps-q-race_sync_v2_worker", 1)
+            locked = acquire_lock(harness, LOCK_TOKEN_A)
+            self.assertEqual(locked.returncode, 0, locked.stderr)
+            harness.clear_log()
+
+            result = self._run_orchestration(harness)
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("race_sync_v2_worker", result.stderr)
+            self.assertFalse(
+                any(
+                    event[0] == "compose" and event[2][:1] == ["stop"]
+                    for event in harness.events()
+                )
+            )
 
 
 class RaceLiveStatePersistenceTests(SimpleTestCase):
@@ -3987,7 +4327,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                 harness, original_oid, original_image, branch=True
             )
 
-    def test_rollback_allowlist_requires_reviewed_migrations_through_0073(self):
+    def test_rollback_allowlist_requires_reviewed_migrations_through_0074(self):
         allowlist = json.loads(
             (
                 ROOT / "deploy/reviewed_release_b_rollback_migrations.json"
@@ -4003,6 +4343,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                 "server/stable/migrations/0071_historical_calendar_release_b.py",
                 "server/stable/migrations/0072_add_extended_racing_regions.py",
                 "server/stable/migrations/0073_lifecycle_enforce_registry.py",
+                "server/stable/migrations/0074_race_data_sync_r0_control_plane.py",
             },
         )
         self.assertEqual(
@@ -4028,6 +4369,14 @@ class RollbackContractValidationTests(SimpleTestCase):
             ]},
             {
                 "fa2b26f907ded36553f17cb75a0738ae09281adbe0e620d67aba8187d5ad9404",
+            },
+        )
+        self.assertEqual(
+            {item["sha256"] for item in contracts[
+                "server/stable/migrations/0074_race_data_sync_r0_control_plane.py"
+            ]},
+            {
+                "21670e7731456a33e473fd97cb43ca72545477aa600ea594c6c071c4dd2d54eb",
             },
         )
         self.assertTrue(
@@ -4140,7 +4489,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                         )
                     )
 
-    def test_0073_rollback_target_does_not_need_later_v2_marker_file(self):
+    def test_0074_rollback_target_does_not_need_later_v2_marker_file(self):
         verifier_call = (
             "python3 ./deploy/verify_rollback_target_migration.py "
             '--target-oid "$TARGET_OID"'
@@ -4161,7 +4510,7 @@ class RollbackContractValidationTests(SimpleTestCase):
             )
             self.assertIn(
                 "RELEASE_B_EXPECTED_MIGRATION_LEAF_SET="
-                "stable.0073_lifecycle_enforce_registry",
+                "stable.0074_race_data_sync_r0_control_plane",
                 text,
             )
 
@@ -4169,7 +4518,7 @@ class RollbackContractValidationTests(SimpleTestCase):
             ROOT / "deploy/resume_rollback_control_state.sh"
         ).read_text(encoding="utf-8")
         self.assertIn(
-            "EXPECTED_LEAF=stable.0073_lifecycle_enforce_registry", resume
+            "EXPECTED_LEAF=stable.0074_race_data_sync_r0_control_plane", resume
         )
 
         verifier = (
@@ -4192,6 +4541,7 @@ class RollbackContractValidationTests(SimpleTestCase):
                 "server/stable/migrations/0071_historical_calendar_release_b.py",
                 "server/stable/migrations/0072_add_extended_racing_regions.py",
                 "server/stable/migrations/0073_lifecycle_enforce_registry.py",
+                "server/stable/migrations/0074_race_data_sync_r0_control_plane.py",
             },
         )
 
@@ -5022,6 +5372,11 @@ class RollbackContractValidationTests(SimpleTestCase):
                                 "show",
                                 f"{self.FIXED_OID}:server/stable/migrations/"
                                 "0073_lifecycle_enforce_registry.py",
+                            ],
+                            [
+                                "show",
+                                f"{self.FIXED_OID}:server/stable/migrations/"
+                                "0074_race_data_sync_r0_control_plane.py",
                             ],
                         ],
                     )

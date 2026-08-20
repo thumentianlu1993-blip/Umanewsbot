@@ -237,7 +237,7 @@ class RaceDataProviderRosterContractTests(SimpleTestCase):
             ),
         }
 
-        self.assertEqual(roster.schema_version, 1)
+        self.assertEqual(roster.schema_version, 2)
         self.assertRegex(roster.registry_digest, r"\A[0-9a-f]{64}\Z")
         self.assertTrue(roster.verify_digest())
         self.assertEqual(

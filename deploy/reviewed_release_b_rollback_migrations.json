@@ -58,6 +58,21 @@
           "sha256": "fa2b26f907ded36553f17cb75a0738ae09281adbe0e620d67aba8187d5ad9404"
         }
       ]
+    },
+    {
+      "migration_path": "server/stable/migrations/0074_race_data_sync_r0_control_plane.py",
+      "reviewed_variants": [
+        {
+          "dependencies": [
+            [
+              "stable",
+              "0073_lifecycle_enforce_registry"
+            ]
+          ],
+          "rationale": "The rollback target must carry the additive 0074 race-data control plane, identity scope and dedicated-worker contract; pre-0074 targets require separately reviewed cross-schema recovery.",
+          "sha256": "21670e7731456a33e473fd97cb43ca72545477aa600ea594c6c071c4dd2d54eb"
+        }
+      ]
     }
   ],
   "schema_version": "release-b-rollback-migration-allowlist/v2"

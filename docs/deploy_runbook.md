@@ -1,5 +1,51 @@
 # 部署运行手册
 
+## 2026-08-20 race-data-sync R0 发布边界（仅本地实现，未授权部署）
+
+1. 当前生产真实 migration leaf 仍以线上只读核验为准；本候选代码把目标 leaf 扩展为
+   `stable.0074_race_data_sync_r0_control_plane`。部署前必须重新核对 exact merge SHA/image、migration plan、
+   PostgreSQL catalog、数据库备份可恢复性及全部 `RACE_DATA_SYNC_*` 开关为 false/空集合；不得把本地测试
+   结果当作生产已应用证据。
+2. 新服务 `race_sync_v2_worker` 只消费 `race_sync_v2`。标准 application/manual release 必须在停止任何服务前
+   probe 它；若原本运行，则与普通 worker 分别 drain、停止、写入独立 frozen intent，并只在目标 compose
+   catalog 仍存在该服务且恢复合同通过时恢复。probe 或 drain 失败即停止发布并保持后续零执行。
+3. `resume_stopped_release.sh` 必须同时读取并交叉验证 race-live 与 race-data-sync 两份 intent 的 action/phase；
+   任一可信 pre-contract marker 为 `switching`，即使 sibling 缺失/损坏也必须全局拒绝；两个可信 marker 不一致
+   同样保留文件并拒绝。`rollback_pre_single_owner.sh` 在 checkout/build 前也必须 probe/drain/stop 新 worker，
+   但目标旧镜像不含该服务时不得恢复到旧 catalog。
+4. 普通 Release-B schema rollback 目标必须能通过 `0074` catalog/allowlist 合同。任何 pre-0074 目标都是独立
+   跨 schema 恢复：需要新的 reviewed reverse/restore 方案、停服边界与备份证明，不能通过放宽 allowlist 或
+   手工 fake migration 绕过。
+5. 关闭态部署即使成功也只安装控制面：provider task 仍为 fail-closed placeholder。联网、schedule/racecard/
+   result apply、public/correction、enrollment apply 分别需要新的精确授权；不得一次性开启，也不得复用遗留
+   `race_live` 队列的历史积压。
+6. `RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED` 默认必须为 `false`。未来启用只读 proposal 前，standing policy
+   必须是绝对路径、普通非 symlink 文件、UTF-8 duplicate-key-free JSON，且
+   `RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256` 与原始字节完全一致；image commit 必须是精确 40 位 Git SHA。
+   当前 task 只在 `race_sync_v2` 返回 census/manifest proposal，不持久化 artifact、不执行 enrollment apply。
+7. `RACE_DATA_RAW_MAX_COMPRESSED_BYTES`、`RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES`、provider/region 日 bytes/request、
+   root high/low water、min-free、cleanup rows/bytes 与 hold alert 的默认值均为 `0`。关闭态部署必须保留这些值；
+   在 G2 通过 live disk 与约 45GB 备份的 sizing proof 前，严禁只打开 network 或填任意占位正数绕过门禁。
+8. reverse disenrollment 必须使用同一受审 commit 生成的限时 exact manifest，apply 前重算 event/source/route/
+   owner/enrollment baseline；成功只释放 tracking、checkpoint 与 `data_sync` owner。不得删除来源证据或任何
+   observation/revision/audit，也不得把 reverse 当作公开数据回滚。
+9. `0074` 的 reviewed migration SHA 必须是
+   `21670e7731456a33e473fd97cb43ca72545477aa600ea594c6c071c4dd2d54eb`；preflight 必须同时核对精确列
+   type/nullability/default、状态集合、generation/state-shape CHECK 和 `data_sync` owner 集合。任一
+   `CHECK(TRUE)`、任意额外放宽的 `OR`、错误 default 或 nullable/type 漂移都必须停止发布。
+10. pre-contract rollback state 的 `phase` 只允许 `pre-switch`、`switching`、`image-switched`（兼容旧的
+    `frozen` 读取）。`pre-switch` 退出可恢复旧 worker；`switching` 必须保留 intent 并人工判定镜像状态；
+    `image-switched` 不得把新 sync service 启动到不含该 service 的旧 catalog。
+11. 首次 enrollment 或 claim 前必须以当前 Slice A roster 重新解析 provider/region/identity namespace/全部
+    data kind，并匹配 registry/contract/proof/host/path/budget。legacy transfer 还必须验证 15 分钟内 runtime
+    receipt、两个队列 `message_count=0/active_claim_count=0`、精确 commit/expiry 和 projection baseline。
+    apply 只接受 `RACE_DATA_SYNC_LEGACY_TRANSFER_APPROVAL_SHA256` 绑定的 canonical approval 文件；approval
+    必须在 manifest 生成后、expiry 前产生，并逐字绑定 manifest/receipt raw SHA。任何调用者提供的裸布尔值
+    或同一调用方自签 SHA 都不是发布证据。
+12. 当前本地候选验证为 `566` 项通过、2 项按环境跳过；这只证明关闭态代码候选，不是 production migration、
+    联网、自动 enrollment、赛事字段写入或 worker 启动授权。同一独立 reviewer 的 `VERDICT: APPROVED` 也只
+    覆盖该默认关闭 R0 边界。
+
 ## 2026-08-17 York race_datetime 与备份/OSS/Nginx 运维收口
 
 1. event `946–953` 的生产时间写入以 manifest

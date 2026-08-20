@@ -20,6 +20,7 @@ from stable.services.historical_calendar_release_b_schema import (
     check_release_b_schema_compatibility,
     collect_live_production_audit,
     collect_postgresql_catalog_contract,
+    validate_race_data_sync_r0_catalog_contract,
     validate_postgresql_catalog_contract,
 )
 from stable.services.historical_calendar_release_b_handoff import (
@@ -36,7 +37,199 @@ M0069 = ("stable", "0069_race_data_sync_pipeline_a_ledger_guards")
 M0070 = ("stable", "0070_horse_identity_evidence_commit_receipt")
 M0071 = ("stable", "0071_historical_calendar_release_b")
 M0072 = ("stable", "0072_add_extended_racing_regions")
+M0073 = ("stable", "0073_lifecycle_enforce_registry")
+M0074 = ("stable", "0074_race_data_sync_r0_control_plane")
 POSTGRES = connection.vendor == "postgresql"
+
+
+@skipUnless(POSTGRES, "requires PostgreSQL catalog mutation semantics")
+class RaceDataSyncR0CatalogFaultInjectionTests(TransactionTestCase):
+    reset_sequences = False
+
+    def _drift(self) -> list[str]:
+        return validate_race_data_sync_r0_catalog_contract(
+            contract=collect_postgresql_catalog_contract(),
+            migration_applied=True,
+        )
+
+    def test_0074_rejects_wrong_type_nullability_default_and_weakened_checks(self):
+        cases = (
+            (
+                "wrong_type",
+                "ALTER TABLE stable_racedatasnapshotlease "
+                "ALTER COLUMN owner_token TYPE text",
+                "ALTER TABLE stable_racedatasnapshotlease "
+                "ALTER COLUMN owner_token TYPE varchar(64)",
+                "0074.racedatasnapshotlease_column_semantics",
+            ),
+            (
+                "drop_not_null",
+                "ALTER TABLE stable_racedatasnapshotlease "
+                "ALTER COLUMN owner_token DROP NOT NULL",
+                "ALTER TABLE stable_racedatasnapshotlease "
+                "ALTER COLUMN owner_token SET NOT NULL",
+                "0074.racedatasnapshotlease_column_semantics",
+            ),
+            (
+                "wrong_default",
+                "ALTER TABLE stable_racedatasnapshotlease "
+                "ALTER COLUMN state SET DEFAULT 'complete'",
+                "ALTER TABLE stable_racedatasnapshotlease "
+                "ALTER COLUMN state DROP DEFAULT",
+                "0074.racedatasnapshotlease_column_defaults",
+            ),
+            (
+                "identity_default",
+                "ALTER TABLE stable_raceresultsourceidentity "
+                "ALTER COLUMN region_code SET DEFAULT 'japan'",
+                "ALTER TABLE stable_raceresultsourceidentity "
+                "ALTER COLUMN region_code DROP DEFAULT",
+                "0074.identity_scope_defaults",
+            ),
+            (
+                "projection_owner_type",
+                "ALTER TABLE stable_raceeventprojectioncontrol "
+                "ALTER COLUMN write_owner TYPE text",
+                "ALTER TABLE stable_raceeventprojectioncontrol "
+                "ALTER COLUMN write_owner TYPE varchar(16)",
+                "0074.projection_owner_column_semantics",
+            ),
+            (
+                "projection_owner_default",
+                "ALTER TABLE stable_raceeventprojectioncontrol "
+                "ALTER COLUMN write_owner SET DEFAULT 'unmanaged'",
+                "ALTER TABLE stable_raceeventprojectioncontrol "
+                "ALTER COLUMN write_owner DROP DEFAULT",
+                "0074.projection_owner_column_default",
+            ),
+        )
+        for label, mutate, restore, expected in cases:
+            with self.subTest(case=label):
+                try:
+                    with connection.cursor() as cursor:
+                        cursor.execute(mutate)
+                    self.assertIn(expected, self._drift())
+                finally:
+                    with connection.cursor() as cursor:
+                        cursor.execute(restore)
+                self.assertEqual(self._drift(), [])
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "ALTER TABLE stable_racedatasnapshotlease "
+                    "DROP CONSTRAINT race_data_snapshot_state_valid"
+                )
+                cursor.execute(
+                    "ALTER TABLE stable_racedatasnapshotlease "
+                    "ADD CONSTRAINT race_data_snapshot_state_valid CHECK (TRUE)"
+                )
+            self.assertIn(
+                "0074.race_data_snapshot_state_valid",
+                self._drift(),
+            )
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "ALTER TABLE stable_racedatasnapshotlease "
+                    "DROP CONSTRAINT race_data_snapshot_state_valid"
+                )
+                cursor.execute(
+                    "ALTER TABLE stable_racedatasnapshotlease "
+                    "ADD CONSTRAINT race_data_snapshot_state_valid "
+                    "CHECK (state IN ('claimed', 'complete', 'failed'))"
+                )
+        self.assertEqual(self._drift(), [])
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "ALTER TABLE stable_racedatasnapshotlease "
+                    "DROP CONSTRAINT race_data_snapshot_state_valid"
+                )
+                cursor.execute(
+                    "ALTER TABLE stable_racedatasnapshotlease "
+                    "ADD CONSTRAINT race_data_snapshot_state_valid "
+                    "CHECK (state IN ('claimed', 'complete', 'failed') "
+                    "OR length(state) > 0)"
+                )
+            self.assertIn("0074.race_data_snapshot_state_valid", self._drift())
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "ALTER TABLE stable_racedatasnapshotlease "
+                    "DROP CONSTRAINT race_data_snapshot_state_valid"
+                )
+                cursor.execute(
+                    "ALTER TABLE stable_racedatasnapshotlease "
+                    "ADD CONSTRAINT race_data_snapshot_state_valid "
+                    "CHECK (state IN ('claimed', 'complete', 'failed'))"
+                )
+        self.assertEqual(self._drift(), [])
+
+        state_shape = (
+            "((state = 'claimed' AND owner_token > '' AND "
+            "lease_expires_at IS NOT NULL AND artifact_sha256 = '' AND "
+            "retry_after IS NULL AND error_code = '') OR "
+            "(state = 'complete' AND owner_token = '' AND "
+            "lease_expires_at IS NOT NULL AND artifact_sha256 > '' AND "
+            "retry_after IS NULL AND error_code = '') OR "
+            "(state = 'failed' AND owner_token = '' AND "
+            "lease_expires_at IS NULL AND artifact_sha256 = '' AND "
+            "retry_after IS NOT NULL AND error_code > ''))"
+        )
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "ALTER TABLE stable_racedatasnapshotlease "
+                    "DROP CONSTRAINT race_data_snapshot_state_shape"
+                )
+                cursor.execute(
+                    "ALTER TABLE stable_racedatasnapshotlease "
+                    "ADD CONSTRAINT race_data_snapshot_state_shape CHECK ("
+                    + state_shape
+                    + " OR owner_token = 'bypass')"
+                )
+            self.assertIn("0074.race_data_snapshot_state_shape", self._drift())
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "ALTER TABLE stable_racedatasnapshotlease "
+                    "DROP CONSTRAINT race_data_snapshot_state_shape"
+                )
+                cursor.execute(
+                    "ALTER TABLE stable_racedatasnapshotlease "
+                    "ADD CONSTRAINT race_data_snapshot_state_shape CHECK "
+                    + state_shape
+                )
+        self.assertEqual(self._drift(), [])
+
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "ALTER TABLE stable_raceeventprojectioncontrol "
+                    "DROP CONSTRAINT race_projection_owner_valid"
+                )
+                cursor.execute(
+                    "ALTER TABLE stable_raceeventprojectioncontrol "
+                    "ADD CONSTRAINT race_projection_owner_valid "
+                    "CHECK (write_owner IN ('unmanaged', 'historical', 'live', "
+                    "'data_sync', 'manual_paused') OR TRUE)"
+                )
+            self.assertIn("0074.projection_owner_check", self._drift())
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "ALTER TABLE stable_raceeventprojectioncontrol "
+                    "DROP CONSTRAINT race_projection_owner_valid"
+                )
+                cursor.execute(
+                    "ALTER TABLE stable_raceeventprojectioncontrol "
+                    "ADD CONSTRAINT race_projection_owner_valid "
+                    "CHECK (write_owner IN ('unmanaged', 'historical', 'live', "
+                    "'data_sync', 'manual_paused'))"
+                )
+        self.assertEqual(self._drift(), [])
 
 
 def _executor() -> MigrationExecutor:
@@ -46,7 +239,7 @@ def _executor() -> MigrationExecutor:
 def _stable_plan(executor: MigrationExecutor) -> list[str]:
     return [
         migration.name
-        for migration, backwards in executor.migration_plan([M0072])
+        for migration, backwards in executor.migration_plan([M0074])
         if migration.app_label == "stable" and not backwards and migration.name >= "0068"
     ]
 
@@ -71,7 +264,7 @@ class ProductionAuditBaselinePostgresTests(TransactionTestCase):
             operation_log=operation,
         )
         output = StringIO()
-        final_nodes = (M0068, M0069, M0071, M0072)
+        final_nodes = (M0068, M0069, M0071, M0072, M0073, M0074)
         placeholders = ", ".join(["(%s, %s)"] * len(final_nodes))
         params = [part for node in final_nodes for part in node]
         with connection.cursor() as cursor:
@@ -129,7 +322,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
 
     def tearDown(self):
         # Never leave the shared Django test database at a partial migration leaf.
-        _executor().migrate([M0072])
+        _executor().migrate([M0074])
         super().tearDown()
 
     def test_initial_install_exact_origin_and_monotonic_prefixes_have_exact_catalogs(self):
@@ -139,7 +332,15 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
         self.assertTrue(origin["initial_install_origin"])
         self.assertEqual(
             origin["migration_plan"],
-            [M0070[1], M0068[1], M0069[1], M0071[1], M0072[1]],
+            [
+                M0070[1],
+                M0068[1],
+                M0069[1],
+                M0071[1],
+                M0072[1],
+                M0073[1],
+                M0074[1],
+            ],
         )
 
         _executor().migrate([M0068, M0070])
@@ -158,7 +359,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
             [f"{M0069[0]}.{M0069[1]}", f"{M0070[0]}.{M0070[1]}"],
         )
 
-        _executor().migrate([M0072])
+        _executor().migrate([M0074])
         final = check_initial_install_schema_compatibility()
         self.assertTrue(final["ok"], final)
 
@@ -317,7 +518,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
             identity = json.loads(ensure_out.getvalue())
             self.assertTrue(marker_path.exists())
 
-            _executor().migrate([M0072])
+            _executor().migrate([M0074])
             self.assertEqual(collect_live_production_audit()["receipt_count"], 0)
             complete_out = StringIO()
             call_command(
@@ -369,7 +570,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
             )
             publish_restricted_recovery_marker(path=marker_path, marker=marker)
             info = marker_path.stat()
-            _executor().migrate([M0072])
+            _executor().migrate([M0074])
             output = StringIO()
             with self.assertRaises(CommandError):
                 call_command(
@@ -420,7 +621,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
             )
             publish_restricted_recovery_marker(path=marker_path, marker=repair_marker)
             info = marker_path.stat()
-            _executor().migrate([M0072])
+            _executor().migrate([M0074])
             with self.assertRaisesRegex(CommandError, "artifact/marker binding mismatch"):
                 call_command(
                     "complete_historical_calendar_restricted_recovery",
@@ -466,10 +667,17 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
         executor = _executor()
         self.assertEqual(
             _stable_plan(executor),
-            [M0068[1], M0069[1], M0071[1], M0072[1]],
+            [
+                M0068[1],
+                M0069[1],
+                M0071[1],
+                M0072[1],
+                M0073[1],
+                M0074[1],
+            ],
         )
         self.assertNotIn(M0070[1], _stable_plan(executor))
-        executor.migrate([M0072])
+        executor.migrate([M0074])
 
         self.assertEqual(collect_live_production_audit(), before)
         executor = _executor()
@@ -488,7 +696,7 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
     def test_fresh_install_creates_receipt_once_and_second_plan_is_empty(self):
         _executor().migrate([("stable", None)])
         executor = _executor()
-        executor.migrate([M0072])
+        executor.migrate([M0074])
         with connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -508,7 +716,8 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
         _executor().migrate([M0068, M0070])
         executor = _executor()
         self.assertEqual(
-            _stable_plan(executor), [M0069[1], M0071[1], M0072[1]]
+            _stable_plan(executor),
+            [M0069[1], M0071[1], M0072[1], M0073[1], M0074[1]],
         )
         applied = {
             f"{app}.{name}"
@@ -522,7 +731,10 @@ class MigrationHistoryRepairPostgresMigrationTests(TransactionTestCase):
 
         executor.migrate([M0069, M0070])
         executor = _executor()
-        self.assertEqual(_stable_plan(executor), [M0071[1], M0072[1]])
+        self.assertEqual(
+            _stable_plan(executor),
+            [M0071[1], M0072[1], M0073[1], M0074[1]],
+        )
         applied = {
             f"{app}.{name}"
             for app, name in executor.loader.applied_migrations

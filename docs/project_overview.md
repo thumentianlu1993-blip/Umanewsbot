@@ -1,5 +1,16 @@
 # 项目总览
 
+截至 2026-08-20，赛事数据自动同步已在独立分支完成 R0 关闭态控制面骨架：复用既有 Slice A，新增
+`data_sync` 持久 writer owner、manifest-bound enrollment、provider checkpoint、DB snapshot single-flight、
+每分钟 selector 和 `race_sync_v2` 隔离 worker，并把新服务纳入发布/恢复/回滚状态机。exact reverse manifest
+可安全停止纳管并保留全部来源/修订证据；每小时 future discovery 当前只生成 raw-SHA standing-policy 绑定的
+小批限时 proposal，不持久化或自动 apply。所有新开关默认关闭，`RACE_DATA_RAW_*` 容量默认值为零且 provider
+执行器尚未接通，当前不会联网或自动修改公开赛事；R1 时间、R2 出马表、R3 赛果 revision、R4 生命周期/公开
+仍需按阶段实现和审核。两轮独立代码评审指出的 provider registry 绕过、optional-row/checkpoint 锁序、
+snapshot TTL/过期 owner、legacy 独立信任根与后置审批、exact catalog guard、rollback sibling phase 等缺口
+已修复；本地 `566` 项通过、2 项按环境跳过。同一独立 reviewer 最终复核为 0 blocker/high/medium/low，
+`VERDICT: APPROVED`；该批准只覆盖默认关闭的 R0 代码候选，仍不构成联网、migration、部署或生产启用授权。
+
 八地区链路与 migration `0072` 已关闭态发布；当前生产代码 revision 为 PR `#98` 的精确 merge SHA
 `127d4833…9528`，统一 image 为 `sha256:37f84597…8852`。2025 范围暂收缩为日本、中国香港、英国、法国和美国，
 并通过 source-bound participant batch 接入既有 P0 补全、审核、release 与 verifier。首批日本 r2 已

@@ -5,7 +5,8 @@
 # the one-shot) -> this script (recover services).
 #
 # It acquires the shared deployment lock (action=resume-release), refuses to
-# proceed while any application service (web, worker, beat, race_live_worker)
+# proceed while any application service (web, worker, beat, race_live_worker,
+# race_sync_v2_worker)
 # is running, restarting or unreadable, then starts web, waits for healthy,
 # starts worker/beat/nginx, and restores race_live_worker only from a
 # trustworthy frozen running intent. It never invokes the one-shot release
@@ -57,7 +58,7 @@ fi
 # Fail closed if any application service is running, restarting, or its state
 # cannot be read (same standard as manual_release.sh). No service may be
 # started before this gate.
-for service in web worker beat race_live_worker; do
+for service in web worker beat race_live_worker race_sync_v2_worker; do
   if ! ps_output="$("$COMPOSE" -f "$COMPOSE_FILE" ps -q "$service" 2>/dev/null)"; then
     echo "resume: cannot list $service containers; failing closed" >&2
     exit 1
@@ -93,15 +94,53 @@ done
 # the final status check succeed, regardless of the frozen state.
 RACE_LIVE_STATE_FILE="${DEPLOYMENT_LOCK_DIR:-/tmp/umanews-deployment.lock}.race-live-state"
 race_live_intent=""
+race_live_intent_action=""
+race_live_intent_phase=""
 intent_file_trusted=false
 if [ -f "$RACE_LIVE_STATE_FILE" ] || [ -L "$RACE_LIVE_STATE_FILE" ]; then
   if validate_race_live_state_file "$RACE_LIVE_STATE_FILE" "$COMPOSE_FILE" "deploy rollback pre-contract-rollback"; then
     race_live_intent="$(race_live_state_field "$RACE_LIVE_STATE_FILE" state)"
+    race_live_intent_action="$(race_live_state_field "$RACE_LIVE_STATE_FILE" action)"
+    race_live_intent_phase="$(race_live_state_field "$RACE_LIVE_STATE_FILE" phase)"
     intent_file_trusted=true
   else
     echo "resume: race-live intent file is not trustworthy; skipping race_live_worker recovery." >&2
     echo "resume: review the file and delete it manually before relying on it again." >&2
   fi
+fi
+
+RACE_DATA_SYNC_STATE_FILE="${DEPLOYMENT_LOCK_DIR:-/tmp/umanews-deployment.lock}.race-data-sync-state"
+race_data_sync_intent=""
+race_data_sync_intent_action=""
+race_data_sync_intent_phase=""
+race_data_sync_intent_file_trusted=false
+race_data_sync_intent_consumed=false
+if [ -f "$RACE_DATA_SYNC_STATE_FILE" ] || [ -L "$RACE_DATA_SYNC_STATE_FILE" ]; then
+  if validate_race_live_state_file "$RACE_DATA_SYNC_STATE_FILE" "$COMPOSE_FILE" "deploy rollback pre-contract-rollback"; then
+    race_data_sync_intent="$(race_live_state_field "$RACE_DATA_SYNC_STATE_FILE" state)"
+    race_data_sync_intent_action="$(race_live_state_field "$RACE_DATA_SYNC_STATE_FILE" action)"
+    race_data_sync_intent_phase="$(race_live_state_field "$RACE_DATA_SYNC_STATE_FILE" phase)"
+    race_data_sync_intent_file_trusted=true
+  else
+    echo "resume: race-data-sync intent file is not trustworthy; skipping race_sync_v2_worker recovery." >&2
+    echo "resume: review the file and delete it manually before relying on it again." >&2
+  fi
+fi
+
+if { [ "$race_live_intent_action" = "pre-contract-rollback" ] && \
+     [ "$race_live_intent_phase" = "switching" ]; } || \
+   { [ "$race_data_sync_intent_action" = "pre-contract-rollback" ] && \
+     [ "$race_data_sync_intent_phase" = "switching" ]; }; then
+  echo "resume: pre-contract image switch outcome is unknown; preserving intent and refusing automatic recovery." >&2
+  exit 1
+fi
+
+if [ "$intent_file_trusted" = "true" ] && \
+   [ "$race_data_sync_intent_file_trusted" = "true" ] && \
+   { [ "$race_live_intent_action" != "$race_data_sync_intent_action" ] || \
+     [ "$race_live_intent_phase" != "$race_data_sync_intent_phase" ]; }; then
+  echo "resume: sibling restore intents disagree on action or phase; preserving both and refusing automatic recovery." >&2
+  exit 1
 fi
 
 echo "resume: starting web"
@@ -118,10 +157,30 @@ if [ "$race_live_intent" = "running" ]; then
   "$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps race_live_worker
 fi
 
+if [ "$race_data_sync_intent" = "running" ] && \
+   { [ "$race_data_sync_intent_action" != "pre-contract-rollback" ] || \
+     [ "$race_data_sync_intent_phase" = "pre-switch" ]; }; then
+  echo "resume: restoring race_sync_v2_worker from the frozen running intent"
+  "$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps race_sync_v2_worker
+  race_data_sync_intent_consumed=true
+elif [ "$race_data_sync_intent_action" = "pre-contract-rollback" ] && \
+     [ "$race_data_sync_intent_phase" = "image-switched" ]; then
+  echo "resume: old image catalog is active; consuming sync-worker intent without restoring the absent service"
+  race_data_sync_intent_consumed=true
+elif [ "$race_data_sync_intent_file_trusted" = "true" ] && \
+     [ "$race_data_sync_intent_action" != "pre-contract-rollback" ]; then
+  race_data_sync_intent_consumed=true
+fi
+
 "$COMPOSE" -f "$COMPOSE_FILE" ps
 
 if [ "$intent_file_trusted" = "true" ]; then
   rm -f "$RACE_LIVE_STATE_FILE"
   echo "resume: consumed race-live intent file removed after full recovery"
+fi
+if [ "$race_data_sync_intent_file_trusted" = "true" ] && \
+   [ "$race_data_sync_intent_consumed" = "true" ]; then
+  rm -f "$RACE_DATA_SYNC_STATE_FILE"
+  echo "resume: consumed race-data-sync intent file removed after full recovery"
 fi
 echo "resume: service recovery completed"

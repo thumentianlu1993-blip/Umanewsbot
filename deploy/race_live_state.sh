@@ -3,7 +3,8 @@
 # and deploy/resume_stopped_release.sh. POSIX sh; callers run with set -eu.
 #
 # The file binds a restore intent to the exact attempt that froze it:
-# state, node, compose file, action, HEAD and freeze time, written mode 600.
+# state, node, compose file, action, image-switch phase, HEAD and freeze time,
+# written mode 600.
 # Readers must validate ownership, permissions, non-symlink regularity and the
 # compose_file/action/head binding before trusting it.
 
@@ -11,18 +12,43 @@ race_live_state_field() {
   awk -F= -v key="$2" '$1 == key {print $2; exit}' "$1"
 }
 
-# write_race_live_state_file <file> <state> <node> <compose_file> <action>
+# write_race_live_state_file <file> <state> <node> <compose_file> <action> [phase]
 write_race_live_state_file() {
   _wrls_head="$(git rev-parse HEAD)"
+  _wrls_phase="${6:-frozen}"
+  case "$_wrls_phase" in
+    frozen|pre-switch|switching|image-switched) ;;
+    *)
+      echo "race-live intent phase is invalid" >&2
+      return 1
+      ;;
+  esac
   {
     printf 'state=%s\n' "$2"
     printf 'node=%s\n' "$3"
     printf 'compose_file=%s\n' "$4"
     printf 'action=%s\n' "$5"
+    printf 'phase=%s\n' "$_wrls_phase"
     printf 'head=%s\n' "$_wrls_head"
     printf 'frozen_at_utc=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   } > "$1"
   chmod 600 "$1"
+}
+
+# update_race_live_state_phase <file> <phase>
+update_race_live_state_phase() {
+  case "$2" in
+    frozen|pre-switch|switching|image-switched) ;;
+    *)
+      echo "race-live intent phase is invalid" >&2
+      return 1
+      ;;
+  esac
+  _urlsp_tmp="$1.phase.$$"
+  awk -F= '$1 != "phase" { print }' "$1" > "$_urlsp_tmp"
+  printf 'phase=%s\n' "$2" >> "$_urlsp_tmp"
+  chmod 600 "$_urlsp_tmp"
+  mv -f "$_urlsp_tmp" "$1"
 }
 
 # validate_race_live_state_file <file> <compose_file> <allowed actions (space separated)>
@@ -80,6 +106,15 @@ validate_race_live_state_file() {
     echo "race-live intent file was frozen by a different action; refusing to trust it" >&2
     return 1
   fi
+
+  _vrsl_phase="$(race_live_state_field "$_vrsl_file" phase)"
+  case "$_vrsl_phase" in
+    ""|frozen|pre-switch|switching|image-switched) ;;
+    *)
+      echo "race-live intent file has an invalid image-switch phase; refusing to trust it" >&2
+      return 1
+      ;;
+  esac
 
   _vrsl_head="$(race_live_state_field "$_vrsl_file" head)"
   _vrsl_current_head="$(git rev-parse HEAD)"

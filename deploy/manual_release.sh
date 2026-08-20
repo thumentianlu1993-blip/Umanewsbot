@@ -4,7 +4,8 @@
 # After the removal of web-entrypoint migrations, `compose up web` no longer
 # prepares the schema. Use this top-level command to run the single release
 # task by hand. It acquires the same deployment lock, refuses to proceed
-# while any application service (web, worker, beat, race_live_worker) is
+# while any application service (web, worker, beat, race_live_worker,
+# race_sync_v2_worker) is
 # running, restarting or unreadable, and leaves all application services
 # stopped afterwards. Service recovery must go through the audited
 # deploy/rollback orchestration, never through this script.
@@ -50,7 +51,7 @@ python3 ./deploy/ensure_migration_history_repair_runtime.py
 # Fail closed if any application service is running, restarting, or its
 # state cannot be read. No Compose `run` may happen before this gate. A
 # failing `compose ps -q` probe is a probe failure, never "not running".
-for service in web worker beat race_live_worker; do
+for service in web worker beat race_live_worker race_sync_v2_worker; do
   if ! ps_output="$("$COMPOSE" -f "$COMPOSE_FILE" ps -q "$service" 2>/dev/null)"; then
     echo "manual release: cannot list $service containers; failing closed" >&2
     exit 1

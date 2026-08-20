@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import stat
 import tempfile
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -99,6 +99,134 @@ class RawCleanupResult:
     skipped: int
 
 
+@dataclass(frozen=True)
+class RaceDataSyncCapacityLimits:
+    raw_max_compressed_bytes: int
+    raw_max_uncompressed_bytes: int
+    provider_region_daily_bytes: int
+    provider_region_daily_requests: int
+    artifact_high_water_bytes: int
+    artifact_low_water_bytes: int
+    min_free_disk_bytes: int
+    cleanup_max_rows: int
+    cleanup_max_bytes: int
+    hold_alert_bytes: int
+
+    @classmethod
+    def from_settings(cls) -> "RaceDataSyncCapacityLimits":
+        limits = cls(
+            raw_max_compressed_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_MAX_COMPRESSED_BYTES", 0)
+            ),
+            raw_max_uncompressed_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES", 0)
+            ),
+            provider_region_daily_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_DAILY_PROVIDER_REGION_BYTES", 0)
+            ),
+            provider_region_daily_requests=int(
+                getattr(settings, "RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS", 0)
+            ),
+            artifact_high_water_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_ROOT_HIGH_WATER_BYTES", 0)
+            ),
+            artifact_low_water_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_ROOT_LOW_WATER_BYTES", 0)
+            ),
+            min_free_disk_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_MIN_FREE_DISK_BYTES", 0)
+            ),
+            cleanup_max_rows=int(
+                getattr(settings, "RACE_DATA_RAW_CLEANUP_MAX_ROWS", 0)
+            ),
+            cleanup_max_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_CLEANUP_MAX_BYTES", 0)
+            ),
+            hold_alert_bytes=int(
+                getattr(settings, "RACE_DATA_RAW_HOLD_ALERT_BYTES", 0)
+            ),
+        )
+        positive = (
+            limits.raw_max_compressed_bytes,
+            limits.raw_max_uncompressed_bytes,
+            limits.provider_region_daily_bytes,
+            limits.provider_region_daily_requests,
+            limits.artifact_high_water_bytes,
+            limits.artifact_low_water_bytes,
+            limits.min_free_disk_bytes,
+            limits.cleanup_max_rows,
+            limits.cleanup_max_bytes,
+            limits.hold_alert_bytes,
+        )
+        if any(value <= 0 for value in positive):
+            raise ValueError("race data capacity limits must be positive")
+        if limits.raw_max_uncompressed_bytes < limits.raw_max_compressed_bytes:
+            raise ValueError("race data raw payload limits are inconsistent")
+        if limits.artifact_high_water_bytes <= limits.artifact_low_water_bytes:
+            raise ValueError("race data artifact watermarks are inconsistent")
+        return limits
+
+
+@dataclass(frozen=True)
+class RaceDataSyncCapacityDecision:
+    allowed: bool
+    reason_code: str
+
+
+def evaluate_race_data_capacity(
+    *,
+    limits: RaceDataSyncCapacityLimits,
+    proposed_compressed_bytes: int,
+    proposed_uncompressed_bytes: int,
+    provider_region_daily_bytes: int,
+    provider_region_daily_requests: int,
+    artifact_root_bytes: int,
+    free_disk_bytes: int,
+    hold_bytes: int,
+    capacity_circuit_open: bool,
+    cleanup_failed: bool,
+) -> RaceDataSyncCapacityDecision:
+    """Pure pre-transport capacity admission.
+
+    Callers reserve their worst-case payload sizes.  A rejection must happen
+    before constructing transport or issuing a network request.
+    """
+
+    counters = (
+        proposed_compressed_bytes,
+        proposed_uncompressed_bytes,
+        provider_region_daily_bytes,
+        provider_region_daily_requests,
+        artifact_root_bytes,
+        free_disk_bytes,
+        hold_bytes,
+    )
+    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in counters):
+        raise ValueError("race data capacity counters are invalid")
+    if cleanup_failed:
+        return RaceDataSyncCapacityDecision(False, "artifact_capacity_cleanup_failed")
+    if hold_bytes >= limits.hold_alert_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_capacity_hold_exceeded")
+    if capacity_circuit_open and artifact_root_bytes > limits.artifact_low_water_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_capacity_circuit_open")
+    if proposed_compressed_bytes > limits.raw_max_compressed_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_payload_compressed_too_large")
+    if proposed_uncompressed_bytes > limits.raw_max_uncompressed_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_payload_uncompressed_too_large")
+    if (
+        provider_region_daily_bytes + proposed_compressed_bytes
+        > limits.provider_region_daily_bytes
+    ):
+        return RaceDataSyncCapacityDecision(False, "artifact_daily_bytes_exceeded")
+    if provider_region_daily_requests + 1 > limits.provider_region_daily_requests:
+        return RaceDataSyncCapacityDecision(False, "artifact_daily_requests_exceeded")
+    if artifact_root_bytes + proposed_compressed_bytes > limits.artifact_high_water_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_root_high_water")
+    if free_disk_bytes - proposed_compressed_bytes < limits.min_free_disk_bytes:
+        return RaceDataSyncCapacityDecision(False, "artifact_min_free_disk")
+    return RaceDataSyncCapacityDecision(True, "")
+
+
 class _RacecardNeedsReview(Exception):
     def __init__(self, *, reason: str, event_id: int, observation_id: int, changes=()):
         super().__init__(reason)
@@ -114,6 +242,14 @@ class RaceDataSyncFlags:
     providers: frozenset[str]
     regions: frozenset[str]
     fields: frozenset[str]
+    data_kinds: frozenset[str]
+    scheduler_enabled: bool
+    allow_network: bool
+    schedule_apply_enabled: bool
+    racecard_apply_enabled: bool
+    result_apply_enabled: bool
+    result_public_enabled: bool
+    correction_apply_enabled: bool
 
     @classmethod
     def from_settings(cls) -> "RaceDataSyncFlags":
@@ -140,6 +276,34 @@ class RaceDataSyncFlags:
                 )
                 if str(value).strip()
             ),
+            data_kinds=frozenset(
+                str(value).strip()
+                for value in getattr(
+                    settings, "RACE_DATA_SYNC_ENABLED_DATA_KINDS", ()
+                )
+                if str(value).strip()
+            ),
+            scheduler_enabled=bool(
+                getattr(settings, "RACE_DATA_SYNC_SCHEDULER_ENABLED", False)
+            ),
+            allow_network=bool(
+                getattr(settings, "RACE_DATA_SYNC_ALLOW_NETWORK", False)
+            ),
+            schedule_apply_enabled=bool(
+                getattr(settings, "RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED", False)
+            ),
+            racecard_apply_enabled=bool(
+                getattr(settings, "RACE_DATA_SYNC_RACECARD_APPLY_ENABLED", False)
+            ),
+            result_apply_enabled=bool(
+                getattr(settings, "RACE_DATA_SYNC_RESULT_APPLY_ENABLED", False)
+            ),
+            result_public_enabled=bool(
+                getattr(settings, "RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED", False)
+            ),
+            correction_apply_enabled=bool(
+                getattr(settings, "RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED", False)
+            ),
         )
 
     def allows(self, *, provider: str, region: str, field_name: str) -> bool:
@@ -149,6 +313,18 @@ class RaceDataSyncFlags:
             and region in self.regions
             and field_name in self.fields
         )
+
+    def allows_data_kind(self, data_kind: str) -> bool:
+        return bool(self.enabled and data_kind in self.data_kinds)
+
+    def apply_enabled_for(self, data_kind: str) -> bool:
+        if not self.allows_data_kind(data_kind):
+            return False
+        return {
+            "race_time": self.schedule_apply_enabled,
+            "racecard": self.racecard_apply_enabled,
+            "result": self.result_apply_enabled,
+        }.get(data_kind, False)
 
 
 @dataclass(frozen=True)
@@ -162,6 +338,16 @@ class RaceDataProviderRosterEntry:
     contract_version: str
     contract_digest: str
     allowed_fields: tuple[str, ...]
+    identity_namespaces: tuple[str, ...]
+    data_kinds: tuple[str, ...]
+    enabled_data_kinds: tuple[str, ...]
+    terminal_markers: tuple[str, ...]
+    allowed_hosts: tuple[str, ...]
+    allowed_path_prefixes: tuple[str, ...]
+    request_budget: int
+    minimum_interval_seconds: int
+    automation_allowed: bool
+    proof_digest: str
 
 
 @dataclass(frozen=True)
@@ -194,6 +380,48 @@ class RaceDataProviderRoster:
             ),
             None,
         )
+
+    def resolve_route(
+        self,
+        *,
+        provider: str,
+        region: str,
+        identity_namespace: str,
+        data_kind: str,
+    ) -> RaceDataProviderRosterEntry | None:
+        if not self.verify_digest():
+            return None
+        return next(
+            (
+                entry
+                for entry in self.entries
+                if entry.provider == provider
+                and region in entry.regions
+                and identity_namespace in entry.identity_namespaces
+                and data_kind in entry.enabled_data_kinds
+                and entry.adapter_status == "implemented"
+                and entry.automation_allowed
+                and bool(entry.proof_digest)
+                and bool(entry.allowed_hosts)
+                and bool(entry.allowed_path_prefixes)
+                and entry.request_budget > 0
+                and entry.minimum_interval_seconds > 0
+            ),
+            None,
+        )
+
+
+@dataclass(frozen=True)
+class RaceDataResolvedRoute:
+    registry_digest: str
+    route_digest: str
+    contract_digest: str
+    proof_digest: str
+    allowed_hosts: tuple[str, ...]
+    allowed_path_prefixes: tuple[str, ...]
+    request_budget: int
+    minimum_interval_seconds: int
+    entry: RaceDataProviderRosterEntry
 
 
 _ROSTER_ALLOWED_FIELDS = tuple(
@@ -268,10 +496,80 @@ def _provider_roster_digest(
                     "adapter_status": entry.adapter_status,
                     "contract_version": entry.contract_version,
                     "contract_digest": entry.contract_digest,
+                    "identity_namespaces": list(entry.identity_namespaces),
+                    "data_kinds": list(entry.data_kinds),
+                    "terminal_markers": list(entry.terminal_markers),
+                    "allowed_hosts": list(entry.allowed_hosts),
+                    "allowed_path_prefixes": list(entry.allowed_path_prefixes),
+                    "request_budget": entry.request_budget,
+                    "minimum_interval_seconds": entry.minimum_interval_seconds,
+                    "proof_digest": entry.proof_digest,
                 }
                 for entry in entries
             ],
         }
+    )
+
+
+def race_data_route_digest(
+    *, roster: RaceDataProviderRoster, entry: RaceDataProviderRosterEntry
+) -> str:
+    """Bind one runnable route to the exact current roster and audit proof."""
+
+    return _canonical_sha256(
+        {
+            "registry_digest": roster.registry_digest,
+            "provider": entry.provider,
+            "regions": list(entry.regions),
+            "identity_namespaces": list(entry.identity_namespaces),
+            "enabled_data_kinds": list(entry.enabled_data_kinds),
+            "contract_version": entry.contract_version,
+            "contract_digest": entry.contract_digest,
+            "proof_digest": entry.proof_digest,
+            "allowed_hosts": list(entry.allowed_hosts),
+            "allowed_path_prefixes": list(entry.allowed_path_prefixes),
+            "request_budget": entry.request_budget,
+            "minimum_interval_seconds": entry.minimum_interval_seconds,
+        }
+    )
+
+
+def resolve_race_data_provider_route(
+    *,
+    provider: str,
+    region: str,
+    identity_namespace: str,
+    data_kinds: Iterable[str],
+) -> RaceDataResolvedRoute | None:
+    """Resolve every requested kind through the one current Slice A roster."""
+
+    kinds = tuple(sorted(set(data_kinds)))
+    if not kinds:
+        return None
+    roster = build_race_data_provider_roster()
+    matches = {
+        roster.resolve_route(
+            provider=provider,
+            region=region,
+            identity_namespace=identity_namespace,
+            data_kind=kind,
+        )
+        for kind in kinds
+    }
+    if None in matches or len(matches) != 1:
+        return None
+    entry = next(iter(matches))
+    assert entry is not None
+    return RaceDataResolvedRoute(
+        registry_digest=roster.registry_digest,
+        route_digest=race_data_route_digest(roster=roster, entry=entry),
+        contract_digest=entry.contract_digest,
+        proof_digest=entry.proof_digest,
+        allowed_hosts=entry.allowed_hosts,
+        allowed_path_prefixes=entry.allowed_path_prefixes,
+        request_budget=entry.request_budget,
+        minimum_interval_seconds=entry.minimum_interval_seconds,
+        entry=entry,
     )
 
 
@@ -281,7 +579,14 @@ def build_race_data_provider_roster(
     flags = RaceDataSyncFlags.from_settings()
     entries = []
     for provider, regions, source_class, adapter_status in _ROSTER_DEFINITIONS:
-        contract_version = "racecard-v1"
+        contract_version = "race-data-v2"
+        identity_namespaces = (f"{provider}-race-v1",)
+        data_kinds = tuple(models.RaceDataSyncDataKind.values)
+        terminal_markers: tuple[str, ...] = ()
+        allowed_hosts: tuple[str, ...] = ()
+        allowed_path_prefixes: tuple[str, ...] = ()
+        request_budget = 0
+        minimum_interval_seconds = 1
         contract_digest = _canonical_sha256(
             {
                 "provider": provider,
@@ -290,6 +595,13 @@ def build_race_data_provider_roster(
                 "adapter_status": adapter_status,
                 "contract_version": contract_version,
                 "allowed_fields": list(_ROSTER_ALLOWED_FIELDS),
+                "identity_namespaces": list(identity_namespaces),
+                "data_kinds": list(data_kinds),
+                "terminal_markers": list(terminal_markers),
+                "allowed_hosts": list(allowed_hosts),
+                "allowed_path_prefixes": list(allowed_path_prefixes),
+                "request_budget": request_budget,
+                "minimum_interval_seconds": minimum_interval_seconds,
             }
         )
         runtime_provider_enabled = bool(
@@ -306,6 +618,10 @@ def build_race_data_provider_roster(
         runtime_apply_enabled = bool(
             runtime_provider_enabled and runtime_fields
         )
+        enabled_data_kinds = tuple(
+            kind for kind in data_kinds if kind in flags.data_kinds
+        )
+        automation_allowed = bool(runtime_provider_enabled and enabled_data_kinds)
         entries.append(
             RaceDataProviderRosterEntry(
                 provider=provider,
@@ -321,11 +637,21 @@ def build_race_data_provider_roster(
                     if runtime_apply_enabled
                     else _ROSTER_ALLOWED_FIELDS
                 ),
+                identity_namespaces=identity_namespaces,
+                data_kinds=data_kinds,
+                enabled_data_kinds=enabled_data_kinds,
+                terminal_markers=terminal_markers,
+                allowed_hosts=allowed_hosts,
+                allowed_path_prefixes=allowed_path_prefixes,
+                request_budget=request_budget,
+                minimum_interval_seconds=minimum_interval_seconds,
+                automation_allowed=automation_allowed,
+                proof_digest=contract_digest if adapter_status == "implemented" else "",
             )
         )
     roster_entries = tuple(entries)
     registry_digest = _provider_roster_digest(
-        schema_version=1, entries=roster_entries
+        schema_version=2, entries=roster_entries
     )
     if (
         expected_registry_digest is not None
@@ -333,7 +659,7 @@ def build_race_data_provider_roster(
     ):
         raise ValueError("race data provider roster digest mismatch")
     return RaceDataProviderRoster(
-        schema_version=1,
+        schema_version=2,
         registry_digest=registry_digest,
         entries=roster_entries,
     )

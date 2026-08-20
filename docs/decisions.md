@@ -1,5 +1,39 @@
 # 关键决策
 
+## 2026-08-20 赛事数据自动同步 R0 使用独立持久 owner、限时 manifest 与隔离 worker
+
+- 新 writer 只能使用 `RaceEventProjectionWriteOwner.DATA_SYNC`；旧 `LIVE` 不由 migration 或普通 enrollment
+  自动转移。唯一允许的 legacy transfer 必须证明 legacy runtime 关闭、legacy/new 两条队列完整 drain、无
+  active claim，并绑定 current/LKG/revision/tracking 的精确 baseline 后单事务执行 owner generation CAS。
+- enrollment 是赛事数据同步选择边界，不替代 lifecycle membership。普通纳管必须绑定 exact commit、standing
+  policy、census/event/source/route/owner snapshot、entry SHA、限时不超过 24 小时的 manifest；过期、歧义、
+  identity/route/owner 漂移均逐场零写拒绝。
+- provider roster 仍以既有 Slice A 为唯一 facade。adapter 为 implemented 仍不等于可联网；缺任一 audited
+  proof、host allowlist、path prefix、正 request budget 或最小间隔时，route resolution 必须返回不可用。
+- `race_sync_v2_worker` 只消费 `race_sync_v2`，使用独立 concurrency/prefetch/time limits、max-tasks-per-child、
+  max-memory-per-child 和 Compose CPU/memory 上限；不得消费或清理遗留 `race_live` backlog。
+- reverse disenrollment 必须绑定当前 event/source/route/owner/enrollment snapshot，逐场释放 tracking、checkpoint
+  与 `data_sync` owner；来源、observation、revision 和 audit 永久保留。任一 baseline 漂移即该场零写拒绝。
+- future discovery 当前只允许读取 raw SHA 绑定的 standing policy 并生成限时小批 proposal，不得由 Beat 直接
+  apply。proposal artifact persistence、route admission 复核和独立 live-apply 开关完成前，自动纳管保持关闭。
+- `RACE_DATA_RAW_*` 容量值默认全部为 `0`，含义是配置无效而不是无限制。只有基于生产磁盘、备份占用、
+  provider/region 成本与 cleanup/hold 故障的 sizing proof 冻结正值后，network admission 才可能通过。
+- release freeze/resume/rollback 必须把新 worker 当作独立状态机成员。目标旧镜像 service catalog 不含新 worker
+  时不得恢复它；普通 rollback 只接受包含 `0074` 合同的目标，pre-0074 为另行审核的跨 schema 恢复。
+- 所有 R0 事件写路径遵循 `RaceEvent -> projection control -> live tracking -> enrollment -> checkpoint -> source`
+  的统一锁序；optional control/tracking 不存在时也必须在 source 前创建并锁定，后续拒绝通过 savepoint 零残留；
+  会停用旧 checkpoint 的 rotate/transfer/manifest 外层必须先按稳定顺序锁全量目标行。snapshot `COMPLETE` 只
+  允许复用 150 秒，publish/fail 也必须 CAS `lease_expires_at > now`，失败态必须有显式 retry boundary。
+- legacy owner transfer 的信任根是配置 raw SHA 绑定的独立 approval 文件，不是 API 调用者传入的布尔状态或
+  自签 manifest。approval 必须在 canonical manifest 生成后产生，并绑定 manifest/receipt 原始字节 SHA、commit、
+  时间窗和 event；apply 还须复核当前 runtime、两条队列 drain、entry digest 与 projection baseline。
+- `0074` 发布 guard 必须拒绝列 type/nullability/default 或 CHECK 语义漂移；只比较列名、约束名或出现
+  `data_sync` 字符串不构成 schema compatibility。rollback 在 image switch 前后必须持久 phase，`switching`
+  歧义态禁止自动恢复猜测；race-live/data-sync 任一可信 sibling marker 为 `switching` 或两者 action/phase
+  不一致时都必须全局拒绝恢复。
+- 本决定只固定 R0 关闭态控制面，不批准联网、赛事字段写入、公开赛果、生产 migration 或部署。首次生产启用
+  仍需 PostgreSQL/Celery/Compose、容量故障与独立代码 review 门禁，以及单独 G2/G3 授权。
+
 ## 2026-08-17 未来赛事时间只写官方明确值，备份可恢复性先于磁盘清理
 
 - 首批未来时间只使用 York Racecourse 官方 Order of Runnings；其他地区没有明确、当前、可核对的开赛

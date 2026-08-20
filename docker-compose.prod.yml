@@ -75,6 +75,25 @@ services:
       web:
         condition: service_started
 
+  race_sync_v2_worker:
+    image: umanewsbot:prod
+    command: /app/deploy/docker/start-race-data-sync-worker.sh
+    cpus: ${RACE_DATA_SYNC_WORKER_CPUS:-0.25}
+    mem_limit: ${RACE_DATA_SYNC_WORKER_MEMORY_LIMIT:-384M}
+    env_file:
+      - .env
+    environment: *safe_news_modes
+    volumes:
+      - app_logs:/app/logs
+      - ./runtime/secrets:/run/secrets:ro
+      - ./runtime/race_data_sync:/run/race-data-sync:rw
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
+
   beat:
     image: umanewsbot:prod
     command: /app/deploy/docker/start-beat.sh

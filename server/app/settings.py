@@ -191,6 +191,99 @@ RACE_DATA_SYNC_ENABLED_FIELDS = tuple(
     for item in env("RACE_DATA_SYNC_ENABLED_FIELDS", "").split(",")
     if item.strip()
 )
+RACE_DATA_SYNC_ENABLED_DATA_KINDS = tuple(
+    item.strip()
+    for item in env("RACE_DATA_SYNC_ENABLED_DATA_KINDS", "").split(",")
+    if item.strip()
+)
+RACE_DATA_SYNC_SCHEDULER_ENABLED = env_bool(
+    "RACE_DATA_SYNC_SCHEDULER_ENABLED", False
+)
+RACE_DATA_SYNC_ALLOW_NETWORK = env_bool("RACE_DATA_SYNC_ALLOW_NETWORK", False)
+RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED = env_bool(
+    "RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED", False
+)
+RACE_DATA_SYNC_RACECARD_APPLY_ENABLED = env_bool(
+    "RACE_DATA_SYNC_RACECARD_APPLY_ENABLED", False
+)
+RACE_DATA_SYNC_RESULT_APPLY_ENABLED = env_bool(
+    "RACE_DATA_SYNC_RESULT_APPLY_ENABLED", False
+)
+RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED = env_bool(
+    "RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED", False
+)
+RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED = env_bool(
+    "RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED", False
+)
+RACE_DATA_SYNC_SELECTOR_BATCH_SIZE = int(
+    env("RACE_DATA_SYNC_SELECTOR_BATCH_SIZE", "100")
+)
+RACE_DATA_SYNC_CLAIM_TTL_SECONDS = int(
+    env("RACE_DATA_SYNC_CLAIM_TTL_SECONDS", "240")
+)
+RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED = env_bool(
+    "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED", False
+)
+RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE = env(
+    "RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE", ""
+)
+RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256 = env(
+    "RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256", ""
+)
+RACE_DATA_SYNC_FUTURE_HORIZON_DAYS = int(
+    env("RACE_DATA_SYNC_FUTURE_HORIZON_DAYS", "30")
+)
+RACE_DATA_SYNC_FUTURE_BATCH_SIZE = int(
+    env("RACE_DATA_SYNC_FUTURE_BATCH_SIZE", "20")
+)
+RACE_DATA_SYNC_FUTURE_MANIFEST_TTL_SECONDS = int(
+    env("RACE_DATA_SYNC_FUTURE_MANIFEST_TTL_SECONDS", "900")
+)
+RACE_DATA_SYNC_LEGACY_TRANSFER_APPROVAL_SHA256 = env(
+    "RACE_DATA_SYNC_LEGACY_TRANSFER_APPROVAL_SHA256", ""
+)
+UMANEWS_RELEASE_COMMIT = env("UMANEWS_RELEASE_COMMIT", "")
+
+
+def race_data_capacity_int(name: str) -> int | None:
+    """Keep bad capacity input local to provider admission, not process import."""
+
+    try:
+        return int(env(name, "0"))
+    except (TypeError, ValueError):
+        return None
+
+
+RACE_DATA_RAW_MAX_COMPRESSED_BYTES = race_data_capacity_int(
+    "RACE_DATA_RAW_MAX_COMPRESSED_BYTES"
+)
+RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES = race_data_capacity_int(
+    "RACE_DATA_RAW_MAX_UNCOMPRESSED_BYTES"
+)
+RACE_DATA_RAW_DAILY_PROVIDER_REGION_BYTES = race_data_capacity_int(
+    "RACE_DATA_RAW_DAILY_PROVIDER_REGION_BYTES"
+)
+RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS = race_data_capacity_int(
+    "RACE_DATA_RAW_DAILY_PROVIDER_REGION_REQUESTS"
+)
+RACE_DATA_RAW_ROOT_HIGH_WATER_BYTES = race_data_capacity_int(
+    "RACE_DATA_RAW_ROOT_HIGH_WATER_BYTES"
+)
+RACE_DATA_RAW_ROOT_LOW_WATER_BYTES = race_data_capacity_int(
+    "RACE_DATA_RAW_ROOT_LOW_WATER_BYTES"
+)
+RACE_DATA_RAW_MIN_FREE_DISK_BYTES = race_data_capacity_int(
+    "RACE_DATA_RAW_MIN_FREE_DISK_BYTES"
+)
+RACE_DATA_RAW_CLEANUP_MAX_ROWS = race_data_capacity_int(
+    "RACE_DATA_RAW_CLEANUP_MAX_ROWS"
+)
+RACE_DATA_RAW_CLEANUP_MAX_BYTES = race_data_capacity_int(
+    "RACE_DATA_RAW_CLEANUP_MAX_BYTES"
+)
+RACE_DATA_RAW_HOLD_ALERT_BYTES = race_data_capacity_int(
+    "RACE_DATA_RAW_HOLD_ALERT_BYTES"
+)
 
 HISTORICAL_RACE_BACKFILL_ENABLED = env_bool("HISTORICAL_RACE_BACKFILL_ENABLED", False)
 HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK = env_bool("HISTORICAL_RACE_BACKFILL_ALLOW_NETWORK", False)
@@ -781,6 +874,8 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_ROUTES = {
     "stable.tasks.poll_race_live_event_task": {"queue": "race_live"},
     "stable.tasks.monitor_race_live_sla_task": {"queue": "race_live"},
+    "stable.tasks.sync_race_event_provider_task": {"queue": "race_sync_v2"},
+    "stable.tasks.discover_future_race_data_sync_task": {"queue": "race_sync_v2"},
     "stable.tasks.advance_race_event_lifecycle_task": {"queue": "celery"},
     "stable.tasks.scheduled_race_result_review_task": {"queue": "celery"},
 }
@@ -825,6 +920,25 @@ def build_race_live_beat_schedule(
             "task": "stable.tasks.monitor_race_live_sla_task",
             "schedule": crontab(minute="*"),
             "options": {"queue": "race_live", "expires": 55},
+        }
+    return schedule
+
+
+def build_race_data_sync_beat_schedule(
+    *, scheduler_enabled: bool, future_discovery_enabled: bool = False
+) -> dict:
+    schedule = {}
+    if scheduler_enabled:
+        schedule["select-due-race-data-sync"] = {
+            "task": "stable.tasks.select_due_race_data_sync_task",
+            "schedule": crontab(minute="*"),
+            "options": {"queue": "celery", "expires": 55},
+        }
+    if future_discovery_enabled:
+        schedule["discover-future-race-data-sync"] = {
+            "task": "stable.tasks.discover_future_race_data_sync_task",
+            "schedule": crontab(minute=17),
+            "options": {"queue": "race_sync_v2", "expires": 3300},
         }
     return schedule
 
@@ -913,6 +1027,12 @@ CELERY_BEAT_SCHEDULE.update(
     build_race_live_beat_schedule(
         scheduler_enabled=RACE_LIVE_SCHEDULER_ENABLED,
         monitor_enabled=RACE_LIVE_MONITOR_ENABLED,
+    )
+)
+CELERY_BEAT_SCHEDULE.update(
+    build_race_data_sync_beat_schedule(
+        scheduler_enabled=RACE_DATA_SYNC_SCHEDULER_ENABLED,
+        future_discovery_enabled=RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED,
     )
 )
 

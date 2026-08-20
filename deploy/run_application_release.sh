@@ -9,17 +9,17 @@
 #   DEPLOYMENT_LOCK_TOKEN   owner token of the held deployment lock
 #
 # Order (any failure stops all later steps):
-#   freeze worker/race_live_worker hostname+running state
+#   freeze worker/race_live_worker/race_sync_v2_worker hostname+running state
 #   -> stop beat
 #   -> drain all celery workers (complete expected node snapshot required)
 #   -> stop worker
-#   -> stop race_live_worker only if it was running
+#   -> stop optional workers only if they were running
 #   -> stop web
 #   -> release task (one all-phase run normally; control/target/control for rollback)
 #   -> up web
 #   -> bounded wait for web healthy
 #   -> up worker/beat/nginx
-#   -> restore race_live_worker only if it was running
+#   -> restore optional workers only if they were running
 #   -> ps
 set -eu
 
@@ -129,6 +129,17 @@ if [ -f "$RACE_LIVE_STATE_FILE" ] || [ -L "$RACE_LIVE_STATE_FILE" ]; then
   echo "release: reusing frozen race_live_worker restore intent ($race_live_intent) from a previous attempt"
 fi
 
+RACE_DATA_SYNC_STATE_FILE="${DEPLOYMENT_LOCK_DIR:-/tmp/umanews-deployment.lock}.race-data-sync-state"
+race_data_sync_intent=""
+if [ -f "$RACE_DATA_SYNC_STATE_FILE" ] || [ -L "$RACE_DATA_SYNC_STATE_FILE" ]; then
+  if ! validate_race_live_state_file "$RACE_DATA_SYNC_STATE_FILE" "$COMPOSE_FILE" "$RELEASE_ACTION"; then
+    echo "frozen race_sync_v2_worker intent file failed trust validation; review it and delete it manually before retrying" >&2
+    exit 1
+  fi
+  race_data_sync_intent="$(race_live_state_field "$RACE_DATA_SYNC_STATE_FILE" state)"
+  echo "release: reusing frozen race_sync_v2_worker restore intent ($race_data_sync_intent) from a previous attempt"
+fi
+
 # Freeze current container hostname and running state for this release.
 # Prints "<running|not-running> <node>" or returns non-zero on probe failure
 # (a failing `compose ps -q`, an inspect error, or invalid/empty output).
@@ -173,10 +184,24 @@ race_live_probe="$(probe_service race_live_worker)" || {
 race_live_current="$(printf '%s' "$race_live_probe" | awk '{print $1}')"
 race_live_node="$(printf '%s' "$race_live_probe" | awk '{print $2}')"
 
+race_data_sync_probe="$(probe_service race_sync_v2_worker)" || {
+  echo "failed to read race_sync_v2_worker container state; failing closed before any stop" >&2
+  exit 1
+}
+race_data_sync_current="$(printf '%s' "$race_data_sync_probe" | awk '{print $1}')"
+race_data_sync_node="$(printf '%s' "$race_data_sync_probe" | awk '{print $2}')"
+
 if [ -z "$race_live_intent" ]; then
   race_live_intent="$race_live_current"
   write_race_live_state_file \
     "$RACE_LIVE_STATE_FILE" "$race_live_intent" "$race_live_node" \
+    "$COMPOSE_FILE" "$RELEASE_ACTION"
+fi
+
+if [ -z "$race_data_sync_intent" ]; then
+  race_data_sync_intent="$race_data_sync_current"
+  write_race_live_state_file \
+    "$RACE_DATA_SYNC_STATE_FILE" "$race_data_sync_intent" "$race_data_sync_node" \
     "$COMPOSE_FILE" "$RELEASE_ACTION"
 fi
 
@@ -186,6 +211,9 @@ if [ "$worker_state" = "running" ]; then
 fi
 if [ "$race_live_current" = "running" ]; then
   expected_workers="${expected_workers:+$expected_workers }$race_live_node"
+fi
+if [ "$race_data_sync_current" = "running" ]; then
+  expected_workers="${expected_workers:+$expected_workers }$race_data_sync_node"
 fi
 
 echo "release: stopping beat"
@@ -200,6 +228,11 @@ echo "release: stopping worker"
 if [ "$race_live_current" = "running" ]; then
   echo "release: stopping race_live_worker (currently running)"
   "$COMPOSE" -f "$COMPOSE_FILE" stop race_live_worker
+fi
+
+if [ "$race_data_sync_current" = "running" ]; then
+  echo "release: stopping race_sync_v2_worker (currently running)"
+  "$COMPOSE" -f "$COMPOSE_FILE" stop race_sync_v2_worker
 fi
 
 echo "release: stopping web"
@@ -234,6 +267,12 @@ if [ "$race_live_intent" = "running" ]; then
   "$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps race_live_worker
 fi
 
+if [ "$race_data_sync_intent" = "running" ]; then
+  echo "release: restoring race_sync_v2_worker (frozen restore intent)"
+  "$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps race_sync_v2_worker
+fi
+
 "$COMPOSE" -f "$COMPOSE_FILE" ps
 rm -f "$RACE_LIVE_STATE_FILE"
+rm -f "$RACE_DATA_SYNC_STATE_FILE"
 echo "release: application release completed"

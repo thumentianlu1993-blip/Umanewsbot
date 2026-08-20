@@ -1,5 +1,35 @@
 # 项目状态文档
 
+## 2026-08-20 赛事数据自动同步 R0 已通过独立代码评审，保持默认关闭
+
+- 独立 clean worktree/branch 已完成 `0074` additive migration、`data_sync` writer owner、来源稳定 identity、
+  enrollment/checkpoint/snapshot lease、每分钟 selector 和 `race_sync_v2` 隔离 worker；Slice A 仍是唯一
+  provider roster 与业务 flag namespace。
+- 99 场 census、standing-policy route 歧义、限时 manifest、owner acquire/replay/rotate/disenroll、legacy
+  reviewed transfer、claim/generation/checkpoint CAS 和 provider 局部失败重排已有测试。新 route 缺 host/path/
+  request-budget proof 时保持不可用；provider executor 尚未实现，所有开关默认关闭。
+- 首轮独立代码 review 的 6 high + 3 medium 及第二轮限定复核发现的 legacy 信任根/审批时序、exact catalog、
+  optional-row/checkpoint 锁序、snapshot expiry CAS、rollback sibling marker 已逐项修复：所有 admission/
+  enrollment/claim 绑定当前唯一 provider roster；统一 event-first 锁序并补真实并发/abort；snapshot 使用
+  规范五元组 key、150 秒 COMPLETE
+  TTL 与 FAILED retry；legacy transfer 改为受审 artifact trust root；catalog guard 核精确列语义和 CHECK；
+  rollback intent 增加 image-switch phase；exact enrollment manifest 可重放；非法容量值和 worker media
+  挂载均 fail closed。
+- reverse disenrollment manifest 已按当前 event/source/route/owner/enrollment snapshot 精确释放 tracking、
+  checkpoint 与 `data_sync` owner，保留来源、observation/revision/audit。每小时 future discovery 只加载 raw
+  SHA 绑定的 standing policy，生成全量 census 与最多 20 场限时 proposal；当前不持久化 artifact、不自动 apply。
+- 容量配置已统一为 `RACE_DATA_RAW_*`，默认全部为 `0`，因此在完成生产磁盘 sizing proof 前误开 network 也会
+  在 provider 执行前 fail closed。纯 admission 已覆盖 payload、provider/region 日预算、high/low water、
+  min-free、hold 和 cleanup failure；生产文件系统采样、清理执行与故障注入仍未接线。
+- 发布控制面已纳入新 worker 的 probe/drain/frozen intent/stop/restore 和旧镜像 catalog 边界；migration/
+  rollback 合同顺接 `0074`，migration SHA 为 `21670e77…d54eb`。本轮本地验证合计 R0/邻接/migration/
+  release/PostgreSQL 并发 `566` 项通过、2 项按环境跳过，三份 Compose 结构与静态检查通过。
+- 同一独立 reviewer 最终复核未发现 blocker/high/medium/low，结论为 `VERDICT: APPROVED`。该结论仅批准
+  默认关闭 R0 代码候选，不构成联网、migration、部署或生产启用授权。
+- 当前不是可启用版本：future proposal artifact persistence/运行中自动 apply、真实 provider transport、
+  R1–R4 跨写路径锁图、Celery 真实集成、生产容量/低磁盘故障注入仍待完成。没有生产
+  网络、migration、写入、配置启用、服务重启、push、PR 或部署。
+
 ## 2026-08-17 未来赛事时间已有首批真实样本，备份链路暴露 P1 运维缺口
 
 - event `946–953` 已按 York 官方赛程补齐时间并完成生产审计/页面验收；7 天 lifecycle census 已从

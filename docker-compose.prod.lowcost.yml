@@ -117,6 +117,38 @@ services:
       web:
         condition: service_started
 
+  race_sync_v2_worker:
+    image: umanewsbot:prod
+    command: /app/deploy/docker/start-race-data-sync-worker.sh
+    cpus: ${RACE_DATA_SYNC_WORKER_CPUS:-0.25}
+    mem_limit: ${RACE_DATA_SYNC_WORKER_MEMORY_LIMIT:-384M}
+    env_file:
+      - .env
+    environment:
+      DB_ENGINE: postgres
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      RACE_DATA_SYNC_ENABLED: ${RACE_DATA_SYNC_ENABLED:-false}
+      RACE_DATA_SYNC_SCHEDULER_ENABLED: ${RACE_DATA_SYNC_SCHEDULER_ENABLED:-false}
+      RACE_DATA_SYNC_ALLOW_NETWORK: ${RACE_DATA_SYNC_ALLOW_NETWORK:-false}
+      RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED: ${RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED:-false}
+      RACE_DATA_SYNC_RACECARD_APPLY_ENABLED: ${RACE_DATA_SYNC_RACECARD_APPLY_ENABLED:-false}
+      RACE_DATA_SYNC_RESULT_APPLY_ENABLED: ${RACE_DATA_SYNC_RESULT_APPLY_ENABLED:-false}
+      RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED: ${RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED:-false}
+      RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED: ${RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED:-false}
+    volumes:
+      - app_logs:/app/logs
+      - ./runtime/secrets:/run/secrets:ro
+      - ./runtime/race_data_sync:/run/race-data-sync:rw
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
+
   beat:
     image: umanewsbot:prod
     command: /app/deploy/docker/start-beat.sh

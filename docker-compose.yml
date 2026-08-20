@@ -53,6 +53,19 @@ services:
       - db
       - redis
 
+  race_sync_v2_worker:
+    build: .
+    command: /app/deploy/docker/start-race-data-sync-worker.sh
+    volumes:
+      - ./server:/app/server
+      - ./runtime/secrets:/run/secrets:ro
+      - ./runtime/race_data_sync:/run/race-data-sync:rw
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+
   beat:
     build: .
     command: celery -A app beat -l info

@@ -1608,6 +1608,8 @@ class SupportedDeployOneOffInventoryTests(SimpleTestCase):
                 "deploy/run_release_tasks.sh",
                 "deploy/run_historical_calendar_release_b_preflight.sh",
                 "deploy/deploy_race_live_p0_closed.sh",
+                "deploy/resume_migration_history_repair.sh",
+                "deploy/resume_rollback_control_state.sh",
             },
             calls,
         )

@@ -1,6 +1,58 @@
 # 当前状态
 
-## 2026-08-20 赛事数据自动同步方案已通过同一独立 reviewer 第 3 轮评审，尚未实现
+## 2026-08-20 赛事数据自动同步 R0 已通过独立代码评审，保持默认关闭
+
+- 已在干净 worktree `/Users/mentianlu/.codex/worktrees/implement-race-data-lifecycle-sync/umanews` 和独立分支
+  `codex/implement-race-data-lifecycle-sync` 开始实现；未复用方案 worktree，也未改动共享主工作区。
+- 新增 migration `stable.0074_race_data_sync_r0_control_plane`：projection writer 增加独立 `data_sync`
+  owner；新增 manifest-bound enrollment、逐 provider/data-kind checkpoint 和持久 snapshot single-flight
+  lease；来源稳定身份补充 `region_code + identity_namespace` 唯一边界。历史 `live` owner 不自动迁移，
+  无法从既有 identity 字段确定性 adoption 的来源会关闭 automation 并标记 review required。
+- Slice A 继续作为唯一 `RACE_DATA_SYNC_*` roster/flag/reconciliation 命名空间。新增每分钟 selector、
+  `race_sync_v2` 专用队列/worker、父 claim/generation/checkpoint CAS、限时 enrollment manifest、99 场 census
+  合同和 legacy `live -> data_sync` 的关闭 runtime + 双队列 drain + 精确 projection baseline 转移入口。
+  未审计 host/path/request budget 的 route 即使 adapter 已存在也不可解析为自动化 route。
+- 首轮独立代码 review 结论为 `REVISE`（0 blocker、6 high、3 medium）。第二轮限定复核继续发现并已修复
+  legacy transfer 独立信任根/审批时序、catalog exact CHECK、全局 optional-row/checkpoint 锁序、snapshot
+  过期 owner CAS 和 pre-contract sibling intent 等直接缺口。当前已把 enrollment/census/apply/
+  claim/legacy transfer 全部绑定到 Slice A 当前唯一 roster 的 registry/contract/proof/host/path/budget；route
+  不存在或 digest 漂移逐场零写。全局 event -> projection -> tracking -> enrollment/checkpoint 锁序已覆盖
+  failure×rotate、failure×disenroll 与事务 abort 的真实 PostgreSQL 并发测试。
+- snapshot single-flight key 由 provider/region/scope/data-kind/registry 五元组规范生成；`COMPLETE` 仅缓存
+  150 秒，过期或损坏由单一 CAS takeover；原 owner 在 lease 到期边界后即使尚未被 takeover 也不得 publish/
+  fail。legacy `live -> data_sync` 只接受配置中 raw SHA 绑定的独立 approval 文件，并逐字绑定 canonical
+  transfer manifest 与 runtime receipt；审批必须发生在 manifest 生成之后，apply 同时复核当前 runtime 关闭、
+  双队列 drain 与 event baseline，不再信任调用者布尔值或自签 SHA。
+- enrollment 已补 exact reverse manifest：绑定当前 event/source/route/owner/enrollment snapshot 后只停止
+  tracking/checkpoint 并释放 `data_sync` owner，不删除来源、observation/revision/audit；baseline 漂移逐场零写。
+  每小时 future discovery 在 `race_sync_v2` 隔离队列加载 raw SHA 绑定的 standing policy，生成全量 census 和
+  最多 20 场限时 proposal，当前保持只读，不自动 apply。
+- 容量键已与批准方案统一为 `RACE_DATA_RAW_*`，默认全部为 `0`。在 G2 基于生产磁盘/约 45GB 备份完成 sizing
+  proof 前，误开 network 会在 provider 执行前以 `artifact_capacity_config_invalid` 释放精确 claim；纯
+  admission 已覆盖 payload、provider/region 日预算、high/low water、min-free、hold 与 cleanup failure。
+- application/manual/resume/rollback/immutable-control 发布入口现已单独 probe、drain、stop、冻结并恢复
+  `race_sync_v2_worker`。回滚目标代码若没有该 service，不会把新 worker 恢复到旧镜像；普通 B-to-B
+  rollback schema 合同顺接到 `0074`，pre-0074 恢复仍是单独受审的跨 schema 流程。
+- `0074` catalog guard 现核对精确 type/nullability/default、状态集合、generation 与 state-shape CHECK，且有
+  PostgreSQL 故障注入证明 wrong type、DROP NOT NULL、错误 default、`CHECK(TRUE)`/`OR TRUE` 都会拒绝发布。
+  migration SHA 已冻结为 `21670e7731456a33e473fd97cb43ca72545477aa600ea594c6c071c4dd2d54eb`。
+  pre-contract rollback intent 新增 `pre-switch/switching/image-switched` phase；resume 同时核对 race-live/
+  data-sync 两个 trusted sibling marker，任一可信 `switching` 或两者 action/phase 不一致均保留 intent 并拒绝
+  自动猜测。切镜像前退出会恢复旧 sync worker。非法非数字容量配置只关闭 provider admission，不再让
+  Django settings import 崩溃；生产/low-cost sync worker 不挂载可写 media volume。
+- 所有新 runtime/network/schedule/racecard/result/public/correction 开关默认关闭；provider worker 当前在
+  network 关闭或执行器未实现时只按精确 claim fail closed 并重排，不会抓取来源或写赛事字段。真实 provider
+  transport、future proposal artifact persistence/运行中自动 apply、Celery worker 真实集成、生产文件系统
+  容量/低磁盘故障注入、R1–R4 的跨写路径 PostgreSQL 锁图均尚未完成，因此当前代码不具备生产启用条件。
+- 本地本轮验证已通过 `566` 项：R0 SQLite `41/41`、R0 PostgreSQL 并发 `12/12`、PostgreSQL
+  migration-history/catalog/fault-injection `26/26`、SQLite migration-history `75/75`、single-owner/release/
+  rollback `170/170`，以及 Slice A/lifecycle/race-live/发布 hardening 邻接 `242/242`；另 2 项按测试环境跳过。
+  Django check、migration drift、三份 Compose 结构、shell syntax、Python compile、secret pattern scan 与
+  `git diff --check` 均通过。同一独立 reviewer 最终复核为 0 blocker/high/medium/low，`VERDICT: APPROVED`；
+  该结论只批准 R0 默认关闭代码候选，不授权联网、migration、部署或生产启用。未执行生产网络、生产
+  migration、配置启用、服务重启、push、PR 或部署。
+
+## 2026-08-20 赛事数据自动同步方案已通过同一独立 reviewer 第 3 轮评审
 
 - 同一独立只读 reviewer 首轮结论为 `REVISE`：0 blocker、8 high、3 medium、1 low；没有修改仓库文件。
   findings 主要是遗漏主干既有 race-data Slice A、跨 lifecycle/race-live 锁序相反、缺少存量/未来赛事
@@ -26,9 +78,8 @@
 - T+30 验收已拆为 independent upstream terminal availability、terminal detection、confirmed publication、
   blocked alert coverage；alert 不再计入结果成功。canary 对上游确实可用的赛果要求 >=95% confirmed/public，
   地区扩大后 >=99%，错误赛果为 0。
-- 当前仍没有应用代码、migration、真实来源网络、生产写入、配置/服务改动、commit、push、PR 或部署。
-  方案评审门禁已通过，但这不构成实现、真实来源网络、生产写入、迁移、部署或启用授权；下一步须由用户
-  决定是否创建新的实现 worktree/授权进入 R0。
+- 该段记录的是方案冻结时状态；实现已在上方独立分支进入 R0，但方案评审仍不构成真实来源网络、生产写入、
+  migration、部署或启用授权。
 
 ## 2026-08-19 已创建赛事时间、出马表与赛果自动同步原生方案，尚未实现
 

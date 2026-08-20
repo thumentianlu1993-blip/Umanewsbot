@@ -336,6 +336,179 @@ def select_due_race_live_events_task() -> dict:
 
 
 @shared_task
+def select_due_race_data_sync_task() -> dict:
+    """Claim enrolled data-sync events; never touches the legacy queue."""
+
+    if getattr(settings, "RACE_DATA_SYNC_SCHEDULER_ENABLED", False) is not True:
+        return {"enabled": False, "claimed": 0, "dispatched": 0}
+    if getattr(settings, "RACE_DATA_SYNC_ENABLED", False) is not True:
+        return {"enabled": False, "claimed": 0, "dispatched": 0}
+
+    enabled_providers = tuple(
+        getattr(settings, "RACE_DATA_SYNC_ENABLED_PROVIDERS", ())
+    )
+    enabled_regions = tuple(
+        getattr(settings, "RACE_DATA_SYNC_ENABLED_REGIONS", ())
+    )
+    enabled_data_kinds = tuple(
+        getattr(settings, "RACE_DATA_SYNC_ENABLED_DATA_KINDS", ())
+    )
+    if not enabled_providers or not enabled_regions or not enabled_data_kinds:
+        return {
+            "enabled": False,
+            "claimed": 0,
+            "dispatched": 0,
+            "reason": "admission_scope_empty",
+        }
+
+    from stable.services.race_data_sync_control import claim_due_enrollments
+
+    claims = claim_due_enrollments(
+        now=timezone.now(),
+        batch_size=getattr(settings, "RACE_DATA_SYNC_SELECTOR_BATCH_SIZE", 100),
+        ttl_seconds=getattr(settings, "RACE_DATA_SYNC_CLAIM_TTL_SECONDS", 240),
+        enabled_providers=enabled_providers,
+        enabled_regions=enabled_regions,
+        enabled_data_kinds=enabled_data_kinds,
+    )
+    for claim in claims:
+        dispatch_kwargs = {
+            "event_id": claim.event_id,
+            "expected_enrollment_generation": claim.enrollment_generation,
+            "expected_owner_generation": claim.owner_generation,
+            "expected_claim_generation": claim.claim_generation,
+            "attempt_token": claim.attempt_token,
+            "data_kinds": claim.data_kinds,
+            "checkpoint_plan": claim.checkpoint_plan,
+            "expected_enrollment_entry_sha256": claim.enrollment_entry_sha256,
+            "expected_plan_sha256": claim.plan_sha256,
+        }
+        transaction.on_commit(
+            lambda kwargs=dispatch_kwargs: sync_race_event_provider_task.apply_async(
+                kwargs=kwargs,
+                queue="race_sync_v2",
+            )
+        )
+    count = len(claims)
+    return {"enabled": True, "claimed": count, "dispatched": count}
+
+
+@shared_task
+def discover_future_race_data_sync_task() -> dict:
+    """Hourly read-only census and bounded enrollment proposal."""
+
+    if getattr(settings, "RACE_DATA_SYNC_FUTURE_DISCOVERY_ENABLED", False) is not True:
+        return {"enabled": False, "status": "disabled"}
+
+    import re
+
+    from stable.services.race_data_sync_enrollment import (
+        build_future_race_data_enrollment_proposal,
+        load_standing_policy_file,
+    )
+
+    candidate_commit = str(getattr(settings, "UMANEWS_RELEASE_COMMIT", ""))
+    if re.fullmatch(r"[0-9a-f]{40}", candidate_commit) is None:
+        return {"enabled": True, "status": "blocked", "reason": "release_commit_invalid"}
+    try:
+        horizon_days = int(settings.RACE_DATA_SYNC_FUTURE_HORIZON_DAYS)
+        max_events = int(settings.RACE_DATA_SYNC_FUTURE_BATCH_SIZE)
+        ttl_seconds = int(settings.RACE_DATA_SYNC_FUTURE_MANIFEST_TTL_SECONDS)
+        if not 1 <= horizon_days <= 366:
+            raise ValueError("horizon_days")
+        if not 1 <= max_events <= 100:
+            raise ValueError("max_events")
+        if not 60 <= ttl_seconds <= 86_400:
+            raise ValueError("ttl_seconds")
+        policy = load_standing_policy_file(
+            path=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE,
+            expected_sha256=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256,
+        )
+        now = timezone.now()
+        proposal = build_future_race_data_enrollment_proposal(
+            standing_policy=policy,
+            cutoff=now,
+            horizon_days=horizon_days,
+            max_events=max_events,
+            candidate_commit=candidate_commit,
+            apply_expires_at=now + timedelta(seconds=ttl_seconds),
+        )
+    except (OSError, TypeError, ValueError) as exc:
+        logger.error("race_data_future_discovery_blocked error=%s", exc)
+        return {
+            "enabled": True,
+            "status": "blocked",
+            "reason": "future_discovery_contract_invalid",
+        }
+    return {
+        "enabled": True,
+        "status": "proposal_ready" if proposal.manifest else "no_candidates",
+        "census_sha256": proposal.census.census_sha256,
+        "total": proposal.census.total,
+        "classification_counts": proposal.census.classification_counts,
+        "selected_event_ids": proposal.selected_event_ids,
+        "manifest": proposal.manifest.as_dict() if proposal.manifest else None,
+    }
+
+
+@shared_task
+def sync_race_event_provider_task(
+    event_id: int,
+    expected_enrollment_generation: int,
+    expected_owner_generation: int,
+    expected_claim_generation: int,
+    attempt_token: str,
+    data_kinds: tuple[str, ...] | list[str],
+    checkpoint_plan: tuple[dict, ...] | list[dict] | None = None,
+    expected_enrollment_entry_sha256: str = "",
+    expected_plan_sha256: str = "",
+) -> dict:
+    """R0 worker boundary; provider transport remains fail-closed."""
+
+    from datetime import timedelta
+
+    from stable.services.race_data_sync_control import fail_race_data_sync_claim
+
+    def fail_closed(reason: str) -> dict:
+        now = timezone.now()
+        decision = fail_race_data_sync_claim(
+            event_id=event_id,
+            expected_enrollment_generation=expected_enrollment_generation,
+            expected_owner_generation=expected_owner_generation,
+            expected_claim_generation=expected_claim_generation,
+            attempt_token=attempt_token,
+            data_kinds=data_kinds,
+            checkpoint_plan=checkpoint_plan,
+            expected_enrollment_entry_sha256=expected_enrollment_entry_sha256,
+            expected_plan_sha256=expected_plan_sha256,
+            reason_code=reason,
+            retry_at=now + timedelta(minutes=5),
+            now=now,
+        )
+        return {
+            "processed": False,
+            "event_id": event_id,
+            "reason": reason,
+            "claim_action": decision.action,
+            "claim_reason": decision.reason_code,
+        }
+
+    if getattr(settings, "RACE_DATA_SYNC_ENABLED", False) is not True:
+        return fail_closed("disabled")
+    if getattr(settings, "RACE_DATA_SYNC_ALLOW_NETWORK", False) is not True:
+        return fail_closed("network_disabled")
+    from stable.services.race_data_sync_pipeline import RaceDataSyncCapacityLimits
+
+    try:
+        RaceDataSyncCapacityLimits.from_settings()
+    except (TypeError, ValueError):
+        return fail_closed("artifact_capacity_config_invalid")
+    result = fail_closed("provider_execution_not_implemented")
+    result["data_kinds"] = tuple(data_kinds)
+    return result
+
+
+@shared_task
 def poll_race_live_event_task(
     event_id: int,
     expected_owner_generation: int,

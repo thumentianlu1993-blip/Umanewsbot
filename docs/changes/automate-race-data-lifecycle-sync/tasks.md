@@ -11,22 +11,27 @@
 
 ## R0：Slice A 扩展、纳管、统一调度与队列隔离
 
-- [ ] (application) 为现有 Slice A roster/flags/reconciler 唯一 owner、legacy 双开冲突和所有配置组合写 RED。
-- [ ] (application) 为新增 `data_sync` projection owner 的 acquire/replay/rotate/disenroll/legacy transfer/CAS
+- [x] (application) 为现有 Slice A roster/flags/reconciler 唯一 owner、legacy 双开冲突和所有配置组合写 RED。
+- [x] (application) 为新增 `data_sync` projection owner 的 acquire/replay/rotate/disenroll/legacy transfer/CAS
   truth table 与旧代码 fail-closed 写 RED。
-- [ ] (application) 为稳定 identity 的 region/namespace 唯一约束、contract 升级和历史 adoption 写 RED。
-- [ ] (application) 为 99 场完整 census、standing policy、future event enrollment/disenrollment、owner conflict 写 RED。
-- [ ] (application) 为 `RaceEventLiveProviderCheckpoint`、父 min-due、claim/generation/CAS 写 RED。
-- [ ] (integration) 为 selector 并发、provider 局部失败、DB single-flight owner crash/takeover、host budget 写 RED。
-- [ ] (operations) 为 `race_sync_v2` 路由、worker 资源限制、flag-off 三零与 release/rollback/resume 状态机写 RED。
-- [ ] (application) 扩展 Slice A schema/roster/flags 和 projection owner enum；不得新增第二 registry、
+- [x] (application) 为稳定 identity 的 region/namespace 唯一约束、contract 升级和历史 adoption 写 RED。
+- [x] (application) 为 99 场完整 census、standing policy、future event enrollment/disenrollment、owner conflict 写 RED。
+- [x] (application) 为 `RaceEventLiveProviderCheckpoint`、父 min-due、claim/generation/CAS 写 RED。
+- [x] (integration) 为 selector 并发、provider 局部失败、DB single-flight owner crash/takeover、host budget 写 RED。
+- [x] (operations) 为 `race_sync_v2` 路由、worker 资源限制、flag-off 三零与 release/rollback/resume 状态机写 RED。
+- [x] (application) 扩展 Slice A schema/roster/flags 和 projection owner enum；不得新增第二 registry、
   reconciler 或业务 flag namespace，历史 `live` 不自动迁移。
 - [ ] (application) 实现 manifest-bound enrollment census/apply/disenroll 与 standing policy future discovery。
-- [ ] (integration) 实现每分钟 selector、父 claim、provider checkpoint 和持久 single-flight snapshot lease。
-- [ ] (operations) 新增专用 worker/queue 与全部默认关闭配置；不得处理 `race_live` 积压。
-- [ ] (operations) 同步修改 application/manual/resume/rollback/immutable-control 发布路径的 probe、drain、
+  当前已完成 census、限时 enrollment/reverse disenroll manifest、apply/rotate/release CAS，以及每小时
+  standing-policy census + 小批 proposal；运行中自动 apply 仍待单独开关与 artifact persistence 门禁。
+- [x] (integration) 实现每分钟 selector、父 claim、provider checkpoint 和持久 single-flight snapshot lease。
+- [x] (operations) 新增专用 worker/queue 与全部默认关闭配置；不得处理 `race_live` 积压。
+- [x] (operations) 同步修改 application/manual/resume/rollback/immutable-control 发布路径的 probe、drain、
   frozen intent、stop/restore 和旧镜像 service catalog。
-- [ ] (operations) 运行 targeted/PostgreSQL/Celery/Compose 回归并完成独立代码 review。
+- [ ] (operations) 运行 targeted/PostgreSQL/Celery/Compose 回归并完成独立代码 review。首轮代码 review 为
+  `REVISE`（0 blocker、6 high、3 medium）；第二轮限定 findings 也已修复。本地 `566` 项与静态/Compose
+  结构检查通过；同一 reviewer 最终为 0 blocker/high/medium/low，`VERDICT: APPROVED`。本项继续未勾选是因
+  真实 Celery worker 集成仍待后续门禁，不是代码 review 未完成。
 
 ## R1：开跑时间与原子 reschedule
 
