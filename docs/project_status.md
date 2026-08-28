@@ -1,9 +1,10 @@
 # 项目状态文档
 
-## 2026-08-29 PR #108 阻塞修复已通过最终独立复审与发布门禁，精确候选已生成
+## 2026-08-29 PR #108 阻塞修复和生产历史 claim 已收口，待最终发布确认
 
 - 生产真实状态未变：PR 仍 OPEN，revision `2833558a…56c`、leaf `0073`，新赛事写入全关，
-  `race_sync_v2=0`、旧 `race_live=7543`。未备份、未收口 14 条 claim、未 migration/合并/部署/启用。
+  `race_sync_v2=0`、旧 `race_live=7543`。未 migration/合并/部署/启用；既有 lifecycle 的
+  `enabled/enforce + 6 controls` 保持不动，不属于本次新 data-sync 开关。
 - 历史 claim 修复已绑定 exact manifest SHA、eligibility、PostgreSQL advisory transaction lock 和全集合
   CAS；同时修复 prepare exception 终态化与严格过期 sweeper，畸形/活跃/已有证据行仍整批拒绝。
 - 全 PR 的 13 项有效 review findings 已关闭：`0075` final leaf/catalog/rollback、未知名次不猜测、
@@ -16,8 +17,12 @@
   migration/history/catalog/fault injection `27/27`，R0 + Pipeline A 并发/CAS `24/24`，历史 claim 锁
   另 `4/4`。Django check、migration generation、compileall、Shell、三份 Compose、secret pattern 与
   diff whitespace 门禁全绿。
-- 当前下一步是 push 并核对远端精确候选，随后在生产创建可恢复备份并精确收口 14 条 claim。最终
-  merge/deploy/enable 仍需绑定 exact PR head/merge SHA/image 的一次用户确认；任一门禁失败都停止且
+- 生产关闭态使用 `dd67c789…8aa0` / candidate image `8114325b…d8620` 复核迁移计划只有
+  `0074/0075`；manifest `5897db0d…76d1a5` 精确收口 14 行为 `failed/stale_claim_reconciled`，claimed
+  归零。写前 custom backup 为 `484192137` bytes、SHA `64d72011…44bdc`、0600/TOC 有效。
+- 独立复核证明 cursor 保持，bundle/selector 为空，pending/delivery/approval/赛果/相关日志计数、
+  `celery=0`、`race_sync_v2=0`、旧 `race_live=7543` 均未变；旧 Beat 恢复，公网三入口 200。
+  最终 merge/deploy/enable 仍需绑定最终 PR head 和该关闭态证据的一次用户确认；任一门禁失败都停止且
   保持新写入关闭。
 
 ## 2026-08-28 PR #108 发布因 14 条 claimed 赛果审核记录停止

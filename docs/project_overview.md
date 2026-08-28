@@ -9,8 +9,11 @@ retention、终态 polling 和 T+30 alert 问题已修复并通过 SQLite/Postgr
 future discovery/cleanup 绑定总开关、覆盖完整 snapshot lease 并消除公开批量读取 source N+1；完整
 diff 独立复审最终为 `No findings`，本地发布门禁全绿。生产仍为
 revision `2833558a…56c` / leaf `0073`，PR 未合并，新写入全关，`race_sync_v2=0`，旧
-`race_live=7543` 保持不动；本记录所在候选 commit 尚未合并，且尚未备份、收口生产 claim、
-migration、部署或启用。
+`race_live=7543` 保持不动。候选 `dd67c789…8aa0` 已在停止 Beat 的关闭态窗口创建并验证 custom
+backup，以 SHA-bound manifest 把 14 条过期空证据 claim 精确收口为 failed；claimed 已归零，队列、
+审批、赛果、投递和 pending 集合不变，旧 Beat 已恢复。既有 lifecycle `enabled/enforce + 6 controls`
+保持原授权状态；新 data-sync lifecycle 和其余新开关仍关闭。当前尚未 migration、合并、部署或启用，
+等待一次最终发布确认。
 
 ## 历史背景（以下状态以各段日期为准）
 

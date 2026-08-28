@@ -1,11 +1,12 @@
 # 当前状态
 
-## 2026-08-29 PR #108 历史 claim 与整体代码阻塞已通过最终复审和发布门禁，生产未变
+## 2026-08-29 PR #108 历史 claim 已在关闭态精确收口，待最终 merge/deploy/enable 确认
 
 - PR `#108` 仍为 OPEN，生产仍运行 revision `2833558a6a2d67b7dc9816b53ea8ad5d580eb56c` / image
   `sha256:4bc392d0…611a611` / migration leaf `0073`；新赛事写入开关均关闭，
-  `race_sync_v2=0`，旧 `race_live=7543` 未清理、迁移或消费。本记录所在候选 commit 尚未合并，
-  未执行生产备份、历史 claim 收口、migration、合并、镜像切换或自动化启用。
+  `race_sync_v2=0`，旧 `race_live=7543` 未清理、迁移或消费。本记录所在候选尚未合并；未执行
+  `0074/0075`、服务镜像切换或新自动化启用。既有 lifecycle 保持此前生产状态
+  `RACE_EVENT_LIFECYCLE_ENABLED=true / mode=enforce / 6 controls`，本次未改动。
 - 14 条过期 `claimed` 的根因修复保持三层边界：prepare exception 按原 token 终态化；
   每 5 分钟 sweeper 只收口过期且严格空证据 claim；历史命令使用 canonical manifest SHA、
   PostgreSQL advisory transaction lock 和全集合重算，任一活跃、畸形、证据存在或
@@ -27,9 +28,19 @@
   migration/history/catalog/fault-injection `27/27`，R0 + Pipeline A 并发/CAS `24/24`，历史 claim
   并发锁另 `4/4`。Django check、migration drift、compileall、Shell syntax、三份 Compose、secret
   pattern scan 与 `git diff --check` 全绿。
-- 下一步只允许 push 并核对远端精确候选，再按生产只读复核、备份、精确收口 14 条 claim 和重跑
-  closed-state preflight 的顺序准备发布。只在 exact PR head/merge SHA/image 的 merge/deploy/enable 前
-  再请求一次最终确认；任一门禁失败立即停止并保持新写入关闭。
+- 关闭态生产修复使用候选 `dd67c78902182e52123d5e2d4d2919aa2c348aa0` / image
+  `sha256:8114325bcc6b4dc8ef814516ba82fc64b309942561bec85f806b7d2cd44d8620`。停 Beat 后 exact preview
+  仍是 14 eligible / 0 blocker，manifest `5897db0d…76d1a5`；写前 custom backup
+  `pre-pr108-claim-reconcile-dd67c789-20260828T1938Z.dump` 为 `484192137` bytes、SHA-256
+  `64d72011245c60d359cada8998bb04decaab58ca8a15071a5a4b64eb09a44bdc`、0600 且 TOC 有效。
+- exact apply 后 14 行只转为 `failed/stale_claim_reconciled`，claimed 为 0；cursor 保持，selector/bundle
+  仍空，pending/delivery/approval/赛事赛果及 OperationLog 相关计数都未变。两条新/普通队列仍为 0，
+  旧 `race_live=7543`；旧 Beat 已以原 image 恢复。独立 verifier、三个公网 200 与近 10 分钟三服务
+  错误计数 0 均通过，证据位于
+  `/opt/umanewsbot-builds/pr108-dd67c789-claim-reconcile-evidence`。
+- 下一步只请求一次绑定最终 PR head 与关闭态候选证据的 merge/deploy/enable 确认；确认后才允许合并、
+  构建 exact merge image、应用 `0074/0075` 并按 frozen capacity 逐级启用。任一门禁失败立即停止并
+  保持新写入关闭。
 
 ## 2026-08-28 PR #108 生产发布在 writer 静默门禁安全停止
 

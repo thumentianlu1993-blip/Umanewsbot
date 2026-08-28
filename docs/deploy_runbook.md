@@ -2,6 +2,13 @@
 
 ## 2026-08-29 PR #108 历史 claim 修复后的发布门禁（候选未上线）
 
+本轮关闭态修复已完成：候选 `dd67c789…8aa0` / image `8114325b…d8620` 的 preview manifest
+`5897db0d…76d1a5` 精确命中 14 行；写前 custom dump 为 `484192137` bytes、SHA-256
+`64d72011245c60d359cada8998bb04decaab58ca8a15071a5a4b64eb09a44bdc`，0600 且 `pg_restore --list`
+通过。apply 后 claimed=0，队列仍为 `celery=0 / race_sync_v2=0 / race_live=7543`，原 Beat 已恢复。
+证据目录为 `/opt/umanewsbot-builds/pr108-dd67c789-claim-reconcile-evidence`；这不构成 migration、合并、
+部署或启用授权。
+
 1. 重试必须从生产只读盘点开始：exact resident revision/image/schema、host health、五个新写
    开关、Beat/worker active/reserved/scheduled、external/historical/P0 writer、`celery`、`race_sync_v2`
    与旧 `race_live` 队列都要重新读取。旧 `race_live` 只记录长度，不得清理、迁移或消费。
@@ -27,6 +34,9 @@
    每步都分别核对 run terminal、claim/checkpoint、provider 预算、revision/projection、alert 与公开页；
    任一失败立即停止后续步骤并关闭新写入。最终 merge/deploy/enable 前必须绑定精确
    PR head/merge SHA/image 取得用户确认。
+8. 当前旧 lifecycle 已是 `RACE_EVENT_LIFECYCLE_ENABLED=true / mode=enforce`，数据库有 6 个 enforce
+   controls；它们属于既有生产授权，不得在本发布中顺手关闭、迁移或重新纳管。第三阶段启用的是
+   `RACE_DATA_SYNC_LIFECYCLE_APPLY_ENABLED`，必须证明 enrollment/event 边界不与旧 controls 冲突。
 
 ## 2026-08-20 race-data-sync R0 发布边界（仅本地实现，未授权部署）
 

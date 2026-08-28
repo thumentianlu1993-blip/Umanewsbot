@@ -23,6 +23,9 @@
 - cancelled/finished 为 lifecycle 终态；cancelled 停止所有 checkpoint，postponed 丢弃旧
   result datetime 并等待新 schedule。T+30 告警只针对未确认且非 cancelled/postponed 的 enrolled
   event；已有 open incident 不得占用后续 batch，赛果确认后 incident 自动 resolved。
+- 历史 claim 关闭态收口只处理 exact preview 中的过期空证据行，不把既有 lifecycle 或 race-live 当作
+  本发布附带清理项。生产原有 `enabled/enforce` lifecycle controls 保持原授权状态；新 data-sync
+  lifecycle 继续由独立 false 开关隔离，旧 `race_live` 队列只读计数、不得消费或迁移。
 
 ## 2026-08-28 自动赛事数据以一次最终生产确认为授权边界，canonical 写入必须重验 exact claim
 
